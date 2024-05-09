@@ -16,21 +16,18 @@ import (
 // cluster consensus.
 type ClusterPayloads struct {
 	db    *badger.DB
-	cache *Cache
+	cache *Cache[flow.Identifier, *cluster.Payload]
 }
 
 func NewClusterPayloads(cacheMetrics module.CacheMetrics, db *badger.DB) *ClusterPayloads {
 
-	store := func(key interface{}, val interface{}) func(*transaction.Tx) error {
-		blockID := key.(flow.Identifier)
-		payload := val.(*cluster.Payload)
+	store := func(blockID flow.Identifier, payload *cluster.Payload) func(*transaction.Tx) error {
 		return transaction.WithTx(procedure.InsertClusterPayload(blockID, payload))
 	}
 
-	retrieve := func(key interface{}) func(tx *badger.Txn) (interface{}, error) {
-		blockID := key.(flow.Identifier)
+	retrieve := func(blockID flow.Identifier) func(tx *badger.Txn) (*cluster.Payload, error) {
 		var payload cluster.Payload
-		return func(tx *badger.Txn) (interface{}, error) {
+		return func(tx *badger.Txn) (*cluster.Payload, error) {
 			err := procedure.RetrieveClusterPayload(blockID, &payload)(tx)
 			return &payload, err
 		}
@@ -38,8 +35,8 @@ func NewClusterPayloads(cacheMetrics module.CacheMetrics, db *badger.DB) *Cluste
 
 	cp := &ClusterPayloads{
 		db: db,
-		cache: newCache(cacheMetrics, metrics.ResourceClusterPayload,
-			withLimit(flow.DefaultTransactionExpiry*4),
+		cache: newCache[flow.Identifier, *cluster.Payload](cacheMetrics, metrics.ResourceClusterPayload,
+			withLimit[flow.Identifier, *cluster.Payload](flow.DefaultTransactionExpiry*4),
 			withStore(store),
 			withRetrieve(retrieve)),
 	}
@@ -50,13 +47,14 @@ func NewClusterPayloads(cacheMetrics module.CacheMetrics, db *badger.DB) *Cluste
 func (cp *ClusterPayloads) storeTx(blockID flow.Identifier, payload *cluster.Payload) func(*transaction.Tx) error {
 	return cp.cache.PutTx(blockID, payload)
 }
+
 func (cp *ClusterPayloads) retrieveTx(blockID flow.Identifier) func(*badger.Txn) (*cluster.Payload, error) {
 	return func(tx *badger.Txn) (*cluster.Payload, error) {
 		val, err := cp.cache.Get(blockID)(tx)
 		if err != nil {
 			return nil, err
 		}
-		return val.(*cluster.Payload), nil
+		return val, nil
 	}
 }
 

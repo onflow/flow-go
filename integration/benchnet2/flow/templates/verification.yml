@@ -1,0 +1,117 @@
+{{- range $k, $v := .Values.verification.nodes }}
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  # This is the full name of your deployment. It must be unique
+  name: {{ $k }}
+  labels:
+    app: {{ $k }}
+    nodeType: verification
+    service: flow
+    networkId: {{ $.Values.networkId }}
+
+spec:
+  serviceName: {{ $k }}
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ $k }}
+      nodeType: verification
+      service: flow
+      networkId: {{ $.Values.networkId }}
+
+  template:
+    metadata:
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: /metrics
+        prometheus.io/port: "8080"
+      labels:
+        app: {{ $k }}
+        networkId: {{ $.Values.networkId }}
+        nodeType: verification
+        owner: {{ $.Values.owner }}
+        service: flow
+    spec:  
+      nodeSelector:
+        iam.gke.io/gke-metadata-server-enabled: "true"
+      serviceAccountName: "benchnet-configuration-reader"
+      initContainers:
+        - name: bootstrap-download
+          image: gcr.io/google.com/cloudsdktool/google-cloud-cli:372.0.0
+          command: 
+            - 'sh'
+            - '-c'
+            - "mkdir -p /data/bootstrap; cd /data/bootstrap; gsutil cp gs://{{ $.Values.configurationBucket }}/{{ $.Values.networkId }}.tar - | tar -x"
+          volumeMounts:
+            - name: data
+              mountPath: /data
+      containers:
+        - name: {{ $k }}
+          image: {{ $v.image }}
+          {{ if $v.imagePullPolicy }}
+          imagePullPolicy: {{ $v.imagePullPolicy| toYaml | nindent 12 }}
+          {{ else}}
+          imagePullPolicy: {{ $.Values.verification.defaults.imagePullPolicy | toYaml | nindent 12 }}
+          {{ end }}
+
+          args: {{ $v.args | toYaml | nindent 12}}
+
+          {{ if $v.ports }}
+          ports: {{ $v.ports | toYaml | nindent 12 }}
+          {{ else}}
+          ports: {{ $.Values.verification.defaults.containerPorts | toYaml | nindent 12 }}
+          {{ end }}
+  
+          {{ if $v.env }}
+          env: {{ $v.env | toYaml | nindent 12 }}
+          {{ else}}
+          env: {{ $.Values.verification.defaults.env | toYaml | nindent 12 }}
+          {{ end }}
+          
+          volumeMounts:
+            - name: data
+              mountPath: /data
+
+          {{ if $v.resources }}
+          resources: {{ $v.resources | toYaml | nindent 12 }}
+          {{ else}}
+          resources: {{ $.Values.verification.defaults.resources | toYaml | nindent 12 }}
+          {{ end }}
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+        labels:
+          networkId: {{ $.Values.networkId }}
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            {{ if $v.storage }}
+            storage: {{ $v.storage }}
+            {{ else}}
+            storage: {{ $.Values.verification.defaults.storage }}
+            {{ end }}
+{{- end }}
+
+{{- range $k, $v := $.Values.verification.nodes }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $k }}
+  labels:
+    app: {{ $k }}
+    networkId: {{ $.Values.networkId }}
+    owner: {{ $.Values.owner }}
+spec:
+  {{ if $v.servicePorts }}
+  ports: {{ $v.servicePorts | toYaml | nindent 12 }}
+  {{ else}}
+  ports: {{ $.Values.verification.defaults.servicePorts  | toYaml | nindent 4 }}
+  {{ end }}
+  selector:
+    app: {{ $k }}
+  type: NodePort
+{{- end }}

@@ -5,9 +5,29 @@ import (
 	"fmt"
 )
 
+// ErrInvalidEncoding indicates that the message code byte (first byte of message payload) is unknown.
+type ErrInvalidEncoding struct {
+	err error
+}
+
+func (e ErrInvalidEncoding) Error() string {
+	return fmt.Sprintf("failed to decode message with invalid encoding: %v", e.err)
+}
+
+// NewInvalidEncodingErr returns a new ErrInvalidEncoding
+func NewInvalidEncodingErr(err error) ErrInvalidEncoding {
+	return ErrInvalidEncoding{err}
+}
+
+// IsErrInvalidEncoding returns true if an error is ErrInvalidEncoding
+func IsErrInvalidEncoding(err error) bool {
+	var e ErrInvalidEncoding
+	return errors.As(err, &e)
+}
+
 // ErrUnknownMsgCode indicates that the message code byte (first byte of message payload) is unknown.
 type ErrUnknownMsgCode struct {
-	code uint8
+	code MessageCode
 }
 
 func (e ErrUnknownMsgCode) Error() string {
@@ -15,7 +35,7 @@ func (e ErrUnknownMsgCode) Error() string {
 }
 
 // NewUnknownMsgCodeErr returns a new ErrUnknownMsgCode
-func NewUnknownMsgCodeErr(code uint8) ErrUnknownMsgCode {
+func NewUnknownMsgCodeErr(code MessageCode) ErrUnknownMsgCode {
 	return ErrUnknownMsgCode{code}
 }
 

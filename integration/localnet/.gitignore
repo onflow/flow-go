@@ -4,3 +4,4 @@
 /trie/
 docker-compose.nodes.yml
 targets.nodes.json
+ports.nodes.json

@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/onflow/crypto"
+	"go.uber.org/atomic"
+
 	sdk "github.com/onflow/flow-go-sdk"
 
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	model "github.com/onflow/flow-go/model/messages"
@@ -22,25 +24,25 @@ var errClientDisabled = fmt.Errorf("dkg client artifically disabled for tests")
 // emulator return an error.
 type DKGClientWrapper struct {
 	client  *dkgmod.Client
-	enabled bool
+	enabled *atomic.Bool
 }
 
 // NewDKGClientWrapper instantiates a new DKGClientWrapper
 func NewDKGClientWrapper(client *dkgmod.Client) *DKGClientWrapper {
 	return &DKGClientWrapper{
 		client:  client,
-		enabled: true,
+		enabled: atomic.NewBool(true),
 	}
 }
 
 // Enable allows the client to call the DKG smart-contract
 func (c *DKGClientWrapper) Enable() {
-	c.enabled = true
+	c.enabled.Store(true)
 }
 
 // Disable short-circuits all calls to the DKG smart-contract
 func (c *DKGClientWrapper) Disable() {
-	c.enabled = false
+	c.enabled.Store(true)
 }
 
 // GetAccount implements the BaseClient interface
@@ -60,7 +62,7 @@ func (c *DKGClientWrapper) WaitForSealed(ctx context.Context, txID sdk.Identifie
 
 // Broadcast implements the DKGContractClient interface
 func (c *DKGClientWrapper) Broadcast(msg model.BroadcastDKGMessage) error {
-	if !c.enabled {
+	if !c.enabled.Load() {
 		return fmt.Errorf("failed to broadcast DKG message: %w", errClientDisabled)
 	}
 	return c.client.Broadcast(msg)
@@ -68,7 +70,7 @@ func (c *DKGClientWrapper) Broadcast(msg model.BroadcastDKGMessage) error {
 
 // ReadBroadcast implements the DKGContractClient interface
 func (c *DKGClientWrapper) ReadBroadcast(fromIndex uint, referenceBlock flow.Identifier) ([]messages.BroadcastDKGMessage, error) {
-	if !c.enabled {
+	if !c.enabled.Load() {
 		return []messages.BroadcastDKGMessage{}, fmt.Errorf("failed to read DKG broadcast messages: %w", errClientDisabled)
 	}
 	return c.client.ReadBroadcast(fromIndex, referenceBlock)
@@ -76,7 +78,7 @@ func (c *DKGClientWrapper) ReadBroadcast(fromIndex uint, referenceBlock flow.Ide
 
 // SubmitResult implements the DKGContractClient interface
 func (c *DKGClientWrapper) SubmitResult(groupPubKey crypto.PublicKey, pubKeys []crypto.PublicKey) error {
-	if !c.enabled {
+	if !c.enabled.Load() {
 		return fmt.Errorf("failed to submit DKG result: %w", errClientDisabled)
 	}
 	return c.client.SubmitResult(groupPubKey, pubKeys)

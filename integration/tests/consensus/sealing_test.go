@@ -2,20 +2,18 @@ package consensus
 
 import (
 	"context"
-	"math/rand"
 	"testing"
 	"time"
 
+	"github.com/onflow/crypto"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/onflow/flow-go/crypto"
 	exeUtils "github.com/onflow/flow-go/engine/execution/utils"
 	"github.com/onflow/flow-go/engine/ghost/client"
 	verUtils "github.com/onflow/flow-go/engine/verification/utils"
 	"github.com/onflow/flow-go/integration/testnet"
-	"github.com/onflow/flow-go/integration/tests/lib"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/network/channels"
@@ -42,22 +40,19 @@ type SealingSuite struct {
 }
 
 func (ss *SealingSuite) Execution() *client.GhostClient {
-	ghost := ss.net.ContainerByID(ss.exeID)
-	client, err := lib.GetGhostClient(ghost)
+	client, err := ss.net.ContainerByID(ss.exeID).GhostClient()
 	require.NoError(ss.T(), err, "could not get ghost client")
 	return client
 }
 
 func (ss *SealingSuite) Execution2() *client.GhostClient {
-	ghost := ss.net.ContainerByID(ss.exe2ID)
-	client, err := lib.GetGhostClient(ghost)
+	client, err := ss.net.ContainerByID(ss.exe2ID).GhostClient()
 	require.NoError(ss.T(), err, "could not get ghost client")
 	return client
 }
 
 func (ss *SealingSuite) Verification() *client.GhostClient {
-	ghost := ss.net.ContainerByID(ss.verID)
-	client, err := lib.GetGhostClient(ghost)
+	client, err := ss.net.ContainerByID(ss.verID).GhostClient()
 	require.NoError(ss.T(), err, "could not get ghost client")
 	return client
 }
@@ -65,9 +60,6 @@ func (ss *SealingSuite) Verification() *client.GhostClient {
 func (ss *SealingSuite) SetupTest() {
 	ss.log = unittest.LoggerForTest(ss.Suite.T(), zerolog.InfoLevel)
 	ss.log.Info().Msgf("================> SetupTest")
-
-	// seed random generator
-	rand.Seed(time.Now().UnixNano())
 
 	// to collect node confiss...
 	var nodeConfigs []testnet.NodeConfig
@@ -176,9 +168,10 @@ SearchLoop:
 		if !ok {
 			continue
 		}
+		block := proposal.Block.ToInternal()
 
 		// make sure we skip duplicates
-		proposalID := proposal.Header.ID()
+		proposalID := block.Header.ID()
 		_, processed := confirmations[proposalID]
 		if processed {
 			continue
@@ -186,12 +179,12 @@ SearchLoop:
 		confirmations[proposalID] = 0
 
 		// we map the proposal to its parent for later
-		parentID := proposal.Header.ParentID
+		parentID := block.Header.ParentID
 		parents[proposalID] = parentID
 
 		ss.T().Logf("received block proposal height %v, view %v, id %v",
-			proposal.Header.Height,
-			proposal.Header.View,
+			block.Header.Height,
+			block.Header.View,
 			proposalID)
 
 		// we add one confirmation for each ancestor
@@ -363,10 +356,11 @@ SealingLoop:
 		if !ok {
 			continue
 		}
+		block := proposal.Block.ToInternal()
 
 		// log the proposal details
-		proposalID := proposal.Header.ID()
-		seals := proposal.Payload.Seals
+		proposalID := block.Header.ID()
+		seals := block.Payload.Seals
 
 		// if the block seal is included, we add the block to those we
 		// monitor for confirmations

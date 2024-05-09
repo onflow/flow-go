@@ -13,21 +13,18 @@ import (
 // Guarantees implements persistent storage for collection guarantees.
 type Guarantees struct {
 	db    *badger.DB
-	cache *Cache
+	cache *Cache[flow.Identifier, *flow.CollectionGuarantee]
 }
 
 func NewGuarantees(collector module.CacheMetrics, db *badger.DB, cacheSize uint) *Guarantees {
 
-	store := func(key interface{}, val interface{}) func(*transaction.Tx) error {
-		collID := key.(flow.Identifier)
-		guarantee := val.(*flow.CollectionGuarantee)
+	store := func(collID flow.Identifier, guarantee *flow.CollectionGuarantee) func(*transaction.Tx) error {
 		return transaction.WithTx(operation.SkipDuplicates(operation.InsertGuarantee(collID, guarantee)))
 	}
 
-	retrieve := func(key interface{}) func(*badger.Txn) (interface{}, error) {
-		collID := key.(flow.Identifier)
+	retrieve := func(collID flow.Identifier) func(*badger.Txn) (*flow.CollectionGuarantee, error) {
 		var guarantee flow.CollectionGuarantee
-		return func(tx *badger.Txn) (interface{}, error) {
+		return func(tx *badger.Txn) (*flow.CollectionGuarantee, error) {
 			err := operation.RetrieveGuarantee(collID, &guarantee)(tx)
 			return &guarantee, err
 		}
@@ -35,8 +32,8 @@ func NewGuarantees(collector module.CacheMetrics, db *badger.DB, cacheSize uint)
 
 	g := &Guarantees{
 		db: db,
-		cache: newCache(collector, metrics.ResourceGuarantee,
-			withLimit(cacheSize),
+		cache: newCache[flow.Identifier, *flow.CollectionGuarantee](collector, metrics.ResourceGuarantee,
+			withLimit[flow.Identifier, *flow.CollectionGuarantee](cacheSize),
 			withStore(store),
 			withRetrieve(retrieve)),
 	}
@@ -54,7 +51,7 @@ func (g *Guarantees) retrieveTx(collID flow.Identifier) func(*badger.Txn) (*flow
 		if err != nil {
 			return nil, err
 		}
-		return val.(*flow.CollectionGuarantee), nil
+		return val, nil
 	}
 }
 

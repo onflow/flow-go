@@ -1,6 +1,7 @@
 package testutils
 
 import (
+	crand "crypto/rand"
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
@@ -151,7 +152,10 @@ func RandomPaths(n int) []l.Path {
 	i := 0
 	for i < n {
 		var path l.Path
-		rand.Read(path[:])
+		_, err := crand.Read(path[:])
+		if err != nil {
+			panic("randomness failed")
+		}
 		// deduplicate
 		if _, found := alreadySelectPaths[path]; !found {
 			paths = append(paths, path)
@@ -166,11 +170,17 @@ func RandomPaths(n int) []l.Path {
 func RandomPayload(minByteSize int, maxByteSize int) *l.Payload {
 	keyByteSize := minByteSize + rand.Intn(maxByteSize-minByteSize)
 	keydata := make([]byte, keyByteSize)
-	rand.Read(keydata)
+	_, err := crand.Read(keydata)
+	if err != nil {
+		panic("randomness failed")
+	}
 	key := l.Key{KeyParts: []l.KeyPart{{Type: 0, Value: keydata}}}
 	valueByteSize := minByteSize + rand.Intn(maxByteSize-minByteSize)
 	valuedata := make([]byte, valueByteSize)
-	rand.Read(valuedata)
+	_, err = crand.Read(valuedata)
+	if err != nil {
+		panic("random generation failed")
+	}
 	value := l.Value(valuedata)
 	return l.NewPayload(key, value)
 }
@@ -196,7 +206,10 @@ func RandomValues(n int, minByteSize, maxByteSize int) []l.Value {
 			byteSize = minByteSize + rand.Intn(maxByteSize-minByteSize)
 		}
 		value := make([]byte, byteSize)
-		rand.Read(value)
+		_, err := crand.Read(value)
+		if err != nil {
+			panic("random generation failed")
+		}
 		values = append(values, value)
 	}
 	return values
@@ -218,7 +231,10 @@ func RandomUniqueKeys(n, m, minByteSize, maxByteSize int) []l.Key {
 				byteSize = minByteSize + rand.Intn(maxByteSize-minByteSize)
 			}
 			keyPartData := make([]byte, byteSize)
-			rand.Read(keyPartData)
+			_, err := crand.Read(keyPartData)
+			if err != nil {
+				panic("random generation failed")
+			}
 			keyParts = append(keyParts, l.NewKeyPart(uint16(j), keyPartData))
 		}
 		key := l.NewKey(keyParts)

@@ -1,17 +1,13 @@
 package inmem
 
 import (
-	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/state/protocol"
-	"github.com/onflow/flow-go/state/protocol/seed"
-)
+	"fmt"
 
-var (
-	_ protocol.Snapshot     = new(Snapshot)
-	_ protocol.GlobalParams = new(Params)
-	_ protocol.EpochQuery   = new(Epochs)
-	_ protocol.Epoch        = new(Epoch)
-	_ protocol.Cluster      = new(Cluster)
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
 )
 
 // Snapshot is a memory-backed implementation of protocol.Snapshot. The snapshot
@@ -21,6 +17,8 @@ type Snapshot struct {
 	enc EncodableSnapshot
 }
 
+var _ protocol.Snapshot = (*Snapshot)(nil)
+
 func (s Snapshot) Head() (*flow.Header, error) {
 	return s.enc.Head, nil
 }
@@ -29,16 +27,26 @@ func (s Snapshot) QuorumCertificate() (*flow.QuorumCertificate, error) {
 	return s.enc.QuorumCertificate, nil
 }
 
-func (s Snapshot) Identities(selector flow.IdentityFilter) (flow.IdentityList, error) {
-	return s.enc.Identities.Filter(selector), nil
+func (s Snapshot) Identities(selector flow.IdentityFilter[flow.Identity]) (flow.IdentityList, error) {
+	protocolState, err := s.EpochProtocolState()
+	if err != nil {
+		return nil, fmt.Errorf("could not access protocol state: %w", err)
+	}
+	return protocolState.Identities().Filter(selector), nil
 }
 
 func (s Snapshot) Identity(nodeID flow.Identifier) (*flow.Identity, error) {
-	identity, ok := s.enc.Identities.ByNodeID(nodeID)
-	if !ok {
+	// filter identities at snapshot for node ID
+	identities, err := s.Identities(filter.HasNodeID[flow.Identity](nodeID))
+	if err != nil {
+		return nil, fmt.Errorf("could not get identities: %w", err)
+	}
+
+	// check if node ID is part of identities
+	if len(identities) == 0 {
 		return nil, protocol.IdentityNotFoundError{NodeID: nodeID}
 	}
-	return identity, nil
+	return identities[0], nil
 }
 
 func (s Snapshot) Commit() (flow.StateCommitment, error) {
@@ -58,21 +66,22 @@ func (s Snapshot) Descendants() ([]flow.Identifier, error) {
 	return nil, nil
 }
 
-func (s Snapshot) ValidDescendants() ([]flow.Identifier, error) {
-	// canonical snapshots don't have any descendants
-	return nil, nil
-}
-
 func (s Snapshot) Phase() (flow.EpochPhase, error) {
-	return s.enc.Phase, nil
+	epochProtocolState, err := s.EpochProtocolState()
+	if err != nil {
+		return flow.EpochPhaseUndefined, fmt.Errorf("could not get epoch protocol state: %w", err)
+	}
+	return epochProtocolState.EpochPhase(), nil
 }
 
 func (s Snapshot) RandomSource() ([]byte, error) {
-	return seed.FromParentQCSignature(s.enc.QuorumCertificate.SigData)
+	return model.BeaconSignature(s.enc.QuorumCertificate)
 }
 
 func (s Snapshot) Epochs() protocol.EpochQuery {
-	return Epochs{s.enc.Epochs}
+	return Epochs{
+		entry: *s.enc.SealingSegment.LatestProtocolStateEntry().EpochEntry,
+	}
 }
 
 func (s Snapshot) Params() protocol.GlobalParams {
@@ -83,43 +92,22 @@ func (s Snapshot) Encodable() EncodableSnapshot {
 	return s.enc
 }
 
+func (s Snapshot) EpochProtocolState() (protocol.DynamicProtocolState, error) {
+	entry := s.enc.SealingSegment.LatestProtocolStateEntry()
+	return NewDynamicProtocolStateAdapter(entry.EpochEntry, s.Params()), nil
+}
+
+func (s Snapshot) ProtocolState() (protocol.KVStoreReader, error) {
+	entry := s.enc.SealingSegment.LatestProtocolStateEntry()
+	return kvstore.VersionedDecode(entry.KVStore.Version, entry.KVStore.Data)
+}
+
+func (s Snapshot) VersionBeacon() (*flow.SealedVersionBeacon, error) {
+	return s.enc.SealedVersionBeacon, nil
+}
+
 func SnapshotFromEncodable(enc EncodableSnapshot) *Snapshot {
 	return &Snapshot{
 		enc: enc,
 	}
-}
-
-// StrippedInmemSnapshot removes all the networking address in the snapshot
-func StrippedInmemSnapshot(snapshot EncodableSnapshot) EncodableSnapshot {
-	removeAddress := func(ids flow.IdentityList) {
-		for _, identity := range ids {
-			identity.Address = ""
-		}
-	}
-
-	removeAddressFromEpoch := func(epoch *EncodableEpoch) {
-		if epoch == nil {
-			return
-		}
-		removeAddress(epoch.InitialIdentities)
-		for _, cluster := range epoch.Clustering {
-			removeAddress(cluster)
-		}
-		for _, c := range epoch.Clusters {
-			removeAddress(c.Members)
-		}
-	}
-
-	removeAddress(snapshot.Identities)
-	removeAddressFromEpoch(snapshot.Epochs.Previous)
-	removeAddressFromEpoch(&snapshot.Epochs.Current)
-	removeAddressFromEpoch(snapshot.Epochs.Next)
-
-	for _, event := range snapshot.LatestResult.ServiceEvents {
-		switch event.Type {
-		case flow.ServiceEventSetup:
-			removeAddress(event.Event.(*flow.EpochSetup).Participants)
-		}
-	}
-	return snapshot
 }

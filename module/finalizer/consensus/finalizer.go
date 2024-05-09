@@ -1,5 +1,3 @@
-// (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
-
 package consensus
 
 import (
@@ -21,7 +19,7 @@ import (
 type Finalizer struct {
 	db      *badger.DB
 	headers storage.Headers
-	state   protocol.MutableState
+	state   protocol.FollowerState
 	cleanup CleanupFunc
 	tracer  module.Tracer
 }
@@ -29,7 +27,7 @@ type Finalizer struct {
 // NewFinalizer creates a new finalizer for the temporary state.
 func NewFinalizer(db *badger.DB,
 	headers storage.Headers,
-	state protocol.MutableState,
+	state protocol.FollowerState,
 	tracer module.Tracer,
 	options ...func(*Finalizer)) *Finalizer {
 	f := &Finalizer{
@@ -52,9 +50,10 @@ func NewFinalizer(db *badger.DB,
 // included in a block proposal. Between entering the non-finalized chain state
 // and being finalized, entities should be present in both the volatile memory
 // pools and persistent storage.
+// No errors are expected during normal operation.
 func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 
-	span, ctx, _ := f.tracer.StartBlockSpan(context.Background(), blockID, trace.CONFinalizerFinalizeBlock)
+	span, ctx := f.tracer.StartBlockSpan(context.Background(), blockID, trace.CONFinalizerFinalizeBlock)
 	defer span.End()
 
 	// STEP ONE: This is an idempotent operation. In case we are trying to
@@ -74,12 +73,12 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 	}
 
 	if pending.Height <= finalized {
-		dup, err := f.headers.ByHeight(pending.Height)
+		dupID, err := f.headers.BlockIDByHeight(pending.Height)
 		if err != nil {
 			return fmt.Errorf("could not retrieve finalized equivalent: %w", err)
 		}
-		if dup.ID() != blockID {
-			return fmt.Errorf("cannot finalize pending block conflicting with finalized state (height: %d, pending: %x, finalized: %x)", pending.Height, blockID, dup.ID())
+		if dupID != blockID {
+			return fmt.Errorf("cannot finalize pending block conflicting with finalized state (height: %d, pending: %x, finalized: %x)", pending.Height, blockID, dupID)
 		}
 		return nil
 	}
@@ -124,14 +123,5 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 		}
 	}
 
-	return nil
-}
-
-// MakeValid marks a block as having passed HotStuff validation.
-func (f *Finalizer) MakeValid(blockID flow.Identifier) error {
-	err := f.state.MarkValid(blockID)
-	if err != nil {
-		return fmt.Errorf("could not mark block as valid (%x): %w", blockID, err)
-	}
 	return nil
 }

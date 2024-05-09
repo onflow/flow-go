@@ -10,7 +10,6 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/onflow/flow-go/integration/testnet"
-	"github.com/onflow/flow-go/integration/tests/lib"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/network/channels"
@@ -26,10 +25,10 @@ func TestGhostNodeExample_Send(t *testing.T) {
 
 	var (
 		// one real collection node
-		realCollNode = testnet.NewNodeConfig(flow.RoleCollection, testnet.WithLogLevel(zerolog.DebugLevel), testnet.WithIDInt(1))
+		realCollNode = testnet.NewNodeConfig(flow.RoleCollection, testnet.WithLogLevel(zerolog.InfoLevel), testnet.WithIDInt(1))
 
 		// a ghost node masquerading as a collection node
-		ghostCollNode = testnet.NewNodeConfig(flow.RoleCollection, testnet.WithLogLevel(zerolog.DebugLevel), testnet.WithIDInt(2),
+		ghostCollNode = testnet.NewNodeConfig(flow.RoleCollection, testnet.WithLogLevel(zerolog.InfoLevel), testnet.WithIDInt(2),
 			testnet.AsGhost())
 
 		// three consensus nodes
@@ -56,11 +55,8 @@ func TestGhostNodeExample_Send(t *testing.T) {
 	net.Start(ctx)
 	defer net.Remove()
 
-	// get the ghost container
-	ghostContainer := net.ContainerByID(ghostCollNode.Identifier)
-
 	// get a ghost client connected to the ghost node
-	ghostClient, err := lib.GetGhostClient(ghostContainer)
+	ghostClient, err := net.ContainerByID(ghostCollNode.Identifier).GhostClient()
 	assert.NoError(t, err)
 
 	// generate a test transaction
@@ -90,7 +86,7 @@ func TestGhostNodeExample_Subscribe(t *testing.T) {
 		realExeNode = testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.FatalLevel), testnet.WithIDInt(2))
 
 		// a ghost node masquerading as an execution node
-		ghostExeNode = testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.DebugLevel), testnet.WithIDInt(3),
+		ghostExeNode = testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.InfoLevel), testnet.WithIDInt(3),
 			testnet.AsGhost())
 
 		// a verification node
@@ -113,11 +109,8 @@ func TestGhostNodeExample_Subscribe(t *testing.T) {
 		logger.Info().Msg("================> Finish TearDownTest")
 	}()
 
-	// get the ghost container
-	ghostContainer := net.ContainerByID(ghostExeNode.Identifier)
-
 	// get a ghost client connected to the ghost node
-	ghostClient, err := lib.GetGhostClient(ghostContainer)
+	ghostClient, err := net.ContainerByID(ghostExeNode.Identifier).GhostClient()
 	assert.NoError(t, err)
 
 	// subscribe to all the events the ghost execution node will receive
@@ -132,7 +125,7 @@ func TestGhostNodeExample_Subscribe(t *testing.T) {
 		// the following switch should be similar to the one defined in the actual node that is being emulated
 		switch v := event.(type) {
 		case *messages.BlockProposal:
-			fmt.Printf("Received block proposal: %s from %s\n", v.Header.ID().String(), from.String())
+			fmt.Printf("Received block proposal: %s from %s\n", v.Block.Header.ID().String(), from.String())
 			i++
 		default:
 			t.Logf(" ignoring event: :%T: %v", v, v)

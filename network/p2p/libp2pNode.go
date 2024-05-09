@@ -1,293 +1,240 @@
-// Package p2p encapsulates the libp2p library
 package p2p
 
 import (
 	"context"
-	"fmt"
-	"sync"
-	"time"
 
-	"github.com/hashicorp/go-multierror"
-	"github.com/libp2p/go-libp2p-core/host"
-	libp2pnet "github.com/libp2p/go-libp2p-core/network"
-	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/libp2p/go-libp2p-core/protocol"
-	"github.com/libp2p/go-libp2p-core/routing"
-	dht "github.com/libp2p/go-libp2p-kad-dht"
 	kbucket "github.com/libp2p/go-libp2p-kbucket"
-	pubsub "github.com/libp2p/go-libp2p-pubsub"
-	"github.com/rs/zerolog"
+	"github.com/libp2p/go-libp2p/core/host"
+	libp2pnet "github.com/libp2p/go-libp2p/core/network"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/protocol"
+	"github.com/libp2p/go-libp2p/core/routing"
 
-	"github.com/onflow/flow-go/network/slashing"
-
+	"github.com/onflow/flow-go/engine/collection"
+	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/network"
 	flownet "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
-	"github.com/onflow/flow-go/network/p2p/unicast"
-	"github.com/onflow/flow-go/network/validator"
-	flowpubsub "github.com/onflow/flow-go/network/validator/pubsub"
+	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 )
 
-const (
-	// maximum number of attempts to be made to connect to a remote node for 1-1 direct communication
-	maxConnectAttempt = 3
-
-	// timeout for FindPeer queries to the routing system
-	// TODO: is this a sensible value?
-	findPeerQueryTimeout = 10 * time.Second
-)
-
-// Node is a wrapper around the LibP2P host.
-type Node struct {
-	sync.Mutex
-	unicastManager *unicast.Manager
-	host           host.Host                               // reference to the libp2p host (https://godoc.org/github.com/libp2p/go-libp2p-core/host)
-	pubSub         *pubsub.PubSub                          // reference to the libp2p PubSub component
-	logger         zerolog.Logger                          // used to provide logging
-	topics         map[channels.Topic]*pubsub.Topic        // map of a topic string to an actual topic instance
-	subs           map[channels.Topic]*pubsub.Subscription // map of a topic string to an actual subscription
-	routing        routing.Routing
-	pCache         *protocolPeerCache
+// CoreP2P service management capabilities
+type CoreP2P interface {
+	// Start the libp2p node.
+	Start(ctx irrecoverable.SignalerContext)
+	// Stop terminates the libp2p node.
+	Stop() error
+	// GetIPPort returns the IP and Port the libp2p node is listening on.
+	GetIPPort() (string, string, error)
+	// Host returns pointer to host object of node.
+	Host() host.Host
+	// SetComponentManager sets the component manager for the node.
+	// SetComponentManager may be called at most once.
+	SetComponentManager(cm *component.ComponentManager)
 }
 
-// Stop terminates the libp2p node.
-func (n *Node) Stop() (chan struct{}, error) {
-	var result error
-	done := make(chan struct{})
-	n.logger.Debug().Msg("unsubscribing from all topics")
-	for t := range n.topics {
-		if err := n.UnSubscribe(t); err != nil {
-			result = multierror.Append(result, err)
-		}
-	}
-
-	n.logger.Debug().Msg("stopping libp2p node")
-	if err := n.host.Close(); err != nil {
-		result = multierror.Append(result, err)
-	}
-
-	n.logger.Debug().Msg("closing peer store")
-	// to prevent peerstore routine leak (https://github.com/libp2p/go-libp2p/issues/718)
-	if err := n.host.Peerstore().Close(); err != nil {
-		n.logger.Debug().Err(err).Msg("closing peer store")
-		result = multierror.Append(result, err)
-	}
-
-	if result != nil {
-		close(done)
-		return done, result
-	}
-
-	go func(done chan struct{}) {
-		defer close(done)
-		addrs := len(n.host.Network().ListenAddresses())
-		ticker := time.NewTicker(time.Millisecond * 2)
-		defer ticker.Stop()
-		timeout := time.After(time.Second)
-		for addrs > 0 {
-			// wait for all listen addresses to have been removed
-			select {
-			case <-timeout:
-				n.logger.Error().Int("port", addrs).Msg("listen addresses still open")
-				return
-			case <-ticker.C:
-				addrs = len(n.host.Network().ListenAddresses())
-			}
-		}
-
-		n.logger.Debug().Msg("libp2p node stopped successfully")
-	}(done)
-
-	return done, nil
+// PeerManagement set of node traits related to its lifecycle and metadata retrieval
+type PeerManagement interface {
+	// ConnectToPeer connects to the peer with the given peer address information.
+	// This method is used to connect to a peer that is not in the peer store.
+	ConnectToPeer(ctx context.Context, peerInfo peer.AddrInfo) error
+	// RemovePeer closes the connection with the peer.
+	RemovePeer(peerID peer.ID) error
+	// ListPeers returns list of peer IDs for peers subscribed to the topic.
+	ListPeers(topic string) []peer.ID
+	// GetPeersForProtocol returns slice peer IDs for the specified protocol ID.
+	GetPeersForProtocol(pid protocol.ID) peer.IDSlice
+	// GetIPPort returns the IP and Port the libp2p node is listening on.
+	GetIPPort() (string, string, error)
+	// RoutingTable returns the node routing table
+	RoutingTable() *kbucket.RoutingTable
+	// Subscribe subscribes the node to the given topic and returns the subscription
+	Subscribe(topic channels.Topic, topicValidator TopicValidatorFunc) (Subscription, error)
+	// Unsubscribe cancels the subscriber and closes the topic corresponding to the given channel.
+	Unsubscribe(topic channels.Topic) error
+	// Publish publishes the given payload on the topic.
+	Publish(ctx context.Context, messageScope network.OutgoingMessageScope) error
+	// Host returns pointer to host object of node.
+	Host() host.Host
+	// ID returns the peer.ID of the node, which is the unique identifier of the node at the libp2p level.
+	// For other libp2p nodes, the current node is identified by this ID.
+	ID() peer.ID
+	// WithDefaultUnicastProtocol overrides the default handler of the unicast manager and registers all preferred protocols.
+	WithDefaultUnicastProtocol(defaultHandler libp2pnet.StreamHandler, preferred []protocols.ProtocolName) error
+	// WithPeersProvider sets the PeersProvider for the peer manager.
+	// If a peer manager factory is set, this method will set the peer manager's PeersProvider.
+	WithPeersProvider(peersProvider PeersProvider)
+	// PeerManagerComponent returns the component interface of the peer manager.
+	PeerManagerComponent() component.Component
+	// RequestPeerUpdate requests an update to the peer connections of this node using the peer manager.
+	RequestPeerUpdate()
 }
 
-// AddPeer adds a peer to this node by adding it to this node's peerstore and connecting to it
-func (n *Node) AddPeer(ctx context.Context, peerInfo peer.AddrInfo) error {
-	return n.host.Connect(ctx, peerInfo)
+// Routable set of node routing capabilities
+type Routable interface {
+	// RoutingTable returns the node routing table
+	RoutingTable() *kbucket.RoutingTable
+	// SetRouting sets the node's routing implementation.
+	// SetRouting may be called at most once.
+	// Returns:
+	// - error: An error, if any occurred during the process; any returned error is irrecoverable.
+	SetRouting(r routing.Routing) error
+	// Routing returns node routing object.
+	Routing() routing.Routing
 }
 
-// RemovePeer closes the connection with the peer.
-func (n *Node) RemovePeer(peerID peer.ID) error {
-	err := n.host.Network().ClosePeer(peerID)
-	if err != nil {
-		return fmt.Errorf("failed to remove peer %s: %w", peerID, err)
-	}
-	return nil
+// UnicastManagement abstracts the unicast management capabilities of the node.
+type UnicastManagement interface {
+	// OpenAndWriteOnStream opens a new stream to a peer with a protection tag. The protection tag can be used to ensure
+	// that the connection to the peer is maintained for a particular purpose. The stream is opened to the given peerID
+	// and writingLogic is executed on the stream. The created stream does not need to be reused and can be inexpensively
+	// created for each send. Moreover, the stream creation does not incur a round-trip time as the stream negotiation happens
+	// on an existing connection.
+	//
+	// Args:
+	// - ctx: The context used to control the stream's lifecycle.
+	// - peerID: The ID of the peer to open the stream to.
+	// - protectionTag: A tag that protects the connection and ensures that the connection manager keeps it alive, and
+	//   won't prune the connection while the tag is active.
+	// - writingLogic: A callback function that contains the logic for writing to the stream. It allows an external caller to
+	//   write to the stream without having to worry about the stream creation and management.
+	//
+	// Returns:
+	// error: An error, if any occurred during the process. This includes failure in creating the stream, setting the write
+	// deadline, executing the writing logic, resetting the stream if the writing logic fails, or closing the stream.
+	// All returned errors during this process can be considered benign.
+	OpenAndWriteOnStream(ctx context.Context, peerID peer.ID, protectionTag string, writingLogic func(stream libp2pnet.Stream) error) error
+	// WithDefaultUnicastProtocol overrides the default handler of the unicast manager and registers all preferred protocols.
+	WithDefaultUnicastProtocol(defaultHandler libp2pnet.StreamHandler, preferred []protocols.ProtocolName) error
 }
 
-func (n *Node) GetPeersForProtocol(pid protocol.ID) peer.IDSlice {
-	pMap := n.pCache.getPeers(pid)
-	peers := make(peer.IDSlice, 0, len(pMap))
-	for p := range pMap {
-		peers = append(peers, p)
-	}
-	return peers
+// PubSub publish subscribe features for node
+type PubSub interface {
+	// Subscribe subscribes the node to the given topic and returns the subscription
+	Subscribe(topic channels.Topic, topicValidator TopicValidatorFunc) (Subscription, error)
+	// Unsubscribe cancels the subscriber and closes the topic.
+	Unsubscribe(topic channels.Topic) error
+	// Publish publishes the given payload on the topic.
+	Publish(ctx context.Context, messageScope flownet.OutgoingMessageScope) error
+	// SetPubSub sets the node's pubsub implementation.
+	// SetPubSub may be called at most once.
+	SetPubSub(ps PubSubAdapter)
+
+	// GetLocalMeshPeers returns the list of peers in the local mesh for the given topic.
+	// Args:
+	// - topic: the topic.
+	// Returns:
+	// - []peer.ID: the list of peers in the local mesh for the given topic.
+	GetLocalMeshPeers(topic channels.Topic) []peer.ID
 }
 
-// CreateStream returns an existing stream connected to the peer if it exists, or creates a new stream with it.
-func (n *Node) CreateStream(ctx context.Context, peerID peer.ID) (libp2pnet.Stream, error) {
-	lg := n.logger.With().Str("peer_id", peerID.Pretty()).Logger()
+// LibP2PNode represents a Flow libp2p node. It provides the network layer with the necessary interface to
+// control the underlying libp2p node. It is essentially the Flow wrapper around the libp2p node, and allows
+// us to define different types of libp2p nodes that can operate in different ways by overriding these methods.
+type LibP2PNode interface {
+	module.ReadyDoneAware
+	Subscriptions
+	// PeerConnections connection status information per peer.
+	PeerConnections
+	// PeerScore exposes the peer score API.
+	PeerScore
+	// DisallowListNotificationConsumer exposes the disallow list notification consumer API for the node so that
+	// it will be notified when a new disallow list update is distributed.
+	DisallowListNotificationConsumer
+	// CollectionClusterChangesConsumer  is the interface for consuming the events of changes in the collection cluster.
+	// This is used to notify the node of changes in the collection cluster.
+	// LibP2PNode implements this interface and consumes the events to be notified of changes in the clustering channels.
+	// The clustering channels are used by the collection nodes of a cluster to communicate with each other.
+	// As the cluster (and hence their cluster channels) of collection nodes changes over time (per epoch) the node needs to be notified of these changes.
+	CollectionClusterChangesConsumer
+	// DisallowListOracle exposes the disallow list oracle API for external consumers to query about the disallow list.
+	DisallowListOracle
 
-	// If we do not currently have any addresses for the given peer, stream creation will almost
-	// certainly fail. If this Node was configured with a routing system, we can try to use it to
-	// look up the address of the peer.
-	if len(n.host.Peerstore().Addrs(peerID)) == 0 && n.routing != nil {
-		lg.Info().Msg("address not found in peer store, searching for peer in routing system")
+	// CoreP2P service management capabilities
+	CoreP2P
 
-		var err error
-		func() {
-			timedCtx, cancel := context.WithTimeout(ctx, findPeerQueryTimeout)
-			defer cancel()
-			// try to find the peer using the routing system
-			_, err = n.routing.FindPeer(timedCtx, peerID)
-		}()
+	// PeerManagement current peer management functions
+	PeerManagement
 
-		if err != nil {
-			lg.Warn().Err(err).Msg("address not found in both peer store and routing system")
-		} else {
-			lg.Debug().Msg("address not found in peer store, but found in routing system search")
-		}
-	}
-	stream, dialAddrs, err := n.unicastManager.CreateStream(ctx, peerID, maxConnectAttempt)
-	if err != nil {
-		return nil, flownet.NewPeerUnreachableError(fmt.Errorf("could not create stream (peer_id: %s, dialing address(s): %v): %w", peerID,
-			dialAddrs, err))
-	}
+	// Routable routing related features
+	Routable
 
-	lg.Info().
-		Str("networking_protocol_id", string(stream.Protocol())).
-		Str("dial_address", fmt.Sprintf("%v", dialAddrs)).
-		Msg("stream successfully created to remote peer")
-	return stream, nil
+	// PubSub publish subscribe features for node
+	PubSub
+
+	// UnicastManagement node stream management
+	UnicastManagement
 }
 
-// GetIPPort returns the IP and Port the libp2p node is listening on.
-func (n *Node) GetIPPort() (string, string, error) {
-	return IPPortFromMultiAddress(n.host.Network().ListenAddresses()...)
+// Subscriptions set of funcs related to current subscription info of a node.
+type Subscriptions interface {
+	// HasSubscription returns true if the node currently has an active subscription to the topic.
+	HasSubscription(topic channels.Topic) bool
+	// SetUnicastManager sets the unicast manager for the node.
+	SetUnicastManager(uniMgr UnicastManager)
 }
 
-func (n *Node) RoutingTable() *kbucket.RoutingTable {
-	return n.routing.(*dht.IpfsDHT).RoutingTable()
+// CollectionClusterChangesConsumer  is the interface for consuming the events of changes in the collection cluster.
+// This is used to notify the node of changes in the collection cluster.
+// LibP2PNode implements this interface and consumes the events to be notified of changes in the clustering channels.
+// The clustering channels are used by the collection nodes of a cluster to communicate with each other.
+// As the cluster (and hence their cluster channels) of collection nodes changes over time (per epoch) the node needs to be notified of these changes.
+type CollectionClusterChangesConsumer interface {
+	collection.ClusterEvents
 }
 
-func (n *Node) ListPeers(topic string) []peer.ID {
-	return n.pubSub.ListPeers(topic)
+// PeerScore is the interface for the peer score module. It is used to expose the peer score to other
+// components of the node. It is also used to set the peer score exposer implementation.
+type PeerScore interface {
+	// PeerScoreExposer returns the node's peer score exposer implementation.
+	// If the node's peer score exposer has not been set, the second return value will be false.
+	PeerScoreExposer() PeerScoreExposer
 }
 
-// Subscribe subscribes the node to the given topic and returns the subscription
-// Currently only one subscriber is allowed per topic.
-// NOTE: A node will receive its own published messages.
-func (n *Node) Subscribe(topic channels.Topic, codec flownet.Codec, peerFilter PeerFilter, slashingViolationsConsumer slashing.ViolationsConsumer, validators ...validator.PubSubMessageValidator) (*pubsub.Subscription, error) {
-	n.Lock()
-	defer n.Unlock()
-
-	// Check if the topic has been already created and is in the cache
-	n.pubSub.GetTopics()
-	tp, found := n.topics[topic]
-	var err error
-	if !found {
-		topicValidator := flowpubsub.TopicValidator(n.logger, codec, slashingViolationsConsumer, peerFilter, validators...)
-		if err := n.pubSub.RegisterTopicValidator(
-			topic.String(), topicValidator, pubsub.WithValidatorInline(true),
-		); err != nil {
-			n.logger.Err(err).Str("topic", topic.String()).Msg("failed to register topic validator, aborting subscription")
-			return nil, fmt.Errorf("failed to register topic validator: %w", err)
-		}
-
-		tp, err = n.pubSub.Join(topic.String())
-		if err != nil {
-			if err := n.pubSub.UnregisterTopicValidator(topic.String()); err != nil {
-				n.logger.Err(err).Str("topic", topic.String()).Msg("failed to unregister topic validator")
-			}
-
-			return nil, fmt.Errorf("could not join topic (%s): %w", topic, err)
-		}
-
-		n.topics[topic] = tp
-	}
-
-	// Create a new subscription
-	s, err := tp.Subscribe()
-	if err != nil {
-		return s, fmt.Errorf("could not subscribe to topic (%s): %w", topic, err)
-	}
-
-	// Add the subscription to the cache
-	n.subs[topic] = s
-
-	n.logger.Debug().
-		Str("topic", topic.String()).
-		Msg("subscribed to topic")
-	return s, err
+// PeerConnections subset of funcs related to underlying libp2p host connections.
+type PeerConnections interface {
+	// IsConnected returns true if address is a direct peer of this node else false.
+	// Peers are considered not connected if the underlying libp2p host reports the
+	// peers as not connected and there are no connections in the connection list.
+	// The following error returns indicate a bug in the code:
+	//  * network.ErrIllegalConnectionState if the underlying libp2p host reports connectedness as NotConnected but the connections list
+	// 	  to the peer is not empty. This indicates a bug within libp2p.
+	IsConnected(peerID peer.ID) (bool, error)
 }
 
-// UnSubscribe cancels the subscriber and closes the topic.
-func (n *Node) UnSubscribe(topic channels.Topic) error {
-	n.Lock()
-	defer n.Unlock()
-	// Remove the Subscriber from the cache
-	if s, found := n.subs[topic]; found {
-		s.Cancel()
-		n.subs[topic] = nil
-		delete(n.subs, topic)
-	}
+// DisallowListNotificationConsumer is an interface for consuming disallow/allow list update notifications.
+type DisallowListNotificationConsumer interface {
+	// OnDisallowListNotification is called when a new disallow list update notification is distributed.
+	// Any error on consuming event must handle internally.
+	// The implementation must be concurrency safe.
+	// Args:
+	// 	id: peer ID of the peer being disallow-listed.
+	// 	cause: cause of the peer being disallow-listed (only this cause is added to the peer's disallow-listed causes).
+	// Returns:
+	// 	none
+	OnDisallowListNotification(id peer.ID, cause network.DisallowListedCause)
 
-	tp, found := n.topics[topic]
-	if !found {
-		err := fmt.Errorf("could not find topic (%s)", topic)
-		return err
-	}
-
-	if err := n.pubSub.UnregisterTopicValidator(topic.String()); err != nil {
-		n.logger.Err(err).Str("topic", topic.String()).Msg("failed to unregister topic validator")
-	}
-
-	// attempt to close the topic
-	err := tp.Close()
-	if err != nil {
-		err = fmt.Errorf("could not close topic (%s): %w", topic, err)
-		return err
-	}
-	n.topics[topic] = nil
-	delete(n.topics, topic)
-
-	n.logger.Debug().
-		Str("topic", topic.String()).
-		Msg("unsubscribed from topic")
-	return err
+	// OnAllowListNotification is called when a new allow list update notification is distributed.
+	// Any error on consuming event must handle internally.
+	// The implementation must be concurrency safe.
+	// Args:
+	// 	id: peer ID of the peer being allow-listed.
+	// 	cause: cause of the peer being allow-listed (only this cause is removed from the peer's disallow-listed causes).
+	// Returns:
+	// 	none
+	OnAllowListNotification(id peer.ID, cause network.DisallowListedCause)
 }
 
-// Publish publishes the given payload on the topic
-func (n *Node) Publish(ctx context.Context, topic channels.Topic, data []byte) error {
-	ps, found := n.topics[topic]
-	if !found {
-		return fmt.Errorf("could not find topic (%s)", topic)
-	}
-	err := ps.Publish(ctx, data)
-	if err != nil {
-		return fmt.Errorf("could not publish to topic (%s): %w", topic, err)
-	}
-	return nil
-}
-
-// Host returns pointer to host object of node.
-func (n *Node) Host() host.Host {
-	return n.host
-}
-
-func (n *Node) WithDefaultUnicastProtocol(defaultHandler libp2pnet.StreamHandler, preferred []unicast.ProtocolName) error {
-	n.unicastManager.WithDefaultHandler(defaultHandler)
-	for _, p := range preferred {
-		err := n.unicastManager.Register(p)
-		if err != nil {
-			return fmt.Errorf("could not register unicast protocls: %w", err)
-		}
-	}
-
-	return nil
-}
-
-// IsConnected returns true is address is a direct peer of this node else false
-func (n *Node) IsConnected(peerID peer.ID) (bool, error) {
-	isConnected := n.host.Network().Connectedness(peerID) == libp2pnet.Connected
-	return isConnected, nil
+// DisallowListOracle is an interface for querying disallow-listed peers.
+type DisallowListOracle interface {
+	// IsDisallowListed determines whether the given peer is disallow-listed for any reason.
+	// Args:
+	// - peerID: the peer to check.
+	// Returns:
+	// - []network.DisallowListedCause: the list of causes for which the given peer is disallow-listed. If the peer is not disallow-listed for any reason,
+	// a nil slice is returned.
+	// - bool: true if the peer is disallow-listed for any reason, false otherwise.
+	IsDisallowListed(peerId peer.ID) ([]network.DisallowListedCause, bool)
 }

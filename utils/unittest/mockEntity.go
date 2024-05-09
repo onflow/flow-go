@@ -7,6 +7,7 @@ import (
 // MockEntity implements a bare minimum entity for sake of test.
 type MockEntity struct {
 	Identifier flow.Identifier
+	Nonce      uint64
 }
 
 func (m MockEntity) ID() flow.Identifier {
@@ -31,4 +32,12 @@ func EntityListFixture(n uint) []*MockEntity {
 
 func MockEntityFixture() *MockEntity {
 	return &MockEntity{Identifier: IdentifierFixture()}
+}
+
+func MockEntityListFixture(count int) []*MockEntity {
+	entities := make([]*MockEntity, 0, count)
+	for i := 0; i < count; i++ {
+		entities = append(entities, MockEntityFixture())
+	}
+	return entities
 }

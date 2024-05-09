@@ -16,78 +16,72 @@ import (
 type Environment interface {
 	runtime.Interface
 
-	SetAccountFrozen(address common.Address, frozen bool) error
+	RandomSourceHistory() ([]byte, error)
 }
 
-var setAccountFrozenFunctionType = &sema.FunctionType{
-	Parameters: []*sema.Parameter{
-		{
-			Label:          sema.ArgumentLabelNotRequired,
-			Identifier:     "account",
-			TypeAnnotation: sema.NewTypeAnnotation(&sema.AddressType{}),
-		},
-		{
-			Label:          sema.ArgumentLabelNotRequired,
-			Identifier:     "frozen",
-			TypeAnnotation: sema.NewTypeAnnotation(sema.BoolType),
-		},
-	},
-	ReturnTypeAnnotation: &sema.TypeAnnotation{
-		Type: sema.VoidType,
-	},
+// randomSourceFunctionType is the type of the `randomSource` function.
+// This defies the signature as `func (): [UInt8]`
+var randomSourceFunctionType = &sema.FunctionType{
+	Parameters:           []sema.Parameter{},
+	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.ByteArrayType),
 }
 
 type ReusableCadenceRuntime struct {
 	runtime.Runtime
-	runtime.Environment
+	TxRuntimeEnv     runtime.Environment
+	ScriptRuntimeEnv runtime.Environment
 
 	fvmEnv Environment
 }
 
-func NewReusableCadenceRuntime(rt runtime.Runtime) *ReusableCadenceRuntime {
+func NewReusableCadenceRuntime(rt runtime.Runtime, config runtime.Config) *ReusableCadenceRuntime {
 	reusable := &ReusableCadenceRuntime{
-		Runtime:     rt,
-		Environment: runtime.NewBaseInterpreterEnvironment(runtime.Config{}),
+		Runtime:          rt,
+		TxRuntimeEnv:     runtime.NewBaseInterpreterEnvironment(config),
+		ScriptRuntimeEnv: runtime.NewScriptInterpreterEnvironment(config),
 	}
 
-	setAccountFrozen := stdlib.StandardLibraryValue{
-		Name: "setAccountFrozen",
-		Type: setAccountFrozenFunctionType,
+	// Declare the `randomSourceHistory` function. This function is **only** used by the
+	// System transaction, to fill the `RandomBeaconHistory` contract via the heartbeat
+	// resource. This allows the `RandomBeaconHistory` contract to be a standard contract,
+	// without any special parts.
+	// Since the `randomSourceHistory` function is only used by the System transaction,
+	// it is not part of the cadence standard library, and can just be injected from here.
+	// It also doesnt need user documentation, since it is not (and should not)
+	// be called by the user. If it is called by the user it will panic.
+	blockRandomSource := stdlib.StandardLibraryValue{
+		Name: "randomSourceHistory",
+		Type: randomSourceFunctionType,
 		Kind: common.DeclarationKindFunction,
 		Value: interpreter.NewUnmeteredHostFunctionValue(
+			randomSourceFunctionType,
 			func(invocation interpreter.Invocation) interpreter.Value {
-				address, ok := invocation.Arguments[0].(interpreter.AddressValue)
-				if !ok {
-					panic(errors.NewValueErrorf(invocation.Arguments[0].String(),
-						"first argument of setAccountFrozen must be an address"))
-				}
-
-				frozen, ok := invocation.Arguments[1].(interpreter.BoolValue)
-				if !ok {
-					panic(errors.NewValueErrorf(invocation.Arguments[0].String(),
-						"second argument of setAccountFrozen must be a boolean"))
+				if len(invocation.Arguments) != 0 {
+					panic(errors.NewInvalidArgumentErrorf(
+						"randomSourceHistory should be called without arguments"))
 				}
 
 				var err error
+				var source []byte
 				if reusable.fvmEnv != nil {
-					err = reusable.fvmEnv.SetAccountFrozen(
-						common.Address(address),
-						bool(frozen))
+					source, err = reusable.fvmEnv.RandomSourceHistory()
 				} else {
-					err = errors.NewOperationNotSupportedError("SetAccountFrozen")
+					err = errors.NewOperationNotSupportedError("randomSourceHistory")
 				}
 
 				if err != nil {
 					panic(err)
 				}
 
-				return interpreter.VoidValue{}
+				return interpreter.ByteSliceToByteArrayValue(
+					invocation.Interpreter,
+					source)
 			},
-			setAccountFrozenFunctionType,
 		),
 	}
 
-	reusable.Declare(setAccountFrozen)
+	reusable.TxRuntimeEnv.DeclareValue(blockRandomSource, nil)
+
 	return reusable
 }
 
@@ -107,7 +101,7 @@ func (reusable *ReusableCadenceRuntime) ReadStored(
 		path,
 		runtime.Context{
 			Interface:   reusable.fvmEnv,
-			Environment: reusable.Environment,
+			Environment: reusable.TxRuntimeEnv,
 		},
 	)
 }
@@ -128,21 +122,21 @@ func (reusable *ReusableCadenceRuntime) InvokeContractFunction(
 		argumentTypes,
 		runtime.Context{
 			Interface:   reusable.fvmEnv,
-			Environment: reusable.Environment,
+			Environment: reusable.TxRuntimeEnv,
 		},
 	)
 }
 
-func (reusable *ReusableCadenceRuntime) ExecuteTransaction(
+func (reusable *ReusableCadenceRuntime) NewTransactionExecutor(
 	script runtime.Script,
 	location common.Location,
-) error {
-	return reusable.Runtime.ExecuteTransaction(
+) runtime.Executor {
+	return reusable.Runtime.NewTransactionExecutor(
 		script,
 		runtime.Context{
 			Interface:   reusable.fvmEnv,
 			Location:    location,
-			Environment: reusable.Environment,
+			Environment: reusable.TxRuntimeEnv,
 		},
 	)
 }
@@ -157,11 +151,14 @@ func (reusable *ReusableCadenceRuntime) ExecuteScript(
 	return reusable.Runtime.ExecuteScript(
 		script,
 		runtime.Context{
-			Interface: reusable.fvmEnv,
-			Location:  location,
+			Interface:   reusable.fvmEnv,
+			Location:    location,
+			Environment: reusable.ScriptRuntimeEnv,
 		},
 	)
 }
+
+type CadenceRuntimeConstructor func(config runtime.Config) runtime.Runtime
 
 type ReusableCadenceRuntimePool struct {
 	pool chan *ReusableCadenceRuntime
@@ -173,13 +170,13 @@ type ReusableCadenceRuntimePool struct {
 	// pool will create runtimes using this function.
 	//
 	// Note that this is primarily used for testing.
-	newCustomRuntime func() runtime.Runtime
+	newCustomRuntime CadenceRuntimeConstructor
 }
 
 func newReusableCadenceRuntimePool(
 	poolSize int,
 	config runtime.Config,
-	newCustomRuntime func() runtime.Runtime,
+	newCustomRuntime CadenceRuntimeConstructor,
 ) ReusableCadenceRuntimePool {
 	var pool chan *ReusableCadenceRuntime
 	if poolSize > 0 {
@@ -197,22 +194,28 @@ func NewReusableCadenceRuntimePool(
 	poolSize int,
 	config runtime.Config,
 ) ReusableCadenceRuntimePool {
-	return newReusableCadenceRuntimePool(poolSize, config, nil)
+	return newReusableCadenceRuntimePool(
+		poolSize,
+		config,
+		nil,
+	)
 }
 
 func NewCustomReusableCadenceRuntimePool(
 	poolSize int,
-	newCustomRuntime func() runtime.Runtime,
+	config runtime.Config,
+	newCustomRuntime CadenceRuntimeConstructor,
 ) ReusableCadenceRuntimePool {
 	return newReusableCadenceRuntimePool(
 		poolSize,
-		runtime.Config{},
-		newCustomRuntime)
+		config,
+		newCustomRuntime,
+	)
 }
 
 func (pool ReusableCadenceRuntimePool) newRuntime() runtime.Runtime {
 	if pool.newCustomRuntime != nil {
-		return pool.newCustomRuntime()
+		return pool.newCustomRuntime(pool.config)
 	}
 	return runtime.NewInterpreterRuntime(pool.config)
 }
@@ -225,7 +228,12 @@ func (pool ReusableCadenceRuntimePool) Borrow(
 	case reusable = <-pool.pool:
 		// Do nothing.
 	default:
-		reusable = NewReusableCadenceRuntime(pool.newRuntime())
+		reusable = NewReusableCadenceRuntime(
+			WrappedCadenceRuntime{
+				pool.newRuntime(),
+			},
+			pool.config,
+		)
 	}
 
 	reusable.SetFvmEnvironment(fvmEnv)

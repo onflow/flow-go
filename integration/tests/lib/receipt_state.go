@@ -12,7 +12,6 @@ import (
 )
 
 const receiptTimeout = 120 * time.Second
-const receiptStateTimeout = 120 * time.Second
 
 type ReceiptState struct {
 	sync.RWMutex
@@ -72,4 +71,19 @@ func (rs *ReceiptState) WaitForReceiptFrom(t *testing.T, blockID, executorID flo
 		fmt.Sprintf("did not receive execution receipt for block ID %x from %x within %v seconds", blockID, executorID,
 			receiptTimeout))
 	return r
+}
+
+// WaitForNoReceiptFrom waits no execution receipt for the given blockID and the given executorID exists
+func (rs *ReceiptState) WaitForNoReceiptFrom(t *testing.T, timeout time.Duration, blockID, executorID flow.Identifier) {
+	require.Eventually(t, func() bool {
+		rs.RLock() // avoiding concurrent map access
+		defer rs.RUnlock()
+
+		var ok bool
+		_, ok = rs.receipts[blockID][executorID]
+		return !ok
+	}, timeout, 100*time.Millisecond,
+		fmt.Sprintf("received unwanted execution receipt for block ID %x from %x within %v seconds", blockID, executorID,
+			timeout))
+
 }

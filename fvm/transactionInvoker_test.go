@@ -13,9 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/fvm/programs"
-	"github.com/onflow/flow-go/fvm/state"
-	"github.com/onflow/flow-go/fvm/utils"
+	"github.com/onflow/flow-go/fvm/storage/testutils"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -25,27 +23,21 @@ func TestSafetyCheck(t *testing.T) {
 
 		buffer := &bytes.Buffer{}
 		log := zerolog.New(buffer)
-		txInvoker := fvm.NewTransactionInvoker()
-
-		vm := fvm.NewVM()
-
 		code := `X`
 
 		proc := fvm.Transaction(&flow.TransactionBody{Script: []byte(code)}, 0)
 
-		view := utils.NewSimpleView()
-		context := fvm.NewContext(fvm.WithLogger(log))
+		context := fvm.NewContext(
+			fvm.WithLogger(log),
+			fvm.WithAuthorizationChecksEnabled(false),
+			fvm.WithSequenceNumberCheckAndIncrementEnabled(false))
 
-		stTxn := state.NewStateTransaction(
-			view,
-			state.DefaultParameters().
-				WithMaxKeySizeAllowed(context.MaxStateKeySize).
-				WithMaxValueSizeAllowed(context.MaxStateValueSize).
-				WithMaxInteractionSizeAllowed(context.MaxStateInteractionSize),
-		)
+		txnState := testutils.NewSimpleTransaction(nil)
 
-		err := txInvoker.Process(vm, &context, proc, stTxn, programs.NewEmptyPrograms())
-		require.Error(t, err)
+		executor := proc.NewExecutor(context, txnState)
+		err := fvm.Run(executor)
+		require.Nil(t, err)
+		require.Error(t, executor.Output().Err)
 
 		require.NotContains(t, buffer.String(), "programs")
 		require.NotContains(t, buffer.String(), "codes")
@@ -56,27 +48,22 @@ func TestSafetyCheck(t *testing.T) {
 
 		buffer := &bytes.Buffer{}
 		log := zerolog.New(buffer)
-		txInvoker := fvm.NewTransactionInvoker()
-
-		vm := fvm.NewVM()
 
 		code := `transaction(arg: X) { }`
 
 		proc := fvm.Transaction(&flow.TransactionBody{Script: []byte(code)}, 0)
 
-		view := utils.NewSimpleView()
-		context := fvm.NewContext(fvm.WithLogger(log))
+		context := fvm.NewContext(
+			fvm.WithLogger(log),
+			fvm.WithAuthorizationChecksEnabled(false),
+			fvm.WithSequenceNumberCheckAndIncrementEnabled(false))
 
-		stTxn := state.NewStateTransaction(
-			view,
-			state.DefaultParameters().
-				WithMaxKeySizeAllowed(context.MaxStateKeySize).
-				WithMaxValueSizeAllowed(context.MaxStateValueSize).
-				WithMaxInteractionSizeAllowed(context.MaxStateInteractionSize),
-		)
+		txnState := testutils.NewSimpleTransaction(nil)
 
-		err := txInvoker.Process(vm, &context, proc, stTxn, programs.NewEmptyPrograms())
-		require.Error(t, err)
+		executor := proc.NewExecutor(context, txnState)
+		err := fvm.Run(executor)
+		require.Nil(t, err)
+		require.Error(t, executor.Output().Err)
 
 		require.NotContains(t, buffer.String(), "programs")
 		require.NotContains(t, buffer.String(), "codes")
@@ -85,6 +72,12 @@ func TestSafetyCheck(t *testing.T) {
 
 type ErrorReturningRuntime struct {
 	TxErrors []error
+}
+
+var _ runtime.Runtime = &ErrorReturningRuntime{}
+
+func (e *ErrorReturningRuntime) Config() runtime.Config {
+	panic("Config not expected")
 }
 
 func (e *ErrorReturningRuntime) NewScriptExecutor(script runtime.Script, context runtime.Context) runtime.Executor {
@@ -106,8 +99,6 @@ func (e *ErrorReturningRuntime) SetInvalidatedResourceValidationEnabled(_ bool) 
 func (e *ErrorReturningRuntime) SetResourceOwnerChangeHandlerEnabled(_ bool) {
 	panic("SetResourceOwnerChangeHandlerEnabled not expected")
 }
-
-var _ runtime.Runtime = &ErrorReturningRuntime{}
 
 func (e *ErrorReturningRuntime) ExecuteTransaction(_ runtime.Script, _ runtime.Context) error {
 	if len(e.TxErrors) == 0 {
@@ -141,10 +132,6 @@ func (*ErrorReturningRuntime) SetAtreeValidationEnabled(_ bool) {
 
 func (e *ErrorReturningRuntime) ReadStored(_ common.Address, _ cadence.Path, _ runtime.Context) (cadence.Value, error) {
 	return nil, nil
-}
-
-func (e *ErrorReturningRuntime) ReadLinked(_ common.Address, _ cadence.Path, _ runtime.Context) (cadence.Value, error) {
-	panic("ReadLinked not expected")
 }
 
 func (e *ErrorReturningRuntime) InvokeContractFunction(_ common.AddressLocation, _ string, _ []cadence.Value, _ []sema.Type, _ runtime.Context) (cadence.Value, error) {

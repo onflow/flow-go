@@ -25,7 +25,7 @@ type MessageQueue struct {
 	cond         *sync.Cond
 	priorityFunc MessagePriorityFunc
 	ctx          context.Context
-	metrics      module.NetworkMetrics
+	metrics      module.NetworkInboundQueueMetrics
 }
 
 func (mq *MessageQueue) Insert(message interface{}) error {
@@ -37,7 +37,7 @@ func (mq *MessageQueue) Insert(message interface{}) error {
 	// determine the message priority
 	priority, err := mq.priorityFunc(message)
 	if err != nil {
-		return fmt.Errorf("failed to dervie message priority: %w", err)
+		return fmt.Errorf("failed to derive message priority: %w", err)
 	}
 
 	// create the queue item
@@ -92,14 +92,14 @@ func (mq *MessageQueue) Len() int {
 	return mq.pq.Len()
 }
 
-func NewMessageQueue(ctx context.Context, priorityFunc MessagePriorityFunc, nm module.NetworkMetrics) *MessageQueue {
+func NewMessageQueue(ctx context.Context, priorityFunc MessagePriorityFunc, metrics module.NetworkInboundQueueMetrics) *MessageQueue {
 	var items = make([]*item, 0)
 	pq := priorityQueue(items)
 	mq := &MessageQueue{
 		pq:           &pq,
 		priorityFunc: priorityFunc,
 		ctx:          ctx,
-		metrics:      nm,
+		metrics:      metrics,
 	}
 	m := sync.Mutex{}
 	mq.cond = sync.NewCond(&m)

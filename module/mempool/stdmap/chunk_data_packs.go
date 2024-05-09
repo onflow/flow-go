@@ -1,4 +1,3 @@
-// (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
 package stdmap
 
 import (
@@ -59,9 +58,4 @@ func (c *ChunkDataPacks) All() []*flow.ChunkDataPack {
 		chunkDataPack = append(chunkDataPack, entity.(*flow.ChunkDataPack))
 	}
 	return chunkDataPack
-}
-
-// Hash will return a hash of the contents of the memory pool.
-func (c *ChunkDataPacks) Hash() flow.Identifier {
-	return c.Backend.Hash()
 }

@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -63,8 +64,8 @@ func setupTest() *FetcherEngineTestSuite {
 	return s
 }
 
-// newFetcherEngine returns a fetcher engine for testing.
-func newFetcherEngine(s *FetcherEngineTestSuite) *fetcher.Engine {
+// newFetcherEngineWithStop returns a fetcher engine for testing with stop at height set
+func newFetcherEngineWithStop(s *FetcherEngineTestSuite, stopAtHeight uint64) *fetcher.Engine {
 	s.requester.On("WithChunkDataPackHandler", mock.AnythingOfType("*fetcher.Engine")).Return()
 
 	e := fetcher.New(s.log,
@@ -77,10 +78,16 @@ func newFetcherEngine(s *FetcherEngineTestSuite) *fetcher.Engine {
 		s.blocks,
 		s.results,
 		s.receipts,
-		s.requester)
+		s.requester,
+		stopAtHeight)
 
 	e.WithChunkConsumerNotifier(s.chunkConsumerNotifier)
 	return e
+}
+
+// newFetcherEngine returns a fetcher engine for testing.
+func newFetcherEngine(s *FetcherEngineTestSuite) *fetcher.Engine {
+	return newFetcherEngineWithStop(s, 0)
 }
 
 func TestProcessAssignedChunkHappyPath(t *testing.T) {
@@ -131,7 +138,7 @@ func testProcessAssignChunkHappyPath(t *testing.T, chunkNum int, assignedNum int
 	s.metrics.On("OnAssignedChunkReceivedAtFetcher").Return().Times(len(locators))
 
 	// the chunks belong to an unsealed block.
-	mockBlockSealingStatus(s.state, s.headers, block, false)
+	mockBlockSealingStatus(s.state, s.headers, block.Header, false)
 
 	// mocks resources on fetcher engine side.
 	mockResultsByIDs(s.results, []*flow.ExecutionResult{result})
@@ -192,7 +199,7 @@ func TestChunkResponse_RemovingStatusFails(t *testing.T) {
 	// creates a result with specified 2 chunks and a single assigned chunk to this fetcher engine.
 	block, result, statuses, _, collMap := completeChunkStatusListFixture(t, 2, 1)
 	_, _, agrees, _ := mockReceiptsBlockID(t, block.ID(), s.receipts, result, 2, 2)
-	mockBlockSealingStatus(s.state, s.headers, block, false)
+	mockBlockSealingStatus(s.state, s.headers, block.Header, false)
 
 	mockResultsByIDs(s.results, []*flow.ExecutionResult{result})
 	mockBlocksStorage(s.blocks, s.headers, block)
@@ -229,7 +236,7 @@ func TestProcessAssignChunkSealedAfterRequest(t *testing.T) {
 	// also the chunk belongs to an unsealed block.
 	block, result, statuses, locators, collMap := completeChunkStatusListFixture(t, 2, 1)
 	_, _, agrees, disagrees := mockReceiptsBlockID(t, block.ID(), s.receipts, result, 2, 2)
-	mockBlockSealingStatus(s.state, s.headers, block, false)
+	mockBlockSealingStatus(s.state, s.headers, block.Header, false)
 	s.metrics.On("OnAssignedChunkReceivedAtFetcher").Return().Times(len(locators))
 
 	// mocks resources on fetcher engine side.
@@ -331,7 +338,27 @@ func TestChunkResponse_InvalidChunkDataPack(t *testing.T) {
 				// we don't alter chunk data pack content
 			},
 			mockStateFunc: func(identity flow.Identity, state *protocol.State, blockID flow.Identifier) {
-				identity.Weight = 0
+				identity.EpochParticipationStatus = flow.EpochParticipationStatusJoining
+				mockStateAtBlockIDForIdentities(state, blockID, flow.IdentityList{&identity})
+			},
+			msg: "participation-status-joining-origin-id",
+		},
+		{
+			alterChunkDataResponse: func(cdp *flow.ChunkDataPack) {
+				// we don't alter chunk data pack content
+			},
+			mockStateFunc: func(identity flow.Identity, state *protocol.State, blockID flow.Identifier) {
+				identity.EpochParticipationStatus = flow.EpochParticipationStatusLeaving
+				mockStateAtBlockIDForIdentities(state, blockID, flow.IdentityList{&identity})
+			},
+			msg: "participation-status-leaving-origin-id",
+		},
+		{
+			alterChunkDataResponse: func(cdp *flow.ChunkDataPack) {
+				// we don't alter chunk data pack content
+			},
+			mockStateFunc: func(identity flow.Identity, state *protocol.State, blockID flow.Identifier) {
+				identity.InitialWeight = 0
 				mockStateAtBlockIDForIdentities(state, blockID, flow.IdentityList{&identity})
 			},
 			msg: "zero-weight-origin-id",
@@ -450,7 +477,7 @@ func TestSkipChunkOfSealedBlock(t *testing.T) {
 	locators := unittest.ChunkStatusListToChunkLocatorFixture(statuses)
 	s.metrics.On("OnAssignedChunkReceivedAtFetcher").Return().Once()
 
-	mockBlockSealingStatus(s.state, s.headers, &block, true)
+	mockBlockSealingStatus(s.state, s.headers, block.Header, true)
 	mockResultsByIDs(s.results, []*flow.ExecutionResult{result})
 
 	// expects processing notifier being invoked upon sealed chunk detected,
@@ -467,6 +494,66 @@ func TestSkipChunkOfSealedBlock(t *testing.T) {
 	s.requester.AssertNotCalled(t, "Request")
 	// we should not try adding a chunk of a sealed block to chunk status mempool.
 	s.pendingChunks.AssertNotCalled(t, "Add")
+}
+
+// TestSkipChunkOfSealedBlock evaluates that if fetcher engine receives a chunk belonging to a sealed block,
+// it drops it without processing it any further and notifies consumer
+// that it is done with processing that chunk.
+func TestStopAtHeight(t *testing.T) {
+	s := setupTest()
+
+	headerA := unittest.BlockHeaderFixture()
+	headerB := unittest.BlockHeaderWithParentFixture(headerA)
+
+	fmt.Printf("A = %d B = %d\n", headerA.Height, headerB.Height)
+
+	// stop at blockB, meaning it blockA will be last to verify
+	e := newFetcherEngineWithStop(s, headerB.Height)
+
+	resultA := unittest.ExecutionResultFixture(unittest.WithExecutionResultBlockID(headerA.ID()))
+	resultB := unittest.ExecutionResultFixture(unittest.WithExecutionResultBlockID(headerB.ID()))
+
+	//statusesA := unittest.ChunkStatusListFixture(t, headerA.Height, resultA, 1)
+	//locatorsA := unittest.ChunkStatusListToChunkLocatorFixture(statusesA)
+	s.metrics.On("OnAssignedChunkReceivedAtFetcher").Return()
+
+	mockBlockSealingStatus(s.state, s.headers, headerA, false)
+	mockBlockSealingStatus(s.state, s.headers, headerB, false)
+	mockResultsByIDs(s.results, []*flow.ExecutionResult{resultA, resultB})
+
+	locatorA := chunks.Locator{
+		ResultID: resultA.ID(),
+		Index:    0,
+	}
+	locatorB := chunks.Locator{
+		ResultID: resultB.ID(),
+		Index:    0,
+	}
+
+	// expects processing notifier being invoked upon sealed chunk detected,
+	// which means the termination of processing a sealed chunk on fetcher engine
+	// side.
+	mockChunkConsumerNotifier(t, s.chunkConsumerNotifier, flow.GetIDs([]flow.Entity{locatorA, locatorB}))
+
+	s.pendingChunks.On("Add", mock.Anything).Run(func(args mock.Arguments) {
+		spew.Dump(args[0].(*verification.ChunkStatus).BlockHeight)
+	}).Return(false)
+
+	e.ProcessAssignedChunk(&locatorA)
+	e.ProcessAssignedChunk(&locatorB)
+
+	mock.AssertExpectationsForObjects(t, s.results, s.metrics)
+
+	// we should not request a duplicate chunk status.
+	s.requester.AssertNotCalled(t, "Request")
+
+	s.pendingChunks.AssertNotCalled(t, "Add", mock.MatchedBy(func(status *verification.ChunkStatus) bool {
+		return status.BlockHeight == headerB.Height
+	}))
+
+	s.pendingChunks.AssertCalled(t, "Add", mock.MatchedBy(func(status *verification.ChunkStatus) bool {
+		return status.BlockHeight == headerA.Height
+	}))
 }
 
 // mockResultsByIDs mocks the results storage for affirmative querying of result IDs.
@@ -706,12 +793,12 @@ func mockChunkConsumerNotifier(t *testing.T, notifier *module.ProcessingNotifier
 }
 
 // mockBlockSealingStatus mocks protocol state sealing status at height of given block.
-func mockBlockSealingStatus(state *protocol.State, headers *storage.Headers, block *flow.Block, sealed bool) {
-	headers.On("ByBlockID", block.ID()).Return(block.Header, nil)
+func mockBlockSealingStatus(state *protocol.State, headers *storage.Headers, header *flow.Header, sealed bool) {
+	headers.On("ByBlockID", header.ID()).Return(header, nil)
 	if sealed {
-		vertestutils.MockLastSealedHeight(state, block.Header.Height+1)
+		vertestutils.MockLastSealedHeight(state, header.Height+1)
 	} else {
-		vertestutils.MockLastSealedHeight(state, block.Header.Height-1)
+		vertestutils.MockLastSealedHeight(state, header.Height-1)
 	}
 }
 

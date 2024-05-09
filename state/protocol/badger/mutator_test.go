@@ -1,5 +1,3 @@
-// (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
-
 package badger_test
 
 import (
@@ -11,15 +9,15 @@ import (
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/onflow/crypto"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
-	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/module/metrics"
 	mockmodule "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/signature"
@@ -30,6 +28,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol/events"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	mockprotocol "github.com/onflow/flow-go/state/protocol/mock"
+	protocol_state "github.com/onflow/flow-go/state/protocol/protocol_state/state"
 	"github.com/onflow/flow-go/state/protocol/util"
 	"github.com/onflow/flow-go/storage"
 	stoerr "github.com/onflow/flow-go/storage"
@@ -38,10 +37,6 @@ import (
 	storeutil "github.com/onflow/flow-go/storage/util"
 	"github.com/onflow/flow-go/utils/unittest"
 )
-
-func init() {
-	rand.Seed(time.Now().UnixNano())
-}
 
 var participants = unittest.IdentityListFixture(5, unittest.WithAllRoles())
 
@@ -83,50 +78,82 @@ func TestBootstrapValid(t *testing.T) {
 	})
 }
 
+// TestExtendValid tests the happy path of extending the state with a single block.
+// * BlockFinalized is emitted when the block is finalized
+// * BlockProcessable is emitted when a block's child is inserted
 func TestExtendValid(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		metrics := metrics.NewNoopCollector()
 		tracer := trace.NewNoopTracer()
-		headers, _, seals, index, payloads, blocks, setups, commits, statuses, results := storeutil.StorageLayer(t, db)
+		log := zerolog.Nop()
+		all := storeutil.StorageLayer(t, db)
 
-		// create a event consumer to test epoch transition events
 		distributor := events.NewDistributor()
-		consumer := new(mockprotocol.Consumer)
+		consumer := mockprotocol.NewConsumer(t)
 		distributor.AddConsumer(consumer)
 
 		block, result, seal := unittest.BootstrapFixture(participants)
-		qc := unittest.QuorumCertificateFixture(unittest.QCWithBlockID(block.ID()))
+		qc := unittest.QuorumCertificateFixture(unittest.QCWithRootBlockID(block.ID()))
 		rootSnapshot, err := inmem.SnapshotFromBootstrapState(block, result, seal, qc)
 		require.NoError(t, err)
 
-		state, err := protocol.Bootstrap(metrics, db, headers, seals, results, blocks, setups, commits, statuses, rootSnapshot)
+		state, err := protocol.Bootstrap(
+			metrics,
+			db,
+			all.Headers,
+			all.Seals,
+			all.Results,
+			all.Blocks,
+			all.QuorumCertificates,
+			all.Setups,
+			all.EpochCommits,
+			all.EpochProtocolState,
+			all.ProtocolKVStore,
+			all.VersionBeacons,
+			rootSnapshot,
+		)
 		require.NoError(t, err)
 
-		fullState, err := protocol.NewFullConsensusState(state, index, payloads, tracer, consumer, util.MockBlockTimer(),
-			util.MockReceiptValidator(), util.MockSealValidator(seals))
+		fullState, err := protocol.NewFullConsensusState(
+			log,
+			tracer,
+			consumer,
+			state,
+			all.Index,
+			all.Payloads,
+			util.MockBlockTimer(),
+			util.MockReceiptValidator(),
+			util.MockSealValidator(all.Seals),
+		)
 		require.NoError(t, err)
 
-		extend := unittest.BlockWithParentFixture(block.Header)
-		extend.Payload.Guarantees = nil
-		extend.Header.PayloadHash = extend.Payload.Hash()
-
-		err = fullState.Extend(context.Background(), extend)
+		// insert block1 on top of the root block
+		block1 := unittest.BlockWithParentProtocolState(block)
+		err = fullState.Extend(context.Background(), block1)
 		require.NoError(t, err)
 
-		finalCommit, err := state.Final().Commit()
-		require.NoError(t, err)
-		require.Equal(t, seal.FinalState, finalCommit)
+		// we should not emit BlockProcessable for the root block
+		consumer.AssertNotCalled(t, "BlockProcessable", block.Header)
 
-		consumer.On("BlockFinalized", extend.Header).Once()
-		err = fullState.Finalize(context.Background(), extend.ID())
-		require.NoError(t, err)
-		consumer.AssertExpectations(t)
+		t.Run("BlockFinalized event should be emitted when block1 is finalized", func(t *testing.T) {
+			consumer.On("BlockFinalized", block1.Header).Once()
+			err := fullState.Finalize(context.Background(), block1.ID())
+			require.NoError(t, err)
+		})
+
+		t.Run("BlockProcessable event should be emitted when any child of block1 is inserted", func(t *testing.T) {
+			block2 := unittest.BlockWithParentProtocolState(block1)
+			consumer.On("BlockProcessable", block1.Header, mock.Anything).Once()
+			err := fullState.Extend(context.Background(), block2)
+			require.NoError(t, err)
+		})
 	})
 }
 
 func TestSealedIndex(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
-	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.MutableState) {
+	rootProtocolStateID := getRootProtocolStateID(t, rootSnapshot)
+	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState) {
 		rootHeader, err := rootSnapshot.Head()
 		require.NoError(t, err)
 
@@ -138,20 +165,22 @@ func TestSealedIndex(t *testing.T) {
 
 		// block 1
 		b1 := unittest.BlockWithParentFixture(rootHeader)
-		b1.SetPayload(flow.EmptyPayload())
+		b1.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
 		err = state.Extend(context.Background(), b1)
 		require.NoError(t, err)
 
 		// block 2(result B1)
 		b1Receipt := unittest.ReceiptForBlockFixture(b1)
 		b2 := unittest.BlockWithParentFixture(b1.Header)
-		b2.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(b1Receipt)))
+		b2.SetPayload(unittest.PayloadFixture(
+			unittest.WithReceipts(b1Receipt),
+			unittest.WithProtocolStateID(rootProtocolStateID),
+		))
 		err = state.Extend(context.Background(), b2)
 		require.NoError(t, err)
 
 		// block 3
-		b3 := unittest.BlockWithParentFixture(b2.Header)
-		b3.SetPayload(flow.EmptyPayload())
+		b3 := unittest.BlockWithParentProtocolState(b2)
 		err = state.Extend(context.Background(), b3)
 		require.NoError(t, err)
 
@@ -160,8 +189,9 @@ func TestSealedIndex(t *testing.T) {
 		b3Receipt := unittest.ReceiptForBlockFixture(b3)
 		b4 := unittest.BlockWithParentFixture(b3.Header)
 		b4.SetPayload(flow.Payload{
-			Receipts: []*flow.ExecutionReceiptMeta{b2Receipt.Meta(), b3Receipt.Meta()},
-			Results:  []*flow.ExecutionResult{&b2Receipt.ExecutionResult, &b3Receipt.ExecutionResult},
+			Receipts:        []*flow.ExecutionReceiptMeta{b2Receipt.Meta(), b3Receipt.Meta()},
+			Results:         []*flow.ExecutionResult{&b2Receipt.ExecutionResult, &b3Receipt.ExecutionResult},
+			ProtocolStateID: rootProtocolStateID,
 		})
 		err = state.Extend(context.Background(), b4)
 		require.NoError(t, err)
@@ -170,7 +200,8 @@ func TestSealedIndex(t *testing.T) {
 		b1Seal := unittest.Seal.Fixture(unittest.Seal.WithResult(&b1Receipt.ExecutionResult))
 		b5 := unittest.BlockWithParentFixture(b4.Header)
 		b5.SetPayload(flow.Payload{
-			Seals: []*flow.Seal{b1Seal},
+			Seals:           []*flow.Seal{b1Seal},
+			ProtocolStateID: rootProtocolStateID,
 		})
 		err = state.Extend(context.Background(), b5)
 		require.NoError(t, err)
@@ -180,14 +211,14 @@ func TestSealedIndex(t *testing.T) {
 		b3Seal := unittest.Seal.Fixture(unittest.Seal.WithResult(&b3Receipt.ExecutionResult))
 		b6 := unittest.BlockWithParentFixture(b5.Header)
 		b6.SetPayload(flow.Payload{
-			Seals: []*flow.Seal{b2Seal, b3Seal},
+			Seals:           []*flow.Seal{b2Seal, b3Seal},
+			ProtocolStateID: rootProtocolStateID,
 		})
 		err = state.Extend(context.Background(), b6)
 		require.NoError(t, err)
 
 		// block 7
-		b7 := unittest.BlockWithParentFixture(b6.Header)
-		b7.SetPayload(flow.EmptyPayload())
+		b7 := unittest.BlockWithParentProtocolState(b6)
 		err = state.Extend(context.Background(), b7)
 		require.NoError(t, err)
 
@@ -243,9 +274,181 @@ func TestSealedIndex(t *testing.T) {
 
 }
 
+func TestVersionBeaconIndex(t *testing.T) {
+	rootSnapshot := unittest.RootSnapshotFixture(participants)
+	rootProtocolStateID := getRootProtocolStateID(t, rootSnapshot)
+	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState) {
+		rootHeader, err := rootSnapshot.Head()
+		require.NoError(t, err)
+
+		// build a chain:
+		// G <- B1 <- B2 (resultB1(vb1)) <- B3 <- B4 (resultB2(vb2), resultB3(vb3)) <- B5 (sealB1) <- B6 (sealB2, sealB3)
+		// up until and including finalization of B5 there should be no VBs indexed
+		//    when B5 is finalized, index VB1
+		//    when B6 is finalized, we can index VB2 and VB3, but (only) the last one should be indexed by seal height
+
+		// block 1
+		b1 := unittest.BlockWithParentFixture(rootHeader)
+		b1.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
+		err = state.Extend(context.Background(), b1)
+		require.NoError(t, err)
+
+		vb1 := unittest.VersionBeaconFixture(
+			unittest.WithBoundaries(
+				flow.VersionBoundary{
+					BlockHeight: rootHeader.Height,
+					Version:     "0.21.37",
+				},
+				flow.VersionBoundary{
+					BlockHeight: rootHeader.Height + 100,
+					Version:     "0.21.38",
+				},
+			),
+		)
+		vb2 := unittest.VersionBeaconFixture(
+			unittest.WithBoundaries(
+				flow.VersionBoundary{
+					BlockHeight: rootHeader.Height,
+					Version:     "0.21.37",
+				},
+				flow.VersionBoundary{
+					BlockHeight: rootHeader.Height + 101,
+					Version:     "0.21.38",
+				},
+				flow.VersionBoundary{
+					BlockHeight: rootHeader.Height + 201,
+					Version:     "0.21.39",
+				},
+			),
+		)
+		vb3 := unittest.VersionBeaconFixture(
+			unittest.WithBoundaries(
+				flow.VersionBoundary{
+					BlockHeight: rootHeader.Height,
+					Version:     "0.21.37",
+				},
+				flow.VersionBoundary{
+					BlockHeight: rootHeader.Height + 99,
+					Version:     "0.21.38",
+				},
+				flow.VersionBoundary{
+					BlockHeight: rootHeader.Height + 199,
+					Version:     "0.21.39",
+				},
+				flow.VersionBoundary{
+					BlockHeight: rootHeader.Height + 299,
+					Version:     "0.21.40",
+				},
+			),
+		)
+
+		b1Receipt := unittest.ReceiptForBlockFixture(b1)
+		b1Receipt.ExecutionResult.ServiceEvents = []flow.ServiceEvent{vb1.ServiceEvent()}
+		b2 := unittest.BlockWithParentFixture(b1.Header)
+		b2.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(b1Receipt),
+			unittest.WithProtocolStateID(rootProtocolStateID)))
+		err = state.Extend(context.Background(), b2)
+		require.NoError(t, err)
+
+		// block 3
+		b3 := unittest.BlockWithParentProtocolState(b2)
+		err = state.Extend(context.Background(), b3)
+		require.NoError(t, err)
+
+		// block 4 (resultB2, resultB3)
+		b2Receipt := unittest.ReceiptForBlockFixture(b2)
+		b2Receipt.ExecutionResult.ServiceEvents = []flow.ServiceEvent{vb2.ServiceEvent()}
+
+		b3Receipt := unittest.ReceiptForBlockFixture(b3)
+		b3Receipt.ExecutionResult.ServiceEvents = []flow.ServiceEvent{vb3.ServiceEvent()}
+
+		b4 := unittest.BlockWithParentFixture(b3.Header)
+		b4.SetPayload(flow.Payload{
+			Receipts:        []*flow.ExecutionReceiptMeta{b2Receipt.Meta(), b3Receipt.Meta()},
+			Results:         []*flow.ExecutionResult{&b2Receipt.ExecutionResult, &b3Receipt.ExecutionResult},
+			ProtocolStateID: rootProtocolStateID,
+		})
+		err = state.Extend(context.Background(), b4)
+		require.NoError(t, err)
+
+		// block 5 (sealB1)
+		b1Seal := unittest.Seal.Fixture(unittest.Seal.WithResult(&b1Receipt.ExecutionResult))
+		b5 := unittest.BlockWithParentFixture(b4.Header)
+		b5.SetPayload(flow.Payload{
+			Seals:           []*flow.Seal{b1Seal},
+			ProtocolStateID: rootProtocolStateID,
+		})
+		err = state.Extend(context.Background(), b5)
+		require.NoError(t, err)
+
+		// block 6 (sealB2, sealB3)
+		b2Seal := unittest.Seal.Fixture(unittest.Seal.WithResult(&b2Receipt.ExecutionResult))
+		b3Seal := unittest.Seal.Fixture(unittest.Seal.WithResult(&b3Receipt.ExecutionResult))
+		b6 := unittest.BlockWithParentFixture(b5.Header)
+		b6.SetPayload(flow.Payload{
+			Seals:           []*flow.Seal{b2Seal, b3Seal},
+			ProtocolStateID: rootProtocolStateID,
+		})
+		err = state.Extend(context.Background(), b6)
+		require.NoError(t, err)
+
+		versionBeacons := bstorage.NewVersionBeacons(db)
+
+		// No VB can be found before finalizing anything
+		vb, err := versionBeacons.Highest(b6.Header.Height)
+		require.NoError(t, err)
+		require.Nil(t, vb)
+
+		// finalizing b1 - b5
+		err = state.Finalize(context.Background(), b1.ID())
+		require.NoError(t, err)
+		err = state.Finalize(context.Background(), b2.ID())
+		require.NoError(t, err)
+		err = state.Finalize(context.Background(), b3.ID())
+		require.NoError(t, err)
+		err = state.Finalize(context.Background(), b4.ID())
+		require.NoError(t, err)
+
+		// No VB can be found after finalizing B4
+		vb, err = versionBeacons.Highest(b6.Header.Height)
+		require.NoError(t, err)
+		require.Nil(t, vb)
+
+		// once B5 is finalized, B1 and VB1 are sealed, hence index should now find it
+		err = state.Finalize(context.Background(), b5.ID())
+		require.NoError(t, err)
+
+		versionBeacon, err := versionBeacons.Highest(b6.Header.Height)
+		require.NoError(t, err)
+		require.Equal(t,
+			&flow.SealedVersionBeacon{
+				VersionBeacon: vb1,
+				SealHeight:    b5.Header.Height,
+			},
+			versionBeacon,
+		)
+
+		// finalizing B6 should index events sealed by B6, so VB2 and VB3
+		// while we don't expect multiple VBs in one block, we index newest, so last one emitted - VB3
+		err = state.Finalize(context.Background(), b6.ID())
+		require.NoError(t, err)
+
+		versionBeacon, err = versionBeacons.Highest(b6.Header.Height)
+		require.NoError(t, err)
+		require.Equal(t,
+			&flow.SealedVersionBeacon{
+				VersionBeacon: vb3,
+				SealHeight:    b6.Header.Height,
+			},
+			versionBeacon,
+		)
+	})
+}
+
 func TestExtendSealedBoundary(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
-	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.MutableState) {
+	rootProtocolStateID := getRootProtocolStateID(t, rootSnapshot)
+	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState) {
 		head, err := rootSnapshot.Head()
 		require.NoError(t, err)
 		_, seal, err := rootSnapshot.SealedResult()
@@ -256,7 +459,7 @@ func TestExtendSealedBoundary(t *testing.T) {
 
 		// Create a first block on top of the snapshot
 		block1 := unittest.BlockWithParentFixture(head)
-		block1.SetPayload(flow.EmptyPayload())
+		block1.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
 		err = state.Extend(context.Background(), block1)
 		require.NoError(t, err)
 
@@ -264,8 +467,9 @@ func TestExtendSealedBoundary(t *testing.T) {
 		block1Receipt := unittest.ReceiptForBlockFixture(block1)
 		block2 := unittest.BlockWithParentFixture(block1.Header)
 		block2.SetPayload(flow.Payload{
-			Receipts: []*flow.ExecutionReceiptMeta{block1Receipt.Meta()},
-			Results:  []*flow.ExecutionResult{&block1Receipt.ExecutionResult},
+			Receipts:        []*flow.ExecutionReceiptMeta{block1Receipt.Meta()},
+			Results:         []*flow.ExecutionResult{&block1Receipt.ExecutionResult},
+			ProtocolStateID: rootProtocolStateID,
 		})
 		err = state.Extend(context.Background(), block2)
 		require.NoError(t, err)
@@ -274,7 +478,8 @@ func TestExtendSealedBoundary(t *testing.T) {
 		block1Seal := unittest.Seal.Fixture(unittest.Seal.WithResult(&block1Receipt.ExecutionResult))
 		block3 := unittest.BlockWithParentFixture(block2.Header)
 		block3.SetPayload(flow.Payload{
-			Seals: []*flow.Seal{block1Seal},
+			Seals:           []*flow.Seal{block1Seal},
+			ProtocolStateID: rootProtocolStateID,
 		})
 		err = state.Extend(context.Background(), block3)
 		require.NoError(t, err)
@@ -308,7 +513,7 @@ func TestExtendSealedBoundary(t *testing.T) {
 
 func TestExtendMissingParent(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
-	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.MutableState) {
+	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState) {
 		extend := unittest.BlockFixture()
 		extend.Payload.Guarantees = nil
 		extend.Payload.Seals = nil
@@ -325,21 +530,23 @@ func TestExtendMissingParent(t *testing.T) {
 		var sealID flow.Identifier
 		err = db.View(operation.LookupLatestSealAtBlock(extend.ID(), &sealID))
 		require.Error(t, err)
-		require.True(t, errors.Is(err, stoerr.ErrNotFound), err)
+		require.ErrorIs(t, err, stoerr.ErrNotFound)
 	})
 }
 
 func TestExtendHeightTooSmall(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
-	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.MutableState) {
+	rootProtocolStateID := getRootProtocolStateID(t, rootSnapshot)
+	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState) {
 		head, err := rootSnapshot.Head()
 		require.NoError(t, err)
 
 		extend := unittest.BlockFixture()
-		extend.SetPayload(flow.EmptyPayload())
+		extend.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
 		extend.Header.Height = 1
 		extend.Header.View = 1
 		extend.Header.ParentID = head.ID()
+		extend.Header.ParentView = head.View
 
 		err = state.Extend(context.Background(), &extend)
 		require.NoError(t, err)
@@ -356,13 +563,13 @@ func TestExtendHeightTooSmall(t *testing.T) {
 		var sealID flow.Identifier
 		err = db.View(operation.LookupLatestSealAtBlock(extend.ID(), &sealID))
 		require.Error(t, err)
-		require.True(t, errors.Is(err, stoerr.ErrNotFound), err)
+		require.ErrorIs(t, err, stoerr.ErrNotFound)
 	})
 }
 
 func TestExtendHeightTooLarge(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
-	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.MutableState) {
+	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState) {
 
 		head, err := rootSnapshot.Head()
 		require.NoError(t, err)
@@ -377,16 +584,37 @@ func TestExtendHeightTooLarge(t *testing.T) {
 	})
 }
 
+// TestExtendInconsistentParentView tests if mutableState rejects block with invalid ParentView. ParentView must be consistent
+// with view of block referred by ParentID.
+func TestExtendInconsistentParentView(t *testing.T) {
+	rootSnapshot := unittest.RootSnapshotFixture(participants)
+	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState) {
+
+		head, err := rootSnapshot.Head()
+		require.NoError(t, err)
+
+		block := unittest.BlockWithParentFixture(head)
+		block.SetPayload(flow.EmptyPayload())
+		// set an invalid parent view
+		block.Header.ParentView++
+
+		err = state.Extend(context.Background(), block)
+		require.Error(t, err)
+		require.True(t, st.IsInvalidExtensionError(err))
+	})
+}
+
 func TestExtendBlockNotConnected(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
-	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.MutableState) {
+	rootProtocolStateID := getRootProtocolStateID(t, rootSnapshot)
+	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState) {
 
 		head, err := rootSnapshot.Head()
 		require.NoError(t, err)
 
 		// add 2 blocks, the second finalizing/sealing the state of the first
 		extend := unittest.BlockWithParentFixture(head)
-		extend.SetPayload(flow.EmptyPayload())
+		extend.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
 
 		err = state.Extend(context.Background(), extend)
 		require.NoError(t, err)
@@ -405,13 +633,13 @@ func TestExtendBlockNotConnected(t *testing.T) {
 		var sealID flow.Identifier
 		err = db.View(operation.LookupLatestSealAtBlock(extend.ID(), &sealID))
 		require.Error(t, err)
-		require.True(t, errors.Is(err, stoerr.ErrNotFound), err)
+		require.ErrorIs(t, err, stoerr.ErrNotFound)
 	})
 }
 
 func TestExtendInvalidChainID(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
-	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.MutableState) {
+	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState) {
 		head, err := rootSnapshot.Head()
 		require.NoError(t, err)
 
@@ -436,7 +664,7 @@ func TestExtendReceiptsNotSorted(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
 	head, err := rootSnapshot.Head()
 	require.NoError(t, err)
-	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.MutableState) {
+	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState) {
 		// create block2 and block3
 		block2 := unittest.BlockWithParentFixture(head)
 		block2.Payload.Guarantees = nil
@@ -467,10 +695,10 @@ func TestExtendReceiptsNotSorted(t *testing.T) {
 }
 
 func TestExtendReceiptsInvalid(t *testing.T) {
-	validator := &mockmodule.ReceiptValidator{}
-
+	validator := mockmodule.NewReceiptValidator(t)
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
-	util.RunWithFullProtocolStateAndValidator(t, rootSnapshot, validator, func(db *badger.DB, state *protocol.MutableState) {
+	rootProtocolStateID := getRootProtocolStateID(t, rootSnapshot)
+	util.RunWithFullProtocolStateAndValidator(t, rootSnapshot, validator, func(db *badger.DB, state *protocol.ParticipantState) {
 		head, err := rootSnapshot.Head()
 		require.NoError(t, err)
 
@@ -478,7 +706,7 @@ func TestExtendReceiptsInvalid(t *testing.T) {
 
 		// create block2 and block3
 		block2 := unittest.BlockWithParentFixture(head)
-		block2.SetPayload(flow.EmptyPayload())
+		block2.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
 		err = state.Extend(context.Background(), block2)
 		require.NoError(t, err)
 
@@ -487,8 +715,9 @@ func TestExtendReceiptsInvalid(t *testing.T) {
 
 		block3 := unittest.BlockWithParentFixture(block2.Header)
 		block3.SetPayload(flow.Payload{
-			Receipts: []*flow.ExecutionReceiptMeta{receipt.Meta()},
-			Results:  []*flow.ExecutionResult{&receipt.ExecutionResult},
+			Receipts:        []*flow.ExecutionReceiptMeta{receipt.Meta()},
+			Results:         []*flow.ExecutionResult{&receipt.ExecutionResult},
+			ProtocolStateID: rootProtocolStateID,
 		})
 
 		// force the receipt validator to refuse this payload
@@ -497,27 +726,25 @@ func TestExtendReceiptsInvalid(t *testing.T) {
 		err = state.Extend(context.Background(), block3)
 		require.Error(t, err)
 		require.True(t, st.IsInvalidExtensionError(err), err)
-		validator.AssertExpectations(t)
 	})
 }
 
 func TestExtendReceiptsValid(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
-	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.MutableState) {
+	rootProtocolStateID := getRootProtocolStateID(t, rootSnapshot)
+	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState) {
 		head, err := rootSnapshot.Head()
 		require.NoError(t, err)
 		block2 := unittest.BlockWithParentFixture(head)
-		block2.SetPayload(flow.EmptyPayload())
+		block2.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
 		err = state.Extend(context.Background(), block2)
 		require.NoError(t, err)
 
-		block3 := unittest.BlockWithParentFixture(block2.Header)
-		block3.SetPayload(flow.EmptyPayload())
+		block3 := unittest.BlockWithParentProtocolState(block2)
 		err = state.Extend(context.Background(), block3)
 		require.NoError(t, err)
 
-		block4 := unittest.BlockWithParentFixture(block3.Header)
-		block4.SetPayload(flow.EmptyPayload())
+		block4 := unittest.BlockWithParentProtocolState(block3)
 		err = state.Extend(context.Background(), block4)
 		require.NoError(t, err)
 
@@ -537,6 +764,7 @@ func TestExtendReceiptsValid(t *testing.T) {
 				&receipt3b.ExecutionResult,
 				&receipt3c.ExecutionResult,
 			},
+			ProtocolStateID: rootProtocolStateID,
 		})
 		err = state.Extend(context.Background(), block5)
 		require.NoError(t, err)
@@ -547,33 +775,32 @@ func TestExtendReceiptsValid(t *testing.T) {
 // event, then a commit event, then finalizing the first block of the next epoch.
 // Also tests that appropriate epoch transition events are fired.
 //
-// Epoch information becomes available in the protocol state in the block AFTER
-// the block sealing the relevant service event. This is because the block after
-// the sealing block contains a QC certifying validity of the payload of the
-// sealing block.
+// Epoch information becomes available in the protocol state in the block containing the seal
+// for the block whose execution emitted the service event.
 //
-// ROOT <- B1 <- B2(R1) <- B3(S1) <- B4 <- B5(R2) <- B6(S2) <- B7 <- B8 <-|- B9
+// ROOT <- B1 <- B2(R1) <- B3(S1) <- B4 <- B5(R2) <- B6(S2) <- B7 <-|- B8
 //
-// B4 contains a QC for B3, which seals B1, in which EpochSetup is emitted.
-// * we can query the EpochSetup beginning with B4
-// * EpochSetupPhaseStarted triggered when B4 is finalized
+// B3 seals B1, in which EpochSetup is emitted.
+//   - we can query the EpochSetup beginning with B3
+//   - EpochSetupPhaseStarted triggered when B3 is finalized
 //
-// B7 contains a QC for B6, which seals B2, in which EpochCommitted is emitted.
-// * we can query the EpochCommit beginning with B7
-// * EpochSetupPhaseStarted triggered when B7 is finalized
+// B6 seals B2, in which EpochCommitted is emitted.
+//   - we can query the EpochCommit beginning with B6
+//   - EpochCommittedPhaseStarted triggered when B6 is finalized
 //
-// B8 is the final block of the epoch.
-// B9 is the first block of the NEXT epoch.
+// B7 is the final block of the epoch.
+// B8 is the first block of the NEXT epoch.
 func TestExtendEpochTransitionValid(t *testing.T) {
-	// create a event consumer to test epoch transition events
-	consumer := new(mockprotocol.Consumer)
+	// create an event consumer to test epoch transition events
+	consumer := mockprotocol.NewConsumer(t)
 	consumer.On("BlockFinalized", mock.Anything)
+	consumer.On("BlockProcessable", mock.Anything, mock.Anything)
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
-
+	rootProtocolStateID := getRootProtocolStateID(t, rootSnapshot)
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 
 		// set up state and mock ComplianceMetrics object
-		metrics := new(mockmodule.ComplianceMetrics)
+		metrics := mockmodule.NewComplianceMetrics(t)
 		metrics.On("BlockSealed", mock.Anything)
 		metrics.On("SealedHeight", mock.Anything)
 		metrics.On("FinalizedHeight", mock.Anything)
@@ -589,7 +816,6 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		require.NoError(t, err)
 		metrics.On("CurrentEpochCounter", counter).Once()
 		metrics.On("CurrentEpochPhase", initialPhase).Once()
-		metrics.On("CommittedEpochFinalView", finalView).Once()
 
 		metrics.On("CurrentEpochFinalView", finalView).Once()
 
@@ -600,14 +826,49 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		metrics.On("CurrentDKGPhase3FinalView", dkgPhase3FinalView).Once()
 
 		tracer := trace.NewNoopTracer()
-		headers, _, seals, index, payloads, blocks, setups, commits, statuses, results := storeutil.StorageLayer(t, db)
-		protoState, err := protocol.Bootstrap(metrics, db, headers, seals, results, blocks, setups, commits, statuses, rootSnapshot)
+		log := zerolog.Nop()
+		all := storeutil.StorageLayer(t, db)
+		protoState, err := protocol.Bootstrap(
+			metrics,
+			db,
+			all.Headers,
+			all.Seals,
+			all.Results,
+			all.Blocks,
+			all.QuorumCertificates,
+			all.Setups,
+			all.EpochCommits,
+			all.EpochProtocolState,
+			all.ProtocolKVStore,
+			all.VersionBeacons,
+			rootSnapshot,
+		)
 		require.NoError(t, err)
 		receiptValidator := util.MockReceiptValidator()
-		sealValidator := util.MockSealValidator(seals)
-		state, err := protocol.NewFullConsensusState(protoState, index, payloads, tracer, consumer,
-			util.MockBlockTimer(), receiptValidator, sealValidator)
+		sealValidator := util.MockSealValidator(all.Seals)
+		state, err := protocol.NewFullConsensusState(
+			log,
+			tracer,
+			consumer,
+			protoState,
+			all.Index,
+			all.Payloads,
+			util.MockBlockTimer(),
+			receiptValidator,
+			sealValidator,
+		)
 		require.NoError(t, err)
+
+		mutableProtocolState := protocol_state.NewMutableProtocolState(
+			all.EpochProtocolState,
+			all.ProtocolKVStore,
+			state.Params(),
+			all.Headers,
+			all.Results,
+			all.Setups,
+			all.EpochCommits,
+		)
+		calculateExpectedStateId := calculateExpectedStateId(t, mutableProtocolState)
 
 		head, err := rootSnapshot.Head()
 		require.NoError(t, err)
@@ -621,7 +882,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 
 		// add a block for the first seal to reference
 		block1 := unittest.BlockWithParentFixture(head)
-		block1.SetPayload(flow.EmptyPayload())
+		block1.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
 		err = state.Extend(context.Background(), block1)
 		require.NoError(t, err)
 		err = state.Finalize(context.Background(), block1.ID())
@@ -632,7 +893,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 
 		// add a participant for the next epoch
 		epoch2NewParticipant := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
-		epoch2Participants := append(participants, epoch2NewParticipant).Sort(order.Canonical)
+		epoch2Participants := append(participants, epoch2NewParticipant).Sort(flow.Canonical[flow.Identity]).ToSkeleton()
 
 		// create the epoch setup event for the second epoch
 		epoch2Setup := unittest.EpochSetupFixture(
@@ -649,7 +910,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 
 		// add a second block with the receipt for block 1
 		block2 := unittest.BlockWithParentFixture(block1.Header)
-		block2.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt1)))
+		block2.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt1), unittest.WithProtocolStateID(block1.Payload.ProtocolStateID)))
 
 		err = state.Extend(context.Background(), block2)
 		require.NoError(t, err)
@@ -657,65 +918,67 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		require.NoError(t, err)
 
 		// block 3 contains the seal for block 1
+		seals := []*flow.Seal{seal1}
 		block3 := unittest.BlockWithParentFixture(block2.Header)
 		block3.SetPayload(flow.Payload{
-			Seals: []*flow.Seal{seal1},
+			Seals:           seals,
+			ProtocolStateID: calculateExpectedStateId(block3.Header, seals),
 		})
 
 		// insert the block sealing the EpochSetup event
 		err = state.Extend(context.Background(), block3)
 		require.NoError(t, err)
 
-		// insert a block with a QC pointing to block 3
-		block4 := unittest.BlockWithParentFixture(block3.Header)
-		err = state.Extend(context.Background(), block4)
-		require.NoError(t, err)
-
 		// now that the setup event has been emitted, we should be in the setup phase
-		phase, err = state.AtBlockID(block4.ID()).Phase()
+		phase, err = state.AtBlockID(block3.ID()).Phase()
 		assert.NoError(t, err)
 		require.Equal(t, flow.EpochPhaseSetup, phase)
 
-		// we should NOT be able to query epoch 2 wrt blocks before 4
-		for _, blockID := range []flow.Identifier{block1.ID(), block2.ID(), block3.ID()} {
+		// we should NOT be able to query epoch 2 wrt blocks before 3
+		for _, blockID := range []flow.Identifier{block1.ID(), block2.ID()} {
 			_, err = state.AtBlockID(blockID).Epochs().Next().InitialIdentities()
 			require.Error(t, err)
 			_, err = state.AtBlockID(blockID).Epochs().Next().Clustering()
 			require.Error(t, err)
 		}
 
-		// we should be able to query epoch 2 wrt block 4
-		_, err = state.AtBlockID(block4.ID()).Epochs().Next().InitialIdentities()
+		// we should be able to query epoch 2 wrt block 3
+		_, err = state.AtBlockID(block3.ID()).Epochs().Next().InitialIdentities()
 		assert.NoError(t, err)
-		_, err = state.AtBlockID(block4.ID()).Epochs().Next().Clustering()
+		_, err = state.AtBlockID(block3.ID()).Epochs().Next().Clustering()
 		assert.NoError(t, err)
 
 		// only setup event is finalized, not commit, so shouldn't be able to get certain info
-		_, err = state.AtBlockID(block4.ID()).Epochs().Next().DKG()
+		_, err = state.AtBlockID(block3.ID()).Epochs().Next().DKG()
 		require.Error(t, err)
 
-		// finalize block 3 so we can finalize subsequent blocks
-		err = state.Finalize(context.Background(), block3.ID())
+		// insert B4
+		block4 := unittest.BlockWithParentProtocolState(block3)
+		err = state.Extend(context.Background(), block4)
 		require.NoError(t, err)
 
-		// finalize block 4 so we can finalize subsequent blocks
-		// ensure an epoch phase transition when we finalize block 4
-		consumer.On("EpochSetupPhaseStarted", epoch2Setup.Counter-1, block4.Header).Once()
+		consumer.On("EpochSetupPhaseStarted", epoch2Setup.Counter-1, block3.Header).Once()
 		metrics.On("CurrentEpochPhase", flow.EpochPhaseSetup).Once()
-		err = state.Finalize(context.Background(), block4.ID())
+		// finalize block 3, so we can finalize subsequent blocks
+		// ensure an epoch phase transition when we finalize block 3
+		err = state.Finalize(context.Background(), block3.ID())
 		require.NoError(t, err)
-		consumer.AssertCalled(t, "EpochSetupPhaseStarted", epoch2Setup.Counter-1, block4.Header)
+		consumer.AssertCalled(t, "EpochSetupPhaseStarted", epoch2Setup.Counter-1, block3.Header)
 		metrics.AssertCalled(t, "CurrentEpochPhase", flow.EpochPhaseSetup)
 
 		// now that the setup event has been emitted, we should be in the setup phase
-		phase, err = state.AtBlockID(block4.ID()).Phase()
-		assert.NoError(t, err)
+		phase, err = state.AtBlockID(block3.ID()).Phase()
+		require.NoError(t, err)
 		require.Equal(t, flow.EpochPhaseSetup, phase)
+
+		// finalize block 4
+		err = state.Finalize(context.Background(), block4.ID())
+		require.NoError(t, err)
 
 		epoch2Commit := unittest.EpochCommitFixture(
 			unittest.CommitWithCounter(epoch2Setup.Counter),
 			unittest.WithClusterQCsFromAssignments(epoch2Setup.Assignments),
-			unittest.WithDKGFromParticipants(epoch2Participants),
+			unittest.WithDKGFromParticipants(epoch2Participants.ToSkeleton()),
 		)
 
 		// create receipt and seal for block 2
@@ -726,7 +989,8 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 
 		// block 5 contains the receipt for block 2
 		block5 := unittest.BlockWithParentFixture(block4.Header)
-		block5.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt2)))
+		block5.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt2),
+			unittest.WithProtocolStateID(block4.Payload.ProtocolStateID)))
 
 		err = state.Extend(context.Background(), block5)
 		require.NoError(t, err)
@@ -734,51 +998,49 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		require.NoError(t, err)
 
 		// block 6 contains the seal for block 2
+		seals = []*flow.Seal{seal2}
 		block6 := unittest.BlockWithParentFixture(block5.Header)
 		block6.SetPayload(flow.Payload{
-			Seals: []*flow.Seal{seal2},
+			Seals:           seals,
+			ProtocolStateID: calculateExpectedStateId(block6.Header, seals),
 		})
 
 		err = state.Extend(context.Background(), block6)
 		require.NoError(t, err)
 
-		// insert a block with a QC pointing to block 6
-		block7 := unittest.BlockWithParentFixture(block6.Header)
-		err = state.Extend(context.Background(), block7)
-		require.NoError(t, err)
-
-		// we should NOT be able to query epoch 2 commit info wrt blocks before 7
-		for _, blockID := range []flow.Identifier{block4.ID(), block5.ID(), block6.ID()} {
+		// we should NOT be able to query epoch 2 commit info wrt blocks before 6
+		for _, blockID := range []flow.Identifier{block4.ID(), block5.ID()} {
 			_, err = state.AtBlockID(blockID).Epochs().Next().DKG()
 			require.Error(t, err)
 		}
 
-		// now epoch 2 is fully ready, we can query anything we want about it wrt block 7 (or later)
-		_, err = state.AtBlockID(block7.ID()).Epochs().Next().InitialIdentities()
+		// now epoch 2 is fully ready, we can query anything we want about it wrt block 6 (or later)
+		_, err = state.AtBlockID(block6.ID()).Epochs().Next().InitialIdentities()
 		require.NoError(t, err)
-		_, err = state.AtBlockID(block7.ID()).Epochs().Next().Clustering()
+		_, err = state.AtBlockID(block6.ID()).Epochs().Next().Clustering()
 		require.NoError(t, err)
-		_, err = state.AtBlockID(block7.ID()).Epochs().Next().DKG()
+		_, err = state.AtBlockID(block6.ID()).Epochs().Next().DKG()
 		assert.NoError(t, err)
 
 		// now that the commit event has been emitted, we should be in the committed phase
-		phase, err = state.AtBlockID(block7.ID()).Phase()
+		phase, err = state.AtBlockID(block6.ID()).Phase()
 		assert.NoError(t, err)
 		require.Equal(t, flow.EpochPhaseCommitted, phase)
+
+		// block 7 has the final view of the epoch, insert it, finalized after finalizing block 6
+		block7 := unittest.BlockWithParentProtocolState(block6)
+		block7.Header.View = epoch1FinalView
+		err = state.Extend(context.Background(), block7)
+		require.NoError(t, err)
+
+		// expect epoch phase transition once we finalize block 6
+		consumer.On("EpochCommittedPhaseStarted", epoch2Setup.Counter-1, block6.Header).Once()
+		metrics.On("CurrentEpochPhase", flow.EpochPhaseCommitted).Once()
 
 		err = state.Finalize(context.Background(), block6.ID())
 		require.NoError(t, err)
 
-		// expect epoch phase transition once we finalize block 7
-		consumer.On("EpochCommittedPhaseStarted", epoch2Setup.Counter-1, block7.Header).Once()
-		// expect committed final view to be updated, since we are committing epoch 2
-		metrics.On("CommittedEpochFinalView", epoch2Setup.FinalView).Once()
-		metrics.On("CurrentEpochPhase", flow.EpochPhaseCommitted).Once()
-		err = state.Finalize(context.Background(), block7.ID())
-
-		require.NoError(t, err)
-		consumer.AssertCalled(t, "EpochCommittedPhaseStarted", epoch2Setup.Counter-1, block7.Header)
-		metrics.AssertCalled(t, "CommittedEpochFinalView", epoch2Setup.FinalView)
+		consumer.AssertCalled(t, "EpochCommittedPhaseStarted", epoch2Setup.Counter-1, block6.Header)
 		metrics.AssertCalled(t, "CurrentEpochPhase", flow.EpochPhaseCommitted)
 
 		// we should still be in epoch 1
@@ -786,41 +1048,40 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, epoch1Setup.Counter, epochCounter)
 
-		// block 8 has the final view of the epoch
+		err = state.Finalize(context.Background(), block7.ID())
+		require.NoError(t, err)
+
+		// we should still be in epoch 1, since epochs are inclusive of final view
+		epochCounter, err = state.AtBlockID(block7.ID()).Epochs().Current().Counter()
+		require.NoError(t, err)
+		require.Equal(t, epoch1Setup.Counter, epochCounter)
+
+		// block 8 has a view > final view of epoch 1, it will be considered the first block of epoch 2
 		block8 := unittest.BlockWithParentFixture(block7.Header)
-		block8.SetPayload(flow.EmptyPayload())
-		block8.Header.View = epoch1FinalView
+		// we should handle views that aren't exactly the first valid view of the epoch
+		block8.Header.View = epoch1FinalView + uint64(1+rand.Intn(10))
+		// need to update root protocol state since we enter new epoch
+		block8.SetPayload(
+			unittest.PayloadFixture(
+				unittest.WithProtocolStateID(calculateExpectedStateId(block8.Header, nil))))
 
 		err = state.Extend(context.Background(), block8)
 		require.NoError(t, err)
 
-		// we should still be in epoch 1, since epochs are inclusive of final view
-		epochCounter, err = state.AtBlockID(block8.ID()).Epochs().Current().Counter()
-		require.NoError(t, err)
-		require.Equal(t, epoch1Setup.Counter, epochCounter)
-
-		// block 9 has a view > final view of epoch 1, it will be considered the first block of epoch 2
-		block9 := unittest.BlockWithParentFixture(block8.Header)
-		block9.SetPayload(flow.EmptyPayload())
-		// we should handle views that aren't exactly the first valid view of the epoch
-		block9.Header.View = epoch1FinalView + uint64(1+rand.Intn(10))
-
-		err = state.Extend(context.Background(), block9)
-		require.NoError(t, err)
-
 		// now, at long last, we are in epoch 2
-		epochCounter, err = state.AtBlockID(block9.ID()).Epochs().Current().Counter()
+		epochCounter, err = state.AtBlockID(block8.ID()).Epochs().Current().Counter()
 		require.NoError(t, err)
 		require.Equal(t, epoch2Setup.Counter, epochCounter)
 
 		// we should begin epoch 2 in staking phase
 		// how that the commit event has been emitted, we should be in the committed phase
-		phase, err = state.AtBlockID(block9.ID()).Phase()
+		phase, err = state.AtBlockID(block8.ID()).Phase()
 		assert.NoError(t, err)
 		require.Equal(t, flow.EpochPhaseStaking, phase)
 
 		// expect epoch transition once we finalize block 9
-		consumer.On("EpochTransition", epoch2Setup.Counter, block9.Header).Once()
+		consumer.On("EpochTransition", epoch2Setup.Counter, block8.Header).Once()
+		metrics.On("EpochTransitionHeight", block8.Header.Height).Once()
 		metrics.On("CurrentEpochCounter", epoch2Setup.Counter).Once()
 		metrics.On("CurrentEpochPhase", flow.EpochPhaseStaking).Once()
 		metrics.On("CurrentEpochFinalView", epoch2Setup.FinalView).Once()
@@ -828,19 +1089,22 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		metrics.On("CurrentDKGPhase2FinalView", epoch2Setup.DKGPhase2FinalView).Once()
 		metrics.On("CurrentDKGPhase3FinalView", epoch2Setup.DKGPhase3FinalView).Once()
 
+		// before block 9 is finalized, the epoch 1-2 boundary is unknown
+		_, err = state.AtBlockID(block8.ID()).Epochs().Current().FinalHeight()
+		assert.ErrorIs(t, err, realprotocol.ErrUnknownEpochBoundary)
+		_, err = state.AtBlockID(block8.ID()).Epochs().Current().FirstHeight()
+		assert.ErrorIs(t, err, realprotocol.ErrUnknownEpochBoundary)
+
 		err = state.Finalize(context.Background(), block8.ID())
 		require.NoError(t, err)
-		err = state.Finalize(context.Background(), block9.ID())
-		require.NoError(t, err)
-		consumer.AssertCalled(t, "EpochTransition", epoch2Setup.Counter, block9.Header)
-		metrics.AssertCalled(t, "CurrentEpochCounter", epoch2Setup.Counter)
-		metrics.AssertCalled(t, "CurrentEpochPhase", flow.EpochPhaseStaking)
-		metrics.AssertCalled(t, "CurrentEpochFinalView", epoch2Setup.FinalView)
-		metrics.AssertCalled(t, "CurrentDKGPhase1FinalView", epoch2Setup.DKGPhase1FinalView)
-		metrics.AssertCalled(t, "CurrentDKGPhase2FinalView", epoch2Setup.DKGPhase2FinalView)
-		metrics.AssertCalled(t, "CurrentDKGPhase3FinalView", epoch2Setup.DKGPhase3FinalView)
 
-		metrics.AssertExpectations(t)
+		// once block 8 is finalized, epoch 2 has unambiguously begun - the epoch 1-2 boundary is known
+		epoch1FinalHeight, err := state.AtBlockID(block8.ID()).Epochs().Previous().FinalHeight()
+		require.NoError(t, err)
+		assert.Equal(t, block7.Header.Height, epoch1FinalHeight)
+		epoch2FirstHeight, err := state.AtBlockID(block8.ID()).Epochs().Current().FirstHeight()
+		require.NoError(t, err)
+		assert.Equal(t, block8.Header.Height, epoch2FirstHeight)
 	})
 }
 
@@ -852,7 +1116,9 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 //	         \--B2<--B4(R2)<--B6(S2)<--B8
 func TestExtendConflictingEpochEvents(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
-	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.MutableState) {
+	rootProtocolStateID := getRootProtocolStateID(t, rootSnapshot)
+	util.RunWithFullProtocolStateAndMutator(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState, mutableState realprotocol.MutableProtocolState) {
+		calculateExpectedStateId := calculateExpectedStateId(t, mutableState)
 
 		head, err := rootSnapshot.Head()
 		require.NoError(t, err)
@@ -861,12 +1127,12 @@ func TestExtendConflictingEpochEvents(t *testing.T) {
 
 		// add two conflicting blocks for each service event to reference
 		block1 := unittest.BlockWithParentFixture(head)
-		block1.SetPayload(flow.EmptyPayload())
+		block1.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
 		err = state.Extend(context.Background(), block1)
 		require.NoError(t, err)
 
 		block2 := unittest.BlockWithParentFixture(head)
-		block2.SetPayload(flow.EmptyPayload())
+		block2.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
 		err = state.Extend(context.Background(), block2)
 		require.NoError(t, err)
 
@@ -894,8 +1160,9 @@ func TestExtendConflictingEpochEvents(t *testing.T) {
 		// add block 1 receipt to block 3 payload
 		block3 := unittest.BlockWithParentFixture(block1.Header)
 		block3.SetPayload(flow.Payload{
-			Receipts: []*flow.ExecutionReceiptMeta{block1Receipt.Meta()},
-			Results:  []*flow.ExecutionResult{&block1Receipt.ExecutionResult},
+			Receipts:        []*flow.ExecutionReceiptMeta{block1Receipt.Meta()},
+			Results:         []*flow.ExecutionResult{&block1Receipt.ExecutionResult},
+			ProtocolStateID: block1.Payload.ProtocolStateID,
 		})
 		err = state.Extend(context.Background(), block3)
 		require.NoError(t, err)
@@ -907,22 +1174,24 @@ func TestExtendConflictingEpochEvents(t *testing.T) {
 		// add block 2 receipt to block 4 payload
 		block4 := unittest.BlockWithParentFixture(block2.Header)
 		block4.SetPayload(flow.Payload{
-			Receipts: []*flow.ExecutionReceiptMeta{block2Receipt.Meta()},
-			Results:  []*flow.ExecutionResult{&block2Receipt.ExecutionResult},
+			Receipts:        []*flow.ExecutionReceiptMeta{block2Receipt.Meta()},
+			Results:         []*flow.ExecutionResult{&block2Receipt.ExecutionResult},
+			ProtocolStateID: block1.Payload.ProtocolStateID,
 		})
 		err = state.Extend(context.Background(), block4)
 		require.NoError(t, err)
 
 		// seal for block 1
-		seal1 := unittest.Seal.Fixture(unittest.Seal.WithResult(&block1Receipt.ExecutionResult))
+		seals1 := []*flow.Seal{unittest.Seal.Fixture(unittest.Seal.WithResult(&block1Receipt.ExecutionResult))}
 
 		// seal for block 2
-		seal2 := unittest.Seal.Fixture(unittest.Seal.WithResult(&block2Receipt.ExecutionResult))
+		seals2 := []*flow.Seal{unittest.Seal.Fixture(unittest.Seal.WithResult(&block2Receipt.ExecutionResult))}
 
 		// block 5 builds on block 3, contains seal for block 1
 		block5 := unittest.BlockWithParentFixture(block3.Header)
 		block5.SetPayload(flow.Payload{
-			Seals: []*flow.Seal{seal1},
+			Seals:           seals1,
+			ProtocolStateID: calculateExpectedStateId(block5.Header, seals1),
 		})
 		err = state.Extend(context.Background(), block5)
 		require.NoError(t, err)
@@ -930,18 +1199,19 @@ func TestExtendConflictingEpochEvents(t *testing.T) {
 		// block 6 builds on block 4, contains seal for block 2
 		block6 := unittest.BlockWithParentFixture(block4.Header)
 		block6.SetPayload(flow.Payload{
-			Seals: []*flow.Seal{seal2},
+			Seals:           seals2,
+			ProtocolStateID: calculateExpectedStateId(block6.Header, seals2),
 		})
 		err = state.Extend(context.Background(), block6)
 		require.NoError(t, err)
 
 		// block 7 builds on block 5, contains QC for block 7
-		block7 := unittest.BlockWithParentFixture(block5.Header)
+		block7 := unittest.BlockWithParentProtocolState(block5)
 		err = state.Extend(context.Background(), block7)
 		require.NoError(t, err)
 
 		// block 8 builds on block 6, contains QC for block 6
-		block8 := unittest.BlockWithParentFixture(block6.Header)
+		block8 := unittest.BlockWithParentProtocolState(block6)
 		err = state.Extend(context.Background(), block8)
 		require.NoError(t, err)
 
@@ -964,7 +1234,9 @@ func TestExtendConflictingEpochEvents(t *testing.T) {
 //	        \--B2<--B4(R2)<--B6(S2)<--B8
 func TestExtendDuplicateEpochEvents(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
-	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.MutableState) {
+	rootProtocolStateID := getRootProtocolStateID(t, rootSnapshot)
+	util.RunWithFullProtocolStateAndMutator(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState, mutableState realprotocol.MutableProtocolState) {
+		calculateExpectedStateId := calculateExpectedStateId(t, mutableState)
 
 		head, err := rootSnapshot.Head()
 		require.NoError(t, err)
@@ -973,12 +1245,12 @@ func TestExtendDuplicateEpochEvents(t *testing.T) {
 
 		// add two conflicting blocks for each service event to reference
 		block1 := unittest.BlockWithParentFixture(head)
-		block1.SetPayload(flow.EmptyPayload())
+		block1.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
 		err = state.Extend(context.Background(), block1)
 		require.NoError(t, err)
 
 		block2 := unittest.BlockWithParentFixture(head)
-		block2.SetPayload(flow.EmptyPayload())
+		block2.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
 		err = state.Extend(context.Background(), block2)
 		require.NoError(t, err)
 
@@ -999,7 +1271,10 @@ func TestExtendDuplicateEpochEvents(t *testing.T) {
 
 		// add block 1 receipt to block 3 payload
 		block3 := unittest.BlockWithParentFixture(block1.Header)
-		block3.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(block1Receipt)))
+		block3.SetPayload(unittest.PayloadFixture(
+			unittest.WithReceipts(block1Receipt),
+			unittest.WithProtocolStateID(rootProtocolStateID),
+		))
 		err = state.Extend(context.Background(), block3)
 		require.NoError(t, err)
 
@@ -1009,20 +1284,24 @@ func TestExtendDuplicateEpochEvents(t *testing.T) {
 
 		// add block 2 receipt to block 4 payload
 		block4 := unittest.BlockWithParentFixture(block2.Header)
-		block4.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(block2Receipt)))
+		block4.SetPayload(unittest.PayloadFixture(
+			unittest.WithReceipts(block2Receipt),
+			unittest.WithProtocolStateID(rootProtocolStateID),
+		))
 		err = state.Extend(context.Background(), block4)
 		require.NoError(t, err)
 
 		// seal for block 1
-		seal1 := unittest.Seal.Fixture(unittest.Seal.WithResult(&block1Receipt.ExecutionResult))
+		seals1 := []*flow.Seal{unittest.Seal.Fixture(unittest.Seal.WithResult(&block1Receipt.ExecutionResult))}
 
 		// seal for block 2
-		seal2 := unittest.Seal.Fixture(unittest.Seal.WithResult(&block2Receipt.ExecutionResult))
+		seals2 := []*flow.Seal{unittest.Seal.Fixture(unittest.Seal.WithResult(&block2Receipt.ExecutionResult))}
 
 		// block 5 builds on block 3, contains seal for block 1
 		block5 := unittest.BlockWithParentFixture(block3.Header)
 		block5.SetPayload(flow.Payload{
-			Seals: []*flow.Seal{seal1},
+			Seals:           seals1,
+			ProtocolStateID: calculateExpectedStateId(block5.Header, seals1),
 		})
 		err = state.Extend(context.Background(), block5)
 		require.NoError(t, err)
@@ -1030,19 +1309,20 @@ func TestExtendDuplicateEpochEvents(t *testing.T) {
 		// block 6 builds on block 4, contains seal for block 2
 		block6 := unittest.BlockWithParentFixture(block4.Header)
 		block6.SetPayload(flow.Payload{
-			Seals: []*flow.Seal{seal2},
+			Seals:           seals2,
+			ProtocolStateID: calculateExpectedStateId(block6.Header, seals2),
 		})
 		err = state.Extend(context.Background(), block6)
 		require.NoError(t, err)
 
 		// block 7 builds on block 5, contains QC for block 7
-		block7 := unittest.BlockWithParentFixture(block5.Header)
+		block7 := unittest.BlockWithParentProtocolState(block5)
 		err = state.Extend(context.Background(), block7)
 		require.NoError(t, err)
 
 		// block 8 builds on block 6, contains QC for block 6
 		// at this point we are inserting the duplicate EpochSetup, should not error
-		block8 := unittest.BlockWithParentFixture(block6.Header)
+		block8 := unittest.BlockWithParentProtocolState(block6)
 		err = state.Extend(context.Background(), block8)
 		require.NoError(t, err)
 
@@ -1057,10 +1337,20 @@ func TestExtendDuplicateEpochEvents(t *testing.T) {
 	})
 }
 
-// extending protocol state with an invalid epoch setup service event should cause an error
+// TestExtendEpochSetupInvalid tests that incorporating an invalid EpochSetup
+// service event should trigger epoch fallback when the fork is finalized.
 func TestExtendEpochSetupInvalid(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
-	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.MutableState) {
+	rootProtocolStateID := getRootProtocolStateID(t, rootSnapshot)
+
+	// setupState initializes the protocol state for a test case
+	// * creates and finalizes a new block for the first seal to reference
+	// * creates a factory method for test cases to generated valid EpochSetup events
+	setupState := func(t *testing.T, db *badger.DB, state *protocol.ParticipantState) (
+		*flow.Block,
+		func(...func(*flow.EpochSetup)) (*flow.EpochSetup, *flow.ExecutionReceipt, *flow.Seal),
+	) {
+
 		head, err := rootSnapshot.Head()
 		require.NoError(t, err)
 		result, _, err := rootSnapshot.SealedResult()
@@ -1068,19 +1358,18 @@ func TestExtendEpochSetupInvalid(t *testing.T) {
 
 		// add a block for the first seal to reference
 		block1 := unittest.BlockWithParentFixture(head)
-		block1.SetPayload(flow.EmptyPayload())
-		err = state.Extend(context.Background(), block1)
-		require.NoError(t, err)
+		block1.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
+		unittest.InsertAndFinalize(t, state, block1)
 
 		epoch1Setup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
 
 		// add a participant for the next epoch
 		epoch2NewParticipant := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
-		epoch2Participants := append(participants, epoch2NewParticipant).Sort(order.Canonical)
+		epoch2Participants := append(participants, epoch2NewParticipant).Sort(flow.Canonical[flow.Identity]).ToSkeleton()
 
 		// this function will return a VALID setup event and seal, we will modify
 		// in different ways in each test case
-		createSetup := func(opts ...func(*flow.EpochSetup)) (*flow.EpochSetup, *flow.ExecutionReceipt, *flow.Seal) {
+		createSetupEvent := func(opts ...func(*flow.EpochSetup)) (*flow.EpochSetup, *flow.ExecutionReceipt, *flow.Seal) {
 			setup := unittest.EpochSetupFixture(
 				unittest.WithParticipants(epoch2Participants),
 				unittest.SetupWithCounter(epoch1Setup.Counter+1),
@@ -1096,55 +1385,110 @@ func TestExtendEpochSetupInvalid(t *testing.T) {
 			return setup, receipt, seal
 		}
 
-		// expect a setup event with wrong counter to trigger EECC without error
-		t.Run("wrong counter (EECC)", func(t *testing.T) {
+		return block1, createSetupEvent
+	}
+
+	// expect a setup event with wrong counter to trigger EFM without error
+	t.Run("wrong counter [EFM]", func(t *testing.T) {
+		util.RunWithFullProtocolStateAndMutator(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState, mutableState realprotocol.MutableProtocolState) {
+			block1, createSetup := setupState(t, db, state)
+
 			_, receipt, seal := createSetup(func(setup *flow.EpochSetup) {
-				setup.Counter = epoch1Setup.Counter
+				setup.Counter = rand.Uint64()
 			})
 
-			sealingBlock := unittest.SealBlock(t, state, block1, receipt, seal)
-
-			qcBlock := unittest.BlockWithParentFixture(sealingBlock)
-			err = state.Extend(context.Background(), qcBlock)
+			receiptBlock, sealingBlock := unittest.SealBlock(t, state, mutableState, block1, receipt, seal)
+			err := state.Finalize(context.Background(), receiptBlock.ID())
 			require.NoError(t, err)
-			assertEpochEmergencyFallbackTriggered(t, db)
+			// epoch fallback not triggered before finalization
+			assertEpochEmergencyFallbackTriggered(t, state, false)
+			err = state.Finalize(context.Background(), sealingBlock.ID())
+			require.NoError(t, err)
+			// epoch fallback triggered after finalization
+			assertEpochEmergencyFallbackTriggered(t, state, true)
 		})
+	})
 
-		// expect a setup event with wrong final view to trigger EECC without error
-		t.Run("invalid final view (EECC)", func(t *testing.T) {
+	// expect a setup event with wrong final view to trigger EFM without error
+	t.Run("invalid final view [EFM]", func(t *testing.T) {
+		util.RunWithFullProtocolStateAndMutator(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState, mutableState realprotocol.MutableProtocolState) {
+			block1, createSetup := setupState(t, db, state)
+
 			_, receipt, seal := createSetup(func(setup *flow.EpochSetup) {
 				setup.FinalView = block1.Header.View
 			})
 
-			sealingBlock := unittest.SealBlock(t, state, block1, receipt, seal)
-
-			qcBlock := unittest.BlockWithParentFixture(sealingBlock)
-			err = state.Extend(context.Background(), qcBlock)
+			receiptBlock, sealingBlock := unittest.SealBlock(t, state, mutableState, block1, receipt, seal)
+			err := state.Finalize(context.Background(), receiptBlock.ID())
 			require.NoError(t, err)
-			assertEpochEmergencyFallbackTriggered(t, db)
+			// epoch fallback not triggered before finalization
+			assertEpochEmergencyFallbackTriggered(t, state, false)
+			err = state.Finalize(context.Background(), sealingBlock.ID())
+			require.NoError(t, err)
+			// epoch fallback triggered after finalization
+			assertEpochEmergencyFallbackTriggered(t, state, true)
 		})
+	})
 
-		// expect a setup event with empty seed to trigger EECC without error
-		t.Run("empty seed (EECC)", func(t *testing.T) {
+	// expect a setup event with empty seed to trigger EFM without error
+	t.Run("empty seed [EFM]", func(t *testing.T) {
+		util.RunWithFullProtocolStateAndMutator(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState, mutableState realprotocol.MutableProtocolState) {
+			block1, createSetup := setupState(t, db, state)
+
 			_, receipt, seal := createSetup(func(setup *flow.EpochSetup) {
 				setup.RandomSource = nil
 			})
 
-			sealingBlock := unittest.SealBlock(t, state, block1, receipt, seal)
-
-			qcBlock := unittest.BlockWithParentFixture(sealingBlock)
-			err = state.Extend(context.Background(), qcBlock)
+			receiptBlock, sealingBlock := unittest.SealBlock(t, state, mutableState, block1, receipt, seal)
+			err := state.Finalize(context.Background(), receiptBlock.ID())
 			require.NoError(t, err)
-			assertEpochEmergencyFallbackTriggered(t, db)
+			// epoch fallback not triggered before finalization
+			assertEpochEmergencyFallbackTriggered(t, state, false)
+			err = state.Finalize(context.Background(), sealingBlock.ID())
+			require.NoError(t, err)
+			// epoch fallback triggered after finalization
+			assertEpochEmergencyFallbackTriggered(t, state, true)
+		})
+	})
+
+	t.Run("participants not ordered [EFM]", func(t *testing.T) {
+		util.RunWithFullProtocolStateAndMutator(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState, mutableState realprotocol.MutableProtocolState) {
+			block1, createSetup := setupState(t, db, state)
+
+			_, receipt, seal := createSetup(func(setup *flow.EpochSetup) {
+				var err error
+				setup.Participants, err = setup.Participants.Shuffle()
+				require.NoError(t, err)
+			})
+
+			receiptBlock, sealingBlock := unittest.SealBlock(t, state, mutableState, block1, receipt, seal)
+			err := state.Finalize(context.Background(), receiptBlock.ID())
+			require.NoError(t, err)
+			// epoch fallback not triggered before finalization
+			assertEpochEmergencyFallbackTriggered(t, state, false)
+			err = state.Finalize(context.Background(), sealingBlock.ID())
+			require.NoError(t, err)
+			// epoch fallback triggered after finalization
+			assertEpochEmergencyFallbackTriggered(t, state, true)
 		})
 	})
 }
 
-// extending protocol state with an invalid epoch commit service event should cause an error
+// TestExtendEpochCommitInvalid tests that incorporating an invalid EpochCommit
+// service event should trigger epoch fallback when the fork is finalized.
 func TestExtendEpochCommitInvalid(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
-	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.MutableState) {
+	rootProtocolStateID := getRootProtocolStateID(t, rootSnapshot)
 
+	// setupState initializes the protocol state for a test case
+	// * creates and finalizes a new block for the first seal to reference
+	// * creates a factory method for test cases to generated valid EpochSetup events
+	// * creates a factory method for test cases to generated valid EpochCommit events
+	setupState := func(t *testing.T, state *protocol.ParticipantState) (
+		*flow.Block,
+		func(*flow.Block) (*flow.EpochSetup, *flow.ExecutionReceipt, *flow.Seal),
+		func(*flow.Block, ...func(*flow.EpochCommit)) (*flow.EpochCommit, *flow.ExecutionReceipt, *flow.Seal),
+	) {
 		head, err := rootSnapshot.Head()
 		require.NoError(t, err)
 		result, _, err := rootSnapshot.SealedResult()
@@ -1152,19 +1496,19 @@ func TestExtendEpochCommitInvalid(t *testing.T) {
 
 		// add a block for the first seal to reference
 		block1 := unittest.BlockWithParentFixture(head)
-		block1.SetPayload(flow.EmptyPayload())
-		err = state.Extend(context.Background(), block1)
-		require.NoError(t, err)
+		block1.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
+		unittest.InsertAndFinalize(t, state, block1)
 
 		epoch1Setup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
 
 		// swap consensus node for a new one for epoch 2
 		epoch2NewParticipant := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus))
 		epoch2Participants := append(
-			participants.Filter(filter.Not(filter.HasRole(flow.RoleConsensus))),
+			participants.Filter(filter.Not[flow.Identity](filter.HasRole[flow.Identity](flow.RoleConsensus))),
 			epoch2NewParticipant,
-		).Sort(order.Canonical)
+		).Sort(flow.Canonical[flow.Identity]).ToSkeleton()
 
+		// factory method to create a valid EpochSetup method w.r.t. the generated state
 		createSetup := func(block *flow.Block) (*flow.EpochSetup, *flow.ExecutionReceipt, *flow.Seal) {
 			setup := unittest.EpochSetupFixture(
 				unittest.WithParticipants(epoch2Participants),
@@ -1179,6 +1523,7 @@ func TestExtendEpochCommitInvalid(t *testing.T) {
 			return setup, receipt, seal
 		}
 
+		// factory method to create a valid EpochCommit method w.r.t. the generated state
 		createCommit := func(block *flow.Block, opts ...func(*flow.EpochCommit)) (*flow.EpochCommit, *flow.ExecutionReceipt, *flow.Seal) {
 			commit := unittest.EpochCommitFixture(
 				unittest.CommitWithCounter(epoch1Setup.Counter+1),
@@ -1193,67 +1538,124 @@ func TestExtendEpochCommitInvalid(t *testing.T) {
 			return commit, receipt, seal
 		}
 
-		t.Run("without setup", func(t *testing.T) {
+		return block1, createSetup, createCommit
+	}
+
+	t.Run("without setup [EFM]", func(t *testing.T) {
+		util.RunWithFullProtocolStateAndMutator(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState, mutableState realprotocol.MutableProtocolState) {
+			block1, _, createCommit := setupState(t, state)
+
 			_, receipt, seal := createCommit(block1)
 
-			sealingBlock := unittest.SealBlock(t, state, block1, receipt, seal)
-
-			qcBlock := unittest.BlockWithParentFixture(sealingBlock)
-			err = state.Extend(context.Background(), qcBlock)
-			require.Error(t, err)
-			require.True(t, st.IsInvalidExtensionError(err), err)
+			receiptBlock, sealingBlock := unittest.SealBlock(t, state, mutableState, block1, receipt, seal)
+			err := state.Finalize(context.Background(), receiptBlock.ID())
+			require.NoError(t, err)
+			// epoch fallback not triggered before finalization
+			assertEpochEmergencyFallbackTriggered(t, state, false)
+			err = state.Finalize(context.Background(), sealingBlock.ID())
+			require.NoError(t, err)
+			// epoch fallback triggered after finalization
+			assertEpochEmergencyFallbackTriggered(t, state, true)
 		})
+	})
 
-		// seal block 1, in which EpochSetup was emitted
-		epoch2Setup, setupReceipt, setupSeal := createSetup(block1)
-		block2 := unittest.SealBlock(t, state, block1, setupReceipt, setupSeal)
+	// expect a commit event with wrong counter to trigger EFM without error
+	t.Run("inconsistent counter [EFM]", func(t *testing.T) {
+		util.RunWithFullProtocolStateAndMutator(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState, mutableState realprotocol.MutableProtocolState) {
+			block1, createSetup, createCommit := setupState(t, state)
 
-		// insert a block with a QC for block 2
-		block3 := unittest.BlockWithParentFixture(block2)
-		err = state.Extend(context.Background(), block3)
-		require.NoError(t, err)
+			// seal block 1, in which EpochSetup was emitted
+			epoch2Setup, setupReceipt, setupSeal := createSetup(block1)
+			epochSetupReceiptBlock, epochSetupSealingBlock := unittest.SealBlock(t, state, mutableState, block1, setupReceipt, setupSeal)
+			err := state.Finalize(context.Background(), epochSetupReceiptBlock.ID())
+			require.NoError(t, err)
+			err = state.Finalize(context.Background(), epochSetupSealingBlock.ID())
+			require.NoError(t, err)
 
-		// expect a commit event with wrong counter to trigger EECC without error
-		t.Run("inconsistent counter (EECC)", func(t *testing.T) {
+			// insert a block with a QC for block 2
+			block3 := unittest.BlockWithParentProtocolState(epochSetupSealingBlock)
+			unittest.InsertAndFinalize(t, state, block3)
+
 			_, receipt, seal := createCommit(block3, func(commit *flow.EpochCommit) {
 				commit.Counter = epoch2Setup.Counter + 1
 			})
 
-			sealingBlock := unittest.SealBlock(t, state, block3, receipt, seal)
-
-			qcBlock := unittest.BlockWithParentFixture(sealingBlock)
-			err = state.Extend(context.Background(), qcBlock)
+			receiptBlock, sealingBlock := unittest.SealBlock(t, state, mutableState, block3, receipt, seal)
+			err = state.Finalize(context.Background(), receiptBlock.ID())
 			require.NoError(t, err)
-			assertEpochEmergencyFallbackTriggered(t, db)
+			// epoch fallback not triggered before finalization
+			assertEpochEmergencyFallbackTriggered(t, state, false)
+			err = state.Finalize(context.Background(), sealingBlock.ID())
+			require.NoError(t, err)
+			// epoch fallback triggered after finalization
+			assertEpochEmergencyFallbackTriggered(t, state, true)
 		})
+	})
 
-		// expect a commit event with wrong cluster QCs to trigger EECC without error
-		t.Run("inconsistent cluster QCs (EECC)", func(t *testing.T) {
+	// expect a commit event with wrong cluster QCs to trigger EFM without error
+	t.Run("inconsistent cluster QCs [EFM]", func(t *testing.T) {
+		util.RunWithFullProtocolStateAndMutator(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState, mutableState realprotocol.MutableProtocolState) {
+			block1, createSetup, createCommit := setupState(t, state)
+
+			// seal block 1, in which EpochSetup was emitted
+			_, setupReceipt, setupSeal := createSetup(block1)
+			epochSetupReceiptBlock, epochSetupSealingBlock := unittest.SealBlock(t, state, mutableState, block1, setupReceipt, setupSeal)
+			err := state.Finalize(context.Background(), epochSetupReceiptBlock.ID())
+			require.NoError(t, err)
+			err = state.Finalize(context.Background(), epochSetupSealingBlock.ID())
+			require.NoError(t, err)
+
+			// insert a block with a QC for block 2
+			block3 := unittest.BlockWithParentProtocolState(epochSetupSealingBlock)
+			unittest.InsertAndFinalize(t, state, block3)
+
 			_, receipt, seal := createCommit(block3, func(commit *flow.EpochCommit) {
 				commit.ClusterQCs = append(commit.ClusterQCs, flow.ClusterQCVoteDataFromQC(unittest.QuorumCertificateWithSignerIDsFixture()))
 			})
 
-			sealingBlock := unittest.SealBlock(t, state, block3, receipt, seal)
-
-			qcBlock := unittest.BlockWithParentFixture(sealingBlock)
-			err = state.Extend(context.Background(), qcBlock)
+			receiptBlock, sealingBlock := unittest.SealBlock(t, state, mutableState, block3, receipt, seal)
+			err = state.Finalize(context.Background(), receiptBlock.ID())
 			require.NoError(t, err)
-			assertEpochEmergencyFallbackTriggered(t, db)
+			// epoch fallback not triggered before finalization
+			assertEpochEmergencyFallbackTriggered(t, state, false)
+			err = state.Finalize(context.Background(), sealingBlock.ID())
+			require.NoError(t, err)
+			// epoch fallback triggered after finalization
+			assertEpochEmergencyFallbackTriggered(t, state, true)
 		})
+	})
 
-		// expect a commit event with wrong dkg participants to trigger EECC without error
-		t.Run("inconsistent DKG participants (EECC)", func(t *testing.T) {
+	// expect a commit event with wrong dkg participants to trigger EFM without error
+	t.Run("inconsistent DKG participants [EFM]", func(t *testing.T) {
+		util.RunWithFullProtocolStateAndMutator(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState, mutableState realprotocol.MutableProtocolState) {
+			block1, createSetup, createCommit := setupState(t, state)
+
+			// seal block 1, in which EpochSetup was emitted
+			_, setupReceipt, setupSeal := createSetup(block1)
+			epochSetupReceiptBlock, epochSetupSealingBlock := unittest.SealBlock(t, state, mutableState, block1, setupReceipt, setupSeal)
+			err := state.Finalize(context.Background(), epochSetupReceiptBlock.ID())
+			require.NoError(t, err)
+			err = state.Finalize(context.Background(), epochSetupSealingBlock.ID())
+			require.NoError(t, err)
+
+			// insert a block with a QC for block 2
+			block3 := unittest.BlockWithParentProtocolState(epochSetupSealingBlock)
+			unittest.InsertAndFinalize(t, state, block3)
+
 			_, receipt, seal := createCommit(block3, func(commit *flow.EpochCommit) {
 				// add an extra dkg key
 				commit.DKGParticipantKeys = append(commit.DKGParticipantKeys, unittest.KeyFixture(crypto.BLSBLS12381).PublicKey())
 			})
 
-			sealingBlock := unittest.SealBlock(t, state, block3, receipt, seal)
-
-			qcBlock := unittest.BlockWithParentFixture(sealingBlock)
-			err = state.Extend(context.Background(), qcBlock)
+			receiptBlock, sealingBlock := unittest.SealBlock(t, state, mutableState, block3, receipt, seal)
+			err = state.Finalize(context.Background(), receiptBlock.ID())
 			require.NoError(t, err)
-			assertEpochEmergencyFallbackTriggered(t, db)
+			// epoch fallback not triggered before finalization
+			assertEpochEmergencyFallbackTriggered(t, state, false)
+			err = state.Finalize(context.Background(), sealingBlock.ID())
+			require.NoError(t, err)
+			// epoch fallback triggered after finalization
+			assertEpochEmergencyFallbackTriggered(t, state, true)
 		})
 	})
 }
@@ -1265,10 +1667,10 @@ func TestExtendEpochCommitInvalid(t *testing.T) {
 func TestExtendEpochTransitionWithoutCommit(t *testing.T) {
 
 	// skipping because this case will now result in emergency epoch continuation kicking in
-	unittest.SkipUnless(t, unittest.TEST_TODO, "disabled as the current implementation uses a temporary fallback measure in this case (triggers EECC), rather than returning an error")
+	unittest.SkipUnless(t, unittest.TEST_TODO, "disabled as the current implementation uses a temporary fallback measure in this case (triggers EFM), rather than returning an error")
 
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
-	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.MutableState) {
+	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState) {
 		head, err := rootSnapshot.Head()
 		require.NoError(t, err)
 		result, _, err := rootSnapshot.SealedResult()
@@ -1287,7 +1689,7 @@ func TestExtendEpochTransitionWithoutCommit(t *testing.T) {
 
 		// add a participant for the next epoch
 		epoch2NewParticipant := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
-		epoch2Participants := append(participants, epoch2NewParticipant).Sort(order.Canonical)
+		epoch2Participants := append(participants, epoch2NewParticipant).Sort(flow.Canonical[flow.Identity]).ToSkeleton()
 
 		// create the epoch setup event for the second epoch
 		epoch2Setup := unittest.EpochSetupFixture(
@@ -1325,27 +1727,102 @@ func TestExtendEpochTransitionWithoutCommit(t *testing.T) {
 	})
 }
 
-func TestEmergencyEpochChainContinuation(t *testing.T) {
+// TestEmergencyEpochFallback tests that epoch emergency fallback is triggered
+// when an epoch fails to be committed before the epoch commitment deadline,
+// or when an invalid service event (indicating service account smart contract bug)
+// is sealed.
+func TestEmergencyEpochFallback(t *testing.T) {
 
-	// if we reach the first block of the next epoch before both setup and commit
-	// service events are finalized, the chain should continue with the previous epoch.
+	// if we finalize the first block past the epoch commitment deadline while
+	// in the EpochStaking phase, EFM should be triggered
 	//
-	// ROOT <- B1 <- B2(R1) <- B3(S1) <- B4
-	t.Run("epoch transition without commit event - should continue with fallback epoch", func(t *testing.T) {
+	//       Epoch Commitment Deadline
+	//       |     Epoch Boundary
+	//       |     |
+	//       v     v
+	// ROOT <- B1 <- B2
+	t.Run("passed epoch commitment deadline in EpochStaking phase - should trigger EFM", func(t *testing.T) {
 
 		rootSnapshot := unittest.RootSnapshotFixture(participants)
-		metricsMock := new(mockmodule.ComplianceMetrics)
+		metricsMock := mockmodule.NewComplianceMetrics(t)
 		mockMetricsForRootSnapshot(metricsMock, rootSnapshot)
+		protoEventsMock := mockprotocol.NewConsumer(t)
+		protoEventsMock.On("BlockFinalized", mock.Anything)
+		protoEventsMock.On("BlockProcessable", mock.Anything, mock.Anything)
 
-		util.RunWithFullProtocolStateAndMetrics(t, rootSnapshot, metricsMock, func(db *badger.DB, state *protocol.MutableState) {
+		util.RunWithFullProtocolStateAndMetricsAndConsumer(t, rootSnapshot, metricsMock, protoEventsMock, func(db *badger.DB, state *protocol.ParticipantState, mutableProtocolState realprotocol.MutableProtocolState) {
 			head, err := rootSnapshot.Head()
 			require.NoError(t, err)
 			result, _, err := rootSnapshot.SealedResult()
 			require.NoError(t, err)
+			safetyThreshold := rootSnapshot.Params().EpochCommitSafetyThreshold()
+			require.NoError(t, err)
+
+			calculateExpectedStateId := calculateExpectedStateId(t, mutableProtocolState)
+
+			epoch1Setup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
+			epoch1FinalView := epoch1Setup.FinalView
+			epoch1CommitmentDeadline := epoch1FinalView - safetyThreshold
+
+			// finalizing block 1 should trigger EFM
+			metricsMock.On("EpochEmergencyFallbackTriggered").Once()
+			protoEventsMock.On("EpochEmergencyFallbackTriggered").Once()
+
+			// we begin the epoch in the EpochStaking phase and
+			// block 1 will be the first block on or past the epoch commitment deadline
+			block1 := unittest.BlockWithParentFixture(head)
+			block1.Header.View = epoch1CommitmentDeadline + rand.Uint64()%2
+			block1.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(calculateExpectedStateId(block1.Header, nil))))
+			err = state.Extend(context.Background(), block1)
+			require.NoError(t, err)
+			assertEpochEmergencyFallbackTriggered(t, state, false) // not triggered before finalization
+			err = state.Finalize(context.Background(), block1.ID())
+			require.NoError(t, err)
+			assertEpochEmergencyFallbackTriggered(t, state, true) // triggered after finalization
+
+			// block 2 will be the first block past the first epoch boundary
+			block2 := unittest.BlockWithParentProtocolState(block1)
+			block2.Header.View = epoch1FinalView + 1
+			err = state.Extend(context.Background(), block2)
+			require.NoError(t, err)
+			err = state.Finalize(context.Background(), block2.ID())
+			require.NoError(t, err)
+
+			// since EFM has been triggered, epoch transition metrics should not be updated
+			metricsMock.AssertNotCalled(t, "EpochTransition", mock.Anything, mock.Anything)
+			metricsMock.AssertNotCalled(t, "CurrentEpochCounter", epoch1Setup.Counter+1)
+		})
+	})
+
+	// if we finalize the first block past the epoch commitment deadline while
+	// in the EpochSetup phase, EFM should be triggered
+	//
+	//                       Epoch Commitment Deadline
+	//                       |         Epoch Boundary
+	//                       |         |
+	//                       v         v
+	// ROOT <- B1 <- B2(R1) <- B3(S1) <- B4
+	t.Run("passed epoch commitment deadline in EpochSetup phase - should trigger EFM", func(t *testing.T) {
+
+		rootSnapshot := unittest.RootSnapshotFixture(participants)
+		rootProtocolStateID := getRootProtocolStateID(t, rootSnapshot)
+		metricsMock := mockmodule.NewComplianceMetrics(t)
+		mockMetricsForRootSnapshot(metricsMock, rootSnapshot)
+		protoEventsMock := mockprotocol.NewConsumer(t)
+		protoEventsMock.On("BlockFinalized", mock.Anything)
+		protoEventsMock.On("BlockProcessable", mock.Anything, mock.Anything)
+
+		util.RunWithFullProtocolStateAndMetricsAndConsumer(t, rootSnapshot, metricsMock, protoEventsMock, func(db *badger.DB, state *protocol.ParticipantState, mutableState realprotocol.MutableProtocolState) {
+			head, err := rootSnapshot.Head()
+			require.NoError(t, err)
+			result, _, err := rootSnapshot.SealedResult()
+			require.NoError(t, err)
+			safetyThreshold := rootSnapshot.Params().EpochCommitSafetyThreshold()
+			require.NoError(t, err)
 
 			// add a block for the first seal to reference
 			block1 := unittest.BlockWithParentFixture(head)
-			block1.SetPayload(flow.EmptyPayload())
+			block1.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
 			err = state.Extend(context.Background(), block1)
 			require.NoError(t, err)
 			err = state.Finalize(context.Background(), block1.ID())
@@ -1353,10 +1830,11 @@ func TestEmergencyEpochChainContinuation(t *testing.T) {
 
 			epoch1Setup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
 			epoch1FinalView := epoch1Setup.FinalView
+			epoch1CommitmentDeadline := epoch1FinalView - safetyThreshold
 
 			// add a participant for the next epoch
 			epoch2NewParticipant := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
-			epoch2Participants := append(participants, epoch2NewParticipant).Sort(order.Canonical)
+			epoch2Participants := append(participants, epoch2NewParticipant).Sort(flow.Canonical[flow.Identity]).ToSkeleton()
 
 			// create the epoch setup event for the second epoch
 			epoch2Setup := unittest.EpochSetupFixture(
@@ -1368,116 +1846,72 @@ func TestEmergencyEpochChainContinuation(t *testing.T) {
 
 			receipt1, seal1 := unittest.ReceiptAndSealForBlock(block1)
 			receipt1.ExecutionResult.ServiceEvents = []flow.ServiceEvent{epoch2Setup.ServiceEvent()}
+			seal1.ResultID = receipt1.ExecutionResult.ID()
 
 			// add a block containing a receipt for block 1
 			block2 := unittest.BlockWithParentFixture(block1.Header)
-			block2.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt1)))
+			block2.SetPayload(unittest.PayloadFixture(
+				unittest.WithReceipts(receipt1),
+				unittest.WithProtocolStateID(rootProtocolStateID),
+			))
 			err = state.Extend(context.Background(), block2)
 			require.NoError(t, err)
 			err = state.Finalize(context.Background(), block2.ID())
 			require.NoError(t, err)
 
-			// block 3 seals block 1
+			// block 3 seals block 1 and will be the first block on or past the epoch commitment deadline
 			block3 := unittest.BlockWithParentFixture(block2.Header)
+			block3.Header.View = epoch1CommitmentDeadline + rand.Uint64()%2
+			seals := []*flow.Seal{seal1}
 			block3.SetPayload(flow.Payload{
-				Seals: []*flow.Seal{seal1},
+				Seals:           seals,
+				ProtocolStateID: calculateExpectedStateId(t, mutableState)(block3.Header, seals),
 			})
 			err = state.Extend(context.Background(), block3)
 			require.NoError(t, err)
 
-			// block 4 will be the first block for epoch 2
-			block4 := unittest.BlockWithParentFixture(block3.Header)
-			block4.Header.View = epoch1Setup.FinalView + 1
-
-			// inserting block 4 should trigger EECC
+			// finalizing block 3 should trigger EFM
 			metricsMock.On("EpochEmergencyFallbackTriggered").Once()
+			protoEventsMock.On("EpochEmergencyFallbackTriggered").Once()
 
+			assertEpochEmergencyFallbackTriggered(t, state, false) // not triggered before finalization
+			err = state.Finalize(context.Background(), block3.ID())
+			require.NoError(t, err)
+			assertEpochEmergencyFallbackTriggered(t, state, true) // triggered after finalization
+
+			// block 4 will be the first block past the first epoch boundary
+			block4 := unittest.BlockWithParentProtocolState(block3)
+			block4.Header.View = epoch1FinalView + 1
 			err = state.Extend(context.Background(), block4)
 			require.NoError(t, err)
+			err = state.Finalize(context.Background(), block4.ID())
+			require.NoError(t, err)
 
-			assertEpochEmergencyFallbackTriggered(t, db)
-
-			// epoch metrics should not be emitted
+			// since EFM has been triggered, epoch transition metrics should not be updated
 			metricsMock.AssertNotCalled(t, "EpochTransition", epoch2Setup.Counter, mock.Anything)
 			metricsMock.AssertNotCalled(t, "CurrentEpochCounter", epoch2Setup.Counter)
-			metricsMock.AssertExpectations(t)
-		})
-	})
-
-	// if we reach the first block of the next epoch before either setup and commit
-	// service events are finalized, the chain should continue with the previous epoch.
-	//
-	// ROOT <- B1 <- B2(R1) <- B3(S1) <- B4
-	t.Run("epoch transition without setup event - should continue with fallback epoch", func(t *testing.T) {
-
-		rootSnapshot := unittest.RootSnapshotFixture(participants)
-		metricsMock := new(mockmodule.ComplianceMetrics)
-		mockMetricsForRootSnapshot(metricsMock, rootSnapshot)
-
-		util.RunWithFullProtocolStateAndMetrics(t, rootSnapshot, metricsMock, func(db *badger.DB, state *protocol.MutableState) {
-			head, err := rootSnapshot.Head()
-			require.NoError(t, err)
-			result, _, err := rootSnapshot.SealedResult()
-			require.NoError(t, err)
-
-			// add a block for the first seal to reference
-			block1 := unittest.BlockWithParentFixture(head)
-			block1.SetPayload(flow.EmptyPayload())
-			err = state.Extend(context.Background(), block1)
-			require.NoError(t, err)
-			err = state.Finalize(context.Background(), block1.ID())
-			require.NoError(t, err)
-
-			epoch1Setup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
-			receipt1, seal1 := unittest.ReceiptAndSealForBlock(block1)
-
-			// add a block containing a receipt for block 1
-			block2 := unittest.BlockWithParentFixture(block1.Header)
-			block2.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt1)))
-			err = state.Extend(context.Background(), block2)
-			require.NoError(t, err)
-			err = state.Finalize(context.Background(), block2.ID())
-			require.NoError(t, err)
-
-			// block 3 seals block 1
-			block3 := unittest.BlockWithParentFixture(block2.Header)
-			block3.SetPayload(flow.Payload{
-				Seals: []*flow.Seal{seal1},
-			})
-			err = state.Extend(context.Background(), block3)
-			require.NoError(t, err)
-
-			// block 4 will be the first block for epoch 2
-			block4 := unittest.BlockWithParentFixture(block3.Header)
-			block4.Header.View = epoch1Setup.FinalView + 1
-
-			// inserting block 4 should trigger EECC
-			metricsMock.On("EpochEmergencyFallbackTriggered").Once()
-
-			err = state.Extend(context.Background(), block4)
-			require.NoError(t, err)
-
-			assertEpochEmergencyFallbackTriggered(t, db)
-
-			// epoch metrics should not be emitted
-			metricsMock.AssertNotCalled(t, "EpochTransition", epoch1Setup.Counter+1, mock.Anything)
-			metricsMock.AssertNotCalled(t, "CurrentEpochCounter", epoch1Setup.Counter+1)
-			metricsMock.AssertExpectations(t)
 		})
 	})
 
 	// if an invalid epoch service event is incorporated, we should:
-	//  * not apply the phase transition corresponding to the invalid service event
-	//  * trigger EECC
+	//   - not apply the phase transition corresponding to the invalid service event
+	//   - immediately trigger EFM
 	//
+	//                            Epoch Boundary
+	//                                 |
+	//                                 v
 	// ROOT <- B1 <- B2(R1) <- B3(S1) <- B4
-	t.Run("epoch transition with invalid service event - should continue with fallback epoch", func(t *testing.T) {
+	t.Run("epoch transition with invalid service event - should trigger EFM", func(t *testing.T) {
 
 		rootSnapshot := unittest.RootSnapshotFixture(participants)
-		metricsMock := new(mockmodule.ComplianceMetrics)
+		rootProtocolStateID := getRootProtocolStateID(t, rootSnapshot)
+		metricsMock := mockmodule.NewComplianceMetrics(t)
 		mockMetricsForRootSnapshot(metricsMock, rootSnapshot)
+		protoEventsMock := mockprotocol.NewConsumer(t)
+		protoEventsMock.On("BlockFinalized", mock.Anything)
+		protoEventsMock.On("BlockProcessable", mock.Anything, mock.Anything)
 
-		util.RunWithFullProtocolStateAndMetrics(t, rootSnapshot, metricsMock, func(db *badger.DB, state *protocol.MutableState) {
+		util.RunWithFullProtocolStateAndMetricsAndConsumer(t, rootSnapshot, metricsMock, protoEventsMock, func(db *badger.DB, state *protocol.ParticipantState, mutableState realprotocol.MutableProtocolState) {
 			head, err := rootSnapshot.Head()
 			require.NoError(t, err)
 			result, _, err := rootSnapshot.SealedResult()
@@ -1485,7 +1919,7 @@ func TestEmergencyEpochChainContinuation(t *testing.T) {
 
 			// add a block for the first seal to reference
 			block1 := unittest.BlockWithParentFixture(head)
-			block1.SetPayload(flow.EmptyPayload())
+			block1.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
 			err = state.Extend(context.Background(), block1)
 			require.NoError(t, err)
 			err = state.Finalize(context.Background(), block1.ID())
@@ -1496,7 +1930,7 @@ func TestEmergencyEpochChainContinuation(t *testing.T) {
 
 			// add a participant for the next epoch
 			epoch2NewParticipant := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
-			epoch2Participants := append(participants, epoch2NewParticipant).Sort(order.Canonical)
+			epoch2Participants := append(participants, epoch2NewParticipant).Sort(flow.Canonical[flow.Identity]).ToSkeleton()
 
 			// create the epoch setup event for the second epoch
 			// this event is invalid because it used a non-contiguous first view
@@ -1509,39 +1943,49 @@ func TestEmergencyEpochChainContinuation(t *testing.T) {
 
 			receipt1, seal1 := unittest.ReceiptAndSealForBlock(block1)
 			receipt1.ExecutionResult.ServiceEvents = []flow.ServiceEvent{epoch2Setup.ServiceEvent()}
-
-			// incorporating the service event should trigger EECC
-			metricsMock.On("EpochEmergencyFallbackTriggered").Once()
+			seal1.ResultID = receipt1.ExecutionResult.ID()
 
 			// add a block containing a receipt for block 1
 			block2 := unittest.BlockWithParentFixture(block1.Header)
-			block2.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt1)))
+			block2.SetPayload(unittest.PayloadFixture(
+				unittest.WithReceipts(receipt1),
+				unittest.WithProtocolStateID(rootProtocolStateID),
+			))
 			err = state.Extend(context.Background(), block2)
 			require.NoError(t, err)
 			err = state.Finalize(context.Background(), block2.ID())
 			require.NoError(t, err)
 
-			// block 3 seals block 1
+			// block 3 is where the service event state change comes into effect
 			block3 := unittest.BlockWithParentFixture(block2.Header)
+			seals := []*flow.Seal{seal1}
 			block3.SetPayload(flow.Payload{
-				Seals: []*flow.Seal{seal1},
+				Seals:           seals,
+				ProtocolStateID: calculateExpectedStateId(t, mutableState)(block3.Header, seals),
 			})
 			err = state.Extend(context.Background(), block3)
 			require.NoError(t, err)
 
-			// block 4 will be the first block for epoch 2
-			block4 := unittest.BlockWithParentFixture(block3.Header)
-			block4.Header.View = epoch1Setup.FinalView + 1
+			// incorporating the service event should trigger EFM
+			metricsMock.On("EpochEmergencyFallbackTriggered").Once()
+			protoEventsMock.On("EpochEmergencyFallbackTriggered").Once()
 
+			assertEpochEmergencyFallbackTriggered(t, state, false) // not triggered before finalization
+			err = state.Finalize(context.Background(), block3.ID())
+			require.NoError(t, err)
+			assertEpochEmergencyFallbackTriggered(t, state, true) // triggered after finalization
+
+			// block 5 is the first block past the current epoch boundary
+			block4 := unittest.BlockWithParentProtocolState(block3)
+			block4.Header.View = epoch1Setup.FinalView + 1
 			err = state.Extend(context.Background(), block4)
 			require.NoError(t, err)
+			err = state.Finalize(context.Background(), block4.ID())
+			require.NoError(t, err)
 
-			assertEpochEmergencyFallbackTriggered(t, db)
-
-			// epoch metrics should not be emitted
+			// since EFM has been triggered, epoch transition metrics should not be updated
 			metricsMock.AssertNotCalled(t, "EpochTransition", epoch2Setup.Counter, mock.Anything)
 			metricsMock.AssertNotCalled(t, "CurrentEpochCounter", epoch2Setup.Counter)
-			metricsMock.AssertExpectations(t)
 		})
 	})
 }
@@ -1550,54 +1994,83 @@ func TestExtendInvalidSealsInBlock(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		metrics := metrics.NewNoopCollector()
 		tracer := trace.NewNoopTracer()
-		headers, _, seals, index, payloads, blocks, setups, commits, statuses, results := storeutil.StorageLayer(t, db)
+		log := zerolog.Nop()
+		all := storeutil.StorageLayer(t, db)
 
 		// create a event consumer to test epoch transition events
 		distributor := events.NewDistributor()
-		consumer := new(mockprotocol.Consumer)
+		consumer := mockprotocol.NewConsumer(t)
 		distributor.AddConsumer(consumer)
+		consumer.On("BlockProcessable", mock.Anything, mock.Anything)
 
 		rootSnapshot := unittest.RootSnapshotFixture(participants)
+		rootProtocolStateID := getRootProtocolStateID(t, rootSnapshot)
 
-		state, err := protocol.Bootstrap(metrics, db, headers, seals, results, blocks, setups, commits, statuses, rootSnapshot)
+		state, err := protocol.Bootstrap(
+			metrics,
+			db,
+			all.Headers,
+			all.Seals,
+			all.Results,
+			all.Blocks,
+			all.QuorumCertificates,
+			all.Setups,
+			all.EpochCommits,
+			all.EpochProtocolState,
+			all.ProtocolKVStore,
+			all.VersionBeacons,
+			rootSnapshot,
+		)
 		require.NoError(t, err)
 
 		head, err := rootSnapshot.Head()
 		require.NoError(t, err)
 
 		block1 := unittest.BlockWithParentFixture(head)
-		block1.Payload.Guarantees = nil
-		block1.Header.PayloadHash = block1.Payload.Hash()
+		block1.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
 
 		block1Receipt := unittest.ReceiptForBlockFixture(block1)
 		block2 := unittest.BlockWithParentFixture(block1.Header)
-		block2.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(block1Receipt)))
+		block2.SetPayload(unittest.PayloadFixture(
+			unittest.WithReceipts(block1Receipt),
+			unittest.WithProtocolStateID(rootProtocolStateID),
+		))
 
 		block1Seal := unittest.Seal.Fixture(unittest.Seal.WithResult(&block1Receipt.ExecutionResult))
 		block3 := unittest.BlockWithParentFixture(block2.Header)
 		block3.SetPayload(flow.Payload{
-			Seals: []*flow.Seal{block1Seal},
+			Seals:           []*flow.Seal{block1Seal},
+			ProtocolStateID: rootProtocolStateID,
 		})
 
-		sealValidator := &mockmodule.SealValidator{}
+		sealValidator := mockmodule.NewSealValidator(t)
 		sealValidator.On("Validate", mock.Anything).
 			Return(func(candidate *flow.Block) *flow.Seal {
 				if candidate.ID() == block3.ID() {
 					return nil
 				}
-				seal, _ := seals.HighestInFork(candidate.Header.ParentID)
+				seal, _ := all.Seals.HighestInFork(candidate.Header.ParentID)
 				return seal
 			}, func(candidate *flow.Block) error {
 				if candidate.ID() == block3.ID() {
 					return engine.NewInvalidInputError("")
 				}
-				_, err := seals.HighestInFork(candidate.Header.ParentID)
+				_, err := all.Seals.HighestInFork(candidate.Header.ParentID)
 				return err
 			}).
 			Times(3)
 
-		fullState, err := protocol.NewFullConsensusState(state, index, payloads, tracer, consumer,
-			util.MockBlockTimer(), util.MockReceiptValidator(), sealValidator)
+		fullState, err := protocol.NewFullConsensusState(
+			log,
+			tracer,
+			consumer,
+			state,
+			all.Index,
+			all.Payloads,
+			util.MockBlockTimer(),
+			util.MockReceiptValidator(),
+			sealValidator,
+		)
 		require.NoError(t, err)
 
 		err = fullState.Extend(context.Background(), block1)
@@ -1605,8 +2078,6 @@ func TestExtendInvalidSealsInBlock(t *testing.T) {
 		err = fullState.Extend(context.Background(), block2)
 		require.NoError(t, err)
 		err = fullState.Extend(context.Background(), block3)
-
-		sealValidator.AssertExpectations(t)
 		require.Error(t, err)
 		require.True(t, st.IsInvalidExtensionError(err))
 	})
@@ -1614,6 +2085,7 @@ func TestExtendInvalidSealsInBlock(t *testing.T) {
 
 func TestHeaderExtendValid(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
+	rootProtocolStateID := getRootProtocolStateID(t, rootSnapshot)
 	util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.FollowerState) {
 		head, err := rootSnapshot.Head()
 		require.NoError(t, err)
@@ -1621,9 +2093,9 @@ func TestHeaderExtendValid(t *testing.T) {
 		require.NoError(t, err)
 
 		extend := unittest.BlockWithParentFixture(head)
-		extend.SetPayload(flow.EmptyPayload())
+		extend.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
 
-		err = state.Extend(context.Background(), extend)
+		err = state.ExtendCertified(context.Background(), extend, unittest.CertifyBlock(extend.Header))
 		require.NoError(t, err)
 
 		finalCommit, err := state.Final().Commit()
@@ -1643,27 +2115,27 @@ func TestHeaderExtendMissingParent(t *testing.T) {
 		extend.Header.ParentID = unittest.BlockFixture().ID()
 		extend.Header.PayloadHash = extend.Payload.Hash()
 
-		err := state.Extend(context.Background(), &extend)
+		err := state.ExtendCertified(context.Background(), &extend, unittest.CertifyBlock(extend.Header))
 		require.Error(t, err)
-		require.True(t, st.IsInvalidExtensionError(err), err)
+		require.False(t, st.IsInvalidExtensionError(err), err)
 
 		// verify seal not indexed
 		var sealID flow.Identifier
 		err = db.View(operation.LookupLatestSealAtBlock(extend.ID(), &sealID))
 		require.Error(t, err)
-		require.True(t, errors.Is(err, stoerr.ErrNotFound), err)
+		require.ErrorIs(t, err, stoerr.ErrNotFound)
 	})
 }
 
 func TestHeaderExtendHeightTooSmall(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
+	rootProtocolStateID := getRootProtocolStateID(t, rootSnapshot)
 	util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.FollowerState) {
 		head, err := rootSnapshot.Head()
 		require.NoError(t, err)
 
 		block1 := unittest.BlockWithParentFixture(head)
-		err = state.Extend(context.Background(), block1)
-		require.NoError(t, err)
+		block1.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
 
 		// create another block that points to the previous block `extend` as parent
 		// but has _same_ height as parent. This violates the condition that a child's
@@ -1672,14 +2144,16 @@ func TestHeaderExtendHeightTooSmall(t *testing.T) {
 		block2 := unittest.BlockWithParentFixture(block1.Header)
 		block2.Header.Height = block1.Header.Height
 
-		err = state.Extend(context.Background(), block2)
-		require.Error(t, err)
+		err = state.ExtendCertified(context.Background(), block1, block2.Header.QuorumCertificate())
+		require.NoError(t, err)
+
+		err = state.ExtendCertified(context.Background(), block2, unittest.CertifyBlock(block2.Header))
+		require.False(t, st.IsInvalidExtensionError(err))
 
 		// verify seal not indexed
 		var sealID flow.Identifier
 		err = db.View(operation.LookupLatestSealAtBlock(block2.ID(), &sealID))
-		require.Error(t, err)
-		require.True(t, errors.Is(err, stoerr.ErrNotFound), err)
+		require.ErrorIs(t, err, stoerr.ErrNotFound)
 	})
 }
 
@@ -1694,22 +2168,92 @@ func TestHeaderExtendHeightTooLarge(t *testing.T) {
 		// set an invalid height
 		block.Header.Height = head.Height + 2
 
-		err = state.Extend(context.Background(), block)
-		require.Error(t, err)
+		err = state.ExtendCertified(context.Background(), block, unittest.CertifyBlock(block.Header))
+		require.False(t, st.IsInvalidExtensionError(err))
 	})
 }
 
-func TestHeaderExtendBlockNotConnected(t *testing.T) {
+// TestExtendBlockProcessable tests that BlockProcessable is called correctly and doesn't produce duplicates of same notifications
+// when extending blocks with and without certifying QCs.
+func TestExtendBlockProcessable(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
+	head, err := rootSnapshot.Head()
+	require.NoError(t, err)
+	rootProtocolStateID := getRootProtocolStateID(t, rootSnapshot)
+	consumer := mockprotocol.NewConsumer(t)
+	util.RunWithFullProtocolStateAndConsumer(t, rootSnapshot, consumer, func(db *badger.DB, state *protocol.ParticipantState) {
+		block := unittest.BlockWithParentFixture(head)
+		block.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
+		child := unittest.BlockWithParentProtocolState(block)
+		grandChild := unittest.BlockWithParentProtocolState(child)
+
+		// extend block using certifying QC, expect that BlockProcessable will be emitted once
+		consumer.On("BlockProcessable", block.Header, child.Header.QuorumCertificate()).Once()
+		err := state.ExtendCertified(context.Background(), block, child.Header.QuorumCertificate())
+		require.NoError(t, err)
+
+		// extend block without certifying QC, expect that BlockProcessable won't be called
+		err = state.Extend(context.Background(), child)
+		require.NoError(t, err)
+		consumer.AssertNumberOfCalls(t, "BlockProcessable", 1)
+
+		// extend block using certifying QC, expect that BlockProcessable will be emitted twice.
+		// One for parent block and second for current block.
+		grandChildCertifyingQC := unittest.CertifyBlock(grandChild.Header)
+		consumer.On("BlockProcessable", child.Header, grandChild.Header.QuorumCertificate()).Once()
+		consumer.On("BlockProcessable", grandChild.Header, grandChildCertifyingQC).Once()
+		err = state.ExtendCertified(context.Background(), grandChild, grandChildCertifyingQC)
+		require.NoError(t, err)
+	})
+}
+
+// TestFollowerHeaderExtendBlockNotConnected tests adding an orphaned block to the follower state.
+// Specifically, we add 2 blocks, where:
+// first block is added and then finalized;
+// second block is a sibling to the finalized block
+// The Follower should accept this block since tracking of orphan blocks is implemented by another component.
+func TestFollowerHeaderExtendBlockNotConnected(t *testing.T) {
+	rootSnapshot := unittest.RootSnapshotFixture(participants)
+	rootProtocolStateID := getRootProtocolStateID(t, rootSnapshot)
 	util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.FollowerState) {
 		head, err := rootSnapshot.Head()
 		require.NoError(t, err)
 
-		// add 2 blocks, where:
-		// first block is added and then finalized;
-		// second block is a sibling to the finalized block
-		// The Follower should reject this block as an outdated chain extension
 		block1 := unittest.BlockWithParentFixture(head)
+		block1.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
+		err = state.ExtendCertified(context.Background(), block1, unittest.CertifyBlock(block1.Header))
+		require.NoError(t, err)
+
+		err = state.Finalize(context.Background(), block1.ID())
+		require.NoError(t, err)
+
+		// create a fork at view/height 1 and try to connect it to root
+		block2 := unittest.BlockWithParentFixture(head)
+		block2.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
+		err = state.ExtendCertified(context.Background(), block2, unittest.CertifyBlock(block2.Header))
+		require.NoError(t, err)
+
+		// verify seal not indexed
+		var sealID flow.Identifier
+		err = db.View(operation.LookupLatestSealAtBlock(block2.ID(), &sealID))
+		require.NoError(t, err)
+	})
+}
+
+// TestParticipantHeaderExtendBlockNotConnected tests adding an orphaned block to the consensus participant state.
+// Specifically, we add 2 blocks, where:
+// first block is added and then finalized;
+// second block is a sibling to the finalized block
+// The Participant should reject this block as an outdated chain extension
+func TestParticipantHeaderExtendBlockNotConnected(t *testing.T) {
+	rootSnapshot := unittest.RootSnapshotFixture(participants)
+	rootProtocolStateID := getRootProtocolStateID(t, rootSnapshot)
+	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState) {
+		head, err := rootSnapshot.Head()
+		require.NoError(t, err)
+
+		block1 := unittest.BlockWithParentFixture(head)
+		block1.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
 		err = state.Extend(context.Background(), block1)
 		require.NoError(t, err)
 
@@ -1718,15 +2262,14 @@ func TestHeaderExtendBlockNotConnected(t *testing.T) {
 
 		// create a fork at view/height 1 and try to connect it to root
 		block2 := unittest.BlockWithParentFixture(head)
+		block2.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
 		err = state.Extend(context.Background(), block2)
-		require.Error(t, err)
 		require.True(t, st.IsOutdatedExtensionError(err), err)
 
 		// verify seal not indexed
 		var sealID flow.Identifier
 		err = db.View(operation.LookupLatestSealAtBlock(block2.ID(), &sealID))
-		require.Error(t, err)
-		require.True(t, errors.Is(err, stoerr.ErrNotFound), err)
+		require.ErrorIs(t, err, stoerr.ErrNotFound)
 	})
 }
 
@@ -1734,40 +2277,77 @@ func TestHeaderExtendHighestSeal(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
 	head, err := rootSnapshot.Head()
 	require.NoError(t, err)
+	rootProtocolStateID := getRootProtocolStateID(t, rootSnapshot)
 	util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.FollowerState) {
 		// create block2 and block3
 		block2 := unittest.BlockWithParentFixture(head)
-		block2.SetPayload(flow.EmptyPayload())
-		err := state.Extend(context.Background(), block2)
+		block2.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
+
+		block3 := unittest.BlockWithParentProtocolState(block2)
+
+		err := state.ExtendCertified(context.Background(), block2, block3.Header.QuorumCertificate())
 		require.NoError(t, err)
 
-		block3 := unittest.BlockWithParentFixture(block2.Header)
-		block3.SetPayload(flow.EmptyPayload())
-		err = state.Extend(context.Background(), block3)
-		require.NoError(t, err)
-
-		// create seals for block2 and block3
-		seal2 := unittest.Seal.Fixture(
-			unittest.Seal.WithBlockID(block2.ID()),
-		)
-		seal3 := unittest.Seal.Fixture(
-			unittest.Seal.WithBlockID(block3.ID()),
-		)
+		// create receipts and seals for block2 and block3
+		receipt2, seal2 := unittest.ReceiptAndSealForBlock(block2)
+		receipt3, seal3 := unittest.ReceiptAndSealForBlock(block3)
 
 		// include the seals in block4
 		block4 := unittest.BlockWithParentFixture(block3.Header)
-		block4.SetPayload(flow.Payload{
-			// placing seals in the reversed order to test
-			// Extend will pick the highest sealed block
-			Seals:      []*flow.Seal{seal3, seal2},
-			Guarantees: nil,
-		})
-		err = state.Extend(context.Background(), block4)
+		// include receipts and results
+		block4.SetPayload(unittest.PayloadFixture(
+			unittest.WithReceipts(receipt3, receipt2),
+			unittest.WithProtocolStateID(rootProtocolStateID),
+		))
+
+		// include the seals in block4
+		block5 := unittest.BlockWithParentFixture(block4.Header)
+		// placing seals in the reversed order to test
+		// Extend will pick the highest sealed block
+		block5.SetPayload(unittest.PayloadFixture(
+			unittest.WithSeals(seal3, seal2),
+			unittest.WithProtocolStateID(rootProtocolStateID),
+		))
+
+		err = state.ExtendCertified(context.Background(), block3, block4.Header.QuorumCertificate())
 		require.NoError(t, err)
 
-		finalCommit, err := state.AtBlockID(block4.ID()).Commit()
+		err = state.ExtendCertified(context.Background(), block4, block5.Header.QuorumCertificate())
+		require.NoError(t, err)
+
+		err = state.ExtendCertified(context.Background(), block5, unittest.CertifyBlock(block5.Header))
+		require.NoError(t, err)
+
+		finalCommit, err := state.AtBlockID(block5.ID()).Commit()
 		require.NoError(t, err)
 		require.Equal(t, seal3.FinalState, finalCommit)
+	})
+}
+
+// TestExtendCertifiedInvalidQC checks if ExtendCertified performs a sanity check of certifying QC.
+func TestExtendCertifiedInvalidQC(t *testing.T) {
+	rootSnapshot := unittest.RootSnapshotFixture(participants)
+	head, err := rootSnapshot.Head()
+	require.NoError(t, err)
+	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState) {
+		// create child block
+		block := unittest.BlockWithParentFixture(head)
+		block.SetPayload(flow.EmptyPayload())
+
+		t.Run("qc-invalid-view", func(t *testing.T) {
+			certifyingQC := unittest.CertifyBlock(block.Header)
+			certifyingQC.View++ // invalidate block view
+			err = state.ExtendCertified(context.Background(), block, certifyingQC)
+			require.Error(t, err)
+			require.False(t, st.IsOutdatedExtensionError(err))
+		})
+		t.Run("qc-invalid-block-id", func(t *testing.T) {
+			certifyingQC := unittest.CertifyBlock(block.Header)
+			certifyingQC.BlockID = unittest.IdentifierFixture() // invalidate blockID
+			err = state.ExtendCertified(context.Background(), block, certifyingQC)
+			require.Error(t, err)
+			require.False(t, st.IsOutdatedExtensionError(err))
+		})
 	})
 }
 
@@ -1775,7 +2355,8 @@ func TestHeaderExtendHighestSeal(t *testing.T) {
 // guarantees with invalid guarantors
 func TestExtendInvalidGuarantee(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
-	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.MutableState) {
+	rootProtocolStateID := getRootProtocolStateID(t, rootSnapshot)
+	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState) {
 		// create a valid block
 		head, err := rootSnapshot.Head()
 		require.NoError(t, err)
@@ -1789,13 +2370,15 @@ func TestExtendInvalidGuarantee(t *testing.T) {
 		require.NoError(t, err)
 
 		block := unittest.BlockWithParentFixture(head)
-		payload := flow.EmptyPayload()
-		payload.Guarantees = []*flow.CollectionGuarantee{
-			{
-				ChainID:          cluster.ChainID(),
-				ReferenceBlockID: head.ID(),
-				SignerIndices:    validSignerIndices,
+		payload := flow.Payload{
+			Guarantees: []*flow.CollectionGuarantee{
+				{
+					ChainID:          cluster.ChainID(),
+					ReferenceBlockID: head.ID(),
+					SignerIndices:    validSignerIndices,
+				},
 			},
+			ProtocolStateID: rootProtocolStateID,
 		}
 
 		// now the valid block has a guarantee in the payload with valid signer indices.
@@ -1807,10 +2390,14 @@ func TestExtendInvalidGuarantee(t *testing.T) {
 
 		// now the guarantee has invalid signer indices: the checksum should have 4 bytes, but it only has 1
 		payload.Guarantees[0].SignerIndices = []byte{byte(1)}
+
+		// create new block that has invalid collection guarantee
+		block = unittest.BlockWithParentFixture(head)
+		block.SetPayload(payload)
+
 		err = state.Extend(context.Background(), block)
-		require.Error(t, err)
 		require.True(t, signature.IsInvalidSignerIndicesError(err), err)
-		require.True(t, errors.Is(err, signature.ErrInvalidChecksum), err)
+		require.ErrorIs(t, err, signature.ErrInvalidChecksum)
 		require.True(t, st.IsInvalidExtensionError(err), err)
 
 		// now the guarantee has invalid signer indices: the checksum should have 4 bytes, but it only has 1
@@ -1822,9 +2409,8 @@ func TestExtendInvalidGuarantee(t *testing.T) {
 		}
 		payload.Guarantees[0].SignerIndices = checksumMismatch
 		err = state.Extend(context.Background(), block)
-		require.Error(t, err)
 		require.True(t, signature.IsInvalidSignerIndicesError(err), err)
-		require.True(t, errors.Is(err, signature.ErrInvalidChecksum), err)
+		require.ErrorIs(t, err, signature.ErrInvalidChecksum)
 		require.True(t, st.IsInvalidExtensionError(err), err)
 
 		// let's test even if the checksum is correct, but signer indices is still wrong because the tailing are not 0,
@@ -1837,16 +2423,15 @@ func TestExtendInvalidGuarantee(t *testing.T) {
 		err = state.Extend(context.Background(), block)
 		require.Error(t, err)
 		require.True(t, signature.IsInvalidSignerIndicesError(err), err)
-		require.True(t, errors.Is(err, signature.ErrIllegallyPaddedBitVector), err)
+		require.ErrorIs(t, err, signature.ErrIllegallyPaddedBitVector)
 		require.True(t, st.IsInvalidExtensionError(err), err)
 
 		// test imcompatible bit vector length
 		wrongbitVectorLength := validSignerIndices[0 : len(validSignerIndices)-1]
 		payload.Guarantees[0].SignerIndices = wrongbitVectorLength
 		err = state.Extend(context.Background(), block)
-		require.Error(t, err)
 		require.True(t, signature.IsInvalidSignerIndicesError(err), err)
-		require.True(t, errors.Is(err, signature.ErrIncompatibleBitVectorLength), err)
+		require.ErrorIs(t, err, signature.ErrIncompatibleBitVectorLength)
 		require.True(t, st.IsInvalidExtensionError(err), err)
 
 		// revert back to good value
@@ -1855,95 +2440,64 @@ func TestExtendInvalidGuarantee(t *testing.T) {
 		// test the ReferenceBlockID is not found
 		payload.Guarantees[0].ReferenceBlockID = flow.ZeroID
 		err = state.Extend(context.Background(), block)
-		require.Error(t, err)
-		require.True(t, errors.Is(err, storage.ErrNotFound), err)
+		require.ErrorIs(t, err, storage.ErrNotFound)
 		require.True(t, st.IsInvalidExtensionError(err), err)
 
 		// revert back to good value
 		payload.Guarantees[0].ReferenceBlockID = head.ID()
 
-		// TODO: test the guarantee has bad reference block ID that would return ErrEpochNotCommitted
+		// TODO: test the guarantee has bad reference block ID that would return protocol.ErrNextEpochNotCommitted
 		// this case is not easy to create, since the test case has no such block yet.
-		// we need to refactor the MutableState to add a guaranteeValidator, so that we can mock it and
-		// return the ErrEpochNotCommitted for testing
+		// we need to refactor the ParticipantState to add a guaranteeValidator, so that we can mock it and
+		// return the protocol.ErrNextEpochNotCommitted for testing
 
 		// test the guarantee has wrong chain ID, and should return ErrClusterNotFound
 		payload.Guarantees[0].ChainID = flow.ChainID("some_bad_chain_ID")
 		err = state.Extend(context.Background(), block)
 		require.Error(t, err)
-		require.True(t, errors.Is(err, realprotocol.ErrClusterNotFound), err)
+		require.ErrorIs(t, err, realprotocol.ErrClusterNotFound)
 		require.True(t, st.IsInvalidExtensionError(err), err)
-	})
-}
-
-func TestMakeValid(t *testing.T) {
-	t.Run("should trigger BlockProcessable with parent block", func(t *testing.T) {
-		consumer := &mockprotocol.Consumer{}
-		rootSnapshot := unittest.RootSnapshotFixture(participants)
-		head, err := rootSnapshot.Head()
-		require.NoError(t, err)
-		util.RunWithFullProtocolStateAndConsumer(t, rootSnapshot, consumer, func(db *badger.DB, state *protocol.MutableState) {
-			// create block2 and block3
-			block2 := unittest.BlockWithParentFixture(head)
-			block2.SetPayload(flow.EmptyPayload())
-			err := state.Extend(context.Background(), block2)
-			require.NoError(t, err)
-
-			block3 := unittest.BlockWithParentFixture(block2.Header)
-			block3.SetPayload(flow.EmptyPayload())
-			err = state.Extend(context.Background(), block3)
-			require.NoError(t, err)
-
-			consumer.On("BlockProcessable", mock.Anything).Return()
-
-			// make valid on block2
-			err = state.MarkValid(block2.ID())
-			require.NoError(t, err)
-
-			// because the parent block is the root block,
-			// BlockProcessable is not triggered on root block.
-			consumer.AssertNotCalled(t, "BlockProcessable")
-
-			err = state.MarkValid(block3.ID())
-			require.NoError(t, err)
-
-			// because the parent is not a root block, BlockProcessable event should be emitted
-			// block3's parent is block2
-			consumer.AssertCalled(t, "BlockProcessable", block2.Header)
-		})
 	})
 }
 
 // If block B is finalized and contains a seal for block A, then A is the last sealed block
 func TestSealed(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
+	rootProtocolStateID := getRootProtocolStateID(t, rootSnapshot)
 	util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.FollowerState) {
 		head, err := rootSnapshot.Head()
 		require.NoError(t, err)
 
 		// block 1 will be sealed
 		block1 := unittest.BlockWithParentFixture(head)
-		err = state.Extend(context.Background(), block1)
-		require.NoError(t, err)
-		err = state.Finalize(context.Background(), block1.ID())
-		require.NoError(t, err)
-
+		block1.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
 		receipt1, seal1 := unittest.ReceiptAndSealForBlock(block1)
 
 		// block 2 contains receipt for block 1
 		block2 := unittest.BlockWithParentFixture(block1.Header)
-		block2.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt1)))
-		err = state.Extend(context.Background(), block2)
+		block2.SetPayload(unittest.PayloadFixture(
+			unittest.WithReceipts(receipt1),
+			unittest.WithProtocolStateID(rootProtocolStateID),
+		))
+
+		err = state.ExtendCertified(context.Background(), block1, block2.Header.QuorumCertificate())
 		require.NoError(t, err)
-		err = state.Finalize(context.Background(), block2.ID())
+		err = state.Finalize(context.Background(), block1.ID())
 		require.NoError(t, err)
 
 		// block 3 contains seal for block 1
 		block3 := unittest.BlockWithParentFixture(block2.Header)
 		block3.SetPayload(flow.Payload{
-			Seals: []*flow.Seal{seal1},
+			Seals:           []*flow.Seal{seal1},
+			ProtocolStateID: rootProtocolStateID,
 		})
-		err = state.Extend(context.Background(), block3)
+
+		err = state.ExtendCertified(context.Background(), block2, block3.Header.QuorumCertificate())
+		require.NoError(t, err)
+		err = state.Finalize(context.Background(), block2.ID())
+		require.NoError(t, err)
+
+		err = state.ExtendCertified(context.Background(), block3, unittest.CertifyBlock(block3.Header))
 		require.NoError(t, err)
 		err = state.Finalize(context.Background(), block3.ID())
 		require.NoError(t, err)
@@ -1960,12 +2514,14 @@ func TestSealed(t *testing.T) {
 // A non atomic bug would be: header is found in DB, but payload index is not found
 func TestCacheAtomicity(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
+	rootProtocolStateID := getRootProtocolStateID(t, rootSnapshot)
 	util.RunWithFollowerProtocolStateAndHeaders(t, rootSnapshot,
 		func(db *badger.DB, state *protocol.FollowerState, headers storage.Headers, index storage.Index) {
 			head, err := rootSnapshot.Head()
 			require.NoError(t, err)
 
 			block := unittest.BlockWithParentFixture(head)
+			block.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
 			blockID := block.ID()
 
 			// check 100 times to see if either 1) or 2) satisfies
@@ -1987,7 +2543,7 @@ func TestCacheAtomicity(t *testing.T) {
 
 			// storing the block to database, which supposed to be atomic updates to headers and index,
 			// both to badger database and the cache.
-			err = state.Extend(context.Background(), block)
+			err = state.ExtendCertified(context.Background(), block, unittest.CertifyBlock(block.Header))
 			require.NoError(t, err)
 			wg.Wait()
 		})
@@ -1998,26 +2554,50 @@ func TestHeaderInvalidTimestamp(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		metrics := metrics.NewNoopCollector()
 		tracer := trace.NewNoopTracer()
-		headers, _, seals, index, payloads, blocks, setups, commits, statuses, results := storeutil.StorageLayer(t, db)
+		log := zerolog.Nop()
+		all := storeutil.StorageLayer(t, db)
 
 		// create a event consumer to test epoch transition events
 		distributor := events.NewDistributor()
-		consumer := new(mockprotocol.Consumer)
+		consumer := mockprotocol.NewConsumer(t)
 		distributor.AddConsumer(consumer)
 
 		block, result, seal := unittest.BootstrapFixture(participants)
-		qc := unittest.QuorumCertificateFixture(unittest.QCWithBlockID(block.ID()))
+		qc := unittest.QuorumCertificateFixture(unittest.QCWithRootBlockID(block.ID()))
 		rootSnapshot, err := inmem.SnapshotFromBootstrapState(block, result, seal, qc)
 		require.NoError(t, err)
 
-		state, err := protocol.Bootstrap(metrics, db, headers, seals, results, blocks, setups, commits, statuses, rootSnapshot)
+		state, err := protocol.Bootstrap(
+			metrics,
+			db,
+			all.Headers,
+			all.Seals,
+			all.Results,
+			all.Blocks,
+			all.QuorumCertificates,
+			all.Setups,
+			all.EpochCommits,
+			all.EpochProtocolState,
+			all.ProtocolKVStore,
+			all.VersionBeacons,
+			rootSnapshot,
+		)
 		require.NoError(t, err)
 
 		blockTimer := &mockprotocol.BlockTimer{}
 		blockTimer.On("Validate", mock.Anything, mock.Anything).Return(realprotocol.NewInvalidBlockTimestamp(""))
 
-		fullState, err := protocol.NewFullConsensusState(state, index, payloads, tracer, consumer, blockTimer,
-			util.MockReceiptValidator(), util.MockSealValidator(seals))
+		fullState, err := protocol.NewFullConsensusState(
+			log,
+			tracer,
+			consumer,
+			state,
+			all.Index,
+			all.Payloads,
+			blockTimer,
+			util.MockReceiptValidator(),
+			util.MockSealValidator(all.Seals),
+		)
 		require.NoError(t, err)
 
 		extend := unittest.BlockWithParentFixture(block.Header)
@@ -2030,26 +2610,76 @@ func TestHeaderInvalidTimestamp(t *testing.T) {
 	})
 }
 
-func assertEpochEmergencyFallbackTriggered(t *testing.T, db *badger.DB) {
-	var triggered bool
-	err := db.View(operation.CheckEpochEmergencyFallbackTriggered(&triggered))
+// TestProtocolStateIdempotent tests that both participant and follower states correctly process adding same block twice
+// where second extend doesn't result in an error and effectively is no-op.
+func TestProtocolStateIdempotent(t *testing.T) {
+	rootSnapshot := unittest.RootSnapshotFixture(participants)
+	rootProtocolStateID := getRootProtocolStateID(t, rootSnapshot)
+	head, err := rootSnapshot.Head()
 	require.NoError(t, err)
-	assert.True(t, triggered)
+	t.Run("follower", func(t *testing.T) {
+		util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.FollowerState) {
+			block := unittest.BlockWithParentFixture(head)
+			block.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
+			err := state.ExtendCertified(context.Background(), block, unittest.CertifyBlock(block.Header))
+			require.NoError(t, err)
+
+			// same operation should be no-op
+			err = state.ExtendCertified(context.Background(), block, unittest.CertifyBlock(block.Header))
+			require.NoError(t, err)
+		})
+	})
+	t.Run("participant", func(t *testing.T) {
+		util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState) {
+			block := unittest.BlockWithParentFixture(head)
+			block.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
+			err := state.Extend(context.Background(), block)
+			require.NoError(t, err)
+
+			// same operation should be no-op
+			err = state.Extend(context.Background(), block)
+			require.NoError(t, err)
+
+			err = state.ExtendCertified(context.Background(), block, unittest.CertifyBlock(block.Header))
+			require.NoError(t, err)
+		})
+	})
+}
+
+func assertEpochEmergencyFallbackTriggered(t *testing.T, state realprotocol.State, expected bool) {
+	triggered, err := state.Params().EpochFallbackTriggered()
+	require.NoError(t, err)
+	assert.Equal(t, expected, triggered)
 }
 
 // mockMetricsForRootSnapshot mocks the given metrics mock object to expect all
 // metrics which are set during bootstrapping and building blocks.
 func mockMetricsForRootSnapshot(metricsMock *mockmodule.ComplianceMetrics, rootSnapshot *inmem.Snapshot) {
-	metricsMock.On("CurrentEpochCounter", rootSnapshot.Encodable().Epochs.Current.Counter)
-	metricsMock.On("CurrentEpochPhase", rootSnapshot.Encodable().Phase)
-	metricsMock.On("CurrentEpochFinalView", rootSnapshot.Encodable().Epochs.Current.FinalView)
-	metricsMock.On("CommittedEpochFinalView", rootSnapshot.Encodable().Epochs.Current.FinalView)
-	metricsMock.On("CurrentDKGPhase1FinalView", rootSnapshot.Encodable().Epochs.Current.DKGPhase1FinalView)
-	metricsMock.On("CurrentDKGPhase2FinalView", rootSnapshot.Encodable().Epochs.Current.DKGPhase2FinalView)
-	metricsMock.On("CurrentDKGPhase3FinalView", rootSnapshot.Encodable().Epochs.Current.DKGPhase3FinalView)
+	epochProtocolState := rootSnapshot.Encodable().SealingSegment.LatestProtocolStateEntry().EpochEntry
+	epochSetup := epochProtocolState.CurrentEpochSetup
+	metricsMock.On("CurrentEpochCounter", epochSetup.Counter)
+	metricsMock.On("CurrentEpochPhase", epochProtocolState.EpochPhase())
+	metricsMock.On("CurrentEpochFinalView", epochSetup.FinalView)
+	metricsMock.On("CurrentDKGPhase1FinalView", epochSetup.DKGPhase1FinalView)
+	metricsMock.On("CurrentDKGPhase2FinalView", epochSetup.DKGPhase2FinalView)
+	metricsMock.On("CurrentDKGPhase3FinalView", epochSetup.DKGPhase3FinalView)
 	metricsMock.On("BlockSealed", mock.Anything)
 	metricsMock.On("BlockFinalized", mock.Anything)
 	metricsMock.On("FinalizedHeight", mock.Anything)
 	metricsMock.On("SealedHeight", mock.Anything)
+}
 
+func getRootProtocolStateID(t *testing.T, rootSnapshot *inmem.Snapshot) flow.Identifier {
+	rootProtocolState, err := rootSnapshot.ProtocolState()
+	require.NoError(t, err)
+	return rootProtocolState.ID()
+}
+
+// calculateExpectedStateId is a utility function which makes easier to get expected protocol state ID after applying service events contained in seals.
+func calculateExpectedStateId(t *testing.T, mutableProtocolState realprotocol.MutableProtocolState) func(header *flow.Header, seals []*flow.Seal) flow.Identifier {
+	return func(header *flow.Header, seals []*flow.Seal) flow.Identifier {
+		expectedStateID, _, err := mutableProtocolState.EvolveState(header.ParentID, header.View, seals)
+		require.NoError(t, err)
+		return expectedStateID
+	}
 }

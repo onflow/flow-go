@@ -57,7 +57,7 @@ func (c *CorruptedConnector) Connect(ctx irrecoverable.SignalerContext, targetId
 		return nil, fmt.Errorf("could not dial corruptible conduit factory %s: %w", corruptedAddress, err)
 	}
 
-	client := insecure.NewCorruptibleConduitFactoryClient(gRpcClient)
+	client := insecure.NewCorruptNetworkClient(gRpcClient)
 
 	inbound, err := client.ConnectAttacker(ctx, &empty.Empty{})
 	if err != nil {

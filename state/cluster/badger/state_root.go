@@ -7,18 +7,22 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// StateRoot is the root information required to bootstrap the cluster state
+// StateRoot is the root information required to bootstrap the cluster state.
 type StateRoot struct {
-	block *cluster.Block
+	block *cluster.Block          // root block for the cluster chain
+	qc    *flow.QuorumCertificate // root QC for the cluster chain
+	epoch uint64                  // operating epoch for the cluster chain
 }
 
-func NewStateRoot(genesis *cluster.Block) (*StateRoot, error) {
+func NewStateRoot(genesis *cluster.Block, qc *flow.QuorumCertificate, epoch uint64) (*StateRoot, error) {
 	err := validateClusterGenesis(genesis)
 	if err != nil {
 		return nil, fmt.Errorf("inconsistent state root: %w", err)
 	}
 	return &StateRoot{
 		block: genesis,
+		qc:    qc,
+		epoch: epoch,
 	}, nil
 }
 
@@ -52,4 +56,12 @@ func (s StateRoot) ClusterID() flow.ChainID {
 
 func (s StateRoot) Block() *cluster.Block {
 	return s.block
+}
+
+func (s StateRoot) QC() *flow.QuorumCertificate {
+	return s.qc
+}
+
+func (s StateRoot) EpochCounter() uint64 {
+	return s.epoch
 }

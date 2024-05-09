@@ -7,13 +7,18 @@ import (
 	"github.com/spf13/pflag"
 
 	flowconsensus "github.com/onflow/flow-go/consensus"
+	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
+	"github.com/onflow/flow-go/consensus/hotstuff/notifications"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	hotsignature "github.com/onflow/flow-go/consensus/hotstuff/signature"
+	"github.com/onflow/flow-go/consensus/hotstuff/validator"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	recoveryprotocol "github.com/onflow/flow-go/consensus/recovery/protocol"
 	"github.com/onflow/flow-go/engine/common/follower"
+	followereng "github.com/onflow/flow-go/engine/common/follower"
 	commonsync "github.com/onflow/flow-go/engine/common/synchronization"
+	"github.com/onflow/flow-go/engine/execution/computation"
 	"github.com/onflow/flow-go/engine/verification/assigner"
 	"github.com/onflow/flow-go/engine/verification/assigner/blockconsumer"
 	"github.com/onflow/flow-go/engine/verification/fetcher"
@@ -23,10 +28,8 @@ import (
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/buffer"
 	"github.com/onflow/flow-go/module/chainsync"
 	"github.com/onflow/flow-go/module/chunks"
-	"github.com/onflow/flow-go/module/compliance"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
@@ -49,6 +52,8 @@ type VerificationConfig struct {
 
 	blockWorkers uint64 // number of blocks processed in parallel.
 	chunkWorkers uint64 // number of chunks processed in parallel.
+
+	stopAtHeight uint64 // height to stop the node on
 }
 
 type VerificationNodeBuilder struct {
@@ -75,12 +80,13 @@ func (v *VerificationNodeBuilder) LoadFlags() {
 			flags.Uint64Var(&v.verConf.requestTargets, "request-targets", requester.DefaultRequestTargets, "maximum number of execution nodes a chunk data pack request is dispatched to")
 			flags.Uint64Var(&v.verConf.blockWorkers, "block-workers", blockconsumer.DefaultBlockWorkers, "maximum number of blocks being processed in parallel")
 			flags.Uint64Var(&v.verConf.chunkWorkers, "chunk-workers", chunkconsumer.DefaultChunkWorkers, "maximum number of execution nodes a chunk data pack request is dispatched to")
+			flags.Uint64Var(&v.verConf.stopAtHeight, "stop-at-height", 0, "height to stop the node at (0 to disable)")
 		})
 }
 
 func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 	var (
-		followerState protocol.MutableState
+		followerState protocol.FollowerState
 
 		chunkStatuses        *stdmap.ChunkStatuses    // used in fetcher engine
 		chunkRequests        *stdmap.ChunkRequests    // used in requester engine
@@ -88,19 +94,19 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 		processedBlockHeight *badger.ConsumerProgress // used in block consumer
 		chunkQueue           *badger.ChunksQueue      // used in chunk consumer
 
-		syncCore                *chainsync.Core       // used in follower engine
-		pendingBlocks           *buffer.PendingBlocks // used in follower engine
-		assignerEngine          *assigner.Engine      // the assigner engine
-		fetcherEngine           *fetcher.Engine       // the fetcher engine
-		requesterEngine         *requester.Engine     // the requester engine
-		verifierEng             *verifier.Engine      // the verifier engine
-		chunkConsumer           *chunkconsumer.ChunkConsumer
-		blockConsumer           *blockconsumer.BlockConsumer
-		finalizationDistributor *pubsub.FinalizationDistributor
-		finalizedHeader         *commonsync.FinalizedHeaderCache
+		syncCore            *chainsync.Core   // used in follower engine
+		assignerEngine      *assigner.Engine  // the assigner engine
+		fetcherEngine       *fetcher.Engine   // the fetcher engine
+		requesterEngine     *requester.Engine // the requester engine
+		verifierEng         *verifier.Engine  // the verifier engine
+		chunkConsumer       *chunkconsumer.ChunkConsumer
+		blockConsumer       *blockconsumer.BlockConsumer
+		followerDistributor *pubsub.FollowerDistributor
 
-		followerEng *follower.Engine           // the follower engine
-		collector   module.VerificationMetrics // used to collect metrics of all engines
+		committee    *committees.Consensus
+		followerCore *hotstuff.FollowerLoop     // follower hotstuff logic
+		followerEng  *follower.ComplianceEngine // the follower engine
+		collector    module.VerificationMetrics // used to collect metrics of all engines
 	)
 
 	v.FlowNodeBuilder.
@@ -114,11 +120,12 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 				return fmt.Errorf("only implementations of type badger.State are currently supported but read-only state has type %T", node.State)
 			}
 			followerState, err = badgerState.NewFollowerState(
+				node.Logger,
+				node.Tracer,
+				node.ProtocolEvents,
 				state,
 				node.Storage.Index,
 				node.Storage.Payloads,
-				node.Tracer,
-				node.ProtocolEvents,
 				blocktimer.DefaultBlockTimer,
 			)
 			return err
@@ -169,42 +176,37 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 
 			return nil
 		}).
-		Module("pending block cache", func(node *NodeConfig) error {
-			var err error
-
-			// consensus cache for follower engine
-			pendingBlocks = buffer.NewPendingBlocks()
-
-			// registers size method of backend for metrics
-			err = node.Metrics.Mempool.Register(metrics.ResourcePendingBlock, pendingBlocks.Size)
-			if err != nil {
-				return fmt.Errorf("could not register backend metric: %w", err)
-			}
-
+		Module("follower distributor", func(node *NodeConfig) error {
+			followerDistributor = pubsub.NewFollowerDistributor()
+			followerDistributor.AddProposalViolationConsumer(notifications.NewSlashingViolationsConsumer(node.Logger))
 			return nil
 		}).
 		Module("sync core", func(node *NodeConfig) error {
 			var err error
 
-			syncCore, err = chainsync.New(node.Logger, node.SyncCoreConfig, metrics.NewChainSyncCollector())
+			syncCore, err = chainsync.New(node.Logger, node.SyncCoreConfig, metrics.NewChainSyncCollector(node.RootChainID), node.RootChainID)
 			return err
 		}).
 		Component("verifier engine", func(node *NodeConfig) (module.ReadyDoneAware, error) {
 			var err error
 
-			vm := fvm.NewVM()
+			vm := fvm.NewVirtualMachine()
 			fvmOptions := append(
 				[]fvm.Option{fvm.WithLogger(node.Logger)},
 				node.FvmOptions...,
 			)
+
+			// TODO(JanezP): cleanup creation of fvm context github.com/onflow/flow-go/issues/5249
+			fvmOptions = append(fvmOptions, computation.DefaultFVMOptions(node.RootChainID, false, false)...)
 			vmCtx := fvm.NewContext(fvmOptions...)
+
 			chunkVerifier := chunks.NewChunkVerifier(vm, vmCtx, node.Logger)
 			approvalStorage := badger.NewResultApprovals(node.Metrics.Cache, node.DB)
 			verifierEng, err = verifier.New(
 				node.Logger,
 				collector,
 				node.Tracer,
-				node.Network,
+				node.EngineRegistry,
 				node.State,
 				node.Me,
 				chunkVerifier,
@@ -217,7 +219,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 			requesterEngine, err = requester.New(
 				node.Logger,
 				node.State,
-				node.Network,
+				node.EngineRegistry,
 				node.Tracer,
 				collector,
 				chunkRequests,
@@ -244,16 +246,21 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 				node.Storage.Blocks,
 				node.Storage.Results,
 				node.Storage.Receipts,
-				requesterEngine)
+				requesterEngine,
+				v.verConf.stopAtHeight)
 
 			// requester and fetcher engines are started by chunk consumer
-			chunkConsumer = chunkconsumer.NewChunkConsumer(
+			chunkConsumer, err = chunkconsumer.NewChunkConsumer(
 				node.Logger,
 				collector,
 				processedChunkIndex,
 				chunkQueue,
 				fetcherEngine,
 				v.verConf.chunkWorkers)
+
+			if err != nil {
+				return nil, fmt.Errorf("could not create chunk consumer: %w", err)
+			}
 
 			err = node.Metrics.Mempool.Register(metrics.ResourceChunkConsumer, chunkConsumer.Size)
 			if err != nil {
@@ -279,7 +286,8 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 				node.State,
 				chunkAssigner,
 				chunkQueue,
-				chunkConsumer)
+				chunkConsumer,
+				v.verConf.stopAtHeight)
 
 			return assignerEngine, nil
 		}).
@@ -312,88 +320,112 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 
 			return blockConsumer, nil
 		}).
-		Component("follower engine", func(node *NodeConfig) (module.ReadyDoneAware, error) {
-			// initialize cleaner for DB
-			cleaner := badger.NewCleaner(node.Logger, node.DB, node.Metrics.CleanCollector, flow.DefaultValueLogGCFrequency)
-
-			// create a finalizer that handles updating the protocol
-			// state when the follower detects newly finalized blocks
-			final := finalizer.NewFinalizer(node.DB, node.Storage.Headers, followerState, node.Tracer)
-
+		Component("consensus committee", func(node *NodeConfig) (module.ReadyDoneAware, error) {
 			// initialize consensus committee's membership state
 			// This committee state is for the HotStuff follower, which follows the MAIN CONSENSUS Committee
 			// Note: node.Me.NodeID() is not part of the consensus committee
-			committee, err := committees.NewConsensusCommittee(node.State, node.Me.NodeID())
-			if err != nil {
-				return nil, fmt.Errorf("could not create Committee state for main consensus: %w", err)
-			}
-
-			packer := hotsignature.NewConsensusSigDataPacker(committee)
-			// initialize the verifier for the protocol consensus
-			verifier := verification.NewCombinedVerifier(committee, packer)
+			var err error
+			committee, err = committees.NewConsensusCommittee(node.State, node.Me.NodeID())
+			node.ProtocolEvents.AddConsumer(committee)
+			return committee, err
+		}).
+		Component("follower core", func(node *NodeConfig) (module.ReadyDoneAware, error) {
+			// create a finalizer that handles updating the protocol
+			// state when the follower detects newly finalized blocks
+			final := finalizer.NewFinalizer(node.DB, node.Storage.Headers, followerState, node.Tracer)
 
 			finalized, pending, err := recoveryprotocol.FindLatest(node.State, node.Storage.Headers)
 			if err != nil {
 				return nil, fmt.Errorf("could not find latest finalized block and pending blocks to recover consensus follower: %w", err)
 			}
 
-			finalizationDistributor = pubsub.NewFinalizationDistributor()
-			finalizationDistributor.AddConsumer(blockConsumer)
+			followerDistributor.AddOnBlockFinalizedConsumer(blockConsumer.OnFinalizedBlock)
 
 			// creates a consensus follower with ingestEngine as the notifier
 			// so that it gets notified upon each new finalized block
-			followerCore, err := flowconsensus.NewFollower(node.Logger, committee, node.Storage.Headers, final, verifier, finalizationDistributor, node.RootBlock.Header,
-				node.RootQC, finalized, pending)
+			followerCore, err = flowconsensus.NewFollower(
+				node.Logger,
+				node.Metrics.Mempool,
+				node.Storage.Headers,
+				final,
+				followerDistributor,
+				node.FinalizedRootBlock.Header,
+				node.RootQC,
+				finalized,
+				pending,
+			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create follower core logic: %w", err)
 			}
 
-			followerEng, err = follower.New(
+			return followerCore, nil
+		}).
+		Component("follower engine", func(node *NodeConfig) (module.ReadyDoneAware, error) {
+			packer := hotsignature.NewConsensusSigDataPacker(committee)
+			// initialize the verifier for the protocol consensus
+			verifier := verification.NewCombinedVerifier(committee, packer)
+			validator := validator.New(committee, verifier)
+
+			var heroCacheCollector module.HeroCacheMetrics = metrics.NewNoopCollector()
+			if node.HeroCacheMetricsEnable {
+				heroCacheCollector = metrics.FollowerCacheMetrics(node.MetricsRegisterer)
+			}
+
+			core, err := followereng.NewComplianceCore(
 				node.Logger,
-				node.Network,
-				node.Me,
-				node.Metrics.Engine,
 				node.Metrics.Mempool,
-				cleaner,
-				node.Storage.Headers,
-				node.Storage.Payloads,
+				heroCacheCollector,
+				followerDistributor,
 				followerState,
-				pendingBlocks,
 				followerCore,
+				validator,
 				syncCore,
 				node.Tracer,
-				follower.WithComplianceOptions(compliance.WithSkipNewProposalsThreshold(node.ComplianceConfig.SkipNewProposalsThreshold)),
+			)
+			if err != nil {
+				return nil, fmt.Errorf("could not create follower core: %w", err)
+			}
+
+			followerEng, err = followereng.NewComplianceLayer(
+				node.Logger,
+				node.EngineRegistry,
+				node.Me,
+				node.Metrics.Engine,
+				node.Storage.Headers,
+				node.LastFinalizedHeader,
+				core,
+				node.ComplianceConfig,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create follower engine: %w", err)
 			}
+			followerDistributor.AddOnBlockFinalizedConsumer(followerEng.OnFinalizedBlock)
 
 			return followerEng, nil
 		}).
-		Component("finalized snapshot", func(node *NodeConfig) (module.ReadyDoneAware, error) {
-			var err error
-			finalizedHeader, err = commonsync.NewFinalizedHeaderCache(node.Logger, node.State, finalizationDistributor)
+		Component("sync engine", func(node *NodeConfig) (module.ReadyDoneAware, error) {
+			spamConfig, err := commonsync.NewSpamDetectionConfig()
 			if err != nil {
-				return nil, fmt.Errorf("could not create finalized snapshot cache: %w", err)
+				return nil, fmt.Errorf("could not initialize spam detection config: %w", err)
 			}
 
-			return finalizedHeader, nil
-		}).
-		Component("sync engine", func(node *NodeConfig) (module.ReadyDoneAware, error) {
 			sync, err := commonsync.New(
 				node.Logger,
 				node.Metrics.Engine,
-				node.Network,
+				node.EngineRegistry,
 				node.Me,
+				node.State,
 				node.Storage.Blocks,
 				followerEng,
 				syncCore,
-				finalizedHeader,
 				node.SyncEngineIdentifierProvider,
+				spamConfig,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create synchronization engine: %w", err)
 			}
+			followerDistributor.AddFinalizationConsumer(sync)
+
 			return sync, nil
 		})
 }

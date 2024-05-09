@@ -160,7 +160,7 @@ A component will now be started by passing a `SignalerContext` to its `Start` me
   // It is meant to inspect the error, determining its type and seeing if e.g. a restart or some other measure is suitable,
   // and then return an ErrorHandlingResult indicating how RunComponent should proceed.
   // Before returning, it could also:
-  // - panic (in stagingnet / benchmark)
+  // - panic (in sandboxnet / benchmark)
   // - log in various Error channels and / or send telemetry ...
   type OnError = func(err error) ErrorHandlingResult
 

@@ -17,7 +17,7 @@ func BatchInsertExecutionReceiptMeta(receiptID flow.Identifier, meta *flow.Execu
 	return batchWrite(makePrefix(codeExecutionReceiptMeta, receiptID), meta)
 }
 
-// RetrieveExecutionReceipt retrieves a execution receipt meta by ID.
+// RetrieveExecutionReceiptMeta retrieves a execution receipt meta by ID.
 func RetrieveExecutionReceiptMeta(receiptID flow.Identifier, meta *flow.ExecutionReceiptMeta) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeExecutionReceiptMeta, receiptID), meta)
 }
@@ -41,6 +41,13 @@ func LookupOwnExecutionReceipt(blockID flow.Identifier, receiptID *flow.Identifi
 // RemoveOwnExecutionReceipt removes own execution receipt index by blockID
 func RemoveOwnExecutionReceipt(blockID flow.Identifier) func(*badger.Txn) error {
 	return remove(makePrefix(codeOwnBlockReceipt, blockID))
+}
+
+// BatchRemoveOwnExecutionReceipt removes blockID-to-my-receiptID index entries keyed by a blockID in a provided batch.
+// No errors are expected during normal operation, but it may return generic error
+// if badger fails to process request
+func BatchRemoveOwnExecutionReceipt(blockID flow.Identifier) func(batch *badger.WriteBatch) error {
+	return batchRemove(makePrefix(codeOwnBlockReceipt, blockID))
 }
 
 // IndexExecutionReceipts inserts an execution receipt ID keyed by block ID and receipt ID.

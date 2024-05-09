@@ -3,17 +3,16 @@ package run
 import (
 	"fmt"
 
+	"github.com/onflow/crypto"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
-	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	hotstuffSig "github.com/onflow/flow-go/consensus/hotstuff/signature"
 	"github.com/onflow/flow-go/consensus/hotstuff/validator"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	"github.com/onflow/flow-go/consensus/hotstuff/votecollector"
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/dkg"
 	"github.com/onflow/flow-go/model/flow"
@@ -31,6 +30,17 @@ type ParticipantData struct {
 	GroupKey     crypto.PublicKey
 }
 
+// PublicBeaconKeys returns the nodes' individual public random-beacon keys (excluding
+// the group public key). The keys are returned in the same order as the nodes appear
+// in the Participants list, which must be the DKG index order.
+func (pd *ParticipantData) PublicBeaconKeys() []crypto.PublicKey {
+	keys := make([]crypto.PublicKey, len(pd.Participants))
+	for i, participant := range pd.Participants {
+		keys[i] = participant.RandomBeaconPrivKey.PublicKey()
+	}
+	return keys
+}
+
 func (pd *ParticipantData) Identities() flow.IdentityList {
 	nodes := make([]bootstrap.NodeInfo, 0, len(pd.Participants))
 	for _, participant := range pd.Participants {
@@ -45,11 +55,18 @@ func (pd *ParticipantData) Identities() flow.IdentityList {
 // which assumes that only consensus participants construct QCs, which also have produce votes.
 //
 // TODO: modularize QC construction code (and code to verify QC) to be instantiated without needing private keys.
-func GenerateRootQC(block *flow.Block, votes []*model.Vote, participantData *ParticipantData, identities flow.IdentityList) (*flow.QuorumCertificate, error) {
+// It returns (qc, nil, nil) if a QC can be constructed with enough votes, and there is no invalid votes
+// It returns (qc, invalidVotes, nil) if there are some invalid votes, but a QC can still be constructed
+// It returns (nil, invalidVotes, err) if no qc can be constructed with not enough votes or running any any exception
+func GenerateRootQC(block *flow.Block, votes []*model.Vote, participantData *ParticipantData, identities flow.IdentityList) (
+	*flow.QuorumCertificate, // the constructed QC
+	[]error, // return invalid votes error
+	error, // exception or could not construct qc
+) {
 	// create consensus committee's state
 	committee, err := committees.NewStaticCommittee(identities, flow.Identifier{}, participantData.Lookup, participantData.GroupKey)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	// STEP 1: create VoteProcessor
@@ -59,34 +76,44 @@ func GenerateRootQC(block *flow.Block, votes []*model.Vote, participantData *Par
 		createdQC = qc
 	})
 	if err != nil {
-		return nil, fmt.Errorf("could not CombinedVoteProcessor processor: %w", err)
+		return nil, nil, fmt.Errorf("could not CombinedVoteProcessor processor: %w", err)
 	}
 
+	invalidVotes := make([]error, 0, len(votes))
 	// STEP 2: feed the votes into the vote processor to create QC
 	for _, vote := range votes {
 		err := processor.Process(vote)
+
+		// in case there are invalid votes, we continue process more votes,
+		// so that finalizing block won't be interrupted by any invalid vote.
+		// if no enough votes are collected, finalize will fail and exit anyway, because
+		// no QC will be built.
 		if err != nil {
-			return nil, fmt.Errorf("fail to process vote %v for block %v from signer %v: %w",
+			if model.IsInvalidVoteError(err) {
+				invalidVotes = append(invalidVotes, err)
+				continue
+			}
+			return nil, invalidVotes, fmt.Errorf("fail to process vote %v for block %v from signer %v: %w",
 				vote.ID(),
-				block.ID(),
+				vote.BlockID,
 				vote.SignerID,
 				err)
 		}
 	}
 
 	if createdQC == nil {
-		return nil, fmt.Errorf("QC is not created, total number of votes %v, expect to have 2/3 votes of %v participants",
+		return nil, invalidVotes, fmt.Errorf("QC is not created, total number of votes %v, expect to have 2/3 votes of %v participants",
 			len(votes), len(identities))
 	}
 
 	// STEP 3: validate constructed QC
 	val, err := createValidator(committee)
 	if err != nil {
-		return nil, err
+		return nil, invalidVotes, err
 	}
-	err = val.ValidateQC(createdQC, hotBlock)
+	err = val.ValidateQC(createdQC)
 
-	return createdQC, err
+	return createdQC, invalidVotes, err
 }
 
 // GenerateRootBlockVotes generates votes for root block based on participantData
@@ -104,7 +131,7 @@ func GenerateRootBlockVotes(block *flow.Block, participantData *ParticipantData)
 		if err != nil {
 			return nil, fmt.Errorf("could not get private keys for participant: %w", err)
 		}
-		me, err := local.New(p.Identity(), keys.StakingKey)
+		me, err := local.New(p.Identity().IdentitySkeleton, keys.StakingKey)
 		if err != nil {
 			return nil, err
 		}
@@ -121,12 +148,11 @@ func GenerateRootBlockVotes(block *flow.Block, participantData *ParticipantData)
 }
 
 // createValidator creates validator that can validate votes and QC
-func createValidator(committee hotstuff.Committee) (hotstuff.Validator, error) {
+func createValidator(committee hotstuff.DynamicCommittee) (hotstuff.Validator, error) {
 	packer := hotstuffSig.NewConsensusSigDataPacker(committee)
 	verifier := verification.NewCombinedVerifier(committee, packer)
 
-	forks := &mocks.ForksReader{}
-	hotstuffValidator := validator.New(committee, forks, verifier)
+	hotstuffValidator := validator.New(committee, verifier)
 	return hotstuffValidator, nil
 }
 

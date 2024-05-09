@@ -12,13 +12,16 @@ import (
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	_ "google.golang.org/grpc/encoding/gzip" //required for gRPC compression
 	"google.golang.org/grpc/status"
+
+	_ "github.com/onflow/flow-go/engine/common/grpc/compressor/deflate" // required for gRPC compression
+	_ "github.com/onflow/flow-go/engine/common/grpc/compressor/snappy"  // required for gRPC compression
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/utils/grpcutils"
 )
 
 // Backend defines the core functionality required by the RPC API.
@@ -31,7 +34,7 @@ type Backend interface {
 // Config defines the configurable options for the ingress server.
 type Config struct {
 	ListenAddr        string
-	MaxMsgSize        int  // in bytes
+	MaxMsgSize        uint // in bytes
 	RpcMetricsEnabled bool // enable GRPC metrics
 }
 
@@ -54,14 +57,10 @@ func New(
 	apiRatelimits map[string]int, // the api rate limit (max calls per second) for each of the gRPC API e.g. Ping->100, ExecuteScriptAtBlockID->300
 	apiBurstLimits map[string]int, // the api burst limit (max calls at the same time) for each of the gRPC API e.g. Ping->50, ExecuteScriptAtBlockID->10
 ) *Engine {
-	if config.MaxMsgSize == 0 {
-		config.MaxMsgSize = grpcutils.DefaultMaxMsgSize
-	}
-
 	// create a GRPC server to serve GRPC clients
 	grpcOpts := []grpc.ServerOption{
-		grpc.MaxRecvMsgSize(config.MaxMsgSize),
-		grpc.MaxSendMsgSize(config.MaxMsgSize),
+		grpc.MaxRecvMsgSize(int(config.MaxMsgSize)),
+		grpc.MaxSendMsgSize(int(config.MaxMsgSize)),
 	}
 
 	var interceptors []grpc.UnaryServerInterceptor // ordered list of interceptors
@@ -159,6 +158,9 @@ func (h *handler) SendTransaction(_ context.Context, req *access.SendTransaction
 	}
 
 	err = h.backend.ProcessTransaction(&tx)
+	if engine.IsInvalidInputError(err) {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
 	if err != nil {
 		return nil, err
 	}

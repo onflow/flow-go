@@ -21,14 +21,13 @@ import (
 type MyExecutionReceipts struct {
 	genericReceipts *ExecutionReceipts
 	db              *badger.DB
-	cache           *Cache
+	cache           *Cache[flow.Identifier, *flow.ExecutionReceipt]
 }
 
 // NewMyExecutionReceipts creates instance of MyExecutionReceipts which is a wrapper wrapper around badger.ExecutionReceipts
 // It's useful for execution nodes to keep track of produced execution receipts.
 func NewMyExecutionReceipts(collector module.CacheMetrics, db *badger.DB, receipts *ExecutionReceipts) *MyExecutionReceipts {
-	store := func(key interface{}, val interface{}) func(*transaction.Tx) error {
-		receipt := val.(*flow.ExecutionReceipt)
+	store := func(key flow.Identifier, receipt *flow.ExecutionReceipt) func(*transaction.Tx) error {
 		// assemble DB operations to store receipt (no execution)
 		storeReceiptOps := receipts.storeTx(receipt)
 		// assemble DB operations to index receipt as one of my own (no execution)
@@ -68,10 +67,8 @@ func NewMyExecutionReceipts(collector module.CacheMetrics, db *badger.DB, receip
 		}
 	}
 
-	retrieve := func(key interface{}) func(tx *badger.Txn) (interface{}, error) {
-		blockID := key.(flow.Identifier)
-
-		return func(tx *badger.Txn) (interface{}, error) {
+	retrieve := func(blockID flow.Identifier) func(tx *badger.Txn) (*flow.ExecutionReceipt, error) {
+		return func(tx *badger.Txn) (*flow.ExecutionReceipt, error) {
 			var receiptID flow.Identifier
 			err := operation.LookupOwnExecutionReceipt(blockID, &receiptID)(tx)
 			if err != nil {
@@ -88,8 +85,8 @@ func NewMyExecutionReceipts(collector module.CacheMetrics, db *badger.DB, receip
 	return &MyExecutionReceipts{
 		genericReceipts: receipts,
 		db:              db,
-		cache: newCache(collector, metrics.ResourceMyReceipt,
-			withLimit(flow.DefaultTransactionExpiry+100),
+		cache: newCache[flow.Identifier, *flow.ExecutionReceipt](collector, metrics.ResourceMyReceipt,
+			withLimit[flow.Identifier, *flow.ExecutionReceipt](flow.DefaultTransactionExpiry+100),
 			withStore(store),
 			withRetrieve(retrieve)),
 	}
@@ -108,7 +105,7 @@ func (m *MyExecutionReceipts) myReceipt(blockID flow.Identifier) func(*badger.Tx
 		if err != nil {
 			return nil, err
 		}
-		return val.(*flow.ExecutionReceipt), nil
+		return val, nil
 	}
 }
 
@@ -120,6 +117,10 @@ func (m *MyExecutionReceipts) StoreMyReceipt(receipt *flow.ExecutionReceipt) err
 	return operation.RetryOnConflictTx(m.db, transaction.Update, m.storeMyReceipt(receipt))
 }
 
+// BatchStoreMyReceipt stores blockID-to-my-receipt index entry keyed by blockID in a provided batch.
+// No errors are expected during normal operation
+// If entity fails marshalling, the error is wrapped in a generic error and returned.
+// If Badger unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
 func (m *MyExecutionReceipts) BatchStoreMyReceipt(receipt *flow.ExecutionReceipt, batch storage.BatchStorage) error {
 
 	writeBatch := batch.GetWriter()
@@ -147,4 +148,12 @@ func (m *MyExecutionReceipts) MyReceipt(blockID flow.Identifier) (*flow.Executio
 
 func (m *MyExecutionReceipts) RemoveIndexByBlockID(blockID flow.Identifier) error {
 	return m.db.Update(operation.SkipNonExist(operation.RemoveOwnExecutionReceipt(blockID)))
+}
+
+// BatchRemoveIndexByBlockID removes blockID-to-my-execution-receipt index entry keyed by a blockID in a provided batch
+// No errors are expected during normal operation, even if no entries are matched.
+// If Badger unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
+func (m *MyExecutionReceipts) BatchRemoveIndexByBlockID(blockID flow.Identifier, batch storage.BatchStorage) error {
+	writeBatch := batch.GetWriter()
+	return operation.BatchRemoveOwnExecutionReceipt(blockID)(writeBatch)
 }

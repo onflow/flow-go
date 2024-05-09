@@ -17,35 +17,35 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// TestConnectorHappy_Send checks that a CorruptedConnector can successfully create a connection to a remote Corruptible Conduit Factory (CCF).
-// Moreover, it checks that the resulted connection is capable of intact message delivery in a timely fashion from attacker to CCF.
+// TestConnectorHappy_Send checks that a CorruptedConnector can successfully create a connection to a remote corrupt network (CN).
+// Moreover, it checks that the resulted connection is capable of intact message delivery in a timely fashion from attacker to corrupt network.
 func TestConnectorHappyPath_Send(t *testing.T) {
-	withMockCorruptibleConduitFactory(t, func(corruptedId flow.Identity, ctx irrecoverable.SignalerContext, ccf *mockCorruptibleConduitFactory) {
-		// extracting port that ccf gRPC server is running on CCF.
-		_, ccfPortStr, err := net.SplitHostPort(ccf.ServerAddress())
+	withMockCorruptNetwork(t, func(corruptedId flow.Identity, ctx irrecoverable.SignalerContext, cn *mockCorruptNetwork) {
+		// extracting port that CN gRPC server is running on.
+		_, cnPortStr, err := net.SplitHostPort(cn.ServerAddress())
 		require.NoError(t, err)
 
 		connector := NewCorruptedConnector(unittest.Logger(),
 			flow.IdentityList{&corruptedId},
-			map[flow.Identifier]string{corruptedId.NodeID: ccfPortStr})
+			map[flow.Identifier]string{corruptedId.NodeID: cnPortStr})
 		// empty incoming handler, as this test does not evaluate receive path
 		connector.WithIncomingMessageHandler(func(i *insecure.Message) {})
 
-		// goroutine checks the mock ccf for receiving the attacker registration from connector.
-		// the attacker registration arrives as the connector attempts a connection on to the ccf.
+		// goroutine checks the mock cn for receiving the attacker registration from connector.
+		// the attacker registration arrives as the connector attempts a connection on to the cn.
 		attackerRegistered := make(chan struct{})
 		go func() {
-			<-ccf.attackerRegMsg
+			<-cn.attackerRegMsg
 			close(attackerRegistered)
 		}()
 
-		// goroutine checks mock ccf for receiving the message sent over the connection.
+		// goroutine checks mock cn for receiving the message sent over the connection.
 		msg, _, _ := insecure.EgressMessageFixture(t, unittest.NetworkCodec(), insecure.Protocol_MULTICAST, &message.TestMessage{
-			Text: fmt.Sprintf("this is a test message from attacker to ccf: %d", rand.Int()),
+			Text: fmt.Sprintf("this is a test message from attacker to cn: %d", rand.Int()),
 		})
 		sentMsgReceived := make(chan struct{})
 		go func() {
-			receivedMsg := <-ccf.attackerMsg
+			receivedMsg := <-cn.attackerMsg
 
 			// received message should have an exact match on the relevant fields.
 			// Note: only fields filled by test fixtures are checked, as some others
@@ -60,43 +60,42 @@ func TestConnectorHappyPath_Send(t *testing.T) {
 			close(sentMsgReceived)
 		}()
 
-		// creates a connection to the corruptible conduit ccf.
+		// creates a connection to the corrupt network.
 		connection, err := connector.Connect(ctx, corruptedId.NodeID)
 		require.NoError(t, err)
 		defer func() {
 			require.NoError(t, connection.CloseConnection())
 		}()
 
-		// sends a message to ccf
+		// sends a message to cn
 		require.NoError(t, connection.SendMessage(msg))
 
-		// checks a timely arrival of the registration and sent message at the ccf.
-		unittest.RequireCloseBefore(t, attackerRegistered, 1*time.Second, "ccf could not receive attacker registration on time")
-		// imitates sending a message from ccf to attacker through corrupted connection.
-		unittest.RequireCloseBefore(t, sentMsgReceived, 1*time.Second, "ccf could not receive message sent on connection on time")
+		// checks a timely arrival of the registration and sent message at the cn.
+		unittest.RequireCloseBefore(t, attackerRegistered, 100*time.Millisecond, "cn could not receive attacker registration on time")
+		// imitates sending a message from cn to attacker through corrupted connection.
+		unittest.RequireCloseBefore(t, sentMsgReceived, 100*time.Millisecond, "cn could not receive message sent on connection on time")
 	})
 }
 
-// TestConnectorHappy_Receive checks that a CorruptedConnector can successfully create a connection to a remote Corruptible Conduit Factory (
-// CCF).
-// Moreover, it checks that the resulted connection is capable of intact message delivery in a timely fashion from CCF to attacker.
+// TestConnectorHappy_Receive checks that a CorruptedConnector can successfully create a connection to a remote corrupt network (CN).
+// Moreover, it checks that the resulted connection is capable of intact message delivery in a timely fashion from CN to attacker.
 func TestConnectorHappyPath_Receive(t *testing.T) {
-	withMockCorruptibleConduitFactory(t, func(corruptedId flow.Identity, ctx irrecoverable.SignalerContext, ccf *mockCorruptibleConduitFactory) {
-		// extracting port that ccf gRPC server is running on
-		_, ccfPortStr, err := net.SplitHostPort(ccf.ServerAddress())
+	withMockCorruptNetwork(t, func(corruptedId flow.Identity, ctx irrecoverable.SignalerContext, cn *mockCorruptNetwork) {
+		// extracting port that CN gRPC server is running on
+		_, cnPortStr, err := net.SplitHostPort(cn.ServerAddress())
 		require.NoError(t, err)
 
 		msg, _, _ := insecure.EgressMessageFixture(t, unittest.NetworkCodec(), insecure.Protocol_MULTICAST, &message.TestMessage{
-			Text: fmt.Sprintf("this is a test message from ccf to attacker: %d", rand.Int()),
+			Text: fmt.Sprintf("this is a test message from cn to attacker: %d", rand.Int()),
 		})
 
 		sentMsgReceived := make(chan struct{})
 		connector := NewCorruptedConnector(unittest.Logger(),
 			flow.IdentityList{&corruptedId},
-			map[flow.Identifier]string{corruptedId.NodeID: ccfPortStr})
+			map[flow.Identifier]string{corruptedId.NodeID: cnPortStr})
 		connector.WithIncomingMessageHandler(
 			func(receivedMsg *insecure.Message) {
-				// received message by attacker should have an exact match on the relevant fields as sent by ccf.
+				// received message by attacker should have an exact match on the relevant fields as sent by cn.
 				// Note: only fields filled by test fixtures are checked, as some others
 				// are filled by gRPC on the fly, which are not relevant to the test's sanity.
 				require.Equal(t, receivedMsg.Egress.Payload, msg.Egress.Payload)
@@ -109,54 +108,54 @@ func TestConnectorHappyPath_Receive(t *testing.T) {
 				close(sentMsgReceived)
 			})
 
-		// goroutine checks the mock ccf for receiving the register message from connector.
-		// the register message arrives as the connector attempts a connection on to the ccf.
+		// goroutine checks the mock cn for receiving the register message from connector.
+		// the register message arrives as the connector attempts a connection on to the cn.
 		registerMsgReceived := make(chan struct{})
 		go func() {
-			<-ccf.attackerRegMsg
+			<-cn.attackerRegMsg
 			close(registerMsgReceived)
 		}()
 
-		// creates a connection to ccf.
+		// creates a connection to cn.
 		_, err = connector.Connect(ctx, corruptedId.NodeID)
 		require.NoError(t, err)
 
-		// checks a timely attacker registration as well as arrival of the sent message by ccf to corrupted connection
-		unittest.RequireCloseBefore(t, registerMsgReceived, 1*time.Second, "ccf could not receive attacker registration on time")
+		// checks a timely attacker registration as well as arrival of the sent message by cn to corrupted connection
+		unittest.RequireCloseBefore(t, registerMsgReceived, 100*time.Millisecond, "cn could not receive attacker registration on time")
 
-		// imitates sending a message from ccf to attacker through corrupted connection.
-		require.NoError(t, ccf.attackerObserveStream.Send(msg))
+		// imitates sending a message from cn to attacker through corrupted connection.
+		require.NoError(t, cn.attackerObserveStream.Send(msg))
 
-		unittest.RequireCloseBefore(t, sentMsgReceived, 1*time.Second, "corrupted connection could not receive ccf message on time")
+		unittest.RequireCloseBefore(t, sentMsgReceived, 100*time.Millisecond, "corrupted connection could not receive cn message on time")
 	})
 }
 
-// withMockCorruptibleConduitFactory creates and starts a mock corruptible conduit factory. This mock factory only runs the gRPC server part of an
-// actual corruptible conduit factory, and then executes the run function on it.
-func withMockCorruptibleConduitFactory(t *testing.T, run func(flow.Identity, irrecoverable.SignalerContext, *mockCorruptibleConduitFactory)) {
+// withMockCorruptNetwork creates and starts a mock corrupt network. This mock corrupt network only runs the gRPC server part of an
+// actual corrupt network, and then executes the run function on it.
+func withMockCorruptNetwork(t *testing.T, run func(flow.Identity, irrecoverable.SignalerContext, *mockCorruptNetwork)) {
 	corruptedIdentity := unittest.IdentityFixture(unittest.WithAddress(insecure.DefaultAddress))
 
-	// life-cycle management of corruptible conduit factory.
+	// life-cycle management of corrupt network.
 	ctx, cancel := context.WithCancel(context.Background())
-	ccfCtx, errChan := irrecoverable.WithSignaler(ctx)
+	cnCtx, errChan := irrecoverable.WithSignaler(ctx)
 	go func() {
 		select {
 		case err := <-errChan:
-			t.Error("mock corruptible conduit factory startup encountered fatal error", err)
+			t.Error("mock corrupt network startup encountered fatal error", err)
 		case <-ctx.Done():
 			return
 		}
 	}()
 
-	ccf := newMockCorruptibleConduitFactory()
+	cn := newMockCorruptNetwork()
 
-	// starts corruptible conduit factory
-	ccf.Start(ccfCtx)
-	unittest.RequireCloseBefore(t, ccf.Ready(), 1*time.Second, "could not start corruptible conduit factory on time")
+	// starts corrupt network
+	cn.Start(cnCtx)
+	unittest.RequireCloseBefore(t, cn.Ready(), 100*time.Millisecond, "could not start corrupt network on time")
 
-	run(*corruptedIdentity, ccfCtx, ccf)
+	run(*corruptedIdentity, cnCtx, cn)
 
 	// terminates orchestratorNetwork
 	cancel()
-	unittest.RequireCloseBefore(t, ccf.Done(), 1*time.Second, "could not stop corruptible conduit on time")
+	unittest.RequireCloseBefore(t, cn.Done(), 100*time.Millisecond, "could not stop corrupt network on time")
 }

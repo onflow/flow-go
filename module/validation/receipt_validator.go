@@ -4,17 +4,20 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/onflow/flow-go/crypto/hash"
+	"github.com/onflow/crypto/hash"
+
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/signature"
+	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/fork"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
 
 // receiptValidator holds all needed context for checking
-// receipt validity against current protocol state.
+// receipt validity against the current protocol state.
 type receiptValidator struct {
 	headers         storage.Headers
 	seals           storage.Seals
@@ -24,12 +27,14 @@ type receiptValidator struct {
 	signatureHasher hash.Hasher
 }
 
+var _ module.ReceiptValidator = (*receiptValidator)(nil)
+
 func NewReceiptValidator(state protocol.State,
 	headers storage.Headers,
 	index storage.Index,
 	results storage.ExecutionResults,
 	seals storage.Seals,
-) *receiptValidator {
+) module.ReceiptValidator {
 	rv := &receiptValidator{
 		state:           state,
 		headers:         headers,
@@ -38,7 +43,6 @@ func NewReceiptValidator(state protocol.State,
 		signatureHasher: signature.NewBLSHasher(signature.ExecutionReceiptTag),
 		seals:           seals,
 	}
-
 	return rv
 }
 
@@ -108,7 +112,7 @@ func (v *receiptValidator) fetchResult(resultID flow.Identifier) (*flow.Executio
 func (v *receiptValidator) subgraphCheck(result *flow.ExecutionResult, prevResult *flow.ExecutionResult) error {
 	block, err := v.state.AtBlockID(result.BlockID).Head()
 	if err != nil {
-		if errors.Is(err, storage.ErrNotFound) {
+		if errors.Is(err, state.ErrUnknownSnapshotReference) {
 			return engine.NewInvalidInputErrorf("no block found %v %w", result.BlockID, err)
 		}
 		return err
@@ -271,11 +275,21 @@ func (v *receiptValidator) ValidatePayload(candidate *flow.Block) error {
 		return fmt.Errorf("internal error while traversing the ancestor fork of unsealed blocks: %w", err)
 	}
 
-	// first validate all results that were included into payload
-	// if one of results is invalid we fail the whole check because it could be violating
-	// parent-children relationship
+	// tracks the number of receipts committing to each result.
+	// it's ok to only index receipts at this point, because we will perform
+	// all needed checks after we have validated all results.
+	receiptsByResult := payload.Receipts.GroupByResultID()
+
+	// validate all results that are incorporated into the payload. If one is malformed, the entire block is invalid.
 	for i, result := range payload.Results {
 		resultID := result.ID()
+
+		// Every included result must be accompanied by a receipt with a corresponding `ResultID`, in the same block.
+		// If a result is included without a corresponding receipt, it cannot be attributed to any executor.
+		receiptsForResult := uint(len(receiptsByResult.GetGroup(resultID)))
+		if receiptsForResult == 0 {
+			return engine.NewInvalidInputErrorf("no receipts for result %v at index %d", resultID, i)
+		}
 
 		// check for duplicated results
 		if _, isDuplicate := executionTree[resultID]; isDuplicate {

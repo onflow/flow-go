@@ -5,9 +5,10 @@ const MinSkipNewProposalsThreshold = 1000
 // Config is shared config for consensus and collection compliance engines, and
 // the consensus follower engine.
 type Config struct {
-	// SkipNewProposalsThreshold defines the threshold where, if we observe a new
-	// proposal which is this far behind our local latest finalized, we drop the
-	// proposal rather than cache it.
+	// SkipNewProposalsThreshold defines the threshold for dropping blocks that are too far in
+	// the future. Formally, let `H` be the view of the latest finalized block known to this
+	// node. A new block `B` is dropped without further processing, if
+	//   B.View > H + SkipNewProposalsThreshold
 	SkipNewProposalsThreshold uint64
 }
 
@@ -15,6 +16,15 @@ func DefaultConfig() Config {
 	return Config{
 		SkipNewProposalsThreshold: 100_000,
 	}
+}
+
+// GetSkipNewProposalsThreshold returns stored value in config possibly applying a lower bound.
+func (c *Config) GetSkipNewProposalsThreshold() uint64 {
+	if c.SkipNewProposalsThreshold < MinSkipNewProposalsThreshold {
+		return MinSkipNewProposalsThreshold
+	}
+
+	return c.SkipNewProposalsThreshold
 }
 
 type Opt func(*Config)

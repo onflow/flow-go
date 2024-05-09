@@ -2,9 +2,12 @@ package model
 
 import (
 	"bytes"
+	"fmt"
 
-	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/crypto"
+
 	"github.com/onflow/flow-go/model/encoding/rlp"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // SigDataPacker implements logic for encoding/decoding SignatureData using RLP encoding.
@@ -32,22 +35,30 @@ func (p *SigDataPacker) Encode(sigData *SignatureData) ([]byte, error) {
 }
 
 // Decode performs decoding of SignatureData
+// This function is side-effect free. It only ever returns
+// a model.InvalidFormatError, which indicates an invalid encoding.
 func (p *SigDataPacker) Decode(data []byte) (*SignatureData, error) {
 	bs := bytes.NewReader(data)
 	decoder := p.codec.NewDecoder(bs)
 	var sigData SignatureData
 	err := decoder.Decode(&sigData)
-	return &sigData, err
+	if err != nil {
+		return nil, NewInvalidFormatErrorf("given data is not a valid encoding of SignatureData: %w", err)
+	}
+	return &sigData, nil
 }
 
-// UnpackRandomBeaconSig takes sigData previously packed by packer,
-// decodes it and extracts random beacon signature
-func UnpackRandomBeaconSig(sigData []byte) (crypto.Signature, error) {
-	// decode into typed data
+// BeaconSignature extracts the source of randomness from the QC sigData.
+//
+// The sigData is an RLP encoded structure that is part of QuorumCertificate.
+// The function only ever returns a model.InvalidFormatError, which indicates an
+// invalid encoding.
+func BeaconSignature(qc *flow.QuorumCertificate) ([]byte, error) {
+	// unpack sig data to extract random beacon signature
 	packer := SigDataPacker{}
-	sig, err := packer.Decode(sigData)
+	sigData, err := packer.Decode(qc.SigData)
 	if err != nil {
-		return nil, NewInvalidFormatErrorf("could not decode sig data: %w", err)
+		return nil, fmt.Errorf("could not unpack block signature: %w", err)
 	}
-	return sig.ReconstructedRandomBeaconSig, nil
+	return sigData.ReconstructedRandomBeaconSig, nil
 }

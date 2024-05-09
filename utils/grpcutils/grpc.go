@@ -6,21 +6,44 @@ import (
 	"encoding/hex"
 	"fmt"
 
-	lcrypto "github.com/libp2p/go-libp2p-core/crypto"
-	libp2ptls "github.com/libp2p/go-libp2p-tls"
+	lcrypto "github.com/libp2p/go-libp2p/core/crypto"
+	libp2ptls "github.com/libp2p/go-libp2p/p2p/security/tls"
+	"github.com/onflow/crypto"
 
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 )
 
-// DefaultMaxMsgSize use 16MB as the default message size limit.
-// grpc library default is 4MB
-const DefaultMaxMsgSize = 1024 * 1024 * 16
+// NoCompressor use when no specific compressor name provided, which effectively means no compression.
+const NoCompressor = ""
+
+// DefaultMaxMsgSize use 1 GiB as the default message size limit.
+// This enforces a sane max message size, while still allowing for reasonably large messages.
+// grpc library default is 4 MiB.
+const DefaultMaxMsgSize = 1 << (10 * 3) // 1 GiB
+
+// CertificateConfig is used to configure an Certificate
+type CertificateConfig struct {
+	opts []libp2ptls.IdentityOption
+}
+
+// CertificateOption transforms an CertificateConfig to apply optional settings.
+type CertificateOption func(r *CertificateConfig)
+
+// WithCertTemplate specifies the template to use when generating a new certificate.
+func WithCertTemplate(template *x509.Certificate) CertificateOption {
+	return func(c *CertificateConfig) {
+		c.opts = append(c.opts, libp2ptls.WithCertTemplate(template))
+	}
+}
 
 // X509Certificate generates a self-signed x509 TLS certificate from the given key. The generated certificate
 // includes a libp2p extension that specifies the public key and the signature. The certificate does not include any
 // SAN extension.
-func X509Certificate(privKey crypto.PrivateKey) (*tls.Certificate, error) {
+func X509Certificate(privKey crypto.PrivateKey, opts ...CertificateOption) (*tls.Certificate, error) {
+	config := CertificateConfig{}
+	for _, opt := range opts {
+		opt(&config)
+	}
 
 	// convert the Flow crypto private key to a Libp2p private crypto key
 	libP2PKey, err := keyutils.LibP2PPrivKeyFromFlow(privKey)
@@ -29,7 +52,7 @@ func X509Certificate(privKey crypto.PrivateKey) (*tls.Certificate, error) {
 	}
 
 	// create a libp2p Identity from the libp2p private key
-	id, err := libp2ptls.NewIdentity(libP2PKey)
+	id, err := libp2ptls.NewIdentity(libP2PKey, config.opts...)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate identity: %w", err)
 	}
@@ -49,6 +72,9 @@ func X509Certificate(privKey crypto.PrivateKey) (*tls.Certificate, error) {
 
 // DefaultServerTLSConfig returns the default TLS server config with the given cert for a secure GRPC server
 func DefaultServerTLSConfig(cert *tls.Certificate) *tls.Config {
+
+	// TODO(rbtz): remove after we pick up https://github.com/securego/gosec/pull/903
+	// #nosec G402
 	tlsConfig := &tls.Config{
 		MinVersion:   tls.VersionTLS13,
 		Certificates: []tls.Certificate{*cert},

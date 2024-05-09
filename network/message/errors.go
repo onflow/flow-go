@@ -6,6 +6,8 @@ import (
 )
 
 var (
+	ErrUnauthorizedUnicastOnChannel = errors.New("message is not authorized to be sent on channel via unicast")
+	ErrUnauthorizedPublishOnChannel = errors.New("message is not authorized to be sent on channel via publish/multicast")
 	ErrUnauthorizedMessageOnChannel = errors.New("message is not authorized to be sent on channel")
 	ErrUnauthorizedRole             = errors.New("sender role not authorized to send message on channel")
 )
@@ -28,4 +30,13 @@ func NewUnknownMsgTypeErr(msgType interface{}) UnknownMsgTypeErr {
 func IsUnknownMsgTypeErr(err error) bool {
 	var e UnknownMsgTypeErr
 	return errors.As(err, &e)
+}
+
+// NewUnauthorizedProtocolError returns ErrUnauthorizedUnicastOnChannel or ErrUnauthorizedPublishOnChannel depending on the protocol provided.
+func NewUnauthorizedProtocolError(p ProtocolType) error {
+	if p == ProtocolTypeUnicast {
+		return ErrUnauthorizedUnicastOnChannel
+	}
+
+	return ErrUnauthorizedPublishOnChannel
 }

@@ -1,5 +1,3 @@
-// (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
-
 package cbor
 
 import (
@@ -60,7 +58,7 @@ func (c *Codec) Encode(v interface{}) ([]byte, error) {
 	// encode / append the envelope code
 	//bs1 := binstat.EnterTime(binstat.BinNet + ":wire<1(cbor)envelope2payload")
 	var data bytes.Buffer
-	data.WriteByte(code)
+	data.WriteByte(code.Uint8())
 	//binstat.LeaveVal(bs1, int64(data.Len()))
 
 	// encode the payload
@@ -85,16 +83,21 @@ func (c *Codec) Encode(v interface{}) ([]byte, error) {
 // NOTE: 'envelope' contains 'code' & serialized / encoded 'v'.
 // i.e.  1st byte is 'code' and remaining bytes are CBOR encoded 'v'.
 // Expected error returns during normal operations:
-//   - codec.UnknownMsgCodeErr if message code byte does not match any of the configured message codes.
+//   - codec.ErrInvalidEncoding if message encoding is invalid.
+//   - codec.ErrUnknownMsgCode if message code byte does not match any of the configured message codes.
 //   - codec.ErrMsgUnmarshal if the codec fails to unmarshal the data to the message type denoted by the message code.
 func (c *Codec) Decode(data []byte) (interface{}, error) {
 
+	msgCode, err := codec.MessageCodeFromPayload(data)
+	if err != nil {
+		return nil, err
+	}
 	// decode the envelope
 	//bs1 := binstat.EnterTime(binstat.BinNet + ":wire>3(cbor)payload2envelope")
 
 	//binstat.LeaveVal(bs1, int64(len(data)))
 
-	msgInterface, what, err := codec.InterfaceFromMessageCode(data[0])
+	msgInterface, what, err := codec.InterfaceFromMessageCode(msgCode)
 	if err != nil {
 		return nil, err
 	}

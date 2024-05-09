@@ -3,8 +3,10 @@ package verification
 import (
 	"fmt"
 
+	"github.com/onflow/crypto/hash"
+
+	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
-	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	msig "github.com/onflow/flow-go/module/signature"
@@ -15,10 +17,13 @@ import (
 // as part of their vote. StakingSigner is responsible for creating correctly
 // signed proposals and votes.
 type StakingSigner struct {
-	me            module.Local
-	stakingHasher hash.Hasher
-	signerID      flow.Identifier
+	me                  module.Local
+	stakingHasher       hash.Hasher
+	timeoutObjectHasher hash.Hasher
+	signerID            flow.Identifier
 }
+
+var _ hotstuff.Signer = (*StakingSigner)(nil)
 
 // NewStakingSigner instantiates a StakingSigner, which signs votes and
 // proposals with the staking key.  The generated signatures are aggregatable.
@@ -27,9 +32,10 @@ func NewStakingSigner(
 ) *StakingSigner {
 
 	sc := &StakingSigner{
-		me:            me,
-		stakingHasher: msig.NewBLSHasher(msig.CollectorVoteTag),
-		signerID:      me.NodeID(),
+		me:                  me,
+		stakingHasher:       msig.NewBLSHasher(msig.CollectorVoteTag),
+		timeoutObjectHasher: msig.NewBLSHasher(msig.CollectorTimeoutTag),
+		signerID:            me.NodeID(),
 	}
 	return sc
 }
@@ -75,6 +81,25 @@ func (c *StakingSigner) CreateVote(block *model.Block) (*model.Vote, error) {
 	}
 
 	return vote, nil
+}
+
+// CreateTimeout will create a signed timeout object for the given view.
+func (c *StakingSigner) CreateTimeout(curView uint64, newestQC *flow.QuorumCertificate, lastViewTC *flow.TimeoutCertificate) (*model.TimeoutObject, error) {
+	// create timeout object specific message
+	msg := MakeTimeoutMessage(curView, newestQC.View)
+	sigData, err := c.me.Sign(msg, c.timeoutObjectHasher)
+	if err != nil {
+		return nil, fmt.Errorf("could not generate signature for timeout object at view %d: %w", curView, err)
+	}
+
+	timeout := &model.TimeoutObject{
+		View:       curView,
+		NewestQC:   newestQC,
+		LastViewTC: lastViewTC,
+		SignerID:   c.signerID,
+		SigData:    sigData,
+	}
+	return timeout, nil
 }
 
 // genSigData generates the signature data for our local node for the given block.

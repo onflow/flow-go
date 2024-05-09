@@ -2,7 +2,6 @@ package storage
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/onflow/flow-go/admin"
@@ -65,17 +64,19 @@ func (r *ReadResultsCommand) Handler(ctx context.Context, req *admin.CommandRequ
 	return commands.ConvertToInterfaceList(results)
 }
 
+// Validator validates the request.
+// Returns admin.InvalidAdminReqError for invalid/malformed requests.
 func (r *ReadResultsCommand) Validator(req *admin.CommandRequest) error {
 	input, ok := req.Data.(map[string]interface{})
 	if !ok {
-		return ErrValidatorReqDataFormat
+		return admin.NewInvalidAdminReqFormatError("expected map[string]any")
 	}
 
 	data := &readResultsRequest{}
 
-	if result, ok := input["result"]; ok {
-		errInvalidResultValue := fmt.Errorf("invalid value for \"result\": expected a result ID represented as a 64 character long hex string, but got: %v", result)
-		result, ok := result.(string)
+	if resultIn, ok := input["result"]; ok {
+		errInvalidResultValue := admin.NewInvalidAdminReqParameterError("result", "expected a result ID represented as a 64 character long hex string", resultIn)
+		result, ok := resultIn.(string)
 		if !ok {
 			return errInvalidResultValue
 		}
@@ -88,17 +89,17 @@ func (r *ReadResultsCommand) Validator(req *admin.CommandRequest) error {
 	} else if block, ok := input["block"]; ok {
 		br, err := parseBlocksRequest(block)
 		if err != nil {
-			return err
+			return admin.NewInvalidAdminReqErrorf("invalid 'block' field: %w", err)
 		}
 		data.requestType = readResultsRequestByBlock
 		data.value = br
 	} else {
-		return errors.New("either \"block\" or \"result\" field is required")
+		return admin.NewInvalidAdminReqErrorf("either \"block\" or \"result\" field is required")
 	}
 
 	if n, ok := input["n"]; ok {
 		if n, err := parseN(n); err != nil {
-			return err
+			return admin.NewInvalidAdminReqErrorf("invalid 'n' field: %w", err)
 		} else {
 			data.numResultsToQuery = n
 		}

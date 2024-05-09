@@ -8,37 +8,13 @@ import (
 
 // EncodableSnapshot is the encoding format for protocol.Snapshot
 type EncodableSnapshot struct {
-	Head              *flow.Header
-	Identities        flow.IdentityList
-	LatestSeal        *flow.Seal
-	LatestResult      *flow.ExecutionResult
-	SealingSegment    *flow.SealingSegment
-	QuorumCertificate *flow.QuorumCertificate
-	Phase             flow.EpochPhase
-	Epochs            EncodableEpochs
-	Params            EncodableParams
-}
-
-// EncodableEpochs is the encoding format for protocol.EpochQuery
-type EncodableEpochs struct {
-	Previous *EncodableEpoch
-	Current  EncodableEpoch // cannot be nil
-	Next     *EncodableEpoch
-}
-
-// EncodableEpoch is the encoding format for protocol.Epoch
-type EncodableEpoch struct {
-	Counter            uint64
-	FirstView          uint64
-	DKGPhase1FinalView uint64
-	DKGPhase2FinalView uint64
-	DKGPhase3FinalView uint64
-	FinalView          uint64
-	RandomSource       []byte
-	InitialIdentities  flow.IdentityList
-	Clustering         flow.ClusterList
-	Clusters           []EncodableCluster
-	DKG                *EncodableDKG
+	Head                *flow.Header
+	LatestSeal          *flow.Seal            // TODO replace with same info from sealing segment
+	LatestResult        *flow.ExecutionResult // TODO replace with same info from sealing segment
+	SealingSegment      *flow.SealingSegment
+	QuorumCertificate   *flow.QuorumCertificate
+	Params              EncodableParams
+	SealedVersionBeacon *flow.SealedVersionBeacon
 }
 
 // EncodableDKG is the encoding format for protocol.DKG
@@ -57,14 +33,16 @@ type EncodableFullDKG struct {
 type EncodableCluster struct {
 	Index     uint
 	Counter   uint64
-	Members   flow.IdentityList
+	Members   flow.IdentitySkeletonList
 	RootBlock *cluster.Block
 	RootQC    *flow.QuorumCertificate
 }
 
 // EncodableParams is the encoding format for protocol.GlobalParams
 type EncodableParams struct {
-	ChainID         flow.ChainID
-	SporkID         flow.Identifier
-	ProtocolVersion uint
+	ChainID                    flow.ChainID
+	SporkID                    flow.Identifier
+	SporkRootBlockHeight       uint64
+	ProtocolVersion            uint
+	EpochCommitSafetyThreshold uint64
 }

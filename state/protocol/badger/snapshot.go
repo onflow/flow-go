@@ -1,21 +1,19 @@
-// (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
-
 package badger
 
 import (
 	"errors"
 	"fmt"
 
+	"github.com/dgraph-io/badger/v2"
+
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
-	"github.com/onflow/flow-go/model/flow/mapfunc"
-	"github.com/onflow/flow-go/model/flow/order"
-	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/fork"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/state/protocol/invalid"
-	"github.com/onflow/flow-go/state/protocol/seed"
+	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/storage/badger/procedure"
@@ -32,11 +30,39 @@ type Snapshot struct {
 	blockID flow.Identifier // reference block for this snapshot
 }
 
-func NewSnapshot(state *State, blockID flow.Identifier) *Snapshot {
+// FinalizedSnapshot represents a read-only immutable snapshot of the protocol state
+// at a finalized block. It is guaranteed to have a header available.
+type FinalizedSnapshot struct {
+	Snapshot
+	header *flow.Header
+}
+
+var _ protocol.Snapshot = (*Snapshot)(nil)
+var _ protocol.Snapshot = (*FinalizedSnapshot)(nil)
+
+// newSnapshotWithIncorporatedReferenceBlock creates a new state snapshot with the given reference block.
+// CAUTION: The caller is responsible for ensuring that the reference block has been incorporated.
+func newSnapshotWithIncorporatedReferenceBlock(state *State, blockID flow.Identifier) *Snapshot {
 	return &Snapshot{
 		state:   state,
 		blockID: blockID,
 	}
+}
+
+// NewFinalizedSnapshot instantiates a `FinalizedSnapshot`.
+// CAUTION: the header's ID _must_ match `blockID` (not checked)
+func NewFinalizedSnapshot(state *State, blockID flow.Identifier, header *flow.Header) *FinalizedSnapshot {
+	return &FinalizedSnapshot{
+		Snapshot: Snapshot{
+			state:   state,
+			blockID: blockID,
+		},
+		header: header,
+	}
+}
+
+func (s *FinalizedSnapshot) Head() (*flow.Header, error) {
+	return s.header, nil
 }
 
 func (s *Snapshot) Head() (*flow.Header, error) {
@@ -45,193 +71,38 @@ func (s *Snapshot) Head() (*flow.Header, error) {
 }
 
 // QuorumCertificate (QC) returns a valid quorum certificate pointing to the
-// header at this snapshot. With the exception of the root block, a valid child
-// block must be which contains the desired QC. The sentinel error
-// state.NoValidChildBlockError is returned if the the QC is unknown.
-//
-// For root block snapshots, returns the root quorum certificate. For all other
-// blocks, generates a quorum certificate from a valid child, if one exists.
+// header at this snapshot.
+// The sentinel error storage.ErrNotFound is returned if the QC is unknown.
 func (s *Snapshot) QuorumCertificate() (*flow.QuorumCertificate, error) {
-
-	// CASE 1: for the root block, return the root QC
-	root, err := s.state.Params().Root()
+	qc, err := s.state.qcs.ByBlockID(s.blockID)
 	if err != nil {
-		return nil, fmt.Errorf("could not get root: %w", err)
+		return nil, fmt.Errorf("could not retrieve quorum certificate for (%x): %w", s.blockID, err)
 	}
-
-	if s.blockID == root.ID() {
-		var rootQC flow.QuorumCertificate
-		err := s.state.db.View(operation.RetrieveRootQuorumCertificate(&rootQC))
-		if err != nil {
-			return nil, fmt.Errorf("could not retrieve root qc: %w", err)
-		}
-		return &rootQC, nil
-	}
-
-	// CASE 2: for any other block, generate the root QC from a valid child
-	child, err := s.validChild()
-	if err != nil {
-		return nil, fmt.Errorf("could not get valid child of block %x: %w", s.blockID, err)
-	}
-
-	// sanity check: ensure the child has the snapshot block as parent
-	if child.ParentID != s.blockID {
-		return nil, fmt.Errorf("child parent id (%x) does not match snapshot id (%x)", child.ParentID, s.blockID)
-	}
-
-	// retrieve the full header as we need the view for the quorum certificate
-	head, err := s.Head()
-	if err != nil {
-		return nil, fmt.Errorf("could not get head: %w", err)
-	}
-
-	qc := &flow.QuorumCertificate{
-		View:          head.View,
-		BlockID:       s.blockID,
-		SignerIndices: child.ParentVoterIndices,
-		SigData:       child.ParentVoterSigData,
-	}
-
 	return qc, nil
 }
 
-// validChild returns a child of the snapshot head that has been validated
-// by HotStuff. Returns state.NoValidChildBlockError if no valid child exists.
-//
-// Any valid child may be returned. Subsequent calls are not guaranteed to
-// return the same child.
-func (s *Snapshot) validChild() (*flow.Header, error) {
-
-	var childIDs []flow.Identifier
-	err := s.state.db.View(procedure.LookupBlockChildren(s.blockID, &childIDs))
-	if err != nil {
-		return nil, fmt.Errorf("could not look up children: %w", err)
-	}
-
-	// find the first child that has been validated
-	validChildID := flow.ZeroID
-	for _, childID := range childIDs {
-		var valid bool
-		err = s.state.db.View(operation.RetrieveBlockValidity(childID, &valid))
-		// skip blocks whose validity hasn't been checked yet
-		if errors.Is(err, storage.ErrNotFound) {
-			continue
-		}
-		if err != nil {
-			return nil, fmt.Errorf("failed to determine validity of child block %v: %w", childID, err)
-		}
-		if valid {
-			validChildID = childID
-			break
-		}
-	}
-
-	if validChildID == flow.ZeroID {
-		return nil, state.NewNoValidChildBlockErrorf("block has no valid children (total children: %d)", len(childIDs))
-	}
-
-	// get the header of the first child
-	child, err := s.state.headers.ByBlockID(validChildID)
-	return child, err
-}
-
 func (s *Snapshot) Phase() (flow.EpochPhase, error) {
-	status, err := s.state.epoch.statuses.ByBlockID(s.blockID)
+	psSnapshot, err := s.state.protocolState.AtBlockID(s.blockID)
 	if err != nil {
-		return flow.EpochPhaseUndefined, fmt.Errorf("could not retrieve epoch status: %w", err)
+		return flow.EpochPhaseUndefined, fmt.Errorf("could not retrieve protocol state snapshot: %w", err)
 	}
-	phase, err := status.Phase()
-	return phase, err
+	return psSnapshot.EpochPhase(), nil
 }
 
-func (s *Snapshot) Identities(selector flow.IdentityFilter) (flow.IdentityList, error) {
-
-	// TODO: CAUTION SHORTCUT
-	// we retrieve identities based on the initial identity table from the EpochSetup
-	// event here -- this will need revision to support mid-epoch identity changes
-	// once slashing is implemented
-
-	status, err := s.state.epoch.statuses.ByBlockID(s.blockID)
+func (s *Snapshot) Identities(selector flow.IdentityFilter[flow.Identity]) (flow.IdentityList, error) {
+	psSnapshot, err := s.state.protocolState.AtBlockID(s.blockID)
 	if err != nil {
 		return nil, err
 	}
-
-	setup, err := s.state.epoch.setups.ByID(status.CurrentEpoch.SetupID)
-	if err != nil {
-		return nil, err
-	}
-
-	// sort the identities so the 'Exists' binary search works
-	identities := setup.Participants.Sort(order.Canonical)
-
-	// get identities that are in either last/next epoch but NOT in the current epoch
-	var otherEpochIdentities flow.IdentityList
-	phase, err := status.Phase()
-	if err != nil {
-		return nil, fmt.Errorf("could not get phase: %w", err)
-	}
-	switch phase {
-	// during staking phase (the beginning of the epoch) we include identities
-	// from the previous epoch that are now un-staking
-	case flow.EpochPhaseStaking:
-
-		if !status.HasPrevious() {
-			break
-		}
-
-		previousSetup, err := s.state.epoch.setups.ByID(status.PreviousEpoch.SetupID)
-		if err != nil {
-			return nil, fmt.Errorf("could not get previous epoch setup event: %w", err)
-		}
-
-		for _, identity := range previousSetup.Participants {
-			exists := identities.Exists(identity)
-			// add identity from previous epoch that is not in current epoch
-			if !exists {
-				otherEpochIdentities = append(otherEpochIdentities, identity)
-			}
-		}
-
-	// during setup and committed phases (the end of the epoch) we include
-	// identities that will join in the next epoch
-	case flow.EpochPhaseSetup, flow.EpochPhaseCommitted:
-
-		nextSetup, err := s.state.epoch.setups.ByID(status.NextEpoch.SetupID)
-		if err != nil {
-			return nil, fmt.Errorf("could not get next epoch setup: %w", err)
-		}
-
-		for _, identity := range nextSetup.Participants {
-			exists := identities.Exists(identity)
-
-			// add identity from next epoch that is not in current epoch
-			if !exists {
-				otherEpochIdentities = append(otherEpochIdentities, identity)
-			}
-		}
-
-	default:
-		return nil, fmt.Errorf("invalid epoch phase: %s", phase)
-	}
-
-	// add the identities from next/last epoch, with weight set to 0
-	identities = append(
-		identities,
-		otherEpochIdentities.Map(mapfunc.WithWeight(0))...,
-	)
 
 	// apply the filter to the participants
-	identities = identities.Filter(selector)
-
-	// apply a deterministic sort to the participants
-	identities = identities.Sort(order.Canonical)
-
+	identities := psSnapshot.Identities().Filter(selector)
 	return identities, nil
 }
 
 func (s *Snapshot) Identity(nodeID flow.Identifier) (*flow.Identity, error) {
 	// filter identities at snapshot for node ID
-	identities, err := s.Identities(filter.HasNodeID(nodeID))
+	identities, err := s.Identities(filter.HasNodeID[flow.Identity](nodeID))
 	if err != nil {
 		return nil, fmt.Errorf("could not get identities: %w", err)
 	}
@@ -268,30 +139,82 @@ func (s *Snapshot) SealedResult() (*flow.ExecutionResult, *flow.Seal, error) {
 
 // SealingSegment will walk through the chain backward until we reach the block referenced
 // by the latest seal and build a SealingSegment. As we visit each block we check each execution
-// receipt in the block's payload to make sure we have a corresponding execution result, any execution
-// results missing from blocks are stored in the SealingSegment.ExecutionResults field.
+// receipt in the block's payload to make sure we have a corresponding execution result, any
+// execution results missing from blocks are stored in the `SealingSegment.ExecutionResults` field.
+// See `model/flow/sealing_segment.md` for detailed technical specification of the Sealing Segment
+//
+// Expected errors during normal operations:
+//   - protocol.ErrSealingSegmentBelowRootBlock if sealing segment would stretch beyond the node's local history cut-off
+//   - protocol.UnfinalizedSealingSegmentError if sealing segment would contain unfinalized blocks (including orphaned blocks)
 func (s *Snapshot) SealingSegment() (*flow.SealingSegment, error) {
-	var rootHeight uint64
-	err := s.state.db.View(operation.RetrieveRootHeight(&rootHeight))
+	// Lets denote the highest block in the sealing segment `head` (initialized below).
+	// Based on the tech spec `flow/sealing_segment.md`, the Sealing Segment must contain
+	//  enough history to satisfy _all_ of the following conditions:
+	//   (i) The highest sealed block as of `head` needs to be included in the sealing segment.
+	//       This is relevant if `head` does not contain any seals.
+	//  (ii) All blocks that are sealed by `head`. This is relevant if head` contains _multiple_ seals.
+	// (iii) The sealing segment should contain the history back to (including):
+	//       limitHeight := max(blockSealedAtHead.Height - flow.DefaultTransactionExpiry, SporkRootBlockHeight)
+	// Per convention, we include the blocks for (i) in the `SealingSegment.Blocks`, while the
+	// additional blocks for (ii) and optionally (iii) are contained in as `SealingSegment.ExtraBlocks`.
+	head, err := s.state.blocks.ByID(s.blockID)
 	if err != nil {
-		return nil, fmt.Errorf("could not get root height: %w", err)
+		return nil, fmt.Errorf("could not get snapshot's reference block: %w", err)
 	}
-	head, err := s.Head()
-	if err != nil {
-		return nil, fmt.Errorf("could not get snapshot reference block: %w", err)
-	}
-	if head.Height < rootHeight {
+	if head.Header.Height < s.state.finalizedRootHeight {
 		return nil, protocol.ErrSealingSegmentBelowRootBlock
 	}
 
+	// Verify that head of sealing segment is finalized.
+	finalizedBlockAtHeight, err := s.state.headers.BlockIDByHeight(head.Header.Height)
+	if err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			return nil, protocol.NewUnfinalizedSealingSegmentErrorf("head of sealing segment at height %d is not finalized: %w", head.Header.Height, err)
+		}
+		return nil, fmt.Errorf("exception while retrieving finzalized bloc, by height: %w", err)
+	}
+	if finalizedBlockAtHeight != s.blockID { // comparison of fixed-length arrays
+		return nil, protocol.NewUnfinalizedSealingSegmentErrorf("head of sealing segment is orphaned, finalized block at height %d is %x", head.Header.Height, finalizedBlockAtHeight)
+	}
+
+	// STEP (i): highest sealed block as of `head` must be included.
 	seal, err := s.state.seals.HighestInFork(s.blockID)
 	if err != nil {
 		return nil, fmt.Errorf("could not get seal for sealing segment: %w", err)
 	}
+	blockSealedAtHead, err := s.state.headers.ByBlockID(seal.BlockID)
+	if err != nil {
+		return nil, fmt.Errorf("could not get block: %w", err)
+	}
+
+	// TODO this is a temporary measure resulting from epoch data being stored outside the
+	//  protocol KV Store, once epoch data is in the KV Store, we can pass protocolKVStoreSnapshotsDB.ByID
+	//  directly to NewSealingSegmentBuilder (similar to other getters)
+	getProtocolStateEntry := func(protocolStateID flow.Identifier) (*flow.ProtocolStateEntryWrapper, error) {
+		kvStoreEntry, err := s.state.protocolKVStoreSnapshotsDB.ByID(protocolStateID)
+		if err != nil {
+			return nil, fmt.Errorf("could not get kv store entry: %w", err)
+		}
+		kvStoreReader, err := kvstore.VersionedDecode(kvStoreEntry.Version, kvStoreEntry.Data)
+		if err != nil {
+			return nil, fmt.Errorf("could not decode kv store entry: %w", err)
+		}
+		epochDataEntry, err := s.state.protocolStateSnapshotsDB.ByID(kvStoreReader.GetEpochStateID())
+		if err != nil {
+			return nil, fmt.Errorf("could not get epoch data: %w", err)
+		}
+		return &flow.ProtocolStateEntryWrapper{
+			KVStore: flow.PSKeyValueStoreData{
+				Version: kvStoreEntry.Version,
+				Data:    kvStoreEntry.Data,
+			},
+			EpochEntry: epochDataEntry,
+		}, nil
+	}
 
 	// walk through the chain backward until we reach the block referenced by
 	// the latest seal - the returned segment includes this block
-	builder := flow.NewSealingSegmentBuilder(s.state.results.ByID, s.state.seals.HighestInFork)
+	builder := flow.NewSealingSegmentBuilder(s.state.results.ByID, s.state.seals.HighestInFork, getProtocolStateEntry)
 	scraper := func(header *flow.Header) error {
 		blockID := header.ID()
 		block, err := s.state.blocks.ByID(blockID)
@@ -306,10 +229,58 @@ func (s *Snapshot) SealingSegment() (*flow.SealingSegment, error) {
 
 		return nil
 	}
-
 	err = fork.TraverseForward(s.state.headers, s.blockID, scraper, fork.IncludingBlock(seal.BlockID))
 	if err != nil {
 		return nil, fmt.Errorf("could not traverse sealing segment: %w", err)
+	}
+
+	// STEP (ii): extend history down to the lowest block, whose seal is included in `head`
+	lowestSealedByHead := blockSealedAtHead
+	for _, sealInHead := range head.Payload.Seals {
+		h, e := s.state.headers.ByBlockID(sealInHead.BlockID)
+		if e != nil {
+			return nil, fmt.Errorf("could not get block (id=%x) for seal: %w", seal.BlockID, e) // storage.ErrNotFound or exception
+		}
+		if h.Height < lowestSealedByHead.Height {
+			lowestSealedByHead = h
+		}
+	}
+
+	// STEP (iii): extended history to allow checking for duplicated collections, i.e.
+	// limitHeight = max(blockSealedAtHead.Height - flow.DefaultTransactionExpiry, SporkRootBlockHeight)
+	limitHeight := s.state.sporkRootBlockHeight
+	if blockSealedAtHead.Height > s.state.sporkRootBlockHeight+flow.DefaultTransactionExpiry {
+		limitHeight = blockSealedAtHead.Height - flow.DefaultTransactionExpiry
+	}
+
+	// As we have to satisfy (ii) _and_ (iii), we have to take the longest history, i.e. the lowest height.
+	if lowestSealedByHead.Height < limitHeight {
+		limitHeight = lowestSealedByHead.Height
+		if limitHeight < s.state.sporkRootBlockHeight { // sanity check; should never happen
+			return nil, fmt.Errorf("unexpected internal error: calculated history-cutoff at height %d, which is lower than the spork's root height %d", limitHeight, s.state.sporkRootBlockHeight)
+		}
+	}
+	if limitHeight < blockSealedAtHead.Height {
+		// we need to include extra blocks in sealing segment
+		extraBlocksScraper := func(header *flow.Header) error {
+			blockID := header.ID()
+			block, err := s.state.blocks.ByID(blockID)
+			if err != nil {
+				return fmt.Errorf("could not get block: %w", err)
+			}
+
+			err = builder.AddExtraBlock(block)
+			if err != nil {
+				return fmt.Errorf("could not add block to sealing segment: %w", err)
+			}
+
+			return nil
+		}
+
+		err = fork.TraverseBackward(s.state.headers, blockSealedAtHead.ParentID, extraBlocksScraper, fork.IncludingHeight(limitHeight))
+		if err != nil {
+			return nil, fmt.Errorf("could not traverse extra blocks for sealing segment: %w", err)
+		}
 	}
 
 	segment, err := builder.SealingSegment()
@@ -328,68 +299,13 @@ func (s *Snapshot) Descendants() ([]flow.Identifier, error) {
 	return descendants, nil
 }
 
-func (s *Snapshot) ValidDescendants() ([]flow.Identifier, error) {
-	valid, err := s.lookupValidity(s.blockID)
-	if err != nil {
-		return nil, fmt.Errorf("could not determine validity of block %v: %w", s.blockID, err)
-	}
-	if !valid {
-		return []flow.Identifier{}, nil
-	}
-
-	descendants, err := s.validDescendants(s.blockID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to traverse the descendants tree of block %v: %w", s.blockID, err)
-	}
-	return descendants, nil
-}
-
 func (s *Snapshot) lookupChildren(blockID flow.Identifier) ([]flow.Identifier, error) {
-	var children []flow.Identifier
+	var children flow.IdentifierList
 	err := s.state.db.View(procedure.LookupBlockChildren(blockID, &children))
 	if err != nil {
 		return nil, fmt.Errorf("could not get children of block %v: %w", blockID, err)
 	}
 	return children, nil
-}
-
-func (s *Snapshot) lookupValidity(blockID flow.Identifier) (bool, error) {
-	valid := false
-	err := s.state.db.View(operation.RetrieveBlockValidity(blockID, &valid))
-	if err != nil {
-		// We only store the validity flag for blocks that have been marked valid.
-		// For blocks that haven't been marked valid (yet), the flag is simply absent.
-		if !errors.Is(err, storage.ErrNotFound) {
-			return false, fmt.Errorf("could not retrieve validity of block %v: %w", blockID, err)
-		}
-	}
-	return valid, nil
-}
-
-func (s *Snapshot) validDescendants(blockID flow.Identifier) ([]flow.Identifier, error) {
-	var descendantIDs []flow.Identifier
-
-	children, err := s.lookupChildren(blockID)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, descendantID := range children {
-		valid, err := s.lookupValidity(descendantID)
-		if err != nil {
-			return nil, err
-		}
-
-		if valid {
-			descendantIDs = append(descendantIDs, descendantID)
-			additionalIDs, err := s.validDescendants(descendantID)
-			if err != nil {
-				return nil, err
-			}
-			descendantIDs = append(descendantIDs, additionalIDs...)
-		}
-	}
-	return descendantIDs, nil
 }
 
 func (s *Snapshot) descendants(blockID flow.Identifier) ([]flow.Identifier, error) {
@@ -408,43 +324,19 @@ func (s *Snapshot) descendants(blockID flow.Identifier) ([]flow.Identifier, erro
 	return descendantIDs, nil
 }
 
-// RandomSource returns the seed for the current block snapshot.
+// RandomSource returns the seed for the current block's snapshot.
 // Expected error returns:
-// * state.NoValidChildBlockError if no valid child is known
+// * storage.ErrNotFound is returned if the QC is unknown.
 func (s *Snapshot) RandomSource() ([]byte, error) {
-
-	// CASE 1: for the root block, generate the seed from the root qc
-	root, err := s.state.Params().Root()
+	qc, err := s.QuorumCertificate()
 	if err != nil {
-		return nil, fmt.Errorf("could not get root: %w", err)
+		return nil, err
 	}
-
-	if s.blockID == root.ID() {
-		var rootQC flow.QuorumCertificate
-		err := s.state.db.View(operation.RetrieveRootQuorumCertificate(&rootQC))
-		if err != nil {
-			return nil, fmt.Errorf("could not retrieve root qc: %w", err)
-		}
-
-		seed, err := seed.FromParentQCSignature(rootQC.SigData)
-		if err != nil {
-			return nil, fmt.Errorf("could not create seed from root qc: %w", err)
-		}
-		return seed, nil
-	}
-
-	// CASE 2: for any other block, use any valid child
-	child, err := s.validChild()
+	randomSource, err := model.BeaconSignature(qc)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get valid child of block %x: %w", s.blockID, err)
+		return nil, fmt.Errorf("could not create seed from QC's signature: %w", err)
 	}
-
-	seed, err := seed.FromParentQCSignature(child.ParentVoterSigData)
-	if err != nil {
-		return nil, fmt.Errorf("could not create seed from header's signature: %w", err)
-	}
-
-	return seed, nil
+	return randomSource, nil
 }
 
 func (s *Snapshot) Epochs() protocol.EpochQuery {
@@ -457,6 +349,33 @@ func (s *Snapshot) Params() protocol.GlobalParams {
 	return s.state.Params()
 }
 
+// EpochProtocolState returns the epoch part of dynamic protocol state that the Head block commits to.
+// The compliance layer guarantees that only valid blocks are appended to the protocol state.
+// Returns state.ErrUnknownSnapshotReference if snapshot reference block is unknown.
+// All other errors should be treated as exceptions.
+// For each block stored there should be a protocol state stored.
+func (s *Snapshot) EpochProtocolState() (protocol.DynamicProtocolState, error) {
+	return s.state.protocolState.AtBlockID(s.blockID)
+}
+
+// ProtocolState returns the dynamic protocol state that the Head block commits to.
+// The compliance layer guarantees that only valid blocks are appended to the protocol state.
+// Returns state.ErrUnknownSnapshotReference if snapshot reference block is unknown.
+// All other errors should be treated as exceptions.
+// For each block stored there should be a protocol state stored.
+func (s *Snapshot) ProtocolState() (protocol.KVStoreReader, error) {
+	return s.state.protocolState.KVStoreAtBlockID(s.blockID)
+}
+
+func (s *Snapshot) VersionBeacon() (*flow.SealedVersionBeacon, error) {
+	head, err := s.state.headers.ByBlockID(s.blockID)
+	if err != nil {
+		return nil, err
+	}
+
+	return s.state.versionBeacons.Highest(head.Height)
+}
+
 // EpochQuery encapsulates querying epochs w.r.t. a snapshot.
 type EpochQuery struct {
 	snap *Snapshot
@@ -464,70 +383,50 @@ type EpochQuery struct {
 
 // Current returns the current epoch.
 func (q *EpochQuery) Current() protocol.Epoch {
-
-	status, err := q.snap.state.epoch.statuses.ByBlockID(q.snap.blockID)
+	// all errors returned from storage reads here are unexpected, because all
+	// snapshots reside within a current epoch, which must be queryable
+	psSnapshot, err := q.snap.state.protocolState.AtBlockID(q.snap.blockID)
 	if err != nil {
-		return invalid.NewEpoch(fmt.Errorf("failed to get epoch statuses for block ID %s: %w",
-			q.snap.blockID, err))
-	}
-	setup, err := q.snap.state.epoch.setups.ByID(status.CurrentEpoch.SetupID)
-	if err != nil {
-		return invalid.NewEpoch(fmt.Errorf("failed to get epoch setups for setup ID %s at block %v: %w",
-			status.CurrentEpoch.SetupID, q.snap.blockID, err))
-	}
-	commit, err := q.snap.state.epoch.commits.ByID(status.CurrentEpoch.CommitID)
-	if err != nil {
-		return invalid.NewEpoch(fmt.Errorf("failed to get epoch commits for commit ID %s at block %v: %w",
-			status.CurrentEpoch.CommitID, q.snap.blockID, err))
+		return invalid.NewEpochf("could not get protocol state snapshot at block %x: %w", q.snap.blockID, err)
 	}
 
-	epoch, err := inmem.NewCommittedEpoch(setup, commit)
+	setup := psSnapshot.EpochSetup()
+	commit := psSnapshot.EpochCommit()
+	firstHeight, _, isFirstHeightKnown, _, err := q.retrieveEpochHeightBounds(setup.Counter)
 	if err != nil {
-		return invalid.NewEpoch(fmt.Errorf("failed to get new committed epoch with setup (%s) and commit (%s) at block %v: %w",
-			setup.ID(), commit.ID(), q.snap.blockID, err))
+		return invalid.NewEpochf("could not get current epoch height bounds: %s", err.Error())
 	}
-	return epoch
+	if isFirstHeightKnown {
+		return inmem.NewEpochWithStartBoundary(setup, commit, firstHeight)
+	}
+	return inmem.NewCommittedEpoch(setup, commit)
 }
 
 // Next returns the next epoch, if it is available.
 func (q *EpochQuery) Next() protocol.Epoch {
 
-	status, err := q.snap.state.epoch.statuses.ByBlockID(q.snap.blockID)
+	psSnapshot, err := q.snap.state.protocolState.AtBlockID(q.snap.blockID)
 	if err != nil {
-		return invalid.NewEpoch(err)
+		return invalid.NewEpochf("could not get protocol state snapshot at block %x: %w", q.snap.blockID, err)
 	}
-	phase, err := status.Phase()
-	if err != nil {
-		return invalid.NewEpoch(err)
-	}
+	phase := psSnapshot.EpochPhase()
+	entry := psSnapshot.Entry()
+
 	// if we are in the staking phase, the next epoch is not setup yet
 	if phase == flow.EpochPhaseStaking {
 		return invalid.NewEpoch(protocol.ErrNextEpochNotSetup)
 	}
-
 	// if we are in setup phase, return a SetupEpoch
-	nextSetup, err := q.snap.state.epoch.setups.ByID(status.NextEpoch.SetupID)
-	if err != nil {
-		return invalid.NewEpoch(fmt.Errorf("failed to retrieve setup event for next epoch: %w", err))
-	}
+	nextSetup := entry.NextEpochSetup
 	if phase == flow.EpochPhaseSetup {
-		epoch, err := inmem.NewSetupEpoch(nextSetup)
-		if err != nil {
-			return invalid.NewEpoch(err)
-		}
-		return epoch
+		return inmem.NewSetupEpoch(nextSetup)
 	}
-
 	// if we are in committed phase, return a CommittedEpoch
-	nextCommit, err := q.snap.state.epoch.commits.ByID(status.NextEpoch.CommitID)
-	if err != nil {
-		return invalid.NewEpoch(fmt.Errorf("failed to retrieve commit event for next epoch: %w", err))
+	nextCommit := entry.NextEpochCommit
+	if phase == flow.EpochPhaseCommitted {
+		return inmem.NewCommittedEpoch(nextSetup, nextCommit)
 	}
-	epoch, err := inmem.NewCommittedEpoch(nextSetup, nextCommit)
-	if err != nil {
-		return invalid.NewEpoch(err)
-	}
-	return epoch
+	return invalid.NewEpochf("data corruption: unknown epoch phase implies malformed protocol state epoch data")
 }
 
 // Previous returns the previous epoch. During the first epoch after the root
@@ -535,31 +434,111 @@ func (q *EpochQuery) Next() protocol.Epoch {
 // For all other epochs, returns the previous epoch.
 func (q *EpochQuery) Previous() protocol.Epoch {
 
-	status, err := q.snap.state.epoch.statuses.ByBlockID(q.snap.blockID)
+	psSnapshot, err := q.snap.state.protocolState.AtBlockID(q.snap.blockID)
 	if err != nil {
-		return invalid.NewEpoch(err)
+		return invalid.NewEpochf("could not get protocol state snapshot at block %x: %w", q.snap.blockID, err)
 	}
+	entry := psSnapshot.Entry()
 
 	// CASE 1: there is no previous epoch - this indicates we are in the first
 	// epoch after a spork root or genesis block
-	if !status.HasPrevious() {
+	if !psSnapshot.PreviousEpochExists() {
 		return invalid.NewEpoch(protocol.ErrNoPreviousEpoch)
 	}
 
 	// CASE 2: we are in any other epoch - retrieve the setup and commit events
 	// for the previous epoch
-	setup, err := q.snap.state.epoch.setups.ByID(status.PreviousEpoch.SetupID)
-	if err != nil {
-		return invalid.NewEpoch(err)
-	}
-	commit, err := q.snap.state.epoch.commits.ByID(status.PreviousEpoch.CommitID)
-	if err != nil {
-		return invalid.NewEpoch(err)
-	}
+	setup := entry.PreviousEpochSetup
+	commit := entry.PreviousEpochCommit
 
-	epoch, err := inmem.NewCommittedEpoch(setup, commit)
+	firstHeight, finalHeight, firstHeightKnown, finalHeightKnown, err := q.retrieveEpochHeightBounds(setup.Counter)
 	if err != nil {
-		return invalid.NewEpoch(err)
+		return invalid.NewEpochf("could not get epoch height bounds: %w", err)
 	}
-	return epoch
+	if firstHeightKnown && finalHeightKnown {
+		// typical case - we usually know both boundaries for a past epoch
+		return inmem.NewEpochWithStartAndEndBoundaries(setup, commit, firstHeight, finalHeight)
+	}
+	if firstHeightKnown && !finalHeightKnown {
+		// this case is possible when the snapshot reference block is un-finalized
+		// and is past an un-finalized epoch boundary
+		return inmem.NewEpochWithStartBoundary(setup, commit, firstHeight)
+	}
+	if !firstHeightKnown && finalHeightKnown {
+		// this case is possible when this node's lowest known block is after
+		// the queried epoch's start boundary
+		return inmem.NewEpochWithEndBoundary(setup, commit, finalHeight)
+	}
+	if !firstHeightKnown && !finalHeightKnown {
+		// this case is possible when this node's lowest known block is after
+		// the queried epoch's end boundary
+		return inmem.NewCommittedEpoch(setup, commit)
+	}
+	return invalid.NewEpochf("sanity check failed: impossible combination of boundaries for previous epoch")
+}
+
+// retrieveEpochHeightBounds retrieves the height bounds for an epoch.
+// Height bounds are NOT fork-aware, and are only determined upon finalization.
+//
+// Since the protocol state's API is fork-aware, we may be querying an
+// un-finalized block, as in the following example:
+//
+//	Epoch 1    Epoch 2
+//	A <- B <-|- C <- D
+//
+// Suppose block B is the latest finalized block and we have queried block D.
+// Then, the transition from epoch 1 to 2 has not been committed, because the first block of epoch 2 has not been finalized.
+// In this case, the final block of Epoch 1, from the perspective of block D, is unknown.
+// There are edge-case scenarios, where a different fork could exist (as illustrated below)
+// that still adds additional blocks to Epoch 1.
+//
+//	Epoch 1      Epoch 2
+//	A <- B <---|-- C <- D
+//	     ^
+//	     ╰ X <-|- X <- Y <- Z
+//
+// Returns:
+//   - (0, 0, false, false, nil) if neither boundary is known
+//   - (firstHeight, 0, true, false, nil) if epoch start boundary is known but end boundary is not known
+//   - (firstHeight, finalHeight, true, true, nil) if epoch start and end boundary are known
+//   - (0, finalHeight, false, true, nil) if epoch start boundary is known but end boundary is not known
+//
+// No errors are expected during normal operation.
+func (q *EpochQuery) retrieveEpochHeightBounds(epoch uint64) (
+	firstHeight, finalHeight uint64,
+	isFirstHeightKnown, isLastHeightKnown bool,
+	err error,
+) {
+	err = q.snap.state.db.View(func(tx *badger.Txn) error {
+		// Retrieve the epoch's first height
+		err = operation.RetrieveEpochFirstHeight(epoch, &firstHeight)(tx)
+		if err != nil {
+			if errors.Is(err, storage.ErrNotFound) {
+				isFirstHeightKnown = false // unknown boundary
+			} else {
+				return err // unexpected error
+			}
+		} else {
+			isFirstHeightKnown = true // known boundary
+		}
+
+		var subsequentEpochFirstHeight uint64
+		err = operation.RetrieveEpochFirstHeight(epoch+1, &subsequentEpochFirstHeight)(tx)
+		if err != nil {
+			if errors.Is(err, storage.ErrNotFound) {
+				isLastHeightKnown = false // unknown boundary
+			} else {
+				return err // unexpected error
+			}
+		} else { // known boundary
+			isLastHeightKnown = true
+			finalHeight = subsequentEpochFirstHeight - 1
+		}
+
+		return nil
+	})
+	if err != nil {
+		return 0, 0, false, false, err
+	}
+	return firstHeight, finalHeight, isFirstHeightKnown, isLastHeightKnown, nil
 }

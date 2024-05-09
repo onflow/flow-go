@@ -1,49 +1,53 @@
 package testnet
 
 import (
-	"context"
 	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"math"
 	"os"
 	"os/user"
 	"path/filepath"
+	"testing"
 
-	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/integration/client"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/onflow/crypto"
+	"github.com/rs/zerolog/log"
+	"github.com/stretchr/testify/require"
+
+	"github.com/onflow/flow-go/cmd/bootstrap/cmd"
+	"github.com/onflow/flow-go/cmd/bootstrap/utils"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/state/protocol/inmem"
+	"github.com/onflow/flow-go/network/p2p/keyutils"
+	"github.com/onflow/flow-go/network/p2p/translator"
 	"github.com/onflow/flow-go/utils/io"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// healthcheckAccessGRPC returns a Docker healthcheck function that pings the Access node GRPC
-// service exposed at the given port.
-func healthcheckAccessGRPC(apiPort string) func() error {
-	return func() error {
-		fmt.Println("healthchecking...")
-		c, err := client.NewAccessClient(fmt.Sprintf(":%s", apiPort))
-		if err != nil {
-			return err
-		}
-
-		return c.Ping(context.Background())
-	}
+func makeDir(t *testing.T, base string, subdir string) string {
+	dir := filepath.Join(base, subdir)
+	err := os.MkdirAll(dir, 0700)
+	require.NoError(t, err)
+	return dir
 }
 
-// healthcheckExecutionGRPC returns a Docker healthcheck function that pings the Execution node GRPC
-// service exposed at the given port.
-func healthcheckExecutionGRPC(apiPort string) func() error {
-	return func() error {
-		fmt.Println("healthchecking...")
-		c, err := client.NewExecutionClient(fmt.Sprintf(":%s", apiPort))
-		if err != nil {
-			return err
-		}
+// makeTempDir creates a temporary directory in TmpRoot, and deletes it after the test completes.
+func makeTempDir(t *testing.T, pattern string) string {
+	dir := makeTempSubDir(t, TmpRoot, pattern)
+	t.Cleanup(func() {
+		err := os.RemoveAll(dir)
+		require.NoError(t, err)
+	})
+	return dir
+}
 
-		return c.Ping(context.Background())
-	}
+// makeTempSubDir creates a randomly named subdirectory in the given directory.
+func makeTempSubDir(t *testing.T, dir, pattern string) string {
+	dir, err := os.MkdirTemp(dir, pattern)
+	require.NoError(t, err)
+	return dir
 }
 
 // currentUser returns a uid:gid Unix user identifier string for the current
@@ -71,7 +75,7 @@ func toNodeInfos(confs []ContainerConfig) []bootstrap.NodeInfo {
 }
 
 func getSeed() ([]byte, error) {
-	seedLen := int(math.Max(crypto.SeedMinLenDKG, crypto.KeyGenSeedMinLenBLSBLS12381))
+	seedLen := int(math.Max(crypto.KeyGenSeedMinLen, crypto.KeyGenSeedMinLen))
 	seed := make([]byte, seedLen)
 	n, err := rand.Read(seed)
 	if err != nil || n != seedLen {
@@ -99,22 +103,109 @@ func WriteFile(path string, data []byte) error {
 	return err
 }
 
-// rootProtocolJsonWithoutAddresses strips out all node addresses from the root protocol json file specified as srcFile
-// and creates the dstFile with the modified contents
-func rootProtocolJsonWithoutAddresses(srcfile string, dstFile string) error {
-
-	data, err := io.ReadFile(filepath.Join(srcfile))
+func WriteObserverPrivateKey(observerName, bootstrapDir string) (crypto.PrivateKey, error) {
+	// make the observer private key for named observer
+	// only used for localnet, not for use with production
+	networkSeed := cmd.GenerateRandomSeed(crypto.KeyGenSeedMinLen)
+	networkKey, err := utils.GeneratePublicNetworkingKey(networkSeed)
 	if err != nil {
-		return err
+		return nil, fmt.Errorf("could not generate networking key: %w", err)
 	}
 
-	var rootSnapshot inmem.EncodableSnapshot
-	err = json.Unmarshal(data, &rootSnapshot)
+	// hex encode
+	keyBytes := networkKey.Encode()
+	output := make([]byte, hex.EncodedLen(len(keyBytes)))
+	hex.Encode(output, keyBytes)
+
+	// write to file
+	outputFile := fmt.Sprintf("%s/private-root-information/%s_key", bootstrapDir, observerName)
+	err = os.WriteFile(outputFile, output, 0600)
 	if err != nil {
-		return err
+		return nil, fmt.Errorf("could not write private key to file: %w", err)
 	}
 
-	strippedSnapshot := inmem.StrippedInmemSnapshot(rootSnapshot)
+	return networkKey, nil
+}
 
-	return WriteJSON(dstFile, strippedSnapshot)
+func WriteTestExecutionService(_ flow.Identifier, address, observerName, bootstrapDir string) (bootstrap.NodeInfo, error) {
+	// make the observer private key for named observer
+	// only used for localnet, not for use with production
+	networkSeed := cmd.GenerateRandomSeed(crypto.KeyGenSeedMinLen)
+	networkKey, err := utils.GeneratePublicNetworkingKey(networkSeed)
+	if err != nil {
+		return bootstrap.NodeInfo{}, fmt.Errorf("could not generate networking key: %w", err)
+	}
+
+	// hex encode
+	keyBytes := networkKey.Encode()
+	output := make([]byte, hex.EncodedLen(len(keyBytes)))
+	hex.Encode(output, keyBytes)
+
+	encryptionKey, err := utils.GenerateSecretsDBEncryptionKey()
+	if err != nil {
+		return bootstrap.NodeInfo{}, err
+	}
+
+	pubKey, err := keyutils.LibP2PPublicKeyFromFlow(networkKey.PublicKey())
+	if err != nil {
+		return bootstrap.NodeInfo{}, fmt.Errorf("could not get libp2p public key from flow public key: %w", err)
+	}
+
+	peerID, err := peer.IDFromPublicKey(pubKey)
+	if err != nil {
+		return bootstrap.NodeInfo{}, fmt.Errorf("could not get peer ID from public key: %w", err)
+	}
+
+	nodeID, err := translator.NewPublicNetworkIDTranslator().GetFlowID(peerID)
+	if err != nil {
+		return bootstrap.NodeInfo{}, fmt.Errorf("could not get flow node ID: %w", err)
+	}
+
+	k, err := pubKey.Raw()
+	if err != nil {
+		return bootstrap.NodeInfo{}, err
+	}
+
+	ks := unittest.StakingKeys(1)
+	stakingKey := ks[0]
+
+	log.Info().Msgf("test execution node private key: %v, public key: %x, peerID: %v, nodeID: %v", networkKey, k, peerID, nodeID)
+
+	nodeInfo := bootstrap.NewPrivateNodeInfo(
+		nodeID,
+		flow.RoleExecution,
+		address,
+		0,
+		networkKey,
+		stakingKey,
+	)
+
+	path := fmt.Sprintf("%s/private-root-information/private-node-info_%v/%vjson",
+		bootstrapDir, nodeID, bootstrap.PathPrivNodeInfoPrefix)
+
+	private, err := nodeInfo.Private()
+	if err != nil {
+		return bootstrap.NodeInfo{}, err
+	}
+
+	err = io.WriteJSON(path, private)
+	if err != nil {
+		return bootstrap.NodeInfo{}, err
+	}
+
+	path = fmt.Sprintf("%s/private-root-information/private-node-info_%v/%v",
+		bootstrapDir, nodeID, bootstrap.FilenameSecretsEncryptionKey)
+	err = os.WriteFile(path, encryptionKey, 0644)
+	if err != nil {
+		return bootstrap.NodeInfo{}, err
+	}
+
+	// write network private key
+	outputFile := fmt.Sprintf("%s/private-root-information/private-node-info_%v/network_private_key", bootstrapDir, nodeID)
+	err = os.WriteFile(outputFile, output, 0600)
+	if err != nil {
+		return bootstrap.NodeInfo{}, fmt.Errorf("could not write private key to file: %w", err)
+	}
+
+	return nodeInfo, nil
 }

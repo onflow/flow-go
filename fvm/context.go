@@ -3,50 +3,49 @@ package fvm
 import (
 	"math"
 
-	"github.com/onflow/cadence/runtime"
 	"github.com/rs/zerolog"
+	otelTrace "go.opentelemetry.io/otel/trace"
 
 	"github.com/onflow/flow-go/fvm/environment"
-	"github.com/onflow/flow-go/fvm/programs"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
-	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage/derived"
+	"github.com/onflow/flow-go/fvm/storage/state"
+	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 )
 
+const (
+	AccountKeyWeightThreshold = 1000
+
+	DefaultComputationLimit   = 100_000 // 100K
+	DefaultMemoryLimit        = math.MaxUint64
+	DefaultMaxInteractionSize = 20_000_000 // ~20MB
+)
+
 // A Context defines a set of execution parameters used by the virtual machine.
 type Context struct {
-	Chain   flow.Chain
-	Blocks  environment.Blocks
-	Metrics environment.MetricsReporter
-	Tracer  module.Tracer
 	// DisableMemoryAndInteractionLimits will override memory and interaction
 	// limits and set them to MaxUint64, effectively disabling these limits.
 	DisableMemoryAndInteractionLimits bool
+	EVMEnabled                        bool
 	ComputationLimit                  uint64
 	MemoryLimit                       uint64
 	MaxStateKeySize                   uint64
 	MaxStateValueSize                 uint64
 	MaxStateInteractionSize           uint64
-	EventCollectionByteSizeLimit      uint64
-	BlockHeader                       *flow.Header
-	// NOTE: The ServiceAccountEnabled option is used by the playground
-	// https://github.com/onflow/flow-playground-api/blob/1ad967055f31db8f1ce88e008960e5fc14a9fbd1/compute/computer.go#L76
-	ServiceAccountEnabled bool
-	// Depricated: RestrictedDeploymentEnabled is deprecated use SetIsContractDeploymentRestrictedTransaction instead.
-	// Can be removed after all networks are migrated to SetIsContractDeploymentRestrictedTransaction
-	RestrictContractDeployment    bool
-	RestrictContractRemoval       bool
-	LimitAccountStorage           bool
-	TransactionFeesEnabled        bool
-	CadenceLoggingEnabled         bool
-	ServiceEventCollectionEnabled bool
-	ExtensiveTracing              bool
-	TransactionProcessors         []TransactionProcessor
-	ScriptProcessors              []ScriptProcessor
-	Logger                        zerolog.Logger
-	ReusableCadenceRuntimePool    reusableRuntime.ReusableCadenceRuntimePool
-	BlockPrograms                 *programs.Programs
+
+	TransactionExecutorParams
+
+	DerivedBlockData *derived.DerivedBlockData
+
+	tracing.TracerSpan
+
+	environment.EnvironmentParams
+
+	// AllowProgramCacheWritesInScripts determines if the program cache can be written to in scripts
+	// By default, the program cache is only updated by transactions.
+	AllowProgramCacheWritesInScripts bool
 }
 
 // NewContext initializes a new execution context with the provided options.
@@ -67,46 +66,16 @@ func newContext(ctx Context, opts ...Option) Context {
 	return ctx
 }
 
-const AccountKeyWeightThreshold = 1000
-
-const (
-	DefaultComputationLimit             = 100_000        // 100K
-	DefaultMemoryLimit                  = math.MaxUint64 //
-	DefaultEventCollectionByteSizeLimit = 256_000        // 256KB
-)
-
 func defaultContext() Context {
 	return Context{
-		Chain:                             flow.Mainnet.Chain(),
-		Blocks:                            nil,
-		Metrics:                           environment.NoopMetricsReporter{},
-		Tracer:                            nil,
 		DisableMemoryAndInteractionLimits: false,
 		ComputationLimit:                  DefaultComputationLimit,
 		MemoryLimit:                       DefaultMemoryLimit,
 		MaxStateKeySize:                   state.DefaultMaxKeySize,
 		MaxStateValueSize:                 state.DefaultMaxValueSize,
-		MaxStateInteractionSize:           state.DefaultMaxInteractionSize,
-		EventCollectionByteSizeLimit:      DefaultEventCollectionByteSizeLimit,
-		BlockHeader:                       nil,
-		ServiceAccountEnabled:             true,
-		RestrictContractDeployment:        true,
-		RestrictContractRemoval:           true,
-		CadenceLoggingEnabled:             false,
-		ServiceEventCollectionEnabled:     false,
-		ExtensiveTracing:                  false,
-		TransactionProcessors: []TransactionProcessor{
-			NewTransactionVerifier(AccountKeyWeightThreshold),
-			NewTransactionSequenceNumberChecker(),
-			NewTransactionInvoker(),
-		},
-		ScriptProcessors: []ScriptProcessor{
-			NewScriptInvoker(),
-		},
-		Logger: zerolog.Nop(),
-		ReusableCadenceRuntimePool: reusableRuntime.NewReusableCadenceRuntimePool(
-			0,
-			runtime.Config{}),
+		MaxStateInteractionSize:           DefaultMaxInteractionSize,
+		TransactionExecutorParams:         DefaultTransactionExecutorParams(),
+		EnvironmentParams:                 environment.DefaultEnvironmentParams(),
 	}
 }
 
@@ -196,10 +165,19 @@ func WithEventCollectionSizeLimit(limit uint64) Option {
 	}
 }
 
+// WithEntropyProvider sets the entropy provider of a virtual machine context.
+//
+// The VM uses the input to provide entropy to the Cadence runtime randomness functions.
+func WithEntropyProvider(source environment.EntropyProvider) Option {
+	return func(ctx Context) Context {
+		ctx.EntropyProvider = source
+		return ctx
+	}
+}
+
 // WithBlockHeader sets the block header for a virtual machine context.
 //
-// The VM uses the header to provide current block information to the Cadence runtime,
-// as well as to seed the pseudorandom number generator.
+// The VM uses the header to provide current block information to the Cadence runtime.
 func WithBlockHeader(header *flow.Header) Option {
 	return func(ctx Context) Context {
 		ctx.BlockHeader = header
@@ -211,14 +189,6 @@ func WithBlockHeader(header *flow.Header) Option {
 func WithServiceEventCollectionEnabled() Option {
 	return func(ctx Context) Context {
 		ctx.ServiceEventCollectionEnabled = true
-		return ctx
-	}
-}
-
-// WithExtensiveTracing sets the extensive tracing
-func WithExtensiveTracing() Option {
-	return func(ctx Context) Context {
-		ctx.ExtensiveTracing = true
 		return ctx
 	}
 }
@@ -240,7 +210,7 @@ func WithBlocks(blocks environment.Blocks) Option {
 func WithMetricsReporter(mr environment.MetricsReporter) Option {
 	return func(ctx Context) Context {
 		if mr != nil {
-			ctx.Metrics = mr
+			ctx.MetricsReporter = mr
 		}
 		return ctx
 	}
@@ -254,11 +224,18 @@ func WithTracer(tr module.Tracer) Option {
 	}
 }
 
-// WithTransactionProcessors sets the transaction processors for a
-// virtual machine context.
-func WithTransactionProcessors(processors ...TransactionProcessor) Option {
+// WithSpan sets the trace span for a virtual machine context.
+func WithSpan(span otelTrace.Span) Option {
 	return func(ctx Context) Context {
-		ctx.TransactionProcessors = processors
+		ctx.Span = span
+		return ctx
+	}
+}
+
+// WithExtensiveTracing sets the extensive tracing
+func WithExtensiveTracing() Option {
+	return func(ctx Context) Context {
+		ctx.ExtensiveTracing = true
 		return ctx
 	}
 }
@@ -279,13 +256,6 @@ func WithContractRemovalRestricted(enabled bool) Option {
 		ctx.RestrictContractRemoval = enabled
 		return ctx
 	}
-}
-
-// @Depricated please use WithContractDeploymentRestricted instead of this
-// this has been kept to reduce breaking change on the emulator, but would be
-// removed at some point.
-func WithRestrictedDeployment(restricted bool) Option {
-	return WithContractDeploymentRestricted(restricted)
 }
 
 // WithRestrictedContractDeployment enables or disables restricted contract deployment for a
@@ -316,10 +286,60 @@ func WithAccountStorageLimit(enabled bool) Option {
 	}
 }
 
+// WithAuthorizationCheckxEnabled enables or disables pre-execution
+// authorization checks.
+func WithAuthorizationChecksEnabled(enabled bool) Option {
+	return func(ctx Context) Context {
+		ctx.AuthorizationChecksEnabled = enabled
+		return ctx
+	}
+}
+
+// WithSequenceNumberCheckAndIncrementEnabled enables or disables pre-execution
+// sequence number check / increment.
+func WithSequenceNumberCheckAndIncrementEnabled(enabled bool) Option {
+	return func(ctx Context) Context {
+		ctx.SequenceNumberCheckAndIncrementEnabled = enabled
+		return ctx
+	}
+}
+
+// WithAccountKeyWeightThreshold sets the key weight threshold used for
+// authorization checks.  If the threshold is a negative number, signature
+// verification is skipped.
+//
+// Note: This is set only by tests
+func WithAccountKeyWeightThreshold(threshold int) Option {
+	return func(ctx Context) Context {
+		ctx.AccountKeyWeightThreshold = threshold
+		return ctx
+	}
+}
+
+// WithTransactionBodyExecutionEnabled enables or disables the transaction body
+// execution.
+//
+// Note: This is disabled only by tests
+func WithTransactionBodyExecutionEnabled(enabled bool) Option {
+	return func(ctx Context) Context {
+		ctx.TransactionBodyExecutionEnabled = enabled
+		return ctx
+	}
+}
+
 // WithTransactionFeesEnabled enables or disables deduction of transaction fees
 func WithTransactionFeesEnabled(enabled bool) Option {
 	return func(ctx Context) Context {
 		ctx.TransactionFeesEnabled = enabled
+		return ctx
+	}
+}
+
+// WithRandomSourceHistoryCallAllowed enables or disables calling the `entropy` function
+// within cadence
+func WithRandomSourceHistoryCallAllowed(allowed bool) Option {
+	return func(ctx Context) Context {
+		ctx.RandomSourceHistoryCallAllowed = allowed
 		return ctx
 	}
 }
@@ -335,11 +355,35 @@ func WithReusableCadenceRuntimePool(
 	}
 }
 
-// WithBlockPrograms sets the programs cache storage to be used by the
+// WithDerivedBlockData sets the derived data cache storage to be used by the
 // transaction/script.
-func WithBlockPrograms(programs *programs.Programs) Option {
+func WithDerivedBlockData(derivedBlockData *derived.DerivedBlockData) Option {
 	return func(ctx Context) Context {
-		ctx.BlockPrograms = programs
+		ctx.DerivedBlockData = derivedBlockData
+		return ctx
+	}
+}
+
+// WithEventEncoder sets events encoder to be used for encoding events emitted during execution
+func WithEventEncoder(encoder environment.EventEncoder) Option {
+	return func(ctx Context) Context {
+		ctx.EventEncoder = encoder
+		return ctx
+	}
+}
+
+// WithEVMEnabled enables access to the evm environment
+func WithEVMEnabled(enabled bool) Option {
+	return func(ctx Context) Context {
+		ctx.EVMEnabled = enabled
+		return ctx
+	}
+}
+
+// WithAllowProgramCacheWritesInScriptsEnabled enables caching of programs accessed by scripts
+func WithAllowProgramCacheWritesInScriptsEnabled(enabled bool) Option {
+	return func(ctx Context) Context {
+		ctx.AllowProgramCacheWritesInScripts = enabled
 		return ctx
 	}
 }

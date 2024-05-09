@@ -1,5 +1,3 @@
-// (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
-
 package merkle
 
 import (
@@ -15,7 +13,14 @@ type node interface {
 	// Hash computes recursively the hash of this respective sub trie.
 	// To simplify enforcing cryptographic security, we introduce the convention
 	// that hashing a nil node is an illegal operation, which panics.
-	Hash() []byte
+	// If cacheEnabled is set the node stores the computed hash value for future
+	// calls to the Hash function. Note that the cached value is only returned
+	// when cacheEnabled is also set for the future calls.
+	Hash(cacheEnabled bool) []byte
+
+	// MaxDepthOfDescendants returns the length of the longest path from this node to any of the decedent leaf nodes,
+	// i.e. it returns the maximum depth of the subtree under this node.
+	MaxDepthOfDescendants() uint
 }
 
 // NodeTags encodes the type of node when hashing it. Required for cryptographic
@@ -33,9 +38,10 @@ var (
 // a full node or a leaf.
 
 type short struct {
-	count int    // holds the count of bits in the path
-	path  []byte // holds the common path to the next node
-	child node   // holds the child after the common path; never nil
+	count           int    // holds the count of bits in the path
+	path            []byte // holds the common path to the next node
+	child           node   // holds the child after the common path; never nil
+	cachedHashValue []byte // cached hash value
 }
 
 var _ node = &short{}
@@ -49,8 +55,18 @@ func computeShortHash(count int, path []byte, childHash []byte) []byte {
 	return h.Sum(nil)
 }
 
-func (n *short) Hash() []byte {
-	return computeShortHash(n.count, n.path, n.child.Hash())
+func (n *short) Hash(cacheEnabled bool) []byte {
+	if !cacheEnabled {
+		return computeShortHash(n.count, n.path, n.child.Hash(cacheEnabled))
+	}
+	if len(n.cachedHashValue) == 0 {
+		n.cachedHashValue = computeShortHash(n.count, n.path, n.child.Hash(cacheEnabled))
+	}
+	return n.cachedHashValue
+}
+
+func (n *short) MaxDepthOfDescendants() uint {
+	return n.child.MaxDepthOfDescendants() + 1
 }
 
 // serializedPathSegmentLength serializes the bitCount into two bytes.
@@ -66,8 +82,9 @@ func serializedPathSegmentLength(bitCount int) [2]byte {
 // Per convention a Full Node has always _two children_. Nil values not allowed.
 
 type full struct {
-	left  node // holds the left path node (bit 0); never nil
-	right node // holds the right path node (bit 1); never nil
+	left            node   // holds the left path node (bit 0); never nil
+	right           node   // holds the right path node (bit 1); never nil
+	cachedHashValue []byte // cached hash value
 }
 
 var _ node = &full{}
@@ -79,8 +96,23 @@ func computeFullHash(leftChildHash, rightChildHash []byte) []byte {
 	return h.Sum(nil)
 }
 
-func (n *full) Hash() []byte {
-	return computeFullHash(n.left.Hash(), n.right.Hash())
+func (n *full) Hash(cacheEnabled bool) []byte {
+	if !cacheEnabled {
+		return computeFullHash(n.left.Hash(cacheEnabled), n.right.Hash(cacheEnabled))
+	}
+	if len(n.cachedHashValue) == 0 {
+		n.cachedHashValue = computeFullHash(n.left.Hash(cacheEnabled), n.right.Hash(cacheEnabled))
+	}
+	return n.cachedHashValue
+}
+
+func (n *full) MaxDepthOfDescendants() uint {
+	left := n.left.MaxDepthOfDescendants()
+	right := n.right.MaxDepthOfDescendants()
+	if left < right {
+		return right + 1
+	}
+	return left + 1
 }
 
 // Leaf Node
@@ -88,7 +120,8 @@ func (n *full) Hash() []byte {
 // key is implicitly stored as the merkle path through the tree.
 
 type leaf struct {
-	val []byte
+	val             []byte
+	cachedHashValue []byte // cached hash value
 }
 
 var _ node = &leaf{}
@@ -99,8 +132,18 @@ func computeLeafHash(value []byte) []byte {
 	return h.Sum(nil)
 }
 
-func (n *leaf) Hash() []byte {
-	return computeLeafHash(n.val)
+func (n *leaf) Hash(cacheEnabled bool) []byte {
+	if !cacheEnabled {
+		return computeLeafHash(n.val)
+	}
+	if len(n.cachedHashValue) == 0 {
+		n.cachedHashValue = computeLeafHash(n.val)
+	}
+	return n.cachedHashValue
+}
+
+func (n *leaf) MaxDepthOfDescendants() uint {
+	return 0
 }
 
 // Dummy Node
@@ -113,8 +156,12 @@ type dummy struct{}
 
 var _ node = &dummy{}
 
-func (n *dummy) Hash() []byte {
+func (n *dummy) Hash(_ bool) []byte {
 	// Per convention, Hash should never be called by the business logic but
 	// is required to implement the node interface
 	panic("dummy node has no hash")
+}
+
+func (n *dummy) MaxDepthOfDescendants() uint {
+	return 0
 }

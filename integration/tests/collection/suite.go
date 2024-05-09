@@ -82,7 +82,7 @@ func (suite *CollectorSuite) SetupTest(name string, nNodes, nClusters uint) {
 	}
 	colNodes := testnet.NewNodeConfigSet(nNodes, flow.RoleCollection,
 		testnet.WithLogLevel(zerolog.InfoLevel),
-		testnet.WithAdditionalFlag("--block-rate-delay=1ms"),
+		testnet.WithAdditionalFlag("--hotstuff-proposal-duration=1ms"),
 	)
 
 	suite.nClusters = nClusters
@@ -132,8 +132,7 @@ func (s *CollectorSuite) TearDownTest() {
 
 // Ghost returns a client for the ghost node.
 func (suite *CollectorSuite) Ghost() *ghostclient.GhostClient {
-	ghost := suite.net.ContainerByID(suite.ghostID)
-	client, err := lib.GetGhostClient(ghost)
+	client, err := suite.net.ContainerByID(suite.ghostID).GhostClient()
 	require.NoError(suite.T(), err, "could not get ghost client")
 	return client
 }
@@ -143,7 +142,7 @@ func (suite *CollectorSuite) Clusters() flow.ClusterList {
 	setup, ok := result.ServiceEvents[0].Event.(*flow.EpochSetup)
 	suite.Require().True(ok)
 
-	collectors := suite.net.Identities().Filter(filter.HasRole(flow.RoleCollection))
+	collectors := suite.net.Identities().Filter(filter.HasRole[flow.Identity](flow.RoleCollection)).ToSkeleton()
 	clusters, err := factory.NewClusterList(setup.Assignments, collectors)
 	suite.Require().Nil(err)
 	return clusters
@@ -171,7 +170,7 @@ func (suite *CollectorSuite) NextTransaction(opts ...func(*sdk.Transaction)) *sd
 	return tx
 }
 
-func (suite *CollectorSuite) TxForCluster(target flow.IdentityList) *sdk.Transaction {
+func (suite *CollectorSuite) TxForCluster(target flow.IdentitySkeletonList) *sdk.Transaction {
 	acct := suite.acct
 
 	tx := suite.NextTransaction()
@@ -188,7 +187,7 @@ func (suite *CollectorSuite) TxForCluster(target flow.IdentityList) *sdk.Transac
 		require.Nil(suite.T(), err)
 		routed, ok := clusters.ByTxID(convert.IDFromSDK(tx.ID()))
 		require.True(suite.T(), ok)
-		if routed.Fingerprint() == target.Fingerprint() {
+		if routed.ID() == target.ID() {
 			break
 		}
 	}
@@ -213,11 +212,8 @@ func (suite *CollectorSuite) AwaitProposals(n uint) []cluster.Block {
 
 		switch val := msg.(type) {
 		case *messages.ClusterBlockProposal:
-			block := cluster.Block{
-				Header:  val.Header,
-				Payload: val.Payload,
-			}
-			blocks = append(blocks, block)
+			block := val.Block.ToInternal()
+			blocks = append(blocks, *block)
 			if len(blocks) == int(n) {
 				return blocks
 			}
@@ -265,8 +261,9 @@ func (suite *CollectorSuite) AwaitTransactionsIncluded(txIDs ...flow.Identifier)
 
 		switch val := msg.(type) {
 		case *messages.ClusterBlockProposal:
-			header := val.Header
-			collection := val.Payload.Collection
+			block := val.Block.ToInternal()
+			header := block.Header
+			collection := block.Payload.Collection
 			suite.T().Logf("got collection from %v height=%d col_id=%x size=%d", originID, header.Height, collection.ID(), collection.Len())
 			if guarantees[collection.ID()] {
 				for _, txID := range collection.Light().Transactions {
@@ -323,8 +320,7 @@ func (suite *CollectorSuite) AwaitTransactionsIncluded(txIDs ...flow.Identifier)
 	suite.T().Fatalf("missing transactions: %v", missing)
 }
 
-// Collector returns the collector node with the given index in the
-// given cluster.
+// Collector returns the collector node with the given index in the given cluster.
 func (suite *CollectorSuite) Collector(clusterIdx, nodeIdx uint) *testnet.Container {
 
 	clusters := suite.Clusters()
@@ -335,11 +331,10 @@ func (suite *CollectorSuite) Collector(clusterIdx, nodeIdx uint) *testnet.Contai
 	node, ok := cluster.ByIndex(nodeIdx)
 	require.True(suite.T(), ok, "invalid node index")
 
-	return suite.net.ContainerByID(node.ID())
+	return suite.net.ContainerByID(node.NodeID)
 }
 
-// ClusterStateFor returns a cluster state instance for the collector node
-// with the given ID.
+// ClusterStateFor returns a cluster state instance for the collector node with the given ID.
 func (suite *CollectorSuite) ClusterStateFor(id flow.Identifier) *clusterstateimpl.State {
 
 	myCluster, _, ok := suite.Clusters().ByNodeID(id)
@@ -353,9 +348,10 @@ func (suite *CollectorSuite) ClusterStateFor(id flow.Identifier) *clusterstateim
 	db, err := node.DB()
 	require.Nil(suite.T(), err, "could not get node db")
 
-	clusterStateRoot, err := clusterstateimpl.NewStateRoot(rootBlock)
+	rootQC := unittest.QuorumCertificateFixture(unittest.QCWithRootBlockID(rootBlock.ID()))
+	clusterStateRoot, err := clusterstateimpl.NewStateRoot(rootBlock, rootQC, setup.Counter)
 	suite.NoError(err)
-	clusterState, err := clusterstateimpl.OpenState(db, nil, nil, nil, clusterStateRoot.ClusterID())
+	clusterState, err := clusterstateimpl.OpenState(db, nil, nil, nil, clusterStateRoot.ClusterID(), clusterStateRoot.EpochCounter())
 	require.NoError(suite.T(), err, "could not get cluster state")
 
 	return clusterState

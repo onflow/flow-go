@@ -21,10 +21,9 @@ const DefaultBlockWorkers = uint64(2)
 // and notifies the consumer to check in the job queue
 // (i.e., its block reader) for new block jobs.
 type BlockConsumer struct {
-	consumer     module.JobConsumer
-	defaultIndex uint64
-	unit         *engine.Unit
-	metrics      module.VerificationMetrics
+	consumer module.JobConsumer
+	unit     *engine.Unit
+	metrics  module.VerificationMetrics
 }
 
 // defaultProcessedIndex returns the last sealed block height from the protocol state.
@@ -59,17 +58,20 @@ func NewBlockConsumer(log zerolog.Logger,
 	// the block reader is where the consumer reads new finalized blocks from (i.e., jobs).
 	jobs := jobqueue.NewFinalizedBlockReader(state, blocks)
 
-	consumer := jobqueue.NewConsumer(lg, jobs, processedHeight, worker, maxProcessing, 0)
 	defaultIndex, err := defaultProcessedIndex(state)
 	if err != nil {
 		return nil, 0, fmt.Errorf("could not read default processed index: %w", err)
 	}
 
+	consumer, err := jobqueue.NewConsumer(lg, jobs, processedHeight, worker, maxProcessing, 0, defaultIndex)
+	if err != nil {
+		return nil, 0, fmt.Errorf("could not create block consumer: %w", err)
+	}
+
 	blockConsumer := &BlockConsumer{
-		consumer:     consumer,
-		defaultIndex: defaultIndex,
-		unit:         engine.NewUnit(),
-		metrics:      metrics,
+		consumer: consumer,
+		unit:     engine.NewUnit(),
+		metrics:  metrics,
 	}
 	worker.withBlockConsumer(blockConsumer)
 
@@ -98,14 +100,8 @@ func (c *BlockConsumer) OnFinalizedBlock(*model.Block) {
 	c.unit.Launch(c.consumer.Check)
 }
 
-// OnBlockIncorporated is to implement FinalizationConsumer
-func (c *BlockConsumer) OnBlockIncorporated(*model.Block) {}
-
-// OnDoubleProposeDetected is to implement FinalizationConsumer
-func (c *BlockConsumer) OnDoubleProposeDetected(*model.Block, *model.Block) {}
-
 func (c *BlockConsumer) Ready() <-chan struct{} {
-	err := c.consumer.Start(c.defaultIndex)
+	err := c.consumer.Start()
 	if err != nil {
 		panic(fmt.Errorf("could not start block consumer for finder engine: %w", err))
 	}

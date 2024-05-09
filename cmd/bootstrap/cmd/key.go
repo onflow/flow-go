@@ -2,19 +2,15 @@ package cmd
 
 import (
 	"fmt"
-	"net"
-	"strconv"
+
+	"github.com/onflow/crypto"
+	"github.com/spf13/cobra"
 
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/cmd/bootstrap/utils"
-
-	"github.com/multiformats/go-multiaddr"
-	"github.com/spf13/cobra"
-
-	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	model "github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/network/p2p"
 )
 
 var (
@@ -47,17 +43,17 @@ func init() {
 		&flagNetworkSeed,
 		"networking-seed",
 		[]byte{},
-		fmt.Sprintf("hex encoded networking seed (min %d bytes)", crypto.KeyGenSeedMinLenECDSAP256))
+		fmt.Sprintf("hex encoded networking seed (min %d bytes)", crypto.KeyGenSeedMinLen))
 	keyCmd.Flags().BytesHexVar(
 		&flagStakingSeed,
 		"staking-seed",
 		[]byte{},
-		fmt.Sprintf("hex encoded staking seed (min %d bytes)", crypto.KeyGenSeedMinLenBLSBLS12381))
+		fmt.Sprintf("hex encoded staking seed (min %d bytes)", crypto.KeyGenSeedMinLen))
 	keyCmd.Flags().BytesHexVar(
 		&flagMachineSeed,
 		"machine-seed",
 		[]byte{},
-		fmt.Sprintf("hex encoded machine account seed (min %d bytes)", crypto.KeyGenSeedMinLenECDSAP256))
+		fmt.Sprintf("hex encoded machine account seed (min %d bytes)", crypto.KeyGenSeedMinLen))
 }
 
 // keyCmdRun generate the node staking key, networking key and node information
@@ -65,18 +61,18 @@ func keyCmdRun(_ *cobra.Command, _ []string) {
 
 	// generate private key seeds if not specified via flag
 	if len(flagNetworkSeed) == 0 {
-		flagNetworkSeed = GenerateRandomSeed(crypto.KeyGenSeedMinLenECDSAP256)
+		flagNetworkSeed = GenerateRandomSeed(crypto.KeyGenSeedMinLen)
 	}
 	if len(flagStakingSeed) == 0 {
-		flagStakingSeed = GenerateRandomSeed(crypto.KeyGenSeedMinLenBLSBLS12381)
+		flagStakingSeed = GenerateRandomSeed(crypto.KeyGenSeedMinLen)
 	}
 	if len(flagMachineSeed) == 0 {
-		flagMachineSeed = GenerateRandomSeed(crypto.KeyGenSeedMinLenECDSAP256)
+		flagMachineSeed = GenerateRandomSeed(crypto.KeyGenSeedMinLen)
 	}
 
 	// validate inputs
 	role := validateRole(flagRole)
-	validateAddressFormat(flagAddress)
+	common.ValidateAddressFormat(log, flagAddress)
 
 	// generate staking and network keys
 	networkKey, stakingKey, secretsDBKey, err := generateKeys()
@@ -97,16 +93,34 @@ func keyCmdRun(_ *cobra.Command, _ []string) {
 		log.Fatal().Err(err).Msg("could not access private keys")
 	}
 
+	// write files
+	err = common.WriteText(model.PathNodeID, flagOutdir, []byte(nodeInfo.NodeID.String()))
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to write file")
+	}
+	log.Info().Msgf("wrote file %s/%s", flagOutdir, model.PathNodeID)
+
+	err = common.WriteJSON(fmt.Sprintf(model.PathNodeInfoPriv, nodeInfo.NodeID), flagOutdir, private)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to write json")
+	}
+	log.Info().Msgf("wrote file %s/%s", flagOutdir, model.PathNodeInfoPriv)
+
+	err = common.WriteText(fmt.Sprintf(model.PathSecretsEncryptionKey, nodeInfo.NodeID), flagOutdir, secretsDBKey)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to write file")
+	}
+	log.Info().Msgf("wrote file %s/%s", flagOutdir, model.PathSecretsEncryptionKey)
+
 	public, err := nodeInfo.Public()
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not access public keys")
 	}
-
-	// write files
-	writeText(model.PathNodeID, []byte(nodeInfo.NodeID.String()))
-	writeJSON(fmt.Sprintf(model.PathNodeInfoPriv, nodeInfo.NodeID), private)
-	writeText(fmt.Sprintf(model.PathSecretsEncryptionKey, nodeInfo.NodeID), secretsDBKey)
-	writeJSON(fmt.Sprintf(model.PathNodeInfoPub, nodeInfo.NodeID), public)
+	err = common.WriteJSON(fmt.Sprintf(model.PathNodeInfoPub, nodeInfo.NodeID), flagOutdir, public)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to write json")
+	}
+	log.Info().Msgf("wrote file %s/%s", flagOutdir, model.PathNodeInfoPub)
 
 	// write machine account info
 	if role == flow.RoleCollection || role == flow.RoleConsensus {
@@ -120,7 +134,11 @@ func keyCmdRun(_ *cobra.Command, _ []string) {
 		log.Debug().Str("address", flagAddress).Msg("assembling machine account information")
 		// write the public key to terminal for entry in Flow Port
 		machineAccountPriv := assembleNodeMachineAccountKey(machineKey)
-		writeJSON(fmt.Sprintf(model.PathNodeMachineAccountPrivateKey, nodeInfo.NodeID), machineAccountPriv)
+		err = common.WriteJSON(fmt.Sprintf(model.PathNodeMachineAccountPrivateKey, nodeInfo.NodeID), flagOutdir, machineAccountPriv)
+		if err != nil {
+			log.Fatal().Err(err).Msg("failed to write json")
+		}
+		log.Info().Msgf("wrote file %s/%s", flagOutdir, model.PathNodeMachineAccountPrivateKey)
 	}
 }
 
@@ -169,28 +187,4 @@ func validateRole(role string) flow.Role {
 			"\"verification\" or \"access\"")
 	}
 	return parsed
-}
-
-// validateAddressFormat validates the address provided by pretty much doing what the network layer would do before
-// starting the node
-func validateAddressFormat(address string) {
-	checkErr := func(err error) {
-		if err != nil {
-			log.Fatal().Err(err).Str("address", address).Msg("invalid address format.\n" +
-				`Address needs to be in the format hostname:port or ip:port e.g. "flow.com:3569"`)
-		}
-	}
-
-	// split address into ip/hostname and port
-	ip, port, err := net.SplitHostPort(address)
-	checkErr(err)
-
-	// check that port number is indeed a number
-	_, err = strconv.Atoi(port)
-	checkErr(err)
-
-	// create a libp2p address from the ip and port
-	lp2pAddr := p2p.MultiAddressStr(ip, port)
-	_, err = multiaddr.NewMultiaddr(lp2pAddr)
-	checkErr(err)
 }

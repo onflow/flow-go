@@ -12,7 +12,6 @@ import (
 
 	ghostclient "github.com/onflow/flow-go/engine/ghost/client"
 	"github.com/onflow/flow-go/integration/testnet"
-	"github.com/onflow/flow-go/integration/tests/lib"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/network/channels"
@@ -71,8 +70,7 @@ func TestNetwork(t *testing.T) {
 	}
 
 	// get the sender container and relay an echo message via it to all the other nodes
-	ghostContainer := net.ContainerByID(sender)
-	ghostClient, err := lib.GetGhostClient(ghostContainer)
+	ghostClient, err := net.ContainerByID(sender).GhostClient()
 	require.NoError(t, err)
 
 	// seed a message, it should propagate to all nodes.
@@ -93,12 +91,8 @@ func launchReadLoop(
 	expectedOrigin flow.Identifier,
 	expectedMsg string,
 ) {
-
-	// get the ghost container
-	ghostContainer := net.ContainerByID(id)
-
 	// get a ghost client connected to the ghost node
-	ghostClient, err := lib.GetGhostClient(ghostContainer)
+	ghostClient, err := net.ContainerByID(id).GhostClient()
 	require.NoError(t, err)
 
 	// subscribe to all the events the ghost execution node will receive

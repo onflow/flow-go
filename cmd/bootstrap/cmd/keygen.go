@@ -5,11 +5,11 @@ import (
 	"io"
 	"os"
 
-	"github.com/onflow/flow-go/cmd"
-	"github.com/onflow/flow-go/cmd/bootstrap/utils"
-
 	"github.com/spf13/cobra"
 
+	"github.com/onflow/flow-go/cmd"
+	"github.com/onflow/flow-go/cmd/bootstrap/utils"
+	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	model "github.com/onflow/flow-go/model/bootstrap"
 )
 
@@ -22,7 +22,7 @@ var keygenCmd = &cobra.Command{
 	Long:  `Generate Staking and Networking keys for a list of nodes provided by the flag '--config'`,
 	Run: func(cmd *cobra.Command, args []string) {
 		// check if out directory exists
-		exists, err := pathExists(flagOutdir)
+		exists, err := common.PathExists(flagOutdir)
 		if err != nil {
 			log.Error().Msg("could not check if directory exists")
 			return
@@ -49,12 +49,10 @@ var keygenCmd = &cobra.Command{
 
 		// write key files
 		writeJSONFile := func(relativePath string, val interface{}) error {
-			writeJSON(relativePath, val)
-			return nil
+			return common.WriteJSON(relativePath, flagOutdir, val)
 		}
 		writeFile := func(relativePath string, data []byte) error {
-			writeText(relativePath, data)
-			return nil
+			return common.WriteText(relativePath, flagOutdir, data)
 		}
 
 		log.Info().Msg("writing internal private key files")
@@ -85,7 +83,7 @@ var keygenCmd = &cobra.Command{
 		}
 
 		// count roles
-		roleCounts := nodeCountByRole(nodes)
+		roleCounts := common.NodeCountByRole(nodes)
 		for role, count := range roleCounts {
 			log.Info().Msg(fmt.Sprintf("created keys for %d %s nodes", count, role.String()))
 		}
@@ -107,7 +105,7 @@ func init() {
 
 	// optional parameters, used for generating machine account files
 	keygenCmd.Flags().BoolVar(&flagDefaultMachineAccount, "machine-account", false, "whether or not to generate a default (same as networking key) machine account key file")
-	keygenCmd.Flags().StringVar(&flagRootChain, "root-chain", "local", "chain ID for the root block (can be 'main', 'test', 'staging', 'bench', or 'local'")
+	keygenCmd.Flags().StringVar(&flagRootChain, "root-chain", "local", "chain ID for the root block (can be 'main', 'test', 'sandbox', 'preview', 'bench', or 'local'")
 }
 
 // isEmptyDir returns True if the directory contains children
@@ -134,6 +132,10 @@ func genNodePubInfo(nodes []model.NodeInfo) error {
 		}
 		pubNodes = append(pubNodes, pub)
 	}
-	writeJSON(model.PathInternalNodeInfosPub, pubNodes)
+	err := common.WriteJSON(model.PathInternalNodeInfosPub, flagOutdir, pubNodes)
+	if err != nil {
+		return err
+	}
+	log.Info().Msgf("wrote file %s/%s", flagOutdir, model.PathInternalNodeInfosPub)
 	return nil
 }

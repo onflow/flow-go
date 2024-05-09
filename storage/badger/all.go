@@ -16,9 +16,13 @@ func InitAll(metrics module.CacheMetrics, db *badger.DB) *storage.All {
 	receipts := NewExecutionReceipts(metrics, db, results, DefaultCacheSize)
 	payloads := NewPayloads(db, index, guarantees, seals, receipts, results)
 	blocks := NewBlocks(db, headers, payloads)
+	qcs := NewQuorumCertificates(metrics, db, DefaultCacheSize)
 	setups := NewEpochSetups(metrics, db)
 	epochCommits := NewEpochCommits(metrics, db)
-	statuses := NewEpochStatuses(metrics, db)
+	protocolState := NewProtocolState(metrics, setups, epochCommits, db,
+		DefaultProtocolStateCacheSize, DefaultProtocolStateByBlockIDCacheSize)
+	protocolKVStore := NewProtocolKVStore(metrics, db, DefaultProtocolKVStoreCacheSize, DefaultProtocolKVStoreByBlockIDCacheSize)
+	versionBeacons := NewVersionBeacons(db)
 
 	commits := NewCommits(metrics, db)
 	transactions := NewTransactions(metrics, db)
@@ -34,9 +38,12 @@ func InitAll(metrics module.CacheMetrics, db *badger.DB) *storage.All {
 		Index:              index,
 		Payloads:           payloads,
 		Blocks:             blocks,
+		QuorumCertificates: qcs,
 		Setups:             setups,
 		EpochCommits:       epochCommits,
-		Statuses:           statuses,
+		EpochProtocolState: protocolState,
+		ProtocolKVStore:    protocolKVStore,
+		VersionBeacons:     versionBeacons,
 		Results:            results,
 		Receipts:           receipts,
 		ChunkDataPacks:     chunkDataPacks,

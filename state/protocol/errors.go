@@ -17,17 +17,46 @@ var (
 	// has not been set up yet.
 	ErrNextEpochNotSetup = fmt.Errorf("next epoch has not yet been set up")
 
-	// ErrEpochNotCommitted is a sentinel error returned when the epoch has
-	// not been committed and information is queried that is only accessible
+	// ErrNextEpochNotCommitted is a sentinel error returned when the next epoch
+	// has not been committed and information is queried that is only accessible
 	// in the EpochCommitted phase.
-	ErrEpochNotCommitted = fmt.Errorf("queried info from EpochCommit event before it was emitted")
+	ErrNextEpochNotCommitted = fmt.Errorf("queried info from EpochCommit event before it was emitted")
+
+	// ErrUnknownEpochBoundary is a sentinel returned when a query is made for an
+	// epoch boundary which is unknown to this node.
+	//
+	// There are 2 cases where an epoch boundary can be unknown.
+	// Consider an epoch boundary between epoch N and epoch M=N+1.
+	// Let:
+	//   - n be the final block in epoch N
+	//   - m be the first block in epoch M
+	//   - r be this node's lowest known block
+	//   - f be this node's latest finalized block
+	//
+	// CASE 1: `r.Height > n.Height`
+	// The boundary occurred before this node's lowest known block
+	// Note that this includes the case where `r == m` (we know the first block
+	// of epoch M but not the final block of epoch N).
+	//
+	// CASE 2: `f.Height < m.Height`
+	// The boundary has not been finalized yet. Note that we may have finalized
+	// n but not m.
+	ErrUnknownEpochBoundary = fmt.Errorf("unknown epoch boundary for current chain state")
 
 	// ErrSealingSegmentBelowRootBlock is a sentinel error returned for queries
-	// for a sealing segment below the root block.
-	ErrSealingSegmentBelowRootBlock = fmt.Errorf("cannot query sealing segment below root block")
+	// for a sealing segment below the root block (local history cutoff).
+	ErrSealingSegmentBelowRootBlock = fmt.Errorf("cannot construct sealing segment beyond locally known history")
 
 	// ErrClusterNotFound is a sentinel error returns for queries for a cluster
 	ErrClusterNotFound = fmt.Errorf("could not find cluster")
+
+	// ErrMultipleSealsForSameHeight indicates that an (unordered) slice of seals
+	// contains two or more seals for the same block height (possibilities include
+	// duplicated seals or seals for different blocks at the same height).
+	ErrMultipleSealsForSameHeight = fmt.Errorf("multiple seals for same block height")
+
+	// ErrDiscontinuousSeals indicates that an (unordered) slice of seals skips at least one block height.
+	ErrDiscontinuousSeals = fmt.Errorf("seals have discontinuity, i.e. they skip some block heights")
 )
 
 type IdentityNotFoundError struct {
@@ -44,15 +73,15 @@ func IsIdentityNotFound(err error) bool {
 }
 
 type InvalidBlockTimestampError struct {
-	err error
+	error
 }
 
 func (e InvalidBlockTimestampError) Unwrap() error {
-	return e.err
+	return e.error
 }
 
 func (e InvalidBlockTimestampError) Error() string {
-	return e.err.Error()
+	return e.error.Error()
 }
 
 func IsInvalidBlockTimestampError(err error) bool {
@@ -62,21 +91,17 @@ func IsInvalidBlockTimestampError(err error) bool {
 
 func NewInvalidBlockTimestamp(msg string, args ...interface{}) error {
 	return InvalidBlockTimestampError{
-		err: fmt.Errorf(msg, args...),
+		error: fmt.Errorf(msg, args...),
 	}
 }
 
 // InvalidServiceEventError indicates an invalid service event was processed.
 type InvalidServiceEventError struct {
-	err error
+	error
 }
 
 func (e InvalidServiceEventError) Unwrap() error {
-	return e.err
-}
-
-func (e InvalidServiceEventError) Error() string {
-	return e.err.Error()
+	return e.error
 }
 
 func IsInvalidServiceEventError(err error) bool {
@@ -84,14 +109,40 @@ func IsInvalidServiceEventError(err error) bool {
 	return errors.As(err, &errInvalidServiceEventError)
 }
 
-// NewInvalidServiceEventError returns an invalid service event error. Since all invalid
+// NewInvalidServiceEventErrorf returns an invalid service event error. Since all invalid
 // service events indicate an invalid extension, the service event error is wrapped in
 // the invalid extension error at construction.
-func NewInvalidServiceEventError(msg string, args ...interface{}) error {
+func NewInvalidServiceEventErrorf(msg string, args ...interface{}) error {
 	return state.NewInvalidExtensionErrorf(
 		"cannot extend state with invalid service event: %w",
 		InvalidServiceEventError{
-			err: fmt.Errorf(msg, args...),
+			error: fmt.Errorf(msg, args...),
 		},
 	)
+}
+
+// UnfinalizedSealingSegmentError indicates that including unfinalized blocks
+// in the sealing segment is illegal.
+type UnfinalizedSealingSegmentError struct {
+	error
+}
+
+func NewUnfinalizedSealingSegmentErrorf(msg string, args ...interface{}) error {
+	return UnfinalizedSealingSegmentError{
+		error: fmt.Errorf(msg, args...),
+	}
+}
+
+func (e UnfinalizedSealingSegmentError) Unwrap() error {
+	return e.error
+}
+
+func (e UnfinalizedSealingSegmentError) Error() string {
+	return e.error.Error()
+}
+
+// IsUnfinalizedSealingSegmentError returns true if err is of type UnfinalizedSealingSegmentError
+func IsUnfinalizedSealingSegmentError(err error) bool {
+	var e UnfinalizedSealingSegmentError
+	return errors.As(err, &e)
 }

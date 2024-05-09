@@ -4,13 +4,16 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/onflow/cadence"
+	"github.com/hashicorp/go-multierror"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 
+	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/programs"
-	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/evm"
+	"github.com/onflow/flow-go/fvm/storage"
+	"github.com/onflow/flow-go/fvm/storage/logical"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/hash"
 )
@@ -20,20 +23,10 @@ type ScriptProcedure struct {
 	Script         []byte
 	Arguments      [][]byte
 	RequestContext context.Context
-	Value          cadence.Value
-	Logs           []string
-	Events         []flow.Event
-	GasUsed        uint64
-	MemoryEstimate uint64
-	Err            errors.Error
-}
-
-type ScriptProcessor interface {
-	Process(*VirtualMachine, Context, *ScriptProcedure, *state.StateHolder, *programs.Programs) error
 }
 
 func Script(code []byte) *ScriptProcedure {
-	scriptHash := hash.DefaultHasher.ComputeHash(code)
+	scriptHash := hash.DefaultComputeHash(code)
 
 	return &ScriptProcedure{
 		Script:         code,
@@ -51,7 +44,9 @@ func (proc *ScriptProcedure) WithArguments(args ...[]byte) *ScriptProcedure {
 	}
 }
 
-func (proc *ScriptProcedure) WithRequestContext(reqContext context.Context) *ScriptProcedure {
+func (proc *ScriptProcedure) WithRequestContext(
+	reqContext context.Context,
+) *ScriptProcedure {
 	return &ScriptProcedure{
 		ID:             proc.ID,
 		Script:         proc.Script,
@@ -60,8 +55,12 @@ func (proc *ScriptProcedure) WithRequestContext(reqContext context.Context) *Scr
 	}
 }
 
-func NewScriptWithContextAndArgs(code []byte, reqContext context.Context, args ...[]byte) *ScriptProcedure {
-	scriptHash := hash.DefaultHasher.ComputeHash(code)
+func NewScriptWithContextAndArgs(
+	code []byte,
+	reqContext context.Context,
+	args ...[]byte,
+) *ScriptProcedure {
+	scriptHash := hash.DefaultComputeHash(code)
 	return &ScriptProcedure{
 		ID:             flow.HashToID(scriptHash),
 		Script:         code,
@@ -70,23 +69,11 @@ func NewScriptWithContextAndArgs(code []byte, reqContext context.Context, args .
 	}
 }
 
-func (proc *ScriptProcedure) Run(vm *VirtualMachine, ctx Context, sth *state.StateHolder, programs *programs.Programs) error {
-	for _, p := range ctx.ScriptProcessors {
-		err := p.Process(vm, ctx, proc, sth, programs)
-		txError, failure := errors.SplitErrorTypes(err)
-		if failure != nil {
-			if errors.IsALedgerFailure(failure) {
-				return fmt.Errorf("cannot execute the script, this error usually happens if the reference block for this script is not set to a recent block: %w", failure)
-			}
-			return failure
-		}
-		if txError != nil {
-			proc.Err = txError
-			return nil
-		}
-	}
-
-	return nil
+func (proc *ScriptProcedure) NewExecutor(
+	ctx Context,
+	txnState storage.TransactionPreparer,
+) ProcedureExecutor {
+	return newScriptExecutor(ctx, proc, txnState)
 }
 
 func (proc *ScriptProcedure) ComputationLimit(ctx Context) uint64 {
@@ -113,39 +100,132 @@ func (proc *ScriptProcedure) ShouldDisableMemoryAndInteractionLimits(
 	return ctx.DisableMemoryAndInteractionLimits
 }
 
-type ScriptInvoker struct{}
-
-func NewScriptInvoker() ScriptInvoker {
-	return ScriptInvoker{}
+func (ScriptProcedure) Type() ProcedureType {
+	return ScriptProcedureType
 }
 
-func (i ScriptInvoker) Process(
-	vm *VirtualMachine,
+func (proc *ScriptProcedure) ExecutionTime() logical.Time {
+	return logical.EndOfBlockExecutionTime
+}
+
+type scriptExecutor struct {
+	ctx      Context
+	proc     *ScriptProcedure
+	txnState storage.TransactionPreparer
+
+	env environment.Environment
+
+	output ProcedureOutput
+}
+
+func newScriptExecutor(
 	ctx Context,
 	proc *ScriptProcedure,
-	sth *state.StateHolder,
-	programs *programs.Programs,
-) error {
-	env := NewScriptEnvironment(proc.RequestContext, ctx, vm, sth, programs)
+	txnState storage.TransactionPreparer,
+) *scriptExecutor {
+	// update `ctx.EnvironmentParams` with the script info before
+	// creating the executor
+	scriptInfo := environment.NewScriptInfoParams(proc.Script, proc.Arguments)
+	ctx.EnvironmentParams.SetScriptInfoParams(scriptInfo)
+	return &scriptExecutor{
+		ctx:      ctx,
+		proc:     proc,
+		txnState: txnState,
+		env: environment.NewScriptEnv(
+			proc.RequestContext,
+			ctx.TracerSpan,
+			ctx.EnvironmentParams,
+			txnState),
+	}
+}
 
-	rt := env.BorrowCadenceRuntime()
-	defer env.ReturnCadenceRuntime(rt)
+func (executor *scriptExecutor) Cleanup() {
+	// Do nothing.
+}
+
+func (executor *scriptExecutor) Output() ProcedureOutput {
+	return executor.output
+}
+
+func (executor *scriptExecutor) Preprocess() error {
+	// Do nothing.
+	return nil
+}
+
+func (executor *scriptExecutor) Execute() error {
+	err := executor.execute()
+	txError, failure := errors.SplitErrorTypes(err)
+	if failure != nil {
+		if errors.IsLedgerFailure(failure) {
+			return fmt.Errorf(
+				"cannot execute the script, this error usually happens if "+
+					"the reference block for this script is not set to a "+
+					"recent block: %w",
+				failure)
+		}
+		return failure
+	}
+	if txError != nil {
+		executor.output.Err = txError
+	}
+
+	return nil
+}
+
+func (executor *scriptExecutor) execute() error {
+	meterParams, err := getBodyMeterParameters(
+		executor.ctx,
+		executor.proc,
+		executor.txnState)
+	if err != nil {
+		return fmt.Errorf("error getting meter parameters: %w", err)
+	}
+
+	txnId, err := executor.txnState.BeginNestedTransactionWithMeterParams(
+		meterParams)
+	if err != nil {
+		return err
+	}
+
+	errs := errors.NewErrorsCollector()
+	errs.Collect(executor.executeScript())
+
+	_, err = executor.txnState.CommitNestedTransaction(txnId)
+	errs.Collect(err)
+
+	return errs.ErrorOrNil()
+}
+
+func (executor *scriptExecutor) executeScript() error {
+	rt := executor.env.BorrowCadenceRuntime()
+	defer executor.env.ReturnCadenceRuntime(rt)
+
+	if executor.ctx.EVMEnabled {
+		chain := executor.ctx.Chain
+		sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+		err := evm.SetupEnvironment(
+			chain.ChainID(),
+			executor.env,
+			rt.ScriptRuntimeEnv,
+			sc.FlowToken.Address,
+		)
+		if err != nil {
+			return err
+		}
+	}
 
 	value, err := rt.ExecuteScript(
 		runtime.Script{
-			Source:    proc.Script,
-			Arguments: proc.Arguments,
+			Source:    executor.proc.Script,
+			Arguments: executor.proc.Arguments,
 		},
-		common.ScriptLocation(proc.ID))
-
+		common.ScriptLocation(executor.proc.ID),
+	)
+	populateErr := executor.output.PopulateEnvironmentValues(executor.env)
 	if err != nil {
-		return errors.HandleRuntimeError(err)
+		return multierror.Append(err, populateErr)
 	}
 
-	proc.Value = value
-	proc.Logs = env.Logs()
-	proc.Events = env.Events()
-	proc.GasUsed = env.ComputationUsed()
-	proc.MemoryEstimate = env.MemoryEstimate()
-	return nil
+	executor.output.Value = value
+	return populateErr
 }

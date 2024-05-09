@@ -24,12 +24,12 @@ func TestIndexAndLookupChild(t *testing.T) {
 		require.NoError(t, err)
 
 		// retrieve child
-		var retrievedIDs []flow.Identifier
+		var retrievedIDs flow.IdentifierList
 		err = db.View(procedure.LookupBlockChildren(parentID, &retrievedIDs))
 		require.NoError(t, err)
 
 		// retrieved child should be the stored child
-		require.Equal(t, []flow.Identifier{childID}, retrievedIDs)
+		require.Equal(t, flow.IdentifierList{childID}, retrievedIDs)
 	})
 }
 
@@ -51,11 +51,11 @@ func TestIndexTwiceAndRetrieve(t *testing.T) {
 		err = db.Update(procedure.IndexNewBlock(child2ID, parentID))
 		require.NoError(t, err)
 
-		var retrievedIDs []flow.Identifier
+		var retrievedIDs flow.IdentifierList
 		err = db.View(procedure.LookupBlockChildren(parentID, &retrievedIDs))
 		require.NoError(t, err)
 
-		require.Equal(t, []flow.Identifier{child1ID, child2ID}, retrievedIDs)
+		require.Equal(t, flow.IdentifierList{child1ID, child2ID}, retrievedIDs)
 	})
 }
 
@@ -69,7 +69,7 @@ func TestIndexZeroParent(t *testing.T) {
 		require.NoError(t, err)
 
 		// zero id should have no children
-		var retrievedIDs []flow.Identifier
+		var retrievedIDs flow.IdentifierList
 		err = db.View(procedure.LookupBlockChildren(flow.ZeroID, &retrievedIDs))
 		require.True(t, errors.Is(err, storage.ErrNotFound))
 	})
@@ -94,19 +94,19 @@ func TestDirectChildren(t *testing.T) {
 		require.NoError(t, err)
 
 		// check the children of the first block
-		var retrievedIDs []flow.Identifier
+		var retrievedIDs flow.IdentifierList
 
 		err = db.View(procedure.LookupBlockChildren(b1, &retrievedIDs))
 		require.NoError(t, err)
-		require.Equal(t, []flow.Identifier{b2}, retrievedIDs)
+		require.Equal(t, flow.IdentifierList{b2}, retrievedIDs)
 
 		err = db.View(procedure.LookupBlockChildren(b2, &retrievedIDs))
 		require.NoError(t, err)
-		require.Equal(t, []flow.Identifier{b3}, retrievedIDs)
+		require.Equal(t, flow.IdentifierList{b3}, retrievedIDs)
 
 		err = db.View(procedure.LookupBlockChildren(b3, &retrievedIDs))
 		require.NoError(t, err)
-		require.Equal(t, []flow.Identifier{b4}, retrievedIDs)
+		require.Equal(t, flow.IdentifierList{b4}, retrievedIDs)
 
 		err = db.View(procedure.LookupBlockChildren(b4, &retrievedIDs))
 		require.NoError(t, err)

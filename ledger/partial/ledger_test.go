@@ -8,14 +8,15 @@ import (
 	"github.com/stretchr/testify/require"
 
 	executionState "github.com/onflow/flow-go/engine/execution/state"
-	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/ledger/common/testutils"
 	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
 	"github.com/onflow/flow-go/ledger/partial"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestFunctionalityWithCompleteTrie(t *testing.T) {
@@ -119,24 +120,18 @@ func TestProofsForEmptyRegisters(t *testing.T) {
 	// create empty update
 	emptyState := l.InitialState()
 
-	view := delta.NewView(executionState.LedgerGetRegister(l, flow.StateCommitment(emptyState)))
+	// No updates.
+	keys, values := executionState.RegisterEntriesToKeysValues(nil)
 
-	registerID := flow.NewRegisterID("b", "nk")
-
-	v, err := view.Get(registerID.Owner, registerID.Key)
-	require.NoError(t, err)
-	require.Empty(t, v)
-
-	ids, values := view.Delta().RegisterUpdates()
-	updated, err := ledger.NewUpdate(
-		emptyState,
-		executionState.RegisterIDSToKeys(ids),
-		executionState.RegisterValuesToValues(values),
-	)
+	updated, err := ledger.NewUpdate(emptyState, keys, values)
 	require.NoError(t, err)
 
-	allRegisters := view.Interactions().AllRegisters()
-	allKeys := executionState.RegisterIDSToKeys(allRegisters)
+	// Read one register during execution.
+	registerID := flow.NewRegisterID(unittest.RandomAddressFixture(), "nk")
+	allKeys := []ledger.Key{
+		convert.RegisterIDToLedgerKey(registerID),
+	}
+
 	newState := updated.State()
 
 	proofQuery, err := ledger.NewQuery(newState, allKeys)
@@ -149,7 +144,7 @@ func TestProofsForEmptyRegisters(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, pled.InitialState(), emptyState)
 
-	query, err := ledger.NewQuery(newState, []ledger.Key{executionState.RegisterIDToKey(registerID)})
+	query, err := ledger.NewQuery(newState, []ledger.Key{convert.RegisterIDToLedgerKey(registerID)})
 	require.NoError(t, err)
 
 	results, err := pled.Get(query)
@@ -157,5 +152,20 @@ func TestProofsForEmptyRegisters(t *testing.T) {
 	require.Len(t, results, 1)
 
 	require.Empty(t, results[0])
+}
 
+func TestEmptyLedger(t *testing.T) {
+	l, err := complete.NewLedger(&fixtures.NoopWAL{}, 100, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
+	require.NoError(t, err)
+
+	u, err := ledger.NewUpdate(
+		ledger.State(unittest.StateCommitmentFixture()),
+		[]ledger.Key{},
+		[]ledger.Value{},
+	)
+	require.NoError(t, err)
+	newState, trieUpdate, err := l.Set(u)
+	require.NoError(t, err)
+	require.True(t, trieUpdate.IsEmpty())
+	require.Equal(t, u.State(), newState)
 }

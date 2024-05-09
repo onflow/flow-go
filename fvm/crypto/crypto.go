@@ -5,9 +5,9 @@ import (
 	"fmt"
 
 	"github.com/onflow/cadence/runtime"
+	"github.com/onflow/crypto"
+	"github.com/onflow/crypto/hash"
 
-	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/model/flow"
 	msig "github.com/onflow/flow-go/module/signature"
@@ -278,7 +278,7 @@ func AggregateSignatures(sigs [][]byte) (crypto.Signature, error) {
 	aggregatedSignature, err := crypto.AggregateBLSSignatures(s)
 	if err != nil {
 		// check for a user error
-		if crypto.IsInvalidInputsError(err) {
+		if crypto.IsBLSAggregateEmptyListError(err) || crypto.IsInvalidSignatureError(err) {
 			return nil, err
 		}
 		panic(fmt.Errorf("aggregate BLS signatures failed with unexpected error %w", err))
@@ -303,7 +303,7 @@ func AggregatePublicKeys(keys []*runtime.PublicKey) (*runtime.PublicKey, error) 
 	pk, err := crypto.AggregateBLSPublicKeys(pks)
 	if err != nil {
 		// check for a user error
-		if crypto.IsInvalidInputsError(err) {
+		if crypto.IsBLSAggregateEmptyListError(err) || crypto.IsNotBLSKeyError(err) {
 			return nil, err
 		}
 		panic(fmt.Errorf("aggregate BLS public keys failed with unexpected error %w", err))

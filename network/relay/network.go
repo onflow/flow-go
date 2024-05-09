@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/ipfs/go-datastore"
-	"github.com/libp2p/go-libp2p-core/protocol"
+	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -14,17 +14,17 @@ import (
 )
 
 type RelayNetwork struct {
-	originNet      network.Network
-	destinationNet network.Network
+	originNet      network.EngineRegistry
+	destinationNet network.EngineRegistry
 	logger         zerolog.Logger
 	channels       map[channels.Channel]channels.Channel
 }
 
-var _ network.Network = (*RelayNetwork)(nil)
+var _ network.EngineRegistry = (*RelayNetwork)(nil)
 
 func NewRelayNetwork(
-	originNetwork network.Network,
-	destinationNetwork network.Network,
+	originNetwork network.EngineRegistry,
+	destinationNetwork network.EngineRegistry,
 	logger zerolog.Logger,
 	channels map[channels.Channel]channels.Channel,
 ) *RelayNetwork {

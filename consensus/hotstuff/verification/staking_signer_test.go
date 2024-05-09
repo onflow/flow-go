@@ -47,11 +47,11 @@ func TestStakingSigner_CreateProposal(t *testing.T) {
 		require.Nil(t, proposal)
 	})
 	t.Run("created-proposal", func(t *testing.T) {
-		me, err := local.New(signer, stakingPriv)
+		me, err := local.New(signer.IdentitySkeleton, stakingPriv)
 		require.NoError(t, err)
 
-		signerIdentity := unittest.IdentityFixture(unittest.WithNodeID(signerID),
-			unittest.WithStakingPubKey(stakingPriv.PublicKey()))
+		signerIdentity := &unittest.IdentityFixture(unittest.WithNodeID(signerID),
+			unittest.WithStakingPubKey(stakingPriv.PublicKey())).IdentitySkeleton
 
 		signer := NewStakingSigner(me)
 
@@ -61,7 +61,7 @@ func TestStakingSigner_CreateProposal(t *testing.T) {
 		require.NotNil(t, proposal)
 
 		verifier := NewStakingVerifier()
-		err = verifier.VerifyVote(signerIdentity, proposal.SigData, proposal.Block)
+		err = verifier.VerifyVote(signerIdentity, proposal.SigData, proposal.Block.View, proposal.Block.BlockID)
 		require.NoError(t, err)
 	})
 }
@@ -88,11 +88,11 @@ func TestStakingSigner_CreateVote(t *testing.T) {
 		require.Nil(t, proposal)
 	})
 	t.Run("created-vote", func(t *testing.T) {
-		me, err := local.New(signer, stakingPriv)
+		me, err := local.New(signer.IdentitySkeleton, stakingPriv)
 		require.NoError(t, err)
 
-		signerIdentity := unittest.IdentityFixture(unittest.WithNodeID(signerID),
-			unittest.WithStakingPubKey(stakingPriv.PublicKey()))
+		signerIdentity := &unittest.IdentityFixture(unittest.WithNodeID(signerID),
+			unittest.WithStakingPubKey(stakingPriv.PublicKey())).IdentitySkeleton
 
 		signer := NewStakingSigner(me)
 
@@ -102,7 +102,7 @@ func TestStakingSigner_CreateVote(t *testing.T) {
 		require.NotNil(t, vote)
 
 		verifier := NewStakingVerifier()
-		err = verifier.VerifyVote(signerIdentity, vote.SigData, block)
+		err = verifier.VerifyVote(signerIdentity, vote.SigData, block.View, block.BlockID)
 		require.NoError(t, err)
 	})
 }
@@ -110,13 +110,13 @@ func TestStakingSigner_CreateVote(t *testing.T) {
 // TestStakingSigner_VerifyQC checks that a QC without any signers is rejected right away without calling into any sub-components
 func TestStakingSigner_VerifyQC(t *testing.T) {
 	header := unittest.BlockHeaderFixture()
-	block := model.BlockFromFlow(header, header.View-1)
+	block := model.BlockFromFlow(header)
 	sigData := unittest.RandomBytes(127)
 
 	verifier := NewStakingVerifier()
-	err := verifier.VerifyQC([]*flow.Identity{}, sigData, block)
-	require.True(t, model.IsInvalidFormatError(err))
+	err := verifier.VerifyQC(flow.IdentitySkeletonList{}, sigData, block.View, block.BlockID)
+	require.True(t, model.IsInsufficientSignaturesError(err))
 
-	err = verifier.VerifyQC(nil, sigData, block)
-	require.True(t, model.IsInvalidFormatError(err))
+	err = verifier.VerifyQC(nil, sigData, block.View, block.BlockID)
+	require.True(t, model.IsInsufficientSignaturesError(err))
 }

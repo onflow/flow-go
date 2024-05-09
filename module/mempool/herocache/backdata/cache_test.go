@@ -17,7 +17,7 @@ import (
 // TestArrayBackData_SingleBucket evaluates health of state transition for storing 10 entities in a Cache with only
 // a single bucket (of 16). It also evaluates all stored items are retrievable.
 func TestArrayBackData_SingleBucket(t *testing.T) {
-	limit := 10
+	limit := 16
 
 	bd := NewCache(uint32(limit),
 		1,
@@ -124,6 +124,160 @@ func TestArrayBackData_Adjust(t *testing.T) {
 
 	// adjustment must be idempotent for size
 	require.Equal(t, bd.Size(), uint(limit))
+}
+
+// TestArrayBackData_AdjustWitInit evaluates that AdjustWithInit method. It should initialize and then adjust the value of
+// non-existing entity while preserving the integrity of BackData on just adjusting the value of existing entity.
+func TestArrayBackData_AdjustWitInit(t *testing.T) {
+	limit := 100_000
+
+	bd := NewCache(uint32(limit),
+		8,
+		heropool.LRUEjection,
+		unittest.Logger(),
+		metrics.NewNoopCollector())
+
+	entities := unittest.EntityListFixture(uint(limit))
+	for _, e := range entities {
+		adjustedEntity, adjusted := bd.AdjustWithInit(e.ID(), func(entity flow.Entity) flow.Entity {
+			// adjust logic, increments the nonce of the entity
+			mockEntity, ok := entity.(*unittest.MockEntity)
+			require.True(t, ok)
+			mockEntity.Nonce++
+			return mockEntity
+		}, func() flow.Entity {
+			return e // initialize with the entity
+		})
+		require.True(t, adjusted)
+		require.Equal(t, e.ID(), adjustedEntity.ID())
+		require.Equal(t, uint64(1), adjustedEntity.(*unittest.MockEntity).Nonce)
+	}
+
+	// picks a random entity from BackData and adjusts its identifier to a new one.
+	entityIndex := rand.Int() % limit
+	// checking integrity of retrieving entity
+	oldEntity, ok := bd.ByID(entities[entityIndex].ID())
+	require.True(t, ok)
+	oldEntityID := oldEntity.ID()
+	require.Equal(t, entities[entityIndex].ID(), oldEntityID)
+	require.Equal(t, entities[entityIndex], oldEntity)
+
+	// picks a new identifier for the entity and makes sure it is different than its current one.
+	newEntityID := unittest.IdentifierFixture()
+	require.NotEqual(t, oldEntityID, newEntityID)
+
+	// adjusts old entity to a new entity with a new identifier
+	newEntity, ok := bd.Adjust(oldEntity.ID(), func(entity flow.Entity) flow.Entity {
+		mockEntity, ok := entity.(*unittest.MockEntity)
+		require.True(t, ok)
+		// oldEntity must be passed to func parameter of adjust.
+		require.Equal(t, oldEntityID, mockEntity.ID())
+		require.Equal(t, oldEntity, mockEntity)
+
+		// adjust logic, adjsuts the nonce of the entity
+		return &unittest.MockEntity{Identifier: newEntityID, Nonce: 2}
+	})
+
+	// adjustment must be successful, and identifier must be updated.
+	require.True(t, ok)
+	require.Equal(t, newEntityID, newEntity.ID())
+	require.Equal(t, uint64(2), newEntity.(*unittest.MockEntity).Nonce)
+	newMockEntity, ok := newEntity.(*unittest.MockEntity)
+	require.True(t, ok)
+
+	// replaces new entity in the original reference list and
+	// retrieves all.
+	entities[entityIndex] = newMockEntity
+	testRetrievableFrom(t, bd, entities, 0)
+
+	// re-adjusting old entity must fail, since its identifier must no longer exist
+	entity, ok := bd.Adjust(oldEntityID, func(entity flow.Entity) flow.Entity {
+		require.Fail(t, "function must not be invoked on a non-existing entity")
+		return entity
+	})
+	require.False(t, ok)
+	require.Nil(t, entity)
+
+	// similarly, retrieving old entity must fail
+	entity, ok = bd.ByID(oldEntityID)
+	require.False(t, ok)
+	require.Nil(t, entity)
+
+	ok = bd.Has(oldEntityID)
+	require.False(t, ok)
+}
+
+// TestArrayBackData_GetWithInit evaluates that GetWithInit method. It should initialize and then retrieve the value of
+// non-existing entity while preserving the integrity of BackData on just retrieving the value of existing entity.
+func TestArrayBackData_GetWithInit(t *testing.T) {
+	limit := 1000
+
+	bd := NewCache(uint32(limit), 8, heropool.LRUEjection, unittest.Logger(), metrics.NewNoopCollector())
+
+	entities := unittest.EntityListFixture(uint(limit))
+
+	// GetWithInit
+	for _, e := range entities {
+		// all entities must be initialized retrieved successfully
+		actual, ok := bd.GetWithInit(e.ID(), func() flow.Entity {
+			return e // initialize with the entity
+		})
+		require.True(t, ok)
+		require.Equal(t, e, actual)
+	}
+
+	// All
+	all := bd.All()
+	require.Equal(t, len(entities), len(all))
+	for _, expected := range entities {
+		actual, ok := bd.ByID(expected.ID())
+		require.True(t, ok)
+		require.Equal(t, expected, actual)
+	}
+
+	// Identifiers
+	ids := bd.Identifiers()
+	require.Equal(t, len(entities), len(ids))
+	for _, id := range ids {
+		require.True(t, bd.Has(id))
+	}
+
+	// Entities
+	actualEntities := bd.Entities()
+	require.Equal(t, len(entities), len(actualEntities))
+	require.ElementsMatch(t, entities, actualEntities)
+
+	// Adjust
+	for _, e := range entities {
+		// all entities must be adjusted successfully
+		actual, ok := bd.Adjust(e.ID(), func(entity flow.Entity) flow.Entity {
+			// increment nonce of the entity
+			entity.(*unittest.MockEntity).Nonce++
+			return entity
+		})
+		require.True(t, ok)
+		require.Equal(t, e, actual)
+	}
+
+	// ByID; should return the latest version of the entity
+	for _, e := range entities {
+		// all entities must be retrieved successfully
+		actual, ok := bd.ByID(e.ID())
+		require.True(t, ok)
+		require.Equal(t, e.ID(), actual.ID())
+		require.Equal(t, uint64(1), actual.(*unittest.MockEntity).Nonce)
+	}
+
+	// GetWithInit; should return the latest version of the entity, than increment the nonce
+	for _, e := range entities {
+		// all entities must be retrieved successfully
+		actual, ok := bd.GetWithInit(e.ID(), func() flow.Entity {
+			require.Fail(t, "should not be called") // entity has already been initialized
+			return e
+		})
+		require.True(t, ok)
+		require.Equal(t, e.ID(), actual.ID())
+	}
 }
 
 // TestArrayBackData_WriteHeavy evaluates correctness of Cache under the writing and retrieving

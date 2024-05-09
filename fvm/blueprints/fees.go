@@ -8,22 +8,21 @@ import (
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime/common"
-	"github.com/onflow/flow-core-contracts/lib/go/contracts"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
 
 	"github.com/onflow/flow-go/model/flow"
 )
 
 var TransactionFeesExecutionEffortWeightsPath = cadence.Path{
-	Domain:     common.PathDomainStorage.Identifier(),
+	Domain:     common.PathDomainStorage,
 	Identifier: "executionEffortWeights",
 }
 var TransactionFeesExecutionMemoryWeightsPath = cadence.Path{
-	Domain:     common.PathDomainStorage.Identifier(),
+	Domain:     common.PathDomainStorage,
 	Identifier: "executionMemoryWeights",
 }
 var TransactionFeesExecutionMemoryLimitPath = cadence.Path{
-	Domain:     common.PathDomainStorage.Identifier(),
+	Domain:     common.PathDomainStorage,
 	Identifier: "executionMemoryLimit",
 }
 
@@ -36,17 +35,16 @@ var setupParametersTransactionTemplate string
 //go:embed scripts/setupStorageForServiceAccountsTemplate.cdc
 var setupStorageForServiceAccountsTemplate string
 
+//go:embed scripts/setupStorageForAccount.cdc
+var setupStorageForAccountTemplate string
+
 //go:embed scripts/setupFeesTransactionTemplate.cdc
 var setupFeesTransactionTemplate string
 
 //go:embed scripts/setExecutionMemoryLimit.cdc
 var setExecutionMemoryLimit string
 
-func DeployTxFeesContractTransaction(service, fungibleToken, flowToken, flowFees flow.Address) *flow.TransactionBody {
-	contract := contracts.FlowFees(
-		fungibleToken.HexWithPrefix(),
-		flowToken.HexWithPrefix(),
-	)
+func DeployTxFeesContractTransaction(flowFees, service flow.Address, contract []byte) *flow.TransactionBody {
 
 	return flow.NewTransactionBody().
 		SetScript([]byte(deployTxFeesTransactionTemplate)).
@@ -113,6 +111,22 @@ func SetupStorageForServiceAccountsTransaction(
 		AddAuthorizer(fungibleToken).
 		AddAuthorizer(flowToken).
 		AddAuthorizer(feeContract)
+}
+
+func SetupStorageForAccountTransaction(
+	account, service, fungibleToken, flowToken flow.Address,
+) *flow.TransactionBody {
+	return flow.NewTransactionBody().
+		SetScript([]byte(templates.ReplaceAddresses(setupStorageForAccountTemplate,
+			templates.Environment{
+				ServiceAccountAddress: service.Hex(),
+				StorageFeesAddress:    service.Hex(),
+				FungibleTokenAddress:  fungibleToken.Hex(),
+				FlowTokenAddress:      flowToken.Hex(),
+			})),
+		).
+		AddAuthorizer(account).
+		AddAuthorizer(service)
 }
 
 func SetupFeesTransaction(

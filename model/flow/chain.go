@@ -12,6 +12,7 @@ import (
 //
 // Chain IDs are used used to prevent replay attacks and to support network-specific address generation.
 type ChainID string
+type ChainIDList []ChainID
 
 const (
 	// Mainnet is the chain ID for the mainnet chain.
@@ -21,8 +22,10 @@ const (
 
 	// Testnet is the chain ID for the testnet chain.
 	Testnet ChainID = "flow-testnet"
-	// Stagingnet is the chain ID for internal stagingnet chain.
-	Stagingnet ChainID = "flow-stagingnet"
+	// Sandboxnet is the chain ID for internal sandboxnet chain.
+	Sandboxnet ChainID = "flow-sandboxnet"
+	// Previewet is the chain ID for an external preview chain.
+	Previewnet ChainID = "flow-previewnet"
 
 	// Transient test networks
 
@@ -39,9 +42,24 @@ const (
 	MonotonicEmulator ChainID = "flow-emulator-monotonic"
 )
 
+// AllChainIDs returns a list of all supported chain IDs.
+func AllChainIDs() ChainIDList {
+	return ChainIDList{
+		Mainnet,
+		Testnet,
+		Sandboxnet,
+		Previewnet,
+		Benchnet,
+		Localnet,
+		Emulator,
+		BftTestnet,
+		MonotonicEmulator,
+	}
+}
+
 // Transient returns whether the chain ID is for a transient network.
 func (c ChainID) Transient() bool {
-	return c == Emulator || c == Localnet || c == Benchnet || c == BftTestnet
+	return c == Emulator || c == Localnet || c == Benchnet || c == BftTestnet || c == Previewnet
 }
 
 // getChainCodeWord derives the network type used for address generation from the globally
@@ -52,8 +70,10 @@ func (c ChainID) getChainCodeWord() uint64 {
 		return 0
 	case Testnet:
 		return invalidCodeTestNetwork
-	case Stagingnet:
-		return invalidCodeStagingNetwork
+	case Sandboxnet:
+		return invalidCodeSandboxNetwork
+	case Previewnet:
+		return invalidCodePreviewNetwork
 	case Emulator, Localnet, Benchnet, BftTestnet:
 		return invalidCodeTransientNetwork
 	default:
@@ -175,9 +195,15 @@ var bftTestNet = &addressedChain{
 	},
 }
 
-var stagingnet = &addressedChain{
+var sandboxnet = &addressedChain{
 	chainImpl: &linearCodeImpl{
-		chainID: Stagingnet,
+		chainID: Sandboxnet,
+	},
+}
+
+var previewnet = &addressedChain{
+	chainImpl: &linearCodeImpl{
+		chainID: Previewnet,
 	},
 }
 
@@ -210,8 +236,10 @@ func (c ChainID) Chain() Chain {
 		return mainnet
 	case Testnet:
 		return testnet
-	case Stagingnet:
-		return stagingnet
+	case Sandboxnet:
+		return sandboxnet
+	case Previewnet:
+		return previewnet
 	case Benchnet:
 		return benchnet
 	case Localnet:

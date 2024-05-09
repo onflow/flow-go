@@ -5,10 +5,11 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/onflow/crypto"
 	"github.com/spf13/cobra"
 
 	"github.com/onflow/flow-go/cmd"
-	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	model "github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 	ioutils "github.com/onflow/flow-go/utils/io"
@@ -52,7 +53,7 @@ func machineAccountRun(_ *cobra.Command, _ []string) {
 
 	// check if node-machine-account-key.priv.json path exists
 	machineAccountKeyPath := fmt.Sprintf(model.PathNodeMachineAccountPrivateKey, nodeID)
-	keyExists, err := pathExists(filepath.Join(flagOutdir, machineAccountKeyPath))
+	keyExists, err := common.PathExists(filepath.Join(flagOutdir, machineAccountKeyPath))
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not check if node-machine-account-key.priv.json exists")
 	}
@@ -63,7 +64,7 @@ func machineAccountRun(_ *cobra.Command, _ []string) {
 
 	// check if node-machine-account-info.priv.json file exists in boostrap dir
 	machineAccountInfoPath := fmt.Sprintf(model.PathNodeMachineAccountInfoPriv, nodeID)
-	infoExists, err := pathExists(filepath.Join(flagOutdir, machineAccountInfoPath))
+	infoExists, err := common.PathExists(filepath.Join(flagOutdir, machineAccountInfoPath))
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not check if node-machine-account-info.priv.json exists")
 	}
@@ -80,7 +81,11 @@ func machineAccountRun(_ *cobra.Command, _ []string) {
 	machineAccountInfo := assembleNodeMachineAccountInfo(machinePrivKey, flagMachineAccountAddress)
 
 	// write machine account info
-	writeJSON(fmt.Sprintf(model.PathNodeMachineAccountInfoPriv, nodeID), machineAccountInfo)
+	err = common.WriteJSON(fmt.Sprintf(model.PathNodeMachineAccountInfoPriv, nodeID), flagOutdir, machineAccountInfo)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to write json")
+	}
+	log.Info().Msgf("wrote file %s/%s", flagOutdir, fmt.Sprintf(model.PathNodeMachineAccountInfoPriv, nodeID))
 }
 
 // readMachineAccountPriv reads the machine account private key files in the bootstrap dir
@@ -88,7 +93,10 @@ func readMachineAccountKey(nodeID string) crypto.PrivateKey {
 	var machineAccountPriv model.NodeMachineAccountKey
 
 	path := filepath.Join(flagOutdir, fmt.Sprintf(model.PathNodeMachineAccountPrivateKey, nodeID))
-	readJSON(path, &machineAccountPriv)
+	err := common.ReadJSON(path, &machineAccountPriv)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to read json")
+	}
 
 	return machineAccountPriv.PrivateKey.PrivateKey
 }
@@ -124,8 +132,12 @@ func validateMachineAccountAddress(addressStr string) error {
 		log.Warn().Msgf("Machine account address (%s) is **TESTNET** address - ensure this is desired before continuing", address)
 		return nil
 	}
-	if flow.Stagingnet.Chain().IsValid(address) {
-		log.Warn().Msgf("Machine account address (%s) is **STAGINGNET** address - ensure this is desired before continuing", address)
+	if flow.Sandboxnet.Chain().IsValid(address) {
+		log.Warn().Msgf("Machine account address (%s) is **SANDBOXNET** address - ensure this is desired before continuing", address)
+		return nil
+	}
+	if flow.Previewnet.Chain().IsValid(address) {
+		log.Warn().Msgf("Machine account address (%s) is **PREVIEWNET** address - ensure this is desired before continuing", address)
 		return nil
 	}
 	if flow.Localnet.Chain().IsValid(address) {

@@ -3,9 +3,11 @@ package flow_test
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/utils/rand"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -103,4 +105,56 @@ func TestChunkList_Indices(t *testing.T) {
 		require.Len(t, indices, 3)
 		require.Contains(t, indices, uint64(0), uint64(2), uint64(4))
 	})
+}
+
+func TestChunkIndexIsSet(t *testing.T) {
+
+	i, err := rand.Uint()
+	require.NoError(t, err)
+	chunk := flow.NewChunk(
+		unittest.IdentifierFixture(),
+		int(i),
+		unittest.StateCommitmentFixture(),
+		21,
+		unittest.IdentifierFixture(),
+		unittest.StateCommitmentFixture(),
+		17995,
+	)
+
+	assert.Equal(t, i, uint(chunk.Index))
+	assert.Equal(t, i, uint(chunk.CollectionIndex))
+}
+
+func TestChunkNumberOfTxsIsSet(t *testing.T) {
+
+	i, err := rand.Uint32()
+	require.NoError(t, err)
+	chunk := flow.NewChunk(
+		unittest.IdentifierFixture(),
+		3,
+		unittest.StateCommitmentFixture(),
+		int(i),
+		unittest.IdentifierFixture(),
+		unittest.StateCommitmentFixture(),
+		17995,
+	)
+
+	assert.Equal(t, i, uint32(chunk.NumberOfTransactions))
+}
+
+func TestChunkTotalComputationUsedIsSet(t *testing.T) {
+
+	i, err := rand.Uint64()
+	require.NoError(t, err)
+	chunk := flow.NewChunk(
+		unittest.IdentifierFixture(),
+		3,
+		unittest.StateCommitmentFixture(),
+		21,
+		unittest.IdentifierFixture(),
+		unittest.StateCommitmentFixture(),
+		i,
+	)
+
+	assert.Equal(t, i, chunk.TotalComputationUsed)
 }

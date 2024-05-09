@@ -6,7 +6,9 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/rs/zerolog"
 	"go.opentelemetry.io/otel/attribute"
+	otelTrace "go.opentelemetry.io/otel/trace"
 
+	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/module/trace"
 )
 
@@ -17,6 +19,8 @@ type MetricsReporter interface {
 	RuntimeTransactionChecked(time.Duration)
 	RuntimeTransactionInterpreted(time.Duration)
 	RuntimeSetNumberOfAccounts(count uint64)
+	RuntimeTransactionProgramsCacheMiss()
+	RuntimeTransactionProgramsCacheHit()
 }
 
 // NoopMetricsReporter is a MetricReporter that does nothing.
@@ -34,45 +38,70 @@ func (NoopMetricsReporter) RuntimeTransactionInterpreted(time.Duration) {}
 // RuntimeSetNumberOfAccounts is a noop
 func (NoopMetricsReporter) RuntimeSetNumberOfAccounts(count uint64) {}
 
-type ProgramLogger struct {
-	tracer *Tracer
+// RuntimeTransactionProgramsCacheMiss is a noop
+func (NoopMetricsReporter) RuntimeTransactionProgramsCacheMiss() {}
 
-	logger zerolog.Logger
+// RuntimeTransactionProgramsCacheHit is a noop
+func (NoopMetricsReporter) RuntimeTransactionProgramsCacheHit() {}
 
-	cadenceLoggingEnabled bool
-	logs                  []string
+type ProgramLoggerParams struct {
+	zerolog.Logger
 
-	reporter MetricsReporter
+	CadenceLoggingEnabled bool
+
+	MetricsReporter
 }
 
-func NewProgramLogger(
-	tracer *Tracer,
-	logger zerolog.Logger,
-	reporter MetricsReporter,
-	cadenceLoggingEnabled bool,
-) *ProgramLogger {
-	return &ProgramLogger{
-		tracer:                tracer,
-		logger:                logger,
-		cadenceLoggingEnabled: cadenceLoggingEnabled,
-		logs:                  nil,
-		reporter:              reporter,
+func DefaultProgramLoggerParams() ProgramLoggerParams {
+	return ProgramLoggerParams{
+		Logger:                zerolog.Nop(),
+		CadenceLoggingEnabled: false,
+		MetricsReporter:       NoopMetricsReporter{},
 	}
 }
 
-func (logger *ProgramLogger) Logger() *zerolog.Logger {
-	return &logger.logger
+type ProgramLogger struct {
+	tracer tracing.TracerSpan
+
+	ProgramLoggerParams
+
+	logs []string
+}
+
+func NewProgramLogger(
+	tracer tracing.TracerSpan,
+	params ProgramLoggerParams,
+) *ProgramLogger {
+	return &ProgramLogger{
+		tracer:              tracer,
+		ProgramLoggerParams: params,
+		logs:                nil,
+	}
+}
+
+func (logger *ProgramLogger) Logger() zerolog.Logger {
+	return logger.ProgramLoggerParams.Logger
 }
 
 func (logger *ProgramLogger) ImplementationDebugLog(message string) error {
-	logger.logger.Debug().Msgf("Cadence: %s", message)
+	logger.Debug().Msgf("Cadence: %s", message)
 	return nil
 }
 
 func (logger *ProgramLogger) ProgramLog(message string) error {
-	defer logger.tracer.StartExtensiveTracingSpanFromRoot(trace.FVMEnvProgramLog).End()
+	defer logger.tracer.StartExtensiveTracingChildSpan(
+		trace.FVMEnvProgramLog).End()
 
-	if logger.cadenceLoggingEnabled {
+	if logger.CadenceLoggingEnabled {
+
+		// If cadence logging is enabled (which is usually in the
+		// emulator or emulator based tools),
+		// we log the message to the zerolog logger so that they can be tracked
+		// while stepping through a transaction/script.
+		logger.
+			Debug().
+			Msgf("Cadence log: %s", message)
+
 		logger.logs = append(logger.logs, message)
 	}
 	return nil
@@ -82,18 +111,30 @@ func (logger *ProgramLogger) Logs() []string {
 	return logger.logs
 }
 
-func (logger *ProgramLogger) RecordTrace(operation string, location common.Location, duration time.Duration, attrs []attribute.KeyValue) {
+func (logger *ProgramLogger) RecordTrace(
+	operation string,
+	location common.Location,
+	duration time.Duration,
+	attrs []attribute.KeyValue,
+) {
 	if location != nil {
 		attrs = append(attrs, attribute.String("location", location.String()))
 	}
-	logger.tracer.RecordSpanFromRoot(
+
+	end := time.Now()
+
+	span := logger.tracer.StartChildSpan(
 		trace.FVMCadenceTrace.Child(operation),
-		duration,
-		attrs)
+		otelTrace.WithAttributes(attrs...),
+		otelTrace.WithTimestamp(end.Add(-duration)))
+	span.End(otelTrace.WithTimestamp(end))
 }
 
 // ProgramParsed captures time spent on parsing a code at specific location
-func (logger *ProgramLogger) ProgramParsed(location common.Location, duration time.Duration) {
+func (logger *ProgramLogger) ProgramParsed(
+	location common.Location,
+	duration time.Duration,
+) {
 	logger.RecordTrace("parseProgram", location, duration, nil)
 
 	// These checks prevent re-reporting durations, the metrics collection is
@@ -107,12 +148,15 @@ func (logger *ProgramLogger) ProgramParsed(location common.Location, duration ti
 		return
 	}
 	if _, ok := location.(common.TransactionLocation); ok {
-		logger.reporter.RuntimeTransactionParsed(duration)
+		logger.MetricsReporter.RuntimeTransactionParsed(duration)
 	}
 }
 
 // ProgramChecked captures time spent on checking a code at specific location
-func (logger *ProgramLogger) ProgramChecked(location common.Location, duration time.Duration) {
+func (logger *ProgramLogger) ProgramChecked(
+	location common.Location,
+	duration time.Duration,
+) {
 	logger.RecordTrace("checkProgram", location, duration, nil)
 
 	// see the comment for ProgramParsed
@@ -120,12 +164,15 @@ func (logger *ProgramLogger) ProgramChecked(location common.Location, duration t
 		return
 	}
 	if _, ok := location.(common.TransactionLocation); ok {
-		logger.reporter.RuntimeTransactionChecked(duration)
+		logger.MetricsReporter.RuntimeTransactionChecked(duration)
 	}
 }
 
 // ProgramInterpreted captures time spent on interpreting a code at specific location
-func (logger *ProgramLogger) ProgramInterpreted(location common.Location, duration time.Duration) {
+func (logger *ProgramLogger) ProgramInterpreted(
+	location common.Location,
+	duration time.Duration,
+) {
 	logger.RecordTrace("interpretProgram", location, duration, nil)
 
 	// see the comment for ProgramInterpreted
@@ -133,7 +180,7 @@ func (logger *ProgramLogger) ProgramInterpreted(location common.Location, durati
 		return
 	}
 	if _, ok := location.(common.TransactionLocation); ok {
-		logger.reporter.RuntimeTransactionInterpreted(duration)
+		logger.MetricsReporter.RuntimeTransactionInterpreted(duration)
 	}
 }
 

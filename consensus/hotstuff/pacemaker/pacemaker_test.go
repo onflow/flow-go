@@ -1,492 +1,445 @@
 package pacemaker
 
 import (
-	"fmt"
-	"math"
+	"context"
+	"errors"
+	"math/rand"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
+	"github.com/onflow/flow-go/consensus/hotstuff/helper"
 	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/pacemaker/timeout"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 const (
-	startRepTimeout        float64 = 400.0 // Milliseconds
-	minRepTimeout          float64 = 100.0 // Milliseconds
-	voteTimeoutFraction    float64 = 0.5   // multiplicative factor
-	multiplicativeIncrease float64 = 1.5   // multiplicative factor
-	multiplicativeDecrease float64 = 0.85  // multiplicative factor
+	minRepTimeout             float64 = 100.0 // Milliseconds
+	maxRepTimeout             float64 = 600.0 // Milliseconds
+	multiplicativeIncrease    float64 = 1.5   // multiplicative factor
+	happyPathMaxRoundFailures uint64  = 6     // number of failed rounds before first timeout increase
 )
 
-func expectedTimerInfo(view uint64, mode model.TimeoutMode) interface{} {
+func expectedTimerInfo(view uint64) interface{} {
 	return mock.MatchedBy(
-		func(timerInfo *model.TimerInfo) bool {
-			return timerInfo.View == view && timerInfo.Mode == mode
+		func(timerInfo model.TimerInfo) bool {
+			return timerInfo.View == view
 		})
 }
 
-func expectedTimeoutInfo(view uint64, mode model.TimeoutMode) interface{} {
-	return mock.MatchedBy(
-		func(timerInfo *model.TimerInfo) bool {
-			return timerInfo.View == view && timerInfo.Mode == mode
-		})
+func TestActivePaceMaker(t *testing.T) {
+	suite.Run(t, new(ActivePaceMakerTestSuite))
 }
 
-func initPaceMaker(t *testing.T, view uint64) (hotstuff.PaceMaker, *mocks.Consumer) {
-	notifier := &mocks.Consumer{}
-	tc, err := timeout.NewConfig(
-		time.Duration(startRepTimeout*1e6),
-		time.Duration(minRepTimeout*1e6),
-		voteTimeoutFraction,
-		multiplicativeIncrease,
-		multiplicativeDecrease,
-		0)
-	if err != nil {
-		t.Fail()
+type ActivePaceMakerTestSuite struct {
+	suite.Suite
+
+	initialView uint64
+	initialQC   *flow.QuorumCertificate
+	initialTC   *flow.TimeoutCertificate
+
+	notifier                 *mocks.Consumer
+	proposalDurationProvider hotstuff.ProposalDurationProvider
+	persist                  *mocks.Persister
+	paceMaker                *ActivePaceMaker
+	stop                     context.CancelFunc
+	timeoutConf              timeout.Config
+}
+
+func (s *ActivePaceMakerTestSuite) SetupTest() {
+	s.initialView = 3
+	s.initialQC = QC(2)
+	s.initialTC = nil
+	var err error
+
+	s.timeoutConf, err = timeout.NewConfig(time.Duration(minRepTimeout*1e6), time.Duration(maxRepTimeout*1e6), multiplicativeIncrease, happyPathMaxRoundFailures, time.Duration(maxRepTimeout*1e6))
+	require.NoError(s.T(), err)
+
+	// init consumer for notifications emitted by PaceMaker
+	s.notifier = mocks.NewConsumer(s.T())
+	s.notifier.On("OnStartingTimeout", expectedTimerInfo(s.initialView)).Return().Once()
+
+	// init Persister dependency for PaceMaker
+	// CAUTION: The Persister hands a pointer to `livenessData` to the PaceMaker, which means the PaceMaker
+	// could modify our struct in-place. `livenessData` should not be used by tests to determine expected values!
+	s.persist = mocks.NewPersister(s.T())
+	livenessData := &hotstuff.LivenessData{
+		CurrentView: 3,
+		LastViewTC:  nil,
+		NewestQC:    s.initialQC,
 	}
-	pm, err := New(view, timeout.NewController(tc), notifier)
-	if err != nil {
-		t.Fail()
-	}
-	notifier.On("OnStartingTimeout", expectedTimerInfo(view, model.ReplicaTimeout)).Return().Once()
-	pm.Start()
-	return pm, notifier
+	s.persist.On("GetLivenessData").Return(livenessData, nil)
+
+	// init PaceMaker and start
+	s.paceMaker, err = New(timeout.NewController(s.timeoutConf), NoProposalDelay(), s.notifier, s.persist)
+	require.NoError(s.T(), err)
+
+	var ctx context.Context
+	ctx, s.stop = context.WithCancel(context.Background())
+	s.paceMaker.Start(ctx)
+}
+
+func (s *ActivePaceMakerTestSuite) TearDownTest() {
+	s.stop()
 }
 
 func QC(view uint64) *flow.QuorumCertificate {
-	return &flow.QuorumCertificate{View: view}
+	return helper.MakeQC(helper.WithQCView(view))
 }
 
-func makeBlock(qcView, blockView uint64) *model.Block {
-	return &model.Block{View: blockView, QC: QC(qcView)}
+func LivenessData(qc *flow.QuorumCertificate) *hotstuff.LivenessData {
+	return &hotstuff.LivenessData{
+		CurrentView: qc.View + 1,
+		LastViewTC:  nil,
+		NewestQC:    qc,
+	}
 }
 
-// Test_SkipIncreaseViewThroughQC tests that PaceMaker increases View when receiving QC,
+// TestProcessQC_SkipIncreaseViewThroughQC tests that ActivePaceMaker increases view when receiving QC,
 // if applicable, by skipping views
-func Test_SkipIncreaseViewThroughQC(t *testing.T) {
-	pm, notifier := initPaceMaker(t, 3)
+func (s *ActivePaceMakerTestSuite) TestProcessQC_SkipIncreaseViewThroughQC() {
+	// seeing a QC for the current view should advance the view by one
+	qc := QC(s.initialView)
+	s.persist.On("PutLivenessData", LivenessData(qc)).Return(nil).Once()
+	s.notifier.On("OnStartingTimeout", expectedTimerInfo(4)).Return().Once()
+	s.notifier.On("OnQcTriggeredViewChange", s.initialView, uint64(4), qc).Return().Once()
+	s.notifier.On("OnViewChange", s.initialView, qc.View+1).Once()
+	nve, err := s.paceMaker.ProcessQC(qc)
+	require.NoError(s.T(), err)
+	require.Equal(s.T(), qc.View+1, s.paceMaker.CurView())
+	require.True(s.T(), nve.View == qc.View+1)
+	require.Equal(s.T(), qc, s.paceMaker.NewestQC())
+	require.Nil(s.T(), s.paceMaker.LastViewTC())
 
-	qc := QC(3)
-	notifier.On("OnStartingTimeout", expectedTimerInfo(4, model.ReplicaTimeout)).Return().Once()
-	notifier.On("OnQcTriggeredViewChange", qc, uint64(4)).Return().Once()
-	nve, nveOccurred := pm.UpdateCurViewWithQC(qc)
-	notifier.AssertExpectations(t)
-	assert.Equal(t, uint64(4), pm.CurView())
-	assert.True(t, nveOccurred && nve.View == 4)
+	// seeing a QC for 10 views in the future should advance to view +11
+	curView := s.paceMaker.CurView()
+	qc = QC(curView + 10)
+	s.persist.On("PutLivenessData", LivenessData(qc)).Return(nil).Once()
+	s.notifier.On("OnStartingTimeout", expectedTimerInfo(qc.View+1)).Return().Once()
+	s.notifier.On("OnQcTriggeredViewChange", curView, qc.View+1, qc).Return().Once()
+	s.notifier.On("OnViewChange", curView, qc.View+1).Once()
+	nve, err = s.paceMaker.ProcessQC(qc)
+	require.NoError(s.T(), err)
+	require.True(s.T(), nve.View == qc.View+1)
+	require.Equal(s.T(), qc, s.paceMaker.NewestQC())
+	require.Nil(s.T(), s.paceMaker.LastViewTC())
 
-	qc = QC(12)
-	notifier.On("OnStartingTimeout", expectedTimerInfo(13, model.ReplicaTimeout)).Return().Once()
-	notifier.On("OnQcTriggeredViewChange", qc, uint64(13)).Return().Once()
-	nve, nveOccurred = pm.UpdateCurViewWithQC(qc)
-	assert.True(t, nveOccurred && nve.View == 13)
-
-	notifier.AssertExpectations(t)
-	assert.Equal(t, uint64(13), pm.CurView())
+	require.Equal(s.T(), qc.View+1, s.paceMaker.CurView())
 }
 
-// Test_IgnoreOldBlocks tests that PaceMaker ignores old blocks
-func Test_IgnoreOldQC(t *testing.T) {
-	pm, notifier := initPaceMaker(t, 3)
-	nve, nveOccurred := pm.UpdateCurViewWithQC(QC(2))
-	assert.True(t, !nveOccurred && nve == nil)
-	notifier.AssertExpectations(t)
-	assert.Equal(t, uint64(3), pm.CurView())
-}
-
-// Test_SkipViewThroughBlock tests that PaceMaker skips View when receiving Block containing QC with larger View Number
-func Test_SkipViewThroughBlock(t *testing.T) {
-	pm, notifier := initPaceMaker(t, 3)
-
-	block := makeBlock(5, 9)
-	notifier.On("OnStartingTimeout", expectedTimerInfo(6, model.ReplicaTimeout)).Return().Once()
-	notifier.On("OnQcTriggeredViewChange", block.QC, uint64(6)).Return().Once()
-	nve, nveOccurred := pm.UpdateCurViewWithBlock(block, true)
-	notifier.AssertExpectations(t)
-	assert.Equal(t, uint64(6), pm.CurView())
-	assert.True(t, nveOccurred && nve.View == 6)
-
-	block = makeBlock(22, 25)
-	notifier.On("OnStartingTimeout", expectedTimerInfo(23, model.ReplicaTimeout)).Return().Once()
-	notifier.On("OnQcTriggeredViewChange", block.QC, uint64(23)).Return().Once()
-	nve, nveOccurred = pm.UpdateCurViewWithBlock(block, false)
-	assert.True(t, nveOccurred && nve.View == 23)
-
-	notifier.AssertExpectations(t)
-	assert.Equal(t, uint64(23), pm.CurView())
-}
-
-// Test_HandlesSkipViewAttack verifies that PaceMaker skips views based on QC.view
-// but NOT based on block.View to avoid vulnerability against Fast-Forward Attack
-func Test_HandlesSkipViewAttack(t *testing.T) {
-	pm, notifier := initPaceMaker(t, 3)
-
-	block := makeBlock(5, 9)
-	notifier.On("OnStartingTimeout", expectedTimerInfo(6, model.ReplicaTimeout)).Return().Once()
-	notifier.On("OnQcTriggeredViewChange", block.QC, uint64(6)).Return().Once()
-	nve, nveOccurred := pm.UpdateCurViewWithBlock(block, true)
-	notifier.AssertExpectations(t)
-	assert.Equal(t, uint64(6), pm.CurView())
-	assert.True(t, nveOccurred && nve.View == 6)
-
-	block = makeBlock(14, 23)
-	notifier.On("OnStartingTimeout", expectedTimerInfo(15, model.ReplicaTimeout)).Return().Once()
-	notifier.On("OnQcTriggeredViewChange", block.QC, uint64(15)).Return().Once()
-	nve, nveOccurred = pm.UpdateCurViewWithBlock(block, false)
-	assert.True(t, nveOccurred && nve.View == 15)
-
-	notifier.AssertExpectations(t)
-	assert.Equal(t, uint64(15), pm.CurView())
-}
-
-// Test_IgnoreOldBlocks tests that PaceMaker ignores old blocks
-func Test_IgnoreOldBlocks(t *testing.T) {
-	pm, notifier := initPaceMaker(t, 3)
-	pm.UpdateCurViewWithBlock(makeBlock(1, 2), false)
-	pm.UpdateCurViewWithBlock(makeBlock(1, 2), true)
-	notifier.AssertExpectations(t)
-	assert.Equal(t, uint64(3), pm.CurView())
-}
-
-// Test_ProcessBlockForCurrentView tests that PaceMaker processes the block for the current view correctly
-func Test_ProcessBlockForCurrentView(t *testing.T) {
-	pm, notifier := initPaceMaker(t, 3)
-	notifier.On("OnStartingTimeout", expectedTimerInfo(3, model.VoteCollectionTimeout)).Return().Once()
-	nve, nveOccurred := pm.UpdateCurViewWithBlock(makeBlock(1, 3), true)
-	notifier.AssertExpectations(t)
-	assert.Equal(t, uint64(3), pm.CurView())
-	assert.True(t, !nveOccurred && nve == nil)
-
-	pm, notifier = initPaceMaker(t, 3)
-	notifier.On("OnStartingTimeout", expectedTimerInfo(4, model.ReplicaTimeout)).Return().Once()
-	nve, nveOccurred = pm.UpdateCurViewWithBlock(makeBlock(1, 3), false)
-	notifier.AssertExpectations(t)
-	assert.Equal(t, uint64(4), pm.CurView())
-	assert.True(t, nveOccurred && nve.View == 4)
-}
-
-// Test_FutureBlockWithQcForCurrentView tests that PaceMaker processes the block with
-//
-//	block.qc.view = curView
-//	block.view = curView +1
-//
-// correctly. Specifically, it should induce a view change to the block.view, which
-// enables processing the block right away, i.e. switch to block.view + 1
-func Test_FutureBlockWithQcForCurrentView(t *testing.T) {
-	block := makeBlock(3, 4)
-
-	// NOT Primary for the Block's view
-	pm, notifier := initPaceMaker(t, 3)
-	notifier.On("OnStartingTimeout", expectedTimerInfo(4, model.ReplicaTimeout)).Return().Once()
-	notifier.On("OnStartingTimeout", expectedTimerInfo(5, model.ReplicaTimeout)).Return().Once()
-	notifier.On("OnQcTriggeredViewChange", block.QC, uint64(4)).Return().Once()
-	nve, nveOccurred := pm.UpdateCurViewWithBlock(block, false)
-	notifier.AssertExpectations(t)
-	assert.Equal(t, uint64(5), pm.CurView())
-	assert.True(t, nveOccurred && nve.View == 5)
-
-	// PRIMARY for the Block's view
-	pm, notifier = initPaceMaker(t, 3)
-	notifier.On("OnStartingTimeout", expectedTimerInfo(4, model.ReplicaTimeout)).Return().Once()
-	notifier.On("OnStartingTimeout", expectedTimerInfo(4, model.VoteCollectionTimeout)).Return().Once()
-	notifier.On("OnQcTriggeredViewChange", block.QC, uint64(4)).Return().Once()
-	nve, nveOccurred = pm.UpdateCurViewWithBlock(block, true)
-	notifier.AssertExpectations(t)
-	assert.Equal(t, uint64(4), pm.CurView())
-	assert.True(t, nveOccurred && nve.View == 4)
-}
-
-// Test_FutureBlockWithQcForCurrentView tests that PaceMaker processes the block with
-//
-//	block.qc.view > curView
-//	block.view = block.qc.view +1
-//
-// correctly. Specifically, it should induce a view change to block.view, which
-// enables processing the block right away, i.e. switch to block.view + 1
-func Test_FutureBlockWithQcForFutureView(t *testing.T) {
-	block := makeBlock(13, 14)
-
-	pm, notifier := initPaceMaker(t, 3)
-	notifier.On("OnQcTriggeredViewChange", block.QC, uint64(14)).Return().Once()
-	notifier.On("OnStartingTimeout", expectedTimerInfo(14, model.ReplicaTimeout)).Return().Once()
-	notifier.On("OnStartingTimeout", expectedTimerInfo(15, model.ReplicaTimeout)).Return().Once()
-	nve, nveOccurred := pm.UpdateCurViewWithBlock(block, false)
-	notifier.AssertExpectations(t)
-	assert.Equal(t, uint64(15), pm.CurView())
-	assert.True(t, nveOccurred && nve.View == 15)
-
-	pm, notifier = initPaceMaker(t, 3)
-	notifier.On("OnQcTriggeredViewChange", block.QC, uint64(14)).Return().Once()
-	notifier.On("OnStartingTimeout", expectedTimerInfo(14, model.ReplicaTimeout)).Return().Once()
-	notifier.On("OnStartingTimeout", expectedTimerInfo(14, model.VoteCollectionTimeout)).Return().Once()
-	nve, nveOccurred = pm.UpdateCurViewWithBlock(block, true)
-	notifier.AssertExpectations(t)
-	assert.Equal(t, uint64(14), pm.CurView())
-	assert.True(t, nveOccurred && nve.View == 14)
-}
-
-// Test_FutureBlockWithQcForCurrentView tests that PaceMaker processes the block with
-//
-//	block.qc.view > curView
-//	block.view > block.qc.view +1
-//
-// correctly. Specifically, it should induce a view change to the block.qc.view +1,
-// which is not sufficient to process the block. I.e. we expect view change to block.qc.view +1
-// enables processing the block right away.
-func Test_FutureBlockWithQcForFutureFutureView(t *testing.T) {
-	block := makeBlock(13, 17)
-
-	pm, notifier := initPaceMaker(t, 3)
-	notifier.On("OnQcTriggeredViewChange", block.QC, uint64(14)).Return().Once()
-	notifier.On("OnStartingTimeout", expectedTimerInfo(14, model.ReplicaTimeout)).Return().Once()
-	nve, nveOccurred := pm.UpdateCurViewWithBlock(block, false)
-	notifier.AssertExpectations(t)
-	assert.Equal(t, uint64(14), pm.CurView())
-	assert.True(t, nveOccurred && nve.View == 14)
-
-	pm, notifier = initPaceMaker(t, 3)
-	notifier.On("OnQcTriggeredViewChange", block.QC, uint64(14)).Return().Once()
-	notifier.On("OnStartingTimeout", expectedTimerInfo(14, model.ReplicaTimeout)).Return().Once()
-	nve, nveOccurred = pm.UpdateCurViewWithBlock(block, true)
-	notifier.AssertExpectations(t)
-	assert.Equal(t, uint64(14), pm.CurView())
-	assert.True(t, nveOccurred && nve.View == 14)
-}
-
-// Test_IgnoreBlockDuplicates tests that PaceMaker ignores duplicate blocks
-func Test_IgnoreBlockDuplicates(t *testing.T) {
-	block := makeBlock(3, 4)
-
-	// NOT Primary for the Block's view
-	pm, notifier := initPaceMaker(t, 3)
-	notifier.On("OnQcTriggeredViewChange", block.QC, uint64(4)).Return().Once()
-	notifier.On("OnStartingTimeout", expectedTimerInfo(4, model.ReplicaTimeout)).Return().Once()
-	notifier.On("OnStartingTimeout", expectedTimerInfo(5, model.ReplicaTimeout)).Return().Once()
-	nve, nveOccurred := pm.UpdateCurViewWithBlock(block, false)
-	assert.True(t, nveOccurred && nve.View == 5)
-	nve, nveOccurred = pm.UpdateCurViewWithBlock(block, false)
-	assert.True(t, !nveOccurred && nve == nil)
-	nve, nveOccurred = pm.UpdateCurViewWithBlock(block, false)
-	assert.True(t, !nveOccurred && nve == nil)
-	notifier.AssertExpectations(t)
-	assert.Equal(t, uint64(5), pm.CurView())
-
-	// PRIMARY for the Block's view
-	pm, notifier = initPaceMaker(t, 3)
-	notifier.On("OnQcTriggeredViewChange", block.QC, uint64(4)).Return().Once()
-	notifier.On("OnStartingTimeout", expectedTimerInfo(4, model.ReplicaTimeout)).Return().Once()
-	notifier.On("OnStartingTimeout", expectedTimerInfo(4, model.VoteCollectionTimeout)).Return().Once()
-	nve, nveOccurred = pm.UpdateCurViewWithBlock(block, true)
-	assert.True(t, nveOccurred && nve.View == 4)
-	nve, nveOccurred = pm.UpdateCurViewWithBlock(block, true)
-	assert.True(t, !nveOccurred && nve == nil)
-	nve, nveOccurred = pm.UpdateCurViewWithBlock(block, true)
-	assert.True(t, !nveOccurred && nve == nil)
-	notifier.AssertExpectations(t)
-	assert.Equal(t, uint64(4), pm.CurView())
-}
-
-// Test_ReplicaTimeout tests that replica timeout fires as expected
-func Test_ReplicaTimeout(t *testing.T) {
-	start := time.Now()
-	pm, notifier := initPaceMaker(t, 3) // initPaceMaker also calls Start() on PaceMaker
-
-	select {
-	case <-pm.TimeoutChannel():
-		break // testing path: corresponds to EventLoop picking up timeout from channel
-	case <-time.After(time.Duration(2) * time.Duration(startRepTimeout) * time.Millisecond):
-		t.Fail() // to prevent test from hanging
+// TestProcessTC_SkipIncreaseViewThroughTC tests that ActivePaceMaker increases view when receiving TC,
+// if applicable, by skipping views
+func (s *ActivePaceMakerTestSuite) TestProcessTC_SkipIncreaseViewThroughTC() {
+	// seeing a TC for the current view should advance the view by one
+	tc := helper.MakeTC(helper.WithTCView(s.initialView), helper.WithTCNewestQC(s.initialQC))
+	expectedLivenessData := &hotstuff.LivenessData{
+		CurrentView: tc.View + 1,
+		LastViewTC:  tc,
+		NewestQC:    s.initialQC,
 	}
-	actualTimeout := float64(time.Since(start).Milliseconds()) // in millisecond
-	fmt.Println(actualTimeout)
-	assert.GreaterOrEqual(t, actualTimeout, startRepTimeout, "the actual timeout should be greater or equal to the init timeout")
-	// While the timeout event has been put in the channel,
-	// PaceMaker should NOT react on it without the timeout event being processed by the EventHandler
-	assert.Equal(t, uint64(3), pm.CurView())
+	s.persist.On("PutLivenessData", expectedLivenessData).Return(nil).Once()
+	s.notifier.On("OnStartingTimeout", expectedTimerInfo(tc.View+1)).Return().Once()
+	s.notifier.On("OnTcTriggeredViewChange", s.initialView, tc.View+1, tc).Return().Once()
+	s.notifier.On("OnViewChange", s.initialView, tc.View+1).Once()
+	nve, err := s.paceMaker.ProcessTC(tc)
+	require.NoError(s.T(), err)
+	require.Equal(s.T(), tc.View+1, s.paceMaker.CurView())
+	require.True(s.T(), nve.View == tc.View+1)
+	require.Equal(s.T(), tc, s.paceMaker.LastViewTC())
 
-	// here the, the Event loop would now call EventHandler.OnTimeout() -> PaceMaker.OnTimeout()
-	notifier.On("OnReachedTimeout", expectedTimeoutInfo(3, model.ReplicaTimeout)).Return().Once()
-	notifier.On("OnStartingTimeout", expectedTimerInfo(4, model.ReplicaTimeout)).Return().Once()
-	viewChange := pm.OnTimeout()
-	if viewChange == nil {
-		assert.Fail(t, "Expecting ViewChange event as result of timeout")
+	// seeing a TC for 10 views in the future should advance to view +11
+	curView := s.paceMaker.CurView()
+	tc = helper.MakeTC(helper.WithTCView(curView+10), helper.WithTCNewestQC(s.initialQC))
+	expectedLivenessData = &hotstuff.LivenessData{
+		CurrentView: tc.View + 1,
+		LastViewTC:  tc,
+		NewestQC:    s.initialQC,
 	}
+	s.persist.On("PutLivenessData", expectedLivenessData).Return(nil).Once()
+	s.notifier.On("OnStartingTimeout", expectedTimerInfo(tc.View+1)).Return().Once()
+	s.notifier.On("OnTcTriggeredViewChange", curView, tc.View+1, tc).Return().Once()
+	s.notifier.On("OnViewChange", curView, tc.View+1).Once()
+	nve, err = s.paceMaker.ProcessTC(tc)
+	require.NoError(s.T(), err)
+	require.True(s.T(), nve.View == tc.View+1)
+	require.Equal(s.T(), tc, s.paceMaker.LastViewTC())
+	require.Equal(s.T(), tc.NewestQC, s.paceMaker.NewestQC())
 
-	notifier.AssertExpectations(t)
-	assert.Equal(t, uint64(4), pm.CurView())
+	require.Equal(s.T(), tc.View+1, s.paceMaker.CurView())
 }
 
-// Test_ViewChangeWithProgress tests that the PaceMaker respects the definition of Progress:
-// Progress is defined as entering view V for which the replica knows a QC with V = QC.view + 1
-// For this test, we feed it with a block for the current view containing a QC from the last view.
-// Hence, the PaceMaker should decrease the timeout (because the committee is synchronized).
-func Test_ViewChangeWithProgress(t *testing.T) {
-	pm, notifier := initPaceMaker(t, 5) // initPaceMaker also calls Start() on PaceMaker
-
-	// The pace maker should transition into view 6
-	// and decrease its timeout value by the following pacemaker call, as progress is made
-	notifier.On("OnStartingTimeout", expectedTimerInfo(6, model.ReplicaTimeout)).Return().Once()
-	start := time.Now()
-	nve, nveOccurred := pm.UpdateCurViewWithBlock(makeBlock(4, 5), false)
-	assert.True(t, nveOccurred && nve.View == 6)
-	notifier.AssertExpectations(t)
-
-	select {
-	case <-pm.TimeoutChannel():
-		break // testing path: corresponds to EventLoop picking up timeout from channel
-	case <-time.After(time.Duration(2) * time.Duration(startRepTimeout) * time.Millisecond):
-		t.Fail() // to prevent test from hanging
-	}
-
-	actualTimeout := float64(time.Since(start).Milliseconds()) // in millisecond
-	expectedVoteCollectionTimeout := startRepTimeout * multiplicativeDecrease
-	assert.True(t, math.Abs(actualTimeout-expectedVoteCollectionTimeout) < 0.1*expectedVoteCollectionTimeout)
-	assert.Equal(t, uint64(6), pm.CurView())
+// TestProcessTC_IgnoreOldTC tests that ActivePaceMaker ignores old TC and doesn't advance round.
+func (s *ActivePaceMakerTestSuite) TestProcessTC_IgnoreOldTC() {
+	nve, err := s.paceMaker.ProcessTC(helper.MakeTC(helper.WithTCView(s.initialView-1),
+		helper.WithTCNewestQC(s.initialQC)))
+	require.NoError(s.T(), err)
+	require.Nil(s.T(), nve)
+	require.Equal(s.T(), s.initialView, s.paceMaker.CurView())
 }
 
-// Test_ViewChangeWithoutProgress tests that the PaceMaker respects the definition of Progress:
-// Progress is defined as entering view V for which the replica knows a QC with V = QC.view + 1
-// For this test, we feed it with a block for the current view, but containing an old QC.
-// Hence, the PaceMaker should NOT decrease the timeout (because the committee is still not synchronized)
-func Test_ViewChangeWithoutProgress(t *testing.T) {
-	pm, notifier := initPaceMaker(t, 5) // initPaceMaker also calls Start() on PaceMaker
-
-	// while the pace maker should transition into view 6
-	// we are not expecting a change of timeout value by the following pacemaker call, because no progress is made
-	notifier.On("OnStartingTimeout", expectedTimerInfo(6, model.ReplicaTimeout)).Return().Once()
-	start := time.Now()
-	nve, nveOccurred := pm.UpdateCurViewWithBlock(makeBlock(3, 5), false)
-	assert.True(t, nveOccurred && nve.View == 6)
-	notifier.AssertExpectations(t)
-
-	select {
-	case <-pm.TimeoutChannel():
-		break // testing path: corresponds to EventLoop picking up timeout from channel
-	case <-time.After(time.Duration(2) * time.Duration(startRepTimeout) * time.Millisecond):
-		t.Fail() // to prevent test from hanging
-	}
-
-	actualTimeout := float64(time.Since(start).Milliseconds()) // in millisecond
-	expectedVoteCollectionTimeout := startRepTimeout
-	assert.True(t, math.Abs(actualTimeout-expectedVoteCollectionTimeout) < 0.1*expectedVoteCollectionTimeout)
-	assert.Equal(t, uint64(6), pm.CurView())
+// TestProcessTC_IgnoreNilTC tests that ActivePaceMaker accepts nil TC as allowed input but doesn't trigger a new view event
+func (s *ActivePaceMakerTestSuite) TestProcessTC_IgnoreNilTC() {
+	nve, err := s.paceMaker.ProcessTC(nil)
+	require.NoError(s.T(), err)
+	require.Nil(s.T(), nve)
+	require.Equal(s.T(), s.initialView, s.paceMaker.CurView())
 }
 
-func Test_ReplicaTimeoutAgain(t *testing.T) {
-	start := time.Now()
-	pm, notifier := initPaceMaker(t, 3) // initPaceMaker also calls Start() on PaceMaker
-	notifier.On("OnReachedTimeout", mock.Anything)
-	notifier.On("OnStartingTimeout", mock.Anything)
-
-	// wait until the timeout is hit for the first time
-	select {
-	case <-pm.TimeoutChannel():
-	case <-time.After(time.Duration(2*startRepTimeout) * time.Millisecond):
-	}
-
-	// calculate the actual timeout duration that has been waited.
-	actualTimeout := float64(time.Since(start).Milliseconds()) // in millisecond
-	assert.GreaterOrEqual(t, actualTimeout, startRepTimeout, "the actual timeout should be greater or equal to the init timeout")
-	assert.Less(t, actualTimeout, 2*startRepTimeout, "the actual timeout was too long")
-
-	// reset timer
-	start = time.Now()
-
-	// trigger view change and restart the pacemaker timer. The next timeout should take 1.5 longer
-	_ = pm.OnTimeout()
-
-	// wait until the timeout is hit again
-	select {
-	case <-pm.TimeoutChannel():
-	case <-time.After(time.Duration(3) * time.Duration(startRepTimeout) * time.Millisecond):
-	}
-
-	nv := pm.OnTimeout()
-
-	// calculate the actual timeout duration that has been waited again
-	actualTimeout = float64(time.Since(start).Milliseconds()) // in millisecond
-	assert.GreaterOrEqual(t, actualTimeout, 1.5*startRepTimeout, "the actual timeout should be greater or equal to the timeout")
-	assert.Less(t, actualTimeout, 2*startRepTimeout, "the actual timeout was too long")
-
-	var changed bool
-	// timeout reduce linearly
-	select {
-	case <-pm.TimeoutChannel():
-		break
-	case <-time.After(time.Duration(0.1 * startRepTimeout)):
-		nv, changed = pm.UpdateCurViewWithBlock(makeBlock(nv.View-1, nv.View), false)
-		break
-	}
-
-	require.True(t, changed)
-
-	// timeout reduce linearly
-	select {
-	case <-pm.TimeoutChannel():
-		break
-	case <-time.After(time.Duration(0.1 * startRepTimeout)):
-		// start the timer before the UpdateCurViewWithBlock is called, which starts the internal timer.
-		// This is required to make the tests more accurate, because when it's running on CI,
-		// there might be some delay for time.Now() gets called, which impact the accuracy of the actual timeout
-		// measurement
-
-		start = time.Now()
-		_, changed = pm.UpdateCurViewWithBlock(makeBlock(nv.View-1, nv.View), false)
-		break
-	}
-
-	require.True(t, changed)
-
-	// wait until the timeout is hit again
-	select {
-	case <-pm.TimeoutChannel():
-	case <-time.After(time.Duration(3) * time.Duration(startRepTimeout) * time.Millisecond):
-	}
-
-	actualTimeout = float64(time.Since(start).Microseconds()) * 0.001 // in millisecond
-	// the actual timeout should be startRepTimeout * 1.5 *1.5 * multiplicativeDecrease * multiplicativeDecrease
-	// because it hits timeout twice and then received blocks for current view twice
-	assert.GreaterOrEqual(t, actualTimeout, 1.5*1.5*startRepTimeout*multiplicativeDecrease*multiplicativeDecrease, "the actual timeout should be greater or equal to the timeout")
-	assert.Less(t, actualTimeout, 1.5*1.5*startRepTimeout*multiplicativeDecrease, "the actual timeout is too long")
+// TestProcessQC_PersistException tests that ActivePaceMaker propagates exception
+// when processing QC
+func (s *ActivePaceMakerTestSuite) TestProcessQC_PersistException() {
+	exception := errors.New("persist-exception")
+	qc := QC(s.initialView)
+	s.persist.On("PutLivenessData", mock.Anything).Return(exception).Once()
+	nve, err := s.paceMaker.ProcessQC(qc)
+	require.Nil(s.T(), nve)
+	require.ErrorIs(s.T(), err, exception)
 }
 
-// Test_VoteTimeout tests that vote timeout fires as expected
-func Test_VoteTimeout(t *testing.T) {
-	pm, notifier := initPaceMaker(t, 3) // initPaceMaker also calls Start() on PaceMaker
-	start := time.Now()
+// TestProcessTC_PersistException tests that ActivePaceMaker propagates exception
+// when processing TC
+func (s *ActivePaceMakerTestSuite) TestProcessTC_PersistException() {
+	exception := errors.New("persist-exception")
+	tc := helper.MakeTC(helper.WithTCView(s.initialView))
+	s.persist.On("PutLivenessData", mock.Anything).Return(exception).Once()
+	nve, err := s.paceMaker.ProcessTC(tc)
+	require.Nil(s.T(), nve)
+	require.ErrorIs(s.T(), err, exception)
+}
 
-	notifier.On("OnStartingTimeout", expectedTimerInfo(3, model.VoteCollectionTimeout)).Return().Once()
-	// we are not expecting a change of timeout value by the following pacemaker call, because no view change happens
-	pm.UpdateCurViewWithBlock(makeBlock(2, 3), true)
-	notifier.AssertExpectations(t)
+// TestProcessQC_InvalidatesLastViewTC verifies that PaceMaker does not retain any old
+// TC if the last view change was triggered by observing a QC from the previous view.
+func (s *ActivePaceMakerTestSuite) TestProcessQC_InvalidatesLastViewTC() {
+	tc := helper.MakeTC(helper.WithTCView(s.initialView+1), helper.WithTCNewestQC(s.initialQC))
+	s.persist.On("PutLivenessData", mock.Anything).Return(nil).Times(2)
+	s.notifier.On("OnStartingTimeout", mock.Anything).Return().Times(2)
+	s.notifier.On("OnTcTriggeredViewChange", mock.Anything, mock.Anything, mock.Anything).Return().Once()
+	s.notifier.On("OnQcTriggeredViewChange", mock.Anything, mock.Anything, mock.Anything).Return().Once()
+	s.notifier.On("OnViewChange", s.initialView, tc.View+1).Once()
+	nve, err := s.paceMaker.ProcessTC(tc)
+	require.NotNil(s.T(), nve)
+	require.NoError(s.T(), err)
+	require.NotNil(s.T(), s.paceMaker.LastViewTC())
 
-	// the pacemaker should now be running the vote collection timeout:
-	expectedVoteCollectionTimeout := startRepTimeout * voteTimeoutFraction
-	select {
-	case <-pm.TimeoutChannel():
-		break // testing path: corresponds to EventLoop picking up timeout from channel
-	case <-time.After(2 * time.Duration(expectedVoteCollectionTimeout) * time.Millisecond):
-		t.Fail() // to prevent test from hanging
+	qc := QC(tc.View + 1)
+	s.notifier.On("OnViewChange", tc.View+1, qc.View+1).Once()
+	nve, err = s.paceMaker.ProcessQC(qc)
+	require.NotNil(s.T(), nve)
+	require.NoError(s.T(), err)
+	require.Nil(s.T(), s.paceMaker.LastViewTC())
+}
+
+// TestProcessQC_IgnoreOldQC tests that ActivePaceMaker ignores old QC and doesn't advance round
+func (s *ActivePaceMakerTestSuite) TestProcessQC_IgnoreOldQC() {
+	qc := QC(s.initialView - 1)
+	nve, err := s.paceMaker.ProcessQC(qc)
+	require.NoError(s.T(), err)
+	require.Nil(s.T(), nve)
+	require.Equal(s.T(), s.initialView, s.paceMaker.CurView())
+	require.NotEqual(s.T(), qc, s.paceMaker.NewestQC())
+}
+
+// TestProcessQC_UpdateNewestQC tests that ActivePaceMaker tracks the newest QC even if it has advanced past this view.
+// In this test, we feed a newer QC as part of a TC into the PaceMaker.
+func (s *ActivePaceMakerTestSuite) TestProcessQC_UpdateNewestQC() {
+	tc := helper.MakeTC(helper.WithTCView(s.initialView+10), helper.WithTCNewestQC(s.initialQC))
+	expectedView := tc.View + 1
+	s.notifier.On("OnTcTriggeredViewChange", mock.Anything, mock.Anything, mock.Anything).Return().Once()
+	s.notifier.On("OnViewChange", s.initialView, expectedView).Once()
+	s.notifier.On("OnStartingTimeout", mock.Anything).Return().Once()
+	s.persist.On("PutLivenessData", mock.Anything).Return(nil).Once()
+	nve, err := s.paceMaker.ProcessTC(tc)
+	require.NoError(s.T(), err)
+	require.NotNil(s.T(), nve)
+
+	qc := QC(s.initialView + 5)
+	expectedLivenessData := &hotstuff.LivenessData{
+		CurrentView: expectedView,
+		LastViewTC:  tc,
+		NewestQC:    qc,
 	}
-	duration := float64(time.Since(start).Milliseconds()) // in millisecond
-	assert.True(t, math.Abs(duration-expectedVoteCollectionTimeout) < 0.1*expectedVoteCollectionTimeout)
-	// While the timeout event has been put in the channel,
-	// PaceMaker should NOT react on it without the timeout event being processed by the EventHandler
-	assert.Equal(t, uint64(3), pm.CurView())
+	s.persist.On("PutLivenessData", expectedLivenessData).Return(nil).Once()
 
-	// here the, the Event loop would now call EventHandler.OnTimeout() -> PaceMaker.OnTimeout()
-	notifier.On("OnReachedTimeout", expectedTimeoutInfo(3, model.VoteCollectionTimeout)).Return().Once()
-	notifier.On("OnStartingTimeout", expectedTimerInfo(4, model.ReplicaTimeout)).Return().Once()
-	viewChange := pm.OnTimeout()
-	if viewChange == nil {
-		assert.Fail(t, "Expecting ViewChange event as result of timeout")
+	nve, err = s.paceMaker.ProcessQC(qc)
+	require.NoError(s.T(), err)
+	require.Nil(s.T(), nve)
+	require.Equal(s.T(), qc, s.paceMaker.NewestQC())
+}
+
+// TestProcessTC_UpdateNewestQC tests that ActivePaceMaker tracks the newest QC included in TC even if it has advanced past this view.
+func (s *ActivePaceMakerTestSuite) TestProcessTC_UpdateNewestQC() {
+	tc := helper.MakeTC(helper.WithTCView(s.initialView+10), helper.WithTCNewestQC(s.initialQC))
+	expectedView := tc.View + 1
+	s.notifier.On("OnTcTriggeredViewChange", mock.Anything, mock.Anything, mock.Anything).Return().Once()
+	s.notifier.On("OnViewChange", s.initialView, expectedView).Once()
+	s.notifier.On("OnStartingTimeout", mock.Anything).Return().Once()
+	s.persist.On("PutLivenessData", mock.Anything).Return(nil).Once()
+	nve, err := s.paceMaker.ProcessTC(tc)
+	require.NoError(s.T(), err)
+	require.NotNil(s.T(), nve)
+
+	qc := QC(s.initialView + 5)
+	olderTC := helper.MakeTC(helper.WithTCView(s.paceMaker.CurView()-1), helper.WithTCNewestQC(qc))
+	expectedLivenessData := &hotstuff.LivenessData{
+		CurrentView: expectedView,
+		LastViewTC:  tc,
+		NewestQC:    qc,
 	}
-	notifier.AssertExpectations(t)
-	assert.Equal(t, uint64(4), pm.CurView())
+	s.persist.On("PutLivenessData", expectedLivenessData).Return(nil).Once()
+
+	nve, err = s.paceMaker.ProcessTC(olderTC)
+	require.NoError(s.T(), err)
+	require.Nil(s.T(), nve)
+	require.Equal(s.T(), qc, s.paceMaker.NewestQC())
+}
+
+// Test_Initialization tests QCs and TCs provided as optional constructor arguments.
+// We want to test that nil, old and duplicate TCs & QCs are accepted in arbitrary order.
+// The constructed PaceMaker should be in the state:
+//   - in view V+1, where V is the _largest view of _any_ of the ingested QCs and TCs
+//   - method `NewestQC` should report the QC with the highest View in _any_ of the inputs
+func (s *ActivePaceMakerTestSuite) Test_Initialization() {
+	highestView := uint64(0) // highest View of any QC or TC constructed below
+
+	// Randomly create 80 TCs:
+	//  * their view is randomly sampled from the range [3, 103)
+	//  * as we sample 80 times, probability of creating 2 TCs for the same
+	//    view is practically 1 (-> birthday problem)
+	//  * we place the TCs in a slice of length 110, i.e. some elements are guaranteed to be nil
+	//  * Note: we specifically allow for the TC to have the same view as the highest QC.
+	//    This is useful as a fallback, because it allows replicas other than the designated
+	//     leader to also collect votes and generate a QC.
+	tcs := make([]*flow.TimeoutCertificate, 110)
+	for i := 0; i < 80; i++ {
+		tcView := s.initialView + uint64(rand.Intn(100))
+		qcView := 1 + uint64(rand.Intn(int(tcView)))
+		tcs[i] = helper.MakeTC(helper.WithTCView(tcView), helper.WithTCNewestQC(QC(qcView)))
+		highestView = max(highestView, tcView, qcView)
+	}
+	rand.Shuffle(len(tcs), func(i, j int) {
+		tcs[i], tcs[j] = tcs[j], tcs[i]
+	})
+
+	// randomly create 80 QCs (same logic as above)
+	qcs := make([]*flow.QuorumCertificate, 110)
+	for i := 0; i < 80; i++ {
+		qcs[i] = QC(s.initialView + uint64(rand.Intn(100)))
+		highestView = max(highestView, qcs[i].View)
+	}
+	rand.Shuffle(len(qcs), func(i, j int) {
+		qcs[i], qcs[j] = qcs[j], qcs[i]
+	})
+
+	// set up mocks
+	s.persist.On("PutLivenessData", mock.Anything).Return(nil)
+
+	// test that the constructor finds the newest QC and TC
+	s.Run("Random TCs and QCs combined", func() {
+		pm, err := New(
+			timeout.NewController(s.timeoutConf), NoProposalDelay(), s.notifier, s.persist,
+			WithQCs(qcs...), WithTCs(tcs...),
+		)
+		require.NoError(s.T(), err)
+
+		require.Equal(s.T(), highestView+1, pm.CurView())
+		if tc := pm.LastViewTC(); tc != nil {
+			require.Equal(s.T(), highestView, tc.View)
+		} else {
+			require.Equal(s.T(), highestView, pm.NewestQC().View)
+		}
+	})
+
+	// We specifically test an edge case: an outdated TC can still contain a QC that
+	// is newer than the newest QC the pacemaker knows so far.
+	s.Run("Newest QC in older TC", func() {
+		tcs[17] = helper.MakeTC(helper.WithTCView(highestView+20), helper.WithTCNewestQC(QC(highestView+5)))
+		tcs[45] = helper.MakeTC(helper.WithTCView(highestView+15), helper.WithTCNewestQC(QC(highestView+12)))
+
+		pm, err := New(
+			timeout.NewController(s.timeoutConf), NoProposalDelay(), s.notifier, s.persist,
+			WithTCs(tcs...), WithQCs(qcs...),
+		)
+		require.NoError(s.T(), err)
+
+		// * when observing tcs[17], which is newer than any other QC or TC, the pacemaker should enter view tcs[17].View + 1
+		// * when observing tcs[45], which is older than tcs[17], the PaceMaker should notice that the QC in tcs[45]
+		//   is newer than its local QC and update it
+		require.Equal(s.T(), tcs[17].View+1, pm.CurView())
+		require.Equal(s.T(), tcs[17], pm.LastViewTC())
+		require.Equal(s.T(), tcs[45].NewestQC, pm.NewestQC())
+	})
+
+	// Another edge case: a TC from a past view contains QC for the same view.
+	// While is TC is outdated, the contained QC is still newer that the QC the pacemaker knows so far.
+	s.Run("Newest QC in older TC", func() {
+		tcs[17] = helper.MakeTC(helper.WithTCView(highestView+20), helper.WithTCNewestQC(QC(highestView+5)))
+		tcs[45] = helper.MakeTC(helper.WithTCView(highestView+15), helper.WithTCNewestQC(QC(highestView+15)))
+
+		pm, err := New(
+			timeout.NewController(s.timeoutConf), NoProposalDelay(), s.notifier, s.persist,
+			WithTCs(tcs...), WithQCs(qcs...),
+		)
+		require.NoError(s.T(), err)
+
+		// * when observing tcs[17], which is newer than any other QC or TC, the pacemaker should enter view tcs[17].View + 1
+		// * when observing tcs[45], which is older than tcs[17], the PaceMaker should notice that the QC in tcs[45]
+		//   is newer than its local QC and update it
+		require.Equal(s.T(), tcs[17].View+1, pm.CurView())
+		require.Equal(s.T(), tcs[17], pm.LastViewTC())
+		require.Equal(s.T(), tcs[45].NewestQC, pm.NewestQC())
+	})
+
+	// Verify that WithTCs still works correctly if no TCs are given:
+	// the list of TCs is empty or all contained TCs are nil
+	s.Run("Only nil TCs", func() {
+		pm, err := New(timeout.NewController(s.timeoutConf), NoProposalDelay(), s.notifier, s.persist, WithTCs())
+		require.NoError(s.T(), err)
+		require.Equal(s.T(), s.initialView, pm.CurView())
+
+		pm, err = New(timeout.NewController(s.timeoutConf), NoProposalDelay(), s.notifier, s.persist, WithTCs(nil, nil, nil))
+		require.NoError(s.T(), err)
+		require.Equal(s.T(), s.initialView, pm.CurView())
+	})
+
+	// Verify that WithQCs still works correctly if no QCs are given:
+	// the list of QCs is empty or all contained QCs are nil
+	s.Run("Only nil QCs", func() {
+		pm, err := New(timeout.NewController(s.timeoutConf), NoProposalDelay(), s.notifier, s.persist, WithQCs())
+		require.NoError(s.T(), err)
+		require.Equal(s.T(), s.initialView, pm.CurView())
+
+		pm, err = New(timeout.NewController(s.timeoutConf), NoProposalDelay(), s.notifier, s.persist, WithQCs(nil, nil, nil))
+		require.NoError(s.T(), err)
+		require.Equal(s.T(), s.initialView, pm.CurView())
+	})
+
+}
+
+// TestProposalDuration tests that the active pacemaker forwards proposal duration values from the provider.
+func (s *ActivePaceMakerTestSuite) TestProposalDuration() {
+	proposalDurationProvider := NewStaticProposalDurationProvider(time.Millisecond * 500)
+	pm, err := New(timeout.NewController(s.timeoutConf), &proposalDurationProvider, s.notifier, s.persist)
+	require.NoError(s.T(), err)
+
+	now := time.Now().UTC()
+	assert.Equal(s.T(), now.Add(time.Millisecond*500), pm.TargetPublicationTime(117, now, unittest.IdentifierFixture()))
+	proposalDurationProvider.dur = time.Second
+	assert.Equal(s.T(), now.Add(time.Second), pm.TargetPublicationTime(117, now, unittest.IdentifierFixture()))
+}
+
+func max(a uint64, values ...uint64) uint64 {
+	for _, v := range values {
+		if v > a {
+			a = v
+		}
+	}
+	return a
 }

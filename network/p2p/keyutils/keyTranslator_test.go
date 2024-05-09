@@ -3,17 +3,16 @@ package keyutils
 import (
 	"crypto/rand"
 	"fmt"
-	"math"
 	"testing"
 
-	btcec "github.com/btcsuite/btcd/btcec/v2"
-	lcrypto "github.com/libp2p/go-libp2p-core/crypto"
-	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/btcsuite/btcd/btcec/v2"
+	lcrypto "github.com/libp2p/go-libp2p/core/crypto"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	fcrypto "github.com/onflow/flow-go/crypto"
+	fcrypto "github.com/onflow/crypto"
 )
 
 // KeyTranslatorTestSuite tests key conversion from Flow keys to LibP2P keys
@@ -171,7 +170,7 @@ func (k *KeyTranslatorTestSuite) TestPeerIDGenerationIsConsistent() {
 }
 
 func (k *KeyTranslatorTestSuite) createSeed() []byte {
-	seedLen := int(math.Max(fcrypto.KeyGenSeedMinLenECDSAP256, fcrypto.KeyGenSeedMinLenECDSASecp256k1))
+	const seedLen = fcrypto.KeyGenSeedMinLen
 	seed := make([]byte, seedLen)
 	n, err := rand.Read(seed)
 	require.NoError(k.T(), err)

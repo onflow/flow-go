@@ -14,16 +14,23 @@ const (
 	namespaceStateSync         = "state_synchronization"
 	namespaceExecutionDataSync = "execution_data_sync"
 	namespaceChainsync         = "chainsync"
+	namespaceFollowerEngine    = "follower"
+	namespaceRestAPI           = "access_rest_api"
+	namespaceMachineAcct       = "machine_account"
 )
 
 // Network subsystems represent the various layers of networking.
 const (
-	// subsystemLibp2p = "libp2p"
-	subsystemGossip  = "gossip"
-	subsystemEngine  = "engine"
-	subsystemQueue   = "queue"
-	subsystemDHT     = "dht"
-	subsystemBitswap = "bitswap"
+	subsystemLibp2p       = "libp2p"
+	subsystemGossip       = "gossip"
+	subsystemEngine       = "engine"
+	subsystemQueue        = "queue"
+	subsystemDHT          = "dht"
+	subsystemBitswap      = "bitswap"
+	subsystemAuth         = "authorization"
+	subsystemRateLimiting = "ratelimit"
+	subsystemAlsp         = "alsp"
+	subsystemSecurity     = "security"
 )
 
 // Storage subsystems represent the various components of the storage layer.
@@ -38,6 +45,7 @@ const (
 	subsystemTransactionTiming     = "transaction_timing"
 	subsystemTransactionSubmission = "transaction_submission"
 	subsystemConnectionPool        = "connection_pool"
+	subsystemHTTP                  = "http"
 )
 
 // Observer subsystem
@@ -54,6 +62,7 @@ const (
 const (
 	subsystemCompliance  = "compliance"
 	subsystemHotstuff    = "hotstuff"
+	subsystemCruiseCtl   = "cruisectl"
 	subsystemMatchEngine = "match"
 )
 
@@ -83,6 +92,7 @@ const (
 	subsystemExeDataProvider        = "provider"
 	subsystemExeDataPruner          = "pruner"
 	subsystemExecutionDataRequester = "execution_data_requester"
+	subsystemExecutionStateIndexer  = "execution_state_indexer"
 	subsystemExeDataBlobstore       = "blobstore"
 )
 

@@ -12,7 +12,7 @@ import (
 
 func TestEpochEmergencyFallback(t *testing.T) {
 
-	// the block ID where EECC was triggered
+	// the block ID where EFM was triggered
 	blockID := unittest.IdentifierFixture()
 
 	t.Run("reading when unset should return false", func(t *testing.T) {

@@ -13,21 +13,18 @@ import (
 
 type Commits struct {
 	db    *badger.DB
-	cache *Cache
+	cache *Cache[flow.Identifier, flow.StateCommitment]
 }
 
 func NewCommits(collector module.CacheMetrics, db *badger.DB) *Commits {
 
-	store := func(key interface{}, val interface{}) func(*transaction.Tx) error {
-		blockID := key.(flow.Identifier)
-		commit := val.(flow.StateCommitment)
+	store := func(blockID flow.Identifier, commit flow.StateCommitment) func(*transaction.Tx) error {
 		return transaction.WithTx(operation.SkipDuplicates(operation.IndexStateCommitment(blockID, commit)))
 	}
 
-	retrieve := func(key interface{}) func(tx *badger.Txn) (interface{}, error) {
-		blockID := key.(flow.Identifier)
-		var commit flow.StateCommitment
-		return func(tx *badger.Txn) (interface{}, error) {
+	retrieve := func(blockID flow.Identifier) func(tx *badger.Txn) (flow.StateCommitment, error) {
+		return func(tx *badger.Txn) (flow.StateCommitment, error) {
+			var commit flow.StateCommitment
 			err := operation.LookupStateCommitment(blockID, &commit)(tx)
 			return commit, err
 		}
@@ -35,8 +32,8 @@ func NewCommits(collector module.CacheMetrics, db *badger.DB) *Commits {
 
 	c := &Commits{
 		db: db,
-		cache: newCache(collector, metrics.ResourceCommit,
-			withLimit(100),
+		cache: newCache[flow.Identifier, flow.StateCommitment](collector, metrics.ResourceCommit,
+			withLimit[flow.Identifier, flow.StateCommitment](1000),
 			withStore(store),
 			withRetrieve(retrieve),
 		),
@@ -55,7 +52,7 @@ func (c *Commits) retrieveTx(blockID flow.Identifier) func(tx *badger.Txn) (flow
 		if err != nil {
 			return flow.DummyStateCommitment, err
 		}
-		return val.(flow.StateCommitment), nil
+		return val, nil
 	}
 }
 
@@ -63,6 +60,9 @@ func (c *Commits) Store(blockID flow.Identifier, commit flow.StateCommitment) er
 	return operation.RetryOnConflictTx(c.db, transaction.Update, c.storeTx(blockID, commit))
 }
 
+// BatchStore stores Commit keyed by blockID in provided batch
+// No errors are expected during normal operation, even if no entries are matched.
+// If Badger unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
 func (c *Commits) BatchStore(blockID flow.Identifier, commit flow.StateCommitment, batch storage.BatchStorage) error {
 	// we can't cache while using batches, as it's unknown at this point when, and if
 	// the batch will be committed. Cache will be populated on read however.
@@ -78,4 +78,12 @@ func (c *Commits) ByBlockID(blockID flow.Identifier) (flow.StateCommitment, erro
 
 func (c *Commits) RemoveByBlockID(blockID flow.Identifier) error {
 	return c.db.Update(operation.SkipNonExist(operation.RemoveStateCommitment(blockID)))
+}
+
+// BatchRemoveByBlockID removes Commit keyed by blockID in provided batch
+// No errors are expected during normal operation, even if no entries are matched.
+// If Badger unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
+func (c *Commits) BatchRemoveByBlockID(blockID flow.Identifier, batch storage.BatchStorage) error {
+	writeBatch := batch.GetWriter()
+	return operation.BatchRemoveStateCommitment(blockID)(writeBatch)
 }

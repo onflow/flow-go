@@ -1,5 +1,7 @@
 package slices
 
+import "sort"
+
 // Concat concatenates multiple []byte into one []byte with efficient one-time allocation.
 func Concat(slices [][]byte) []byte {
 	var totalLen int
@@ -33,4 +35,33 @@ func MakeRange(min, max int) []int {
 		a[i] = min + i
 	}
 	return a
+}
+
+// AreStringSlicesEqual returns true if the two string slices are equal.
+func AreStringSlicesEqual(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+
+	sort.Strings(a)
+	sort.Strings(b)
+
+	for i := 0; i < len(a); i++ {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+
+	return true
+}
+
+// StringSliceContainsElement returns true if the string slice contains the element.
+func StringSliceContainsElement(a []string, v string) bool {
+	for _, x := range a {
+		if x == v {
+			return true
+		}
+	}
+
+	return false
 }

@@ -2,7 +2,7 @@ package trace
 
 import (
 	"context"
-	"math/rand"
+	"crypto/rand"
 	"testing"
 
 	"github.com/rs/zerolog"
@@ -18,8 +18,7 @@ func BenchmarkStartSpanFromParent(b *testing.B) {
 	tracer.Ready()
 	defer tracer.Done()
 
-	span, _, sampled := tracer.StartTransactionSpan(context.Background(), flow.Identifier{}, "test")
-	require.True(b, sampled)
+	span, _ := tracer.StartBlockSpan(context.Background(), flow.Identifier{}, "test")
 	defer span.End()
 
 	b.ResetTimer()
@@ -30,7 +29,7 @@ func BenchmarkStartSpanFromParent(b *testing.B) {
 	b.StopTimer()
 }
 
-func BenchmarkStartTransactionSpan(b *testing.B) {
+func BenchmarkStartBlockSpan(b *testing.B) {
 	tracer, err := NewTracer(zerolog.Logger{}, "test", string(flow.Localnet), 0)
 	require.NoError(b, err)
 
@@ -56,8 +55,7 @@ func BenchmarkStartTransactionSpan(b *testing.B) {
 
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				span, _, sampled := tracer.StartTransactionSpan(context.Background(), randomIDs[i%t.n], "test")
-				require.True(b, sampled)
+				span, _ := tracer.StartBlockSpan(context.Background(), randomIDs[i%t.n], "test")
 				span.End()
 			}
 			b.StopTimer()

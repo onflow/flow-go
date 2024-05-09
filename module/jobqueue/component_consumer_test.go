@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -28,8 +29,6 @@ type ComponentConsumerSuite struct {
 	defaultIndex   uint64
 	maxProcessing  uint64
 	maxSearchAhead uint64
-
-	progress *storagemock.ConsumerProgress
 }
 
 func TestComponentConsumerSuite(t *testing.T) {
@@ -41,8 +40,6 @@ func (suite *ComponentConsumerSuite) SetupTest() {
 	suite.defaultIndex = uint64(0)
 	suite.maxProcessing = uint64(2)
 	suite.maxSearchAhead = uint64(5)
-
-	suite.progress = new(storagemock.ConsumerProgress)
 }
 
 func mockJobs(data map[uint64]TestJob) *modulemock.Jobs {
@@ -68,14 +65,6 @@ func mockJobs(data map[uint64]TestJob) *modulemock.Jobs {
 	return jobs
 }
 
-func mockProgress() *storagemock.ConsumerProgress {
-	progress := new(storagemock.ConsumerProgress)
-	progress.On("ProcessedIndex").Return(uint64(0), nil)
-	progress.On("SetProcessedIndex", mock.AnythingOfType("uint64")).Return(nil)
-
-	return progress
-}
-
 func generateTestData(jobCount uint64) map[uint64]TestJob {
 	jobData := make(map[uint64]TestJob, jobCount)
 
@@ -94,10 +83,13 @@ func (suite *ComponentConsumerSuite) prepareTest(
 ) (*ComponentConsumer, chan struct{}) {
 
 	jobs := mockJobs(jobData)
-	workSignal := make(chan struct{})
-	progress := mockProgress()
+	workSignal := make(chan struct{}, 1)
 
-	consumer := NewComponentConsumer(
+	progress := new(storagemock.ConsumerProgress)
+	progress.On("ProcessedIndex").Return(suite.defaultIndex, nil)
+	progress.On("SetProcessedIndex", mock.AnythingOfType("uint64")).Return(nil)
+
+	consumer, err := NewComponentConsumer(
 		zerolog.New(os.Stdout).With().Timestamp().Logger(),
 		workSignal,
 		progress,
@@ -107,6 +99,7 @@ func (suite *ComponentConsumerSuite) prepareTest(
 		suite.maxProcessing,
 		suite.maxSearchAhead,
 	)
+	require.NoError(suite.T(), err)
 	consumer.SetPreNotifier(preNotifier)
 	consumer.SetPostNotifier(postNotifier)
 
@@ -145,7 +138,7 @@ func (suite *ComponentConsumerSuite) TestHappyPath() {
 		wg.Add(int(testJobsCount))
 		consumer, workSignal := suite.prepareTest(processor, nil, notifier, jobData)
 
-		suite.runTest(testCtx, consumer, workSignal, func() {
+		suite.runTest(testCtx, consumer, func() {
 			workSignal <- struct{}{}
 			wg.Wait()
 		})
@@ -163,7 +156,7 @@ func (suite *ComponentConsumerSuite) TestHappyPath() {
 		wg.Add(int(testJobsCount))
 		consumer, workSignal := suite.prepareTest(processor, notifier, nil, jobData)
 
-		suite.runTest(testCtx, consumer, workSignal, func() {
+		suite.runTest(testCtx, consumer, func() {
 			workSignal <- struct{}{}
 			wg.Wait()
 		})
@@ -217,7 +210,7 @@ func (suite *ComponentConsumerSuite) TestProgressesOnComplete() {
 	suite.maxProcessing = 1
 	consumer, workSignal := suite.prepareTest(processor, nil, notifier, jobData)
 
-	suite.runTest(testCtx, consumer, workSignal, func() {
+	suite.runTest(testCtx, consumer, func() {
 		workSignal <- struct{}{}
 		unittest.RequireNeverClosedWithin(suite.T(), done, 100*time.Millisecond, fmt.Sprintf("job %d wasn't supposed to finish", stopIndex+1))
 	})
@@ -229,6 +222,48 @@ func (suite *ComponentConsumerSuite) TestProgressesOnComplete() {
 	for index := range finishedJobs {
 		assert.LessOrEqual(suite.T(), index, stopIndex)
 	}
+}
+
+func (suite *ComponentConsumerSuite) TestSignalsBeforeReadyDoNotCheck() {
+	testCtx, testCancel := context.WithCancel(context.Background())
+	defer testCancel()
+
+	suite.defaultIndex = uint64(100)
+	started := atomic.NewBool(false)
+
+	jobConsumer := modulemock.NewJobConsumer(suite.T())
+	jobConsumer.On("Start").Return(func() error {
+		// force Start to take a while so the processingLoop is ready first
+		// the processingLoop should wait to start, otherwise Check would be called
+		time.Sleep(500 * time.Millisecond)
+		started.Store(true)
+		return nil
+	})
+	jobConsumer.On("Stop")
+
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+
+	jobConsumer.On("Check").Run(func(_ mock.Arguments) {
+		assert.True(suite.T(), started.Load(), "check was called before started")
+		wg.Done()
+	})
+
+	consumer, workSignal := suite.prepareTest(nil, nil, nil, nil)
+	consumer.consumer = jobConsumer
+
+	// send a signal before the component starts to ensure Check would be called if the
+	// processingLoop was started
+	workSignal <- struct{}{}
+
+	ctx, cancel := context.WithCancel(testCtx)
+	signalCtx := irrecoverable.NewMockSignalerContext(suite.T(), ctx)
+	consumer.Start(signalCtx)
+
+	unittest.RequireCloseBefore(suite.T(), consumer.Ready(), 1*time.Second, "timeout waiting for consumer to be ready")
+	unittest.RequireReturnsBefore(suite.T(), wg.Wait, 100*time.Millisecond, "check was not called")
+	cancel()
+	unittest.RequireCloseBefore(suite.T(), consumer.Done(), 1*time.Second, "timeout waiting for consumer to be done")
 }
 
 // TestPassesIrrecoverableErrors:
@@ -283,16 +318,12 @@ func (suite *ComponentConsumerSuite) TestPassesIrrecoverableErrors() {
 func (suite *ComponentConsumerSuite) runTest(
 	testCtx context.Context,
 	consumer *ComponentConsumer,
-	workSignal chan<- struct{},
 	sendJobs func(),
 ) {
 	ctx, cancel := context.WithCancel(testCtx)
-	signalCtx, errChan := irrecoverable.WithSignaler(ctx)
+	signalerCtx := irrecoverable.NewMockSignalerContext(suite.T(), ctx)
 
-	// use global context so we listen for errors until the test is finished
-	go irrecoverableNotExpected(suite.T(), testCtx, errChan)
-
-	consumer.Start(signalCtx)
+	consumer.Start(signalerCtx)
 	unittest.RequireCloseBefore(suite.T(), consumer.Ready(), 100*time.Millisecond, "timeout waiting for the consumer to be ready")
 
 	sendJobs()
@@ -300,13 +331,4 @@ func (suite *ComponentConsumerSuite) runTest(
 	// shutdown
 	cancel()
 	unittest.RequireCloseBefore(suite.T(), consumer.Done(), 100*time.Millisecond, "timeout waiting for the consumer to be done")
-}
-
-func irrecoverableNotExpected(t *testing.T, ctx context.Context, errChan <-chan error) {
-	select {
-	case <-ctx.Done():
-		return
-	case err := <-errChan:
-		require.NoError(t, err, "unexpected irrecoverable error")
-	}
 }

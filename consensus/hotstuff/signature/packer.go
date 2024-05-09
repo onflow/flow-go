@@ -1,6 +1,7 @@
 package signature
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
@@ -13,13 +14,13 @@ import (
 // The encoding method is RLP.
 type ConsensusSigDataPacker struct {
 	model.SigDataPacker
-	committees hotstuff.Committee
+	committees hotstuff.Replicas
 }
 
 var _ hotstuff.Packer = &ConsensusSigDataPacker{}
 
 // NewConsensusSigDataPacker creates a new ConsensusSigDataPacker instance
-func NewConsensusSigDataPacker(committees hotstuff.Committee) *ConsensusSigDataPacker {
+func NewConsensusSigDataPacker(committees hotstuff.Replicas) *ConsensusSigDataPacker {
 	return &ConsensusSigDataPacker{
 		committees: committees,
 	}
@@ -29,11 +30,11 @@ func NewConsensusSigDataPacker(committees hotstuff.Committee) *ConsensusSigDataP
 // To pack the block signature data, we first build a compact data type, and then encode it into bytes.
 // Expected error returns during normal operations:
 //   - none; all errors are symptoms of inconsistent input data or corrupted internal state.
-func (p *ConsensusSigDataPacker) Pack(blockID flow.Identifier, sig *hotstuff.BlockSignatureData) ([]byte, []byte, error) {
+func (p *ConsensusSigDataPacker) Pack(view uint64, sig *hotstuff.BlockSignatureData) ([]byte, []byte, error) {
 	// retrieve all authorized consensus participants at the given block
-	fullMembers, err := p.committees.Identities(blockID)
+	fullMembers, err := p.committees.IdentitiesByEpoch(view)
 	if err != nil {
-		return nil, nil, fmt.Errorf("could not find consensus committees by block id(%v): %w", blockID, err)
+		return nil, nil, fmt.Errorf("could not find consensus committee for view %d: %w", view, err)
 	}
 
 	// breaking staking and random beacon signers into signerIDs and sig type for compaction
@@ -63,23 +64,24 @@ func (p *ConsensusSigDataPacker) Pack(blockID flow.Identifier, sig *hotstuff.Blo
 }
 
 // Unpack de-serializes the provided signature data.
+// view is the view of the block that the aggregated sig is signed for
 // sig is the aggregated signature data
 // It returns:
 //   - (sigData, nil) if successfully unpacked the signature data
 //   - (nil, model.InvalidFormatError) if failed to unpack the signature data
-func (p *ConsensusSigDataPacker) Unpack(signerIdentities flow.IdentityList, sigData []byte) (*hotstuff.BlockSignatureData, error) {
+func (p *ConsensusSigDataPacker) Unpack(signerIdentities flow.IdentitySkeletonList, sigData []byte) (*hotstuff.BlockSignatureData, error) {
 	// decode into typed data
-	data, err := p.Decode(sigData)
+	data, err := p.Decode(sigData) // all potential error are of type `model.InvalidFormatError`
 	if err != nil {
-		return nil, model.NewInvalidFormatErrorf("could not decode sig data %s", err)
+		return nil, fmt.Errorf("could not decode sig data %w", err)
 	}
 
 	stakingSigners, randomBeaconSigners, err := signature.DecodeSigTypeToStakingAndBeaconSigners(signerIdentities, data.SigType)
 	if err != nil {
-		if signature.IsInvalidSigTypesError(err) {
-			return nil, model.NewInvalidFormatErrorf("invalid signer type data.SigType %v: %w", data.SigType, err)
+		if errors.Is(err, signature.ErrIllegallyPaddedBitVector) || errors.Is(err, signature.ErrIncompatibleBitVectorLength) {
+			return nil, model.NewInvalidFormatErrorf("invalid SigType vector: %w", err)
 		}
-		return nil, fmt.Errorf("unexpected exception unpacking signer data data.SigType %v: %w", data.SigType, err)
+		return nil, fmt.Errorf("could not decode signer indices and sig type: %w", err)
 	}
 
 	return &hotstuff.BlockSignatureData{

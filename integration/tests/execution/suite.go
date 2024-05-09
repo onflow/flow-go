@@ -1,8 +1,11 @@
 package execution
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
+	"net/http"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
@@ -29,40 +32,78 @@ type Suite struct {
 }
 
 func (s *Suite) Ghost() *client.GhostClient {
-	ghost := s.net.ContainerByID(s.ghostID)
-	client, err := lib.GetGhostClient(ghost)
+	client, err := s.net.ContainerByID(s.ghostID).GhostClient()
 	require.NoError(s.T(), err, "could not get ghost client")
 	return client
 }
 
 func (s *Suite) AccessClient() *testnet.Client {
-	chain := s.net.Root().Header.ChainID.Chain()
-	client, err := testnet.NewClient(fmt.Sprintf(":%s", s.net.AccessPorts[testnet.AccessNodeAPIPort]), chain)
+	client, err := s.net.ContainerByName(testnet.PrimaryAN).TestnetClient()
 	require.NoError(s.T(), err, "could not get access client")
 	return client
 }
 
-func (s *Suite) ExecutionClient() *testnet.Client {
-	execNode := s.net.ContainerByID(s.exe1ID)
-	chain := s.net.Root().Header.ChainID.Chain()
-	client, err := testnet.NewClient(fmt.Sprintf(":%s", execNode.Ports[testnet.ExeNodeAPIPort]), chain)
-	require.NoError(s.T(), err, "could not get execution client")
-	return client
+type AdminCommandRequest struct {
+	CommandName string `json:"commandName"`
+	Data        any    `json:"data"`
+}
+
+type AdminCommandResponse struct {
+	Output any `json:"output"`
+}
+
+// SendExecutionAdminCommand sends admin command to EN. data will be serialized to JSON and sent as data part of the command request.
+// Response will be deserialized into output object.
+// It bubbles up errors from (un)marshalling of data and handling the request
+func (s *Suite) SendExecutionAdminCommand(ctx context.Context, command string, data any, output any) error {
+	enContainer := s.net.ContainerByID(s.exe1ID)
+
+	request := AdminCommandRequest{
+		CommandName: command,
+		Data:        data,
+	}
+
+	marshal, err := json.Marshal(request)
+	if err != nil {
+		return fmt.Errorf("error while marshalling request: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "POST",
+		fmt.Sprintf("http://localhost:%s/admin/run_command", enContainer.Port(testnet.AdminPort)),
+		bytes.NewBuffer(marshal),
+	)
+	if err != nil {
+		return fmt.Errorf("error while building request: %w", err)
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("error while sending request: %w", err)
+	}
+
+	adminCommandResponse := AdminCommandResponse{
+		Output: output,
+	}
+
+	err = json.NewDecoder(resp.Body).Decode(&adminCommandResponse)
+	if err != nil {
+		return fmt.Errorf("error while reading/decoding response: %w", err)
+	}
+
+	return nil
 }
 
 func (s *Suite) AccessPort() string {
-	return s.net.AccessPorts[testnet.AccessNodeAPIPort]
+	return s.net.ContainerByName(testnet.PrimaryAN).Port(testnet.GRPCPort)
 }
 
 func (s *Suite) MetricsPort() string {
-	return s.net.AccessPorts[testnet.ExeNodeMetricsPort]
+	return s.net.ContainerByName("execution_1").Port(testnet.GRPCPort)
 }
 
 func (s *Suite) SetupTest() {
 	s.log = unittest.LoggerForTest(s.Suite.T(), zerolog.InfoLevel)
 	s.log.Info().Msg("================> SetupTest")
-
-	blockRateFlag := "--block-rate-delay=1ms"
 
 	s.nodeConfigs = append(s.nodeConfigs, testnet.NewNodeConfig(flow.RoleAccess))
 
@@ -71,8 +112,7 @@ func (s *Suite) SetupTest() {
 	for _, nodeID := range s.nodeIDs {
 		nodeConfig := testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithID(nodeID),
 			testnet.WithLogLevel(zerolog.FatalLevel),
-			testnet.WithAdditionalFlag("--hotstuff-timeout=12s"),
-			testnet.WithAdditionalFlag(blockRateFlag),
+			testnet.WithAdditionalFlag("cruise-ctl-fallback-proposal-duration=1ms"),
 		)
 		s.nodeConfigs = append(s.nodeConfigs, nodeConfig)
 	}
@@ -86,11 +126,11 @@ func (s *Suite) SetupTest() {
 	// need two collection node
 	coll1Config := testnet.NewNodeConfig(flow.RoleCollection,
 		testnet.WithLogLevel(zerolog.FatalLevel),
-		testnet.WithAdditionalFlag(blockRateFlag),
+		testnet.WithAdditionalFlag("--hotstuff-proposal-duration=1ms"),
 	)
 	coll2Config := testnet.NewNodeConfig(flow.RoleCollection,
 		testnet.WithLogLevel(zerolog.FatalLevel),
-		testnet.WithAdditionalFlag(blockRateFlag),
+		testnet.WithAdditionalFlag("--hotstuff-proposal-duration=1ms"),
 	)
 	s.nodeConfigs = append(s.nodeConfigs, coll1Config, coll2Config)
 

@@ -7,19 +7,78 @@ import (
 
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
+
 	"github.com/onflow/flow-core-contracts/lib/go/contracts"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
 
 	"github.com/onflow/flow-go/model/flow"
 )
 
-func DeployFungibleTokenContractTransaction(fungibleToken flow.Address) *flow.TransactionBody {
-	contract := contracts.FungibleToken()
+func DeployFungibleTokenContractTransaction(fungibleToken flow.Address, contract []byte) *flow.TransactionBody {
 	contractName := "FungibleToken"
 	return DeployContractTransaction(
 		fungibleToken,
 		contract,
-		contractName)
+		contractName,
+	)
+}
+
+func DeployNonFungibleTokenContractTransaction(nonFungibleToken flow.Address, contract []byte) *flow.TransactionBody {
+	contractName := "NonFungibleToken"
+	return DeployContractTransaction(
+		nonFungibleToken,
+		contract,
+		contractName,
+	)
+}
+
+func DeployMetadataViewsContractTransaction(nonFungibleToken flow.Address, contract []byte) *flow.TransactionBody {
+	contractName := "MetadataViews"
+	return DeployContractTransaction(
+		nonFungibleToken,
+		contract,
+		contractName,
+	)
+}
+
+func DeployViewResolverContractTransaction(nonFungibleToken flow.Address) *flow.TransactionBody {
+	contract := contracts.ViewResolver()
+	contractName := "ViewResolver"
+	return DeployContractTransaction(
+		nonFungibleToken,
+		contract,
+		contractName,
+	)
+}
+
+func DeployBurnerContractTransaction(fungibleToken flow.Address) *flow.TransactionBody {
+	contract := contracts.Burner()
+	contractName := "Burner"
+	return DeployContractTransaction(
+		fungibleToken,
+		contract,
+		contractName,
+	)
+}
+
+func DeployFungibleTokenMetadataViewsContractTransaction(fungibleToken flow.Address, contract []byte) *flow.TransactionBody {
+
+	contractName := "FungibleTokenMetadataViews"
+	return DeployContractTransaction(
+		fungibleToken,
+		contract,
+		contractName,
+	)
+}
+
+func DeployFungibleTokenSwitchboardContractTransaction(fungibleToken flow.Address, contract []byte) *flow.TransactionBody {
+
+	contractName := "FungibleTokenSwitchboard"
+	return DeployContractTransaction(
+		fungibleToken,
+		contract,
+		contractName,
+	)
 }
 
 //go:embed scripts/deployFlowTokenTransactionTemplate.cdc
@@ -31,8 +90,7 @@ var createFlowTokenMinterTransactionTemplate string
 //go:embed scripts/mintFlowTokenTransactionTemplate.cdc
 var mintFlowTokenTransactionTemplate string
 
-func DeployFlowTokenContractTransaction(service, fungibleToken, flowToken flow.Address) *flow.TransactionBody {
-	contract := contracts.FlowToken(fungibleToken.HexWithPrefix())
+func DeployFlowTokenContractTransaction(service, flowToken flow.Address, contract []byte) *flow.TransactionBody {
 
 	return flow.NewTransactionBody().
 		SetScript([]byte(deployFlowTokenTransactionTemplate)).

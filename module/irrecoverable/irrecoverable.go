@@ -30,7 +30,7 @@ func NewSignaler() (*Signaler, <-chan error) {
 // errors as unhandled.
 func (s *Signaler) Throw(err error) {
 	defer runtime.Goexit()
-	if s.errThrown.CAS(false, true) {
+	if s.errThrown.CompareAndSwap(false, true) {
 		s.errChan <- err
 		close(s.errChan)
 	} else {
@@ -40,13 +40,16 @@ func (s *Signaler) Throw(err error) {
 	}
 }
 
-// We define a constrained interface to provide a drop-in replacement for context.Context
-// including in interfaces that compose it.
+// SignalerContext is a constrained interface to provide a drop-in replacement for
+// context.Context including in interfaces that compose it.
 type SignalerContext interface {
 	context.Context
 	Throw(err error) // delegates to the signaler
 	sealed()         // private, to constrain builder to using WithSignaler
 }
+
+// SignalerContextKey represents the key type for retrieving a SignalerContext from a value `context.Context`.
+type SignalerContextKey struct{}
 
 // private, to force context derivation / WithSignaler
 type signalerCtx struct {
@@ -56,25 +59,40 @@ type signalerCtx struct {
 
 func (sc signalerCtx) sealed() {}
 
-// the One True Way of getting a SignalerContext
+// WithSignaler is the One True Way of getting a SignalerContext.
 func WithSignaler(parent context.Context) (SignalerContext, <-chan error) {
 	sig, errChan := NewSignaler()
 	return &signalerCtx{parent, sig}, errChan
 }
 
-// If we have an SignalerContext, we can directly ctx.Throw.
+// WithSignalerContext wraps `SignalerContext` using `context.WithValue` so it can later be used with `Throw`.
+func WithSignalerContext(parent context.Context, ctx SignalerContext) context.Context {
+	return context.WithValue(parent, SignalerContextKey{}, ctx)
+}
+
+// Throw enables throwing an irrecoverable error using any context.Context.
 //
-// But a lot of library methods expect context.Context, & we want to pass the same w/o boilerplate
+// If we have an SignalerContext, we can directly ctx.Throw.
+// But a lot of library methods expect context.Context, & we want to pass the same w/o boilerplate.
 // Moreover, we could have built with: context.WithCancel(irrecoverable.WithSignaler(ctx, sig)),
 // "downcasting" to context.Context. Yet, we can still type-assert and recover.
 //
 // Throw can be a drop-in replacement anywhere we have a context.Context likely
 // to support Irrecoverables. Note: this is not a method
 func Throw(ctx context.Context, err error) {
-	signalerAbleContext, ok := ctx.(SignalerContext)
+	signalerAbleContext, ok := ctx.Value(SignalerContextKey{}).(SignalerContext)
 	if ok {
 		signalerAbleContext.Throw(err)
+	} else {
+		// Be spectacular on how this does not -but should- handle irrecoverables:
+		log.Fatalf("irrecoverable error signaler not found for context, please implement! Unhandled irrecoverable error: %v", err)
 	}
-	// Be spectacular on how this does not -but should- handle irrecoverables:
-	log.Fatalf("irrecoverable error signaler not found for context, please implement! Unhandled irrecoverable error %v", err)
+}
+
+// WithSignallerAndCancel returns an irrecoverable context, the cancel
+// function for the context, and the error channel for the context.
+func WithSignallerAndCancel(ctx context.Context) (SignalerContext, context.CancelFunc, <-chan error) {
+	parent, cancel := context.WithCancel(ctx)
+	irrecoverableCtx, errCh := WithSignaler(parent)
+	return irrecoverableCtx, cancel, errCh
 }

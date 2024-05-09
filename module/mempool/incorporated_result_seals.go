@@ -1,5 +1,3 @@
-// (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
-
 package mempool
 
 import (
@@ -37,6 +35,6 @@ type IncorporatedResultSeals interface {
 	// Monotonicity Requirement:
 	// The pruned height cannot decrease, as we cannot recover already pruned elements.
 	// If `height` is smaller than the previous value, the previous value is kept
-	// and the sentinel empool.NewDecreasingPruningHeightError is returned.
+	// and the sentinel mempool.BelowPrunedThresholdError is returned.
 	PruneUpToHeight(height uint64) error
 }

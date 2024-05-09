@@ -35,7 +35,7 @@ This generates keys for each of the nodes and a genesis block to build on.
 Bootstrap a new network:
 
 ```sh
-make init
+make bootstrap
 ```
 
 ### Configuration
@@ -46,14 +46,14 @@ All configuration is optional.
 Specify the number of nodes for each role:
 
 ```sh
-make -e COLLECTION=2 CONSENSUS=5 EXECUTION=3 VERIFICATION=2 ACCESS=2 init
+make -e COLLECTION=2 CONSENSUS=5 EXECUTION=3 VERIFICATION=2 ACCESS=2 bootstrap
 ```
 *NOTE: number of execution\consensus nodes should be no less than 2. It is to avoid seals being created in case of execution forks.*
 
 Specify the number of collector clusters:
 
 ```sh
-make -e NCLUSTERS=3 init
+make -e NCLUSTERS=3 bootstrap
 ```
 
 ### Profiling
@@ -62,7 +62,7 @@ You can turn on automatic profiling for all nodes. Profiles are written every 2
 minutes to `./profiler`.
 
 ```sh
-make -e PROFILER=true init
+make -e PROFILER=true bootstrap
 ```
 
 ## Start the network
@@ -74,12 +74,25 @@ and then start the test network:
 make start
 ```
 
+Alternatively, this command will start the test network without re-building, using the most recently built image.
+```shell
+make start-cached
+```
+
+
 ## Stop the network
 
 The network needs to be stopped between each consecutive run to clear the chain state:
 
 ```sh
 make stop
+```
+
+## Build Localnet images
+
+To build images for Localnet, run this command.
+```shell
+make build-flow
 ```
 
 ## Logs
@@ -133,6 +146,64 @@ The command by default will load your localnet with 1 tps for 30s, then 10 tps f
 
 More about the loader can be found in the benchmark module.
 
+## Debugging
+It is possible to connect a debugger to a localnet instance to debug the code. To set this up, find the
+node you want to debug in `docker-compose.nodes.yml`, then make the following changes to its config:
+
+1. Set the build `target` setting to `debug`. This configures it to use the special `debug` image which
+   runs the node application within `dlv`.
+	```
+	build:
+		...
+		target: debug
+	```
+2. Expose the debugger ports to your host network
+	```
+	ports:
+		...
+		- "2345:2345"
+	```
+3. Rebuild the node. In these examples, we are rebuilding the `execution_1` node.
+	```
+	docker-compose -f docker-compose.nodes.yml build execution_1
+	```
+4. Stop and restart the node
+	```
+	docker-compose -f docker-compose.nodes.yml stop execution_1
+	docker-compose -f docker-compose.nodes.yml up -d execution_1
+	```
+5. Check the logs to make sure it's working
+	```
+	docker-compose -f docker-compose.nodes.yml logs -f execution_1
+
+	localnet-execution_1-1  | API server listening at: [::]:2345
+	```
+6. Configure your debugger client to connect. Here is a vscode launch config as an example:
+	```
+   {
+        "name": "Connect to container",
+        "type": "go",
+        "request": "attach",
+        "mode": "remote",
+        "debugAdapter": "dlv-dap",
+        "substitutePath": [
+            {
+                "from": "${workspaceFolder}",
+                "to": "/app",
+            },
+        ],
+        "port": 2345,
+        "trace": "verbose"
+    },
+	```
+
+Notes:
+* `JSON-rpc` only supports connecting to the headless server once. You will need to restart the
+node to connect again. `Debug Adaptor Protocol (DAP)` supports reconnecting.
+* The Dockerfile is configured to pause the application until the debugger connects. This ensures
+`JSON-rpc` clients can connect. If you are connecting with `DAP` and would like the node to start
+immediately, update the debug `ENTRYPOINT` in the Dockerfile to include `--continue=true`.
+
 ## Playing with Localnet
 
 This section documents how can be localnet used for experimenting with the network.
@@ -146,7 +217,7 @@ An example of the Flow CLI configuration modified for connecting to the localnet
 ```
 {
 	"networks": {
-		"localnet": "127.0.0.1:3569"
+		"localnet": "127.0.0.1:4001"
 	}
 }
 ```
@@ -167,7 +238,7 @@ An example of the Flow CLI configuration with the service account added:
 ```
 {
 	"networks": {
-		"localnet": "127.0.0.1:3569"
+		"localnet": "127.0.0.1:4001"
 	},
 	"accounts": {
 		"localnet-service-account": {
@@ -242,9 +313,10 @@ Create a file (for example `my_script.cdc`) containing following cadence code:
 import FungibleToken from 0xee82856bf20e2aa6
 import FlowToken from 0x0ae53cb6e3f42a79
 
-pub fun main(address: Address): UFix64 {
+access(all)
+fun main(address: Address): UFix64 {
 	let acct = getAccount(address)
-	let vaultRef = acct.getCapability(/public/flowTokenBalance)!.borrow<&FlowToken.Vault{FungibleToken.Balance}>()
+	let vaultRef = acct.capabilities.borrow<&FlowToken.Vault{FungibleToken.Balance}>(/public/flowTokenBalance)
 		?? panic("Could not borrow Balance reference to the Vault")
 	return vaultRef.balance
 }
@@ -260,7 +332,8 @@ The script should output the account balance of the specified account.
 You can also execute simple script without creating files, by providing the script in the command, for example:
 ```
 # flow scripts execute -n localnet <(echo """
-pub fun main(address: Address): UFix64 {
+access(all)
+fun main(address: Address): UFix64 {
     return getAccount(address).balance
 }
 """) "<ACCOUNT_ADDRESS>"
@@ -284,15 +357,15 @@ After the transaction is sealed, the account with `<ACCOUNT_ADDRESS>` should hav
 # admin tool
 The admin tool is enabled by default in localnet for all node type except access node.
 
-For instance, in order to use admin tool to change log level, first find the local port that maps to `9002` which is the admin tool address, if the local port is `3702`, then run:
+For instance, in order to use admin tool to change log level, first find the local port that maps to `9002` which is the admin tool address, if the local port is `6100`, then run:
 ```
-curl localhost:3702/admin/run_command -H 'Content-Type: application/json' -d '{"commandName": "set-log-level", "data": "debug"}'
+curl localhost:6100/admin/run_command -H 'Content-Type: application/json' -d '{"commandName": "set-log-level", "data": "debug"}'
 ```
 
 To find the local port after launching the localnet, run `docker ps -a`, and find the port mapping.
-For instance, the following result of `docker ps -a ` shows `localnet-collection` maps 9002 port to localhost's 3702 port, so we could use 3702 port to connect to admin tool.
+For instance, the following result of `docker ps -a ` shows `localnet-collection` maps 9002 port to localhost's 6100 port, so we could use 6100 port to connect to admin tool.
 ```
-2e0621f7e592   localnet-access                   "/bin/app --nodeid=9…"   9 seconds ago    Up 8 seconds              0.0.0.0:3571->9000/tcp, :::3571->9000/tcp, 0.0.0.0:3572->9001/tcp, :::3572->9001/tcp                                                           localnet_access_2_1
-fcd92116f902   localnet-collection               "/bin/app --nodeid=0…"   9 seconds ago    Up 8 seconds              0.0.0.0:3702->9002/tcp, :::3702->9002/tcp                                                                                                      localnet_collection_1_1
-dd841d389e36   localnet-access                   "/bin/app --nodeid=a…"   10 seconds ago   Up 9 seconds              0.0.0.0:3569->9000/tcp, :::3569->9000/tcp, 0.0.0.0:3570->9001/tcp, :::3570->9001/tcp                                                           localnet_access_1_1
+2e0621f7e592   localnet-access                   "/bin/app --nodeid=9…"   9 seconds ago    Up 8 seconds              0.0.0.0:4011->9000/tcp, :::4011->9000/tcp, 0.0.0.0:4012->9001/tcp, :::4012->9001/tcp                                                           localnet_access_2_1
+fcd92116f902   localnet-collection               "/bin/app --nodeid=0…"   9 seconds ago    Up 8 seconds              0.0.0.0:6100->9002/tcp, :::6100->9002/tcp                                                                                                      localnet_collection_1_1
+dd841d389e36   localnet-access                   "/bin/app --nodeid=a…"   10 seconds ago   Up 9 seconds              0.0.0.0:4001->9000/tcp, :::4001->9000/tcp, 0.0.0.0:4002->9001/tcp, :::4002->9001/tcp                                                           localnet_access_1_1
 ```

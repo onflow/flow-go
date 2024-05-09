@@ -1,5 +1,3 @@
-// (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
-
 package mempool
 
 import (
@@ -34,8 +32,4 @@ type Transactions interface {
 
 	// Clear removes all transactions from the mempool.
 	Clear()
-
-	// Hash will return a fingerprint hash representing the contents of the
-	// entire memory pool.
-	Hash() flow.Identifier
 }

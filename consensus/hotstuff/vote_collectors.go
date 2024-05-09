@@ -3,7 +3,7 @@ package hotstuff
 import "github.com/onflow/flow-go/module"
 
 // VoteCollectors is an interface which allows VoteAggregator to interact with collectors structured by
-// view and blockID.
+// view.
 // Implementations of this interface are responsible for state transitions of `VoteCollector`s and pruning of
 // stale and outdated collectors by view.
 type VoteCollectors interface {
@@ -15,11 +15,11 @@ type VoteCollectors interface {
 	// When creating a vote collector, the view will be used to get epoch by view, then create the random beacon
 	// signer object by epoch, because epoch determines DKG, which determines random beacon committee.
 	// It returns:
-	//  -  (collector, true, nil) if no collector can be found by the block ID, and a new collector was created.
-	//  -  (collector, false, nil) if the collector can be found by the block ID
+	//  -  (collector, true, nil) if no collector can be found by the view, and a new collector was created.
+	//  -  (collector, false, nil) if the collector can be found by the view
 	//  -  (nil, false, error) if running into any exception creating the vote collector state machine
 	// Expected error returns during normal operations:
-	//  * mempool.DecreasingPruningHeightError
+	//  * mempool.BelowPrunedThresholdError - in case view is lower than last pruned view
 	GetOrCreateCollector(view uint64) (collector VoteCollector, created bool, err error)
 
 	// PruneUpToView prunes the vote collectors with views _below_ the given value, i.e.

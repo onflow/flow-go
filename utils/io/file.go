@@ -5,7 +5,8 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"syscall"
+
+	"go.uber.org/multierr"
 )
 
 // ReadFile reads the file from path, if not found, it will print the absolute path, instead of
@@ -48,11 +49,6 @@ func CopyDirectory(scrDir, dest string) error {
 			return err
 		}
 
-		stat, ok := fileInfo.Sys().(*syscall.Stat_t)
-		if !ok {
-			return fmt.Errorf("failed to get raw syscall.Stat_t data for '%s'", sourcePath)
-		}
-
 		switch fileInfo.Mode() & os.ModeType {
 		case os.ModeDir:
 			if err := CreateIfNotExists(destPath, 0755); err != nil {
@@ -71,7 +67,7 @@ func CopyDirectory(scrDir, dest string) error {
 			}
 		}
 
-		if err := os.Lchown(destPath, int(stat.Uid), int(stat.Gid)); err != nil {
+		if err := chown(destPath, fileInfo); err != nil {
 			return err
 		}
 
@@ -90,23 +86,24 @@ func CopyDirectory(scrDir, dest string) error {
 	return nil
 }
 
-func Copy(srcFile, dstFile string) error {
-	out, err := os.Create(dstFile)
-	if err != nil {
-		return err
-	}
-
-	defer out.Close()
-
+func Copy(srcFile, dstFile string) (errToReturn error) {
 	in, err := os.Open(srcFile)
 	if err != nil {
-		return err
+		return fmt.Errorf("can not open file %v to copy from: %w", srcFile, err)
 	}
-	defer in.Close()
+
+	defer multierr.AppendInvoke(&errToReturn, multierr.Close(in))
+
+	out, err := os.Create(dstFile)
+	if err != nil {
+		return fmt.Errorf("can not create file %v to copy to: %w", dstFile, err)
+	}
+
+	defer multierr.AppendInvoke(&errToReturn, multierr.Close(out))
 
 	_, err = io.Copy(out, in)
 	if err != nil {
-		return err
+		return fmt.Errorf("can not copy file: %w", err)
 	}
 
 	return nil

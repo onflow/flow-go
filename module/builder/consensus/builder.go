@@ -1,5 +1,3 @@
-// (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
-
 package consensus
 
 import (
@@ -25,33 +23,35 @@ import (
 // Builder is the builder for consensus block payloads. Upon providing a payload
 // hash, it also memorizes which entities were included into the payload.
 type Builder struct {
-	metrics    module.MempoolMetrics
-	tracer     module.Tracer
-	db         *badger.DB
-	state      protocol.MutableState
-	seals      storage.Seals
-	headers    storage.Headers
-	index      storage.Index
-	blocks     storage.Blocks
-	resultsDB  storage.ExecutionResults
-	receiptsDB storage.ExecutionReceipts
-	guarPool   mempool.Guarantees
-	sealPool   mempool.IncorporatedResultSeals
-	recPool    mempool.ExecutionTree
-	cfg        Config
+	metrics              module.MempoolMetrics
+	tracer               module.Tracer
+	db                   *badger.DB
+	state                protocol.ParticipantState
+	seals                storage.Seals
+	headers              storage.Headers
+	index                storage.Index
+	blocks               storage.Blocks
+	resultsDB            storage.ExecutionResults
+	receiptsDB           storage.ExecutionReceipts
+	guarPool             mempool.Guarantees
+	sealPool             mempool.IncorporatedResultSeals
+	recPool              mempool.ExecutionTree
+	mutableProtocolState protocol.MutableProtocolState
+	cfg                  Config
 }
 
 // NewBuilder creates a new block builder.
 func NewBuilder(
 	metrics module.MempoolMetrics,
 	db *badger.DB,
-	state protocol.MutableState,
+	state protocol.ParticipantState,
 	headers storage.Headers,
 	seals storage.Seals,
 	index storage.Index,
 	blocks storage.Blocks,
 	resultsDB storage.ExecutionResults,
 	receiptsDB storage.ExecutionReceipts,
+	mutableProtocolState protocol.MutableProtocolState,
 	guarPool mempool.Guarantees,
 	sealPool mempool.IncorporatedResultSeals,
 	recPool mempool.ExecutionTree,
@@ -79,20 +79,21 @@ func NewBuilder(
 	}
 
 	b := &Builder{
-		metrics:    metrics,
-		db:         db,
-		tracer:     tracer,
-		state:      state,
-		headers:    headers,
-		seals:      seals,
-		index:      index,
-		blocks:     blocks,
-		resultsDB:  resultsDB,
-		receiptsDB: receiptsDB,
-		guarPool:   guarPool,
-		sealPool:   sealPool,
-		recPool:    recPool,
-		cfg:        cfg,
+		metrics:              metrics,
+		db:                   db,
+		tracer:               tracer,
+		state:                state,
+		headers:              headers,
+		seals:                seals,
+		index:                index,
+		blocks:               blocks,
+		resultsDB:            resultsDB,
+		receiptsDB:           receiptsDB,
+		guarPool:             guarPool,
+		sealPool:             sealPool,
+		recPool:              recPool,
+		mutableProtocolState: mutableProtocolState,
+		cfg:                  cfg,
 	}
 
 	err = b.repopulateExecutionTree()
@@ -106,7 +107,7 @@ func NewBuilder(
 // BuildOn creates a new block header on top of the provided parent, using the
 // given view and applying the custom setter function to allow the caller to
 // make changes to the header before storing it.
-func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) error) (*flow.Header, error) {
+func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) error, sign func(*flow.Header) error) (*flow.Header, error) {
 
 	// since we don't know the blockID when building the block we track the
 	// time indirectly and insert the span directly at the end
@@ -136,12 +137,13 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		insertableGuarantees,
 		insertableSeals,
 		insertableReceipts,
-		setter)
+		setter,
+		sign)
 	if err != nil {
 		return nil, fmt.Errorf("could not assemble proposal: %w", err)
 	}
 
-	span, ctx, _ := b.tracer.StartBlockSpan(context.Background(), proposal.ID(), trace.CONBuilderBuildOn, otelTrace.WithTimestamp(startTime))
+	span, ctx := b.tracer.StartBlockSpan(context.Background(), proposal.ID(), trace.CONBuilderBuildOn, otelTrace.WithTimestamp(startTime))
 	defer span.End()
 
 	err = b.state.Extend(ctx, proposal)
@@ -223,7 +225,7 @@ func (b *Builder) repopulateExecutionTree() error {
 
 	// At this point execution tree is filled with all results for blocks (lastSealedBlock, lastFinalizedBlock].
 	// Now, we add all known receipts for any valid block that descends from the latest finalized block:
-	validPending, err := finalizedSnapshot.ValidDescendants()
+	validPending, err := finalizedSnapshot.Descendants()
 	if err != nil {
 		return fmt.Errorf("could not retrieve valid pending blocks from finalized snapshot: %w", err)
 	}
@@ -606,15 +608,9 @@ func (b *Builder) createProposal(parentID flow.Identifier,
 	guarantees []*flow.CollectionGuarantee,
 	seals []*flow.Seal,
 	insertableReceipts *InsertableReceipts,
-	setter func(*flow.Header) error) (*flow.Block, error) {
-
-	// build the payload so we can get the hash
-	payload := &flow.Payload{
-		Guarantees: guarantees,
-		Seals:      seals,
-		Receipts:   insertableReceipts.receipts,
-		Results:    insertableReceipts.results,
-	}
+	setter func(*flow.Header) error,
+	sign func(*flow.Header) error,
+) (*flow.Block, error) {
 
 	parent, err := b.headers.ByBlockID(parentID)
 	if err != nil {
@@ -629,18 +625,38 @@ func (b *Builder) createProposal(parentID flow.Identifier,
 		ParentID:    parentID,
 		Height:      parent.Height + 1,
 		Timestamp:   timestamp,
-		PayloadHash: payload.Hash(),
+		PayloadHash: flow.ZeroID,
 	}
 
-	// apply the custom fields setter of the consensus algorithm
+	// apply the custom fields setter of the consensus algorithm, we must do this before applying service events
+	// since we need to know the correct view of the block.
 	err = setter(header)
 	if err != nil {
 		return nil, fmt.Errorf("could not apply setter: %w", err)
 	}
 
+	// Evolve the Protocol State starting from the parent block's state. Information that may change the state is:
+	// the candidate block's view and Service Events from execution results sealed in the candidate block.
+	protocolStateID, _, err := b.mutableProtocolState.EvolveState(header.ParentID, header.View, seals)
+	if err != nil {
+		return nil, fmt.Errorf("evolving protocol state failed: %w", err)
+	}
+
 	proposal := &flow.Block{
-		Header:  header,
-		Payload: payload,
+		Header: header,
+	}
+	proposal.SetPayload(flow.Payload{
+		Guarantees:      guarantees,
+		Seals:           seals,
+		Receipts:        insertableReceipts.receipts,
+		Results:         insertableReceipts.results,
+		ProtocolStateID: protocolStateID,
+	})
+
+	// sign the proposal
+	err = sign(header)
+	if err != nil {
+		return nil, fmt.Errorf("could not sign the proposal: %w", err)
 	}
 
 	return proposal, nil

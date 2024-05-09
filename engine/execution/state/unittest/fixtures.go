@@ -1,57 +1,94 @@
 package unittest
 
 import (
+	"context"
+	"testing"
+
+	"github.com/onflow/crypto"
+	"github.com/stretchr/testify/require"
+
 	"github.com/onflow/flow-go/engine/execution"
-	"github.com/onflow/flow-go/engine/execution/state/delta"
+	"github.com/onflow/flow-go/fvm/meter"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func StateInteractionsFixture() *delta.SpockSnapshot {
-	return delta.NewView(nil).Interactions()
-}
-
-func ComputationResultFixture(collectionsSignerIDs [][]flow.Identifier) *execution.ComputationResult {
-	stateViews := make([]*delta.SpockSnapshot, len(collectionsSignerIDs)+1) //+1 for system chunk
-	stateCommitments := make([]flow.StateCommitment, len(collectionsSignerIDs)+1)
-	eventHashes := make([]flow.Identifier, len(collectionsSignerIDs)+1)
-	proofs := make([][]byte, len(collectionsSignerIDs)+1)
-	for i := 0; i < len(collectionsSignerIDs)+1; i++ {
-		stateViews[i] = StateInteractionsFixture()
-		stateCommitments[i] = unittest.StateCommitmentFixture()
-		eventHashes[i] = unittest.IdentifierFixture()
-		proofs[i] = unittest.RandomBytes(2)
-	}
-	return &execution.ComputationResult{
-		ExecutableBlock:  unittest.ExecutableBlockFixture(collectionsSignerIDs),
-		StateSnapshots:   stateViews,
-		StateCommitments: stateCommitments,
-		EventsHashes:     eventHashes,
-		Proofs:           proofs,
+func StateInteractionsFixture() *snapshot.ExecutionSnapshot {
+	return &snapshot.ExecutionSnapshot{
+		Meter: meter.NewMeter(meter.DefaultParameters()),
 	}
 }
 
-func ComputationResultForBlockFixture(completeBlock *entity.ExecutableBlock) *execution.ComputationResult {
-	n := len(completeBlock.CompleteCollections) + 1
-	stateViews := make([]*delta.SpockSnapshot, n)
-	stateCommitments := make([]flow.StateCommitment, n)
-	proofs := make([][]byte, n)
-	events := make([]flow.EventsList, n)
-	eventHashes := make([]flow.Identifier, n)
-	for i := 0; i < n; i++ {
-		stateViews[i] = StateInteractionsFixture()
-		stateCommitments[i] = *completeBlock.StartState
-		proofs[i] = unittest.RandomBytes(6)
-		events[i] = make(flow.EventsList, 0)
-		eventHashes[i] = unittest.IdentifierFixture()
+func ComputationResultFixture(
+	t *testing.T,
+	parentBlockExecutionResultID flow.Identifier,
+	collectionsSignerIDs [][]flow.Identifier,
+) *execution.ComputationResult {
+
+	startState := unittest.StateCommitmentFixture()
+	block := unittest.ExecutableBlockFixture(collectionsSignerIDs, &startState)
+
+	return ComputationResultForBlockFixture(t,
+		parentBlockExecutionResultID,
+		block)
+}
+
+func ComputationResultForBlockFixture(
+	t *testing.T,
+	parentBlockExecutionResultID flow.Identifier,
+	completeBlock *entity.ExecutableBlock,
+) *execution.ComputationResult {
+	collections := completeBlock.Collections()
+	computationResult := execution.NewEmptyComputationResult(completeBlock)
+
+	numberOfChunks := len(collections) + 1
+	ceds := make([]*execution_data.ChunkExecutionData, numberOfChunks)
+	startState := *completeBlock.StartState
+	for i := 0; i < numberOfChunks; i++ {
+		ceds[i] = unittest.ChunkExecutionDataFixture(t, 1024)
+		endState := unittest.StateCommitmentFixture()
+		computationResult.CollectionExecutionResultAt(i).UpdateExecutionSnapshot(StateInteractionsFixture())
+		computationResult.AppendCollectionAttestationResult(
+			startState,
+			endState,
+			nil,
+			unittest.IdentifierFixture(),
+			ceds[i],
+		)
+		startState = endState
 	}
-	return &execution.ComputationResult{
-		ExecutableBlock:  completeBlock,
-		StateSnapshots:   stateViews,
-		StateCommitments: stateCommitments,
-		Proofs:           proofs,
-		Events:           events,
-		EventsHashes:     eventHashes,
+	bed := unittest.BlockExecutionDataFixture(
+		unittest.WithBlockExecutionDataBlockID(completeBlock.Block.ID()),
+		unittest.WithChunkExecutionDatas(ceds...),
+	)
+	executionDataID, err := execution_data.CalculateID(context.Background(), bed, execution_data.DefaultSerializer)
+	require.NoError(t, err)
+
+	_, serviceEventEpochCommitProtocol := unittest.EpochCommitFixtureByChainID(flow.Localnet)
+	_, serviceEventEpochSetupProtocol := unittest.EpochSetupFixtureByChainID(flow.Localnet)
+	_, serviceEventVersionBeaconProtocol := unittest.VersionBeaconFixtureByChainID(flow.Localnet)
+
+	convertedServiceEvents := flow.ServiceEventList{
+		serviceEventEpochCommitProtocol.ServiceEvent(),
+		serviceEventEpochSetupProtocol.ServiceEvent(),
+		serviceEventVersionBeaconProtocol.ServiceEvent(),
 	}
+
+	executionResult := flow.NewExecutionResult(
+		parentBlockExecutionResultID,
+		completeBlock.ID(),
+		computationResult.AllChunks(),
+		convertedServiceEvents,
+		executionDataID)
+
+	computationResult.ExecutionReceipt = &flow.ExecutionReceipt{
+		ExecutionResult:   *executionResult,
+		Spocks:            make([]crypto.Signature, numberOfChunks),
+		ExecutorSignature: crypto.Signature{},
+	}
+
+	return computationResult
 }

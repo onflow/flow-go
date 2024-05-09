@@ -13,21 +13,18 @@ import (
 // Transactions ...
 type Transactions struct {
 	db    *badger.DB
-	cache *Cache
+	cache *Cache[flow.Identifier, *flow.TransactionBody]
 }
 
 // NewTransactions ...
 func NewTransactions(cacheMetrics module.CacheMetrics, db *badger.DB) *Transactions {
-	store := func(key interface{}, val interface{}) func(*transaction.Tx) error {
-		txID := key.(flow.Identifier)
-		flowTx := val.(*flow.TransactionBody)
-		return transaction.WithTx(operation.SkipDuplicates(operation.InsertTransaction(txID, flowTx)))
+	store := func(txID flow.Identifier, flowTX *flow.TransactionBody) func(*transaction.Tx) error {
+		return transaction.WithTx(operation.SkipDuplicates(operation.InsertTransaction(txID, flowTX)))
 	}
 
-	retrieve := func(key interface{}) func(tx *badger.Txn) (interface{}, error) {
-		txID := key.(flow.Identifier)
-		var flowTx flow.TransactionBody
-		return func(tx *badger.Txn) (interface{}, error) {
+	retrieve := func(txID flow.Identifier) func(tx *badger.Txn) (*flow.TransactionBody, error) {
+		return func(tx *badger.Txn) (*flow.TransactionBody, error) {
+			var flowTx flow.TransactionBody
 			err := operation.RetrieveTransaction(txID, &flowTx)(tx)
 			return &flowTx, err
 		}
@@ -35,8 +32,8 @@ func NewTransactions(cacheMetrics module.CacheMetrics, db *badger.DB) *Transacti
 
 	t := &Transactions{
 		db: db,
-		cache: newCache(cacheMetrics, metrics.ResourceTransaction,
-			withLimit(flow.DefaultTransactionExpiry+100),
+		cache: newCache[flow.Identifier, *flow.TransactionBody](cacheMetrics, metrics.ResourceTransaction,
+			withLimit[flow.Identifier, *flow.TransactionBody](flow.DefaultTransactionExpiry+100),
 			withStore(store),
 			withRetrieve(retrieve)),
 	}
@@ -66,6 +63,6 @@ func (t *Transactions) retrieveTx(txID flow.Identifier) func(*badger.Txn) (*flow
 		if err != nil {
 			return nil, err
 		}
-		return val.(*flow.TransactionBody), err
+		return val, err
 	}
 }

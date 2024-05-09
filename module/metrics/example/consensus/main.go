@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics/example"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/network/channels"
+	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -31,7 +32,7 @@ func main() {
 		}{
 			HotstuffCollector:   metrics.NewHotstuffCollector("some_chain_id"),
 			ConsensusCollector:  metrics.NewConsensusCollector(tracer, prometheus.DefaultRegisterer),
-			NetworkCollector:    metrics.NewNetworkCollector(),
+			NetworkCollector:    metrics.NewNetworkCollector(unittest.Logger()),
 			ComplianceCollector: metrics.NewComplianceCollector(),
 			MempoolCollector:    metrics.NewMempoolCollector(5 * time.Second),
 		}
@@ -40,8 +41,8 @@ func main() {
 			block := unittest.BlockFixture()
 			collector.MempoolEntries(metrics.ResourceGuarantee, 22)
 			collector.BlockFinalized(&block)
-			collector.HotStuffBusyDuration(10, metrics.HotstuffEventTypeTimeout)
-			collector.HotStuffWaitDuration(10, metrics.HotstuffEventTypeTimeout)
+			collector.HotStuffBusyDuration(10, metrics.HotstuffEventTypeLocalTimeout)
+			collector.HotStuffWaitDuration(10, metrics.HotstuffEventTypeLocalTimeout)
 			collector.HotStuffIdleDuration(10)
 			collector.SetCurView(uint64(i))
 			collector.SetQCView(uint64(i))
@@ -65,14 +66,16 @@ func main() {
 
 			collProvider := channels.TestNetworkChannel.String()
 			collIngest := channels.TestMetricsChannel.String()
+			protocol1 := message.ProtocolTypeUnicast.String()
+			protocol2 := message.ProtocolTypePubSub.String()
 			message1 := "CollectionRequest"
 			message2 := "ClusterBlockProposal"
 
-			collector.NetworkMessageSent(rand.Intn(1000), collProvider, message1)
-			collector.NetworkMessageSent(rand.Intn(1000), collIngest, message2)
+			collector.OutboundMessageSent(rand.Intn(1000), collProvider, protocol1, message1)
+			collector.OutboundMessageSent(rand.Intn(1000), collIngest, protocol2, message2)
 
-			collector.NetworkMessageReceived(rand.Intn(1000), collProvider, message1)
-			collector.NetworkMessageReceived(rand.Intn(1000), collIngest, message2)
+			collector.InboundMessageReceived(rand.Intn(1000), collProvider, protocol1, message1)
+			collector.InboundMessageReceived(rand.Intn(1000), collIngest, protocol2, message2)
 
 			time.Sleep(1 * time.Second)
 		}

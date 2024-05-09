@@ -1,5 +1,3 @@
-// (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
-
 package channels
 
 import (
@@ -102,6 +100,7 @@ func PublicChannels() ChannelList {
 	return ChannelList{
 		PublicSyncCommittee,
 		PublicReceiveBlocks,
+		PublicExecutionDataService,
 	}
 }
 
@@ -124,7 +123,6 @@ const (
 	// Channels for protocols actively synchronizing state across nodes
 	SyncCommittee     = Channel("sync-committee")
 	SyncClusterPrefix = "sync-cluster" // dynamic channel, use SyncCluster function
-	SyncExecution     = Channel("sync-execution")
 
 	// Channels for dkg communication
 	DKGCommittee = "dkg-committee"
@@ -155,9 +153,10 @@ const (
 	ProvideApprovalsByChunk  = RequestApprovalsByChunk
 
 	// Public network channels
-	PublicPushBlocks    = Channel("public-push-blocks")
-	PublicReceiveBlocks = PublicPushBlocks
-	PublicSyncCommittee = Channel("public-sync-committee")
+	PublicPushBlocks           = Channel("public-push-blocks")
+	PublicReceiveBlocks        = PublicPushBlocks
+	PublicSyncCommittee        = Channel("public-sync-committee")
+	PublicExecutionDataService = Channel("public-execution-data-service")
 
 	// Execution data service
 	ExecutionDataService = Channel("execution-data-service")
@@ -180,7 +179,6 @@ func initializeChannelRoleMap() {
 
 	// Channels for protocols actively synchronizing state across nodes
 	channelRoleMap[SyncCommittee] = flow.Roles()
-	channelRoleMap[SyncExecution] = flow.RoleList{flow.RoleExecution}
 
 	// Channels for DKG communication
 	channelRoleMap[DKGCommittee] = flow.RoleList{flow.RoleConsensus}
@@ -258,6 +256,15 @@ func TopicFromChannel(channel Channel, rootBlockID flow.Identifier) Topic {
 	return Topic(fmt.Sprintf("%s/%s", string(channel), rootBlockID.String()))
 }
 
+// TopicsFromChannels returns the unique LibP2P topics form the channels.
+func TopicsFromChannels(channels ChannelList, rootBlockID flow.Identifier) []Topic {
+	topics := make([]Topic, 0, len(channels))
+	for _, channel := range channels {
+		topics = append(topics, TopicFromChannel(channel, rootBlockID))
+	}
+	return topics
+}
+
 func ChannelFromTopic(topic Topic) (Channel, bool) {
 	if IsClusterChannel(Channel(topic)) {
 		return Channel(topic), true
@@ -270,6 +277,54 @@ func ChannelFromTopic(topic Topic) (Channel, bool) {
 	return "", false
 }
 
+// sporkIdFromTopic returns the pre-pended spork ID flow identifier for the topic.
+// A valid channel has a spork ID suffix:
+//
+//	channel/spork_id
+//
+// A generic error is returned if an error is encountered while converting the spork ID to flow Identifier or
+// the spork ID is missing.
+func sporkIdFromTopic(topic Topic) (flow.Identifier, error) {
+	if index := strings.LastIndex(topic.String(), "/"); index != -1 {
+		id, err := flow.HexStringToIdentifier(string(topic)[index+1:])
+		if err != nil {
+			return flow.Identifier{}, fmt.Errorf("failed to get spork ID from topic %s: %w", topic, err)
+		}
+
+		return id, nil
+	}
+	return flow.Identifier{}, fmt.Errorf("spork id missing from topic")
+}
+
+// sporkIdStrFromTopic returns the pre-pended spork ID string for the topic.
+// A valid channel has a spork ID suffix:
+//
+//	channel/spork_id
+//
+// A generic error is returned if an error is encountered while deriving the spork ID from the topic
+func sporkIdStrFromTopic(topic Topic) (string, error) {
+	sporkId, err := sporkIdFromTopic(topic)
+	if err != nil {
+		return "", err
+	}
+	return sporkId.String(), nil
+}
+
+// clusterIDStrFromTopic returns the appended cluster ID in flow.ChainID format for the cluster prefixed topic.
+// A valid cluster-prefixed channel includes the cluster prefix and cluster ID suffix:
+//
+//	sync-cluster/some_cluster_id
+//
+// A generic error is returned if the topic is malformed.
+func clusterIDStrFromTopic(topic Topic) (flow.ChainID, error) {
+	for prefix := range clusterChannelPrefixRoleMap {
+		if strings.HasPrefix(topic.String(), prefix) {
+			return flow.ChainID(strings.TrimPrefix(topic.String(), fmt.Sprintf("%s-", prefix))), nil
+		}
+	}
+	return "", fmt.Errorf("failed to get cluster ID from topic %s", topic)
+}
+
 // ConsensusCluster returns a dynamic cluster consensus channel based on
 // the chain ID of the cluster in question.
 func ConsensusCluster(clusterID flow.ChainID) Channel {
@@ -280,4 +335,73 @@ func ConsensusCluster(clusterID flow.ChainID) Channel {
 // ID of the cluster in question.
 func SyncCluster(clusterID flow.ChainID) Channel {
 	return Channel(fmt.Sprintf("%s-%s", SyncClusterPrefix, clusterID))
+}
+
+// IsValidNonClusterFlowTopic ensures the topic is a valid Flow network topic and
+// ensures the sporkID part of the Topic is equal to the current network sporkID.
+// Expected errors:
+// - InvalidTopicErr if the topic is not a if the topic is not a valid topic for the given spork.
+func IsValidNonClusterFlowTopic(topic Topic, expectedSporkID flow.Identifier) error {
+	sporkID, err := sporkIdStrFromTopic(topic)
+	if err != nil {
+		return NewInvalidTopicErr(topic, fmt.Errorf("failed to get spork ID from topic: %w", err))
+	}
+
+	if sporkID != expectedSporkID.String() {
+		return NewInvalidTopicErr(topic, fmt.Errorf("invalid flow topic mismatch spork ID expected spork ID %s actual spork ID %s", expectedSporkID, sporkID))
+	}
+
+	return isValidFlowTopic(topic)
+}
+
+// IsValidFlowClusterTopic ensures the topic is a valid Flow network topic and
+// ensures the cluster ID part of the Topic is equal to one of the provided active cluster IDs.
+// All errors returned from this function can be considered benign.
+// Expected errors:
+// - InvalidTopicErr if the topic is not a valid Flow topic or the cluster ID cannot be derived from the topic.
+// - UnknownClusterIDErr if the cluster ID from the topic is not in the activeClusterIDS list.
+func IsValidFlowClusterTopic(topic Topic, activeClusterIDS flow.ChainIDList) error {
+	err := isValidFlowTopic(topic)
+	if err != nil {
+		return err
+	}
+
+	clusterID, err := clusterIDStrFromTopic(topic)
+	if err != nil {
+		return NewInvalidTopicErr(topic, fmt.Errorf("failed to get cluster ID from topic: %w", err))
+	}
+
+	for _, activeClusterID := range activeClusterIDS {
+		if clusterID == activeClusterID {
+			return nil
+		}
+	}
+
+	return NewUnknownClusterIdErr(clusterID, activeClusterIDS)
+}
+
+// isValidFlowTopic ensures the topic is a valid Flow network topic.
+// A valid Topic has the following properties:
+// - A Channel can be derived from the Topic and that channel exists.
+// Expected errors:
+// - InvalidTopicErr if the topic is not a valid Flow topic.
+func isValidFlowTopic(topic Topic) error {
+	channel, ok := ChannelFromTopic(topic)
+	if !ok {
+		return NewInvalidTopicErr(topic, fmt.Errorf("invalid topic: failed to get channel from topic"))
+	}
+	err := IsValidFlowChannel(channel)
+	if err != nil {
+		return NewInvalidTopicErr(topic, fmt.Errorf("invalid topic: %w", err))
+	}
+	return nil
+}
+
+// IsValidFlowChannel ensures the channel is a valid Flow network channel.
+// All errors returned from this function can be considered benign.
+func IsValidFlowChannel(channel Channel) error {
+	if !ChannelExists(channel) {
+		return fmt.Errorf("unknown channel: %s", channel)
+	}
+	return nil
 }

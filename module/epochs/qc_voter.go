@@ -2,11 +2,13 @@ package epochs
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
 
 	"github.com/onflow/flow-go/module/retrymiddleware"
+	"github.com/onflow/flow-go/network"
 
 	"github.com/sethvargo/go-retry"
 
@@ -70,11 +72,12 @@ func NewRootQCVoter(
 }
 
 // Vote handles the full procedure of generating a vote, submitting it to the
-// epoch smart contract, and verifying submission. Returns an error only if
-// there is a critical error that would make it impossible for the vote to be
-// submitted. Otherwise, exits when the vote has been successfully submitted.
-//
+// epoch smart contract, and verifying submission.
 // It is safe to run multiple times within a single setup phase.
+//
+// Error returns:
+//   - ErrWontVote if we fail to vote for a benign reason
+//   - generic error in case of critical unexpected failure
 func (voter *RootQCVoter) Vote(ctx context.Context, epoch protocol.Epoch) error {
 
 	counter, err := epoch.Counter()
@@ -87,7 +90,7 @@ func (voter *RootQCVoter) Vote(ctx context.Context, epoch protocol.Epoch) error 
 	}
 	cluster, clusterIndex, ok := clusters.ByNodeID(voter.me.NodeID())
 	if !ok {
-		return fmt.Errorf("could not find self in clustering")
+		return NewClusterQCNoVoteErrorf("could not find self in clustering")
 	}
 
 	log := voter.log.With().
@@ -115,7 +118,7 @@ func (voter *RootQCVoter) Vote(ctx context.Context, epoch protocol.Epoch) error 
 
 	clientIndex, qcContractClient := voter.getInitialContractClient()
 	onMaxConsecutiveRetries := func(totalAttempts int) {
-		voter.updateContractClient(clientIndex)
+		clientIndex, qcContractClient = voter.updateContractClient(clientIndex)
 		log.Warn().Msgf("retrying on attempt (%d) with fallback access node at index (%d)", totalAttempts, clientIndex)
 	}
 	backoff = retrymiddleware.AfterConsecutiveFailures(retryMaxConsecutiveFailures, backoff, onMaxConsecutiveRetries)
@@ -125,16 +128,19 @@ func (voter *RootQCVoter) Vote(ctx context.Context, epoch protocol.Epoch) error 
 		// submit a vote anyway and must exit this process
 		phase, err := voter.state.Final().Phase()
 		if err != nil {
-			log.Error().Err(err).Msg("could not get current phase")
+			return fmt.Errorf("unexpected error - unable to get current epoch phase: %w", err)
 		} else if phase != flow.EpochPhaseSetup {
-			return fmt.Errorf("could not submit vote - no longer in setup phase")
+			return NewClusterQCNoVoteErrorf("could not submit vote because we we are not in EpochSetup phase (in %s phase instead)", phase)
 		}
 
 		// check whether we've already voted, if we have we can exit early
 		voted, err := qcContractClient.Voted(ctx)
 		if err != nil {
-			log.Error().Err(err).Msg("could not check vote status")
-			return retry.RetryableError(err)
+			if network.IsTransientError(err) {
+				log.Warn().Err(err).Msg("unable to check vote status, retrying...")
+				return retry.RetryableError(err)
+			}
+			return fmt.Errorf("unexpected error in Voted script execution: %w", err)
 		} else if voted {
 			log.Info().Msg("already voted - exiting QC vote process...")
 			// update our last successful client index for future calls
@@ -147,8 +153,16 @@ func (voter *RootQCVoter) Vote(ctx context.Context, epoch protocol.Epoch) error 
 		log.Info().Msg("submitting vote...")
 		err = qcContractClient.SubmitVote(ctx, vote)
 		if err != nil {
-			log.Error().Err(err).Msg("could not submit vote - retrying...")
-			return retry.RetryableError(err)
+			if network.IsTransientError(err) || errors.Is(err, errTransactionExpired) {
+				log.Warn().Err(err).Msg("could not submit vote due to transient failure - retrying...")
+				return retry.RetryableError(err)
+			} else if errors.Is(err, errTransactionReverted) {
+				// this error case could be benign or not - if we observe it, we should investigate further
+				log.Err(err).Msg("vote submission failed due to execution failure - caution: this could be either a benign error (eg. 'already voted') or a critical bug - retrying")
+				return retry.RetryableError(err)
+			} else {
+				return fmt.Errorf("unexpected error submitting vote: %w", err)
+			}
 		}
 
 		log.Info().Msg("successfully submitted vote - exiting QC vote process...")
@@ -157,7 +171,9 @@ func (voter *RootQCVoter) Vote(ctx context.Context, epoch protocol.Epoch) error 
 		voter.updateLastSuccessfulClient(clientIndex)
 		return nil
 	})
-
+	if network.IsTransientError(err) || errors.Is(err, errTransactionReverted) || errors.Is(err, errTransactionReverted) {
+		return NewClusterQCNoVoteErrorf("exceeded retry limit without successfully submitting our vote: %w", err)
+	}
 	return err
 }
 

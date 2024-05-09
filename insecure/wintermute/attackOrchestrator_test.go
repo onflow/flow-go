@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/network/channels"
+	"github.com/onflow/flow-go/utils/rand"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -26,13 +27,13 @@ func TestSingleExecutionReceipt(t *testing.T) {
 	rootStateFixture, allIds, corruptedIds := bootstrapWintermuteFlowSystem(t)
 
 	// identities of nodes who are expected targets of an execution receipt.
-	receiptTargetIds, err := rootStateFixture.State.Final().Identities(filter.HasRole(flow.RoleAccess, flow.RoleConsensus, flow.RoleVerification))
+	receiptTargetIds, err := rootStateFixture.State.Final().Identities(filter.HasRole[flow.Identity](flow.RoleAccess, flow.RoleConsensus, flow.RoleVerification))
 	require.NoError(t, err)
 
 	corruptedExecutionIds := flow.IdentifierList(
 		allIds.Filter(
-			filter.And(filter.HasRole(flow.RoleExecution),
-				filter.HasNodeID(corruptedIds...)),
+			filter.And(filter.HasRole[flow.Identity](flow.RoleExecution),
+				filter.HasNodeID[flow.Identity](corruptedIds...)),
 		).NodeIDs())
 	eventMap, receipts := receiptsWithSameResultFixture(t, 1, corruptedExecutionIds[0:1], receiptTargetIds.NodeIDs())
 
@@ -139,11 +140,11 @@ func testConcurrentExecutionReceipts(t *testing.T,
 	rootStateFixture, allIds, corruptedIds := bootstrapWintermuteFlowSystem(t)
 	corruptedExecutionIds := flow.IdentifierList(
 		allIds.Filter(
-			filter.And(filter.HasRole(flow.RoleExecution),
-				filter.HasNodeID(corruptedIds...)),
+			filter.And(filter.HasRole[flow.Identity](flow.RoleExecution),
+				filter.HasNodeID[flow.Identity](corruptedIds...)),
 		).NodeIDs())
 	// identities of nodes who are expected targets of an execution receipt.
-	receiptTargetIds, err := rootStateFixture.State.Final().Identities(filter.HasRole(flow.RoleAccess, flow.RoleConsensus, flow.RoleVerification))
+	receiptTargetIds, err := rootStateFixture.State.Final().Identities(filter.HasRole[flow.Identity](flow.RoleAccess, flow.RoleConsensus, flow.RoleVerification))
 	require.NoError(t, err)
 
 	var eventMap map[flow.Identifier]*insecure.EgressEvent
@@ -269,8 +270,8 @@ func TestRespondingWithCorruptedAttestation(t *testing.T) {
 	_, allIds, corruptedIds := bootstrapWintermuteFlowSystem(t)
 	corruptedVerIds := flow.IdentifierList(
 		allIds.Filter(
-			filter.And(filter.HasRole(flow.RoleVerification),
-				filter.HasNodeID(corruptedIds...)),
+			filter.And(filter.HasRole[flow.Identity](flow.RoleVerification),
+				filter.HasNodeID[flow.Identity](corruptedIds...)),
 		).NodeIDs())
 	wintermuteOrchestrator := NewOrchestrator(unittest.Logger(), corruptedIds, allIds)
 
@@ -350,8 +351,8 @@ func TestPassingThroughChunkDataRequests(t *testing.T) {
 	_, allIds, corruptedIds := bootstrapWintermuteFlowSystem(t)
 	corruptedVerIds := flow.IdentifierList(
 		allIds.Filter(
-			filter.And(filter.HasRole(flow.RoleVerification),
-				filter.HasNodeID(corruptedIds...)),
+			filter.And(filter.HasRole[flow.Identity](flow.RoleVerification),
+				filter.HasNodeID[flow.Identity](corruptedIds...)),
 		).NodeIDs())
 	wintermuteOrchestrator := NewOrchestrator(unittest.Logger(), corruptedIds, allIds)
 
@@ -439,7 +440,7 @@ func TestPassingThroughChunkDataResponse_WithAttack(t *testing.T) {
 func testPassingThroughChunkDataResponse(t *testing.T, state *attackState) {
 	totalChunks := 10
 	_, allIds, corruptedIds := bootstrapWintermuteFlowSystem(t)
-	verIds := flow.IdentifierList(allIds.Filter(filter.HasRole(flow.RoleVerification)).NodeIDs())
+	verIds := flow.IdentifierList(allIds.Filter(filter.HasRole[flow.Identity](flow.RoleVerification)).NodeIDs())
 	wintermuteOrchestrator := NewOrchestrator(unittest.Logger(), corruptedIds, allIds)
 
 	wintermuteOrchestrator.state = state
@@ -509,8 +510,8 @@ func TestWintermuteChunkResponseForCorruptedChunks(t *testing.T) {
 	_, allIds, corruptedIds := bootstrapWintermuteFlowSystem(t)
 	honestVnIds := flow.IdentifierList(
 		allIds.Filter(filter.And(
-			filter.HasRole(flow.RoleVerification),
-			filter.Not(filter.HasNodeID(corruptedIds...)))).NodeIDs())
+			filter.HasRole[flow.Identity](flow.RoleVerification),
+			filter.Not(filter.HasNodeID[flow.Identity](corruptedIds...)))).NodeIDs())
 	wintermuteOrchestrator := NewOrchestrator(unittest.Logger(), corruptedIds, allIds)
 
 	originalResult := unittest.ExecutionResultFixture()
@@ -556,8 +557,11 @@ func TestPassingThroughMiscellaneousEvents(t *testing.T) {
 
 	// creates a block event fixture that is out of the context of
 	// the wintermute attack.
+	random, err := rand.Uintn(uint(len(corruptedIds)))
+	require.NoError(t, err)
+
 	miscellaneousEvent := &insecure.EgressEvent{
-		CorruptOriginId:   corruptedIds.Sample(1)[0],
+		CorruptOriginId:   corruptedIds[random],
 		Channel:           channels.TestNetworkChannel,
 		Protocol:          insecure.Protocol_MULTICAST,
 		TargetNum:         3,
@@ -630,8 +634,11 @@ func TestPassingThrough_ResultApproval(t *testing.T) {
 	approval := unittest.ResultApprovalFixture()
 	require.NotEqual(t, wintermuteOrchestrator.state.originalResult.ID(), approval.ID())
 	require.NotEqual(t, wintermuteOrchestrator.state.corruptedResult.ID(), approval.ID())
+
+	random, err := rand.Uintn(uint(len(corruptedIds)))
+	require.NoError(t, err)
 	approvalEvent := &insecure.EgressEvent{
-		CorruptOriginId:   corruptedIds.Sample(1)[0],
+		CorruptOriginId:   corruptedIds[random],
 		Channel:           channels.TestNetworkChannel,
 		Protocol:          insecure.Protocol_MULTICAST,
 		TargetNum:         3,
@@ -702,8 +709,10 @@ func TestWintermute_ResultApproval(t *testing.T) {
 	}
 
 	// generates a result approval event for one of the chunks of the original result.
+	random, err := rand.Uintn(uint(len(corruptedIds)))
+	require.NoError(t, err)
 	approvalEvent := &insecure.EgressEvent{
-		CorruptOriginId: corruptedIds.Sample(1)[0],
+		CorruptOriginId: corruptedIds[random],
 		Channel:         channels.TestNetworkChannel,
 		Protocol:        insecure.Protocol_MULTICAST,
 		TargetNum:       3,

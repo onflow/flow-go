@@ -6,6 +6,7 @@ import (
 
 	"github.com/dgraph-io/badger/v2"
 
+	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/state/cluster"
@@ -16,7 +17,8 @@ import (
 
 type State struct {
 	db        *badger.DB
-	clusterID flow.ChainID
+	clusterID flow.ChainID // the chain ID for the cluster
+	epoch     uint64       // the operating epoch for the cluster
 }
 
 // Bootstrap initializes the persistent cluster state with a genesis block.
@@ -30,9 +32,10 @@ func Bootstrap(db *badger.DB, stateRoot *StateRoot) (*State, error) {
 	if isBootstrapped {
 		return nil, fmt.Errorf("expected empty cluster state for cluster ID %s", stateRoot.ClusterID())
 	}
-	state := newState(db, stateRoot.ClusterID())
+	state := newState(db, stateRoot.ClusterID(), stateRoot.EpochCounter())
 
 	genesis := stateRoot.Block()
+	rootQC := stateRoot.QC()
 	// bootstrap cluster state
 	err = operation.RetryOnConflict(state.db.Update, func(tx *badger.Txn) error {
 		chainID := genesis.Header.ChainID
@@ -52,14 +55,25 @@ func Bootstrap(db *badger.DB, stateRoot *StateRoot) (*State, error) {
 		if err != nil {
 			return fmt.Errorf("could not insert genesis boundary: %w", err)
 		}
-		err = operation.InsertStartedView(chainID, genesis.Header.View)(tx)
-		if err != nil {
-			return fmt.Errorf("could not insert started view: %w", err)
+
+		safetyData := &hotstuff.SafetyData{
+			LockedOneChainView:      genesis.Header.View,
+			HighestAcknowledgedView: genesis.Header.View,
 		}
-		// insert voted view for hotstuff
-		err = operation.InsertVotedView(chainID, genesis.Header.View)(tx)
+
+		livenessData := &hotstuff.LivenessData{
+			CurrentView: genesis.Header.View + 1,
+			NewestQC:    rootQC,
+		}
+		// insert safety data
+		err = operation.InsertSafetyData(chainID, safetyData)(tx)
 		if err != nil {
-			return fmt.Errorf("could not insert voted view: %w", err)
+			return fmt.Errorf("could not insert safety data: %w", err)
+		}
+		// insert liveness data
+		err = operation.InsertLivenessData(chainID, livenessData)(tx)
+		if err != nil {
+			return fmt.Errorf("could not insert liveness data: %w", err)
 		}
 
 		return nil
@@ -71,7 +85,7 @@ func Bootstrap(db *badger.DB, stateRoot *StateRoot) (*State, error) {
 	return state, nil
 }
 
-func OpenState(db *badger.DB, tracer module.Tracer, headers storage.Headers, payloads storage.ClusterPayloads, clusterID flow.ChainID) (*State, error) {
+func OpenState(db *badger.DB, _ module.Tracer, _ storage.Headers, _ storage.ClusterPayloads, clusterID flow.ChainID, epoch uint64) (*State, error) {
 	isBootstrapped, err := IsBootstrapped(db, clusterID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to determine whether database contains bootstrapped state: %w", err)
@@ -79,14 +93,15 @@ func OpenState(db *badger.DB, tracer module.Tracer, headers storage.Headers, pay
 	if !isBootstrapped {
 		return nil, fmt.Errorf("expected database to contain bootstrapped state")
 	}
-	state := newState(db, clusterID)
+	state := newState(db, clusterID, epoch)
 	return state, nil
 }
 
-func newState(db *badger.DB, clusterID flow.ChainID) *State {
+func newState(db *badger.DB, clusterID flow.ChainID, epoch uint64) *State {
 	state := &State{
 		db:        db,
 		clusterID: clusterID,
+		epoch:     epoch,
 	}
 	return state
 }
@@ -136,7 +151,7 @@ func (s *State) AtBlockID(blockID flow.Identifier) cluster.Snapshot {
 	return snapshot
 }
 
-// IsBootstrapped returns whether or not the database contains a bootstrapped state
+// IsBootstrapped returns whether the database contains a bootstrapped state.
 func IsBootstrapped(db *badger.DB, clusterID flow.ChainID) (bool, error) {
 	var finalized uint64
 	err := db.View(operation.RetrieveClusterFinalizedHeight(clusterID, &finalized))

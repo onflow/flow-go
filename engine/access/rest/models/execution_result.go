@@ -5,7 +5,10 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-func (e *ExecutionResult) Build(exeResult *flow.ExecutionResult, link LinkGenerator) error {
+func (e *ExecutionResult) Build(
+	exeResult *flow.ExecutionResult,
+	link LinkGenerator,
+) error {
 	self, err := SelfLink(exeResult.ID(), link.ExecutionResultLink)
 	if err != nil {
 		return err
@@ -14,7 +17,7 @@ func (e *ExecutionResult) Build(exeResult *flow.ExecutionResult, link LinkGenera
 	events := make([]Event, len(exeResult.ServiceEvents))
 	for i, e := range exeResult.ServiceEvents {
 		events[i] = Event{
-			Type_: e.Type,
+			Type_: e.Type.String(),
 		}
 	}
 

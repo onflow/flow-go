@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/util"
+	"github.com/onflow/flow-go/utils/logging"
 )
 
 var _ component.Component = (*FlowNodeImp)(nil)
@@ -95,7 +96,9 @@ func (node *FlowNodeImp) run(ctx context.Context, shutdown context.CancelFunc) e
 	go func() {
 		select {
 		case <-node.Ready():
-			node.logger.Info().Msgf("%s node startup complete", node.BaseConfig.NodeRole)
+			node.logger.Info().
+				Hex("spork_id", logging.ID(node.SporkID)).
+				Msgf("%s node startup complete", node.BaseConfig.NodeRole)
 		case <-ctx.Done():
 		}
 	}()

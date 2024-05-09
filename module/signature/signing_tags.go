@@ -1,8 +1,8 @@
 package signature
 
 import (
-	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/crypto/hash"
+	"github.com/onflow/crypto"
+	"github.com/onflow/crypto/hash"
 )
 
 // List of domain separation tags for protocol signatures.
@@ -44,6 +44,10 @@ var (
 	ConsensusVoteTag = tag("Consensus_Vote")
 	// CollectorVoteTag is used for Collection Hotstuff votes
 	CollectorVoteTag = tag("Collector_Vote")
+	// ConsensusTimeoutTag is used for Consensus Active Pacemaker timeouts
+	ConsensusTimeoutTag = tag("Consensus_Timeout")
+	// CollectorTimeoutTag is used for Collector Active Pacemaker timeouts
+	CollectorTimeoutTag = tag("Collector_Timeout")
 	// ExecutionReceiptTag is used for execution receipts
 	ExecutionReceiptTag = tag("Execution_Receipt")
 	// ResultApprovalTag is used for result approvals
@@ -58,7 +62,8 @@ var (
 // in the protocol and abstracts the hasher details from the protocol logic.
 //
 // The hasher returned is the the expand-message step in the BLS hash-to-curve.
-// It uses a xof (extendable output function) based on KMAC128.
+// It uses a xof (extendable output function) based on KMAC128. It therefore has
+// 128-bytes outputs.
 func NewBLSHasher(tag string) hash.Hasher {
 	return crypto.NewExpandMsgXOFKMAC128(tag)
 }

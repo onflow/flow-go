@@ -8,67 +8,85 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/counters"
 )
 
 type ExecutionCollector struct {
-	tracer                              module.Tracer
-	stateReadsPerBlock                  prometheus.Histogram
-	totalExecutedBlocksCounter          prometheus.Counter
-	totalExecutedCollectionsCounter     prometheus.Counter
-	totalExecutedTransactionsCounter    prometheus.Counter
-	totalExecutedScriptsCounter         prometheus.Counter
-	totalFailedTransactionsCounter      prometheus.Counter
-	lastExecutedBlockHeightGauge        prometheus.Gauge
-	stateStorageDiskTotal               prometheus.Gauge
-	storageStateCommitment              prometheus.Gauge
-	forestApproxMemorySize              prometheus.Gauge
-	forestNumberOfTrees                 prometheus.Gauge
-	latestTrieRegCount                  prometheus.Gauge
-	latestTrieRegCountDiff              prometheus.Gauge
-	latestTrieRegSize                   prometheus.Gauge
-	latestTrieRegSizeDiff               prometheus.Gauge
-	latestTrieMaxDepthTouched           prometheus.Gauge
-	updated                             prometheus.Counter
-	proofSize                           prometheus.Gauge
-	updatedValuesNumber                 prometheus.Counter
-	updatedValuesSize                   prometheus.Gauge
-	updatedDuration                     prometheus.Histogram
-	updatedDurationPerValue             prometheus.Histogram
-	readValuesNumber                    prometheus.Counter
-	readValuesSize                      prometheus.Gauge
-	readDuration                        prometheus.Histogram
-	readDurationPerValue                prometheus.Histogram
-	blockComputationUsed                prometheus.Histogram
-	blockExecutionTime                  prometheus.Histogram
-	blockTransactionCounts              prometheus.Histogram
-	blockCollectionCounts               prometheus.Histogram
-	collectionComputationUsed           prometheus.Histogram
-	collectionExecutionTime             prometheus.Histogram
-	collectionTransactionCounts         prometheus.Histogram
-	collectionRequestSent               prometheus.Counter
-	collectionRequestRetried            prometheus.Counter
-	transactionParseTime                prometheus.Histogram
-	transactionCheckTime                prometheus.Histogram
-	transactionInterpretTime            prometheus.Histogram
-	transactionExecutionTime            prometheus.Histogram
-	transactionMemoryUsage              prometheus.Histogram
-	transactionMemoryEstimate           prometheus.Histogram
-	transactionMemoryDifference         prometheus.Histogram
-	transactionComputationUsed          prometheus.Histogram
-	transactionEmittedEvents            prometheus.Histogram
-	scriptExecutionTime                 prometheus.Histogram
-	scriptComputationUsed               prometheus.Histogram
-	scriptMemoryUsage                   prometheus.Histogram
-	scriptMemoryEstimate                prometheus.Histogram
-	scriptMemoryDifference              prometheus.Histogram
-	numberOfAccounts                    prometheus.Gauge
-	chunkDataPackRequestProcessedTotal  prometheus.Counter
-	stateSyncActive                     prometheus.Gauge
-	blockDataUploadsInProgress          prometheus.Gauge
-	blockDataUploadsDuration            prometheus.Histogram
-	maxCollectionHeight                 prometheus.Gauge
-	computationResultUploadedCount      prometheus.Counter
-	computationResultUploadRetriedCount prometheus.Counter
+	tracer                                  module.Tracer
+	totalExecutedBlocksCounter              prometheus.Counter
+	totalExecutedCollectionsCounter         prometheus.Counter
+	totalExecutedTransactionsCounter        prometheus.Counter
+	totalExecutedScriptsCounter             prometheus.Counter
+	totalFailedTransactionsCounter          prometheus.Counter
+	lastExecutedBlockHeightGauge            prometheus.Gauge
+	lastFinalizedExecutedBlockHeightGauge   prometheus.Gauge
+	stateStorageDiskTotal                   prometheus.Gauge
+	storageStateCommitment                  prometheus.Gauge
+	checkpointSize                          prometheus.Gauge
+	forestApproxMemorySize                  prometheus.Gauge
+	forestNumberOfTrees                     prometheus.Gauge
+	latestTrieRegCount                      prometheus.Gauge
+	latestTrieRegCountDiff                  prometheus.Gauge
+	latestTrieRegSize                       prometheus.Gauge
+	latestTrieRegSizeDiff                   prometheus.Gauge
+	latestTrieMaxDepthTouched               prometheus.Gauge
+	updated                                 prometheus.Counter
+	proofSize                               prometheus.Gauge
+	updatedValuesNumber                     prometheus.Counter
+	updatedValuesSize                       prometheus.Gauge
+	updatedDuration                         prometheus.Histogram
+	updatedDurationPerValue                 prometheus.Histogram
+	readValuesNumber                        prometheus.Counter
+	readValuesSize                          prometheus.Gauge
+	readDuration                            prometheus.Histogram
+	readDurationPerValue                    prometheus.Histogram
+	blockComputationUsed                    prometheus.Histogram
+	blockComputationVector                  *prometheus.GaugeVec
+	blockCachedPrograms                     prometheus.Gauge
+	blockMemoryUsed                         prometheus.Histogram
+	blockEventCounts                        prometheus.Histogram
+	blockEventSize                          prometheus.Histogram
+	blockExecutionTime                      prometheus.Histogram
+	blockTransactionCounts                  prometheus.Histogram
+	blockCollectionCounts                   prometheus.Histogram
+	collectionComputationUsed               prometheus.Histogram
+	collectionMemoryUsed                    prometheus.Histogram
+	collectionEventSize                     prometheus.Histogram
+	collectionEventCounts                   prometheus.Histogram
+	collectionNumberOfRegistersTouched      prometheus.Histogram
+	collectionTotalBytesWrittenToRegisters  prometheus.Histogram
+	collectionExecutionTime                 prometheus.Histogram
+	collectionTransactionCounts             prometheus.Histogram
+	collectionRequestSent                   prometheus.Counter
+	collectionRequestRetried                prometheus.Counter
+	transactionParseTime                    prometheus.Histogram
+	transactionCheckTime                    prometheus.Histogram
+	transactionInterpretTime                prometheus.Histogram
+	transactionExecutionTime                prometheus.Histogram
+	transactionConflictRetries              prometheus.Histogram
+	transactionMemoryEstimate               prometheus.Histogram
+	transactionComputationUsed              prometheus.Histogram
+	transactionNormalizedTimePerComputation prometheus.Histogram
+	transactionEmittedEvents                prometheus.Histogram
+	transactionEventSize                    prometheus.Histogram
+	scriptExecutionTime                     prometheus.Histogram
+	scriptComputationUsed                   prometheus.Histogram
+	scriptMemoryUsage                       prometheus.Histogram
+	scriptMemoryEstimate                    prometheus.Histogram
+	scriptMemoryDifference                  prometheus.Histogram
+	numberOfAccounts                        prometheus.Gauge
+	programsCacheMiss                       prometheus.Counter
+	programsCacheHit                        prometheus.Counter
+	chunkDataPackRequestProcessedTotal      prometheus.Counter
+	chunkDataPackProofSize                  prometheus.Histogram
+	chunkDataPackCollectionSize             prometheus.Histogram
+	stateSyncActive                         prometheus.Gauge
+	blockDataUploadsInProgress              prometheus.Gauge
+	blockDataUploadsDuration                prometheus.Histogram
+	maxCollectionHeightData                 counters.StrictMonotonousCounter
+	maxCollectionHeight                     prometheus.Gauge
+	computationResultUploadedCount          prometheus.Counter
+	computationResultUploadRetriedCount     prometheus.Counter
 }
 
 func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
@@ -201,7 +219,7 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 		Subsystem: subsystemRuntime,
 		Name:      "block_execution_time_milliseconds",
 		Help:      "the total time spent on block execution in milliseconds",
-		Buckets:   []float64{100, 500, 1000, 1500, 2000, 2500, 3000, 6000},
+		Buckets:   []float64{50, 100, 200, 300, 400, 1000, 2000, 6000},
 	})
 
 	blockComputationUsed := promauto.NewHistogram(prometheus.HistogramOpts{
@@ -210,6 +228,44 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 		Name:      "block_computation_used",
 		Help:      "the total amount of computation used by a block",
 		Buckets:   []float64{1000, 10000, 100000, 500000, 1000000, 5000000, 10000000},
+	})
+
+	blockMemoryUsed := promauto.NewHistogram(prometheus.HistogramOpts{
+		Namespace: namespaceExecution,
+		Subsystem: subsystemRuntime,
+		Name:      "block_memory_used",
+		Help:      "the total amount of memory (cadence estimate) used by a block",
+		Buckets:   []float64{100_000_000, 1_000_000_000, 5_000_000_000, 10_000_000_000, 50_000_000_000, 100_000_000_000, 500_000_000_000, 1_000_000_000_000, 5_000_000_000_000, 10_000_000_000_000},
+	})
+
+	blockEventCounts := promauto.NewHistogram(prometheus.HistogramOpts{
+		Namespace: namespaceExecution,
+		Subsystem: subsystemRuntime,
+		Name:      "block_event_counts",
+		Help:      "the total number of events emitted during a block execution",
+		Buckets:   []float64{10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000},
+	})
+
+	blockEventSize := promauto.NewHistogram(prometheus.HistogramOpts{
+		Namespace: namespaceExecution,
+		Subsystem: subsystemRuntime,
+		Name:      "block_event_size",
+		Help:      "the total number of bytes used by events emitted during a block execution",
+		Buckets:   []float64{1_000, 10_000, 100_000, 500_000, 1_000_000, 5_000_000, 10_000_000, 50_000_000, 100_000_000, 500_000_000},
+	})
+
+	blockComputationVector := promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: namespaceExecution,
+		Subsystem: subsystemRuntime,
+		Name:      "block_execution_effort_vector",
+		Help:      "execution effort vector of the last executed block by computation kind",
+	}, []string{LabelComputationKind})
+
+	blockCachedPrograms := promauto.NewGauge(prometheus.GaugeOpts{
+		Namespace: namespaceExecution,
+		Subsystem: subsystemRuntime,
+		Name:      "block_execution_cached_programs",
+		Help:      "Number of cached programs at the end of block execution",
 	})
 
 	blockTransactionCounts := promauto.NewHistogram(prometheus.HistogramOpts{
@@ -242,6 +298,46 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 		Name:      "collection_computation_used",
 		Help:      "the total amount of computation used by a collection",
 		Buckets:   []float64{1000, 10000, 50000, 100000, 500000, 1000000},
+	})
+
+	collectionMemoryUsed := promauto.NewHistogram(prometheus.HistogramOpts{
+		Namespace: namespaceExecution,
+		Subsystem: subsystemRuntime,
+		Name:      "collection_memory_used",
+		Help:      "the total amount of memory used (cadence estimate) by a collection",
+		Buckets:   []float64{10_000_000, 100_000_000, 1_000_000_000, 5_000_000_000, 10_000_000_000, 50_000_000_000, 100_000_000_000, 500_000_000_000, 1_000_000_000_000, 5_000_000_000_000},
+	})
+
+	collectionEventSize := promauto.NewHistogram(prometheus.HistogramOpts{
+		Namespace: namespaceExecution,
+		Subsystem: subsystemRuntime,
+		Name:      "collection_event_size",
+		Help:      "the total byte size used by all events generated during a collection execution",
+		Buckets:   []float64{100, 1000, 10000, 100000, 10000000, 100000000, 1000000000},
+	})
+
+	collectionEventCounts := promauto.NewHistogram(prometheus.HistogramOpts{
+		Namespace: namespaceExecution,
+		Subsystem: subsystemRuntime,
+		Name:      "collection_event_counts",
+		Help:      "the total number of events emitted per collection",
+		Buckets:   prometheus.ExponentialBuckets(4, 2, 8),
+	})
+
+	collectionNumberOfRegistersTouched := promauto.NewHistogram(prometheus.HistogramOpts{
+		Namespace: namespaceExecution,
+		Subsystem: subsystemRuntime,
+		Name:      "collection_number_of_registers_touched",
+		Help:      "the total number of registers touched during collection execution",
+		Buckets:   prometheus.ExponentialBuckets(10, 2, 12),
+	})
+
+	collectionTotalBytesWrittenToRegisters := promauto.NewHistogram(prometheus.HistogramOpts{
+		Namespace: namespaceExecution,
+		Subsystem: subsystemRuntime,
+		Name:      "collection_total_number_of_bytes_written_to_registers",
+		Help:      "the total number of bytes written to registers during collection execution",
+		Buckets:   prometheus.ExponentialBuckets(1000, 2, 16),
 	})
 
 	collectionTransactionCounts := promauto.NewHistogram(prometheus.HistogramOpts{
@@ -295,7 +391,15 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 		Subsystem: subsystemRuntime,
 		Name:      "transaction_execution_time_milliseconds",
 		Help:      "the total time spent on transaction execution in milliseconds",
-		Buckets:   []float64{2, 4, 8, 16, 32, 64, 100, 250, 500},
+		Buckets:   prometheus.ExponentialBuckets(2, 2, 10),
+	})
+
+	transactionConflictRetries := promauto.NewHistogram(prometheus.HistogramOpts{
+		Namespace: namespaceExecution,
+		Subsystem: subsystemRuntime,
+		Name:      "transaction_conflict_retries",
+		Help:      "the number of conflict retries needed to successfully commit a transaction.  If retry count is high, consider reducing concurrency",
+		Buckets:   []float64{0, 1, 2, 3, 4, 5, 10, 20, 30, 40, 50, 100},
 	})
 
 	transactionComputationUsed := promauto.NewHistogram(prometheus.HistogramOpts{
@@ -306,12 +410,12 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 		Buckets:   []float64{50, 100, 500, 1000, 5000, 10000},
 	})
 
-	transactionMemoryUsage := promauto.NewHistogram(prometheus.HistogramOpts{
+	transactionNormalizedTimePerComputation := promauto.NewHistogram(prometheus.HistogramOpts{
 		Namespace: namespaceExecution,
 		Subsystem: subsystemRuntime,
-		Name:      "transaction_memory_usage",
-		Help:      "the total amount of memory allocated by a transaction",
-		Buckets:   []float64{100_000, 1_000_000, 10_000_000, 50_000_000, 100_000_000, 500_000_000, 1_000_000_000},
+		Name:      "transaction_ms_per_computation",
+		Help:      "The normalized ratio of millisecond of execution time per computation used. Value below 1 means the transaction was executed faster than estimated (is using less resources then estimated)",
+		Buckets:   []float64{0.015625, 0.03125, 0.0625, 0.125, 0.25, 0.5, 1, 2, 4, 8, 16, 32, 64},
 	})
 
 	transactionMemoryEstimate := promauto.NewHistogram(prometheus.HistogramOpts{
@@ -322,19 +426,20 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 		Buckets:   []float64{1_000_000, 10_000_000, 100_000_000, 1_000_000_000, 5_000_000_000, 10_000_000_000, 50_000_000_000, 100_000_000_000},
 	})
 
-	transactionMemoryDifference := promauto.NewHistogram(prometheus.HistogramOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemRuntime,
-		Name:      "transaction_memory_difference",
-		Help:      "the difference in actual memory usage and estimate for a transaction",
-		Buckets:   []float64{-1, 0, 10_000_000, 100_000_000, 1_000_000_000},
-	})
-
 	transactionEmittedEvents := promauto.NewHistogram(prometheus.HistogramOpts{
 		Namespace: namespaceExecution,
 		Subsystem: subsystemRuntime,
 		Name:      "transaction_emitted_events",
 		Help:      "the total number of events emitted by a transaction",
+		Buckets:   prometheus.ExponentialBuckets(2, 2, 10),
+	})
+
+	transactionEventSize := promauto.NewHistogram(prometheus.HistogramOpts{
+		Namespace: namespaceExecution,
+		Subsystem: subsystemRuntime,
+		Name:      "transaction_event_size",
+		Help:      "the total number bytes used of events emitted during a transaction execution",
+		Buckets:   prometheus.ExponentialBuckets(100, 2, 12),
 	})
 
 	scriptExecutionTime := promauto.NewHistogram(prometheus.HistogramOpts{
@@ -384,6 +489,22 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 		Help:      "the total number of chunk data pack requests processed by provider engine",
 	})
 
+	chunkDataPackProofSize := promauto.NewHistogram(prometheus.HistogramOpts{
+		Namespace: namespaceExecution,
+		Subsystem: subsystemIngestion,
+		Name:      "chunk_data_pack_proof_size",
+		Help:      "the total number bytes used for storing proof part of chunk data pack",
+		Buckets:   prometheus.ExponentialBuckets(1000, 2, 16),
+	})
+
+	chunkDataPackCollectionSize := promauto.NewHistogram(prometheus.HistogramOpts{
+		Namespace: namespaceExecution,
+		Subsystem: subsystemIngestion,
+		Name:      "chunk_data_pack_collection_size",
+		Help:      "the total number transactions in the collection",
+		Buckets:   prometheus.ExponentialBuckets(1, 2, 10),
+	})
+
 	blockDataUploadsInProgress := promauto.NewGauge(prometheus.GaugeOpts{
 		Namespace: namespaceExecution,
 		Subsystem: subsystemBlockDataUploader,
@@ -416,60 +537,64 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 	ec := &ExecutionCollector{
 		tracer: tracer,
 
-		forestApproxMemorySize:              forestApproxMemorySize,
-		forestNumberOfTrees:                 forestNumberOfTrees,
-		latestTrieRegCount:                  latestTrieRegCount,
-		latestTrieRegCountDiff:              latestTrieRegCountDiff,
-		latestTrieRegSize:                   latestTrieRegSize,
-		latestTrieRegSizeDiff:               latestTrieRegSizeDiff,
-		latestTrieMaxDepthTouched:           latestTrieMaxDepthTouched,
-		updated:                             updatedCount,
-		proofSize:                           proofSize,
-		updatedValuesNumber:                 updatedValuesNumber,
-		updatedValuesSize:                   updatedValuesSize,
-		updatedDuration:                     updatedDuration,
-		updatedDurationPerValue:             updatedDurationPerValue,
-		readValuesNumber:                    readValuesNumber,
-		readValuesSize:                      readValuesSize,
-		readDuration:                        readDuration,
-		readDurationPerValue:                readDurationPerValue,
-		blockExecutionTime:                  blockExecutionTime,
-		blockComputationUsed:                blockComputationUsed,
-		blockTransactionCounts:              blockTransactionCounts,
-		blockCollectionCounts:               blockCollectionCounts,
-		collectionExecutionTime:             collectionExecutionTime,
-		collectionComputationUsed:           collectionComputationUsed,
-		collectionTransactionCounts:         collectionTransactionCounts,
-		collectionRequestSent:               collectionRequestsSent,
-		collectionRequestRetried:            collectionRequestsRetries,
-		transactionParseTime:                transactionParseTime,
-		transactionCheckTime:                transactionCheckTime,
-		transactionInterpretTime:            transactionInterpretTime,
-		transactionExecutionTime:            transactionExecutionTime,
-		transactionComputationUsed:          transactionComputationUsed,
-		transactionMemoryUsage:              transactionMemoryUsage,
-		transactionMemoryEstimate:           transactionMemoryEstimate,
-		transactionMemoryDifference:         transactionMemoryDifference,
-		transactionEmittedEvents:            transactionEmittedEvents,
-		scriptExecutionTime:                 scriptExecutionTime,
-		scriptComputationUsed:               scriptComputationUsed,
-		scriptMemoryUsage:                   scriptMemoryUsage,
-		scriptMemoryEstimate:                scriptMemoryEstimate,
-		scriptMemoryDifference:              scriptMemoryDifference,
-		chunkDataPackRequestProcessedTotal:  chunkDataPackRequestProcessedTotal,
-		blockDataUploadsInProgress:          blockDataUploadsInProgress,
-		blockDataUploadsDuration:            blockDataUploadsDuration,
-		computationResultUploadedCount:      computationResultUploadedCount,
-		computationResultUploadRetriedCount: computationResultUploadRetriedCount,
-
-		stateReadsPerBlock: promauto.NewHistogram(prometheus.HistogramOpts{
-			Namespace: namespaceExecution,
-			Subsystem: subsystemRuntime,
-			Buckets:   []float64{5, 10, 50, 100, 500},
-			Name:      "block_state_reads",
-			Help:      "count of state access/read operations performed per block",
-		}),
-
+		forestApproxMemorySize:                  forestApproxMemorySize,
+		forestNumberOfTrees:                     forestNumberOfTrees,
+		latestTrieRegCount:                      latestTrieRegCount,
+		latestTrieRegCountDiff:                  latestTrieRegCountDiff,
+		latestTrieRegSize:                       latestTrieRegSize,
+		latestTrieRegSizeDiff:                   latestTrieRegSizeDiff,
+		latestTrieMaxDepthTouched:               latestTrieMaxDepthTouched,
+		updated:                                 updatedCount,
+		proofSize:                               proofSize,
+		updatedValuesNumber:                     updatedValuesNumber,
+		updatedValuesSize:                       updatedValuesSize,
+		updatedDuration:                         updatedDuration,
+		updatedDurationPerValue:                 updatedDurationPerValue,
+		readValuesNumber:                        readValuesNumber,
+		readValuesSize:                          readValuesSize,
+		readDuration:                            readDuration,
+		readDurationPerValue:                    readDurationPerValue,
+		blockExecutionTime:                      blockExecutionTime,
+		blockComputationUsed:                    blockComputationUsed,
+		blockComputationVector:                  blockComputationVector,
+		blockCachedPrograms:                     blockCachedPrograms,
+		blockMemoryUsed:                         blockMemoryUsed,
+		blockEventCounts:                        blockEventCounts,
+		blockEventSize:                          blockEventSize,
+		blockTransactionCounts:                  blockTransactionCounts,
+		blockCollectionCounts:                   blockCollectionCounts,
+		collectionExecutionTime:                 collectionExecutionTime,
+		collectionComputationUsed:               collectionComputationUsed,
+		collectionMemoryUsed:                    collectionMemoryUsed,
+		collectionEventSize:                     collectionEventSize,
+		collectionEventCounts:                   collectionEventCounts,
+		collectionNumberOfRegistersTouched:      collectionNumberOfRegistersTouched,
+		collectionTotalBytesWrittenToRegisters:  collectionTotalBytesWrittenToRegisters,
+		collectionTransactionCounts:             collectionTransactionCounts,
+		collectionRequestSent:                   collectionRequestsSent,
+		collectionRequestRetried:                collectionRequestsRetries,
+		transactionParseTime:                    transactionParseTime,
+		transactionCheckTime:                    transactionCheckTime,
+		transactionInterpretTime:                transactionInterpretTime,
+		transactionExecutionTime:                transactionExecutionTime,
+		transactionConflictRetries:              transactionConflictRetries,
+		transactionComputationUsed:              transactionComputationUsed,
+		transactionNormalizedTimePerComputation: transactionNormalizedTimePerComputation,
+		transactionMemoryEstimate:               transactionMemoryEstimate,
+		transactionEmittedEvents:                transactionEmittedEvents,
+		transactionEventSize:                    transactionEventSize,
+		scriptExecutionTime:                     scriptExecutionTime,
+		scriptComputationUsed:                   scriptComputationUsed,
+		scriptMemoryUsage:                       scriptMemoryUsage,
+		scriptMemoryEstimate:                    scriptMemoryEstimate,
+		scriptMemoryDifference:                  scriptMemoryDifference,
+		chunkDataPackRequestProcessedTotal:      chunkDataPackRequestProcessedTotal,
+		chunkDataPackProofSize:                  chunkDataPackProofSize,
+		chunkDataPackCollectionSize:             chunkDataPackCollectionSize,
+		blockDataUploadsInProgress:              blockDataUploadsInProgress,
+		blockDataUploadsDuration:                blockDataUploadsDuration,
+		computationResultUploadedCount:          computationResultUploadedCount,
+		computationResultUploadRetriedCount:     computationResultUploadRetriedCount,
 		totalExecutedBlocksCounter: promauto.NewCounter(prometheus.CounterOpts{
 			Namespace: namespaceExecution,
 			Subsystem: subsystemRuntime,
@@ -512,6 +637,13 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 			Help:      "the last height that was executed",
 		}),
 
+		lastFinalizedExecutedBlockHeightGauge: promauto.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespaceExecution,
+			Subsystem: subsystemRuntime,
+			Name:      "last_finalized_executed_block_height",
+			Help:      "the last height that was finalized and executed",
+		}),
+
 		stateStorageDiskTotal: promauto.NewGauge(prometheus.GaugeOpts{
 			Namespace: namespaceExecution,
 			Subsystem: subsystemStateStorage,
@@ -519,11 +651,19 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 			Help:      "the execution state size on disk in bytes",
 		}),
 
+		// TODO: remove
 		storageStateCommitment: promauto.NewGauge(prometheus.GaugeOpts{
 			Namespace: namespaceExecution,
 			Subsystem: subsystemStateStorage,
 			Name:      "commitment_size_bytes",
 			Help:      "the storage size of a state commitment in bytes",
+		}),
+
+		checkpointSize: promauto.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespaceExecution,
+			Subsystem: subsystemStateStorage,
+			Name:      "checkpoint_size_bytes",
+			Help:      "the size of a checkpoint in bytes",
 		}),
 
 		stateSyncActive: promauto.NewGauge(prometheus.GaugeOpts{
@@ -540,6 +680,21 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 			Help:      "the number of existing accounts on the network",
 		}),
 
+		programsCacheMiss: promauto.NewCounter(prometheus.CounterOpts{
+			Namespace: namespaceExecution,
+			Subsystem: subsystemRuntime,
+			Name:      "programs_cache_miss",
+			Help:      "the number of times a program was not found in the cache and had to be loaded",
+		}),
+
+		programsCacheHit: promauto.NewCounter(prometheus.CounterOpts{
+			Namespace: namespaceExecution,
+			Subsystem: subsystemRuntime,
+			Name:      "programs_cache_hit",
+			Help:      "the number of times a program was found in the cache",
+		}),
+
+		maxCollectionHeightData: counters.NewMonotonousCounter(0),
 		maxCollectionHeight: prometheus.NewGauge(prometheus.GaugeOpts{
 			Name:      "max_collection_height",
 			Namespace: namespaceExecution,
@@ -561,40 +716,73 @@ func (ec *ExecutionCollector) StartBlockReceivedToExecuted(blockID flow.Identifi
 func (ec *ExecutionCollector) FinishBlockReceivedToExecuted(blockID flow.Identifier) {
 }
 
-// ExecutionBlockExecuted reports computation and total time spent on a block computation
-func (ec *ExecutionCollector) ExecutionBlockExecuted(dur time.Duration, compUsed uint64, txCounts int, colCounts int) {
+// ExecutionBlockExecuted reports execution meta data after executing a block
+func (ec *ExecutionCollector) ExecutionBlockExecuted(
+	dur time.Duration,
+	stats module.ExecutionResultStats,
+) {
 	ec.totalExecutedBlocksCounter.Inc()
 	ec.blockExecutionTime.Observe(float64(dur.Milliseconds()))
-	ec.blockComputationUsed.Observe(float64(compUsed))
-	ec.blockTransactionCounts.Observe(float64(txCounts))
-	ec.blockCollectionCounts.Observe(float64(colCounts))
+	ec.blockComputationUsed.Observe(float64(stats.ComputationUsed))
+	ec.blockMemoryUsed.Observe(float64(stats.MemoryUsed))
+	ec.blockEventCounts.Observe(float64(stats.EventCounts))
+	ec.blockEventSize.Observe(float64(stats.EventSize))
+	ec.blockTransactionCounts.Observe(float64(stats.NumberOfTransactions))
+	ec.blockCollectionCounts.Observe(float64(stats.NumberOfCollections))
 }
 
-// ExecutionCollectionExecuted reports computation and total time spent on a block computation
-func (ec *ExecutionCollector) ExecutionCollectionExecuted(dur time.Duration, compUsed uint64, txCounts int) {
+// ExecutionCollectionExecuted reports stats for executing a collection
+func (ec *ExecutionCollector) ExecutionCollectionExecuted(
+	dur time.Duration,
+	stats module.ExecutionResultStats,
+) {
 	ec.totalExecutedCollectionsCounter.Inc()
 	ec.collectionExecutionTime.Observe(float64(dur.Milliseconds()))
-	ec.collectionComputationUsed.Observe(float64(compUsed))
-	ec.collectionTransactionCounts.Observe(float64(txCounts))
+	ec.collectionComputationUsed.Observe(float64(stats.ComputationUsed))
+	ec.collectionMemoryUsed.Observe(float64(stats.MemoryUsed))
+	ec.collectionEventCounts.Observe(float64(stats.EventCounts))
+	ec.collectionEventSize.Observe(float64(stats.EventSize))
+	ec.collectionNumberOfRegistersTouched.Observe(float64(stats.NumberOfRegistersTouched))
+	ec.collectionTotalBytesWrittenToRegisters.Observe(float64(stats.NumberOfBytesWrittenToRegisters))
+	ec.collectionTransactionCounts.Observe(float64(stats.NumberOfTransactions))
 }
 
-// TransactionExecuted reports the time and computation spent executing a single transaction
+func (ec *ExecutionCollector) ExecutionBlockExecutionEffortVectorComponent(compKind string, value uint) {
+	ec.blockComputationVector.With(prometheus.Labels{LabelComputationKind: compKind}).Set(float64(value))
+}
+
+func (ec *ExecutionCollector) ExecutionBlockCachedPrograms(programs int) {
+	ec.blockCachedPrograms.Set(float64(programs))
+}
+
+// ExecutionTransactionExecuted reports stats for executing a transaction
 func (ec *ExecutionCollector) ExecutionTransactionExecuted(
 	dur time.Duration,
-	compUsed, memoryUsed, memoryEstimated uint64,
+	numConflictRetries int,
+	compUsed uint64,
+	memoryUsed uint64,
 	eventCounts int,
+	eventSize int,
 	failed bool,
 ) {
 	ec.totalExecutedTransactionsCounter.Inc()
 	ec.transactionExecutionTime.Observe(float64(dur.Milliseconds()))
+	ec.transactionConflictRetries.Observe(float64(numConflictRetries))
 	ec.transactionComputationUsed.Observe(float64(compUsed))
-	ec.transactionMemoryUsage.Observe(float64(memoryUsed))
-	ec.transactionMemoryEstimate.Observe(float64(memoryEstimated))
-	ec.transactionMemoryDifference.Observe(float64(memoryEstimated) - float64(memoryUsed))
+	ec.transactionNormalizedTimePerComputation.Observe(
+		flow.NormalizedExecutionTimePerComputationUnit(dur, compUsed))
+	ec.transactionMemoryEstimate.Observe(float64(memoryUsed))
 	ec.transactionEmittedEvents.Observe(float64(eventCounts))
+	ec.transactionEventSize.Observe(float64(eventSize))
 	if failed {
 		ec.totalFailedTransactionsCounter.Inc()
 	}
+}
+
+// ExecutionChunkDataPackGenerated reports stats on chunk data pack generation
+func (ec *ExecutionCollector) ExecutionChunkDataPackGenerated(proofSize, numberOfTransactions int) {
+	ec.chunkDataPackProofSize.Observe(float64(proofSize))
+	ec.chunkDataPackCollectionSize.Observe(float64(numberOfTransactions))
 }
 
 // ScriptExecuted reports the time spent executing a single script
@@ -607,11 +795,6 @@ func (ec *ExecutionCollector) ExecutionScriptExecuted(dur time.Duration, compUse
 	ec.scriptMemoryDifference.Observe(float64(memoryEstimated) - float64(memoryUsed))
 }
 
-// ExecutionStateReadsPerBlock reports number of state access/read operations per block
-func (ec *ExecutionCollector) ExecutionStateReadsPerBlock(reads uint64) {
-	ec.stateReadsPerBlock.Observe(float64(reads))
-}
-
 // ExecutionStateStorageDiskTotal reports the total storage size of the execution state on disk in bytes
 func (ec *ExecutionCollector) ExecutionStateStorageDiskTotal(bytes int64) {
 	ec.stateStorageDiskTotal.Set(float64(bytes))
@@ -622,9 +805,19 @@ func (ec *ExecutionCollector) ExecutionStorageStateCommitment(bytes int64) {
 	ec.storageStateCommitment.Set(float64(bytes))
 }
 
+// ExecutionCheckpointSize reports the size of a checkpoint in bytes
+func (ec *ExecutionCollector) ExecutionCheckpointSize(bytes uint64) {
+	ec.checkpointSize.Set(float64(bytes))
+}
+
 // ExecutionLastExecutedBlockHeight reports last executed block height
 func (ec *ExecutionCollector) ExecutionLastExecutedBlockHeight(height uint64) {
 	ec.lastExecutedBlockHeightGauge.Set(float64(height))
+}
+
+// ExecutionLastFinalizedExecutedBlockHeight reports last finalized executed block height
+func (ec *ExecutionCollector) ExecutionLastFinalizedExecutedBlockHeight(height uint64) {
+	ec.lastFinalizedExecutedBlockHeightGauge.Set(float64(height))
 }
 
 // ForestApproxMemorySize records approximate memory usage of forest (all in-memory trees)
@@ -762,8 +955,19 @@ func (ec *ExecutionCollector) RuntimeSetNumberOfAccounts(count uint64) {
 	ec.numberOfAccounts.Set(float64(count))
 }
 
+func (ec *ExecutionCollector) RuntimeTransactionProgramsCacheMiss() {
+	ec.programsCacheMiss.Inc()
+}
+
+func (ec *ExecutionCollector) RuntimeTransactionProgramsCacheHit() {
+	ec.programsCacheHit.Inc()
+}
+
 func (ec *ExecutionCollector) UpdateCollectionMaxHeight(height uint64) {
-	ec.maxCollectionHeight.Set(float64(height))
+	updated := ec.maxCollectionHeightData.Set(height)
+	if updated {
+		ec.maxCollectionHeight.Set(float64(height))
+	}
 }
 
 func (ec *ExecutionCollector) ExecutionComputationResultUploaded() {

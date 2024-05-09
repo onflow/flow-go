@@ -2,18 +2,17 @@ package signature
 
 import (
 	"errors"
-	mrand "math/rand"
+	"math/rand"
 	"sync"
 	"testing"
-	"time"
 
+	"github.com/onflow/crypto"
+	"github.com/onflow/crypto/hash"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
-	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -24,6 +23,7 @@ func TestRandomBeaconInspector(t *testing.T) {
 
 type randomBeaconSuite struct {
 	suite.Suite
+	rng                       *rand.Rand
 	n                         int
 	threshold                 int
 	kmac                      hash.Hasher
@@ -39,9 +39,9 @@ func (rs *randomBeaconSuite) SetupTest() {
 	rs.threshold = signature.RandomBeaconThreshold(rs.n)
 
 	// generate threshold keys
-	mrand.Seed(time.Now().UnixNano())
-	seed := make([]byte, crypto.SeedMinLenDKG)
-	_, err := mrand.Read(seed)
+	rs.rng = unittest.GetPRG(rs.T())
+	seed := make([]byte, crypto.KeyGenSeedMinLen)
+	_, err := rs.rng.Read(seed)
 	require.NoError(rs.T(), err)
 	rs.skShares, rs.pkShares, rs.pkGroup, err = crypto.BLSThresholdKeyGen(rs.n, rs.threshold, seed)
 	require.NoError(rs.T(), err)
@@ -57,7 +57,7 @@ func (rs *randomBeaconSuite) SetupTest() {
 	for i := 0; i < rs.n; i++ {
 		rs.signers = append(rs.signers, i)
 	}
-	mrand.Shuffle(rs.n, func(i, j int) {
+	rs.rng.Shuffle(rs.n, func(i, j int) {
 		rs.signers[i], rs.signers[j] = rs.signers[j], rs.signers[i]
 	})
 }
@@ -166,7 +166,7 @@ func (rs *randomBeaconSuite) TestInvalidSignerIndex() {
 func (rs *randomBeaconSuite) TestInvalidSignature() {
 	follower, err := NewRandomBeaconInspector(rs.pkGroup, rs.pkShares, rs.threshold, rs.thresholdSignatureMessage)
 	require.NoError(rs.T(), err)
-	index := mrand.Intn(rs.n) // random signer
+	index := rs.rng.Intn(rs.n) // random signer
 	share, err := rs.skShares[index].Sign(rs.thresholdSignatureMessage, rs.kmac)
 	require.NoError(rs.T(), err)
 

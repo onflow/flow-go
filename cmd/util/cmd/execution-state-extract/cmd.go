@@ -5,12 +5,15 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"strings"
 
+	runtimeCommon "github.com/onflow/cadence/runtime/common"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
-	"github.com/onflow/flow-go/ledger/complete/wal"
+	"github.com/onflow/flow-go/cmd/util/ledger/migrations"
+	"github.com/onflow/flow-go/cmd/util/ledger/util"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
@@ -18,25 +21,34 @@ import (
 )
 
 var (
-	flagExecutionStateDir string
-	flagOutputDir         string
-	flagBlockHash         string
-	flagStateCommitment   string
-	flagDatadir           string
-	flagChain             string
-	flagNoMigration       bool
-	flagNoReport          bool
+	flagExecutionStateDir                  string
+	flagOutputDir                          string
+	flagBlockHash                          string
+	flagStateCommitment                    string
+	flagDatadir                            string
+	flagChain                              string
+	flagNWorker                            int
+	flagNoMigration                        bool
+	flagNoReport                           bool
+	flagValidateMigration                  bool
+	flagAllowPartialStateFromPayloads      bool
+	flagSortPayloads                       bool
+	flagPrune                              bool
+	flagLogVerboseValidationError          bool
+	flagDiffMigration                      bool
+	flagLogVerboseDiff                     bool
+	flagVerboseErrorOutput                 bool
+	flagStagedContractsFile                string
+	flagContinueMigrationOnValidationError bool
+	flagCheckStorageHealthBeforeMigration  bool
+	flagCheckStorageHealthAfterMigration   bool
+	flagInputPayloadFileName               string
+	flagOutputPayloadFileName              string
+	flagOutputPayloadByAddresses           string
+	flagMaxAccountSize                     uint64
+	flagFixSlabsWithBrokenReferences       bool
+	flagFilterUnreferencedSlabs            bool
 )
-
-func getChain(chainName string) (chain flow.Chain, err error) {
-	defer func() {
-		if r := recover(); r != nil {
-			err = fmt.Errorf("invalid chain: %s", r)
-		}
-	}()
-	chain = flow.ChainID(chainName).Chain()
-	return
-}
 
 var Cmd = &cobra.Command{
 	Use:   "execution-state-extract",
@@ -70,6 +82,83 @@ func init() {
 
 	Cmd.Flags().BoolVar(&flagNoReport, "no-report", false,
 		"don't report the state")
+
+	Cmd.Flags().IntVar(&flagNWorker, "n-migrate-worker", 10, "number of workers to migrate payload concurrently")
+
+	Cmd.Flags().BoolVar(&flagValidateMigration, "validate", false,
+		"validate migrated Cadence values (atree migration)")
+
+	Cmd.Flags().BoolVar(&flagLogVerboseValidationError, "log-verbose-validation-error", false,
+		"log entire Cadence values on validation error (atree migration)")
+
+	Cmd.Flags().BoolVar(&flagDiffMigration, "diff", false,
+		"compare Cadence values and log diff (migration)")
+
+	Cmd.Flags().BoolVar(&flagLogVerboseDiff, "log-verbose-diff", false,
+		"log entire Cadence values on diff (requires --diff flag)")
+
+	Cmd.Flags().BoolVar(&flagVerboseErrorOutput, "verbose-error-output", true,
+		"log verbose output on migration errors")
+
+	Cmd.Flags().StringVar(&flagStagedContractsFile, "staged-contracts", "",
+		"Staged contracts CSV file")
+
+	Cmd.Flags().BoolVar(&flagAllowPartialStateFromPayloads, "allow-partial-state-from-payload-file", false,
+		"allow input payload file containing partial state (e.g. not all accounts)")
+
+	Cmd.Flags().BoolVar(&flagCheckStorageHealthBeforeMigration, "check-storage-health-before", false,
+		"check (atree) storage health before migration")
+
+	Cmd.Flags().BoolVar(&flagCheckStorageHealthAfterMigration, "check-storage-health-after", false,
+		"check (atree) storage health after migration")
+
+	Cmd.Flags().BoolVar(&flagContinueMigrationOnValidationError, "continue-migration-on-validation-errors", false,
+		"continue migration even if validation fails")
+
+	Cmd.Flags().BoolVar(&flagSortPayloads, "sort-payloads", true,
+		"sort payloads (generate deterministic output; disable only for development purposes)")
+
+	Cmd.Flags().BoolVar(&flagPrune, "prune", false,
+		"prune the state (for development purposes)")
+
+	// If specified, the state will consist of payloads from the given input payload file.
+	// If not specified, then the state will be extracted from the latest checkpoint file.
+	// This flag can be used to reduce total duration of migrations when state extraction involves
+	// multiple migrations because it helps avoid repeatedly reading from checkpoint file to rebuild trie.
+	// The input payload file must be created by state extraction running with either
+	// flagOutputPayloadFileName or flagOutputPayloadByAddresses.
+	Cmd.Flags().StringVar(
+		&flagInputPayloadFileName,
+		"input-payload-filename",
+		"",
+		"input payload file",
+	)
+
+	Cmd.Flags().StringVar(
+		&flagOutputPayloadFileName,
+		"output-payload-filename",
+		"",
+		"output payload file",
+	)
+
+	Cmd.Flags().StringVar(
+		// Extract payloads of specified addresses (comma separated list of hex-encoded addresses)
+		// to file specified by --output-payload-filename.
+		// If no address is specified (empty string) then this flag is ignored.
+		&flagOutputPayloadByAddresses,
+		"extract-payloads-by-address",
+		"",
+		"extract payloads of addresses (comma separated hex-encoded addresses) to file specified by output-payload-filename",
+	)
+
+	Cmd.Flags().Uint64Var(&flagMaxAccountSize, "max-account-size", 0,
+		"max account size")
+
+	Cmd.Flags().BoolVar(&flagFixSlabsWithBrokenReferences, "fix-testnet-slabs-with-broken-references", false,
+		"fix slabs with broken references in testnet")
+
+	Cmd.Flags().BoolVar(&flagFilterUnreferencedSlabs, "filter-unreferenced-slabs", false,
+		"filter unreferenced slabs")
 }
 
 func run(*cobra.Command, []string) {
@@ -80,11 +169,30 @@ func run(*cobra.Command, []string) {
 		return
 	}
 
+	if len(flagBlockHash) == 0 && len(flagStateCommitment) == 0 && len(flagInputPayloadFileName) == 0 {
+		log.Fatal().Msg("--block-hash or --state-commitment or --input-payload-filename must be specified")
+	}
+
+	if len(flagInputPayloadFileName) > 0 && (len(flagBlockHash) > 0 || len(flagStateCommitment) > 0) {
+		log.Fatal().Msg("--input-payload-filename cannot be used with --block-hash or --state-commitment")
+	}
+
+	// When flagOutputPayloadByAddresses is specified, flagOutputPayloadFileName is required.
+	if len(flagOutputPayloadFileName) == 0 && len(flagOutputPayloadByAddresses) > 0 {
+		log.Fatal().Msg("--extract-payloads-by-address requires --output-payload-filename to be specified")
+	}
+
+	if flagValidateMigration && flagDiffMigration {
+		log.Fatal().Msg("Both --validate and --diff are enabled, please specify only one (or none) of these")
+	}
+
 	if len(flagBlockHash) > 0 {
 		blockID, err := flow.HexStringToIdentifier(flagBlockHash)
 		if err != nil {
 			log.Fatal().Err(err).Msg("malformed block hash")
 		}
+
+		log.Info().Msgf("extracting state by block ID: %v", blockID)
 
 		db := common.InitStorage(flagDatadir)
 		defer db.Close()
@@ -92,9 +200,9 @@ func run(*cobra.Command, []string) {
 		cache := &metrics.NoopCollector{}
 		commits := badger.NewCommits(cache, db)
 
-		stateCommitment, err = getStateCommitment(commits, blockID)
+		stateCommitment, err = commits.ByBlockID(blockID)
 		if err != nil {
-			log.Fatal().Err(err).Msg("cannot get state commitment for block")
+			log.Fatal().Err(err).Msgf("cannot get state commitment for block %v", blockID)
 		}
 	}
 
@@ -108,46 +216,226 @@ func run(*cobra.Command, []string) {
 		if err != nil {
 			log.Fatal().Err(err).Msg("invalid state commitment length")
 		}
+
+		log.Info().Msgf("extracting state by state commitment: %x", stateCommitment)
 	}
 
-	if len(flagBlockHash) == 0 && len(flagStateCommitment) == 0 {
-		// read state commitment from root checkpoint
-
-		f, err := os.Open(path.Join(flagExecutionStateDir, bootstrap.FilenameWALRootCheckpoint))
-		if err != nil {
-			log.Fatal().Err(err).Msg("invalid root checkpoint")
-		}
-		defer f.Close()
-
-		rootHash, err := wal.ReadLastTrieRootHashFromCheckpoint(f)
-		if err != nil {
-			log.Fatal().Err(err).Msgf("failed to read last root hash in root checkpoint: %s", err.Error())
+	if len(flagInputPayloadFileName) > 0 {
+		if _, err := os.Stat(flagInputPayloadFileName); os.IsNotExist(err) {
+			log.Fatal().Msgf("payload input file %s doesn't exist", flagInputPayloadFileName)
 		}
 
-		stateCommitment, err = flow.ToStateCommitment(rootHash[:])
+		partialState, err := util.IsPayloadFilePartialState(flagInputPayloadFileName)
 		if err != nil {
-			log.Fatal().Err(err).Msg("failed to convert state commitment from last root hash in root checkpoint")
+			log.Fatal().Err(err).Msgf("cannot get flag from payload input file %s", flagInputPayloadFileName)
+		}
+
+		// Check if payload file contains partial state and is allowed by --allow-partial-state-from-payload-file.
+		if !flagAllowPartialStateFromPayloads && partialState {
+			log.Fatal().Msgf("payload input file %s contains partial state, please specify --allow-partial-state-from-payload-file", flagInputPayloadFileName)
+		}
+
+		msg := "input payloads represent "
+		if partialState {
+			msg += "partial state"
+		} else {
+			msg += "complete state"
+		}
+		if flagAllowPartialStateFromPayloads {
+			msg += ", and --allow-partial-state-from-payload-file is specified"
+		} else {
+			msg += ", and --allow-partial-state-from-payload-file is NOT specified"
+		}
+		log.Info().Msg(msg)
+	}
+
+	if len(flagOutputPayloadFileName) > 0 {
+		if _, err := os.Stat(flagOutputPayloadFileName); os.IsExist(err) {
+			log.Fatal().Msgf("payload output file %s exists", flagOutputPayloadFileName)
 		}
 	}
 
-	log.Info().Msgf("Block state commitment: %s", hex.EncodeToString(stateCommitment[:]))
+	var exportedAddresses []runtimeCommon.Address
 
-	chain, err := getChain(flagChain)
+	if len(flagOutputPayloadByAddresses) > 0 {
+
+		addresses := strings.Split(flagOutputPayloadByAddresses, ",")
+
+		for _, hexAddr := range addresses {
+			b, err := hex.DecodeString(strings.TrimSpace(hexAddr))
+			if err != nil {
+				log.Fatal().Err(err).Msgf("cannot hex decode address %s for payload export", strings.TrimSpace(hexAddr))
+			}
+
+			addr, err := runtimeCommon.BytesToAddress(b)
+			if err != nil {
+				log.Fatal().Err(err).Msgf("cannot decode address %x for payload export", b)
+			}
+
+			exportedAddresses = append(exportedAddresses, addr)
+		}
+	}
+
+	// err := ensureCheckpointFileExist(flagExecutionStateDir)
+	// if err != nil {
+	// 	log.Fatal().Err(err).Msgf("cannot ensure checkpoint file exist in folder %v", flagExecutionStateDir)
+	// }
+
+	chain := flow.ChainID(flagChain).Chain()
+
+	if flagNoReport {
+		log.Warn().Msgf("--no-report flag is deprecated")
+	}
+
+	if flagValidateMigration {
+		log.Warn().Msgf("--validate flag is enabled and will increase duration of migration")
+	}
+
+	if flagLogVerboseValidationError {
+		log.Warn().Msgf("--log-verbose-validation-error flag is enabled which may increase size of log")
+	}
+
+	if flagDiffMigration {
+		log.Warn().Msgf("--diff flag is enabled and will increase duration of migration")
+	}
+
+	if flagLogVerboseDiff {
+		log.Warn().Msgf("--log-verbose-diff flag is enabled which may increase size of log")
+	}
+
+	if flagVerboseErrorOutput {
+		log.Warn().Msgf("--verbose-error-output flag is enabled which may increase size of log")
+	}
+
+	if flagCheckStorageHealthBeforeMigration {
+		log.Warn().Msgf("--check-storage-health-before flag is enabled and will increase duration of migration")
+	}
+
+	if flagCheckStorageHealthAfterMigration {
+		log.Warn().Msgf("--check-storage-health-after flag is enabled and will increase duration of migration")
+	}
+
+	var inputMsg string
+	if len(flagInputPayloadFileName) > 0 {
+		// Input is payloads
+		inputMsg = fmt.Sprintf("reading payloads from %s", flagInputPayloadFileName)
+	} else {
+		// Input is execution state
+		inputMsg = fmt.Sprintf("reading block state commitment %s from %s",
+			hex.EncodeToString(stateCommitment[:]),
+			flagExecutionStateDir,
+		)
+	}
+
+	var outputMsg string
+	if len(flagOutputPayloadFileName) > 0 {
+		// Output is payload file
+		if len(exportedAddresses) == 0 {
+			outputMsg = fmt.Sprintf("exporting all payloads to %s", flagOutputPayloadFileName)
+		} else {
+			outputMsg = fmt.Sprintf(
+				"exporting payloads by addresses %v to %s",
+				flagOutputPayloadByAddresses,
+				flagOutputPayloadFileName,
+			)
+		}
+	} else {
+		// Output is checkpoint files
+		outputMsg = fmt.Sprintf(
+			"exporting root checkpoint to %s, version: %d",
+			path.Join(flagOutputDir, bootstrap.FilenameWALRootCheckpoint),
+			6,
+		)
+	}
+
+	log.Info().Msgf("state extraction plan: %s, %s", inputMsg, outputMsg)
+
+	chainID := chain.ChainID()
+	// TODO:
+	evmContractChange := migrations.EVMContractChangeNone
+
+	var burnerContractChange migrations.BurnerContractChange
+	switch chainID {
+	case flow.Emulator:
+		burnerContractChange = migrations.BurnerContractChangeDeploy
+	case flow.Testnet, flow.Mainnet:
+		burnerContractChange = migrations.BurnerContractChangeUpdate
+	}
+
+	stagedContracts, err := migrations.StagedContractsFromCSV(flagStagedContractsFile)
 	if err != nil {
-		log.Fatal().Err(err).Msgf("invalid chain name")
+		log.Fatal().Err(err).Msgf("error loading staged contracts: %s", err.Error())
 	}
 
-	err = extractExecutionState(
-		flagExecutionStateDir,
-		stateCommitment,
-		flagOutputDir,
-		log.Logger,
-		chain,
-		!flagNoMigration,
-		!flagNoReport,
-	)
+	opts := migrations.Options{
+		NWorker:                           flagNWorker,
+		DiffMigrations:                    flagDiffMigration,
+		LogVerboseDiff:                    flagLogVerboseDiff,
+		CheckStorageHealthBeforeMigration: flagCheckStorageHealthBeforeMigration,
+		ChainID:                           chainID,
+		EVMContractChange:                 evmContractChange,
+		BurnerContractChange:              burnerContractChange,
+		StagedContracts:                   stagedContracts,
+		Prune:                             flagPrune,
+		MaxAccountSize:                    flagMaxAccountSize,
+		VerboseErrorOutput:                flagVerboseErrorOutput,
+		FixSlabsWithBrokenReferences:      chainID == flow.Testnet && flagFixSlabsWithBrokenReferences,
+		FilterUnreferencedSlabs:           flagFilterUnreferencedSlabs,
+	}
+
+	if len(flagInputPayloadFileName) > 0 {
+		err = extractExecutionStateFromPayloads(
+			log.Logger,
+			flagExecutionStateDir,
+			flagOutputDir,
+			flagNWorker,
+			!flagNoMigration,
+			flagInputPayloadFileName,
+			flagOutputPayloadFileName,
+			exportedAddresses,
+			flagSortPayloads,
+			opts,
+		)
+	} else {
+		err = extractExecutionState(
+			log.Logger,
+			flagExecutionStateDir,
+			stateCommitment,
+			flagOutputDir,
+			flagNWorker,
+			!flagNoMigration,
+			flagOutputPayloadFileName,
+			exportedAddresses,
+			flagSortPayloads,
+			opts,
+		)
+	}
 
 	if err != nil {
 		log.Fatal().Err(err).Msgf("error extracting the execution state: %s", err.Error())
 	}
 }
+
+// func ensureCheckpointFileExist(dir string) error {
+// 	checkpoints, err := wal.Checkpoints(dir)
+// 	if err != nil {
+// 		return fmt.Errorf("could not find checkpoint files: %v", err)
+// 	}
+//
+// 	if len(checkpoints) != 0 {
+// 		log.Info().Msgf("found checkpoint %v files: %v", len(checkpoints), checkpoints)
+// 		return nil
+// 	}
+//
+// 	has, err := wal.HasRootCheckpoint(dir)
+// 	if err != nil {
+// 		return fmt.Errorf("could not check has root checkpoint: %w", err)
+// 	}
+//
+// 	if has {
+// 		log.Info().Msg("found root checkpoint file")
+// 		return nil
+// 	}
+//
+// 	return fmt.Errorf("no checkpoint file was found, no root checkpoint file was found")
+// }

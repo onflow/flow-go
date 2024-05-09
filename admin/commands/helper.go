@@ -1,6 +1,8 @@
 package commands
 
-import "encoding/json"
+import (
+	"encoding/json"
+)
 
 func ConvertToInterfaceList(list interface{}) ([]interface{}, error) {
 	var resultList []interface{}

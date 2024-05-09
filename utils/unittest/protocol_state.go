@@ -22,7 +22,7 @@ func FinalizedProtocolStateWithParticipants(participants flow.IdentityList) (
 	// set up protocol snapshot mock
 	snapshot := &mockprotocol.Snapshot{}
 	snapshot.On("Identities", mock.Anything).Return(
-		func(filter flow.IdentityFilter) flow.IdentityList {
+		func(filter flow.IdentityFilter[flow.Identity]) flow.IdentityList {
 			return participants.Filter(filter)
 		},
 		nil,
@@ -69,25 +69,41 @@ func FinalizedProtocolStateWithParticipants(participants flow.IdentityList) (
 	return block, snapshot, state, sealedSnapshot
 }
 
-// SealBlock seals a block by building two blocks on it, the first containing
-// a receipt for the block, the second containing a seal for the block.
-// Returns the block containing the seal.
-func SealBlock(t *testing.T, st protocol.MutableState, block *flow.Block, receipt *flow.ExecutionReceipt, seal *flow.Seal) *flow.Header {
+// SealBlock seals a block B by building two blocks on it, the first containing
+// a receipt for the block (BR), the second (BS) containing a seal for the block.
+// B <- BR(Result_B) <- BS(Seal_B)
+// Returns the two generated blocks.
+func SealBlock(t *testing.T, st protocol.ParticipantState, mutableProtocolState protocol.MutableProtocolState, block *flow.Block, receipt *flow.ExecutionReceipt, seal *flow.Seal) (br *flow.Block, bs *flow.Block) {
 
 	block2 := BlockWithParentFixture(block.Header)
 	block2.SetPayload(flow.Payload{
-		Receipts: []*flow.ExecutionReceiptMeta{receipt.Meta()},
-		Results:  []*flow.ExecutionResult{&receipt.ExecutionResult},
+		Receipts:        []*flow.ExecutionReceiptMeta{receipt.Meta()},
+		Results:         []*flow.ExecutionResult{&receipt.ExecutionResult},
+		ProtocolStateID: block.Payload.ProtocolStateID,
 	})
 	err := st.Extend(context.Background(), block2)
 	require.NoError(t, err)
 
 	block3 := BlockWithParentFixture(block2.Header)
+	seals := []*flow.Seal{seal}
+	updatedStateId, dbUpdates, err := mutableProtocolState.EvolveState(block3.Header.ParentID, block3.Header.View, seals)
+	require.NoError(t, err)
+	require.False(t, dbUpdates.IsEmpty())
+
 	block3.SetPayload(flow.Payload{
-		Seals: []*flow.Seal{seal},
+		Seals:           seals,
+		ProtocolStateID: updatedStateId,
 	})
 	err = st.Extend(context.Background(), block3)
 	require.NoError(t, err)
 
-	return block3.Header
+	return block2, block3
+}
+
+// InsertAndFinalize inserts, then finalizes, the input block.
+func InsertAndFinalize(t *testing.T, st protocol.ParticipantState, block *flow.Block) {
+	err := st.Extend(context.Background(), block)
+	require.NoError(t, err)
+	err = st.Finalize(context.Background(), block.ID())
+	require.NoError(t, err)
 }

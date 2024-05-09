@@ -1,0 +1,180 @@
+# from https://github.com/onflow/flow-go/blob/fa60c8f96b4a22f0f252c4b82a5dc4bbf54128c1/integration/localnet/values.yml
+branch: fake-branch
+# Commit must be a string
+commit: "123456"
+
+defaults: {}
+access:
+  defaults:{{template "defaults"}}
+    resources:
+      requests:
+        cpu: "200m"
+        memory: "128Mi"
+      limits:
+        cpu: "800m"
+        memory: "10Gi"
+    storage: 1G
+  nodes:
+{{- range $val := .}}{{if eq ($val.role) ("access")}}
+    {{$val.name}}:
+      args:{{template "args" .}}
+        - --loglevel=INFO
+        - --rpc-addr=0.0.0.0:9000
+        - --secure-rpc-addr=0.0.0.0:9001
+        - --http-addr=0.0.0.0:8000
+        - --collection-ingress-port=9000
+        - --supports-observer=true
+        - --public-network-address=0.0.0.0:1234
+        - --log-tx-time-to-finalized
+        - --log-tx-time-to-executed
+        - --log-tx-time-to-finalized-executed
+      env:{{template "env" .}}
+      image: {{$val.docker_registry}}/access:{{$val.docker_tag}}
+      nodeId: {{$val.node_id}}
+{{- end}}{{end}}
+collection:
+  defaults:{{template "defaults"}}
+    resources:
+      requests:
+        cpu: "200m"
+        memory: "128Mi"
+      limits:
+        cpu: "800m"
+        memory: "10Gi"
+    storage: 1G
+  nodes:
+{{- range $val := .}}{{if eq ($val.role) ("collection")}}
+    {{$val.name}}:
+      args:{{template "args" .}}
+        - --loglevel=INFO
+        - --block-rate-delay=950ms
+        - --hotstuff-timeout=2.15s
+        - --hotstuff-min-timeout=2.15s
+        - --ingress-addr=0.0.0.0:9000
+        - --insecure-access-api=false
+        - --access-node-ids=*
+      env:{{template "env" .}}
+      image: {{$val.docker_registry}}/collection:{{$val.docker_tag}}
+      nodeId: {{$val.node_id}}
+{{- end}}{{end}}
+consensus:
+  defaults:{{template "defaults"}}
+    resources:
+      requests:
+        cpu: "200m"
+        memory: "128Mi"
+      limits:
+        cpu: "800m"
+        memory: "10Gi"
+    storage: 1G
+  nodes:
+{{- range $val := .}}{{if eq ($val.role) ("consensus")}}
+    {{$val.name}}:
+      args:{{template "args" .}}
+        - --loglevel=DEBUG
+        - --block-rate-delay=800ms
+        - --hotstuff-timeout=2s
+        - --hotstuff-min-timeout=2s
+        - --chunk-alpha=1
+        - --emergency-sealing-active=false
+        - --insecure-access-api=false
+        - --access-node-ids=*
+      env:{{template "env" .}}
+      image: {{$val.docker_registry}}/consensus:{{$val.docker_tag}}
+      nodeId: {{$val.node_id}}
+{{- end}}{{end}}
+execution:
+  defaults:{{template "defaults"}}
+    resources:
+      requests:
+        cpu: "200m"
+        memory: "512Mi"
+    storage: 10G
+  nodes:
+{{- range $val := .}}{{if eq ($val.role) ("execution")}}
+    {{$val.name}}:
+      args:{{template "args" .}}
+        - --loglevel=INFO
+        - --triedir=/trie
+        - --rpc-addr=0.0.0.0:9000
+        - --cadence-tracing=false
+        - --extensive-tracing=false
+      env:{{template "env" .}}
+      image: {{$val.docker_registry}}/execution:{{$val.docker_tag}}
+      nodeId: {{$val.node_id}}
+{{- end}}{{end}}
+verification:
+  defaults:{{template "defaults"}}
+    resources:
+      requests:
+        cpu: "200m"
+        memory: "512Mi"
+      limits:
+        cpu: "800m"
+        memory: "10Gi"
+    storage: 1G
+  nodes:
+{{- range $val := .}}{{if eq ($val.role) ("verification")}}
+    {{$val.name}}:
+      args:{{template "args" .}}
+        - --loglevel=INFO
+        - --chunk-alpha=1
+      env:{{template "env" .}}
+      image: {{$val.docker_registry}}/verification:{{$val.docker_tag}}
+      nodeId: {{$val.node_id}}
+{{end}}{{end}}
+
+{{define "args"}}
+        - --bootstrapdir=/bootstrap
+        - --datadir=/data/protocol
+        - --secretsdir=/data/secret
+        - --bind=0.0.0.0:3569
+        - --profiler-enabled=false
+        - --profile-uploader-enabled=false
+        - --tracer-enabled=false
+        - --profiler-dir=/profiler
+        - --profiler-interval=2m
+        - --nodeid={{.node_id}}
+{{- end}}
+
+{{define "env"}}
+        - name: OTEL_EXPORTER_OTLP_TRACES_ENDPOINT
+          value: http://tempo:4317
+        - name: OTEL_EXPORTER_OTLP_TRACES_INSECURE
+          value: "true"
+        - name: OTEL_RESOURCE_ATTRIBUTES
+          value: network=benchnet2,role={{.role}},num={{.name}}-{{.docker_tag}}
+{{- end}}
+
+{{define "defaults"}}
+    imagePullPolicy: Always
+    containerPorts:
+      - name: metrics
+        containerPort: 8080
+      - name: ptp
+        containerPort: 3569
+      - name: grpc
+        containerPort: 9000
+      - name: secure-grpc
+        containerPort: 9001
+      - name: admin
+        containerPort: 9002
+    env: []
+    servicePorts:
+      - name: ptp
+        protocol: TCP
+        port: 3569
+        targetPort: ptp
+      - name: grpc
+        protocol: TCP
+        port: 9000
+        targetPort: grpc
+      - name: secure-grpc
+        protocol: TCP
+        port: 9001
+        targetPort: secure-grpc
+      - name: admin
+        protocol: TCP
+        port: 9002
+        targetPort: admin
+{{- end}}

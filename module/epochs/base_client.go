@@ -2,6 +2,7 @@ package epochs
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -11,6 +12,7 @@ import (
 
 	sdk "github.com/onflow/flow-go-sdk"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
+	"github.com/onflow/flow-go/network"
 
 	"github.com/onflow/flow-go/module"
 )
@@ -20,13 +22,19 @@ const (
 	waitForSealedMaxDuration   = 5 * time.Minute
 )
 
+var (
+	// errTransactionExpired is returned when a transaction expires before it is incorporated into a block.
+	errTransactionExpired = errors.New("transaction expired")
+	// errTransactionReverted is returned when a transaction is executed, but the execution reverts.
+	errTransactionReverted = errors.New("transaction execution reverted")
+)
+
 // BaseClient represents the core fields and methods needed to create
 // a client to a contract on the Flow Network.
 type BaseClient struct {
 	Log zerolog.Logger // default logger
 
-	ContractAddress string                  // contract address
-	FlowClient      module.SDKClientWrapper // flow access node client
+	FlowClient module.SDKClientWrapper // flow access node client
 
 	AccountAddress  sdk.Address      // account belonging to node interacting with the contract
 	AccountKeyIndex uint             // account key index
@@ -40,12 +48,10 @@ func NewBaseClient(
 	accountAddress string,
 	accountKeyIndex uint,
 	signer sdkcrypto.Signer,
-	contractAddress string,
 ) *BaseClient {
 
 	return &BaseClient{
 		Log:             log,
-		ContractAddress: contractAddress,
 		FlowClient:      flowClient,
 		AccountKeyIndex: accountKeyIndex,
 		Signer:          signer,
@@ -53,23 +59,32 @@ func NewBaseClient(
 	}
 }
 
+// GetAccount returns the current state for the account associated with the BaseClient.
+// Error returns:
+//   - network.TransientError for any errors from the underlying client
+//   - generic error in case of unexpected critical failure
 func (c *BaseClient) GetAccount(ctx context.Context) (*sdk.Account, error) {
 
 	// get account from access node for given address
 	account, err := c.FlowClient.GetAccount(ctx, c.AccountAddress)
 	if err != nil {
-		return nil, fmt.Errorf("could not get account: %w", err)
+		// we consider all errors from client network calls to be transient and non-critical
+		return nil, network.NewTransientErrorf("could not get account: %w", err)
 	}
 
 	// check if account key index within range of keys
-	if len(account.Keys) <= int(c.AccountKeyIndex) {
-		return nil, fmt.Errorf("given account key index is bigger than the number of keys for this account")
+	if int(c.AccountKeyIndex) >= len(account.Keys) {
+		return nil, fmt.Errorf("given account key index exceeds the number of keys for this account (%d>=%d)",
+			c.AccountKeyIndex, len(account.Keys))
 	}
 
 	return account, nil
 }
 
 // SendTransaction submits a transaction to Flow. Requires transaction to be signed.
+// Error returns:
+//   - network.TransientError for any errors from the underlying client
+//   - generic error in case of unexpected critical failure
 func (c *BaseClient) SendTransaction(ctx context.Context, tx *sdk.Transaction) (sdk.Identifier, error) {
 
 	// check if the transaction has a signature
@@ -80,13 +95,19 @@ func (c *BaseClient) SendTransaction(ctx context.Context, tx *sdk.Transaction) (
 	// submit transaction to client
 	err := c.FlowClient.SendTransaction(ctx, *tx)
 	if err != nil {
-		return sdk.EmptyID, fmt.Errorf("failed to send transaction: %w", err)
+		// we consider all errors from client network calls to be transient and non-critical
+		return sdk.EmptyID, network.NewTransientErrorf("failed to send transaction: %w", err)
 	}
 
 	return tx.ID(), nil
 }
 
 // WaitForSealed waits for a transaction to be sealed
+// Error returns:
+//   - network.TransientError for any errors from the underlying client, if the retry period has been exceeded
+//   - errTransactionExpired if the transaction has expired
+//   - errTransactionReverted if the transaction execution reverted
+//   - generic error in case of unexpected critical failure
 func (c *BaseClient) WaitForSealed(ctx context.Context, txID sdk.Identifier, started time.Time) error {
 
 	log := c.Log.With().Str("tx_id", txID.Hex()).Logger()
@@ -101,30 +122,31 @@ func (c *BaseClient) WaitForSealed(ctx context.Context, txID sdk.Identifier, sta
 
 		result, err := c.FlowClient.GetTransactionResult(ctx, txID)
 		if err != nil {
-			msg := "could not get transaction result, retrying"
-			log.Error().Err(err).Msg(msg)
-			return retry.RetryableError(fmt.Errorf(msg))
+			// we consider all errors from client network calls to be transient and non-critical
+			err = network.NewTransientErrorf("could not get transaction result: %w", err)
+			log.Err(err).Msg("retrying getting transaction result...")
+			return retry.RetryableError(err)
 		}
 
 		if result.Error != nil {
-			return fmt.Errorf("error executing transaction: %w", result.Error)
+			return fmt.Errorf("transaction reverted with error=[%s]: %w", result.Error.Error(), errTransactionReverted)
 		}
 
 		log.Info().Str("status", result.Status.String()).Msg("got transaction result")
 
 		// if the transaction has expired we skip waiting for seal
 		if result.Status == sdk.TransactionStatusExpired {
-			return fmt.Errorf("transaction has expired")
+			return errTransactionExpired
 		}
 
 		if result.Status == sdk.TransactionStatusSealed {
 			return nil
 		}
 
-		return retry.RetryableError(fmt.Errorf("waiting for transaction to be sealed retrying"))
+		return retry.RetryableError(network.NewTransientErrorf("transaction not sealed yet (status=%s)", result.Status))
 	})
 	if err != nil {
-		return err
+		return fmt.Errorf("transaction (id=%s) failed to be sealed successfully after %s: %w", txID.String(), time.Since(started), err)
 	}
 
 	return nil

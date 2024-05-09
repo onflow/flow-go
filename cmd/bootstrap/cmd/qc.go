@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 
 	"github.com/onflow/flow-go/cmd/bootstrap/run"
+	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/dkg"
@@ -20,7 +21,13 @@ func constructRootQC(block *flow.Block, votes []*model.Vote, allNodes, internalN
 		log.Fatal().Err(err).Msg("failed to generate QC participant data")
 	}
 
-	qc, err := run.GenerateRootQC(block, votes, participantData, identities)
+	qc, invalidVotesErr, err := run.GenerateRootQC(block, votes, participantData, identities)
+	if len(invalidVotesErr) > 0 {
+		for _, err := range invalidVotesErr {
+			log.Warn().Err(err).Msg("invalid vote")
+		}
+	}
+
 	if err != nil {
 		log.Fatal().Err(err).Msg("generating root QC failed")
 	}
@@ -42,6 +49,10 @@ func constructRootVotes(block *flow.Block, allNodes, internalNodes []bootstrap.N
 
 	for _, vote := range votes {
 		path := filepath.Join(bootstrap.DirnameRootBlockVotes, fmt.Sprintf(bootstrap.FilenameRootBlockVote, vote.SignerID))
-		writeJSON(path, vote)
+		err = common.WriteJSON(path, flagOutdir, vote)
+		if err != nil {
+			log.Fatal().Err(err).Msg("failed to write json")
+		}
+		log.Info().Msgf("wrote file %s/%s", flagOutdir, path)
 	}
 }

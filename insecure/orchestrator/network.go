@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
+	flownetmsg "github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
@@ -91,7 +92,7 @@ func (on *Network) start(ctx irrecoverable.SignalerContext) error {
 	return nil
 }
 
-// stop conducts the termination logic of the sub-modules of orchestrator network.
+// stop conducts the termination logic of the submodules of orchestrator network.
 func (on *Network) stop() error {
 	// tears down connections to corrupt nodes.
 	var errors *multierror.Error
@@ -107,28 +108,48 @@ func (on *Network) stop() error {
 }
 
 // Observe is the inbound message handler of the orchestrator network.
-// Instead of dispatching their messages to the networking layer of Flow, the conduits of corrupt nodes
-// dispatch the outgoing messages to the orchestrator network by calling the InboundHandler method of it remotely.
+// Instead of dispatching their messages to the networking layer of Flow, the corrupt nodes
+// dispatch both the incoming (i.e., ingress) as well as the outgoing (i.e., egress)
+// messages to the orchestrator network by calling the InboundHandler method of it remotely.
 func (on *Network) Observe(message *insecure.Message) {
-	if err := on.processEgressMessage(message); err != nil {
-		on.logger.Fatal().Err(err).Msg("could not process message of corrupt node")
+	if message.Ingress == nil && message.Egress == nil {
+		// In BFT testing framework, it is a bug to has neither ingress nor egress not set.
+		on.logger.Fatal().Msg("could not observe message - both ingress and egress messages can't be nil")
+		return // return to avoid changing the behavior by tweaking the log level.
+	}
+	if message.Ingress != nil && message.Egress != nil {
+		// In BFT testing framework, it is a bug to have both ingress and egress messages set.
+		on.logger.Fatal().Msg("could not observe message - both ingress and egress messages can't be set")
+		return // return to avoid changing the behavior by tweaking the log level.
+	}
+	if message.Egress != nil {
+		if err := on.processEgressMessage(message.Egress); err != nil {
+			on.logger.Error().Err(err).Msg("could not process egress message of corrupt node")
+			return // return to avoid changing the behavior by tweaking the log level.
+		}
+	}
+	if message.Ingress != nil {
+		if err := on.processIngressMessage(message.Ingress); err != nil {
+			on.logger.Error().Err(err).Msg("could not process ingress message of corrupt node")
+			return // return to avoid changing the behavior by tweaking the log level.
+		}
 	}
 }
 
-// processEgressMessage processes incoming messages arrived from corrupt conduits by passing them
+// processEgressMessage processes incoming egress messages arrived from corrupt conduits by passing them
 // to the orchestrator.
-func (on *Network) processEgressMessage(message *insecure.Message) error {
-	event, err := on.codec.Decode(message.Egress.Payload)
+func (on *Network) processEgressMessage(message *insecure.EgressMessage) error {
+	event, err := on.codec.Decode(message.Payload)
 	if err != nil {
-		return fmt.Errorf("could not decode observed payload: %w", err)
+		return fmt.Errorf("could not decode observed egress payload: %w", err)
 	}
 
-	sender, err := flow.ByteSliceToId(message.Egress.CorruptOriginID)
+	sender, err := flow.ByteSliceToId(message.CorruptOriginID)
 	if err != nil {
 		return fmt.Errorf("could not convert origin id to flow identifier: %w", err)
 	}
 
-	targetIds, err := flow.ByteSlicesToIds(message.Egress.TargetIDs)
+	targetIds, err := flow.ByteSlicesToIds(message.TargetIDs)
 	if err != nil {
 		return fmt.Errorf("could not convert target ids to flow identifiers: %w", err)
 	}
@@ -137,16 +158,70 @@ func (on *Network) processEgressMessage(message *insecure.Message) error {
 	on.orchestratorMutex.Lock()
 	defer on.orchestratorMutex.Unlock()
 
+	channel := channels.Channel(message.ChannelID)
+
+	egressEventIDHash, err := flownetmsg.EventId(channel, message.Payload)
+	if err != nil {
+		return fmt.Errorf("could not create egress event ID: %w", err)
+	}
+
+	egressEventID := flow.HashToID(egressEventIDHash)
+
 	err = on.orchestrator.HandleEgressEvent(&insecure.EgressEvent{
-		CorruptOriginId:   sender,
-		Channel:           channels.Channel(message.Egress.ChannelID),
-		FlowProtocolEvent: event,
-		Protocol:          message.Egress.Protocol,
-		TargetNum:         message.Egress.TargetNum,
-		TargetIds:         targetIds,
+		CorruptOriginId:     sender,
+		Channel:             channel,
+		FlowProtocolEvent:   event,
+		FlowProtocolEventID: egressEventID,
+		Protocol:            message.Protocol,
+		TargetNum:           message.TargetNum,
+		TargetIds:           targetIds,
 	})
 	if err != nil {
-		return fmt.Errorf("could not handle event by orchestrator: %w", err)
+		return fmt.Errorf("could not handle egress event by orchestrator: %w", err)
+	}
+
+	return nil
+}
+
+// processIngressMessage processes incoming ingress messages arrived from corrupt nodes by passing them
+// to the orchestrator.
+func (on *Network) processIngressMessage(message *insecure.IngressMessage) error {
+	event, err := on.codec.Decode(message.Payload)
+	if err != nil {
+		return fmt.Errorf("could not decode observed ingress payload: %w", err)
+	}
+
+	senderId, err := flow.ByteSliceToId(message.OriginID)
+	if err != nil {
+		return fmt.Errorf("could not convert origin id to flow identifier: %w", err)
+	}
+
+	targetId, err := flow.ByteSliceToId(message.CorruptTargetID)
+	if err != nil {
+		return fmt.Errorf("could not convert corrupted target id to flow identifier: %w", err)
+	}
+
+	// making sure events are sent sequentially to orchestrator.
+	on.orchestratorMutex.Lock()
+	defer on.orchestratorMutex.Unlock()
+
+	channel := channels.Channel(message.ChannelID)
+	ingressEventIDHash, err := flownetmsg.EventId(channel, message.Payload)
+	if err != nil {
+		return fmt.Errorf("could not create ingress event ID: %w", err)
+	}
+
+	ingressEventID := flow.HashToID(ingressEventIDHash)
+
+	err = on.orchestrator.HandleIngressEvent(&insecure.IngressEvent{
+		OriginID:            senderId,
+		CorruptTargetID:     targetId,
+		Channel:             channel,
+		FlowProtocolEvent:   event,
+		FlowProtocolEventID: ingressEventID,
+	})
+	if err != nil {
+		return fmt.Errorf("could not handle ingress event by orchestrator: %w", err)
 	}
 
 	return nil

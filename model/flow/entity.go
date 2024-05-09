@@ -1,5 +1,11 @@
 package flow
 
+type IDEntity interface {
+	// ID returns a unique id for this entity using a hash of the immutable
+	// fields of the entity.
+	ID() Identifier
+}
+
 // Entity defines how flow entities should be defined
 // Entities are flat data structures holding multiple data fields.
 // Entities don't include nested entities, they only include pointers to
@@ -7,55 +13,40 @@ package flow
 // of keeping a slice of entity object itself. This simplifies storage, signature and validation
 // of entities.
 type Entity interface {
-
-	// ID returns a unique id for this entity using a hash of the immutable
-	// fields of the entity.
-	ID() Identifier
+	IDEntity
 
 	// Checksum returns a unique checksum for the entity, including the mutable
 	// data such as signatures.
 	Checksum() Identifier
 }
 
-// Proof contains proof that an entity is part of a EntityList
-type Proof []byte
-
-// EntityList is a list of entities of the same type
-type EntityList interface {
-	EntitySet
-
-	// HasIndex checks if the list has an entity at the given index.
-	HasIndex(i uint) bool
-
-	// ByIndex returns an entity from the list by index
-	ByIndex(i uint) (Entity, bool)
-
-	// ByIndexWithProof returns an entity from the list by index and proof of membership
-	ByIndexWithProof(i uint) (Entity, Proof, bool)
+func EntitiesToIDs[T Entity](entities []T) []Identifier {
+	ids := make([]Identifier, 0, len(entities))
+	for _, entity := range entities {
+		ids = append(ids, entity.ID())
+	}
+	return ids
 }
 
-// EntitySet holds a set of entities (order doesn't matter)
-type EntitySet interface {
+// Deduplicate entities in a slice by the ID method
+// The original order of the entities is preserved.
+func Deduplicate[T IDEntity](entities []T) []T {
+	if entities == nil {
+		return nil
+	}
 
-	// Insert adds an entity to the data structure.
-	Insert(Entity) bool
+	seen := make(map[Identifier]struct{}, len(entities))
+	result := make([]T, 0, len(entities))
 
-	// Remove removes an entity from the data structure.
-	Remove(Entity) bool
+	for _, entity := range entities {
+		id := entity.ID()
+		if _, ok := seen[id]; ok {
+			continue
+		}
 
-	// Items returns all items of the collection.
-	Items() []Entity
+		seen[id] = struct{}{}
+		result = append(result, entity)
+	}
 
-	// Size returns the number of entities in the data structure.
-	Size() uint
-
-	// Fingerprint returns a unique identifier for all entities of the data
-	// structure.
-	Fingerprint() Identifier
-
-	// ByID returns the entity with the given fingerprint.
-	ByID(id Identifier) (Entity, bool)
-
-	// if the set has an specific member providing proof of membership
-	ByIDWithProof(id Identifier) (bool, Proof, error)
+	return result
 }

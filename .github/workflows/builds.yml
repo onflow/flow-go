@@ -1,0 +1,133 @@
+name: Build Node Docker Images
+# This workflow is used to build and push one-off images for specific node types. This is useful
+# when deploying hotfixes or any time a change is not needed for all node roles.
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        type: string
+        description: 'Git tag/commit'
+        required: true
+      docker_tag:
+        type: string
+        description: 'Docker tag'
+        required: true
+      # GHA doesn't support multi-selects, so simulating it with one boolean for each option
+      build_access:
+        type: boolean
+        description: 'Access'
+        required: false
+      build_collection:
+        type: boolean
+        description: 'Collection'
+        required: false
+      build_consensus:
+        type: boolean
+        description: 'Consensus'
+        required: false
+      build_execution:
+        type: boolean
+        description: 'Execution'
+        required: false
+      build_verification:
+        type: boolean
+        description: 'Verification'
+        required: false
+      build_observer:
+        type: boolean
+        description: 'Observer'
+        required: false
+      # GHA allows only up to 10 inputs - regroup two entries in one
+      include_alternative_builds:
+        type: boolean
+        description: 'Build amd64 `without_adx` and `without_netgo_without_adx` images, and arm64 images'
+        required: false
+
+jobs:
+  # matrix_builder generates a matrix that includes the roles selected in the input
+  matrix_builder:
+    name: Setup build jobs
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.generate.outputs.matrix }}
+    steps:
+    - name: Print all input variables
+      run: echo '${{ toJson(inputs) }}' | jq
+
+    - id: generate
+      run: |
+        roles=()
+        if [[ "${{ inputs.build_access }}" = "true" ]]; then
+          roles+=( "access" )
+        fi
+        if [[ "${{ inputs.build_collection }}" = "true" ]]; then
+          roles+=( "collection" )
+        fi
+        if [[ "${{ inputs.build_consensus }}" = "true" ]]; then
+          roles+=( "consensus" )
+        fi
+        if [[ "${{ inputs.build_execution }}" = "true" ]]; then
+          roles+=( "execution" )
+        fi
+        if [[ "${{ inputs.build_verification }}" = "true" ]]; then
+          roles+=( "verification" )
+        fi
+        if [[ "${{ inputs.build_observer }}" = "true" ]]; then
+          roles+=( "observer" )
+        fi
+        rolesJSON=$(jq --compact-output --null-input '$ARGS.positional' --args -- "${roles[@]}")
+        echo "matrix={\"role\":$(echo $rolesJSON)}" >> $GITHUB_OUTPUT
+
+  docker-push:
+    name: ${{ matrix.role }} images
+    runs-on: ubuntu-latest
+    needs: matrix_builder
+
+    # setup jobs for each role
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.matrix_builder.outputs.matrix) }}
+
+    steps:
+    - name: Setup Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.19'
+
+    - name: Checkout repo
+      uses: actions/checkout@v2
+      with:
+        ref: ${{ inputs.tag }}
+
+    # Provide Google Service Account credentials to Github Action, allowing interaction with the Google Container Registry
+    # Logging in as github-actions@dl-flow.iam.gserviceaccount.com
+    - id: auth
+      uses: google-github-actions/auth@v1
+      with:
+        credentials_json: ${{ secrets.GCR_SERVICE_KEY_SECRET }}
+    - name: Set up Google Cloud SDK
+      uses: google-github-actions/setup-gcloud@v1
+    - name: Authenticate docker with gcloud
+      run: |
+        gcloud auth configure-docker
+
+    - name: Build/Push ${{ matrix.role }} amd64 images with adx (default)
+      env:
+        IMAGE_TAG: ${{ inputs.docker_tag }}
+        CADENCE_DEPLOY_KEY: ${{ secrets.CADENCE_DEPLOY_KEY }}
+      run: |
+        make docker-build-${{ matrix.role }}-with-adx docker-push-${{ matrix.role }}-with-adx
+
+    - name: Build/Push ${{ matrix.role }} amd64 images without netgo and without adx, arm64 images
+      if: ${{ inputs.include_alternative_builds }}
+      env:
+        IMAGE_TAG: ${{ inputs.docker_tag }}
+        CADENCE_DEPLOY_KEY: ${{ secrets.CADENCE_DEPLOY_KEY }}
+      run: |
+        make docker-build-${{ matrix.role }}-without-adx docker-push-${{ matrix.role }}-without-adx \
+          docker-build-${{ matrix.role }}-without-netgo-without-adx docker-push-${{ matrix.role }}-without-netgo-without-adx \
+          docker-cross-build-${{ matrix.role }}-arm docker-push-${{ matrix.role }}-arm
+
+
+        

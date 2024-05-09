@@ -1,10 +1,6 @@
-// (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
-
 package cbor
 
 import (
-	"fmt"
-
 	"github.com/fxamacker/cbor/v2"
 
 	"github.com/onflow/flow-go/network/codec"
@@ -18,20 +14,26 @@ type Decoder struct {
 
 // Decode will decode the next CBOR value from the stream.
 // Expected error returns during normal operations:
-//   - codec.UnknownMsgCodeErr if message code byte does not match any of the configured message codes.
+//   - codec.ErrInvalidEncoding if message encoding is invalid.
+//   - codec.ErrUnknownMsgCode if message code byte does not match any of the configured message codes.
 //   - codec.ErrMsgUnmarshal if the codec fails to unmarshal the data to the message type denoted by the message code.
 func (d *Decoder) Decode() (interface{}, error) {
 
 	// read from stream and extract code
 	var data []byte
 	//bs1 := binstat.EnterTime(binstat.BinNet + ":strm>1(cbor)iowriter2payload2envelope")
-	err := d.dec.Decode(data)
+	err := d.dec.Decode(&data)
 	//binstat.LeaveVal(bs1, int64(len(data)))
-	if err != nil || len(data) == 0 {
-		return nil, fmt.Errorf("could not decode message; len(data)=%d: %w", len(data), err)
+	if err != nil {
+		return nil, codec.NewInvalidEncodingErr(err)
 	}
 
-	msgInterface, what, err := codec.InterfaceFromMessageCode(data[0])
+	msgCode, err := codec.MessageCodeFromPayload(data)
+	if err != nil {
+		return nil, err
+	}
+
+	msgInterface, what, err := codec.InterfaceFromMessageCode(msgCode)
 	if err != nil {
 		return nil, err
 	}

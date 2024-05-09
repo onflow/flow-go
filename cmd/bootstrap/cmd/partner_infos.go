@@ -7,12 +7,13 @@ import (
 	"strings"
 
 	"github.com/onflow/cadence"
+	"github.com/onflow/crypto"
 	"github.com/spf13/cobra"
 
 	client "github.com/onflow/flow-go-sdk/access/grpc"
+
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
@@ -21,12 +22,12 @@ import (
 const (
 	// Index of each field in the cadence NodeInfo as it corresponds to cadence.Struct.Fields
 	// fields not needed are left out.
-	idField = iota
-	roleField
-	networkingAddressField
-	networkingKeyField
-	stakingKeyField
-	stakingKePOPyField
+	idField                = "id"
+	roleField              = "role"
+	networkingAddressField = "networkingAddress"
+	networkingKeyField     = "networkingKey"
+	stakingKeyField        = "stakingKey"
+	stakingKePOPyField     = "stakingKeyPoP"
 )
 
 const (
@@ -65,7 +66,7 @@ func populatePartnerInfosRun(_ *cobra.Command, _ []string) {
 
 	flowClient := getFlowClient()
 
-	partnerWeights := make(PartnerWeights)
+	partnerWeights := make(common.PartnerWeights)
 	skippedNodes := 0
 	numOfPartnerNodesByRole := map[flow.Role]int{
 		flow.RoleCollection:   0,
@@ -147,7 +148,8 @@ func executeGetProposedNodesInfosScript(ctx context.Context, client *client.Clie
 
 // parseNodeInfo convert node info retrieved from cadence script
 func parseNodeInfo(info cadence.Value) (*bootstrap.NodeInfoPub, error) {
-	fields := info.(cadence.Struct).Fields
+	fields := cadence.FieldsMappedByName(info.(cadence.Struct))
+
 	nodeID, err := flow.HexStringToIdentifier(string(fields[idField].(cadence.String)))
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert flow node ID from hex string to identifier (%s): %w", string(fields[idField].(cadence.String)), err)
@@ -210,12 +212,20 @@ func validateANNetworkKey(key string) error {
 // writeNodePubInfoFile writes the node-pub-info file
 func writeNodePubInfoFile(info *bootstrap.NodeInfoPub) {
 	fileOutputPath := fmt.Sprintf(bootstrap.PathNodeInfoPub, info.NodeID)
-	writeJSON(fileOutputPath, info)
+	err := common.WriteJSON(fileOutputPath, flagOutdir, info)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to write json")
+	}
+	log.Info().Msgf("wrote file %s/%s", flagOutdir, fileOutputPath)
 }
 
 // writePartnerWeightsFile writes the partner weights file
-func writePartnerWeightsFile(partnerWeights PartnerWeights) {
-	writeJSON(bootstrap.FileNamePartnerWeights, partnerWeights)
+func writePartnerWeightsFile(partnerWeights common.PartnerWeights) {
+	err := common.WriteJSON(bootstrap.FileNamePartnerWeights, flagOutdir, partnerWeights)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to write json")
+	}
+	log.Info().Msgf("wrote file %s/%s", flagOutdir, bootstrap.FileNamePartnerWeights)
 }
 
 func printNodeCounts(numOfNodesByType map[flow.Role]int, totalNumOfPartnerNodes, skippedNodes int) {

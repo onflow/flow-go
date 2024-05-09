@@ -3,13 +3,20 @@ package state
 import (
 	"errors"
 	"fmt"
-
-	"github.com/onflow/flow-go/model/flow"
 )
 
-// InvalidExtensionError is an error for invalid extension of the state
+var (
+	// ErrUnknownSnapshotReference indicates that the reference point for a queried
+	// snapshot cannot be resolved. The reference point is either a height above the
+	// finalized boundary, or a block ID that does not exist in the state.
+	ErrUnknownSnapshotReference = errors.New("reference block of the snapshot is not resolvable")
+)
+
+// InvalidExtensionError is an error for invalid extension of the state. An invalid
+// extension is distinct from outdated or unverifiable extensions, in that it indicates
+// a malicious input.
 type InvalidExtensionError struct {
-	err error
+	error
 }
 
 func NewInvalidExtensionError(msg string) error {
@@ -18,16 +25,12 @@ func NewInvalidExtensionError(msg string) error {
 
 func NewInvalidExtensionErrorf(msg string, args ...interface{}) error {
 	return InvalidExtensionError{
-		err: fmt.Errorf(msg, args...),
+		error: fmt.Errorf(msg, args...),
 	}
 }
 
 func (e InvalidExtensionError) Unwrap() error {
-	return e.err
-}
-
-func (e InvalidExtensionError) Error() string {
-	return e.err.Error()
+	return e.error
 }
 
 // IsInvalidExtensionError returns whether the given error is an InvalidExtensionError error
@@ -40,7 +43,7 @@ func IsInvalidExtensionError(err error) bool {
 // Knowing whether an outdated extension is an invalid extension or not would
 // take more state queries.
 type OutdatedExtensionError struct {
-	err error
+	error
 }
 
 func NewOutdatedExtensionError(msg string) error {
@@ -49,76 +52,38 @@ func NewOutdatedExtensionError(msg string) error {
 
 func NewOutdatedExtensionErrorf(msg string, args ...interface{}) error {
 	return OutdatedExtensionError{
-		err: fmt.Errorf(msg, args...),
+		error: fmt.Errorf(msg, args...),
 	}
 }
 
 func (e OutdatedExtensionError) Unwrap() error {
-	return e.err
-}
-
-func (e OutdatedExtensionError) Error() string {
-	return e.err.Error()
+	return e.error
 }
 
 func IsOutdatedExtensionError(err error) bool {
 	return errors.As(err, &OutdatedExtensionError{})
 }
 
-// NoValidChildBlockError is a sentinel error when the case where a certain block has
-// no valid child.
-type NoValidChildBlockError struct {
-	err error
+// UnverifiableExtensionError represents a state extension (block) which cannot be
+// verified at the moment. For example, it does not connect to the finalized state,
+// or an entity referenced within the payload is unknown.
+// Unlike InvalidExtensionError, this error is only used when the failure CANNOT be
+// attributed to a malicious input, therefore this error can be treated as a benign failure.
+type UnverifiableExtensionError struct {
+	error
 }
 
-func NewNoValidChildBlockError(msg string) error {
-	return NoValidChildBlockError{
-		err: fmt.Errorf(msg),
+func NewUnverifiableExtensionError(msg string, args ...interface{}) error {
+	return UnverifiableExtensionError{
+		error: fmt.Errorf(msg, args...),
 	}
 }
 
-func NewNoValidChildBlockErrorf(msg string, args ...interface{}) error {
-	return NewNoValidChildBlockError(fmt.Sprintf(msg, args...))
+func (e UnverifiableExtensionError) Unwrap() error {
+	return e.error
 }
 
-func (e NoValidChildBlockError) Unwrap() error {
-	return e.err
-}
-
-func (e NoValidChildBlockError) Error() string {
-	return e.err.Error()
-}
-
-func IsNoValidChildBlockError(err error) bool {
-	return errors.As(err, &NoValidChildBlockError{})
-}
-
-// UnknownBlockError is a sentinel error indicating that a certain block
-// has not been ingested yet.
-type UnknownBlockError struct {
-	blockID flow.Identifier
-	err     error
-}
-
-// WrapAsUnknownBlockError wraps a given error as UnknownBlockError
-func WrapAsUnknownBlockError(blockID flow.Identifier, err error) error {
-	return UnknownBlockError{
-		blockID: blockID,
-		err:     fmt.Errorf("block %v has not been processed yet: %w", blockID, err),
-	}
-}
-
-func NewUnknownBlockError(blockID flow.Identifier) error {
-	return UnknownBlockError{
-		blockID: blockID,
-		err:     fmt.Errorf("block %v has not been processed yet", blockID),
-	}
-}
-
-func (e UnknownBlockError) Unwrap() error { return e.err }
-func (e UnknownBlockError) Error() string { return e.err.Error() }
-
-func IsUnknownBlockError(err error) bool {
-	var e UnknownBlockError
-	return errors.As(err, &e)
+func IsUnverifiableExtensionError(err error) bool {
+	var errUnverifiableExtensionError UnverifiableExtensionError
+	return errors.As(err, &errUnverifiableExtensionError)
 }

@@ -1,5 +1,3 @@
-// (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
-
 package main
 
 import (
@@ -14,18 +12,19 @@ import (
 
 	client "github.com/onflow/flow-go-sdk/access/grpc"
 	"github.com/onflow/flow-go-sdk/crypto"
-	"github.com/onflow/flow-go/admin/commands"
-	admincommon "github.com/onflow/flow-go/admin/commands/common"
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/blockproducer"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
+	"github.com/onflow/flow-go/consensus/hotstuff/cruisectl"
+	"github.com/onflow/flow-go/consensus/hotstuff/notifications"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/consensus/hotstuff/pacemaker/timeout"
 	"github.com/onflow/flow-go/consensus/hotstuff/persister"
 	hotsignature "github.com/onflow/flow-go/consensus/hotstuff/signature"
+	"github.com/onflow/flow-go/consensus/hotstuff/timeoutcollector"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	"github.com/onflow/flow-go/consensus/hotstuff/votecollector"
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
@@ -36,7 +35,7 @@ import (
 	dkgeng "github.com/onflow/flow-go/engine/consensus/dkg"
 	"github.com/onflow/flow-go/engine/consensus/ingestion"
 	"github.com/onflow/flow-go/engine/consensus/matching"
-	"github.com/onflow/flow-go/engine/consensus/provider"
+	"github.com/onflow/flow-go/engine/consensus/message_hub"
 	"github.com/onflow/flow-go/engine/consensus/sealing"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/bootstrap"
@@ -48,7 +47,6 @@ import (
 	builder "github.com/onflow/flow-go/module/builder/consensus"
 	"github.com/onflow/flow-go/module/chainsync"
 	chmodule "github.com/onflow/flow-go/module/chunks"
-	modulecompliance "github.com/onflow/flow-go/module/compliance"
 	dkgmodule "github.com/onflow/flow-go/module/dkg"
 	"github.com/onflow/flow-go/module/epochs"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
@@ -56,13 +54,16 @@ import (
 	consensusMempools "github.com/onflow/flow-go/module/mempool/consensus"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
+	msig "github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/module/updatable_configs"
+	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/module/validation"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/state/protocol"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
+	protocol_state "github.com/onflow/flow-go/state/protocol/protocol_state/state"
 	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/utils/io"
@@ -71,28 +72,30 @@ import (
 func main() {
 
 	var (
-		guaranteeLimit                         uint
-		resultLimit                            uint
-		approvalLimit                          uint
-		sealLimit                              uint
-		pendingReceiptsLimit                   uint
-		minInterval                            time.Duration
-		maxInterval                            time.Duration
-		maxSealPerBlock                        uint
-		maxGuaranteePerBlock                   uint
-		hotstuffTimeout                        time.Duration
-		hotstuffMinTimeout                     time.Duration
-		hotstuffTimeoutIncreaseFactor          float64
-		hotstuffTimeoutDecreaseFactor          float64
-		hotstuffTimeoutVoteAggregationFraction float64
-		blockRateDelay                         time.Duration
-		chunkAlpha                             uint
-		requiredApprovalsForSealVerification   uint
-		requiredApprovalsForSealConstruction   uint
-		emergencySealing                       bool
-		dkgControllerConfig                    dkgmodule.ControllerConfig
-		startupTimeString                      string
-		startupTime                            time.Time
+		guaranteeLimit                        uint
+		resultLimit                           uint
+		approvalLimit                         uint
+		sealLimit                             uint
+		pendingReceiptsLimit                  uint
+		minInterval                           time.Duration
+		maxInterval                           time.Duration
+		maxSealPerBlock                       uint
+		maxGuaranteePerBlock                  uint
+		hotstuffMinTimeout                    time.Duration
+		hotstuffTimeoutAdjustmentFactor       float64
+		hotstuffHappyPathMaxRoundFailures     uint64
+		chunkAlpha                            uint
+		requiredApprovalsForSealVerification  uint
+		requiredApprovalsForSealConstruction  uint
+		emergencySealing                      bool
+		dkgMessagingEngineConfig              = dkgeng.DefaultMessagingEngineConfig()
+		cruiseCtlConfig                       = cruisectl.DefaultConfig()
+		cruiseCtlFallbackProposalDurationFlag time.Duration
+		cruiseCtlMinViewDurationFlag          time.Duration
+		cruiseCtlMaxViewDurationFlag          time.Duration
+		cruiseCtlEnabledFlag                  bool
+		startupTimeString                     string
+		startupTime                           time.Time
 
 		// DKG contract client
 		machineAccountInfo *bootstrap.NodeMachineAccountInfo
@@ -100,31 +103,34 @@ func main() {
 		insecureAccessAPI  bool
 		accessNodeIDS      []string
 
-		err                          error
-		mutableState                 protocol.MutableState
-		beaconPrivateKey             *encodable.RandomBeaconPrivKey
-		guarantees                   mempool.Guarantees
-		receipts                     mempool.ExecutionTree
-		seals                        mempool.IncorporatedResultSeals
-		pendingReceipts              mempool.PendingReceipts
-		prov                         *provider.Engine
-		receiptRequester             *requester.Engine
-		syncCore                     *chainsync.Core
-		comp                         *compliance.Engine
-		conMetrics                   module.ConsensusMetrics
-		mainMetrics                  module.HotstuffMetrics
-		receiptValidator             module.ReceiptValidator
-		chunkAssigner                *chmodule.ChunkAssigner
-		finalizationDistributor      *pubsub.FinalizationDistributor
-		dkgBrokerTunnel              *dkgmodule.BrokerTunnel
-		blockTimer                   protocol.BlockTimer
-		finalizedHeader              *synceng.FinalizedHeaderCache
-		hotstuffModules              *consensus.HotstuffModules
-		dkgState                     *bstorage.DKGState
-		safeBeaconKeys               *bstorage.SafeBeaconPrivateKeys
-		adminCmdSetRequiredApprovals commands.AdminCommand
-		getSealingConfigs            module.SealingConfigsGetter
+		err                   error
+		mutableState          protocol.ParticipantState
+		beaconPrivateKey      *encodable.RandomBeaconPrivKey
+		guarantees            mempool.Guarantees
+		receipts              mempool.ExecutionTree
+		seals                 mempool.IncorporatedResultSeals
+		pendingReceipts       mempool.PendingReceipts
+		receiptRequester      *requester.Engine
+		syncCore              *chainsync.Core
+		comp                  *compliance.Engine
+		hot                   module.HotStuff
+		conMetrics            module.ConsensusMetrics
+		machineAccountMetrics module.MachineAccountMetrics
+		mainMetrics           module.HotstuffMetrics
+		receiptValidator      module.ReceiptValidator
+		chunkAssigner         *chmodule.ChunkAssigner
+		followerDistributor   *pubsub.FollowerDistributor
+		dkgBrokerTunnel       *dkgmodule.BrokerTunnel
+		blockTimer            protocol.BlockTimer
+		proposalDurProvider   hotstuff.ProposalDurationProvider
+		committee             *committees.Consensus
+		epochLookup           *epochs.EpochLookup
+		hotstuffModules       *consensus.HotstuffModules
+		dkgState              *bstorage.DKGState
+		safeBeaconKeys        *bstorage.SafeBeaconPrivateKeys
+		getSealingConfigs     module.SealingConfigsGetter
 	)
+	var deprecatedFlagBlockRateDelay time.Duration
 
 	nodeBuilder := cmd.FlowNode(flow.RoleConsensus.String())
 	nodeBuilder.ExtraFlags(func(flags *pflag.FlagSet) {
@@ -139,22 +145,24 @@ func main() {
 		flags.DurationVar(&maxInterval, "max-interval", 90*time.Second, "the maximum amount of time between two blocks")
 		flags.UintVar(&maxSealPerBlock, "max-seal-per-block", 100, "the maximum number of seals to be included in a block")
 		flags.UintVar(&maxGuaranteePerBlock, "max-guarantee-per-block", 100, "the maximum number of collection guarantees to be included in a block")
-		flags.DurationVar(&hotstuffTimeout, "hotstuff-timeout", 60*time.Second, "the initial timeout for the hotstuff pacemaker")
-		flags.DurationVar(&hotstuffMinTimeout, "hotstuff-min-timeout", 2500*time.Millisecond, "the lower timeout bound for the hotstuff pacemaker")
-		flags.Float64Var(&hotstuffTimeoutIncreaseFactor, "hotstuff-timeout-increase-factor", timeout.DefaultConfig.TimeoutIncrease, "multiplicative increase of timeout value in case of time out event")
-		flags.Float64Var(&hotstuffTimeoutDecreaseFactor, "hotstuff-timeout-decrease-factor", timeout.DefaultConfig.TimeoutDecrease, "multiplicative decrease of timeout value in case of progress")
-		flags.Float64Var(&hotstuffTimeoutVoteAggregationFraction, "hotstuff-timeout-vote-aggregation-fraction", 0.6, "additional fraction of replica timeout that the primary will wait for votes")
-		flags.DurationVar(&blockRateDelay, "block-rate-delay", 500*time.Millisecond, "the delay to broadcast block proposal in order to control block production rate")
+		flags.DurationVar(&hotstuffMinTimeout, "hotstuff-min-timeout", 2500*time.Millisecond, "the lower timeout bound for the hotstuff pacemaker, this is also used as initial timeout")
+		flags.Float64Var(&hotstuffTimeoutAdjustmentFactor, "hotstuff-timeout-adjustment-factor", timeout.DefaultConfig.TimeoutAdjustmentFactor, "adjustment of timeout duration in case of time out event")
+		flags.Uint64Var(&hotstuffHappyPathMaxRoundFailures, "hotstuff-happy-path-max-round-failures", timeout.DefaultConfig.HappyPathMaxRoundFailures, "number of failed rounds before first timeout increase")
+		flags.DurationVar(&cruiseCtlFallbackProposalDurationFlag, "cruise-ctl-fallback-proposal-duration", cruiseCtlConfig.FallbackProposalDelay.Load(), "the proposal duration value to use when the controller is disabled, or in epoch fallback mode. In those modes, this value has the same as the old `--block-rate-delay`")
+		flags.DurationVar(&cruiseCtlMinViewDurationFlag, "cruise-ctl-min-view-duration", cruiseCtlConfig.MinViewDuration.Load(), "the lower bound of authority for the controller, when active. This is the smallest amount of time a view is allowed to take.")
+		flags.DurationVar(&cruiseCtlMaxViewDurationFlag, "cruise-ctl-max-view-duration", cruiseCtlConfig.MaxViewDuration.Load(), "the upper bound of authority for the controller when active. This is the largest amount of time a view is allowed to take.")
+		flags.BoolVar(&cruiseCtlEnabledFlag, "cruise-ctl-enabled", cruiseCtlConfig.Enabled.Load(), "whether the block time controller is enabled; when disabled, the FallbackProposalDelay is used")
 		flags.UintVar(&chunkAlpha, "chunk-alpha", flow.DefaultChunkAssignmentAlpha, "number of verifiers that should be assigned to each chunk")
 		flags.UintVar(&requiredApprovalsForSealVerification, "required-verification-seal-approvals", flow.DefaultRequiredApprovalsForSealValidation, "minimum number of approvals that are required to verify a seal")
 		flags.UintVar(&requiredApprovalsForSealConstruction, "required-construction-seal-approvals", flow.DefaultRequiredApprovalsForSealConstruction, "minimum number of approvals that are required to construct a seal")
 		flags.BoolVar(&emergencySealing, "emergency-sealing-active", flow.DefaultEmergencySealingActive, "(de)activation of emergency sealing")
 		flags.BoolVar(&insecureAccessAPI, "insecure-access-api", false, "required if insecure GRPC connection should be used")
 		flags.StringSliceVar(&accessNodeIDS, "access-node-ids", []string{}, fmt.Sprintf("array of access node IDs sorted in priority order where the first ID in this array will get the first connection attempt and each subsequent ID after serves as a fallback. Minimum length %d. Use '*' for all IDs in protocol state.", common.DefaultAccessNodeIDSMinimum))
-		flags.DurationVar(&dkgControllerConfig.BaseStartDelay, "dkg-controller-base-start-delay", dkgmodule.DefaultBaseStartDelay, "used to define the range for jitter prior to DKG start (eg. 500µs) - the base value is scaled quadratically with the # of DKG participants")
-		flags.DurationVar(&dkgControllerConfig.BaseHandleFirstBroadcastDelay, "dkg-controller-base-handle-first-broadcast-delay", dkgmodule.DefaultBaseHandleFirstBroadcastDelay, "used to define the range for jitter prior to DKG handling the first broadcast messages (eg. 50ms) - the base value is scaled quadratically with the # of DKG participants")
-		flags.DurationVar(&dkgControllerConfig.HandleSubsequentBroadcastDelay, "dkg-controller-handle-subsequent-broadcast-delay", dkgmodule.DefaultHandleSubsequentBroadcastDelay, "used to define the constant delay introduced prior to DKG handling subsequent broadcast messages (eg. 2s)")
+		flags.DurationVar(&dkgMessagingEngineConfig.RetryBaseWait, "dkg-messaging-engine-retry-base-wait", dkgMessagingEngineConfig.RetryBaseWait, "the inter-attempt wait time for the first attempt (base of exponential retry)")
+		flags.Uint64Var(&dkgMessagingEngineConfig.RetryMax, "dkg-messaging-engine-retry-max", dkgMessagingEngineConfig.RetryMax, "the maximum number of retry attempts for an outbound DKG message")
+		flags.Uint64Var(&dkgMessagingEngineConfig.RetryJitterPercent, "dkg-messaging-engine-retry-jitter-percent", dkgMessagingEngineConfig.RetryJitterPercent, "the percentage of jitter to apply to each inter-attempt wait time")
 		flags.StringVar(&startupTimeString, "hotstuff-startup-time", cmd.NotSet, "specifies date and time (in ISO 8601 format) after which the consensus participant may enter the first view (e.g 1996-04-24T15:04:05-07:00)")
+		flags.DurationVar(&deprecatedFlagBlockRateDelay, "block-rate-delay", 0, "[deprecated in v0.30; Jun 2023] Use `cruise-ctl-*` flags instead, this flag has no effect and will eventually be removed")
 	}).ValidateFlags(func() error {
 		nodeBuilder.Logger.Info().Str("startup_time_str", startupTimeString).Msg("got startup_time_str")
 		if startupTimeString != cmd.NotSet {
@@ -165,6 +173,23 @@ func main() {
 			startupTime = t
 			nodeBuilder.Logger.Info().Time("startup_time", startupTime).Msg("got startup_time")
 		}
+		// convert local flag variables to atomic config variables, for dynamically updatable fields
+		if cruiseCtlEnabledFlag != cruiseCtlConfig.Enabled.Load() {
+			cruiseCtlConfig.Enabled.Store(cruiseCtlEnabledFlag)
+		}
+		if cruiseCtlFallbackProposalDurationFlag != cruiseCtlConfig.FallbackProposalDelay.Load() {
+			cruiseCtlConfig.FallbackProposalDelay.Store(cruiseCtlFallbackProposalDurationFlag)
+		}
+		if cruiseCtlMinViewDurationFlag != cruiseCtlConfig.MinViewDuration.Load() {
+			cruiseCtlConfig.MinViewDuration.Store(cruiseCtlMinViewDurationFlag)
+		}
+		if cruiseCtlMaxViewDurationFlag != cruiseCtlConfig.MaxViewDuration.Load() {
+			cruiseCtlConfig.MaxViewDuration.Store(cruiseCtlMaxViewDurationFlag)
+		}
+		// log a warning about deprecated flags
+		if deprecatedFlagBlockRateDelay > 0 {
+			nodeBuilder.Logger.Warn().Msg("A deprecated flag was specified (--block-rate-delay). This flag is deprecated as of v0.30 (Jun 2023), has no effect, and will eventually be removed.")
+		}
 		return nil
 	})
 
@@ -174,8 +199,17 @@ func main() {
 
 	nodeBuilder.
 		PreInit(cmd.DynamicStartPreInit).
+		ValidateRootSnapshot(badgerState.ValidRootSnapshotContainsEntityExpiryRange).
+		Module("machine account config", func(node *cmd.NodeConfig) error {
+			machineAccountInfo, err = cmd.LoadNodeMachineAccountInfoFile(node.BootstrapDir, node.NodeID)
+			return err
+		}).
 		Module("consensus node metrics", func(node *cmd.NodeConfig) error {
 			conMetrics = metrics.NewConsensusCollector(node.Tracer, node.MetricsRegisterer)
+			return nil
+		}).
+		Module("machine account metrics", func(node *cmd.NodeConfig) error {
+			machineAccountMetrics = metrics.NewMachineAccountCollector(node.MetricsRegisterer, machineAccountInfo.FlowAddress())
 			return nil
 		}).
 		Module("dkg state", func(node *cmd.NodeConfig) error {
@@ -186,14 +220,13 @@ func main() {
 			safeBeaconKeys = bstorage.NewSafeBeaconPrivateKeys(dkgState)
 			return nil
 		}).
-		Module("requiredApprovalsForSealConstruction setter", func(node *cmd.NodeConfig) error {
+		Module("updatable sealing config", func(node *cmd.NodeConfig) error {
 			setter, err := updatable_configs.NewSealingConfigs(
 				requiredApprovalsForSealConstruction,
 				requiredApprovalsForSealVerification,
 				chunkAlpha,
 				emergencySealing,
 			)
-
 			if err != nil {
 				return err
 			}
@@ -203,15 +236,10 @@ func main() {
 
 			// admin tool is the only instance that have access to the setter interface, therefore, is
 			// the only module can change this config
-			adminCmdSetRequiredApprovals = admincommon.NewSetRequiredApprovalsForSealingCommand(setter)
-
-			return nil
-		}).
-		AdminCommand("set-required-approvals-for-sealing", func(node *cmd.NodeConfig) commands.AdminCommand {
-			return adminCmdSetRequiredApprovals
-		}).
-		AdminCommand("get-required-approvals-for-sealing", func(node *cmd.NodeConfig) commands.AdminCommand {
-			return admincommon.NewGetRequiredApprovalsForSealingCommand(getSealingConfigs)
+			err = node.ConfigManager.RegisterUintConfig("consensus-required-approvals-for-sealing",
+				setter.RequireApprovalsForSealConstructionDynamicValue,
+				setter.SetRequiredApprovalsForSealingConstruction)
+			return err
 		}).
 		Module("mutable follower state", func(node *cmd.NodeConfig) error {
 			// For now, we only support state implementations from package badger.
@@ -249,14 +277,16 @@ func main() {
 			}
 
 			mutableState, err = badgerState.NewFullConsensusState(
+				node.Logger,
+				node.Tracer,
+				node.ProtocolEvents,
 				state,
 				node.Storage.Index,
 				node.Storage.Payloads,
-				node.Tracer,
-				node.ProtocolEvents,
 				blockTimer,
 				receiptValidator,
-				sealValidator)
+				sealValidator,
+			)
 			return err
 		}).
 		Module("random beacon key", func(node *cmd.NodeConfig) error {
@@ -271,7 +301,7 @@ func main() {
 			// their first beacon private key through the DKG in the EpochSetup phase
 			// prior to their first epoch as network participant).
 
-			rootSnapshot := node.State.AtBlockID(node.RootBlock.ID())
+			rootSnapshot := node.State.AtBlockID(node.FinalizedRootBlock.ID())
 			isSporkRoot, err := protocol.IsSporkRootSnapshot(rootSnapshot)
 			if err != nil {
 				return fmt.Errorf("could not check whether root snapshot is spork root: %w", err)
@@ -291,7 +321,7 @@ func main() {
 				return fmt.Errorf("could not load beacon key file: %w", err)
 			}
 
-			rootEpoch := node.State.AtBlockID(node.RootBlock.ID()).Epochs().Current()
+			rootEpoch := node.State.AtBlockID(node.FinalizedRootBlock.ID()).Epochs().Current()
 			epochCounter, err := rootEpoch.Counter()
 			if err != nil {
 				return fmt.Errorf("could not get root epoch counter: %w", err)
@@ -365,16 +395,12 @@ func main() {
 			return nil
 		}).
 		Module("sync core", func(node *cmd.NodeConfig) error {
-			syncCore, err = chainsync.New(node.Logger, node.SyncCoreConfig, metrics.NewChainSyncCollector())
+			syncCore, err = chainsync.New(node.Logger, node.SyncCoreConfig, metrics.NewChainSyncCollector(node.RootChainID), node.RootChainID)
 			return err
 		}).
-		Module("finalization distributor", func(node *cmd.NodeConfig) error {
-			finalizationDistributor = pubsub.NewFinalizationDistributor()
+		Module("follower distributor", func(node *cmd.NodeConfig) error {
+			followerDistributor = pubsub.NewFollowerDistributor()
 			return nil
-		}).
-		Module("machine account config", func(node *cmd.NodeConfig) error {
-			machineAccountInfo, err = cmd.LoadNodeMachineAccountInfoFile(node.BootstrapDir, node.NodeID)
-			return err
 		}).
 		Module("sdk client connection options", func(node *cmd.NodeConfig) error {
 			anIDS, err := common.ValidateAccessNodeIDSFlag(accessNodeIDS, node.RootChainID, node.State.Sealed())
@@ -390,7 +416,7 @@ func main() {
 			return nil
 		}).
 		Component("machine account config validator", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			//@TODO use fallback logic for flowClient similar to DKG/QC contract clients
+			// @TODO use fallback logic for flowClient similar to DKG/QC contract clients
 			flowClient, err := common.FlowClient(flowClientConfigs[0])
 			if err != nil {
 				return nil, fmt.Errorf("failed to get flow client connection option for access node (0): %s %w", flowClientConfigs[0].AccessAddress, err)
@@ -404,8 +430,9 @@ func main() {
 			validator, err := epochs.NewMachineAccountConfigValidator(
 				node.Logger,
 				flowClient,
-				flow.RoleCollection,
+				flow.RoleConsensus,
 				*machineAccountInfo,
+				machineAccountMetrics,
 				opts...,
 			)
 			return validator, err
@@ -421,7 +448,7 @@ func main() {
 				node.Metrics.Engine,
 				node.Metrics.Mempool,
 				sealingTracker,
-				node.Network,
+				node.EngineRegistry,
 				node.Me,
 				node.Storage.Headers,
 				node.Storage.Payloads,
@@ -435,8 +462,8 @@ func main() {
 			)
 
 			// subscribe for finalization events from hotstuff
-			finalizationDistributor.AddOnBlockFinalizedConsumer(e.OnFinalizedBlock)
-			finalizationDistributor.AddOnBlockIncorporatedConsumer(e.OnBlockIncorporated)
+			followerDistributor.AddOnBlockFinalizedConsumer(e.OnFinalizedBlock)
+			followerDistributor.AddOnBlockIncorporatedConsumer(e.OnBlockIncorporated)
 
 			return e, err
 		}).
@@ -444,11 +471,11 @@ func main() {
 			receiptRequester, err = requester.New(
 				node.Logger,
 				node.Metrics.Engine,
-				node.Network,
+				node.EngineRegistry,
 				node.Me,
 				node.State,
 				channels.RequestReceiptsByBlockID,
-				filter.HasRole(flow.RoleExecution),
+				filter.HasRole[flow.Identity](flow.RoleExecution),
 				func() flow.Entity { return &flow.ExecutionReceipt{} },
 				requester.WithRetryInitial(2*time.Second),
 				requester.WithRetryMaximum(30*time.Second),
@@ -475,7 +502,7 @@ func main() {
 
 			e, err := matching.NewEngine(
 				node.Logger,
-				node.Network,
+				node.EngineRegistry,
 				node.Me,
 				node.Metrics.Engine,
 				node.Metrics.Mempool,
@@ -490,21 +517,10 @@ func main() {
 
 			// subscribe engine to inputs from other node-internal components
 			receiptRequester.WithHandle(e.HandleReceipt)
-			finalizationDistributor.AddOnBlockFinalizedConsumer(e.OnFinalizedBlock)
-			finalizationDistributor.AddOnBlockIncorporatedConsumer(e.OnBlockIncorporated)
+			followerDistributor.AddOnBlockFinalizedConsumer(e.OnFinalizedBlock)
+			followerDistributor.AddOnBlockIncorporatedConsumer(e.OnBlockIncorporated)
 
 			return e, err
-		}).
-		Component("provider engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			prov, err = provider.New(
-				node.Logger,
-				node.Metrics.Engine,
-				node.Tracer,
-				node.Network,
-				node.State,
-				node.Me,
-			)
-			return prov, err
 		}).
 		Component("ingestion engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			core := ingestion.NewCore(
@@ -519,12 +535,22 @@ func main() {
 			ing, err := ingestion.New(
 				node.Logger,
 				node.Metrics.Engine,
-				node.Network,
+				node.EngineRegistry,
 				node.Me,
 				core,
 			)
 
 			return ing, err
+		}).
+		Component("hotstuff committee", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			committee, err = committees.NewConsensusCommittee(node.State, node.Me.NodeID())
+			node.ProtocolEvents.AddConsumer(committee)
+			return committee, err
+		}).
+		Component("epoch lookup", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			epochLookup, err = epochs.NewEpochLookup(node.State)
+			node.ProtocolEvents.AddConsumer(epochLookup)
+			return epochLookup, err
 		}).
 		Component("hotstuff modules", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			// initialize the block finalizer
@@ -542,15 +568,9 @@ func main() {
 				)),
 			)
 
-			// initialize Main consensus committee's state
-			var committee hotstuff.Committee
-			committee, err = committees.NewConsensusCommittee(node.State, node.Me.NodeID())
-			if err != nil {
-				return nil, fmt.Errorf("could not create Committee state for main consensus: %w", err)
-			}
-			committee = committees.NewMetricsWrapper(committee, mainMetrics) // wrapper for measuring time spent determining consensus committee relations
+			// wrap Main consensus committee with metrics
+			wrappedCommittee := committees.NewMetricsWrapper(committee, mainMetrics) // wrapper for measuring time spent determining consensus committee relations
 
-			epochLookup := epochs.NewEpochLookup(node.State)
 			beaconKeyStore := hotsignature.NewEpochAwareRandomBeaconKeyStore(epochLookup, safeBeaconKeys)
 
 			// initialize the combined signer for hotstuff
@@ -561,15 +581,23 @@ func main() {
 			)
 			signer = verification.NewMetricsWrapper(signer, mainMetrics) // wrapper for measuring time spent with crypto-related operations
 
+			// create consensus logger
+			logger := createLogger(node.Logger, node.RootChainID)
+
+			telemetryConsumer := notifications.NewTelemetryConsumer(logger)
+			slashingViolationConsumer := notifications.NewSlashingViolationsConsumer(nodeBuilder.Logger)
+			followerDistributor.AddProposalViolationConsumer(slashingViolationConsumer)
+
 			// initialize a logging notifier for hotstuff
 			notifier := createNotifier(
-				node.Logger,
+				logger,
 				mainMetrics,
-				node.Tracer,
-				node.RootChainID,
 			)
 
-			notifier.AddConsumer(finalizationDistributor)
+			notifier.AddParticipantConsumer(telemetryConsumer)
+			notifier.AddCommunicatorConsumer(telemetryConsumer)
+			notifier.AddFinalizationConsumer(telemetryConsumer)
+			notifier.AddFollowerConsumer(followerDistributor)
 
 			// initialize the persister
 			persist := persister.New(node.DB, node.RootChainID)
@@ -584,41 +612,118 @@ func main() {
 				node.Storage.Headers,
 				finalize,
 				notifier,
-				node.RootBlock.Header,
+				node.FinalizedRootBlock.Header,
 				node.RootQC,
 			)
 			if err != nil {
 				return nil, err
 			}
 
-			qcDistributor := pubsub.NewQCCreatedDistributor()
-			validator := consensus.NewValidator(mainMetrics, committee, forks)
-			voteProcessorFactory := votecollector.NewCombinedVoteProcessorFactory(committee, qcDistributor.OnQcConstructedFromVotes)
+			// create producer and connect it to consumers
+			voteAggregationDistributor := pubsub.NewVoteAggregationDistributor()
+			voteAggregationDistributor.AddVoteCollectorConsumer(telemetryConsumer)
+			voteAggregationDistributor.AddVoteAggregationViolationConsumer(slashingViolationConsumer)
+
+			validator := consensus.NewValidator(mainMetrics, wrappedCommittee)
+			voteProcessorFactory := votecollector.NewCombinedVoteProcessorFactory(wrappedCommittee, voteAggregationDistributor.OnQcConstructedFromVotes)
 			lowestViewForVoteProcessing := finalizedBlock.View + 1
-			aggregator, err := consensus.NewVoteAggregator(node.Logger,
+			voteAggregator, err := consensus.NewVoteAggregator(
+				logger,
+				mainMetrics,
+				node.Metrics.Engine,
+				node.Metrics.Mempool,
 				lowestViewForVoteProcessing,
-				notifier,
+				voteAggregationDistributor,
 				voteProcessorFactory,
-				finalizationDistributor)
+				followerDistributor)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize vote aggregator: %w", err)
 			}
 
-			hotstuffModules = &consensus.HotstuffModules{
-				Notifier:                notifier,
-				Committee:               committee,
-				Signer:                  signer,
-				Persist:                 persist,
-				QCCreatedDistributor:    qcDistributor,
-				FinalizationDistributor: finalizationDistributor,
-				Forks:                   forks,
-				Validator:               validator,
-				Aggregator:              aggregator,
+			// create producer and connect it to consumers
+			timeoutAggregationDistributor := pubsub.NewTimeoutAggregationDistributor()
+			timeoutAggregationDistributor.AddTimeoutCollectorConsumer(telemetryConsumer)
+			timeoutAggregationDistributor.AddTimeoutAggregationViolationConsumer(slashingViolationConsumer)
+
+			timeoutProcessorFactory := timeoutcollector.NewTimeoutProcessorFactory(
+				logger,
+				timeoutAggregationDistributor,
+				committee,
+				validator,
+				msig.ConsensusTimeoutTag,
+			)
+			timeoutAggregator, err := consensus.NewTimeoutAggregator(
+				logger,
+				mainMetrics,
+				node.Metrics.Engine,
+				node.Metrics.Mempool,
+				notifier,
+				timeoutProcessorFactory,
+				timeoutAggregationDistributor,
+				lowestViewForVoteProcessing,
+			)
+			if err != nil {
+				return nil, fmt.Errorf("could not initialize timeout aggregator: %w", err)
 			}
 
-			return aggregator, nil
+			hotstuffModules = &consensus.HotstuffModules{
+				Notifier:                    notifier,
+				Committee:                   wrappedCommittee,
+				Signer:                      signer,
+				Persist:                     persist,
+				VoteCollectorDistributor:    voteAggregationDistributor.VoteCollectorDistributor,
+				TimeoutCollectorDistributor: timeoutAggregationDistributor.TimeoutCollectorDistributor,
+				Forks:                       forks,
+				Validator:                   validator,
+				VoteAggregator:              voteAggregator,
+				TimeoutAggregator:           timeoutAggregator,
+			}
+
+			return util.MergeReadyDone(voteAggregator, timeoutAggregator), nil
 		}).
-		Component("consensus compliance engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		Component("block rate cruise control", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			livenessData, err := hotstuffModules.Persist.GetLivenessData()
+			if err != nil {
+				return nil, err
+			}
+			ctl, err := cruisectl.NewBlockTimeController(node.Logger, metrics.NewCruiseCtlMetrics(), cruiseCtlConfig, node.State, livenessData.CurrentView)
+			if err != nil {
+				return nil, err
+			}
+			proposalDurProvider = ctl
+			hotstuffModules.Notifier.AddOnBlockIncorporatedConsumer(ctl.OnBlockIncorporated)
+			node.ProtocolEvents.AddConsumer(ctl)
+
+			// set up admin commands for dynamically updating configs
+			err = node.ConfigManager.RegisterBoolConfig("cruise-ctl-enabled", cruiseCtlConfig.GetEnabled, cruiseCtlConfig.SetEnabled)
+			if err != nil {
+				return nil, err
+			}
+			err = node.ConfigManager.RegisterDurationConfig("cruise-ctl-fallback-proposal-duration", cruiseCtlConfig.GetFallbackProposalDuration, cruiseCtlConfig.SetFallbackProposalDuration)
+			if err != nil {
+				return nil, err
+			}
+			err = node.ConfigManager.RegisterDurationConfig("cruise-ctl-min-view-duration", cruiseCtlConfig.GetMinViewDuration, cruiseCtlConfig.SetMinViewDuration)
+			if err != nil {
+				return nil, err
+			}
+			err = node.ConfigManager.RegisterDurationConfig("cruise-ctl-max-view-duration", cruiseCtlConfig.GetMaxViewDuration, cruiseCtlConfig.SetMaxViewDuration)
+			if err != nil {
+				return nil, err
+			}
+
+			return ctl, nil
+		}).
+		Component("consensus participant", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			mutableProtocolState := protocol_state.NewMutableProtocolState(
+				node.Storage.EpochProtocolState,
+				node.Storage.ProtocolKVStore,
+				node.State.Params(),
+				node.Storage.Headers,
+				node.Storage.Results,
+				node.Storage.Setups,
+				node.Storage.EpochCommits,
+			)
 			// initialize the block builder
 			var build module.Builder
 			build, err = builder.NewBuilder(
@@ -631,6 +736,7 @@ func main() {
 				node.Storage.Blocks,
 				node.Storage.Results,
 				node.Storage.Receipts,
+				mutableProtocolState,
 				guarantees,
 				seals,
 				receipts,
@@ -642,69 +748,29 @@ func main() {
 			if err != nil {
 				return nil, fmt.Errorf("could not initialized block builder: %w", err)
 			}
-
 			build = blockproducer.NewMetricsWrapper(build, mainMetrics) // wrapper for measuring time spent building block payload component
 
 			opts := []consensus.Option{
-				consensus.WithInitialTimeout(hotstuffTimeout),
 				consensus.WithMinTimeout(hotstuffMinTimeout),
-				consensus.WithVoteAggregationTimeoutFraction(hotstuffTimeoutVoteAggregationFraction),
-				consensus.WithTimeoutIncreaseFactor(hotstuffTimeoutIncreaseFactor),
-				consensus.WithTimeoutDecreaseFactor(hotstuffTimeoutDecreaseFactor),
-				consensus.WithBlockRateDelay(blockRateDelay),
+				consensus.WithTimeoutAdjustmentFactor(hotstuffTimeoutAdjustmentFactor),
+				consensus.WithHappyPathMaxRoundFailures(hotstuffHappyPathMaxRoundFailures),
+				consensus.WithProposalDurationProvider(proposalDurProvider),
 			}
 
 			if !startupTime.IsZero() {
 				opts = append(opts, consensus.WithStartupTime(startupTime))
 			}
-
 			finalizedBlock, pending, err := recovery.FindLatest(node.State, node.Storage.Headers)
 			if err != nil {
 				return nil, err
 			}
 
-			// initialize the entity database accessors
-			cleaner := bstorage.NewCleaner(node.Logger, node.DB, node.Metrics.CleanCollector, flow.DefaultValueLogGCFrequency)
-
-			// initialize the pending blocks cache
-			proposals := buffer.NewPendingBlocks()
-
-			complianceCore, err := compliance.NewCore(node.Logger,
-				node.Metrics.Engine,
-				node.Tracer,
-				node.Metrics.Mempool,
-				node.Metrics.Compliance,
-				cleaner,
-				node.Storage.Headers,
-				node.Storage.Payloads,
-				mutableState,
-				proposals,
-				syncCore,
-				hotstuffModules.Aggregator,
-				modulecompliance.WithSkipNewProposalsThreshold(node.ComplianceConfig.SkipNewProposalsThreshold),
-			)
-			if err != nil {
-				return nil, fmt.Errorf("could not initialize compliance core: %w", err)
-			}
-
-			// initialize the compliance engine
-			comp, err = compliance.NewEngine(
-				node.Logger,
-				node.Network,
-				node.Me,
-				prov,
-				complianceCore,
-			)
-			if err != nil {
-				return nil, fmt.Errorf("could not initialize compliance engine: %w", err)
-			}
-
 			// initialize hotstuff consensus algorithm
-			hot, err := consensus.NewParticipant(
-				node.Logger,
+			hot, err = consensus.NewParticipant(
+				createLogger(node.Logger, node.RootChainID),
 				mainMetrics,
+				node.Metrics.Mempool,
 				build,
-				comp,
 				finalizedBlock,
 				pending,
 				hotstuffModules,
@@ -713,34 +779,90 @@ func main() {
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize hotstuff engine: %w", err)
 			}
-
-			comp = comp.WithConsensus(hot)
-			finalizationDistributor.AddOnBlockFinalizedConsumer(comp.OnFinalizedBlock)
-			return comp, nil
+			return hot, nil
 		}).
-		Component("finalized snapshot", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			finalizedHeader, err = synceng.NewFinalizedHeaderCache(node.Logger, node.State, finalizationDistributor)
+		Component("consensus compliance engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			// initialize the pending blocks cache
+			proposals := buffer.NewPendingBlocks()
+
+			logger := createLogger(node.Logger, node.RootChainID)
+			complianceCore, err := compliance.NewCore(
+				logger,
+				node.Metrics.Engine,
+				node.Metrics.Mempool,
+				mainMetrics,
+				node.Metrics.Compliance,
+				followerDistributor,
+				node.Tracer,
+				node.Storage.Headers,
+				node.Storage.Payloads,
+				mutableState,
+				proposals,
+				syncCore,
+				hotstuffModules.Validator,
+				hot,
+				hotstuffModules.VoteAggregator,
+				hotstuffModules.TimeoutAggregator,
+				node.ComplianceConfig,
+			)
 			if err != nil {
-				return nil, fmt.Errorf("could not create finalized snapshot cache: %w", err)
+				return nil, fmt.Errorf("could not initialize compliance core: %w", err)
 			}
 
-			return finalizedHeader, nil
+			// initialize the compliance engine
+			comp, err = compliance.NewEngine(
+				logger,
+				node.Me,
+				complianceCore,
+			)
+			if err != nil {
+				return nil, fmt.Errorf("could not initialize compliance engine: %w", err)
+			}
+			followerDistributor.AddOnBlockFinalizedConsumer(comp.OnFinalizedBlock)
+
+			return comp, nil
+		}).
+		Component("consensus message hub", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			messageHub, err := message_hub.NewMessageHub(
+				createLogger(node.Logger, node.RootChainID),
+				node.Metrics.Engine,
+				node.EngineRegistry,
+				node.Me,
+				comp,
+				hot,
+				hotstuffModules.VoteAggregator,
+				hotstuffModules.TimeoutAggregator,
+				node.State,
+				node.Storage.Payloads,
+			)
+			if err != nil {
+				return nil, fmt.Errorf("could not create consensus message hub: %w", err)
+			}
+			hotstuffModules.Notifier.AddConsumer(messageHub)
+			return messageHub, nil
 		}).
 		Component("sync engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			spamConfig, err := synceng.NewSpamDetectionConfig()
+			if err != nil {
+				return nil, fmt.Errorf("could not initialize spam detection config: %w", err)
+			}
+
 			sync, err := synceng.New(
 				node.Logger,
 				node.Metrics.Engine,
-				node.Network,
+				node.EngineRegistry,
 				node.Me,
+				node.State,
 				node.Storage.Blocks,
 				comp,
 				syncCore,
-				finalizedHeader,
 				node.SyncEngineIdentifierProvider,
+				spamConfig,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize synchronization engine: %w", err)
 			}
+			followerDistributor.AddFinalizationConsumer(sync)
 
 			return sync, nil
 		}).
@@ -758,9 +880,11 @@ func main() {
 			// exchange private DKG messages
 			messagingEngine, err := dkgeng.NewMessagingEngine(
 				node.Logger,
-				node.Network,
+				node.EngineRegistry,
 				node.Me,
 				dkgBrokerTunnel,
+				node.Metrics.Mempool,
+				dkgMessagingEngineConfig,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize DKG messaging engine: %w", err)
@@ -792,7 +916,6 @@ func main() {
 					node.Me,
 					dkgContractClients,
 					dkgBrokerTunnel,
-					dkgControllerConfig,
 				),
 				viewsObserver,
 			)
@@ -829,10 +952,7 @@ func loadBeaconPrivateKey(dir string, myID flow.Identifier) (*encodable.RandomBe
 func createDKGContractClient(node *cmd.NodeConfig, machineAccountInfo *bootstrap.NodeMachineAccountInfo, flowClient *client.Client, anID flow.Identifier) (module.DKGContractClient, error) {
 	var dkgClient module.DKGContractClient
 
-	contracts, err := systemcontracts.SystemContractsForChain(node.RootChainID)
-	if err != nil {
-		return nil, err
-	}
+	contracts := systemcontracts.SystemContractsForChain(node.RootChainID)
 	dkgContractAddress := contracts.DKG.Address.Hex()
 
 	// construct signer from private key

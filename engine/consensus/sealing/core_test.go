@@ -60,7 +60,7 @@ func (s *ApprovalProcessingCoreTestSuite) SetupTest() {
 	params := new(mockstate.Params)
 	s.State.On("Sealed").Return(unittest.StateSnapshotForKnownBlock(s.ParentBlock, nil)).Maybe()
 	s.State.On("Params").Return(params)
-	params.On("Root").Return(
+	params.On("FinalizedRoot").Return(
 		func() *flow.Header { return s.rootHeader },
 		func() error { return nil },
 	)
@@ -558,7 +558,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestRequestPendingApprovals() {
 	}
 
 	// the sealing Core requires approvals from both verifiers for each chunk
-	_, err := s.setter.SetRequiredApprovalsForSealingConstruction(2)
+	err := s.setter.SetRequiredApprovalsForSealingConstruction(2)
 	require.NoError(s.T(), err)
 
 	// populate the incorporated-results tree with:
@@ -742,9 +742,9 @@ func (s *ApprovalProcessingCoreTestSuite) TestRepopulateAssignmentCollectorTree(
 		}
 	}
 
-	// ValidDescendants has to return all valid descendants from finalized block
+	// Descendants has to return all valid descendants from finalized block
 	finalSnapShot := unittest.StateSnapshotForKnownBlock(s.IncorporatedBlock, nil)
-	finalSnapShot.On("ValidDescendants").Return(blockChildren, nil)
+	finalSnapShot.On("Descendants").Return(blockChildren, nil)
 	s.State.On("Final").Return(finalSnapShot)
 
 	core, err := NewCore(unittest.Logger(), s.WorkerPool, tracer, metrics, &tracker.NoopSealingTracker{}, engine.NewUnit(),
@@ -809,7 +809,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestRepopulateAssignmentCollectorTree_
 	finalSnapShot := unittest.StateSnapshotForKnownBlock(s.rootHeader, nil)
 	s.Snapshots[s.rootHeader.ID()] = finalSnapShot
 	// root snapshot has no pending children
-	finalSnapShot.On("ValidDescendants").Return(nil, nil)
+	finalSnapShot.On("Descendants").Return(nil, nil)
 	// set up sealing segment
 	finalSnapShot.On("SealingSegment").Return(
 		&flow.SealingSegment{

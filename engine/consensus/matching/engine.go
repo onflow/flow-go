@@ -44,7 +44,7 @@ type Engine struct {
 
 func NewEngine(
 	log zerolog.Logger,
-	net network.Network,
+	net network.EngineRegistry,
 	me module.Local,
 	engineMetrics module.EngineMetrics,
 	mempool module.MempoolMetrics,
@@ -55,15 +55,14 @@ func NewEngine(
 
 	// FIFO queue for execution receipts
 	receiptsQueue, err := fifoqueue.NewFifoQueue(
-		fifoqueue.WithCapacity(defaultReceiptQueueCapacity),
+		defaultReceiptQueueCapacity,
 		fifoqueue.WithLengthObserver(func(len int) { mempool.MempoolEntries(metrics.ResourceBlockProposalQueue, uint(len)) }),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create queue for inbound receipts: %w", err)
 	}
 
-	pendingIncorporatedBlocks, err := fifoqueue.NewFifoQueue(
-		fifoqueue.WithCapacity(defaultIncorporatedBlockQueueCapacity))
+	pendingIncorporatedBlocks, err := fifoqueue.NewFifoQueue(defaultIncorporatedBlockQueueCapacity)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create queue for incorporated block events: %w", err)
 	}
@@ -189,15 +188,16 @@ func (e *Engine) OnBlockIncorporated(incorporatedBlock *model.Block) {
 // only from receipts received directly from ENs. sealing Core would not know about
 // Receipts that are incorporated by other nodes in their blocks blocks (but never
 // received directly from the EN).
-func (e *Engine) processIncorporatedBlock(finalizedBlockID flow.Identifier) error {
-	index, err := e.index.ByBlockID(finalizedBlockID)
+// No errors expected during normal operations.
+func (e *Engine) processIncorporatedBlock(blockID flow.Identifier) error {
+	index, err := e.index.ByBlockID(blockID)
 	if err != nil {
-		e.log.Fatal().Err(err).Msgf("could not retrieve payload index for block %v", finalizedBlockID)
+		return fmt.Errorf("could not retrieve payload index for incorporated block %v", blockID)
 	}
 	for _, receiptID := range index.ReceiptIDs {
 		receipt, err := e.receipts.ByID(receiptID)
 		if err != nil {
-			return fmt.Errorf("could not retrieve receipt incorporated in block %v: %w", finalizedBlockID, err)
+			return fmt.Errorf("could not retrieve receipt incorporated in block %v: %w", blockID, err)
 		}
 		e.pendingReceipts.Push(receipt)
 	}
@@ -221,7 +221,7 @@ func (e *Engine) finalizationProcessingLoop() {
 	}
 }
 
-// blockIncorporatedEventsProcessingLoop is a separate goroutine for processing block incorporated events
+// blockIncorporatedEventsProcessingLoop is a separate goroutine for processing block incorporated events.
 func (e *Engine) blockIncorporatedEventsProcessingLoop() {
 	c := e.blockIncorporatedNotifier.Channel()
 
@@ -254,7 +254,8 @@ func (e *Engine) inboundEventsProcessingLoop() {
 	}
 }
 
-// processBlockIncorporatedEvents performs processing of block incorporated hot stuff events
+// processBlockIncorporatedEvents performs processing of block incorporated hot stuff events.
+// No errors expected during normal operations.
 func (e *Engine) processBlockIncorporatedEvents() error {
 	for {
 		select {
@@ -279,7 +280,8 @@ func (e *Engine) processBlockIncorporatedEvents() error {
 }
 
 // processAvailableEvents processes _all_ available events (untrusted messages
-// from other nodes as well as internally trusted
+// from other nodes as well as internally trusted.
+// No errors expected during normal operations.
 func (e *Engine) processAvailableEvents() error {
 	for {
 		select {

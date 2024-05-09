@@ -68,11 +68,6 @@ required to trigger this condition is put in place to prevent triggering it in c
 happen on unstable networks.
 EN keeps track of the highest block it has executed. This is not a Flow protocol feature, and only serves synchronisation needs.
 
-### Execution State syncing
-Other execution node is queried for range of missing blocks and hold authority to decide if it's willing (and able) to answer this query.
-If so, it sends the `ExecutionStateDelta` which contains all the block data and results of execution.
-Currently, this is fully trusted operation, meaning data is applied as-is without any extra checks.
-
 ### Missing blocks
 If no other EN are available, the block-level synchronisation is started. This requests blocks from consensus nodes, and
 incoming blocks are processed as if they were received during normal mode of operation

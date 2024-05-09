@@ -29,7 +29,8 @@ func (r receiveCacheEntry) Checksum() flow.Identifier {
 }
 
 // NewHeroReceiveCache returns a new HeroCache-based receive cache.
-func NewHeroReceiveCache(sizeLimit uint32, logger zerolog.Logger, collector module.HeroCacheMetrics) *ReceiveCache {
+func NewHeroReceiveCache(sizeLimit uint32, logger zerolog.Logger, collector module.HeroCacheMetrics,
+) *ReceiveCache {
 	backData := herocache.NewCache(sizeLimit,
 		herocache.DefaultOversizeFactor,
 		heropool.LRUEjection, // receive cache must be LRU.
@@ -60,6 +61,6 @@ func (r *ReceiveCache) Add(eventID []byte) bool {
 	return r.c.Add(receiveCacheEntry{eventID: flow.HashToID(eventID)}) // ignore eviction status
 }
 
-func (r ReceiveCache) Size() uint {
+func (r *ReceiveCache) Size() uint {
 	return r.c.Size()
 }

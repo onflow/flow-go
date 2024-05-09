@@ -5,9 +5,9 @@ import (
 	"math/rand"
 	"os"
 	"testing"
-	"time"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -25,8 +25,10 @@ import (
 	pbadger "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/events"
 	"github.com/onflow/flow-go/state/protocol/inmem"
+	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
 	"github.com/onflow/flow-go/state/protocol/util"
-	storage "github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/storage"
+	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/storage/badger/procedure"
 	sutil "github.com/onflow/flow-go/storage/util"
@@ -34,23 +36,25 @@ import (
 )
 
 var noopSetter = func(*flow.Header) error { return nil }
+var noopSigner = func(*flow.Header) error { return nil }
 
 type BuilderSuite struct {
 	suite.Suite
 	db    *badger.DB
 	dbdir string
 
-	genesis *model.Block
-	chainID flow.ChainID
+	genesis      *model.Block
+	chainID      flow.ChainID
+	epochCounter uint64
 
-	headers  *storage.Headers
-	payloads *storage.ClusterPayloads
-	blocks   *storage.Blocks
+	headers  storage.Headers
+	payloads storage.ClusterPayloads
+	blocks   storage.Blocks
 
 	state cluster.MutableState
 
 	// protocol state for reference blocks for transactions
-	protoState protocol.MutableState
+	protoState protocol.FollowerState
 
 	pool    mempool.Transactions
 	builder *builder.Builder
@@ -59,9 +63,6 @@ type BuilderSuite struct {
 // runs before each test runs
 func (suite *BuilderSuite) SetupTest() {
 	var err error
-
-	// seed the RNG
-	rand.Seed(time.Now().UnixNano())
 
 	suite.genesis = model.Genesis()
 	suite.chainID = suite.genesis.Header.ChainID
@@ -73,13 +74,33 @@ func (suite *BuilderSuite) SetupTest() {
 
 	metrics := metrics.NewNoopCollector()
 	tracer := trace.NewNoopTracer()
-	headers, _, seals, index, conPayloads, blocks, setups, commits, statuses, results := sutil.StorageLayer(suite.T(), suite.db)
+	log := zerolog.Nop()
+	all := sutil.StorageLayer(suite.T(), suite.db)
 	consumer := events.NewNoop()
-	suite.headers = headers
-	suite.blocks = blocks
-	suite.payloads = storage.NewClusterPayloads(metrics, suite.db)
 
-	clusterStateRoot, err := clusterkv.NewStateRoot(suite.genesis)
+	suite.headers = all.Headers
+	suite.blocks = all.Blocks
+	suite.payloads = bstorage.NewClusterPayloads(metrics, suite.db)
+
+	// just bootstrap with a genesis block, we'll use this as reference
+	root, result, seal := unittest.BootstrapFixture(unittest.IdentityListFixture(5, unittest.WithAllRoles()))
+	// ensure we don't enter a new epoch for tests that build many blocks
+	result.ServiceEvents[0].Event.(*flow.EpochSetup).FinalView = root.Header.View + 100000
+	seal.ResultID = result.ID()
+	root.Payload.ProtocolStateID = kvstore.NewDefaultKVStore(inmem.ProtocolStateFromEpochServiceEvents(
+		result.ServiceEvents[0].Event.(*flow.EpochSetup),
+		result.ServiceEvents[1].Event.(*flow.EpochCommit),
+	).ID()).ID()
+	rootSnapshot, err := inmem.SnapshotFromBootstrapState(root, result, seal, unittest.QuorumCertificateFixture(unittest.QCWithRootBlockID(root.ID())))
+	require.NoError(suite.T(), err)
+	suite.epochCounter = rootSnapshot.Encodable().SealingSegment.LatestProtocolStateEntry().EpochEntry.EpochCounter()
+
+	clusterQC := unittest.QuorumCertificateFixture(unittest.QCWithRootBlockID(suite.genesis.ID()))
+	root.Payload.ProtocolStateID = kvstore.NewDefaultKVStore(inmem.ProtocolStateFromEpochServiceEvents(
+		result.ServiceEvents[0].Event.(*flow.EpochSetup),
+		result.ServiceEvents[1].Event.(*flow.EpochCommit),
+	).ID()).ID()
+	clusterStateRoot, err := clusterkv.NewStateRoot(suite.genesis, clusterQC, suite.epochCounter)
 	suite.Require().NoError(err)
 	clusterState, err := clusterkv.Bootstrap(suite.db, clusterStateRoot)
 	suite.Require().NoError(err)
@@ -87,21 +108,32 @@ func (suite *BuilderSuite) SetupTest() {
 	suite.state, err = clusterkv.NewMutableState(clusterState, tracer, suite.headers, suite.payloads)
 	suite.Require().NoError(err)
 
-	// just bootstrap with a genesis block, we'll use this as reference
-	participants := unittest.IdentityListFixture(5, unittest.WithAllRoles())
-	root, result, seal := unittest.BootstrapFixture(participants)
-	qc := unittest.QuorumCertificateFixture(unittest.QCWithBlockID(root.ID()))
-	// ensure we don't enter a new epoch for tests that build many blocks
-	result.ServiceEvents[0].Event.(*flow.EpochSetup).FinalView = root.Header.View + 100000
-	seal.ResultID = result.ID()
-
-	rootSnapshot, err := inmem.SnapshotFromBootstrapState(root, result, seal, qc)
+	state, err := pbadger.Bootstrap(
+		metrics,
+		suite.db,
+		all.Headers,
+		all.Seals,
+		all.Results,
+		all.Blocks,
+		all.QuorumCertificates,
+		all.Setups,
+		all.EpochCommits,
+		all.EpochProtocolState,
+		all.ProtocolKVStore,
+		all.VersionBeacons,
+		rootSnapshot,
+	)
 	require.NoError(suite.T(), err)
 
-	state, err := pbadger.Bootstrap(metrics, suite.db, headers, seals, results, blocks, setups, commits, statuses, rootSnapshot)
-	require.NoError(suite.T(), err)
-
-	suite.protoState, err = pbadger.NewFollowerState(state, index, conPayloads, tracer, consumer, util.MockBlockTimer())
+	suite.protoState, err = pbadger.NewFollowerState(
+		log,
+		tracer,
+		consumer,
+		state,
+		all.Index,
+		all.Payloads,
+		util.MockBlockTimer(),
+	)
 	require.NoError(suite.T(), err)
 
 	// add some transactions to transaction pool
@@ -115,7 +147,7 @@ func (suite *BuilderSuite) SetupTest() {
 		suite.Assert().True(added)
 	}
 
-	suite.builder, _ = builder.NewBuilder(suite.db, tracer, suite.headers, suite.headers, suite.payloads, suite.pool, unittest.Logger())
+	suite.builder, _ = builder.NewBuilder(suite.db, tracer, suite.protoState, suite.state, suite.headers, suite.headers, suite.payloads, suite.pool, unittest.Logger(), suite.epochCounter)
 }
 
 // runs after each test finishes
@@ -158,9 +190,7 @@ func (suite *BuilderSuite) Payload(transactions ...*flow.TransactionBody) model.
 
 // ProtoStateRoot returns the root block of the protocol state.
 func (suite *BuilderSuite) ProtoStateRoot() *flow.Header {
-	root, err := suite.protoState.Params().Root()
-	suite.Require().NoError(err)
-	return root
+	return suite.protoState.Params().FinalizedRoot()
 }
 
 // ClearPool removes all items from the pool
@@ -187,7 +217,7 @@ func (suite *BuilderSuite) TestBuildOn_NonExistentParent() {
 	// use a non-existent parent ID
 	parentID := unittest.IdentifierFixture()
 
-	_, err := suite.builder.BuildOn(parentID, noopSetter)
+	_, err := suite.builder.BuildOn(parentID, noopSetter, noopSigner)
 	suite.Assert().Error(err)
 }
 
@@ -199,7 +229,7 @@ func (suite *BuilderSuite) TestBuildOn_Success() {
 		return nil
 	}
 
-	header, err := suite.builder.BuildOn(suite.genesis.ID(), setter)
+	header, err := suite.builder.BuildOn(suite.genesis.ID(), setter, noopSigner)
 	suite.Require().NoError(err)
 
 	// setter should have been run
@@ -234,7 +264,7 @@ func (suite *BuilderSuite) TestBuildOn_WithUnknownReferenceBlock() {
 	unknownReferenceTx.ReferenceBlockID = unittest.IdentifierFixture()
 	suite.pool.Add(&unknownReferenceTx)
 
-	header, err := suite.builder.BuildOn(suite.genesis.ID(), noopSetter)
+	header, err := suite.builder.BuildOn(suite.genesis.ID(), noopSetter, noopSigner)
 	suite.Require().NoError(err)
 
 	// should be able to retrieve built block from storage
@@ -259,9 +289,14 @@ func (suite *BuilderSuite) TestBuildOn_WithUnfinalizedReferenceBlock() {
 	// add an unfinalized block to the protocol state
 	genesis, err := suite.protoState.Final().Head()
 	suite.Require().NoError(err)
+	protocolState, err := suite.protoState.Final().ProtocolState()
+	suite.Require().NoError(err)
+	protocolStateID := protocolState.ID()
+
 	unfinalizedReferenceBlock := unittest.BlockWithParentFixture(genesis)
-	unfinalizedReferenceBlock.SetPayload(flow.EmptyPayload())
-	err = suite.protoState.Extend(context.Background(), unfinalizedReferenceBlock)
+	unfinalizedReferenceBlock.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(protocolStateID)))
+	err = suite.protoState.ExtendCertified(context.Background(), unfinalizedReferenceBlock,
+		unittest.CertifyBlock(unfinalizedReferenceBlock.Header))
 	suite.Require().NoError(err)
 
 	// add a transaction with unfinalized reference block to the pool
@@ -269,7 +304,7 @@ func (suite *BuilderSuite) TestBuildOn_WithUnfinalizedReferenceBlock() {
 	unfinalizedReferenceTx.ReferenceBlockID = unfinalizedReferenceBlock.ID()
 	suite.pool.Add(&unfinalizedReferenceTx)
 
-	header, err := suite.builder.BuildOn(suite.genesis.ID(), noopSetter)
+	header, err := suite.builder.BuildOn(suite.genesis.ID(), noopSetter, noopSigner)
 	suite.Require().NoError(err)
 
 	// should be able to retrieve built block from storage
@@ -294,15 +329,19 @@ func (suite *BuilderSuite) TestBuildOn_WithOrphanedReferenceBlock() {
 	// add an orphaned block to the protocol state
 	genesis, err := suite.protoState.Final().Head()
 	suite.Require().NoError(err)
+	protocolState, err := suite.protoState.Final().ProtocolState()
+	suite.Require().NoError(err)
+	protocolStateID := protocolState.ID()
+
 	// create a block extending genesis which will be orphaned
 	orphan := unittest.BlockWithParentFixture(genesis)
-	orphan.SetPayload(flow.EmptyPayload())
-	err = suite.protoState.Extend(context.Background(), orphan)
+	orphan.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(protocolStateID)))
+	err = suite.protoState.ExtendCertified(context.Background(), orphan, unittest.CertifyBlock(orphan.Header))
 	suite.Require().NoError(err)
 	// create and finalize a block on top of genesis, orphaning `orphan`
 	block1 := unittest.BlockWithParentFixture(genesis)
-	block1.SetPayload(flow.EmptyPayload())
-	err = suite.protoState.Extend(context.Background(), block1)
+	block1.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(protocolStateID)))
+	err = suite.protoState.ExtendCertified(context.Background(), block1, unittest.CertifyBlock(block1.Header))
 	suite.Require().NoError(err)
 	err = suite.protoState.Finalize(context.Background(), block1.ID())
 	suite.Require().NoError(err)
@@ -312,7 +351,7 @@ func (suite *BuilderSuite) TestBuildOn_WithOrphanedReferenceBlock() {
 	orphanedReferenceTx.ReferenceBlockID = orphan.ID()
 	suite.pool.Add(&orphanedReferenceTx)
 
-	header, err := suite.builder.BuildOn(suite.genesis.ID(), noopSetter)
+	header, err := suite.builder.BuildOn(suite.genesis.ID(), noopSetter, noopSigner)
 	suite.Require().NoError(err)
 
 	// should be able to retrieve built block from storage
@@ -355,7 +394,7 @@ func (suite *BuilderSuite) TestBuildOn_WithForks() {
 	suite.InsertBlock(block2)
 
 	// build on top of fork 1
-	header, err := suite.builder.BuildOn(block1.ID(), noopSetter)
+	header, err := suite.builder.BuildOn(block1.ID(), noopSetter, noopSigner)
 	require.NoError(t, err)
 
 	// should be able to retrieve built block from storage
@@ -398,7 +437,7 @@ func (suite *BuilderSuite) TestBuildOn_ConflictingFinalizedBlock() {
 	suite.FinalizeBlock(finalizedBlock)
 
 	// build on the un-finalized block
-	header, err := suite.builder.BuildOn(unFinalizedBlock.ID(), noopSetter)
+	header, err := suite.builder.BuildOn(unFinalizedBlock.ID(), noopSetter, noopSigner)
 	require.NoError(t, err)
 
 	// retrieve the built block from storage
@@ -447,7 +486,7 @@ func (suite *BuilderSuite) TestBuildOn_ConflictingInvalidatedForks() {
 	suite.FinalizeBlock(finalizedBlock)
 
 	// build on the finalized block
-	header, err := suite.builder.BuildOn(finalizedBlock.ID(), noopSetter)
+	header, err := suite.builder.BuildOn(finalizedBlock.ID(), noopSetter, noopSigner)
 	require.NoError(t, err)
 
 	// retrieve the built block from storage
@@ -467,7 +506,7 @@ func (suite *BuilderSuite) TestBuildOn_LargeHistory() {
 
 	// use a mempool with 2000 transactions, one per block
 	suite.pool = herocache.NewTransactions(2000, unittest.Logger(), metrics.NewNoopCollector())
-	suite.builder, _ = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool, unittest.Logger(), builder.WithMaxCollectionSize(10000))
+	suite.builder, _ = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.protoState, suite.state, suite.headers, suite.headers, suite.payloads, suite.pool, unittest.Logger(), suite.epochCounter, builder.WithMaxCollectionSize(10000))
 
 	// get a valid reference block ID
 	final, err := suite.protoState.Final().Head()
@@ -531,7 +570,7 @@ func (suite *BuilderSuite) TestBuildOn_LargeHistory() {
 	t.Log("conflicting: ", len(invalidatedTxIds))
 
 	// build on the head block
-	header, err := suite.builder.BuildOn(head.ID(), noopSetter)
+	header, err := suite.builder.BuildOn(head.ID(), noopSetter, noopSigner)
 	require.NoError(t, err)
 
 	// retrieve the built block from storage
@@ -547,10 +586,10 @@ func (suite *BuilderSuite) TestBuildOn_LargeHistory() {
 
 func (suite *BuilderSuite) TestBuildOn_MaxCollectionSize() {
 	// set the max collection size to 1
-	suite.builder, _ = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool, unittest.Logger(), builder.WithMaxCollectionSize(1))
+	suite.builder, _ = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.protoState, suite.state, suite.headers, suite.headers, suite.payloads, suite.pool, unittest.Logger(), suite.epochCounter, builder.WithMaxCollectionSize(1))
 
 	// build a block
-	header, err := suite.builder.BuildOn(suite.genesis.ID(), noopSetter)
+	header, err := suite.builder.BuildOn(suite.genesis.ID(), noopSetter, noopSigner)
 	suite.Require().NoError(err)
 
 	// retrieve the built block from storage
@@ -565,10 +604,10 @@ func (suite *BuilderSuite) TestBuildOn_MaxCollectionSize() {
 
 func (suite *BuilderSuite) TestBuildOn_MaxCollectionByteSize() {
 	// set the max collection byte size to 400 (each tx is about 150 bytes)
-	suite.builder, _ = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool, unittest.Logger(), builder.WithMaxCollectionByteSize(400))
+	suite.builder, _ = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.protoState, suite.state, suite.headers, suite.headers, suite.payloads, suite.pool, unittest.Logger(), suite.epochCounter, builder.WithMaxCollectionByteSize(400))
 
 	// build a block
-	header, err := suite.builder.BuildOn(suite.genesis.ID(), noopSetter)
+	header, err := suite.builder.BuildOn(suite.genesis.ID(), noopSetter, noopSigner)
 	suite.Require().NoError(err)
 
 	// retrieve the built block from storage
@@ -583,10 +622,10 @@ func (suite *BuilderSuite) TestBuildOn_MaxCollectionByteSize() {
 
 func (suite *BuilderSuite) TestBuildOn_MaxCollectionTotalGas() {
 	// set the max gas to 20,000
-	suite.builder, _ = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool, unittest.Logger(), builder.WithMaxCollectionTotalGas(20000))
+	suite.builder, _ = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.protoState, suite.state, suite.headers, suite.headers, suite.payloads, suite.pool, unittest.Logger(), suite.epochCounter, builder.WithMaxCollectionTotalGas(20000))
 
 	// build a block
-	header, err := suite.builder.BuildOn(suite.genesis.ID(), noopSetter)
+	header, err := suite.builder.BuildOn(suite.genesis.ID(), noopSetter, noopSigner)
 	suite.Require().NoError(err)
 
 	// retrieve the built block from storage
@@ -604,14 +643,15 @@ func (suite *BuilderSuite) TestBuildOn_ExpiredTransaction() {
 	// create enough main-chain blocks that an expired transaction is possible
 	genesis, err := suite.protoState.Final().Head()
 	suite.Require().NoError(err)
+	protocolState, err := suite.protoState.Final().ProtocolState()
+	suite.Require().NoError(err)
+	protocolStateID := protocolState.ID()
 
 	head := genesis
 	for i := 0; i < flow.DefaultTransactionExpiry+1; i++ {
 		block := unittest.BlockWithParentFixture(head)
-		block.Payload.Guarantees = nil
-		block.Payload.Seals = nil
-		block.Header.PayloadHash = block.Payload.Hash()
-		err = suite.protoState.Extend(context.Background(), block)
+		block.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(protocolStateID)))
+		err = suite.protoState.ExtendCertified(context.Background(), block, unittest.CertifyBlock(block.Header))
 		suite.Require().NoError(err)
 		err = suite.protoState.Finalize(context.Background(), block.ID())
 		suite.Require().NoError(err)
@@ -620,7 +660,7 @@ func (suite *BuilderSuite) TestBuildOn_ExpiredTransaction() {
 
 	// reset the pool and builder
 	suite.pool = herocache.NewTransactions(10, unittest.Logger(), metrics.NewNoopCollector())
-	suite.builder, _ = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool, unittest.Logger())
+	suite.builder, _ = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.protoState, suite.state, suite.headers, suite.headers, suite.payloads, suite.pool, unittest.Logger(), suite.epochCounter)
 
 	// insert a transaction referring genesis (now expired)
 	tx1 := unittest.TransactionBodyFixture(func(tx *flow.TransactionBody) {
@@ -642,7 +682,7 @@ func (suite *BuilderSuite) TestBuildOn_ExpiredTransaction() {
 	suite.T().Log("tx2: ", tx2.ID())
 
 	// build a block
-	header, err := suite.builder.BuildOn(suite.genesis.ID(), noopSetter)
+	header, err := suite.builder.BuildOn(suite.genesis.ID(), noopSetter, noopSigner)
 	suite.Require().NoError(err)
 
 	// retrieve the built block from storage
@@ -662,9 +702,9 @@ func (suite *BuilderSuite) TestBuildOn_EmptyMempool() {
 
 	// start with an empty mempool
 	suite.pool = herocache.NewTransactions(1000, unittest.Logger(), metrics.NewNoopCollector())
-	suite.builder, _ = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool, unittest.Logger())
+	suite.builder, _ = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.protoState, suite.state, suite.headers, suite.headers, suite.payloads, suite.pool, unittest.Logger(), suite.epochCounter)
 
-	header, err := suite.builder.BuildOn(suite.genesis.ID(), noopSetter)
+	header, err := suite.builder.BuildOn(suite.genesis.ID(), noopSetter, noopSigner)
 	suite.Require().NoError(err)
 
 	var built model.Block
@@ -689,7 +729,7 @@ func (suite *BuilderSuite) TestBuildOn_NoRateLimiting() {
 	suite.ClearPool()
 
 	// create builder with no rate limit and max 10 tx/collection
-	suite.builder, _ = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool, unittest.Logger(),
+	suite.builder, _ = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.protoState, suite.state, suite.headers, suite.headers, suite.payloads, suite.pool, unittest.Logger(), suite.epochCounter,
 		builder.WithMaxCollectionSize(10),
 		builder.WithMaxPayerTransactionRate(0),
 	)
@@ -707,7 +747,7 @@ func (suite *BuilderSuite) TestBuildOn_NoRateLimiting() {
 	// since we have no rate limiting we should fill all collections and in 10 blocks
 	parentID := suite.genesis.ID()
 	for i := 0; i < 10; i++ {
-		header, err := suite.builder.BuildOn(parentID, noopSetter)
+		header, err := suite.builder.BuildOn(parentID, noopSetter, noopSigner)
 		suite.Require().NoError(err)
 		parentID = header.ID()
 
@@ -730,7 +770,7 @@ func (suite *BuilderSuite) TestBuildOn_RateLimitNonPayer() {
 	suite.ClearPool()
 
 	// create builder with 5 tx/payer and max 10 tx/collection
-	suite.builder, _ = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool, unittest.Logger(),
+	suite.builder, _ = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.protoState, suite.state, suite.headers, suite.headers, suite.payloads, suite.pool, unittest.Logger(), suite.epochCounter,
 		builder.WithMaxCollectionSize(10),
 		builder.WithMaxPayerTransactionRate(5),
 	)
@@ -754,7 +794,7 @@ func (suite *BuilderSuite) TestBuildOn_RateLimitNonPayer() {
 	// since rate limiting does not apply to non-payer keys, we should fill all collections in 10 blocks
 	parentID := suite.genesis.ID()
 	for i := 0; i < 10; i++ {
-		header, err := suite.builder.BuildOn(parentID, noopSetter)
+		header, err := suite.builder.BuildOn(parentID, noopSetter, noopSigner)
 		suite.Require().NoError(err)
 		parentID = header.ID()
 
@@ -774,7 +814,7 @@ func (suite *BuilderSuite) TestBuildOn_HighRateLimit() {
 	suite.ClearPool()
 
 	// create builder with 5 tx/payer and max 10 tx/collection
-	suite.builder, _ = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool, unittest.Logger(),
+	suite.builder, _ = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.protoState, suite.state, suite.headers, suite.headers, suite.payloads, suite.pool, unittest.Logger(), suite.epochCounter,
 		builder.WithMaxCollectionSize(10),
 		builder.WithMaxPayerTransactionRate(5),
 	)
@@ -792,7 +832,7 @@ func (suite *BuilderSuite) TestBuildOn_HighRateLimit() {
 	// rate-limiting should be applied, resulting in half-full collections (5/10)
 	parentID := suite.genesis.ID()
 	for i := 0; i < 10; i++ {
-		header, err := suite.builder.BuildOn(parentID, noopSetter)
+		header, err := suite.builder.BuildOn(parentID, noopSetter, noopSigner)
 		suite.Require().NoError(err)
 		parentID = header.ID()
 
@@ -812,7 +852,7 @@ func (suite *BuilderSuite) TestBuildOn_LowRateLimit() {
 	suite.ClearPool()
 
 	// create builder with .5 tx/payer and max 10 tx/collection
-	suite.builder, _ = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool, unittest.Logger(),
+	suite.builder, _ = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.protoState, suite.state, suite.headers, suite.headers, suite.payloads, suite.pool, unittest.Logger(), suite.epochCounter,
 		builder.WithMaxCollectionSize(10),
 		builder.WithMaxPayerTransactionRate(.5),
 	)
@@ -831,7 +871,7 @@ func (suite *BuilderSuite) TestBuildOn_LowRateLimit() {
 	// having one transaction and empty collections otherwise
 	parentID := suite.genesis.ID()
 	for i := 0; i < 10; i++ {
-		header, err := suite.builder.BuildOn(parentID, noopSetter)
+		header, err := suite.builder.BuildOn(parentID, noopSetter, noopSigner)
 		suite.Require().NoError(err)
 		parentID = header.ID()
 
@@ -854,7 +894,7 @@ func (suite *BuilderSuite) TestBuildOn_UnlimitedPayer() {
 	// create builder with 5 tx/payer and max 10 tx/collection
 	// configure an unlimited payer
 	payer := unittest.RandomAddressFixture()
-	suite.builder, _ = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool, unittest.Logger(),
+	suite.builder, _ = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.protoState, suite.state, suite.headers, suite.headers, suite.payloads, suite.pool, unittest.Logger(), suite.epochCounter,
 		builder.WithMaxCollectionSize(10),
 		builder.WithMaxPayerTransactionRate(5),
 		builder.WithUnlimitedPayers(payer),
@@ -872,7 +912,7 @@ func (suite *BuilderSuite) TestBuildOn_UnlimitedPayer() {
 	// rate-limiting should not be applied, since the payer is marked as unlimited
 	parentID := suite.genesis.ID()
 	for i := 0; i < 10; i++ {
-		header, err := suite.builder.BuildOn(parentID, noopSetter)
+		header, err := suite.builder.BuildOn(parentID, noopSetter, noopSigner)
 		suite.Require().NoError(err)
 		parentID = header.ID()
 
@@ -895,7 +935,7 @@ func (suite *BuilderSuite) TestBuildOn_RateLimitDryRun() {
 	// create builder with 5 tx/payer and max 10 tx/collection
 	// configure an unlimited payer
 	payer := unittest.RandomAddressFixture()
-	suite.builder, _ = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool, unittest.Logger(),
+	suite.builder, _ = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.protoState, suite.state, suite.headers, suite.headers, suite.payloads, suite.pool, unittest.Logger(), suite.epochCounter,
 		builder.WithMaxCollectionSize(10),
 		builder.WithMaxPayerTransactionRate(5),
 		builder.WithRateLimitDryRun(true),
@@ -913,7 +953,7 @@ func (suite *BuilderSuite) TestBuildOn_RateLimitDryRun() {
 	// rate-limiting should not be applied, since dry-run setting is enabled
 	parentID := suite.genesis.ID()
 	for i := 0; i < 10; i++ {
-		header, err := suite.builder.BuildOn(parentID, noopSetter)
+		header, err := suite.builder.BuildOn(parentID, noopSetter, noopSigner)
 		suite.Require().NoError(err)
 		parentID = header.ID()
 
@@ -978,12 +1018,13 @@ func benchmarkBuildOn(b *testing.B, size int) {
 
 		metrics := metrics.NewNoopCollector()
 		tracer := trace.NewNoopTracer()
-		headers, _, _, _, _, blocks, _, _, _, _ := sutil.StorageLayer(suite.T(), suite.db)
-		suite.headers = headers
-		suite.blocks = blocks
-		suite.payloads = storage.NewClusterPayloads(metrics, suite.db)
+		all := sutil.StorageLayer(suite.T(), suite.db)
+		suite.headers = all.Headers
+		suite.blocks = all.Blocks
+		suite.payloads = bstorage.NewClusterPayloads(metrics, suite.db)
 
-		stateRoot, err := clusterkv.NewStateRoot(suite.genesis)
+		qc := unittest.QuorumCertificateFixture(unittest.QCWithRootBlockID(suite.genesis.ID()))
+		stateRoot, err := clusterkv.NewStateRoot(suite.genesis, qc, suite.epochCounter)
 
 		state, err := clusterkv.Bootstrap(suite.db, stateRoot)
 		assert.NoError(b, err)
@@ -999,7 +1040,7 @@ func benchmarkBuildOn(b *testing.B, size int) {
 		}
 
 		// create the builder
-		suite.builder, _ = builder.NewBuilder(suite.db, tracer, suite.headers, suite.headers, suite.payloads, suite.pool, unittest.Logger())
+		suite.builder, _ = builder.NewBuilder(suite.db, tracer, suite.protoState, suite.state, suite.headers, suite.headers, suite.payloads, suite.pool, unittest.Logger(), suite.epochCounter)
 	}
 
 	// create a block history to test performance against
@@ -1019,7 +1060,7 @@ func benchmarkBuildOn(b *testing.B, size int) {
 
 	b.StartTimer()
 	for n := 0; n < b.N; n++ {
-		_, err := suite.builder.BuildOn(final.ID(), noopSetter)
+		_, err := suite.builder.BuildOn(final.ID(), noopSetter, noopSigner)
 		assert.NoError(b, err)
 	}
 }

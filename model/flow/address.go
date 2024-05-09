@@ -1,5 +1,3 @@
-// (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
-
 package flow
 
 import (
@@ -9,46 +7,37 @@ import (
 	"strings"
 )
 
+// AddressLength is the size of an account address in bytes.
+// (n) is the size of an account address in bits.
+const AddressLength = (linearCodeN + 7) >> 3
+
 // Address represents the 8 byte address of an account.
 type Address [AddressLength]byte
 
-type AddressGenerator interface {
-	NextAddress() (Address, error)
-	CurrentAddress() Address
-	Bytes() []byte
-	AddressCount() uint64 // returns the total number of addresses that have been generated so far
-}
-
-type MonotonicAddressGenerator struct {
-	index uint64
-}
-
-// linearCodeAddressGenerator represents the internal index of the linear code address generation mechanism
-type linearCodeAddressGenerator struct {
-	chainCodeWord uint64
-	index         uint64
-}
-
-const (
-	// AddressLength is the size of an account address in bytes.
-	// (n) is the size of an account address in bits.
-	AddressLength = (linearCodeN + 7) >> 3
-	// addressIndexLength is the size of an account address state in bytes.
-	// (k) is the size of an account address in bits.
-	addressIndexLength = (linearCodeK + 7) >> 3
-)
-
 // EmptyAddress is the default value of a variable of type Address
-var EmptyAddress = Address{}
+var EmptyAddress = BytesToAddress(nil)
+
+func ConvertAddress(b [AddressLength]byte) Address {
+	return Address(b)
+}
 
 // HexToAddress converts a hex string to an Address.
 func HexToAddress(h string) Address {
+	addr, _ := StringToAddress(h)
+	return addr
+}
+
+// StringToAddress converts a string to an Address and return an error if the string is malformed
+func StringToAddress(h string) (Address, error) {
 	trimmed := strings.TrimPrefix(h, "0x")
 	if len(trimmed)%2 == 1 {
 		trimmed = "0" + trimmed
 	}
-	b, _ := hex.DecodeString(trimmed)
-	return BytesToAddress(b)
+	b, err := hex.DecodeString(trimmed)
+	if err != nil {
+		return EmptyAddress, fmt.Errorf("can not decode hex string (%v) to address: %w", h, err)
+	}
+	return BytesToAddress(b), nil
 }
 
 // BytesToAddress returns Address with value b.
@@ -105,6 +94,12 @@ func (a *Address) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// uint64 converts an address into a uint64
+func (a Address) uint64() uint64 {
+	v := binary.BigEndian.Uint64(a[:])
+	return v
+}
+
 // modified from binary.bigEndian.uint64
 func uint48(b []byte) uint64 {
 	_ = b[5] // bounds check hint to compiler;
@@ -123,10 +118,31 @@ func putUint48(b []byte, v uint64) {
 	b[5] = byte(v)
 }
 
+// addressIndexLength is the size of an account address state in bytes.
+// (k) is the size of an account address in bits.
+const addressIndexLength = (linearCodeK + 7) >> 3
+
 func indexToBytes(index uint64) []byte {
 	indexBytes := make([]byte, addressIndexLength)
 	putUint48(indexBytes, index)
 	return indexBytes
+}
+
+type AddressGenerator interface {
+	NextAddress() (Address, error)
+	CurrentAddress() Address
+	Bytes() []byte
+	AddressCount() uint64 // returns the total number of addresses that have been generated so far
+}
+
+type MonotonicAddressGenerator struct {
+	index uint64
+}
+
+// linearCodeAddressGenerator represents the internal index of the linear code address generation mechanism
+type linearCodeAddressGenerator struct {
+	chainCodeWord uint64
+	index         uint64
 }
 
 // Bytes converts an address index into a slice of bytes
@@ -218,12 +234,6 @@ func uint64ToAddress(v uint64) Address {
 	return Address(b)
 }
 
-// uint64 converts an address into a uint64
-func (a *Address) uint64() uint64 {
-	v := binary.BigEndian.Uint64(a[:])
-	return v
-}
-
 const (
 	// [n,k,d]-Linear code parameters
 	// The linear code used in the account addressing is a [64,45,7]
@@ -249,8 +259,15 @@ const (
 	maxIndex = (1 << linearCodeK) - 1
 )
 
-// The following are invalid code-words in the [64,45] code.
-// These constants are used to generate non-Flow-Mainnet addresses
+// The following constants are invalid code-words in the [64,45] code, generated randomly.
+// These constants are used to generate non-Flow-Mainnet addresses.
+//
+// Flow-Mainnet address space uses the original [64,45] code, while each network
+// uses an orthogonal space obtained by adding a specific invalid code word to the
+// original [64,45] code. The linearity of the code guarantees that all the obtained
+// spaces are disjoint, as long as all invalid code words are distinct.
+//
+// Spaces intersection is validated in `testAddressesIntersection`.
 
 // invalidCodeTestNetwork is the invalid codeword used for long-lived test networks.
 const invalidCodeTestNetwork = uint64(0x6834ba37b3980209)
@@ -258,8 +275,11 @@ const invalidCodeTestNetwork = uint64(0x6834ba37b3980209)
 // invalidCodeTransientNetwork  is the invalid codeword used for transient test networks.
 const invalidCodeTransientNetwork = uint64(0x1cb159857af02018)
 
-// invalidCodeStagingNetwork is the invalid codeword used for Staging network.
-const invalidCodeStagingNetwork = uint64(0x1035ce4eff92ae01)
+// invalidCodeSandboxNetwork is the invalid codeword used for Sandbox network.
+const invalidCodeSandboxNetwork = uint64(0x1035ce4eff92ae01)
+
+// invalidCodePreviewNetwork is the invalid codeword used for Preview networks.
+const invalidCodePreviewNetwork = uint64(0x5211829E88528817)
 
 // encodeWord encodes a word into a code word.
 // In Flow, the word is the account index while the code word

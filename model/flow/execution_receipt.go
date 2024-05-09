@@ -3,7 +3,7 @@ package flow
 import (
 	"encoding/json"
 
-	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/crypto"
 )
 
 type Spock []byte
@@ -11,8 +11,8 @@ type Spock []byte
 // ExecutionReceipt is the full execution receipt, as sent by the Execution Node.
 // Specifically, it contains the detailed execution result.
 type ExecutionReceipt struct {
-	ExecutorID        Identifier
-	ExecutionResult   ExecutionResult
+	ExecutorID Identifier
+	ExecutionResult
 	Spocks            []crypto.Signature
 	ExecutorSignature crypto.Signature
 }

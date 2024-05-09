@@ -3,8 +3,9 @@ package chunks
 import (
 	"fmt"
 
-	"github.com/onflow/flow-go/crypto/hash"
-	"github.com/onflow/flow-go/crypto/random"
+	"github.com/onflow/crypto/hash"
+	"github.com/onflow/crypto/random"
+
 	chunkmodels "github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/encoding/json"
 	"github.com/onflow/flow-go/model/flow"
@@ -12,7 +13,7 @@ import (
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/state/protocol"
-	"github.com/onflow/flow-go/state/protocol/seed"
+	"github.com/onflow/flow-go/state/protocol/prg"
 )
 
 // ChunkAssigner implements an instance of the Public Chunk Assignment
@@ -66,9 +67,12 @@ func (p *ChunkAssigner) Assign(result *flow.ExecutionResult, blockID flow.Identi
 	}
 
 	// Get a list of verifiers at block that is being sealed
-	verifiers, err := p.protocolState.AtBlockID(result.BlockID).Identities(filter.And(filter.HasRole(flow.RoleVerification),
-		filter.HasWeight(true),
-		filter.Not(filter.Ejected)))
+	verifiers, err := p.protocolState.AtBlockID(result.BlockID).Identities(
+		filter.And(
+			filter.HasInitialWeight[flow.Identity](true),
+			filter.HasRole[flow.Identity](flow.RoleVerification),
+			filter.IsValidCurrentEpochParticipant,
+		))
 	if err != nil {
 		return nil, fmt.Errorf("could not get verifiers: %w", err)
 	}
@@ -98,7 +102,7 @@ func (p *ChunkAssigner) rngByBlockID(stateSnapshot protocol.Snapshot) (random.Ra
 		return nil, fmt.Errorf("failed to retrieve source of randomness: %w", err)
 	}
 
-	rng, err := seed.PRGFromRandomSource(randomSource, seed.ProtocolVerificationChunkAssignment)
+	rng, err := prg.New(randomSource, prg.VerificationChunkAssignment, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to instantiate random number generator: %w", err)
 	}

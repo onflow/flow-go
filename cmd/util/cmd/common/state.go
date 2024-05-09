@@ -21,9 +21,12 @@ func InitProtocolState(db *badger.DB, storages *storage.All) (protocol.State, er
 		storages.Seals,
 		storages.Results,
 		storages.Blocks,
+		storages.QuorumCertificates,
 		storages.Setups,
 		storages.EpochCommits,
-		storages.Statuses,
+		storages.EpochProtocolState,
+		storages.ProtocolKVStore,
+		storages.VersionBeacons,
 	)
 
 	if err != nil {

@@ -5,12 +5,14 @@ import (
 	"os"
 	"path"
 	"reflect"
+	"regexp"
 	"sync"
 	"testing"
 	"time"
 
-	prometheusWAL "github.com/m4ksio/wal/wal"
+	prometheusWAL "github.com/onflow/wal/wal"
 	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/atomic"
@@ -23,6 +25,10 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/utils/unittest"
 )
+
+// slow down updating the ledger, because running too fast would cause the previous checkpoint
+// to not finish and get delayed, and this might cause tests to stuck
+const LedgerUpdateDelay = time.Millisecond * 500
 
 // Compactor observer that waits until it gets notified of a
 // latest checkpoint larger than fromBound
@@ -41,6 +47,7 @@ func (co *CompactorObserver) OnNext(val interface{}) {
 			co.done <- struct{}{}
 		}
 	}
+	fmt.Println("Compactor observer res:", res)
 }
 
 func (co *CompactorObserver) OnError(err error) {}
@@ -48,18 +55,19 @@ func (co *CompactorObserver) OnComplete() {
 	close(co.done)
 }
 
-// TestCompactor tests creation of WAL segments and checkpoints, and
+// TestCompactorCreation tests creation of WAL segments and checkpoints, and
 // checks if the rebuilt ledger state matches previous ledger state.
-func TestCompactor(t *testing.T) {
+func TestCompactorCreation(t *testing.T) {
 	const (
 		numInsPerStep      = 2
 		pathByteSize       = 32
-		minPayloadByteSize = 2 << 15
-		maxPayloadByteSize = 2 << 16
+		minPayloadByteSize = 2 << 15 // 64  KB
+		maxPayloadByteSize = 2 << 16 // 128 KB
 		size               = 10
 		checkpointDistance = 3
 		checkpointsToKeep  = 1
 		forestCapacity     = size * 10
+		segmentSize        = 32 * 1024 // 32 KB
 	)
 
 	metricsCollector := &metrics.NoopCollector{}
@@ -73,16 +81,16 @@ func TestCompactor(t *testing.T) {
 
 		t.Run("creates checkpoints", func(t *testing.T) {
 
-			wal, err := realWAL.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir, forestCapacity, pathByteSize, 32*1024)
+			wal, err := realWAL.NewDiskWAL(unittest.Logger(), nil, metrics.NewNoopCollector(), dir, forestCapacity, pathByteSize, segmentSize)
 			require.NoError(t, err)
 
-			l, err = NewLedger(wal, size*10, metricsCollector, zerolog.Logger{}, DefaultPathFinderVersion)
+			l, err = NewLedger(wal, size*10, metricsCollector, unittest.Logger(), DefaultPathFinderVersion)
 			require.NoError(t, err)
 
 			// WAL segments are 32kB, so here we generate 2 keys 64kB each, times `size`
 			// so we should get at least `size` segments
 
-			compactor, err := NewCompactor(l, wal, zerolog.Nop(), forestCapacity, checkpointDistance, checkpointsToKeep, atomic.NewBool(false))
+			compactor, err := NewCompactor(l, wal, unittest.Logger(), forestCapacity, checkpointDistance, checkpointsToKeep, atomic.NewBool(false), metrics.NewNoopCollector())
 			require.NoError(t, err)
 
 			co := CompactorObserver{fromBound: 8, done: make(chan struct{})}
@@ -91,10 +99,18 @@ func TestCompactor(t *testing.T) {
 			// Run Compactor in background.
 			<-compactor.Ready()
 
+			log.Info().Msgf("compactor is ready")
+
 			rootState := l.InitialState()
 
 			// Generate the tree and create WAL
+			// update the ledger size (10) times, since each update will trigger a segment file creation
+			// and checkpointDistance is 3, then, 10 segment files should trigger generating checkpoint:
+			// 2, 5, 8, that's why the fromBound is 8
 			for i := 0; i < size; i++ {
+				// slow down updating the ledger, because running too fast would cause the previous checkpoint
+				// to not finish and get delayed
+				time.Sleep(LedgerUpdateDelay)
 
 				payloads := testutils.RandomPayloads(numInsPerStep, minPayloadByteSize, maxPayloadByteSize)
 
@@ -110,6 +126,8 @@ func TestCompactor(t *testing.T) {
 				update, err := ledger.NewUpdate(rootState, keys, values)
 				require.NoError(t, err)
 
+				log.Info().Msgf("update ledger with min payload byte size: %v, %v will trigger segment file creation",
+					numInsPerStep*minPayloadByteSize, segmentSize)
 				newState, _, err := l.Set(update)
 				require.NoError(t, err)
 
@@ -126,7 +144,8 @@ func TestCompactor(t *testing.T) {
 				rootState = newState
 			}
 
-			// wait for the bound-checking observer to confirm checkpoints have been made
+			log.Info().Msgf("wait for the bound-checking observer to confirm checkpoints have been made")
+
 			select {
 			case <-co.done:
 				// continue
@@ -175,16 +194,28 @@ func TestCompactor(t *testing.T) {
 			dirF, _ := os.Open(dir)
 			files, _ := dirF.Readdir(0)
 
+			find008, err := regexp.Compile("checkpoint.00000008*")
+			require.NoError(t, err)
+
 			for _, fileInfo := range files {
 
 				name := fileInfo.Name()
-
-				if name != "checkpoint.00000008" &&
-					name != "00000009" &&
-					name != "00000010" {
-					err := os.Remove(path.Join(dir, name))
-					require.NoError(t, err)
+				if name == "00000009" ||
+					name == "00000010" ||
+					name == "00000011" {
+					log.Info().Msgf("keep file %v/%v", dir, name)
+					continue
 				}
+
+				// checkpoint V6 has multiple files
+				if find008.MatchString(name) {
+					log.Info().Msgf("keep file %v/%v", dir, name)
+					continue
+				}
+
+				err := os.Remove(path.Join(dir, name))
+				require.NoError(t, err)
+				log.Info().Msgf("removed file %v/%v", dir, name)
 			}
 		})
 
@@ -194,10 +225,10 @@ func TestCompactor(t *testing.T) {
 
 		t.Run("load data from checkpoint and WAL", func(t *testing.T) {
 
-			wal2, err := realWAL.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir, size*10, pathByteSize, 32*1024)
+			wal2, err := realWAL.NewDiskWAL(unittest.Logger(), nil, metrics.NewNoopCollector(), dir, size*10, pathByteSize, 32*1024)
 			require.NoError(t, err)
 
-			l2, err = NewLedger(wal2, size*10, metricsCollector, zerolog.Logger{}, DefaultPathFinderVersion)
+			l2, err = NewLedger(wal2, size*10, metricsCollector, unittest.Logger(), DefaultPathFinderVersion)
 			require.NoError(t, err)
 
 			<-wal2.Done()
@@ -276,7 +307,7 @@ func TestCompactorSkipCheckpointing(t *testing.T) {
 		// saved data after updates
 		savedData := make(map[ledger.RootHash]map[string]*ledger.Payload)
 
-		wal, err := realWAL.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir, forestCapacity, pathByteSize, 32*1024)
+		wal, err := realWAL.NewDiskWAL(unittest.Logger(), nil, metrics.NewNoopCollector(), dir, forestCapacity, pathByteSize, 32*1024)
 		require.NoError(t, err)
 
 		l, err = NewLedger(wal, size*10, metricsCollector, zerolog.Logger{}, DefaultPathFinderVersion)
@@ -285,7 +316,7 @@ func TestCompactorSkipCheckpointing(t *testing.T) {
 		// WAL segments are 32kB, so here we generate 2 keys 64kB each, times `size`
 		// so we should get at least `size` segments
 
-		compactor, err := NewCompactor(l, wal, zerolog.Nop(), forestCapacity, checkpointDistance, checkpointsToKeep, atomic.NewBool(false))
+		compactor, err := NewCompactor(l, wal, unittest.Logger(), forestCapacity, checkpointDistance, checkpointsToKeep, atomic.NewBool(false), metrics.NewNoopCollector())
 		require.NoError(t, err)
 
 		co := CompactorObserver{fromBound: 8, done: make(chan struct{})}
@@ -298,6 +329,10 @@ func TestCompactorSkipCheckpointing(t *testing.T) {
 
 		// Generate the tree and create WAL
 		for i := 0; i < size; i++ {
+
+			// slow down updating the ledger, because running too fast would cause the previous checkpoint
+			// to not finish and get delayed
+			time.Sleep(LedgerUpdateDelay)
 
 			payloads := testutils.RandomPayloads(numInsPerStep, minPayloadByteSize, maxPayloadByteSize)
 
@@ -401,13 +436,13 @@ func TestCompactorAccuracy(t *testing.T) {
 		// Create DiskWAL and Ledger repeatedly to test rebuilding ledger state at restart.
 		for i := 0; i < 3; i++ {
 
-			wal, err := realWAL.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir, forestCapacity, pathByteSize, 32*1024)
+			wal, err := realWAL.NewDiskWAL(unittest.Logger(), nil, metrics.NewNoopCollector(), dir, forestCapacity, pathByteSize, 32*1024)
 			require.NoError(t, err)
 
 			l, err := NewLedger(wal, forestCapacity, metricsCollector, zerolog.Logger{}, DefaultPathFinderVersion)
 			require.NoError(t, err)
 
-			compactor, err := NewCompactor(l, wal, zerolog.Nop(), forestCapacity, checkpointDistance, checkpointsToKeep, atomic.NewBool(false))
+			compactor, err := NewCompactor(l, wal, unittest.Logger(), forestCapacity, checkpointDistance, checkpointsToKeep, atomic.NewBool(false), metrics.NewNoopCollector())
 			require.NoError(t, err)
 
 			fromBound := lastCheckpointNum + (size / 2)
@@ -421,6 +456,9 @@ func TestCompactorAccuracy(t *testing.T) {
 			// Generate the tree and create WAL
 			// size+2 is used to ensure that size/2 segments are finalized.
 			for i := 0; i < size+2; i++ {
+				// slow down updating the ledger, because running too fast would cause the previous checkpoint
+				// to not finish and get delayed
+				time.Sleep(LedgerUpdateDelay)
 
 				payloads := testutils.RandomPayloads(numInsPerStep, minPayloadByteSize, maxPayloadByteSize)
 
@@ -514,7 +552,7 @@ func TestCompactorTriggeredByAdminTool(t *testing.T) {
 		l, err := NewLedger(wal, forestCapacity, metricsCollector, unittest.LoggerWithName("ledger"), DefaultPathFinderVersion)
 		require.NoError(t, err)
 
-		compactor, err := NewCompactor(l, wal, unittest.LoggerWithName("compactor"), forestCapacity, checkpointDistance, checkpointsToKeep, atomic.NewBool(true))
+		compactor, err := NewCompactor(l, wal, unittest.LoggerWithName("compactor"), forestCapacity, checkpointDistance, checkpointsToKeep, atomic.NewBool(true), metrics.NewNoopCollector())
 		require.NoError(t, err)
 
 		fmt.Println("should stop as soon as segment 5 is generated, which should trigger checkpoint 5 to be created")
@@ -533,6 +571,9 @@ func TestCompactorTriggeredByAdminTool(t *testing.T) {
 		fmt.Println("2 trie updates will fill a segment file, and 12 trie updates will fill 6 segment files")
 		fmt.Println("13 trie updates in total will trigger segment 5 to be finished, which should trigger checkpoint 5")
 		for i := 0; i < 13; i++ {
+			// slow down updating the ledger, because running too fast would cause the previous checkpoint
+			// to not finish and get delayed
+			time.Sleep(LedgerUpdateDelay)
 
 			payloads := testutils.RandomPayloads(numInsPerStep, minPayloadByteSize, maxPayloadByteSize)
 
@@ -609,13 +650,13 @@ func TestCompactorConcurrency(t *testing.T) {
 		// There are 1-2 records per segment (according to logs), so
 		// generate size/2 segments.
 
-		wal, err := realWAL.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir, forestCapacity, pathByteSize, 32*1024)
+		wal, err := realWAL.NewDiskWAL(unittest.Logger(), nil, metrics.NewNoopCollector(), dir, forestCapacity, pathByteSize, 32*1024)
 		require.NoError(t, err)
 
 		l, err := NewLedger(wal, forestCapacity, metricsCollector, zerolog.Logger{}, DefaultPathFinderVersion)
 		require.NoError(t, err)
 
-		compactor, err := NewCompactor(l, wal, zerolog.Nop(), forestCapacity, checkpointDistance, checkpointsToKeep, atomic.NewBool(false))
+		compactor, err := NewCompactor(l, wal, unittest.Logger(), forestCapacity, checkpointDistance, checkpointsToKeep, atomic.NewBool(false), metrics.NewNoopCollector())
 		require.NoError(t, err)
 
 		fromBound := lastCheckpointNum + (size / 2 * numGoroutine)
@@ -636,6 +677,9 @@ func TestCompactorConcurrency(t *testing.T) {
 
 				// size+1 is used to ensure that size/2*numGoroutine segments are finalized.
 				for i := 0; i < size+1; i++ {
+					// slow down updating the ledger, because running too fast would cause the previous checkpoint
+					// to not finish and get delayed
+					time.Sleep(LedgerUpdateDelay)
 					payloads := testutils.RandomPayloads(numInsPerStep, minPayloadByteSize, maxPayloadByteSize)
 
 					keys := make([]ledger.Key, len(payloads))
@@ -772,7 +816,7 @@ func replaySegments(
 	updateFn func(update *ledger.TrieUpdate) error,
 	deleteFn func(rootHash ledger.RootHash) error,
 ) error {
-	sr, err := prometheusWAL.NewSegmentsRangeReader(prometheusWAL.SegmentRange{
+	sr, err := prometheusWAL.NewSegmentsRangeReader(unittest.Logger(), prometheusWAL.SegmentRange{
 		Dir:   dir,
 		First: 0,
 		Last:  to,

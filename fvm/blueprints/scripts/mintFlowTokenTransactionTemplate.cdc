@@ -1,19 +1,18 @@
-import FungibleToken from 0xFUNGIBLETOKENADDRESS
-import FlowToken from 0xFLOWTOKENADDRESS
+import FungibleToken from "FungibleToken"
+import FlowToken from "FlowToken"
 
 transaction(amount: UFix64) {
 
   let tokenAdmin: &FlowToken.Administrator
-  let tokenReceiver: &FlowToken.Vault{FungibleToken.Receiver}
+  let tokenReceiver: &FlowToken.Vault
 
-  prepare(signer: AuthAccount) {
-	self.tokenAdmin = signer
+  prepare(signer: auth(BorrowValue) &Account) {
+	self.tokenAdmin = signer.storage
 	  .borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin)
 	  ?? panic("Signer is not the token admin")
 
 	self.tokenReceiver = signer
-	  .getCapability(/public/flowTokenReceiver)
-	  .borrow<&FlowToken.Vault{FungibleToken.Receiver}>()
+	  .capabilities.borrow<&FlowToken.Vault>(/public/flowTokenReceiver)
 	  ?? panic("Unable to borrow receiver reference for recipient")
   }
 

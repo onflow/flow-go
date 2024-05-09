@@ -2,47 +2,52 @@ package computation
 
 import (
 	"context"
+	"crypto/rand"
 	"fmt"
 	"testing"
 
+	"github.com/ipfs/boxo/blockstore"
+	"github.com/ipfs/go-datastore"
+	dssync "github.com/ipfs/go-datastore/sync"
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
+	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/onflow/crypto"
 
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/computation/committer"
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
 	"github.com/onflow/flow-go/engine/execution/state"
 	bootstrapexec "github.com/onflow/flow-go/engine/execution/state/bootstrap"
-	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/engine/execution/testutil"
+	"github.com/onflow/flow-go/engine/execution/utils"
+	"github.com/onflow/flow-go/engine/testutil/mocklocal"
 	"github.com/onflow/flow-go/engine/verification/fetcher"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/fvm/environment"
-	"github.com/onflow/flow-go/fvm/programs"
+	"github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/fvm/storage/derived"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	completeLedger "github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
-	chmodels "github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/verification"
 	"github.com/onflow/flow-go/module/chunks"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	exedataprovider "github.com/onflow/flow-go/module/executiondatasync/provider"
-	exedatatracker "github.com/onflow/flow-go/module/executiondatasync/tracker"
 	mocktracker "github.com/onflow/flow-go/module/executiondatasync/tracker/mock"
 	"github.com/onflow/flow-go/module/metrics"
 	requesterunit "github.com/onflow/flow-go/module/state_synchronization/requester/unittest"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/utils/unittest"
+)
 
-	"github.com/ipfs/go-cid"
-	"github.com/ipfs/go-datastore"
-	dssync "github.com/ipfs/go-datastore/sync"
-	blockstore "github.com/ipfs/go-ipfs-blockstore"
-	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
+const (
+	testVerifyMaxConcurrency = 2
 )
 
 var chain = flow.Emulator.Chain()
@@ -61,10 +66,10 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 	t.Run("single transaction event", func(t *testing.T) {
 
 		deployTx := blueprints.DeployContractTransaction(chain.ServiceAddress(), []byte(""+
-			`pub contract Foo {
-				pub event FooEvent(x: Int, y: Int)
+			`access(all) contract Foo {
+				access(all) event FooEvent(x: Int, y: Int)
 
-				pub fun event() { 
+				access(all) fun emitEvent() { 
 					emit FooEvent(x: 2, y: 1)
 				}
 			}`), "Foo")
@@ -75,7 +80,7 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 			transaction {
 				prepare() {}
 				execute {
-					Foo.event()
+					Foo.emitEvent()
 				}
 			}`, chain.ServiceAddress())),
 		}
@@ -92,20 +97,23 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 			},
 		}, fvm.BootstrapProcedureFeeParameters{}, fvm.DefaultMinimumStorageReservation)
 
+		colResult := cr.CollectionExecutionResultAt(0)
+		txResults := colResult.TransactionResults()
+		events := colResult.Events()
 		// ensure event is emitted
-		require.Empty(t, cr.TransactionResults[0].ErrorMessage)
-		require.Empty(t, cr.TransactionResults[1].ErrorMessage)
-		require.Len(t, cr.Events[0], 2)
-		require.Equal(t, flow.EventType(fmt.Sprintf("A.%s.Foo.FooEvent", chain.ServiceAddress())), cr.Events[0][1].Type)
+		require.Empty(t, txResults[0].ErrorMessage)
+		require.Empty(t, txResults[1].ErrorMessage)
+		require.Len(t, events, 2)
+		require.Equal(t, flow.EventType(fmt.Sprintf("A.%s.Foo.FooEvent", chain.ServiceAddress())), events[1].Type)
 	})
 
 	t.Run("multiple collections events", func(t *testing.T) {
 
 		deployTx := blueprints.DeployContractTransaction(chain.ServiceAddress(), []byte(""+
-			`pub contract Foo {
-				pub event FooEvent(x: Int, y: Int)
+			`access(all) contract Foo {
+				access(all) event FooEvent(x: Int, y: Int)
 
-				pub fun event() { 
+				access(all) fun emitEvent() { 
 					emit FooEvent(x: 2, y: 1)
 				}
 			}`), "Foo")
@@ -116,7 +124,7 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 			transaction {
 				prepare() {}
 				execute {
-					Foo.event()
+					Foo.emitEvent()
 				}
 			}`, chain.ServiceAddress())),
 		}
@@ -147,13 +155,38 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 			},
 		}, fvm.BootstrapProcedureFeeParameters{}, fvm.DefaultMinimumStorageReservation)
 
-		// ensure event is emitted
-		require.Empty(t, cr.TransactionResults[0].ErrorMessage)
-		require.Empty(t, cr.TransactionResults[1].ErrorMessage)
-		require.Empty(t, cr.TransactionResults[2].ErrorMessage)
-		require.Empty(t, cr.TransactionResults[3].ErrorMessage)
-		require.Len(t, cr.Events[0], 2)
-		require.Equal(t, flow.EventType(fmt.Sprintf("A.%s.Foo.FooEvent", chain.ServiceAddress())), cr.Events[0][1].Type)
+		verifyTxResults := func(t *testing.T, colIndex, expResCount int) {
+			colResult := cr.CollectionExecutionResultAt(colIndex)
+			txResults := colResult.TransactionResults()
+			require.Len(t, txResults, expResCount)
+			for i := 0; i < expResCount; i++ {
+				require.Empty(t, txResults[i].ErrorMessage)
+			}
+		}
+
+		verifyEvents := func(t *testing.T, colIndex int, eventTypes []flow.EventType) {
+			colResult := cr.CollectionExecutionResultAt(colIndex)
+			events := colResult.Events()
+			require.Len(t, events, len(eventTypes))
+			for i, event := range events {
+				require.Equal(t, event.Type, eventTypes[i])
+			}
+		}
+
+		expEventType1 := flow.EventType("flow.AccountContractAdded")
+		expEventType2 := flow.EventType(fmt.Sprintf("A.%s.Foo.FooEvent", chain.ServiceAddress()))
+
+		// first collection
+		verifyTxResults(t, 0, 2)
+		verifyEvents(t, 0, []flow.EventType{expEventType1, expEventType2})
+
+		// second collection
+		verifyTxResults(t, 1, 1)
+		verifyEvents(t, 1, []flow.EventType{expEventType2})
+
+		// 3rd collection
+		verifyTxResults(t, 2, 1)
+		verifyEvents(t, 2, []flow.EventType{expEventType2})
 	})
 
 	t.Run("with failed storage limit", func(t *testing.T) {
@@ -161,7 +194,7 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 		accountPrivKey, createAccountTx := testutil.CreateAccountCreationTransaction(t, chain)
 
 		// this should return the address of newly created account
-		accountAddress, err := chain.AddressAtIndex(5)
+		accountAddress, err := chain.AddressAtIndex(systemcontracts.LastSystemAccountIndex + 1)
 		require.NoError(t, err)
 
 		err = testutil.SignTransactionAsServiceAccount(createAccountTx, 0, chain)
@@ -171,7 +204,7 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 		err = testutil.SignTransaction(addKeyTx, accountAddress, accountPrivKey, 0)
 		require.NoError(t, err)
 
-		minimumStorage, err := cadence.NewUFix64("0.00008312")
+		minimumStorage, err := cadence.NewUFix64("0.00011661")
 		require.NoError(t, err)
 
 		cr := executeBlockAndVerify(t, [][]*flow.TransactionBody{
@@ -183,20 +216,27 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 			},
 		}, fvm.DefaultTransactionFees, minimumStorage)
 
+		colResult := cr.CollectionExecutionResultAt(0)
+		txResults := colResult.TransactionResults()
 		// storage limit error
-		assert.Equal(t, cr.TransactionResults[0].ErrorMessage, "")
+		assert.Len(t, txResults, 1)
+		assert.Equal(t, "", txResults[0].ErrorMessage)
 		// ensure events from the first transaction is emitted
-		require.Len(t, cr.Events[0], 10)
-		// ensure fee deduction events are emitted even though tx fails
-		require.Len(t, cr.Events[1], 3)
+		require.Len(t, colResult.Events(), 14)
+
+		colResult = cr.CollectionExecutionResultAt(1)
+		txResults = colResult.TransactionResults()
+		assert.Len(t, txResults, 1)
 		// storage limit error
-		assert.Contains(t, cr.TransactionResults[1].ErrorMessage, "Error Code: 1103")
+		assert.Contains(t, txResults[0].ErrorMessage, errors.ErrCodeStorageCapacityExceeded.String())
+		// ensure fee deduction events are emitted even though tx fails
+		require.Len(t, colResult.Events(), 5)
 	})
 
 	t.Run("with failed transaction fee deduction", func(t *testing.T) {
 		accountPrivKey, createAccountTx := testutil.CreateAccountCreationTransaction(t, chain)
 		// this should return the address of newly created account
-		accountAddress, err := chain.AddressAtIndex(5)
+		accountAddress, err := chain.AddressAtIndex(systemcontracts.LastSystemAccountIndex + 1)
 		require.NoError(t, err)
 
 		err = testutil.SignTransactionAsServiceAccount(createAccountTx, 0, chain)
@@ -223,7 +263,7 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 			}`),
 		}
 
-		spamTx.SetGasLimit(800000)
+		spamTx.SetComputeLimit(800000)
 		err = testutil.SignTransaction(spamTx, accountAddress, accountPrivKey, 0)
 		require.NoError(t, err)
 
@@ -248,29 +288,32 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 				fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
 			})
 
+		colResult := cr.CollectionExecutionResultAt(0)
+		txResults := colResult.TransactionResults()
+		events := colResult.Events()
+
 		// no error
-		assert.Equal(t, cr.TransactionResults[0].ErrorMessage, "")
+		assert.Equal(t, txResults[0].ErrorMessage, "")
 
 		// ensure events from the first transaction is emitted. Since transactions are in the same block, get all events from Events[0]
 		transactionEvents := 0
-		for _, event := range cr.Events[0] {
-			if event.TransactionID == cr.TransactionResults[0].TransactionID {
+		for _, event := range events {
+			if event.TransactionID == txResults[0].TransactionID {
 				transactionEvents += 1
 			}
 		}
-		require.Equal(t, 10, transactionEvents)
+		require.Equal(t, 14, transactionEvents)
 
-		// minimum account balance error as account is put below minimum account balance due to fee deduction
-		assert.Contains(t, cr.TransactionResults[1].ErrorMessage, "Error Code: 1103")
+		assert.Contains(t, txResults[1].ErrorMessage, errors.ErrCodeStorageCapacityExceeded.String())
 
 		// ensure tx fee deduction events are emitted even though tx failed
 		transactionEvents = 0
-		for _, event := range cr.Events[0] {
-			if event.TransactionID == cr.TransactionResults[1].TransactionID {
+		for _, event := range events {
+			if event.TransactionID == txResults[1].TransactionID {
 				transactionEvents += 1
 			}
 		}
-		require.Equal(t, 3, transactionEvents)
+		require.Equal(t, 5, transactionEvents)
 	})
 
 }
@@ -288,29 +331,38 @@ func TestTransactionFeeDeduction(t *testing.T) {
 	fundingAmount := uint64(100_000_000)
 	transferAmount := uint64(123_456)
 
+	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+
+	depositedEvent := fmt.Sprintf("A.%s.FlowToken.TokensDeposited", sc.FlowToken.Address)
+	withdrawnEvent := fmt.Sprintf("A.%s.FlowToken.TokensWithdrawn", sc.FlowToken.Address)
+
 	testCases := []testCase{
 		{
 			name:          "Transaction fee deduction emits events",
 			fundWith:      fundingAmount,
 			tryToTransfer: 0,
 			checkResult: func(t *testing.T, cr *execution.ComputationResult) {
-				require.Empty(t, cr.TransactionResults[0].ErrorMessage)
-				require.Empty(t, cr.TransactionResults[1].ErrorMessage)
-				require.Empty(t, cr.TransactionResults[2].ErrorMessage)
+				txResults := cr.AllTransactionResults()
+
+				require.Empty(t, txResults[0].ErrorMessage)
+				require.Empty(t, txResults[1].ErrorMessage)
+				require.Empty(t, txResults[2].ErrorMessage)
 
 				var deposits []flow.Event
 				var withdraws []flow.Event
 
-				for _, e := range cr.Events[2] {
-					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensDeposited", fvm.FlowTokenAddress(chain)) {
+				// events of the first collection
+				events := cr.CollectionExecutionResultAt(2).Events()
+				for _, e := range events {
+					if string(e.Type) == depositedEvent {
 						deposits = append(deposits, e)
 					}
-					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensWithdrawn", fvm.FlowTokenAddress(chain)) {
+					if string(e.Type) == withdrawnEvent {
 						withdraws = append(withdraws, e)
 					}
 				}
 
-				require.Len(t, deposits, 2)
+				require.Len(t, deposits, 1)
 				require.Len(t, withdraws, 2)
 			},
 		},
@@ -319,23 +371,27 @@ func TestTransactionFeeDeduction(t *testing.T) {
 			fundWith:      txFees + transferAmount,
 			tryToTransfer: transferAmount,
 			checkResult: func(t *testing.T, cr *execution.ComputationResult) {
-				require.Empty(t, cr.TransactionResults[0].ErrorMessage)
-				require.Empty(t, cr.TransactionResults[1].ErrorMessage)
-				require.Empty(t, cr.TransactionResults[2].ErrorMessage)
+				txResults := cr.AllTransactionResults()
+
+				require.Empty(t, txResults[0].ErrorMessage)
+				require.Empty(t, txResults[1].ErrorMessage)
+				require.Empty(t, txResults[2].ErrorMessage)
 
 				var deposits []flow.Event
 				var withdraws []flow.Event
 
-				for _, e := range cr.Events[2] {
-					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensDeposited", fvm.FlowTokenAddress(chain)) {
+				// events of the last collection
+				events := cr.CollectionExecutionResultAt(2).Events()
+				for _, e := range events {
+					if string(e.Type) == depositedEvent {
 						deposits = append(deposits, e)
 					}
-					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensWithdrawn", fvm.FlowTokenAddress(chain)) {
+					if string(e.Type) == withdrawnEvent {
 						withdraws = append(withdraws, e)
 					}
 				}
 
-				require.Len(t, deposits, 2)
+				require.Len(t, deposits, 1)
 				require.Len(t, withdraws, 2)
 			},
 		},
@@ -346,23 +402,27 @@ func TestTransactionFeeDeduction(t *testing.T) {
 			fundWith:      txFees,
 			tryToTransfer: 1,
 			checkResult: func(t *testing.T, cr *execution.ComputationResult) {
-				require.Empty(t, cr.TransactionResults[0].ErrorMessage)
-				require.Empty(t, cr.TransactionResults[1].ErrorMessage)
-				require.Empty(t, cr.TransactionResults[2].ErrorMessage)
+				txResults := cr.AllTransactionResults()
+
+				require.Empty(t, txResults[0].ErrorMessage)
+				require.Empty(t, txResults[1].ErrorMessage)
+				require.Empty(t, txResults[2].ErrorMessage)
 
 				var deposits []flow.Event
 				var withdraws []flow.Event
 
-				for _, e := range cr.Events[2] {
-					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensDeposited", fvm.FlowTokenAddress(chain)) {
+				// events of the last collection
+				events := cr.CollectionExecutionResultAt(2).Events()
+				for _, e := range events {
+					if string(e.Type) == depositedEvent {
 						deposits = append(deposits, e)
 					}
-					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensWithdrawn", fvm.FlowTokenAddress(chain)) {
+					if string(e.Type) == withdrawnEvent {
 						withdraws = append(withdraws, e)
 					}
 				}
 
-				require.Len(t, deposits, 2)
+				require.Len(t, deposits, 1)
 				require.Len(t, withdraws, 2)
 			},
 		},
@@ -371,18 +431,22 @@ func TestTransactionFeeDeduction(t *testing.T) {
 			fundWith:      fundingAmount,
 			tryToTransfer: 2 * fundingAmount,
 			checkResult: func(t *testing.T, cr *execution.ComputationResult) {
-				require.Empty(t, cr.TransactionResults[0].ErrorMessage)
-				require.Empty(t, cr.TransactionResults[1].ErrorMessage)
-				require.Contains(t, cr.TransactionResults[2].ErrorMessage, "Error Code: 1101")
+				txResults := cr.AllTransactionResults()
+
+				require.Empty(t, txResults[0].ErrorMessage)
+				require.Empty(t, txResults[1].ErrorMessage)
+				require.Contains(t, txResults[2].ErrorMessage, "Error Code: 1101")
 
 				var deposits []flow.Event
 				var withdraws []flow.Event
 
-				for _, e := range cr.Events[2] {
-					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensDeposited", fvm.FlowTokenAddress(chain)) {
+				// events of the last collection
+				events := cr.CollectionExecutionResultAt(2).Events()
+				for _, e := range events {
+					if string(e.Type) == depositedEvent {
 						deposits = append(deposits, e)
 					}
-					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensWithdrawn", fvm.FlowTokenAddress(chain)) {
+					if string(e.Type) == withdrawnEvent {
 						withdraws = append(withdraws, e)
 					}
 				}
@@ -399,23 +463,27 @@ func TestTransactionFeeDeduction(t *testing.T) {
 			fundWith:      fundingAmount,
 			tryToTransfer: 0,
 			checkResult: func(t *testing.T, cr *execution.ComputationResult) {
-				require.Empty(t, cr.TransactionResults[0].ErrorMessage)
-				require.Empty(t, cr.TransactionResults[1].ErrorMessage)
-				require.Empty(t, cr.TransactionResults[2].ErrorMessage)
+				txResults := cr.AllTransactionResults()
+
+				require.Empty(t, txResults[0].ErrorMessage)
+				require.Empty(t, txResults[1].ErrorMessage)
+				require.Empty(t, txResults[2].ErrorMessage)
 
 				var deposits []flow.Event
 				var withdraws []flow.Event
 
-				for _, e := range cr.Events[2] {
-					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensDeposited", fvm.FlowTokenAddress(chain)) {
+				// events of the last collection
+				events := cr.CollectionExecutionResultAt(2).Events()
+				for _, e := range events {
+					if string(e.Type) == depositedEvent {
 						deposits = append(deposits, e)
 					}
-					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensWithdrawn", fvm.FlowTokenAddress(chain)) {
+					if string(e.Type) == withdrawnEvent {
 						withdraws = append(withdraws, e)
 					}
 				}
 
-				require.Len(t, deposits, 2)
+				require.Len(t, deposits, 1)
 				require.Len(t, withdraws, 2)
 			},
 		},
@@ -424,23 +492,27 @@ func TestTransactionFeeDeduction(t *testing.T) {
 			fundWith:      txFees + transferAmount,
 			tryToTransfer: transferAmount,
 			checkResult: func(t *testing.T, cr *execution.ComputationResult) {
-				require.Empty(t, cr.TransactionResults[0].ErrorMessage)
-				require.Empty(t, cr.TransactionResults[1].ErrorMessage)
-				require.Empty(t, cr.TransactionResults[2].ErrorMessage)
+				txResults := cr.AllTransactionResults()
+
+				require.Empty(t, txResults[0].ErrorMessage)
+				require.Empty(t, txResults[1].ErrorMessage)
+				require.Empty(t, txResults[2].ErrorMessage)
 
 				var deposits []flow.Event
 				var withdraws []flow.Event
 
-				for _, e := range cr.Events[2] {
-					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensDeposited", fvm.FlowTokenAddress(chain)) {
+				// events of the last collection
+				events := cr.CollectionExecutionResultAt(2).Events()
+				for _, e := range events {
+					if string(e.Type) == depositedEvent {
 						deposits = append(deposits, e)
 					}
-					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensWithdrawn", fvm.FlowTokenAddress(chain)) {
+					if string(e.Type) == withdrawnEvent {
 						withdraws = append(withdraws, e)
 					}
 				}
 
-				require.Len(t, deposits, 2)
+				require.Len(t, deposits, 1)
 				require.Len(t, withdraws, 2)
 			},
 		},
@@ -449,18 +521,22 @@ func TestTransactionFeeDeduction(t *testing.T) {
 			fundWith:      fundingAmount,
 			tryToTransfer: 2 * fundingAmount,
 			checkResult: func(t *testing.T, cr *execution.ComputationResult) {
-				require.Empty(t, cr.TransactionResults[0].ErrorMessage)
-				require.Empty(t, cr.TransactionResults[1].ErrorMessage)
-				require.Contains(t, cr.TransactionResults[2].ErrorMessage, "Error Code: 1101")
+				txResults := cr.AllTransactionResults()
+
+				require.Empty(t, txResults[0].ErrorMessage)
+				require.Empty(t, txResults[1].ErrorMessage)
+				require.Contains(t, txResults[2].ErrorMessage, "Error Code: 1101")
 
 				var deposits []flow.Event
 				var withdraws []flow.Event
 
-				for _, e := range cr.Events[2] {
-					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensDeposited", fvm.FlowTokenAddress(chain)) {
+				// events of the last collection
+				events := cr.CollectionExecutionResultAt(2).Events()
+				for _, e := range events {
+					if string(e.Type) == depositedEvent {
 						deposits = append(deposits, e)
 					}
-					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensWithdrawn", fvm.FlowTokenAddress(chain)) {
+					if string(e.Type) == withdrawnEvent {
 						withdraws = append(withdraws, e)
 					}
 				}
@@ -474,18 +550,22 @@ func TestTransactionFeeDeduction(t *testing.T) {
 			fundWith:      0,
 			tryToTransfer: 0,
 			checkResult: func(t *testing.T, cr *execution.ComputationResult) {
-				require.Empty(t, cr.TransactionResults[0].ErrorMessage)
-				require.Empty(t, cr.TransactionResults[1].ErrorMessage)
-				require.Contains(t, cr.TransactionResults[2].ErrorMessage, "Error Code: 1103")
+				txResults := cr.AllTransactionResults()
+
+				require.Empty(t, txResults[0].ErrorMessage)
+				require.Empty(t, txResults[1].ErrorMessage)
+				require.Contains(t, txResults[2].ErrorMessage, errors.ErrCodeStorageCapacityExceeded.String())
 
 				var deposits []flow.Event
 				var withdraws []flow.Event
 
-				for _, e := range cr.Events[2] {
-					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensDeposited", fvm.FlowTokenAddress(chain)) {
+				// events of the last collection
+				events := cr.CollectionExecutionResultAt(2).Events()
+				for _, e := range events {
+					if string(e.Type) == depositedEvent {
 						deposits = append(deposits, e)
 					}
-					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensWithdrawn", fvm.FlowTokenAddress(chain)) {
+					if string(e.Type) == withdrawnEvent {
 						withdraws = append(withdraws, e)
 					}
 				}
@@ -512,12 +592,12 @@ func TestTransactionFeeDeduction(t *testing.T) {
 							transaction(amount: UFix64, to: Address) {
 							
 								// The Vault resource that holds the tokens that are being transferred
-								let sentVault: @FungibleToken.Vault
+								let sentVault: @{FungibleToken.Vault}
 							
-								prepare(signer: AuthAccount) {
+								prepare(signer: auth(BorrowValue) &Account) {
 							
 									// Get a reference to the signer's stored vault
-									let vaultRef = signer.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
+									let vaultRef = signer.storage.borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(from: /storage/flowTokenVault)
 										?? panic("Could not borrow reference to the owner's Vault!")
 							
 									// Withdraw tokens from the signer's stored vault
@@ -530,14 +610,13 @@ func TestTransactionFeeDeduction(t *testing.T) {
 									let recipient = getAccount(to)
 							
 									// Get a reference to the recipient's Receiver
-									let receiverRef = recipient.getCapability(/public/flowTokenReceiver)
-										.borrow<&{FungibleToken.Receiver}>()
+									let receiverRef = recipient.capabilities.borrow<&{FungibleToken.Receiver}>(/public/flowTokenReceiver)
 										?? panic("Could not borrow receiver reference to the recipient's Vault")
 							
 									// Deposit the withdrawn tokens in the recipient's receiver
 									receiverRef.deposit(from: <-self.sentVault)
 								}
-							}`, fvm.FungibleTokenAddress(chain), fvm.FlowTokenAddress(chain))),
+							}`, sc.FungibleToken.Address, sc.FlowToken.Address)),
 			)
 	}
 
@@ -549,7 +628,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 			privateKey, createAccountTx := testutil.CreateAccountCreationTransaction(t, chain)
 
 			// this should return the address of newly created account
-			address, err := chain.AddressAtIndex(5)
+			address, err := chain.AddressAtIndex(systemcontracts.LastSystemAccountIndex + 1)
 			require.NoError(t, err)
 
 			err = testutil.SignTransactionAsServiceAccount(createAccountTx, 0, chain)
@@ -632,7 +711,7 @@ func executeBlockAndVerifyWithParameters(t *testing.T,
 	txs [][]*flow.TransactionBody,
 	opts []fvm.Option,
 	bootstrapOpts []fvm.BootstrapProcedureOption) *execution.ComputationResult {
-	vm := fvm.NewVM()
+	vm := fvm.NewVirtualMachine()
 
 	logger := zerolog.Nop()
 
@@ -674,10 +753,7 @@ func executeBlockAndVerifyWithParameters(t *testing.T,
 	ledgerCommiter := committer.NewLedgerViewCommitter(ledger, tracer)
 
 	bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
-	trackerStorage := new(mocktracker.Storage)
-	trackerStorage.On("Update", mock.Anything).Return(func(fn exedatatracker.UpdateFn) error {
-		return fn(func(uint64, ...cid.Cid) error { return nil })
-	})
+	trackerStorage := mocktracker.NewMockStorage()
 
 	prov := exedataprovider.NewProvider(
 		zerolog.Nop(),
@@ -687,21 +763,76 @@ func executeBlockAndVerifyWithParameters(t *testing.T,
 		trackerStorage,
 	)
 
-	blockComputer, err := computer.NewBlockComputer(vm, fvmContext, collector, tracer, logger, ledgerCommiter, prov)
+	// generates signing identity including staking key for signing
+	myIdentity := unittest.IdentityFixture()
+	seed := make([]byte, crypto.KeyGenSeedMinLen)
+	n, err := rand.Read(seed)
+	require.Equal(t, n, crypto.KeyGenSeedMinLen)
 	require.NoError(t, err)
+	sk, err := crypto.GeneratePrivateKey(crypto.BLSBLS12381, seed)
+	require.NoError(t, err)
+	myIdentity.StakingPubKey = sk.PublicKey()
+	me := mocklocal.NewMockLocal(sk, myIdentity.ID(), t)
 
-	view := delta.NewView(state.LedgerGetRegister(ledger, initialCommit))
+	// used by computer to generate the prng used in the service tx
+	stateForRandomSource := testutil.ProtocolStateWithSourceFixture(nil)
+
+	blockComputer, err := computer.NewBlockComputer(
+		vm,
+		fvmContext,
+		collector,
+		tracer,
+		logger,
+		ledgerCommiter,
+		me,
+		prov,
+		nil,
+		stateForRandomSource,
+		testVerifyMaxConcurrency)
+	require.NoError(t, err)
 
 	executableBlock := unittest.ExecutableBlockFromTransactions(chain.ChainID(), txs)
 	executableBlock.StartState = &initialCommit
 
-	computationResult, err := blockComputer.ExecuteBlock(context.Background(), executableBlock, view, programs.NewEmptyPrograms())
-	require.NoError(t, err)
-
 	prevResultId := unittest.IdentifierFixture()
-
-	_, chdps, er, err := execution.GenerateExecutionResultAndChunkDataPacks(prevResultId, initialCommit, computationResult)
+	computationResult, err := blockComputer.ExecuteBlock(
+		context.Background(),
+		prevResultId,
+		executableBlock,
+		state.NewLedgerStorageSnapshot(
+			ledger,
+			initialCommit),
+		derived.NewEmptyDerivedBlockData(0))
 	require.NoError(t, err)
+
+	spockHasher := utils.NewSPOCKHasher()
+
+	for i := 0; i < computationResult.BlockExecutionResult.Size(); i++ {
+		res := computationResult.CollectionExecutionResultAt(i)
+		snapshot := res.ExecutionSnapshot()
+		valid, err := crypto.SPOCKVerifyAgainstData(
+			myIdentity.StakingPubKey,
+			computationResult.Spocks[i],
+			snapshot.SpockSecret,
+			spockHasher)
+		require.NoError(t, err)
+		require.True(t, valid)
+	}
+
+	receipt := computationResult.ExecutionReceipt
+	receiptID := receipt.ID()
+	valid, err := myIdentity.StakingPubKey.Verify(
+		receipt.ExecutorSignature,
+		receiptID[:],
+		utils.NewExecutionReceiptHasher())
+
+	require.NoError(t, err)
+	require.True(t, valid)
+
+	chdps := computationResult.AllChunkDataPacks()
+	require.Equal(t, len(chdps), len(receipt.Spocks))
+
+	er := &computationResult.ExecutionResult
 
 	verifier := chunks.NewChunkVerifier(vm, fvmContext, logger)
 
@@ -720,20 +851,17 @@ func executeBlockAndVerifyWithParameters(t *testing.T,
 			ChunkDataPack:     chdps[i],
 			EndState:          chunk.EndState,
 			TransactionOffset: offsetForChunk,
+			// returns the same RandomSource used by the computer
+			Snapshot: stateForRandomSource.AtBlockID(chunk.BlockID),
 		}
 	}
 
 	require.Len(t, vcds, len(txs)+1) // +1 for system chunk
 
 	for _, vcd := range vcds {
-		var fault chmodels.ChunkFault
-		if vcd.IsSystemChunk {
-			_, fault, err = verifier.SystemChunkVerify(vcd)
-		} else {
-			_, fault, err = verifier.Verify(vcd)
-		}
+		spockSecret, err := verifier.Verify(vcd)
 		assert.NoError(t, err)
-		assert.Nil(t, fault)
+		assert.NotNil(t, spockSecret)
 	}
 
 	return computationResult

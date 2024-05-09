@@ -4,13 +4,14 @@ package bootstrap
 import (
 	"encoding/json"
 	"fmt"
-	"sort"
 	"strings"
+
+	"github.com/onflow/crypto"
+	"golang.org/x/exp/slices"
 
 	sdk "github.com/onflow/flow-go-sdk"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -176,6 +177,18 @@ type decodableNodeInfoPub struct {
 	Stake uint64
 }
 
+func (info *NodeInfoPub) Equals(other *NodeInfoPub) bool {
+	if other == nil {
+		return false
+	}
+	return info.Address == other.Address &&
+		info.NodeID == other.NodeID &&
+		info.Role == other.Role &&
+		info.Weight == other.Weight &&
+		info.NetworkPubKey.PublicKey.Equals(other.NetworkPubKey.PublicKey) &&
+		info.StakingPubKey.PublicKey.Equals(other.StakingPubKey.PublicKey)
+}
+
 func (info *NodeInfoPub) UnmarshalJSON(b []byte) error {
 	var decodable decodableNodeInfoPub
 	err := json.Unmarshal(b, &decodable)
@@ -267,7 +280,7 @@ func NewPrivateNodeInfo(
 ) (NodeInfo, error) {
 	pop, err := crypto.BLSGeneratePOP(stakingKey)
 	if err != nil {
-		return NodeInfo{}, fmt.Errorf("failed to generate node info: %w", err)
+		return NodeInfo{}, fmt.Errorf("failed to generate PoP: %w", err)
 	}
 
 	return NodeInfo{
@@ -382,12 +395,17 @@ func (node NodeInfo) PartnerPublic() (PartnerNodeInfoPub, error) {
 // Identity returns the node info as a public Flow identity.
 func (node NodeInfo) Identity() *flow.Identity {
 	identity := &flow.Identity{
-		NodeID:        node.NodeID,
-		Address:       node.Address,
-		Role:          node.Role,
-		Weight:        node.Weight,
-		StakingPubKey: node.StakingPubKey(),
-		NetworkPubKey: node.NetworkPubKey(),
+		IdentitySkeleton: flow.IdentitySkeleton{
+			NodeID:        node.NodeID,
+			Address:       node.Address,
+			Role:          node.Role,
+			InitialWeight: node.Weight,
+			StakingPubKey: node.stakingPubKey,
+			NetworkPubKey: node.networkPubKey,
+		},
+		DynamicIdentity: flow.DynamicIdentity{
+			EpochParticipationStatus: flow.EpochParticipationStatusActive,
+		},
 	}
 	return identity
 }
@@ -399,7 +417,7 @@ func PrivateNodeInfoFromIdentity(identity *flow.Identity, networkKey, stakingKey
 		identity.NodeID,
 		identity.Role,
 		identity.Address,
-		identity.Weight,
+		identity.InitialWeight,
 		networkKey,
 		stakingKey,
 	)
@@ -417,11 +435,13 @@ func FilterByRole(nodes []NodeInfo, role flow.Role) []NodeInfo {
 }
 
 // Sort sorts the NodeInfo list using the given ordering.
-func Sort(nodes []NodeInfo, order flow.IdentityOrder) []NodeInfo {
+//
+// The sorted list is returned and the original list is untouched.
+func Sort(nodes []NodeInfo, order flow.IdentityOrder[flow.Identity]) []NodeInfo {
 	dup := make([]NodeInfo, len(nodes))
 	copy(dup, nodes)
-	sort.Slice(dup, func(i, j int) bool {
-		return order(dup[i].Identity(), dup[j].Identity())
+	slices.SortFunc(dup, func(i, j NodeInfo) int {
+		return order(i.Identity(), j.Identity())
 	})
 	return dup
 }

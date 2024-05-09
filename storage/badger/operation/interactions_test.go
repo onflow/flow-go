@@ -1,5 +1,3 @@
-// (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
-
 package operation
 
 import (
@@ -9,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/engine/execution/state/delta"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -17,41 +15,46 @@ import (
 func TestStateInteractionsInsertCheckRetrieve(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 
-		d1 := delta.NewView(func(owner, key string) (value flow.RegisterValue, err error) {
-			return nil, nil
-		})
+		id1 := flow.NewRegisterID(
+			flow.BytesToAddress([]byte("\x89krg\u007fBN\x1d\xf5\xfb\xb8r\xbc4\xbd\x98ռ\xf1\xd0twU\xbf\x16N\xb4?,\xa0&;")),
+			"")
+		id2 := flow.NewRegisterID(flow.BytesToAddress([]byte{2}), "")
+		id3 := flow.NewRegisterID(flow.BytesToAddress([]byte{3}), "")
 
-		d2 := delta.NewView(func(owner, key string) (value flow.RegisterValue, err error) {
-			return nil, nil
-		})
+		executionSnapshot := &snapshot.ExecutionSnapshot{
+			ReadSet: map[flow.RegisterID]struct{}{
+				id2: {},
+				id3: {},
+			},
+			WriteSet: map[flow.RegisterID]flow.RegisterValue{
+				id1: []byte("zażółć gęślą jaźń"),
+				id2: []byte("c"),
+			},
+		}
 
-		// some set and reads
-		err := d1.Set(string([]byte("\x89krg\u007fBN\x1d\xf5\xfb\xb8r\xbc4\xbd\x98ռ\xf1\xd0twU\xbf\x16N\xb4?,\xa0&;")), "", []byte("zażółć gęślą jaźń"))
-		require.NoError(t, err)
-		err = d1.Set(string([]byte{2}), "", []byte("b"))
-		require.NoError(t, err)
-		err = d1.Set(string([]byte{2}), "", []byte("c"))
-		require.NoError(t, err)
-
-		_, err = d1.Get(string([]byte{2}), "")
-		require.NoError(t, err)
-		_, err = d1.Get(string([]byte{3}), "")
-		require.NoError(t, err)
-
-		interactions := []*delta.Snapshot{&d1.Interactions().Snapshot, &d2.Interactions().Snapshot}
+		interactions := []*snapshot.ExecutionSnapshot{
+			executionSnapshot,
+			{},
+		}
 
 		blockID := unittest.IdentifierFixture()
 
-		err = db.Update(InsertExecutionStateInteractions(blockID, interactions))
+		err := db.Update(InsertExecutionStateInteractions(blockID, interactions))
 		require.Nil(t, err)
 
-		var readInteractions []*delta.Snapshot
+		var readInteractions []*snapshot.ExecutionSnapshot
 
 		err = db.View(RetrieveExecutionStateInteractions(blockID, &readInteractions))
 		require.NoError(t, err)
 
 		assert.Equal(t, interactions, readInteractions)
-
-		assert.Equal(t, d1.Delta(), d1.Interactions().Delta)
+		assert.Equal(
+			t,
+			executionSnapshot.WriteSet,
+			readInteractions[0].WriteSet)
+		assert.Equal(
+			t,
+			executionSnapshot.ReadSet,
+			readInteractions[0].ReadSet)
 	})
 }

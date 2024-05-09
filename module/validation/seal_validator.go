@@ -3,7 +3,8 @@ package validation
 import (
 	"fmt"
 
-	"github.com/onflow/flow-go/crypto/hash"
+	"github.com/onflow/crypto/hash"
+
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -178,7 +179,7 @@ func (s *sealValidator) Validate(candidate *flow.Block) (*flow.Seal, error) {
 	}
 
 	// We do _not_ add the results from the candidate block's own payload to incorporatedResults.
-	// That's because a result requires to be added to a bock first in order to determine
+	// That's because a result requires to be added to a block first in order to determine
 	// its chunk assignment for verification. Therefore a seal can only be added in the
 	// next block or after. In other words, a receipt and its seal can't be the same block.
 

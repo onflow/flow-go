@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math/rand"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -25,11 +24,28 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/logging"
+	"github.com/onflow/flow-go/utils/rand"
 )
 
 type ProviderEngine interface {
 	network.MessageProcessor
-	BroadcastExecutionReceipt(context.Context, *flow.ExecutionReceipt) error
+	module.ReadyDoneAware
+	// BroadcastExecutionReceipt broadcasts an execution receipt to all nodes in the network.
+	// It skips broadcasting the receipt if the block is sealed, or the node is not authorized at the block.
+	// It returns true if the receipt is broadcasted, false otherwise.
+	BroadcastExecutionReceipt(context.Context, uint64, *flow.ExecutionReceipt) (bool, error)
+}
+
+type NoopEngine struct {
+	module.NoopReadyDoneAware
+}
+
+func (*NoopEngine) Process(channel channels.Channel, originID flow.Identifier, message interface{}) error {
+	return nil
+}
+
+func (*NoopEngine) BroadcastExecutionReceipt(context.Context, uint64, *flow.ExecutionReceipt) (bool, error) {
+	return false, nil
 }
 
 const (
@@ -42,6 +58,8 @@ const (
 	// node.
 	DefaultChunkDataPackDeliveryTimeout = 10 * time.Second
 )
+
+var _ ProviderEngine = (*Engine)(nil)
 
 // An Engine provides means of accessing data about execution state and broadcasts execution receipts to nodes in the network.
 // Also generates and saves execution receipts
@@ -58,7 +76,7 @@ type Engine struct {
 	metrics                module.ExecutionMetrics
 	checkAuthorizedAtBlock func(blockID flow.Identifier) (bool, error)
 	chdpRequestHandler     *engine.MessageHandler
-	chdpRequestQueue       mempool.ChunkDataPackMessageStore
+	chdpRequestQueue       engine.MessageStore
 
 	// buffered channel for ChunkDataRequest workers to pick
 	// requests and process.
@@ -73,12 +91,12 @@ type Engine struct {
 func New(
 	logger zerolog.Logger,
 	tracer module.Tracer,
-	net network.Network,
+	net network.EngineRegistry,
 	state protocol.State,
 	execState state.ReadOnlyExecutionState,
 	metrics module.ExecutionMetrics,
 	checkAuthorizedAtBlock func(blockID flow.Identifier) (bool, error),
-	chunkDataPackRequestQueue mempool.ChunkDataPackMessageStore,
+	chunkDataPackRequestQueue engine.MessageStore,
 	chdpRequestWorkers uint,
 	chunkDataPackQueryTimeout time.Duration,
 	chunkDataPackDeliveryTimeout time.Duration,
@@ -166,7 +184,7 @@ func (e *Engine) processQueuedChunkDataPackRequestsShovelerWorker(ctx irrecovera
 		select {
 		case <-e.chdpRequestHandler.GetNotifier():
 			// there is at list a single chunk data pack request queued up.
-			e.shovelChunkDataPackRequests()
+			e.processAvailableMesssages(ctx)
 		case <-ctx.Done():
 			// close the internal channel, the workers will drain the channel before exiting
 			close(e.chdpRequestChannel)
@@ -176,20 +194,33 @@ func (e *Engine) processQueuedChunkDataPackRequestsShovelerWorker(ctx irrecovera
 	}
 }
 
-// shovelChunkDataPackRequests is a blocking method that reads all queued ChunkDataRequests till the queue gets empty.
+// processAvailableMesssages is a blocking method that reads all queued ChunkDataRequests till the queue gets empty.
 // Each ChunkDataRequest is processed by a single concurrent worker. However, there are limited number of such workers.
 // If there is no worker available for a request, the method blocks till one is available.
-func (e *Engine) shovelChunkDataPackRequests() {
+func (e *Engine) processAvailableMesssages(ctx irrecoverable.SignalerContext) {
 	for {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
+
 		msg, ok := e.chdpRequestQueue.Get()
 		if !ok {
 			// no more requests, return
 			return
 		}
 
+		chunkId, ok := msg.Payload.(flow.Identifier)
+		if !ok {
+			// should never happen.
+			// if it does happen, it means there is a bug in the queue implementation.
+			ctx.Throw(fmt.Errorf("invalid chunk id type in chunk data pack request queue: %T", msg.Payload))
+		}
+
 		request := &mempool.ChunkDataPackRequest{
 			RequesterId: msg.OriginID,
-			ChunkId:     msg.Payload.(flow.Identifier),
+			ChunkId:     chunkId,
 		}
 		lg := e.log.With().
 			Hex("chunk_id", logging.ID(request.ChunkId)).
@@ -253,6 +284,10 @@ func (e *Engine) onChunkDataRequest(request *mempool.ChunkDataPackRequest) {
 		Logger()
 	lg.Info().Msg("started processing chunk data pack request")
 
+	// TODO(ramtin): we might add a future logic to do extra checks on the origin of the request
+	// currently the networking layer checks that the requested is a valid node operator
+	// that has not been ejected.
+
 	// increases collector metric
 	e.metrics.ChunkDataPackRequestProcessed()
 	chunkDataPack, err := e.execState.ChunkDataPackByChunkID(request.ChunkId)
@@ -280,14 +315,6 @@ func (e *Engine) onChunkDataRequest(request *mempool.ChunkDataPackRequest) {
 			Msg("chunk data pack query takes longer than expected timeout")
 	}
 
-	_, err = e.ensureAuthorized(chunkDataPack.ChunkID, request.RequesterId)
-	if err != nil {
-		lg.Error().
-			Err(err).
-			Msg("could not verify authorization of identity of chunk data pack request")
-		return
-	}
-
 	e.deliverChunkDataResponse(chunkDataPack, request.RequesterId)
 }
 
@@ -302,12 +329,24 @@ func (e *Engine) deliverChunkDataResponse(chunkDataPack *flow.ChunkDataPack, req
 	// sends requested chunk data pack to the requester
 	deliveryStartTime := time.Now()
 
-	response := &messages.ChunkDataResponse{
-		ChunkDataPack: *chunkDataPack,
-		Nonce:         rand.Uint64(),
+	nonce, err := rand.Uint64()
+	if err != nil {
+		// TODO: this error should be returned by deliverChunkDataResponse
+		// it is logged for now since the only error possible is related to a failure
+		// of the system entropy generation. Such error is going to cause failures in other
+		// components where it's handled properly and will lead to crashing the module.
+		lg.Error().
+			Err(err).
+			Msg("could not generate nonce for chunk data response")
+		return
 	}
 
-	err := e.chunksConduit.Unicast(response, requesterId)
+	response := &messages.ChunkDataResponse{
+		ChunkDataPack: *chunkDataPack,
+		Nonce:         nonce,
+	}
+
+	err = e.chunksConduit.Unicast(response, requesterId)
 	if err != nil {
 		lg.Warn().
 			Err(err).
@@ -333,40 +372,36 @@ func (e *Engine) deliverChunkDataResponse(chunkDataPack *flow.ChunkDataPack, req
 	lg.Info().Msg("chunk data pack request successfully replied")
 }
 
-func (e *Engine) ensureAuthorized(chunkID flow.Identifier, originID flow.Identifier) (*flow.Identity, error) {
-	blockID, err := e.execState.GetBlockIDByChunkID(chunkID)
+// BroadcastExecutionReceipt broadcasts an execution receipt to all nodes in the network.
+// It skips broadcasting the receipt if the block is sealed, or the node is not authorized at the block.
+// It returns true if the receipt is broadcasted, false otherwise.
+func (e *Engine) BroadcastExecutionReceipt(ctx context.Context, height uint64, receipt *flow.ExecutionReceipt) (bool, error) {
+	// if the receipt is for a sealed block, then no need to broadcast it.
+	lastSealed, err := e.state.Sealed().Head()
 	if err != nil {
-		return nil, engine.NewInvalidInputErrorf("cannot find blockID corresponding to chunk data pack: %w", err)
+		return false, fmt.Errorf("could not get sealed block before broadcasting: %w", err)
 	}
 
-	authorizedAt, err := e.checkAuthorizedAtBlock(blockID)
+	isExecutedBlockSealed := height <= lastSealed.Height
+
+	if isExecutedBlockSealed {
+		// no need to braodcast the receipt if the block is sealed
+		return false, nil
+	}
+
+	blockID := receipt.ExecutionResult.BlockID
+	authorizedAtBlock, err := e.checkAuthorizedAtBlock(blockID)
 	if err != nil {
-		return nil, engine.NewInvalidInputErrorf("cannot check block staking status: %w", err)
-	}
-	if !authorizedAt {
-		return nil, engine.NewInvalidInputErrorf("this node is not authorized at the block (%s) corresponding to chunk data pack (%s)", blockID.String(), chunkID.String())
+		return false, fmt.Errorf("could not check staking status: %w", err)
 	}
 
-	origin, err := e.state.AtBlockID(blockID).Identity(originID)
-	if err != nil {
-		return nil, engine.NewInvalidInputErrorf("invalid origin id (%s): %w", origin, err)
+	if !authorizedAtBlock {
+		return false, nil
 	}
 
-	// only verifier nodes are allowed to request chunk data packs
-	if origin.Role != flow.RoleVerification {
-		return nil, engine.NewInvalidInputErrorf("invalid role for receiving collection: %s", origin.Role)
-	}
-
-	if origin.Weight == 0 {
-		return nil, engine.NewInvalidInputErrorf("node %s has zero weight at the block (%s) corresponding to chunk data pack (%s)", originID, blockID.String(), chunkID.String())
-	}
-	return origin, nil
-}
-
-func (e *Engine) BroadcastExecutionReceipt(ctx context.Context, receipt *flow.ExecutionReceipt) error {
 	finalState, err := receipt.ExecutionResult.FinalStateCommitment()
 	if err != nil {
-		return fmt.Errorf("could not get final state: %w", err)
+		return false, fmt.Errorf("could not get final state: %w", err)
 	}
 
 	span, _ := e.tracer.StartSpanFromContext(ctx, trace.EXEBroadcastExecutionReceipt)
@@ -378,16 +413,16 @@ func (e *Engine) BroadcastExecutionReceipt(ctx context.Context, receipt *flow.Ex
 		Hex("final_state", finalState[:]).
 		Msg("broadcasting execution receipt")
 
-	identities, err := e.state.Final().Identities(filter.HasRole(flow.RoleAccess, flow.RoleConsensus,
+	identities, err := e.state.Final().Identities(filter.HasRole[flow.Identity](flow.RoleAccess, flow.RoleConsensus,
 		flow.RoleVerification))
 	if err != nil {
-		return fmt.Errorf("could not get consensus and verification identities: %w", err)
+		return false, fmt.Errorf("could not get consensus and verification identities: %w", err)
 	}
 
 	err = e.receiptCon.Publish(receipt, identities.NodeIDs()...)
 	if err != nil {
-		return fmt.Errorf("could not submit execution receipts: %w", err)
+		return false, fmt.Errorf("could not submit execution receipts: %w", err)
 	}
 
-	return nil
+	return true, nil
 }

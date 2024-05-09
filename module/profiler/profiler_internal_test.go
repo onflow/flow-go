@@ -17,7 +17,15 @@ func TestGoHeapProfile(t *testing.T) {
 	t.Parallel()
 	t.Run("goHeapProfile", func(t *testing.T) {
 		unittest.RunWithTempDir(t, func(tempDir string) {
-			p, err := New(zerolog.Nop(), &NoopUploader{}, tempDir, time.Millisecond*100, time.Millisecond*100, false)
+			p, err := New(
+				zerolog.Nop(),
+				&NoopUploader{},
+				ProfilerConfig{
+					Enabled:  false,
+					Dir:      tempDir,
+					Interval: 100 * time.Millisecond,
+					Duration: 100 * time.Millisecond,
+				})
 			require.NoError(t, err)
 			unittest.AssertClosesBefore(t, p.Ready(), 5*time.Second)
 			t.Logf("profiler ready %s", tempDir)
@@ -43,7 +51,15 @@ func TestGoAllocsProfile(t *testing.T) {
 	t.Parallel()
 	t.Run("pprofAllocs", func(t *testing.T) {
 		unittest.RunWithTempDir(t, func(tempDir string) {
-			p, err := New(zerolog.Nop(), &NoopUploader{}, tempDir, time.Hour, time.Second*1, false)
+			p, err := New(
+				zerolog.Nop(),
+				&NoopUploader{},
+				ProfilerConfig{
+					Enabled:  false,
+					Dir:      tempDir,
+					Interval: time.Hour,
+					Duration: time.Second,
+				})
 			require.NoError(t, err)
 			unittest.AssertClosesBefore(t, p.Ready(), 5*time.Second)
 			t.Logf("profiler ready %s", tempDir)
@@ -60,7 +76,7 @@ func TestGoAllocsProfile(t *testing.T) {
 			}()
 
 			buf := &bytes.Buffer{}
-			err = p.pprofAllocs(buf)
+			err = p.pprofAllocs(buf, time.Second*1)
 			require.NoError(t, err)
 
 			prof, err := profile.Parse(buf)

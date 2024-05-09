@@ -7,10 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ipfs/go-cid"
+	blockstore "github.com/ipfs/boxo/blockstore"
 	"github.com/ipfs/go-datastore"
 	dssync "github.com/ipfs/go-datastore/sync"
-	blockstore "github.com/ipfs/go-ipfs-blockstore"
 	"github.com/onflow/cadence/runtime"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
@@ -18,16 +17,14 @@ import (
 
 	"github.com/onflow/flow-go/engine/execution/computation/committer"
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
-	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/fvm/programs"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
-	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage/derived"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	exedataprovider "github.com/onflow/flow-go/module/executiondatasync/provider"
-	"github.com/onflow/flow-go/module/executiondatasync/tracker"
 	mocktracker "github.com/onflow/flow-go/module/executiondatasync/tracker/mock"
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/module/metrics"
@@ -47,11 +44,23 @@ type testAccounts struct {
 	seq      uint64
 }
 
-func createAccounts(b *testing.B, vm *fvm.VirtualMachine, ledger state.View, num int) *testAccounts {
+func createAccounts(
+	b *testing.B,
+	vm fvm.VM,
+	snapshotTree snapshot.SnapshotTree,
+	num int,
+) (
+	snapshot.SnapshotTree,
+	*testAccounts,
+) {
 	privateKeys, err := testutil.GenerateAccountPrivateKeys(num)
 	require.NoError(b, err)
 
-	addresses, err := testutil.CreateAccounts(vm, ledger, programs.NewEmptyPrograms(), privateKeys, chain)
+	snapshotTree, addresses, err := testutil.CreateAccounts(
+		vm,
+		snapshotTree,
+		privateKeys,
+		chain)
 	require.NoError(b, err)
 
 	accs := &testAccounts{
@@ -63,44 +72,97 @@ func createAccounts(b *testing.B, vm *fvm.VirtualMachine, ledger state.View, num
 			privateKey: privateKeys[i],
 		}
 	}
-	return accs
+	return snapshotTree, accs
 }
 
-func mustFundAccounts(b *testing.B, vm *fvm.VirtualMachine, ledger state.View, execCtx fvm.Context, accs *testAccounts) {
+func mustFundAccounts(
+	b *testing.B,
+	vm fvm.VM,
+	snapshotTree snapshot.SnapshotTree,
+	execCtx fvm.Context,
+	accs *testAccounts,
+) snapshot.SnapshotTree {
 	var err error
-	for i, acc := range accs.accounts {
+	for _, acc := range accs.accounts {
 		transferTx := testutil.CreateTokenTransferTransaction(chain, 1_000_000, acc.address, chain.ServiceAddress())
 		err = testutil.SignTransactionAsServiceAccount(transferTx, accs.seq, chain)
 		require.NoError(b, err)
 		accs.seq++
 
-		tx := fvm.Transaction(transferTx, uint32(i))
-		err = vm.RunV2(execCtx, tx, ledger)
+		executionSnapshot, output, err := vm.Run(
+			execCtx,
+			fvm.Transaction(transferTx, 0),
+			snapshotTree)
 		require.NoError(b, err)
-		require.NoError(b, tx.Err)
+		require.NoError(b, output.Err)
+		snapshotTree = snapshotTree.Append(executionSnapshot)
 	}
+
+	return snapshotTree
 }
 
 func BenchmarkComputeBlock(b *testing.B) {
 	b.StopTimer()
+	b.SetParallelism(1)
 
+	type benchmarkCase struct {
+		numCollections               int
+		numTransactionsPerCollection int
+		maxConcurrency               int
+	}
+
+	for _, benchCase := range []benchmarkCase{
+		{
+			numCollections:               16,
+			numTransactionsPerCollection: 128,
+			maxConcurrency:               1,
+		},
+		{
+			numCollections:               16,
+			numTransactionsPerCollection: 128,
+			maxConcurrency:               2,
+		},
+	} {
+		b.Run(
+			fmt.Sprintf(
+				"%d/cols/%d/txes/%d/max-concurrency",
+				benchCase.numCollections,
+				benchCase.numTransactionsPerCollection,
+				benchCase.maxConcurrency),
+			func(b *testing.B) {
+				benchmarkComputeBlock(
+					b,
+					benchCase.numCollections,
+					benchCase.numTransactionsPerCollection,
+					benchCase.maxConcurrency)
+			})
+	}
+}
+
+func benchmarkComputeBlock(
+	b *testing.B,
+	numCollections int,
+	numTransactionsPerCollection int,
+	maxConcurrency int,
+) {
 	tracer, err := trace.NewTracer(zerolog.Nop(), "", "", 4)
 	require.NoError(b, err)
 
-	vm := fvm.NewVM()
+	vm := fvm.NewVirtualMachine()
 
-	chain := flow.Emulator.Chain()
+	const chainID = flow.Emulator
 	execCtx := fvm.NewContext(
-		fvm.WithChain(chain),
+		fvm.WithChain(chainID.Chain()),
 		fvm.WithAccountStorageLimit(true),
 		fvm.WithTransactionFeesEnabled(true),
 		fvm.WithTracer(tracer),
 		fvm.WithReusableCadenceRuntimePool(
 			reusableRuntime.NewReusableCadenceRuntimePool(
 				ReusableCadenceRuntimePoolSize,
-				runtime.Config{})),
+				runtime.Config{},
+			)),
 	)
-	ledger := testutil.RootBootstrappedLedger(
+	snapshotTree := testutil.RootBootstrappedLedger(
 		vm,
 		execCtx,
 		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
@@ -108,17 +170,17 @@ func BenchmarkComputeBlock(b *testing.B) {
 		fvm.WithTransactionFee(fvm.DefaultTransactionFees),
 		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
 	)
-	accs := createAccounts(b, vm, ledger, 1000)
-	mustFundAccounts(b, vm, ledger, execCtx, accs)
+	snapshotTree, accs := createAccounts(b, vm, snapshotTree, 1000)
+	snapshotTree = mustFundAccounts(b, vm, snapshotTree, execCtx, accs)
 
 	me := new(module.Local)
 	me.On("NodeID").Return(flow.ZeroID)
+	me.On("Sign", mock.Anything, mock.Anything).Return(nil, nil)
+	me.On("SignFunc", mock.Anything, mock.Anything, mock.Anything).
+		Return(nil, nil)
 
 	bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
-	trackerStorage := new(mocktracker.Storage)
-	trackerStorage.On("Update", mock.Anything).Return(func(fn tracker.UpdateFn) error {
-		return fn(func(uint64, ...cid.Cid) error { return nil })
-	})
+	trackerStorage := mocktracker.NewMockStorage()
 
 	prov := exedataprovider.NewProvider(
 		zerolog.Nop(),
@@ -129,61 +191,72 @@ func BenchmarkComputeBlock(b *testing.B) {
 	)
 
 	// TODO(rbtz): add real ledger
-	blockComputer, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), tracer, zerolog.Nop(), committer.NewNoopViewCommitter(), prov)
+	blockComputer, err := computer.NewBlockComputer(
+		vm,
+		execCtx,
+		metrics.NewNoopCollector(),
+		tracer,
+		zerolog.Nop(),
+		committer.NewNoopViewCommitter(),
+		me,
+		prov,
+		nil,
+		testutil.ProtocolStateWithSourceFixture(nil),
+		maxConcurrency)
 	require.NoError(b, err)
 
-	programsCache, err := NewProgramsCache(1000)
+	derivedChainData, err := derived.NewDerivedChainData(
+		derived.DefaultDerivedDataCacheSize)
 	require.NoError(b, err)
 
 	engine := &Manager{
-		blockComputer: blockComputer,
-		tracer:        tracer,
-		me:            me,
-		programsCache: programsCache,
+		blockComputer:    blockComputer,
+		derivedChainData: derivedChainData,
 	}
-
-	view := delta.NewView(ledger.Get)
-	blockView := view.NewChild()
-
-	b.SetParallelism(1)
 
 	parentBlock := &flow.Block{
 		Header:  &flow.Header{},
 		Payload: &flow.Payload{},
 	}
 
-	const (
-		cols = 16
-		txes = 128
-	)
+	b.StopTimer()
+	b.ResetTimer()
 
-	b.Run(fmt.Sprintf("%d/cols/%d/txes", cols, txes), func(b *testing.B) {
+	var elapsed time.Duration
+	for i := 0; i < b.N; i++ {
+		executableBlock := createBlock(
+			b,
+			parentBlock,
+			accs,
+			numCollections,
+			numTransactionsPerCollection)
+		parentBlock = executableBlock.Block
+
+		b.StartTimer()
+		start := time.Now()
+		res, err := engine.ComputeBlock(
+			context.Background(),
+			unittest.IdentifierFixture(),
+			executableBlock,
+			snapshotTree)
+		elapsed += time.Since(start)
 		b.StopTimer()
-		b.ResetTimer()
 
-		var elapsed time.Duration
-		for i := 0; i < b.N; i++ {
-			executableBlock := createBlock(b, parentBlock, accs, cols, txes)
-			parentBlock = executableBlock.Block
-
-			b.StartTimer()
-			start := time.Now()
-			res, err := engine.ComputeBlock(context.Background(), executableBlock, blockView)
-			elapsed += time.Since(start)
-			b.StopTimer()
-
-			require.NoError(b, err)
-			for j, r := range res.TransactionResults {
-				// skip system transactions
-				if j >= cols*txes {
-					break
-				}
-				require.Emptyf(b, r.ErrorMessage, "Transaction %d failed", j)
-			}
+		require.NoError(b, err)
+		for _, snapshot := range res.AllExecutionSnapshots() {
+			snapshotTree = snapshotTree.Append(snapshot)
 		}
-		totalTxes := int64(cols) * int64(txes) * int64(b.N)
-		b.ReportMetric(float64(elapsed.Nanoseconds()/totalTxes/int64(time.Microsecond)), "us/tx")
-	})
+
+		for j, r := range res.AllTransactionResults() {
+			// skip system transactions
+			if j >= numCollections*numTransactionsPerCollection {
+				break
+			}
+			require.Emptyf(b, r.ErrorMessage, "Transaction %d failed", j)
+		}
+	}
+	totalTxes := int64(numCollections) * int64(numTransactionsPerCollection) * int64(b.N)
+	b.ReportMetric(float64(elapsed.Nanoseconds()/totalTxes/int64(time.Microsecond)), "us/tx")
 }
 
 func createBlock(b *testing.B, parentBlock *flow.Block, accs *testAccounts, colNum int, txNum int) *entity.ExecutableBlock {
@@ -234,7 +307,7 @@ func createTokenTransferTransaction(b *testing.B, accs *testAccounts) *flow.Tran
 
 	tx := testutil.CreateTokenTransferTransaction(chain, 1, dst.address, src.address)
 	tx.SetProposalKey(chain.ServiceAddress(), 0, accs.seq).
-		SetGasLimit(1000).
+		SetComputeLimit(1000).
 		SetPayer(chain.ServiceAddress())
 	accs.seq++
 

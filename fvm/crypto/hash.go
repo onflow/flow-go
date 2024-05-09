@@ -4,7 +4,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/onflow/flow-go/crypto/hash"
+	"github.com/onflow/crypto/hash"
+
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -14,7 +15,7 @@ const tagLength = flow.DomainTagLength
 // prefixedHashing embeds a crypto hasher and implements
 // hashing with a prefix : prefixedHashing(data) = hasher(prefix || data)
 //
-// Prefixes are padded tags till 32 bytes to guarantee prefixedHashers are independant
+// Prefixes are padded tags till 32 bytes to guarantee prefixedHashers are independent
 // hashers.
 // Prefixes are disabled with the particular tag value ""
 type prefixedHashing struct {

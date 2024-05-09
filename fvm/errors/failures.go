@@ -1,182 +1,79 @@
 package errors
 
 import (
-	"errors"
-	"fmt"
+	"github.com/onflow/flow-go/module/trace"
 )
 
-// UnknownFailure captures an unknown vm fatal error
-type UnknownFailure struct {
-	err error
-}
-
-// NewUnknownFailure constructs a new UnknownFailure
-func NewUnknownFailure(err error) *UnknownFailure {
-	return &UnknownFailure{err: err}
-}
-
-func (e *UnknownFailure) Error() string {
-	return fmt.Sprintf("%s unknown failure: %s", e.FailureCode().String(), e.err.Error())
-}
-
-// FailureCode returns the failure code
-func (e *UnknownFailure) FailureCode() FailureCode {
-	return FailureCodeUnknownFailure
-}
-
-// Unwrap unwraps the error
-func (e UnknownFailure) Unwrap() error {
-	return e.err
-}
-
-// EncodingFailure captures an fatal error sourced from encoding issues
-type EncodingFailure struct {
-	err error
+func NewUnknownFailure(err error) CodedFailure {
+	return WrapCodedFailure(
+		FailureCodeUnknownFailure,
+		err,
+		"unknown failure")
 }
 
 // NewEncodingFailuref formats and returns a new EncodingFailure
-func NewEncodingFailuref(msg string, err error) *EncodingFailure {
-	return &EncodingFailure{
-		err: fmt.Errorf(msg, err),
-	}
+func NewEncodingFailuref(
+	err error,
+	msg string,
+	args ...interface{},
+) CodedFailure {
+	return WrapCodedFailure(
+		FailureCodeEncodingFailure,
+		err,
+		"encoding failed: "+msg,
+		args...)
 }
 
-func (e *EncodingFailure) Error() string {
-	return fmt.Sprintf("%s encoding failed: %s", e.FailureCode().String(), e.err.Error())
+// NewLedgerFailure constructs a new CodedError which captures a fatal error
+// cause by ledger failures.
+func NewLedgerFailure(err error) CodedFailure {
+	return WrapCodedFailure(
+		FailureCodeLedgerFailure,
+		err,
+		"ledger returns unsuccessful")
 }
 
-// FailureCode returns the failure code
-func (e *EncodingFailure) FailureCode() FailureCode {
-	return FailureCodeEncodingFailure
+// IsLedgerFailure returns true if the error or any of the wrapped errors is
+// a ledger failure
+func IsLedgerFailure(err error) bool {
+	return HasFailureCode(err, FailureCodeLedgerFailure)
 }
 
-// Unwrap unwraps the error
-func (e EncodingFailure) Unwrap() error {
-	return e.err
+// NewStateMergeFailure constructs a new CodedError which captures a fatal
+// caused by state merge.
+func NewStateMergeFailure(err error) CodedFailure {
+	return WrapCodedFailure(
+		FailureCodeStateMergeFailure,
+		err,
+		"can not merge the state")
 }
 
-// LedgerFailure captures a fatal error cause by ledger failures
-type LedgerFailure struct {
-	err error
+// NewBlockFinderFailure constructs a new CodedError which captures a fatal
+// caused by block finder.
+func NewBlockFinderFailure(err error) CodedFailure {
+	return WrapCodedFailure(
+		FailureCodeBlockFinderFailure,
+		err,
+		"can not retrieve the block")
 }
 
-// NewLedgerFailure constructs a new LedgerFailure
-func NewLedgerFailure(err error) *LedgerFailure {
-	return &LedgerFailure{err: err}
+// NewParseRestrictedModeInvalidAccessFailure constructs a CodedError which
+// captures a fatal caused by Cadence accessing an unexpected environment
+// operation while it is parsing programs.
+func NewParseRestrictedModeInvalidAccessFailure(
+	spanName trace.SpanName,
+) CodedFailure {
+	return NewCodedFailure(
+		FailureCodeParseRestrictedModeInvalidAccessFailure,
+		"cannot access %s while cadence is in parse restricted mode",
+		spanName)
 }
 
-func (e *LedgerFailure) Error() string {
-	return fmt.Sprintf("%s ledger returns unsuccessful: %s", e.FailureCode().String(), e.err.Error())
-}
-
-// FailureCode returns the failure code
-func (e *LedgerFailure) FailureCode() FailureCode {
-	return FailureCodeLedgerFailure
-}
-
-// Unwrap unwraps the error
-func (e LedgerFailure) Unwrap() error {
-	return e.err
-}
-
-// IsALedgerFailure returns true if the error or any of the wrapped errors is a ledger failure
-func IsALedgerFailure(err error) bool {
-	var t *LedgerFailure
-	return errors.As(err, &t)
-}
-
-// StateMergeFailure captures a fatal caused by state merge
-type StateMergeFailure struct {
-	err error
-}
-
-// NewStateMergeFailure constructs a new StateMergeFailure
-func NewStateMergeFailure(err error) *StateMergeFailure {
-	return &StateMergeFailure{err: err}
-}
-
-func (e StateMergeFailure) Error() string {
-	return fmt.Sprintf("%s can not merge the state: %s", e.FailureCode().String(), e.err.Error())
-}
-
-// FailureCode returns the failure code
-func (e StateMergeFailure) FailureCode() FailureCode {
-	return FailureCodeStateMergeFailure
-}
-
-// Unwrap unwraps the error
-func (e StateMergeFailure) Unwrap() error {
-	return e.err
-}
-
-// BlockFinderFailure captures a fatal caused by block finder
-type BlockFinderFailure struct {
-	err error
-}
-
-// NewBlockFinderFailure constructs a new BlockFinderFailure
-func NewBlockFinderFailure(err error) *BlockFinderFailure {
-	return &BlockFinderFailure{err: err}
-}
-
-func (e BlockFinderFailure) Error() string {
-	return fmt.Sprintf("%s can not retrieve the block: %s", e.FailureCode().String(), e.err.Error())
-}
-
-// FailureCode returns the failure code
-func (e BlockFinderFailure) FailureCode() FailureCode {
-	return FailureCodeBlockFinderFailure
-}
-
-// Unwrap unwraps the error
-func (e BlockFinderFailure) Unwrap() error {
-	return e.err
-}
-
-// HasherFailure captures a fatal caused by hasher
-type HasherFailure struct {
-	err error
-}
-
-// NewHasherFailuref constructs a new hasherFailure
-func NewHasherFailuref(msg string, args ...interface{}) *HasherFailure {
-	return &HasherFailure{err: fmt.Errorf(msg, args...)}
-}
-
-func (e HasherFailure) Error() string {
-	return fmt.Sprintf("%s hasher failed: %s", e.FailureCode().String(), e.err.Error())
-}
-
-// FailureCode returns the failure code
-func (e HasherFailure) FailureCode() FailureCode {
-	return FailureCodeHasherFailure
-}
-
-// Unwrap unwraps the error
-func (e HasherFailure) Unwrap() error {
-	return e.err
-}
-
-// MetaTransactionFailure captures a fatal caused by invoking a meta transaction
-type MetaTransactionFailure struct {
-	err error
-}
-
-// NewMetaTransactionFailuref constructs a new hasherFailure
-func NewMetaTransactionFailuref(msg string, args ...interface{}) *MetaTransactionFailure {
-	return &MetaTransactionFailure{err: fmt.Errorf(msg, args...)}
-}
-
-func (e MetaTransactionFailure) Error() string {
-	return fmt.Sprintf("%s meta transaction failed: %s", e.FailureCode().String(), e.err.Error())
-}
-
-// FailureCode returns the failure code
-func (e MetaTransactionFailure) FailureCode() FailureCode {
-	return FailureCodeMetaTransactionFailure
-}
-
-// Unwrap unwraps the error
-func (e MetaTransactionFailure) Unwrap() error {
-	return e.err
+// NewEVMFailure constructs a new CodedFailure which captures a fatal
+// caused by the EVM.
+func NewEVMFailure(err error) CodedFailure {
+	return WrapCodedFailure(
+		FailureCodeEVMFailure,
+		err,
+		"evm failure")
 }

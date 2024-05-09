@@ -1,6 +1,8 @@
 package badger
 
 import (
+	"fmt"
+
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -12,21 +14,18 @@ import (
 
 type EpochCommits struct {
 	db    *badger.DB
-	cache *Cache
+	cache *Cache[flow.Identifier, *flow.EpochCommit]
 }
 
 func NewEpochCommits(collector module.CacheMetrics, db *badger.DB) *EpochCommits {
 
-	store := func(key interface{}, val interface{}) func(*transaction.Tx) error {
-		id := key.(flow.Identifier)
-		commit := val.(*flow.EpochCommit)
+	store := func(id flow.Identifier, commit *flow.EpochCommit) func(*transaction.Tx) error {
 		return transaction.WithTx(operation.SkipDuplicates(operation.InsertEpochCommit(id, commit)))
 	}
 
-	retrieve := func(key interface{}) func(*badger.Txn) (interface{}, error) {
-		id := key.(flow.Identifier)
-		var commit flow.EpochCommit
-		return func(tx *badger.Txn) (interface{}, error) {
+	retrieve := func(id flow.Identifier) func(*badger.Txn) (*flow.EpochCommit, error) {
+		return func(tx *badger.Txn) (*flow.EpochCommit, error) {
+			var commit flow.EpochCommit
 			err := operation.RetrieveEpochCommit(id, &commit)(tx)
 			return &commit, err
 		}
@@ -34,8 +33,8 @@ func NewEpochCommits(collector module.CacheMetrics, db *badger.DB) *EpochCommits
 
 	ec := &EpochCommits{
 		db: db,
-		cache: newCache(collector, metrics.ResourceEpochCommit,
-			withLimit(4*flow.DefaultTransactionExpiry),
+		cache: newCache[flow.Identifier, *flow.EpochCommit](collector, metrics.ResourceEpochCommit,
+			withLimit[flow.Identifier, *flow.EpochCommit](4*flow.DefaultTransactionExpiry),
 			withStore(store),
 			withRetrieve(retrieve)),
 	}
@@ -51,9 +50,9 @@ func (ec *EpochCommits) retrieveTx(commitID flow.Identifier) func(tx *badger.Txn
 	return func(tx *badger.Txn) (*flow.EpochCommit, error) {
 		val, err := ec.cache.Get(commitID)(tx)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("could not retrieve EpochCommit event with id %x: %w", commitID, err)
 		}
-		return val.(*flow.EpochCommit), nil
+		return val, nil
 	}
 }
 
@@ -62,6 +61,9 @@ func (ec *EpochCommits) Store(commit *flow.EpochCommit) error {
 	return operation.RetryOnConflictTx(ec.db, transaction.Update, ec.StoreTx(commit))
 }
 
+// ByID will return the EpochCommit event by its ID.
+// Error returns:
+// * storage.ErrNotFound if no EpochCommit with the ID exists
 func (ec *EpochCommits) ByID(commitID flow.Identifier) (*flow.EpochCommit, error) {
 	tx := ec.db.NewTransaction(false)
 	defer tx.Discard()

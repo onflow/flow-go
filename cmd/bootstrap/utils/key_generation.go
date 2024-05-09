@@ -7,16 +7,15 @@ import (
 	gohash "hash"
 	"io"
 
-	sdk "github.com/onflow/flow-go-sdk"
-
-	"github.com/onflow/flow-go/model/encodable"
-
+	"github.com/onflow/crypto"
 	"golang.org/x/crypto/hkdf"
 
+	sdk "github.com/onflow/flow-go-sdk"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 
-	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/bootstrap"
+	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -183,7 +182,7 @@ func WriteMachineAccountFiles(chainID flow.ChainID, nodeInfos []bootstrap.NodeIn
 	//
 	// for the machine account key, we keep track of the address index to map
 	// the Flow address of the machine account to the key.
-	addressIndex := uint64(4)
+	addressIndex := uint64(systemcontracts.LastSystemAccountIndex)
 	for _, nodeInfo := range nodeInfos {
 
 		// retrieve private representation of the node

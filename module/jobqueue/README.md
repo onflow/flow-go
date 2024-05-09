@@ -37,7 +37,7 @@ Job consumer provides the `Check` method for users to notify new jobs available.
 
 Once called, job consumer will iterate through each height with the `AtIndex` method. It stops when one of the following condition is true:
 1. no job was found at a index
-2. no more workers to work on them, which is limitted by the config item `maxProcessing`
+2. no more workers to work on them, which is limited by the config item `maxProcessing`
 
 `Check` method is concurrent safe, meaning even if job consumer is notified concurrently about new jobs available, job consumer will check at most once to find new jobs.
 

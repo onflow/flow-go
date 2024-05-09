@@ -1,148 +1,244 @@
 package fvm
 
 import (
+	"context"
 	"fmt"
-	"math"
 
-	"github.com/onflow/cadence/runtime"
+	"github.com/onflow/cadence"
 
-	errors "github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/fvm/environment"
+	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/meter"
-	"github.com/onflow/flow-go/fvm/programs"
-	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/storage"
+	"github.com/onflow/flow-go/fvm/storage/logical"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
+	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// An Procedure is an operation (or set of operations) that reads or writes ledger state.
-type Procedure interface {
-	Run(vm *VirtualMachine, ctx Context, sth *state.StateHolder, programs *programs.Programs) error
-	ComputationLimit(ctx Context) uint64
-	MemoryLimit(ctx Context) uint64
-	ShouldDisableMemoryAndInteractionLimits(ctx Context) bool
+type ProcedureType string
+
+const (
+	BootstrapProcedureType   = ProcedureType("bootstrap")
+	TransactionProcedureType = ProcedureType("transaction")
+	ScriptProcedureType      = ProcedureType("script")
+)
+
+type ProcedureOutput struct {
+	// Output by both transaction and script.
+	Logs                   []string
+	Events                 flow.EventsList
+	ServiceEvents          flow.EventsList
+	ConvertedServiceEvents flow.ServiceEventList
+	ComputationUsed        uint64
+	ComputationIntensities meter.MeteredComputationIntensities
+	MemoryEstimate         uint64
+	Err                    errors.CodedError
+
+	// Output only by script.
+	Value cadence.Value
 }
 
-func NewInterpreterRuntime(config runtime.Config) runtime.Runtime {
-	return runtime.NewInterpreterRuntime(config)
-}
-
-// A VirtualMachine augments the Cadence runtime with Flow host functionality.
-type VirtualMachine struct {
-	Runtime runtime.Runtime // DEPRECATED.  DO NOT USE.
-}
-
-func NewVM() *VirtualMachine {
-	return &VirtualMachine{}
-}
-
-// DEPRECATED.  DO NOT USE.
-//
-// TODO(patrick): remove after emulator is updated.
-//
-// Emulator is a special snowflake which prevents fvm from every changing its
-// APIs (integration test uses a pinned version of the emulator, which in turn
-// uses a pinned non-master version of flow-go).  This method is expose to break
-// the ridiculous circular dependency between the two builds.
-func NewVirtualMachine(rt runtime.Runtime) *VirtualMachine {
-	return &VirtualMachine{
-		Runtime: rt,
-	}
-}
-
-// DEPRECATED.  DO NOT USE.
-//
-// TODO(patrick): remove after emulator is updated
-//
-// Run runs a procedure against a ledger in the given context.
-func (vm *VirtualMachine) Run(ctx Context, proc Procedure, v state.View, _ *programs.Programs) (err error) {
-	return vm.RunV2(ctx, proc, v)
-}
-
-// TODO(patrick): rename back to Run after emulator is fully updated (this
-// takes at least 3 sporks ...).
-//
-// Run runs a procedure against a ledger in the given context.
-func (vm *VirtualMachine) RunV2(
-	ctx Context,
-	proc Procedure,
-	v state.View,
+func (output *ProcedureOutput) PopulateEnvironmentValues(
+	env environment.Environment,
 ) error {
-	blockPrograms := ctx.BlockPrograms
-	if blockPrograms == nil {
-		blockPrograms = programs.NewEmptyPrograms()
-	}
+	output.Logs = env.Logs()
 
-	meterParams := meter.DefaultParameters().
-		WithComputationLimit(uint(proc.ComputationLimit(ctx))).
-		WithMemoryLimit(proc.MemoryLimit(ctx))
-
-	meterParams, err := getEnvironmentMeterParameters(
-		vm,
-		ctx,
-		v,
-		blockPrograms,
-		meterParams,
-	)
+	computationUsed, err := env.ComputationUsed()
 	if err != nil {
-		return fmt.Errorf("error gettng environment meter parameters: %w", err)
+		return fmt.Errorf("error getting computation used: %w", err)
 	}
+	output.ComputationUsed = computationUsed
 
-	interactionLimit := ctx.MaxStateInteractionSize
-	if proc.ShouldDisableMemoryAndInteractionLimits(ctx) {
-		meterParams = meterParams.WithMemoryLimit(math.MaxUint64)
-		interactionLimit = math.MaxUint64
-	}
-
-	stTxn := state.NewStateTransaction(
-		v,
-		state.DefaultParameters().
-			WithMeterParameters(meterParams).
-			WithMaxKeySizeAllowed(ctx.MaxStateKeySize).
-			WithMaxValueSizeAllowed(ctx.MaxStateValueSize).
-			WithMaxInteractionSizeAllowed(interactionLimit),
-	)
-
-	err = proc.Run(vm, ctx, stTxn, blockPrograms)
+	memoryUsed, err := env.MemoryUsed()
 	if err != nil {
-		return err
+		return fmt.Errorf("error getting memory used: %w", err)
 	}
+	output.MemoryEstimate = memoryUsed
+
+	output.ComputationIntensities = env.ComputationIntensities()
+
+	// if tx failed this will only contain fee deduction events
+	output.Events = env.Events()
+	output.ServiceEvents = env.ServiceEvents()
+	output.ConvertedServiceEvents = env.ConvertedServiceEvents()
 
 	return nil
 }
 
+type ProcedureExecutor interface {
+	Preprocess() error
+	Execute() error
+	Cleanup()
+
+	Output() ProcedureOutput
+}
+
+func Run(executor ProcedureExecutor) error {
+	defer executor.Cleanup()
+	err := executor.Preprocess()
+	if err != nil {
+		return err
+	}
+	return executor.Execute()
+}
+
+// An Procedure is an operation (or set of operations) that reads or writes ledger state.
+type Procedure interface {
+	NewExecutor(
+		ctx Context,
+		txnState storage.TransactionPreparer,
+	) ProcedureExecutor
+
+	ComputationLimit(ctx Context) uint64
+	MemoryLimit(ctx Context) uint64
+	ShouldDisableMemoryAndInteractionLimits(ctx Context) bool
+
+	Type() ProcedureType
+
+	// For transactions, the execution time is TxIndex.  For scripts, the
+	// execution time is EndOfBlockExecutionTime.
+	ExecutionTime() logical.Time
+}
+
+// VM runs procedures
+type VM interface {
+	NewExecutor(
+		Context,
+		Procedure,
+		storage.TransactionPreparer,
+	) ProcedureExecutor
+
+	Run(
+		Context,
+		Procedure,
+		snapshot.StorageSnapshot,
+	) (
+		*snapshot.ExecutionSnapshot,
+		ProcedureOutput,
+		error,
+	)
+
+	GetAccount(Context, flow.Address, snapshot.StorageSnapshot) (*flow.Account, error)
+}
+
+var _ VM = (*VirtualMachine)(nil)
+
+// A VirtualMachine augments the Cadence runtime with Flow host functionality.
+type VirtualMachine struct {
+}
+
+func NewVirtualMachine() *VirtualMachine {
+	return &VirtualMachine{}
+}
+
+func (vm *VirtualMachine) NewExecutor(
+	ctx Context,
+	proc Procedure,
+	txn storage.TransactionPreparer,
+) ProcedureExecutor {
+	return proc.NewExecutor(ctx, txn)
+}
+
+// Run runs a procedure against a ledger in the given context.
+func (vm *VirtualMachine) Run(
+	ctx Context,
+	proc Procedure,
+	storageSnapshot snapshot.StorageSnapshot,
+) (
+	*snapshot.ExecutionSnapshot,
+	ProcedureOutput,
+	error,
+) {
+	blockDatabase := storage.NewBlockDatabase(
+		storageSnapshot,
+		proc.ExecutionTime(),
+		ctx.DerivedBlockData)
+
+	stateParameters := ProcedureStateParameters(ctx, proc)
+
+	var storageTxn storage.Transaction
+	var err error
+	switch proc.Type() {
+	case ScriptProcedureType:
+		if ctx.AllowProgramCacheWritesInScripts {
+			// if configured, allow scripts to update the programs cache
+			storageTxn, err = blockDatabase.NewCachingSnapshotReadTransaction(stateParameters)
+		} else {
+			storageTxn = blockDatabase.NewSnapshotReadTransaction(stateParameters)
+		}
+	case TransactionProcedureType, BootstrapProcedureType:
+		storageTxn, err = blockDatabase.NewTransaction(
+			proc.ExecutionTime(),
+			stateParameters)
+	default:
+		return nil, ProcedureOutput{}, fmt.Errorf(
+			"invalid proc type: %v",
+			proc.Type())
+	}
+
+	if err != nil {
+		return nil, ProcedureOutput{}, fmt.Errorf(
+			"error creating derived transaction data: %w",
+			err)
+	}
+
+	executor := proc.NewExecutor(ctx, storageTxn)
+	err = Run(executor)
+	if err != nil {
+		return nil, ProcedureOutput{}, err
+	}
+
+	err = storageTxn.Finalize()
+	if err != nil {
+		return nil, ProcedureOutput{}, err
+	}
+
+	executionSnapshot, err := storageTxn.Commit()
+	if err != nil {
+		return nil, ProcedureOutput{}, err
+	}
+
+	return executionSnapshot, executor.Output(), nil
+}
+
 // GetAccount returns an account by address or an error if none exists.
-func (vm *VirtualMachine) GetAccount(ctx Context, address flow.Address, v state.View, programs *programs.Programs) (*flow.Account, error) {
-	stTxn := state.NewStateTransaction(
-		v,
+func (vm *VirtualMachine) GetAccount(
+	ctx Context,
+	address flow.Address,
+	storageSnapshot snapshot.StorageSnapshot,
+) (
+	*flow.Account,
+	error,
+) {
+	blockDatabase := storage.NewBlockDatabase(
+		storageSnapshot,
+		0,
+		ctx.DerivedBlockData)
+
+	storageTxn := blockDatabase.NewSnapshotReadTransaction(
 		state.DefaultParameters().
 			WithMaxKeySizeAllowed(ctx.MaxStateKeySize).
 			WithMaxValueSizeAllowed(ctx.MaxStateValueSize).
-			WithMaxInteractionSizeAllowed(ctx.MaxStateInteractionSize),
-	)
+			WithMeterParameters(
+				meter.DefaultParameters().
+					WithStorageInteractionLimit(ctx.MaxStateInteractionSize)))
 
-	account, err := getAccount(vm, ctx, stTxn, programs, address)
+	env := environment.NewScriptEnv(
+		context.Background(),
+		ctx.TracerSpan,
+		ctx.EnvironmentParams,
+		storageTxn)
+	account, err := env.GetAccount(address)
 	if err != nil {
-		if errors.IsALedgerFailure(err) {
-			return nil, fmt.Errorf("cannot get account, this error usually happens if the reference block for this query is not set to a recent block: %w", err)
+		if errors.IsLedgerFailure(err) {
+			return nil, fmt.Errorf(
+				"cannot get account, this error usually happens if the "+
+					"reference block for this query is not set to a recent "+
+					"block: %w",
+				err)
 		}
 		return nil, fmt.Errorf("cannot get account: %w", err)
 	}
 	return account, nil
-}
-
-// invokeMetaTransaction invokes a meta transaction inside the context of an outer transaction.
-//
-// Errors that occur in a meta transaction are propagated as a single error that can be
-// captured by the Cadence runtime and eventually disambiguated by the parent context.
-func (vm *VirtualMachine) invokeMetaTransaction(parentCtx Context, tx *TransactionProcedure, stTxn *state.StateHolder, programs *programs.Programs) (errors.Error, error) {
-	invoker := NewTransactionInvoker()
-
-	// do not deduct fees or check storage in meta transactions
-	ctx := NewContextFromParent(parentCtx,
-		WithAccountStorageLimit(false),
-		WithTransactionFeesEnabled(false),
-	)
-
-	err := invoker.Process(vm, &ctx, tx, stTxn, programs)
-	txErr, fatalErr := errors.SplitErrorTypes(err)
-	return txErr, fatalErr
 }

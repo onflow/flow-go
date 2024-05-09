@@ -3,8 +3,9 @@ package signature
 import (
 	"fmt"
 
+	"github.com/onflow/crypto"
+
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/module/signature"
 )
 
@@ -33,7 +34,7 @@ func NewRandomBeaconInspector(
 		message,
 		signature.RandomBeaconTag)
 	if err != nil {
-		if crypto.IsInvalidInputsError(err) {
+		if crypto.IsInvalidInputsError(err) || crypto.IsNotBLSKeyError(err) {
 			return nil, model.NewConfigurationErrorf("invalid parametrization for BLS Threshold Signature Inspector: %w", err)
 		}
 		return nil, fmt.Errorf("unexpected exception while instantiating BLS Threshold Signature Inspector: %w", err)
@@ -119,7 +120,7 @@ func (r *randomBeaconInspector) EnoughShares() bool {
 func (r *randomBeaconInspector) Reconstruct() (crypto.Signature, error) {
 	sig, err := r.inspector.ThresholdSignature()
 	if err != nil {
-		if crypto.IsInvalidInputsError(err) {
+		if crypto.IsInvalidInputsError(err) || crypto.IsInvalidSignatureError(err) {
 			return nil, model.NewInvalidSignatureIncludedError(err)
 		}
 		if crypto.IsNotEnoughSharesError(err) {

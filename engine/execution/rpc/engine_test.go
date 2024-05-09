@@ -3,20 +3,24 @@ package rpc
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math/rand"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/testing/protocmp"
 
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 	"github.com/onflow/flow/protobuf/go/flow/execution"
 
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
-	ingestion "github.com/onflow/flow-go/engine/execution/ingestion/mock"
+	mockEng "github.com/onflow/flow-go/engine/execution/mock"
+	"github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/model/flow"
 	realstorage "github.com/onflow/flow-go/storage"
 	storage "github.com/onflow/flow-go/storage/mock"
@@ -29,7 +33,8 @@ type Suite struct {
 	events     *storage.Events
 	exeResults *storage.ExecutionResults
 	txResults  *storage.TransactionResults
-	blocks     *storage.Blocks
+	commits    *storage.Commits
+	headers    *storage.Headers
 }
 
 func TestHandler(t *testing.T) {
@@ -38,19 +43,21 @@ func TestHandler(t *testing.T) {
 
 func (suite *Suite) SetupTest() {
 	suite.log = zerolog.Logger{}
-	suite.events = new(storage.Events)
-	suite.exeResults = new(storage.ExecutionResults)
-	suite.txResults = new(storage.TransactionResults)
-	suite.blocks = new(storage.Blocks)
+	suite.events = storage.NewEvents(suite.T())
+	suite.exeResults = storage.NewExecutionResults(suite.T())
+	suite.txResults = storage.NewTransactionResults(suite.T())
+	suite.commits = storage.NewCommits(suite.T())
+	suite.headers = storage.NewHeaders(suite.T())
 }
 
 // TestExecuteScriptAtBlockID tests the ExecuteScriptAtBlockID API call
 func (suite *Suite) TestExecuteScriptAtBlockID() {
 	// setup handler
-	mockEngine := new(ingestion.IngestRPC)
+	mockEngine := mockEng.NewScriptExecutor(suite.T())
 	handler := &handler{
-		engine: mockEngine,
-		chain:  flow.Mainnet,
+		engine:  mockEngine,
+		chain:   flow.Mainnet,
+		commits: suite.commits,
 	}
 
 	// setup dummy request/response
@@ -63,22 +70,33 @@ func (suite *Suite) TestExecuteScriptAtBlockID() {
 		Script:  script,
 	}
 	scriptExecValue := []byte{9, 10, 11}
+	computationUsage := uint64(11)
 	executionResp := execution.ExecuteScriptAtBlockIDResponse{
-		Value: scriptExecValue,
+		Value:            scriptExecValue,
+		ComputationUsage: computationUsage,
 	}
 
 	suite.Run("happy path with successful script execution", func() {
+		suite.commits.On("ByBlockID", mockIdentifier).Return(nil, nil).Once()
 		mockEngine.On("ExecuteScriptAtBlockID", ctx, script, arguments, mockIdentifier).
-			Return(scriptExecValue, nil).Once()
+			Return(scriptExecValue, computationUsage, nil).Once()
 		response, err := handler.ExecuteScriptAtBlockID(ctx, &executionReq)
 		suite.Require().NoError(err)
 		suite.Require().Equal(&executionResp, response)
 		mockEngine.AssertExpectations(suite.T())
 	})
 
+	suite.Run("valid request for unknown block", func() {
+		suite.commits.On("ByBlockID", mockIdentifier).Return(nil, realstorage.ErrNotFound).Once()
+		_, err := handler.ExecuteScriptAtBlockID(ctx, &executionReq)
+		suite.Require().Error(err)
+		errors.Is(err, status.Error(codes.NotFound, ""))
+	})
+
 	suite.Run("valid request with script execution failure", func() {
+		suite.commits.On("ByBlockID", mockIdentifier).Return(nil, nil).Once()
 		mockEngine.On("ExecuteScriptAtBlockID", ctx, script, arguments, mockIdentifier).
-			Return(nil, status.Error(codes.InvalidArgument, "")).Once()
+			Return(nil, uint64(0), status.Error(codes.InvalidArgument, "")).Once()
 		_, err := handler.ExecuteScriptAtBlockID(ctx, &executionReq)
 		suite.Require().Error(err)
 		errors.Is(err, status.Error(codes.InvalidArgument, ""))
@@ -121,13 +139,13 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 			eventMessages[j] = convert.EventToMessage(e)
 		}
 		// expect one call to lookup result for each block ID
-		suite.exeResults.On("ByBlockID", id).Return(nil, nil).Once()
+		suite.commits.On("ByBlockID", id).Return(nil, nil).Once()
 
 		// expect one call to lookup events for each block ID
-		suite.events.On("ByBlockIDEventType", id, flow.EventAccountCreated).Return(eventsForBlock, nil).Once()
+		suite.events.On("ByBlockID", id).Return(eventsForBlock, nil).Once()
 
 		// expect one call to lookup each block
-		suite.blocks.On("ByID", id).Return(&block, nil).Once()
+		suite.headers.On("ByBlockID", id).Return(block.Header, nil).Once()
 
 		// create the expected result for this block
 		expectedResult[i] = &execution.GetEventsForBlockIDsResponse_Result{
@@ -139,11 +157,13 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 
 	// create the handler
 	handler := &handler{
-		blocks:             suite.blocks,
+		headers:            suite.headers,
 		events:             suite.events,
 		exeResults:         suite.exeResults,
 		transactionResults: suite.txResults,
+		commits:            suite.commits,
 		chain:              flow.Mainnet,
+		maxBlockRange:      DefaultMaxBlockRange,
 	}
 
 	concoctReq := func(errType string, blockIDs [][]byte) *execution.GetEventsForBlockIDsRequest {
@@ -167,9 +187,6 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 
 		actualResult := resp.GetResults()
 		suite.Require().ElementsMatch(expectedResult, actualResult)
-
-		// check that appropriate storage calls were made
-		suite.events.AssertExpectations(suite.T())
 	})
 
 	// failure path - empty even type in the request results in an error
@@ -183,9 +200,6 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 		// check that an error was received
 		suite.Require().Error(err)
 		errors.Is(err, status.Error(codes.InvalidArgument, ""))
-
-		// check that no storage calls was made
-		suite.events.AssertExpectations(suite.T())
 	})
 
 	// failure path - empty block ids in request results in an error
@@ -199,9 +213,6 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 		// check that an error was received
 		suite.Require().Error(err)
 		errors.Is(err, status.Error(codes.InvalidArgument, ""))
-
-		// check that no storage calls was made
-		suite.events.AssertExpectations(suite.T())
 	})
 
 	// failure path - non-existent block id in request results in an error
@@ -210,7 +221,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 		id := unittest.IdentifierFixture()
 
 		// expect a storage call for the invalid id but return an error
-		suite.exeResults.On("ByBlockID", id).Return(nil, realstorage.ErrNotFound).Once()
+		suite.commits.On("ByBlockID", id).Return(nil, realstorage.ErrNotFound).Once()
 
 		// create an API request with the invalid block id
 		req := concoctReq(string(flow.EventAccountCreated), [][]byte{id[:]})
@@ -220,9 +231,23 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 		// check that an error was received
 		suite.Require().Error(err)
 		errors.Is(err, status.Error(codes.NotFound, ""))
+	})
 
-		// check that no storage calls was made
-		suite.events.AssertExpectations(suite.T())
+	// request for too many blocks - receives a InvalidArgument error
+	suite.Run("request for too many blocks", func() {
+
+		// update range so it's smaller than list of blockIDs
+		handler.maxBlockRange = totalBlocks / 2
+
+		// create a valid API request
+		req := concoctReq(string(flow.EventAccountCreated), blockIDs)
+
+		// execute the GetEventsForBlockIDs call
+		_, err := handler.GetEventsForBlockIDs(context.Background(), req)
+
+		// check that an error was received
+		suite.Require().Error(err)
+		errors.Is(err, status.Error(codes.InvalidArgument, ""))
 	})
 }
 
@@ -236,12 +261,13 @@ func (suite *Suite) TestGetAccountAtBlockID() {
 		Address: serviceAddress,
 	}
 
-	mockEngine := new(ingestion.IngestRPC)
+	mockEngine := mockEng.NewScriptExecutor(suite.T())
 
 	// create the handler
 	handler := &handler{
-		engine: mockEngine,
-		chain:  flow.Mainnet,
+		engine:  mockEngine,
+		chain:   flow.Mainnet,
+		commits: suite.commits,
 	}
 
 	createReq := func(id []byte, address []byte) *execution.GetAccountAtBlockIDRequest {
@@ -254,6 +280,8 @@ func (suite *Suite) TestGetAccountAtBlockID() {
 	suite.Run("happy path with valid request", func() {
 
 		// setup mock expectations
+		suite.commits.On("ByBlockID", id).Return(nil, nil).Once()
+
 		mockEngine.On("GetAccount", mock.Anything, serviceAddress, id).Return(&serviceAccount, nil).Once()
 
 		req := createReq(id[:], serviceAddress.Bytes())
@@ -264,8 +292,21 @@ func (suite *Suite) TestGetAccountAtBlockID() {
 		actualAccount := resp.GetAccount()
 		expectedAccount, err := convert.AccountToMessage(&serviceAccount)
 		suite.Require().NoError(err)
-		suite.Require().Equal(*expectedAccount, *actualAccount)
-		mockEngine.AssertExpectations(suite.T())
+		suite.Require().Empty(
+			cmp.Diff(expectedAccount, actualAccount, protocmp.Transform()))
+	})
+
+	suite.Run("invalid request with unknown block id", func() {
+
+		// setup mock expectations
+		suite.commits.On("ByBlockID", id).Return(nil, realstorage.ErrNotFound).Once()
+
+		req := createReq(id[:], serviceAddress.Bytes())
+
+		_, err := handler.GetAccountAtBlockID(context.Background(), req)
+
+		suite.Require().Error(err)
+		errors.Is(err, status.Error(codes.NotFound, ""))
 	})
 
 	suite.Run("invalid request with nil block id", func() {
@@ -275,6 +316,7 @@ func (suite *Suite) TestGetAccountAtBlockID() {
 		_, err := handler.GetAccountAtBlockID(context.Background(), req)
 
 		suite.Require().Error(err)
+		errors.Is(err, status.Error(codes.InvalidArgument, ""))
 	})
 
 	suite.Run("invalid request with nil root address", func() {
@@ -284,6 +326,28 @@ func (suite *Suite) TestGetAccountAtBlockID() {
 		_, err := handler.GetAccountAtBlockID(context.Background(), req)
 
 		suite.Require().Error(err)
+		errors.Is(err, status.Error(codes.InvalidArgument, ""))
+	})
+
+	suite.Run("valid request for unavailable data", func() {
+		suite.commits.On("ByBlockID", id).Return(nil, nil).Once()
+
+		expectedErr := fmt.Errorf(
+			"failed to execute script at block (%s): %w (%s). "+
+				"this error usually happens if the reference "+
+				"block for this script is not set to a recent block.",
+			id,
+			state.ErrExecutionStatePruned,
+			unittest.IdentifierFixture(),
+		)
+
+		mockEngine.On("GetAccount", mock.Anything, serviceAddress, id).Return(nil, expectedErr).Once()
+
+		req := createReq(id[:], serviceAddress.Bytes())
+
+		resp, err := handler.GetAccountAtBlockID(context.Background(), req)
+		suite.Assert().Nil(resp)
+		suite.Assert().Equal(codes.OutOfRange, status.Code(err))
 	})
 }
 
@@ -294,7 +358,7 @@ func (suite *Suite) TestGetRegisterAtBlockID() {
 	serviceAddress := flow.Mainnet.Chain().ServiceAddress()
 	validKey := []byte("exists")
 
-	mockEngine := new(ingestion.IngestRPC)
+	mockEngine := mockEng.NewScriptExecutor(suite.T())
 
 	// create the handler
 	handler := &handler{
@@ -322,7 +386,6 @@ func (suite *Suite) TestGetRegisterAtBlockID() {
 		value := resp.GetValue()
 		suite.Require().NoError(err)
 		suite.Require().True(len(value) > 0)
-		mockEngine.AssertExpectations(suite.T())
 	})
 
 	suite.Run("invalid request with bad address", func() {
@@ -358,15 +421,13 @@ func (suite *Suite) TestGetTransactionResult() {
 	// expect a call to lookup events by block ID and transaction ID
 	suite.events.On("ByBlockIDTransactionID", bID, txID).Return(eventsForTx, nil)
 
-	// expect a call to lookup each block
-	suite.blocks.On("ByID", block.ID()).Return(&block, true)
-
 	// create the handler
 	createHandler := func(txResults *storage.TransactionResults) *handler {
 		handler := &handler{
-			blocks:             suite.blocks,
+			headers:            suite.headers,
 			events:             suite.events,
 			transactionResults: txResults,
+			commits:            suite.commits,
 			chain:              flow.Mainnet,
 		}
 		return handler
@@ -405,7 +466,7 @@ func (suite *Suite) TestGetTransactionResult() {
 		}
 
 		// expect a call to lookup transaction result by block ID and transaction ID, return a result with no error
-		txResults := new(storage.TransactionResults)
+		txResults := storage.NewTransactionResults(suite.T())
 		txResult := flow.TransactionResult{
 			TransactionID: flow.Identifier{},
 			ErrorMessage:  "",
@@ -425,10 +486,6 @@ func (suite *Suite) TestGetTransactionResult() {
 
 		// check that all fields in response are as expected
 		assertEqual(expectedResult, actualResult)
-
-		// check that appropriate storage calls were made
-		suite.events.AssertExpectations(suite.T())
-		txResults.AssertExpectations(suite.T())
 	})
 
 	// happy path - valid requests receives all events for the given transaction by index
@@ -442,7 +499,7 @@ func (suite *Suite) TestGetTransactionResult() {
 		}
 
 		// expect a call to lookup transaction result by block ID and transaction ID, return a result with no error
-		txResults := new(storage.TransactionResults)
+		txResults := storage.NewTransactionResults(suite.T())
 		txResult := flow.TransactionResult{
 			TransactionID: flow.Identifier{},
 			ErrorMessage:  "",
@@ -465,10 +522,6 @@ func (suite *Suite) TestGetTransactionResult() {
 
 		// check that all fields in response are as expected
 		assertEqual(expectedResult, actualResult)
-
-		// check that appropriate storage calls were made
-		suite.events.AssertExpectations(suite.T())
-		txResults.AssertExpectations(suite.T())
 	})
 
 	// happy path - valid requests receives all events and an error for the given transaction
@@ -482,7 +535,7 @@ func (suite *Suite) TestGetTransactionResult() {
 		}
 
 		// setup the storage to return a transaction error
-		txResults := new(storage.TransactionResults)
+		txResults := storage.NewTransactionResults(suite.T())
 		txResult := flow.TransactionResult{
 			TransactionID: txID,
 			ErrorMessage:  "runtime error",
@@ -502,10 +555,6 @@ func (suite *Suite) TestGetTransactionResult() {
 
 		// check that all fields in response are as expected
 		assertEqual(expectedResult, actualResult)
-
-		// check that appropriate storage calls were made
-		suite.events.AssertExpectations(suite.T())
-		txResults.AssertExpectations(suite.T())
 	})
 
 	// happy path - valid requests receives all events and an error for the given transaction
@@ -519,7 +568,7 @@ func (suite *Suite) TestGetTransactionResult() {
 		}
 
 		// setup the storage to return a transaction error
-		txResults := new(storage.TransactionResults)
+		txResults := storage.NewTransactionResults(suite.T())
 		txResult := flow.TransactionResult{
 			TransactionID: txID,
 			ErrorMessage:  "runtime error",
@@ -544,8 +593,6 @@ func (suite *Suite) TestGetTransactionResult() {
 		assertEqual(expectedResult, actualResult)
 
 		// check that appropriate storage calls were made
-		suite.events.AssertExpectations(suite.T())
-		txResults.AssertExpectations(suite.T())
 	})
 
 	// failure path - nil transaction ID in the request results in an error
@@ -554,11 +601,7 @@ func (suite *Suite) TestGetTransactionResult() {
 		// create an API request with transaction ID as nil
 		req := concoctReq(bID[:], nil)
 
-		// expect a call to lookup transaction result by block ID and transaction ID, return an error
-		txResults := new(storage.TransactionResults)
-
-		txResults.On("ByBlockIDTransactionID", bID, nil).Return(nil, status.Error(codes.InvalidArgument, "")).Once()
-
+		txResults := storage.NewTransactionResults(suite.T())
 		handler := createHandler(txResults)
 
 		_, err := handler.GetTransactionResult(context.Background(), req)
@@ -566,9 +609,6 @@ func (suite *Suite) TestGetTransactionResult() {
 		// check that an error was received
 		suite.Require().Error(err)
 		errors.Is(err, status.Error(codes.InvalidArgument, ""))
-
-		// check that no storage calls was made
-		suite.events.AssertExpectations(suite.T())
 	})
 
 	// failure path - nil block id in the request results in an error
@@ -577,10 +617,7 @@ func (suite *Suite) TestGetTransactionResult() {
 		// create an API request with a nil block id
 		req := concoctReq(nil, txID[:])
 
-		txResults := new(storage.TransactionResults)
-
-		txResults.On("ByBlockIDTransactionID", nil, txID).Return(nil, status.Error(codes.InvalidArgument, "")).Once()
-
+		txResults := storage.NewTransactionResults(suite.T())
 		handler := createHandler(txResults)
 
 		_, err := handler.GetTransactionResult(context.Background(), req)
@@ -588,9 +625,6 @@ func (suite *Suite) TestGetTransactionResult() {
 		// check that an error was received
 		suite.Require().Error(err)
 		errors.Is(err, status.Error(codes.InvalidArgument, ""))
-
-		// check that no storage calls was made
-		suite.events.AssertExpectations(suite.T())
 	})
 
 	// failure path - nil block id in the index request results in an error
@@ -599,10 +633,7 @@ func (suite *Suite) TestGetTransactionResult() {
 		// create an API request with a nil block id
 		req := concoctIndexReq(nil, txIndex)
 
-		txResults := new(storage.TransactionResults)
-
-		txResults.On("ByBlockIDTransactionIndex", nil, txID).Return(nil, status.Error(codes.InvalidArgument, "")).Once()
-
+		txResults := storage.NewTransactionResults(suite.T())
 		handler := createHandler(txResults)
 
 		_, err := handler.GetTransactionResultByIndex(context.Background(), req)
@@ -610,9 +641,6 @@ func (suite *Suite) TestGetTransactionResult() {
 		// check that an error was received
 		suite.Require().Error(err)
 		errors.Is(err, status.Error(codes.InvalidArgument, ""))
-
-		// check that no storage calls was made
-		suite.events.AssertExpectations(suite.T())
 	})
 
 	// failure path - non-existent transaction ID in request results in an error
@@ -624,8 +652,29 @@ func (suite *Suite) TestGetTransactionResult() {
 		req := concoctReq(bID[:], wrongTxID[:])
 
 		// expect a storage call for the invalid tx ID but return an error
-		txResults := new(storage.TransactionResults)
-		txResults.On("ByBlockIDTransactionID", bID, wrongTxID).Return(nil, status.Error(codes.Internal, "")).Once()
+		txResults := storage.NewTransactionResults(suite.T())
+		txResults.On("ByBlockIDTransactionID", bID, wrongTxID).Return(nil, realstorage.ErrNotFound).Once()
+
+		handler := createHandler(txResults)
+
+		_, err := handler.GetTransactionResult(context.Background(), req)
+
+		// check that an error was received
+		suite.Require().Error(err)
+		errors.Is(err, status.Error(codes.NotFound, ""))
+	})
+
+	// failure path - non-existent transaction ID in request results in an exception
+	suite.Run("request with non-existent transaction ID, exception", func() {
+
+		wrongTxID := unittest.IdentifierFixture()
+
+		// create an API request with the invalid transaction ID
+		req := concoctReq(bID[:], wrongTxID[:])
+
+		// expect a storage call for the invalid tx ID but return an exception
+		txResults := storage.NewTransactionResults(suite.T())
+		txResults.On("ByBlockIDTransactionID", bID, wrongTxID).Return(nil, errors.New("internal-error")).Once()
 
 		handler := createHandler(txResults)
 
@@ -634,9 +683,6 @@ func (suite *Suite) TestGetTransactionResult() {
 		// check that an error was received
 		suite.Require().Error(err)
 		errors.Is(err, status.Error(codes.Internal, ""))
-
-		// check that one storage call was made
-		suite.events.AssertExpectations(suite.T())
 	})
 
 	// failure path - non-existent transaction index in request results in an error
@@ -648,8 +694,29 @@ func (suite *Suite) TestGetTransactionResult() {
 		req := concoctIndexReq(bID[:], wrongTxIndex)
 
 		// expect a storage call for the invalid tx ID but return an error
-		txResults := new(storage.TransactionResults)
-		txResults.On("ByBlockIDTransactionIndex", bID, wrongTxIndex).Return(nil, status.Error(codes.Internal, "")).Once()
+		txResults := storage.NewTransactionResults(suite.T())
+		txResults.On("ByBlockIDTransactionIndex", bID, wrongTxIndex).Return(nil, realstorage.ErrNotFound).Once()
+
+		handler := createHandler(txResults)
+
+		_, err := handler.GetTransactionResultByIndex(context.Background(), req)
+
+		// check that an error was received
+		suite.Require().Error(err)
+		errors.Is(err, status.Error(codes.NotFound, ""))
+	})
+
+	// failure path - non-existent transaction index in request results in an exception
+	suite.Run("request with non-existent transaction index, exception", func() {
+
+		wrongTxIndex := txIndex + 1
+
+		// create an API request with the invalid transaction ID
+		req := concoctIndexReq(bID[:], wrongTxIndex)
+
+		// expect a storage call for the invalid tx ID but return an exception
+		txResults := storage.NewTransactionResults(suite.T())
+		txResults.On("ByBlockIDTransactionIndex", bID, wrongTxIndex).Return(nil, errors.New("internal-error")).Once()
 
 		handler := createHandler(txResults)
 
@@ -658,9 +725,6 @@ func (suite *Suite) TestGetTransactionResult() {
 		// check that an error was received
 		suite.Require().Error(err)
 		errors.Is(err, status.Error(codes.Internal, ""))
-
-		// check that one storage call was made
-		suite.events.AssertExpectations(suite.T())
 	})
 }
 
@@ -700,9 +764,10 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 	// create the handler
 	createHandler := func(txResults *storage.TransactionResults) *handler {
 		handler := &handler{
-			blocks:             suite.blocks,
+			headers:            suite.headers,
 			events:             suite.events,
 			transactionResults: txResults,
+			commits:            suite.commits,
 			chain:              flow.Mainnet,
 		}
 		return handler
@@ -729,6 +794,8 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 	// happy path - valid requests receives all events for the given transaction
 	suite.Run("happy path with valid events and no transaction error", func() {
 
+		suite.commits.On("ByBlockID", bID).Return(nil, nil).Once()
+
 		// expect a call to lookup events by block ID and transaction ID
 		suite.events.On("ByBlockID", bID).Return(eventsForBlock, nil).Once()
 
@@ -749,7 +816,7 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 		}
 
 		// expect a call to lookup transaction result by block ID return a result with no error
-		txResultsMock := new(storage.TransactionResults)
+		txResultsMock := storage.NewTransactionResults(suite.T())
 		txResults := []flow.TransactionResult{
 			{
 				TransactionID: tx1ID,
@@ -775,14 +842,12 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 
 		// check that all fields in response are as expected
 		assertEqual(expectedResult, actualResult)
-
-		// check that appropriate storage calls were made
-		suite.events.AssertExpectations(suite.T())
-		txResultsMock.AssertExpectations(suite.T())
 	})
 
 	// happy path - valid requests receives all events and an error for the given transaction
 	suite.Run("happy path with valid events and a transaction error", func() {
+
+		suite.commits.On("ByBlockID", bID).Return(nil, nil).Once()
 
 		// expect a call to lookup events by block ID and transaction ID
 		suite.events.On("ByBlockID", bID).Return(eventsForBlock, nil).Once()
@@ -804,7 +869,7 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 		}
 
 		// expect a call to lookup transaction result by block ID return a result with no error
-		txResultsMock := new(storage.TransactionResults)
+		txResultsMock := storage.NewTransactionResults(suite.T())
 		txResults := []flow.TransactionResult{
 			{
 				TransactionID: tx1ID,
@@ -830,10 +895,6 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 
 		// check that all fields in response are as expected
 		assertEqual(expectedResult, actualResult)
-
-		// check that appropriate storage calls were made
-		suite.events.AssertExpectations(suite.T())
-		txResultsMock.AssertExpectations(suite.T())
 	})
 
 	// failure path - nil block id in the request results in an error
@@ -842,10 +903,7 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 		// create an API request with a nil block id
 		req := concoctReq(nil)
 
-		txResults := new(storage.TransactionResults)
-
-		txResults.On("ByBlockID", nil).Return(nil, status.Error(codes.InvalidArgument, "")).Once()
-
+		txResults := storage.NewTransactionResults(suite.T())
 		handler := createHandler(txResults)
 
 		_, err := handler.GetTransactionResultsByBlockID(context.Background(), req)
@@ -853,43 +911,474 @@ func (suite *Suite) TestGetTransactionResultsByBlockID() {
 		// check that an error was received
 		suite.Require().Error(err)
 		errors.Is(err, status.Error(codes.InvalidArgument, ""))
-
-		// check that no storage calls was made
-		suite.events.AssertExpectations(suite.T())
 	})
 
-	// failure path - nonexisting block id in the request results in valid, but empty
+	// failure path - nonexisting block id in the request results in not found error
 	suite.Run("request with nonexisting block ID", func() {
 
-		// expect a call to lookup events by block ID and transaction ID
-		suite.events.On("ByBlockID", nonexistingBlockID).Return(eventsForBlock, nil).Once()
+		suite.commits.On("ByBlockID", nonexistingBlockID).Return(nil, realstorage.ErrNotFound).Once()
 
-		// create the expected result
-		expectedResult := &execution.GetTransactionResultsResponse{
-			TransactionResults: []*execution.GetTransactionResultResponse{},
-		}
-
-		// expect a call to lookup transaction result by block ID return a result with no error
-		txResultsMock := new(storage.TransactionResults)
-		var txResults []flow.TransactionResult
-		txResultsMock.On("ByBlockID", nonexistingBlockID).Return(txResults, nil).Once()
-
+		txResultsMock := storage.NewTransactionResults(suite.T())
 		handler := createHandler(txResultsMock)
 
 		// create a valid API request
 		req := concoctReq(nonexistingBlockID[:])
 
 		// execute the GetTransactionResult call
-		actualResult, err := handler.GetTransactionResultsByBlockID(context.Background(), req)
+		_, err := handler.GetTransactionResultsByBlockID(context.Background(), req)
+
+		// check that an error was received
+		suite.Require().Error(err)
+		errors.Is(err, status.Error(codes.NotFound, ""))
+	})
+}
+
+// TestGetTransactionErrorMessage tests the GetTransactionErrorMessage and GetTransactionErrorMessageByIndex API calls
+func (suite *Suite) TestGetTransactionErrorMessage() {
+	block := unittest.BlockFixture()
+	tx := unittest.TransactionFixture()
+	bID := block.ID()
+	txID := tx.ID()
+	txIndex := rand.Uint32()
+
+	// create the handler
+	createHandler := func(txResults *storage.TransactionResults) *handler {
+		handler := &handler{
+			headers:            suite.headers,
+			events:             suite.events,
+			transactionResults: txResults,
+			commits:            suite.commits,
+			chain:              flow.Mainnet,
+		}
+		return handler
+	}
+
+	// concoctReq creates a GetTransactionErrorMessageRequest
+	concoctReq := func(bID []byte, tID []byte) *execution.GetTransactionErrorMessageRequest {
+		return &execution.GetTransactionErrorMessageRequest{
+			BlockId:       bID,
+			TransactionId: tID,
+		}
+	}
+
+	// concoctIndexReq creates a GetTransactionErrorMessageByIndexRequest
+	concoctIndexReq := func(bID []byte, tIndex uint32) *execution.GetTransactionErrorMessageByIndexRequest {
+		return &execution.GetTransactionErrorMessageByIndexRequest{
+			BlockId: bID,
+			Index:   tIndex,
+		}
+	}
+
+	suite.Run("happy path - by tx id - no transaction error", func() {
+
+		// create the expected result
+		expectedResult := &execution.GetTransactionErrorMessageResponse{
+			TransactionId: convert.IdentifierToMessage(txID),
+			ErrorMessage:  "",
+		}
+
+		// expect a call to lookup transaction result by block ID and transaction ID, return a result with no error
+		txResults := storage.NewTransactionResults(suite.T())
+		txResult := flow.TransactionResult{
+			TransactionID: txID,
+			ErrorMessage:  "",
+		}
+		txResults.On("ByBlockIDTransactionID", bID, txID).Return(&txResult, nil).Once()
+
+		handler := createHandler(txResults)
+
+		// create a valid API request
+		req := concoctReq(bID[:], txID[:])
+
+		// execute the GetTransactionErrorMessage call
+		actualResult, err := handler.GetTransactionErrorMessage(context.Background(), req)
 
 		// check that a successful response is received
 		suite.Require().NoError(err)
 
 		// check that all fields in response are as expected
-		assertEqual(expectedResult, actualResult)
+		suite.Equal(expectedResult, actualResult)
+	})
 
-		// check that appropriate storage calls were made
-		suite.events.AssertExpectations(suite.T())
-		txResultsMock.AssertExpectations(suite.T())
+	suite.Run("happy path - at index - no transaction error", func() {
+
+		// create the expected result
+		expectedResult := &execution.GetTransactionErrorMessageResponse{
+			TransactionId: convert.IdentifierToMessage(txID),
+			ErrorMessage:  "",
+		}
+
+		// expect a call to lookup transaction result by block ID and transaction ID, return a result with no error
+		txResults := storage.NewTransactionResults(suite.T())
+		txResult := flow.TransactionResult{
+			TransactionID: txID,
+			ErrorMessage:  "",
+		}
+		txResults.On("ByBlockIDTransactionIndex", bID, txIndex).Return(&txResult, nil).Once()
+
+		handler := createHandler(txResults)
+
+		// create a valid API request
+		req := concoctIndexReq(bID[:], txIndex)
+
+		// execute the GetTransactionResult call
+		actualResult, err := handler.GetTransactionErrorMessageByIndex(context.Background(), req)
+
+		// check that a successful response is received
+		suite.Require().NoError(err)
+
+		// check that all fields in response are as expected
+		suite.Equal(expectedResult, actualResult)
+	})
+
+	suite.Run("happy path - by tx id - transaction error", func() {
+
+		// create the expected result
+		expectedResult := &execution.GetTransactionErrorMessageResponse{
+			TransactionId: convert.IdentifierToMessage(txID),
+			ErrorMessage:  "runtime error",
+		}
+
+		// setup the storage to return a transaction error
+		txResults := storage.NewTransactionResults(suite.T())
+		txResult := flow.TransactionResult{
+			TransactionID: txID,
+			ErrorMessage:  "runtime error",
+		}
+		txResults.On("ByBlockIDTransactionID", bID, txID).Return(&txResult, nil).Once()
+
+		handler := createHandler(txResults)
+
+		// create a valid API request
+		req := concoctReq(bID[:], txID[:])
+
+		// execute the GetTransactionErrorMessage call
+		actualResult, err := handler.GetTransactionErrorMessage(context.Background(), req)
+
+		// check that a successful response is received
+		suite.Require().NoError(err)
+
+		// check that all fields in response are as expected
+		suite.Equal(expectedResult, actualResult)
+	})
+
+	suite.Run("happy path - at index - transaction error", func() {
+
+		// create the expected result
+		expectedResult := &execution.GetTransactionErrorMessageResponse{
+			TransactionId: convert.IdentifierToMessage(txID),
+			ErrorMessage:  "runtime error",
+		}
+
+		// setup the storage to return a transaction error
+		txResults := storage.NewTransactionResults(suite.T())
+		txResult := flow.TransactionResult{
+			TransactionID: txID,
+			ErrorMessage:  "runtime error",
+		}
+		txResults.On("ByBlockIDTransactionIndex", bID, txIndex).Return(&txResult, nil).Once()
+
+		handler := createHandler(txResults)
+
+		// create a valid API request
+		req := concoctIndexReq(bID[:], txIndex)
+
+		// execute the GetTransactionErrorMessageByIndex call
+		actualResult, err := handler.GetTransactionErrorMessageByIndex(context.Background(), req)
+
+		// check that a successful response is received
+		suite.Require().NoError(err)
+
+		// check that all fields in response are as expected
+		suite.Equal(expectedResult, actualResult)
+	})
+
+	// failure path - nil transaction ID in the request results in an error
+	suite.Run("request with nil tx ID", func() {
+
+		// create an API request with transaction ID as nil
+		req := concoctReq(bID[:], nil)
+
+		txResults := storage.NewTransactionResults(suite.T())
+		handler := createHandler(txResults)
+
+		_, err := handler.GetTransactionErrorMessage(context.Background(), req)
+
+		// check that an error was received
+		suite.Require().Error(err)
+		errors.Is(err, status.Error(codes.InvalidArgument, ""))
+	})
+
+	// failure path - nil block id in the request results in an error
+	suite.Run("request with nil block ID", func() {
+
+		// create an API request with a nil block id
+		req := concoctReq(nil, txID[:])
+
+		txResults := storage.NewTransactionResults(suite.T())
+		handler := createHandler(txResults)
+
+		_, err := handler.GetTransactionErrorMessage(context.Background(), req)
+
+		// check that an error was received
+		suite.Require().Error(err)
+		errors.Is(err, status.Error(codes.InvalidArgument, ""))
+	})
+
+	// failure path - nil block id in the index request results in an error
+	suite.Run("index request with nil block ID", func() {
+
+		// create an API request with a nil block id
+		req := concoctIndexReq(nil, txIndex)
+
+		txResults := storage.NewTransactionResults(suite.T())
+		handler := createHandler(txResults)
+
+		_, err := handler.GetTransactionErrorMessageByIndex(context.Background(), req)
+
+		// check that an error was received
+		suite.Require().Error(err)
+		errors.Is(err, status.Error(codes.InvalidArgument, ""))
+	})
+
+	// failure path - non-existent transaction ID in request results in an error
+	suite.Run("request with non-existent transaction ID", func() {
+
+		wrongTxID := unittest.IdentifierFixture()
+
+		// create an API request with the invalid transaction ID
+		req := concoctReq(bID[:], wrongTxID[:])
+
+		// expect a storage call for the invalid tx ID but return an error
+		txResults := storage.NewTransactionResults(suite.T())
+		txResults.On("ByBlockIDTransactionID", bID, wrongTxID).Return(nil, realstorage.ErrNotFound).Once()
+
+		handler := createHandler(txResults)
+
+		_, err := handler.GetTransactionErrorMessage(context.Background(), req)
+
+		// check that an error was received
+		suite.Require().Error(err)
+		errors.Is(err, status.Error(codes.NotFound, ""))
+	})
+
+	// failure path - non-existent transaction ID in request results in an exception
+	suite.Run("request with non-existent transaction ID, exception", func() {
+
+		wrongTxID := unittest.IdentifierFixture()
+
+		// create an API request with the invalid transaction ID
+		req := concoctReq(bID[:], wrongTxID[:])
+
+		// expect a storage call for the invalid tx ID but return an exception
+		txResults := storage.NewTransactionResults(suite.T())
+		txResults.On("ByBlockIDTransactionID", bID, wrongTxID).Return(nil, errors.New("internal-error")).Once()
+
+		handler := createHandler(txResults)
+
+		_, err := handler.GetTransactionErrorMessage(context.Background(), req)
+
+		// check that an error was received
+		suite.Require().Error(err)
+		errors.Is(err, status.Error(codes.Internal, ""))
+	})
+
+	// failure path - non-existent transaction index in request results in an error
+	suite.Run("request with non-existent transaction index", func() {
+
+		wrongTxIndex := txIndex + 1
+
+		// create an API request with the invalid transaction ID
+		req := concoctIndexReq(bID[:], wrongTxIndex)
+
+		// expect a storage call for the invalid tx ID but return an error
+		txResults := storage.NewTransactionResults(suite.T())
+		txResults.On("ByBlockIDTransactionIndex", bID, wrongTxIndex).Return(nil, realstorage.ErrNotFound).Once()
+
+		handler := createHandler(txResults)
+
+		_, err := handler.GetTransactionErrorMessageByIndex(context.Background(), req)
+
+		// check that an error was received
+		suite.Require().Error(err)
+		errors.Is(err, status.Error(codes.NotFound, ""))
+	})
+
+	// failure path - non-existent transaction index in request results in an exception
+	suite.Run("request with non-existent transaction index, exception", func() {
+
+		wrongTxIndex := txIndex + 1
+
+		// create an API request with the invalid transaction ID
+		req := concoctIndexReq(bID[:], wrongTxIndex)
+
+		// expect a storage call for the invalid tx ID but return an exception
+		txResults := storage.NewTransactionResults(suite.T())
+		txResults.On("ByBlockIDTransactionIndex", bID, wrongTxIndex).Return(nil, errors.New("internal-error")).Once()
+
+		handler := createHandler(txResults)
+
+		_, err := handler.GetTransactionErrorMessageByIndex(context.Background(), req)
+
+		// check that an error was received
+		suite.Require().Error(err)
+		errors.Is(err, status.Error(codes.Internal, ""))
+	})
+}
+
+// TestGetTransactionErrorMessagesByBlockID tests GetTransactionErrorMessagesByBlockID API calls
+func (suite *Suite) TestGetTransactionErrorMessagesByBlockID() {
+	block := unittest.BlockFixture()
+	tx := unittest.TransactionFixture()
+	bID := block.ID()
+	nonexistingBlockID := unittest.IdentifierFixture()
+	tx1ID := tx.ID()
+	tx2ID := tx.ID()
+	tx3ID := tx.ID()
+
+	// create the handler
+	createHandler := func(txResults *storage.TransactionResults) *handler {
+		handler := &handler{
+			headers:            suite.headers,
+			events:             suite.events,
+			transactionResults: txResults,
+			commits:            suite.commits,
+			chain:              flow.Mainnet,
+		}
+		return handler
+	}
+
+	// concoctReq creates a GetTransactionErrorMessagesByBlockIDRequest
+	concoctReq := func(bID []byte) *execution.GetTransactionErrorMessagesByBlockIDRequest {
+		return &execution.GetTransactionErrorMessagesByBlockIDRequest{
+			BlockId: bID,
+		}
+	}
+
+	// happy path - if no transaction errors are found, an empty list is returned
+	suite.Run("happy path with no transaction error", func() {
+		suite.commits.On("ByBlockID", bID).Return(nil, nil).Once()
+
+		// create the expected result
+		expectedResult := &execution.GetTransactionErrorMessagesResponse{
+			Results: []*execution.GetTransactionErrorMessagesResponse_Result{},
+		}
+
+		// expect a call to lookup transaction result by block ID return a result with no error
+		txResultsMock := storage.NewTransactionResults(suite.T())
+		txResults := []flow.TransactionResult{
+			{
+				TransactionID: tx1ID,
+				ErrorMessage:  "",
+			},
+			{
+				TransactionID: tx2ID,
+				ErrorMessage:  "",
+			},
+		}
+		txResultsMock.On("ByBlockID", bID).Return(txResults, nil).Once()
+
+		handler := createHandler(txResultsMock)
+
+		// create a valid API request
+		req := concoctReq(bID[:])
+
+		// execute the GetTransactionErrorMessagesByBlockID call
+		actualResult, err := handler.GetTransactionErrorMessagesByBlockID(context.Background(), req)
+
+		// check that a successful response is received
+		suite.Require().NoError(err)
+
+		// check that all fields in response are as expected
+		suite.Assert().ElementsMatch(expectedResult.Results, actualResult.Results)
+	})
+
+	// happy path - valid requests receives error messages for all failed transactions.
+	suite.Run("happy path with transaction errors", func() {
+
+		suite.commits.On("ByBlockID", bID).Return(nil, nil).Once()
+
+		// create the expected result
+		expectedResult := &execution.GetTransactionErrorMessagesResponse{
+			Results: []*execution.GetTransactionErrorMessagesResponse_Result{
+				{
+					TransactionId: convert.IdentifierToMessage(tx2ID),
+					Index:         1,
+					ErrorMessage:  "runtime error",
+				},
+				{
+					TransactionId: convert.IdentifierToMessage(tx3ID),
+					Index:         2,
+					ErrorMessage:  "runtime error",
+				},
+			},
+		}
+
+		// expect a call to lookup transaction result by block ID return a result with no error
+		txResultsMock := storage.NewTransactionResults(suite.T())
+		txResults := []flow.TransactionResult{
+			{
+				TransactionID: tx1ID,
+				ErrorMessage:  "",
+			},
+			{
+				TransactionID: tx2ID,
+				ErrorMessage:  "runtime error",
+			},
+			{
+				TransactionID: tx3ID,
+				ErrorMessage:  "runtime error",
+			},
+		}
+		txResultsMock.On("ByBlockID", bID).Return(txResults, nil).Once()
+
+		handler := createHandler(txResultsMock)
+
+		// create a valid API request
+		req := concoctReq(bID[:])
+
+		// execute the GetTransactionErrorMessagesByBlockID call
+		actualResult, err := handler.GetTransactionErrorMessagesByBlockID(context.Background(), req)
+
+		// check that a successful response is received
+		suite.Require().NoError(err)
+
+		// check that all fields in response are as expected
+		suite.Assert().ElementsMatch(expectedResult.Results, actualResult.Results)
+	})
+
+	// failure path - nil block id in the request results in an error
+	suite.Run("request with nil block ID", func() {
+
+		// create an API request with a nil block id
+		req := concoctReq(nil)
+
+		txResults := storage.NewTransactionResults(suite.T())
+		handler := createHandler(txResults)
+
+		_, err := handler.GetTransactionErrorMessagesByBlockID(context.Background(), req)
+
+		// check that an error was received
+		suite.Require().Error(err)
+		errors.Is(err, status.Error(codes.InvalidArgument, ""))
+	})
+
+	// failure path - nonexisting block id in the request results in not found error
+	suite.Run("request with nonexisting block ID", func() {
+
+		suite.commits.On("ByBlockID", nonexistingBlockID).Return(nil, realstorage.ErrNotFound).Once()
+
+		txResultsMock := storage.NewTransactionResults(suite.T())
+		handler := createHandler(txResultsMock)
+
+		// create a valid API request
+		req := concoctReq(nonexistingBlockID[:])
+
+		// execute the GetTransactionResult call
+		_, err := handler.GetTransactionErrorMessagesByBlockID(context.Background(), req)
+
+		// check that an error was received
+		suite.Require().Error(err)
+		errors.Is(err, status.Error(codes.NotFound, ""))
 	})
 }

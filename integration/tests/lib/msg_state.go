@@ -91,17 +91,3 @@ func MsgIsResultApproval(msg interface{}) bool {
 	_, ok := msg.(*flow.ResultApproval)
 	return ok
 }
-
-func MsgIsExecutionStateDelta(msg interface{}) bool {
-	_, ok := msg.(*messages.ExecutionStateDelta)
-	return ok
-}
-
-func MsgIsExecutionStateDeltaWithChanges(msg interface{}) bool {
-	delta, ok := msg.(*messages.ExecutionStateDelta)
-	if !ok {
-		return false
-	}
-
-	return *delta.StartState != delta.EndState
-}

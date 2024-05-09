@@ -1,201 +1,116 @@
 package complete_test
 
 import (
+	"errors"
 	"flag"
 	"fmt"
-	"io"
 	"os"
+	"path/filepath"
 	"strconv"
-	"strings"
 	"testing"
 	"time"
 
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/ledger"
-	"github.com/onflow/flow-go/ledger/common/pathfinder"
-	"github.com/onflow/flow-go/ledger/complete/mtrie"
-	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 	"github.com/onflow/flow-go/ledger/complete/wal"
-	"github.com/onflow/flow-go/module/metrics"
 )
 
-var dir = flag.String("dir", ".", "dir containing checkpoint and wal files")
+// To benchmark with local data, using this command:
+// $ go test -c -o benchmark
+// $ GOARCH=amd64 GOOS=linux ./benchmark -test.bench=BenchmarkStoreCheckpointV6Concurrently -test.benchmem --checkpointFile ./root.checkpoint
+var checkpointFile = flag.String("checkpointFile", "", "input checkpoint filename")
 
-// BenchmarkNewCheckpoint benchmarks checkpoint file creation from existing checkpoint and wal segments.
-// This requires a checkpoint file and one or more segments following the checkpoint file.
-// This benchmark will create a checkpoint file.
-func BenchmarkNewCheckpoint(b *testing.B) {
-	// Check if there is any segment in specified dir
-	foundSeg, err := hasSegmentInDir(*dir)
-	if err != nil {
-		b.Fatal(err)
-	}
-	if !foundSeg {
-		b.Fatalf("failed to find segment in %s.  Use -dir to specify dir containing segments and checkpoint files.", *dir)
-	}
+func BenchmarkStoreCheckpointV5(b *testing.B) {
+	benchmarkStoreCheckpoint(b, 5, false)
+}
 
-	// Check if there is any checkpoint file in specified dir
-	foundCheckpoint, err := hasCheckpointInDir(*dir)
-	if err != nil {
-		b.Fatal(err)
-	}
-	if !foundCheckpoint {
-		b.Fatalf("failed to find checkpoint in %s.  Use -dir to specify dir containing segments and checkpoint files.", *dir)
+func BenchmarkStoreCheckpointV6(b *testing.B) {
+	benchmarkStoreCheckpoint(b, 6, false)
+}
+
+func BenchmarkStoreCheckpointV6Concurrently(b *testing.B) {
+	benchmarkStoreCheckpoint(b, 6, true)
+}
+
+func benchmarkStoreCheckpoint(b *testing.B, version int, concurrent bool) {
+	if version != 5 && version != 6 {
+		b.Fatalf("checkpoint file version must be 5 or 6, version %d isn't supported", version)
 	}
 
-	diskwal, err := wal.NewDiskWAL(
-		zerolog.Nop(),
-		nil,
-		metrics.NewNoopCollector(),
-		*dir,
-		500,
-		pathfinder.PathByteSize,
-		wal.SegmentSize,
-	)
-	if err != nil {
-		b.Fatal(err)
+	log := zerolog.Nop()
+
+	// Check if checkpoint file exists
+	_, err := os.Stat(*checkpointFile)
+	if errors.Is(err, os.ErrNotExist) {
+		b.Fatalf("input checkpoint file %s doesn't exist", *checkpointFile)
 	}
 
-	_, to, err := diskwal.Segments()
+	dir, fileName := filepath.Split(*checkpointFile)
+	subdir := strconv.FormatInt(time.Now().UnixNano(), 10)
+	outputDir := filepath.Join(dir, subdir)
+	err = os.Mkdir(outputDir, 0755)
 	if err != nil {
-		b.Fatal(err)
+		b.Fatalf("cannot create output dir %s: %s", outputDir, err)
 	}
+	defer func() {
+		// Remove output directory and its contents.
+		os.RemoveAll(outputDir)
+	}()
 
-	checkpointer, err := diskwal.NewCheckpointer()
+	// Load checkpoint
+	tries, err := wal.LoadCheckpoint(*checkpointFile, log)
 	if err != nil {
-		b.Fatal(err)
+		b.Fatalf("cannot load checkpoint: %s", err)
 	}
 
 	start := time.Now()
 	b.ResetTimer()
 
-	err = checkpointer.Checkpoint(to-1, func() (io.WriteCloser, error) {
-		return checkpointer.CheckpointWriter(to - 1)
-	})
+	// Serialize checkpoint V5.
+	switch version {
+	case 5:
+		err = wal.StoreCheckpointV5(outputDir, fileName, log, tries...)
+	case 6:
+		if concurrent {
+			err = wal.StoreCheckpointV6Concurrently(tries, outputDir, fileName, log)
+		} else {
+			err = wal.StoreCheckpointV6SingleThread(tries, outputDir, fileName, log)
+		}
+	}
 
 	b.StopTimer()
 	elapsed := time.Since(start)
 
 	if err != nil {
-		b.Fatal(err)
+		b.Fatalf("cannot store checkpoint: %s", err)
 	}
 
-	b.ReportMetric(float64(elapsed/time.Millisecond), "newcheckpoint_time_(ms)")
+	b.ReportMetric(float64(elapsed/time.Millisecond), fmt.Sprintf("storecheckpoint_v%d_time_(ms)", version))
 	b.ReportAllocs()
 }
 
-// BenchmarkLoadCheckpointAndWALs benchmarks checkpoint file loading and wal segments replaying.
-// This requires a checkpoint file and one or more segments following the checkpoint file.
-// This mimics rebuliding mtrie at EN startup.
-func BenchmarkLoadCheckpointAndWALs(b *testing.B) {
-	// Check if there is any segment in specified dir
-	foundSeg, err := hasSegmentInDir(*dir)
-	if err != nil {
-		b.Fatal(err)
-	}
-	if !foundSeg {
-		b.Fatalf("failed to find segment in %s.  Use -dir to specify dir containing segments and checkpoint files.", *dir)
+func BenchmarkLoadCheckpoint(b *testing.B) {
+	// Check if input checkpoint file exists
+	_, err := os.Stat(*checkpointFile)
+	if errors.Is(err, os.ErrNotExist) {
+		b.Fatalf("input checkpoint file %s doesn't exist", *checkpointFile)
 	}
 
-	// Check if there is any checkpoint file in specified dir
-	foundCheckpoint, err := hasCheckpointInDir(*dir)
-	if err != nil {
-		b.Fatal(err)
-	}
-	if !foundCheckpoint {
-		b.Fatalf("failed to find checkpoint in %s.  Use -dir to specify dir containing segments and checkpoint files.", *dir)
-	}
-
-	forest, err := mtrie.NewForest(500, metrics.NewNoopCollector(), nil)
-	if err != nil {
-		b.Fatal(err)
-	}
-
-	diskwal, err := wal.NewDiskWAL(
-		zerolog.Nop(),
-		nil,
-		metrics.NewNoopCollector(),
-		*dir,
-		500,
-		pathfinder.PathByteSize,
-		wal.SegmentSize,
-	)
-	if err != nil {
-		b.Fatal(err)
-	}
-
-	// pause records to prevent double logging trie removals
-	diskwal.PauseRecord()
-	defer diskwal.UnpauseRecord()
+	log := zerolog.Nop()
 
 	start := time.Now()
 	b.ResetTimer()
 
-	err = diskwal.Replay(
-		func(tries []*trie.MTrie) error {
-			err := forest.AddTries(tries)
-			if err != nil {
-				return fmt.Errorf("adding rebuilt tries to forest failed: %w", err)
-			}
-			return nil
-		},
-		func(update *ledger.TrieUpdate) error {
-			_, err := forest.Update(update)
-			return err
-		},
-		func(rootHash ledger.RootHash) error {
-			return nil
-		},
-	)
-	if err != nil {
-		b.Fatal(err)
-	}
+	// Load checkpoint
+	_, err = wal.LoadCheckpoint(*checkpointFile, log)
 
 	b.StopTimer()
 	elapsed := time.Since(start)
 
-	b.ReportMetric(float64(elapsed/time.Millisecond), "loadcheckpointandwals_time_(ms)")
+	if err != nil {
+		b.Fatalf("cannot load checkpoint : %s", err)
+	}
+
+	b.ReportMetric(float64(elapsed/time.Millisecond), "loadcheckpoint_time_(ms)")
 	b.ReportAllocs()
-}
-
-func hasSegmentInDir(dir string) (bool, error) {
-	files, err := os.ReadDir(dir)
-	if err != nil {
-		return false, err
-	}
-
-	for _, fn := range files {
-		fname := fn.Name()
-		_, err := strconv.Atoi(fname)
-		if err != nil {
-			continue
-		}
-		return true, nil
-	}
-	return false, nil
-}
-
-func hasCheckpointInDir(dir string) (bool, error) {
-	const checkpointFilenamePrefix = "checkpoint."
-
-	files, err := os.ReadDir(dir)
-	if err != nil {
-		return false, err
-	}
-
-	for _, fn := range files {
-		fname := fn.Name()
-		if !strings.HasPrefix(fname, checkpointFilenamePrefix) {
-			continue
-		}
-		justNumber := fname[len(checkpointFilenamePrefix):]
-		_, err := strconv.Atoi(justNumber)
-		if err != nil {
-			continue
-		}
-		return true, nil
-	}
-
-	return false, nil
 }

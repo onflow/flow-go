@@ -1,83 +1,178 @@
+# This workflow runs all skipped (flaky) and non-skipped (regular) tests and generates a summary that's uploaded to BigQuery.
+
 name: Flaky Test Monitor
 
 on:
   schedule:
     - cron: '0 */2 * * *' # every 2 hours
   push:
-    branches:
-      - master
+    paths:
+      - '.github/workflows/flaky-test-monitor.yml'
 
 env:
   BIGQUERY_DATASET: production_src_flow_test_metrics
-  BIGQUERY_TABLE: test_results
-  GO_VERSION: 1.19
+  BIGQUERY_TABLE: skipped_tests
+  BIGQUERY_TABLE2: test_results
+  GO_VERSION: "1.20"
+  SKIPPED_TESTS_FILE: skipped-tests
+  RESULTS_FILE: test-results
+  COMMIT_SHA: ${{ github.sha }}
+  RUN_ID: ${{ github.run_id }}
+  JSON_OUTPUT: true
+  VERBOSE: true
+  TEST_FLAKY: true
 
-concurrency: 
+concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
   cancel-in-progress: true
 
 jobs:
-  upload-flaky-test-summary:
-    name: Upload Flaky Test Summary
+  create-dynamic-test-matrix:
+    name: Create Dynamic Test Matrix
+    runs-on: ubuntu-latest
+    outputs:
+      dynamic-matrix: ${{ steps.set-test-matrix.outputs.dynamicMatrix }}
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+      - name: Set Test Matrix
+        id: set-test-matrix
+        run: go run utils/test_matrix/test_matrix.go admin cmd consensus engine fvm ledger module network/test network/p2p utils
+
+  unit-test:
+    name: Unit Tests (${{ matrix.targets.name }})
+    needs: create-dynamic-test-matrix
     strategy:
       fail-fast: false
       matrix:
-        test-category:
-          - unit
-          - unit-crypto
-          - unit-integration
-          - integration-bft
-          - integration-mvp
-          - integration-ghost
-          - integration-network
-          - integration-epochs
-          - integration-access
-          - integration-collection
-          - integration-consensus
-          - integration-execution
-          - integration-verification
-    env:
-      TEST_CATEGORY: ${{ matrix.test-category }}
-      COMMIT_SHA: ${{ github.sha }} 
-      RUN_ID: ${{ github.run_id }}
-      RESULTS_FILE: test-results
+        targets: ${{ fromJSON(needs.create-dynamic-test-matrix.outputs.dynamic-matrix)}}
+    # need to set image explicitly due to GitHub logging issue as described in https://github.com/onflow/flow-go/pull/3087#issuecomment-1234383202
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+      - name: Setup tests (${{ matrix.targets.name }})
+        run: make -e GO_TEST_PACKAGES="${{ matrix.targets.packages }}" install-tools
+      - name: Run tests (${{ matrix.targets.name }})
+        run: make -es GO_TEST_PACKAGES="${{ matrix.targets.packages }}" unittest-main > test-output
+        timeout-minutes: 100
+        # test run should continue even if there are failed tests
+        continue-on-error: true
+      - name: Process test results
+        env:
+          TEST_CATEGORY: unit
+        uses: ./.github/workflows/actions/test-monitor-process-results
+        with:
+          gcp_sa_key: ${{ secrets.GCP_SA_KEY }}
+
+  unit-test-modules:
+    name: Unit Tests (Modules)
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: crypto
+            setup: noop
+            race: 1
+            test_category: unit-crypto
+          - name: insecure
+            setup: install-tools
+            race: 0
+            test_category: unit-insecure
+          - name: integration
+            setup: install-tools
+            race: 0
+            test_category: unit-integration
     runs-on: ubuntu-latest
     steps:
-    - name: Get job run date
-      id: job_run_date
-      run: echo "::set-output name=date::$(TZ=":America/Los_Angeles" date -Iseconds)"
-    - name: Set up Cloud SDK
-      uses: google-github-actions/setup-gcloud@v0
-      with:
-        service_account_key: ${{ secrets.GCP_SA_KEY }}
-    - name: Setup Go
-      uses: actions/setup-go@v2
-      with:
-        go-version: ${{ env.GO_VERSION }}
-    - name: Checkout repo
-      uses: actions/checkout@v2
-      with:
-        ref: ${{ env.COMMIT_SHA }}
-    - name: Get commit date
-      id: commit_date
-      run: echo "::set-output name=date::$(git show --no-patch --no-notes --pretty='%cI' $COMMIT_SHA)"
-    - name: Test setup
-      run: ./tools/test_monitor/test-setup.sh
-    - name: Run tests
-      continue-on-error: true
-      run: ./tools/test_monitor/run-tests.sh > test-output
-      env:
-        TEST_FLAKY: true
-        JSON_OUTPUT: true
-        RACE_DETECTOR: 1
-    - name: Process test results
-      run: cat test-output | go run tools/test_monitor/level1/process_summary1_results.go
-      env:
-        JOB_STARTED: ${{ steps.job_run_date.outputs.date }}
-        COMMIT_DATE: ${{ steps.commit_date.outputs.date }}
-    - name: Upload results to BigQuery
-      uses: nick-fields/retry@v2
-      with:
-        timeout_minutes: 2
-        max_attempts: 3
-        command: bq load --source_format=NEWLINE_DELIMITED_JSON $BIGQUERY_DATASET.$BIGQUERY_TABLE $RESULTS_FILE tools/test_monitor/schemas/test_results_schema.json
+      - name: Checkout repo
+        uses: actions/checkout@v3
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+      - name: Setup tests (${{ matrix.name }})
+        run: make ${{ matrix.setup }}
+      - name: Run tests (${{ matrix.name }})
+        env:
+          RACE_DETECTOR: ${{ matrix.race }}
+        run: make -es -C ${{ matrix.name }} test > test-output
+        timeout-minutes: 100
+        continue-on-error: true
+      - name: Process test results (${{ matrix.name }})
+        env:
+          TEST_CATEGORY: ${{ matrix.test_category }}
+        uses: ./.github/workflows/actions/test-monitor-process-results
+        with:
+          gcp_sa_key: ${{ secrets.GCP_SA_KEY }}
+
+  integration-test:
+    name: Integration Tests
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: access-tests
+            test_category: integration-access
+          - target: bft-protocol-tests
+            test_category: integration-bft-protocol
+          - target: bft-framework-tests
+            test_category: integration-bft-framework
+          - target: bft-gossipsub-tests
+            test_category: integration-bft-gossipsub
+          - target: collection-tests
+            test_category: integration-collection
+          - target: consensus-tests
+            test_category: integration-consensus
+          - target: epochs-cohort1-tests
+            test_category: integration-epochs
+          - target: epochs-cohort2-tests
+            test_category: integration-epochs
+          - target: execution-tests
+            test_category: integration-execution
+          - target: ghost-tests
+            test_category: integration-ghost
+          - target: mvp-tests
+            test_category: integration-mvp
+          - target: network-tests
+            test_category: integration-network
+          - target: verification-tests
+            test_category: integration-verification
+          - target: upgrades-tests
+            test_category: integration-upgrades
+
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+        with:
+          # all tags are needed for integration tests
+          fetch-depth: 0
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+      - name: Docker build
+        run: make docker-native-build-flow docker-native-build-flow-corrupt
+      - name: Run tests
+        run: make -es -C integration ${{ matrix.target }} > test-output
+        timeout-minutes: 100
+        continue-on-error: true
+      - name: Process test results
+        env:
+          TEST_CATEGORY: ${{ matrix.test_category }}
+        uses: ./.github/workflows/actions/test-monitor-process-results
+        with:
+          gcp_sa_key: ${{ secrets.GCP_SA_KEY }}

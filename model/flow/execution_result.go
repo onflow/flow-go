@@ -14,7 +14,23 @@ type ExecutionResult struct {
 	BlockID          Identifier // commit of the current block
 	Chunks           ChunkList
 	ServiceEvents    ServiceEventList
-	ExecutionDataID  Identifier
+	ExecutionDataID  Identifier // hash commitment to flow.BlockExecutionDataRoot
+}
+
+func NewExecutionResult(
+	previousResultID Identifier,
+	blockID Identifier,
+	chunks ChunkList,
+	serviceEvents ServiceEventList,
+	executionDataID Identifier,
+) *ExecutionResult {
+	return &ExecutionResult{
+		PreviousResultID: previousResultID,
+		BlockID:          blockID,
+		Chunks:           chunks,
+		ServiceEvents:    serviceEvents,
+		ExecutionDataID:  executionDataID,
+	}
 }
 
 // ID returns the hash of the execution result body

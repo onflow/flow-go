@@ -111,7 +111,7 @@ func (s *RequestTrackerTestSuite) TestTryUpdate_UpdateForPrunedHeight() {
 	result := unittest.ExecutionResultFixture(unittest.WithBlock(&executedBlock))
 	_, updated, err := s.tracker.TryUpdate(result, executedBlock.ID(), uint64(0))
 	require.Error(s.T(), err)
-	require.True(s.T(), mempool.IsDecreasingPruningHeightError(err))
+	require.True(s.T(), mempool.IsBelowPrunedThresholdError(err))
 	require.False(s.T(), updated)
 }
 
@@ -140,12 +140,12 @@ func (s *RequestTrackerTestSuite) TestPruneUpToHeight_Pruning() {
 	require.True(s.T(), ok)
 }
 
-// TestPruneUpToHeight_PruningWithDecreasingHeight tests that pruning with decreasing height results in error
-func (s *RequestTrackerTestSuite) TestPruneUpToHeight_PruningWithDecreasingHeight() {
+// TestPruneUpToHeight_PruningWithHeightBelowPrunedThreshold tests that pruning with height below pruned threshold results in error
+func (s *RequestTrackerTestSuite) TestPruneUpToHeight_PruningWithHeightBelowPrunedThreshold() {
 	height := uint64(100)
 	err := s.tracker.PruneUpToHeight(height + 1)
 	require.NoError(s.T(), err)
 	err = s.tracker.PruneUpToHeight(height)
 	require.Error(s.T(), err)
-	require.True(s.T(), mempool.IsDecreasingPruningHeightError(err))
+	require.True(s.T(), mempool.IsBelowPrunedThresholdError(err))
 }

@@ -5,14 +5,43 @@ import (
 	"math/bits"
 	"math/rand"
 	"testing"
-	"time"
 
+	"github.com/onflow/cadence"
+	"github.com/onflow/cadence/runtime/common"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 type addressWrapper struct {
 	Address Address
+}
+
+func TestConvertAddress(t *testing.T) {
+	expected := BytesToAddress([]byte{1, 2, 3, 4, 5, 6, 7, 8})
+	cadenceAddress := cadence.BytesToAddress([]byte{1, 2, 3, 4, 5, 6, 7, 8})
+	runtimeAddress := common.MustBytesToAddress([]byte{1, 2, 3, 4, 5, 6, 7, 8})
+
+	assert.NotEqual(t, cadenceAddress, runtimeAddress)
+
+	assert.Equal(t, expected, ConvertAddress(cadenceAddress))
+	assert.Equal(t, expected, ConvertAddress(runtimeAddress))
+}
+
+func TestBytesToAddress(t *testing.T) {
+	type testCase struct {
+		expected string
+		value    string
+	}
+
+	for _, test := range []testCase{
+		{string([]byte{0, 0, 0, 0, 0, 0, 0, 0}), ""},
+		{string([]byte{0, 0, 0, 0}) + "1234", "1234"},
+		{"12345678", "12345678"},
+		{"12345678", "trim12345678"},
+	} {
+		address := BytesToAddress([]byte(test.value))
+		assert.Equal(t, test.expected, string(address[:]))
+	}
 }
 
 func TestHexToAddress(t *testing.T) {
@@ -98,20 +127,20 @@ func testAddressConstants(t *testing.T) {
 		Mainnet,
 		Testnet,
 		Emulator,
-		Stagingnet,
+		Sandboxnet,
+		Previewnet,
 	}
 
 	for _, chainID := range chainIDs {
 
 		chain := chainID.Chain()
-		if chainID != Emulator {
-			// check the Zero and Root constants
-			expected := uint64ToAddress(uint64(chainID.getChainCodeWord()))
 
-			assert.Equal(t, chain.zeroAddress(), expected)
-			expected = uint64ToAddress(generatorMatrixRows[0] ^ uint64(chainID.getChainCodeWord()))
-			assert.Equal(t, chain.ServiceAddress(), expected)
-		}
+		// check the Zero and Root constants
+		expected := uint64ToAddress(uint64(chainID.getChainCodeWord()))
+
+		assert.Equal(t, chain.zeroAddress(), expected)
+		expected = uint64ToAddress(generatorMatrixRows[0] ^ uint64(chainID.getChainCodeWord()))
+		assert.Equal(t, chain.ServiceAddress(), expected)
 
 		// check the transition from account zero to root
 		state := chain.NewAddressGenerator()
@@ -133,12 +162,10 @@ func testAddressConstants(t *testing.T) {
 	}
 }
 
+// invalid code word for all networks
 const invalidCodeWord = uint64(0xab2ae42382900010)
 
 func testAddressGeneration(t *testing.T) {
-	// seed random generator
-	rand.Seed(time.Now().UnixNano())
-
 	// loops in each test
 	const loop = 50
 
@@ -147,7 +174,8 @@ func testAddressGeneration(t *testing.T) {
 		Mainnet,
 		Testnet,
 		Emulator,
-		Stagingnet,
+		Sandboxnet,
+		Previewnet,
 	}
 
 	for _, chainID := range chainIDs {
@@ -168,7 +196,7 @@ func testAddressGeneration(t *testing.T) {
 		}
 
 		// sanity check of addresses weights in Flow.
-		// All addresses hamming weights must be less than d.
+		// All addresses hamming weights must be larger than d.
 		// this is only a sanity check of the implementation and not an exhaustive proof
 		if chainID == Mainnet {
 			r := uint64(rand.Intn(maxIndex - loop))
@@ -181,27 +209,23 @@ func testAddressGeneration(t *testing.T) {
 			}
 		}
 
-		if chainID == Mainnet {
-
-			// sanity check of address distances.
-			// All distances between any two addresses must be less than d.
-			// this is only a sanity check of the implementation and not an exhaustive proof
-			r := uint64(rand.Intn(maxIndex - loop - 1))
-			state = chain.newAddressGeneratorAtIndex(r)
-			refAddress, err := state.NextAddress()
+		// sanity check of address distances.
+		// All distances between any two addresses must be larger than d.
+		// this is only a sanity check of the implementation and not an exhaustive proof
+		r := uint64(rand.Intn(maxIndex - loop - 1))
+		state = chain.newAddressGeneratorAtIndex(r)
+		refAddress, err := state.NextAddress()
+		require.NoError(t, err)
+		for i := 0; i < loop; i++ {
+			address, err := state.NextAddress()
 			require.NoError(t, err)
-			for i := 0; i < loop; i++ {
-				address, err := state.NextAddress()
-				require.NoError(t, err)
-				distance := bits.OnesCount64(address.uint64() ^ refAddress.uint64())
-				assert.LessOrEqual(t, linearCodeD, distance)
-			}
-
+			distance := bits.OnesCount64(address.uint64() ^ refAddress.uint64())
+			assert.LessOrEqual(t, linearCodeD, distance)
 		}
 
 		// sanity check of valid account addresses.
 		// All valid addresses must pass IsValid.
-		r := uint64(rand.Intn(maxIndex - loop))
+		r = uint64(rand.Intn(maxIndex - loop))
 		state = chain.newAddressGeneratorAtIndex(r)
 		for i := 0; i < loop; i++ {
 			address, err := state.NextAddress()
@@ -229,9 +253,6 @@ func testAddressGeneration(t *testing.T) {
 }
 
 func testAddressesIntersection(t *testing.T) {
-	// seed random generator
-	rand.Seed(time.Now().UnixNano())
-
 	// loops in each test
 	const loop = 25
 
@@ -240,14 +261,15 @@ func testAddressesIntersection(t *testing.T) {
 		Mainnet,
 		Testnet,
 		Emulator,
-		Stagingnet,
+		Sandboxnet,
+		Previewnet,
 	}
 
 	for _, chainID := range chainIDs {
 
 		chain := chainID.Chain()
 
-		// All valid test addresses must fail Flow Mainnet check
+		// a valid address in one network must be invalid in all other networks
 		r := uint64(rand.Intn(maxIndex - loop))
 		state := chain.newAddressGeneratorAtIndex(r)
 		for k := 0; k < loop; k++ {
@@ -256,7 +278,8 @@ func testAddressesIntersection(t *testing.T) {
 			for _, otherChain := range chainIDs {
 				if chainID != otherChain {
 					check := otherChain.Chain().IsValid(address)
-					assert.False(t, check, "test account address format should be invalid in Flow")
+					assert.False(t, check, "address %s belongs to %s and should be invalid in %s",
+						address, chainID, otherChain)
 				} else {
 					sameChainCheck := chain.IsValid(address)
 					require.True(t, sameChainCheck)
@@ -264,33 +287,21 @@ func testAddressesIntersection(t *testing.T) {
 			}
 		}
 
-		// sanity check: mainnet addresses must fail the test check
-		r = uint64(rand.Intn(maxIndex - loop))
-		for k := 0; k < loop; k++ {
-			for _, otherChain := range chainIDs {
-				if chainID != otherChain {
-					invalidAddress, err := otherChain.Chain().newAddressGeneratorAtIndex(r).NextAddress()
-					require.NoError(t, err)
-					check := chain.IsValid(invalidAddress)
-					assert.False(t, check, "account address format should be invalid")
-				}
-			}
-		}
-
-		// sanity check of invalid account addresses in all networks
+		// `invalidCodeWord` must be invalid in all networks
+		// for the remaining section of the test
 		require.NotEqual(t, invalidCodeWord, uint64(0))
 		invalidAddress := uint64ToAddress(invalidCodeWord)
 		check := chain.IsValid(invalidAddress)
-		assert.False(t, check, "account address format should be invalid")
-		r = uint64(rand.Intn(maxIndex - loop))
+		require.False(t, check, "account address format should be invalid")
 
+		// build invalid addresses using `invalidCodeWord` and make sure they all
+		// fail the check for all networks
+		r = uint64(rand.Intn(maxIndex - loop))
 		state = chain.newAddressGeneratorAtIndex(r)
 		for k := 0; k < loop; k++ {
 			address, err := state.NextAddress()
 			require.NoError(t, err)
 			invalidAddress = uint64ToAddress(address.uint64() ^ invalidCodeWord)
-
-			// must fail test network check
 			check = chain.IsValid(invalidAddress)
 			assert.False(t, check, "account address format should be invalid")
 		}
@@ -298,9 +309,6 @@ func testAddressesIntersection(t *testing.T) {
 }
 
 func testIndexFromAddress(t *testing.T) {
-	// seed random generator
-	rand.Seed(time.Now().UnixNano())
-
 	// loops in each test
 	const loop = 50
 
@@ -309,7 +317,8 @@ func testIndexFromAddress(t *testing.T) {
 		mainnet,
 		testnet,
 		emulator,
-		stagingnet,
+		sandboxnet,
+		previewnet,
 	}
 
 	for _, chain := range chains {
@@ -339,9 +348,6 @@ func testIndexFromAddress(t *testing.T) {
 }
 
 func TestUint48(t *testing.T) {
-	// seed random generator
-	rand.Seed(time.Now().UnixNano())
-
 	const loop = 50
 	// test consistensy of putUint48 and uint48
 	for i := 0; i < loop; i++ {

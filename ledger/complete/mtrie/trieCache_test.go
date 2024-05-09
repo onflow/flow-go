@@ -6,7 +6,7 @@ package mtrie
 // test across boundry
 
 import (
-	"math/rand"
+	"crypto/rand"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -174,10 +174,16 @@ func TestConcurrentAccess(t *testing.T) {
 
 func randomMTrie() (*trie.MTrie, error) {
 	var randomPath ledger.Path
-	rand.Read(randomPath[:])
+	_, err := rand.Read(randomPath[:])
+	if err != nil {
+		return nil, err
+	}
 
 	var randomHashValue hash.Hash
-	rand.Read(randomHashValue[:])
+	_, err = rand.Read(randomHashValue[:])
+	if err != nil {
+		return nil, err
+	}
 
 	root := node.NewNode(256, nil, nil, randomPath, nil, randomHashValue)
 

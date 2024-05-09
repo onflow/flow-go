@@ -1,5 +1,3 @@
-// (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
-
 package mempool
 
 import (
@@ -31,8 +29,4 @@ type Guarantees interface {
 	// All will retrieve all collection guarantees that are currently in the memory pool
 	// as a slice.
 	All() []*flow.CollectionGuarantee
-
-	// Hash will return a fingerprint has representing the contents of the
-	// entire memory pool.
-	Hash() flow.Identifier
 }

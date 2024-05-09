@@ -36,7 +36,7 @@ func TestID_ValidParse(t *testing.T) {
 }
 
 func TestIDs_ValidParse(t *testing.T) {
-	testIDs := unittest.IdentifierListFixture(3)
+	var testIDs []flow.Identifier = unittest.IdentifierListFixture(3)
 
 	var ids IDs
 	rawIDs := make([]string, 0)

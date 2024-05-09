@@ -98,6 +98,10 @@ func (t *TransactionResult) Build(txr *access.TransactionResult, txID flow.Ident
 		t.BlockId = txr.BlockID.String()
 	}
 
+	if txr.CollectionID != flow.ZeroID { // don't send back 0 ID
+		t.CollectionId = txr.CollectionID.String()
+	}
+
 	t.Status = &status
 	t.Execution = &execution
 	t.StatusCode = int32(txr.StatusCode)

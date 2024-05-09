@@ -45,18 +45,16 @@ func (q *RequestHeap) Get() (*engine.Message, bool) {
 	q.lock.Lock()
 	defer q.lock.Unlock()
 
-	var originID flow.Identifier
-	var msg *engine.Message
-
 	if len(q.requests) == 0 {
 		return nil, false
 	}
 
-	// pick first element using go map randomness property
+	// pick arbitrary element using go map randomness property
+	var originID flow.Identifier
+	var msg *engine.Message
 	for originID, msg = range q.requests {
 		break
 	}
-
 	delete(q.requests, originID)
 
 	return msg, true
@@ -66,8 +64,9 @@ func (q *RequestHeap) Get() (*engine.Message, bool) {
 // configured memory pool size limit. If called on max capacity will eject at least one element.
 func (q *RequestHeap) reduce() {
 	for overCapacity := len(q.requests) - int(q.limit); overCapacity >= 0; overCapacity-- {
-		for originID := range q.requests {
+		for originID := range q.requests { // pick first element using go map randomness property
 			delete(q.requests, originID)
+			break
 		}
 	}
 }

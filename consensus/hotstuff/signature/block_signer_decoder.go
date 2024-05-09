@@ -5,46 +5,54 @@ import (
 	"fmt"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/signature"
-	"github.com/onflow/flow-go/state"
-	"github.com/onflow/flow-go/storage"
 )
 
-// BlockSignerDecoder is a wrapper around the `hotstuff.Committee`, which implements
-// the auxilluary logic for de-coding signer indices of a block (header) to full node IDs
+// BlockSignerDecoder is a wrapper around the `hotstuff.DynamicCommittee`, which implements
+// the auxiliary logic for de-coding signer indices of a block (header) to full node IDs
 type BlockSignerDecoder struct {
-	// TODO: update to Replicas API once active PaceMaker is merged
-	hotstuff.Committee
+	hotstuff.DynamicCommittee
 }
 
-func NewBlockSignerDecoder(committee hotstuff.Committee) *BlockSignerDecoder {
+func NewBlockSignerDecoder(committee hotstuff.DynamicCommittee) *BlockSignerDecoder {
 	return &BlockSignerDecoder{committee}
 }
 
 var _ hotstuff.BlockSignerDecoder = (*BlockSignerDecoder)(nil)
 
 // DecodeSignerIDs decodes the signer indices from the given block header into full node IDs.
+// Note: A block header contains a quorum certificate for its parent, which proves that the
+// consensus committee has reached agreement on validity of parent block. Consequently, the
+// returned IdentifierList contains the consensus participants that signed the parent block.
 // Expected Error returns during normal operations:
-//   - state.UnknownBlockError if block has not been ingested yet
 //   - signature.InvalidSignerIndicesError if signer indices included in the header do
 //     not encode a valid subset of the consensus committee
+//   - state.ErrUnknownSnapshotReference if the input header is not a known incorporated block.
 func (b *BlockSignerDecoder) DecodeSignerIDs(header *flow.Header) (flow.IdentifierList, error) {
 	// root block does not have signer indices
 	if header.ParentVoterIndices == nil && header.View == 0 {
 		return []flow.Identifier{}, nil
 	}
 
-	// The block header contains the signatures for the parents. Hence, we need to get the
-	// identities that were authorized to sign the parent block, to decode the signer indices.
-	members, err := b.Identities(header.ParentID)
+	// we will use IdentitiesByEpoch since it's a faster call and avoids DB lookup
+	members, err := b.IdentitiesByEpoch(header.ParentView)
 	if err != nil {
-		// TODO: this potentially needs to be updated when we implement and document proper error handling for
-		//       `hotstuff.Committee` and underlying code (such as `protocol.Snapshot`)
-		if errors.Is(err, storage.ErrNotFound) {
-			return nil, state.WrapAsUnknownBlockError(header.ID(), err)
+		if errors.Is(err, model.ErrViewForUnknownEpoch) {
+			// possibly, we request epoch which is far behind in the past, in this case we won't have it in cache.
+			// try asking by parent ID
+			// TODO: this assumes no identity table changes within epochs, must be changed for Dynamic Protocol State
+			//  See https://github.com/onflow/flow-go/issues/4085
+			byBlockMembers, err := b.IdentitiesByBlock(header.ParentID)
+			if err != nil {
+				return nil, fmt.Errorf("could not retrieve identities for block %x with QC view %d for parent %x: %w",
+					header.ID(), header.ParentView, header.ParentID, err) // state.ErrUnknownSnapshotReference or exception
+			}
+			members = byBlockMembers.ToSkeleton()
+		} else {
+			return nil, fmt.Errorf("unexpected error retrieving identities for block %v: %w", header.ID(), err)
 		}
-		return nil, fmt.Errorf("fail to retrieve identities for block %v: %w", header.ID(), err)
 	}
 	signerIDs, err := signature.DecodeSignerIndicesToIdentifiers(members.NodeIDs(), header.ParentVoterIndices)
 	if err != nil {

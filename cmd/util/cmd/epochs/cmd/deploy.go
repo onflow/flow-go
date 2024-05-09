@@ -254,19 +254,17 @@ func getDeployEpochTransactionText(snapshot *inmem.Snapshot) []byte {
 
 	// root chain id and system contractsRegister
 	chainID := head.ChainID
-	systemContracts, err := systemcontracts.SystemContractsForChain(chainID)
-	if err != nil {
-		log.Fatal().Err(err).Str("chain_id", chainID.String()).Msgf("could not get system contracts for chainID")
-	}
+	systemContracts := systemcontracts.SystemContractsForChain(chainID)
+
+	env := systemContracts.AsTemplateEnv()
+	env.FungibleTokenAddress = flagFungibleTokenAddress
+	env.FlowTokenAddress = flagFlowTokenAddress
+	env.IDTableAddress = flagIDTableAddress
+	env.FlowFeesAddress = flagFlowFeesAddress
 
 	// epoch contract name and get code for contract
 	epochContractCode := contracts.FlowEpoch(
-		flagFungibleTokenAddress,
-		flagFlowTokenAddress,
-		flagIDTableAddress,
-		systemContracts.ClusterQC.Address.Hex(),
-		systemContracts.DKG.Address.Hex(),
-		flagFlowFeesAddress,
+		env,
 	)
 
 	// convert the epoch contract code to an [UInt8] literal string that can be

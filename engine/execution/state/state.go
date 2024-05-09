@@ -4,57 +4,70 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/dgraph-io/badger/v2"
 
-	"github.com/onflow/flow-go/engine/execution/state/delta"
+	"github.com/onflow/flow-go/engine/execution"
+	"github.com/onflow/flow-go/engine/execution/storehouse"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/storage"
 	badgerstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/storage/badger/procedure"
 )
+
+var ErrExecutionStatePruned = fmt.Errorf("execution state is pruned")
+var ErrNotExecuted = fmt.Errorf("block not executed")
 
 // ReadOnlyExecutionState allows to read the execution state
 type ReadOnlyExecutionState interface {
-	// NewView creates a new ready-only view at the given state commitment.
-	NewView(flow.StateCommitment) *delta.View
-
-	GetRegisters(
-		context.Context,
-		flow.StateCommitment,
-		[]flow.RegisterID,
-	) ([]flow.RegisterValue, error)
-
-	GetProof(
-		context.Context,
-		flow.StateCommitment,
-		[]flow.RegisterID,
-	) (flow.StorageProof, error)
-
-	// StateCommitmentByBlockID returns the final state commitment for the provided block ID.
-	StateCommitmentByBlockID(context.Context, flow.Identifier) (flow.StateCommitment, error)
-
-	// HasState returns true if the state with the given state commitment exists in memory
-	HasState(flow.StateCommitment) bool
+	ScriptExecutionState
 
 	// ChunkDataPackByChunkID retrieve a chunk data pack given the chunk ID.
 	ChunkDataPackByChunkID(flow.Identifier) (*flow.ChunkDataPack, error)
 
 	GetExecutionResultID(context.Context, flow.Identifier) (flow.Identifier, error)
 
-	RetrieveStateDelta(context.Context, flow.Identifier) (*messages.ExecutionStateDelta, error)
-
 	GetHighestExecutedBlockID(context.Context) (uint64, flow.Identifier, error)
+}
 
-	GetCollection(identifier flow.Identifier) (*flow.Collection, error)
+// ScriptExecutionState is a subset of the `state.ExecutionState` interface purposed to only access the state
+// used for script execution and not mutate the execution state of the blockchain.
+type ScriptExecutionState interface {
+	// NewStorageSnapshot creates a new ready-only view at the given block.
+	NewStorageSnapshot(commit flow.StateCommitment, blockID flow.Identifier, height uint64) snapshot.StorageSnapshot
 
-	GetBlockIDByChunkID(chunkID flow.Identifier) (flow.Identifier, error)
+	// CreateStorageSnapshot creates a new ready-only view at the given block.
+	// It returns:
+	// - (nil, nil, storage.ErrNotFound) if block is unknown
+	// - (nil, nil, state.ErrNotExecuted) if block is not executed
+	// - (nil, nil, state.ErrExecutionStatePruned) if the execution state has been pruned
+	CreateStorageSnapshot(blockID flow.Identifier) (snapshot.StorageSnapshot, *flow.Header, error)
+
+	// StateCommitmentByBlockID returns the final state commitment for the provided block ID.
+	StateCommitmentByBlockID(flow.Identifier) (flow.StateCommitment, error)
+
+	// Any error returned is exception
+	IsBlockExecuted(height uint64, blockID flow.Identifier) (bool, error)
+}
+
+func IsParentExecuted(state ReadOnlyExecutionState, header *flow.Header) (bool, error) {
+	// sanity check, caller should not pass a root block
+	if header.Height == 0 {
+		return false, fmt.Errorf("root block does not have parent block")
+	}
+	return state.IsBlockExecuted(header.Height-1, header.ParentID)
+}
+
+// FinalizedExecutionState is an interface used to access the finalized execution state
+type FinalizedExecutionState interface {
+	GetHighestFinalizedExecuted() (uint64, error)
 }
 
 // TODO Many operations here are should be transactional, so we need to refactor this
@@ -67,18 +80,15 @@ type ExecutionState interface {
 
 	UpdateHighestExecutedBlockIfHigher(context.Context, *flow.Header) error
 
-	SaveExecutionResults(ctx context.Context, header *flow.Header, endState flow.StateCommitment,
-		chunkDataPacks []*flow.ChunkDataPack,
-		executionReceipt *flow.ExecutionReceipt, events []flow.EventsList, serviceEvents flow.EventsList, results []flow.TransactionResult) error
-}
+	SaveExecutionResults(
+		ctx context.Context,
+		result *execution.ComputationResult,
+	) error
 
-const (
-	KeyPartOwner = uint16(0)
-	// @deprecated - controller was used only by the very first
-	// version of cadence for access controll which was retired later on
-	// KeyPartController = uint16(1)
-	KeyPartKey = uint16(2)
-)
+	// only available with storehouse enabled
+	// panic when called with storehouse disabled (which should be a bug)
+	GetHighestFinalizedExecuted() (uint64, error)
+}
 
 type state struct {
 	tracer             module.Tracer
@@ -94,13 +104,11 @@ type state struct {
 	serviceEvents      storage.ServiceEvents
 	transactionResults storage.TransactionResults
 	db                 *badger.DB
-}
 
-func RegisterIDToKey(reg flow.RegisterID) ledger.Key {
-	return ledger.NewKey([]ledger.KeyPart{
-		ledger.NewKeyPart(KeyPartOwner, []byte(reg.Owner)),
-		ledger.NewKeyPart(KeyPartKey, []byte(reg.Key)),
-	})
+	registerStore execution.RegisterStore
+	// when it is true, registers are stored in both register store and ledger
+	// and register queries will send to the register store instead of ledger
+	enableRegisterStore bool
 }
 
 // NewExecutionState returns a new execution state access layer for the given ledger storage.
@@ -118,196 +126,214 @@ func NewExecutionState(
 	transactionResults storage.TransactionResults,
 	db *badger.DB,
 	tracer module.Tracer,
+	registerStore execution.RegisterStore,
+	enableRegisterStore bool,
 ) ExecutionState {
 	return &state{
-		tracer:             tracer,
-		ls:                 ls,
-		commits:            commits,
-		blocks:             blocks,
-		headers:            headers,
-		collections:        collections,
-		chunkDataPacks:     chunkDataPacks,
-		results:            results,
-		myReceipts:         myReceipts,
-		events:             events,
-		serviceEvents:      serviceEvents,
-		transactionResults: transactionResults,
-		db:                 db,
+		tracer:              tracer,
+		ls:                  ls,
+		commits:             commits,
+		blocks:              blocks,
+		headers:             headers,
+		collections:         collections,
+		chunkDataPacks:      chunkDataPacks,
+		results:             results,
+		myReceipts:          myReceipts,
+		events:              events,
+		serviceEvents:       serviceEvents,
+		transactionResults:  transactionResults,
+		db:                  db,
+		registerStore:       registerStore,
+		enableRegisterStore: enableRegisterStore,
 	}
 
 }
 
-func makeSingleValueQuery(commitment flow.StateCommitment, owner, key string) (*ledger.QuerySingleValue, error) {
+func makeSingleValueQuery(commitment flow.StateCommitment, id flow.RegisterID) (*ledger.QuerySingleValue, error) {
 	return ledger.NewQuerySingleValue(ledger.State(commitment),
-		RegisterIDToKey(flow.NewRegisterID(owner, key)),
+		convert.RegisterIDToLedgerKey(id),
 	)
 }
 
-func makeQuery(commitment flow.StateCommitment, ids []flow.RegisterID) (*ledger.Query, error) {
-
-	keys := make([]ledger.Key, len(ids))
-	for i, id := range ids {
-		keys[i] = RegisterIDToKey(id)
+func RegisterEntriesToKeysValues(
+	entries flow.RegisterEntries,
+) (
+	[]ledger.Key,
+	[]ledger.Value,
+) {
+	keys := make([]ledger.Key, len(entries))
+	values := make([]ledger.Value, len(entries))
+	for i, entry := range entries {
+		keys[i] = convert.RegisterIDToLedgerKey(entry.Key)
+		values[i] = entry.Value
 	}
-
-	return ledger.NewQuery(ledger.State(commitment), keys)
+	return keys, values
 }
 
-func RegisterIDSToKeys(ids []flow.RegisterID) []ledger.Key {
-	keys := make([]ledger.Key, len(ids))
-	for i, id := range ids {
-		keys[i] = RegisterIDToKey(id)
-	}
-	return keys
+type LedgerStorageSnapshot struct {
+	ledger     ledger.Ledger
+	commitment flow.StateCommitment
+
+	mutex     sync.RWMutex
+	readCache map[flow.RegisterID]flow.RegisterValue // Guarded by mutex.
 }
 
-func RegisterValuesToValues(values []flow.RegisterValue) []ledger.Value {
-	vals := make([]ledger.Value, len(values))
-	for i, value := range values {
-		vals[i] = value
-	}
-	return vals
-}
-
-func LedgerGetRegister(ldg ledger.Ledger, commitment flow.StateCommitment) delta.GetRegisterFunc {
-
-	readCache := make(map[flow.RegisterID]flow.RegisterEntry)
-
-	return func(owner, key string) (flow.RegisterValue, error) {
-		regID := flow.RegisterID{
-			Owner: owner,
-			Key:   key,
-		}
-
-		if value, ok := readCache[regID]; ok {
-			return value.Value, nil
-		}
-
-		query, err := makeSingleValueQuery(commitment, owner, key)
-
-		if err != nil {
-			return nil, fmt.Errorf("cannot create ledger query: %w", err)
-		}
-
-		value, err := ldg.GetSingleValue(query)
-
-		if err != nil {
-			return nil, fmt.Errorf("error getting register (%s) value at %x: %w", key, commitment, err)
-		}
-
-		// Prevent caching of value with len zero
-		if len(value) == 0 {
-			return nil, nil
-		}
-
-		// don't cache value with len zero
-		readCache[regID] = flow.RegisterEntry{Key: regID, Value: value}
-
-		return value, nil
+func NewLedgerStorageSnapshot(
+	ldg ledger.Ledger,
+	commitment flow.StateCommitment,
+) snapshot.StorageSnapshot {
+	return &LedgerStorageSnapshot{
+		ledger:     ldg,
+		commitment: commitment,
+		readCache:  make(map[flow.RegisterID]flow.RegisterValue),
 	}
 }
 
-func (s *state) NewView(commitment flow.StateCommitment) *delta.View {
-	return delta.NewView(LedgerGetRegister(s.ls, commitment))
+func (storage *LedgerStorageSnapshot) getFromCache(
+	id flow.RegisterID,
+) (
+	flow.RegisterValue,
+	bool,
+) {
+	storage.mutex.RLock()
+	defer storage.mutex.RUnlock()
+
+	value, ok := storage.readCache[id]
+	return value, ok
 }
 
-type RegisterUpdatesHolder interface {
-	RegisterUpdates() ([]flow.RegisterID, []flow.RegisterValue)
-}
-
-func CommitDelta(ldg ledger.Ledger, ruh RegisterUpdatesHolder, baseState flow.StateCommitment) (flow.StateCommitment, *ledger.TrieUpdate, error) {
-	ids, values := ruh.RegisterUpdates()
-
-	update, err := ledger.NewUpdate(
-		ledger.State(baseState),
-		RegisterIDSToKeys(ids),
-		RegisterValuesToValues(values),
-	)
-
-	if err != nil {
-		return flow.DummyStateCommitment, nil, fmt.Errorf("cannot create ledger update: %w", err)
-	}
-
-	commit, trieUpdate, err := ldg.Set(update)
-	if err != nil {
-		return flow.DummyStateCommitment, nil, err
-	}
-
-	return flow.StateCommitment(commit), trieUpdate, nil
-}
-
-//func (s *state) CommitDelta(ctx context.Context, delta delta.Delta, baseState flow.StateCommitment) (flow.StateCommitment, error) {
-//	span, _ := s.tracer.StartSpanFromContext(ctx, trace.EXECommitDelta)
-//	defer span.End()
-//
-//	return CommitDelta(s.ls, delta, baseState)
-//}
-
-func (s *state) getRegisters(commit flow.StateCommitment, registerIDs []flow.RegisterID) (*ledger.Query, []ledger.Value, error) {
-
-	query, err := makeQuery(commit, registerIDs)
-
-	if err != nil {
-		return nil, nil, fmt.Errorf("cannot create ledger query: %w", err)
-	}
-
-	values, err := s.ls.Get(query)
-	if err != nil {
-		return nil, nil, fmt.Errorf("cannot query ledger: %w", err)
-	}
-
-	return query, values, err
-}
-
-func (s *state) GetRegisters(
-	ctx context.Context,
-	commit flow.StateCommitment,
-	registerIDs []flow.RegisterID,
-) ([]flow.RegisterValue, error) {
-	span, _ := s.tracer.StartSpanFromContext(ctx, trace.EXEGetRegisters)
-	defer span.End()
-
-	_, values, err := s.getRegisters(commit, registerIDs)
-	if err != nil {
-		return nil, err
-	}
-
-	registerValues := make([]flow.RegisterValue, len(values))
-	for i, v := range values {
-		registerValues[i] = v
-	}
-
-	return registerValues, nil
-}
-
-func (s *state) GetProof(
-	ctx context.Context,
-	commit flow.StateCommitment,
-	registerIDs []flow.RegisterID,
-) (flow.StorageProof, error) {
-
-	span, _ := s.tracer.StartSpanFromContext(ctx, trace.EXEGetRegistersWithProofs)
-	defer span.End()
-
-	query, err := makeQuery(commit, registerIDs)
-
+func (storage *LedgerStorageSnapshot) getFromLedger(
+	id flow.RegisterID,
+) (
+	flow.RegisterValue,
+	error,
+) {
+	query, err := makeSingleValueQuery(storage.commitment, id)
 	if err != nil {
 		return nil, fmt.Errorf("cannot create ledger query: %w", err)
 	}
 
-	// Get proofs in an arbitrary order, not correlated to the register ID order in the query.
-	proof, err := s.ls.Prove(query)
+	value, err := storage.ledger.GetSingleValue(query)
 	if err != nil {
-		return nil, fmt.Errorf("cannot get proof: %w", err)
+		return nil, fmt.Errorf(
+			"error getting register (%s) value at %x: %w",
+			id,
+			storage.commitment,
+			err)
 	}
-	return proof, nil
+
+	return value, nil
 }
 
-func (s *state) HasState(commitment flow.StateCommitment) bool {
-	return s.ls.HasState(ledger.State(commitment))
+func (storage *LedgerStorageSnapshot) Get(
+	id flow.RegisterID,
+) (
+	flow.RegisterValue,
+	error,
+) {
+	value, ok := storage.getFromCache(id)
+	if ok {
+		return value, nil
+	}
+
+	value, err := storage.getFromLedger(id)
+	if err != nil {
+		return nil, err
+	}
+
+	storage.mutex.Lock()
+	defer storage.mutex.Unlock()
+
+	storage.readCache[id] = value
+	return value, nil
 }
 
-func (s *state) StateCommitmentByBlockID(ctx context.Context, blockID flow.Identifier) (flow.StateCommitment, error) {
+func (s *state) NewStorageSnapshot(
+	commitment flow.StateCommitment,
+	blockID flow.Identifier,
+	height uint64,
+) snapshot.StorageSnapshot {
+	if s.enableRegisterStore {
+		return storehouse.NewBlockEndStateSnapshot(s.registerStore, blockID, height)
+	}
+	return NewLedgerStorageSnapshot(s.ls, commitment)
+}
+
+func (s *state) CreateStorageSnapshot(
+	blockID flow.Identifier,
+) (snapshot.StorageSnapshot, *flow.Header, error) {
+	header, err := s.headers.ByBlockID(blockID)
+	if err != nil {
+		return nil, nil, fmt.Errorf("cannot get header by block ID: %w", err)
+	}
+
+	// make sure the block is executed
+	commit, err := s.commits.ByBlockID(blockID)
+	if err != nil {
+		// statecommitment not exists means the block hasn't been executed yet
+		if errors.Is(err, storage.ErrNotFound) {
+			return nil, nil, fmt.Errorf("block %v is never executed: %w", blockID, ErrNotExecuted)
+		}
+
+		return nil, header, fmt.Errorf("cannot get commit by block ID: %w", err)
+	}
+
+	// make sure we have trie state for this block
+	ledgerHasState := s.ls.HasState(ledger.State(commit))
+	if !ledgerHasState {
+		return nil, header, fmt.Errorf("state not found in ledger for commit %x (block %v): %w", commit, blockID, ErrExecutionStatePruned)
+	}
+
+	if s.enableRegisterStore {
+		isExecuted, err := s.registerStore.IsBlockExecuted(header.Height, blockID)
+		if err != nil {
+			return nil, header, fmt.Errorf("cannot check if block %v is executed: %w", blockID, err)
+		}
+		if !isExecuted {
+			return nil, header, fmt.Errorf("block %v is not executed yet: %w", blockID, ErrNotExecuted)
+		}
+	}
+
+	return s.NewStorageSnapshot(commit, blockID, header.Height), header, nil
+}
+
+type RegisterUpdatesHolder interface {
+	UpdatedRegisters() flow.RegisterEntries
+	UpdatedRegisterSet() map[flow.RegisterID]flow.RegisterValue
+}
+
+// CommitDelta takes a base storage snapshot and creates a new storage snapshot
+// with the register updates from the given RegisterUpdatesHolder
+// a new statecommitment is returned from the ledger, along with the trie update
+// any error returned are exceptions
+func CommitDelta(
+	ldg ledger.Ledger,
+	ruh RegisterUpdatesHolder,
+	baseStorageSnapshot execution.ExtendableStorageSnapshot,
+) (flow.StateCommitment, *ledger.TrieUpdate, execution.ExtendableStorageSnapshot, error) {
+
+	updatedRegisters := ruh.UpdatedRegisters()
+	keys, values := RegisterEntriesToKeysValues(updatedRegisters)
+	baseState := baseStorageSnapshot.Commitment()
+	update, err := ledger.NewUpdate(ledger.State(baseState), keys, values)
+
+	if err != nil {
+		return flow.DummyStateCommitment, nil, nil, fmt.Errorf("cannot create ledger update: %w", err)
+	}
+
+	newState, trieUpdate, err := ldg.Set(update)
+	if err != nil {
+		return flow.DummyStateCommitment, nil, nil, fmt.Errorf("could not update ledger: %w", err)
+	}
+
+	newCommit := flow.StateCommitment(newState)
+
+	newStorageSnapshot := baseStorageSnapshot.Extend(newCommit, ruh.UpdatedRegisterSet())
+
+	return newCommit, trieUpdate, newStorageSnapshot, nil
+}
+
+func (s *state) StateCommitmentByBlockID(blockID flow.Identifier) (flow.StateCommitment, error) {
 	return s.commits.ByBlockID(blockID)
 }
 
@@ -331,64 +357,90 @@ func (s *state) GetExecutionResultID(ctx context.Context, blockID flow.Identifie
 	return result.ID(), nil
 }
 
-func (s *state) SaveExecutionResults(ctx context.Context, header *flow.Header, endState flow.StateCommitment,
-	chunkDataPacks []*flow.ChunkDataPack, executionReceipt *flow.ExecutionReceipt, events []flow.EventsList, serviceEvents flow.EventsList,
-	results []flow.TransactionResult) error {
-	return s.saveExecutionResults(ctx, header, endState, chunkDataPacks, executionReceipt, events, serviceEvents, results)
-}
-
-func (s *state) saveExecutionResults(ctx context.Context, header *flow.Header, endState flow.StateCommitment,
-	chunkDataPacks []*flow.ChunkDataPack, executionReceipt *flow.ExecutionReceipt, events []flow.EventsList, serviceEvents flow.EventsList,
-	results []flow.TransactionResult) error {
-
-	spew.Config.DisableMethods = true
-	spew.Config.DisablePointerMethods = true
-
-	span, childCtx := s.tracer.StartSpanFromContext(ctx, trace.EXEStateSaveExecutionResults)
+func (s *state) SaveExecutionResults(
+	ctx context.Context,
+	result *execution.ComputationResult,
+) error {
+	span, childCtx := s.tracer.StartSpanFromContext(
+		ctx,
+		trace.EXEStateSaveExecutionResults)
 	defer span.End()
 
+	err := s.saveExecutionResults(ctx, result)
+	if err != nil {
+		return fmt.Errorf("could not save execution results: %w", err)
+	}
+
+	if s.enableRegisterStore {
+		// save registers to register store
+		err = s.registerStore.SaveRegisters(
+			result.BlockExecutionResult.ExecutableBlock.Block.Header,
+			result.BlockExecutionResult.AllUpdatedRegisters(),
+		)
+
+		if err != nil {
+			return fmt.Errorf("could not save updated registers: %w", err)
+		}
+	}
+
+	//outside batch because it requires read access
+	err = s.UpdateHighestExecutedBlockIfHigher(childCtx, result.ExecutableBlock.Block.Header)
+	if err != nil {
+		return fmt.Errorf("cannot update highest executed block: %w", err)
+	}
+	return nil
+}
+
+func (s *state) saveExecutionResults(
+	ctx context.Context,
+	result *execution.ComputationResult,
+) (err error) {
+	header := result.ExecutableBlock.Block.Header
 	blockID := header.ID()
 
+	err = s.chunkDataPacks.Store(result.AllChunkDataPacks())
+	if err != nil {
+		return fmt.Errorf("can not store multiple chunk data pack: %w", err)
+	}
+
 	// Write Batch is BadgerDB feature designed for handling lots of writes
-	// in efficient and automatic manner, hence pushing all the updates we can
+	// in efficient and atomic manner, hence pushing all the updates we can
 	// as tightly as possible to let Badger manage it.
 	// Note, that it does not guarantee atomicity as transactions has size limit,
 	// but it's the closest thing to atomicity we could have
 	batch := badgerstorage.NewBatch(s.db)
 
-	for _, chunkDataPack := range chunkDataPacks {
-		err := s.chunkDataPacks.BatchStore(chunkDataPack, batch)
+	defer func() {
+		// Rollback if an error occurs during batch operations
 		if err != nil {
-			return fmt.Errorf("cannot store chunk data pack: %w", err)
+			chunks := result.AllChunkDataPacks()
+			chunkIDs := make([]flow.Identifier, 0, len(chunks))
+			for _, chunk := range chunks {
+				chunkIDs = append(chunkIDs, chunk.ID())
+			}
+			_ = s.chunkDataPacks.Remove(chunkIDs)
 		}
+	}()
 
-		err = s.headers.BatchIndexByChunkID(header.ID(), chunkDataPack.ChunkID, batch)
-		if err != nil {
-			return fmt.Errorf("cannot index chunk data pack by blockID: %w", err)
-		}
-	}
-
-	err := s.commits.BatchStore(blockID, endState, batch)
-	if err != nil {
-		return fmt.Errorf("cannot store state commitment: %w", err)
-	}
-
-	err = s.events.BatchStore(blockID, events, batch)
+	err = s.events.BatchStore(blockID, []flow.EventsList{result.AllEvents()}, batch)
 	if err != nil {
 		return fmt.Errorf("cannot store events: %w", err)
 	}
 
-	err = s.serviceEvents.BatchStore(blockID, serviceEvents, batch)
+	err = s.serviceEvents.BatchStore(blockID, result.AllServiceEvents(), batch)
 	if err != nil {
 		return fmt.Errorf("cannot store service events: %w", err)
 	}
 
-	err = s.transactionResults.BatchStore(blockID, results, batch)
+	err = s.transactionResults.BatchStore(
+		blockID,
+		result.AllTransactionResults(),
+		batch)
 	if err != nil {
 		return fmt.Errorf("cannot store transaction result: %w", err)
 	}
 
-	executionResult := &executionReceipt.ExecutionResult
+	executionResult := &result.ExecutionReceipt.ExecutionResult
 	err = s.results.BatchStore(executionResult, batch)
 	if err != nil {
 		return fmt.Errorf("cannot store execution result: %w", err)
@@ -399,9 +451,17 @@ func (s *state) saveExecutionResults(ctx context.Context, header *flow.Header, e
 		return fmt.Errorf("cannot index execution result: %w", err)
 	}
 
-	err = s.myReceipts.BatchStoreMyReceipt(executionReceipt, batch)
+	err = s.myReceipts.BatchStoreMyReceipt(result.ExecutionReceipt, batch)
 	if err != nil {
 		return fmt.Errorf("could not persist execution result: %w", err)
+	}
+
+	// the state commitment is the last data item to be stored, so that
+	// IsBlockExecuted can be implemented by checking whether state commitment exists
+	// in the database
+	err = s.commits.BatchStore(blockID, result.CurrentEndState(), batch)
+	if err != nil {
+		return fmt.Errorf("cannot store state commitment: %w", err)
 	}
 
 	err = batch.Flush()
@@ -409,97 +469,7 @@ func (s *state) saveExecutionResults(ctx context.Context, header *flow.Header, e
 		return fmt.Errorf("batch flush error: %w", err)
 	}
 
-	//outside batch because it requires read access
-	err = s.UpdateHighestExecutedBlockIfHigher(childCtx, header)
-	if err != nil {
-		return fmt.Errorf("cannot update highest executed block: %w", err)
-	}
 	return nil
-}
-
-func (s *state) RetrieveStateDelta(ctx context.Context, blockID flow.Identifier) (*messages.ExecutionStateDelta, error) {
-	block, err := s.blocks.ByID(blockID)
-	if err != nil {
-		return nil, fmt.Errorf("cannot retrieve block: %w", err)
-	}
-	completeCollections := make(map[flow.Identifier]*entity.CompleteCollection)
-
-	for _, guarantee := range block.Payload.Guarantees {
-		collection, err := s.collections.ByID(guarantee.CollectionID)
-		if err != nil {
-			return nil, fmt.Errorf("cannot retrieve collection for delta: %w", err)
-		}
-		completeCollections[collection.ID()] = &entity.CompleteCollection{
-			Guarantee:    guarantee,
-			Transactions: collection.Transactions,
-		}
-	}
-
-	var startStateCommitment flow.StateCommitment
-	var endStateCommitment flow.StateCommitment
-	var stateInteractions []*delta.Snapshot
-	var events []flow.Event
-	var serviceEvents []flow.Event
-	var txResults []flow.TransactionResult
-
-	err = s.db.View(func(txn *badger.Txn) error {
-		err = operation.LookupStateCommitment(blockID, &endStateCommitment)(txn)
-		if err != nil {
-			return fmt.Errorf("cannot lookup state commitment: %w", err)
-
-		}
-
-		err = operation.LookupStateCommitment(block.Header.ParentID, &startStateCommitment)(txn)
-		if err != nil {
-			return fmt.Errorf("cannot lookup parent state commitment: %w", err)
-		}
-
-		err = operation.LookupEventsByBlockID(blockID, &events)(txn)
-		if err != nil {
-			return fmt.Errorf("cannot lookup events: %w", err)
-		}
-
-		err = operation.LookupServiceEventsByBlockID(blockID, &serviceEvents)(txn)
-		if err != nil {
-			return fmt.Errorf("cannot lookup events: %w", err)
-		}
-
-		err = operation.LookupTransactionResultsByBlockID(blockID, &txResults)(txn)
-		if err != nil {
-			return fmt.Errorf("cannot lookup transaction errors: %w", err)
-		}
-
-		err = operation.RetrieveExecutionStateInteractions(blockID, &stateInteractions)(txn)
-		if err != nil {
-			return fmt.Errorf("cannot lookup execution state views: %w", err)
-		}
-
-		return nil
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	return &messages.ExecutionStateDelta{
-		ExecutableBlock: entity.ExecutableBlock{
-			Block:               block,
-			StartState:          &startStateCommitment,
-			CompleteCollections: completeCollections,
-		},
-		StateInteractions:  stateInteractions,
-		EndState:           endStateCommitment,
-		Events:             events,
-		ServiceEvents:      serviceEvents,
-		TransactionResults: txResults,
-	}, nil
-}
-
-func (s *state) GetCollection(identifier flow.Identifier) (*flow.Collection, error) {
-	return s.collections.ByID(identifier)
-}
-
-func (s *state) GetBlockIDByChunkID(chunkID flow.Identifier) (flow.Identifier, error) {
-	return s.headers.IDByChunkID(chunkID)
 }
 
 func (s *state) UpdateHighestExecutedBlockIfHigher(ctx context.Context, header *flow.Header) error {
@@ -508,56 +478,85 @@ func (s *state) UpdateHighestExecutedBlockIfHigher(ctx context.Context, header *
 		defer span.End()
 	}
 
-	return operation.RetryOnConflict(s.db.Update, func(txn *badger.Txn) error {
-		var blockID flow.Identifier
-		err := operation.RetrieveExecutedBlock(&blockID)(txn)
-		if err != nil {
-			return fmt.Errorf("cannot lookup executed block: %w", err)
-		}
-
-		var highest flow.Header
-		err = operation.RetrieveHeader(blockID, &highest)(txn)
-		if err != nil {
-			return fmt.Errorf("cannot retrieve executed header: %w", err)
-		}
-
-		if header.Height <= highest.Height {
-			return nil
-		}
-		err = operation.UpdateExecutedBlock(header.ID())(txn)
-		if err != nil {
-			return fmt.Errorf("cannot update highest executed block: %w", err)
-		}
-
-		return nil
-	})
+	return operation.RetryOnConflict(s.db.Update, procedure.UpdateHighestExecutedBlockIfHigher(header))
 }
 
+// deprecated by storehouse's GetHighestFinalizedExecuted
 func (s *state) GetHighestExecutedBlockID(ctx context.Context) (uint64, flow.Identifier, error) {
+	if s.enableRegisterStore {
+		// when storehouse is enabled, the highest executed block is consisted as
+		// the highest finalized and executed block
+		height, err := s.GetHighestFinalizedExecuted()
+		if err != nil {
+			return 0, flow.ZeroID, fmt.Errorf("could not get highest finalized executed: %w", err)
+		}
+
+		finalizedID, err := s.headers.BlockIDByHeight(height)
+		if err != nil {
+			return 0, flow.ZeroID, fmt.Errorf("could not get header by height %v: %w", height, err)
+		}
+		return height, finalizedID, nil
+	}
+
 	var blockID flow.Identifier
-	var highest flow.Header
-	err := s.db.View(func(tx *badger.Txn) error {
-		err := operation.RetrieveExecutedBlock(&blockID)(tx)
-		if err != nil {
-			return fmt.Errorf("could not lookup executed block %v: %w", blockID, err)
-		}
-		err = operation.RetrieveHeader(blockID, &highest)(tx)
-		if err != nil {
-			return fmt.Errorf("could not retrieve executed header %v: %w", blockID, err)
-		}
-		return nil
-	})
+	var height uint64
+	err := s.db.View(procedure.GetHighestExecutedBlock(&height, &blockID))
 	if err != nil {
 		return 0, flow.ZeroID, err
 	}
 
-	return highest.Height, blockID, nil
+	return height, blockID, nil
 }
 
-// IsBlockExecuted returns whether the block has been executed.
-// it checks whether the state commitment exists in execution state.
-func IsBlockExecuted(ctx context.Context, state ReadOnlyExecutionState, block flow.Identifier) (bool, error) {
-	_, err := state.StateCommitmentByBlockID(ctx, block)
+func (s *state) GetHighestFinalizedExecuted() (uint64, error) {
+	if s.enableRegisterStore {
+		return s.registerStore.LastFinalizedAndExecutedHeight(), nil
+	}
+
+	var finalizedHeight uint64
+	err := s.db.View(operation.RetrieveFinalizedHeight(&finalizedHeight))
+	if err != nil {
+		return 0, fmt.Errorf("could not retrieve finalized height: %w", err)
+	}
+
+	executedHeight, executedID, err := s.GetHighestExecutedBlockID(context.Background())
+	if err != nil {
+		return 0, fmt.Errorf("could not get highest executed block: %w", err)
+	}
+
+	var finalizedID flow.Identifier
+	var highest uint64
+	if finalizedHeight >= executedHeight {
+		finalizedID, err = s.headers.BlockIDByHeight(executedHeight)
+		if err != nil {
+			return 0, fmt.Errorf("could not get header by height %v: %w", executedHeight, err)
+		}
+		highest = executedHeight
+	} else {
+		finalizedID, err = s.headers.BlockIDByHeight(finalizedHeight)
+		if err != nil {
+			return 0, fmt.Errorf("could not get header by height %v: %w", executedHeight, err)
+		}
+		highest = finalizedHeight
+	}
+
+	if finalizedID != executedID {
+		return 0, fmt.Errorf("finalized block %v does not match executed block %v", finalizedID, executedID)
+	}
+
+	return highest, nil
+}
+
+// IsBlockExecuted returns true if the block is executed, which means registers, events,
+// results, etc are all stored.
+// otherwise returns false
+func (s *state) IsBlockExecuted(height uint64, blockID flow.Identifier) (bool, error) {
+	if s.enableRegisterStore {
+		return s.registerStore.IsBlockExecuted(height, blockID)
+	}
+
+	// ledger-based execution state uses commitment to determine if a block has been executed
+	_, err := s.StateCommitmentByBlockID(blockID)
 
 	// statecommitment exists means the block has been executed
 	if err == nil {
@@ -570,4 +569,5 @@ func IsBlockExecuted(ctx context.Context, state ReadOnlyExecutionState, block fl
 	}
 
 	return false, err
+
 }

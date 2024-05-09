@@ -1,174 +1,95 @@
 package pubsub
 
 import (
-	"sync"
-
 	"github.com/onflow/flow-go/consensus/hotstuff"
-	"github.com/onflow/flow-go/consensus/hotstuff/model"
-	"github.com/onflow/flow-go/model/flow"
 )
 
-// Distributor distributes notifications to a list of subscribers (event consumers).
+// Distributor distributes notifications to a list of consumers (event consumers).
 //
 // It allows thread-safe subscription of multiple consumers to events.
 type Distributor struct {
-	subscribers []hotstuff.Consumer
-	lock        sync.RWMutex
+	*FollowerDistributor
+	*CommunicatorDistributor
+	*ParticipantDistributor
 }
 
 var _ hotstuff.Consumer = (*Distributor)(nil)
 
-func (p *Distributor) OnEventProcessed() {
-	p.lock.RLock()
-	defer p.lock.RUnlock()
-	for _, subscriber := range p.subscribers {
-		subscriber.OnEventProcessed()
-	}
-}
-
 func NewDistributor() *Distributor {
-	return &Distributor{}
+	return &Distributor{
+		FollowerDistributor:     NewFollowerDistributor(),
+		CommunicatorDistributor: NewCommunicatorDistributor(),
+		ParticipantDistributor:  NewParticipantDistributor(),
+	}
 }
 
-// AddConsumer adds an a event consumer to the Distributor
+// AddConsumer adds an event consumer to the Distributor
 func (p *Distributor) AddConsumer(consumer hotstuff.Consumer) {
-	p.lock.Lock()
-	defer p.lock.Unlock()
-	p.subscribers = append(p.subscribers, consumer)
+	p.FollowerDistributor.AddFollowerConsumer(consumer)
+	p.CommunicatorDistributor.AddCommunicatorConsumer(consumer)
+	p.ParticipantDistributor.AddParticipantConsumer(consumer)
 }
 
-func (p *Distributor) OnReceiveVote(currentView uint64, vote *model.Vote) {
-	p.lock.RLock()
-	defer p.lock.RUnlock()
-	for _, subscriber := range p.subscribers {
-		subscriber.OnReceiveVote(currentView, vote)
+// FollowerDistributor ingests consensus follower events and distributes it to consumers.
+// It allows thread-safe subscription of multiple consumers to events.
+type FollowerDistributor struct {
+	*ProposalViolationDistributor
+	*FinalizationDistributor
+}
+
+var _ hotstuff.FollowerConsumer = (*FollowerDistributor)(nil)
+
+func NewFollowerDistributor() *FollowerDistributor {
+	return &FollowerDistributor{
+		ProposalViolationDistributor: NewProtocolViolationDistributor(),
+		FinalizationDistributor:      NewFinalizationDistributor(),
 	}
 }
 
-func (p *Distributor) OnReceiveProposal(currentView uint64, proposal *model.Proposal) {
-	p.lock.RLock()
-	defer p.lock.RUnlock()
-	for _, subscriber := range p.subscribers {
-		subscriber.OnReceiveProposal(currentView, proposal)
+// AddFollowerConsumer registers the input `consumer` to be notified on `hotstuff.ConsensusFollowerConsumer` events.
+func (d *FollowerDistributor) AddFollowerConsumer(consumer hotstuff.FollowerConsumer) {
+	d.FinalizationDistributor.AddFinalizationConsumer(consumer)
+	d.ProposalViolationDistributor.AddProposalViolationConsumer(consumer)
+}
+
+// TimeoutAggregationDistributor ingests timeout aggregation events and distributes it to consumers.
+// It allows thread-safe subscription of multiple consumers to events.
+type TimeoutAggregationDistributor struct {
+	*TimeoutAggregationViolationDistributor
+	*TimeoutCollectorDistributor
+}
+
+var _ hotstuff.TimeoutAggregationConsumer = (*TimeoutAggregationDistributor)(nil)
+
+func NewTimeoutAggregationDistributor() *TimeoutAggregationDistributor {
+	return &TimeoutAggregationDistributor{
+		TimeoutAggregationViolationDistributor: NewTimeoutAggregationViolationDistributor(),
+		TimeoutCollectorDistributor:            NewTimeoutCollectorDistributor(),
 	}
 }
 
-func (p *Distributor) OnEnteringView(view uint64, leader flow.Identifier) {
-	p.lock.RLock()
-	defer p.lock.RUnlock()
-	for _, subscriber := range p.subscribers {
-		subscriber.OnEnteringView(view, leader)
+func (d *TimeoutAggregationDistributor) AddTimeoutAggregationConsumer(consumer hotstuff.TimeoutAggregationConsumer) {
+	d.TimeoutAggregationViolationDistributor.AddTimeoutAggregationViolationConsumer(consumer)
+	d.TimeoutCollectorDistributor.AddTimeoutCollectorConsumer(consumer)
+}
+
+// VoteAggregationDistributor ingests vote aggregation events and distributes it to consumers.
+// It allows thread-safe subscription of multiple consumers to events.
+type VoteAggregationDistributor struct {
+	*VoteAggregationViolationDistributor
+	*VoteCollectorDistributor
+}
+
+var _ hotstuff.VoteAggregationConsumer = (*VoteAggregationDistributor)(nil)
+
+func NewVoteAggregationDistributor() *VoteAggregationDistributor {
+	return &VoteAggregationDistributor{
+		VoteAggregationViolationDistributor: NewVoteAggregationViolationDistributor(),
+		VoteCollectorDistributor:            NewQCCreatedDistributor(),
 	}
 }
 
-func (p *Distributor) OnQcTriggeredViewChange(qc *flow.QuorumCertificate, newView uint64) {
-	p.lock.RLock()
-	defer p.lock.RUnlock()
-	for _, subscriber := range p.subscribers {
-		subscriber.OnQcTriggeredViewChange(qc, newView)
-	}
-}
-
-func (p *Distributor) OnProposingBlock(proposal *model.Proposal) {
-	p.lock.RLock()
-	defer p.lock.RUnlock()
-	for _, subscriber := range p.subscribers {
-		subscriber.OnProposingBlock(proposal)
-	}
-}
-
-func (p *Distributor) OnVoting(vote *model.Vote) {
-	p.lock.RLock()
-	defer p.lock.RUnlock()
-	for _, subscriber := range p.subscribers {
-		subscriber.OnVoting(vote)
-	}
-}
-
-func (p *Distributor) OnQcConstructedFromVotes(curView uint64, qc *flow.QuorumCertificate) {
-	p.lock.RLock()
-	defer p.lock.RUnlock()
-	for _, subscriber := range p.subscribers {
-		subscriber.OnQcConstructedFromVotes(curView, qc)
-	}
-}
-
-func (p *Distributor) OnStartingTimeout(timerInfo *model.TimerInfo) {
-	p.lock.RLock()
-	defer p.lock.RUnlock()
-	for _, subscriber := range p.subscribers {
-		subscriber.OnStartingTimeout(timerInfo)
-	}
-}
-
-func (p *Distributor) OnReachedTimeout(timeout *model.TimerInfo) {
-	p.lock.RLock()
-	defer p.lock.RUnlock()
-	for _, subscriber := range p.subscribers {
-		subscriber.OnReachedTimeout(timeout)
-	}
-}
-
-func (p *Distributor) OnQcIncorporated(qc *flow.QuorumCertificate) {
-	p.lock.RLock()
-	defer p.lock.RUnlock()
-	for _, subscriber := range p.subscribers {
-		subscriber.OnQcIncorporated(qc)
-	}
-}
-
-func (p *Distributor) OnForkChoiceGenerated(curView uint64, selectedQC *flow.QuorumCertificate) {
-	p.lock.RLock()
-	defer p.lock.RUnlock()
-	for _, subscriber := range p.subscribers {
-		subscriber.OnForkChoiceGenerated(curView, selectedQC)
-	}
-}
-
-func (p *Distributor) OnBlockIncorporated(block *model.Block) {
-	p.lock.RLock()
-	defer p.lock.RUnlock()
-	for _, subscriber := range p.subscribers {
-		subscriber.OnBlockIncorporated(block)
-	}
-}
-
-func (p *Distributor) OnFinalizedBlock(block *model.Block) {
-	p.lock.RLock()
-	defer p.lock.RUnlock()
-	for _, subscriber := range p.subscribers {
-		subscriber.OnFinalizedBlock(block)
-	}
-}
-
-func (p *Distributor) OnDoubleProposeDetected(block1, block2 *model.Block) {
-	p.lock.RLock()
-	defer p.lock.RUnlock()
-	for _, subscriber := range p.subscribers {
-		subscriber.OnDoubleProposeDetected(block1, block2)
-	}
-}
-
-func (p *Distributor) OnDoubleVotingDetected(vote1, vote2 *model.Vote) {
-	p.lock.RLock()
-	defer p.lock.RUnlock()
-	for _, subscriber := range p.subscribers {
-		subscriber.OnDoubleVotingDetected(vote1, vote2)
-	}
-}
-
-func (p *Distributor) OnInvalidVoteDetected(vote *model.Vote) {
-	p.lock.RLock()
-	defer p.lock.RUnlock()
-	for _, subscriber := range p.subscribers {
-		subscriber.OnInvalidVoteDetected(vote)
-	}
-}
-
-func (p *Distributor) OnVoteForInvalidBlockDetected(vote *model.Vote, invalidProposal *model.Proposal) {
-	p.lock.RLock()
-	defer p.lock.RUnlock()
-	for _, subscriber := range p.subscribers {
-		subscriber.OnVoteForInvalidBlockDetected(vote, invalidProposal)
-	}
+func (d *VoteAggregationDistributor) AddVoteAggregationConsumer(consumer hotstuff.VoteAggregationConsumer) {
+	d.VoteAggregationViolationDistributor.AddVoteAggregationViolationConsumer(consumer)
+	d.VoteCollectorDistributor.AddVoteCollectorConsumer(consumer)
 }

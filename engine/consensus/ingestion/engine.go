@@ -1,5 +1,3 @@
-// (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
-
 package ingestion
 
 import (
@@ -43,7 +41,7 @@ type Engine struct {
 func New(
 	log zerolog.Logger,
 	engineMetrics module.EngineMetrics,
-	net network.Network,
+	net network.EngineRegistry,
 	me module.Local,
 	core *Core,
 ) (*Engine, error) {
@@ -51,7 +49,7 @@ func New(
 	logger := log.With().Str("ingestion", "engine").Logger()
 
 	guaranteesQueue, err := fifoqueue.NewFifoQueue(
-		fifoqueue.WithCapacity(defaultGuaranteeQueueCapacity),
+		defaultGuaranteeQueueCapacity,
 		fifoqueue.WithLengthObserver(func(len int) { core.mempool.MempoolEntries(metrics.ResourceCollectionGuaranteesQueue, uint(len)) }),
 	)
 	if err != nil {

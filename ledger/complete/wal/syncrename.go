@@ -21,7 +21,7 @@ type WriterSeekerCloser interface {
 // to target one as the last step. This help avoid situation when writing is
 // interrupted  and unusable file but with target name exists.
 type SyncOnCloseRenameFile struct {
-	logger     *zerolog.Logger
+	logger     zerolog.Logger
 	file       *os.File
 	targetName string
 	savedError error // savedError is the first error returned from Write.  Close() renames temp file to target file only if savedError is nil.

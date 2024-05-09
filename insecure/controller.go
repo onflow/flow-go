@@ -24,5 +24,5 @@ type IngressController interface {
 	// HandleIncomingEvent sends an incoming event (to an engine) to the corrupted networking layer to process.
 	// Boolean return type represents whether attacker is registered with the corrupted network.
 	// Returns true if it is, false otherwise.
-	HandleIncomingEvent(channels.Channel, flow.Identifier, interface{}) bool
+	HandleIncomingEvent(interface{}, channels.Channel, flow.Identifier) bool
 }

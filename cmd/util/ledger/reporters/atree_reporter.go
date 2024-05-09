@@ -8,12 +8,11 @@ import (
 	"sync"
 
 	"github.com/onflow/atree"
-
-	fvmState "github.com/onflow/flow-go/fvm/state"
-	"github.com/onflow/flow-go/ledger"
-
 	"github.com/rs/zerolog"
 	"github.com/schollz/progressbar/v3"
+
+	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // AtreeReporter iterates payloads and generates payload and atree stats.
@@ -116,12 +115,14 @@ func getPayloadType(p *ledger.Payload) (payloadType, error) {
 	if len(k.KeyParts) < 2 {
 		return unknownPayloadType, nil
 	}
-	if fvmState.IsFVMStateKey(
-		string(k.KeyParts[0].Value),
-		string(k.KeyParts[1].Value),
-	) {
+
+	id := flow.NewRegisterID(
+		flow.BytesToAddress(k.KeyParts[0].Value),
+		string(k.KeyParts[1].Value))
+	if id.IsInternalState() {
 		return fvmPayloadType, nil
 	}
+
 	if bytes.HasPrefix(k.KeyParts[1].Value, []byte(atree.LedgerBaseStorageSlabPrefix)) {
 		return slabPayloadType, nil
 	}

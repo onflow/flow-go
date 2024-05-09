@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/onflow/crypto"
 	"github.com/rs/zerolog"
 	"go.uber.org/atomic"
 
@@ -11,7 +12,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/signature"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
 	msig "github.com/onflow/flow-go/module/signature"
@@ -30,7 +30,7 @@ import (
 // the proposer's vote (decorator pattern).
 // nolint:unused
 type combinedVoteProcessorFactoryBaseV3 struct {
-	committee   hotstuff.Committee
+	committee   hotstuff.DynamicCommittee
 	onQCCreated hotstuff.OnQCCreated
 	packer      hotstuff.Packer
 }
@@ -39,7 +39,7 @@ type combinedVoteProcessorFactoryBaseV3 struct {
 // Caller must treat all errors as exceptions
 // nolint:unused
 func (f *combinedVoteProcessorFactoryBaseV3) Create(log zerolog.Logger, block *model.Block) (hotstuff.VerifyingVoteProcessor, error) {
-	allParticipants, err := f.committee.Identities(block.BlockID)
+	allParticipants, err := f.committee.IdentitiesByBlock(block.BlockID)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving consensus participants at block %v: %w", block.BlockID, err)
 	}
@@ -58,7 +58,7 @@ func (f *combinedVoteProcessorFactoryBaseV3) Create(log zerolog.Logger, block *m
 		return nil, fmt.Errorf("could not create aggregator for staking signatures: %w", err)
 	}
 
-	dkg, err := f.committee.DKG(block.BlockID)
+	dkg, err := f.committee.DKG(block.View)
 	if err != nil {
 		return nil, fmt.Errorf("could not get DKG info at block %v: %w", block.BlockID, err)
 	}
@@ -85,7 +85,10 @@ func (f *combinedVoteProcessorFactoryBaseV3) Create(log zerolog.Logger, block *m
 	}
 
 	rbRector := signature.NewRandomBeaconReconstructor(dkg, randomBeaconInspector)
-	minRequiredWeight := hotstuff.ComputeWeightThresholdForBuildingQC(allParticipants.TotalWeight())
+	minRequiredWeight, err := f.committee.QuorumThresholdForView(block.View)
+	if err != nil {
+		return nil, fmt.Errorf("could not get weight threshold for view %d: %w", block.View, err)
+	}
 
 	return &CombinedVoteProcessorV3{
 		log:               log.With().Hex("block_id", block.BlockID[:]).Logger(),
@@ -150,11 +153,11 @@ func (p *CombinedVoteProcessorV3) Status() hotstuff.VoteCollectorStatus {
 // `VerifyingVoteProcessor` (once as part of a cached vote, once as an individual vote). This can be exploited
 // by a byzantine proposer to be erroneously counted twice, which would lead to a safety fault.
 //
-// TODO: (suggestion) I think it would be worth-while to include a second `votesCache` into the `CombinedVoteProcessorV3`.
-// Thereby,  `CombinedVoteProcessorV3` inherently guarantees correctness of the QCs it produces without relying on
-// external conditions (making the code more modular, less interdependent and thereby easier to maintain). The
-// runtime overhead is marginal: For `votesCache` to add 500 votes (concurrently with 20 threads) takes about
-// 0.25ms. This runtime overhead is neglectable and a good tradeoff for the gain in maintainability and code clarity.
+//	 TODO (suggestion): I think it would be worth-while to include a second `votesCache` into the `CombinedVoteProcessorV3`.
+//			Thereby, `CombinedVoteProcessorV3` inherently guarantees correctness of the QCs it produces without relying on
+//			external conditions (making the code more modular, less interdependent and thereby easier to maintain). The
+//			runtime overhead is marginal: For `votesCache` to add 500 votes (concurrently with 20 threads) takes about
+//			0.25ms. This runtime overhead is neglectable and a good tradeoff for the gain in maintainability and code clarity.
 func (p *CombinedVoteProcessorV3) Process(vote *model.Vote) error {
 	err := EnsureVoteForBlock(vote, p.block)
 	if err != nil {
@@ -240,7 +243,7 @@ func (p *CombinedVoteProcessorV3) Process(vote *model.Vote) error {
 
 	// At this point, we have enough signatures to build a QC. Another routine
 	// might just be at this point. To avoid duplicate work, only one routine can pass:
-	if !p.done.CAS(false, true) {
+	if !p.done.CompareAndSwap(false, true) {
 		return nil
 	}
 
@@ -255,7 +258,7 @@ func (p *CombinedVoteProcessorV3) Process(vote *model.Vote) error {
 	p.log.Info().
 		Uint64("view", qc.View).
 		Hex("signers", qc.SignerIndices).
-		Msg("new qc has been created")
+		Msg("new QC has been created")
 
 	p.onQCCreated(qc)
 
@@ -305,7 +308,7 @@ func (p *CombinedVoteProcessorV3) buildQC() (*flow.QuorumCertificate, error) {
 		AggregatedRandomBeaconSig:    aggregatedRandomBeaconSig,
 		ReconstructedRandomBeaconSig: reconstructedBeaconSig,
 	}
-	signerIndices, sigData, err := p.packer.Pack(p.block.BlockID, blockSigData)
+	signerIndices, sigData, err := p.packer.Pack(p.block.View, blockSigData)
 	if err != nil {
 		return nil, fmt.Errorf("could not pack the block sig data: %w", err)
 	}

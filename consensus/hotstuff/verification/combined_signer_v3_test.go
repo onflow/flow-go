@@ -7,57 +7,51 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/crypto"
+
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/signature"
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/local"
 	modulemock "github.com/onflow/flow-go/module/mock"
 	msig "github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/state/protocol"
-	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// Test that when DKG key is available for a view, a signed block can pass the validation
+// Test that when beacon key is available for a view, a signed block can pass the validation
 // the sig is a random beacon sig.
-func TestCombinedSignWithDKGKeyV3(t *testing.T) {
+func TestCombinedSignWithBeaconKeyV3(t *testing.T) {
 	// prepare data
-	dkgKey := unittest.RandomBeaconPriv()
-	pk := dkgKey.PublicKey()
+	beaconKey := unittest.RandomBeaconPriv()
+	pk := beaconKey.PublicKey()
 	view := uint64(20)
 
 	fblock := unittest.BlockFixture()
 	fblock.Header.View = view
-	block := model.BlockFromFlow(fblock.Header, 10)
+	block := model.BlockFromFlow(fblock.Header)
 	signerID := fblock.Header.ProposerID
 
-	epochCounter := uint64(3)
-	epochLookup := &modulemock.EpochLookup{}
-	epochLookup.On("EpochForViewWithFallback", view).Return(epochCounter, nil)
-
-	keys := &storagemock.SafeBeaconKeys{}
-	// there is DKG key for this epoch
-	keys.On("RetrieveMyBeaconPrivateKey", epochCounter).Return(dkgKey, true, nil)
-
-	beaconKeyStore := signature.NewEpochAwareRandomBeaconKeyStore(epochLookup, keys)
+	beaconKeyStore := modulemock.NewRandomBeaconKeyStore(t)
+	beaconKeyStore.On("ByView", view).Return(beaconKey, nil)
 
 	stakingPriv := unittest.StakingPrivKeyFixture()
-	nodeID := unittest.IdentityFixture()
+	nodeID := &unittest.IdentityFixture().IdentitySkeleton
 	nodeID.NodeID = signerID
 	nodeID.StakingPubKey = stakingPriv.PublicKey()
 
-	me, err := local.New(nodeID, stakingPriv)
+	me, err := local.New(*nodeID, stakingPriv)
 	require.NoError(t, err)
 	signer := NewCombinedSignerV3(me, beaconKeyStore)
 
 	dkg := &mocks.DKG{}
 	dkg.On("KeyShare", signerID).Return(pk, nil)
 
-	committee := &mocks.Committee{}
+	committee := &mocks.DynamicCommittee{}
 	committee.On("DKG", mock.Anything).Return(dkg, nil)
 
 	packer := signature.NewConsensusSigDataPacker(committee)
@@ -68,13 +62,13 @@ func TestCombinedSignWithDKGKeyV3(t *testing.T) {
 	require.NoError(t, err)
 
 	vote := proposal.ProposerVote()
-	err = verifier.VerifyVote(nodeID, vote.SigData, proposal.Block)
+	err = verifier.VerifyVote(nodeID, vote.SigData, proposal.Block.View, proposal.Block.BlockID)
 	require.NoError(t, err)
 
 	// check that a created proposal's signature is a combined staking sig and random beacon sig
 	msg := MakeVoteMessage(block.View, block.BlockID)
 
-	beaconSig, err := dkgKey.Sign(msg, msig.NewBLSHasher(msig.RandomBeaconTag))
+	beaconSig, err := beaconKey.Sign(msg, msig.NewBLSHasher(msig.RandomBeaconTag))
 	require.NoError(t, err)
 
 	expectedSig := msig.EncodeSingleSig(encoding.SigTypeRandomBeacon, beaconSig)
@@ -85,46 +79,39 @@ func TestCombinedSignWithDKGKeyV3(t *testing.T) {
 	// as a sign of an invalid vote and wraps it into a `model.InvalidSignerError`.
 	*dkg = mocks.DKG{} // overwrite DKG mock with a new one
 	dkg.On("KeyShare", signerID).Return(nil, protocol.IdentityNotFoundError{NodeID: signerID})
-	err = verifier.VerifyVote(nodeID, vote.SigData, proposal.Block)
+	err = verifier.VerifyVote(nodeID, vote.SigData, proposal.Block.View, proposal.Block.BlockID)
 	require.True(t, model.IsInvalidSignerError(err))
 }
 
-// Test that when DKG key is not available for a view, a signed block can pass the validation
+// Test that when beacon key is not available for a view, a signed block can pass the validation
 // the sig is a staking sig
-func TestCombinedSignWithNoDKGKeyV3(t *testing.T) {
+func TestCombinedSignWithNoBeaconKeyV3(t *testing.T) {
 	// prepare data
-	dkgKey := unittest.RandomBeaconPriv()
-	pk := dkgKey.PublicKey()
+	beaconKey := unittest.RandomBeaconPriv()
+	pk := beaconKey.PublicKey()
 	view := uint64(20)
 
 	fblock := unittest.BlockFixture()
 	fblock.Header.View = view
-	block := model.BlockFromFlow(fblock.Header, 10)
+	block := model.BlockFromFlow(fblock.Header)
 	signerID := fblock.Header.ProposerID
 
-	epochCounter := uint64(3)
-	epochLookup := &modulemock.EpochLookup{}
-	epochLookup.On("EpochForViewWithFallback", view).Return(epochCounter, nil)
-
-	keys := &storagemock.SafeBeaconKeys{}
-	// there is no DKG key for this epoch
-	keys.On("RetrieveMyBeaconPrivateKey", epochCounter).Return(nil, false, nil)
-
-	beaconKeyStore := signature.NewEpochAwareRandomBeaconKeyStore(epochLookup, keys)
+	beaconKeyStore := modulemock.NewRandomBeaconKeyStore(t)
+	beaconKeyStore.On("ByView", view).Return(nil, module.ErrNoBeaconKeyForEpoch)
 
 	stakingPriv := unittest.StakingPrivKeyFixture()
-	nodeID := unittest.IdentityFixture()
+	nodeID := &unittest.IdentityFixture().IdentitySkeleton
 	nodeID.NodeID = signerID
 	nodeID.StakingPubKey = stakingPriv.PublicKey()
 
-	me, err := local.New(nodeID, stakingPriv)
+	me, err := local.New(*nodeID, stakingPriv)
 	require.NoError(t, err)
 	signer := NewCombinedSignerV3(me, beaconKeyStore)
 
 	dkg := &mocks.DKG{}
 	dkg.On("KeyShare", signerID).Return(pk, nil)
 
-	committee := &mocks.Committee{}
+	committee := &mocks.DynamicCommittee{}
 	// even if the node failed DKG, and has no random beacon private key,
 	// but other nodes, who completed and succeeded DKG, have a public key
 	// for this failed node, which can be used to verify signature from
@@ -138,7 +125,7 @@ func TestCombinedSignWithNoDKGKeyV3(t *testing.T) {
 	require.NoError(t, err)
 
 	vote := proposal.ProposerVote()
-	err = verifier.VerifyVote(nodeID, vote.SigData, proposal.Block)
+	err = verifier.VerifyVote(nodeID, vote.SigData, proposal.Block.View, proposal.Block.BlockID)
 	require.NoError(t, err)
 
 	// check that a created proposal's signature is a combined staking sig and random beacon sig
@@ -155,7 +142,7 @@ func TestCombinedSignWithNoDKGKeyV3(t *testing.T) {
 // Test_VerifyQC checks that a QC where either signer list is empty is rejected as invalid
 func Test_VerifyQCV3(t *testing.T) {
 	header := unittest.BlockHeaderFixture()
-	block := model.BlockFromFlow(header, header.View-1)
+	block := model.BlockFromFlow(header)
 	msg := MakeVoteMessage(block.View, block.BlockID)
 
 	// generate some BLS key as a stub of the random beacon group key and use it to generate a reconstructed beacon sig
@@ -163,7 +150,7 @@ func Test_VerifyQCV3(t *testing.T) {
 	dkg := &mocks.DKG{}
 	dkg.On("GroupKey").Return(privGroupKey.PublicKey(), nil)
 	dkg.On("Size").Return(uint(20))
-	committee := &mocks.Committee{}
+	committee := &mocks.DynamicCommittee{}
 	committee.On("DKG", mock.Anything).Return(dkg, nil)
 
 	// generate 17 BLS keys as stubs for staking keys and use them to generate an aggregated staking sig
@@ -174,7 +161,7 @@ func Test_VerifyQCV3(t *testing.T) {
 	stakingSigners := generateIdentitiesForPrivateKeys(t, privStakingKeys)
 	rbSigners := generateIdentitiesForPrivateKeys(t, privRbKeyShares)
 	registerPublicRbKeys(t, dkg, rbSigners.NodeIDs(), privRbKeyShares)
-	allSigners := append(append(flow.IdentityList{}, stakingSigners...), rbSigners...)
+	allSigners := append(append(flow.IdentityList{}, stakingSigners...), rbSigners...).ToSkeleton()
 
 	packedSigData := unittest.RandomBytes(1021)
 	unpackedSigData := hotstuff.BlockSignatureData{
@@ -191,7 +178,7 @@ func Test_VerifyQCV3(t *testing.T) {
 		packer.On("Unpack", mock.Anything, packedSigData).Return(&unpackedSigData, nil)
 
 		verifier := NewCombinedVerifierV3(committee, packer)
-		err := verifier.VerifyQC(allSigners, packedSigData, block)
+		err := verifier.VerifyQC(allSigners, packedSigData, block.View, block.BlockID)
 		require.NoError(t, err)
 	})
 
@@ -208,7 +195,7 @@ func Test_VerifyQCV3(t *testing.T) {
 		packer := &mocks.Packer{}
 		packer.On("Unpack", mock.Anything, packedSigData).Return(&sd, nil)
 		verifier := NewCombinedVerifierV3(committee, packer)
-		err := verifier.VerifyQC(allSigners, packedSigData, block)
+		err := verifier.VerifyQC(allSigners, packedSigData, block.View, block.BlockID)
 		require.NoError(t, err)
 	})
 
@@ -223,7 +210,7 @@ func Test_VerifyQCV3(t *testing.T) {
 		packer := &mocks.Packer{}
 		packer.On("Unpack", mock.Anything, packedSigData).Return(&sd, nil)
 		verifier := NewCombinedVerifierV3(committee, packer)
-		err := verifier.VerifyQC(allSigners, packedSigData, block)
+		err := verifier.VerifyQC(allSigners, packedSigData, block.View, block.BlockID)
 		require.True(t, model.IsInvalidFormatError(err))
 	})
 
@@ -236,7 +223,7 @@ func Test_VerifyQCV3(t *testing.T) {
 		packer := &mocks.Packer{}
 		packer.On("Unpack", mock.Anything, packedSigData).Return(&sd, nil)
 		verifier := NewCombinedVerifierV3(committee, packer)
-		err := verifier.VerifyQC(allSigners, packedSigData, block)
+		err := verifier.VerifyQC(allSigners, packedSigData, block.View, block.BlockID)
 		require.True(t, model.IsInvalidFormatError(err))
 	})
 
@@ -252,7 +239,7 @@ func Test_VerifyQCV3(t *testing.T) {
 		packer := &mocks.Packer{}
 		packer.On("Unpack", mock.Anything, packedSigData).Return(&sd, nil)
 		verifier := NewCombinedVerifierV3(committee, packer)
-		err := verifier.VerifyQC(allSigners, packedSigData, block)
+		err := verifier.VerifyQC(allSigners, packedSigData, block.View, block.BlockID)
 		require.True(t, model.IsInvalidFormatError(err))
 	})
 
@@ -263,19 +250,56 @@ func Test_VerifyQCV3(t *testing.T) {
 // any sub-components, because some (e.g. `crypto.AggregateBLSPublicKeys`) don't provide sufficient
 // sentinel errors to distinguish between internal problems and external byzantine inputs.
 func Test_VerifyQC_EmptySignersV3(t *testing.T) {
-	committee := &mocks.Committee{}
+	committee := &mocks.DynamicCommittee{}
+	dkg := &mocks.DKG{}
+	pk := &modulemock.PublicKey{}
+	pk.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
+	dkg.On("GroupKey").Return(pk)
+	committee.On("DKG", mock.Anything).Return(dkg, nil)
 	packer := signature.NewConsensusSigDataPacker(committee)
 	verifier := NewCombinedVerifier(committee, packer)
 
 	header := unittest.BlockHeaderFixture()
-	block := model.BlockFromFlow(header, header.View-1)
-	sigData := unittest.QCSigDataFixture()
+	block := model.BlockFromFlow(header)
+	// sigData with empty signers
+	emptySignersInput := model.SignatureData{
+		SigType:                      []byte{},
+		AggregatedStakingSig:         unittest.SignatureFixture(),
+		AggregatedRandomBeaconSig:    unittest.SignatureFixture(),
+		ReconstructedRandomBeaconSig: unittest.SignatureFixture(),
+	}
+	encoder := new(model.SigDataPacker)
+	sigData, err := encoder.Encode(&emptySignersInput)
+	require.NoError(t, err)
 
-	err := verifier.VerifyQC([]*flow.Identity{}, sigData, block)
+	err = verifier.VerifyQC(flow.IdentitySkeletonList{}, sigData, block.View, block.BlockID)
 	require.True(t, model.IsInsufficientSignaturesError(err))
 
-	err = verifier.VerifyQC(nil, sigData, block)
+	err = verifier.VerifyQC(nil, sigData, block.View, block.BlockID)
 	require.True(t, model.IsInsufficientSignaturesError(err))
+}
+
+// TestCombinedSign_BeaconKeyStore_ViewForUnknownEpochv3 tests that if the beacon
+// key store reports the view of the entity to sign has no known epoch, an
+// exception should be raised.
+func TestCombinedSign_BeaconKeyStore_ViewForUnknownEpochv3(t *testing.T) {
+	beaconKeyStore := modulemock.NewRandomBeaconKeyStore(t)
+	beaconKeyStore.On("ByView", mock.Anything).Return(nil, model.ErrViewForUnknownEpoch)
+
+	stakingPriv := unittest.StakingPrivKeyFixture()
+	nodeID := unittest.IdentityFixture()
+	nodeID.StakingPubKey = stakingPriv.PublicKey()
+
+	me, err := local.New(nodeID.IdentitySkeleton, stakingPriv)
+	require.NoError(t, err)
+	signer := NewCombinedSigner(me, beaconKeyStore)
+
+	fblock := unittest.BlockHeaderFixture()
+	block := model.BlockFromFlow(fblock)
+
+	vote, err := signer.CreateVote(block)
+	require.Error(t, err)
+	assert.Nil(t, vote)
 }
 
 func generateIdentitiesForPrivateKeys(t *testing.T, pivKeys []crypto.PrivateKey) flow.IdentityList {
@@ -315,7 +339,7 @@ func generateAggregatedSignature(t *testing.T, n int, msg []byte, tag string) ([
 // generateSignature creates a single private BLS 12-381 key, signs the provided `message` with
 // using domain separation `tag` and return the private key and signature.
 func generateSignature(t *testing.T, message []byte, tag string) (crypto.PrivateKey, crypto.Signature) {
-	priv := unittest.PrivateKeyFixture(crypto.BLSBLS12381, crypto.KeyGenSeedMinLenBLSBLS12381)
+	priv := unittest.PrivateKeyFixture(crypto.BLSBLS12381, crypto.KeyGenSeedMinLen)
 	sig, err := priv.Sign(message, msig.NewBLSHasher(tag))
 	require.NoError(t, err)
 	return priv, sig

@@ -39,7 +39,7 @@ func TestExecutionForkWithDuplicateAssignedChunks(t *testing.T) {
 	mockStateAtBlockIDForIdentities(s.state, block.ID(), executorsA.Union(executorsB))
 
 	// the chunks belong to an unsealed block, so their chunk data pack is requested.
-	mockBlockSealingStatus(s.state, s.headers, block, false)
+	mockBlockSealingStatus(s.state, s.headers, block.Header, false)
 
 	// mocks resources on fetcher engine side.
 	mockResultsByIDs(s.results, []*flow.ExecutionResult{resultA, resultB})

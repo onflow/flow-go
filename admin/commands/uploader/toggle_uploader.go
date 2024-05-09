@@ -2,33 +2,38 @@ package uploader
 
 import (
 	"context"
-	"errors"
 
 	"github.com/onflow/flow-go/admin"
 	"github.com/onflow/flow-go/admin/commands"
-	"github.com/onflow/flow-go/engine/execution/computation"
+	"github.com/onflow/flow-go/engine/execution/ingestion/uploader"
 )
 
 var _ commands.AdminCommand = (*ToggleUploaderCommand)(nil)
 
-type ToggleUploaderCommand struct{}
+type ToggleUploaderCommand struct {
+	uploadManager *uploader.Manager
+}
 
 func (t *ToggleUploaderCommand) Handler(ctx context.Context, req *admin.CommandRequest) (interface{}, error) {
 	enabled := req.ValidatorData.(bool)
-	computation.SetUploaderEnabled(enabled)
+	t.uploadManager.SetEnabled(enabled)
 	return "ok", nil
 }
 
+// Validator validates the request.
+// Returns admin.InvalidAdminReqError for invalid/malformed requests.
 func (t *ToggleUploaderCommand) Validator(req *admin.CommandRequest) error {
 	enabled, ok := req.Data.(bool)
 	if !ok {
-		return errors.New("the input must be a boolean")
+		return admin.NewInvalidAdminReqFormatError("expected bool")
 	}
 
 	req.ValidatorData = enabled
 	return nil
 }
 
-func NewToggleUploaderCommand() commands.AdminCommand {
-	return &ToggleUploaderCommand{}
+func NewToggleUploaderCommand(uploadManager *uploader.Manager) commands.AdminCommand {
+	return &ToggleUploaderCommand{
+		uploadManager: uploadManager,
+	}
 }

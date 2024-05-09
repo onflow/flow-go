@@ -12,15 +12,18 @@ var errStopCondition = errors.New("stop condition reached")
 type Option func(*Config)
 
 type Config struct {
-	Root              *flow.Header
-	Participants      flow.IdentityList
-	LocalID           flow.Identifier
-	Timeouts          timeout.Config
-	IncomingVotes     VoteFilter
-	OutgoingVotes     VoteFilter
-	IncomingProposals ProposalFilter
-	OutgoingProposals ProposalFilter
-	StopCondition     Condition
+	Root                   *flow.Header
+	Participants           flow.IdentityList
+	LocalID                flow.Identifier
+	Timeouts               timeout.Config
+	IncomingVotes          VoteFilter
+	OutgoingVotes          VoteFilter
+	IncomingTimeoutObjects TimeoutObjectFilter
+	OutgoingTimeoutObjects TimeoutObjectFilter
+	IncomingProposals      ProposalFilter
+	OutgoingProposals      ProposalFilter
+
+	StopCondition Condition
 }
 
 func WithRoot(root *flow.Header) Option {
@@ -68,6 +71,18 @@ func WithIncomingProposals(Filter ProposalFilter) Option {
 func WithOutgoingProposals(Filter ProposalFilter) Option {
 	return func(cfg *Config) {
 		cfg.OutgoingProposals = Filter
+	}
+}
+
+func WithIncomingTimeoutObjects(Filter TimeoutObjectFilter) Option {
+	return func(cfg *Config) {
+		cfg.IncomingTimeoutObjects = Filter
+	}
+}
+
+func WithOutgoingTimeoutObjects(Filter TimeoutObjectFilter) Option {
+	return func(cfg *Config) {
+		cfg.OutgoingTimeoutObjects = Filter
 	}
 }
 

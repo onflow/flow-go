@@ -7,15 +7,16 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/onflow/cadence"
-	"github.com/onflow/flow-core-contracts/lib/go/templates"
 	"github.com/rs/zerolog"
+
+	"github.com/onflow/cadence"
+	"github.com/onflow/crypto"
+	"github.com/onflow/flow-core-contracts/lib/go/templates"
 
 	sdk "github.com/onflow/flow-go-sdk"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
-	"github.com/onflow/flow-go/model/flow"
 
-	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/model/flow"
 	model "github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/epochs"
@@ -44,7 +45,7 @@ func NewClient(
 		Str("component", "dkg_contract_client").
 		Str("flow_client_an_id", flowClientANID.String()).
 		Logger()
-	base := epochs.NewBaseClient(log, flowClient, accountAddress, accountKeyIndex, signer, dkgContractAddress)
+	base := epochs.NewBaseClient(log, flowClient, accountAddress, accountKeyIndex, signer)
 
 	env := templates.Environment{DkgAddress: dkgContractAddress}
 
@@ -63,8 +64,14 @@ func (c *Client) ReadBroadcast(fromIndex uint, referenceBlock flow.Identifier) (
 
 	// construct read latest broadcast messages transaction
 	template := templates.GenerateGetDKGLatestWhiteBoardMessagesScript(c.env)
-	value, err := c.FlowClient.ExecuteScriptAtBlockID(ctx,
-		sdk.Identifier(referenceBlock), template, []cadence.Value{cadence.NewInt(int(fromIndex))})
+	value, err := c.FlowClient.ExecuteScriptAtBlockID(
+		ctx,
+		sdk.Identifier(referenceBlock),
+		template,
+		[]cadence.Value{
+			cadence.NewInt(int(fromIndex)),
+		},
+	)
 	if err != nil {
 		return nil, fmt.Errorf("could not execute read broadcast script: %w", err)
 	}
@@ -73,7 +80,9 @@ func (c *Client) ReadBroadcast(fromIndex uint, referenceBlock flow.Identifier) (
 	// unpack return from contract to `model.DKGMessage`
 	messages := make([]model.BroadcastDKGMessage, 0, len(values))
 	for _, val := range values {
-		id, err := strconv.Unquote(val.(cadence.Struct).Fields[0].String())
+		fields := cadence.FieldsMappedByName(val.(cadence.Struct))
+
+		id, err := strconv.Unquote(fields["nodeID"].String())
 		if err != nil {
 			return nil, fmt.Errorf("could not unquote nodeID cadence string (%s): %w", id, err)
 		}
@@ -83,7 +92,7 @@ func (c *Client) ReadBroadcast(fromIndex uint, referenceBlock flow.Identifier) (
 			return nil, fmt.Errorf("could not parse nodeID (%v): %w", val, err)
 		}
 
-		content := val.(cadence.Struct).Fields[1]
+		content := fields["content"]
 		jsonString, err := strconv.Unquote(content.String())
 		if err != nil {
 			return nil, fmt.Errorf("could not unquote json string: %w", err)
@@ -126,7 +135,7 @@ func (c *Client) Broadcast(msg model.BroadcastDKGMessage) error {
 	// construct transaction to send dkg whiteboard message to contract
 	tx := sdk.NewTransaction().
 		SetScript(templates.GenerateSendDKGWhiteboardMessageScript(c.env)).
-		SetGasLimit(9999).
+		SetComputeLimit(9999).
 		SetReferenceBlockID(latestBlock.ID).
 		SetProposalKey(account.Address, int(c.AccountKeyIndex), account.Keys[int(c.AccountKeyIndex)].SequenceNumber).
 		SetPayer(account.Address).
@@ -192,7 +201,7 @@ func (c *Client) SubmitResult(groupPublicKey crypto.PublicKey, publicKeys []cryp
 
 	tx := sdk.NewTransaction().
 		SetScript(templates.GenerateSendDKGFinalSubmissionScript(c.env)).
-		SetGasLimit(9999).
+		SetComputeLimit(9999).
 		SetReferenceBlockID(latestBlock.ID).
 		SetProposalKey(account.Address, int(c.AccountKeyIndex), account.Keys[int(c.AccountKeyIndex)].SequenceNumber).
 		SetPayer(account.Address).

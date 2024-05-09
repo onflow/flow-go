@@ -1,0 +1,63 @@
+# This workflow is used to build and upload the node bootstrapping tools
+name: Build Tools
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag/commit'
+        required: true
+        type: string
+      promote:
+        description: 'Promote to official boot-tools?'
+        required: false
+        type: boolean
+
+jobs:
+  build-publish:
+    name: Build boot tools
+    runs-on: ubuntu-latest
+    steps:
+    - name: Print all input variables
+      run: echo '${{ toJson(inputs) }}' | jq
+    - id: auth
+      uses: google-github-actions/auth@v1
+      with:
+        credentials_json: ${{ secrets.GCR_SERVICE_KEY }}
+    - name: Set up Google Cloud SDK
+      uses: google-github-actions/setup-gcloud@v1
+      with:
+        project_id: flow
+    - name: Setup Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: "1.20"
+    - name: Checkout repo
+      uses: actions/checkout@v3
+      with:
+        # to accurately get the version tag
+        fetch-depth: 0
+        ref: ${{ inputs.tag }}
+    - name: Build and upload boot-tools
+      run: |
+        make tool-bootstrap tool-transit
+        mkdir boot-tools
+        mv bootstrap transit boot-tools/
+        tar -czf boot-tools.tar ./boot-tools/
+        gsutil cp boot-tools.tar gs://flow-genesis-bootstrap/tools/${{ inputs.tag }}/boot-tools.tar
+    - name: Build and upload util
+      run: |
+        make tool-util
+        tar -czf util.tar util
+        gsutil cp util.tar gs://flow-genesis-bootstrap/tools/${{ inputs.tag }}/util.tar
+    - name: Promote boot-tools
+      run: |
+        if [[ "${{ inputs.promote }}" = true ]]; then
+          echo "promoting boot-tools.tar"
+          gsutil cp boot-tools.tar gs://flow-genesis-bootstrap/boot-tools.tar
+          SUMMARY=$'# Tool Build and Upload Summary \n Your tools were uploaded to the following GCS objects \n * Boot Tools gs://flow-genesis-bootstrap/boot-tools.tar \n * Util util.tar gs://flow-genesis-bootstrap/tools/${{ inputs.tag }}/util.tar'
+        else
+          echo "not promoting boot-tools.tar"
+          SUMMARY=$'# Tool Build and Upload Summary \n Your tools were uploaded to the following GCS objects \n * Boot Tools gs://flow-genesis-bootstrap/tools/${{ inputs.tag }}/boot-tools.tar \n * Util util.tar gs://flow-genesis-bootstrap/tools/${{ inputs.tag }}/util.tar'
+        fi
+        echo "$SUMMARY" >> $GITHUB_STEP_SUMMARY

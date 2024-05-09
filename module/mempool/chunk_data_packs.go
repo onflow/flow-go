@@ -1,5 +1,3 @@
-// (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
-
 package mempool
 
 import (
@@ -21,7 +19,7 @@ type ChunkDataPacks interface {
 	// return true if the ChunkDataPack was known and removed.
 	Remove(chunkID flow.Identifier) bool
 
-	// ByID retrieve the chunk datapacke with the given chunk ID from the memory
+	// ByChunkID retrieve the chunk datapacke with the given chunk ID from the memory
 	// pool. It will return false if it was not found in the mempool.
 	ByChunkID(chunkID flow.Identifier) (*flow.ChunkDataPack, bool)
 
@@ -31,7 +29,4 @@ type ChunkDataPacks interface {
 	// All will retrieve all ChunkDataPacks that are currently in the memory pool
 	// as a slice.
 	All() []*flow.ChunkDataPack
-
-	// Hash will return a hash of the contents of the memory pool.
-	Hash() flow.Identifier
 }

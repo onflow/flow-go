@@ -21,9 +21,7 @@ import (
 	consensusingest "github.com/onflow/flow-go/engine/consensus/ingestion"
 	"github.com/onflow/flow-go/engine/consensus/matching"
 	"github.com/onflow/flow-go/engine/consensus/sealing"
-	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/computation"
-	"github.com/onflow/flow-go/engine/execution/computation/computer"
 	"github.com/onflow/flow-go/engine/execution/ingestion"
 	executionprovider "github.com/onflow/flow-go/engine/execution/provider"
 	"github.com/onflow/flow-go/engine/execution/state"
@@ -33,7 +31,7 @@ import (
 	"github.com/onflow/flow-go/engine/verification/fetcher/chunkconsumer"
 	verificationrequester "github.com/onflow/flow-go/engine/verification/requester"
 	"github.com/onflow/flow-go/engine/verification/verifier"
-	fvmState "github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/model/flow"
@@ -41,7 +39,6 @@ import (
 	"github.com/onflow/flow-go/module/finalizer/consensus"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool"
-	"github.com/onflow/flow-go/module/mempool/entity"
 	epochpool "github.com/onflow/flow-go/module/mempool/epochs"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/util"
@@ -61,7 +58,7 @@ type StateFixture struct {
 	SecretsDB      *badger.DB
 	Storage        *storage.All
 	ProtocolEvents *events.Distributor
-	State          protocol.MutableState
+	State          protocol.ParticipantState
 }
 
 // GenericNode implements a generic in-process node for tests.
@@ -69,24 +66,31 @@ type GenericNode struct {
 	// context and cancel function used to start/stop components
 	Ctx    irrecoverable.SignalerContext
 	Cancel context.CancelFunc
+	Errs   <-chan error
 
-	Log            zerolog.Logger
-	Metrics        *metrics.NoopCollector
-	Tracer         module.Tracer
-	PublicDB       *badger.DB
-	SecretsDB      *badger.DB
-	Headers        storage.Headers
-	Guarantees     storage.Guarantees
-	Seals          storage.Seals
-	Payloads       storage.Payloads
-	Blocks         storage.Blocks
-	State          protocol.MutableState
-	Index          storage.Index
-	Me             module.Local
-	Net            *stub.Network
-	DBDir          string
-	ChainID        flow.ChainID
-	ProtocolEvents *events.Distributor
+	Log                zerolog.Logger
+	Metrics            *metrics.NoopCollector
+	Tracer             module.Tracer
+	PublicDB           *badger.DB
+	SecretsDB          *badger.DB
+	Headers            storage.Headers
+	Guarantees         storage.Guarantees
+	Seals              storage.Seals
+	Payloads           storage.Payloads
+	Blocks             storage.Blocks
+	QuorumCertificates storage.QuorumCertificates
+	Results            storage.ExecutionResults
+	Setups             storage.EpochSetups
+	EpochCommits       storage.EpochCommits
+	EpochProtocolState storage.ProtocolState
+	ProtocolKVStore    storage.ProtocolKVStore
+	State              protocol.ParticipantState
+	Index              storage.Index
+	Me                 module.Local
+	Net                *stub.Network
+	DBDir              string
+	ChainID            flow.ChainID
+	ProtocolEvents     *events.Distributor
 }
 
 func (g *GenericNode) Done() {
@@ -131,8 +135,14 @@ type CollectionNode struct {
 	EpochManagerEngine *epochmgr.Engine
 }
 
-func (n CollectionNode) Ready() <-chan struct{} {
+func (n CollectionNode) Start(t *testing.T) {
+	go unittest.FailOnIrrecoverableError(t, n.Ctx.Done(), n.Errs)
 	n.IngestionEngine.Start(n.Ctx)
+	n.EpochManagerEngine.Start(n.Ctx)
+	n.ProviderEngine.Start(n.Ctx)
+}
+
+func (n CollectionNode) Ready() <-chan struct{} {
 	return util.AllReady(
 		n.PusherEngine,
 		n.ProviderEngine,
@@ -178,41 +188,27 @@ func (cn ConsensusNode) Done() {
 	<-cn.SealingEngine.Done()
 }
 
-type ComputerWrap struct {
-	*computation.Manager
-	OnComputeBlock func(ctx context.Context, block *entity.ExecutableBlock, view fvmState.View)
-}
-
-func (c *ComputerWrap) ComputeBlock(
-	ctx context.Context,
-	block *entity.ExecutableBlock,
-	view fvmState.View,
-) (*execution.ComputationResult, error) {
-	if c.OnComputeBlock != nil {
-		c.OnComputeBlock(ctx, block, view)
-	}
-	return c.Manager.ComputeBlock(ctx, block, view)
-}
-
 // ExecutionNode implements a mocked execution node for tests.
 type ExecutionNode struct {
 	GenericNode
-	MutableState        protocol.MutableState
+	FollowerState       protocol.FollowerState
 	IngestionEngine     *ingestion.Engine
-	ExecutionEngine     *ComputerWrap
+	ExecutionEngine     *computation.Manager
 	RequestEngine       *requester.Engine
 	ReceiptsEngine      *executionprovider.Engine
-	FollowerEngine      *followereng.Engine
+	FollowerCore        module.HotStuffFollower
+	FollowerEngine      *followereng.ComplianceEngine
 	SyncEngine          *synchronization.Engine
 	Compactor           *complete.Compactor
 	BadgerDB            *badger.DB
-	VM                  computer.VirtualMachine
+	VM                  fvm.VM
 	ExecutionState      state.ExecutionState
 	Ledger              ledger.Ledger
 	LevelDbDir          string
 	Collections         storage.Collections
 	Finalizer           *consensus.Finalizer
 	MyExecutionReceipts storage.MyExecutionReceipts
+	StorehouseEnabled   bool
 }
 
 func (en ExecutionNode) Ready(ctx context.Context) {
@@ -221,11 +217,15 @@ func (en ExecutionNode) Ready(ctx context.Context) {
 	// new interface.
 	irctx, _ := irrecoverable.WithSignaler(ctx)
 	en.ReceiptsEngine.Start(irctx)
+	en.FollowerCore.Start(irctx)
+	en.FollowerEngine.Start(irctx)
+	en.SyncEngine.Start(irctx)
 
 	<-util.AllReady(
 		en.Ledger,
 		en.ReceiptsEngine,
 		en.IngestionEngine,
+		en.FollowerCore,
 		en.FollowerEngine,
 		en.RequestEngine,
 		en.SyncEngine,
@@ -242,6 +242,7 @@ func (en ExecutionNode) Done(cancelFunc context.CancelFunc) {
 		en.IngestionEngine,
 		en.ReceiptsEngine,
 		en.Ledger,
+		en.FollowerCore,
 		en.FollowerEngine,
 		en.RequestEngine,
 		en.SyncEngine,
@@ -252,12 +253,23 @@ func (en ExecutionNode) Done(cancelFunc context.CancelFunc) {
 }
 
 func (en ExecutionNode) AssertHighestExecutedBlock(t *testing.T, header *flow.Header) {
-
 	height, blockID, err := en.ExecutionState.GetHighestExecutedBlockID(context.Background())
 	require.NoError(t, err)
 
 	require.Equal(t, header.ID(), blockID)
 	require.Equal(t, header.Height, height)
+}
+
+func (en ExecutionNode) AssertBlockIsExecuted(t *testing.T, header *flow.Header) {
+	executed, err := en.ExecutionState.IsBlockExecuted(header.Height, header.ID())
+	require.NoError(t, err)
+	require.True(t, executed)
+}
+
+func (en ExecutionNode) AssertBlockNotExecuted(t *testing.T, header *flow.Header) {
+	executed, err := en.ExecutionState.IsBlockExecuted(header.Height, header.ID())
+	require.NoError(t, err)
+	require.False(t, executed)
 }
 
 // VerificationNode implements an in-process verification node for tests.

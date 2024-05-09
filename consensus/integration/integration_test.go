@@ -18,8 +18,14 @@ import (
 func runNodes(signalerCtx irrecoverable.SignalerContext, nodes []*Node) {
 	for _, n := range nodes {
 		go func(n *Node) {
-			n.aggregator.Start(signalerCtx)
-			<-util.AllReady(n.aggregator, n.compliance, n.sync)
+			n.committee.Start(signalerCtx)
+			n.hot.Start(signalerCtx)
+			n.voteAggregator.Start(signalerCtx)
+			n.timeoutAggregator.Start(signalerCtx)
+			n.compliance.Start(signalerCtx)
+			n.messageHub.Start(signalerCtx)
+			n.sync.Start(signalerCtx)
+			<-util.AllReady(n.committee, n.hot, n.voteAggregator, n.timeoutAggregator, n.compliance, n.sync, n.messageHub)
 		}(n)
 	}
 }
@@ -28,9 +34,17 @@ func stopNodes(t *testing.T, cancel context.CancelFunc, nodes []*Node) {
 	stoppingNodes := make([]<-chan struct{}, 0)
 	cancel()
 	for _, n := range nodes {
-		stoppingNodes = append(stoppingNodes, util.AllDone(n.aggregator, n.compliance, n.sync))
+		stoppingNodes = append(stoppingNodes, util.AllDone(
+			n.committee,
+			n.hot,
+			n.voteAggregator,
+			n.timeoutAggregator,
+			n.compliance,
+			n.sync,
+			n.messageHub,
+		))
 	}
-	unittest.RequireCloseBefore(t, util.AllClosed(stoppingNodes...), time.Minute, "requiring nodes to stop")
+	unittest.RequireCloseBefore(t, util.AllClosed(stoppingNodes...), time.Second, "requiring nodes to stop")
 }
 
 // happy path: with 3 nodes, they can reach consensus
@@ -38,39 +52,29 @@ func Test3Nodes(t *testing.T) {
 	stopper := NewStopper(5, 0)
 	participantsData := createConsensusIdentities(t, 3)
 	rootSnapshot := createRootSnapshot(t, participantsData)
-	nodes, hub := createNodes(t, NewConsensusParticipants(participantsData), rootSnapshot, stopper)
+	nodes, hub, runFor := createNodes(t, NewConsensusParticipants(participantsData), rootSnapshot, stopper)
 
 	hub.WithFilter(blockNothing)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	signalerCtx, _ := irrecoverable.WithSignaler(ctx)
-
-	runNodes(signalerCtx, nodes)
-
-	unittest.AssertClosesBefore(t, stopper.stopped, 30*time.Second)
+	runFor(30 * time.Second)
 
 	allViews := allFinalizedViews(t, nodes)
 	assertSafety(t, allViews)
 
-	stopNodes(t, cancel, nodes)
 	cleanupNodes(nodes)
 }
 
 // with 5 nodes, and one node completely blocked, the other 4 nodes can still reach consensus
 func Test5Nodes(t *testing.T) {
-	// 4 nodes should be able finalize at least 3 blocks.
+	// 4 nodes should be able to finalize at least 3 blocks.
 	stopper := NewStopper(2, 1)
 	participantsData := createConsensusIdentities(t, 5)
 	rootSnapshot := createRootSnapshot(t, participantsData)
-	nodes, hub := createNodes(t, NewConsensusParticipants(participantsData), rootSnapshot, stopper)
+	nodes, hub, runFor := createNodes(t, NewConsensusParticipants(participantsData), rootSnapshot, stopper)
 
 	hub.WithFilter(blockNodes(nodes[0]))
-	ctx, cancel := context.WithCancel(context.Background())
-	signalerCtx, _ := irrecoverable.WithSignaler(ctx)
 
-	runNodes(signalerCtx, nodes)
-
-	<-stopper.stopped
+	runFor(30 * time.Second)
 
 	header, err := nodes[0].state.Final().Head()
 	require.NoError(t, err)
@@ -81,7 +85,6 @@ func Test5Nodes(t *testing.T) {
 	allViews := allFinalizedViews(t, nodes[1:])
 	assertSafety(t, allViews)
 
-	stopNodes(t, cancel, nodes)
 	cleanupNodes(nodes)
 }
 
@@ -127,8 +130,7 @@ func chainViews(t *testing.T, node *Node) []uint64 {
 		require.NoError(t, err)
 	}
 
-	// reverse all views to start from lower view to higher view
-
+	// reverse all views to runFor from lower view to higher view
 	low2high := make([]uint64, 0)
 	for i := len(views) - 1; i >= 0; i-- {
 		low2high = append(low2high, views[i])
@@ -136,27 +138,35 @@ func chainViews(t *testing.T, node *Node) []uint64 {
 	return low2high
 }
 
+// BlockOrDelayFunc is a function for deciding whether a message (or other event) should be
+// blocked or delayed. The first return value specifies whether the event should be dropped
+// entirely (return value `true`) or should be delivered (return value `false`). The second
+// return value specifies the delay by which the message should be delivered.
+// Implementations must be CONCURRENCY SAFE.
 type BlockOrDelayFunc func(channel channels.Channel, event interface{}, sender, receiver *Node) (bool, time.Duration)
 
-// block nothing
-func blockNothing(channel channels.Channel, event interface{}, sender, receiver *Node) (bool, time.Duration) {
+// blockNothing specifies that _all_ messages should be delivered without delay.
+// I.e. this function returns always `false` (no blocking), `0` (no delay).
+func blockNothing(_ channels.Channel, _ interface{}, _, _ *Node) (bool, time.Duration) {
 	return false, 0
 }
 
-// block all messages sent by or received by a list of denied nodes
+// blockNodes specifies that all messages sent or received by any member of the `denyList`
+// should be dropped, i.e. we return `true` (block message), `0` (no delay).
+// For nodes _not_ in the `denyList`,  we return `false` (no blocking), `0` (no delay).
 func blockNodes(denyList ...*Node) BlockOrDelayFunc {
-	blackList := make(map[flow.Identifier]*Node, len(denyList))
+	denyMap := make(map[flow.Identifier]*Node, len(denyList))
 	for _, n := range denyList {
-		blackList[n.id.ID()] = n
+		denyMap[n.id.ID()] = n
 	}
+	// no concurrency protection needed as blackList is only read but not modified
 	return func(channel channels.Channel, event interface{}, sender, receiver *Node) (bool, time.Duration) {
-		block, notBlock := true, false
-		if _, ok := blackList[sender.id.ID()]; ok {
-			return block, 0
+		if _, ok := denyMap[sender.id.ID()]; ok {
+			return true, 0 // block the message
 		}
-		if _, ok := blackList[receiver.id.ID()]; ok {
-			return block, 0
+		if _, ok := denyMap[receiver.id.ID()]; ok {
+			return true, 0 // block the message
 		}
-		return notBlock, 0
+		return false, 0 // allow the message
 	}
 }

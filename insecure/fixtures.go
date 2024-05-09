@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
+	flownetmsg "github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -40,9 +41,12 @@ func EgressMessageFixture(t *testing.T, codec network.Codec, protocol Protocol, 
 	// encodes event to create payload
 	payload, err := codec.Encode(content)
 	require.NoError(t, err)
+	eventIDHash, err := flownetmsg.EventId(channel, payload)
+	require.NoError(t, err)
+
+	eventID := flow.HashToID(eventIDHash)
 
 	// creates egress message that goes over gRPC.
-
 	egressMsg := &EgressMessage{
 		ChannelID:       channels.TestNetworkChannel.String(),
 		CorruptOriginID: originId[:],
@@ -59,12 +63,13 @@ func EgressMessageFixture(t *testing.T, codec network.Codec, protocol Protocol, 
 	// creates corresponding event of that message that
 	// is sent by orchestrator network to orchestrator.
 	e := &EgressEvent{
-		CorruptOriginId:   originId,
-		Channel:           channel,
-		FlowProtocolEvent: content,
-		Protocol:          protocol,
-		TargetNum:         targetNum,
-		TargetIds:         targetIds,
+		CorruptOriginId:     originId,
+		Channel:             channel,
+		FlowProtocolEvent:   content,
+		FlowProtocolEventID: eventID,
+		Protocol:            protocol,
+		TargetNum:           targetNum,
+		TargetIds:           targetIds,
 	}
 
 	return m, e, unittest.IdentityFixture(unittest.WithNodeID(originId), unittest.WithAddress(DefaultAddress))

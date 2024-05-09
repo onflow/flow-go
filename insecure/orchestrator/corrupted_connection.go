@@ -19,16 +19,16 @@ type CorruptedNodeConnection struct {
 	component.Component
 	cm             *component.ComponentManager
 	logger         zerolog.Logger
-	inboundHandler func(*insecure.Message)                                         // handler for incoming messages from corruptible conduit factories.
-	outbound       insecure.CorruptibleConduitFactory_ProcessAttackerMessageClient // from orchestrator to ccf.
-	inbound        insecure.CorruptibleConduitFactory_ConnectAttackerClient        // from ccf to orchestrator.
+	inboundHandler func(*insecure.Message)                              // handler for incoming messages from corruptible conduit factories.
+	outbound       insecure.CorruptNetwork_ProcessAttackerMessageClient // from attacker to corrupt network.
+	inbound        insecure.CorruptNetwork_ConnectAttackerClient        // from corrupt network to attacker.
 }
 
 func NewCorruptedNodeConnection(
 	logger zerolog.Logger,
 	inboundHandler func(message *insecure.Message),
-	outbound insecure.CorruptibleConduitFactory_ProcessAttackerMessageClient,
-	inbound insecure.CorruptibleConduitFactory_ConnectAttackerClient) *CorruptedNodeConnection {
+	outbound insecure.CorruptNetwork_ProcessAttackerMessageClient,
+	inbound insecure.CorruptNetwork_ConnectAttackerClient) *CorruptedNodeConnection {
 	c := &CorruptedNodeConnection{
 		logger:         logger.With().Str("component", "corrupted-connector").Logger(),
 		outbound:       outbound,
@@ -55,6 +55,9 @@ func NewCorruptedNodeConnection(
 // SendMessage sends the message from orchestrator to the corrupted conduit factory.
 func (c *CorruptedNodeConnection) SendMessage(message *insecure.Message) error {
 	err := c.outbound.Send(message)
+	if err == io.EOF {
+		c.logger.Warn().Err(err).Msg("outbound stream to corrupt node is closed")
+	}
 	if err != nil {
 		return fmt.Errorf("could not send message: %w", err)
 	}

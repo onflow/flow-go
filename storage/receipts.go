@@ -1,5 +1,3 @@
-// (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
-
 package storage
 
 import (
@@ -36,9 +34,17 @@ type MyExecutionReceipts interface {
 	// store conflicting receipts for the same block will error.
 	StoreMyReceipt(receipt *flow.ExecutionReceipt) error
 
-	// BatchStoreMyReceipt stores the receipt and marks it as mine (trusted) in a given batch
+	// BatchStoreMyReceipt stores blockID-to-my-receipt index entry keyed by blockID in a provided batch.
+	// No errors are expected during normal operation
+	// If entity fails marshalling, the error is wrapped in a generic error and returned.
+	// If Badger unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
 	BatchStoreMyReceipt(receipt *flow.ExecutionReceipt, batch BatchStorage) error
 
 	// MyReceipt retrieves my receipt for the given block.
 	MyReceipt(blockID flow.Identifier) (*flow.ExecutionReceipt, error)
+
+	// BatchRemoveIndexByBlockID removes blockID-to-my-execution-receipt index entry keyed by a blockID in a provided batch
+	// No errors are expected during normal operation, even if no entries are matched.
+	// If Badger unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
+	BatchRemoveIndexByBlockID(blockID flow.Identifier, batch BatchStorage) error
 }

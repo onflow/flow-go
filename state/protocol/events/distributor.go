@@ -7,11 +7,14 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 )
 
-// Distributor distributes events to a list of subscribers.
+// Distributor implements the `protocol.Consumer` interface for ingesting notifications emitted
+// by the protocol state. It distributes the notifications to all registered consumers.
 type Distributor struct {
 	subscribers []protocol.Consumer
 	mu          sync.RWMutex
 }
+
+var _ protocol.Consumer = (*Distributor)(nil)
 
 // NewDistributor returns a new events distributor.
 func NewDistributor() *Distributor {
@@ -32,11 +35,11 @@ func (d *Distributor) BlockFinalized(block *flow.Header) {
 	}
 }
 
-func (d *Distributor) BlockProcessable(block *flow.Header) {
+func (d *Distributor) BlockProcessable(block *flow.Header, certifyingQC *flow.QuorumCertificate) {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
 	for _, sub := range d.subscribers {
-		sub.BlockProcessable(block)
+		sub.BlockProcessable(block, certifyingQC)
 	}
 }
 
@@ -61,5 +64,13 @@ func (d *Distributor) EpochCommittedPhaseStarted(epoch uint64, first *flow.Heade
 	defer d.mu.RUnlock()
 	for _, sub := range d.subscribers {
 		sub.EpochCommittedPhaseStarted(epoch, first)
+	}
+}
+
+func (d *Distributor) EpochEmergencyFallbackTriggered() {
+	d.mu.RLock()
+	defer d.mu.RUnlock()
+	for _, sub := range d.subscribers {
+		sub.EpochEmergencyFallbackTriggered()
 	}
 }

@@ -2,7 +2,6 @@ package complete_test
 
 import (
 	"math"
-	"math/rand"
 	"testing"
 	"time"
 
@@ -40,8 +39,6 @@ func benchmarkStorage(steps int, b *testing.B) {
 		checkpointsToKeep  = 1
 	)
 
-	rand.Seed(time.Now().UnixNano())
-
 	dir := b.TempDir()
 
 	diskWal, err := wal.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir, steps+1, pathfinder.PathByteSize, wal.SegmentSize)
@@ -50,7 +47,7 @@ func benchmarkStorage(steps int, b *testing.B) {
 	led, err := complete.NewLedger(diskWal, steps+1, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
 	require.NoError(b, err)
 
-	compactor, err := complete.NewCompactor(led, diskWal, zerolog.Nop(), uint(steps+1), checkpointDistance, checkpointsToKeep, atomic.NewBool(false))
+	compactor, err := complete.NewCompactor(led, diskWal, zerolog.Nop(), uint(steps+1), checkpointDistance, checkpointsToKeep, atomic.NewBool(false), metrics.NewNoopCollector())
 	require.NoError(b, err)
 
 	<-compactor.Ready()
@@ -155,8 +152,6 @@ func BenchmarkTrieUpdate(b *testing.B) {
 		checkpointsToKeep  = 1
 	)
 
-	rand.Seed(1)
-
 	dir := b.TempDir()
 
 	diskWal, err := wal.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir, capacity, pathfinder.PathByteSize, wal.SegmentSize)
@@ -165,7 +160,7 @@ func BenchmarkTrieUpdate(b *testing.B) {
 	led, err := complete.NewLedger(diskWal, capacity, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
 	require.NoError(b, err)
 
-	compactor, err := complete.NewCompactor(led, diskWal, zerolog.Nop(), capacity, checkpointDistance, checkpointsToKeep, atomic.NewBool(false))
+	compactor, err := complete.NewCompactor(led, diskWal, zerolog.Nop(), capacity, checkpointDistance, checkpointsToKeep, atomic.NewBool(false), metrics.NewNoopCollector())
 	require.NoError(b, err)
 
 	<-compactor.Ready()
@@ -209,8 +204,6 @@ func BenchmarkTrieRead(b *testing.B) {
 		checkpointsToKeep  = 1
 	)
 
-	rand.Seed(1)
-
 	dir := b.TempDir()
 
 	diskWal, err := wal.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir, capacity, pathfinder.PathByteSize, wal.SegmentSize)
@@ -219,7 +212,7 @@ func BenchmarkTrieRead(b *testing.B) {
 	led, err := complete.NewLedger(diskWal, capacity, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
 	require.NoError(b, err)
 
-	compactor, err := complete.NewCompactor(led, diskWal, zerolog.Nop(), capacity, checkpointDistance, checkpointsToKeep, atomic.NewBool(false))
+	compactor, err := complete.NewCompactor(led, diskWal, zerolog.Nop(), capacity, checkpointDistance, checkpointsToKeep, atomic.NewBool(false), metrics.NewNoopCollector())
 	require.NoError(b, err)
 
 	<-compactor.Ready()
@@ -272,8 +265,6 @@ func BenchmarkLedgerGetOneValue(b *testing.B) {
 		checkpointsToKeep  = 1
 	)
 
-	rand.Seed(1)
-
 	dir := b.TempDir()
 
 	diskWal, err := wal.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir, capacity, pathfinder.PathByteSize, wal.SegmentSize)
@@ -282,7 +273,7 @@ func BenchmarkLedgerGetOneValue(b *testing.B) {
 	led, err := complete.NewLedger(diskWal, capacity, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
 	require.NoError(b, err)
 
-	compactor, err := complete.NewCompactor(led, diskWal, zerolog.Nop(), capacity, checkpointDistance, checkpointsToKeep, atomic.NewBool(false))
+	compactor, err := complete.NewCompactor(led, diskWal, zerolog.Nop(), capacity, checkpointDistance, checkpointsToKeep, atomic.NewBool(false), metrics.NewNoopCollector())
 	require.NoError(b, err)
 
 	<-compactor.Ready()
@@ -352,8 +343,6 @@ func BenchmarkTrieProve(b *testing.B) {
 		checkpointsToKeep  = 1
 	)
 
-	rand.Seed(1)
-
 	dir := b.TempDir()
 
 	diskWal, err := wal.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir, capacity, pathfinder.PathByteSize, wal.SegmentSize)
@@ -362,7 +351,7 @@ func BenchmarkTrieProve(b *testing.B) {
 	led, err := complete.NewLedger(diskWal, capacity, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
 	require.NoError(b, err)
 
-	compactor, err := complete.NewCompactor(led, diskWal, zerolog.Nop(), capacity, checkpointDistance, checkpointsToKeep, atomic.NewBool(false))
+	compactor, err := complete.NewCompactor(led, diskWal, zerolog.Nop(), capacity, checkpointDistance, checkpointsToKeep, atomic.NewBool(false), metrics.NewNoopCollector())
 	require.NoError(b, err)
 
 	<-compactor.Ready()

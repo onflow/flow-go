@@ -1,5 +1,3 @@
-// (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
-
 package operation
 
 import (
@@ -52,8 +50,27 @@ func RemoveServiceEventsByBlockID(blockID flow.Identifier) func(*badger.Txn) err
 	return removeByPrefix(makePrefix(codeServiceEvent, blockID))
 }
 
+// BatchRemoveServiceEventsByBlockID removes all service events for the given blockID.
+// No errors are expected during normal operation, even if no entries are matched.
+// If Badger unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
+func BatchRemoveServiceEventsByBlockID(blockID flow.Identifier, batch *badger.WriteBatch) func(*badger.Txn) error {
+	return func(txn *badger.Txn) error {
+		return batchRemoveByPrefix(makePrefix(codeServiceEvent, blockID))(txn, batch)
+	}
+}
+
 func RemoveEventsByBlockID(blockID flow.Identifier) func(*badger.Txn) error {
 	return removeByPrefix(makePrefix(codeEvent, blockID))
+}
+
+// BatchRemoveEventsByBlockID removes all events for the given blockID.
+// No errors are expected during normal operation, even if no entries are matched.
+// If Badger unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
+func BatchRemoveEventsByBlockID(blockID flow.Identifier, batch *badger.WriteBatch) func(*badger.Txn) error {
+	return func(txn *badger.Txn) error {
+		return batchRemoveByPrefix(makePrefix(codeEvent, blockID))(txn, batch)
+	}
+
 }
 
 // eventIterationFunc returns an in iteration function which returns all events found during traversal or iteration

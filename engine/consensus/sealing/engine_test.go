@@ -1,5 +1,3 @@
-// (c) 2021 Dapper Labs - ALL RIGHTS RESERVED
-
 package sealing
 
 import (
@@ -89,7 +87,7 @@ func (s *SealingEngineSuite) TestOnFinalizedBlock() {
 
 	s.state.On("Final").Return(unittest.StateSnapshotForKnownBlock(finalizedBlock, nil))
 	s.core.On("ProcessFinalizedBlock", finalizedBlockID).Return(nil).Once()
-	s.engine.OnFinalizedBlock(model.BlockFromFlow(finalizedBlock, finalizedBlock.View-1))
+	s.engine.OnFinalizedBlock(model.BlockFromFlow(finalizedBlock))
 
 	// matching engine has at least 100ms ticks for processing events
 	time.Sleep(1 * time.Second)
@@ -121,7 +119,7 @@ func (s *SealingEngineSuite) TestOnBlockIncorporated() {
 	headers.On("ByBlockID", incorporatedBlockID).Return(incorporatedBlock, nil).Once()
 	s.engine.headers = headers
 
-	s.engine.OnBlockIncorporated(model.BlockFromFlow(incorporatedBlock, incorporatedBlock.View-1))
+	s.engine.OnBlockIncorporated(model.BlockFromFlow(incorporatedBlock))
 
 	// matching engine has at least 100ms ticks for processing events
 	time.Sleep(1 * time.Second)

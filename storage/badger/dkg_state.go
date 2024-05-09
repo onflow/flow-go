@@ -4,8 +4,8 @@ import (
 	"fmt"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/onflow/crypto"
 
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -18,7 +18,7 @@ import (
 // computed keys. Must be instantiated using secrets database.
 type DKGState struct {
 	db       *badger.DB
-	keyCache *Cache
+	keyCache *Cache[uint64, *encodable.RandomBeaconPrivKey]
 }
 
 // NewDKGState returns the DKGState implementation backed by Badger DB.
@@ -28,23 +28,20 @@ func NewDKGState(collector module.CacheMetrics, db *badger.DB) (*DKGState, error
 		return nil, fmt.Errorf("cannot instantiate dkg state storage in non-secret db: %w", err)
 	}
 
-	storeKey := func(key interface{}, val interface{}) func(*transaction.Tx) error {
-		epochCounter := key.(uint64)
-		info := val.(*encodable.RandomBeaconPrivKey)
+	storeKey := func(epochCounter uint64, info *encodable.RandomBeaconPrivKey) func(*transaction.Tx) error {
 		return transaction.WithTx(operation.InsertMyBeaconPrivateKey(epochCounter, info))
 	}
 
-	retrieveKey := func(key interface{}) func(*badger.Txn) (interface{}, error) {
-		epochCounter := key.(uint64)
-		var info encodable.RandomBeaconPrivKey
-		return func(tx *badger.Txn) (interface{}, error) {
+	retrieveKey := func(epochCounter uint64) func(*badger.Txn) (*encodable.RandomBeaconPrivKey, error) {
+		return func(tx *badger.Txn) (*encodable.RandomBeaconPrivKey, error) {
+			var info encodable.RandomBeaconPrivKey
 			err := operation.RetrieveMyBeaconPrivateKey(epochCounter, &info)(tx)
 			return &info, err
 		}
 	}
 
-	cache := newCache(collector, metrics.ResourceBeaconKey,
-		withLimit(10),
+	cache := newCache[uint64, *encodable.RandomBeaconPrivKey](collector, metrics.ResourceBeaconKey,
+		withLimit[uint64, *encodable.RandomBeaconPrivKey](10),
 		withStore(storeKey),
 		withRetrieve(retrieveKey),
 	)
@@ -67,7 +64,7 @@ func (ds *DKGState) retrieveKeyTx(epochCounter uint64) func(tx *badger.Txn) (*en
 		if err != nil {
 			return nil, err
 		}
-		return val.(*encodable.RandomBeaconPrivKey), nil
+		return val, nil
 	}
 }
 
@@ -137,19 +134,21 @@ func NewSafeBeaconPrivateKeys(state *DKGState) *SafeBeaconPrivateKeys {
 // epoch, only if my key has been confirmed valid and safe for use.
 //
 // Returns:
-// * (key, true, nil) if the key is present and confirmed valid
-// * (nil, false, nil) if the key has been marked invalid (by SetDKGEnded)
-// * (nil, false, error) for any other condition, or exception
+//   - (key, true, nil) if the key is present and confirmed valid
+//   - (nil, false, nil) if the key has been marked invalid or unavailable
+//     -> no beacon key will ever be available for the epoch in this case
+//   - (nil, false, storage.ErrNotFound) if the DKG has not ended
+//   - (nil, false, error) for any unexpected exception
 func (keys *SafeBeaconPrivateKeys) RetrieveMyBeaconPrivateKey(epochCounter uint64) (key crypto.PrivateKey, safe bool, err error) {
 	err = keys.state.db.View(func(txn *badger.Txn) error {
 
-		// retrieve the end state, error on any storage error (including not found)
+		// retrieve the end state
 		var endState flow.DKGEndState
 		err = operation.RetrieveDKGEndStateForEpoch(epochCounter, &endState)(txn)
 		if err != nil {
 			key = nil
 			safe = false
-			return err
+			return err // storage.ErrNotFound or exception
 		}
 
 		// for any end state besides success, the key is not safe
@@ -159,13 +158,13 @@ func (keys *SafeBeaconPrivateKeys) RetrieveMyBeaconPrivateKey(epochCounter uint6
 			return nil
 		}
 
-		// retrieve the key, error on any storage error
+		// retrieve the key - any storage error (including not found) is an exception
 		var encodableKey *encodable.RandomBeaconPrivKey
 		encodableKey, err = keys.state.retrieveKeyTx(epochCounter)(txn)
 		if err != nil {
 			key = nil
 			safe = false
-			return err
+			return fmt.Errorf("[unexpected] could not retrieve beacon key for epoch %d with successful DKG: %v", epochCounter, err)
 		}
 
 		// return the key only for successful end state

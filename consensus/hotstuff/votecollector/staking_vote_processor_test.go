@@ -5,18 +5,19 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/onflow/crypto"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
+	"github.com/onflow/flow-go/consensus/hotstuff/committees"
 	"github.com/onflow/flow-go/consensus/hotstuff/helper"
 	mockhotstuff "github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	hotstuffvalidator "github.com/onflow/flow-go/consensus/hotstuff/validator"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/local"
 	modulemock "github.com/onflow/flow-go/module/mock"
@@ -161,7 +162,7 @@ func (s *StakingVoteProcessorTestSuite) TestProcess_CreatingQC() {
 	// setup aggregator
 	*s.stakingAggregator = mockhotstuff.WeightedSignatureAggregator{}
 	expectedSigData := unittest.RandomBytes(128)
-	s.stakingAggregator.On("Aggregate").Return([]flow.Identifier(stakingSigners), expectedSigData, nil).Once()
+	s.stakingAggregator.On("Aggregate").Return(stakingSigners, expectedSigData, nil).Once()
 
 	// expected QC
 	s.onQCCreatedState.On("onQCCreated", mock.Anything).Run(func(args mock.Arguments) {
@@ -209,7 +210,7 @@ func (s *StakingVoteProcessorTestSuite) TestProcess_ConcurrentCreatingQC() {
 		aggregator.On("Verify", mock.Anything, mock.Anything).Return(nil)
 		aggregator.On("TrustedAdd", mock.Anything, mock.Anything).Return(s.minRequiredWeight, nil)
 		aggregator.On("TotalWeight").Return(s.minRequiredWeight)
-		aggregator.On("Aggregate").Return([]flow.Identifier(stakingSigners), unittest.RandomBytes(128), nil)
+		aggregator.On("Aggregate").Return(stakingSigners, unittest.RandomBytes(128), nil)
 	}
 
 	// mock aggregators, so we have enough weight and shares for creating QC
@@ -259,19 +260,19 @@ func TestStakingVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 		stakingPriv := unittest.StakingPrivKeyFixture()
 		identity.StakingPubKey = stakingPriv.PublicKey()
 
-		me, err := local.New(identity, stakingPriv)
+		me, err := local.New(identity.IdentitySkeleton, stakingPriv)
 		require.NoError(t, err)
 
 		signers[identity.NodeID] = verification.NewStakingSigner(me)
-	})
+	}).Sort(flow.Canonical[flow.Identity])
 
 	leader := stakingSigners[0]
+	block := helper.MakeBlock(helper.WithBlockView(view), helper.WithBlockProposer(leader.NodeID))
 
-	block := helper.MakeBlock(helper.WithBlockView(view),
-		helper.WithBlockProposer(leader.NodeID))
-
-	committee := &mockhotstuff.Committee{}
-	committee.On("Identities", block.BlockID, mock.Anything).Return(stakingSigners, nil)
+	committee := &mockhotstuff.DynamicCommittee{}
+	committee.On("IdentitiesByEpoch", block.View).Return(stakingSigners.ToSkeleton(), nil)
+	committee.On("IdentitiesByBlock", block.BlockID).Return(stakingSigners, nil)
+	committee.On("QuorumThresholdForView", mock.Anything).Return(committees.WeightThresholdToBuildQC(stakingSigners.ToSkeleton().TotalWeight()), nil)
 
 	votes := make([]*model.Vote, 0, len(stakingSigners))
 
@@ -291,11 +292,10 @@ func TestStakingVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 	onQCCreated := func(qc *flow.QuorumCertificate) {
 		// create verifier that will do crypto checks of created QC
 		verifier := verification.NewStakingVerifier()
-		forks := &mockhotstuff.Forks{}
 		// create validator which will do compliance and crypto checked of created QC
-		validator := hotstuffvalidator.New(committee, forks, verifier)
+		validator := hotstuffvalidator.New(committee, verifier)
 		// check if QC is valid against parent
-		err := validator.ValidateQC(qc, block)
+		err := validator.ValidateQC(qc)
 		require.NoError(t, err)
 
 		qcCreated = true

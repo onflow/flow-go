@@ -152,11 +152,11 @@ func (ir *IncorporatedResultSeals) Clear() {
 // Monotonicity Requirement:
 // The pruned height cannot decrease, as we cannot recover already pruned elements.
 // If `height` is smaller than the previous value, the previous value is kept
-// and the sentinel mempool.DecreasingPruningHeightError is returned.
+// and the sentinel mempool.BelowPrunedThresholdError is returned.
 func (ir *IncorporatedResultSeals) PruneUpToHeight(height uint64) error {
 	return ir.Backend.Run(func(backData mempool.BackData) error {
 		if height < ir.lowestHeight {
-			return mempool.NewDecreasingPruningHeightErrorf(
+			return mempool.NewBelowPrunedThresholdErrorf(
 				"pruning height: %d, existing height: %d", height, ir.lowestHeight)
 		}
 

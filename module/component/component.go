@@ -30,7 +30,7 @@ type ComponentFactory func() (Component, error)
 // It is meant to inspect the error, determining its type and seeing if e.g. a restart or some other measure is suitable,
 // and then return an ErrorHandlingResult indicating how RunComponent should proceed.
 // Before returning, it could also:
-// - panic (in stagingnet / benchmark)
+// - panic (in sandboxnet / benchmark)
 // - log in various Error channels and / or send telemetry ...
 type OnError = func(error) ErrorHandlingResult
 
@@ -132,6 +132,13 @@ type ReadyFunc func()
 // waits until all workers have signaled that they are ready before closing its own Ready channel.
 type ComponentWorker func(ctx irrecoverable.SignalerContext, ready ReadyFunc)
 
+// NoopWorker is a worker routine which is immediately ready, does nothing, and
+// exits when the context is done.
+func NoopWorker(ctx irrecoverable.SignalerContext, ready ReadyFunc) {
+	ready()
+	<-ctx.Done()
+}
+
 // ComponentManagerBuilder provides a mechanism for building a ComponentManager
 type ComponentManagerBuilder interface {
 	// AddWorker adds a worker routine for the ComponentManager
@@ -202,7 +209,7 @@ type ComponentManager struct {
 func (c *ComponentManager) Start(parent irrecoverable.SignalerContext) {
 	// Make sure we only start once. atomically check if started is false then set it to true.
 	// If it was not false, panic
-	if !c.started.CAS(false, true) {
+	if !c.started.CompareAndSwap(false, true) {
 		panic(module.ErrMultipleStartup)
 	}
 

@@ -1,68 +1,52 @@
 package meter
 
-import "github.com/onflow/cadence/runtime/common"
+type MeterParameters struct {
+	ComputationMeterParameters
+	MemoryMeterParameters
+	EventMeterParameters
+	InteractionMeterParameters
+}
 
-type MetringOperationType uint
+func DefaultParameters() MeterParameters {
+	return MeterParameters{
+		ComputationMeterParameters: DefaultComputationMeterParameters(),
+		MemoryMeterParameters:      DefaultMemoryParameters(),
+		EventMeterParameters:       DefaultEventMeterParameters(),
+		InteractionMeterParameters: DefaultInteractionMeterParameters(),
+	}
+}
 
-// TODO(patrick): rm after emulator is updated ...
-const (
-	// [2_000, 3_000) reserved for the FVM
-	_ common.ComputationKind = iota + 2_000
-	ComputationKindHash
-	ComputationKindVerifySignature
-	ComputationKindAddAccountKey
-	ComputationKindAddEncodedAccountKey
-	ComputationKindAllocateStorageIndex
-	ComputationKindCreateAccount
-	ComputationKindEmitEvent
-	ComputationKindGenerateUUID
-	ComputationKindGetAccountAvailableBalance
-	ComputationKindGetAccountBalance
-	ComputationKindGetAccountContractCode
-	ComputationKindGetAccountContractNames
-	ComputationKindGetAccountKey
-	ComputationKindGetBlockAtHeight
-	ComputationKindGetCode
-	ComputationKindGetCurrentBlockHeight
-	ComputationKindGetProgram
-	ComputationKindGetStorageCapacity
-	ComputationKindGetStorageUsed
-	ComputationKindGetValue
-	ComputationKindRemoveAccountContractCode
-	ComputationKindResolveLocation
-	ComputationKindRevokeAccountKey
-	ComputationKindRevokeEncodedAccountKey
-	ComputationKindSetProgram
-	ComputationKindSetValue
-	ComputationKindUpdateAccountContractCode
-	ComputationKindValidatePublicKey
-	ComputationKindValueExists
-)
+// Meter collects memory and computation usage and enforces limits
+// for any each memory/computation usage call it sums intensity multiplied by the weight of the intensity to the total
+// memory/computation usage metrics and returns error if limits are not met.
+type Meter struct {
+	MeterParameters
 
-type MeteredComputationIntensities map[common.ComputationKind]uint
-type MeteredMemoryIntensities map[common.MemoryKind]uint
+	MemoryMeter
+	ComputationMeter
+	EventMeter
+	InteractionMeter
+}
 
-type Meter interface {
-	// merge child funcionality
-	NewChild() Meter
-	MergeMeter(child Meter)
+// NewMeter constructs a new Meter
+func NewMeter(params MeterParameters) *Meter {
+	return &Meter{
+		MeterParameters:  params,
+		ComputationMeter: NewComputationMeter(params.ComputationMeterParameters),
+		MemoryMeter:      NewMemoryMeter(params.MemoryMeterParameters),
+		EventMeter:       NewEventMeter(params.EventMeterParameters),
+		InteractionMeter: NewInteractionMeter(params.InteractionMeterParameters),
+	}
+}
 
-	// computation metering
-	MeterComputation(kind common.ComputationKind, intensity uint) error
-	ComputationIntensities() MeteredComputationIntensities
-	TotalComputationUsed() uint
-	TotalComputationLimit() uint
+// MergeMeter merges the input meter into the current meter
+func (m *Meter) MergeMeter(child *Meter) {
+	if child == nil {
+		return
+	}
 
-	// memory metering
-	MeterMemory(kind common.MemoryKind, intensity uint) error
-	MemoryIntensities() MeteredMemoryIntensities
-	TotalMemoryEstimate() uint64
-	TotalMemoryLimit() uint64
-
-	// TODO move storage metering to here
-	// MeterStorageRead(byteSize uint) error
-	// MeterStorageWrite(byteSize uint) error
-	// TotalBytesReadFromStorage() int
-	// TotalBytesWroteToStorage() int
-	// TotalBytesOfStorageInteractions() int
+	m.ComputationMeter.Merge(child.ComputationMeter)
+	m.MemoryMeter.Merge(child.MemoryMeter)
+	m.EventMeter.Merge(child.EventMeter)
+	m.InteractionMeter.Merge(child.InteractionMeter)
 }

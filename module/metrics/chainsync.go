@@ -7,9 +7,11 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/onflow/flow-go/model/chainsync"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 type ChainSyncCollector struct {
+	chainID               flow.ChainID
 	timeToPruned          *prometheus.HistogramVec
 	timeToReceived        *prometheus.HistogramVec
 	totalPruned           *prometheus.CounterVec
@@ -18,8 +20,9 @@ type ChainSyncCollector struct {
 	totalIdsRequested     prometheus.Counter
 }
 
-func NewChainSyncCollector() *ChainSyncCollector {
+func NewChainSyncCollector(chainID flow.ChainID) *ChainSyncCollector {
 	return &ChainSyncCollector{
+		chainID: chainID,
 		timeToPruned: prometheus.NewHistogramVec(prometheus.HistogramOpts{
 			Name:      "time_to_pruned_seconds",
 			Namespace: namespaceChainsync,

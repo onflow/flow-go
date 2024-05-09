@@ -7,6 +7,7 @@ import (
 	"io"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/onflow/flow-go/utils/unittest"
 
@@ -33,7 +34,7 @@ type GhostClient struct {
 
 func NewGhostClient(addr string) (*GhostClient, error) {
 
-	conn, err := grpc.Dial(addr, grpc.WithInsecure()) //nolint:staticcheck
+	conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return nil, err
 	}

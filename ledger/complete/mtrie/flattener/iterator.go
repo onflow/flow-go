@@ -78,13 +78,7 @@ type NodeIterator struct {
 // NodeIterator created by NewNodeIterator is safe for concurrent use
 // because visitedNodes is always nil in this case.
 func NewNodeIterator(n *node.Node) *NodeIterator {
-	// for a Trie with height H (measured by number of edges), the longest possible path contains H+1 vertices
-	stackSize := ledger.NodeMaxHeight + 1
-	i := &NodeIterator{
-		stack: make([]*node.Node, 0, stackSize),
-	}
-	i.unprocessedRoot = n
-	return i
+	return NewUniqueNodeIterator(n, nil)
 }
 
 // NewUniqueNodeIterator returns a node NodeIterator, which iterates through all unique nodes
@@ -112,6 +106,9 @@ func NewUniqueNodeIterator(n *node.Node, visitedNodes map[*node.Node]uint64) *No
 	return i
 }
 
+// Next moves the cursor to the next node in order for Value method to return it.
+// It returns true if there is a next node to iterate, in which case the Value method will return the node.
+// It returns false if there is no more node to iterate, in which case the Value method will return nil.
 func (i *NodeIterator) Next() bool {
 	if i.unprocessedRoot != nil {
 		// initial call to Next() for a non-empty trie
@@ -137,6 +134,8 @@ func (i *NodeIterator) Next() bool {
 	return false // as len(i.stack) == 0, i.e. there are no more elements to recall
 }
 
+// Value will return the current node at the cursor.
+// Note: you should call Next() before calling
 func (i *NodeIterator) Value() *node.Node {
 	if len(i.stack) == 0 {
 		return nil

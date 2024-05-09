@@ -6,7 +6,8 @@ type Transaction interface {
 	Set(key, val []byte) error
 }
 
-// BatchStorage
+// BatchStorage serves as an abstraction over batch storage, adding ability to add ability to add extra
+// callbacks which fire after the batch is successfully flushed.
 type BatchStorage interface {
 	GetWriter() *badger.WriteBatch
 

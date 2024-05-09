@@ -1,6 +1,7 @@
 package backend
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -14,4 +15,9 @@ type InsufficientExecutionReceipts struct {
 
 func (e InsufficientExecutionReceipts) Error() string {
 	return fmt.Sprintf("insufficient execution receipts found (%d) for block ID: %s", e.receiptCount, e.blockID.String())
+}
+
+func IsInsufficientExecutionReceipts(err error) bool {
+	var errInsufficientExecutionReceipts InsufficientExecutionReceipts
+	return errors.As(err, &errInsufficientExecutionReceipts)
 }

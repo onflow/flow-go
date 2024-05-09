@@ -4,9 +4,9 @@ import (
 	"context"
 	"errors"
 
+	"github.com/ipfs/boxo/blockstore"
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
-	blockstore "github.com/ipfs/go-ipfs-blockstore"
 	ipld "github.com/ipfs/go-ipld-format"
 )
 
@@ -81,3 +81,41 @@ func (bs *blobstoreImpl) AllKeysChan(ctx context.Context) (<-chan cid.Cid, error
 func (bs *blobstoreImpl) HashOnRead(enabled bool) {
 	bs.bs.HashOnRead(enabled)
 }
+
+// NoopBlobstore is a Blobstore that does nothing, which is useful for calculating
+// BlockExecutionData IDs without storing the data.
+type NoopBlobstore struct{}
+
+func NewNoopBlobstore() *NoopBlobstore {
+	return &NoopBlobstore{}
+}
+
+func (n *NoopBlobstore) DeleteBlob(context.Context, cid.Cid) error {
+	return nil
+}
+
+func (n *NoopBlobstore) Has(context.Context, cid.Cid) (bool, error) {
+	return false, nil
+}
+
+func (n *NoopBlobstore) Get(context.Context, cid.Cid) (Blob, error) {
+	return nil, nil
+}
+
+func (n *NoopBlobstore) GetSize(context.Context, cid.Cid) (int, error) {
+	return 0, nil
+}
+
+func (n *NoopBlobstore) Put(context.Context, Blob) error {
+	return nil
+}
+
+func (n *NoopBlobstore) PutMany(context.Context, []Blob) error {
+	return nil
+}
+
+func (n *NoopBlobstore) AllKeysChan(ctx context.Context) (<-chan cid.Cid, error) {
+	return nil, nil
+}
+
+func (n *NoopBlobstore) HashOnRead(enabled bool) {}

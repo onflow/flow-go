@@ -1,6 +1,7 @@
 package network
 
 import (
+	crand "crypto/rand"
 	"fmt"
 	"math/rand"
 	"net"
@@ -20,7 +21,7 @@ type TxtLookupTestCase struct {
 
 func NetIPAddrFixture() net.IPAddr {
 	token := make([]byte, 4)
-	rand.Read(token)
+	_, _ = crand.Read(token)
 
 	ip := net.IPAddr{
 		IP:   net.IPv4(token[0], token[1], token[2], token[3]),
@@ -32,7 +33,7 @@ func NetIPAddrFixture() net.IPAddr {
 
 func TxtIPFixture() string {
 	token := make([]byte, 4)
-	rand.Read(token)
+	_, _ = crand.Read(token)
 	return "dnsaddr=" + net.IPv4(token[0], token[1], token[2], token[3]).String()
 }
 

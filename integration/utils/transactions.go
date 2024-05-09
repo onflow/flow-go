@@ -1,17 +1,31 @@
 package utils
 
 import (
+	"context"
+	_ "embed"
 	"fmt"
 
 	"github.com/onflow/cadence"
+	"github.com/onflow/crypto"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
-	fttemplates "github.com/onflow/flow-ft/lib/go/templates"
 
 	sdk "github.com/onflow/flow-go-sdk"
-	"github.com/onflow/flow-go-sdk/crypto"
+	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 	sdktemplates "github.com/onflow/flow-go-sdk/templates"
+
+	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/utils/unittest"
 )
+
+//go:embed templates/create-and-setup-node.cdc
+var createAndSetupNodeTxScript string
+
+//go:embed templates/remove-node.cdc
+var removeNodeTxScript string
+
+//go:embed templates/set-protocol-state-version.cdc
+var setProtocolStateVersionScript string
 
 func LocalnetEnv() templates.Environment {
 	return templates.Environment{
@@ -25,103 +39,109 @@ func LocalnetEnv() templates.Environment {
 	}
 }
 
-// MakeCreateStakingCollectionTx submits transaction stakingCollection/setup_staking_collection.cdc
-// which will setup the staking collection object for the account
-func MakeCreateStakingCollectionTx(
+// MakeCreateAndSetupNodeTx creates a transaction which creates and configures a new staking account.
+// It creates the account, funds it, and registers the node using the staking collection.
+func MakeCreateAndSetupNodeTx(
 	env templates.Environment,
-	stakingAccount *sdk.Account,
-	stakingAccountKeyID int,
-	stakingSigner crypto.Signer,
-	payerAddress sdk.Address,
+	service *sdk.Account,
 	latestBlockID sdk.Identifier,
-) (*sdk.Transaction, error) {
-	accountKey := stakingAccount.Keys[stakingAccountKeyID]
-	tx := sdk.NewTransaction().
-		SetScript(templates.GenerateCollectionSetup(env)).
-		SetGasLimit(9999).
-		SetReferenceBlockID(latestBlockID).
-		SetProposalKey(stakingAccount.Address, stakingAccountKeyID, accountKey.SequenceNumber).
-		SetPayer(payerAddress).
-		AddAuthorizer(stakingAccount.Address)
-
-	//signing the payload as used AddAuthorizer
-	err := tx.SignPayload(stakingAccount.Address, stakingAccountKeyID, stakingSigner)
-	if err != nil {
-		return nil, fmt.Errorf("could not sign payload: %w", err)
-	}
-
-	return tx, nil
-}
-
-func MakeStakingCollectionRegisterNodeTx(
-	env templates.Environment,
-	stakingAccount *sdk.Account,
-	stakingAccountKeyID int,
-	stakingSigner crypto.Signer,
-	payerAddress sdk.Address,
-	latestBlockID sdk.Identifier,
+	// transaction arguments
+	stakingAcctKey *sdk.AccountKey,
+	stake string,
 	nodeID flow.Identifier,
 	role flow.Role,
 	networkingAddress string,
 	networkingKey string,
 	stakingKey string,
-	amount string,
 	machineKey *sdk.AccountKey,
-) (*sdk.Transaction, error) {
-	accountKey := stakingAccount.Keys[stakingAccountKeyID]
-	tx := sdk.NewTransaction().
-		SetScript(templates.GenerateCollectionRegisterNode(env)).
-		SetGasLimit(9999).
-		SetReferenceBlockID(latestBlockID).
-		SetProposalKey(stakingAccount.Address, stakingAccountKeyID, accountKey.SequenceNumber).
-		SetPayer(payerAddress).
-		AddAuthorizer(stakingAccount.Address)
+) (
+	*sdk.Transaction,
+	error,
+) {
 
-	id, _ := cadence.NewString(nodeID.String())
-	err := tx.AddArgument(id)
+	script := []byte(templates.ReplaceAddresses(createAndSetupNodeTxScript, env))
+	tx := sdk.NewTransaction().
+		SetScript(script).
+		SetComputeLimit(9999).
+		SetReferenceBlockID(latestBlockID).
+		SetProposalKey(service.Address, 0, service.Keys[0].SequenceNumber).
+		AddAuthorizer(service.Address).
+		SetPayer(service.Address)
+
+	// 0 - staking account key
+	cdcStakingAcctKey, err := sdktemplates.AccountKeyToCadenceCryptoKey(stakingAcctKey)
+	if err != nil {
+		return nil, err
+	}
+	err = tx.AddArgument(cdcStakingAcctKey)
 	if err != nil {
 		return nil, err
 	}
 
+	// 1 - stake
+	cdcStake, err := cadence.NewUFix64(stake)
+	if err != nil {
+		return nil, err
+	}
+	err = tx.AddArgument(cdcStake)
+	if err != nil {
+		return nil, err
+	}
+
+	// 2 - node ID
+	id, err := cadence.NewString(nodeID.String())
+	if err != nil {
+		return nil, err
+	}
+	err = tx.AddArgument(id)
+	if err != nil {
+		return nil, err
+	}
+
+	// 3 - role
 	r := cadence.NewUInt8(uint8(role))
 	err = tx.AddArgument(r)
 	if err != nil {
 		return nil, err
 	}
 
-	networkingAddressCDC, _ := cadence.NewString(networkingAddress)
+	// 4 - networking address
+	networkingAddressCDC, err := cadence.NewString(networkingAddress)
+	if err != nil {
+		return nil, err
+	}
 	err = tx.AddArgument(networkingAddressCDC)
 	if err != nil {
 		return nil, err
 	}
 
-	networkingKeyCDC, _ := cadence.NewString(networkingKey)
+	// 5 - networking key
+	networkingKeyCDC, err := cadence.NewString(networkingKey)
+	if err != nil {
+		return nil, err
+	}
 	err = tx.AddArgument(networkingKeyCDC)
 	if err != nil {
 		return nil, err
 	}
 
-	stakingKeyCDC, _ := cadence.NewString(stakingKey)
-	err = tx.AddArgument(stakingKeyCDC)
+	// 6 - staking key
+	stakingKeyCDC, err := cadence.NewString(stakingKey)
 	if err != nil {
 		return nil, err
 	}
-
-	amountCDC, _ := cadence.NewUFix64(amount)
-	err = tx.AddArgument(amountCDC)
+	err = tx.AddArgument(stakingKeyCDC)
 	if err != nil {
 		return nil, err
 	}
 
 	if machineKey != nil {
 		// for collection/consensus nodes, register the machine account key
-		publicKey, err := sdktemplates.AccountKeyToCadenceCryptoKey(machineKey)
+		cdcMachineAcctKey, err := sdktemplates.AccountKeyToCadenceCryptoKey(machineKey)
 		if err != nil {
 			return nil, err
 		}
-		publicKeysCDC := cadence.NewArray([]cadence.Value{publicKey})
-
-		err = tx.AddArgument(cadence.NewOptional(publicKeysCDC))
+		err = tx.AddArgument(cadence.NewOptional(cdcMachineAcctKey))
 		if err != nil {
 			return nil, err
 		}
@@ -133,52 +153,11 @@ func MakeStakingCollectionRegisterNodeTx(
 		}
 	}
 
-	err = tx.SignPayload(stakingAccount.Address, stakingAccountKeyID, stakingSigner)
-	if err != nil {
-		return nil, fmt.Errorf("could not sign payload: %w", err)
-	}
-
 	return tx, nil
 }
 
-func MakeStakingCollectionCloseStakeTx(
-	env templates.Environment,
-	stakingAccount *sdk.Account,
-	stakingAccountKeyID int,
-	stakingSigner crypto.Signer,
-	payerAddress sdk.Address,
-	latestBlockID sdk.Identifier,
-	nodeID flow.Identifier,
-) (*sdk.Transaction, error) {
-	accountKey := stakingAccount.Keys[stakingAccountKeyID]
-	tx := sdk.NewTransaction().
-		SetScript(templates.GenerateCollectionCloseStake(env)).
-		SetGasLimit(9999).
-		SetReferenceBlockID(latestBlockID).
-		SetProposalKey(stakingAccount.Address, stakingAccountKeyID, accountKey.SequenceNumber).
-		SetPayer(payerAddress).
-		AddAuthorizer(stakingAccount.Address)
-
-	id, _ := cadence.NewString(nodeID.String())
-	err := tx.AddArgument(id)
-	if err != nil {
-		return nil, err
-	}
-
-	err = tx.AddArgument(cadence.NewOptional(nil))
-	if err != nil {
-		return nil, err
-	}
-
-	err = tx.SignPayload(stakingAccount.Address, stakingAccountKeyID, stakingSigner)
-	if err != nil {
-		return nil, fmt.Errorf("could not sign payload: %w", err)
-	}
-
-	return tx, nil
-}
-
-// MakeAdminRemoveNodeTx makes the admin remove node transaction.  This is equivalent to the node un-staking and will result in removal at the next epoch boundary
+// MakeAdminRemoveNodeTx makes an admin transaction to remove the node. This transaction both
+// manually unstakes and removes the node, and removes it from the allow-list.
 func MakeAdminRemoveNodeTx(
 	env templates.Environment,
 	adminAccount *sdk.Account,
@@ -188,8 +167,8 @@ func MakeAdminRemoveNodeTx(
 ) (*sdk.Transaction, error) {
 	accountKey := adminAccount.Keys[adminAccountKeyID]
 	tx := sdk.NewTransaction().
-		SetScript(templates.GenerateRemoveNodeScript(env)).
-		SetGasLimit(9999).
+		SetScript([]byte(templates.ReplaceAddresses(removeNodeTxScript, env))).
+		SetComputeLimit(9999).
 		SetReferenceBlockID(latestBlockID).
 		SetProposalKey(adminAccount.Address, adminAccountKeyID, accountKey.SequenceNumber).
 		SetPayer(adminAccount.Address).
@@ -204,34 +183,55 @@ func MakeAdminRemoveNodeTx(
 	return tx, nil
 }
 
-func MakeTransferTokenTx(env templates.Environment, receiver sdk.Address, sender *sdk.Account, senderKeyID int, tokenAmount string, latestBlockID sdk.Identifier) (
-	*sdk.Transaction, error) {
-
-	senderKey := sender.Keys[senderKeyID]
-	fungible := sdk.HexToAddress(env.FungibleTokenAddress)
-	flowToken := sdk.HexToAddress(env.FlowTokenAddress)
-	script := fttemplates.GenerateTransferVaultScript(fungible, flowToken, "FlowToken")
-
+// MakeSetProtocolStateVersionTx makes an admin transaction to set the protocol state version.
+// See the Cadence transaction file for detailed documentation.
+func MakeSetProtocolStateVersionTx(
+	env templates.Environment,
+	adminAccount *sdk.Account,
+	adminAccountKeyID int,
+	latestBlockID sdk.Identifier,
+	newProtocolVersion uint64,
+	activeViewDiff uint64,
+) (*sdk.Transaction, error) {
+	accountKey := adminAccount.Keys[adminAccountKeyID]
 	tx := sdk.NewTransaction().
-		SetScript([]byte(script)).
-		SetGasLimit(100).
+		SetScript([]byte(templates.ReplaceAddresses(setProtocolStateVersionScript, env))).
+		SetComputeLimit(9999).
 		SetReferenceBlockID(latestBlockID).
-		SetProposalKey(sender.Address, senderKeyID, senderKey.SequenceNumber).
-		SetPayer(sender.Address).
-		AddAuthorizer(sender.Address)
+		SetProposalKey(adminAccount.Address, adminAccountKeyID, accountKey.SequenceNumber).
+		SetPayer(adminAccount.Address).
+		AddAuthorizer(adminAccount.Address)
 
-	amount, err := cadence.NewUFix64(tokenAmount)
+	err := tx.AddArgument(cadence.NewUInt64(newProtocolVersion))
 	if err != nil {
-		return nil, fmt.Errorf("could not add arguments to transaction :%w", err)
+		return nil, err
 	}
-	err = tx.AddArgument(amount)
+	err = tx.AddArgument(cadence.NewUInt64(activeViewDiff))
 	if err != nil {
-		return nil, fmt.Errorf("could not add argument to transaction :%w", err)
+		return nil, err
 	}
 
-	err = tx.AddArgument(cadence.NewAddress(receiver))
-	if err != nil {
-		return nil, fmt.Errorf("could not add argument to transaction :%w", err)
-	}
 	return tx, nil
+}
+
+// submitSmokeTestTransaction will submit a create account transaction to smoke test network
+// This ensures a single transaction can be sealed by the network.
+func CreateFlowAccount(ctx context.Context, client *testnet.Client) (sdk.Address, error) {
+	fullAccountKey := sdk.NewAccountKey().
+		SetPublicKey(unittest.PrivateKeyFixture(crypto.ECDSAP256, crypto.KeyGenSeedMinLen).PublicKey()).
+		SetHashAlgo(sdkcrypto.SHA2_256).
+		SetWeight(sdk.AccountKeyWeightThreshold)
+
+	latestBlockID, err := client.GetLatestBlockID(ctx)
+	if err != nil {
+		return sdk.EmptyAddress, fmt.Errorf("failed to get latest block id: %w", err)
+	}
+
+	// createAccount will submit a create account transaction and wait for it to be sealed
+	addr, err := client.CreateAccount(ctx, fullAccountKey, sdk.Identifier(latestBlockID))
+	if err != nil {
+		return sdk.EmptyAddress, fmt.Errorf("failed to create account: %w", err)
+	}
+
+	return addr, nil
 }

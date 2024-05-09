@@ -1,5 +1,3 @@
-// (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
-
 package operation
 
 import (
@@ -27,14 +25,10 @@ func LookupBlockHeight(height uint64, blockID *flow.Identifier) func(*badger.Txn
 	return retrieve(makePrefix(codeHeightToBlock, height), blockID)
 }
 
-// InsertBlockValidity marks a block as valid or invalid, defined by the consensus algorithm.
-func InsertBlockValidity(blockID flow.Identifier, valid bool) func(*badger.Txn) error {
-	return insert(makePrefix(codeBlockValidity, blockID), valid)
-}
-
-// RetrieveBlockValidity returns a block's validity wrt the consensus algorithm.
-func RetrieveBlockValidity(blockID flow.Identifier, valid *bool) func(*badger.Txn) error {
-	return retrieve(makePrefix(codeBlockValidity, blockID), valid)
+// BlockExists checks whether the block exists in the database.
+// No errors are expected during normal operation.
+func BlockExists(blockID flow.Identifier, blockExists *bool) func(*badger.Txn) error {
+	return exists(makePrefix(codeHeader, blockID), blockExists)
 }
 
 func InsertExecutedBlock(blockID flow.Identifier) func(*badger.Txn) error {
@@ -54,28 +48,9 @@ func IndexCollectionBlock(collID flow.Identifier, blockID flow.Identifier) func(
 	return insert(makePrefix(codeCollectionBlock, collID), blockID)
 }
 
-func IndexBlockIDByChunkID(chunkID, blockID flow.Identifier) func(*badger.Txn) error {
-	return insert(makePrefix(codeIndexBlockByChunkID, chunkID), blockID)
-}
-
-// BatchIndexBlockByChunkID indexes blockID by chunkID into a batch
-func BatchIndexBlockByChunkID(blockID, chunkID flow.Identifier) func(batch *badger.WriteBatch) error {
-	return batchWrite(makePrefix(codeIndexBlockByChunkID, chunkID), blockID)
-}
-
 // LookupCollectionBlock looks up a block by a collection within that block.
 func LookupCollectionBlock(collID flow.Identifier, blockID *flow.Identifier) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeCollectionBlock, collID), blockID)
-}
-
-// LookupBlockIDByChunkID looks up a block by a collection within that block.
-func LookupBlockIDByChunkID(chunkID flow.Identifier, blockID *flow.Identifier) func(*badger.Txn) error {
-	return retrieve(makePrefix(codeIndexBlockByChunkID, chunkID), blockID)
-}
-
-// RemoveBlockIDByChunkID removes chunkID-blockID index by chunkID
-func RemoveBlockIDByChunkID(chunkID flow.Identifier) func(*badger.Txn) error {
-	return remove(makePrefix(codeIndexBlockByChunkID, chunkID))
 }
 
 // FindHeaders iterates through all headers, calling `filter` on each, and adding

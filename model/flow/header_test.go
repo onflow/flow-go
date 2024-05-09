@@ -6,11 +6,12 @@ import (
 	"time"
 
 	"github.com/fxamacker/cbor/v2"
+	"github.com/onflow/crypto"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/vmihailenco/msgpack/v4"
 
-	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/consensus/hotstuff/helper"
 	"github.com/onflow/flow-go/model/encoding/rlp"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -31,6 +32,7 @@ func TestHeaderEncodingJSON(t *testing.T) {
 
 func TestHeaderFingerprint(t *testing.T) {
 	header := unittest.BlockHeaderFixture()
+	header.LastViewTC = helper.MakeTC()
 	headerID := header.ID()
 	data := header.Fingerprint()
 	var decoded struct {
@@ -40,9 +42,11 @@ func TestHeaderFingerprint(t *testing.T) {
 		PayloadHash        flow.Identifier
 		Timestamp          uint64
 		View               uint64
+		ParentView         uint64
 		ParentVoterIndices []byte
 		ParentVoterSigData crypto.Signature
 		ProposerID         flow.Identifier
+		LastViewTC         interface{}
 	}
 	rlp.NewMarshaler().MustUnmarshal(data, &decoded)
 	decHeader := &flow.Header{
@@ -52,10 +56,12 @@ func TestHeaderFingerprint(t *testing.T) {
 		PayloadHash:        decoded.PayloadHash,
 		Timestamp:          time.Unix(0, int64(decoded.Timestamp)).UTC(),
 		View:               decoded.View,
+		ParentView:         decoded.ParentView,
 		ParentVoterIndices: decoded.ParentVoterIndices,
 		ParentVoterSigData: decoded.ParentVoterSigData,
 		ProposerID:         decoded.ProposerID,
-		ProposerSigData:    header.ProposerSigData, // since this field is not encoded/decoded, just set it to the original
+		ProposerSigData:    header.ProposerSigData, // since this field is not encoded/decoded, just set it to the original value to pass test
+		LastViewTC:         header.LastViewTC,
 	}
 	decodedID := decHeader.ID()
 	assert.Equal(t, headerID, decodedID)

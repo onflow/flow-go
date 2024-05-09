@@ -53,6 +53,8 @@ type Engine struct {
 	verifier              network.Engine            // used to push verifiable chunk down the verification pipeline.
 	requester             ChunkDataPackRequester    // used to request chunk data packs from network.
 	chunkConsumerNotifier module.ProcessingNotifier // used to notify chunk consumer that it is done processing a chunk.
+
+	stopAtHeight uint64
 }
 
 func New(
@@ -67,6 +69,7 @@ func New(
 	results storage.ExecutionResults,
 	receipts storage.ExecutionReceipts,
 	requester ChunkDataPackRequester,
+	stopAtHeight uint64,
 ) *Engine {
 	e := &Engine{
 		unit:          engine.NewUnit(),
@@ -81,6 +84,7 @@ func New(
 		results:       results,
 		receipts:      receipts,
 		requester:     requester,
+		stopAtHeight:  stopAtHeight,
 	}
 
 	e.requester.WithChunkDataPackHandler(e)
@@ -165,10 +169,8 @@ func (e *Engine) ProcessAssignedChunk(locator *chunks.Locator) {
 // processAssignedChunkWithTracing encapsulates the logic of processing assigned chunk with tracing enabled.
 func (e *Engine) processAssignedChunkWithTracing(chunk *flow.Chunk, result *flow.ExecutionResult, chunkLocatorID flow.Identifier) (bool, uint64, error) {
 
-	span, _, isSampled := e.tracer.StartBlockSpan(e.unit.Ctx(), result.BlockID, trace.VERProcessAssignedChunk)
-	if isSampled {
-		span.SetAttributes(attribute.Int("collection_index", int(chunk.CollectionIndex)))
-	}
+	span, _ := e.tracer.StartBlockSpan(e.unit.Ctx(), result.BlockID, trace.VERProcessAssignedChunk)
+	span.SetAttributes(attribute.Int("collection_index", int(chunk.CollectionIndex)))
 	defer span.End()
 
 	requested, blockHeight, err := e.processAssignedChunk(chunk, result, chunkLocatorID)
@@ -186,6 +188,13 @@ func (e *Engine) processAssignedChunk(chunk *flow.Chunk, result *flow.ExecutionR
 		return false, 0, fmt.Errorf("could not determine whether block has been sealed: %w", err)
 	}
 	if sealed {
+		e.chunkConsumerNotifier.Notify(chunkLocatorID) // tells consumer that we are done with this chunk.
+		return false, blockHeight, nil
+	}
+
+	// skip chunk if it verifies a block at or above stop height
+	if e.stopAtHeight > 0 && blockHeight >= e.stopAtHeight {
+		e.log.Warn().Msgf("Skipping chunk %s - height  %d at or above stop height requested (%d)", chunkID, blockHeight, e.stopAtHeight)
 		e.chunkConsumerNotifier.Notify(chunkLocatorID) // tells consumer that we are done with this chunk.
 		return false, blockHeight, nil
 	}
@@ -253,7 +262,7 @@ func (e *Engine) HandleChunkDataPack(originID flow.Identifier, response *verific
 		Bool("system_chunk", IsSystemChunk(status.ChunkIndex, status.ExecutionResult)).
 		Logger()
 
-	span, ctx, _ := e.tracer.StartBlockSpan(context.Background(), status.ExecutionResult.BlockID, trace.VERFetcherHandleChunkDataPack)
+	span, ctx := e.tracer.StartBlockSpan(context.Background(), status.ExecutionResult.BlockID, trace.VERFetcherHandleChunkDataPack)
 	defer span.End()
 
 	processed, err := e.handleChunkDataPackWithTracing(ctx, originID, status, response.Cdp)
@@ -517,8 +526,8 @@ func (e *Engine) pushToVerifier(chunk *flow.Chunk,
 	if err != nil {
 		return fmt.Errorf("could not get block: %w", err)
 	}
-
-	vchunk, err := e.makeVerifiableChunkData(chunk, header, result, chunkDataPack)
+	snapshot := e.state.AtBlockID(header.ID())
+	vchunk, err := e.makeVerifiableChunkData(chunk, header, snapshot, result, chunkDataPack)
 	if err != nil {
 		return fmt.Errorf("could not verify chunk: %w", err)
 	}
@@ -536,6 +545,7 @@ func (e *Engine) pushToVerifier(chunk *flow.Chunk,
 // chunk data to verify it.
 func (e *Engine) makeVerifiableChunkData(chunk *flow.Chunk,
 	header *flow.Header,
+	snapshot protocol.Snapshot,
 	result *flow.ExecutionResult,
 	chunkDataPack *flow.ChunkDataPack,
 ) (*verification.VerifiableChunkData, error) {
@@ -557,6 +567,7 @@ func (e *Engine) makeVerifiableChunkData(chunk *flow.Chunk,
 		IsSystemChunk:     isSystemChunk,
 		Chunk:             chunk,
 		Header:            header,
+		Snapshot:          snapshot,
 		Result:            result,
 		ChunkDataPack:     chunkDataPack,
 		EndState:          endState,
@@ -576,7 +587,7 @@ func (e *Engine) requestChunkDataPack(chunkIndex uint64, chunkID flow.Identifier
 		return fmt.Errorf("could not get header for block: %x", blockID)
 	}
 
-	allExecutors, err := e.state.AtBlockID(blockID).Identities(filter.HasRole(flow.RoleExecution))
+	allExecutors, err := e.state.AtBlockID(blockID).Identities(filter.HasRole[flow.Identity](flow.RoleExecution))
 	if err != nil {
 		return fmt.Errorf("could not fetch execution node ids at block %x: %w", blockID, err)
 	}

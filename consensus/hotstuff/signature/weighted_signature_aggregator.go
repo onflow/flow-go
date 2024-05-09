@@ -1,12 +1,14 @@
 package signature
 
 import (
+	"errors"
 	"fmt"
 	"sync"
 
+	"github.com/onflow/crypto"
+
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/signature"
 )
@@ -18,9 +20,12 @@ type signerInfo struct {
 }
 
 // WeightedSignatureAggregator implements consensus/hotstuff.WeightedSignatureAggregator.
-// It is a wrapper around signature.SignatureAggregatorSameMessage, which implements a
+// It is a wrapper around module/signature.SignatureAggregatorSameMessage, which implements a
 // mapping from node IDs (as used by HotStuff) to index-based addressing of authorized
 // signers (as used by SignatureAggregatorSameMessage).
+//
+// Similarly to module/signature.SignatureAggregatorSameMessage, this module assumes proofs of possession (PoP)
+// of all identity public keys are valid.
 type WeightedSignatureAggregator struct {
 	aggregator  *signature.SignatureAggregatorSameMessage // low level crypto BLS aggregator, agnostic of weights and flow IDs
 	ids         flow.IdentityList                         // all possible ids (only gets updated by constructor)
@@ -41,6 +46,8 @@ var _ hotstuff.WeightedSignatureAggregator = (*WeightedSignatureAggregator)(nil)
 // NewWeightedSignatureAggregator returns a weighted aggregator initialized with a list of flow
 // identities, their respective public keys, a message and a domain separation tag. The identities
 // represent the list of all possible signers.
+// This aggregator is only safe if PoPs of all identity keys are valid. This constructor does not
+// verify the PoPs but assumes they have been validated outside this module.
 // The constructor errors if:
 // - the list of identities is empty
 // - if the length of keys does not match the length of identities
@@ -62,7 +69,7 @@ func NewWeightedSignatureAggregator(
 	idToInfo := make(map[flow.Identifier]signerInfo)
 	for i, id := range ids {
 		idToInfo[id.NodeID] = signerInfo{
-			weight: id.Weight,
+			weight: id.InitialWeight,
 			index:  i,
 		}
 	}
@@ -148,17 +155,25 @@ func (w *WeightedSignatureAggregator) TotalWeight() uint64 {
 }
 
 // Aggregate aggregates the signatures and returns the aggregated signature.
-// The function performs a final verification and errors if the aggregated signature is not valid. This is
-// required for the function safety since "TrustedAdd" allows adding invalid signatures.
+// The function performs a final verification and errors if the aggregated signature is invalid. This is
+// required for the function safety since `TrustedAdd` allows adding invalid signatures.
 // The function errors with:
 //   - model.InsufficientSignaturesError if no signatures have been added yet
-//   - model.InvalidSignatureIncludedError if some signature(s), included via TrustedAdd, are invalid
+//   - model.InvalidSignatureIncludedError if:
+//   - some signature(s), included via TrustedAdd, fail to deserialize (regardless of the aggregated public key)
+//     -- or all signatures deserialize correctly but some signature(s), included via TrustedAdd, are
+//     invalid (while aggregated public key is valid)
+//     -- model.InvalidAggregatedKeyError if all signatures deserialize correctly but the signer's
+//     staking public keys sum up to an invalid key (BLS identity public key).
+//     Any aggregated signature would fail the cryptographic verification under the identity public
+//     key and therefore such signature is considered invalid. Such scenario can only happen if
+//     staking public keys of signers were forged to add up to the identity public key.
+//     Under the assumption that all staking key PoPs are valid, this error case can only
+//     happen if all signers are malicious and colluding. If there is at least one honest signer,
+//     there is a negligible probability that the aggregated key is identity.
 //
 // The function is thread-safe.
-//
-// TODO : When compacting the list of signers, update the return from []flow.Identifier
-// to a compact bit vector.
-func (w *WeightedSignatureAggregator) Aggregate() ([]flow.Identifier, []byte, error) {
+func (w *WeightedSignatureAggregator) Aggregate() (flow.IdentifierList, []byte, error) {
 	w.lock.Lock()
 	defer w.lock.Unlock()
 
@@ -167,6 +182,9 @@ func (w *WeightedSignatureAggregator) Aggregate() ([]flow.Identifier, []byte, er
 	if err != nil {
 		if signature.IsInsufficientSignaturesError(err) {
 			return nil, nil, model.NewInsufficientSignaturesError(err)
+		}
+		if errors.Is(err, signature.ErrIdentityPublicKey) {
+			return nil, nil, model.NewInvalidAggregatedKeyError(err)
 		}
 		if signature.IsInvalidSignatureIncludedError(err) {
 			return nil, nil, model.NewInvalidSignatureIncludedError(err)

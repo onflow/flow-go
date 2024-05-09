@@ -1,5 +1,3 @@
-// (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
-
 package operation
 
 import (
@@ -11,12 +9,14 @@ import (
 	"github.com/vmihailenco/msgpack/v4"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/storage"
 )
 
 // batchWrite will encode the given entity using msgpack and will upsert the resulting
 // binary data in the badger wrote batch under the provided key - if the value already exists
-// in the database it will be overridden
+// in the database it will be overridden.
+// No errors are expected during normal operation.
 func batchWrite(key []byte, entity interface{}) func(writeBatch *badger.WriteBatch) error {
 	return func(writeBatch *badger.WriteBatch) error {
 
@@ -32,13 +32,13 @@ func batchWrite(key []byte, entity interface{}) func(writeBatch *badger.WriteBat
 		// serialize the entity data
 		val, err := msgpack.Marshal(entity)
 		if err != nil {
-			return fmt.Errorf("could not encode entity: %w", err)
+			return irrecoverable.NewExceptionf("could not encode entity: %w", err)
 		}
 
 		// persist the entity data into the DB
 		err = writeBatch.Set(key, val)
 		if err != nil {
-			return fmt.Errorf("could not store data: %w", err)
+			return irrecoverable.NewExceptionf("could not store data: %w", err)
 		}
 		return nil
 	}
@@ -47,6 +47,10 @@ func batchWrite(key []byte, entity interface{}) func(writeBatch *badger.WriteBat
 // insert will encode the given entity using msgpack and will insert the resulting
 // binary data in the badger DB under the provided key. It will error if the
 // key already exists.
+// Error returns:
+//   - storage.ErrAlreadyExists if the key already exists in the database.
+//   - generic error in case of unexpected failure from the database layer or
+//     encoding failure.
 func insert(key []byte, entity interface{}) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 
@@ -66,27 +70,30 @@ func insert(key []byte, entity interface{}) func(*badger.Txn) error {
 		}
 
 		if !errors.Is(err, badger.ErrKeyNotFound) {
-			return fmt.Errorf("could not retrieve key: %w", err)
+			return irrecoverable.NewExceptionf("could not retrieve key: %w", err)
 		}
 
 		// serialize the entity data
 		val, err := msgpack.Marshal(entity)
 		if err != nil {
-			return fmt.Errorf("could not encode entity: %w", err)
+			return irrecoverable.NewExceptionf("could not encode entity: %w", err)
 		}
 
 		// persist the entity data into the DB
 		err = tx.Set(key, val)
 		if err != nil {
-			return fmt.Errorf("could not store data: %w", err)
+			return irrecoverable.NewExceptionf("could not store data: %w", err)
 		}
 		return nil
 	}
 }
 
 // update will encode the given entity with MsgPack and update the binary data
-// under the given key in the badger DB. It will error if the key does not exist
-// yet.
+// under the given key in the badger DB. The key must already exist.
+// Error returns:
+//   - storage.ErrNotFound if the key does not already exist in the database.
+//   - generic error in case of unexpected failure from the database layer or
+//     encoding failure.
 func update(key []byte, entity interface{}) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 
@@ -96,19 +103,19 @@ func update(key []byte, entity interface{}) func(*badger.Txn) error {
 			return storage.ErrNotFound
 		}
 		if err != nil {
-			return fmt.Errorf("could not check key: %w", err)
+			return irrecoverable.NewExceptionf("could not check key: %w", err)
 		}
 
 		// serialize the entity data
 		val, err := msgpack.Marshal(entity)
 		if err != nil {
-			return fmt.Errorf("could not encode entity: %w", err)
+			return irrecoverable.NewExceptionf("could not encode entity: %w", err)
 		}
 
 		// persist the entity data into the DB
 		err = tx.Set(key, val)
 		if err != nil {
-			return fmt.Errorf("could not replace data: %w", err)
+			return irrecoverable.NewExceptionf("could not replace data: %w", err)
 		}
 
 		return nil
@@ -131,13 +138,13 @@ func upsert(key []byte, entity interface{}) func(*badger.Txn) error {
 		// serialize the entity data
 		val, err := msgpack.Marshal(entity)
 		if err != nil {
-			return fmt.Errorf("could not encode entity: %w", err)
+			return irrecoverable.NewExceptionf("could not encode entity: %w", err)
 		}
 
 		// persist the entity data into the DB
 		err = tx.Set(key, val)
 		if err != nil {
-			return fmt.Errorf("could not upsert data: %w", err)
+			return irrecoverable.NewExceptionf("could not upsert data: %w", err)
 		}
 
 		return nil
@@ -146,24 +153,44 @@ func upsert(key []byte, entity interface{}) func(*badger.Txn) error {
 
 // remove removes the entity with the given key, if it exists. If it doesn't
 // exist, this is a no-op.
+// Error returns:
+// * storage.ErrNotFound if the key to delete does not exist.
+// * generic error in case of unexpected database error
 func remove(key []byte) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 		// retrieve the item from the key-value store
 		_, err := tx.Get(key)
-		if errors.Is(err, badger.ErrKeyNotFound) {
-			return storage.ErrNotFound
-		}
 		if err != nil {
-			return fmt.Errorf("could not check key: %w", err)
+			if errors.Is(err, badger.ErrKeyNotFound) {
+				return storage.ErrNotFound
+			}
+			return irrecoverable.NewExceptionf("could not check key: %w", err)
 		}
 
 		err = tx.Delete(key)
-		return err
+		if err != nil {
+			return irrecoverable.NewExceptionf("could not delete item: %w", err)
+		}
+		return nil
+	}
+}
+
+// batchRemove removes entry under a given key in a write-batch.
+// if key doesn't exist, does nothing.
+// No errors are expected during normal operation.
+func batchRemove(key []byte) func(writeBatch *badger.WriteBatch) error {
+	return func(writeBatch *badger.WriteBatch) error {
+		err := writeBatch.Delete(key)
+		if err != nil {
+			return irrecoverable.NewExceptionf("could not batch delete data: %w", err)
+		}
+		return nil
 	}
 }
 
 // removeByPrefix removes all the entities if the prefix of the key matches the given prefix.
 // if no key matches, this is a no-op
+// No errors are expected during normal operation.
 func removeByPrefix(prefix []byte) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 		opts := badger.DefaultIteratorOptions
@@ -176,7 +203,7 @@ func removeByPrefix(prefix []byte) func(*badger.Txn) error {
 			key := it.Item().KeyCopy(nil)
 			err := tx.Delete(key)
 			if err != nil {
-				return err
+				return irrecoverable.NewExceptionf("could not delete item with prefix: %w", err)
 			}
 		}
 
@@ -184,9 +211,36 @@ func removeByPrefix(prefix []byte) func(*badger.Txn) error {
 	}
 }
 
+// batchRemoveByPrefix removes all items under the keys match the given prefix in a batch write transaction.
+// no error would be returned if no key was found with the given prefix.
+// all error returned should be exception
+func batchRemoveByPrefix(prefix []byte) func(tx *badger.Txn, writeBatch *badger.WriteBatch) error {
+	return func(tx *badger.Txn, writeBatch *badger.WriteBatch) error {
+
+		opts := badger.DefaultIteratorOptions
+		opts.AllVersions = false
+		opts.PrefetchValues = false
+		it := tx.NewIterator(opts)
+		defer it.Close()
+
+		for it.Seek(prefix); it.ValidForPrefix(prefix); it.Next() {
+			key := it.Item().KeyCopy(nil)
+			err := writeBatch.Delete(key)
+			if err != nil {
+				return irrecoverable.NewExceptionf("could not delete item in batch: %w", err)
+			}
+		}
+		return nil
+	}
+}
+
 // retrieve will retrieve the binary data under the given key from the badger DB
 // and decode it into the given entity. The provided entity needs to be a
 // pointer to an initialized entity of the correct type.
+// Error returns:
+//   - storage.ErrNotFound if the key does not exist in the database
+//   - generic error in case of unexpected failure from the database layer, or failure
+//     to decode an existing database value
 func retrieve(key []byte, entity interface{}) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 
@@ -196,7 +250,7 @@ func retrieve(key []byte, entity interface{}) func(*badger.Txn) error {
 			return storage.ErrNotFound
 		}
 		if err != nil {
-			return fmt.Errorf("could not load data: %w", err)
+			return irrecoverable.NewExceptionf("could not load data: %w", err)
 		}
 
 		// get the value from the item
@@ -205,9 +259,30 @@ func retrieve(key []byte, entity interface{}) func(*badger.Txn) error {
 			return err
 		})
 		if err != nil {
-			return fmt.Errorf("could not decode entity: %w", err)
+			return irrecoverable.NewExceptionf("could not decode entity: %w", err)
 		}
 
+		return nil
+	}
+}
+
+// exists returns true if a key exists in the database.
+// No errors are expected during normal operation.
+func exists(key []byte, keyExists *bool) func(*badger.Txn) error {
+	return func(tx *badger.Txn) error {
+		_, err := tx.Get(key)
+		if err != nil {
+			// the key does not exist in the database
+			if errors.Is(err, badger.ErrKeyNotFound) {
+				*keyExists = false
+				return nil
+			}
+			// exception while checking for the key
+			return irrecoverable.NewExceptionf("could not load data: %w", err)
+		}
+
+		// the key does exist in the database
+		*keyExists = true
 		return nil
 	}
 }
@@ -225,6 +300,7 @@ type createFunc func() interface{}
 // handleFunc is a function that starts the processing of the current key-value
 // pair during a badger iteration. It should be called after the key was checked
 // and the entity was decoded.
+// No errors are expected during normal operation. Any errors will halt the iteration.
 type handleFunc func() error
 
 // iterationFunc is a function provided to our low-level iteration function that
@@ -276,8 +352,9 @@ func withPrefetchValuesFalse(options *badger.IteratorOptions) {
 // On each iteration, it will call the iteration function to initialize
 // functions specific to processing the given key-value pair.
 //
-// TODO: this function is unbounded – pass context.Context to this or calling
-// functions to allow timing functions out.
+// TODO: this function is unbounded – pass context.Context to this or calling functions to allow timing functions out.
+// No errors are expected during normal operation. Any errors returned by the
+// provided handleFunc will be propagated back to the caller of iterate.
 func iterate(start []byte, end []byte, iteration iterationFunc, opts ...func(*badger.IteratorOptions)) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 
@@ -360,7 +437,7 @@ func iterate(start []byte, end []byte, iteration iterationFunc, opts ...func(*ba
 				entity := create()
 				err := msgpack.Unmarshal(val, entity)
 				if err != nil {
-					return fmt.Errorf("could not decode entity: %w", err)
+					return irrecoverable.NewExceptionf("could not decode entity: %w", err)
 				}
 
 				// process the entity
@@ -422,7 +499,7 @@ func traverse(prefix []byte, iteration iterationFunc) func(*badger.Txn) error {
 				entity := create()
 				err := msgpack.Unmarshal(val, entity)
 				if err != nil {
-					return fmt.Errorf("could not decode entity: %w", err)
+					return irrecoverable.NewExceptionf("could not decode entity: %w", err)
 				}
 
 				// process the entity
@@ -439,6 +516,43 @@ func traverse(prefix []byte, iteration iterationFunc) func(*badger.Txn) error {
 		}
 
 		return nil
+	}
+}
+
+// findHighestAtOrBelow searches for the highest key with the given prefix and a height
+// at or below the target height, and retrieves and decodes the value associated with the
+// key into the given entity.
+// If no key is found, the function returns storage.ErrNotFound.
+func findHighestAtOrBelow(
+	prefix []byte,
+	height uint64,
+	entity interface{},
+) func(*badger.Txn) error {
+	return func(tx *badger.Txn) error {
+		if len(prefix) == 0 {
+			return fmt.Errorf("prefix must not be empty")
+		}
+
+		opts := badger.DefaultIteratorOptions
+		opts.Prefix = prefix
+		opts.Reverse = true
+
+		it := tx.NewIterator(opts)
+		defer it.Close()
+
+		it.Seek(append(prefix, b(height)...))
+
+		if !it.Valid() {
+			return storage.ErrNotFound
+		}
+
+		return it.Item().Value(func(val []byte) error {
+			err := msgpack.Unmarshal(val, entity)
+			if err != nil {
+				return fmt.Errorf("could not decode entity: %w", err)
+			}
+			return nil
+		})
 	}
 }
 

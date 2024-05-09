@@ -4,16 +4,23 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/libp2p/go-libp2p-core/peer"
-	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/model/flow"
+	libp2pmessage "github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/model/messages"
+	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/alsp"
 	"github.com/onflow/flow-go/network/channels"
+	"github.com/onflow/flow-go/network/codec"
 	"github.com/onflow/flow-go/network/message"
+	"github.com/onflow/flow-go/network/mocknetwork"
+	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/slashing"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -23,7 +30,9 @@ type TestCase struct {
 	GetIdentity func(pid peer.ID) (*flow.Identity, bool)
 	Channel     channels.Channel
 	Message     interface{}
+	MessageCode codec.MessageCode
 	MessageStr  string
+	Protocols   message.Protocols
 }
 
 func TestIsAuthorizedSender(t *testing.T) {
@@ -35,40 +44,90 @@ type TestAuthorizedSenderValidatorSuite struct {
 	authorizedSenderTestCases             []TestCase
 	unauthorizedSenderTestCases           []TestCase
 	unauthorizedMessageOnChannelTestCases []TestCase
+	unauthorizedUnicastOnChannel          []TestCase
+	authorizedUnicastOnChannel            []TestCase
 	log                                   zerolog.Logger
-	slashingViolationsConsumer            slashing.ViolationsConsumer
+	slashingViolationsConsumer            network.ViolationsConsumer
+	allMsgConfigs                         []message.MsgAuthConfig
+	codec                                 network.Codec
 }
 
 func (s *TestAuthorizedSenderValidatorSuite) SetupTest() {
+	s.allMsgConfigs = message.GetAllMessageAuthConfigs()
 	s.initializeAuthorizationTestCases()
 	s.initializeInvalidMessageOnChannelTestCases()
+	s.initializeUnicastOnChannelTestCases()
 	s.log = unittest.Logger()
-	s.slashingViolationsConsumer = slashing.NewSlashingViolationsConsumer(s.log)
+	s.codec = unittest.NetworkCodec()
 }
 
-// TestValidatorCallback_AuthorizedSender checks that the call back returned from AuthorizedSenderValidator does not return false positive
+// TestValidatorCallback_AuthorizedSender checks that AuthorizedSenderValidator.Validate does not return false positive
 // validation errors for all possible valid combinations (authorized sender role, message type).
 func (s *TestAuthorizedSenderValidatorSuite) TestValidatorCallback_AuthorizedSender() {
 	for _, c := range s.authorizedSenderTestCases {
 		str := fmt.Sprintf("role (%s) should be authorized to send message type (%s) on channel (%s)", c.Identity.Role, c.MessageStr, c.Channel)
 		s.Run(str, func() {
-			validate := AuthorizedSenderValidator(s.log, s.slashingViolationsConsumer, c.Channel, true, c.GetIdentity)
-
+			misbehaviorReportConsumer := mocknetwork.NewMisbehaviorReportConsumer(s.T())
+			defer misbehaviorReportConsumer.AssertNotCalled(s.T(), "ReportMisbehaviorOnChannel", mock.AnythingOfType("channels.Channel"), mock.AnythingOfType("*alsp.MisbehaviorReport"))
+			violationsConsumer := slashing.NewSlashingViolationsConsumer(s.log, metrics.NewNoopCollector(), misbehaviorReportConsumer)
+			authorizedSenderValidator := NewAuthorizedSenderValidator(s.log, violationsConsumer, c.GetIdentity)
+			validateUnicast := authorizedSenderValidator.Validate
+			validatePubsub := authorizedSenderValidator.PubSubMessageValidator(c.Channel)
 			pid, err := unittest.PeerIDFromFlowID(c.Identity)
 			require.NoError(s.T(), err)
-
-			msgType, err := validate(pid, c.Message)
-			require.NoError(s.T(), err)
-			require.Equal(s.T(), c.MessageStr, msgType)
-
-			validatePubsub := AuthorizedSenderMessageValidator(s.log, s.slashingViolationsConsumer, c.Channel, c.GetIdentity)
-			pubsubResult := validatePubsub(pid, c.Message)
-			require.Equal(s.T(), pubsub.ValidationAccept, pubsubResult)
+			switch {
+			// ensure according to the message auth config, if a message is authorized to be sent via unicast it
+			// is accepted.
+			case c.Protocols.Contains(message.ProtocolTypeUnicast):
+				msgType, err := validateUnicast(pid, []byte{c.MessageCode.Uint8()}, c.Channel, message.ProtocolTypeUnicast)
+				if c.Protocols.Contains(message.ProtocolTypeUnicast) {
+					require.NoError(s.T(), err)
+					require.Equal(s.T(), c.MessageStr, msgType)
+				}
+			// ensure according to the message auth config, if a message is authorized to be sent via pubsub it
+			// is accepted.
+			case c.Protocols.Contains(message.ProtocolTypePubSub):
+				payload, err := s.codec.Encode(c.Message)
+				require.NoError(s.T(), err)
+				m := &message.Message{
+					ChannelID: c.Channel.String(),
+					Payload:   payload,
+				}
+				pubsubResult := validatePubsub(pid, m)
+				require.Equal(s.T(), p2p.ValidationAccept, pubsubResult)
+			default:
+				s.T().Fatal("authconfig does not contain any protocols")
+			}
 		})
 	}
+
+	s.Run("test messages should be allowed to be sent via both protocols unicast/pubsub on test channel", func() {
+		identity, _ := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleCollection))
+		misbehaviorReportConsumer := mocknetwork.NewMisbehaviorReportConsumer(s.T())
+		defer misbehaviorReportConsumer.AssertNotCalled(s.T(), "ReportMisbehaviorOnChannel", mock.AnythingOfType("channels.Channel"), mock.AnythingOfType("*alsp.MisbehaviorReport"))
+		violationsConsumer := slashing.NewSlashingViolationsConsumer(s.log, metrics.NewNoopCollector(), misbehaviorReportConsumer)
+		getIdentityFunc := s.getIdentity(identity)
+		pid, err := unittest.PeerIDFromFlowID(identity)
+		require.NoError(s.T(), err)
+		authorizedSenderValidator := NewAuthorizedSenderValidator(s.log, violationsConsumer, getIdentityFunc)
+
+		msgType, err := authorizedSenderValidator.Validate(pid, []byte{codec.CodeEcho.Uint8()}, channels.TestNetworkChannel, message.ProtocolTypeUnicast)
+		require.NoError(s.T(), err)
+		require.Equal(s.T(), "*message.TestMessage", msgType)
+
+		payload, err := s.codec.Encode(&libp2pmessage.TestMessage{})
+		require.NoError(s.T(), err)
+		m := &message.Message{
+			ChannelID: channels.TestNetworkChannel.String(),
+			Payload:   payload,
+		}
+		validatePubsub := authorizedSenderValidator.PubSubMessageValidator(channels.TestNetworkChannel)
+		pubsubResult := validatePubsub(pid, m)
+		require.Equal(s.T(), p2p.ValidationAccept, pubsubResult)
+	})
 }
 
-// TestValidatorCallback_UnAuthorizedSender checks that the call back returned from AuthorizedSenderValidator return's ErrUnauthorizedSender
+// TestValidatorCallback_UnAuthorizedSender checks that AuthorizedSenderValidator.Validate return's p2p.ValidationReject
 // validation error for all possible invalid combinations (unauthorized sender role, message type).
 func (s *TestAuthorizedSenderValidatorSuite) TestValidatorCallback_UnAuthorizedSender() {
 	for _, c := range s.unauthorizedSenderTestCases {
@@ -76,42 +135,101 @@ func (s *TestAuthorizedSenderValidatorSuite) TestValidatorCallback_UnAuthorizedS
 		s.Run(str, func() {
 			pid, err := unittest.PeerIDFromFlowID(c.Identity)
 			require.NoError(s.T(), err)
+			expectedMisbehaviorReport, err := alsp.NewMisbehaviorReport(c.Identity.NodeID, alsp.UnAuthorizedSender)
+			require.NoError(s.T(), err)
+			misbehaviorReportConsumer := mocknetwork.NewMisbehaviorReportConsumer(s.T())
+			misbehaviorReportConsumer.On("ReportMisbehaviorOnChannel", c.Channel, expectedMisbehaviorReport).Once()
+			violationsConsumer := slashing.NewSlashingViolationsConsumer(s.log, metrics.NewNoopCollector(), misbehaviorReportConsumer)
+			authorizedSenderValidator := NewAuthorizedSenderValidator(s.log, violationsConsumer, c.GetIdentity)
 
-			validate := AuthorizedSenderValidator(s.log, s.slashingViolationsConsumer, c.Channel, true, c.GetIdentity)
-			msgType, err := validate(pid, c.Message)
-			require.ErrorIs(s.T(), err, message.ErrUnauthorizedRole)
-			require.Equal(s.T(), c.MessageStr, msgType)
-
-			validatePubsub := AuthorizedSenderMessageValidator(s.log, s.slashingViolationsConsumer, c.Channel, c.GetIdentity)
-			pubsubResult := validatePubsub(pid, c.Message)
-			require.Equal(s.T(), pubsub.ValidationReject, pubsubResult)
+			payload, err := s.codec.Encode(c.Message)
+			require.NoError(s.T(), err)
+			m := &message.Message{
+				ChannelID: c.Channel.String(),
+				Payload:   payload,
+			}
+			validatePubsub := authorizedSenderValidator.PubSubMessageValidator(c.Channel)
+			pubsubResult := validatePubsub(pid, m)
+			require.Equal(s.T(), p2p.ValidationReject, pubsubResult)
 		})
 	}
 }
 
-// TestValidatorCallback_UnAuthorizedMessageOnChannel for each invalid combination of message type and channel
-// the call back returned from AuthorizedSenderValidator returns the appropriate error message.ErrUnauthorizedMessageOnChannel.
+// TestValidatorCallback_AuthorizedUnicastOnChannel checks that AuthorizedSenderValidator.Validate does not return an error
+// for messages sent via unicast that are authorized to be sent via unicast.
+func (s *TestAuthorizedSenderValidatorSuite) TestValidatorCallback_AuthorizedUnicastOnChannel() {
+	for _, c := range s.authorizedUnicastOnChannel {
+		str := fmt.Sprintf("role (%s) should be authorized to send message type (%s) on channel (%s) via unicast", c.Identity.Role, c.MessageStr, c.Channel)
+		s.Run(str, func() {
+			pid, err := unittest.PeerIDFromFlowID(c.Identity)
+			require.NoError(s.T(), err)
+			misbehaviorReportConsumer := mocknetwork.NewMisbehaviorReportConsumer(s.T())
+			defer misbehaviorReportConsumer.AssertNotCalled(s.T(), "ReportMisbehaviorOnChannel", mock.AnythingOfType("channels.Channel"), mock.AnythingOfType("*alsp.MisbehaviorReport"))
+			violationsConsumer := slashing.NewSlashingViolationsConsumer(s.log, metrics.NewNoopCollector(), misbehaviorReportConsumer)
+			authorizedSenderValidator := NewAuthorizedSenderValidator(s.log, violationsConsumer, c.GetIdentity)
+
+			msgType, err := authorizedSenderValidator.Validate(pid, []byte{c.MessageCode.Uint8()}, c.Channel, message.ProtocolTypeUnicast)
+			require.NoError(s.T(), err)
+			require.Equal(s.T(), c.MessageStr, msgType)
+		})
+	}
+}
+
+// TestValidatorCallback_UnAuthorizedUnicastOnChannel checks that AuthorizedSenderValidator.Validate returns message.ErrUnauthorizedUnicastOnChannel
+// when a message not authorized to be sent via unicast is sent via unicast.
+func (s *TestAuthorizedSenderValidatorSuite) TestValidatorCallback_UnAuthorizedUnicastOnChannel() {
+	for _, c := range s.unauthorizedUnicastOnChannel {
+		str := fmt.Sprintf("role (%s) should not be authorized to send message type (%s) on channel (%s) via unicast", c.Identity.Role, c.MessageStr, c.Channel)
+		s.Run(str, func() {
+			pid, err := unittest.PeerIDFromFlowID(c.Identity)
+			require.NoError(s.T(), err)
+			expectedMisbehaviorReport, err := alsp.NewMisbehaviorReport(c.Identity.NodeID, alsp.UnauthorizedUnicastOnChannel)
+			require.NoError(s.T(), err)
+			misbehaviorReportConsumer := mocknetwork.NewMisbehaviorReportConsumer(s.T())
+			misbehaviorReportConsumer.On("ReportMisbehaviorOnChannel", c.Channel, expectedMisbehaviorReport).Once()
+			violationsConsumer := slashing.NewSlashingViolationsConsumer(s.log, metrics.NewNoopCollector(), misbehaviorReportConsumer)
+			authorizedSenderValidator := NewAuthorizedSenderValidator(s.log, violationsConsumer, c.GetIdentity)
+
+			msgType, err := authorizedSenderValidator.Validate(pid, []byte{c.MessageCode.Uint8()}, c.Channel, message.ProtocolTypeUnicast)
+			require.ErrorIs(s.T(), err, message.ErrUnauthorizedUnicastOnChannel)
+			require.Equal(s.T(), c.MessageStr, msgType)
+		})
+	}
+}
+
+// TestValidatorCallback_UnAuthorizedMessageOnChannel checks that for each invalid combination of message type and channel
+// AuthorizedSenderValidator.Validate returns the appropriate error message.ErrUnauthorizedMessageOnChannel.
 func (s *TestAuthorizedSenderValidatorSuite) TestValidatorCallback_UnAuthorizedMessageOnChannel() {
 	for _, c := range s.unauthorizedMessageOnChannelTestCases {
 		str := fmt.Sprintf("message type (%s) should not be authorized to be sent on channel (%s)", c.MessageStr, c.Channel)
 		s.Run(str, func() {
 			pid, err := unittest.PeerIDFromFlowID(c.Identity)
 			require.NoError(s.T(), err)
+			expectedMisbehaviorReport, err := alsp.NewMisbehaviorReport(c.Identity.NodeID, alsp.UnAuthorizedSender)
+			require.NoError(s.T(), err)
+			misbehaviorReportConsumer := mocknetwork.NewMisbehaviorReportConsumer(s.T())
+			misbehaviorReportConsumer.On("ReportMisbehaviorOnChannel", c.Channel, expectedMisbehaviorReport).Twice()
+			violationsConsumer := slashing.NewSlashingViolationsConsumer(s.log, metrics.NewNoopCollector(), misbehaviorReportConsumer)
+			authorizedSenderValidator := NewAuthorizedSenderValidator(s.log, violationsConsumer, c.GetIdentity)
 
-			validate := AuthorizedSenderValidator(s.log, s.slashingViolationsConsumer, c.Channel, true, c.GetIdentity)
-
-			msgType, err := validate(pid, c.Message)
+			msgType, err := authorizedSenderValidator.Validate(pid, []byte{c.MessageCode.Uint8()}, c.Channel, message.ProtocolTypeUnicast)
 			require.ErrorIs(s.T(), err, message.ErrUnauthorizedMessageOnChannel)
 			require.Equal(s.T(), c.MessageStr, msgType)
 
-			validatePubsub := AuthorizedSenderMessageValidator(s.log, s.slashingViolationsConsumer, c.Channel, c.GetIdentity)
-			pubsubResult := validatePubsub(pid, c.Message)
-			require.Equal(s.T(), pubsub.ValidationReject, pubsubResult)
+			payload, err := s.codec.Encode(c.Message)
+			require.NoError(s.T(), err)
+			m := &message.Message{
+				ChannelID: c.Channel.String(),
+				Payload:   payload,
+			}
+			validatePubsub := authorizedSenderValidator.PubSubMessageValidator(c.Channel)
+			pubsubResult := validatePubsub(pid, m)
+			require.Equal(s.T(), p2p.ValidationReject, pubsubResult)
 		})
 	}
 }
 
-// TestValidatorCallback_ClusterPrefixedChannels checks that the call back returned from AuthorizedSenderValidator correctly
+// TestValidatorCallback_ClusterPrefixedChannels checks that AuthorizedSenderValidator.Validate correctly
 // handles cluster prefixed channels during validation.
 func (s *TestAuthorizedSenderValidatorSuite) TestValidatorCallback_ClusterPrefixedChannels() {
 	identity, _ := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleCollection))
@@ -121,78 +239,108 @@ func (s *TestAuthorizedSenderValidatorSuite) TestValidatorCallback_ClusterPrefix
 	pid, err := unittest.PeerIDFromFlowID(identity)
 	require.NoError(s.T(), err)
 
-	// validate collection consensus cluster
-	validateCollConsensus := AuthorizedSenderValidator(s.log, s.slashingViolationsConsumer, channels.ConsensusCluster(clusterID), true, getIdentityFunc)
-	msgType, err := validateCollConsensus(pid, &messages.ClusterBlockProposal{})
+	expectedMisbehaviorReport, err := alsp.NewMisbehaviorReport(identity.NodeID, alsp.UnauthorizedUnicastOnChannel)
 	require.NoError(s.T(), err)
-	require.Equal(s.T(), message.ClusterBlockProposal, msgType)
+	misbehaviorReportConsumer := mocknetwork.NewMisbehaviorReportConsumer(s.T())
+	misbehaviorReportConsumer.On("ReportMisbehaviorOnChannel", channels.SyncCluster(clusterID), expectedMisbehaviorReport).Once()
+	misbehaviorReportConsumer.On("ReportMisbehaviorOnChannel", channels.ConsensusCluster(clusterID), expectedMisbehaviorReport).Once()
 
-	validateCollConsensusPubsub := AuthorizedSenderMessageValidator(s.log, s.slashingViolationsConsumer, channels.ConsensusCluster(clusterID), getIdentityFunc)
-	pubsubResult := validateCollConsensusPubsub(pid, &messages.ClusterBlockProposal{})
-	require.Equal(s.T(), pubsub.ValidationAccept, pubsubResult)
+	violationsConsumer := slashing.NewSlashingViolationsConsumer(s.log, metrics.NewNoopCollector(), misbehaviorReportConsumer)
+	authorizedSenderValidator := NewAuthorizedSenderValidator(s.log, violationsConsumer, getIdentityFunc)
 
-	// validate collection sync cluster
-	validateSyncCluster := AuthorizedSenderValidator(s.log, s.slashingViolationsConsumer, channels.SyncCluster(clusterID), true, getIdentityFunc)
-	msgType, err = validateSyncCluster(pid, &messages.SyncRequest{})
+	// validate collection sync cluster SyncRequest is not allowed to be sent on channel via unicast
+	msgType, err := authorizedSenderValidator.Validate(pid, []byte{codec.CodeSyncRequest.Uint8()}, channels.SyncCluster(clusterID), message.ProtocolTypeUnicast)
+	require.ErrorIs(s.T(), err, message.ErrUnauthorizedUnicastOnChannel)
+	require.Equal(s.T(), "*messages.SyncRequest", msgType)
+
+	// ensure ClusterBlockProposal not allowed to be sent on channel via unicast
+	msgType, err = authorizedSenderValidator.Validate(pid, []byte{codec.CodeClusterBlockProposal.Uint8()}, channels.ConsensusCluster(clusterID), message.ProtocolTypeUnicast)
+	require.ErrorIs(s.T(), err, message.ErrUnauthorizedUnicastOnChannel)
+	require.Equal(s.T(), "*messages.ClusterBlockProposal", msgType)
+
+	// ensure ClusterBlockProposal is allowed to be sent via pubsub by authorized sender
+	payload, err := s.codec.Encode(&messages.ClusterBlockProposal{})
 	require.NoError(s.T(), err)
-	require.Equal(s.T(), message.SyncRequest, msgType)
+	m := &message.Message{
+		ChannelID: channels.ConsensusCluster(clusterID).String(),
+		Payload:   payload,
+	}
+	validateCollConsensusPubsub := authorizedSenderValidator.PubSubMessageValidator(channels.ConsensusCluster(clusterID))
+	pubsubResult := validateCollConsensusPubsub(pid, m)
+	require.Equal(s.T(), p2p.ValidationAccept, pubsubResult)
 
-	validateSyncClusterPubsub := AuthorizedSenderMessageValidator(s.log, s.slashingViolationsConsumer, channels.SyncCluster(clusterID), getIdentityFunc)
-	pubsubResult = validateSyncClusterPubsub(pid, &messages.SyncRequest{})
-	require.Equal(s.T(), pubsub.ValidationAccept, pubsubResult)
+	// ensure SyncRequest is allowed to be sent via pubsub by authorized sender
+	payload, err = s.codec.Encode(&messages.SyncRequest{})
+	require.NoError(s.T(), err)
+	m = &message.Message{
+		ChannelID: channels.SyncCluster(clusterID).String(),
+		Payload:   payload,
+	}
+	validateSyncClusterPubsub := authorizedSenderValidator.PubSubMessageValidator(channels.SyncCluster(clusterID))
+	pubsubResult = validateSyncClusterPubsub(pid, m)
+	require.Equal(s.T(), p2p.ValidationAccept, pubsubResult)
 }
 
-// TestValidatorCallback_ValidationFailure checks that the call back returned from AuthorizedSenderValidator returns the expected validation error.
+// TestValidatorCallback_ValidationFailure checks that AuthorizedSenderValidator.Validate returns the expected validation error.
 func (s *TestAuthorizedSenderValidatorSuite) TestValidatorCallback_ValidationFailure() {
 	s.Run("sender is ejected", func() {
 		identity, _ := unittest.IdentityWithNetworkingKeyFixture()
-		identity.Ejected = true
+		identity.EpochParticipationStatus = flow.EpochParticipationStatusEjected
 		getIdentityFunc := s.getIdentity(identity)
 		pid, err := unittest.PeerIDFromFlowID(identity)
 		require.NoError(s.T(), err)
 
-		validate := AuthorizedSenderValidator(s.log, s.slashingViolationsConsumer, channels.SyncCommittee, true, getIdentityFunc)
-		msgType, err := validate(pid, &messages.SyncRequest{})
+		expectedMisbehaviorReport, err := alsp.NewMisbehaviorReport(identity.NodeID, alsp.SenderEjected)
+		require.NoError(s.T(), err)
+		misbehaviorReportConsumer := mocknetwork.NewMisbehaviorReportConsumer(s.T())
+		misbehaviorReportConsumer.On("ReportMisbehaviorOnChannel", channels.SyncCommittee, expectedMisbehaviorReport).Twice()
+		violationsConsumer := slashing.NewSlashingViolationsConsumer(s.log, metrics.NewNoopCollector(), misbehaviorReportConsumer)
+		authorizedSenderValidator := NewAuthorizedSenderValidator(s.log, violationsConsumer, getIdentityFunc)
+
+		msgType, err := authorizedSenderValidator.Validate(pid, []byte{codec.CodeSyncRequest.Uint8()}, channels.SyncCommittee, message.ProtocolTypeUnicast)
 		require.ErrorIs(s.T(), err, ErrSenderEjected)
 		require.Equal(s.T(), "", msgType)
 
-		validatePubsub := AuthorizedSenderMessageValidator(s.log, s.slashingViolationsConsumer, channels.SyncCommittee, getIdentityFunc)
-		pubsubResult := validatePubsub(pid, &messages.SyncRequest{})
-		require.Equal(s.T(), pubsub.ValidationReject, pubsubResult)
+		payload, err := s.codec.Encode(&messages.SyncRequest{})
+		require.NoError(s.T(), err)
+		m := &message.Message{
+			ChannelID: channels.SyncCommittee.String(),
+			Payload:   payload,
+		}
+		validatePubsub := authorizedSenderValidator.PubSubMessageValidator(channels.SyncCommittee)
+		pubsubResult := validatePubsub(pid, m)
+		require.Equal(s.T(), p2p.ValidationReject, pubsubResult)
 	})
 
-	s.Run("unknown message type", func() {
+	s.Run("unknown message code", func() {
 		identity, _ := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleConsensus))
-		type msg struct {
-			*messages.BlockProposal
-		}
-
-		// *validator.msg is not a known message type, but embeds *messages.BlockProposal which is
-		m := &msg{&messages.BlockProposal{
-			Header:  nil,
-			Payload: nil,
-		}}
 
 		getIdentityFunc := s.getIdentity(identity)
 		pid, err := unittest.PeerIDFromFlowID(identity)
 		require.NoError(s.T(), err)
 
-		validate := AuthorizedSenderValidator(s.log, s.slashingViolationsConsumer, channels.ConsensusCommittee, true, getIdentityFunc)
-		validatePubsub := AuthorizedSenderMessageValidator(s.log, s.slashingViolationsConsumer, channels.ConsensusCommittee, getIdentityFunc)
+		expectedMisbehaviorReport, err := alsp.NewMisbehaviorReport(identity.NodeID, alsp.UnknownMsgType)
+		require.NoError(s.T(), err)
+		misbehaviorReportConsumer := mocknetwork.NewMisbehaviorReportConsumer(s.T())
+		misbehaviorReportConsumer.On("ReportMisbehaviorOnChannel", channels.ConsensusCommittee, expectedMisbehaviorReport).Twice()
+		violationsConsumer := slashing.NewSlashingViolationsConsumer(s.log, metrics.NewNoopCollector(), misbehaviorReportConsumer)
+		authorizedSenderValidator := NewAuthorizedSenderValidator(s.log, violationsConsumer, getIdentityFunc)
+		validatePubsub := authorizedSenderValidator.PubSubMessageValidator(channels.ConsensusCommittee)
 
 		// unknown message types are rejected
-		msgType, err := validate(pid, m)
-		require.True(s.T(), message.IsUnknownMsgTypeErr(err))
+		msgType, err := authorizedSenderValidator.Validate(pid, []byte{'x'}, channels.ConsensusCommittee, message.ProtocolTypeUnicast)
+		require.True(s.T(), codec.IsErrUnknownMsgCode(err))
 		require.Equal(s.T(), "", msgType)
-		pubsubResult := validatePubsub(pid, m)
-		require.Equal(s.T(), pubsub.ValidationReject, pubsubResult)
 
-		// nil messages are rejected
-		msgType, err = validate(pid, nil)
-		require.True(s.T(), message.IsUnknownMsgTypeErr(err))
-		require.Equal(s.T(), "", msgType)
-		pubsubResult = validatePubsub(pid, nil)
-		require.Equal(s.T(), pubsub.ValidationReject, pubsubResult)
+		payload, err := s.codec.Encode(&messages.BlockProposal{})
+		require.NoError(s.T(), err)
+		payload[0] = byte('x')
+		netMsg := &message.Message{
+			ChannelID: channels.ConsensusCommittee.String(),
+			Payload:   payload,
+		}
+		pubsubResult := validatePubsub(pid, netMsg)
+		require.Equal(s.T(), p2p.ValidationReject, pubsubResult)
 	})
 
 	s.Run("sender is not staked getIdentityFunc does not return identity ", func() {
@@ -204,31 +352,70 @@ func (s *TestAuthorizedSenderValidatorSuite) TestValidatorCallback_ValidationFai
 		pid, err := unittest.PeerIDFromFlowID(identity)
 		require.NoError(s.T(), err)
 
-		validate := AuthorizedSenderValidator(s.log, s.slashingViolationsConsumer, channels.SyncCommittee, true, getIdentityFunc)
-		msgType, err := validate(pid, &messages.SyncRequest{})
+		misbehaviorReportConsumer := mocknetwork.NewMisbehaviorReportConsumer(s.T())
+		// we cannot penalize a peer if identity is not known, in this case we don't expect any misbehavior reports to be reported
+		defer misbehaviorReportConsumer.AssertNotCalled(s.T(), "ReportMisbehaviorOnChannel", mock.AnythingOfType("channels.Channel"), mock.AnythingOfType("*alsp.MisbehaviorReport"))
+		violationsConsumer := slashing.NewSlashingViolationsConsumer(s.log, metrics.NewNoopCollector(), misbehaviorReportConsumer)
+		authorizedSenderValidator := NewAuthorizedSenderValidator(s.log, violationsConsumer, getIdentityFunc)
+
+		msgType, err := authorizedSenderValidator.Validate(pid, []byte{codec.CodeSyncRequest.Uint8()}, channels.SyncCommittee, message.ProtocolTypeUnicast)
 		require.ErrorIs(s.T(), err, ErrIdentityUnverified)
 		require.Equal(s.T(), "", msgType)
 
-		validatePubsub := AuthorizedSenderMessageValidator(s.log, s.slashingViolationsConsumer, channels.SyncCommittee, getIdentityFunc)
-		pubsubResult := validatePubsub(pid, &messages.SyncRequest{})
-		require.Equal(s.T(), pubsub.ValidationReject, pubsubResult)
+		payload, err := s.codec.Encode(&messages.SyncRequest{})
+		require.NoError(s.T(), err)
+		m := &message.Message{
+			ChannelID: channels.SyncCommittee.String(),
+			Payload:   payload,
+		}
+		validatePubsub := authorizedSenderValidator.PubSubMessageValidator(channels.SyncCommittee)
+		pubsubResult := validatePubsub(pid, m)
+		require.Equal(s.T(), p2p.ValidationReject, pubsubResult)
 	})
+}
+
+// TestValidatorCallback_ValidationFailure checks that AuthorizedSenderValidator returns the expected validation error when a unicast-only message is published.
+func (s *TestAuthorizedSenderValidatorSuite) TestValidatorCallback_UnauthorizedPublishOnChannel() {
+	for _, c := range s.authorizedUnicastOnChannel {
+		str := fmt.Sprintf("message type (%s) is not authorized to be sent via libp2p publish", c.MessageStr)
+		s.Run(str, func() {
+			// skip test message check
+			if c.MessageStr == "*message.TestMessage" {
+				return
+			}
+			pid, err := unittest.PeerIDFromFlowID(c.Identity)
+			require.NoError(s.T(), err)
+			expectedMisbehaviorReport, err := alsp.NewMisbehaviorReport(c.Identity.NodeID, alsp.UnauthorizedPublishOnChannel)
+			require.NoError(s.T(), err)
+			misbehaviorReportConsumer := mocknetwork.NewMisbehaviorReportConsumer(s.T())
+			misbehaviorReportConsumer.On("ReportMisbehaviorOnChannel", c.Channel, expectedMisbehaviorReport).Once()
+			violationsConsumer := slashing.NewSlashingViolationsConsumer(s.log, metrics.NewNoopCollector(), misbehaviorReportConsumer)
+			authorizedSenderValidator := NewAuthorizedSenderValidator(s.log, violationsConsumer, c.GetIdentity)
+			msgType, err := authorizedSenderValidator.Validate(pid, []byte{c.MessageCode.Uint8()}, c.Channel, message.ProtocolTypePubSub)
+			require.ErrorIs(s.T(), err, message.ErrUnauthorizedPublishOnChannel)
+			require.Equal(s.T(), c.MessageStr, msgType)
+		})
+	}
 }
 
 // initializeAuthorizationTestCases initializes happy and sad path test cases for checking authorized and unauthorized role message combinations.
 func (s *TestAuthorizedSenderValidatorSuite) initializeAuthorizationTestCases() {
-	for _, c := range message.GetAllMessageAuthConfigs() {
-		for channel, authorizedRoles := range c.Config {
+	for _, c := range s.allMsgConfigs {
+		for channel, channelAuthConfig := range c.Config {
 			for _, role := range flow.Roles() {
 				identity, _ := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(role))
+				code, what, err := codec.MessageCodeFromInterface(c.Type())
+				require.NoError(s.T(), err)
 				tc := TestCase{
 					Identity:    identity,
 					GetIdentity: s.getIdentity(identity),
 					Channel:     channel,
 					Message:     c.Type(),
-					MessageStr:  c.Name,
+					MessageCode: code,
+					MessageStr:  what,
+					Protocols:   channelAuthConfig.AllowedProtocols,
 				}
-				if authorizedRoles.Contains(role) {
+				if channelAuthConfig.AuthorizedRoles.Contains(role) {
 					// test cases for validation success happy path
 					s.authorizedSenderTestCases = append(s.authorizedSenderTestCases, tc)
 				} else {
@@ -243,28 +430,54 @@ func (s *TestAuthorizedSenderValidatorSuite) initializeAuthorizationTestCases() 
 // initializeInvalidMessageOnChannelTestCases initializes test cases for all possible combinations of invalid message types on channel.
 // NOTE: the role in the test case does not matter since ErrUnauthorizedMessageOnChannel will be returned before the role is checked.
 func (s *TestAuthorizedSenderValidatorSuite) initializeInvalidMessageOnChannelTestCases() {
-	configs := message.GetAllMessageAuthConfigs()
-
 	// iterate all channels
-	for _, c := range configs {
-		for channel, authorizedRoles := range c.Config {
-			identity, _ := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(authorizedRoles[0]))
+	for _, c := range s.allMsgConfigs {
+		for channel, channelAuthConfig := range c.Config {
+			identity, _ := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(channelAuthConfig.AuthorizedRoles[0]))
 
 			// iterate all message types
-			for _, config := range configs {
-
+			for _, config := range s.allMsgConfigs {
 				// include test if message type is not authorized on channel
 				_, ok := config.Config[channel]
+				code, what, err := codec.MessageCodeFromInterface(config.Type())
+				require.NoError(s.T(), err)
 				if config.Name != c.Name && !ok {
 					tc := TestCase{
 						Identity:    identity,
 						GetIdentity: s.getIdentity(identity),
 						Channel:     channel,
 						Message:     config.Type(),
-						MessageStr:  config.Name,
+						MessageCode: code,
+						MessageStr:  what,
+						Protocols:   channelAuthConfig.AllowedProtocols,
 					}
 					s.unauthorizedMessageOnChannelTestCases = append(s.unauthorizedMessageOnChannelTestCases, tc)
 				}
+			}
+		}
+	}
+}
+
+// initializeUnicastOnChannelTestCases initializes happy and sad path test cases for unicast on channel message combinations.
+func (s *TestAuthorizedSenderValidatorSuite) initializeUnicastOnChannelTestCases() {
+	for _, c := range s.allMsgConfigs {
+		for channel, channelAuthConfig := range c.Config {
+			identity, _ := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(channelAuthConfig.AuthorizedRoles[0]))
+			code, what, err := codec.MessageCodeFromInterface(c.Type())
+			require.NoError(s.T(), err)
+			tc := TestCase{
+				Identity:    identity,
+				GetIdentity: s.getIdentity(identity),
+				Channel:     channel,
+				Message:     c.Type(),
+				MessageCode: code,
+				MessageStr:  what,
+				Protocols:   channelAuthConfig.AllowedProtocols,
+			}
+			if channelAuthConfig.AllowedProtocols.Contains(message.ProtocolTypeUnicast) {
+				s.authorizedUnicastOnChannel = append(s.authorizedUnicastOnChannel, tc)
+			} else {
+				s.unauthorizedUnicastOnChannel = append(s.unauthorizedUnicastOnChannel, tc)
 			}
 		}
 	}

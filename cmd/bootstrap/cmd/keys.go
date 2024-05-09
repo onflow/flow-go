@@ -3,11 +3,13 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/onflow/flow-go/cmd/bootstrap/utils"
-	"github.com/onflow/flow-go/crypto/hash"
-	"github.com/onflow/flow-go/model/flow/order"
+	"github.com/onflow/crypto/hash"
 
-	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/cmd/bootstrap/utils"
+
+	"github.com/onflow/crypto"
+
+	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	model "github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
@@ -19,7 +21,11 @@ import (
 func genNetworkAndStakingKeys() []model.NodeInfo {
 
 	var nodeConfigs []model.NodeConfig
-	readJSON(flagConfig, &nodeConfigs)
+	err := common.ReadJSON(flagConfig, &nodeConfigs)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to read json")
+	}
+
 	nodes := len(nodeConfigs)
 	log.Info().Msgf("read %v node configurations", nodes)
 
@@ -27,14 +33,14 @@ func genNetworkAndStakingKeys() []model.NodeInfo {
 	log.Debug().Msg("all node addresses are unique")
 
 	log.Debug().Msgf("will generate %v networking keys for nodes in config", nodes)
-	networkKeys, err := utils.GenerateNetworkingKeys(nodes, GenerateRandomSeeds(nodes, crypto.KeyGenSeedMinLenECDSAP256))
+	networkKeys, err := utils.GenerateNetworkingKeys(nodes, GenerateRandomSeeds(nodes, crypto.KeyGenSeedMinLen))
 	if err != nil {
 		log.Fatal().Err(err).Msg("cannot generate networking keys")
 	}
 	log.Info().Msgf("generated %v networking keys for nodes in config", nodes)
 
 	log.Debug().Msgf("will generate %v staking keys for nodes in config", nodes)
-	stakingKeys, err := utils.GenerateStakingKeys(nodes, GenerateRandomSeeds(nodes, crypto.KeyGenSeedMinLenBLSBLS12381))
+	stakingKeys, err := utils.GenerateStakingKeys(nodes, GenerateRandomSeeds(nodes, crypto.KeyGenSeedMinLen))
 	if err != nil {
 		log.Fatal().Err(err).Msg("cannot generate staking keys")
 	}
@@ -47,7 +53,7 @@ func genNetworkAndStakingKeys() []model.NodeInfo {
 		internalNodes = append(internalNodes, nodeInfo)
 	}
 
-	return model.Sort(internalNodes, order.Canonical)
+	return model.Sort(internalNodes, flow.Canonical[flow.Identity])
 }
 
 func assembleNodeInfo(nodeConfig model.NodeConfig, networkKey, stakingKey crypto.PrivateKey,

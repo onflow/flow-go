@@ -2,14 +2,11 @@ package badger
 
 import (
 	"math"
-	"math/rand"
 	"os"
 	"testing"
-	"time"
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	model "github.com/onflow/flow-go/model/cluster"
@@ -31,8 +28,9 @@ type SnapshotSuite struct {
 	db    *badger.DB
 	dbdir string
 
-	genesis *model.Block
-	chainID flow.ChainID
+	genesis      *model.Block
+	chainID      flow.ChainID
+	epochCounter uint64
 
 	protoState protocol.State
 
@@ -43,9 +41,6 @@ type SnapshotSuite struct {
 func (suite *SnapshotSuite) SetupTest() {
 	var err error
 
-	// seed the RNG
-	rand.Seed(time.Now().UnixNano())
-
 	suite.genesis = model.Genesis()
 	suite.chainID = suite.genesis.Header.ChainID
 
@@ -55,23 +50,35 @@ func (suite *SnapshotSuite) SetupTest() {
 	metrics := metrics.NewNoopCollector()
 	tracer := trace.NewNoopTracer()
 
-	headers, _, seals, _, _, blocks, setups, commits, statuses, results := util.StorageLayer(suite.T(), suite.db)
+	all := util.StorageLayer(suite.T(), suite.db)
 	colPayloads := storage.NewClusterPayloads(metrics, suite.db)
 
-	clusterStateRoot, err := NewStateRoot(suite.genesis)
-	suite.Assert().Nil(err)
+	root := unittest.RootSnapshotFixture(unittest.IdentityListFixture(5, unittest.WithAllRoles()))
+	suite.epochCounter = root.Encodable().SealingSegment.LatestProtocolStateEntry().EpochEntry.EpochCounter()
+
+	suite.protoState, err = pbadger.Bootstrap(
+		metrics,
+		suite.db,
+		all.Headers,
+		all.Seals,
+		all.Results,
+		all.Blocks,
+		all.QuorumCertificates,
+		all.Setups,
+		all.EpochCommits,
+		all.EpochProtocolState,
+		all.ProtocolKVStore,
+		all.VersionBeacons,
+		root,
+	)
+	suite.Require().NoError(err)
+
+	clusterStateRoot, err := NewStateRoot(suite.genesis, unittest.QuorumCertificateFixture(), suite.epochCounter)
+	suite.Require().NoError(err)
 	clusterState, err := Bootstrap(suite.db, clusterStateRoot)
-	suite.Assert().Nil(err)
-	suite.state, err = NewMutableState(clusterState, tracer, headers, colPayloads)
-	suite.Assert().Nil(err)
-
-	participants := unittest.IdentityListFixture(5, unittest.WithAllRoles())
-	root := unittest.RootSnapshotFixture(participants)
-
-	suite.protoState, err = pbadger.Bootstrap(metrics, suite.db, headers, seals, results, blocks, setups, commits, statuses, root)
-	require.NoError(suite.T(), err)
-
-	suite.Require().Nil(err)
+	suite.Require().NoError(err)
+	suite.state, err = NewMutableState(clusterState, tracer, all.Headers, colPayloads)
+	suite.Require().NoError(err)
 }
 
 // runs after each test finishes
@@ -284,8 +291,6 @@ func (suite *SnapshotSuite) TestPending_Grandchildren() {
 }
 
 func (suite *SnapshotSuite) TestParams_ChainID() {
-
-	chainID, err := suite.state.Params().ChainID()
-	suite.Require().Nil(err)
+	chainID := suite.state.Params().ChainID()
 	suite.Assert().Equal(suite.genesis.Header.ChainID, chainID)
 }

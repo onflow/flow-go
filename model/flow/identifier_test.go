@@ -1,10 +1,10 @@
 package flow_test
 
 import (
+	"crypto/rand"
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
-	"math/rand"
 	"testing"
 
 	blocks "github.com/ipfs/go-block-format"
@@ -66,20 +66,23 @@ func TestIdentifierSample(t *testing.T) {
 
 	t.Run("Sample creates a random sample", func(t *testing.T) {
 		sampleSize := uint(5)
-		sample := flow.Sample(sampleSize, ids...)
+		sample, err := flow.Sample(sampleSize, ids...)
+		require.NoError(t, err)
 		require.Len(t, sample, int(sampleSize))
 		require.NotEqual(t, sample, ids[:sampleSize])
 	})
 
 	t.Run("sample size greater than total size results in the original list", func(t *testing.T) {
 		sampleSize := uint(len(ids) + 1)
-		sample := flow.Sample(sampleSize, ids...)
+		sample, err := flow.Sample(sampleSize, ids...)
+		require.NoError(t, err)
 		require.Equal(t, sample, ids)
 	})
 
 	t.Run("sample size of zero results in an empty list", func(t *testing.T) {
 		sampleSize := uint(0)
-		sample := flow.Sample(sampleSize, ids...)
+		sample, err := flow.Sample(sampleSize, ids...)
+		require.NoError(t, err)
 		require.Empty(t, sample)
 	})
 }
@@ -131,7 +134,8 @@ func TestCIDConversion(t *testing.T) {
 
 	// generate random CID
 	data := make([]byte, 4)
-	rand.Read(data)
+	_, err = rand.Read(data)
+	require.NoError(t, err)
 	cid = blocks.NewBlock(data).Cid()
 
 	id, err = flow.CidToId(cid)

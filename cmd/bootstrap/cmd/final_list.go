@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/onflow/flow-go/cmd"
+	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	model "github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -72,7 +73,11 @@ func finalList(cmd *cobra.Command, args []string) {
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to read public info")
 	}
-	writeJSON(model.PathFinallist, pubInfo)
+	err = common.WriteJSON(model.PathFinallist, flagOutdir, pubInfo)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to write json")
+	}
+	log.Info().Msgf("wrote file %s/%s", flagOutdir, model.PathFinallist)
 }
 
 func validateNodes(localNodes []model.NodeInfo, registeredNodes []model.NodeInfo) {
@@ -252,18 +257,25 @@ func checkMismatchingNodes(localNodes []model.NodeInfo, registeredNodes []model.
 }
 
 func assembleInternalNodesWithoutWeight() []model.NodeInfo {
-	privInternals := readInternalNodes()
+	privInternals, err := common.ReadInternalNodeInfos(flagInternalNodePrivInfoDir)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to read internal node infos")
+	}
 	log.Info().Msgf("read %v internal private node-info files", len(privInternals))
 
 	var nodes []model.NodeInfo
 	for _, internal := range privInternals {
 		// check if address is valid format
-		validateAddressFormat(internal.Address)
+		common.ValidateAddressFormat(log, internal.Address)
 
 		// validate every single internal node
-		nodeID := validateNodeID(internal.NodeID)
+		err := common.ValidateNodeID(internal.NodeID)
+		if err != nil {
+			log.Fatal().Err(err).Msg(fmt.Sprintf("invalid node ID: %s", internal.NodeID))
+		}
+
 		node, err := model.NewPrivateNodeInfo(
-			nodeID,
+			internal.NodeID,
 			internal.Role,
 			internal.Address,
 			flow.DefaultInitialWeight,
@@ -281,36 +293,51 @@ func assembleInternalNodesWithoutWeight() []model.NodeInfo {
 }
 
 func assemblePartnerNodesWithoutWeight() []model.NodeInfo {
-	partners := readPartnerNodes()
+	partners, err := common.ReadPartnerNodeInfos(flagPartnerNodeInfoDir)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to read partner node infos")
+	}
 	log.Info().Msgf("read %v partner node configuration files", len(partners))
 	return createPublicNodeInfo(partners)
 }
 
 func readStakingContractDetails() []model.NodeInfo {
 	var stakingNodes []model.NodeInfoPub
-	readJSON(flagStakingNodesPath, &stakingNodes)
+	err := common.ReadJSON(flagStakingNodesPath, &stakingNodes)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to read json")
+	}
 	return createPublicNodeInfo(stakingNodes)
 }
 
 func createPublicNodeInfo(nodes []model.NodeInfoPub) []model.NodeInfo {
 	var publicInfoNodes []model.NodeInfo
 	for _, n := range nodes {
-		validateAddressFormat(n.Address)
+		common.ValidateAddressFormat(log, n.Address)
 
 		// validate every single partner node
-		nodeID := validateNodeID(n.NodeID)
-		networkPubKey := validateNetworkPubKey(n.NetworkPubKey)
-		stakingPubKey, stakingKeyPoP := validateStakingPubKey(n.StakingPubKey, n.StakingPoP)
+		err := common.ValidateNodeID(n.NodeID)
+		if err != nil {
+			log.Fatal().Err(err).Msg(fmt.Sprintf("invalid node ID: %s", n.NodeID))
+		}
+		err = common.ValidateNetworkPubKey(n.NetworkPubKey)
+		if err != nil {
+			log.Fatal().Err(err).Msg(fmt.Sprintf("invalid network public key: %s", n.NetworkPubKey))
+		}
+		err = common.ValidateStakingPubKey(n.StakingPubKey, n.StakingPoP)
+		if err != nil {
+			log.Fatal().Err(err).Msg(fmt.Sprintf("invalid staking public key : %s, or staking PoP: %s", n.StakingPubKey, n.StakingPoP))
+		}
 
-		// all nodes should have equal weight
+		// all nodes should have equal weight (this might change in the future)
 		node := model.NewPublicNodeInfo(
-			nodeID,
+			n.NodeID,
 			n.Role,
 			n.Address,
 			flow.DefaultInitialWeight,
-			networkPubKey,
-			stakingPubKey,
-			stakingKeyPoP,
+			n.NetworkPubKey,
+			n.StakingPubKey,
+			n.StakingPoP,
 		)
 
 		publicInfoNodes = append(publicInfoNodes, node)

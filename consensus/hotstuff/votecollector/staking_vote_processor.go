@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/onflow/crypto"
 	"github.com/rs/zerolog"
 	"go.uber.org/atomic"
 
@@ -11,7 +12,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/signature"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	msig "github.com/onflow/flow-go/module/signature"
 )
@@ -28,14 +28,14 @@ import (
 // by `votecollector.VoteProcessorFactory` which adds the logic to verify
 // the proposer's vote (decorator pattern).
 type stakingVoteProcessorFactoryBase struct {
-	committee   hotstuff.Committee
+	committee   hotstuff.DynamicCommittee
 	onQCCreated hotstuff.OnQCCreated
 }
 
 // Create creates StakingVoteProcessor for processing votes for the given block.
 // Caller must treat all errors as exceptions
 func (f *stakingVoteProcessorFactoryBase) Create(log zerolog.Logger, block *model.Block) (hotstuff.VerifyingVoteProcessor, error) {
-	allParticipants, err := f.committee.Identities(block.BlockID)
+	allParticipants, err := f.committee.IdentitiesByBlock(block.BlockID)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving consensus participants: %w", err)
 	}
@@ -54,10 +54,13 @@ func (f *stakingVoteProcessorFactoryBase) Create(log zerolog.Logger, block *mode
 		return nil, fmt.Errorf("could not create aggregator for staking signatures: %w", err)
 	}
 
-	minRequiredWeight := hotstuff.ComputeWeightThresholdForBuildingQC(allParticipants.TotalWeight())
+	minRequiredWeight, err := f.committee.QuorumThresholdForView(block.View)
+	if err != nil {
+		return nil, fmt.Errorf("could not get weight threshold for view %d: %w", block.View, err)
+	}
 
 	return &StakingVoteProcessor{
-		log:               log,
+		log:               log.With().Hex("block_id", block.BlockID[:]).Logger(),
 		block:             block,
 		stakingSigAggtor:  stakingSigAggtor,
 		onQCCreated:       f.onQCCreated,
@@ -136,6 +139,8 @@ func (p *StakingVoteProcessor) Process(vote *model.Vote) error {
 		return fmt.Errorf("unexpected exception adding signature from vote %x to staking aggregator: %w", vote.ID(), err)
 	}
 
+	p.log.Debug().Msgf("processed vote, total weight=(%d), required=(%d)", totalWeight, p.minRequiredWeight)
+
 	// checking of conditions for building QC are satisfied
 	if totalWeight < p.minRequiredWeight {
 		return nil
@@ -143,13 +148,18 @@ func (p *StakingVoteProcessor) Process(vote *model.Vote) error {
 
 	// At this point, we have enough signatures to build a QC. Another routine
 	// might just be at this point. To avoid duplicate work, only one routine can pass:
-	if !p.done.CAS(false, true) {
+	if !p.done.CompareAndSwap(false, true) {
 		return nil
 	}
 	qc, err := p.buildQC()
 	if err != nil {
 		return fmt.Errorf("internal error constructing QC from votes: %w", err)
 	}
+
+	p.log.Info().
+		Uint64("view", qc.View).
+		Hex("signers", qc.SignerIndices).
+		Msg("new QC has been created")
 	p.onQCCreated(qc)
 
 	return nil

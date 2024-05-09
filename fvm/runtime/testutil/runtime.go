@@ -15,6 +15,10 @@ type TestInterpreterRuntime struct {
 	InvokeContractFunc func(a common.AddressLocation, s string, values []cadence.Value, types []sema.Type, ctx runtime.Context) (cadence.Value, error)
 }
 
+func (t *TestInterpreterRuntime) Config() runtime.Config {
+	panic("Config not defined")
+}
+
 func (t *TestInterpreterRuntime) NewScriptExecutor(script runtime.Script, context runtime.Context) runtime.Executor {
 	panic("NewScriptExecutor not defined")
 }
@@ -79,10 +83,6 @@ func (t *TestInterpreterRuntime) ReadStored(address common.Address, path cadence
 		panic("ReadStored not defined")
 	}
 	return t.ReadStoredFunc(address, path, context)
-}
-
-func (t *TestInterpreterRuntime) ReadLinked(common.Address, cadence.Path, runtime.Context) (cadence.Value, error) {
-	panic("ReadLinked not defined")
 }
 
 func (*TestInterpreterRuntime) Storage(runtime.Context) (*runtime.Storage, *interpreter.Interpreter, error) {

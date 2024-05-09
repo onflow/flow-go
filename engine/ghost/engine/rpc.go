@@ -15,13 +15,12 @@ import (
 	"github.com/onflow/flow-go/network/channels"
 	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/state/protocol"
-	"github.com/onflow/flow-go/utils/grpcutils"
 )
 
 // Config defines the configurable options for the gRPC server.
 type Config struct {
 	ListenAddr string
-	MaxMsgSize int // In bytes
+	MaxMsgSize uint // In bytes
 }
 
 // RPC implements a gRPC server for the Ghost node
@@ -41,7 +40,7 @@ type RPC struct {
 }
 
 // New returns a new RPC engine.
-func New(net network.Network, log zerolog.Logger, me module.Local, state protocol.State, config Config) (*RPC, error) {
+func New(net network.EngineRegistry, log zerolog.Logger, me module.Local, state protocol.State, config Config) (*RPC, error) {
 
 	log = log.With().Str("engine", "rpc").Logger()
 
@@ -50,17 +49,13 @@ func New(net network.Network, log zerolog.Logger, me module.Local, state protoco
 
 	codec := cborcodec.NewCodec()
 
-	if config.MaxMsgSize == 0 {
-		config.MaxMsgSize = grpcutils.DefaultMaxMsgSize
-	}
-
 	eng := &RPC{
 		log:  log,
 		unit: engine.NewUnit(),
 		me:   me,
 		server: grpc.NewServer(
-			grpc.MaxRecvMsgSize(config.MaxMsgSize),
-			grpc.MaxSendMsgSize(config.MaxMsgSize),
+			grpc.MaxRecvMsgSize(int(config.MaxMsgSize)),
+			grpc.MaxSendMsgSize(int(config.MaxMsgSize)),
 		),
 		config:   config,
 		messages: messages,
@@ -81,13 +76,12 @@ func New(net network.Network, log zerolog.Logger, me module.Local, state protoco
 }
 
 // registerConduits registers for ALL channels and returns a map of engine id to conduit
-func registerConduits(net network.Network, state protocol.State, eng network.Engine) (map[channels.Channel]network.Conduit, error) {
+func registerConduits(net network.EngineRegistry, state protocol.State, eng network.Engine) (map[channels.Channel]network.Conduit, error) {
 
 	// create a list of all channels that don't change over time
 	channelList := channels.ChannelList{
 		channels.ConsensusCommittee,
 		channels.SyncCommittee,
-		channels.SyncExecution,
 		channels.PushTransactions,
 		channels.PushGuarantees,
 		channels.PushBlocks,

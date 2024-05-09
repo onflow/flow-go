@@ -7,6 +7,7 @@ import (
 
 	"github.com/dgraph-io/badger/v2"
 
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/storage"
 )
 
@@ -24,6 +25,7 @@ func init() {
 
 // InitMax retrieves the maximum key length to have it internally in the
 // package after restarting.
+// No errors are expected during normal operation.
 func InitMax(tx *badger.Txn) error {
 	key := makePrefix(codeMax)
 	item, err := tx.Get(key)
@@ -42,13 +44,14 @@ func InitMax(tx *badger.Txn) error {
 }
 
 // SetMax sets the value for the maximum key length used for efficient iteration.
+// No errors are expected during normal operation.
 func SetMax(tx storage.Transaction) error {
 	key := makePrefix(codeMax)
 	val := make([]byte, 4)
 	binary.LittleEndian.PutUint32(val, max)
 	err := tx.Set(key, val)
 	if err != nil {
-		return fmt.Errorf("could not set max: %w", err)
+		return irrecoverable.NewExceptionf("could not set max: %w", err)
 	}
 	return nil
 }

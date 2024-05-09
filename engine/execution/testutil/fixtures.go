@@ -8,18 +8,29 @@ import (
 	"testing"
 
 	"github.com/onflow/cadence"
+	"github.com/onflow/cadence/encoding/ccf"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
+	"github.com/onflow/cadence/runtime/stdlib"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/crypto/hash"
+	"github.com/onflow/crypto"
+	"github.com/onflow/crypto/hash"
+
+	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/utils"
 	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/fvm/programs"
-	"github.com/onflow/flow-go/fvm/state"
-	fvmUtils "github.com/onflow/flow-go/fvm/utils"
+	"github.com/onflow/flow-go/fvm/environment"
+	envMock "github.com/onflow/flow-go/fvm/environment/mock"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
+	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/pathfinder"
+	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/epochs"
+	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
+	"github.com/onflow/flow-go/state/protocol"
+	protocolMock "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -28,7 +39,7 @@ func CreateContractDeploymentTransaction(contractName string, contract string, a
 	encoded := hex.EncodeToString([]byte(contract))
 
 	script := []byte(fmt.Sprintf(`transaction {
-              prepare(signer: AuthAccount, service: AuthAccount) {
+              prepare(signer: auth(AddContract) &Account, service: &Account) {
                 signer.contracts.add(name: "%s", code: "%s".decodeHex())
               }
             }`, contractName, encoded))
@@ -46,8 +57,8 @@ func UpdateContractDeploymentTransaction(contractName string, contract string, a
 
 	return flow.NewTransactionBody().
 		SetScript([]byte(fmt.Sprintf(`transaction {
-              prepare(signer: AuthAccount, service: AuthAccount) {
-                signer.contracts.update__experimental(name: "%s", code: "%s".decodeHex())
+              prepare(signer: auth(UpdateContract) &Account, service: &Account) {
+                signer.contracts.update(name: "%s", code: "%s".decodeHex())
               }
             }`, contractName, encoded)),
 		).
@@ -60,8 +71,8 @@ func UpdateContractUnathorizedDeploymentTransaction(contractName string, contrac
 
 	return flow.NewTransactionBody().
 		SetScript([]byte(fmt.Sprintf(`transaction {
-              prepare(signer: AuthAccount) {
-                signer.contracts.update__experimental(name: "%s", code: "%s".decodeHex())
+              prepare(signer: auth(UpdateContract) &Account) {
+                signer.contracts.update(name: "%s", code: "%s".decodeHex())
               }
             }`, contractName, encoded)),
 		).
@@ -71,7 +82,7 @@ func UpdateContractUnathorizedDeploymentTransaction(contractName string, contrac
 func RemoveContractDeploymentTransaction(contractName string, authorizer flow.Address, chain flow.Chain) *flow.TransactionBody {
 	return flow.NewTransactionBody().
 		SetScript([]byte(fmt.Sprintf(`transaction {
-              prepare(signer: AuthAccount, service: AuthAccount) {
+              prepare(signer: auth(RemoveContract) &Account, service: &Account) {
                 signer.contracts.remove(name: "%s")
               }
             }`, contractName)),
@@ -83,7 +94,7 @@ func RemoveContractDeploymentTransaction(contractName string, authorizer flow.Ad
 func RemoveContractUnathorizedDeploymentTransaction(contractName string, authorizer flow.Address) *flow.TransactionBody {
 	return flow.NewTransactionBody().
 		SetScript([]byte(fmt.Sprintf(`transaction {
-              prepare(signer: AuthAccount) {
+              prepare(signer: auth(RemoveContract) &Account) {
                 signer.contracts.remove(name: "%s")
               }
             }`, contractName)),
@@ -96,7 +107,7 @@ func CreateUnauthorizedContractDeploymentTransaction(contractName string, contra
 
 	return flow.NewTransactionBody().
 		SetScript([]byte(fmt.Sprintf(`transaction {
-              prepare(signer: AuthAccount) {
+              prepare(signer: auth(AddContract) &Account) {
                 signer.contracts.add(name: "%s", code: "%s".decodeHex())
               }
             }`, contractName, encoded)),
@@ -169,7 +180,7 @@ func GenerateAccountPrivateKeys(numberOfPrivateKeys int) ([]flow.AccountPrivateK
 
 // GenerateAccountPrivateKey generates a private key.
 func GenerateAccountPrivateKey() (flow.AccountPrivateKey, error) {
-	seed := make([]byte, crypto.KeyGenSeedMinLenECDSAP256)
+	seed := make([]byte, crypto.KeyGenSeedMinLen)
 	_, err := rand.Read(seed)
 	if err != nil {
 		return flow.AccountPrivateKey{}, err
@@ -188,36 +199,44 @@ func GenerateAccountPrivateKey() (flow.AccountPrivateKey, error) {
 
 // CreateAccounts inserts accounts into the ledger using the provided private keys.
 func CreateAccounts(
-	vm *fvm.VirtualMachine,
-	view state.View,
-	programs *programs.Programs,
+	vm fvm.VM,
+	snapshotTree snapshot.SnapshotTree,
 	privateKeys []flow.AccountPrivateKey,
 	chain flow.Chain,
-) ([]flow.Address, error) {
-	return CreateAccountsWithSimpleAddresses(vm, view, programs, privateKeys, chain)
+) (
+	snapshot.SnapshotTree,
+	[]flow.Address,
+	error,
+) {
+	return CreateAccountsWithSimpleAddresses(
+		vm,
+		snapshotTree,
+		privateKeys,
+		chain)
 }
 
 func CreateAccountsWithSimpleAddresses(
-	vm *fvm.VirtualMachine,
-	view state.View,
-	programs *programs.Programs,
+	vm fvm.VM,
+	snapshotTree snapshot.SnapshotTree,
 	privateKeys []flow.AccountPrivateKey,
 	chain flow.Chain,
-) ([]flow.Address, error) {
+) (
+	snapshot.SnapshotTree,
+	[]flow.Address,
+	error,
+) {
 	ctx := fvm.NewContext(
 		fvm.WithChain(chain),
-		fvm.WithTransactionProcessors(
-			fvm.NewTransactionInvoker(),
-		),
-		fvm.WithBlockPrograms(programs),
+		fvm.WithAuthorizationChecksEnabled(false),
+		fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
 	)
 
 	var accounts []flow.Address
 
 	scriptTemplate := `
         transaction(publicKey: [UInt8]) {
-            prepare(signer: AuthAccount) {
-                let acct = AuthAccount(payer: signer)
+            prepare(signer: auth(AddKey, BorrowValue) &Account) {
+                let acct = Account(payer: signer)
                 let publicKey2 = PublicKey(
                     publicKey: publicKey,
                     signatureAlgorithm: SignatureAlgorithm.%s
@@ -232,7 +251,7 @@ func CreateAccountsWithSimpleAddresses(
 
 	serviceAddress := chain.ServiceAddress()
 
-	for i, privateKey := range privateKeys {
+	for _, privateKey := range privateKeys {
 		accountKey := privateKey.PublicKey(fvm.AccountKeyWeightThreshold)
 		encPublicKey := accountKey.PublicKey.Encode()
 		cadPublicKey := BytesToCadenceArray(encPublicKey)
@@ -252,40 +271,58 @@ func CreateAccountsWithSimpleAddresses(
 			AddArgument(encCadPublicKey).
 			AddAuthorizer(serviceAddress)
 
-		tx := fvm.Transaction(txBody, uint32(i))
-		err := vm.RunV2(ctx, tx, view)
+		tx := fvm.Transaction(txBody, 0)
+		executionSnapshot, output, err := vm.Run(ctx, tx, snapshotTree)
 		if err != nil {
-			return nil, err
+			return snapshotTree, nil, err
 		}
 
-		if tx.Err != nil {
-			return nil, fmt.Errorf("failed to create account: %w", tx.Err)
+		if output.Err != nil {
+			return snapshotTree, nil, fmt.Errorf(
+				"failed to create account: %w",
+				output.Err)
 		}
+
+		snapshotTree = snapshotTree.Append(executionSnapshot)
 
 		var addr flow.Address
 
-		for _, event := range tx.Events {
+		for _, event := range output.Events {
 			if event.Type == flow.EventAccountCreated {
-				data, err := jsoncdc.Decode(nil, event.Payload)
+				data, err := ccf.Decode(nil, event.Payload)
 				if err != nil {
-					return nil, errors.New("error decoding events")
+					return snapshotTree, nil, errors.New("error decoding events")
 				}
-				addr = flow.Address(data.(cadence.Event).Fields[0].(cadence.Address))
+
+				event, ok := data.(cadence.Event)
+				if !ok {
+					return snapshotTree, nil, errors.New("error decoding events")
+				}
+
+				address := cadence.SearchFieldByName(
+					event,
+					stdlib.AccountEventAddressParameter.Identifier,
+				).(cadence.Address)
+
+				addr = flow.ConvertAddress(address)
 				break
 			}
 		}
 		if addr == flow.EmptyAddress {
-			return nil, errors.New("no account creation event emitted")
+			return snapshotTree, nil, errors.New(
+				"no account creation event emitted")
 		}
 		accounts = append(accounts, addr)
 	}
 
-	return accounts, nil
+	return snapshotTree, accounts, nil
 }
 
-func RootBootstrappedLedger(vm *fvm.VirtualMachine, ctx fvm.Context, additionalOptions ...fvm.BootstrapProcedureOption) state.View {
-	view := fvmUtils.NewSimpleView()
-
+func RootBootstrappedLedger(
+	vm fvm.VM,
+	ctx fvm.Context,
+	additionalOptions ...fvm.BootstrapProcedureOption,
+) snapshot.SnapshotTree {
 	// set 0 clusters to pass n_collectors >= n_clusters check
 	epochConfig := epochs.DefaultEpochConfig()
 	epochConfig.NumCollectorClusters = 0
@@ -302,8 +339,11 @@ func RootBootstrappedLedger(vm *fvm.VirtualMachine, ctx fvm.Context, additionalO
 		options...,
 	)
 
-	_ = vm.RunV2(ctx, bootstrap, view)
-	return view
+	executionSnapshot, _, err := vm.Run(ctx, bootstrap, nil)
+	if err != nil {
+		panic(err)
+	}
+	return snapshot.NewSnapshotTree(nil).Append(executionSnapshot)
 }
 
 func BytesToCadenceArray(l []byte) cadence.Array {
@@ -312,7 +352,7 @@ func BytesToCadenceArray(l []byte) cadence.Array {
 		values[i] = cadence.NewUInt8(b)
 	}
 
-	return cadence.NewArray(values).WithType(cadence.NewVariableSizedArrayType(cadence.NewUInt8Type()))
+	return cadence.NewArray(values).WithType(cadence.NewVariableSizedArrayType(cadence.UInt8Type))
 }
 
 // CreateAccountCreationTransaction creates a transaction which will create a new account.
@@ -329,8 +369,8 @@ func CreateAccountCreationTransaction(t testing.TB, chain flow.Chain) (flow.Acco
 	// define the cadence script
 	script := fmt.Sprintf(`
         transaction(publicKey: [UInt8]) {
-            prepare(signer: AuthAccount) {
-				let acct = AuthAccount(payer: signer)
+            prepare(signer: auth(AddKey, BorrowValue) &Account) {
+				let acct = Account(payer: signer)
                 let publicKey2 = PublicKey(
                     publicKey: publicKey,
                     signatureAlgorithm: SignatureAlgorithm.%s
@@ -369,10 +409,10 @@ func CreateMultiAccountCreationTransaction(t *testing.T, chain flow.Chain, n int
 	// define the cadence script
 	script := fmt.Sprintf(`
         transaction(publicKey: [UInt8]) {
-            prepare(signer: AuthAccount) {
+            prepare(signer: auth(AddKey, BorrowValue) &Account) {
                 var i = 0
                 while i < %d {
-                    let account = AuthAccount(payer: signer)
+                    let account = Account(payer: signer)
                     let publicKey2 = PublicKey(
                         publicKey: publicKey,
                         signatureAlgorithm: SignatureAlgorithm.%s
@@ -405,7 +445,7 @@ func CreateMultiAccountCreationTransaction(t *testing.T, chain flow.Chain, n int
 func CreateAddAnAccountKeyMultipleTimesTransaction(t *testing.T, accountKey *flow.AccountPrivateKey, counts int) *flow.TransactionBody {
 	script := []byte(fmt.Sprintf(`
       transaction(counts: Int, key: [UInt8]) {
-        prepare(signer: AuthAccount) {
+        prepare(signer: auth(AddKey) &Account) {
           var i = 0
           while i < counts {
             i = i + 1
@@ -444,8 +484,8 @@ func CreateAddAccountKeyTransaction(t *testing.T, accountKey *flow.AccountPrivat
 
 	script := []byte(`
         transaction(key: [UInt8]) {
-          prepare(signer: AuthAccount) {
-            let acct = AuthAccount(payer: signer)
+          prepare(signer: auth(AddKey) &Account) {
+            let acct = Account(payer: signer)
             let publicKey2 = PublicKey(
               publicKey: key,
               signatureAlgorithm: SignatureAlgorithm.%s
@@ -477,4 +517,155 @@ func bytesToCadenceArray(l []byte) cadence.Array {
 	}
 
 	return cadence.NewArray(values)
+}
+
+// TODO(ramtin): when we get rid of BlockExecutionData, this could move to the global unittest fixtures
+// TrieUpdates are internal data to the ledger package and should not have leaked into
+// packages like uploader in the first place
+func ComputationResultFixture(t *testing.T) *execution.ComputationResult {
+	startState := unittest.StateCommitmentFixture()
+	update1, err := ledger.NewUpdate(
+		ledger.State(startState),
+		[]ledger.Key{
+			ledger.NewKey([]ledger.KeyPart{ledger.NewKeyPart(3, []byte{33})}),
+			ledger.NewKey([]ledger.KeyPart{ledger.NewKeyPart(1, []byte{11})}),
+			ledger.NewKey([]ledger.KeyPart{ledger.NewKeyPart(2, []byte{1, 1}), ledger.NewKeyPart(3, []byte{2, 5})}),
+		},
+		[]ledger.Value{
+			[]byte{21, 37},
+			nil,
+			[]byte{3, 3, 3, 3, 3},
+		},
+	)
+	require.NoError(t, err)
+
+	trieUpdate1, err := pathfinder.UpdateToTrieUpdate(update1, complete.DefaultPathFinderVersion)
+	require.NoError(t, err)
+
+	update2, err := ledger.NewUpdate(
+		ledger.State(unittest.StateCommitmentFixture()),
+		[]ledger.Key{},
+		[]ledger.Value{},
+	)
+	require.NoError(t, err)
+
+	trieUpdate2, err := pathfinder.UpdateToTrieUpdate(update2, complete.DefaultPathFinderVersion)
+	require.NoError(t, err)
+
+	update3, err := ledger.NewUpdate(
+		ledger.State(unittest.StateCommitmentFixture()),
+		[]ledger.Key{
+			ledger.NewKey([]ledger.KeyPart{ledger.NewKeyPart(9, []byte{6})}),
+		},
+		[]ledger.Value{
+			[]byte{21, 37},
+		},
+	)
+	require.NoError(t, err)
+
+	trieUpdate3, err := pathfinder.UpdateToTrieUpdate(update3, complete.DefaultPathFinderVersion)
+	require.NoError(t, err)
+
+	update4, err := ledger.NewUpdate(
+		ledger.State(unittest.StateCommitmentFixture()),
+		[]ledger.Key{
+			ledger.NewKey([]ledger.KeyPart{ledger.NewKeyPart(9, []byte{6})}),
+		},
+		[]ledger.Value{
+			[]byte{21, 37},
+		},
+	)
+	require.NoError(t, err)
+
+	trieUpdate4, err := pathfinder.UpdateToTrieUpdate(update4, complete.DefaultPathFinderVersion)
+	require.NoError(t, err)
+
+	executableBlock := unittest.ExecutableBlockFixture([][]flow.Identifier{
+		{unittest.IdentifierFixture()},
+		{unittest.IdentifierFixture()},
+		{unittest.IdentifierFixture()},
+	}, &startState)
+
+	blockExecResult := execution.NewPopulatedBlockExecutionResult(executableBlock)
+	blockExecResult.CollectionExecutionResultAt(0).AppendTransactionResults(
+		flow.EventsList{
+			unittest.EventFixture("what", 0, 0, unittest.IdentifierFixture(), 2),
+			unittest.EventFixture("ever", 0, 1, unittest.IdentifierFixture(), 22),
+		},
+		nil,
+		nil,
+		flow.TransactionResult{
+			TransactionID:   unittest.IdentifierFixture(),
+			ErrorMessage:    "",
+			ComputationUsed: 23,
+			MemoryUsed:      101,
+		},
+	)
+	blockExecResult.CollectionExecutionResultAt(1).AppendTransactionResults(
+		flow.EventsList{
+			unittest.EventFixture("what", 2, 0, unittest.IdentifierFixture(), 2),
+			unittest.EventFixture("ever", 2, 1, unittest.IdentifierFixture(), 22),
+			unittest.EventFixture("ever", 2, 2, unittest.IdentifierFixture(), 2),
+			unittest.EventFixture("ever", 2, 3, unittest.IdentifierFixture(), 22),
+		},
+		nil,
+		nil,
+		flow.TransactionResult{
+			TransactionID:   unittest.IdentifierFixture(),
+			ErrorMessage:    "fail",
+			ComputationUsed: 1,
+			MemoryUsed:      22,
+		},
+	)
+
+	return &execution.ComputationResult{
+		BlockExecutionResult: blockExecResult,
+		BlockAttestationResult: &execution.BlockAttestationResult{
+			BlockExecutionData: &execution_data.BlockExecutionData{
+				ChunkExecutionDatas: []*execution_data.ChunkExecutionData{
+					{TrieUpdate: trieUpdate1},
+					{TrieUpdate: trieUpdate2},
+					{TrieUpdate: trieUpdate3},
+					{TrieUpdate: trieUpdate4},
+				},
+			},
+		},
+		ExecutionReceipt: &flow.ExecutionReceipt{
+			ExecutionResult: flow.ExecutionResult{
+				Chunks: flow.ChunkList{
+					{EndState: unittest.StateCommitmentFixture()},
+					{EndState: unittest.StateCommitmentFixture()},
+					{EndState: unittest.StateCommitmentFixture()},
+					{EndState: unittest.StateCommitmentFixture()},
+				},
+			},
+		},
+	}
+}
+
+// EntropyProviderFixture returns an entropy provider mock that
+// supports RandomSource().
+// If input is nil, a random source fixture is generated.
+func EntropyProviderFixture(source []byte) environment.EntropyProvider {
+	if source == nil {
+		source = unittest.SignatureFixture()
+	}
+	provider := envMock.EntropyProvider{}
+	provider.On("RandomSource").Return(source, nil)
+	return &provider
+}
+
+// ProtocolStateWithSourceFixture returns a protocol state mock that only
+// supports AtBlockID to return a snapshot mock.
+// The snapshot mock only supports RandomSource().
+// If input is nil, a random source fixture is generated.
+func ProtocolStateWithSourceFixture(source []byte) protocol.State {
+	if source == nil {
+		source = unittest.SignatureFixture()
+	}
+	snapshot := &protocolMock.Snapshot{}
+	snapshot.On("RandomSource").Return(source, nil)
+	state := protocolMock.State{}
+	state.On("AtBlockID", mock.Anything).Return(snapshot)
+	return &state
 }

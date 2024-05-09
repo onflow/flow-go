@@ -31,14 +31,22 @@ type EgressEvent struct {
 	// sent to attacker to decide on its content before dispatching it to the
 	// Flow network.
 	FlowProtocolEvent interface{}
+
+	// FlowProtocolEventID the flow identifier generated from the hash of the payload of the FlowProtocolEvent.
+	// This can be used to map events sent and received by corrupted nodes to further control ingress / egress traffic.
+	FlowProtocolEventID flow.Identifier
 }
 
 // IngressEvent is the incoming event coming to a corrupt node (from an honest or corrupt node)
 type IngressEvent struct {
-	OriginID          flow.Identifier
-	CorruptTargetID   flow.Identifier // corrupt node Id
-	Channel           channels.Channel
+	OriginID        flow.Identifier
+	CorruptTargetID flow.Identifier // corrupt node Id
+	Channel         channels.Channel
+
 	FlowProtocolEvent interface{}
+	// FlowProtocolEventID the flow identifier generated from the hash of the payload of the FlowProtocolEvent.
+	// This can be used to map events sent and received by corrupted nodes to further control ingress / egress traffic.
+	FlowProtocolEventID flow.Identifier
 }
 
 func ProtocolStr(p Protocol) string {

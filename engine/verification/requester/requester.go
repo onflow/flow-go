@@ -67,7 +67,7 @@ type Engine struct {
 
 func New(log zerolog.Logger,
 	state protocol.State,
-	net network.Network,
+	net network.EngineRegistry,
 	tracer module.Tracer,
 	metrics module.VerificationMetrics,
 	pendingRequests mempool.ChunkRequests,
@@ -168,10 +168,8 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 func (e *Engine) handleChunkDataPackWithTracing(originID flow.Identifier, chunkDataPack *flow.ChunkDataPack) {
 	// TODO: change this to block level as well
 	if chunkDataPack.Collection != nil {
-		span, _, isSampled := e.tracer.StartCollectionSpan(e.unit.Ctx(), chunkDataPack.Collection.ID(), trace.VERRequesterHandleChunkDataResponse)
-		if isSampled {
-			span.SetAttributes(attribute.String("chunk_id", chunkDataPack.ChunkID.String()))
-		}
+		span, _ := e.tracer.StartCollectionSpan(e.unit.Ctx(), chunkDataPack.Collection.ID(), trace.VERRequesterHandleChunkDataResponse)
+		span.SetAttributes(attribute.String("chunk_id", chunkDataPack.ChunkID.String()))
 		defer span.End()
 	}
 	e.handleChunkDataPack(originID, chunkDataPack)
@@ -333,8 +331,11 @@ func (e *Engine) requestChunkDataPack(request *verification.ChunkDataPackRequest
 	}
 
 	// publishes the chunk data request to the network
-	targetIDs := request.SampleTargets(int(e.requestTargets))
-	err := e.con.Publish(req, targetIDs...)
+	targetIDs, err := request.SampleTargets(int(e.requestTargets))
+	if err != nil {
+		return fmt.Errorf("target sampling failed: %w", err)
+	}
+	err = e.con.Publish(req, targetIDs...)
 	if err != nil {
 		return fmt.Errorf("could not publish chunk data pack request for chunk (id=%s): %w", request.ChunkID, err)
 	}

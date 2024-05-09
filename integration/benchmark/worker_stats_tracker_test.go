@@ -1,8 +1,8 @@
 package benchmark
 
 import (
+	"context"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -10,16 +10,21 @@ import (
 // TestWorkerStatsTracker creates a new worker stats,
 // adds a couple of transactions there and verifies that average tps is correct.
 func TestWorkerStatsTracker(t *testing.T) {
-	st := NewWorkerStatsTracker()
-	st.StartPrinting(time.Second)
-	defer st.StopPrinting()
+	st := NewWorkerStatsTracker(context.Background())
+	st.AddWorkers(1)
 
-	st.AddWorker()
+	stats := st.GetStats()
+	assert.Equal(t, 0, stats.TxsSent)
+	assert.Equal(t, 1, stats.Workers)
 
-	startTime := time.Now()
-	endTime := startTime.Add(time.Second)
-	assert.Equal(t, 0., st.AvgTPSBetween(startTime, endTime))
-	st.AddTxSent()
-	st.AddTxSent()
-	assert.Equal(t, 2., st.AvgTPSBetween(startTime, endTime))
+	st.IncTxSent()
+	st.IncTxSent()
+	st.IncTxExecuted()
+
+	stats = st.GetStats()
+	assert.Equal(t, 1, stats.TxsExecuted)
+	assert.Equal(t, 2, stats.TxsSent)
+	assert.Equal(t, 0., stats.TxsSentMovingAverage)
+
+	st.Stop()
 }

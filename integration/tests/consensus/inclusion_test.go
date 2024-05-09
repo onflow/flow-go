@@ -2,7 +2,6 @@ package consensus
 
 import (
 	"context"
-	"math/rand"
 	"testing"
 	"time"
 
@@ -12,7 +11,6 @@ import (
 
 	"github.com/onflow/flow-go/engine/ghost/client"
 	"github.com/onflow/flow-go/integration/testnet"
-	"github.com/onflow/flow-go/integration/tests/lib"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/signature"
@@ -36,8 +34,7 @@ type InclusionSuite struct {
 }
 
 func (is *InclusionSuite) Collection() *client.GhostClient {
-	ghost := is.net.ContainerByID(is.collID)
-	client, err := lib.GetGhostClient(ghost)
+	client, err := is.net.ContainerByID(is.collID).GhostClient()
 	require.NoError(is.T(), err, "could not get ghost client")
 	return client
 }
@@ -45,9 +42,6 @@ func (is *InclusionSuite) Collection() *client.GhostClient {
 func (is *InclusionSuite) SetupTest() {
 	is.log = unittest.LoggerForTest(is.Suite.T(), zerolog.InfoLevel)
 	is.log.Info().Msgf("================> SetupTest")
-
-	// seed random generator
-	rand.Seed(time.Now().UnixNano())
 
 	// to collect node confiis...
 	var nodeConfigs []testnet.NodeConfig
@@ -157,10 +151,11 @@ func (is *InclusionSuite) waitUntilSeenProposal(deadline time.Time) {
 		if !ok {
 			continue
 		}
+		block := proposal.Block.ToInternal()
 
-		is.T().Logf("receive block proposal from %v, height %v", originID, proposal.Header.Height)
+		is.T().Logf("receive block proposal from %v, height %v", originID, block.Header.Height)
 		// wait until proposal finalized
-		if proposal.Header.Height >= 1 {
+		if block.Header.Height >= 1 {
 			return
 		}
 	}
@@ -188,7 +183,7 @@ func (is *InclusionSuite) sendCollectionToConsensus(deadline time.Time, sentinel
 	is.T().Fatalf("%v timeout (deadline %s) sendng collection %x to consensus", time.Now(), deadline, colID)
 }
 
-func (is *InclusionSuite) waitUntilCollectionIncludeInProposal(deadline time.Time, sentinel *flow.CollectionGuarantee) *messages.BlockProposal {
+func (is *InclusionSuite) waitUntilCollectionIncludeInProposal(deadline time.Time, sentinel *flow.CollectionGuarantee) *flow.Block {
 	colID := sentinel.CollectionID
 	// we try to find a block with the guarantee included
 	for time.Now().Before(deadline) {
@@ -205,17 +200,18 @@ func (is *InclusionSuite) waitUntilCollectionIncludeInProposal(deadline time.Tim
 		if !ok {
 			continue
 		}
+		block := proposal.Block.ToInternal()
 
-		guarantees := proposal.Payload.Guarantees
-		height := proposal.Header.Height
+		guarantees := block.Payload.Guarantees
+		height := block.Header.Height
 		is.T().Logf("receive block proposal height %v from %v, %v guarantees included in the payload!", height, originID, len(guarantees))
 
 		// check if the collection guarantee is included
 		for _, guarantee := range guarantees {
 			if guarantee.CollectionID == sentinel.CollectionID {
-				proposalID := proposal.Header.ID()
+				proposalID := block.Header.ID()
 				is.T().Logf("%x: collection guarantee %x included!\n", proposalID, colID)
-				return proposal
+				return block
 			}
 		}
 	}
@@ -226,12 +222,12 @@ func (is *InclusionSuite) waitUntilCollectionIncludeInProposal(deadline time.Tim
 
 // checkingProposalConfirmed returns whether it has seen 3 blocks confirmations on the block
 // that contains the guarantee
-func (is *InclusionSuite) waitUntilProposalConfirmed(deadline time.Time, sentinel *flow.CollectionGuarantee, proposal *messages.BlockProposal) {
+func (is *InclusionSuite) waitUntilProposalConfirmed(deadline time.Time, sentinel *flow.CollectionGuarantee, block *flow.Block) {
 	colID := sentinel.CollectionID
 	// we try to find a block with the guarantee included and three confirmations
 	confirmations := make(map[flow.Identifier]uint)
 	// add the proposal that includes the guarantee
-	confirmations[proposal.Header.ID()] = 0
+	confirmations[block.Header.ID()] = 0
 
 	for time.Now().Before(deadline) {
 
@@ -247,9 +243,10 @@ func (is *InclusionSuite) waitUntilProposalConfirmed(deadline time.Time, sentine
 		if !ok {
 			continue
 		}
+		nextBlock := proposal.Block.ToInternal()
 
 		// check if the proposal was already processed
-		proposalID := proposal.Header.ID()
+		proposalID := nextBlock.Header.ID()
 		is.T().Logf("proposal %v received from %v", proposalID, originID)
 
 		_, processed := confirmations[proposalID]
@@ -260,7 +257,7 @@ func (is *InclusionSuite) waitUntilProposalConfirmed(deadline time.Time, sentine
 		// if the parent is in the map, it is on a chain that included the
 		// guarantee; take parent confirmatians plus one as the confirmations
 		// for the follow-up block
-		n, ok := confirmations[proposal.Header.ParentID]
+		n, ok := confirmations[nextBlock.Header.ParentID]
 		if ok {
 			confirmations[proposalID] = n + 1
 			is.T().Logf("%x: collection guarantee %x confirmed! (count: %d)\n", proposalID, colID, n+1)
