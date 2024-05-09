@@ -86,6 +86,8 @@ func CreateLoadType(log zerolog.Logger, t LoadType) Load {
 		return ExecDataHeavyLoad
 	case TokenTransferLoadType:
 		return NewTokenTransferLoad()
+	case TokenTransferMultiLoadType:
+		return NewTokenTransferMultiLoad()
 	case AddKeysLoadType:
 		return NewAddKeysLoad()
 	case EVMTransferLoadType:
