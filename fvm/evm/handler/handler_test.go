@@ -17,6 +17,7 @@ import (
 	gethVM "github.com/onflow/go-ethereum/core/vm"
 	gethParams "github.com/onflow/go-ethereum/params"
 	"github.com/onflow/go-ethereum/rlp"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -46,7 +47,7 @@ func TestHandler_TransactionRunOrPanic(t *testing.T) {
 			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
 				testutils.RunWithEOATestAccount(t, backend, rootAddr, func(eoa *testutils.EOATestAccount) {
 
-					bs := handler.NewBlockStore(backend, rootAddr)
+					bs := handler.NewBlockStore(backend, rootAddr, zerolog.Nop())
 
 					aa := handler.NewAddressAllocator()
 
@@ -149,7 +150,7 @@ func TestHandler_TransactionRunOrPanic(t *testing.T) {
 		testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
 			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
 				testutils.RunWithEOATestAccount(t, backend, rootAddr, func(eoa *testutils.EOATestAccount) {
-					bs := handler.NewBlockStore(backend, rootAddr)
+					bs := handler.NewBlockStore(backend, rootAddr, zerolog.Nop())
 					aa := handler.NewAddressAllocator()
 					em := &testutils.TestEmulator{
 						RunTransactionFunc: func(tx *gethTypes.Transaction) (*types.Result, error) {
@@ -208,7 +209,7 @@ func TestHandler_TransactionRunOrPanic(t *testing.T) {
 			testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
 				testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
 					testutils.RunWithEOATestAccount(t, backend, rootAddr, func(eoa *testutils.EOATestAccount) {
-						bs := handler.NewBlockStore(backend, rootAddr)
+						bs := handler.NewBlockStore(backend, rootAddr, zerolog.Nop())
 						aa := handler.NewAddressAllocator()
 						em := &testutils.TestEmulator{
 							RunTransactionFunc: func(tx *gethTypes.Transaction) (*types.Result, error) {
@@ -448,7 +449,7 @@ func TestHandler_COA(t *testing.T) {
 		testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
 			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
 				testutils.RunWithEOATestAccount(t, backend, rootAddr, func(eoa *testutils.EOATestAccount) {
-					bs := handler.NewBlockStore(backend, rootAddr)
+					bs := handler.NewBlockStore(backend, rootAddr, zerolog.Nop())
 					aa := handler.NewAddressAllocator()
 
 					// Withdraw calls are only possible within FOA accounts
@@ -526,7 +527,7 @@ func TestHandler_COA(t *testing.T) {
 		testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
 			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
 				testutils.RunWithEOATestAccount(t, backend, rootAddr, func(eoa *testutils.EOATestAccount) {
-					bs := handler.NewBlockStore(backend, rootAddr)
+					bs := handler.NewBlockStore(backend, rootAddr, zerolog.Nop())
 					aa := handler.NewAddressAllocator()
 
 					// test non fatal error of emulator
@@ -684,7 +685,7 @@ func TestHandler_TransactionRun(t *testing.T) {
 			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
 				testutils.RunWithEOATestAccount(t, backend, rootAddr, func(eoa *testutils.EOATestAccount) {
 
-					bs := handler.NewBlockStore(backend, rootAddr)
+					bs := handler.NewBlockStore(backend, rootAddr, zerolog.Nop())
 					aa := handler.NewAddressAllocator()
 
 					result := &types.Result{
@@ -728,7 +729,7 @@ func TestHandler_TransactionRun(t *testing.T) {
 			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
 				testutils.RunWithEOATestAccount(t, backend, rootAddr, func(eoa *testutils.EOATestAccount) {
 
-					bs := handler.NewBlockStore(backend, rootAddr)
+					bs := handler.NewBlockStore(backend, rootAddr, zerolog.Nop())
 					aa := handler.NewAddressAllocator()
 
 					result := &types.Result{
@@ -773,7 +774,7 @@ func TestHandler_TransactionRun(t *testing.T) {
 		testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
 			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
 				testutils.RunWithEOATestAccount(t, backend, rootAddr, func(eoa *testutils.EOATestAccount) {
-					bs := handler.NewBlockStore(backend, rootAddr)
+					bs := handler.NewBlockStore(backend, rootAddr, zerolog.Nop())
 					aa := handler.NewAddressAllocator()
 					evmErr := fmt.Errorf("%w: next nonce %v, tx nonce %v", gethCore.ErrNonceTooLow, 1, 0)
 					em := &testutils.TestEmulator{
@@ -823,7 +824,7 @@ func TestHandler_TransactionRun(t *testing.T) {
 		testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
 			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
 				testutils.RunWithEOATestAccount(t, backend, rootAddr, func(eoa *testutils.EOATestAccount) {
-					bs := handler.NewBlockStore(backend, rootAddr)
+					bs := handler.NewBlockStore(backend, rootAddr, zerolog.Nop())
 					aa := handler.NewAddressAllocator()
 
 					gasConsumed := testutils.RandomGas(1000)
@@ -932,7 +933,7 @@ func TestHandler_TransactionRun(t *testing.T) {
 		testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
 			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
 				testutils.RunWithEOATestAccount(t, backend, rootAddr, func(eoa *testutils.EOATestAccount) {
-					bs := handler.NewBlockStore(backend, rootAddr)
+					bs := handler.NewBlockStore(backend, rootAddr, zerolog.Nop())
 					aa := handler.NewAddressAllocator()
 
 					gasConsumed := testutils.RandomGas(1000)
@@ -979,7 +980,7 @@ func TestHandler_TransactionRun(t *testing.T) {
 			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
 				testutils.RunWithEOATestAccount(t, backend, rootAddr, func(eoa *testutils.EOATestAccount) {
 
-					bs := handler.NewBlockStore(backend, rootAddr)
+					bs := handler.NewBlockStore(backend, rootAddr, zerolog.Nop())
 					aa := handler.NewAddressAllocator()
 
 					nonce := uint64(1)
@@ -1062,7 +1063,7 @@ func assertPanic(t *testing.T, check checkError, f func()) {
 }
 
 func SetupHandler(t testing.TB, backend types.Backend, rootAddr flow.Address) *handler.ContractHandler {
-	bs := handler.NewBlockStore(backend, rootAddr)
+	bs := handler.NewBlockStore(backend, rootAddr, zerolog.Nop())
 	aa := handler.NewAddressAllocator()
 	emulator := emulator.NewEmulator(backend, rootAddr)
 

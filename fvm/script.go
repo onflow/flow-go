@@ -208,6 +208,7 @@ func (executor *scriptExecutor) executeScript() error {
 			executor.env,
 			rt.ScriptRuntimeEnv,
 			sc.FlowToken.Address,
+			executor.ctx.Logger,
 		)
 		if err != nil {
 			return err

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	gethCommon "github.com/onflow/go-ethereum/common"
+	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/model/flow"
@@ -20,15 +21,17 @@ type BlockStore struct {
 	backend       types.Backend
 	rootAddress   flow.Address
 	blockProposal *types.Block
+	logger        zerolog.Logger
 }
 
 var _ types.BlockStore = &BlockStore{}
 
 // NewBlockStore constructs a new block store
-func NewBlockStore(backend types.Backend, rootAddress flow.Address) *BlockStore {
+func NewBlockStore(backend types.Backend, rootAddress flow.Address, logger zerolog.Logger) *BlockStore {
 	return &BlockStore{
 		backend:     backend,
 		rootAddress: rootAddress,
+		logger:      logger,
 	}
 }
 
@@ -117,7 +120,7 @@ func (bs *BlockStore) LatestBlock() (*types.Block, error) {
 	if err != nil {
 		return nil, types.NewFatalError(err)
 	}
-	return types.NewBlockFromBytes(data)
+	return types.NewBlockFromBytes(data, bs.logger)
 }
 
 // BlockHash returns the block hash for the last x blocks
