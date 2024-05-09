@@ -61,6 +61,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/chainsync"
+	"github.com/onflow/flow-go/module/counters"
 	"github.com/onflow/flow-go/module/execution"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	execdatacache "github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
@@ -1445,6 +1446,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 
 	ingestionDependable := module.NewProxiedReadyDoneAware()
 	builder.IndexerDependencies.Add(ingestionDependable)
+	var lastFullBlockHeight *counters.PersistentStrictMonotonicCounter
 
 	builder.
 		BuildConsensusFollower().
@@ -1619,6 +1621,20 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			builder.TxResultsIndex = index.NewTransactionResultsIndex(builder.Storage.LightTransactionResults)
 			return nil
 		}).
+		Module("processed last full block height monotonic consumer progress", func(node *cmd.NodeConfig) error {
+			rootBlockHeight := node.State.Params().FinalizedRoot().Height
+
+			var err error
+			lastFullBlockHeight, err = counters.NewPersistentStrictMonotonicCounter(
+				bstorage.NewConsumerProgress(builder.DB, module.ConsumeProgressLastFullBlockHeight),
+				rootBlockHeight,
+			)
+			if err != nil {
+				return fmt.Errorf("failed to initialize monotonic consumer progress: %w", err)
+			}
+
+			return nil
+		}).
 		Component("RPC engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			config := builder.rpcConf
 			backendConfig := config.BackendConfig
@@ -1717,9 +1733,10 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 					builder.stateStreamConf.ResponseLimit,
 					builder.stateStreamConf.ClientSendBufferSize,
 				),
-				EventsIndex:       builder.EventsIndex,
-				TxResultQueryMode: txResultQueryMode,
-				TxResultsIndex:    builder.TxResultsIndex,
+				EventsIndex:         builder.EventsIndex,
+				TxResultQueryMode:   txResultQueryMode,
+				TxResultsIndex:      builder.TxResultsIndex,
+				LastFullBlockHeight: lastFullBlockHeight,
 			})
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize backend: %w", err)
@@ -1785,6 +1802,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				node.Storage.Results,
 				node.Storage.Receipts,
 				builder.collectionExecutedMetric,
+				lastFullBlockHeight,
 			)
 			if err != nil {
 				return nil, err

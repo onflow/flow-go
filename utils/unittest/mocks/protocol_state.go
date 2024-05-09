@@ -106,6 +106,12 @@ func (ps *ProtocolState) AtHeight(height uint64) protocol.Snapshot {
 	block, ok := ps.heights[height]
 	if ok {
 		snapshot.On("Head").Return(block.Header, nil)
+		mocked := snapshot.On("Descendants")
+		mocked.RunFn = func(args mock.Arguments) {
+			pendings := pending(ps, block.Header.ID())
+			mocked.ReturnArguments = mock.Arguments{pendings, nil}
+		}
+
 	} else {
 		snapshot.On("Head").Return(nil, storage.ErrNotFound)
 	}

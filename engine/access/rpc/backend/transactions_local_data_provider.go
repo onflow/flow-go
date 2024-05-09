@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/counters"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/protocol"
@@ -49,13 +50,14 @@ type TransactionErrorMessage interface {
 
 // TransactionsLocalDataProvider provides functionality for retrieving transaction results and error messages from local storages
 type TransactionsLocalDataProvider struct {
-	state           protocol.State
-	collections     storage.Collections
-	blocks          storage.Blocks
-	eventsIndex     *index.EventsIndex
-	txResultsIndex  *index.TransactionResultsIndex
-	txErrorMessages TransactionErrorMessage
-	systemTxID      flow.Identifier
+	state               protocol.State
+	collections         storage.Collections
+	blocks              storage.Blocks
+	eventsIndex         *index.EventsIndex
+	txResultsIndex      *index.TransactionResultsIndex
+	txErrorMessages     TransactionErrorMessage
+	systemTxID          flow.Identifier
+	lastFullBlockHeight *counters.PersistentStrictMonotonicCounter
 }
 
 // GetTransactionResultFromStorage retrieves a transaction result from storage by block ID and transaction ID.
@@ -322,10 +324,7 @@ func (t *TransactionsLocalDataProvider) DeriveUnknownTransactionStatus(refBlockI
 
 	// the last full height is the height where we have received all
 	// collections  for all blocks with a lower height
-	fullHeight, err := t.blocks.GetLastFullBlockHeight()
-	if err != nil {
-		return flow.TransactionStatusUnknown, err
-	}
+	fullHeight := t.lastFullBlockHeight.Value()
 
 	// if we have received collections  for all blocks up to the expiry block, the transaction is expired
 	if isExpired(refHeight, fullHeight) {
