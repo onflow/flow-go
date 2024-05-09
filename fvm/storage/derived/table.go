@@ -77,6 +77,11 @@ type TableTransaction[TKey comparable, TVal any] struct {
 	// When isSnapshotReadTransaction is true, invalidators must be empty.
 	isSnapshotReadTransaction bool
 	invalidators              chainedTableInvalidators[TKey, TVal]
+
+	// ignoreLatestCommitExecutionTime is used to bypass latestCommitExecutionTime checks during
+	// commit. This is used when operating in caching mode with scripts since "commits" are all done
+	// at the end of the block and are not expected to progress the execution time.
+	ignoreLatestCommitExecutionTime bool
 }
 
 func NewEmptyTable[
@@ -270,6 +275,7 @@ func (table *DerivedDataTable[TKey, TVal]) commit(
 	defer table.lock.Unlock()
 
 	if !txn.isSnapshotReadTransaction &&
+		!txn.ignoreLatestCommitExecutionTime &&
 		table.latestCommitExecutionTime+1 < txn.snapshotTime {
 
 		return fmt.Errorf(
@@ -328,15 +334,17 @@ func (table *DerivedDataTable[TKey, TVal]) newTableTransaction(
 	snapshotTime logical.Time,
 	executionTime logical.Time,
 	isSnapshotReadTransaction bool,
+	ignoreLatestCommitExecutionTime bool,
 ) *TableTransaction[TKey, TVal] {
 	return &TableTransaction[TKey, TVal]{
-		table:                     table,
-		snapshotTime:              snapshotTime,
-		executionTime:             executionTime,
-		toValidateTime:            snapshotTime,
-		readSet:                   map[TKey]*invalidatableEntry[TVal]{},
-		writeSet:                  map[TKey]*invalidatableEntry[TVal]{},
-		isSnapshotReadTransaction: isSnapshotReadTransaction,
+		table:                           table,
+		snapshotTime:                    snapshotTime,
+		executionTime:                   executionTime,
+		toValidateTime:                  snapshotTime,
+		readSet:                         map[TKey]*invalidatableEntry[TVal]{},
+		writeSet:                        map[TKey]*invalidatableEntry[TVal]{},
+		isSnapshotReadTransaction:       isSnapshotReadTransaction,
+		ignoreLatestCommitExecutionTime: ignoreLatestCommitExecutionTime,
 	}
 }
 
@@ -344,6 +352,15 @@ func (table *DerivedDataTable[TKey, TVal]) NewSnapshotReadTableTransaction() *Ta
 	return table.newTableTransaction(
 		logical.EndOfBlockExecutionTime,
 		logical.EndOfBlockExecutionTime,
+		true,
+		false)
+}
+
+func (table *DerivedDataTable[TKey, TVal]) NewCachingSnapshotReadTableTransaction() *TableTransaction[TKey, TVal] {
+	return table.newTableTransaction(
+		logical.EndOfBlockExecutionTime,
+		logical.EndOfBlockExecutionTime,
+		false,
 		true)
 }
 
@@ -372,6 +389,7 @@ func (table *DerivedDataTable[TKey, TVal]) NewTableTransaction(
 	return table.newTableTransaction(
 		snapshotTime,
 		executionTime,
+		false,
 		false), nil
 }
 

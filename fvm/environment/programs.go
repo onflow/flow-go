@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/hashicorp/go-multierror"
+	"golang.org/x/xerrors"
 
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
@@ -17,6 +18,22 @@ import (
 	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/module/trace"
 )
+
+type ProgramLoadingError struct {
+	Err      error
+	Location common.Location
+}
+
+func (p ProgramLoadingError) Unwrap() error {
+	return p.Err
+}
+
+var _ error = ProgramLoadingError{}
+var _ xerrors.Wrapper = ProgramLoadingError{}
+
+func (p ProgramLoadingError) Error() string {
+	return fmt.Sprintf("error getting program %v: %s", p.Location, p.Err)
+}
 
 // Programs manages operations around cadence program parsing.
 //
@@ -126,7 +143,10 @@ func (programs *Programs) getOrLoadAddressProgram(
 		loader,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("error getting program %v: %w", location, err)
+		return nil, ProgramLoadingError{
+			Err:      err,
+			Location: location,
+		}
 	}
 
 	// Add dependencies to the stack.

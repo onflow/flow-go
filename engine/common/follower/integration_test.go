@@ -63,7 +63,8 @@ func TestFollowerHappyPath(t *testing.T) {
 			all.QuorumCertificates,
 			all.Setups,
 			all.EpochCommits,
-			all.ProtocolState,
+			all.EpochProtocolState,
+			all.ProtocolKVStore,
 			all.VersionBeacons,
 			rootSnapshot,
 		)
@@ -88,7 +89,7 @@ func TestFollowerHappyPath(t *testing.T) {
 		require.NoError(t, err)
 		rootProtocolState, err := rootSnapshot.ProtocolState()
 		require.NoError(t, err)
-		rootProtocolStateID := rootProtocolState.Entry().ID()
+		rootProtocolStateID := rootProtocolState.ID()
 
 		// Hack EFM.
 		// Since root snapshot is created with 1000 views for first epoch, we will forcefully enter EFM to avoid errors

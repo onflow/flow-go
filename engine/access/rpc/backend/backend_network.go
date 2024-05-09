@@ -14,7 +14,6 @@ import (
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
-	"github.com/onflow/flow-go/state/protocol/snapshots"
 	"github.com/onflow/flow-go/storage"
 )
 
@@ -65,16 +64,10 @@ func (b *backendNetwork) GetNodeVersionInfo(_ context.Context) (*access.NodeVers
 	}, nil
 }
 
-// GetLatestProtocolStateSnapshot returns the latest finalized snapshot
+// GetLatestProtocolStateSnapshot returns the latest finalized snapshot.
 func (b *backendNetwork) GetLatestProtocolStateSnapshot(_ context.Context) ([]byte, error) {
 	snapshot := b.state.Final()
-
-	validSnapshot, err := snapshots.GetClosestDynamicBootstrapSnapshot(b.state, snapshot, b.snapshotHistoryLimit)
-	if err != nil {
-		return nil, err
-	}
-
-	data, err := convert.SnapshotToBytes(validSnapshot)
+	data, err := convert.SnapshotToBytes(snapshot)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to convert snapshot to bytes: %v", err)
 	}
@@ -86,9 +79,7 @@ func (b *backendNetwork) GetLatestProtocolStateSnapshot(_ context.Context) ([]by
 // The requested block must be finalized, otherwise an error is returned.
 // Expected errors during normal operation:
 //   - status.Error[codes.NotFound] - No block with the given ID was found
-//   - status.Error[codes.InvalidArgument] - Block ID will never have a valid snapshot:
-//     1. A block was found, but it is not finalized and is below the finalized height, so it will never be finalized.
-//     2. A block was found, however its sealing segment spans an epoch phase transition, yielding an invalid snapshot.
+//   - status.Error[codes.InvalidArgument] - Block ID is for an orphaned block and will never have a valid snapshot
 //   - status.Error[codes.FailedPrecondition] - A block was found, but it is not finalized and is above the finalized height.
 //     The block may or may not be finalized in the future; the client can retry later.
 func (b *backendNetwork) GetProtocolStateSnapshotByBlockID(_ context.Context, blockID flow.Identifier) ([]byte, error) {
@@ -98,7 +89,6 @@ func (b *backendNetwork) GetProtocolStateSnapshotByBlockID(_ context.Context, bl
 		if errors.Is(err, state.ErrUnknownSnapshotReference) {
 			return nil, status.Errorf(codes.NotFound, "failed to get a valid snapshot: block not found")
 		}
-
 		return nil, status.Errorf(codes.Internal, "could not get header by blockID: %v", err)
 	}
 
@@ -124,21 +114,10 @@ func (b *backendNetwork) GetProtocolStateSnapshotByBlockID(_ context.Context, bl
 			"failed to retrieve snapshot for block: block not finalized and is below finalized height")
 	}
 
-	validSnapshot, err := snapshots.GetDynamicBootstrapSnapshot(b.state, snapshot)
-	if err != nil {
-		if errors.Is(err, snapshots.ErrSnapshotPhaseMismatch) {
-			return nil, status.Errorf(codes.InvalidArgument,
-				"failed to retrieve snapshot for block, try again with different block: "+
-					"%v", err)
-		}
-		return nil, status.Errorf(codes.Internal, "failed to get a valid snapshot: %v", err)
-	}
-
-	data, err := convert.SnapshotToBytes(validSnapshot)
+	data, err := convert.SnapshotToBytes(snapshot)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to convert snapshot to bytes: %v", err)
 	}
-
 	return data, nil
 }
 
@@ -147,8 +126,6 @@ func (b *backendNetwork) GetProtocolStateSnapshotByBlockID(_ context.Context, bl
 // Expected errors during normal operation:
 //   - status.Error[codes.NotFound] - No block with the given height was found.
 //     The block height may or may not be finalized in the future; the client can retry later.
-//   - status.Error[codes.InvalidArgument] - A block was found, however its sealing segment spans an epoch phase transition,
-//     yielding an invalid snapshot. Therefore we will never return a snapshot for this block height.
 func (b *backendNetwork) GetProtocolStateSnapshotByHeight(_ context.Context, blockHeight uint64) ([]byte, error) {
 	snapshot := b.state.AtHeight(blockHeight)
 	_, err := snapshot.Head()
@@ -156,24 +133,12 @@ func (b *backendNetwork) GetProtocolStateSnapshotByHeight(_ context.Context, blo
 		if errors.Is(err, state.ErrUnknownSnapshotReference) {
 			return nil, status.Errorf(codes.NotFound, "failed to find snapshot: %v", err)
 		}
-
 		return nil, status.Errorf(codes.Internal, "failed to get a valid snapshot: %v", err)
 	}
 
-	validSnapshot, err := snapshots.GetDynamicBootstrapSnapshot(b.state, snapshot)
-	if err != nil {
-		if errors.Is(err, snapshots.ErrSnapshotPhaseMismatch) {
-			return nil, status.Errorf(codes.InvalidArgument,
-				"failed to retrieve snapshot for block, try again with different block: "+
-					"%v", err)
-		}
-		return nil, status.Errorf(codes.Internal, "failed to get a valid snapshot: %v", err)
-	}
-
-	data, err := convert.SnapshotToBytes(validSnapshot)
+	data, err := convert.SnapshotToBytes(snapshot)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to convert snapshot to bytes: %v", err)
 	}
-
 	return data, nil
 }

@@ -24,7 +24,8 @@ import (
 	bcluster "github.com/onflow/flow-go/state/cluster/badger"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/inmem"
-	"github.com/onflow/flow-go/state/protocol/protocol_state"
+	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
+	protocol_state "github.com/onflow/flow-go/state/protocol/protocol_state/state"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -98,7 +99,8 @@ func NewClusterSwitchoverTestCase(t *testing.T, conf ClusterSwitchoverTestConf) 
 	commit.ClusterQCs = rootClusterQCs
 
 	seal.ResultID = result.ID()
-	root.Payload.ProtocolStateID = inmem.ProtocolStateFromEpochServiceEvents(setup, commit).ID()
+	root.Payload.ProtocolStateID = kvstore.NewDefaultKVStore(
+		inmem.ProtocolStateFromEpochServiceEvents(setup, commit).ID()).ID()
 	tc.root, err = inmem.SnapshotFromBootstrapState(root, result, seal, qc)
 	require.NoError(t, err)
 
@@ -135,7 +137,8 @@ func NewClusterSwitchoverTestCase(t *testing.T, conf ClusterSwitchoverTestConf) 
 	// take first collection node and use its storage as data source for stateMutator
 	refNode := tc.nodes[0]
 	stateMutator := protocol_state.NewMutableProtocolState(
-		refNode.ProtocolStateSnapshots,
+		refNode.EpochProtocolState,
+		refNode.ProtocolKVStore,
 		refNode.State.Params(),
 		refNode.Headers,
 		refNode.Results,
@@ -432,7 +435,7 @@ func RunTestCase(tc *ClusterSwitchoverTestCase) {
 	// build the epoch, ending on the first block on the next epoch
 	tc.builder.BuildEpoch().CompleteEpoch()
 	// build halfway through the grace period for the epoch 1 cluster
-	tc.builder.BuildBlocks(flow.DefaultTransactionExpiry / 2)
+	tc.builder.AddBlocksWithSeals(flow.DefaultTransactionExpiry/2, 1)
 
 	epoch1 := tc.State().Final().Epochs().Previous()
 	epoch2 := tc.State().Final().Epochs().Current()
@@ -463,7 +466,7 @@ func RunTestCase(tc *ClusterSwitchoverTestCase) {
 	// NOTE: this is here solely to improve test reliability, as it means that
 	// while we are waiting for a guarantee there is only one cluster consensus
 	// instance running (per node) rather than two.
-	tc.builder.BuildBlocks(flow.DefaultTransactionExpiry/2 + 1)
+	tc.builder.AddBlocksWithSeals(flow.DefaultTransactionExpiry/2+1, 1)
 
 	// wait for epoch 2 transactions to be guaranteed
 	unittest.RequireReturnsBefore(tc.T(), waitForGuarantees.Wait, tc.Timeout(), "did not receive guarantees at consensus node")
