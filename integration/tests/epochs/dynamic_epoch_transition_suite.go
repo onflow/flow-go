@@ -303,8 +303,9 @@ func (s *DynamicEpochTransitionSuite) newTestContainerOnNetwork(role flow.Role, 
 	}
 
 	nodeConfig := testnet.NewNodeConfig(role, containerConfigs...)
-	testContainerConfig := testnet.NewContainerConfig(info.ContainerName, nodeConfig, info.NetworkingKey, info.StakingKey)
-	err := testContainerConfig.WriteKeyFiles(s.net.BootstrapDir, info.MachineAccountAddress, encodable.MachineAccountPrivKey{PrivateKey: info.MachineAccountKey}, role)
+	testContainerConfig, err := testnet.NewContainerConfig(info.ContainerName, nodeConfig, info.NetworkingKey, info.StakingKey)
+	require.NoError(s.T(), err)
+	err = testContainerConfig.WriteKeyFiles(s.net.BootstrapDir, info.MachineAccountAddress, encodable.MachineAccountPrivKey{PrivateKey: info.MachineAccountKey}, role)
 	require.NoError(s.T(), err)
 
 	//add our container to the network
