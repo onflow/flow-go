@@ -1,6 +1,8 @@
 package types
 
 import (
+	"encoding/hex"
+	"fmt"
 	"math/big"
 
 	gethCommon "github.com/onflow/go-ethereum/common"
@@ -8,6 +10,7 @@ import (
 	gethCrypto "github.com/onflow/go-ethereum/crypto"
 	gethRLP "github.com/onflow/go-ethereum/rlp"
 	gethTrie "github.com/onflow/go-ethereum/trie"
+	"github.com/rs/zerolog"
 )
 
 // Block represents a evm block.
@@ -100,13 +103,20 @@ func NewBlock(
 }
 
 // NewBlockFromBytes constructs a new block from encoded data
-func NewBlockFromBytes(encoded []byte) (*Block, error) {
+func NewBlockFromBytes(encoded []byte, logger zerolog.Logger) (*Block, error) {
 	res := &Block{}
 
 	err := gethRLP.DecodeBytes(encoded, res)
 	if err != nil {
 		res = decodeBlockBreakingChanges(encoded)
 		if res == nil {
+			logger.Err(err).
+				Str("payload", hex.EncodeToString(encoded)).
+				Bytes("payload-raw", encoded).
+				Msg("failed to RLP decode EVM block")
+
+			fmt.Println("failed to RLP decode: ", hex.EncodeToString(encoded))
+
 			return nil, err
 		}
 	}

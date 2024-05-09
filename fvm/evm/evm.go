@@ -3,6 +3,7 @@ package evm
 import (
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
+	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/evm/backends"
@@ -32,6 +33,7 @@ func SetupEnvironment(
 	fvmEnv environment.Environment,
 	runtimeEnv runtime.Environment,
 	flowToken flow.Address,
+	logger zerolog.Logger,
 ) error {
 	evmStorageAccountAddress, err := StorageAccountAddress(chainID)
 	if err != nil {
@@ -49,7 +51,7 @@ func SetupEnvironment(
 
 	emulator := evm.NewEmulator(backend, evmStorageAccountAddress)
 
-	blockStore := handler.NewBlockStore(backend, evmStorageAccountAddress)
+	blockStore := handler.NewBlockStore(backend, evmStorageAccountAddress, logger)
 
 	addressAllocator := handler.NewAddressAllocator()
 

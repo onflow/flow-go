@@ -1,11 +1,12 @@
 package handler_test
 
 import (
-	gethRLP "github.com/onflow/go-ethereum/rlp"
 	"math/big"
 	"testing"
 
 	gethCommon "github.com/onflow/go-ethereum/common"
+	gethRLP "github.com/onflow/go-ethereum/rlp"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm/evm/handler"
@@ -18,7 +19,7 @@ func TestBlockStore(t *testing.T) {
 
 	testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
 		testutils.RunWithTestFlowEVMRootAddress(t, backend, func(root flow.Address) {
-			bs := handler.NewBlockStore(backend, root)
+			bs := handler.NewBlockStore(backend, root, zerolog.Nop())
 
 			// check gensis block
 			b, err := bs.LatestBlock()
@@ -81,7 +82,7 @@ func TestBlockStore_AddedTimestamp(t *testing.T) {
 	testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
 		testutils.RunWithTestFlowEVMRootAddress(t, backend, func(root flow.Address) {
 
-			bs := handler.NewBlockStore(backend, root)
+			bs := handler.NewBlockStore(backend, root, zerolog.Nop())
 
 			// block type before breaking change (no timestamp and total gas used)
 			type oldBlockV1 struct {
