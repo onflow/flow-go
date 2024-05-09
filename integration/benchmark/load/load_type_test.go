@@ -37,6 +37,10 @@ func TestLoadTypes(t *testing.T) {
 	// don't create that many accounts for the test
 	evmLoad.PreCreateEOAAccounts = 20
 
+	evmBatchLoad := load.NewEVMBatchTransferLoad(log)
+	// don't create that many accounts for the test
+	evmBatchLoad.PreCreateEOAAccounts = 20
+
 	loads := []load.Load{
 		load.CompHeavyLoad,
 		load.EventHeavyLoad,
@@ -46,6 +50,7 @@ func TestLoadTypes(t *testing.T) {
 		load.NewTokenTransferMultiLoad(),
 		load.NewAddKeysLoad(),
 		evmLoad,
+		evmBatchLoad,
 		load.NewCreateAccountLoad(),
 	}
 
