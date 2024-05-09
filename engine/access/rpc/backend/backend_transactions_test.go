@@ -913,12 +913,6 @@ func (suite *Suite) TestGetSystemTransactionResult_HappyPath() {
 	})
 }
 
-// TestGetSystemTransactionResultFromStorage tests that GetSystemTransactionResult call
-// returns system transaction result for required block id from the cache.
-//
-// How it is tested: In case of cache hit, GetSystemTransactionResult doesn't
-// reach out to the execution nodes and returns early, so we check how
-// many times we do reach execution nodes
 func (suite *Suite) TestGetSystemTransactionResultFromStorage() {
 	// Create fixtures for block, transaction, and collection
 	block := unittest.BlockFixture()
