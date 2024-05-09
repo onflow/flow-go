@@ -24,14 +24,14 @@ func TestEntityExpirySnapshotValidation(t *testing.T) {
 	})
 	t.Run("not-enough-history", func(t *testing.T) {
 		rootSnapshot := unittest.RootSnapshotFixture(participants)
-		rootSnapshot.Encodable().Head.Height += 10 // advance height to be not spork root snapshot
+		rootSnapshot.Encodable().GetHead().Height += 10 // advance height to be not spork root snapshot
 		err := ValidRootSnapshotContainsEntityExpiryRange(rootSnapshot)
 		require.Error(t, err)
 	})
 	t.Run("enough-history-spork-just-started", func(t *testing.T) {
 		rootSnapshot := unittest.RootSnapshotFixture(participants)
 		// advance height to be not spork root snapshot, but still lower than transaction expiry
-		rootSnapshot.Encodable().Head.Height += flow.DefaultTransactionExpiry / 2
+		rootSnapshot.Encodable().GetHead().Height += flow.DefaultTransactionExpiry / 2
 		// add blocks to sealing segment
 		rootSnapshot.Encodable().SealingSegment.ExtraBlocks = unittest.BlockFixtures(int(flow.DefaultTransactionExpiry / 2))
 		err := ValidRootSnapshotContainsEntityExpiryRange(rootSnapshot)
@@ -40,7 +40,7 @@ func TestEntityExpirySnapshotValidation(t *testing.T) {
 	t.Run("enough-history-long-spork", func(t *testing.T) {
 		rootSnapshot := unittest.RootSnapshotFixture(participants)
 		// advance height to be not spork root snapshot
-		rootSnapshot.Encodable().Head.Height += flow.DefaultTransactionExpiry * 2
+		rootSnapshot.Encodable().GetHead().Height += flow.DefaultTransactionExpiry * 2
 		// add blocks to sealing segment
 		rootSnapshot.Encodable().SealingSegment.ExtraBlocks = unittest.BlockFixtures(int(flow.DefaultTransactionExpiry) - 1)
 		err := ValidRootSnapshotContainsEntityExpiryRange(rootSnapshot)
@@ -49,7 +49,7 @@ func TestEntityExpirySnapshotValidation(t *testing.T) {
 	t.Run("more-history-than-needed", func(t *testing.T) {
 		rootSnapshot := unittest.RootSnapshotFixture(participants)
 		// advance height to be not spork root snapshot
-		rootSnapshot.Encodable().Head.Height += flow.DefaultTransactionExpiry * 2
+		rootSnapshot.Encodable().GetHead().Height += flow.DefaultTransactionExpiry * 2
 		// add blocks to sealing segment
 		rootSnapshot.Encodable().SealingSegment.ExtraBlocks = unittest.BlockFixtures(flow.DefaultTransactionExpiry * 2)
 		err := ValidRootSnapshotContainsEntityExpiryRange(rootSnapshot)

@@ -20,7 +20,7 @@ type Snapshot struct {
 var _ protocol.Snapshot = (*Snapshot)(nil)
 
 func (s Snapshot) Head() (*flow.Header, error) {
-	return s.enc.Head, nil
+	return s.enc.GetHead(), nil
 }
 
 func (s Snapshot) QuorumCertificate() (*flow.QuorumCertificate, error) {

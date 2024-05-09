@@ -17,12 +17,12 @@ type EncodableSnapshot struct {
 	SealedVersionBeacon *flow.SealedVersionBeacon
 }
 
-func (snap EncodableSnapshot) getHead() *flow.Header {
+func (snap EncodableSnapshot) GetHead() *flow.Header {
 	return snap.SealingSegment.Highest().Header
 }
 
 func (snap EncodableSnapshot) getLatestSeal() *flow.Seal {
-	head := snap.getHead()
+	head := snap.GetHead()
 	latestSealID := snap.SealingSegment.LatestSeals[head.ID()]
 	_ = latestSealID
 	// iterate backward through payloads of snap.SealingSegment.Blocks
