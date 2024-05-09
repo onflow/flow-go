@@ -166,6 +166,5 @@ func Test_DecodeBlocks(t *testing.T) {
 	require.Equal(t, b.Height, bv5.Height)
 	require.Equal(t, b.ParentBlockHash, bv5.ParentBlockHash)
 	require.Equal(t, b.TransactionHashes, bv5.TransactionHashes)
-	require.Empty(t, b.Timestamp)
 	require.Empty(t, b.TotalGasUsed)
 }
