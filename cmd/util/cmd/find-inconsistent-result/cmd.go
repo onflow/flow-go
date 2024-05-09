@@ -146,7 +146,14 @@ func (c *checker) CompareAtHeight(height uint64) (bool, error) {
 		return false, fmt.Errorf("could not find sealed result for block %v: %w", blockID, err)
 	}
 
-	return ownResultID == sealedResultID, nil
+	match := ownResultID == sealedResultID
+	if match {
+		fmt.Printf("height %v match: result %v\n", height, ownResultID)
+	} else {
+		fmt.Printf("height %v mismatch: own %v, sealed %v\n", height, ownResultID, sealedResultID)
+	}
+
+	return match, nil
 }
 
 func findRootBlockHeight(state protocol.State) (uint64, error) {
