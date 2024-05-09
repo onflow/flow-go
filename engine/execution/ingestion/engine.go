@@ -207,7 +207,7 @@ func (e *Engine) BlockProcessable(b *flow.Header, _ *flow.QuorumCertificate) {
 
 	// skip if stopControl tells to skip, so that we can avoid fetching collections
 	// for this block
-	if !e.stopControl.ShouldExecuteBlock(b) {
+	if !e.stopControl.ShouldExecuteBlock(b.ID(), b.Height) {
 		return
 	}
 
@@ -366,7 +366,7 @@ func (e *Engine) executeBlock(
 ) {
 
 	// don't execute the block if the stop control says no
-	if !e.stopControl.ShouldExecuteBlock(executableBlock.Block.Header) {
+	if !e.stopControl.ShouldExecuteBlock(executableBlock.Block.Header.ID(), executableBlock.Block.Header.Height) {
 		return
 	}
 
