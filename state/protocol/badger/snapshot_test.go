@@ -40,7 +40,7 @@ func TestUnknownReferenceBlock(t *testing.T) {
 
 	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
 		// build some finalized non-root blocks (heights 101-110)
-		head := unittest.BlockWithParentFixture(rootSnapshot.Encodable().GetHead())
+		head := unittest.BlockWithParentFixture(rootSnapshot.Encodable().Head())
 		head.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
 		buildFinalizedBlock(t, state, head)
 

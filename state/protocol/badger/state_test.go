@@ -180,7 +180,7 @@ func TestBootstrap_EpochHeightBoundaries(t *testing.T) {
 	t.Parallel()
 	// start with a regular post-spork root snapshot
 	rootSnapshot := unittest.RootSnapshotFixture(unittest.CompleteIdentitySet())
-	epoch1FirstHeight := rootSnapshot.Encodable().GetHead().Height
+	epoch1FirstHeight := rootSnapshot.Encodable().Head().Height
 
 	// For the spork root snapshot, only the first height of the root epoch should be indexed.
 	// [x]

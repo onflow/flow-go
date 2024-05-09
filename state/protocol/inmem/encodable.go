@@ -8,7 +8,6 @@ import (
 
 // EncodableSnapshot is the encoding format for protocol.Snapshot
 type EncodableSnapshot struct {
-	Head                *flow.Header
 	LatestSeal          *flow.Seal            // TODO replace with same info from sealing segment
 	LatestResult        *flow.ExecutionResult // TODO replace with same info from sealing segment
 	SealingSegment      *flow.SealingSegment
@@ -17,12 +16,13 @@ type EncodableSnapshot struct {
 	SealedVersionBeacon *flow.SealedVersionBeacon
 }
 
-func (snap EncodableSnapshot) GetHead() *flow.Header {
+// Head returns the latest finalized header of the Snapshot.
+func (snap EncodableSnapshot) Head() *flow.Header {
 	return snap.SealingSegment.Highest().Header
 }
 
 func (snap EncodableSnapshot) getLatestSeal() *flow.Seal {
-	head := snap.GetHead()
+	head := snap.Head()
 	latestSealID := snap.SealingSegment.LatestSeals[head.ID()]
 	_ = latestSealID
 	// iterate backward through payloads of snap.SealingSegment.Blocks
