@@ -36,6 +36,8 @@ var (
 	fvmFailureErr = fvmerrors.NewCodedFailure(fvmerrors.FailureCodeBlockFinderFailure, "fvm error")
 	ctxCancelErr  = fvmerrors.NewCodedError(fvmerrors.ErrCodeScriptExecutionCancelledError, "context canceled error")
 	timeoutErr    = fvmerrors.NewCodedError(fvmerrors.ErrCodeScriptExecutionTimedOutError, "timeout error")
+	compLimitErr  = fvmerrors.NewCodedError(fvmerrors.ErrCodeComputationLimitExceededError, "computation limit exceeded error")
+	memLimitErr   = fvmerrors.NewCodedError(fvmerrors.ErrCodeMemoryLimitExceededError, "memory limit exceeded error")
 )
 
 // Create a suite similar to GetAccount that covers each of the modes
@@ -291,6 +293,8 @@ func (s *BackendScriptsSuite) TestExecuteScriptWithFailover_HappyPath() {
 		storage.ErrNotFound,
 		fmt.Errorf("system error"),
 		fvmFailureErr,
+		compLimitErr,
+		memLimitErr,
 	}
 
 	s.setupExecutionNodes(s.block)

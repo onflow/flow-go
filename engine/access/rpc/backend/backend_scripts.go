@@ -346,6 +346,12 @@ func convertScriptExecutionError(err error, height uint64) error {
 		case fvmerrors.ErrCodeScriptExecutionTimedOutError:
 			return status.Errorf(codes.DeadlineExceeded, "script execution timed out: %v", err)
 
+		case fvmerrors.ErrCodeComputationLimitExceededError:
+			return status.Errorf(codes.ResourceExhausted, "script execution computation limit exceeded: %v", err)
+
+		case fvmerrors.ErrCodeMemoryLimitExceededError:
+			return status.Errorf(codes.ResourceExhausted, "script execution memory limit exceeded: %v", err)
+
 		default:
 			// runtime errors
 			return status.Errorf(codes.InvalidArgument, "failed to execute script: %v", err)
