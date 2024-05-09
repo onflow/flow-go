@@ -1,10 +1,12 @@
 package load
 
 import (
-	"github.com/onflow/cadence"
-	"github.com/onflow/flow-go/model/flow"
-	"github.com/rs/zerolog"
 	"sync"
+
+	"github.com/onflow/cadence"
+	"github.com/rs/zerolog"
+
+	"github.com/onflow/flow-go/model/flow"
 
 	flowsdk "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
