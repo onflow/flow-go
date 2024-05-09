@@ -8,8 +8,6 @@ import (
 
 // EncodableSnapshot is the encoding format for protocol.Snapshot
 type EncodableSnapshot struct {
-	LatestSeal          *flow.Seal            // TODO replace with same info from sealing segment
-	LatestResult        *flow.ExecutionResult // TODO replace with same info from sealing segment
 	SealingSegment      *flow.SealingSegment
 	QuorumCertificate   *flow.QuorumCertificate
 	Params              EncodableParams
@@ -23,10 +21,10 @@ func (snap EncodableSnapshot) Head() *flow.Header {
 	return snap.SealingSegment.Highest().Header
 }
 
-// GetLatestSeal returns the latest seal of the Snapshot. This is the seal
+// LatestSeal returns the latest seal of the Snapshot. This is the seal
 // for the block with the greatest height, of all seals in the Snapshot.
 // The EncodableSnapshot receiver must be correctly formed.
-func (snap EncodableSnapshot) GetLatestSeal() *flow.Seal {
+func (snap EncodableSnapshot) LatestSeal() *flow.Seal {
 	// CASE 1: In the case of a spork root, the single block of the sealing
 	// segment is sealed by protocol definition by `FirstSeal`.
 	if snap.SealingSegment.IsSporkRoot() {
@@ -56,22 +54,23 @@ func (snap EncodableSnapshot) GetLatestSeal() *flow.Seal {
 	panic("unreachable for correctly formatted sealing segments")
 }
 
-// GetLatestResult returns the latest sealed result of the Snapshot.
-// This is the result which is sealed by LatestSeal.
+// LatestSealedResult returns the latest sealed result of the Snapshot. This is the result which is sealed by LatestSeal.
 // The EncodableSnapshot receiver must be correctly formed.
-func (snap EncodableSnapshot) GetLatestResult() *flow.ExecutionResult {
-	latestSeal := snap.GetLatestSeal()
+func (snap EncodableSnapshot) LatestSealedResult() *flow.ExecutionResult {
+	latestSeal := snap.LatestSeal()
 
-	for _, result := range snap.SealingSegment.ExecutionResults {
-		if latestSeal.ResultID == result.ID() {
-			return result
-		}
-	}
+	// For both spork root and mid-spork snapshots, the latest sealing result must
+	// either appear in a block payload or in the ExecutionResults field.
 	for _, block := range snap.SealingSegment.Blocks {
 		for _, result := range block.Payload.Results {
 			if latestSeal.ResultID == result.ID() {
 				return result
 			}
+		}
+	}
+	for _, result := range snap.SealingSegment.ExecutionResults {
+		if latestSeal.ResultID == result.ID() {
+			return result
 		}
 	}
 	// Correctly formatted sealing segments must contain latest result.
