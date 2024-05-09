@@ -1256,7 +1256,7 @@ func (h *Handler) blockHeaderResponse(header *flow.Header, status flow.BlockStat
 
 // buildMetadataResponse builds and returns the metadata response object.
 // Expected error returns during normal operations:
-// - codes.Internal if it is impossible to get highest indexed height from indexer.
+// - codes.Internal if an error is encountered getting the highest indexed height from indexer.
 func (h *Handler) buildMetadataResponse() (*entities.Metadata, error) {
 	lastFinalizedHeader := h.finalizedHeaderCache.Get()
 	blockId := lastFinalizedHeader.ID()
