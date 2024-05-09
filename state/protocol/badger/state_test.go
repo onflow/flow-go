@@ -609,7 +609,7 @@ func TestBootstrap_SealMismatch(t *testing.T) {
 		rootSnapshot := unittest.RootSnapshotFixture(unittest.CompleteIdentitySet())
 		// convert to encodable to easily modify snapshot
 		encodable := rootSnapshot.Encodable()
-		encodable.LatestSeal.BlockID = unittest.IdentifierFixture()
+		encodable.GetLatestSeal().BlockID = unittest.IdentifierFixture()
 
 		bootstrap(t, rootSnapshot, func(state *bprotocol.State, err error) {
 			assert.Error(t, err)
@@ -620,7 +620,7 @@ func TestBootstrap_SealMismatch(t *testing.T) {
 		rootSnapshot := unittest.RootSnapshotFixture(unittest.CompleteIdentitySet())
 		// convert to encodable to easily modify snapshot
 		encodable := rootSnapshot.Encodable()
-		encodable.LatestResult.BlockID = unittest.IdentifierFixture()
+		encodable.GetLatestResult().BlockID = unittest.IdentifierFixture()
 
 		bootstrap(t, rootSnapshot, func(state *bprotocol.State, err error) {
 			assert.Error(t, err)
@@ -631,7 +631,7 @@ func TestBootstrap_SealMismatch(t *testing.T) {
 		rootSnapshot := unittest.RootSnapshotFixture(unittest.CompleteIdentitySet())
 		// convert to encodable to easily modify snapshot
 		encodable := rootSnapshot.Encodable()
-		encodable.LatestSeal.ResultID = unittest.IdentifierFixture()
+		encodable.GetLatestSeal().ResultID = unittest.IdentifierFixture()
 
 		bootstrap(t, rootSnapshot, func(state *bprotocol.State, err error) {
 			assert.Error(t, err)

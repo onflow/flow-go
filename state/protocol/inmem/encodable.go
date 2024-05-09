@@ -16,26 +16,66 @@ type EncodableSnapshot struct {
 	SealedVersionBeacon *flow.SealedVersionBeacon
 }
 
-// Head returns the latest finalized header of the Snapshot.
+// Head returns the latest finalized header of the Snapshot, which is the block
+// in the sealing segment with the greatest Height.
+// The EncodableSnapshot receiver must be correctly formed.
 func (snap EncodableSnapshot) Head() *flow.Header {
 	return snap.SealingSegment.Highest().Header
 }
 
-func (snap EncodableSnapshot) getLatestSeal() *flow.Seal {
+// GetLatestSeal returns the latest seal of the Snapshot. This is the seal
+// for the block with the greatest height, of all seals in the Snapshot.
+// The EncodableSnapshot receiver must be correctly formed.
+func (snap EncodableSnapshot) GetLatestSeal() *flow.Seal {
+	// CASE 1: In the case of a spork root, the single block of the sealing
+	// segment is sealed by protocol definition by `FirstSeal`.
+	if snap.SealingSegment.IsSporkRoot() {
+		return snap.SealingSegment.FirstSeal
+	}
+
 	head := snap.Head()
 	latestSealID := snap.SealingSegment.LatestSeals[head.ID()]
-	_ = latestSealID
-	// iterate backward through payloads of snap.SealingSegment.Blocks
-	// search for seal with matching ID
-	return nil
+
+	// CASE 2: For a mid-spork root snapshot, there are multiple blocks in the sealing segment.
+	// Since seals are included in increasing height order, the latest seal must be in the
+	// first block (by height descending) which contains any seals.
+	for i := len(snap.SealingSegment.Blocks) - 1; i >= 0; i-- {
+		block := snap.SealingSegment.Blocks[i]
+		for _, seal := range block.Payload.Seals {
+			if seal.ID() == latestSealID {
+				return seal
+			}
+		}
+		if len(block.Payload.Seals) > 0 {
+			// We encountered a block with some seals, but not the latest seal.
+			// This can only occur in a structurally invalid SealingSegment.
+			panic("sanity check failed: no latest seal")
+		}
+	}
+	// Correctly formatted sealing segments must contain latest seal.
+	panic("unreachable for correctly formatted sealing segments")
 }
 
-func (snap EncodableSnapshot) getLatestResult() *flow.ExecutionResult {
-	latestSeal := snap.getLatestSeal()
-	_ = latestSeal
-	// iterate backward through payloads of snap.SealingSegment.Blocks
-	// search for result with ID matching latestSeal.ResultID
-	return nil
+// GetLatestResult returns the latest sealed result of the Snapshot.
+// This is the result which is sealed by LatestSeal.
+// The EncodableSnapshot receiver must be correctly formed.
+func (snap EncodableSnapshot) GetLatestResult() *flow.ExecutionResult {
+	latestSeal := snap.GetLatestSeal()
+
+	for _, result := range snap.SealingSegment.ExecutionResults {
+		if latestSeal.ResultID == result.ID() {
+			return result
+		}
+	}
+	for _, block := range snap.SealingSegment.Blocks {
+		for _, result := range block.Payload.Results {
+			if latestSeal.ResultID == result.ID() {
+				return result
+			}
+		}
+	}
+	// Correctly formatted sealing segments must contain latest result.
+	panic("unreachable for correctly formatted sealing segments")
 }
 
 // EncodableDKG is the encoding format for protocol.DKG

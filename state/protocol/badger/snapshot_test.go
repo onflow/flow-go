@@ -808,7 +808,7 @@ func TestSealingSegment_FailureCases(t *testing.T) {
 	// Here, we want to specifically test correct handling of the edge case, where a block exists in storage
 	// that has _lower height_ than the node's local root block. Such blocks are typically contained in the
 	// bootstrapping data, such that all entities referenced in the local root block can be resolved.
-	// Is is possible to retrieve blocks that are lower than the local root block from storage, directly
+	// It is possible to retrieve blocks that are lower than the local root block from storage, directly
 	// via their ID. Despite these blocks existing in storage, SealingSegment construction should be
 	// because the known history is potentially insufficient when going below the root block.
 	t.Run("sealing segment from block below local state root", func(t *testing.T) {

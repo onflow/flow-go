@@ -23,10 +23,6 @@ func FromSnapshot(from protocol.Snapshot) (*Snapshot, error) {
 	)
 
 	// convert top-level fields
-	snap.LatestResult, snap.LatestSeal, err = from.SealedResult()
-	if err != nil {
-		return nil, fmt.Errorf("could not get seal: %w", err)
-	}
 	snap.SealingSegment, err = from.SealingSegment()
 	if err != nil {
 		return nil, fmt.Errorf("could not get sealing segment: %w", err)
@@ -213,8 +209,6 @@ func SnapshotFromBootstrapStateWithParams(
 	}
 
 	snap := SnapshotFromEncodable(EncodableSnapshot{
-		LatestSeal:   seal,
-		LatestResult: result,
 		SealingSegment: &flow.SealingSegment{
 			Blocks:           []*flow.Block{root},
 			ExecutionResults: flow.ExecutionResultList{result},
