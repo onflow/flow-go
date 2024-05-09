@@ -247,7 +247,7 @@ func (s *Suite) TestOnFinalizedBlockSingle() {
 	clusterCommittee := unittest.IdentityListFixture(32 * 4).Filter(filter.HasRole[flow.Identity](flow.RoleCollection)).ToSkeleton()
 	cluster.On("Members").Return(clusterCommittee, nil)
 
-	irrecoverableCtx, _ := irrecoverable.WithSignaler(s.ctx)
+	irrecoverableCtx := irrecoverable.NewMockSignalerContext(s.T(), s.ctx)
 	eng := s.initIngestionEngine(irrecoverableCtx)
 
 	lastFinalizedHeight := s.finalizedBlock.Height
@@ -317,7 +317,7 @@ func (s *Suite) TestOnFinalizedBlockSeveralBlocksAhead() {
 	lastFinalizedHeight := s.finalizedBlock.Height
 	s.blocks.On("GetLastFullBlockHeight").Return(lastFinalizedHeight, nil).Maybe()
 
-	irrecoverableCtx, _ := irrecoverable.WithSignaler(s.ctx)
+	irrecoverableCtx := irrecoverable.NewMockSignalerContext(s.T(), s.ctx)
 	eng := s.initIngestionEngine(irrecoverableCtx)
 
 	blkCnt := 3
@@ -376,7 +376,7 @@ func (s *Suite) TestOnFinalizedBlockSeveralBlocksAhead() {
 
 // TestOnCollection checks that when a Collection is received, it is persisted
 func (s *Suite) TestOnCollection() {
-	irrecoverableCtx, _ := irrecoverable.WithSignaler(s.ctx)
+	irrecoverableCtx := irrecoverable.NewMockSignalerContext(s.T(), s.ctx)
 	s.initIngestionEngine(irrecoverableCtx)
 
 	collection := unittest.CollectionFixture(5)
@@ -408,7 +408,7 @@ func (s *Suite) TestOnCollection() {
 
 // TestExecutionReceiptsAreIndexed checks that execution receipts are properly indexed
 func (s *Suite) TestExecutionReceiptsAreIndexed() {
-	irrecoverableCtx, _ := irrecoverable.WithSignaler(s.ctx)
+	irrecoverableCtx := irrecoverable.NewMockSignalerContext(s.T(), s.ctx)
 	eng := s.initIngestionEngine(irrecoverableCtx)
 
 	originID := unittest.IdentifierFixture()
@@ -458,7 +458,7 @@ func (s *Suite) TestExecutionReceiptsAreIndexed() {
 // TestOnCollectionDuplicate checks that when a duplicate collection is received, the node doesn't
 // crash but just ignores its transactions.
 func (s *Suite) TestOnCollectionDuplicate() {
-	irrecoverableCtx, _ := irrecoverable.WithSignaler(s.ctx)
+	irrecoverableCtx := irrecoverable.NewMockSignalerContext(s.T(), s.ctx)
 	s.initIngestionEngine(irrecoverableCtx)
 
 	collection := unittest.CollectionFixture(5)
@@ -490,7 +490,7 @@ func (s *Suite) TestOnCollectionDuplicate() {
 
 // TestRequestMissingCollections tests that the all missing collections are requested on the call to requestMissingCollections
 func (s *Suite) TestRequestMissingCollections() {
-	irrecoverableCtx, _ := irrecoverable.WithSignaler(s.ctx)
+	irrecoverableCtx := irrecoverable.NewMockSignalerContext(s.T(), s.ctx)
 	eng := s.initIngestionEngine(irrecoverableCtx)
 
 	blkCnt := 3
@@ -621,7 +621,7 @@ func (s *Suite) TestRequestMissingCollections() {
 // function calls keep the FullBlockIndex up-to-date and request collections if blocks with missing
 // collections exceed the threshold.
 func (s *Suite) TestProcessBackgroundCalls() {
-	irrecoverableCtx, _ := irrecoverable.WithSignaler(s.ctx)
+	irrecoverableCtx := irrecoverable.NewMockSignalerContext(s.T(), s.ctx)
 	eng := s.initIngestionEngine(irrecoverableCtx)
 
 	blkCnt := 3
@@ -802,7 +802,7 @@ func (s *Suite) TestProcessBackgroundCalls() {
 }
 
 func (s *Suite) TestComponentShutdown() {
-	irrecoverableCtx, _ := irrecoverable.WithSignaler(s.ctx)
+	irrecoverableCtx := irrecoverable.NewMockSignalerContext(s.T(), s.ctx)
 	eng := s.initIngestionEngine(irrecoverableCtx)
 
 	// start then shut down the engine
