@@ -52,7 +52,7 @@ func (s *EpochStateMachineSuite) SetupTest() {
 	s.globalParams = protocolmock.NewGlobalParams(s.T())
 	s.globalParams.On("EpochCommitSafetyThreshold").Return(uint64(1_000))
 	s.parentState = protocolmock.NewKVStoreReader(s.T())
-	s.parentEpochState = unittest.ProtocolStateFixture()
+	s.parentEpochState = unittest.EpochStateFixture()
 	s.mutator = protocol_statemock.NewKVStoreMutator(s.T())
 	s.candidate = unittest.BlockHeaderFixture(unittest.HeaderWithView(s.parentEpochState.CurrentEpochSetup.FirstView + 1))
 	s.happyPathStateMachine = mock.NewStateMachine(s.T())
@@ -104,14 +104,12 @@ func (s *EpochStateMachineSuite) TestBuild_NoChanges() {
 	s.epochStateDB.On("Index", s.candidate.ID(), s.parentEpochState.ID()).Return(indexTxDeferredUpdate.Execute, nil).Once()
 	s.mutator.On("SetEpochStateID", s.parentEpochState.ID()).Return(nil).Once()
 
-	dbUpdates := s.stateMachine.Build()
-	// in next loop we assert that we have received expected deferred db updates by executing them
-	// and expecting that corresponding mock methods will be called
-	tx := &transaction.Tx{}
-	for _, dbUpdate := range dbUpdates.Decorate(s.candidate.ID()) {
-		err := dbUpdate(tx)
-		require.NoError(s.T(), err)
-	}
+	dbUpdates, err := s.stateMachine.Build()
+	require.NoError(s.T(), err)
+	// Provide the blockID and execute the resulting `DeferredDBUpdate`. Thereby,
+	// the expected mock methods should be called, which is asserted by the testify framework
+	err = dbUpdates.Pending().WithBlock(s.candidate.ID())(&transaction.Tx{})
+	require.NoError(s.T(), err)
 }
 
 // TestBuild_HappyPath tests that hierarchical epoch state machine maintains index of epoch states and commits
@@ -119,7 +117,7 @@ func (s *EpochStateMachineSuite) TestBuild_NoChanges() {
 // This test also ensures that updated state ID is committed in the KV store.
 func (s *EpochStateMachineSuite) TestBuild_HappyPath() {
 	s.happyPathStateMachine.On("ParentState").Return(s.parentEpochState)
-	updatedState := unittest.ProtocolStateFixture().ProtocolStateEntry
+	updatedState := unittest.EpochStateFixture().ProtocolStateEntry
 	updatedStateID := updatedState.ID()
 	s.happyPathStateMachine.On("Build").Return(updatedState, updatedStateID, true).Once()
 
@@ -153,14 +151,12 @@ func (s *EpochStateMachineSuite) TestBuild_HappyPath() {
 	s.epochStateDB.On("StoreTx", updatedStateID, updatedState).Return(storeTxDeferredUpdate.Execute, nil).Once()
 	s.mutator.On("SetEpochStateID", updatedStateID).Return(nil).Once()
 
-	dbUpdates := s.stateMachine.Build()
-	// in next loop we assert that we have received expected deferred db updates by executing them
-	// and expecting that corresponding mock methods will be called
-	tx := &transaction.Tx{}
-	for _, dbUpdate := range dbUpdates.Decorate(s.candidate.ID()) {
-		err := dbUpdate(tx)
-		require.NoError(s.T(), err)
-	}
+	dbUpdates, err := s.stateMachine.Build()
+	require.NoError(s.T(), err)
+	// Provide the blockID and execute the resulting `DeferredDBUpdate`. Thereby,
+	// the expected mock methods should be called, which is asserted by the testify framework
+	err = dbUpdates.Pending().WithBlock(s.candidate.ID())(&transaction.Tx{})
+	require.NoError(s.T(), err)
 }
 
 // TestEpochStateMachine_Constructor tests the behavior of the EpochStateMachine constructor.
@@ -225,7 +221,7 @@ func (s *EpochStateMachineSuite) TestEpochStateMachine_Constructor() {
 	})
 
 	s.Run("EpochSetup phase", func() {
-		s.parentEpochState = unittest.ProtocolStateFixture(unittest.WithNextEpochProtocolState())
+		s.parentEpochState = unittest.EpochStateFixture(unittest.WithNextEpochProtocolState())
 		s.parentEpochState.NextEpochCommit = nil
 		s.parentEpochState.NextEpoch.CommitID = flow.ZeroID
 
@@ -283,7 +279,7 @@ func (s *EpochStateMachineSuite) TestEpochStateMachine_Constructor() {
 	})
 
 	s.Run("EpochCommitted phase", func() {
-		s.parentEpochState = unittest.ProtocolStateFixture(unittest.WithNextEpochProtocolState())
+		s.parentEpochState = unittest.EpochStateFixture(unittest.WithNextEpochProtocolState())
 		// Since we are before the epoch commitment deadline, we should instantiate a happy-path state machine
 		s.Run("before commitment deadline", func() {
 			happyPathStateMachineFactory := mock.NewStateMachineFactoryMethod(s.T())
@@ -483,7 +479,7 @@ func (s *EpochStateMachineSuite) TestEvolveState_InvalidEpochCommit() {
 // TestEvolveStateTransitionToNextEpoch tests that EpochStateMachine transitions to the next epoch
 // when the epoch has been committed, and we are at the first block of the next epoch.
 func (s *EpochStateMachineSuite) TestEvolveStateTransitionToNextEpoch() {
-	parentState := unittest.ProtocolStateFixture(unittest.WithNextEpochProtocolState())
+	parentState := unittest.EpochStateFixture(unittest.WithNextEpochProtocolState())
 	s.happyPathStateMachine.On("ParentState").Unset()
 	s.happyPathStateMachine.On("ParentState").Return(parentState)
 	// we are at the first block of the next epoch
@@ -496,7 +492,7 @@ func (s *EpochStateMachineSuite) TestEvolveStateTransitionToNextEpoch() {
 // TestEvolveStateTransitionToNextEpoch_Error tests that error that has been
 // observed when transitioning to the next epoch and propagated to the caller.
 func (s *EpochStateMachineSuite) TestEvolveStateTransitionToNextEpoch_Error() {
-	parentState := unittest.ProtocolStateFixture(unittest.WithNextEpochProtocolState())
+	parentState := unittest.EpochStateFixture(unittest.WithNextEpochProtocolState())
 	s.happyPathStateMachine.On("ParentState").Unset()
 	s.happyPathStateMachine.On("ParentState").Return(parentState)
 	// we are at the first block of the next epoch
@@ -513,5 +509,52 @@ func (s *EpochStateMachineSuite) TestEvolveState_EventsAreFiltered() {
 	err := s.stateMachine.EvolveState([]flow.ServiceEvent{
 		unittest.ProtocolStateVersionUpgradeFixture().ServiceEvent(),
 	})
+	require.NoError(s.T(), err)
+}
+
+// TestEvolveStateTransitionToNextEpoch_WithInvalidStateTransition tests that EpochStateMachine transitions to the next epoch
+// if an invalid state transition has been detected in a block which triggers transitioning to the next epoch.
+// In such situation, we still need to enter the next epoch (because it has already been committed), but persist in the
+// state that we have entered Epoch fallback mode (`flow.ProtocolStateEntry.InvalidEpochTransitionAttempted` is set to `true`).
+// This test ensures that we don't drop previously committed next epoch.
+func (s *EpochStateMachineSuite) TestEvolveStateTransitionToNextEpoch_WithInvalidStateTransition() {
+	unittest.SkipUnless(s.T(), unittest.TEST_TODO,
+		"This test is broken with current implementation but must pass when EFM recovery has been implemented."+
+			"See for details https://github.com/onflow/flow-go/issues/5631.")
+	s.parentEpochState = unittest.EpochStateFixture(unittest.WithNextEpochProtocolState())
+	s.candidate.View = s.parentEpochState.NextEpochSetup.FirstView
+	stateMachine, err := epochs.NewEpochStateMachineFactory(
+		s.globalParams,
+		s.setupsDB,
+		s.commitsDB,
+		s.epochStateDB,
+	).Create(s.candidate.View, s.candidate.ParentID, s.parentState, s.mutator)
+	require.NoError(s.T(), err)
+
+	invalidServiceEvent := unittest.EpochSetupFixture()
+	err = stateMachine.EvolveState([]flow.ServiceEvent{invalidServiceEvent.ServiceEvent()})
+	require.NoError(s.T(), err)
+
+	indexTxDeferredUpdate := storagemock.NewDeferredDBUpdate(s.T())
+	indexTxDeferredUpdate.On("Execute", mocks.Anything).Return(nil).Once()
+	s.epochStateDB.On("Index", s.candidate.ID(), mocks.Anything).Return(indexTxDeferredUpdate.Execute, nil).Once()
+
+	expectedEpochState := &flow.ProtocolStateEntry{
+		PreviousEpoch:                   s.parentEpochState.CurrentEpoch.Copy(),
+		CurrentEpoch:                    *s.parentEpochState.NextEpoch.Copy(),
+		NextEpoch:                       nil,
+		InvalidEpochTransitionAttempted: true,
+	}
+
+	storeTxDeferredUpdate := storagemock.NewDeferredDBUpdate(s.T())
+	storeTxDeferredUpdate.On("Execute", mocks.Anything).Return(nil).Once()
+	s.epochStateDB.On("StoreTx", expectedEpochState.ID(), expectedEpochState).Return(storeTxDeferredUpdate.Execute, nil).Once()
+	s.mutator.On("SetEpochStateID", expectedEpochState.ID()).Return().Once()
+
+	dbOps, err := stateMachine.Build()
+	require.NoError(s.T(), err)
+	// Provide the blockID and execute the resulting `DeferredDBUpdate`. Thereby,
+	// the expected mock methods should be called, which is asserted by the testify framework
+	err = dbOps.Pending().WithBlock(s.candidate.ID())(&transaction.Tx{})
 	require.NoError(s.T(), err)
 }

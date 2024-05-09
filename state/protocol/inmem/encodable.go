@@ -4,47 +4,17 @@ import (
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/storage"
 )
 
 // EncodableSnapshot is the encoding format for protocol.Snapshot
 type EncodableSnapshot struct {
 	Head                *flow.Header
-	LatestSeal          *flow.Seal
-	LatestResult        *flow.ExecutionResult
+	LatestSeal          *flow.Seal            // TODO replace with same info from sealing segment
+	LatestResult        *flow.ExecutionResult // TODO replace with same info from sealing segment
 	SealingSegment      *flow.SealingSegment
 	QuorumCertificate   *flow.QuorumCertificate
-	Epochs              EncodableEpochs
 	Params              EncodableParams
-	EpochProtocolState  *flow.ProtocolStateEntry
-	KVStore             storage.KeyValueStoreData
 	SealedVersionBeacon *flow.SealedVersionBeacon
-}
-
-// EncodableEpochs is the encoding format for protocol.EpochQuery
-type EncodableEpochs struct {
-	Previous *EncodableEpoch
-	Current  EncodableEpoch // cannot be nil
-	Next     *EncodableEpoch
-}
-
-// EncodableEpoch is the encoding format for protocol.Epoch
-type EncodableEpoch struct {
-	Counter            uint64
-	FirstView          uint64
-	DKGPhase1FinalView uint64
-	DKGPhase2FinalView uint64
-	DKGPhase3FinalView uint64
-	FinalView          uint64
-	RandomSource       []byte
-	TargetDuration     uint64 // desired real-world duration for the epoch, in seconds
-	TargetEndTime      uint64 // desired real-world end time for the epoch, in UNIX time [seconds]
-	InitialIdentities  flow.IdentitySkeletonList
-	Clustering         flow.ClusterList
-	Clusters           []EncodableCluster
-	DKG                *EncodableDKG
-	FirstHeight        *uint64
-	FinalHeight        *uint64
 }
 
 // EncodableDKG is the encoding format for protocol.DKG

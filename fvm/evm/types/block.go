@@ -19,6 +19,10 @@ type Block struct {
 	// Height returns the height of this block
 	Height uint64
 
+	// Timestamp is a Unix timestamp in seconds at which the block was created
+	// Note that this value must be provided from the FVM Block
+	Timestamp uint64
+
 	// holds the total amount of the native token deposited in the evm side. (in attoflow)
 	TotalSupply *big.Int
 
@@ -30,6 +34,9 @@ type Block struct {
 
 	// transaction hashes
 	TransactionHashes []gethCommon.Hash
+
+	// stores gas used by all transactions included in the block.
+	TotalGasUsed uint64
 }
 
 // ToBytes encodes the block into bytes
@@ -44,17 +51,28 @@ func (b *Block) Hash() (gethCommon.Hash, error) {
 }
 
 // PopulateReceiptRoot populates receipt root with the given results
-func (b *Block) PopulateReceiptRoot(results []Result) {
+func (b *Block) PopulateReceiptRoot(results []*Result) {
 	if len(results) == 0 {
 		b.ReceiptRoot = gethTypes.EmptyReceiptsHash
 		return
 	}
 
-	receipts := make(gethTypes.Receipts, len(results))
-	for i, res := range results {
-		receipts[i] = res.Receipt()
+	receipts := make(gethTypes.Receipts, 0)
+	for _, res := range results {
+		r := res.Receipt()
+		if r == nil {
+			continue
+		}
+		receipts = append(receipts, r)
 	}
 	b.ReceiptRoot = gethTypes.DeriveSha(receipts, gethTrie.NewStackTrie(nil))
+}
+
+// CalculateGasUsage sums up all the gas transactions in the block used
+func (b *Block) CalculateGasUsage(results []Result) {
+	for _, res := range results {
+		b.TotalGasUsed += res.GasConsumed
+	}
 }
 
 // AppendTxHash appends a transaction hash to the list of transaction hashes of the block
@@ -66,6 +84,7 @@ func (b *Block) AppendTxHash(txHash gethCommon.Hash) {
 func NewBlock(
 	parentBlockHash gethCommon.Hash,
 	height uint64,
+	timestamp uint64,
 	totalSupply *big.Int,
 	receiptRoot gethCommon.Hash,
 	txHashes []gethCommon.Hash,
@@ -73,6 +92,7 @@ func NewBlock(
 	return &Block{
 		ParentBlockHash:   parentBlockHash,
 		Height:            height,
+		Timestamp:         timestamp,
 		TotalSupply:       totalSupply,
 		ReceiptRoot:       receiptRoot,
 		TransactionHashes: txHashes,
@@ -82,8 +102,34 @@ func NewBlock(
 // NewBlockFromBytes constructs a new block from encoded data
 func NewBlockFromBytes(encoded []byte) (*Block, error) {
 	res := &Block{}
+
 	err := gethRLP.DecodeBytes(encoded, res)
-	return res, err
+	if err != nil {
+		// if decoding fails, try to decode to previous block type (without timestamp)
+		r := struct {
+			ParentBlockHash   gethCommon.Hash
+			Height            uint64
+			TotalSupply       *big.Int
+			ReceiptRoot       gethCommon.Hash
+			TransactionHashes []gethCommon.Hash
+			TotalGasUsed      uint64
+		}{}
+		if e := gethRLP.DecodeBytes(encoded, &r); e != nil {
+			// if both error out, return first error since it's more relevant
+			return nil, err
+		}
+
+		return &Block{
+			ParentBlockHash:   r.ParentBlockHash,
+			Height:            r.Height,
+			TotalSupply:       r.TotalSupply,
+			ReceiptRoot:       r.ReceiptRoot,
+			TransactionHashes: r.TransactionHashes,
+			TotalGasUsed:      r.TotalGasUsed,
+		}, nil
+	}
+
+	return res, nil
 }
 
 // GenesisBlock is the genesis block in the EVM environment

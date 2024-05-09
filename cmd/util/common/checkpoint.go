@@ -11,7 +11,6 @@ import (
 	"github.com/onflow/flow-go/ledger/complete/wal"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
-	"github.com/onflow/flow-go/state/protocol/snapshots"
 	"github.com/onflow/flow-go/storage"
 )
 
@@ -113,12 +112,12 @@ func GenerateProtocolSnapshotForCheckpoint(
 	seals storage.Seals,
 	checkpointDir string,
 	blocksToSkip uint,
-) (protocol.Snapshot, uint64, flow.StateCommitment, error) {
+) (protocol.Snapshot, uint64, flow.StateCommitment, string, error) {
 	// skip X blocks (i.e. 10) each time to find the block that produces the state commitment in the checkpoint file
 	// since a checkpoint file contains 500 tries, this allows us to find the block more efficiently
 	sealed, err := state.Sealed().Head()
 	if err != nil {
-		return nil, 0, flow.DummyStateCommitment, err
+		return nil, 0, flow.DummyStateCommitment, "", err
 	}
 	endHeight := sealed.Height
 
@@ -156,7 +155,7 @@ func GenerateProtocolSnapshotForCheckpointWithHeights(
 	checkpointDir string,
 	blocksToSkip uint,
 	endHeight uint64,
-) (protocol.Snapshot, uint64, flow.StateCommitment, error) {
+) (protocol.Snapshot, uint64, flow.StateCommitment, string, error) {
 	// Stop searching after 10,000 iterations or upon reaching the minimum height, whichever comes first.
 	startHeight := uint64(0)
 	// preventing startHeight from being negative
@@ -167,7 +166,7 @@ func GenerateProtocolSnapshotForCheckpointWithHeights(
 
 	checkpointFilePath, err := findLatestCheckpointFilePath(checkpointDir)
 	if err != nil {
-		return nil, 0, flow.DummyStateCommitment, fmt.Errorf("could not find latest checkpoint file in directory %v: %w", checkpointDir, err)
+		return nil, 0, flow.DummyStateCommitment, "", fmt.Errorf("could not find latest checkpoint file in directory %v: %w", checkpointDir, err)
 	}
 
 	log.Info().
@@ -178,18 +177,13 @@ func GenerateProtocolSnapshotForCheckpointWithHeights(
 	// find the height of the finalized block that produces the state commitment contained in the checkpoint file
 	sealedHeight, commit, finalizedHeight, err := FindHeightsByCheckpoints(logger, headers, seals, checkpointFilePath, blocksToSkip, startHeight, endHeight)
 	if err != nil {
-		return nil, 0, flow.DummyStateCommitment, fmt.Errorf("could not find sealed height in range [%v:%v] (blocksToSkip: %v) by checkpoints: %w",
+		return nil, 0, flow.DummyStateCommitment, "", fmt.Errorf("could not find sealed height in range [%v:%v] (blocksToSkip: %v) by checkpoints: %w",
 			startHeight, endHeight, blocksToSkip,
 			err)
 	}
 
 	snapshot := state.AtHeight(finalizedHeight)
-	validSnapshot, err := snapshots.GetDynamicBootstrapSnapshot(state, snapshot)
-	if err != nil {
-		return nil, 0, flow.DummyStateCommitment, fmt.Errorf("could not get dynamic bootstrap snapshot: %w", err)
-	}
-
-	return validSnapshot, sealedHeight, commit, nil
+	return snapshot, sealedHeight, commit, checkpointFilePath, nil
 }
 
 // hashesToCommits converts a list of ledger.RootHash to a list of flow.StateCommitment

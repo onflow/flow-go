@@ -3,7 +3,7 @@ package kvstore
 import (
 	"fmt"
 
-	"github.com/huandu/go-clone/generic" //nolint:goimports
+	clone "github.com/huandu/go-clone/generic" //nolint:goimports
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
@@ -59,8 +59,10 @@ type Modelv0 struct {
 var _ protocol_state.KVStoreAPI = (*Modelv0)(nil)
 var _ protocol_state.KVStoreMutator = (*Modelv0)(nil)
 
-// ID returns an identifier for this key-value store snapshot by hashing internal fields.
-func (model *Modelv0) ID() flow.Identifier { return flow.MakeID(model) }
+// ID returns an identifier for this key-value store snapshot by hashing internal fields and version number.
+func (model *Modelv0) ID() flow.Identifier {
+	return makeVersionedModelID(model)
+}
 
 // Replicate instantiates a Protocol State Snapshot of the given `protocolVersion`.
 // It clones existing snapshot and performs a migration if `protocolVersion = 1`.
@@ -79,8 +81,7 @@ func (model *Modelv0) Replicate(protocolVersion uint64) (protocol_state.KVStoreM
 
 	// perform actual replication to the next version
 	v1 := &Modelv1{
-		Modelv0:                         clone.Clone(*model),
-		InvalidEpochTransitionAttempted: false,
+		Modelv0: clone.Clone(*model),
 	}
 	return v1, nil
 }
@@ -101,16 +102,6 @@ func (model *Modelv0) GetProtocolStateVersion() uint64 {
 	return 0
 }
 
-// GetInvalidEpochTransitionAttempted returns ErrKeyNotSupported.
-func (model *Modelv0) GetInvalidEpochTransitionAttempted() (bool, error) {
-	return false, ErrKeyNotSupported
-}
-
-// SetInvalidEpochTransitionAttempted returns ErrKeyNotSupported.
-func (model *Modelv0) SetInvalidEpochTransitionAttempted(_ bool) error {
-	return ErrKeyNotSupported
-}
-
 // GetEpochStateID returns the state ID of the epoch state.
 // This is part of the most basic model and is used to commit the epoch state to the KV store.
 func (model *Modelv0) GetEpochStateID() flow.Identifier {
@@ -128,21 +119,15 @@ func (model *Modelv0) SetEpochStateID(id flow.Identifier) {
 // deployed software version.
 type Modelv1 struct {
 	Modelv0
-
-	// InvalidEpochTransitionAttempted encodes whether an invalid epoch transition
-	// has been detected in this fork. Under normal operations, this value is false.
-	// Node-internally, the EpochFallback notification is emitted when a block is
-	// finalized that changes this flag from false to true.
-	//
-	// Currently, the only possible state transition is false → true.
-	InvalidEpochTransitionAttempted bool
 }
 
 var _ protocol_state.KVStoreAPI = (*Modelv1)(nil)
 var _ protocol_state.KVStoreMutator = (*Modelv1)(nil)
 
-// ID returns an identifier for this key-value store snapshot by hashing internal fields.
-func (model *Modelv1) ID() flow.Identifier { return flow.MakeID(model) }
+// ID returns an identifier for this key-value store snapshot by hashing internal fields and version number.
+func (model *Modelv1) ID() flow.Identifier {
+	return makeVersionedModelID(model)
+}
 
 // Replicate instantiates a Protocol State Snapshot of the given `protocolVersion`.
 // It clones existing snapshot if `protocolVersion = 1`, other versions are not supported yet.
@@ -176,20 +161,6 @@ func (model *Modelv1) GetProtocolStateVersion() uint64 {
 	return 1
 }
 
-// GetInvalidEpochTransitionAttempted returns the InvalidEpochTransitionAttempted flag.
-// This key must have a value set and will never return ErrKeyNotSet.
-// No errors are expected during normal operation.
-func (model *Modelv1) GetInvalidEpochTransitionAttempted() (bool, error) {
-	return model.InvalidEpochTransitionAttempted, nil
-}
-
-// SetInvalidEpochTransitionAttempted sets the InvalidEpochTransitionAttempted flag.
-// No errors are expected during normal operation.
-func (model *Modelv1) SetInvalidEpochTransitionAttempted(attempted bool) error {
-	model.InvalidEpochTransitionAttempted = attempted
-	return nil
-}
-
 // NewDefaultKVStore constructs a default Key-Value Store of the *latest* protocol version for bootstrapping.
 // Currently, the KV store is largely empty.
 // TODO: Shortcut in bootstrapping; we will probably have to start with a non-empty KV store in the future;
@@ -200,6 +171,34 @@ func NewDefaultKVStore(epochStateID flow.Identifier) protocol_state.KVStoreAPI {
 			UpgradableModel: UpgradableModel{},
 			EpochStateID:    epochStateID,
 		},
-		InvalidEpochTransitionAttempted: false,
 	}
+}
+
+// NewKVStoreV0 constructs a KVStore using the v0 model. This is used to test
+// version upgrades, from v0 to v1.
+func NewKVStoreV0(epochStateID flow.Identifier) protocol_state.KVStoreAPI {
+	return &Modelv0{
+		UpgradableModel: UpgradableModel{},
+		EpochStateID:    epochStateID,
+	}
+}
+
+// versionedModel generically represents a versioned protocol state model.
+type versionedModel interface {
+	GetProtocolStateVersion() uint64
+	*Modelv0 | *Modelv1
+}
+
+// makeVersionedModelID produces an Identifier which includes both the model's
+// internal fields and its version. This guarantees that two models with different
+// versions but otherwise identical fields will have different IDs, a requirement
+// of the protocol.KVStoreReader API.
+func makeVersionedModelID[T versionedModel](model T) flow.Identifier {
+	return flow.MakeID(struct {
+		Version uint64
+		Model   T
+	}{
+		Version: model.GetProtocolStateVersion(),
+		Model:   model,
+	})
 }

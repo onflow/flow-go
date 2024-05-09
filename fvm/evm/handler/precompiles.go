@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"encoding/binary"
 	"fmt"
 
 	"github.com/onflow/cadence"
@@ -14,6 +15,7 @@ import (
 
 func preparePrecompiles(
 	evmContractAddress flow.Address,
+	randomBeaconAddress flow.Address,
 	addressAllocator types.AddressAllocator,
 	backend types.Backend,
 ) []types.Precompile {
@@ -22,6 +24,7 @@ func preparePrecompiles(
 		archAddress,
 		blockHeightProvider(backend),
 		coaOwnershipProofValidator(evmContractAddress, backend),
+		randomSourceProvider(randomBeaconAddress, backend),
 	)
 	return []types.Precompile{archContract}
 }
@@ -35,6 +38,49 @@ func blockHeightProvider(backend types.Backend) func() (uint64, error) {
 		return h, err
 	}
 }
+
+const RandomSourceTypeValueFieldName = "value"
+
+func randomSourceProvider(contractAddress flow.Address, backend types.Backend) func(uint64) (uint64, error) {
+	return func(blockHeight uint64) (uint64, error) {
+		value, err := backend.Invoke(
+			environment.ContractFunctionSpec{
+				AddressFromChain: func(_ flow.Chain) flow.Address {
+					return contractAddress
+				},
+				LocationName: "RandomBeaconHistory",
+				FunctionName: "sourceOfRandomness",
+				ArgumentTypes: []sema.Type{
+					sema.UInt64Type,
+				},
+			},
+			[]cadence.Value{
+				cadence.NewUInt64(blockHeight),
+			},
+		)
+		if err != nil {
+			if types.IsAFatalError(err) || types.IsABackendError(err) {
+				panic(err)
+			}
+			return 0, err
+		}
+
+		data, ok := value.(cadence.Struct)
+		if !ok {
+			return 0, fmt.Errorf("invalid output data received from getRandomSource")
+		}
+
+		cadenceArray := cadence.SearchFieldByName(data, RandomSourceTypeValueFieldName).(cadence.Array)
+		source := make([]byte, 8)
+		for i := range source {
+			source[i] = byte(cadenceArray.Values[i].(cadence.UInt8))
+		}
+
+		return binary.BigEndian.Uint64(source), nil
+	}
+}
+
+const ValidationResultTypeIsValidFieldName = "isValid"
 
 func coaOwnershipProofValidator(contractAddress flow.Address, backend types.Backend) func(proof *types.COAOwnershipProofInContext) (bool, error) {
 	return func(proof *types.COAOwnershipProofInContext) (bool, error) {
@@ -63,9 +109,15 @@ func coaOwnershipProofValidator(contractAddress flow.Address, backend types.Back
 			return false, err
 		}
 		data, ok := value.(cadence.Struct)
-		if !ok || len(data.Fields) == 0 {
+		if !ok {
 			return false, fmt.Errorf("invalid output data received from validateCOAOwnershipProof")
 		}
-		return bool(data.Fields[0].(cadence.Bool)), nil
+
+		isValidValue := cadence.SearchFieldByName(data, ValidationResultTypeIsValidFieldName)
+		if isValidValue == nil {
+			return false, fmt.Errorf("invalid output data received from validateCOAOwnershipProof")
+		}
+
+		return bool(isValidValue.(cadence.Bool)), nil
 	}
 }

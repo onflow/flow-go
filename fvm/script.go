@@ -207,7 +207,6 @@ func (executor *scriptExecutor) executeScript() error {
 			chain.ChainID(),
 			executor.env,
 			rt.ScriptRuntimeEnv,
-			chain.ServiceAddress(),
 			sc.FlowToken.Address,
 		)
 		if err != nil {

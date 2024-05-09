@@ -12,7 +12,9 @@ import (
 
 	sdk "github.com/onflow/flow-go-sdk"
 	client "github.com/onflow/flow-go-sdk/access/grpc"
+
 	"github.com/onflow/flow-go/cmd"
+	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	model "github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/module/epochs"
 )
@@ -44,7 +46,10 @@ func checkMachineAccountRun(_ *cobra.Command, _ []string) {
 
 	// read the private node information - used to get the role
 	var nodeInfoPriv model.NodeInfoPriv
-	readJSON(filepath.Join(flagOutdir, fmt.Sprintf(model.PathNodeInfoPriv, nodeID)), &nodeInfoPriv)
+	err = common.ReadJSON(filepath.Join(flagOutdir, fmt.Sprintf(model.PathNodeInfoPriv, nodeID)), &nodeInfoPriv)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to read json")
+	}
 
 	// read the machine account info file
 	machineAccountInfo := readMachineAccountInfo(nodeID)
@@ -63,7 +68,12 @@ func checkMachineAccountRun(_ *cobra.Command, _ []string) {
 		Str("hash_algo", machineAccountInfo.HashAlgorithm.String()).
 		Msg("read machine account info from disk")
 
-	flowClient, err := client.NewClient(flagAccessAPIAddress, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	flowClient, err := client.NewClient(
+		flagAccessAPIAddress,
+		client.WithGRPCDialOptions(
+			grpc.WithTransportCredentials(insecure.NewCredentials()),
+		),
+	)
 	if err != nil {
 		log.Fatal().Err(err).Msgf("could not connect to access API at address %s", flagAccessAPIAddress)
 	}
@@ -97,7 +107,10 @@ func readMachineAccountInfo(nodeID string) model.NodeMachineAccountInfo {
 	var machineAccountInfo model.NodeMachineAccountInfo
 
 	path := filepath.Join(flagOutdir, fmt.Sprintf(model.PathNodeMachineAccountInfoPriv, nodeID))
-	readJSON(path, &machineAccountInfo)
+	err := common.ReadJSON(path, &machineAccountInfo)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to read json")
+	}
 
 	return machineAccountInfo
 }

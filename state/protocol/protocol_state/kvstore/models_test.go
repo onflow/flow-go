@@ -1,7 +1,6 @@
 package kvstore_test
 
 import (
-	"math/rand"
 	"reflect"
 	"testing"
 
@@ -39,9 +38,7 @@ func TestEncodeDecode(t *testing.T) {
 	})
 
 	t.Run("v1", func(t *testing.T) {
-		model := &kvstore.Modelv1{
-			InvalidEpochTransitionAttempted: rand.Int()%2 == 0,
-		}
+		model := &kvstore.Modelv1{}
 
 		version, encoded, err := model.VersionedEncode()
 		require.NoError(t, err)
@@ -65,13 +62,6 @@ func TestKVStoreAPI(t *testing.T) {
 
 		version := model.GetProtocolStateVersion()
 		assert.Equal(t, uint64(0), version)
-
-		// v1
-		err := model.SetInvalidEpochTransitionAttempted(true)
-		assert.ErrorIs(t, err, kvstore.ErrKeyNotSupported)
-
-		_, err = model.GetInvalidEpochTransitionAttempted()
-		assert.ErrorIs(t, err, kvstore.ErrKeyNotSupported)
 	})
 
 	t.Run("v1", func(t *testing.T) {
@@ -82,14 +72,6 @@ func TestKVStoreAPI(t *testing.T) {
 
 		version := model.GetProtocolStateVersion()
 		assert.Equal(t, uint64(1), version)
-
-		// v1
-		err := model.SetInvalidEpochTransitionAttempted(true)
-		assert.NoError(t, err)
-
-		invalidEpochTransitionAttempted, err := model.GetInvalidEpochTransitionAttempted()
-		assert.NoError(t, err)
-		assert.Equal(t, true, invalidEpochTransitionAttempted)
 	})
 }
 
@@ -113,6 +95,7 @@ func TestKVStoreAPI_Replicate(t *testing.T) {
 		cpy, err := model.Replicate(model.GetProtocolStateVersion())
 		require.NoError(t, err)
 		require.True(t, reflect.DeepEqual(model, cpy)) // expect the same model
+		require.Equal(t, cpy.ID(), model.ID())
 
 		model.VersionUpgrade.ActivationView++ // change
 		require.False(t, reflect.DeepEqual(model, cpy), "expect to have a deep copy")
@@ -129,6 +112,7 @@ func TestKVStoreAPI_Replicate(t *testing.T) {
 		newVersion, err := model.Replicate(1)
 		require.NoError(t, err)
 		require.Equal(t, uint64(1), newVersion.GetProtocolStateVersion())
+		require.NotEqual(t, newVersion.ID(), model.ID(), "two models with the same data but different version must have different ID")
 		_, ok := newVersion.(*kvstore.Modelv1)
 		require.True(t, ok, "expected Modelv1")
 		require.Equal(t, newVersion.GetVersionUpgrade(), model.GetVersionUpgrade())
@@ -150,7 +134,6 @@ func TestKVStoreAPI_Replicate(t *testing.T) {
 				},
 				EpochStateID: unittest.IdentifierFixture(),
 			},
-			InvalidEpochTransitionAttempted: false,
 		}
 		cpy, err := model.Replicate(model.GetProtocolStateVersion())
 		require.NoError(t, err)

@@ -9,9 +9,9 @@ import (
 	"time"
 
 	"github.com/coreos/go-semver/semver"
+	"github.com/ipfs/boxo/blockstore"
 	"github.com/ipfs/go-datastore"
 	dssync "github.com/ipfs/go-datastore/sync"
-	blockstore "github.com/ipfs/go-ipfs-blockstore"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -572,7 +572,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ide
 	diskWal, err := wal.NewDiskWAL(node.Log.With().Str("subcomponent", "wal").Logger(), nil, metricsCollector, dbDir, capacity, pathfinder.PathByteSize, wal.SegmentSize)
 	require.NoError(t, err)
 
-	ls, err := completeLedger.NewLedger(diskWal, capacity, metricsCollector, node.Log.With().Str("compontent", "ledger").Logger(), completeLedger.DefaultPathFinderVersion)
+	ls, err := completeLedger.NewLedger(diskWal, capacity, metricsCollector, node.Log.With().Str("component", "ledger").Logger(), completeLedger.DefaultPathFinderVersion)
 	require.NoError(t, err)
 
 	compactor, err := completeLedger.NewCompactor(ls, diskWal, zerolog.Nop(), capacity, checkpointDistance, checkpointsToKeep, atomic.NewBool(false), metricsCollector)

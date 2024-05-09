@@ -8,12 +8,11 @@ import (
 	runtime2 "runtime"
 	"time"
 
-	"github.com/rs/zerolog"
-
 	"github.com/onflow/atree"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
+	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/fvm/environment"
@@ -31,7 +30,6 @@ type AtreeRegisterMigrator struct {
 
 	sampler zerolog.Sampler
 	rw      reporters.ReportWriter
-	rwf     reporters.ReportWriterFactory
 
 	nWorkers int
 
@@ -43,6 +41,7 @@ type AtreeRegisterMigrator struct {
 }
 
 var _ AccountBasedMigration = (*AtreeRegisterMigrator)(nil)
+
 var _ io.Closer = (*AtreeRegisterMigrator)(nil)
 
 func NewAtreeRegisterMigrator(
@@ -58,7 +57,6 @@ func NewAtreeRegisterMigrator(
 
 	migrator := &AtreeRegisterMigrator{
 		sampler:                            sampler,
-		rwf:                                rwf,
 		rw:                                 rwf.ReportWriter("atree-register-migrator"),
 		validateMigratedValues:             validateMigratedValues,
 		logVerboseValidationError:          logVerboseValidationError,
@@ -94,7 +92,7 @@ func (m *AtreeRegisterMigrator) MigrateAccount(
 	oldPayloads []*ledger.Payload,
 ) ([]*ledger.Payload, error) {
 	// create all the runtime components we need for the migration
-	mr, err := newMigratorRuntime(address, oldPayloads)
+	mr, err := NewAtreeRegisterMigratorRuntime(m.log, address, oldPayloads, 1)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create migrator runtime: %w", err)
 	}
@@ -154,7 +152,7 @@ func (m *AtreeRegisterMigrator) MigrateAccount(
 		m.rw.Write(migrationProblem{
 			Address: address.Hex(),
 			Key:     "",
-			Size:    len(mr.Snapshot.Payloads),
+			Size:    mr.Snapshot.Len(),
 			Kind:    "more_registers_after_migration",
 			Msg:     fmt.Sprintf("original: %d, new: %d", originalLen, newLen),
 		})
@@ -162,7 +160,7 @@ func (m *AtreeRegisterMigrator) MigrateAccount(
 
 	// Check storage health after migration, if enabled.
 	if m.checkStorageHealthAfterMigration {
-		mr, err := newMigratorRuntime(address, newPayloads)
+		mr, err := NewAtreeRegisterMigratorRuntime(m.log, address, newPayloads, 1)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create migrator runtime: %w", err)
 		}
@@ -180,12 +178,12 @@ func (m *AtreeRegisterMigrator) MigrateAccount(
 }
 
 func (m *AtreeRegisterMigrator) migrateAccountStorage(
-	mr *migratorRuntime,
+	mr *AtreeRegisterMigratorRuntime,
 	storageMapIds map[string]struct{},
 ) (map[flow.RegisterID]flow.RegisterValue, error) {
 
 	// iterate through all domains and migrate them
-	for _, domain := range domains {
+	for _, domain := range allStorageMapDomains {
 		err := m.convertStorageDomain(mr, storageMapIds, domain)
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert storage domain %s : %w", domain, err)
@@ -207,7 +205,7 @@ func (m *AtreeRegisterMigrator) migrateAccountStorage(
 }
 
 func (m *AtreeRegisterMigrator) convertStorageDomain(
-	mr *migratorRuntime,
+	mr *AtreeRegisterMigratorRuntime,
 	storageMapIds map[string]struct{},
 	domain string,
 ) error {
@@ -272,7 +270,7 @@ func (m *AtreeRegisterMigrator) convertStorageDomain(
 
 			m.rw.Write(migrationProblem{
 				Address: mr.Address.Hex(),
-				Size:    len(mr.Snapshot.Payloads),
+				Size:    mr.Snapshot.Len(),
 				Key:     fmt.Sprintf("%v (%T)", key, key),
 				Kind:    "migration_failure",
 				Msg:     err.Error(),
@@ -285,12 +283,12 @@ func (m *AtreeRegisterMigrator) convertStorageDomain(
 }
 
 func (m *AtreeRegisterMigrator) validateChangesAndCreateNewRegisters(
-	mr *migratorRuntime,
+	mr *AtreeRegisterMigratorRuntime,
 	changes map[flow.RegisterID]flow.RegisterValue,
 	storageMapIds map[string]struct{},
 ) ([]*ledger.Payload, error) {
 	originalPayloadsSnapshot := mr.Snapshot
-	originalPayloads := originalPayloadsSnapshot.Payloads
+	originalPayloads := originalPayloadsSnapshot.PayloadMap()
 	newPayloads := make([]*ledger.Payload, 0, len(originalPayloads))
 
 	// store state payload so that it can be updated
@@ -360,7 +358,7 @@ func (m *AtreeRegisterMigrator) validateChangesAndCreateNewRegisters(
 				continue
 			}
 
-			if _, isADomainKey := domainsLookupMap[id.Key]; isADomainKey {
+			if _, isADomainKey := allStorageMapDomainsSet[id.Key]; isADomainKey {
 				// this is expected. Move it to the new payloads
 				newPayloads = append(newPayloads, value)
 				continue
@@ -376,7 +374,7 @@ func (m *AtreeRegisterMigrator) validateChangesAndCreateNewRegisters(
 			m.rw.Write(migrationProblem{
 				Address: mr.Address.Hex(),
 				Key:     id.String(),
-				Size:    len(mr.Snapshot.Payloads),
+				Size:    mr.Snapshot.Len(),
 				Kind:    "not_migrated",
 				Msg:     fmt.Sprintf("%x", value.Value()),
 			})
@@ -420,7 +418,7 @@ func (m *AtreeRegisterMigrator) validateChangesAndCreateNewRegisters(
 }
 
 func (m *AtreeRegisterMigrator) cloneValue(
-	mr *migratorRuntime,
+	mr *AtreeRegisterMigratorRuntime,
 	value interpreter.Value,
 ) (interpreter.Value, error) {
 

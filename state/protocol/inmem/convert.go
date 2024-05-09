@@ -1,7 +1,6 @@
 package inmem
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/onflow/flow-go/model/encodable"
@@ -9,8 +8,8 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/state/protocol/protocol_state"
 	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
-	"github.com/onflow/flow-go/storage"
 )
 
 // FromSnapshot generates a memory-backed snapshot from the input snapshot.
@@ -42,58 +41,12 @@ func FromSnapshot(from protocol.Snapshot) (*Snapshot, error) {
 		return nil, fmt.Errorf("could not get qc: %w", err)
 	}
 
-	// convert epochs
-	previous, err := FromEpoch(from.Epochs().Previous())
-	// it is possible for valid snapshots to have no previous epoch
-	if errors.Is(err, protocol.ErrNoPreviousEpoch) {
-		snap.Epochs.Previous = nil
-	} else if err != nil {
-		return nil, fmt.Errorf("could not get previous epoch: %w", err)
-	} else {
-		snap.Epochs.Previous = &previous.enc
-	}
-
-	current, err := FromEpoch(from.Epochs().Current())
-	if err != nil {
-		return nil, fmt.Errorf("could not get current epoch: %w", err)
-	}
-	snap.Epochs.Current = current.enc
-
-	next, err := FromEpoch(from.Epochs().Next())
-	// it is possible for valid snapshots to have no next epoch
-	if errors.Is(err, protocol.ErrNextEpochNotSetup) {
-		snap.Epochs.Next = nil
-	} else if err != nil {
-		return nil, fmt.Errorf("could not get next epoch: %w", err)
-	} else {
-		snap.Epochs.Next = &next.enc
-	}
-
 	// convert global state parameters
 	params, err := FromParams(from.Params())
 	if err != nil {
 		return nil, fmt.Errorf("could not get params: %w", err)
 	}
 	snap.Params = params.enc
-
-	protocolEpochState, err := from.EpochProtocolState()
-	if err != nil {
-		return nil, fmt.Errorf("could not get protocol epoch state: %w", err)
-	}
-	snap.EpochProtocolState = protocolEpochState.Entry().ProtocolStateEntry
-
-	protocolState, err := from.ProtocolState()
-	if err != nil {
-		return nil, fmt.Errorf("could not get protocol state: %w", err)
-	}
-	kvStoreVersion, kvStoreData, err := protocolState.VersionedEncode()
-	if err != nil {
-		return nil, fmt.Errorf("could not encode kvstore: %w", err)
-	}
-	snap.KVStore = storage.KeyValueStoreData{
-		Version: kvStoreVersion,
-		Data:    kvStoreData,
-	}
 
 	// convert version beacon
 	versionBeacon, err := from.VersionBeacon()
@@ -117,107 +70,6 @@ func FromParams(from protocol.GlobalParams) (*Params, error) {
 		EpochCommitSafetyThreshold: from.EpochCommitSafetyThreshold(),
 	}
 	return &Params{params}, nil
-}
-
-// FromEpoch converts any protocol.Epoch to a memory-backed Epoch.
-// Error returns:
-// * protocol.ErrNoPreviousEpoch - if the epoch represents a previous epoch which does not exist.
-// * protocol.ErrNextEpochNotSetup - if the epoch represents a next epoch which has not been set up.
-// * state.ErrUnknownSnapshotReference - if the epoch is queried from an unresolvable snapshot.
-func FromEpoch(from protocol.Epoch) (*Epoch, error) {
-	var (
-		epoch EncodableEpoch
-		err   error
-	)
-
-	// convert top-level fields
-	epoch.Counter, err = from.Counter()
-	if err != nil {
-		return nil, fmt.Errorf("could not get counter: %w", err)
-	}
-	epoch.InitialIdentities, err = from.InitialIdentities()
-	if err != nil {
-		return nil, fmt.Errorf("could not get initial identities: %w", err)
-	}
-	epoch.FirstView, err = from.FirstView()
-	if err != nil {
-		return nil, fmt.Errorf("could not get first view: %w", err)
-	}
-	epoch.FinalView, err = from.FinalView()
-	if err != nil {
-		return nil, fmt.Errorf("could not get final view: %w", err)
-	}
-	epoch.RandomSource, err = from.RandomSource()
-	if err != nil {
-		return nil, fmt.Errorf("could not get random source: %w", err)
-	}
-	epoch.TargetDuration, err = from.TargetDuration()
-	if err != nil {
-		return nil, fmt.Errorf("could not get target epoch duration: %w", err)
-	}
-	epoch.TargetEndTime, err = from.TargetEndTime()
-	if err != nil {
-		return nil, fmt.Errorf("could not get target end time: %w", err)
-	}
-	epoch.DKGPhase1FinalView, epoch.DKGPhase2FinalView, epoch.DKGPhase3FinalView, err = protocol.DKGPhaseViews(from)
-	if err != nil {
-		return nil, fmt.Errorf("could not get dkg final views")
-	}
-	clustering, err := from.Clustering()
-	if err != nil {
-		return nil, fmt.Errorf("could not get clustering: %w", err)
-	}
-	epoch.Clustering = clustering
-
-	// convert dkg
-	dkg, err := from.DKG()
-	// if this epoch hasn't been committed yet, return the epoch as-is
-	if errors.Is(err, protocol.ErrNextEpochNotCommitted) {
-		return &Epoch{epoch}, nil
-	}
-	if err != nil {
-		return nil, fmt.Errorf("could not get dkg: %w", err)
-	}
-	convertedDKG, err := FromDKG(dkg, epoch.InitialIdentities.Filter(filter.HasRole[flow.IdentitySkeleton](flow.RoleConsensus)))
-	if err != nil {
-		return nil, err
-	}
-	epoch.DKG = &convertedDKG.enc
-
-	// convert clusters
-	for index := range clustering {
-		cluster, err := from.Cluster(uint(index))
-		if err != nil {
-			return nil, fmt.Errorf("could not get cluster %d: %w", index, err)
-		}
-		convertedCluster, err := FromCluster(cluster)
-		if err != nil {
-			return nil, fmt.Errorf("could not convert cluster %d: %w", index, err)
-		}
-		epoch.Clusters = append(epoch.Clusters, convertedCluster.enc)
-	}
-
-	// convert height bounds
-	firstHeight, err := from.FirstHeight()
-	if errors.Is(err, protocol.ErrEpochTransitionNotFinalized) {
-		// if this epoch hasn't been started yet, return the epoch as-is
-		return &Epoch{epoch}, nil
-	}
-	if err != nil {
-		return nil, fmt.Errorf("could not get first height: %w", err)
-	}
-	epoch.FirstHeight = &firstHeight
-	finalHeight, err := from.FinalHeight()
-	if errors.Is(err, protocol.ErrEpochTransitionNotFinalized) {
-		// if this epoch hasn't ended yet, return the epoch as-is
-		return &Epoch{epoch}, nil
-	}
-	if err != nil {
-		return nil, fmt.Errorf("could not get final height: %w", err)
-	}
-	epoch.FinalHeight = &finalHeight
-
-	return &Epoch{epoch}, nil
 }
 
 // FromCluster converts any protocol.Cluster to a memory-backed Cluster.
@@ -288,7 +140,7 @@ func SnapshotFromBootstrapState(root *flow.Block, result *flow.ExecutionResult, 
 	if err != nil {
 		return nil, fmt.Errorf("could not get default epoch commit safety threshold: %w", err)
 	}
-	return SnapshotFromBootstrapStateWithParams(root, result, seal, qc, version, threshold)
+	return SnapshotFromBootstrapStateWithParams(root, result, seal, qc, version, threshold, kvstore.NewDefaultKVStore)
 }
 
 // SnapshotFromBootstrapStateWithParams is SnapshotFromBootstrapState
@@ -300,6 +152,7 @@ func SnapshotFromBootstrapStateWithParams(
 	qc *flow.QuorumCertificate,
 	protocolVersion uint,
 	epochCommitSafetyThreshold uint64,
+	kvStoreFactory func(epochStateID flow.Identifier) protocol_state.KVStoreAPI,
 ) (*Snapshot, error) {
 	setup, ok := result.ServiceEvents[0].Event.(*flow.EpochSetup)
 	if !ok {
@@ -330,13 +183,6 @@ func SnapshotFromBootstrapStateWithParams(
 			return nil, fmt.Errorf("mismatching cluster and qc: %w", err)
 		}
 	}
-	encodable, err := FromEpoch(NewStartedEpoch(setup, commit, root.Header.Height))
-	if err != nil {
-		return nil, fmt.Errorf("could not convert epoch: %w", err)
-	}
-	epochs := EncodableEpochs{
-		Current: encodable.enc,
-	}
 
 	params := EncodableParams{
 		ChainID:                    root.Header.ChainID,        // chain ID must match the root block
@@ -347,7 +193,8 @@ func SnapshotFromBootstrapStateWithParams(
 	}
 
 	rootEpochState := ProtocolStateFromEpochServiceEvents(setup, commit)
-	rootKvStore := kvstore.NewDefaultKVStore(rootEpochState.ID())
+	rootEpochStateID := rootEpochState.ID()
+	rootKvStore := kvStoreFactory(rootEpochStateID)
 	if rootKvStore.ID() != root.Payload.ProtocolStateID {
 		return nil, fmt.Errorf("incorrect protocol state ID in root block, expected (%x) but got (%x)",
 			root.Payload.ProtocolStateID, rootKvStore.ID())
@@ -355,6 +202,19 @@ func SnapshotFromBootstrapStateWithParams(
 	kvStoreVersion, kvStoreData, err := rootKvStore.VersionedEncode()
 	if err != nil {
 		return nil, fmt.Errorf("could not encode kvstore: %w", err)
+	}
+
+	richRootEpochState, err := flow.NewRichProtocolStateEntry(rootEpochState, nil, nil, setup, commit, nil, nil)
+	if err != nil {
+		return nil, fmt.Errorf("could not construct root rich epoch state entry: %w", err)
+	}
+
+	rootProtocolStateEntryWrapper := &flow.ProtocolStateEntryWrapper{
+		KVStore: flow.PSKeyValueStoreData{
+			Version: kvStoreVersion,
+			Data:    kvStoreData,
+		},
+		EpochEntry: richRootEpochState,
 	}
 
 	snap := SnapshotFromEncodable(EncodableSnapshot{
@@ -365,17 +225,14 @@ func SnapshotFromBootstrapStateWithParams(
 			Blocks:           []*flow.Block{root},
 			ExecutionResults: flow.ExecutionResultList{result},
 			LatestSeals:      map[flow.Identifier]flow.Identifier{root.ID(): seal.ID()},
-			FirstSeal:        seal,
-			ExtraBlocks:      make([]*flow.Block, 0),
+			ProtocolStateEntries: map[flow.Identifier]*flow.ProtocolStateEntryWrapper{
+				rootKvStore.ID(): rootProtocolStateEntryWrapper,
+			},
+			FirstSeal:   seal,
+			ExtraBlocks: make([]*flow.Block, 0),
 		},
-		QuorumCertificate:  qc,
-		Epochs:             epochs,
-		Params:             params,
-		EpochProtocolState: rootEpochState,
-		KVStore: storage.KeyValueStoreData{
-			Version: kvStoreVersion,
-			Data:    kvStoreData,
-		},
+		QuorumCertificate:   qc,
+		Params:              params,
 		SealedVersionBeacon: nil,
 	})
 

@@ -12,7 +12,7 @@ import (
 	"github.com/rs/zerolog"
 )
 
-// TODO janezp: we should be able to swithch the report writer to write to a database.
+// TODO janezp: we should be able to switch the report writer to write to a database.
 type ReportWriterFactory interface {
 	ReportWriter(dataNamespace string) ReportWriter
 }
