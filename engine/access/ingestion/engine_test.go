@@ -160,6 +160,7 @@ func (s *Suite) SetupTest() {
 	s.blocks.On("GetLastFullBlockHeight").Once().Return(uint64(0), errors.New("do nothing"))
 }
 
+// initIngestionEngine create new instance of ingestion engine and waits when it starts
 func (s *Suite) initIngestionEngine(ctx irrecoverable.SignalerContext) *Engine {
 	processedHeight := bstorage.NewConsumerProgress(s.db, module.ConsumeProgressIngestionEngineBlockHeight)
 
@@ -173,6 +174,7 @@ func (s *Suite) initIngestionEngine(ctx irrecoverable.SignalerContext) *Engine {
 	return eng
 }
 
+// mockCollectionsForBlock mocks collections for block
 func (s *Suite) mockCollectionsForBlock(block flow.Block) {
 	// we should query the block once and index the guarantee payload once
 	for _, g := range block.Payload.Guarantees {
@@ -182,6 +184,7 @@ func (s *Suite) mockCollectionsForBlock(block flow.Block) {
 	}
 }
 
+// generateBlock prepares block with payload and specified guarantee.SignerIndices
 func (s *Suite) generateBlock(clusterCommittee flow.IdentitySkeletonList, snap *protocol.Snapshot) flow.Block {
 	block := unittest.BlockFixture()
 	block.SetPayload(unittest.PayloadFixture(
