@@ -157,9 +157,9 @@ func (c *checker) CompareAtHeight(height uint64) (bool, error) {
 
 	match := ownResultID == sealedResultID
 	if match {
-		fmt.Printf("height %v match: result %v\n", height, ownResultID)
+		fmt.Printf("block %v (id: %v) match: result %v\n", height, blockID, ownResultID)
 	} else {
-		fmt.Printf("height %v mismatch: own %v, sealed %v\n", height, ownResultID, sealedResultID)
+		fmt.Printf("block %v (id: %v) mismatch: own %v, sealed %v\n", height, blockID, ownResultID, sealedResultID)
 	}
 
 	return match, nil
