@@ -37,25 +37,22 @@ func init() {
 }
 
 func run(*cobra.Command, []string) {
-	height, err := findFirstMismatch(flagDatadir, flagStartHeight, flagEndHeight)
+	err := findFirstMismatch(flagDatadir, flagStartHeight, flagEndHeight)
 	if err != nil {
 		if errors.Is(err, NoMissmatchFoundError) {
 			fmt.Printf("no mismatch found: %v\n", err)
 		} else {
 			fmt.Printf("fatal: %v\n", err)
 		}
-		return
 	}
-
-	fmt.Printf("first mismatch found at height %v\n", height)
 }
 
-func findFirstMismatch(datadir string, startHeight, endHeight uint64) (uint64, error) {
+func findFirstMismatch(datadir string, startHeight, endHeight uint64) error {
 	fmt.Printf("initializing database\n")
 	headers, results, seals, state, db, err := createStorages(datadir)
 	defer db.Close()
 	if err != nil {
-		return 0, fmt.Errorf("could not create storages: %v", err)
+		return fmt.Errorf("could not create storages: %v", err)
 	}
 
 	c := &checker{
@@ -72,7 +69,7 @@ func findFirstMismatch(datadir string, startHeight, endHeight uint64) (uint64, e
 	if endHeight == 0 {
 		endHeight, err = findLastExecutedAndSealedHeight(state, db)
 		if err != nil {
-			return 0, fmt.Errorf("could not find last executed and sealed height: %v", err)
+			return fmt.Errorf("could not find last executed and sealed height: %v", err)
 		}
 	}
 
@@ -80,10 +77,19 @@ func findFirstMismatch(datadir string, startHeight, endHeight uint64) (uint64, e
 
 	mismatchHeight, err := c.FindFirstMismatchHeight(startHeight, endHeight)
 	if err != nil {
-		return 0, fmt.Errorf("could not find first mismatch: %v", err)
+		return fmt.Errorf("could not find first mismatch: %v", err)
 	}
 
-	return mismatchHeight, nil
+	fmt.Printf("first mismatch found at block %v\n", mismatchHeight)
+
+	blockID, err := findBlockIDByHeight(headers, mismatchHeight)
+	if err != nil {
+		return fmt.Errorf("could not find block id for height %v: %v", mismatchHeight, err)
+	}
+
+	fmt.Printf("mismatching block %v (id: %v)\n", mismatchHeight, blockID)
+
+	return nil
 }
 
 func createStorages(dir string) (
