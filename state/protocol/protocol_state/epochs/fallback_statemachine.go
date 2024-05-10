@@ -98,10 +98,3 @@ func (m *FallbackStateMachine) ProcessEpochCommit(_ *flow.EpochCommit) (bool, er
 	// won't process if we are in fallback mode
 	return false, nil
 }
-
-// TransitionToNextEpoch performs transition to next epoch, in epoch fallback no transitions are possible.
-// TODO for 'leaving Epoch Fallback via special service event' this might need to change.
-func (m *FallbackStateMachine) TransitionToNextEpoch() error {
-	// won't process if we are in fallback mode
-	return nil
-}

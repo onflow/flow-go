@@ -61,14 +61,88 @@ func (s *EpochFallbackStateMachineSuite) TestProcessEpochCommitIsNoop() {
 	require.Equal(s.T(), s.parentProtocolState.ID(), s.stateMachine.ParentState().ID())
 }
 
-// TestTransitionToNextEpoch ensures that transition to next epoch is not possible.
+// TestTransitionToNextEpoch tests a scenario where the FallbackStateMachine processes first block from next epoch.
+// It has to discard the parent state and build a new state with data from next epoch.
 func (s *EpochFallbackStateMachineSuite) TestTransitionToNextEpoch() {
-	err := s.stateMachine.TransitionToNextEpoch()
-	require.NoError(s.T(), err)
-	updatedState, updateStateID, hasChanges := s.stateMachine.Build()
-	require.False(s.T(), hasChanges)
-	require.Equal(s.T(), updatedState.ID(), updateStateID)
-	require.Equal(s.T(), s.parentProtocolState.ID(), updateStateID)
+	// update protocol state with next epoch information
+	unittest.WithNextEpochProtocolState()(s.parentProtocolState)
+
+	candidate := unittest.BlockHeaderFixture(
+		unittest.HeaderWithView(s.parentProtocolState.CurrentEpochSetup.FinalView + 1))
+
+	expectedState := &flow.ProtocolStateEntry{
+		PreviousEpoch:                   s.parentProtocolState.CurrentEpoch.Copy(),
+		CurrentEpoch:                    *s.parentProtocolState.NextEpoch.Copy(),
+		NextEpoch:                       nil,
+		InvalidEpochTransitionAttempted: true,
+	}
+
+	s.Run("happy-path", func() {
+		parentProtocolState := s.parentProtocolState.Copy()
+		parentProtocolState.InvalidEpochTransitionAttempted = false
+
+		var err error
+		// since the candidate block is from next epoch, HappyPathStateMachine should transition to next epoch
+		s.stateMachine, err = NewFallbackStateMachine(s.params, candidate.View, parentProtocolState.Copy())
+		require.NoError(s.T(), err)
+		err = s.stateMachine.TransitionToNextEpoch()
+		require.NoError(s.T(), err)
+		updatedState, stateID, hasChanges := s.stateMachine.Build()
+		require.True(s.T(), hasChanges)
+		require.NotEqual(s.T(), parentProtocolState.ID(), updatedState.ID())
+		require.Equal(s.T(), updatedState.ID(), stateID)
+		require.Equal(s.T(), updatedState, expectedState, "state should be equal to expected one")
+	})
+	s.Run("epoch-fallback-mode", func() {
+		parentProtocolState := s.parentProtocolState.Copy()
+		parentProtocolState.InvalidEpochTransitionAttempted = true // just to be explicit
+
+		var err error
+		// since the candidate block is from next epoch, HappyPathStateMachine should transition to next epoch
+		s.stateMachine, err = NewFallbackStateMachine(s.params, candidate.View, parentProtocolState.Copy())
+		require.NoError(s.T(), err)
+		err = s.stateMachine.TransitionToNextEpoch()
+		require.NoError(s.T(), err)
+		updatedState, stateID, hasChanges := s.stateMachine.Build()
+		require.True(s.T(), hasChanges)
+		require.NotEqual(s.T(), parentProtocolState.ID(), updatedState.ID())
+		require.Equal(s.T(), updatedState.ID(), stateID)
+		require.Equal(s.T(), updatedState, expectedState, "state should be equal to expected one")
+	})
+}
+
+// TestTransitionToNextEpochNotAllowed tests different scenarios where transition to next epoch is not allowed.
+func (s *EpochFallbackStateMachineSuite) TestTransitionToNextEpochNotAllowed() {
+	s.Run("no next epoch protocol state", func() {
+		protocolState := unittest.EpochStateFixture()
+		candidate := unittest.BlockHeaderFixture(
+			unittest.HeaderWithView(protocolState.CurrentEpochSetup.FinalView + 1))
+		stateMachine, err := NewFallbackStateMachine(s.params, candidate.View, protocolState)
+		require.NoError(s.T(), err)
+		err = stateMachine.TransitionToNextEpoch()
+		require.Error(s.T(), err, "should not allow transition to next epoch if there is no next epoch protocol state")
+	})
+	s.Run("next epoch not committed", func() {
+		protocolState := unittest.EpochStateFixture(unittest.WithNextEpochProtocolState(), func(entry *flow.RichProtocolStateEntry) {
+			entry.NextEpoch.CommitID = flow.ZeroID
+			entry.NextEpochCommit = nil
+		})
+		candidate := unittest.BlockHeaderFixture(
+			unittest.HeaderWithView(protocolState.CurrentEpochSetup.FinalView + 1))
+		stateMachine, err := NewFallbackStateMachine(s.params, candidate.View, protocolState)
+		require.NoError(s.T(), err)
+		err = stateMachine.TransitionToNextEpoch()
+		require.Error(s.T(), err, "should not allow transition to next epoch if it is not committed")
+	})
+	s.Run("candidate block is not from next epoch", func() {
+		protocolState := unittest.EpochStateFixture(unittest.WithNextEpochProtocolState())
+		candidate := unittest.BlockHeaderFixture(
+			unittest.HeaderWithView(protocolState.CurrentEpochSetup.FinalView))
+		stateMachine, err := NewFallbackStateMachine(s.params, candidate.View, protocolState)
+		require.NoError(s.T(), err)
+		err = stateMachine.TransitionToNextEpoch()
+		require.Error(s.T(), err, "should not allow transition to next epoch if next block is not first block from next epoch")
+	})
 }
 
 // TestNewEpochFallbackStateMachine tests that creating epoch fallback state machine sets
@@ -423,5 +497,4 @@ func (s *EpochFallbackStateMachineSuite) TestEpochFallbackStateMachineInjectsMul
 		require.Greater(s.T(), parentProtocolState.CurrentEpochFinalView(), candidateView,
 			"final view should be greater than final view of test")
 	}
-
 }
