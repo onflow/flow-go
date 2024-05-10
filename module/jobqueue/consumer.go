@@ -215,7 +215,6 @@ func (c *Consumer) checkProcessable() {
 	} else {
 		c.log.Debug().Bool("running", c.running).Msg("no job found")
 	}
-
 }
 
 // run checks if there are processable jobs and process them by giving

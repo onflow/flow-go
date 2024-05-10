@@ -43,6 +43,7 @@ func TestLoadTypes(t *testing.T) {
 		load.LedgerHeavyLoad,
 		load.ExecDataHeavyLoad,
 		load.NewTokenTransferLoad(),
+		load.NewTokenTransferMultiLoad(),
 		load.NewAddKeysLoad(),
 		evmLoad,
 		load.NewCreateAccountLoad(),

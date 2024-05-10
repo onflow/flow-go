@@ -29,6 +29,8 @@ type AccountProvider interface {
 	BorrowAvailableAccount() (*FlowAccount, error)
 	// ReturnAvailableAccount returns an account to the account provider, so it can be reused.
 	ReturnAvailableAccount(*FlowAccount)
+	// GetAddresses returns the addresses of the first n available accounts.
+	GetAddresses(uint) ([]flowsdk.Address, error)
 }
 
 type provider struct {
@@ -54,6 +56,20 @@ func (p *provider) ReturnAvailableAccount(account *FlowAccount) {
 	case p.availableAccounts <- account:
 	default:
 	}
+}
+
+func (p *provider) GetAddresses(u uint) ([]flowsdk.Address, error) {
+	addresses := make([]flowsdk.Address, 0, u)
+	for i := uint(0); i < u; i++ {
+		select {
+		case account := <-p.availableAccounts:
+			addresses = append(addresses, account.Address)
+			p.availableAccounts <- account
+		default:
+			return addresses, ErrNoAccountsAvailable
+		}
+	}
+	return addresses, nil
 }
 
 func SetupProvider(
