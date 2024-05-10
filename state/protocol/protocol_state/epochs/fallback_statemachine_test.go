@@ -390,8 +390,6 @@ func (s *EpochFallbackStateMachineSuite) TestEpochFallbackStateMachineInjectsMul
 // It is expected that it will transition into the next epoch (since it was committed)
 // then reach the safety threshold and add the extension to the next epoch, which at that point will be considered 'current'.
 func (s *EpochFallbackStateMachineSuite) TestEpochFallbackStateMachineInjectsMultipleExtensions_NextEpochCommitted() {
-	unittest.SkipUnless(s.T(), unittest.TEST_TODO,
-		"This test doesn't work since it misses logic to transition to the next epoch when we are in EFM.")
 	originalParentState := s.parentProtocolState.Copy()
 	originalParentState.InvalidEpochTransitionAttempted = false
 	unittest.WithNextEpochProtocolState()(originalParentState)
@@ -421,7 +419,6 @@ func (s *EpochFallbackStateMachineSuite) TestEpochFallbackStateMachineInjectsMul
 	firstExtensionViewThreshold := originalParentState.NextEpochSetup.FinalView + DefaultEpochExtensionViewCount - s.params.EpochCommitSafetyThreshold()
 	secondExtensionViewThreshold := originalParentState.NextEpochSetup.FinalView + 2*DefaultEpochExtensionViewCount - s.params.EpochCommitSafetyThreshold()
 	thirdExtensionViewThreshold := originalParentState.NextEpochSetup.FinalView + 3*DefaultEpochExtensionViewCount - s.params.EpochCommitSafetyThreshold()
-	currentEpochLastView := originalParentState.CurrentEpochSetup.FinalView
 
 	parentProtocolState := originalParentState.Copy()
 	candidateView := originalParentState.CurrentEpochSetup.FirstView + 1
@@ -432,28 +429,26 @@ func (s *EpochFallbackStateMachineSuite) TestEpochFallbackStateMachineInjectsMul
 			stateMachine, err := NewFallbackStateMachine(s.params, candidateView, parentProtocolState.Copy())
 			require.NoError(s.T(), err)
 
-			var (
-				nextEpochSetup  *flow.EpochSetup
-				nextEpochCommit *flow.EpochCommit
-			)
+			previousEpochSetup, previousEpochCommit := parentProtocolState.PreviousEpochSetup, parentProtocolState.PreviousEpochCommit
+			currentEpochSetup, currentEpochCommit := parentProtocolState.CurrentEpochSetup, parentProtocolState.CurrentEpochCommit
+			nextEpochSetup, nextEpochCommit := parentProtocolState.NextEpochSetup, parentProtocolState.NextEpochCommit
 			if candidateView > parentProtocolState.CurrentEpochFinalView() {
 				require.NoError(s.T(), stateMachine.TransitionToNextEpoch())
+
+				// after we have transitioned to the next epoch, we need to update the current epoch
+				// for the next iteration we can use parent protocol state again
+				previousEpochSetup, previousEpochCommit = currentEpochSetup, currentEpochCommit
+				currentEpochSetup, currentEpochCommit = parentProtocolState.NextEpochSetup, parentProtocolState.NextEpochCommit
+				nextEpochSetup, nextEpochCommit = nil, nil
 			}
 
 			updatedState, _, _ := stateMachine.Build()
 
-			if candidateView < currentEpochLastView {
-				// as the next epoch has been committed, we need to respect that in current epoch
-				// when we transition to the next epoch we will pass nil instead.
-				nextEpochSetup = parentProtocolState.NextEpochSetup
-				nextEpochCommit = parentProtocolState.NextEpochCommit
-			}
-
 			parentProtocolState, err = flow.NewRichProtocolStateEntry(updatedState,
-				parentProtocolState.PreviousEpochSetup,
-				parentProtocolState.PreviousEpochCommit,
-				parentProtocolState.CurrentEpochSetup,
-				parentProtocolState.CurrentEpochCommit,
+				previousEpochSetup,
+				previousEpochCommit,
+				currentEpochSetup,
+				currentEpochCommit,
 				nextEpochSetup,
 				nextEpochCommit)
 
@@ -483,11 +478,11 @@ func (s *EpochFallbackStateMachineSuite) TestEpochFallbackStateMachineInjectsMul
 		evolveStateToView(data.TargetView)
 
 		expectedState := &flow.ProtocolStateEntry{
-			PreviousEpoch: originalParentState.PreviousEpoch,
+			PreviousEpoch: originalParentState.CurrentEpoch.Copy(),
 			CurrentEpoch: flow.EpochStateContainer{
-				SetupID:          originalParentState.CurrentEpoch.SetupID,
-				CommitID:         originalParentState.CurrentEpoch.CommitID,
-				ActiveIdentities: originalParentState.CurrentEpoch.ActiveIdentities,
+				SetupID:          originalParentState.NextEpoch.SetupID,
+				CommitID:         originalParentState.NextEpoch.CommitID,
+				ActiveIdentities: originalParentState.NextEpoch.ActiveIdentities,
 				EpochExtensions:  data.ExpectedExtensions,
 			},
 			NextEpoch:                       nil,
