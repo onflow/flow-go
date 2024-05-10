@@ -271,7 +271,7 @@ func withNextEpoch(
 	rootSeal.ResultID = rootResult.ID()
 	rootSeal.BlockID = rootBlock.ID()
 	encodableSnapshot.SealingSegment.LatestSeals = map[flow.Identifier]flow.Identifier{
-		rootBlock.ID(): encodableSnapshot.LatestSeal().ID(),
+		rootBlock.ID(): rootSeal.ID(),
 	}
 	encodableSnapshot.QuorumCertificate = createQC(rootBlock)
 
