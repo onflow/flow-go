@@ -209,7 +209,7 @@ require (
 	github.com/onflow/flow/protobuf/go/flow v0.4.2 // indirect
 	github.com/onflow/go-ethereum v1.13.4 // indirect
 	github.com/onflow/sdks v0.5.1-0.20230912225508-b35402f12bba // indirect
-	github.com/onflow/wal v0.0.0-20240208022732-d756cd497d3b // indirect
+	github.com/onflow/wal v1.0.2 // indirect
 	github.com/onsi/ginkgo/v2 v2.13.2 // indirect
 	github.com/opencontainers/runtime-spec v1.1.0 // indirect
 	github.com/opentracing/opentracing-go v1.2.0 // indirect

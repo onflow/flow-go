@@ -2186,8 +2186,8 @@ github.com/onflow/go-ethereum v1.13.4 h1:iNO86fm8RbBbhZ87ZulblInqCdHnAQVY8okBrNs
 github.com/onflow/go-ethereum v1.13.4/go.mod h1:cE/gEUkAffhwbVmMJYz+t1dAfVNHNwZCgc3BWtZxBGY=
 github.com/onflow/sdks v0.5.1-0.20230912225508-b35402f12bba h1:rIehuhO6bj4FkwE4VzwEjX7MoAlOhUJENBJLqDqVxAo=
 github.com/onflow/sdks v0.5.1-0.20230912225508-b35402f12bba/go.mod h1:F0dj0EyHC55kknLkeD10js4mo14yTdMotnWMslPirrU=
-github.com/onflow/wal v0.0.0-20240208022732-d756cd497d3b h1:6O/BEmA99PDT5QVjoJgrYlGsWnpxGJTAMmsC+V9gyds=
-github.com/onflow/wal v0.0.0-20240208022732-d756cd497d3b/go.mod h1:iMC8gkLqu4nkbkAla5HkSBb+FGyQOZiWz3DYm2wSXCk=
+github.com/onflow/wal v1.0.2 h1:5bgsJVf2O3cfMNK12fiiTyYZ8cOrUiELt3heBJfHOhc=
+github.com/onflow/wal v1.0.2/go.mod h1:iMC8gkLqu4nkbkAla5HkSBb+FGyQOZiWz3DYm2wSXCk=
 github.com/onsi/ginkgo v1.6.0/go.mod h1:lLunBs/Ym6LB5Z9jYTR76FiuTmxDTDusOGeTQH+WWjE=
 github.com/onsi/ginkgo v1.7.0/go.mod h1:lLunBs/Ym6LB5Z9jYTR76FiuTmxDTDusOGeTQH+WWjE=
 github.com/onsi/ginkgo v1.10.3/go.mod h1:lLunBs/Ym6LB5Z9jYTR76FiuTmxDTDusOGeTQH+WWjE=
