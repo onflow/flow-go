@@ -223,7 +223,7 @@ func (ctl *BlockTimeController) storeProposalTiming(proposalTiming ProposalTimin
 }
 
 // GetProposalTiming returns the controller's latest ProposalTiming. Concurrency safe.
-func (ctl *BlockTimeController) GetProposalTiming() ProposalTiming {
+func (ctl *BlockTimeController) getProposalTiming() ProposalTiming {
 	pt := ctl.latestProposalTiming.Load()
 	if pt == nil { // should never happen, as we always store non-nil instances of ProposalTiming. Though, this extra check makes `GetProposalTiming` universal.
 		return nil
@@ -231,8 +231,39 @@ func (ctl *BlockTimeController) GetProposalTiming() ProposalTiming {
 	return *pt
 }
 
+// TargetPublicationTime is intended to be called by the EventHandler, whenever it
+// wants to publish a new proposal. The event handler inputs
+//   - proposalView: the view it is proposing for,
+//   - timeViewEntered: the time when the EventHandler entered this view
+//   - parentBlockId: the ID of the parent block, which the EventHandler is building on
+//
+// TargetPublicationTime returns the time stamp when the new proposal should be broadcasted.
+// For a given view where we are the primary, suppose the actual time we are done building our proposal is P:
+//   - if P < TargetPublicationTime(..), then the EventHandler should wait until
+//     `TargetPublicationTime` to broadcast the proposal
+//   - if P >= TargetPublicationTime(..), then the EventHandler should immediately broadcast the proposal
+//
+// Note: Technically, our metrics capture the publication delay relative to this function's _latest_ call.
+// Currently, the EventHandler is the only caller of this function, and only calls it once.
+//
+// Concurrency safe.
 func (ctl *BlockTimeController) TargetPublicationTime(proposalView uint64, timeViewEntered time.Time, parentBlockId flow.Identifier) time.Time {
-	return ctl.GetProposalTiming().TargetPublicationTime(proposalView, timeViewEntered, parentBlockId)
+	targetPublicationTime := ctl.getProposalTiming().TargetPublicationTime(proposalView, timeViewEntered, parentBlockId)
+
+	publicationDelay := time.Until(targetPublicationTime)
+	// targetPublicationTime should already account for the controller's upper limit of authority (longest view time
+	// the controller is allowed to select). However, targetPublicationTime is allowed to be in the past, if the
+	// controller want to signal that the proposal should be published asap. We could hypothetically update a past
+	// targetPublicationTime to 'now' at every level in the code. However, this time stamp would move into the past
+	// immediately, and we would have to update the targetPublicationTime over and over. Instead, we just allow values
+	// in the past, thereby making repeated corrections unnecessary. In this model, the code _interpreting_ the value
+	// needs to apply the convention a negative publicationDelay essentially means "no delay".
+	if publicationDelay < 0 {
+		publicationDelay = 0 // Controller can only delay publication of proposal. Hence, the delay is lower-bounded by zero.
+	}
+	ctl.metrics.ProposalPublicationDelay(publicationDelay)
+
+	return targetPublicationTime
 }
 
 // processEventsWorkerLogic is the logic for processing events received from other components.
@@ -310,7 +341,7 @@ func (ctl *BlockTimeController) processIncorporatedBlock(tb TimedBlock) error {
 		return nil
 	}
 
-	latest := ctl.GetProposalTiming()
+	latest := ctl.getProposalTiming()
 	if tb.Block.View <= latest.ObservationView() { // we don't care about older blocks that are incorporated into the protocol state
 		return nil
 	}
@@ -377,7 +408,7 @@ func (ctl *BlockTimeController) measureViewDuration(tb TimedBlock) error {
 		return nil
 	}
 
-	previousProposalTiming := ctl.GetProposalTiming()
+	previousProposalTiming := ctl.getProposalTiming()
 	previousPropErr := ctl.proportionalErr.Value()
 
 	// Compute the projected time still needed for the remaining views, assuming that we progress through the remaining views with

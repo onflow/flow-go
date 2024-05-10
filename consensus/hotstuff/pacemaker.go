@@ -86,6 +86,7 @@ type PaceMaker interface {
 
 // ProposalDurationProvider generates the target publication time for block proposals.
 type ProposalDurationProvider interface {
+
 	// TargetPublicationTime is intended to be called by the EventHandler, whenever it
 	// wants to publish a new proposal. The event handler inputs
 	//  - proposalView: the view it is proposing for,
@@ -96,6 +97,10 @@ type ProposalDurationProvider interface {
 	//   - if P < TargetPublicationTime(..), then the EventHandler should wait until
 	//     `TargetPublicationTime` to broadcast the proposal
 	//   - if P >= TargetPublicationTime(..), then the EventHandler should immediately broadcast the proposal
+	//
+	// Note: Technically, our metrics capture the publication delay relative to this function's _latest_ call.
+	// Currently, the EventHandler is the only caller of this function, and only calls it once.
+	//
 	// Concurrency safe.
 	TargetPublicationTime(proposalView uint64, timeViewEntered time.Time, parentBlockId flow.Identifier) time.Time
 }

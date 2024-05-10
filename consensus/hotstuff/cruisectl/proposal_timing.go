@@ -23,7 +23,7 @@ type ProposalTiming interface {
 	// processed and generated this ProposalTiming instance in response.
 	ObservationView() uint64
 
-	// ObservationTime returns the time, when the controller received the block
+	// ObservationTime returns the time, when the controller received the
 	// leading to the generation of this ProposalTiming instance.
 	ObservationTime() time.Time
 }
@@ -67,7 +67,7 @@ func (pt *publishImmediately) ConstrainedBlockTime() time.Duration { return 0 }
 // Then, `TargetPublicationTime(..)` returns `t + d` as the target publication time for the child block.
 //
 // By convention, happyPathBlockTime should be treated as immutable.
-// TODO: any additional logic for assiting the EventHandler in determining the applied delay should be added to the ControllerViewDuration
+// TODO: any additional logic for assisting the EventHandler in determining the applied delay should be added to the ControllerViewDuration
 type happyPathBlockTime struct {
 	TimedBlock                         // latest block observed by the controller, including the time stamp when the controller received the block [UTC]
 	constrainedBlockTime time.Duration // block time _after_ applying limits of authority to unconstrainedBlockTime
@@ -79,9 +79,9 @@ var _ ProposalTiming = (*happyPathBlockTime)(nil)
 //   - `timedBlock` references the _published_ block with the highest view known to this node.
 //     On the consensus happy path, this node may construct the child block (iff it is the primary for
 //     view `timedBlock.Block.View` + 1). Note that the controller determines when to publish this child.
-//     In other words, at the time the primary determines when to broadcast the child, the child has _not_ been
-//     published and the `timedBlock` references the parent on the happy path (or another earlier block on the
-//     unhappy path)
+//     In other words, when primary determines at what future time to broadcast the child, the child
+//     has _not_ been published and the `timedBlock` references the parent on the happy path (or another
+//     earlier block on the unhappy path)
 //   - `unconstrainedBlockTime` is the delay, relative to `timedBlock.TimeObserved` when the controller would
 //     like the child block to be published. Caution, no limits of authority have been applied to this value yet!
 //   - `timingConfig` which defines the limits for authority for the controller.
