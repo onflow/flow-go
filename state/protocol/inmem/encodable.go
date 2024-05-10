@@ -30,7 +30,7 @@ func (snap EncodableSnapshot) LatestSeal() *flow.Seal {
 
 	// CASE 1: The spork root block is the latest sealed block.
 	// By protocol definition, FirstSeal seals the spork root block.
-	if snap.SealingSegment.FirstSeal.ID() == latestSealID {
+	if snap.SealingSegment.FirstSeal != nil && snap.SealingSegment.FirstSeal.ID() == latestSealID {
 		return snap.SealingSegment.FirstSeal
 	}
 
