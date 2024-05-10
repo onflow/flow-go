@@ -25,16 +25,16 @@ func (snap EncodableSnapshot) Head() *flow.Header {
 // for the block with the greatest height, of all seals in the Snapshot.
 // The EncodableSnapshot receiver must be correctly formed.
 func (snap EncodableSnapshot) LatestSeal() *flow.Seal {
-	// CASE 1: In the case of a spork root, the single block of the sealing
-	// segment is sealed by protocol definition by `FirstSeal`.
-	if snap.SealingSegment.IsSporkRoot() {
-		return snap.SealingSegment.FirstSeal
-	}
-
 	head := snap.Head()
 	latestSealID := snap.SealingSegment.LatestSeals[head.ID()]
 
-	// CASE 2: For a mid-spork root snapshot, there are multiple blocks in the sealing segment.
+	// CASE 1: The spork root block is the latest sealed block.
+	// By protocol definition, FirstSeal seals the spork root block.
+	if snap.SealingSegment.FirstSeal.ID() == latestSealID {
+		return snap.SealingSegment.FirstSeal
+	}
+
+	// CASE 2: For any other snapshot, the latest seal must be in a block payload.
 	// Since seals are included in increasing height order, the latest seal must be in the
 	// first block (by height descending) which contains any seals.
 	for i := len(snap.SealingSegment.Blocks) - 1; i >= 0; i-- {
@@ -47,11 +47,11 @@ func (snap EncodableSnapshot) LatestSeal() *flow.Seal {
 		if len(block.Payload.Seals) > 0 {
 			// We encountered a block with some seals, but not the latest seal.
 			// This can only occur in a structurally invalid SealingSegment.
-			panic("sanity check failed: no latest seal")
+			panic("LatestSeal: sanity check failed: no latest seal")
 		}
 	}
 	// Correctly formatted sealing segments must contain latest seal.
-	panic("unreachable for correctly formatted sealing segments")
+	panic("LatestSeal: unreachable for correctly formatted sealing segments")
 }
 
 // LatestSealedResult returns the latest sealed result of the Snapshot. This is the result which is sealed by LatestSeal.
@@ -74,7 +74,7 @@ func (snap EncodableSnapshot) LatestSealedResult() *flow.ExecutionResult {
 		}
 	}
 	// Correctly formatted sealing segments must contain latest result.
-	panic("unreachable for correctly formatted sealing segments")
+	panic("LatestSealedResult: unreachable for correctly formatted sealing segments")
 }
 
 // EncodableDKG is the encoding format for protocol.DKG
