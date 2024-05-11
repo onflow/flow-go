@@ -300,36 +300,6 @@ func MigrateGroupConcurrently(
 	return migrated, nil
 }
 
-var testnetAccountsWithBrokenSlabReferences = func() map[common.Address]struct{} {
-	testnetAddresses := map[common.Address]struct{}{
-		mustHexToAddress("434a1f199a7ae3ba"): {},
-		mustHexToAddress("454c9991c2b8d947"): {},
-		mustHexToAddress("48602d8056ff9d93"): {},
-		mustHexToAddress("5d63c34d7f05e5a4"): {},
-		mustHexToAddress("5e3448b3cffb97f2"): {},
-		mustHexToAddress("7d8c7e050c694eaa"): {},
-		mustHexToAddress("ba53f16ede01972d"): {},
-		mustHexToAddress("c843c1f5a4805c3a"): {},
-		mustHexToAddress("48d3be92e6e4a973"): {},
-	}
-
-	for address := range testnetAddresses {
-		if !flow.Testnet.Chain().IsValid(flow.Address(address)) {
-			panic(fmt.Sprintf("invalid testnet address: %s", address.Hex()))
-		}
-	}
-
-	return testnetAddresses
-}()
-
-func mustHexToAddress(hex string) common.Address {
-	address, err := common.HexToAddress(hex)
-	if err != nil {
-		panic(err)
-	}
-	return address
-}
-
 type jobMigrateAccountGroup struct {
 	Address  common.Address
 	Payloads []*ledger.Payload
