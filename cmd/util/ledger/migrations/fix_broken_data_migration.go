@@ -15,6 +15,7 @@ import (
 
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
+	"github.com/onflow/flow-go/cmd/util/ledger/util/registers"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/model/flow"
@@ -50,7 +51,7 @@ func NewFixBrokenReferencesInSlabsMigration(
 
 func (m *FixSlabsWithBrokenReferencesMigration) InitMigration(
 	log zerolog.Logger,
-	_ []*ledger.Payload,
+	_ *registers.ByAccount,
 	nWorkers int,
 ) error {
 	m.log = log.
@@ -65,27 +66,24 @@ func (m *FixSlabsWithBrokenReferencesMigration) InitMigration(
 func (m *FixSlabsWithBrokenReferencesMigration) MigrateAccount(
 	_ context.Context,
 	address common.Address,
-	oldPayloads []*ledger.Payload,
-) (
-	newPayloads []*ledger.Payload,
-	err error,
-) {
+	accountRegisters *registers.AccountRegisters,
+) error {
 
 	if _, exist := m.accountsToFix[address]; !exist {
-		return oldPayloads, nil
+		return nil
 	}
 
 	migrationRuntime, err := NewAtreeRegisterMigratorRuntime(address, oldPayloads)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create cadence runtime: %w", err)
+		return fmt.Errorf("failed to create cadence runtime: %w", err)
 	}
 
 	storage := migrationRuntime.Storage
 
 	// Load all atree registers in storage
-	err = loadAtreeSlabsInStorge(storage, oldPayloads, m.nWorkers)
+	err = loadAtreeSlabsInStorage(storage, accountRegisters, m.nWorkers)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	// Fix broken references
@@ -94,44 +92,44 @@ func (m *FixSlabsWithBrokenReferencesMigration) MigrateAccount(
 		return true
 	})
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	if len(skippedStorageIDs) > 0 {
 		m.log.Warn().
-			Str("account", address.Hex()).
+			Str("account", address.HexWithPrefix()).
 			Msgf("skipped slabs with broken references: %v", skippedStorageIDs)
 	}
 
 	if len(fixedStorageIDs) == 0 {
 		m.log.Warn().
-			Str("account", address.Hex()).
+			Str("account", address.HexWithPrefix()).
 			Msgf("did not fix any slabs with broken references")
 
-		return oldPayloads, nil
+		return nil
 	}
 
 	m.log.Log().
-		Str("account", address.Hex()).
+		Str("account", address.HexWithPrefix()).
 		Msgf("fixed %d slabs with broken references", len(fixedStorageIDs))
 
 	// Save broken payloads to save to payload file later
-	brokenPayloads, err := getAtreePayloadsByID(oldPayloads, fixedStorageIDs)
+	brokenPayloads, err := getAtreePayloadsByID(accountRegisters, fixedStorageIDs)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	m.mergeBrokenPayloads(brokenPayloads)
 
 	err = storage.NondeterministicFastCommit(m.nWorkers)
 	if err != nil {
-		return nil, err
+		return fmt.Errorf("failed to commit storage: %w", err)
 	}
 
 	// Finalize the transaction
 	result, err := migrationRuntime.TransactionState.FinalizeMainTransaction()
 	if err != nil {
-		return nil, fmt.Errorf("failed to finalize main transaction: %w", err)
+		return fmt.Errorf("failed to finalize main transaction: %w", err)
 	}
 
 	// Merge the changes to the original payloads.
@@ -139,19 +137,20 @@ func (m *FixSlabsWithBrokenReferencesMigration) MigrateAccount(
 		flow.Address(address): {},
 	}
 
-	newPayloads, err = migrationRuntime.Snapshot.ApplyChangesAndGetNewPayloads(
+	err = registers.ApplyChanges(
+		accountRegisters,
 		result.WriteSet,
 		expectedAddresses,
 		m.log,
 	)
 	if err != nil {
-		return nil, err
+		return fmt.Errorf("failed to apply changes to account registers: %w", err)
 	}
 
 	// Log fixed payloads
-	fixedPayloads, err := getAtreePayloadsByID(newPayloads, fixedStorageIDs)
+	fixedPayloads, err := getAtreePayloadsByID(accountRegisters, fixedStorageIDs)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	m.rw.Write(fixedSlabsWithBrokenReferences{
@@ -160,7 +159,7 @@ func (m *FixSlabsWithBrokenReferencesMigration) MigrateAccount(
 		FixedPayloads:  fixedPayloads,
 	})
 
-	return newPayloads, nil
+	return nil
 }
 
 func (m *FixSlabsWithBrokenReferencesMigration) mergeBrokenPayloads(payloads []*ledger.Payload) {
@@ -212,27 +211,42 @@ func (m *FixSlabsWithBrokenReferencesMigration) writeBrokenPayloads() error {
 	return nil
 }
 
-func getAtreePayloadsByID(payloads []*ledger.Payload, ids map[atree.SlabID][]atree.SlabID) ([]*ledger.Payload, error) {
+func getAtreePayloadsByID(
+	registers *registers.AccountRegisters,
+	ids map[atree.SlabID][]atree.SlabID,
+) (
+	[]*ledger.Payload,
+	error,
+) {
 	outputPayloads := make([]*ledger.Payload, 0, len(ids))
 
-	for _, payload := range payloads {
-		registerID, _, err := convert.PayloadToRegister(payload)
-		if err != nil {
-			return nil, fmt.Errorf("failed to convert payload to register: %w", err)
-		}
+	err := registers.ForEach(func(owner string, key string, value []byte) error {
 
-		if !registerID.IsSlabIndex() {
-			continue
+		if !flow.IsSlabIndexKey(key) {
+			return nil
 		}
 
 		storageID := atree.NewSlabID(
-			atree.Address([]byte(registerID.Owner)),
-			atree.SlabIndex([]byte(registerID.Key[1:])),
+			atree.Address([]byte(owner)),
+			atree.SlabIndex([]byte(key[1:])),
 		)
 
-		if _, ok := ids[storageID]; ok {
-			outputPayloads = append(outputPayloads, payload)
+		_, ok := ids[storageID]
+		if !ok {
+			return nil
 		}
+
+		ledgerKey := convert.RegisterIDToLedgerKey(flow.RegisterID{
+			Owner: owner,
+			Key:   key,
+		})
+		payload := ledger.NewPayload(ledgerKey, value)
+		outputPayloads = append(outputPayloads, payload)
+
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
 
 	return outputPayloads, nil
