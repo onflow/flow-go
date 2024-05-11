@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/cmd/util/ledger/util/registers"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/convert"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 func getSlabIDsFromPayloads(payloads []*ledger.Payload) ([]atree.SlabID, error) {
@@ -85,4 +86,27 @@ func init() {
 	for _, domain := range allStorageMapDomains {
 		allStorageMapDomainsSet[domain] = struct{}{}
 	}
+}
+
+func loadAtreeSlabsInStorage(storage *runtime.Storage, registers registers.Registers) error {
+
+	return registers.ForEach(func(owner string, key string, value []byte) error {
+
+		if !flow.IsSlabIndexKey(key) {
+			return nil
+		}
+
+		storageID := atree.NewSlabID(
+			atree.Address([]byte(owner)),
+			atree.SlabIndex([]byte(key[1:])),
+		)
+
+		// Retrieve the slab
+		_, _, err := storage.Retrieve(storageID)
+		if err != nil {
+			return fmt.Errorf("failed to retrieve slab %s: %w", storageID, err)
+		}
+
+		return nil
+	})
 }
