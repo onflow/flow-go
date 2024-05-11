@@ -11,7 +11,6 @@ import (
 	"github.com/onflow/atree"
 	"github.com/onflow/cadence/runtime/common"
 
-	"github.com/onflow/flow-go/cmd/util/ledger/util/snapshot"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/convert"
@@ -69,57 +68,11 @@ func (a *AccountsAtreeLedger) AllocateStorageIndex(owner []byte) (atree.StorageI
 	return v, nil
 }
 
-type PayloadsReadonlyLedger struct {
-	Snapshot snapshot.MigrationSnapshot
-
-	AllocateStorageIndexFunc func(owner []byte) (atree.StorageIndex, error)
-	SetValueFunc             func(owner, key, value []byte) (err error)
-}
-
-var _ atree.Ledger = &PayloadsReadonlyLedger{}
-
-func (p *PayloadsReadonlyLedger) GetValue(owner, key []byte) (value []byte, err error) {
-	registerID := newRegisterID(owner, key)
-	v, err := p.Snapshot.Get(registerID)
-	if err != nil {
-		return nil, fmt.Errorf("getting value failed: %w", err)
-	}
-	return v, nil
-}
-
-func (p *PayloadsReadonlyLedger) SetValue(owner, key, value []byte) (err error) {
-	if p.SetValueFunc != nil {
-		return p.SetValueFunc(owner, key, value)
-	}
-
-	panic("SetValue not expected to be called")
-}
-
-func (p *PayloadsReadonlyLedger) ValueExists(owner, key []byte) (bool, error) {
-	registerID := newRegisterID(owner, key)
-	exists := p.Snapshot.Exists(registerID)
-	return exists, nil
-}
-
-func (p *PayloadsReadonlyLedger) AllocateStorageIndex(owner []byte) (atree.StorageIndex, error) {
-	if p.AllocateStorageIndexFunc != nil {
-		return p.AllocateStorageIndexFunc(owner)
-	}
-
-	panic("AllocateStorageIndex not expected to be called")
-}
-
-func NewPayloadsReadonlyLedger(snapshot snapshot.MigrationSnapshot) *PayloadsReadonlyLedger {
-	return &PayloadsReadonlyLedger{Snapshot: snapshot}
-}
-
 // IsServiceLevelAddress returns true if the given address is the service level address.
 // Which means it's not an actual account but instead holds service lever registers.
 func IsServiceLevelAddress(address common.Address) bool {
 	return address == common.ZeroAddress
 }
-
-var _ atree.Ledger = &PayloadsReadonlyLedger{}
 
 func PayloadsFromEmulatorSnapshot(snapshotPath string) ([]*ledger.Payload, error) {
 	db, err := sql.Open("sqlite", snapshotPath)
