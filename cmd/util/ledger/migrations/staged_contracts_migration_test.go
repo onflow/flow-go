@@ -997,7 +997,7 @@ func TestStagedContractsWithImports(t *testing.T) {
 		require.Contains(
 			t,
 			logWriter.logs[0],
-			"cannot find declaration `B` in `ee82856bf20e2aa6.B`",
+			"`pub` is no longer a valid access keyword",
 		)
 
 		// Registers should be the old ones
@@ -1239,7 +1239,7 @@ func TestStagedContractsWithImports(t *testing.T) {
 		require.Contains(
 			t,
 			logWriter.logs[0],
-			"cannot find declaration `B` in `ee82856bf20e2aa6.B`",
+			"`pub` is no longer a valid access keyword",
 		)
 
 		// A and B should be the old ones.
@@ -1597,7 +1597,7 @@ func TestStagedContractsWithUpdateValidator(t *testing.T) {
 		require.Len(t, logWriter.logs, 1)
 		assert.Contains(t,
 			logWriter.logs[0],
-			"cannot find declaration `FungibleToken` in `0000000000000002.FungibleToken`",
+			"incompatible type annotations. expected `FungibleToken.Vault`, found `{FungibleToken.Vault}`",
 		)
 
 		require.Equal(t, 1, accountRegistersA.Count())
