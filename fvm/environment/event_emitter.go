@@ -19,16 +19,14 @@ const (
 )
 
 type EventEmitterParams struct {
-	ServiceEventCollectionEnabled bool
-	EventCollectionByteSizeLimit  uint64
-	EventEncoder                  EventEncoder
+	EventCollectionByteSizeLimit uint64
+	EventEncoder                 EventEncoder
 }
 
 func DefaultEventEmitterParams() EventEmitterParams {
 	return EventEmitterParams{
-		ServiceEventCollectionEnabled: false,
-		EventCollectionByteSizeLimit:  DefaultEventCollectionByteSizeLimit,
-		EventEncoder:                  NewCadenceEventEncoder(),
+		EventCollectionByteSizeLimit: DefaultEventCollectionByteSizeLimit,
+		EventEncoder:                 NewCadenceEventEncoder(),
 	}
 }
 
@@ -191,27 +189,24 @@ func (emitter *eventEmitter) EmitEvent(event cadence.Event) error {
 	// TODO: to set limit to maximum when it is service account and get rid of this flag
 	isServiceAccount := emitter.payer == emitter.chain.ServiceAddress()
 
-	if emitter.ServiceEventCollectionEnabled {
-		ok, err := IsServiceEvent(eventType, emitter.chain.ChainID())
-		if err != nil {
-			return fmt.Errorf("unable to check service event: %w", err)
-		}
-		if ok {
-			eventEmitError := emitter.eventCollection.AppendServiceEvent(
-				emitter.chain,
-				flowEvent,
-				uint64(payloadSize))
+	isServiceEvent, err := IsServiceEvent(eventType, emitter.chain.ChainID())
+	if err != nil {
+		return fmt.Errorf("unable to check service event: %w", err)
+	}
+	if isServiceEvent {
+		eventEmitError := emitter.eventCollection.AppendServiceEvent(
+			emitter.chain,
+			flowEvent,
+			uint64(payloadSize))
 
-			// skip limit if payer is service account
-			// TODO skip only limit-related errors
-			if !isServiceAccount && eventEmitError != nil {
-				return eventEmitError
-			}
+		// skip limit if payer is service account
+		// TODO skip only limit-related errors
+		if !isServiceAccount && eventEmitError != nil {
+			return eventEmitError
 		}
-		// We don't return and append the service event into event collection
-		// as well.
 	}
 
+	// Regardless of whether it is a service event, add to eventCollection
 	eventEmitError := emitter.eventCollection.AppendEvent(flowEvent, uint64(payloadSize))
 	// skip limit if payer is service account
 	if !isServiceAccount {
@@ -295,8 +290,11 @@ func (collection *EventCollection) TotalEventCounter() uint32 {
 	return collection.eventCounter
 }
 
-// IsServiceEvent determines whether or not an emitted Cadence event is
-// considered a service event for the given chain.
+// IsServiceEvent determines whether an emitted Cadence event is considered a service event for the given chain.
+// An event is a service event if it is defined in the `systemcontracts` package allow-list.
+// Note that we have *removed* the prior constraint that service events can only be
+// emitted in the system chunk. Now a system smart contract can emit service events
+// as part of any transaction.
 func IsServiceEvent(eventType flow.EventType, chain flow.ChainID) (bool, error) {
 
 	// retrieve the service event information for this chain
