@@ -7,6 +7,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/cmd/util/ledger/util/registers"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
@@ -119,7 +120,10 @@ func TestDeploy(t *testing.T) {
 		}
 	}
 
-	newPayloads, err := migration(filteredPayloads)
+	registersByAccount, err := registers.NewByAccountFromPayloads(filteredPayloads)
+	require.NoError(t, err)
+
+	err = migration(registersByAccount)
 	require.NoError(t, err)
 
 	txBody := flow.NewTransactionBody().
@@ -140,7 +144,7 @@ func TestDeploy(t *testing.T) {
 
 	storageSnapshot := snapshot.MapStorageSnapshot{}
 
-	for _, newPayload := range newPayloads {
+	for _, newPayload := range registersByAccount.Payloads() {
 		registerID, registerValue, err := convert.PayloadToRegister(newPayload)
 		require.NoError(t, err)
 
