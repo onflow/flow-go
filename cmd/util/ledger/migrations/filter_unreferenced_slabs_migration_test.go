@@ -17,6 +17,7 @@ import (
 
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
+	"github.com/onflow/flow-go/cmd/util/ledger/util/registers"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/model/flow"
@@ -161,12 +162,19 @@ func TestFilterUnreferencedSlabs(t *testing.T) {
 
 	log := zerolog.New(zerolog.NewTestWriter(t))
 
-	err = migration.InitMigration(log, nil, 0)
+	registersByAccount, err := registers.NewByAccountFromPayloads(oldPayloads)
 	require.NoError(t, err)
 
-	ctx := context.Background()
+	err = migration.InitMigration(log, registersByAccount, 1)
+	require.NoError(t, err)
 
-	newPayloads, err := migration.MigrateAccount(ctx, testAddress, oldPayloads)
+	accountRegisters := registersByAccount.AccountRegisters(string(testAddress[:]))
+
+	err = migration.MigrateAccount(
+		context.Background(),
+		testAddress,
+		accountRegisters,
+	)
 	require.NoError(t, err)
 
 	err = migration.Close()
@@ -182,6 +190,7 @@ func TestFilterUnreferencedSlabs(t *testing.T) {
 		string([]byte{flow.SlabIndexPrefix, 0, 0, 0, 0, 0, 0, 0, 3}): {},
 	}
 
+	newPayloads := registersByAccount.Payloads()
 	assert.Len(t, newPayloads, totalSlabCount-len(expectedKeys))
 
 	expectedFilteredPayloads := make([]*ledger.Payload, 0, len(expectedKeys))
@@ -210,7 +219,7 @@ func TestFilterUnreferencedSlabs(t *testing.T) {
 		},
 		writer.entries,
 	)
-	assert.Equal(t,
+	assert.ElementsMatch(t,
 		expectedFilteredPayloads,
 		migration.filteredPayloads,
 	)
@@ -218,7 +227,10 @@ func TestFilterUnreferencedSlabs(t *testing.T) {
 	readIsPartial, readFilteredPayloads, err := util.ReadPayloadFile(log, migration.payloadsFile)
 	require.NoError(t, err)
 	assert.True(t, readIsPartial)
-	assert.Equal(t, expectedFilteredPayloads, readFilteredPayloads)
+	assert.ElementsMatch(t,
+		expectedFilteredPayloads,
+		readFilteredPayloads,
+	)
 }
 
 type testReportWriterFactory struct {
