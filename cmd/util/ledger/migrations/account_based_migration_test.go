@@ -1,4 +1,4 @@
-package migrations_test
+package migrations
 
 import (
 	"context"
@@ -10,9 +10,23 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/cmd/util/ledger/migrations"
+	"github.com/onflow/flow-go/cmd/util/ledger/util/registers"
+	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/convert"
+	"github.com/onflow/flow-go/model/flow"
 )
+
+func accountStatusPayload(address common.Address) *ledger.Payload {
+	accountStatus := environment.NewAccountStatus()
+
+	return ledger.NewPayload(
+		convert.RegisterIDToLedgerKey(
+			flow.AccountStatusRegisterID(flow.ConvertAddress(address)),
+		),
+		accountStatus.ToBytes(),
+	)
+}
 
 func TestErrorPropagation(t *testing.T) {
 	t.Parallel()
@@ -22,19 +36,26 @@ func TestErrorPropagation(t *testing.T) {
 	address, err := common.HexToAddress("0x1")
 	require.NoError(t, err)
 
-	migrateWith := func(mig migrations.AccountBasedMigration) error {
-		_, err := migrations.MigrateByAccount(
+	migrateWith := func(mig AccountBasedMigration) error {
+
+		// at least one payload otherwise the migration will not get called
+		payloads := []*ledger.Payload{
+			accountStatusPayload(address),
+		}
+
+		registersByAccount, err := registers.NewByAccountFromPayloads(payloads)
+		if err != nil {
+			return fmt.Errorf("could not create registers by account: %w", err)
+		}
+
+		return MigrateByAccount(
 			log,
 			10,
-			[]*ledger.Payload{
-				// at least one payload otherwise the migration will not get called
-				accountStatusPayload(address),
-			},
-			[]migrations.AccountBasedMigration{
+			registersByAccount,
+			[]AccountBasedMigration{
 				mig,
 			},
 		)
-		return err
 	}
 
 	t.Run("no err", func(t *testing.T) {
@@ -61,7 +82,11 @@ func TestErrorPropagation(t *testing.T) {
 		desiredErr := fmt.Errorf("test init error")
 		err := migrateWith(
 			testMigration{
-				InitMigrationFN: func(log zerolog.Logger, allPayloads []*ledger.Payload, nWorkers int) error {
+				InitMigrationFN: func(
+					log zerolog.Logger,
+					registersByAccount *registers.ByAccount,
+					nWorkers int,
+				) error {
 					return desiredErr
 				},
 			},
@@ -73,8 +98,12 @@ func TestErrorPropagation(t *testing.T) {
 		desiredErr := fmt.Errorf("test migrate error")
 		err := migrateWith(
 			testMigration{
-				MigrateAccountFN: func(ctx context.Context, address common.Address, payloads []*ledger.Payload) ([]*ledger.Payload, error) {
-					return nil, desiredErr
+				MigrateAccountFN: func(
+					_ context.Context,
+					_ common.Address,
+					_ *registers.AccountRegisters,
+				) error {
+					return desiredErr
 				},
 			},
 		)
@@ -83,24 +112,42 @@ func TestErrorPropagation(t *testing.T) {
 }
 
 type testMigration struct {
-	InitMigrationFN  func(log zerolog.Logger, allPayloads []*ledger.Payload, nWorkers int) error
-	MigrateAccountFN func(ctx context.Context, address common.Address, payloads []*ledger.Payload) ([]*ledger.Payload, error)
-	CloseFN          func() error
+	InitMigrationFN func(
+		log zerolog.Logger,
+		registersByAccount *registers.ByAccount,
+		nWorkers int,
+	) error
+	MigrateAccountFN func(
+		ctx context.Context,
+		address common.Address,
+		accountRegisters *registers.AccountRegisters,
+	) error
+	CloseFN func() error
 }
 
-func (t testMigration) InitMigration(log zerolog.Logger, allPayloads []*ledger.Payload, nWorkers int) error {
+var _ AccountBasedMigration = &testMigration{}
+
+func (t testMigration) InitMigration(
+	log zerolog.Logger,
+	registersByAccount *registers.ByAccount,
+	nWorkers int,
+) error {
 	if t.InitMigrationFN != nil {
-		return t.InitMigrationFN(log, allPayloads, nWorkers)
+		return t.InitMigrationFN(log, registersByAccount, nWorkers)
 	}
 	return nil
 }
 
-func (t testMigration) MigrateAccount(ctx context.Context, address common.Address, payloads []*ledger.Payload) ([]*ledger.Payload, error) {
+func (t testMigration) MigrateAccount(
+	ctx context.Context,
+	address common.Address,
+	accountRegisters *registers.AccountRegisters,
+) error {
 
 	if t.MigrateAccountFN != nil {
-		return t.MigrateAccountFN(ctx, address, payloads)
+		return t.MigrateAccountFN(ctx, address, accountRegisters)
 	}
-	return payloads, nil
+	return nil
 }
 
 func (t testMigration) Close() error {
@@ -109,5 +156,3 @@ func (t testMigration) Close() error {
 	}
 	return nil
 }
-
-var _ migrations.AccountBasedMigration = &testMigration{}

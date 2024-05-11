@@ -8,6 +8,7 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/stdlib"
 
+	"github.com/onflow/flow-go/cmd/util/ledger/util/registers"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/convert"
 )
@@ -66,6 +67,8 @@ func checkStorageHealth(
 
 	return storage.CheckHealth()
 }
+
+type RegistersMigration func(registersByAccount *registers.ByAccount) error
 
 var allStorageMapDomains = []string{
 	common.PathDomainStorage.Identifier(),
