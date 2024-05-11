@@ -12,6 +12,8 @@ import (
 	"github.com/onflow/flow-go/ledger/common/convert"
 )
 
+type RegistersMigration func(registersByAccount *registers.ByAccount) error
+
 var allStorageMapDomains = []string{
 	common.PathDomainStorage.Identifier(),
 	common.PathDomainPrivate.Identifier(),

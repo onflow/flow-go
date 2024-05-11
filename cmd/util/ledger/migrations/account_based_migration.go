@@ -13,8 +13,7 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
-	"github.com/onflow/flow-go/ledger"
-	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/cmd/util/ledger/util/registers"
 	moduleUtil "github.com/onflow/flow-go/module/util"
 )
 
@@ -26,14 +25,14 @@ const logTopNDurations = 20
 type AccountBasedMigration interface {
 	InitMigration(
 		log zerolog.Logger,
-		allPayloads []*ledger.Payload,
+		registersByAccount *registers.ByAccount,
 		nWorkers int,
 	) error
 	MigrateAccount(
 		ctx context.Context,
 		address common.Address,
-		payloads []*ledger.Payload,
-	) ([]*ledger.Payload, error)
+		accountRegisters *registers.AccountRegisters,
+	) error
 	io.Closer
 }
 
@@ -48,30 +47,29 @@ func NewAccountBasedMigration(
 	log zerolog.Logger,
 	nWorker int,
 	migrations []AccountBasedMigration,
-) func(payloads []*ledger.Payload) ([]*ledger.Payload, error) {
-	return func(payloads []*ledger.Payload) ([]*ledger.Payload, error) {
+) RegistersMigration {
+	return func(registersByAccount *registers.ByAccount) error {
 		return MigrateByAccount(
 			log,
 			nWorker,
-			payloads,
+			registersByAccount,
 			migrations,
 		)
 	}
 }
 
-// MigrateByAccount takes migrations and all the Payloads,
-// and returns the migrated Payloads.
+// MigrateByAccount takes migrations and all the registers, grouped by account,
+// and returns the migrated registers.
 func MigrateByAccount(
 	log zerolog.Logger,
 	nWorker int,
-	allPayloads []*ledger.Payload,
+	registersByAccount *registers.ByAccount,
 	migrations []AccountBasedMigration,
-) (
-	[]*ledger.Payload,
-	error,
-) {
-	if len(allPayloads) == 0 {
-		return allPayloads, nil
+) error {
+	accountCount := registersByAccount.AccountCount()
+
+	if accountCount == 0 {
+		return nil
 	}
 
 	log.Info().
@@ -79,40 +77,37 @@ func MigrateByAccount(
 		Int("nWorker", nWorker).
 		Msgf("created account migrations")
 
-	// group the Payloads by account
-	accountGroups := util.GroupPayloadsByAccount(log, allPayloads, nWorker)
-
-	for i, migrator := range migrations {
-		err := migrator.InitMigration(
+	for i, migration := range migrations {
+		err := migration.InitMigration(
 			log.With().
 				Int("migration_index", i).
 				Logger(),
-			allPayloads,
+			registersByAccount,
 			nWorker,
 		)
 		if err != nil {
-			return nil, fmt.Errorf("could not init migration: %w", err)
+			return fmt.Errorf("could not init migration: %w", err)
 		}
 	}
 
-	var migrated []*ledger.Payload
 	err := withMigrations(log, migrations, func() error {
-		var err error
-		// migrate the Payloads under accounts
-		migrated, err = MigrateGroupConcurrently(log, migrations, accountGroups, nWorker)
-		return err
+		return MigrateGroupConcurrently(
+			log,
+			migrations,
+			registersByAccount,
+			nWorker,
+		)
 	})
 
 	log.Info().
-		Int("account_count", accountGroups.Len()).
-		Int("payload_count", len(allPayloads)).
-		Msgf("finished migrating Payloads")
+		Int("account_count", accountCount).
+		Msgf("finished migrating registers")
 
 	if err != nil {
-		return nil, fmt.Errorf("could not migrate accounts: %w", err)
+		return fmt.Errorf("could not migrate accounts: %w", err)
 	}
 
-	return migrated, nil
+	return nil
 }
 
 // withMigrations calls the given function and then closes the given migrations.
@@ -122,12 +117,12 @@ func withMigrations(
 	f func() error,
 ) (err error) {
 	defer func() {
-		for i, migrator := range migrations {
+		for migrationIndex, migration := range migrations {
 			log.Info().
-				Int("migration_index", i).
-				Type("migration", migrator).
+				Int("migration_index", migrationIndex).
+				Type("migration", migration).
 				Msg("closing migration")
-			if cerr := migrator.Close(); cerr != nil {
+			if cerr := migration.Close(); cerr != nil {
 				log.Err(cerr).Msg("error closing migration")
 				if err == nil {
 					// only set the error if it's not already set
@@ -141,25 +136,26 @@ func withMigrations(
 	return f()
 }
 
-// MigrateGroupConcurrently migrate the Payloads in the given account groups.
-// It uses nWorker to process the Payloads concurrently. The Payloads in each account
-// are processed sequentially by the given migrations in order.
+// MigrateGroupConcurrently migrate the registers in the given account groups.
+// The registers in each account are processed sequentially by the given migrations in order.
 func MigrateGroupConcurrently(
 	log zerolog.Logger,
 	migrations []AccountBasedMigration,
-	accountGroups *util.PayloadAccountGrouping,
+	registersByAccount *registers.ByAccount,
 	nWorker int,
-) ([]*ledger.Payload, error) {
+) error {
 
 	ctx := context.Background()
 	ctx, cancel := context.WithCancelCause(ctx)
 	defer cancel(nil)
 
-	jobs := make(chan jobMigrateAccountGroup, accountGroups.Len())
+	accountCount := registersByAccount.AccountCount()
+
+	jobs := make(chan jobMigrateAccountGroup, accountCount)
 
 	wg := sync.WaitGroup{}
 	wg.Add(nWorker)
-	resultCh := make(chan *migrationResult, accountGroups.Len())
+	resultCh := make(chan *migrationResult, accountCount)
 	for i := 0; i < nWorker; i++ {
 		go func() {
 			defer wg.Done()
@@ -174,22 +170,22 @@ func MigrateGroupConcurrently(
 					}
 					start := time.Now()
 
+					address := job.Address
+					accountRegisters := job.AccountRegisters
+
 					// This is not an account, but service level keys.
-					if util.IsServiceLevelAddress(job.Address) {
+					if util.IsServiceLevelAddress(address) {
 						resultCh <- &migrationResult{
 							migrationDuration: migrationDuration{
-								Address:      job.Address,
-								Duration:     time.Since(start),
-								PayloadCount: len(job.Payloads),
+								Address:       address,
+								Duration:      time.Since(start),
+								RegisterCount: accountRegisters.Count(),
 							},
-							Migrated: job.Payloads,
 						}
 						continue
 					}
 
-					var err error
-					accountMigrated := job.Payloads
-					for m, migrator := range migrations {
+					for m, migration := range migrations {
 
 						select {
 						case <-ctx.Done():
@@ -197,13 +193,13 @@ func MigrateGroupConcurrently(
 						default:
 						}
 
-						accountMigrated, err = migrator.MigrateAccount(ctx, job.Address, accountMigrated)
+						err := migration.MigrateAccount(ctx, address, accountRegisters)
 						if err != nil {
 							log.Error().
 								Err(err).
 								Int("migration_index", m).
-								Type("migration", migrator).
-								Hex("address", job.Address[:]).
+								Type("migration", migration).
+								Hex("address", address[:]).
 								Msg("could not migrate account")
 							cancel(fmt.Errorf("could not migrate account: %w", err))
 							return
@@ -212,11 +208,10 @@ func MigrateGroupConcurrently(
 
 					resultCh <- &migrationResult{
 						migrationDuration: migrationDuration{
-							Address:      job.Address,
-							Duration:     time.Since(start),
-							PayloadCount: len(job.Payloads),
+							Address:       address,
+							Duration:      time.Since(start),
+							RegisterCount: accountRegisters.Count(),
 						},
-						Migrated: accountMigrated,
 					}
 				}
 			}
@@ -225,27 +220,28 @@ func MigrateGroupConcurrently(
 
 	go func() {
 		defer close(jobs)
-		for {
-			g, err := accountGroups.Next()
-			if err != nil {
-				cancel(fmt.Errorf("could not get next account group: %w", err))
-				return
-			}
+		err := registersByAccount.ForEachAccount(
+			func(owner string, accountRegisters *registers.AccountRegisters) error {
+				address, err := common.BytesToAddress([]byte(owner))
+				if err != nil {
+					return err
+				}
+				job := jobMigrateAccountGroup{
+					Address:          address,
+					AccountRegisters: accountRegisters,
+				}
 
-			if g == nil {
-				break
-			}
+				select {
+				case <-ctx.Done():
+					return nil
+				case jobs <- job:
+				}
 
-			job := jobMigrateAccountGroup{
-				Address:  g.Address,
-				Payloads: g.Payloads,
-			}
-
-			select {
-			case <-ctx.Done():
-				return
-			case jobs <- job:
-			}
+				return nil
+			},
+		)
+		if err != nil {
+			cancel(fmt.Errorf("failed to schedule jobs for all accounts: %w", err))
 		}
 	}()
 
@@ -254,32 +250,24 @@ func MigrateGroupConcurrently(
 		log,
 		moduleUtil.DefaultLogProgressConfig(
 			"processing account group",
-			accountGroups.Len(),
+			accountCount,
 		),
 	)
 
-	migrated := make([]*ledger.Payload, 0, accountGroups.AllPayloadsCount())
 	durations := newMigrationDurations(logTopNDurations)
-	contextDone := false
-	for i := 0; i < accountGroups.Len(); i++ {
+accountLoop:
+	for accountIndex := 0; accountIndex < accountCount; accountIndex++ {
 		select {
 		case <-ctx.Done():
-			contextDone = true
-			break
+			break accountLoop
 		case result := <-resultCh:
 			durations.Add(result)
-
-			accountMigrated := result.Migrated
-			migrated = append(migrated, accountMigrated...)
 			logAccount(1)
-		}
-		if contextDone {
-			break
 		}
 	}
 
 	// make sure to exit all workers before returning from this function
-	// so that the migrator can be closed properly
+	// so that the migration can be closed properly
 	log.Info().Msg("waiting for migration workers to finish")
 	wg.Wait()
 
@@ -294,27 +282,25 @@ func MigrateGroupConcurrently(
 			err = cause
 		}
 
-		return nil, fmt.Errorf("failed to migrate payload: %w", err)
+		return fmt.Errorf("failed to migrate payload: %w", err)
 	}
 
-	return migrated, nil
+	return nil
 }
 
 type jobMigrateAccountGroup struct {
-	Address  common.Address
-	Payloads []*ledger.Payload
+	Address          common.Address
+	AccountRegisters *registers.AccountRegisters
 }
 
 type migrationResult struct {
 	migrationDuration
-
-	Migrated []*ledger.Payload
 }
 
 type migrationDuration struct {
-	Address      common.Address
-	Duration     time.Duration
-	PayloadCount int
+	Address       common.Address
+	Duration      time.Duration
+	RegisterCount int
 }
 
 // migrationDurations implements heap methods for the timer results
@@ -354,9 +340,9 @@ func (h *migrationDurations) Pop() interface{} {
 func (h *migrationDurations) Array() zerolog.LogArrayMarshaler {
 	array := zerolog.Arr()
 	for _, result := range h.v {
-		array = array.Str(fmt.Sprintf("%s [payloads: %d]: %s",
+		array = array.Str(fmt.Sprintf("%s [registers: %d]: %s",
 			result.Address.Hex(),
-			result.PayloadCount,
+			result.RegisterCount,
 			result.Duration.String(),
 		))
 	}
