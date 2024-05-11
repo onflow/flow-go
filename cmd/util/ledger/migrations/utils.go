@@ -8,8 +8,8 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/stdlib"
 
-	"github.com/onflow/flow-go/ledger"
-	"github.com/onflow/flow-go/ledger/common/convert"
+	"github.com/onflow/flow-go/cmd/util/ledger/util/registers"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 type RegistersMigration func(registersByAccount *registers.ByAccount) error
@@ -31,39 +31,36 @@ func init() {
 	}
 }
 
-func loadAtreeSlabsInStorge(storage *runtime.Storage, payloads []*ledger.Payload) error {
-	for _, payload := range payloads {
-		registerID, _, err := convert.PayloadToRegister(payload)
+func loadAtreeSlabsInStorage(storage *runtime.Storage, registers registers.Registers) error {
+
+	return registers.ForEach(func(owner string, key string, value []byte) error {
+
+		if !flow.IsSlabIndexKey(key) {
+			return nil
+		}
+
+		storageID := atree.NewStorageID(
+			atree.Address([]byte(owner)),
+			atree.StorageIndex([]byte(key[1:])),
+		)
+
+		// Retrieve the slab
+		_, _, err := storage.Retrieve(storageID)
 		if err != nil {
-			return fmt.Errorf("failed to convert payload to register: %w", err)
+			return fmt.Errorf("failed to retrieve slab %s: %w", storageID, err)
 		}
 
-		if !registerID.IsSlabIndex() {
-			continue
-		}
-
-		// Convert the register ID to a storage ID.
-		slabID := atree.NewStorageID(
-			atree.Address([]byte(registerID.Owner)),
-			atree.StorageIndex([]byte(registerID.Key[1:])))
-
-		// Retrieve the slab.
-		_, _, err = storage.Retrieve(slabID)
-		if err != nil {
-			return fmt.Errorf("failed to retrieve slab %s: %w", slabID, err)
-		}
-	}
-
-	return nil
+		return nil
+	})
 }
 
 func checkStorageHealth(
 	address common.Address,
 	storage *runtime.Storage,
-	payloads []*ledger.Payload,
+	registers registers.Registers,
 ) error {
 
-	err := loadAtreeSlabsInStorge(storage, payloads)
+	err := loadAtreeSlabsInStorage(storage, registers)
 	if err != nil {
 		return err
 	}
