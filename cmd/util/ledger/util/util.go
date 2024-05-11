@@ -203,7 +203,7 @@ var _ atree.Ledger = &PayloadsReadonlyLedger{}
 type PayloadsLedger struct {
 	Payloads map[flow.RegisterID]*ledger.Payload
 
-	AllocateStorageIndexFunc func(owner []byte) (atree.SlabIndex, error)
+	AllocateSlabIndexFunc func(owner []byte) (atree.SlabIndex, error)
 }
 
 var _ atree.Ledger = &PayloadsLedger{}
@@ -237,8 +237,8 @@ func (p *PayloadsLedger) ValueExists(owner, key []byte) (exists bool, err error)
 }
 
 func (p *PayloadsLedger) AllocateSlabIndex(owner []byte) (atree.SlabIndex, error) {
-	if p.AllocateStorageIndexFunc != nil {
-		return p.AllocateStorageIndexFunc(owner)
+	if p.AllocateSlabIndexFunc != nil {
+		return p.AllocateSlabIndexFunc(owner)
 	}
 
 	panic("AllocateSlabIndex not expected to be called")

@@ -75,8 +75,27 @@ func ContractNamesRegisterID(address Address) RegisterID {
 func ContractRegisterID(address Address, contractName string) RegisterID {
 	return RegisterID{
 		Owner: addressToOwner(address),
-		Key:   CodeKeyPrefix + contractName,
+		Key:   ContractKey(contractName),
 	}
+}
+
+func ContractKey(contractName string) string {
+	return CodeKeyPrefix + contractName
+}
+
+func IsContractKey(key string) bool {
+	return strings.HasPrefix(key, CodeKeyPrefix)
+}
+
+func KeyContractName(key string) string {
+	if !IsContractKey(key) {
+		return ""
+	}
+	return key[len(CodeKeyPrefix):]
+}
+
+func IsContractNamesRegisterID(registerID RegisterID) bool {
+	return registerID.Key == ContractNamesKey
 }
 
 func CadenceRegisterID(owner []byte, key []byte) RegisterID {
@@ -135,7 +154,11 @@ const SlabIndexPrefix = '$'
 // only to cadence.  Cadence encodes this map into bytes and split the bytes
 // into slab chunks before storing the slabs into the ledger.
 func (id RegisterID) IsSlabIndex() bool {
-	return len(id.Key) == 9 && id.Key[0] == SlabIndexPrefix
+	return IsSlabIndexKey(id.Key)
+}
+
+func IsSlabIndexKey(key string) bool {
+	return len(key) == 9 && key[0] == SlabIndexPrefix
 }
 
 // String returns formatted string representation of the RegisterID.

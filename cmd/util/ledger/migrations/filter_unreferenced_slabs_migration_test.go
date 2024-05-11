@@ -40,7 +40,7 @@ func TestFilterUnreferencedSlabs(t *testing.T) {
 	payloadsLedger := util.NewPayloadsLedger(payloads)
 
 	storageIndices := map[string]uint64{}
-	payloadsLedger.AllocateStorageIndexFunc = func(owner []byte) (atree.SlabIndex, error) {
+	payloadsLedger.AllocateSlabIndexFunc = func(owner []byte) (atree.SlabIndex, error) {
 		var index atree.SlabIndex
 
 		storageIndices[string(owner)]++
