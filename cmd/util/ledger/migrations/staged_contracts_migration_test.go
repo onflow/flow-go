@@ -1451,6 +1451,7 @@ func TestStagedContractsWithUpdateValidator(t *testing.T) {
 				},
 			},
 		)
+		require.NoError(t, err)
 
 		err = migration.InitMigration(log, registersByAccount, 1)
 		require.NoError(t, err)
@@ -1567,6 +1568,7 @@ func TestStagedContractsWithUpdateValidator(t *testing.T) {
 				},
 			},
 		)
+		require.NoError(t, err)
 
 		err = migration.InitMigration(log, registersByAccount, 1)
 		require.NoError(t, err)
@@ -1672,6 +1674,7 @@ func TestStagedContractsWithUpdateValidator(t *testing.T) {
 				},
 			},
 		)
+		require.NoError(t, err)
 
 		err = migration.InitMigration(log, registersByAccount, 1)
 		require.NoError(t, err)
@@ -1803,6 +1806,7 @@ func TestStagedContractConformanceChanges(t *testing.T) {
 					},
 				},
 			)
+			require.NoError(t, err)
 
 			err = migration.InitMigration(log, registersByAccount, 1)
 			require.NoError(t, err)
@@ -1935,6 +1939,7 @@ func TestStagedContractConformanceChanges(t *testing.T) {
 				},
 			},
 		)
+		require.NoError(t, err)
 
 		err = migration.InitMigration(log, registersByAccount, 1)
 		require.NoError(t, err)
@@ -2197,6 +2202,7 @@ func TestStagedContractsUpdateValidationErrors(t *testing.T) {
 				},
 			},
 		)
+		require.NoError(t, err)
 
 		err = migration.InitMigration(log, registersByAccount, 1)
 		require.NoError(t, err)
@@ -2319,6 +2325,7 @@ func TestStagedContractsUpdateValidationErrors(t *testing.T) {
 				},
 			},
 		)
+		require.NoError(t, err)
 
 		err = migration.InitMigration(log, registersByAccount, 1)
 		require.NoError(t, err)
