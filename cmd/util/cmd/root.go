@@ -72,7 +72,10 @@ func init() {
 	rootCmd.PersistentFlags().DurationVar(&flagProfilerInterval, "profiler-interval", 1*time.Minute, "the interval between auto-profiler runs")
 	rootCmd.PersistentFlags().DurationVar(&flagProfilerDuration, "profiler-duration", 10*time.Second, "the duration to run the auto-profile for")
 
-	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
+	log.Logger = log.Output(zerolog.ConsoleWriter{
+		Out:        os.Stderr,
+		TimeFormat: time.TimeOnly,
+	})
 
 	cobra.OnInitialize(initConfig)
 
