@@ -17,6 +17,7 @@ import (
 )
 
 func TestFixSlabsWithBrokenReferences(t *testing.T) {
+	t.Parallel()
 
 	rawAddress := mustDecodeHex("5e3448b3cffb97f2")
 

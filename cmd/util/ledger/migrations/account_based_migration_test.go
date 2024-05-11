@@ -59,6 +59,8 @@ func TestErrorPropagation(t *testing.T) {
 	}
 
 	t.Run("no err", func(t *testing.T) {
+		t.Parallel()
+
 		err := migrateWith(
 			testMigration{},
 		)
@@ -66,6 +68,7 @@ func TestErrorPropagation(t *testing.T) {
 	})
 
 	t.Run("err on close", func(t *testing.T) {
+		t.Parallel()
 
 		desiredErr := fmt.Errorf("test close error")
 		err := migrateWith(
@@ -79,6 +82,8 @@ func TestErrorPropagation(t *testing.T) {
 	})
 
 	t.Run("err on init", func(t *testing.T) {
+		t.Parallel()
+
 		desiredErr := fmt.Errorf("test init error")
 		err := migrateWith(
 			testMigration{
@@ -95,6 +100,8 @@ func TestErrorPropagation(t *testing.T) {
 	})
 
 	t.Run("err on migrate", func(t *testing.T) {
+		t.Parallel()
+
 		desiredErr := fmt.Errorf("test migrate error")
 		err := migrateWith(
 			testMigration{

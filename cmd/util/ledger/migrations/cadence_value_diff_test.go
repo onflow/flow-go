@@ -18,12 +18,16 @@ import (
 )
 
 func TestDiffCadenceValues(t *testing.T) {
+	t.Parallel()
+
 	address, err := common.HexToAddress("0x1")
 	require.NoError(t, err)
 
 	domain := common.PathDomainStorage.Identifier()
 
 	t.Run("no diff", func(t *testing.T) {
+		t.Parallel()
+
 		writer := &testReportWriter{}
 
 		diffReporter := NewCadenceValueDiffReporter(address, flow.Emulator, writer, true)
@@ -38,6 +42,8 @@ func TestDiffCadenceValues(t *testing.T) {
 	})
 
 	t.Run("one storage map doesn't exist", func(t *testing.T) {
+		t.Parallel()
+
 		writer := &testReportWriter{}
 
 		diffReporter := NewCadenceValueDiffReporter(address, flow.Emulator, writer, true)
@@ -57,6 +63,8 @@ func TestDiffCadenceValues(t *testing.T) {
 	})
 
 	t.Run("storage maps have different sets of keys", func(t *testing.T) {
+		t.Parallel()
+
 		writer := &testReportWriter{}
 
 		diffReporter := NewCadenceValueDiffReporter(address, flow.Emulator, writer, true)
@@ -82,6 +90,8 @@ func TestDiffCadenceValues(t *testing.T) {
 	})
 
 	t.Run("storage maps have overlapping keys", func(t *testing.T) {
+		t.Parallel()
+
 		writer := &testReportWriter{}
 
 		diffReporter := NewCadenceValueDiffReporter(address, flow.Emulator, writer, true)
@@ -107,6 +117,8 @@ func TestDiffCadenceValues(t *testing.T) {
 	})
 
 	t.Run("storage maps have one different value", func(t *testing.T) {
+		t.Parallel()
+
 		writer := &testReportWriter{}
 
 		diffReporter := NewCadenceValueDiffReporter(address, flow.Emulator, writer, false)
@@ -132,6 +144,8 @@ func TestDiffCadenceValues(t *testing.T) {
 	})
 
 	t.Run("storage maps have multiple different values", func(t *testing.T) {
+		t.Parallel()
+
 		writer := &testReportWriter{}
 
 		diffReporter := NewCadenceValueDiffReporter(address, flow.Emulator, writer, false)
@@ -156,6 +170,8 @@ func TestDiffCadenceValues(t *testing.T) {
 	})
 
 	t.Run("nested array value has different elements", func(t *testing.T) {
+		t.Parallel()
+
 		writer := &testReportWriter{}
 
 		diffReporter := NewCadenceValueDiffReporter(address, flow.Emulator, writer, false)
@@ -264,6 +280,8 @@ func TestDiffCadenceValues(t *testing.T) {
 	})
 
 	t.Run("nested dict value has different elements", func(t *testing.T) {
+		t.Parallel()
+
 		writer := &testReportWriter{}
 
 		diffReporter := NewCadenceValueDiffReporter(address, flow.Emulator, writer, false)
@@ -379,6 +397,8 @@ func TestDiffCadenceValues(t *testing.T) {
 	})
 
 	t.Run("nested composite value has different elements", func(t *testing.T) {
+		t.Parallel()
+
 		writer := &testReportWriter{}
 
 		diffReporter := NewCadenceValueDiffReporter(address, flow.Emulator, writer, false)
@@ -505,6 +525,8 @@ func TestDiffCadenceValues(t *testing.T) {
 	})
 
 	t.Run("nested composite value has different elements with verbose logging", func(t *testing.T) {
+		t.Parallel()
+
 		writer := &testReportWriter{}
 
 		diffReporter := NewCadenceValueDiffReporter(address, flow.Emulator, writer, true)
