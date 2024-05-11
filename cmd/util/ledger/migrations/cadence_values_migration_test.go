@@ -18,10 +18,9 @@ import (
 
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
-	"github.com/onflow/flow-go/cmd/util/ledger/util/snapshot"
+	"github.com/onflow/flow-go/cmd/util/ledger/util/registers"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
-	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -52,6 +51,9 @@ func TestCadenceValuesMigration(t *testing.T) {
 
 	// Get the old payloads
 	payloads, err := util.PayloadsFromEmulatorSnapshot(snapshotPath)
+	require.NoError(t, err)
+
+	registersByAccount, err := registers.NewByAccountFromPayloads(payloads)
 	require.NoError(t, err)
 
 	rwf := &testReportWriterFactory{}
@@ -92,7 +94,7 @@ func TestCadenceValuesMigration(t *testing.T) {
 	)
 
 	for _, migration := range migrations {
-		payloads, err = migration.Migrate(payloads)
+		err = migration.Migrate(registersByAccount)
 		require.NoError(
 			t,
 			err,
@@ -103,7 +105,7 @@ func TestCadenceValuesMigration(t *testing.T) {
 	}
 
 	// Assert the migrated payloads
-	checkMigratedPayloads(t, address, payloads, chainID)
+	checkMigratedPayloads(t, address, registersByAccount, chainID)
 
 	// Check reporters
 	checkReporters(t, rwf, address)
@@ -120,16 +122,13 @@ var flowTokenAddress = func() common.Address {
 func checkMigratedPayloads(
 	t *testing.T,
 	address common.Address,
-	newPayloads []*ledger.Payload,
+	registersByAccount *registers.ByAccount,
 	chainID flow.ChainID,
 ) {
-	mr, err := NewMigratorRuntime(
-		zerolog.Nop(),
-		newPayloads,
+	mr, err := NewInterpreterMigrationRuntime(
+		registersByAccount,
 		chainID,
-		MigratorRuntimeConfig{},
-		snapshot.SmallChangeSetSnapshot,
-		1,
+		InterpreterMigrationRuntimeConfig{},
 	)
 	require.NoError(t, err)
 
@@ -387,7 +386,7 @@ func checkMigratedPayloads(
 	}
 }
 
-func checkAccountID(t *testing.T, mr *MigratorRuntime, address common.Address) {
+func checkAccountID(t *testing.T, mr *InterpreterMigrationRuntime, address common.Address) {
 	id := flow.AccountStatusRegisterID(flow.Address(address))
 	statusBytes, err := mr.Accounts.GetValue(id)
 	require.NoError(t, err)
@@ -699,6 +698,9 @@ func TestBootstrappedStateMigration(t *testing.T) {
 	payloads, err := newBootstrapPayloads(chainID)
 	require.NoError(t, err)
 
+	registersByAccount, err := registers.NewByAccountFromPayloads(payloads)
+	require.NoError(t, err)
+
 	migrations := NewCadence1Migrations(
 		logger,
 		t.TempDir(),
@@ -713,7 +715,7 @@ func TestBootstrappedStateMigration(t *testing.T) {
 	)
 
 	for _, migration := range migrations {
-		payloads, err = migration.Migrate(payloads)
+		err = migration.Migrate(registersByAccount)
 		require.NoError(
 			t,
 			err,
@@ -745,13 +747,13 @@ func TestProgramParsingError(t *testing.T) {
 	payloads, err := newBootstrapPayloads(chainID)
 	require.NoError(t, err)
 
-	runtime, err := NewMigratorRuntime(
-		zerolog.Nop(),
-		payloads,
+	registersByAccount, err := registers.NewByAccountFromPayloads(payloads)
+	require.NoError(t, err)
+
+	runtime, err := NewInterpreterMigrationRuntime(
+		registersByAccount,
 		chainID,
-		MigratorRuntimeConfig{},
-		snapshot.SmallChangeSetSnapshot,
-		1,
+		InterpreterMigrationRuntimeConfig{},
 	)
 	require.NoError(t, err)
 
@@ -796,13 +798,14 @@ func TestProgramParsingError(t *testing.T) {
 	result, err := runtime.TransactionState.FinalizeMainTransaction()
 	require.NoError(t, err)
 
-	// Merge the changes to the original payloads.
+	// Merge the changes into the registers
 
 	expectedAddresses := map[flow.Address]struct{}{
 		flow.Address(testAddress): {},
 	}
 
-	payloads, err = runtime.Snapshot.ApplyChangesAndGetNewPayloads(
+	err = registers.ApplyChanges(
+		registersByAccount,
 		result.WriteSet,
 		expectedAddresses,
 		logger,
@@ -811,14 +814,12 @@ func TestProgramParsingError(t *testing.T) {
 
 	// Set the code for the old program
 
-	payloads = append(
-		payloads,
-		newContractPayload(
-			testAddress,
-			contractName,
-			[]byte(`pub contract C {}`),
-		),
+	err = registersByAccount.Set(
+		string(testAddress[:]),
+		flow.ContractKey(contractName),
+		[]byte(`pub contract C {}`),
 	)
+	require.NoError(t, err)
 
 	// Migrate
 
@@ -841,7 +842,7 @@ func TestProgramParsingError(t *testing.T) {
 	)
 
 	for _, migration := range migrations {
-		payloads, err = migration.Migrate(payloads)
+		err = migration.Migrate(registersByAccount)
 		require.NoError(
 			t,
 			err,
@@ -852,6 +853,7 @@ func TestProgramParsingError(t *testing.T) {
 	}
 
 	reporter := rwf.reportWriters[contractCheckingReporterName]
+	require.NotNil(t, reporter)
 
 	var messages []string
 
@@ -892,13 +894,13 @@ func TestCoreContractUsage(t *testing.T) {
 		payloads, err := newBootstrapPayloads(chainID)
 		require.NoError(t, err)
 
-		runtime, err := NewMigratorRuntime(
-			zerolog.Nop(),
-			payloads,
+		registersByAccount, err := registers.NewByAccountFromPayloads(payloads)
+		require.NoError(t, err)
+
+		runtime, err := NewInterpreterMigrationRuntime(
+			registersByAccount,
 			chainID,
-			MigratorRuntimeConfig{},
-			snapshot.SmallChangeSetSnapshot,
-			1,
+			InterpreterMigrationRuntimeConfig{},
 		)
 		require.NoError(t, err)
 
@@ -941,7 +943,8 @@ func TestCoreContractUsage(t *testing.T) {
 			flow.Address(testAddress): {},
 		}
 
-		payloads, err = runtime.Snapshot.ApplyChangesAndGetNewPayloads(
+		err = registers.ApplyChanges(
+			registersByAccount,
 			result.WriteSet,
 			expectedAddresses,
 			logger,
@@ -969,7 +972,7 @@ func TestCoreContractUsage(t *testing.T) {
 		)
 
 		for _, migration := range migrations {
-			payloads, err = migration.Migrate(payloads)
+			err = migration.Migrate(registersByAccount)
 			require.NoError(
 				t,
 				err,
@@ -984,13 +987,10 @@ func TestCoreContractUsage(t *testing.T) {
 
 		// Get result
 
-		mr, err := NewMigratorRuntime(
-			zerolog.Nop(),
-			payloads,
+		mr, err := NewInterpreterMigrationRuntime(
+			registersByAccount,
 			chainID,
-			MigratorRuntimeConfig{},
-			snapshot.SmallChangeSetSnapshot,
-			nWorker,
+			InterpreterMigrationRuntimeConfig{},
 		)
 		require.NoError(t, err)
 

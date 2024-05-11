@@ -16,8 +16,8 @@ import (
 )
 
 const contractA = `
-access(all) contract A { 
-    access(all) fun foo() {} 
+access(all) contract A {
+    access(all) fun foo() {}
 }`
 
 const updatedContractA = `

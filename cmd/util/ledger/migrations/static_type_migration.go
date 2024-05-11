@@ -7,7 +7,7 @@ import (
 
 type StaticTypeMigrationRules map[common.TypeID]interpreter.StaticType
 
-func NewStaticTypeMigrator[T interpreter.StaticType](
+func NewStaticTypeMigration[T interpreter.StaticType](
 	rules StaticTypeMigrationRules,
 ) func(staticType T) interpreter.StaticType {
 
