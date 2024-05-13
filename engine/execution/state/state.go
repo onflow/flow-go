@@ -513,35 +513,40 @@ func (s *state) GetHighestFinalizedExecuted() (uint64, error) {
 		return s.registerStore.LastFinalizedAndExecutedHeight(), nil
 	}
 
+	// last finalized height
 	var finalizedHeight uint64
 	err := s.db.View(operation.RetrieveFinalizedHeight(&finalizedHeight))
 	if err != nil {
 		return 0, fmt.Errorf("could not retrieve finalized height: %w", err)
 	}
 
-	executedHeight, executedID, err := s.GetHighestExecutedBlockID(context.Background())
+	// last executed height
+	executedHeight, _, err := s.GetHighestExecutedBlockID(context.Background())
 	if err != nil {
 		return 0, fmt.Errorf("could not get highest executed block: %w", err)
 	}
 
-	var finalizedID flow.Identifier
+	// find higest finalized and executed height
 	var highest uint64
 	if finalizedHeight >= executedHeight {
-		finalizedID, err = s.headers.BlockIDByHeight(executedHeight)
-		if err != nil {
-			return 0, fmt.Errorf("could not get header by height %v: %w", executedHeight, err)
-		}
 		highest = executedHeight
 	} else {
-		finalizedID, err = s.headers.BlockIDByHeight(finalizedHeight)
-		if err != nil {
-			return 0, fmt.Errorf("could not get header by height %v: %w", executedHeight, err)
-		}
 		highest = finalizedHeight
 	}
 
-	if finalizedID != executedID {
-		return 0, fmt.Errorf("finalized block %v does not match executed block %v", finalizedID, executedID)
+	// double check the higesht block is executed
+	blockID, err := s.headers.BlockIDByHeight(highest)
+	if err != nil {
+		return 0, fmt.Errorf("could not get header by height %v: %w", highest, err)
+	}
+
+	isExecuted, err := s.IsBlockExecuted(highest, blockID)
+	if err != nil {
+		return 0, fmt.Errorf("could not check if block %v (height: %v) is executed: %w", blockID, highest, err)
+	}
+
+	if !isExecuted {
+		return 0, fmt.Errorf("block %v (height: %v) is not executed yet", blockID, highest)
 	}
 
 	return highest, nil
