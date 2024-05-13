@@ -118,6 +118,8 @@ func (marshaller marshallerImpl) UnmarshalWrapped(b []byte) (ServiceEvent, error
 		event, err = unmarshalWrapped[EpochSetup](b, marshaller)
 	case ServiceEventCommit:
 		event, err = unmarshalWrapped[EpochCommit](b, marshaller)
+	case ServiceEventRecover:
+		event, err = unmarshalWrapped[EpochRecover](b, marshaller)
 	case ServiceEventVersionBeacon:
 		event, err = unmarshalWrapped[VersionBeacon](b, marshaller)
 	case ServiceEventProtocolStateVersionUpgrade:
@@ -160,6 +162,8 @@ func (marshaller marshallerImpl) UnmarshalWithType(b []byte, eventType ServiceEv
 		event = new(EpochSetup)
 	case ServiceEventCommit:
 		event = new(EpochCommit)
+	case ServiceEventRecover:
+		event = new(EpochRecover)
 	case ServiceEventVersionBeacon:
 		event = new(VersionBeacon)
 	case ServiceEventProtocolStateVersionUpgrade:
@@ -252,6 +256,23 @@ func (se *ServiceEvent) EqualTo(other *ServiceEvent) (bool, error) {
 			)
 		}
 		return commit.EqualTo(otherCommit), nil
+
+	case ServiceEventRecover:
+		ev, ok := se.Event.(*EpochRecover)
+		if !ok {
+			return false, fmt.Errorf(
+				"internal invalid type for ServiceEventRecover: %T",
+				se.Event,
+			)
+		}
+		otherEv, ok := other.Event.(*EpochRecover)
+		if !ok {
+			return false, fmt.Errorf(
+				"internal invalid type for ServiceEventRecover: %T",
+				other.Event,
+			)
+		}
+		return ev.EqualTo(otherEv), nil
 
 	case ServiceEventVersionBeacon:
 		version, ok := se.Event.(*VersionBeacon)

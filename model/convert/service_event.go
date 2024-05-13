@@ -279,6 +279,10 @@ func convertServiceEventEpochCommit(event flow.Event) (*flow.ServiceEvent, error
 	return serviceEvent, nil
 }
 
+func convertServiceEventEpochRecovers(event flow.Event) (*flow.ServiceEvent, error) {
+
+}
+
 // convertClusterAssignments converts the Cadence representation of cluster
 // assignments included in the EpochSetup into the protocol AssignmentList
 // representation.
