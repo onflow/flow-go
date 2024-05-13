@@ -405,6 +405,32 @@ func (_m *AccessAPIServer) GetExecutionResultForBlockID(_a0 context.Context, _a1
 	return r0, r1
 }
 
+// GetFullCollectionByID provides a mock function with given fields: _a0, _a1
+func (_m *AccessAPIServer) GetFullCollectionByID(_a0 context.Context, _a1 *access.GetFullCollectionByIDRequest) (*access.FullCollectionResponse, error) {
+	ret := _m.Called(_a0, _a1)
+
+	var r0 *access.FullCollectionResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *access.GetFullCollectionByIDRequest) (*access.FullCollectionResponse, error)); ok {
+		return rf(_a0, _a1)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *access.GetFullCollectionByIDRequest) *access.FullCollectionResponse); ok {
+		r0 = rf(_a0, _a1)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*access.FullCollectionResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *access.GetFullCollectionByIDRequest) error); ok {
+		r1 = rf(_a0, _a1)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetLatestBlock provides a mock function with given fields: _a0, _a1
 func (_m *AccessAPIServer) GetLatestBlock(_a0 context.Context, _a1 *access.GetLatestBlockRequest) (*access.BlockResponse, error) {
 	ret := _m.Called(_a0, _a1)

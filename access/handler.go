@@ -194,6 +194,33 @@ func (h *Handler) GetCollectionByID(
 	}, nil
 }
 
+func (h *Handler) GetFullCollectionByID(
+	ctx context.Context,
+	req *access.GetFullCollectionByIDRequest,
+) (*access.FullCollectionResponse, error) {
+	metadata := h.buildMetadataResponse()
+
+	id, err := convert.CollectionID(req.GetId())
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid collection id: %v", err)
+	}
+
+	col, err := h.api.GetFullCollectionByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	transactions, err := convert.FullCollectionToMessage(col)
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	return &access.FullCollectionResponse{
+		Transactions: transactions,
+		Metadata:     metadata,
+	}, nil
+}
+
 // SendTransaction submits a transaction to the network.
 func (h *Handler) SendTransaction(
 	ctx context.Context,

@@ -44,6 +44,19 @@ func LightCollectionToMessage(c *flow.LightCollection) (*entities.Collection, er
 	}, nil
 }
 
+func FullCollectionToMessage(c *flow.Collection) ([]*entities.Transaction, error) {
+	if c == nil || c.Transactions == nil {
+		return nil, fmt.Errorf("invalid collection")
+	}
+
+	transactions := make([]*entities.Transaction, len(c.Transactions))
+	for i, tx := range c.Transactions {
+		transactions[i] = TransactionToMessage(*tx)
+	}
+
+	return transactions, nil
+}
+
 // MessageToLightCollection converts a protobuf message to a light collection
 func MessageToLightCollection(m *entities.Collection) (*flow.LightCollection, error) {
 	transactions := make([]flow.Identifier, 0, len(m.TransactionIds))
