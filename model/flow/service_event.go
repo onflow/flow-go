@@ -21,6 +21,7 @@ func (set ServiceEventType) String() string {
 const (
 	ServiceEventSetup                       ServiceEventType = "setup"
 	ServiceEventCommit                      ServiceEventType = "commit"
+	ServiceEventRecover                     ServiceEventType = "recover"
 	ServiceEventVersionBeacon               ServiceEventType = "version-beacon"                 // VersionBeacon only controls version of ENs, describing software compatability via semantic versioning
 	ServiceEventProtocolStateVersionUpgrade ServiceEventType = "protocol-state-version-upgrade" // Protocol State version applies to all nodes and uses an _integer version_ of the _protocol_
 )
