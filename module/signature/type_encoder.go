@@ -62,12 +62,14 @@ func EncodeDoubleSig(stakingSig crypto.Signature, beaconSig crypto.Signature) []
 //   - nil, nil, ErrInvalidSignatureFormat if the sig type is invalid (covers nil or empty sigData)
 func DecodeDoubleSig(sigData []byte) (crypto.Signature, crypto.Signature, error) {
 	sigLength := len(sigData)
-	switch sigLength {
-	case SigLen:
-		return sigData, nil, nil
-	case 2 * SigLen:
-		return sigData[:SigLen], sigData[SigLen:], nil
-	}
 
-	return nil, nil, fmt.Errorf("invalid sig data length %d: %w", sigLength, ErrInvalidSignatureFormat)
+	// Prefer if/else statement instead of switch/case to avoid below issue
+	// https://github.com/onflow/flow-go/issues/5899
+	if sigLength == SigLen {
+		return sigData, nil, nil
+	} else if sigLength == 2*SigLen {
+		return sigData[:SigLen], sigData[SigLen:], nil
+	} else {
+		return nil, nil, fmt.Errorf("invalid sig data length %d: %w", sigLength, ErrInvalidSignatureFormat)
+	}
 }
