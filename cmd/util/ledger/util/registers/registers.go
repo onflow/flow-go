@@ -92,9 +92,9 @@ func (b *ByAccount) Payloads() []*ledger.Payload {
 	return payloads
 }
 
-func (b *ByAccount) ForEachAccount(f func(owner string, accountRegisters *AccountRegisters) error) error {
-	for owner, accountRegisters := range b.registers {
-		err := f(owner, accountRegisters)
+func (b *ByAccount) ForEachAccount(f func(accountRegisters *AccountRegisters) error) error {
+	for _, accountRegisters := range b.registers {
+		err := f(accountRegisters)
 		if err != nil {
 			return err
 		}

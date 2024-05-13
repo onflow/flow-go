@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"sort"
 	"sync"
 	"time"
 
@@ -220,28 +221,48 @@ func MigrateGroupConcurrently(
 
 	go func() {
 		defer close(jobs)
+
+		allAccountRegisters := make([]*registers.AccountRegisters, 0, accountCount)
+
 		err := registersByAccount.ForEachAccount(
-			func(owner string, accountRegisters *registers.AccountRegisters) error {
-				address, err := common.BytesToAddress([]byte(owner))
-				if err != nil {
-					return err
-				}
-				job := jobMigrateAccountGroup{
-					Address:          address,
-					AccountRegisters: accountRegisters,
-				}
-
-				select {
-				case <-ctx.Done():
-					return nil
-				case jobs <- job:
-				}
-
+			func(accountRegisters *registers.AccountRegisters) error {
+				allAccountRegisters = append(
+					allAccountRegisters,
+					accountRegisters,
+				)
 				return nil
 			},
 		)
 		if err != nil {
-			cancel(fmt.Errorf("failed to schedule jobs for all accounts: %w", err))
+			cancel(fmt.Errorf("failed to get all account registers: %w", err))
+		}
+
+		// Schedule jobs in descending order of the number of registers
+		sort.Slice(allAccountRegisters, func(i, j int) bool {
+			a := allAccountRegisters[i]
+			b := allAccountRegisters[j]
+			return a.Count() > b.Count()
+		})
+
+		for _, accountRegisters := range allAccountRegisters {
+			owner := accountRegisters.Owner()
+
+			address, err := common.BytesToAddress([]byte(owner))
+			if err != nil {
+				cancel(fmt.Errorf("failed to convert owner to address: %w", err))
+				return
+			}
+
+			job := jobMigrateAccountGroup{
+				Address:          address,
+				AccountRegisters: accountRegisters,
+			}
+
+			select {
+			case <-ctx.Done():
+				return
+			case jobs <- job:
+			}
 		}
 	}()
 
