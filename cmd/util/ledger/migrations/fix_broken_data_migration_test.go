@@ -19,6 +19,8 @@ import (
 func TestFixSlabsWithBrokenReferences(t *testing.T) {
 	t.Parallel()
 
+	const nWorker = 2
+
 	rawAddress := mustDecodeHex("5e3448b3cffb97f2")
 
 	address := common.MustBytesToAddress(rawAddress)
@@ -149,7 +151,7 @@ func TestFixSlabsWithBrokenReferences(t *testing.T) {
 	registersByAccount, err := registers.NewByAccountFromPayloads(oldPayloads)
 	require.NoError(t, err)
 
-	err = migration.InitMigration(log, registersByAccount, 1)
+	err = migration.InitMigration(log, registersByAccount, nWorker)
 	require.NoError(t, err)
 
 	accountRegisters := registersByAccount.AccountRegisters(string(address[:]))
@@ -164,7 +166,7 @@ func TestFixSlabsWithBrokenReferences(t *testing.T) {
 	err = migration.Close()
 	require.NoError(t, err)
 
-	newPayloads := registersByAccount.DestructIntoPayloads()
+	newPayloads := registersByAccount.DestructIntoPayloads(nWorker)
 
 	require.Equal(t, len(expectedNewPayloads), len(newPayloads))
 

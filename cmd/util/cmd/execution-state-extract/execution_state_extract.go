@@ -411,7 +411,7 @@ func newMigration(
 
 		logger.Info().Msg("creating new payloads from registers ...")
 
-		newPayloads := registersByAccount.DestructIntoPayloads()
+		newPayloads := registersByAccount.DestructIntoPayloads(nWorker)
 
 		logger.Info().Msgf("created new payloads (%d) from registers", len(newPayloads))
 

@@ -2,6 +2,7 @@ package registers
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/onflow/atree"
 	"github.com/rs/zerolog"
@@ -83,8 +84,29 @@ func (b *ByAccount) ForEach(f ForEachCallback) error {
 	return nil
 }
 
-func (b *ByAccount) DestructIntoPayloads() []*ledger.Payload {
+func (b *ByAccount) DestructIntoPayloads(nWorker int) []*ledger.Payload {
 	payloads := make([]*ledger.Payload, b.Count())
+
+	type job struct {
+		registers *AccountRegisters
+		payloads  []*ledger.Payload
+	}
+
+	var wg sync.WaitGroup
+
+	jobs := make(chan job)
+
+	worker := func() {
+		defer wg.Done()
+		for job := range jobs {
+			job.registers.insertPayloads(job.payloads)
+		}
+	}
+
+	for i := 0; i < nWorker; i++ {
+		wg.Add(1)
+		go worker()
+	}
 
 	startOffset := 0
 	for owner, accountRegisters := range b.registers {
@@ -92,7 +114,10 @@ func (b *ByAccount) DestructIntoPayloads() []*ledger.Payload {
 		endOffset := startOffset + accountRegisters.Count()
 		accountPayloads := payloads[startOffset:endOffset]
 
-		accountRegisters.insertPayloads(accountPayloads)
+		jobs <- job{
+			registers: accountRegisters,
+			payloads:  accountPayloads,
+		}
 
 		// Remove the account from the map to reduce memory usage.
 		// The account registers are now stored in the payloads,
@@ -102,6 +127,9 @@ func (b *ByAccount) DestructIntoPayloads() []*ledger.Payload {
 
 		startOffset = endOffset
 	}
+	close(jobs)
+
+	wg.Wait()
 
 	return payloads
 }
