@@ -222,7 +222,7 @@ func (ctl *BlockTimeController) storeProposalTiming(proposalTiming ProposalTimin
 	ctl.latestProposalTiming.Store(&proposalTiming)
 }
 
-// GetProposalTiming returns the controller's latest ProposalTiming. Concurrency safe.
+// getProposalTiming returns the controller's latest ProposalTiming. Concurrency safe.
 func (ctl *BlockTimeController) getProposalTiming() ProposalTiming {
 	pt := ctl.latestProposalTiming.Load()
 	if pt == nil { // should never happen, as we always store non-nil instances of ProposalTiming. Though, this extra check makes `GetProposalTiming` universal.
