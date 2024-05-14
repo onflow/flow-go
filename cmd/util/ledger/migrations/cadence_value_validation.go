@@ -3,6 +3,7 @@ package migrations
 import (
 	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
@@ -20,16 +21,42 @@ func validateCadenceValues(
 	newPayloads []*ledger.Payload,
 	log zerolog.Logger,
 	verboseLogging bool,
+	nWorkers int,
 ) error {
+
 	// Create all the runtime components we need for comparing Cadence values.
 	oldRuntime, err := newReadonlyStorageRuntime(oldPayloads)
 	if err != nil {
 		return fmt.Errorf("failed to create validator runtime with old payloads: %w", err)
 	}
 
+	// Batch preload old payloads in goroutine
+	batchPreloadResult := make(chan error, 1)
+
+	var wg sync.WaitGroup
+
+	wg.Add(1)
+	go func(result chan<- error) {
+		defer wg.Done()
+		result <- loadAtreeSlabsInStorge(oldRuntime.Storage, oldPayloads, nWorkers)
+	}(batchPreloadResult)
+
 	newRuntime, err := newReadonlyStorageRuntime(newPayloads)
 	if err != nil {
 		return fmt.Errorf("failed to create validator runtime with new payloads: %w", err)
+	}
+
+	// Batch preload new payloads
+	err = loadAtreeSlabsInStorge(newRuntime.Storage, newPayloads, nWorkers)
+	if err != nil {
+		return err
+	}
+
+	wg.Wait()
+
+	err = <-batchPreloadResult
+	if err != nil {
+		return err
 	}
 
 	// Iterate through all domains and compare cadence values.

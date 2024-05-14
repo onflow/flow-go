@@ -83,7 +83,7 @@ func (m *FixSlabsWithBrokenReferencesMigration) MigrateAccount(
 	storage := migrationRuntime.Storage
 
 	// Load all atree registers in storage
-	err = loadAtreeSlabsInStorge(storage, oldPayloads)
+	err = loadAtreeSlabsInStorge(storage, oldPayloads, m.nWorkers)
 	if err != nil {
 		return nil, err
 	}
@@ -123,7 +123,7 @@ func (m *FixSlabsWithBrokenReferencesMigration) MigrateAccount(
 
 	m.mergeBrokenPayloads(brokenPayloads)
 
-	err = storage.FastCommit(m.nWorkers)
+	err = storage.NondeterministicFastCommit(m.nWorkers)
 	if err != nil {
 		return nil, err
 	}

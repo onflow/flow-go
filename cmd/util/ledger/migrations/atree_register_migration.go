@@ -97,9 +97,16 @@ func (m *AtreeRegisterMigrator) MigrateAccount(
 		return nil, fmt.Errorf("failed to create migrator runtime: %w", err)
 	}
 
+	// Preload account payloads
+	err = loadAtreeSlabsInStorge(mr.Storage, oldPayloads, m.nWorkers)
+	if err != nil {
+		return nil, err
+	}
+
 	// Check storage health before migration, if enabled.
 	if m.checkStorageHealthBeforeMigration {
-		err = checkStorageHealth(address, mr.Storage, oldPayloads)
+		// Atree slabs are preloaded already.
+		err = checkStorageHealth(address, mr.Storage, oldPayloads, m.nWorkers, false)
 		if err != nil {
 			m.log.Warn().
 				Err(err).
@@ -132,7 +139,7 @@ func (m *AtreeRegisterMigrator) MigrateAccount(
 	}
 
 	if m.validateMigratedValues {
-		err = validateCadenceValues(address, oldPayloads, newPayloads, m.log, m.logVerboseValidationError)
+		err = validateCadenceValues(address, oldPayloads, newPayloads, m.log, m.logVerboseValidationError, m.nWorkers)
 		if err != nil {
 			if !m.continueMigrationOnValidationError {
 				return nil, err
@@ -165,7 +172,7 @@ func (m *AtreeRegisterMigrator) MigrateAccount(
 			return nil, fmt.Errorf("failed to create migrator runtime: %w", err)
 		}
 
-		err = checkStorageHealth(address, mr.Storage, newPayloads)
+		err = checkStorageHealth(address, mr.Storage, newPayloads, m.nWorkers, true)
 		if err != nil {
 			m.log.Warn().
 				Err(err).
@@ -190,7 +197,7 @@ func (m *AtreeRegisterMigrator) migrateAccountStorage(
 		}
 	}
 
-	err := mr.Storage.Commit(mr.Interpreter, false)
+	err := mr.Storage.PersistentSlabStorage.NondeterministicFastCommit(m.nWorkers)
 	if err != nil {
 		return nil, fmt.Errorf("failed to commit storage: %w", err)
 	}

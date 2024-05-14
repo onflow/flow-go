@@ -12,11 +12,13 @@ import (
 	"github.com/onflow/flow-go/ledger/common/convert"
 )
 
-func loadAtreeSlabsInStorge(storage *runtime.Storage, payloads []*ledger.Payload) error {
+func getSlabIDsFromPayloads(payloads []*ledger.Payload) ([]atree.SlabID, error) {
+	slabIDs := make([]atree.SlabID, 0, len(payloads))
+
 	for _, payload := range payloads {
 		registerID, _, err := convert.PayloadToRegister(payload)
 		if err != nil {
-			return fmt.Errorf("failed to convert payload to register: %w", err)
+			return nil, fmt.Errorf("failed to convert payload to register: %w", err)
 		}
 
 		if !registerID.IsSlabIndex() {
@@ -28,25 +30,34 @@ func loadAtreeSlabsInStorge(storage *runtime.Storage, payloads []*ledger.Payload
 			atree.Address([]byte(registerID.Owner)),
 			atree.SlabIndex([]byte(registerID.Key[1:])))
 
-		// Retrieve the slab.
-		_, _, err = storage.Retrieve(slabID)
-		if err != nil {
-			return fmt.Errorf("failed to retrieve slab %s: %w", slabID, err)
-		}
+		slabIDs = append(slabIDs, slabID)
 	}
 
-	return nil
+	return slabIDs, nil
+}
+
+func loadAtreeSlabsInStorge(storage *runtime.Storage, payloads []*ledger.Payload, nWorkers int) error {
+	slabIDs, err := getSlabIDsFromPayloads(payloads)
+	if err != nil {
+		return err
+	}
+
+	return storage.PersistentSlabStorage.BatchPreload(slabIDs, nWorkers)
 }
 
 func checkStorageHealth(
 	address common.Address,
 	storage *runtime.Storage,
 	payloads []*ledger.Payload,
+	nWorkers int,
+	needToPreloadAtreeSlabs bool,
 ) error {
 
-	err := loadAtreeSlabsInStorge(storage, payloads)
-	if err != nil {
-		return err
+	if needToPreloadAtreeSlabs {
+		err := loadAtreeSlabsInStorge(storage, payloads, nWorkers)
+		if err != nil {
+			return err
+		}
 	}
 
 	for _, domain := range allStorageMapDomains {
