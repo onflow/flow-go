@@ -151,6 +151,7 @@ contract EVM {
         }
 
         /// Serializes the address to a hex string without the 0x prefix
+        /// Future implementations should pass data to InternalEVM for native serialization
         access(all)
         view fun toString(): String {
             let addressBytes: [UInt8] = [
@@ -171,6 +172,7 @@ contract EVM {
     }
 
     /// Converts a hex string to an EVM address if the string is a valid hex string
+    /// Future implementations should pass data to InternalEVM for native deserialization
     access(all)
     fun addressFromString(_ asHex: String): EVMAddress? {
         pre {
