@@ -46,6 +46,7 @@ type CadenceBaseMigration struct {
 	errorMessageHandler               *errorMessageHandler
 	programs                          map[runtime.Location]*interpreter.Program
 	chainID                           flow.ChainID
+	nWorkers                          int
 }
 
 var _ AccountBasedMigration = (*CadenceBaseMigration)(nil)
@@ -65,9 +66,10 @@ func (m *CadenceBaseMigration) Close() error {
 func (m *CadenceBaseMigration) InitMigration(
 	log zerolog.Logger,
 	_ *registers.ByAccount,
-	_ int,
+	nWorkers int,
 ) error {
 	m.log = log.With().Str("migration", m.name).Logger()
+	m.nWorkers = nWorkers
 
 	// During the migration, we only provide already checked programs,
 	// no parsing/checking of contracts is expected.
@@ -120,7 +122,7 @@ func (m *CadenceBaseMigration) MigrateAccount(
 	var storageHealthErrorBefore error
 	if m.checkStorageHealthBeforeMigration {
 
-		storageHealthErrorBefore = checkStorageHealth(address, storage, accountRegisters)
+		storageHealthErrorBefore = checkStorageHealth(address, storage, accountRegisters, m.nWorkers)
 		if storageHealthErrorBefore != nil {
 			m.log.Warn().
 				Err(storageHealthErrorBefore).
@@ -204,6 +206,7 @@ func (m *CadenceBaseMigration) MigrateAccount(
 			m.chainID,
 			m.diffReporter,
 			m.logVerboseDiff,
+			m.nWorkers,
 		)
 
 		accountDiffReporter.DiffStates(

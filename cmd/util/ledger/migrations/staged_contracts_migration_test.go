@@ -707,7 +707,7 @@ func TestStagedContractsMigration(t *testing.T) {
 			interpreter.NewUnmeteredStringValue("Also in the same storage path prefix"),
 		)
 
-		err = mr.Storage.Commit(mr.Interpreter, false)
+		err = mr.Storage.NondeterministicCommit(mr.Interpreter, false)
 		require.NoError(t, err)
 
 		result, err := mr.TransactionState.FinalizeMainTransaction()
