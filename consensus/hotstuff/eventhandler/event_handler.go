@@ -389,11 +389,11 @@ func (e *EventHandler) proposeForNewViewIfPrimary() error {
 
 	// determine target publication time
 	// CAUTION:
-	//  • must be call `TargetPublicationTime` _before_ `AddValidatedBlock`, because `AddValidatedBlock` may emit
-	//    a BlockIncorporatedEvent, which changes CruiseControl's state.
+	//  • we must call `TargetPublicationTime` _before_ `AddValidatedBlock`, because `AddValidatedBlock`
+	//    may emit a BlockIncorporatedEvent, which changes CruiseControl's state.
 	//  • metrics for the PaceMaker/CruiseControl assume that the event handler is the only caller of
-	//   `TargetPublicationTime`. Technically, `TargetPublicationTime` records the publication delay relative to
-	//   its _latest_ call.
+	//   `TargetPublicationTime`. Technically, `TargetPublicationTime` records the publication delay
+	//    relative to its _latest_ call.
 	targetPublicationTime := e.paceMaker.TargetPublicationTime(flowProposal.View, start, flowProposal.ParentID)
 
 	// we want to store created proposal in forks to make sure that we don't create more proposals for
