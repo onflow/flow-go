@@ -61,7 +61,7 @@ func EncodeDoubleSig(stakingSig crypto.Signature, beaconSig crypto.Signature) []
 //     if sigData is the size of a BLS signature, we interpret sigData entirely as staking signature
 //   - nil, nil, ErrInvalidSignatureFormat if the sig type is invalid (covers nil or empty sigData)
 func DecodeDoubleSig(sigData []byte) (crypto.Signature, crypto.Signature, error) {
-	sigLen := crypto.SignatureLenBLSBLS12381
+	sigLen := SigLen
 
 	switch len(sigData) {
 	case sigLen:
