@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"sync"
 
 	"github.com/dgraph-io/badger/v2"
@@ -526,13 +527,8 @@ func (s *state) GetHighestFinalizedExecuted() (uint64, error) {
 		return 0, fmt.Errorf("could not get highest executed block: %w", err)
 	}
 
-	// find higest finalized and executed height
-	var highest uint64
-	if finalizedHeight >= executedHeight {
-		highest = executedHeight
-	} else {
-		highest = finalizedHeight
-	}
+	// the highest finalized and executed height is the min of the two
+	highest := uint64(math.Min(float64(finalizedHeight), float64(executedHeight)))
 
 	// double check the higesht block is executed
 	blockID, err := s.headers.BlockIDByHeight(highest)
