@@ -605,7 +605,6 @@ func (bs *BlockTimeControllerSuite) TestMetrics_TargetPublicationTime() {
 	expectedDelay := expectedPublicationTime2.Sub(now) // approximate value that the metrics-component should capture as delay
 	bs.metrics.On("ProposalPublicationDelay", inProximityOf(expectedDelay, 100*time.Millisecond)).Once()
 	bs.ctl.TargetPublicationTime(bs.initialView+1, now, timedBlock.Block.BlockID)
-	//assert.NoError(bs.T(), err)
 }
 
 // Test_vs_PythonSimulation performs a regression test. We implemented the controller in python
@@ -733,7 +732,7 @@ func captureControllerStateDigest(ctl *BlockTimeController) *controllerStateDige
 	}
 }
 
-// blockWithID returns a testify `argumentMatcher` that only accepts durations d,
+// inProximityOf returns a testify `argumentMatcher` that only accepts durations d,
 // such that |d - t| ≤ ε, for specified constants targetValue t and acceptedDeviation ε.
 func inProximityOf(targetValue, acceptedDeviation time.Duration) interface{} {
 	return mock.MatchedBy(func(duration time.Duration) bool {

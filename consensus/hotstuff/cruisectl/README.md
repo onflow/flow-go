@@ -250,8 +250,8 @@ In general, there is no bound on the output of the controller output $u$. Howeve
     
   Let $t_\textnormal{p}[v]$ denote the time when the primary for view $v$ has constructed its block proposal.
   On the happy path, a replica concludes view $v-1$ and transitions to view $v$, when it observes the proposal for view $v$.
-  The time difference $t_\textnormal{p}[v] - t[v-1]$ between the primary observing the parent block (view $v-1$), collecting votes for it,
-  constructing a QC for view $v-1$ and subsequently its own proposal for view $v$ is the minimally required time to execute the protocol.
+  The duration $t_\textnormal{p}[v] - t[v-1]$ is the time between the primary observing the parent block (view $v-1$), collecting votes,
+  constructing a QC for view $v-1$, and subsequently its own proposal for view $v$. This duration is the minimally required time to execute the protocol.
   The controller can only *delay* broadcasting the block,
   but it cannot release the block before  $t_\textnormal{p}[v]$ simply because the proposal isn’t ready any earlier. 
     
@@ -262,7 +262,7 @@ In general, there is no bound on the output of the controller output $u$. Howeve
 ```math
 \hat{t}[v] := \max\Big(t[v-1] +\min(\widehat{\tau}[v-1],\ \tau_\textrm{max}),\  t_\textnormal{p}[v]\Big) 
 ```
-This equation guarantees that the controller does not drive consensus into a timeout, as long broadcasting the block and its validation
+This equation guarantees that the controller does not drive consensus into a timeout, as long as broadcasting the block and its validation
 together require less than time $\beta$. Currently, we have $\tau_\textrm{max}$ = 910ms as the upper bound for view durations that the controller can set.
 In comparison, for HotStuff's timeout threshold we set $\texttt{hotstuff-min-timeout} = \tau_\textrm{max} + \beta$, with $\beta$ = 135ms.  
 

@@ -244,7 +244,7 @@ func (ctl *BlockTimeController) getProposalTiming() ProposalTiming {
 //   - if P >= TargetPublicationTime(..), then the EventHandler should immediately broadcast the proposal
 //
 // Note: Technically, our metrics capture the publication delay relative to this function's _latest_ call.
-// Currently, the EventHandler is the only caller of this function, and only calls it once.
+// Currently, the EventHandler is the only caller of this function, and only calls it once per proposal.
 //
 // Concurrency safe.
 func (ctl *BlockTimeController) TargetPublicationTime(proposalView uint64, timeViewEntered time.Time, parentBlockId flow.Identifier) time.Time {
