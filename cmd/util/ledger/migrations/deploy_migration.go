@@ -6,7 +6,6 @@ import (
 	coreContracts "github.com/onflow/flow-core-contracts/lib/go/contracts"
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -16,7 +15,7 @@ func NewDeploymentMigration(
 	authorizer flow.Address,
 	expectedWriteAddresses map[flow.Address]struct{},
 	logger zerolog.Logger,
-) ledger.Migration {
+) RegistersMigration {
 
 	script := []byte(`
       transaction(name: String, code: String) {
@@ -43,7 +42,7 @@ func NewDeploymentMigration(
 func NewBurnerDeploymentMigration(
 	chainID flow.ChainID,
 	logger zerolog.Logger,
-) ledger.Migration {
+) RegistersMigration {
 	address := BurnerAddressForChain(chainID)
 	return NewDeploymentMigration(
 		chainID,

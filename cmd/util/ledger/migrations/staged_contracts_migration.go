@@ -20,9 +20,8 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
-	"github.com/onflow/flow-go/cmd/util/ledger/util/snapshot"
+	"github.com/onflow/flow-go/cmd/util/ledger/util/registers"
 	"github.com/onflow/flow-go/ledger"
-	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/model/flow"
 
 	coreContracts "github.com/onflow/flow-core-contracts/lib/go/contracts"
@@ -33,7 +32,7 @@ type StagedContractsMigration struct {
 	chainID                        flow.ChainID
 	log                            zerolog.Logger
 	mutex                          sync.RWMutex
-	stagedContracts                map[common.Address]map[flow.RegisterID]Contract
+	stagedContracts                map[common.Address]map[string]Contract
 	contractsByLocation            map[common.Location][]byte
 	enableUpdateValidation         bool
 	userDefinedTypeChangeCheckFunc func(oldTypeID common.TypeID, newTypeID common.TypeID) (checked bool, valid bool)
@@ -42,7 +41,6 @@ type StagedContractsMigration struct {
 	contractNamesProvider          stdlib.AccountContractNamesProvider
 	reporter                       reporters.ReportWriter
 	verboseErrorOutput             bool
-	nWorkers                       int
 }
 
 type StagedContract struct {
@@ -73,7 +71,7 @@ func NewStagedContractsMigration(
 		name:                name,
 		log:                 log,
 		chainID:             options.ChainID,
-		stagedContracts:     map[common.Address]map[flow.RegisterID]Contract{},
+		stagedContracts:     map[common.Address]map[string]Contract{},
 		contractsByLocation: map[common.Location][]byte{},
 		reporter:            rwf.ReportWriter(reporterName),
 		verboseErrorOutput:  options.VerboseErrorOutput,
@@ -106,8 +104,8 @@ func (m *StagedContractsMigration) Close() error {
 		dict := zerolog.Dict()
 		for address, contracts := range m.stagedContracts {
 			arr := zerolog.Arr()
-			for registerID := range contracts {
-				arr = arr.Str(flow.RegisterIDContractName(registerID))
+			for name := range contracts {
+				arr = arr.Str(name)
 			}
 			dict = dict.Array(
 				address.HexWithPrefix(),
@@ -124,15 +122,15 @@ func (m *StagedContractsMigration) Close() error {
 
 func (m *StagedContractsMigration) InitMigration(
 	log zerolog.Logger,
-	allPayloads []*ledger.Payload,
-	nWorkers int,
+	registersByAccount *registers.ByAccount,
+	_ int,
 ) error {
 	m.log = log.
 		With().
 		Str("migration", m.name).
 		Logger()
 
-	err := m.collectAndRegisterStagedContractsFromPayloads(allPayloads)
+	err := m.collectAndRegisterStagedContracts(registersByAccount)
 	if err != nil {
 		return err
 	}
@@ -149,7 +147,7 @@ func (m *StagedContractsMigration) InitMigration(
 
 	elaborations := map[common.Location]*sema.Elaboration{}
 
-	config := MigratorRuntimeConfig{
+	config := InterpreterMigrationRuntimeConfig{
 		GetCode: func(location common.AddressLocation) ([]byte, error) {
 			return m.contractsByLocation[location], nil
 		},
@@ -160,14 +158,10 @@ func (m *StagedContractsMigration) InitMigration(
 		},
 	}
 
-	// Pass empty address. We are only interested in the created `env` object.
-	mr, err := NewMigratorRuntime(
-		log,
-		allPayloads,
+	mr, err := NewInterpreterMigrationRuntime(
+		registersByAccount,
 		m.chainID,
 		config,
-		snapshot.SmallChangeSetSnapshot,
-		nWorkers,
 	)
 	if err != nil {
 		return err
@@ -176,14 +170,15 @@ func (m *StagedContractsMigration) InitMigration(
 	m.elaborations = elaborations
 	m.contractAdditionHandler = mr.ContractAdditionHandler
 	m.contractNamesProvider = mr.ContractNamesProvider
-	m.nWorkers = nWorkers
 
 	return nil
 }
 
-// collectAndRegisterStagedContractsFromPayloads scan through the payloads and collects the contracts
+// collectAndRegisterStagedContracts scans through the registers and collects the contracts
 // staged through the `MigrationContractStaging` contract.
-func (m *StagedContractsMigration) collectAndRegisterStagedContractsFromPayloads(allPayloads []*ledger.Payload) error {
+func (m *StagedContractsMigration) collectAndRegisterStagedContracts(
+	registersByAccount *registers.ByAccount,
+) error {
 
 	// If the contracts are already passed as an input to the migration
 	// then no need to scan the storage.
@@ -206,31 +201,18 @@ func (m *StagedContractsMigration) collectAndRegisterStagedContractsFromPayloads
 
 	stagingAccountAddress := common.Address(flow.HexToAddress(stagingAccount))
 
-	// Filter-in only the payloads belong to the staging account.
-	stagingAccountPayloads := make([]*ledger.Payload, 0)
-	for _, payload := range allPayloads {
-		key, err := payload.Key()
-		if err != nil {
-			return err
-		}
+	stagingAccountRegisters := registersByAccount.AccountRegisters(string(stagingAccountAddress[:]))
 
-		address := flow.BytesToAddress(key.KeyParts[0].Value)
+	m.log.Info().Msgf(
+		"found %d registers in account %s",
+		stagingAccountRegisters.Count(),
+		stagingAccount,
+	)
 
-		if common.Address(address) == stagingAccountAddress {
-			stagingAccountPayloads = append(stagingAccountPayloads, payload)
-		}
-	}
-
-	m.log.Info().
-		Msgf("found %d payloads in account %s", len(stagingAccountPayloads), stagingAccount)
-
-	mr, err := NewMigratorRuntime(
-		m.log,
-		stagingAccountPayloads,
+	mr, err := NewInterpreterMigrationRuntime(
+		stagingAccountRegisters,
 		m.chainID,
-		MigratorRuntimeConfig{},
-		snapshot.SmallChangeSetSnapshot,
-		m.nWorkers,
+		InterpreterMigrationRuntimeConfig{},
 	)
 	if err != nil {
 		return err
@@ -391,14 +373,12 @@ func (m *StagedContractsMigration) registerContractChange(change StagedContract)
 	}
 
 	if _, ok := m.stagedContracts[address]; !ok {
-		m.stagedContracts[address] = map[flow.RegisterID]Contract{}
+		m.stagedContracts[address] = map[string]Contract{}
 	}
 
 	name := change.Name
 
-	registerID := flow.ContractRegisterID(flow.ConvertAddress(address), name)
-
-	_, exist := m.stagedContracts[address][registerID]
+	_, exist := m.stagedContracts[address][name]
 	if exist {
 		// Staged multiple updates for the same contract.
 		// Overwrite the previous update.
@@ -409,7 +389,7 @@ func (m *StagedContractsMigration) registerContractChange(change StagedContract)
 		)
 	}
 
-	m.stagedContracts[address][registerID] = change.Contract
+	m.stagedContracts[address][name] = change.Contract
 
 	location := common.AddressLocation{
 		Name:    name,
@@ -420,7 +400,7 @@ func (m *StagedContractsMigration) registerContractChange(change StagedContract)
 
 func (m *StagedContractsMigration) contractUpdatesForAccount(
 	address common.Address,
-) (map[flow.RegisterID]Contract, bool) {
+) (map[string]Contract, bool) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
@@ -436,38 +416,37 @@ func (m *StagedContractsMigration) contractUpdatesForAccount(
 func (m *StagedContractsMigration) MigrateAccount(
 	_ context.Context,
 	address common.Address,
-	oldPayloads []*ledger.Payload,
-) ([]*ledger.Payload, error) {
-
-	checkPayloadsOwnership(oldPayloads, address, m.log)
+	accountRegisters *registers.AccountRegisters,
+) error {
 
 	contractUpdates, ok := m.contractUpdatesForAccount(address)
 	if !ok {
 		// no contracts to change on this address
-		return oldPayloads, nil
+		return nil
 	}
 
-	for payloadIndex, payload := range oldPayloads {
-		key, err := payload.Key()
-		if err != nil {
-			return nil, err
-		}
+	for name, contract := range contractUpdates {
 
-		registerID, err := convert.LedgerKeyToRegisterID(key)
-		if err != nil {
-			return nil, err
-		}
+		owner := string(address[:])
+		key := flow.ContractKey(name)
 
-		updatedContract, ok := contractUpdates[registerID]
-		if !ok {
-			// not a contract register, or
-			// not interested in this contract
+		newCode := contract.Code
+		oldCode, err := accountRegisters.Get(owner, key)
+		if err != nil {
+			m.log.Err(err).
+				Str("account", address.HexWithPrefix()).
+				Str("contract", name).
+				Msg("failed to get old contract code")
 			continue
 		}
 
-		name := updatedContract.Name
-		newCode := updatedContract.Code
-		oldCode := payload.Value()
+		if len(oldCode) == 0 {
+			m.log.Error().
+				Str("address", address.HexWithPrefix()).
+				Str("contract", name).
+				Msg("missing old code for contract, skipping update")
+			continue
+		}
 
 		if m.enableUpdateValidation {
 			err = m.checkContractUpdateValidity(
@@ -477,7 +456,6 @@ func (m *StagedContractsMigration) MigrateAccount(
 				oldCode,
 			)
 		}
-
 		if err != nil {
 			var builder strings.Builder
 			errorPrinter := pretty.NewErrorPrettyPrinter(&builder, false)
@@ -497,6 +475,8 @@ func (m *StagedContractsMigration) MigrateAccount(
 
 			if m.verboseErrorOutput {
 				m.log.Error().
+					Str("account", address.HexWithPrefix()).
+					Str("contract", name).
 					Msgf(
 						"failed to update contract %s in account %s: %s",
 						name,
@@ -510,36 +490,27 @@ func (m *StagedContractsMigration) MigrateAccount(
 				ContractName:   name,
 				Error:          errorDetails,
 			})
-		} else {
-			// change contract code
-			oldPayloads[payloadIndex] = ledger.NewPayload(
-				key,
-				newCode,
-			)
 
-			m.reporter.Write(contractUpdateEntry{
-				AccountAddress: address,
-				ContractName:   name,
-			})
+			continue
 		}
 
-		// remove contract from list of contracts to change
-		// to keep track of which contracts are left to change
-		delete(contractUpdates, registerID)
-	}
-
-	if len(contractUpdates) > 0 {
-		arr := zerolog.Arr()
-		for registerID := range contractUpdates {
-			arr = arr.Str(flow.RegisterIDContractName(registerID))
+		// change contract code
+		err = accountRegisters.Set(owner, key, newCode)
+		if err != nil {
+			m.log.Err(err).
+				Str("account", address.HexWithPrefix()).
+				Str("contract", name).
+				Msg("failed to set new contract code")
+			continue
 		}
-		m.log.Error().
-			Array("contracts", arr).
-			Str("address", address.HexWithPrefix()).
-			Msg("failed to find all contract registers that need to be changed for address")
+
+		m.reporter.Write(contractUpdateEntry{
+			AccountAddress: address,
+			ContractName:   name,
+		})
 	}
 
-	return oldPayloads, nil
+	return nil
 }
 
 func (m *StagedContractsMigration) checkContractUpdateValidity(
