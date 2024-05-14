@@ -44,6 +44,18 @@ func LightCollectionToMessage(c *flow.LightCollection) (*entities.Collection, er
 	}, nil
 }
 
+// MessageToLightCollection converts a protobuf message to a light collection
+func MessageToLightCollection(m *entities.Collection) (*flow.LightCollection, error) {
+	transactions := make([]flow.Identifier, 0, len(m.TransactionIds))
+	for _, txId := range m.TransactionIds {
+		transactions = append(transactions, MessageToIdentifier(txId))
+	}
+
+	return &flow.LightCollection{
+		Transactions: transactions,
+	}, nil
+}
+
 func FullCollectionToMessage(c *flow.Collection) ([]*entities.Transaction, error) {
 	if c == nil || c.Transactions == nil {
 		return nil, fmt.Errorf("invalid collection")
@@ -57,14 +69,17 @@ func FullCollectionToMessage(c *flow.Collection) ([]*entities.Transaction, error
 	return transactions, nil
 }
 
-// MessageToLightCollection converts a protobuf message to a light collection
-func MessageToLightCollection(m *entities.Collection) (*flow.LightCollection, error) {
-	transactions := make([]flow.Identifier, 0, len(m.TransactionIds))
-	for _, txId := range m.TransactionIds {
-		transactions = append(transactions, MessageToIdentifier(txId))
+func MessageToFullCollection(m []*entities.Transaction, chain flow.Chain) (*flow.Collection, error) {
+	transactions := make([]*flow.TransactionBody, len(m))
+	for i, tx := range m {
+		t, err := MessageToTransaction(tx, chain)
+		if err != nil {
+			return nil, err
+		}
+		transactions[i] = &t
 	}
 
-	return &flow.LightCollection{
+	return &flow.Collection{
 		Transactions: transactions,
 	}, nil
 }
