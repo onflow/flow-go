@@ -163,7 +163,7 @@ func TestFixSlabsWithBrokenReferences(t *testing.T) {
 	err = migration.Close()
 	require.NoError(t, err)
 
-	newPayloads := registersByAccount.Payloads()
+	newPayloads := registersByAccount.DestructIntoPayloads()
 
 	require.Equal(t, len(expectedNewPayloads), len(newPayloads))
 
