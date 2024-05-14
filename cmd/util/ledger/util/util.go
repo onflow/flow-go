@@ -23,13 +23,11 @@ func newRegisterID(owner []byte, key []byte) flow.RegisterID {
 
 type AccountsAtreeLedger struct {
 	Accounts environment.Accounts
-	temp     map[string][]byte
 }
 
 func NewAccountsAtreeLedger(accounts environment.Accounts) *AccountsAtreeLedger {
 	return &AccountsAtreeLedger{
 		Accounts: accounts,
-		temp:     make(map[string][]byte),
 	}
 }
 
@@ -37,7 +35,7 @@ var _ atree.Ledger = &AccountsAtreeLedger{}
 
 func (a *AccountsAtreeLedger) GetValue(owner, key []byte) ([]byte, error) {
 	if common.Address(owner) == common.ZeroAddress {
-		return a.temp[string(key)], nil
+		return nil, nil
 	}
 
 	registerID := newRegisterID(owner, key)
@@ -49,11 +47,6 @@ func (a *AccountsAtreeLedger) GetValue(owner, key []byte) ([]byte, error) {
 }
 
 func (a *AccountsAtreeLedger) SetValue(owner, key, value []byte) error {
-	if common.Address(owner) == common.ZeroAddress {
-		a.temp[string(key)] = value
-		return nil
-	}
-
 	registerID := newRegisterID(owner, key)
 	err := a.Accounts.SetValue(registerID, value)
 	if err != nil {
