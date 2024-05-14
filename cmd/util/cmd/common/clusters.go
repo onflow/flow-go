@@ -146,16 +146,20 @@ func ConstructRootQCsForClusters(log zerolog.Logger, clusterList flow.ClusterLis
 
 // ConvertClusterAssignmentsCdc converts golang cluster assignments type to Cadence type `[[String]]`.
 func ConvertClusterAssignmentsCdc(assignments flow.AssignmentList) cadence.Array {
+	stringArrayType := cadence.NewVariableSizedArrayType(cadence.StringType)
+
 	assignmentsCdc := make([]cadence.Value, len(assignments))
 	for i, asmt := range assignments {
 		vals := make([]cadence.Value, asmt.Len())
 		for j, nodeID := range asmt {
 			vals[j] = cadence.String(nodeID.String())
 		}
-		assignmentsCdc[i] = cadence.NewArray(vals).WithType(cadence.NewVariableSizedArrayType(cadence.StringType{}))
+		assignmentsCdc[i] = cadence.NewArray(vals).
+			WithType(stringArrayType)
 	}
 
-	return cadence.NewArray(assignmentsCdc).WithType(cadence.NewVariableSizedArrayType(cadence.NewVariableSizedArrayType(cadence.StringType{})))
+	return cadence.NewArray(assignmentsCdc).
+		WithType(cadence.NewVariableSizedArrayType(stringArrayType))
 }
 
 // ConvertClusterQcsCdc converts cluster QCs from `QuorumCertificate` type to `ClusterQCVoteData` type.

@@ -19,6 +19,8 @@ import "github.com/onflow/flow-go/model/flow"
 // ./kvstore/models.go
 type KVStoreReader interface {
 	// ID returns an identifier for this key-value store snapshot by hashing internal fields.
+	// Two different model versions containing the same data must have different IDs.
+	// New models should use `makeVersionedModelID` to implement ID.
 	ID() flow.Identifier
 
 	// v0/v1

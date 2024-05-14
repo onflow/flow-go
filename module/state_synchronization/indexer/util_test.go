@@ -64,15 +64,15 @@ func contractUpdatedFixture(t *testing.T, address common.Address, contractName s
 		Fields: []cadence.Field{
 			{
 				Identifier: "address",
-				Type:       cadence.AddressType{},
+				Type:       cadence.AddressType,
 			},
 			{
 				Identifier: "codeHash",
-				Type:       cadence.AddressType{}, // actually a byte slice, but we're ignoring it anyway
+				Type:       cadence.AddressType, // actually a byte slice, but we're ignoring it anyway
 			},
 			{
 				Identifier: "contract",
-				Type:       cadence.StringType{},
+				Type:       cadence.StringType,
 			},
 		},
 	}

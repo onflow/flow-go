@@ -63,9 +63,12 @@ func secureFlowClient(accessAddress, accessApiNodePubKey string) (*client.Client
 	}
 
 	// create flow client
-	flowClient, err := client.NewClient(accessAddress,
-		dialOpts,
-		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(grpcutils.DefaultMaxMsgSize)),
+	flowClient, err := client.NewClient(
+		accessAddress,
+		client.WithGRPCDialOptions(
+			dialOpts,
+			grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(grpcutils.DefaultMaxMsgSize)),
+		),
 	)
 	if err != nil {
 		return nil, err
@@ -77,9 +80,12 @@ func secureFlowClient(accessAddress, accessApiNodePubKey string) (*client.Client
 // insecureFlowClient creates flow client with insecure GRPC connection
 func insecureFlowClient(accessAddress string) (*client.Client, error) {
 	// create flow client
-	flowClient, err := client.NewClient(accessAddress,
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(grpcutils.DefaultMaxMsgSize)),
+	flowClient, err := client.NewClient(
+		accessAddress,
+		client.WithGRPCDialOptions(
+			grpc.WithTransportCredentials(insecure.NewCredentials()),
+			grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(grpcutils.DefaultMaxMsgSize)),
+		),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create flow client %w", err)
