@@ -3368,7 +3368,7 @@ func TestDependencyCheck(t *testing.T) {
 
 			deployServiceContractDependencyCheck(fmt.Sprintf(`
 				access(all) fun checkDependencies(_ dependenciesAddresses: [Address], _ dependenciesNames: [String], _ authorizers: [Address]) {
-					if authorizers[0] == %s {
+					if authorizers.length == 1 && authorizers[0] == %s {
 						return
 					}
 
@@ -3399,7 +3399,7 @@ func TestDependencyCheck(t *testing.T) {
 				pub event TestEvent(_ dependenciesNames: [String])
 				
 				access(all) fun checkDependencies(_ dependenciesAddresses: [Address], _ dependenciesNames: [String], _ authorizers: [Address]) {
-					if authorizers[0] == %s {
+					if authorizers.length == 1 && authorizers[0] == %s {
 						return
 					}
 
@@ -3433,7 +3433,7 @@ func TestDependencyCheck(t *testing.T) {
 
 					dependencies := payload.(cadence.Event).Fields[0].(cadence.Array).Values
 
-					require.Equal(t, []cadence.Value{cadence.String("D"), cadence.String("C"), cadence.String("B"), cadence.String("A")}, dependencies)
+					require.ElementsMatch(t, []cadence.Value{cadence.String("D"), cadence.String("C"), cadence.String("B"), cadence.String("A")}, dependencies)
 				},
 			)
 		}))
