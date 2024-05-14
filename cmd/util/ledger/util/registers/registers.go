@@ -236,6 +236,16 @@ func (a *AccountRegisters) Payloads() []*ledger.Payload {
 }
 
 func (a *AccountRegisters) insertPayloads(payloads []*ledger.Payload) {
+	payloadCount := len(payloads)
+	registerCount := len(a.registers)
+	if payloadCount != registerCount {
+		panic(fmt.Errorf(
+			"given payloads slice has wrong size: got %d, expected %d",
+			payloadCount,
+			registerCount,
+		))
+	}
+
 	index := 0
 	for key, value := range a.registers {
 		if len(value) == 0 {
