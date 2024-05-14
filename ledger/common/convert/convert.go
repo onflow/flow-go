@@ -9,9 +9,9 @@ import (
 
 const (
 	KeyPartOwner = uint16(0)
-	// @deprecated - controller was used only by the very first
-	// version of cadence for access controll which was retired later on
-	// KeyPartController = uint16(1)
+	// Deprecated: KeyPartController was only used by the very first
+	// version of Cadence for access control, which was later retired
+	_          = uint16(1) // DO NOT REUSE
 	KeyPartKey = uint16(2)
 )
 
@@ -21,32 +21,33 @@ var UnexpectedLedgerKeyFormat = fmt.Errorf("unexpected ledger key format")
 // LedgerKeyToRegisterID converts a ledger key to a register id
 // returns an UnexpectedLedgerKeyFormat error if the key is not in the expected format
 func LedgerKeyToRegisterID(key ledger.Key) (flow.RegisterID, error) {
-	if len(key.KeyParts) != 2 ||
-		key.KeyParts[0].Type != KeyPartOwner ||
-		key.KeyParts[1].Type != KeyPartKey {
+	parts := key.KeyParts
+	if len(parts) != 2 ||
+		parts[0].Type != KeyPartOwner ||
+		parts[1].Type != KeyPartKey {
 		return flow.RegisterID{}, fmt.Errorf("ledger key %s: %w", key.String(), UnexpectedLedgerKeyFormat)
 	}
 
 	return flow.NewRegisterID(
-		flow.BytesToAddress(key.KeyParts[0].Value),
-		string(key.KeyParts[1].Value),
+		flow.BytesToAddress(parts[0].Value),
+		string(parts[1].Value),
 	), nil
 }
 
 // RegisterIDToLedgerKey converts a register id to a ledger key
 func RegisterIDToLedgerKey(registerID flow.RegisterID) ledger.Key {
-	newKey := ledger.Key{}
-	newKey.KeyParts = []ledger.KeyPart{
-		{
-			Type:  KeyPartOwner,
-			Value: []byte(registerID.Owner),
-		},
-		{
-			Type:  KeyPartKey,
-			Value: []byte(registerID.Key),
+	return ledger.Key{
+		KeyParts: []ledger.KeyPart{
+			{
+				Type:  KeyPartOwner,
+				Value: []byte(registerID.Owner),
+			},
+			{
+				Type:  KeyPartKey,
+				Value: []byte(registerID.Key),
+			},
 		},
 	}
-	return newKey
 }
 
 // PayloadToRegister converts a payload to a register id and value

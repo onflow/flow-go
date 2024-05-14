@@ -263,7 +263,7 @@ func NewSystemContractsMigration(
 ) *StagedContractsMigration {
 	migration := NewStagedContractsMigration(
 		"SystemContractsMigration",
-		"system-contracts-migrator",
+		"system-contracts-migration",
 		log,
 		rwf,
 		options.StagedContractsMigrationOptions,

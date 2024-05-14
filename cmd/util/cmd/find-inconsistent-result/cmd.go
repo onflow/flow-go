@@ -17,8 +17,9 @@ import (
 var NoMissmatchFoundError = errors.New("No missmatch found")
 
 var (
-	flagDatadir   string
-	flagEndHeight uint64
+	flagDatadir     string
+	flagStartHeight uint64
+	flagEndHeight   uint64
 )
 
 var Cmd = &cobra.Command{
@@ -32,68 +33,82 @@ func init() {
 	_ = Cmd.MarkPersistentFlagRequired("datadir")
 
 	Cmd.Flags().Uint64Var(&flagEndHeight, "end-height", 0, "the last block height checks for result consistency")
+	Cmd.Flags().Uint64Var(&flagStartHeight, "start-height", 0, "the first block height checks for result consistency")
 }
 
 func run(*cobra.Command, []string) {
-	height, err := findFirstMismatch(flagDatadir, flagEndHeight)
+	err := findFirstMismatch(flagDatadir, flagStartHeight, flagEndHeight)
 	if err != nil {
 		if errors.Is(err, NoMissmatchFoundError) {
 			fmt.Printf("no mismatch found: %v\n", err)
 		} else {
 			fmt.Printf("fatal: %v\n", err)
 		}
-		return
 	}
-
-	fmt.Printf("first mismatch found at height %v\n", height)
 }
 
-func findFirstMismatch(datadir string, endHeight uint64) (uint64, error) {
-	headers, results, state, db, err := createStorages(datadir)
+func findFirstMismatch(datadir string, startHeight, endHeight uint64) error {
+	fmt.Printf("initializing database\n")
+	headers, results, seals, state, db, err := createStorages(datadir)
 	defer db.Close()
 	if err != nil {
-		return 0, fmt.Errorf("could not create storages: %v", err)
+		return fmt.Errorf("could not create storages: %v", err)
 	}
 
 	c := &checker{
 		headers: headers,
 		results: results,
+		seals:   seals,
 		state:   state,
 	}
 
-	startHeight := findRootBlockHeight(state)
+	if startHeight == 0 {
+		startHeight = findRootBlockHeight(state)
+	}
 
 	if endHeight == 0 {
-		lastExecutedSealed, err := findLastExecutedAndSealedHeight(state, db)
+		endHeight, err = findLastExecutedAndSealedHeight(state, db)
 		if err != nil {
-			return 0, fmt.Errorf("could not find last executed and sealed height: %v", err)
+			return fmt.Errorf("could not find last executed and sealed height: %v", err)
 		}
-		endHeight = lastExecutedSealed
 	}
+
+	fmt.Printf("finding mismatch result between heights %v and %v\n", startHeight, endHeight)
 
 	mismatchHeight, err := c.FindFirstMismatchHeight(startHeight, endHeight)
 	if err != nil {
-		return 0, fmt.Errorf("could not find first mismatch: %v", err)
+		return fmt.Errorf("could not find first mismatch: %v", err)
 	}
 
-	return mismatchHeight, nil
+	fmt.Printf("first mismatch found at block %v\n", mismatchHeight)
+
+	blockID, err := findBlockIDByHeight(headers, mismatchHeight)
+	if err != nil {
+		return fmt.Errorf("could not find block id for height %v: %v", mismatchHeight, err)
+	}
+
+	fmt.Printf("mismatching block %v (id: %v)\n", mismatchHeight, blockID)
+
+	return nil
 }
 
-func createStorages(dir string) (storage.Headers, storage.ExecutionResults, protocol.State, *badger.DB, error) {
+func createStorages(dir string) (
+	storage.Headers, storage.ExecutionResults, storage.Seals, protocol.State, *badger.DB, error) {
 	db := common.InitStorage(dir)
 
 	storages := common.InitStorages(db)
 	state, err := common.InitProtocolState(db, storages)
 	if err != nil {
-		return nil, nil, nil, db, fmt.Errorf("could not init protocol state: %v", err)
+		return nil, nil, nil, nil, db, fmt.Errorf("could not init protocol state: %v", err)
 	}
 
-	return storages.Headers, storages.Results, state, db, err
+	return storages.Headers, storages.Results, storages.Seals, state, db, err
 }
 
 type checker struct {
 	headers storage.Headers
 	results storage.ExecutionResults
+	seals   storage.Seals
 	state   protocol.State
 }
 
@@ -138,16 +153,16 @@ func (c *checker) CompareAtHeight(height uint64) (bool, error) {
 		return false, fmt.Errorf("could not find own result for block %v: %w", blockID, err)
 	}
 
-	sealedResultID, err := findSealedResultIDByBlockHeight(c.state, blockID)
+	sealedResultID, err := findSealedResultIDByBlockHeight(c.seals, blockID)
 	if err != nil {
 		return false, fmt.Errorf("could not find sealed result for block %v: %w", blockID, err)
 	}
 
 	match := ownResultID == sealedResultID
 	if match {
-		fmt.Printf("height %v match: result %v\n", height, ownResultID)
+		fmt.Printf("block %v (id: %v) match: result %v\n", height, blockID, ownResultID)
 	} else {
-		fmt.Printf("height %v mismatch: own %v, sealed %v\n", height, ownResultID, sealedResultID)
+		fmt.Printf("block %v (id: %v) mismatch: own %v, sealed %v\n", height, blockID, ownResultID, sealedResultID)
 	}
 
 	return match, nil
@@ -189,11 +204,11 @@ func findOwnResultIDByBlockID(results storage.ExecutionResults, blockID flow.Ide
 	return result.ID(), nil
 }
 
-func findSealedResultIDByBlockHeight(state protocol.State, blockID flow.Identifier) (flow.Identifier, error) {
-	result, _, err := state.AtBlockID(blockID).SealedResult()
+func findSealedResultIDByBlockHeight(seals storage.Seals, blockID flow.Identifier) (flow.Identifier, error) {
+	seal, err := seals.FinalizedSealForBlock(blockID)
 	if err != nil {
 		return flow.Identifier{}, err
 	}
 
-	return result.ID(), nil
+	return seal.ResultID, nil
 }
