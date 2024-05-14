@@ -144,7 +144,9 @@ func TestDeploy(t *testing.T) {
 
 	storageSnapshot := snapshot.MapStorageSnapshot{}
 
-	for _, newPayload := range registersByAccount.Payloads() {
+	newPayloads := registersByAccount.DestructIntoPayloads()
+
+	for _, newPayload := range newPayloads {
 		registerID, registerValue, err := convert.PayloadToRegister(newPayload)
 		require.NoError(t, err)
 

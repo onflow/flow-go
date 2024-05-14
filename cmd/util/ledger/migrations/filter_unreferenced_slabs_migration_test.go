@@ -169,7 +169,7 @@ func TestFilterUnreferencedSlabs(t *testing.T) {
 		string([]byte{flow.SlabIndexPrefix, 0, 0, 0, 0, 0, 0, 0, 3}): {},
 	}
 
-	newPayloads := registersByAccount.Payloads()
+	newPayloads := registersByAccount.DestructIntoPayloads()
 	assert.Len(t, newPayloads, totalSlabCount-len(expectedKeys))
 
 	expectedFilteredPayloads := make([]*ledger.Payload, 0, len(expectedKeys))
