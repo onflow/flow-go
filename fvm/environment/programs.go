@@ -186,6 +186,14 @@ func (programs *Programs) DecodeArgument(
 	return v, err
 }
 
+func (programs *Programs) GetProgramDependencies() (derived.ProgramDependencies, error) {
+	top, err := programs.dependencyStack.top()
+	if err != nil {
+		return derived.ProgramDependencies{}, err
+	}
+	return top, nil
+}
+
 func (programs *Programs) cacheHit() {
 	programs.metrics.RuntimeTransactionProgramsCacheHit()
 }

@@ -279,3 +279,48 @@ func (sys *SystemContracts) AccountsStorageCapacity(
 		},
 	)
 }
+
+func (sys *SystemContracts) CheckDependencies(
+	dependencies []common.AddressLocation,
+	authorizers []flow.Address,
+) (cadence.Value, error) {
+
+	dependenciesAddresses := make([]cadence.Value, len(dependencies))
+	dependenciesNames := make([]cadence.Value, len(dependencies))
+	for i, dep := range dependencies {
+		dependenciesAddresses[i] = cadence.BytesToAddress(dep.Address.Bytes())
+		dependenciesNames[i] = cadence.String(dep.Name)
+	}
+
+	authorizersAddresses := make([]cadence.Value, len(authorizers))
+	for i, auth := range authorizers {
+		authorizersAddresses[i] = cadence.BytesToAddress(auth.Bytes())
+	}
+
+	return sys.Invoke(
+		ContractFunctionSpec{
+			AddressFromChain: ServiceAddress,
+			LocationName:     systemcontracts.ContractNameServiceAccount,
+			FunctionName:     systemcontracts.ContractServiceAccountFunction_checkDependencies,
+			ArgumentTypes: []sema.Type{
+				sema.NewVariableSizedType(
+					nil,
+					&sema.AddressType{},
+				),
+				sema.NewVariableSizedType(
+					nil,
+					sema.StringType,
+				),
+				sema.NewVariableSizedType(
+					nil,
+					&sema.AddressType{},
+				),
+			},
+		},
+		[]cadence.Value{
+			cadence.NewArray(dependenciesAddresses),
+			cadence.NewArray(dependenciesNames),
+			cadence.NewArray(authorizersAddresses),
+		},
+	)
+}

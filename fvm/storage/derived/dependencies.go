@@ -2,6 +2,7 @@ package derived
 
 import (
 	"github.com/onflow/cadence/runtime/common"
+	"golang.org/x/exp/maps"
 )
 
 // ProgramDependencies are the locations of programs that a program depends on.
@@ -53,4 +54,9 @@ func (d ProgramDependencies) ContainsAddress(address common.Address) bool {
 func (d ProgramDependencies) ContainsLocation(location common.Location) bool {
 	_, ok := d.locations[location]
 	return ok
+}
+
+// Locations returns all the locations.
+func (d ProgramDependencies) Locations() []common.Location {
+	return maps.Keys(d.locations)
 }
