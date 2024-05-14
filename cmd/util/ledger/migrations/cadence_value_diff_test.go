@@ -2,14 +2,13 @@ package migrations
 
 import (
 	"fmt"
+	"strconv"
 	"testing"
-
-	"github.com/rs/zerolog"
 
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
 
-	"github.com/onflow/flow-go/cmd/util/ledger/util/snapshot"
+	"github.com/onflow/flow-go/cmd/util/ledger/util/registers"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/convert"
@@ -19,15 +18,19 @@ import (
 )
 
 func TestDiffCadenceValues(t *testing.T) {
+	t.Parallel()
+
 	address, err := common.HexToAddress("0x1")
 	require.NoError(t, err)
 
 	domain := common.PathDomainStorage.Identifier()
 
 	t.Run("no diff", func(t *testing.T) {
+		t.Parallel()
+
 		writer := &testReportWriter{}
 
-		diffReporter := NewCadenceValueDiffReporter(address, writer, true)
+		diffReporter := NewCadenceValueDiffReporter(address, flow.Emulator, writer, true)
 
 		diffReporter.DiffStates(
 			createTestPayloads(t, address, domain),
@@ -39,9 +42,11 @@ func TestDiffCadenceValues(t *testing.T) {
 	})
 
 	t.Run("one storage map doesn't exist", func(t *testing.T) {
+		t.Parallel()
+
 		writer := &testReportWriter{}
 
-		diffReporter := NewCadenceValueDiffReporter(address, writer, true)
+		diffReporter := NewCadenceValueDiffReporter(address, flow.Emulator, writer, true)
 
 		diffReporter.DiffStates(
 			createTestPayloads(t, address, domain),
@@ -58,9 +63,11 @@ func TestDiffCadenceValues(t *testing.T) {
 	})
 
 	t.Run("storage maps have different sets of keys", func(t *testing.T) {
+		t.Parallel()
+
 		writer := &testReportWriter{}
 
-		diffReporter := NewCadenceValueDiffReporter(address, writer, true)
+		diffReporter := NewCadenceValueDiffReporter(address, flow.Emulator, writer, true)
 
 		diffReporter.DiffStates(
 			createTestPayloads(t, address, domain),
@@ -83,9 +90,11 @@ func TestDiffCadenceValues(t *testing.T) {
 	})
 
 	t.Run("storage maps have overlapping keys", func(t *testing.T) {
+		t.Parallel()
+
 		writer := &testReportWriter{}
 
-		diffReporter := NewCadenceValueDiffReporter(address, writer, true)
+		diffReporter := NewCadenceValueDiffReporter(address, flow.Emulator, writer, true)
 
 		diffReporter.DiffStates(
 			createStorageMapPayloads(t, address, domain, []string{"0", "1"}, []interpreter.Value{interpreter.UInt64Value(0), interpreter.UInt64Value(0)}),
@@ -108,9 +117,11 @@ func TestDiffCadenceValues(t *testing.T) {
 	})
 
 	t.Run("storage maps have one different value", func(t *testing.T) {
+		t.Parallel()
+
 		writer := &testReportWriter{}
 
-		diffReporter := NewCadenceValueDiffReporter(address, writer, false)
+		diffReporter := NewCadenceValueDiffReporter(address, flow.Emulator, writer, false)
 
 		diffReporter.DiffStates(
 			createStorageMapPayloads(t, address, domain, []string{"0", "1"}, []interpreter.Value{interpreter.UInt64Value(100), interpreter.UInt64Value(101)}),
@@ -133,9 +144,11 @@ func TestDiffCadenceValues(t *testing.T) {
 	})
 
 	t.Run("storage maps have multiple different values", func(t *testing.T) {
+		t.Parallel()
+
 		writer := &testReportWriter{}
 
-		diffReporter := NewCadenceValueDiffReporter(address, writer, false)
+		diffReporter := NewCadenceValueDiffReporter(address, flow.Emulator, writer, false)
 
 		diffReporter.DiffStates(
 			createStorageMapPayloads(t, address, domain, []string{"0", "1"}, []interpreter.Value{interpreter.UInt64Value(100), interpreter.UInt64Value(101)}),
@@ -157,9 +170,11 @@ func TestDiffCadenceValues(t *testing.T) {
 	})
 
 	t.Run("nested array value has different elements", func(t *testing.T) {
+		t.Parallel()
+
 		writer := &testReportWriter{}
 
-		diffReporter := NewCadenceValueDiffReporter(address, writer, false)
+		diffReporter := NewCadenceValueDiffReporter(address, flow.Emulator, writer, false)
 
 		createPayloads := func(arrayValues []interpreter.Value) []*ledger.Payload {
 
@@ -172,15 +187,18 @@ func TestDiffCadenceValues(t *testing.T) {
 				accountStatus.ToBytes(),
 			)
 
-			mr, err := NewMigratorRuntime(
-				zerolog.Nop(),
+			// at least one payload otherwise the migration will not get called
+			registersByAccount, err := registers.NewByAccountFromPayloads(
 				[]*ledger.Payload{
 					accountStatusPayload,
 				},
+			)
+			require.NoError(t, err)
+
+			mr, err := NewInterpreterMigrationRuntime(
+				registersByAccount.AccountRegisters(string(address[:])),
 				flow.Emulator,
-				MigratorRuntimeConfig{},
-				snapshot.LargeChangeSetOrReadonlySnapshot,
-				1,
+				InterpreterMigrationRuntimeConfig{},
 			)
 			require.NoError(t, err)
 
@@ -262,9 +280,11 @@ func TestDiffCadenceValues(t *testing.T) {
 	})
 
 	t.Run("nested dict value has different elements", func(t *testing.T) {
+		t.Parallel()
+
 		writer := &testReportWriter{}
 
-		diffReporter := NewCadenceValueDiffReporter(address, writer, false)
+		diffReporter := NewCadenceValueDiffReporter(address, flow.Emulator, writer, false)
 
 		createPayloads := func(dictValues []interpreter.Value) []*ledger.Payload {
 
@@ -277,15 +297,18 @@ func TestDiffCadenceValues(t *testing.T) {
 				accountStatus.ToBytes(),
 			)
 
-			mr, err := NewMigratorRuntime(
-				zerolog.Nop(),
+			// at least one payload otherwise the migration will not get called
+			registersByAccount, err := registers.NewByAccountFromPayloads(
 				[]*ledger.Payload{
 					accountStatusPayload,
 				},
+			)
+			require.NoError(t, err)
+
+			mr, err := NewInterpreterMigrationRuntime(
+				registersByAccount.AccountRegisters(string(address[:])),
 				flow.Emulator,
-				MigratorRuntimeConfig{},
-				snapshot.LargeChangeSetOrReadonlySnapshot,
-				1,
+				InterpreterMigrationRuntimeConfig{},
 			)
 			require.NoError(t, err)
 
@@ -374,9 +397,11 @@ func TestDiffCadenceValues(t *testing.T) {
 	})
 
 	t.Run("nested composite value has different elements", func(t *testing.T) {
+		t.Parallel()
+
 		writer := &testReportWriter{}
 
-		diffReporter := NewCadenceValueDiffReporter(address, writer, false)
+		diffReporter := NewCadenceValueDiffReporter(address, flow.Emulator, writer, false)
 
 		createPayloads := func(compositeFields []string, compositeValues []interpreter.Value) []*ledger.Payload {
 
@@ -389,15 +414,18 @@ func TestDiffCadenceValues(t *testing.T) {
 				accountStatus.ToBytes(),
 			)
 
-			mr, err := NewMigratorRuntime(
-				zerolog.Nop(),
+			// at least one payload otherwise the migration will not get called
+			registersByAccount, err := registers.NewByAccountFromPayloads(
 				[]*ledger.Payload{
 					accountStatusPayload,
 				},
+			)
+			require.NoError(t, err)
+
+			mr, err := NewInterpreterMigrationRuntime(
+				registersByAccount.AccountRegisters(string(address[:])),
 				flow.Emulator,
-				MigratorRuntimeConfig{},
-				snapshot.LargeChangeSetOrReadonlySnapshot,
-				1,
+				InterpreterMigrationRuntimeConfig{},
 			)
 			require.NoError(t, err)
 
@@ -497,9 +525,11 @@ func TestDiffCadenceValues(t *testing.T) {
 	})
 
 	t.Run("nested composite value has different elements with verbose logging", func(t *testing.T) {
+		t.Parallel()
+
 		writer := &testReportWriter{}
 
-		diffReporter := NewCadenceValueDiffReporter(address, writer, true)
+		diffReporter := NewCadenceValueDiffReporter(address, flow.Emulator, writer, true)
 
 		createPayloads := func(compositeFields []string, compositeValues []interpreter.Value) []*ledger.Payload {
 
@@ -512,15 +542,18 @@ func TestDiffCadenceValues(t *testing.T) {
 				accountStatus.ToBytes(),
 			)
 
-			mr, err := NewMigratorRuntime(
-				zerolog.Nop(),
+			// at least one payload otherwise the migration will not get called
+			registersByAccount, err := registers.NewByAccountFromPayloads(
 				[]*ledger.Payload{
 					accountStatusPayload,
 				},
+			)
+			require.NoError(t, err)
+
+			mr, err := NewInterpreterMigrationRuntime(
+				registersByAccount.AccountRegisters(string(address[:])),
 				flow.Emulator,
-				MigratorRuntimeConfig{},
-				snapshot.LargeChangeSetOrReadonlySnapshot,
-				1,
+				InterpreterMigrationRuntimeConfig{},
 			)
 			require.NoError(t, err)
 
@@ -642,15 +675,18 @@ func createStorageMapPayloads(t *testing.T, address common.Address, domain strin
 		accountStatus.ToBytes(),
 	)
 
-	mr, err := NewMigratorRuntime(
-		zerolog.Nop(),
+	// at least one payload otherwise the migration will not get called
+	registersByAccount, err := registers.NewByAccountFromPayloads(
 		[]*ledger.Payload{
 			accountStatusPayload,
 		},
+	)
+	require.NoError(t, err)
+
+	mr, err := NewInterpreterMigrationRuntime(
+		registersByAccount.AccountRegisters(string(address[:])),
 		flow.Emulator,
-		MigratorRuntimeConfig{},
-		snapshot.LargeChangeSetOrReadonlySnapshot,
-		1,
+		InterpreterMigrationRuntimeConfig{},
 	)
 	require.NoError(t, err)
 
@@ -664,6 +700,155 @@ func createStorageMapPayloads(t *testing.T, address common.Address, domain strin
 			values[i],
 		)
 	}
+
+	err = mr.Storage.Commit(mr.Interpreter, false)
+	require.NoError(t, err)
+
+	// finalize the transaction
+	result, err := mr.TransactionState.FinalizeMainTransaction()
+	require.NoError(t, err)
+
+	payloads := make([]*ledger.Payload, 0, len(result.WriteSet))
+	for id, value := range result.WriteSet {
+		key := convert.RegisterIDToLedgerKey(id)
+		payloads = append(payloads, ledger.NewPayload(key, value))
+	}
+
+	return payloads
+}
+
+func createTestPayloads(t *testing.T, address common.Address, domain string) []*ledger.Payload {
+
+	// Create account status payload
+	accountStatus := environment.NewAccountStatus()
+	accountStatusPayload := ledger.NewPayload(
+		convert.RegisterIDToLedgerKey(
+			flow.AccountStatusRegisterID(flow.ConvertAddress(address)),
+		),
+		accountStatus.ToBytes(),
+	)
+
+	registersByAccount, err := registers.NewByAccountFromPayloads(
+		[]*ledger.Payload{
+			accountStatusPayload,
+		},
+	)
+	require.NoError(t, err)
+
+	mr, err := NewInterpreterMigrationRuntime(
+		registersByAccount,
+		flow.Emulator,
+		InterpreterMigrationRuntimeConfig{},
+	)
+	require.NoError(t, err)
+
+	// Create new storage map
+	storageMap := mr.Storage.GetStorageMap(address, domain, true)
+
+	// Add Cadence UInt64Value
+	storageMap.WriteValue(
+		mr.Interpreter,
+		interpreter.StringStorageMapKey(strconv.FormatUint(storageMap.Count(), 10)),
+		interpreter.NewUnmeteredUInt64Value(1),
+	)
+
+	// Add Cadence SomeValue
+	storageMap.WriteValue(
+		mr.Interpreter,
+		interpreter.StringStorageMapKey(strconv.FormatUint(storageMap.Count(), 10)),
+		interpreter.NewUnmeteredSomeValueNonCopying(interpreter.NewUnmeteredStringValue("InnerValueString")),
+	)
+
+	// Add Cadence ArrayValue
+	const arrayCount = 10
+	i := uint64(0)
+	storageMap.WriteValue(
+		mr.Interpreter,
+		interpreter.StringStorageMapKey(strconv.FormatUint(storageMap.Count(), 10)),
+		interpreter.NewArrayValueWithIterator(
+			mr.Interpreter,
+			&interpreter.VariableSizedStaticType{
+				Type: interpreter.PrimitiveStaticTypeAnyStruct,
+			},
+			address,
+			0,
+			func() interpreter.Value {
+				if i == arrayCount {
+					return nil
+				}
+				v := interpreter.NewUnmeteredUInt64Value(i)
+				i++
+				return v
+			},
+		),
+	)
+
+	// Add Cadence DictionaryValue
+	const dictCount = 10
+	dictValues := make([]interpreter.Value, 0, dictCount*2)
+	for i := 0; i < dictCount; i++ {
+		k := interpreter.NewUnmeteredUInt64Value(uint64(i))
+		v := interpreter.NewUnmeteredStringValue(fmt.Sprintf("value %d", i))
+		dictValues = append(dictValues, k, v)
+	}
+
+	storageMap.WriteValue(
+		mr.Interpreter,
+		interpreter.StringStorageMapKey(strconv.FormatUint(storageMap.Count(), 10)),
+		interpreter.NewDictionaryValueWithAddress(
+			mr.Interpreter,
+			interpreter.EmptyLocationRange,
+			&interpreter.DictionaryStaticType{
+				KeyType:   interpreter.PrimitiveStaticTypeUInt64,
+				ValueType: interpreter.PrimitiveStaticTypeString,
+			},
+			address,
+			dictValues...,
+		),
+	)
+
+	// Add Cadence CompositeValue
+	storageMap.WriteValue(
+		mr.Interpreter,
+		interpreter.StringStorageMapKey(strconv.FormatUint(storageMap.Count(), 10)),
+		interpreter.NewCompositeValue(
+			mr.Interpreter,
+			interpreter.EmptyLocationRange,
+			common.StringLocation("test"),
+			"Test",
+			common.CompositeKindStructure,
+			[]interpreter.CompositeField{
+				{Name: "field1", Value: interpreter.NewUnmeteredStringValue("value1")},
+				{Name: "field2", Value: interpreter.NewUnmeteredStringValue("value2")},
+			},
+			address,
+		),
+	)
+
+	// Add Cadence DictionaryValue with nested CadenceArray
+	nestedArrayValue := interpreter.NewArrayValue(
+		mr.Interpreter,
+		interpreter.EmptyLocationRange,
+		&interpreter.VariableSizedStaticType{
+			Type: interpreter.PrimitiveStaticTypeUInt64,
+		},
+		address,
+		interpreter.NewUnmeteredUInt64Value(0),
+	)
+
+	storageMap.WriteValue(
+		mr.Interpreter,
+		interpreter.StringStorageMapKey(strconv.FormatUint(storageMap.Count(), 10)),
+		interpreter.NewArrayValue(
+			mr.Interpreter,
+			interpreter.EmptyLocationRange,
+			&interpreter.VariableSizedStaticType{
+				Type: interpreter.PrimitiveStaticTypeAnyStruct,
+			},
+			address,
+			nestedArrayValue,
+		),
+	)
 
 	err = mr.Storage.Commit(mr.Interpreter, false)
 	require.NoError(t, err)

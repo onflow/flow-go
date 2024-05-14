@@ -22,15 +22,14 @@ import (
 
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
-	"github.com/onflow/flow-go/cmd/util/ledger/util/snapshot"
+	"github.com/onflow/flow-go/cmd/util/ledger/util/registers"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/ledger"
-	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/model/flow"
 )
 
-type CadenceBaseMigrator struct {
+type CadenceBaseMigration struct {
 	name                              string
 	log                               zerolog.Logger
 	reporter                          reporters.ReportWriter
@@ -43,17 +42,16 @@ type CadenceBaseMigrator struct {
 		accounts environment.Accounts,
 		reporter *cadenceValueMigrationReporter,
 	) []migrations.ValueMigration
-	migratorRuntimeConfig MigratorRuntimeConfig
-	errorMessageHandler   *errorMessageHandler
-	programs              map[runtime.Location]*interpreter.Program
-	chainID               flow.ChainID
-	nWorkers              int
+	interpreterMigrationRuntimeConfig InterpreterMigrationRuntimeConfig
+	errorMessageHandler               *errorMessageHandler
+	programs                          map[runtime.Location]*interpreter.Program
+	chainID                           flow.ChainID
 }
 
-var _ AccountBasedMigration = (*CadenceBaseMigrator)(nil)
-var _ io.Closer = (*CadenceBaseMigrator)(nil)
+var _ AccountBasedMigration = (*CadenceBaseMigration)(nil)
+var _ io.Closer = (*CadenceBaseMigration)(nil)
 
-func (m *CadenceBaseMigrator) Close() error {
+func (m *CadenceBaseMigration) Close() error {
 	// Close the report writer so it flushes to file.
 	m.reporter.Close()
 
@@ -64,18 +62,17 @@ func (m *CadenceBaseMigrator) Close() error {
 	return nil
 }
 
-func (m *CadenceBaseMigrator) InitMigration(
+func (m *CadenceBaseMigration) InitMigration(
 	log zerolog.Logger,
-	_ []*ledger.Payload,
-	nWorkers int,
+	_ *registers.ByAccount,
+	_ int,
 ) error {
 	m.log = log.With().Str("migration", m.name).Logger()
-	m.nWorkers = nWorkers
 
 	// During the migration, we only provide already checked programs,
 	// no parsing/checking of contracts is expected.
 
-	m.migratorRuntimeConfig = MigratorRuntimeConfig{
+	m.interpreterMigrationRuntimeConfig = InterpreterMigrationRuntimeConfig{
 		GetOrLoadProgram: func(
 			location runtime.Location,
 			_ func() (*interpreter.Program, error),
@@ -97,25 +94,24 @@ func (m *CadenceBaseMigrator) InitMigration(
 	return nil
 }
 
-func (m *CadenceBaseMigrator) MigrateAccount(
+func (m *CadenceBaseMigration) MigrateAccount(
 	_ context.Context,
 	address common.Address,
-	oldPayloads []*ledger.Payload,
-) ([]*ledger.Payload, error) {
-
-	checkPayloadsOwnership(oldPayloads, address, m.log)
+	accountRegisters *registers.AccountRegisters,
+) error {
+	var oldPayloadsForDiff []*ledger.Payload
+	if m.diffReporter != nil {
+		oldPayloadsForDiff = accountRegisters.Payloads()
+	}
 
 	// Create all the runtime components we need for the migration
-	migrationRuntime, err := NewMigratorRuntime(
-		m.log,
-		oldPayloads,
+	migrationRuntime, err := NewInterpreterMigrationRuntime(
+		accountRegisters,
 		m.chainID,
-		m.migratorRuntimeConfig,
-		snapshot.SmallChangeSetSnapshot,
-		m.nWorkers,
+		m.interpreterMigrationRuntimeConfig,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create migrator runtime: %w", err)
+		return fmt.Errorf("failed to create interpreter migration runtime: %w", err)
 	}
 
 	storage := migrationRuntime.Storage
@@ -124,11 +120,11 @@ func (m *CadenceBaseMigrator) MigrateAccount(
 	var storageHealthErrorBefore error
 	if m.checkStorageHealthBeforeMigration {
 
-		storageHealthErrorBefore = checkStorageHealth(address, storage, oldPayloads)
+		storageHealthErrorBefore = checkStorageHealth(address, storage, accountRegisters)
 		if storageHealthErrorBefore != nil {
 			m.log.Warn().
 				Err(storageHealthErrorBefore).
-				Str("account", address.Hex()).
+				Str("account", address.HexWithPrefix()).
 				Msg("storage health check before migration failed")
 		}
 	}
@@ -140,7 +136,7 @@ func (m *CadenceBaseMigrator) MigrateAccount(
 		address,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create storage migration: %w", err)
+		return fmt.Errorf("failed to create storage migration: %w", err)
 	}
 
 	reporter := newValueMigrationReporter(
@@ -165,7 +161,7 @@ func (m *CadenceBaseMigrator) MigrateAccount(
 
 	err = migration.Commit()
 	if err != nil {
-		return nil, fmt.Errorf("failed to commit changes: %w", err)
+		return fmt.Errorf("failed to commit changes: %w", err)
 	}
 
 	// Check storage health after migration.
@@ -174,7 +170,7 @@ func (m *CadenceBaseMigrator) MigrateAccount(
 		storageHealthErrorAfter := storage.CheckHealth()
 		if storageHealthErrorAfter != nil {
 			m.log.Err(storageHealthErrorAfter).
-				Str("account", address.Hex()).
+				Str("account", address.HexWithPrefix()).
 				Msg("storage health check after migration failed")
 		}
 	}
@@ -182,74 +178,49 @@ func (m *CadenceBaseMigrator) MigrateAccount(
 	// finalize the transaction
 	result, err := migrationRuntime.TransactionState.FinalizeMainTransaction()
 	if err != nil {
-		return nil, fmt.Errorf("failed to finalize main transaction: %w", err)
+		return fmt.Errorf("failed to finalize main transaction: %w", err)
 	}
 
-	// Merge the changes to the original payloads.
+	// Merge the changes into the registers
 	expectedAddresses := map[flow.Address]struct{}{
 		flow.Address(address): {},
 	}
 
-	newPayloads, err := migrationRuntime.Snapshot.ApplyChangesAndGetNewPayloads(
+	err = registers.ApplyChanges(
+		accountRegisters,
 		result.WriteSet,
 		expectedAddresses,
 		m.log,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to merge register changes: %w", err)
+		return fmt.Errorf("failed to apply changes: %w", err)
 	}
 
 	if m.diffReporter != nil {
+		newPayloadsForDiff := accountRegisters.Payloads()
 
-		accountDiffReporter := NewCadenceValueDiffReporter(address, m.diffReporter, m.logVerboseDiff)
+		accountDiffReporter := NewCadenceValueDiffReporter(
+			address,
+			m.chainID,
+			m.diffReporter,
+			m.logVerboseDiff,
+		)
 
 		accountDiffReporter.DiffStates(
-			oldPayloads,
-			newPayloads,
+			oldPayloadsForDiff,
+			newPayloadsForDiff,
 			allStorageMapDomains,
 		)
 	}
 
-	return newPayloads, nil
-}
-
-func checkPayloadsOwnership(payloads []*ledger.Payload, address common.Address, log zerolog.Logger) {
-	for _, payload := range payloads {
-		checkPayloadOwnership(payload, address, log)
-	}
-}
-
-func checkPayloadOwnership(payload *ledger.Payload, address common.Address, log zerolog.Logger) {
-	registerID, _, err := convert.PayloadToRegister(payload)
-	if err != nil {
-		log.Err(err).Msg("failed to convert payload to register")
-		return
-	}
-
-	owner := registerID.Owner
-
-	if len(owner) > 0 {
-		payloadAddress, err := common.BytesToAddress([]byte(owner))
-		if err != nil {
-			log.Err(err).Msgf("failed to convert register owner to address: %x", owner)
-			return
-		}
-
-		if payloadAddress != address {
-			log.Error().Msgf(
-				"payload address %s does not match expected address %s",
-				payloadAddress,
-				address,
-			)
-		}
-	}
+	return nil
 }
 
 const cadenceValueMigrationReporterName = "cadence-value-migration"
 
-// NewCadence1ValueMigrator creates a new CadenceBaseMigrator
+// NewCadence1ValueMigration creates a new CadenceBaseMigration
 // which runs some of the Cadence value migrations (static types, entitlements, strings)
-func NewCadence1ValueMigrator(
+func NewCadence1ValueMigration(
 	rwf reporters.ReportWriterFactory,
 	errorMessageHandler *errorMessageHandler,
 	programs map[runtime.Location]*interpreter.Program,
@@ -257,14 +228,14 @@ func NewCadence1ValueMigrator(
 	interfaceTypeConverter statictypes.InterfaceTypeConverterFunc,
 	staticTypeCache migrations.StaticTypeCache,
 	opts Options,
-) *CadenceBaseMigrator {
+) *CadenceBaseMigration {
 
 	var diffReporter reporters.ReportWriter
 	if opts.DiffMigrations {
 		diffReporter = rwf.ReportWriter("cadence-value-migration-diff")
 	}
 
-	return &CadenceBaseMigrator{
+	return &CadenceBaseMigration{
 		name:                              "cadence_value_migration",
 		reporter:                          rwf.ReportWriter(cadenceValueMigrationReporterName),
 		diffReporter:                      diffReporter,
@@ -290,24 +261,24 @@ func NewCadence1ValueMigrator(
 	}
 }
 
-// NewCadence1LinkValueMigrator creates a new CadenceBaseMigrator
+// NewCadence1LinkValueMigration creates a new CadenceBaseMigration
 // which migrates links to capability controllers.
 // It populates the given map with the IDs of the capability controller it issues.
-func NewCadence1LinkValueMigrator(
+func NewCadence1LinkValueMigration(
 	rwf reporters.ReportWriterFactory,
 	errorMessageHandler *errorMessageHandler,
 	programs map[runtime.Location]*interpreter.Program,
 	capabilityMapping *capcons.CapabilityMapping,
 	opts Options,
-) *CadenceBaseMigrator {
+) *CadenceBaseMigration {
 	var diffReporter reporters.ReportWriter
 	if opts.DiffMigrations {
 		diffReporter = rwf.ReportWriter("cadence-link-value-migration-diff")
 	}
 
-	return &CadenceBaseMigrator{
+	return &CadenceBaseMigration{
 		name:                              "cadence_link_value_migration",
-		reporter:                          rwf.ReportWriter("cadence-link-value-migrator"),
+		reporter:                          rwf.ReportWriter("cadence-link-value-migration"),
 		diffReporter:                      diffReporter,
 		logVerboseDiff:                    opts.LogVerboseDiff,
 		verboseErrorOutput:                opts.VerboseErrorOutput,
@@ -336,25 +307,25 @@ func NewCadence1LinkValueMigrator(
 	}
 }
 
-// NewCadence1CapabilityValueMigrator creates a new CadenceBaseMigrator
+// NewCadence1CapabilityValueMigration creates a new CadenceBaseMigration
 // which migrates path capability values to ID capability values.
 // It requires a map the IDs of the capability controllers,
 // generated by the link value migration.
-func NewCadence1CapabilityValueMigrator(
+func NewCadence1CapabilityValueMigration(
 	rwf reporters.ReportWriterFactory,
 	errorMessageHandler *errorMessageHandler,
 	programs map[runtime.Location]*interpreter.Program,
 	capabilityMapping *capcons.CapabilityMapping,
 	opts Options,
-) *CadenceBaseMigrator {
+) *CadenceBaseMigration {
 	var diffReporter reporters.ReportWriter
 	if opts.DiffMigrations {
 		diffReporter = rwf.ReportWriter("cadence-capability-value-migration-diff")
 	}
 
-	return &CadenceBaseMigrator{
+	return &CadenceBaseMigration{
 		name:                              "cadence_capability_value_migration",
-		reporter:                          rwf.ReportWriter("cadence-capability-value-migrator"),
+		reporter:                          rwf.ReportWriter("cadence-capability-value-migration"),
 		diffReporter:                      diffReporter,
 		logVerboseDiff:                    opts.LogVerboseDiff,
 		verboseErrorOutput:                opts.VerboseErrorOutput,
