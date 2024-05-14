@@ -1015,6 +1015,7 @@ func (exeNode *ExecutionNode) LoadIngestionEngine(
 		if err != nil {
 			return nil, fmt.Errorf("could not create access collection fetcher: %w", err)
 		}
+		colFetcher = accessFetcher
 		exeNode.collectionRequester = accessFetcher
 	} else {
 		reqEng, err := requester.New(node.Logger, node.Metrics.Engine, node.EngineRegistry, node.Me, node.State,
