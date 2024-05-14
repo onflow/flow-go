@@ -35,6 +35,7 @@ type FilterUnreferencedSlabsMigration struct {
 	mutex            sync.Mutex
 	filteredPayloads []*ledger.Payload
 	payloadsFile     string
+	nWorkers         int
 }
 
 var _ AccountBasedMigration = &FilterUnreferencedSlabsMigration{}
@@ -55,8 +56,9 @@ func NewFilterUnreferencedSlabsMigration(
 func (m *FilterUnreferencedSlabsMigration) InitMigration(
 	log zerolog.Logger,
 	_ []*ledger.Payload,
-	_ int,
+	nWorkers int,
 ) error {
+	m.nWorkers = nWorkers
 	m.log = log.
 		With().
 		Str("migration", filterUnreferencedSlabsName).
@@ -82,7 +84,7 @@ func (m *FilterUnreferencedSlabsMigration) MigrateAccount(
 
 	newPayloads = oldPayloads
 
-	err = checkStorageHealth(address, storage, oldPayloads)
+	err = checkStorageHealth(address, storage, oldPayloads, m.nWorkers, true)
 	if err == nil {
 		return
 	}

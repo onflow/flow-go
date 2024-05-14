@@ -3,6 +3,7 @@ package migrations
 import (
 	"bytes"
 	"fmt"
+	"runtime"
 	"strconv"
 	"testing"
 
@@ -33,6 +34,7 @@ func TestValidateCadenceValues(t *testing.T) {
 			createTestPayloads(t, address, domain),
 			log,
 			false,
+			runtime.NumCPU(),
 		)
 		require.NoError(t, err)
 	})
@@ -112,6 +114,7 @@ func TestValidateCadenceValues(t *testing.T) {
 			newPayloads,
 			log,
 			false,
+			runtime.NumCPU(),
 		)
 		require.ErrorContains(t, err, wantErrorMsg)
 		require.Equal(t, 0, w.Len())
@@ -123,6 +126,7 @@ func TestValidateCadenceValues(t *testing.T) {
 			newPayloads,
 			log,
 			true,
+			runtime.NumCPU(),
 		)
 		require.ErrorContains(t, err, wantErrorMsg)
 		require.Equal(t, wantVerboseMsg, w.String())
