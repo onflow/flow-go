@@ -89,7 +89,7 @@ func ExecutionErrorCode(err error) ErrorCode {
 	}
 }
 
-func GetErrorForCode(errorCode ErrorCode) error {
+func ErrorFromCode(errorCode ErrorCode) error {
 	switch errorCode {
 	case ValidationErrCodeGasUintOverflow:
 		return gethVM.ErrGasUintOverflow
