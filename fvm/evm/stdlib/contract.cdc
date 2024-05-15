@@ -154,14 +154,7 @@ contract EVM {
         /// Future implementations should pass data to InternalEVM for native serialization
         access(all)
         view fun toString(): String {
-            let addressBytes: [UInt8] = [
-                self.bytes[0], self.bytes[1], self.bytes[2], self.bytes[3],
-                self.bytes[4], self.bytes[5], self.bytes[6], self.bytes[7],
-                self.bytes[8], self.bytes[9], self.bytes[10], self.bytes[11],
-                self.bytes[12], self.bytes[13], self.bytes[14], self.bytes[15],
-                self.bytes[16], self.bytes[17], self.bytes[18], self.bytes[19]
-            ]
-            return String.encodeHex(addressBytes)
+            return String.encodeHex(self.bytes.toVariableSized())
         }
 
         /// Compares the address with another address
@@ -174,28 +167,14 @@ contract EVM {
     /// Converts a hex string to an EVM address if the string is a valid hex string
     /// Future implementations should pass data to InternalEVM for native deserialization
     access(all)
-    fun addressFromString(_ asHex: String): EVMAddress? {
-        pre {
-            asHex.length == 40 || asHex.length == 42: "Invalid hex string length"
+    fun addressFromString(_ asHex: String): EVMAddress {
+        var withoutPrefix = asHex
+        // Strip the 0x prefix, if any
+        if asHex.length >= 2 && asHex[0] == "0" && asHex[1] == "x" {
+            withoutPrefix = asHex.slice(from: 2, upTo: asHex.length)
         }
-        // Remove the 0x prefix if it exists
-        let sanitized = (asHex[1] == "x" ? asHex.split(separator: "x")[1] : asHex).toLower()
-        if sanitized.length != 40 {
-            return nil
-        }
-        // Decode the hex string
-        var addressBytes: [UInt8] = asHex.decodeHex()
-        if addressBytes.length != 20 {
-            return nil
-        }
-        // Return the EVM address from the decoded hex string
-        return EVM.EVMAddress(bytes: [
-            addressBytes[0], addressBytes[1], addressBytes[2], addressBytes[3],
-            addressBytes[4], addressBytes[5], addressBytes[6], addressBytes[7],
-            addressBytes[8], addressBytes[9], addressBytes[10], addressBytes[11],
-            addressBytes[12], addressBytes[13], addressBytes[14], addressBytes[15],
-            addressBytes[16], addressBytes[17], addressBytes[18], addressBytes[19]
-        ])
+        let bytes = withoutPrefix.decodeHex().toConstantSized<[UInt8;20]>()!
+        return EVMAddress(bytes: bytes)
     }
 
     access(all)
