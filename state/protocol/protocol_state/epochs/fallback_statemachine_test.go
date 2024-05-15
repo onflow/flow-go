@@ -77,12 +77,14 @@ func (s *EpochFallbackStateMachineSuite) TestTransitionToNextEpoch() {
 		InvalidEpochTransitionAttempted: true,
 	}
 
-	s.Run("happy-path", func() {
+	// Irrespective of whether the parent state is in EFM, the FallbackStateMachine should always set
+	// `InvalidEpochTransitionAttempted` to true and transition the next epoch, because the candidate block
+	// belongs to the next epoch.
+	var err error
+	for _, parentAlreadyInEFM := range []bool{true, false} {
 		parentProtocolState := s.parentProtocolState.Copy()
-		parentProtocolState.InvalidEpochTransitionAttempted = false
+		parentProtocolState.InvalidEpochTransitionAttempted = parentAlreadyInEFM
 
-		var err error
-		// since the candidate block is from next epoch, HappyPathStateMachine should transition to next epoch
 		s.stateMachine, err = NewFallbackStateMachine(s.params, candidate.View, parentProtocolState.Copy())
 		require.NoError(s.T(), err)
 		err = s.stateMachine.TransitionToNextEpoch()
@@ -91,24 +93,8 @@ func (s *EpochFallbackStateMachineSuite) TestTransitionToNextEpoch() {
 		require.True(s.T(), hasChanges)
 		require.NotEqual(s.T(), parentProtocolState.ID(), updatedState.ID())
 		require.Equal(s.T(), updatedState.ID(), stateID)
-		require.Equal(s.T(), updatedState, expectedState, "state should be equal to expected one")
-	})
-	s.Run("epoch-fallback-mode", func() {
-		parentProtocolState := s.parentProtocolState.Copy()
-		parentProtocolState.InvalidEpochTransitionAttempted = true // just to be explicit
-
-		var err error
-		// since the candidate block is from next epoch, HappyPathStateMachine should transition to next epoch
-		s.stateMachine, err = NewFallbackStateMachine(s.params, candidate.View, parentProtocolState.Copy())
-		require.NoError(s.T(), err)
-		err = s.stateMachine.TransitionToNextEpoch()
-		require.NoError(s.T(), err)
-		updatedState, stateID, hasChanges := s.stateMachine.Build()
-		require.True(s.T(), hasChanges)
-		require.NotEqual(s.T(), parentProtocolState.ID(), updatedState.ID())
-		require.Equal(s.T(), updatedState.ID(), stateID)
-		require.Equal(s.T(), updatedState, expectedState, "state should be equal to expected one")
-	})
+		require.Equal(s.T(), updatedState, expectedState, "FallbackStateMachine produced unexpected Protocol State")
+	}
 }
 
 // TestTransitionToNextEpochNotAllowed tests different scenarios where transition to next epoch is not allowed.
@@ -126,6 +112,7 @@ func (s *EpochFallbackStateMachineSuite) TestTransitionToNextEpochNotAllowed() {
 		protocolState := unittest.EpochStateFixture(unittest.WithNextEpochProtocolState(), func(entry *flow.RichProtocolStateEntry) {
 			entry.NextEpoch.CommitID = flow.ZeroID
 			entry.NextEpochCommit = nil
+			entry.NextEpochIdentityTable = nil
 		})
 		candidate := unittest.BlockHeaderFixture(
 			unittest.HeaderWithView(protocolState.CurrentEpochSetup.FinalView + 1))
@@ -387,7 +374,7 @@ func (s *EpochFallbackStateMachineSuite) TestEpochFallbackStateMachineInjectsMul
 // TestEpochFallbackStateMachineInjectsMultipleExtensions_NextEpochCommitted tests that the state machine injects multiple extensions
 // as it reaches the safety threshold of the current epoch and the extensions themselves.
 // In this test we are simulating the scenario where the current epoch enters fallback mode when the next epoch has been committed.
-// It is expected that it will transition into the next epoch (since it was committed)
+// It is expected that it will transition into the next epoch (since it was committed),
 // then reach the safety threshold and add the extension to the next epoch, which at that point will be considered 'current'.
 func (s *EpochFallbackStateMachineSuite) TestEpochFallbackStateMachineInjectsMultipleExtensions_NextEpochCommitted() {
 	originalParentState := s.parentProtocolState.Copy()
@@ -443,7 +430,6 @@ func (s *EpochFallbackStateMachineSuite) TestEpochFallbackStateMachineInjectsMul
 			}
 
 			updatedState, _, _ := stateMachine.Build()
-
 			parentProtocolState, err = flow.NewRichProtocolStateEntry(updatedState,
 				previousEpochSetup,
 				previousEpochCommit,
@@ -451,7 +437,6 @@ func (s *EpochFallbackStateMachineSuite) TestEpochFallbackStateMachineInjectsMul
 				currentEpochCommit,
 				nextEpochSetup,
 				nextEpochCommit)
-
 			require.NoError(s.T(), err)
 		}
 	}
