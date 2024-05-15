@@ -3265,8 +3265,10 @@ func TestEVMCreateCadenceOwnedAccount(t *testing.T) {
 
 	// check cadence owned account created events
 	expectedCoaAddress := types.Address{3}
+	expectedEncodedAddress, err := cadence.NewString(expectedCoaAddress.String())
+	require.NoError(t, err)
 	require.Equal(t,
-		expectedCoaAddress.ToCadenceValue(),
+		expectedEncodedAddress,
 		cadence.SearchFieldByName(
 			events[0],
 			types.CadenceOwnedAccountCreatedTypeAddressBytesFieldName,
@@ -3274,8 +3276,9 @@ func TestEVMCreateCadenceOwnedAccount(t *testing.T) {
 	)
 
 	expectedCoaAddress = types.Address{4}
+	expectedEncodedAddress, err = cadence.NewString(expectedCoaAddress.String())
 	require.Equal(t,
-		expectedCoaAddress.ToCadenceValue(),
+		expectedEncodedAddress,
 		cadence.SearchFieldByName(
 			events[1],
 			types.CadenceOwnedAccountCreatedTypeAddressBytesFieldName,
@@ -3650,10 +3653,12 @@ func TestCOADeposit(t *testing.T) {
 	tokenDepositEvent := events[3]
 	tokenDepositEventFields := cadence.FieldsMappedByName(tokenDepositEvent)
 
+	expectedEncodedAddress, err := cadence.NewString(expectedCoaAddress.String())
+	require.NoError(t, err)
 	// check address
 	require.Equal(t,
-		expectedCoaAddress.ToCadenceValue(),
-		tokenDepositEventFields["addressBytes"],
+		expectedEncodedAddress,
+		tokenDepositEventFields["address"],
 	)
 	// check amount
 	require.Equal(t,
@@ -3823,10 +3828,11 @@ func TestCadenceOwnedAccountWithdraw(t *testing.T) {
 	tokenWithdrawEvent := events[4]
 	tokenWithdrawEventFields := cadence.FieldsMappedByName(tokenWithdrawEvent)
 
+	expectedEncodedAddress, err := cadence.NewString(expectedCoaAddress.String())
 	// check address
 	require.Equal(t,
-		expectedCoaAddress.ToCadenceValue(),
-		tokenWithdrawEventFields["addressBytes"],
+		expectedEncodedAddress,
+		tokenWithdrawEventFields["address"],
 	)
 	// check amount
 	require.Equal(t,
