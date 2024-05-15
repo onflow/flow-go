@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"sort"
 	"sync"
 	"time"
 
@@ -217,14 +216,33 @@ func MigrateGroupConcurrently(
 	go func() {
 		defer close(jobs)
 
-		allAccountRegisters := make([]*registers.AccountRegisters, 0, accountCount)
+		// TODO: maybe adjust, make configurable, or dependent on chain
+		const keepTopNAccountRegisters = 20
+		largestAccountRegisters := util.NewTopN[*registers.AccountRegisters](
+			keepTopNAccountRegisters,
+			func(a, b *registers.AccountRegisters) bool {
+				return a.Count() < b.Count()
+			},
+		)
 
+		allAccountRegisters := make([]*registers.AccountRegisters, accountCount)
+
+		smallerAccountRegisterIndex := keepTopNAccountRegisters
 		err := registersByAccount.ForEachAccount(
 			func(accountRegisters *registers.AccountRegisters) error {
-				allAccountRegisters = append(
-					allAccountRegisters,
-					accountRegisters,
-				)
+
+				// Try to add the account registers to the top N largest account registers.
+				// If there is an "overflow" element (either the added element, or an existing element),
+				// add it to the account registers.
+				// This way we can process the largest account registers first,
+				// and do not need to sort all account registers.
+
+				popped, didPop := largestAccountRegisters.Add(accountRegisters)
+				if didPop {
+					allAccountRegisters[smallerAccountRegisterIndex] = popped
+					smallerAccountRegisterIndex++
+				}
+
 				return nil
 			},
 		)
@@ -232,12 +250,12 @@ func MigrateGroupConcurrently(
 			cancel(fmt.Errorf("failed to get all account registers: %w", err))
 		}
 
-		// Schedule jobs in descending order of the number of registers
-		sort.Slice(allAccountRegisters, func(i, j int) bool {
-			a := allAccountRegisters[i]
-			b := allAccountRegisters[j]
-			return a.Count() > b.Count()
-		})
+		// Add the largest account registers to the account registers.
+		// The elements in the top N largest account registers are returned in reverse order.
+		for index := largestAccountRegisters.Len() - 1; index >= 0; index-- {
+			accountRegisters := heap.Pop(largestAccountRegisters).(*registers.AccountRegisters)
+			allAccountRegisters[index] = accountRegisters
+		}
 
 		for _, accountRegisters := range allAccountRegisters {
 			owner := accountRegisters.Owner()
