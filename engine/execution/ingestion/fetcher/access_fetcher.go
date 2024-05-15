@@ -113,12 +113,16 @@ func (f *AccessCollectionFetcher) fetchCollection(ctx irrecoverable.SignalerCont
 				Id: g.colID[:],
 			})
 		if err != nil {
-			return fmt.Errorf("failed to fetch collection %v: %w", g.colID, err)
+			f.log.Error().Err(err).Hex("blockID", g.blockID[:]).Uint64("height", g.height).
+				Msgf("failed to fetch collection %v", g.colID)
+			return retry.RetryableError(err)
 		}
 
 		col, err := convert.MessageToFullCollection(resp.Transactions, f.chain)
 		if err != nil {
-			return fmt.Errorf("failed to convert collection %v: %w", g.colID, err)
+			f.log.Error().Err(err).Hex("blockID", g.blockID[:]).Uint64("height", g.height).
+				Msgf("failed to convert collection %v", g.colID)
+			return err
 		}
 
 		f.handler(f.originID, col)
