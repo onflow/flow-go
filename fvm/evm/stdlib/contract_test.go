@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"math/big"
+	"strings"
 	"testing"
 
 	"github.com/onflow/cadence"
@@ -3443,25 +3444,20 @@ func TestEVMCreateCadenceOwnedAccount(t *testing.T) {
 
 	// check cadence owned account created events
 	expectedCoaAddress := types.Address{3}
-	expectedEncodedAddress, err := cadence.NewString(expectedCoaAddress.String())
-	require.NoError(t, err)
-	require.Equal(t,
-		expectedEncodedAddress,
-		cadence.SearchFieldByName(
-			events[0],
-			types.CadenceOwnedAccountCreatedTypeAddressFieldName,
-		),
-	)
+	requireEqualEventAddress(t, events[0], expectedCoaAddress)
 
 	expectedCoaAddress = types.Address{4}
-	expectedEncodedAddress, err = cadence.NewString(expectedCoaAddress.String())
-	require.Equal(t,
-		expectedEncodedAddress,
-		cadence.SearchFieldByName(
-			events[1],
-			types.CadenceOwnedAccountCreatedTypeAddressFieldName,
-		),
-	)
+	requireEqualEventAddress(t, events[1], expectedCoaAddress)
+}
+
+func requireEqualEventAddress(t *testing.T, event cadence.Event, address types.Address) {
+	actual := cadence.SearchFieldByName(event, types.CadenceOwnedAccountCreatedTypeAddressFieldName)
+	strippedHex := strings.TrimPrefix(address.String(), "0x")
+	expected, err := cadence.NewString(strippedHex)
+	if err != nil {
+		require.NoError(t, err)
+	}
+	require.Equal(t, expected, actual)
 }
 
 func TestCadenceOwnedAccountCall(t *testing.T) {
@@ -3831,13 +3827,8 @@ func TestCOADeposit(t *testing.T) {
 	tokenDepositEvent := events[3]
 	tokenDepositEventFields := cadence.FieldsMappedByName(tokenDepositEvent)
 
-	expectedEncodedAddress, err := cadence.NewString(expectedCoaAddress.String())
-	require.NoError(t, err)
-	// check address
-	require.Equal(t,
-		expectedEncodedAddress,
-		tokenDepositEventFields["address"],
-	)
+	requireEqualEventAddress(t, tokenDepositEvent, expectedCoaAddress)
+
 	// check amount
 	require.Equal(t,
 		expectedBalance,
@@ -4006,12 +3997,8 @@ func TestCadenceOwnedAccountWithdraw(t *testing.T) {
 	tokenWithdrawEvent := events[4]
 	tokenWithdrawEventFields := cadence.FieldsMappedByName(tokenWithdrawEvent)
 
-	expectedEncodedAddress, err := cadence.NewString(expectedCoaAddress.String())
-	// check address
-	require.Equal(t,
-		expectedEncodedAddress,
-		tokenWithdrawEventFields["address"],
-	)
+	requireEqualEventAddress(t, tokenWithdrawEvent, expectedCoaAddress)
+
 	// check amount
 	require.Equal(t,
 		expectedWithdrawBalance,
