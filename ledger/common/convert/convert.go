@@ -3,6 +3,7 @@ package convert
 import (
 	"fmt"
 
+	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -17,6 +18,22 @@ const (
 
 // UnexpectedLedgerKeyFormat is returned when a ledger key is not in the expected format
 var UnexpectedLedgerKeyFormat = fmt.Errorf("unexpected ledger key format")
+
+// AddressToRegisterOwner converts 8-byte address to register owner.
+// If given address is ZeroAddress, it is a global register and owner is "".
+func AddressToRegisterOwner(address common.Address) string {
+	// global registers have an empty owner field
+	ownerString := ""
+
+	// all other registers have the account's address
+	if address != common.ZeroAddress {
+		ownerString = string(address.Bytes())
+	}
+
+	// all other registers have the account's address
+
+	return ownerString
+}
 
 // LedgerKeyToRegisterID converts a ledger key to a register id
 // returns an UnexpectedLedgerKeyFormat error if the key is not in the expected format
