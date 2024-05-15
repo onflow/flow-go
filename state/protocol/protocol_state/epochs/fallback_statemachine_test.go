@@ -61,14 +61,75 @@ func (s *EpochFallbackStateMachineSuite) TestProcessEpochCommitIsNoop() {
 	require.Equal(s.T(), s.parentProtocolState.ID(), s.stateMachine.ParentState().ID())
 }
 
-// TestTransitionToNextEpoch ensures that transition to next epoch is not possible.
+// TestTransitionToNextEpoch tests a scenario where the FallbackStateMachine processes first block from next epoch.
+// It has to discard the parent state and build a new state with data from next epoch.
 func (s *EpochFallbackStateMachineSuite) TestTransitionToNextEpoch() {
-	err := s.stateMachine.TransitionToNextEpoch()
-	require.NoError(s.T(), err)
-	updatedState, updateStateID, hasChanges := s.stateMachine.Build()
-	require.False(s.T(), hasChanges)
-	require.Equal(s.T(), updatedState.ID(), updateStateID)
-	require.Equal(s.T(), s.parentProtocolState.ID(), updateStateID)
+	// update protocol state with next epoch information
+	unittest.WithNextEpochProtocolState()(s.parentProtocolState)
+
+	candidate := unittest.BlockHeaderFixture(
+		unittest.HeaderWithView(s.parentProtocolState.CurrentEpochSetup.FinalView + 1))
+
+	expectedState := &flow.ProtocolStateEntry{
+		PreviousEpoch:                   s.parentProtocolState.CurrentEpoch.Copy(),
+		CurrentEpoch:                    *s.parentProtocolState.NextEpoch.Copy(),
+		NextEpoch:                       nil,
+		InvalidEpochTransitionAttempted: true,
+	}
+
+	// Irrespective of whether the parent state is in EFM, the FallbackStateMachine should always set
+	// `InvalidEpochTransitionAttempted` to true and transition the next epoch, because the candidate block
+	// belongs to the next epoch.
+	var err error
+	for _, parentAlreadyInEFM := range []bool{true, false} {
+		parentProtocolState := s.parentProtocolState.Copy()
+		parentProtocolState.InvalidEpochTransitionAttempted = parentAlreadyInEFM
+
+		s.stateMachine, err = NewFallbackStateMachine(s.params, candidate.View, parentProtocolState.Copy())
+		require.NoError(s.T(), err)
+		err = s.stateMachine.TransitionToNextEpoch()
+		require.NoError(s.T(), err)
+		updatedState, stateID, hasChanges := s.stateMachine.Build()
+		require.True(s.T(), hasChanges)
+		require.NotEqual(s.T(), parentProtocolState.ID(), updatedState.ID())
+		require.Equal(s.T(), updatedState.ID(), stateID)
+		require.Equal(s.T(), updatedState, expectedState, "FallbackStateMachine produced unexpected Protocol State")
+	}
+}
+
+// TestTransitionToNextEpochNotAllowed tests different scenarios where transition to next epoch is not allowed.
+func (s *EpochFallbackStateMachineSuite) TestTransitionToNextEpochNotAllowed() {
+	s.Run("no next epoch protocol state", func() {
+		protocolState := unittest.EpochStateFixture()
+		candidate := unittest.BlockHeaderFixture(
+			unittest.HeaderWithView(protocolState.CurrentEpochSetup.FinalView + 1))
+		stateMachine, err := NewFallbackStateMachine(s.params, candidate.View, protocolState)
+		require.NoError(s.T(), err)
+		err = stateMachine.TransitionToNextEpoch()
+		require.Error(s.T(), err, "should not allow transition to next epoch if there is no next epoch protocol state")
+	})
+	s.Run("next epoch not committed", func() {
+		protocolState := unittest.EpochStateFixture(unittest.WithNextEpochProtocolState(), func(entry *flow.RichProtocolStateEntry) {
+			entry.NextEpoch.CommitID = flow.ZeroID
+			entry.NextEpochCommit = nil
+			entry.NextEpochIdentityTable = nil
+		})
+		candidate := unittest.BlockHeaderFixture(
+			unittest.HeaderWithView(protocolState.CurrentEpochSetup.FinalView + 1))
+		stateMachine, err := NewFallbackStateMachine(s.params, candidate.View, protocolState)
+		require.NoError(s.T(), err)
+		err = stateMachine.TransitionToNextEpoch()
+		require.Error(s.T(), err, "should not allow transition to next epoch if it is not committed")
+	})
+	s.Run("candidate block is not from next epoch", func() {
+		protocolState := unittest.EpochStateFixture(unittest.WithNextEpochProtocolState())
+		candidate := unittest.BlockHeaderFixture(
+			unittest.HeaderWithView(protocolState.CurrentEpochSetup.FinalView))
+		stateMachine, err := NewFallbackStateMachine(s.params, candidate.View, protocolState)
+		require.NoError(s.T(), err)
+		err = stateMachine.TransitionToNextEpoch()
+		require.Error(s.T(), err, "should not allow transition to next epoch if next block is not first block from next epoch")
+	})
 }
 
 // TestNewEpochFallbackStateMachine tests that creating epoch fallback state machine sets
@@ -313,11 +374,9 @@ func (s *EpochFallbackStateMachineSuite) TestEpochFallbackStateMachineInjectsMul
 // TestEpochFallbackStateMachineInjectsMultipleExtensions_NextEpochCommitted tests that the state machine injects multiple extensions
 // as it reaches the safety threshold of the current epoch and the extensions themselves.
 // In this test we are simulating the scenario where the current epoch enters fallback mode when the next epoch has been committed.
-// It is expected that it will transition into the next epoch (since it was committed)
+// It is expected that it will transition into the next epoch (since it was committed),
 // then reach the safety threshold and add the extension to the next epoch, which at that point will be considered 'current'.
 func (s *EpochFallbackStateMachineSuite) TestEpochFallbackStateMachineInjectsMultipleExtensions_NextEpochCommitted() {
-	unittest.SkipUnless(s.T(), unittest.TEST_TODO,
-		"This test doesn't work since it misses logic to transition to the next epoch when we are in EFM.")
 	originalParentState := s.parentProtocolState.Copy()
 	originalParentState.InvalidEpochTransitionAttempted = false
 	unittest.WithNextEpochProtocolState()(originalParentState)
@@ -347,7 +406,6 @@ func (s *EpochFallbackStateMachineSuite) TestEpochFallbackStateMachineInjectsMul
 	firstExtensionViewThreshold := originalParentState.NextEpochSetup.FinalView + DefaultEpochExtensionViewCount - s.params.EpochCommitSafetyThreshold()
 	secondExtensionViewThreshold := originalParentState.NextEpochSetup.FinalView + 2*DefaultEpochExtensionViewCount - s.params.EpochCommitSafetyThreshold()
 	thirdExtensionViewThreshold := originalParentState.NextEpochSetup.FinalView + 3*DefaultEpochExtensionViewCount - s.params.EpochCommitSafetyThreshold()
-	currentEpochLastView := originalParentState.CurrentEpochSetup.FinalView
 
 	parentProtocolState := originalParentState.Copy()
 	candidateView := originalParentState.CurrentEpochSetup.FirstView + 1
@@ -358,31 +416,27 @@ func (s *EpochFallbackStateMachineSuite) TestEpochFallbackStateMachineInjectsMul
 			stateMachine, err := NewFallbackStateMachine(s.params, candidateView, parentProtocolState.Copy())
 			require.NoError(s.T(), err)
 
-			var (
-				nextEpochSetup  *flow.EpochSetup
-				nextEpochCommit *flow.EpochCommit
-			)
+			previousEpochSetup, previousEpochCommit := parentProtocolState.PreviousEpochSetup, parentProtocolState.PreviousEpochCommit
+			currentEpochSetup, currentEpochCommit := parentProtocolState.CurrentEpochSetup, parentProtocolState.CurrentEpochCommit
+			nextEpochSetup, nextEpochCommit := parentProtocolState.NextEpochSetup, parentProtocolState.NextEpochCommit
 			if candidateView > parentProtocolState.CurrentEpochFinalView() {
 				require.NoError(s.T(), stateMachine.TransitionToNextEpoch())
+
+				// after we have transitioned to the next epoch, we need to update the current epoch
+				// for the next iteration we can use parent protocol state again
+				previousEpochSetup, previousEpochCommit = currentEpochSetup, currentEpochCommit
+				currentEpochSetup, currentEpochCommit = parentProtocolState.NextEpochSetup, parentProtocolState.NextEpochCommit
+				nextEpochSetup, nextEpochCommit = nil, nil
 			}
 
 			updatedState, _, _ := stateMachine.Build()
-
-			if candidateView < currentEpochLastView {
-				// as the next epoch has been committed, we need to respect that in current epoch
-				// when we transition to the next epoch we will pass nil instead.
-				nextEpochSetup = parentProtocolState.NextEpochSetup
-				nextEpochCommit = parentProtocolState.NextEpochCommit
-			}
-
 			parentProtocolState, err = flow.NewRichProtocolStateEntry(updatedState,
-				parentProtocolState.PreviousEpochSetup,
-				parentProtocolState.PreviousEpochCommit,
-				parentProtocolState.CurrentEpochSetup,
-				parentProtocolState.CurrentEpochCommit,
+				previousEpochSetup,
+				previousEpochCommit,
+				currentEpochSetup,
+				currentEpochCommit,
 				nextEpochSetup,
 				nextEpochCommit)
-
 			require.NoError(s.T(), err)
 		}
 	}
@@ -409,11 +463,11 @@ func (s *EpochFallbackStateMachineSuite) TestEpochFallbackStateMachineInjectsMul
 		evolveStateToView(data.TargetView)
 
 		expectedState := &flow.ProtocolStateEntry{
-			PreviousEpoch: originalParentState.PreviousEpoch,
+			PreviousEpoch: originalParentState.CurrentEpoch.Copy(),
 			CurrentEpoch: flow.EpochStateContainer{
-				SetupID:          originalParentState.CurrentEpoch.SetupID,
-				CommitID:         originalParentState.CurrentEpoch.CommitID,
-				ActiveIdentities: originalParentState.CurrentEpoch.ActiveIdentities,
+				SetupID:          originalParentState.NextEpoch.SetupID,
+				CommitID:         originalParentState.NextEpoch.CommitID,
+				ActiveIdentities: originalParentState.NextEpoch.ActiveIdentities,
 				EpochExtensions:  data.ExpectedExtensions,
 			},
 			NextEpoch:                       nil,
@@ -423,5 +477,4 @@ func (s *EpochFallbackStateMachineSuite) TestEpochFallbackStateMachineInjectsMul
 		require.Greater(s.T(), parentProtocolState.CurrentEpochFinalView(), candidateView,
 			"final view should be greater than final view of test")
 	}
-
 }

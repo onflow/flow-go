@@ -152,33 +152,3 @@ func (u *HappyPathStateMachine) ProcessEpochCommit(epochCommit *flow.EpochCommit
 	u.state.NextEpoch.CommitID = epochCommit.ID()
 	return true, nil
 }
-
-// TransitionToNextEpoch updates the notion of 'current epoch', 'previous' and 'next epoch' in the protocol
-// state. An epoch transition is only allowed when:
-// - next epoch has been set up,
-// - next epoch has been committed,
-// - invalid state transition has not been attempted (this is ensured by constructor),
-// - candidate block is in the next epoch.
-// No errors are expected during normal operations.
-func (u *HappyPathStateMachine) TransitionToNextEpoch() error {
-	nextEpoch := u.state.NextEpoch
-	// Check if there is next epoch protocol state
-	if nextEpoch == nil {
-		return fmt.Errorf("protocol state has not been setup yet")
-	}
-	// Check if there is a commit event for next epoch
-	if nextEpoch.CommitID == flow.ZeroID {
-		return fmt.Errorf("protocol state has not been committed yet")
-	}
-	// Check if we are at the next epoch, only then a transition is allowed
-	if u.view < u.parentState.NextEpochSetup.FirstView {
-		return fmt.Errorf("protocol state transition is only allowed when enterring next epoch")
-	}
-	u.state = &flow.ProtocolStateEntry{
-		PreviousEpoch:                   &u.state.CurrentEpoch,
-		CurrentEpoch:                    *u.state.NextEpoch,
-		InvalidEpochTransitionAttempted: false,
-	}
-	u.rebuildIdentityLookup()
-	return nil
-}

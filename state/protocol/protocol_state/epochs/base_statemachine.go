@@ -1,6 +1,8 @@
 package epochs
 
 import (
+	"fmt"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
 )
@@ -93,5 +95,32 @@ func (u *baseStateMachine) EjectIdentity(nodeID flow.Identifier) error {
 		return protocol.NewInvalidServiceEventErrorf("expected to find identity for "+
 			"prev, current or next epoch, but (%v) was not found", nodeID)
 	}
+	return nil
+}
+
+// TransitionToNextEpoch updates the notion of 'current epoch', 'previous' and 'next epoch' in the protocol
+// state. An epoch transition is only allowed when _all_ of the following conditions are satisfied:
+// - next epoch has been set up,
+// - next epoch has been committed,
+// - candidate block is in the next epoch.
+// No errors are expected during normal operations.
+func (u *baseStateMachine) TransitionToNextEpoch() error {
+	nextEpoch := u.state.NextEpoch
+	if nextEpoch == nil { // nextEpoch ≠ nil if and only if next epoch was already set up (on the happy path)
+		return fmt.Errorf("protocol state for next epoch has not yet been setup")
+	}
+	if nextEpoch.CommitID == flow.ZeroID { // nextEpoch.CommitID ≠ flow.ZeroID if and only if next epoch was already committed (on the happy path)
+		return fmt.Errorf("protocol state for next epoch has not yet been committed")
+	}
+	// Check if we are at the next epoch, only then a transition is allowed
+	if u.view < u.parentState.NextEpochSetup.FirstView {
+		return fmt.Errorf("epoch transition is only allowed when entering next epoch")
+	}
+	u.state = &flow.ProtocolStateEntry{
+		PreviousEpoch:                   &u.state.CurrentEpoch,
+		CurrentEpoch:                    *u.state.NextEpoch,
+		InvalidEpochTransitionAttempted: u.state.InvalidEpochTransitionAttempted,
+	}
+	u.rebuildIdentityLookup()
 	return nil
 }
