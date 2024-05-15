@@ -19,6 +19,7 @@ type Registers interface {
 	Get(owner string, key string) ([]byte, error)
 	Set(owner string, key string, value []byte) error
 	ForEach(f ForEachCallback) error
+	Count() int
 }
 
 // ByAccount represents the registers of all accounts

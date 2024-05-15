@@ -2,6 +2,7 @@ package migrations
 
 import (
 	"fmt"
+	"runtime"
 	"strconv"
 	"testing"
 
@@ -30,7 +31,7 @@ func TestDiffCadenceValues(t *testing.T) {
 
 		writer := &testReportWriter{}
 
-		diffReporter := NewCadenceValueDiffReporter(address, flow.Emulator, writer, true)
+		diffReporter := NewCadenceValueDiffReporter(address, flow.Emulator, writer, true, runtime.NumCPU())
 
 		diffReporter.DiffStates(
 			createTestPayloads(t, address, domain),
@@ -46,7 +47,7 @@ func TestDiffCadenceValues(t *testing.T) {
 
 		writer := &testReportWriter{}
 
-		diffReporter := NewCadenceValueDiffReporter(address, flow.Emulator, writer, true)
+		diffReporter := NewCadenceValueDiffReporter(address, flow.Emulator, writer, true, runtime.NumCPU())
 
 		diffReporter.DiffStates(
 			createTestPayloads(t, address, domain),
@@ -67,7 +68,7 @@ func TestDiffCadenceValues(t *testing.T) {
 
 		writer := &testReportWriter{}
 
-		diffReporter := NewCadenceValueDiffReporter(address, flow.Emulator, writer, true)
+		diffReporter := NewCadenceValueDiffReporter(address, flow.Emulator, writer, true, runtime.NumCPU())
 
 		diffReporter.DiffStates(
 			createTestPayloads(t, address, domain),
@@ -94,7 +95,7 @@ func TestDiffCadenceValues(t *testing.T) {
 
 		writer := &testReportWriter{}
 
-		diffReporter := NewCadenceValueDiffReporter(address, flow.Emulator, writer, true)
+		diffReporter := NewCadenceValueDiffReporter(address, flow.Emulator, writer, true, runtime.NumCPU())
 
 		diffReporter.DiffStates(
 			createStorageMapPayloads(t, address, domain, []string{"0", "1"}, []interpreter.Value{interpreter.UInt64Value(0), interpreter.UInt64Value(0)}),
@@ -121,7 +122,7 @@ func TestDiffCadenceValues(t *testing.T) {
 
 		writer := &testReportWriter{}
 
-		diffReporter := NewCadenceValueDiffReporter(address, flow.Emulator, writer, false)
+		diffReporter := NewCadenceValueDiffReporter(address, flow.Emulator, writer, false, runtime.NumCPU())
 
 		diffReporter.DiffStates(
 			createStorageMapPayloads(t, address, domain, []string{"0", "1"}, []interpreter.Value{interpreter.UInt64Value(100), interpreter.UInt64Value(101)}),
@@ -148,7 +149,7 @@ func TestDiffCadenceValues(t *testing.T) {
 
 		writer := &testReportWriter{}
 
-		diffReporter := NewCadenceValueDiffReporter(address, flow.Emulator, writer, false)
+		diffReporter := NewCadenceValueDiffReporter(address, flow.Emulator, writer, false, runtime.NumCPU())
 
 		diffReporter.DiffStates(
 			createStorageMapPayloads(t, address, domain, []string{"0", "1"}, []interpreter.Value{interpreter.UInt64Value(100), interpreter.UInt64Value(101)}),
@@ -174,7 +175,7 @@ func TestDiffCadenceValues(t *testing.T) {
 
 		writer := &testReportWriter{}
 
-		diffReporter := NewCadenceValueDiffReporter(address, flow.Emulator, writer, false)
+		diffReporter := NewCadenceValueDiffReporter(address, flow.Emulator, writer, false, runtime.NumCPU())
 
 		createPayloads := func(arrayValues []interpreter.Value) []*ledger.Payload {
 
@@ -229,7 +230,7 @@ func TestDiffCadenceValues(t *testing.T) {
 				),
 			)
 
-			err = mr.Storage.Commit(mr.Interpreter, false)
+			err = mr.Storage.NondeterministicCommit(mr.Interpreter, false)
 			require.NoError(t, err)
 
 			// finalize the transaction
@@ -284,7 +285,7 @@ func TestDiffCadenceValues(t *testing.T) {
 
 		writer := &testReportWriter{}
 
-		diffReporter := NewCadenceValueDiffReporter(address, flow.Emulator, writer, false)
+		diffReporter := NewCadenceValueDiffReporter(address, flow.Emulator, writer, false, runtime.NumCPU())
 
 		createPayloads := func(dictValues []interpreter.Value) []*ledger.Payload {
 
@@ -340,7 +341,7 @@ func TestDiffCadenceValues(t *testing.T) {
 				),
 			)
 
-			err = mr.Storage.Commit(mr.Interpreter, false)
+			err = mr.Storage.NondeterministicCommit(mr.Interpreter, false)
 			require.NoError(t, err)
 
 			// finalize the transaction
@@ -401,7 +402,7 @@ func TestDiffCadenceValues(t *testing.T) {
 
 		writer := &testReportWriter{}
 
-		diffReporter := NewCadenceValueDiffReporter(address, flow.Emulator, writer, false)
+		diffReporter := NewCadenceValueDiffReporter(address, flow.Emulator, writer, false, runtime.NumCPU())
 
 		createPayloads := func(compositeFields []string, compositeValues []interpreter.Value) []*ledger.Payload {
 
@@ -462,7 +463,7 @@ func TestDiffCadenceValues(t *testing.T) {
 				),
 			)
 
-			err = mr.Storage.Commit(mr.Interpreter, false)
+			err = mr.Storage.NondeterministicCommit(mr.Interpreter, false)
 			require.NoError(t, err)
 
 			// finalize the transaction
@@ -529,7 +530,7 @@ func TestDiffCadenceValues(t *testing.T) {
 
 		writer := &testReportWriter{}
 
-		diffReporter := NewCadenceValueDiffReporter(address, flow.Emulator, writer, true)
+		diffReporter := NewCadenceValueDiffReporter(address, flow.Emulator, writer, true, runtime.NumCPU())
 
 		createPayloads := func(compositeFields []string, compositeValues []interpreter.Value) []*ledger.Payload {
 
@@ -590,7 +591,7 @@ func TestDiffCadenceValues(t *testing.T) {
 				),
 			)
 
-			err = mr.Storage.Commit(mr.Interpreter, false)
+			err = mr.Storage.NondeterministicCommit(mr.Interpreter, false)
 			require.NoError(t, err)
 
 			// finalize the transaction
@@ -701,7 +702,7 @@ func createStorageMapPayloads(t *testing.T, address common.Address, domain strin
 		)
 	}
 
-	err = mr.Storage.Commit(mr.Interpreter, false)
+	err = mr.Storage.NondeterministicCommit(mr.Interpreter, false)
 	require.NoError(t, err)
 
 	// finalize the transaction
@@ -850,7 +851,7 @@ func createTestPayloads(t *testing.T, address common.Address, domain string) []*
 		),
 	)
 
-	err = mr.Storage.Commit(mr.Interpreter, false)
+	err = mr.Storage.NondeterministicCommit(mr.Interpreter, false)
 	require.NoError(t, err)
 
 	// finalize the transaction
