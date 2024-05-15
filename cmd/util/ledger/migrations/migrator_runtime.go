@@ -2,12 +2,12 @@ package migrations
 
 import (
 	"fmt"
-	"github.com/onflow/crypto/hash"
 
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/onflow/cadence/runtime/stdlib"
+	"github.com/onflow/crypto/hash"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
 	"github.com/onflow/flow-go/cmd/util/ledger/util/registers"
@@ -99,6 +99,8 @@ func (c InterpreterMigrationRuntimeConfig) NewRuntimeInterface(
 
 // NewBasicMigrationRuntime returns a basic runtime for migrations.
 func NewBasicMigrationRuntime(regs registers.Registers) *BasicMigrationRuntime {
+	// Create a new transaction state with a dummy hasher
+	// because we do not need spock proofs for migrations.
 	transactionState := state.NewTransactionStateFromExecutionState(
 		state.NewExecutionStateWithSpockStateHasher(
 			registers.StorageSnapshot{
@@ -106,7 +108,7 @@ func NewBasicMigrationRuntime(regs registers.Registers) *BasicMigrationRuntime {
 			},
 			state.DefaultParameters(),
 			func() hash.Hasher {
-				return newDummyHasher(32)
+				return newDummyHasher(0)
 			},
 		),
 	)

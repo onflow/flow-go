@@ -2,9 +2,9 @@ package state
 
 import (
 	"fmt"
-	"github.com/onflow/crypto/hash"
 
 	"github.com/onflow/cadence/runtime/common"
+	"github.com/onflow/crypto/hash"
 
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/meter"
