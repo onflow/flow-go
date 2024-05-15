@@ -3,9 +3,10 @@ package fetcher
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
+	"github.com/sethvargo/go-retry"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
@@ -16,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/ingestion"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/utils/grpcutils"
 )
 
@@ -27,6 +29,14 @@ type AccessCollectionFetcher struct {
 	client   access.AccessAPIClient
 	chain    flow.Chain
 	originID flow.Identifier
+
+	guaranteeInfos chan guaranteeInfo
+}
+
+type guaranteeInfo struct {
+	blockID flow.Identifier
+	height  uint64
+	colID   flow.Identifier
 }
 
 var _ ingestion.CollectionFetcher = (*AccessCollectionFetcher)(nil)
@@ -43,36 +53,31 @@ func NewAccessCollectionFetcher(
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to collection rpc: %w", err)
 	}
-	return &AccessCollectionFetcher{
-		log:      logger.With().Str("engine", "collection_fetcher").Logger(),
-		handler:  nil,
-		client:   access.NewAccessAPIClient(collectionRPCConn),
-		chain:    chain,
-		originID: nodeID,
-	}, nil
+
+	noopHandler := func(flow.Identifier, flow.Entity) {}
+	e := &AccessCollectionFetcher{
+		log:            logger.With().Str("engine", "collection_fetcher").Logger(),
+		handler:        noopHandler,
+		client:         access.NewAccessAPIClient(collectionRPCConn),
+		chain:          chain,
+		originID:       nodeID,
+		guaranteeInfos: make(chan guaranteeInfo, 100),
+	}
+
+	builder := component.NewComponentManagerBuilder().AddWorker(e.launchWorker)
+
+	e.ComponentManager = builder.Build()
+
+	return e, nil
 }
 
 func (f *AccessCollectionFetcher) FetchCollection(blockID flow.Identifier, height uint64, guarantee *flow.CollectionGuarantee) error {
-	go func(colID flow.Identifier) {
-		f.log.Debug().Hex("blockID", blockID[:]).Uint64("height", height).Hex("col_id", colID[:]).Msgf("fetching collection")
+	f.guaranteeInfos <- guaranteeInfo{
+		blockID: blockID,
+		height:  height,
+		colID:   guarantee.CollectionID,
+	}
 
-		resp, err := f.client.GetFullCollectionByID(context.Background(), &access.GetFullCollectionByIDRequest{
-			Id: colID[:],
-		})
-		if err != nil {
-			log.Error().Err(err).Msgf("failed to fetch collection %v", colID)
-			return
-		}
-
-		if f.handler != nil {
-			col, err := convert.MessageToFullCollection(resp.Transactions, f.chain)
-			if err != nil {
-				log.Error().Err(err).Msgf("failed to convert collection %v", colID)
-				return
-			}
-			f.handler(f.originID, col)
-		}
-	}(guarantee.CollectionID)
 	return nil
 }
 
@@ -83,14 +88,40 @@ func (f *AccessCollectionFetcher) WithHandle(handler requester.HandleFunc) {
 	f.handler = handler
 }
 
-func (f *AccessCollectionFetcher) Ready() <-chan struct{} {
-	ready := make(chan struct{})
-	close(ready)
-	return ready
+func (f *AccessCollectionFetcher) launchWorker(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+	ready()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case guaranteeInfo := <-f.guaranteeInfos:
+			err := f.fetchCollection(ctx, guaranteeInfo)
+			if err != nil {
+				ctx.Throw(fmt.Errorf("failed to fetch collection: %w", err))
+			}
+		}
+	}
 }
 
-func (f *AccessCollectionFetcher) Done() <-chan struct{} {
-	done := make(chan struct{})
-	close(done)
-	return done
+func (f *AccessCollectionFetcher) fetchCollection(ctx irrecoverable.SignalerContext, g guaranteeInfo) error {
+	backoff := retry.NewConstant(3 * time.Second)
+	return retry.Do(ctx, backoff, func(ctx context.Context) error {
+		f.log.Debug().Hex("blockID", g.blockID[:]).Uint64("height", g.height).Hex("col_id", g.colID[:]).Msgf("fetching collection")
+		resp, err := f.client.GetFullCollectionByID(context.Background(),
+			&access.GetFullCollectionByIDRequest{
+				Id: g.colID[:],
+			})
+		if err != nil {
+			return fmt.Errorf("failed to fetch collection %v: %w", g.colID, err)
+		}
+
+		col, err := convert.MessageToFullCollection(resp.Transactions, f.chain)
+		if err != nil {
+			return fmt.Errorf("failed to convert collection %v: %w", g.colID, err)
+		}
+
+		f.handler(f.originID, col)
+		return nil
+	})
 }
