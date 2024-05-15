@@ -99,7 +99,7 @@ func (u *baseStateMachine) EjectIdentity(nodeID flow.Identifier) error {
 }
 
 // TransitionToNextEpoch updates the notion of 'current epoch', 'previous' and 'next epoch' in the protocol
-// state. An epoch transition is only allowed when:
+// state. An epoch transition is only allowed when _all_ of the following conditions are satisfied:
 // - next epoch has been set up,
 // - next epoch has been committed,
 // - invalid state transition has not been attempted (this is ensured by constructor),
@@ -107,17 +107,14 @@ func (u *baseStateMachine) EjectIdentity(nodeID flow.Identifier) error {
 // No errors are expected during normal operations.
 func (u *baseStateMachine) TransitionToNextEpoch() error {
 	nextEpoch := u.state.NextEpoch
-	// Check if there is next epoch protocol state
-	if nextEpoch == nil {
-		return fmt.Errorf("protocol state has not been setup yet")
+	if nextEpoch == nil { // nextEpoch ≠ nil if and only if next epoch was already set up (on the happy path)
+		return fmt.Errorf("protocol state for next epoch has not yet been setup")
 	}
-	// Check if there is a commit event for next epoch
-	if nextEpoch.CommitID == flow.ZeroID {
-		return fmt.Errorf("protocol state has not been committed yet")
-	}
+	if nextEpoch.CommitID == flow.ZeroID { // nextEpoch.CommitID ≠ flow.ZeroID if and only if next epoch was already committed (on the happy path)
+		return fmt.Errorf("protocol state for next epoch has not yet been committed")
 	// Check if we are at the next epoch, only then a transition is allowed
 	if u.view < u.parentState.NextEpochSetup.FirstView {
-		return fmt.Errorf("protocol state transition is only allowed when enterring next epoch")
+		return fmt.Errorf("epoch transition is only allowed when entering next epoch")
 	}
 	u.state = &flow.ProtocolStateEntry{
 		PreviousEpoch:                   &u.state.CurrentEpoch,
