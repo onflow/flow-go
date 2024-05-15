@@ -63,19 +63,19 @@ contract EVM {
     )
 
     access(all)
-    event CadenceOwnedAccountCreated(addressBytes: [UInt8; 20])
+    event CadenceOwnedAccountCreated(address: String)
 
     /// FLOWTokensDeposited is emitted when FLOW tokens is bridged
     /// into the EVM environment. Note that this event is not emitted
     /// for transfer of flow tokens between two EVM addresses.
     access(all)
-    event FLOWTokensDeposited(addressBytes: [UInt8; 20], amount: UFix64)
+    event FLOWTokensDeposited(address: String, amount: UFix64)
 
     /// FLOWTokensWithdrawn is emitted when FLOW tokens are bridged
     /// out of the EVM environment. Note that this event is not emitted
     /// for transfer of flow tokens between two EVM addresses.
     access(all)
-    event FLOWTokensWithdrawn(addressBytes: [UInt8; 20], amount: UFix64)
+    event FLOWTokensWithdrawn(address: String, amount: UFix64)
 
     /// BridgeAccessorUpdated is emitted when the BridgeAccessor Capability
     /// is updated in the stored BridgeRouter along with identifying
@@ -147,7 +147,7 @@ contract EVM {
                 from: <-from,
                 to: self.bytes
             )
-            emit FLOWTokensDeposited(addressBytes: self.bytes, amount: amount)
+            emit FLOWTokensDeposited(address: self.toString(), amount: amount)
         }
     }
 
@@ -340,7 +340,7 @@ contract EVM {
                 from: self.addressBytes,
                 amount: balance.attoflow
             ) as! @FlowToken.Vault
-            emit FLOWTokensWithdrawn(addressBytes: self.addressBytes, amount: balance.inFLOW())
+            emit FLOWTokensWithdrawn(address: self.address().toString(), amount: balance.inFLOW())
             return <-vault
         }
 
@@ -439,7 +439,8 @@ contract EVM {
         let acc <-create CadenceOwnedAccount()
         let addr = InternalEVM.createCadenceOwnedAccount(uuid: acc.uuid)
         acc.initAddress(addressBytes: addr)
-        emit CadenceOwnedAccountCreated(addressBytes: addr)
+
+        emit CadenceOwnedAccountCreated(address: acc.address().toString())
         return <-acc
     }
 
