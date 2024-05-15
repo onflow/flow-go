@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -14,9 +15,14 @@ import (
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/engine/execution/ingestion"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/utils/grpcutils"
 )
 
 type AccessCollectionFetcher struct {
+	*component.ComponentManager
+	log zerolog.Logger
+
 	handler  requester.HandleFunc
 	client   access.AccessAPIClient
 	chain    flow.Chain
@@ -26,15 +32,19 @@ type AccessCollectionFetcher struct {
 var _ ingestion.CollectionFetcher = (*AccessCollectionFetcher)(nil)
 var _ ingestion.CollectionRequester = (*AccessCollectionFetcher)(nil)
 
-func NewAccessCollectionFetcher(accessURL string, nodeID flow.Identifier, chain flow.Chain) (*AccessCollectionFetcher, error) {
+func NewAccessCollectionFetcher(
+	logger zerolog.Logger, accessURL string, nodeID flow.Identifier, chain flow.Chain) (
+	*AccessCollectionFetcher, error) {
 	collectionRPCConn, err := grpc.Dial(
 		accessURL,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(grpcutils.DefaultMaxMsgSize)),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to collection rpc: %w", err)
 	}
 	return &AccessCollectionFetcher{
+		log:      logger.With().Str("engine", "collection_fetcher").Logger(),
 		handler:  nil,
 		client:   access.NewAccessAPIClient(collectionRPCConn),
 		chain:    chain,
@@ -44,6 +54,8 @@ func NewAccessCollectionFetcher(accessURL string, nodeID flow.Identifier, chain 
 
 func (f *AccessCollectionFetcher) FetchCollection(blockID flow.Identifier, height uint64, guarantee *flow.CollectionGuarantee) error {
 	go func(colID flow.Identifier) {
+		f.log.Debug().Hex("blockID", blockID[:]).Uint64("height", height).Hex("col_id", colID[:]).Msgf("fetching collection")
+
 		resp, err := f.client.GetFullCollectionByID(context.Background(), &access.GetFullCollectionByIDRequest{
 			Id: colID[:],
 		})
