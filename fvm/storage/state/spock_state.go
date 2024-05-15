@@ -24,6 +24,8 @@ type spockState struct {
 
 	spockSecretHasher hash.Hasher
 
+	getHasher func() hash.Hasher
+
 	// NOTE: spockState is no longer accessible once Finalize is called.  We
 	// can't support access after Finalize since spockSecretHasher.SumHash is
 	// not idempotent.  Repeated calls to SumHash (without modifying the input)
@@ -31,17 +33,23 @@ type spockState struct {
 	finalizedSpockSecret []byte
 }
 
-func newSpockState(base snapshot.StorageSnapshot) *spockState {
+var DefaultSpockSecretHasher = func() hash.Hasher {
+	return hash.NewSHA3_256()
+}
+
+func newSpockState(base snapshot.StorageSnapshot, getHasher func() hash.Hasher) *spockState {
 	return &spockState{
 		storageState:      newStorageState(base),
-		spockSecretHasher: hash.NewSHA3_256(),
+		spockSecretHasher: getHasher(),
+		getHasher:         getHasher,
 	}
 }
 
 func (state *spockState) NewChild() *spockState {
 	return &spockState{
 		storageState:      state.storageState.NewChild(),
-		spockSecretHasher: hash.NewSHA3_256(),
+		spockSecretHasher: state.getHasher(),
+		getHasher:         state.getHasher,
 	}
 }
 

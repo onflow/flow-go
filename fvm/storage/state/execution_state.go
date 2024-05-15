@@ -2,6 +2,7 @@ package state
 
 import (
 	"fmt"
+	"github.com/onflow/crypto/hash"
 
 	"github.com/onflow/cadence/runtime/common"
 
@@ -103,10 +104,23 @@ func NewExecutionState(
 	snapshot snapshot.StorageSnapshot,
 	params StateParameters,
 ) *ExecutionState {
+	return NewExecutionStateWithSpockStateHasher(
+		snapshot,
+		params,
+		DefaultSpockSecretHasher,
+	)
+}
+
+// NewExecutionStateWithSpockStateHasher constructs a new state with a custom hasher
+func NewExecutionStateWithSpockStateHasher(
+	snapshot snapshot.StorageSnapshot,
+	params StateParameters,
+	getHasher func() hash.Hasher,
+) *ExecutionState {
 	m := meter.NewMeter(params.MeterParameters)
 	return &ExecutionState{
 		finalized:        false,
-		spockState:       newSpockState(snapshot),
+		spockState:       newSpockState(snapshot, getHasher),
 		meter:            m,
 		limitsController: newLimitsController(params),
 	}
