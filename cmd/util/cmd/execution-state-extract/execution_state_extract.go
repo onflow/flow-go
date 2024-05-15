@@ -20,7 +20,6 @@ import (
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
 	"github.com/onflow/flow-go/cmd/util/ledger/util/registers"
 	"github.com/onflow/flow-go/ledger"
-	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/ledger/common/hash"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	"github.com/onflow/flow-go/ledger/complete"
@@ -464,7 +463,7 @@ func newByAccountRegistersFromPayloadAccountGrouping(
 			for payloadAccountGroup := range jobs {
 
 				// Convert address to owner
-				payloadGroupOwner := convert.AddressToRegisterOwner(payloadAccountGroup.Address)
+				payloadGroupOwner := flow.AddressToRegisterOwner(payloadAccountGroup.Address)
 
 				accountRegisters, err := registers.NewAccountRegistersFromPayloads(
 					payloadGroupOwner,
