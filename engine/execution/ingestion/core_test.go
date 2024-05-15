@@ -21,6 +21,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool/entity"
+	"github.com/onflow/flow-go/module/metrics"
 	storageerr "github.com/onflow/flow-go/storage"
 	storage "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -121,8 +122,9 @@ func createCore(t *testing.T, blocks []*flow.Block) (
 	)
 	collectionFetcher := newMockFetcher()
 	executor := &mockExecutor{t: t, consumer: consumer}
+	metrics := metrics.NewNoopCollector()
 	core, err := NewCore(unittest.Logger(), throttle, execState, stopControl, blocksDB,
-		collections, executor, collectionFetcher, consumer)
+		collections, executor, collectionFetcher, consumer, metrics)
 	require.NoError(t, err)
 	return core, throttle, state, collections, blocksDB, headers, collectionFetcher, consumer
 }
