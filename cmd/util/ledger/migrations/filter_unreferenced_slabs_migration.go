@@ -92,7 +92,7 @@ func (m *FilterUnreferencedSlabsMigration) MigrateAccount(
 		nil,
 	)
 
-	err := checkStorageHealth(address, storage, accountRegisters)
+	err := checkStorageHealth(address, storage, accountRegisters, m.nWorkers)
 	if err == nil {
 		return nil
 	}

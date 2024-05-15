@@ -2,6 +2,7 @@ package stdlib_test
 
 import (
 	"encoding/binary"
+	"encoding/hex"
 	"math/big"
 	"testing"
 
@@ -2667,6 +2668,183 @@ func TestEVMAddressConstructionAndReturn(t *testing.T) {
 			addressBytesArray,
 		}).WithType(evmAddressCadenceType),
 		result,
+	)
+}
+
+func TestEVMAddressSerializationAndDeserialization(t *testing.T) {
+
+	t.Parallel()
+
+	handler := &testContractHandler{}
+
+	contractsAddress := flow.BytesToAddress([]byte{0x1})
+
+	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
+	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
+
+	rt := runtime.NewInterpreterRuntime(runtime.Config{})
+
+	addressFromBytesScript := []byte(`
+      import EVM from 0x1
+
+      access(all)
+      fun main(_ bytes: [UInt8; 20]): EVM.EVMAddress {
+          return EVM.EVMAddress(bytes: bytes)
+      }
+    `)
+
+	accountCodes := map[common.Location][]byte{}
+	var events []cadence.Event
+
+	runtimeInterface := &TestRuntimeInterface{
+		Storage: NewTestLedger(nil, nil),
+		OnGetSigningAccounts: func() ([]runtime.Address, error) {
+			return []runtime.Address{runtime.Address(contractsAddress)}, nil
+		},
+		OnResolveLocation: LocationResolver,
+		OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
+			accountCodes[location] = code
+			return nil
+		},
+		OnGetAccountContractCode: func(location common.AddressLocation) (code []byte, err error) {
+			code = accountCodes[location]
+			return code, nil
+		},
+		OnEmitEvent: func(event cadence.Event) error {
+			events = append(events, event)
+			return nil
+		},
+		OnDecodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
+			return json.Decode(nil, b)
+		},
+	}
+
+	sourceBytes := []byte{
+		1, 1, 2, 2, 3, 3, 4, 4, 5, 5,
+		6, 6, 7, 7, 8, 8, 9, 9, 10, 10,
+	}
+
+	// construct the address as a cadence value from sourceBytes
+	addressBytesArray := cadence.NewArray([]cadence.Value{
+		cadence.UInt8(sourceBytes[0]), cadence.UInt8(sourceBytes[1]),
+		cadence.UInt8(sourceBytes[2]), cadence.UInt8(sourceBytes[3]),
+		cadence.UInt8(sourceBytes[4]), cadence.UInt8(sourceBytes[5]),
+		cadence.UInt8(sourceBytes[6]), cadence.UInt8(sourceBytes[7]),
+		cadence.UInt8(sourceBytes[8]), cadence.UInt8(sourceBytes[9]),
+		cadence.UInt8(sourceBytes[10]), cadence.UInt8(sourceBytes[11]),
+		cadence.UInt8(sourceBytes[12]), cadence.UInt8(sourceBytes[13]),
+		cadence.UInt8(sourceBytes[14]), cadence.UInt8(sourceBytes[15]),
+		cadence.UInt8(sourceBytes[16]), cadence.UInt8(sourceBytes[17]),
+		cadence.UInt8(sourceBytes[18]), cadence.UInt8(sourceBytes[19]),
+	}).WithType(stdlib.EVMAddressBytesCadenceType)
+
+	nextTransactionLocation := NewTransactionLocationGenerator()
+	nextScriptLocation := NewScriptLocationGenerator()
+
+	// Deploy contracts
+
+	deployContracts(
+		t,
+		rt,
+		contractsAddress,
+		runtimeInterface,
+		transactionEnvironment,
+		nextTransactionLocation,
+	)
+
+	// Run script
+
+	constructAddrResult, err := rt.ExecuteScript(
+		runtime.Script{
+			Source: addressFromBytesScript,
+			Arguments: EncodeArgs([]cadence.Value{
+				addressBytesArray,
+			}),
+		},
+		runtime.Context{
+			Interface:   runtimeInterface,
+			Environment: scriptEnvironment,
+			Location:    nextScriptLocation(),
+		},
+	)
+	require.NoError(t, err)
+
+	evmAddressCadenceType := stdlib.NewEVMAddressCadenceType(common.Address(contractsAddress))
+	evmAddress := cadence.NewStruct([]cadence.Value{
+		addressBytesArray,
+	}).WithType(evmAddressCadenceType)
+
+	assert.Equal(t,
+		evmAddress,
+		constructAddrResult,
+	)
+
+	// Attempt to serialize and deserialize the address
+
+	addressSerializationScript := []byte(`
+	  import EVM from 0x1
+
+	  access(all)
+	  fun main(address: EVM.EVMAddress): String {
+		return address.toString()
+	  }
+	`)
+
+	serializeAddrResult, err := rt.ExecuteScript(
+		runtime.Script{
+			Source: addressSerializationScript,
+			Arguments: EncodeArgs([]cadence.Value{
+				evmAddress,
+			}),
+		},
+		runtime.Context{
+			Interface:   runtimeInterface,
+			Environment: scriptEnvironment,
+			Location:    nextScriptLocation(),
+		},
+	)
+
+	require.NoError(t, err)
+
+	// Encode the sourceBytes array as a hex string as the expected value to compare the result against
+
+	expectedHex, _ := cadence.NewString(hex.EncodeToString(sourceBytes))
+
+	assert.Equal(t,
+		expectedHex,
+		serializeAddrResult,
+	)
+
+	// Attempt to deserialize the address
+
+	addressDeserializationScript := []byte(`
+	  import EVM from 0x1
+
+	  access(all)
+	  fun main(hexString: String): EVM.EVMAddress {
+		return EVM.addressFromString(hexString) ?? panic("Invalid address provided")
+	  }
+	`)
+
+	deserializeAddrResult, err := rt.ExecuteScript(
+		runtime.Script{
+			Source: addressDeserializationScript,
+			Arguments: EncodeArgs([]cadence.Value{
+				serializeAddrResult,
+			}),
+		},
+		runtime.Context{
+			Interface:   runtimeInterface,
+			Environment: scriptEnvironment,
+			Location:    nextScriptLocation(),
+		},
+	)
+
+	require.NoError(t, err)
+
+	assert.Equal(t,
+		evmAddress,
+		deserializeAddrResult,
 	)
 }
 

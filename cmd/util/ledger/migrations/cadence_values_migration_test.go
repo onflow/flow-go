@@ -791,7 +791,7 @@ func TestProgramParsingError(t *testing.T) {
 		capabilityValue,
 	)
 
-	err = storage.Commit(runtime.Interpreter, false)
+	err = storage.NondeterministicCommit(runtime.Interpreter, false)
 	require.NoError(t, err)
 
 	// finalize the transaction
@@ -930,7 +930,7 @@ func TestCoreContractUsage(t *testing.T) {
 			capabilityValue,
 		)
 
-		err = storage.Commit(runtime.Interpreter, false)
+		err = storage.NondeterministicCommit(runtime.Interpreter, false)
 		require.NoError(t, err)
 
 		// finalize the transaction

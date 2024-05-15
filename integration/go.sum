@@ -2134,11 +2134,11 @@ github.com/oklog/ulid v1.3.1/go.mod h1:CirwcVhetQ6Lv90oh/F+FBtV6XMibvdAFo93nm5qn
 github.com/olekukonko/tablewriter v0.0.5 h1:P2Ga83D34wi1o9J6Wh1mRuqd4mF/x/lgBS7N7AbDhec=
 github.com/olekukonko/tablewriter v0.0.5/go.mod h1:hPp6KlRPjbx+hW8ykQs1w3UBbZlj6HuIJcUGPhkA7kY=
 github.com/onflow/atree v0.6.1-0.20230711151834-86040b30171f/go.mod h1:xvP61FoOs95K7IYdIYRnNcYQGf4nbF/uuJ0tHf4DRuM=
-github.com/onflow/atree v0.8.0-rc.1 h1:sTxguTcS0qq8vv0EcJri0OO2be8/GCZDARGm7Nt0XRg=
-github.com/onflow/atree v0.8.0-rc.1/go.mod h1:7YNAyCd5JENq+NzH+fR1ABUZVzbSq9dkt0+5fZH3L2A=
+github.com/onflow/atree v0.8.0-rc.2 h1:7XYaOiiYJqLadzmyLyju2ztoqyTw/ikzcI0HI2LA+bI=
+github.com/onflow/atree v0.8.0-rc.2/go.mod h1:7YNAyCd5JENq+NzH+fR1ABUZVzbSq9dkt0+5fZH3L2A=
 github.com/onflow/cadence v1.0.0-M3/go.mod h1:odXGZZ/wGNA5mwT8bC9v8u8EXACHllB2ABSZK65TGL8=
-github.com/onflow/cadence v1.0.0-preview-atree-register-inlining.26 h1:0AifXgDMWoSonlIGBRIMHlKesqVnq/JInulr9QUdCDw=
-github.com/onflow/cadence v1.0.0-preview-atree-register-inlining.26/go.mod h1:SxUHsIXNA2nLdooN6QzpChw+wNUlrujRgLp7QgI59VQ=
+github.com/onflow/cadence v1.0.0-preview-atree-register-inlining.27 h1:J2fp33mZcGI9EIQcKw6nImXhGn9LnEmHakslPwTNlnw=
+github.com/onflow/cadence v1.0.0-preview-atree-register-inlining.27/go.mod h1:KclJlSGWG4USgPK4CsI3V/YtCHYOwPpjyzb6iEfWlbM=
 github.com/onflow/crypto v0.25.0/go.mod h1:C8FbaX0x8y+FxWjbkHy0Q4EASCDR9bSPWZqlpCLYyVI=
 github.com/onflow/crypto v0.25.1 h1:0txy2PKPMM873JbpxQNbJmuOJtD56bfs48RQfm0ts5A=
 github.com/onflow/crypto v0.25.1/go.mod h1:C8FbaX0x8y+FxWjbkHy0Q4EASCDR9bSPWZqlpCLYyVI=

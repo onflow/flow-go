@@ -707,7 +707,7 @@ func TestStagedContractsMigration(t *testing.T) {
 			interpreter.NewUnmeteredStringValue("Also in the same storage path prefix"),
 		)
 
-		err = mr.Storage.Commit(mr.Interpreter, false)
+		err = mr.Storage.NondeterministicCommit(mr.Interpreter, false)
 		require.NoError(t, err)
 
 		result, err := mr.TransactionState.FinalizeMainTransaction()
@@ -763,7 +763,7 @@ func TestStagedContractsMigration(t *testing.T) {
 		require.NoError(t, err)
 
 		require.Len(t, logWriter.logs, 4)
-		require.Contains(t, logWriter.logs[0], "found 6 registers in account 0x2ceae959ed1a7e7a")
+		require.Contains(t, logWriter.logs[0], "found 4 registers in account 0x2ceae959ed1a7e7a")
 		require.Contains(t, logWriter.logs[1], "found a value with an unexpected type `String`")
 		require.Contains(t, logWriter.logs[2], "found 1 staged contracts from payloads")
 		require.Contains(t, logWriter.logs[3], "total of 1 unique contracts are staged for all accounts")

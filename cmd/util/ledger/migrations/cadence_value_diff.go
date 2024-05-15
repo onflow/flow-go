@@ -77,6 +77,7 @@ type CadenceValueDiffReporter struct {
 	chainID        flow.ChainID
 	reportWriter   reporters.ReportWriter
 	verboseLogging bool
+	nWorkers       int
 }
 
 func NewCadenceValueDiffReporter(
@@ -84,12 +85,14 @@ func NewCadenceValueDiffReporter(
 	chainID flow.ChainID,
 	rw reporters.ReportWriter,
 	verboseLogging bool,
+	nWorkers int,
 ) *CadenceValueDiffReporter {
 	return &CadenceValueDiffReporter{
 		address:        address,
 		chainID:        chainID,
 		reportWriter:   rw,
 		verboseLogging: verboseLogging,
+		nWorkers:       nWorkers,
 	}
 }
 
@@ -97,24 +100,30 @@ func (dr *CadenceValueDiffReporter) newStorageRuntime(
 	payloads []*ledger.Payload,
 ) (
 	*InterpreterMigrationRuntime,
+	registers.Registers,
 	error,
 ) {
 	registersByAccount, err := registers.NewByAccountFromPayloads(payloads)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	// TODO: maybe make read-only again
-	return NewInterpreterMigrationRuntime(
+	runtimeInterface, err := NewInterpreterMigrationRuntime(
 		registersByAccount,
 		dr.chainID,
 		InterpreterMigrationRuntimeConfig{},
 	)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return runtimeInterface, registersByAccount, nil
 }
 
 func (dr *CadenceValueDiffReporter) DiffStates(oldPayloads, newPayloads []*ledger.Payload, domains []string) {
 	// Create all the runtime components we need for comparing Cadence values.
-	oldRuntime, err := dr.newStorageRuntime(oldPayloads)
+	oldRuntime, oldRegs, err := dr.newStorageRuntime(oldPayloads)
 	if err != nil {
 		dr.reportWriter.Write(
 			diffError{
@@ -125,13 +134,35 @@ func (dr *CadenceValueDiffReporter) DiffStates(oldPayloads, newPayloads []*ledge
 		return
 	}
 
-	newRuntime, err := dr.newStorageRuntime(newPayloads)
+	err = loadAtreeSlabsInStorage(oldRuntime.Storage, oldRegs, dr.nWorkers)
+	if err != nil {
+		dr.reportWriter.Write(
+			diffError{
+				Address: dr.address.Hex(),
+				Kind:    diffErrorKindString[abortErrorKind],
+				Msg:     fmt.Sprintf("failed to preload old state atree payloads: %s", err),
+			})
+		return
+	}
+
+	newRuntime, newRegs, err := dr.newStorageRuntime(newPayloads)
 	if err != nil {
 		dr.reportWriter.Write(
 			diffError{
 				Address: dr.address.Hex(),
 				Kind:    diffErrorKindString[abortErrorKind],
 				Msg:     fmt.Sprintf("failed to create runtime with new state payloads: %s", err),
+			})
+		return
+	}
+
+	err = loadAtreeSlabsInStorage(newRuntime.Storage, newRegs, dr.nWorkers)
+	if err != nil {
+		dr.reportWriter.Write(
+			diffError{
+				Address: dr.address.Hex(),
+				Kind:    diffErrorKindString[abortErrorKind],
+				Msg:     fmt.Sprintf("failed to preload new state atree payloads: %s", err),
 			})
 		return
 	}

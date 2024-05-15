@@ -1,8 +1,6 @@
 package migrations
 
 import (
-	"fmt"
-
 	"github.com/onflow/atree"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
@@ -31,9 +29,10 @@ func init() {
 	}
 }
 
-func loadAtreeSlabsInStorage(storage *runtime.Storage, registers registers.Registers) error {
+func getSlabIDsFromRegisters(registers registers.Registers) ([]atree.SlabID, error) {
+	storageIDs := make([]atree.SlabID, 0, registers.Count())
 
-	return registers.ForEach(func(owner string, key string, value []byte) error {
+	err := registers.ForEach(func(owner string, key string, value []byte) error {
 
 		if !flow.IsSlabIndexKey(key) {
 			return nil
@@ -44,23 +43,39 @@ func loadAtreeSlabsInStorage(storage *runtime.Storage, registers registers.Regis
 			atree.SlabIndex([]byte(key[1:])),
 		)
 
-		// Retrieve the slab
-		_, _, err := storage.Retrieve(slabID)
-		if err != nil {
-			return fmt.Errorf("failed to retrieve slab %s: %w", slabID, err)
-		}
+		storageIDs = append(storageIDs, slabID)
 
 		return nil
 	})
+	if err != nil {
+		return nil, err
+	}
+
+	return storageIDs, nil
+}
+
+func loadAtreeSlabsInStorage(
+	storage *runtime.Storage,
+	registers registers.Registers,
+	nWorkers int,
+) error {
+
+	storageIDs, err := getSlabIDsFromRegisters(registers)
+	if err != nil {
+		return err
+	}
+
+	return storage.PersistentSlabStorage.BatchPreload(storageIDs, nWorkers)
 }
 
 func checkStorageHealth(
 	address common.Address,
 	storage *runtime.Storage,
 	registers registers.Registers,
+	nWorkers int,
 ) error {
 
-	err := loadAtreeSlabsInStorage(storage, registers)
+	err := loadAtreeSlabsInStorage(storage, registers, nWorkers)
 	if err != nil {
 		return err
 	}
