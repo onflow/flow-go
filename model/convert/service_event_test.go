@@ -120,22 +120,21 @@ func TestEventConversion(t *testing.T) {
 		assert.Equal(t, expected, actual)
 	})
 
-	t.Run(
-		"version beacon", func(t *testing.T) {
+	t.Run("version beacon", func(t *testing.T) {
 
-			fixture, expected := unittest.VersionBeaconFixtureByChainID(chainID)
+		fixture, expected := unittest.VersionBeaconFixtureByChainID(chainID)
 
-			// convert Cadence types to Go types
-			event, err := convert.ServiceEvent(chainID, fixture)
-			require.NoError(t, err)
-			require.NotNil(t, event)
+		// convert Cadence types to Go types
+		event, err := convert.ServiceEvent(chainID, fixture)
+		require.NoError(t, err)
+		require.NotNil(t, event)
 
-			// cast event type to version beacon
-			actual, ok := event.Event.(*flow.VersionBeacon)
-			require.True(t, ok)
+		// cast event type to version beacon
+		actual, ok := event.Event.(*flow.VersionBeacon)
+		require.True(t, ok)
 
-			assert.Equal(t, expected, actual)
-		},
+		assert.Equal(t, expected, actual)
+	},
 	)
 
 	t.Run("protocol state version upgrade", func(t *testing.T) {
