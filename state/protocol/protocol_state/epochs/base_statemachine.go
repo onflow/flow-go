@@ -102,7 +102,6 @@ func (u *baseStateMachine) EjectIdentity(nodeID flow.Identifier) error {
 // state. An epoch transition is only allowed when _all_ of the following conditions are satisfied:
 // - next epoch has been set up,
 // - next epoch has been committed,
-// - invalid state transition has not been attempted (this is ensured by constructor),
 // - candidate block is in the next epoch.
 // No errors are expected during normal operations.
 func (u *baseStateMachine) TransitionToNextEpoch() error {
@@ -112,6 +111,7 @@ func (u *baseStateMachine) TransitionToNextEpoch() error {
 	}
 	if nextEpoch.CommitID == flow.ZeroID { // nextEpoch.CommitID ≠ flow.ZeroID if and only if next epoch was already committed (on the happy path)
 		return fmt.Errorf("protocol state for next epoch has not yet been committed")
+	}
 	// Check if we are at the next epoch, only then a transition is allowed
 	if u.view < u.parentState.NextEpochSetup.FirstView {
 		return fmt.Errorf("epoch transition is only allowed when entering next epoch")

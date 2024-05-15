@@ -126,7 +126,7 @@ func (s *EpochFallbackStateMachineSuite) TestTransitionToNextEpochNotAllowed() {
 		protocolState := unittest.EpochStateFixture(unittest.WithNextEpochProtocolState(), func(entry *flow.RichProtocolStateEntry) {
 			entry.NextEpoch.CommitID = flow.ZeroID
 			entry.NextEpochCommit = nil
-			entry.NextEpochIdentityTable = nil			
+			entry.NextEpochIdentityTable = nil
 		})
 		candidate := unittest.BlockHeaderFixture(
 			unittest.HeaderWithView(protocolState.CurrentEpochSetup.FinalView + 1))
