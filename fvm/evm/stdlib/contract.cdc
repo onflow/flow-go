@@ -168,11 +168,11 @@ contract EVM {
     /// Future implementations should pass data to InternalEVM for native deserialization
     access(all)
     fun addressFromString(_ asHex: String): EVMAddress {
-        var withoutPrefix = asHex
-        // Strip the 0x prefix, if any
-        if asHex.length >= 2 && asHex[0] == "0" && asHex[1] == "x" {
-            withoutPrefix = asHex.slice(from: 2, upTo: asHex.length)
+        pre {
+            asHex.length == 40 || asHex.length == 42: "Invalid hex string length for an EVM address"
         }
+        // Strip the 0x prefix if it exists
+        var withoutPrefix = (asHex[1] == "x" ? asHex.slice(from: 2, upTo: asHex.length) : asHex).toLower()
         let bytes = withoutPrefix.decodeHex().toConstantSized<[UInt8;20]>()!
         return EVMAddress(bytes: bytes)
     }
