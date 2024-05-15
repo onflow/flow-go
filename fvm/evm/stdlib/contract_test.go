@@ -3271,7 +3271,7 @@ func TestEVMCreateCadenceOwnedAccount(t *testing.T) {
 		expectedEncodedAddress,
 		cadence.SearchFieldByName(
 			events[0],
-			types.CadenceOwnedAccountCreatedTypeAddressBytesFieldName,
+			types.CadenceOwnedAccountCreatedTypeAddressFieldName,
 		),
 	)
 
@@ -3281,7 +3281,7 @@ func TestEVMCreateCadenceOwnedAccount(t *testing.T) {
 		expectedEncodedAddress,
 		cadence.SearchFieldByName(
 			events[1],
-			types.CadenceOwnedAccountCreatedTypeAddressBytesFieldName,
+			types.CadenceOwnedAccountCreatedTypeAddressFieldName,
 		),
 	)
 }
