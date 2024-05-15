@@ -23,17 +23,13 @@ var UnexpectedLedgerKeyFormat = fmt.Errorf("unexpected ledger key format")
 // AddressToRegisterOwner converts 8-byte address to register owner.
 // If given address is ZeroAddress, register owner is "" (global register).
 func AddressToRegisterOwner(address common.Address) string {
-	// global registers have an empty owner field
-	ownerString := ""
-
-	// all other registers have the account's address
-	if address != common.ZeroAddress {
-		ownerString = string(address.Bytes())
+	// Global registers have address zero and an empty owner field
+	if address == common.ZeroAddress {
+		return ""
 	}
 
-	// all other registers have the account's address
-
-	return ownerString
+	// All other registers have the account's address
+	return string(address.Bytes())
 }
 
 // LedgerKeyToRegisterID converts a ledger key to a register id
