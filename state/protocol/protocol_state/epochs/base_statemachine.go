@@ -102,7 +102,6 @@ func (u *baseStateMachine) EjectIdentity(nodeID flow.Identifier) error {
 // state. An epoch transition is only allowed when _all_ of the following conditions are satisfied:
 // - next epoch has been set up,
 // - next epoch has been committed,
-// - invalid state transition has not been attempted (this is ensured by constructor),
 // - candidate block is in the next epoch.
 // No errors are expected during normal operations.
 func (u *baseStateMachine) TransitionToNextEpoch() error {
