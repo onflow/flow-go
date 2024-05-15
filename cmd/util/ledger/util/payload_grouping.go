@@ -58,7 +58,7 @@ func (g *PayloadAccountGrouping) Next() (*PayloadAccountGroup, error) {
 	}
 	g.current++
 
-	address, err := payloadToAddress(g.payloads[accountStartIndex])
+	address, err := PayloadToAddress(g.payloads[accountStartIndex])
 	if err != nil {
 		return nil, fmt.Errorf("failed to get address from payload: %w", err)
 	}
@@ -127,12 +127,12 @@ func GroupPayloadsByAccount(
 	}
 }
 
-// payloadToAddress takes a payload and return:
+// PayloadToAddress takes a payload and return:
 // - (address, nil) if the payload is for an account, the account address is returned
 // - (common.ZeroAddress, nil) if the payload is not for an account
 // - (common.ZeroAddress, err) if running into any exception
 // The zero address is used for global Payloads and is not an actual account
-func payloadToAddress(p *ledger.Payload) (common.Address, error) {
+func PayloadToAddress(p *ledger.Payload) (common.Address, error) {
 	k, err := p.Key()
 	if err != nil {
 		return common.ZeroAddress, fmt.Errorf("could not find key for payload: %w", err)
