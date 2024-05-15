@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/onflow/cadence/runtime/common"
+
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -20,7 +21,7 @@ const (
 var UnexpectedLedgerKeyFormat = fmt.Errorf("unexpected ledger key format")
 
 // AddressToRegisterOwner converts 8-byte address to register owner.
-// If given address is ZeroAddress, it is a global register and owner is "".
+// If given address is ZeroAddress, register owner is "" (global register).
 func AddressToRegisterOwner(address common.Address) string {
 	// global registers have an empty owner field
 	ownerString := ""
