@@ -108,7 +108,7 @@ func NewBasicMigrationRuntime(regs registers.Registers) *BasicMigrationRuntime {
 			},
 			state.DefaultParameters(),
 			func() hash.Hasher {
-				return newDummyHasher(0)
+				return dummyHasher{}
 			},
 		),
 	)
@@ -179,12 +179,11 @@ func NewInterpreterMigrationRuntime(
 	}, nil
 }
 
-type dummyHasher struct{ size int }
+type dummyHasher struct{}
 
-func newDummyHasher(size int) hash.Hasher               { return &dummyHasher{size} }
-func (d *dummyHasher) Algorithm() hash.HashingAlgorithm { return hash.UnknownHashingAlgorithm }
-func (d *dummyHasher) Size() int                        { return d.size }
-func (d *dummyHasher) ComputeHash([]byte) hash.Hash     { return make([]byte, d.size) }
-func (d *dummyHasher) Write([]byte) (int, error)        { return 0, nil }
-func (d *dummyHasher) SumHash() hash.Hash               { return make([]byte, d.size) }
-func (d *dummyHasher) Reset()                           {}
+func (d dummyHasher) Algorithm() hash.HashingAlgorithm { return hash.UnknownHashingAlgorithm }
+func (d dummyHasher) Size() int                        { return 0 }
+func (d dummyHasher) ComputeHash([]byte) hash.Hash     { return nil }
+func (d dummyHasher) Write([]byte) (int, error)        { return 0, nil }
+func (d dummyHasher) SumHash() hash.Hash               { return nil }
+func (d dummyHasher) Reset()                           {}
