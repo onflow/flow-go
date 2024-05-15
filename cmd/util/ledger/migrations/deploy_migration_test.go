@@ -62,6 +62,8 @@ func TestDeploy(t *testing.T) {
 
 	chain := chainID.Chain()
 
+	const nWorker = 2
+
 	systemContracts := systemcontracts.SystemContractsForChain(chainID)
 	serviceAccountAddress := systemContracts.FlowServiceAccount.Address
 	fungibleTokenAddress := systemContracts.FungibleToken.Address
@@ -144,7 +146,9 @@ func TestDeploy(t *testing.T) {
 
 	storageSnapshot := snapshot.MapStorageSnapshot{}
 
-	for _, newPayload := range registersByAccount.Payloads() {
+	newPayloads := registersByAccount.DestructIntoPayloads(nWorker)
+
+	for _, newPayload := range newPayloads {
 		registerID, registerValue, err := convert.PayloadToRegister(newPayload)
 		require.NoError(t, err)
 

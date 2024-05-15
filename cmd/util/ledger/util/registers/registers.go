@@ -2,6 +2,7 @@ package registers
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/onflow/atree"
 	"github.com/rs/zerolog"
@@ -18,7 +19,6 @@ type Registers interface {
 	Get(owner string, key string) ([]byte, error)
 	Set(owner string, key string, value []byte) error
 	ForEach(f ForEachCallback) error
-	Payloads() []*ledger.Payload
 }
 
 // ByAccount represents the registers of all accounts
@@ -70,7 +70,7 @@ func (b *ByAccount) Get(owner string, key string) ([]byte, error) {
 
 func (b *ByAccount) Set(owner string, key string, value []byte) error {
 	accountRegisters := b.AccountRegisters(owner)
-	accountRegisters.registers[key] = value
+	accountRegisters.uncheckedSet(key, value)
 	return nil
 }
 
@@ -84,11 +84,53 @@ func (b *ByAccount) ForEach(f ForEachCallback) error {
 	return nil
 }
 
-func (b *ByAccount) Payloads() []*ledger.Payload {
-	payloads := make([]*ledger.Payload, 0, len(b.registers)*payloadsPerAccountEstimate)
-	for _, accountRegisters := range b.registers {
-		payloads = accountRegisters.appendPayloads(payloads)
+func (b *ByAccount) DestructIntoPayloads(nWorker int) []*ledger.Payload {
+	payloads := make([]*ledger.Payload, b.Count())
+
+	type job struct {
+		registers *AccountRegisters
+		payloads  []*ledger.Payload
 	}
+
+	var wg sync.WaitGroup
+
+	jobs := make(chan job, b.AccountCount())
+
+	worker := func() {
+		defer wg.Done()
+		for job := range jobs {
+			job.registers.insertPayloads(job.payloads)
+		}
+	}
+
+	for i := 0; i < nWorker; i++ {
+		wg.Add(1)
+		go worker()
+	}
+
+	startOffset := 0
+	for owner, accountRegisters := range b.registers {
+
+		endOffset := startOffset + accountRegisters.Count()
+		accountPayloads := payloads[startOffset:endOffset]
+
+		jobs <- job{
+			registers: accountRegisters,
+			payloads:  accountPayloads,
+		}
+
+		// Remove the account from the map to reduce memory usage.
+		// The account registers are now stored in the payloads,
+		// so we don't need to keep them in the by-account registers.
+		// This allows GC to collect converted account registers during the loop.
+		delete(b.registers, owner)
+
+		startOffset = endOffset
+	}
+	close(jobs)
+
+	wg.Wait()
+
 	return payloads
 }
 
@@ -157,12 +199,16 @@ func (a *AccountRegisters) Set(owner string, key string, value []byte) error {
 	if owner != a.owner {
 		return fmt.Errorf("owner mismatch: expected %s, got %s", a.owner, owner)
 	}
+	a.uncheckedSet(key, value)
+	return nil
+}
+
+func (a *AccountRegisters) uncheckedSet(key string, value []byte) {
 	if len(value) == 0 {
 		delete(a.registers, key)
 	} else {
 		a.registers[key] = value
 	}
-	return nil
 }
 
 func (a *AccountRegisters) ForEach(f ForEachCallback) error {
@@ -184,14 +230,26 @@ func (a *AccountRegisters) Owner() string {
 }
 
 func (a *AccountRegisters) Payloads() []*ledger.Payload {
-	payloads := make([]*ledger.Payload, 0, len(a.registers))
-	return a.appendPayloads(payloads)
+	payloads := make([]*ledger.Payload, 0, a.Count())
+	a.insertPayloads(payloads)
+	return payloads
 }
 
-func (a *AccountRegisters) appendPayloads(payloads []*ledger.Payload) []*ledger.Payload {
+func (a *AccountRegisters) insertPayloads(payloads []*ledger.Payload) {
+	payloadCount := len(payloads)
+	registerCount := len(a.registers)
+	if payloadCount != registerCount {
+		panic(fmt.Errorf(
+			"given payloads slice has wrong size: got %d, expected %d",
+			payloadCount,
+			registerCount,
+		))
+	}
+
+	index := 0
 	for key, value := range a.registers {
 		if len(value) == 0 {
-			continue
+			panic(fmt.Errorf("unexpected empty register value: %x, %x", a.owner, key))
 		}
 
 		ledgerKey := convert.RegisterIDToLedgerKey(flow.RegisterID{
@@ -199,9 +257,9 @@ func (a *AccountRegisters) appendPayloads(payloads []*ledger.Payload) []*ledger.
 			Key:   key,
 		})
 		payload := ledger.NewPayload(ledgerKey, value)
-		payloads = append(payloads, payload)
+		payloads[index] = payload
+		index++
 	}
-	return payloads
 }
 
 func NewAccountRegistersFromPayloads(owner string, payloads []*ledger.Payload) (*AccountRegisters, error) {
