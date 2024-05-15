@@ -41,7 +41,7 @@ func NewAccountStorageMigration(
 		}
 
 		// Commit the changes
-		err = storage.Commit(inter, false)
+		err = storage.NondeterministicCommit(inter, false)
 		if err != nil {
 			return fmt.Errorf("failed to commit changes: %w", err)
 		}

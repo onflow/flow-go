@@ -28,6 +28,8 @@ func TestFilterUnreferencedSlabs(t *testing.T) {
 	const chainID = flow.Emulator
 	chain := chainID.Chain()
 
+	const nWorker = 2
+
 	testFlowAddress, err := chain.AddressAtIndex(1_000_000)
 	require.NoError(t, err)
 
@@ -130,7 +132,7 @@ func TestFilterUnreferencedSlabs(t *testing.T) {
 		dict1,
 	)
 
-	err = storage.Commit(inter, false)
+	err = storage.NondeterministicCommit(inter, false)
 	require.NoError(t, err)
 
 	oldPayloads := make([]*ledger.Payload, 0, len(payloads))
@@ -187,7 +189,7 @@ func TestFilterUnreferencedSlabs(t *testing.T) {
 		string([]byte{flow.SlabIndexPrefix, 0, 0, 0, 0, 0, 0, 0, 3}): {},
 	}
 
-	newPayloads := registersByAccount.Payloads()
+	newPayloads := registersByAccount.DestructIntoPayloads(nWorker)
 	assert.Len(t, newPayloads, totalSlabCount-len(expectedKeys))
 
 	expectedFilteredPayloads := make([]*ledger.Payload, 0, len(expectedKeys))
