@@ -105,6 +105,21 @@ func TestEventConversion(t *testing.T) {
 		},
 	)
 
+	t.Run("epoch recover", func(t *testing.T) {
+		fixture, expected := unittest.EpochRecoverFixtureByChainID(chainID)
+
+		// convert Cadence types to Go types
+		event, err := convert.ServiceEvent(chainID, fixture)
+		require.NoError(t, err)
+		require.NotNil(t, event)
+
+		// cast event type to epoch recover
+		actual, ok := event.Event.(*flow.EpochRecover)
+		require.True(t, ok)
+
+		assert.Equal(t, expected, actual)
+	})
+
 	t.Run(
 		"version beacon", func(t *testing.T) {
 

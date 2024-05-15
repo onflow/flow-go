@@ -158,6 +158,42 @@ func EpochCommitFixtureByChainID(chain flow.ChainID) (flow.Event, *flow.EpochCom
 	return event, expected
 }
 
+// EpochRecoverFixtureByChainID returns an EpochRecover service event as a Cadence event
+// representation and as a protocol model representation.
+func EpochRecoverFixtureByChainID(chain flow.ChainID) (flow.Event, *flow.EpochCommit) {
+
+	events := systemcontracts.ServiceEventsForChain(chain)
+
+	event := EventFixture(events.EpochRecover.EventType(), 1, 1, IdentifierFixture(), 0)
+	event.Payload = EpochRecoverFixtureCCF
+
+	expected := &flow.EpochCommit{
+		Counter: 1,
+		ClusterQCs: []flow.ClusterQCVoteData{
+			{
+				VoterIDs: []flow.Identifier{
+					flow.MustHexStringToIdentifier("0000000000000000000000000000000000000000000000000000000000000001"),
+					flow.MustHexStringToIdentifier("0000000000000000000000000000000000000000000000000000000000000002"),
+				},
+				SigData: MustDecodeSignatureHex("b072ed22ed305acd44818a6c836e09b4e844eebde6a4fdbf5cec983e2872b86c8b0f6c34c0777bf52e385ab7c45dc55d"),
+			},
+			{
+				VoterIDs: []flow.Identifier{
+					flow.MustHexStringToIdentifier("0000000000000000000000000000000000000000000000000000000000000003"),
+					flow.MustHexStringToIdentifier("0000000000000000000000000000000000000000000000000000000000000004"),
+				},
+				SigData: MustDecodeSignatureHex("899e266a543e1b3a564f68b22f7be571f2e944ec30fadc4b39e2d5f526ba044c0f3cb2648f8334fc216fa3360a0418b2"),
+			},
+		},
+		DKGGroupKey: MustDecodePublicKeyHex(crypto.BLSBLS12381, "8c588266db5f5cda629e83f8aa04ae9413593fac19e4865d06d291c9d14fbdd9bdb86a7a12f9ef8590c79cb635e3163315d193087e9336092987150d0cd2b14ac6365f7dc93eec573752108b8c12368abb65f0652d9f644e5aed611c37926950"),
+		DKGParticipantKeys: []crypto.PublicKey{
+			MustDecodePublicKeyHex(crypto.BLSBLS12381, "87a339e4e5c74f089da20a33f515d8c8f4464ab53ede5a74aa2432cd1ae66d522da0c122249ee176cd747ddc83ca81090498389384201614caf51eac392c1c0a916dfdcfbbdf7363f9552b6468434add3d3f6dc91a92bbe3ee368b59b7828488"),
+		},
+	}
+
+	return event, expected
+}
+
 // VersionBeaconFixtureByChainID returns a VersionTable service event as a Cadence event
 // representation and as a protocol model representation.
 func VersionBeaconFixtureByChainID(chain flow.ChainID) (flow.Event, *flow.VersionBeacon) {
@@ -681,6 +717,97 @@ func createEpochCommitEvent() cadence.Event {
 	}).WithType(newFlowEpochEpochCommitEventType())
 }
 
+func createEpochRecoverEvent(randomSourceHex string) cadence.Event {
+
+	clusterQCVoteDataType := newFlowClusterQCClusterQCVoteDataStructType()
+
+	cluster1 := cadence.NewStruct([]cadence.Value{
+		// voteSignatures
+		cadence.NewArray([]cadence.Value{
+			cadence.String("a39cd1e1bf7e2fb0609b7388ce5215a6a4c01eef2aee86e1a007faa28a6b2a3dc876e11bb97cdb26c3846231d2d01e4d"),
+			cadence.String("91673ad9c717d396c9a0953617733c128049ac1a639653d4002ab245b121df1939430e313bcbfd06948f6a281f6bf853"),
+		}).WithType(cadence.NewVariableSizedArrayType(cadence.StringType)),
+
+		// voterIDs
+		cadence.NewArray([]cadence.Value{
+			cadence.String("0000000000000000000000000000000000000000000000000000000000000001"),
+			cadence.String("0000000000000000000000000000000000000000000000000000000000000002"),
+		}).WithType(cadence.NewVariableSizedArrayType(cadence.StringType)),
+	}).WithType(clusterQCVoteDataType)
+
+	cluster2 := cadence.NewStruct([]cadence.Value{
+		// voteSignatures
+		cadence.NewArray([]cadence.Value{
+			cadence.String("b2bff159971852ed63e72c37991e62c94822e52d4fdcd7bf29aaf9fb178b1c5b4ce20dd9594e029f3574cb29533b857a"),
+			cadence.String("9931562f0248c9195758da3de4fb92f24fa734cbc20c0cb80280163560e0e0348f843ac89ecbd3732e335940c1e8dccb"),
+		}).WithType(cadence.NewVariableSizedArrayType(cadence.StringType)),
+
+		// voterIDs
+		cadence.NewArray([]cadence.Value{
+			cadence.String("0000000000000000000000000000000000000000000000000000000000000003"),
+			cadence.String("0000000000000000000000000000000000000000000000000000000000000004"),
+		}).WithType(cadence.NewVariableSizedArrayType(cadence.StringType)),
+	}).WithType(clusterQCVoteDataType)
+
+	return cadence.NewEvent([]cadence.Value{
+		// counter
+		cadence.NewUInt64(1),
+
+		// nodeInfo
+		createEpochNodes(),
+
+		// firstView
+		cadence.NewUInt64(100),
+
+		// finalView
+		cadence.NewUInt64(200),
+
+		// collectorClusters
+		cadence.NewArray([]cadence.Value{
+			// cluster 1
+			cadence.NewArray([]cadence.Value{
+				cadence.String("0000000000000000000000000000000000000000000000000000000000000001"),
+				cadence.String("0000000000000000000000000000000000000000000000000000000000000002"),
+			}).WithType(cadence.NewVariableSizedArrayType(cadence.StringType)),
+			// cluster 2
+			cadence.NewArray([]cadence.Value{
+				cadence.String("0000000000000000000000000000000000000000000000000000000000000003"),
+				cadence.String("0000000000000000000000000000000000000000000000000000000000000004"),
+			}).WithType(cadence.NewVariableSizedArrayType(cadence.StringType)),
+		}).WithType(cadence.NewVariableSizedArrayType(cadence.NewVariableSizedArrayType(cadence.StringType))),
+
+		// randomSource
+		cadence.String(randomSourceHex),
+
+		// DKGPhase1FinalView
+		cadence.UInt64(150),
+
+		// DKGPhase2FinalView
+		cadence.UInt64(160),
+
+		// DKGPhase3FinalView
+		cadence.UInt64(170),
+
+		// targetDuration
+		cadence.UInt64(200),
+
+		// targetEndTime
+		cadence.UInt64(2000000000),
+
+		// clusterQCs
+		cadence.NewArray([]cadence.Value{
+			cluster1,
+			cluster2,
+		}).WithType(cadence.NewVariableSizedArrayType(clusterQCVoteDataType)),
+
+		// dkgPubKeys
+		cadence.NewArray([]cadence.Value{
+			cadence.String("8c588266db5f5cda629e83f8aa04ae9413593fac19e4865d06d291c9d14fbdd9bdb86a7a12f9ef8590c79cb635e3163315d193087e9336092987150d0cd2b14ac6365f7dc93eec573752108b8c12368abb65f0652d9f644e5aed611c37926950"),
+			cadence.String("87a339e4e5c74f089da20a33f515d8c8f4464ab53ede5a74aa2432cd1ae66d522da0c122249ee176cd747ddc83ca81090498389384201614caf51eac392c1c0a916dfdcfbbdf7363f9552b6468434add3d3f6dc91a92bbe3ee368b59b7828488"),
+		}).WithType(cadence.NewVariableSizedArrayType(cadence.StringType)),
+	}).WithType(newFlowEpochEpochRecoverEventType())
+}
+
 func createVersionBeaconEvent() cadence.Event {
 	versionBoundaryType := NewNodeVersionBeaconVersionBoundaryStructType()
 
@@ -921,6 +1048,73 @@ func newFlowEpochEpochCommitEventType() *cadence.EventType {
 	}
 }
 
+func newFlowEpochEpochRecoverEventType() *cadence.EventType {
+
+	// A.01cf0e2f2f715450.FlowEpoch.EpochRecover
+
+	address, _ := common.HexToAddress("01cf0e2f2f715450")
+	location := common.NewAddressLocation(nil, address, "FlowEpoch")
+
+	return &cadence.EventType{
+		Location:            location,
+		QualifiedIdentifier: "FlowEpoch.EpochRecover",
+		Fields: []cadence.Field{
+			{
+				Identifier: "counter",
+				Type:       cadence.UInt64Type,
+			},
+			{
+				Identifier: "nodeInfo",
+				Type:       cadence.NewVariableSizedArrayType(newFlowIDTableStakingNodeInfoStructType()),
+			},
+			{
+				Identifier: "firstView",
+				Type:       cadence.UInt64Type,
+			},
+			{
+				Identifier: "finalView",
+				Type:       cadence.UInt64Type,
+			},
+			{
+				Identifier: "collectorClusters",
+				Type:       cadence.NewVariableSizedArrayType(cadence.NewVariableSizedArrayType(cadence.StringType)),
+			},
+			{
+				Identifier: "randomSource",
+				Type:       cadence.StringType,
+			},
+			{
+				Identifier: "DKGPhase1FinalView",
+				Type:       cadence.UInt64Type,
+			},
+			{
+				Identifier: "DKGPhase2FinalView",
+				Type:       cadence.UInt64Type,
+			},
+			{
+				Identifier: "DKGPhase3FinalView",
+				Type:       cadence.UInt64Type,
+			},
+			{
+				Identifier: "targetDuration",
+				Type:       cadence.UInt64Type,
+			},
+			{
+				Identifier: "targetEndTime",
+				Type:       cadence.UInt64Type,
+			},
+			{
+				Identifier: "clusterQCVoteData",
+				Type:       cadence.NewVariableSizedArrayType(newFlowClusterQCClusterQCVoteDataStructType()),
+			},
+			{
+				Identifier: "dkgPubKeys",
+				Type:       cadence.NewVariableSizedArrayType(cadence.StringType),
+			},
+		},
+	}
+}
+
 func newFlowClusterQCClusterQCStructType() *cadence.StructType {
 
 	// A.01cf0e2f2f715450.FlowClusterQC.ClusterQC"
@@ -943,6 +1137,29 @@ func newFlowClusterQCClusterQCStructType() *cadence.StructType {
 			{
 				Identifier: "voteMessage",
 				Type:       cadence.StringType,
+			},
+			{
+				Identifier: "voterIDs",
+				Type:       cadence.NewVariableSizedArrayType(cadence.StringType),
+			},
+		},
+	}
+}
+
+func newFlowClusterQCClusterQCVoteDataStructType() *cadence.StructType {
+
+	// A.01cf0e2f2f715450.FlowClusterQC.ClusterQCVoteData"
+
+	address, _ := common.HexToAddress("01cf0e2f2f715450")
+	location := common.NewAddressLocation(nil, address, "ClusterQCVoteData")
+
+	return &cadence.StructType{
+		Location:            location,
+		QualifiedIdentifier: "FlowClusterQC.ClusterQCVoteData",
+		Fields: []cadence.Field{
+			{
+				Identifier: "voteSignatures",
+				Type:       cadence.NewVariableSizedArrayType(cadence.StringType),
 			},
 			{
 				Identifier: "voterIDs",
@@ -1095,6 +1312,19 @@ func EpochSetupCCFWithNonHexRandomSource() []byte {
 
 var EpochCommitFixtureCCF = func() []byte {
 	b, err := ccf.Encode(createEpochCommitEvent())
+	if err != nil {
+		panic(err)
+	}
+	_, err = ccf.Decode(nil, b)
+	if err != nil {
+		panic(err)
+	}
+	return b
+}()
+
+var EpochRecoverFixtureCCF = func() []byte {
+	randomSourceHex := hex.EncodeToString(EpochSetupRandomSourceFixture())
+	b, err := ccf.Encode(createEpochRecoverEvent(randomSourceHex))
 	if err != nil {
 		panic(err)
 	}

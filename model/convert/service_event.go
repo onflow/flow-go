@@ -371,7 +371,7 @@ func convertServiceEventEpochRecover(event flow.Event) (*flow.ServiceEvent, erro
 		return nil, fmt.Errorf("failed to decode EpochRecover event: %w", err)
 	}
 
-	cdcClusterQCVotes, err := getField[cadence.Array](fields, "clusterQCVoteData")
+	cdcClusterQCVoteData, err := getField[cadence.Array](fields, "clusterQCVoteData")
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode EpochRecover event: %w", err)
 	}
@@ -428,9 +428,9 @@ func convertServiceEventEpochRecover(event flow.Event) (*flow.ServiceEvent, erro
 	}
 
 	// parse cluster qc votes
-	commit.ClusterQCs, err = convertClusterQCVoteData(cdcClusterQCVotes.Values)
+	commit.ClusterQCs, err = convertClusterQCVoteData(cdcClusterQCVoteData.Values)
 	if err != nil {
-		return nil, fmt.Errorf("could not convert cluster qc votes: %w", err)
+		return nil, fmt.Errorf("could not convert cluster qc vote data: %w", err)
 	}
 
 	// parse DKG group key and participants
@@ -723,7 +723,7 @@ func convertClusterQCVoteData(cdcClusterQCVoteData []cadence.Value) ([]flow.Clus
 
 		fields := cadence.FieldsMappedByName(cdcClusterQCStruct)
 
-		const expectedFieldCount = 4
+		const expectedFieldCount = 2
 		if len(fields) < expectedFieldCount {
 			return nil, fmt.Errorf(
 				"insufficient fields (%d < %d)",
