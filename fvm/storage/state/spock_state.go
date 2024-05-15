@@ -33,10 +33,13 @@ type spockState struct {
 	finalizedSpockSecret []byte
 }
 
+// DefaultSpockSecretHasher returns a new SHA3_256 hasher
 var DefaultSpockSecretHasher = func() hash.Hasher {
 	return hash.NewSHA3_256()
 }
 
+// NewSpockState creates a new spock state
+// getHasher will be called to create a new hasher for the spock state and each child state
 func newSpockState(base snapshot.StorageSnapshot, getHasher func() hash.Hasher) *spockState {
 	return &spockState{
 		storageState:      newStorageState(base),
