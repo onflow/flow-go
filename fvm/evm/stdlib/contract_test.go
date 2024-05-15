@@ -183,6 +183,16 @@ func (t *testFlowAccount) Call(address types.Address, data types.Data, limit typ
 	return t.call(address, data, limit, balance)
 }
 
+func requireEqualEventAddress(t *testing.T, event cadence.Event, address types.Address) {
+	actual := cadence.SearchFieldByName(event, types.CadenceOwnedAccountCreatedTypeAddressFieldName)
+	strippedHex := strings.TrimPrefix(address.String(), "0x")
+	expected, err := cadence.NewString(strippedHex)
+	if err != nil {
+		require.NoError(t, err)
+	}
+	require.Equal(t, expected, actual)
+}
+
 func deployContracts(
 	t *testing.T,
 	rt runtime.Runtime,
@@ -3448,16 +3458,6 @@ func TestEVMCreateCadenceOwnedAccount(t *testing.T) {
 
 	expectedCoaAddress = types.Address{4}
 	requireEqualEventAddress(t, events[1], expectedCoaAddress)
-}
-
-func requireEqualEventAddress(t *testing.T, event cadence.Event, address types.Address) {
-	actual := cadence.SearchFieldByName(event, types.CadenceOwnedAccountCreatedTypeAddressFieldName)
-	strippedHex := strings.TrimPrefix(address.String(), "0x")
-	expected, err := cadence.NewString(strippedHex)
-	if err != nil {
-		require.NoError(t, err)
-	}
-	require.Equal(t, expected, actual)
 }
 
 func TestCadenceOwnedAccountCall(t *testing.T) {
