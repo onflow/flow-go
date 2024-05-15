@@ -588,7 +588,6 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 	t.Run(
 		"service events are emitted", func(t *testing.T) {
 			execCtx := fvm.NewContext(
-				fvm.WithServiceEventCollectionEnabled(),
 				fvm.WithAuthorizationChecksEnabled(false),
 				fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
 			)

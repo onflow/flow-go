@@ -7,7 +7,9 @@ import (
 	"github.com/onflow/cadence/runtime/interpreter"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
+	"github.com/onflow/flow-go/cmd/util/ledger/util/registers"
 	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 type diffKind int
@@ -72,25 +74,47 @@ type difference struct {
 
 type CadenceValueDiffReporter struct {
 	address        common.Address
+	chainID        flow.ChainID
 	reportWriter   reporters.ReportWriter
 	verboseLogging bool
 }
 
 func NewCadenceValueDiffReporter(
 	address common.Address,
+	chainID flow.ChainID,
 	rw reporters.ReportWriter,
 	verboseLogging bool,
 ) *CadenceValueDiffReporter {
 	return &CadenceValueDiffReporter{
 		address:        address,
+		chainID:        chainID,
 		reportWriter:   rw,
 		verboseLogging: verboseLogging,
 	}
 }
 
+func (dr *CadenceValueDiffReporter) newStorageRuntime(
+	payloads []*ledger.Payload,
+) (
+	*InterpreterMigrationRuntime,
+	error,
+) {
+	registersByAccount, err := registers.NewByAccountFromPayloads(payloads)
+	if err != nil {
+		return nil, err
+	}
+
+	// TODO: maybe make read-only again
+	return NewInterpreterMigrationRuntime(
+		registersByAccount,
+		dr.chainID,
+		InterpreterMigrationRuntimeConfig{},
+	)
+}
+
 func (dr *CadenceValueDiffReporter) DiffStates(oldPayloads, newPayloads []*ledger.Payload, domains []string) {
 	// Create all the runtime components we need for comparing Cadence values.
-	oldRuntime, err := newReadonlyStorageRuntime(oldPayloads)
+	oldRuntime, err := dr.newStorageRuntime(oldPayloads)
 	if err != nil {
 		dr.reportWriter.Write(
 			diffError{
@@ -101,7 +125,7 @@ func (dr *CadenceValueDiffReporter) DiffStates(oldPayloads, newPayloads []*ledge
 		return
 	}
 
-	newRuntime, err := newReadonlyStorageRuntime(newPayloads)
+	newRuntime, err := dr.newStorageRuntime(newPayloads)
 	if err != nil {
 		dr.reportWriter.Write(
 			diffError{
@@ -118,10 +142,12 @@ func (dr *CadenceValueDiffReporter) DiffStates(oldPayloads, newPayloads []*ledge
 	}
 }
 
-func (dr *CadenceValueDiffReporter) diffStorageDomain(oldRuntime, newRuntime *readonlyStorageRuntime, domain string) {
-
+func (dr *CadenceValueDiffReporter) diffStorageDomain(
+	oldRuntime *InterpreterMigrationRuntime,
+	newRuntime *InterpreterMigrationRuntime,
+	domain string,
+) {
 	oldStorageMap := oldRuntime.Storage.GetStorageMap(dr.address, domain, false)
-
 	newStorageMap := newRuntime.Storage.GetStorageMap(dr.address, domain, false)
 
 	if oldStorageMap == nil && newStorageMap == nil {

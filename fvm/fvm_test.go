@@ -2396,28 +2396,28 @@ func TestInteractionLimit(t *testing.T) {
 }
 
 func TestAttachments(t *testing.T) {
-	test := func(t *testing.T, attachmentsEnabled bool) {
-		newVMTest().
-			withBootstrapProcedureOptions().
-			withContextOptions(
-				fvm.WithReusableCadenceRuntimePool(
-					reusableRuntime.NewReusableCadenceRuntimePool(
-						1,
-						runtime.Config{
-							AttachmentsEnabled: attachmentsEnabled,
-						},
-					),
+
+	newVMTest().
+		withBootstrapProcedureOptions().
+		withContextOptions(
+			fvm.WithReusableCadenceRuntimePool(
+				reusableRuntime.NewReusableCadenceRuntimePool(
+					1,
+					runtime.Config{
+						AttachmentsEnabled: true,
+					},
 				),
-			).
-			run(
-				func(
-					t *testing.T,
-					vm fvm.VM,
-					chain flow.Chain,
-					ctx fvm.Context,
-					snapshotTree snapshot.SnapshotTree,
-				) {
-					script := fvm.Script([]byte(`
+			),
+		).
+		run(
+			func(
+				t *testing.T,
+				vm fvm.VM,
+				chain flow.Chain,
+				ctx fvm.Context,
+				snapshotTree snapshot.SnapshotTree,
+			) {
+				script := fvm.Script([]byte(`
 
 						access(all) resource R {}
 
@@ -2430,29 +2430,13 @@ func TestAttachments(t *testing.T) {
 						}
 					`))
 
-					_, output, err := vm.Run(ctx, script, snapshotTree)
-					require.NoError(t, err)
+				_, output, err := vm.Run(ctx, script, snapshotTree)
+				require.NoError(t, err)
+				require.NoError(t, output.Err)
 
-					if attachmentsEnabled {
-						require.NoError(t, output.Err)
-					} else {
-						require.Error(t, output.Err)
-						require.ErrorContains(
-							t,
-							output.Err,
-							"attachments are not enabled")
-					}
-				},
-			)(t)
-	}
+			},
+		)(t)
 
-	t.Run("attachments enabled", func(t *testing.T) {
-		test(t, true)
-	})
-
-	t.Run("attachments disabled", func(t *testing.T) {
-		test(t, false)
-	})
 }
 
 func TestCapabilityControllers(t *testing.T) {

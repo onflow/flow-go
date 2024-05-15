@@ -10,13 +10,12 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
-	"github.com/onflow/flow-go/cmd/util/ledger/util/snapshot"
-	"github.com/onflow/flow-go/ledger"
-	"github.com/onflow/flow-go/ledger/common/convert"
+	"github.com/onflow/flow-go/cmd/util/ledger/util/registers"
 	"github.com/onflow/flow-go/model/flow"
 )
 
 const contractCheckingReporterName = "contract-checking"
+const contractCountEstimate = 1000
 
 // NewContractCheckingMigration returns a migration that checks all contracts.
 // It parses and checks all contract code and stores the programs in the provided map.
@@ -26,57 +25,45 @@ func NewContractCheckingMigration(
 	chainID flow.ChainID,
 	verboseErrorOutput bool,
 	programs map[common.Location]*interpreter.Program,
-	nWorkers int,
-) ledger.Migration {
-	return func(payloads []*ledger.Payload) ([]*ledger.Payload, error) {
+) RegistersMigration {
+	return func(registersByAccount *registers.ByAccount) error {
 
 		reporter := rwf.ReportWriter(contractCheckingReporterName)
 
-		// Extract payloads that have contract code or contract names,
-		// we don't need a payload snapshot with all payloads,
-		// because all we do is parse and check all contracts.
-
-		contractPayloads, err := extractContractPayloads(payloads, log)
-		if err != nil {
-			return nil, fmt.Errorf("failed to extract contract payloads: %w", err)
-		}
-
-		mr, err := NewMigratorRuntime(
-			log,
-			contractPayloads,
+		mr, err := NewInterpreterMigrationRuntime(
+			registersByAccount,
 			chainID,
-			MigratorRuntimeConfig{},
-			snapshot.LargeChangeSetOrReadonlySnapshot,
-			nWorkers,
+			InterpreterMigrationRuntimeConfig{},
 		)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create migrator runtime: %w", err)
+			return fmt.Errorf("failed to create interpreter migration runtime: %w", err)
 		}
 
 		// Gather all contracts
 
-		contractsByLocation := make(map[common.Location][]byte, 1000)
+		contractsByLocation := make(map[common.Location][]byte, contractCountEstimate)
 
-		for _, payload := range contractPayloads {
-			registerID, registerValue, err := convert.PayloadToRegister(payload)
-			if err != nil {
-				return nil, fmt.Errorf("failed to convert payload to register: %w", err)
-			}
+		err = registersByAccount.ForEach(func(owner string, key string, value []byte) error {
 
 			// Skip payloads that are not contract code
-			contractName := flow.RegisterIDContractName(registerID)
+			contractName := flow.KeyContractName(key)
 			if contractName == "" {
-				continue
+				return nil
 			}
 
-			owner := common.Address([]byte(registerID.Owner))
-			code := registerValue
+			address := common.Address([]byte(owner))
+			code := value
 			location := common.AddressLocation{
-				Address: owner,
+				Address: address,
 				Name:    contractName,
 			}
 
 			contractsByLocation[location] = code
+
+			return nil
+		})
+		if err != nil {
+			return fmt.Errorf("failed to iterate over registers: %w", err)
 		}
 
 		// Check all contracts
@@ -127,42 +114,8 @@ func NewContractCheckingMigration(
 
 		reporter.Close()
 
-		// Return the payloads as-is
-		return payloads, nil
+		return nil
 	}
-}
-
-// extractContractPayloads extracts payloads that contain contract code or contract names
-func extractContractPayloads(payloads []*ledger.Payload, log zerolog.Logger) (
-	contractPayloads []*ledger.Payload,
-	err error,
-) {
-	log.Info().Msg("extracting contract payloads ...")
-
-	var contractCount int
-
-	for _, payload := range payloads {
-		registerID, _, err := convert.PayloadToRegister(payload)
-		if err != nil {
-			return nil, fmt.Errorf("failed to convert payload to register: %w", err)
-		}
-
-		// Include payloads which contain contract code
-		if flow.IsContractCodeRegisterID(registerID) {
-			contractPayloads = append(contractPayloads, payload)
-
-			contractCount++
-		}
-
-		// Include payloads which contain contract names
-		if flow.IsContractNamesRegisterID(registerID) {
-			contractPayloads = append(contractPayloads, payload)
-		}
-	}
-
-	log.Info().Msgf("extracted %d contracts from payloads", contractCount)
-
-	return contractPayloads, nil
 }
 
 type contractCheckingFailure struct {
