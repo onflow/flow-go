@@ -461,8 +461,12 @@ func newByAccountRegistersFromPayloadAccountGrouping(
 			}()
 
 			for payloadAccountGroup := range jobs {
+
+				// Convert address to owner
+				payloadGroupOwner := flow.AddressToRegisterOwner(payloadAccountGroup.Address)
+
 				accountRegisters, err := registers.NewAccountRegistersFromPayloads(
-					string(payloadAccountGroup.Address[:]),
+					payloadGroupOwner,
 					payloadAccountGroup.Payloads,
 				)
 				if err != nil {

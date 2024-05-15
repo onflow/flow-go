@@ -5,17 +5,22 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
+
+	"github.com/onflow/flow-go/module"
 )
 
 // CruiseCtlMetrics captures metrics about the Block Rate Controller, which adjusts
 // the proposal duration to attain a target epoch switchover time.
 type CruiseCtlMetrics struct {
-	proportionalErr   prometheus.Gauge
-	integralErr       prometheus.Gauge
-	derivativeErr     prometheus.Gauge
-	targetProposalDur prometheus.Gauge
-	controllerOutput  prometheus.Gauge
+	proportionalErr          prometheus.Gauge
+	integralErr              prometheus.Gauge
+	derivativeErr            prometheus.Gauge
+	targetProposalDur        prometheus.Gauge
+	controllerOutput         prometheus.Gauge
+	proposalPublicationDelay prometheus.Gauge
 }
+
+var _ module.CruiseCtlMetrics = (*CruiseCtlMetrics)(nil)
 
 func NewCruiseCtlMetrics() *CruiseCtlMetrics {
 	return &CruiseCtlMetrics{
@@ -41,13 +46,19 @@ func NewCruiseCtlMetrics() *CruiseCtlMetrics {
 			Name:      "target_proposal_dur_s",
 			Namespace: namespaceConsensus,
 			Subsystem: subsystemCruiseCtl,
-			Help:      "The current target duration from parent to child proposal",
+			Help:      "The current target duration from parent to child proposal [seconds]",
 		}),
 		controllerOutput: promauto.NewGauge(prometheus.GaugeOpts{
 			Name:      "controller_output_s",
 			Namespace: namespaceConsensus,
 			Subsystem: subsystemCruiseCtl,
-			Help:      "The most recent output of the controller; the adjustment to subtract from the baseline proposal duration",
+			Help:      "The most recent output of the controller [seconds]; the adjustment to subtract from the baseline proposal duration",
+		}),
+		proposalPublicationDelay: promauto.NewGauge(prometheus.GaugeOpts{
+			Name:      "proposal_publication_delay_s",
+			Namespace: namespaceConsensus,
+			Subsystem: subsystemCruiseCtl,
+			Help:      "Effective delay the controller imposes on publishing the node's own proposals [seconds]; with all limits of authority",
 		}),
 	}
 }
@@ -64,4 +75,8 @@ func (c *CruiseCtlMetrics) TargetProposalDuration(duration time.Duration) {
 
 func (c *CruiseCtlMetrics) ControllerOutput(duration time.Duration) {
 	c.controllerOutput.Set(duration.Seconds())
+}
+
+func (c *CruiseCtlMetrics) ProposalPublicationDelay(duration time.Duration) {
+	c.proposalPublicationDelay.Set(duration.Seconds())
 }
