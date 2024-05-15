@@ -29,6 +29,7 @@ type Context struct {
 	// limits and set them to MaxUint64, effectively disabling these limits.
 	DisableMemoryAndInteractionLimits bool
 	EVMEnabled                        bool
+	DependencyCheckEnabled            bool
 	ComputationLimit                  uint64
 	MemoryLimit                       uint64
 	MaxStateKeySize                   uint64
@@ -189,6 +190,14 @@ func WithBlockHeader(header *flow.Header) Option {
 func WithServiceEventCollectionEnabled() Option {
 	return func(ctx Context) Context {
 		ctx.ServiceEventCollectionEnabled = true
+		return ctx
+	}
+}
+
+// WithDependencyCheckEnabled enables or disables the dependency check.
+func WithDependencyCheckEnabled(enabled bool) Option {
+	return func(ctx Context) Context {
+		ctx.DependencyCheckEnabled = enabled
 		return ctx
 	}
 }

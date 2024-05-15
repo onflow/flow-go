@@ -12,6 +12,8 @@ import (
 
 	common "github.com/onflow/cadence/runtime/common"
 
+	derived "github.com/onflow/flow-go/fvm/storage/derived"
+
 	environment "github.com/onflow/flow-go/fvm/environment"
 
 	flow "github.com/onflow/flow-go/model/flow"
@@ -250,6 +252,32 @@ func (_m *Environment) BorrowCadenceRuntime() *runtime.ReusableCadenceRuntime {
 	}
 
 	return r0
+}
+
+// CheckDependencies provides a mock function with given fields: dependencies, auths
+func (_m *Environment) CheckDependencies(dependencies []common.AddressLocation, auths []flow.Address) (cadence.Value, error) {
+	ret := _m.Called(dependencies, auths)
+
+	var r0 cadence.Value
+	var r1 error
+	if rf, ok := ret.Get(0).(func([]common.AddressLocation, []flow.Address) (cadence.Value, error)); ok {
+		return rf(dependencies, auths)
+	}
+	if rf, ok := ret.Get(0).(func([]common.AddressLocation, []flow.Address) cadence.Value); ok {
+		r0 = rf(dependencies, auths)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(cadence.Value)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func([]common.AddressLocation, []flow.Address) error); ok {
+		r1 = rf(dependencies, auths)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
 
 // CheckPayerBalanceAndGetMaxTxFees provides a mock function with given fields: payer, inclusionEffort, executionEffort
@@ -796,6 +824,30 @@ func (_m *Environment) GetOrLoadProgram(location common.Location, load func() (*
 
 	if rf, ok := ret.Get(1).(func(common.Location, func() (*interpreter.Program, error)) error); ok {
 		r1 = rf(location, load)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetProgramDependencies provides a mock function with given fields:
+func (_m *Environment) GetProgramDependencies() (derived.ProgramDependencies, error) {
+	ret := _m.Called()
+
+	var r0 derived.ProgramDependencies
+	var r1 error
+	if rf, ok := ret.Get(0).(func() (derived.ProgramDependencies, error)); ok {
+		return rf()
+	}
+	if rf, ok := ret.Get(0).(func() derived.ProgramDependencies); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(derived.ProgramDependencies)
+	}
+
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
 	} else {
 		r1 = ret.Error(1)
 	}

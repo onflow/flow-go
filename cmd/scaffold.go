@@ -1547,6 +1547,13 @@ func (fnb *FlowNodeBuilder) initFvmOptions() {
 			fvm.WithContractDeploymentRestricted(false),
 		)
 	}
+	// temporarily enable dependency check for testnet
+	if fnb.RootChainID == flow.Testnet {
+		vmOpts = append(vmOpts,
+			fvm.WithDependencyCheckEnabled(true),
+		)
+	}
+
 	fnb.FvmOptions = vmOpts
 }
 

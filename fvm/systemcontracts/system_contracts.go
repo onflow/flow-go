@@ -55,6 +55,7 @@ const (
 	ContractServiceAccountFunction_defaultTokenBalance                        = "defaultTokenBalance"
 	ContractServiceAccountFunction_deductTransactionFee                       = "deductTransactionFee"
 	ContractServiceAccountFunction_verifyPayersBalanceForTransactionExecution = "verifyPayersBalanceForTransactionExecution"
+	ContractServiceAccountFunction_checkDependencies                          = "checkDependencies"
 	ContractStorageFeesFunction_calculateAccountCapacity                      = "calculateAccountCapacity"
 	ContractStorageFeesFunction_getAccountsCapacityForTransactionStorageCheck = "getAccountsCapacityForTransactionStorageCheck"
 	ContractStorageFeesFunction_defaultTokenAvailableBalance                  = "defaultTokenAvailableBalance"

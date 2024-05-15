@@ -6,6 +6,7 @@ import (
 
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
+	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/rs/zerolog"
 	"go.opentelemetry.io/otel/attribute"
 	otelTrace "go.opentelemetry.io/otel/trace"
@@ -19,6 +20,7 @@ import (
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
 )
 
@@ -418,7 +420,17 @@ func (executor *transactionExecutor) normalExecution() (
 	}
 
 	executor.txnState.RunWithAllLimitsDisabled(func() {
+
 		err = executor.deductTransactionFees()
+
+	})
+
+	if err != nil {
+		return
+	}
+
+	executor.txnState.RunWithAllLimitsDisabled(func() {
+		err = executor.checkDependencies()
 	})
 
 	return
@@ -489,4 +501,51 @@ func (executor *transactionExecutor) commit(
 	}
 
 	return nil
+}
+
+func (executor *transactionExecutor) checkDependencies() error {
+
+	if !executor.ctx.DependencyCheckEnabled {
+		return nil
+	}
+
+	deps, err := executor.env.GetProgramDependencies()
+
+	if err != nil {
+		return fmt.Errorf("failed to get program dependencies: %w", err)
+	}
+
+	dependencies := make([]common.AddressLocation, 0, len(deps.Locations()))
+	for _, loc := range deps.Locations() {
+		if addressLoc, ok := loc.(common.AddressLocation); ok {
+			dependencies = append(dependencies, addressLoc)
+		}
+	}
+
+	authorizerSet := make(map[flow.Address]struct{}, len(executor.proc.Transaction.Authorizers))
+	for _, authorizer := range executor.proc.Transaction.Authorizers {
+		authorizerSet[authorizer] = struct{}{}
+	}
+
+	authorizerSet[executor.proc.Transaction.Payer] = struct{}{}
+
+	auths := make([]flow.Address, 0, len(authorizerSet))
+	for auth := range authorizerSet {
+		auths = append(auths, auth)
+	}
+
+	_, err = executor.env.CheckDependencies(
+		dependencies,
+		auths)
+
+	// If the service contract does not have the required method, ignore the error, but log it
+	if errors.Is(err, interpreter.NotInvokableError{}) {
+		log := executor.env.Logger()
+		log.Info().
+			Str("method", systemcontracts.ContractServiceAccountFunction_checkDependencies).
+			Msg("Service contract does not have the required method")
+		return nil
+	}
+
+	return err
 }

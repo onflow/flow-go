@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/encoding/ccf"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
@@ -15,6 +17,7 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 	cadenceErrors "github.com/onflow/cadence/runtime/errors"
 	"github.com/onflow/cadence/runtime/tests/utils"
+	coreContracts "github.com/onflow/flow-core-contracts/lib/go/contracts"
 	"github.com/stretchr/testify/assert"
 	mockery "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -1394,6 +1397,8 @@ func TestSettingExecutionWeights(t *testing.T) {
 		},
 	))
 
+	log := zerolog.New(zerolog.NewTestWriter(t))
+
 	t.Run("transaction should not use up more computation that the transaction body itself", newVMTest().withBootstrapProcedureOptions(
 		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
 		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
@@ -1410,6 +1415,7 @@ func TestSettingExecutionWeights(t *testing.T) {
 		fvm.WithAccountStorageLimit(true),
 		fvm.WithTransactionFeesEnabled(true),
 		fvm.WithMemoryLimit(math.MaxUint64),
+		fvm.WithLogger(log),
 	).run(
 		func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) {
 			// Use the maximum amount of computation so that the transaction still passes.
@@ -3160,4 +3166,275 @@ func TestEVM(t *testing.T) {
 			}
 		}),
 	)
+}
+
+func TestDependencyCheck(t *testing.T) {
+
+	t.Run("DependencyCheck", newVMTest().
+		withBootstrapProcedureOptions().
+		withContextOptions(
+			fvm.WithContractDeploymentRestricted(false),
+		).
+		run(func(
+			t *testing.T,
+			vm fvm.VM,
+			chain flow.Chain,
+			ctx fvm.Context,
+			snapshotTree snapshot.SnapshotTree,
+		) {
+			ctx.DependencyCheckEnabled = true
+
+			// Create a private key
+			privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
+			require.NoError(t, err)
+
+			// Bootstrap a ledger, creating an account with the provided private key and the root account.
+			snapshotTree, accounts, err := testutil.CreateAccounts(
+				vm,
+				snapshotTree,
+				privateKeys,
+				chain,
+			)
+			require.NoError(t, err)
+
+			contractA := `
+				    pub contract A {
+					}
+				`
+
+			contractB := fmt.Sprintf(`
+				    import A from %s
+
+				    pub contract B {
+					}`,
+				accounts[0].HexWithPrefix(),
+			)
+
+			contractC := fmt.Sprintf(`
+				    import B from %s
+				    import A from %s
+
+				    pub contract C {
+					}`,
+				accounts[0].HexWithPrefix(),
+				accounts[0].HexWithPrefix(),
+			)
+
+			contractD := fmt.Sprintf(`
+				    import C from %s
+				    import B from %s
+				    import A from %s
+
+				    pub contract D {
+					}`,
+				accounts[0].HexWithPrefix(),
+				accounts[0].HexWithPrefix(),
+				accounts[0].HexWithPrefix(),
+			)
+
+			var sequenceNumber uint64 = 0
+
+			runTransactionWithOutputHandler := func(
+				code []byte,
+				handle func(t *testing.T, err error, output fvm.ProcedureOutput),
+			) {
+				txBody := flow.NewTransactionBody().
+					SetScript(code).
+					SetPayer(chain.ServiceAddress()).
+					SetProposalKey(chain.ServiceAddress(), 0, sequenceNumber).
+					AddAuthorizer(accounts[0])
+
+				_ = testutil.SignPayload(txBody, accounts[0], privateKeys[0])
+				_ = testutil.SignEnvelope(txBody, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
+
+				executionSnapshot, output, err := vm.Run(
+					ctx,
+					fvm.Transaction(txBody, 0),
+					snapshotTree,
+				)
+
+				handle(t, err, output)
+
+				snapshotTree = snapshotTree.Append(executionSnapshot)
+
+				// increment sequence number
+				sequenceNumber++
+			}
+
+			runTransaction := func(
+				code []byte,
+			) {
+				runTransactionWithOutputHandler(code,
+					func(t *testing.T, err error, output fvm.ProcedureOutput) {
+						require.NoError(t, err)
+						require.NoError(t, output.Err)
+					})
+
+			}
+
+			deployServiceContractDependencyCheck := func(dependencyCheck string) {
+				sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+
+				code := string(coreContracts.FlowServiceAccount(
+					sc.FungibleToken.Address.HexWithPrefix(),
+					sc.FlowToken.Address.HexWithPrefix(),
+					sc.FlowFees.Address.HexWithPrefix(),
+					sc.FlowStorageFees.Address.HexWithPrefix(),
+				))
+
+				code = strings.Replace(
+					code,
+					"init() {",
+					fmt.Sprintf("%s\ninit() {", dependencyCheck),
+					1)
+
+				update := utils.UpdateTransaction(
+					"FlowServiceAccount",
+					[]byte(code),
+				)
+
+				txBody := flow.NewTransactionBody().
+					SetScript(update).
+					AddAuthorizer(chain.ServiceAddress())
+
+				err := testutil.SignTransactionAsServiceAccount(txBody, sequenceNumber, chain)
+				require.NoError(t, err)
+
+				executionSnapshot, output, err := vm.Run(
+					ctx,
+					fvm.Transaction(txBody, 0),
+					snapshotTree,
+				)
+
+				require.NoError(t, err)
+				require.NoError(t, output.Err)
+
+				snapshotTree = snapshotTree.Append(executionSnapshot)
+
+				sequenceNumber++
+			}
+
+			// Deploy `A`
+			runTransaction(utils.DeploymentTransaction(
+				"A",
+				[]byte(contractA),
+			))
+
+			// Deploy `B`
+			runTransaction(utils.DeploymentTransaction(
+				"B",
+				[]byte(contractB),
+			))
+
+			// Deploy `C`
+			runTransaction(utils.DeploymentTransaction(
+				"C",
+				[]byte(contractC),
+			))
+
+			// Deploy `D`
+			runTransaction(utils.DeploymentTransaction(
+				"D",
+				[]byte(contractD),
+			))
+
+			// This succeeds because dependency check does not exist yet
+			runTransaction([]byte(fmt.Sprintf(
+				`
+					import D from %s
+
+					transaction {
+						prepare(signer: AuthAccount) {
+						}
+					}`,
+				accounts[0].HexWithPrefix(),
+			)))
+
+			deployServiceContractDependencyCheck(`
+				access(all) fun checkDependencies(_ dependenciesAddresses: [Address], _ dependenciesNames: [String], _ authorizers: [Address]) { }
+			`)
+
+			// This succeeds because dependency check is empty
+			runTransaction([]byte(fmt.Sprintf(
+				`
+					import D from %s
+
+					transaction {
+						prepare(signer: AuthAccount) {
+						}
+					}`,
+				accounts[0].HexWithPrefix(),
+			)))
+
+			deployServiceContractDependencyCheck(fmt.Sprintf(`
+				access(all) fun checkDependencies(_ dependenciesAddresses: [Address], _ dependenciesNames: [String], _ authorizers: [Address]) {
+					if authorizers.length == 1 && authorizers[0] == %s {
+						return
+					}
+
+					panic("dependencies check failed")
+				}
+			`, chain.ServiceAddress().HexWithPrefix()))
+
+			// This fails because dependency check panics
+			runTransactionWithOutputHandler(
+				[]byte(fmt.Sprintf(
+					`
+					import D from %s
+
+					transaction {
+						prepare(signer: AuthAccount) {
+						}
+					}`,
+					accounts[0].HexWithPrefix(),
+				)),
+				func(t *testing.T, err error, output fvm.ProcedureOutput) {
+					require.NoError(t, err)
+					require.Error(t, output.Err)
+					require.ErrorContains(t, output.Err, "dependencies check failed")
+				},
+			)
+
+			deployServiceContractDependencyCheck(fmt.Sprintf(`
+				pub event TestEvent(_ dependenciesNames: [String])
+				
+				access(all) fun checkDependencies(_ dependenciesAddresses: [Address], _ dependenciesNames: [String], _ authorizers: [Address]) {
+					if authorizers.length == 1 && authorizers[0] == %s {
+						return
+					}
+
+					emit TestEvent(dependenciesNames)
+				}
+			`, chain.ServiceAddress().HexWithPrefix()))
+
+			// This fails because dependency check panics
+			runTransactionWithOutputHandler(
+				[]byte(fmt.Sprintf(
+					`
+					import D from %s
+
+					transaction {
+						prepare(signer: AuthAccount) {
+						}
+					}`,
+					accounts[0].HexWithPrefix(),
+				)),
+				func(t *testing.T, err error, output fvm.ProcedureOutput) {
+					require.NoError(t, err)
+					require.NoError(t, output.Err)
+
+					require.Len(t, output.Events, 1)
+
+					event := output.Events[0]
+					require.Equal(t, flow.EventType("A.8c5303eaa26202d6.FlowServiceAccount.TestEvent"), event.Type)
+
+					payload, err := ccf.Decode(nil, event.Payload)
+					require.NoError(t, err)
+
+					dependencies := payload.(cadence.Event).Fields[0].(cadence.Array).Values
+
+					require.ElementsMatch(t, []cadence.Value{cadence.String("D"), cadence.String("C"), cadence.String("B"), cadence.String("A")}, dependencies)
+				},
+			)
+		}))
 }

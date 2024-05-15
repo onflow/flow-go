@@ -3,10 +3,12 @@ package environment
 import (
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
+	"github.com/onflow/cadence/runtime/common"
 	"github.com/rs/zerolog"
 	otelTrace "go.opentelemetry.io/otel/trace"
 
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
+	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
@@ -85,6 +87,10 @@ type Environment interface {
 	// Reset resets all stateful environment modules (e.g., ContractUpdater,
 	// EventEmitter) to initial state.
 	Reset()
+
+	GetProgramDependencies() (derived.ProgramDependencies, error)
+
+	CheckDependencies(dependencies []common.AddressLocation, auths []flow.Address) (cadence.Value, error)
 }
 
 type EnvironmentParams struct {
