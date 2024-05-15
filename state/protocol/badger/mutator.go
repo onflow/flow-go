@@ -627,8 +627,8 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 	header := block.Header
 
 	// keep track of metrics updates and protocol events to emit:
-	// * metrics are updated after a successful database update
-	// * protocol events are emitted atomically with the database update
+	//  - metrics are updated after a successful database update
+	//  - protocol events are emitted atomically with the database update
 	var metrics []func()
 	var events []func()
 
@@ -662,18 +662,22 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 
 	// We update metrics and emit protocol events for epoch state changes when
 	// the block corresponding to the state change is finalized
-	psSnapshot, err := m.protocolState.AtBlockID(blockID)
+	parentPsSnapshot, err := m.protocolState.AtBlockID(block.Header.ParentID)
+	if err != nil {
+		return fmt.Errorf("could not retrieve protocol state snapshot for parent: %w", err)
+	}
+	finalizingPsSnapshot, err := m.protocolState.AtBlockID(blockID)
 	if err != nil {
 		return fmt.Errorf("could not retrieve protocol state snapshot: %w", err)
 	}
-	currentEpochSetup := psSnapshot.EpochSetup()
+	currentEpochSetup := finalizingPsSnapshot.EpochSetup()
 	epochFallbackTriggered, err := m.isEpochEmergencyFallbackTriggered()
 	if err != nil {
 		return fmt.Errorf("could not check persisted epoch emergency fallback flag: %w", err)
 	}
 
 	// if epoch fallback was not previously triggered, check whether this block triggers it
-	if !epochFallbackTriggered && psSnapshot.InvalidEpochTransitionAttempted() {
+	if !epochFallbackTriggered && finalizingPsSnapshot.InvalidEpochTransitionAttempted() {
 		epochFallbackTriggered = true
 		// emit the protocol event only the first time epoch fallback is triggered
 		events = append(events, m.consumer.EpochEmergencyFallbackTriggered)
@@ -690,21 +694,21 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 	// If epoch emergency fallback is triggered, the current epoch continues until
 	// the next spork - so skip these updates.
 	if !epochFallbackTriggered {
-		epochPhaseMetrics, epochPhaseEvents, err := m.epochPhaseMetricsAndEventsOnBlockFinalized(block)
+		epochPhaseMetrics, epochPhaseEvents, err := m.epochMetricsAndEventsOnBlockFinalized(parentPsSnapshot, finalizingPsSnapshot, header)
 		if err != nil {
 			return fmt.Errorf("could not determine epoch phase metrics/events for finalized block: %w", err)
 		}
 		metrics = append(metrics, epochPhaseMetrics...)
 		events = append(events, epochPhaseEvents...)
-
-		if isFirstBlockOfEpoch {
-			epochTransitionMetrics, epochTransitionEvents := m.epochTransitionMetricsAndEventsOnBlockFinalized(header, psSnapshot.EpochSetup())
-			if err != nil {
-				return fmt.Errorf("could not determine epoch transition metrics/events for finalized block: %w", err)
-			}
-			metrics = append(metrics, epochTransitionMetrics...)
-			events = append(events, epochTransitionEvents...)
-		}
+		//
+		//if isFirstBlockOfEpoch {
+		//	epochTransitionMetrics, epochTransitionEvents := m.epochTransitionMetricsAndEventsOnBlockFinalized(header, finalizingPsSnapshot.EpochSetup())
+		//	if err != nil {
+		//		return fmt.Errorf("could not determine epoch transition metrics/events for finalized block: %w", err)
+		//	}
+		//	metrics = append(metrics, epochTransitionMetrics...)
+		//	events = append(events, epochTransitionEvents...)
+		//}
 	}
 
 	// Extract and validate version beacon events from the block seals.
@@ -813,6 +817,7 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 // NOTE: There can be multiple (un-finalized) blocks that qualify as the first block of epoch N.
 // No errors are expected during normal operation.
 func (m *FollowerState) isFirstBlockOfEpoch(block *flow.Header, currentEpochSetup *flow.EpochSetup) (bool, error) {
+
 	currentEpochFirstView := currentEpochSetup.FirstView
 	// sanity check: B.View >= W
 	if block.View < currentEpochFirstView {
@@ -858,7 +863,7 @@ func (m *FollowerState) epochTransitionMetricsAndEventsOnBlockFinalized(block *f
 	return
 }
 
-// epochPhaseMetricsAndEventsOnBlockFinalized determines metrics to update and protocol
+// epochMetricsAndEventsOnBlockFinalized determines metrics to update and protocol
 // events to emit. Service Events embedded into an execution result take effect, when the
 // execution result's _seal is finalized_ (i.e. when the block holding a seal for the
 // result is finalized). See also handleEpochServiceEvents for further details. Example:
@@ -870,50 +875,59 @@ func (m *FollowerState) epochTransitionMetricsAndEventsOnBlockFinalized(block *f
 // Suppose an EpochSetup service event is emitted during execution of block A. C seals A, therefore
 // we apply the metrics/events when C is finalized. The first block of the EpochSetup
 // phase is block C.
-// TODO: this should read data from the KVStore/ProtocolStateEntry for the block rather than parsing service events
 //
 // This function should only be called when epoch fallback *has not already been triggered*.
 // No errors are expected during normal operation.
-func (m *FollowerState) epochPhaseMetricsAndEventsOnBlockFinalized(block *flow.Block) (
+func (m *FollowerState) epochMetricsAndEventsOnBlockFinalized(parentPsSnapshot, finalizedPsSnapshot protocol.DynamicProtocolState, finalized *flow.Header) (
 	metrics []func(),
 	events []func(),
 	err error,
 ) {
 
-	// block payload may not specify seals in order, so order them by block height before processing
-	orderedSeals, err := protocol.OrderedSeals(block.Payload.Seals, m.headers)
-	if err != nil {
-		if errors.Is(err, storage.ErrNotFound) {
-			return nil, nil, fmt.Errorf("ordering seals: parent payload contains seals for unknown block: %s", err.Error())
-		}
-		return nil, nil, fmt.Errorf("unexpected error ordering seals: %w", err)
+	parentEpochCounter := parentPsSnapshot.Epoch()
+	childEpochCounter := finalizedPsSnapshot.Epoch()
+	parentEpochPhase := parentPsSnapshot.EpochPhase()
+	childEpochPhase := finalizedPsSnapshot.EpochPhase()
+
+	// Different counter -> must be an epoch transition
+	if parentEpochCounter != childEpochCounter {
+		childEpochSetup := finalizedPsSnapshot.EpochSetup()
+		events = append(events, func() { m.consumer.EpochTransition(childEpochSetup.Counter, finalized) })
+		// set current epoch counter corresponding to new epoch
+		metrics = append(metrics, func() { m.metrics.CurrentEpochCounter(childEpochSetup.Counter) })
+		// denote the most recent epoch transition height
+		metrics = append(metrics, func() { m.metrics.EpochTransitionHeight(finalized.Height) })
+		// set epoch phase - since we are starting a new epoch we begin in the staking phase
+		metrics = append(metrics, func() { m.metrics.CurrentEpochPhase(flow.EpochPhaseStaking) })
+		// set current epoch view values
+		metrics = append(
+			metrics,
+			func() { m.metrics.CurrentEpochFinalView(childEpochSetup.FinalView) },
+			func() { m.metrics.CurrentDKGPhase1FinalView(childEpochSetup.DKGPhase1FinalView) },
+			func() { m.metrics.CurrentDKGPhase2FinalView(childEpochSetup.DKGPhase2FinalView) },
+			func() { m.metrics.CurrentDKGPhase3FinalView(childEpochSetup.DKGPhase3FinalView) },
+		)
+		return
+	}
+	// Same counter and same phase -> nothing to do
+	if parentEpochPhase == childEpochPhase {
+		return
+	}
+	// Transition from Staking phase to Setup phase. `finalized` is first block in Setup phase.
+	if parentEpochPhase == flow.EpochPhaseStaking && childEpochPhase == flow.EpochPhaseSetup {
+		events = append(events, func() { m.metrics.CurrentEpochPhase(flow.EpochPhaseSetup) })
+		events = append(events, func() { m.consumer.EpochSetupPhaseStarted(childEpochCounter, finalized) })
+		return
+	}
+	// Transition from Setup phase to Committed phase. `finalized` is first block in Committed phase.
+	if parentEpochPhase == flow.EpochPhaseSetup && childEpochPhase == flow.EpochPhaseCommitted {
+		events = append(events, func() { m.metrics.CurrentEpochPhase(flow.EpochPhaseCommitted) })
+		events = append(events, func() { m.consumer.EpochCommittedPhaseStarted(childEpochCounter, finalized) })
+		return
 	}
 
-	// track service event driven metrics and protocol events that should be emitted
-	for _, seal := range orderedSeals {
-		result, err := m.results.ByID(seal.ResultID)
-		if err != nil {
-			return nil, nil, fmt.Errorf("could not retrieve result (id=%x) for seal (id=%x): %w", seal.ResultID, seal.ID(), err)
-		}
-		for _, event := range result.ServiceEvents {
-			switch ev := event.Event.(type) {
-			case *flow.EpochSetup:
-				// update current epoch phase
-				events = append(events, func() { m.metrics.CurrentEpochPhase(flow.EpochPhaseSetup) })
-				// track epoch phase transition (staking->setup)
-				events = append(events, func() { m.consumer.EpochSetupPhaseStarted(ev.Counter-1, block.Header) })
-			case *flow.EpochCommit:
-				// update current epoch phase
-				events = append(events, func() { m.metrics.CurrentEpochPhase(flow.EpochPhaseCommitted) })
-				// track epoch phase transition (setup->committed)
-				events = append(events, func() { m.consumer.EpochCommittedPhaseStarted(ev.Counter-1, block.Header) })
-			default:
-				// do nothing
-			}
-		}
-	}
-
-	return
+	return nil, nil, fmt.Errorf("sanity check failed: invalid subsequent [epoch-phase] [%d-%s]->[%d-%s]",
+		parentEpochCounter, parentEpochPhase, childEpochCounter, childEpochPhase)
 }
 
 // versionBeaconOnBlockFinalized extracts and returns the VersionBeacons from the
