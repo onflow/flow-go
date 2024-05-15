@@ -126,19 +126,8 @@ func (setup *EpochSetup) EqualTo(other *EpochSetup) bool {
 // It contains data from EpochSetup, and EpochCommit events to so replicas can create a committed epoch from which they
 // can continue operating on the happy path.
 type EpochRecover struct {
-	Counter            uint64               // the number of the epoch
-	FirstView          uint64               // the first view of the epoch
-	DKGPhase1FinalView uint64               // the final view of DKG phase 1
-	DKGPhase2FinalView uint64               // the final view of DKG phase 2
-	DKGPhase3FinalView uint64               // the final view of DKG phase 3
-	FinalView          uint64               // the final view of the epoch
-	Participants       IdentitySkeletonList // all participants of the epoch in canonical order
-	Assignments        AssignmentList       // cluster assignment for the epoch
-	RandomSource       []byte               // source of randomness for epoch-specific setup tasks
-	TargetDuration     uint64               // desired real-world duration for the epoch [seconds]
-	TargetEndTime      uint64               // desired real-world end time for the epoch in UNIX time [seconds]
-	ClusterQCs         []ClusterQCVoteData  // quorum certificates for each cluster
-	DKGParticipantKeys []crypto.PublicKey   // public keys for DKG participants
+	EpochSetup
+	EpochCommit
 }
 
 func (recover *EpochRecover) ServiceEvent() ServiceEvent {
@@ -154,54 +143,11 @@ func (recover *EpochRecover) ID() Identifier {
 }
 
 func (recover *EpochRecover) EqualTo(other *EpochRecover) bool {
-	if recover.Counter != other.Counter {
+	if !recover.EpochSetup.EqualTo(&other.EpochSetup) {
 		return false
 	}
-	if recover.FirstView != other.FirstView {
+	if !recover.EpochCommit.EqualTo(&other.EpochCommit) {
 		return false
-	}
-	if recover.DKGPhase1FinalView != other.DKGPhase1FinalView {
-		return false
-	}
-	if recover.DKGPhase2FinalView != other.DKGPhase2FinalView {
-		return false
-	}
-	if recover.DKGPhase3FinalView != other.DKGPhase3FinalView {
-		return false
-	}
-	if recover.FinalView != other.FinalView {
-		return false
-	}
-	if recover.TargetDuration != other.TargetDuration {
-		return false
-	}
-	if recover.TargetEndTime != other.TargetEndTime {
-		return false
-	}
-	if !IdentitySkeletonListEqualTo(recover.Participants, other.Participants) {
-		return false
-	}
-	if !recover.Assignments.EqualTo(other.Assignments) {
-		return false
-	}
-	if !bytes.Equal(recover.RandomSource, other.RandomSource) {
-		return false
-	}
-	if len(recover.ClusterQCs) != len(other.ClusterQCs) {
-		return false
-	}
-	for i, qc := range recover.ClusterQCs {
-		if !qc.EqualTo(&other.ClusterQCs[i]) {
-			return false
-		}
-	}
-	if len(recover.DKGParticipantKeys) != len(other.DKGParticipantKeys) {
-		return false
-	}
-	for i, key := range recover.DKGParticipantKeys {
-		if !key.Equals(other.DKGParticipantKeys[i]) {
-			return false
-		}
 	}
 	return true
 }
