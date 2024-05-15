@@ -487,8 +487,8 @@ func newByAccountRegistersFromPayloadAccountGrouping(
 ) {
 	g, ctx := errgroup.WithContext(context.Background())
 
-	jobs := make(chan *util.PayloadAccountGroup)
-	results := make(chan *registers.AccountRegisters)
+	jobs := make(chan *util.PayloadAccountGroup, nWorker)
+	results := make(chan *registers.AccountRegisters, nWorker)
 
 	g.Go(func() error {
 		defer close(jobs)

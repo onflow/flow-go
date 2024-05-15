@@ -95,7 +95,7 @@ func (b *ByAccount) DestructIntoPayloads(nWorker int) []*ledger.Payload {
 
 	var wg sync.WaitGroup
 
-	jobs := make(chan job)
+	jobs := make(chan job, b.AccountCount())
 
 	worker := func() {
 		defer wg.Done()
