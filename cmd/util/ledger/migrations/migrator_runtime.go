@@ -2,6 +2,7 @@ package migrations
 
 import (
 	"fmt"
+	"github.com/onflow/crypto/hash"
 
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
@@ -98,11 +99,16 @@ func (c InterpreterMigrationRuntimeConfig) NewRuntimeInterface(
 
 // NewBasicMigrationRuntime returns a basic runtime for migrations.
 func NewBasicMigrationRuntime(regs registers.Registers) *BasicMigrationRuntime {
-	transactionState := state.NewTransactionState(
-		registers.StorageSnapshot{
-			Registers: regs,
-		},
-		state.DefaultParameters(),
+	transactionState := state.NewTransactionStateFromExecutionState(
+		state.NewExecutionStateWithSpockStateHasher(
+			registers.StorageSnapshot{
+				Registers: regs,
+			},
+			state.DefaultParameters(),
+			func() hash.Hasher {
+				return newDummyHasher(32)
+			},
+		),
 	)
 	accounts := environment.NewAccounts(transactionState)
 
@@ -170,3 +176,13 @@ func NewInterpreterMigrationRuntime(
 		ContractNamesProvider:   env,
 	}, nil
 }
+
+type dummyHasher struct{ size int }
+
+func newDummyHasher(size int) hash.Hasher               { return &dummyHasher{size} }
+func (d *dummyHasher) Algorithm() hash.HashingAlgorithm { return hash.UnknownHashingAlgorithm }
+func (d *dummyHasher) Size() int                        { return d.size }
+func (d *dummyHasher) ComputeHash([]byte) hash.Hash     { return make([]byte, d.size) }
+func (d *dummyHasher) Write([]byte) (int, error)        { return 0, nil }
+func (d *dummyHasher) SumHash() hash.Hash               { return make([]byte, d.size) }
+func (d *dummyHasher) Reset()                           {}

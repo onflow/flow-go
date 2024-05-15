@@ -187,6 +187,21 @@ func NewTransactionState(
 	}
 }
 
+// NewTransactionStateFromExecutionState constructs a new state transaction directly
+// from an execution state.
+func NewTransactionStateFromExecutionState(
+	startState *ExecutionState,
+) NestedTransactionPreparer {
+	return &transactionState{
+		nestedTransactions: []nestedTransactionStackFrame{
+			nestedTransactionStackFrame{
+				ExecutionState:   startState,
+				parseRestriction: nil,
+			},
+		},
+	}
+}
+
 func (txnState *transactionState) current() nestedTransactionStackFrame {
 	return txnState.nestedTransactions[txnState.NumNestedTransactions()]
 }
