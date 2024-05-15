@@ -1009,7 +1009,7 @@ func (exeNode *ExecutionNode) LoadIngestionEngine(
 			return nil, fmt.Errorf("public access node with ID %s is ejected", anID)
 		}
 
-		accessFetcher, err := fetcher.NewAccessCollectionFetcher(anNode.Address, anNode.NodeID, node.RootChainID.Chain())
+		accessFetcher, err := fetcher.NewAccessCollectionFetcher(node.Logger, anNode.Address, anNode.NodeID, node.RootChainID.Chain())
 		if err != nil {
 			return nil, fmt.Errorf("could not create access collection fetcher: %w", err)
 		}
