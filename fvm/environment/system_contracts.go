@@ -280,6 +280,26 @@ func (sys *SystemContracts) AccountsStorageCapacity(
 	)
 }
 
+var checkDependenciesSpec = ContractFunctionSpec{
+	AddressFromChain: ServiceAddress,
+	LocationName:     systemcontracts.ContractNameServiceAccount,
+	FunctionName:     systemcontracts.ContractServiceAccountFunction_checkDependencies,
+	ArgumentTypes: []sema.Type{
+		sema.NewVariableSizedType(
+			nil,
+			&sema.AddressType{},
+		),
+		sema.NewVariableSizedType(
+			nil,
+			sema.StringType,
+		),
+		sema.NewVariableSizedType(
+			nil,
+			&sema.AddressType{},
+		),
+	},
+}
+
 func (sys *SystemContracts) CheckDependencies(
 	dependencies []common.AddressLocation,
 	authorizers []flow.Address,
@@ -298,25 +318,7 @@ func (sys *SystemContracts) CheckDependencies(
 	}
 
 	return sys.Invoke(
-		ContractFunctionSpec{
-			AddressFromChain: ServiceAddress,
-			LocationName:     systemcontracts.ContractNameServiceAccount,
-			FunctionName:     systemcontracts.ContractServiceAccountFunction_checkDependencies,
-			ArgumentTypes: []sema.Type{
-				sema.NewVariableSizedType(
-					nil,
-					&sema.AddressType{},
-				),
-				sema.NewVariableSizedType(
-					nil,
-					sema.StringType,
-				),
-				sema.NewVariableSizedType(
-					nil,
-					&sema.AddressType{},
-				),
-			},
-		},
+		checkDependenciesSpec,
 		[]cadence.Value{
 			cadence.NewArray(dependenciesAddresses),
 			cadence.NewArray(dependenciesNames),
