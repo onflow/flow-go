@@ -27,7 +27,7 @@ require (
 	github.com/onflow/flow-go v0.34.0-crescendo-preview.10-staged-contracts-3.0.20240501031941-53ca114d9c37
 	github.com/onflow/flow-go-sdk v1.0.0-preview.26
 	github.com/onflow/flow-go/insecure v0.0.0-00010101000000-000000000000
-	github.com/onflow/flow/protobuf/go/flow v0.4.1-0.20240412170550-911321113030
+	github.com/onflow/flow/protobuf/go/flow v0.4.3
 	github.com/onflow/go-ethereum v1.13.4
 	github.com/plus3it/gorecurcopy v0.0.1
 	github.com/prometheus/client_golang v1.18.0
@@ -247,7 +247,7 @@ require (
 	github.com/onflow/flow-nft/lib/go/contracts v1.2.0 // indirect
 	github.com/onflow/flow-nft/lib/go/templates v1.2.0 // indirect
 	github.com/onflow/sdks v0.5.1-0.20230912225508-b35402f12bba // indirect
-	github.com/onflow/wal v0.0.0-20240208022732-d756cd497d3b // indirect
+	github.com/onflow/wal v1.0.2 // indirect
 	github.com/onsi/ginkgo/v2 v2.13.2 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.0.2 // indirect

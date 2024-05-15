@@ -53,7 +53,7 @@ require (
 	github.com/onflow/flow-core-contracts/lib/go/contracts v1.0.0
 	github.com/onflow/flow-core-contracts/lib/go/templates v1.0.0
 	github.com/onflow/flow-go-sdk v1.0.0-preview.26
-	github.com/onflow/flow/protobuf/go/flow v0.4.1-0.20240412170550-911321113030
+	github.com/onflow/flow/protobuf/go/flow v0.4.3
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58
 	github.com/pierrec/lz4 v2.6.1+incompatible
 	github.com/pkg/errors v0.9.1
@@ -105,7 +105,7 @@ require (
 	github.com/ipfs/boxo v0.17.1-0.20240131173518-89bceff34bf1
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/onflow/go-ethereum v1.13.4
-	github.com/onflow/wal v0.0.0-20240208022732-d756cd497d3b
+	github.com/onflow/wal v1.0.2
 	github.com/slok/go-http-metrics v0.10.0
 	github.com/sony/gobreaker v0.5.0
 	golang.org/x/xerrors v0.0.0-20231012003039-104605ab7028

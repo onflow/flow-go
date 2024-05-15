@@ -3,21 +3,11 @@ package backend
 import (
 	"context"
 	"fmt"
+	"os"
 	"testing"
 	"time"
 
-	"github.com/onflow/flow/protobuf/go/flow/entities"
-
-	"github.com/onflow/flow-go/engine/common/rpc/convert"
-
-	protocolint "github.com/onflow/flow-go/state/protocol"
-
-	"github.com/onflow/flow-go/engine/access/index"
-
-	"github.com/onflow/flow-go/utils/unittest/mocks"
-
-	syncmock "github.com/onflow/flow-go/module/state_synchronization/mock"
-
+	"github.com/dgraph-io/badger/v2"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -26,16 +16,26 @@ import (
 
 	accessapi "github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/access/index"
 	access "github.com/onflow/flow-go/engine/access/mock"
 	backendmock "github.com/onflow/flow-go/engine/access/rpc/backend/mock"
 	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	subscriptionmock "github.com/onflow/flow-go/engine/access/subscription/mock"
+	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/counters"
 	"github.com/onflow/flow-go/module/metrics"
+	syncmock "github.com/onflow/flow-go/module/state_synchronization/mock"
+	protocolint "github.com/onflow/flow-go/state/protocol"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
+	bstorage "github.com/onflow/flow-go/storage/badger"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/utils/unittest/mocks"
+
+	"github.com/onflow/flow/protobuf/go/flow/entities"
 )
 
 type TransactionStatusSuite struct {
@@ -78,6 +78,10 @@ type TransactionStatusSuite struct {
 	resultsMap map[flow.Identifier]*flow.ExecutionResult
 
 	backend *Backend
+
+	db                  *badger.DB
+	dbDir               string
+	lastFullBlockHeight *counters.PersistentStrictMonotonicCounter
 }
 
 func TestTransactionStatusSuite(t *testing.T) {
@@ -91,6 +95,7 @@ func (s *TransactionStatusSuite) SetupTest() {
 	s.sealedSnapshot = protocol.NewSnapshot(s.T())
 	s.finalSnapshot = protocol.NewSnapshot(s.T())
 	s.tempSnapshot = &protocol.Snapshot{}
+	s.db, s.dbDir = unittest.TempBadgerDB(s.T())
 
 	header := unittest.BlockHeaderFixture()
 
@@ -125,6 +130,13 @@ func (s *TransactionStatusSuite) SetupTest() {
 	s.rootBlock = unittest.BlockFixture()
 	rootResult := unittest.ExecutionResultFixture(unittest.WithBlock(&s.rootBlock))
 	s.resultsMap[s.rootBlock.ID()] = rootResult
+
+	var err error
+	s.lastFullBlockHeight, err = counters.NewPersistentStrictMonotonicCounter(
+		bstorage.NewConsumerProgress(s.db, module.ConsumeProgressLastFullBlockHeight),
+		s.rootBlock.Header.Height,
+	)
+	require.NoError(s.T(), err)
 
 	s.sealedBlock = &s.rootBlock
 	s.finalizedBlock = unittest.BlockWithParentFixture(s.sealedBlock.Header)
@@ -169,14 +181,19 @@ func (s *TransactionStatusSuite) SetupTest() {
 	}, nil)
 
 	backendParams := s.backendParams()
-	err := backendParams.EventsIndex.Initialize(s.reporter)
+	err = backendParams.EventsIndex.Initialize(s.reporter)
 	require.NoError(s.T(), err)
 	err = backendParams.TxResultsIndex.Initialize(s.reporter)
 	require.NoError(s.T(), err)
 
 	s.backend, err = New(backendParams)
 	require.NoError(s.T(), err)
+}
 
+// TearDownTest cleans up the db
+func (s *TransactionStatusSuite) TearDownTest() {
+	err := os.RemoveAll(s.dbDir)
+	s.Require().NoError(err)
 }
 
 // backendParams returns the Params configuration for the backend.
@@ -205,10 +222,11 @@ func (s *TransactionStatusSuite) backendParams() Params {
 			subscription.DefaultResponseLimit,
 			subscription.DefaultSendBufferSize,
 		),
-		TxResultsIndex:    index.NewTransactionResultsIndex(s.transactionResults),
-		EventQueryMode:    IndexQueryModeLocalOnly,
-		TxResultQueryMode: IndexQueryModeLocalOnly,
-		EventsIndex:       index.NewEventsIndex(s.events),
+		TxResultsIndex:      index.NewTransactionResultsIndex(s.transactionResults),
+		EventQueryMode:      IndexQueryModeLocalOnly,
+		TxResultQueryMode:   IndexQueryModeLocalOnly,
+		EventsIndex:         index.NewEventsIndex(s.events),
+		LastFullBlockHeight: s.lastFullBlockHeight,
 	}
 }
 
@@ -345,10 +363,6 @@ func (s *TransactionStatusSuite) TestSubscribeTransactionStatusExpired() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	s.blocks.On("GetLastFullBlockHeight").Return(func() (uint64, error) {
-		return s.sealedBlock.Header.Height, nil
-	}, nil)
-
 	// Generate sent transaction with ref block of the current finalized block
 	transaction := unittest.TransactionFixture()
 	transaction.SetReferenceBlockID(s.finalizedBlock.ID())
@@ -389,6 +403,9 @@ func (s *TransactionStatusSuite) TestSubscribeTransactionStatusExpired() {
 	// Generate final blocks and check transaction expired
 	s.sealedBlock = s.finalizedBlock
 	s.addNewFinalizedBlock(s.sealedBlock.Header, true)
+	err := s.lastFullBlockHeight.Set(s.sealedBlock.Header.Height)
+	s.Require().NoError(err)
+
 	checkNewSubscriptionMessage(sub, flow.TransactionStatusExpired)
 
 	// Ensure subscription shuts down gracefully

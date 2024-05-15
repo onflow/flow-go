@@ -126,7 +126,6 @@ func SystemChunkContext(vmCtx fvm.Context) fvm.Context {
 		fvm.WithAuthorizationChecksEnabled(false),
 		fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
 		fvm.WithTransactionFeesEnabled(false),
-		fvm.WithServiceEventCollectionEnabled(),
 		fvm.WithEventCollectionSizeLimit(SystemChunkEventCollectionMaxSize),
 		fvm.WithMemoryAndInteractionLimitsDisabled(),
 		// only the system transaction is allowed to call the block entropy provider

@@ -20,6 +20,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/counters"
 	"github.com/onflow/flow-go/module/execution"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
@@ -113,9 +114,10 @@ type Params struct {
 	BlockTracker              subscription.BlockTracker
 	SubscriptionHandler       *subscription.SubscriptionHandler
 
-	EventsIndex       *index.EventsIndex
-	TxResultQueryMode IndexQueryMode
-	TxResultsIndex    *index.TransactionResultsIndex
+	EventsIndex         *index.EventsIndex
+	TxResultQueryMode   IndexQueryMode
+	TxResultsIndex      *index.TransactionResultsIndex
+	LastFullBlockHeight *counters.PersistentStrictMonotonicCounter
 }
 
 var _ TransactionErrorMessage = (*Backend)(nil)
@@ -163,12 +165,13 @@ func New(params Params) (*Backend, error) {
 	nodeInfo := getNodeVersionInfo(params.State.Params())
 
 	transactionsLocalDataProvider := &TransactionsLocalDataProvider{
-		state:          params.State,
-		collections:    params.Collections,
-		blocks:         params.Blocks,
-		eventsIndex:    params.EventsIndex,
-		txResultsIndex: params.TxResultsIndex,
-		systemTxID:     systemTxID,
+		state:               params.State,
+		collections:         params.Collections,
+		blocks:              params.Blocks,
+		eventsIndex:         params.EventsIndex,
+		txResultsIndex:      params.TxResultsIndex,
+		systemTxID:          systemTxID,
+		lastFullBlockHeight: params.LastFullBlockHeight,
 	}
 
 	b := &Backend{
