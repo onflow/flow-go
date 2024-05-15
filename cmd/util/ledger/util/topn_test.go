@@ -17,37 +17,46 @@ func TestTopN(t *testing.T) {
 		},
 	)
 
-	topN.Add(5)
+	_, didPop := topN.Add(5)
+	assert.False(t, didPop)
 	assert.ElementsMatch(t,
 		[]int{5},
 		topN.Tree,
 	)
 
-	topN.Add(2)
+	_, didPop = topN.Add(2)
+	assert.False(t, didPop)
 	assert.ElementsMatch(t,
 		[]int{5, 2},
 		topN.Tree,
 	)
 
-	topN.Add(3)
+	_, didPop = topN.Add(3)
+	assert.False(t, didPop)
 	assert.ElementsMatch(t,
 		[]int{5, 3, 2},
 		topN.Tree,
 	)
 
-	topN.Add(3)
+	popped, didPop := topN.Add(3)
+	assert.True(t, didPop)
+	assert.Equal(t, 2, popped)
 	assert.ElementsMatch(t,
 		[]int{5, 3, 3},
 		topN.Tree,
 	)
 
-	topN.Add(1)
+	popped, didPop = topN.Add(1)
+	assert.True(t, didPop)
+	assert.Equal(t, 1, popped)
 	assert.ElementsMatch(t,
 		[]int{5, 3, 3},
 		topN.Tree,
 	)
 
-	topN.Add(4)
+	popped, didPop = topN.Add(4)
+	assert.True(t, didPop)
+	assert.Equal(t, 3, popped)
 	assert.ElementsMatch(t,
 		[]int{5, 4, 3},
 		topN.Tree,
