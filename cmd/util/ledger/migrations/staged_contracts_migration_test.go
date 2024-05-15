@@ -8,31 +8,18 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/onflow/flow-go/cmd/util/ledger/util/snapshot"
-
+	"github.com/onflow/cadence/runtime/interpreter"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/rs/zerolog"
-
+	"github.com/onflow/flow-go/cmd/util/ledger/util/registers"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
-	"github.com/onflow/flow-go/ledger"
-	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/model/flow"
 
 	"github.com/onflow/cadence/runtime/common"
-	"github.com/onflow/cadence/runtime/interpreter"
 )
-
-func newContractPayload(address common.Address, contractName string, contract []byte) *ledger.Payload {
-	return ledger.NewPayload(
-		convert.RegisterIDToLedgerKey(
-			flow.ContractRegisterID(flow.ConvertAddress(address), contractName),
-		),
-		contract,
-	)
-}
 
 type logWriter struct {
 	logs           []string
@@ -52,6 +39,23 @@ func (l *logWriter) Write(bytes []byte) (int, error) {
 
 	l.logs = append(l.logs, logStr)
 	return len(bytes), nil
+}
+
+func registersForStagedContracts(stagedContracts ...StagedContract) (*registers.ByAccount, error) {
+	registersByAccount := registers.NewByAccount()
+
+	for _, stagedContract := range stagedContracts {
+		err := registersByAccount.Set(
+			string(stagedContract.Address[:]),
+			flow.ContractKey(stagedContract.Name),
+			stagedContract.Code,
+		)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return registersByAccount, nil
 }
 
 func TestStagedContractsMigration(t *testing.T) {
@@ -74,11 +78,11 @@ func TestStagedContractsMigration(t *testing.T) {
 
 		stagedContracts := []StagedContract{
 			{
+				Address: common.Address(address1),
 				Contract: Contract{
 					Name: "A",
 					Code: []byte(newCode),
 				},
-				Address: common.Address(address1),
 			},
 		}
 
@@ -95,15 +99,28 @@ func TestStagedContractsMigration(t *testing.T) {
 		migration := NewStagedContractsMigration("test", "test", log, rwf, options).
 			WithStagedContractUpdates(stagedContracts)
 
-		err := migration.InitMigration(log, nil, 0)
+		registersByAccount, err := registersForStagedContracts(
+			StagedContract{
+				Address: common.Address(address1),
+				Contract: Contract{
+					Name: "A",
+					Code: []byte(oldCode),
+				},
+			},
+		)
 		require.NoError(t, err)
 
-		payloads, err := migration.MigrateAccount(
+		err = migration.InitMigration(log, registersByAccount, 1)
+		require.NoError(t, err)
+
+		owner1 := string(address1[:])
+
+		accountRegisters1 := registersByAccount.AccountRegisters(owner1)
+
+		err = migration.MigrateAccount(
 			context.Background(),
 			common.Address(address1),
-			[]*ledger.Payload{
-				newContractPayload(common.Address(address1), "A", []byte(oldCode)),
-			},
+			accountRegisters1,
 		)
 		require.NoError(t, err)
 
@@ -112,8 +129,10 @@ func TestStagedContractsMigration(t *testing.T) {
 
 		require.Empty(t, logWriter.logs)
 
-		require.Len(t, payloads, 1)
-		require.Equal(t, newCode, string(payloads[0].Value()))
+		// Registers should have the new code
+		require.Equal(t, 1, registersByAccount.AccountCount())
+		require.Equal(t, 1, accountRegisters1.Count())
+		require.Equal(t, newCode, contractCode(t, registersByAccount, owner1, "A"))
 	})
 
 	t.Run("syntax error in new code", func(t *testing.T) {
@@ -124,11 +143,11 @@ func TestStagedContractsMigration(t *testing.T) {
 
 		stagedContracts := []StagedContract{
 			{
+				Address: common.Address(address1),
 				Contract: Contract{
 					Name: "A",
 					Code: []byte(newCode),
 				},
-				Address: common.Address(address1),
 			},
 		}
 
@@ -146,15 +165,28 @@ func TestStagedContractsMigration(t *testing.T) {
 			WithContractUpdateValidation()
 		migration.WithStagedContractUpdates(stagedContracts)
 
-		err := migration.InitMigration(log, nil, 0)
+		registersByAccount, err := registersForStagedContracts(
+			StagedContract{
+				Address: common.Address(address1),
+				Contract: Contract{
+					Name: "A",
+					Code: []byte(oldCode),
+				},
+			},
+		)
 		require.NoError(t, err)
 
-		payloads, err := migration.MigrateAccount(
+		err = migration.InitMigration(log, registersByAccount, 1)
+		require.NoError(t, err)
+
+		owner1 := string(address1[:])
+
+		accountRegisters1 := registersByAccount.AccountRegisters(owner1)
+
+		err = migration.MigrateAccount(
 			context.Background(),
 			common.Address(address1),
-			[]*ledger.Payload{
-				newContractPayload(common.Address(address1), "A", []byte(oldCode)),
-			},
+			accountRegisters1,
 		)
 		require.NoError(t, err)
 
@@ -164,9 +196,10 @@ func TestStagedContractsMigration(t *testing.T) {
 		require.Len(t, logWriter.logs, 1)
 		require.Contains(t, logWriter.logs[0], `error: expected token '{'`)
 
-		// Payloads should still have the old code
-		require.Len(t, payloads, 1)
-		require.Equal(t, oldCode, string(payloads[0].Value()))
+		// Registers should still have the old code
+		require.Equal(t, 1, registersByAccount.AccountCount())
+		require.Equal(t, 1, accountRegisters1.Count())
+		require.Equal(t, oldCode, contractCode(t, registersByAccount, owner1, "A"))
 	})
 
 	t.Run("syntax error in old code", func(t *testing.T) {
@@ -177,11 +210,11 @@ func TestStagedContractsMigration(t *testing.T) {
 
 		stagedContracts := []StagedContract{
 			{
+				Address: common.Address(address1),
 				Contract: Contract{
 					Name: "A",
 					Code: []byte(newCode),
 				},
-				Address: common.Address(address1),
 			},
 		}
 
@@ -199,15 +232,28 @@ func TestStagedContractsMigration(t *testing.T) {
 			WithContractUpdateValidation().
 			WithStagedContractUpdates(stagedContracts)
 
-		err := migration.InitMigration(log, nil, 0)
+		registersByAccount, err := registersForStagedContracts(
+			StagedContract{
+				Address: common.Address(address1),
+				Contract: Contract{
+					Name: "A",
+					Code: []byte(oldCode),
+				},
+			},
+		)
 		require.NoError(t, err)
 
-		payloads, err := migration.MigrateAccount(
+		err = migration.InitMigration(log, registersByAccount, 1)
+		require.NoError(t, err)
+
+		owner1 := string(address1[:])
+
+		accountRegisters1 := registersByAccount.AccountRegisters(owner1)
+
+		err = migration.MigrateAccount(
 			context.Background(),
 			common.Address(address1),
-			[]*ledger.Payload{
-				newContractPayload(common.Address(address1), "A", []byte(oldCode)),
-			},
+			accountRegisters1,
 		)
 		require.NoError(t, err)
 
@@ -217,9 +263,10 @@ func TestStagedContractsMigration(t *testing.T) {
 		require.Len(t, logWriter.logs, 1)
 		require.Contains(t, logWriter.logs[0], `error: expected token '}'`)
 
-		// Payloads should still have the old code
-		require.Len(t, payloads, 1)
-		require.Equal(t, oldCode, string(payloads[0].Value()))
+		// Registers should still have the old code
+		require.Equal(t, 1, registersByAccount.AccountCount())
+		require.Equal(t, 1, accountRegisters1.Count())
+		require.Equal(t, oldCode, contractCode(t, registersByAccount, owner1, "A"))
 	})
 
 	t.Run("one fail, one success", func(t *testing.T) {
@@ -233,18 +280,18 @@ func TestStagedContractsMigration(t *testing.T) {
 
 		stagedContracts := []StagedContract{
 			{
+				Address: common.Address(address1),
 				Contract: Contract{
 					Name: "A",
 					Code: []byte(newCode1),
 				},
-				Address: common.Address(address1),
 			},
 			{
+				Address: common.Address(address1),
 				Contract: Contract{
 					Name: "B",
 					Code: []byte(newCode2),
 				},
-				Address: common.Address(address1),
 			},
 		}
 
@@ -266,16 +313,35 @@ func TestStagedContractsMigration(t *testing.T) {
 			WithContractUpdateValidation().
 			WithStagedContractUpdates(stagedContracts)
 
-		err := migration.InitMigration(log, nil, 0)
+		registersByAccount, err := registersForStagedContracts(
+			StagedContract{
+				Address: common.Address(address1),
+				Contract: Contract{
+					Name: "A",
+					Code: []byte(oldCode1),
+				},
+			},
+			StagedContract{
+				Address: common.Address(address1),
+				Contract: Contract{
+					Name: "B",
+					Code: []byte(oldCode2),
+				},
+			},
+		)
 		require.NoError(t, err)
 
-		payloads, err := migration.MigrateAccount(
+		err = migration.InitMigration(log, registersByAccount, 1)
+		require.NoError(t, err)
+
+		owner1 := string(address1[:])
+
+		accountRegisters1 := registersByAccount.AccountRegisters(owner1)
+
+		err = migration.MigrateAccount(
 			context.Background(),
 			common.Address(address1),
-			[]*ledger.Payload{
-				newContractPayload(common.Address(address1), "A", []byte(oldCode1)),
-				newContractPayload(common.Address(address1), "B", []byte(oldCode2)),
-			},
+			accountRegisters1,
 		)
 		require.NoError(t, err)
 
@@ -286,31 +352,29 @@ func TestStagedContractsMigration(t *testing.T) {
 		require.Contains(t, logWriter.logs[0], `{"level":"info","message":"total of 2 staged contracts are provided externally"}`)
 		require.Contains(t, logWriter.logs[1], `error: expected token '{'`)
 
-		require.Len(t, payloads, 2)
-		// First payload should still have the old code
-		require.Equal(t, oldCode1, string(payloads[0].Value()))
-		// Second payload should have the updated code
-		require.Equal(t, newCode2, string(payloads[1].Value()))
+		require.Equal(t, 1, registersByAccount.AccountCount())
+		require.Equal(t, 2, accountRegisters1.Count())
+		// First register should still have the old code
+		require.Equal(t, oldCode1, contractCode(t, registersByAccount, owner1, "A"))
+		// Second register should have the updated code
+		require.Equal(t, newCode2, contractCode(t, registersByAccount, owner1, "B"))
 
 		reportWriter := rwf.reportWriters[reporterName]
-		require.Len(t, reportWriter.entries, 2)
-		assert.Equal(
+		require.NotNil(t, reportWriter)
+		assert.ElementsMatch(
 			t,
-			contractUpdateFailureEntry{
-				AccountAddress: common.Address(address1),
-				ContractName:   "A",
-				Error:          "error: expected token '{'\n --> f8d6e0586b0a20c7.A:1:46\n  |\n1 | access(all) contract A { access(all) struct C () }\n  |                                               ^\n",
+			[]any{
+				contractUpdateFailureEntry{
+					AccountAddress: common.Address(address1),
+					ContractName:   "A",
+					Error:          "error: expected token '{'\n --> f8d6e0586b0a20c7.A:1:46\n  |\n1 | access(all) contract A { access(all) struct C () }\n  |                                               ^\n",
+				},
+				contractUpdateEntry{
+					AccountAddress: common.Address(address1),
+					ContractName:   "B",
+				},
 			},
-			reportWriter.entries[0],
-		)
-
-		assert.Equal(
-			t,
-			contractUpdateEntry{
-				AccountAddress: common.Address(address1),
-				ContractName:   "B",
-			},
-			reportWriter.entries[1],
+			reportWriter.entries,
 		)
 	})
 
@@ -322,11 +386,11 @@ func TestStagedContractsMigration(t *testing.T) {
 
 		stagedContracts := []StagedContract{
 			{
+				Address: common.Address(address2),
 				Contract: Contract{
 					Name: "A",
 					Code: []byte(newCode),
 				},
-				Address: common.Address(address2),
 			},
 		}
 
@@ -344,39 +408,58 @@ func TestStagedContractsMigration(t *testing.T) {
 		migration := NewStagedContractsMigration("test", reporterName, log, rwf, options).
 			WithStagedContractUpdates(stagedContracts)
 
-		err := migration.InitMigration(log, nil, 0)
+		registersByAccount, err := registersForStagedContracts(
+			StagedContract{
+				Address: common.Address(address1),
+				Contract: Contract{
+					Name: "A",
+					Code: []byte(oldCode),
+				},
+			},
+			StagedContract{
+				Address: common.Address(address2),
+				Contract: Contract{
+					Name: "A",
+					Code: []byte(oldCode),
+				},
+			},
+		)
 		require.NoError(t, err)
 
-		payloads1 := []*ledger.Payload{
-			newContractPayload(common.Address(address1), "A", []byte(oldCode)),
-		}
-		payloads2 := []*ledger.Payload{
-			newContractPayload(common.Address(address2), "A", []byte(oldCode)),
-		}
+		err = migration.InitMigration(log, registersByAccount, 1)
+		require.NoError(t, err)
 
 		// Run migration for account 1,
 		// There are no staged updates for contracts in account 1.
 		// So codes should not have been updated.
-		payloads1, err = migration.MigrateAccount(
+
+		owner1 := string(address1[:])
+		accountRegisters1 := registersByAccount.AccountRegisters(owner1)
+
+		err = migration.MigrateAccount(
 			context.Background(),
 			common.Address(address1),
-			payloads1,
+			accountRegisters1,
 		)
 		require.NoError(t, err)
-		require.Len(t, payloads1, 1)
-		require.Equal(t, oldCode, string(payloads1[0].Value()))
+		require.Equal(t, 1, accountRegisters1.Count())
+		require.Equal(t, oldCode, contractCode(t, registersByAccount, owner1, "A"))
 
 		// Run migration for account 2
 		// There is one staged update for contracts in account 2.
-		// So one payload/contract-code should be updated, and the other should remain the same.
-		payloads2, err = migration.MigrateAccount(
+		// So one register/contract-code should be updated, and the other should remain the same.
+
+		owner2 := string(address2[:])
+		accountRegisters2 := registersByAccount.AccountRegisters(owner2)
+
+		err = migration.MigrateAccount(
 			context.Background(),
 			common.Address(address2),
-			payloads2,
+			accountRegisters2,
 		)
 		require.NoError(t, err)
-		require.Len(t, payloads2, 1)
-		require.Equal(t, newCode, string(payloads2[0].Value()))
+		require.Equal(t, 1, accountRegisters2.Count())
+		require.Equal(t, newCode, contractCode(t, registersByAccount, owner2, "A"))
 
 		err = migration.Close()
 		require.NoError(t, err)
@@ -385,6 +468,7 @@ func TestStagedContractsMigration(t *testing.T) {
 		require.Empty(t, logWriter.logs)
 
 		reportWriter := rwf.reportWriters[reporterName]
+		require.NotNil(t, reportWriter)
 		require.Len(t, reportWriter.entries, 1)
 		assert.Equal(
 			t,
@@ -405,18 +489,18 @@ func TestStagedContractsMigration(t *testing.T) {
 
 		stagedContracts := []StagedContract{
 			{
+				Address: common.Address(address1),
 				Contract: Contract{
 					Name: "A",
 					Code: []byte(update1),
 				},
-				Address: common.Address(address1),
 			},
 			{
+				Address: common.Address(address1),
 				Contract: Contract{
 					Name: "A",
 					Code: []byte(update2),
 				},
-				Address: common.Address(address1),
 			},
 		}
 
@@ -433,15 +517,27 @@ func TestStagedContractsMigration(t *testing.T) {
 		migration := NewStagedContractsMigration("test", "test", log, rwf, options).
 			WithStagedContractUpdates(stagedContracts)
 
-		err := migration.InitMigration(log, nil, 0)
+		registersByAccount, err := registersForStagedContracts(
+			StagedContract{
+				Address: common.Address(address1),
+				Contract: Contract{
+					Name: "A",
+					Code: []byte(oldCode),
+				},
+			},
+		)
 		require.NoError(t, err)
 
-		payloads, err := migration.MigrateAccount(
+		err = migration.InitMigration(log, registersByAccount, 1)
+		require.NoError(t, err)
+
+		owner1 := string(address1[:])
+		accountRegisters1 := registersByAccount.AccountRegisters(owner1)
+
+		err = migration.MigrateAccount(
 			context.Background(),
 			common.Address(address1),
-			[]*ledger.Payload{
-				newContractPayload(common.Address(address1), "A", []byte(oldCode)),
-			},
+			accountRegisters1,
 		)
 		require.NoError(t, err)
 
@@ -455,8 +551,9 @@ func TestStagedContractsMigration(t *testing.T) {
 			`existing staged update found`,
 		)
 
-		require.Len(t, payloads, 1)
-		require.Equal(t, update2, string(payloads[0].Value()))
+		require.Equal(t, 1, registersByAccount.AccountCount())
+		require.Equal(t, 1, accountRegisters1.Count())
+		require.Equal(t, update2, contractCode(t, registersByAccount, owner1, "A"))
 	})
 
 	t.Run("missing old contract", func(t *testing.T) {
@@ -466,11 +563,11 @@ func TestStagedContractsMigration(t *testing.T) {
 
 		stagedContracts := []StagedContract{
 			{
+				Address: common.Address(address1),
 				Contract: Contract{
 					Name: "A",
 					Code: []byte(newCode),
 				},
-				Address: common.Address(address1),
 			},
 		}
 
@@ -487,21 +584,26 @@ func TestStagedContractsMigration(t *testing.T) {
 		migration := NewStagedContractsMigration("test", "test", log, rwf, options).
 			WithStagedContractUpdates(stagedContracts)
 
-		err := migration.InitMigration(log, nil, 0)
+		// NOTE: no payloads
+		registersByAccount := registers.NewByAccount()
+
+		err := migration.InitMigration(log, registersByAccount, 1)
 		require.NoError(t, err)
 
-		// NOTE: no payloads
-		_, err = migration.MigrateAccount(
+		owner1 := string(address1[:])
+		accountRegisters1 := registersByAccount.AccountRegisters(owner1)
+
+		err = migration.MigrateAccount(
 			context.Background(),
 			common.Address(address1),
-			nil,
+			accountRegisters1,
 		)
 		require.NoError(t, err)
 
 		require.Len(t, logWriter.logs, 1)
 		assert.Contains(t,
 			logWriter.logs[0],
-			`"failed to find all contract registers that need to be changed for address"`,
+			"missing old code for contract",
 		)
 	})
 
@@ -518,110 +620,106 @@ func TestStagedContractsMigration(t *testing.T) {
 
 		stagingAccountAddress := common.Address(flow.HexToAddress("0x2ceae959ed1a7e7a"))
 
-		createStagedContractPayloads := func() []*ledger.Payload {
-			// Create account status payload
-			accountStatus := environment.NewAccountStatus()
-			accountStatusPayload := ledger.NewPayload(
-				convert.RegisterIDToLedgerKey(
-					flow.AccountStatusRegisterID(flow.ConvertAddress(stagingAccountAddress)),
-				),
-				accountStatus.ToBytes(),
-			)
+		registersByAccount := registers.NewByAccount()
 
-			mr, err := NewMigratorRuntime(
-				zerolog.Nop(),
-				[]*ledger.Payload{
-					accountStatusPayload,
+		// Create account status register
+		accountStatus := environment.NewAccountStatus()
+
+		err = registersByAccount.Set(
+			string(stagingAccountAddress[:]),
+			flow.AccountStatusKey,
+			accountStatus.ToBytes(),
+		)
+		require.NoError(t, err)
+
+		mr, err := NewInterpreterMigrationRuntime(
+			registersByAccount,
+			chainID,
+			InterpreterMigrationRuntimeConfig{},
+		)
+		require.NoError(t, err)
+
+		// Create new storage map
+		domain := common.PathDomainStorage.Identifier()
+		storageMap := mr.Storage.GetStorageMap(stagingAccountAddress, domain, true)
+
+		contractUpdateValue := interpreter.NewCompositeValue(
+			mr.Interpreter,
+			interpreter.EmptyLocationRange,
+			common.AddressLocation{
+				Address: stagingAccountAddress,
+				Name:    "MigrationContractStaging",
+			},
+			"MigrationContractStaging.ContractUpdate",
+			common.CompositeKindStructure,
+			[]interpreter.CompositeField{
+				{
+					Name:  "address",
+					Value: interpreter.AddressValue(accountAddress),
 				},
-				chainID,
-				MigratorRuntimeConfig{},
-				snapshot.SmallChangeSetSnapshot,
-				2,
-			)
-			require.NoError(t, err)
-
-			// Create new storage map
-			domain := common.PathDomainStorage.Identifier()
-			storageMap := mr.Storage.GetStorageMap(stagingAccountAddress, domain, true)
-
-			contractUpdateValue := interpreter.NewCompositeValue(
-				mr.Interpreter,
-				interpreter.EmptyLocationRange,
-				common.AddressLocation{
-					Address: stagingAccountAddress,
-					Name:    "MigrationContractStaging",
+				{
+					Name:  "name",
+					Value: interpreter.NewUnmeteredStringValue("A"),
 				},
-				"MigrationContractStaging.ContractUpdate",
-				common.CompositeKindStructure,
-				[]interpreter.CompositeField{
-					{
-						Name:  "address",
-						Value: interpreter.AddressValue(accountAddress),
-					},
-					{
-						Name:  "name",
-						Value: interpreter.NewUnmeteredStringValue("A"),
-					},
-					{
-						Name:  "code",
-						Value: interpreter.NewUnmeteredStringValue(newCode),
-					},
+				{
+					Name:  "code",
+					Value: interpreter.NewUnmeteredStringValue(newCode),
 				},
-				stagingAccountAddress,
-			)
+			},
+			stagingAccountAddress,
+		)
 
-			capsuleValue := interpreter.NewCompositeValue(
-				mr.Interpreter,
-				interpreter.EmptyLocationRange,
-				common.AddressLocation{
-					Address: stagingAccountAddress,
-					Name:    "MigrationContractStaging",
+		capsuleValue := interpreter.NewCompositeValue(
+			mr.Interpreter,
+			interpreter.EmptyLocationRange,
+			common.AddressLocation{
+				Address: stagingAccountAddress,
+				Name:    "MigrationContractStaging",
+			},
+			"MigrationContractStaging.Capsule",
+			common.CompositeKindResource,
+			[]interpreter.CompositeField{
+				{
+					Name:  "update",
+					Value: contractUpdateValue,
 				},
-				"MigrationContractStaging.Capsule",
-				common.CompositeKindResource,
-				[]interpreter.CompositeField{
-					{
-						Name:  "update",
-						Value: contractUpdateValue,
-					},
-				},
-				stagingAccountAddress,
-			)
+			},
+			stagingAccountAddress,
+		)
 
-			// Write the staged contract capsule value.
-			storageMap.WriteValue(
-				mr.Interpreter,
-				interpreter.StringStorageMapKey("MigrationContractStagingCapsule_some_random_suffix"),
-				capsuleValue,
-			)
+		// Write the staged contract capsule value.
+		storageMap.WriteValue(
+			mr.Interpreter,
+			interpreter.StringStorageMapKey("MigrationContractStagingCapsule_some_random_suffix"),
+			capsuleValue,
+		)
 
-			// Write some random values as well.
-			storageMap.WriteValue(
-				mr.Interpreter,
-				interpreter.StringStorageMapKey("some_key"),
-				interpreter.NewUnmeteredStringValue("Also in the same account"),
-			)
+		// Write some random values as well.
+		storageMap.WriteValue(
+			mr.Interpreter,
+			interpreter.StringStorageMapKey("some_key"),
+			interpreter.NewUnmeteredStringValue("Also in the same account"),
+		)
 
-			storageMap.WriteValue(
-				mr.Interpreter,
-				interpreter.StringStorageMapKey("MigrationContractStagingCapsule_some_garbage_value"),
-				interpreter.NewUnmeteredStringValue("Also in the same storage path prefix"),
-			)
+		storageMap.WriteValue(
+			mr.Interpreter,
+			interpreter.StringStorageMapKey("MigrationContractStagingCapsule_some_garbage_value"),
+			interpreter.NewUnmeteredStringValue("Also in the same storage path prefix"),
+		)
 
-			err = mr.Storage.Commit(mr.Interpreter, false)
-			require.NoError(t, err)
+		err = mr.Storage.Commit(mr.Interpreter, false)
+		require.NoError(t, err)
 
-			result, err := mr.TransactionState.FinalizeMainTransaction()
-			require.NoError(t, err)
+		result, err := mr.TransactionState.FinalizeMainTransaction()
+		require.NoError(t, err)
 
-			payloads := make([]*ledger.Payload, 0, len(result.WriteSet))
-			for id, value := range result.WriteSet {
-				key := convert.RegisterIDToLedgerKey(id)
-				payloads = append(payloads, ledger.NewPayload(key, value))
-			}
-
-			return payloads
-		}
+		err = registers.ApplyChanges(
+			registersByAccount,
+			result.WriteSet,
+			nil,
+			zerolog.Nop(),
+		)
+		require.NoError(t, err)
 
 		logWriter := &logWriter{
 			enableInfoLogs: true,
@@ -640,20 +738,24 @@ func TestStagedContractsMigration(t *testing.T) {
 
 		migration := NewStagedContractsMigration("test", "test", log, rwf, options)
 
-		accountPayloads := []*ledger.Payload{
-			newContractPayload(common.Address(accountAddress), "A", []byte(oldCode)),
-		}
+		accountOwner := string(accountAddress[:])
 
-		allPayloads := createStagedContractPayloads()
-		allPayloads = append(allPayloads, accountPayloads...)
-
-		err = migration.InitMigration(log, allPayloads, 0)
+		err = registersByAccount.Set(
+			accountOwner,
+			flow.ContractKey("A"),
+			[]byte(oldCode),
+		)
 		require.NoError(t, err)
 
-		payloads, err := migration.MigrateAccount(
+		err = migration.InitMigration(log, registersByAccount, 1)
+		require.NoError(t, err)
+
+		accountRegisters := registersByAccount.AccountRegisters(accountOwner)
+
+		err = migration.MigrateAccount(
 			context.Background(),
 			common.Address(accountAddress),
-			accountPayloads,
+			accountRegisters,
 		)
 		require.NoError(t, err)
 
@@ -661,14 +763,20 @@ func TestStagedContractsMigration(t *testing.T) {
 		require.NoError(t, err)
 
 		require.Len(t, logWriter.logs, 4)
-		require.Contains(t, logWriter.logs[0], "found 6 payloads in account 0x2ceae959ed1a7e7a")
+		require.Contains(t, logWriter.logs[0], "found 6 registers in account 0x2ceae959ed1a7e7a")
 		require.Contains(t, logWriter.logs[1], "found a value with an unexpected type `String`")
 		require.Contains(t, logWriter.logs[2], "found 1 staged contracts from payloads")
 		require.Contains(t, logWriter.logs[3], "total of 1 unique contracts are staged for all accounts")
 
-		require.Len(t, payloads, 1)
-		require.Equal(t, newCode, string(payloads[0].Value()))
+		require.Equal(t, 1, accountRegisters.Count())
+		require.Equal(t, newCode, contractCode(t, registersByAccount, accountOwner, "A"))
 	})
+}
+
+func contractCode(t *testing.T, registersByAccount *registers.ByAccount, owner, contractName string) string {
+	code, err := registersByAccount.Get(owner, flow.ContractKey(contractName))
+	require.NoError(t, err)
+	return string(code)
 }
 
 func TestStagedContractsWithImports(t *testing.T) {
@@ -713,18 +821,18 @@ func TestStagedContractsWithImports(t *testing.T) {
 
 		stagedContracts := []StagedContract{
 			{
+				Address: common.Address(address1),
 				Contract: Contract{
 					Name: "A",
 					Code: []byte(newCodeA),
 				},
-				Address: common.Address(address1),
 			},
 			{
+				Address: common.Address(address2),
 				Contract: Contract{
 					Name: "B",
 					Code: []byte(newCodeB),
 				},
-				Address: common.Address(address2),
 			},
 		}
 
@@ -741,27 +849,44 @@ func TestStagedContractsWithImports(t *testing.T) {
 		migration := NewStagedContractsMigration("test", "test", log, rwf, options).
 			WithStagedContractUpdates(stagedContracts)
 
-		err := migration.InitMigration(log, nil, 0)
-		require.NoError(t, err)
-
-		payloads1 := []*ledger.Payload{
-			newContractPayload(common.Address(address1), "A", []byte(oldCodeA)),
-		}
-		payloads2 := []*ledger.Payload{
-			newContractPayload(common.Address(address2), "B", []byte(oldCodeB)),
-		}
-
-		payloads1, err = migration.MigrateAccount(
-			context.Background(),
-			common.Address(address1),
-			payloads1,
+		registersByAccount, err := registersForStagedContracts(
+			StagedContract{
+				Address: common.Address(address1),
+				Contract: Contract{
+					Name: "A",
+					Code: []byte(oldCodeA),
+				},
+			},
+			StagedContract{
+				Address: common.Address(address2),
+				Contract: Contract{
+					Name: "B",
+					Code: []byte(oldCodeB),
+				},
+			},
 		)
 		require.NoError(t, err)
 
-		payloads2, err = migration.MigrateAccount(
+		err = migration.InitMigration(log, registersByAccount, 1)
+		require.NoError(t, err)
+
+		owner1 := string(address1[:])
+		accountRegisters1 := registersByAccount.AccountRegisters(owner1)
+
+		err = migration.MigrateAccount(
+			context.Background(),
+			common.Address(address1),
+			accountRegisters1,
+		)
+		require.NoError(t, err)
+
+		owner2 := string(address2[:])
+		accountRegisters2 := registersByAccount.AccountRegisters(owner2)
+
+		err = migration.MigrateAccount(
 			context.Background(),
 			common.Address(address2),
-			payloads2,
+			accountRegisters2,
 		)
 		require.NoError(t, err)
 
@@ -770,11 +895,11 @@ func TestStagedContractsWithImports(t *testing.T) {
 
 		require.Empty(t, logWriter.logs)
 
-		require.Len(t, payloads1, 1)
-		assert.Equal(t, newCodeA, string(payloads1[0].Value()))
+		require.Equal(t, 1, accountRegisters1.Count())
+		assert.Equal(t, newCodeA, contractCode(t, registersByAccount, owner1, "A"))
 
-		require.Len(t, payloads2, 1)
-		assert.Equal(t, newCodeB, string(payloads2[0].Value()))
+		require.Equal(t, 1, accountRegisters2.Count())
+		assert.Equal(t, newCodeB, contractCode(t, registersByAccount, owner2, "B"))
 	})
 
 	t.Run("broken import, no update staged", func(t *testing.T) {
@@ -802,11 +927,11 @@ func TestStagedContractsWithImports(t *testing.T) {
 
 		stagedContracts := []StagedContract{
 			{
+				Address: common.Address(address1),
 				Contract: Contract{
 					Name: "A",
 					Code: []byte(newCodeA),
 				},
-				Address: common.Address(address1),
 			},
 		}
 
@@ -824,27 +949,44 @@ func TestStagedContractsWithImports(t *testing.T) {
 			WithContractUpdateValidation().
 			WithStagedContractUpdates(stagedContracts)
 
-		err := migration.InitMigration(log, nil, 0)
-		require.NoError(t, err)
-
-		payloads1 := []*ledger.Payload{
-			newContractPayload(common.Address(address1), "A", []byte(oldCodeA)),
-		}
-		payloads2 := []*ledger.Payload{
-			newContractPayload(common.Address(address2), "B", []byte(oldCodeB)),
-		}
-
-		payloads1, err = migration.MigrateAccount(
-			context.Background(),
-			common.Address(address1),
-			payloads1,
+		registersByAccount, err := registersForStagedContracts(
+			StagedContract{
+				Address: common.Address(address1),
+				Contract: Contract{
+					Name: "A",
+					Code: []byte(oldCodeA),
+				},
+			},
+			StagedContract{
+				Address: common.Address(address2),
+				Contract: Contract{
+					Name: "B",
+					Code: []byte(oldCodeB),
+				},
+			},
 		)
 		require.NoError(t, err)
 
-		payloads2, err = migration.MigrateAccount(
+		err = migration.InitMigration(log, registersByAccount, 1)
+		require.NoError(t, err)
+
+		owner1 := string(address1[:])
+		accountRegisters1 := registersByAccount.AccountRegisters(owner1)
+
+		err = migration.MigrateAccount(
+			context.Background(),
+			common.Address(address1),
+			accountRegisters1,
+		)
+		require.NoError(t, err)
+
+		owner2 := string(address2[:])
+		accountRegisters2 := registersByAccount.AccountRegisters(owner2)
+
+		err = migration.MigrateAccount(
 			context.Background(),
 			common.Address(address2),
-			payloads2,
+			accountRegisters2,
 		)
 		require.NoError(t, err)
 
@@ -855,15 +997,15 @@ func TestStagedContractsWithImports(t *testing.T) {
 		require.Contains(
 			t,
 			logWriter.logs[0],
-			"cannot find declaration `B` in `ee82856bf20e2aa6.B`",
+			"`pub` is no longer a valid access keyword",
 		)
 
-		// Payloads should be the old ones
-		require.Len(t, payloads1, 1)
-		assert.Equal(t, oldCodeA, string(payloads1[0].Value()))
+		// Registers should be the old ones
+		require.Equal(t, 1, accountRegisters1.Count())
+		assert.Equal(t, oldCodeA, contractCode(t, registersByAccount, owner1, "A"))
 
-		require.Len(t, payloads2, 1)
-		assert.Equal(t, oldCodeB, string(payloads2[0].Value()))
+		require.Equal(t, 1, accountRegisters2.Count())
+		assert.Equal(t, oldCodeB, contractCode(t, registersByAccount, owner2, "B"))
 	})
 
 	t.Run("broken import ", func(t *testing.T) {
@@ -893,18 +1035,18 @@ func TestStagedContractsWithImports(t *testing.T) {
 
 		stagedContracts := []StagedContract{
 			{
+				Address: common.Address(address1),
 				Contract: Contract{
 					Name: "A",
 					Code: []byte(newCodeA),
 				},
-				Address: common.Address(address1),
 			},
 			{
+				Address: common.Address(address2),
 				Contract: Contract{
 					Name: "B",
 					Code: []byte(newCodeB),
 				},
-				Address: common.Address(address2),
 			},
 		}
 
@@ -922,27 +1064,44 @@ func TestStagedContractsWithImports(t *testing.T) {
 			WithContractUpdateValidation().
 			WithStagedContractUpdates(stagedContracts)
 
-		err := migration.InitMigration(log, nil, 0)
-		require.NoError(t, err)
-
-		payloads1 := []*ledger.Payload{
-			newContractPayload(common.Address(address1), "A", []byte(oldCodeA)),
-		}
-		payloads2 := []*ledger.Payload{
-			newContractPayload(common.Address(address2), "B", []byte(oldCodeB)),
-		}
-
-		payloads1, err = migration.MigrateAccount(
-			context.Background(),
-			common.Address(address1),
-			payloads1,
+		registersByAccount, err := registersForStagedContracts(
+			StagedContract{
+				Address: common.Address(address1),
+				Contract: Contract{
+					Name: "A",
+					Code: []byte(oldCodeA),
+				},
+			},
+			StagedContract{
+				Address: common.Address(address2),
+				Contract: Contract{
+					Name: "B",
+					Code: []byte(oldCodeB),
+				},
+			},
 		)
 		require.NoError(t, err)
 
-		payloads2, err = migration.MigrateAccount(
+		err = migration.InitMigration(log, registersByAccount, 1)
+		require.NoError(t, err)
+
+		owner1 := string(address1[:])
+		accountRegisters1 := registersByAccount.AccountRegisters(owner1)
+
+		err = migration.MigrateAccount(
+			context.Background(),
+			common.Address(address1),
+			accountRegisters1,
+		)
+		require.NoError(t, err)
+
+		owner2 := string(address2[:])
+		accountRegisters2 := registersByAccount.AccountRegisters(owner2)
+
+		err = migration.MigrateAccount(
 			context.Background(),
 			common.Address(address2),
-			payloads2,
+			accountRegisters2,
 		)
 		require.NoError(t, err)
 
@@ -961,12 +1120,12 @@ func TestStagedContractsWithImports(t *testing.T) {
 			"`pub` is no longer a valid access keyword",
 		)
 
-		// Payloads should be the old ones
-		require.Len(t, payloads1, 1)
-		assert.Equal(t, oldCodeA, string(payloads1[0].Value()))
+		// Registers should be the old ones
+		require.Equal(t, 1, accountRegisters1.Count())
+		assert.Equal(t, oldCodeA, contractCode(t, registersByAccount, owner1, "A"))
 
-		require.Len(t, payloads2, 1)
-		assert.Equal(t, oldCodeB, string(payloads2[0].Value()))
+		require.Equal(t, 1, accountRegisters2.Count())
+		assert.Equal(t, oldCodeB, contractCode(t, registersByAccount, owner2, "B"))
 	})
 
 	t.Run("broken import in one, valid third contract", func(t *testing.T) {
@@ -996,18 +1155,18 @@ func TestStagedContractsWithImports(t *testing.T) {
 
 		stagedContracts := []StagedContract{
 			{
+				Address: common.Address(address1),
 				Contract: Contract{
 					Name: "A",
 					Code: []byte(newCodeA),
 				},
-				Address: common.Address(address1),
 			},
 			{
+				Address: common.Address(address1),
 				Contract: Contract{
 					Name: "C",
 					Code: []byte(newCodeC),
 				},
-				Address: common.Address(address1),
 			},
 		}
 
@@ -1025,29 +1184,51 @@ func TestStagedContractsWithImports(t *testing.T) {
 			WithContractUpdateValidation().
 			WithStagedContractUpdates(stagedContracts)
 
-		err := migration.InitMigration(log, nil, 0)
-		require.NoError(t, err)
-
-		payloads1 := []*ledger.Payload{
-			newContractPayload(common.Address(address1), "A", []byte(oldCodeA)),
-			newContractPayload(common.Address(address1), "C", []byte(oldCodeC)),
-		}
-
-		payloads2 := []*ledger.Payload{
-			newContractPayload(common.Address(address2), "B", []byte(oldCodeB)),
-		}
-
-		payloads1, err = migration.MigrateAccount(
-			context.Background(),
-			common.Address(address1),
-			payloads1,
+		registersByAccount, err := registersForStagedContracts(
+			StagedContract{
+				Address: common.Address(address1),
+				Contract: Contract{
+					Name: "A",
+					Code: []byte(oldCodeA),
+				},
+			},
+			StagedContract{
+				Address: common.Address(address1),
+				Contract: Contract{
+					Name: "C",
+					Code: []byte(oldCodeC),
+				},
+			},
+			StagedContract{
+				Address: common.Address(address2),
+				Contract: Contract{
+					Name: "B",
+					Code: []byte(oldCodeB),
+				},
+			},
 		)
 		require.NoError(t, err)
 
-		payloads2, err = migration.MigrateAccount(
+		err = migration.InitMigration(log, registersByAccount, 1)
+		require.NoError(t, err)
+
+		owner1 := string(address1[:])
+		accountRegisters1 := registersByAccount.AccountRegisters(owner1)
+
+		err = migration.MigrateAccount(
+			context.Background(),
+			common.Address(address1),
+			accountRegisters1,
+		)
+		require.NoError(t, err)
+
+		owner2 := string(address2[:])
+		accountRegisters2 := registersByAccount.AccountRegisters(owner2)
+
+		err = migration.MigrateAccount(
 			context.Background(),
 			common.Address(address2),
-			payloads2,
+			accountRegisters2,
 		)
 		require.NoError(t, err)
 
@@ -1058,19 +1239,19 @@ func TestStagedContractsWithImports(t *testing.T) {
 		require.Contains(
 			t,
 			logWriter.logs[0],
-			"cannot find declaration `B` in `ee82856bf20e2aa6.B`",
+			"`pub` is no longer a valid access keyword",
 		)
 
 		// A and B should be the old ones.
 		// C should be updated.
 		// Type checking failures in unrelated contracts should not
 		// stop other contracts from being migrated.
-		require.Len(t, payloads1, 2)
-		require.Equal(t, oldCodeA, string(payloads1[0].Value()))
-		require.Equal(t, newCodeC, string(payloads1[1].Value()))
+		require.Equal(t, 2, accountRegisters1.Count())
+		require.Equal(t, oldCodeA, contractCode(t, registersByAccount, owner1, "A"))
+		require.Equal(t, newCodeC, contractCode(t, registersByAccount, owner1, "C"))
 
-		require.Len(t, payloads2, 1)
-		require.Equal(t, oldCodeB, string(payloads2[0].Value()))
+		require.Equal(t, 1, accountRegisters2.Count())
+		require.Equal(t, oldCodeB, contractCode(t, registersByAccount, owner2, "B"))
 	})
 }
 
@@ -1175,12 +1356,13 @@ func TestStagedContractsWithUpdateValidator(t *testing.T) {
 	const chainID = flow.Emulator
 	systemContracts := systemcontracts.SystemContractsForChain(chainID)
 
-	addressGenerator := chainID.Chain().NewAddressGenerator()
+	chain := chainID.Chain()
 
-	addressA, err := addressGenerator.NextAddress()
+	// Prevent conflicts with system contracts
+	addressA, err := chain.AddressAtIndex(1_000_000)
 	require.NoError(t, err)
 
-	addressB, err := addressGenerator.NextAddress()
+	addressB, err := chain.AddressAtIndex(2_000_000)
 	require.NoError(t, err)
 
 	t.Run("FungibleToken.Vault", func(t *testing.T) {
@@ -1188,51 +1370,54 @@ func TestStagedContractsWithUpdateValidator(t *testing.T) {
 
 		ftAddress := common.Address(systemContracts.FungibleToken.Address)
 
-		oldCodeA := fmt.Sprintf(`
-            import FungibleToken from %s
+		oldCodeA := fmt.Sprintf(
+			`
+              import FungibleToken from %s
 
-            pub contract A {
-                pub var vault: @FungibleToken.Vault?
-                init() {
-                    self.vault <- nil
-                }
-            }
-        `,
+              pub contract A {
+                  pub var vault: @FungibleToken.Vault?
+                  init() {
+                      self.vault <- nil
+                  }
+              }
+            `,
 			ftAddress.HexWithPrefix(),
 		)
 
-		newCodeA := fmt.Sprintf(`
-            import FungibleToken from %s
-            access(all) contract A {
-                access(all) var vault: @{FungibleToken.Vault}?
-                init() {
-                    self.vault <- nil
+		newCodeA := fmt.Sprintf(
+			`
+                import FungibleToken from %s
+
+                access(all) contract A {
+                    access(all) var vault: @{FungibleToken.Vault}?
+                    init() {
+                        self.vault <- nil
+                    }
                 }
-            }
-        `,
+            `,
 			ftAddress.HexWithPrefix(),
 		)
 
 		ftContract := `
-            access(all) contract FungibleToken {
-                access(all) resource interface Vault {}
-		    }
+           access(all) contract FungibleToken {
+               access(all) resource interface Vault {}
+           }
         `
 
 		stagedContracts := []StagedContract{
 			{
+				Address: common.Address(addressA),
 				Contract: Contract{
 					Name: "A",
 					Code: []byte(newCodeA),
 				},
-				Address: common.Address(addressA),
 			},
 			{
+				Address: ftAddress,
 				Contract: Contract{
 					Name: "FungibleToken",
 					Code: []byte(ftContract),
 				},
-				Address: ftAddress,
 			},
 		}
 
@@ -1250,27 +1435,44 @@ func TestStagedContractsWithUpdateValidator(t *testing.T) {
 			WithContractUpdateValidation().
 			WithStagedContractUpdates(stagedContracts)
 
-		err := migration.InitMigration(log, nil, 0)
-		require.NoError(t, err)
-
-		payloads1 := []*ledger.Payload{
-			newContractPayload(common.Address(addressA), "A", []byte(oldCodeA)),
-		}
-		payloads2 := []*ledger.Payload{
-			newContractPayload(ftAddress, "FungibleToken", []byte(ftContract)),
-		}
-
-		payloads1, err = migration.MigrateAccount(
-			context.Background(),
-			common.Address(addressA),
-			payloads1,
+		registersByAccount, err := registersForStagedContracts(
+			StagedContract{
+				Address: common.Address(addressA),
+				Contract: Contract{
+					Name: "A",
+					Code: []byte(oldCodeA),
+				},
+			},
+			StagedContract{
+				Address: ftAddress,
+				Contract: Contract{
+					Name: "FungibleToken",
+					Code: []byte(ftContract),
+				},
+			},
 		)
 		require.NoError(t, err)
 
-		payloads2, err = migration.MigrateAccount(
+		err = migration.InitMigration(log, registersByAccount, 1)
+		require.NoError(t, err)
+
+		ownerA := string(addressA[:])
+		accountRegistersA := registersByAccount.AccountRegisters(ownerA)
+
+		err = migration.MigrateAccount(
+			context.Background(),
+			common.Address(addressA),
+			accountRegistersA,
+		)
+		require.NoError(t, err)
+
+		ftOwner := string(ftAddress[:])
+		ftAccountRegisters := registersByAccount.AccountRegisters(ftOwner)
+
+		err = migration.MigrateAccount(
 			context.Background(),
 			ftAddress,
-			payloads2,
+			ftAccountRegisters,
 		)
 		require.NoError(t, err)
 
@@ -1279,11 +1481,11 @@ func TestStagedContractsWithUpdateValidator(t *testing.T) {
 
 		require.Empty(t, logWriter.logs)
 
-		require.Len(t, payloads1, 1)
-		assert.Equal(t, newCodeA, string(payloads1[0].Value()))
+		require.Equal(t, 1, accountRegistersA.Count())
+		assert.Equal(t, newCodeA, contractCode(t, registersByAccount, ownerA, "A"))
 
-		require.Len(t, payloads2, 1)
-		assert.Equal(t, ftContract, string(payloads2[0].Value()))
+		require.Equal(t, 1, ftAccountRegisters.Count())
+		assert.Equal(t, ftContract, contractCode(t, registersByAccount, ftOwner, "FungibleToken"))
 	})
 
 	t.Run("other type", func(t *testing.T) {
@@ -1292,44 +1494,47 @@ func TestStagedContractsWithUpdateValidator(t *testing.T) {
 		otherAddress, err := common.HexToAddress("0x2")
 		require.NoError(t, err)
 
-		oldCodeA := fmt.Sprintf(`
-            import FungibleToken from %s
+		oldCodeA := fmt.Sprintf(
+			`
+              import FungibleToken from %s
 
-            pub contract A {
-                pub var vault: @FungibleToken.Vault?
-                init() {
-                    self.vault <- nil
-                }
-            }
-        `,
+              pub contract A {
+                  pub var vault: @FungibleToken.Vault?
+                  init() {
+                      self.vault <- nil
+                  }
+              }
+            `,
 			otherAddress.HexWithPrefix(), // Importing from some other address
 		)
 
-		newCodeA := fmt.Sprintf(`
-            import FungibleToken from %s
-            access(all) contract A {
-                access(all) var vault: @{FungibleToken.Vault}?
-                init() {
-                    self.vault <- nil
-                }
-            }
-        `,
+		newCodeA := fmt.Sprintf(
+			`
+              import FungibleToken from %s
+
+              access(all) contract A {
+                  access(all) var vault: @{FungibleToken.Vault}?
+                  init() {
+                      self.vault <- nil
+                  }
+              }
+            `,
 			otherAddress.HexWithPrefix(), // Importing from some other address
 		)
 
 		ftContract := `
-            access(all) contract FungibleToken {
-                access(all) resource interface Vault {}
-		    }
+          access(all) contract FungibleToken {
+              access(all) resource interface Vault {}
+          }
         `
 
 		stagedContracts := []StagedContract{
 			{
+				Address: common.Address(addressA),
 				Contract: Contract{
 					Name: "A",
 					Code: []byte(newCodeA),
 				},
-				Address: common.Address(addressA),
 			},
 		}
 
@@ -1347,28 +1552,44 @@ func TestStagedContractsWithUpdateValidator(t *testing.T) {
 			WithContractUpdateValidation().
 			WithStagedContractUpdates(stagedContracts)
 
-		err = migration.InitMigration(log, nil, 0)
-		require.NoError(t, err)
-
-		payloads1 := []*ledger.Payload{
-			newContractPayload(common.Address(addressA), "A", []byte(oldCodeA)),
-		}
-
-		payloads2 := []*ledger.Payload{
-			newContractPayload(otherAddress, "FungibleToken", []byte(ftContract)),
-		}
-
-		payloads1, err = migration.MigrateAccount(
-			context.Background(),
-			common.Address(addressA),
-			payloads1,
+		registersByAccount, err := registersForStagedContracts(
+			StagedContract{
+				Address: common.Address(addressA),
+				Contract: Contract{
+					Name: "A",
+					Code: []byte(oldCodeA),
+				},
+			},
+			StagedContract{
+				Address: otherAddress,
+				Contract: Contract{
+					Name: "FungibleToken",
+					Code: []byte(ftContract),
+				},
+			},
 		)
 		require.NoError(t, err)
 
-		payloads2, err = migration.MigrateAccount(
+		err = migration.InitMigration(log, registersByAccount, 1)
+		require.NoError(t, err)
+
+		ownerA := string(addressA[:])
+		accountRegistersA := registersByAccount.AccountRegisters(ownerA)
+
+		err = migration.MigrateAccount(
+			context.Background(),
+			common.Address(addressA),
+			accountRegistersA,
+		)
+		require.NoError(t, err)
+
+		otherOwner := string(otherAddress[:])
+		otherAccountRegisters := registersByAccount.AccountRegisters(otherOwner)
+
+		err = migration.MigrateAccount(
 			context.Background(),
 			otherAddress,
-			payloads2,
+			otherAccountRegisters,
 		)
 		require.NoError(t, err)
 
@@ -1378,54 +1599,50 @@ func TestStagedContractsWithUpdateValidator(t *testing.T) {
 		require.Len(t, logWriter.logs, 1)
 		assert.Contains(t,
 			logWriter.logs[0],
-			"cannot find declaration `FungibleToken` in `0000000000000002.FungibleToken`",
+			"incompatible type annotations. expected `FungibleToken.Vault`, found `{FungibleToken.Vault}`",
 		)
 
-		require.Len(t, payloads1, 1)
-		assert.Equal(t, oldCodeA, string(payloads1[0].Value()))
+		require.Equal(t, 1, accountRegistersA.Count())
+		assert.Equal(t, oldCodeA, contractCode(t, registersByAccount, ownerA, "A"))
 
-		require.Len(t, payloads2, 1)
-		assert.Equal(t, ftContract, string(payloads2[0].Value()))
+		require.Equal(t, 1, otherAccountRegisters.Count())
+		assert.Equal(t, ftContract, contractCode(t, registersByAccount, otherOwner, "FungibleToken"))
 	})
 
 	t.Run("import from other account", func(t *testing.T) {
 		t.Parallel()
 
-		oldCodeA := fmt.Sprintf(`
-            import B from %s
+		oldCodeA := fmt.Sprintf(
+			`
+              import B from %s
 
-            pub contract A {}
-        `,
+              pub contract A {}
+            `,
 			addressB.HexWithPrefix(),
 		)
 
-		newCodeA := fmt.Sprintf(`
-            import B from %s
+		newCodeA := fmt.Sprintf(
+			`
+              import B from %s
 
-            access(all) contract A {}
-        `,
+              access(all) contract A {}
+            `,
 			addressB.HexWithPrefix(),
 		)
 
 		codeB := `
-		   access(all) contract B {}
-		`
+          access(all) contract B {}
+        `
 
 		stagedContracts := []StagedContract{
 			{
+				Address: common.Address(addressA),
 				Contract: Contract{
 					Name: "A",
 					Code: []byte(newCodeA),
 				},
-				Address: common.Address(addressA),
 			},
 		}
-
-		contractACode := newContractPayload(common.Address(addressA), "A", []byte(oldCodeA))
-		contractBCode := newContractPayload(common.Address(addressB), "B", []byte(codeB))
-
-		accountPayloads := []*ledger.Payload{contractACode}
-		allPayloads := []*ledger.Payload{contractACode, contractBCode}
 
 		logWriter := &logWriter{}
 		log := zerolog.New(logWriter)
@@ -1441,13 +1658,34 @@ func TestStagedContractsWithUpdateValidator(t *testing.T) {
 			WithContractUpdateValidation().
 			WithStagedContractUpdates(stagedContracts)
 
-		err := migration.InitMigration(log, allPayloads, 0)
+		registersByAccount, err := registersForStagedContracts(
+			StagedContract{
+				Address: common.Address(addressA),
+				Contract: Contract{
+					Name: "A",
+					Code: []byte(oldCodeA),
+				},
+			},
+			StagedContract{
+				Address: common.Address(addressB),
+				Contract: Contract{
+					Name: "B",
+					Code: []byte(codeB),
+				},
+			},
+		)
 		require.NoError(t, err)
 
-		accountPayloads, err = migration.MigrateAccount(
+		err = migration.InitMigration(log, registersByAccount, 1)
+		require.NoError(t, err)
+
+		ownerA := string(addressA[:])
+		accountRegistersA := registersByAccount.AccountRegisters(ownerA)
+
+		err = migration.MigrateAccount(
 			context.Background(),
 			common.Address(addressA),
-			accountPayloads,
+			accountRegistersA,
 		)
 		require.NoError(t, err)
 
@@ -1456,8 +1694,8 @@ func TestStagedContractsWithUpdateValidator(t *testing.T) {
 
 		require.Empty(t, logWriter.logs)
 
-		require.Len(t, accountPayloads, 1)
-		assert.Equal(t, newCodeA, string(accountPayloads[0].Value()))
+		require.Equal(t, 1, accountRegistersA.Count())
+		assert.Equal(t, newCodeA, contractCode(t, registersByAccount, ownerA, "A"))
 	})
 }
 
@@ -1467,9 +1705,8 @@ func TestStagedContractConformanceChanges(t *testing.T) {
 	const chainID = flow.Emulator
 	systemContracts := systemcontracts.SystemContractsForChain(chainID)
 
-	addressGenerator := chainID.Chain().NewAddressGenerator()
-
-	address, err := addressGenerator.NextAddress()
+	// Prevent conflict with system contracts
+	address, err := chainID.Chain().AddressAtIndex(1_000_000)
 	require.NoError(t, err)
 
 	type testCase struct {
@@ -1493,43 +1730,49 @@ func TestStagedContractConformanceChanges(t *testing.T) {
 			metadataViewsAddress := common.Address(systemContracts.MetadataViews.Address)
 			viewResolverAddress := common.Address(systemContracts.ViewResolver.Address)
 
-			oldCode := fmt.Sprintf(`
-                import %[2]s from %[1]s
+			oldCode := fmt.Sprintf(
+				`
+                  import %[2]s from %[1]s
 
-                pub contract C {
-                    pub resource A: %[2]s.%[3]s {}
-                }`,
+                  pub contract C {
+                      pub resource A: %[2]s.%[3]s {}
+                  }
+                `,
 				metadataViewsAddress.HexWithPrefix(),
 				oldContract,
 				oldInterface,
 			)
 
-			newCode := fmt.Sprintf(`
-                import %[2]s from %[1]s
+			newCode := fmt.Sprintf(
+				`
+                  import %[2]s from %[1]s
 
-                access(all) contract C {
-                    access(all) resource A: %[2]s.%[3]s {}
-                }`,
+                  access(all) contract C {
+                      access(all) resource A: %[2]s.%[3]s {}
+                  }
+                `,
 				viewResolverAddress.HexWithPrefix(),
 				newContract,
 				newInterface,
 			)
 
-			newImportedContract := fmt.Sprintf(`
-                access(all) contract %s {
-                    access(all) resource interface %s {}
-		        }`,
+			newImportedContract := fmt.Sprintf(
+				`
+                  access(all) contract %s {
+                      access(all) resource interface %s {}
+                  }
+                `,
 				newContract,
 				newInterface,
 			)
 
 			stagedContracts := []StagedContract{
 				{
+					Address: common.Address(address),
 					Contract: Contract{
 						Name: "A",
 						Code: []byte(newCode),
 					},
-					Address: common.Address(address),
 				},
 			}
 
@@ -1547,23 +1790,35 @@ func TestStagedContractConformanceChanges(t *testing.T) {
 				WithContractUpdateValidation().
 				WithStagedContractUpdates(stagedContracts)
 
-			contractCodePayload := newContractPayload(common.Address(address), "A", []byte(oldCode))
-			viewResolverCodePayload := newContractPayload(
-				viewResolverAddress,
-				newContract,
-				[]byte(newImportedContract),
+			registersByAccount, err := registersForStagedContracts(
+				StagedContract{
+					Address: common.Address(address),
+					Contract: Contract{
+						Name: "A",
+						Code: []byte(oldCode),
+					},
+				},
+				StagedContract{
+					Address: viewResolverAddress,
+					Contract: Contract{
+						Name: newContract,
+						Code: []byte(newImportedContract),
+					},
+				},
 			)
-
-			accountPayloads := []*ledger.Payload{contractCodePayload}
-			allPayloads := []*ledger.Payload{contractCodePayload, viewResolverCodePayload}
-
-			err := migration.InitMigration(log, allPayloads, 0)
 			require.NoError(t, err)
 
-			accountPayloads, err = migration.MigrateAccount(
+			err = migration.InitMigration(log, registersByAccount, 1)
+			require.NoError(t, err)
+
+			owner := string(address[:])
+			accountRegisters := registersByAccount.AccountRegisters(owner)
+			require.Equal(t, 1, accountRegisters.Count())
+
+			err = migration.MigrateAccount(
 				context.Background(),
 				common.Address(address),
-				accountPayloads,
+				accountRegisters,
 			)
 			require.NoError(t, err)
 
@@ -1572,8 +1827,8 @@ func TestStagedContractConformanceChanges(t *testing.T) {
 
 			require.Empty(t, logWriter.logs)
 
-			require.Len(t, accountPayloads, 1)
-			assert.Equal(t, newCode, string(accountPayloads[0].Value()))
+			require.Equal(t, 1, accountRegisters.Count())
+			assert.Equal(t, newCode, contractCode(t, registersByAccount, owner, "A"))
 		})
 	}
 
@@ -1616,39 +1871,41 @@ func TestStagedContractConformanceChanges(t *testing.T) {
 		metadataViewsAddress := common.Address(systemContracts.MetadataViews.Address)
 		viewResolverAddress := common.Address(systemContracts.ViewResolver.Address)
 
-		oldCode := fmt.Sprintf(`
-            import MetadataViews from %s
+		oldCode := fmt.Sprintf(
+			`
+	          import MetadataViews from %s
 
-            pub contract C {
-                pub resource A: MetadataViews.Resolver {}
-            }
-        `,
+	          pub contract C {
+	              pub resource A: MetadataViews.Resolver {}
+	          }
+	       `,
 			metadataViewsAddress.HexWithPrefix(),
 		)
 
-		newCode := fmt.Sprintf(`
-            import ArbitraryContract from %s
+		newCode := fmt.Sprintf(
+			`
+	          import ArbitraryContract from %s
 
-            access(all) contract C {
-                access(all) resource A: ArbitraryContract.Resolver {}
-            }
-        `,
+	          access(all) contract C {
+	              access(all) resource A: ArbitraryContract.Resolver {}
+	          }
+	       `,
 			viewResolverAddress.HexWithPrefix(),
 		)
 
 		arbitraryContract := `
-            access(all) contract ArbitraryContract {
-                access(all) resource interface Resolver {}
-		    }
-        `
+	      access(all) contract ArbitraryContract {
+	          access(all) resource interface Resolver {}
+	      }
+	    `
 
 		stagedContracts := []StagedContract{
 			{
+				Address: common.Address(address),
 				Contract: Contract{
 					Name: "A",
 					Code: []byte(newCode),
 				},
-				Address: common.Address(address),
 			},
 		}
 
@@ -1666,23 +1923,35 @@ func TestStagedContractConformanceChanges(t *testing.T) {
 			WithContractUpdateValidation().
 			WithStagedContractUpdates(stagedContracts)
 
-		contractCodePayload := newContractPayload(common.Address(address), "A", []byte(oldCode))
-		arbitraryContractCodePayload := newContractPayload(
-			viewResolverAddress,
-			"ArbitraryContract",
-			[]byte(arbitraryContract),
+		registersByAccount, err := registersForStagedContracts(
+			StagedContract{
+				Address: common.Address(address),
+				Contract: Contract{
+					Name: "A",
+					Code: []byte(oldCode),
+				},
+			},
+			StagedContract{
+				Address: viewResolverAddress,
+				Contract: Contract{
+					Name: "ArbitraryContract",
+					Code: []byte(arbitraryContract),
+				},
+			},
 		)
-
-		accountPayloads := []*ledger.Payload{contractCodePayload}
-		allPayloads := []*ledger.Payload{contractCodePayload, arbitraryContractCodePayload}
-
-		err := migration.InitMigration(log, allPayloads, 0)
 		require.NoError(t, err)
 
-		accountPayloads, err = migration.MigrateAccount(
+		err = migration.InitMigration(log, registersByAccount, 1)
+		require.NoError(t, err)
+
+		owner := string(address[:])
+		accountRegisters := registersByAccount.AccountRegisters(owner)
+		require.Equal(t, 1, accountRegisters.Count())
+
+		err = migration.MigrateAccount(
 			context.Background(),
 			common.Address(address),
-			accountPayloads,
+			accountRegisters,
 		)
 		require.NoError(t, err)
 
@@ -1692,8 +1961,8 @@ func TestStagedContractConformanceChanges(t *testing.T) {
 		require.Len(t, logWriter.logs, 1)
 		require.Contains(t, logWriter.logs[0], "conformances do not match in `A`")
 
-		require.Len(t, accountPayloads, 1)
-		assert.Equal(t, oldCode, string(accountPayloads[0].Value()))
+		require.Equal(t, 1, accountRegisters.Count())
+		assert.Equal(t, oldCode, contractCode(t, registersByAccount, owner, "A"))
 	})
 }
 
@@ -1713,47 +1982,51 @@ func TestConcurrentContractUpdate(t *testing.T) {
 	addressImport, err := addressGenerator.NextAddress()
 	require.NoError(t, err)
 
-	oldCodeA := fmt.Sprintf(`
-        import Foo from %[1]s
-        import Bar from %[1]s
-        import Baz from %[1]s
+	oldCodeA := fmt.Sprintf(
+		`
+          import Foo from %[1]s
+          import Bar from %[1]s
+          import Baz from %[1]s
 
-        pub contract A {}
+          pub contract A {}
         `,
 		addressImport.HexWithPrefix(),
 	)
 
-	newCodeA := fmt.Sprintf(`
-        import Foo from %[1]s
-        import Baz from %[1]s
-        import Bar from %[1]s
+	newCodeA := fmt.Sprintf(
+		`
+          import Foo from %[1]s
+          import Baz from %[1]s
+          import Bar from %[1]s
 
-        access(all) contract A {
-            access(all) struct AA {}
-        }
-    `,
-		addressImport.HexWithPrefix(),
-	)
-
-	oldCodeB := fmt.Sprintf(`
-        import Foo from %[1]s
-        import Bar from %[1]s
-        import Baz from %[1]s
-
-        pub contract B {}
+          access(all) contract A {
+              access(all) struct AA {}
+          }
         `,
 		addressImport.HexWithPrefix(),
 	)
 
-	newCodeB := fmt.Sprintf(`
-        import Foo from %[1]s
-        import Baz from %[1]s
-        import Bar from %[1]s
+	oldCodeB := fmt.Sprintf(
+		`
+          import Foo from %[1]s
+          import Bar from %[1]s
+          import Baz from %[1]s
 
-        access(all) contract B {
-            access(all) struct BB {}
-        }
-    `,
+          pub contract B {}
+        `,
+		addressImport.HexWithPrefix(),
+	)
+
+	newCodeB := fmt.Sprintf(
+		`
+         import Foo from %[1]s
+         import Baz from %[1]s
+         import Bar from %[1]s
+
+         access(all) contract B {
+             access(all) struct BB {}
+         }
+        `,
 		addressImport.HexWithPrefix(),
 	)
 
@@ -1763,28 +2036,59 @@ func TestConcurrentContractUpdate(t *testing.T) {
 
 	stagedContracts := []StagedContract{
 		{
+			Address: common.Address(addressA),
 			Contract: Contract{
 				Name: "A",
 				Code: []byte(newCodeA),
 			},
-			Address: common.Address(addressA),
 		},
 		{
+			Address: common.Address(addressB),
 			Contract: Contract{
 				Name: "B",
 				Code: []byte(newCodeB),
 			},
-			Address: common.Address(addressB),
 		},
 	}
 
-	allPayloads := []*ledger.Payload{
-		newContractPayload(common.Address(addressA), "A", []byte(oldCodeA)),
-		newContractPayload(common.Address(addressB), "B", []byte(oldCodeB)),
-		newContractPayload(common.Address(addressImport), "Foo", []byte(codeFoo)),
-		newContractPayload(common.Address(addressImport), "Bar", []byte(codeBar)),
-		newContractPayload(common.Address(addressImport), "Baz", []byte(codeBaz)),
-	}
+	registersByAccount, err := registersForStagedContracts(
+		StagedContract{
+			Address: common.Address(addressA),
+			Contract: Contract{
+				Name: "A",
+				Code: []byte(oldCodeA),
+			},
+		},
+		StagedContract{
+			Address: common.Address(addressB),
+			Contract: Contract{
+				Name: "B",
+				Code: []byte(oldCodeB),
+			},
+		},
+		StagedContract{
+			Address: common.Address(addressImport),
+			Contract: Contract{
+				Name: "Foo",
+				Code: []byte(codeFoo),
+			},
+		},
+		StagedContract{
+			Address: common.Address(addressImport),
+			Contract: Contract{
+				Name: "Bar",
+				Code: []byte(codeBar),
+			},
+		},
+		StagedContract{
+			Address: common.Address(addressImport),
+			Contract: Contract{
+				Name: "Baz",
+				Code: []byte(codeBaz),
+			},
+		},
+	)
+	require.NoError(t, err)
 
 	rwf := &testReportWriterFactory{}
 
@@ -1813,11 +2117,11 @@ func TestConcurrentContractUpdate(t *testing.T) {
 
 	for _, migration := range migrations {
 		// only run the staged contracts migration
-		if migration.Name != "staged-contracts-update-migration" {
+		if migration.Name != stagedContractUpdateMigrationName {
 			continue
 		}
 
-		allPayloads, err = migration.Migrate(allPayloads)
+		err = migration.Migrate(registersByAccount)
 		require.NoError(
 			t,
 			err,
@@ -1831,7 +2135,7 @@ func TestConcurrentContractUpdate(t *testing.T) {
 	require.Empty(t, logWriter.logs)
 
 	require.NoError(t, err)
-	require.Len(t, allPayloads, 5)
+	require.Equal(t, 5, registersByAccount.Count())
 }
 
 func TestStagedContractsUpdateValidationErrors(t *testing.T) {
@@ -1840,39 +2144,38 @@ func TestStagedContractsUpdateValidationErrors(t *testing.T) {
 	const chainID = flow.Emulator
 	systemContracts := systemcontracts.SystemContractsForChain(chainID)
 
-	addressGenerator := chainID.Chain().NewAddressGenerator()
-
-	address, err := addressGenerator.NextAddress()
+	// Prevent conflict with system contracts
+	address, err := chainID.Chain().AddressAtIndex(1_000_000)
 	require.NoError(t, err)
 
 	t.Run("field mismatch", func(t *testing.T) {
 		t.Parallel()
 
 		oldCodeA := `
-            access(all) contract Test {
-                access(all) var a: Int
-                init() {
-                    self.a = 0
-                }
-            }
-        `
+          access(all) contract Test {
+              access(all) var a: Int
+              init() {
+                  self.a = 0
+              }
+          }
+       `
 
 		newCodeA := `
-            access(all) contract Test {
-                access(all) var a: String
-                init() {
-                    self.a = "hello"
-                }
-            }
-        `
+          access(all) contract Test {
+              access(all) var a: String
+              init() {
+                  self.a = "hello"
+              }
+          }
+       `
 
 		stagedContracts := []StagedContract{
 			{
+				Address: common.Address(address),
 				Contract: Contract{
 					Name: "A",
 					Code: []byte(newCodeA),
 				},
-				Address: common.Address(address),
 			},
 		}
 
@@ -1890,18 +2193,28 @@ func TestStagedContractsUpdateValidationErrors(t *testing.T) {
 			WithContractUpdateValidation().
 			WithStagedContractUpdates(stagedContracts)
 
-		payloads := []*ledger.Payload{
-			newContractPayload(common.Address(address), "A", []byte(oldCodeA)),
-		}
-
-		var err error
-		err = migration.InitMigration(log, payloads, 0)
+		registersByAccount, err := registersForStagedContracts(
+			StagedContract{
+				Address: common.Address(address),
+				Contract: Contract{
+					Name: "A",
+					Code: []byte(oldCodeA),
+				},
+			},
+		)
 		require.NoError(t, err)
 
-		_, err = migration.MigrateAccount(
+		err = migration.InitMigration(log, registersByAccount, 1)
+		require.NoError(t, err)
+
+		owner := string(address[:])
+		accountRegisters := registersByAccount.AccountRegisters(owner)
+		require.Equal(t, 1, accountRegisters.Count())
+
+		err = migration.MigrateAccount(
 			context.Background(),
 			common.Address(address),
-			payloads,
+			accountRegisters,
 		)
 		require.NoError(t, err)
 
@@ -1917,11 +2230,11 @@ func TestStagedContractsUpdateValidationErrors(t *testing.T) {
 
 		assert.Equal(
 			t,
-			"failed to update contract A in account 0xf8d6e0586b0a20c7: error: mismatching field `a` in `Test`\n"+
-				" --> f8d6e0586b0a20c7.A:3:35\n"+
+			"failed to update contract A in account 0x9bc576e17b370b16: error: mismatching field `a` in `Test`\n"+
+				" --> 9bc576e17b370b16.A:3:33\n"+
 				"  |\n"+
-				"3 |                 access(all) var a: String\n"+
-				"  |                                    ^^^^^^ incompatible type annotations. expected `Int`, found `String`\n",
+				"3 |               access(all) var a: String\n"+
+				"  |                                  ^^^^^^ incompatible type annotations. expected `Int`, found `String`\n",
 			jsonObject["message"],
 		)
 	})
@@ -1931,52 +2244,54 @@ func TestStagedContractsUpdateValidationErrors(t *testing.T) {
 
 		nftAddress := common.Address(systemContracts.NonFungibleToken.Address)
 
-		oldCodeA := fmt.Sprintf(`
-            import NonFungibleToken from %s
+		oldCodeA := fmt.Sprintf(
+			`
+              import NonFungibleToken from %s
 
-            access(all) contract Test {
-                access(all) var a: Capability<&{NonFungibleToken.Provider}>?
-                init() {
-                    self.a = nil
-                }
-            }
-        `,
+              access(all) contract Test {
+                  access(all) var a: Capability<&{NonFungibleToken.Provider}>?
+                  init() {
+                      self.a = nil
+                  }
+              }
+            `,
 			nftAddress.HexWithPrefix(),
 		)
 
-		newCodeA := fmt.Sprintf(`
-            import NonFungibleToken from %s
+		newCodeA := fmt.Sprintf(
+			`
+              import NonFungibleToken from %s
 
-            access(all) contract Test {
-                access(all) var a: Capability<auth(NonFungibleToken.E1) &{NonFungibleToken.Provider}>?
-                init() {
-                    self.a = nil
-                }
-            }
-        `,
+              access(all) contract Test {
+                  access(all) var a: Capability<auth(NonFungibleToken.E1) &{NonFungibleToken.Provider}>?
+                  init() {
+                      self.a = nil
+                  }
+              }
+            `,
 			nftAddress.HexWithPrefix(),
 		)
 
 		nftContract := `
-            access(all) contract NonFungibleToken {
+          access(all) contract NonFungibleToken {
 
-                access(all) entitlement E1
-                access(all) entitlement E2
+              access(all) entitlement E1
+              access(all) entitlement E2
 
-                access(all) resource interface Provider {
-                    access(E1) fun foo()
-                    access(E2) fun bar()
-                }
-		    }
+              access(all) resource interface Provider {
+                  access(E1) fun foo()
+                  access(E2) fun bar()
+              }
+          }
         `
 
 		stagedContracts := []StagedContract{
 			{
+				Address: common.Address(address),
 				Contract: Contract{
 					Name: "A",
 					Code: []byte(newCodeA),
 				},
-				Address: common.Address(address),
 			},
 		}
 
@@ -1994,20 +2309,35 @@ func TestStagedContractsUpdateValidationErrors(t *testing.T) {
 			WithContractUpdateValidation().
 			WithStagedContractUpdates(stagedContracts)
 
-		contractACode := newContractPayload(common.Address(address), "A", []byte(oldCodeA))
-		nftCode := newContractPayload(nftAddress, "NonFungibleToken", []byte(nftContract))
-
-		accountPayloads := []*ledger.Payload{contractACode}
-		allPayloads := []*ledger.Payload{contractACode, nftCode}
-
-		var err error
-		err = migration.InitMigration(log, allPayloads, 0)
+		registersByAccount, err := registersForStagedContracts(
+			StagedContract{
+				Address: common.Address(address),
+				Contract: Contract{
+					Name: "A",
+					Code: []byte(oldCodeA),
+				},
+			},
+			StagedContract{
+				Address: nftAddress,
+				Contract: Contract{
+					Name: "NonFungibleToken",
+					Code: []byte(nftContract),
+				},
+			},
+		)
 		require.NoError(t, err)
 
-		_, err = migration.MigrateAccount(
+		err = migration.InitMigration(log, registersByAccount, 1)
+		require.NoError(t, err)
+
+		owner := string(address[:])
+		accountRegisters := registersByAccount.AccountRegisters(owner)
+		require.Equal(t, 1, accountRegisters.Count())
+
+		err = migration.MigrateAccount(
 			context.Background(),
 			common.Address(address),
-			accountPayloads,
+			accountRegisters,
 		)
 		require.NoError(t, err)
 
@@ -2019,11 +2349,11 @@ func TestStagedContractsUpdateValidationErrors(t *testing.T) {
 
 		assert.Equal(
 			t,
-			"failed to update contract A in account 0xf8d6e0586b0a20c7: error: mismatching field `a` in `Test`\n"+
-				" --> f8d6e0586b0a20c7.A:5:35\n"+
+			"failed to update contract A in account 0x9bc576e17b370b16: error: mismatching field `a` in `Test`\n"+
+				" --> 9bc576e17b370b16.A:5:37\n"+
 				"  |\n"+
-				"5 |                 access(all) var a: Capability<auth(NonFungibleToken.E1) &{NonFungibleToken.Provider}>?\n"+
-				"  |                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ mismatching authorization:"+
+				"5 |                   access(all) var a: Capability<auth(NonFungibleToken.E1) &{NonFungibleToken.Provider}>?\n"+
+				"  |                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ mismatching authorization:"+
 				" the entitlements migration would only grant this value `NonFungibleToken.E1, NonFungibleToken.E2`, but the annotation present is `NonFungibleToken.E1`\n",
 			jsonObject["message"],
 		)
