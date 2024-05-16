@@ -177,9 +177,17 @@ func NewTransactionState(
 	params StateParameters,
 ) NestedTransactionPreparer {
 	startState := NewExecutionState(snapshot, params)
+	return NewTransactionStateFromExecutionState(startState)
+}
+
+// NewTransactionStateFromExecutionState constructs a new state transaction directly
+// from an execution state.
+func NewTransactionStateFromExecutionState(
+	startState *ExecutionState,
+) NestedTransactionPreparer {
 	return &transactionState{
 		nestedTransactions: []nestedTransactionStackFrame{
-			nestedTransactionStackFrame{
+			{
 				ExecutionState:   startState,
 				parseRestriction: nil,
 			},

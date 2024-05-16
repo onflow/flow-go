@@ -123,7 +123,7 @@ func TestFilterUnreferencedSlabs(t *testing.T) {
 		dict1,
 	)
 
-	err = storage.Commit(inter, false)
+	err = storage.NondeterministicCommit(inter, false)
 	require.NoError(t, err)
 
 	oldPayloads := make([]*ledger.Payload, 0, len(payloads))

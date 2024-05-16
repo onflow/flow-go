@@ -105,17 +105,21 @@ func CadenceRegisterID(owner []byte, key []byte) RegisterID {
 	}
 }
 
-func NewRegisterID(owner Address, key string) RegisterID {
-	// global registers have an empty owner field
-	ownerString := ""
-
-	// all other registers have the account's address
-	if owner != EmptyAddress {
-		ownerString = addressToOwner(owner)
+// AddressToRegisterOwner converts 8-byte address to register owner.
+// If given address is ZeroAddress, register owner is "" (global register).
+func AddressToRegisterOwner(address Address) string {
+	// Global registers have address zero and an empty owner field
+	if address == EmptyAddress {
+		return ""
 	}
 
+	// All other registers have the account's address
+	return addressToOwner(address)
+}
+
+func NewRegisterID(owner Address, key string) RegisterID {
 	return RegisterID{
-		Owner: ownerString,
+		Owner: AddressToRegisterOwner(owner),
 		Key:   key,
 	}
 }

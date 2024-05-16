@@ -19,6 +19,7 @@ type Registers interface {
 	Get(owner string, key string) ([]byte, error)
 	Set(owner string, key string, value []byte) error
 	ForEach(f ForEachCallback) error
+	Count() int
 }
 
 // ByAccount represents the registers of all accounts
@@ -134,9 +135,9 @@ func (b *ByAccount) DestructIntoPayloads(nWorker int) []*ledger.Payload {
 	return payloads
 }
 
-func (b *ByAccount) ForEachAccount(f func(owner string, accountRegisters *AccountRegisters) error) error {
-	for owner, accountRegisters := range b.registers {
-		err := f(owner, accountRegisters)
+func (b *ByAccount) ForEachAccount(f func(accountRegisters *AccountRegisters) error) error {
+	for _, accountRegisters := range b.registers {
+		err := f(accountRegisters)
 		if err != nil {
 			return err
 		}
