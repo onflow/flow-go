@@ -292,7 +292,7 @@ func MigrateGroupConcurrently(
 	topDurations := util.NewTopN[migrationDuration](
 		logTopNDurations,
 		func(duration migrationDuration, duration2 migrationDuration) bool {
-			return duration.Duration > duration2.Duration
+			return duration.Duration < duration2.Duration
 		},
 	)
 
