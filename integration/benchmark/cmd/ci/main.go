@@ -142,6 +142,8 @@ func main() {
 		log,
 		workerStatsTracker,
 		loaderMetrics,
+		*adjustIntervalFlag,
+		*adjustDelayFlag,
 		[]access.Client{flowClient},
 		benchmark.NetworkParams{
 			ServAccPrivKeyHex: serviceAccountPrivateKeyHex,
@@ -163,23 +165,6 @@ func main() {
 		log.Fatal().Err(err).Msg("unable to set tps")
 	}
 
-	adjuster := NewTPSAdjuster(
-		bCtx,
-		log,
-		lg,
-		workerStatsTracker,
-
-		AdjusterParams{
-			Delay:       *adjustDelayFlag,
-			Interval:    *adjustIntervalFlag,
-			InitialTPS:  uint(loadConfig.TPSInitial),
-			MinTPS:      uint(loadConfig.TpsMin),
-			MaxTPS:      uint(loadConfig.TpsMax),
-			MaxInflight: uint(maxInflight / 2),
-		},
-	)
-	defer adjuster.Stop()
-
 	recorder := NewTPSRecorder(bCtx, workerStatsTracker, *statIntervalFlag)
 	defer recorder.Stop()
 
@@ -193,7 +178,6 @@ func main() {
 	log.Info().Msg("Cancelling benchmark context")
 	bCancel()
 	recorder.Stop()
-	adjuster.Stop()
 
 	log.Info().Msg("Stopping load generator")
 	lg.Stop()

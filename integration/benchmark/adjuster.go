@@ -1,4 +1,4 @@
-package main
+package benchmark
 
 import (
 	"context"
@@ -9,8 +9,6 @@ import (
 
 	"github.com/rs/zerolog"
 	"go.einride.tech/pid"
-
-	"github.com/onflow/flow-go/integration/benchmark"
 )
 
 type Adjuster struct {
@@ -21,8 +19,8 @@ type Adjuster struct {
 	controller *pid.Controller
 	params     AdjusterParams
 
-	lg                 *benchmark.ContLoadGenerator
-	workerStatsTracker *benchmark.WorkerStatsTracker
+	lg                 *ContLoadGenerator
+	workerStatsTracker *WorkerStatsTracker
 	log                zerolog.Logger
 }
 type AdjusterParams struct {
@@ -46,8 +44,8 @@ type adjusterState struct {
 func NewTPSAdjuster(
 	ctx context.Context,
 	log zerolog.Logger,
-	lg *benchmark.ContLoadGenerator,
-	workerStatsTracker *benchmark.WorkerStatsTracker,
+	lg *ContLoadGenerator,
+	workerStatsTracker *WorkerStatsTracker,
 	params AdjusterParams,
 ) *Adjuster {
 	ctx, cancel := context.WithCancel(ctx)
