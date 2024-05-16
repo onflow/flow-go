@@ -38,7 +38,6 @@ The process variable is the variable which:
 👉 The `BlockTimeController` controls the progression through views, such that the epoch switchover happens at the intended point in time. We define:
 
 - $\gamma = k\cdot \tau_0$ is the remaining epoch duration of a hypothetical ideal system, where *all* remaining $k$ views of the epoch progress with the ideal view time  $\tau_0$.
-- $\gamma = k\cdot \tau_0$ is the remaining epoch duration of a hypothetical ideal system, where *all* remaining $k$ views of the epoch progress with the ideal view time  $\tau_0$.
 - The parameter $\tau_0$ is computed solely based on the Epoch configuration as
   $\tau_0 := \frac{<{\rm total\ epoch\ time}>}{<{\rm total\ views\ in\ epoch}>}$ (for mainnet 22, Epoch 75, we have $\tau_0 \simeq$  1250ms).
 - $\Gamma$ is the *actual* time remaining until the desired epoch switchover.
@@ -62,30 +61,32 @@ The desired idealized system behaviour would a constant view duration $\tau_0$ t
 
 However, in the real-world system we have disturbances (varying message relay times, slow or offline nodes, etc) and measurement uncertainty (node can only observe its local view times, but not the committee’s collective swarm behaviour).
 
-![](/docs/CruiseControl_BlockTimeController/PID_controller_for_block-rate-delay.png)
+<img src='https://github.com/onflow/flow-go/blob/master/docs/CruiseControl_BlockTimeController/PID_controller_for_block-rate-delay.png' width='600'>
+
 
 After a disturbance, we want the controller to drive the system back to a state, where it can closely follow the ideal behaviour from there on. 
 
 - Simulations have shown that this approach produces *very* stable controller with the intended behaviour.
-    
+
     **Controller driving  $e := \gamma - \Gamma \rightarrow 0$**
     - setting the differential term $K_d=0$, the controller responds as expected with damped oscillatory behaviour
       to a singular strong disturbance. Setting $K_d=3$ suppresses oscillations and the controller's performance improves as it responds more effectively.  
 
-      ![](/docs/CruiseControl_BlockTimeController/EpochSimulation_029.png)
-      ![](/docs/CruiseControl_BlockTimeController/EpochSimulation_030.png)
-    
+      <img src='https://github.com/onflow/flow-go/blob/master/docs/CruiseControl_BlockTimeController/EpochSimulation_029.png' width='900'>
+
+      <img src='https://github.com/onflow/flow-go/blob/master/docs/CruiseControl_BlockTimeController/EpochSimulation_030.png' width='900'>
+
     - controller very quickly compensates for moderate disturbances and observational noise in a well-behaved system:
 
-      ![](/docs/CruiseControl_BlockTimeController/EpochSimulation_028.png)
-        
+      <img src='https://github.com/onflow/flow-go/blob/master/docs/CruiseControl_BlockTimeController/EpochSimulation_028.png' width='900'>
+  
     - controller compensates massive anomaly (100s network partition) effectively:
 
-      ![](/docs/CruiseControl_BlockTimeController/EpochSimulation_000.png)
-        
+      <img src='https://github.com/onflow/flow-go/blob/master/docs/CruiseControl_BlockTimeController/EpochSimulation_000.png' width='900'>
+
     - controller effectively stabilizes system with continued larger disturbances (20% of offline consensus participants) and notable observational noise:
 
-      ![](/docs/CruiseControl_BlockTimeController/EpochSimulation_005-0.png)
+      <img src='https://github.com/onflow/flow-go/blob/master/docs/CruiseControl_BlockTimeController/EpochSimulation_005-0.png' width='900'>
          
     **References:**
     
@@ -111,7 +112,7 @@ $\tau_0 := \frac{<{\rm total\ epoch\ time}>}{<{\rm total\ views\ in\ epoch}>}$  
 
 - remaining views of the epoch $k[v] := F[v] +1 - v$
 - time remaining until the desired epoch switchover $\Gamma[v] := T[v]-t[v]$
-- error $e[v] := \underbrace{k\cdot\tau_0}_{\gamma[v]} - \Gamma[v] = t[v] + k\cdot\tau_0 - T[v]$
+- error $e[v] := \underbrace{k\cdot\tau_0}_{\gamma[v]} - \Gamma[v] = t[v] + k[v] \cdot\tau_0 - T[v]$
 
 ### Precise convention of View Timing
 
@@ -119,7 +120,7 @@ Upon observing block `B` with view $v$, the controller updates its internal stat
 
 Note the '+1' term in the computation of the remaining views $k[v] := F[v] +1 - v$  . This is related to our convention that the epoch begins (happy path) when observing the first block of the epoch. Only by observing this block, the nodes transition to the first view of the epoch. Up to that point, the consensus replicas remain in the last view of the previous epoch, in the state of `having processed the last block of the old epoch and voted for it` (happy path). Replicas remain in this state until they see a confirmation of the view (either QC or TC for the last view of the previous epoch). 
 
-![](/docs/CruiseControl_BlockTimeController/ViewDurationConvention.png)
+<img src='https://github.com/onflow/flow-go/blob/master/docs/CruiseControl_BlockTimeController/ViewDurationConvention.png' width='600'>
 
 In accordance with this convention, observing the proposal for the last view of an epoch, marks the start of the last view. By observing the proposal, nodes enter the last view, verify the block, vote for it, the primary aggregates the votes, constructs the child (for first view of new epoch). The last view of the epoch ends, when the child proposal is published.
 
@@ -180,11 +181,11 @@ In particular systematic observation bias are a problem, as it leads to a diverg
 ```math
 \eqalign{
 \textnormal{initialization: }\quad \bar{\mathcal{I}} :&= 0 \\
-\textnormal{update with instantaneous error\ } e[v]:\quad \bar{\mathcal{I}}[v] &= e[v] + (1-\beta)\cdot\bar{\mathcal{I}}[v-1]
+\textnormal{update with instantaneous error\ } e[v]:\quad \bar{\mathcal{I}}[v] &= e[v] + (1-\lambda)\cdot\bar{\mathcal{I}}[v-1]
 }
 ```
 
-Intuitively, the loss factor $\beta$ relates to the time window of the integrator. A factor of 0 means an infinite time horizon, while $\beta =1$  makes the integrator only memorize the last input. Let  $\beta \equiv \frac{1}{N_\textnormal{itg}}$ and consider a constant input value $x$. Then $N_\textnormal{itg}$ relates to the number of past samples that the integrator remembers: 
+Intuitively, the loss factor $\lambda$ relates to the time window of the integrator. A factor of 0 means an infinite time horizon, while $\lambda =1$  makes the integrator only memorize the last input. Let  $\lambda \equiv \frac{1}{N_\textnormal{itg}}$ and consider a constant input value $x$. Then $N_\textnormal{itg}$ relates to the number of past samples that the integrator remembers: 
 
 - the integrators output will saturate at $x\cdot N_\textnormal{itg}$
 - an integrator initialized with 0, reaches 2/3 of the saturation value $x\cdot N_\textnormal{itg}$ after consuming $N_\textnormal{itg}$ inputs
@@ -221,7 +222,7 @@ with parameters:
 - $K_i = 0.6$
 - $K_d = 3.0$
 - $N_\textnormal{ewma} = 5$, i.e. $\alpha = \frac{1}{N_\textnormal{ewma}} = 0.2$
-- $N_\textnormal{itg} = 50$, i.e.  $\beta = \frac{1}{N_\textnormal{itg}} = 0.02$
+- $N_\textnormal{itg} = 50$, i.e.  $\lambda = \frac{1}{N_\textnormal{itg}} = 0.02$
     
 The controller output $u[v]$ represents the amount of time by which the controller wishes to deviate from the ideal view duration $\tau_0$. In other words, the duration of view $v$ that the controller wants to set is
 ```math
@@ -229,26 +230,29 @@ The controller output $u[v]$ represents the amount of time by which the controll
 ```
 ---    
 
+### Limits of authority 
 
-For further details about 
-
-- the statistical model of the view duration, see [ID controller for ``block-rate-delay``](https://www.notion.so/ID-controller-for-block-rate-delay-cc9c2d9785ac4708a37bb952557b5ef4?pvs=21)
-- the simulation and controller tuning, see  [flow-internal/analyses/pacemaker_timing/2023-05_Blocktime_PID-controller](https://github.com/dapperlabs/flow-internal/tree/master/analyses/pacemaker_timing/2023-05_Blocktime_PID-controller) → [controller_tuning_v01.py](https://github.com/dapperlabs/flow-internal/blob/master/analyses/pacemaker_timing/2023-05_Blocktime_PID-controller/controller_tuning_v01.py)
-
-### Limits of authority
+[Latest update: Crescendo Upgrade, June 2024]
 
 In general, there is no bound on the output of the controller output $u$. However, it is important to limit the controller’s influence to keep $u$ within a sensible range.
 
 - upper bound on view duration $\widehat{\tau}[v]$ that we allow the controller to set:
   
-  The current timeout threshold is set to 2.5s. Therefore, the largest view duration we want to allow the  controller to set is 1.6s.
-  Thereby, approx. 900ms remain for message propagation, voting and constructing the child block, which will prevent the controller to drive the node into timeout with high probability. 
-    
+  The current timeout threshold is set to 1045ms and the largest view duration we want to allow the controller to set is $\tau_\textrm{max}$ = 910ms.
+  Thereby, we have a buffer $\beta$ = 135ms remaining for message propagation and the replicas validating the proposal for view $v$.
+
+  Note the subtle but important aspect: Primary for view $v$ controls duration of view $v-1$. This is because its proposal for view $v$
+  contains the proof (Quorum Certificate [QC]) that view $v-1$ concluded on the happy path. By observing the QC for view $v-1$, nodes enter the
+  subsequent view $v$.
+
+
 - lower bound on the view duration:
     
-  Let $t_\textnormal{p}[v]$ denote the time when the primary for view $v$ has constructed its block proposal. 
-  The time difference $t_\textnormal{p}[v] - t[v]$ between the primary entering the view and having its proposal
-  ready is the minimally required time to execute the protocol. The controller can only *delay* broadcasting the block,
+  Let $t_\textnormal{p}[v]$ denote the time when the primary for view $v$ has constructed its block proposal.
+  On the happy path, a replica concludes view $v-1$ and transitions to view $v$, when it observes the proposal for view $v$.
+  The duration $t_\textnormal{p}[v] - t[v-1]$ is the time between the primary observing the parent block (view $v-1$), collecting votes,
+  constructing a QC for view $v-1$, and subsequently its own proposal for view $v$. This duration is the minimally required time to execute the protocol.
+  The controller can only *delay* broadcasting the block,
   but it cannot release the block before  $t_\textnormal{p}[v]$ simply because the proposal isn’t ready any earlier. 
     
 
@@ -256,28 +260,39 @@ In general, there is no bound on the output of the controller output $u$. Howeve
 👉 Let $\hat{t}[v]$ denote the time when the primary for view $v$ *broadcasts* its proposal. We assign:
 
 ```math
-\hat{t}[v] := \max\big(t[v] +\min(\widehat{\tau}[v],\ 2\textnormal{s}),\  t_\textnormal{p}[v]\big) 
+\hat{t}[v] := \max\Big(t[v-1] +\min(\widehat{\tau}[v-1],\ \tau_\textrm{max}),\  t_\textnormal{p}[v]\Big) 
 ```
+This equation guarantees that the controller does not drive consensus into a timeout, as long as broadcasting the block and its validation
+together require less than time $\beta$. Currently, we have $\tau_\textrm{max}$ = 910ms as the upper bound for view durations that the controller can set.
+In comparison, for HotStuff's timeout threshold we set $\texttt{hotstuff-min-timeout} = \tau_\textrm{max} + \beta$, with $\beta$ = 135ms.  
 
+
+
+### Further reading
+
+- the statistical model of the view duration, see [PID controller for ``block-rate-delay``](https://www.notion.so/ID-controller-for-block-rate-delay-cc9c2d9785ac4708a37bb952557b5ef4?pvs=21)
+- the simulation and controller tuning, see  [flow-internal/analyses/pacemaker_timing/2023-05_Blocktime_PID-controller](https://github.com/dapperlabs/flow-internal/tree/master/analyses/pacemaker_timing/2023-05_Blocktime_PID-controller) → [controller_tuning_v01.py](https://github.com/dapperlabs/flow-internal/blob/master/analyses/pacemaker_timing/2023-05_Blocktime_PID-controller/controller_tuning_v01.py)
+- The most recent parameter setting was derived here:
+    - [Cruise-Control headroom for speedups](https://www.notion.so/flowfoundation/Cruise-Control-headroom-for-speedups-46dc17e07ae14462b03341e4432a907d?pvs=4) contains the formal analysis and discusses the numerical results in detail
+    - Python code for figures and calculating the final parameter settings: [flow-internal/analyses/pacemaker_timing/2024-03_Block-timing-update](https://github.com/dapperlabs/flow-internal/tree/master/analyses/pacemaker_timing/2024-03_Block-timing-update) → [timeout-attacks.py](https://github.com/dapperlabs/flow-internal/blob/master/analyses/pacemaker_timing/2024-03_Block-timing-update/timeout-attacks.py)
 
 
 ## Edge Cases
 
 ### A node is catching up
 
-When a node is catching up, it processes blocks more quickly than when it is up-to-date, and therefore observes a faster view rate. This would cause the node’s `BlockRateManager` to compensate by increasing the block rate delay.
+When a node is catching up, it observes the blocks significantly later than they were published. In other words, from the perspective
+of the node catching up, the blocks are too late. However, as it reaches the most recent blocks, also the observed timing error approaches zero
+(assuming approximately correct block publication by the honest supermajority). Nevertheless, due to its biased error observations, the node
+catching up could still try to compensate for the network being behind, and publish its proposal as early as possible.   
 
-As long as delay function is responsive, it doesn’t have a practical impact, because nodes catching up don’t propose anyway.
-
-To the extent the delay function is not responsive, this would cause the block rate to slow down slightly, when the node is caught up. 
-
-**Assumption:** as we assume that only a smaller fraction of nodes go offline, the effect is expected to be small and easily compensated for by the supermajority of online nodes.
+**Assumption:** With only a smaller fraction of nodes being offline or catching up, the effect is expected to be small and easily compensated for by the supermajority of online nodes.
 
 ### A node has a misconfigured clock
 
 Cap the maximum deviation from the default delay (limits the general impact of error introduced by the `BlockTimeController`). The node with misconfigured clock will contribute to the error in a limited way, but as long as the majority of nodes have an accurate clock, they will offset this error. 
 
-**Assumption:** few enough nodes will have a misconfigured clock, that the effect will be small enough to be easily compensated for by the supermajority of correct nodes.
+**Assumption:** With only a smaller fraction of nodes having misconfigured clocks, the effect will be small enough to be easily compensated for by the supermajority of correct nodes.
 
 ### Near epoch boundaries
 
@@ -287,7 +302,9 @@ We might incorrectly compute high error in the target view rate, if local curren
 
 ### EFM
 
-We need to detect EFM and revert to a default block-rate-delay (stop adjusting).
+When the network is in EFM, epoch timing is anyway disrupted. The main thing we want to avoid is that the controller drives consensus into a timeout.
+This is largely guaranteed, due to the limits of authority. Beyond that, pretty much any block timing on the happy path is acceptable.
+Through, the optimal solution would be a consistent view time throughout normal Epochs as well as EFM.  
 
 ## Testing
 
