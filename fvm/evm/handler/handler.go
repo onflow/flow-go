@@ -368,11 +368,6 @@ func (h *ContractHandler) dryRun(
 		return nil, types.ErrUnexpectedEmptyResult
 	}
 
-	// if invalid return the invalid error
-	if res.Invalid() {
-		return nil, res.ValidationError
-	}
-
 	return res, nil
 }
 
