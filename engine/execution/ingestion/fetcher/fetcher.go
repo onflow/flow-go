@@ -71,7 +71,7 @@ func (e *CollectionFetcher) FetchCollection(blockID flow.Identifier, height uint
 		})
 	}
 
-	e.log.Info().Bool("onflowOnlyLNs", e.onflowOnlyLNs).
+	e.log.Debug().Bool("onflowOnlyLNs", e.onflowOnlyLNs).
 		Msgf("queued collection %v for block %v, height %v from guarantors: %v",
 			guarantee.ID(), blockID, height, guarantors)
 
