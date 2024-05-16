@@ -176,9 +176,9 @@ func TestPayloadFile(t *testing.T) {
 				}
 			}
 
-			addresses := make([]common.Address, 0, len(selectedAddresses))
+			addresses := make(map[string]struct{}, len(selectedAddresses))
 			for address := range selectedAddresses {
-				addresses = append(addresses, address)
+				addresses[string(address[:])] = struct{}{}
 			}
 
 			numOfPayloadWritten, err := util.CreatePayloadFile(
@@ -244,7 +244,9 @@ func TestPayloadFile(t *testing.T) {
 				zerolog.Nop(),
 				payloadFileName,
 				payloads,
-				[]common.Address{emptyAddress},
+				map[string]struct{}{
+					string(emptyAddress[:]): {},
+				},
 				false,
 			)
 			require.NoError(t, err)
