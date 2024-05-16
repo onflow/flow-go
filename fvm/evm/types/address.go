@@ -2,6 +2,7 @@ package types
 
 import (
 	"bytes"
+	"encoding/hex"
 	"fmt"
 
 	"github.com/onflow/cadence"
@@ -105,7 +106,12 @@ func COAAddressFromFlowCOACreatedEvent(evmContractAddress flow.Address, event fl
 		return Address{}, fmt.Errorf("address is not a string")
 	}
 
-	return NewAddressFromString(addressString.String()), nil
+	addressBytes, err := hex.DecodeString(string(addressString))
+	if err != nil {
+		return Address{}, err
+	}
+
+	return NewAddressFromBytes(addressBytes), nil
 }
 
 // NewAddressFromString constructs a new address from an string
