@@ -25,7 +25,8 @@ func ParseOwners(hexAddresses []string) (map[string]struct{}, error) {
 
 			addresses[string(addr[:])] = struct{}{}
 		} else {
-			addresses[hexAddr] = struct{}{}
+			// global registers has empty address
+			addresses[""] = struct{}{}
 		}
 	}
 
