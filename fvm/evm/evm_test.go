@@ -1,6 +1,7 @@
 package evm_test
 
 import (
+	"encoding/binary"
 	"encoding/hex"
 	"fmt"
 	"math"
@@ -1530,7 +1531,8 @@ func TestCadenceArch(t *testing.T) {
 					access(all)
 					fun main(tx: [UInt8], coinbaseBytes: [UInt8; 20]) {
 						let coinbase = EVM.EVMAddress(bytes: coinbaseBytes)
-						EVM.run(tx: tx, coinbase: coinbase)
+						let res = EVM.run(tx: tx, coinbase: coinbase)
+						assert(res.status == EVM.Status.successful, message: "test failed: ".concat(res.errorCode.toString()))
 					}
                     `,
 					sc.EVMContract.Address.HexWithPrefix(),
@@ -1560,6 +1562,73 @@ func TestCadenceArch(t *testing.T) {
 					snapshot)
 				require.NoError(t, err)
 				require.NoError(t, output.Err)
+			})
+	})
+
+	t.Run("testing calling Cadence arch - revertible random (happy case)", func(t *testing.T) {
+		chain := flow.Emulator.Chain()
+		sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+		RunWithNewEnvironment(t,
+			chain, func(
+				ctx fvm.Context,
+				vm fvm.VM,
+				snapshot snapshot.SnapshotTree,
+				testContract *TestContract,
+				testAccount *EOATestAccount,
+			) {
+				entropy := []byte{13, 37}
+				random := uint64(5685951790659751383)
+				ctx.EntropyProvider = testutil.EntropyProviderFixture(entropy) // fix the entropy
+
+				code := []byte(fmt.Sprintf(
+					`
+					import EVM from %s
+
+					access(all)
+					fun main(tx: [UInt8], coinbaseBytes: [UInt8; 20]): [UInt8] {
+						let coinbase = EVM.EVMAddress(bytes: coinbaseBytes)
+						let res = EVM.run(tx: tx, coinbase: coinbase)
+						assert(res.status == EVM.Status.successful, message: "test failed: ".concat(res.errorCode.toString()))
+						return res.data
+					}
+                    `,
+					sc.EVMContract.Address.HexWithPrefix(),
+				))
+				innerTxBytes := testAccount.PrepareSignAndEncodeTx(t,
+					testContract.DeployedAt.ToCommon(),
+					testContract.MakeCallData(t, "verifyArchCallToRevertibleRandom"),
+					big.NewInt(0),
+					uint64(10_000_000),
+					big.NewInt(0),
+				)
+				script := fvm.Script(code).WithArguments(
+					json.MustEncode(
+						cadence.NewArray(
+							ConvertToCadence(innerTxBytes),
+						).WithType(stdlib.EVMTransactionBytesCadenceType),
+					),
+					json.MustEncode(
+						cadence.NewArray(
+							ConvertToCadence(testAccount.Address().Bytes()),
+						).WithType(stdlib.EVMAddressBytesCadenceType),
+					),
+				)
+				_, output, err := vm.Run(
+					ctx,
+					script,
+					snapshot)
+				require.NoError(t, err)
+				require.NoError(t, output.Err)
+
+				res := make([]byte, 8)
+				vals := output.Value.(cadence.Array).Values
+				vals = vals[len(vals)-8:] // only last 8 bytes is the value
+				for i := range res {
+					res[i] = byte(vals[i].(cadence.UInt8))
+				}
+
+				actualRand := binary.BigEndian.Uint64(res)
+				require.Equal(t, random, actualRand)
 			})
 	})
 
@@ -1809,7 +1878,8 @@ func TestCadenceArch(t *testing.T) {
 					access(all)
 					fun main(tx: [UInt8], coinbaseBytes: [UInt8; 20]) {
 						let coinbase = EVM.EVMAddress(bytes: coinbaseBytes)
-						EVM.run(tx: tx, coinbase: coinbase)
+						let res = EVM.run(tx: tx, coinbase: coinbase)
+						assert(res.status == EVM.Status.successful, message: "test failed: ".concat(res.errorCode.toString()))
 					}
                 	`,
 					sc.EVMContract.Address.HexWithPrefix(),
