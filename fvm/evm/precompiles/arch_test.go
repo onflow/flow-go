@@ -22,6 +22,7 @@ func TestArchContract(t *testing.T) {
 			},
 			nil,
 			nil,
+			nil,
 		)
 
 		input := precompiles.FlowBlockHeightFuncSig.Bytes()
@@ -48,6 +49,7 @@ func TestArchContract(t *testing.T) {
 			func(u uint64) (uint64, error) {
 				return rand, nil
 			},
+			nil,
 		)
 
 		require.Equal(t, address, pc.Address())
@@ -66,6 +68,32 @@ func TestArchContract(t *testing.T) {
 		require.Equal(t, rand, resultRand)
 	})
 
+	t.Run("test revertible random", func(t *testing.T) {
+		address := testutils.RandomAddress(t)
+		rand := uint64(1337)
+		pc := precompiles.ArchContract(
+			address,
+			nil,
+			nil,
+			nil,
+			func() (uint64, error) {
+				return rand, nil
+			},
+		)
+
+		require.Equal(t, address, pc.Address())
+
+		input := append(precompiles.RevertibleRandomFuncSig.Bytes())
+		require.Equal(t, precompiles.RevertibleRandomGas, pc.RequiredGas(input))
+
+		ret, err := pc.Run(input)
+		require.NoError(t, err)
+
+		resultRand, err := precompiles.ReadUint64(ret, 0)
+		require.NoError(t, err)
+		require.Equal(t, rand, resultRand)
+	})
+
 	t.Run("test proof verification", func(t *testing.T) {
 		proof := testutils.COAOwnershipProofInContextFixture(t)
 		pc := precompiles.ArchContract(
@@ -75,6 +103,7 @@ func TestArchContract(t *testing.T) {
 				require.Equal(t, proof, p)
 				return true, nil
 			},
+			nil,
 			nil,
 		)
 
