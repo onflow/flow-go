@@ -7,6 +7,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/cmd/util/ledger/util/registers"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
@@ -60,6 +61,8 @@ func TestDeploy(t *testing.T) {
 	const chainID = flow.Emulator
 
 	chain := chainID.Chain()
+
+	const nWorker = 2
 
 	systemContracts := systemcontracts.SystemContractsForChain(chainID)
 	serviceAccountAddress := systemContracts.FlowServiceAccount.Address
@@ -119,7 +122,10 @@ func TestDeploy(t *testing.T) {
 		}
 	}
 
-	newPayloads, err := migration(filteredPayloads)
+	registersByAccount, err := registers.NewByAccountFromPayloads(filteredPayloads)
+	require.NoError(t, err)
+
+	err = migration(registersByAccount)
 	require.NoError(t, err)
 
 	txBody := flow.NewTransactionBody().
@@ -139,6 +145,8 @@ func TestDeploy(t *testing.T) {
 	vm := fvm.NewVirtualMachine()
 
 	storageSnapshot := snapshot.MapStorageSnapshot{}
+
+	newPayloads := registersByAccount.DestructIntoPayloads(nWorker)
 
 	for _, newPayload := range newPayloads {
 		registerID, registerValue, err := convert.PayloadToRegister(newPayload)

@@ -16,6 +16,24 @@ func TestSet(t *testing.T) {
 	require.Equal(t, uint64(4), counter.Value())
 }
 
+func TestIncrement(t *testing.T) {
+	counter := NewMonotonousCounter(1)
+	require.Equal(t, uint64(2), counter.Increment())
+	require.Equal(t, uint64(3), counter.Increment())
+}
+
+// TestIncrementConcurrently tests that the MonotonousCounter's Increment method
+// works correctly when called concurrently from multiple goroutines
+func TestIncrementConcurrently(t *testing.T) {
+	counter := NewMonotonousCounter(0)
+
+	unittest.Concurrently(100, func(i int) {
+		counter.Increment()
+	})
+
+	require.Equal(t, uint64(100), counter.Value())
+}
+
 func TestFuzzy(t *testing.T) {
 	counter := NewMonotonousCounter(3)
 	require.True(t, counter.Set(4))
