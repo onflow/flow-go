@@ -10,7 +10,6 @@ import (
 	syncAtomic "sync/atomic"
 	"time"
 
-	"github.com/onflow/cadence/runtime/common"
 	"github.com/rs/zerolog"
 	"go.uber.org/atomic"
 	"golang.org/x/sync/errgroup"
@@ -38,7 +37,7 @@ func extractExecutionState(
 	nWorker int, // number of concurrent worker to migration payloads
 	runMigrations bool,
 	outputPayloadFile string,
-	exportPayloadsByAddresses []common.Address,
+	exportPayloadsForOwners map[string]struct{},
 	sortPayloads bool,
 	opts migrators.Options,
 ) error {
@@ -144,7 +143,7 @@ func extractExecutionState(
 			payloads,
 			nWorker,
 			outputPayloadFile,
-			exportPayloadsByAddresses,
+			exportPayloadsForOwners,
 			false, // payloads represents entire state.
 			sortPayloads,
 		)
@@ -216,7 +215,7 @@ func extractExecutionStateFromPayloads(
 	runMigrations bool,
 	inputPayloadFile string,
 	outputPayloadFile string,
-	exportPayloadsByAddresses []common.Address,
+	exportPayloadsForOwners map[string]struct{},
 	sortPayloads bool,
 	opts migrators.Options,
 ) error {
@@ -252,7 +251,7 @@ func extractExecutionStateFromPayloads(
 			payloads,
 			nWorker,
 			outputPayloadFile,
-			exportPayloadsByAddresses,
+			exportPayloadsForOwners,
 			inputPayloadsFromPartialState,
 			sortPayloads,
 		)
@@ -287,7 +286,7 @@ func exportPayloads(
 	payloads []*ledger.Payload,
 	nWorker int,
 	outputPayloadFile string,
-	exportPayloadsByAddresses []common.Address,
+	exportPayloadsForOwners map[string]struct{},
 	inputPayloadsFromPartialState bool,
 	sortPayloads bool,
 ) error {
@@ -307,7 +306,7 @@ func exportPayloads(
 		log,
 		outputPayloadFile,
 		payloads,
-		exportPayloadsByAddresses,
+		exportPayloadsForOwners,
 		inputPayloadsFromPartialState,
 	)
 	if err != nil {
