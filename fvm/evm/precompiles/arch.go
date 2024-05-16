@@ -46,6 +46,7 @@ func ArchContract(
 	heightProvider func() (uint64, error),
 	proofVer func(*types.COAOwnershipProofInContext) (bool, error),
 	randomSourceProvider func(uint64) (uint64, error),
+	revertibleRandomGenerator func() (uint64, error),
 ) types.Precompile {
 	return MultiFunctionPrecompileContract(
 		address,
@@ -53,6 +54,7 @@ func ArchContract(
 			&flowBlockHeight{heightProvider},
 			&proofVerifier{proofVer},
 			&randomnessSource{randomSourceProvider},
+			&revertibleRandom{revertibleRandomGenerator},
 		},
 	)
 }
