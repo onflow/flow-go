@@ -581,6 +581,12 @@ type CruiseCtlMetrics interface {
 	// ControllerOutput measures the output of the cruise control PID controller.
 	// Concretely, this is the quantity to subtract from the baseline view duration.
 	ControllerOutput(duration time.Duration)
+
+	// ProposalPublicationDelay measures the effective delay the controller imposes on publishing
+	// the node's own proposals, with all limits of authority applied.
+	// Note: Technically, our metrics capture the publication delay relative to when the publication delay was
+	// last requested. Currently, only the EventHandler requests a publication delay, exactly once per proposal.
+	ProposalPublicationDelay(duration time.Duration)
 }
 
 type CollectionMetrics interface {

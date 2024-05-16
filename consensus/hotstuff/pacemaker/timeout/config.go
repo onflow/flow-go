@@ -44,10 +44,9 @@ func NewDefaultConfig() Config {
 	timeoutAdjustmentFactorFactor := 1.2
 	// after 6 successively failed rounds, the pacemaker leaves the hot path and starts increasing timeouts (recovery mode)
 	happyPathMaxRoundFailures := uint64(6)
-	blockRateDelay := 0 * time.Millisecond
 	maxRebroadcastInterval := 5 * time.Second
 
-	conf, err := NewConfig(minReplicaTimeout+blockRateDelay, maxReplicaTimeout, timeoutAdjustmentFactorFactor, happyPathMaxRoundFailures, maxRebroadcastInterval)
+	conf, err := NewConfig(minReplicaTimeout, maxReplicaTimeout, timeoutAdjustmentFactorFactor, happyPathMaxRoundFailures, maxRebroadcastInterval)
 	if err != nil {
 		// we check in a unit test that this does not happen
 		panic("Default config is not compliant with timeout Config requirements")
