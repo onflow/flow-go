@@ -117,23 +117,6 @@ func New(
 		stoppedChannel:     make(chan struct{}),
 	}
 
-	adjuster := NewTPSAdjuster(
-		ctx,
-		log,
-		lg,
-		workerStatsTracker,
-
-		AdjusterParams{
-			Delay:       adjustDelay,
-			Interval:    adjustInterval,
-			InitialTPS:  uint(loadParams.LoadConfig.TPSInitial),
-			MinTPS:      uint(loadParams.LoadConfig.TpsMin),
-			MaxTPS:      uint(loadParams.LoadConfig.TpsMax),
-			MaxInflight: uint(loadParams.NumberOfAccounts / 2),
-		},
-	)
-	lg.adjuster = adjuster
-
 	lg.log.Info().Int("num_keys", servAcc.NumKeys()).Msg("service account loaded")
 
 	ts := &transactionSender{
@@ -195,13 +178,7 @@ func New(
 		return nil, fmt.Errorf("error setting up load: %w", err)
 	}
 
-	// Reset the adjuster after the Setup phase
-	lg.adjuster.Stop()
-	err = lg.SetTPS(uint(loadParams.LoadConfig.TPSInitial))
-	if err != nil {
-		return nil, fmt.Errorf("error setting TPS: %w", err)
-	}
-	adjuster = NewTPSAdjuster(
+	adjuster := NewTPSAdjuster(
 		ctx,
 		log,
 		lg,
