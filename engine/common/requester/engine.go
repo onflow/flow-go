@@ -306,7 +306,8 @@ func (e *Engine) dispatchRequest() (bool, error) {
 	e.log.Debug().Int("num_entities", len(e.items)).Msg("selecting entities")
 
 	// get the current top-level set of valid providers
-	providers, err := e.state.Final().Identities(e.selector)
+	final := e.state.Final()
+	providers, err := final.Identities(e.selector)
 	if err != nil {
 		return false, fmt.Errorf("could not get providers: %w", err)
 	}
@@ -346,15 +347,15 @@ func (e *Engine) dispatchRequest() (bool, error) {
 		// if the provider has already been chosen, check if this item
 		// can be requested from the same provider; otherwise skip it
 		// for now, so it will be part of the next batch request
-		if providerID != flow.ZeroID {
-			overlap := providers.Filter(filter.And(
-				filter.HasNodeID(providerID),
-				item.ExtraSelector,
-			))
-			if len(overlap) == 0 {
-				continue
-			}
-		}
+		// if providerID != flow.ZeroID {
+		// 	overlap := providers.Filter(filter.And(
+		// 		filter.HasNodeID(providerID),
+		// 		item.ExtraSelector,
+		// 	))
+		// 	if len(overlap) == 0 {
+		// 		continue
+		// 	}
+		// }
 
 		// if no provider has been chosen yet, choose from restricted set
 		// NOTE: a single item can not permanently block requests going
