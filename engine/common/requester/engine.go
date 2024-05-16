@@ -362,15 +362,16 @@ func (e *Engine) dispatchRequest() (bool, error) {
 		// order is random and will skip the item most of the times
 		// when other items are available
 		if providerID == flow.ZeroID {
-			providers = providers.Filter(item.ExtraSelector)
-			if len(providers) == 0 {
-				return false, fmt.Errorf("no valid providers available")
+			filteredProviders := providers.Filter(item.ExtraSelector)
+			if len(filteredProviders) == 0 {
+				return false, fmt.Errorf("no valid providers available for item %s, total providers: %v", entityID.String(), len(providers))
 			}
-			id, err := providers.Sample(1)
+			id, err := filteredProviders.Sample(1)
 			if err != nil {
 				return false, fmt.Errorf("sampling failed: %w", err)
 			}
 			providerID = id[0].NodeID
+			providers = filteredProviders
 		}
 
 		// add item to list and set retry parameters
