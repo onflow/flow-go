@@ -8,6 +8,7 @@ contract Storage {
     event NewStore(address indexed caller, uint256 indexed value);
 
     uint256 number;
+    uint256[] numberHistory;
 
     constructor() payable {
     }
@@ -21,6 +22,11 @@ contract Storage {
         number = num;
     }
 
+    function storeWithHistory(uint256 num) public {
+        number = num;
+        numberHistory.push(num);
+    }
+
     function storeButRevert(uint256 num) public {
         number = num;
         revert();
@@ -28,6 +34,10 @@ contract Storage {
 
     function retrieve() public view returns (uint256){
         return number;
+    }
+
+    function retrieveHistory() public view returns (uint256[] memory) {
+        return numberHistory;
     }
 
     function blockNumber() public view returns (uint256) {
