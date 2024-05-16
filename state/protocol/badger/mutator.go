@@ -821,6 +821,11 @@ func (m *FollowerState) epochMetricsAndEventsOnBlockFinalized(parentPsSnapshot, 
 	parentEpochPhase := parentPsSnapshot.EpochPhase()
 	childEpochPhase := finalizedPsSnapshot.EpochPhase()
 
+	// Same epoch phase -> nothing to do
+	if parentEpochPhase == childEpochPhase {
+		return
+	}
+
 	// Different counter -> must be an epoch transition
 	if parentEpochCounter != childEpochCounter {
 		childEpochSetup := finalizedPsSnapshot.EpochSetup()
@@ -839,10 +844,6 @@ func (m *FollowerState) epochMetricsAndEventsOnBlockFinalized(parentPsSnapshot, 
 			func() { m.metrics.CurrentDKGPhase2FinalView(childEpochSetup.DKGPhase2FinalView) },
 			func() { m.metrics.CurrentDKGPhase3FinalView(childEpochSetup.DKGPhase3FinalView) },
 		)
-		return
-	}
-	// Same counter and same phase -> nothing to do
-	if parentEpochPhase == childEpochPhase {
 		return
 	}
 	// Transition from Staking phase to Setup phase. `finalized` is first block in Setup phase.
