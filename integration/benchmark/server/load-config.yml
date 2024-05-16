@@ -24,7 +24,7 @@ evm-transfer:
   tps_min: 1
   tps_max: 1200
 evm-batch-transfer:
-  load_type: evm-transfer
+  load_type: evm-batch-transfer
   tps_initial: 5
   tps_min: 1
   tps_max: 1200
