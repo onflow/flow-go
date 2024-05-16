@@ -2822,7 +2822,7 @@ func TestEVMAddressSerializationAndDeserialization(t *testing.T) {
 
 	  access(all)
 	  fun main(hexString: String): EVM.EVMAddress {
-		return EVM.addressFromString(hexString) ?? panic("Invalid address provided")
+		return EVM.addressFromString(hexString)
 	  }
 	`)
 
