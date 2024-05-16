@@ -61,7 +61,8 @@ func (snap EncodableSnapshot) LatestSealedResult() *flow.ExecutionResult {
 
 	// For both spork root and mid-spork snapshots, the latest sealing result must
 	// either appear in a block payload or in the ExecutionResults field.
-	for _, block := range snap.SealingSegment.Blocks {
+	for i := len(snap.SealingSegment.Blocks) - 1; i >= 0; i-- {
+		block := snap.SealingSegment.Blocks[i]
 		for _, result := range block.Payload.Results {
 			if latestSeal.ResultID == result.ID() {
 				return result
