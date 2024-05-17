@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/fxamacker/cbor/v2"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/stretchr/testify/require"
 )
 
@@ -308,26 +309,52 @@ func TestPayloadKey(t *testing.T) {
 		k, err := p.Key()
 		require.NoError(t, err)
 		require.Equal(t, Key{}, k)
+
+		_, err = p.Address()
+		require.Error(t, err)
 	})
 	t.Run("empty payload", func(t *testing.T) {
 		p := Payload{}
 		k, err := p.Key()
 		require.NoError(t, err)
 		require.Equal(t, Key{}, k)
+
+		_, err = p.Address()
+		require.Error(t, err)
 	})
 	t.Run("empty key", func(t *testing.T) {
 		p := NewPayload(Key{}, Value{})
 		k, err := p.Key()
 		require.NoError(t, err)
 		require.Equal(t, Key{}, k)
+
+		_, err = p.Address()
+		require.Error(t, err)
 	})
-	t.Run("key", func(t *testing.T) {
-		key := Key{KeyParts: []KeyPart{{Type: 0, Value: []byte("abc")}, {Type: 1, Value: []byte("def")}}}
+	t.Run("global key", func(t *testing.T) {
+		key := Key{KeyParts: []KeyPart{{Type: 0, Value: []byte{}}, {Type: 1, Value: []byte("def")}}}
 		value := Value([]byte{0, 1, 2})
 		p := NewPayload(key, value)
 		k, err := p.Key()
 		require.NoError(t, err)
 		require.Equal(t, key, k)
+
+		addr, err := p.Address()
+		require.NoError(t, err)
+		require.Equal(t, flow.EmptyAddress, addr)
+	})
+	t.Run("key", func(t *testing.T) {
+		address := []byte{1, 2, 3, 4, 5, 6, 7, 8}
+		key := Key{KeyParts: []KeyPart{{Type: 0, Value: address}, {Type: 1, Value: []byte("def")}}}
+		value := Value([]byte{0, 1, 2})
+		p := NewPayload(key, value)
+		k, err := p.Key()
+		require.NoError(t, err)
+		require.Equal(t, key, k)
+
+		addr, err := p.Address()
+		require.NoError(t, err)
+		require.Equal(t, flow.Address(address), addr)
 	})
 }
 
