@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/cadence/encoding/ccf"
 	"github.com/onflow/cadence/runtime/common"
 	gethTypes "github.com/onflow/go-ethereum/core/types"
+	gethCrypto "github.com/onflow/go-ethereum/crypto"
 	"github.com/onflow/go-ethereum/rlp"
 	"github.com/stretchr/testify/assert"
 
@@ -674,7 +675,23 @@ func TestEVMBatchRun(t *testing.T) {
 				require.NoError(t, err)
 				txsBytes = append(txsBytes, txBytes)
 
-				// invalid transaction not enough balance for amount transfered (#6 excluded)
+				// invalid transaction signature (#6 exlcuded)
+				pkey, err := gethCrypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
+				require.NoError(t, err)
+				txSig, err := gethTypes.SignTx(gethTypes.NewTransaction(
+					nonce,
+					to,
+					big.NewInt(100_000), // more than available
+					limit,
+					price,
+					storeData(false),
+				), gethTypes.NewEIP2930Signer(big.NewInt(2)), pkey)
+				require.NoError(t, err)
+				txBytes, err = txSig.MarshalBinary()
+				require.NoError(t, err)
+				txsBytes = append(txsBytes, txBytes)
+
+				// invalid transaction not enough balance for amount transfered (#7 excluded)
 				txBytes, err = testAccount.
 					SignTx(t, gethTypes.NewTransaction(
 						nonce,
@@ -688,7 +705,7 @@ func TestEVMBatchRun(t *testing.T) {
 				require.NoError(t, err)
 				txsBytes = append(txsBytes, txBytes)
 
-				// failed transaction with non-existing method call (#7 excluded)
+				// failed transaction with non-existing method call (#8 excluded)
 				// this transaction is still included and increases nonce
 				txBytes, err = testAccount.
 					SignTx(t, gethTypes.NewTransaction(
@@ -705,7 +722,7 @@ func TestEVMBatchRun(t *testing.T) {
 				storeData(false) // call so it increments the number
 				nonce++
 
-				// invalid transaction not enough balance for paying high gas price (#8 excluded)
+				// invalid transaction not enough balance for paying high gas price (#9 excluded)
 				txBytes, err = testAccount.
 					SignTx(t, gethTypes.NewTransaction(
 						nonce,
@@ -719,7 +736,7 @@ func TestEVMBatchRun(t *testing.T) {
 				require.NoError(t, err)
 				txsBytes = append(txsBytes, txBytes)
 
-				// one more valid transaction (#9 included)
+				// one more valid transaction (#10 included)
 				txBytes, err = testAccount.
 					SignTx(t, gethTypes.NewTransaction(
 						nonce,
