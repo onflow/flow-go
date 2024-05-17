@@ -971,6 +971,8 @@ func (state *State) populateCache() error {
 }
 
 // isEpochEmergencyFallbackTriggered checks whether epoch fallback has been globally triggered.
+// TODO(efm-recovery): Stop storing a global EFM flag, use parentState.EFMTriggered instead
+//
 // Returns:
 // * (true, nil) if epoch fallback is triggered
 // * (false, nil) if epoch fallback is not triggered (including if the flag is not set)
