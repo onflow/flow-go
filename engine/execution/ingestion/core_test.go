@@ -28,7 +28,7 @@ import (
 	unittestMocks "github.com/onflow/flow-go/utils/unittest/mocks"
 )
 
-func TestInogestionCoreExecuteBlock(t *testing.T) {
+func TestIngestionCoreExecuteBlock(t *testing.T) {
 	// Given R <- 1 <- 2 (Col0) <- 3 <- 4 (Col1)
 	blocks, cols := makeBlocksAndCollections(t)
 	// create core
@@ -220,6 +220,8 @@ func (m *mockConsumer) OnComputationResultSaved(ctx context.Context, result *exe
 }
 
 func (m *mockConsumer) WaitForExecuted(blockID flow.Identifier, wg *sync.WaitGroup) {
+	m.Lock()
+	defer m.Unlock()
 	wg.Add(1)
 	m.wgs[blockID] = wg
 }
