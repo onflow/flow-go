@@ -1508,6 +1508,30 @@ func TestDryRun(t *testing.T) {
 				require.NotEmpty(t, result.DeployedContractAddress.String())
 			})
 	})
+
+	t.Run("test dry run validation error", func(t *testing.T) {
+		RunWithNewEnvironment(t,
+			chain, func(
+				ctx fvm.Context,
+				vm fvm.VM,
+				snapshot snapshot.SnapshotTree,
+				testContract *TestContract,
+				testAccount *EOATestAccount,
+			) {
+				tx := gethTypes.NewContractCreation(
+					0,
+					big.NewInt(100), // more than available
+					uint64(1000000),
+					big.NewInt(0),
+					nil,
+				)
+
+				result := dryRunTx(t, tx, ctx, vm, snapshot, testContract)
+				assert.Equal(t, types.ValidationErrCodeInsufficientFunds, result.ErrorCode)
+				assert.Equal(t, types.StatusInvalid, result.Status)
+				assert.Equal(t, types.InvalidTransactionGasCost, int(result.GasConsumed))
+			})
+	})
 }
 
 func TestCadenceArch(t *testing.T) {
