@@ -5,7 +5,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/cmd/util/ledger/util"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/model/flow"
@@ -34,7 +33,7 @@ func TestLedgerKeyToRegisterID(t *testing.T) {
 
 	p := ledger.NewPayload(key, ledger.Value("value"))
 
-	address, err := util.PayloadToAddress(p)
+	address, err := p.Address()
 
 	require.NoError(t, err)
 	require.Equal(t, registerID.Owner, flow.AddressToRegisterOwner(address))
@@ -62,7 +61,7 @@ func TestLedgerKeyToRegisterID_Global(t *testing.T) {
 
 	p := ledger.NewPayload(key, ledger.Value("value"))
 
-	address, err := util.PayloadToAddress(p)
+	address, err := p.Address()
 
 	require.NoError(t, err)
 	require.Equal(t, registerID.Owner, flow.AddressToRegisterOwner(address))
