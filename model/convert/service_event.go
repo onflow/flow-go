@@ -314,7 +314,7 @@ func convertServiceEventEpochRecover(event flow.Event) (*flow.ServiceEvent, erro
 		)
 	}
 
-	// parse EpochSetup event
+	// parse EpochRecover event
 
 	counter, err := getField[cadence.UInt64](fields, "counter")
 	if err != nil {
