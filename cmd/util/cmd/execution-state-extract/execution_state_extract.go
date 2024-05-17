@@ -548,7 +548,16 @@ func newByAccountRegistersFromPayloadAccountGrouping(
 		for accountRegisters := range results {
 			oldAccountRegisters := registersByAccount.SetAccountRegisters(accountRegisters)
 			if oldAccountRegisters != nil {
-				log.Warn().Msgf("account registers already exist for %x, merging", accountRegisters.Owner())
+				// Account grouping should never create multiple groups for an account.
+				// In case it does anyway, merge the groups together,
+				// by merging the existing registers into the new ones.
+
+				log.Warn().Msgf(
+					"account registers already exist for account %x. merging %d existing registers into %d new",
+					accountRegisters.Owner(),
+					oldAccountRegisters.Count(),
+					accountRegisters.Count(),
+				)
 
 				err := accountRegisters.Merge(oldAccountRegisters)
 				if err != nil {
