@@ -45,3 +45,16 @@ func ParseAddress(hexAddr string) (flow.Address, error) {
 
 	return flow.BytesToAddress(b), nil
 }
+
+func OwnersToString(owners map[string]struct{}) string {
+	var sb strings.Builder
+	index := 0
+	for owner := range owners {
+		if index > 0 {
+			sb.WriteRune(',')
+		}
+		_, _ = fmt.Fprintf(&sb, "%x", owner)
+		index++
+	}
+	return sb.String()
+}

@@ -328,7 +328,7 @@ func run(*cobra.Command, []string) {
 		} else {
 			outputMsg = fmt.Sprintf(
 				"exporting payloads for owners %v to %s",
-				flagOutputPayloadByAddresses,
+				common2.OwnersToString(exportPayloadsForOwners),
 				flagOutputPayloadFileName,
 			)
 		}

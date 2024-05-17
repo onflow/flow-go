@@ -57,14 +57,14 @@ func run(*cobra.Command, []string) {
 		log.Fatal().Msgf("Output file %s exists", flagOutputPayloadFileName)
 	}
 
-	addresses, err := common.ParseOwners(strings.Split(flagAddresses, ","))
+	owners, err := common.ParseOwners(strings.Split(flagAddresses, ","))
 	if err != nil {
 		log.Fatal().Err(err)
 	}
 
 	log.Info().Msgf(
-		"extracting payloads with address %v from %s to %s",
-		addresses,
+		"extracting payloads with owners %s from %s to %s",
+		common.OwnersToString(owners),
 		flagInputPayloadFileName,
 		flagOutputPayloadFileName,
 	)
@@ -78,7 +78,7 @@ func run(*cobra.Command, []string) {
 		log.Logger,
 		flagOutputPayloadFileName,
 		payloads,
-		addresses,
+		owners,
 		inputPayloadsFromPartialState,
 	)
 	if err != nil {
@@ -86,9 +86,9 @@ func run(*cobra.Command, []string) {
 	}
 
 	log.Info().Msgf(
-		"extracted %d payloads with addresses %v from %s to %s",
+		"extracted %d payloads with owners %s from %s to %s",
 		numOfPayloadWritten,
-		addresses,
+		common.OwnersToString(owners),
 		flagInputPayloadFileName,
 		flagOutputPayloadFileName,
 	)
