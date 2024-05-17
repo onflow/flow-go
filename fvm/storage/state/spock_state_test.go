@@ -31,8 +31,8 @@ func testSpock(
 ) []*spockState {
 	resultStates := []*spockState{}
 	for _, experiment := range counterfactualExperiments {
-		run1 := newSpockState(snapshot.MapStorageSnapshot{})
-		run2 := newSpockState(snapshot.MapStorageSnapshot{})
+		run1 := newSpockState(snapshot.MapStorageSnapshot{}, DefaultSpockSecretHasher)
+		run2 := newSpockState(snapshot.MapStorageSnapshot{}, DefaultSpockSecretHasher)
 
 		if experiment != nil {
 			experiment(t, run1)
@@ -106,12 +106,16 @@ func TestSpockStateGetDifferentUnderlyingStorage(t *testing.T) {
 	state1 := newSpockState(
 		snapshot.MapStorageSnapshot{
 			badRegisterId: value1,
-		})
+		},
+		DefaultSpockSecretHasher,
+	)
 
 	state2 := newSpockState(
 		snapshot.MapStorageSnapshot{
 			badRegisterId: value2,
-		})
+		},
+		DefaultSpockSecretHasher,
+	)
 
 	value, err := state1.Get(badRegisterId)
 	require.NoError(t, err)
@@ -407,7 +411,9 @@ func TestSpockStateNewChild(t *testing.T) {
 	parent := newSpockState(
 		snapshot.MapStorageSnapshot{
 			baseRegisterId: baseValue,
-		})
+		},
+		DefaultSpockSecretHasher,
+	)
 
 	err := parent.Set(parentRegisterId1, parentValue)
 	require.NoError(t, err)

@@ -54,7 +54,7 @@ func NewProtocolKVStore(collector module.CacheMetrics,
 			var kvStore flow.PSKeyValueStoreData
 			err := operation.RetrieveProtocolKVStore(stateID, &kvStore)(tx)
 			if err != nil {
-				return nil, fmt.Errorf("could not get kv snapshot by id: %w", err)
+				return nil, fmt.Errorf("could not get kv snapshot by id (%x): %w", stateID, err)
 			}
 			return &kvStore, nil
 		}
