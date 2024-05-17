@@ -1811,7 +1811,6 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				node.Storage.VersionBeacons,
 				ver,
 				latestFinalizedBlock,
-				true,
 			)
 			// VersionControl needs to consume BlockFinalized events.
 			node.ProtocolEvents.AddConsumer(versionControl)
