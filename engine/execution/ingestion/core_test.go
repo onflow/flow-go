@@ -220,6 +220,8 @@ func (m *mockConsumer) OnComputationResultSaved(ctx context.Context, result *exe
 }
 
 func (m *mockConsumer) WaitForExecuted(blockID flow.Identifier, wg *sync.WaitGroup) {
+	m.Lock()
+	defer m.Unlock()
 	wg.Add(1)
 	m.wgs[blockID] = wg
 }
