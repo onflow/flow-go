@@ -34,6 +34,16 @@ func (tc *TestContract) MakeCallData(t testing.TB, name string, args ...interfac
 	return MakeCallData(t, tc.ABI, name, args...)
 }
 
+func (tc *TestContract) ReturnValues(t testing.TB, functionName string, data []byte) interface{} {
+	abi, err := gethABI.JSON(strings.NewReader(tc.ABI))
+	require.NoError(t, err)
+
+	vals, err := abi.Unpack(functionName, data)
+	require.NoError(t, err)
+
+	return vals
+}
+
 func (tc *TestContract) SetDeployedAt(deployedAt types.Address) {
 	tc.DeployedAt = deployedAt
 }
