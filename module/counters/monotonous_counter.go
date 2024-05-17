@@ -35,3 +35,14 @@ func (c *StrictMonotonousCounter) Set(newValue uint64) bool {
 func (c *StrictMonotonousCounter) Value() uint64 {
 	return atomic.LoadUint64(&c.atomicCounter)
 }
+
+// Increment atomically increments counter and returns updated value
+func (c *StrictMonotonousCounter) Increment() uint64 {
+	for {
+		oldValue := c.Value()
+		newValue := oldValue + 1
+		if atomic.CompareAndSwapUint64(&c.atomicCounter, oldValue, newValue) {
+			return newValue
+		}
+	}
+}

@@ -381,10 +381,7 @@ func (h *Handler) handleEventsResponse(send sendSubscribeEventsResponseFunc, hea
 			return status.Errorf(codes.Internal, "could not convert events to entity: %v", err)
 		}
 
-		index := messageIndex.Value()
-		if ok := messageIndex.Set(index + 1); !ok {
-			return status.Errorf(codes.Internal, "message index already incremented to %d", messageIndex.Value())
-		}
+		index := messageIndex.Increment()
 
 		err = send(&executiondata.SubscribeEventsResponse{
 			BlockHeight:    resp.Height,
@@ -498,10 +495,7 @@ func (h *Handler) handleAccountStatusesResponse(
 			return err
 		}
 
-		index := messageIndex.Value()
-		if ok := messageIndex.Set(index + 1); !ok {
-			return status.Errorf(codes.Internal, "message index already incremented to %d", messageIndex.Value())
-		}
+		index := messageIndex.Increment()
 
 		err = send(&executiondata.SubscribeAccountStatusesResponse{
 			BlockId:      convert.IdentifierToMessage(resp.BlockID),
