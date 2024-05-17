@@ -250,7 +250,7 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 		subscription.DefaultSendBufferSize,
 	)
 
-	eventIndexer := index.NewEventsIndex(suite.events)
+	eventIndexer := index.NewEventsIndex(index.NewReporter(), suite.events)
 
 	suite.executionDataTracker = subscription.NewExecutionDataTracker(
 		suite.log,

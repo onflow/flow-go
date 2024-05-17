@@ -14,9 +14,9 @@ type EventsIndex struct {
 	events storage.Events
 }
 
-func NewEventsIndex(events storage.Events) *EventsIndex {
+func NewEventsIndex(reporter *Reporter, events storage.Events) *EventsIndex {
 	return &EventsIndex{
-		Reporter: NewReporter(),
+		Reporter: reporter,
 		events:   events,
 	}
 }

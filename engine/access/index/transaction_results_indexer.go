@@ -12,9 +12,9 @@ type TransactionResultsIndex struct {
 	results storage.LightTransactionResults
 }
 
-func NewTransactionResultsIndex(results storage.LightTransactionResults) *TransactionResultsIndex {
+func NewTransactionResultsIndex(reporter *Reporter, results storage.LightTransactionResults) *TransactionResultsIndex {
 	return &TransactionResultsIndex{
-		Reporter: NewReporter(),
+		Reporter: reporter,
 		results:  results,
 	}
 }

@@ -179,7 +179,7 @@ func (s *BackendExecutionDataSuite) SetupTestSuite(blockCount int) {
 func (s *BackendExecutionDataSuite) SetupTestMocks() {
 	s.registerID = unittest.RegisterIDFixture()
 
-	s.eventsIndex = index.NewEventsIndex(s.events)
+	s.eventsIndex = index.NewEventsIndex(index.NewReporter(), s.events)
 	s.registersAsync = execution.NewRegistersAsyncStore()
 	s.registers = storagemock.NewRegisterIndex(s.T())
 	err := s.registersAsync.Initialize(s.registers)

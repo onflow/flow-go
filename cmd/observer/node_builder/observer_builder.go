@@ -266,7 +266,7 @@ type ObserverServiceBuilder struct {
 	ExecutionDataStore      execution_data.ExecutionDataStore
 
 	RegistersAsyncStore *execution.RegistersAsyncStore
-	SimpleIndex         *index.Reporter
+	Reporter            *index.Reporter
 	EventsIndex         *index.EventsIndex
 	ScriptExecutor      *backend.ScriptExecutor
 
@@ -1364,12 +1364,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 			// setup requester to notify indexer when new execution data is received
 			execDataDistributor.AddOnExecutionDataReceivedConsumer(builder.ExecutionIndexer.OnExecutionData)
 
-			err = builder.SimpleIndex.Initialize(builder.ExecutionIndexer)
-			if err != nil {
-				return nil, err
-			}
-
-			err = builder.EventsIndex.Initialize(builder.ExecutionIndexer)
+			err = builder.Reporter.Initialize(builder.ExecutionIndexer)
 			if err != nil {
 				return nil, err
 			}
@@ -1389,11 +1384,6 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 			)
 
 			err = builder.ScriptExecutor.Initialize(builder.ExecutionIndexer, scripts)
-			if err != nil {
-				return nil, err
-			}
-
-			err = builder.TxResultsIndex.Initialize(builder.ExecutionIndexer)
 			if err != nil {
 				return nil, err
 			}
@@ -1688,16 +1678,16 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		builder.Storage.Events = bstorage.NewEvents(node.Metrics.Cache, node.DB)
 		return nil
 	})
-	builder.Module("simple index", func(node *cmd.NodeConfig) error {
-		builder.SimpleIndex = index.NewReporter()
+	builder.Module("reporter", func(node *cmd.NodeConfig) error {
+		builder.Reporter = index.NewReporter()
 		return nil
 	})
 	builder.Module("events index", func(node *cmd.NodeConfig) error {
-		builder.EventsIndex = index.NewEventsIndex(builder.Storage.Events)
+		builder.EventsIndex = index.NewEventsIndex(builder.Reporter, builder.Storage.Events)
 		return nil
 	})
 	builder.Module("transaction result index", func(node *cmd.NodeConfig) error {
-		builder.TxResultsIndex = index.NewTransactionResultsIndex(builder.Storage.LightTransactionResults)
+		builder.TxResultsIndex = index.NewTransactionResultsIndex(builder.Reporter, builder.Storage.LightTransactionResults)
 		return nil
 	})
 	builder.Module("script executor", func(node *cmd.NodeConfig) error {
@@ -1816,7 +1806,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			builder.unsecureGrpcServer,
 			builder.stateStreamBackend,
 			builder.stateStreamConf,
-			builder.SimpleIndex,
+			builder.Reporter,
 		)
 		if err != nil {
 			return nil, err

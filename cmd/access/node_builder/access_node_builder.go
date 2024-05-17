@@ -293,7 +293,7 @@ type FlowAccessNodeBuilder struct {
 	ExecutionIndexerCore       *indexer.IndexerCore
 	ScriptExecutor             *backend.ScriptExecutor
 	RegistersAsyncStore        *execution.RegistersAsyncStore
-	SimpleIndex                *index.Reporter
+	Reporter                   *index.Reporter
 	EventsIndex                *index.EventsIndex
 	TxResultsIndex             *index.TransactionResultsIndex
 	IndexerDependencies        *cmd.DependencyList
@@ -873,17 +873,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					return nil, err
 				}
 
-				err = builder.SimpleIndex.Initialize(builder.ExecutionIndexer)
-				if err != nil {
-					return nil, err
-				}
-
-				err = builder.EventsIndex.Initialize(builder.ExecutionIndexer)
-				if err != nil {
-					return nil, err
-				}
-
-				err = builder.TxResultsIndex.Initialize(builder.ExecutionIndexer)
+				err = builder.Reporter.Initialize(builder.ExecutionIndexer)
 				if err != nil {
 					return nil, err
 				}
@@ -1626,16 +1616,16 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			builder.Storage.Events = bstorage.NewEvents(node.Metrics.Cache, node.DB)
 			return nil
 		}).
-		Module("simple index", func(node *cmd.NodeConfig) error {
-			builder.SimpleIndex = index.NewReporter()
+		Module("reporter", func(node *cmd.NodeConfig) error {
+			builder.Reporter = index.NewReporter()
 			return nil
 		}).
 		Module("events index", func(node *cmd.NodeConfig) error {
-			builder.EventsIndex = index.NewEventsIndex(builder.Storage.Events)
+			builder.EventsIndex = index.NewEventsIndex(builder.Reporter, builder.Storage.Events)
 			return nil
 		}).
 		Module("transaction result index", func(node *cmd.NodeConfig) error {
-			builder.TxResultsIndex = index.NewTransactionResultsIndex(builder.Storage.LightTransactionResults)
+			builder.TxResultsIndex = index.NewTransactionResultsIndex(builder.Reporter, builder.Storage.LightTransactionResults)
 			return nil
 		}).
 		Module("processed block height consumer progress", func(node *cmd.NodeConfig) error {
@@ -1777,7 +1767,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				builder.unsecureGrpcServer,
 				builder.stateStreamBackend,
 				builder.stateStreamConf,
-				builder.SimpleIndex,
+				builder.Reporter,
 			)
 			if err != nil {
 				return nil, err
