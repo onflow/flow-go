@@ -83,7 +83,7 @@ func TestArchContract(t *testing.T) {
 
 		require.Equal(t, address, pc.Address())
 
-		input := append(precompiles.RevertibleRandomFuncSig.Bytes())
+		input := precompiles.RevertibleRandomFuncSig.Bytes()
 		require.Equal(t, precompiles.RevertibleRandomGas, pc.RequiredGas(input))
 
 		ret, err := pc.Run(input)
