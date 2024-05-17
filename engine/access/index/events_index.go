@@ -8,16 +8,16 @@ import (
 )
 
 // EventsIndex implements a wrapper around `storage.Events` ensuring that needed data has been synced and is available to the client.
-// Note: read detail how `SimpleIndex` is working
+// Note: read detail how `Reporter` is working
 type EventsIndex struct {
-	*SimpleIndex
+	*Reporter
 	events storage.Events
 }
 
 func NewEventsIndex(events storage.Events) *EventsIndex {
 	return &EventsIndex{
-		SimpleIndex: NewSimpleIndex(),
-		events:      events,
+		Reporter: NewReporter(),
+		events:   events,
 	}
 }
 

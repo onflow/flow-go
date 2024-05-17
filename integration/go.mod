@@ -19,15 +19,15 @@ require (
 	github.com/ipfs/go-datastore v0.6.0
 	github.com/ipfs/go-ds-badger2 v0.1.3
 	github.com/libp2p/go-libp2p v0.32.2
-	github.com/onflow/cadence v1.0.0-preview.26
+	github.com/onflow/cadence v1.0.0-preview.28
 	github.com/onflow/crypto v0.25.1
 	github.com/onflow/flow-core-contracts/lib/go/contracts v1.0.0
 	github.com/onflow/flow-core-contracts/lib/go/templates v1.0.0
 	github.com/onflow/flow-emulator v1.0.0-preview.21.0.20240501034320-e644fcba11e2
 	github.com/onflow/flow-go v0.34.0-crescendo-preview.10-staged-contracts-3.0.20240501031941-53ca114d9c37
-	github.com/onflow/flow-go-sdk v1.0.0-preview.26
+	github.com/onflow/flow-go-sdk v1.0.0-preview.29
 	github.com/onflow/flow-go/insecure v0.0.0-00010101000000-000000000000
-	github.com/onflow/flow/protobuf/go/flow v0.4.2
+	github.com/onflow/flow/protobuf/go/flow v0.4.3
 	github.com/onflow/go-ethereum v1.13.4
 	github.com/plus3it/gorecurcopy v0.0.1
 	github.com/prometheus/client_golang v1.18.0
@@ -241,7 +241,7 @@ require (
 	github.com/multiformats/go-multistream v0.5.0 // indirect
 	github.com/multiformats/go-varint v0.0.7 // indirect
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
-	github.com/onflow/atree v0.7.0-rc.1 // indirect
+	github.com/onflow/atree v0.7.0-rc.2 // indirect
 	github.com/onflow/flow-ft/lib/go/contracts v1.0.0 // indirect
 	github.com/onflow/flow-ft/lib/go/templates v1.0.0 // indirect
 	github.com/onflow/flow-nft/lib/go/contracts v1.2.0 // indirect

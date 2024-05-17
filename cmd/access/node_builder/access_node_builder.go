@@ -293,7 +293,7 @@ type FlowAccessNodeBuilder struct {
 	ExecutionIndexerCore       *indexer.IndexerCore
 	ScriptExecutor             *backend.ScriptExecutor
 	RegistersAsyncStore        *execution.RegistersAsyncStore
-	SimpleIndex                *index.SimpleIndex
+	SimpleIndex                *index.Reporter
 	EventsIndex                *index.EventsIndex
 	TxResultsIndex             *index.TransactionResultsIndex
 	IndexerDependencies        *cmd.DependencyList
@@ -643,7 +643,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				// requester expects the initial last processed height, which is the first height - 1
 				builder.executionDataConfig.InitialBlockHeight = builder.executionDataStartHeight - 1
 			} else {
-				builder.executionDataConfig.InitialBlockHeight = builder.FinalizedRootBlock.Header.Height
+				builder.executionDataConfig.InitialBlockHeight = builder.SealedRootBlock.Header.Height
 			}
 
 			execDataDistributor = edrequester.NewExecutionDataDistributor()
@@ -1627,7 +1627,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			return nil
 		}).
 		Module("simple index", func(node *cmd.NodeConfig) error {
-			builder.SimpleIndex = index.NewSimpleIndex()
+			builder.SimpleIndex = index.NewReporter()
 			return nil
 		}).
 		Module("events index", func(node *cmd.NodeConfig) error {

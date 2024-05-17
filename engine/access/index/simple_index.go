@@ -11,28 +11,28 @@ import (
 	"github.com/onflow/flow-go/module/state_synchronization"
 )
 
-var _ state_synchronization.IndexReporter = (*SimpleIndex)(nil)
+var _ state_synchronization.IndexReporter = (*Reporter)(nil)
 
-// SimpleIndex implements a wrapper around `IndexReporter` ensuring that needed data has been synced and is available to the client.
-// Note: `SimpleIndex` is created with empty reporter due to the next reasoning:
+// Reporter implements a wrapper around `IndexReporter` ensuring that needed data has been synced and is available to the client.
+// Note: `Reporter` is created with empty reporter due to the next reasoning:
 // When the index is initially bootstrapped, the indexer needs to load an execution state checkpoint from
 // disk and index all the data. This process can take more than 1 hour on some systems. Consequently, the Initialize
 // pattern is implemented to enable the Access API to start up and serve queries before the index is fully ready. During
 // the initialization phase, all calls to retrieve data from this struct should return indexer.ErrIndexNotInitialized.
 // The caller is responsible for handling this error appropriately for the method.
-type SimpleIndex struct {
+type Reporter struct {
 	reporter *atomic.Pointer[state_synchronization.IndexReporter]
 }
 
-func NewSimpleIndex() *SimpleIndex {
-	return &SimpleIndex{
+func NewReporter() *Reporter {
+	return &Reporter{
 		reporter: atomic.NewPointer[state_synchronization.IndexReporter](nil),
 	}
 }
 
 // Initialize replaces a previously non-initialized reporter. Can be called once.
 // No errors are expected during normal operations.
-func (s *SimpleIndex) Initialize(indexReporter state_synchronization.IndexReporter) error {
+func (s *Reporter) Initialize(indexReporter state_synchronization.IndexReporter) error {
 	if s.reporter.CompareAndSwap(nil, &indexReporter) {
 		return nil
 	}
@@ -42,7 +42,7 @@ func (s *SimpleIndex) Initialize(indexReporter state_synchronization.IndexReport
 // LowestIndexedHeight returns the lowest height indexed by the execution state indexer.
 // Expected errors:
 // - indexer.ErrIndexNotInitialized if the EventsIndex has not been initialized
-func (s *SimpleIndex) LowestIndexedHeight() (uint64, error) {
+func (s *Reporter) LowestIndexedHeight() (uint64, error) {
 	reporter, err := s.getReporter()
 	if err != nil {
 		return 0, err
@@ -54,7 +54,7 @@ func (s *SimpleIndex) LowestIndexedHeight() (uint64, error) {
 // HighestIndexedHeight returns the highest height indexed by the execution state indexer.
 // Expected errors:
 // - indexer.ErrIndexNotInitialized if the EventsIndex has not been initialized
-func (s *SimpleIndex) HighestIndexedHeight() (uint64, error) {
+func (s *Reporter) HighestIndexedHeight() (uint64, error) {
 	reporter, err := s.getReporter()
 	if err != nil {
 		return 0, err
@@ -69,7 +69,7 @@ func (s *SimpleIndex) HighestIndexedHeight() (uint64, error) {
 //   - indexer.ErrIndexNotInitialized if the `TransactionResultsIndex` has not been initialized
 //   - storage.ErrHeightNotIndexed if the block at the provided height is not indexed yet
 //   - fmt.Errorf with custom message if the highest or lowest indexed heights cannot be retrieved from the reporter
-func (s *SimpleIndex) checkDataAvailability(height uint64) error {
+func (s *Reporter) checkDataAvailability(height uint64) error {
 	reporter, err := s.getReporter()
 	if err != nil {
 		return err
@@ -97,7 +97,7 @@ func (s *SimpleIndex) checkDataAvailability(height uint64) error {
 // getReporter retrieves the current index reporter instance from the atomic pointer.
 // Expected errors:
 //   - indexer.ErrIndexNotInitialized if the reporter is not initialized
-func (s *SimpleIndex) getReporter() (state_synchronization.IndexReporter, error) {
+func (s *Reporter) getReporter() (state_synchronization.IndexReporter, error) {
 	reporter := s.reporter.Load()
 	if reporter == nil {
 		return nil, indexer.ErrIndexNotInitialized

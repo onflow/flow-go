@@ -6,16 +6,16 @@ import (
 )
 
 // TransactionResultsIndex implements a wrapper around `storage.LightTransactionResult` ensuring that needed data has been synced and is available to the client.
-// Note: read detail how `SimpleIndex` is working
+// Note: read detail how `Reporter` is working
 type TransactionResultsIndex struct {
-	*SimpleIndex
+	*Reporter
 	results storage.LightTransactionResults
 }
 
 func NewTransactionResultsIndex(results storage.LightTransactionResults) *TransactionResultsIndex {
 	return &TransactionResultsIndex{
-		SimpleIndex: NewSimpleIndex(),
-		results:     results,
+		Reporter: NewReporter(),
+		results:  results,
 	}
 }
 

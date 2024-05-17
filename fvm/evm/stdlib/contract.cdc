@@ -149,6 +149,32 @@ contract EVM {
             )
             emit FLOWTokensDeposited(addressBytes: self.bytes, amount: amount)
         }
+
+        /// Serializes the address to a hex string without the 0x prefix
+        /// Future implementations should pass data to InternalEVM for native serialization
+        access(all)
+        view fun toString(): String {
+            return String.encodeHex(self.bytes.toVariableSized())
+        }
+
+        /// Compares the address with another address
+        access(all)
+        view fun equals(_ other: EVMAddress): Bool {
+            return self.bytes == other.bytes
+        }
+    }
+
+    /// Converts a hex string to an EVM address if the string is a valid hex string
+    /// Future implementations should pass data to InternalEVM for native deserialization
+    access(all)
+    fun addressFromString(_ asHex: String): EVMAddress {
+        pre {
+            asHex.length == 40 || asHex.length == 42: "Invalid hex string length for an EVM address"
+        }
+        // Strip the 0x prefix if it exists
+        var withoutPrefix = (asHex[1] == "x" ? asHex.slice(from: 2, upTo: asHex.length) : asHex).toLower()
+        let bytes = withoutPrefix.decodeHex().toConstantSized<[UInt8;20]>()!
+        return EVMAddress(bytes: bytes)
     }
 
     access(all)

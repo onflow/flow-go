@@ -266,7 +266,7 @@ type ObserverServiceBuilder struct {
 	ExecutionDataStore      execution_data.ExecutionDataStore
 
 	RegistersAsyncStore *execution.RegistersAsyncStore
-	SimpleIndex         *index.SimpleIndex
+	SimpleIndex         *index.Reporter
 	EventsIndex         *index.EventsIndex
 	ScriptExecutor      *backend.ScriptExecutor
 
@@ -1192,7 +1192,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				// requester expects the initial last processed height, which is the first height - 1
 				builder.executionDataConfig.InitialBlockHeight = builder.executionDataStartHeight - 1
 			} else {
-				builder.executionDataConfig.InitialBlockHeight = builder.FinalizedRootBlock.Header.Height
+				builder.executionDataConfig.InitialBlockHeight = builder.SealedRootBlock.Header.Height
 			}
 
 			execDataDistributor = edrequester.NewExecutionDataDistributor()
@@ -1689,7 +1689,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		return nil
 	})
 	builder.Module("simple index", func(node *cmd.NodeConfig) error {
-		builder.SimpleIndex = index.NewSimpleIndex()
+		builder.SimpleIndex = index.NewReporter()
 		return nil
 	})
 	builder.Module("events index", func(node *cmd.NodeConfig) error {

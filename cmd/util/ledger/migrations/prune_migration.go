@@ -29,7 +29,7 @@ func NewCadence1PruneMigration(
 	chainID flow.ChainID,
 	log zerolog.Logger,
 	nWorkers int,
-) ledger.Migration {
+) RegistersMigration {
 	if chainID != flow.Testnet {
 		return nil
 	}
@@ -50,7 +50,6 @@ func NewCadence1PruneMigration(
 		serviceAccountAddress,
 		log,
 		chainID,
-		nWorkers,
 		migrate,
 	)
 }

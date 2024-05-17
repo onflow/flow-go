@@ -884,6 +884,11 @@ func (suite *Suite) TestGetSystemTransactionResult_HappyPath() {
 		backend, err := New(params)
 		suite.Require().NoError(err)
 
+		suite.execClient.
+			On("GetTransactionResult", mock.Anything, mock.AnythingOfType("*execution.GetTransactionResultRequest")).
+			Return(exeEventResp.TransactionResults[0], nil).
+			Once()
+
 		// Make the call for the system transaction result
 		res, err := backend.GetSystemTransactionResult(
 			context.Background(),
@@ -893,11 +898,8 @@ func (suite *Suite) TestGetSystemTransactionResult_HappyPath() {
 		suite.Require().NoError(err)
 
 		// Expected system chunk transaction
-		systemTx, err := blueprints.SystemChunkTransaction(suite.chainID.Chain())
-		suite.Require().NoError(err)
-
 		suite.Require().Equal(flow.TransactionStatusExecuted, res.Status)
-		suite.Require().Equal(systemTx.ID(), res.TransactionID)
+		suite.Require().Equal(suite.systemTx.ID(), res.TransactionID)
 
 		// Check for successful decoding of event
 		_, err = jsoncdc.Decode(nil, res.Events[0].Payload)
@@ -909,6 +911,71 @@ func (suite *Suite) TestGetSystemTransactionResult_HappyPath() {
 		suite.Require().NoError(err)
 		suite.Require().Equal(events, res.Events)
 	})
+}
+
+func (suite *Suite) TestGetSystemTransactionResultFromStorage() {
+	// Create fixtures for block, transaction, and collection
+	block := unittest.BlockFixture()
+	sysTx, err := blueprints.SystemChunkTransaction(suite.chainID.Chain())
+	suite.Require().NoError(err)
+	suite.Require().NotNil(sysTx)
+	transaction := flow.Transaction{TransactionBody: *sysTx}
+	txId := suite.systemTx.ID()
+	blockId := block.ID()
+
+	// Mock the behavior of the blocks and transactionResults objects
+	suite.blocks.
+		On("ByID", blockId).
+		Return(&block, nil).
+		Once()
+
+	lightTxShouldFail := false
+	suite.transactionResults.
+		On("ByBlockIDTransactionID", blockId, txId).
+		Return(&flow.LightTransactionResult{
+			TransactionID:   txId,
+			Failed:          lightTxShouldFail,
+			ComputationUsed: 0,
+		}, nil).
+		Once()
+
+	suite.transactions.
+		On("ByID", txId).
+		Return(&transaction.TransactionBody, nil).
+		Once()
+
+	// Set up the events storage mock
+	var eventsForTx []flow.Event
+	// expect a call to lookup events by block ID and transaction ID
+	suite.events.On("ByBlockIDTransactionID", blockId, txId).Return(eventsForTx, nil)
+
+	// Set up the state and snapshot mocks
+	suite.state.On("Final").Return(suite.snapshot, nil).Once()
+	suite.state.On("Sealed").Return(suite.snapshot, nil).Once()
+	suite.snapshot.On("Head", mock.Anything).Return(block.Header, nil).Once()
+
+	// create a mock index reporter
+	reporter := syncmock.NewIndexReporter(suite.T())
+	reporter.On("LowestIndexedHeight").Return(block.Header.Height, nil)
+	reporter.On("HighestIndexedHeight").Return(block.Header.Height+10, nil)
+
+	// Set up the backend parameters and the backend instance
+	params := suite.defaultBackendParams()
+	params.TxResultQueryMode = IndexQueryModeLocalOnly
+
+	params.EventsIndex = index.NewEventsIndex(suite.events)
+	err = params.EventsIndex.Initialize(reporter)
+	suite.Require().NoError(err)
+
+	params.TxResultsIndex = index.NewTransactionResultsIndex(suite.transactionResults)
+	err = params.TxResultsIndex.Initialize(reporter)
+	suite.Require().NoError(err)
+
+	backend, err := New(params)
+	suite.Require().NoError(err)
+
+	response, err := backend.GetSystemTransactionResult(context.Background(), blockId, entities.EventEncodingVersion_JSON_CDC_V0)
+	suite.assertTransactionResultResponse(err, response, block, txId, lightTxShouldFail, eventsForTx)
 }
 
 // TestGetSystemTransactionResult_BlockNotFound tests GetSystemTransactionResult function when block was not found.
@@ -1011,6 +1078,11 @@ func (suite *Suite) TestGetSystemTransactionResult_FailedEncodingConversion() {
 		backend, err := New(params)
 		suite.Require().NoError(err)
 
+		suite.execClient.
+			On("GetTransactionResult", mock.Anything, mock.AnythingOfType("*execution.GetTransactionResultRequest")).
+			Return(exeEventResp.TransactionResults[0], nil).
+			Once()
+
 		// Make the call for the system transaction result
 		res, err := backend.GetSystemTransactionResult(
 			context.Background(),
@@ -1020,7 +1092,7 @@ func (suite *Suite) TestGetSystemTransactionResult_FailedEncodingConversion() {
 
 		suite.Require().Nil(res)
 		suite.Require().Error(err)
-		suite.Require().Equal(err, status.Errorf(codes.Internal, "failed to convert events from system tx result: %v",
+		suite.Require().Equal(err, status.Errorf(codes.Internal, "failed to convert events to message: %v",
 			fmt.Errorf("conversion from format JSON_CDC_V0 to CCF_V0 is not supported")))
 	})
 }
