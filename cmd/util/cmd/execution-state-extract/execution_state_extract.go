@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"go.uber.org/atomic"
 	"golang.org/x/sync/errgroup"
 
@@ -547,10 +548,12 @@ func newByAccountRegistersFromPayloadAccountGrouping(
 		for accountRegisters := range results {
 			oldAccountRegisters := registersByAccount.SetAccountRegisters(accountRegisters)
 			if oldAccountRegisters != nil {
-				return fmt.Errorf(
-					"duplicate account registers for account %s",
-					accountRegisters.Owner(),
-				)
+				log.Warn().Msgf("account registers already exist for %x, merging", accountRegisters.Owner())
+
+				err := accountRegisters.Merge(oldAccountRegisters)
+				if err != nil {
+					return fmt.Errorf("failed to merge account registers: %w", err)
+				}
 			}
 		}
 
