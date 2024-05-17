@@ -57,7 +57,7 @@ func MessageToLightCollection(m *entities.Collection) (*flow.LightCollection, er
 }
 
 func FullCollectionToMessage(c *flow.Collection) ([]*entities.Transaction, error) {
-	if c == nil || c.Transactions == nil {
+	if c == nil {
 		return nil, fmt.Errorf("invalid collection")
 	}
 
