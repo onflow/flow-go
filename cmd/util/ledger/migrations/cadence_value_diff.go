@@ -7,7 +7,9 @@ import (
 	"github.com/onflow/cadence/runtime/interpreter"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
+	"github.com/onflow/flow-go/cmd/util/ledger/util/registers"
 	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 type diffKind int
@@ -72,25 +74,56 @@ type difference struct {
 
 type CadenceValueDiffReporter struct {
 	address        common.Address
+	chainID        flow.ChainID
 	reportWriter   reporters.ReportWriter
 	verboseLogging bool
+	nWorkers       int
 }
 
 func NewCadenceValueDiffReporter(
 	address common.Address,
+	chainID flow.ChainID,
 	rw reporters.ReportWriter,
 	verboseLogging bool,
+	nWorkers int,
 ) *CadenceValueDiffReporter {
 	return &CadenceValueDiffReporter{
 		address:        address,
+		chainID:        chainID,
 		reportWriter:   rw,
 		verboseLogging: verboseLogging,
+		nWorkers:       nWorkers,
 	}
+}
+
+func (dr *CadenceValueDiffReporter) newStorageRuntime(
+	payloads []*ledger.Payload,
+) (
+	*InterpreterMigrationRuntime,
+	registers.Registers,
+	error,
+) {
+	registersByAccount, err := registers.NewByAccountFromPayloads(payloads)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// TODO: maybe make read-only again
+	runtimeInterface, err := NewInterpreterMigrationRuntime(
+		registersByAccount,
+		dr.chainID,
+		InterpreterMigrationRuntimeConfig{},
+	)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return runtimeInterface, registersByAccount, nil
 }
 
 func (dr *CadenceValueDiffReporter) DiffStates(oldPayloads, newPayloads []*ledger.Payload, domains []string) {
 	// Create all the runtime components we need for comparing Cadence values.
-	oldRuntime, err := newReadonlyStorageRuntime(oldPayloads)
+	oldRuntime, oldRegs, err := dr.newStorageRuntime(oldPayloads)
 	if err != nil {
 		dr.reportWriter.Write(
 			diffError{
@@ -101,7 +134,18 @@ func (dr *CadenceValueDiffReporter) DiffStates(oldPayloads, newPayloads []*ledge
 		return
 	}
 
-	newRuntime, err := newReadonlyStorageRuntime(newPayloads)
+	err = loadAtreeSlabsInStorage(oldRuntime.Storage, oldRegs, dr.nWorkers)
+	if err != nil {
+		dr.reportWriter.Write(
+			diffError{
+				Address: dr.address.Hex(),
+				Kind:    diffErrorKindString[abortErrorKind],
+				Msg:     fmt.Sprintf("failed to preload old state atree payloads: %s", err),
+			})
+		return
+	}
+
+	newRuntime, newRegs, err := dr.newStorageRuntime(newPayloads)
 	if err != nil {
 		dr.reportWriter.Write(
 			diffError{
@@ -112,16 +156,29 @@ func (dr *CadenceValueDiffReporter) DiffStates(oldPayloads, newPayloads []*ledge
 		return
 	}
 
+	err = loadAtreeSlabsInStorage(newRuntime.Storage, newRegs, dr.nWorkers)
+	if err != nil {
+		dr.reportWriter.Write(
+			diffError{
+				Address: dr.address.Hex(),
+				Kind:    diffErrorKindString[abortErrorKind],
+				Msg:     fmt.Sprintf("failed to preload new state atree payloads: %s", err),
+			})
+		return
+	}
+
 	// Iterate through all domains and compare cadence values.
 	for _, domain := range domains {
 		dr.diffStorageDomain(oldRuntime, newRuntime, domain)
 	}
 }
 
-func (dr *CadenceValueDiffReporter) diffStorageDomain(oldRuntime, newRuntime *readonlyStorageRuntime, domain string) {
-
+func (dr *CadenceValueDiffReporter) diffStorageDomain(
+	oldRuntime *InterpreterMigrationRuntime,
+	newRuntime *InterpreterMigrationRuntime,
+	domain string,
+) {
 	oldStorageMap := oldRuntime.Storage.GetStorageMap(dr.address, domain, false)
-
 	newStorageMap := newRuntime.Storage.GetStorageMap(dr.address, domain, false)
 
 	if oldStorageMap == nil && newStorageMap == nil {
