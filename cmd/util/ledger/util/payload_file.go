@@ -249,9 +249,15 @@ func includePayloadByOwners(payload *ledger.Payload, owners map[string]struct{})
 		return false, fmt.Errorf("can't get key from payload: %w", err)
 	}
 
-	owner := k.KeyParts[0].Value
+	owner := string(k.KeyParts[0].Value)
 
-	_, ok := owners[string(owner)]
+	// Always include payloads for global registers,
+	// i.e. with empty owner
+	if owner == "" {
+		return true, nil
+	}
+
+	_, ok := owners[owner]
 	return ok, nil
 }
 
