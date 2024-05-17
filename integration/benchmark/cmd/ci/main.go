@@ -160,7 +160,7 @@ func main() {
 	}
 
 	// run load
-	err = lg.SetTPS(uint(*initialTPSFlag))
+	err = lg.SetTPS(uint(loadConfig.TPSInitial))
 	if err != nil {
 		log.Fatal().Err(err).Msg("unable to set tps")
 	}
