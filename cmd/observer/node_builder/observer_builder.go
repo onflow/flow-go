@@ -1792,6 +1792,12 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			return nil, err
 		}
 
+		// If execution data syncing and indexing is disabled, pass nil indexReporter
+		var indexReporter state_synchronization.IndexReporter
+		if builder.executionDataSyncEnabled && builder.executionDataIndexingEnabled {
+			indexReporter = builder.Reporter
+		}
+
 		engineBuilder, err := rpc.NewBuilder(
 			node.Logger,
 			node.State,
@@ -1806,7 +1812,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			builder.unsecureGrpcServer,
 			builder.stateStreamBackend,
 			builder.stateStreamConf,
-			builder.Reporter,
+			indexReporter,
 		)
 		if err != nil {
 			return nil, err

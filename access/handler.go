@@ -1259,21 +1259,22 @@ func (h *Handler) buildMetadataResponse() (*entities.Metadata, error) {
 	blockId := lastFinalizedHeader.ID()
 	nodeId := h.me.NodeID()
 
-	var highestIndexedHeight uint64
-	if h.indexReporter != nil {
-		var err error
-		highestIndexedHeight, err = h.indexReporter.HighestIndexedHeight()
-		if err != nil {
-			return nil, rpc.ConvertIndexError(err, lastFinalizedHeader.Height, "could not get highest indexed height")
-		}
-	}
-
-	return &entities.Metadata{
+	metadata := &entities.Metadata{
 		LatestFinalizedBlockId: blockId[:],
 		LatestFinalizedHeight:  lastFinalizedHeader.Height,
 		NodeId:                 nodeId[:],
-		HighestIndexedHeight:   highestIndexedHeight,
-	}, nil
+	}
+
+	if h.indexReporter != nil {
+		var err error
+		highestIndexedHeight, err := h.indexReporter.HighestIndexedHeight()
+		if err != nil {
+			return nil, rpc.ConvertIndexError(err, lastFinalizedHeader.Height, "could not get highest indexed height")
+		}
+		metadata.HighestIndexedHeight = highestIndexedHeight
+	}
+
+	return metadata, nil
 }
 
 func executionResultToMessages(er *flow.ExecutionResult, metadata *entities.Metadata) (*access.ExecutionResultForBlockIDResponse, error) {
