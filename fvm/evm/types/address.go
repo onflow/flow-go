@@ -2,6 +2,7 @@ package types
 
 import (
 	"bytes"
+	"encoding/hex"
 	"fmt"
 
 	"github.com/onflow/cadence"
@@ -76,7 +77,7 @@ func NewAddressFromBytes(inp []byte) Address {
 	return Address(gethCommon.BytesToAddress(inp))
 }
 
-const CadenceOwnedAccountCreatedTypeAddressBytesFieldName = "addressBytes"
+const CadenceOwnedAccountCreatedTypeAddressFieldName = "address"
 
 func COAAddressFromFlowCOACreatedEvent(evmContractAddress flow.Address, event flow.Event) (Address, error) {
 	// check the type first
@@ -95,19 +96,19 @@ func COAAddressFromFlowCOACreatedEvent(evmContractAddress flow.Address, event fl
 		return Address{}, fmt.Errorf("event data is not a cadence event")
 	}
 
-	addressBytesValue := cadence.SearchFieldByName(
+	addressValue := cadence.SearchFieldByName(
 		cadenceEvent,
-		CadenceOwnedAccountCreatedTypeAddressBytesFieldName,
+		CadenceOwnedAccountCreatedTypeAddressFieldName,
 	)
 
-	addressBytesArray, ok := addressBytesValue.(cadence.Array)
+	addressString, ok := addressValue.(cadence.String)
 	if !ok {
-		return Address{}, fmt.Errorf("addressBytes is not an array")
+		return Address{}, fmt.Errorf("address is not a string")
 	}
 
-	addressBytes := make([]byte, AddressLength)
-	for i, v := range addressBytesArray.Values {
-		addressBytes[i] = byte(v.(cadence.UInt8))
+	addressBytes, err := hex.DecodeString(string(addressString))
+	if err != nil {
+		return Address{}, err
 	}
 
 	return NewAddressFromBytes(addressBytes), nil

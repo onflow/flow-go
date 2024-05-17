@@ -355,15 +355,16 @@ func run(*cobra.Command, []string) {
 	log.Info().Msgf("state extraction plan: %s, %s", inputMsg, outputMsg)
 
 	chainID := chain.ChainID()
-	// TODO:
-	evmContractChange := migrations.EVMContractChangeNone
 
-	var burnerContractChange migrations.BurnerContractChange
+	burnerContractChange := migrations.BurnerContractChangeNone
+	evmContractChange := migrations.EVMContractChangeNone
 	switch chainID {
 	case flow.Emulator:
 		burnerContractChange = migrations.BurnerContractChangeDeploy
+		evmContractChange = migrations.EVMContractChangeDeploy
 	case flow.Testnet, flow.Mainnet:
 		burnerContractChange = migrations.BurnerContractChangeUpdate
+		evmContractChange = migrations.EVMContractChangeUpdate
 	}
 
 	stagedContracts, err := migrations.StagedContractsFromCSV(flagStagedContractsFile)
