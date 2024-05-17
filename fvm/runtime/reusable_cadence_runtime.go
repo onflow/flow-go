@@ -53,7 +53,7 @@ func NewReusableCadenceRuntime(rt runtime.Runtime, config runtime.Config) *Reusa
 		Name: "randomSourceHistory",
 		Type: randomSourceFunctionType,
 		Kind: common.DeclarationKindFunction,
-		Value: interpreter.NewUnmeteredHostFunctionValue(
+		Value: interpreter.NewUnmeteredStaticHostFunctionValue(
 			randomSourceFunctionType,
 			func(invocation interpreter.Invocation) interpreter.Value {
 				if len(invocation.Arguments) != 0 {
