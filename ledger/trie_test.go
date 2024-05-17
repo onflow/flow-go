@@ -5,8 +5,9 @@ import (
 	"testing"
 
 	"github.com/fxamacker/cbor/v2"
-	"github.com/onflow/flow-go/model/flow"
 	"github.com/stretchr/testify/require"
+
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // TestPayloadEquals tests equality of payloads.  It tests:
