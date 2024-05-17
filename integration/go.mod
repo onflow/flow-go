@@ -19,13 +19,13 @@ require (
 	github.com/ipfs/go-datastore v0.6.0
 	github.com/ipfs/go-ds-badger2 v0.1.3
 	github.com/libp2p/go-libp2p v0.32.2
-	github.com/onflow/cadence v1.0.0-preview.28
+	github.com/onflow/cadence v1.0.0-preview.29
 	github.com/onflow/crypto v0.25.1
 	github.com/onflow/flow-core-contracts/lib/go/contracts v1.1.0
 	github.com/onflow/flow-core-contracts/lib/go/templates v1.0.0
 	github.com/onflow/flow-emulator v1.0.0-preview.21.0.20240501034320-e644fcba11e2
 	github.com/onflow/flow-go v0.34.0-crescendo-preview.10-staged-contracts-3.0.20240501031941-53ca114d9c37
-	github.com/onflow/flow-go-sdk v1.0.0-preview.29
+	github.com/onflow/flow-go-sdk v1.0.0-preview.30
 	github.com/onflow/flow-go/insecure v0.0.0-00010101000000-000000000000
 	github.com/onflow/flow/protobuf/go/flow v0.4.3
 	github.com/onflow/go-ethereum v1.13.4
