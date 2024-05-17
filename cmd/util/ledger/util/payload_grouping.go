@@ -128,12 +128,12 @@ func (s sortablePayloads) Less(i, j int) bool {
 }
 
 func (s sortablePayloads) Compare(i, j int) int {
-	a, err := PayloadToAddress(s[i])
+	a, err := s[i].Address()
 	if err != nil {
 		panic(err)
 	}
 
-	b, err := PayloadToAddress(s[j])
+	b, err := s[j].Address()
 	if err != nil {
 		panic(err)
 	}
