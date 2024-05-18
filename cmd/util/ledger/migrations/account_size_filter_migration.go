@@ -57,20 +57,24 @@ func NewAccountSizeFilterMigration(
 			}
 		}
 
-		return registersByAccount.ForEachAccount(func(owner string, accountRegisters *registers.AccountRegisters) error {
-			if _, ok := exceptions[owner]; ok {
-				return nil
-			}
+		return registersByAccount.ForEachAccount(
+			func(accountRegisters *registers.AccountRegisters) error {
+				owner := accountRegisters.Owner()
 
-			info := payloadCountByAddress[owner]
-			if info.size <= maxAccountSize {
-				return nil
-			}
+				if _, ok := exceptions[owner]; ok {
+					return nil
+				}
 
-			return accountRegisters.ForEach(func(owner, key string, _ []byte) error {
-				return accountRegisters.Set(owner, key, nil)
-			})
-		})
+				info := payloadCountByAddress[owner]
+				if info.size <= maxAccountSize {
+					return nil
+				}
+
+				return accountRegisters.ForEach(func(owner, key string, _ []byte) error {
+					return accountRegisters.Set(owner, key, nil)
+				})
+			},
+		)
 	}
 }
 

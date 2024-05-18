@@ -135,9 +135,9 @@ func (b *ByAccount) DestructIntoPayloads(nWorker int) []*ledger.Payload {
 	return payloads
 }
 
-func (b *ByAccount) ForEachAccount(f func(owner string, accountRegisters *AccountRegisters) error) error {
-	for owner, accountRegisters := range b.registers {
-		err := f(owner, accountRegisters)
+func (b *ByAccount) ForEachAccount(f func(accountRegisters *AccountRegisters) error) error {
+	for _, accountRegisters := range b.registers {
+		err := f(accountRegisters)
 		if err != nil {
 			return err
 		}
@@ -261,6 +261,17 @@ func (a *AccountRegisters) insertPayloads(payloads []*ledger.Payload) {
 		payloads[index] = payload
 		index++
 	}
+}
+
+func (a *AccountRegisters) Merge(other *AccountRegisters) error {
+	for key, value := range other.registers {
+		_, ok := a.registers[key]
+		if ok {
+			return fmt.Errorf("key already exists: %s", key)
+		}
+		a.registers[key] = value
+	}
+	return nil
 }
 
 func NewAccountRegistersFromPayloads(owner string, payloads []*ledger.Payload) (*AccountRegisters, error) {

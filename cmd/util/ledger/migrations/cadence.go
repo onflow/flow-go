@@ -353,6 +353,16 @@ func NewCadence1ContractsMigrations(
 		)
 	}
 
+	if opts.EVMContractChange == EVMContractChangeDeploy {
+		migs = append(
+			migs,
+			NamedMigration{
+				Name:    "evm-deployment-migration",
+				Migrate: NewEVMDeploymentMigration(opts.ChainID, log),
+			},
+		)
+	}
+
 	if opts.BurnerContractChange == BurnerContractChangeDeploy {
 		migs = append(
 			migs,
