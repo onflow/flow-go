@@ -518,10 +518,29 @@ func (m *StagedContractsMigration) checkContractUpdateValidity(
 	contractName string,
 	newCode []byte,
 	oldCode ledger.Value,
-) error {
+) (err error) {
 	// Parsing and checking of programs has to be done synchronously.
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
+
+	// Recover panics that might occur due to bugs while parsing, checking,
+	// or validating the contract update
+	defer func() {
+		// recover
+		if r := recover(); r != nil {
+			var ok bool
+			err, ok = r.(error)
+			if !ok {
+				err = fmt.Errorf("panic: %v", r)
+			}
+
+			m.log.Err(err).
+				Stack().
+				Str("account", address.HexWithPrefix()).
+				Str("contract", contractName).
+				Msg("failed to validate contract update")
+		}
+	}()
 
 	location := common.AddressLocation{
 		Name:    contractName,

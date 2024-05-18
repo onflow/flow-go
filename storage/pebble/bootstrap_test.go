@@ -231,8 +231,8 @@ func randomRegisterPayloads(n uint16) []ledger.Payload {
 		o := make([]byte, 0, 8)
 		o = binary.BigEndian.AppendUint16(o, n)
 		k := ledger.Key{KeyParts: []ledger.KeyPart{
-			{Type: convert.KeyPartOwner, Value: o},
-			{Type: convert.KeyPartKey, Value: o},
+			{Type: ledger.KeyPartOwner, Value: o},
+			{Type: ledger.KeyPartKey, Value: o},
 		}}
 		// values are always 'v' for ease of testing/checking
 		v := ledger.Value{defaultRegisterValue}

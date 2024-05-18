@@ -16,6 +16,8 @@ var (
 
 	RandomSourceFuncSig = ComputeFunctionSelector("getRandomSource", []string{"uint64"})
 
+	RevertibleRandomFuncSig = ComputeFunctionSelector("revertibleRandom", nil)
+
 	// FlowBlockHeightFixedGas is set to match the `number` opCode (0x43)
 	FlowBlockHeightFixedGas = uint64(2)
 	// ProofVerifierBaseGas covers the cost of decoding, checking capability the resource
@@ -25,8 +27,11 @@ var (
 	// but we might increase this in the future
 	ProofVerifierGasMultiplerPerSignature = uint64(3_000)
 
-	// RandomSourceGas covers the cost of calculating a revertible random bytes
-	RandomSourceGas = uint64(1_000) // todo define
+	// RandomSourceGas covers the cost of obtaining random sournce bytes
+	RandomSourceGas = uint64(1_000)
+
+	// RevertibleRandomGas covers the cost of calculating a revertible random bytes
+	RevertibleRandomGas = uint64(1_000)
 
 	// errUnexpectedInput is returned when the function that doesn't expect an input
 	// argument, receives one
@@ -41,6 +46,7 @@ func ArchContract(
 	heightProvider func() (uint64, error),
 	proofVer func(*types.COAOwnershipProofInContext) (bool, error),
 	randomSourceProvider func(uint64) (uint64, error),
+	revertibleRandomGenerator func() (uint64, error),
 ) types.Precompile {
 	return MultiFunctionPrecompileContract(
 		address,
@@ -48,6 +54,7 @@ func ArchContract(
 			&flowBlockHeight{heightProvider},
 			&proofVerifier{proofVer},
 			&randomnessSource{randomSourceProvider},
+			&revertibleRandom{revertibleRandomGenerator},
 		},
 	)
 }
@@ -149,6 +156,35 @@ func (r *randomnessSource) Run(input []byte) ([]byte, error) {
 		return nil, err
 	}
 	rand, err := r.randomSourceProvider(height)
+	if err != nil {
+		return nil, err
+	}
+
+	buf := make([]byte, EncodedUint64Size)
+	err = EncodeUint64(rand, buf, 0)
+	if err != nil {
+		return nil, err
+	}
+
+	return buf, nil
+}
+
+var _ Function = &revertibleRandom{}
+
+type revertibleRandom struct {
+	revertibleRandomGenerator func() (uint64, error)
+}
+
+func (r *revertibleRandom) FunctionSelector() FunctionSelector {
+	return RevertibleRandomFuncSig
+}
+
+func (r *revertibleRandom) ComputeGas(input []byte) uint64 {
+	return RevertibleRandomGas
+}
+
+func (r *revertibleRandom) Run(input []byte) ([]byte, error) {
+	rand, err := r.revertibleRandomGenerator()
 	if err != nil {
 		return nil, err
 	}
