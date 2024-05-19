@@ -54,7 +54,6 @@ import (
 	"github.com/onflow/flow-go/engine/common/requester"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/engine/execution/computation/query"
-	"github.com/onflow/flow-go/engine/execution/ingestion/stop"
 	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/complete/wal"
@@ -161,8 +160,6 @@ type AccessNodeConfig struct {
 	registerCacheType                 string
 	registerCacheSize                 uint
 	programCacheSize                  uint
-	maxGracefulStopDuration           time.Duration
-	ingestionUnit                     *engine.Unit
 }
 
 type PublicNetworkConfig struct {
@@ -260,8 +257,6 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 		registerCacheType:            pStorage.CacheTypeTwoQueue.String(),
 		registerCacheSize:            0,
 		programCacheSize:             0,
-		maxGracefulStopDuration:      stop.DefaultMaxGracefulStopDuration,
-		ingestionUnit:                engine.NewUnit(),
 	}
 }
 
@@ -1278,9 +1273,6 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 			"program-cache-size",
 			defaultConfig.programCacheSize,
 			"[experimental] number of blocks to cache for cadence programs. use 0 to disable cache. default: 0. Note: this is an experimental feature and may cause nodes to become unstable under certain workloads. Use with caution.")
-
-		// Version Control
-		flags.DurationVar(&builder.maxGracefulStopDuration, "max-graceful-stop-duration", defaultConfig.maxGracefulStopDuration, "the maximum amount of time stop control will wait for ingestion engine to gracefully shutdown before crashing")
 	}).ValidateFlags(func() error {
 		if builder.supportsObserver && (builder.PublicNetworkConfig.BindAddress == cmd.NotSet || builder.PublicNetworkConfig.BindAddress == "") {
 			return errors.New("public-network-address must be set if supports-observer is true")
@@ -1804,8 +1796,6 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			}
 
 			versionControl := version.NewVersionControl(
-				builder.ingestionUnit,
-				builder.maxGracefulStopDuration,
 				builder.Logger,
 				node.Storage.Headers,
 				node.Storage.VersionBeacons,
