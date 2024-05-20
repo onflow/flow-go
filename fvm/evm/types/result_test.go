@@ -22,6 +22,7 @@ func Test_ResultErrors(t *testing.T) {
 
 		require.True(t, res.Invalid())
 		require.False(t, res.Failed())
+
 		sum := res.ResultSummary()
 		require.Equal(t, StatusInvalid, sum.Status)
 		require.Equal(t, ValidationErrCodeGasLimitReached, sum.ErrorCode)
@@ -37,6 +38,16 @@ func Test_ResultErrors(t *testing.T) {
 		sum := res.ResultSummary()
 		require.Equal(t, ValidationErrCodeNonceMax, sum.ErrorCode)
 		require.Equal(t, StatusInvalid, sum.Status)
+	})
+
+	t.Run("failed result", func(t *testing.T) {
+		res := Result{
+			VMError: gethCore.ErrGasUintOverflow,
+		}
+
+		require.True(t, res.Failed())
+		require.False(t, res.Invalid())
+		require.Equal(t, "gas uint64 overflow", res.VMErrorString())
 	})
 
 	t.Run("receipt", func(t *testing.T) {
