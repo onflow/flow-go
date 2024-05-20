@@ -39,7 +39,7 @@ func Test_ResultErrors(t *testing.T) {
 		require.Equal(t, StatusInvalid, sum.Status)
 	})
 
-	t.Run("failed receipt", func(t *testing.T) {
+	t.Run("receipt", func(t *testing.T) {
 		const gas = uint64(2000)
 		res := Result{
 			GasConsumed: gas,
@@ -50,5 +50,11 @@ func Test_ResultErrors(t *testing.T) {
 		rec := res.Receipt()
 		require.Equal(t, types.ReceiptStatusFailed, rec.Status)
 		require.Equal(t, gas, rec.CumulativeGasUsed)
+
+		// if invalid we should return nil
+		res = Result{
+			ValidationError: gethCore.ErrNonceMax,
+		}
+		require.Nil(t, res.Receipt())
 	})
 }
