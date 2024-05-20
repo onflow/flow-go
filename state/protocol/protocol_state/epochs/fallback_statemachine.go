@@ -19,6 +19,7 @@ const DefaultEpochExtensionViewCount = 100_000
 // TODO for 'leaving Epoch Fallback via special service event': this might need to change.
 type FallbackStateMachine struct {
 	baseStateMachine
+	params protocol.GlobalParams
 }
 
 var _ StateMachine = (*FallbackStateMachine)(nil)
@@ -44,6 +45,7 @@ func NewFallbackStateMachine(params protocol.GlobalParams, view uint64, parentSt
 			state:       state,
 			view:        view,
 		},
+		params: params,
 	}
 
 	if !nextEpochCommitted && view+params.EpochCommitSafetyThreshold() >= parentState.CurrentEpochFinalView() {
@@ -101,6 +103,20 @@ func (m *FallbackStateMachine) ProcessEpochCommit(_ *flow.EpochCommit) (bool, er
 
 // ProcessEpochRecover processes epoch recover service events.
 func (m *FallbackStateMachine) ProcessEpochRecover(epochRecover *flow.EpochRecover) (bool, error) {
+	if m.state.NextEpoch != nil { // sanity check: we can't process epoch recover if next epoch is already set
+		return false, protocol.NewInvalidServiceEventErrorf("can't process epoch recover, next epoch is already set")
+	}
+	epochExtensionsLen := len(m.state.CurrentEpoch.EpochExtensions)
+	if epochExtensionsLen == 0 {
+		return false, protocol.NewInvalidServiceEventErrorf("can't process epoch recover, no epoch extensions present")
+	}
+	finalView := m.state.CurrentEpoch.EpochExtensions[epochExtensionsLen-1].FinalView
+	if finalView+1 != epochRecover.EpochSetup.FirstView {
+		return false, protocol.NewInvalidServiceEventErrorf("can't process epoch recover, epoch setup is not contiguous with last extension")
+	}
+	if m.view+m.params.EpochCommitSafetyThreshold() >= finalView {
+		return false, protocol.NewInvalidServiceEventErrorf("can't process epoch recover, safety threshold reached")
+	}
 	nextEpochParticipants, err := buildNextEpochActiveParticipants(
 		m.parentState.CurrentEpoch.ActiveIdentities.Lookup(),
 		m.parentState.CurrentEpochSetup,

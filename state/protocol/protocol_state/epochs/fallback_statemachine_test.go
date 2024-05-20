@@ -61,6 +61,17 @@ func (s *EpochFallbackStateMachineSuite) TestProcessEpochCommitIsNoop() {
 	require.Equal(s.T(), s.parentProtocolState.ID(), s.stateMachine.ParentState().ID())
 }
 
+// TestProcessEpochRecover ensures that after processing EpochRecover event the state machine initializes
+// correctly the next epoch with correct values. Tests happy path scenario where the next epoch has been set up correctly.
+func (s *EpochFallbackStateMachineSuite) TestProcessEpochRecover() {
+	epochRecover := unittest.EpochRecoverFixture(func(setup *flow.EpochSetup) {
+		setup.Counter = s.parentProtocolState.CurrentEpochSetup.Counter + 3
+	})
+	processed, err := s.stateMachine.ProcessEpochRecover(epochRecover)
+	require.True(s.T(), processed)
+	require.NoError(s.T(), err)
+}
+
 // TestTransitionToNextEpoch tests a scenario where the FallbackStateMachine processes first block from next epoch.
 // It has to discard the parent state and build a new state with data from next epoch.
 func (s *EpochFallbackStateMachineSuite) TestTransitionToNextEpoch() {

@@ -2101,6 +2101,20 @@ func EpochSetupFixture(opts ...func(setup *flow.EpochSetup)) *flow.EpochSetup {
 	return setup
 }
 
+func EpochRecoverFixture(opts ...func(setup *flow.EpochSetup)) *flow.EpochRecover {
+	setup := EpochSetupFixture()
+	for _, apply := range opts {
+		apply(setup)
+	}
+
+	commit := EpochCommitFixture(CommitWithCounter(setup.Counter))
+	ev := &flow.EpochRecover{
+		EpochSetup:  *setup,
+		EpochCommit: *commit,
+	}
+	return ev
+}
+
 func IndexFixture() *flow.Index {
 	return &flow.Index{
 		CollectionIDs: IdentifierListFixture(5),
