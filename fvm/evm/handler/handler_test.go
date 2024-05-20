@@ -992,6 +992,48 @@ func TestHandler_TransactionRun(t *testing.T) {
 		})
 	})
 
+	t.Run("test - transaction batch run (invalid transaction)", func(t *testing.T) {
+		t.Parallel()
+
+		testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
+			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
+				testutils.RunWithEOATestAccount(t, backend, rootAddr, func(eoa *testutils.EOATestAccount) {
+					bs := handler.NewBlockStore(backend, rootAddr)
+					aa := handler.NewAddressAllocator()
+
+					result := func(tx *gethTypes.Transaction) *types.Result {
+						return types.NewInvalidResult(tx, gethCore.ErrNonceTooHigh)
+					}
+
+					em := &testutils.TestEmulator{
+						BatchRunTransactionFunc: func(txs []*gethTypes.Transaction) ([]*types.Result, error) {
+							res := make([]*types.Result, len(txs))
+							for i := range res {
+								res[i] = result(txs[i])
+							}
+							return res, nil
+						},
+					}
+					handler := handler.NewContractHandler(flow.Testnet, rootAddr, flowTokenAddress, randomBeaconAddress, bs, aa, backend, em)
+					coinbase := types.NewAddress(gethCommon.Address{})
+
+					// batch run invalid transactions
+					txBytes, err := gethTypes.
+						NewTransaction(0, gethCommon.Address{}, nil, 0, nil, nil).
+						MarshalBinary()
+					require.NoError(t, err)
+					txs := [][]byte{
+						txBytes,
+					}
+					results := handler.BatchRun(txs, coinbase)
+					require.Len(t, results, 1)
+					require.Equal(t, types.StatusInvalid, results[0].Status)
+					require.Equal(t, uint64(types.InvalidTransactionGasCost), results[0].GasConsumed)
+				})
+			})
+		})
+	})
+
 	t.Run("test dry run successful", func(t *testing.T) {
 		t.Parallel()
 
