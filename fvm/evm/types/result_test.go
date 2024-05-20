@@ -41,13 +41,24 @@ func Test_ResultErrors(t *testing.T) {
 
 	t.Run("receipt", func(t *testing.T) {
 		const gas = uint64(2000)
+		deploy := NewAddress(gethCommon.Address{0x02, 0x03})
 		res := Result{
+			TxType:                  1,
+			GasConsumed:             gas,
+			DeployedContractAddress: &deploy,
+		}
+
+		rec := res.Receipt()
+		require.Equal(t, deploy.ToCommon(), rec.ContractAddress)
+		require.Equal(t, types.ReceiptStatusSuccessful, rec.Status)
+
+		res = Result{
 			GasConsumed: gas,
 			TxType:      1,
 			VMError:     gethCore.ErrGasUintOverflow,
 		}
 
-		rec := res.Receipt()
+		rec = res.Receipt()
 		require.Equal(t, types.ReceiptStatusFailed, rec.Status)
 		require.Equal(t, gas, rec.CumulativeGasUsed)
 
