@@ -50,11 +50,23 @@ func (s Snapshot) Identity(nodeID flow.Identifier) (*flow.Identity, error) {
 }
 
 func (s Snapshot) Commit() (flow.StateCommitment, error) {
-	return s.enc.LatestSeal().FinalState, nil
+	latestSeal, err := s.enc.LatestSeal()
+	if err != nil {
+		return flow.StateCommitment{}, nil
+	}
+	return latestSeal.FinalState, nil
 }
 
 func (s Snapshot) SealedResult() (*flow.ExecutionResult, *flow.Seal, error) {
-	return s.enc.LatestSealedResult(), s.enc.LatestSeal(), nil
+	latestSeal, err := s.enc.LatestSeal()
+	if err != nil {
+		return nil, nil, err
+	}
+	latestSealedResult, err := s.enc.LatestSealedResult()
+	if err != nil {
+		return nil, nil, err
+	}
+	return latestSealedResult, latestSeal, nil
 }
 
 func (s Snapshot) SealingSegment() (*flow.SealingSegment, error) {
