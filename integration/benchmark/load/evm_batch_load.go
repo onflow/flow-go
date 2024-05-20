@@ -54,7 +54,7 @@ func NewEVMBatchTransferLoad(log zerolog.Logger) *EVMBatchTransferLoad {
 		eoaChan:                 make(chan *eoa, 1_000_000),
 		doneChan:                make(chan struct{}),
 		PreCreateEOAAccounts:    5000,
-		TransfersPerTransaction: 50,
+		TransfersPerTransaction: 1,
 	}
 
 	go load.reportStatus()
