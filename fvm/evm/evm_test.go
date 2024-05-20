@@ -1275,7 +1275,7 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 	
 						let res = cadenceOwnedAccount.deploy(
 							code: code,
-							gasLimit: 1000000,
+							gasLimit: 2000000,
 							value: EVM.Balance(attoflow: 1230000000000000000)
 						)
 						destroy cadenceOwnedAccount
@@ -1494,7 +1494,7 @@ func TestDryRun(t *testing.T) {
 				tx := gethTypes.NewContractCreation(
 					0,
 					big.NewInt(0),
-					uint64(1000000),
+					uint64(2000000),
 					big.NewInt(0),
 					testContract.ByteCode,
 				)
