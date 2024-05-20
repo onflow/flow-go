@@ -48,7 +48,7 @@ func (bs *BlockStore) BlockProposal() (*types.Block, error) {
 		return nil, err
 	}
 	if !found {
-		return nil, fmt.Errorf("cadence block not found")
+		return nil, fmt.Errorf("cadence block at height: %d not found", cadenceHeight)
 	}
 
 	lastExecutedBlock, err := bs.LatestBlock()
