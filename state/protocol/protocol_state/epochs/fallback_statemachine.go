@@ -98,3 +98,22 @@ func (m *FallbackStateMachine) ProcessEpochCommit(_ *flow.EpochCommit) (bool, er
 	// won't process if we are in fallback mode
 	return false, nil
 }
+
+// ProcessEpochRecover processes epoch recover service events.
+func (m *FallbackStateMachine) ProcessEpochRecover(epochRecover *flow.EpochRecover) (bool, error) {
+	nextEpochParticipants, err := buildNextEpochActiveParticipants(
+		m.parentState.CurrentEpoch.ActiveIdentities.Lookup(),
+		m.parentState.CurrentEpochSetup,
+		&epochRecover.EpochSetup)
+	if err != nil {
+		return false, fmt.Errorf("failed to build next epoch active participants: %w", err)
+	}
+	m.state.NextEpoch = &flow.EpochStateContainer{
+		SetupID:          epochRecover.EpochSetup.ID(),
+		CommitID:         epochRecover.EpochCommit.ID(),
+		ActiveIdentities: nextEpochParticipants,
+		EpochExtensions:  nil,
+	}
+	m.state.InvalidEpochTransitionAttempted = false
+	return true, nil
+}

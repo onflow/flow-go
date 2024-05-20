@@ -53,6 +53,8 @@ type StateMachine interface {
 	//     after such error and discard the StateMachine!
 	ProcessEpochCommit(epochCommit *flow.EpochCommit) (bool, error)
 
+	ProcessEpochRecover(epochRecover *flow.EpochRecover) (bool, error)
+
 	// EjectIdentity updates identity table by changing the node's participation status to 'ejected'.
 	// Should pass identity which is already present in the table, otherwise an exception will be raised.
 	// Expected errors during normal operations:
@@ -270,6 +272,14 @@ func (e *EpochStateMachine) applyServiceEventsFromOrderedResults(orderedUpdates 
 			}
 			if processed {
 				dbUpdates.AddDbOp(e.commits.StoreTx(ev)) // we'll insert the commit event when we insert the block
+			}
+		case *flow.EpochRecover:
+			processed, err := e.activeStateMachine.ProcessEpochRecover(ev)
+			if err != nil {
+				return nil, fmt.Errorf("could not process epoch recover event: %w", err)
+			}
+			if processed {
+				dbUpdates.AddDbOps(e.setups.StoreTx(&ev.EpochSetup), e.commits.StoreTx(&ev.EpochCommit)) // we'll insert the setup & commit events when we insert the block
 			}
 		default:
 			continue
