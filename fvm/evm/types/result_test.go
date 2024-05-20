@@ -104,4 +104,14 @@ func Test_ResultErrors(t *testing.T) {
 		}
 		require.Nil(t, res.Receipt())
 	})
+
+	t.Run("invalid result construct", func(t *testing.T) {
+		res := NewInvalidResult(
+			types.NewTransaction(1, gethCommon.Address{}, nil, 100, nil, nil),
+			gethCore.ErrGasLimitReached,
+		)
+
+		require.True(t, res.Invalid())
+		require.False(t, res.Failed())
+	})
 }
