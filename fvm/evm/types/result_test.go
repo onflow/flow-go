@@ -41,6 +41,26 @@ func Test_ResultErrors(t *testing.T) {
 		require.Equal(t, StatusInvalid, sum.Status)
 	})
 
+	t.Run("successful result", func(t *testing.T) {
+		const gas = uint64(1000)
+		addr := NewAddress(gethCommon.Address{0x01})
+		res := Result{
+			TxType:                  1,
+			GasConsumed:             gas,
+			DeployedContractAddress: &addr,
+			ReturnedValue:           []byte{0x01},
+			TxHash:                  gethCommon.Hash{0x02},
+			Index:                   1,
+		}
+
+		sum := res.ResultSummary()
+		require.Equal(t, ErrCodeNoError, sum.ErrorCode)
+		require.Equal(t, gas, sum.GasConsumed)
+		require.Equal(t, StatusSuccessful, sum.Status)
+		require.Equal(t, &addr, sum.DeployedContractAddress)
+		require.Equal(t, Data([]byte{0x01}), sum.ReturnedValue)
+	})
+
 	t.Run("failed result", func(t *testing.T) {
 		res := Result{
 			VMError: gethVM.ErrGasUintOverflow,
