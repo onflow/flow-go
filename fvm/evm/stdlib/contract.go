@@ -239,7 +239,7 @@ func newInternalEVMTypeEncodeABIFunction(
 
 	evmAddressTypeID := location.TypeID(gauge, evmAddressTypeQualifiedIdentifier)
 
-	return interpreter.NewHostFunctionValue(
+	return interpreter.NewStaticHostFunctionValue(
 		gauge,
 		internalEVMTypeEncodeABIFunctionType,
 		func(invocation interpreter.Invocation) interpreter.Value {
@@ -658,7 +658,7 @@ func newInternalEVMTypeDecodeABIFunction(
 ) *interpreter.HostFunctionValue {
 	evmAddressTypeID := location.TypeID(gauge, evmAddressTypeQualifiedIdentifier)
 
-	return interpreter.NewHostFunctionValue(
+	return interpreter.NewStaticHostFunctionValue(
 		gauge,
 		internalEVMTypeDecodeABIFunctionType,
 		func(invocation interpreter.Invocation) interpreter.Value {
@@ -1006,7 +1006,7 @@ func newInternalEVMTypeRunFunction(
 	gauge common.MemoryGauge,
 	handler types.ContractHandler,
 ) *interpreter.HostFunctionValue {
-	return interpreter.NewHostFunctionValue(
+	return interpreter.NewStaticHostFunctionValue(
 		gauge,
 		internalEVMTypeRunFunctionType,
 		func(invocation interpreter.Invocation) interpreter.Value {
@@ -1070,7 +1070,7 @@ func newInternalEVMTypeDryRunFunction(
 	gauge common.MemoryGauge,
 	handler types.ContractHandler,
 ) *interpreter.HostFunctionValue {
-	return interpreter.NewHostFunctionValue(
+	return interpreter.NewStaticHostFunctionValue(
 		gauge,
 		internalEVMTypeDryRunFunctionType,
 		func(invocation interpreter.Invocation) interpreter.Value {
@@ -1130,7 +1130,7 @@ func newInternalEVMTypeBatchRunFunction(
 	gauge common.MemoryGauge,
 	handler types.ContractHandler,
 ) *interpreter.HostFunctionValue {
-	return interpreter.NewHostFunctionValue(
+	return interpreter.NewStaticHostFunctionValue(
 		gauge,
 		internalEVMTypeBatchRunFunctionType,
 		func(invocation interpreter.Invocation) interpreter.Value {
@@ -1392,7 +1392,7 @@ func newInternalEVMTypeCallFunction(
 	gauge common.MemoryGauge,
 	handler types.ContractHandler,
 ) *interpreter.HostFunctionValue {
-	return interpreter.NewHostFunctionValue(
+	return interpreter.NewStaticHostFunctionValue(
 		gauge,
 		internalEVMTypeCallFunctionType,
 		func(invocation interpreter.Invocation) interpreter.Value {
@@ -1479,7 +1479,7 @@ func newInternalEVMTypeCreateCadenceOwnedAccountFunction(
 	gauge common.MemoryGauge,
 	handler types.ContractHandler,
 ) *interpreter.HostFunctionValue {
-	return interpreter.NewHostFunctionValue(
+	return interpreter.NewStaticHostFunctionValue(
 		gauge,
 		internalEVMTypeCreateCadenceOwnedAccountFunctionType,
 		func(invocation interpreter.Invocation) interpreter.Value {
@@ -1516,7 +1516,7 @@ func newInternalEVMTypeDepositFunction(
 	gauge common.MemoryGauge,
 	handler types.ContractHandler,
 ) *interpreter.HostFunctionValue {
-	return interpreter.NewHostFunctionValue(
+	return interpreter.NewStaticHostFunctionValue(
 		gauge,
 		internalEVMTypeCallFunctionType,
 		func(invocation interpreter.Invocation) interpreter.Value {
@@ -1587,7 +1587,7 @@ func newInternalEVMTypeBalanceFunction(
 	gauge common.MemoryGauge,
 	handler types.ContractHandler,
 ) *interpreter.HostFunctionValue {
-	return interpreter.NewHostFunctionValue(
+	return interpreter.NewStaticHostFunctionValue(
 		gauge,
 		internalEVMTypeCallFunctionType,
 		func(invocation interpreter.Invocation) interpreter.Value {
@@ -1629,7 +1629,7 @@ func newInternalEVMTypeNonceFunction(
 	gauge common.MemoryGauge,
 	handler types.ContractHandler,
 ) *interpreter.HostFunctionValue {
-	return interpreter.NewHostFunctionValue(
+	return interpreter.NewStaticHostFunctionValue(
 		gauge,
 		internalEVMTypeCallFunctionType,
 		func(invocation interpreter.Invocation) interpreter.Value {
@@ -1671,7 +1671,7 @@ func newInternalEVMTypeCodeFunction(
 	gauge common.MemoryGauge,
 	handler types.ContractHandler,
 ) *interpreter.HostFunctionValue {
-	return interpreter.NewHostFunctionValue(
+	return interpreter.NewStaticHostFunctionValue(
 		gauge,
 		internalEVMTypeCallFunctionType,
 		func(invocation interpreter.Invocation) interpreter.Value {
@@ -1713,7 +1713,7 @@ func newInternalEVMTypeCodeHashFunction(
 	gauge common.MemoryGauge,
 	handler types.ContractHandler,
 ) *interpreter.HostFunctionValue {
-	return interpreter.NewHostFunctionValue(
+	return interpreter.NewStaticHostFunctionValue(
 		gauge,
 		internalEVMTypeCallFunctionType,
 		func(invocation interpreter.Invocation) interpreter.Value {
@@ -1758,7 +1758,7 @@ func newInternalEVMTypeWithdrawFunction(
 	gauge common.MemoryGauge,
 	handler types.ContractHandler,
 ) *interpreter.HostFunctionValue {
-	return interpreter.NewHostFunctionValue(
+	return interpreter.NewStaticHostFunctionValue(
 		gauge,
 		internalEVMTypeCallFunctionType,
 		func(invocation interpreter.Invocation) interpreter.Value {
@@ -1856,7 +1856,7 @@ func newInternalEVMTypeDeployFunction(
 	gauge common.MemoryGauge,
 	handler types.ContractHandler,
 ) *interpreter.HostFunctionValue {
-	return interpreter.NewHostFunctionValue(
+	return interpreter.NewStaticHostFunctionValue(
 		gauge,
 		internalEVMTypeCallFunctionType,
 		func(invocation interpreter.Invocation) interpreter.Value {
@@ -1933,7 +1933,7 @@ var internalEVMTypeCastToAttoFLOWFunctionType = &sema.FunctionType{
 func newInternalEVMTypeCastToAttoFLOWFunction(
 	gauge common.MemoryGauge,
 ) *interpreter.HostFunctionValue {
-	return interpreter.NewHostFunctionValue(
+	return interpreter.NewStaticHostFunctionValue(
 		gauge,
 		internalEVMTypeCallFunctionType,
 		func(invocation interpreter.Invocation) interpreter.Value {
@@ -1963,7 +1963,7 @@ var internalEVMTypeCastToFLOWFunctionType = &sema.FunctionType{
 func newInternalEVMTypeCastToFLOWFunction(
 	gauge common.MemoryGauge,
 ) *interpreter.HostFunctionValue {
-	return interpreter.NewHostFunctionValue(
+	return interpreter.NewStaticHostFunctionValue(
 		gauge,
 		internalEVMTypeCallFunctionType,
 		func(invocation interpreter.Invocation) interpreter.Value {
@@ -1994,7 +1994,7 @@ func newInternalEVMTypeGetLatestBlockFunction(
 	gauge common.MemoryGauge,
 	handler types.ContractHandler,
 ) *interpreter.HostFunctionValue {
-	return interpreter.NewHostFunctionValue(
+	return interpreter.NewStaticHostFunctionValue(
 		gauge,
 		internalEVMTypeCallFunctionType,
 		func(invocation interpreter.Invocation) interpreter.Value {

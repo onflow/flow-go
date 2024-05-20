@@ -84,6 +84,7 @@ func NewMachine(
 		e,
 		collectionFetcher,
 		e,
+		metrics,
 	)
 
 	if err != nil {

@@ -308,7 +308,7 @@ func (e *EventHandler) broadcastTimeoutObjectIfAuthorized() error {
 	return nil
 }
 
-// proposeForNewViewIfPrimary will only be called when we may able to propose a block, after processing a new event.
+// proposeForNewViewIfPrimary will only be called when we may be able to propose a block, after processing a new event.
 //   - after entering a new view as a result of processing a QC or TC, then we may propose for the newly entered view
 //   - after receiving a proposal (but not changing view), if that proposal is referenced by our highest known QC,
 //     and the proposal was previously unknown, then we can propose a block in the current view
@@ -386,7 +386,14 @@ func (e *EventHandler) proposeForNewViewIfPrimary() error {
 		return fmt.Errorf("can not make block proposal for curView %v: %w", curView, err)
 	}
 	proposedBlock := model.BlockFromFlow(flowProposal) // turn the signed flow header into a proposal
-	// determine target publication time (CAUTION: must happen before AddValidatedBlock)
+
+	// determine target publication time
+	// CAUTION:
+	//  • we must call `TargetPublicationTime` _before_ `AddValidatedBlock`, because `AddValidatedBlock`
+	//    may emit a BlockIncorporatedEvent, which changes CruiseControl's state.
+	//  • metrics for the PaceMaker/CruiseControl assume that the event handler is the only caller of
+	//   `TargetPublicationTime`. Technically, `TargetPublicationTime` records the publication delay
+	//    relative to its _latest_ call.
 	targetPublicationTime := e.paceMaker.TargetPublicationTime(flowProposal.View, start, flowProposal.ParentID)
 
 	// we want to store created proposal in forks to make sure that we don't create more proposals for

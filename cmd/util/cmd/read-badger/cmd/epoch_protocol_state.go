@@ -9,15 +9,15 @@ import (
 )
 
 func init() {
-	rootCmd.AddCommand(protocolStateCmd)
+	rootCmd.AddCommand(epochProtocolStateCmd)
 
-	protocolStateCmd.Flags().StringVarP(&flagBlockID, "block-id", "b", "", "the block id of which to query the protocol state")
-	_ = protocolStateCmd.MarkFlagRequired("block-id")
+	epochProtocolStateCmd.Flags().StringVarP(&flagBlockID, "block-id", "b", "", "the block id of which to query the protocol state")
+	_ = epochProtocolStateCmd.MarkFlagRequired("block-id")
 }
 
-var protocolStateCmd = &cobra.Command{
-	Use:   "protocol-state",
-	Short: "get protocol state by block ID",
+var epochProtocolStateCmd = &cobra.Command{
+	Use:   "epoch-protocol-state",
+	Short: "get epoch protocol state by block ID",
 	Run: func(cmd *cobra.Command, args []string) {
 		storages, db := InitStorages()
 		defer db.Close()

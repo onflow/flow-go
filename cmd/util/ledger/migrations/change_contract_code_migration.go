@@ -30,7 +30,8 @@ type EVMContractChange uint8
 
 const (
 	EVMContractChangeNone EVMContractChange = iota
-	EVMContractChangeFull
+	EVMContractChangeDeploy
+	EVMContractChangeUpdate
 )
 
 type BurnerContractChange uint8
@@ -213,11 +214,8 @@ func SystemContractChanges(chainID flow.ChainID, options SystemContractsMigratio
 		)
 	}
 
-	// EVM related contracts
-	switch options.EVM {
-	case EVMContractChangeNone:
-		// do nothing
-	case EVMContractChangeFull:
+	// EVM contract
+	if options.EVM == EVMContractChangeUpdate {
 		contractChanges = append(
 			contractChanges,
 			NewSystemContractChange(
@@ -229,8 +227,6 @@ func SystemContractChanges(chainID flow.ChainID, options SystemContractsMigratio
 				),
 			),
 		)
-	default:
-		panic(fmt.Errorf("unsupported EVM contract change option: %d", options.EVM))
 	}
 
 	// Burner contract
@@ -263,7 +259,7 @@ func NewSystemContractsMigration(
 ) *StagedContractsMigration {
 	migration := NewStagedContractsMigration(
 		"SystemContractsMigration",
-		"system-contracts-migrator",
+		"system-contracts-migration",
 		log,
 		rwf,
 		options.StagedContractsMigrationOptions,

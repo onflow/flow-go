@@ -197,16 +197,16 @@ require (
 	github.com/multiformats/go-multistream v0.5.0 // indirect
 	github.com/multiformats/go-varint v0.0.7 // indirect
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
-	github.com/onflow/atree v0.7.0-rc.1 // indirect
-	github.com/onflow/cadence v1.0.0-preview.26 // indirect
-	github.com/onflow/flow-core-contracts/lib/go/contracts v1.0.0 // indirect
+	github.com/onflow/atree v0.7.0-rc.2 // indirect
+	github.com/onflow/cadence v1.0.0-preview.29 // indirect
+	github.com/onflow/flow-core-contracts/lib/go/contracts v1.1.0 // indirect
 	github.com/onflow/flow-core-contracts/lib/go/templates v1.0.0 // indirect
 	github.com/onflow/flow-ft/lib/go/contracts v1.0.0 // indirect
 	github.com/onflow/flow-ft/lib/go/templates v1.0.0 // indirect
-	github.com/onflow/flow-go-sdk v1.0.0-preview.26 // indirect
-	github.com/onflow/flow-nft/lib/go/contracts v1.2.0 // indirect
+	github.com/onflow/flow-go-sdk v1.0.0-preview.30 // indirect
+	github.com/onflow/flow-nft/lib/go/contracts v1.2.1 // indirect
 	github.com/onflow/flow-nft/lib/go/templates v1.2.0 // indirect
-	github.com/onflow/flow/protobuf/go/flow v0.4.1 // indirect
+	github.com/onflow/flow/protobuf/go/flow v0.4.3 // indirect
 	github.com/onflow/go-ethereum v1.13.4 // indirect
 	github.com/onflow/sdks v0.5.1-0.20230912225508-b35402f12bba // indirect
 	github.com/onflow/wal v1.0.2 // indirect
