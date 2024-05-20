@@ -188,6 +188,7 @@ func TestEpochTransition_IdentitiesDisjoint(t *testing.T) {
 
 // withNextEpoch adds a valid next epoch with the given identities to the input
 // snapshot. Also sets the length of the first (current) epoch to curEpochViews.
+// NOTE: the input initial snapshot must be a spork root snapshot.
 //
 // We make the first (current) epoch start in committed phase so we can transition
 // to the next epoch upon reaching the appropriate view without any further changes
@@ -207,6 +208,7 @@ func withNextEpoch(
 	encodableSnapshot := snapshot.Encodable()
 	rootResult, rootSeal, err := snapshot.SealedResult()
 	require.NoError(t, err)
+	require.Len(t, encodableSnapshot.SealingSegment.Blocks, 1, "function `withNextEpoch` only works for spork-root/genesis snapshots")
 
 	rootProtocolState := encodableSnapshot.SealingSegment.LatestProtocolStateEntry()
 	epochProtocolState := rootProtocolState.EpochEntry
