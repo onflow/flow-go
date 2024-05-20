@@ -6,6 +6,7 @@ import (
 	gethCommon "github.com/onflow/go-ethereum/common"
 	gethCore "github.com/onflow/go-ethereum/core"
 	"github.com/onflow/go-ethereum/core/types"
+	gethVM "github.com/onflow/go-ethereum/core/vm"
 	"github.com/stretchr/testify/require"
 )
 
@@ -42,12 +43,16 @@ func Test_ResultErrors(t *testing.T) {
 
 	t.Run("failed result", func(t *testing.T) {
 		res := Result{
-			VMError: gethCore.ErrGasUintOverflow,
+			VMError: gethVM.ErrGasUintOverflow,
 		}
 
 		require.True(t, res.Failed())
 		require.False(t, res.Invalid())
 		require.Equal(t, "gas uint64 overflow", res.VMErrorString())
+
+		sum := res.ResultSummary()
+		require.Equal(t, StatusFailed, sum.Status)
+		require.Equal(t, ExecutionErrCodeGasUintOverflow, sum.ErrorCode)
 	})
 
 	t.Run("receipt", func(t *testing.T) {
