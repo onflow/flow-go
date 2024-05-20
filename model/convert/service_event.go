@@ -336,7 +336,7 @@ func convertServiceEventEpochRecover(event flow.Event) (*flow.ServiceEvent, erro
 		return nil, fmt.Errorf("failed to decode EpochRecover event: %w", err)
 	}
 
-	cdcClusters, err := getField[cadence.Array](fields, "collectorClusters")
+	cdcClusters, err := getField[cadence.Array](fields, "clusterAssignments")
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode EpochRecover event: %w", err)
 	}

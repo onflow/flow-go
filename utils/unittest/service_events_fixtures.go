@@ -1158,7 +1158,7 @@ func newFlowEpochEpochRecoverEventType() *cadence.EventType {
 				Type:       cadence.UInt64Type,
 			},
 			{
-				Identifier: "collectorClusters",
+				Identifier: "clusterAssignments",
 				Type:       cadence.NewVariableSizedArrayType(cadence.NewVariableSizedArrayType(cadence.StringType)),
 			},
 			{
