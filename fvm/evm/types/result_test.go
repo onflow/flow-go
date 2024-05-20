@@ -23,6 +23,7 @@ func Test_ResultErrors(t *testing.T) {
 
 		require.True(t, res.Invalid())
 		require.False(t, res.Failed())
+		require.Empty(t, res.VMErrorString())
 
 		sum := res.ResultSummary()
 		require.Equal(t, StatusInvalid, sum.Status)
