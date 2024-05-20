@@ -100,7 +100,7 @@ func (b *ByAccount) DestructIntoPayloads(nWorker int) []*ledger.Payload {
 	worker := func() {
 		defer wg.Done()
 		for job := range jobs {
-			job.registers.insertPayloads(job.payloads)
+			job.registers.insertIntoPayloads(job.payloads)
 		}
 	}
 
@@ -231,12 +231,14 @@ func (a *AccountRegisters) Owner() string {
 }
 
 func (a *AccountRegisters) Payloads() []*ledger.Payload {
-	payloads := make([]*ledger.Payload, 0, a.Count())
-	a.insertPayloads(payloads)
+	payloads := make([]*ledger.Payload, a.Count())
+	a.insertIntoPayloads(payloads)
 	return payloads
 }
 
-func (a *AccountRegisters) insertPayloads(payloads []*ledger.Payload) {
+// insertIntoPayloads inserts the registers into the given payloads slice.
+// The payloads slice must have the same size as the number of registers.
+func (a *AccountRegisters) insertIntoPayloads(payloads []*ledger.Payload) {
 	payloadCount := len(payloads)
 	registerCount := len(a.registers)
 	if payloadCount != registerCount {
@@ -263,6 +265,7 @@ func (a *AccountRegisters) insertPayloads(payloads []*ledger.Payload) {
 	}
 }
 
+// Merge merges the registers from the other AccountRegisters into this AccountRegisters.
 func (a *AccountRegisters) Merge(other *AccountRegisters) error {
 	for key, value := range other.registers {
 		_, ok := a.registers[key]
