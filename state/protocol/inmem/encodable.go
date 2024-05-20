@@ -31,13 +31,13 @@ func (snap EncodableSnapshot) LatestSeal() (*flow.Seal, error) {
 	head := snap.Head()
 	latestSealID := snap.SealingSegment.LatestSeals[head.ID()]
 
-	// CASE 1: The spork root block is the latest sealed block.
+	// Genesis/Spork-Root Case: The spork root block is the latest sealed block.
 	// By protocol definition, FirstSeal seals the spork root block.
 	if snap.SealingSegment.FirstSeal != nil && snap.SealingSegment.FirstSeal.ID() == latestSealID {
 		return snap.SealingSegment.FirstSeal, nil
 	}
 
-	// CASE 2: For any other snapshot, the latest seal must be in a block payload.
+	// Common Case: The highest seal within the payload of any block in the sealing segment.
 	// Since seals are included in increasing height order, the latest seal must be in the
 	// first block (by height descending) which contains any seals.
 	for i := len(snap.SealingSegment.Blocks) - 1; i >= 0; i-- {
