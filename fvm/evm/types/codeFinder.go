@@ -8,44 +8,38 @@ import (
 )
 
 func ValidationErrorCode(err error) ErrorCode {
-	// direct errors that are returned by the evm
-	switch err {
-	case gethVM.ErrGasUintOverflow:
+	switch {
+	case errors.Is(err, gethVM.ErrGasUintOverflow):
 		return ValidationErrCodeGasUintOverflow
-	}
-
-	// wrapped errors return from the evm
-	nested := errors.Unwrap(err)
-	switch nested {
-	case gethCore.ErrNonceTooLow:
+	case errors.Is(err, gethCore.ErrNonceTooLow):
 		return ValidationErrCodeNonceTooLow
-	case gethCore.ErrNonceTooHigh:
+	case errors.Is(err, gethCore.ErrNonceTooHigh):
 		return ValidationErrCodeNonceTooHigh
-	case gethCore.ErrNonceMax:
+	case errors.Is(err, gethCore.ErrNonceMax):
 		return ValidationErrCodeNonceMax
-	case gethCore.ErrGasLimitReached:
+	case errors.Is(err, gethCore.ErrGasLimitReached):
 		return ValidationErrCodeGasLimitReached
-	case gethCore.ErrInsufficientFundsForTransfer:
+	case errors.Is(err, gethCore.ErrInsufficientFundsForTransfer):
 		return ValidationErrCodeInsufficientFundsForTransfer
-	case gethCore.ErrMaxInitCodeSizeExceeded:
+	case errors.Is(err, gethCore.ErrMaxInitCodeSizeExceeded):
 		return ValidationErrCodeMaxInitCodeSizeExceeded
-	case gethCore.ErrInsufficientFunds:
+	case errors.Is(err, gethCore.ErrInsufficientFunds):
 		return ValidationErrCodeInsufficientFunds
-	case gethCore.ErrIntrinsicGas:
+	case errors.Is(err, gethCore.ErrIntrinsicGas):
 		return ValidationErrCodeIntrinsicGas
-	case gethCore.ErrTxTypeNotSupported:
+	case errors.Is(err, gethCore.ErrTxTypeNotSupported):
 		return ValidationErrCodeTxTypeNotSupported
-	case gethCore.ErrTipAboveFeeCap:
+	case errors.Is(err, gethCore.ErrTipAboveFeeCap):
 		return ValidationErrCodeTipAboveFeeCap
-	case gethCore.ErrTipVeryHigh:
+	case errors.Is(err, gethCore.ErrTipVeryHigh):
 		return ValidationErrCodeTipVeryHigh
-	case gethCore.ErrFeeCapVeryHigh:
+	case errors.Is(err, gethCore.ErrFeeCapVeryHigh):
 		return ValidationErrCodeFeeCapVeryHigh
-	case gethCore.ErrFeeCapTooLow:
+	case errors.Is(err, gethCore.ErrFeeCapTooLow):
 		return ValidationErrCodeFeeCapTooLow
-	case gethCore.ErrSenderNoEOA:
+	case errors.Is(err, gethCore.ErrSenderNoEOA):
 		return ValidationErrCodeSenderNoEOA
-	case gethCore.ErrBlobFeeCapTooLow:
+	case errors.Is(err, gethCore.ErrBlobFeeCapTooLow):
 		return ValidationErrCodeBlobFeeCapTooLow
 	default:
 		return ValidationErrCodeMisc
@@ -53,35 +47,34 @@ func ValidationErrorCode(err error) ErrorCode {
 }
 
 func ExecutionErrorCode(err error) ErrorCode {
-	// execution VM errors are never wrapped
-	switch err {
-	case gethVM.ErrOutOfGas:
+	switch {
+	case errors.Is(err, gethVM.ErrOutOfGas):
 		return ExecutionErrCodeOutOfGas
-	case gethVM.ErrCodeStoreOutOfGas:
+	case errors.Is(err, gethVM.ErrCodeStoreOutOfGas):
 		return ExecutionErrCodeCodeStoreOutOfGas
-	case gethVM.ErrDepth:
+	case errors.Is(err, gethVM.ErrDepth):
 		return ExecutionErrCodeDepth
-	case gethVM.ErrInsufficientBalance:
+	case errors.Is(err, gethVM.ErrInsufficientBalance):
 		return ExecutionErrCodeInsufficientBalance
-	case gethVM.ErrContractAddressCollision:
+	case errors.Is(err, gethVM.ErrContractAddressCollision):
 		return ExecutionErrCodeContractAddressCollision
-	case gethVM.ErrExecutionReverted:
+	case errors.Is(err, gethVM.ErrExecutionReverted):
 		return ExecutionErrCodeExecutionReverted
-	case gethVM.ErrMaxInitCodeSizeExceeded:
+	case errors.Is(err, gethVM.ErrMaxInitCodeSizeExceeded):
 		return ExecutionErrCodeMaxInitCodeSizeExceeded
-	case gethVM.ErrMaxCodeSizeExceeded:
+	case errors.Is(err, gethVM.ErrMaxCodeSizeExceeded):
 		return ExecutionErrCodeMaxCodeSizeExceeded
-	case gethVM.ErrInvalidJump:
+	case errors.Is(err, gethVM.ErrInvalidJump):
 		return ExecutionErrCodeInvalidJump
-	case gethVM.ErrWriteProtection:
+	case errors.Is(err, gethVM.ErrWriteProtection):
 		return ExecutionErrCodeWriteProtection
-	case gethVM.ErrReturnDataOutOfBounds:
+	case errors.Is(err, gethVM.ErrReturnDataOutOfBounds):
 		return ExecutionErrCodeReturnDataOutOfBounds
-	case gethVM.ErrGasUintOverflow:
+	case errors.Is(err, gethVM.ErrGasUintOverflow):
 		return ExecutionErrCodeGasUintOverflow
-	case gethVM.ErrInvalidCode:
+	case errors.Is(err, gethVM.ErrInvalidCode):
 		return ExecutionErrCodeInvalidCode
-	case gethVM.ErrNonceUintOverflow:
+	case errors.Is(err, gethVM.ErrNonceUintOverflow):
 		return ExecutionErrCodeNonceUintOverflow
 	default:
 		return ExecutionErrCodeMisc
