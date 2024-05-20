@@ -268,7 +268,7 @@ func createEpochNodes() cadence.Array {
 		ufix64FromString("0.00000000"),
 
 		// delegators
-		cadence.NewArray([]cadence.Value{}).WithType(cadence.NewVariableSizedArrayType(cadence.NewUInt32Type())),
+		cadence.NewArray([]cadence.Value{}).WithType(cadence.NewVariableSizedArrayType(cadence.UInt32Type)),
 
 		// delegatorIDCounter
 		cadence.UInt32(0),
@@ -312,7 +312,7 @@ func createEpochNodes() cadence.Array {
 		ufix64FromString("0.00000000"),
 
 		// delegators
-		cadence.NewArray([]cadence.Value{}).WithType(cadence.NewVariableSizedArrayType(cadence.NewUInt32Type())),
+		cadence.NewArray([]cadence.Value{}).WithType(cadence.NewVariableSizedArrayType(cadence.UInt32Type)),
 
 		// delegatorIDCounter
 		cadence.UInt32(0),
@@ -356,7 +356,7 @@ func createEpochNodes() cadence.Array {
 		ufix64FromString("0.00000000"),
 
 		// delegators
-		cadence.NewArray([]cadence.Value{}).WithType(cadence.NewVariableSizedArrayType(cadence.NewUInt32Type())),
+		cadence.NewArray([]cadence.Value{}).WithType(cadence.NewVariableSizedArrayType(cadence.UInt32Type)),
 
 		// delegatorIDCounter
 		cadence.UInt32(0),
@@ -400,7 +400,7 @@ func createEpochNodes() cadence.Array {
 		ufix64FromString("0.00000000"),
 
 		// delegators
-		cadence.NewArray([]cadence.Value{}).WithType(cadence.NewVariableSizedArrayType(cadence.NewUInt32Type())),
+		cadence.NewArray([]cadence.Value{}).WithType(cadence.NewVariableSizedArrayType(cadence.UInt32Type)),
 
 		// delegatorIDCounter
 		cadence.UInt32(0),
@@ -444,7 +444,7 @@ func createEpochNodes() cadence.Array {
 		ufix64FromString("0.00000000"),
 
 		// delegators
-		cadence.NewArray([]cadence.Value{}).WithType(cadence.NewVariableSizedArrayType(cadence.NewUInt32Type())),
+		cadence.NewArray([]cadence.Value{}).WithType(cadence.NewVariableSizedArrayType(cadence.UInt32Type)),
 
 		// delegatorIDCounter
 		cadence.UInt32(0),
@@ -488,7 +488,7 @@ func createEpochNodes() cadence.Array {
 		ufix64FromString("0.00000000"),
 
 		// delegators
-		cadence.NewArray([]cadence.Value{}).WithType(cadence.NewVariableSizedArrayType(cadence.NewUInt32Type())),
+		cadence.NewArray([]cadence.Value{}).WithType(cadence.NewVariableSizedArrayType(cadence.UInt32Type)),
 
 		// delegatorIDCounter
 		cadence.UInt32(0),
@@ -532,7 +532,7 @@ func createEpochNodes() cadence.Array {
 		ufix64FromString("0.00000000"),
 
 		// delegators
-		cadence.NewArray([]cadence.Value{}).WithType(cadence.NewVariableSizedArrayType(cadence.NewUInt32Type())),
+		cadence.NewArray([]cadence.Value{}).WithType(cadence.NewVariableSizedArrayType(cadence.UInt32Type)),
 
 		// delegatorIDCounter
 		cadence.UInt32(0),
@@ -575,16 +575,16 @@ func createEpochCollectors() cadence.Array {
 				Key:   cadence.String("0000000000000000000000000000000000000000000000000000000000000002"),
 				Value: cadence.UInt64(100),
 			},
-		}).WithType(cadence.NewMeteredDictionaryType(nil, cadence.StringType{}, cadence.UInt64Type{})),
+		}).WithType(cadence.NewMeteredDictionaryType(nil, cadence.StringType, cadence.UInt64Type)),
 
 		// totalWeight
 		cadence.NewUInt64(100),
 
 		// generatedVotes
-		cadence.NewDictionary(nil).WithType(cadence.NewDictionaryType(cadence.StringType{}, voteType)),
+		cadence.NewDictionary(nil).WithType(cadence.NewDictionaryType(cadence.StringType, voteType)),
 
 		// uniqueVoteMessageTotalWeights
-		cadence.NewDictionary(nil).WithType(cadence.NewDictionaryType(cadence.StringType{}, cadence.UInt64Type{})),
+		cadence.NewDictionary(nil).WithType(cadence.NewDictionaryType(cadence.StringType, cadence.UInt64Type)),
 	}).WithType(clusterType)
 
 	cluster2 := cadence.NewStruct([]cadence.Value{
@@ -601,16 +601,16 @@ func createEpochCollectors() cadence.Array {
 				Key:   cadence.String("0000000000000000000000000000000000000000000000000000000000000004"),
 				Value: cadence.UInt64(100),
 			},
-		}).WithType(cadence.NewMeteredDictionaryType(nil, cadence.StringType{}, cadence.UInt64Type{})),
+		}).WithType(cadence.NewMeteredDictionaryType(nil, cadence.StringType, cadence.UInt64Type)),
 
 		// totalWeight
 		cadence.NewUInt64(0),
 
 		// generatedVotes
-		cadence.NewDictionary(nil).WithType(cadence.NewDictionaryType(cadence.StringType{}, voteType)),
+		cadence.NewDictionary(nil).WithType(cadence.NewDictionaryType(cadence.StringType, voteType)),
 
 		// uniqueVoteMessageTotalWeights
-		cadence.NewDictionary(nil).WithType(cadence.NewDictionaryType(cadence.StringType{}, cadence.UInt64Type{})),
+		cadence.NewDictionary(nil).WithType(cadence.NewDictionaryType(cadence.StringType, cadence.UInt64Type)),
 	}).WithType(clusterType)
 
 	return cadence.NewArray([]cadence.Value{
@@ -631,7 +631,7 @@ func createEpochCommitEvent() cadence.Event {
 		cadence.NewArray([]cadence.Value{
 			cadence.String("a39cd1e1bf7e2fb0609b7388ce5215a6a4c01eef2aee86e1a007faa28a6b2a3dc876e11bb97cdb26c3846231d2d01e4d"),
 			cadence.String("91673ad9c717d396c9a0953617733c128049ac1a639653d4002ab245b121df1939430e313bcbfd06948f6a281f6bf853"),
-		}).WithType(cadence.NewVariableSizedArrayType(cadence.StringType{})),
+		}).WithType(cadence.NewVariableSizedArrayType(cadence.StringType)),
 
 		// voteMessage
 		cadence.String("irrelevant_for_these_purposes"),
@@ -640,7 +640,7 @@ func createEpochCommitEvent() cadence.Event {
 		cadence.NewArray([]cadence.Value{
 			cadence.String("0000000000000000000000000000000000000000000000000000000000000001"),
 			cadence.String("0000000000000000000000000000000000000000000000000000000000000002"),
-		}).WithType(cadence.NewVariableSizedArrayType(cadence.StringType{})),
+		}).WithType(cadence.NewVariableSizedArrayType(cadence.StringType)),
 	}).WithType(clusterQCType)
 
 	cluster2 := cadence.NewStruct([]cadence.Value{
@@ -651,7 +651,7 @@ func createEpochCommitEvent() cadence.Event {
 		cadence.NewArray([]cadence.Value{
 			cadence.String("b2bff159971852ed63e72c37991e62c94822e52d4fdcd7bf29aaf9fb178b1c5b4ce20dd9594e029f3574cb29533b857a"),
 			cadence.String("9931562f0248c9195758da3de4fb92f24fa734cbc20c0cb80280163560e0e0348f843ac89ecbd3732e335940c1e8dccb"),
-		}).WithType(cadence.NewVariableSizedArrayType(cadence.StringType{})),
+		}).WithType(cadence.NewVariableSizedArrayType(cadence.StringType)),
 
 		// voteMessage
 		cadence.String("irrelevant_for_these_purposes"),
@@ -660,7 +660,7 @@ func createEpochCommitEvent() cadence.Event {
 		cadence.NewArray([]cadence.Value{
 			cadence.String("0000000000000000000000000000000000000000000000000000000000000003"),
 			cadence.String("0000000000000000000000000000000000000000000000000000000000000004"),
-		}).WithType(cadence.NewVariableSizedArrayType(cadence.StringType{})),
+		}).WithType(cadence.NewVariableSizedArrayType(cadence.StringType)),
 	}).WithType(clusterQCType)
 
 	return cadence.NewEvent([]cadence.Value{
@@ -677,7 +677,7 @@ func createEpochCommitEvent() cadence.Event {
 		cadence.NewArray([]cadence.Value{
 			cadence.String("8c588266db5f5cda629e83f8aa04ae9413593fac19e4865d06d291c9d14fbdd9bdb86a7a12f9ef8590c79cb635e3163315d193087e9336092987150d0cd2b14ac6365f7dc93eec573752108b8c12368abb65f0652d9f644e5aed611c37926950"),
 			cadence.String("87a339e4e5c74f089da20a33f515d8c8f4464ab53ede5a74aa2432cd1ae66d522da0c122249ee176cd747ddc83ca81090498389384201614caf51eac392c1c0a916dfdcfbbdf7363f9552b6468434add3d3f6dc91a92bbe3ee368b59b7828488"),
-		}).WithType(cadence.NewVariableSizedArrayType(cadence.StringType{})),
+		}).WithType(cadence.NewVariableSizedArrayType(cadence.StringType)),
 	}).WithType(newFlowEpochEpochCommitEventType())
 }
 
@@ -742,23 +742,23 @@ func newFlowClusterQCVoteStructType() cadence.Type {
 		Fields: []cadence.Field{
 			{
 				Identifier: "nodeID",
-				Type:       cadence.StringType{},
+				Type:       cadence.StringType,
 			},
 			{
 				Identifier: "signature",
-				Type:       cadence.NewOptionalType(cadence.StringType{}),
+				Type:       cadence.NewOptionalType(cadence.StringType),
 			},
 			{
 				Identifier: "message",
-				Type:       cadence.NewOptionalType(cadence.StringType{}),
+				Type:       cadence.NewOptionalType(cadence.StringType),
 			},
 			{
 				Identifier: "clusterIndex",
-				Type:       cadence.UInt16Type{},
+				Type:       cadence.UInt16Type,
 			},
 			{
 				Identifier: "weight",
-				Type:       cadence.UInt64Type{},
+				Type:       cadence.UInt64Type,
 			},
 		},
 	}
@@ -777,59 +777,59 @@ func newFlowIDTableStakingNodeInfoStructType() *cadence.StructType {
 		Fields: []cadence.Field{
 			{
 				Identifier: "id",
-				Type:       cadence.StringType{},
+				Type:       cadence.StringType,
 			},
 			{
 				Identifier: "role",
-				Type:       cadence.UInt8Type{},
+				Type:       cadence.UInt8Type,
 			},
 			{
 				Identifier: "networkingAddress",
-				Type:       cadence.StringType{},
+				Type:       cadence.StringType,
 			},
 			{
 				Identifier: "networkingKey",
-				Type:       cadence.StringType{},
+				Type:       cadence.StringType,
 			},
 			{
 				Identifier: "stakingKey",
-				Type:       cadence.StringType{},
+				Type:       cadence.StringType,
 			},
 			{
 				Identifier: "tokensStaked",
-				Type:       cadence.UFix64Type{},
+				Type:       cadence.UFix64Type,
 			},
 			{
 				Identifier: "tokensCommitted",
-				Type:       cadence.UFix64Type{},
+				Type:       cadence.UFix64Type,
 			},
 			{
 				Identifier: "tokensUnstaking",
-				Type:       cadence.UFix64Type{},
+				Type:       cadence.UFix64Type,
 			},
 			{
 				Identifier: "tokensUnstaked",
-				Type:       cadence.UFix64Type{},
+				Type:       cadence.UFix64Type,
 			},
 			{
 				Identifier: "tokensRewarded",
-				Type:       cadence.UFix64Type{},
+				Type:       cadence.UFix64Type,
 			},
 			{
 				Identifier: "delegators",
-				Type:       cadence.NewVariableSizedArrayType(cadence.NewUInt32Type()),
+				Type:       cadence.NewVariableSizedArrayType(cadence.UInt32Type),
 			},
 			{
 				Identifier: "delegatorIDCounter",
-				Type:       cadence.UInt32Type{},
+				Type:       cadence.UInt32Type,
 			},
 			{
 				Identifier: "tokensRequestedToUnstake",
-				Type:       cadence.UFix64Type{},
+				Type:       cadence.UFix64Type,
 			},
 			{
 				Identifier: "initialWeight",
-				Type:       cadence.UInt64Type{},
+				Type:       cadence.UInt64Type,
 			},
 		},
 	}
@@ -848,7 +848,7 @@ func newFlowEpochEpochSetupEventType() *cadence.EventType {
 		Fields: []cadence.Field{
 			{
 				Identifier: "counter",
-				Type:       cadence.UInt64Type{},
+				Type:       cadence.UInt64Type,
 			},
 			{
 				Identifier: "nodeInfo",
@@ -856,11 +856,11 @@ func newFlowEpochEpochSetupEventType() *cadence.EventType {
 			},
 			{
 				Identifier: "firstView",
-				Type:       cadence.UInt64Type{},
+				Type:       cadence.UInt64Type,
 			},
 			{
 				Identifier: "finalView",
-				Type:       cadence.UInt64Type{},
+				Type:       cadence.UInt64Type,
 			},
 			{
 				Identifier: "collectorClusters",
@@ -868,27 +868,27 @@ func newFlowEpochEpochSetupEventType() *cadence.EventType {
 			},
 			{
 				Identifier: "randomSource",
-				Type:       cadence.StringType{},
+				Type:       cadence.StringType,
 			},
 			{
 				Identifier: "DKGPhase1FinalView",
-				Type:       cadence.UInt64Type{},
+				Type:       cadence.UInt64Type,
 			},
 			{
 				Identifier: "DKGPhase2FinalView",
-				Type:       cadence.UInt64Type{},
+				Type:       cadence.UInt64Type,
 			},
 			{
 				Identifier: "DKGPhase3FinalView",
-				Type:       cadence.UInt64Type{},
+				Type:       cadence.UInt64Type,
 			},
 			{
 				Identifier: "targetDuration",
-				Type:       cadence.UInt64Type{},
+				Type:       cadence.UInt64Type,
 			},
 			{
 				Identifier: "targetEndTime",
-				Type:       cadence.UInt64Type{},
+				Type:       cadence.UInt64Type,
 			},
 		},
 	}
@@ -907,7 +907,7 @@ func newFlowEpochEpochCommitEventType() *cadence.EventType {
 		Fields: []cadence.Field{
 			{
 				Identifier: "counter",
-				Type:       cadence.UInt64Type{},
+				Type:       cadence.UInt64Type,
 			},
 			{
 				Identifier: "clusterQCs",
@@ -915,7 +915,7 @@ func newFlowEpochEpochCommitEventType() *cadence.EventType {
 			},
 			{
 				Identifier: "dkgPubKeys",
-				Type:       cadence.NewVariableSizedArrayType(cadence.StringType{}),
+				Type:       cadence.NewVariableSizedArrayType(cadence.StringType),
 			},
 		},
 	}
@@ -934,19 +934,19 @@ func newFlowClusterQCClusterQCStructType() *cadence.StructType {
 		Fields: []cadence.Field{
 			{
 				Identifier: "index",
-				Type:       cadence.UInt16Type{},
+				Type:       cadence.UInt16Type,
 			},
 			{
 				Identifier: "voteSignatures",
-				Type:       cadence.NewVariableSizedArrayType(cadence.StringType{}),
+				Type:       cadence.NewVariableSizedArrayType(cadence.StringType),
 			},
 			{
 				Identifier: "voteMessage",
-				Type:       cadence.StringType{},
+				Type:       cadence.StringType,
 			},
 			{
 				Identifier: "voterIDs",
-				Type:       cadence.NewVariableSizedArrayType(cadence.StringType{}),
+				Type:       cadence.NewVariableSizedArrayType(cadence.StringType),
 			},
 		},
 	}
@@ -969,7 +969,7 @@ func NewNodeVersionBeaconVersionBeaconEventType() *cadence.EventType {
 			},
 			{
 				Identifier: "sequence",
-				Type:       cadence.UInt64Type{},
+				Type:       cadence.UInt64Type,
 			},
 		},
 	}
@@ -988,7 +988,7 @@ func NewNodeVersionBeaconVersionBoundaryStructType() *cadence.StructType {
 		Fields: []cadence.Field{
 			{
 				Identifier: "blockHeight",
-				Type:       cadence.UInt64Type{},
+				Type:       cadence.UInt64Type,
 			},
 			{
 				Identifier: "version",
@@ -1011,19 +1011,19 @@ func NewNodeVersionBeaconSemverStructType() *cadence.StructType {
 		Fields: []cadence.Field{
 			{
 				Identifier: "major",
-				Type:       cadence.UInt8Type{},
+				Type:       cadence.UInt8Type,
 			},
 			{
 				Identifier: "minor",
-				Type:       cadence.UInt8Type{},
+				Type:       cadence.UInt8Type,
 			},
 			{
 				Identifier: "patch",
-				Type:       cadence.UInt8Type{},
+				Type:       cadence.UInt8Type,
 			},
 			{
 				Identifier: "preRelease",
-				Type:       cadence.NewOptionalType(cadence.StringType{}),
+				Type:       cadence.NewOptionalType(cadence.StringType),
 			},
 		},
 	}
@@ -1042,11 +1042,11 @@ func NewProtocolStateVersionUpgradeEventType() *cadence.EventType {
 		Fields: []cadence.Field{
 			{
 				Identifier: "newProtocolVersion",
-				Type:       cadence.UInt64Type{},
+				Type:       cadence.UInt64Type,
 			},
 			{
 				Identifier: "activeView",
-				Type:       cadence.UInt64Type{},
+				Type:       cadence.UInt64Type,
 			},
 		},
 	}
@@ -1158,23 +1158,23 @@ func NewFlowClusterQCClusterStructType() *cadence.StructType {
 		Fields: []cadence.Field{
 			{
 				Identifier: "index",
-				Type:       cadence.UInt16Type{},
+				Type:       cadence.UInt16Type,
 			},
 			{
 				Identifier: "nodeWeights",
-				Type:       cadence.NewDictionaryType(cadence.StringType{}, cadence.UInt64Type{}),
+				Type:       cadence.NewDictionaryType(cadence.StringType, cadence.UInt64Type),
 			},
 			{
 				Identifier: "totalWeight",
-				Type:       cadence.UInt64Type{},
+				Type:       cadence.UInt64Type,
 			},
 			{
 				Identifier: "generatedVotes",
-				Type:       cadence.NewDictionaryType(cadence.StringType{}, newFlowClusterQCVoteStructType()),
+				Type:       cadence.NewDictionaryType(cadence.StringType, newFlowClusterQCVoteStructType()),
 			},
 			{
 				Identifier: "uniqueVoteMessageTotalWeights",
-				Type:       cadence.NewDictionaryType(cadence.StringType{}, cadence.UInt64Type{}),
+				Type:       cadence.NewDictionaryType(cadence.StringType, cadence.UInt64Type),
 			},
 		},
 	}

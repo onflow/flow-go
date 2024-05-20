@@ -335,13 +335,12 @@ func (l *Ledger) Checkpointer() (*realWAL.Checkpointer, error) {
 
 func (l *Ledger) MigrateAt(
 	state ledger.State,
-	migrations []ledger.Migration,
+	migration ledger.Migration,
 	targetPathFinderVersion uint8,
 ) (*trie.MTrie, error) {
 	l.logger.Info().Msgf(
-		"Ledger is loaded, checkpoint export has started for state %s, and %d migrations have been planed",
+		"Ledger is loaded, checkpoint export has started for state %s",
 		state.String(),
-		len(migrations),
 	)
 
 	// get trie
@@ -365,40 +364,15 @@ func (l *Ledger) MigrateAt(
 	var payloads []*ledger.Payload
 	var newTrie *trie.MTrie
 
-	noMigration := len(migrations) == 0
-
-	if noMigration {
+	if migration == nil {
 		// when there is no migration, reuse the trie without rebuilding it
 		newTrie = t
 	} else {
 		// get all payloads
 		payloads = t.AllPayloads()
-		payloadSize := len(payloads)
-
-		// migrate payloads
-		for i, migrate := range migrations {
-			l.logger.Info().Msgf("migration %d/%d is underway", i, len(migrations))
-
-			start := time.Now()
-			payloads, err = migrate(payloads)
-			elapsed := time.Since(start)
-
-			if err != nil {
-				return nil, fmt.Errorf("error applying migration (%d): %w", i, err)
-			}
-
-			newPayloadSize := len(payloads)
-
-			if payloadSize != newPayloadSize {
-				l.logger.Warn().
-					Int("migration_step", i).
-					Int("expected_size", payloadSize).
-					Int("outcome_size", newPayloadSize).
-					Msg("payload counts has changed during migration, make sure this is expected.")
-			}
-			l.logger.Info().Str("timeTaken", elapsed.String()).Msgf("migration %d is done", i)
-
-			payloadSize = newPayloadSize
+		payloads, err = migration(payloads)
+		if err != nil {
+			return nil, fmt.Errorf("error applying migration: %w", err)
 		}
 
 		l.logger.Info().Msgf("creating paths for %v payloads", len(payloads))
@@ -419,16 +393,16 @@ func (l *Ledger) MigrateAt(
 		}
 
 		// no need to prune the data since it has already been prunned through migrations
-		applyPruning := false
+		const applyPruning = false
 		newTrie, _, err = trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, derefPayloads, applyPruning)
 		if err != nil {
 			return nil, fmt.Errorf("constructing updated trie failed: %w", err)
 		}
 	}
 
-	statecommitment := ledger.State(newTrie.RootHash())
+	stateCommitment := ledger.State(newTrie.RootHash())
 
-	l.logger.Info().Msgf("successfully built new trie. NEW ROOT STATECOMMIEMENT: %v", statecommitment.String())
+	l.logger.Info().Msgf("successfully built new trie. NEW ROOT STATECOMMIEMENT: %v", stateCommitment.String())
 
 	return newTrie, nil
 }

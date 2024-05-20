@@ -39,7 +39,7 @@ import (
 // This is a collection of tests that validate various Access API endpoints work as expected.
 
 var (
-	simpleScript       = `pub fun main(): Int { return 42; }`
+	simpleScript       = `access(all) fun main(): Int { return 42; }`
 	simpleScriptResult = cadence.NewInt(42)
 
 	OriginalContract = dsl.Contract{
@@ -68,7 +68,9 @@ var (
 const (
 	GetMessageScript = `
 import TestingContract from 0x%s
-pub fun main(): String {
+
+access(all)
+fun main(): String {
 	return TestingContract.message()
 }`
 )
@@ -317,7 +319,7 @@ func (s *AccessAPISuite) TestSendAndSubscribeTransactionStatuses() {
 	})
 	s.Require().NoError(err)
 
-	expectedCounter := uint64(0)
+	expectedCounter := uint64(1)
 	lastReportedTxStatus := entities.TransactionStatus_UNKNOWN
 	var txID sdk.Identifier
 
@@ -362,7 +364,7 @@ func (s *AccessAPISuite) TestContractUpdate() {
 	// execute script and verify we get the original message
 	result, err := s.an2Client.ExecuteScriptAtBlockHeight(s.ctx, targetHeight, []byte(script), nil)
 	s.Require().NoError(err)
-	s.Require().Equal("Initial Contract", result.ToGoValue().(string))
+	s.Require().Equal("Initial Contract", string(result.(cadence.String)))
 
 	txResult = s.deployContract(UpdatedContract, true)
 	targetHeight = txResult.BlockHeight + 1
@@ -371,7 +373,7 @@ func (s *AccessAPISuite) TestContractUpdate() {
 	// execute script and verify we get the updated message
 	result, err = s.an2Client.ExecuteScriptAtBlockHeight(s.ctx, targetHeight, []byte(script), nil)
 	s.Require().NoError(err)
-	s.Require().Equal("Updated Contract", result.ToGoValue().(string))
+	s.Require().Equal("Updated Contract", string(result.(cadence.String)))
 }
 
 func (s *AccessAPISuite) testGetAccount(client *client.Client) {

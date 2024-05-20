@@ -2,7 +2,9 @@ package stdlib_test
 
 import (
 	"encoding/binary"
+	"encoding/hex"
 	"math/big"
+	"strings"
 	"testing"
 
 	"github.com/onflow/cadence"
@@ -13,6 +15,7 @@ import (
 	cadenceStdlib "github.com/onflow/cadence/runtime/stdlib"
 	"github.com/onflow/cadence/runtime/tests/utils"
 	coreContracts "github.com/onflow/flow-core-contracts/lib/go/contracts"
+	coreContractstemplates "github.com/onflow/flow-core-contracts/lib/go/templates"
 	"github.com/onflow/go-ethereum/crypto"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -180,6 +183,16 @@ func (t *testFlowAccount) Call(address types.Address, data types.Data, limit typ
 	return t.call(address, data, limit, balance)
 }
 
+func requireEqualEventAddress(t *testing.T, event cadence.Event, address types.Address) {
+	actual := cadence.SearchFieldByName(event, types.CadenceOwnedAccountCreatedTypeAddressFieldName)
+	strippedHex := strings.TrimPrefix(address.String(), "0x")
+	expected, err := cadence.NewString(strippedHex)
+	if err != nil {
+		require.NoError(t, err)
+	}
+	require.Equal(t, expected, actual)
+}
+
 func deployContracts(
 	t *testing.T,
 	rt runtime.Runtime,
@@ -191,47 +204,61 @@ func deployContracts(
 
 	contractsAddressHex := contractsAddress.Hex()
 
+	env := coreContractstemplates.Environment{
+		ServiceAccountAddress:             contractsAddressHex,
+		ViewResolverAddress:               contractsAddressHex,
+		BurnerAddress:                     contractsAddressHex,
+		FungibleTokenAddress:              contractsAddressHex,
+		NonFungibleTokenAddress:           contractsAddressHex,
+		MetadataViewsAddress:              contractsAddressHex,
+		FungibleTokenMetadataViewsAddress: contractsAddressHex,
+	}
+
 	contracts := []struct {
 		name     string
 		code     []byte
 		deployTx []byte
 	}{
 		{
+			name: "ViewResolver",
+			code: coreContracts.ViewResolver(),
+		},
+		{
+			name: "Burner",
+			code: coreContracts.Burner(),
+		},
+		{
 			name: "FungibleToken",
-			code: coreContracts.FungibleToken(),
+			code: coreContracts.FungibleToken(
+				env,
+			),
 		},
 		{
 			name: "NonFungibleToken",
-			code: coreContracts.NonFungibleToken(),
+			code: coreContracts.NonFungibleToken(
+				env,
+			),
 		},
 		{
 			name: "MetadataViews",
 			code: coreContracts.MetadataViews(
-				contractsAddressHex,
-				contractsAddressHex,
+				env,
 			),
 		},
 		{
 			name: "FungibleTokenMetadataViews",
 			code: coreContracts.FungibleTokenMetadataViews(
-				contractsAddressHex,
-				contractsAddressHex,
+				env,
 			),
-		},
-		{
-			name: "ViewResolver",
-			code: coreContracts.ViewResolver(),
 		},
 		{
 			name: "FlowToken",
 			code: coreContracts.FlowToken(
-				contractsAddressHex,
-				contractsAddressHex,
-				contractsAddressHex,
+				env,
 			),
 			deployTx: []byte(`
               transaction(name: String, code: String) {
-                prepare(signer: AuthAccount) {
+                prepare(signer: auth(AddContract, Storage, Capabilities) &Account) {
                   signer.contracts.add(name: name, code: code.utf8, signer)
                 }
               }
@@ -397,7 +424,7 @@ func TestEVMEncodeABI(t *testing.T) {
 	}
 	encodedABI := cadence.NewArray(
 		cdcBytes,
-	).WithType(cadence.NewVariableSizedArrayType(cadence.TheUInt8Type))
+	).WithType(cadence.NewVariableSizedArrayType(cadence.UInt8Type))
 
 	assert.Equal(t,
 		encodedABI,
@@ -808,7 +835,7 @@ func TestEVMDecodeABI(t *testing.T) {
 	}
 	encodedABI := cadence.NewArray(
 		cdcBytes,
-	).WithType(cadence.NewVariableSizedArrayType(cadence.TheUInt8Type))
+	).WithType(cadence.NewVariableSizedArrayType(cadence.UInt8Type))
 
 	result, err := rt.ExecuteScript(
 		runtime.Script{
@@ -2301,7 +2328,7 @@ func TestEVMEncodeABIWithSignature(t *testing.T) {
 	}
 	encodedABI := cadence.NewArray(
 		cdcBytes,
-	).WithType(cadence.NewVariableSizedArrayType(cadence.TheUInt8Type))
+	).WithType(cadence.NewVariableSizedArrayType(cadence.UInt8Type))
 
 	assert.Equal(t,
 		encodedABI,
@@ -2420,7 +2447,7 @@ func TestEVMDecodeABIWithSignature(t *testing.T) {
 	}
 	encodedABI := cadence.NewArray(
 		cdcBytes,
-	).WithType(cadence.NewVariableSizedArrayType(cadence.TheUInt8Type))
+	).WithType(cadence.NewVariableSizedArrayType(cadence.UInt8Type))
 
 	result, err := rt.ExecuteScript(
 		runtime.Script{
@@ -2534,7 +2561,7 @@ func TestEVMDecodeABIWithSignatureMismatch(t *testing.T) {
 	}
 	encodedABI := cadence.NewArray(
 		cdcBytes,
-	).WithType(cadence.NewVariableSizedArrayType(cadence.TheUInt8Type))
+	).WithType(cadence.NewVariableSizedArrayType(cadence.UInt8Type))
 
 	_, err := rt.ExecuteScript(
 		runtime.Script{
@@ -2648,13 +2675,187 @@ func TestEVMAddressConstructionAndReturn(t *testing.T) {
 	evmAddressCadenceType := stdlib.NewEVMAddressCadenceType(common.Address(contractsAddress))
 
 	assert.Equal(t,
-		cadence.Struct{
-			StructType: evmAddressCadenceType,
-			Fields: []cadence.Value{
-				addressBytesArray,
-			},
-		},
+		cadence.NewStruct([]cadence.Value{
+			addressBytesArray,
+		}).WithType(evmAddressCadenceType),
 		result,
+	)
+}
+
+func TestEVMAddressSerializationAndDeserialization(t *testing.T) {
+
+	t.Parallel()
+
+	handler := &testContractHandler{}
+
+	contractsAddress := flow.BytesToAddress([]byte{0x1})
+
+	transactionEnvironment := newEVMTransactionEnvironment(handler, contractsAddress)
+	scriptEnvironment := newEVMScriptEnvironment(handler, contractsAddress)
+
+	rt := runtime.NewInterpreterRuntime(runtime.Config{})
+
+	addressFromBytesScript := []byte(`
+      import EVM from 0x1
+
+      access(all)
+      fun main(_ bytes: [UInt8; 20]): EVM.EVMAddress {
+          return EVM.EVMAddress(bytes: bytes)
+      }
+    `)
+
+	accountCodes := map[common.Location][]byte{}
+	var events []cadence.Event
+
+	runtimeInterface := &TestRuntimeInterface{
+		Storage: NewTestLedger(nil, nil),
+		OnGetSigningAccounts: func() ([]runtime.Address, error) {
+			return []runtime.Address{runtime.Address(contractsAddress)}, nil
+		},
+		OnResolveLocation: LocationResolver,
+		OnUpdateAccountContractCode: func(location common.AddressLocation, code []byte) error {
+			accountCodes[location] = code
+			return nil
+		},
+		OnGetAccountContractCode: func(location common.AddressLocation) (code []byte, err error) {
+			code = accountCodes[location]
+			return code, nil
+		},
+		OnEmitEvent: func(event cadence.Event) error {
+			events = append(events, event)
+			return nil
+		},
+		OnDecodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
+			return json.Decode(nil, b)
+		},
+	}
+
+	sourceBytes := []byte{
+		1, 1, 2, 2, 3, 3, 4, 4, 5, 5,
+		6, 6, 7, 7, 8, 8, 9, 9, 10, 10,
+	}
+
+	// construct the address as a cadence value from sourceBytes
+	addressBytesArray := cadence.NewArray([]cadence.Value{
+		cadence.UInt8(sourceBytes[0]), cadence.UInt8(sourceBytes[1]),
+		cadence.UInt8(sourceBytes[2]), cadence.UInt8(sourceBytes[3]),
+		cadence.UInt8(sourceBytes[4]), cadence.UInt8(sourceBytes[5]),
+		cadence.UInt8(sourceBytes[6]), cadence.UInt8(sourceBytes[7]),
+		cadence.UInt8(sourceBytes[8]), cadence.UInt8(sourceBytes[9]),
+		cadence.UInt8(sourceBytes[10]), cadence.UInt8(sourceBytes[11]),
+		cadence.UInt8(sourceBytes[12]), cadence.UInt8(sourceBytes[13]),
+		cadence.UInt8(sourceBytes[14]), cadence.UInt8(sourceBytes[15]),
+		cadence.UInt8(sourceBytes[16]), cadence.UInt8(sourceBytes[17]),
+		cadence.UInt8(sourceBytes[18]), cadence.UInt8(sourceBytes[19]),
+	}).WithType(stdlib.EVMAddressBytesCadenceType)
+
+	nextTransactionLocation := NewTransactionLocationGenerator()
+	nextScriptLocation := NewScriptLocationGenerator()
+
+	// Deploy contracts
+
+	deployContracts(
+		t,
+		rt,
+		contractsAddress,
+		runtimeInterface,
+		transactionEnvironment,
+		nextTransactionLocation,
+	)
+
+	// Run script
+
+	constructAddrResult, err := rt.ExecuteScript(
+		runtime.Script{
+			Source: addressFromBytesScript,
+			Arguments: EncodeArgs([]cadence.Value{
+				addressBytesArray,
+			}),
+		},
+		runtime.Context{
+			Interface:   runtimeInterface,
+			Environment: scriptEnvironment,
+			Location:    nextScriptLocation(),
+		},
+	)
+	require.NoError(t, err)
+
+	evmAddressCadenceType := stdlib.NewEVMAddressCadenceType(common.Address(contractsAddress))
+	evmAddress := cadence.NewStruct([]cadence.Value{
+		addressBytesArray,
+	}).WithType(evmAddressCadenceType)
+
+	assert.Equal(t,
+		evmAddress,
+		constructAddrResult,
+	)
+
+	// Attempt to serialize and deserialize the address
+
+	addressSerializationScript := []byte(`
+	  import EVM from 0x1
+
+	  access(all)
+	  fun main(address: EVM.EVMAddress): String {
+		return address.toString()
+	  }
+	`)
+
+	serializeAddrResult, err := rt.ExecuteScript(
+		runtime.Script{
+			Source: addressSerializationScript,
+			Arguments: EncodeArgs([]cadence.Value{
+				evmAddress,
+			}),
+		},
+		runtime.Context{
+			Interface:   runtimeInterface,
+			Environment: scriptEnvironment,
+			Location:    nextScriptLocation(),
+		},
+	)
+
+	require.NoError(t, err)
+
+	// Encode the sourceBytes array as a hex string as the expected value to compare the result against
+
+	expectedHex, _ := cadence.NewString(hex.EncodeToString(sourceBytes))
+
+	assert.Equal(t,
+		expectedHex,
+		serializeAddrResult,
+	)
+
+	// Attempt to deserialize the address
+
+	addressDeserializationScript := []byte(`
+	  import EVM from 0x1
+
+	  access(all)
+	  fun main(hexString: String): EVM.EVMAddress {
+		return EVM.addressFromString(hexString)
+	  }
+	`)
+
+	deserializeAddrResult, err := rt.ExecuteScript(
+		runtime.Script{
+			Source: addressDeserializationScript,
+			Arguments: EncodeArgs([]cadence.Value{
+				serializeAddrResult,
+			}),
+		},
+		runtime.Context{
+			Interface:   runtimeInterface,
+			Environment: scriptEnvironment,
+			Location:    nextScriptLocation(),
+		},
+	)
+
+	require.NoError(t, err)
+
+	assert.Equal(t,
+		evmAddress,
+		deserializeAddrResult,
 	)
 }
 
@@ -2742,12 +2943,9 @@ func TestBalanceConstructionAndReturn(t *testing.T) {
 	evmBalanceCadenceType := stdlib.NewBalanceCadenceType(common.Address(contractsAddress))
 
 	assert.Equal(t,
-		cadence.Struct{
-			StructType: evmBalanceCadenceType,
-			Fields: []cadence.Value{
-				flowValue,
-			},
-		},
+		cadence.NewStruct([]cadence.Value{
+			flowValue,
+		}).WithType(evmBalanceCadenceType),
 		result,
 	)
 }
@@ -3010,7 +3208,7 @@ func TestEVMBatchRun(t *testing.T) {
 		cadence.NewArray([]cadence.Value{cadence.UInt8(1), cadence.UInt8(2), cadence.UInt8(3)}),
 		cadence.NewArray([]cadence.Value{cadence.UInt8(4), cadence.UInt8(5), cadence.UInt8(6)}),
 		cadence.NewArray([]cadence.Value{cadence.UInt8(7), cadence.UInt8(8), cadence.UInt8(9)}),
-	}).WithType(cadence.NewVariableSizedArrayType(cadence.NewVariableSizedArrayType(cadence.UInt8Type{})))
+	}).WithType(cadence.NewVariableSizedArrayType(cadence.NewVariableSizedArrayType(cadence.UInt8Type)))
 
 	coinbase := cadence.NewArray([]cadence.Value{
 		cadence.UInt8(1), cadence.UInt8(1),
@@ -3242,7 +3440,7 @@ func TestEVMCreateCadenceOwnedAccount(t *testing.T) {
 		cadence.UInt8(0), cadence.UInt8(0),
 	}).WithType(cadence.NewConstantSizedArrayType(
 		types.AddressLength,
-		cadence.UInt8Type{},
+		cadence.UInt8Type,
 	))
 
 	require.Equal(t, expected, actual)
@@ -3256,10 +3454,10 @@ func TestEVMCreateCadenceOwnedAccount(t *testing.T) {
 
 	// check cadence owned account created events
 	expectedCoaAddress := types.Address{3}
-	require.Equal(t, expectedCoaAddress.ToCadenceValue().ToGoValue(), events[0].Fields[0].ToGoValue())
+	requireEqualEventAddress(t, events[0], expectedCoaAddress)
 
 	expectedCoaAddress = types.Address{4}
-	require.Equal(t, expectedCoaAddress.ToCadenceValue().ToGoValue(), events[1].Fields[0].ToGoValue())
+	requireEqualEventAddress(t, events[1], expectedCoaAddress)
 }
 
 func TestCadenceOwnedAccountCall(t *testing.T) {
@@ -3383,7 +3581,7 @@ func TestCadenceOwnedAccountCall(t *testing.T) {
 		cadence.UInt8(3),
 		cadence.UInt8(1),
 		cadence.UInt8(4),
-	}).WithType(cadence.NewVariableSizedArrayType(cadence.UInt8Type{}))
+	}).WithType(cadence.NewVariableSizedArrayType(cadence.UInt8Type))
 
 	require.Equal(t, expected, actual)
 }
@@ -3410,7 +3608,7 @@ func TestEVMAddressDeposit(t *testing.T) {
 					deposited = true
 					assert.Equal(
 						t,
-						types.Balance(expectedBalance),
+						expectedBalance,
 						vault.Balance(),
 					)
 				},
@@ -3431,8 +3629,8 @@ func TestEVMAddressDeposit(t *testing.T) {
 
       access(all)
       fun main() {
-          let admin = getAuthAccount(0x1)
-              .borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin)!
+          let admin = getAuthAccount<auth(Storage) &Account>(0x1)
+              .storage.borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin)!
           let minter <- admin.createNewMinter(allowedAmount: 1.23)
           let vault <- minter.mintTokens(amount: 1.23)
           destroy minter
@@ -3545,8 +3743,8 @@ func TestCOADeposit(t *testing.T) {
 
       access(all)
       fun main() {
-          let admin = getAuthAccount(0x1)
-              .borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin)!
+          let admin = getAuthAccount<auth(BorrowValue) &Account>(0x1)
+              .storage.borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin)!
           let minter <- admin.createNewMinter(allowedAmount: 1.23)
           let vault <- minter.mintTokens(amount: 1.23)
           destroy minter
@@ -3627,10 +3825,15 @@ func TestCOADeposit(t *testing.T) {
 
 	// token deposit event
 	tokenDepositEvent := events[3]
-	// check address
-	require.Equal(t, expectedCoaAddress.ToCadenceValue().ToGoValue(), tokenDepositEvent.Fields[0].ToGoValue())
+	tokenDepositEventFields := cadence.FieldsMappedByName(tokenDepositEvent)
+
+	requireEqualEventAddress(t, tokenDepositEvent, expectedCoaAddress)
+
 	// check amount
-	require.Equal(t, expectedBalance.ToGoValue(), tokenDepositEvent.Fields[1].ToGoValue())
+	require.Equal(t,
+		expectedBalance,
+		tokenDepositEventFields["amount"],
+	)
 }
 
 func TestCadenceOwnedAccountWithdraw(t *testing.T) {
@@ -3695,8 +3898,8 @@ func TestCadenceOwnedAccountWithdraw(t *testing.T) {
 
       access(all)
       fun main(): UFix64 {
-          let admin = getAuthAccount(0x1)
-              .borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin)!
+          let admin = getAuthAccount<auth(BorrowValue) &Account>(0x1)
+              .storage.borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin)!
           let minter <- admin.createNewMinter(allowedAmount: 2.34)
           let vault <- minter.mintTokens(amount: 2.34)
           destroy minter
@@ -3792,10 +3995,15 @@ func TestCadenceOwnedAccountWithdraw(t *testing.T) {
 
 	// token deposit event
 	tokenWithdrawEvent := events[4]
-	// check address
-	require.Equal(t, expectedCoaAddress.ToCadenceValue().ToGoValue(), tokenWithdrawEvent.Fields[0].ToGoValue())
+	tokenWithdrawEventFields := cadence.FieldsMappedByName(tokenWithdrawEvent)
+
+	requireEqualEventAddress(t, tokenWithdrawEvent, expectedCoaAddress)
+
 	// check amount
-	require.Equal(t, expectedWithdrawBalance.ToGoValue(), tokenWithdrawEvent.Fields[1].ToGoValue())
+	require.Equal(t,
+		expectedWithdrawBalance,
+		tokenWithdrawEventFields["amount"],
+	)
 }
 
 func TestCadenceOwnedAccountDeploy(t *testing.T) {
@@ -3847,7 +4055,7 @@ func TestCadenceOwnedAccountDeploy(t *testing.T) {
           let res = cadenceOwnedAccount.deploy(
               code: [4, 5, 6],
               gasLimit: 9999,
-              value: EVM.Balance(flow: 1230000000000000000)
+              value: EVM.Balance(attoflow: 1230000000000000000)
           )
           destroy cadenceOwnedAccount
 
@@ -3912,7 +4120,7 @@ func TestCadenceOwnedAccountDeploy(t *testing.T) {
 
 	expected := cadence.
 		NewArray([]cadence.Value{cadence.UInt8(5)}).
-		WithType(cadence.NewVariableSizedArrayType(cadence.UInt8Type{}))
+		WithType(cadence.NewVariableSizedArrayType(cadence.UInt8Type))
 
 	require.Equal(t, expected, actual)
 
@@ -3985,8 +4193,7 @@ func RunEVMScript(
 	)
 	require.NoError(t, err)
 
-	require.NoError(t, err)
-	require.Equal(t, expectedValue.ToGoValue(), actual.ToGoValue())
+	require.Equal(t, expectedValue, actual)
 }
 
 func TestEVMAccountBalance(t *testing.T) {
@@ -4071,7 +4278,7 @@ func TestEVMAccountCode(t *testing.T) {
 	expectedCodeRaw := []byte{1, 2, 3}
 	expectedCodeValue := cadence.NewArray(
 		[]cadence.Value{cadence.UInt8(1), cadence.UInt8(2), cadence.UInt8(3)},
-	).WithType(cadence.NewVariableSizedArrayType(cadence.TheUInt8Type))
+	).WithType(cadence.NewVariableSizedArrayType(cadence.UInt8Type))
 
 	handler := &testContractHandler{
 		flowTokenAddress:   common.Address(contractsAddress),
@@ -4111,7 +4318,7 @@ func TestEVMAccountCodeHash(t *testing.T) {
 	expectedCodeHashRaw := []byte{1, 2, 3}
 	expectedCodeHashValue := cadence.NewArray(
 		[]cadence.Value{cadence.UInt8(1), cadence.UInt8(2), cadence.UInt8(3)},
-	).WithType(cadence.NewVariableSizedArrayType(cadence.TheUInt8Type))
+	).WithType(cadence.NewVariableSizedArrayType(cadence.UInt8Type))
 
 	handler := &testContractHandler{
 		flowTokenAddress:   common.Address(contractsAddress),
@@ -4234,12 +4441,17 @@ func TestEVMValidateCOAOwnershipProof(t *testing.T) {
 		import EVM from 0x1
 
 		transaction {
-			prepare(account: AuthAccount) {
-				let cadenceOwnedAccount1 <- EVM.createCadenceOwnedAccount()
-				account.save<@EVM.CadenceOwnedAccount>(<-cadenceOwnedAccount1,
-					                              to: /storage/coa)
-				account.link<&EVM.CadenceOwnedAccount{EVM.Addressable}>(/public/coa,
-					                                               target: /storage/coa)
+			prepare(account: auth(Capabilities, SaveValue) &Account) {
+				let cadenceOwnedAccount <- EVM.createCadenceOwnedAccount()
+
+				account.storage.save(
+				    <-cadenceOwnedAccount,
+					to: /storage/coa
+				)
+
+				let cap = account.capabilities.storage
+				    .issue<&EVM.CadenceOwnedAccount>(/storage/coa)
+				account.capabilities.publish(cap, at: /public/coa)
 			}
 		}`)
 
@@ -4405,15 +4617,12 @@ func TestEVMGetLatestBlock(t *testing.T) {
 	blockTotalSupply := cadence.NewIntFromBig(latestBlock.TotalSupply)
 	timestamp := cadence.NewUInt64(latestBlock.Timestamp)
 
-	expectedEVMBlock := cadence.Struct{
-		StructType: evmBlockCadenceType,
-		Fields: []cadence.Value{
-			blockHeight,
-			blockHash,
-			blockTotalSupply,
-			timestamp,
-		},
-	}
+	expectedEVMBlock := cadence.NewStruct([]cadence.Value{
+		blockHeight,
+		blockHash,
+		blockTotalSupply,
+		timestamp,
+	}).WithType(evmBlockCadenceType)
 
 	RunEVMScript(t, handler, script, expectedEVMBlock)
 }

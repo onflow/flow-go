@@ -1,6 +1,7 @@
 package evm_test
 
 import (
+	"encoding/binary"
 	"encoding/hex"
 	"fmt"
 	"math"
@@ -54,7 +55,7 @@ func TestEVMRun(t *testing.T) {
 					import EVM from %s
 
 					transaction(tx: [UInt8], coinbaseBytes: [UInt8; 20]){
-						prepare(account: AuthAccount) {
+						prepare(account: &Account) {
 							let coinbase = EVM.EVMAddress(bytes: coinbaseBytes)
 							let res = EVM.run(tx: tx, coinbase: coinbase)
 
@@ -107,7 +108,11 @@ func TestEVMRun(t *testing.T) {
 
 				assert.Equal(
 					t,
-					common.NewAddressLocation(nil, common.Address(sc.EVMContract.Address), string(types.EventTypeBlockExecuted)).ID(),
+					common.NewAddressLocation(
+						nil,
+						common.Address(sc.EVMContract.Address),
+						string(types.EventTypeBlockExecuted),
+					).ID(),
 					string(blockEvent.Type),
 				)
 
@@ -124,7 +129,11 @@ func TestEVMRun(t *testing.T) {
 
 				assert.Equal(
 					t,
-					common.NewAddressLocation(nil, common.Address(sc.EVMContract.Address), string(types.EventTypeTransactionExecuted)).ID(),
+					common.NewAddressLocation(
+						nil,
+						common.Address(sc.EVMContract.Address),
+						string(types.EventTypeTransactionExecuted),
+					).ID(),
 					string(txEvent.Type),
 				)
 
@@ -214,7 +223,7 @@ func TestEVMRun(t *testing.T) {
 					import EVM from %s
 
 					transaction(tx: [UInt8], coinbaseBytes: [UInt8; 20]){
-						prepare(account: AuthAccount) {
+						prepare(account: &Account) {
 							let coinbase = EVM.EVMAddress(bytes: coinbaseBytes)
 							let res = EVM.run(tx: tx, coinbase: coinbase)
 
@@ -324,7 +333,7 @@ func TestEVMRun(t *testing.T) {
 					import EVM from %s
 
 					transaction(tx: [UInt8], coinbaseBytes: [UInt8; 20]){
-						prepare(account: AuthAccount) {
+						prepare(account: &Account) {
 							let coinbase = EVM.EVMAddress(bytes: coinbaseBytes)
 							let res = EVM.run(tx: tx, coinbase: coinbase)
 
@@ -415,7 +424,7 @@ func TestEVMBatchRun(t *testing.T) {
 					import EVM from %s
 
 					transaction(txs: [[UInt8]], coinbaseBytes: [UInt8; 20]) {
-						prepare(account: AuthAccount) {
+						prepare(account: &Account) {
 							let coinbase = EVM.EVMAddress(bytes: coinbaseBytes)
 							let batchResults = EVM.batchRun(txs: txs, coinbase: coinbase)
 							
@@ -572,7 +581,7 @@ func TestEVMBatchRun(t *testing.T) {
 					import EVM from %s
 
 					transaction(txs: [[UInt8]], coinbaseBytes: [UInt8; 20]) {
-						prepare(account: AuthAccount) {
+						prepare(account: &Account) {
 							let coinbase = EVM.EVMAddress(bytes: coinbaseBytes)
 							let batchResults = EVM.batchRun(txs: txs, coinbase: coinbase)
 							
@@ -916,13 +925,15 @@ func TestEVMAddressDeposit(t *testing.T) {
 				import FlowToken from %s
 
 				transaction(addr: [UInt8; 20]) {
-					prepare(account: AuthAccount) {
-						let admin = account.borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin)!
+					prepare(account: auth(BorrowValue) &Account) {
+						let admin = account.storage
+							.borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin)!
+
 						let minter <- admin.createNewMinter(allowedAmount: 1.0)
 						let vault <- minter.mintTokens(amount: 1.0)
 						destroy minter
 
-						let address = EVM.EVMAddress(addr)
+						let address = EVM.EVMAddress(bytes: addr)
 						address.deposit(from: <-vault)
 					}
 				}
@@ -977,8 +988,8 @@ func TestCOAAddressDeposit(t *testing.T) {
 
 				access(all)
 				fun main() {
-					let admin = getAuthAccount(%s)
-						.borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin)!
+					let admin = getAuthAccount<auth(BorrowValue) &Account>(%s)
+						.storage.borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin)!
 					let minter <- admin.createNewMinter(allowedAmount: 1.23)
 					let vault <- minter.mintTokens(amount: 1.23)
 					destroy minter
@@ -1080,8 +1091,8 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 
 				access(all)
 				fun main(): UFix64 {
-					let admin = getAuthAccount(%s)
-						.borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin)!
+					let admin = getAuthAccount<auth(BorrowValue) &Account>(%s)
+						.storage.borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin)!
 					let minter <- admin.createNewMinter(allowedAmount: 2.34)
 					let vault <- minter.mintTokens(amount: 2.34)
 					destroy minter
@@ -1133,8 +1144,9 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 
 				access(all)
 				fun main(address: [UInt8; 20]): UFix64 {
-					let admin = getAuthAccount(%s)
-						.borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin)!
+					let admin = getAuthAccount<auth(BorrowValue) &Account>(%s)
+						.storage.borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin)!
+
 					let minter <- admin.createNewMinter(allowedAmount: 2.34)
 					let vault <- minter.mintTokens(amount: 2.34)
 					destroy minter
@@ -1200,8 +1212,9 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 
 				access(all)
 				fun main(): UFix64 {
-					let admin = getAuthAccount(%s)
-						.borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin)!
+					let admin = getAuthAccount<auth(Storage) &Account>(%s)
+						.storage.borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin)!
+
 					let minter <- admin.createNewMinter(allowedAmount: 2.34)
 					let vault <- minter.mintTokens(amount: 2.34)
 					destroy minter
@@ -1251,8 +1264,8 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 	
 					access(all)
 					fun main(code: [UInt8]): EVM.Result {
-						let admin = getAuthAccount(%s)
-							.borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin)!
+						let admin = getAuthAccount<auth(Storage) &Account>(%s)
+							.storage.borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin)!
 						let minter <- admin.createNewMinter(allowedAmount: 2.34)
 						let vault <- minter.mintTokens(amount: 2.34)
 						destroy minter
@@ -1278,7 +1291,7 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 					WithArguments(json.MustEncode(
 						cadence.NewArray(
 							ConvertToCadence(testContract.ByteCode),
-						).WithType(cadence.NewVariableSizedArrayType(cadence.UInt8Type{})),
+						).WithType(cadence.NewVariableSizedArrayType(cadence.UInt8Type)),
 					))
 
 				_, output, err := vm.Run(
@@ -1495,6 +1508,30 @@ func TestDryRun(t *testing.T) {
 				require.NotEmpty(t, result.DeployedContractAddress.String())
 			})
 	})
+
+	t.Run("test dry run validation error", func(t *testing.T) {
+		RunWithNewEnvironment(t,
+			chain, func(
+				ctx fvm.Context,
+				vm fvm.VM,
+				snapshot snapshot.SnapshotTree,
+				testContract *TestContract,
+				testAccount *EOATestAccount,
+			) {
+				tx := gethTypes.NewContractCreation(
+					0,
+					big.NewInt(100), // more than available
+					uint64(1000000),
+					big.NewInt(0),
+					nil,
+				)
+
+				result := dryRunTx(t, tx, ctx, vm, snapshot, testContract)
+				assert.Equal(t, types.ValidationErrCodeInsufficientFunds, result.ErrorCode)
+				assert.Equal(t, types.StatusInvalid, result.Status)
+				assert.Equal(t, types.InvalidTransactionGasCost, int(result.GasConsumed))
+			})
+	})
 }
 
 func TestCadenceArch(t *testing.T) {
@@ -1518,7 +1555,8 @@ func TestCadenceArch(t *testing.T) {
 					access(all)
 					fun main(tx: [UInt8], coinbaseBytes: [UInt8; 20]) {
 						let coinbase = EVM.EVMAddress(bytes: coinbaseBytes)
-						EVM.run(tx: tx, coinbase: coinbase)
+						let res = EVM.run(tx: tx, coinbase: coinbase)
+						assert(res.status == EVM.Status.successful, message: "test failed: ".concat(res.errorCode.toString()))
 					}
                     `,
 					sc.EVMContract.Address.HexWithPrefix(),
@@ -1551,6 +1589,73 @@ func TestCadenceArch(t *testing.T) {
 			})
 	})
 
+	t.Run("testing calling Cadence arch - revertible random", func(t *testing.T) {
+		chain := flow.Emulator.Chain()
+		sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+		RunWithNewEnvironment(t,
+			chain, func(
+				ctx fvm.Context,
+				vm fvm.VM,
+				snapshot snapshot.SnapshotTree,
+				testContract *TestContract,
+				testAccount *EOATestAccount,
+			) {
+				code := []byte(fmt.Sprintf(
+					`
+					import EVM from %s
+
+					access(all)
+					fun main(tx: [UInt8], coinbaseBytes: [UInt8; 20]): [UInt8] {
+						let coinbase = EVM.EVMAddress(bytes: coinbaseBytes)
+						let res = EVM.run(tx: tx, coinbase: coinbase)
+						assert(res.status == EVM.Status.successful, message: "test failed: ".concat(res.errorCode.toString()))
+						return res.data
+					}
+                    `,
+					sc.EVMContract.Address.HexWithPrefix(),
+				))
+				innerTxBytes := testAccount.PrepareSignAndEncodeTx(t,
+					testContract.DeployedAt.ToCommon(),
+					testContract.MakeCallData(t, "verifyArchCallToRevertibleRandom"),
+					big.NewInt(0),
+					uint64(10_000_000),
+					big.NewInt(0),
+				)
+				script := fvm.Script(code).WithArguments(
+					json.MustEncode(
+						cadence.NewArray(
+							ConvertToCadence(innerTxBytes),
+						).WithType(stdlib.EVMTransactionBytesCadenceType),
+					),
+					json.MustEncode(
+						cadence.NewArray(
+							ConvertToCadence(testAccount.Address().Bytes()),
+						).WithType(stdlib.EVMAddressBytesCadenceType),
+					),
+				)
+				_, output, err := vm.Run(
+					ctx,
+					script,
+					snapshot)
+				require.NoError(t, err)
+				require.NoError(t, output.Err)
+
+				res := make([]byte, 8)
+				vals := output.Value.(cadence.Array).Values
+				vals = vals[len(vals)-8:] // only last 8 bytes is the value
+				for i := range res {
+					res[i] = byte(vals[i].(cadence.UInt8))
+				}
+
+				actualRand := binary.BigEndian.Uint64(res)
+				// because PRG uses script ID and random source we can not predict the random
+				// we can set the random source but since script ID is generated by hashing
+				// script and args, and since arg is a signed transaction which always changes
+				// we can't fix the value
+				require.Greater(t, actualRand, uint64(0))
+			})
+	})
+
 	t.Run("testing calling Cadence arch - random source (happy case)", func(t *testing.T) {
 		chain := flow.Emulator.Chain()
 		sc := systemcontracts.SystemContractsForChain(chain.ChainID())
@@ -1578,8 +1683,8 @@ func TestCadenceArch(t *testing.T) {
 						import RandomBeaconHistory from %s
 
 						transaction {
-							prepare(serviceAccount: AuthAccount) {
-								let randomBeaconHistoryHeartbeat = serviceAccount.borrow<&RandomBeaconHistory.Heartbeat>(
+							prepare(serviceAccount: auth(Capabilities, Storage) &Account) {
+								let randomBeaconHistoryHeartbeat = serviceAccount.storage.borrow<&RandomBeaconHistory.Heartbeat>(
 									from: RandomBeaconHistory.HeartbeatStoragePath)
 										?? panic("Couldn't borrow RandomBeaconHistory.Heartbeat Resource")
 								randomBeaconHistoryHeartbeat.heartbeat(randomSourceHistory: randomSourceHistory())
@@ -1644,7 +1749,7 @@ func TestCadenceArch(t *testing.T) {
 				vals := output.Value.(cadence.Array).Values
 				vals = vals[len(vals)-8:] // only last 8 bytes is the value
 				for i := range res {
-					res[i] = vals[i].ToGoValue().(byte)
+					res[i] = byte(vals[i].(cadence.UInt8))
 				}
 				require.Equal(t, source, res)
 			})
@@ -1673,8 +1778,8 @@ func TestCadenceArch(t *testing.T) {
 						import RandomBeaconHistory from %s
 
 						transaction {
-							prepare(serviceAccount: AuthAccount) {
-								let randomBeaconHistoryHeartbeat = serviceAccount.borrow<&RandomBeaconHistory.Heartbeat>(
+							prepare(serviceAccount: auth(Capabilities, Storage) &Account) {
+								let randomBeaconHistoryHeartbeat = serviceAccount.storage.borrow<&RandomBeaconHistory.Heartbeat>(
 									from: RandomBeaconHistory.HeartbeatStoragePath)
 										?? panic("Couldn't borrow RandomBeaconHistory.Heartbeat Resource")
 								randomBeaconHistoryHeartbeat.heartbeat(randomSourceHistory: randomSourceHistory())
@@ -1797,7 +1902,8 @@ func TestCadenceArch(t *testing.T) {
 					access(all)
 					fun main(tx: [UInt8], coinbaseBytes: [UInt8; 20]) {
 						let coinbase = EVM.EVMAddress(bytes: coinbaseBytes)
-						EVM.run(tx: tx, coinbase: coinbase)
+						let res = EVM.run(tx: tx, coinbase: coinbase)
+						assert(res.status == EVM.Status.successful, message: "test failed: ".concat(res.errorCode.toString()))
 					}
                 	`,
 					sc.EVMContract.Address.HexWithPrefix(),
@@ -1867,13 +1973,15 @@ func createAndFundFlowAccount(
 		import FungibleToken from %s 
 
 		transaction {
-			prepare(account: AuthAccount) {
-			let admin = account.borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin)!
+			prepare(account: auth(BorrowValue) &Account) {
+			let admin = account.storage
+				.borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin)!
+
 			let minter <- admin.createNewMinter(allowedAmount: 100.0)
 			let vault <- minter.mintTokens(amount: 100.0)
 
-			let receiverRef = getAccount(%s).getCapability(/public/flowTokenReceiver)
-				.borrow<&{FungibleToken.Receiver}>()
+			let receiverRef = getAccount(%s).capabilities
+				.borrow<&{FungibleToken.Receiver}>(/public/flowTokenReceiver)
 				?? panic("Could not borrow receiver reference to the recipient's Vault")
 			receiverRef.deposit(from: <-vault)
 
@@ -1927,21 +2035,26 @@ func setupCOA(
 	import FlowToken from %s
 
 	transaction(amount: UFix64) {
-		prepare(account: AuthAccount) {
+		prepare(account: auth(Capabilities, Storage) &Account) {
 			let cadenceOwnedAccount1 <- EVM.createCadenceOwnedAccount()
 			
-			let vaultRef = account.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
-			?? panic("Could not borrow reference to the owner's Vault!")
+			let vaultRef = account.storage
+                .borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(from: /storage/flowTokenVault)
+				?? panic("Could not borrow reference to the owner's Vault!")
 
 			if amount > 0.0 {
 				let vault <- vaultRef.withdraw(amount: amount) as! @FlowToken.Vault
 				cadenceOwnedAccount1.deposit(from: <-vault)
 			}
+			
+			account.storage.save<@EVM.CadenceOwnedAccount>(
+				<-cadenceOwnedAccount1,
+				to: /storage/coa
+			)
 
-			account.save<@EVM.CadenceOwnedAccount>(<-cadenceOwnedAccount1,
-												to: /storage/coa)
-			account.link<&EVM.CadenceOwnedAccount{EVM.Addressable}>(/public/coa,
-																target: /storage/coa)
+			let cap = account.capabilities.storage
+				.issue<&EVM.CadenceOwnedAccount>(/storage/coa)
+			account.capabilities.publish(cap, at: /public/coa)
 		}
 	}
 	`,
@@ -1962,7 +2075,7 @@ func setupCOA(
 	snap = snap.Append(es)
 
 	// 3rd event is the cadence owned account created event
-	coaAddress, err := types.COAAddressFromFlowEvent(sc.EVMContract.Address, output.Events[2])
+	coaAddress, err := types.COAAddressFromFlowCOACreatedEvent(sc.EVMContract.Address, output.Events[2])
 	require.NoError(t, err)
 
 	return coaAddress, snap
@@ -2114,7 +2227,6 @@ func RunWithNewEnvironment(
 
 				baseBootstrapOpts := []fvm.BootstrapProcedureOption{
 					fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply),
-					fvm.WithSetupEVMEnabled(true),
 				}
 
 				executionSnapshot, _, err := vm.Run(

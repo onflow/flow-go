@@ -15,6 +15,7 @@ import (
 	runtimeCommon "github.com/onflow/cadence/runtime/common"
 
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
+	"github.com/onflow/flow-go/cmd/util/ledger/migrations"
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
@@ -40,7 +41,7 @@ func TestExtractExecutionState(t *testing.T) {
 			db := common.InitStorage(datadir)
 			commits := badger.NewCommits(metr, db)
 
-			_, err := getStateCommitment(commits, unittest.IdentifierFixture())
+			_, err := commits.ByBlockID(unittest.IdentifierFixture())
 			require.Error(t, err)
 		})
 	})
@@ -57,7 +58,7 @@ func TestExtractExecutionState(t *testing.T) {
 			err := commits.Store(blockID, stateCommitment)
 			require.NoError(t, err)
 
-			retrievedStateCommitment, err := getStateCommitment(commits, blockID)
+			retrievedStateCommitment, err := commits.ByBlockID(blockID)
 			require.NoError(t, err)
 			require.Equal(t, stateCommitment, retrievedStateCommitment)
 		})
@@ -65,6 +66,14 @@ func TestExtractExecutionState(t *testing.T) {
 
 	t.Run("empty WAL doesn't find anything", func(t *testing.T) {
 		withDirs(t, func(datadir, execdir, outdir string) {
+			opts := migrations.Options{
+				NWorker:              10,
+				ChainID:              flow.Emulator,
+				EVMContractChange:    migrations.EVMContractChangeNone,
+				BurnerContractChange: migrations.BurnerContractChangeDeploy,
+				VerboseErrorOutput:   true,
+			}
+
 			err := extractExecutionState(
 				zerolog.Nop(),
 				execdir,
@@ -74,6 +83,8 @@ func TestExtractExecutionState(t *testing.T) {
 				false,
 				"",
 				nil,
+				false,
+				opts,
 			)
 			require.Error(t, err)
 		})
@@ -395,10 +406,22 @@ func TestExtractPayloadsFromExecutionState(t *testing.T) {
 			// Verify exported payloads.
 			partialState, payloadsFromFile, err := util.ReadPayloadFile(zerolog.Nop(), outputPayloadFileName)
 			require.NoError(t, err)
-			require.Equal(t, len(selectedKeysValues), len(payloadsFromFile))
 			require.True(t, partialState)
 
+			nonGlobalPayloads := make([]*ledger.Payload, 0, len(selectedKeysValues))
 			for _, payloadFromFile := range payloadsFromFile {
+				key, err := payloadFromFile.Key()
+				require.NoError(t, err)
+
+				owner := key.KeyParts[0].Value
+				if len(owner) > 0 {
+					nonGlobalPayloads = append(nonGlobalPayloads, payloadFromFile)
+				}
+			}
+
+			require.Equal(t, len(selectedKeysValues), len(nonGlobalPayloads))
+
+			for _, payloadFromFile := range nonGlobalPayloads {
 				k, err := payloadFromFile.Key()
 				require.NoError(t, err)
 

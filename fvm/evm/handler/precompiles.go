@@ -25,6 +25,7 @@ func preparePrecompiles(
 		blockHeightProvider(backend),
 		coaOwnershipProofValidator(evmContractAddress, backend),
 		randomSourceProvider(randomBeaconAddress, backend),
+		revertibleRandomGenerator(backend),
 	)
 	return []types.Precompile{archContract}
 }
@@ -38,6 +39,8 @@ func blockHeightProvider(backend types.Backend) func() (uint64, error) {
 		return h, err
 	}
 }
+
+const RandomSourceTypeValueFieldName = "value"
 
 func randomSourceProvider(contractAddress flow.Address, backend types.Backend) func(uint64) (uint64, error) {
 	return func(blockHeight uint64) (uint64, error) {
@@ -68,14 +71,29 @@ func randomSourceProvider(contractAddress flow.Address, backend types.Backend) f
 			return 0, fmt.Errorf("invalid output data received from getRandomSource")
 		}
 
-		cadenceArray := data.Fields[1].(cadence.Array)
+		cadenceArray := cadence.SearchFieldByName(data, RandomSourceTypeValueFieldName).(cadence.Array)
 		source := make([]byte, 8)
 		for i := range source {
-			source[i] = cadenceArray.Values[i].ToGoValue().(byte)
+			source[i] = byte(cadenceArray.Values[i].(cadence.UInt8))
 		}
+
 		return binary.BigEndian.Uint64(source), nil
 	}
 }
+
+func revertibleRandomGenerator(backend types.Backend) func() (uint64, error) {
+	return func() (uint64, error) {
+		rand := make([]byte, 8)
+		err := backend.ReadRandom(rand)
+		if err != nil {
+			return 0, err
+		}
+
+		return binary.BigEndian.Uint64(rand), nil
+	}
+}
+
+const ValidationResultTypeIsValidFieldName = "isValid"
 
 func coaOwnershipProofValidator(contractAddress flow.Address, backend types.Backend) func(proof *types.COAOwnershipProofInContext) (bool, error) {
 	return func(proof *types.COAOwnershipProofInContext) (bool, error) {
@@ -104,9 +122,15 @@ func coaOwnershipProofValidator(contractAddress flow.Address, backend types.Back
 			return false, err
 		}
 		data, ok := value.(cadence.Struct)
-		if !ok || len(data.Fields) == 0 {
+		if !ok {
 			return false, fmt.Errorf("invalid output data received from validateCOAOwnershipProof")
 		}
-		return bool(data.Fields[0].(cadence.Bool)), nil
+
+		isValidValue := cadence.SearchFieldByName(data, ValidationResultTypeIsValidFieldName)
+		if isValidValue == nil {
+			return false, fmt.Errorf("invalid output data received from validateCOAOwnershipProof")
+		}
+
+		return bool(isValidValue.(cadence.Bool)), nil
 	}
 }

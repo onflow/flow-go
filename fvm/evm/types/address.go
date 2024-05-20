@@ -2,6 +2,7 @@ package types
 
 import (
 	"bytes"
+	"encoding/hex"
 	"fmt"
 
 	"github.com/onflow/cadence"
@@ -76,20 +77,40 @@ func NewAddressFromBytes(inp []byte) Address {
 	return Address(gethCommon.BytesToAddress(inp))
 }
 
-func COAAddressFromFlowEvent(evmContractAddress flow.Address, event flow.Event) (Address, error) {
+const CadenceOwnedAccountCreatedTypeAddressFieldName = "address"
+
+func COAAddressFromFlowCOACreatedEvent(evmContractAddress flow.Address, event flow.Event) (Address, error) {
 	// check the type first
 	if string(event.Type) != fmt.Sprintf(COAAddressTemplate, evmContractAddress.Hex()) {
 		return Address{}, fmt.Errorf("wrong event type is passed")
 	}
+
 	// then decode
 	eventData, err := ccf.Decode(nil, event.Payload)
 	if err != nil {
 		return Address{}, err
 	}
-	addressBytes := make([]byte, AddressLength)
-	for i, v := range eventData.(cadence.Event).Fields[0].(cadence.Array).Values {
-		addressBytes[i] = v.ToGoValue().(byte)
+
+	cadenceEvent, ok := eventData.(cadence.Event)
+	if !ok {
+		return Address{}, fmt.Errorf("event data is not a cadence event")
 	}
+
+	addressValue := cadence.SearchFieldByName(
+		cadenceEvent,
+		CadenceOwnedAccountCreatedTypeAddressFieldName,
+	)
+
+	addressString, ok := addressValue.(cadence.String)
+	if !ok {
+		return Address{}, fmt.Errorf("address is not a string")
+	}
+
+	addressBytes, err := hex.DecodeString(string(addressString))
+	if err != nil {
+		return Address{}, err
+	}
+
 	return NewAddressFromBytes(addressBytes), nil
 }
 
@@ -98,7 +119,7 @@ func NewAddressFromString(str string) Address {
 	return NewAddressFromBytes([]byte(str))
 }
 
-var AddressBytesCadenceType = cadence.NewVariableSizedArrayType(cadence.TheUInt8Type)
+var AddressBytesCadenceType = cadence.NewConstantSizedArrayType(AddressLength, cadence.UInt8Type)
 var AddressBytesSemaType = sema.ByteArrayType
 
 func (a Address) ToCadenceValue() cadence.Array {
@@ -106,7 +127,8 @@ func (a Address) ToCadenceValue() cadence.Array {
 	for i, v := range a {
 		values[i] = cadence.NewUInt8(v)
 	}
-	return cadence.NewArray(values).WithType(AddressBytesCadenceType)
+	return cadence.NewArray(values).
+		WithType(AddressBytesCadenceType)
 }
 
 // IsACOAAddress returns true if the address is a COA address

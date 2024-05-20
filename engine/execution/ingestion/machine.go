@@ -26,6 +26,7 @@ type Machine struct {
 	events.Noop        // satisfy protocol events consumer interface
 	log                zerolog.Logger
 	core               *Core
+	throttle           Throttle
 	broadcaster        provider.ProviderEngine
 	uploader           *uploader.Manager
 	execState          state.ExecutionState
@@ -67,7 +68,6 @@ func NewMachine(
 		state,
 		execState,
 		headers,
-		DefaultCatchUpThreshold,
 	)
 
 	if err != nil {
@@ -79,18 +79,19 @@ func NewMachine(
 		throttle,
 		execState,
 		stopControl,
-		headers,
 		blocks,
 		collections,
 		e,
 		collectionFetcher,
 		e,
+		metrics,
 	)
 
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to create ingestion core: %w", err)
 	}
 
+	e.throttle = throttle
 	e.core = core
 
 	protocolEvents.AddConsumer(e)
@@ -107,8 +108,16 @@ func NewMachine(
 }
 
 // Protocol Events implementation
-func (e *Machine) BlockProcessable(b *flow.Header, qc *flow.QuorumCertificate) {
-	e.core.OnBlock(b, qc)
+func (e *Machine) BlockProcessable(header *flow.Header, qc *flow.QuorumCertificate) {
+	err := e.throttle.OnBlock(qc.BlockID, header.Height)
+	if err != nil {
+		e.log.Fatal().Err(err).Msgf("error processing block %v (qc.BlockID: %v, blockID: %v)",
+			header.Height, qc.BlockID, header.ID())
+	}
+}
+
+func (e *Machine) BlockFinalized(b *flow.Header) {
+	e.throttle.OnBlockFinalized(b.Height)
 }
 
 // EventConsumer implementation

@@ -143,7 +143,7 @@ func (info *blockInfo) GetBlockAtHeight(
 	}
 
 	if height+uint64(flow.DefaultTransactionExpiry) < info.blockHeader.Height {
-		return runtime.Block{}, false, errors.NewBlockHeightOutOfRangeError(height)
+		return runtime.Block{}, false, nil
 	}
 
 	header, err := info.blocks.ByHeightFrom(height, info.blockHeader)

@@ -67,7 +67,7 @@ func newContext(ctx Context, opts ...Option) Context {
 }
 
 func defaultContext() Context {
-	return Context{
+	ctx := Context{
 		DisableMemoryAndInteractionLimits: false,
 		ComputationLimit:                  DefaultComputationLimit,
 		MemoryLimit:                       DefaultMemoryLimit,
@@ -77,6 +77,7 @@ func defaultContext() Context {
 		TransactionExecutorParams:         DefaultTransactionExecutorParams(),
 		EnvironmentParams:                 environment.DefaultEnvironmentParams(),
 	}
+	return ctx
 }
 
 // An Option sets a configuration parameter for a virtual machine context.
@@ -181,14 +182,6 @@ func WithEntropyProvider(source environment.EntropyProvider) Option {
 func WithBlockHeader(header *flow.Header) Option {
 	return func(ctx Context) Context {
 		ctx.BlockHeader = header
-		return ctx
-	}
-}
-
-// WithServiceEventCollectionEnabled enables service event collection
-func WithServiceEventCollectionEnabled() Option {
-	return func(ctx Context) Context {
-		ctx.ServiceEventCollectionEnabled = true
 		return ctx
 	}
 }

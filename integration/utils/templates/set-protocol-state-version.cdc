@@ -14,14 +14,17 @@ transaction(newProtocolVersion: UInt64, activeViewDiff: UInt64) {
 
   let adminRef: &NodeVersionBeacon.Admin
 
-  prepare(acct: AuthAccount) {
+  prepare(acct: auth(BorrowValue) &Account) {
     // Borrow a reference to the NodeVersionAdmin implementing resource
-    self.adminRef = acct.borrow<&NodeVersionBeacon.Admin>(from: NodeVersionBeacon.AdminStoragePath)
+    self.adminRef = acct.storage.borrow<&NodeVersionBeacon.Admin>(from: NodeVersionBeacon.AdminStoragePath)
       ?? panic("Couldn't borrow NodeVersionBeacon.Admin Resource")
   }
 
   execute {
     let block = getCurrentBlock()
-    self.adminRef.setPendingProtocolStateVersionUpgrade(newProtocolVersion: newProtocolVersion, activeView: block.view + activeViewDiff)
+    self.adminRef.setPendingProtocolStateVersionUpgrade(
+      newProtocolVersion: newProtocolVersion,
+      activeView: block.view + activeViewDiff
+    )
   }
 }

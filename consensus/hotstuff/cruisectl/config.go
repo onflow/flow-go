@@ -11,8 +11,8 @@ func DefaultConfig() *Config {
 	return &Config{
 		TimingConfig{
 			FallbackProposalDelay: atomic.NewDuration(250 * time.Millisecond),
-			MinViewDuration:       atomic.NewDuration(600 * time.Millisecond),
-			MaxViewDuration:       atomic.NewDuration(1600 * time.Millisecond),
+			MinViewDuration:       atomic.NewDuration(125 * time.Millisecond),
+			MaxViewDuration:       atomic.NewDuration(910 * time.Millisecond),
 			Enabled:               atomic.NewBool(true),
 		},
 		ControllerParams{

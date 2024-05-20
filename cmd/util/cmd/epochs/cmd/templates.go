@@ -21,7 +21,7 @@ transaction(name: String,
             FLOWsupplyIncreasePercentage: UFix64,
             randomSource: String) {
 
-  prepare(signer: AuthAccount) {
+  prepare(signer: auth(AddContract) &Account) {
 
     let currentBlock = getCurrentBlock()
 

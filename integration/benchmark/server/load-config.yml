@@ -3,6 +3,11 @@ token-transfer:
   tps_initial: 800
   tps_min: 1
   tps_max: 1200
+token-transfer-multi:
+  load_type: token-transfer-multi
+  tps_initial: 20
+  tps_min: 1
+  tps_max: 1200
 create-account:
   load_type: create-account
   tps_initial: 600
