@@ -3,6 +3,7 @@ package load_test
 import (
 	"context"
 	"fmt"
+	"github.com/onflow/flow-go/fvm/meter"
 	"sync"
 	"testing"
 
@@ -15,6 +16,7 @@ import (
 	sdk "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go-sdk/crypto"
 
+	cadenceCommon "github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/flow-go/engine/execution/computation"
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
@@ -232,7 +234,18 @@ func (t *testTransactionSender) Send(tx *sdk.Transaction) (sdk.TransactionResult
 	// Update the snapshot
 	t.snapshot.Append(executionSnapshot)
 
-	computationUsed := environment.MainnetExecutionEffortWeights.ComputationFromIntensities(result.ComputationIntensities)
+	// temporarily hardcode the weights as they are not confirmed yet
+	executionEffortWeights := meter.ExecutionEffortWeights{
+		cadenceCommon.ComputationKindStatement:          314,
+		cadenceCommon.ComputationKindLoop:               314,
+		cadenceCommon.ComputationKindFunctionInvocation: 314,
+		environment.ComputationKindGetValue:             162,
+		environment.ComputationKindCreateAccount:        567534,
+		environment.ComputationKindSetValue:             153,
+		environment.ComputationKindEVMGasUsage:          33,
+	}
+
+	computationUsed := executionEffortWeights.ComputationFromIntensities(result.ComputationIntensities)
 	t.log.Debug().Uint64("computation", computationUsed).Msg("Transaction applied")
 
 	sdkResult := sdk.TransactionResult{
