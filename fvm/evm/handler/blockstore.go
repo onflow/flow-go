@@ -102,12 +102,6 @@ func (bs *BlockStore) CommitBlockProposal() error {
 	return nil
 }
 
-// ResetBlockProposal resets the block proposal
-func (bs *BlockStore) ResetBlockProposal() error {
-	bs.blockProposal = nil
-	return nil
-}
-
 // LatestBlock returns the latest executed block
 func (bs *BlockStore) LatestBlock() (*types.Block, error) {
 	data, err := bs.backend.GetValue(bs.rootAddress[:], []byte(BlockStoreLatestBlockKey))
