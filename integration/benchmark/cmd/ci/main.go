@@ -9,7 +9,6 @@ import (
 
 	"github.com/onflow/flow-go/integration/benchmark/load"
 
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -92,8 +91,9 @@ func main() {
 	<-server.Ready()
 	loaderMetrics := metrics.NewLoaderCollector()
 
-	sp := benchmark.NewStatsPusher(ctx, log, pushgateway, "loader", prometheus.DefaultGatherer)
-	defer sp.Stop()
+	// stats pusher doesn't work currently
+	// sp := benchmark.NewStatsPusher(ctx, log, pushgateway, "loader", prometheus.DefaultGatherer)
+	// defer sp.Stop()
 
 	addressGen := flowsdk.NewAddressGenerator(flowsdk.Emulator)
 	serviceAccountAddress := addressGen.NextAddress()
