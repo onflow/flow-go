@@ -30,7 +30,7 @@ type ReceiptValidationSuite struct {
 
 func (s *ReceiptValidationSuite) SetupTest() {
 	s.SetupChain()
-	s.publicKey = &mock_module.PublicKey{}
+	s.publicKey = mock_module.NewPublicKey(s.T())
 	s.Identities[s.ExeID].StakingPubKey = s.publicKey
 	s.receiptValidator = NewReceiptValidator(
 		s.State,
@@ -61,22 +61,17 @@ func (s *ReceiptValidationSuite) TestReceiptValid() {
 }
 
 // TestReceiptNoIdentity tests that we reject receipt with invalid `ExecutionResult.ExecutorID`
+// Note: for a receipt with a bad `ExecutorID`, we should never get to validating the signature,
+// because there is no valid identity, where we can retrieve a staking signature from.
 func (s *ReceiptValidationSuite) TestReceiptNoIdentity() {
 	valSubgrph := s.ValidSubgraphFixture()
-	node := unittest.IdentityFixture()
-	mockPk := &mock_module.PublicKey{}
+	node := unittest.IdentityFixture() // unknown Node
+	mockPk := mock_module.NewPublicKey(s.T())
 	node.StakingPubKey = mockPk
 
-	receipt := unittest.ExecutionReceiptFixture(unittest.WithExecutorID(node.NodeID),
-		unittest.WithResult(valSubgrph.Result))
+	receipt := unittest.ExecutionReceiptFixture(unittest.WithExecutorID(node.NodeID), unittest.WithResult(valSubgrph.Result))
 	s.AddSubgraphFixtureToMempools(valSubgrph)
-	receiptID := receipt.ID()
 
-	mockPk.On("Verify",
-		receiptID[:],
-		receipt.ExecutorSignature,
-		mock.Anything,
-	).Return(true, nil).Once()
 	err := s.receiptValidator.Validate(receipt)
 	s.Require().Error(err, "should reject invalid identity")
 	s.Assert().True(engine.IsInvalidInputError(err))
@@ -399,9 +394,6 @@ func (s *ReceiptValidationSuite) TestMultiReceiptValidResultChain() {
 //
 // Notation: B(A) means block B has receipt for A.
 func (s *ReceiptValidationSuite) TestMultiReceiptInvalidParent() {
-	// assuming signatures are all good
-	s.publicKey.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
-
 	// G <- A <- B <- C
 	blocks, result0, seal := unittest.ChainFixture(4)
 	s.SealsIndex[blocks[0].ID()] = seal
@@ -427,7 +419,9 @@ func (s *ReceiptValidationSuite) TestMultiReceiptInvalidParent() {
 	}
 	s.PersistedResults[result0.ID()] = result0
 
-	// make receipt B as bad
+	// receipt B is from an invalid node
+	// Note: for a receipt with a bad `ExecutorID`, we should never get to validating the signature,
+	// because there is no valid identity, where we can retrieve a staking signature from.
 	receiptBInvalid.ExecutorID = unittest.IdentifierFixture()
 
 	candidate := unittest.BlockWithParentFixture(blockC.Header)
@@ -569,8 +563,8 @@ func (s *ReceiptValidationSuite) TestValidationReceiptForIncorporatedResult() {
 // Block X must be considered invalid, because confirming validity of
 // ReceiptMeta[A] requires information _not_ included in the fork.
 func (s *ReceiptValidationSuite) TestValidationReceiptWithoutIncorporatedResult() {
-	// assuming signatures are all good
-	s.publicKey.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
+	// assuming signatures are all good (if we get to checking signatures)
+	s.publicKey.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil).Maybe()
 
 	// create block A
 	blockA := unittest.BlockWithParentFixture(s.LatestSealedBlock.Header) // for block G, we use the LatestSealedBlock
@@ -810,16 +804,11 @@ func (s *ReceiptValidationSuite) TestExtendReceiptsDuplicate() {
 // `TestValidateReceiptAfterBootstrap` tests a special case when we try to produce a new block
 // after genesis with empty payload.
 func (s *ReceiptValidationSuite) TestValidateReceiptAfterBootstrap() {
-	// assuming signatures are all good
-	s.publicKey.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
-
-	// G
+	// Genesis block
 	blocks, result0, seal := unittest.ChainFixture(0)
+	require.Equal(s.T(), len(blocks), 1, "expected only creation of genesis block")
 	s.SealsIndex[blocks[0].ID()] = seal
-
-	for _, b := range blocks {
-		s.Extend(b)
-	}
+	s.Extend(blocks[0])
 	s.PersistedResults[result0.ID()] = result0
 
 	candidate := unittest.BlockWithParentFixture(blocks[0].Header)
@@ -831,8 +820,8 @@ func (s *ReceiptValidationSuite) TestValidateReceiptAfterBootstrap() {
 // into their proposal. ReceiptValidator must ensure that for each result included in the block, there must be
 // at least one receipt included in that block as well.
 func (s *ReceiptValidationSuite) TestValidateReceiptResultWithoutReceipt() {
-	// assuming signatures are all good
-	s.publicKey.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
+	// assuming signatures are all good (if we get to checking signatures)
+	s.publicKey.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil).Maybe()
 
 	// G <- A <- B
 	blocks, result0, seal := unittest.ChainFixture(2)
@@ -972,7 +961,7 @@ func (s *ReceiptValidationSuite) TestException_HeadersByBlockID() {
 	candidate.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt)))
 
 	// receiptValidator.headers yields exception on retrieving any block header
-	*s.HeadersDB = mock_storage.Headers{} // receiptValidator has pointer to this field, which we override with a new state mock
+	*s.HeadersDB = *mock_storage.NewHeaders(s.T()) // receiptValidator has pointer to this field, which we override with a new state mock
 	exception := errors.New("headers.ByBlockID() exception")
 	s.HeadersDB.On("ByBlockID", mock.Anything).Return(nil, exception)
 
@@ -996,7 +985,7 @@ func (s *ReceiptValidationSuite) TestException_SealsHighestInFork() {
 	candidate.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt)))
 
 	// receiptValidator.seals yields exception on retrieving highest sealed block in fork up to candidate's parent
-	*s.SealsDB = mock_storage.Seals{} // receiptValidator has pointer to this field, which we override with a new state mock
+	*s.SealsDB = *mock_storage.NewSeals(s.T()) // receiptValidator has pointer to this field, which we override with a new state mock
 	exception := errors.New("seals.HighestInFork(..) exception")
 	s.SealsDB.On("HighestInFork", candidate.Header.ParentID).Return(nil, exception)
 
@@ -1017,8 +1006,8 @@ func (s *ReceiptValidationSuite) TestException_ProtocolStateHead() {
 	receipt := unittest.ExecutionReceiptFixture(unittest.WithExecutorID(s.ExeID), unittest.WithResult(valSubgrph.Result))
 
 	// receiptValidator.state yields exception on Block Header retrieval
-	*s.State = mock_protocol.State{} // receiptValidator has pointer to this field, which we override with a new state mock
-	snapshot := &mock_protocol.Snapshot{}
+	*s.State = *mock_protocol.NewState(s.T()) // receiptValidator has pointer to this field, which we override with a new state mock
+	snapshot := mock_protocol.NewSnapshot(s.T())
 	exception := errors.New("state.Head() exception")
 	snapshot.On("Head").Return(nil, exception)
 	s.State.On("AtBlockID", valSubgrph.Block.ID()).Return(snapshot)
@@ -1052,12 +1041,12 @@ func (s *ReceiptValidationSuite) TestException_ProtocolStateIdentity() {
 	receipt := unittest.ExecutionReceiptFixture(unittest.WithExecutorID(s.ExeID), unittest.WithResult(valSubgrph.Result))
 
 	// receiptValidator.state yields exception on Identity retrieval
-	*s.State = mock_protocol.State{} // receiptValidator has pointer to this field, which we override with a new state mock
-	snapshot := &mock_protocol.Snapshot{}
+	*s.State = *mock_protocol.NewState(s.T()) // receiptValidator has pointer to this field, which we override with a new state mock
+	snapshot := *mock_protocol.NewSnapshot(s.T())
 	exception := errors.New("state.Identity() exception")
 	snapshot.On("Head").Return(valSubgrph.Block.Header, nil)
 	snapshot.On("Identity", mock.Anything).Return(nil, exception)
-	s.State.On("AtBlockID", valSubgrph.Block.ID()).Return(snapshot)
+	s.State.On("AtBlockID", valSubgrph.Block.ID()).Return(&snapshot)
 
 	s.T().Run("Method Validate", func(t *testing.T) {
 		err := s.receiptValidator.Validate(receipt)
@@ -1088,7 +1077,7 @@ func (s *ReceiptValidationSuite) TestException_IndexByBlockID() {
 	receipt := unittest.ExecutionReceiptFixture(unittest.WithExecutorID(s.ExeID), unittest.WithResult(valSubgrph.Result))
 
 	// receiptValidator.index yields exception on Identity retrieval
-	*s.IndexDB = mock_storage.Index{} // receiptValidator has pointer to this field, which we override with a new state mock
+	*s.IndexDB = *mock_storage.NewIndex(s.T()) // receiptValidator has pointer to this field, which we override with a new state mock
 	exception := errors.New("index.ByBlockID(..) exception")
 	s.IndexDB.On("ByBlockID", valSubgrph.Block.ID()).Return(nil, exception)
 
@@ -1121,7 +1110,7 @@ func (s *ReceiptValidationSuite) TestException_ResultsByID() {
 	receipt := unittest.ExecutionReceiptFixture(unittest.WithExecutorID(s.ExeID), unittest.WithResult(valSubgrph.Result))
 
 	// receiptValidator.results yields exception on ExecutionResult retrieval
-	*s.ResultsDB = mock_storage.ExecutionResults{} // receiptValidator has pointer to this field, which we override with a new state mock
+	*s.ResultsDB = *mock_storage.NewExecutionResults(s.T()) // receiptValidator has pointer to this field, which we override with a new state mock
 	exception := errors.New("results.ByID(..) exception")
 	s.ResultsDB.On("ByID", valSubgrph.Result.PreviousResultID).Return(nil, exception)
 
