@@ -263,7 +263,7 @@ func (s *ReceiptValidationSuite) TestReceiptInvalidCollectionIndex() {
 }
 
 // TestReceiptNoPreviousResult tests that `Validate` rejects a receipt, whose parent result is unknown:
-// - per API contract it should return a `module.IsUnknownResultError`
+// - per API contract it should return a `module.UnknownResultError`
 // - should _not_ be misinterpreted as an invalid receipt, i.e. should not receive an `engine.InvalidInputError`
 func (s *ReceiptValidationSuite) TestReceiptNoPreviousResult() {
 	valSubgrph := s.ValidSubgraphFixture()
@@ -964,7 +964,6 @@ func (s *ReceiptValidationSuite) TestReceiptNoBlock() {
 func (s *ReceiptValidationSuite) TestException_HeadersByBlockID() {
 	s.publicKey.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil).Maybe()
 
-	//s.T().Run("seals yields exception on Identity retrieval", func(t *testing.T) {
 	valSubgrph := s.ValidSubgraphFixture()
 	s.AddSubgraphFixtureToMempools(valSubgrph)
 

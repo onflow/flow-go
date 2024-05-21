@@ -103,7 +103,7 @@ func (v *receiptValidator) verifyChunksFormat(result *flow.ExecutionResult) erro
 // execution results form a valid subgraph if and only if R2 references A's parent.
 //
 // Expected errors during normal operations:
-//   - sentinel engine.InvalidInputError if result does not form a valid sub-graph
+//   - engine.InvalidInputError if result does not form a valid sub-graph
 //   - module.UnknownBlockError when the executed block is unknown
 func (v *receiptValidator) subgraphCheck(result *flow.ExecutionResult, prevResult *flow.ExecutionResult) error {
 	block, err := v.state.AtBlockID(result.BlockID).Head() // returns `storage.ErrNotFound` for unknown BlockID
@@ -179,8 +179,6 @@ func (v *receiptValidator) Validate(receipt *flow.ExecutionReceipt) error {
 
 	err = v.validateReceipt(receipt.Meta(), receipt.ExecutionResult.BlockID)
 	if err != nil {
-		// It's very important that we fail the whole validation if one of the receipts is invalid.
-		// It allows us to make assumptions as stated in previous comment.
 		return fmt.Errorf("could not validate receipt %v: %w", receipt.ID(), err)
 	}
 
@@ -205,7 +203,7 @@ func (v *receiptValidator) Validate(receipt *flow.ExecutionReceipt) error {
 //   - engine.InvalidInputError if some receipts in the candidate block violate protocol condition
 //   - module.UnknownBlockError if the candidate block's _parent_ is unknown
 //
-// All other error are potential symptoms critical internal failures, such as bugs or state corruption.
+// All other error are potential symptoms of critical internal failures, such as bugs or state corruption.
 // Note that module.UnknownResultError is not possible; we have either an invalid candidate block
 // (yields engine.InvalidInputError) or a missing parent block (yields module.UnknownBlockError).
 func (v *receiptValidator) ValidatePayload(candidate *flow.Block) error {
@@ -378,8 +376,7 @@ func (v *receiptValidator) ValidatePayload(candidate *flow.Block) error {
 }
 
 // validateResult validates that the given result is well-formed.
-// While we do not check the validity of the resulting
-// state commitment,
+// We do not check the validity of the resulting state commitment.
 // Expected errors during normal operations:
 //   - engine.InvalidInputError if the result has malformed chunks
 //   - module.UnknownBlockError if blockID does not correspond to a block known by the protocol state
@@ -403,9 +400,9 @@ func (v *receiptValidator) validateResult(result *flow.ExecutionResult, prevResu
 }
 
 // validateReceipt validates that the given `receipt` is a valid commitment from an Execution Node
-// to some result. Specifically it enforces:
+// to some result.
 // Error returns:
-//   - sentinel engine.InvalidInputError if `receipt` is invalid
+//   - engine.InvalidInputError if `receipt` is invalid
 //   - module.UnknownBlockError if executedBlockID is unknown
 func (v *receiptValidator) validateReceipt(receipt *flow.ExecutionReceiptMeta, executedBlockID flow.Identifier) error {
 	identity, err := identityForNode(v.state, executedBlockID, receipt.ExecutorID)

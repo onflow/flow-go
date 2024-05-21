@@ -226,7 +226,7 @@ func (c *Core) processReceipt(receipt *flow.ExecutionReceipt) (bool, error) {
 			//  - If we cache the missing previous receipts, then all of them will be processed, because once
 			//    A is processed, we will check if there is a child receipt pending, if yes, then process it.
 			c.pendingReceipts.Add(receipt)
-			log.Info().Msg("receipt is cached because its previous result is missing")
+			log.Debug().Msg("receipt is cached because its previous result is missing")
 			return false, nil
 		}
 		if engine.IsInvalidInputError(err) {

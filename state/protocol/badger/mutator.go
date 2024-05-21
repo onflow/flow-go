@@ -121,7 +121,7 @@ func NewFullConsensusState(
 //	candidate.View == certifyingQC.View && candidate.ID() == certifyingQC.BlockID
 //
 // CAUTION:
-//   - This function expects that `qc` has been validated. (otherwise, the state will be corrupted)
+//   - This function expects that `certifyingQC ` has been validated. (otherwise, the state will be corrupted)
 //   - The parent block must already be stored.
 //
 // Orphaned blocks are excepted.
