@@ -34,6 +34,9 @@ func TestEncodeDecode(t *testing.T) {
 	require.NoError(t, err)
 
 	// check that the computed and stored result IDs are consistent
-	decodedResult, decodedSeal := decodedSnapshot.LatestResult, decodedSnapshot.LatestSeal
+	decodedSeal, err := decodedSnapshot.LatestSeal()
+	require.NoError(t, err)
+	decodedResult, err := decodedSnapshot.LatestSealedResult()
+	require.NoError(t, err)
 	assert.Equal(t, decodedResult.ID(), decodedSeal.ResultID)
 }
