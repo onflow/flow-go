@@ -3,6 +3,7 @@ package fetcher
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -13,6 +14,7 @@ import (
 	"github.com/onflow/crypto"
 	"github.com/onflow/flow/protobuf/go/flow/access"
 
+	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/engine/common/requester"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/engine/execution/ingestion"
@@ -52,8 +54,14 @@ func NewAccessCollectionFetcher(
 		return nil, fmt.Errorf("failed to create tls config: %w", err)
 	}
 
+	accessAddress := convertAccessAddrFromState(accessURL)
+
+	lg := logger.With().Str("engine", "collection_fetcher").Logger()
+
+	lg.Info().Msgf("dailing access rpc at %s", accessAddress)
+
 	collectionRPCConn, err := grpc.Dial(
-		accessURL,
+		accessAddress,
 		grpc.WithTransportCredentials(credentials.NewTLS(tlsConfig)),
 		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(grpcutils.DefaultMaxMsgSize)),
 	)
@@ -63,7 +71,7 @@ func NewAccessCollectionFetcher(
 
 	noopHandler := func(flow.Identifier, flow.Entity) {}
 	e := &AccessCollectionFetcher{
-		log:            logger.With().Str("engine", "collection_fetcher").Logger(),
+		log:            lg,
 		handler:        noopHandler,
 		client:         access.NewAccessAPIClient(collectionRPCConn),
 		chain:          chain,
@@ -76,6 +84,17 @@ func NewAccessCollectionFetcher(
 	e.ComponentManager = builder.Build()
 
 	return e, nil
+}
+
+// port number depending on the insecureAccessAPI arg.
+func convertAccessAddrFromState(address string) string {
+	// remove gossip port from access address and add respective secure or insecure port
+	var accessAddress strings.Builder
+	accessAddress.WriteString(strings.Split(address, ":")[0])
+
+	accessAddress.WriteString(fmt.Sprintf(":%s", common.DefaultAccessAPISecurePort))
+
+	return accessAddress.String()
 }
 
 func (f *AccessCollectionFetcher) FetchCollection(blockID flow.Identifier, height uint64, guarantee *flow.CollectionGuarantee) error {
