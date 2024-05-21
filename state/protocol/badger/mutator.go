@@ -122,9 +122,18 @@ func NewFullConsensusState(
 //
 // CAUTION:
 //   - This function expects that `certifyingQC ` has been validated. (otherwise, the state will be corrupted)
-//   - The parent block must already be stored.
+//   - The parent block must already have been ingested.
 //
-// Orphaned blocks are excepted.
+// Per convention, the protocol state requires that the candidate's parent has already been ingested.
+// Other than that, all valid extensions are excepted. Even if we have enough information to determine that
+// a candidate block is already orphaned (e.g. its view is below the latest finalized view), it is important
+// to accept it nevertheless to avoid spamming vulnerabilities. If a block is orphaned, consensus rules
+// guarantee that there exists only a limited number of descendants which cannot increase anymore. So there
+// is only a finite (generally small) amount of work to do accepting orphaned blocks and all their descendants.
+// However, if we were to drop orphaned blocks, e.g. block X of the orphaned fork X <- Y <- Z, we might not
+// have enough information to reject blocks Y, Z later if we receive them. We would re-request X, then
+// determine it is orphaned and drop it, attempt to ingest Y re-request the unknown parent X and repeat
+// potentially very often.
 //
 // No errors are expected during normal operations.
 func (m *FollowerState) ExtendCertified(ctx context.Context, candidate *flow.Block, certifyingQC *flow.QuorumCertificate) error {
@@ -174,6 +183,17 @@ func (m *FollowerState) ExtendCertified(ctx context.Context, candidate *flow.Blo
 //
 // CAUTION: per convention, the protocol state requires that the candidate's
 // parent has already been ingested. Otherwise, an exception is returned.
+//
+// Per convention, the protocol state requires that the candidate's parent has already been ingested.
+// Other than that, all valid extensions are excepted. Even if we have enough information to determine that
+// a candidate block is already orphaned (e.g. its view is below the latest finalized view), it is important
+// to accept it nevertheless to avoid spamming vulnerabilities. If a block is orphaned, consensus rules
+// guarantee that there exists only a limited number of descendants which cannot increase anymore. So there
+// is only a finite (generally small) amount of work to do accepting orphaned blocks and all their descendants.
+// However, if we were to drop orphaned blocks, e.g. block X of the orphaned fork X <- Y <- Z, we might not
+// have enough information to reject blocks Y, Z later if we receive them. We would re-request X, then
+// determine it is orphaned and drop it, attempt to ingest Y re-request the unknown parent X and repeat
+// potentially very often.
 //
 // Expected errors during normal operations:
 //   - state.OutdatedExtensionError if the candidate block is outdated (e.g. orphaned)
