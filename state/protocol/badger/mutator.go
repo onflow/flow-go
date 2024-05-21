@@ -125,7 +125,7 @@ func NewFullConsensusState(
 //   - The parent block must already have been ingested.
 //
 // Per convention, the protocol state requires that the candidate's parent has already been ingested.
-// Other than that, all valid extensions are excepted. Even if we have enough information to determine that
+// Other than that, all valid extensions are accepted. Even if we have enough information to determine that
 // a candidate block is already orphaned (e.g. its view is below the latest finalized view), it is important
 // to accept it nevertheless to avoid spamming vulnerabilities. If a block is orphaned, consensus rules
 // guarantee that there exists only a limited number of descendants which cannot increase anymore. So there
@@ -185,7 +185,7 @@ func (m *FollowerState) ExtendCertified(ctx context.Context, candidate *flow.Blo
 // parent has already been ingested. Otherwise, an exception is returned.
 //
 // Per convention, the protocol state requires that the candidate's parent has already been ingested.
-// Other than that, all valid extensions are excepted. Even if we have enough information to determine that
+// Other than that, all valid extensions are accepted. Even if we have enough information to determine that
 // a candidate block is already orphaned (e.g. its view is below the latest finalized view), it is important
 // to accept it nevertheless to avoid spamming vulnerabilities. If a block is orphaned, consensus rules
 // guarantee that there exists only a limited number of descendants which cannot increase anymore. So there
