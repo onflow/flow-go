@@ -300,6 +300,8 @@ var checkDependenciesSpec = ContractFunctionSpec{
 	},
 }
 
+// CheckDependencies calls the checkDependencies function on the service account.
+// The inputs should be deterministically sorted.
 func (sys *SystemContracts) CheckDependencies(
 	dependencies []common.AddressLocation,
 	authorizers []flow.Address,

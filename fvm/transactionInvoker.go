@@ -1,8 +1,10 @@
 package fvm
 
 import (
+	"bytes"
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
@@ -10,6 +12,7 @@ import (
 	"github.com/rs/zerolog"
 	"go.opentelemetry.io/otel/attribute"
 	otelTrace "go.opentelemetry.io/otel/trace"
+	"golang.org/x/exp/slices"
 
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
@@ -504,13 +507,16 @@ func (executor *transactionExecutor) commit(
 }
 
 func (executor *transactionExecutor) checkDependencies() error {
-
 	if !executor.ctx.DependencyCheckEnabled {
 		return nil
 	}
 
-	deps, err := executor.env.GetProgramDependencies()
+	// This should not happen, but if it does, we should halt
+	if executor.proc.Transaction == nil {
+		return nil
+	}
 
+	deps, err := executor.env.GetProgramDependencies()
 	if err != nil {
 		return fmt.Errorf("failed to get program dependencies: %w", err)
 	}
@@ -521,18 +527,36 @@ func (executor *transactionExecutor) checkDependencies() error {
 			dependencies = append(dependencies, addressLoc)
 		}
 	}
+	if len(dependencies) == 0 {
+		// this is an unlikely case, but we don't need to check dependencies
+		// if there are none
+		return nil
+	}
+	// sort the dependencies so the execution order is deterministic
+	slices.SortFunc(
+		dependencies,
+		func(a common.AddressLocation, b common.AddressLocation) int {
+			return strings.Compare(a.ID(), b.ID())
+		})
 
 	authorizerSet := make(map[flow.Address]struct{}, len(executor.proc.Transaction.Authorizers))
 	for _, authorizer := range executor.proc.Transaction.Authorizers {
 		authorizerSet[authorizer] = struct{}{}
 	}
 
+	// add the payer as well
 	authorizerSet[executor.proc.Transaction.Payer] = struct{}{}
 
 	auths := make([]flow.Address, 0, len(authorizerSet))
 	for auth := range authorizerSet {
 		auths = append(auths, auth)
 	}
+	// sort the authorizers so the execution order is deterministic
+	slices.SortFunc(
+		auths,
+		func(a flow.Address, b flow.Address) int {
+			return bytes.Compare(a[:], b[:])
+		})
 
 	_, err = executor.env.CheckDependencies(
 		dependencies,

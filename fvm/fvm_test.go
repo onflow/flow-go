@@ -3368,6 +3368,7 @@ func TestDependencyCheck(t *testing.T) {
 
 			deployServiceContractDependencyCheck(fmt.Sprintf(`
 				access(all) fun checkDependencies(_ dependenciesAddresses: [Address], _ dependenciesNames: [String], _ authorizers: [Address]) {
+					// tis is so that is doesnt trigger on the contract update transaction
 					if authorizers.length == 1 && authorizers[0] == %s {
 						return
 					}
@@ -3396,14 +3397,15 @@ func TestDependencyCheck(t *testing.T) {
 			)
 
 			deployServiceContractDependencyCheck(fmt.Sprintf(`
-				pub event TestEvent(_ dependenciesNames: [String])
+				pub event TestEvent(_ dependenciesNames: [String], _ authorizers: [Address])
 				
 				access(all) fun checkDependencies(_ dependenciesAddresses: [Address], _ dependenciesNames: [String], _ authorizers: [Address]) {
+					// tis is so that is doesnt trigger on the contract update transaction
 					if authorizers.length == 1 && authorizers[0] == %s {
 						return
 					}
 
-					emit TestEvent(dependenciesNames)
+					emit TestEvent(dependenciesNames, authorizers)
 				}
 			`, chain.ServiceAddress().HexWithPrefix()))
 
@@ -3432,8 +3434,10 @@ func TestDependencyCheck(t *testing.T) {
 					require.NoError(t, err)
 
 					dependencies := payload.(cadence.Event).Fields[0].(cadence.Array).Values
+					require.Equal(t, []cadence.Value{cadence.String("A"), cadence.String("B"), cadence.String("C"), cadence.String("D")}, dependencies)
 
-					require.ElementsMatch(t, []cadence.Value{cadence.String("D"), cadence.String("C"), cadence.String("B"), cadence.String("A")}, dependencies)
+					authorizers := payload.(cadence.Event).Fields[1].(cadence.Array).Values
+					require.Equal(t, []cadence.Value{cadence.BytesToAddress(accounts[0].Bytes()), cadence.BytesToAddress(chain.ServiceAddress().Bytes())}, authorizers)
 				},
 			)
 		}))
