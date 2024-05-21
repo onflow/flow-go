@@ -8,8 +8,9 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/sethvargo/go-retry"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/credentials"
 
+	"github.com/onflow/crypto"
 	"github.com/onflow/flow/protobuf/go/flow/access"
 
 	"github.com/onflow/flow-go/engine/common/requester"
@@ -43,11 +44,17 @@ var _ ingestion.CollectionFetcher = (*AccessCollectionFetcher)(nil)
 var _ ingestion.CollectionRequester = (*AccessCollectionFetcher)(nil)
 
 func NewAccessCollectionFetcher(
-	logger zerolog.Logger, accessURL string, nodeID flow.Identifier, chain flow.Chain) (
+	logger zerolog.Logger, accessURL string, networkPubKey crypto.PublicKey, nodeID flow.Identifier, chain flow.Chain) (
 	*AccessCollectionFetcher, error) {
+
+	tlsConfig, err := grpcutils.DefaultClientTLSConfig(networkPubKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create tls config: %w", err)
+	}
+
 	collectionRPCConn, err := grpc.Dial(
 		accessURL,
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithTransportCredentials(credentials.NewTLS(tlsConfig)),
 		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(grpcutils.DefaultMaxMsgSize)),
 	)
 	if err != nil {
