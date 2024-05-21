@@ -72,7 +72,7 @@ func (b *backendScripts) ExecuteScriptAtLatestBlock(
 	latestHeader, err := b.state.Sealed().Head()
 	if err != nil {
 		// the latest sealed header MUST be available
-		err := irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err)
+		err := irrecoverable.NewExceptionf("failed to lookup sealed header: %v", err)
 		irrecoverable.Throw(ctx, err)
 		return nil, err
 	}
@@ -134,7 +134,7 @@ func (b *backendScripts) executeScript(
 		// issues for some scripts.
 		execResult, execDuration, execErr := b.executeScriptOnAvailableExecutionNodes(ctx, scriptRequest)
 
-		resultComparer := newScriptResultComparison(b.log, b.metrics, scriptRequest)
+		resultComparer := newScriptResultComparison(b.log, b.metrics, b.shouldLogScript, scriptRequest)
 		_ = resultComparer.compare(
 			newScriptResult(execResult, execDuration, execErr),
 			newScriptResult(localResult, localDuration, localErr),
@@ -152,7 +152,7 @@ func (b *backendScripts) executeScript(
 		}
 		localResult, localDuration, localErr := b.executeScriptLocally(ctx, scriptRequest)
 
-		resultComparer := newScriptResultComparison(b.log, b.metrics, scriptRequest)
+		resultComparer := newScriptResultComparison(b.log, b.metrics, b.shouldLogScript, scriptRequest)
 		_ = resultComparer.compare(
 			newScriptResult(execResult, execDuration, execErr),
 			newScriptResult(localResult, localDuration, localErr),
@@ -191,9 +191,11 @@ func (b *backendScripts) executeScriptLocally(
 
 		switch status.Code(convertedErr) {
 		case codes.InvalidArgument, codes.Canceled, codes.DeadlineExceeded:
-			lg.Debug().Err(err).
-				Str("script", string(r.script)).
-				Msg("script failed to execute locally")
+			logEvent := lg.Debug().Err(err)
+			if b.shouldLogScript(execEndTime, r.insecureScriptHash) {
+				logEvent.Str("script", string(r.script))
+			}
+			logEvent.Msg("script failed to execute locally")
 
 		default:
 			lg.Error().Err(err).Msg("script execution failed")
@@ -203,7 +205,7 @@ func (b *backendScripts) executeScriptLocally(
 		return nil, execDuration, convertedErr
 	}
 
-	if b.log.GetLevel() == zerolog.DebugLevel && b.shouldLogScript(execEndTime, r.insecureScriptHash) {
+	if b.shouldLogScript(execEndTime, r.insecureScriptHash) {
 		lg.Debug().
 			Str("script", string(r.script)).
 			Msg("Successfully executed script")
@@ -233,6 +235,7 @@ func (b *backendScripts) executeScriptOnAvailableExecutionNodes(
 		Logger()
 
 	var result []byte
+	var executionTime time.Time
 	var execDuration time.Duration
 	errToReturn := b.nodeCommunicator.CallAvailableNode(
 		executors,
@@ -241,22 +244,20 @@ func (b *backendScripts) executeScriptOnAvailableExecutionNodes(
 
 			result, err = b.tryExecuteScriptOnExecutionNode(ctx, node.Address, r)
 
-			executionTime := time.Now()
+			executionTime = time.Now()
 			execDuration = executionTime.Sub(execStartTime)
 
 			if err != nil {
 				return err
 			}
 
-			if b.log.GetLevel() == zerolog.DebugLevel {
-				if b.shouldLogScript(executionTime, r.insecureScriptHash) {
-					lg.Debug().
-						Str("script_executor_addr", node.Address).
-						Str("script", string(r.script)).
-						Dur("execution_dur_ms", execDuration).
-						Msg("Successfully executed script")
-					b.loggedScripts.Add(r.insecureScriptHash, executionTime)
-				}
+			if b.shouldLogScript(executionTime, r.insecureScriptHash) {
+				lg.Debug().
+					Str("script_executor_addr", node.Address).
+					Str("script", string(r.script)).
+					Dur("execution_dur_ms", execDuration).
+					Msg("Successfully executed script")
+				b.loggedScripts.Add(r.insecureScriptHash, executionTime)
 			}
 
 			// log execution time
@@ -266,10 +267,11 @@ func (b *backendScripts) executeScriptOnAvailableExecutionNodes(
 		},
 		func(node *flow.Identity, err error) bool {
 			if status.Code(err) == codes.InvalidArgument {
-				lg.Debug().Err(err).
-					Str("script_executor_addr", node.Address).
-					Str("script", string(r.script)).
-					Msg("script failed to execute on the execution node")
+				logEvent := lg.Debug().Err(err).Str("script_executor_addr", node.Address)
+				if b.shouldLogScript(executionTime, r.insecureScriptHash) {
+					logEvent.Str("script", string(r.script))
+				}
+				logEvent.Msg("script failed to execute on the execution node")
 				return true
 			}
 			return false
@@ -318,6 +320,9 @@ func isInvalidArgumentError(scriptExecutionErr error) bool {
 
 // shouldLogScript checks if the script hash is unique in the time window
 func (b *backendScripts) shouldLogScript(execTime time.Time, scriptHash [md5.Size]byte) bool {
+	if b.log.GetLevel() > zerolog.DebugLevel {
+		return false
+	}
 	timestamp, seen := b.loggedScripts.Get(scriptHash)
 	if seen {
 		return execTime.Sub(timestamp) >= uniqueScriptLoggingTimeWindow
