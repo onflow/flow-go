@@ -312,24 +312,11 @@ func (e *Engine) dispatchRequest() (bool, error) {
 		return false, fmt.Errorf("could not get providers: %w", err)
 	}
 
-	// randomize order of items, so that they can be requested in different order each time
-	rndItems := make([]flow.Identifier, 0, len(e.items))
-	for k := range e.items {
-		rndItems = append(rndItems, e.items[k].EntityID)
-	}
-	err = rand.Shuffle(uint(len(rndItems)), func(i, j uint) {
-		rndItems[i], rndItems[j] = rndItems[j], rndItems[i]
-	})
-	if err != nil {
-		return false, fmt.Errorf("shuffle failed: %w", err)
-	}
-
 	// go through each item and decide if it should be requested again
 	now := time.Now().UTC()
 	var providerID flow.Identifier
 	var entityIDs []flow.Identifier
-	for _, entityID := range rndItems {
-		item := e.items[entityID]
+	for entityID, item := range e.items {
 
 		// if the item should not be requested yet, ignore
 		cutoff := item.LastRequested.Add(item.RetryAfter)
@@ -347,15 +334,15 @@ func (e *Engine) dispatchRequest() (bool, error) {
 		// if the provider has already been chosen, check if this item
 		// can be requested from the same provider; otherwise skip it
 		// for now, so it will be part of the next batch request
-		// if providerID != flow.ZeroID {
-		// 	overlap := providers.Filter(filter.And(
-		// 		filter.HasNodeID(providerID),
-		// 		item.ExtraSelector,
-		// 	))
-		// 	if len(overlap) == 0 {
-		// 		continue
-		// 	}
-		// }
+		if providerID != flow.ZeroID {
+			overlap := providers.Filter(filter.And(
+				filter.HasNodeID(providerID),
+				item.ExtraSelector,
+			))
+			if len(overlap) == 0 {
+				continue
+			}
+		}
 
 		// if no provider has been chosen yet, choose from restricted set
 		// NOTE: a single item can not permanently block requests going
@@ -367,6 +354,8 @@ func (e *Engine) dispatchRequest() (bool, error) {
 			if len(filteredProviders) == 0 {
 				return false, fmt.Errorf("no valid providers available for item %s, total providers: %v", entityID.String(), len(providers))
 			}
+			// ramdonly select a provider from the filtered set
+			// to send as many item requests as possible.
 			id, err := filteredProviders.Sample(1)
 			if err != nil {
 				return false, fmt.Errorf("sampling failed: %w", err)

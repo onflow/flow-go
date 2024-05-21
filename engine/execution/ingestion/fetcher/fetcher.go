@@ -12,7 +12,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 )
 
-var onlyOnflowRegex = regexp.MustCompile(`.*\.onflow\.org:3569$`)
+var onlyOnflowRegex = regexp.MustCompile(`.*\.(onflow\.org|dapper-flow\.com):3569$`)
 
 type CollectionFetcher struct {
 	log     zerolog.Logger
