@@ -336,7 +336,7 @@ func convertServiceEventEpochRecover(event flow.Event) (*flow.ServiceEvent, erro
 		return nil, fmt.Errorf("failed to decode EpochRecover event: %w", err)
 	}
 
-	cdcClusters, err := getField[cadence.Array](fields, "collectorClusters")
+	cdcClusters, err := getField[cadence.Array](fields, "clusterAssignments")
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode EpochRecover event: %w", err)
 	}
@@ -700,6 +700,7 @@ func convertParticipants(cdcParticipants []cadence.Value) (flow.IdentitySkeleton
 // convertClusterQCVoteData converts cluster QC vote data from the EpochRecover event
 // to a representation suitable for inclusion in the protocol state. Votes are
 // aggregated as part of this conversion.
+// TODO(efm-recovery): update this function for new QCVoteData structure (see https://github.com/onflow/flow-go/pull/5943#discussion_r1605267444)
 func convertClusterQCVoteData(cdcClusterQCVoteData []cadence.Value) ([]flow.ClusterQCVoteData, error) {
 	qcVoteDatas := make([]flow.ClusterQCVoteData, 0, len(cdcClusterQCVoteData))
 

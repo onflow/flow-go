@@ -130,23 +130,23 @@ type EpochRecover struct {
 	EpochCommit
 }
 
-func (recover *EpochRecover) ServiceEvent() ServiceEvent {
+func (er *EpochRecover) ServiceEvent() ServiceEvent {
 	return ServiceEvent{
 		Type:  ServiceEventRecover,
-		Event: recover,
+		Event: er,
 	}
 }
 
 // ID returns the hash of the event contents.
-func (recover *EpochRecover) ID() Identifier {
-	return MakeID(recover)
+func (er *EpochRecover) ID() Identifier {
+	return MakeID(er)
 }
 
-func (recover *EpochRecover) EqualTo(other *EpochRecover) bool {
-	if !recover.EpochSetup.EqualTo(&other.EpochSetup) {
+func (er *EpochRecover) EqualTo(other *EpochRecover) bool {
+	if !er.EpochSetup.EqualTo(&other.EpochSetup) {
 		return false
 	}
-	if !recover.EpochCommit.EqualTo(&other.EpochCommit) {
+	if !er.EpochCommit.EqualTo(&other.EpochCommit) {
 		return false
 	}
 	return true
