@@ -57,16 +57,6 @@ type EpochProtocolState interface {
 // ProtocolState is the read-only interface for protocol state. It allows querying the
 // Protocol KVStore or Epoch sub-state by block, and retrieving global network params.
 type ProtocolState interface {
-	// ByEpoch returns an object with static protocol state information by epoch number.
-	// To be able to use this interface we need to observe both epoch setup and commit events.
-	// Not available for next epoch unless we have observed an EpochCommit event.
-	// No errors are expected during normal operations.
-	// TODO(yuraolex): check return types
-	// TODO(yuraolex): decide if we really need this approach. It's unclear if it's useful to query
-	//  by epoch counter. To implement it we need an additional index by epoch counter. Alternatively we need a way to map
-	//  epoch counter -> block ID. It gets worse if we consider that we need a way to get the epoch counter itself at caller side.
-	//ByEpoch(epoch uint64) (InitialProtocolState, error)
-
 	// AtBlockID returns epoch protocol state at block ID.
 	// The resulting epoch protocol state is returned AFTER applying updates that are contained in block.
 	// Can be queried for any block that has been added to the block tree.
