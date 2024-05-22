@@ -139,7 +139,7 @@ type Snapshot interface {
 	// The compliance layer guarantees that only valid blocks are appended to the protocol state.
 	// Returns state.ErrUnknownSnapshotReference if snapshot reference block is unknown.
 	// All other errors should be treated as exceptions.
-	EpochProtocolState() (DynamicProtocolState, error)
+	EpochProtocolState() (EpochProtocolState, error)
 
 	// ProtocolState returns the dynamic protocol state that the Head block commits to.
 	// The compliance layer guarantees that only valid blocks are appended to the protocol state.

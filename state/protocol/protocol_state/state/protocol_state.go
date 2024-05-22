@@ -46,10 +46,10 @@ func newProtocolState(epochProtocolStateDB storage.ProtocolState, kvStoreSnapsho
 // The resulting epoch protocol state is returned AFTER applying updates that are contained in block.
 // Can be queried for any block that has been added to the block tree.
 // Returns:
-// - (DynamicProtocolState, nil) - if there is an epoch protocol state associated with given block ID.
+// - (EpochProtocolState, nil) - if there is an epoch protocol state associated with given block ID.
 // - (nil, storage.ErrNotFound) - if there is no epoch protocol state associated with given block ID.
 // - (nil, exception) - any other error should be treated as exception.
-func (s *ProtocolState) AtBlockID(blockID flow.Identifier) (protocol.DynamicProtocolState, error) {
+func (s *ProtocolState) AtBlockID(blockID flow.Identifier) (protocol.EpochProtocolState, error) {
 	protocolStateEntry, err := s.epochProtocolStateDB.ByBlockID(blockID)
 	if err != nil {
 		return nil, fmt.Errorf("could not query epoch protocol state at block (%x): %w", blockID, err)

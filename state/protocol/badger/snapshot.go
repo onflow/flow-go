@@ -354,7 +354,7 @@ func (s *Snapshot) Params() protocol.GlobalParams {
 // Returns state.ErrUnknownSnapshotReference if snapshot reference block is unknown.
 // All other errors should be treated as exceptions.
 // For each block stored there should be a protocol state stored.
-func (s *Snapshot) EpochProtocolState() (protocol.DynamicProtocolState, error) {
+func (s *Snapshot) EpochProtocolState() (protocol.EpochProtocolState, error) {
 	return s.state.protocolState.AtBlockID(s.blockID)
 }
 

@@ -5,10 +5,11 @@ import (
 	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
-// DynamicProtocolState extends the InitialProtocolState with data that can change from block to block.
-// It can be used to access the identity table at given block.
-// TODO rename
-type DynamicProtocolState interface {
+// EpochProtocolState represents the subset of the Protocol State KVStore related to epochs:
+// the Identity Table, DKG, cluster assignment, etc.
+// EpochProtocolState is fork-aware and can change on a block-by-block basis.
+// Each EpochProtocolState instance refers to the state with respect to some reference block.
+type EpochProtocolState interface {
 	// Epoch returns counter of epoch.
 	Epoch() uint64
 	// Clustering returns initial clustering from epoch setup.
@@ -21,11 +22,6 @@ type DynamicProtocolState interface {
 	// DKG returns information about DKG that was obtained from EpochCommit event.
 	// No errors are expected during normal operations.
 	DKG() (DKG, error)
-	// Entry Returns low-level protocol state entry that was used to initialize this object.
-	// It shouldn't be used by high-level logic, it is useful for some cases such as bootstrapping.
-	// Prefer using other methods to access protocol state.
-	Entry() *flow.RichProtocolStateEntry
-
 	// InvalidEpochTransitionAttempted denotes whether an invalid epoch state transition was attempted
 	// on the fork ending this block. Once the first block where this flag is true is finalized, epoch
 	// fallback mode is triggered.
@@ -48,12 +44,18 @@ type DynamicProtocolState interface {
 	//   - nodes in C with status `flow.EpochParticipationStatusActive`
 	//   - nodes in N-C with status `flow.EpochParticipationStatusJoining`
 	Identities() flow.IdentityList
-	// GlobalParams returns params that are same for all nodes in the network.
+
+	// GlobalParams returns global, static network params that are same for all nodes in the network.
 	GlobalParams() GlobalParams
+
+	// Entry Returns low-level protocol state entry that was used to initialize this object.
+	// It shouldn't be used by high-level logic, it is useful for some cases such as bootstrapping.
+	// Prefer using other methods to access protocol state.
+	Entry() *flow.RichProtocolStateEntry
 }
 
-// ProtocolState is the read-only interface for protocol state, it allows to query information
-// on a per-block and per-epoch basis.
+// ProtocolState is the read-only interface for protocol state. It allows querying the
+// Protocol KVStore or Epoch sub-state by block, and retrieving global network params.
 type ProtocolState interface {
 	// ByEpoch returns an object with static protocol state information by epoch number.
 	// To be able to use this interface we need to observe both epoch setup and commit events.
@@ -69,10 +71,10 @@ type ProtocolState interface {
 	// The resulting epoch protocol state is returned AFTER applying updates that are contained in block.
 	// Can be queried for any block that has been added to the block tree.
 	// Returns:
-	// - (DynamicProtocolState, nil) - if there is an epoch protocol state associated with given block ID.
+	// - (EpochProtocolState, nil) - if there is an epoch protocol state associated with given block ID.
 	// - (nil, storage.ErrNotFound) - if there is no epoch protocol state associated with given block ID.
 	// - (nil, exception) - any other error should be treated as exception.
-	AtBlockID(blockID flow.Identifier) (DynamicProtocolState, error)
+	AtBlockID(blockID flow.Identifier) (EpochProtocolState, error)
 
 	// KVStoreAtBlockID returns protocol state at block ID.
 	// The resulting protocol state is returned AFTER applying updates that are contained in block.

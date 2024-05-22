@@ -7,14 +7,14 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 )
 
-// DynamicProtocolStateAdapter implements protocol.DynamicProtocolState by wrapping an InitialProtocolStateAdapter.
+// DynamicProtocolStateAdapter implements protocol.EpochProtocolState by wrapping an InitialProtocolStateAdapter.
 // TODO rename
 type DynamicProtocolStateAdapter struct {
 	*flow.RichProtocolStateEntry
 	params protocol.GlobalParams
 }
 
-var _ protocol.DynamicProtocolState = (*DynamicProtocolStateAdapter)(nil)
+var _ protocol.EpochProtocolState = (*DynamicProtocolStateAdapter)(nil)
 
 func NewDynamicProtocolStateAdapter(entry *flow.RichProtocolStateEntry, params protocol.GlobalParams) *DynamicProtocolStateAdapter {
 	return &DynamicProtocolStateAdapter{

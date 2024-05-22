@@ -76,7 +76,7 @@ func (u *Snapshot) Params() protocol.GlobalParams {
 	return Params{u.err}
 }
 
-func (u *Snapshot) EpochProtocolState() (protocol.DynamicProtocolState, error) {
+func (u *Snapshot) EpochProtocolState() (protocol.EpochProtocolState, error) {
 	return nil, u.err
 }
 

@@ -487,7 +487,7 @@ func bootstrapEpochForProtocolStateEntry(
 	epochProtocolStateSnapshots storage.ProtocolState,
 	epochSetups storage.EpochSetups,
 	epochCommits storage.EpochCommits,
-	epochProtocolStateEntry protocol.DynamicProtocolState,
+	epochProtocolStateEntry protocol.EpochProtocolState,
 	verifyNetworkAddress bool,
 ) func(*transaction.Tx) error {
 	return func(tx *transaction.Tx) error {
