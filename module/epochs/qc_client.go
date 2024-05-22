@@ -104,7 +104,7 @@ func (c *QCContractClient) SubmitVote(ctx context.Context, vote *model.Vote) err
 	seqNumber := account.Keys[int(c.AccountKeyIndex)].SequenceNumber
 	tx := sdk.NewTransaction().
 		SetScript(templates.GenerateSubmitVoteScript(c.env)).
-		SetGasLimit(9999).
+		SetComputeLimit(9999).
 		SetReferenceBlockID(latestBlock.ID).
 		SetProposalKey(account.Address, int(c.AccountKeyIndex), seqNumber).
 		SetPayer(account.Address).

@@ -53,14 +53,14 @@ func NewAppSpecificScoreCache(sizeLimit uint32, logger zerolog.Logger, collector
 // - time.Time: the time at which the score was last updated.
 // - bool: true if the score was retrieved successfully, false otherwise.
 func (a *AppSpecificScoreCache) Get(peerID peer.ID) (float64, time.Time, bool) {
-	e, ok := a.c.ByID(flow.MakeID(peerID))
+	e, ok := a.c.ByID(entityIdOf(peerID))
 	if !ok {
 		return 0, time.Time{}, false
 	}
 	return e.(appSpecificScoreRecordEntity).Score, e.(appSpecificScoreRecordEntity).LastUpdated, true
 }
 
-// Add adds the application specific score of a peer to the cache.
+// AdjustWithInit adds the application specific score of a peer to the cache.
 // If the peer already has a score in the cache, the score is updated.
 // Args:
 // - peerID: the peer ID of the peer in the GossipSub protocol.
@@ -68,27 +68,26 @@ func (a *AppSpecificScoreCache) Get(peerID peer.ID) (float64, time.Time, bool) {
 // - time: the time at which the score was last updated.
 // Returns:
 // - error on failure to add the score. The returned error is irrecoverable and indicates an exception.
-func (a *AppSpecificScoreCache) Add(peerID peer.ID, score float64, time time.Time) error {
-	entityId := flow.MakeID(peerID)
+func (a *AppSpecificScoreCache) AdjustWithInit(peerID peer.ID, score float64, time time.Time) error {
+	entityId := entityIdOf(peerID)
 
-	// first tries an optimistic add; if it fails, it tries an optimistic update
-	added := a.c.Add(appSpecificScoreRecordEntity{
-		entityId:    entityId,
-		PeerID:      peerID,
-		Score:       score,
-		LastUpdated: time,
-	})
-	if !added {
-		_, ok := a.c.Adjust(entityId, func(entity flow.Entity) flow.Entity {
-			r := entity.(appSpecificScoreRecordEntity)
-			r.Score = score
-			r.LastUpdated = time
-			return r
-		})
-
-		if !ok {
-			return fmt.Errorf("failed to add app specific score record for peer %s", peerID)
+	initLogic := func() flow.Entity {
+		return appSpecificScoreRecordEntity{
+			entityId:    entityId,
+			PeerID:      peerID,
+			Score:       score,
+			LastUpdated: time,
 		}
+	}
+	adjustLogic := func(entity flow.Entity) flow.Entity {
+		r := entity.(appSpecificScoreRecordEntity)
+		r.Score = score
+		r.LastUpdated = time
+		return r
+	}
+	_, adjusted := a.c.AdjustWithInit(entityId, adjustLogic, initLogic)
+	if !adjusted {
+		return fmt.Errorf("failed to adjust app specific score for peer %s", peerID)
 	}
 
 	return nil

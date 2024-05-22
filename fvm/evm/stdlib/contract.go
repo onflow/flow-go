@@ -9,8 +9,6 @@ import (
 	"regexp"
 	"strings"
 
-	gethABI "github.com/ethereum/go-ethereum/accounts/abi"
-	gethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
@@ -18,6 +16,8 @@ import (
 	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/onflow/cadence/runtime/sema"
 	"github.com/onflow/cadence/runtime/stdlib"
+	gethABI "github.com/onflow/go-ethereum/accounts/abi"
+	gethCommon "github.com/onflow/go-ethereum/common"
 
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/evm/types"
@@ -27,27 +27,59 @@ import (
 //go:embed contract.cdc
 var contractCode string
 
-var flowTokenImportPattern = regexp.MustCompile(`^import "FlowToken"\n`)
+var nftImportPattern = regexp.MustCompile(`(?m)^import "NonFungibleToken"`)
+var fungibleTokenImportPattern = regexp.MustCompile(`(?m)^import "FungibleToken"`)
+var flowTokenImportPattern = regexp.MustCompile(`(?m)^import "FlowToken"`)
 
-func ContractCode(flowTokenAddress flow.Address) []byte {
-	return []byte(flowTokenImportPattern.ReplaceAllString(
+func ContractCode(nonFungibleTokenAddress, fungibleTokenAddress, flowTokenAddress flow.Address) []byte {
+	evmContract := nftImportPattern.ReplaceAllString(
 		contractCode,
+		fmt.Sprintf("import NonFungibleToken from %s", nonFungibleTokenAddress.HexWithPrefix()),
+	)
+	evmContract = fungibleTokenImportPattern.ReplaceAllString(
+		evmContract,
+		fmt.Sprintf("import FungibleToken from %s", fungibleTokenAddress.HexWithPrefix()),
+	)
+	evmContract = flowTokenImportPattern.ReplaceAllString(
+		evmContract,
 		fmt.Sprintf("import FlowToken from %s", flowTokenAddress.HexWithPrefix()),
-	))
+	)
+	return []byte(evmContract)
 }
 
-const ContractName = "EVM"
-const evmAddressTypeBytesFieldName = "bytes"
-const evmAddressTypeQualifiedIdentifier = "EVM.EVMAddress"
+const (
+	ContractName = "EVM"
 
-const abiEncodingByteSize = 32
+	evmAddressTypeBytesFieldName = "bytes"
 
-var EVMTransactionBytesCadenceType = cadence.NewVariableSizedArrayType(cadence.TheUInt8Type)
-var evmTransactionBytesType = sema.NewVariableSizedType(nil, sema.UInt8Type)
+	evmAddressTypeQualifiedIdentifier = "EVM.EVMAddress"
 
-var evmAddressBytesType = sema.NewConstantSizedType(nil, sema.UInt8Type, types.AddressLength)
-var evmAddressBytesStaticType = interpreter.ConvertSemaArrayTypeToStaticArrayType(nil, evmAddressBytesType)
-var EVMAddressBytesCadenceType = cadence.NewConstantSizedArrayType(types.AddressLength, cadence.TheUInt8Type)
+	evmBalanceTypeQualifiedIdentifier = "EVM.Balance"
+
+	evmResultTypeQualifiedIdentifier       = "EVM.Result"
+	evmResultTypeStatusFieldName           = "status"
+	evmResultTypeErrorCodeFieldName        = "errorCode"
+	evmResultTypeGasUsedFieldName          = "gasUsed"
+	evmResultTypeDataFieldName             = "data"
+	evmResultTypeDeployedContractFieldName = "deployedContract"
+
+	evmStatusTypeQualifiedIdentifier = "EVM.Status"
+
+	evmBlockTypeQualifiedIdentifier = "EVM.EVMBlock"
+	abiEncodingByteSize             = 32
+)
+
+var (
+	EVMTransactionBytesCadenceType = cadence.NewVariableSizedArrayType(cadence.UInt8Type)
+
+	evmTransactionBytesType       = sema.NewVariableSizedType(nil, sema.UInt8Type)
+	evmTransactionsBatchBytesType = sema.NewVariableSizedType(nil, evmTransactionBytesType)
+	evmAddressBytesType           = sema.NewConstantSizedType(nil, sema.UInt8Type, types.AddressLength)
+
+	evmAddressBytesStaticType = interpreter.ConvertSemaArrayTypeToStaticArrayType(nil, evmAddressBytesType)
+
+	EVMAddressBytesCadenceType = cadence.NewConstantSizedArrayType(types.AddressLength, cadence.UInt8Type)
+)
 
 // abiEncodingError
 type abiEncodingError struct {
@@ -102,73 +134,85 @@ func (e abiDecodingError) Error() string {
 
 func reportABIEncodingComputation(
 	inter *interpreter.Interpreter,
+	locationRange interpreter.LocationRange,
 	values *interpreter.ArrayValue,
 	evmAddressTypeID common.TypeID,
 	reportComputation func(intensity uint),
 ) {
-	values.Iterate(inter, func(element interpreter.Value) (resume bool) {
-		switch value := element.(type) {
-		case *interpreter.StringValue:
-			// Dynamic variables, such as strings, are encoded
-			// in 2+ chunks of 32 bytes. The first chunk contains
-			// the index where information for the string begin,
-			// the second chunk contains the number of bytes the
-			// string occupies, and the third chunk contains the
-			// value of the string itself.
-			computation := uint(2 * abiEncodingByteSize)
-			stringLength := len(value.Str)
-			chunks := math.Ceil(float64(stringLength) / float64(abiEncodingByteSize))
-			computation += uint(chunks * abiEncodingByteSize)
-			reportComputation(computation)
+	values.Iterate(
+		inter,
+		func(element interpreter.Value) (resume bool) {
+			switch value := element.(type) {
+			case *interpreter.StringValue:
+				// Dynamic variables, such as strings, are encoded
+				// in 2+ chunks of 32 bytes. The first chunk contains
+				// the index where information for the string begin,
+				// the second chunk contains the number of bytes the
+				// string occupies, and the third chunk contains the
+				// value of the string itself.
+				computation := uint(2 * abiEncodingByteSize)
+				stringLength := len(value.Str)
+				chunks := math.Ceil(float64(stringLength) / float64(abiEncodingByteSize))
+				computation += uint(chunks * abiEncodingByteSize)
+				reportComputation(computation)
 
-		case interpreter.BoolValue,
-			interpreter.UInt8Value,
-			interpreter.UInt16Value,
-			interpreter.UInt32Value,
-			interpreter.UInt64Value,
-			interpreter.UInt128Value,
-			interpreter.UInt256Value,
-			interpreter.Int8Value,
-			interpreter.Int16Value,
-			interpreter.Int32Value,
-			interpreter.Int64Value,
-			interpreter.Int128Value,
-			interpreter.Int256Value:
+			case interpreter.BoolValue,
+				interpreter.UInt8Value,
+				interpreter.UInt16Value,
+				interpreter.UInt32Value,
+				interpreter.UInt64Value,
+				interpreter.UInt128Value,
+				interpreter.UInt256Value,
+				interpreter.Int8Value,
+				interpreter.Int16Value,
+				interpreter.Int32Value,
+				interpreter.Int64Value,
+				interpreter.Int128Value,
+				interpreter.Int256Value:
 
-			// Numeric and bool variables are also static variables
-			// with a fixed size of 32 bytes.
-			reportComputation(abiEncodingByteSize)
-
-		case *interpreter.CompositeValue:
-			if value.TypeID() == evmAddressTypeID {
-				// EVM addresses are static variables with a fixed
-				// size of 32 bytes.
+				// Numeric and bool variables are also static variables
+				// with a fixed size of 32 bytes.
 				reportComputation(abiEncodingByteSize)
-			} else {
+
+			case *interpreter.CompositeValue:
+				if value.TypeID() == evmAddressTypeID {
+					// EVM addresses are static variables with a fixed
+					// size of 32 bytes.
+					reportComputation(abiEncodingByteSize)
+				} else {
+					panic(abiEncodingError{
+						Type: value.StaticType(inter),
+					})
+				}
+			case *interpreter.ArrayValue:
+				// Dynamic variables, such as arrays & slices, are encoded
+				// in 2+ chunks of 32 bytes. The first chunk contains
+				// the index where information for the array begin,
+				// the second chunk contains the number of bytes the
+				// array occupies, and the third chunk contains the
+				// values of the array itself.
+				computation := uint(2 * abiEncodingByteSize)
+				reportComputation(computation)
+				reportABIEncodingComputation(
+					inter,
+					locationRange,
+					value,
+					evmAddressTypeID,
+					reportComputation,
+				)
+
+			default:
 				panic(abiEncodingError{
-					Type: value.StaticType(inter),
+					Type: element.StaticType(inter),
 				})
 			}
-		case *interpreter.ArrayValue:
-			// Dynamic variables, such as arrays & slices, are encoded
-			// in 2+ chunks of 32 bytes. The first chunk contains
-			// the index where information for the array begin,
-			// the second chunk contains the number of bytes the
-			// array occupies, and the third chunk contains the
-			// values of the array itself.
-			computation := uint(2 * abiEncodingByteSize)
-			reportComputation(computation)
-			reportABIEncodingComputation(inter, value, evmAddressTypeID, reportComputation)
 
-		default:
-			panic(abiEncodingError{
-				Type: element.StaticType(inter),
-			})
-		}
-
-		// continue iteration
-		return true
-	})
+			// continue iteration
+			return true
+		},
+		false,
+		locationRange,
+	)
 }
 
 // EVM.encodeABI
@@ -195,7 +239,7 @@ func newInternalEVMTypeEncodeABIFunction(
 
 	evmAddressTypeID := location.TypeID(gauge, evmAddressTypeQualifiedIdentifier)
 
-	return interpreter.NewHostFunctionValue(
+	return interpreter.NewStaticHostFunctionValue(
 		gauge,
 		internalEVMTypeEncodeABIFunctionType,
 		func(invocation interpreter.Invocation) interpreter.Value {
@@ -211,6 +255,7 @@ func newInternalEVMTypeEncodeABIFunction(
 
 			reportABIEncodingComputation(
 				inter,
+				locationRange,
 				valuesArray,
 				evmAddressTypeID,
 				func(intensity uint) {
@@ -223,24 +268,29 @@ func newInternalEVMTypeEncodeABIFunction(
 			values := make([]any, 0, size)
 			arguments := make(gethABI.Arguments, 0, size)
 
-			valuesArray.Iterate(inter, func(element interpreter.Value) (resume bool) {
-				value, ty, err := encodeABI(
-					inter,
-					locationRange,
-					element,
-					element.StaticType(inter),
-					evmAddressTypeID,
-				)
-				if err != nil {
-					panic(err)
-				}
+			valuesArray.Iterate(
+				inter,
+				func(element interpreter.Value) (resume bool) {
+					value, ty, err := encodeABI(
+						inter,
+						locationRange,
+						element,
+						element.StaticType(inter),
+						evmAddressTypeID,
+					)
+					if err != nil {
+						panic(err)
+					}
 
-				values = append(values, value)
-				arguments = append(arguments, gethABI.Argument{Type: ty})
+					values = append(values, value)
+					arguments = append(arguments, gethABI.Argument{Type: ty})
 
-				// continue iteration
-				return true
-			})
+					// continue iteration
+					return true
+				},
+				false,
+				locationRange,
+			)
 
 			encodedValues, err := arguments.Pack(values...)
 			if err != nil {
@@ -253,19 +303,33 @@ func newInternalEVMTypeEncodeABIFunction(
 }
 
 var gethTypeString = gethABI.Type{T: gethABI.StringTy}
+
 var gethTypeBool = gethABI.Type{T: gethABI.BoolTy}
+
 var gethTypeUint8 = gethABI.Type{T: gethABI.UintTy, Size: 8}
+
 var gethTypeUint16 = gethABI.Type{T: gethABI.UintTy, Size: 16}
+
 var gethTypeUint32 = gethABI.Type{T: gethABI.UintTy, Size: 32}
+
 var gethTypeUint64 = gethABI.Type{T: gethABI.UintTy, Size: 64}
+
 var gethTypeUint128 = gethABI.Type{T: gethABI.UintTy, Size: 128}
+
 var gethTypeUint256 = gethABI.Type{T: gethABI.UintTy, Size: 256}
+
 var gethTypeInt8 = gethABI.Type{T: gethABI.IntTy, Size: 8}
+
 var gethTypeInt16 = gethABI.Type{T: gethABI.IntTy, Size: 16}
+
 var gethTypeInt32 = gethABI.Type{T: gethABI.IntTy, Size: 32}
+
 var gethTypeInt64 = gethABI.Type{T: gethABI.IntTy, Size: 64}
+
 var gethTypeInt128 = gethABI.Type{T: gethABI.IntTy, Size: 128}
+
 var gethTypeInt256 = gethABI.Type{T: gethABI.IntTy, Size: 256}
+
 var gethTypeAddress = gethABI.Type{Size: 20, T: gethABI.AddressTy}
 
 func gethABIType(staticType interpreter.StaticType, evmAddressTypeID common.TypeID) (gethABI.Type, bool) {
@@ -303,14 +367,14 @@ func gethABIType(staticType interpreter.StaticType, evmAddressTypeID common.Type
 	}
 
 	switch staticType := staticType.(type) {
-	case interpreter.CompositeStaticType:
+	case *interpreter.CompositeStaticType:
 		if staticType.TypeID != evmAddressTypeID {
 			break
 		}
 
 		return gethTypeAddress, true
 
-	case interpreter.ConstantSizedStaticType:
+	case *interpreter.ConstantSizedStaticType:
 		elementGethABIType, ok := gethABIType(
 			staticType.ElementType(),
 			evmAddressTypeID,
@@ -325,7 +389,7 @@ func gethABIType(staticType interpreter.StaticType, evmAddressTypeID common.Type
 			Size: int(staticType.Size),
 		}, true
 
-	case interpreter.VariableSizedStaticType:
+	case *interpreter.VariableSizedStaticType:
 		elementGethABIType, ok := gethABIType(
 			staticType.ElementType(),
 			evmAddressTypeID,
@@ -382,7 +446,7 @@ func goType(
 	}
 
 	switch staticType := staticType.(type) {
-	case interpreter.ConstantSizedStaticType:
+	case *interpreter.ConstantSizedStaticType:
 		elementType, ok := goType(staticType.ElementType(), evmAddressTypeID)
 		if !ok {
 			break
@@ -390,7 +454,7 @@ func goType(
 
 		return reflect.ArrayOf(int(staticType.Size), elementType), true
 
-	case interpreter.VariableSizedStaticType:
+	case *interpreter.VariableSizedStaticType:
 		elementType, ok := goType(staticType.ElementType(), evmAddressTypeID)
 		if !ok {
 			break
@@ -522,36 +586,41 @@ func encodeABI(
 		var result reflect.Value
 
 		switch arrayStaticType := arrayStaticType.(type) {
-		case interpreter.ConstantSizedStaticType:
+		case *interpreter.ConstantSizedStaticType:
 			size := int(arrayStaticType.Size)
 			result = reflect.Indirect(reflect.New(reflect.ArrayOf(size, elementGoType)))
 
-		case interpreter.VariableSizedStaticType:
+		case *interpreter.VariableSizedStaticType:
 			size := value.Count()
 			result = reflect.MakeSlice(reflect.SliceOf(elementGoType), size, size)
 		}
 
 		var index int
-		value.Iterate(inter, func(element interpreter.Value) (resume bool) {
+		value.Iterate(
+			inter,
+			func(element interpreter.Value) (resume bool) {
 
-			arrayElement, _, err := encodeABI(
-				inter,
-				locationRange,
-				element,
-				element.StaticType(inter),
-				evmAddressTypeID,
-			)
-			if err != nil {
-				panic(err)
-			}
+				arrayElement, _, err := encodeABI(
+					inter,
+					locationRange,
+					element,
+					element.StaticType(inter),
+					evmAddressTypeID,
+				)
+				if err != nil {
+					panic(err)
+				}
 
-			result.Index(index).Set(reflect.ValueOf(arrayElement))
+				result.Index(index).Set(reflect.ValueOf(arrayElement))
 
-			index++
+				index++
 
-			// continue iteration
-			return true
-		})
+				// continue iteration
+				return true
+			},
+			false,
+			locationRange,
+		)
 
 		return result.Interface(), arrayGethABIType, nil
 	}
@@ -589,7 +658,7 @@ func newInternalEVMTypeDecodeABIFunction(
 ) *interpreter.HostFunctionValue {
 	evmAddressTypeID := location.TypeID(gauge, evmAddressTypeQualifiedIdentifier)
 
-	return interpreter.NewHostFunctionValue(
+	return interpreter.NewStaticHostFunctionValue(
 		gauge,
 		internalEVMTypeDecodeABIFunctionType,
 		func(invocation interpreter.Invocation) interpreter.Value {
@@ -621,31 +690,36 @@ func newInternalEVMTypeDecodeABIFunction(
 			}
 
 			var arguments gethABI.Arguments
-			typesArray.Iterate(inter, func(element interpreter.Value) (resume bool) {
-				typeValue, ok := element.(interpreter.TypeValue)
-				if !ok {
-					panic(errors.NewUnreachableError())
-				}
+			typesArray.Iterate(
+				inter,
+				func(element interpreter.Value) (resume bool) {
+					typeValue, ok := element.(interpreter.TypeValue)
+					if !ok {
+						panic(errors.NewUnreachableError())
+					}
 
-				staticType := typeValue.Type
+					staticType := typeValue.Type
 
-				gethABITy, ok := gethABIType(staticType, evmAddressTypeID)
-				if !ok {
-					panic(abiDecodingError{
-						Type: staticType,
-					})
-				}
+					gethABITy, ok := gethABIType(staticType, evmAddressTypeID)
+					if !ok {
+						panic(abiDecodingError{
+							Type: staticType,
+						})
+					}
 
-				arguments = append(
-					arguments,
-					gethABI.Argument{
-						Type: gethABITy,
-					},
-				)
+					arguments = append(
+						arguments,
+						gethABI.Argument{
+							Type: gethABITy,
+						},
+					)
 
-				// continue iteration
-				return true
-			})
+					// continue iteration
+					return true
+				},
+				false,
+				locationRange,
+			)
 
 			decodedValues, err := arguments.Unpack(data)
 			if err != nil {
@@ -655,33 +729,38 @@ func newInternalEVMTypeDecodeABIFunction(
 			var index int
 			values := make([]interpreter.Value, 0, len(decodedValues))
 
-			typesArray.Iterate(inter, func(element interpreter.Value) (resume bool) {
-				typeValue, ok := element.(interpreter.TypeValue)
-				if !ok {
-					panic(errors.NewUnreachableError())
-				}
+			typesArray.Iterate(
+				inter,
+				func(element interpreter.Value) (resume bool) {
+					typeValue, ok := element.(interpreter.TypeValue)
+					if !ok {
+						panic(errors.NewUnreachableError())
+					}
 
-				staticType := typeValue.Type
+					staticType := typeValue.Type
 
-				value, err := decodeABI(
-					inter,
-					locationRange,
-					decodedValues[index],
-					staticType,
-					location,
-					evmAddressTypeID,
-				)
-				if err != nil {
-					panic(err)
-				}
+					value, err := decodeABI(
+						inter,
+						locationRange,
+						decodedValues[index],
+						staticType,
+						location,
+						evmAddressTypeID,
+					)
+					if err != nil {
+						panic(err)
+					}
 
-				index++
+					index++
 
-				values = append(values, value)
+					values = append(values, value)
 
-				// continue iteration
-				return true
-			})
+					// continue iteration
+					return true
+				},
+				false,
+				locationRange,
+			)
 
 			arrayType := interpreter.NewVariableSizedStaticType(
 				inter,
@@ -859,7 +938,7 @@ func decodeABI(
 			},
 		), nil
 
-	case interpreter.CompositeStaticType:
+	case *interpreter.CompositeStaticType:
 		if staticType.TypeID != evmAddressTypeID {
 			break
 		}
@@ -919,14 +998,15 @@ var internalEVMTypeRunFunctionType = &sema.FunctionType{
 			TypeAnnotation: sema.NewTypeAnnotation(evmAddressBytesType),
 		},
 	},
-	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.BoolType),
+	// Actually EVM.Result, but cannot refer to it here
+	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.AnyStructType),
 }
 
 func newInternalEVMTypeRunFunction(
 	gauge common.MemoryGauge,
 	handler types.ContractHandler,
 ) *interpreter.HostFunctionValue {
-	return interpreter.NewHostFunctionValue(
+	return interpreter.NewStaticHostFunctionValue(
 		gauge,
 		internalEVMTypeRunFunctionType,
 		func(invocation interpreter.Invocation) interpreter.Value {
@@ -960,10 +1040,262 @@ func newInternalEVMTypeRunFunction(
 			// Run
 
 			cb := types.NewAddressFromBytes(coinbase)
-			handler.Run(transaction, cb)
+			result := handler.Run(transaction, cb)
 
-			return interpreter.Void
+			return NewResultValue(handler, gauge, inter, locationRange, result)
 		},
+	)
+}
+
+// dry run
+
+const internalEVMTypeDryRunFunctionName = "dryRun"
+
+var internalEVMTypeDryRunFunctionType = &sema.FunctionType{
+	Parameters: []sema.Parameter{
+		{
+			Label:          "tx",
+			TypeAnnotation: sema.NewTypeAnnotation(evmTransactionBytesType),
+		},
+		{
+			Label:          "from",
+			TypeAnnotation: sema.NewTypeAnnotation(evmAddressBytesType),
+		},
+	},
+	// Actually EVM.Result, but cannot refer to it here
+	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.AnyStructType),
+}
+
+func newInternalEVMTypeDryRunFunction(
+	gauge common.MemoryGauge,
+	handler types.ContractHandler,
+) *interpreter.HostFunctionValue {
+	return interpreter.NewStaticHostFunctionValue(
+		gauge,
+		internalEVMTypeDryRunFunctionType,
+		func(invocation interpreter.Invocation) interpreter.Value {
+			inter := invocation.Interpreter
+			locationRange := invocation.LocationRange
+
+			// Get transaction argument
+
+			transactionValue, ok := invocation.Arguments[0].(*interpreter.ArrayValue)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
+
+			transaction, err := interpreter.ByteArrayValueToByteSlice(inter, transactionValue, locationRange)
+			if err != nil {
+				panic(err)
+			}
+
+			// Get from argument
+
+			fromValue, ok := invocation.Arguments[1].(*interpreter.ArrayValue)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
+
+			from, err := interpreter.ByteArrayValueToByteSlice(inter, fromValue, locationRange)
+			if err != nil {
+				panic(err)
+			}
+
+			// call estimate
+
+			res := handler.DryRun(transaction, types.NewAddressFromBytes(from))
+			return NewResultValue(handler, gauge, inter, locationRange, res)
+		},
+	)
+}
+
+const internalEVMTypeBatchRunFunctionName = "batchRun"
+
+var internalEVMTypeBatchRunFunctionType = &sema.FunctionType{
+	Parameters: []sema.Parameter{
+		{
+			Label:          "txs",
+			TypeAnnotation: sema.NewTypeAnnotation(evmTransactionsBatchBytesType),
+		},
+		{
+			Label:          "coinbase",
+			TypeAnnotation: sema.NewTypeAnnotation(evmAddressBytesType),
+		},
+	},
+	// Actually [EVM.Result], but cannot refer to it here
+	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.NewVariableSizedType(nil, sema.AnyStructType)),
+}
+
+func newInternalEVMTypeBatchRunFunction(
+	gauge common.MemoryGauge,
+	handler types.ContractHandler,
+) *interpreter.HostFunctionValue {
+	return interpreter.NewStaticHostFunctionValue(
+		gauge,
+		internalEVMTypeBatchRunFunctionType,
+		func(invocation interpreter.Invocation) interpreter.Value {
+			inter := invocation.Interpreter
+			locationRange := invocation.LocationRange
+
+			// Get transactions batch argument
+
+			transactionsBatchValue, ok := invocation.Arguments[0].(*interpreter.ArrayValue)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
+
+			batchCount := transactionsBatchValue.Count()
+			var transactionBatch [][]byte
+			if batchCount > 0 {
+				transactionBatch = make([][]byte, batchCount)
+				i := 0
+				transactionsBatchValue.Iterate(inter, func(transactionValue interpreter.Value) (resume bool) {
+					t, err := interpreter.ByteArrayValueToByteSlice(inter, transactionValue, locationRange)
+					if err != nil {
+						panic(err)
+					}
+					transactionBatch[i] = t
+					i++
+					return true
+				}, false, locationRange)
+			}
+
+			// Get coinbase argument
+
+			coinbaseValue, ok := invocation.Arguments[1].(*interpreter.ArrayValue)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
+
+			coinbase, err := interpreter.ByteArrayValueToByteSlice(inter, coinbaseValue, locationRange)
+			if err != nil {
+				panic(err)
+			}
+
+			// Batch run
+
+			cb := types.NewAddressFromBytes(coinbase)
+			batchResults := handler.BatchRun(transactionBatch, cb)
+
+			values := newResultValues(handler, gauge, inter, locationRange, batchResults)
+
+			loc := common.NewAddressLocation(gauge, handler.EVMContractAddress(), ContractName)
+			evmResultType := interpreter.NewVariableSizedStaticType(
+				inter,
+				interpreter.NewCompositeStaticType(
+					nil,
+					loc,
+					evmResultTypeQualifiedIdentifier,
+					common.NewTypeIDFromQualifiedName(
+						nil,
+						loc,
+						evmResultTypeQualifiedIdentifier,
+					),
+				),
+			)
+
+			return interpreter.NewArrayValue(
+				inter,
+				locationRange,
+				evmResultType,
+				common.ZeroAddress,
+				values...,
+			)
+		},
+	)
+}
+
+// newResultValues converts batch run result summary type to cadence array of structs
+func newResultValues(
+	handler types.ContractHandler,
+	gauge common.MemoryGauge,
+	inter *interpreter.Interpreter,
+	locationRange interpreter.LocationRange,
+	results []*types.ResultSummary,
+) []interpreter.Value {
+	values := make([]interpreter.Value, 0)
+	for _, result := range results {
+		res := NewResultValue(handler, gauge, inter, locationRange, result)
+		values = append(values, res)
+	}
+	return values
+}
+
+func NewResultValue(
+	handler types.ContractHandler,
+	gauge common.MemoryGauge,
+	inter *interpreter.Interpreter,
+	locationRange interpreter.LocationRange,
+	result *types.ResultSummary,
+) *interpreter.CompositeValue {
+
+	evmContractLocation := common.NewAddressLocation(
+		gauge,
+		handler.EVMContractAddress(),
+		ContractName,
+	)
+
+	deployedContractAddress := result.DeployedContractAddress
+	deployedContractValue := interpreter.NilOptionalValue
+	if deployedContractAddress != nil {
+		deployedContractValue = interpreter.NewSomeValueNonCopying(
+			inter,
+			NewEVMAddress(
+				inter,
+				locationRange,
+				evmContractLocation,
+				*deployedContractAddress,
+			),
+		)
+	}
+
+	fields := []interpreter.CompositeField{
+		{
+			Name: "status",
+			Value: interpreter.NewEnumCaseValue(
+				inter,
+				locationRange,
+				&sema.CompositeType{
+					Location:   evmContractLocation,
+					Identifier: evmStatusTypeQualifiedIdentifier,
+					Kind:       common.CompositeKindEnum,
+				},
+				interpreter.NewUInt8Value(gauge, func() uint8 {
+					return uint8(result.Status)
+				}),
+				nil,
+			),
+		},
+		{
+			Name: "errorCode",
+			Value: interpreter.NewUInt64Value(gauge, func() uint64 {
+				return uint64(result.ErrorCode)
+			}),
+		},
+		{
+			Name: "gasUsed",
+			Value: interpreter.NewUInt64Value(gauge, func() uint64 {
+				return result.GasConsumed
+			}),
+		},
+		{
+			Name:  "data",
+			Value: interpreter.ByteSliceToByteArrayValue(inter, result.ReturnedValue),
+		},
+		{
+			Name:  "deployedContract",
+			Value: deployedContractValue,
+		},
+	}
+
+	return interpreter.NewCompositeValue(
+		inter,
+		locationRange,
+		evmContractLocation,
+		evmResultTypeQualifiedIdentifier,
+		common.CompositeKindStructure,
+		fields,
+		common.ZeroAddress,
 	)
 }
 
@@ -1012,10 +1344,11 @@ var internalEVMTypeCallFunctionType = &sema.FunctionType{
 		},
 		{
 			Label:          "value",
-			TypeAnnotation: sema.NewTypeAnnotation(sema.UFix64Type),
+			TypeAnnotation: sema.NewTypeAnnotation(sema.UIntType),
 		},
 	},
-	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.ByteArrayType),
+	// Actually EVM.Result, but cannot refer to it here
+	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.AnyStructType),
 }
 
 func AddressBytesArrayValueToEVMAddress(
@@ -1059,7 +1392,7 @@ func newInternalEVMTypeCallFunction(
 	gauge common.MemoryGauge,
 	handler types.ContractHandler,
 ) *interpreter.HostFunctionValue {
-	return interpreter.NewHostFunctionValue(
+	return interpreter.NewStaticHostFunctionValue(
 		gauge,
 		internalEVMTypeCallFunctionType,
 		func(invocation interpreter.Invocation) interpreter.Value {
@@ -1113,40 +1446,49 @@ func newInternalEVMTypeCallFunction(
 
 			// Get balance
 
-			balanceValue, ok := invocation.Arguments[4].(interpreter.UFix64Value)
+			balanceValue, ok := invocation.Arguments[4].(interpreter.UIntValue)
 			if !ok {
 				panic(errors.NewUnreachableError())
 			}
 
-			balance := types.Balance(balanceValue)
-
+			balance := types.NewBalance(balanceValue.BigInt)
 			// Call
 
 			const isAuthorized = true
 			account := handler.AccountByAddress(fromAddress, isAuthorized)
 			result := account.Call(toAddress, data, gasLimit, balance)
 
-			return interpreter.ByteSliceToByteArrayValue(inter, result)
+			return NewResultValue(handler, gauge, inter, locationRange, result)
 		},
 	)
 }
 
-const internalEVMTypeCreateBridgedAccountFunctionName = "createBridgedAccount"
+const internalEVMTypeCreateCadenceOwnedAccountFunctionName = "createCadenceOwnedAccount"
 
-var internalEVMTypeCreateBridgedAccountFunctionType = &sema.FunctionType{
+var internalEVMTypeCreateCadenceOwnedAccountFunctionType = &sema.FunctionType{
+	Parameters: []sema.Parameter{
+		{
+			Label:          "uuid",
+			TypeAnnotation: sema.NewTypeAnnotation(sema.UInt64Type),
+		},
+	},
 	ReturnTypeAnnotation: sema.NewTypeAnnotation(evmAddressBytesType),
 }
 
-func newInternalEVMTypeCreateBridgedAccountFunction(
+func newInternalEVMTypeCreateCadenceOwnedAccountFunction(
 	gauge common.MemoryGauge,
 	handler types.ContractHandler,
 ) *interpreter.HostFunctionValue {
-	return interpreter.NewHostFunctionValue(
+	return interpreter.NewStaticHostFunctionValue(
 		gauge,
-		internalEVMTypeCreateBridgedAccountFunctionType,
+		internalEVMTypeCreateCadenceOwnedAccountFunctionType,
 		func(invocation interpreter.Invocation) interpreter.Value {
 			inter := invocation.Interpreter
-			address := handler.AllocateAddress()
+			uuid, ok := invocation.Arguments[0].(interpreter.UInt64Value)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
+			address := handler.DeployCOA(uint64(uuid))
 			return EVMAddressToAddressBytesArrayValue(inter, address)
 		},
 	)
@@ -1174,7 +1516,7 @@ func newInternalEVMTypeDepositFunction(
 	gauge common.MemoryGauge,
 	handler types.ContractHandler,
 ) *interpreter.HostFunctionValue {
-	return interpreter.NewHostFunctionValue(
+	return interpreter.NewStaticHostFunctionValue(
 		gauge,
 		internalEVMTypeCallFunctionType,
 		func(invocation interpreter.Invocation) interpreter.Value {
@@ -1197,7 +1539,7 @@ func newInternalEVMTypeDepositFunction(
 				panic(errors.NewUnreachableError())
 			}
 
-			amount := types.Balance(amountValue)
+			amount := types.NewBalanceFromUFix64(cadence.UFix64(amountValue))
 
 			// Get to address
 
@@ -1230,13 +1572,14 @@ func newInternalEVMTypeDepositFunction(
 const internalEVMTypeBalanceFunctionName = "balance"
 
 var internalEVMTypeBalanceFunctionType = &sema.FunctionType{
+	Purity: sema.FunctionPurityView,
 	Parameters: []sema.Parameter{
 		{
 			Label:          "address",
 			TypeAnnotation: sema.NewTypeAnnotation(evmAddressBytesType),
 		},
 	},
-	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.UFix64Type),
+	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.UIntType),
 }
 
 // newInternalEVMTypeBalanceFunction returns the Flow balance of the account
@@ -1244,7 +1587,7 @@ func newInternalEVMTypeBalanceFunction(
 	gauge common.MemoryGauge,
 	handler types.ContractHandler,
 ) *interpreter.HostFunctionValue {
-	return interpreter.NewHostFunctionValue(
+	return interpreter.NewStaticHostFunctionValue(
 		gauge,
 		internalEVMTypeCallFunctionType,
 		func(invocation interpreter.Invocation) interpreter.Value {
@@ -1264,7 +1607,133 @@ func newInternalEVMTypeBalanceFunction(
 			const isAuthorized = false
 			account := handler.AccountByAddress(address, isAuthorized)
 
-			return interpreter.UFix64Value(account.Balance())
+			return interpreter.UIntValue{BigInt: account.Balance()}
+		},
+	)
+}
+
+const internalEVMTypeNonceFunctionName = "nonce"
+
+var internalEVMTypeNonceFunctionType = &sema.FunctionType{
+	Parameters: []sema.Parameter{
+		{
+			Label:          "address",
+			TypeAnnotation: sema.NewTypeAnnotation(evmAddressBytesType),
+		},
+	},
+	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.UInt64Type),
+}
+
+// newInternalEVMTypeNonceFunction returns the nonce of the account
+func newInternalEVMTypeNonceFunction(
+	gauge common.MemoryGauge,
+	handler types.ContractHandler,
+) *interpreter.HostFunctionValue {
+	return interpreter.NewStaticHostFunctionValue(
+		gauge,
+		internalEVMTypeCallFunctionType,
+		func(invocation interpreter.Invocation) interpreter.Value {
+			inter := invocation.Interpreter
+			locationRange := invocation.LocationRange
+
+			addressValue, ok := invocation.Arguments[0].(*interpreter.ArrayValue)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
+
+			address, err := AddressBytesArrayValueToEVMAddress(inter, locationRange, addressValue)
+			if err != nil {
+				panic(err)
+			}
+
+			const isAuthorized = false
+			account := handler.AccountByAddress(address, isAuthorized)
+
+			return interpreter.UInt64Value(account.Nonce())
+		},
+	)
+}
+
+const internalEVMTypeCodeFunctionName = "code"
+
+var internalEVMTypeCodeFunctionType = &sema.FunctionType{
+	Parameters: []sema.Parameter{
+		{
+			Label:          "address",
+			TypeAnnotation: sema.NewTypeAnnotation(evmAddressBytesType),
+		},
+	},
+	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.ByteArrayType),
+}
+
+// newInternalEVMTypeCodeFunction returns the code of the account
+func newInternalEVMTypeCodeFunction(
+	gauge common.MemoryGauge,
+	handler types.ContractHandler,
+) *interpreter.HostFunctionValue {
+	return interpreter.NewStaticHostFunctionValue(
+		gauge,
+		internalEVMTypeCallFunctionType,
+		func(invocation interpreter.Invocation) interpreter.Value {
+			inter := invocation.Interpreter
+			locationRange := invocation.LocationRange
+
+			addressValue, ok := invocation.Arguments[0].(*interpreter.ArrayValue)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
+
+			address, err := AddressBytesArrayValueToEVMAddress(inter, locationRange, addressValue)
+			if err != nil {
+				panic(err)
+			}
+
+			const isAuthorized = false
+			account := handler.AccountByAddress(address, isAuthorized)
+
+			return interpreter.ByteSliceToByteArrayValue(inter, account.Code())
+		},
+	)
+}
+
+const internalEVMTypeCodeHashFunctionName = "codeHash"
+
+var internalEVMTypeCodeHashFunctionType = &sema.FunctionType{
+	Parameters: []sema.Parameter{
+		{
+			Label:          "address",
+			TypeAnnotation: sema.NewTypeAnnotation(evmAddressBytesType),
+		},
+	},
+	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.ByteArrayType),
+}
+
+// newInternalEVMTypeCodeHashFunction returns the code hash of the account
+func newInternalEVMTypeCodeHashFunction(
+	gauge common.MemoryGauge,
+	handler types.ContractHandler,
+) *interpreter.HostFunctionValue {
+	return interpreter.NewStaticHostFunctionValue(
+		gauge,
+		internalEVMTypeCallFunctionType,
+		func(invocation interpreter.Invocation) interpreter.Value {
+			inter := invocation.Interpreter
+			locationRange := invocation.LocationRange
+
+			addressValue, ok := invocation.Arguments[0].(*interpreter.ArrayValue)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
+
+			address, err := AddressBytesArrayValueToEVMAddress(inter, locationRange, addressValue)
+			if err != nil {
+				panic(err)
+			}
+
+			const isAuthorized = false
+			account := handler.AccountByAddress(address, isAuthorized)
+
+			return interpreter.ByteSliceToByteArrayValue(inter, account.CodeHash())
 		},
 	)
 }
@@ -1279,7 +1748,7 @@ var internalEVMTypeWithdrawFunctionType = &sema.FunctionType{
 		},
 		{
 			Label:          "amount",
-			TypeAnnotation: sema.NewTypeAnnotation(sema.UFix64Type),
+			TypeAnnotation: sema.NewTypeAnnotation(sema.UIntType),
 		},
 	},
 	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.AnyResourceType),
@@ -1289,7 +1758,7 @@ func newInternalEVMTypeWithdrawFunction(
 	gauge common.MemoryGauge,
 	handler types.ContractHandler,
 ) *interpreter.HostFunctionValue {
-	return interpreter.NewHostFunctionValue(
+	return interpreter.NewStaticHostFunctionValue(
 		gauge,
 		internalEVMTypeCallFunctionType,
 		func(invocation interpreter.Invocation) interpreter.Value {
@@ -1310,18 +1779,26 @@ func newInternalEVMTypeWithdrawFunction(
 
 			// Get amount
 
-			amountValue, ok := invocation.Arguments[1].(interpreter.UFix64Value)
+			amountValue, ok := invocation.Arguments[1].(interpreter.UIntValue)
 			if !ok {
 				panic(errors.NewUnreachableError())
 			}
 
-			amount := types.Balance(amountValue)
+			amount := types.NewBalance(amountValue.BigInt)
 
 			// Withdraw
 
 			const isAuthorized = true
 			account := handler.AccountByAddress(fromAddress, isAuthorized)
 			vault := account.Withdraw(amount)
+
+			ufix, roundedOff, err := types.ConvertBalanceToUFix64(vault.Balance())
+			if err != nil {
+				panic(err)
+			}
+			if roundedOff {
+				panic(types.ErrWithdrawBalanceRounding)
+			}
 
 			// TODO: improve: maybe call actual constructor
 			return interpreter.NewCompositeValue(
@@ -1334,7 +1811,13 @@ func newInternalEVMTypeWithdrawFunction(
 					{
 						Name: "balance",
 						Value: interpreter.NewUFix64Value(gauge, func() uint64 {
-							return uint64(vault.Balance())
+							return uint64(ufix)
+						}),
+					},
+					{
+						Name: sema.ResourceUUIDFieldName,
+						Value: interpreter.NewUInt64Value(gauge, func() uint64 {
+							return handler.GenerateResourceUUID()
 						}),
 					},
 				},
@@ -1362,17 +1845,18 @@ var internalEVMTypeDeployFunctionType = &sema.FunctionType{
 		},
 		{
 			Label:          "value",
-			TypeAnnotation: sema.NewTypeAnnotation(sema.UFix64Type),
+			TypeAnnotation: sema.NewTypeAnnotation(sema.UIntType),
 		},
 	},
-	ReturnTypeAnnotation: sema.NewTypeAnnotation(evmAddressBytesType),
+	// Actually EVM.Result, but cannot refer to it here
+	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.AnyStructType),
 }
 
 func newInternalEVMTypeDeployFunction(
 	gauge common.MemoryGauge,
 	handler types.ContractHandler,
 ) *interpreter.HostFunctionValue {
-	return interpreter.NewHostFunctionValue(
+	return interpreter.NewStaticHostFunctionValue(
 		gauge,
 		internalEVMTypeCallFunctionType,
 		func(invocation interpreter.Invocation) interpreter.Value {
@@ -1414,21 +1898,165 @@ func newInternalEVMTypeDeployFunction(
 
 			// Get value
 
-			amountValue, ok := invocation.Arguments[3].(interpreter.UFix64Value)
+			amountValue, ok := invocation.Arguments[3].(interpreter.UIntValue)
 			if !ok {
 				panic(errors.NewUnreachableError())
 			}
 
-			amount := types.Balance(amountValue)
+			amount := types.NewBalance(amountValue.BigInt)
 
 			// Deploy
 
 			const isAuthorized = true
 			account := handler.AccountByAddress(fromAddress, isAuthorized)
-			address := account.Deploy(code, gasLimit, amount)
+			result := account.Deploy(code, gasLimit, amount)
 
-			return EVMAddressToAddressBytesArrayValue(inter, address)
+			res := NewResultValue(handler, gauge, inter, locationRange, result)
+			return res
 		},
+	)
+}
+
+const internalEVMTypeCastToAttoFLOWFunctionName = "castToAttoFLOW"
+
+var internalEVMTypeCastToAttoFLOWFunctionType = &sema.FunctionType{
+	Purity: sema.FunctionPurityView,
+	Parameters: []sema.Parameter{
+		{
+			Label:          "balance",
+			TypeAnnotation: sema.NewTypeAnnotation(sema.UFix64Type),
+		},
+	},
+	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.UIntType),
+}
+
+func newInternalEVMTypeCastToAttoFLOWFunction(
+	gauge common.MemoryGauge,
+) *interpreter.HostFunctionValue {
+	return interpreter.NewStaticHostFunctionValue(
+		gauge,
+		internalEVMTypeCallFunctionType,
+		func(invocation interpreter.Invocation) interpreter.Value {
+			balanceValue, ok := invocation.Arguments[0].(interpreter.UFix64Value)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
+			balance := types.NewBalanceFromUFix64(cadence.UFix64(balanceValue))
+			return interpreter.UIntValue{BigInt: balance}
+		},
+	)
+}
+
+const internalEVMTypeCastToFLOWFunctionName = "castToFLOW"
+
+var internalEVMTypeCastToFLOWFunctionType = &sema.FunctionType{
+	Purity: sema.FunctionPurityView,
+	Parameters: []sema.Parameter{
+		{
+			Label:          "balance",
+			TypeAnnotation: sema.NewTypeAnnotation(sema.UIntType),
+		},
+	},
+	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.UFix64Type),
+}
+
+func newInternalEVMTypeCastToFLOWFunction(
+	gauge common.MemoryGauge,
+) *interpreter.HostFunctionValue {
+	return interpreter.NewStaticHostFunctionValue(
+		gauge,
+		internalEVMTypeCallFunctionType,
+		func(invocation interpreter.Invocation) interpreter.Value {
+			balanceValue, ok := invocation.Arguments[0].(interpreter.UIntValue)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
+			balance := types.NewBalance(balanceValue.BigInt)
+			// ignoring the rounding error and let user handle it
+			v, _, err := types.ConvertBalanceToUFix64(balance)
+			if err != nil {
+				panic(err)
+			}
+			return interpreter.UFix64Value(v)
+		},
+	)
+}
+
+const internalEVMTypeGetLatestBlockFunctionName = "getLatestBlock"
+
+var internalEVMTypeGetLatestBlockFunctionType = &sema.FunctionType{
+	Parameters: []sema.Parameter{},
+	// Actually EVM.Block, but cannot refer to it here
+	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.AnyStructType),
+}
+
+func newInternalEVMTypeGetLatestBlockFunction(
+	gauge common.MemoryGauge,
+	handler types.ContractHandler,
+) *interpreter.HostFunctionValue {
+	return interpreter.NewStaticHostFunctionValue(
+		gauge,
+		internalEVMTypeCallFunctionType,
+		func(invocation interpreter.Invocation) interpreter.Value {
+			inter := invocation.Interpreter
+			locationRange := invocation.LocationRange
+
+			latestBlock := handler.LastExecutedBlock()
+			return NewEVMBlockValue(handler, gauge, inter, locationRange, latestBlock)
+		},
+	)
+}
+
+func NewEVMBlockValue(
+	handler types.ContractHandler,
+	gauge common.MemoryGauge,
+	inter *interpreter.Interpreter,
+	locationRange interpreter.LocationRange,
+	block *types.Block,
+) *interpreter.CompositeValue {
+	loc := common.NewAddressLocation(gauge, handler.EVMContractAddress(), ContractName)
+	hash, err := block.Hash()
+	if err != nil {
+		panic(err)
+	}
+
+	return interpreter.NewCompositeValue(
+		inter,
+		locationRange,
+		loc,
+		evmBlockTypeQualifiedIdentifier,
+		common.CompositeKindStructure,
+		[]interpreter.CompositeField{
+			{
+				Name:  "height",
+				Value: interpreter.UInt64Value(block.Height),
+			},
+			{
+				Name: "hash",
+				Value: interpreter.NewStringValue(
+					inter,
+					common.NewStringMemoryUsage(len(hash)),
+					func() string {
+						return hash.Hex()
+					},
+				),
+			},
+			{
+				Name: "totalSupply",
+				Value: interpreter.NewIntValueFromBigInt(
+					inter,
+					common.NewBigIntMemoryUsage(common.BigIntByteLength(block.TotalSupply)),
+					func() *big.Int {
+						return block.TotalSupply
+					},
+				),
+			},
+			{
+				Name:  "timestamp",
+				Value: interpreter.UInt64Value(block.Timestamp),
+			},
+		},
+		common.ZeroAddress,
 	)
 }
 
@@ -1443,15 +2071,23 @@ func NewInternalEVMContractValue(
 		internalEVMContractStaticType,
 		InternalEVMContractType.Fields,
 		map[string]interpreter.Value{
-			internalEVMTypeRunFunctionName:                  newInternalEVMTypeRunFunction(gauge, handler),
-			internalEVMTypeCreateBridgedAccountFunctionName: newInternalEVMTypeCreateBridgedAccountFunction(gauge, handler),
-			internalEVMTypeCallFunctionName:                 newInternalEVMTypeCallFunction(gauge, handler),
-			internalEVMTypeDepositFunctionName:              newInternalEVMTypeDepositFunction(gauge, handler),
-			internalEVMTypeWithdrawFunctionName:             newInternalEVMTypeWithdrawFunction(gauge, handler),
-			internalEVMTypeDeployFunctionName:               newInternalEVMTypeDeployFunction(gauge, handler),
-			internalEVMTypeBalanceFunctionName:              newInternalEVMTypeBalanceFunction(gauge, handler),
-			internalEVMTypeEncodeABIFunctionName:            newInternalEVMTypeEncodeABIFunction(gauge, location),
-			internalEVMTypeDecodeABIFunctionName:            newInternalEVMTypeDecodeABIFunction(gauge, location),
+			internalEVMTypeRunFunctionName:                       newInternalEVMTypeRunFunction(gauge, handler),
+			internalEVMTypeBatchRunFunctionName:                  newInternalEVMTypeBatchRunFunction(gauge, handler),
+			internalEVMTypeCreateCadenceOwnedAccountFunctionName: newInternalEVMTypeCreateCadenceOwnedAccountFunction(gauge, handler),
+			internalEVMTypeCallFunctionName:                      newInternalEVMTypeCallFunction(gauge, handler),
+			internalEVMTypeDepositFunctionName:                   newInternalEVMTypeDepositFunction(gauge, handler),
+			internalEVMTypeWithdrawFunctionName:                  newInternalEVMTypeWithdrawFunction(gauge, handler),
+			internalEVMTypeDeployFunctionName:                    newInternalEVMTypeDeployFunction(gauge, handler),
+			internalEVMTypeBalanceFunctionName:                   newInternalEVMTypeBalanceFunction(gauge, handler),
+			internalEVMTypeNonceFunctionName:                     newInternalEVMTypeNonceFunction(gauge, handler),
+			internalEVMTypeCodeFunctionName:                      newInternalEVMTypeCodeFunction(gauge, handler),
+			internalEVMTypeCodeHashFunctionName:                  newInternalEVMTypeCodeHashFunction(gauge, handler),
+			internalEVMTypeEncodeABIFunctionName:                 newInternalEVMTypeEncodeABIFunction(gauge, location),
+			internalEVMTypeDecodeABIFunctionName:                 newInternalEVMTypeDecodeABIFunction(gauge, location),
+			internalEVMTypeCastToAttoFLOWFunctionName:            newInternalEVMTypeCastToAttoFLOWFunction(gauge),
+			internalEVMTypeCastToFLOWFunctionName:                newInternalEVMTypeCastToFLOWFunction(gauge),
+			internalEVMTypeGetLatestBlockFunctionName:            newInternalEVMTypeGetLatestBlockFunction(gauge, handler),
+			internalEVMTypeDryRunFunctionName:                    newInternalEVMTypeDryRunFunction(gauge, handler),
 		},
 		nil,
 		nil,
@@ -1476,8 +2112,20 @@ var InternalEVMContractType = func() *sema.CompositeType {
 		),
 		sema.NewUnmeteredPublicFunctionMember(
 			ty,
-			internalEVMTypeCreateBridgedAccountFunctionName,
-			internalEVMTypeCreateBridgedAccountFunctionType,
+			internalEVMTypeDryRunFunctionName,
+			internalEVMTypeDryRunFunctionType,
+			"",
+		),
+		sema.NewUnmeteredPublicFunctionMember(
+			ty,
+			internalEVMTypeBatchRunFunctionName,
+			internalEVMTypeBatchRunFunctionType,
+			"",
+		),
+		sema.NewUnmeteredPublicFunctionMember(
+			ty,
+			internalEVMTypeCreateCadenceOwnedAccountFunctionName,
+			internalEVMTypeCreateCadenceOwnedAccountFunctionType,
 			"",
 		),
 		sema.NewUnmeteredPublicFunctionMember(
@@ -1506,8 +2154,38 @@ var InternalEVMContractType = func() *sema.CompositeType {
 		),
 		sema.NewUnmeteredPublicFunctionMember(
 			ty,
+			internalEVMTypeCastToAttoFLOWFunctionName,
+			internalEVMTypeCastToAttoFLOWFunctionType,
+			"",
+		),
+		sema.NewUnmeteredPublicFunctionMember(
+			ty,
+			internalEVMTypeCastToFLOWFunctionName,
+			internalEVMTypeCastToFLOWFunctionType,
+			"",
+		),
+		sema.NewUnmeteredPublicFunctionMember(
+			ty,
 			internalEVMTypeBalanceFunctionName,
 			internalEVMTypeBalanceFunctionType,
+			"",
+		),
+		sema.NewUnmeteredPublicFunctionMember(
+			ty,
+			internalEVMTypeNonceFunctionName,
+			internalEVMTypeNonceFunctionType,
+			"",
+		),
+		sema.NewUnmeteredPublicFunctionMember(
+			ty,
+			internalEVMTypeCodeFunctionName,
+			internalEVMTypeCodeFunctionType,
+			"",
+		),
+		sema.NewUnmeteredPublicFunctionMember(
+			ty,
+			internalEVMTypeCodeHashFunctionName,
+			internalEVMTypeCodeHashFunctionType,
 			"",
 		),
 		sema.NewUnmeteredPublicFunctionMember(
@@ -1520,6 +2198,12 @@ var InternalEVMContractType = func() *sema.CompositeType {
 			ty,
 			internalEVMTypeDecodeABIFunctionName,
 			internalEVMTypeDecodeABIFunctionType,
+			"",
+		),
+		sema.NewUnmeteredPublicFunctionMember(
+			ty,
+			internalEVMTypeGetLatestBlockFunctionName,
+			internalEVMTypeGetLatestBlockFunctionType,
 			"",
 		),
 	})
@@ -1550,8 +2234,12 @@ var internalEVMStandardLibraryType = stdlib.StandardLibraryType{
 	Kind: common.DeclarationKindContract,
 }
 
-func SetupEnvironment(env runtime.Environment, handler types.ContractHandler, service flow.Address) {
-	location := common.NewAddressLocation(nil, common.Address(service), ContractName)
+func SetupEnvironment(
+	env runtime.Environment,
+	handler types.ContractHandler,
+	contractAddress flow.Address,
+) {
+	location := common.NewAddressLocation(nil, common.Address(contractAddress), ContractName)
 
 	env.DeclareType(
 		internalEVMStandardLibraryType,
@@ -1580,11 +2268,120 @@ func NewEVMAddressCadenceType(address common.Address) *cadence.StructType {
 func NewBalanceCadenceType(address common.Address) *cadence.StructType {
 	return cadence.NewStructType(
 		common.NewAddressLocation(nil, address, ContractName),
-		"EVM.Balance",
+		evmBalanceTypeQualifiedIdentifier,
 		[]cadence.Field{
 			{
-				Identifier: "flow",
-				Type:       cadence.UFix64Type{},
+				Identifier: "attoflow",
+				Type:       cadence.UIntType,
+			},
+		},
+		nil,
+	)
+}
+
+func ResultSummaryFromEVMResultValue(val cadence.Value) (*types.ResultSummary, error) {
+	str, ok := val.(cadence.Struct)
+	if !ok {
+		return nil, fmt.Errorf("invalid input: unexpected value type")
+	}
+
+	fields := cadence.FieldsMappedByName(str)
+
+	const expectedFieldCount = 5
+	if len(fields) != expectedFieldCount {
+		return nil, fmt.Errorf(
+			"invalid input: field count mismatch: expected %d, got %d",
+			expectedFieldCount,
+			len(fields),
+		)
+	}
+
+	statusEnum, ok := fields[evmResultTypeStatusFieldName].(cadence.Enum)
+	if !ok {
+		return nil, fmt.Errorf("invalid input: unexpected type for status field")
+	}
+
+	status, ok := cadence.FieldsMappedByName(statusEnum)[sema.EnumRawValueFieldName].(cadence.UInt8)
+	if !ok {
+		return nil, fmt.Errorf("invalid input: unexpected type for status field")
+	}
+
+	errorCode, ok := fields[evmResultTypeErrorCodeFieldName].(cadence.UInt64)
+	if !ok {
+		return nil, fmt.Errorf("invalid input: unexpected type for error code field")
+	}
+
+	gasUsed, ok := fields[evmResultTypeGasUsedFieldName].(cadence.UInt64)
+	if !ok {
+		return nil, fmt.Errorf("invalid input: unexpected type for gas field")
+	}
+
+	data, ok := fields[evmResultTypeDataFieldName].(cadence.Array)
+	if !ok {
+		return nil, fmt.Errorf("invalid input: unexpected type for data field")
+	}
+
+	convertedData := make([]byte, len(data.Values))
+	for i, value := range data.Values {
+		convertedData[i] = byte(value.(cadence.UInt8))
+	}
+
+	var convertedDeployedAddress *types.Address
+
+	deployedAddressField, ok := fields[evmResultTypeDeployedContractFieldName].(cadence.Optional)
+	if !ok {
+		return nil, fmt.Errorf("invalid input: unexpected type for deployed contract field")
+	}
+
+	if deployedAddressField.Value != nil {
+		evmAddress, ok := deployedAddressField.Value.(cadence.Struct)
+		if !ok {
+			return nil, fmt.Errorf("invalid input: unexpected type for deployed contract field")
+		}
+
+		bytes, ok := cadence.SearchFieldByName(evmAddress, evmAddressTypeBytesFieldName).(cadence.Array)
+		if !ok {
+			return nil, fmt.Errorf("invalid input: unexpected type for deployed contract field")
+		}
+
+		convertedAddress := make([]byte, len(bytes.Values))
+		for i, value := range bytes.Values {
+			convertedAddress[i] = byte(value.(cadence.UInt8))
+		}
+		addr := types.Address(convertedAddress)
+		convertedDeployedAddress = &addr
+	}
+
+	return &types.ResultSummary{
+		Status:                  types.Status(status),
+		ErrorCode:               types.ErrorCode(errorCode),
+		GasConsumed:             uint64(gasUsed),
+		ReturnedValue:           convertedData,
+		DeployedContractAddress: convertedDeployedAddress,
+	}, nil
+
+}
+
+func NewEVMBlockCadenceType(address common.Address) *cadence.StructType {
+	return cadence.NewStructType(
+		common.NewAddressLocation(nil, address, ContractName),
+		evmBlockTypeQualifiedIdentifier,
+		[]cadence.Field{
+			{
+				Identifier: "height",
+				Type:       cadence.UInt64Type,
+			},
+			{
+				Identifier: "hash",
+				Type:       cadence.StringType,
+			},
+			{
+				Identifier: "totalSupply",
+				Type:       cadence.IntType,
+			},
+			{
+				Identifier: "timestamp",
+				Type:       cadence.UInt64Type,
 			},
 		},
 		nil,

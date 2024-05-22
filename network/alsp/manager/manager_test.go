@@ -1602,7 +1602,7 @@ func TestDecayMisbehaviorPenalty_DecayToZero_AllowListing(t *testing.T) {
 
 	// simulates a disallow-listed peer in cache.
 	originId := unittest.IdentifierFixture()
-	penalty, err := cache.Adjust(originId, func(record model.ProtocolSpamRecord) (model.ProtocolSpamRecord, error) {
+	penalty, err := cache.AdjustWithInit(originId, func(record model.ProtocolSpamRecord) (model.ProtocolSpamRecord, error) {
 		record.Penalty = -10 // set the penalty to -10 to simulate that the penalty has already been decayed for a while.
 		record.CutoffCounter = 1
 		record.DisallowListed = true

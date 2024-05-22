@@ -27,7 +27,7 @@ func IdentifierCanonical(id1 Identifier, id2 Identifier) int {
 	return bytes.Compare(id1[:], id2[:])
 }
 
-// IsCanonical returns true if and only if the given identifiers are in canonical order.
+// IsIdentifierCanonical returns true if and only if the given identifiers are in canonical order.
 //
 // By convention, two identifiers (i1, i2) are in canonical order if i1's bytes
 // are lexicographically _strictly_ smaller than i2's bytes.
@@ -38,7 +38,7 @@ func IsIdentifierCanonical(i1, i2 Identifier) bool {
 	return IdentifierCanonical(i1, i2) < 0
 }
 
-// IsIdentityListCanonical returns true if and only if the given list is
+// IsIdentifierListCanonical returns true if and only if the given list is
 // _strictly_ sorted with regards to the canonical order.
 //
 // The strictness is important here, meaning that a list with 2 equal identifiers

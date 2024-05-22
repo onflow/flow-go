@@ -5,6 +5,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 	unicastcache "github.com/onflow/flow-go/network/p2p/unicast/cache"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -20,12 +21,13 @@ func TestUnicastConfigEntity(t *testing.T) {
 			StreamCreationRetryAttemptBudget: 20,
 			ConsecutiveSuccessfulStream:      30,
 		},
+		EntityId: flow.MakeID(peerID),
 	}
 
 	t.Run(
 		"Test ID and Checksum", func(t *testing.T) {
 			// id and checksum methods must return the same value as expected.
-			expectedID := unicastcache.PeerIdToFlowId(peerID)
+			expectedID := flow.MakeID(peerID)
 			require.Equal(t, expectedID, d.ID())
 			require.Equal(t, expectedID, d.Checksum())
 
@@ -36,9 +38,11 @@ func TestUnicastConfigEntity(t *testing.T) {
 	)
 
 	t.Run("ID is only calculated from peer.ID", func(t *testing.T) {
+		peerId := unittest.PeerIdFixture(t)
 		d2 := &unicastcache.UnicastConfigEntity{
-			PeerId: unittest.PeerIdFixture(t),
-			Config: d.Config,
+			PeerId:   peerId,
+			Config:   d.Config,
+			EntityId: flow.MakeID(peerId),
 		}
 		require.NotEqual(t, d.ID(), d2.ID()) // different peer id, different id.
 
@@ -47,6 +51,7 @@ func TestUnicastConfigEntity(t *testing.T) {
 			Config: unicast.Config{
 				StreamCreationRetryAttemptBudget: 200,
 			},
+			EntityId: d.EntityId,
 		}
 		require.Equal(t, d.ID(), d3.ID()) // same peer id, same id, even though the unicast config is different.
 	})

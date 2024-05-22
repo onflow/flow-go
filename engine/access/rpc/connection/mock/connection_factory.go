@@ -5,7 +5,7 @@ package mock
 import (
 	access "github.com/onflow/flow/protobuf/go/flow/access"
 
-	crypto "github.com/onflow/flow-go/crypto"
+	crypto "github.com/onflow/crypto"
 
 	execution "github.com/onflow/flow/protobuf/go/flow/execution"
 

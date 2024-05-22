@@ -1,5 +1,3 @@
-// (c) 2021 Dapper Labs - ALL RIGHTS RESERVED
-
 package sealing
 
 import (
@@ -9,11 +7,11 @@ import (
 	"time"
 
 	"github.com/gammazero/workerpool"
+	"github.com/onflow/crypto/hash"
 	"github.com/rs/zerolog"
 	"go.opentelemetry.io/otel/attribute"
 	otelTrace "go.opentelemetry.io/otel/trace"
 
-	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/consensus"
 	"github.com/onflow/flow-go/engine/consensus/approvals"
@@ -137,10 +135,7 @@ func (c *Core) RepopulateAssignmentCollectorTree(payloads storage.Payloads) erro
 
 	// Get the root block of our local state - we allow references to unknown
 	// blocks below the root height
-	rootHeader, err := c.state.Params().FinalizedRoot()
-	if err != nil {
-		return fmt.Errorf("could not retrieve root header: %w", err)
-	}
+	rootHeader := c.state.Params().FinalizedRoot()
 
 	// Determine the list of unknown blocks referenced within the sealing segment
 	// if we are initializing with a latest sealed block below the root height

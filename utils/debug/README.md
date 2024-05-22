@@ -31,7 +31,7 @@ func TestDebugger_RunTransaction(t *testing.T) {
 	const scriptTemplate = `
 	import FlowServiceAccount from 0x%s
 	transaction() {
-		prepare(signer: AuthAccount) {
+		prepare(signer: &Account) {
 			log(signer.balance)
 		}
 	  }
@@ -39,7 +39,7 @@ func TestDebugger_RunTransaction(t *testing.T) {
 
 	script := []byte(fmt.Sprintf(scriptTemplate, chain.ServiceAddress()))
 	txBody := flow.NewTransactionBody().
-		SetGasLimit(9999).
+		SetComputeLimit(9999).
 		SetScript([]byte(script)).
 		SetPayer(chain.ServiceAddress()).
 		SetProposalKey(chain.ServiceAddress(), 0, 0)

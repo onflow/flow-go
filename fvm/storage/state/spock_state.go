@@ -4,7 +4,8 @@ import (
 	"encoding/binary"
 	"fmt"
 
-	"github.com/onflow/flow-go/crypto/hash"
+	"github.com/onflow/crypto/hash"
+
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -23,6 +24,8 @@ type spockState struct {
 
 	spockSecretHasher hash.Hasher
 
+	getHasher func() hash.Hasher
+
 	// NOTE: spockState is no longer accessible once Finalize is called.  We
 	// can't support access after Finalize since spockSecretHasher.SumHash is
 	// not idempotent.  Repeated calls to SumHash (without modifying the input)
@@ -30,17 +33,26 @@ type spockState struct {
 	finalizedSpockSecret []byte
 }
 
-func newSpockState(base snapshot.StorageSnapshot) *spockState {
+// DefaultSpockSecretHasher returns a new SHA3_256 hasher
+var DefaultSpockSecretHasher = func() hash.Hasher {
+	return hash.NewSHA3_256()
+}
+
+// NewSpockState creates a new spock state
+// getHasher will be called to create a new hasher for the spock state and each child state
+func newSpockState(base snapshot.StorageSnapshot, getHasher func() hash.Hasher) *spockState {
 	return &spockState{
 		storageState:      newStorageState(base),
-		spockSecretHasher: hash.NewSHA3_256(),
+		spockSecretHasher: getHasher(),
+		getHasher:         getHasher,
 	}
 }
 
 func (state *spockState) NewChild() *spockState {
 	return &spockState{
 		storageState:      state.storageState.NewChild(),
-		spockSecretHasher: hash.NewSHA3_256(),
+		spockSecretHasher: state.getHasher(),
+		getHasher:         state.getHasher,
 	}
 }
 

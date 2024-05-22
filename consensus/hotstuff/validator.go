@@ -31,5 +31,5 @@ type Validator interface {
 	// the following errors are expected:
 	//  * model.InvalidVoteError for invalid votes
 	//  * model.ErrViewForUnknownEpoch if the vote refers unknown epoch
-	ValidateVote(vote *model.Vote) (*flow.Identity, error)
+	ValidateVote(vote *model.Vote) (*flow.IdentitySkeleton, error)
 }

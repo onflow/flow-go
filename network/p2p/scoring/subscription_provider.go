@@ -134,7 +134,7 @@ func (s *SubscriptionProvider) updateTopics() error {
 				continue
 			}
 
-			updatedTopics, err := s.cache.AddTopicForPeer(p, topic)
+			updatedTopics, err := s.cache.AddWithInitTopicForPeer(p, topic)
 			if err != nil {
 				// this is an irrecoverable error; hence, we crash the node.
 				return fmt.Errorf("failed to update topics for peer %s: %w", p, err)

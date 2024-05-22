@@ -2,20 +2,17 @@ package cmd
 
 import (
 	"encoding/hex"
+	"time"
 
 	"github.com/onflow/flow-go/cmd/bootstrap/run"
-	"github.com/onflow/flow-go/model/dkg"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/signature"
 )
 
 func constructRootResultAndSeal(
 	rootCommit string,
 	block *flow.Block,
-	participants flow.IdentityList,
-	assignments flow.AssignmentList,
-	clusterQCs []*flow.QuorumCertificate,
-	dkgData dkg.DKGData,
+	epochSetup *flow.EpochSetup,
+	epochCommit *flow.EpochCommit,
 ) (*flow.ExecutionResult, *flow.Seal) {
 
 	stateCommitBytes, err := hex.DecodeString(rootCommit)
@@ -30,41 +27,6 @@ func constructRootResultAndSeal(
 			Msg("root state commitment has incompatible length")
 	}
 
-	firstView := block.Header.View
-	epochSetup := &flow.EpochSetup{
-		Counter:            flagEpochCounter,
-		FirstView:          firstView,
-		FinalView:          firstView + flagNumViewsInEpoch - 1,
-		DKGPhase1FinalView: firstView + flagNumViewsInStakingAuction + flagNumViewsInDKGPhase - 1,
-		DKGPhase2FinalView: firstView + flagNumViewsInStakingAuction + flagNumViewsInDKGPhase*2 - 1,
-		DKGPhase3FinalView: firstView + flagNumViewsInStakingAuction + flagNumViewsInDKGPhase*3 - 1,
-		Participants:       participants.Sort(flow.Canonical),
-		Assignments:        assignments,
-		RandomSource:       GenerateRandomSeed(flow.EpochSetupRandomSourceLength),
-	}
-
-	qcsWithSignerIDs := make([]*flow.QuorumCertificateWithSignerIDs, 0, len(clusterQCs))
-	for i, clusterQC := range clusterQCs {
-		members := assignments[i]
-		signerIDs, err := signature.DecodeSignerIndicesToIdentifiers(members, clusterQC.SignerIndices)
-		if err != nil {
-			log.Fatal().Err(err).Msgf("could not decode signer IDs from clusterQC at index %v", i)
-		}
-		qcsWithSignerIDs = append(qcsWithSignerIDs, &flow.QuorumCertificateWithSignerIDs{
-			View:      clusterQC.View,
-			BlockID:   clusterQC.BlockID,
-			SignerIDs: signerIDs,
-			SigData:   clusterQC.SigData,
-		})
-	}
-
-	epochCommit := &flow.EpochCommit{
-		Counter:            flagEpochCounter,
-		ClusterQCs:         flow.ClusterQCVoteDatasFromQCs(qcsWithSignerIDs),
-		DKGGroupKey:        dkgData.PubGroupKey,
-		DKGParticipantKeys: dkgData.PubKeyShares,
-	}
-
 	result := run.GenerateRootResult(block, stateCommit, epochSetup, epochCommit)
 	seal, err := run.GenerateRootSeal(result)
 	if err != nil {
@@ -76,4 +38,23 @@ func constructRootResultAndSeal(
 	}
 
 	return result, seal
+}
+
+// rootEpochTargetEndTime computes the target end time for the given epoch, using the given config.
+// CAUTION: the variables `flagEpochTimingRefCounter`, `flagEpochTimingDuration`, and
+// `flagEpochTimingRefTimestamp` must contain proper values. You can either specify a value for
+// each config parameter or use the function `validateOrPopulateEpochTimingConfig()` to populate the variables
+// from defaults.
+func rootEpochTargetEndTime() uint64 {
+	if flagEpochTimingRefTimestamp == 0 || flagEpochTimingDuration == 0 {
+		panic("invalid epoch timing config: must specify ALL of --epoch-target-end-time-ref-counter, --epoch-target-end-time-ref-timestamp, and --epoch-target-end-time-duration")
+	}
+	if flagEpochCounter < flagEpochTimingRefCounter {
+		panic("invalid epoch timing config: reference epoch counter must be less than or equal to root epoch counter")
+	}
+	targetEndTime := flagEpochTimingRefTimestamp + (flagEpochCounter-flagEpochTimingRefCounter)*flagEpochTimingDuration
+	if targetEndTime <= uint64(time.Now().Unix()) {
+		panic("sanity check failed: root epoch target end time is before current time")
+	}
+	return targetEndTime
 }

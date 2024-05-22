@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/state/protocol"
@@ -274,13 +275,8 @@ func authorizedAsVerification(state protocol.State, blockID flow.Identifier, ide
 		return false, fmt.Errorf("node has an invalid role. expected: %s, got: %s", flow.RoleVerification, identity.Role)
 	}
 
-	// checks identity has not been ejected
-	if identity.Ejected {
-		return false, nil
-	}
-
-	// checks identity has weight
-	if identity.Weight == 0 {
+	// checks identity is an active epoch participant with positive weight
+	if !filter.IsValidCurrentEpochParticipant(identity) || identity.InitialWeight == 0 {
 		return false, nil
 	}
 

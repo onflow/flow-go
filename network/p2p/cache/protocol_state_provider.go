@@ -141,7 +141,7 @@ func (p *ProtocolStateIDCache) update(blockID flow.Identifier) {
 // protocol that pass the provided filter. Caution, this includes ejected nodes.
 // Please check the `Ejected` flag in the identities (or provide a filter for
 // removing ejected nodes).
-func (p *ProtocolStateIDCache) Identities(filter flow.IdentityFilter) flow.IdentityList {
+func (p *ProtocolStateIDCache) Identities(filter flow.IdentityFilter[flow.Identity]) flow.IdentityList {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 	return p.identities.Filter(filter)

@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
+	blockstore "github.com/ipfs/boxo/blockstore"
 	"github.com/ipfs/go-datastore"
 	dssync "github.com/ipfs/go-datastore/sync"
-	blockstore "github.com/ipfs/go-ipfs-blockstore"
 	"github.com/onflow/cadence/runtime"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
@@ -307,7 +307,7 @@ func createTokenTransferTransaction(b *testing.B, accs *testAccounts) *flow.Tran
 
 	tx := testutil.CreateTokenTransferTransaction(chain, 1, dst.address, src.address)
 	tx.SetProposalKey(chain.ServiceAddress(), 0, accs.seq).
-		SetGasLimit(1000).
+		SetComputeLimit(1000).
 		SetPayer(chain.ServiceAddress())
 	accs.seq++
 

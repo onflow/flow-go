@@ -2,7 +2,7 @@ package tracer_test
 
 import (
 	"context"
-	"os"
+	"io"
 	"testing"
 	"time"
 
@@ -61,7 +61,7 @@ func TestGossipSubMeshTracer(t *testing.T) {
 			}
 		}
 	})
-	logger := zerolog.New(os.Stdout).Level(zerolog.DebugLevel).Hook(hook)
+	logger := zerolog.New(io.Discard).Level(zerolog.DebugLevel).Hook(hook)
 
 	// creates one node with a gossipsub mesh meshTracer, and the other nodes without a gossipsub mesh meshTracer.
 	// we only need one node with a meshTracer to test the meshTracer.
@@ -74,6 +74,8 @@ func TestGossipSubMeshTracer(t *testing.T) {
 	defaultConfig.NetworkConfig.GossipSub.RpcTracer.LocalMeshLogInterval = 1 * time.Second
 	// disables peer scoring for sake of testing; so that unknown peers are not penalized and could be detected by the meshTracer.
 	defaultConfig.NetworkConfig.GossipSub.PeerScoringEnabled = false
+	// disables rejection of RPC's from unstaked peer so that unknown peers could be detected bu the meshTracer
+	defaultConfig.NetworkConfig.GossipSub.RpcInspector.Validation.InspectionProcess.Inspect.RejectUnstakedPeers = false
 	tracerNode, tracerId := p2ptest.NodeFixture(
 		t,
 		sporkId,

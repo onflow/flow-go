@@ -11,7 +11,6 @@ type All struct {
 	QuorumCertificates      QuorumCertificates
 	Setups                  EpochSetups
 	EpochCommits            EpochCommits
-	Statuses                EpochStatuses
 	Results                 ExecutionResults
 	Receipts                ExecutionReceipts
 	ChunkDataPacks          ChunkDataPacks
@@ -21,6 +20,8 @@ type All struct {
 	TransactionResults      TransactionResults
 	Collections             Collections
 	Events                  Events
+	EpochProtocolState      ProtocolState
+	ProtocolKVStore         ProtocolKVStore
 	VersionBeacons          VersionBeacons
 	RegisterIndex           RegisterIndex
 }

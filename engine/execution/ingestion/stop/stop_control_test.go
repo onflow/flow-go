@@ -47,7 +47,7 @@ func TestCannotSetNewValuesAfterStoppingCommenced(t *testing.T) {
 
 		// no stopping has started yet, block below stop height
 		header := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(20))
-		require.True(t, sc.ShouldExecuteBlock(header))
+		require.True(t, sc.ShouldExecuteBlock(header.ID(), header.Height))
 
 		stop2 := StopParameters{StopBeforeHeight: 37}
 		err = sc.SetStopParameters(stop2)
@@ -55,7 +55,7 @@ func TestCannotSetNewValuesAfterStoppingCommenced(t *testing.T) {
 
 		// block at stop height, it should be skipped
 		header = unittest.BlockHeaderFixture(unittest.WithHeaderHeight(37))
-		require.False(t, sc.ShouldExecuteBlock(header))
+		require.False(t, sc.ShouldExecuteBlock(header.ID(), header.Height))
 
 		// cannot set new stop height after stopping has started
 		err = sc.SetStopParameters(StopParameters{StopBeforeHeight: 2137})
@@ -865,4 +865,11 @@ func Test_StopControlWorkers(t *testing.T) {
 func TestPatchedVersion(t *testing.T) {
 	require.True(t, semver.New("0.31.20").LessThan(*semver.New("0.31.21")))
 	require.True(t, semver.New("0.31.20-patch.1").LessThan(*semver.New("0.31.20"))) // be careful with this one
+	require.True(t, semver.New("0.31.20-without-adx").LessThan(*semver.New("0.31.20")))
+
+	// a special build created with "+" would not change the version priority for standard and pre-release versions
+	require.True(t, semver.New("0.31.20+without-adx").Equal(*semver.New("0.31.20")))
+	require.True(t, semver.New("0.31.20-patch.1+without-adx").Equal(*semver.New("0.31.20-patch.1")))
+	require.True(t, semver.New("0.31.20+without-netgo-without-adx").Equal(*semver.New("0.31.20")))
+	require.True(t, semver.New("0.31.20+arm").Equal(*semver.New("0.31.20")))
 }

@@ -197,7 +197,7 @@ func (h *handler) ExecuteScriptAtBlockID(
 		return nil, status.Errorf(codes.Internal, "state commitment for block ID %s could not be retrieved", blockID)
 	}
 
-	value, err := h.engine.ExecuteScriptAtBlockID(ctx, req.GetScript(), req.GetArguments(), blockID)
+	value, compUsage, err := h.engine.ExecuteScriptAtBlockID(ctx, req.GetScript(), req.GetArguments(), blockID)
 	if err != nil {
 		// todo check the error code instead
 		// return code 3 as this passes the litmus test in our context
@@ -205,7 +205,8 @@ func (h *handler) ExecuteScriptAtBlockID(
 	}
 
 	res := &execution.ExecuteScriptAtBlockIDResponse{
-		Value: value,
+		Value:            value,
+		ComputationUsage: compUsage,
 	}
 
 	return res, nil
@@ -269,10 +270,19 @@ func (h *handler) GetEventsForBlockIDs(
 			return nil, status.Errorf(codes.Internal, "state commitment for block ID %s could not be retrieved", bID)
 		}
 
-		// lookup events
-		blockEvents, err := h.events.ByBlockIDEventType(bID, flow.EventType(eType))
+		// lookup all events for the block
+		blockAllEvents, err := h.getEventsByBlockID(bID)
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "failed to get events for block: %v", err)
+		}
+
+		// filter events by type
+		eventType := flow.EventType(eType)
+		blockEvents := make([]flow.Event, 0, len(blockAllEvents))
+		for _, event := range blockAllEvents {
+			if event.Type == eventType {
+				blockEvents = append(blockEvents, event)
+			}
 		}
 
 		result, err := h.eventResult(bID, blockEvents)
@@ -280,7 +290,6 @@ func (h *handler) GetEventsForBlockIDs(
 			return nil, err
 		}
 		results[i] = result
-
 	}
 
 	return &execution.GetEventsForBlockIDsResponse{
@@ -442,7 +451,7 @@ func (h *handler) GetTransactionResultsByBlockID(
 	}
 
 	// get all events for a block
-	blockEvents, err := h.events.ByBlockID(blockID)
+	blockEvents, err := h.getEventsByBlockID(blockID)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to get events for block: %v", err)
 	}
@@ -791,4 +800,31 @@ func (h *handler) blockHeaderResponse(header *flow.Header) (*execution.BlockHead
 	return &execution.BlockHeaderResponse{
 		Block: msg,
 	}, nil
+}
+
+// additional check that when there is no event in the block, double check if the execution
+// result has no events as well, otherwise return an error.
+// we check the execution result has no event by checking if each chunk's EventCollection is
+// the default hash for empty event collection.
+func (h *handler) getEventsByBlockID(blockID flow.Identifier) ([]flow.Event, error) {
+	blockEvents, err := h.events.ByBlockID(blockID)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to get events for block: %v", err)
+	}
+
+	if len(blockEvents) == 0 {
+		executionResult, err := h.exeResults.ByBlockID(blockID)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to get execution result for block %v: %v", blockID, err)
+		}
+
+		for _, chunk := range executionResult.Chunks {
+			if chunk.EventCollection != flow.EmptyEventCollectionID &&
+				executionResult.PreviousResultID != flow.ZeroID { // skip the root blcok
+				return nil, status.Errorf(codes.Internal, "events not found for block %s, but chunk %d has events", blockID, chunk.Index)
+			}
+		}
+	}
+
+	return blockEvents, nil
 }

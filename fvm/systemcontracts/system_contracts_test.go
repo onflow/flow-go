@@ -104,4 +104,5 @@ func checkServiceEvents(t *testing.T, chainID flow.ChainID) {
 	assert.Equal(t, epochContractAddr, events.EpochSetup.Address)
 	assert.Equal(t, epochContractAddr, events.EpochCommit.Address)
 	assert.Equal(t, versionContractAddr, events.VersionBeacon.Address)
+	assert.Equal(t, versionContractAddr, events.ProtocolStateVersionUpgrade.Address)
 }

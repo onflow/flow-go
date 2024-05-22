@@ -8,11 +8,11 @@ import (
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/protocol"
+	"github.com/onflow/crypto"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	fcrypto "github.com/onflow/flow-go/crypto"
 	p2pbuilder "github.com/onflow/flow-go/network/p2p/builder"
 	"github.com/onflow/flow-go/network/p2p/node/internal"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -23,13 +23,13 @@ func TestProtocolPeerCache(t *testing.T) {
 	defer cancel()
 
 	// create three hosts, and a pcache for the first
-	h1, err := p2pbuilder.DefaultLibP2PHost(unittest.DefaultAddress, unittest.KeyFixture(fcrypto.ECDSASecp256k1))
+	h1, err := p2pbuilder.DefaultLibP2PHost(unittest.DefaultAddress, unittest.KeyFixture(crypto.ECDSASecp256k1))
 	require.NoError(t, err)
 	pcache, err := internal.NewProtocolPeerCache(zerolog.Nop(), h1)
 	require.NoError(t, err)
-	h2, err := p2pbuilder.DefaultLibP2PHost(unittest.DefaultAddress, unittest.KeyFixture(fcrypto.ECDSASecp256k1))
+	h2, err := p2pbuilder.DefaultLibP2PHost(unittest.DefaultAddress, unittest.KeyFixture(crypto.ECDSASecp256k1))
 	require.NoError(t, err)
-	h3, err := p2pbuilder.DefaultLibP2PHost(unittest.DefaultAddress, unittest.KeyFixture(fcrypto.ECDSASecp256k1))
+	h3, err := p2pbuilder.DefaultLibP2PHost(unittest.DefaultAddress, unittest.KeyFixture(crypto.ECDSASecp256k1))
 	require.NoError(t, err)
 
 	// register each host on a separate protocol

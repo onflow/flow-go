@@ -10,7 +10,7 @@ import (
 	"github.com/fxamacker/cbor/v2"
 	"github.com/vmihailenco/msgpack"
 
-	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/crypto"
 )
 
 // ConsensusVoteSigLen is the length of a consensus vote as well as aggregated consensus votes.
@@ -160,6 +160,14 @@ func (priv *StakingPrivKey) UnmarshalJSON(b []byte) error {
 // crypto package since the crypto package should not know about the different key types.
 type RandomBeaconPubKey struct {
 	crypto.PublicKey
+}
+
+func WrapRandomBeaconPubKeys(keys []crypto.PublicKey) []RandomBeaconPubKey {
+	encodables := make([]RandomBeaconPubKey, len(keys))
+	for i := range keys {
+		encodables[i] = RandomBeaconPubKey{PublicKey: keys[i]}
+	}
+	return encodables
 }
 
 func (pub RandomBeaconPubKey) MarshalJSON() ([]byte, error) {

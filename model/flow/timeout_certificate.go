@@ -1,6 +1,6 @@
 package flow
 
-import "github.com/onflow/flow-go/crypto"
+import "github.com/onflow/crypto"
 
 // TimeoutCertificate proves that a super-majority of consensus participants want to abandon the specified View.
 // At its core, a timeout certificate is an aggregation of TimeoutObjects, which individual nodes send to signal

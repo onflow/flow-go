@@ -5,9 +5,9 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/onflow/crypto"
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -24,7 +24,7 @@ const DefaultPollStep = 10
 
 // dkgInfo consolidates information about the current DKG protocol instance.
 type dkgInfo struct {
-	identities      flow.IdentityList
+	identities      flow.IdentitySkeletonList
 	phase1FinalView uint64
 	phase2FinalView uint64
 	phase3FinalView uint64
@@ -181,7 +181,7 @@ func (e *ReactorEngine) startDKGForEpoch(currentEpochCounter uint64, first *flow
 		log.Fatal().Err(err).Msg("could not retrieve epoch info")
 	}
 
-	committee := curDKGInfo.identities.Filter(filter.IsVotingConsensusCommitteeMember)
+	committee := curDKGInfo.identities.Filter(filter.IsConsensusCommitteeMember)
 
 	log.Info().
 		Uint64("phase1", curDKGInfo.phase1FinalView).

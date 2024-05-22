@@ -24,6 +24,7 @@ const (
 	LabelMethod              = "method"
 	LabelService             = "service"
 	LabelRejectionReason     = "rejection_reason"
+	LabelAccountAddress      = "acct_address" // Account address for a machine account
 )
 
 const (
@@ -60,6 +61,10 @@ const (
 	ResourceQC                                               = "qc"
 	ResourceMyReceipt                                        = "my_receipt"
 	ResourceCollection                                       = "collection"
+	ResourceProtocolState                                    = "protocol_state"
+	ResourceProtocolStateByBlockID                           = "protocol_state_by_block_id"
+	ResourceProtocolKVStore                                  = "protocol_kv_store"
+	ResourceProtocolKVStoreByBlockID                         = "protocol_kv_store_by_block_id"
 	ResourceApproval                                         = "approval"
 	ResourceSeal                                             = "seal"
 	ResourcePendingIncorporatedSeal                          = "pending_incorporated_seal"
@@ -102,6 +107,7 @@ const (
 	ResourceNetworkingRPCSentTrackerCache                    = "gossipsub_rpc_sent_tracker_cache"
 	ResourceNetworkingRPCSentTrackerQueue                    = "gossipsub_rpc_sent_tracker_queue"
 	ResourceNetworkingUnicastDialConfigCache                 = "unicast_dial_config_cache"
+	ResourceNetworkingGossipsubDuplicateMessagesTrackerCache = "gossipsub_duplicate_messages_tracker_cache"
 
 	ResourceFollowerPendingBlocksCache         = "follower_pending_block_cache"           // follower engine
 	ResourceFollowerLoopCertifiedBlocksChannel = "follower_loop_certified_blocks_channel" // follower loop, certified blocks buffered channel

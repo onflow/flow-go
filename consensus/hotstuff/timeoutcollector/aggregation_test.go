@@ -5,10 +5,9 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/onflow/crypto"
+	"github.com/onflow/crypto/hash"
 	"github.com/stretchr/testify/require"
-
-	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/crypto/hash"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
@@ -21,7 +20,7 @@ import (
 // createAggregationData is a helper which creates fixture data for testing
 func createAggregationData(t *testing.T, signersNumber int) (
 	*TimeoutSignatureAggregator,
-	flow.IdentityList,
+	flow.IdentitySkeletonList,
 	[]crypto.PublicKey,
 	[]crypto.Signature,
 	[]hotstuff.TimeoutSignerInfo,
@@ -37,14 +36,14 @@ func createAggregationData(t *testing.T, signersNumber int) (
 	hashers := make([]hash.Hasher, 0, signersNumber)
 
 	// create keys, identities and signatures
-	ids := make([]*flow.Identity, 0, signersNumber)
+	ids := make(flow.IdentitySkeletonList, 0, signersNumber)
 	pks := make([]crypto.PublicKey, 0, signersNumber)
 	view := 10 + uint64(rand.Uint32())
 	for i := 0; i < signersNumber; i++ {
 		sk := unittest.PrivateKeyFixture(crypto.BLSBLS12381, crypto.KeyGenSeedMinLen)
 		identity := unittest.IdentityFixture(unittest.WithStakingPubKey(sk.PublicKey()))
 		// id
-		ids = append(ids, identity)
+		ids = append(ids, &identity.IdentitySkeleton)
 		// keys
 		newestQCView := uint64(rand.Intn(int(view)))
 		msg := verification.MakeTimeoutMessage(view, newestQCView)
@@ -74,10 +73,10 @@ func TestNewTimeoutSignatureAggregator(t *testing.T) {
 	sk := unittest.PrivateKeyFixture(crypto.ECDSAP256, crypto.KeyGenSeedMinLen)
 	signer := unittest.IdentityFixture(unittest.WithStakingPubKey(sk.PublicKey()))
 	// wrong key type
-	_, err := NewTimeoutSignatureAggregator(0, flow.IdentityList{signer}, tag)
+	_, err := NewTimeoutSignatureAggregator(0, flow.IdentitySkeletonList{&signer.IdentitySkeleton}, tag)
 	require.Error(t, err)
 	// empty signers
-	_, err = NewTimeoutSignatureAggregator(0, flow.IdentityList{}, tag)
+	_, err = NewTimeoutSignatureAggregator(0, flow.IdentitySkeletonList{}, tag)
 	require.Error(t, err)
 }
 
@@ -102,7 +101,7 @@ func TestTimeoutSignatureAggregator_HappyPath(t *testing.T) {
 			// ignore weight as comparing against expected weight is not thread safe
 			require.NoError(t, err)
 		}(i, sig)
-		expectedWeight += ids[i+subSet].Weight
+		expectedWeight += ids[i+subSet].InitialWeight
 	}
 
 	wg.Wait()
@@ -118,7 +117,7 @@ func TestTimeoutSignatureAggregator_HappyPath(t *testing.T) {
 	for i, sig := range sigs[:subSet] {
 		weight, err := aggregator.VerifyAndAdd(ids[i].NodeID, sig, signersData[i].NewestQCView)
 		require.NoError(t, err)
-		expectedWeight += ids[i].Weight
+		expectedWeight += ids[i].InitialWeight
 		require.Equal(t, expectedWeight, weight)
 		// test TotalWeight
 		require.Equal(t, expectedWeight, aggregator.TotalWeight())
@@ -154,7 +153,7 @@ func TestTimeoutSignatureAggregator_VerifyAndAdd(t *testing.T) {
 		// add signatures
 		for i, sig := range sigs {
 			weight, err := aggregator.VerifyAndAdd(ids[i].NodeID, sig, signersInfo[i].NewestQCView)
-			expectedWeight += ids[i].Weight
+			expectedWeight += ids[i].InitialWeight
 			require.Equal(t, expectedWeight, weight)
 			require.NoError(t, err)
 		}
@@ -205,7 +204,7 @@ func TestTimeoutSignatureAggregator_Aggregate(t *testing.T) {
 		for i, sig := range sigs {
 			weight, err := aggregator.VerifyAndAdd(ids[i].NodeID, sig, signersInfo[i].NewestQCView)
 			if err == nil {
-				expectedWeight += ids[i].Weight
+				expectedWeight += ids[i].InitialWeight
 			}
 			require.Equal(t, expectedWeight, weight)
 		}

@@ -6,16 +6,14 @@ import (
 
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multiaddr"
+	"github.com/onflow/crypto"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/onflow/flow-go/network/p2p/utils"
-
-	"github.com/onflow/flow-go/crypto"
-
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
+	"github.com/onflow/flow-go/network/p2p/utils"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -31,7 +29,7 @@ func TestLibP2PUtilsTestSuite(t *testing.T) {
 func (ts *LibP2PUtilsTestSuite) TestPeerInfoFromID() {
 	ids, exceptedPeerInfos := idsAndPeerInfos(ts.T())
 	for i, id := range ids {
-		actualAddrInfo, err := utils.PeerAddressInfo(*id)
+		actualAddrInfo, err := utils.PeerAddressInfo(id.IdentitySkeleton)
 		assert.NoError(ts.T(), err)
 		assert.Equal(ts.T(), exceptedPeerInfos[i].String(), actualAddrInfo.String())
 	}
@@ -85,6 +83,6 @@ func BenchmarkPeerInfoFromID(b *testing.B) {
 	id.Address = "1.1.1.1:3569"
 	b.StartTimer()
 	for n := 0; n < b.N; n++ {
-		_, _ = utils.PeerAddressInfo(*id)
+		_, _ = utils.PeerAddressInfo(id.IdentitySkeleton)
 	}
 }

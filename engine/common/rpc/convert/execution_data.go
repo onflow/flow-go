@@ -311,7 +311,7 @@ func messageToTrustedTransaction(
 	t.SetScript(m.GetScript())
 	t.SetArguments(m.GetArguments())
 	t.SetReferenceBlockID(flow.HashToID(m.GetReferenceBlockId()))
-	t.SetGasLimit(m.GetGasLimit())
+	t.SetComputeLimit(m.GetGasLimit())
 
 	return *t, nil
 }

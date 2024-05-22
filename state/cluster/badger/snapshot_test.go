@@ -54,7 +54,7 @@ func (suite *SnapshotSuite) SetupTest() {
 	colPayloads := storage.NewClusterPayloads(metrics, suite.db)
 
 	root := unittest.RootSnapshotFixture(unittest.IdentityListFixture(5, unittest.WithAllRoles()))
-	suite.epochCounter = root.Encodable().Epochs.Current.Counter
+	suite.epochCounter = root.Encodable().SealingSegment.LatestProtocolStateEntry().EpochEntry.EpochCounter()
 
 	suite.protoState, err = pbadger.Bootstrap(
 		metrics,
@@ -66,7 +66,8 @@ func (suite *SnapshotSuite) SetupTest() {
 		all.QuorumCertificates,
 		all.Setups,
 		all.EpochCommits,
-		all.Statuses,
+		all.EpochProtocolState,
+		all.ProtocolKVStore,
 		all.VersionBeacons,
 		root,
 	)
@@ -290,8 +291,6 @@ func (suite *SnapshotSuite) TestPending_Grandchildren() {
 }
 
 func (suite *SnapshotSuite) TestParams_ChainID() {
-
-	chainID, err := suite.state.Params().ChainID()
-	suite.Require().Nil(err)
+	chainID := suite.state.Params().ChainID()
 	suite.Assert().Equal(suite.genesis.Header.ChainID, chainID)
 }

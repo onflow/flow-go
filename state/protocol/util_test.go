@@ -26,7 +26,7 @@ func TestIsSporkRootSnapshot(t *testing.T) {
 
 	t.Run("other snapshot", func(t *testing.T) {
 		snapshot := unittest.RootSnapshotFixture(unittest.IdentityListFixture(10, unittest.WithAllRoles()))
-		snapshot.Encodable().Head.Height += 1 // modify head height to break equivalence with spork root block height
+		snapshot.Encodable().Head().Height += 1 // modify head height to break equivalence with spork root block height
 		isSporkRoot, err := protocol.IsSporkRootSnapshot(snapshot)
 		require.NoError(t, err)
 		assert.False(t, isSporkRoot)
@@ -39,7 +39,7 @@ func TestOrderedSeals(t *testing.T) {
 		payload := flow.EmptyPayload()
 		headers := storagemock.NewHeaders(t)
 
-		ordered, err := protocol.OrderedSeals(&payload, headers)
+		ordered, err := protocol.OrderedSeals(payload.Seals, headers)
 		require.NoError(t, err)
 		require.Empty(t, ordered)
 	})
@@ -49,7 +49,7 @@ func TestOrderedSeals(t *testing.T) {
 		payload := unittest.PayloadFixture(unittest.WithSeals(seals...))
 		headers.On("ByBlockID", mock.Anything).Return(nil, storage.ErrNotFound)
 
-		ordered, err := protocol.OrderedSeals(&payload, headers)
+		ordered, err := protocol.OrderedSeals(payload.Seals, headers)
 		require.ErrorIs(t, err, storage.ErrNotFound)
 		require.Empty(t, ordered)
 	})
@@ -60,7 +60,7 @@ func TestOrderedSeals(t *testing.T) {
 		exception := errors.New("exception")
 		headers.On("ByBlockID", mock.Anything).Return(nil, exception)
 
-		ordered, err := protocol.OrderedSeals(&payload, headers)
+		ordered, err := protocol.OrderedSeals(payload.Seals, headers)
 		require.ErrorIs(t, err, exception)
 		require.Empty(t, ordered)
 	})
@@ -75,7 +75,7 @@ func TestOrderedSeals(t *testing.T) {
 		}
 		payload := unittest.PayloadFixture(unittest.WithSeals(seals...))
 
-		ordered, err := protocol.OrderedSeals(&payload, headers)
+		ordered, err := protocol.OrderedSeals(payload.Seals, headers)
 		require.NoError(t, err)
 		require.Equal(t, seals, ordered)
 	})
@@ -96,7 +96,7 @@ func TestOrderedSeals(t *testing.T) {
 		})
 		payload := unittest.PayloadFixture(unittest.WithSeals(unorderedSeals...))
 
-		ordered, err := protocol.OrderedSeals(&payload, headers)
+		ordered, err := protocol.OrderedSeals(payload.Seals, headers)
 		require.NoError(t, err)
 		require.Equal(t, orderedSeals, ordered)
 	})

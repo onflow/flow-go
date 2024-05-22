@@ -11,6 +11,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/routing"
+	"github.com/onflow/crypto"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/cmd"
@@ -24,7 +25,6 @@ import (
 	hotstuffvalidator "github.com/onflow/flow-go/consensus/hotstuff/validator"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine/common/follower"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/model/encodable"
@@ -86,8 +86,8 @@ import (
 type FollowerServiceConfig struct {
 	bootstrapNodeAddresses  []string
 	bootstrapNodePublicKeys []string
-	bootstrapIdentities     flow.IdentityList // the identity list of bootstrap peers the node uses to discover other nodes
-	NetworkKey              crypto.PrivateKey // the networking key passed in by the caller when being used as a library
+	bootstrapIdentities     flow.IdentitySkeletonList // the identity list of bootstrap peers the node uses to discover other nodes
+	NetworkKey              crypto.PrivateKey         // the networking key passed in by the caller when being used as a library
 	baseOptions             []cmd.Option
 }
 
@@ -331,7 +331,7 @@ func (builder *FollowerServiceBuilder) BuildConsensusFollower() cmd.NodeBuilder 
 
 type FollowerOption func(*FollowerServiceConfig)
 
-func WithBootStrapPeers(bootstrapNodes ...*flow.Identity) FollowerOption {
+func WithBootStrapPeers(bootstrapNodes ...*flow.IdentitySkeleton) FollowerOption {
 	return func(config *FollowerServiceConfig) {
 		config.bootstrapIdentities = bootstrapNodes
 	}
@@ -385,13 +385,13 @@ func publicNetworkMsgValidators(log zerolog.Logger, idProvider module.IdentityPr
 // BootstrapIdentities converts the bootstrap node addresses and keys to a Flow Identity list where
 // each Flow Identity is initialized with the passed address, the networking key
 // and the Node ID set to ZeroID, role set to Access, 0 stake and no staking key.
-func BootstrapIdentities(addresses []string, keys []string) (flow.IdentityList, error) {
+func BootstrapIdentities(addresses []string, keys []string) (flow.IdentitySkeletonList, error) {
 
 	if len(addresses) != len(keys) {
 		return nil, fmt.Errorf("number of addresses and keys provided for the boostrap nodes don't match")
 	}
 
-	ids := make([]*flow.Identity, len(addresses))
+	ids := make(flow.IdentitySkeletonList, len(addresses))
 	for i, address := range addresses {
 		key := keys[i]
 
@@ -409,7 +409,7 @@ func BootstrapIdentities(addresses []string, keys []string) (flow.IdentityList, 
 		}
 
 		// create the identity of the peer by setting only the relevant fields
-		ids[i] = &flow.Identity{
+		ids[i] = &flow.IdentitySkeleton{
 			NodeID:        flow.ZeroID, // the NodeID is the hash of the staking key and for the public network it does not apply
 			Address:       address,
 			Role:          flow.RoleAccess, // the upstream node has to be an access node
@@ -621,7 +621,7 @@ func (builder *FollowerServiceBuilder) initPublicLibp2pNode(networkKey crypto.Pr
 func (builder *FollowerServiceBuilder) initObserverLocal() func(node *cmd.NodeConfig) error {
 	return func(node *cmd.NodeConfig) error {
 		// for an observer, set the identity here explicitly since it will not be found in the protocol state
-		self := &flow.Identity{
+		self := flow.IdentitySkeleton{
 			NodeID:        node.NodeID,
 			NetworkPubKey: node.NetworkKey.PublicKey(),
 			StakingPubKey: nil,             // no staking key needed for the observer

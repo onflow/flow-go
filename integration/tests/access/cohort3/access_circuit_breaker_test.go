@@ -148,9 +148,9 @@ func (s *AccessCircuitBreakerSuite) TestCircuitBreaker() {
 
 	createAccountTx.
 		SetReferenceBlockID(sdk.Identifier(latestBlockID)).
-		SetProposalKey(serviceAddress, 0, accessClient.GetSeqNumber()).
+		SetProposalKey(serviceAddress, 0, accessClient.GetAndIncrementSeqNumber()).
 		SetPayer(serviceAddress).
-		SetGasLimit(9999)
+		SetComputeLimit(9999)
 
 	// Sign the transaction
 	signedTx, err := accessClient.SignTransaction(createAccountTx)

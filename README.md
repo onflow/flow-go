@@ -100,14 +100,18 @@ The recommended way to build and run Flow for local development is using Docker.
 Build a Docker image for all nodes:
 
 ```bash
-make docker-build-flow
+make docker-native-build-flow
 ```
 
 Build a Docker image for a particular node role (replace `$ROLE` with `collection`, `consensus`, etc.):
 
 ```bash
-make docker-build-$ROLE
+make docker-native-build-$ROLE
 ```
+
+### Importing the module
+
+When importing the `github.com/onflow/flow-go` module in your Go project, testing or building your project may require setting extra Go flags because the module requires [cgo](https://pkg.go.dev/cmd/cgo). In particular, `CGO_ENABLED` must be set to `1` if `cgo` isn't enabled by default. This constraint comes from the underlying cryptography library. Refer to the [crypto repository build](https://github.com/onflow/crypto?tab=readme-ov-file#build) for more details.
 
 ### Local Network
 

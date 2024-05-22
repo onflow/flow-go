@@ -19,11 +19,13 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/access/index"
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	"github.com/onflow/flow-go/engine/access/state_stream"
 	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
+	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/execution"
@@ -46,19 +48,20 @@ import (
 // on the same port
 type SameGRPCPortTestSuite struct {
 	suite.Suite
-	state          *protocol.State
-	snapshot       *protocol.Snapshot
-	epochQuery     *protocol.EpochQuery
-	log            zerolog.Logger
-	net            *network.EngineRegistry
-	request        *module.Requester
-	collClient     *accessmock.AccessAPIClient
-	execClient     *accessmock.ExecutionAPIClient
-	me             *module.Local
-	chainID        flow.ChainID
-	metrics        *metrics.NoopCollector
-	rpcEng         *rpc.Engine
-	stateStreamEng *statestreambackend.Engine
+	state                *protocol.State
+	snapshot             *protocol.Snapshot
+	epochQuery           *protocol.EpochQuery
+	log                  zerolog.Logger
+	net                  *network.EngineRegistry
+	request              *module.Requester
+	collClient           *accessmock.AccessAPIClient
+	execClient           *accessmock.ExecutionAPIClient
+	me                   *module.Local
+	chainID              flow.ChainID
+	metrics              *metrics.NoopCollector
+	rpcEng               *rpc.Engine
+	stateStreamEng       *statestreambackend.Engine
+	executionDataTracker subscription.ExecutionDataTracker
 
 	// storage
 	blocks       *storagemock.Blocks
@@ -120,7 +123,7 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 
 	suite.broadcaster = engine.NewBroadcaster()
 
-	suite.execDataHeroCache = herocache.NewBlockExecutionData(state_stream.DefaultCacheSize, suite.log, metrics.NewNoopCollector())
+	suite.execDataHeroCache = herocache.NewBlockExecutionData(subscription.DefaultCacheSize, suite.log, metrics.NewNoopCollector())
 	suite.execDataCache = cache.NewExecutionDataCache(suite.eds, suite.headers, suite.seals, suite.results, suite.execDataHeroCache)
 
 	accessIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleAccess))
@@ -234,25 +237,45 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 	).Maybe()
 
 	conf := statestreambackend.Config{
-		ClientSendTimeout:    state_stream.DefaultSendTimeout,
-		ClientSendBufferSize: state_stream.DefaultSendBufferSize,
+		ClientSendTimeout:    subscription.DefaultSendTimeout,
+		ClientSendBufferSize: subscription.DefaultSendBufferSize,
 	}
+
+	subscriptionHandler := subscription.NewSubscriptionHandler(
+		suite.log,
+		suite.broadcaster,
+		subscription.DefaultSendTimeout,
+		subscription.DefaultResponseLimit,
+		subscription.DefaultSendBufferSize,
+	)
+
+	eventIndexer := index.NewEventsIndex(suite.events)
+
+	suite.executionDataTracker = subscription.NewExecutionDataTracker(
+		suite.log,
+		suite.state,
+		rootBlock.Header.Height,
+		suite.headers,
+		nil,
+		rootBlock.Header.Height,
+		eventIndexer,
+		false,
+	)
 
 	stateStreamBackend, err := statestreambackend.New(
 		suite.log,
-		conf,
 		suite.state,
 		suite.headers,
-		suite.events,
 		suite.seals,
 		suite.results,
 		nil,
 		suite.execDataCache,
-		nil,
-		rootBlock.Header.Height,
-		rootBlock.Header.Height,
 		suite.registers,
+		eventIndexer,
 		false,
+		state_stream.DefaultRegisterIDsRequestLimit,
+		subscriptionHandler,
+		suite.executionDataTracker,
 	)
 	assert.NoError(suite.T(), err)
 
@@ -265,7 +288,6 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 		suite.chainID,
 		suite.unsecureGrpcServer,
 		stateStreamBackend,
-		nil,
 	)
 	assert.NoError(suite.T(), err)
 
@@ -310,11 +332,11 @@ func (suite *SameGRPCPortTestSuite) TestEnginesOnTheSameGrpcPort() {
 	})
 
 	suite.Run("happy path - grpc execution data api client can connect successfully", func() {
-		req := &executiondataproto.SubscribeEventsRequest{}
+		req := &executiondataproto.SubscribeEventsFromLatestRequest{}
 
 		client := suite.unsecureExecutionDataAPIClient(conn)
 
-		_, err := client.SubscribeEvents(ctx, req)
+		_, err := client.SubscribeEventsFromLatest(ctx, req)
 		assert.NoError(suite.T(), err, "failed to subscribe events")
 	})
 	defer closer.Close()

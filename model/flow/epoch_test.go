@@ -3,11 +3,11 @@ package flow_test
 import (
 	"testing"
 
-	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/crypto"
+	"github.com/stretchr/testify/require"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
-
-	"github.com/stretchr/testify/require"
 )
 
 func TestClusterQCVoteData_Equality(t *testing.T) {
@@ -179,8 +179,8 @@ func TestEpochCommit_EqualTo(t *testing.T) {
 
 func TestEpochSetup_EqualTo(t *testing.T) {
 
-	identityA := unittest.IdentityFixture()
-	identityB := unittest.IdentityFixture()
+	identityA := &unittest.IdentityFixture().IdentitySkeleton
+	identityB := &unittest.IdentityFixture().IdentitySkeleton
 
 	assignmentA := flow.AssignmentList{[]flow.Identifier{[32]byte{1, 2, 3}, [32]byte{2, 2, 2}}}
 	assignmentB := flow.AssignmentList{[]flow.Identifier{[32]byte{1, 2, 3}, [32]byte{}}}
@@ -243,8 +243,8 @@ func TestEpochSetup_EqualTo(t *testing.T) {
 
 	t.Run("Participants length differ", func(t *testing.T) {
 
-		a := &flow.EpochSetup{Participants: flow.IdentityList{identityA}}
-		b := &flow.EpochSetup{Participants: flow.IdentityList{}}
+		a := &flow.EpochSetup{Participants: flow.IdentitySkeletonList{identityA}}
+		b := &flow.EpochSetup{Participants: flow.IdentitySkeletonList{}}
 
 		require.False(t, a.EqualTo(b))
 		require.False(t, b.EqualTo(a))
@@ -252,8 +252,8 @@ func TestEpochSetup_EqualTo(t *testing.T) {
 
 	t.Run("Participants length same but different data", func(t *testing.T) {
 
-		a := &flow.EpochSetup{Participants: flow.IdentityList{identityA}}
-		b := &flow.EpochSetup{Participants: flow.IdentityList{identityB}}
+		a := &flow.EpochSetup{Participants: flow.IdentitySkeletonList{identityA}}
+		b := &flow.EpochSetup{Participants: flow.IdentitySkeletonList{identityB}}
 
 		require.False(t, a.EqualTo(b))
 		require.False(t, b.EqualTo(a))
@@ -261,8 +261,8 @@ func TestEpochSetup_EqualTo(t *testing.T) {
 
 	t.Run("Participants length same with same data", func(t *testing.T) {
 
-		a := &flow.EpochSetup{Participants: flow.IdentityList{identityA}}
-		b := &flow.EpochSetup{Participants: flow.IdentityList{identityA}}
+		a := &flow.EpochSetup{Participants: flow.IdentitySkeletonList{identityA}}
+		b := &flow.EpochSetup{Participants: flow.IdentitySkeletonList{identityA}}
 
 		require.True(t, a.EqualTo(b))
 		require.True(t, b.EqualTo(a))

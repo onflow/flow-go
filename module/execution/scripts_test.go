@@ -6,7 +6,10 @@ import (
 	"os"
 	"testing"
 
+	"github.com/onflow/cadence/runtime/stdlib"
+
 	"github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/fvm/storage/derived"
 
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/encoding/ccf"
@@ -48,7 +51,7 @@ type scriptTestSuite struct {
 func (s *scriptTestSuite) TestScriptExecution() {
 	s.Run("Simple Script Execution", func() {
 		number := int64(42)
-		code := []byte(fmt.Sprintf("pub fun main(): Int { return %d; }", number))
+		code := []byte(fmt.Sprintf("access(all) fun main(): Int { return %d; }", number))
 
 		result, err := s.scripts.ExecuteAtBlockHeight(context.Background(), code, nil, s.height)
 		s.Require().NoError(err)
@@ -58,7 +61,7 @@ func (s *scriptTestSuite) TestScriptExecution() {
 	})
 
 	s.Run("Get Block", func() {
-		code := []byte(fmt.Sprintf(`pub fun main(): UInt64 {
+		code := []byte(fmt.Sprintf(`access(all) fun main(): UInt64 {
 			getBlock(at: %d)!
 			return getCurrentBlock().height 
 		}`, s.height))
@@ -68,12 +71,12 @@ func (s *scriptTestSuite) TestScriptExecution() {
 		val, err := jsoncdc.Decode(nil, result)
 		s.Require().NoError(err)
 		// make sure that the returned block height matches the current one set
-		s.Assert().Equal(s.height, val.(cadence.UInt64).ToGoValue())
+		s.Assert().Equal(s.height, uint64(val.(cadence.UInt64)))
 	})
 
 	s.Run("Handle not found Register", func() {
 		// use a non-existing address to trigger register get function
-		code := []byte("import Foo from 0x01; pub fun main() { }")
+		code := []byte("import Foo from 0x01; access(all) fun main() { }")
 
 		result, err := s.scripts.ExecuteAtBlockHeight(context.Background(), code, nil, s.height)
 		s.Assert().Error(err)
@@ -81,7 +84,7 @@ func (s *scriptTestSuite) TestScriptExecution() {
 	})
 
 	s.Run("Valid Argument", func() {
-		code := []byte("pub fun main(foo: Int): Int { return foo }")
+		code := []byte("access(all) fun main(foo: Int): Int { return foo }")
 		arg := cadence.NewInt(2)
 		encoded, err := jsoncdc.Encode(arg)
 		s.Require().NoError(err)
@@ -97,7 +100,7 @@ func (s *scriptTestSuite) TestScriptExecution() {
 	})
 
 	s.Run("Invalid Argument", func() {
-		code := []byte("pub fun main(foo: Int): Int { return foo }")
+		code := []byte("access(all) fun main(foo: Int): Int { return foo }")
 		invalid := [][]byte{[]byte("i")}
 
 		result, err := s.scripts.ExecuteAtBlockHeight(context.Background(), code, invalid, s.height)
@@ -156,10 +159,26 @@ func (s *scriptTestSuite) SetupTest() {
 	s.Require().NoError(err)
 	s.registerIndex = pebbleRegisters
 
-	index, err := indexer.New(logger, metrics.NewNoopCollector(), nil, s.registerIndex, headers, nil, nil, func(originID flow.Identifier, entity flow.Entity) {})
+	derivedChainData, err := derived.NewDerivedChainData(derived.DefaultDerivedDataCacheSize)
 	s.Require().NoError(err)
 
-	scripts, err := NewScripts(
+	index, err := indexer.New(
+		logger,
+		metrics.NewNoopCollector(),
+		nil,
+		s.registerIndex,
+		headers,
+		nil,
+		nil,
+		nil,
+		nil,
+		flow.Testnet.Chain(),
+		derivedChainData,
+		nil,
+	)
+	s.Require().NoError(err)
+
+	s.scripts = NewScripts(
 		logger,
 		metrics.NewNoopCollector(),
 		s.chain.ChainID(),
@@ -167,9 +186,9 @@ func (s *scriptTestSuite) SetupTest() {
 		headers,
 		index.RegisterValue,
 		query.NewDefaultConfig(),
+		derivedChainData,
+		true,
 	)
-	s.Require().NoError(err)
-	s.scripts = scripts
 
 	s.bootstrap()
 }
@@ -201,8 +220,8 @@ func (s *scriptTestSuite) bootstrap() {
 func (s *scriptTestSuite) createAccount() flow.Address {
 	const createAccountTransaction = `
 		transaction {
-		  prepare(signer: AuthAccount) {
-			let account = AuthAccount(payer: signer)
+		  prepare(signer: auth(Storage, Capabilities) &Account) {
+			let account = Account(payer: signer)
 		  }
 		}`
 
@@ -236,9 +255,13 @@ func (s *scriptTestSuite) createAccount() flow.Address {
 
 	data, err := ccf.Decode(nil, accountCreatedEvents[0].Payload)
 	s.Require().NoError(err)
-	address := flow.ConvertAddress(data.(cadence.Event).Fields[0].(cadence.Address))
 
-	return address
+	return flow.ConvertAddress(
+		cadence.SearchFieldByName(
+			data.(cadence.Event),
+			stdlib.AccountEventAddressParameter.Identifier,
+		).(cadence.Address),
+	)
 }
 
 func newBlockHeadersStorage(blocks []*flow.Block) storage.Headers {

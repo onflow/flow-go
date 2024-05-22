@@ -8,6 +8,7 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/counters"
 )
 
 type ExecutionCollector struct {
@@ -21,6 +22,7 @@ type ExecutionCollector struct {
 	lastFinalizedExecutedBlockHeightGauge   prometheus.Gauge
 	stateStorageDiskTotal                   prometheus.Gauge
 	storageStateCommitment                  prometheus.Gauge
+	checkpointSize                          prometheus.Gauge
 	forestApproxMemorySize                  prometheus.Gauge
 	forestNumberOfTrees                     prometheus.Gauge
 	latestTrieRegCount                      prometheus.Gauge
@@ -81,6 +83,7 @@ type ExecutionCollector struct {
 	stateSyncActive                         prometheus.Gauge
 	blockDataUploadsInProgress              prometheus.Gauge
 	blockDataUploadsDuration                prometheus.Histogram
+	maxCollectionHeightData                 counters.StrictMonotonousCounter
 	maxCollectionHeight                     prometheus.Gauge
 	computationResultUploadedCount          prometheus.Counter
 	computationResultUploadRetriedCount     prometheus.Counter
@@ -648,11 +651,19 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 			Help:      "the execution state size on disk in bytes",
 		}),
 
+		// TODO: remove
 		storageStateCommitment: promauto.NewGauge(prometheus.GaugeOpts{
 			Namespace: namespaceExecution,
 			Subsystem: subsystemStateStorage,
 			Name:      "commitment_size_bytes",
 			Help:      "the storage size of a state commitment in bytes",
+		}),
+
+		checkpointSize: promauto.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespaceExecution,
+			Subsystem: subsystemStateStorage,
+			Name:      "checkpoint_size_bytes",
+			Help:      "the size of a checkpoint in bytes",
 		}),
 
 		stateSyncActive: promauto.NewGauge(prometheus.GaugeOpts{
@@ -683,6 +694,7 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 			Help:      "the number of times a program was found in the cache",
 		}),
 
+		maxCollectionHeightData: counters.NewMonotonousCounter(0),
 		maxCollectionHeight: prometheus.NewGauge(prometheus.GaugeOpts{
 			Name:      "max_collection_height",
 			Namespace: namespaceExecution,
@@ -743,7 +755,7 @@ func (ec *ExecutionCollector) ExecutionBlockCachedPrograms(programs int) {
 	ec.blockCachedPrograms.Set(float64(programs))
 }
 
-// TransactionExecuted reports stats for executing a transaction
+// ExecutionTransactionExecuted reports stats for executing a transaction
 func (ec *ExecutionCollector) ExecutionTransactionExecuted(
 	dur time.Duration,
 	numConflictRetries int,
@@ -757,11 +769,8 @@ func (ec *ExecutionCollector) ExecutionTransactionExecuted(
 	ec.transactionExecutionTime.Observe(float64(dur.Milliseconds()))
 	ec.transactionConflictRetries.Observe(float64(numConflictRetries))
 	ec.transactionComputationUsed.Observe(float64(compUsed))
-	if compUsed > 0 {
-		// normalize so the value should be around 1
-		ec.transactionNormalizedTimePerComputation.Observe(
-			(float64(dur.Milliseconds()) / float64(compUsed)) * flow.EstimatedComputationPerMillisecond)
-	}
+	ec.transactionNormalizedTimePerComputation.Observe(
+		flow.NormalizedExecutionTimePerComputationUnit(dur, compUsed))
 	ec.transactionMemoryEstimate.Observe(float64(memoryUsed))
 	ec.transactionEmittedEvents.Observe(float64(eventCounts))
 	ec.transactionEventSize.Observe(float64(eventSize))
@@ -794,6 +803,11 @@ func (ec *ExecutionCollector) ExecutionStateStorageDiskTotal(bytes int64) {
 // ExecutionStorageStateCommitment reports the storage size of a state commitment
 func (ec *ExecutionCollector) ExecutionStorageStateCommitment(bytes int64) {
 	ec.storageStateCommitment.Set(float64(bytes))
+}
+
+// ExecutionCheckpointSize reports the size of a checkpoint in bytes
+func (ec *ExecutionCollector) ExecutionCheckpointSize(bytes uint64) {
+	ec.checkpointSize.Set(float64(bytes))
 }
 
 // ExecutionLastExecutedBlockHeight reports last executed block height
@@ -950,7 +964,10 @@ func (ec *ExecutionCollector) RuntimeTransactionProgramsCacheHit() {
 }
 
 func (ec *ExecutionCollector) UpdateCollectionMaxHeight(height uint64) {
-	ec.maxCollectionHeight.Set(float64(height))
+	updated := ec.maxCollectionHeightData.Set(height)
+	if updated {
+		ec.maxCollectionHeight.Set(float64(height))
+	}
 }
 
 func (ec *ExecutionCollector) ExecutionComputationResultUploaded() {

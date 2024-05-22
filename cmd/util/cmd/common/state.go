@@ -24,7 +24,8 @@ func InitProtocolState(db *badger.DB, storages *storage.All) (protocol.State, er
 		storages.QuorumCertificates,
 		storages.Setups,
 		storages.EpochCommits,
-		storages.Statuses,
+		storages.EpochProtocolState,
+		storages.ProtocolKVStore,
 		storages.VersionBeacons,
 	)
 

@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
@@ -13,11 +14,17 @@ import (
 	gcemd "cloud.google.com/go/compute/metadata"
 	"github.com/dgraph-io/badger/v2"
 	"github.com/hashicorp/go-multierror"
+	dht "github.com/libp2p/go-libp2p-kad-dht"
+	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/core/routing"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
 	"golang.org/x/time/rate"
 	"google.golang.org/api/option"
+
+	"github.com/onflow/crypto"
 
 	"github.com/onflow/flow-go/admin"
 	"github.com/onflow/flow-go/admin/commands"
@@ -46,16 +53,23 @@ import (
 	"github.com/onflow/flow-go/network"
 	alspmgr "github.com/onflow/flow-go/network/alsp/manager"
 	netcache "github.com/onflow/flow-go/network/cache"
+	"github.com/onflow/flow-go/network/channels"
+	"github.com/onflow/flow-go/network/converter"
 	"github.com/onflow/flow-go/network/p2p"
 	p2pbuilder "github.com/onflow/flow-go/network/p2p/builder"
 	p2pbuilderconfig "github.com/onflow/flow-go/network/p2p/builder/config"
 	"github.com/onflow/flow-go/network/p2p/cache"
 	"github.com/onflow/flow-go/network/p2p/conduit"
 	"github.com/onflow/flow-go/network/p2p/connection"
+	p2pdht "github.com/onflow/flow-go/network/p2p/dht"
 	"github.com/onflow/flow-go/network/p2p/dns"
+	"github.com/onflow/flow-go/network/p2p/keyutils"
 	"github.com/onflow/flow-go/network/p2p/ping"
+	"github.com/onflow/flow-go/network/p2p/subscription"
+	"github.com/onflow/flow-go/network/p2p/translator"
 	"github.com/onflow/flow-go/network/p2p/unicast/protocols"
 	"github.com/onflow/flow-go/network/p2p/unicast/ratelimit"
+	"github.com/onflow/flow-go/network/p2p/utils"
 	"github.com/onflow/flow-go/network/p2p/utils/ratelimiter"
 	"github.com/onflow/flow-go/network/slashing"
 	"github.com/onflow/flow-go/network/topology"
@@ -124,6 +138,8 @@ type FlowNodeBuilder struct {
 	adminCommandBootstrapper *admin.CommandRunnerBootstrapper
 	adminCommands            map[string]func(config *NodeConfig) commands.AdminCommand
 	componentBuilder         component.ComponentManagerBuilder
+	bootstrapNodeAddresses   []string
+	bootstrapNodePublicKeys  []string
 }
 
 var _ NodeBuilder = (*FlowNodeBuilder)(nil)
@@ -174,6 +190,15 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 
 	fnb.flags.UintVar(&fnb.BaseConfig.guaranteesCacheSize, "guarantees-cache-size", bstorage.DefaultCacheSize, "collection guarantees cache size")
 	fnb.flags.UintVar(&fnb.BaseConfig.receiptsCacheSize, "receipts-cache-size", bstorage.DefaultCacheSize, "receipts cache size")
+
+	fnb.flags.BoolVar(&fnb.BaseConfig.DhtSystemEnabled,
+		"dht-enabled",
+		defaultConfig.DhtSystemEnabled,
+		"[experimental] whether to enable dht system. This is an experimental feature. Use with caution.")
+	fnb.flags.BoolVar(&fnb.BaseConfig.BitswapReprovideEnabled,
+		"bitswap-reprovide-enabled",
+		defaultConfig.BitswapReprovideEnabled,
+		"[experimental] whether to enable bitswap reproviding. This is an experimental feature. Use with caution.")
 
 	// dynamic node startup flags
 	fnb.flags.StringVar(&fnb.BaseConfig.DynamicStartupANPubkey,
@@ -226,6 +251,17 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 		"compliance-skip-proposals-threshold",
 		defaultConfig.ComplianceConfig.SkipNewProposalsThreshold,
 		"threshold at which new proposals are discarded rather than cached, if their height is this much above local finalized height")
+
+	// observer mode allows a unstaked execution node to fetch blocks from a public staked access node, and being able to execute blocks
+	fnb.flags.BoolVar(&fnb.BaseConfig.ObserverMode, "observer-mode", defaultConfig.ObserverMode, "whether the node is running in observer mode")
+	fnb.flags.StringSliceVar(&fnb.bootstrapNodePublicKeys,
+		"observer-mode-bootstrap-node-public-keys",
+		nil,
+		"the networking public key of the bootstrap access node if this is an observer (in the same order as the bootstrap node addresses) e.g. \"d57a5e9c5.....\",\"44ded42d....\"")
+	fnb.flags.StringSliceVar(&fnb.bootstrapNodeAddresses,
+		"observer-mode-bootstrap-node-addresses",
+		nil,
+		"the network addresses of the bootstrap access node if this is an observer e.g. access-001.mainnet.flow.org:9653,access-002.mainnet.flow.org:9653")
 }
 
 func (fnb *FlowNodeBuilder) EnqueuePingService() {
@@ -376,7 +412,18 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			myAddr = fnb.BaseConfig.BindAddr
 		}
 
-		dhtActivationStatus, err := DhtSystemActivationStatus(fnb.NodeRole)
+		if fnb.ObserverMode {
+			// observer mode only init pulbic libp2p node
+			publicLibp2pNode, err := fnb.BuildPublicLibp2pNode(myAddr)
+			if err != nil {
+				return nil, fmt.Errorf("could not build public libp2p node: %w", err)
+			}
+			fnb.LibP2PNode = publicLibp2pNode
+
+			return publicLibp2pNode, nil
+		}
+
+		dhtActivationStatus, err := DhtSystemActivationStatus(fnb.NodeRole, fnb.DhtSystemEnabled)
 		if err != nil {
 			return nil, fmt.Errorf("could not determine dht activation status: %w", err)
 		}
@@ -431,9 +478,11 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 	})
 
 	// peer manager won't be created until all PeerManagerDependencies are ready.
-	fnb.DependableComponent("peer manager", func(node *NodeConfig) (module.ReadyDoneAware, error) {
-		return fnb.LibP2PNode.PeerManagerComponent(), nil
-	}, fnb.PeerManagerDependencies)
+	if !fnb.ObserverMode {
+		fnb.DependableComponent("peer manager", func(node *NodeConfig) (module.ReadyDoneAware, error) {
+			return fnb.LibP2PNode.PeerManagerComponent(), nil
+		}, fnb.PeerManagerDependencies)
+	}
 }
 
 // HeroCacheMetricsFactory returns a HeroCacheMetricsFactory based on the MetricsEnabled flag.
@@ -444,6 +493,89 @@ func (fnb *FlowNodeBuilder) HeroCacheMetricsFactory() metrics.HeroCacheMetricsFa
 		return metrics.NewHeroCacheMetricsFactory(fnb.MetricsRegisterer)
 	}
 	return metrics.NewNoopHeroCacheMetricsFactory()
+}
+
+// initPublicLibp2pNode creates a libp2p node for the observer service in the public (unstaked) network.
+// The factory function is later passed into the initMiddleware function to eventually instantiate the p2p.LibP2PNode instance
+// The LibP2P host is created with the following options:
+// * DHT as client and seeded with the given bootstrap peers
+// * The specified bind address as the listen address
+// * The passed in private key as the libp2p key
+// * No connection gater
+// * No connection manager
+// * No peer manager
+// * Default libp2p pubsub options.
+// Args:
+// - networkKey: the private key to use for the libp2p node
+// Returns:
+// - p2p.LibP2PNode: the libp2p node
+// - error: if any error occurs. Any error returned is considered irrecoverable.
+func (fnb *FlowNodeBuilder) BuildPublicLibp2pNode(address string) (p2p.LibP2PNode, error) {
+	var pis []peer.AddrInfo
+
+	ids, err := BootstrapIdentities(fnb.bootstrapNodeAddresses, fnb.bootstrapNodePublicKeys)
+	if err != nil {
+		return nil, fmt.Errorf("could not create bootstrap identities: %w", err)
+	}
+
+	for _, b := range ids {
+		pi, err := utils.PeerAddressInfo(*b)
+		if err != nil {
+			return nil, fmt.Errorf("could not extract peer address info from bootstrap identity %v: %w", b, err)
+		}
+
+		pis = append(pis, pi)
+	}
+
+	for _, b := range ids {
+		pi, err := utils.PeerAddressInfo(*b)
+		if err != nil {
+			return nil, fmt.Errorf("could not extract peer address info from bootstrap identity %v: %w", b, err)
+		}
+
+		pis = append(pis, pi)
+	}
+
+	node, err := p2pbuilder.NewNodeBuilder(
+		fnb.Logger,
+		&fnb.FlowConfig.NetworkConfig.GossipSub,
+		&p2pbuilderconfig.MetricsConfig{
+			HeroCacheFactory: fnb.HeroCacheMetricsFactory(),
+			Metrics:          fnb.Metrics.Network,
+		},
+		network.PublicNetwork,
+		address,
+		fnb.NetworkKey,
+		fnb.SporkID,
+		fnb.IdentityProvider,
+		&fnb.FlowConfig.NetworkConfig.ResourceManager,
+		p2pbuilderconfig.PeerManagerDisableConfig(), // disable peer manager for observer node.
+		&p2p.DisallowListCacheConfig{
+			MaxSize: fnb.FlowConfig.NetworkConfig.DisallowListNotificationCacheSize,
+			Metrics: metrics.DisallowListCacheMetricsFactory(fnb.HeroCacheMetricsFactory(), network.PublicNetwork),
+		},
+		&p2pbuilderconfig.UnicastConfig{
+			Unicast: fnb.FlowConfig.NetworkConfig.Unicast,
+		}).
+		SetSubscriptionFilter(
+			subscription.NewRoleBasedFilter(
+				subscription.UnstakedRole, fnb.IdentityProvider,
+			),
+		).
+		SetRoutingSystem(func(ctx context.Context, h host.Host) (routing.Routing, error) {
+			return p2pdht.NewDHT(ctx, h, protocols.FlowPublicDHTProtocolID(fnb.SporkID),
+				fnb.Logger,
+				fnb.Metrics.Network,
+				p2pdht.AsClient(),
+				dht.BootstrapPeers(pis...),
+			)
+		}).
+		Build()
+
+	if err != nil {
+		return nil, fmt.Errorf("could not initialize libp2p node for observer: %w", err)
+	}
+	return node, nil
 }
 
 func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(
@@ -479,6 +611,12 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(
 		return nil, fmt.Errorf("could not register networking receive cache metric: %w", err)
 	}
 
+	networkType := network.PrivateNetwork
+	if fnb.ObserverMode {
+		// observer mode uses public network
+		networkType = network.PublicNetwork
+	}
+
 	// creates network instance
 	net, err := underlay.NewNetwork(&underlay.NetworkConfig{
 		Logger:                fnb.Logger,
@@ -502,7 +640,7 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(
 			HeartBeatInterval:       fnb.FlowConfig.NetworkConfig.AlspConfig.HearBeatInterval,
 			AlspMetrics:             fnb.Metrics.Network,
 			HeroCacheMetricsFactory: fnb.HeroCacheMetricsFactory(),
-			NetworkType:             network.PrivateNetwork,
+			NetworkType:             networkType,
 		},
 		SlashingViolationConsumerFactory: func(adapter network.ConduitAdapter) network.ViolationsConsumer {
 			return slashing.NewSlashingViolationsConsumer(fnb.Logger, fnb.Metrics.Network, adapter)
@@ -512,7 +650,11 @@ func (fnb *FlowNodeBuilder) InitFlowNetworkWithConduitFactory(
 		return nil, fmt.Errorf("could not initialize network: %w", err)
 	}
 
-	fnb.EngineRegistry = net  // setting network as the fnb.Network for the engine-level components
+	if node.ObserverMode {
+		fnb.EngineRegistry = converter.NewNetwork(net, channels.SyncCommittee, channels.PublicSyncCommittee)
+	} else {
+		fnb.EngineRegistry = net // setting network as the fnb.Network for the engine-level components
+	}
 	fnb.NetworkUnderlay = net // setting network as the fnb.Underlay for the lower-level components
 
 	// register network ReadyDoneAware interface so other components can depend on it for startup
@@ -613,7 +755,7 @@ func (fnb *FlowNodeBuilder) ParseAndPrintFlags() error {
 		fnb.Logger.Fatal().Err(err).Msg("flow configuration validation failed")
 	}
 
-	info := fnb.Logger.Info()
+	info := fnb.Logger.Error()
 
 	noPrint := config.LogConfig(info, fnb.flags)
 	fnb.flags.VisitAll(func(flag *pflag.Flag) {
@@ -621,7 +763,7 @@ func (fnb *FlowNodeBuilder) ParseAndPrintFlags() error {
 			info.Str(flag.Name, fmt.Sprintf("%v", flag.Value))
 		}
 	})
-	info.Msg("configuration loaded")
+	info.Msg("configuration loaded (logged as error for visibility)")
 	return fnb.extraFlagsValidation()
 }
 
@@ -654,11 +796,46 @@ func (fnb *FlowNodeBuilder) initNodeInfo() error {
 		return fmt.Errorf("failed to load private node info: %w", err)
 	}
 
-	fnb.NodeID = nodeID
-	fnb.NetworkKey = info.NetworkPrivKey.PrivateKey
 	fnb.StakingKey = info.StakingPrivKey.PrivateKey
 
+	if fnb.ObserverMode {
+		// observer mode uses a network private key with different format than the staked node,
+		// so it has to load the network private key from a separate file
+		networkingPrivateKey, err := LoadNetworkPrivateKey(fnb.BaseConfig.BootstrapDir, nodeID)
+		if err != nil {
+			return fmt.Errorf("failed to load networking private key: %w", err)
+		}
+
+		peerID, err := peerIDFromNetworkKey(networkingPrivateKey)
+		if err != nil {
+			return fmt.Errorf("could not get peer ID from network key: %w", err)
+		}
+
+		// public node ID for observer is derived from peer ID which is derived from network key
+		pubNodeID, err := translator.NewPublicNetworkIDTranslator().GetFlowID(peerID)
+		if err != nil {
+			return fmt.Errorf("could not get flow node ID: %w", err)
+		}
+
+		fnb.NodeID = pubNodeID
+		fnb.NetworkKey = networkingPrivateKey
+
+		return nil
+	}
+
+	fnb.NodeID = nodeID
+	fnb.NetworkKey = info.NetworkPrivKey.PrivateKey
+
 	return nil
+}
+
+func peerIDFromNetworkKey(privateKey crypto.PrivateKey) (peer.ID, error) {
+	pubKey, err := keyutils.LibP2PPublicKeyFromFlow(privateKey.PublicKey())
+	if err != nil {
+		return "", fmt.Errorf("could not load libp2p public key: %w", err)
+	}
+
+	return peer.IDFromPublicKey(pubKey)
 }
 
 func (fnb *FlowNodeBuilder) initLogger() error {
@@ -755,10 +932,7 @@ func (fnb *FlowNodeBuilder) initMetrics() error {
 		// metrics enabled, report node info metrics as post init event
 		fnb.PostInit(func(nodeConfig *NodeConfig) error {
 			nodeInfoMetrics := metrics.NewNodeInfoCollector()
-			protocolVersion, err := fnb.RootSnapshot.Params().ProtocolVersion()
-			if err != nil {
-				return fmt.Errorf("could not query root snapshoot protocol version: %w", err)
-			}
+			protocolVersion := fnb.RootSnapshot.Params().ProtocolVersion()
 			nodeInfoMetrics.NodeInfo(build.Version(), build.Commit(), nodeConfig.SporkID.String(), protocolVersion)
 			return nil
 		})
@@ -1006,8 +1180,11 @@ func (fnb *FlowNodeBuilder) initStorage() error {
 	collections := bstorage.NewCollections(fnb.DB, transactions)
 	setups := bstorage.NewEpochSetups(fnb.Metrics.Cache, fnb.DB)
 	epochCommits := bstorage.NewEpochCommits(fnb.Metrics.Cache, fnb.DB)
-	statuses := bstorage.NewEpochStatuses(fnb.Metrics.Cache, fnb.DB)
 	commits := bstorage.NewCommits(fnb.Metrics.Cache, fnb.DB)
+	protocolState := bstorage.NewProtocolState(fnb.Metrics.Cache, setups, epochCommits, fnb.DB,
+		bstorage.DefaultProtocolStateCacheSize, bstorage.DefaultProtocolStateByBlockIDCacheSize)
+	protocolKVStores := bstorage.NewProtocolKVStore(fnb.Metrics.Cache, fnb.DB,
+		bstorage.DefaultProtocolKVStoreCacheSize, bstorage.DefaultProtocolKVStoreByBlockIDCacheSize)
 	versionBeacons := bstorage.NewVersionBeacons(fnb.DB)
 
 	fnb.Storage = Storage{
@@ -1025,7 +1202,8 @@ func (fnb *FlowNodeBuilder) initStorage() error {
 		Setups:             setups,
 		EpochCommits:       epochCommits,
 		VersionBeacons:     versionBeacons,
-		Statuses:           statuses,
+		EpochProtocolState: protocolState,
+		ProtocolKVStore:    protocolKVStores,
 		Commits:            commits,
 	}
 
@@ -1038,7 +1216,6 @@ func (fnb *FlowNodeBuilder) InitIDProviders() {
 		if err != nil {
 			return fmt.Errorf("could not initialize ProtocolStateIDCache: %w", err)
 		}
-		node.IDTranslator = idCache
 
 		// The following wrapper allows to disallow-list byzantine nodes via an admin command:
 		// the wrapper overrides the 'Ejected' flag of disallow-listed nodes to true
@@ -1050,6 +1227,33 @@ func (fnb *FlowNodeBuilder) InitIDProviders() {
 		}
 		node.IdentityProvider = disallowListWrapper
 
+		if node.ObserverMode {
+			// identifier providers decides which node to connect to when syncing blocks,
+			// in observer mode, the peer nodes have to be specific public access node,
+			// rather than the staked consensus nodes.
+			idTranslator, factory, err := CreatePublicIDTranslatorAndIdentifierProvider(
+				fnb.Logger,
+				fnb.NetworkKey,
+				fnb.SporkID,
+				// fnb.LibP2PNode is not created yet, until EnqueueNetworkInit is called.
+				// so we pass a function that will return the LibP2PNode when called.
+				func() p2p.LibP2PNode {
+					return fnb.LibP2PNode
+				},
+				idCache,
+			)
+			if err != nil {
+				return fmt.Errorf("could not initialize public ID translator and identifier provider: %w", err)
+			}
+
+			fnb.IDTranslator = idTranslator
+			fnb.SyncEngineIdentifierProvider = factory()
+
+			return nil
+		}
+
+		node.IDTranslator = idCache
+
 		// register the disallow list wrapper for dynamic configuration via admin command
 		err = node.ConfigManager.RegisterIdentifierListConfig("network-id-provider-blocklist",
 			disallowListWrapper.GetDisallowList, disallowListWrapper.Update)
@@ -1059,9 +1263,9 @@ func (fnb *FlowNodeBuilder) InitIDProviders() {
 
 		node.SyncEngineIdentifierProvider = id.NewIdentityFilterIdentifierProvider(
 			filter.And(
-				filter.HasRole(flow.RoleConsensus),
-				filter.Not(filter.HasNodeID(node.Me.NodeID())),
-				underlay.NotEjectedFilter,
+				filter.HasRole[flow.Identity](flow.RoleConsensus),
+				filter.Not(filter.HasNodeID[flow.Identity](node.Me.NodeID())),
+				filter.NotEjectedFilter,
 			),
 			node.IdentityProvider,
 		)
@@ -1089,7 +1293,8 @@ func (fnb *FlowNodeBuilder) initState() error {
 			fnb.Storage.QuorumCertificates,
 			fnb.Storage.Setups,
 			fnb.Storage.EpochCommits,
-			fnb.Storage.Statuses,
+			fnb.Storage.EpochProtocolState,
+			fnb.Storage.ProtocolKVStore,
 			fnb.Storage.VersionBeacons,
 		)
 		if err != nil {
@@ -1098,11 +1303,7 @@ func (fnb *FlowNodeBuilder) initState() error {
 		fnb.State = state
 
 		// set root snapshot field
-		rootBlock, err := state.Params().FinalizedRoot()
-		if err != nil {
-			return fmt.Errorf("could not get root block from protocol state: %w", err)
-		}
-
+		rootBlock := state.Params().FinalizedRoot()
 		rootSnapshot := state.AtBlockID(rootBlock.ID())
 		if err := fnb.setRootSnapshot(rootSnapshot); err != nil {
 			return err
@@ -1141,7 +1342,8 @@ func (fnb *FlowNodeBuilder) initState() error {
 			fnb.Storage.QuorumCertificates,
 			fnb.Storage.Setups,
 			fnb.Storage.EpochCommits,
-			fnb.Storage.Statuses,
+			fnb.Storage.EpochProtocolState,
+			fnb.Storage.ProtocolKVStore,
 			fnb.Storage.VersionBeacons,
 			fnb.RootSnapshot,
 			options...,
@@ -1230,24 +1432,50 @@ func (fnb *FlowNodeBuilder) setRootSnapshot(rootSnapshot protocol.Snapshot) erro
 	}
 
 	fnb.RootChainID = fnb.FinalizedRootBlock.Header.ChainID
-	fnb.SporkID, err = fnb.RootSnapshot.Params().SporkID()
-	if err != nil {
-		return fmt.Errorf("failed to read spork ID: %w", err)
-	}
+	fnb.SporkID = fnb.RootSnapshot.Params().SporkID()
 
 	return nil
 }
 
 func (fnb *FlowNodeBuilder) initLocal() error {
+	// NodeID has been set in initNodeInfo
+	myID := fnb.NodeID
+	if fnb.ObserverMode {
+		nodeID, err := flow.HexStringToIdentifier(fnb.BaseConfig.nodeIDHex)
+		if err != nil {
+			return fmt.Errorf("could not parse node ID from string (id: %v): %w", fnb.BaseConfig.nodeIDHex, err)
+		}
+		info, err := LoadPrivateNodeInfo(fnb.BaseConfig.BootstrapDir, nodeID)
+		if err != nil {
+			return fmt.Errorf("could not load private node info: %w", err)
+		}
+
+		if info.Role != flow.RoleExecution {
+			return fmt.Errorf("observer mode is only available for execution nodes")
+		}
+
+		id := flow.IdentitySkeleton{
+			// observer mode uses the node id derived from the network key,
+			// rather than the node id from the node info file
+			NodeID:        myID,
+			Address:       info.Address,
+			Role:          info.Role,
+			InitialWeight: 0,
+			NetworkPubKey: fnb.NetworkKey.PublicKey(),
+			StakingPubKey: fnb.StakingKey.PublicKey(),
+		}
+		fnb.Me, err = local.New(id, fnb.StakingKey)
+		if err != nil {
+			return fmt.Errorf("could not initialize local: %w", err)
+		}
+
+		return nil
+	}
+
 	// Verify that my ID (as given in the configuration) is known to the network
 	// (i.e. protocol state). There are two cases that will cause the following error:
 	// 1) used the wrong node id, which is not part of the identity list of the finalized state
 	// 2) the node id is a new one for a new spork, but the bootstrap data has not been updated.
-	myID, err := flow.HexStringToIdentifier(fnb.BaseConfig.nodeIDHex)
-	if err != nil {
-		return fmt.Errorf("could not parse node identifier: %w", err)
-	}
-
 	self, err := fnb.State.Final().Identity(myID)
 	if err != nil {
 		return fmt.Errorf("node identity not found in the identity list of the finalized state (id: %v): %w", myID, err)
@@ -1257,11 +1485,7 @@ func (fnb *FlowNodeBuilder) initLocal() error {
 	// We enforce this strictly for MainNet. For other networks (e.g. TestNet or BenchNet), we
 	// are lenient, to allow ghost node to run as any role.
 	if self.Role.String() != fnb.BaseConfig.NodeRole {
-		rootBlockHeader, err := fnb.State.Params().FinalizedRoot()
-		if err != nil {
-			return fmt.Errorf("could not get root block from protocol state: %w", err)
-		}
-
+		rootBlockHeader := fnb.State.Params().FinalizedRoot()
 		if rootBlockHeader.ChainID == flow.Mainnet {
 			return fmt.Errorf("running as incorrect role, expected: %v, actual: %v, exiting",
 				self.Role.String(),
@@ -1282,7 +1506,7 @@ func (fnb *FlowNodeBuilder) initLocal() error {
 		return fmt.Errorf("configured staking key does not match protocol state")
 	}
 
-	fnb.Me, err = local.New(self, fnb.StakingKey)
+	fnb.Me, err = local.New(self.IdentitySkeleton, fnb.StakingKey)
 	if err != nil {
 		return fmt.Errorf("could not initialize local: %w", err)
 	}
@@ -1297,12 +1521,21 @@ func (fnb *FlowNodeBuilder) initFvmOptions() {
 		fvm.WithBlocks(blockFinder),
 		fvm.WithAccountStorageLimit(true),
 	}
-	if fnb.RootChainID == flow.Testnet || fnb.RootChainID == flow.Sandboxnet || fnb.RootChainID == flow.Mainnet {
+	switch fnb.RootChainID {
+	case flow.Testnet,
+		flow.Sandboxnet,
+		flow.Previewnet,
+		flow.Mainnet:
 		vmOpts = append(vmOpts,
 			fvm.WithTransactionFeesEnabled(true),
 		)
 	}
-	if fnb.RootChainID == flow.Testnet || fnb.RootChainID == flow.Sandboxnet || fnb.RootChainID == flow.Localnet || fnb.RootChainID == flow.Benchnet {
+	switch fnb.RootChainID {
+	case flow.Testnet,
+		flow.Sandboxnet,
+		flow.Previewnet,
+		flow.Localnet,
+		flow.Benchnet:
 		vmOpts = append(vmOpts,
 			fvm.WithContractDeploymentRestricted(false),
 		)
@@ -1312,6 +1545,7 @@ func (fnb *FlowNodeBuilder) initFvmOptions() {
 
 // handleModules initializes the given module.
 func (fnb *FlowNodeBuilder) handleModule(v namedModuleFunc) error {
+	fnb.Logger.Info().Str("module", v.name).Msg("module initialization started")
 	err := v.fn(fnb.NodeConfig)
 	if err != nil {
 		return fmt.Errorf("module %s initialization failed: %w", v.name, err)
@@ -1411,10 +1645,14 @@ func (fnb *FlowNodeBuilder) handleComponent(v namedComponentFunc, dependencies <
 
 		logger := fnb.Logger.With().Str("component", v.name).Logger()
 
+		logger.Info().Msg("component initialization started")
 		// First, build the component using the factory method.
 		readyAware, err := v.fn(fnb.NodeConfig)
 		if err != nil {
 			ctx.Throw(fmt.Errorf("component %s initialization failed: %w", v.name, err))
+		}
+		if readyAware == nil {
+			ctx.Throw(fmt.Errorf("component %s initialization failed: nil component", v.name))
 		}
 		logger.Info().Msg("component initialization complete")
 
@@ -1482,6 +1720,7 @@ func (fnb *FlowNodeBuilder) handleRestartableComponent(v namedComponentFunc, par
 
 		// This may be called multiple times if the component is restarted
 		componentFactory := func() (component.Component, error) {
+			log.Info().Msg("component initialization started")
 			c, err := v.fn(fnb.NodeConfig)
 			if err != nil {
 				return nil, err
@@ -1901,10 +2140,11 @@ func (fnb *FlowNodeBuilder) extraFlagsValidation() error {
 // DhtSystemActivationStatus parses the given role string and returns the corresponding DHT system activation status.
 // Args:
 // - roleStr: the role string to parse.
+// - enabled: whether the DHT system is configured to be enabled. Only meaningful for access and execution nodes.
 // Returns:
 // - DhtSystemActivation: the corresponding DHT system activation status.
 // - error: if the role string is invalid, returns an error.
-func DhtSystemActivationStatus(roleStr string) (p2pbuilder.DhtSystemActivation, error) {
+func DhtSystemActivationStatus(roleStr string, enabled bool) (p2pbuilder.DhtSystemActivation, error) {
 	if roleStr == "ghost" {
 		// ghost node is not a valid role, so we don't need to parse it
 		return p2pbuilder.DhtSystemDisabled, nil
@@ -1915,12 +2155,12 @@ func DhtSystemActivationStatus(roleStr string) (p2pbuilder.DhtSystemActivation, 
 		// ghost role is not a valid role, so we don't need to parse it
 		return p2pbuilder.DhtSystemDisabled, fmt.Errorf("could not parse node role: %w", err)
 	}
-	if role == flow.RoleAccess || role == flow.RoleExecution {
-		// Only access and execution nodes need to run DHT;
-		// Access nodes and execution nodes need DHT to run a blob service.
-		// Moreover, access nodes run a DHT to let un-staked (public) access nodes find each other on the public network.
-		return p2pbuilder.DhtSystemEnabled, nil
+
+	// Only access and execution nodes need to run DHT; which is used by bitswap.
+	// Access nodes also run a DHT on the public network for peer discovery of un-staked nodes.
+	if role != flow.RoleAccess && role != flow.RoleExecution {
+		return p2pbuilder.DhtSystemDisabled, nil
 	}
 
-	return p2pbuilder.DhtSystemDisabled, nil
+	return p2pbuilder.DhtSystemActivation(enabled), nil
 }

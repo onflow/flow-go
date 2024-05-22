@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 
+	none "github.com/ipfs/boxo/routing/none"
 	"github.com/libp2p/go-libp2p"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/config"
@@ -18,9 +19,9 @@ import (
 	"github.com/libp2p/go-libp2p/p2p/transport/tcp"
 	"github.com/multiformats/go-multiaddr"
 	madns "github.com/multiformats/go-multiaddr-dns"
+	fcrypto "github.com/onflow/crypto"
 	"github.com/rs/zerolog"
 
-	fcrypto "github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
@@ -146,7 +147,14 @@ func (builder *LibP2PNodeBuilder) SetRoutingSystem(f func(context.Context, host.
 	return builder
 }
 
-func (builder *LibP2PNodeBuilder) SetGossipSubFactory(gf p2p.GossipSubFactoryFunc, cf p2p.GossipSubAdapterConfigFunc) p2p.NodeBuilder {
+// OverrideGossipSubFactory overrides the default gossipsub factory for the GossipSub protocol.
+// The purpose of override is to allow the node to provide a custom gossipsub factory for sake of testing or experimentation.
+// Note: it is not recommended to override the default gossipsub factory in production unless you know what you are doing.
+// Args:
+// - factory: custom gossipsub factory
+// Returns:
+// - NodeBuilder: the node builder
+func (builder *LibP2PNodeBuilder) OverrideGossipSubFactory(gf p2p.GossipSubFactoryFunc, cf p2p.GossipSubAdapterConfigFunc) p2p.NodeBuilder {
 	builder.gossipSubBuilder.SetGossipSubFactory(gf)
 	builder.gossipSubBuilder.SetGossipSubConfigFunc(cf)
 	return builder
@@ -180,8 +188,15 @@ func (builder *LibP2PNodeBuilder) OverrideNodeConstructor(f p2p.NodeConstructor)
 	return builder
 }
 
-func (builder *LibP2PNodeBuilder) OverrideDefaultRpcInspectorSuiteFactory(factory p2p.GossipSubRpcInspectorSuiteFactoryFunc) p2p.NodeBuilder {
-	builder.gossipSubBuilder.OverrideDefaultRpcInspectorSuiteFactory(factory)
+// OverrideDefaultRpcInspectorFactory overrides the default rpc inspector factory for the GossipSub protocol.
+// The purpose of override is to allow the node to provide a custom rpc inspector factory for sake of testing or experimentation.
+// Note: it is not recommended to override the default rpc inspector factory in production unless you know what you are doing.
+// Args:
+// - factory: custom rpc inspector factory
+// Returns:
+// - NodeBuilder: the node builder
+func (builder *LibP2PNodeBuilder) OverrideDefaultRpcInspectorFactory(factory p2p.GossipSubRpcInspectorFactoryFunc) p2p.NodeBuilder {
+	builder.gossipSubBuilder.OverrideDefaultRpcInspectorFactory(factory)
 	return builder
 }
 
@@ -215,7 +230,7 @@ func (builder *LibP2PNodeBuilder) Build() (p2p.LibP2PNode, error) {
 		}
 
 		opts = append(opts, libp2p.ResourceManager(mgr))
-		builder.logger.Info().Msg("default libp2p resource manager is enabled with metrics")
+		builder.logger.Info().Msgf("default libp2p resource manager is enabled with metrics, pubkey: %s", builder.networkKey.PublicKey())
 	}
 
 	if builder.connManager != nil {
@@ -437,7 +452,9 @@ func DefaultNodeBuilder(
 		idProvider,
 		rCfg, peerManagerCfg,
 		disallowListCacheCfg,
-		uniCfg).
+		uniCfg)
+
+	builder.
 		SetBasicResolver(resolver).
 		SetConnectionManager(connManager).
 		SetConnectionGater(connGater)
@@ -449,13 +466,28 @@ func DefaultNodeBuilder(
 		}
 		builder.SetSubscriptionFilter(subscription.NewRoleBasedFilter(r, idProvider))
 
-		if dhtSystemActivation == DhtSystemEnabled {
-			builder.SetRoutingSystem(
-				func(ctx context.Context, host host.Host) (routing.Routing, error) {
-					return dht.NewDHT(ctx, host, protocols.FlowDHTProtocolID(sporkId), logger, metricsCfg.Metrics, dht.AsServer())
-				})
-		}
+		builder.configureRoutingSystem(r, dhtSystemActivation)
 	}
 
 	return builder, nil
+}
+
+func (b *LibP2PNodeBuilder) configureRoutingSystem(
+	role flow.Role,
+	dhtSystemActivation DhtSystemActivation,
+) {
+	if role != flow.RoleAccess && role != flow.RoleExecution {
+		return // routing only required for Access and Execution nodes
+	}
+
+	if dhtSystemActivation == DhtSystemEnabled {
+		b.SetRoutingSystem(func(ctx context.Context, host host.Host) (routing.Routing, error) {
+			return dht.NewDHT(ctx, host, protocols.FlowDHTProtocolID(b.sporkId), b.logger, b.metricsConfig.Metrics, dht.AsServer())
+		})
+	} else {
+		// bitswap requires a content routing system. this returns a stub instead of a full DHT
+		b.SetRoutingSystem(func(ctx context.Context, host host.Host) (routing.Routing, error) {
+			return none.ConstructNilRouting(ctx, host, nil, nil)
+		})
+	}
 }

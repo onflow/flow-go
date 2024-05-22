@@ -2,6 +2,7 @@ package backend
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -9,12 +10,10 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/access/index"
 	"github.com/onflow/flow-go/engine/access/state_stream"
-	"github.com/onflow/flow-go/engine/common/rpc"
-	"github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/counters"
 	"github.com/onflow/flow-go/module/execution"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
@@ -61,11 +60,13 @@ type Config struct {
 }
 
 type GetExecutionDataFunc func(context.Context, uint64) (*execution_data.BlockExecutionDataEntity, error)
-type GetStartHeightFunc func(flow.Identifier, uint64) (uint64, error)
 
 type StateStreamBackend struct {
+	subscription.ExecutionDataTracker
+
 	ExecutionDataBackend
 	EventsBackend
+	AccountStatusesBackend
 
 	log                  zerolog.Logger
 	state                protocol.State
@@ -74,42 +75,29 @@ type StateStreamBackend struct {
 	results              storage.ExecutionResults
 	execDataStore        execution_data.ExecutionDataStore
 	execDataCache        *cache.ExecutionDataCache
-	broadcaster          *engine.Broadcaster
-	rootBlockHeight      uint64
-	rootBlockID          flow.Identifier
 	registers            *execution.RegistersAsyncStore
 	registerRequestLimit int
-
-	// highestHeight contains the highest consecutive block height for which we have received a
-	// new Execution Data notification.
-	highestHeight counters.StrictMonotonousCounter
 }
 
 func New(
 	log zerolog.Logger,
-	config Config,
 	state protocol.State,
 	headers storage.Headers,
-	events storage.Events,
 	seals storage.Seals,
 	results storage.ExecutionResults,
 	execDataStore execution_data.ExecutionDataStore,
 	execDataCache *cache.ExecutionDataCache,
-	broadcaster *engine.Broadcaster,
-	rootHeight uint64,
-	highestAvailableHeight uint64,
 	registers *execution.RegistersAsyncStore,
+	eventsIndex *index.EventsIndex,
 	useEventsIndex bool,
+	registerIDsRequestLimit int,
+	subscriptionHandler *subscription.SubscriptionHandler,
+	executionDataTracker subscription.ExecutionDataTracker,
 ) (*StateStreamBackend, error) {
 	logger := log.With().Str("module", "state_stream_api").Logger()
 
-	// cache the root block height and ID for runtime lookups.
-	rootBlockID, err := headers.BlockIDByHeight(rootHeight)
-	if err != nil {
-		return nil, fmt.Errorf("could not get root block ID: %w", err)
-	}
-
 	b := &StateStreamBackend{
+		ExecutionDataTracker: executionDataTracker,
 		log:                  logger,
 		state:                state,
 		headers:              headers,
@@ -117,36 +105,38 @@ func New(
 		results:              results,
 		execDataStore:        execDataStore,
 		execDataCache:        execDataCache,
-		broadcaster:          broadcaster,
-		rootBlockHeight:      rootHeight,
-		rootBlockID:          rootBlockID,
 		registers:            registers,
-		registerRequestLimit: int(config.RegisterIDsRequestLimit),
-		highestHeight:        counters.NewMonotonousCounter(highestAvailableHeight),
+		registerRequestLimit: registerIDsRequestLimit,
 	}
 
 	b.ExecutionDataBackend = ExecutionDataBackend{
+		log:                  logger,
+		headers:              headers,
+		subscriptionHandler:  subscriptionHandler,
+		getExecutionData:     b.getExecutionData,
+		executionDataTracker: executionDataTracker,
+	}
+
+	eventsRetriever := EventsRetriever{
 		log:              logger,
 		headers:          headers,
-		broadcaster:      broadcaster,
-		sendTimeout:      config.ClientSendTimeout,
-		responseLimit:    config.ResponseLimit,
-		sendBufferSize:   int(config.ClientSendBufferSize),
 		getExecutionData: b.getExecutionData,
-		getStartHeight:   b.getStartHeight,
+		useEventsIndex:   useEventsIndex,
+		eventsIndex:      eventsIndex,
 	}
 
 	b.EventsBackend = EventsBackend{
-		log:              logger,
-		events:           events,
-		headers:          headers,
-		broadcaster:      broadcaster,
-		sendTimeout:      config.ClientSendTimeout,
-		responseLimit:    config.ResponseLimit,
-		sendBufferSize:   int(config.ClientSendBufferSize),
-		getExecutionData: b.getExecutionData,
-		getStartHeight:   b.getStartHeight,
-		useIndex:         useEventsIndex,
+		log:                  logger,
+		subscriptionHandler:  subscriptionHandler,
+		executionDataTracker: executionDataTracker,
+		eventsRetriever:      eventsRetriever,
+	}
+
+	b.AccountStatusesBackend = AccountStatusesBackend{
+		log:                  logger,
+		subscriptionHandler:  subscriptionHandler,
+		executionDataTracker: b.ExecutionDataTracker,
+		eventsRetriever:      eventsRetriever,
 	}
 
 	return b, nil
@@ -154,78 +144,27 @@ func New(
 
 // getExecutionData returns the execution data for the given block height.
 // Expected errors during normal operation:
-// - storage.ErrNotFound or execution_data.BlobNotFoundError: execution data for the given block height is not available.
+// - subscription.ErrBlockNotReady: execution data for the given block height is not available.
 func (b *StateStreamBackend) getExecutionData(ctx context.Context, height uint64) (*execution_data.BlockExecutionDataEntity, error) {
+	highestHeight := b.ExecutionDataTracker.GetHighestHeight()
 	// fail early if no notification has been received for the given block height.
 	// note: it's possible for the data to exist in the data store before the notification is
 	// received. this ensures a consistent view is available to all streams.
-	if height > b.highestHeight.Value() {
-		return nil, fmt.Errorf("execution data for block %d is not available yet: %w", height, storage.ErrNotFound)
+	if height > highestHeight {
+		return nil, fmt.Errorf("execution data for block %d is not available yet: %w", height, subscription.ErrBlockNotReady)
 	}
 
 	execData, err := b.execDataCache.ByHeight(ctx, height)
 	if err != nil {
+		if errors.Is(err, storage.ErrNotFound) ||
+			execution_data.IsBlobNotFoundError(err) {
+			err = errors.Join(err, subscription.ErrBlockNotReady)
+			return nil, fmt.Errorf("could not get execution data for block %d: %w", height, err)
+		}
 		return nil, fmt.Errorf("could not get execution data for block %d: %w", height, err)
 	}
 
 	return execData, nil
-}
-
-// getStartHeight returns the start height to use when searching.
-// Only one of startBlockID and startHeight may be set. Otherwise, an InvalidArgument error is returned.
-// If a block is provided and does not exist, a NotFound error is returned.
-// If neither startBlockID nor startHeight is provided, the latest sealed block is used.
-func (b *StateStreamBackend) getStartHeight(startBlockID flow.Identifier, startHeight uint64) (uint64, error) {
-	// make sure only one of start block ID and start height is provided
-	if startBlockID != flow.ZeroID && startHeight > 0 {
-		return 0, status.Errorf(codes.InvalidArgument, "only one of start block ID and start height may be provided")
-	}
-
-	// if the start block is the root block, there will not be an execution data. skip it and
-	// begin from the next block.
-	// Note: we can skip the block lookup since it was already done in the constructor
-	if startBlockID == b.rootBlockID ||
-		// Note: there is a corner case when rootBlockHeight == 0:
-		// since the default value of an uint64 is 0, when checking if startHeight matches the root block
-		// we also need to check that startBlockID is unset, otherwise we may incorrectly set the start height
-		// for non-matching startBlockIDs.
-		(startHeight == b.rootBlockHeight && startBlockID == flow.ZeroID) {
-		return b.rootBlockHeight + 1, nil
-	}
-
-	// invalid or missing block IDs will result in an error
-	if startBlockID != flow.ZeroID {
-		header, err := b.headers.ByBlockID(startBlockID)
-		if err != nil {
-			return 0, rpc.ConvertStorageError(fmt.Errorf("could not get header for block %v: %w", startBlockID, err))
-		}
-		return header.Height, nil
-	}
-
-	// heights that have not been indexed yet will result in an error
-	if startHeight > 0 {
-		if startHeight < b.rootBlockHeight {
-			return 0, status.Errorf(codes.InvalidArgument, "start height must be greater than or equal to the root height %d", b.rootBlockHeight)
-		}
-
-		header, err := b.headers.ByHeight(startHeight)
-		if err != nil {
-			return 0, rpc.ConvertStorageError(fmt.Errorf("could not get header for height %d: %w", startHeight, err))
-		}
-		return header.Height, nil
-	}
-
-	// if no start block was provided, use the latest sealed block
-	header, err := b.state.Sealed().Head()
-	if err != nil {
-		return 0, status.Errorf(codes.Internal, "could not get latest sealed block: %v", err)
-	}
-	return header.Height, nil
-}
-
-// setHighestHeight sets the highest height for which execution data is available.
-func (b *StateStreamBackend) setHighestHeight(height uint64) bool {
-	return b.highestHeight.Set(height)
 }
 
 // GetRegisterValues returns the register values for the given register IDs at the given block height.

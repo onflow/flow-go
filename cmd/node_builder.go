@@ -6,13 +6,13 @@ import (
 
 	"github.com/dgraph-io/badger/v2"
 	madns "github.com/multiformats/go-multiaddr-dns"
+	"github.com/onflow/crypto"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
 
 	"github.com/onflow/flow-go/admin/commands"
 	"github.com/onflow/flow-go/config"
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -141,6 +141,7 @@ type BaseConfig struct {
 	AdminMaxMsgSize             uint
 	BindAddr                    string
 	NodeRole                    string
+	ObserverMode                bool
 	DynamicStartupANAddress     string
 	DynamicStartupANPubkey      string
 	DynamicStartupEpochPhase    string
@@ -171,6 +172,13 @@ type BaseConfig struct {
 
 	// FlowConfig Flow configuration.
 	FlowConfig config.FlowConfig
+
+	// DhtSystemEnabled configures whether the DHT system is enabled on Access and Execution nodes.
+	DhtSystemEnabled bool
+
+	// BitswapReprovideEnabled configures whether the Bitswap reprovide mechanism is enabled.
+	// This is only meaningful to Access and Execution nodes.
+	BitswapReprovideEnabled bool
 }
 
 // NodeConfig contains all the derived parameters such the NodeID, private keys etc. and initialized instances of
@@ -234,7 +242,7 @@ type StateExcerptAtBoot struct {
 	SealedRootBlock     *flow.Block             // The last sealed block when bootstrapped.
 	RootQC              *flow.QuorumCertificate // QC for Finalized Root Block
 	RootResult          *flow.ExecutionResult   // Result for SealedRootBlock
-	RootSeal            *flow.Seal              //Seal for RootResult
+	RootSeal            *flow.Seal              // Seal for RootResult
 	RootChainID         flow.ChainID
 	SporkID             flow.Identifier
 	LastFinalizedHeader *flow.Header // last finalized header when the node boots up
@@ -255,6 +263,7 @@ func DefaultBaseConfig() *BaseConfig {
 		AdminClientCAs:   NotSet,
 		AdminMaxMsgSize:  grpcutils.DefaultMaxMsgSize,
 		BindAddr:         NotSet,
+		ObserverMode:     false,
 		BootstrapDir:     "bootstrap",
 		datadir:          datadir,
 		secretsdir:       NotSet,
@@ -278,10 +287,12 @@ func DefaultBaseConfig() *BaseConfig {
 			Duration: 10 * time.Second,
 		},
 
-		HeroCacheMetricsEnable: false,
-		SyncCoreConfig:         chainsync.DefaultConfig(),
-		CodecFactory:           codecFactory,
-		ComplianceConfig:       compliance.DefaultConfig(),
+		HeroCacheMetricsEnable:  false,
+		SyncCoreConfig:          chainsync.DefaultConfig(),
+		CodecFactory:            codecFactory,
+		ComplianceConfig:        compliance.DefaultConfig(),
+		DhtSystemEnabled:        true,
+		BitswapReprovideEnabled: true,
 	}
 }
 

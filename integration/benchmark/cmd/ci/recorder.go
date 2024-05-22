@@ -39,7 +39,7 @@ type BenchmarkResults struct {
 	RawTPS []RawTPSRecord
 }
 
-type tpsRecorder struct {
+type TPSRecorder struct {
 	BenchmarkResults
 
 	lastStats benchmark.WorkerStats
@@ -56,10 +56,10 @@ func NewTPSRecorder(
 	ctx context.Context,
 	workerStatsTracker *benchmark.WorkerStatsTracker,
 	statInterval time.Duration,
-) *tpsRecorder {
+) *TPSRecorder {
 	ctx, cancel := context.WithCancel(ctx)
 
-	r := &tpsRecorder{
+	r := &TPSRecorder{
 		BenchmarkResults: BenchmarkResults{
 			Status:    StatusUnknown,
 			StartTime: time.Now(),
@@ -90,7 +90,7 @@ func NewTPSRecorder(
 	return r
 }
 
-func (r *tpsRecorder) Stop() {
+func (r *TPSRecorder) Stop() {
 	r.stopOnce.Do(func() {
 		r.cancel()
 		<-r.done
@@ -103,11 +103,11 @@ func (r *tpsRecorder) Stop() {
 	})
 }
 
-func (r *tpsRecorder) SetStatus(status Status) {
+func (r *TPSRecorder) SetStatus(status Status) {
 	r.Status = status
 }
 
-func (r *tpsRecorder) record(nowTs time.Time, stats benchmark.WorkerStats) {
+func (r *TPSRecorder) record(nowTs time.Time, stats benchmark.WorkerStats) {
 	if !r.lastTs.IsZero() {
 		r.RawTPS = append(r.RawTPS, r.statsToRawTPS(nowTs, stats))
 	}
@@ -116,7 +116,7 @@ func (r *tpsRecorder) record(nowTs time.Time, stats benchmark.WorkerStats) {
 	r.lastTs = nowTs
 }
 
-func (r *tpsRecorder) statsToRawTPS(nowTs time.Time, stats benchmark.WorkerStats) RawTPSRecord {
+func (r *TPSRecorder) statsToRawTPS(nowTs time.Time, stats benchmark.WorkerStats) RawTPSRecord {
 	timeDiff := nowTs.Sub(r.lastTs).Seconds()
 
 	return RawTPSRecord{

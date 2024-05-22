@@ -20,7 +20,7 @@ type IdentityProvider interface {
 	// protocol that pass the provided filter. Caution, this includes ejected nodes.
 	// Please check the `Ejected` flag in the identities (or provide a filter for
 	// removing ejected nodes).
-	Identities(flow.IdentityFilter) flow.IdentityList
+	Identities(flow.IdentityFilter[flow.Identity]) flow.IdentityList
 
 	// ByNodeID returns the full identity for the node with the given Identifier,
 	// where Identifier is the way the protocol refers to the node. The function

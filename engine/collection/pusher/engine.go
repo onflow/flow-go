@@ -128,7 +128,7 @@ func (e *Engine) onSubmitCollectionGuarantee(originID flow.Identifier, req *mess
 
 // SubmitCollectionGuarantee submits the collection guarantee to all consensus nodes.
 func (e *Engine) SubmitCollectionGuarantee(guarantee *flow.CollectionGuarantee) error {
-	consensusNodes, err := e.state.Final().Identities(filter.HasRole(flow.RoleConsensus))
+	consensusNodes, err := e.state.Final().Identities(filter.HasRole[flow.Identity](flow.RoleConsensus))
 	if err != nil {
 		return fmt.Errorf("could not get consensus nodes: %w", err)
 	}

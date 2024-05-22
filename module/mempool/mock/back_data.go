@@ -53,6 +53,32 @@ func (_m *BackData) Adjust(entityID flow.Identifier, f func(flow.Entity) flow.En
 	return r0, r1
 }
 
+// AdjustWithInit provides a mock function with given fields: entityID, adjust, init
+func (_m *BackData) AdjustWithInit(entityID flow.Identifier, adjust func(flow.Entity) flow.Entity, init func() flow.Entity) (flow.Entity, bool) {
+	ret := _m.Called(entityID, adjust, init)
+
+	var r0 flow.Entity
+	var r1 bool
+	if rf, ok := ret.Get(0).(func(flow.Identifier, func(flow.Entity) flow.Entity, func() flow.Entity) (flow.Entity, bool)); ok {
+		return rf(entityID, adjust, init)
+	}
+	if rf, ok := ret.Get(0).(func(flow.Identifier, func(flow.Entity) flow.Entity, func() flow.Entity) flow.Entity); ok {
+		r0 = rf(entityID, adjust, init)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(flow.Entity)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(flow.Identifier, func(flow.Entity) flow.Entity, func() flow.Entity) bool); ok {
+		r1 = rf(entityID, adjust, init)
+	} else {
+		r1 = ret.Get(1).(bool)
+	}
+
+	return r0, r1
+}
+
 // All provides a mock function with given fields:
 func (_m *BackData) All() map[flow.Identifier]flow.Entity {
 	ret := _m.Called()
@@ -114,6 +140,32 @@ func (_m *BackData) Entities() []flow.Entity {
 	}
 
 	return r0
+}
+
+// GetWithInit provides a mock function with given fields: entityID, init
+func (_m *BackData) GetWithInit(entityID flow.Identifier, init func() flow.Entity) (flow.Entity, bool) {
+	ret := _m.Called(entityID, init)
+
+	var r0 flow.Entity
+	var r1 bool
+	if rf, ok := ret.Get(0).(func(flow.Identifier, func() flow.Entity) (flow.Entity, bool)); ok {
+		return rf(entityID, init)
+	}
+	if rf, ok := ret.Get(0).(func(flow.Identifier, func() flow.Entity) flow.Entity); ok {
+		r0 = rf(entityID, init)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(flow.Entity)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(flow.Identifier, func() flow.Entity) bool); ok {
+		r1 = rf(entityID, init)
+	} else {
+		r1 = ret.Get(1).(bool)
+	}
+
+	return r0, r1
 }
 
 // Has provides a mock function with given fields: entityID

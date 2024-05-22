@@ -3,9 +3,9 @@ package types
 import (
 	"math/big"
 
-	gethCommon "github.com/ethereum/go-ethereum/common"
-	gethTypes "github.com/ethereum/go-ethereum/core/types"
-	gethVM "github.com/ethereum/go-ethereum/core/vm"
+	gethCommon "github.com/onflow/go-ethereum/common"
+	gethTypes "github.com/onflow/go-ethereum/core/types"
+	gethVM "github.com/onflow/go-ethereum/core/vm"
 )
 
 // StateDB acts as the main interface to the EVM runtime
@@ -13,18 +13,30 @@ type StateDB interface {
 	gethVM.StateDB
 
 	// Commit commits the changes
-	Commit() error
+	// setting `finalize` flag
+	// calls a subsequent call to Finalize
+	// defering finalization and calling it once at the end
+	// improves efficiency of batch operations.
+	Commit(finalize bool) error
+
+	// Finalize flushes all the changes
+	// to the permanent storage
+	Finalize() error
 
 	// Logs collects and prepares logs
 	Logs(
-		blockHash gethCommon.Hash,
 		blockNumber uint64,
 		txHash gethCommon.Hash,
 		txIndex uint,
 	) []*gethTypes.Log
 
-	// returns a map of preimages
+	// Preimages returns a map of preimages
 	Preimages() map[gethCommon.Hash][]byte
+
+	// Reset resets uncommitted changes and transient artifacts such as error, logs,
+	// preimages, access lists, ...
+	// The method is often called between execution of different transactions
+	Reset()
 }
 
 // ReadOnlyView provides a readonly view of the state
@@ -33,8 +45,9 @@ type ReadOnlyView interface {
 	Exist(gethCommon.Address) (bool, error)
 	// IsCreated returns true if address has been created in this tx
 	IsCreated(gethCommon.Address) bool
-	// HasSuicided returns true if an address has suicided
-	HasSuicided(gethCommon.Address) (bool, *big.Int)
+	// HasSelfDestructed returns true if an address has self destructed
+	// it also returns the balance of address before selfdestruction call
+	HasSelfDestructed(gethCommon.Address) (bool, *big.Int)
 	// GetBalance returns the balance of an address
 	GetBalance(gethCommon.Address) (*big.Int, error)
 	// GetNonce returns the nonce of an address
@@ -63,8 +76,9 @@ type HotView interface {
 
 	// CreateAccount creates a new account
 	CreateAccount(gethCommon.Address) error
-	// Suicide set the flag for deletion of the account after execution
-	Suicide(gethCommon.Address) (success bool, err error)
+	// SelfDestruct set the flag for destruction of the account after execution
+	SelfDestruct(gethCommon.Address) error
+
 	// SubBalance subtracts the amount from the balance the given address
 	SubBalance(gethCommon.Address, *big.Int) error
 	// AddBalance adds the amount to the balance of the given address

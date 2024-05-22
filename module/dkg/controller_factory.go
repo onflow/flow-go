@@ -3,9 +3,9 @@ package dkg
 import (
 	"fmt"
 
+	"github.com/onflow/crypto"
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/signature"
@@ -44,7 +44,7 @@ func NewControllerFactory(
 // is capable of communicating with other nodes.
 func (f *ControllerFactory) Create(
 	dkgInstanceID string,
-	participants flow.IdentityList,
+	participants flow.IdentitySkeletonList,
 	seed []byte) (module.DKGController, error) {
 
 	myIndex, ok := participants.GetIndex(f.me.NodeID())

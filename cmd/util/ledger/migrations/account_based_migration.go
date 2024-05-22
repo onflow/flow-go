@@ -1,206 +1,356 @@
 package migrations
 
 import (
+	"container/heap"
+	"context"
 	"fmt"
+	"io"
+	"sync"
+	"time"
 
-	"github.com/rs/zerolog/log"
+	"github.com/onflow/cadence/runtime/common"
+	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/ledger"
-	"github.com/onflow/flow-go/ledger/common/convert"
-	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/util"
+	"github.com/onflow/flow-go/cmd/util/ledger/util"
+	"github.com/onflow/flow-go/cmd/util/ledger/util/registers"
+	moduleUtil "github.com/onflow/flow-go/module/util"
 )
 
-// PayloadToAccount takes a payload and return:
-// - (address, true, nil) if the payload is for an account, the account address is returned
-// - ("", false, nil) if the payload is not for an account
-// - ("", false, err) if running into any exception
-func PayloadToAccount(p ledger.Payload) (string, bool, error) {
-	k, err := p.Key()
-	if err != nil {
-		return "", false, fmt.Errorf("could not find key for payload: %w", err)
-	}
-	id, err := convert.LedgerKeyToRegisterID(k)
-	if err != nil {
-		return "", false, fmt.Errorf("error converting key to register ID")
-	}
-	if len([]byte(id.Owner)) != flow.AddressLength {
-		return "", false, nil
-	}
-	return id.Owner, true, nil
+// logTopNDurations is the number of longest migrations to log at the end of the migration
+const logTopNDurations = 20
+
+// AccountBasedMigration is an interface for migrations that migrate account by account
+// concurrently getting all the payloads for each account at a time.
+type AccountBasedMigration interface {
+	InitMigration(
+		log zerolog.Logger,
+		registersByAccount *registers.ByAccount,
+		nWorkers int,
+	) error
+	MigrateAccount(
+		ctx context.Context,
+		address common.Address,
+		accountRegisters *registers.AccountRegisters,
+	) error
+	io.Closer
 }
 
-// PayloadGroup groups payloads by account.
-// For global payloads, it's stored under NonAccountPayloads field
-type PayloadGroup struct {
-	NonAccountPayloads []ledger.Payload
-	Accounts           map[string][]ledger.Payload
-}
-
-// PayloadGrouping is a reducer function that adds the given payload to the corresponding
-// group under its account
-func PayloadGrouping(groups *PayloadGroup, payload ledger.Payload) (*PayloadGroup, error) {
-	address, isAccount, err := PayloadToAccount(payload)
-	if err != nil {
-		return nil, err
-	}
-
-	if isAccount {
-		groups.Accounts[address] = append(groups.Accounts[address], payload)
-	} else {
-		groups.NonAccountPayloads = append(groups.NonAccountPayloads, payload)
-	}
-
-	return groups, nil
-}
-
-// AccountMigrator takes all the payloads that belong to the given account
-// and return the migrated payloads
-type AccountMigrator interface {
-	MigratePayloads(account string, payloads []ledger.Payload) ([]ledger.Payload, error)
-}
-
-// MigrateByAccount teaks a migrator function and all the payloads, and return the migrated payloads
-func MigrateByAccount(migrator AccountMigrator, allPayloads []ledger.Payload, nWorker int) (
-	[]ledger.Payload, error) {
-	groups := &PayloadGroup{
-		NonAccountPayloads: make([]ledger.Payload, 0),
-		Accounts:           make(map[string][]ledger.Payload),
-	}
-
-	log.Info().Msgf("start grouping for a total of %v payloads", len(allPayloads))
-
-	var err error
-	logGrouping := util.LogProgress(
-		log.Logger,
-		util.DefaultLogProgressConfig(
-			"grouping payload",
-			len(allPayloads),
-		),
-	)
-	for _, payload := range allPayloads {
-		groups, err = PayloadGrouping(groups, payload)
-		if err != nil {
-			return nil, err
-		}
-		logGrouping(1)
-	}
-
-	log.Info().Msgf("finish grouping for payloads by account: %v groups in total, %v NonAccountPayloads",
-		len(groups.Accounts), len(groups.NonAccountPayloads))
-
-	// migrate the payloads under accounts
-	migrated, err := MigrateGroupConcurrently(migrator, groups.Accounts, nWorker)
-
-	if err != nil {
-		return nil, fmt.Errorf("could not migrate group: %w", err)
-	}
-
-	log.Info().Msgf("finished migrating payloads for %v account", len(groups.Accounts))
-
-	// add the non accounts which don't need to be migrated
-	migrated = append(migrated, groups.NonAccountPayloads...)
-
-	log.Info().Msgf("finished migrating all account based payloads, total migrated payloads: %v", len(migrated))
-
-	return migrated, nil
-}
-
-// MigrateGroupSequentially migrate the payloads in the given payloadsByAccount map which
-// using the migrator
-func MigrateGroupSequentially(
-	migrator AccountMigrator,
-	payloadsByAccount map[string][]ledger.Payload,
-) (
-	[]ledger.Payload, error) {
-
-	logAccount := util.LogProgress(
-		log.Logger,
-		util.DefaultLogProgressConfig(
-			"processing account group",
-			len(payloadsByAccount),
-		),
-	)
-
-	migrated := make([]ledger.Payload, 0)
-	for address, payloads := range payloadsByAccount {
-		accountMigrated, err := migrator.MigratePayloads(address, payloads)
-		if err != nil {
-			return nil, fmt.Errorf("could not migrate for account address %v: %w", address, err)
-		}
-
-		migrated = append(migrated, accountMigrated...)
-		logAccount(1)
-	}
-
-	return migrated, nil
-}
-
-type jobMigrateAccountGroup struct {
-	Account  string
-	Payloads []ledger.Payload
-}
-
-type migrationResult struct {
-	Migrated []ledger.Payload
-	Err      error
-}
-
-// MigrateGroupConcurrently migrate the payloads in the given payloadsByAccount map which
-// using the migrator
-// It's similar to MigrateGroupSequentially, except it will migrate different groups concurrently
-func MigrateGroupConcurrently(
-	migrator AccountMigrator,
-	payloadsByAccount map[string][]ledger.Payload,
+// NewAccountBasedMigration creates a migration function that migrates the payloads
+// account by account using the given migrations
+// accounts are processed concurrently using the given number of workers
+// but each account is processed sequentially by the given migrations in order.
+// The migrations InitMigration function is called once before the migration starts
+// And the Close function is called once after the migration finishes if the migration
+// is a finisher.
+func NewAccountBasedMigration(
+	log zerolog.Logger,
 	nWorker int,
-) (
-	[]ledger.Payload, error) {
+	migrations []AccountBasedMigration,
+) RegistersMigration {
+	return func(registersByAccount *registers.ByAccount) error {
+		return MigrateByAccount(
+			log,
+			nWorker,
+			registersByAccount,
+			migrations,
+		)
+	}
+}
 
-	jobs := make(chan jobMigrateAccountGroup, len(payloadsByAccount))
-	go func() {
-		for account, payloads := range payloadsByAccount {
-			jobs <- jobMigrateAccountGroup{
-				Account:  account,
-				Payloads: payloads,
+// MigrateByAccount takes migrations and all the registers, grouped by account,
+// and returns the migrated registers.
+func MigrateByAccount(
+	log zerolog.Logger,
+	nWorker int,
+	registersByAccount *registers.ByAccount,
+	migrations []AccountBasedMigration,
+) error {
+	accountCount := registersByAccount.AccountCount()
+
+	if accountCount == 0 {
+		return nil
+	}
+
+	log.Info().
+		Int("inner_migrations", len(migrations)).
+		Int("nWorker", nWorker).
+		Msgf("created account migrations")
+
+	for i, migration := range migrations {
+		err := migration.InitMigration(
+			log.With().
+				Int("migration_index", i).
+				Logger(),
+			registersByAccount,
+			nWorker,
+		)
+		if err != nil {
+			return fmt.Errorf("could not init migration: %w", err)
+		}
+	}
+
+	err := withMigrations(log, migrations, func() error {
+		return MigrateGroupConcurrently(
+			log,
+			migrations,
+			registersByAccount,
+			nWorker,
+		)
+	})
+
+	log.Info().
+		Int("account_count", accountCount).
+		Msgf("finished migrating registers")
+
+	if err != nil {
+		return fmt.Errorf("could not migrate accounts: %w", err)
+	}
+
+	return nil
+}
+
+// withMigrations calls the given function and then closes the given migrations.
+func withMigrations(
+	log zerolog.Logger,
+	migrations []AccountBasedMigration,
+	f func() error,
+) (err error) {
+	defer func() {
+		for migrationIndex, migration := range migrations {
+			log.Info().
+				Int("migration_index", migrationIndex).
+				Type("migration", migration).
+				Msg("closing migration")
+			if cerr := migration.Close(); cerr != nil {
+				log.Err(cerr).Msg("error closing migration")
+				if err == nil {
+					// only set the error if it's not already set
+					// so that we don't overwrite the original error
+					err = cerr
+				}
 			}
 		}
-		close(jobs)
 	}()
 
-	resultCh := make(chan *migrationResult)
-	for i := 0; i < int(nWorker); i++ {
+	return f()
+}
+
+// MigrateGroupConcurrently migrate the registers in the given account groups.
+// The registers in each account are processed sequentially by the given migrations in order.
+func MigrateGroupConcurrently(
+	log zerolog.Logger,
+	migrations []AccountBasedMigration,
+	registersByAccount *registers.ByAccount,
+	nWorker int,
+) error {
+
+	ctx := context.Background()
+	ctx, cancel := context.WithCancelCause(ctx)
+	defer cancel(nil)
+
+	accountCount := registersByAccount.AccountCount()
+
+	jobs := make(chan jobMigrateAccountGroup, accountCount)
+
+	wg := sync.WaitGroup{}
+	wg.Add(nWorker)
+	resultCh := make(chan migrationDuration, accountCount)
+	for i := 0; i < nWorker; i++ {
 		go func() {
-			for job := range jobs {
-				accountMigrated, err := migrator.MigratePayloads(job.Account, job.Payloads)
-				resultCh <- &migrationResult{
-					Migrated: accountMigrated,
-					Err:      err,
+			defer wg.Done()
+
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case job, ok := <-jobs:
+					if !ok {
+						return
+					}
+					start := time.Now()
+
+					address := job.Address
+					accountRegisters := job.AccountRegisters
+
+					// This is not an account, but service level keys.
+					if util.IsServiceLevelAddress(address) {
+						resultCh <- migrationDuration{
+							Address:       address,
+							Duration:      time.Since(start),
+							RegisterCount: accountRegisters.Count(),
+						}
+						continue
+					}
+
+					for m, migration := range migrations {
+
+						select {
+						case <-ctx.Done():
+							return
+						default:
+						}
+
+						err := migration.MigrateAccount(ctx, address, accountRegisters)
+						if err != nil {
+							log.Error().
+								Err(err).
+								Int("migration_index", m).
+								Type("migration", migration).
+								Hex("address", address[:]).
+								Msg("could not migrate account")
+							cancel(fmt.Errorf("could not migrate account: %w", err))
+							return
+						}
+					}
+
+					resultCh <- migrationDuration{
+						Address:       address,
+						Duration:      time.Since(start),
+						RegisterCount: accountRegisters.Count(),
+					}
 				}
 			}
 		}()
 	}
 
+	go func() {
+		defer close(jobs)
+
+		// TODO: maybe adjust, make configurable, or dependent on chain
+		const keepTopNAccountRegisters = 20
+		largestAccountRegisters := util.NewTopN[*registers.AccountRegisters](
+			keepTopNAccountRegisters,
+			func(a, b *registers.AccountRegisters) bool {
+				return a.Count() < b.Count()
+			},
+		)
+
+		allAccountRegisters := make([]*registers.AccountRegisters, accountCount)
+
+		smallerAccountRegisterIndex := keepTopNAccountRegisters
+		err := registersByAccount.ForEachAccount(
+			func(accountRegisters *registers.AccountRegisters) error {
+
+				// Try to add the account registers to the top N largest account registers.
+				// If there is an "overflow" element (either the added element, or an existing element),
+				// add it to the account registers.
+				// This way we can process the largest account registers first,
+				// and do not need to sort all account registers.
+
+				popped, didPop := largestAccountRegisters.Add(accountRegisters)
+				if didPop {
+					allAccountRegisters[smallerAccountRegisterIndex] = popped
+					smallerAccountRegisterIndex++
+				}
+
+				return nil
+			},
+		)
+		if err != nil {
+			cancel(fmt.Errorf("failed to get all account registers: %w", err))
+		}
+
+		// Add the largest account registers to the account registers.
+		// The elements in the top N largest account registers are returned in reverse order.
+		for index := largestAccountRegisters.Len() - 1; index >= 0; index-- {
+			accountRegisters := heap.Pop(largestAccountRegisters).(*registers.AccountRegisters)
+			allAccountRegisters[index] = accountRegisters
+		}
+
+		for _, accountRegisters := range allAccountRegisters {
+			owner := accountRegisters.Owner()
+
+			address, err := common.BytesToAddress([]byte(owner))
+			if err != nil {
+				cancel(fmt.Errorf("failed to convert owner to address: %w", err))
+				return
+			}
+
+			job := jobMigrateAccountGroup{
+				Address:          address,
+				AccountRegisters: accountRegisters,
+			}
+
+			select {
+			case <-ctx.Done():
+				return
+			case jobs <- job:
+			}
+		}
+	}()
+
 	// read job results
-	logAccount := util.LogProgress(
-		log.Logger,
-		util.DefaultLogProgressConfig(
+	logAccount := moduleUtil.LogProgress(
+		log,
+		moduleUtil.DefaultLogProgressConfig(
 			"processing account group",
-			len(payloadsByAccount),
+			accountCount,
 		),
 	)
 
-	migrated := make([]ledger.Payload, 0)
+	topDurations := util.NewTopN[migrationDuration](
+		logTopNDurations,
+		func(duration migrationDuration, duration2 migrationDuration) bool {
+			return duration.Duration < duration2.Duration
+		},
+	)
 
-	for i := 0; i < len(payloadsByAccount); i++ {
-		result := <-resultCh
-		if result.Err != nil {
-			return nil, fmt.Errorf("fail to migrate payload: %w", result.Err)
+accountLoop:
+	for accountIndex := 0; accountIndex < accountCount; accountIndex++ {
+		select {
+		case <-ctx.Done():
+			break accountLoop
+		case duration := <-resultCh:
+			topDurations.Add(duration)
+			logAccount(1)
 		}
-
-		accountMigrated := result.Migrated
-		migrated = append(migrated, accountMigrated...)
-		logAccount(1)
 	}
 
-	return migrated, nil
+	// make sure to exit all workers before returning from this function
+	// so that the migration can be closed properly
+	log.Info().Msg("waiting for migration workers to finish")
+	wg.Wait()
+
+	log.Info().
+		Array("top_longest_migrations", loggableMigrationDurations(topDurations)).
+		Msgf("Top longest migrations")
+
+	err := ctx.Err()
+	if err != nil {
+		cause := context.Cause(ctx)
+		if cause != nil {
+			err = cause
+		}
+
+		return fmt.Errorf("failed to migrate payload: %w", err)
+	}
+
+	return nil
+}
+
+type jobMigrateAccountGroup struct {
+	Address          common.Address
+	AccountRegisters *registers.AccountRegisters
+}
+
+type migrationDuration struct {
+	Address       common.Address
+	Duration      time.Duration
+	RegisterCount int
+}
+
+func loggableMigrationDurations(durations *util.TopN[migrationDuration]) zerolog.LogArrayMarshaler {
+	array := zerolog.Arr()
+
+	for index := durations.Len() - 1; index >= 0; index-- {
+		duration := heap.Pop(durations).(migrationDuration)
+		array = array.Str(fmt.Sprintf(
+			"%s [registers: %d]: %s",
+			duration.Address.Hex(),
+			duration.RegisterCount,
+			duration.Duration.String(),
+		))
+	}
+
+	return array
 }

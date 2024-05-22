@@ -1,4 +1,3 @@
-// (c) 2021 Dapper Labs - ALL RIGHTS RESERVED
 package id
 
 import "github.com/onflow/flow-go/model/flow"

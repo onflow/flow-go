@@ -35,6 +35,7 @@ type ComputationManager interface {
 		snapshot snapshot.StorageSnapshot,
 	) (
 		[]byte,
+		uint64,
 		error,
 	)
 
@@ -179,10 +180,6 @@ func (e *Manager) ComputeBlock(
 		snapshot,
 		derivedBlockData)
 	if err != nil {
-		e.log.Error().
-			Hex("block_id", logging.Entity(block.Block)).
-			Msg("failed to compute block result")
-
 		return nil, fmt.Errorf("failed to execute block: %w", err)
 	}
 
@@ -199,7 +196,7 @@ func (e *Manager) ExecuteScript(
 	arguments [][]byte,
 	blockHeader *flow.Header,
 	snapshot snapshot.StorageSnapshot,
-) ([]byte, error) {
+) ([]byte, uint64, error) {
 	return e.queryExecutor.ExecuteScript(ctx,
 		code,
 		arguments,
@@ -234,14 +231,11 @@ func DefaultFVMOptions(chainID flow.ChainID, cadenceTracing bool, extensiveTraci
 			reusableRuntime.NewReusableCadenceRuntimePool(
 				ReusableCadenceRuntimePoolSize,
 				runtime.Config{
-					TracingEnabled:        cadenceTracing,
-					AccountLinkingEnabled: true,
-					// Attachments are enabled everywhere except for Mainnet
-					AttachmentsEnabled: chainID != flow.Mainnet,
-					// Capability Controllers are enabled everywhere except for Mainnet
-					CapabilityControllersEnabled: chainID != flow.Mainnet,
+					TracingEnabled:     cadenceTracing,
+					AttachmentsEnabled: true,
 				},
 			)),
+		fvm.WithEVMEnabled(true),
 	}
 
 	if extensiveTracing {

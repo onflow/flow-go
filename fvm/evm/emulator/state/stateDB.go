@@ -7,12 +7,11 @@ import (
 	"math/big"
 	"sort"
 
-	gethCommon "github.com/ethereum/go-ethereum/common"
-	gethTypes "github.com/ethereum/go-ethereum/core/types"
-	gethParams "github.com/ethereum/go-ethereum/params"
 	"github.com/onflow/atree"
+	gethCommon "github.com/onflow/go-ethereum/common"
+	gethTypes "github.com/onflow/go-ethereum/core/types"
+	gethParams "github.com/onflow/go-ethereum/params"
 
-	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -54,7 +53,7 @@ func NewStateDB(ledger atree.Ledger, root flow.Address) (*StateDB, error) {
 
 // Exist returns true if the given address exists in state.
 //
-// this should also return true for suicided accounts during the transaction execution.
+// this should also return true for self destructed accounts during the transaction execution.
 func (db *StateDB) Exist(addr gethCommon.Address) bool {
 	exist, err := db.lastestView().Exist(addr)
 	db.handleError(err)
@@ -85,20 +84,26 @@ func (db *StateDB) IsCreated(addr gethCommon.Address) bool {
 	return db.lastestView().IsCreated(addr)
 }
 
-// Suicide flags the address for deletion.
+// SelfDestruct flags the address for deletion.
 //
 // while this address exists for the rest of transaction,
-// the balance of this account is return zero after the Suicide call.
-func (db *StateDB) Suicide(addr gethCommon.Address) bool {
-	success, err := db.lastestView().Suicide(addr)
+// the balance of this account is return zero after the SelfDestruct call.
+func (db *StateDB) SelfDestruct(addr gethCommon.Address) {
+	err := db.lastestView().SelfDestruct(addr)
 	db.handleError(err)
-	return success
 }
 
-// HasSuicided returns true if address is flaged with suicide.
-func (db *StateDB) HasSuicided(addr gethCommon.Address) bool {
-	suicided, _ := db.lastestView().HasSuicided(addr)
-	return suicided
+// Selfdestruct6780 would only follow the self destruct steps if account is created
+func (db *StateDB) Selfdestruct6780(addr gethCommon.Address) {
+	if db.IsCreated(addr) {
+		db.SelfDestruct(addr)
+	}
+}
+
+// HasSelfDestructed returns true if address is flaged with self destruct.
+func (db *StateDB) HasSelfDestructed(addr gethCommon.Address) bool {
+	destructed, _ := db.lastestView().HasSelfDestructed(addr)
+	return destructed
 }
 
 // SubBalance substitutes the amount from the balance of the given address
@@ -258,7 +263,6 @@ func (db *StateDB) Snapshot() int {
 // Logs returns the list of logs
 // it also update each log with the block and tx info
 func (db *StateDB) Logs(
-	blockHash gethCommon.Hash,
 	blockNumber uint64,
 	txHash gethCommon.Hash,
 	txIndex uint,
@@ -267,7 +271,6 @@ func (db *StateDB) Logs(
 	for _, view := range db.views {
 		for _, log := range view.Logs() {
 			log.BlockNumber = blockNumber
-			log.BlockHash = blockHash
 			log.TxHash = txHash
 			log.TxIndex = txIndex
 			allLogs = append(allLogs, log)
@@ -288,7 +291,7 @@ func (db *StateDB) Preimages() map[gethCommon.Hash][]byte {
 }
 
 // Commit commits state changes back to the underlying
-func (db *StateDB) Commit() error {
+func (db *StateDB) Commit(finalize bool) error {
 	// return error if any has been acumulated
 	if db.cachedError != nil {
 		return wrapError(db.cachedError)
@@ -322,8 +325,8 @@ func (db *StateDB) Commit() error {
 	// update accounts
 	for _, addr := range sortedAddresses {
 		deleted := false
-		// First we need to delete accounts
-		if db.HasSuicided(addr) {
+		// first we need to delete accounts
+		if db.HasSelfDestructed(addr) {
 			err = db.baseView.DeleteAccount(addr)
 			if err != nil {
 				return wrapError(err)
@@ -385,11 +388,17 @@ func (db *StateDB) Commit() error {
 	}
 
 	// don't purge views yet, people might call the logs etc
-	err = db.baseView.Commit()
-	if err != nil {
-		return wrapError(err)
+	if finalize {
+		return db.Finalize()
 	}
 	return nil
+}
+
+// Finalize flushes all the changes
+// to the permanent storage
+func (db *StateDB) Finalize() error {
+	err := db.baseView.Commit()
+	return wrapError(err)
 }
 
 // Prepare is a highlevel logic that sadly is considered to be part of the
@@ -416,6 +425,14 @@ func (db *StateDB) Prepare(rules gethParams.Rules, sender, coinbase gethCommon.A
 			db.AddAddressToAccessList(coinbase)
 		}
 	}
+}
+
+// Reset resets uncommitted changes and transient artifacts such as error, logs,
+// preimages, access lists, ...
+// The method is often called between execution of different transactions
+func (db *StateDB) Reset() {
+	db.views = []*DeltaView{NewDeltaView(db.baseView)}
+	db.cachedError = nil
 }
 
 // Error returns the memorized database failure occurred earlier.
@@ -454,9 +471,9 @@ func wrapError(err error) error {
 		return types.NewFatalError(err)
 	}
 
-	// if is fvm fatal error
-	if errors.IsFailure(err) {
-		return types.NewFatalError(err)
+	// if is a fatal error
+	if types.IsAFatalError(err) {
+		return err
 	}
 
 	return types.NewStateError(err)

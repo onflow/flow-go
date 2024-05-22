@@ -1,7 +1,6 @@
 package internal
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -14,8 +13,6 @@ import (
 	"github.com/onflow/flow-go/module/mempool/herocache/backdata/heropool"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 )
-
-var ErrTopicRecordNotFound = fmt.Errorf("topic record not found")
 
 // SubscriptionRecordCache manages the subscription records of peers in a network.
 // It uses a currentCycle counter to track the update cycles of the cache, ensuring the relevance of subscription data.
@@ -61,7 +58,7 @@ func NewSubscriptionRecordCache(sizeLimit uint32,
 // - []string: the list of topics the peer is subscribed to.
 // - bool: true if there is a record for the peer, false otherwise.
 func (s *SubscriptionRecordCache) GetSubscribedTopics(pid peer.ID) ([]string, bool) {
-	e, ok := s.c.ByID(flow.MakeID(pid))
+	e, ok := s.c.ByID(entityIdOf(pid))
 	if !ok {
 		return nil, false
 	}
@@ -87,7 +84,7 @@ func (s *SubscriptionRecordCache) MoveToNextUpdateCycle() uint64 {
 	return s.currentCycle.Load()
 }
 
-// AddTopicForPeer appends a topic to the list of topics a peer is subscribed to. If the peer is not subscribed to any
+// AddWithInitTopicForPeer appends a topic to the list of topics a peer is subscribed to. If the peer is not subscribed to any
 // topics yet, a new record is created.
 // If the last update cycle is older than the current cycle, the list of topics for the peer is first cleared, and then
 // the topic is added to the list. This is to ensure that the list of topics for a peer is always up to date.
@@ -98,40 +95,18 @@ func (s *SubscriptionRecordCache) MoveToNextUpdateCycle() uint64 {
 // - []string: the list of topics the peer is subscribed to after the update.
 // - error: an error if the update failed; any returned error is an irrecoverable error and indicates a bug or misconfiguration.
 // Implementation must be thread-safe.
-func (s *SubscriptionRecordCache) AddTopicForPeer(pid peer.ID, topic string) ([]string, error) {
-	// first, we try to optimistically adjust the record assuming that the record already exists.
-	entityId := flow.MakeID(pid)
-	topics, err := s.addTopicForPeer(entityId, topic)
-
-	switch {
-	case errors.Is(err, ErrTopicRecordNotFound):
-		// if the record does not exist, we initialize the record and try to adjust it again.
-		// Note: there is an edge case where the record is initialized by another goroutine between the two calls.
-		// In this case, the init function is invoked twice, but it is not a problem because the underlying
-		// cache is thread-safe. Hence, we do not need to synchronize the two calls. In such cases, one of the
-		// two calls returns false, and the other call returns true. We do not care which call returns false, hence,
-		// we ignore the return value of the init function.
-		_ = s.c.Add(SubscriptionRecordEntity{
+func (s *SubscriptionRecordCache) AddWithInitTopicForPeer(pid peer.ID, topic string) ([]string, error) {
+	entityId := entityIdOf(pid)
+	initLogic := func() flow.Entity {
+		return SubscriptionRecordEntity{
 			entityId:         entityId,
 			PeerID:           pid,
 			Topics:           make([]string, 0),
 			LastUpdatedCycle: s.currentCycle.Load(),
-		})
-		// as the record is initialized, the adjust attempt should not return an error, and any returned error
-		// is an irrecoverable error and indicates a bug.
-		return s.addTopicForPeer(entityId, topic)
-	case err != nil:
-		// if the adjust function returns an unexpected error on the first attempt, we return the error directly.
-		return nil, err
-	default:
-		// if the adjust function returns no error, we return the updated list of topics.
-		return topics, nil
+		}
 	}
-}
-
-func (s *SubscriptionRecordCache) addTopicForPeer(entityId flow.Identifier, topic string) ([]string, error) {
 	var rErr error
-	updatedEntity, adjusted := s.c.Adjust(entityId, func(entity flow.Entity) flow.Entity {
+	adjustLogic := func(entity flow.Entity) flow.Entity {
 		record, ok := entity.(SubscriptionRecordEntity)
 		if !ok {
 			// sanity check
@@ -162,15 +137,25 @@ func (s *SubscriptionRecordCache) addTopicForPeer(entityId flow.Identifier, topi
 
 		// Return the adjusted record.
 		return record
-	})
-
+	}
+	adjustedEntity, adjusted := s.c.AdjustWithInit(entityId, adjustLogic, initLogic)
 	if rErr != nil {
-		return nil, fmt.Errorf("failed to adjust record: %w", rErr)
+		return nil, fmt.Errorf("failed to adjust record with error: %w", rErr)
 	}
-
 	if !adjusted {
-		return nil, ErrTopicRecordNotFound
+		return nil, fmt.Errorf("failed to adjust record, entity not found")
 	}
 
-	return updatedEntity.(SubscriptionRecordEntity).Topics, nil
+	return adjustedEntity.(SubscriptionRecordEntity).Topics, nil
+}
+
+// entityIdOf converts a peer ID to a flow ID by taking the hash of the peer ID.
+// This is used to convert the peer ID in a notion that is compatible with HeroCache.
+// This is not a protocol-level conversion, and is only used internally by the cache, MUST NOT be exposed outside the cache.
+// Args:
+// - peerId: the peer ID of the peer in the GossipSub protocol.
+// Returns:
+// - flow.Identifier: the flow ID of the peer.
+func entityIdOf(pid peer.ID) flow.Identifier {
+	return flow.MakeID(pid)
 }

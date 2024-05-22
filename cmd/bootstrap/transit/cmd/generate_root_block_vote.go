@@ -60,11 +60,11 @@ func generateVote(c *cobra.Command, args []string) {
 	}
 
 	stakingPrivKey := nodeInfo.StakingPrivKey.PrivateKey
-	identity := &flow.Identity{
+	identity := flow.IdentitySkeleton{
 		NodeID:        nodeID,
 		Address:       nodeInfo.Address,
 		Role:          nodeInfo.Role,
-		Weight:        flow.DefaultInitialWeight,
+		InitialWeight: flow.DefaultInitialWeight,
 		StakingPubKey: stakingPrivKey.PublicKey(),
 		NetworkPubKey: nodeInfo.NetworkPrivKey.PrivateKey.PublicKey(),
 	}

@@ -4,32 +4,40 @@ import (
 	"math"
 	"math/big"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core"
-	"github.com/ethereum/go-ethereum/core/vm"
-	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/params"
+	gethCommon "github.com/onflow/go-ethereum/common"
+	gethCore "github.com/onflow/go-ethereum/core"
+	gethVM "github.com/onflow/go-ethereum/core/vm"
+	gethParams "github.com/onflow/go-ethereum/params"
+
+	"github.com/onflow/flow-go/fvm/evm/types"
 )
 
 var (
-	FlowEVMTestnetChainID = big.NewInt(666)
-	FlowEVMMainnetChainID = big.NewInt(777)
-	BlockLevelGasLimit    = uint64(math.MaxUint64)
-	zero                  = uint64(0)
+	DefaultBlockLevelGasLimit = uint64(math.MaxUint64)
+	DefaultBaseFee            = big.NewInt(0)
+	zero                      = uint64(0)
+	bigZero                   = big.NewInt(0)
 )
 
 // Config sets the required parameters
 type Config struct {
 	// Chain Config
-	ChainConfig *params.ChainConfig
+	ChainConfig *gethParams.ChainConfig
 	// EVM config
-	EVMConfig vm.Config
+	EVMConfig gethVM.Config
 	// block context
-	BlockContext *vm.BlockContext
+	BlockContext *gethVM.BlockContext
 	// transaction context
-	TxContext *vm.TxContext
+	TxContext *gethVM.TxContext
 	// base unit of gas for direct calls
 	DirectCallBaseGasUsage uint64
+}
+
+func (c *Config) ChainRules() gethParams.Rules {
+	return c.ChainConfig.Rules(
+		c.BlockContext.BlockNumber,
+		c.BlockContext.Random != nil,
+		c.BlockContext.Time)
 }
 
 // DefaultChainConfig is the default chain config which
@@ -39,23 +47,23 @@ type Config struct {
 // For the future changes of EVM, we need to update the EVM go mod version
 // and set a proper height for the specific release based on the Flow EVM heights
 // so it could gets activated at a desired time.
-var DefaultChainConfig = &params.ChainConfig{
-	ChainID: FlowEVMTestnetChainID, // default is testnet
+var DefaultChainConfig = &gethParams.ChainConfig{
+	ChainID: types.FlowEVMPreviewNetChainID,
 
 	// Fork scheduling based on block heights
-	HomesteadBlock:      big.NewInt(0),
-	DAOForkBlock:        big.NewInt(0),
+	HomesteadBlock:      bigZero,
+	DAOForkBlock:        bigZero,
 	DAOForkSupport:      false,
-	EIP150Block:         big.NewInt(0),
-	EIP155Block:         big.NewInt(0),
-	EIP158Block:         big.NewInt(0),
-	ByzantiumBlock:      big.NewInt(0), // already on Byzantium
-	ConstantinopleBlock: big.NewInt(0), // already on Constantinople
-	PetersburgBlock:     big.NewInt(0), // already on Petersburg
-	IstanbulBlock:       big.NewInt(0), // already on Istanbul
-	BerlinBlock:         big.NewInt(0), // already on Berlin
-	LondonBlock:         big.NewInt(0), // already on London
-	MuirGlacierBlock:    big.NewInt(0), // already on MuirGlacier
+	EIP150Block:         bigZero,
+	EIP155Block:         bigZero,
+	EIP158Block:         bigZero,
+	ByzantiumBlock:      bigZero, // already on Byzantium
+	ConstantinopleBlock: bigZero, // already on Constantinople
+	PetersburgBlock:     bigZero, // already on Petersburg
+	IstanbulBlock:       bigZero, // already on Istanbul
+	BerlinBlock:         bigZero, // already on Berlin
+	LondonBlock:         bigZero, // already on London
+	MuirGlacierBlock:    bigZero, // already on MuirGlacier
 
 	// Fork scheduling based on timestamps
 	ShanghaiTime: &zero, // already on Shanghai
@@ -63,21 +71,30 @@ var DefaultChainConfig = &params.ChainConfig{
 	PragueTime:   &zero, // already on Prague
 }
 
+// Default config supports the dynamic fee structure (EIP-1559)
+// so it accepts both legacy transactions with a fixed gas price
+// and dynamic transactions with tip and cap.
+// Yet default config keeps the base fee to zero (no automatic adjustment)
 func defaultConfig() *Config {
 	return &Config{
 		ChainConfig: DefaultChainConfig,
-		EVMConfig: vm.Config{
+		EVMConfig: gethVM.Config{
+			// setting this flag let us we force the base fee to zero (coinbase will collect)
 			NoBaseFee: true,
 		},
-		TxContext: &vm.TxContext{},
-		BlockContext: &vm.BlockContext{
-			CanTransfer: core.CanTransfer,
-			Transfer:    core.Transfer,
-			GasLimit:    BlockLevelGasLimit, // block gas limit
-			BaseFee:     big.NewInt(0),
-			GetHash: func(n uint64) common.Hash { // default returns some random hash values
-				return common.BytesToHash(crypto.Keccak256([]byte(new(big.Int).SetUint64(n).String())))
+		TxContext: &gethVM.TxContext{
+			GasPrice:   new(big.Int),
+			BlobFeeCap: new(big.Int),
+		},
+		BlockContext: &gethVM.BlockContext{
+			CanTransfer: gethCore.CanTransfer,
+			Transfer:    gethCore.Transfer,
+			GasLimit:    DefaultBlockLevelGasLimit,
+			BaseFee:     DefaultBaseFee,
+			GetHash: func(n uint64) gethCommon.Hash {
+				return gethCommon.Hash{}
 			},
+			GetPrecompile: gethCore.GetPrecompile,
 		},
 	}
 }
@@ -93,25 +110,16 @@ func NewConfig(opts ...Option) *Config {
 
 type Option func(*Config) *Config
 
-// WithMainnetChainID sets the chain ID to flow evm testnet
-func WithTestnetChainID() Option {
+// WithChainID sets the evm chain ID
+func WithChainID(chainID *big.Int) Option {
 	return func(c *Config) *Config {
-		c.ChainConfig.ChainID = FlowEVMTestnetChainID
+		c.ChainConfig.ChainID = chainID
 		return c
 	}
-}
-
-// WithMainnetChainID sets the chain ID to flow evm mainnet
-func WithMainnetChainID() Option {
-	return func(c *Config) *Config {
-		c.ChainConfig.ChainID = FlowEVMMainnetChainID
-		return c
-	}
-
 }
 
 // WithOrigin sets the origin of the transaction (signer)
-func WithOrigin(origin common.Address) Option {
+func WithOrigin(origin gethCommon.Address) Option {
 	return func(c *Config) *Config {
 		c.TxContext.Origin = origin
 		return c
@@ -135,7 +143,7 @@ func WithGasLimit(gasLimit uint64) Option {
 }
 
 // WithCoinbase sets the coinbase of the block where the fees are collected in
-func WithCoinbase(coinbase common.Address) Option {
+func WithCoinbase(coinbase gethCommon.Address) Option {
 	return func(c *Config) *Config {
 		c.BlockContext.Coinbase = coinbase
 		return c
@@ -159,7 +167,7 @@ func WithBlockTime(time uint64) Option {
 }
 
 // WithGetBlockHashFunction sets the functionality to look up block hash by height
-func WithGetBlockHashFunction(getHash vm.GetHashFunc) Option {
+func WithGetBlockHashFunction(getHash gethVM.GetHashFunc) Option {
 	return func(c *Config) *Config {
 		c.BlockContext.GetHash = getHash
 		return c
@@ -170,6 +178,32 @@ func WithGetBlockHashFunction(getHash vm.GetHashFunc) Option {
 func WithDirectCallBaseGasUsage(gas uint64) Option {
 	return func(c *Config) *Config {
 		c.DirectCallBaseGasUsage = gas
+		return c
+	}
+}
+
+// WithExtraPrecompiles appends precompile list with extra precompiles
+func WithExtraPrecompiles(precompiles []types.Precompile) Option {
+	return func(c *Config) *Config {
+		extraPreCompMap := make(map[gethCommon.Address]gethVM.PrecompiledContract)
+		for _, pc := range precompiles {
+			extraPreCompMap[pc.Address().ToCommon()] = pc
+		}
+		c.BlockContext.GetPrecompile = func(rules gethParams.Rules, addr gethCommon.Address) (gethVM.PrecompiledContract, bool) {
+			prec, found := extraPreCompMap[addr]
+			if found {
+				return prec, true
+			}
+			return gethCore.GetPrecompile(rules, addr)
+		}
+		return c
+	}
+}
+
+// WithRandom sets the block context random field
+func WithRandom(rand *gethCommon.Hash) Option {
+	return func(c *Config) *Config {
+		c.BlockContext.Random = rand
 		return c
 	}
 }

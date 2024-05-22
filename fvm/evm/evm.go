@@ -4,53 +4,71 @@ import (
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 
+	"github.com/onflow/flow-go/fvm/environment"
+	"github.com/onflow/flow-go/fvm/evm/backends"
 	evm "github.com/onflow/flow-go/fvm/evm/emulator"
-	"github.com/onflow/flow-go/fvm/evm/emulator/database"
 	"github.com/onflow/flow-go/fvm/evm/handler"
 	"github.com/onflow/flow-go/fvm/evm/stdlib"
-	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
 )
 
-func RootAccountAddress(chainID flow.ChainID) (flow.Address, error) {
+func ContractAccountAddress(chainID flow.ChainID) (flow.Address, error) {
 	sc := systemcontracts.SystemContractsForChain(chainID)
-	return sc.EVM.Address, nil
+	return sc.EVMContract.Address, nil
+}
+
+func StorageAccountAddress(chainID flow.ChainID) (flow.Address, error) {
+	sc := systemcontracts.SystemContractsForChain(chainID)
+	return sc.EVMStorage.Address, nil
+}
+
+func RandomBeaconAddress(chainID flow.ChainID) flow.Address {
+	return systemcontracts.SystemContractsForChain(chainID).RandomBeaconHistory.Address
 }
 
 func SetupEnvironment(
 	chainID flow.ChainID,
-	backend types.Backend,
-	env runtime.Environment,
-	service flow.Address,
+	fvmEnv environment.Environment,
+	runtimeEnv runtime.Environment,
 	flowToken flow.Address,
 ) error {
-	// TODO: setup proper root address based on chainID
-	evmRootAddress, err := RootAccountAddress(chainID)
+	evmStorageAccountAddress, err := StorageAccountAddress(chainID)
 	if err != nil {
 		return err
 	}
 
-	db, err := database.NewDatabase(backend, evmRootAddress)
+	evmContractAccountAddress, err := ContractAccountAddress(chainID)
 	if err != nil {
 		return err
 	}
 
-	em := evm.NewEmulator(db)
+	randomBeaconAddress := RandomBeaconAddress(chainID)
 
-	bs, err := handler.NewBlockStore(backend, evmRootAddress)
-	if err != nil {
-		return err
-	}
+	backend := backends.NewWrappedEnvironment(fvmEnv)
 
-	aa, err := handler.NewAddressAllocator(backend, evmRootAddress)
-	if err != nil {
-		return err
-	}
+	emulator := evm.NewEmulator(backend, evmStorageAccountAddress)
 
-	contractHandler := handler.NewContractHandler(common.Address(flowToken), bs, aa, backend, em)
+	blockStore := handler.NewBlockStore(backend, evmStorageAccountAddress)
 
-	stdlib.SetupEnvironment(env, contractHandler, service)
+	addressAllocator := handler.NewAddressAllocator()
+
+	contractHandler := handler.NewContractHandler(
+		chainID,
+		evmContractAccountAddress,
+		common.Address(flowToken),
+		randomBeaconAddress,
+		blockStore,
+		addressAllocator,
+		backend,
+		emulator,
+	)
+
+	stdlib.SetupEnvironment(
+		runtimeEnv,
+		contractHandler,
+		evmContractAccountAddress,
+	)
 
 	return nil
 }

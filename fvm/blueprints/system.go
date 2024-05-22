@@ -32,7 +32,7 @@ func SystemChunkTransaction(chain flow.Chain) (*flow.TransactionBody, error) {
 		// The heartbeat resources needed by the system tx have are on the service account,
 		// therefore, the service account is the only authorizer needed.
 		AddAuthorizer(chain.ServiceAddress()).
-		SetGasLimit(SystemChunkTransactionGasLimit)
+		SetComputeLimit(SystemChunkTransactionGasLimit)
 
 	return tx, nil
 }

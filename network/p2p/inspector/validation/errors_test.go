@@ -30,7 +30,7 @@ func TestErrActiveClusterIDsNotSetRoundTrip(t *testing.T) {
 // TestErrDuplicateTopicRoundTrip ensures correct error formatting for DuplicateTopicErr.
 func TestDuplicateTopicErrRoundTrip(t *testing.T) {
 	expectedErrorMsg := fmt.Sprintf("duplicate topic found in %s control message type: %s", p2pmsg.CtrlMsgGraft, channels.TestNetworkChannel)
-	err := NewDuplicateTopicErr(channels.TestNetworkChannel.String(), p2pmsg.CtrlMsgGraft)
+	err := NewDuplicateTopicErr(channels.TestNetworkChannel.String(), 1, p2pmsg.CtrlMsgGraft)
 	assert.Equal(t, expectedErrorMsg, err.Error(), "the error message should be correctly formatted")
 	// tests the IsDuplicateTopicErr function.
 	assert.True(t, IsDuplicateTopicErr(err), "IsDuplicateTopicErr should return true for DuplicateTopicErr error")
@@ -44,11 +44,11 @@ func TestDuplicateMessageIDErrRoundTrip(t *testing.T) {
 	msgID := "flow-1804flkjnafo"
 	expectedErrMsg1 := fmt.Sprintf("duplicate message ID foud in %s control message type: %s", p2pmsg.CtrlMsgIHave, msgID)
 	expectedErrMsg2 := fmt.Sprintf("duplicate message ID foud in %s control message type: %s", p2pmsg.CtrlMsgIWant, msgID)
-	err := NewDuplicateMessageIDErr(msgID, p2pmsg.CtrlMsgIHave)
+	err := NewDuplicateMessageIDErr(msgID, 1, p2pmsg.CtrlMsgIHave)
 	assert.Equal(t, expectedErrMsg1, err.Error(), "the error message should be correctly formatted")
 	// tests the IsDuplicateTopicErr function.
 	assert.True(t, IsDuplicateMessageIDErr(err), "IsDuplicateMessageIDErr should return true for DuplicateMessageIDErr error")
-	err = NewDuplicateMessageIDErr(msgID, p2pmsg.CtrlMsgIWant)
+	err = NewDuplicateMessageIDErr(msgID, 1, p2pmsg.CtrlMsgIWant)
 	assert.Equal(t, expectedErrMsg2, err.Error(), "the error message should be correctly formatted")
 	// tests the IsDuplicateTopicErr function.
 	assert.True(t, IsDuplicateMessageIDErr(err), "IsDuplicateMessageIDErr should return true for DuplicateMessageIDErr error")
@@ -59,10 +59,10 @@ func TestDuplicateMessageIDErrRoundTrip(t *testing.T) {
 
 // TestIWantCacheMissThresholdErrRoundTrip ensures correct error formatting for IWantCacheMissThresholdErr.
 func TestIWantCacheMissThresholdErrRoundTrip(t *testing.T) {
-	err := NewIWantCacheMissThresholdErr(5, 10, .4)
+	err := NewIWantCacheMissThresholdErr(5, 10, 5)
 
 	// tests the error message formatting.
-	expectedErrMsg := "5/10 iWant cache misses exceeds the allowed threshold: 0.400000"
+	expectedErrMsg := "5/10 iWant cache misses exceeds the allowed threshold: 5"
 	assert.Equal(t, expectedErrMsg, err.Error(), "the error message should be correctly formatted")
 
 	// tests the IsIWantCacheMissThresholdErr function.
@@ -75,10 +75,10 @@ func TestIWantCacheMissThresholdErrRoundTrip(t *testing.T) {
 
 // TestIWantDuplicateMsgIDThresholdErrRoundTrip ensures correct error formatting for IWantDuplicateMsgIDThresholdErr.
 func TestIWantDuplicateMsgIDThresholdErrRoundTrip(t *testing.T) {
-	err := NewIWantDuplicateMsgIDThresholdErr(5, 10, .4)
+	err := NewIWantDuplicateMsgIDThresholdErr(5, 10, 5)
 
 	// tests the error message formatting.
-	expectedErrMsg := "5/10 iWant duplicate message ids exceeds the allowed threshold: 0.400000"
+	expectedErrMsg := "5/10 iWant duplicate message ids exceeds the allowed threshold: 5"
 	assert.Equal(t, expectedErrMsg, err.Error(), "the error message should be correctly formatted")
 
 	// tests the IsIWantDuplicateMsgIDThresholdErr function.
@@ -104,4 +104,28 @@ func TestInvalidRpcPublishMessagesErrRoundTrip(t *testing.T) {
 	// test IsInvalidRpcPublishMessagesErr with a different error type.
 	dummyErr := fmt.Errorf("dummy error")
 	assert.False(t, IsInvalidRpcPublishMessagesErr(dummyErr), "IsInvalidRpcPublishMessagesErr should return false for non-InvalidRpcPublishMessagesErr error")
+}
+
+// TestErrDuplicateTopicIDThresholdExceededRoundTrip ensures correct error formatting for DuplicateTopicIDThresholdExceeded.
+func TestDuplicateTopicIDThresholdExceededRoundTrip(t *testing.T) {
+	expectedErrorMsg := "3/5 duplicate topic IDs exceed the allowed threshold: 2"
+	err := NewDuplicateTopicIDThresholdExceeded(3, 5, 2)
+	assert.Equal(t, expectedErrorMsg, err.Error(), "the error message should be correctly formatted")
+	// tests the IsDuplicateTopicIDThresholdExceeded function.
+	assert.True(t, IsDuplicateTopicIDThresholdExceeded(err), "IsDuplicateTopicIDThresholdExceeded should return true for DuplicateTopicIDThresholdExceeded error")
+	// test IsDuplicateTopicIDThresholdExceeded with a different error type.
+	dummyErr := fmt.Errorf("dummy error")
+	assert.False(t, IsDuplicateTopicIDThresholdExceeded(dummyErr), "IsDuplicateTopicIDThresholdExceeded should return false for non-DuplicateTopicIDThresholdExceeded error")
+}
+
+// TestErrInvalidTopicIDThresholdExceededRoundTrip ensures correct error formatting for InvalidTopicIDThresholdExceeded.
+func TestInvalidTopicIDThresholdExceededRoundTrip(t *testing.T) {
+	expectedErrorMsg := "8 invalid topic IDs exceed the allowed threshold: 5"
+	err := NewInvalidTopicIDThresholdExceeded(8, 5)
+	assert.Equal(t, expectedErrorMsg, err.Error(), "the error message should be correctly formatted")
+	// tests the IsInvalidTopicIDThresholdExceeded function.
+	assert.True(t, IsInvalidTopicIDThresholdExceeded(err), "IsInvalidTopicIDThresholdExceeded should return true for InvalidTopicIDThresholdExceeded error")
+	// test IsInvalidTopicIDThresholdExceeded with a different error type.
+	dummyErr := fmt.Errorf("dummy error")
+	assert.False(t, IsInvalidTopicIDThresholdExceeded(dummyErr), "IsInvalidTopicIDThresholdExceeded should return false for non-InvalidTopicIDThresholdExceeded error")
 }

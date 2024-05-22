@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	fcrypto "github.com/onflow/flow-go/crypto"
+	fcrypto "github.com/onflow/crypto"
 )
 
 // KeyTranslatorTestSuite tests key conversion from Flow keys to LibP2P keys
