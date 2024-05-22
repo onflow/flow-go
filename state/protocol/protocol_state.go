@@ -5,13 +5,9 @@ import (
 	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
-// InitialProtocolState returns constant data for given epoch.
-// This interface can be only obtained for epochs that have progressed to epoch commit event.
-type InitialProtocolState interface {
-}
-
 // DynamicProtocolState extends the InitialProtocolState with data that can change from block to block.
 // It can be used to access the identity table at given block.
+// TODO rename
 type DynamicProtocolState interface {
 	// Epoch returns counter of epoch.
 	Epoch() uint64

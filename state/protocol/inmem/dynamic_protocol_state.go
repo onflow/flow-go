@@ -8,19 +8,18 @@ import (
 )
 
 // DynamicProtocolStateAdapter implements protocol.DynamicProtocolState by wrapping an InitialProtocolStateAdapter.
+// TODO rename
 type DynamicProtocolStateAdapter struct {
-	InitialProtocolStateAdapter // TODO replace with RichProtocolStateEntry
-	params                      protocol.GlobalParams
+	*flow.RichProtocolStateEntry
+	params protocol.GlobalParams
 }
 
 var _ protocol.DynamicProtocolState = (*DynamicProtocolStateAdapter)(nil)
 
 func NewDynamicProtocolStateAdapter(entry *flow.RichProtocolStateEntry, params protocol.GlobalParams) *DynamicProtocolStateAdapter {
 	return &DynamicProtocolStateAdapter{
-		InitialProtocolStateAdapter: InitialProtocolStateAdapter{
-			RichProtocolStateEntry: entry,
-		},
-		params: params,
+		RichProtocolStateEntry: entry,
+		params:                 params,
 	}
 }
 
