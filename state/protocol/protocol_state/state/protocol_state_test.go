@@ -19,7 +19,7 @@ import (
 // Test_ProtocolState verifies the different scenarios of retrieving a protocol state, global parameters
 // and KV store snapshots by block ID for the `EpochProtocolStateEntries`. Happy and unhappy paths are covered.
 func Test_ProtocolState(t *testing.T) {
-	epochProtocolStateDB := storagemock.NewProtocolState(t)
+	epochProtocolStateDB := storagemock.NewEpochProtocolStateEntries(t)
 	protocolKVStoreDB := storagemock.NewProtocolKVStore(t)
 	globalParams := psmock.NewGlobalParams(t)
 	protocolState := NewProtocolState(epochProtocolStateDB, protocolKVStoreDB, globalParams)
@@ -38,7 +38,7 @@ func Test_ProtocolState(t *testing.T) {
 // Test_MutableProtocolState verifies the different scenarios of retrieving a protocol state, global parameters
 // and KV store snapshots by block ID for the `MutableProtocolState`. Happy and unhappy paths are covered.
 func Test_MutableProtocolState(t *testing.T) {
-	epochProtocolStateDB := storagemock.NewProtocolState(t)
+	epochProtocolStateDB := storagemock.NewEpochProtocolStateEntries(t)
 	protocolKVStoreDB := storagemock.NewProtocolKVStore(t)
 	globalParams := psmock.NewGlobalParams(t)
 	headersDB := storagemock.NewHeaders(t)
@@ -66,7 +66,7 @@ func Test_MutableProtocolState(t *testing.T) {
 	})
 }
 
-func test_AtBlockID(t *testing.T, protocolState protocol.ProtocolState, epochProtocolStateDB *storagemock.ProtocolState) {
+func test_AtBlockID(t *testing.T, protocolState protocol.ProtocolState, epochProtocolStateDB *storagemock.EpochProtocolStateEntries) {
 	blockID := unittest.IdentifierFixture()
 
 	t.Run("retrieve epoch state for existing blocks", func(t *testing.T) {

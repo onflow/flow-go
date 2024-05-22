@@ -30,7 +30,7 @@ func TestEpochStateMachine(t *testing.T) {
 // Tests in this suite are designed to rely on automatic assertions when leaving the scope of the test.
 type EpochStateMachineSuite struct {
 	suite.Suite
-	epochStateDB                    *storagemock.ProtocolState
+	epochStateDB                    *storagemock.EpochProtocolStateEntries
 	setupsDB                        *storagemock.EpochSetups
 	commitsDB                       *storagemock.EpochCommits
 	globalParams                    *protocolmock.GlobalParams
@@ -46,7 +46,7 @@ type EpochStateMachineSuite struct {
 }
 
 func (s *EpochStateMachineSuite) SetupTest() {
-	s.epochStateDB = storagemock.NewProtocolState(s.T())
+	s.epochStateDB = storagemock.NewEpochProtocolStateEntries(s.T())
 	s.setupsDB = storagemock.NewEpochSetups(s.T())
 	s.commitsDB = storagemock.NewEpochCommits(s.T())
 	s.globalParams = protocolmock.NewGlobalParams(s.T())
