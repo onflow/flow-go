@@ -20,7 +20,7 @@ require (
 	github.com/ipfs/go-ds-badger2 v0.1.3
 	github.com/ipfs/go-ipfs-blockstore v1.3.0
 	github.com/libp2p/go-libp2p v0.32.2
-	github.com/onflow/cadence v0.42.11-atree-register-inlining.2.0.20240514160523-56fb3b4fc478
+	github.com/onflow/cadence v0.42.11-atree-register-inlining.2.0.20240521221904-9615ee937719
 	github.com/onflow/crypto v0.25.1
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.15.1
 	github.com/onflow/flow-core-contracts/lib/go/templates v0.15.1
@@ -252,7 +252,7 @@ require (
 	github.com/multiformats/go-multistream v0.5.0 // indirect
 	github.com/multiformats/go-varint v0.0.7 // indirect
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
-	github.com/onflow/atree v0.8.0-rc.2 // indirect
+	github.com/onflow/atree v0.8.0-rc.3 // indirect
 	github.com/onflow/flow-ft/lib/go/contracts v0.7.1-0.20230711213910-baad011d2b13 // indirect
 	github.com/onflow/flow-nft/lib/go/contracts v1.1.0 // indirect
 	github.com/onflow/nft-storefront/lib/go/contracts v0.0.0-20221222181731-14b90207cead // indirect
