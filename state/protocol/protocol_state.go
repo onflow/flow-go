@@ -64,6 +64,7 @@ type ProtocolState interface {
 	// - (EpochProtocolState, nil) - if there is an epoch protocol state associated with given block ID.
 	// - (nil, storage.ErrNotFound) - if there is no epoch protocol state associated with given block ID.
 	// - (nil, exception) - any other error should be treated as exception.
+	// TODO rename? EpochStateAtBlockID
 	AtBlockID(blockID flow.Identifier) (EpochProtocolState, error)
 
 	// KVStoreAtBlockID returns protocol state at block ID.
