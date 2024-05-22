@@ -947,7 +947,32 @@ func (s *ReceiptValidationSuite) TestReceiptNoBlock() {
 	s.Assert().False(engine.IsInvalidInputError(err), err)
 }
 
-// TestException_SealsHighestInFork tests that unexpected exceptions raised by the dependency
+// TestException_HeadersExists tests that unexpected exceptions raised by the dependency
+// `receiptValidator.headers.Exists(..)` are escalated and not misinterpreted as
+// `InvalidInputError` or `UnknownBlockError` or `UnknownResultError`
+func (s *ReceiptValidationSuite) TestException_HeadersExists() {
+	s.publicKey.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil).Maybe()
+
+	valSubgrph := s.ValidSubgraphFixture()
+	s.AddSubgraphFixtureToMempools(valSubgrph)
+
+	receipt := unittest.ExecutionReceiptFixture(unittest.WithExecutorID(s.ExeID), unittest.WithResult(valSubgrph.Result))
+	candidate := unittest.BlockWithParentFixture(valSubgrph.Block.Header)
+	candidate.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt)))
+
+	// receiptValidator.headers yields exception on retrieving any block header
+	*s.HeadersDB = *mock_storage.NewHeaders(s.T()) // receiptValidator has pointer to this field, which we override with a new state mock
+	exception := errors.New("headers.ByBlockID() exception")
+	s.HeadersDB.On("Exists", mock.Anything).Return(false, exception)
+
+	err := s.receiptValidator.ValidatePayload(candidate)
+	s.Require().Error(err, "ValidatePayload should escalate exception")
+	s.Assert().False(engine.IsInvalidInputError(err), err)
+	s.Assert().False(module.IsUnknownBlockError(err), err)
+	s.Assert().False(module.IsUnknownResultError(err), err)
+}
+
+// TestException_HeadersByBlockID tests that unexpected exceptions raised by the dependency
 // `receiptValidator.headers.ByBlockID(..)` are escalated and not misinterpreted as
 // `InvalidInputError` or `UnknownBlockError` or `UnknownResultError`
 func (s *ReceiptValidationSuite) TestException_HeadersByBlockID() {
@@ -961,8 +986,9 @@ func (s *ReceiptValidationSuite) TestException_HeadersByBlockID() {
 	candidate.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt)))
 
 	// receiptValidator.headers yields exception on retrieving any block header
-	*s.HeadersDB = *mock_storage.NewHeaders(s.T()) // receiptValidator has pointer to this field, which we override with a new state mock
 	exception := errors.New("headers.ByBlockID() exception")
+	*s.HeadersDB = *mock_storage.NewHeaders(s.T()) // receiptValidator has pointer to this field, which we override with a new state mock
+	s.HeadersDB.On("Exists", mock.Anything).Return(true, nil)
 	s.HeadersDB.On("ByBlockID", mock.Anything).Return(nil, exception)
 
 	err := s.receiptValidator.ValidatePayload(candidate)

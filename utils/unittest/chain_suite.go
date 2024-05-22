@@ -258,6 +258,13 @@ func (bc *BaseChainSuite) SetupChain() {
 			return nil
 		},
 	)
+	bc.HeadersDB.On("Exists", mock.Anything).Return(
+		func(blockID flow.Identifier) bool {
+			_, found := bc.Blocks[blockID]
+			return found
+		},
+		func(blockID flow.Identifier) error { return nil },
+	)
 	bc.HeadersDB.On("ByHeight", mock.Anything).Return(
 		func(blockHeight uint64) *flow.Header {
 			for _, b := range bc.Blocks {
