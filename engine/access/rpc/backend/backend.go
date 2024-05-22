@@ -527,7 +527,7 @@ func chooseExecutionNodes(state protocol.State, executorIDs flow.IdentifierList)
 		return nil, fmt.Errorf("failed to retrieve all execution IDs: %w", err)
 	}
 
-	// choose from preferred execution nodes
+	// choose from preferred EN IDs
 	var chosenIDs flow.IdentityList
 	if len(preferredENIdentifiers) > 0 {
 		chosenIDs = allENs.Filter(filter.And(
