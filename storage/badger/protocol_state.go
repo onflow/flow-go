@@ -59,7 +59,7 @@ type ProtocolState struct {
 	byBlockIdCache *Cache[flow.Identifier, flow.Identifier]
 }
 
-var _ storage.ProtocolState = (*ProtocolState)(nil)
+var _ storage.EpochProtocolStateEntries = (*ProtocolState)(nil)
 
 // NewProtocolState creates a ProtocolState instance, which is a database of Protocol State.
 // It supports storing, caching and retrieving by ID or the additionally indexed block ID.

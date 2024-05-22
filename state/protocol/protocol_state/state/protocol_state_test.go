@@ -17,20 +17,20 @@ import (
 )
 
 // Test_ProtocolState verifies the different scenarios of retrieving a protocol state, global parameters
-// and KV store snapshots by block ID for the `ProtocolState`. Happy and unhappy paths are covered.
+// and KV store snapshots by block ID for the `EpochProtocolStateEntries`. Happy and unhappy paths are covered.
 func Test_ProtocolState(t *testing.T) {
 	epochProtocolStateDB := storagemock.NewProtocolState(t)
 	protocolKVStoreDB := storagemock.NewProtocolKVStore(t)
 	globalParams := psmock.NewGlobalParams(t)
 	protocolState := NewProtocolState(epochProtocolStateDB, protocolKVStoreDB, globalParams)
 
-	t.Run("testing `ProtocolState.AtBlockID`", func(t *testing.T) {
+	t.Run("testing `EpochProtocolStateEntries.AtBlockID`", func(t *testing.T) {
 		test_AtBlockID(t, protocolState, epochProtocolStateDB)
 	})
-	t.Run("testing `ProtocolState.GlobalParams`", func(t *testing.T) {
+	t.Run("testing `EpochProtocolStateEntries.GlobalParams`", func(t *testing.T) {
 		test_GlobalParams(t, protocolState, globalParams)
 	})
-	t.Run("testing `ProtocolState.KVStoreAtBlockID`", func(t *testing.T) {
+	t.Run("testing `EpochProtocolStateEntries.KVStoreAtBlockID`", func(t *testing.T) {
 		test_KVStoreAtBlockID(t, protocolState, protocolKVStoreDB)
 	})
 }

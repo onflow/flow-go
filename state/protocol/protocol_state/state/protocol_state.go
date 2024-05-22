@@ -18,23 +18,23 @@ import (
 
 // ProtocolState is an implementation of the read-only interface for protocol state, it allows querying information
 // on a per-block and per-epoch basis.
-// It is backed by a storage.ProtocolState and an in-memory protocol.GlobalParams.
+// It is backed by a storage.EpochProtocolStateEntries and an in-memory protocol.GlobalParams.
 type ProtocolState struct {
-	epochProtocolStateDB storage.ProtocolState
+	epochProtocolStateDB storage.EpochProtocolStateEntries
 	kvStoreSnapshots     protocol_state.ProtocolKVStore
 	globalParams         protocol.GlobalParams
 }
 
 var _ protocol.ProtocolState = (*ProtocolState)(nil)
 
-func NewProtocolState(epochProtocolStateDB storage.ProtocolState, kvStoreSnapshots storage.ProtocolKVStore, globalParams protocol.GlobalParams) *ProtocolState {
+func NewProtocolState(epochProtocolStateDB storage.EpochProtocolStateEntries, kvStoreSnapshots storage.ProtocolKVStore, globalParams protocol.GlobalParams) *ProtocolState {
 	return newProtocolState(epochProtocolStateDB, kvstore.NewProtocolKVStore(kvStoreSnapshots), globalParams)
 }
 
 // newProtocolState creates a new ProtocolState instance. The exported constructor `NewProtocolState` only requires the
 // lower-level `storage.ProtocolKVStore` as input. Though, internally we use the higher-level `protocol_state.ProtocolKVStore`,
 // which wraps the lower-level ProtocolKVStore.
-func newProtocolState(epochProtocolStateDB storage.ProtocolState, kvStoreSnapshots protocol_state.ProtocolKVStore, globalParams protocol.GlobalParams) *ProtocolState {
+func newProtocolState(epochProtocolStateDB storage.EpochProtocolStateEntries, kvStoreSnapshots protocol_state.ProtocolKVStore, globalParams protocol.GlobalParams) *ProtocolState {
 	return &ProtocolState{
 		epochProtocolStateDB: epochProtocolStateDB,
 		kvStoreSnapshots:     kvStoreSnapshots,
@@ -86,7 +86,7 @@ var _ protocol.MutableProtocolState = (*MutableProtocolState)(nil)
 
 // NewMutableProtocolState creates a new instance of MutableProtocolState.
 func NewMutableProtocolState(
-	epochProtocolStateDB storage.ProtocolState,
+	epochProtocolStateDB storage.EpochProtocolStateEntries,
 	kvStoreSnapshots storage.ProtocolKVStore,
 	globalParams protocol.GlobalParams,
 	headers storage.Headers,
@@ -109,7 +109,7 @@ func NewMutableProtocolState(
 // implement. Therefore, we test it independently of the state machines required for production. In comparison, the
 // constructor `NewMutableProtocolState` is intended for production use, where the list of state machines is hard-coded.
 func newMutableProtocolState(
-	epochProtocolStateDB storage.ProtocolState,
+	epochProtocolStateDB storage.EpochProtocolStateEntries,
 	kvStoreSnapshots protocol_state.ProtocolKVStore,
 	globalParams protocol.GlobalParams,
 	headers storage.Headers,

@@ -20,7 +20,7 @@ type All struct {
 	TransactionResults      TransactionResults
 	Collections             Collections
 	Events                  Events
-	EpochProtocolState      ProtocolState
+	EpochProtocolState      EpochProtocolStateEntries
 	ProtocolKVStore         ProtocolKVStore
 	VersionBeacons          VersionBeacons
 	RegisterIndex           RegisterIndex

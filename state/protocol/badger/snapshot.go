@@ -199,7 +199,7 @@ func (s *Snapshot) SealingSegment() (*flow.SealingSegment, error) {
 		if err != nil {
 			return nil, fmt.Errorf("could not decode kv store entry: %w", err)
 		}
-		epochDataEntry, err := s.state.protocolStateSnapshotsDB.ByID(kvStoreReader.GetEpochStateID())
+		epochDataEntry, err := s.state.epochProtocolStateEntriesDB.ByID(kvStoreReader.GetEpochStateID())
 		if err != nil {
 			return nil, fmt.Errorf("could not get epoch data: %w", err)
 		}

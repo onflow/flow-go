@@ -38,11 +38,11 @@ type State struct {
 		setups  storage.EpochSetups
 		commits storage.EpochCommits
 	}
-	params                     protocol.Params
-	protocolKVStoreSnapshotsDB storage.ProtocolKVStore
-	protocolStateSnapshotsDB   storage.ProtocolState // TODO remove when EpochProtocolStateEntry is stored in KVStore
-	protocolState              protocol.MutableProtocolState
-	versionBeacons             storage.VersionBeacons
+	params                      protocol.Params
+	protocolKVStoreSnapshotsDB  storage.ProtocolKVStore
+	epochProtocolStateEntriesDB storage.EpochProtocolStateEntries // TODO remove when EpochProtocolStateEntry is stored in KVStore
+	protocolState               protocol.MutableProtocolState
+	versionBeacons              storage.VersionBeacons
 
 	// finalizedRootHeight marks the cutoff of the history this node knows about. We cache it in the state
 	// because it cannot change over the lifecycle of a protocol state instance. It is frequently
@@ -95,7 +95,7 @@ func Bootstrap(
 	qcs storage.QuorumCertificates,
 	setups storage.EpochSetups,
 	commits storage.EpochCommits,
-	epochProtocolStateSnapshots storage.ProtocolState,
+	epochProtocolStateSnapshots storage.EpochProtocolStateEntries,
 	protocolKVStoreSnapshots storage.ProtocolKVStore,
 	versionBeacons storage.VersionBeacons,
 	root protocol.Snapshot,
@@ -237,7 +237,7 @@ func Bootstrap(
 func bootstrapProtocolState(
 	segment *flow.SealingSegment,
 	params protocol.GlobalParams,
-	epochProtocolStateSnapshots storage.ProtocolState,
+	epochProtocolStateSnapshots storage.EpochProtocolStateEntries,
 	protocolKVStoreSnapshots storage.ProtocolKVStore,
 	epochSetups storage.EpochSetups,
 	epochCommits storage.EpochCommits,
@@ -484,7 +484,7 @@ func bootstrapStatePointers(root protocol.Snapshot) func(*transaction.Tx) error 
 // epoch information (service events) they reference, which case duplicate writes of
 // the same data are ignored.
 func bootstrapEpochForProtocolStateEntry(
-	epochProtocolStateSnapshots storage.ProtocolState,
+	epochProtocolStateSnapshots storage.EpochProtocolStateEntries,
 	epochSetups storage.EpochSetups,
 	epochCommits storage.EpochCommits,
 	epochProtocolStateEntry protocol.EpochProtocolState,
@@ -655,7 +655,7 @@ func OpenState(
 	qcs storage.QuorumCertificates,
 	setups storage.EpochSetups,
 	commits storage.EpochCommits,
-	epochProtocolState storage.ProtocolState,
+	epochProtocolState storage.EpochProtocolStateEntries,
 	protocolKVStoreSnapshots storage.ProtocolKVStore,
 	versionBeacons storage.VersionBeacons,
 ) (*State, error) {
@@ -801,7 +801,7 @@ func newState(
 	qcs storage.QuorumCertificates,
 	setups storage.EpochSetups,
 	commits storage.EpochCommits,
-	epochProtocolStateSnapshots storage.ProtocolState,
+	epochProtocolStateSnapshots storage.EpochProtocolStateEntries,
 	protocolKVStoreSnapshots storage.ProtocolKVStore,
 	versionBeacons storage.VersionBeacons,
 	params protocol.Params,
@@ -821,9 +821,9 @@ func newState(
 			setups:  setups,
 			commits: commits,
 		},
-		params:                     params,
-		protocolKVStoreSnapshotsDB: protocolKVStoreSnapshots,
-		protocolStateSnapshotsDB:   epochProtocolStateSnapshots,
+		params:                      params,
+		protocolKVStoreSnapshotsDB:  protocolKVStoreSnapshots,
+		epochProtocolStateEntriesDB: epochProtocolStateSnapshots,
 		protocolState: protocol_state.
 			NewMutableProtocolState(
 				epochProtocolStateSnapshots,

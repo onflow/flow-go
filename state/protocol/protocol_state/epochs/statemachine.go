@@ -92,7 +92,7 @@ type EpochStateMachine struct {
 
 	setups               storage.EpochSetups
 	commits              storage.EpochCommits
-	epochProtocolStateDB storage.ProtocolState
+	epochProtocolStateDB storage.EpochProtocolStateEntries
 	pendingDbUpdates     *transaction.DeferredBlockPersist
 }
 
@@ -109,7 +109,7 @@ func NewEpochStateMachine(
 	params protocol.GlobalParams,
 	setups storage.EpochSetups,
 	commits storage.EpochCommits,
-	epochProtocolStateDB storage.ProtocolState,
+	epochProtocolStateDB storage.EpochProtocolStateEntries,
 	parentState protocol.KVStoreReader,
 	mutator protocol_state.KVStoreMutator,
 	happyPathStateMachineFactory StateMachineFactoryMethod,

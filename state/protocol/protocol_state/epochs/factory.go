@@ -13,7 +13,7 @@ type EpochStateMachineFactory struct {
 	params               protocol.GlobalParams
 	setups               storage.EpochSetups
 	commits              storage.EpochCommits
-	epochProtocolStateDB storage.ProtocolState
+	epochProtocolStateDB storage.EpochProtocolStateEntries
 }
 
 var _ protocol_state.KeyValueStoreStateMachineFactory = (*EpochStateMachineFactory)(nil)
@@ -22,7 +22,7 @@ func NewEpochStateMachineFactory(
 	params protocol.GlobalParams,
 	setups storage.EpochSetups,
 	commits storage.EpochCommits,
-	epochProtocolStateDB storage.ProtocolState,
+	epochProtocolStateDB storage.EpochProtocolStateEntries,
 ) *EpochStateMachineFactory {
 	return &EpochStateMachineFactory{
 		params:               params,

@@ -5,9 +5,9 @@ import (
 	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
-// ProtocolState represents persistent storage for protocol state entries.
-// TODO rename?
-type ProtocolState interface {
+// EpochProtocolStateEntries represents persistent storage for epoch protocol state entries.
+// Epoch Protocol State entries hold fork-aware sub-states of the overall Protocol State (KV Store).
+type EpochProtocolStateEntries interface {
 	// StoreTx returns an anonymous function (intended to be executed as part of a badger transaction),
 	// which persists the given protocol state as part of a DB tx. Per convention, the identities in
 	// the Protocol State must be in canonical order for the current and next epoch (if present),
@@ -17,7 +17,7 @@ type ProtocolState interface {
 	StoreTx(protocolStateID flow.Identifier, protocolState *flow.EpochProtocolStateEntry) func(*transaction.Tx) error
 
 	// Index returns an anonymous function that is intended to be executed as part of a database transaction.
-	// In a nutshell, we want to maintain a map from `blockID` to `protocolStateID`, where `blockID` references the
+	// In a nutshell, we want to maintain a map from `blockID` to `epochProtocolStateID`, where `blockID` references the
 	// block that _proposes_ the Protocol State.
 	// Upon call, the anonymous function persists the specific map entry in the node's database.
 	// Protocol convention:
@@ -30,7 +30,7 @@ type ProtocolState interface {
 	//
 	// Expected errors during normal operations:
 	//   - storage.ErrAlreadyExists if a Protocol State for the given blockID has already been indexed
-	Index(blockID flow.Identifier, protocolStateID flow.Identifier) func(*transaction.Tx) error
+	Index(blockID flow.Identifier, epochProtocolStateID flow.Identifier) func(*transaction.Tx) error
 
 	// ByID returns the protocol state by its ID.
 	// Expected errors during normal operations:
