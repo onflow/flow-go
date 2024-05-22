@@ -514,3 +514,19 @@ func (s *ProtocolStateMachineSuite) TestEpochSetupAfterIdentityChange() {
 		require.False(s.T(), foundInNextEpoch)
 	}
 }
+
+// TestProcessEpochRecover ensures that HappyPathStateMachine returns a sentinel error when processing an EpochRecover event.
+func (s *ProtocolStateMachineSuite) TestProcessEpochRecover() {
+	nextEpochParticipants := s.parentProtocolState.CurrentEpochIdentityTable.Copy()
+	epochRecover := unittest.EpochRecoverFixture(func(setup *flow.EpochSetup) {
+		setup.Participants = nextEpochParticipants.ToSkeleton()
+		setup.Assignments = unittest.ClusterAssignment(1, nextEpochParticipants.ToSkeleton())
+		setup.Counter = s.parentProtocolState.CurrentEpochSetup.Counter + 1
+		setup.FirstView = s.parentProtocolState.CurrentEpochSetup.FinalView + 1
+		setup.FinalView = setup.FirstView + 10_000
+	})
+	processed, err := s.stateMachine.ProcessEpochRecover(epochRecover)
+	require.Error(s.T(), err)
+	require.True(s.T(), protocol.IsInvalidServiceEventError(err))
+	require.False(s.T(), processed)
+}
