@@ -157,32 +157,47 @@ func run(*cobra.Command, []string) {
 
 	payloads1, payloads2 := loadPayloads()
 
-	if len(payloads1) != len(payloads2) {
+	payloadCount1 := len(payloads1)
+	payloadCount2 := len(payloads2)
+	if payloadCount1 != payloadCount2 {
 		log.Warn().Msgf(
 			"Payloads files have different number of payloads: %d vs %d",
-			len(payloads1),
-			len(payloads2),
+			payloadCount1,
+			payloadCount2,
 		)
 	}
 
 	registers1, registers2 := payloadsToRegisters(payloads1, payloads2)
+
+	accountCount1 := registers1.AccountCount()
+	accountCount2 := registers2.AccountCount()
+	if accountCount1 != accountCount2 {
+		log.Warn().Msgf(
+			"Registers have different number of accounts: %d vs %d",
+			accountCount1,
+			accountCount2,
+		)
+	}
 
 	// Free up memory
 	payloads1 = nil
 	payloads2 = nil
 
 	diff(registers1, registers2, chainID, rw)
-
-	log.Info().Msg("Done")
 }
 
 func loadPayloads() (payloads1, payloads2 []*ledger.Payload) {
+
+	log.Info().Msg("Loading payloads")
+
 	var group errgroup.Group
 
 	group.Go(func() (err error) {
 		if flagPayloads1 != "" {
 			_, payloads1, err = util.ReadPayloadFile(log.Logger, flagPayloads1)
 		} else {
+			log.Info().Msg("Reading first trie")
+
 			stateCommitment := parseStateCommitment(flagStateCommitment1)
 			payloads1, err = readTrie(flagState1, stateCommitment)
 		}
@@ -193,6 +208,8 @@ func loadPayloads() (payloads1, payloads2 []*ledger.Payload) {
 		if flagPayloads2 != "" {
 			_, payloads2, err = util.ReadPayloadFile(log.Logger, flagPayloads2)
 		} else {
+			log.Info().Msg("Reading second trie")
+
 			stateCommitment := parseStateCommitment(flagStateCommitment2)
 			payloads2, err = readTrie(flagState2, stateCommitment)
 		}
@@ -204,25 +221,41 @@ func loadPayloads() (payloads1, payloads2 []*ledger.Payload) {
 		log.Fatal().Err(err)
 	}
 
+	log.Info().Msg("Finished loading payloads")
+
 	return
 }
 
 func payloadsToRegisters(payloads1, payloads2 []*ledger.Payload) (registers1, registers2 *registers.ByAccount) {
 
+	log.Info().Msg("Creating registers from payloads")
+
 	var group errgroup.Group
 
 	group.Go(func() (err error) {
-		log.Info().Msg("Creating registers from first payloads")
+		log.Info().Msgf("Creating registers from first payloads (%d)", len(payloads1))
 
 		registers1, err = registers.NewByAccountFromPayloads(payloads1)
+
+		log.Info().Msgf(
+			"Created %d registers from payloads (%d accounts)",
+			registers1.Count(),
+			registers1.AccountCount(),
+		)
 
 		return
 	})
 
 	group.Go(func() (err error) {
-		log.Info().Msg("Creating registers from second payloads")
+		log.Info().Msgf("Creating registers from second payloads (%d)", len(payloads2))
 
 		registers2, err = registers.NewByAccountFromPayloads(payloads2)
+
+		log.Info().Msgf(
+			"Created %d registers from payloads (%d accounts)",
+			registers2.Count(),
+			registers2.AccountCount(),
+		)
 
 		return
 	})
@@ -231,6 +264,8 @@ func payloadsToRegisters(payloads1, payloads2 []*ledger.Payload) (registers1, re
 	if err != nil {
 		log.Fatal().Err(err)
 	}
+
+	log.Info().Msg("Finished creating registers from payloads")
 
 	return
 }
@@ -243,6 +278,8 @@ func diff(
 	chainID flow.ChainID,
 	rw reporters.ReportWriter,
 ) {
+	log.Info().Msg("Diffing accounts")
+
 	err := registers1.ForEachAccount(func(accountRegisters1 *registers.AccountRegisters) (err error) {
 		owner := accountRegisters1.Owner()
 
@@ -334,6 +371,9 @@ func diff(
 	if err != nil {
 		log.Fatal().Err(err)
 	}
+
+	log.Info().Msg("Finished diffing accounts")
+
 }
 
 func readTrie(dir string, targetHash flow.StateCommitment) ([]*ledger.Payload, error) {
