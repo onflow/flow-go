@@ -148,7 +148,7 @@ func TestIsValidExtendingEpochSetup(t *testing.T) {
 			unittest.SetupWithCounter(currentEpochSetup.Counter+1),
 			unittest.WithParticipants(participants.ToSkeleton()),
 		)
-		err := protocol.IsValidExtendingEpochSetup(extendingSetup, protocolState.ProtocolStateEntry, currentEpochSetup)
+		err := protocol.IsValidExtendingEpochSetup(extendingSetup, protocolState)
 		require.NoError(t, err)
 	})
 	t.Run("(a) We should only have a single epoch setup event per epoch.", func(t *testing.T) {
@@ -160,7 +160,7 @@ func TestIsValidExtendingEpochSetup(t *testing.T) {
 			unittest.SetupWithCounter(currentEpochSetup.Counter+1),
 			unittest.WithParticipants(participants.ToSkeleton()),
 		)
-		err := protocol.IsValidExtendingEpochSetup(extendingSetup, protocolState.ProtocolStateEntry, currentEpochSetup)
+		err := protocol.IsValidExtendingEpochSetup(extendingSetup, protocolState)
 		require.Error(t, err)
 	})
 	t.Run("(b) The setup event should have the counter increased by one", func(t *testing.T) {
@@ -172,7 +172,7 @@ func TestIsValidExtendingEpochSetup(t *testing.T) {
 			unittest.SetupWithCounter(currentEpochSetup.Counter+2),
 			unittest.WithParticipants(participants.ToSkeleton()),
 		)
-		err := protocol.IsValidExtendingEpochSetup(extendingSetup, protocolState.ProtocolStateEntry, currentEpochSetup)
+		err := protocol.IsValidExtendingEpochSetup(extendingSetup, protocolState)
 		require.Error(t, err)
 	})
 	t.Run("(c) The first view needs to be exactly one greater than the current epoch final view", func(t *testing.T) {
@@ -184,7 +184,7 @@ func TestIsValidExtendingEpochSetup(t *testing.T) {
 			unittest.SetupWithCounter(currentEpochSetup.Counter+1),
 			unittest.WithParticipants(participants.ToSkeleton()),
 		)
-		err := protocol.IsValidExtendingEpochSetup(extendingSetup, protocolState.ProtocolStateEntry, currentEpochSetup)
+		err := protocol.IsValidExtendingEpochSetup(extendingSetup, protocolState)
 		require.Error(t, err)
 	})
 }

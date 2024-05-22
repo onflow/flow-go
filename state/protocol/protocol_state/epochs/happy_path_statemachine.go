@@ -57,7 +57,7 @@ func NewHappyPathStateMachine(view uint64, parentState *flow.RichProtocolStateEn
 //     CAUTION: the HappyPathStateMachine is left with a potentially dysfunctional state when this error occurs. Do NOT call the Build method
 //     after such error and discard the HappyPathStateMachine!
 func (u *HappyPathStateMachine) ProcessEpochSetup(epochSetup *flow.EpochSetup) (bool, error) {
-	err := protocol.IsValidExtendingEpochSetup(epochSetup, u.parentState.ProtocolStateEntry, u.parentState.CurrentEpochSetup)
+	err := protocol.IsValidExtendingEpochSetup(epochSetup, u.parentState)
 	if err != nil {
 		return false, fmt.Errorf("invalid epoch setup event: %w", err)
 	}

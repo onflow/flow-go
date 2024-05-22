@@ -62,14 +62,35 @@ func (s *EpochFallbackStateMachineSuite) TestProcessEpochCommitIsNoop() {
 }
 
 // TestProcessEpochRecover ensures that after processing EpochRecover event the state machine initializes
-// correctly the next epoch with correct values. Tests happy path scenario where the next epoch has been set up correctly.
+// correctly the next epoch with expected values. Tests happy path scenario where the next epoch has been set up correctly.
 func (s *EpochFallbackStateMachineSuite) TestProcessEpochRecover() {
+	nextEpochParticipants := s.parentProtocolState.CurrentEpochIdentityTable.Copy()
 	epochRecover := unittest.EpochRecoverFixture(func(setup *flow.EpochSetup) {
-		setup.Counter = s.parentProtocolState.CurrentEpochSetup.Counter + 3
+		setup.Participants = nextEpochParticipants.ToSkeleton()
+		setup.Assignments = unittest.ClusterAssignment(1, nextEpochParticipants.ToSkeleton())
+		setup.Counter = s.parentProtocolState.CurrentEpochSetup.Counter + 1
+		setup.FirstView = s.parentProtocolState.CurrentEpochSetup.FinalView + 1
+		setup.FinalView = setup.FirstView + 10_000
 	})
 	processed, err := s.stateMachine.ProcessEpochRecover(epochRecover)
-	require.True(s.T(), processed)
 	require.NoError(s.T(), err)
+	require.True(s.T(), processed)
+	updatedState, updatedStateID, hasChanges := s.stateMachine.Build()
+	require.True(s.T(), hasChanges, "should have changes")
+	require.Equal(s.T(), updatedState.ID(), updatedStateID, "state ID should be equal to updated state ID")
+
+	expectedState := &flow.ProtocolStateEntry{
+		PreviousEpoch: s.parentProtocolState.PreviousEpoch.Copy(),
+		CurrentEpoch:  s.parentProtocolState.CurrentEpoch,
+		NextEpoch: &flow.EpochStateContainer{
+			SetupID:          epochRecover.EpochSetup.ID(),
+			CommitID:         epochRecover.EpochCommit.ID(),
+			ActiveIdentities: flow.DynamicIdentityEntryListFromIdentities(nextEpochParticipants),
+			EpochExtensions:  nil,
+		},
+		InvalidEpochTransitionAttempted: false,
+	}
+	require.Equal(s.T(), expectedState, updatedState, "updatedState should be equal to expected one")
 }
 
 // TestTransitionToNextEpoch tests a scenario where the FallbackStateMachine processes first block from next epoch.

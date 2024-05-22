@@ -2,7 +2,6 @@ package epochs
 
 import (
 	"fmt"
-
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
 )
@@ -103,20 +102,15 @@ func (m *FallbackStateMachine) ProcessEpochCommit(_ *flow.EpochCommit) (bool, er
 
 // ProcessEpochRecover processes epoch recover service events.
 func (m *FallbackStateMachine) ProcessEpochRecover(epochRecover *flow.EpochRecover) (bool, error) {
-	if m.state.NextEpoch != nil { // sanity check: we can't process epoch recover if next epoch is already set
-		return false, protocol.NewInvalidServiceEventErrorf("can't process epoch recover, next epoch is already set")
+	if m.view+m.params.EpochCommitSafetyThreshold() >= m.parentState.CurrentEpochFinalView() {
+		return false, protocol.NewInvalidServiceEventErrorf("could not process epoch recover, safety threshold reached")
 	}
-	epochExtensionsLen := len(m.state.CurrentEpoch.EpochExtensions)
-	if epochExtensionsLen == 0 {
-		return false, protocol.NewInvalidServiceEventErrorf("can't process epoch recover, no epoch extensions present")
+
+	err := protocol.IsValidExtendingEpochSetup(&epochRecover.EpochSetup, m.parentState)
+	if err != nil {
+		return false, fmt.Errorf("invalid epoch recovery event: %w", err)
 	}
-	finalView := m.state.CurrentEpoch.EpochExtensions[epochExtensionsLen-1].FinalView
-	if finalView+1 != epochRecover.EpochSetup.FirstView {
-		return false, protocol.NewInvalidServiceEventErrorf("can't process epoch recover, epoch setup is not contiguous with last extension")
-	}
-	if m.view+m.params.EpochCommitSafetyThreshold() >= finalView {
-		return false, protocol.NewInvalidServiceEventErrorf("can't process epoch recover, safety threshold reached")
-	}
+
 	nextEpochParticipants, err := buildNextEpochActiveParticipants(
 		m.parentState.CurrentEpoch.ActiveIdentities.Lookup(),
 		m.parentState.CurrentEpochSetup,

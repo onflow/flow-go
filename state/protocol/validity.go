@@ -14,20 +14,20 @@ import (
 // CAUTION: This function assumes that all inputs besides extendingCommit are already validated.
 // Expected errors during normal operations:
 // * protocol.InvalidServiceEventError if the input service event is invalid to extend the currently active epoch status
-func IsValidExtendingEpochSetup(extendingSetup *flow.EpochSetup, protocolStateEntry *flow.ProtocolStateEntry, currentEpochSetupEvent *flow.EpochSetup) error {
+func IsValidExtendingEpochSetup(extendingSetup *flow.EpochSetup, protocolStateEntry *flow.RichProtocolStateEntry) error {
 	// Enforce EpochSetup is valid w.r.t to current epoch state
 	if protocolStateEntry.NextEpoch != nil { // We should only have a single epoch setup event per epoch.
 		// true iff EpochSetup event for NEXT epoch was already included before
 		return NewInvalidServiceEventErrorf("duplicate epoch setup service event: %x", protocolStateEntry.NextEpoch.SetupID)
 	}
-	if extendingSetup.Counter != currentEpochSetupEvent.Counter+1 { // The setup event should have the counter increased by one.
-		return NewInvalidServiceEventErrorf("next epoch setup has invalid counter (%d => %d)", currentEpochSetupEvent.Counter, extendingSetup.Counter)
+	if extendingSetup.Counter != protocolStateEntry.CurrentEpochSetup.Counter+1 { // The setup event should have the counter increased by one.
+		return NewInvalidServiceEventErrorf("next epoch setup has invalid counter (%d => %d)", protocolStateEntry.CurrentEpochSetup.Counter, extendingSetup.Counter)
 	}
-	if extendingSetup.FirstView != currentEpochSetupEvent.FinalView+1 { // The first view needs to be exactly one greater than the current epoch final view
+	if extendingSetup.FirstView != protocolStateEntry.CurrentEpochFinalView()+1 { // The first view needs to be exactly one greater than the current epoch final view
 		return NewInvalidServiceEventErrorf(
 			"next epoch first view must be exactly 1 more than current epoch final view (%d != %d+1)",
 			extendingSetup.FirstView,
-			currentEpochSetupEvent.FinalView,
+			protocolStateEntry.CurrentEpochFinalView(),
 		)
 	}
 
