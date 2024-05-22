@@ -73,19 +73,19 @@ func test_AtBlockID(t *testing.T, protocolState protocol.ProtocolState, epochPro
 		epochState := unittest.EpochStateFixture(unittest.WithValidDKG())
 		epochProtocolStateDB.On("ByBlockID", blockID).Return(epochState, nil).Once()
 
-		epochProtocolState, err := protocolState.AtBlockID(blockID)
+		epochProtocolState, err := protocolState.EpochStateAtBlockID(blockID)
 		require.NoError(t, err)
 		assert.Equal(t, epochState.CurrentEpochIdentityTable, epochProtocolState.Identities())
 	})
 	t.Run("retrieving epoch state for non-existing block yields storage.ErrNotFound error", func(t *testing.T) {
 		epochProtocolStateDB.On("ByBlockID", blockID).Return(nil, storage.ErrNotFound).Once()
-		_, err := protocolState.AtBlockID(blockID)
+		_, err := protocolState.EpochStateAtBlockID(blockID)
 		require.ErrorIs(t, err, storage.ErrNotFound)
 	})
 	t.Run("exception during retrieve is propagated", func(t *testing.T) {
 		exception := errors.New("exception")
 		epochProtocolStateDB.On("ByBlockID", blockID).Return(nil, exception).Once()
-		_, err := protocolState.AtBlockID(blockID)
+		_, err := protocolState.EpochStateAtBlockID(blockID)
 		require.ErrorIs(t, err, exception)
 	})
 }

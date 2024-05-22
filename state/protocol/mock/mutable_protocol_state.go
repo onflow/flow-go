@@ -18,7 +18,7 @@ type MutableProtocolState struct {
 }
 
 // AtBlockID provides a mock function with given fields: blockID
-func (_m *MutableProtocolState) AtBlockID(blockID flow.Identifier) (protocol.EpochProtocolState, error) {
+func (_m *MutableProtocolState) EpochStateAtBlockID(blockID flow.Identifier) (protocol.EpochProtocolState, error) {
 	ret := _m.Called(blockID)
 
 	var r0 protocol.EpochProtocolState

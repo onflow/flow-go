@@ -57,15 +57,14 @@ type EpochProtocolState interface {
 // ProtocolState is the read-only interface for protocol state. It allows querying the
 // Protocol KVStore or Epoch sub-state by block, and retrieving global network params.
 type ProtocolState interface {
-	// AtBlockID returns epoch protocol state at block ID.
+	// EpochStateAtBlockID returns epoch protocol state at block ID.
 	// The resulting epoch protocol state is returned AFTER applying updates that are contained in block.
 	// Can be queried for any block that has been added to the block tree.
 	// Returns:
 	// - (EpochProtocolState, nil) - if there is an epoch protocol state associated with given block ID.
 	// - (nil, storage.ErrNotFound) - if there is no epoch protocol state associated with given block ID.
 	// - (nil, exception) - any other error should be treated as exception.
-	// TODO rename? EpochStateAtBlockID
-	AtBlockID(blockID flow.Identifier) (EpochProtocolState, error)
+	EpochStateAtBlockID(blockID flow.Identifier) (EpochProtocolState, error)
 
 	// KVStoreAtBlockID returns protocol state at block ID.
 	// The resulting protocol state is returned AFTER applying updates that are contained in block.

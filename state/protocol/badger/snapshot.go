@@ -82,7 +82,7 @@ func (s *Snapshot) QuorumCertificate() (*flow.QuorumCertificate, error) {
 }
 
 func (s *Snapshot) Phase() (flow.EpochPhase, error) {
-	epochState, err := s.state.protocolState.AtBlockID(s.blockID)
+	epochState, err := s.state.protocolState.EpochStateAtBlockID(s.blockID)
 	if err != nil {
 		return flow.EpochPhaseUndefined, fmt.Errorf("could not retrieve protocol state snapshot: %w", err)
 	}
@@ -90,7 +90,7 @@ func (s *Snapshot) Phase() (flow.EpochPhase, error) {
 }
 
 func (s *Snapshot) Identities(selector flow.IdentityFilter[flow.Identity]) (flow.IdentityList, error) {
-	epochState, err := s.state.protocolState.AtBlockID(s.blockID)
+	epochState, err := s.state.protocolState.EpochStateAtBlockID(s.blockID)
 	if err != nil {
 		return nil, err
 	}
@@ -355,7 +355,7 @@ func (s *Snapshot) Params() protocol.GlobalParams {
 // All other errors should be treated as exceptions.
 // For each block stored there should be a protocol state stored.
 func (s *Snapshot) EpochProtocolState() (protocol.EpochProtocolState, error) {
-	return s.state.protocolState.AtBlockID(s.blockID)
+	return s.state.protocolState.EpochStateAtBlockID(s.blockID)
 }
 
 // ProtocolState returns the dynamic protocol state that the Head block commits to.
@@ -385,7 +385,7 @@ type EpochQuery struct {
 func (q *EpochQuery) Current() protocol.Epoch {
 	// all errors returned from storage reads here are unexpected, because all
 	// snapshots reside within a current epoch, which must be queryable
-	epochState, err := q.snap.state.protocolState.AtBlockID(q.snap.blockID)
+	epochState, err := q.snap.state.protocolState.EpochStateAtBlockID(q.snap.blockID)
 	if err != nil {
 		return invalid.NewEpochf("could not get protocol state snapshot at block %x: %w", q.snap.blockID, err)
 	}
@@ -405,7 +405,7 @@ func (q *EpochQuery) Current() protocol.Epoch {
 // Next returns the next epoch, if it is available.
 func (q *EpochQuery) Next() protocol.Epoch {
 
-	epochState, err := q.snap.state.protocolState.AtBlockID(q.snap.blockID)
+	epochState, err := q.snap.state.protocolState.EpochStateAtBlockID(q.snap.blockID)
 	if err != nil {
 		return invalid.NewEpochf("could not get protocol state snapshot at block %x: %w", q.snap.blockID, err)
 	}
@@ -434,7 +434,7 @@ func (q *EpochQuery) Next() protocol.Epoch {
 // For all other epochs, returns the previous epoch.
 func (q *EpochQuery) Previous() protocol.Epoch {
 
-	epochState, err := q.snap.state.protocolState.AtBlockID(q.snap.blockID)
+	epochState, err := q.snap.state.protocolState.EpochStateAtBlockID(q.snap.blockID)
 	if err != nil {
 		return invalid.NewEpochf("could not get protocol state snapshot at block %x: %w", q.snap.blockID, err)
 	}

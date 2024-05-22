@@ -662,11 +662,11 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 
 	// We update metrics and emit protocol events for epoch state changes when
 	// the block corresponding to the state change is finalized
-	parentEpochState, err := m.protocolState.AtBlockID(block.Header.ParentID)
+	parentEpochState, err := m.protocolState.EpochStateAtBlockID(block.Header.ParentID)
 	if err != nil {
 		return fmt.Errorf("could not retrieve protocol state snapshot for parent: %w", err)
 	}
-	finalizingEpochState, err := m.protocolState.AtBlockID(blockID)
+	finalizingEpochState, err := m.protocolState.EpochStateAtBlockID(blockID)
 	if err != nil {
 		return fmt.Errorf("could not retrieve protocol state snapshot: %w", err)
 	}
