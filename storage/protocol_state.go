@@ -14,7 +14,7 @@ type ProtocolState interface {
 	// otherwise an exception is returned.
 	// Expected errors of the returned anonymous function:
 	//   - storage.ErrAlreadyExists if a Protocol State with the given id is already stored
-	StoreTx(protocolStateID flow.Identifier, protocolState *flow.ProtocolStateEntry) func(*transaction.Tx) error
+	StoreTx(protocolStateID flow.Identifier, protocolState *flow.EpochProtocolStateEntry) func(*transaction.Tx) error
 
 	// Index returns an anonymous function that is intended to be executed as part of a database transaction.
 	// In a nutshell, we want to maintain a map from `blockID` to `protocolStateID`, where `blockID` references the
@@ -35,7 +35,7 @@ type ProtocolState interface {
 	// ByID returns the protocol state by its ID.
 	// Expected errors during normal operations:
 	//   - storage.ErrNotFound if no protocol state with the given Identifier is known.
-	ByID(id flow.Identifier) (*flow.RichProtocolStateEntry, error)
+	ByID(id flow.Identifier) (*flow.RichEpochProtocolStateEntry, error)
 
 	// ByBlockID retrieves the Protocol State that the block with the given ID proposes.
 	// CAUTION: this protocol state requires confirmation by a QC and will only become active at the child block,
@@ -49,5 +49,5 @@ type ProtocolState interface {
 	//
 	// Expected errors during normal operations:
 	//   - storage.ErrNotFound if no protocol state has been indexed for the given block.
-	ByBlockID(blockID flow.Identifier) (*flow.RichProtocolStateEntry, error)
+	ByBlockID(blockID flow.Identifier) (*flow.RichEpochProtocolStateEntry, error)
 }

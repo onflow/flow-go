@@ -14,7 +14,7 @@ type DynamicIdentityEntry struct {
 
 type DynamicIdentityEntryList []*DynamicIdentityEntry
 
-// ProtocolStateEntry represents a snapshot of the identity table (incl. the set of all notes authorized to
+// EpochProtocolStateEntry represents a snapshot of the identity table (incl. the set of all notes authorized to
 // be part of the network) at some point in time. It allows to reconstruct the state of identity table using
 // epoch setup events and dynamic identities. It tracks attempts of invalid state transitions.
 // It also holds information about the next epoch, if it has been already committed.
@@ -23,8 +23,7 @@ type DynamicIdentityEntryList []*DynamicIdentityEntry
 // Note that the current implementation does not store the identity table directly. Instead, we store
 // the original events that constituted the _initial_ identity table at the beginning of the epoch
 // plus some modifiers. We intend to restructure this code soon.
-// TODO rename?
-type ProtocolStateEntry struct {
+type EpochProtocolStateEntry struct {
 	PreviousEpoch *EpochStateContainer // minimal dynamic properties for previous epoch [optional, nil for first epoch after spork, genesis]
 	CurrentEpoch  EpochStateContainer  // minimal dynamic properties for current epoch
 	NextEpoch     *EpochStateContainer // minimal dynamic properties for next epoch [optional, nil iff we are in staking phase]
@@ -94,9 +93,9 @@ func (c *EpochStateContainer) Copy() *EpochStateContainer {
 	}
 }
 
-// RichProtocolStateEntry is a ProtocolStateEntry which has additional fields that are cached
+// RichEpochProtocolStateEntry is a EpochProtocolStateEntry which has additional fields that are cached
 // from storage layer for convenience.
-// Using this structure instead of ProtocolStateEntry allows us to avoid querying
+// Using this structure instead of EpochProtocolStateEntry allows us to avoid querying
 // the database for epoch setups and commits and full identity table.
 // It holds several invariants, such as:
 //   - CurrentEpochSetup and CurrentEpochCommit are for the same epoch. Never nil.
@@ -112,9 +111,8 @@ func (c *EpochStateContainer) Copy() *EpochStateContainer {
 // the Identity Table additionally contains nodes (with weight zero) from the previous or
 // upcoming epoch, which are transitioning into / out of the network and are only allowed
 // to listen but not to actively contribute.
-// TODO rename?
-type RichProtocolStateEntry struct {
-	*ProtocolStateEntry
+type RichEpochProtocolStateEntry struct {
+	*EpochProtocolStateEntry
 
 	PreviousEpochSetup        *EpochSetup
 	PreviousEpochCommit       *EpochCommit
@@ -129,16 +127,16 @@ type RichProtocolStateEntry struct {
 // NewRichProtocolStateEntry constructs a rich protocol state entry from a protocol state entry and additional data.
 // No errors are expected during normal operation. All errors indicate inconsistent or invalid inputs.
 func NewRichProtocolStateEntry(
-	protocolState *ProtocolStateEntry,
+	protocolState *EpochProtocolStateEntry,
 	previousEpochSetup *EpochSetup,
 	previousEpochCommit *EpochCommit,
 	currentEpochSetup *EpochSetup,
 	currentEpochCommit *EpochCommit,
 	nextEpochSetup *EpochSetup,
 	nextEpochCommit *EpochCommit,
-) (*RichProtocolStateEntry, error) {
-	result := &RichProtocolStateEntry{
-		ProtocolStateEntry:        protocolState,
+) (*RichEpochProtocolStateEntry, error) {
+	result := &RichEpochProtocolStateEntry{
+		EpochProtocolStateEntry:   protocolState,
 		PreviousEpochSetup:        previousEpochSetup,
 		PreviousEpochCommit:       previousEpochCommit,
 		CurrentEpochSetup:         currentEpochSetup,
@@ -149,22 +147,22 @@ func NewRichProtocolStateEntry(
 		NextEpochIdentityTable:    IdentityList{},
 	}
 
-	// If previous epoch is specified: ensure respective epoch service events are not nil and consistent with commitments in `ProtocolStateEntry.PreviousEpoch`
+	// If previous epoch is specified: ensure respective epoch service events are not nil and consistent with commitments in `EpochProtocolStateEntry.PreviousEpoch`
 	if protocolState.PreviousEpoch != nil {
 		if protocolState.PreviousEpoch.SetupID != previousEpochSetup.ID() { // calling ID() will panic is EpochSetup event is nil
-			return nil, fmt.Errorf("supplied previous epoch's setup event (%x) does not match commitment (%x) in ProtocolStateEntry", previousEpochSetup.ID(), protocolState.PreviousEpoch.SetupID)
+			return nil, fmt.Errorf("supplied previous epoch's setup event (%x) does not match commitment (%x) in EpochProtocolStateEntry", previousEpochSetup.ID(), protocolState.PreviousEpoch.SetupID)
 		}
 		if protocolState.PreviousEpoch.CommitID != previousEpochCommit.ID() { // calling ID() will panic is EpochCommit event is nil
-			return nil, fmt.Errorf("supplied previous epoch's commit event (%x) does not match commitment (%x) in ProtocolStateEntry", previousEpochCommit.ID(), protocolState.PreviousEpoch.CommitID)
+			return nil, fmt.Errorf("supplied previous epoch's commit event (%x) does not match commitment (%x) in EpochProtocolStateEntry", previousEpochCommit.ID(), protocolState.PreviousEpoch.CommitID)
 		}
 	}
 
-	// For current epoch: ensure respective epoch service events are not nil and consistent with commitments in `ProtocolStateEntry.CurrentEpoch`
+	// For current epoch: ensure respective epoch service events are not nil and consistent with commitments in `EpochProtocolStateEntry.CurrentEpoch`
 	if protocolState.CurrentEpoch.SetupID != currentEpochSetup.ID() { // calling ID() will panic is EpochSetup event is nil
-		return nil, fmt.Errorf("supplied current epoch's setup event (%x) does not match commitment (%x) in ProtocolStateEntry", currentEpochSetup.ID(), protocolState.CurrentEpoch.SetupID)
+		return nil, fmt.Errorf("supplied current epoch's setup event (%x) does not match commitment (%x) in EpochProtocolStateEntry", currentEpochSetup.ID(), protocolState.CurrentEpoch.SetupID)
 	}
 	if protocolState.CurrentEpoch.CommitID != currentEpochCommit.ID() { // calling ID() will panic is EpochCommit event is nil
-		return nil, fmt.Errorf("supplied current epoch's commit event (%x) does not match commitment (%x) in ProtocolStateEntry", currentEpochCommit.ID(), protocolState.CurrentEpoch.CommitID)
+		return nil, fmt.Errorf("supplied current epoch's commit event (%x) does not match commitment (%x) in EpochProtocolStateEntry", currentEpochCommit.ID(), protocolState.CurrentEpoch.CommitID)
 	}
 
 	// If we are in staking phase (i.e. protocolState.NextEpoch == nil):
@@ -194,13 +192,13 @@ func NewRichProtocolStateEntry(
 			return nil, fmt.Errorf("could not build identity table for staking phase: %w", err)
 		}
 	} else { // protocolState.NextEpoch ≠ nil, i.e. we are in epoch setup or epoch commit phase
-		// ensure respective epoch service events are not nil and consistent with commitments in `ProtocolStateEntry.NextEpoch`
+		// ensure respective epoch service events are not nil and consistent with commitments in `EpochProtocolStateEntry.NextEpoch`
 		if nextEpoch.SetupID != nextEpochSetup.ID() {
-			return nil, fmt.Errorf("supplied next epoch's setup event (%x) does not match commitment (%x) in ProtocolStateEntry", nextEpoch.SetupID, nextEpochSetup.ID())
+			return nil, fmt.Errorf("supplied next epoch's setup event (%x) does not match commitment (%x) in EpochProtocolStateEntry", nextEpoch.SetupID, nextEpochSetup.ID())
 		}
 		if nextEpoch.CommitID != ZeroID {
 			if nextEpoch.CommitID != nextEpochCommit.ID() {
-				return nil, fmt.Errorf("supplied next epoch's commit event (%x) does not match commitment (%x) in ProtocolStateEntry", nextEpoch.CommitID, nextEpochCommit.ID())
+				return nil, fmt.Errorf("supplied next epoch's commit event (%x) does not match commitment (%x) in EpochProtocolStateEntry", nextEpoch.CommitID, nextEpochCommit.ID())
 			}
 		}
 
@@ -230,7 +228,7 @@ func NewRichProtocolStateEntry(
 }
 
 // ID returns hash of entry by hashing all fields.
-func (e *ProtocolStateEntry) ID() Identifier {
+func (e *EpochProtocolStateEntry) ID() Identifier {
 	if e == nil {
 		return ZeroID
 	}
@@ -250,11 +248,11 @@ func (e *ProtocolStateEntry) ID() Identifier {
 
 // Copy returns a full copy of the entry.
 // Embedded Identities are deep-copied, _except_ for their keys, which are copied by reference.
-func (e *ProtocolStateEntry) Copy() *ProtocolStateEntry {
+func (e *EpochProtocolStateEntry) Copy() *EpochProtocolStateEntry {
 	if e == nil {
 		return nil
 	}
-	return &ProtocolStateEntry{
+	return &EpochProtocolStateEntry{
 		PreviousEpoch:                   e.PreviousEpoch.Copy(),
 		CurrentEpoch:                    *e.CurrentEpoch.Copy(),
 		NextEpoch:                       e.NextEpoch.Copy(),
@@ -265,12 +263,12 @@ func (e *ProtocolStateEntry) Copy() *ProtocolStateEntry {
 // Copy returns a full copy of rich protocol state entry.
 //   - Embedded service events are copied by reference (not deep-copied).
 //   - CurrentEpochIdentityTable and NextEpochIdentityTable are deep-copied, _except_ for their keys, which are copied by reference.
-func (e *RichProtocolStateEntry) Copy() *RichProtocolStateEntry {
+func (e *RichEpochProtocolStateEntry) Copy() *RichEpochProtocolStateEntry {
 	if e == nil {
 		return nil
 	}
-	return &RichProtocolStateEntry{
-		ProtocolStateEntry:        e.ProtocolStateEntry.Copy(),
+	return &RichEpochProtocolStateEntry{
+		EpochProtocolStateEntry:   e.EpochProtocolStateEntry.Copy(),
 		PreviousEpochSetup:        e.PreviousEpochSetup,
 		PreviousEpochCommit:       e.PreviousEpochCommit,
 		CurrentEpochSetup:         e.CurrentEpochSetup,
@@ -283,8 +281,8 @@ func (e *RichProtocolStateEntry) Copy() *RichProtocolStateEntry {
 }
 
 // EpochPhase returns the current epoch phase.
-// The receiver ProtocolStateEntry must be properly constructed.
-func (e *ProtocolStateEntry) EpochPhase() EpochPhase {
+// The receiver EpochProtocolStateEntry must be properly constructed.
+func (e *EpochProtocolStateEntry) EpochPhase() EpochPhase {
 	// The epoch phase is determined by how much information we have about the next epoch
 	if e.NextEpoch == nil {
 		return EpochPhaseStaking // if no information about the next epoch is known, we are in the Staking Phase
@@ -297,8 +295,8 @@ func (e *ProtocolStateEntry) EpochPhase() EpochPhase {
 }
 
 // EpochCounter returns the current epoch counter.
-// The receiver RichProtocolStateEntry must be properly constructed.
-func (e *RichProtocolStateEntry) EpochCounter() uint64 {
+// The receiver RichEpochProtocolStateEntry must be properly constructed.
+func (e *RichEpochProtocolStateEntry) EpochCounter() uint64 {
 	return e.CurrentEpochSetup.Counter
 }
 

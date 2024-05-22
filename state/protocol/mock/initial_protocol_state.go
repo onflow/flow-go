@@ -3,8 +3,9 @@
 package mock
 
 import (
-	flow "github.com/onflow/flow-go/model/flow"
 	mock "github.com/stretchr/testify/mock"
+
+	flow "github.com/onflow/flow-go/model/flow"
 
 	protocol "github.com/onflow/flow-go/state/protocol"
 )
@@ -67,15 +68,15 @@ func (_m *InitialProtocolState) DKG() (protocol.DKG, error) {
 }
 
 // Entry provides a mock function with given fields:
-func (_m *InitialProtocolState) Entry() *flow.RichProtocolStateEntry {
+func (_m *InitialProtocolState) Entry() *flow.RichEpochProtocolStateEntry {
 	ret := _m.Called()
 
-	var r0 *flow.RichProtocolStateEntry
-	if rf, ok := ret.Get(0).(func() *flow.RichProtocolStateEntry); ok {
+	var r0 *flow.RichEpochProtocolStateEntry
+	if rf, ok := ret.Get(0).(func() *flow.RichEpochProtocolStateEntry); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*flow.RichProtocolStateEntry)
+			r0 = ret.Get(0).(*flow.RichEpochProtocolStateEntry)
 		}
 	}
 

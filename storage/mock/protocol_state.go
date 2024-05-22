@@ -3,8 +3,9 @@
 package mock
 
 import (
-	flow "github.com/onflow/flow-go/model/flow"
 	mock "github.com/stretchr/testify/mock"
+
+	flow "github.com/onflow/flow-go/model/flow"
 
 	transaction "github.com/onflow/flow-go/storage/badger/transaction"
 )
@@ -15,19 +16,19 @@ type ProtocolState struct {
 }
 
 // ByBlockID provides a mock function with given fields: blockID
-func (_m *ProtocolState) ByBlockID(blockID flow.Identifier) (*flow.RichProtocolStateEntry, error) {
+func (_m *ProtocolState) ByBlockID(blockID flow.Identifier) (*flow.RichEpochProtocolStateEntry, error) {
 	ret := _m.Called(blockID)
 
-	var r0 *flow.RichProtocolStateEntry
+	var r0 *flow.RichEpochProtocolStateEntry
 	var r1 error
-	if rf, ok := ret.Get(0).(func(flow.Identifier) (*flow.RichProtocolStateEntry, error)); ok {
+	if rf, ok := ret.Get(0).(func(flow.Identifier) (*flow.RichEpochProtocolStateEntry, error)); ok {
 		return rf(blockID)
 	}
-	if rf, ok := ret.Get(0).(func(flow.Identifier) *flow.RichProtocolStateEntry); ok {
+	if rf, ok := ret.Get(0).(func(flow.Identifier) *flow.RichEpochProtocolStateEntry); ok {
 		r0 = rf(blockID)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*flow.RichProtocolStateEntry)
+			r0 = ret.Get(0).(*flow.RichEpochProtocolStateEntry)
 		}
 	}
 
@@ -41,19 +42,19 @@ func (_m *ProtocolState) ByBlockID(blockID flow.Identifier) (*flow.RichProtocolS
 }
 
 // ByID provides a mock function with given fields: id
-func (_m *ProtocolState) ByID(id flow.Identifier) (*flow.RichProtocolStateEntry, error) {
+func (_m *ProtocolState) ByID(id flow.Identifier) (*flow.RichEpochProtocolStateEntry, error) {
 	ret := _m.Called(id)
 
-	var r0 *flow.RichProtocolStateEntry
+	var r0 *flow.RichEpochProtocolStateEntry
 	var r1 error
-	if rf, ok := ret.Get(0).(func(flow.Identifier) (*flow.RichProtocolStateEntry, error)); ok {
+	if rf, ok := ret.Get(0).(func(flow.Identifier) (*flow.RichEpochProtocolStateEntry, error)); ok {
 		return rf(id)
 	}
-	if rf, ok := ret.Get(0).(func(flow.Identifier) *flow.RichProtocolStateEntry); ok {
+	if rf, ok := ret.Get(0).(func(flow.Identifier) *flow.RichEpochProtocolStateEntry); ok {
 		r0 = rf(id)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*flow.RichProtocolStateEntry)
+			r0 = ret.Get(0).(*flow.RichEpochProtocolStateEntry)
 		}
 	}
 
@@ -83,11 +84,11 @@ func (_m *ProtocolState) Index(blockID flow.Identifier, protocolStateID flow.Ide
 }
 
 // StoreTx provides a mock function with given fields: protocolStateID, protocolState
-func (_m *ProtocolState) StoreTx(protocolStateID flow.Identifier, protocolState *flow.ProtocolStateEntry) func(*transaction.Tx) error {
+func (_m *ProtocolState) StoreTx(protocolStateID flow.Identifier, protocolState *flow.EpochProtocolStateEntry) func(*transaction.Tx) error {
 	ret := _m.Called(protocolStateID, protocolState)
 
 	var r0 func(*transaction.Tx) error
-	if rf, ok := ret.Get(0).(func(flow.Identifier, *flow.ProtocolStateEntry) func(*transaction.Tx) error); ok {
+	if rf, ok := ret.Get(0).(func(flow.Identifier, *flow.EpochProtocolStateEntry) func(*transaction.Tx) error); ok {
 		r0 = rf(protocolStateID, protocolState)
 	} else {
 		if ret.Get(0) != nil {

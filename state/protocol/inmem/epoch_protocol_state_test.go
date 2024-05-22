@@ -15,7 +15,7 @@ import (
 )
 
 // TestEpochProtocolStateAdapter tests if the EpochProtocolStateAdapter returns expected values when created
-// using constructor passing a RichProtocolStateEntry.
+// using constructor passing a RichEpochProtocolStateEntry.
 func TestEpochProtocolStateAdapter(t *testing.T) {
 	// construct a valid protocol state entry that has semantically correct DKGParticipantKeys
 	entry := unittest.EpochStateFixture(unittest.WithValidDKG())
@@ -92,14 +92,14 @@ func TestEpochProtocolStateAdapter(t *testing.T) {
 		assert.False(t, adapter.InvalidEpochTransitionAttempted())
 	})
 	t.Run("invalid-state-transition-attempted", func(t *testing.T) {
-		entry := unittest.EpochStateFixture(func(entry *flow.RichProtocolStateEntry) {
+		entry := unittest.EpochStateFixture(func(entry *flow.RichEpochProtocolStateEntry) {
 			entry.InvalidEpochTransitionAttempted = true
 		})
 		adapter := inmem.NewEpochProtocolStateAdapter(entry, globalParams)
 		assert.True(t, adapter.InvalidEpochTransitionAttempted())
 	})
 	t.Run("no-previous-epoch", func(t *testing.T) {
-		entry := unittest.EpochStateFixture(func(entry *flow.RichProtocolStateEntry) {
+		entry := unittest.EpochStateFixture(func(entry *flow.RichEpochProtocolStateEntry) {
 			entry.PreviousEpoch = nil
 			entry.PreviousEpochSetup = nil
 			entry.PreviousEpochCommit = nil

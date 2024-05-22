@@ -10,7 +10,7 @@ import (
 // Error returns:
 //   - storage.ErrAlreadyExists if the key already exists in the database.
 //   - generic error in case of unexpected failure from the database layer or encoding failure.
-func InsertProtocolState(protocolStateID flow.Identifier, protocolState *flow.ProtocolStateEntry) func(*badger.Txn) error {
+func InsertProtocolState(protocolStateID flow.Identifier, protocolState *flow.EpochProtocolStateEntry) func(*badger.Txn) error {
 	return insert(makePrefix(codeProtocolState, protocolStateID), protocolState)
 }
 
@@ -18,7 +18,7 @@ func InsertProtocolState(protocolStateID flow.Identifier, protocolState *flow.Pr
 // Error returns:
 //   - storage.ErrNotFound if the key does not exist in the database
 //   - generic error in case of unexpected failure from the database layer
-func RetrieveProtocolState(protocolStateID flow.Identifier, protocolState *flow.ProtocolStateEntry) func(*badger.Txn) error {
+func RetrieveProtocolState(protocolStateID flow.Identifier, protocolState *flow.EpochProtocolStateEntry) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeProtocolState, protocolStateID), protocolState)
 }
 

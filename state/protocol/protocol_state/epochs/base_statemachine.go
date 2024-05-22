@@ -8,8 +8,8 @@ import (
 // baseStateMachine implements common logic for evolving protocol state both in happy path and epoch fallback
 // operation modes. It partially implements `StateMachine` and is used as building block for more complex implementations.
 type baseStateMachine struct {
-	parentState *flow.RichProtocolStateEntry
-	state       *flow.ProtocolStateEntry
+	parentState *flow.RichEpochProtocolStateEntry
+	state       *flow.EpochProtocolStateEntry
 	view        uint64
 
 	// The following fields are maps from NodeID → DynamicIdentityEntry for the nodes that are *active* in the respective epoch.
@@ -27,7 +27,7 @@ type baseStateMachine struct {
 // Do NOT call Build, if the baseStateMachine instance has returned a `protocol.InvalidServiceEventError`
 // at any time during its lifetime. After this error, the baseStateMachine is left with a potentially
 // dysfunctional state and should be discarded.
-func (u *baseStateMachine) Build() (updatedState *flow.ProtocolStateEntry, stateID flow.Identifier, hasChanges bool) {
+func (u *baseStateMachine) Build() (updatedState *flow.EpochProtocolStateEntry, stateID flow.Identifier, hasChanges bool) {
 	updatedState = u.state.Copy()
 	stateID = updatedState.ID()
 	hasChanges = stateID != u.parentState.ID()
@@ -41,7 +41,7 @@ func (u *baseStateMachine) View() uint64 {
 }
 
 // ParentState returns parent protocol state associated with this state machine.
-func (u *baseStateMachine) ParentState() *flow.RichProtocolStateEntry {
+func (u *baseStateMachine) ParentState() *flow.RichEpochProtocolStateEntry {
 	return u.parentState
 }
 
