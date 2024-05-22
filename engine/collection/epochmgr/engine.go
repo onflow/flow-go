@@ -347,7 +347,7 @@ func (e *Engine) handleEpochEvents(ctx irrecoverable.SignalerContext, ready comp
 				ctx.Throw(err)
 			}
 		case <-e.efmEvents:
-			// stop root qc voting
+			e.stopRootQCVoting()
 		}
 	}
 }
@@ -514,6 +514,11 @@ func (e *Engine) stopEpochComponents(counter uint64) error {
 	case <-time.After(e.startupTimeout):
 		return fmt.Errorf("could not stop epoch %d components after %s", counter, e.startupTimeout)
 	}
+}
+
+// stopRootQCVoting sends signal to root qc voter to stop in progress voting.
+func (e *Engine) stopRootQCVoting() {
+	e.voter.StopVoting()
 }
 
 // getEpochComponents retrieves the stored (running) epoch components for the given epoch counter.
