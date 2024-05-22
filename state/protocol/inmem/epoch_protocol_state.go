@@ -22,10 +22,13 @@ func NewEpochProtocolStateAdapter(entry *flow.RichEpochProtocolStateEntry, param
 	}
 }
 
+// Epoch returns the current epoch counter.
 func (s *EpochProtocolStateAdapter) Epoch() uint64 {
 	return s.CurrentEpochSetup.Counter
 }
 
+// Clustering returns the cluster assignment for the current epoch.
+// No errors are expected during normal operations.
 func (s *EpochProtocolStateAdapter) Clustering() (flow.ClusterList, error) {
 	clustering, err := ClusteringFromSetupEvent(s.CurrentEpochSetup)
 	if err != nil {
@@ -34,14 +37,20 @@ func (s *EpochProtocolStateAdapter) Clustering() (flow.ClusterList, error) {
 	return clustering, nil
 }
 
+// EpochSetup returns the flow.EpochSetup service event which partly defines the
+// initial epoch state for the current epoch.
 func (s *EpochProtocolStateAdapter) EpochSetup() *flow.EpochSetup {
 	return s.CurrentEpochSetup
 }
 
+// EpochCommit returns the flow.EpochCommit service event which partly defines the
+// initial epoch state for the current epoch.
 func (s *EpochProtocolStateAdapter) EpochCommit() *flow.EpochCommit {
 	return s.CurrentEpochCommit
 }
 
+// DKG returns the DKG information for the current epoch.
+// No errors are expected during normal operations.
 func (s *EpochProtocolStateAdapter) DKG() (protocol.DKG, error) {
 	dkg, err := EncodableDKGFromEvents(s.CurrentEpochSetup, s.CurrentEpochCommit)
 	if err != nil {
@@ -58,10 +67,12 @@ func (s *EpochProtocolStateAdapter) Entry() *flow.RichEpochProtocolStateEntry {
 	return s.RichEpochProtocolStateEntry.Copy()
 }
 
+// Identities returns the identity table as of the current block.
 func (s *EpochProtocolStateAdapter) Identities() flow.IdentityList {
 	return s.RichEpochProtocolStateEntry.CurrentEpochIdentityTable
 }
 
+// GlobalParams returns spork-scoped global network parameters.
 func (s *EpochProtocolStateAdapter) GlobalParams() protocol.GlobalParams {
 	return s.params
 }

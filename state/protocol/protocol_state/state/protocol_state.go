@@ -42,7 +42,7 @@ func newProtocolState(epochProtocolStateDB storage.EpochProtocolStateEntries, kv
 	}
 }
 
-// AtBlockID returns epoch protocol state at block ID.
+// EpochStateAtBlockID returns epoch protocol state at block ID.
 // The resulting epoch protocol state is returned AFTER applying updates that are contained in block.
 // Can be queried for any block that has been added to the block tree.
 // Returns:

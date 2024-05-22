@@ -10,7 +10,7 @@ import (
 // EpochProtocolState is fork-aware and can change on a block-by-block basis.
 // Each EpochProtocolState instance refers to the state with respect to some reference block.
 type EpochProtocolState interface {
-	// Epoch returns counter of epoch.
+	// Epoch returns the current epoch counter.
 	Epoch() uint64
 	// Clustering returns initial clustering from epoch setup.
 	// No errors are expected during normal operations.
