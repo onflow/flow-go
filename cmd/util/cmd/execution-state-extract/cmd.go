@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"runtime/pprof"
 	"strings"
 
 	"github.com/rs/zerolog/log"
@@ -58,6 +59,9 @@ var Cmd = &cobra.Command{
 }
 
 func init() {
+	Cmd.Flags().StringVar(&flagCPUProfile, "cpu-profile", "",
+		"file to store cou profile")
+
 	Cmd.Flags().StringVar(&flagExecutionStateDir, "execution-state-dir", "",
 		"Execution Node state dir (where WAL logs are written")
 	_ = Cmd.MarkFlagRequired("execution-state-dir")
@@ -167,6 +171,20 @@ func init() {
 
 func run(*cobra.Command, []string) {
 	var stateCommitment flow.StateCommitment
+
+	if flagCPUProfile != "" {
+		f, err := os.Create(flagCPUProfile)
+		if err != nil {
+			log.Fatal().Err(err).Msg("could not create CPU profile")
+		}
+
+		err = pprof.StartCPUProfile(f)
+		if err != nil {
+			log.Fatal().Err(err).Msg("could not start CPU profile")
+		}
+
+		defer pprof.StopCPUProfile()
+	}
 
 	if len(flagBlockHash) > 0 && len(flagStateCommitment) > 0 {
 		log.Fatal().Msg("cannot run the command with both block hash and state commitment as inputs, only one of them should be provided")
