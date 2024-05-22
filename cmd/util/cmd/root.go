@@ -15,7 +15,7 @@ import (
 	checkpoint_collect_stats "github.com/onflow/flow-go/cmd/util/cmd/checkpoint-collect-stats"
 	checkpoint_list_tries "github.com/onflow/flow-go/cmd/util/cmd/checkpoint-list-tries"
 	checkpoint_trie_stats "github.com/onflow/flow-go/cmd/util/cmd/checkpoint-trie-stats"
-	diff_payloads "github.com/onflow/flow-go/cmd/util/cmd/diff-payloads"
+	diff_states "github.com/onflow/flow-go/cmd/util/cmd/diff-states"
 	epochs "github.com/onflow/flow-go/cmd/util/cmd/epochs/cmd"
 	export "github.com/onflow/flow-go/cmd/util/cmd/exec-data-json-export"
 	edbs "github.com/onflow/flow-go/cmd/util/cmd/execution-data-blobstore/cmd"
@@ -107,7 +107,7 @@ func addCommands() {
 	rootCmd.AddCommand(bootstrap_execution_state_payloads.Cmd)
 	rootCmd.AddCommand(extractpayloads.Cmd)
 	rootCmd.AddCommand(find_inconsistent_result.Cmd)
-	rootCmd.AddCommand(diff_payloads.Cmd)
+	rootCmd.AddCommand(diff_states.Cmd)
 }
 
 func initConfig() {
