@@ -14,9 +14,9 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// TestDynamicProtocolStateAdapter tests if the DynamicProtocolStateAdapter returns expected values when created
+// TestEpochProtocolStateAdapter tests if the EpochProtocolStateAdapter returns expected values when created
 // using constructor passing a RichProtocolStateEntry.
-func TestDynamicProtocolStateAdapter(t *testing.T) {
+func TestEpochProtocolStateAdapter(t *testing.T) {
 	// construct a valid protocol state entry that has semantically correct DKGParticipantKeys
 	entry := unittest.EpochStateFixture(unittest.WithValidDKG())
 

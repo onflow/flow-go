@@ -23,6 +23,7 @@ type DynamicIdentityEntryList []*DynamicIdentityEntry
 // Note that the current implementation does not store the identity table directly. Instead, we store
 // the original events that constituted the _initial_ identity table at the beginning of the epoch
 // plus some modifiers. We intend to restructure this code soon.
+// TODO rename?
 type ProtocolStateEntry struct {
 	PreviousEpoch *EpochStateContainer // minimal dynamic properties for previous epoch [optional, nil for first epoch after spork, genesis]
 	CurrentEpoch  EpochStateContainer  // minimal dynamic properties for current epoch
@@ -111,6 +112,7 @@ func (c *EpochStateContainer) Copy() *EpochStateContainer {
 // the Identity Table additionally contains nodes (with weight zero) from the previous or
 // upcoming epoch, which are transitioning into / out of the network and are only allowed
 // to listen but not to actively contribute.
+// TODO rename?
 type RichProtocolStateEntry struct {
 	*ProtocolStateEntry
 

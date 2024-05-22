@@ -7,27 +7,27 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 )
 
-// DynamicProtocolStateAdapter implements protocol.EpochProtocolState by wrapping an InitialProtocolStateAdapter.
+// EpochProtocolStateAdapter implements protocol.EpochProtocolState by wrapping an InitialProtocolStateAdapter.
 // TODO rename
-type DynamicProtocolStateAdapter struct {
+type EpochProtocolStateAdapter struct {
 	*flow.RichProtocolStateEntry
 	params protocol.GlobalParams
 }
 
-var _ protocol.EpochProtocolState = (*DynamicProtocolStateAdapter)(nil)
+var _ protocol.EpochProtocolState = (*EpochProtocolStateAdapter)(nil)
 
-func NewDynamicProtocolStateAdapter(entry *flow.RichProtocolStateEntry, params protocol.GlobalParams) *DynamicProtocolStateAdapter {
-	return &DynamicProtocolStateAdapter{
+func NewDynamicProtocolStateAdapter(entry *flow.RichProtocolStateEntry, params protocol.GlobalParams) *EpochProtocolStateAdapter {
+	return &EpochProtocolStateAdapter{
 		RichProtocolStateEntry: entry,
 		params:                 params,
 	}
 }
 
-func (s *DynamicProtocolStateAdapter) Epoch() uint64 {
+func (s *EpochProtocolStateAdapter) Epoch() uint64 {
 	return s.CurrentEpochSetup.Counter
 }
 
-func (s *DynamicProtocolStateAdapter) Clustering() (flow.ClusterList, error) {
+func (s *EpochProtocolStateAdapter) Clustering() (flow.ClusterList, error) {
 	clustering, err := ClusteringFromSetupEvent(s.CurrentEpochSetup)
 	if err != nil {
 		return nil, fmt.Errorf("could not extract cluster list from setup event: %w", err)
@@ -35,15 +35,15 @@ func (s *DynamicProtocolStateAdapter) Clustering() (flow.ClusterList, error) {
 	return clustering, nil
 }
 
-func (s *DynamicProtocolStateAdapter) EpochSetup() *flow.EpochSetup {
+func (s *EpochProtocolStateAdapter) EpochSetup() *flow.EpochSetup {
 	return s.CurrentEpochSetup
 }
 
-func (s *DynamicProtocolStateAdapter) EpochCommit() *flow.EpochCommit {
+func (s *EpochProtocolStateAdapter) EpochCommit() *flow.EpochCommit {
 	return s.CurrentEpochCommit
 }
 
-func (s *DynamicProtocolStateAdapter) DKG() (protocol.DKG, error) {
+func (s *EpochProtocolStateAdapter) DKG() (protocol.DKG, error) {
 	dkg, err := EncodableDKGFromEvents(s.CurrentEpochSetup, s.CurrentEpochCommit)
 	if err != nil {
 		return nil, fmt.Errorf("could not construct encodable DKG from events: %w", err)
@@ -55,15 +55,15 @@ func (s *DynamicProtocolStateAdapter) DKG() (protocol.DKG, error) {
 // Entry Returns low-level protocol state entry that was used to initialize this object.
 // It shouldn't be used by high-level logic, it is useful for some cases such as bootstrapping.
 // Prefer using other methods to access protocol state.
-func (s *DynamicProtocolStateAdapter) Entry() *flow.RichProtocolStateEntry {
+func (s *EpochProtocolStateAdapter) Entry() *flow.RichProtocolStateEntry {
 	return s.RichProtocolStateEntry.Copy()
 }
 
-func (s *DynamicProtocolStateAdapter) Identities() flow.IdentityList {
+func (s *EpochProtocolStateAdapter) Identities() flow.IdentityList {
 	return s.RichProtocolStateEntry.CurrentEpochIdentityTable
 }
 
-func (s *DynamicProtocolStateAdapter) GlobalParams() protocol.GlobalParams {
+func (s *EpochProtocolStateAdapter) GlobalParams() protocol.GlobalParams {
 	return s.params
 }
 
@@ -71,17 +71,17 @@ func (s *DynamicProtocolStateAdapter) GlobalParams() protocol.GlobalParams {
 // on the fork ending this block. Once the first block where this flag is true is finalized, epoch
 // fallback mode is triggered.
 // TODO for 'leaving Epoch Fallback via special service event': at the moment, this is a one-way transition and requires a spork to recover - need to revisit for sporkless EFM recovery
-func (s *DynamicProtocolStateAdapter) InvalidEpochTransitionAttempted() bool {
+func (s *EpochProtocolStateAdapter) InvalidEpochTransitionAttempted() bool {
 	return s.ProtocolStateEntry.InvalidEpochTransitionAttempted
 }
 
 // PreviousEpochExists returns true if a previous epoch exists. This is true for all epoch
 // except those immediately following a spork.
-func (s *DynamicProtocolStateAdapter) PreviousEpochExists() bool {
+func (s *EpochProtocolStateAdapter) PreviousEpochExists() bool {
 	return s.PreviousEpoch != nil
 }
 
 // EpochPhase returns the epoch phase for the current epoch.
-func (s *DynamicProtocolStateAdapter) EpochPhase() flow.EpochPhase {
+func (s *EpochProtocolStateAdapter) EpochPhase() flow.EpochPhase {
 	return s.Entry().EpochPhase()
 }
