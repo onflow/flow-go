@@ -407,7 +407,7 @@ func executionNodesForBlockID(
 		}
 		executorIDs = executorIdentities.NodeIDs()
 	} else {
-		// try to find atleast minExecutionNodesCnt execution node ids from the execution receipts for the given blockID
+		// try to find at least minExecutionNodesCnt execution node ids from the execution receipts for the given blockID
 		for attempt := 0; attempt < maxAttemptsForExecutionReceipt; attempt++ {
 			executorIDs, err = findAllExecutionNodes(blockID, executionReceipts, log)
 			if err != nil {
@@ -524,34 +524,59 @@ func findAllExecutionNodes(
 func chooseExecutionNodes(state protocol.State, executorIDs flow.IdentifierList) (flow.IdentitySkeletonList, error) {
 	allENs, err := state.Final().Identities(filter.HasRole[flow.Identity](flow.RoleExecution))
 	if err != nil {
-		return nil, fmt.Errorf("failed to retreive all execution IDs: %w", err)
+		return nil, fmt.Errorf("failed to retrieve all execution IDs: %w", err)
 	}
 
-	// first try and choose from the preferred EN IDs
+	// choose from preferred execution nodes
 	var chosenIDs flow.IdentityList
 	if len(preferredENIdentifiers) > 0 {
-		// find the preferred execution node IDs which have executed the transaction
-		chosenIDs = allENs.Filter(filter.And(filter.HasNodeID[flow.Identity](preferredENIdentifiers...),
-			filter.HasNodeID[flow.Identity](executorIDs...)))
-		if len(chosenIDs) > 0 {
-			return chosenIDs.ToSkeleton(), nil
+		chosenIDs = allENs.Filter(filter.And(
+			filter.HasNodeID[flow.Identity](preferredENIdentifiers...),
+			filter.HasNodeID[flow.Identity](executorIDs...),
+		))
+	}
+
+	// pad the list if needed
+	if len(chosenIDs) < maxFailedRequestCount {
+		// add any EN with a receipt
+		receiptENs := allENs.Filter(filter.HasNodeID[flow.Identity](executorIDs...))
+		for _, en := range receiptENs {
+			if !chosenIDs.Exists(en) && len(chosenIDs) < maxFailedRequestCount {
+				chosenIDs = append(chosenIDs, en)
+			}
+		}
+
+		// add any preferred node not already selected
+		preferredENs := allENs.Filter(filter.HasNodeID[flow.Identity](preferredENIdentifiers...))
+		for _, en := range preferredENs {
+			if !chosenIDs.Exists(en) && len(chosenIDs) < maxFailedRequestCount {
+				chosenIDs = append(chosenIDs, en)
+			}
+		}
+
+		// add any EN not already selected
+		for _, en := range allENs {
+			if !chosenIDs.Exists(en) && len(chosenIDs) < maxFailedRequestCount {
+				chosenIDs = append(chosenIDs, en)
+			}
 		}
 	}
 
 	// if no preferred EN ID is found, then choose from the fixed EN IDs
-	if len(fixedENIdentifiers) > 0 {
-		// choose fixed ENs which have executed the transaction
+	if len(chosenIDs) == 0 && len(fixedENIdentifiers) > 0 {
 		chosenIDs = allENs.Filter(filter.And(
 			filter.HasNodeID[flow.Identity](fixedENIdentifiers...),
-			filter.HasNodeID[flow.Identity](executorIDs...)))
-		if len(chosenIDs) > 0 {
-			return chosenIDs.ToSkeleton(), nil
+			filter.HasNodeID[flow.Identity](executorIDs...),
+		))
+		if len(chosenIDs) == 0 {
+			chosenIDs = allENs.Filter(filter.HasNodeID[flow.Identity](fixedENIdentifiers...))
 		}
-		// if no such ENs are found then just choose all fixed ENs
-		chosenIDs = allENs.Filter(filter.HasNodeID[flow.Identity](fixedENIdentifiers...))
-		return chosenIDs.ToSkeleton(), nil
 	}
 
-	// If no preferred or fixed ENs have been specified, then return all executor IDs i.e. no preference at all
-	return allENs.Filter(filter.HasNodeID[flow.Identity](executorIDs...)).ToSkeleton(), nil
+	// if no preferred or fixed ENs have been specified, then return all executor IDs i.e. no preference at all
+	if len(chosenIDs) == 0 {
+		chosenIDs = allENs.Filter(filter.HasNodeID[flow.Identity](executorIDs...))
+	}
+
+	return chosenIDs.ToSkeleton(), nil
 }
