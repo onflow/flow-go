@@ -8,7 +8,6 @@ import (
 )
 
 // EpochProtocolStateAdapter implements protocol.EpochProtocolState by wrapping an InitialProtocolStateAdapter.
-// TODO rename
 type EpochProtocolStateAdapter struct {
 	*flow.RichProtocolStateEntry
 	params protocol.GlobalParams
