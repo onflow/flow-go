@@ -3,9 +3,8 @@
 package mock
 
 import (
-	mock "github.com/stretchr/testify/mock"
-
 	flow "github.com/onflow/flow-go/model/flow"
+	mock "github.com/stretchr/testify/mock"
 
 	protocol "github.com/onflow/flow-go/state/protocol"
 )
@@ -15,7 +14,7 @@ type ProtocolState struct {
 	mock.Mock
 }
 
-// AtBlockID provides a mock function with given fields: blockID
+// EpochStateAtBlockID provides a mock function with given fields: blockID
 func (_m *ProtocolState) EpochStateAtBlockID(blockID flow.Identifier) (protocol.EpochProtocolState, error) {
 	ret := _m.Called(blockID)
 
