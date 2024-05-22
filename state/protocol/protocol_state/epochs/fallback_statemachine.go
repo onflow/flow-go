@@ -100,7 +100,14 @@ func (m *FallbackStateMachine) ProcessEpochCommit(_ *flow.EpochCommit) (bool, er
 	return false, nil
 }
 
-// ProcessEpochRecover processes epoch recover service events.
+// ProcessEpochRecover updates the internally-maintained interim Epoch state with data from epoch recover event
+// in an attempt to recover from Epoch Fallback Mode(EFM) and get back on happy path track.
+// Specifically, after successfully processing this event, we will have a next epoch in committed phase and leave the EFM.
+// As a result of this operation protocol state for the next epoch will be created.
+// Returned boolean indicates if event triggered a transition in the state machine or not.
+// Implementors must never return (true, error).
+// Expected errors indicating that we are leaving the happy-path of the epoch transitions
+//   - `protocol.InvalidServiceEventError` - if the service event is invalid or is not a valid state transition for the current protocol state.
 func (m *FallbackStateMachine) ProcessEpochRecover(epochRecover *flow.EpochRecover) (bool, error) {
 	if m.view+m.params.EpochCommitSafetyThreshold() >= m.parentState.CurrentEpochFinalView() {
 		return false, protocol.NewInvalidServiceEventErrorf("could not process epoch recover, safety threshold reached")
@@ -118,6 +125,7 @@ func (m *FallbackStateMachine) ProcessEpochRecover(epochRecover *flow.EpochRecov
 	if err != nil {
 		return false, fmt.Errorf("failed to build next epoch active participants: %w", err)
 	}
+
 	m.state.NextEpoch = &flow.EpochStateContainer{
 		SetupID:          epochRecover.EpochSetup.ID(),
 		CommitID:         epochRecover.EpochCommit.ID(),
