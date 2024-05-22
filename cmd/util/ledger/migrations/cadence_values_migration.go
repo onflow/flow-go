@@ -209,10 +209,20 @@ func (m *CadenceBaseMigration) MigrateAccount(
 			m.nWorkers,
 		)
 
+		oldRegistersForDiff, err := registers.NewByAccountFromPayloads(oldPayloadsForDiff)
+		if err != nil {
+			return fmt.Errorf("failed to create registers from old payloads: %w", err)
+		}
+
+		newRegistersForDiff, err := registers.NewByAccountFromPayloads(newPayloadsForDiff)
+		if err != nil {
+			return fmt.Errorf("failed to create registers from new payloads: %w", err)
+		}
+
 		accountDiffReporter.DiffStates(
-			oldPayloadsForDiff,
-			newPayloadsForDiff,
-			allStorageMapDomains,
+			oldRegistersForDiff,
+			newRegistersForDiff,
+			AllStorageMapDomains,
 		)
 	}
 

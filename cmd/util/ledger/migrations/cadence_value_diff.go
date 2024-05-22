@@ -8,7 +8,6 @@ import (
 
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/cmd/util/ledger/util/registers"
-	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -42,7 +41,7 @@ const (
 
 var diffErrorKindString = map[diffErrorKind]string{
 	abortErrorKind: "error_diff_failed",
-	storageMapKeyNotImplementingStorageMapKeyDiffErrorKind: "error_storage_map_key_not_implemeting_StorageMapKey",
+	storageMapKeyNotImplementingStorageMapKeyDiffErrorKind: "error_storage_map_key_not_implementing_StorageMapKey",
 	cadenceValueNotImplementEquatableValueDiffErrorKind:    "error_cadence_value_not_implementing_EquatableValue",
 }
 
@@ -97,39 +96,45 @@ func NewCadenceValueDiffReporter(
 }
 
 func (dr *CadenceValueDiffReporter) newStorageRuntime(
-	payloads []*ledger.Payload,
+	registers registers.Registers,
 ) (
 	*InterpreterMigrationRuntime,
-	registers.Registers,
 	error,
 ) {
-	registersByAccount, err := registers.NewByAccountFromPayloads(payloads)
-	if err != nil {
-		return nil, nil, err
-	}
-
 	// TODO: maybe make read-only again
 	runtimeInterface, err := NewInterpreterMigrationRuntime(
-		registersByAccount,
+		registers,
 		dr.chainID,
 		InterpreterMigrationRuntimeConfig{},
 	)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	return runtimeInterface, registersByAccount, nil
+	return runtimeInterface, nil
 }
 
-func (dr *CadenceValueDiffReporter) DiffStates(oldPayloads, newPayloads []*ledger.Payload, domains []string) {
+func (dr *CadenceValueDiffReporter) DiffStates(oldRegs, newRegs registers.Registers, domains []string) {
+
 	// Create all the runtime components we need for comparing Cadence values.
-	oldRuntime, oldRegs, err := dr.newStorageRuntime(oldPayloads)
+	oldRuntime, err := dr.newStorageRuntime(oldRegs)
 	if err != nil {
 		dr.reportWriter.Write(
 			diffError{
 				Address: dr.address.Hex(),
 				Kind:    diffErrorKindString[abortErrorKind],
-				Msg:     fmt.Sprintf("failed to create runtime with old state payloads: %s", err),
+				Msg:     fmt.Sprintf("failed to create runtime for old registers: %s", err),
+			})
+		return
+	}
+
+	newRuntime, err := dr.newStorageRuntime(newRegs)
+	if err != nil {
+		dr.reportWriter.Write(
+			diffError{
+				Address: dr.address.Hex(),
+				Kind:    diffErrorKindString[abortErrorKind],
+				Msg:     fmt.Sprintf("failed to create runtime with new registers: %s", err),
 			})
 		return
 	}
@@ -140,18 +145,7 @@ func (dr *CadenceValueDiffReporter) DiffStates(oldPayloads, newPayloads []*ledge
 			diffError{
 				Address: dr.address.Hex(),
 				Kind:    diffErrorKindString[abortErrorKind],
-				Msg:     fmt.Sprintf("failed to preload old state atree payloads: %s", err),
-			})
-		return
-	}
-
-	newRuntime, newRegs, err := dr.newStorageRuntime(newPayloads)
-	if err != nil {
-		dr.reportWriter.Write(
-			diffError{
-				Address: dr.address.Hex(),
-				Kind:    diffErrorKindString[abortErrorKind],
-				Msg:     fmt.Sprintf("failed to create runtime with new state payloads: %s", err),
+				Msg:     fmt.Sprintf("failed to preload old atree registers: %s", err),
 			})
 		return
 	}
@@ -162,7 +156,7 @@ func (dr *CadenceValueDiffReporter) DiffStates(oldPayloads, newPayloads []*ledge
 			diffError{
 				Address: dr.address.Hex(),
 				Kind:    diffErrorKindString[abortErrorKind],
-				Msg:     fmt.Sprintf("failed to preload new state atree payloads: %s", err),
+				Msg:     fmt.Sprintf("failed to preload new atree registers: %s", err),
 			})
 		return
 	}
