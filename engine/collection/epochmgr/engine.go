@@ -60,6 +60,7 @@ type Engine struct {
 	epochTransitionEvents        chan *flow.Header        // sends first block of new epoch
 	epochSetupPhaseStartedEvents chan *flow.Header        // sends first block of EpochSetup phase
 	epochStopEvents              chan uint64              // sends counter of epoch to stop
+	efmEvents                    chan struct{}            // signals epoch emergency fallback has triggered
 	clusterIDUpdateDistributor   collection.ClusterEvents // sends cluster ID updates to consumers
 	cm                           *component.ComponentManager
 	component.Component
@@ -312,6 +313,12 @@ func (e *Engine) EpochSetupPhaseStarted(_ uint64, first *flow.Header) {
 	e.epochSetupPhaseStartedEvents <- first
 }
 
+// EpochEmergencyFallbackTriggered handles the epoch emergency fallback triggered protocol event.
+// If epoch emeregency fallback is triggered root QC voting must be stopped.
+func (e *Engine) EpochEmergencyFallbackTriggered() {
+	e.efmEvents <- struct{}{}
+}
+
 // handleEpochEvents handles events relating to the epoch lifecycle:
 //   - EpochTransition protocol event - we start epoch components for the starting epoch,
 //     and schedule shutdown for the ending epoch
@@ -339,6 +346,8 @@ func (e *Engine) handleEpochEvents(ctx irrecoverable.SignalerContext, ready comp
 			if err != nil {
 				ctx.Throw(err)
 			}
+		case <-e.efmEvents:
+			// stop root qc voting
 		}
 	}
 }
