@@ -21,7 +21,7 @@ func TestEpochProtocolStateAdapter(t *testing.T) {
 	entry := unittest.EpochStateFixture(unittest.WithValidDKG())
 
 	globalParams := mock.NewGlobalParams(t)
-	adapter := inmem.NewDynamicProtocolStateAdapter(entry, globalParams)
+	adapter := inmem.NewEpochProtocolStateAdapter(entry, globalParams)
 
 	t.Run("clustering", func(t *testing.T) {
 		clustering, err := inmem.ClusteringFromSetupEvent(entry.CurrentEpochSetup)
@@ -69,7 +69,7 @@ func TestEpochProtocolStateAdapter(t *testing.T) {
 	})
 	t.Run("epoch-phase-staking", func(t *testing.T) {
 		entry := unittest.EpochStateFixture()
-		adapter := inmem.NewDynamicProtocolStateAdapter(entry, globalParams)
+		adapter := inmem.NewEpochProtocolStateAdapter(entry, globalParams)
 		assert.Equal(t, flow.EpochPhaseStaking, adapter.EpochPhase())
 		assert.True(t, adapter.PreviousEpochExists())
 		assert.False(t, adapter.InvalidEpochTransitionAttempted())
@@ -79,14 +79,14 @@ func TestEpochProtocolStateAdapter(t *testing.T) {
 		// cleanup the commit event, so we are in setup phase
 		entry.NextEpoch.CommitID = flow.ZeroID
 
-		adapter := inmem.NewDynamicProtocolStateAdapter(entry, globalParams)
+		adapter := inmem.NewEpochProtocolStateAdapter(entry, globalParams)
 		assert.Equal(t, flow.EpochPhaseSetup, adapter.EpochPhase())
 		assert.True(t, adapter.PreviousEpochExists())
 		assert.False(t, adapter.InvalidEpochTransitionAttempted())
 	})
 	t.Run("epoch-phase-commit", func(t *testing.T) {
 		entry := unittest.EpochStateFixture(unittest.WithNextEpochProtocolState())
-		adapter := inmem.NewDynamicProtocolStateAdapter(entry, globalParams)
+		adapter := inmem.NewEpochProtocolStateAdapter(entry, globalParams)
 		assert.Equal(t, flow.EpochPhaseCommitted, adapter.EpochPhase())
 		assert.True(t, adapter.PreviousEpochExists())
 		assert.False(t, adapter.InvalidEpochTransitionAttempted())
@@ -95,7 +95,7 @@ func TestEpochProtocolStateAdapter(t *testing.T) {
 		entry := unittest.EpochStateFixture(func(entry *flow.RichProtocolStateEntry) {
 			entry.InvalidEpochTransitionAttempted = true
 		})
-		adapter := inmem.NewDynamicProtocolStateAdapter(entry, globalParams)
+		adapter := inmem.NewEpochProtocolStateAdapter(entry, globalParams)
 		assert.True(t, adapter.InvalidEpochTransitionAttempted())
 	})
 	t.Run("no-previous-epoch", func(t *testing.T) {
@@ -104,7 +104,7 @@ func TestEpochProtocolStateAdapter(t *testing.T) {
 			entry.PreviousEpochSetup = nil
 			entry.PreviousEpochCommit = nil
 		})
-		adapter := inmem.NewDynamicProtocolStateAdapter(entry, globalParams)
+		adapter := inmem.NewEpochProtocolStateAdapter(entry, globalParams)
 		assert.False(t, adapter.PreviousEpochExists())
 	})
 }

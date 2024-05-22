@@ -253,7 +253,7 @@ func bootstrapProtocolState(
 			}
 
 			// Store the epoch portion of the protocol state, including underlying EpochSetup/EpochCommit service events
-			dynamicEpochProtocolState := inmem.NewDynamicProtocolStateAdapter(stateEntry.EpochEntry, params)
+			dynamicEpochProtocolState := inmem.NewEpochProtocolStateAdapter(stateEntry.EpochEntry, params)
 			err = bootstrapEpochForProtocolStateEntry(epochProtocolStateSnapshots, epochSetups, epochCommits, dynamicEpochProtocolState, verifyNetworkAddress)(tx)
 			if err != nil {
 				return fmt.Errorf("could not store epoch service events for state entry (id=%x): %w", stateEntry.EpochEntry.ID(), err)

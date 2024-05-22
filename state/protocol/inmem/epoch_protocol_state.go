@@ -15,7 +15,7 @@ type EpochProtocolStateAdapter struct {
 
 var _ protocol.EpochProtocolState = (*EpochProtocolStateAdapter)(nil)
 
-func NewDynamicProtocolStateAdapter(entry *flow.RichProtocolStateEntry, params protocol.GlobalParams) *EpochProtocolStateAdapter {
+func NewEpochProtocolStateAdapter(entry *flow.RichProtocolStateEntry, params protocol.GlobalParams) *EpochProtocolStateAdapter {
 	return &EpochProtocolStateAdapter{
 		RichProtocolStateEntry: entry,
 		params:                 params,

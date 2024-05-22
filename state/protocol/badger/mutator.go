@@ -795,8 +795,8 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 // isFirstBlockOfEpoch returns true if the given block is the first block of a new epoch
 // by comparing the block's Protocol State Snapshot to that of its parent.
 // NOTE: There can be multiple (un-finalized) blocks that qualify as the first block of epoch N.
-func isFirstBlockOfEpoch(parentPsSnapshot, blockPsSnapshot protocol.EpochProtocolState) bool {
-	return parentPsSnapshot.Epoch() < blockPsSnapshot.Epoch()
+func isFirstBlockOfEpoch(parentEpochState, blockEpochState protocol.EpochProtocolState) bool {
+	return parentEpochState.Epoch() < blockEpochState.Epoch()
 }
 
 // epochMetricsAndEventsOnBlockFinalized determines metrics to update and protocol

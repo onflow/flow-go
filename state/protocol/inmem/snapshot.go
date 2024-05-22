@@ -106,7 +106,7 @@ func (s Snapshot) Encodable() EncodableSnapshot {
 
 func (s Snapshot) EpochProtocolState() (protocol.EpochProtocolState, error) {
 	entry := s.enc.SealingSegment.LatestProtocolStateEntry()
-	return NewDynamicProtocolStateAdapter(entry.EpochEntry, s.Params()), nil
+	return NewEpochProtocolStateAdapter(entry.EpochEntry, s.Params()), nil
 }
 
 func (s Snapshot) ProtocolState() (protocol.KVStoreReader, error) {

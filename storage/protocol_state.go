@@ -6,6 +6,7 @@ import (
 )
 
 // ProtocolState represents persistent storage for protocol state entries.
+// TODO rename?
 type ProtocolState interface {
 	// StoreTx returns an anonymous function (intended to be executed as part of a badger transaction),
 	// which persists the given protocol state as part of a DB tx. Per convention, the identities in
