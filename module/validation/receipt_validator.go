@@ -214,12 +214,12 @@ func (v *receiptValidator) ValidatePayload(candidate *flow.Block) error {
 	// This check is important to distinguish expected error cases from unexpected exceptions. By confirming
 	// that the protocol state knows the parent block, we guarantee that we can successfully traverse the
 	// candidate's ancestry below.
-	_, err := v.headers.ByBlockID(header.ParentID)
+	exists, err := v.headers.Exists(header.ParentID)
 	if err != nil {
-		if errors.Is(err, storage.ErrNotFound) {
-			return module.NewUnknownBlockError("cannot validate receipts in block, as its parent block is unknown %v: %w", header.ParentID, err)
-		}
 		return irrecoverable.NewExceptionf("unexpected exception retrieving the candidate block's parent %v: %w", header.ParentID, err)
+	}
+	if !exists {
+		return module.NewUnknownBlockError("cannot validate receipts in block, as its parent block is unknown %v", header.ParentID)
 	}
 
 	// return if nothing to validate
