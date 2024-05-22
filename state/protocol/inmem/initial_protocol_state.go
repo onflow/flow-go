@@ -1,8 +1,6 @@
 package inmem
 
 import (
-	"fmt"
-
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
 )
@@ -23,40 +21,4 @@ func NewInitialProtocolStateAdapter(entry *flow.RichProtocolStateEntry) *Initial
 	return &InitialProtocolStateAdapter{
 		RichProtocolStateEntry: entry,
 	}
-}
-
-func (s *InitialProtocolStateAdapter) Epoch() uint64 {
-	return s.CurrentEpochSetup.Counter
-}
-
-func (s *InitialProtocolStateAdapter) Clustering() (flow.ClusterList, error) {
-	clustering, err := ClusteringFromSetupEvent(s.CurrentEpochSetup)
-	if err != nil {
-		return nil, fmt.Errorf("could not extract cluster list from setup event: %w", err)
-	}
-	return clustering, nil
-}
-
-func (s *InitialProtocolStateAdapter) EpochSetup() *flow.EpochSetup {
-	return s.CurrentEpochSetup
-}
-
-func (s *InitialProtocolStateAdapter) EpochCommit() *flow.EpochCommit {
-	return s.CurrentEpochCommit
-}
-
-func (s *InitialProtocolStateAdapter) DKG() (protocol.DKG, error) {
-	dkg, err := EncodableDKGFromEvents(s.CurrentEpochSetup, s.CurrentEpochCommit)
-	if err != nil {
-		return nil, fmt.Errorf("could not construct encodable DKG from events: %w", err)
-	}
-
-	return NewDKG(dkg), nil
-}
-
-// Entry Returns low-level protocol state entry that was used to initialize this object.
-// It shouldn't be used by high-level logic, it is useful for some cases such as bootstrapping.
-// Prefer using other methods to access protocol state.
-func (s *InitialProtocolStateAdapter) Entry() *flow.RichProtocolStateEntry {
-	return s.RichProtocolStateEntry.Copy()
 }

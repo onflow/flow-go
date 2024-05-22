@@ -8,6 +8,11 @@ import (
 // InitialProtocolState returns constant data for given epoch.
 // This interface can be only obtained for epochs that have progressed to epoch commit event.
 type InitialProtocolState interface {
+}
+
+// DynamicProtocolState extends the InitialProtocolState with data that can change from block to block.
+// It can be used to access the identity table at given block.
+type DynamicProtocolState interface {
 	// Epoch returns counter of epoch.
 	Epoch() uint64
 	// Clustering returns initial clustering from epoch setup.
@@ -24,12 +29,6 @@ type InitialProtocolState interface {
 	// It shouldn't be used by high-level logic, it is useful for some cases such as bootstrapping.
 	// Prefer using other methods to access protocol state.
 	Entry() *flow.RichProtocolStateEntry
-}
-
-// DynamicProtocolState extends the InitialProtocolState with data that can change from block to block.
-// It can be used to access the identity table at given block.
-type DynamicProtocolState interface {
-	InitialProtocolState
 
 	// InvalidEpochTransitionAttempted denotes whether an invalid epoch state transition was attempted
 	// on the fork ending this block. Once the first block where this flag is true is finalized, epoch
