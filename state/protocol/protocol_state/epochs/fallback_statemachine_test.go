@@ -1,6 +1,7 @@
 package epochs
 
 import (
+	"github.com/onflow/flow-go/state/protocol"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -91,6 +92,102 @@ func (s *EpochFallbackStateMachineSuite) TestProcessEpochRecover() {
 		InvalidEpochTransitionAttempted: false,
 	}
 	require.Equal(s.T(), expectedState, updatedState, "updatedState should be equal to expected one")
+}
+
+// TestProcessInvalidEpochRecover tests that processing epoch recover event which is invalid or is not compatible with current
+// protocol state returns a sentinel error.
+func (s *EpochFallbackStateMachineSuite) TestProcessInvalidEpochRecover() {
+	nextEpochParticipants := s.parentProtocolState.CurrentEpochIdentityTable.Copy()
+	s.Run("invalid-first-view", func() {
+		epochRecover := unittest.EpochRecoverFixture(func(setup *flow.EpochSetup) {
+			setup.Participants = nextEpochParticipants.ToSkeleton()
+			setup.Assignments = unittest.ClusterAssignment(1, nextEpochParticipants.ToSkeleton())
+			setup.Counter = s.parentProtocolState.CurrentEpochSetup.Counter + 1
+			setup.FirstView = s.parentProtocolState.CurrentEpochSetup.FinalView + 2 // invalid view
+			setup.FinalView = setup.FirstView + 10_000
+		})
+		processed, err := s.stateMachine.ProcessEpochRecover(epochRecover)
+		require.Error(s.T(), err)
+		require.True(s.T(), protocol.IsInvalidServiceEventError(err))
+		require.False(s.T(), processed)
+	})
+	s.Run("invalid-first-view-with-extension", func() {
+		epochRecover := unittest.EpochRecoverFixture(func(setup *flow.EpochSetup) {
+			setup.Participants = nextEpochParticipants.ToSkeleton()
+			setup.Assignments = unittest.ClusterAssignment(1, nextEpochParticipants.ToSkeleton())
+			setup.Counter = s.parentProtocolState.CurrentEpochSetup.Counter + 1
+			setup.FirstView = s.parentProtocolState.CurrentEpochSetup.FinalView + 1
+			setup.FinalView = setup.FirstView + 10_000
+		})
+
+		parentProtocolState := s.parentProtocolState.Copy()
+		parentProtocolState.CurrentEpoch.EpochExtensions = []flow.EpochExtension{
+			{
+				FirstView:     s.parentProtocolState.CurrentEpochSetup.FinalView + 2, // invalid view for extension
+				FinalView:     s.parentProtocolState.CurrentEpochSetup.FinalView + 1 + 10_000,
+				TargetEndTime: 0,
+			},
+		}
+
+		candidateView := s.parentProtocolState.CurrentEpochSetup.FinalView - s.params.EpochCommitSafetyThreshold() + 1
+		stateMachine, err := NewFallbackStateMachine(s.params, candidateView, parentProtocolState)
+		require.NoError(s.T(), err)
+
+		processed, err := stateMachine.ProcessEpochRecover(epochRecover)
+		require.Error(s.T(), err)
+		require.True(s.T(), protocol.IsInvalidServiceEventError(err))
+		require.False(s.T(), processed)
+	})
+	s.Run("invalid-counter", func() {
+		epochRecover := unittest.EpochRecoverFixture(func(setup *flow.EpochSetup) {
+			setup.Participants = nextEpochParticipants.ToSkeleton()
+			setup.Assignments = unittest.ClusterAssignment(1, nextEpochParticipants.ToSkeleton())
+			setup.Counter = s.parentProtocolState.CurrentEpochSetup.Counter + 2 // invalid counter
+			setup.FirstView = s.parentProtocolState.CurrentEpochSetup.FinalView + 1
+			setup.FinalView = setup.FirstView + 10_000
+		})
+		processed, err := s.stateMachine.ProcessEpochRecover(epochRecover)
+		require.Error(s.T(), err)
+		require.True(s.T(), protocol.IsInvalidServiceEventError(err))
+		require.False(s.T(), processed)
+	})
+	s.Run("next-epoch-present", func() {
+		epochRecover := unittest.EpochRecoverFixture(func(setup *flow.EpochSetup) {
+			setup.Participants = nextEpochParticipants.ToSkeleton()
+			setup.Assignments = unittest.ClusterAssignment(1, nextEpochParticipants.ToSkeleton())
+			setup.Counter = s.parentProtocolState.CurrentEpochSetup.Counter + 1
+			setup.FirstView = s.parentProtocolState.CurrentEpochSetup.FinalView + 1
+			setup.FinalView = setup.FirstView + 10_000
+		})
+
+		parentProtocolState := s.parentProtocolState.Copy()
+		unittest.WithNextEpochProtocolState()(parentProtocolState)
+
+		stateMachine, err := NewFallbackStateMachine(s.params, s.candidate.View, parentProtocolState)
+		require.NoError(s.T(), err)
+
+		processed, err := stateMachine.ProcessEpochRecover(epochRecover)
+		require.Error(s.T(), err)
+		require.True(s.T(), protocol.IsInvalidServiceEventError(err))
+		require.False(s.T(), processed)
+	})
+	s.Run("reached-threshold", func() {
+		epochRecover := unittest.EpochRecoverFixture(func(setup *flow.EpochSetup) {
+			setup.Participants = nextEpochParticipants.ToSkeleton()
+			setup.Assignments = unittest.ClusterAssignment(1, nextEpochParticipants.ToSkeleton())
+			setup.Counter = s.parentProtocolState.CurrentEpochSetup.Counter + 1
+			setup.FirstView = s.parentProtocolState.CurrentEpochSetup.FinalView + 1
+			setup.FinalView = setup.FirstView + 10_000
+		})
+		thresholdView := s.parentProtocolState.CurrentEpochSetup.FinalView - s.params.EpochCommitSafetyThreshold()
+		stateMachine, err := NewFallbackStateMachine(s.params, thresholdView, s.parentProtocolState)
+		require.NoError(s.T(), err)
+
+		processed, err := stateMachine.ProcessEpochRecover(epochRecover)
+		require.Error(s.T(), err)
+		require.True(s.T(), protocol.IsInvalidServiceEventError(err))
+		require.False(s.T(), processed)
+	})
 }
 
 // TestTransitionToNextEpoch tests a scenario where the FallbackStateMachine processes first block from next epoch.

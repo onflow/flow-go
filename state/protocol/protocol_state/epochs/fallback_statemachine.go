@@ -110,13 +110,13 @@ func (m *FallbackStateMachine) ProcessEpochCommit(_ *flow.EpochCommit) (bool, er
 // Expected errors indicating that we are leaving the happy-path of the epoch transitions
 //   - `protocol.InvalidServiceEventError` - if the service event is invalid or is not a valid state transition for the current protocol state.
 func (m *FallbackStateMachine) ProcessEpochRecover(epochRecover *flow.EpochRecover) (bool, error) {
-	if m.view+m.params.EpochCommitSafetyThreshold() >= m.parentState.CurrentEpochFinalView() {
-		return false, protocol.NewInvalidServiceEventErrorf("could not process epoch recover, safety threshold reached")
-	}
-
 	err := protocol.IsValidExtendingEpochSetup(&epochRecover.EpochSetup, m.parentState)
 	if err != nil {
 		return false, fmt.Errorf("invalid epoch recovery event: %w", err)
+	}
+
+	if m.view+m.params.EpochCommitSafetyThreshold() >= m.parentState.CurrentEpochFinalView() {
+		return false, protocol.NewInvalidServiceEventErrorf("could not process epoch recover, safety threshold reached")
 	}
 
 	nextEpochParticipants, err := buildNextEpochActiveParticipants(
