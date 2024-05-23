@@ -17,6 +17,7 @@ import (
 )
 
 type Handler struct {
+	access.UnimplementedAccessAPIServer
 	api                  API
 	chain                flow.Chain
 	signerIndicesDecoder hotstuff.BlockSignerDecoder
