@@ -1007,7 +1007,7 @@ func (exeNode *ExecutionNode) LoadIngestionEngine(
 			return nil, fmt.Errorf("public access node with ID %s is not an access node", anID)
 		}
 
-		if anNode.IsEjected() {
+		if anNode.Ejected {
 			return nil, fmt.Errorf("public access node with ID %s is ejected", anID)
 		}
 
