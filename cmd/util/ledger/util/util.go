@@ -55,11 +55,11 @@ func (a *AccountsAtreeLedger) ValueExists(owner, key []byte) (exists bool, err e
 	return len(v) > 0, nil
 }
 
-// AllocateStorageIndex allocates new storage index under the owner accounts to store a new register
-func (a *AccountsAtreeLedger) AllocateStorageIndex(owner []byte) (atree.StorageIndex, error) {
-	v, err := a.Accounts.AllocateStorageIndex(flow.BytesToAddress(owner))
+// AllocateSlabIndex allocates new storage index under the owner accounts to store a new register
+func (a *AccountsAtreeLedger) AllocateSlabIndex(owner []byte) (atree.SlabIndex, error) {
+	v, err := a.Accounts.AllocateSlabIndex(flow.BytesToAddress(owner))
 	if err != nil {
-		return atree.StorageIndex{}, fmt.Errorf("storage index allocation failed: %w", err)
+		return atree.SlabIndex{}, fmt.Errorf("storage index allocation failed: %w", err)
 	}
 	return v, nil
 }
@@ -108,8 +108,8 @@ var _ common.MemoryGauge = (*NopMemoryGauge)(nil)
 type PayloadsReadonlyLedger struct {
 	Snapshot *PayloadSnapshot
 
-	AllocateStorageIndexFunc func(owner []byte) (atree.StorageIndex, error)
-	SetValueFunc             func(owner, key, value []byte) (err error)
+	AllocateSlabIndexFunc func(owner []byte) (atree.SlabIndex, error)
+	SetValueFunc          func(owner, key, value []byte) (err error)
 }
 
 func (p *PayloadsReadonlyLedger) GetValue(owner, key []byte) (value []byte, err error) {
@@ -133,12 +133,12 @@ func (p *PayloadsReadonlyLedger) ValueExists(owner, key []byte) (exists bool, er
 	return ok, nil
 }
 
-func (p *PayloadsReadonlyLedger) AllocateStorageIndex(owner []byte) (atree.StorageIndex, error) {
-	if p.AllocateStorageIndexFunc != nil {
-		return p.AllocateStorageIndexFunc(owner)
+func (p *PayloadsReadonlyLedger) AllocateSlabIndex(owner []byte) (atree.SlabIndex, error) {
+	if p.AllocateSlabIndexFunc != nil {
+		return p.AllocateSlabIndexFunc(owner)
 	}
 
-	panic("AllocateStorageIndex not expected to be called")
+	panic("AllocateSlabIndex not expected to be called")
 }
 
 func NewPayloadsReadonlyLedger(snapshot *PayloadSnapshot) *PayloadsReadonlyLedger {
