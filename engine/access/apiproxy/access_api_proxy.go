@@ -19,6 +19,7 @@ import (
 // FlowAccessAPIRouter is a structure that represents the routing proxy algorithm.
 // It splits requests between a local and a remote API service.
 type FlowAccessAPIRouter struct {
+	access.UnimplementedAccessAPIServer
 	Logger   zerolog.Logger
 	Metrics  *metrics.ObserverCollector
 	Upstream *FlowAccessAPIForwarder
@@ -99,14 +100,8 @@ func (h *FlowAccessAPIRouter) GetCollectionByID(context context.Context, req *ac
 }
 
 func (h *FlowAccessAPIRouter) GetFullCollectionByID(context context.Context, req *access.GetFullCollectionByIDRequest) (*access.FullCollectionResponse, error) {
-	if h.useIndex {
-		res, err := h.local.GetFullCollectionByID(context, req)
-		h.log(LocalApiService, "GetFullCollectionByID", err)
-		return res, err
-	}
-
-	res, err := h.upstream.GetFullCollectionByID(context, req)
-	h.log(UpstreamApiService, "GetFullCollectionByID", err)
+	res, err := h.Upstream.GetFullCollectionByID(context, req)
+	h.log("upstream", "GetFullCollectionByID", err)
 	return res, err
 }
 
