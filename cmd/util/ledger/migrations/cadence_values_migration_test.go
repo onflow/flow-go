@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	_ "github.com/glebarez/go-sqlite"
+	migrations2 "github.com/onflow/cadence/migrations"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -112,6 +113,352 @@ func TestCadenceValuesMigration(t *testing.T) {
 
 	// Check error logs.
 	require.Empty(t, logWriter.logs)
+
+	checkMigratedState(t, address, registersByAccount, chainID)
+}
+
+type migrationVisit struct {
+	storageKey    interpreter.StorageKey
+	storageMapKey interpreter.StorageMapKey
+	value         string
+}
+
+type visitMigration struct {
+	visits []migrationVisit
+}
+
+var _ migrations2.ValueMigration = &visitMigration{}
+
+func (*visitMigration) Name() string {
+	return "visit"
+}
+
+func (m *visitMigration) Migrate(
+	storageKey interpreter.StorageKey,
+	storageMapKey interpreter.StorageMapKey,
+	value interpreter.Value,
+	_ *interpreter.Interpreter,
+) (newValue interpreter.Value, err error) {
+
+	m.visits = append(
+		m.visits,
+		migrationVisit{
+			storageKey:    storageKey,
+			storageMapKey: storageMapKey,
+			value:         value.String(),
+		},
+	)
+
+	return nil, nil
+}
+
+func (*visitMigration) CanSkip(_ interpreter.StaticType) bool {
+	return false
+}
+
+func (*visitMigration) Domains() map[string]struct{} {
+	return nil
+}
+
+func checkMigratedState(
+	t *testing.T,
+	address common.Address,
+	registersByAccount *registers.ByAccount,
+	chainID flow.ChainID,
+) {
+
+	mr, err := NewInterpreterMigrationRuntime(
+		registersByAccount,
+		chainID,
+		InterpreterMigrationRuntimeConfig{},
+	)
+	require.NoError(t, err)
+
+	validationMigration, err := migrations2.NewStorageMigration(
+		mr.Interpreter,
+		mr.Storage,
+		"validation",
+		address,
+	)
+	require.NoError(t, err)
+
+	visitMigration := &visitMigration{}
+
+	validationMigration.Migrate(
+		validationMigration.NewValueMigrationsPathMigrator(nil, visitMigration),
+	)
+
+	require.Equal(t,
+		[]migrationVisit{
+			{
+				storageKey:    interpreter.StorageKey{Key: "storage", Address: address},
+				storageMapKey: interpreter.StringStorageMapKey("dictionary_with_string_keys"),
+				value:         `"H\u{e9}llo"`,
+			},
+			{
+				storageKey:    interpreter.StorageKey{Key: "storage", Address: address},
+				storageMapKey: interpreter.StringStorageMapKey("dictionary_with_string_keys"),
+				value:         `"Caf\u{e9}"`,
+			},
+			{
+				storageKey:    interpreter.StorageKey{Key: "storage", Address: address},
+				storageMapKey: interpreter.StringStorageMapKey("dictionary_with_string_keys"),
+				value:         `2`,
+			},
+			{
+				storageKey:    interpreter.StorageKey{Key: "storage", Address: address},
+				storageMapKey: interpreter.StringStorageMapKey("dictionary_with_string_keys"),
+				value:         `1`,
+			},
+			{
+				storageKey:    interpreter.StorageKey{Key: "storage", Address: address},
+				storageMapKey: interpreter.StringStorageMapKey("dictionary_with_string_keys"),
+				value:         `{"H\u{e9}llo": 2, "Caf\u{e9}": 1}`,
+			},
+			{
+				storageKey:    interpreter.StorageKey{Key: "storage", Address: address},
+				storageMapKey: interpreter.StringStorageMapKey("flowTokenVault"),
+				value:         `0.00100000`,
+			},
+			{
+				storageKey:    interpreter.StorageKey{Key: "storage", Address: address},
+				storageMapKey: interpreter.StringStorageMapKey("flowTokenVault"),
+				value:         `11240984669916758018`,
+			},
+			{
+				storageKey:    interpreter.StorageKey{Key: "storage", Address: address},
+				storageMapKey: interpreter.StringStorageMapKey("flowTokenVault"),
+				value:         `A.0ae53cb6e3f42a79.FlowToken.Vault(balance: 0.00100000, uuid: 11240984669916758018)`,
+			},
+			{
+				storageKey:    interpreter.StorageKey{Key: "storage", Address: address},
+				storageMapKey: interpreter.StringStorageMapKey("dictionary_with_auth_reference_typed_key"),
+				value:         `Type<auth(A.01cf0e2f2f715450.Test.E) &A.01cf0e2f2f715450.Test.R>()`,
+			},
+			{
+				storageKey:    interpreter.StorageKey{Key: "storage", Address: address},
+				storageMapKey: interpreter.StringStorageMapKey("dictionary_with_auth_reference_typed_key"),
+				value:         `"auth_ref"`,
+			},
+			{
+				storageKey:    interpreter.StorageKey{Key: "storage", Address: address},
+				storageMapKey: interpreter.StringStorageMapKey("dictionary_with_auth_reference_typed_key"),
+				value:         `{Type<auth(A.01cf0e2f2f715450.Test.E) &A.01cf0e2f2f715450.Test.R>(): "auth_ref"}`,
+			},
+			{
+				storageKey:    interpreter.StorageKey{Key: "storage", Address: address},
+				storageMapKey: interpreter.StringStorageMapKey("dictionary_with_reference_typed_key"),
+				value:         `Type<auth(A.01cf0e2f2f715450.Test.E) &A.01cf0e2f2f715450.Test.R>()`,
+			},
+			{
+				storageKey:    interpreter.StorageKey{Key: "storage", Address: address},
+				storageMapKey: interpreter.StringStorageMapKey("dictionary_with_reference_typed_key"),
+				value:         `"non_auth_ref"`,
+			},
+			{
+				storageKey:    interpreter.StorageKey{Key: "storage", Address: address},
+				storageMapKey: interpreter.StringStorageMapKey("dictionary_with_reference_typed_key"),
+				value:         `{Type<auth(A.01cf0e2f2f715450.Test.E) &A.01cf0e2f2f715450.Test.R>(): "non_auth_ref"}`,
+			},
+			{
+				storageKey:    interpreter.StorageKey{Key: "storage", Address: address},
+				storageMapKey: interpreter.StringStorageMapKey("type_value"),
+				value:         "Type<auth(Storage, Contracts, Keys, Inbox, Capabilities) &Account>()",
+			},
+			{
+				storageKey:    interpreter.StorageKey{Key: "storage", Address: address},
+				storageMapKey: interpreter.StringStorageMapKey("dictionary_with_account_type_keys"),
+				value:         "Type<Account_StorageCapabilities>()",
+			},
+			{
+				storageKey:    interpreter.StorageKey{Key: "storage", Address: address},
+				storageMapKey: interpreter.StringStorageMapKey("dictionary_with_account_type_keys"),
+				value:         "Type<Account_Keys>()",
+			},
+			{
+				storageKey:    interpreter.StorageKey{Key: "storage", Address: address},
+				storageMapKey: interpreter.StringStorageMapKey("dictionary_with_account_type_keys"),
+				value:         "Type<Account_Contracts>()",
+			},
+			{
+				storageKey:    interpreter.StorageKey{Key: "storage", Address: address},
+				storageMapKey: interpreter.StringStorageMapKey("dictionary_with_account_type_keys"),
+				value:         "Type<Account_Inbox>()",
+			},
+			{
+				storageKey:    interpreter.StorageKey{Key: "storage", Address: address},
+				storageMapKey: interpreter.StringStorageMapKey("dictionary_with_account_type_keys"),
+				value:         "Type<&Account>()",
+			},
+			{
+				storageKey:    interpreter.StorageKey{Key: "storage", Address: address},
+				storageMapKey: interpreter.StringStorageMapKey("dictionary_with_account_type_keys"),
+				value:         `Type<Account_Capabilities>()`,
+			},
+			{
+				storageKey:    interpreter.StorageKey{Key: "storage", Address: address},
+				storageMapKey: interpreter.StringStorageMapKey("dictionary_with_account_type_keys"),
+				value:         `Type<Account_AccountCapabilities>()`,
+			},
+			{
+				storageKey:    interpreter.StorageKey{Key: "storage", Address: address},
+				storageMapKey: interpreter.StringStorageMapKey("dictionary_with_account_type_keys"),
+				value:         `Type<AccountKey>()`,
+			},
+			{
+				storageKey:    interpreter.StorageKey{Key: "storage", Address: address},
+				storageMapKey: interpreter.StringStorageMapKey("dictionary_with_account_type_keys"),
+				value:         `Type<auth(Storage, Contracts, Keys, Inbox, Capabilities) &Account>()`,
+			},
+			{
+				storageKey:    interpreter.StorageKey{Key: "storage", Address: address},
+				storageMapKey: interpreter.StringStorageMapKey("dictionary_with_account_type_keys"),
+				value:         "4",
+			},
+			{
+				storageKey:    interpreter.StorageKey{Key: "storage", Address: address},
+				storageMapKey: interpreter.StringStorageMapKey("dictionary_with_account_type_keys"),
+				value:         "6",
+			},
+			{
+				storageKey:    interpreter.StorageKey{Key: "storage", Address: address},
+				storageMapKey: interpreter.StringStorageMapKey("dictionary_with_account_type_keys"),
+				value:         "5",
+			},
+			{
+				storageKey:    interpreter.StorageKey{Key: "storage", Address: address},
+				storageMapKey: interpreter.StringStorageMapKey("dictionary_with_account_type_keys"),
+				value:         "7",
+			},
+			{
+				storageKey:    interpreter.StorageKey{Key: "storage", Address: address},
+				storageMapKey: interpreter.StringStorageMapKey("dictionary_with_account_type_keys"),
+				value:         "8",
+			},
+			{
+				storageKey:    interpreter.StorageKey{Key: "storage", Address: address},
+				storageMapKey: interpreter.StringStorageMapKey("dictionary_with_account_type_keys"),
+				value:         "2",
+			},
+			{
+				storageKey:    interpreter.StorageKey{Key: "storage", Address: address},
+				storageMapKey: interpreter.StringStorageMapKey("dictionary_with_account_type_keys"),
+				value:         "3",
+			},
+			{
+				storageKey:    interpreter.StorageKey{Key: "storage", Address: address},
+				storageMapKey: interpreter.StringStorageMapKey("dictionary_with_account_type_keys"),
+				value:         "9",
+			},
+			{
+				storageKey:    interpreter.StorageKey{Key: "storage", Address: address},
+				storageMapKey: interpreter.StringStorageMapKey("dictionary_with_account_type_keys"),
+				value:         "1",
+			},
+			{
+				storageKey:    interpreter.StorageKey{Key: "storage", Address: address},
+				storageMapKey: interpreter.StringStorageMapKey("dictionary_with_account_type_keys"),
+				value:         `{Type<Account_StorageCapabilities>(): 4, Type<Account_Keys>(): 6, Type<Account_Contracts>(): 5, Type<Account_Inbox>(): 7, Type<&Account>(): 8, Type<Account_Capabilities>(): 2, Type<Account_AccountCapabilities>(): 3, Type<AccountKey>(): 9, Type<auth(Storage, Contracts, Keys, Inbox, Capabilities) &Account>(): 1}`,
+			},
+			{
+				storageKey:    interpreter.StorageKey{Key: "storage", Address: address},
+				storageMapKey: interpreter.StringStorageMapKey("capability"),
+				value:         `Capability<auth(A.01cf0e2f2f715450.Test.E) &A.01cf0e2f2f715450.Test.R>(address: 0x01cf0e2f2f715450, id: 2)`,
+			},
+			{
+				storageKey:    interpreter.StorageKey{Key: "storage", Address: address},
+				storageMapKey: interpreter.StringStorageMapKey("capability"),
+				value:         `Capability<auth(A.01cf0e2f2f715450.Test.E) &A.01cf0e2f2f715450.Test.R>(address: 0x01cf0e2f2f715450, id: 2)`,
+			},
+			{
+				storageKey:    interpreter.StorageKey{Key: "storage", Address: address},
+				storageMapKey: interpreter.StringStorageMapKey("string_value_1"),
+				value:         `"Caf\u{e9}"`,
+			},
+			{
+				storageKey:    interpreter.StorageKey{Key: "storage", Address: address},
+				storageMapKey: interpreter.StringStorageMapKey("untyped_capability"),
+				value:         `Capability<auth(A.01cf0e2f2f715450.Test.E) &A.01cf0e2f2f715450.Test.R>(address: 0x01cf0e2f2f715450, id: 2)`,
+			},
+			{
+				storageKey:    interpreter.StorageKey{Key: "storage", Address: address},
+				storageMapKey: interpreter.StringStorageMapKey("r"),
+				value:         `360287970189639680`,
+			},
+			{
+				storageKey:    interpreter.StorageKey{Key: "storage", Address: address},
+				storageMapKey: interpreter.StringStorageMapKey("r"),
+				value:         "A.01cf0e2f2f715450.Test.R(uuid: 360287970189639680)",
+			},
+			{
+				storageKey:    interpreter.StorageKey{Key: "storage", Address: address},
+				storageMapKey: interpreter.StringStorageMapKey("string_value_2"),
+				value:         `"Caf\u{e9}"`,
+			},
+			{
+				storageKey:    interpreter.StorageKey{Key: "storage", Address: address},
+				storageMapKey: interpreter.StringStorageMapKey("dictionary_with_restricted_typed_keys"),
+				value:         `Type<{A.01cf0e2f2f715450.Test.Bar, A.01cf0e2f2f715450.Test.Foo}>()`,
+			},
+			{
+				storageKey:    interpreter.StorageKey{Key: "storage", Address: address},
+				storageMapKey: interpreter.StringStorageMapKey("dictionary_with_restricted_typed_keys"),
+				value:         `Type<{A.01cf0e2f2f715450.Test.Foo, A.01cf0e2f2f715450.Test.Bar, A.01cf0e2f2f715450.Test.Baz}>()`,
+			},
+			{
+				storageKey:    interpreter.StorageKey{Key: "storage", Address: address},
+				storageMapKey: interpreter.StringStorageMapKey("dictionary_with_restricted_typed_keys"),
+				value:         `1`,
+			},
+			{
+				storageKey:    interpreter.StorageKey{Key: "storage", Address: address},
+				storageMapKey: interpreter.StringStorageMapKey("dictionary_with_restricted_typed_keys"),
+				value:         `2`,
+			},
+			{
+				storageKey:    interpreter.StorageKey{Key: "storage", Address: address},
+				storageMapKey: interpreter.StringStorageMapKey("dictionary_with_restricted_typed_keys"),
+				value:         `{Type<{A.01cf0e2f2f715450.Test.Bar, A.01cf0e2f2f715450.Test.Foo}>(): 1, Type<{A.01cf0e2f2f715450.Test.Foo, A.01cf0e2f2f715450.Test.Bar, A.01cf0e2f2f715450.Test.Baz}>(): 2}`,
+			},
+			{
+				storageKey:    interpreter.StorageKey{Key: "public", Address: address},
+				storageMapKey: interpreter.StringStorageMapKey("flowTokenReceiver"),
+				value:         `Capability<&A.0ae53cb6e3f42a79.FlowToken.Vault>(address: 0x01cf0e2f2f715450, id: 1)`,
+			},
+			{
+				storageKey:    interpreter.StorageKey{Key: "public", Address: address},
+				storageMapKey: interpreter.StringStorageMapKey("linkR"),
+				value:         `Capability<auth(A.01cf0e2f2f715450.Test.E) &A.01cf0e2f2f715450.Test.R>(address: 0x01cf0e2f2f715450, id: 2)`,
+			},
+			{
+				storageKey:    interpreter.StorageKey{Key: "public", Address: address},
+				storageMapKey: interpreter.StringStorageMapKey("flowTokenBalance"),
+				value:         `Capability<&A.0ae53cb6e3f42a79.FlowToken.Vault>(address: 0x01cf0e2f2f715450, id: 3)`,
+			},
+			{
+				storageKey:    interpreter.StorageKey{Key: "contract", Address: address},
+				storageMapKey: interpreter.StringStorageMapKey("Test"),
+				value:         `A.01cf0e2f2f715450.Test()`,
+			},
+			{
+				storageKey:    interpreter.StorageKey{Key: "cap_con", Address: address},
+				storageMapKey: interpreter.Uint64StorageMapKey(0x2),
+				value:         "StorageCapabilityController(borrowType: auth(A.01cf0e2f2f715450.Test.E) &A.01cf0e2f2f715450.Test.R, capabilityID: /storage/r, target: 2)",
+			},
+			{
+				storageKey:    interpreter.StorageKey{Key: "cap_con", Address: address},
+				storageMapKey: interpreter.Uint64StorageMapKey(0x1),
+				value:         "StorageCapabilityController(borrowType: &A.0ae53cb6e3f42a79.FlowToken.Vault, capabilityID: /storage/flowTokenVault, target: 1)",
+			},
+			{
+				storageKey:    interpreter.StorageKey{Key: "cap_con", Address: address},
+				storageMapKey: interpreter.Uint64StorageMapKey(0x3),
+				value:         "StorageCapabilityController(borrowType: &A.0ae53cb6e3f42a79.FlowToken.Vault, capabilityID: /storage/flowTokenVault, target: 3)",
+			},
+		},
+		visitMigration.visits,
+	)
+
 }
 
 var flowTokenAddress = func() common.Address {
