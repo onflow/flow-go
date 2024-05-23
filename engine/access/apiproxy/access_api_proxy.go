@@ -19,6 +19,7 @@ import (
 // FlowAccessAPIRouter is a structure that represents the routing proxy algorithm.
 // It splits requests between a local and a remote API service.
 type FlowAccessAPIRouter struct {
+	// only for v0.33, to be backward compatible
 	access.UnimplementedAccessAPIServer
 	Logger   zerolog.Logger
 	Metrics  *metrics.ObserverCollector

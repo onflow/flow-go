@@ -17,6 +17,7 @@ import (
 )
 
 type Handler struct {
+	// only for v0.33, to be backward compatible
 	access.UnimplementedAccessAPIServer
 	api                  API
 	chain                flow.Chain
@@ -32,11 +33,12 @@ var _ access.AccessAPIServer = (*Handler)(nil)
 
 func NewHandler(api API, chain flow.Chain, finalizedHeader module.FinalizedHeaderCache, me module.Local, options ...HandlerOption) *Handler {
 	h := &Handler{
-		api:                  api,
-		chain:                chain,
-		finalizedHeaderCache: finalizedHeader,
-		me:                   me,
-		signerIndicesDecoder: &signature.NoopBlockSignerDecoder{},
+		UnimplementedAccessAPIServer: access.UnimplementedAccessAPIServer{},
+		api:                          api,
+		chain:                        chain,
+		finalizedHeaderCache:         finalizedHeader,
+		me:                           me,
+		signerIndicesDecoder:         &signature.NoopBlockSignerDecoder{},
 	}
 	for _, opt := range options {
 		opt(h)

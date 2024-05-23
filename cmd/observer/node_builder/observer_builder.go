@@ -24,6 +24,7 @@ import (
 	"google.golang.org/grpc/credentials"
 
 	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow/protobuf/go/flow/access"
 
 	"github.com/onflow/flow-go/admin/commands"
 	stateSyncCommands "github.com/onflow/flow-go/admin/commands/state_synchronization"
@@ -1620,6 +1621,8 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		}
 
 		rpcHandler := &apiproxy.FlowAccessAPIRouter{
+			UnimplementedAccessAPIServer: access.UnimplementedAccessAPIServer{},
+
 			Logger:   builder.Logger,
 			Metrics:  observerCollector,
 			Upstream: forwarder,
