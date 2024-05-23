@@ -1037,7 +1037,6 @@ func (exeNode *ExecutionNode) LoadIngestionEngine(
 		exeNode.collectionRequester = reqEng
 	}
 
-	fetcher := fetcher.NewCollectionFetcher(node.Logger, exeNode.collectionRequester, node.State, exeNode.exeConf.onflowOnlyLNs)
 	if exeNode.exeConf.enableNewIngestionEngine {
 		_, core, err := ingestion.NewMachine(
 			node.Logger,
@@ -1071,7 +1070,7 @@ func (exeNode *ExecutionNode) LoadIngestionEngine(
 		node.Logger,
 		node.EngineRegistry,
 		node.Me,
-		fetcher,
+		colFetcher,
 		node.Storage.Headers,
 		node.Storage.Blocks,
 		node.Storage.Collections,
