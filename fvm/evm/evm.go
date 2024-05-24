@@ -13,50 +13,26 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-func ContractAccountAddress(chainID flow.ChainID) (flow.Address, error) {
-	sc := systemcontracts.SystemContractsForChain(chainID)
-	return sc.EVMContract.Address, nil
-}
-
-func StorageAccountAddress(chainID flow.ChainID) (flow.Address, error) {
-	sc := systemcontracts.SystemContractsForChain(chainID)
-	return sc.EVMStorage.Address, nil
-}
-
-func RandomBeaconAddress(chainID flow.ChainID) flow.Address {
-	return systemcontracts.SystemContractsForChain(chainID).RandomBeaconHistory.Address
-}
-
 func SetupEnvironment(
 	chainID flow.ChainID,
 	fvmEnv environment.Environment,
 	runtimeEnv runtime.Environment,
-	flowToken flow.Address,
 ) error {
-	evmStorageAccountAddress, err := StorageAccountAddress(chainID)
-	if err != nil {
-		return err
-	}
-
-	evmContractAccountAddress, err := ContractAccountAddress(chainID)
-	if err != nil {
-		return err
-	}
-
-	randomBeaconAddress := RandomBeaconAddress(chainID)
+	sc := systemcontracts.SystemContractsForChain(chainID)
+	randomBeaconAddress := sc.RandomBeaconHistory.Address
+	flowTokenAddress := sc.FlowToken.Address
+	storageAddress := sc.EVMStorage.Address
+	evmAddress := sc.EVMContract.Address
 
 	backend := backends.NewWrappedEnvironment(fvmEnv)
-
-	emulator := evm.NewEmulator(backend, evmStorageAccountAddress)
-
-	blockStore := handler.NewBlockStore(backend, evmStorageAccountAddress)
-
+	emulator := evm.NewEmulator(backend, storageAddress)
+	blockStore := handler.NewBlockStore(backend, storageAddress)
 	addressAllocator := handler.NewAddressAllocator()
 
 	contractHandler := handler.NewContractHandler(
 		chainID,
-		evmContractAccountAddress,
-		common.Address(flowToken),
+		evmAddress,
+		common.Address(flowTokenAddress),
 		randomBeaconAddress,
 		blockStore,
 		addressAllocator,
@@ -67,7 +43,7 @@ func SetupEnvironment(
 	stdlib.SetupEnvironment(
 		runtimeEnv,
 		contractHandler,
-		evmContractAccountAddress,
+		evmAddress,
 	)
 
 	return nil
