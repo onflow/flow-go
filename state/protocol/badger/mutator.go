@@ -672,6 +672,12 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 		return fmt.Errorf("could not check persisted epoch emergency fallback flag: %w", err)
 	}
 
+	// previously in EFM but not anymore
+	epochFallbackModeRecovered := epochFallbackTriggered && !psSnapshot.InvalidEpochTransitionAttempted()
+	if epochFallbackModeRecovered {
+		epochFallbackTriggered = false
+	}
+
 	// if epoch fallback was not previously triggered, check whether this block triggers it
 	if !epochFallbackTriggered && psSnapshot.InvalidEpochTransitionAttempted() {
 		epochFallbackTriggered = true
@@ -737,6 +743,12 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 			err = operation.SetEpochEmergencyFallbackTriggered(blockID)(tx)
 			if err != nil {
 				return fmt.Errorf("could not set epoch fallback flag: %w", err)
+			}
+		}
+		if epochFallbackModeRecovered {
+			err = operation.UnsetEpochEmergencyFallbackTriggered()(tx)
+			if err != nil {
+				return fmt.Errorf("could not unset epoch fallback flag: %w", err)
 			}
 		}
 		if isFirstBlockOfEpoch && !epochFallbackTriggered {

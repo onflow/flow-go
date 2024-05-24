@@ -38,6 +38,13 @@ func SetEpochEmergencyFallbackTriggered(blockID flow.Identifier) func(txn *badge
 	return SkipDuplicates(insert(makePrefix(codeEpochEmergencyFallbackTriggered), blockID))
 }
 
+// UnsetEpochEmergencyFallbackTriggered removes the flag indicating that protocol is in epoch emergency fallback mode.
+// EFM can be recovered only by finalizing a block which previously sealed an execution result which incorporated an
+// flow.EpochRecover service event.
+func UnsetEpochEmergencyFallbackTriggered() func(txn *badger.Txn) error {
+	return remove(makePrefix(codeEpochEmergencyFallbackTriggered))
+}
+
 // RetrieveEpochEmergencyFallbackTriggeredBlockID gets the block ID where epoch
 // emergency was triggered.
 func RetrieveEpochEmergencyFallbackTriggeredBlockID(blockID *flow.Identifier) func(*badger.Txn) error {

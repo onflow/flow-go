@@ -2107,7 +2107,12 @@ func EpochRecoverFixture(opts ...func(setup *flow.EpochSetup)) *flow.EpochRecove
 		apply(setup)
 	}
 
-	commit := EpochCommitFixture(CommitWithCounter(setup.Counter))
+	commit := EpochCommitFixture(
+		CommitWithCounter(setup.Counter),
+		WithDKGFromParticipants(setup.Participants),
+		WithClusterQCsFromAssignments(setup.Assignments),
+	)
+
 	ev := &flow.EpochRecover{
 		EpochSetup:  *setup,
 		EpochCommit: *commit,
