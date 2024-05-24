@@ -4,6 +4,7 @@ import (
 	_ "embed"
 	"fmt"
 	"io"
+	"sort"
 	"sync"
 	"testing"
 
@@ -546,12 +547,6 @@ func checkMigratedPayloads(
 	}
 
 	expectedValues := []interpreter.Value{
-		// Both string values should be in the normalized form.
-		interpreter.NewUnmeteredStringValue("Caf\u00E9"),
-		interpreter.NewUnmeteredStringValue("Caf\u00E9"),
-
-		interpreter.NewUnmeteredTypeValue(fullyEntitledAccountReferenceType),
-
 		interpreter.NewDictionaryValue(
 			mr.Interpreter,
 			interpreter.EmptyLocationRange,
@@ -565,6 +560,121 @@ func checkMigratedPayloads(
 			interpreter.NewUnmeteredStringValue("H\u00E9llo"),
 			interpreter.NewUnmeteredIntValueFromInt64(2),
 		),
+
+		interpreter.NewCompositeValue(
+			mr.Interpreter,
+			interpreter.EmptyLocationRange,
+			flowTokenLocation,
+			"FlowToken.Vault",
+			common.CompositeKindResource,
+			[]interpreter.CompositeField{
+				{
+					Value: interpreter.NewUnmeteredUFix64Value(0.001 * sema.Fix64Factor),
+					Name:  "balance",
+				},
+				{
+					Value: interpreter.NewUnmeteredUInt64Value(11240984669916758018),
+					Name:  "uuid",
+				},
+			},
+			address,
+		),
+		interpreter.NewDictionaryValue(
+			mr.Interpreter,
+			interpreter.EmptyLocationRange,
+			interpreter.NewDictionaryStaticType(
+				nil,
+				interpreter.PrimitiveStaticTypeMetaType,
+				interpreter.PrimitiveStaticTypeString,
+			),
+			interpreter.NewUnmeteredTypeValue(
+				interpreter.NewReferenceStaticType(
+					nil,
+					entitlementAuthorization(),
+					rResourceType,
+				),
+			),
+			interpreter.NewUnmeteredStringValue("auth_ref"),
+		),
+		interpreter.NewDictionaryValue(
+			mr.Interpreter,
+			interpreter.EmptyLocationRange,
+			interpreter.NewDictionaryStaticType(
+				nil,
+				interpreter.PrimitiveStaticTypeMetaType,
+				interpreter.PrimitiveStaticTypeString,
+			),
+			interpreter.NewUnmeteredTypeValue(
+				interpreter.NewReferenceStaticType(
+					nil,
+					entitlementAuthorization(),
+					rResourceType,
+				),
+			),
+			interpreter.NewUnmeteredStringValue("non_auth_ref"),
+		),
+		interpreter.NewUnmeteredTypeValue(fullyEntitledAccountReferenceType),
+		interpreter.NewDictionaryValue(
+			mr.Interpreter,
+			interpreter.EmptyLocationRange,
+			interpreter.NewDictionaryStaticType(
+				nil,
+				interpreter.PrimitiveStaticTypeMetaType,
+				interpreter.PrimitiveStaticTypeInt,
+			),
+			interpreter.NewUnmeteredTypeValue(fullyEntitledAccountReferenceType),
+			interpreter.NewUnmeteredIntValueFromInt64(1),
+			interpreter.NewUnmeteredTypeValue(interpreter.PrimitiveStaticTypeAccount_Capabilities),
+			interpreter.NewUnmeteredIntValueFromInt64(2),
+			interpreter.NewUnmeteredTypeValue(interpreter.PrimitiveStaticTypeAccount_AccountCapabilities),
+			interpreter.NewUnmeteredIntValueFromInt64(3),
+			interpreter.NewUnmeteredTypeValue(interpreter.PrimitiveStaticTypeAccount_StorageCapabilities),
+			interpreter.NewUnmeteredIntValueFromInt64(4),
+			interpreter.NewUnmeteredTypeValue(interpreter.PrimitiveStaticTypeAccount_Contracts),
+			interpreter.NewUnmeteredIntValueFromInt64(5),
+			interpreter.NewUnmeteredTypeValue(interpreter.PrimitiveStaticTypeAccount_Keys),
+			interpreter.NewUnmeteredIntValueFromInt64(6),
+			interpreter.NewUnmeteredTypeValue(interpreter.PrimitiveStaticTypeAccount_Inbox),
+			interpreter.NewUnmeteredIntValueFromInt64(7),
+			interpreter.NewUnmeteredTypeValue(accountReferenceType),
+			interpreter.NewUnmeteredIntValueFromInt64(8),
+			interpreter.NewUnmeteredTypeValue(interpreter.AccountKeyStaticType),
+			interpreter.NewUnmeteredIntValueFromInt64(9),
+		),
+		interpreter.NewUnmeteredSomeValueNonCopying(
+			interpreter.NewUnmeteredCapabilityValue(
+				2,
+				interpreter.NewAddressValue(nil, address),
+				interpreter.NewReferenceStaticType(nil, entitlementAuthorization(), rResourceType),
+			),
+		),
+
+		// String value should be in the normalized form.
+		interpreter.NewUnmeteredStringValue("Caf\u00E9"),
+
+		interpreter.NewUnmeteredCapabilityValue(
+			2,
+			interpreter.NewAddressValue(nil, address),
+			interpreter.NewReferenceStaticType(nil, entitlementAuthorization(), rResourceType),
+		),
+
+		interpreter.NewCompositeValue(
+			mr.Interpreter,
+			interpreter.EmptyLocationRange,
+			testContractLocation,
+			"Test.R",
+			common.CompositeKindResource,
+			[]interpreter.CompositeField{
+				{
+					Value: interpreter.NewUnmeteredUInt64Value(360287970189639680),
+					Name:  "uuid",
+				},
+			},
+			address,
+		),
+
+		// String value should be in the normalized form.
+		interpreter.NewUnmeteredStringValue("Caf\u00E9"),
 
 		interpreter.NewDictionaryValue(
 			mr.Interpreter,
@@ -596,140 +706,21 @@ func checkMigratedPayloads(
 			),
 			interpreter.NewUnmeteredIntValueFromInt64(2),
 		),
-
-		interpreter.NewCompositeValue(
-			mr.Interpreter,
-			interpreter.EmptyLocationRange,
-			testContractLocation,
-			"Test.R",
-			common.CompositeKindResource,
-			[]interpreter.CompositeField{
-				{
-					Value: interpreter.NewUnmeteredUInt64Value(360287970189639680),
-					Name:  "uuid",
-				},
-			},
-			address,
-		),
-
-		interpreter.NewUnmeteredSomeValueNonCopying(
-			interpreter.NewUnmeteredCapabilityValue(
-				2,
-				interpreter.NewAddressValue(nil, address),
-				interpreter.NewReferenceStaticType(nil, entitlementAuthorization(), rResourceType),
-			),
-		),
-
-		interpreter.NewUnmeteredCapabilityValue(
-			2,
-			interpreter.NewAddressValue(nil, address),
-			interpreter.NewReferenceStaticType(nil, entitlementAuthorization(), rResourceType),
-		),
-
-		interpreter.NewDictionaryValue(
-			mr.Interpreter,
-			interpreter.EmptyLocationRange,
-			interpreter.NewDictionaryStaticType(
-				nil,
-				interpreter.PrimitiveStaticTypeMetaType,
-				interpreter.PrimitiveStaticTypeInt,
-			),
-			interpreter.NewUnmeteredTypeValue(fullyEntitledAccountReferenceType),
-			interpreter.NewUnmeteredIntValueFromInt64(1),
-			interpreter.NewUnmeteredTypeValue(interpreter.PrimitiveStaticTypeAccount_Capabilities),
-			interpreter.NewUnmeteredIntValueFromInt64(2),
-			interpreter.NewUnmeteredTypeValue(interpreter.PrimitiveStaticTypeAccount_AccountCapabilities),
-			interpreter.NewUnmeteredIntValueFromInt64(3),
-			interpreter.NewUnmeteredTypeValue(interpreter.PrimitiveStaticTypeAccount_StorageCapabilities),
-			interpreter.NewUnmeteredIntValueFromInt64(4),
-			interpreter.NewUnmeteredTypeValue(interpreter.PrimitiveStaticTypeAccount_Contracts),
-			interpreter.NewUnmeteredIntValueFromInt64(5),
-			interpreter.NewUnmeteredTypeValue(interpreter.PrimitiveStaticTypeAccount_Keys),
-			interpreter.NewUnmeteredIntValueFromInt64(6),
-			interpreter.NewUnmeteredTypeValue(interpreter.PrimitiveStaticTypeAccount_Inbox),
-			interpreter.NewUnmeteredIntValueFromInt64(7),
-			interpreter.NewUnmeteredTypeValue(accountReferenceType),
-			interpreter.NewUnmeteredIntValueFromInt64(8),
-			interpreter.NewUnmeteredTypeValue(interpreter.AccountKeyStaticType),
-			interpreter.NewUnmeteredIntValueFromInt64(9),
-		),
-
-		interpreter.NewDictionaryValue(
-			mr.Interpreter,
-			interpreter.EmptyLocationRange,
-			interpreter.NewDictionaryStaticType(
-				nil,
-				interpreter.PrimitiveStaticTypeMetaType,
-				interpreter.PrimitiveStaticTypeString,
-			),
-			interpreter.NewUnmeteredTypeValue(
-				interpreter.NewReferenceStaticType(
-					nil,
-					entitlementAuthorization(),
-					rResourceType,
-				),
-			),
-			interpreter.NewUnmeteredStringValue("non_auth_ref"),
-		),
-		interpreter.NewDictionaryValue(
-			mr.Interpreter,
-			interpreter.EmptyLocationRange,
-			interpreter.NewDictionaryStaticType(
-				nil,
-				interpreter.PrimitiveStaticTypeMetaType,
-				interpreter.PrimitiveStaticTypeString,
-			),
-			interpreter.NewUnmeteredTypeValue(
-				interpreter.NewReferenceStaticType(
-					nil,
-					entitlementAuthorization(),
-					rResourceType,
-				),
-			),
-			interpreter.NewUnmeteredStringValue("auth_ref"),
-		),
-
-		interpreter.NewCompositeValue(
-			mr.Interpreter,
-			interpreter.EmptyLocationRange,
-			flowTokenLocation,
-			"FlowToken.Vault",
-			common.CompositeKindResource,
-			[]interpreter.CompositeField{
-				{
-					Value: interpreter.NewUnmeteredUFix64Value(0.001 * sema.Fix64Factor),
-					Name:  "balance",
-				},
-				{
-					Value: interpreter.NewUnmeteredUInt64Value(11240984669916758018),
-					Name:  "uuid",
-				},
-			},
-			address,
-		),
 	}
 
 	require.Equal(t, len(expectedValues), len(values))
 
-	// Order is non-deterministic, so do a greedy compare.
-	for _, value := range values {
-		found := false
+	for index, value := range values {
 		actualValue := value.(interpreter.EquatableValue)
-		for i, expectedValue := range expectedValues {
-			if actualValue.Equal(mr.Interpreter, interpreter.EmptyLocationRange, expectedValue) {
-				expectedValues = append(expectedValues[:i], expectedValues[i+1:]...)
-				found = true
-				break
-			}
+		expectedValue := expectedValues[index]
 
-		}
-		if !found {
-			assert.Fail(t, fmt.Sprintf("extra item in actual values: %s", actualValue))
-		}
-	}
-
-	if len(expectedValues) != 0 {
-		assert.Fail(t, fmt.Sprintf("%d extra item(s) in expected values: %s", len(expectedValues), expectedValues))
+		assert.True(t,
+			actualValue.Equal(mr.Interpreter, interpreter.EmptyLocationRange, expectedValue),
+			"values at index %d are not equal: %s != %s",
+			index,
+			actualValue,
+			expectedValue,
+		)
 	}
 }
 
@@ -775,24 +766,17 @@ func checkReporters(
 		)
 	}
 
-	newCadenceValueMigrationEntry := func(
-		migration, key string,
-		domain common.PathDomain,
-	) cadenceValueMigrationEntry {
-		return cadenceValueMigrationEntry{
-			StorageMapKey: interpreter.StringStorageMapKey(key),
-			StorageKey: interpreter.NewStorageKey(
-				nil,
-				address,
-				domain.Identifier(),
-			),
-			Migration: migration,
-		}
+	var reporterNames []string
+	for reporterName := range rwf.reportWriters {
+		reporterNames = append(reporterNames, reporterName)
 	}
+	sort.Strings(reporterNames)
 
 	var accountReportEntries []valueMigrationReportEntry
 
-	for _, reportWriter := range rwf.reportWriters {
+	for _, reporterName := range reporterNames {
+		reportWriter := rwf.reportWriters[reporterName]
+
 		for _, entry := range reportWriter.entries {
 
 			e, ok := entry.(valueMigrationReportEntry)
@@ -804,63 +788,30 @@ func checkReporters(
 		}
 	}
 
-	acctTypedDictKeyMigrationReportEntry := newCadenceValueMigrationEntry(
-		"StaticTypeMigration",
-		"dictionary_with_account_type_keys",
-		common.PathDomainStorage)
-
-	// Order is non-deterministic, so use 'ElementsMatch'.
-	assert.ElementsMatch(
+	assert.Equal(
 		t,
 		[]valueMigrationReportEntry{
-			newCadenceValueMigrationEntry(
-				"StringNormalizingMigration",
-				"string_value_1",
-				common.PathDomainStorage,
-			),
-			newCadenceValueMigrationEntry(
-				"StaticTypeMigration",
-				"type_value",
-				common.PathDomainStorage,
-			),
-
-			// String keys in dictionary
-			newCadenceValueMigrationEntry(
-				"StringNormalizingMigration",
-				"dictionary_with_string_keys",
-				common.PathDomainStorage,
-			),
-
-			// Restricted typed keys in dictionary
-			newCadenceValueMigrationEntry(
-				"StaticTypeMigration",
-				"dictionary_with_restricted_typed_keys",
-				common.PathDomainStorage,
-			),
-			newCadenceValueMigrationEntry(
-				"StaticTypeMigration",
-				"dictionary_with_restricted_typed_keys",
-				common.PathDomainStorage,
-			),
-
-			// Capabilities and links
+			capabilityMigrationEntry{
+				AccountAddress: address,
+				AddressPath: interpreter.AddressPath{
+					Address: address,
+					Path:    interpreter.PathValue{Identifier: "linkR", Domain: 0x3},
+				},
+				BorrowType: interpreter.NewReferenceStaticType(
+					nil,
+					entitlementAuthorization(),
+					rResourceType,
+				),
+			},
 			cadenceValueMigrationEntry{
+				StorageKey:    interpreter.StorageKey{Key: "storage", Address: address},
 				StorageMapKey: interpreter.StringStorageMapKey("capability"),
-				StorageKey: interpreter.NewStorageKey(
-					nil,
-					address,
-					common.PathDomainStorage.Identifier(),
-				),
-				Migration: "CapabilityValueMigration",
+				Migration:     "CapabilityValueMigration",
 			},
 			capabilityMigrationEntry{
 				AccountAddress: address,
 				AddressPath: interpreter.AddressPath{
-					Address: address,
-					Path: interpreter.NewUnmeteredPathValue(
-						common.PathDomainPublic,
-						"linkR",
-					),
+					Address: address, Path: interpreter.PathValue{Identifier: "linkR", Domain: 0x3},
 				},
 				BorrowType: interpreter.NewReferenceStaticType(
 					nil,
@@ -868,124 +819,149 @@ func checkReporters(
 					rResourceType,
 				),
 			},
-			newCadenceValueMigrationEntry(
-				"EntitlementsMigration",
-				"capability",
-				common.PathDomainStorage,
-			),
-			newCadenceValueMigrationEntry(
-				"EntitlementsMigration",
-				"linkR",
-				common.PathDomainPublic,
-			),
-
-			// untyped capability
-			capabilityMigrationEntry{
-				AccountAddress: address,
-				AddressPath: interpreter.AddressPath{
-					Address: address,
-					Path: interpreter.NewUnmeteredPathValue(
-						common.PathDomainPublic,
-						"linkR",
-					),
-				},
-				BorrowType: interpreter.NewReferenceStaticType(
-					nil,
-					entitlementAuthorization(),
-					rResourceType,
-				),
+			cadenceValueMigrationEntry{
+				StorageKey:    interpreter.StorageKey{Key: "storage", Address: address},
+				StorageMapKey: interpreter.StringStorageMapKey("untyped_capability"),
+				Migration:     "CapabilityValueMigration",
 			},
-			newCadenceValueMigrationEntry(
-				"CapabilityValueMigration",
-				"untyped_capability",
-				common.PathDomainStorage,
-			),
-
-			// Account-typed keys in dictionary
-			acctTypedDictKeyMigrationReportEntry,
-			acctTypedDictKeyMigrationReportEntry,
-			acctTypedDictKeyMigrationReportEntry,
-			acctTypedDictKeyMigrationReportEntry,
-			acctTypedDictKeyMigrationReportEntry,
-			acctTypedDictKeyMigrationReportEntry,
-			acctTypedDictKeyMigrationReportEntry,
-			acctTypedDictKeyMigrationReportEntry,
-			acctTypedDictKeyMigrationReportEntry,
-
-			// Entitled typed keys in dictionary
-			newCadenceValueMigrationEntry(
-				"EntitlementsMigration",
-				"dictionary_with_auth_reference_typed_key",
-				common.PathDomainStorage,
-			),
-			newCadenceValueMigrationEntry(
-				"EntitlementsMigration",
-				"dictionary_with_reference_typed_key",
-				common.PathDomainStorage,
-			),
-
-			// Entitlements in links
-			newCadenceValueMigrationEntry(
-				"EntitlementsMigration",
-				"flowTokenReceiver",
-				common.PathDomainPublic,
-			),
-			newCadenceValueMigrationEntry(
-				"EntitlementsMigration",
-				"flowTokenBalance",
-				common.PathDomainPublic,
-			),
-
-			// Cap cons
-
 			linkMigrationEntry{
 				AccountAddressPath: interpreter.AddressPath{
 					Address: address,
-					Path: interpreter.PathValue{
-						Identifier: "flowTokenReceiver",
-						Domain:     common.PathDomainPublic,
-					},
+					Path:    interpreter.PathValue{Identifier: "flowTokenReceiver", Domain: 0x3},
 				},
-				CapabilityID: 1,
+				CapabilityID: 0x1,
 			},
-			newCadenceValueMigrationEntry(
-				"LinkValueMigration",
-				"flowTokenReceiver",
-				common.PathDomainPublic,
-			),
-
+			cadenceValueMigrationEntry{
+				StorageKey:    interpreter.StorageKey{Key: "public", Address: address},
+				StorageMapKey: interpreter.StringStorageMapKey("flowTokenReceiver"),
+				Migration:     "LinkValueMigration",
+			},
 			linkMigrationEntry{
 				AccountAddressPath: interpreter.AddressPath{
 					Address: address,
-					Path: interpreter.PathValue{
-						Identifier: "linkR",
-						Domain:     common.PathDomainPublic,
-					},
+					Path:    interpreter.PathValue{Identifier: "linkR", Domain: 0x3},
 				},
-				CapabilityID: 2,
+				CapabilityID: 0x2,
 			},
-			newCadenceValueMigrationEntry(
-				"LinkValueMigration",
-				"linkR",
-				common.PathDomainPublic,
-			),
-
+			cadenceValueMigrationEntry{
+				StorageKey:    interpreter.StorageKey{Key: "public", Address: address},
+				StorageMapKey: interpreter.StringStorageMapKey("linkR"),
+				Migration:     "LinkValueMigration",
+			},
 			linkMigrationEntry{
 				AccountAddressPath: interpreter.AddressPath{
 					Address: address,
-					Path: interpreter.PathValue{
-						Identifier: "flowTokenBalance",
-						Domain:     common.PathDomainPublic,
-					},
+					Path:    interpreter.PathValue{Identifier: "flowTokenBalance", Domain: 0x3},
 				},
-				CapabilityID: 3,
+				CapabilityID: 0x3,
 			},
-			newCadenceValueMigrationEntry(
-				"LinkValueMigration",
-				"flowTokenBalance",
-				common.PathDomainPublic,
-			),
+			cadenceValueMigrationEntry{
+				StorageKey:    interpreter.StorageKey{Key: "public", Address: address},
+				StorageMapKey: interpreter.StringStorageMapKey("flowTokenBalance"),
+				Migration:     "LinkValueMigration",
+			},
+			cadenceValueMigrationEntry{
+				StorageKey:    interpreter.StorageKey{Key: "storage", Address: address},
+				StorageMapKey: interpreter.StringStorageMapKey("dictionary_with_string_keys"),
+				Migration:     "StringNormalizingMigration",
+			},
+			cadenceValueMigrationEntry{
+				StorageKey:    interpreter.StorageKey{Key: "storage", Address: address},
+				StorageMapKey: interpreter.StringStorageMapKey("dictionary_with_auth_reference_typed_key"),
+				Migration:     "EntitlementsMigration",
+			},
+			cadenceValueMigrationEntry{
+				StorageKey:    interpreter.StorageKey{Key: "storage", Address: address},
+				StorageMapKey: interpreter.StringStorageMapKey("dictionary_with_reference_typed_key"),
+				Migration:     "EntitlementsMigration",
+			},
+			cadenceValueMigrationEntry{
+				StorageKey:    interpreter.StorageKey{Key: "storage", Address: address},
+				StorageMapKey: interpreter.StringStorageMapKey("type_value"),
+				Migration:     "StaticTypeMigration",
+			},
+			cadenceValueMigrationEntry{
+				StorageKey:    interpreter.StorageKey{Key: "storage", Address: address},
+				StorageMapKey: interpreter.StringStorageMapKey("dictionary_with_account_type_keys"),
+				Migration:     "StaticTypeMigration",
+			},
+			cadenceValueMigrationEntry{
+				StorageKey:    interpreter.StorageKey{Key: "storage", Address: address},
+				StorageMapKey: interpreter.StringStorageMapKey("dictionary_with_account_type_keys"),
+				Migration:     "StaticTypeMigration",
+			},
+			cadenceValueMigrationEntry{
+				StorageKey:    interpreter.StorageKey{Key: "storage", Address: address},
+				StorageMapKey: interpreter.StringStorageMapKey("dictionary_with_account_type_keys"),
+				Migration:     "StaticTypeMigration",
+			},
+			cadenceValueMigrationEntry{
+				StorageKey:    interpreter.StorageKey{Key: "storage", Address: address},
+				StorageMapKey: interpreter.StringStorageMapKey("dictionary_with_account_type_keys"),
+				Migration:     "StaticTypeMigration",
+			},
+			cadenceValueMigrationEntry{
+				StorageKey:    interpreter.StorageKey{Key: "storage", Address: address},
+				StorageMapKey: interpreter.StringStorageMapKey("dictionary_with_account_type_keys"),
+				Migration:     "StaticTypeMigration",
+			},
+			cadenceValueMigrationEntry{
+				StorageKey:    interpreter.StorageKey{Key: "storage", Address: address},
+				StorageMapKey: interpreter.StringStorageMapKey("dictionary_with_account_type_keys"),
+				Migration:     "StaticTypeMigration",
+			},
+			cadenceValueMigrationEntry{
+				StorageKey:    interpreter.StorageKey{Key: "storage", Address: address},
+				StorageMapKey: interpreter.StringStorageMapKey("dictionary_with_account_type_keys"),
+				Migration:     "StaticTypeMigration",
+			},
+			cadenceValueMigrationEntry{
+				StorageKey:    interpreter.StorageKey{Key: "storage", Address: address},
+				StorageMapKey: interpreter.StringStorageMapKey("dictionary_with_account_type_keys"),
+				Migration:     "StaticTypeMigration",
+			},
+			cadenceValueMigrationEntry{
+				StorageKey:    interpreter.StorageKey{Key: "storage", Address: address},
+				StorageMapKey: interpreter.StringStorageMapKey("dictionary_with_account_type_keys"),
+				Migration:     "StaticTypeMigration",
+			},
+			cadenceValueMigrationEntry{
+				StorageKey:    interpreter.StorageKey{Key: "storage", Address: address},
+				StorageMapKey: interpreter.StringStorageMapKey("capability"),
+				Migration:     "EntitlementsMigration",
+			},
+			cadenceValueMigrationEntry{
+				StorageKey:    interpreter.StorageKey{Key: "storage", Address: address},
+				StorageMapKey: interpreter.StringStorageMapKey("string_value_1"),
+				Migration:     "StringNormalizingMigration",
+			},
+			cadenceValueMigrationEntry{
+				StorageKey:    interpreter.StorageKey{Key: "storage", Address: address},
+				StorageMapKey: interpreter.StringStorageMapKey("dictionary_with_restricted_typed_keys"),
+				Migration:     "StaticTypeMigration",
+			},
+			cadenceValueMigrationEntry{
+				StorageKey:    interpreter.StorageKey{Key: "storage", Address: address},
+				StorageMapKey: interpreter.StringStorageMapKey("dictionary_with_restricted_typed_keys"),
+				Migration:     "StaticTypeMigration",
+			},
+			cadenceValueMigrationEntry{
+				StorageKey:    interpreter.StorageKey{Key: "public", Address: address},
+				StorageMapKey: interpreter.StringStorageMapKey("flowTokenReceiver"),
+				Migration:     "EntitlementsMigration",
+			},
+			cadenceValueMigrationEntry{
+				StorageKey:    interpreter.StorageKey{Key: "public", Address: address},
+				StorageMapKey: interpreter.StringStorageMapKey("linkR"),
+				Migration:     "EntitlementsMigration",
+			},
+			cadenceValueMigrationEntry{
+				StorageKey:    interpreter.StorageKey{Key: "public", Address: address},
+				StorageMapKey: interpreter.StringStorageMapKey("flowTokenBalance"),
+				Migration:     "EntitlementsMigration",
+			},
 		},
+
 		accountReportEntries,
 	)
 }
