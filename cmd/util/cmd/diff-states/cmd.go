@@ -476,11 +476,13 @@ func (e rawDiff) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
 		Kind   string `json:"kind"`
 		Owner  string `json:"owner"`
+		Key    string `json:"key"`
 		Value1 string `json:"value1"`
 		Value2 string `json:"value2"`
 	}{
 		Kind:   "raw-diff",
 		Owner:  hex.EncodeToString([]byte(e.Owner)),
+		Key:    e.Key,
 		Value1: hex.EncodeToString(e.Value1),
 		Value2: hex.EncodeToString(e.Value2),
 	})
