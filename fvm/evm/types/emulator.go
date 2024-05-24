@@ -32,6 +32,7 @@ type BlockContext struct {
 	GasFeeCollector        Address
 	GetHashFunc            func(n uint64) gethCommon.Hash
 	Random                 gethCommon.Hash
+	Tracer                 gethVM.EVMLogger
 
 	// a set of extra precompiles to be injected
 	ExtraPrecompiles []Precompile

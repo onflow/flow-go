@@ -46,6 +46,7 @@ func newConfig(ctx types.BlockContext) *Config {
 		WithExtraPrecompiles(ctx.ExtraPrecompiles),
 		WithGetBlockHashFunction(ctx.GetHashFunc),
 		WithRandom(&ctx.Random),
+		WithTransactionTracer(ctx.Tracer),
 	)
 }
 
