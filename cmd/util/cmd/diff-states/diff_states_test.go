@@ -86,7 +86,7 @@ func TestDiffStates(t *testing.T) {
 			t,
 			`
               [
-                {"kind":"raw-diff", "owner":"0100000000000000", "key":"b", "value1":"03", "value2":"05"},
+                {"kind":"raw-diff", "owner":"0100000000000000", "key":"62", "value1":"03", "value2":"05"},
                 {"kind":"account-missing", "owner":"0200000000000000", "state":2},
                 {"kind":"account-missing", "owner":"0300000000000000", "state":1},
                 {"kind":"account-missing", "owner":"0400000000000000", "state":1}
