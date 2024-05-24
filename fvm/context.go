@@ -29,6 +29,7 @@ type Context struct {
 	// limits and set them to MaxUint64, effectively disabling these limits.
 	DisableMemoryAndInteractionLimits bool
 	EVMEnabled                        bool
+	EVMTracingEnabled                 bool
 	ComputationLimit                  uint64
 	MemoryLimit                       uint64
 	MaxStateKeySize                   uint64
