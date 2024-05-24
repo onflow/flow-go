@@ -6,8 +6,8 @@ import (
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/module"
 	protocolstate "github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/protocol"
 )

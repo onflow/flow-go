@@ -560,12 +560,6 @@ func (m *ParticipantState) receiptExtend(ctx context.Context, candidate *flow.Bl
 
 	err := m.receiptValidator.ValidatePayload(candidate)
 	if err != nil {
-		// TODO: this might be not an error, potentially it can be solved by requesting more data and processing this receipt again
-		//if errors.Is(err, storage.ErrNotFound) {
-		//	return state.NewInvalidExtensionErrorf("some entities referenced by receipts are missing: %w", err)
-		//}
-		check if ValidatePayload can return storage.ErrNotFound
-
 		if engine.IsInvalidInputError(err) {
 			return state.NewInvalidExtensionErrorf("payload includes invalid receipts: %w", err)
 		}
