@@ -209,12 +209,14 @@ func (m *CadenceBaseMigration) MigrateAccount(
 			m.nWorkers,
 		)
 
-		oldRegistersForDiff, err := registers.NewByAccountFromPayloads(oldPayloadsForDiff)
+		owner := string(address[:])
+
+		oldRegistersForDiff, err := registers.NewAccountRegistersFromPayloads(owner, oldPayloadsForDiff)
 		if err != nil {
 			return fmt.Errorf("failed to create registers from old payloads: %w", err)
 		}
 
-		newRegistersForDiff, err := registers.NewByAccountFromPayloads(newPayloadsForDiff)
+		newRegistersForDiff, err := registers.NewAccountRegistersFromPayloads(owner, newPayloadsForDiff)
 		if err != nil {
 			return fmt.Errorf("failed to create registers from new payloads: %w", err)
 		}
