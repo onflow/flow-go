@@ -32,6 +32,7 @@ func SetupEnvironment(
 	fvmEnv environment.Environment,
 	runtimeEnv runtime.Environment,
 	flowToken flow.Address,
+	tracingEnabled bool,
 ) error {
 	evmStorageAccountAddress, err := StorageAccountAddress(chainID)
 	if err != nil {
@@ -62,6 +63,7 @@ func SetupEnvironment(
 		addressAllocator,
 		backend,
 		emulator,
+		tracingEnabled,
 	)
 
 	stdlib.SetupEnvironment(

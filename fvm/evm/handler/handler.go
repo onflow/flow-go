@@ -25,6 +25,7 @@ type ContractHandler struct {
 	backend            types.Backend
 	emulator           types.Emulator
 	precompiles        []types.Precompile
+	tracingEnabled     bool
 }
 
 func (h *ContractHandler) FlowTokenAddress() common.Address {
@@ -46,6 +47,7 @@ func NewContractHandler(
 	addressAllocator types.AddressAllocator,
 	backend types.Backend,
 	emulator types.Emulator,
+	tracingEnabled bool,
 ) *ContractHandler {
 	return &ContractHandler{
 		flowChainID:        flowChainID,
@@ -55,6 +57,7 @@ func NewContractHandler(
 		addressAllocator:   addressAllocator,
 		backend:            backend,
 		emulator:           emulator,
+		tracingEnabled:     tracingEnabled,
 		precompiles:        preparePrecompiles(evmContractAddress, randomBeaconAddress, addressAllocator, backend),
 	}
 }
