@@ -209,7 +209,7 @@ func (m *CadenceBaseMigration) MigrateAccount(
 			m.nWorkers,
 		)
 
-		owner := string(address[:])
+		owner := AddressToRegisterOwner(address)
 
 		oldRegistersForDiff, err := registers.NewAccountRegistersFromPayloads(owner, oldPayloadsForDiff)
 		if err != nil {
