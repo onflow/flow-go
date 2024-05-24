@@ -482,7 +482,7 @@ func (e rawDiff) MarshalJSON() ([]byte, error) {
 	}{
 		Kind:   "raw-diff",
 		Owner:  hex.EncodeToString([]byte(e.Owner)),
-		Key:    e.Key,
+		Key:    hex.EncodeToString([]byte(e.Key)),
 		Value1: hex.EncodeToString(e.Value1),
 		Value2: hex.EncodeToString(e.Value2),
 	})
