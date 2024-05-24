@@ -24,7 +24,7 @@ func newPayload(owner flow.Address, key string, value []byte) *ledger.Payload {
 	return ledger.NewPayload(ledgerKey, value)
 }
 
-func TestDiffPayloads(t *testing.T) {
+func TestDiffStates(t *testing.T) {
 
 	unittest.RunWithTempDir(t, func(datadir string) {
 
@@ -86,7 +86,7 @@ func TestDiffPayloads(t *testing.T) {
 			t,
 			`
               [
-                {"kind":"raw-diff", "owner":"0100000000000000", "value1":"03", "value2":"05"}, 
+                {"kind":"raw-diff", "owner":"0100000000000000", "key":"b", "value1":"03", "value2":"05"},
                 {"kind":"account-missing", "owner":"0200000000000000", "state":2},
                 {"kind":"account-missing", "owner":"0300000000000000", "state":1},
                 {"kind":"account-missing", "owner":"0400000000000000", "state":1}
