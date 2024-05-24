@@ -151,6 +151,14 @@ func (f *AccessCollectionFetcher) fetchCollection(ctx irrecoverable.SignalerCont
 			return err
 		}
 
+		// the received collection should match with the guarantee,
+		// validate the collection before processing it
+		if col.ID() != g.colID {
+			f.log.Error().Hex("blockID", g.blockID[:]).Uint64("height", g.height).
+				Msgf("collection id mismatch %v != %v", col.ID(), g.colID)
+			return fmt.Errorf("collection id mismatch %v != %v", col.ID(), g.colID)
+		}
+
 		f.handler(f.originID, col)
 		return nil
 	})
