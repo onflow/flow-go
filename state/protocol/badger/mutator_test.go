@@ -1993,6 +1993,290 @@ func TestEmergencyEpochFallback(t *testing.T) {
 	})
 }
 
+func TestRecoveryFromEpochFallbackMode(t *testing.T) {
+	// if we finalize the first block past the epoch commitment deadline while
+	// in the EpochStaking phase, EFM should be triggered
+	//
+	//       Epoch Commitment Deadline
+	//       |     Epoch Boundary
+	//       |     |
+	//       v     v
+	// ROOT <- B1 <- B2
+	t.Run("entered-EFM-in-staking-phase", func(t *testing.T) {
+
+		rootSnapshot := unittest.RootSnapshotFixture(participants)
+		metricsMock := mockmodule.NewComplianceMetrics(t)
+		mockMetricsForRootSnapshot(metricsMock, rootSnapshot)
+		protoEventsMock := mockprotocol.NewConsumer(t)
+		protoEventsMock.On("BlockFinalized", mock.Anything)
+		protoEventsMock.On("BlockProcessable", mock.Anything, mock.Anything)
+
+		util.RunWithFullProtocolStateAndMetricsAndConsumer(t, rootSnapshot, metricsMock, protoEventsMock, func(db *badger.DB, state *protocol.ParticipantState, mutableProtocolState realprotocol.MutableProtocolState) {
+			head, err := rootSnapshot.Head()
+			require.NoError(t, err)
+			sealedResult, _, err := rootSnapshot.SealedResult()
+			require.NoError(t, err)
+			//safetyThreshold := rootSnapshot.Params().EpochCommitSafetyThreshold()
+			//require.NoError(t, err)
+
+			calculateExpectedStateId := calculateExpectedStateId(t, mutableProtocolState)
+
+			epoch1Setup := sealedResult.ServiceEvents[0].Event.(*flow.EpochSetup)
+			epoch1FinalView := epoch1Setup.FinalView
+			//epoch1CommitmentDeadline := epoch1FinalView - safetyThreshold
+
+			// finalizing block 1 should trigger EFM
+			metricsMock.On("EpochEmergencyFallbackTriggered").Once()
+			protoEventsMock.On("EpochEmergencyFallbackTriggered").Once()
+
+			serviceEventSealingResult := unittest.ExecutionResultFixture(func(result *flow.ExecutionResult) {
+				result.ServiceEvents = []flow.ServiceEvent{unittest.EpochSetupFixture().ServiceEvent()}
+				result.PreviousResultID = sealedResult.ID()
+				result.BlockID = head.ID()
+			})
+			block1 := unittest.BlockWithParentFixture(head)
+			block1.SetPayload(unittest.PayloadFixture(
+				unittest.WithProtocolStateID(calculateExpectedStateId(block1.Header, nil)),
+				unittest.WithReceipts(unittest.ExecutionReceiptFixture(unittest.WithResult(serviceEventSealingResult))),
+			))
+
+			err = state.Extend(context.Background(), block1)
+			require.NoError(t, err)
+
+			err = state.Finalize(context.Background(), block1.ID())
+			require.NoError(t, err)
+
+			seal := unittest.Seal.Fixture(unittest.Seal.WithResult(serviceEventSealingResult))
+			block2 := unittest.BlockWithParentFixture(block1.Header)
+			block2.SetPayload(unittest.PayloadFixture(
+				unittest.WithProtocolStateID(calculateExpectedStateId(block2.Header, []*flow.Seal{seal})),
+				unittest.WithSeals(seal),
+			))
+
+			err = state.Extend(context.Background(), block2)
+			require.NoError(t, err)
+
+			// we begin the epoch in the EpochStaking phase and
+			// block 1 will be the first block on or past the epoch commitment deadline
+
+			assertEpochEmergencyFallbackTriggered(t, state, false) // not triggered before finalization
+			err = state.Finalize(context.Background(), block2.ID())
+			require.NoError(t, err)
+			assertEpochEmergencyFallbackTriggered(t, state, true) // triggered after finalization
+
+			// block 2 will be the first block past the first epoch boundary
+			block3 := unittest.BlockWithParentProtocolState(block1)
+			block3.Header.View = epoch1FinalView + 1
+			err = state.Extend(context.Background(), block3)
+			require.NoError(t, err)
+			err = state.Finalize(context.Background(), block3.ID())
+			require.NoError(t, err)
+
+			// since EFM has been triggered, epoch transition metrics should not be updated
+			metricsMock.AssertNotCalled(t, "EpochTransition", mock.Anything, mock.Anything)
+			metricsMock.AssertNotCalled(t, "CurrentEpochCounter", epoch1Setup.Counter+1)
+		})
+	})
+
+	// if we finalize the first block past the epoch commitment deadline while
+	// in the EpochSetup phase, EFM should be triggered
+	//
+	//                       Epoch Commitment Deadline
+	//                       |         Epoch Boundary
+	//                       |         |
+	//                       v         v
+	// ROOT <- B1 <- B2(R1) <- B3(S1) <- B4
+	t.Run("passed epoch commitment deadline in EpochSetup phase - should trigger EFM", func(t *testing.T) {
+
+		rootSnapshot := unittest.RootSnapshotFixture(participants)
+		rootProtocolStateID := getRootProtocolStateID(t, rootSnapshot)
+		metricsMock := mockmodule.NewComplianceMetrics(t)
+		mockMetricsForRootSnapshot(metricsMock, rootSnapshot)
+		protoEventsMock := mockprotocol.NewConsumer(t)
+		protoEventsMock.On("BlockFinalized", mock.Anything)
+		protoEventsMock.On("BlockProcessable", mock.Anything, mock.Anything)
+
+		util.RunWithFullProtocolStateAndMetricsAndConsumer(t, rootSnapshot, metricsMock, protoEventsMock, func(db *badger.DB, state *protocol.ParticipantState, mutableState realprotocol.MutableProtocolState) {
+			head, err := rootSnapshot.Head()
+			require.NoError(t, err)
+			result, _, err := rootSnapshot.SealedResult()
+			require.NoError(t, err)
+			safetyThreshold := rootSnapshot.Params().EpochCommitSafetyThreshold()
+			require.NoError(t, err)
+
+			// add a block for the first seal to reference
+			block1 := unittest.BlockWithParentFixture(head)
+			block1.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
+			err = state.Extend(context.Background(), block1)
+			require.NoError(t, err)
+			err = state.Finalize(context.Background(), block1.ID())
+			require.NoError(t, err)
+
+			epoch1Setup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
+			epoch1FinalView := epoch1Setup.FinalView
+			epoch1CommitmentDeadline := epoch1FinalView - safetyThreshold
+
+			// add a participant for the next epoch
+			epoch2NewParticipant := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
+			epoch2Participants := append(participants, epoch2NewParticipant).Sort(flow.Canonical[flow.Identity]).ToSkeleton()
+
+			// create the epoch setup event for the second epoch
+			epoch2Setup := unittest.EpochSetupFixture(
+				unittest.WithParticipants(epoch2Participants),
+				unittest.SetupWithCounter(epoch1Setup.Counter+1),
+				unittest.WithFinalView(epoch1FinalView+1000),
+				unittest.WithFirstView(epoch1FinalView+1),
+			)
+
+			receipt1, seal1 := unittest.ReceiptAndSealForBlock(block1)
+			receipt1.ExecutionResult.ServiceEvents = []flow.ServiceEvent{epoch2Setup.ServiceEvent()}
+			seal1.ResultID = receipt1.ExecutionResult.ID()
+
+			// add a block containing a receipt for block 1
+			block2 := unittest.BlockWithParentFixture(block1.Header)
+			block2.SetPayload(unittest.PayloadFixture(
+				unittest.WithReceipts(receipt1),
+				unittest.WithProtocolStateID(rootProtocolStateID),
+			))
+			err = state.Extend(context.Background(), block2)
+			require.NoError(t, err)
+			err = state.Finalize(context.Background(), block2.ID())
+			require.NoError(t, err)
+
+			// block 3 seals block 1 and will be the first block on or past the epoch commitment deadline
+			block3 := unittest.BlockWithParentFixture(block2.Header)
+			block3.Header.View = epoch1CommitmentDeadline + rand.Uint64()%2
+			seals := []*flow.Seal{seal1}
+			block3.SetPayload(flow.Payload{
+				Seals:           seals,
+				ProtocolStateID: calculateExpectedStateId(t, mutableState)(block3.Header, seals),
+			})
+			err = state.Extend(context.Background(), block3)
+			require.NoError(t, err)
+
+			// finalizing block 3 should trigger EFM
+			metricsMock.On("EpochEmergencyFallbackTriggered").Once()
+			protoEventsMock.On("EpochEmergencyFallbackTriggered").Once()
+
+			assertEpochEmergencyFallbackTriggered(t, state, false) // not triggered before finalization
+			err = state.Finalize(context.Background(), block3.ID())
+			require.NoError(t, err)
+			assertEpochEmergencyFallbackTriggered(t, state, true) // triggered after finalization
+
+			// block 4 will be the first block past the first epoch boundary
+			block4 := unittest.BlockWithParentProtocolState(block3)
+			block4.Header.View = epoch1FinalView + 1
+			err = state.Extend(context.Background(), block4)
+			require.NoError(t, err)
+			err = state.Finalize(context.Background(), block4.ID())
+			require.NoError(t, err)
+
+			// since EFM has been triggered, epoch transition metrics should not be updated
+			metricsMock.AssertNotCalled(t, "EpochTransition", epoch2Setup.Counter, mock.Anything)
+			metricsMock.AssertNotCalled(t, "CurrentEpochCounter", epoch2Setup.Counter)
+		})
+	})
+
+	// if an invalid epoch service event is incorporated, we should:
+	//   - not apply the phase transition corresponding to the invalid service event
+	//   - immediately trigger EFM
+	//
+	//                            Epoch Boundary
+	//                                 |
+	//                                 v
+	// ROOT <- B1 <- B2(R1) <- B3(S1) <- B4
+	t.Run("epoch transition with invalid service event - should trigger EFM", func(t *testing.T) {
+
+		rootSnapshot := unittest.RootSnapshotFixture(participants)
+		rootProtocolStateID := getRootProtocolStateID(t, rootSnapshot)
+		metricsMock := mockmodule.NewComplianceMetrics(t)
+		mockMetricsForRootSnapshot(metricsMock, rootSnapshot)
+		protoEventsMock := mockprotocol.NewConsumer(t)
+		protoEventsMock.On("BlockFinalized", mock.Anything)
+		protoEventsMock.On("BlockProcessable", mock.Anything, mock.Anything)
+
+		util.RunWithFullProtocolStateAndMetricsAndConsumer(t, rootSnapshot, metricsMock, protoEventsMock, func(db *badger.DB, state *protocol.ParticipantState, mutableState realprotocol.MutableProtocolState) {
+			head, err := rootSnapshot.Head()
+			require.NoError(t, err)
+			result, _, err := rootSnapshot.SealedResult()
+			require.NoError(t, err)
+
+			// add a block for the first seal to reference
+			block1 := unittest.BlockWithParentFixture(head)
+			block1.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
+			err = state.Extend(context.Background(), block1)
+			require.NoError(t, err)
+			err = state.Finalize(context.Background(), block1.ID())
+			require.NoError(t, err)
+
+			epoch1Setup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
+			epoch1FinalView := epoch1Setup.FinalView
+
+			// add a participant for the next epoch
+			epoch2NewParticipant := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
+			epoch2Participants := append(participants, epoch2NewParticipant).Sort(flow.Canonical[flow.Identity]).ToSkeleton()
+
+			// create the epoch setup event for the second epoch
+			// this event is invalid because it used a non-contiguous first view
+			epoch2Setup := unittest.EpochSetupFixture(
+				unittest.WithParticipants(epoch2Participants),
+				unittest.SetupWithCounter(epoch1Setup.Counter+1),
+				unittest.WithFinalView(epoch1FinalView+1000),
+				unittest.WithFirstView(epoch1FinalView+10), // invalid first view
+			)
+
+			receipt1, seal1 := unittest.ReceiptAndSealForBlock(block1)
+			receipt1.ExecutionResult.ServiceEvents = []flow.ServiceEvent{epoch2Setup.ServiceEvent()}
+			seal1.ResultID = receipt1.ExecutionResult.ID()
+
+			// add a block containing a receipt for block 1
+			block2 := unittest.BlockWithParentFixture(block1.Header)
+			block2.SetPayload(unittest.PayloadFixture(
+				unittest.WithReceipts(receipt1),
+				unittest.WithProtocolStateID(rootProtocolStateID),
+			))
+			err = state.Extend(context.Background(), block2)
+			require.NoError(t, err)
+			err = state.Finalize(context.Background(), block2.ID())
+			require.NoError(t, err)
+
+			// block 3 is where the service event state change comes into effect
+			block3 := unittest.BlockWithParentFixture(block2.Header)
+			seals := []*flow.Seal{seal1}
+			block3.SetPayload(flow.Payload{
+				Seals:           seals,
+				ProtocolStateID: calculateExpectedStateId(t, mutableState)(block3.Header, seals),
+			})
+			err = state.Extend(context.Background(), block3)
+			require.NoError(t, err)
+
+			// incorporating the service event should trigger EFM
+			metricsMock.On("EpochEmergencyFallbackTriggered").Once()
+			protoEventsMock.On("EpochEmergencyFallbackTriggered").Once()
+
+			assertEpochEmergencyFallbackTriggered(t, state, false) // not triggered before finalization
+			err = state.Finalize(context.Background(), block3.ID())
+			require.NoError(t, err)
+			assertEpochEmergencyFallbackTriggered(t, state, true) // triggered after finalization
+
+			// block 4 is the first block past the current epoch boundary
+			block4 := unittest.BlockWithParentFixture(block3.Header)
+			block4.Header.View = epoch1Setup.FinalView + 1
+			block4.SetPayload(flow.Payload{
+				ProtocolStateID: calculateExpectedStateId(t, mutableState)(block4.Header, nil),
+			})
+			err = state.Extend(context.Background(), block4)
+			require.NoError(t, err)
+			err = state.Finalize(context.Background(), block4.ID())
+			require.NoError(t, err)
+
+			// since EFM has been triggered, epoch transition metrics should not be updated
+			metricsMock.AssertNotCalled(t, "EpochTransition", epoch2Setup.Counter, mock.Anything)
+			metricsMock.AssertNotCalled(t, "CurrentEpochCounter", epoch2Setup.Counter)
+		})
+	})
+}
+
 func TestExtendInvalidSealsInBlock(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		metrics := metrics.NewNoopCollector()

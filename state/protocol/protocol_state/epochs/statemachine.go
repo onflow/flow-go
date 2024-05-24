@@ -284,6 +284,10 @@ func (e *EpochStateMachine) applyServiceEventsFromOrderedResults(orderedUpdates 
 		case *flow.EpochRecover:
 			processed, err := e.activeStateMachine.ProcessEpochRecover(ev)
 			if err != nil {
+				if protocol.IsInvalidServiceEventError(err) {
+					// TODO for 'leaving Epoch Fallback via special service event': add reporting of invalid service event, at least a log.
+					continue
+				}
 				return nil, fmt.Errorf("could not process epoch recover event: %w", err)
 			}
 			if processed {
