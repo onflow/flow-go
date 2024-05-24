@@ -158,12 +158,14 @@ func NewEpochLookup(state protocol.State) (*EpochLookup, error) {
 		}
 	}
 
-	// if epoch fallback was triggered, note it here
-	triggered, err := state.Params().EpochFallbackTriggered()
+	epochStateSnapshot, err := final.EpochProtocolState()
 	if err != nil {
-		return nil, fmt.Errorf("could not check epoch fallback: %w", err)
+		return nil, fmt.Errorf("could not retrieve epoch protocol state: %w", err)
 	}
-	if triggered {
+
+	// if epoch fallback was triggered, note it here
+	// TODO: consider replacing with phase check when it's available
+	if epochStateSnapshot.InvalidEpochTransitionAttempted() {
 		lookup.epochFallbackIsTriggered.Store(true)
 	}
 

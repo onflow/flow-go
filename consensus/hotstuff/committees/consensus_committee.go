@@ -174,12 +174,14 @@ func NewConsensusCommittee(state protocol.State, me flow.Identifier) (*Consensus
 		}
 	}
 
-	// if epoch emergency fallback was triggered, inject the fallback epoch
-	triggered, err := state.Params().EpochFallbackTriggered()
+	epochStateSnapshot, err := final.EpochProtocolState()
 	if err != nil {
-		return nil, fmt.Errorf("could not check epoch fallback: %w", err)
+		return nil, fmt.Errorf("could not retrieve epoch protocol state: %w", err)
 	}
-	if triggered {
+
+	// if epoch emergency fallback was triggered, inject the fallback epoch
+	// TODO: consider replacing with phase check when it's available
+	if epochStateSnapshot.InvalidEpochTransitionAttempted() {
 		err = com.onEpochEmergencyFallbackTriggered()
 		if err != nil {
 			return nil, fmt.Errorf("could not prepare emergency fallback epoch: %w", err)

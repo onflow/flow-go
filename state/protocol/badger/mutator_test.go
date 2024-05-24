@@ -2968,9 +2968,9 @@ func TestProtocolStateIdempotent(t *testing.T) {
 }
 
 func assertEpochEmergencyFallbackTriggered(t *testing.T, state realprotocol.State, expected bool) {
-	triggered, err := state.Params().EpochFallbackTriggered()
+	epochState, err := state.Final().EpochProtocolState()
 	require.NoError(t, err)
-	assert.Equal(t, expected, triggered)
+	assert.Equal(t, expected, epochState.InvalidEpochTransitionAttempted())
 }
 
 // mockMetricsForRootSnapshot mocks the given metrics mock object to expect all

@@ -712,13 +712,13 @@ func OpenState(
 	}
 	metrics.SealedHeight(sealed.Height)
 
-	epochFallbackTriggered, err := state.isEpochEmergencyFallbackTriggered()
+	epochStateSnapshot, err := finalSnapshot.EpochProtocolState()
 	if err != nil {
-		return nil, fmt.Errorf("could not check epoch emergency fallback flag: %w", err)
+		return nil, fmt.Errorf("could not retrieve epoch protocol state: %w", err)
 	}
 
 	// update all epoch related metrics
-	err = updateEpochMetrics(metrics, finalSnapshot, epochFallbackTriggered)
+	err = updateEpochMetrics(metrics, finalSnapshot, epochStateSnapshot.InvalidEpochTransitionAttempted())
 	if err != nil {
 		return nil, fmt.Errorf("failed to update epoch metrics: %w", err)
 	}
@@ -968,15 +968,4 @@ func (state *State) populateCache() error {
 	}
 
 	return nil
-}
-
-// isEpochEmergencyFallbackTriggered checks whether epoch fallback has been globally triggered.
-// Returns:
-// * (true, nil) if epoch fallback is triggered
-// * (false, nil) if epoch fallback is not triggered (including if the flag is not set)
-// * (false, err) if an unexpected error occurs
-func (state *State) isEpochEmergencyFallbackTriggered() (bool, error) {
-	var triggered bool
-	err := state.db.View(operation.CheckEpochEmergencyFallbackTriggered(&triggered))
-	return triggered, err
 }
