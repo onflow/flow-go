@@ -230,7 +230,7 @@ func (c *Core) processReceipt(receipt *flow.ExecutionReceipt) (bool, error) {
 			return false, nil
 		}
 		if engine.IsInvalidInputError(err) {
-			log.Err(err).Msg("PROTOCOL VIOLATION detected: invalid execution receipt")
+			log.Err(err).Bool(logging.KeyProtocolViolation, true).Msg("invalid execution receipt")
 			return false, nil
 		}
 		if module.IsUnknownBlockError(err) { // This should never happen
