@@ -218,7 +218,7 @@ func loadPayloads() (payloads1, payloads2 []*ledger.Payload) {
 
 	err := group.Wait()
 	if err != nil {
-		log.Fatal().Err(err)
+		log.Fatal().Err(err).Msg("failed to read payloads")
 	}
 
 	log.Info().Msg("Finished loading payloads")
@@ -262,7 +262,7 @@ func payloadsToRegisters(payloads1, payloads2 []*ledger.Payload) (registers1, re
 
 	err := group.Wait()
 	if err != nil {
-		log.Fatal().Err(err)
+		log.Fatal().Err(err).Msg("failed to create registers from payloads")
 	}
 
 	log.Info().Msg("Finished creating registers from payloads")
@@ -352,7 +352,7 @@ func diff(
 		return nil
 	})
 	if err != nil {
-		log.Fatal().Err(err)
+		log.Fatal().Err(err).Msg("failed to diff")
 	}
 
 	err = registers2.ForEachAccount(func(accountRegisters2 *registers.AccountRegisters) (err error) {
@@ -369,7 +369,7 @@ func diff(
 		return nil
 	})
 	if err != nil {
-		log.Fatal().Err(err)
+		log.Fatal().Err(err).Msg("failed to diff")
 	}
 
 	log.Info().Msg("Finished diffing accounts")
