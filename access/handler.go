@@ -2,10 +2,13 @@ package access
 
 import (
 	"context"
+	"errors"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
+
+	"github.com/onflow/flow-go/module/state_synchronization/indexer"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/signature"
@@ -1267,10 +1270,13 @@ func (h *Handler) buildMetadataResponse() (*entities.Metadata, error) {
 
 	if h.indexReporter != nil {
 		var err error
-		highestIndexedHeight, err := h.indexReporter.HighestIndexedHeight()
-		if err != nil {
+		var highestIndexedHeight uint64
+		highestIndexedHeight, err = h.indexReporter.HighestIndexedHeight()
+		if err != nil &&
+			!errors.Is(err, indexer.ErrIndexNotInitialized) {
 			return nil, rpc.ConvertIndexError(err, lastFinalizedHeader.Height, "could not get highest indexed height")
 		}
+
 		metadata.HighestIndexedHeight = highestIndexedHeight
 	}
 
