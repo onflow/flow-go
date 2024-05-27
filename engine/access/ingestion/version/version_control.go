@@ -35,7 +35,7 @@ type VersionControl struct {
 
 	log zerolog.Logger
 	// Storages
-	headers        storage.Headers
+	headers        VersionControlHeaders
 	versionBeacons storage.VersionBeacons
 
 	// nodeVersion stores the node's current version.
@@ -55,6 +55,12 @@ type VersionControl struct {
 	endHeight   uint64
 }
 
+// VersionControlHeaders is an interface for fetching headers
+// Its jut a small subset of storage.Headers for comments see storage.Headers
+type VersionControlHeaders interface {
+	BlockIDByHeight(height uint64) (flow.Identifier, error)
+}
+
 var _ protocol.Consumer = (*VersionControl)(nil)
 var _ component.Component = (*VersionControl)(nil)
 
@@ -65,7 +71,7 @@ var _ component.Component = (*VersionControl)(nil)
 // Without a node version, the stop control can still be used for manual stopping.
 func NewVersionControl(
 	log zerolog.Logger,
-	headers storage.Headers,
+	headers VersionControlHeaders,
 	versionBeacons storage.VersionBeacons,
 	nodeVersion *semver.Version,
 	latestFinalizedBlock *flow.Header,
@@ -93,7 +99,7 @@ func NewVersionControl(
 			Logger()
 	}
 
-	log.Info().Msgf("Created")
+	log.Info().Msg("Created")
 
 	// Setup component manager for handling worker functions.
 	cm := component.NewComponentManagerBuilder()
@@ -156,6 +162,9 @@ func (v *VersionControl) checkInitialVersionBeacon(
 		}
 
 		if ver.LessThan(*v.nodeVersion) {
+			v.log.Info().
+				Uint64("startHeight", lastCompatibleHeight).
+				Msg("Found start block height for current node version")
 			v.startHeight = lastCompatibleHeight
 			return
 		}
@@ -179,7 +188,7 @@ func (v *VersionControl) BlockFinalizedForTesting(h *flow.Header) {
 // CompatibleAtBlock checks if the node's version is compatible at a given block height.
 // It returns true if the node's version is compatible within the specified height range.
 func (v *VersionControl) CompatibleAtBlock(height uint64) bool {
-	return (v.startHeight == NoHeight || height >= v.startHeight) &&
+	return v.versionBeacon != nil && v.versionBeacon.SealHeight >= height && (v.startHeight == NoHeight || height >= v.startHeight) &&
 		(v.endHeight == NoHeight || height <= v.endHeight)
 }
 
