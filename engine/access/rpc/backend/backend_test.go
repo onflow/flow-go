@@ -1749,7 +1749,7 @@ func (suite *Suite) TestExecutionNodesForBlockID() {
 	suite.Run("two preferred ENs with zero fixed EN", func() {
 		// mark the first two ENs as preferred
 		preferredENs := allExecutionNodes[0:2]
-		expectedList := preferredENs
+		expectedList := allExecutionNodes[0:maxNodesCnt]
 		testExecutionNodesForBlockID(preferredENs, nil, expectedList)
 	})
 	// if only fixed ENs are specified, the ExecutionNodesForBlockID function should
@@ -1767,7 +1767,7 @@ func (suite *Suite) TestExecutionNodesForBlockID() {
 		fixedENs := allExecutionNodes[0:5]
 		// mark the first two of the fixed ENs as preferred ENs
 		preferredENs := fixedENs[0:2]
-		expectedList := preferredENs
+		expectedList := fixedENs[0:maxNodesCnt]
 		testExecutionNodesForBlockID(preferredENs, fixedENs, expectedList)
 	})
 	// if both are specified, but the preferred ENs don't match the ExecutorIDs in the ER,
@@ -1777,7 +1777,7 @@ func (suite *Suite) TestExecutionNodesForBlockID() {
 		fixedENs := allExecutionNodes[0:2]
 		// specify two ENs not specified in the ERs as preferred
 		preferredENs := unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
-		expectedList := fixedENs
+		expectedList := allExecutionNodes[0:maxNodesCnt]
 		testExecutionNodesForBlockID(preferredENs, fixedENs, expectedList)
 	})
 	// if execution receipts are not yet available, the ExecutionNodesForBlockID function should retry twice
@@ -1791,7 +1791,7 @@ func (suite *Suite) TestExecutionNodesForBlockID() {
 		currentAttempt = 0
 		// mark the first two ENs as preferred
 		preferredENs := allExecutionNodes[0:2]
-		expectedList := preferredENs
+		expectedList := allExecutionNodes[0:maxNodesCnt]
 		testExecutionNodesForBlockID(preferredENs, nil, expectedList)
 	})
 }

@@ -534,31 +534,37 @@ func chooseExecutionNodes(state protocol.State, executorIDs flow.IdentifierList)
 			filter.HasNodeID[flow.Identity](preferredENIdentifiers...),
 			filter.HasNodeID[flow.Identity](executorIDs...),
 		))
-	}
 
-	// pad the list if needed
-	if len(chosenIDs) < maxFailedRequestCount {
-		// add any EN with a receipt
-		receiptENs := allENs.Filter(filter.HasNodeID[flow.Identity](executorIDs...))
-		for _, en := range receiptENs {
-			if !chosenIDs.Exists(en) && len(chosenIDs) < maxFailedRequestCount {
-				chosenIDs = append(chosenIDs, en)
+		// Pad the list if needed
+		if len(chosenIDs) < maxNodesCnt {
+			// Add any EN with a receipt
+			receiptENs := allENs.Filter(filter.HasNodeID[flow.Identity](executorIDs...))
+			for _, en := range receiptENs {
+
+				_, exists := chosenIDs.ByNodeID(en.NodeID)
+
+				if !exists && len(chosenIDs) < maxNodesCnt {
+					chosenIDs = append(chosenIDs, en)
+				}
+			}
+
+			// Add any preferred node not already selected
+			preferredENs := allENs.Filter(filter.HasNodeID[flow.Identity](preferredENIdentifiers...))
+			for _, en := range preferredENs {
+				if !chosenIDs.Exists(en) && len(chosenIDs) < maxNodesCnt {
+					chosenIDs = append(chosenIDs, en)
+				}
+			}
+
+			// Add any EN not already selected
+			for _, en := range allENs {
+				if !chosenIDs.Exists(en) && len(chosenIDs) < maxNodesCnt {
+					chosenIDs = append(chosenIDs, en)
+				}
 			}
 		}
-
-		// add any preferred node not already selected
-		preferredENs := allENs.Filter(filter.HasNodeID[flow.Identity](preferredENIdentifiers...))
-		for _, en := range preferredENs {
-			if !chosenIDs.Exists(en) && len(chosenIDs) < maxFailedRequestCount {
-				chosenIDs = append(chosenIDs, en)
-			}
-		}
-
-		// add any EN not already selected
-		for _, en := range allENs {
-			if !chosenIDs.Exists(en) && len(chosenIDs) < maxFailedRequestCount {
-				chosenIDs = append(chosenIDs, en)
-			}
+		if len(chosenIDs) > 0 {
+			return chosenIDs.ToSkeleton(), nil
 		}
 	}
 
@@ -568,15 +574,14 @@ func chooseExecutionNodes(state protocol.State, executorIDs flow.IdentifierList)
 			filter.HasNodeID[flow.Identity](fixedENIdentifiers...),
 			filter.HasNodeID[flow.Identity](executorIDs...),
 		))
-		if len(chosenIDs) == 0 {
-			chosenIDs = allENs.Filter(filter.HasNodeID[flow.Identity](fixedENIdentifiers...))
+		if len(chosenIDs) > 0 {
+			return chosenIDs.ToSkeleton(), nil
 		}
+		// if no such ENs are found then just choose all fixed ENs
+		chosenIDs = allENs.Filter(filter.HasNodeID[flow.Identity](fixedENIdentifiers...))
+		return chosenIDs.ToSkeleton(), nil
 	}
 
-	// if no preferred or fixed ENs have been specified, then return all executor IDs i.e. no preference at all
-	if len(chosenIDs) == 0 {
-		chosenIDs = allENs.Filter(filter.HasNodeID[flow.Identity](executorIDs...))
-	}
-
-	return chosenIDs.ToSkeleton(), nil
+	// If no preferred or fixed ENs have been specified, then return all executor IDs i.e. no preference at all
+	return allENs.Filter(filter.HasNodeID[flow.Identity](executorIDs...)).ToSkeleton(), nil
 }
