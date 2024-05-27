@@ -685,6 +685,15 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 		return fmt.Errorf("could not check if block is first of epoch: %w", err)
 	}
 
+	if isFirstBlockOfEpoch {
+		epochTransitionMetrics, epochTransitionEvents := m.epochTransitionMetricsAndEventsOnBlockFinalized(header, epochStateSnapshot.EpochSetup())
+		if err != nil {
+			return fmt.Errorf("could not determine epoch transition metrics/events for finalized block: %w", err)
+		}
+		metrics = append(metrics, epochTransitionMetrics...)
+		events = append(events, epochTransitionEvents...)
+	}
+
 	// Determine metric updates and protocol events related to epoch phase
 	// changes and epoch transitions.
 	// If epoch emergency fallback is triggered, the current epoch continues until
@@ -696,15 +705,6 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 		}
 		metrics = append(metrics, epochPhaseMetrics...)
 		events = append(events, epochPhaseEvents...)
-
-		if isFirstBlockOfEpoch {
-			epochTransitionMetrics, epochTransitionEvents := m.epochTransitionMetricsAndEventsOnBlockFinalized(header, epochStateSnapshot.EpochSetup())
-			if err != nil {
-				return fmt.Errorf("could not determine epoch transition metrics/events for finalized block: %w", err)
-			}
-			metrics = append(metrics, epochTransitionMetrics...)
-			events = append(events, epochTransitionEvents...)
-		}
 	}
 
 	// Extract and validate version beacon events from the block seals.
@@ -733,7 +733,7 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 		if err != nil {
 			return fmt.Errorf("could not update sealed height: %w", err)
 		}
-		if isFirstBlockOfEpoch && !epochFallbackTriggered {
+		if isFirstBlockOfEpoch {
 			err = operation.InsertEpochFirstHeight(currentEpochSetup.Counter, header.Height)(tx)
 			if err != nil {
 				return fmt.Errorf("could not insert epoch first block height: %w", err)
