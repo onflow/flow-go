@@ -9,6 +9,8 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/sethvargo/go-retry"
 
+	"github.com/onflow/flow-go/utils/logging"
+
 	"github.com/onflow/flow-go-sdk/access/grpc"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
@@ -88,10 +90,16 @@ func GetSnapshotAtEpochAndPhase(ctx context.Context, log zerolog.Logger, startup
 
 		// check if we are in or past the target epoch and phase
 		if currEpochCounter > startupEpoch || (currEpochCounter == startupEpoch && currEpochPhase >= startupEpochPhase) {
+			head, err := snapshot.Head()
+			if err != nil {
+				return fmt.Errorf("could not get Dynamic Startup snapshot header: %w", err)
+			}
 			log.Info().
-				Dur("time-waiting", time.Since(start)).
-				Uint64("current-epoch", currEpochCounter).
-				Str("current-epoch-phase", currEpochPhase.String()).
+				Dur("time_waiting", time.Since(start)).
+				Uint64("current_epoch", currEpochCounter).
+				Str("current_epoch_phase", currEpochPhase.String()).
+				Hex("finalized_root_block_id", logging.ID(head.ID())).
+				Uint64("finalized_block_height", head.Height).
 				Msg("finished dynamic startup - reached desired epoch and phase")
 
 			return nil

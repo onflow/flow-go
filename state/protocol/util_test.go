@@ -26,7 +26,7 @@ func TestIsSporkRootSnapshot(t *testing.T) {
 
 	t.Run("other snapshot", func(t *testing.T) {
 		snapshot := unittest.RootSnapshotFixture(unittest.IdentityListFixture(10, unittest.WithAllRoles()))
-		snapshot.Encodable().Head.Height += 1 // modify head height to break equivalence with spork root block height
+		snapshot.Encodable().Head().Height += 1 // modify head height to break equivalence with spork root block height
 		isSporkRoot, err := protocol.IsSporkRootSnapshot(snapshot)
 		require.NoError(t, err)
 		assert.False(t, isSporkRoot)

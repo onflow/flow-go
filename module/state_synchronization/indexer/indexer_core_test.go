@@ -640,11 +640,11 @@ func ledgerPayloadWithValuesFixture(owner string, key string, value []byte) *led
 	k := ledger.Key{
 		KeyParts: []ledger.KeyPart{
 			{
-				Type:  convert.KeyPartOwner,
+				Type:  ledger.KeyPartOwner,
 				Value: []byte(owner),
 			},
 			{
-				Type:  convert.KeyPartKey,
+				Type:  ledger.KeyPartKey,
 				Value: []byte(key),
 			},
 		},
