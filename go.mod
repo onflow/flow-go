@@ -105,6 +105,7 @@ require (
 	github.com/ipfs/boxo v0.17.1-0.20240131173518-89bceff34bf1
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/onflow/go-ethereum v1.13.4
+	github.com/onflow/nft-storefront/lib/go/contracts v1.0.0
 	github.com/onflow/wal v1.0.2
 	github.com/slok/go-http-metrics v0.10.0
 	github.com/sony/gobreaker v0.5.0

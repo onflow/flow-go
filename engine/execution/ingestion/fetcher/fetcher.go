@@ -12,7 +12,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 )
 
-var onlyOnflowRegex = regexp.MustCompile(`.*\.onflow\.org:3569$`)
+var onlyOnflowRegex = regexp.MustCompile(`.*\.(onflow\.org|dapper-flow\.com):3569$`)
 
 type CollectionFetcher struct {
 	log     zerolog.Logger
@@ -70,6 +70,10 @@ func (e *CollectionFetcher) FetchCollection(blockID flow.Identifier, height uint
 			return onlyOnflowRegex.MatchString(identity.Address)
 		})
 	}
+
+	e.log.Debug().Bool("onflowOnlyLNs", e.onflowOnlyLNs).
+		Msgf("queued collection %v for block %v, height %v from guarantors: %v",
+			guarantee.ID(), blockID, height, guarantors)
 
 	// queue the collection to be requested from one of the guarantors
 	e.request.EntityByID(guarantee.ID(), filter.And(
