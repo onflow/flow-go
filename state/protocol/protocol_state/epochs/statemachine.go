@@ -214,13 +214,7 @@ func (e *EpochStateMachine) EvolveState(sealedServiceEvents []flow.ServiceEvent)
 	//       However, this code will likely need to be changed when working on EFM recovery.
 	phase := parentProtocolState.EpochPhase()
 	if phase == flow.EpochPhaseCommitted {
-		activeSetup := parentProtocolState.CurrentEpochSetup
-		// TODO(efm-recovery): This logic needs to be updated when injection of EFM recovery service event is implemented.
-		// 				       For now, we are only checking transition to next epoch when the next epoch is committed.
-		//                     There is no logic yet to leave EFM, but once we have it, the following logic
-		//                     will be incorrect as we need to check the epoch final view including the extensions but not
-		//					   only the final view of the setup.
-		if e.activeStateMachine.View() > activeSetup.FinalView {
+		if e.activeStateMachine.View() > parentProtocolState.CurrentEpochFinalView() {
 			err := e.activeStateMachine.TransitionToNextEpoch()
 			if err != nil {
 				return fmt.Errorf("could not transition protocol state to next epoch: %w", err)

@@ -2325,12 +2325,18 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 			err = state.Extend(context.Background(), block8)
 			require.NoError(t, err)
 
-			//metricsMock.On("CurrentEpochCounter", validSetup.Counter).Once()
+			metricsMock.On("CurrentEpochCounter", validSetup.Counter).Once()
+			metricsMock.On("EpochTransitionHeight", block8.Header.Height).Once()
+			metricsMock.On("CurrentEpochFinalView", validSetup.FinalView).Once()
+			protoEventsMock.On("EpochTransition", validSetup.Counter, block8.Header).Once()
 
 			err = state.Finalize(context.Background(), block8.ID())
 			require.NoError(t, err)
 
-			//metricsMock.AssertCalled(t, "CurrentEpochCounter", validSetup.Counter)
+			metricsMock.AssertCalled(t, "CurrentEpochCounter", validSetup.Counter)
+			metricsMock.AssertCalled(t, "EpochTransitionHeight", block8.Header.Height)
+			metricsMock.AssertCalled(t, "CurrentEpochFinalView", validSetup.FinalView)
+			protoEventsMock.AssertCalled(t, "EpochTransition", validSetup.Counter, block8.Header)
 
 			// B9 doesn't have any seals, but it reaches the safety threshold for the current epoch, meaning we will create an EpochExtension
 			block9 := unittest.BlockWithParentFixture(block8.Header)
@@ -2406,9 +2412,16 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, validSetup.Counter, epochProtocolState.Epoch(), "expect to be in the previously setup epoch")
 
+			// B14 will be the first block past the epoch extension, meaning it will enter the next epoch which
+			// had been set up by EpochRecover event
 			block14 := unittest.BlockWithParentFixture(block13.Header)
 			block14.Header.View = epochExtensions[0].FinalView + 1
 			block14.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(calculateExpectedStateId(block14.Header, nil))))
+
+			metricsMock.On("CurrentEpochCounter", epochRecover.EpochSetup.Counter).Once()
+			metricsMock.On("EpochTransitionHeight", block14.Header.Height).Once()
+			metricsMock.On("CurrentEpochFinalView", epochRecover.EpochSetup.FinalView).Once()
+			protoEventsMock.On("EpochTransition", epochRecover.EpochSetup.Counter, block14.Header).Once()
 
 			err = state.Extend(context.Background(), block14)
 			require.NoError(t, err)
