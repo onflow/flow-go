@@ -9,6 +9,7 @@ import (
 	gethCommon "github.com/onflow/go-ethereum/common"
 	gethTypes "github.com/onflow/go-ethereum/core/types"
 	gethVM "github.com/onflow/go-ethereum/core/vm"
+	"github.com/onflow/go-ethereum/eth/tracers/logger"
 	gethParams "github.com/onflow/go-ethereum/params"
 	"github.com/stretchr/testify/require"
 
@@ -16,6 +17,8 @@ import (
 	"github.com/onflow/flow-go/fvm/evm/testutils"
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/model/flow"
+
+	_ "github.com/onflow/go-ethereum/eth/tracers/native" // imported so callTracers is registered in init
 )
 
 var blockNumber = big.NewInt(10)
@@ -173,21 +176,29 @@ func TestContractInteraction(t *testing.T) {
 			t.Run("call contract", func(t *testing.T) {
 				num := big.NewInt(10)
 				RunWithNewEmulator(t, backend, rootAddr, func(env *emulator.Emulator) {
-					RunWithNewBlockView(t, env, func(blk types.BlockView) {
-						res, err := blk.DirectCall(
-							types.NewContractCall(
-								testAccount,
-								contractAddr,
-								testContract.MakeCallData(t, "store", num),
-								1_000_000,
-								big.NewInt(0), // this should be zero because the contract doesn't have receiver
-								nonce,
-							),
-						)
-						require.NoError(t, err)
-						require.GreaterOrEqual(t, res.GasConsumed, uint64(40_000))
-						nonce += 1
-					})
+					ctx := types.NewDefaultBlockContext(1)
+
+					blk, err := env.NewBlockView(ctx)
+					require.NoError(t, err)
+
+					res, err := blk.DirectCall(
+						types.NewContractCall(
+							testAccount,
+							contractAddr,
+							testContract.MakeCallData(t, "store", num),
+							1_000_000,
+							big.NewInt(0), // this should be zero because the contract doesn't have receiver
+							nonce,
+						),
+					)
+					require.NoError(t, err)
+					require.GreaterOrEqual(t, res.GasConsumed, uint64(40_000))
+					nonce += 1
+
+					msg, err := tracer.GetResult()
+					require.NoError(t, err)
+					fmt.Println("----- trace -----")
+					fmt.Println(string(msg))
 				})
 
 				RunWithNewEmulator(t, backend, rootAddr, func(env *emulator.Emulator) {
@@ -251,6 +262,41 @@ func TestContractInteraction(t *testing.T) {
 					ret := new(big.Int).SetBytes(res.ReturnedValue)
 					require.Equal(t, types.FlowEVMPreviewNetChainID, ret)
 				})
+			})
+
+			t.Run("test sending simple transaction", func(t *testing.T) {
+				account := testutils.GetTestEOAAccount(t, testutils.EOATestAccount1KeyHex)
+				RunWithNewEmulator(t, backend, rootAddr, func(env *emulator.Emulator) {
+					ctx := types.NewDefaultBlockContext(1)
+					ctx.Tracer = logger.NewStructLogger(&logger.Config{})
+
+					blk, err := env.NewBlockView(ctx)
+					require.NoError(t, err)
+
+					_, err = blk.DirectCall(types.NewDepositCall(
+						bridgeAccount,
+						account.Address(),
+						amount,
+						account.Nonce(),
+					))
+					require.NoError(t, err)
+
+					tx := account.PrepareAndSignTx(
+						t,
+						testAccount.ToCommon(),
+						nil,
+						big.NewInt(5),
+						gethParams.TxGas,
+						gethCommon.Big1,
+					)
+
+					res, err := blk.RunTransaction(tx)
+					require.NoError(t, err)
+					require.NoError(t, res.VMError)
+					require.NoError(t, res.ValidationError)
+					require.Greater(t, res.GasConsumed, uint64(0))
+				})
+
 			})
 
 			t.Run("test sending transactions (happy case)", func(t *testing.T) {
