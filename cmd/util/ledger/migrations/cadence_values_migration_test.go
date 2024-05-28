@@ -258,7 +258,7 @@ func checkMigratedPayloads(
 			common.CompositeKindResource,
 			[]interpreter.CompositeField{
 				{
-					Value: interpreter.NewUnmeteredUInt64Value(360287970189639680),
+					Value: interpreter.NewUnmeteredUInt64Value(11457157452030541824),
 					Name:  "uuid",
 				},
 			},
@@ -354,7 +354,7 @@ func checkMigratedPayloads(
 					Name:  "balance",
 				},
 				{
-					Value: interpreter.NewUnmeteredUInt64Value(11240984669916758018),
+					Value: interpreter.NewUnmeteredUInt64Value(8791026472627208194),
 					Name:  "uuid",
 				},
 			},
