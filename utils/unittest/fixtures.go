@@ -2101,6 +2101,9 @@ func EpochSetupFixture(opts ...func(setup *flow.EpochSetup)) *flow.EpochSetup {
 	return setup
 }
 
+// EpochRecoverFixture creates a valid EpochRecover with default properties for testing.
+// The default properties for setup part can be overwritten with optional parameter functions.
+// Commit part will be adjusted accordingly.
 func EpochRecoverFixture(opts ...func(setup *flow.EpochSetup)) *flow.EpochRecover {
 	setup := EpochSetupFixture()
 	for _, apply := range opts {

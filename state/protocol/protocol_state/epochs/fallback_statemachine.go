@@ -107,7 +107,7 @@ func (m *FallbackStateMachine) ProcessEpochCommit(_ *flow.EpochCommit) (bool, er
 // As a result of this operation protocol state for the next epoch will be created.
 // Returned boolean indicates if event triggered a transition in the state machine or not.
 // Implementors must never return (true, error).
-// Expected errors indicating that we are leaving the happy-path of the epoch transitions
+// Expected errors during normal operations:
 //   - `protocol.InvalidServiceEventError` - if the service event is invalid or is not a valid state transition for the current protocol state.
 func (m *FallbackStateMachine) ProcessEpochRecover(epochRecover *flow.EpochRecover) (bool, error) {
 	err := protocol.IsValidExtendingEpochSetup(&epochRecover.EpochSetup, m.parentState)
