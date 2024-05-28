@@ -12,37 +12,57 @@ import (
 type EpochProtocolState interface {
 	// Epoch returns the current epoch counter.
 	Epoch() uint64
+
 	// Clustering returns initial clustering from epoch setup.
+	// CAUTION: This describes the initial epoch configuration from the view point of the Epoch
+	// Smart Contract. It does _not_ account for subsequent node ejections. For Byzantine Fault
+	// Tolerance, the calling code must account for ejections!
 	// No errors are expected during normal operations.
 	Clustering() (flow.ClusterList, error)
+
 	// EpochSetup returns original epoch setup event that was used to initialize the protocol state.
+	// CAUTION: This describes the initial epoch configuration from the view point of the Epoch
+	// Smart Contract. It does _not_ account for subsequent node ejections. For Byzantine Fault
+	// Tolerance, the calling code must account for ejections!
 	EpochSetup() *flow.EpochSetup
+
 	// EpochCommit returns original epoch commit event that was used to update the protocol state.
+	// CAUTION: This describes the initial epoch configuration from the view point of the Epoch
+	// Smart Contract. It does _not_ account for subsequent node ejections. For Byzantine Fault
+	// Tolerance, the calling code must account for ejections!
 	EpochCommit() *flow.EpochCommit
+
 	// DKG returns information about DKG that was obtained from EpochCommit event.
+	// CAUTION: This describes the initial epoch configuration from the view point of the Epoch
+	// Smart Contract. It does _not_ account for subsequent node ejections. For Byzantine Fault
+	// Tolerance, the calling code must account for ejections!
 	// No errors are expected during normal operations.
 	DKG() (DKG, error)
+
 	// InvalidEpochTransitionAttempted denotes whether an invalid epoch state transition was attempted
 	// on the fork ending this block. Once the first block where this flag is true is finalized, epoch
 	// fallback mode is triggered.
 	// TODO for 'leaving Epoch Fallback via special service event': at the moment, this is a one-way transition and requires a spork to recover - need to revisit for sporkless EFM recovery
 	InvalidEpochTransitionAttempted() bool
+
 	// PreviousEpochExists returns true if a previous epoch exists. This is true for all epoch
 	// except those immediately following a spork.
 	PreviousEpochExists() bool
+
 	// EpochPhase returns the epoch phase for the current epoch.
 	EpochPhase() flow.EpochPhase
 
-	// Identities returns identities (in canonical ordering) that can participate in the current or previous
-	// or next epochs. Let P be the set of identities in the previous epoch, C be the set of identities in
-	// the current epoch, and N be the set of identities in the next epoch.
+	// Identities returns identities (in canonical ordering) that can participate in the current or
+	// previous or next epochs. Let P be the set of identities in the previous epoch, C be the set
+	// of identities in the current epoch, and S be the set of identities in the subsequent epoch.
+	// Let `\` denote the relative set complement (also called 'set difference').
 	// The set of authorized identities this function returns is different depending on epoch state:
 	// EpochStaking phase:
 	//   - nodes in C with status `flow.EpochParticipationStatusActive`
-	//   - nodes in P-C with status `flow.EpochParticipationStatusLeaving`
+	//   - nodes in P\C with status `flow.EpochParticipationStatusLeaving`
 	// EpochSetup/EpochCommitted phase:
 	//   - nodes in C with status `flow.EpochParticipationStatusActive`
-	//   - nodes in N-C with status `flow.EpochParticipationStatusJoining`
+	//   - nodes in S\C with status `flow.EpochParticipationStatusJoining`
 	Identities() flow.IdentityList
 
 	// GlobalParams returns global, static network params that are same for all nodes in the network.
