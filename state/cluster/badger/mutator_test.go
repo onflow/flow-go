@@ -94,7 +94,7 @@ func (suite *MutatorSuite) SetupTest() {
 		all.QuorumCertificates,
 		all.Setups,
 		all.EpochCommits,
-		all.EpochProtocolState,
+		all.EpochProtocolStateEntries,
 		all.ProtocolKVStore,
 		all.VersionBeacons,
 		rootSnapshot,
@@ -104,7 +104,7 @@ func (suite *MutatorSuite) SetupTest() {
 	require.NoError(suite.T(), err)
 
 	suite.mutableProtocolState = protocol_state.NewMutableProtocolState(
-		all.EpochProtocolState,
+		all.EpochProtocolStateEntries,
 		all.ProtocolKVStore,
 		state.Params(),
 		all.Headers,

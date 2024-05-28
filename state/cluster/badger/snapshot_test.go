@@ -66,7 +66,7 @@ func (suite *SnapshotSuite) SetupTest() {
 		all.QuorumCertificates,
 		all.Setups,
 		all.EpochCommits,
-		all.EpochProtocolState,
+		all.EpochProtocolStateEntries,
 		all.ProtocolKVStore,
 		all.VersionBeacons,
 		root,
