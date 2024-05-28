@@ -86,9 +86,12 @@ func setupMocks(bs *BlockTimeControllerSuite) {
 	bs.state.On("Final").Return(&bs.snapshot)
 	bs.state.On("AtHeight", mock.Anything).Return(&bs.snapshot).Maybe()
 	bs.state.On("Params").Return(&bs.params)
-	bs.params.On("EpochFallbackTriggered").Return(
+	epochProtocolState := mockprotocol.NewDynamicProtocolState(bs.T())
+	epochProtocolState.On("InvalidEpochTransitionAttempted").Return(
 		func() bool { return bs.epochFallbackTriggered },
-		func() error { return nil })
+		func() error { return nil },
+	).Maybe()
+	bs.snapshot.On("EpochProtocolState").Return(epochProtocolState, nil)
 	bs.snapshot.On("Phase").Return(
 		func() flow.EpochPhase { return bs.epochs.Phase() },
 		func() error { return nil })

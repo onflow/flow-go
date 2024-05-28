@@ -59,10 +59,12 @@ func (suite *ConsensusSuite) SetupTest() {
 
 	suite.state.On("Final").Return(suite.snapshot)
 	suite.state.On("Params").Return(suite.params)
-	suite.params.On("EpochFallbackTriggered").Return(
+	epochProtocolState := protocolmock.NewDynamicProtocolState(suite.T())
+	epochProtocolState.On("InvalidEpochTransitionAttempted").Return(
 		func() bool { return suite.epochFallbackTriggered },
 		func() error { return nil },
-	)
+	).Maybe()
+	suite.snapshot.On("EpochProtocolState").Return(epochProtocolState, nil)
 	suite.snapshot.On("Phase").Return(
 		func() flow.EpochPhase { return suite.phase },
 		func() error { return nil },
@@ -610,12 +612,13 @@ func TestRemoveOldEpochs(t *testing.T) {
 	epoch1 := newMockEpoch(currentEpochCounter, identities, 1, epochFinalView, unittest.SeedFixture(prg.RandomSourceLength), true)
 
 	// create mocks
-	state := new(protocolmock.State)
-	snapshot := new(protocolmock.Snapshot)
-	params := new(protocolmock.Params)
+	state := protocolmock.NewState(t)
+	snapshot := protocolmock.NewSnapshot(t)
 	state.On("Final").Return(snapshot)
-	state.On("Params").Return(params)
-	params.On("EpochFallbackTriggered").Return(false, nil)
+
+	epochProtocolState := protocolmock.NewDynamicProtocolState(t)
+	epochProtocolState.On("InvalidEpochTransitionAttempted").Return(false, nil)
+	snapshot.On("EpochProtocolState").Return(epochProtocolState, nil)
 
 	epochQuery := mocks.NewEpochQuery(t, currentEpochCounter, epoch1)
 	snapshot.On("Epochs").Return(epochQuery)
