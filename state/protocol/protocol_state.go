@@ -48,7 +48,7 @@ type EpochProtocolState interface {
 	// GlobalParams returns global, static network params that are same for all nodes in the network.
 	GlobalParams() GlobalParams
 
-	// Entry Returns low-level protocol state entry that was used to initialize this object.
+	// Entry returns low-level protocol state entry that was used to initialize this object.
 	// It shouldn't be used by high-level logic, it is useful for some cases such as bootstrapping.
 	// Prefer using other methods to access protocol state.
 	Entry() *flow.RichEpochProtocolStateEntry

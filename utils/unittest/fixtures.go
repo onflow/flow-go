@@ -2641,7 +2641,8 @@ func ChunkExecutionDataFixture(t *testing.T, minSize int, opts ...func(*executio
 	}
 }
 
-// RootProtocolStateFixture creates a fixture with correctly structured data for root protocol state.
+// RootEpochProtocolStateFixture creates a fixture with correctly structured Epoch sub-state.
+// The epoch substate is part of the overall protocol state (KV store). 
 // This can be useful for testing bootstrap when there is no previous epoch.
 func RootProtocolStateFixture() *flow.RichEpochProtocolStateEntry {
 	currentEpochSetup := EpochSetupFixture(func(setup *flow.EpochSetup) {
