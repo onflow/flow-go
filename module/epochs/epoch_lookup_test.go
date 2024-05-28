@@ -65,9 +65,12 @@ func (suite *EpochLookupSuite) SetupTest() {
 		func() flow.EpochPhase { return suite.Phase() },
 		func() error { return nil })
 
-	suite.params.On("EpochFallbackTriggered").Return(
-		func() bool { return suite.EpochFallbackTriggered() },
-		func() error { return nil })
+	epochProtocolState := mockprotocol.NewDynamicProtocolState(suite.T())
+	epochProtocolState.On("InvalidEpochTransitionAttempted").Return(
+		suite.EpochFallbackTriggered,
+		func() error { return nil },
+	)
+	suite.snapshot.On("EpochProtocolState").Return(epochProtocolState, nil)
 
 	suite.state.On("Final").Return(suite.snapshot)
 	suite.state.On("Params").Return(suite.params)
