@@ -3,9 +3,6 @@ package migrations
 import (
 	"context"
 	"fmt"
-	"github.com/onflow/cadence/runtime/sema"
-	"sort"
-	"strings"
 	"sync"
 
 	"github.com/rs/zerolog"
@@ -15,6 +12,7 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/errors"
 	"github.com/onflow/cadence/runtime/interpreter"
+	"github.com/onflow/cadence/runtime/sema"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/cmd/util/ledger/util/registers"
@@ -62,11 +60,9 @@ func (m *MetricsCollectingMigration) InitMigration(
 ) error {
 	m.migratedTypes = make(map[common.TypeID]struct{})
 
+	// If the program is available, that means the associated contracts is compatible with Cadence 1.0.
+	// i.e: the contract is either migrated to be compatible with 1.0 or existing contract already compatible.
 	for _, program := range m.programs {
-		if program.Program == nil {
-			continue
-		}
-
 		var nestedDecls *ast.Members
 
 		contract := program.Program.SoleContractDeclaration()
@@ -246,10 +242,10 @@ func (m *MetricsCollectingMigration) isTypeMigrated(staticType interpreter.Stati
 		if primitiveType != interpreter.PrimitiveStaticTypeUnknown {
 			return true
 		}
-		return m.checkIsTypeMigrated(staticType.TypeID, staticType.Location)
+		return m.checkAndRecordIsTypeMigrated(staticType.TypeID, staticType.Location)
 
 	case *interpreter.InterfaceStaticType:
-		return m.checkIsTypeMigrated(staticType.TypeID, staticType.Location)
+		return m.checkAndRecordIsTypeMigrated(staticType.TypeID, staticType.Location)
 
 	case interpreter.PrimitiveStaticType:
 		return true
@@ -259,11 +255,15 @@ func (m *MetricsCollectingMigration) isTypeMigrated(staticType interpreter.Stati
 	}
 }
 
-func (m *MetricsCollectingMigration) checkIsTypeMigrated(typeID sema.TypeID, location common.Location) bool {
+func (m *MetricsCollectingMigration) checkAndRecordIsTypeMigrated(typeID sema.TypeID, location common.Location) bool {
+	// If a value related to a composite/interface type is found,
+	// then count this value, to measure the total number of values/objects.
 	m.metricsCollector.RecordValueForContract(location)
 
 	_, ok := m.migratedTypes[typeID]
 	if !ok {
+		// If this type is not migrated/usable with cadence 1.0,
+		// then record this as an erroneous value.
 		m.metricsCollector.RecordErrorForContract(location)
 	}
 
@@ -329,38 +329,15 @@ func (c *MigrationMetricsCollector) RecordValueForContract(location common.Locat
 }
 
 func (c *MigrationMetricsCollector) metrics() Metrics {
-	errorsPerContract := make([]ContractErrors, 0, len(c.ErrorsPerContract))
-
+	errorsPerContract := make(map[string]int, len(c.ErrorsPerContract))
 	for location, count := range c.ErrorsPerContract {
-		errorsPerContract = append(
-			errorsPerContract,
-			ContractErrors{
-				Contract: location.ID(),
-				Count:    count,
-			})
+		errorsPerContract[location.ID()] = count
 	}
 
-	sort.SliceStable(errorsPerContract, func(i, j int) bool {
-		this := errorsPerContract[i]
-		that := errorsPerContract[j]
-		return strings.Compare(this.Contract, that.Contract) < 0
-	})
-
-	valuesPerContract := make([]ContractValues, 0, len(c.ValuesPerContract))
+	valuesPerContract := make(map[string]int, len(c.ValuesPerContract))
 	for location, count := range c.ValuesPerContract {
-		valuesPerContract = append(
-			valuesPerContract,
-			ContractValues{
-				Contract: location.ID(),
-				Count:    count,
-			})
+		valuesPerContract[location.ID()] = count
 	}
-
-	sort.SliceStable(valuesPerContract, func(i, j int) bool {
-		this := valuesPerContract[i]
-		that := valuesPerContract[j]
-		return strings.Compare(this.Contract, that.Contract) < 0
-	})
 
 	return Metrics{
 		TotalValues:       c.TotalValues,
@@ -378,21 +355,8 @@ type Metrics struct {
 	TotalErrors int `json:"TotalErrors"`
 
 	// Values with errors (un-migrated) related to each contract
-	ErrorsPerContract []ContractErrors `json:"errorsPerContract"`
+	ErrorsPerContract map[string]int `json:"errorsPerContract"`
 
 	// Total values related to each contract
-	ValuesPerContract []ContractValues `json:"valuesPerContract"`
-}
-
-type ContractErrors struct {
-	Contract string `json:"contract"`
-	Count    int    `json:"count"`
-}
-
-type ContractValues struct {
-	Contract string `json:"contract"`
-	Count    int    `json:"count"`
-
-	// TODO:
-	// Size
+	ValuesPerContract map[string]int `json:"valuesPerContract"`
 }

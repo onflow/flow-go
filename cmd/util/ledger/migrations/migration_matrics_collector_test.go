@@ -50,7 +50,7 @@ func TestMigrationMetricsCollection(t *testing.T) {
 				EVMContractChange:    evmContractChange,
 				BurnerContractChange: burnerContractChange,
 				VerboseErrorOutput:   true,
-				GenerateMetrics:      true,
+				ReportMetrics:        true,
 
 				// Important: 'Test' contract is NOT staged intentionally.
 				// So values belongs to types from 'Test' contract should be
@@ -82,45 +82,18 @@ func TestMigrationMetricsCollection(t *testing.T) {
 			Metrics{
 				TotalValues: 752,
 				TotalErrors: 6,
-				ErrorsPerContract: []ContractErrors{
-					{
-						Contract: "A.01cf0e2f2f715450.Test",
-						Count:    6,
-					},
+				ErrorsPerContract: map[string]int{
+					"A.01cf0e2f2f715450.Test": 6,
 				},
-				ValuesPerContract: []ContractValues{
-					{
-						Contract: "A.01cf0e2f2f715450.Test",
-						Count:    6,
-					},
-					{
-						Contract: "A.0ae53cb6e3f42a79.FlowToken",
-						Count:    20,
-					},
-					{
-						Contract: "A.f8d6e0586b0a20c7.FlowClusterQC",
-						Count:    6,
-					},
-					{
-						Contract: "A.f8d6e0586b0a20c7.FlowDKG",
-						Count:    4,
-					},
-					{
-						Contract: "A.f8d6e0586b0a20c7.FlowEpoch",
-						Count:    1,
-					},
-					{
-						Contract: "A.f8d6e0586b0a20c7.FlowIDTableStaking",
-						Count:    5,
-					},
-					{
-						Contract: "A.f8d6e0586b0a20c7.LockedTokens",
-						Count:    3,
-					},
-					{
-						Contract: "A.f8d6e0586b0a20c7.NodeVersionBeacon",
-						Count:    1,
-					},
+				ValuesPerContract: map[string]int{
+					"A.01cf0e2f2f715450.Test":               6,
+					"A.0ae53cb6e3f42a79.FlowToken":          20,
+					"A.f8d6e0586b0a20c7.FlowClusterQC":      6,
+					"A.f8d6e0586b0a20c7.FlowDKG":            4,
+					"A.f8d6e0586b0a20c7.FlowEpoch":          1,
+					"A.f8d6e0586b0a20c7.FlowIDTableStaking": 5,
+					"A.f8d6e0586b0a20c7.LockedTokens":       3,
+					"A.f8d6e0586b0a20c7.NodeVersionBeacon":  1,
 				},
 			},
 			entry,
@@ -172,7 +145,7 @@ func TestMigrationMetricsCollection(t *testing.T) {
 				EVMContractChange:    evmContractChange,
 				BurnerContractChange: burnerContractChange,
 				VerboseErrorOutput:   true,
-				GenerateMetrics:      true,
+				ReportMetrics:        true,
 				StagedContracts:      stagedContracts,
 			},
 		)
@@ -201,45 +174,18 @@ func TestMigrationMetricsCollection(t *testing.T) {
 			Metrics{
 				TotalValues: 752,
 				TotalErrors: 6,
-				ErrorsPerContract: []ContractErrors{
-					{
-						Contract: "A.01cf0e2f2f715450.Test",
-						Count:    6,
-					},
+				ErrorsPerContract: map[string]int{
+					"A.01cf0e2f2f715450.Test": 6,
 				},
-				ValuesPerContract: []ContractValues{
-					{
-						Contract: "A.01cf0e2f2f715450.Test",
-						Count:    6,
-					},
-					{
-						Contract: "A.0ae53cb6e3f42a79.FlowToken",
-						Count:    20,
-					},
-					{
-						Contract: "A.f8d6e0586b0a20c7.FlowClusterQC",
-						Count:    6,
-					},
-					{
-						Contract: "A.f8d6e0586b0a20c7.FlowDKG",
-						Count:    4,
-					},
-					{
-						Contract: "A.f8d6e0586b0a20c7.FlowEpoch",
-						Count:    1,
-					},
-					{
-						Contract: "A.f8d6e0586b0a20c7.FlowIDTableStaking",
-						Count:    5,
-					},
-					{
-						Contract: "A.f8d6e0586b0a20c7.LockedTokens",
-						Count:    3,
-					},
-					{
-						Contract: "A.f8d6e0586b0a20c7.NodeVersionBeacon",
-						Count:    1,
-					},
+				ValuesPerContract: map[string]int{
+					"A.01cf0e2f2f715450.Test":               6,
+					"A.0ae53cb6e3f42a79.FlowToken":          20,
+					"A.f8d6e0586b0a20c7.FlowClusterQC":      6,
+					"A.f8d6e0586b0a20c7.FlowDKG":            4,
+					"A.f8d6e0586b0a20c7.FlowEpoch":          1,
+					"A.f8d6e0586b0a20c7.FlowIDTableStaking": 5,
+					"A.f8d6e0586b0a20c7.LockedTokens":       3,
+					"A.f8d6e0586b0a20c7.NodeVersionBeacon":  1,
 				},
 			},
 			entry,

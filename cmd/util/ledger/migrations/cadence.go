@@ -306,7 +306,7 @@ func NewCadence1ValueMigrations(
 		)
 	}
 
-	if opts.GenerateMetrics {
+	if opts.ReportMetrics {
 		migs = append(migs, NamedMigration{
 			Name: metricsCollectingMigrationName,
 			Migrate: NewAccountBasedMigration(
@@ -449,7 +449,7 @@ type Options struct {
 	MaxAccountSize                    uint64
 	FixSlabsWithBrokenReferences      bool
 	FilterUnreferencedSlabs           bool
-	GenerateMetrics                   bool
+	ReportMetrics                     bool
 }
 
 func NewCadence1Migrations(
