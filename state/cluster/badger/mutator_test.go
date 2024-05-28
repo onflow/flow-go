@@ -75,7 +75,7 @@ func (suite *MutatorSuite) SetupTest() {
 
 	seal.ResultID = result.ID()
 	qc := unittest.QuorumCertificateFixture(unittest.QCWithRootBlockID(genesis.ID()))
-	genesis.Payload.ProtocolStateID = kvstore.NewDefaultKVStore(inmem.ProtocolStateFromEpochServiceEvents(
+	genesis.Payload.ProtocolStateID = kvstore.NewDefaultKVStore(inmem.EpochProtocolStateFromServiceEvents(
 		result.ServiceEvents[0].Event.(*flow.EpochSetup),
 		result.ServiceEvents[1].Event.(*flow.EpochCommit),
 	).ID()).ID()

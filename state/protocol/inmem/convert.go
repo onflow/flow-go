@@ -183,7 +183,7 @@ func SnapshotFromBootstrapStateWithParams(
 		EpochCommitSafetyThreshold: epochCommitSafetyThreshold, // see protocol.Params for details
 	}
 
-	rootEpochState := ProtocolStateFromEpochServiceEvents(setup, commit)
+	rootEpochState := EpochProtocolStateFromServiceEvents(setup, commit)
 	rootEpochStateID := rootEpochState.ID()
 	rootKvStore := kvStoreFactory(rootEpochStateID)
 	if rootKvStore.ID() != root.Payload.ProtocolStateID {
@@ -227,7 +227,7 @@ func SnapshotFromBootstrapStateWithParams(
 	return snap, nil
 }
 
-// ProtocolStateFromEpochServiceEvents generates a protocol.EpochProtocolStateEntry for a root protocol state which is used for bootstrapping.
+// EpochProtocolStateFromServiceEvents generates a protocol.EpochProtocolStateEntry for a root protocol state which is used for bootstrapping.
 //
 // CONTEXT: The EpochSetup event contains the IdentitySkeletons for each participant, thereby specifying active epoch members.
 // While ejection status is not part of the EpochSetup event, we can supplement this information as follows:
@@ -237,7 +237,7 @@ func SnapshotFromBootstrapStateWithParams(
 //     that happened before should be reflected in the EpochSetup event. Specifically, ejected
 //     nodes should be no longer listed in the EpochSetup event.
 //     Hence, when the EpochSetup event is emitted / processed, the ejected flag is false for all epoch participants.
-func ProtocolStateFromEpochServiceEvents(setup *flow.EpochSetup, commit *flow.EpochCommit) *flow.EpochProtocolStateEntry {
+func EpochProtocolStateFromServiceEvents(setup *flow.EpochSetup, commit *flow.EpochCommit) *flow.EpochProtocolStateEntry {
 	identities := make(flow.DynamicIdentityEntryList, 0, len(setup.Participants))
 	for _, identity := range setup.Participants {
 		identities = append(identities, &flow.DynamicIdentityEntry{
