@@ -1,12 +1,13 @@
 package migrations
 
 import (
-	"github.com/onflow/cadence/runtime/common"
 	"testing"
 
 	"github.com/rs/zerolog"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/onflow/cadence/runtime/common"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
 	"github.com/onflow/flow-go/cmd/util/ledger/util/registers"
@@ -84,7 +85,41 @@ func TestMigrationMetricsCollection(t *testing.T) {
 				ErrorsPerContract: []ContractErrors{
 					{
 						Contract: "A.01cf0e2f2f715450.Test",
-						Errors:   6,
+						Count:    6,
+					},
+				},
+				ValuesPerContract: []ContractValues{
+					{
+						Contract: "A.01cf0e2f2f715450.Test",
+						Count:    6,
+					},
+					{
+						Contract: "A.0ae53cb6e3f42a79.FlowToken",
+						Count:    20,
+					},
+					{
+						Contract: "A.f8d6e0586b0a20c7.FlowClusterQC",
+						Count:    6,
+					},
+					{
+						Contract: "A.f8d6e0586b0a20c7.FlowDKG",
+						Count:    4,
+					},
+					{
+						Contract: "A.f8d6e0586b0a20c7.FlowEpoch",
+						Count:    1,
+					},
+					{
+						Contract: "A.f8d6e0586b0a20c7.FlowIDTableStaking",
+						Count:    5,
+					},
+					{
+						Contract: "A.f8d6e0586b0a20c7.LockedTokens",
+						Count:    3,
+					},
+					{
+						Contract: "A.f8d6e0586b0a20c7.NodeVersionBeacon",
+						Count:    1,
 					},
 				},
 			},
@@ -169,7 +204,41 @@ func TestMigrationMetricsCollection(t *testing.T) {
 				ErrorsPerContract: []ContractErrors{
 					{
 						Contract: "A.01cf0e2f2f715450.Test",
-						Errors:   6,
+						Count:    6,
+					},
+				},
+				ValuesPerContract: []ContractValues{
+					{
+						Contract: "A.01cf0e2f2f715450.Test",
+						Count:    6,
+					},
+					{
+						Contract: "A.0ae53cb6e3f42a79.FlowToken",
+						Count:    20,
+					},
+					{
+						Contract: "A.f8d6e0586b0a20c7.FlowClusterQC",
+						Count:    6,
+					},
+					{
+						Contract: "A.f8d6e0586b0a20c7.FlowDKG",
+						Count:    4,
+					},
+					{
+						Contract: "A.f8d6e0586b0a20c7.FlowEpoch",
+						Count:    1,
+					},
+					{
+						Contract: "A.f8d6e0586b0a20c7.FlowIDTableStaking",
+						Count:    5,
+					},
+					{
+						Contract: "A.f8d6e0586b0a20c7.LockedTokens",
+						Count:    3,
+					},
+					{
+						Contract: "A.f8d6e0586b0a20c7.NodeVersionBeacon",
+						Count:    1,
 					},
 				},
 			},

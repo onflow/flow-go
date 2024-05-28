@@ -3,6 +3,9 @@ package migrations
 import (
 	"context"
 	"fmt"
+	"github.com/onflow/cadence/runtime/sema"
+	"sort"
+	"strings"
 	"sync"
 
 	"github.com/rs/zerolog"
@@ -243,20 +246,10 @@ func (m *MetricsCollectingMigration) isTypeMigrated(staticType interpreter.Stati
 		if primitiveType != interpreter.PrimitiveStaticTypeUnknown {
 			return true
 		}
-
-		_, ok := m.migratedTypes[staticType.TypeID]
-		if !ok {
-			m.metricsCollector.RecordErrorForContract(staticType.Location)
-		}
-
-		return ok
+		return m.checkIsTypeMigrated(staticType.TypeID, staticType.Location)
 
 	case *interpreter.InterfaceStaticType:
-		_, ok := m.migratedTypes[staticType.TypeID]
-		if !ok {
-			m.metricsCollector.RecordErrorForContract(staticType.Location)
-		}
-		return ok
+		return m.checkIsTypeMigrated(staticType.TypeID, staticType.Location)
 
 	case interpreter.PrimitiveStaticType:
 		return true
@@ -264,6 +257,17 @@ func (m *MetricsCollectingMigration) isTypeMigrated(staticType interpreter.Stati
 	default:
 		panic(errors.NewUnexpectedError("unexpected static type: %T", staticType))
 	}
+}
+
+func (m *MetricsCollectingMigration) checkIsTypeMigrated(typeID sema.TypeID, location common.Location) bool {
+	m.metricsCollector.RecordValueForContract(location)
+
+	_, ok := m.migratedTypes[typeID]
+	if !ok {
+		m.metricsCollector.RecordErrorForContract(location)
+	}
+
+	return ok
 }
 
 func (m *MetricsCollectingMigration) Close() error {
@@ -289,12 +293,14 @@ type MigrationMetricsCollector struct {
 	mutex             sync.RWMutex
 	TotalValues       int                     `json:"totalValues"`
 	TotalErrors       int                     `json:"totalErrors"`
+	ValuesPerContract map[common.Location]int `json:"valuesPerContract"`
 	ErrorsPerContract map[common.Location]int `json:"errorsPerContract"`
 }
 
 func NewMigrationMetricsCollector() *MigrationMetricsCollector {
 	return &MigrationMetricsCollector{
 		ErrorsPerContract: make(map[common.Location]int),
+		ValuesPerContract: make(map[common.Location]int),
 	}
 }
 
@@ -316,32 +322,77 @@ func (c *MigrationMetricsCollector) RecordErrorForContract(location common.Locat
 	c.ErrorsPerContract[location]++
 }
 
+func (c *MigrationMetricsCollector) RecordValueForContract(location common.Location) {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+	c.ValuesPerContract[location]++
+}
+
 func (c *MigrationMetricsCollector) metrics() Metrics {
-	errorsPerContract := make([]ContractErrors, 0)
+	errorsPerContract := make([]ContractErrors, 0, len(c.ErrorsPerContract))
 
 	for location, count := range c.ErrorsPerContract {
 		errorsPerContract = append(
 			errorsPerContract,
 			ContractErrors{
 				Contract: location.ID(),
-				Errors:   count,
+				Count:    count,
 			})
 	}
+
+	sort.SliceStable(errorsPerContract, func(i, j int) bool {
+		this := errorsPerContract[i]
+		that := errorsPerContract[j]
+		return strings.Compare(this.Contract, that.Contract) < 0
+	})
+
+	valuesPerContract := make([]ContractValues, 0, len(c.ValuesPerContract))
+	for location, count := range c.ValuesPerContract {
+		valuesPerContract = append(
+			valuesPerContract,
+			ContractValues{
+				Contract: location.ID(),
+				Count:    count,
+			})
+	}
+
+	sort.SliceStable(valuesPerContract, func(i, j int) bool {
+		this := valuesPerContract[i]
+		that := valuesPerContract[j]
+		return strings.Compare(this.Contract, that.Contract) < 0
+	})
 
 	return Metrics{
 		TotalValues:       c.TotalValues,
 		TotalErrors:       c.TotalErrors,
 		ErrorsPerContract: errorsPerContract,
+		ValuesPerContract: valuesPerContract,
 	}
 }
 
 type Metrics struct {
-	TotalValues       int              `json:"totalValues"`
-	TotalErrors       int              `json:"TotalErrors"`
+	// Total values in the storage
+	TotalValues int `json:"totalValues"`
+
+	// Total values with errors (un-migrated values)
+	TotalErrors int `json:"TotalErrors"`
+
+	// Values with errors (un-migrated) related to each contract
 	ErrorsPerContract []ContractErrors `json:"errorsPerContract"`
+
+	// Total values related to each contract
+	ValuesPerContract []ContractValues `json:"valuesPerContract"`
 }
 
 type ContractErrors struct {
 	Contract string `json:"contract"`
-	Errors   int    `json:"errors"`
+	Count    int    `json:"count"`
+}
+
+type ContractValues struct {
+	Contract string `json:"contract"`
+	Count    int    `json:"count"`
+
+	// TODO:
+	// Size
 }
