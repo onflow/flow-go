@@ -82,13 +82,13 @@ func (_m *EpochProtocolStateEntries) Index(blockID flow.Identifier, epochProtoco
 	return r0
 }
 
-// StoreTx provides a mock function with given fields: protocolStateID, protocolState
-func (_m *EpochProtocolStateEntries) StoreTx(protocolStateID flow.Identifier, protocolState *flow.EpochProtocolStateEntry) func(*transaction.Tx) error {
-	ret := _m.Called(protocolStateID, protocolState)
+// StoreTx provides a mock function with given fields: epochProtocolStateID, epochProtocolStateEntry
+func (_m *EpochProtocolStateEntries) StoreTx(epochProtocolStateID flow.Identifier, epochProtocolStateEntry *flow.EpochProtocolStateEntry) func(*transaction.Tx) error {
+	ret := _m.Called(epochProtocolStateID, epochProtocolStateEntry)
 
 	var r0 func(*transaction.Tx) error
 	if rf, ok := ret.Get(0).(func(flow.Identifier, *flow.EpochProtocolStateEntry) func(*transaction.Tx) error); ok {
-		r0 = rf(protocolStateID, protocolState)
+		r0 = rf(epochProtocolStateID, epochProtocolStateEntry)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(func(*transaction.Tx) error)
