@@ -1270,9 +1270,11 @@ func (h *Handler) buildMetadataResponse() (*entities.Metadata, error) {
 
 	if h.indexReporter != nil {
 		highestIndexedHeight, err := h.indexReporter.HighestIndexedHeight()
-		if err != nil &&
-			!errors.Is(err, indexer.ErrIndexNotInitialized) {
-			return nil, rpc.ConvertIndexError(err, lastFinalizedHeader.Height, "could not get highest indexed height")
+		if err != nil {
+			if !errors.Is(err, indexer.ErrIndexNotInitialized) {
+				return nil, rpc.ConvertIndexError(err, lastFinalizedHeader.Height, "could not get highest indexed height")
+			}
+			highestIndexedHeight = 0
 		}
 
 		metadata.HighestIndexedHeight = highestIndexedHeight
