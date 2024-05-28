@@ -155,33 +155,34 @@ func run(*cobra.Command, []string) {
 		ReportWriter(ReporterName)
 	defer rw.Close()
 
-	payloads1, payloads2 := loadPayloads()
+	var registers1, registers2 *registers.ByAccount
+	{
+		// Load payloads and create registers.
+		// Define in a block, so that the memory is released after the registers are created.
+		payloads1, payloads2 := loadPayloads()
 
-	payloadCount1 := len(payloads1)
-	payloadCount2 := len(payloads2)
-	if payloadCount1 != payloadCount2 {
-		log.Warn().Msgf(
-			"Payloads files have different number of payloads: %d vs %d",
-			payloadCount1,
-			payloadCount2,
-		)
+		payloadCount1 := len(payloads1)
+		payloadCount2 := len(payloads2)
+		if payloadCount1 != payloadCount2 {
+			log.Warn().Msgf(
+				"Payloads files have different number of payloads: %d vs %d",
+				payloadCount1,
+				payloadCount2,
+			)
+		}
+
+		registers1, registers2 = payloadsToRegisters(payloads1, payloads2)
+
+		accountCount1 := registers1.AccountCount()
+		accountCount2 := registers2.AccountCount()
+		if accountCount1 != accountCount2 {
+			log.Warn().Msgf(
+				"Registers have different number of accounts: %d vs %d",
+				accountCount1,
+				accountCount2,
+			)
+		}
 	}
-
-	registers1, registers2 := payloadsToRegisters(payloads1, payloads2)
-
-	accountCount1 := registers1.AccountCount()
-	accountCount2 := registers2.AccountCount()
-	if accountCount1 != accountCount2 {
-		log.Warn().Msgf(
-			"Registers have different number of accounts: %d vs %d",
-			accountCount1,
-			accountCount2,
-		)
-	}
-
-	// Free up memory
-	payloads1 = nil
-	payloads2 = nil
 
 	diff(registers1, registers2, chainID, rw)
 }
