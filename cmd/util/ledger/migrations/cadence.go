@@ -13,7 +13,6 @@ import (
 
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
-	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -55,12 +54,12 @@ func NewCompositeTypeConversionRules(chainID flow.ChainID) StaticTypeMigrationRu
 
 func NewCadence1InterfaceStaticTypeConverter(chainID flow.ChainID) statictypes.InterfaceTypeConverterFunc {
 	rules := NewInterfaceTypeConversionRules(chainID)
-	return NewStaticTypeMigrator[*interpreter.InterfaceStaticType](rules)
+	return NewStaticTypeMigration[*interpreter.InterfaceStaticType](rules)
 }
 
 func NewCadence1CompositeStaticTypeConverter(chainID flow.ChainID) statictypes.CompositeTypeConverterFunc {
 	rules := NewCompositeTypeConversionRules(chainID)
-	return NewStaticTypeMigrator[*interpreter.CompositeStaticType](rules)
+	return NewStaticTypeMigration[*interpreter.CompositeStaticType](rules)
 }
 
 func nonFungibleTokenCompositeToInterfaceRule(
@@ -213,7 +212,7 @@ func newFungibleTokenMetadataViewsToViewResolverRule(
 
 type NamedMigration struct {
 	Name    string
-	Migrate ledger.Migration
+	Migrate RegistersMigration
 }
 
 func NewCadence1ValueMigrations(
@@ -222,8 +221,8 @@ func NewCadence1ValueMigrations(
 	opts Options,
 ) (migs []NamedMigration) {
 
-	// Populated by CadenceLinkValueMigrator,
-	// used by CadenceCapabilityValueMigrator
+	// Populated by CadenceLinkValueMigration,
+	// used by CadenceCapabilityValueMigration
 	capabilityMapping := &capcons.CapabilityMapping{}
 
 	errorMessageHandler := &errorMessageHandler{}
@@ -251,14 +250,13 @@ func NewCadence1ValueMigrations(
 				opts.ChainID,
 				opts.VerboseErrorOutput,
 				programs,
-				opts.NWorker,
 			),
 		},
 	}
 
-	for index, migrationConstructor := range []func(opts Options) *CadenceBaseMigrator{
-		func(opts Options) *CadenceBaseMigrator {
-			return NewCadence1ValueMigrator(
+	for index, migrationConstructor := range []func(opts Options) *CadenceBaseMigration{
+		func(opts Options) *CadenceBaseMigration {
+			return NewCadence1ValueMigration(
 				rwf,
 				errorMessageHandler,
 				programs,
@@ -268,8 +266,8 @@ func NewCadence1ValueMigrations(
 				opts,
 			)
 		},
-		func(opts Options) *CadenceBaseMigrator {
-			return NewCadence1LinkValueMigrator(
+		func(opts Options) *CadenceBaseMigration {
+			return NewCadence1LinkValueMigration(
 				rwf,
 				errorMessageHandler,
 				programs,
@@ -277,8 +275,8 @@ func NewCadence1ValueMigrations(
 				opts,
 			)
 		},
-		func(opts Options) *CadenceBaseMigrator {
-			return NewCadence1CapabilityValueMigrator(
+		func(opts Options) *CadenceBaseMigration {
+			return NewCadence1CapabilityValueMigration(
 				rwf,
 				errorMessageHandler,
 				programs,
@@ -311,11 +309,13 @@ func NewCadence1ValueMigrations(
 	return
 }
 
+const stagedContractUpdateMigrationName = "staged-contracts-update-migration"
+
 func NewCadence1ContractsMigrations(
 	log zerolog.Logger,
 	rwf reporters.ReportWriterFactory,
 	opts Options,
-) []NamedMigration {
+) (migs []NamedMigration) {
 
 	stagedContractsMigrationOptions := StagedContractsMigrationOptions{
 		ChainID:            opts.ChainID,
@@ -336,14 +336,14 @@ func NewCadence1ContractsMigrations(
 
 	stagedContractsMigration := NewStagedContractsMigration(
 		"StagedContractsMigration",
-		"staged-contracts-migrator",
+		"staged-contracts-migration",
 		log,
 		rwf,
 		stagedContractsMigrationOptions,
 	).WithContractUpdateValidation().
 		WithStagedContractUpdates(opts.StagedContracts)
 
-	toAccountBasedMigration := func(migration AccountBasedMigration) ledger.Migration {
+	toAccountBasedMigration := func(migration AccountBasedMigration) RegistersMigration {
 		return NewAccountBasedMigration(
 			log,
 			opts.NWorker,
@@ -353,11 +353,19 @@ func NewCadence1ContractsMigrations(
 		)
 	}
 
-	var migrations []NamedMigration
+	if opts.EVMContractChange == EVMContractChangeDeploy {
+		migs = append(
+			migs,
+			NamedMigration{
+				Name:    "evm-deployment-migration",
+				Migrate: NewEVMDeploymentMigration(opts.ChainID, log),
+			},
+		)
+	}
 
 	if opts.BurnerContractChange == BurnerContractChangeDeploy {
-		migrations = append(
-			migrations,
+		migs = append(
+			migs,
 			NamedMigration{
 				Name:    "burner-deployment-migration",
 				Migrate: NewBurnerDeploymentMigration(opts.ChainID, log),
@@ -365,19 +373,49 @@ func NewCadence1ContractsMigrations(
 		)
 	}
 
-	migrations = append(
-		migrations,
+	migs = append(
+		migs,
 		NamedMigration{
 			Name:    "system-contracts-update-migration",
 			Migrate: toAccountBasedMigration(systemContractsMigration),
 		},
 		NamedMigration{
-			Name:    "staged-contracts-update-migration",
+			Name:    stagedContractUpdateMigrationName,
 			Migrate: toAccountBasedMigration(stagedContractsMigration),
 		},
 	)
 
-	return migrations
+	return migs
+}
+
+var testnetAccountsWithBrokenSlabReferences = func() map[common.Address]struct{} {
+	testnetAddresses := map[common.Address]struct{}{
+		mustHexToAddress("434a1f199a7ae3ba"): {},
+		mustHexToAddress("454c9991c2b8d947"): {},
+		mustHexToAddress("48602d8056ff9d93"): {},
+		mustHexToAddress("5d63c34d7f05e5a4"): {},
+		mustHexToAddress("5e3448b3cffb97f2"): {},
+		mustHexToAddress("7d8c7e050c694eaa"): {},
+		mustHexToAddress("ba53f16ede01972d"): {},
+		mustHexToAddress("c843c1f5a4805c3a"): {},
+		mustHexToAddress("48d3be92e6e4a973"): {},
+	}
+
+	for address := range testnetAddresses {
+		if !flow.Testnet.Chain().IsValid(flow.Address(address)) {
+			panic(fmt.Sprintf("invalid testnet address: %s", address.Hex()))
+		}
+	}
+
+	return testnetAddresses
+}()
+
+func mustHexToAddress(hex string) common.Address {
+	address, err := common.HexToAddress(hex)
+	if err != nil {
+		panic(err)
+	}
+	return address
 }
 
 type Options struct {
@@ -401,9 +439,7 @@ func NewCadence1Migrations(
 	outputDir string,
 	rwf reporters.ReportWriterFactory,
 	opts Options,
-) []NamedMigration {
-
-	var migrations []NamedMigration
+) (migs []NamedMigration) {
 
 	if opts.MaxAccountSize > 0 {
 
@@ -414,11 +450,15 @@ func NewCadence1Migrations(
 			maxSizeExceptions[string(systemContract.Address.Bytes())] = struct{}{}
 		}
 
-		migrations = append(
-			migrations,
+		migs = append(
+			migs,
 			NamedMigration{
-				Name:    "account-size-filter-migration",
-				Migrate: NewAccountSizeFilterMigration(opts.MaxAccountSize, maxSizeExceptions, log),
+				Name: "account-size-filter-migration",
+				Migrate: NewAccountSizeFilterMigration(
+					opts.MaxAccountSize,
+					maxSizeExceptions,
+					log,
+				),
 			},
 		)
 	}
@@ -443,21 +483,24 @@ func NewCadence1Migrations(
 			)
 		}
 
-		migrations = append(migrations, NamedMigration{
-			Name: "fix-slabs-migration",
-			Migrate: NewAccountBasedMigration(
-				log,
-				opts.NWorker,
-				accountBasedMigrations,
-			),
-		})
+		migs = append(
+			migs,
+			NamedMigration{
+				Name: "fix-slabs-migration",
+				Migrate: NewAccountBasedMigration(
+					log,
+					opts.NWorker,
+					accountBasedMigrations,
+				),
+			},
+		)
 	}
 
 	if opts.Prune {
 		migration := NewCadence1PruneMigration(opts.ChainID, log, opts.NWorker)
 		if migration != nil {
-			migrations = append(
-				migrations,
+			migs = append(
+				migs,
 				NamedMigration{
 					Name:    "prune-migration",
 					Migrate: migration,
@@ -466,8 +509,8 @@ func NewCadence1Migrations(
 		}
 	}
 
-	migrations = append(
-		migrations,
+	migs = append(
+		migs,
 		NewCadence1ContractsMigrations(
 			log,
 			rwf,
@@ -475,8 +518,8 @@ func NewCadence1Migrations(
 		)...,
 	)
 
-	migrations = append(
-		migrations,
+	migs = append(
+		migs,
 		NewCadence1ValueMigrations(
 			log,
 			rwf,
@@ -484,5 +527,5 @@ func NewCadence1Migrations(
 		)...,
 	)
 
-	return migrations
+	return migs
 }

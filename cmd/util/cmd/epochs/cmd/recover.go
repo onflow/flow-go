@@ -13,6 +13,7 @@ import (
 	epochcmdutil "github.com/onflow/flow-go/cmd/util/cmd/epochs/utils"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/module/grpcclient"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 )
 
@@ -90,12 +91,12 @@ func addGenerateRecoverEpochTxArgsCmdFlags() error {
 
 func getSnapshot() *inmem.Snapshot {
 	// get flow client with secure client connection to download protocol snapshot from access node
-	config, err := common.NewFlowClientConfig(flagAnAddress, flagAnPubkey, flow.ZeroID, false)
+	config, err := grpcclient.NewFlowClientConfig(flagAnAddress, flagAnPubkey, flow.ZeroID, false)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to create flow client config")
 	}
 
-	flowClient, err := common.FlowClient(config)
+	flowClient, err := grpcclient.FlowClient(config)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to create flow client")
 	}

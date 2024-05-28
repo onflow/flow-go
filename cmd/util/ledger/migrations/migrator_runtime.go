@@ -3,48 +3,48 @@ package migrations
 import (
 	"fmt"
 
-	"github.com/rs/zerolog"
-
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/onflow/cadence/runtime/stdlib"
+	"github.com/onflow/crypto/hash"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
-	"github.com/onflow/flow-go/cmd/util/ledger/util/snapshot"
+	"github.com/onflow/flow-go/cmd/util/ledger/util/registers"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/evm"
 	evmStdlib "github.com/onflow/flow-go/fvm/evm/stdlib"
 	"github.com/onflow/flow-go/fvm/storage/state"
-	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 )
 
-type MigratorRuntime struct {
-	Snapshot                snapshot.MigrationSnapshot
-	TransactionState        state.NestedTransactionPreparer
+type BasicMigrationRuntime struct {
+	TransactionState state.NestedTransactionPreparer
+	Storage          *runtime.Storage
+	AccountsLedger   *util.AccountsAtreeLedger
+	Accounts         environment.Accounts
+}
+
+type InterpreterMigrationRuntime struct {
+	*BasicMigrationRuntime
 	Interpreter             *interpreter.Interpreter
-	Storage                 *runtime.Storage
-	Payloads                []*ledger.Payload
-	AccountsLedger          *util.AccountsAtreeLedger
-	Accounts                environment.Accounts
 	ContractAdditionHandler stdlib.AccountContractAdditionHandler
 	ContractNamesProvider   stdlib.AccountContractNamesProvider
 }
 
-// MigratorRuntimeConfig is used to configure the MigratorRuntime.
+// InterpreterMigrationRuntimeConfig is used to configure the InterpreterMigrationRuntime.
 // The code, contract names, and program loading functions can be nil,
 // in which case program loading will be configured to use the default behavior,
 // loading contracts from the given payloads.
 // The listener function is optional and can be used to listen for program loading events.
-type MigratorRuntimeConfig struct {
+type InterpreterMigrationRuntimeConfig struct {
 	GetCode                  util.GetContractCodeFunc
 	GetContractNames         util.GetContractNamesFunc
 	GetOrLoadProgram         util.GetOrLoadProgramFunc
 	GetOrLoadProgramListener util.GerOrLoadProgramListenerFunc
 }
 
-func (c MigratorRuntimeConfig) NewRuntimeInterface(
+func (c InterpreterMigrationRuntimeConfig) NewRuntimeInterface(
 	transactionState state.NestedTransactionPreparer,
 	accounts environment.Accounts,
 ) (
@@ -97,49 +97,63 @@ func (c MigratorRuntimeConfig) NewRuntimeInterface(
 	), nil
 }
 
-// NewMigratorRuntime returns a runtime that can be used in migrations.
-func NewMigratorRuntime(
-	log zerolog.Logger,
-	payloads []*ledger.Payload,
-	chainID flow.ChainID,
-	config MigratorRuntimeConfig,
-	snapshotType snapshot.MigrationSnapshotType,
-	nWorkers int,
-) (
-	*MigratorRuntime,
-	error,
-) {
-	snapshot, err := snapshot.NewPayloadSnapshot(log, payloads, snapshotType, nWorkers)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create payload snapshot: %w", err)
-	}
-
-	transactionState := state.NewTransactionState(snapshot, state.DefaultParameters())
+// NewBasicMigrationRuntime returns a basic runtime for migrations.
+func NewBasicMigrationRuntime(regs registers.Registers) *BasicMigrationRuntime {
+	// Create a new transaction state with a dummy hasher
+	// because we do not need spock proofs for migrations.
+	transactionState := state.NewTransactionStateFromExecutionState(
+		state.NewExecutionStateWithSpockStateHasher(
+			registers.StorageSnapshot{
+				Registers: regs,
+			},
+			state.DefaultParameters(),
+			func() hash.Hasher {
+				return dummyHasher{}
+			},
+		),
+	)
 	accounts := environment.NewAccounts(transactionState)
 
 	accountsAtreeLedger := util.NewAccountsAtreeLedger(accounts)
 	runtimeStorage := runtime.NewStorage(accountsAtreeLedger, nil)
 
+	return &BasicMigrationRuntime{
+		TransactionState: transactionState,
+		Storage:          runtimeStorage,
+		AccountsLedger:   accountsAtreeLedger,
+		Accounts:         accounts,
+	}
+}
+
+// NewInterpreterMigrationRuntime returns a runtime for migrations that need an interpreter.
+func NewInterpreterMigrationRuntime(
+	regs registers.Registers,
+	chainID flow.ChainID,
+	config InterpreterMigrationRuntimeConfig,
+) (
+	*InterpreterMigrationRuntime,
+	error,
+) {
+	basicMigrationRuntime := NewBasicMigrationRuntime(regs)
+
 	env := runtime.NewBaseInterpreterEnvironment(runtime.Config{
 		AttachmentsEnabled: true,
 	})
 
-	runtimeInterface, err := config.NewRuntimeInterface(transactionState, accounts)
+	runtimeInterface, err := config.NewRuntimeInterface(
+		basicMigrationRuntime.TransactionState,
+		basicMigrationRuntime.Accounts,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create runtime interface: %w", err)
 	}
 
-	evmContractAccountAddress, err := evm.ContractAccountAddress(chainID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get EVM contract account address for chain %s: %w", chainID, err)
-	}
-
-	evmStdlib.SetupEnvironment(env, nil, evmContractAccountAddress)
+	evmStdlib.SetupEnvironment(env, nil, evm.ContractAccountAddress(chainID))
 
 	env.Configure(
 		runtimeInterface,
 		runtime.NewCodesAndPrograms(),
-		runtimeStorage,
+		basicMigrationRuntime.Storage,
 		nil,
 	)
 
@@ -152,15 +166,19 @@ func NewMigratorRuntime(
 		return nil, err
 	}
 
-	return &MigratorRuntime{
-		Payloads:                payloads,
-		Snapshot:                snapshot,
-		TransactionState:        transactionState,
+	return &InterpreterMigrationRuntime{
+		BasicMigrationRuntime:   basicMigrationRuntime,
 		Interpreter:             inter,
-		Storage:                 runtimeStorage,
-		AccountsLedger:          accountsAtreeLedger,
-		Accounts:                accounts,
 		ContractAdditionHandler: env,
 		ContractNamesProvider:   env,
 	}, nil
 }
+
+type dummyHasher struct{}
+
+func (d dummyHasher) Algorithm() hash.HashingAlgorithm { return hash.UnknownHashingAlgorithm }
+func (d dummyHasher) Size() int                        { return 0 }
+func (d dummyHasher) ComputeHash([]byte) hash.Hash     { return nil }
+func (d dummyHasher) Write([]byte) (int, error)        { return 0, nil }
+func (d dummyHasher) SumHash() hash.Hash               { return nil }
+func (d dummyHasher) Reset()                           {}

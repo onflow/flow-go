@@ -5,21 +5,20 @@ import (
 
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/ledger"
-	"github.com/onflow/flow-go/ledger/common/convert"
+	"github.com/onflow/flow-go/cmd/util/ledger/util/registers"
 )
 
 func NewAccountSizeFilterMigration(
 	maxAccountSize uint64,
 	exceptions map[string]struct{},
 	log zerolog.Logger,
-) ledger.Migration {
+) RegistersMigration {
 
 	if maxAccountSize == 0 {
 		return nil
 	}
 
-	return func(payloads []*ledger.Payload) ([]*ledger.Payload, error) {
+	return func(registersByAccount *registers.ByAccount) error {
 
 		type accountInfo struct {
 			count int
@@ -27,17 +26,17 @@ func NewAccountSizeFilterMigration(
 		}
 		payloadCountByAddress := make(map[string]accountInfo)
 
-		for _, payload := range payloads {
-			registerID, payloadValue, err := convert.PayloadToRegister(payload)
-			if err != nil {
-				return nil, fmt.Errorf("cannot convert payload to register: %w", err)
-			}
+		err := registersByAccount.ForEach(func(owner string, key string, value []byte) error {
 
-			owner := registerID.Owner
-			accountInfo := payloadCountByAddress[owner]
-			accountInfo.count++
-			accountInfo.size += uint64(len(payloadValue))
-			payloadCountByAddress[owner] = accountInfo
+			info := payloadCountByAddress[owner]
+			info.count++
+			info.size += uint64(len(value))
+			payloadCountByAddress[owner] = info
+
+			return nil
+		})
+		if err != nil {
+			return err
 		}
 
 		for address, info := range payloadCountByAddress {
@@ -58,27 +57,24 @@ func NewAccountSizeFilterMigration(
 			}
 		}
 
-		filteredPayloads := make([]*ledger.Payload, 0, int(0.8*float32(len(payloads))))
+		return registersByAccount.ForEachAccount(
+			func(accountRegisters *registers.AccountRegisters) error {
+				owner := accountRegisters.Owner()
 
-		for _, payload := range payloads {
-			registerID, _, err := convert.PayloadToRegister(payload)
-			if err != nil {
-				return nil, fmt.Errorf("cannot convert payload to register: %w", err)
-			}
-
-			owner := registerID.Owner
-
-			if _, ok := exceptions[owner]; !ok {
-				info := payloadCountByAddress[owner]
-				if info.size > maxAccountSize {
-					continue
+				if _, ok := exceptions[owner]; ok {
+					return nil
 				}
-			}
 
-			filteredPayloads = append(filteredPayloads, payload)
-		}
+				info := payloadCountByAddress[owner]
+				if info.size <= maxAccountSize {
+					return nil
+				}
 
-		return filteredPayloads, nil
+				return accountRegisters.ForEach(func(owner, key string, _ []byte) error {
+					return accountRegisters.Set(owner, key, nil)
+				})
+			},
+		)
 	}
 }
 
