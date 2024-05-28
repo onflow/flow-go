@@ -148,7 +148,7 @@ func TestProtocolStateRootSnapshot(t *testing.T) {
 		setups := NewEpochSetups(metrics, db)
 		commits := NewEpochCommits(metrics, db)
 		store := NewProtocolState(metrics, setups, commits, db, DefaultProtocolStateCacheSize, DefaultProtocolStateByBlockIDCacheSize)
-		expected := unittest.RootProtocolStateFixture()
+		expected := unittest.RootEpochProtocolStateFixture()
 
 		protocolStateID := expected.ID()
 		blockID := unittest.IdentifierFixture()
