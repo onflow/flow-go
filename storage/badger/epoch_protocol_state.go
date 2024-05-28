@@ -23,9 +23,9 @@ var DefaultEpochProtocolStateCacheSize uint = 20
 // We want to be able to cover a broad interval of views without cache misses, so we use a bigger value.
 var DefaultProtocolStateIndexCacheSize uint = 1000
 
-// EpochProtocolStateEntries implements persistent storage for storing flow.EpochProtocolStateEntry's.
-// Protocol state uses an embedded cache without storing capabilities (store happens on first retrieval) to avoid unnecessary
-// operations and to speed up access to frequently used state entries.
+// EpochProtocolStateEntries implements a persistent, fork-aware storage for the Epoch-related
+// sub-states of the overall of the overall Protocol State (KV Store). It uses an embedded cache
+// which is populated on first retrieval to speed up access to frequently used epoch sub-state.
 type EpochProtocolStateEntries struct {
 	db *badger.DB
 
@@ -71,7 +71,7 @@ func NewEpochProtocolStateEntries(collector module.CacheMetrics,
 	stateCacheSize uint,
 	stateByBlockIDCacheSize uint,
 ) *EpochProtocolStateEntries {
-	retrieveByProtocolStateID := func(epochProtocolStateEntryID flow.Identifier) func(tx *badger.Txn) (*flow.RichEpochProtocolStateEntry, error) {
+	retrieveByEntryID := func(epochProtocolStateEntryID flow.Identifier) func(tx *badger.Txn) (*flow.RichEpochProtocolStateEntry, error) {
 		var entry flow.EpochProtocolStateEntry
 		return func(tx *badger.Txn) (*flow.RichEpochProtocolStateEntry, error) {
 			err := operation.RetrieveEpochProtocolState(epochProtocolStateEntryID, &entry)(tx)
@@ -101,7 +101,7 @@ func NewEpochProtocolStateEntries(collector module.CacheMetrics,
 			var entryID flow.Identifier
 			err := operation.LookupEpochProtocolState(blockID, &entryID)(tx)
 			if err != nil {
-				return flow.ZeroID, fmt.Errorf("could not lookup protocol state entry ID for block (%x): %w", blockID[:], err)
+				return flow.ZeroID, fmt.Errorf("could not lookup epoch protocol state entry ID for block (%x): %w", blockID[:], err)
 			}
 			return entryID, nil
 		}
@@ -112,7 +112,7 @@ func NewEpochProtocolStateEntries(collector module.CacheMetrics,
 		cache: newCache[flow.Identifier, *flow.RichEpochProtocolStateEntry](collector, metrics.ResourceProtocolState,
 			withLimit[flow.Identifier, *flow.RichEpochProtocolStateEntry](stateCacheSize),
 			withStore(noopStore[flow.Identifier, *flow.RichEpochProtocolStateEntry]),
-			withRetrieve(retrieveByProtocolStateID)),
+			withRetrieve(retrieveByEntryID)),
 		byBlockIdCache: newCache[flow.Identifier, flow.Identifier](collector, metrics.ResourceProtocolStateByBlockID,
 			withLimit[flow.Identifier, flow.Identifier](stateByBlockIDCacheSize),
 			withStore(storeByBlockID),
