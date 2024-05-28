@@ -16,7 +16,7 @@ import (
 
 // DefaultEpochProtocolStateCacheSize is the default size for primary epoch protocol state entry cache.
 // Minimally, we have 3 entries per epoch (one on epoch Switchover, one on receiving the Epoch Setup and one when seeing the Epoch Commit event).
-// Let's be generous and assume we have 20 different Protocol States per epoch.
+// Let's be generous and assume we have 20 different epoch state entries per epoch.
 var DefaultEpochProtocolStateCacheSize uint = 20
 
 // DefaultProtocolStateIndexCacheSize is the default value for secondary byBlockIdCache.
