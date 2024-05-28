@@ -5,7 +5,7 @@ import (
 	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
-// EpochProtocolStateEntries represents persistent, fork-aware storage for the Epoch-related 
+// EpochProtocolStateEntries represents persistent, fork-aware storage for the Epoch-related
 // sub-state of the overall of the overall Protocol State (KV Store).
 type EpochProtocolStateEntries interface {
 	// StoreTx returns an anonymous function (intended to be executed as part of a badger transaction),

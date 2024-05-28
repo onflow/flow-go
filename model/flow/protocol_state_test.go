@@ -10,7 +10,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// TestNewRichProtocolStateEntry checks that NewRichProtocolStateEntry creates valid identity tables depending on the state
+// TestNewRichProtocolStateEntry checks that NewRichEpochProtocolStateEntry creates valid identity tables depending on the state
 // of epoch which is derived from the protocol state entry.
 func TestNewRichProtocolStateEntry(t *testing.T) {
 	// Conditions right after a spork:
@@ -35,7 +35,7 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 			},
 			InvalidEpochTransitionAttempted: false,
 		}
-		entry, err := flow.NewRichProtocolStateEntry(
+		entry, err := flow.NewRichEpochProtocolStateEntry(
 			stateEntry,
 			nil,
 			nil,
@@ -64,7 +64,7 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 	//  * network is currently in the staking phase for the next epoch, hence no service events for the next epoch exist
 	t.Run("staking-phase", func(t *testing.T) {
 		stateEntry := unittest.EpochStateFixture()
-		richEntry, err := flow.NewRichProtocolStateEntry(
+		richEntry, err := flow.NewRichEpochProtocolStateEntry(
 			stateEntry.EpochProtocolStateEntry,
 			stateEntry.PreviousEpochSetup,
 			stateEntry.PreviousEpochCommit,
@@ -98,7 +98,7 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 			entry.NextEpoch.CommitID = flow.ZeroID
 		})
 
-		richEntry, err := flow.NewRichProtocolStateEntry(
+		richEntry, err := flow.NewRichEpochProtocolStateEntry(
 			stateEntry.EpochProtocolStateEntry,
 			stateEntry.PreviousEpochSetup,
 			stateEntry.PreviousEpochCommit,
@@ -147,7 +147,7 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 		assert.Nil(t, stateEntry.PreviousEpochSetup)
 		assert.Nil(t, stateEntry.PreviousEpochCommit)
 
-		richEntry, err := flow.NewRichProtocolStateEntry(
+		richEntry, err := flow.NewRichEpochProtocolStateEntry(
 			stateEntry.EpochProtocolStateEntry,
 			stateEntry.PreviousEpochSetup,
 			stateEntry.PreviousEpochCommit,
@@ -187,7 +187,7 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 	t.Run("commit-phase", func(t *testing.T) {
 		stateEntry := unittest.EpochStateFixture(unittest.WithNextEpochProtocolState())
 
-		richEntry, err := flow.NewRichProtocolStateEntry(
+		richEntry, err := flow.NewRichEpochProtocolStateEntry(
 			stateEntry.EpochProtocolStateEntry,
 			stateEntry.PreviousEpochSetup,
 			stateEntry.PreviousEpochCommit,
@@ -231,7 +231,7 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 		assert.Nil(t, stateEntry.PreviousEpochSetup)
 		assert.Nil(t, stateEntry.PreviousEpochCommit)
 
-		richEntry, err := flow.NewRichProtocolStateEntry(
+		richEntry, err := flow.NewRichEpochProtocolStateEntry(
 			stateEntry.EpochProtocolStateEntry,
 			stateEntry.PreviousEpochSetup,
 			stateEntry.PreviousEpochCommit,

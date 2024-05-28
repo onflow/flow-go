@@ -124,9 +124,9 @@ type RichEpochProtocolStateEntry struct {
 	NextEpochIdentityTable    IdentityList
 }
 
-// NewRichProtocolStateEntry constructs a rich protocol state entry from a protocol state entry and additional data.
+// NewRichEpochProtocolStateEntry constructs a RichEpochProtocolStateEntry from an EpochProtocolStateEntry and additional data.
 // No errors are expected during normal operation. All errors indicate inconsistent or invalid inputs.
-func NewRichProtocolStateEntry(
+func NewRichEpochProtocolStateEntry(
 	protocolState *EpochProtocolStateEntry,
 	previousEpochSetup *EpochSetup,
 	previousEpochCommit *EpochCommit,
@@ -260,7 +260,7 @@ func (e *EpochProtocolStateEntry) Copy() *EpochProtocolStateEntry {
 	}
 }
 
-// Copy returns a full copy of rich protocol state entry.
+// Copy returns a full copy of the RichEpochProtocolStateEntry.
 //   - Embedded service events are copied by reference (not deep-copied).
 //   - CurrentEpochIdentityTable and NextEpochIdentityTable are deep-copied, _except_ for their keys, which are copied by reference.
 func (e *RichEpochProtocolStateEntry) Copy() *RichEpochProtocolStateEntry {

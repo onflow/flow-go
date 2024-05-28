@@ -178,7 +178,7 @@ func (s *ProtocolStateMachineSuite) TestProcessEpochCommit() {
 
 		updatedState, _, _ := s.stateMachine.Build()
 
-		parentState, err := flow.NewRichProtocolStateEntry(updatedState,
+		parentState, err := flow.NewRichEpochProtocolStateEntry(updatedState,
 			s.parentProtocolState.PreviousEpochSetup,
 			s.parentProtocolState.PreviousEpochCommit,
 			s.parentProtocolState.CurrentEpochSetup,
@@ -223,7 +223,7 @@ func (s *ProtocolStateMachineSuite) TestProcessEpochCommit() {
 		require.Equal(s.T(), updatedState.ID(), stateID)
 		require.Equal(s.T(), s.parentProtocolState.ID(), s.stateMachine.ParentState().ID(), "should not modify parent protocol state")
 
-		parentState, err := flow.NewRichProtocolStateEntry(updatedState,
+		parentState, err := flow.NewRichEpochProtocolStateEntry(updatedState,
 			s.parentProtocolState.PreviousEpochSetup,
 			s.parentProtocolState.PreviousEpochCommit,
 			s.parentProtocolState.CurrentEpochSetup,

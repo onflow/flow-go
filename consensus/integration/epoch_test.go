@@ -240,7 +240,7 @@ func withNextEpoch(
 		ActiveIdentities: flow.DynamicIdentityEntryListFromIdentities(nextEpochIdentities),
 	}
 	// Re-construct epoch protocol state with modified events (constructs ActiveIdentity fields)
-	epochProtocolState, err = flow.NewRichProtocolStateEntry(
+	epochProtocolState, err = flow.NewRichEpochProtocolStateEntry(
 		epochProtocolState.EpochProtocolStateEntry,
 		epochProtocolState.PreviousEpochSetup, epochProtocolState.PreviousEpochCommit,
 		currEpochSetup, currEpochCommit,

@@ -30,7 +30,7 @@ type ProtocolState struct {
 	db *badger.DB
 
 	// cache is essentially an in-memory map from `EpochProtocolStateEntry.ID()` -> `RichEpochProtocolStateEntry`
-	// We do _not_ populate this cache which holds the RichProtocolStateEntrys on store. This is because
+	// We do _not_ populate this cache which holds the RichEpochProtocolStateEntry's on store. This is because
 	//   (i) we don't have the RichEpochProtocolStateEntry on store readily available and
 	//  (ii) new RichEpochProtocolStateEntry are really rare throughout an epoch, so the total cost of populating
 	//       the cache becomes negligible over several views.
@@ -77,9 +77,9 @@ func NewProtocolState(collector module.CacheMetrics,
 			if err != nil {
 				return nil, err
 			}
-			result, err := newRichProtocolStateEntry(&protocolStateEntry, epochSetups, epochCommits)
+			result, err := newRichEpochProtocolStateEntry(&protocolStateEntry, epochSetups, epochCommits)
 			if err != nil {
-				return nil, fmt.Errorf("could not create rich protocol state entry: %w", err)
+				return nil, fmt.Errorf("could not create RichEpochProtocolStateEntry: %w", err)
 			}
 			return result, nil
 		}
@@ -187,10 +187,10 @@ func (s *ProtocolState) ByBlockID(blockID flow.Identifier) (*flow.RichEpochProto
 	return s.cache.Get(protocolStateID)(tx)
 }
 
-// newRichProtocolStateEntry constructs a rich protocol state entry from a protocol state entry.
+// newRichEpochProtocolStateEntry constructs a RichEpochProtocolStateEntry from an epoch sub-state entry.
 // It queries and fills in epoch setups and commits for previous and current epochs and possibly next epoch.
 // No errors are expected during normal operation.
-func newRichProtocolStateEntry(
+func newRichEpochProtocolStateEntry(
 	protocolState *flow.EpochProtocolStateEntry,
 	setups storage.EpochSetups,
 	commits storage.EpochCommits,
@@ -238,7 +238,7 @@ func newRichProtocolStateEntry(
 		}
 	}
 
-	result, err := flow.NewRichProtocolStateEntry(
+	result, err := flow.NewRichEpochProtocolStateEntry(
 		protocolState,
 		previousEpochSetup,
 		previousEpochCommit,
