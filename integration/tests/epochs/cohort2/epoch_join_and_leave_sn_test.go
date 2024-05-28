@@ -11,7 +11,8 @@ import (
 )
 
 func TestEpochJoinAndLeaveSN(t *testing.T) {
-	suite.Run(t, new(EpochJoinAndLeaveSNSuite))
+	s := new(EpochJoinAndLeaveSNSuite)
+	suite.Run(t, &s.DynamicEpochTransitionSuite)
 }
 
 type EpochJoinAndLeaveSNSuite struct {
@@ -23,12 +24,12 @@ func (s *EpochJoinAndLeaveSNSuite) SetupTest() {
 	// update provides faster BLS operations.
 	// TODO: fix the access integration test logic to function without slowing down
 	// the block rate
-	s.ConsensusProposalDuration = time.Millisecond * 250
+	s.DynamicEpochTransitionSuite.ConsensusProposalDuration = time.Millisecond * 250
 	s.DynamicEpochTransitionSuite.SetupTest()
 }
 
 // TestEpochJoinAndLeaveSN should update consensus nodes and assert healthy network conditions
 // after the epoch transition completes. See health check function for details.
 func (s *EpochJoinAndLeaveSNSuite) TestEpochJoinAndLeaveSN() {
-	s.RunTestEpochJoinAndLeave(flow.RoleConsensus, s.AssertNetworkHealthyAfterSNChange)
+	s.DynamicEpochTransitionSuite.RunTestEpochJoinAndLeave(flow.RoleConsensus, s.DynamicEpochTransitionSuite.AssertNetworkHealthyAfterSNChange)
 }

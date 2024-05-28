@@ -3,14 +3,14 @@ package cohort1
 import (
 	"testing"
 
-	"github.com/stretchr/testify/suite"
-
 	"github.com/onflow/flow-go/integration/tests/epochs"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/stretchr/testify/suite"
 )
 
 func TestEpochJoinAndLeaveAN(t *testing.T) {
-	suite.Run(t, new(EpochJoinAndLeaveANSuite))
+	s := new(EpochJoinAndLeaveANSuite)
+	suite.Run(t, &s.DynamicEpochTransitionSuite)
 }
 
 type EpochJoinAndLeaveANSuite struct {
@@ -20,5 +20,5 @@ type EpochJoinAndLeaveANSuite struct {
 // TestEpochJoinAndLeaveAN should update access nodes and assert healthy network conditions
 // after the epoch transition completes. See health check function for details.
 func (s *EpochJoinAndLeaveANSuite) TestEpochJoinAndLeaveAN() {
-	s.RunTestEpochJoinAndLeave(flow.RoleAccess, s.AssertNetworkHealthyAfterANChange)
+	s.DynamicEpochTransitionSuite.RunTestEpochJoinAndLeave(flow.RoleAccess, s.DynamicEpochTransitionSuite.AssertNetworkHealthyAfterANChange)
 }
