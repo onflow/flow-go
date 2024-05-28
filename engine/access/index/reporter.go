@@ -68,7 +68,7 @@ func (s *Reporter) HighestIndexedHeight() (uint64, error) {
 // Expected errors:
 //   - indexer.ErrIndexNotInitialized if the `TransactionResultsIndex` has not been initialized
 //   - storage.ErrHeightNotIndexed if the block at the provided height is not indexed yet
-//   - fmt.Errorf with custom message if the highest or lowest indexed heights cannot be retrieved from the reporter
+//   - all other errors are unexpected
 func (s *Reporter) checkDataAvailability(height uint64) error {
 	reporter, err := s.getReporter()
 	if err != nil {
