@@ -76,15 +76,31 @@ func (m *MetricsCollectingMigration) InitMigration(
 			nestedDecls = contractInterface.Members
 		}
 
-		for _, composite := range nestedDecls.Composites() {
-			typeID := program.Elaboration.CompositeDeclarationType(composite).ID()
-			m.migratedTypes[typeID] = struct{}{}
+		for _, compositeDecl := range nestedDecls.Composites() {
+			compositeType := program.Elaboration.CompositeDeclarationType(compositeDecl)
+			if compositeType == nil {
+				continue
+			}
+			m.migratedTypes[compositeType.ID()] = struct{}{}
 		}
 
-		for _, composite := range nestedDecls.Interfaces() {
-			typeID := program.Elaboration.InterfaceDeclarationType(composite).ID()
-			m.migratedTypes[typeID] = struct{}{}
+		for _, interfaceDecl := range nestedDecls.Interfaces() {
+			interfaceType := program.Elaboration.InterfaceDeclarationType(interfaceDecl)
+			if interfaceType == nil {
+				continue
+			}
+			m.migratedTypes[interfaceType.ID()] = struct{}{}
 		}
+
+		for _, attachmentDecl := range nestedDecls.Attachments() {
+			attachmentType := program.Elaboration.CompositeDeclarationType(attachmentDecl)
+			if attachmentType == nil {
+				continue
+			}
+			m.migratedTypes[attachmentType.ID()] = struct{}{}
+		}
+
+		// Entitlements are not needed, since old values won't have them.
 
 		// TODO: also add the contract type itself?
 	}
