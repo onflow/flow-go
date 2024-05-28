@@ -444,17 +444,17 @@ func checkMigratedState(
 			{
 				storageKey:    interpreter.StorageKey{Key: "cap_con", Address: address},
 				storageMapKey: interpreter.Uint64StorageMapKey(0x2),
-				value:         "StorageCapabilityController(borrowType: auth(A.01cf0e2f2f715450.Test.E) &A.01cf0e2f2f715450.Test.R, capabilityID: /storage/r, target: 2)",
+				value:         "StorageCapabilityController(borrowType: Type<auth(A.01cf0e2f2f715450.Test.E) &A.01cf0e2f2f715450.Test.R>(), capabilityID: 2, target: /storage/r)",
 			},
 			{
 				storageKey:    interpreter.StorageKey{Key: "cap_con", Address: address},
 				storageMapKey: interpreter.Uint64StorageMapKey(0x1),
-				value:         "StorageCapabilityController(borrowType: &A.0ae53cb6e3f42a79.FlowToken.Vault, capabilityID: /storage/flowTokenVault, target: 1)",
+				value:         "StorageCapabilityController(borrowType: Type<&A.0ae53cb6e3f42a79.FlowToken.Vault>(), capabilityID: 1, target: /storage/flowTokenVault)",
 			},
 			{
 				storageKey:    interpreter.StorageKey{Key: "cap_con", Address: address},
 				storageMapKey: interpreter.Uint64StorageMapKey(0x3),
-				value:         "StorageCapabilityController(borrowType: &A.0ae53cb6e3f42a79.FlowToken.Vault, capabilityID: /storage/flowTokenVault, target: 3)",
+				value:         "StorageCapabilityController(borrowType: Type<&A.0ae53cb6e3f42a79.FlowToken.Vault>(), capabilityID: 3, target: /storage/flowTokenVault)",
 			},
 		},
 		visitMigration.visits,
