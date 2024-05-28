@@ -1797,7 +1797,6 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 
 			versionControl := version.NewVersionControl(
 				builder.Logger,
-				node.Storage.Headers,
 				node.Storage.VersionBeacons,
 				ver,
 				latestFinalizedBlock,

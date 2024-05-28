@@ -34,8 +34,7 @@ type VersionControl struct {
 	component.Component
 
 	log zerolog.Logger
-	// Storages
-	headers        VersionControlHeaders
+	// Storage
 	versionBeacons storage.VersionBeacons
 
 	// nodeVersion stores the node's current version.
@@ -55,12 +54,6 @@ type VersionControl struct {
 	endHeight   uint64
 }
 
-// VersionControlHeaders is an interface for fetching headers
-// Its jut a small subset of storage.Headers for comments see storage.Headers
-type VersionControlHeaders interface {
-	BlockIDByHeight(height uint64) (flow.Identifier, error)
-}
-
 var _ protocol.Consumer = (*VersionControl)(nil)
 var _ component.Component = (*VersionControl)(nil)
 
@@ -71,7 +64,6 @@ var _ component.Component = (*VersionControl)(nil)
 // Without a node version, the stop control can still be used for manual stopping.
 func NewVersionControl(
 	log zerolog.Logger,
-	headers VersionControlHeaders,
 	versionBeacons storage.VersionBeacons,
 	nodeVersion *semver.Version,
 	latestFinalizedBlock *flow.Header,
@@ -85,12 +77,10 @@ func NewVersionControl(
 			Logger(),
 
 		blockFinalizedChan: blockFinalizedChan,
-
-		headers:        headers,
-		nodeVersion:    nodeVersion,
-		versionBeacons: versionBeacons,
-		startHeight:    NoHeight,
-		endHeight:      NoHeight,
+		nodeVersion:        nodeVersion,
+		versionBeacons:     versionBeacons,
+		startHeight:        NoHeight,
+		endHeight:          NoHeight,
 	}
 
 	if vc.nodeVersion != nil {
@@ -188,7 +178,7 @@ func (v *VersionControl) BlockFinalizedForTesting(h *flow.Header) {
 // CompatibleAtBlock checks if the node's version is compatible at a given block height.
 // It returns true if the node's version is compatible within the specified height range.
 func (v *VersionControl) CompatibleAtBlock(height uint64) bool {
-	return v.versionBeacon != nil && v.versionBeacon.SealHeight >= height && (v.startHeight == NoHeight || height >= v.startHeight) &&
+	return v.versionBeacon != nil && (v.startHeight == NoHeight || height >= v.startHeight) &&
 		(v.endHeight == NoHeight || height <= v.endHeight)
 }
 
@@ -265,8 +255,6 @@ func (v *VersionControl) blockFinalized(
 		return
 	}
 
-	lastCompatibleHeight := h.Height
-
 	// version boundaries are sorted by version
 	for _, boundary := range vb.VersionBoundaries {
 		ver, err := boundary.Semver()
@@ -281,15 +269,13 @@ func (v *VersionControl) blockFinalized(
 		}
 
 		if ver.Compare(*v.nodeVersion) > 0 {
-			v.endHeight = lastCompatibleHeight
+			v.endHeight = boundary.BlockHeight - 1
 
 			for _, consumer := range v.consumers {
-				consumer(v.endHeight, ver.String())
+				consumer(boundary.BlockHeight, ver.String())
 			}
 
 			break
 		}
-
-		lastCompatibleHeight = boundary.BlockHeight
 	}
 }
