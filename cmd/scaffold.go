@@ -1181,8 +1181,8 @@ func (fnb *FlowNodeBuilder) initStorage() error {
 	setups := bstorage.NewEpochSetups(fnb.Metrics.Cache, fnb.DB)
 	epochCommits := bstorage.NewEpochCommits(fnb.Metrics.Cache, fnb.DB)
 	commits := bstorage.NewCommits(fnb.Metrics.Cache, fnb.DB)
-	protocolState := bstorage.NewProtocolState(fnb.Metrics.Cache, setups, epochCommits, fnb.DB,
-		bstorage.DefaultProtocolStateCacheSize, bstorage.DefaultProtocolStateByBlockIDCacheSize)
+	protocolState := bstorage.NewEpochProtocolStateEntries(fnb.Metrics.Cache, setups, epochCommits, fnb.DB,
+		bstorage.DefaultEpochProtocolStateCacheSize, bstorage.DefaultProtocolStateIndexCacheSize)
 	protocolKVStores := bstorage.NewProtocolKVStore(fnb.Metrics.Cache, fnb.DB,
 		bstorage.DefaultProtocolKVStoreCacheSize, bstorage.DefaultProtocolKVStoreByBlockIDCacheSize)
 	versionBeacons := bstorage.NewVersionBeacons(fnb.DB)

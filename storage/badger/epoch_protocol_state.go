@@ -14,19 +14,19 @@ import (
 	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
-// DefaultProtocolStateCacheSize is the default size for primary protocol state cache.
+// DefaultEpochProtocolStateCacheSize is the default size for primary epoch protocol state entry cache.
 // Minimally, we have 3 entries per epoch (one on epoch Switchover, one on receiving the Epoch Setup and one when seeing the Epoch Commit event).
-// Lets be generous and assume we have 20 different Protocol States per epoch.
-var DefaultProtocolStateCacheSize uint = 20
+// Let's be generous and assume we have 20 different Protocol States per epoch.
+var DefaultEpochProtocolStateCacheSize uint = 20
 
-// DefaultProtocolStateByBlockIDCacheSize is the default value for secondary byBlockIdCache.
+// DefaultProtocolStateIndexCacheSize is the default value for secondary byBlockIdCache.
 // We want to be able to cover a broad interval of views without cache misses, so we use a bigger value.
-var DefaultProtocolStateByBlockIDCacheSize uint = 1000
+var DefaultProtocolStateIndexCacheSize uint = 1000
 
-// ProtocolState implements persistent storage for storing Protocol States.
-// Protocol state uses an embedded cache without storing capabilities(store happens on first retrieval) to avoid unnecessary
-// operations and to speed up access to frequently used Protocol State.
-type ProtocolState struct {
+// EpochProtocolStateEntries implements persistent storage for storing flow.EpochProtocolStateEntry's.
+// Protocol state uses an embedded cache without storing capabilities (store happens on first retrieval) to avoid unnecessary
+// operations and to speed up access to frequently used state entries.
+type EpochProtocolStateEntries struct {
 	db *badger.DB
 
 	// cache is essentially an in-memory map from `EpochProtocolStateEntry.ID()` -> `RichEpochProtocolStateEntry`
@@ -40,18 +40,18 @@ type ProtocolState struct {
 	// have the needed Epoch Setup and Commit events, since it starts with a RichEpochProtocolStateEntry for the parent
 	// state and consumes Epoch Setup and Epoch Commit events. Though, we leave this optimization for later.
 	//
-	// `cache` only holds the distinct Protocol States. On the happy path, we expect something like 3 entries per epoch.
+	// `cache` only holds the distinct state entries. On the happy path, we expect something like 3 entries per epoch.
 	// On the optimal happy path we have 3 entries per epoch: one entry on epoch Switchover, one on receiving the Epoch Setup
-	// and one when seeing the Epoch Commit event. Let's be generous and assume we have 20 different Protocol States per epoch.
+	// and one when seeing the Epoch Commit event. Let's be generous and assume we have 20 different state entries per epoch.
 	// Beyond that, we are certainly leaving the domain of normal operations that we optimize for. Therefore, a cache size of
 	// roughly 100 is a reasonable balance between performance and memory consumption.
 	cache *Cache[flow.Identifier, *flow.RichEpochProtocolStateEntry]
 
 	// byBlockIdCache is essentially an in-memory map from `Block.ID()` -> `EpochProtocolStateEntry.ID()`. The full
-	// Protocol state can be retrieved from the `cache` above.
+	// flow.RichEpochProtocolStateEntry can be retrieved from the `cache` above.
 	// We populate the `byBlockIdCache` on store, because a new entry is added for every block and we probably also
 	// query the Protocol state for every block. So argument (ii) from above does not apply here. Furthermore,
-	// argument (i) from above also does not apply, because we already have the Protocol State's ID on store,
+	// argument (i) from above also does not apply, because we already have the state entry's ID on store,
 	// so populating the cache is easy.
 	//
 	// `byBlockIdCache` will contain an entry for every block. We want to be able to cover a broad interval of views
@@ -59,25 +59,26 @@ type ProtocolState struct {
 	byBlockIdCache *Cache[flow.Identifier, flow.Identifier]
 }
 
-var _ storage.EpochProtocolStateEntries = (*ProtocolState)(nil)
+var _ storage.EpochProtocolStateEntries = (*EpochProtocolStateEntries)(nil)
 
-// NewProtocolState creates a ProtocolState instance, which is a database of Protocol State.
+// NewEpochProtocolStateEntries creates a EpochProtocolStateEntries instance, which stores a subset of the
+// state stored by the Dynamic Protocol State.
 // It supports storing, caching and retrieving by ID or the additionally indexed block ID.
-func NewProtocolState(collector module.CacheMetrics,
+func NewEpochProtocolStateEntries(collector module.CacheMetrics,
 	epochSetups storage.EpochSetups,
 	epochCommits storage.EpochCommits,
 	db *badger.DB,
 	stateCacheSize uint,
 	stateByBlockIDCacheSize uint,
-) *ProtocolState {
-	retrieveByProtocolStateID := func(protocolStateID flow.Identifier) func(tx *badger.Txn) (*flow.RichEpochProtocolStateEntry, error) {
-		var protocolStateEntry flow.EpochProtocolStateEntry
+) *EpochProtocolStateEntries {
+	retrieveByProtocolStateID := func(epochProtocolStateEntryID flow.Identifier) func(tx *badger.Txn) (*flow.RichEpochProtocolStateEntry, error) {
+		var entry flow.EpochProtocolStateEntry
 		return func(tx *badger.Txn) (*flow.RichEpochProtocolStateEntry, error) {
-			err := operation.RetrieveProtocolState(protocolStateID, &protocolStateEntry)(tx)
+			err := operation.RetrieveEpochProtocolState(epochProtocolStateEntryID, &entry)(tx)
 			if err != nil {
 				return nil, err
 			}
-			result, err := newRichEpochProtocolStateEntry(&protocolStateEntry, epochSetups, epochCommits)
+			result, err := newRichEpochProtocolStateEntry(&entry, epochSetups, epochCommits)
 			if err != nil {
 				return nil, fmt.Errorf("could not create RichEpochProtocolStateEntry: %w", err)
 			}
@@ -85,11 +86,11 @@ func NewProtocolState(collector module.CacheMetrics,
 		}
 	}
 
-	storeByBlockID := func(blockID flow.Identifier, protocolStateID flow.Identifier) func(*transaction.Tx) error {
+	storeByBlockID := func(blockID flow.Identifier, epochProtocolStateEntryID flow.Identifier) func(*transaction.Tx) error {
 		return func(tx *transaction.Tx) error {
-			err := transaction.WithTx(operation.IndexProtocolState(blockID, protocolStateID))(tx)
+			err := transaction.WithTx(operation.IndexEpochProtocolState(blockID, epochProtocolStateEntryID))(tx)
 			if err != nil {
-				return fmt.Errorf("could not index protocol state for block (%x): %w", blockID[:], err)
+				return fmt.Errorf("could not index EpochProtocolState for block (%x): %w", blockID[:], err)
 			}
 			return nil
 		}
@@ -97,16 +98,16 @@ func NewProtocolState(collector module.CacheMetrics,
 
 	retrieveByBlockID := func(blockID flow.Identifier) func(tx *badger.Txn) (flow.Identifier, error) {
 		return func(tx *badger.Txn) (flow.Identifier, error) {
-			var protocolStateID flow.Identifier
-			err := operation.LookupProtocolState(blockID, &protocolStateID)(tx)
+			var entryID flow.Identifier
+			err := operation.LookupEpochProtocolState(blockID, &entryID)(tx)
 			if err != nil {
-				return flow.ZeroID, fmt.Errorf("could not lookup protocol state ID for block (%x): %w", blockID[:], err)
+				return flow.ZeroID, fmt.Errorf("could not lookup protocol state entry ID for block (%x): %w", blockID[:], err)
 			}
-			return protocolStateID, nil
+			return entryID, nil
 		}
 	}
 
-	return &ProtocolState{
+	return &EpochProtocolStateEntries{
 		db: db,
 		cache: newCache[flow.Identifier, *flow.RichEpochProtocolStateEntry](collector, metrics.ResourceProtocolState,
 			withLimit[flow.Identifier, *flow.RichEpochProtocolStateEntry](stateCacheSize),
@@ -120,27 +121,27 @@ func NewProtocolState(collector module.CacheMetrics,
 }
 
 // StoreTx returns an anonymous function (intended to be executed as part of a badger transaction),
-// which persists the given protocol state as part of a DB tx. Per convention, the identities in
-// the Protocol State must be in canonical order for the current and next epoch (if present),
+// which persists the given epoch protocol state entry as part of a DB tx. Per convention, the identities in
+// the flow.EpochProtocolStateEntry must be in canonical order for the current and next epoch (if present),
 // otherwise an exception is returned.
 // Expected errors of the returned anonymous function:
-//   - storage.ErrAlreadyExists if a Protocol State with the given id is already stored
-func (s *ProtocolState) StoreTx(protocolStateID flow.Identifier, protocolState *flow.EpochProtocolStateEntry) func(*transaction.Tx) error {
+//   - storage.ErrAlreadyExists if a state entry with the given id is already stored
+func (s *EpochProtocolStateEntries) StoreTx(epochProtocolStateEntryID flow.Identifier, epochStateEntry *flow.EpochProtocolStateEntry) func(*transaction.Tx) error {
 	// front-load sanity checks:
-	if !protocolState.CurrentEpoch.ActiveIdentities.Sorted(flow.IdentifierCanonical) {
+	if !epochStateEntry.CurrentEpoch.ActiveIdentities.Sorted(flow.IdentifierCanonical) {
 		return transaction.Fail(fmt.Errorf("sanity check failed: identities are not sorted"))
 	}
-	if protocolState.NextEpoch != nil && !protocolState.NextEpoch.ActiveIdentities.Sorted(flow.IdentifierCanonical) {
+	if epochStateEntry.NextEpoch != nil && !epochStateEntry.NextEpoch.ActiveIdentities.Sorted(flow.IdentifierCanonical) {
 		return transaction.Fail(fmt.Errorf("sanity check failed: next epoch identities are not sorted"))
 	}
 
-	// happy path: return anonymous function, whose future execution (as part of a transaction) will store the protocolState
-	return transaction.WithTx(operation.InsertProtocolState(protocolStateID, protocolState))
+	// happy path: return anonymous function, whose future execution (as part of a transaction) will store the state entry.
+	return transaction.WithTx(operation.InsertEpochProtocolState(epochProtocolStateEntryID, epochStateEntry))
 }
 
 // Index returns an anonymous function that is intended to be executed as part of a database transaction.
-// In a nutshell, we want to maintain a map from `blockID` to `protocolStateID`, where `blockID` references the
-// block that _proposes_ the Protocol State.
+// In a nutshell, we want to maintain a map from `blockID` to `epochStateEntry`, where `blockID` references the
+// block that _proposes_ the referenced epoch protocol state entry.
 // Upon call, the anonymous function persists the specific map entry in the node's database.
 // Protocol convention:
 //   - Consider block B, whose ingestion might potentially lead to an updated protocol state. For example,
@@ -151,21 +152,21 @@ func (s *ProtocolState) StoreTx(protocolStateID flow.Identifier, protocolState *
 //     _after_ validating the QC.
 //
 // Expected errors during normal operations:
-//   - storage.ErrAlreadyExists if a Protocol State for the given blockID has already been indexed
-func (s *ProtocolState) Index(blockID flow.Identifier, protocolStateID flow.Identifier) func(*transaction.Tx) error {
-	return s.byBlockIdCache.PutTx(blockID, protocolStateID)
+//   - storage.ErrAlreadyExists if a state entry for the given blockID has already been indexed
+func (s *EpochProtocolStateEntries) Index(blockID flow.Identifier, epochProtocolStateEntryID flow.Identifier) func(*transaction.Tx) error {
+	return s.byBlockIdCache.PutTx(blockID, epochProtocolStateEntryID)
 }
 
-// ByID returns the protocol state by its ID.
+// ByID returns the epoch protocol state entry by its ID.
 // Expected errors during normal operations:
 //   - storage.ErrNotFound if no protocol state with the given Identifier is known.
-func (s *ProtocolState) ByID(protocolStateID flow.Identifier) (*flow.RichEpochProtocolStateEntry, error) {
+func (s *EpochProtocolStateEntries) ByID(epochProtocolStateEntryID flow.Identifier) (*flow.RichEpochProtocolStateEntry, error) {
 	tx := s.db.NewTransaction(false)
 	defer tx.Discard()
-	return s.cache.Get(protocolStateID)(tx)
+	return s.cache.Get(epochProtocolStateEntryID)(tx)
 }
 
-// ByBlockID retrieves the Protocol State that the block with the given ID proposes.
+// ByBlockID retrieves the epoch protocol state entry that the block with the given ID proposes.
 // CAUTION: this protocol state requires confirmation by a QC and will only become active at the child block,
 // _after_ validating the QC. Protocol convention:
 //   - Consider block B, whose ingestion might potentially lead to an updated protocol state. For example,
@@ -176,15 +177,15 @@ func (s *ProtocolState) ByID(protocolStateID flow.Identifier) (*flow.RichEpochPr
 //     _after_ validating the QC.
 //
 // Expected errors during normal operations:
-//   - storage.ErrNotFound if no protocol state has been indexed for the given block.
-func (s *ProtocolState) ByBlockID(blockID flow.Identifier) (*flow.RichEpochProtocolStateEntry, error) {
+//   - storage.ErrNotFound if no state entry has been indexed for the given block.
+func (s *EpochProtocolStateEntries) ByBlockID(blockID flow.Identifier) (*flow.RichEpochProtocolStateEntry, error) {
 	tx := s.db.NewTransaction(false)
 	defer tx.Discard()
-	protocolStateID, err := s.byBlockIdCache.Get(blockID)(tx)
+	epochProtocolStateEntryID, err := s.byBlockIdCache.Get(blockID)(tx)
 	if err != nil {
-		return nil, fmt.Errorf("could not lookup protocol state ID for block (%x): %w", blockID[:], err)
+		return nil, fmt.Errorf("could not lookup epoch protocol state ID for block (%x): %w", blockID[:], err)
 	}
-	return s.cache.Get(protocolStateID)(tx)
+	return s.cache.Get(epochProtocolStateEntryID)(tx)
 }
 
 // newRichEpochProtocolStateEntry constructs a RichEpochProtocolStateEntry from an epoch sub-state entry.

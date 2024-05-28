@@ -21,7 +21,7 @@ func TestProtocolStateStorage(t *testing.T) {
 
 		setups := NewEpochSetups(metrics, db)
 		commits := NewEpochCommits(metrics, db)
-		store := NewProtocolState(metrics, setups, commits, db, DefaultProtocolStateCacheSize, DefaultProtocolStateByBlockIDCacheSize)
+		store := NewEpochProtocolStateEntries(metrics, setups, commits, db, DefaultEpochProtocolStateCacheSize, DefaultProtocolStateIndexCacheSize)
 
 		expected := unittest.EpochStateFixture(unittest.WithNextEpochProtocolState())
 		protocolStateID := expected.ID()
@@ -72,7 +72,7 @@ func TestProtocolStateStoreInvalidProtocolState(t *testing.T) {
 		metrics := metrics.NewNoopCollector()
 		setups := NewEpochSetups(metrics, db)
 		commits := NewEpochCommits(metrics, db)
-		store := NewProtocolState(metrics, setups, commits, db, DefaultProtocolStateCacheSize, DefaultProtocolStateByBlockIDCacheSize)
+		store := NewEpochProtocolStateEntries(metrics, setups, commits, db, DefaultEpochProtocolStateCacheSize, DefaultProtocolStateIndexCacheSize)
 		invalid := unittest.EpochStateFixture().EpochProtocolStateEntry
 		// swap first and second elements to break canonical order
 		invalid.CurrentEpoch.ActiveIdentities[0], invalid.CurrentEpoch.ActiveIdentities[1] = invalid.CurrentEpoch.ActiveIdentities[1], invalid.CurrentEpoch.ActiveIdentities[0]
@@ -98,7 +98,7 @@ func TestProtocolStateMergeParticipants(t *testing.T) {
 
 		setups := NewEpochSetups(metrics, db)
 		commits := NewEpochCommits(metrics, db)
-		store := NewProtocolState(metrics, setups, commits, db, DefaultProtocolStateCacheSize, DefaultProtocolStateByBlockIDCacheSize)
+		store := NewEpochProtocolStateEntries(metrics, setups, commits, db, DefaultEpochProtocolStateCacheSize, DefaultProtocolStateIndexCacheSize)
 
 		stateEntry := unittest.EpochStateFixture()
 		// change address of participant in current epoch, so we can distinguish it from the one in previous epoch
@@ -147,7 +147,7 @@ func TestProtocolStateRootSnapshot(t *testing.T) {
 
 		setups := NewEpochSetups(metrics, db)
 		commits := NewEpochCommits(metrics, db)
-		store := NewProtocolState(metrics, setups, commits, db, DefaultProtocolStateCacheSize, DefaultProtocolStateByBlockIDCacheSize)
+		store := NewEpochProtocolStateEntries(metrics, setups, commits, db, DefaultEpochProtocolStateCacheSize, DefaultProtocolStateIndexCacheSize)
 		expected := unittest.RootEpochProtocolStateFixture()
 
 		protocolStateID := expected.ID()
