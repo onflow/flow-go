@@ -120,9 +120,20 @@ func NewFullConsensusState(
 //
 //	candidate.View == certifyingQC.View && candidate.ID() == certifyingQC.BlockID
 //
-// Caution:
-//   - This function expects that `certifyingQC` has been validated.
-//   - The parent block must already be stored.
+// CAUTION:
+//   - This function expects that `certifyingQC ` has been validated. (otherwise, the state will be corrupted)
+//   - The parent block must already have been ingested.
+//
+// Per convention, the protocol state requires that the candidate's parent has already been ingested.
+// Other than that, all valid extensions are accepted. Even if we have enough information to determine that
+// a candidate block is already orphaned (e.g. its view is below the latest finalized view), it is important
+// to accept it nevertheless to avoid spamming vulnerabilities. If a block is orphaned, consensus rules
+// guarantee that there exists only a limited number of descendants which cannot increase anymore. So there
+// is only a finite (generally small) amount of work to do accepting orphaned blocks and all their descendants.
+// However, if we were to drop orphaned blocks, e.g. block X of the orphaned fork X <- Y <- Z, we might not
+// have enough information to reject blocks Y, Z later if we receive them. We would re-request X, then
+// determine it is orphaned and drop it, attempt to ingest Y re-request the unknown parent X and repeat
+// potentially very often.
 //
 // No errors are expected during normal operations.
 func (m *FollowerState) ExtendCertified(ctx context.Context, candidate *flow.Block, certifyingQC *flow.QuorumCertificate) error {
@@ -177,6 +188,21 @@ func (m *FollowerState) ExtendCertified(ctx context.Context, candidate *flow.Blo
 
 // Extend extends the protocol state of a CONSENSUS PARTICIPANT. It checks
 // the validity of the _entire block_ (header and full payload).
+//
+// CAUTION: per convention, the protocol state requires that the candidate's
+// parent has already been ingested. Otherwise, an exception is returned.
+//
+// Per convention, the protocol state requires that the candidate's parent has already been ingested.
+// Other than that, all valid extensions are accepted. Even if we have enough information to determine that
+// a candidate block is already orphaned (e.g. its view is below the latest finalized view), it is important
+// to accept it nevertheless to avoid spamming vulnerabilities. If a block is orphaned, consensus rules
+// guarantee that there exists only a limited number of descendants which cannot increase anymore. So there
+// is only a finite (generally small) amount of work to do accepting orphaned blocks and all their descendants.
+// However, if we were to drop orphaned blocks, e.g. block X of the orphaned fork X <- Y <- Z, we might not
+// have enough information to reject blocks Y, Z later if we receive them. We would re-request X, then
+// determine it is orphaned and drop it, attempt to ingest Y re-request the unknown parent X and repeat
+// potentially very often.
+//
 // Expected errors during normal operations:
 //   - state.OutdatedExtensionError if the candidate block is outdated (e.g. orphaned)
 //   - state.InvalidExtensionError if the candidate block is invalid
@@ -273,11 +299,14 @@ func (m *FollowerState) headerExtend(ctx context.Context, candidate *flow.Block,
 		return state.NewInvalidExtensionError("payload integrity check failed")
 	}
 
-	// STEP 2: Next, we can check whether the block is a valid descendant of the
-	// parent. It should have the same chain ID and a height that is one bigger.
-	parent, err := m.headers.ByBlockID(header.ParentID)
+	// STEP 2: check whether the candidate (i) connects to the known block tree and
+	// (ii) has the same chain ID as its parent and a height incremented by 1.
+	parent, err := m.headers.ByBlockID(header.ParentID) // (i) connects to the known block tree
 	if err != nil {
-		return state.NewInvalidExtensionErrorf("could not retrieve parent: %s", err)
+		// The only sentinel error that can happen here is `storage.ErrNotFound`. However, by convention the
+		// protocol state must be extended in a parent-first order. This block's parent being unknown breaks
+		// with this API contract and results in an exception.
+		return irrecoverable.NewExceptionf("could not retrieve the candidate's parent block %v: %w", header.ParentID, err)
 	}
 	if header.ChainID != parent.ChainID {
 		return state.NewInvalidExtensionErrorf("candidate built for invalid chain (candidate: %s, parent: %s)",
@@ -531,16 +560,16 @@ func (m *ParticipantState) receiptExtend(ctx context.Context, candidate *flow.Bl
 
 	err := m.receiptValidator.ValidatePayload(candidate)
 	if err != nil {
-		// TODO: this might be not an error, potentially it can be solved by requesting more data and processing this receipt again
-		if errors.Is(err, storage.ErrNotFound) {
-			return state.NewInvalidExtensionErrorf("some entities referenced by receipts are missing: %w", err)
-		}
 		if engine.IsInvalidInputError(err) {
 			return state.NewInvalidExtensionErrorf("payload includes invalid receipts: %w", err)
 		}
+		if module.IsUnknownBlockError(err) {
+			// By convention, the protocol state must be extended in a parent-first order. This block's parent
+			// being unknown breaks with this API contract and results in an exception.
+			return irrecoverable.NewExceptionf("internal state corruption detected when validating receipts in candidate block %v: %w", candidate.ID(), err)
+		}
 		return fmt.Errorf("unexpected payload validation error %w", err)
 	}
-
 	return nil
 }
 

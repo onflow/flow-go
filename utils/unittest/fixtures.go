@@ -959,11 +959,11 @@ func ServiceEventsFixture(n int) flow.ServiceEventList {
 }
 
 func ExecutionResultFixture(opts ...func(*flow.ExecutionResult)) *flow.ExecutionResult {
-	blockID := IdentifierFixture()
+	executedBlockID := IdentifierFixture()
 	result := &flow.ExecutionResult{
 		PreviousResultID: IdentifierFixture(),
-		BlockID:          IdentifierFixture(),
-		Chunks:           ChunkListFixture(2, blockID),
+		BlockID:          executedBlockID,
+		Chunks:           ChunkListFixture(2, executedBlockID),
 		ExecutionDataID:  IdentifierFixture(),
 	}
 

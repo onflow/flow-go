@@ -182,7 +182,7 @@ func MigrateGroupConcurrently(
 						continue
 					}
 
-					for m, migration := range migrations {
+					for migrationIndex, migration := range migrations {
 
 						select {
 						case <-ctx.Done():
@@ -194,7 +194,7 @@ func MigrateGroupConcurrently(
 						if err != nil {
 							log.Error().
 								Err(err).
-								Int("migration_index", m).
+								Int("migration_index", migrationIndex).
 								Type("migration", migration).
 								Hex("address", address[:]).
 								Msg("could not migrate account")
