@@ -1,5 +1,3 @@
-// (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
-
 package flow
 
 import (
@@ -16,8 +14,6 @@ const (
 	EventAccountCreated EventType = "flow.AccountCreated"
 	EventAccountUpdated EventType = "flow.AccountUpdated"
 )
-
-const EVMLocationPrefix = "evm"
 
 type EventType string
 

@@ -9,9 +9,9 @@ import (
 	"time"
 
 	"github.com/coreos/go-semver/semver"
+	"github.com/ipfs/boxo/blockstore"
 	"github.com/ipfs/go-datastore"
 	dssync "github.com/ipfs/go-datastore/sync"
-	blockstore "github.com/ipfs/go-ipfs-blockstore"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -189,31 +189,32 @@ func GenericNodeWithStateFixture(t testing.TB,
 	ctx, errs := irrecoverable.WithSignaler(parentCtx)
 
 	return testmock.GenericNode{
-		Ctx:                    ctx,
-		Cancel:                 cancel,
-		Errs:                   errs,
-		Log:                    log,
-		Metrics:                metrics,
-		Tracer:                 tracer,
-		PublicDB:               stateFixture.PublicDB,
-		SecretsDB:              stateFixture.SecretsDB,
-		Headers:                stateFixture.Storage.Headers,
-		Guarantees:             stateFixture.Storage.Guarantees,
-		Seals:                  stateFixture.Storage.Seals,
-		Payloads:               stateFixture.Storage.Payloads,
-		Blocks:                 stateFixture.Storage.Blocks,
-		QuorumCertificates:     stateFixture.Storage.QuorumCertificates,
-		Results:                stateFixture.Storage.Results,
-		Setups:                 stateFixture.Storage.Setups,
-		EpochCommits:           stateFixture.Storage.EpochCommits,
-		ProtocolStateSnapshots: stateFixture.Storage.ProtocolState,
-		State:                  stateFixture.State,
-		Index:                  stateFixture.Storage.Index,
-		Me:                     me,
-		Net:                    net,
-		DBDir:                  stateFixture.DBDir,
-		ChainID:                chainID,
-		ProtocolEvents:         stateFixture.ProtocolEvents,
+		Ctx:                ctx,
+		Cancel:             cancel,
+		Errs:               errs,
+		Log:                log,
+		Metrics:            metrics,
+		Tracer:             tracer,
+		PublicDB:           stateFixture.PublicDB,
+		SecretsDB:          stateFixture.SecretsDB,
+		Headers:            stateFixture.Storage.Headers,
+		Guarantees:         stateFixture.Storage.Guarantees,
+		Seals:              stateFixture.Storage.Seals,
+		Payloads:           stateFixture.Storage.Payloads,
+		Blocks:             stateFixture.Storage.Blocks,
+		QuorumCertificates: stateFixture.Storage.QuorumCertificates,
+		Results:            stateFixture.Storage.Results,
+		Setups:             stateFixture.Storage.Setups,
+		EpochCommits:       stateFixture.Storage.EpochCommits,
+		EpochProtocolState: stateFixture.Storage.EpochProtocolState,
+		ProtocolKVStore:    stateFixture.Storage.ProtocolKVStore,
+		State:              stateFixture.State,
+		Index:              stateFixture.Storage.Index,
+		Me:                 me,
+		Net:                net,
+		DBDir:              stateFixture.DBDir,
+		ChainID:            chainID,
+		ProtocolEvents:     stateFixture.ProtocolEvents,
 	}
 }
 
@@ -244,7 +245,8 @@ func CompleteStateFixture(
 		s.QuorumCertificates,
 		s.Setups,
 		s.EpochCommits,
-		s.ProtocolState,
+		s.EpochProtocolState,
+		s.ProtocolKVStore,
 		s.VersionBeacons,
 		rootSnapshot,
 	)
@@ -570,7 +572,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ide
 	diskWal, err := wal.NewDiskWAL(node.Log.With().Str("subcomponent", "wal").Logger(), nil, metricsCollector, dbDir, capacity, pathfinder.PathByteSize, wal.SegmentSize)
 	require.NoError(t, err)
 
-	ls, err := completeLedger.NewLedger(diskWal, capacity, metricsCollector, node.Log.With().Str("compontent", "ledger").Logger(), completeLedger.DefaultPathFinderVersion)
+	ls, err := completeLedger.NewLedger(diskWal, capacity, metricsCollector, node.Log.With().Str("component", "ledger").Logger(), completeLedger.DefaultPathFinderVersion)
 	require.NoError(t, err)
 
 	compactor, err := completeLedger.NewCompactor(ls, diskWal, zerolog.Nop(), capacity, checkpointDistance, checkpointsToKeep, atomic.NewBool(false), metricsCollector)

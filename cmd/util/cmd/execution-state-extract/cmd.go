@@ -10,9 +10,9 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 
-	runtimeCommon "github.com/onflow/cadence/runtime/common"
-
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
+	common2 "github.com/onflow/flow-go/cmd/util/common"
+	"github.com/onflow/flow-go/cmd/util/ledger/migrations"
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
@@ -21,21 +21,34 @@ import (
 )
 
 var (
-	flagExecutionStateDir             string
-	flagOutputDir                     string
-	flagBlockHash                     string
-	flagStateCommitment               string
-	flagDatadir                       string
-	flagChain                         string
-	flagNWorker                       int
-	flagNoMigration                   bool
-	flagNoReport                      bool
-	flagValidateMigration             bool
-	flagLogVerboseValidationError     bool
-	flagAllowPartialStateFromPayloads bool
-	flagInputPayloadFileName          string
-	flagOutputPayloadFileName         string
-	flagOutputPayloadByAddresses      string
+	flagExecutionStateDir                  string
+	flagOutputDir                          string
+	flagBlockHash                          string
+	flagStateCommitment                    string
+	flagDatadir                            string
+	flagChain                              string
+	flagNWorker                            int
+	flagNoMigration                        bool
+	flagNoReport                           bool
+	flagValidateMigration                  bool
+	flagAllowPartialStateFromPayloads      bool
+	flagSortPayloads                       bool
+	flagPrune                              bool
+	flagLogVerboseValidationError          bool
+	flagDiffMigration                      bool
+	flagLogVerboseDiff                     bool
+	flagVerboseErrorOutput                 bool
+	flagStagedContractsFile                string
+	flagContinueMigrationOnValidationError bool
+	flagCheckStorageHealthBeforeMigration  bool
+	flagCheckStorageHealthAfterMigration   bool
+	flagInputPayloadFileName               string
+	flagOutputPayloadFileName              string
+	flagOutputPayloadByAddresses           string
+	flagMaxAccountSize                     uint64
+	flagFixSlabsWithBrokenReferences       bool
+	flagFilterUnreferencedSlabs            bool
+	flagCPUProfile                         string
 )
 
 var Cmd = &cobra.Command{
@@ -54,6 +67,7 @@ func init() {
 	_ = Cmd.MarkFlagRequired("output-dir")
 
 	Cmd.Flags().StringVar(&flagChain, "chain", "", "Chain name")
+	_ = Cmd.MarkFlagRequired("chain")
 
 	Cmd.Flags().StringVar(&flagStateCommitment, "state-commitment", "",
 		"state commitment (hex-encoded, 64 characters)")
@@ -78,8 +92,35 @@ func init() {
 	Cmd.Flags().BoolVar(&flagLogVerboseValidationError, "log-verbose-validation-error", false,
 		"log entire Cadence values on validation error (atree migration)")
 
+	Cmd.Flags().BoolVar(&flagDiffMigration, "diff", false,
+		"compare Cadence values and log diff (migration)")
+
+	Cmd.Flags().BoolVar(&flagLogVerboseDiff, "log-verbose-diff", false,
+		"log entire Cadence values on diff (requires --diff flag)")
+
+	Cmd.Flags().BoolVar(&flagVerboseErrorOutput, "verbose-error-output", true,
+		"log verbose output on migration errors")
+
+	Cmd.Flags().StringVar(&flagStagedContractsFile, "staged-contracts", "",
+		"Staged contracts CSV file")
+
 	Cmd.Flags().BoolVar(&flagAllowPartialStateFromPayloads, "allow-partial-state-from-payload-file", false,
 		"allow input payload file containing partial state (e.g. not all accounts)")
+
+	Cmd.Flags().BoolVar(&flagCheckStorageHealthBeforeMigration, "check-storage-health-before", false,
+		"check (atree) storage health before migration")
+
+	Cmd.Flags().BoolVar(&flagCheckStorageHealthAfterMigration, "check-storage-health-after", false,
+		"check (atree) storage health after migration")
+
+	Cmd.Flags().BoolVar(&flagContinueMigrationOnValidationError, "continue-migration-on-validation-errors", false,
+		"continue migration even if validation fails")
+
+	Cmd.Flags().BoolVar(&flagSortPayloads, "sort-payloads", true,
+		"sort payloads (generate deterministic output; disable only for development purposes)")
+
+	Cmd.Flags().BoolVar(&flagPrune, "prune", false,
+		"prune the state (for development purposes)")
 
 	// If specified, the state will consist of payloads from the given input payload file.
 	// If not specified, then the state will be extracted from the latest checkpoint file.
@@ -110,6 +151,18 @@ func init() {
 		"",
 		"extract payloads of addresses (comma separated hex-encoded addresses) to file specified by output-payload-filename",
 	)
+
+	Cmd.Flags().Uint64Var(&flagMaxAccountSize, "max-account-size", 0,
+		"max account size")
+
+	Cmd.Flags().BoolVar(&flagFixSlabsWithBrokenReferences, "fix-testnet-slabs-with-broken-references", false,
+		"fix slabs with broken references in testnet")
+
+	Cmd.Flags().BoolVar(&flagFilterUnreferencedSlabs, "filter-unreferenced-slabs", false,
+		"filter unreferenced slabs")
+
+	Cmd.Flags().StringVar(&flagCPUProfile, "cpu-profile", "",
+		"enable CPU profiling")
 }
 
 func run(*cobra.Command, []string) {
@@ -133,6 +186,10 @@ func run(*cobra.Command, []string) {
 		log.Fatal().Msg("--extract-payloads-by-address requires --output-payload-filename to be specified")
 	}
 
+	if flagValidateMigration && flagDiffMigration {
+		log.Fatal().Msg("Both --validate and --diff are enabled, please specify only one (or none) of these")
+	}
+
 	if len(flagBlockHash) > 0 {
 		blockID, err := flow.HexStringToIdentifier(flagBlockHash)
 		if err != nil {
@@ -147,7 +204,7 @@ func run(*cobra.Command, []string) {
 		cache := &metrics.NoopCollector{}
 		commits := badger.NewCommits(cache, db)
 
-		stateCommitment, err = getStateCommitment(commits, blockID)
+		stateCommitment, err = commits.ByBlockID(blockID)
 		if err != nil {
 			log.Fatal().Err(err).Msgf("cannot get state commitment for block %v", blockID)
 		}
@@ -202,24 +259,13 @@ func run(*cobra.Command, []string) {
 		}
 	}
 
-	var exportedAddresses []runtimeCommon.Address
+	var exportPayloadsForOwners map[string]struct{}
 
 	if len(flagOutputPayloadByAddresses) > 0 {
-
-		addresses := strings.Split(flagOutputPayloadByAddresses, ",")
-
-		for _, hexAddr := range addresses {
-			b, err := hex.DecodeString(strings.TrimSpace(hexAddr))
-			if err != nil {
-				log.Fatal().Err(err).Msgf("cannot hex decode address %s for payload export", strings.TrimSpace(hexAddr))
-			}
-
-			addr, err := runtimeCommon.BytesToAddress(b)
-			if err != nil {
-				log.Fatal().Err(err).Msgf("cannot decode address %x for payload export", b)
-			}
-
-			exportedAddresses = append(exportedAddresses, addr)
+		var err error
+		exportPayloadsForOwners, err = common2.ParseOwners(strings.Split(flagOutputPayloadByAddresses, ","))
+		if err != nil {
+			log.Fatal().Err(err).Msgf("failed to parse addresses")
 		}
 	}
 
@@ -228,20 +274,38 @@ func run(*cobra.Command, []string) {
 	// 	log.Fatal().Err(err).Msgf("cannot ensure checkpoint file exist in folder %v", flagExecutionStateDir)
 	// }
 
-	if len(flagChain) > 0 {
-		log.Warn().Msgf("--chain flag is deprecated")
-	}
+	chain := flow.ChainID(flagChain).Chain()
 
 	if flagNoReport {
 		log.Warn().Msgf("--no-report flag is deprecated")
 	}
 
 	if flagValidateMigration {
-		log.Warn().Msgf("atree migration validation flag is enabled and will increase duration of migration")
+		log.Warn().Msgf("--validate flag is enabled and will increase duration of migration")
 	}
 
 	if flagLogVerboseValidationError {
-		log.Warn().Msgf("atree migration has verbose validation error logging enabled which may increase size of log")
+		log.Warn().Msgf("--log-verbose-validation-error flag is enabled which may increase size of log")
+	}
+
+	if flagDiffMigration {
+		log.Warn().Msgf("--diff flag is enabled and will increase duration of migration")
+	}
+
+	if flagLogVerboseDiff {
+		log.Warn().Msgf("--log-verbose-diff flag is enabled which may increase size of log")
+	}
+
+	if flagVerboseErrorOutput {
+		log.Warn().Msgf("--verbose-error-output flag is enabled which may increase size of log")
+	}
+
+	if flagCheckStorageHealthBeforeMigration {
+		log.Warn().Msgf("--check-storage-health-before flag is enabled and will increase duration of migration")
+	}
+
+	if flagCheckStorageHealthAfterMigration {
+		log.Warn().Msgf("--check-storage-health-after flag is enabled and will increase duration of migration")
 	}
 
 	var inputMsg string
@@ -259,12 +323,12 @@ func run(*cobra.Command, []string) {
 	var outputMsg string
 	if len(flagOutputPayloadFileName) > 0 {
 		// Output is payload file
-		if len(exportedAddresses) == 0 {
+		if len(exportPayloadsForOwners) == 0 {
 			outputMsg = fmt.Sprintf("exporting all payloads to %s", flagOutputPayloadFileName)
 		} else {
 			outputMsg = fmt.Sprintf(
-				"exporting payloads by addresses %v to %s",
-				flagOutputPayloadByAddresses,
+				"exporting payloads for owners %v to %s",
+				common2.OwnersToString(exportPayloadsForOwners),
 				flagOutputPayloadFileName,
 			)
 		}
@@ -279,7 +343,40 @@ func run(*cobra.Command, []string) {
 
 	log.Info().Msgf("state extraction plan: %s, %s", inputMsg, outputMsg)
 
-	var err error
+	chainID := chain.ChainID()
+
+	burnerContractChange := migrations.BurnerContractChangeNone
+	evmContractChange := migrations.EVMContractChangeNone
+	switch chainID {
+	case flow.Emulator:
+		burnerContractChange = migrations.BurnerContractChangeDeploy
+		evmContractChange = migrations.EVMContractChangeDeploy
+	case flow.Testnet, flow.Mainnet:
+		burnerContractChange = migrations.BurnerContractChangeUpdate
+		evmContractChange = migrations.EVMContractChangeUpdate
+	}
+
+	stagedContracts, err := migrations.StagedContractsFromCSV(flagStagedContractsFile)
+	if err != nil {
+		log.Fatal().Err(err).Msgf("error loading staged contracts: %s", err.Error())
+	}
+
+	opts := migrations.Options{
+		NWorker:                           flagNWorker,
+		DiffMigrations:                    flagDiffMigration,
+		LogVerboseDiff:                    flagLogVerboseDiff,
+		CheckStorageHealthBeforeMigration: flagCheckStorageHealthBeforeMigration,
+		ChainID:                           chainID,
+		EVMContractChange:                 evmContractChange,
+		BurnerContractChange:              burnerContractChange,
+		StagedContracts:                   stagedContracts,
+		Prune:                             flagPrune,
+		MaxAccountSize:                    flagMaxAccountSize,
+		VerboseErrorOutput:                flagVerboseErrorOutput,
+		FixSlabsWithBrokenReferences:      chainID == flow.Testnet && flagFixSlabsWithBrokenReferences,
+		FilterUnreferencedSlabs:           flagFilterUnreferencedSlabs,
+	}
+
 	if len(flagInputPayloadFileName) > 0 {
 		err = extractExecutionStateFromPayloads(
 			log.Logger,
@@ -289,7 +386,9 @@ func run(*cobra.Command, []string) {
 			!flagNoMigration,
 			flagInputPayloadFileName,
 			flagOutputPayloadFileName,
-			exportedAddresses,
+			exportPayloadsForOwners,
+			flagSortPayloads,
+			opts,
 		)
 	} else {
 		err = extractExecutionState(
@@ -300,7 +399,9 @@ func run(*cobra.Command, []string) {
 			flagNWorker,
 			!flagNoMigration,
 			flagOutputPayloadFileName,
-			exportedAddresses,
+			exportPayloadsForOwners,
+			flagSortPayloads,
+			opts,
 		)
 	}
 

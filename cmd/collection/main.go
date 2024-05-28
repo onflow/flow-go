@@ -43,6 +43,7 @@ import (
 	modulecompliance "github.com/onflow/flow-go/module/compliance"
 	"github.com/onflow/flow-go/module/epochs"
 	confinalizer "github.com/onflow/flow-go/module/finalizer/consensus"
+	"github.com/onflow/flow-go/module/grpcclient"
 	"github.com/onflow/flow-go/module/mempool"
 	epochpool "github.com/onflow/flow-go/module/mempool/epochs"
 	"github.com/onflow/flow-go/module/mempool/herocache"
@@ -87,17 +88,18 @@ func main() {
 		followerDistributor *pubsub.FollowerDistributor
 		addressRateLimiter  *ingest.AddressRateLimiter
 
-		push              *pusher.Engine
-		ing               *ingest.Engine
-		mainChainSyncCore *chainsync.Core
-		followerCore      *hotstuff.FollowerLoop // follower hotstuff logic
-		followerEng       *followereng.ComplianceEngine
-		colMetrics        module.CollectionMetrics
-		err               error
+		push                  *pusher.Engine
+		ing                   *ingest.Engine
+		mainChainSyncCore     *chainsync.Core
+		followerCore          *hotstuff.FollowerLoop // follower hotstuff logic
+		followerEng           *followereng.ComplianceEngine
+		colMetrics            module.CollectionMetrics
+		machineAccountMetrics module.MachineAccountMetrics
+		err                   error
 
 		// epoch qc contract client
 		machineAccountInfo *bootstrap.NodeMachineAccountInfo
-		flowClientConfigs  []*common.FlowClientConfig
+		flowClientConfigs  []*grpcclient.FlowClientConfig
 		insecureAccessAPI  bool
 		accessNodeIDS      []string
 		apiRatelimits      map[string]int
@@ -260,17 +262,21 @@ func main() {
 			err := node.Metrics.Mempool.Register(metrics.ResourceTransaction, pools.CombinedSize)
 			return err
 		}).
-		Module("metrics", func(node *cmd.NodeConfig) error {
+		Module("machine account config", func(node *cmd.NodeConfig) error {
+			machineAccountInfo, err = cmd.LoadNodeMachineAccountInfoFile(node.BootstrapDir, node.NodeID)
+			return err
+		}).
+		Module("collection node metrics", func(node *cmd.NodeConfig) error {
 			colMetrics = metrics.NewCollectionCollector(node.Tracer)
+			return nil
+		}).
+		Module("machine account metrics", func(node *cmd.NodeConfig) error {
+			machineAccountMetrics = metrics.NewMachineAccountCollector(node.MetricsRegisterer, machineAccountInfo.FlowAddress())
 			return nil
 		}).
 		Module("main chain sync core", func(node *cmd.NodeConfig) error {
 			log := node.Logger.With().Str("sync_chain_id", node.RootChainID.String()).Logger()
 			mainChainSyncCore, err = chainsync.New(log, node.SyncCoreConfig, metrics.NewChainSyncCollector(node.RootChainID), node.RootChainID)
-			return err
-		}).
-		Module("machine account config", func(node *cmd.NodeConfig) error {
-			machineAccountInfo, err = cmd.LoadNodeMachineAccountInfoFile(node.BootstrapDir, node.NodeID)
 			return err
 		}).
 		Module("sdk client connection options", func(node *cmd.NodeConfig) error {
@@ -279,7 +285,7 @@ func main() {
 				return fmt.Errorf("failed to validate flag --access-node-ids %w", err)
 			}
 
-			flowClientConfigs, err = common.FlowClientConfigs(anIDS, insecureAccessAPI, node.State.Sealed())
+			flowClientConfigs, err = grpcclient.FlowClientConfigs(anIDS, insecureAccessAPI, node.State.Sealed())
 			if err != nil {
 				return fmt.Errorf("failed to prepare flow client connection configs for each access node id %w", err)
 			}
@@ -288,7 +294,7 @@ func main() {
 		}).
 		Component("machine account config validator", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			// @TODO use fallback logic for flowClient similar to DKG/QC contract clients
-			flowClient, err := common.FlowClient(flowClientConfigs[0])
+			flowClient, err := grpcclient.FlowClient(flowClientConfigs[0])
 			if err != nil {
 				return nil, fmt.Errorf("failed to get flow client connection option for access node (0): %s %w", flowClientConfigs[0].AccessAddress, err)
 			}
@@ -303,6 +309,7 @@ func main() {
 				flowClient,
 				flow.RoleCollection,
 				*machineAccountInfo,
+				machineAccountMetrics,
 				opts...,
 			)
 
@@ -676,11 +683,11 @@ func createQCContractClient(node *cmd.NodeConfig, machineAccountInfo *bootstrap.
 }
 
 // createQCContractClients creates priority ordered array of QCContractClient
-func createQCContractClients(node *cmd.NodeConfig, machineAccountInfo *bootstrap.NodeMachineAccountInfo, flowClientOpts []*common.FlowClientConfig) ([]module.QCContractClient, error) {
+func createQCContractClients(node *cmd.NodeConfig, machineAccountInfo *bootstrap.NodeMachineAccountInfo, flowClientOpts []*grpcclient.FlowClientConfig) ([]module.QCContractClient, error) {
 	qcClients := make([]module.QCContractClient, 0)
 
 	for _, opt := range flowClientOpts {
-		flowClient, err := common.FlowClient(opt)
+		flowClient, err := grpcclient.FlowClient(opt)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create flow client for qc contract client with options: %s %w", flowClientOpts, err)
 		}

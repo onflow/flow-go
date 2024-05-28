@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/coreos/go-semver/semver"
-
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/encoding/ccf"
 	"github.com/onflow/crypto"
@@ -17,8 +16,10 @@ import (
 // ServiceEvent converts a service event encoded as the generic flow.Event
 // type to a flow.ServiceEvent type for use within protocol software and protocol
 // state. This acts as the conversion from the Cadence type to the flow-go type.
+// CAUTION: This function must only be used for input events computed locally, by an
+// Execution or Verification Node; it is not resilient to malicious inputs.
+// No errors are expected during normal operation.
 func ServiceEvent(chainID flow.ChainID, event flow.Event) (*flow.ServiceEvent, error) {
-
 	events := systemcontracts.ServiceEventsForChain(chainID)
 
 	// depending on type of service event construct Go type
@@ -29,9 +30,30 @@ func ServiceEvent(chainID flow.ChainID, event flow.Event) (*flow.ServiceEvent, e
 		return convertServiceEventEpochCommit(event)
 	case events.VersionBeacon.EventType():
 		return convertServiceEventVersionBeacon(event)
+	case events.ProtocolStateVersionUpgrade.EventType():
+		return convertServiceEventProtocolStateVersionUpgrade(event)
 	default:
 		return nil, fmt.Errorf("invalid event type: %s", event.Type)
 	}
+}
+
+func getField[T cadence.Value](fields map[string]cadence.Value, fieldName string) (T, error) {
+	field, ok := fields[fieldName]
+	if !ok || field == nil {
+		var zero T
+		return zero, fmt.Errorf(
+			"required field not found: %s",
+			fieldName,
+		)
+	}
+
+	value, ok := field.(T)
+	if !ok {
+		var zero T
+		return zero, invalidCadenceTypeError(fieldName, field, zero)
+	}
+
+	return value, nil
 }
 
 // convertServiceEventEpochSetup converts a service event encoded as the generic
@@ -39,6 +61,10 @@ func ServiceEvent(chainID flow.ChainID, event flow.Event) (*flow.ServiceEvent, e
 // CONVENTION: in the returned `EpochSetup` event,
 //   - Node identities listed in `EpochSetup.Participants` are in CANONICAL ORDER
 //   - for each cluster assignment (i.e. element in `EpochSetup.Assignments`), the nodeIDs are listed in CANONICAL ORDER
+//
+// CAUTION: This function must only be used for input events computed locally, by an
+// Execution or Verification Node; it is not resilient to malicious inputs.
+// No errors are expected during normal operation.
 func convertServiceEventEpochSetup(event flow.Event) (*flow.ServiceEvent, error) {
 	// decode bytes using ccf
 	payload, err := ccf.Decode(nil, event.Payload)
@@ -52,168 +78,76 @@ func convertServiceEventEpochSetup(event flow.Event) (*flow.ServiceEvent, error)
 		return nil, invalidCadenceTypeError("payload", payload, cadence.Event{})
 	}
 
-	const expectedFieldCount = 11
-	if len(cdcEvent.Fields) < expectedFieldCount {
-		return nil, fmt.Errorf(
-			"insufficient fields in EpochSetup event (%d < %d)",
-			len(cdcEvent.Fields),
-			expectedFieldCount,
-		)
-	}
-
 	if cdcEvent.Type() == nil {
 		return nil, fmt.Errorf("EpochSetup event doesn't have type")
 	}
 
-	// parse EpochSetup event
+	fields := cadence.FieldsMappedByName(cdcEvent)
 
-	var counter cadence.UInt64
-	var firstView cadence.UInt64
-	var finalView cadence.UInt64
-	var randomSrcHex cadence.String
-	var dkgPhase1FinalView cadence.UInt64
-	var dkgPhase2FinalView cadence.UInt64
-	var dkgPhase3FinalView cadence.UInt64
-	var cdcClusters cadence.Array
-	var cdcParticipants cadence.Array
-	var targetDuration cadence.UInt64    // Epoch duration [seconds]
-	var targetEndTimeUnix cadence.UInt64 // Unix time [seconds]
-
-	var foundFieldCount int
-
-	evt := cdcEvent.Type().(*cadence.EventType)
-
-	for i, f := range evt.Fields {
-		switch f.Identifier {
-		case "counter":
-			foundFieldCount++
-			counter, ok = cdcEvent.Fields[i].(cadence.UInt64)
-			if !ok {
-				return nil, invalidCadenceTypeError(
-					"counter",
-					cdcEvent.Fields[i],
-					cadence.UInt64(0),
-				)
-			}
-
-		case "nodeInfo":
-			foundFieldCount++
-			cdcParticipants, ok = cdcEvent.Fields[i].(cadence.Array)
-			if !ok {
-				return nil, invalidCadenceTypeError(
-					"participants",
-					cdcEvent.Fields[i],
-					cadence.Array{},
-				)
-			}
-
-		case "firstView":
-			foundFieldCount++
-			firstView, ok = cdcEvent.Fields[i].(cadence.UInt64)
-			if !ok {
-				return nil, invalidCadenceTypeError(
-					"firstView",
-					cdcEvent.Fields[i],
-					cadence.UInt64(0),
-				)
-			}
-
-		case "finalView":
-			foundFieldCount++
-			finalView, ok = cdcEvent.Fields[i].(cadence.UInt64)
-			if !ok {
-				return nil, invalidCadenceTypeError(
-					"finalView",
-					cdcEvent.Fields[i],
-					cadence.UInt64(0),
-				)
-			}
-
-		case "collectorClusters":
-			foundFieldCount++
-			cdcClusters, ok = cdcEvent.Fields[i].(cadence.Array)
-			if !ok {
-				return nil, invalidCadenceTypeError(
-					"clusters",
-					cdcEvent.Fields[i],
-					cadence.Array{},
-				)
-			}
-
-		case "randomSource":
-			foundFieldCount++
-			randomSrcHex, ok = cdcEvent.Fields[i].(cadence.String)
-			if !ok {
-				return nil, invalidCadenceTypeError(
-					"randomSource",
-					cdcEvent.Fields[i],
-					cadence.String(""),
-				)
-			}
-
-		case "targetDuration":
-			foundFieldCount++
-			targetDuration, ok = cdcEvent.Fields[i].(cadence.UInt64)
-			if !ok {
-				return nil, invalidCadenceTypeError(
-					"targetDuration",
-					cdcEvent.Fields[i],
-					cadence.UInt64(0),
-				)
-			}
-
-		case "targetEndTime":
-			foundFieldCount++
-			targetEndTimeUnix, ok = cdcEvent.Fields[i].(cadence.UInt64)
-			if !ok {
-				return nil, invalidCadenceTypeError(
-					"targetEndTime",
-					cdcEvent.Fields[i],
-					cadence.UInt64(0),
-				)
-			}
-
-		case "DKGPhase1FinalView":
-			foundFieldCount++
-			dkgPhase1FinalView, ok = cdcEvent.Fields[i].(cadence.UInt64)
-			if !ok {
-				return nil, invalidCadenceTypeError(
-					"dkgPhase1FinalView",
-					cdcEvent.Fields[i],
-					cadence.UInt64(0),
-				)
-			}
-
-		case "DKGPhase2FinalView":
-			foundFieldCount++
-			dkgPhase2FinalView, ok = cdcEvent.Fields[i].(cadence.UInt64)
-			if !ok {
-				return nil, invalidCadenceTypeError(
-					"dkgPhase2FinalView",
-					cdcEvent.Fields[i],
-					cadence.UInt64(0),
-				)
-			}
-
-		case "DKGPhase3FinalView":
-			foundFieldCount++
-			dkgPhase3FinalView, ok = cdcEvent.Fields[i].(cadence.UInt64)
-			if !ok {
-				return nil, invalidCadenceTypeError(
-					"dkgPhase3FinalView",
-					cdcEvent.Fields[i],
-					cadence.UInt64(0),
-				)
-			}
-		}
-	}
-
-	if foundFieldCount != expectedFieldCount {
+	const expectedFieldCount = 11
+	if len(fields) < expectedFieldCount {
 		return nil, fmt.Errorf(
-			"EpochSetup event required fields not found (%d != %d)",
-			foundFieldCount,
+			"insufficient fields in EpochSetup event (%d < %d)",
+			len(fields),
 			expectedFieldCount,
 		)
+	}
+
+	// parse EpochSetup event
+
+	counter, err := getField[cadence.UInt64](fields, "counter")
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode EpochSetup event: %w", err)
+	}
+
+	cdcParticipants, err := getField[cadence.Array](fields, "nodeInfo")
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode EpochSetup event: %w", err)
+	}
+
+	firstView, err := getField[cadence.UInt64](fields, "firstView")
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode EpochSetup event: %w", err)
+	}
+
+	finalView, err := getField[cadence.UInt64](fields, "finalView")
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode EpochSetup event: %w", err)
+	}
+
+	cdcClusters, err := getField[cadence.Array](fields, "collectorClusters")
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode EpochSetup event: %w", err)
+	}
+
+	randomSrcHex, err := getField[cadence.String](fields, "randomSource")
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode EpochSetup event: %w", err)
+	}
+
+	targetDuration, err := getField[cadence.UInt64](fields, "targetDuration") // Epoch duration [seconds]
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode EpochSetup event: %w", err)
+	}
+
+	targetEndTimeUnix, err := getField[cadence.UInt64](fields, "targetEndTime") // Unix time [seconds]
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode EpochSetup event: %w", err)
+	}
+
+	dkgPhase1FinalView, err := getField[cadence.UInt64](fields, "DKGPhase1FinalView")
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode EpochSetup event: %w", err)
+	}
+
+	dkgPhase2FinalView, err := getField[cadence.UInt64](fields, "DKGPhase2FinalView")
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode EpochSetup event: %w", err)
+	}
+
+	dkgPhase3FinalView, err := getField[cadence.UInt64](fields, "DKGPhase3FinalView")
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode EpochSetup event: %w", err)
 	}
 
 	setup := &flow.EpochSetup{
@@ -268,7 +202,10 @@ func convertServiceEventEpochSetup(event flow.Event) (*flow.ServiceEvent, error)
 }
 
 // convertServiceEventEpochCommit converts a service event encoded as the generic
-// flow.Event type to a ServiceEvent type for an EpochCommit event
+// flow.Event type to a ServiceEvent type for an EpochCommit event.
+// CAUTION: This function must only be used for input events computed locally, by an
+// Execution or Verification Node; it is not resilient to malicious inputs.
+// No errors are expected during normal operation.
 func convertServiceEventEpochCommit(event flow.Event) (*flow.ServiceEvent, error) {
 	// decode bytes using ccf
 	payload, err := ccf.Decode(nil, event.Payload)
@@ -281,70 +218,36 @@ func convertServiceEventEpochCommit(event flow.Event) (*flow.ServiceEvent, error
 		return nil, invalidCadenceTypeError("payload", payload, cadence.Event{})
 	}
 
-	const expectedFieldCount = 3
-	if len(cdcEvent.Fields) < expectedFieldCount {
-		return nil, fmt.Errorf(
-			"insufficient fields in EpochCommit event (%d < %d)",
-			len(cdcEvent.Fields),
-			expectedFieldCount,
-		)
-	}
-
 	if cdcEvent.Type() == nil {
 		return nil, fmt.Errorf("EpochCommit event doesn't have type")
 	}
 
-	// Extract EpochCommit event fields
-	var counter cadence.UInt64
-	var cdcClusterQCVotes cadence.Array
-	var cdcDKGKeys cadence.Array
-	var foundFieldCount int
+	fields := cadence.FieldsMappedByName(cdcEvent)
 
-	evt := cdcEvent.Type().(*cadence.EventType)
-
-	for i, f := range evt.Fields {
-		switch f.Identifier {
-		case "counter":
-			foundFieldCount++
-			counter, ok = cdcEvent.Fields[i].(cadence.UInt64)
-			if !ok {
-				return nil, invalidCadenceTypeError(
-					"counter",
-					cdcEvent.Fields[i],
-					cadence.UInt64(0),
-				)
-			}
-
-		case "clusterQCs":
-			foundFieldCount++
-			cdcClusterQCVotes, ok = cdcEvent.Fields[i].(cadence.Array)
-			if !ok {
-				return nil, invalidCadenceTypeError(
-					"clusterQCs",
-					cdcEvent.Fields[i],
-					cadence.Array{},
-				)
-			}
-
-		case "dkgPubKeys":
-			foundFieldCount++
-			cdcDKGKeys, ok = cdcEvent.Fields[i].(cadence.Array)
-			if !ok {
-				return nil, invalidCadenceTypeError(
-					"dkgPubKeys",
-					cdcEvent.Fields[i],
-					cadence.Array{},
-				)
-			}
-		}
-	}
-
-	if foundFieldCount != expectedFieldCount {
+	const expectedFieldCount = 3
+	if len(fields) < expectedFieldCount {
 		return nil, fmt.Errorf(
-			"EpochCommit event required fields not found (%d != %d)",
-			foundFieldCount,
+			"insufficient fields in EpochCommit event (%d < %d)",
+			len(fields),
 			expectedFieldCount,
 		)
+	}
+
+	// Extract EpochCommit event fields
+
+	counter, err := getField[cadence.UInt64](fields, "counter")
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode EpochCommit event: %w", err)
+	}
+
+	cdcClusterQCVotes, err := getField[cadence.Array](fields, "clusterQCs")
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode EpochCommit event: %w", err)
+	}
+
+	cdcDKGKeys, err := getField[cadence.Array](fields, "dkgPubKeys")
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode EpochCommit event: %w", err)
 	}
 
 	commit := &flow.EpochCommit{
@@ -392,60 +295,27 @@ func convertClusterAssignments(cdcClusters []cadence.Value) (flow.AssignmentList
 			return nil, invalidCadenceTypeError("cluster", cdcCluster, cadence.Struct{})
 		}
 
-		const expectedFieldCount = 2
-		if len(cdcCluster.Fields) < expectedFieldCount {
-			return nil, fmt.Errorf(
-				"insufficient fields (%d < %d)",
-				len(cdcCluster.Fields),
-				expectedFieldCount,
-			)
-		}
-
 		if cdcCluster.Type() == nil {
 			return nil, fmt.Errorf("cluster struct doesn't have type")
 		}
 
-		// Extract cluster fields
-		var clusterIndex cadence.UInt16
-		var weightsByNodeID cadence.Dictionary
-		var foundFieldCount int
+		fields := cadence.FieldsMappedByName(cdcCluster)
 
-		cdcClusterType := cdcCluster.Type().(*cadence.StructType)
-
-		for i, f := range cdcClusterType.Fields {
-			switch f.Identifier {
-			case "index":
-				foundFieldCount++
-				clusterIndex, ok = cdcCluster.Fields[i].(cadence.UInt16)
-				if !ok {
-					return nil, invalidCadenceTypeError(
-						"index",
-						cdcCluster.Fields[i],
-						cadence.UInt16(0),
-					)
-				}
-
-			case "nodeWeights":
-				foundFieldCount++
-				weightsByNodeID, ok = cdcCluster.Fields[i].(cadence.Dictionary)
-				if !ok {
-					return nil, invalidCadenceTypeError(
-						"nodeWeights",
-						cdcCluster.Fields[i],
-						cadence.Dictionary{},
-					)
-				}
-			}
-		}
-
-		if foundFieldCount != expectedFieldCount {
+		const expectedFieldCount = 2
+		if len(fields) < expectedFieldCount {
 			return nil, fmt.Errorf(
-				"cluster struct required fields not found (%d != %d)",
-				foundFieldCount,
+				"insufficient fields (%d < %d)",
+				len(fields),
 				expectedFieldCount,
 			)
 		}
 
+		// Extract cluster fields
+
+		clusterIndex, err := getField[cadence.UInt16](fields, "index")
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode cluster struct: %w", err)
+		}
 		// ensure cluster index is valid
 		if int(clusterIndex) >= len(cdcClusters) {
 			return nil, fmt.Errorf(
@@ -457,6 +327,11 @@ func convertClusterAssignments(cdcClusters []cadence.Value) (flow.AssignmentList
 		_, dup := indices[uint(clusterIndex)]
 		if dup {
 			return nil, fmt.Errorf("duplicate cdcCluster index (%d)", clusterIndex)
+		}
+
+		weightsByNodeID, err := getField[cadence.Dictionary](fields, "nodeWeights")
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode cluster struct: %w", err)
 		}
 
 		// read weights to retrieve node IDs of cdcCluster members
@@ -492,7 +367,6 @@ func convertClusterAssignments(cdcClusters []cadence.Value) (flow.AssignmentList
 // CONVENTION: returned IdentityList is in CANONICAL ORDER
 func convertParticipants(cdcParticipants []cadence.Value) (flow.IdentitySkeletonList, error) {
 	participants := make(flow.IdentitySkeletonList, 0, len(cdcParticipants))
-	var err error
 
 	for _, value := range cdcParticipants {
 		// checking compliance with expected format
@@ -504,110 +378,53 @@ func convertParticipants(cdcParticipants []cadence.Value) (flow.IdentitySkeleton
 				cadence.Struct{},
 			)
 		}
-		const expectedFieldCount = 14
-		if len(cdcNodeInfoStruct.Fields) < expectedFieldCount {
-			return nil, fmt.Errorf(
-				"insufficient fields (%d < %d)",
-				len(cdcNodeInfoStruct.Fields),
-				expectedFieldCount,
-			)
-		}
+
 		if cdcNodeInfoStruct.Type() == nil {
 			return nil, fmt.Errorf("nodeInfo struct doesn't have type")
 		}
 
-		cdcNodeInfoStructType := cdcNodeInfoStruct.Type().(*cadence.StructType)
+		fields := cadence.FieldsMappedByName(cdcNodeInfoStruct)
 
-		const requiredFieldCount = 6
-		var foundFieldCount int
-
-		var nodeIDHex cadence.String
-		var role cadence.UInt8
-		var address cadence.String
-		var networkKeyHex cadence.String
-		var stakingKeyHex cadence.String
-		var initialWeight cadence.UInt64
-
-		for i, f := range cdcNodeInfoStructType.Fields {
-			switch f.Identifier {
-			case "id":
-				foundFieldCount++
-				nodeIDHex, ok = cdcNodeInfoStruct.Fields[i].(cadence.String)
-				if !ok {
-					return nil, invalidCadenceTypeError(
-						"nodeInfo.id",
-						cdcNodeInfoStruct.Fields[i],
-						cadence.String(""),
-					)
-				}
-
-			case "role":
-				foundFieldCount++
-				role, ok = cdcNodeInfoStruct.Fields[i].(cadence.UInt8)
-				if !ok {
-					return nil, invalidCadenceTypeError(
-						"nodeInfo.role",
-						cdcNodeInfoStruct.Fields[i],
-						cadence.UInt8(0),
-					)
-				}
-
-			case "networkingAddress":
-				foundFieldCount++
-				address, ok = cdcNodeInfoStruct.Fields[i].(cadence.String)
-				if !ok {
-					return nil, invalidCadenceTypeError(
-						"nodeInfo.networkingAddress",
-						cdcNodeInfoStruct.Fields[i],
-						cadence.String(""),
-					)
-				}
-
-			case "networkingKey":
-				foundFieldCount++
-				networkKeyHex, ok = cdcNodeInfoStruct.Fields[i].(cadence.String)
-				if !ok {
-					return nil, invalidCadenceTypeError(
-						"nodeInfo.networkingKey",
-						cdcNodeInfoStruct.Fields[i],
-						cadence.String(""),
-					)
-				}
-
-			case "stakingKey":
-				foundFieldCount++
-				stakingKeyHex, ok = cdcNodeInfoStruct.Fields[i].(cadence.String)
-				if !ok {
-					return nil, invalidCadenceTypeError(
-						"nodeInfo.stakingKey",
-						cdcNodeInfoStruct.Fields[i],
-						cadence.String(""),
-					)
-				}
-
-			case "initialWeight":
-				foundFieldCount++
-				initialWeight, ok = cdcNodeInfoStruct.Fields[i].(cadence.UInt64)
-				if !ok {
-					return nil, invalidCadenceTypeError(
-						"nodeInfo.initialWeight",
-						cdcNodeInfoStruct.Fields[i],
-						cadence.UInt64(0),
-					)
-				}
-			}
-		}
-
-		if foundFieldCount != requiredFieldCount {
+		const expectedFieldCount = 14
+		if len(fields) < expectedFieldCount {
 			return nil, fmt.Errorf(
-				"NodeInfo struct required fields not found (%d != %d)",
-				foundFieldCount,
-				requiredFieldCount,
+				"insufficient fields (%d < %d)",
+				len(fields),
+				expectedFieldCount,
 			)
 		}
 
+		nodeIDHex, err := getField[cadence.String](fields, "id")
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode nodeInfo struct: %w", err)
+		}
+
+		role, err := getField[cadence.UInt8](fields, "role")
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode nodeInfo struct: %w", err)
+		}
 		if !flow.Role(role).Valid() {
 			return nil, fmt.Errorf("invalid role %d", role)
+		}
+
+		address, err := getField[cadence.String](fields, "networkingAddress")
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode nodeInfo struct: %w", err)
+		}
+
+		networkKeyHex, err := getField[cadence.String](fields, "networkingKey")
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode nodeInfo struct: %w", err)
+		}
+
+		stakingKeyHex, err := getField[cadence.String](fields, "stakingKey")
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode nodeInfo struct: %w", err)
+		}
+
+		initialWeight, err := getField[cadence.UInt64](fields, "initialWeight")
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode nodeInfo struct: %w", err)
 		}
 
 		identity := &flow.IdentitySkeleton{
@@ -688,71 +505,34 @@ func convertClusterQCVotes(cdcClusterQCs []cadence.Value) (
 			)
 		}
 
-		const expectedFieldCount = 4
-		if len(cdcClusterQCStruct.Fields) < expectedFieldCount {
-			return nil, fmt.Errorf(
-				"insufficient fields (%d < %d)",
-				len(cdcClusterQCStruct.Fields),
-				expectedFieldCount,
-			)
-		}
-
 		if cdcClusterQCStruct.Type() == nil {
 			return nil, fmt.Errorf("clusterQC struct doesn't have type")
 		}
 
-		cdcClusterQCStructType := cdcClusterQCStruct.Type().(*cadence.StructType)
+		fields := cadence.FieldsMappedByName(cdcClusterQCStruct)
 
-		const requiredFieldCount = 3
-		var foundFieldCount int
-
-		var index cadence.UInt16
-		var cdcVoterIDs cadence.Array
-		var cdcRawVotes cadence.Array
-
-		for i, f := range cdcClusterQCStructType.Fields {
-			switch f.Identifier {
-			case "index":
-				foundFieldCount++
-				index, ok = cdcClusterQCStruct.Fields[i].(cadence.UInt16)
-				if !ok {
-					return nil, invalidCadenceTypeError(
-						"ClusterQC.index",
-						cdcClusterQCStruct.Fields[i],
-						cadence.UInt16(0),
-					)
-				}
-
-			case "voteSignatures":
-				foundFieldCount++
-				cdcRawVotes, ok = cdcClusterQCStruct.Fields[i].(cadence.Array)
-				if !ok {
-					return nil, invalidCadenceTypeError(
-						"clusterQC.voteSignatures",
-						cdcClusterQCStruct.Fields[i],
-						cadence.Array{},
-					)
-				}
-
-			case "voterIDs":
-				foundFieldCount++
-				cdcVoterIDs, ok = cdcClusterQCStruct.Fields[i].(cadence.Array)
-				if !ok {
-					return nil, invalidCadenceTypeError(
-						"clusterQC.voterIDs",
-						cdcClusterQCStruct.Fields[i],
-						cadence.Array{},
-					)
-				}
-			}
+		const expectedFieldCount = 4
+		if len(fields) < expectedFieldCount {
+			return nil, fmt.Errorf(
+				"insufficient fields (%d < %d)",
+				len(fields),
+				expectedFieldCount,
+			)
 		}
 
-		if foundFieldCount != requiredFieldCount {
-			return nil, fmt.Errorf(
-				"clusterQC struct required fields not found (%d != %d)",
-				foundFieldCount,
-				requiredFieldCount,
-			)
+		index, err := getField[cadence.UInt16](fields, "index")
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode clusterQC struct: %w", err)
+		}
+
+		cdcRawVotes, err := getField[cadence.Array](fields, "voteSignatures")
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode clusterQC struct: %w", err)
+		}
+
+		cdcVoterIDs, err := getField[cadence.Array](fields, "voterIDs")
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode clusterQC struct: %w", err)
 		}
 
 		if int(index) >= len(cdcClusterQCs) {
@@ -910,6 +690,81 @@ func invalidCadenceTypeError(
 	)
 }
 
+// convertServiceEventProtocolStateVersionUpgrade converts a Cadence instance of the VersionBeacon
+// service event to the protocol-internal representation.
+// CAUTION: This function must only be used for input events computed locally, by an
+// Execution or Verification Node; it is not resilient to malicious inputs.
+// No errors are expected during normal operation.
+func convertServiceEventProtocolStateVersionUpgrade(event flow.Event) (*flow.ServiceEvent, error) {
+	payload, err := ccf.Decode(nil, event.Payload)
+	if err != nil {
+		return nil, fmt.Errorf("could not unmarshal event payload: %w", err)
+	}
+
+	versionUpgrade, err := DecodeCadenceValue("ProtocolStateVersionUpgrade payload", payload,
+		func(cdcEvent cadence.Event) (*flow.ProtocolStateVersionUpgrade, error) {
+
+			if cdcEvent.Type() == nil {
+				return nil, fmt.Errorf("ProtocolStateVersionUpgrade event doesn't have type")
+			}
+
+			fields := cadence.FieldsMappedByName(cdcEvent)
+
+			const expectedFieldCount = 2
+			if len(fields) < expectedFieldCount {
+				return nil, fmt.Errorf("unexpected number of fields in ProtocolStateVersionUpgrade (%d < %d)",
+					len(fields), expectedFieldCount)
+			}
+
+			newProtocolVersionValue, err := getField[cadence.Value](fields, "newProtocolVersion")
+			if err != nil {
+				return nil, fmt.Errorf("failed to decode VersionBeacon event: %w", err)
+			}
+
+			activeViewValue, err := getField[cadence.Value](fields, "activeView")
+			if err != nil {
+				return nil, fmt.Errorf("failed to decode VersionBeacon event: %w", err)
+			}
+
+			newProtocolVersion, err := DecodeCadenceValue(
+				".newProtocolVersion", newProtocolVersionValue, func(cadenceVal cadence.UInt64) (uint64, error) {
+					return uint64(cadenceVal), err
+				},
+			)
+			if err != nil {
+				return nil, err
+			}
+			activeView, err := DecodeCadenceValue(
+				".activeView", activeViewValue, func(cadenceVal cadence.UInt64) (uint64, error) {
+					return uint64(cadenceVal), err
+				},
+			)
+			if err != nil {
+				return nil, err
+			}
+
+			return &flow.ProtocolStateVersionUpgrade{
+				NewProtocolStateVersion: newProtocolVersion,
+				ActiveView:              activeView,
+			}, nil
+		})
+	if err != nil {
+		return nil, fmt.Errorf("could not decode cadence value: %w", err)
+	}
+
+	// create the service event
+	serviceEvent := &flow.ServiceEvent{
+		Type:  flow.ServiceEventProtocolStateVersionUpgrade,
+		Event: versionUpgrade,
+	}
+	return serviceEvent, nil
+}
+
+// convertServiceEventVersionBeacon converts a Cadence instance of the VersionBeacon
+// service event to the protocol-internal representation.
+// CAUTION: This function must only be used for input events computed locally, by an
+// Execution or Verification Node; it is not resilient to malicious inputs.
+// No errors are expected during normal operation.
 func convertServiceEventVersionBeacon(event flow.Event) (*flow.ServiceEvent, error) {
 	payload, err := ccf.Decode(nil, event.Payload)
 	if err != nil {
@@ -917,53 +772,38 @@ func convertServiceEventVersionBeacon(event flow.Event) (*flow.ServiceEvent, err
 	}
 
 	versionBeacon, err := DecodeCadenceValue(
-		"VersionBeacon payload", payload, func(cdcEvent cadence.Event) (
-			flow.VersionBeacon,
-			error,
-		) {
-			const expectedFieldCount = 2
-			if len(cdcEvent.Fields) != expectedFieldCount {
-				return flow.VersionBeacon{}, fmt.Errorf(
-					"unexpected number of fields in VersionBeacon event (%d != %d)",
-					len(cdcEvent.Fields),
-					expectedFieldCount,
-				)
-			}
+		"VersionBeacon payload", payload, func(cdcEvent cadence.Event) (*flow.VersionBeacon, error) {
 
 			if cdcEvent.Type() == nil {
-				return flow.VersionBeacon{}, fmt.Errorf("VersionBeacon event doesn't have type")
+				return nil, fmt.Errorf("VersionBeacon event doesn't have type")
 			}
 
-			var versionBoundariesValue, sequenceValue cadence.Value
-			var foundFieldCount int
+			fields := cadence.FieldsMappedByName(cdcEvent)
 
-			evt := cdcEvent.Type().(*cadence.EventType)
-
-			for i, f := range evt.Fields {
-				switch f.Identifier {
-				case "versionBoundaries":
-					foundFieldCount++
-					versionBoundariesValue = cdcEvent.Fields[i]
-
-				case "sequence":
-					foundFieldCount++
-					sequenceValue = cdcEvent.Fields[i]
-				}
-			}
-
-			if foundFieldCount != expectedFieldCount {
-				return flow.VersionBeacon{}, fmt.Errorf(
-					"VersionBeacon event required fields not found (%d != %d)",
-					foundFieldCount,
+			const expectedFieldCount = 2
+			if len(fields) != expectedFieldCount {
+				return nil, fmt.Errorf(
+					"unexpected number of fields in VersionBeacon event (%d != %d)",
+					len(fields),
 					expectedFieldCount,
 				)
+			}
+
+			versionBoundariesValue, err := getField[cadence.Value](fields, "versionBoundaries")
+			if err != nil {
+				return nil, fmt.Errorf("failed to decode VersionBeacon event: %w", err)
+			}
+
+			sequenceValue, err := getField[cadence.Value](fields, "sequence")
+			if err != nil {
+				return nil, fmt.Errorf("failed to decode VersionBeacon event: %w", err)
 			}
 
 			versionBoundaries, err := DecodeCadenceValue(
 				".versionBoundaries", versionBoundariesValue, convertVersionBoundaries,
 			)
 			if err != nil {
-				return flow.VersionBeacon{}, err
+				return nil, err
 			}
 
 			sequence, err := DecodeCadenceValue(
@@ -975,10 +815,10 @@ func convertServiceEventVersionBeacon(event flow.Event) (*flow.ServiceEvent, err
 				},
 			)
 			if err != nil {
-				return flow.VersionBeacon{}, err
+				return nil, err
 			}
 
-			return flow.VersionBeacon{
+			return &flow.VersionBeacon{
 				VersionBoundaries: versionBoundaries,
 				Sequence:          sequence,
 			}, err
@@ -996,7 +836,7 @@ func convertServiceEventVersionBeacon(event flow.Event) (*flow.ServiceEvent, err
 	// create the service event
 	serviceEvent := &flow.ServiceEvent{
 		Type:  flow.ServiceEventVersionBeacon,
-		Event: &versionBeacon,
+		Event: versionBeacon,
 	}
 
 	return serviceEvent, nil
@@ -1016,42 +856,29 @@ func convertVersionBoundaries(array cadence.Array) (
 				flow.VersionBoundary,
 				error,
 			) {
-				const expectedFieldCount = 2
-				if len(structVal.Fields) < expectedFieldCount {
-					return flow.VersionBoundary{}, fmt.Errorf(
-						"incorrect number of fields (%d != %d)",
-						len(structVal.Fields),
-						expectedFieldCount,
-					)
-				}
-
 				if structVal.Type() == nil {
 					return flow.VersionBoundary{}, fmt.Errorf("VersionBoundary struct doesn't have type")
 				}
 
-				var blockHeightValue, versionValue cadence.Value
-				var foundFieldCount int
+				fields := cadence.FieldsMappedByName(structVal)
 
-				structValType := structVal.Type().(*cadence.StructType)
-
-				for i, f := range structValType.Fields {
-					switch f.Identifier {
-					case "blockHeight":
-						foundFieldCount++
-						blockHeightValue = structVal.Fields[i]
-
-					case "version":
-						foundFieldCount++
-						versionValue = structVal.Fields[i]
-					}
-				}
-
-				if foundFieldCount != expectedFieldCount {
+				const expectedFieldCount = 2
+				if len(fields) < expectedFieldCount {
 					return flow.VersionBoundary{}, fmt.Errorf(
-						"VersionBoundaries struct required fields not found (%d != %d)",
-						foundFieldCount,
+						"incorrect number of fields (%d != %d)",
+						len(fields),
 						expectedFieldCount,
 					)
+				}
+
+				blockHeightValue, err := getField[cadence.Value](fields, "blockHeight")
+				if err != nil {
+					return flow.VersionBoundary{}, fmt.Errorf("failed to decode VersionBoundary struct: %w", err)
+				}
+
+				versionValue, err := getField[cadence.Value](fields, "version")
+				if err != nil {
+					return flow.VersionBoundary{}, fmt.Errorf("failed to decode VersionBoundary struct: %w", err)
 				}
 
 				height, err := DecodeCadenceValue(
@@ -1096,50 +923,39 @@ func convertSemverVersion(structVal cadence.Struct) (
 	string,
 	error,
 ) {
-	const expectedFieldCount = 4
-	if len(structVal.Fields) < expectedFieldCount {
-		return "", fmt.Errorf(
-			"incorrect number of fields (%d != %d)",
-			len(structVal.Fields),
-			expectedFieldCount,
-		)
-	}
-
 	if structVal.Type() == nil {
 		return "", fmt.Errorf("Semver struct doesn't have type")
 	}
 
-	var majorValue, minorValue, patchValue, preReleaseValue cadence.Value
-	var foundFieldCount int
+	fields := cadence.FieldsMappedByName(structVal)
 
-	structValType := structVal.Type().(*cadence.StructType)
-
-	for i, f := range structValType.Fields {
-		switch f.Identifier {
-		case "major":
-			foundFieldCount++
-			majorValue = structVal.Fields[i]
-
-		case "minor":
-			foundFieldCount++
-			minorValue = structVal.Fields[i]
-
-		case "patch":
-			foundFieldCount++
-			patchValue = structVal.Fields[i]
-
-		case "preRelease":
-			foundFieldCount++
-			preReleaseValue = structVal.Fields[i]
-		}
-	}
-
-	if foundFieldCount != expectedFieldCount {
+	const expectedFieldCount = 4
+	if len(fields) < expectedFieldCount {
 		return "", fmt.Errorf(
-			"Semver struct required fields not found (%d != %d)",
-			foundFieldCount,
+			"incorrect number of fields (%d != %d)",
+			len(fields),
 			expectedFieldCount,
 		)
+	}
+
+	majorValue, err := getField[cadence.Value](fields, "major")
+	if err != nil {
+		return "", fmt.Errorf("failed to decode SemVer struct: %w", err)
+	}
+
+	minorValue, err := getField[cadence.Value](fields, "minor")
+	if err != nil {
+		return "", fmt.Errorf("failed to decode SemVer struct: %w", err)
+	}
+
+	patchValue, err := getField[cadence.Value](fields, "patch")
+	if err != nil {
+		return "", fmt.Errorf("failed to decode SemVer struct: %w", err)
+	}
+
+	preReleaseValue, err := getField[cadence.Value](fields, "preRelease")
+	if err != nil {
+		return "", fmt.Errorf("failed to decode SemVer struct: %w", err)
 	}
 
 	major, err := DecodeCadenceValue(

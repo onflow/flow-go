@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	gethABI "github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/onflow/atree"
+	gethABI "github.com/onflow/go-ethereum/accounts/abi"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm/evm/emulator"
@@ -95,5 +95,6 @@ func DeployContract(t testing.TB, caller types.Address, tc *TestContract, led at
 		),
 	)
 	require.NoError(t, err)
-	tc.SetDeployedAt(res.DeployedContractAddress)
+	require.NotNil(t, res.DeployedContractAddress)
+	tc.SetDeployedAt(*res.DeployedContractAddress)
 }

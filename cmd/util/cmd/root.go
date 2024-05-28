@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -20,6 +21,8 @@ import (
 	extract "github.com/onflow/flow-go/cmd/util/cmd/execution-state-extract"
 	ledger_json_exporter "github.com/onflow/flow-go/cmd/util/cmd/export-json-execution-state"
 	export_json_transactions "github.com/onflow/flow-go/cmd/util/cmd/export-json-transactions"
+	extractpayloads "github.com/onflow/flow-go/cmd/util/cmd/extract-payloads-by-address"
+	find_inconsistent_result "github.com/onflow/flow-go/cmd/util/cmd/find-inconsistent-result"
 	read_badger "github.com/onflow/flow-go/cmd/util/cmd/read-badger/cmd"
 	read_execution_state "github.com/onflow/flow-go/cmd/util/cmd/read-execution-state"
 	read_hotstuff "github.com/onflow/flow-go/cmd/util/cmd/read-hotstuff/cmd"
@@ -29,10 +32,15 @@ import (
 	"github.com/onflow/flow-go/cmd/util/cmd/snapshot"
 	truncate_database "github.com/onflow/flow-go/cmd/util/cmd/truncate-database"
 	"github.com/onflow/flow-go/cmd/util/cmd/version"
+	"github.com/onflow/flow-go/module/profiler"
 )
 
 var (
-	flagLogLevel string
+	flagLogLevel         string
+	flagProfilerEnabled  bool
+	flagProfilerDir      string
+	flagProfilerInterval time.Duration
+	flagProfilerDuration time.Duration
 )
 
 var rootCmd = &cobra.Command{
@@ -40,6 +48,10 @@ var rootCmd = &cobra.Command{
 	Short: "Utility functions for a flow network",
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		setLogLevel()
+		err := initProfiler()
+		if err != nil {
+			log.Fatal().Err(err).Msg("could not initialize profiler")
+		}
 	},
 }
 
@@ -55,8 +67,16 @@ func Execute() {
 func init() {
 	rootCmd.PersistentFlags().StringVarP(&flagLogLevel, "loglevel", "l", "info",
 		"log level (panic, fatal, error, warn, info, debug)")
+	rootCmd.PersistentFlags().BoolVar(&flagProfilerEnabled, "profiler-enabled", false, "whether to enable the auto-profiler")
 
-	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
+	rootCmd.PersistentFlags().StringVar(&flagProfilerDir, "profiler-dir", "profiler", "directory to create auto-profiler profiles")
+	rootCmd.PersistentFlags().DurationVar(&flagProfilerInterval, "profiler-interval", 1*time.Minute, "the interval between auto-profiler runs")
+	rootCmd.PersistentFlags().DurationVar(&flagProfilerDuration, "profiler-duration", 10*time.Second, "the duration to run the auto-profile for")
+
+	log.Logger = log.Output(zerolog.ConsoleWriter{
+		Out:        os.Stderr,
+		TimeFormat: time.TimeOnly,
+	})
 
 	cobra.OnInitialize(initConfig)
 
@@ -84,6 +104,8 @@ func addCommands() {
 	rootCmd.AddCommand(read_hotstuff.RootCmd)
 	rootCmd.AddCommand(addresses.Cmd)
 	rootCmd.AddCommand(bootstrap_execution_state_payloads.Cmd)
+	rootCmd.AddCommand(extractpayloads.Cmd)
+	rootCmd.AddCommand(find_inconsistent_result.Cmd)
 }
 
 func initConfig() {
@@ -108,4 +130,24 @@ func setLogLevel() {
 		log.Fatal().Str("loglevel", flagLogLevel).Msg("unsupported log level, choose one of \"panic\", \"fatal\", " +
 			"\"error\", \"warn\", \"info\" or \"debug\"")
 	}
+}
+
+func initProfiler() error {
+	uploader := &profiler.NoopUploader{}
+	profilerConfig := profiler.ProfilerConfig{
+		Enabled:         flagProfilerEnabled,
+		UploaderEnabled: false,
+
+		Dir:      flagProfilerDir,
+		Interval: flagProfilerInterval,
+		Duration: flagProfilerDuration,
+	}
+
+	profiler, err := profiler.New(log.Logger, uploader, profilerConfig)
+	if err != nil {
+		return fmt.Errorf("could not initialize profiler: %w", err)
+	}
+
+	<-profiler.Ready()
+	return nil
 }

@@ -399,11 +399,14 @@ func prepareExecutionService(container testnet.ContainerConfig, i int, n int) Se
 		panic(err)
 	}
 
+	enableNewIngestionEngine := true
+
 	service.Command = append(service.Command,
 		"--triedir=/trie",
 		fmt.Sprintf("--rpc-addr=%s:%s", container.ContainerName, testnet.GRPCPort),
 		fmt.Sprintf("--cadence-tracing=%t", cadenceTracing),
 		fmt.Sprintf("--extensive-tracing=%t", extesiveTracing),
+		fmt.Sprintf("--enable-new-ingestion-engine=%v", enableNewIngestionEngine),
 		"--execution-data-dir=/data/execution-data",
 		"--chunk-data-pack-dir=/data/chunk-data-pack",
 	)
@@ -465,7 +468,7 @@ func prepareObserverService(i int, observerName string, agPublicKey string) Serv
 		fmt.Sprintf("--upstream-node-addresses=%s:%s", testnet.PrimaryAN, testnet.GRPCSecurePort),
 		fmt.Sprintf("--upstream-node-public-keys=%s", agPublicKey),
 		fmt.Sprintf("--observer-networking-key-path=/bootstrap/private-root-information/%s_key", observerName),
-		"--bind=0.0.0.0:0",
+		"--bind=0.0.0.0:3569",
 		fmt.Sprintf("--rpc-addr=%s:%s", observerName, testnet.GRPCPort),
 		fmt.Sprintf("--secure-rpc-addr=%s:%s", observerName, testnet.GRPCSecurePort),
 		fmt.Sprintf("--http-addr=%s:%s", observerName, testnet.GRPCWebPort),

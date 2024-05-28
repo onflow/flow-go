@@ -10,6 +10,7 @@ import (
 
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -62,7 +63,7 @@ func TestWriteMachineAccountFiles(t *testing.T) {
 	expected := make(map[string]bootstrap.NodeMachineAccountInfo)
 	for i, node := range nodes {
 		// See comments in WriteMachineAccountFiles for why addresses take this form
-		addr, err := chain.AddressAtIndex(uint64(6 + i*2))
+		addr, err := chain.AddressAtIndex(uint64(systemcontracts.LastSystemAccountIndex + (i+1)*2))
 		require.NoError(t, err)
 		private, err := node.Private()
 		require.NoError(t, err)

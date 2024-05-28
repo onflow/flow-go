@@ -1,11 +1,94 @@
 import Crypto
+import "NonFungibleToken"
+import "FungibleToken"
 import "FlowToken"
 
 access(all)
 contract EVM {
 
+    // Entitlements enabling finer-graned access control on a CadenceOwnedAccount
+    access(all) entitlement Validate
+    access(all) entitlement Withdraw
+    access(all) entitlement Call
+    access(all) entitlement Deploy
+    access(all) entitlement Owner
+    access(all) entitlement Bridge
+
+    /// Block executed event is emitted when a new block is created,
+    /// which always happens when a transaction is executed.
     access(all)
-    event CadenceOwnedAccountCreated(addressBytes: [UInt8; 20])
+    event BlockExecuted(
+        // height or number of the block
+        height: UInt64,
+        // hash of the block
+        hash: String,
+        // timestamp of the block creation
+        timestamp: UInt64,
+        // total Flow supply
+        totalSupply: Int,
+        // all gas used in the block by transactions included
+        totalGasUsed: UInt64,
+        // parent block hash
+        parentHash: String,
+        // hash of all the transaction receipts
+        receiptRoot: String,
+        // all the transactions included in the block
+        transactionHashes: [String]
+    )
+
+    /// Transaction executed event is emitted everytime a transaction
+    /// is executed by the EVM (even if failed).
+    access(all)
+    event TransactionExecuted(
+        // hash of the transaction
+        hash: String,
+        // index of the transaction in a block
+        index: UInt16,
+        // type of the transaction
+        type: UInt8,
+        // RLP and hex encoded transaction payload
+        payload: String,
+        // code indicating a specific validation (201-300) or execution (301-400) error
+        errorCode: UInt16,
+        // the amount of gas transaction used
+        gasConsumed: UInt64,
+        // if transaction was a deployment contains a newly deployed contract address
+        contractAddress: String,
+        // RLP and hex encoded logs
+        logs: String,
+        // block height in which transaction was inclued
+        blockHeight: UInt64,
+        // block hash in which transaction was included
+        blockHash: String
+    )
+
+    access(all)
+    event CadenceOwnedAccountCreated(address: String)
+
+    /// FLOWTokensDeposited is emitted when FLOW tokens is bridged
+    /// into the EVM environment. Note that this event is not emitted
+    /// for transfer of flow tokens between two EVM addresses.
+    access(all)
+    event FLOWTokensDeposited(address: String, amount: UFix64)
+
+    /// FLOWTokensWithdrawn is emitted when FLOW tokens are bridged
+    /// out of the EVM environment. Note that this event is not emitted
+    /// for transfer of flow tokens between two EVM addresses.
+    access(all)
+    event FLOWTokensWithdrawn(address: String, amount: UFix64)
+
+    /// BridgeAccessorUpdated is emitted when the BridgeAccessor Capability
+    /// is updated in the stored BridgeRouter along with identifying
+    /// information about both.
+    access(all)
+    event BridgeAccessorUpdated(
+        routerType: Type,
+        routerUUID: UInt64,
+        routerAddress: Address,
+        accessorType: Type,
+        accessorUUID: UInt64,
+        accessorAddress: Address
+    )
 
     /// EVMAddress is an EVM-compatible address
     access(all)
@@ -16,13 +99,13 @@ contract EVM {
         let bytes: [UInt8; 20]
 
         /// Constructs a new EVM address from the given byte representation
-        init(bytes: [UInt8; 20]) {
+        view init(bytes: [UInt8; 20]) {
             self.bytes = bytes
         }
 
         /// Balance of the address
         access(all)
-        fun balance(): Balance {
+        view fun balance(): Balance {
             let balance = InternalEVM.balance(
                 address: self.bytes
             )
@@ -56,11 +139,42 @@ contract EVM {
         /// Deposits the given vault into the EVM account with the given address
         access(all)
         fun deposit(from: @FlowToken.Vault) {
+            let amount = from.balance
+            if amount == 0.0 {
+                panic("calling deposit function with an empty vault is not allowed")
+            }
             InternalEVM.deposit(
                 from: <-from,
                 to: self.bytes
             )
+            emit FLOWTokensDeposited(address: self.toString(), amount: amount)
         }
+
+        /// Serializes the address to a hex string without the 0x prefix
+        /// Future implementations should pass data to InternalEVM for native serialization
+        access(all)
+        view fun toString(): String {
+            return String.encodeHex(self.bytes.toVariableSized())
+        }
+
+        /// Compares the address with another address
+        access(all)
+        view fun equals(_ other: EVMAddress): Bool {
+            return self.bytes == other.bytes
+        }
+    }
+
+    /// Converts a hex string to an EVM address if the string is a valid hex string
+    /// Future implementations should pass data to InternalEVM for native deserialization
+    access(all)
+    fun addressFromString(_ asHex: String): EVMAddress {
+        pre {
+            asHex.length == 40 || asHex.length == 42: "Invalid hex string length for an EVM address"
+        }
+        // Strip the 0x prefix if it exists
+        var withoutPrefix = (asHex[1] == "x" ? asHex.slice(from: 2, upTo: asHex.length) : asHex).toLower()
+        let bytes = withoutPrefix.decodeHex().toConstantSized<[UInt8;20]>()!
+        return EVMAddress(bytes: bytes)
     }
 
     access(all)
@@ -75,7 +189,7 @@ contract EVM {
 
         /// Constructs a new balance
         access(all)
-        init(attoflow: UInt) {
+        view init(attoflow: UInt) {
             self.attoflow = attoflow
         }
 
@@ -91,14 +205,20 @@ contract EVM {
         /// (8 decimal points in compare to 18) might result in rounding down error.
         /// Use the toAttoFlow function if you care need more accuracy.
         access(all)
-        fun inFLOW(): UFix64 {
+        view fun inFLOW(): UFix64 {
             return InternalEVM.castToFLOW(balance: self.attoflow)
         }
 
         /// Returns the balance in Atto-FLOW
         access(all)
-        fun inAttoFLOW(): UInt {
+        view fun inAttoFLOW(): UInt {
             return self.attoflow
+        }
+
+        /// Returns true if the balance is zero
+        access(all)
+        fun isZero(): Bool {
+            return self.attoflow == 0
         }
     }
 
@@ -145,21 +265,34 @@ contract EVM {
 
         /// returns the data that is returned from
         /// the evm for the call. For coa.deploy
-        /// calls it returns the address bytes of the
-        /// newly deployed contract.
+        /// calls it returns the code deployed to
+        /// the address provided in the contractAddress field.
         access(all)
         let data: [UInt8]
+
+        /// returns the newly deployed contract address
+        /// if the transaction caused such a deployment
+        /// otherwise the value is nil.
+        access(all)
+        let deployedContract: EVMAddress?
 
         init(
             status: Status,
             errorCode: UInt64,
             gasUsed: UInt64,
-            data: [UInt8]
+            data: [UInt8],
+            contractAddress: [UInt8; 20]?
         ) {
             self.status = status
             self.errorCode = errorCode
             self.gasUsed = gasUsed
             self.data = data
+
+            if let addressBytes = contractAddress {
+                self.deployedContract = EVMAddress(bytes: addressBytes)
+            } else {
+                self.deployedContract = nil
+            }
         }
     }
 
@@ -167,11 +300,11 @@ contract EVM {
     resource interface Addressable {
         /// The EVM address
         access(all)
-        fun address(): EVMAddress
+        view fun address(): EVMAddress
     }
 
     access(all)
-    resource CadenceOwnedAccount: Addressable  {
+    resource CadenceOwnedAccount: Addressable {
 
         access(self)
         var addressBytes: [UInt8; 20]
@@ -196,14 +329,14 @@ contract EVM {
 
         /// The EVM address of the cadence owned account
         access(all)
-        fun address(): EVMAddress {
+        view fun address(): EVMAddress {
             // Always create a new EVMAddress instance
             return EVMAddress(bytes: self.addressBytes)
         }
 
         /// Get balance of the cadence owned account
         access(all)
-        fun balance(): Balance {
+        view fun balance(): Balance {
             return self.address().balance()
         }
 
@@ -213,40 +346,50 @@ contract EVM {
             self.address().deposit(from: <-from)
         }
 
+        /// The EVM address of the cadence owned account behind an entitlement, acting as proof of access
+        access(Owner | Validate)
+        view fun protectedAddress(): EVMAddress {
+            return self.address()
+        }
+
         /// Withdraws the balance from the cadence owned account's balance
         /// Note that amounts smaller than 10nF (10e-8) can't be withdrawn
         /// given that Flow Token Vaults use UFix64s to store balances.
         /// If the given balance conversion to UFix64 results in
         /// rounding error, this function would fail.
-        access(all)
+        access(Owner | Withdraw)
         fun withdraw(balance: Balance): @FlowToken.Vault {
+            if balance.isZero() {
+                panic("calling withdraw function with zero balance is not allowed")
+            }
             let vault <- InternalEVM.withdraw(
                 from: self.addressBytes,
                 amount: balance.attoflow
             ) as! @FlowToken.Vault
+            emit FLOWTokensWithdrawn(address: self.address().toString(), amount: balance.inFLOW())
             return <-vault
         }
 
         /// Deploys a contract to the EVM environment.
-        /// Returns the address of the newly deployed contract
-        access(all)
+        /// Returns the result which contains address of
+        /// the newly deployed contract
+        access(Owner | Deploy)
         fun deploy(
             code: [UInt8],
             gasLimit: UInt64,
             value: Balance
-        ): EVMAddress {
-            let addressBytes = InternalEVM.deploy(
+        ): Result {
+            return InternalEVM.deploy(
                 from: self.addressBytes,
                 code: code,
                 gasLimit: gasLimit,
                 value: value.attoflow
-            )
-            return EVMAddress(bytes: addressBytes)
+            ) as! Result
         }
 
         /// Calls a function with the given data.
         /// The execution is limited by the given amount of gas
-        access(all)
+        access(Owner | Call)
         fun call(
             to: EVMAddress,
             data: [UInt8],
@@ -261,6 +404,59 @@ contract EVM {
                 value: value.attoflow
             ) as! Result
         }
+
+        /// Bridges the given NFT to the EVM environment, requiring a Provider from which to withdraw a fee to fulfill
+        /// the bridge request
+        access(all)
+        fun depositNFT(
+            nft: @{NonFungibleToken.NFT},
+            feeProvider: auth(FungibleToken.Withdraw) &{FungibleToken.Provider}
+        ) {
+            EVM.borrowBridgeAccessor().depositNFT(nft: <-nft, to: self.address(), feeProvider: feeProvider)
+        }
+
+        /// Bridges the given NFT from the EVM environment, requiring a Provider from which to withdraw a fee to fulfill
+        /// the bridge request. Note: the caller should own the requested NFT in EVM
+        access(Owner | Bridge)
+        fun withdrawNFT(
+            type: Type,
+            id: UInt256,
+            feeProvider: auth(FungibleToken.Withdraw) &{FungibleToken.Provider}
+        ): @{NonFungibleToken.NFT} {
+            return <- EVM.borrowBridgeAccessor().withdrawNFT(
+                caller: &self as auth(Call) &CadenceOwnedAccount,
+                type: type,
+                id: id,
+                feeProvider: feeProvider
+            )
+        }
+
+        /// Bridges the given Vault to the EVM environment, requiring a Provider from which to withdraw a fee to fulfill
+        /// the bridge request
+        access(all)
+        fun depositTokens(
+            vault: @{FungibleToken.Vault},
+            feeProvider: auth(FungibleToken.Withdraw) &{FungibleToken.Provider}
+        ) {
+            EVM.borrowBridgeAccessor().depositTokens(vault: <-vault, to: self.address(), feeProvider: feeProvider)
+        }
+
+        /// Bridges the given fungible tokens from the EVM environment, requiring a Provider from which to withdraw a
+        /// fee to fulfill the bridge request. Note: the caller should own the requested tokens & sufficient balance of
+        /// requested tokens in EVM
+        access(Owner | Bridge)
+        fun withdrawTokens(
+            type: Type,
+            amount: UInt256,
+            feeProvider: auth(FungibleToken.Withdraw) &{FungibleToken.Provider}
+        ): @{FungibleToken.Vault} {
+            return <- EVM.borrowBridgeAccessor().withdrawTokens(
+                caller: &self as auth(Call) &CadenceOwnedAccount,
+                type: type,
+                amount: amount,
+                feeProvider: feeProvider
+            )
+        }
     }
 
     /// Creates a new cadence owned account
@@ -269,7 +465,8 @@ contract EVM {
         let acc <-create CadenceOwnedAccount()
         let addr = InternalEVM.createCadenceOwnedAccount(uuid: acc.uuid)
         acc.initAddress(addressBytes: addr)
-        emit CadenceOwnedAccountCreated(addressBytes: addr)
+
+        emit CadenceOwnedAccountCreated(address: acc.address().toString())
         return <-acc
     }
 
@@ -296,6 +493,29 @@ contract EVM {
             message: "tx is not valid for execution"
         )
         return runResult
+    }
+
+    /// Simulates running unsigned RLP-encoded transaction using
+    /// the from address as the signer.
+    /// The transaction state changes are not persisted.
+    /// This is useful for gas estimation or calling view contract functions.
+    access(all)
+    fun dryRun(tx: [UInt8], from: EVMAddress): Result {
+        return InternalEVM.dryRun(
+            tx: tx,
+            from: from.bytes,
+        ) as! Result
+    }
+
+    /// Runs a batch of RLP-encoded EVM transactions, deducts the gas fees,
+    /// and deposits the gas fees into the provided coinbase address.
+    /// An invalid transaction is not executed and not included in the block.
+    access(all)
+    fun batchRun(txs: [[UInt8]], coinbase: EVMAddress): [Result] {
+        return InternalEVM.batchRun(
+            txs: txs,
+            coinbase: coinbase.bytes,
+        ) as! [Result]
     }
 
     access(all)
@@ -345,7 +565,7 @@ contract EVM {
     struct ValidationResult {
         access(all)
         let isValid: Bool
-        
+
         access(all)
         let problem: String?
 
@@ -400,19 +620,18 @@ contract EVM {
 
         let isValid = keyList.verify(
             signatureSet: signatureSet,
-            signedData: signedData
+            signedData: signedData,
+            domainSeparationTag: "FLOW-V0.0-user"
         )
 
         if !isValid{
             return ValidationResult(
                 isValid: false,
-                problem: "the given signatures are not valid or provide enough weight" 
+                problem: "the given signatures are not valid or provide enough weight"
             )
         }
 
-        let coaRef = acc.getCapability(path)
-            .borrow<&EVM.CadenceOwnedAccount{EVM.Addressable}>()
-        
+        let coaRef = acc.capabilities.borrow<&EVM.CadenceOwnedAccount>(path)
         if coaRef == nil {
              return ValidationResult(
                  isValid: false,
@@ -430,10 +649,109 @@ contract EVM {
                 )
             }
         }
-        
+
         return ValidationResult(
-        	isValid: true,
-        	problem: nil
+            isValid: true,
+            problem: nil
         )
+    }
+
+    /// Block returns information about the latest executed block.
+    access(all)
+    struct EVMBlock {
+        access(all)
+        let height: UInt64
+
+        access(all)
+        let hash: String
+
+        access(all)
+        let totalSupply: Int
+
+        access(all)
+        let timestamp: UInt64
+
+        init(height: UInt64, hash: String, totalSupply: Int, timestamp: UInt64) {
+            self.height = height
+            self.hash = hash
+            self.totalSupply = totalSupply
+            self.timestamp = timestamp
+        }
+    }
+
+    /// Returns the latest executed block.
+    access(all)
+    fun getLatestBlock(): EVMBlock {
+        return InternalEVM.getLatestBlock() as! EVMBlock
+    }
+
+    /// Interface for a resource which acts as an entrypoint to the VM bridge
+    access(all)
+    resource interface BridgeAccessor {
+
+        /// Endpoint enabling the bridging of an NFT to EVM
+        access(Bridge)
+        fun depositNFT(
+            nft: @{NonFungibleToken.NFT},
+            to: EVMAddress,
+            feeProvider: auth(FungibleToken.Withdraw) &{FungibleToken.Provider}
+        )
+
+        /// Endpoint enabling the bridging of an NFT from EVM
+        access(Bridge)
+        fun withdrawNFT(
+            caller: auth(Call) &CadenceOwnedAccount,
+            type: Type,
+            id: UInt256,
+            feeProvider: auth(FungibleToken.Withdraw) &{FungibleToken.Provider}
+        ): @{NonFungibleToken.NFT}
+
+        /// Endpoint enabling the bridging of a fungible token vault to EVM
+        access(Bridge)
+        fun depositTokens(
+            vault: @{FungibleToken.Vault},
+            to: EVMAddress,
+            feeProvider: auth(FungibleToken.Withdraw) &{FungibleToken.Provider}
+        )
+
+        /// Endpoint enabling the bridging of fungible tokens from EVM
+        access(Bridge)
+        fun withdrawTokens(
+            caller: auth(Call) &CadenceOwnedAccount,
+            type: Type,
+            amount: UInt256,
+            feeProvider: auth(FungibleToken.Withdraw) &{FungibleToken.Provider}
+        ): @{FungibleToken.Vault}
+    }
+
+    /// Interface which captures a Capability to the bridge Accessor, saving it within the BridgeRouter resource
+    access(all)
+    resource interface BridgeRouter {
+
+        /// Returns a reference to the BridgeAccessor designated for internal bridge requests
+        access(Bridge) view fun borrowBridgeAccessor(): auth(Bridge) &{BridgeAccessor}
+
+        /// Sets the BridgeAccessor Capability in the BridgeRouter
+        access(Bridge) fun setBridgeAccessor(_ accessor: Capability<auth(Bridge) &{BridgeAccessor}>) {
+            pre {
+                accessor.check(): "Invalid BridgeAccessor Capability provided"
+                emit BridgeAccessorUpdated(
+                    routerType: self.getType(),
+                    routerUUID: self.uuid,
+                    routerAddress: self.owner?.address ?? panic("Router must have an owner to be identified"),
+                    accessorType: accessor.borrow()!.getType(),
+                    accessorUUID: accessor.borrow()!.uuid,
+                    accessorAddress: accessor.address
+                )
+            }
+        }
+    }
+
+    /// Returns a reference to the BridgeAccessor designated for internal bridge requests
+    access(self)
+    view fun borrowBridgeAccessor(): auth(Bridge) &{BridgeAccessor} {
+        return self.account.storage.borrow<auth(Bridge) &{BridgeRouter}>(from: /storage/evmBridgeRouter)
+            ?.borrowBridgeAccessor()
+            ?? panic("Could not borrow reference to the EVM bridge")
     }
 }

@@ -1,35 +1,70 @@
-package migrations_test
+package migrations
 
 import (
 	"context"
+	"io"
+	"strings"
 	"testing"
 
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/cmd/util/ledger/migrations"
-	"github.com/onflow/flow-go/ledger"
-	"github.com/onflow/flow-go/ledger/common/convert"
+	"github.com/onflow/flow-go/cmd/util/ledger/util/registers"
 	"github.com/onflow/flow-go/model/flow"
 )
 
-func newContractPayload(address common.Address, contractName string, contract []byte) *ledger.Payload {
-	return ledger.NewPayload(
-		convert.RegisterIDToLedgerKey(
-			flow.ContractRegisterID(flow.ConvertAddress(address), contractName),
-		),
-		contract,
-	)
+const contractA = `
+access(all) contract A {
+    access(all) fun foo() {}
+}`
+
+const updatedContractA = `
+access(all) contract A {
+    access(all) fun bar() {}
+}`
+
+const contractB = `
+access(all) contract B {
+    access(all) fun foo() {}
+}`
+
+const updatedContractB = `
+access(all) contract B {
+    access(all) fun bar() {}
+}`
+
+type errorLogWriter struct {
+	logs []string
+}
+
+var _ io.Writer = &errorLogWriter{}
+
+const errorLogPrefix = "{\"level\":\"error\""
+
+func (l *errorLogWriter) Write(bytes []byte) (int, error) {
+	logStr := string(bytes)
+
+	// Ignore non-error logs
+	if !strings.HasPrefix(logStr, errorLogPrefix) {
+		return 0, nil
+	}
+
+	l.logs = append(l.logs, logStr)
+	return len(bytes), nil
 }
 
 func TestChangeContractCodeMigration(t *testing.T) {
 	t.Parallel()
 
-	address1, err := common.HexToAddress("0x1")
+	const chainID = flow.Emulator
+	addressGenerator := chainID.Chain().NewAddressGenerator()
+
+	address1, err := addressGenerator.NextAddress()
 	require.NoError(t, err)
 
-	address2, err := common.HexToAddress("0x2")
+	address2, err := addressGenerator.NextAddress()
 	require.NoError(t, err)
 
 	ctx := context.Background()
@@ -37,185 +72,491 @@ func TestChangeContractCodeMigration(t *testing.T) {
 	t.Run("no contracts", func(t *testing.T) {
 		t.Parallel()
 
-		migration := migrations.ChangeContractCodeMigration{}
-		log := zerolog.New(zerolog.NewTestWriter(t))
-		err := migration.InitMigration(log, nil, 0)
+		writer := &errorLogWriter{}
+		log := zerolog.New(writer)
+
+		rwf := &testReportWriterFactory{}
+
+		options := StagedContractsMigrationOptions{
+			ChainID:            flow.Emulator,
+			VerboseErrorOutput: true,
+		}
+		migration := NewStagedContractsMigration("test", "test", log, rwf, options)
+
+		registersByAccount := registers.NewByAccount()
+
+		err := migration.InitMigration(log, registersByAccount, 1)
 		require.NoError(t, err)
 
-		_, err = migration.MigrateAccount(ctx, address1,
-			[]*ledger.Payload{},
+		err = migration.MigrateAccount(
+			ctx,
+			common.Address(address1),
+			registersByAccount.AccountRegisters(string(address1[:])),
 		)
-
 		require.NoError(t, err)
 
 		err = migration.Close()
 		require.NoError(t, err)
+
+		require.Empty(t, writer.logs)
 	})
 
 	t.Run("1 contract - dont migrate", func(t *testing.T) {
 		t.Parallel()
 
-		migration := migrations.ChangeContractCodeMigration{}
-		log := zerolog.New(zerolog.NewTestWriter(t))
-		err := migration.InitMigration(log, nil, 0)
-		require.NoError(t, err)
+		writer := &errorLogWriter{}
+		log := zerolog.New(writer)
 
-		payloads, err := migration.MigrateAccount(ctx, address1,
-			[]*ledger.Payload{
-				newContractPayload(address1, "A", []byte("A")),
+		rwf := &testReportWriterFactory{}
+
+		options := StagedContractsMigrationOptions{
+			ChainID:            flow.Emulator,
+			VerboseErrorOutput: true,
+		}
+		migration := NewStagedContractsMigration("test", "test", log, rwf, options)
+
+		registersByAccount, err := registersForStagedContracts(
+			StagedContract{
+				Address: common.Address(address1),
+				Contract: Contract{
+					Name: "A",
+					Code: []byte(contractA),
+				},
 			},
 		)
-
 		require.NoError(t, err)
-		require.Len(t, payloads, 1)
-		require.Equal(t, []byte("A"), []byte(payloads[0].Value()))
+
+		err = migration.InitMigration(log, registersByAccount, 1)
+		require.NoError(t, err)
+
+		owner1 := string(address1[:])
+
+		accountRegisters1 := registersByAccount.AccountRegisters(owner1)
+
+		err = migration.MigrateAccount(
+			ctx,
+			common.Address(address1),
+			accountRegisters1,
+		)
+		require.NoError(t, err)
+
+		require.Equal(t, 1, registersByAccount.AccountCount())
+		require.Equal(t, 1, accountRegisters1.Count())
+		require.Equal(t,
+			contractA,
+			contractCode(t, registersByAccount, owner1, "A"),
+		)
 
 		err = migration.Close()
 		require.NoError(t, err)
+
+		require.Empty(t, writer.logs)
 	})
 
 	t.Run("1 contract - migrate", func(t *testing.T) {
 		t.Parallel()
 
-		migration := migrations.ChangeContractCodeMigration{}
-		log := zerolog.New(zerolog.NewTestWriter(t))
-		err := migration.InitMigration(log, nil, 0)
-		require.NoError(t, err)
+		writer := &errorLogWriter{}
+		log := zerolog.New(writer)
 
-		migration.RegisterContractChange(address1, "A", "B")
+		rwf := &testReportWriterFactory{}
 
-		payloads, err := migration.MigrateAccount(ctx, address1,
-			[]*ledger.Payload{
-				newContractPayload(address1, "A", []byte("A")),
+		options := StagedContractsMigrationOptions{
+			ChainID:            flow.Emulator,
+			VerboseErrorOutput: true,
+		}
+		migration := NewStagedContractsMigration("test", "test", log, rwf, options).
+			WithStagedContractUpdates([]StagedContract{
+				{
+					Address: common.Address(address1),
+					Contract: Contract{
+						Name: "A",
+						Code: []byte(updatedContractA),
+					},
+				},
+			})
+
+		registersByAccount, err := registersForStagedContracts(
+			StagedContract{
+				Address: common.Address(address1),
+				Contract: Contract{
+					Name: "A",
+					Code: []byte(contractA),
+				},
 			},
 		)
-
 		require.NoError(t, err)
-		require.Len(t, payloads, 1)
-		require.Equal(t, []byte("B"), []byte(payloads[0].Value()))
+
+		err = migration.InitMigration(log, registersByAccount, 1)
+		require.NoError(t, err)
+
+		owner1 := string(address1[:])
+
+		accountRegisters1 := registersByAccount.AccountRegisters(owner1)
+
+		err = migration.MigrateAccount(
+			ctx,
+			common.Address(address1),
+			accountRegisters1,
+		)
+		require.NoError(t, err)
+
+		require.Equal(t, 1, registersByAccount.AccountCount())
+		require.Equal(t, 1, accountRegisters1.Count())
+		require.Equal(t,
+			updatedContractA,
+			contractCode(t, registersByAccount, owner1, "A"),
+		)
 
 		err = migration.Close()
 		require.NoError(t, err)
+
+		require.Empty(t, writer.logs)
 	})
 
 	t.Run("2 contracts - migrate 1", func(t *testing.T) {
 		t.Parallel()
 
-		migration := migrations.ChangeContractCodeMigration{}
-		log := zerolog.New(zerolog.NewTestWriter(t))
-		err := migration.InitMigration(log, nil, 0)
-		require.NoError(t, err)
+		writer := &errorLogWriter{}
+		log := zerolog.New(writer)
 
-		migration.RegisterContractChange(address1, "A", "B")
+		rwf := &testReportWriterFactory{}
 
-		payloads, err := migration.MigrateAccount(ctx, address1,
-			[]*ledger.Payload{
-				newContractPayload(address1, "A", []byte("A")),
-				newContractPayload(address1, "B", []byte("A")),
+		options := StagedContractsMigrationOptions{
+			ChainID:            flow.Emulator,
+			VerboseErrorOutput: true,
+		}
+		migration := NewStagedContractsMigration("test", "test", log, rwf, options).
+			WithStagedContractUpdates([]StagedContract{
+				{
+					Address: common.Address(address1),
+					Contract: Contract{
+						Name: "A",
+						Code: []byte(updatedContractA),
+					},
+				},
+			})
+
+		registersByAccount, err := registersForStagedContracts(
+			StagedContract{
+				Address: common.Address(address1),
+				Contract: Contract{
+					Name: "A",
+					Code: []byte(contractA),
+				},
+			},
+			StagedContract{
+				Address: common.Address(address1),
+				Contract: Contract{
+					Name: "B",
+					Code: []byte(contractB),
+				},
 			},
 		)
-
 		require.NoError(t, err)
-		require.Len(t, payloads, 2)
-		require.Equal(t, []byte("B"), []byte(payloads[0].Value()))
-		require.Equal(t, []byte("A"), []byte(payloads[1].Value()))
+
+		err = migration.InitMigration(log, registersByAccount, 1)
+		require.NoError(t, err)
+
+		owner1 := string(address1[:])
+
+		accountRegisters1 := registersByAccount.AccountRegisters(owner1)
+
+		err = migration.MigrateAccount(
+			ctx,
+			common.Address(address1),
+			accountRegisters1,
+		)
+		require.NoError(t, err)
+
+		require.Equal(t, 1, registersByAccount.AccountCount())
+		require.Equal(t, 2, accountRegisters1.Count())
+		require.Equal(t,
+			updatedContractA,
+			contractCode(t, registersByAccount, owner1, "A"),
+		)
+		require.Equal(t,
+			contractB,
+			contractCode(t, registersByAccount, owner1, "B"),
+		)
 
 		err = migration.Close()
 		require.NoError(t, err)
+
+		require.Empty(t, writer.logs)
 	})
 
 	t.Run("2 contracts - migrate 2", func(t *testing.T) {
 		t.Parallel()
 
-		migration := migrations.ChangeContractCodeMigration{}
-		log := zerolog.New(zerolog.NewTestWriter(t))
-		err := migration.InitMigration(log, nil, 0)
-		require.NoError(t, err)
+		writer := &errorLogWriter{}
+		log := zerolog.New(writer)
 
-		migration.RegisterContractChange(address1, "A", "B")
-		migration.RegisterContractChange(address1, "B", "B")
+		rwf := &testReportWriterFactory{}
 
-		payloads, err := migration.MigrateAccount(ctx, address1,
-			[]*ledger.Payload{
-				newContractPayload(address1, "A", []byte("A")),
-				newContractPayload(address1, "B", []byte("A")),
+		options := StagedContractsMigrationOptions{
+			ChainID:            flow.Emulator,
+			VerboseErrorOutput: true,
+		}
+		migration := NewStagedContractsMigration("test", "test", log, rwf, options).
+			WithStagedContractUpdates([]StagedContract{
+				{
+					Address: common.Address(address1),
+					Contract: Contract{
+						Name: "A",
+						Code: []byte(updatedContractA),
+					},
+				},
+				{
+					Address: common.Address(address1),
+					Contract: Contract{
+						Name: "B",
+						Code: []byte(updatedContractB),
+					},
+				},
+			})
+
+		registersByAccount, err := registersForStagedContracts(
+			StagedContract{
+				Address: common.Address(address1),
+				Contract: Contract{
+					Name: "A",
+					Code: []byte(contractA),
+				},
+			},
+			StagedContract{
+				Address: common.Address(address1),
+				Contract: Contract{
+					Name: "B",
+					Code: []byte(contractB),
+				},
 			},
 		)
-
 		require.NoError(t, err)
-		require.Len(t, payloads, 2)
-		require.Equal(t, []byte("B"), []byte(payloads[0].Value()))
-		require.Equal(t, []byte("B"), []byte(payloads[1].Value()))
+
+		err = migration.InitMigration(log, registersByAccount, 1)
+		require.NoError(t, err)
+
+		owner1 := string(address1[:])
+
+		accountRegisters1 := registersByAccount.AccountRegisters(owner1)
+
+		err = migration.MigrateAccount(
+			ctx,
+			common.Address(address1),
+			accountRegisters1,
+		)
+		require.NoError(t, err)
+
+		require.Equal(t, 1, registersByAccount.AccountCount())
+		require.Equal(t, 2, accountRegisters1.Count())
+		require.Equal(t,
+			updatedContractA,
+			contractCode(t, registersByAccount, owner1, "A"),
+		)
+		require.Equal(t,
+			updatedContractB,
+			contractCode(t, registersByAccount, owner1, "B"),
+		)
 
 		err = migration.Close()
 		require.NoError(t, err)
+
+		require.Empty(t, writer.logs)
 	})
 
 	t.Run("2 contracts on different accounts - migrate 1", func(t *testing.T) {
 		t.Parallel()
 
-		migration := migrations.ChangeContractCodeMigration{}
-		log := zerolog.New(zerolog.NewTestWriter(t))
-		err := migration.InitMigration(log, nil, 0)
-		require.NoError(t, err)
+		writer := &errorLogWriter{}
+		log := zerolog.New(writer)
 
-		migration.RegisterContractChange(address1, "A", "B")
+		rwf := &testReportWriterFactory{}
 
-		payloads, err := migration.MigrateAccount(ctx, address1,
-			[]*ledger.Payload{
-				newContractPayload(address1, "A", []byte("A")),
-				newContractPayload(address2, "A", []byte("A")),
+		options := StagedContractsMigrationOptions{
+			ChainID:            flow.Emulator,
+			VerboseErrorOutput: true,
+		}
+		migration := NewStagedContractsMigration("test", "test", log, rwf, options).
+			WithStagedContractUpdates([]StagedContract{
+				{
+					Address: common.Address(address1),
+					Contract: Contract{
+						Name: "A",
+						Code: []byte(updatedContractA),
+					},
+				},
+			})
+
+		registersByAccount, err := registersForStagedContracts(
+			StagedContract{
+				Address: common.Address(address1),
+				Contract: Contract{
+					Name: "A",
+					Code: []byte(contractA),
+				},
+			},
+			StagedContract{
+				Address: common.Address(address2),
+				Contract: Contract{
+					Name: "A",
+					Code: []byte(contractA),
+				},
 			},
 		)
-
 		require.NoError(t, err)
-		require.Len(t, payloads, 2)
-		require.Equal(t, []byte("B"), []byte(payloads[0].Value()))
-		require.Equal(t, []byte("A"), []byte(payloads[1].Value()))
+
+		err = migration.InitMigration(log, registersByAccount, 1)
+		require.NoError(t, err)
+
+		owner1 := string(address1[:])
+		owner2 := string(address2[:])
+
+		accountRegisters1 := registersByAccount.AccountRegisters(owner1)
+		accountRegisters2 := registersByAccount.AccountRegisters(owner2)
+
+		err = migration.MigrateAccount(
+			ctx,
+			common.Address(address1),
+			accountRegisters1,
+		)
+		require.NoError(t, err)
+
+		require.Equal(t, 2, registersByAccount.AccountCount())
+		require.Equal(t, 1, accountRegisters1.Count())
+		require.Equal(t, 1, accountRegisters2.Count())
+		require.Equal(t,
+			updatedContractA,
+			contractCode(t, registersByAccount, owner1, "A"),
+		)
+		require.Equal(t,
+			contractA,
+			contractCode(t, registersByAccount, owner2, "A"),
+		)
 
 		err = migration.Close()
 		require.NoError(t, err)
+
+		require.Empty(t, writer.logs)
 	})
 
 	t.Run("not all contracts on one account migrated", func(t *testing.T) {
 		t.Parallel()
 
-		migration := migrations.ChangeContractCodeMigration{}
-		log := zerolog.New(zerolog.NewTestWriter(t))
-		err := migration.InitMigration(log, nil, 0)
-		require.NoError(t, err)
+		writer := &errorLogWriter{}
+		log := zerolog.New(writer)
 
-		migration.RegisterContractChange(address1, "A", "B")
-		migration.RegisterContractChange(address1, "B", "B")
+		rwf := &testReportWriterFactory{}
 
-		_, err = migration.MigrateAccount(ctx, address1,
-			[]*ledger.Payload{
-				newContractPayload(address1, "A", []byte("A")),
+		options := StagedContractsMigrationOptions{
+			ChainID:            flow.Emulator,
+			VerboseErrorOutput: true,
+		}
+		migration := NewStagedContractsMigration("test", "test", log, rwf, options).
+			WithStagedContractUpdates([]StagedContract{
+				{
+					Address: common.Address(address1),
+					Contract: Contract{
+						Name: "A",
+						Code: []byte(updatedContractA),
+					},
+				},
+				{
+					Address: common.Address(address1),
+					Contract: Contract{
+						Name: "B",
+						Code: []byte(updatedContractB),
+					},
+				},
+			})
+
+		registersByAccount, err := registersForStagedContracts(
+			StagedContract{
+				Address: common.Address(address1),
+				Contract: Contract{
+					Name: "A",
+					Code: []byte(contractA),
+				},
 			},
 		)
+		require.NoError(t, err)
 
-		require.Error(t, err)
+		err = migration.InitMigration(log, registersByAccount, 1)
+		require.NoError(t, err)
+
+		owner1 := string(address1[:])
+
+		accountRegisters1 := registersByAccount.AccountRegisters(owner1)
+
+		err = migration.MigrateAccount(
+			ctx,
+			common.Address(address1),
+			accountRegisters1,
+		)
+		require.NoError(t, err)
+
+		require.Len(t, writer.logs, 1)
+		assert.Contains(t,
+			writer.logs[0],
+			`missing old code`,
+		)
 	})
 
 	t.Run("not all accounts migrated", func(t *testing.T) {
 		t.Parallel()
 
-		migration := migrations.ChangeContractCodeMigration{}
-		log := zerolog.New(zerolog.NewTestWriter(t))
-		err := migration.InitMigration(log, nil, 0)
-		require.NoError(t, err)
+		writer := &errorLogWriter{}
+		log := zerolog.New(writer)
 
-		migration.RegisterContractChange(address2, "A", "B")
+		rwf := &testReportWriterFactory{}
 
-		_, err = migration.MigrateAccount(ctx, address1,
-			[]*ledger.Payload{
-				newContractPayload(address1, "A", []byte("A")),
+		options := StagedContractsMigrationOptions{
+			ChainID:            flow.Emulator,
+			VerboseErrorOutput: true,
+		}
+		migration := NewStagedContractsMigration("test", "test", log, rwf, options).
+			WithStagedContractUpdates([]StagedContract{
+				{
+					Address: common.Address(address2),
+					Contract: Contract{
+						Name: "A",
+						Code: []byte(updatedContractA),
+					},
+				},
+			})
+
+		registersByAccount, err := registersForStagedContracts(
+			StagedContract{
+				Address: common.Address(address1),
+				Contract: Contract{
+					Name: "A",
+					Code: []byte(contractA),
+				},
 			},
 		)
+		require.NoError(t, err)
 
+		err = migration.InitMigration(log, registersByAccount, 1)
+		require.NoError(t, err)
+
+		owner1 := string(address1[:])
+
+		accountRegisters1 := registersByAccount.AccountRegisters(owner1)
+
+		err = migration.MigrateAccount(
+			ctx,
+			common.Address(address1),
+			accountRegisters1,
+		)
 		require.NoError(t, err)
 
 		err = migration.Close()
-		require.Error(t, err)
+		require.NoError(t, err)
+
+		require.Len(t, writer.logs, 1)
+		assert.Contains(t,
+			writer.logs[0],
+			`"failed to find all contract registers that need to be changed"`,
+		)
 	})
 }

@@ -1,7 +1,10 @@
 package handler
 
 import (
-	gethCommon "github.com/ethereum/go-ethereum/common"
+	"fmt"
+	"time"
+
+	gethCommon "github.com/onflow/go-ethereum/common"
 
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/model/flow"
@@ -35,6 +38,19 @@ func (bs *BlockStore) BlockProposal() (*types.Block, error) {
 		return bs.blockProposal, nil
 	}
 
+	cadenceHeight, err := bs.backend.GetCurrentBlockHeight()
+	if err != nil {
+		return nil, err
+	}
+
+	cadenceBlock, found, err := bs.backend.GetBlockAtHeight(cadenceHeight)
+	if err != nil {
+		return nil, err
+	}
+	if !found {
+		return nil, fmt.Errorf("cadence block not found")
+	}
+
 	lastExecutedBlock, err := bs.LatestBlock()
 	if err != nil {
 		return nil, err
@@ -45,8 +61,14 @@ func (bs *BlockStore) BlockProposal() (*types.Block, error) {
 		return nil, err
 	}
 
-	bs.blockProposal = types.NewBlock(parentHash,
+	// cadence block timestamp is unix nanoseconds but evm blocks
+	// expect timestamps in unix seconds so we convert here
+	timestamp := uint64(cadenceBlock.Timestamp / int64(time.Second))
+
+	bs.blockProposal = types.NewBlock(
+		parentHash,
 		lastExecutedBlock.Height+1,
+		timestamp,
 		lastExecutedBlock.TotalSupply,
 		gethCommon.Hash{},
 		make([]gethCommon.Hash, 0),

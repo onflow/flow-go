@@ -27,6 +27,8 @@ func NewSnapshot(err error) *Snapshot {
 	return &Snapshot{fmt.Errorf("critical unexpected error querying snapshot: %w", err)}
 }
 
+var _ protocol.Snapshot = (*Snapshot)(nil)
+
 // NewSnapshotf is NewSnapshot with ergonomic error formatting.
 func NewSnapshotf(msg string, args ...interface{}) *Snapshot {
 	return NewSnapshot(fmt.Errorf(msg, args...))
@@ -76,7 +78,11 @@ func (u *Snapshot) Params() protocol.GlobalParams {
 	return Params{u.err}
 }
 
-func (u *Snapshot) ProtocolState() (protocol.DynamicProtocolState, error) {
+func (u *Snapshot) EpochProtocolState() (protocol.DynamicProtocolState, error) {
+	return nil, u.err
+}
+
+func (u *Snapshot) ProtocolState() (protocol.KVStoreReader, error) {
 	return nil, u.err
 }
 

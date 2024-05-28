@@ -19,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/environment"
+	envMock "github.com/onflow/flow-go/fvm/environment/mock"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/integration/benchmark/account"
 	"github.com/onflow/flow-go/integration/benchmark/common"
@@ -42,6 +43,7 @@ func TestLoadTypes(t *testing.T) {
 		load.LedgerHeavyLoad,
 		load.ExecDataHeavyLoad,
 		load.NewTokenTransferLoad(),
+		load.NewTokenTransferMultiLoad(),
 		load.NewAddKeysLoad(),
 		evmLoad,
 		load.NewCreateAccountLoad(),
@@ -119,12 +121,21 @@ func testLoad(log zerolog.Logger, l load.Load) func(t *testing.T) {
 func bootstrapVM(t *testing.T, chain flow.Chain) (*fvm.VirtualMachine, fvm.Context, snapshot.SnapshotTree) {
 	source := testutil.EntropyProviderFixture(nil)
 
+	blocks := new(envMock.Blocks)
+	block1 := unittest.BlockFixture()
+	blocks.On("ByHeightFrom",
+		block1.Header.Height,
+		block1.Header,
+	).Return(block1.Header, nil)
+
 	opts := computation.DefaultFVMOptions(chain.ChainID(), false, false)
 	opts = append(opts,
 		fvm.WithTransactionFeesEnabled(true),
 		fvm.WithAccountStorageLimit(true),
 		fvm.WithContractDeploymentRestricted(false),
 		fvm.WithEntropyProvider(source),
+		fvm.WithBlocks(blocks),
+		fvm.WithBlockHeader(block1.Header),
 	)
 
 	ctx := fvm.NewContext(opts...)
@@ -137,7 +148,6 @@ func bootstrapVM(t *testing.T, chain flow.Chain) (*fvm.VirtualMachine, fvm.Conte
 		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
 		fvm.WithTransactionFee(fvm.DefaultTransactionFees),
 		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
-		fvm.WithSetupEVMEnabled(true),
 	}
 
 	executionSnapshot, _, err := vm.Run(

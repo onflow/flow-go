@@ -42,6 +42,10 @@ type Context struct {
 	tracing.TracerSpan
 
 	environment.EnvironmentParams
+
+	// AllowProgramCacheWritesInScripts determines if the program cache can be written to in scripts
+	// By default, the program cache is only updated by transactions.
+	AllowProgramCacheWritesInScripts bool
 }
 
 // NewContext initializes a new execution context with the provided options.
@@ -63,7 +67,7 @@ func newContext(ctx Context, opts ...Option) Context {
 }
 
 func defaultContext() Context {
-	return Context{
+	ctx := Context{
 		DisableMemoryAndInteractionLimits: false,
 		ComputationLimit:                  DefaultComputationLimit,
 		MemoryLimit:                       DefaultMemoryLimit,
@@ -73,6 +77,7 @@ func defaultContext() Context {
 		TransactionExecutorParams:         DefaultTransactionExecutorParams(),
 		EnvironmentParams:                 environment.DefaultEnvironmentParams(),
 	}
+	return ctx
 }
 
 // An Option sets a configuration parameter for a virtual machine context.
@@ -177,14 +182,6 @@ func WithEntropyProvider(source environment.EntropyProvider) Option {
 func WithBlockHeader(header *flow.Header) Option {
 	return func(ctx Context) Context {
 		ctx.BlockHeader = header
-		return ctx
-	}
-}
-
-// WithServiceEventCollectionEnabled enables service event collection
-func WithServiceEventCollectionEnabled() Option {
-	return func(ctx Context) Context {
-		ctx.ServiceEventCollectionEnabled = true
 		return ctx
 	}
 }
@@ -372,6 +369,14 @@ func WithEventEncoder(encoder environment.EventEncoder) Option {
 func WithEVMEnabled(enabled bool) Option {
 	return func(ctx Context) Context {
 		ctx.EVMEnabled = enabled
+		return ctx
+	}
+}
+
+// WithAllowProgramCacheWritesInScriptsEnabled enables caching of programs accessed by scripts
+func WithAllowProgramCacheWritesInScriptsEnabled(enabled bool) Option {
+	return func(ctx Context) Context {
+		ctx.AllowProgramCacheWritesInScripts = enabled
 		return ctx
 	}
 }

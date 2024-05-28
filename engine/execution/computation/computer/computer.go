@@ -126,7 +126,6 @@ func SystemChunkContext(vmCtx fvm.Context) fvm.Context {
 		fvm.WithAuthorizationChecksEnabled(false),
 		fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
 		fvm.WithTransactionFeesEnabled(false),
-		fvm.WithServiceEventCollectionEnabled(),
 		fvm.WithEventCollectionSizeLimit(SystemChunkEventCollectionMaxSize),
 		fvm.WithMemoryAndInteractionLimitsDisabled(),
 		// only the system transaction is allowed to call the block entropy provider
@@ -151,6 +150,13 @@ func NewBlockComputer(
 	if maxConcurrency < 1 {
 		return nil, fmt.Errorf("invalid maxConcurrency: %d", maxConcurrency)
 	}
+
+	// this is a safeguard to prevent scripts from writing to the program cache on Execution nodes.
+	// writes are only allowed by transactions.
+	if vmCtx.AllowProgramCacheWritesInScripts {
+		return nil, fmt.Errorf("program cache writes are not allowed in scripts on Execution nodes")
+	}
+
 	systemChunkCtx := SystemChunkContext(vmCtx)
 	vmCtx = fvm.NewContextFromParent(
 		vmCtx,

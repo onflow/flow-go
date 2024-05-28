@@ -6,21 +6,18 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/onflow/flow-go/model/encodable"
-	"github.com/onflow/flow-go/module/epochs"
-	"github.com/onflow/flow-go/state/protocol/inmem"
-
 	"github.com/onflow/cadence"
-
-	"github.com/onflow/flow-go/model/dkg"
-	"github.com/onflow/flow-go/state/protocol"
-
 	"github.com/spf13/cobra"
 
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/cmd/bootstrap/run"
+	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	model "github.com/onflow/flow-go/model/bootstrap"
+	"github.com/onflow/flow-go/model/dkg"
+	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/epochs"
+	"github.com/onflow/flow-go/state/protocol"
 )
 
 var (
@@ -88,7 +85,7 @@ func addRootBlockCmdFlags() {
 	cmd.MarkFlagRequired(rootBlockCmd, "epoch-dkg-phase-length")
 
 	// required parameters for generation of root block, root execution result and root block seal
-	rootBlockCmd.Flags().StringVar(&flagRootChain, "root-chain", "local", "chain ID for the root block (can be 'main', 'test', 'sandbox', 'bench', or 'local'")
+	rootBlockCmd.Flags().StringVar(&flagRootChain, "root-chain", "local", "chain ID for the root block (can be 'main', 'test', 'sandbox', 'preview', 'bench', or 'local'")
 	rootBlockCmd.Flags().StringVar(&flagRootParent, "root-parent", "0000000000000000000000000000000000000000000000000000000000000000", "ID for the parent of the root block")
 	rootBlockCmd.Flags().Uint64Var(&flagRootHeight, "root-height", 0, "height of the root block")
 	rootBlockCmd.Flags().StringVar(&flagRootTimestamp, "root-timestamp", time.Now().UTC().Format(time.RFC3339), "timestamp of the root block (RFC3339)")
@@ -144,11 +141,18 @@ func rootBlock(cmd *cobra.Command, args []string) {
 	}
 
 	log.Info().Msg("collecting partner network and staking keys")
-	partnerNodes := readPartnerNodeInfos()
+	partnerNodes, err := common.ReadFullPartnerNodeInfos(log, flagPartnerWeights, flagPartnerNodeInfoDir)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to read full partner node infos")
+	}
 	log.Info().Msg("")
 
 	log.Info().Msg("generating internal private networking and staking keys")
-	internalNodes := readInternalNodeInfos()
+	internalNodes, err := common.ReadFullInternalNodeInfos(log, flagInternalNodePrivInfoDir, flagConfig)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to read full internal node infos")
+	}
+
 	log.Info().Msg("")
 
 	log.Info().Msg("checking constraints on consensus nodes")
@@ -157,7 +161,11 @@ func rootBlock(cmd *cobra.Command, args []string) {
 
 	log.Info().Msg("assembling network and staking keys")
 	stakingNodes := mergeNodeInfos(internalNodes, partnerNodes)
-	writeJSON(model.PathNodeInfosPub, model.ToPublicNodeInfoList(stakingNodes))
+	err = common.WriteJSON(model.PathNodeInfosPub, flagOutdir, model.ToPublicNodeInfoList(stakingNodes))
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to write json")
+	}
+	log.Info().Msgf("wrote file %s/%s", flagOutdir, model.PathNodeInfosPub)
 	log.Info().Msg("")
 
 	log.Info().Msg("running DKG for consensus nodes")
@@ -168,7 +176,7 @@ func rootBlock(cmd *cobra.Command, args []string) {
 	participants := model.ToIdentityList(stakingNodes).Sort(flow.Canonical[flow.Identity])
 
 	log.Info().Msg("computing collection node clusters")
-	assignments, clusters, err := constructClusterAssignment(partnerNodes, internalNodes)
+	assignments, clusters, err := common.ConstructClusterAssignment(log, model.ToIdentityList(partnerNodes), model.ToIdentityList(internalNodes), int(flagCollectionClusters))
 	if err != nil {
 		log.Fatal().Err(err).Msg("unable to generate cluster assignment")
 	}
@@ -179,7 +187,7 @@ func rootBlock(cmd *cobra.Command, args []string) {
 	log.Info().Msg("")
 
 	log.Info().Msg("constructing root QCs for collection node clusters")
-	clusterQCs := constructRootQCsForClusters(clusters, internalNodes, clusterBlocks)
+	clusterQCs := common.ConstructRootQCsForClusters(log, clusters, internalNodes, clusterBlocks)
 	log.Info().Msg("")
 
 	log.Info().Msg("constructing root header")
@@ -188,15 +196,11 @@ func rootBlock(cmd *cobra.Command, args []string) {
 
 	log.Info().Msg("constructing intermediary bootstrapping data")
 	epochSetup, epochCommit := constructRootEpochEvents(header.View, participants, assignments, clusterQCs, dkgData)
-	committedEpoch := inmem.NewCommittedEpoch(epochSetup, epochCommit)
-	encodableEpoch, err := inmem.FromEpoch(committedEpoch)
-	if err != nil {
-		log.Fatal().Msg("could not convert root epoch to encodable")
-	}
 	epochConfig := generateExecutionStateEpochConfig(epochSetup, clusterQCs, dkgData)
 	intermediaryEpochData := IntermediaryEpochData{
-		ProtocolStateRootEpoch: encodableEpoch.Encodable(),
-		ExecutionStateConfig:   epochConfig,
+		RootEpochSetup:       epochSetup,
+		RootEpochCommit:      epochCommit,
+		ExecutionStateConfig: epochConfig,
 	}
 	intermediaryParamsData := IntermediaryParamsData{
 		EpochCommitSafetyThreshold: flagEpochCommitSafetyThreshold,
@@ -206,12 +210,20 @@ func rootBlock(cmd *cobra.Command, args []string) {
 		IntermediaryEpochData:  intermediaryEpochData,
 		IntermediaryParamsData: intermediaryParamsData,
 	}
-	writeJSON(model.PathIntermediaryBootstrappingData, intermediaryData)
+	err = common.WriteJSON(model.PathIntermediaryBootstrappingData, flagOutdir, intermediaryData)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to write json")
+	}
+	log.Info().Msgf("wrote file %s/%s", flagOutdir, model.PathIntermediaryBootstrappingData)
 	log.Info().Msg("")
 
 	log.Info().Msg("constructing root block")
 	block := constructRootBlock(header, epochSetup, epochCommit)
-	writeJSON(model.PathRootBlockData, block)
+	err = common.WriteJSON(model.PathRootBlockData, flagOutdir, block)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to write json")
+	}
+	log.Info().Msgf("wrote file %s/%s", flagOutdir, model.PathRootBlockData)
 	log.Info().Msg("")
 
 	log.Info().Msg("constructing and writing votes")

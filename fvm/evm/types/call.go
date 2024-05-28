@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"math/big"
 
-	gethCommon "github.com/ethereum/go-ethereum/common"
-	gethCore "github.com/ethereum/go-ethereum/core"
-	gethTypes "github.com/ethereum/go-ethereum/core/types"
-	gethParams "github.com/ethereum/go-ethereum/params"
-	"github.com/ethereum/go-ethereum/rlp"
+	gethCommon "github.com/onflow/go-ethereum/common"
+	gethCore "github.com/onflow/go-ethereum/core"
+	gethTypes "github.com/onflow/go-ethereum/core/types"
+	gethParams "github.com/onflow/go-ethereum/params"
+	"github.com/onflow/go-ethereum/rlp"
 )
 
 const (
@@ -114,12 +114,11 @@ func (dc *DirectCall) EmptyToField() bool {
 }
 
 func (dc *DirectCall) to() *gethCommon.Address {
-	var to *gethCommon.Address
 	if !dc.EmptyToField() {
 		ct := dc.To.ToCommon()
-		to = &ct
+		return &ct
 	}
-	return to
+	return nil
 }
 
 func NewDepositCall(

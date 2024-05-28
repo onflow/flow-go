@@ -47,6 +47,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/inmem"
+	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
 	"github.com/onflow/flow-go/utils/dsl"
 )
 
@@ -192,6 +193,35 @@ func AccountFixture() (*flow.Account, error) {
 func BlockFixture() flow.Block {
 	header := BlockHeaderFixture()
 	return *BlockWithParentFixture(header)
+}
+
+func ChainBlockFixture(n int) []*flow.Block {
+	root := BlockHeaderFixture()
+	return ChainBlockFixtureWithRoot(root, n)
+}
+
+func ChainBlockFixtureWithRoot(root *flow.Header, n int) []*flow.Block {
+	bs := make([]*flow.Block, 0, n)
+	parent := root
+	for i := 0; i < n; i++ {
+		b := BlockWithParentFixture(parent)
+		bs = append(bs, b)
+		parent = b.Header
+	}
+	return bs
+}
+
+func RechainBlocks(blocks []*flow.Block) {
+	if len(blocks) == 0 {
+		return
+	}
+
+	parent := blocks[0]
+
+	for _, block := range blocks[1:] {
+		block.Header.ParentID = parent.ID()
+		parent = block
+	}
 }
 
 func FullBlockFixture() flow.Block {
@@ -502,6 +532,10 @@ func BlockHeaderWithParentFixture(parent *flow.Header) *flow.Header {
 	}
 }
 
+func BlockHeaderWithHeight(height uint64) *flow.Header {
+	return BlockHeaderFixture(WithHeaderHeight(height))
+}
+
 func BlockHeaderWithParentWithSoRFixture(parent *flow.Header, source []byte) *flow.Header {
 	height := parent.Height + 1
 	view := parent.View + 1 + uint64(rand.Intn(10)) // Intn returns [0, n)
@@ -603,6 +637,17 @@ func WithCollection(collection *flow.Collection) func(guarantee *flow.Collection
 	return func(guarantee *flow.CollectionGuarantee) {
 		guarantee.CollectionID = collection.ID()
 	}
+}
+
+func AddCollectionsToBlock(block *flow.Block, collections []*flow.Collection) {
+	gs := make([]*flow.CollectionGuarantee, 0, len(collections))
+	for _, collection := range collections {
+		g := collection.Guarantee()
+		gs = append(gs, &g)
+	}
+
+	block.Payload.Guarantees = gs
+	block.SetPayload(*block.Payload)
 }
 
 func CollectionGuaranteeFixture(options ...func(*flow.CollectionGuarantee)) *flow.CollectionGuarantee {
@@ -914,11 +959,11 @@ func ServiceEventsFixture(n int) flow.ServiceEventList {
 }
 
 func ExecutionResultFixture(opts ...func(*flow.ExecutionResult)) *flow.ExecutionResult {
-	blockID := IdentifierFixture()
+	executedBlockID := IdentifierFixture()
 	result := &flow.ExecutionResult{
 		PreviousResultID: IdentifierFixture(),
-		BlockID:          IdentifierFixture(),
-		Chunks:           ChunkListFixture(2, blockID),
+		BlockID:          executedBlockID,
+		Chunks:           ChunkListFixture(2, executedBlockID),
 		ExecutionDataID:  IdentifierFixture(),
 	}
 
@@ -1414,7 +1459,7 @@ func TransactionFixture(n ...func(t *flow.Transaction)) flow.Transaction {
 
 func TransactionBodyFixture(opts ...func(*flow.TransactionBody)) flow.TransactionBody {
 	tb := flow.TransactionBody{
-		Script:             []byte("pub fun main() {}"),
+		Script:             []byte("access(all) fun main() {}"),
 		ReferenceBlockID:   IdentifierFixture(),
 		GasLimit:           10,
 		ProposalKey:        ProposalKeyFixture(),
@@ -1456,7 +1501,7 @@ func TransactionDSLFixture(chain flow.Chain) dsl.Transaction {
 		Import: dsl.Import{Address: sdk.Address(chain.ServiceAddress())},
 		Content: dsl.Prepare{
 			Content: dsl.Code(`
-				pub fun main() {}
+				access(all) fun main() {}
 			`),
 		},
 	}
@@ -2143,6 +2188,13 @@ func VersionBeaconFixture(options ...func(*flow.VersionBeacon)) *flow.VersionBea
 	return versionTable
 }
 
+func ProtocolStateVersionUpgradeFixture() *flow.ProtocolStateVersionUpgrade {
+	return &flow.ProtocolStateVersionUpgrade{
+		NewProtocolStateVersion: rand.Uint64(),
+		ActiveView:              rand.Uint64(),
+	}
+}
+
 // BootstrapFixture generates all the artifacts necessary to bootstrap the
 // protocol state.
 func BootstrapFixture(
@@ -2176,7 +2228,9 @@ func BootstrapFixtureWithChainID(
 		WithDKGFromParticipants(participants.ToSkeleton()),
 	)
 
-	root.SetPayload(flow.Payload{ProtocolStateID: inmem.ProtocolStateFromEpochServiceEvents(setup, commit).ID()})
+	rootEpochState := inmem.ProtocolStateFromEpochServiceEvents(setup, commit)
+	rootProtocolStateID := kvstore.NewDefaultKVStore(rootEpochState.ID()).ID()
+	root.SetPayload(flow.Payload{ProtocolStateID: rootProtocolStateID})
 	stateCommit := GenesisStateCommitmentByChainID(chainID)
 
 	result := BootstrapExecutionResultFixture(root, stateCommit)
@@ -2628,7 +2682,7 @@ func RootProtocolStateFixture() *flow.RichProtocolStateEntry {
 	}
 }
 
-// ProtocolStateFixture creates a fixture with correctly structured data. The returned Identity Table
+// EpochStateFixture creates a fixture with correctly structured data. The returned Identity Table
 // represents the common situation during the staking phase of Epoch N+1:
 //   - we are currently in Epoch N
 //   - previous epoch N-1 is known (specifically EpochSetup and EpochCommit events)
@@ -2639,7 +2693,7 @@ func RootProtocolStateFixture() *flow.RichProtocolStateEntry {
 //   - Epoch setup and commit counters are set to match.
 //   - Identities are constructed from setup events.
 //   - Identities are sorted in canonical order.
-func ProtocolStateFixture(options ...func(*flow.RichProtocolStateEntry)) *flow.RichProtocolStateEntry {
+func EpochStateFixture(options ...func(*flow.RichProtocolStateEntry)) *flow.RichProtocolStateEntry {
 	prevEpochSetup := EpochSetupFixture()
 	prevEpochCommit := EpochCommitFixture(func(commit *flow.EpochCommit) {
 		commit.Counter = prevEpochSetup.Counter

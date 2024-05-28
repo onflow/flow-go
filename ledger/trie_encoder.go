@@ -148,28 +148,28 @@ func DecodeKeyPart(encodedKeyPart []byte) (*KeyPart, error) {
 	}
 
 	// decode the key part content (zerocopy)
-	key, err := decodeKeyPart(rest, true, version)
+	kpt, kpv, err := decodeKeyPart(rest, true, version)
 	if err != nil {
 		return nil, fmt.Errorf("error decoding key part: %w", err)
 	}
 
-	return key, nil
+	return &KeyPart{Type: kpt, Value: kpv}, nil
 }
 
 // decodeKeyPart decodes inp into KeyPart. If zeroCopy is true, KeyPart
 // references data in inp.  Otherwise, it is copied.
-func decodeKeyPart(inp []byte, zeroCopy bool, _ uint16) (*KeyPart, error) {
+func decodeKeyPart(inp []byte, zeroCopy bool, _ uint16) (uint16, []byte, error) {
 	// read key part type and the rest is the key item part
 	kpt, kpv, err := utils.ReadUint16(inp)
 	if err != nil {
-		return nil, fmt.Errorf("error decoding key part (content): %w", err)
+		return 0, nil, fmt.Errorf("error decoding key part (content): %w", err)
 	}
 	if zeroCopy {
-		return &KeyPart{Type: kpt, Value: kpv}, nil
+		return kpt, kpv, nil
 	}
 	v := make([]byte, len(kpv))
 	copy(v, kpv)
-	return &KeyPart{Type: kpt, Value: v}, nil
+	return kpt, v, nil
 }
 
 // EncodeKey encodes a key into a byte slice
@@ -240,6 +240,63 @@ func DecodeKey(encodedKey []byte) (*Key, error) {
 	return key, nil
 }
 
+func decodeKeyPartValueByType(inp []byte, typ uint16, zeroCopy bool, version uint16) ([]byte, bool, error) {
+	// Read number of key parts
+	numOfParts, rest, err := utils.ReadUint16(inp)
+	if err != nil {
+		return nil, false, fmt.Errorf("error decoding number of key parts: %w", err)
+	}
+
+	for i := 0; i < int(numOfParts); i++ {
+		var kpt uint16
+		var kpv []byte
+
+		kpt, kpv, rest, err = decodeKeyPartWithEncodedSizeInfo(rest, zeroCopy, version)
+		if err != nil {
+			return nil, false, err
+		}
+		if kpt == typ {
+			return kpv, true, nil
+		}
+	}
+
+	return nil, false, nil
+}
+
+func decodeKeyPartWithEncodedSizeInfo(
+	inp []byte,
+	zeroCopy bool,
+	version uint16,
+) (
+	// kp KeyPart,
+	kpt uint16,
+	kpv []byte,
+	rest []byte,
+	err error,
+) {
+
+	// Read encoded key part size
+	kpEncSize, rest, err := utils.ReadUint32(inp)
+	if err != nil {
+		return 0, nil, nil, fmt.Errorf("error decoding key part: %w", err)
+	}
+
+	// Read encoded key part
+	var kpEnc []byte
+	kpEnc, rest, err = utils.ReadSlice(rest, int(kpEncSize))
+	if err != nil {
+		return 0, nil, nil, fmt.Errorf("error decoding key part: %w", err)
+	}
+
+	// Decode encoded key part
+	kpType, kpValue, err := decodeKeyPart(kpEnc, zeroCopy, version)
+	if err != nil {
+		return 0, nil, nil, fmt.Errorf("error decoding key part: %w", err)
+	}
+
+	return kpType, kpValue, rest, nil
+}
+
 // decodeKey decodes inp into Key. If zeroCopy is true, returned key
 // references data in inp.  Otherwise, it is copied.
 func decodeKey(inp []byte, zeroCopy bool, version uint16) (*Key, error) {
@@ -257,27 +314,15 @@ func decodeKey(inp []byte, zeroCopy bool, version uint16) (*Key, error) {
 	key.KeyParts = make([]KeyPart, numOfParts)
 
 	for i := 0; i < int(numOfParts); i++ {
-		var kpEncSize uint32
-		var kpEnc []byte
-		// read encoded key part size
-		kpEncSize, rest, err = utils.ReadUint32(rest)
+		var kpt uint16
+		var kpv []byte
+
+		kpt, kpv, rest, err = decodeKeyPartWithEncodedSizeInfo(rest, zeroCopy, version)
 		if err != nil {
-			return nil, fmt.Errorf("error decoding key (content): %w", err)
+			return nil, err
 		}
 
-		// read encoded key part
-		kpEnc, rest, err = utils.ReadSlice(rest, int(kpEncSize))
-		if err != nil {
-			return nil, fmt.Errorf("error decoding key (content): %w", err)
-		}
-
-		// decode encoded key part
-		kp, err := decodeKeyPart(kpEnc, zeroCopy, version)
-		if err != nil {
-			return nil, fmt.Errorf("error decoding key (content): %w", err)
-		}
-
-		key.KeyParts[i] = *kp
+		key.KeyParts[i] = KeyPart{kpt, kpv}
 	}
 	return key, nil
 }

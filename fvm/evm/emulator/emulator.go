@@ -1,23 +1,21 @@
 package emulator
 
 import (
+	"errors"
 	"math/big"
-	"sync"
 
-	gethCommon "github.com/ethereum/go-ethereum/common"
-	gethCore "github.com/ethereum/go-ethereum/core"
-	gethTypes "github.com/ethereum/go-ethereum/core/types"
-	gethVM "github.com/ethereum/go-ethereum/core/vm"
-	gethCrypto "github.com/ethereum/go-ethereum/crypto"
-	gethParams "github.com/ethereum/go-ethereum/params"
 	"github.com/onflow/atree"
+	gethCommon "github.com/onflow/go-ethereum/common"
+	gethCore "github.com/onflow/go-ethereum/core"
+	gethTypes "github.com/onflow/go-ethereum/core/types"
+	gethVM "github.com/onflow/go-ethereum/core/vm"
+	gethCrypto "github.com/onflow/go-ethereum/crypto"
+	gethParams "github.com/onflow/go-ethereum/params"
 
 	"github.com/onflow/flow-go/fvm/evm/emulator/state"
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/model/flow"
 )
-
-var pcUpdater = &precompileUpdater{}
 
 // Emulator handles operations against evm runtime
 type Emulator struct {
@@ -42,6 +40,7 @@ func newConfig(ctx types.BlockContext) *Config {
 	return NewConfig(
 		WithChainID(ctx.ChainID),
 		WithBlockNumber(new(big.Int).SetUint64(ctx.BlockNumber)),
+		WithBlockTime(ctx.BlockTimestamp),
 		WithCoinbase(ctx.GasFeeCollector.ToCommon()),
 		WithDirectCallBaseGasUsage(ctx.DirectCallBaseGasUsage),
 		WithExtraPrecompiles(ctx.ExtraPrecompiles),
@@ -61,7 +60,6 @@ func (em *Emulator) NewReadOnlyBlockView(ctx types.BlockContext) (types.ReadOnly
 // NewBlockView constructs a new block view (mutable)
 func (em *Emulator) NewBlockView(ctx types.BlockContext) (types.BlockView, error) {
 	cfg := newConfig(ctx)
-	pcUpdater.SetupPrecompile(cfg)
 	return &BlockView{
 		config:   cfg,
 		rootAddr: em.rootAddr,
@@ -136,31 +134,106 @@ func (bl *BlockView) DirectCall(call *types.DirectCall) (*types.Result, error) {
 func (bl *BlockView) RunTransaction(
 	tx *gethTypes.Transaction,
 ) (*types.Result, error) {
-	var res *types.Result
-	var err error
 	proc, err := bl.newProcedure()
 	if err != nil {
 		return nil, err
 	}
-	msg, err := gethCore.TransactionToMessage(tx, GetSigner(bl.config), proc.config.BlockContext.BaseFee)
+
+	msg, err := gethCore.TransactionToMessage(
+		tx,
+		GetSigner(bl.config),
+		proc.config.BlockContext.BaseFee)
 	if err != nil {
 		// this is not a fatal error (e.g. due to bad signature)
 		// not a valid transaction
-		return res, types.NewEVMValidationError(err)
+		return types.NewInvalidResult(tx, err), nil
 	}
-
-	txHash := tx.Hash()
 
 	// update tx context origin
 	proc.evm.TxContext.Origin = msg.From
-	// TODO: when we support multiple tx per block we need to update
-	// the tx index here to proper value
-	res, err = proc.run(msg, txHash, 0, tx.Type())
+	res, err := proc.run(msg, tx.Hash(), 0, tx.Type())
 	if err != nil {
 		return nil, err
 	}
 	// all commmit errors (StateDB errors) has to be returned
-	return res, proc.commit()
+	if err := proc.commit(true); err != nil {
+		return nil, err
+	}
+
+	return res, nil
+}
+
+func (bl *BlockView) BatchRunTransactions(txs []*gethTypes.Transaction) ([]*types.Result, error) {
+	batchResults := make([]*types.Result, len(txs))
+
+	proc, err := bl.newProcedure()
+	if err != nil {
+		return nil, err
+	}
+
+	for i, tx := range txs {
+		msg, err := gethCore.TransactionToMessage(
+			tx,
+			GetSigner(bl.config),
+			proc.config.BlockContext.BaseFee)
+		if err != nil {
+			batchResults[i] = types.NewInvalidResult(tx, err)
+			continue
+		}
+
+		// update tx context origin
+		proc.evm.TxContext.Origin = msg.From
+		res, err := proc.run(msg, tx.Hash(), uint(i), tx.Type())
+		if err != nil {
+			return nil, err
+		}
+		// all commmit errors (StateDB errors) has to be returned
+		if err := proc.commit(false); err != nil {
+			return nil, err
+		}
+
+		// this clears state for any subsequent transaction runs
+		proc.state.Reset()
+
+		batchResults[i] = res
+	}
+
+	// finalize after all the batch transactions are executed to save resources
+	if err := proc.state.Finalize(); err != nil {
+		return nil, err
+	}
+
+	return batchResults, nil
+}
+
+// DryRunTransaction run unsigned transaction without persisting the state
+func (bl *BlockView) DryRunTransaction(
+	tx *gethTypes.Transaction,
+	from gethCommon.Address,
+) (*types.Result, error) {
+	proc, err := bl.newProcedure()
+	if err != nil {
+		return nil, err
+	}
+
+	msg, err := gethCore.TransactionToMessage(
+		tx,
+		GetSigner(bl.config),
+		proc.config.BlockContext.BaseFee,
+	)
+	// we can ignore invalid signature errors since we don't expect signed transctions
+	if !errors.Is(err, gethTypes.ErrInvalidSig) {
+		return nil, err
+	}
+
+	// use the from as the signer
+	proc.evm.TxContext.Origin = from
+	msg.From = from
+	// we need to skip nonce check for dry run
+	msg.SkipAccountChecks = true
+
+	// return without commiting the state
+	return proc.run(msg, tx.Hash(), 0, tx.Type())
 }
 
 func (bl *BlockView) newProcedure() (*procedure, error) {
@@ -188,9 +261,9 @@ type procedure struct {
 	state  types.StateDB
 }
 
-// commit commits the changes to the state.
-func (proc *procedure) commit() error {
-	err := proc.state.Commit()
+// commit commits the changes to the state (with optional finalization)
+func (proc *procedure) commit(finalize bool) error {
+	err := proc.state.Commit(finalize)
 	if err != nil {
 		// if known types (state errors) don't do anything and return
 		if types.IsAFatalError(err) || types.IsAStateError(err) {
@@ -224,15 +297,23 @@ func (proc *procedure) mintTo(
 	if err != nil {
 		return res, err
 	}
+
+	// if any error (invalid or vm) on the internal call, revert and don't commit any change
+	// this prevents having cases that we add balance to the bridge but the transfer
+	// fails due to gas, etc.
+	// TODO: in the future we might just return without error and handle everything on higher level
+	if res.Invalid() || res.Failed() {
+		return res, types.ErrInternalDirectCallFailed
+	}
+
 	// all commmit errors (StateDB errors) has to be returned
-	return res, proc.commit()
+	return res, proc.commit(true)
 }
 
 func (proc *procedure) withdrawFrom(
 	call *types.DirectCall,
 	txHash gethCommon.Hash,
 ) (*types.Result, error) {
-
 	bridge := call.To.ToCommon()
 
 	// create bridge account if not exist
@@ -248,10 +329,16 @@ func (proc *procedure) withdrawFrom(
 		return res, err
 	}
 
+	// if any error (invalid or vm) on the internal call, revert and don't commit any change
+	// TODO: in the future we might just return without error and handle everything on higher level
+	if res.Invalid() || res.Failed() {
+		return res, types.ErrInternalDirectCallFailed
+	}
+
 	// now deduct the balance from the bridge
 	proc.state.SubBalance(bridge, call.Value)
 	// all commmit errors (StateDB errors) has to be returned
-	return res, proc.commit()
+	return res, proc.commit(true)
 }
 
 // deployAt deploys a contract at the given target address
@@ -277,12 +364,14 @@ func (proc *procedure) deployAt(
 		TxType: types.DirectCallTxType,
 		TxHash: txHash,
 	}
+
 	addr := to.ToCommon()
 
 	// precheck 1 - check balance of the source
 	if value.Sign() != 0 &&
 		!proc.evm.Context.CanTransfer(proc.state, caller.ToCommon(), value) {
-		return res, gethCore.ErrInsufficientFundsForTransfer
+		res.SetValidationError(gethCore.ErrInsufficientFundsForTransfer)
+		return res, nil
 	}
 
 	// precheck 2 - ensure there's no existing eoa or contract is deployed at the address
@@ -365,9 +454,10 @@ func (proc *procedure) deployAt(
 		return res, nil
 	}
 
+	res.DeployedContractAddress = &to
+
 	proc.state.SetCode(addr, ret)
-	res.DeployedContractAddress = to
-	return res, proc.commit()
+	return res, proc.commit(true)
 }
 
 func (proc *procedure) runDirect(
@@ -383,9 +473,14 @@ func (proc *procedure) runDirect(
 		return nil, err
 	}
 	// all commmit errors (StateDB errors) has to be returned
-	return res, proc.commit()
+	return res, proc.commit(true)
 }
 
+// run runs a geth core.message and returns the
+// results, any validation or execution errors
+// are captured inside the result, the remaining
+// return errors are errors requires extra handling
+// on upstream (e.g. backend errors).
 func (proc *procedure) run(
 	msg *gethCore.Message,
 	txHash gethCommon.Hash,
@@ -404,25 +499,28 @@ func (proc *procedure) run(
 		gasPool,
 	).TransitionDb()
 	if err != nil {
-		// if the error is a fatal error or a non-fatal state error return it
-		// this condition should never happen
-		// given all StateDB errors are withheld for the commit time.
-		if types.IsAFatalError(err) || types.IsAStateError(err) {
-			return &res, err
+		// if the error is a fatal error or a non-fatal state error or a backend err return it
+		// this condition should never happen given all StateDB errors are withheld for the commit time.
+		if types.IsAFatalError(err) || types.IsAStateError(err) || types.IsABackendError(err) {
+			return nil, err
 		}
 		// otherwise is a validation error (pre-check failure)
 		// no state change, wrap the error and return
-		return &res, types.NewEVMValidationError(err)
+		res.SetValidationError(err)
+		return &res, nil
 	}
 
 	// if prechecks are passed, the exec result won't be nil
 	if execResult != nil {
 		res.GasConsumed = execResult.UsedGas
+		res.Index = uint16(txIndex)
+
 		if !execResult.Failed() { // collect vm errors
 			res.ReturnedValue = execResult.ReturnData
-			// If the transaction created a contract, store the creation address in the receipt.
+			// If the transaction created a contract, store the creation address in the receipt,
 			if msg.To == nil {
-				res.DeployedContractAddress = types.NewAddress(gethCrypto.CreateAddress(msg.From, msg.Nonce))
+				deployedAddress := types.NewAddress(gethCrypto.CreateAddress(msg.From, msg.Nonce))
+				res.DeployedContractAddress = &deployedAddress
 			}
 			// replace tx index and tx hash
 			res.Logs = proc.state.Logs(
@@ -436,33 +534,4 @@ func (proc *procedure) run(
 		}
 	}
 	return &res, nil
-}
-
-type precompileUpdater struct {
-	updateLock sync.Mutex
-}
-
-func (pu *precompileUpdater) SetupPrecompile(cfg *Config) {
-	pu.updateLock.Lock()
-	defer pu.updateLock.Unlock()
-
-	rules := cfg.ChainRules()
-	// captures the pointer to the map that has to be augmented
-	var precompiles map[gethCommon.Address]gethVM.PrecompiledContract
-	switch {
-	case rules.IsCancun:
-		precompiles = gethVM.PrecompiledContractsCancun
-	case rules.IsBerlin:
-		precompiles = gethVM.PrecompiledContractsBerlin
-	case rules.IsIstanbul:
-		precompiles = gethVM.PrecompiledContractsIstanbul
-	case rules.IsByzantium:
-		precompiles = gethVM.PrecompiledContractsByzantium
-	default:
-		precompiles = gethVM.PrecompiledContractsHomestead
-	}
-	for addr, contract := range cfg.ExtraPrecompiles {
-		// we override if exist since we call this method on every block
-		precompiles[addr] = contract
-	}
 }

@@ -15,11 +15,15 @@ import (
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/counters"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
+
+// ErrTransactionNotInBlock represents an error indicating that the transaction is not found in the block.
+var ErrTransactionNotInBlock = errors.New("transaction not in block")
 
 // TransactionErrorMessage declares the lookup transaction error methods by different input parameters.
 type TransactionErrorMessage interface {
@@ -46,13 +50,14 @@ type TransactionErrorMessage interface {
 
 // TransactionsLocalDataProvider provides functionality for retrieving transaction results and error messages from local storages
 type TransactionsLocalDataProvider struct {
-	state           protocol.State
-	collections     storage.Collections
-	blocks          storage.Blocks
-	eventsIndex     *index.EventsIndex
-	txResultsIndex  *index.TransactionResultsIndex
-	txErrorMessages TransactionErrorMessage
-	systemTxID      flow.Identifier
+	state               protocol.State
+	collections         storage.Collections
+	blocks              storage.Blocks
+	eventsIndex         *index.EventsIndex
+	txResultsIndex      *index.TransactionResultsIndex
+	txErrorMessages     TransactionErrorMessage
+	systemTxID          flow.Identifier
+	lastFullBlockHeight *counters.PersistentStrictMonotonicCounter
 }
 
 // GetTransactionResultFromStorage retrieves a transaction result from storage by block ID and transaction ID.
@@ -91,7 +96,7 @@ func (t *TransactionsLocalDataProvider) GetTransactionResultFromStorage(
 		txStatusCode = 1 // statusCode of 1 indicates an error and 0 indicates no error, the same as on EN
 	}
 
-	txStatus, err := t.deriveTransactionStatus(blockID, block.Header.Height, true)
+	txStatus, err := t.DeriveTransactionStatus(block.Header.Height, true)
 	if err != nil {
 		if !errors.Is(err, state.ErrUnknownSnapshotReference) {
 			irrecoverable.Throw(ctx, err)
@@ -106,13 +111,9 @@ func (t *TransactionsLocalDataProvider) GetTransactionResultFromStorage(
 
 	// events are encoded in CCF format in storage. convert to JSON-CDC if requested
 	if requiredEventEncodingVersion == entities.EventEncodingVersion_JSON_CDC_V0 {
-		for _, e := range events {
-			payload, err := convert.CcfPayloadToJsonPayload(e.Payload)
-			if err != nil {
-				err = fmt.Errorf("failed to convert event payload for block %s: %w", blockID, err)
-				return nil, rpc.ConvertError(err, "failed to convert event payload", codes.Internal)
-			}
-			e.Payload = payload
+		events, err = convert.CcfEventsToJsonEvents(events)
+		if err != nil {
+			return nil, rpc.ConvertError(err, "failed to convert event payload", codes.Internal)
 		}
 	}
 
@@ -179,7 +180,7 @@ func (t *TransactionsLocalDataProvider) GetTransactionResultsByBlockIDFromStorag
 			txStatusCode = 1
 		}
 
-		txStatus, err := t.deriveTransactionStatus(blockID, block.Header.Height, true)
+		txStatus, err := t.DeriveTransactionStatus(block.Header.Height, true)
 		if err != nil {
 			if !errors.Is(err, state.ErrUnknownSnapshotReference) {
 				irrecoverable.Throw(ctx, err)
@@ -194,13 +195,9 @@ func (t *TransactionsLocalDataProvider) GetTransactionResultsByBlockIDFromStorag
 
 		// events are encoded in CCF format in storage. convert to JSON-CDC if requested
 		if requiredEventEncodingVersion == entities.EventEncodingVersion_JSON_CDC_V0 {
-			for _, e := range events {
-				payload, err := convert.CcfPayloadToJsonPayload(e.Payload)
-				if err != nil {
-					err = fmt.Errorf("failed to convert event payload for block %s: %w", blockID, err)
-					return nil, rpc.ConvertError(err, "failed to convert event payload", codes.Internal)
-				}
-				e.Payload = payload
+			events, err = convert.CcfEventsToJsonEvents(events)
+			if err != nil {
+				return nil, rpc.ConvertError(err, "failed to convert event payload", codes.Internal)
 			}
 		}
 
@@ -260,7 +257,7 @@ func (t *TransactionsLocalDataProvider) GetTransactionResultByIndexFromStorage(
 		txStatusCode = 1 // statusCode of 1 indicates an error and 0 indicates no error, the same as on EN
 	}
 
-	txStatus, err := t.deriveTransactionStatus(blockID, block.Header.Height, true)
+	txStatus, err := t.DeriveTransactionStatus(block.Header.Height, true)
 	if err != nil {
 		if !errors.Is(err, state.ErrUnknownSnapshotReference) {
 			irrecoverable.Throw(ctx, err)
@@ -275,17 +272,13 @@ func (t *TransactionsLocalDataProvider) GetTransactionResultByIndexFromStorage(
 
 	// events are encoded in CCF format in storage. convert to JSON-CDC if requested
 	if requiredEventEncodingVersion == entities.EventEncodingVersion_JSON_CDC_V0 {
-		for _, e := range events {
-			payload, err := convert.CcfPayloadToJsonPayload(e.Payload)
-			if err != nil {
-				err = fmt.Errorf("failed to convert event payload for block %s: %w", blockID, err)
-				return nil, rpc.ConvertError(err, "failed to convert event payload", codes.Internal)
-			}
-			e.Payload = payload
+		events, err = convert.CcfEventsToJsonEvents(events)
+		if err != nil {
+			return nil, rpc.ConvertError(err, "failed to convert event payload", codes.Internal)
 		}
 	}
 
-	collectionID, err := t.lookupCollectionIDInBlock(block, txResult.TransactionID)
+	collectionID, err := t.LookupCollectionIDInBlock(block, txResult.TransactionID)
 	if err != nil {
 		return nil, err
 	}
@@ -302,9 +295,9 @@ func (t *TransactionsLocalDataProvider) GetTransactionResultByIndexFromStorage(
 	}, nil
 }
 
-// deriveUnknownTransactionStatus is used to determine the status of transaction
+// DeriveUnknownTransactionStatus is used to determine the status of transaction
 // that are not in a block yet based on the provided reference block ID.
-func (t *TransactionsLocalDataProvider) deriveUnknownTransactionStatus(refBlockID flow.Identifier) (flow.TransactionStatus, error) {
+func (t *TransactionsLocalDataProvider) DeriveUnknownTransactionStatus(refBlockID flow.Identifier) (flow.TransactionStatus, error) {
 	referenceBlock, err := t.state.AtBlockID(refBlockID).Head()
 	if err != nil {
 		return flow.TransactionStatusUnknown, err
@@ -331,10 +324,7 @@ func (t *TransactionsLocalDataProvider) deriveUnknownTransactionStatus(refBlockI
 
 	// the last full height is the height where we have received all
 	// collections  for all blocks with a lower height
-	fullHeight, err := t.blocks.GetLastFullBlockHeight()
-	if err != nil {
-		return flow.TransactionStatusUnknown, err
-	}
+	fullHeight := t.lastFullBlockHeight.Value()
 
 	// if we have received collections  for all blocks up to the expiry block, the transaction is expired
 	if isExpired(refHeight, fullHeight) {
@@ -347,9 +337,9 @@ func (t *TransactionsLocalDataProvider) deriveUnknownTransactionStatus(refBlockI
 	return flow.TransactionStatusPending, nil
 }
 
-// deriveTransactionStatus is used to determine the status of a transaction based on the provided block ID, block height, and execution status.
+// DeriveTransactionStatus is used to determine the status of a transaction based on the provided block height, and execution status.
 // No errors expected during normal operations.
-func (t *TransactionsLocalDataProvider) deriveTransactionStatus(blockID flow.Identifier, blockHeight uint64, executed bool) (flow.TransactionStatus, error) {
+func (t *TransactionsLocalDataProvider) DeriveTransactionStatus(blockHeight uint64, executed bool) (flow.TransactionStatus, error) {
 	if !executed {
 		// If we've gotten here, but the block has not yet been executed, report it as only been finalized
 		return flow.TransactionStatusFinalized, nil
@@ -381,16 +371,16 @@ func isExpired(refHeight, compareToHeight uint64) bool {
 	return compareToHeight-refHeight > flow.DefaultTransactionExpiry
 }
 
-// lookupCollectionIDInBlock returns the collection ID based on the transaction ID. The lookup is performed in block
+// LookupCollectionIDInBlock returns the collection ID based on the transaction ID. The lookup is performed in block
 // collections.
-func (t *TransactionsLocalDataProvider) lookupCollectionIDInBlock(
+func (t *TransactionsLocalDataProvider) LookupCollectionIDInBlock(
 	block *flow.Block,
 	txID flow.Identifier,
 ) (flow.Identifier, error) {
 	for _, guarantee := range block.Payload.Guarantees {
 		collection, err := t.collections.LightByID(guarantee.ID())
 		if err != nil {
-			return flow.ZeroID, err
+			return flow.ZeroID, fmt.Errorf("failed to get collection %s in indexed block: %w", guarantee.ID(), err)
 		}
 
 		for _, collectionTxID := range collection.Transactions {
@@ -399,7 +389,7 @@ func (t *TransactionsLocalDataProvider) lookupCollectionIDInBlock(
 			}
 		}
 	}
-	return flow.ZeroID, status.Error(codes.NotFound, "transaction not found in block")
+	return flow.ZeroID, ErrTransactionNotInBlock
 }
 
 // buildTxIDToCollectionIDMapping returns a map of transaction ID to collection ID based on the provided block.

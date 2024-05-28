@@ -50,6 +50,7 @@ import (
 	dkgmodule "github.com/onflow/flow-go/module/dkg"
 	"github.com/onflow/flow-go/module/epochs"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
+	"github.com/onflow/flow-go/module/grpcclient"
 	"github.com/onflow/flow-go/module/mempool"
 	consensusMempools "github.com/onflow/flow-go/module/mempool/consensus"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
@@ -63,7 +64,7 @@ import (
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
-	"github.com/onflow/flow-go/state/protocol/protocol_state"
+	protocol_state "github.com/onflow/flow-go/state/protocol/protocol_state/state"
 	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/utils/io"
@@ -99,35 +100,36 @@ func main() {
 
 		// DKG contract client
 		machineAccountInfo *bootstrap.NodeMachineAccountInfo
-		flowClientConfigs  []*common.FlowClientConfig
+		flowClientConfigs  []*grpcclient.FlowClientConfig
 		insecureAccessAPI  bool
 		accessNodeIDS      []string
 
-		err                 error
-		mutableState        protocol.ParticipantState
-		beaconPrivateKey    *encodable.RandomBeaconPrivKey
-		guarantees          mempool.Guarantees
-		receipts            mempool.ExecutionTree
-		seals               mempool.IncorporatedResultSeals
-		pendingReceipts     mempool.PendingReceipts
-		receiptRequester    *requester.Engine
-		syncCore            *chainsync.Core
-		comp                *compliance.Engine
-		hot                 module.HotStuff
-		conMetrics          module.ConsensusMetrics
-		mainMetrics         module.HotstuffMetrics
-		receiptValidator    module.ReceiptValidator
-		chunkAssigner       *chmodule.ChunkAssigner
-		followerDistributor *pubsub.FollowerDistributor
-		dkgBrokerTunnel     *dkgmodule.BrokerTunnel
-		blockTimer          protocol.BlockTimer
-		proposalDurProvider hotstuff.ProposalDurationProvider
-		committee           *committees.Consensus
-		epochLookup         *epochs.EpochLookup
-		hotstuffModules     *consensus.HotstuffModules
-		dkgState            *bstorage.DKGState
-		safeBeaconKeys      *bstorage.SafeBeaconPrivateKeys
-		getSealingConfigs   module.SealingConfigsGetter
+		err                   error
+		mutableState          protocol.ParticipantState
+		beaconPrivateKey      *encodable.RandomBeaconPrivKey
+		guarantees            mempool.Guarantees
+		receipts              mempool.ExecutionTree
+		seals                 mempool.IncorporatedResultSeals
+		pendingReceipts       mempool.PendingReceipts
+		receiptRequester      *requester.Engine
+		syncCore              *chainsync.Core
+		comp                  *compliance.Engine
+		hot                   module.HotStuff
+		conMetrics            module.ConsensusMetrics
+		machineAccountMetrics module.MachineAccountMetrics
+		mainMetrics           module.HotstuffMetrics
+		receiptValidator      module.ReceiptValidator
+		chunkAssigner         *chmodule.ChunkAssigner
+		followerDistributor   *pubsub.FollowerDistributor
+		dkgBrokerTunnel       *dkgmodule.BrokerTunnel
+		blockTimer            protocol.BlockTimer
+		proposalDurProvider   hotstuff.ProposalDurationProvider
+		committee             *committees.Consensus
+		epochLookup           *epochs.EpochLookup
+		hotstuffModules       *consensus.HotstuffModules
+		dkgState              *bstorage.DKGState
+		safeBeaconKeys        *bstorage.SafeBeaconPrivateKeys
+		getSealingConfigs     module.SealingConfigsGetter
 	)
 	var deprecatedFlagBlockRateDelay time.Duration
 
@@ -144,7 +146,7 @@ func main() {
 		flags.DurationVar(&maxInterval, "max-interval", 90*time.Second, "the maximum amount of time between two blocks")
 		flags.UintVar(&maxSealPerBlock, "max-seal-per-block", 100, "the maximum number of seals to be included in a block")
 		flags.UintVar(&maxGuaranteePerBlock, "max-guarantee-per-block", 100, "the maximum number of collection guarantees to be included in a block")
-		flags.DurationVar(&hotstuffMinTimeout, "hotstuff-min-timeout", 2500*time.Millisecond, "the lower timeout bound for the hotstuff pacemaker, this is also used as initial timeout")
+		flags.DurationVar(&hotstuffMinTimeout, "hotstuff-min-timeout", 1045*time.Millisecond, "the lower timeout bound for the hotstuff pacemaker, this is also used as initial timeout")
 		flags.Float64Var(&hotstuffTimeoutAdjustmentFactor, "hotstuff-timeout-adjustment-factor", timeout.DefaultConfig.TimeoutAdjustmentFactor, "adjustment of timeout duration in case of time out event")
 		flags.Uint64Var(&hotstuffHappyPathMaxRoundFailures, "hotstuff-happy-path-max-round-failures", timeout.DefaultConfig.HappyPathMaxRoundFailures, "number of failed rounds before first timeout increase")
 		flags.DurationVar(&cruiseCtlFallbackProposalDurationFlag, "cruise-ctl-fallback-proposal-duration", cruiseCtlConfig.FallbackProposalDelay.Load(), "the proposal duration value to use when the controller is disabled, or in epoch fallback mode. In those modes, this value has the same as the old `--block-rate-delay`")
@@ -199,8 +201,16 @@ func main() {
 	nodeBuilder.
 		PreInit(cmd.DynamicStartPreInit).
 		ValidateRootSnapshot(badgerState.ValidRootSnapshotContainsEntityExpiryRange).
+		Module("machine account config", func(node *cmd.NodeConfig) error {
+			machineAccountInfo, err = cmd.LoadNodeMachineAccountInfoFile(node.BootstrapDir, node.NodeID)
+			return err
+		}).
 		Module("consensus node metrics", func(node *cmd.NodeConfig) error {
 			conMetrics = metrics.NewConsensusCollector(node.Tracer, node.MetricsRegisterer)
+			return nil
+		}).
+		Module("machine account metrics", func(node *cmd.NodeConfig) error {
+			machineAccountMetrics = metrics.NewMachineAccountCollector(node.MetricsRegisterer, machineAccountInfo.FlowAddress())
 			return nil
 		}).
 		Module("dkg state", func(node *cmd.NodeConfig) error {
@@ -393,17 +403,13 @@ func main() {
 			followerDistributor = pubsub.NewFollowerDistributor()
 			return nil
 		}).
-		Module("machine account config", func(node *cmd.NodeConfig) error {
-			machineAccountInfo, err = cmd.LoadNodeMachineAccountInfoFile(node.BootstrapDir, node.NodeID)
-			return err
-		}).
 		Module("sdk client connection options", func(node *cmd.NodeConfig) error {
 			anIDS, err := common.ValidateAccessNodeIDSFlag(accessNodeIDS, node.RootChainID, node.State.Sealed())
 			if err != nil {
 				return fmt.Errorf("failed to validate flag --access-node-ids %w", err)
 			}
 
-			flowClientConfigs, err = common.FlowClientConfigs(anIDS, insecureAccessAPI, node.State.Sealed())
+			flowClientConfigs, err = grpcclient.FlowClientConfigs(anIDS, insecureAccessAPI, node.State.Sealed())
 			if err != nil {
 				return fmt.Errorf("failed to prepare flow client connection configs for each access node id %w", err)
 			}
@@ -412,7 +418,7 @@ func main() {
 		}).
 		Component("machine account config validator", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			// @TODO use fallback logic for flowClient similar to DKG/QC contract clients
-			flowClient, err := common.FlowClient(flowClientConfigs[0])
+			flowClient, err := grpcclient.FlowClient(flowClientConfigs[0])
 			if err != nil {
 				return nil, fmt.Errorf("failed to get flow client connection option for access node (0): %s %w", flowClientConfigs[0].AccessAddress, err)
 			}
@@ -425,8 +431,9 @@ func main() {
 			validator, err := epochs.NewMachineAccountConfigValidator(
 				node.Logger,
 				flowClient,
-				flow.RoleCollection,
+				flow.RoleConsensus,
 				*machineAccountInfo,
+				machineAccountMetrics,
 				opts...,
 			)
 			return validator, err
@@ -710,7 +717,8 @@ func main() {
 		}).
 		Component("consensus participant", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			mutableProtocolState := protocol_state.NewMutableProtocolState(
-				node.Storage.ProtocolState,
+				node.Storage.EpochProtocolState,
+				node.Storage.ProtocolKVStore,
 				node.State.Params(),
 				node.Storage.Headers,
 				node.Storage.Results,
@@ -974,11 +982,11 @@ func createDKGContractClient(node *cmd.NodeConfig, machineAccountInfo *bootstrap
 }
 
 // createDKGContractClients creates an array dkgContractClient that is sorted by retry fallback priority
-func createDKGContractClients(node *cmd.NodeConfig, machineAccountInfo *bootstrap.NodeMachineAccountInfo, flowClientOpts []*common.FlowClientConfig) ([]module.DKGContractClient, error) {
+func createDKGContractClients(node *cmd.NodeConfig, machineAccountInfo *bootstrap.NodeMachineAccountInfo, flowClientOpts []*grpcclient.FlowClientConfig) ([]module.DKGContractClient, error) {
 	dkgClients := make([]module.DKGContractClient, 0)
 
 	for _, opt := range flowClientOpts {
-		flowClient, err := common.FlowClient(opt)
+		flowClient, err := grpcclient.FlowClient(opt)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create flow client for dkg contract client with options: %s %w", flowClientOpts, err)
 		}

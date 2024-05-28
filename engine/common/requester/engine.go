@@ -134,9 +134,8 @@ func New(log zerolog.Logger, metrics module.EngineMetrics, net network.EngineReg
 // function. It is done in a separate call so that the requester can be injected
 // into engines upon construction, and then provide a handle function to the
 // requester from that engine itself.
-func (e *Engine) WithHandle(handle HandleFunc) *Engine {
+func (e *Engine) WithHandle(handle HandleFunc) {
 	e.handle = handle
-	return e
 }
 
 // Ready returns a ready channel that is closed once the engine has fully
@@ -313,24 +312,11 @@ func (e *Engine) dispatchRequest() (bool, error) {
 		return false, fmt.Errorf("could not get providers: %w", err)
 	}
 
-	// randomize order of items, so that they can be requested in different order each time
-	rndItems := make([]flow.Identifier, 0, len(e.items))
-	for k := range e.items {
-		rndItems = append(rndItems, e.items[k].EntityID)
-	}
-	err = rand.Shuffle(uint(len(rndItems)), func(i, j uint) {
-		rndItems[i], rndItems[j] = rndItems[j], rndItems[i]
-	})
-	if err != nil {
-		return false, fmt.Errorf("shuffle failed: %w", err)
-	}
-
 	// go through each item and decide if it should be requested again
 	now := time.Now().UTC()
 	var providerID flow.Identifier
 	var entityIDs []flow.Identifier
-	for _, entityID := range rndItems {
-		item := e.items[entityID]
+	for entityID, item := range e.items {
 
 		// if the item should not be requested yet, ignore
 		cutoff := item.LastRequested.Add(item.RetryAfter)
@@ -364,15 +350,18 @@ func (e *Engine) dispatchRequest() (bool, error) {
 		// order is random and will skip the item most of the times
 		// when other items are available
 		if providerID == flow.ZeroID {
-			providers = providers.Filter(item.ExtraSelector)
-			if len(providers) == 0 {
-				return false, fmt.Errorf("no valid providers available")
+			filteredProviders := providers.Filter(item.ExtraSelector)
+			if len(filteredProviders) == 0 {
+				return false, fmt.Errorf("no valid providers available for item %s, total providers: %v", entityID.String(), len(providers))
 			}
-			id, err := providers.Sample(1)
+			// ramdonly select a provider from the filtered set
+			// to send as many item requests as possible.
+			id, err := filteredProviders.Sample(1)
 			if err != nil {
 				return false, fmt.Errorf("sampling failed: %w", err)
 			}
 			providerID = id[0].NodeID
+			providers = filteredProviders
 		}
 
 		// add item to list and set retry parameters

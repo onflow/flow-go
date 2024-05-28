@@ -1,61 +1,88 @@
 package migrations
 
 import (
-	"fmt"
-
 	"github.com/onflow/atree"
+	"github.com/onflow/cadence/runtime"
+	"github.com/onflow/cadence/runtime/common"
+	"github.com/onflow/cadence/runtime/stdlib"
 
-	"github.com/onflow/flow-go/fvm/environment"
+	"github.com/onflow/flow-go/cmd/util/ledger/util/registers"
 	"github.com/onflow/flow-go/model/flow"
 )
 
-type AccountsAtreeLedger struct {
-	Accounts environment.Accounts
+type RegistersMigration func(registersByAccount *registers.ByAccount) error
+
+var allStorageMapDomains = []string{
+	common.PathDomainStorage.Identifier(),
+	common.PathDomainPrivate.Identifier(),
+	common.PathDomainPublic.Identifier(),
+	runtime.StorageDomainContract,
+	stdlib.InboxStorageDomain,
+	stdlib.CapabilityControllerStorageDomain,
 }
 
-func NewAccountsAtreeLedger(accounts environment.Accounts) *AccountsAtreeLedger {
-	return &AccountsAtreeLedger{Accounts: accounts}
-}
+var allStorageMapDomainsSet = map[string]struct{}{}
 
-var _ atree.Ledger = &AccountsAtreeLedger{}
-
-func (a *AccountsAtreeLedger) GetValue(owner, key []byte) ([]byte, error) {
-	v, err := a.Accounts.GetValue(
-		flow.NewRegisterID(
-			flow.BytesToAddress(owner),
-			string(key)))
-	if err != nil {
-		return nil, fmt.Errorf("getting value failed: %w", err)
+func init() {
+	for _, domain := range allStorageMapDomains {
+		allStorageMapDomainsSet[domain] = struct{}{}
 	}
-	return v, nil
 }
 
-func (a *AccountsAtreeLedger) SetValue(owner, key, value []byte) error {
-	err := a.Accounts.SetValue(
-		flow.NewRegisterID(
-			flow.BytesToAddress(owner),
-			string(key)),
-		value)
+func getSlabIDsFromRegisters(registers registers.Registers) ([]atree.StorageID, error) {
+	storageIDs := make([]atree.StorageID, 0, registers.Count())
+
+	err := registers.ForEach(func(owner string, key string, value []byte) error {
+
+		if !flow.IsSlabIndexKey(key) {
+			return nil
+		}
+
+		storageID := atree.NewStorageID(
+			atree.Address([]byte(owner)),
+			atree.StorageIndex([]byte(key[1:])),
+		)
+
+		storageIDs = append(storageIDs, storageID)
+
+		return nil
+	})
 	if err != nil {
-		return fmt.Errorf("setting value failed: %w", err)
+		return nil, err
 	}
-	return nil
+
+	return storageIDs, nil
 }
 
-func (a *AccountsAtreeLedger) ValueExists(owner, key []byte) (exists bool, err error) {
-	v, err := a.GetValue(owner, key)
+func loadAtreeSlabsInStorage(
+	storage *runtime.Storage,
+	registers registers.Registers,
+	nWorkers int,
+) error {
+
+	storageIDs, err := getSlabIDsFromRegisters(registers)
 	if err != nil {
-		return false, fmt.Errorf("checking value existence failed: %w", err)
+		return err
 	}
 
-	return len(v) > 0, nil
+	return storage.PersistentSlabStorage.BatchPreload(storageIDs, nWorkers)
 }
 
-// AllocateStorageIndex allocates new storage index under the owner accounts to store a new register
-func (a *AccountsAtreeLedger) AllocateStorageIndex(owner []byte) (atree.StorageIndex, error) {
-	v, err := a.Accounts.AllocateStorageIndex(flow.BytesToAddress(owner))
+func checkStorageHealth(
+	address common.Address,
+	storage *runtime.Storage,
+	registers registers.Registers,
+	nWorkers int,
+) error {
+
+	err := loadAtreeSlabsInStorage(storage, registers, nWorkers)
 	if err != nil {
-		return atree.StorageIndex{}, fmt.Errorf("storage address allocation failed: %w", err)
+		return err
 	}
-	return v, nil
+
+	for _, domain := range allStorageMapDomains {
+		_ = storage.GetStorageMap(address, domain, false)
+	}
+
+	return storage.CheckHealth()
 }

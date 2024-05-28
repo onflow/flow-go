@@ -19,6 +19,7 @@ import (
 	bprotocol "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/state/protocol/prg"
+	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
 	"github.com/onflow/flow-go/state/protocol/util"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -39,7 +40,7 @@ func TestUnknownReferenceBlock(t *testing.T) {
 
 	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
 		// build some finalized non-root blocks (heights 101-110)
-		head := unittest.BlockWithParentFixture(rootSnapshot.Encodable().Head)
+		head := unittest.BlockWithParentFixture(rootSnapshot.Encodable().Head())
 		head.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
 		buildFinalizedBlock(t, state, head)
 
@@ -234,7 +235,8 @@ func TestClusters(t *testing.T) {
 	clusterQCs := unittest.QuorumCertificatesFromAssignments(setup.Assignments)
 	commit.ClusterQCs = flow.ClusterQCVoteDatasFromQCs(clusterQCs)
 	seal.ResultID = result.ID()
-	root.Payload.ProtocolStateID = inmem.ProtocolStateFromEpochServiceEvents(setup, commit).ID()
+	root.Payload.ProtocolStateID = kvstore.NewDefaultKVStore(
+		inmem.ProtocolStateFromEpochServiceEvents(setup, commit).ID()).ID()
 
 	rootSnapshot, err := inmem.SnapshotFromBootstrapState(root, result, seal, qc)
 	require.NoError(t, err)
@@ -654,10 +656,66 @@ func TestSealingSegment(t *testing.T) {
 			assertSealingSegmentBlocksQueryableAfterBootstrap(t, snapshot)
 		})
 	})
+
+	// Root <- B1 <- B2 <- ... <- B700(Seal_B699)
+	// Expected sealing segment: [B699, B700], Extra blocks: [B98, B99, ..., B698]
+	// where DefaultTransactionExpiry = 600
+	t.Run("test extra blocks contain exactly DefaultTransactionExpiry number of blocks below the sealed block", func(t *testing.T) {
+		util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.FollowerState) {
+			root := unittest.BlockWithParentFixture(head)
+			root.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
+			buildFinalizedBlock(t, state, root)
+
+			blocks := make([]*flow.Block, 0, flow.DefaultTransactionExpiry+3)
+			parent := root
+			for i := 0; i < flow.DefaultTransactionExpiry+1; i++ {
+				next := unittest.BlockWithParentProtocolState(parent)
+				next.Header.View = next.Header.Height + 1 // set view so we are still in the same epoch
+				buildFinalizedBlock(t, state, next)
+				blocks = append(blocks, next)
+				parent = next
+			}
+
+			// last sealed block
+			lastSealedBlock := parent
+			lastReceipt, lastSeal := unittest.ReceiptAndSealForBlock(lastSealedBlock)
+			prevLastBlock := unittest.BlockWithParentFixture(lastSealedBlock.Header)
+			prevLastBlock.SetPayload(unittest.PayloadFixture(
+				unittest.WithReceipts(lastReceipt),
+				unittest.WithProtocolStateID(rootProtocolStateID),
+			))
+			buildFinalizedBlock(t, state, prevLastBlock)
+
+			// last finalized block
+			lastBlock := unittest.BlockWithParentFixture(prevLastBlock.Header)
+			lastBlock.SetPayload(unittest.PayloadFixture(
+				unittest.WithSeals(lastSeal),
+				unittest.WithProtocolStateID(rootProtocolStateID),
+			))
+			buildFinalizedBlock(t, state, lastBlock)
+
+			// build a valid child to ensure we have a QC
+			buildFinalizedBlock(t, state, unittest.BlockWithParentProtocolState(lastBlock))
+
+			snapshot := state.AtBlockID(lastBlock.ID())
+			segment, err := snapshot.SealingSegment()
+			require.NoError(t, err)
+
+			assert.Equal(t, lastBlock.Header, segment.Highest().Header)
+			assert.Equal(t, lastBlock.Header, segment.Finalized().Header)
+			assert.Equal(t, lastSealedBlock.Header, segment.Sealed().Header)
+
+			// there are DefaultTransactionExpiry number of blocks in total
+			unittest.AssertEqualBlocksLenAndOrder(t, blocks[:flow.DefaultTransactionExpiry], segment.ExtraBlocks)
+			assert.Len(t, segment.ExtraBlocks, flow.DefaultTransactionExpiry)
+			assertSealingSegmentBlocksQueryableAfterBootstrap(t, snapshot)
+
+		})
+	})
 	// Test the case where the reference block of the snapshot contains seals for blocks that are lower than the lowest sealing segment's block.
 	// This test case specifically checks if sealing segment includes both highest and lowest block sealed by head.
 	// ROOT <- B1 <- B2 <- B3(Seal_B1) <- B4 <- ... <- LastBlock(Seal_B2, Seal_B3, Seal_B4)
-	// Expected sealing segment: [B4, ..., B5], Extra blocks: [B2, B3]
+	// Expected sealing segment: [B4, ..., B5], Extra blocks: [Root, B1, B2, B3]
 	t.Run("highest block seals outside segment", func(t *testing.T) {
 		util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.FollowerState) {
 			// build a block to seal
@@ -725,7 +783,8 @@ func TestSealingSegment(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, lastBlock.Header, segment.Highest().Header)
 			assert.Equal(t, block4.Header, segment.Sealed().Header)
-			unittest.AssertEqualBlocksLenAndOrder(t, []*flow.Block{block2, block3}, segment.ExtraBlocks)
+			root := rootSnapshot.Encodable().SealingSegment.Sealed()
+			unittest.AssertEqualBlocksLenAndOrder(t, []*flow.Block{root, block1, block2, block3}, segment.ExtraBlocks)
 			assert.Len(t, segment.ExecutionResults, 2)
 
 			assertSealingSegmentBlocksQueryableAfterBootstrap(t, snapshot)
@@ -749,7 +808,7 @@ func TestSealingSegment_FailureCases(t *testing.T) {
 	// Here, we want to specifically test correct handling of the edge case, where a block exists in storage
 	// that has _lower height_ than the node's local root block. Such blocks are typically contained in the
 	// bootstrapping data, such that all entities referenced in the local root block can be resolved.
-	// Is is possible to retrieve blocks that are lower than the local root block from storage, directly
+	// It is possible to retrieve blocks that are lower than the local root block from storage, directly
 	// via their ID. Despite these blocks existing in storage, SealingSegment construction should be
 	// because the known history is potentially insufficient when going below the root block.
 	t.Run("sealing segment from block below local state root", func(t *testing.T) {
@@ -1286,9 +1345,9 @@ func TestSnapshot_EpochFirstView(t *testing.T) {
 
 // TestSnapshot_EpochHeightBoundaries tests querying epoch height boundaries in various conditions.
 //   - FirstHeight should be queryable as soon as the epoch's first block is finalized,
-//     otherwise should return protocol.ErrEpochTransitionNotFinalized
+//     otherwise should return protocol.ErrUnknownEpochBoundary
 //   - FinalHeight should be queryable as soon as the next epoch's first block is finalized,
-//     otherwise should return protocol.ErrEpochTransitionNotFinalized
+//     otherwise should return protocol.ErrUnknownEpochBoundary
 func TestSnapshot_EpochHeightBoundaries(t *testing.T) {
 	identities := unittest.CompleteIdentitySet()
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
@@ -1307,7 +1366,7 @@ func TestSnapshot_EpochHeightBoundaries(t *testing.T) {
 			assert.Equal(t, epoch1FirstHeight, firstHeight)
 			// final height of not completed current epoch should be unknown
 			_, err = state.Final().Epochs().Current().FinalHeight()
-			assert.ErrorIs(t, err, protocol.ErrEpochTransitionNotFinalized)
+			assert.ErrorIs(t, err, protocol.ErrUnknownEpochBoundary)
 		})
 
 		// build first epoch (but don't complete it yet)
@@ -1320,12 +1379,12 @@ func TestSnapshot_EpochHeightBoundaries(t *testing.T) {
 			assert.Equal(t, epoch1FirstHeight, firstHeight)
 			// final height of not completed current epoch should be unknown
 			_, err = state.Final().Epochs().Current().FinalHeight()
-			assert.ErrorIs(t, err, protocol.ErrEpochTransitionNotFinalized)
+			assert.ErrorIs(t, err, protocol.ErrUnknownEpochBoundary)
 			// first and final height of not started next epoch should be unknown
 			_, err = state.Final().Epochs().Next().FirstHeight()
-			assert.ErrorIs(t, err, protocol.ErrEpochTransitionNotFinalized)
+			assert.ErrorIs(t, err, protocol.ErrUnknownEpochBoundary)
 			_, err = state.Final().Epochs().Next().FinalHeight()
-			assert.ErrorIs(t, err, protocol.ErrEpochTransitionNotFinalized)
+			assert.ErrorIs(t, err, protocol.ErrUnknownEpochBoundary)
 		})
 
 		// complete epoch 1 (enter epoch 2)
@@ -1350,7 +1409,7 @@ func TestSnapshot_EpochHeightBoundaries(t *testing.T) {
 			assert.Equal(t, epoch2FirstHeight, firstHeight)
 			// final height of not completed current epoch should be unknown
 			_, err = state.Final().Epochs().Current().FinalHeight()
-			assert.ErrorIs(t, err, protocol.ErrEpochTransitionNotFinalized)
+			assert.ErrorIs(t, err, protocol.ErrUnknownEpochBoundary)
 		})
 	})
 }

@@ -10,7 +10,6 @@ import (
 )
 
 func TestProof(t *testing.T) {
-
 	proof := testutils.COAOwnershipProofFixture(t)
 	encoded, err := proof.Encode()
 	require.NoError(t, err)

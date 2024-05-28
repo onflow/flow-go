@@ -8,6 +8,7 @@ import (
 
 	"github.com/ipfs/go-datastore"
 	dssync "github.com/ipfs/go-datastore/sync"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -45,7 +46,7 @@ var (
 
 type BackendExecutionDataSuite struct {
 	suite.Suite
-
+	logger         zerolog.Logger
 	state          *protocolmock.State
 	params         *protocolmock.Params
 	snapshot       *protocolmock.Snapshot
@@ -74,7 +75,15 @@ type BackendExecutionDataSuite struct {
 	resultMap   map[flow.Identifier]*flow.ExecutionResult
 	registerID  flow.RegisterID
 
-	rootBlock flow.Block
+	rootBlock          flow.Block
+	highestBlockHeader *flow.Header
+}
+
+type executionDataTestType struct {
+	name            string
+	highestBackfill int
+	startBlockID    flow.Identifier
+	startHeight     uint64
 }
 
 func TestBackendExecutionDataSuite(t *testing.T) {
@@ -82,47 +91,11 @@ func TestBackendExecutionDataSuite(t *testing.T) {
 }
 
 func (s *BackendExecutionDataSuite) SetupTest() {
-	logger := unittest.Logger()
-
-	s.state = protocolmock.NewState(s.T())
-	s.snapshot = protocolmock.NewSnapshot(s.T())
-	s.params = protocolmock.NewParams(s.T())
-	s.headers = storagemock.NewHeaders(s.T())
-	s.events = storagemock.NewEvents(s.T())
-	s.seals = storagemock.NewSeals(s.T())
-	s.results = storagemock.NewExecutionResults(s.T())
-
-	s.bs = blobs.NewBlobstore(dssync.MutexWrap(datastore.NewMapDatastore()))
-	s.eds = execution_data.NewExecutionDataStore(s.bs, execution_data.DefaultSerializer)
-
-	s.broadcaster = engine.NewBroadcaster()
-
-	s.execDataHeroCache = herocache.NewBlockExecutionData(subscription.DefaultCacheSize, logger, metrics.NewNoopCollector())
-	s.execDataCache = cache.NewExecutionDataCache(s.eds, s.headers, s.seals, s.results, s.execDataHeroCache)
-	s.executionDataTracker = subscriptionmock.NewExecutionDataTracker(s.T())
-
-	conf := Config{
-		ClientSendTimeout:       subscription.DefaultSendTimeout,
-		ClientSendBufferSize:    subscription.DefaultSendBufferSize,
-		RegisterIDsRequestLimit: state_stream.DefaultRegisterIDsRequestLimit,
-	}
+	blockCount := 5
+	s.SetupTestSuite(blockCount)
 
 	var err error
-
-	blockCount := 5
-	s.execDataMap = make(map[flow.Identifier]*execution_data.BlockExecutionDataEntity, blockCount)
-	s.blockEvents = make(map[flow.Identifier][]flow.Event, blockCount)
-	s.blockMap = make(map[uint64]*flow.Block, blockCount)
-	s.sealMap = make(map[flow.Identifier]*flow.Seal, blockCount)
-	s.resultMap = make(map[flow.Identifier]*flow.ExecutionResult, blockCount)
-	s.blocks = make([]*flow.Block, 0, blockCount)
-
-	// generate blockCount consecutive blocks with associated seal, result and execution data
-	s.rootBlock = unittest.BlockFixture()
 	parent := s.rootBlock.Header
-	s.blockMap[s.rootBlock.Header.Height] = &s.rootBlock
-
-	s.T().Logf("Generating %d blocks, root block: %d %s", blockCount, s.rootBlock.Header.Height, s.rootBlock.ID())
 
 	for i := 0; i < blockCount; i++ {
 		block := unittest.BlockWithParentFixture(parent)
@@ -165,12 +138,51 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 		s.T().Logf("adding exec data for block %d %d %v => %v", i, block.Header.Height, block.ID(), result.ExecutionDataID)
 	}
 
+	s.SetupTestMocks()
+}
+
+func (s *BackendExecutionDataSuite) SetupTestSuite(blockCount int) {
+	s.logger = unittest.Logger()
+
+	s.state = protocolmock.NewState(s.T())
+	s.snapshot = protocolmock.NewSnapshot(s.T())
+	s.params = protocolmock.NewParams(s.T())
+	s.headers = storagemock.NewHeaders(s.T())
+	s.events = storagemock.NewEvents(s.T())
+	s.seals = storagemock.NewSeals(s.T())
+	s.results = storagemock.NewExecutionResults(s.T())
+
+	s.bs = blobs.NewBlobstore(dssync.MutexWrap(datastore.NewMapDatastore()))
+	s.eds = execution_data.NewExecutionDataStore(s.bs, execution_data.DefaultSerializer)
+
+	s.broadcaster = engine.NewBroadcaster()
+
+	s.execDataHeroCache = herocache.NewBlockExecutionData(subscription.DefaultCacheSize, s.logger, metrics.NewNoopCollector())
+	s.execDataCache = cache.NewExecutionDataCache(s.eds, s.headers, s.seals, s.results, s.execDataHeroCache)
+	s.executionDataTracker = subscriptionmock.NewExecutionDataTracker(s.T())
+
+	s.execDataMap = make(map[flow.Identifier]*execution_data.BlockExecutionDataEntity, blockCount)
+	s.blockEvents = make(map[flow.Identifier][]flow.Event, blockCount)
+	s.blockMap = make(map[uint64]*flow.Block, blockCount)
+	s.sealMap = make(map[flow.Identifier]*flow.Seal, blockCount)
+	s.resultMap = make(map[flow.Identifier]*flow.ExecutionResult, blockCount)
+	s.blocks = make([]*flow.Block, 0, blockCount)
+
+	// generate blockCount consecutive blocks with associated seal, result and execution data
+	s.rootBlock = unittest.BlockFixture()
+	s.blockMap[s.rootBlock.Header.Height] = &s.rootBlock
+	s.highestBlockHeader = s.rootBlock.Header
+
+	s.T().Logf("Generating %d blocks, root block: %d %s", blockCount, s.rootBlock.Header.Height, s.rootBlock.ID())
+}
+
+func (s *BackendExecutionDataSuite) SetupTestMocks() {
 	s.registerID = unittest.RegisterIDFixture()
 
 	s.eventsIndex = index.NewEventsIndex(s.events)
 	s.registersAsync = execution.NewRegistersAsyncStore()
 	s.registers = storagemock.NewRegisterIndex(s.T())
-	err = s.registersAsync.Initialize(s.registers)
+	err := s.registersAsync.Initialize(s.registers)
 	require.NoError(s.T(), err)
 	s.registers.On("LatestHeight").Return(s.rootBlock.Header.Height).Maybe()
 	s.registers.On("FirstHeight").Return(s.rootBlock.Header.Height).Maybe()
@@ -218,33 +230,44 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 		),
 	).Maybe()
 
+	s.SetupBackend(false)
+}
+
+func (s *BackendExecutionDataSuite) SetupBackend(useEventsIndex bool) {
+	var err error
 	s.backend, err = New(
-		logger,
-		conf,
+		s.logger,
 		s.state,
 		s.headers,
 		s.seals,
 		s.results,
 		s.eds,
 		s.execDataCache,
-		s.broadcaster,
 		s.registersAsync,
 		s.eventsIndex,
-		false,
+		useEventsIndex,
+		state_stream.DefaultRegisterIDsRequestLimit,
+		subscription.NewSubscriptionHandler(
+			s.logger,
+			s.broadcaster,
+			subscription.DefaultSendTimeout,
+			subscription.DefaultResponseLimit,
+			subscription.DefaultSendBufferSize,
+		),
 		s.executionDataTracker,
 	)
 	require.NoError(s.T(), err)
 
 	// create real execution data tracker to use GetStartHeight from it, instead of mocking
 	s.executionDataTrackerReal = subscription.NewExecutionDataTracker(
-		logger,
+		s.logger,
 		s.state,
 		s.rootBlock.Header.Height,
 		s.headers,
 		s.broadcaster,
 		s.rootBlock.Header.Height,
 		s.eventsIndex,
-		false,
+		useEventsIndex,
 	)
 
 	s.executionDataTracker.On(
@@ -255,6 +278,10 @@ func (s *BackendExecutionDataSuite) SetupTest() {
 	).Return(func(ctx context.Context, startBlockID flow.Identifier, startHeight uint64) (uint64, error) {
 		return s.executionDataTrackerReal.GetStartHeight(ctx, startBlockID, startHeight)
 	}, nil).Maybe()
+
+	s.executionDataTracker.On("GetHighestHeight").Return(func() uint64 {
+		return s.highestBlockHeader.Height
+	}).Maybe()
 }
 
 // generateMockEvents generates a set of mock events for a block split into multiple tx with
@@ -295,8 +322,7 @@ func (s *BackendExecutionDataSuite) TestGetExecutionDataByBlockID() {
 	execData := s.execDataMap[block.ID()]
 
 	// notify backend block is available
-	s.executionDataTracker.On("GetHighestHeight").
-		Return(block.Header.Height)
+	s.highestBlockHeader = block.Header
 
 	var err error
 	s.Run("happy path TestGetExecutionDataByBlockID success", func() {
@@ -320,15 +346,7 @@ func (s *BackendExecutionDataSuite) TestGetExecutionDataByBlockID() {
 }
 
 func (s *BackendExecutionDataSuite) TestSubscribeExecutionData() {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	tests := []struct {
-		name            string
-		highestBackfill int
-		startBlockID    flow.Identifier
-		startHeight     uint64
-	}{
+	tests := []executionDataTestType{
 		{
 			name:            "happy path - all new blocks",
 			highestBackfill: -1, // no backfill
@@ -361,6 +379,123 @@ func (s *BackendExecutionDataSuite) TestSubscribeExecutionData() {
 		},
 	}
 
+	subFunc := func(ctx context.Context, blockID flow.Identifier, startHeight uint64) subscription.Subscription {
+		return s.backend.SubscribeExecutionData(ctx, blockID, startHeight)
+	}
+
+	s.subscribe(subFunc, tests)
+}
+
+func (s *BackendExecutionDataSuite) TestSubscribeExecutionDataFromStartBlockID() {
+	tests := []executionDataTestType{
+		{
+			name:            "happy path - all new blocks",
+			highestBackfill: -1, // no backfill
+			startBlockID:    s.rootBlock.ID(),
+		},
+		{
+			name:            "happy path - partial backfill",
+			highestBackfill: 2, // backfill the first 3 blocks
+			startBlockID:    s.blocks[0].ID(),
+		},
+		{
+			name:            "happy path - complete backfill",
+			highestBackfill: len(s.blocks) - 1, // backfill all blocks
+			startBlockID:    s.blocks[0].ID(),
+		},
+		{
+			name:            "happy path - start from root block by id",
+			highestBackfill: len(s.blocks) - 1, // backfill all blocks
+			startBlockID:    s.rootBlock.ID(),  // start from root block
+		},
+	}
+
+	s.executionDataTracker.On(
+		"GetStartHeightFromBlockID",
+		mock.AnythingOfType("flow.Identifier"),
+	).Return(func(startBlockID flow.Identifier) (uint64, error) {
+		return s.executionDataTrackerReal.GetStartHeightFromBlockID(startBlockID)
+	}, nil)
+
+	subFunc := func(ctx context.Context, blockID flow.Identifier, startHeight uint64) subscription.Subscription {
+		return s.backend.SubscribeExecutionDataFromStartBlockID(ctx, blockID)
+	}
+
+	s.subscribe(subFunc, tests)
+}
+
+func (s *BackendExecutionDataSuite) TestSubscribeExecutionDataFromStartBlockHeight() {
+	tests := []executionDataTestType{
+		{
+			name:            "happy path - all new blocks",
+			highestBackfill: -1, // no backfill
+			startHeight:     s.rootBlock.Header.Height,
+		},
+		{
+			name:            "happy path - partial backfill",
+			highestBackfill: 2, // backfill the first 3 blocks
+			startHeight:     s.blocks[0].Header.Height,
+		},
+		{
+			name:            "happy path - complete backfill",
+			highestBackfill: len(s.blocks) - 1, // backfill all blocks
+			startHeight:     s.blocks[0].Header.Height,
+		},
+		{
+			name:            "happy path - start from root block by id",
+			highestBackfill: len(s.blocks) - 1,         // backfill all blocks
+			startHeight:     s.rootBlock.Header.Height, // start from root block
+		},
+	}
+
+	s.executionDataTracker.On(
+		"GetStartHeightFromHeight",
+		mock.AnythingOfType("uint64"),
+	).Return(func(startHeight uint64) (uint64, error) {
+		return s.executionDataTrackerReal.GetStartHeightFromHeight(startHeight)
+	}, nil)
+
+	subFunc := func(ctx context.Context, blockID flow.Identifier, startHeight uint64) subscription.Subscription {
+		return s.backend.SubscribeExecutionDataFromStartBlockHeight(ctx, startHeight)
+	}
+
+	s.subscribe(subFunc, tests)
+}
+
+func (s *BackendExecutionDataSuite) TestSubscribeExecutionDataFromLatest() {
+	tests := []executionDataTestType{
+		{
+			name:            "happy path - all new blocks",
+			highestBackfill: -1, // no backfill
+		},
+		{
+			name:            "happy path - partial backfill",
+			highestBackfill: 2, // backfill the first 3 blocks
+		},
+		{
+			name:            "happy path - complete backfill",
+			highestBackfill: len(s.blocks) - 1, // backfill all blocks
+		},
+	}
+
+	s.executionDataTracker.On(
+		"GetStartHeightFromLatest",
+		mock.Anything,
+	).Return(func(ctx context.Context) (uint64, error) {
+		return s.executionDataTrackerReal.GetStartHeightFromLatest(ctx)
+	}, nil)
+
+	subFunc := func(ctx context.Context, blockID flow.Identifier, startHeight uint64) subscription.Subscription {
+		return s.backend.SubscribeExecutionDataFromLatest(ctx)
+	}
+
+	s.subscribe(subFunc, tests)
+}
+
+func (s *BackendExecutionDataSuite) subscribe(subscribeFunc func(ctx context.Context, startBlockID flow.Identifier, startHeight uint64) subscription.Subscription, tests []executionDataTestType) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	for _, test := range tests {
 		s.Run(test.name, func() {
 			// make sure we're starting with a fresh cache
@@ -372,12 +507,11 @@ func (s *BackendExecutionDataSuite) TestSubscribeExecutionData() {
 			// this simulates a subscription on a past block
 			for i := 0; i <= test.highestBackfill; i++ {
 				s.T().Logf("backfilling block %d", i)
-				s.executionDataTracker.On("GetHighestHeight").
-					Return(s.blocks[i].Header.Height)
+				s.highestBlockHeader = s.blocks[i].Header
 			}
 
 			subCtx, subCancel := context.WithCancel(ctx)
-			sub := s.backend.SubscribeExecutionData(subCtx, test.startBlockID, test.startHeight)
+			sub := subscribeFunc(subCtx, test.startBlockID, test.startHeight)
 
 			// loop over of the all blocks
 			for i, b := range s.blocks {
@@ -387,9 +521,7 @@ func (s *BackendExecutionDataSuite) TestSubscribeExecutionData() {
 				// simulate new exec data received.
 				// exec data for all blocks with index <= highestBackfill were already received
 				if i > test.highestBackfill {
-					s.executionDataTracker.On("GetHighestHeight").Unset()
-					s.executionDataTracker.On("GetHighestHeight").
-						Return(b.Header.Height)
+					s.highestBlockHeader = b.Header
 					s.broadcaster.Publish()
 				}
 

@@ -12,7 +12,6 @@ import (
 
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/cmd/build"
-	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/index"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/access/subscription"
@@ -21,6 +20,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/counters"
 	"github.com/onflow/flow-go/module/execution"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
@@ -73,6 +73,7 @@ type Backend struct {
 	backendExecutionResults
 	backendNetwork
 	backendSubscribeBlocks
+	backendSubscribeTransactions
 
 	state             protocol.State
 	chainID           flow.ChainID
@@ -111,18 +112,12 @@ type Params struct {
 	ScriptExecutionMode       IndexQueryMode
 	EventQueryMode            IndexQueryMode
 	BlockTracker              subscription.BlockTracker
-	SubscriptionParams        SubscriptionParams
+	SubscriptionHandler       *subscription.SubscriptionHandler
 
-	EventsIndex       *index.EventsIndex
-	TxResultQueryMode IndexQueryMode
-	TxResultsIndex    *index.TransactionResultsIndex
-}
-
-type SubscriptionParams struct {
-	Broadcaster    *engine.Broadcaster
-	SendTimeout    time.Duration
-	ResponseLimit  float64
-	SendBufferSize int
+	EventsIndex         *index.EventsIndex
+	TxResultQueryMode   IndexQueryMode
+	TxResultsIndex      *index.TransactionResultsIndex
+	LastFullBlockHeight *counters.PersistentStrictMonotonicCounter
 }
 
 var _ TransactionErrorMessage = (*Backend)(nil)
@@ -169,6 +164,16 @@ func New(params Params) (*Backend, error) {
 	// initialize node version info
 	nodeInfo := getNodeVersionInfo(params.State.Params())
 
+	transactionsLocalDataProvider := &TransactionsLocalDataProvider{
+		state:               params.State,
+		collections:         params.Collections,
+		blocks:              params.Blocks,
+		eventsIndex:         params.EventsIndex,
+		txResultsIndex:      params.TxResultsIndex,
+		systemTxID:          systemTxID,
+		lastFullBlockHeight: params.LastFullBlockHeight,
+	}
+
 	b := &Backend{
 		state:        params.State,
 		BlockTracker: params.BlockTracker,
@@ -184,32 +189,6 @@ func New(params Params) (*Backend, error) {
 			nodeCommunicator:  params.Communicator,
 			scriptExecutor:    params.ScriptExecutor,
 			scriptExecMode:    params.ScriptExecutionMode,
-		},
-		backendTransactions: backendTransactions{
-			TransactionsLocalDataProvider: TransactionsLocalDataProvider{
-				state:          params.State,
-				collections:    params.Collections,
-				blocks:         params.Blocks,
-				eventsIndex:    params.EventsIndex,
-				txResultsIndex: params.TxResultsIndex,
-				systemTxID:     systemTxID,
-			},
-			log:                  params.Log,
-			staticCollectionRPC:  params.CollectionRPC,
-			chainID:              params.ChainID,
-			transactions:         params.Transactions,
-			executionReceipts:    params.ExecutionReceipts,
-			transactionValidator: configureTransactionValidator(params.State, params.ChainID),
-			transactionMetrics:   params.AccessMetrics,
-			retry:                retry,
-			connFactory:          params.ConnFactory,
-			previousAccessNodes:  params.HistoricalAccessNodes,
-			nodeCommunicator:     params.Communicator,
-			txResultCache:        txResCache,
-			txErrorMessagesCache: txErrorMessagesCache,
-			txResultQueryMode:    params.TxResultQueryMode,
-			systemTx:             systemTx,
-			systemTxID:           systemTxID,
 		},
 		backendEvents: backendEvents{
 			log:               params.Log,
@@ -251,16 +230,14 @@ func New(params Params) (*Backend, error) {
 			snapshotHistoryLimit: params.SnapshotHistoryLimit,
 		},
 		backendSubscribeBlocks: backendSubscribeBlocks{
-			log:            params.Log,
-			state:          params.State,
-			headers:        params.Headers,
-			blocks:         params.Blocks,
-			broadcaster:    params.SubscriptionParams.Broadcaster,
-			sendTimeout:    params.SubscriptionParams.SendTimeout,
-			responseLimit:  params.SubscriptionParams.ResponseLimit,
-			sendBufferSize: params.SubscriptionParams.SendBufferSize,
-			blockTracker:   params.BlockTracker,
+			log:                 params.Log,
+			state:               params.State,
+			headers:             params.Headers,
+			blocks:              params.Blocks,
+			subscriptionHandler: params.SubscriptionHandler,
+			blockTracker:        params.BlockTracker,
 		},
+
 		collections:       params.Collections,
 		executionReceipts: params.ExecutionReceipts,
 		connFactory:       params.ConnFactory,
@@ -268,7 +245,37 @@ func New(params Params) (*Backend, error) {
 		nodeInfo:          nodeInfo,
 	}
 
+	b.backendTransactions = backendTransactions{
+		TransactionsLocalDataProvider: transactionsLocalDataProvider,
+		log:                           params.Log,
+		staticCollectionRPC:           params.CollectionRPC,
+		chainID:                       params.ChainID,
+		transactions:                  params.Transactions,
+		executionReceipts:             params.ExecutionReceipts,
+		transactionValidator:          configureTransactionValidator(params.State, params.ChainID),
+		transactionMetrics:            params.AccessMetrics,
+		retry:                         retry,
+		connFactory:                   params.ConnFactory,
+		previousAccessNodes:           params.HistoricalAccessNodes,
+		nodeCommunicator:              params.Communicator,
+		txResultCache:                 txResCache,
+		txErrorMessagesCache:          txErrorMessagesCache,
+		txResultQueryMode:             params.TxResultQueryMode,
+		systemTx:                      systemTx,
+		systemTxID:                    systemTxID,
+	}
+
+	// TODO: The TransactionErrorMessage interface should be reorganized in future, as it is implemented in backendTransactions but used in TransactionsLocalDataProvider, and its initialization is somewhat quirky.
 	b.backendTransactions.txErrorMessages = b
+
+	b.backendSubscribeTransactions = backendSubscribeTransactions{
+		txLocalDataProvider: transactionsLocalDataProvider,
+		backendTransactions: &b.backendTransactions,
+		log:                 params.Log,
+		executionResults:    params.ExecutionResults,
+		subscriptionHandler: params.SubscriptionHandler,
+		blockTracker:        params.BlockTracker,
+	}
 
 	retry.SetBackend(b)
 

@@ -1,8 +1,8 @@
 package types
 
 import (
-	gethCommon "github.com/ethereum/go-ethereum/common"
 	"github.com/onflow/cadence/runtime/common"
+	gethCommon "github.com/onflow/go-ethereum/common"
 )
 
 // EVM is an account inside FVM with special access to the underlying infrastructure
@@ -36,6 +36,16 @@ type ContractHandler interface {
 	// Run runs a transaction in the evm environment,
 	// collects the gas fees, and transfers the gas fees to the given coinbase account.
 	Run(tx []byte, coinbase Address) *ResultSummary
+
+	// DryRun simulates execution of the provided RLP-encoded and unsigned transaction.
+	// Because the transaction is unsigned the from address is required, since
+	// from address is normally derived from the transaction signature.
+	// The function should not have any persisted changes made to the state.
+	DryRun(tx []byte, from Address) *ResultSummary
+
+	// BatchRun runs transaction batch in the evm environment,
+	// collect all the gas fees and transfers the gas fees to the given coinbase account.
+	BatchRun(txs [][]byte, coinbase Address) []*ResultSummary
 
 	// FlowTokenAddress returns the address where FLOW token is deployed
 	FlowTokenAddress() common.Address
