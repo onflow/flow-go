@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/onflow/flow-go/integration/benchmark/load"
+	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
@@ -19,6 +19,7 @@ import (
 	client "github.com/onflow/flow-go-sdk/access/grpc"
 
 	"github.com/onflow/flow-go/integration/benchmark"
+	"github.com/onflow/flow-go/integration/benchmark/load"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -33,7 +34,6 @@ const (
 	defaultLoadType             = load.TokenTransferLoadType
 	metricport                  = uint(8080)
 	accessNodeAddress           = "127.0.0.1:4001"
-	pushgateway                 = "127.0.0.1:9091"
 	accountMultiplier           = 50
 	feedbackEnabled             = true
 	serviceAccountPrivateKeyHex = unittest.ServiceAccountPrivateKeyHex
@@ -63,6 +63,7 @@ func main() {
 	gitRepoPathFlag := flag.String("git-repo-path", "../..", "git repo path of the filesystem")
 	gitRepoURLFlag := flag.String("git-repo-url", "https://github.com/onflow/flow-go.git", "git repo URL")
 	bigQueryUpload := flag.Bool("bigquery-upload", true, "whether to upload results to BigQuery (true / false)")
+	pushgateway := flag.String("pushgateway", "disabled", "host:port for pushgateway")
 	bigQueryProjectFlag := flag.String("bigquery-project", "dapperlabs-data", "project name for the bigquery uploader")
 	bigQueryDatasetFlag := flag.String("bigquery-dataset", "dev_src_flow_tps_metrics", "dataset name for the bigquery uploader")
 	bigQueryRawTableFlag := flag.String("bigquery-raw-table", "rawResults", "table name for the bigquery raw results")
@@ -91,9 +92,10 @@ func main() {
 	<-server.Ready()
 	loaderMetrics := metrics.NewLoaderCollector()
 
-	// stats pusher doesn't work currently
-	// sp := benchmark.NewStatsPusher(ctx, log, pushgateway, "loader", prometheus.DefaultGatherer)
-	// defer sp.Stop()
+	if *pushgateway != "disabled" {
+		sp := benchmark.NewStatsPusher(ctx, log, *pushgateway, "loader", prometheus.DefaultGatherer)
+		defer sp.Stop()
+	}
 
 	addressGen := flowsdk.NewAddressGenerator(flowsdk.Emulator)
 	serviceAccountAddress := addressGen.NextAddress()
@@ -137,27 +139,44 @@ func main() {
 	statsLogger.Start()
 	defer statsLogger.Stop()
 
+	loadParams := benchmark.LoadParams{
+		NumberOfAccounts: maxInflight,
+		LoadConfig:       loadConfig,
+		FeedbackEnabled:  feedbackEnabled,
+	}
+
 	lg, err := benchmark.New(
 		bCtx,
 		log,
 		workerStatsTracker,
 		loaderMetrics,
-		*adjustIntervalFlag,
-		*adjustDelayFlag,
 		[]access.Client{flowClient},
 		benchmark.NetworkParams{
 			ServAccPrivKeyHex: serviceAccountPrivateKeyHex,
 			ChainId:           flow.Emulator,
 		},
-		benchmark.LoadParams{
-			NumberOfAccounts: maxInflight,
-			LoadConfig:       loadConfig,
-			FeedbackEnabled:  feedbackEnabled,
-		},
+		loadParams,
 	)
+
 	if err != nil {
 		log.Fatal().Err(err).Msg("unable to create new cont load generator")
 	}
+
+	adjuster := benchmark.NewTPSAdjuster(
+		ctx,
+		log,
+		lg,
+		workerStatsTracker,
+		benchmark.AdjusterParams{
+			Delay:       *adjustDelayFlag,
+			Interval:    *adjustIntervalFlag,
+			InitialTPS:  uint(loadParams.LoadConfig.TPSInitial),
+			MinTPS:      uint(loadParams.LoadConfig.TpsMin),
+			MaxTPS:      uint(loadParams.LoadConfig.TpsMax),
+			MaxInflight: uint(loadParams.NumberOfAccounts / 2),
+		},
+	)
+	defer adjuster.Stop()
 
 	// run load
 	err = lg.SetTPS(uint(loadConfig.TPSInitial))

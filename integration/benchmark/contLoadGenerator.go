@@ -36,7 +36,6 @@ type ContLoadGenerator struct {
 	stoppedChannel     chan struct{}
 	follower           TxFollower
 	workFunc           workFunc
-	adjuster           *Adjuster
 
 	workersMutex sync.Mutex
 	workers      []*Worker
@@ -72,8 +71,6 @@ func New(
 	log zerolog.Logger,
 	workerStatsTracker *WorkerStatsTracker,
 	loaderMetrics *metrics.LoaderCollector,
-	adjustDelay time.Duration,
-	adjustInterval time.Duration,
 	flowClients []access.Client,
 	networkParams NetworkParams,
 	loadParams LoadParams,
@@ -178,25 +175,7 @@ func New(
 		return nil, fmt.Errorf("error setting up load: %w", err)
 	}
 
-	adjuster := NewTPSAdjuster(
-		ctx,
-		log,
-		lg,
-		workerStatsTracker,
-
-		AdjusterParams{
-			Delay:       adjustDelay,
-			Interval:    adjustInterval,
-			InitialTPS:  uint(loadParams.LoadConfig.TPSInitial),
-			MinTPS:      uint(loadParams.LoadConfig.TpsMin),
-			MaxTPS:      uint(loadParams.LoadConfig.TpsMax),
-			MaxInflight: uint(loadParams.NumberOfAccounts / 2),
-		},
-	)
-	lg.adjuster = adjuster
-
 	lg.workFunc = func(workerID int) {
-
 		wlc := lc
 		wlc.WorkerContext.WorkerID = workerID
 
@@ -299,8 +278,6 @@ func (lg *ContLoadGenerator) Stop() {
 	lg.log.Debug().Msg("stopping workers")
 	_ = lg.unsafeSetTPS(0)
 	close(lg.stoppedChannel)
-
-	lg.adjuster.Stop()
 }
 
 func (lg *ContLoadGenerator) Done() <-chan struct{} {

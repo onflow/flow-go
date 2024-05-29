@@ -66,7 +66,6 @@ var _ Load = (*EVMBatchTransferLoad)(nil)
 var _ io.Closer = (*EVMBatchTransferLoad)(nil)
 
 func (l *EVMBatchTransferLoad) Close() error {
-	close(l.eoaChan)
 	close(l.doneChan)
 	return nil
 }
