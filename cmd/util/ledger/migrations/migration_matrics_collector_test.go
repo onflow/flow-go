@@ -5,6 +5,7 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/cadence/runtime/common"
@@ -71,8 +72,13 @@ func TestMigrationMetricsCollection(t *testing.T) {
 
 		require.NoError(t, err)
 
-		// Should only have the `Test` contract checking error
-		require.Len(t, logWriter.logs, 1)
+		// Should have 2 errors:
+		// - The `Test` contract checking error
+		// - Key lookup error for metrics collection
+		logs := logWriter.logs
+		require.Len(t, logs, 2)
+		assert.Contains(t, logs[0], "`pub` is no longer a valid access keyword")
+		assert.Contains(t, logs[1], "dictionary_with_auth_reference_typed_key: key (Type<&A.01cf0e2f2f715450.Test.R>()) not found")
 
 		reportWriter := rwf.reportWriters["metrics-collecting-migration"]
 		require.Len(t, reportWriter.entries, 1)
@@ -121,7 +127,7 @@ func TestMigrationMetricsCollection(t *testing.T) {
 		rwf := &testReportWriterFactory{}
 
 		logWriter := &writer{}
-		logger := zerolog.New(logWriter).Level(zerolog.InfoLevel)
+		logger := zerolog.New(logWriter).Level(zerolog.ErrorLevel)
 
 		const nWorker = 2
 
@@ -167,8 +173,15 @@ func TestMigrationMetricsCollection(t *testing.T) {
 
 		require.NoError(t, err)
 
-		// Should only have the `Test` contract checking error
-		require.Len(t, logWriter.logs, 1)
+		// Should have 3 errors:
+		// - Contract update failure error
+		// - The `Test` contract checking error
+		// - Key lookup error for metrics collection
+		logs := logWriter.logs
+		require.Len(t, logs, 3)
+		assert.Contains(t, logs[0], `"migration":"StagedContractsMigration","account":"0x01cf0e2f2f715450","contract":"Test"`)
+		assert.Contains(t, logs[1], "`pub` is no longer a valid access keyword")
+		assert.Contains(t, logs[2], "dictionary_with_auth_reference_typed_key: key (Type<&A.01cf0e2f2f715450.Test.R>()) not found")
 
 		reportWriter := rwf.reportWriters["metrics-collecting-migration"]
 		require.Len(t, reportWriter.entries, 1)
