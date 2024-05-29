@@ -1744,14 +1744,6 @@ func (suite *Suite) TestExecutionNodesForBlockID() {
 	suite.Run("no preferred or fixed ENs", func() {
 		testExecutionNodesForBlockID(nil, nil, allExecutionNodes)
 	})
-	// if only preferred ENs are specified, the ExecutionNodesForBlockID function should
-	// return the preferred ENs list
-	suite.Run("two preferred ENs with zero fixed EN", func() {
-		// mark the first two ENs as preferred
-		preferredENs := allExecutionNodes[0:2]
-		expectedList := allExecutionNodes[0:maxNodesCnt]
-		testExecutionNodesForBlockID(preferredENs, nil, expectedList)
-	})
 	// if only fixed ENs are specified, the ExecutionNodesForBlockID function should
 	// return the fixed ENs list
 	suite.Run("two fixed ENs with zero preferred EN", func() {
@@ -1759,6 +1751,14 @@ func (suite *Suite) TestExecutionNodesForBlockID() {
 		fixedENs := allExecutionNodes[0:2]
 		expectedList := fixedENs
 		testExecutionNodesForBlockID(nil, fixedENs, expectedList)
+	})
+	// if only preferred ENs are specified, the ExecutionNodesForBlockID function should
+	// return the preferred ENs list
+	suite.Run("two preferred ENs with zero fixed EN", func() {
+		// mark the first two ENs as preferred
+		preferredENs := allExecutionNodes[0:2]
+		expectedList := allExecutionNodes[0:maxNodesCnt]
+		testExecutionNodesForBlockID(preferredENs, nil, expectedList)
 	})
 	// if both are specified, the ExecutionNodesForBlockID function should
 	// return the preferred ENs list
