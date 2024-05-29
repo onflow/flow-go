@@ -1118,10 +1118,7 @@ func (h *Handler) SendAndSubscribeTransactionStatuses(
 	messageIndex := counters.NewMonotonousCounter(0)
 	return subscription.HandleSubscription(sub, func(txResults []*TransactionResult) error {
 		for i := range txResults {
-			value := messageIndex.Value()
-			if ok := messageIndex.Set(value + 1); !ok {
-				return status.Errorf(codes.Internal, "the message index has already been incremented to %d", messageIndex.Value())
-			}
+			value := messageIndex.Increment()
 
 			err = stream.Send(&access.SendAndSubscribeTransactionStatusesResponse{
 				TransactionResults: TransactionResultToMessage(txResults[i]),

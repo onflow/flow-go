@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go-sdk/templates"
 
 	"github.com/onflow/flow-go/fvm/systemcontracts"
+
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/integration/tests/lib"
 )
@@ -53,7 +54,7 @@ func RunMVPTest(t *testing.T, ctx context.Context, net *testnet.FlowNetwork, acc
 	require.NoError(t, err)
 	createAccountTx.
 		SetReferenceBlockID(sdk.Identifier(latestBlockID)).
-		SetProposalKey(serviceAddress, 0, serviceAccountClient.GetSeqNumber()).
+		SetProposalKey(serviceAddress, 0, serviceAccountClient.GetAndIncrementSeqNumber()).
 		SetPayer(serviceAddress).
 		SetComputeLimit(9999)
 
@@ -88,16 +89,15 @@ func RunMVPTest(t *testing.T, ctx context.Context, net *testnet.FlowNetwork, acc
 			import FlowToken from 0x%s
 
 			transaction(amount: UFix64, recipient: Address) {
-			  let sentVault: @FungibleToken.Vault
-			  prepare(signer: AuthAccount) {
-				let vaultRef = signer.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
+			  let sentVault: @{FungibleToken.Vault}
+			  prepare(signer: auth(BorrowValue) &Account) {
+				let vaultRef = signer.storage.borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(from: /storage/flowTokenVault)
 				  ?? panic("failed to borrow reference to sender vault")
 				self.sentVault <- vaultRef.withdraw(amount: amount)
 			  }
 			  execute {
 				let receiverRef =  getAccount(recipient)
-				  .getCapability(/public/flowTokenReceiver)
-				  .borrow<&{FungibleToken.Receiver}>()
+				  .capabilities.borrow<&{FungibleToken.Receiver}>(/public/flowTokenReceiver)
 					?? panic("failed to borrow reference to recipient vault")
 				receiverRef.deposit(from: <-self.sentVault)
 			  }
@@ -107,7 +107,7 @@ func RunMVPTest(t *testing.T, ctx context.Context, net *testnet.FlowNetwork, acc
 		))).
 		AddAuthorizer(serviceAddress).
 		SetReferenceBlockID(sdk.Identifier(latestBlockID)).
-		SetProposalKey(serviceAddress, 0, serviceAccountClient.GetSeqNumber()).
+		SetProposalKey(serviceAddress, 0, serviceAccountClient.GetAndIncrementSeqNumber()).
 		SetPayer(serviceAddress).
 		SetComputeLimit(9999)
 

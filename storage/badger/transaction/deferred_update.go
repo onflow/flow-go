@@ -6,7 +6,7 @@ import (
 
 // DeferredDBUpdate is a shorthand notation for an anonymous function that takes
 // a `transaction.Tx` as input and runs some database operations as part of that transaction.
-type DeferredDBUpdate = func(*Tx) error
+type DeferredDBUpdate func(*Tx) error
 
 // DeferredBadgerUpdate is a shorthand notation for an anonymous function that takes
 // a badger transaction as input and runs some database operations as part of that transaction.

@@ -45,9 +45,11 @@ const (
 
 	// Unqualified names of service events (not including address prefix or contract name)
 
-	EventNameEpochSetup    = "EpochSetup"
-	EventNameEpochCommit   = "EpochCommit"
-	EventNameVersionBeacon = "VersionBeacon"
+	EventNameEpochSetup                  = "EpochSetup"
+	EventNameEpochCommit                 = "EpochCommit"
+	EventNameEpochRecover                = "EpochRecover"
+	EventNameVersionBeacon               = "VersionBeacon"               // VersionBeacon only controls version of ENs, describing software compatability via semantic versioning
+	EventNameProtocolStateVersionUpgrade = "ProtocolStateVersionUpgrade" // Protocol State version applies to all nodes and uses an _integer version_ of the _protocol state_
 
 	//  Unqualified names of service event contract functions (not including address prefix or contract name)
 
@@ -59,12 +61,18 @@ const (
 	ContractStorageFeesFunction_getAccountsCapacityForTransactionStorageCheck = "getAccountsCapacityForTransactionStorageCheck"
 	ContractStorageFeesFunction_defaultTokenAvailableBalance                  = "defaultTokenAvailableBalance"
 
-	// Indexes of the system contracts that are deployed to an address at a specific index
+	// These are the account indexes of system contracts as deployed by the default bootstrapping.
+	// On long-running networks some of these contracts might have been deployed after bootstrapping,
+	// and therefore might not be at these indexes.
 
 	FungibleTokenAccountIndex = 2
 	FlowTokenAccountIndex     = 3
 	FlowFeesAccountIndex      = 4
 	EVMStorageAccountIndex    = 5
+
+	// LastSystemAccountIndex is the last index of a system accounts.
+	// Other addresses will be created  after this one.
+	LastSystemAccountIndex = EVMStorageAccountIndex
 )
 
 // Well-known addresses for system contracts on long-running networks.
@@ -135,9 +143,10 @@ type SystemContracts struct {
 	FlowStorageFees     SystemContract
 
 	// token related contracts
-	FlowFees      SystemContract
-	FlowToken     SystemContract
-	FungibleToken SystemContract
+	FlowFees                   SystemContract
+	FlowToken                  SystemContract
+	FungibleToken              SystemContract
+	FungibleTokenMetadataViews SystemContract
 
 	// NFT related contracts
 	NonFungibleToken SystemContract
@@ -163,18 +172,15 @@ func (c SystemContracts) AsTemplateEnv() templates.Environment {
 		RandomBeaconHistoryAddress: c.RandomBeaconHistory.Address.Hex(),
 		StorageFeesAddress:         c.FlowStorageFees.Address.Hex(),
 
-		FlowFeesAddress:      c.FlowFees.Address.Hex(),
-		FlowTokenAddress:     c.FlowToken.Address.Hex(),
-		FungibleTokenAddress: c.FungibleToken.Address.Hex(),
+		FlowFeesAddress:                   c.FlowFees.Address.Hex(),
+		FlowTokenAddress:                  c.FlowToken.Address.Hex(),
+		FungibleTokenAddress:              c.FungibleToken.Address.Hex(),
+		FungibleTokenMetadataViewsAddress: c.FungibleToken.Address.Hex(),
 
-		// The following contracts dont exist on the template env yet
-		// that is not a problem, but they are still listed here for completeness.
-
-		// NonFungibleToken: c.NonFungibleToken.Address.Hex(),
-		// MetadataViews : c.MetadataViews.Address.Hex(),
-		// ViewResolver : c.ViewResolver.Address.Hex(),
-
-		// EVMAddress: c.EVM.Address.Hex(),
+		NonFungibleTokenAddress:         c.NonFungibleToken.Address.Hex(),
+		MetadataViewsAddress:            c.MetadataViews.Address.Hex(),
+		ViewResolverAddress:             c.ViewResolver.Address.Hex(),
+		FungibleTokenSwitchboardAddress: c.FungibleToken.Address.Hex(),
 	}
 }
 
@@ -206,9 +212,11 @@ func (c SystemContracts) All() []SystemContract {
 
 // ServiceEvents is a container for all service events on a particular chain.
 type ServiceEvents struct {
-	EpochSetup    ServiceEvent
-	EpochCommit   ServiceEvent
-	VersionBeacon ServiceEvent
+	EpochSetup                  ServiceEvent
+	EpochCommit                 ServiceEvent
+	EpochRecover                ServiceEvent
+	VersionBeacon               ServiceEvent
+	ProtocolStateVersionUpgrade ServiceEvent
 }
 
 // All returns all service events as a slice.
@@ -216,7 +224,9 @@ func (se ServiceEvents) All() []ServiceEvent {
 	return []ServiceEvent{
 		se.EpochSetup,
 		se.EpochCommit,
+		se.EpochRecover,
 		se.VersionBeacon,
+		se.ProtocolStateVersionUpgrade,
 	}
 }
 
@@ -394,11 +404,12 @@ func init() {
 		}
 
 		events := &ServiceEvents{
-			EpochSetup:    event(ContractNameEpoch, EventNameEpochSetup),
-			EpochCommit:   event(ContractNameEpoch, EventNameEpochCommit),
-			VersionBeacon: event(ContractNameNodeVersionBeacon, EventNameVersionBeacon),
+			EpochSetup:                  event(ContractNameEpoch, EventNameEpochSetup),
+			EpochCommit:                 event(ContractNameEpoch, EventNameEpochCommit),
+			EpochRecover:                event(ContractNameEpoch, EventNameEpochRecover),
+			VersionBeacon:               event(ContractNameNodeVersionBeacon, EventNameVersionBeacon),
+			ProtocolStateVersionUpgrade: event(ContractNameNodeVersionBeacon, EventNameProtocolStateVersionUpgrade),
 		}
-
 		return events
 	}
 

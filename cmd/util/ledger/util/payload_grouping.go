@@ -9,8 +9,6 @@ import (
 
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/cadence/runtime/common"
-
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/model/flow"
@@ -31,7 +29,7 @@ const estimatedNumOfAccount = 30_000_000
 
 // PayloadAccountGroup is a grouping of payloads by account
 type PayloadAccountGroup struct {
-	Address  common.Address
+	Address  flow.Address
 	Payloads []*ledger.Payload
 }
 
@@ -58,7 +56,7 @@ func (g *PayloadAccountGrouping) Next() (*PayloadAccountGroup, error) {
 	}
 	g.current++
 
-	address, err := payloadToAddress(g.payloads[accountStartIndex])
+	address, err := PayloadToAddress(g.payloads[accountStartIndex])
 	if err != nil {
 		return nil, fmt.Errorf("failed to get address from payload: %w", err)
 	}
@@ -127,30 +125,27 @@ func GroupPayloadsByAccount(
 	}
 }
 
-// payloadToAddress takes a payload and return:
+// PayloadToAddress takes a payload and return:
 // - (address, nil) if the payload is for an account, the account address is returned
 // - (common.ZeroAddress, nil) if the payload is not for an account
 // - (common.ZeroAddress, err) if running into any exception
 // The zero address is used for global Payloads and is not an actual account
-func payloadToAddress(p *ledger.Payload) (common.Address, error) {
+func PayloadToAddress(p *ledger.Payload) (flow.Address, error) {
 	k, err := p.Key()
 	if err != nil {
-		return common.ZeroAddress, fmt.Errorf("could not find key for payload: %w", err)
+		return flow.EmptyAddress, fmt.Errorf("could not find key for payload: %w", err)
 	}
 
 	id, err := convert.LedgerKeyToRegisterID(k)
 	if err != nil {
-		return common.ZeroAddress, fmt.Errorf("error converting key to register ID")
+		return flow.EmptyAddress, fmt.Errorf("error converting key to register ID")
 	}
 
 	if len([]byte(id.Owner)) != flow.AddressLength {
-		return common.ZeroAddress, nil
+		return flow.EmptyAddress, nil
 	}
 
-	address, err := common.BytesToAddress([]byte(id.Owner))
-	if err != nil {
-		return common.ZeroAddress, fmt.Errorf("invalid account address: %w", err)
-	}
+	address := flow.BytesToAddress([]byte(id.Owner))
 
 	return address, nil
 }

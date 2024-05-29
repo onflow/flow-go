@@ -28,7 +28,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol/events"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	mockprotocol "github.com/onflow/flow-go/state/protocol/mock"
-	"github.com/onflow/flow-go/state/protocol/protocol_state"
+	protocol_state "github.com/onflow/flow-go/state/protocol/protocol_state/state"
 	"github.com/onflow/flow-go/state/protocol/util"
 	"github.com/onflow/flow-go/storage"
 	stoerr "github.com/onflow/flow-go/storage"
@@ -107,7 +107,8 @@ func TestExtendValid(t *testing.T) {
 			all.QuorumCertificates,
 			all.Setups,
 			all.EpochCommits,
-			all.ProtocolState,
+			all.EpochProtocolState,
+			all.ProtocolKVStore,
 			all.VersionBeacons,
 			rootSnapshot,
 		)
@@ -837,7 +838,8 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 			all.QuorumCertificates,
 			all.Setups,
 			all.EpochCommits,
-			all.ProtocolState,
+			all.EpochProtocolState,
+			all.ProtocolKVStore,
 			all.VersionBeacons,
 			rootSnapshot,
 		)
@@ -858,7 +860,8 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		require.NoError(t, err)
 
 		mutableProtocolState := protocol_state.NewMutableProtocolState(
-			all.ProtocolState,
+			all.EpochProtocolState,
+			all.ProtocolKVStore,
 			state.Params(),
 			all.Headers,
 			all.Results,
@@ -1088,9 +1091,9 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 
 		// before block 9 is finalized, the epoch 1-2 boundary is unknown
 		_, err = state.AtBlockID(block8.ID()).Epochs().Current().FinalHeight()
-		assert.ErrorIs(t, err, realprotocol.ErrEpochTransitionNotFinalized)
+		assert.ErrorIs(t, err, realprotocol.ErrUnknownEpochBoundary)
 		_, err = state.AtBlockID(block8.ID()).Epochs().Current().FirstHeight()
-		assert.ErrorIs(t, err, realprotocol.ErrEpochTransitionNotFinalized)
+		assert.ErrorIs(t, err, realprotocol.ErrUnknownEpochBoundary)
 
 		err = state.Finalize(context.Background(), block8.ID())
 		require.NoError(t, err)
@@ -1972,9 +1975,12 @@ func TestEmergencyEpochFallback(t *testing.T) {
 			require.NoError(t, err)
 			assertEpochEmergencyFallbackTriggered(t, state, true) // triggered after finalization
 
-			// block 5 is the first block past the current epoch boundary
-			block4 := unittest.BlockWithParentProtocolState(block3)
+			// block 4 is the first block past the current epoch boundary
+			block4 := unittest.BlockWithParentFixture(block3.Header)
 			block4.Header.View = epoch1Setup.FinalView + 1
+			block4.SetPayload(flow.Payload{
+				ProtocolStateID: calculateExpectedStateId(t, mutableState)(block4.Header, nil),
+			})
 			err = state.Extend(context.Background(), block4)
 			require.NoError(t, err)
 			err = state.Finalize(context.Background(), block4.ID())
@@ -2013,7 +2019,8 @@ func TestExtendInvalidSealsInBlock(t *testing.T) {
 			all.QuorumCertificates,
 			all.Setups,
 			all.EpochCommits,
-			all.ProtocolState,
+			all.EpochProtocolState,
+			all.ProtocolKVStore,
 			all.VersionBeacons,
 			rootSnapshot,
 		)
@@ -2573,7 +2580,8 @@ func TestHeaderInvalidTimestamp(t *testing.T) {
 			all.QuorumCertificates,
 			all.Setups,
 			all.EpochCommits,
-			all.ProtocolState,
+			all.EpochProtocolState,
+			all.ProtocolKVStore,
 			all.VersionBeacons,
 			rootSnapshot,
 		)
@@ -2650,13 +2658,14 @@ func assertEpochEmergencyFallbackTriggered(t *testing.T, state realprotocol.Stat
 // mockMetricsForRootSnapshot mocks the given metrics mock object to expect all
 // metrics which are set during bootstrapping and building blocks.
 func mockMetricsForRootSnapshot(metricsMock *mockmodule.ComplianceMetrics, rootSnapshot *inmem.Snapshot) {
-	metricsMock.On("CurrentEpochCounter", rootSnapshot.Encodable().Epochs.Current.Counter)
-	phase, _ := rootSnapshot.Phase()
-	metricsMock.On("CurrentEpochPhase", phase)
-	metricsMock.On("CurrentEpochFinalView", rootSnapshot.Encodable().Epochs.Current.FinalView)
-	metricsMock.On("CurrentDKGPhase1FinalView", rootSnapshot.Encodable().Epochs.Current.DKGPhase1FinalView)
-	metricsMock.On("CurrentDKGPhase2FinalView", rootSnapshot.Encodable().Epochs.Current.DKGPhase2FinalView)
-	metricsMock.On("CurrentDKGPhase3FinalView", rootSnapshot.Encodable().Epochs.Current.DKGPhase3FinalView)
+	epochProtocolState := rootSnapshot.Encodable().SealingSegment.LatestProtocolStateEntry().EpochEntry
+	epochSetup := epochProtocolState.CurrentEpochSetup
+	metricsMock.On("CurrentEpochCounter", epochSetup.Counter)
+	metricsMock.On("CurrentEpochPhase", epochProtocolState.EpochPhase())
+	metricsMock.On("CurrentEpochFinalView", epochSetup.FinalView)
+	metricsMock.On("CurrentDKGPhase1FinalView", epochSetup.DKGPhase1FinalView)
+	metricsMock.On("CurrentDKGPhase2FinalView", epochSetup.DKGPhase2FinalView)
+	metricsMock.On("CurrentDKGPhase3FinalView", epochSetup.DKGPhase3FinalView)
 	metricsMock.On("BlockSealed", mock.Anything)
 	metricsMock.On("BlockFinalized", mock.Anything)
 	metricsMock.On("FinalizedHeight", mock.Anything)
@@ -2666,19 +2675,13 @@ func mockMetricsForRootSnapshot(metricsMock *mockmodule.ComplianceMetrics, rootS
 func getRootProtocolStateID(t *testing.T, rootSnapshot *inmem.Snapshot) flow.Identifier {
 	rootProtocolState, err := rootSnapshot.ProtocolState()
 	require.NoError(t, err)
-	return rootProtocolState.Entry().ID()
+	return rootProtocolState.ID()
 }
 
 // calculateExpectedStateId is a utility function which makes easier to get expected protocol state ID after applying service events contained in seals.
 func calculateExpectedStateId(t *testing.T, mutableProtocolState realprotocol.MutableProtocolState) func(header *flow.Header, seals []*flow.Seal) flow.Identifier {
 	return func(header *flow.Header, seals []*flow.Seal) flow.Identifier {
-		stateMutator, err := mutableProtocolState.Mutator(header.View, header.ParentID)
-		require.NoError(t, err)
-
-		err = stateMutator.ApplyServiceEventsFromValidatedSeals(seals)
-		require.NoError(t, err)
-
-		_, _, expectedStateID, _ := stateMutator.Build()
+		expectedStateID, _, err := mutableProtocolState.EvolveState(header.ParentID, header.View, seals)
 		require.NoError(t, err)
 		return expectedStateID
 	}

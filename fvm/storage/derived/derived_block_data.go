@@ -82,13 +82,16 @@ func (block *DerivedBlockData) NewChildDerivedBlockData() *DerivedBlockData {
 }
 
 func (block *DerivedBlockData) NewSnapshotReadDerivedTransactionData() *DerivedTransactionData {
-	txnPrograms := block.programs.NewSnapshotReadTableTransaction()
-
-	txnMeterParamOverrides := block.meterParamOverrides.NewSnapshotReadTableTransaction()
-
 	return &DerivedTransactionData{
-		programs:            txnPrograms,
-		meterParamOverrides: txnMeterParamOverrides,
+		programs:            block.programs.NewSnapshotReadTableTransaction(),
+		meterParamOverrides: block.meterParamOverrides.NewSnapshotReadTableTransaction(),
+	}
+}
+
+func (block *DerivedBlockData) NewCachingSnapshotReadDerivedTransactionData() *DerivedTransactionData {
+	return &DerivedTransactionData{
+		programs:            block.programs.NewCachingSnapshotReadTableTransaction(),
+		meterParamOverrides: block.meterParamOverrides.NewCachingSnapshotReadTableTransaction(),
 	}
 }
 

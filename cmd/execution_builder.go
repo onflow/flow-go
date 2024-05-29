@@ -17,6 +17,7 @@ import (
 	"github.com/ipfs/boxo/bitswap"
 	"github.com/ipfs/go-cid"
 	badger "github.com/ipfs/go-ds-badger2"
+	"github.com/onflow/cadence"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -363,6 +364,10 @@ func (exeNode *ExecutionNode) LoadBlobService(
 				blob.NewTracer(node.Logger.With().Str("blob_service", channels.ExecutionDataService.String()).Logger()),
 			),
 		),
+	}
+
+	if !node.BitswapReprovideEnabled {
+		opts = append(opts, blob.WithReprovideInterval(-1))
 	}
 
 	if exeNode.exeConf.blobstoreRateLimit > 0 && exeNode.exeConf.blobstoreBurstLimit > 0 {
@@ -1322,7 +1327,6 @@ func (exeNode *ExecutionNode) LoadSynchronizationEngine(
 	error,
 ) {
 	// initialize the synchronization engine
-	//var err error
 	spamConfig, err := synchronization.NewSpamDetectionConfig()
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize spam detection config: %w", err)
@@ -1445,8 +1449,8 @@ func getContractEpochCounter(
 		return 0, fmt.Errorf("could not read epoch counter, script returned no value")
 	}
 
-	epochCounter := output.Value.ToGoValue().(uint64)
-	return epochCounter, nil
+	epochCounter := output.Value.(cadence.UInt64)
+	return uint64(epochCounter), nil
 }
 
 // copy the checkpoint files from the bootstrap folder to the execution state folder

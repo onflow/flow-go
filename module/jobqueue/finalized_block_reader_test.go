@@ -66,7 +66,7 @@ func withReader(
 		require.NoError(t, err)
 		protocolState, err := s.State.Final().ProtocolState()
 		require.NoError(t, err)
-		protocolStateID := protocolState.Entry().ID()
+		protocolStateID := protocolState.ID()
 
 		clusterCommittee := participants.Filter(filter.HasRole[flow.Identity](flow.RoleCollection))
 		sources := unittest.RandomSourcesFixture(10)

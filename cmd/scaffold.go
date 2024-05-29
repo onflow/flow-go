@@ -191,6 +191,15 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 	fnb.flags.UintVar(&fnb.BaseConfig.guaranteesCacheSize, "guarantees-cache-size", bstorage.DefaultCacheSize, "collection guarantees cache size")
 	fnb.flags.UintVar(&fnb.BaseConfig.receiptsCacheSize, "receipts-cache-size", bstorage.DefaultCacheSize, "receipts cache size")
 
+	fnb.flags.BoolVar(&fnb.BaseConfig.DhtSystemEnabled,
+		"dht-enabled",
+		defaultConfig.DhtSystemEnabled,
+		"[experimental] whether to enable dht system. This is an experimental feature. Use with caution.")
+	fnb.flags.BoolVar(&fnb.BaseConfig.BitswapReprovideEnabled,
+		"bitswap-reprovide-enabled",
+		defaultConfig.BitswapReprovideEnabled,
+		"[experimental] whether to enable bitswap reproviding. This is an experimental feature. Use with caution.")
+
 	// dynamic node startup flags
 	fnb.flags.StringVar(&fnb.BaseConfig.DynamicStartupANPubkey,
 		"dynamic-startup-access-publickey",
@@ -414,7 +423,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			return publicLibp2pNode, nil
 		}
 
-		dhtActivationStatus, err := DhtSystemActivationStatus(fnb.NodeRole)
+		dhtActivationStatus, err := DhtSystemActivationStatus(fnb.NodeRole, fnb.DhtSystemEnabled)
 		if err != nil {
 			return nil, fmt.Errorf("could not determine dht activation status: %w", err)
 		}
@@ -1174,6 +1183,8 @@ func (fnb *FlowNodeBuilder) initStorage() error {
 	commits := bstorage.NewCommits(fnb.Metrics.Cache, fnb.DB)
 	protocolState := bstorage.NewProtocolState(fnb.Metrics.Cache, setups, epochCommits, fnb.DB,
 		bstorage.DefaultProtocolStateCacheSize, bstorage.DefaultProtocolStateByBlockIDCacheSize)
+	protocolKVStores := bstorage.NewProtocolKVStore(fnb.Metrics.Cache, fnb.DB,
+		bstorage.DefaultProtocolKVStoreCacheSize, bstorage.DefaultProtocolKVStoreByBlockIDCacheSize)
 	versionBeacons := bstorage.NewVersionBeacons(fnb.DB)
 
 	fnb.Storage = Storage{
@@ -1191,7 +1202,8 @@ func (fnb *FlowNodeBuilder) initStorage() error {
 		Setups:             setups,
 		EpochCommits:       epochCommits,
 		VersionBeacons:     versionBeacons,
-		ProtocolState:      protocolState,
+		EpochProtocolState: protocolState,
+		ProtocolKVStore:    protocolKVStores,
 		Commits:            commits,
 	}
 
@@ -1281,7 +1293,8 @@ func (fnb *FlowNodeBuilder) initState() error {
 			fnb.Storage.QuorumCertificates,
 			fnb.Storage.Setups,
 			fnb.Storage.EpochCommits,
-			fnb.Storage.ProtocolState,
+			fnb.Storage.EpochProtocolState,
+			fnb.Storage.ProtocolKVStore,
 			fnb.Storage.VersionBeacons,
 		)
 		if err != nil {
@@ -1329,7 +1342,8 @@ func (fnb *FlowNodeBuilder) initState() error {
 			fnb.Storage.QuorumCertificates,
 			fnb.Storage.Setups,
 			fnb.Storage.EpochCommits,
-			fnb.Storage.ProtocolState,
+			fnb.Storage.EpochProtocolState,
+			fnb.Storage.ProtocolKVStore,
 			fnb.Storage.VersionBeacons,
 			fnb.RootSnapshot,
 			options...,
@@ -1507,12 +1521,21 @@ func (fnb *FlowNodeBuilder) initFvmOptions() {
 		fvm.WithBlocks(blockFinder),
 		fvm.WithAccountStorageLimit(true),
 	}
-	if fnb.RootChainID == flow.Testnet || fnb.RootChainID == flow.Sandboxnet || fnb.RootChainID == flow.Mainnet {
+	switch fnb.RootChainID {
+	case flow.Testnet,
+		flow.Sandboxnet,
+		flow.Previewnet,
+		flow.Mainnet:
 		vmOpts = append(vmOpts,
 			fvm.WithTransactionFeesEnabled(true),
 		)
 	}
-	if fnb.RootChainID == flow.Testnet || fnb.RootChainID == flow.Sandboxnet || fnb.RootChainID == flow.Localnet || fnb.RootChainID == flow.Benchnet {
+	switch fnb.RootChainID {
+	case flow.Testnet,
+		flow.Sandboxnet,
+		flow.Previewnet,
+		flow.Localnet,
+		flow.Benchnet:
 		vmOpts = append(vmOpts,
 			fvm.WithContractDeploymentRestricted(false),
 		)
@@ -2117,10 +2140,11 @@ func (fnb *FlowNodeBuilder) extraFlagsValidation() error {
 // DhtSystemActivationStatus parses the given role string and returns the corresponding DHT system activation status.
 // Args:
 // - roleStr: the role string to parse.
+// - enabled: whether the DHT system is configured to be enabled. Only meaningful for access and execution nodes.
 // Returns:
 // - DhtSystemActivation: the corresponding DHT system activation status.
 // - error: if the role string is invalid, returns an error.
-func DhtSystemActivationStatus(roleStr string) (p2pbuilder.DhtSystemActivation, error) {
+func DhtSystemActivationStatus(roleStr string, enabled bool) (p2pbuilder.DhtSystemActivation, error) {
 	if roleStr == "ghost" {
 		// ghost node is not a valid role, so we don't need to parse it
 		return p2pbuilder.DhtSystemDisabled, nil
@@ -2131,12 +2155,12 @@ func DhtSystemActivationStatus(roleStr string) (p2pbuilder.DhtSystemActivation, 
 		// ghost role is not a valid role, so we don't need to parse it
 		return p2pbuilder.DhtSystemDisabled, fmt.Errorf("could not parse node role: %w", err)
 	}
-	if role == flow.RoleAccess || role == flow.RoleExecution {
-		// Only access and execution nodes need to run DHT;
-		// Access nodes and execution nodes need DHT to run a blob service.
-		// Moreover, access nodes run a DHT to let un-staked (public) access nodes find each other on the public network.
-		return p2pbuilder.DhtSystemEnabled, nil
+
+	// Only access and execution nodes need to run DHT; which is used by bitswap.
+	// Access nodes also run a DHT on the public network for peer discovery of un-staked nodes.
+	if role != flow.RoleAccess && role != flow.RoleExecution {
+		return p2pbuilder.DhtSystemDisabled, nil
 	}
 
-	return p2pbuilder.DhtSystemDisabled, nil
+	return p2pbuilder.DhtSystemActivation(enabled), nil
 }

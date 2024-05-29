@@ -120,7 +120,7 @@ func TestTransaction_InvalidParse(t *testing.T) {
 }
 
 func TestTransaction_ValidParse(t *testing.T) {
-	script := `pub fun main() {}`
+	script := `access(all) fun main() {}`
 	tx := buildTransaction()
 	tx["script"] = util.ToBase64([]byte(script))
 	input := transactionToReader(tx)

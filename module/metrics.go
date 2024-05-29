@@ -581,6 +581,12 @@ type CruiseCtlMetrics interface {
 	// ControllerOutput measures the output of the cruise control PID controller.
 	// Concretely, this is the quantity to subtract from the baseline view duration.
 	ControllerOutput(duration time.Duration)
+
+	// ProposalPublicationDelay measures the effective delay the controller imposes on publishing
+	// the node's own proposals, with all limits of authority applied.
+	// Note: Technically, our metrics capture the publication delay relative to when the publication delay was
+	// last requested. Currently, only the EventHandler requests a publication delay, exactly once per proposal.
+	ProposalPublicationDelay(duration time.Duration)
 }
 
 type CollectionMetrics interface {
@@ -1109,4 +1115,16 @@ type CollectionExecutedMetric interface {
 	BlockFinalized(block *flow.Block)
 	ExecutionReceiptReceived(r *flow.ExecutionReceipt)
 	UpdateLastFullBlockHeight(height uint64)
+}
+
+type MachineAccountMetrics interface {
+	// AccountBalance reports the current balance of the machine account.
+	AccountBalance(bal float64)
+	// RecommendedMinBalance reports the recommended minimum balance. If the actual balance
+	// falls below this level, it must be refilled.
+	// NOTE: Operators should alert on `AccountBalance < RecommendedMinBalance`
+	RecommendedMinBalance(bal float64)
+	// IsMisconfigured reports whether a critical misconfiguration has been detected.
+	// NOTE Operators should alert on non-zero values reported here.
+	IsMisconfigured(misconfigured bool)
 }
