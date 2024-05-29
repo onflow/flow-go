@@ -532,3 +532,38 @@ func (suite *Suite) TestRespondToEpochTransition() {
 	// the expired epoch should have been stopped
 	suite.AssertEpochStopped(suite.counter - 1)
 }
+
+// TestStopQcVoting tests that, if we encounter an EpochEmergencyFallbackTriggered event
+// the engine will stop in progress QC voting.
+func (suite *Suite) TestStopQcVoting() {
+
+	// we expect 1 ActiveClustersChanged events when the engine first starts and the first set of epoch components are started
+	suite.engineEventsDistributor.On("ActiveClustersChanged", mock.AnythingOfType("flow.ChainIDList")).Once()
+	defer suite.engineEventsDistributor.AssertExpectations(suite.T())
+	// we are in setup phase
+	suite.phase = flow.EpochPhaseSetup
+
+	var voteCh = make(chan struct{})
+	var stopVotingCh = make(chan struct{})
+	// should call voter with next epoch
+	suite.voter.On("Vote", mock.Anything, suite.epochQuery.Next()).
+		Return(nil).
+		Run(func(args mock.Arguments) {
+			close(voteCh)
+		}).Once()
+	// should stop voting when efm event processed
+	suite.voter.On("StopVoting").
+		Return(nil).
+		Run(func(args mock.Arguments) {
+			close(stopVotingCh)
+		}).Once()
+
+	// start up the engine
+	suite.StartEngine()
+
+	// simulate processing efm triggered event
+	suite.engine.EpochEmergencyFallbackTriggered()
+
+	unittest.AssertClosesBefore(suite.T(), voteCh, time.Second)
+	unittest.AssertClosesBefore(suite.T(), stopVotingCh, time.Second)
+}

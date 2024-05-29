@@ -92,6 +92,7 @@ func New(
 		epochTransitionEvents:        make(chan *flow.Header, 1),
 		epochSetupPhaseStartedEvents: make(chan *flow.Header, 1),
 		epochStopEvents:              make(chan uint64, 1),
+		efmEvents:                    make(chan struct{}, 1),
 		clusterIDUpdateDistributor:   clusterIDUpdateDistributor,
 	}
 
