@@ -148,12 +148,7 @@ func NewInterpreterMigrationRuntime(
 		return nil, fmt.Errorf("failed to create runtime interface: %w", err)
 	}
 
-	evmContractAccountAddress, err := evm.ContractAccountAddress(chainID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get EVM contract account address for chain %s: %w", chainID, err)
-	}
-
-	evmStdlib.SetupEnvironment(env, nil, evmContractAccountAddress)
+	evmStdlib.SetupEnvironment(env, nil, evm.ContractAccountAddress(chainID))
 
 	env.Configure(
 		runtimeInterface,
