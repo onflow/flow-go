@@ -152,7 +152,7 @@ func (s *BaseSuite) AwaitEpochPhase(ctx context.Context, expectedEpoch uint64, e
 
 // GetContainersByRole returns all containers from the network for the specified role, making sure the containers are not ghost nodes.
 func (s *BaseSuite) GetContainersByRole(role flow.Role) []*testnet.Container {
-	nodes := s.net.ContainersByRole(role, false)
+	nodes := s.net.ContainersByRole(role)
 	require.True(s.T(), len(nodes) > 0)
 	return nodes
 }

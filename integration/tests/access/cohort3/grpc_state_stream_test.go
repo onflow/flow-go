@@ -276,13 +276,13 @@ func SubscribeEventsByBlockHeight(
 	startHeight uint64,
 	filter *executiondata.EventFilter,
 ) (<-chan flow.BlockEvents, <-chan error, error) {
-	req := &executiondata.SubscribeEventsFromStartHeightRequest{
+	req := &executiondata.SubscribeEventsRequest{
 		StartBlockHeight:     startHeight,
 		EventEncodingVersion: entities.EventEncodingVersion_CCF_V0,
 		Filter:               filter,
 		HeartbeatInterval:    1,
 	}
-	stream, err := client.SubscribeEventsFromStartHeight(ctx, req)
+	stream, err := client.SubscribeEvents(ctx, req)
 	if err != nil {
 		return nil, nil, err
 	}
