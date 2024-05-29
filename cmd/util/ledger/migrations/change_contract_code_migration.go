@@ -5,6 +5,7 @@ import (
 
 	"github.com/onflow/cadence/runtime/common"
 	coreContracts "github.com/onflow/flow-core-contracts/lib/go/contracts"
+	nftStorefrontContracts "github.com/onflow/nft-storefront/lib/go/contracts"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
@@ -238,6 +239,22 @@ func SystemContractChanges(chainID flow.ChainID, options SystemContractsMigratio
 				Contract: Contract{
 					Name: "Burner",
 					Code: coreContracts.Burner(),
+				},
+			},
+		)
+	}
+
+	if chainID == flow.Testnet {
+		contractChanges = append(
+			contractChanges,
+			StagedContract{
+				Address: common.Address(flow.HexToAddress("0x2d55b98eb200daef")),
+				Contract: Contract{
+					Name: "NFTStorefrontV2",
+					Code: nftStorefrontContracts.NFTStorefrontV2(
+						systemContracts.FungibleToken.Address.Hex(),
+						systemContracts.NonFungibleToken.Address.Hex(),
+					),
 				},
 			},
 		)

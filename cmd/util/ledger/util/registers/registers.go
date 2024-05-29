@@ -277,6 +277,16 @@ func (a *AccountRegisters) Merge(other *AccountRegisters) error {
 	return nil
 }
 
+func (a *AccountRegisters) ForEachKey(f func(key string) error) error {
+	for key := range a.registers {
+		err := f(key)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func NewAccountRegistersFromPayloads(owner string, payloads []*ledger.Payload) (*AccountRegisters, error) {
 	accountRegisters := NewAccountRegisters(owner)
 

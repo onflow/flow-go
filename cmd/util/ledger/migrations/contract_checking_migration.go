@@ -2,6 +2,7 @@ package migrations
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/onflow/cadence/runtime/common"
@@ -41,7 +42,13 @@ func NewContractCheckingMigration(
 
 		// Gather all contracts
 
-		contractsByLocation := make(map[common.Location][]byte, contractCountEstimate)
+		contractsForPrettyPrinting := make(map[common.Location][]byte, contractCountEstimate)
+
+		type contract struct {
+			location common.AddressLocation
+			code     []byte
+		}
+		contracts := make([]contract, 0, contractCountEstimate)
 
 		err = registersByAccount.ForEach(func(owner string, key string, value []byte) error {
 
@@ -58,7 +65,15 @@ func NewContractCheckingMigration(
 				Name:    contractName,
 			}
 
-			contractsByLocation[location] = code
+			contracts = append(
+				contracts,
+				contract{
+					location: location,
+					code:     code,
+				},
+			)
+
+			contractsForPrettyPrinting[location] = code
 
 			return nil
 		})
@@ -66,9 +81,18 @@ func NewContractCheckingMigration(
 			return fmt.Errorf("failed to iterate over registers: %w", err)
 		}
 
+		sort.Slice(contracts, func(i, j int) bool {
+			a := contracts[i]
+			b := contracts[j]
+			return a.location.ID() < b.location.ID()
+		})
+
 		// Check all contracts
 
-		for location, code := range contractsByLocation {
+		for _, contract := range contracts {
+			location := contract.location
+			code := contract.code
+
 			log.Info().Msgf("checking contract %s ...", location)
 
 			// Check contract code
@@ -80,7 +104,7 @@ func NewContractCheckingMigration(
 				var builder strings.Builder
 				errorPrinter := pretty.NewErrorPrettyPrinter(&builder, false)
 
-				printErr := errorPrinter.PrettyPrintError(err, location, contractsByLocation)
+				printErr := errorPrinter.PrettyPrintError(err, location, contractsForPrettyPrinting)
 
 				var errorDetails string
 				if printErr == nil {
@@ -88,8 +112,6 @@ func NewContractCheckingMigration(
 				} else {
 					errorDetails = err.Error()
 				}
-
-				addressLocation := location.(common.AddressLocation)
 
 				if verboseErrorOutput {
 					log.Error().Msgf(
@@ -100,8 +122,8 @@ func NewContractCheckingMigration(
 				}
 
 				reporter.Write(contractCheckingFailure{
-					AccountAddressHex: addressLocation.Address.HexWithPrefix(),
-					ContractName:      addressLocation.Name,
+					AccountAddressHex: location.Address.HexWithPrefix(),
+					ContractName:      location.Name,
 					Error:             errorDetails,
 				})
 

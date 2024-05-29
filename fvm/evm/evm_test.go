@@ -2196,8 +2196,7 @@ func RunWithNewEnvironment(
 		*EOATestAccount,
 	),
 ) {
-	rootAddr, err := evm.StorageAccountAddress(chain.ChainID())
-	require.NoError(t, err)
+	rootAddr := evm.StorageAccountAddress(chain.ChainID())
 
 	RunWithTestBackend(t, func(backend *TestBackend) {
 		RunWithDeployedContract(t, GetStorageTestContract(t), backend, rootAddr, func(testContract *TestContract) {
