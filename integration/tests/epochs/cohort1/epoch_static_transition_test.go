@@ -4,10 +4,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/onflow/flow-go/integration/tests/epochs"
-	"github.com/onflow/flow-go/model/flow"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+
+	"github.com/onflow/flow-go/integration/tests/epochs"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 func TestEpochStaticTransition(t *testing.T) {

@@ -3,9 +3,10 @@ package cohort1
 import (
 	"testing"
 
+	"github.com/stretchr/testify/suite"
+
 	"github.com/onflow/flow-go/integration/tests/epochs"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/stretchr/testify/suite"
 )
 
 func TestEpochJoinAndLeaveAN(t *testing.T) {
