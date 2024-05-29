@@ -439,6 +439,32 @@ func (_m *API) GetExecutionResultForBlockID(ctx context.Context, blockID flow.Id
 	return r0, r1
 }
 
+// GetFullCollectionByID provides a mock function with given fields: ctx, id
+func (_m *API) GetFullCollectionByID(ctx context.Context, id flow.Identifier) (*flow.Collection, error) {
+	ret := _m.Called(ctx, id)
+
+	var r0 *flow.Collection
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier) (*flow.Collection, error)); ok {
+		return rf(ctx, id)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier) *flow.Collection); ok {
+		r0 = rf(ctx, id)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*flow.Collection)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, flow.Identifier) error); ok {
+		r1 = rf(ctx, id)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetLatestBlock provides a mock function with given fields: ctx, isSealed
 func (_m *API) GetLatestBlock(ctx context.Context, isSealed bool) (*flow.Block, flow.BlockStatus, error) {
 	ret := _m.Called(ctx, isSealed)
