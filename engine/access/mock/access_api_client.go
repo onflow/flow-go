@@ -512,6 +512,39 @@ func (_m *AccessAPIClient) GetExecutionResultForBlockID(ctx context.Context, in 
 	return r0, r1
 }
 
+// GetFullCollectionByID provides a mock function with given fields: ctx, in, opts
+func (_m *AccessAPIClient) GetFullCollectionByID(ctx context.Context, in *access.GetFullCollectionByIDRequest, opts ...grpc.CallOption) (*access.FullCollectionResponse, error) {
+	_va := make([]interface{}, len(opts))
+	for _i := range opts {
+		_va[_i] = opts[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, in)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	var r0 *access.FullCollectionResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *access.GetFullCollectionByIDRequest, ...grpc.CallOption) (*access.FullCollectionResponse, error)); ok {
+		return rf(ctx, in, opts...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *access.GetFullCollectionByIDRequest, ...grpc.CallOption) *access.FullCollectionResponse); ok {
+		r0 = rf(ctx, in, opts...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*access.FullCollectionResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *access.GetFullCollectionByIDRequest, ...grpc.CallOption) error); ok {
+		r1 = rf(ctx, in, opts...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetLatestBlock provides a mock function with given fields: ctx, in, opts
 func (_m *AccessAPIClient) GetLatestBlock(ctx context.Context, in *access.GetLatestBlockRequest, opts ...grpc.CallOption) (*access.BlockResponse, error) {
 	_va := make([]interface{}, len(opts))

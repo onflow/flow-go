@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"path"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -23,7 +24,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-func registerFromStorageID(slabID atree.SlabID) (owner, key string) {
+func registerFromSlabID(slabID atree.SlabID) (owner, key string) {
 	var address [8]byte
 	binary.BigEndian.PutUint64(address[:], slabID.AddressAsUint64())
 
@@ -134,8 +135,21 @@ func (m *FilterUnreferencedSlabsMigration) MigrateAccount(
 		Str("account", address.HexWithPrefix()).
 		Msgf("filtering %d unreferenced slabs", len(unreferencedSlabIDs))
 
-	for slabID := range unreferencedSlabIDs {
-		owner, key := registerFromStorageID(slabID)
+	var slabIDs []atree.SlabID
+	for storageID := range unreferencedSlabIDs {
+		slabIDs = append(slabIDs, storageID)
+	}
+	sort.Slice(
+		slabIDs,
+		func(i, j int) bool {
+			a := slabIDs[i]
+			b := slabIDs[j]
+			return a.Compare(b) < 0
+		},
+	)
+
+	for _, slabID := range slabIDs {
+		owner, key := registerFromSlabID(slabID)
 
 		value, err := accountRegisters.Get(owner, key)
 		if err != nil {
