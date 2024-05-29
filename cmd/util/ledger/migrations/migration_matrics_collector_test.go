@@ -32,7 +32,7 @@ func TestMigrationMetricsCollection(t *testing.T) {
 		rwf := &testReportWriterFactory{}
 
 		logWriter := &writer{}
-		logger := zerolog.New(logWriter).Level(zerolog.InfoLevel)
+		logger := zerolog.New(logWriter).Level(zerolog.ErrorLevel)
 
 		const nWorker = 2
 
@@ -70,6 +70,9 @@ func TestMigrationMetricsCollection(t *testing.T) {
 		}
 
 		require.NoError(t, err)
+
+		// Should only have the `Test` contract checking error
+		require.Len(t, logWriter.logs, 1)
 
 		reportWriter := rwf.reportWriters["metrics-collecting-migration"]
 		require.Len(t, reportWriter.entries, 1)
@@ -162,6 +165,9 @@ func TestMigrationMetricsCollection(t *testing.T) {
 		}
 
 		require.NoError(t, err)
+
+		// Should only have the `Test` contract checking error
+		require.Len(t, logWriter.logs, 1)
 
 		reportWriter := rwf.reportWriters["metrics-collecting-migration"]
 		require.Len(t, reportWriter.entries, 1)

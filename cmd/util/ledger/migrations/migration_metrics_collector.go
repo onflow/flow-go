@@ -24,6 +24,7 @@ const metricsCollectingMigrationName = "metrics_collecting_migration"
 type MetricsCollectingMigration struct {
 	name             string
 	chainID          flow.ChainID
+	log              zerolog.Logger
 	mutex            sync.RWMutex
 	reporter         reporters.ReportWriter
 	metricsCollector *MigrationMetricsCollector
@@ -35,6 +36,7 @@ var _ migrations.ValueMigration = &MetricsCollectingMigration{}
 var _ AccountBasedMigration = &MetricsCollectingMigration{}
 
 func NewMetricsCollectingMigration(
+	log zerolog.Logger,
 	chainID flow.ChainID,
 	rwf reporters.ReportWriterFactory,
 	programs map[common.Location]*interpreter.Program,
@@ -42,6 +44,7 @@ func NewMetricsCollectingMigration(
 
 	return &MetricsCollectingMigration{
 		name:             metricsCollectingMigrationName,
+		log:              log,
 		reporter:         rwf.ReportWriter("metrics-collecting-migration"),
 		metricsCollector: NewMigrationMetricsCollector(),
 		chainID:          chainID,
@@ -137,7 +140,7 @@ func (m *MetricsCollectingMigration) MigrateAccount(
 
 	migration.Migrate(
 		migration.NewValueMigrationsPathMigrator(
-			nil, // No need to report
+			NewStorageVisitingErrorReporter(m.log),
 			m,
 		),
 	)
@@ -378,4 +381,32 @@ type Metrics struct {
 
 	// Total values related to each contract
 	ValuesPerContract map[string]int `json:"valuesPerContract"`
+}
+
+type storageVisitingErrorReporter struct {
+	log zerolog.Logger
+}
+
+func NewStorageVisitingErrorReporter(log zerolog.Logger) *storageVisitingErrorReporter {
+	return &storageVisitingErrorReporter{
+		log: log,
+	}
+}
+
+var _ migrations.Reporter = &storageVisitingErrorReporter{}
+
+func (p *storageVisitingErrorReporter) Migrated(
+	_ interpreter.StorageKey,
+	_ interpreter.StorageMapKey,
+	_ string,
+) {
+	// Ignore
+}
+
+func (p *storageVisitingErrorReporter) DictionaryKeyConflict(addressPath interpreter.AddressPath) {
+	p.log.Error().Msgf("dictionary key conflict for %s", addressPath)
+}
+
+func (p *storageVisitingErrorReporter) Error(err error) {
+	p.log.Error().Msgf("%s", err.Error())
 }
