@@ -14,12 +14,12 @@ import (
 	"github.com/onflow/crypto"
 	"github.com/onflow/flow/protobuf/go/flow/access"
 
-	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/engine/common/requester"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/engine/execution/ingestion"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/grpcclient"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/utils/grpcutils"
 )
@@ -92,7 +92,7 @@ func convertAccessAddrFromState(address string) string {
 	var accessAddress strings.Builder
 	accessAddress.WriteString(strings.Split(address, ":")[0])
 
-	accessAddress.WriteString(fmt.Sprintf(":%s", common.DefaultAccessAPISecurePort))
+	accessAddress.WriteString(fmt.Sprintf(":%s", grpcclient.DefaultAccessAPISecurePort))
 
 	return accessAddress.String()
 }
