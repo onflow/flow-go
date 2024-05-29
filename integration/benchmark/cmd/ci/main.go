@@ -7,8 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
-
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -17,6 +15,7 @@ import (
 	flowsdk "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go-sdk/access"
 	client "github.com/onflow/flow-go-sdk/access/grpc"
+	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/onflow/flow-go/integration/benchmark"
 	"github.com/onflow/flow-go/integration/benchmark/load"
@@ -178,7 +177,7 @@ func main() {
 	)
 	defer adjuster.Stop()
 
-	// run load
+	// start the load with the initial TPS
 	err = lg.SetTPS(uint(loadConfig.TPSInitial))
 	if err != nil {
 		log.Fatal().Err(err).Msg("unable to set tps")

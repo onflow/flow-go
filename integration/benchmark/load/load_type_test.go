@@ -3,7 +3,6 @@ package load_test
 import (
 	"context"
 	"fmt"
-	"github.com/onflow/flow-go/fvm/meter"
 	"sync"
 	"testing"
 
@@ -22,6 +21,7 @@ import (
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/environment"
 	envMock "github.com/onflow/flow-go/fvm/environment/mock"
+	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/integration/benchmark/account"
 	"github.com/onflow/flow-go/integration/benchmark/common"
@@ -242,7 +242,7 @@ func (t *testTransactionSender) Send(tx *sdk.Transaction) (sdk.TransactionResult
 		environment.ComputationKindGetValue:             162,
 		environment.ComputationKindCreateAccount:        567534,
 		environment.ComputationKindSetValue:             153,
-		environment.ComputationKindEVMGasUsage:          33,
+		environment.ComputationKindEVMGasUsage:          13,
 	}
 
 	computationUsed := executionEffortWeights.ComputationFromIntensities(result.ComputationIntensities)
