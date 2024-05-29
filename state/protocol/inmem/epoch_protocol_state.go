@@ -7,7 +7,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 )
 
-// EpochProtocolStateAdapter implements protocol.EpochProtocolState by wrapping an InitialProtocolStateAdapter.
+// EpochProtocolStateAdapter implements protocol.EpochProtocolState by wrapping a flow.RichEpochProtocolStateEntry.
 type EpochProtocolStateAdapter struct {
 	*flow.RichEpochProtocolStateEntry
 	params protocol.GlobalParams
