@@ -345,6 +345,9 @@ func (c *MigrationMetricsCollector) RecordValueForContract(location common.Locat
 }
 
 func (c *MigrationMetricsCollector) metrics() Metrics {
+	c.mutex.RLock()
+	defer c.mutex.RUnlock()
+
 	errorsPerContract := make(map[string]int, len(c.ErrorsPerContract))
 	for location, count := range c.ErrorsPerContract {
 		errorsPerContract[location.ID()] = count
