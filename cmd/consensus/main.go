@@ -717,7 +717,7 @@ func main() {
 		}).
 		Component("consensus participant", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			mutableProtocolState := protocol_state.NewMutableProtocolState(
-				node.Storage.EpochProtocolState,
+				node.Storage.EpochProtocolStateEntries,
 				node.Storage.ProtocolKVStore,
 				node.State.Params(),
 				node.Storage.Headers,

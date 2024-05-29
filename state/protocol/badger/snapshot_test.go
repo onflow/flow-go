@@ -236,7 +236,7 @@ func TestClusters(t *testing.T) {
 	commit.ClusterQCs = flow.ClusterQCVoteDatasFromQCs(clusterQCs)
 	seal.ResultID = result.ID()
 	root.Payload.ProtocolStateID = kvstore.NewDefaultKVStore(
-		inmem.ProtocolStateFromEpochServiceEvents(setup, commit).ID()).ID()
+		inmem.EpochProtocolStateFromServiceEvents(setup, commit).ID()).ID()
 
 	rootSnapshot, err := inmem.SnapshotFromBootstrapState(root, result, seal, qc)
 	require.NoError(t, err)

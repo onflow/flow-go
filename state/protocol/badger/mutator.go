@@ -691,15 +691,15 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 
 	// We update metrics and emit protocol events for epoch state changes when
 	// the block corresponding to the state change is finalized
-	parentPsSnapshot, err := m.protocolState.AtBlockID(block.Header.ParentID)
+	parentEpochState, err := m.protocolState.EpochStateAtBlockID(block.Header.ParentID)
 	if err != nil {
 		return fmt.Errorf("could not retrieve protocol state snapshot for parent: %w", err)
 	}
-	finalizingPsSnapshot, err := m.protocolState.AtBlockID(blockID)
+	finalizingEpochState, err := m.protocolState.EpochStateAtBlockID(blockID)
 	if err != nil {
 		return fmt.Errorf("could not retrieve protocol state snapshot: %w", err)
 	}
-	currentEpochSetup := finalizingPsSnapshot.EpochSetup()
+	currentEpochSetup := finalizingEpochState.EpochSetup()
 	epochFallbackTriggered, err := m.isEpochEmergencyFallbackTriggered()
 	if err != nil {
 		return fmt.Errorf("could not check persisted epoch emergency fallback flag: %w", err)
@@ -707,7 +707,7 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 
 	// if epoch fallback was not previously triggered, check whether this block triggers it
 	// TODO(efm-recovery): remove separate global EFM flag
-	if !epochFallbackTriggered && finalizingPsSnapshot.InvalidEpochTransitionAttempted() {
+	if !epochFallbackTriggered && finalizingEpochState.InvalidEpochTransitionAttempted() {
 		epochFallbackTriggered = true
 		// emit the protocol event only the first time epoch fallback is triggered
 		events = append(events, m.consumer.EpochEmergencyFallbackTriggered)
@@ -715,7 +715,7 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 	}
 
 	// Determine metric updates and protocol events related to epoch phase changes and epoch transitions.
-	epochPhaseMetrics, epochPhaseEvents, err := m.epochMetricsAndEventsOnBlockFinalized(parentPsSnapshot, finalizingPsSnapshot, header)
+	epochPhaseMetrics, epochPhaseEvents, err := m.epochMetricsAndEventsOnBlockFinalized(parentEpochState, finalizingEpochState, header)
 	if err != nil {
 		return fmt.Errorf("could not determine epoch phase metrics/events for finalized block: %w", err)
 	}
@@ -755,7 +755,7 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 			}
 		}
 		// TODO(efm-recovery): we should be able to omit the `!epochFallbackTriggered` check here.
-		if isFirstBlockOfEpoch(parentPsSnapshot, finalizingPsSnapshot) && !epochFallbackTriggered {
+		if isFirstBlockOfEpoch(parentEpochState, finalizingEpochState) && !epochFallbackTriggered {
 			err = operation.InsertEpochFirstHeight(currentEpochSetup.Counter, header.Height)(tx)
 			if err != nil {
 				return fmt.Errorf("could not insert epoch first block height: %w", err)
@@ -824,8 +824,8 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 // isFirstBlockOfEpoch returns true if the given block is the first block of a new epoch
 // by comparing the block's Protocol State Snapshot to that of its parent.
 // NOTE: There can be multiple (un-finalized) blocks that qualify as the first block of epoch N.
-func isFirstBlockOfEpoch(parentPsSnapshot, blockPsSnapshot protocol.DynamicProtocolState) bool {
-	return parentPsSnapshot.Epoch() < blockPsSnapshot.Epoch()
+func isFirstBlockOfEpoch(parentEpochState, blockEpochState protocol.EpochProtocolState) bool {
+	return parentEpochState.Epoch() < blockEpochState.Epoch()
 }
 
 // epochMetricsAndEventsOnBlockFinalized determines metrics to update and protocol
@@ -835,20 +835,20 @@ func isFirstBlockOfEpoch(parentPsSnapshot, blockPsSnapshot protocol.DynamicProto
 //
 // This method must be called for each finalized block.
 // No errors are expected during normal operation.
-func (m *FollowerState) epochMetricsAndEventsOnBlockFinalized(parentPsSnapshot, finalizedPsSnapshot protocol.DynamicProtocolState, finalized *flow.Header) (
+func (m *FollowerState) epochMetricsAndEventsOnBlockFinalized(parentEpochState, finalizedEpochState protocol.EpochProtocolState, finalized *flow.Header) (
 	metrics []func(),
 	events []func(),
 	err error,
 ) {
-	if finalizedPsSnapshot.InvalidEpochTransitionAttempted() {
+	if finalizedEpochState.InvalidEpochTransitionAttempted() {
 		// No epoch state changes to notify on when EFM is triggered
 		return nil, nil, nil
 	}
 
-	parentEpochCounter := parentPsSnapshot.Epoch()
-	childEpochCounter := finalizedPsSnapshot.Epoch()
-	parentEpochPhase := parentPsSnapshot.EpochPhase()
-	childEpochPhase := finalizedPsSnapshot.EpochPhase()
+	parentEpochCounter := parentEpochState.Epoch()
+	childEpochCounter := finalizedEpochState.Epoch()
+	parentEpochPhase := parentEpochState.EpochPhase()
+	childEpochPhase := finalizedEpochState.EpochPhase()
 
 	// Same epoch phase -> nothing to do
 	if parentEpochPhase == childEpochPhase {
@@ -857,7 +857,7 @@ func (m *FollowerState) epochMetricsAndEventsOnBlockFinalized(parentPsSnapshot, 
 
 	// Different counter -> must be an epoch transition
 	if parentEpochCounter != childEpochCounter {
-		childEpochSetup := finalizedPsSnapshot.EpochSetup()
+		childEpochSetup := finalizedEpochState.EpochSetup()
 		events = append(events, func() { m.consumer.EpochTransition(childEpochSetup.Counter, finalized) })
 		// set current epoch counter corresponding to new epoch
 		metrics = append(metrics, func() { m.metrics.CurrentEpochCounter(childEpochSetup.Counter) })

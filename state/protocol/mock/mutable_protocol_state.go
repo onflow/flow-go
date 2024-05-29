@@ -16,20 +16,20 @@ type MutableProtocolState struct {
 	mock.Mock
 }
 
-// AtBlockID provides a mock function with given fields: blockID
-func (_m *MutableProtocolState) AtBlockID(blockID flow.Identifier) (protocol.DynamicProtocolState, error) {
+// EpochStateAtBlockID provides a mock function with given fields: blockID
+func (_m *MutableProtocolState) EpochStateAtBlockID(blockID flow.Identifier) (protocol.EpochProtocolState, error) {
 	ret := _m.Called(blockID)
 
-	var r0 protocol.DynamicProtocolState
+	var r0 protocol.EpochProtocolState
 	var r1 error
-	if rf, ok := ret.Get(0).(func(flow.Identifier) (protocol.DynamicProtocolState, error)); ok {
+	if rf, ok := ret.Get(0).(func(flow.Identifier) (protocol.EpochProtocolState, error)); ok {
 		return rf(blockID)
 	}
-	if rf, ok := ret.Get(0).(func(flow.Identifier) protocol.DynamicProtocolState); ok {
+	if rf, ok := ret.Get(0).(func(flow.Identifier) protocol.EpochProtocolState); ok {
 		r0 = rf(blockID)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(protocol.DynamicProtocolState)
+			r0 = ret.Get(0).(protocol.EpochProtocolState)
 		}
 	}
 
