@@ -12,10 +12,11 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"gopkg.in/yaml.v3"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	flowsdk "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go-sdk/access"
 	client "github.com/onflow/flow-go-sdk/access/grpc"
-	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/onflow/flow-go/integration/benchmark"
 	"github.com/onflow/flow-go/integration/benchmark/load"
