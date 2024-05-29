@@ -19,6 +19,10 @@ type ClusterRootQCVoter interface {
 	//   - epochs.ClusterQCNoVoteError if we fail to vote for a benign reason
 	//   - generic error in case of critical unexpected failure
 	Vote(context.Context, protocol.Epoch) error
+
+	// StopVoting sends a signal to the root qc voter to stop in progress voting.
+	// When the signal is encountered the Vote func will be exited with an non-retryable error.
+	StopVoting()
 }
 
 // QCContractClient enables interacting with the cluster QC aggregator smart
