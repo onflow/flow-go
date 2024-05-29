@@ -173,6 +173,22 @@ func (dr *CadenceValueDiffReporter) diffStorageDomain(
 	newRuntime *InterpreterMigrationRuntime,
 	domain string,
 ) {
+	defer func() {
+		if r := recover(); r != nil {
+			dr.reportWriter.Write(
+				diffProblem{
+					Address: dr.address.Hex(),
+					Domain:  domain,
+					Kind:    diffErrorKindString[abortErrorKind],
+					Msg: fmt.Sprintf(
+						"panic while diffing storage maps: %s",
+						r,
+					),
+				},
+			)
+		}
+	}()
+
 	oldStorageMap := oldRuntime.Storage.GetStorageMap(dr.address, domain, false)
 	newStorageMap := newRuntime.Storage.GetStorageMap(dr.address, domain, false)
 
@@ -339,38 +355,67 @@ func (dr *CadenceValueDiffReporter) diffValues(
 		return dr.diffCadenceSomeValue(vInterpreter, v, otherInterpreter, other, domain, trace)
 
 	default:
-		oldValue, ok := v.(interpreter.EquatableValue)
-		if !ok {
+		return dr.diffEquatable(vInterpreter, v, otherInterpreter, other, domain, trace)
+	}
+}
+
+func (dr *CadenceValueDiffReporter) diffEquatable(
+	vInterpreter *interpreter.Interpreter,
+	v interpreter.Value,
+	otherInterpreter *interpreter.Interpreter,
+	other interpreter.Value,
+	domain string,
+	trace *util.Trace,
+) (hasDifference bool) {
+
+	defer func() {
+		if r := recover(); r != nil {
 			dr.reportWriter.Write(
 				diffProblem{
 					Address: dr.address.Hex(),
 					Domain:  domain,
-					Kind:    diffErrorKindString[cadenceValueNotImplementEquatableValueDiffErrorKind],
+					Kind:    diffErrorKindString[abortErrorKind],
 					Trace:   trace.String(),
 					Msg: fmt.Sprintf(
-						"old value doesn't implement interpreter.EquatableValue: %s (%T)",
-						oldValue.String(),
-						oldValue,
+						"panic while diffing values: %s",
+						r,
 					),
-				})
-			return true
+				},
+			)
 		}
+	}()
 
-		if !oldValue.Equal(nil, interpreter.EmptyLocationRange, other) {
-			dr.reportWriter.Write(
-				difference{
-					Address:            dr.address.Hex(),
-					Domain:             domain,
-					Kind:               diffKindString[cadenceValueDiffKind],
-					Msg:                fmt.Sprintf("values differ: %T vs %T", oldValue, other),
-					Trace:              trace.String(),
-					OldValue:           v.String(),
-					NewValue:           other.String(),
-					OldValueStaticType: v.StaticType(vInterpreter).String(),
-					NewValueStaticType: other.StaticType(otherInterpreter).String(),
-				})
-			return true
-		}
+	oldValue, ok := v.(interpreter.EquatableValue)
+	if !ok {
+		dr.reportWriter.Write(
+			diffProblem{
+				Address: dr.address.Hex(),
+				Domain:  domain,
+				Kind:    diffErrorKindString[cadenceValueNotImplementEquatableValueDiffErrorKind],
+				Trace:   trace.String(),
+				Msg: fmt.Sprintf(
+					"old value doesn't implement interpreter.EquatableValue: %s (%T)",
+					oldValue.String(),
+					oldValue,
+				),
+			})
+		return true
+	}
+
+	if !oldValue.Equal(nil, interpreter.EmptyLocationRange, other) {
+		dr.reportWriter.Write(
+			difference{
+				Address:            dr.address.Hex(),
+				Domain:             domain,
+				Kind:               diffKindString[cadenceValueDiffKind],
+				Msg:                fmt.Sprintf("values differ: %T vs %T", oldValue, other),
+				Trace:              trace.String(),
+				OldValue:           v.String(),
+				NewValue:           other.String(),
+				OldValueStaticType: v.StaticType(vInterpreter).String(),
+				NewValueStaticType: other.StaticType(otherInterpreter).String(),
+			})
+		return true
 	}
 
 	return false
@@ -384,6 +429,24 @@ func (dr *CadenceValueDiffReporter) diffCadenceSomeValue(
 	domain string,
 	trace *util.Trace,
 ) (hasDifference bool) {
+
+	defer func() {
+		if r := recover(); r != nil {
+			dr.reportWriter.Write(
+				diffProblem{
+					Address: dr.address.Hex(),
+					Domain:  domain,
+					Kind:    diffErrorKindString[abortErrorKind],
+					Trace:   trace.String(),
+					Msg: fmt.Sprintf(
+						"panic while diffing some: %s",
+						r,
+					),
+				},
+			)
+		}
+	}()
+
 	otherSome, ok := other.(*interpreter.SomeValue)
 	if !ok {
 		dr.reportWriter.Write(
@@ -419,6 +482,24 @@ func (dr *CadenceValueDiffReporter) diffCadenceArrayValue(
 	domain string,
 	trace *util.Trace,
 ) (hasDifference bool) {
+
+	defer func() {
+		if r := recover(); r != nil {
+			dr.reportWriter.Write(
+				diffProblem{
+					Address: dr.address.Hex(),
+					Domain:  domain,
+					Kind:    diffErrorKindString[abortErrorKind],
+					Trace:   trace.String(),
+					Msg: fmt.Sprintf(
+						"panic while diffing array: %s",
+						r,
+					),
+				},
+			)
+		}
+	}()
+
 	otherArray, ok := other.(*interpreter.ArrayValue)
 	if !ok {
 		dr.reportWriter.Write(
@@ -521,6 +602,24 @@ func (dr *CadenceValueDiffReporter) diffCadenceCompositeValue(
 	domain string,
 	trace *util.Trace,
 ) (hasDifference bool) {
+
+	defer func() {
+		if r := recover(); r != nil {
+			dr.reportWriter.Write(
+				diffProblem{
+					Address: dr.address.Hex(),
+					Domain:  domain,
+					Kind:    diffErrorKindString[abortErrorKind],
+					Trace:   trace.String(),
+					Msg: fmt.Sprintf(
+						"panic while diffing composite: %s",
+						r,
+					),
+				},
+			)
+		}
+	}()
+
 	otherComposite, ok := other.(*interpreter.CompositeValue)
 	if !ok {
 		dr.reportWriter.Write(
@@ -647,6 +746,24 @@ func (dr *CadenceValueDiffReporter) diffCadenceDictionaryValue(
 	domain string,
 	trace *util.Trace,
 ) (hasDifference bool) {
+
+	defer func() {
+		if r := recover(); r != nil {
+			dr.reportWriter.Write(
+				diffProblem{
+					Address: dr.address.Hex(),
+					Domain:  domain,
+					Kind:    diffErrorKindString[abortErrorKind],
+					Trace:   trace.String(),
+					Msg: fmt.Sprintf(
+						"panic while diffing dictionary: %s",
+						r,
+					),
+				},
+			)
+		}
+	}()
+
 	otherDictionary, ok := other.(*interpreter.DictionaryValue)
 	if !ok {
 		dr.reportWriter.Write(
