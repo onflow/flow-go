@@ -172,6 +172,24 @@ func (suite *Suite) TestInvalidTransaction() {
 		suite.Assert().True(errors.As(err, &access.InvalidScriptError{}))
 	})
 
+	suite.Run("transaction script exceeds parse token limit", func() {
+		unittest.SkipUnless(suite.T(), unittest.TEST_TODO, "https://github.com/dapperlabs/flow-go/issues/6964")
+		// https://github.com/onflow/cadence/blob/master/runtime/parser/lexer/lexer.go#L32
+		const tokenLimit = 1 << 19
+		script := "{};"
+		for len(script) < tokenLimit {
+			script += script
+		}
+
+		tx := unittest.TransactionBodyFixture()
+		tx.ReferenceBlockID = suite.root.ID()
+		tx.Script = []byte("transaction { execute {" + script + "}}")
+
+		err := suite.engine.ProcessTransaction(&tx)
+		suite.Assert().Error(err)
+		suite.Assert().True(errors.As(err, &access.InvalidScriptError{}))
+	})
+
 	suite.Run("invalid signature format", func() {
 		signer := flow.Testnet.Chain().ServiceAddress()
 		keyIndex := uint32(0)
