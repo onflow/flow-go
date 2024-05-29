@@ -68,7 +68,7 @@ func NewRootQCVoter(
 		qcContractClients: contractClients,
 		wait:              time.Second * 10,
 		mu:                sync.Mutex{},
-		stopVoting:        make(chan struct{}),
+		stopVoting:        make(chan struct{}, 1),
 	}
 	return voter
 }
@@ -176,8 +176,9 @@ func (voter *RootQCVoter) Vote(ctx context.Context, epoch protocol.Epoch) error 
 	err = retry.Do(ctx, backoff, func(ctx context.Context) error {
 		select {
 		case <-voter.stopVoting:
-			log.Warn().Msgf("root qc voting exiting stop voting signal encountered")
-			return fmt.Errorf("root qc voting exiting stop voting signal encountered")
+			err := NewQCVoteStoppedError()
+			log.Warn().Err(err).Msgf("root qc voting stopped")
+			return err
 		default:
 			return castVote(ctx)
 		}
