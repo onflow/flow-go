@@ -13,13 +13,14 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 
 	jsoncdc "github.com/onflow/cadence/encoding/json"
-	sdk "github.com/onflow/flow-go-sdk"
-	"github.com/onflow/flow-go-sdk/test"
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 	"github.com/onflow/flow/protobuf/go/flow/executiondata"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+
+	sdk "github.com/onflow/flow-go-sdk"
+	"github.com/onflow/flow-go-sdk/test"
 
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/integration/testnet"
@@ -282,6 +283,7 @@ func SubscribeEventsByBlockHeight(
 		Filter:               filter,
 		HeartbeatInterval:    1,
 	}
+	// nolint
 	stream, err := client.SubscribeEvents(ctx, req)
 	if err != nil {
 		return nil, nil, err
