@@ -3,6 +3,7 @@ package backend
 import (
 	"context"
 	"fmt"
+	"github.com/onflow/flow-go/engine/access/ingestion/version"
 
 	"github.com/rs/zerolog"
 	"go.uber.org/atomic"
@@ -22,6 +23,9 @@ type ScriptExecutor struct {
 	// indexReporter provides information about the current state of the execution state indexer.
 	indexReporter state_synchronization.IndexReporter
 
+	// versionControl provides information about the current version beacon for each block
+	versionControl *version.VersionControl
+
 	// initialized is used to signal that the index and executor are ready
 	initialized *atomic.Bool
 
@@ -32,7 +36,7 @@ type ScriptExecutor struct {
 	maxCompatibleHeight *atomic.Uint64
 }
 
-func NewScriptExecutor(log zerolog.Logger, minHeight, maxHeight uint64) *ScriptExecutor {
+func NewScriptExecutor(log zerolog.Logger, versionControl *version.VersionControl, minHeight, maxHeight uint64) *ScriptExecutor {
 	logger := log.With().Str("component", "script-executor").Logger()
 	logger.Info().
 		Uint64("min_height", minHeight).
@@ -41,6 +45,7 @@ func NewScriptExecutor(log zerolog.Logger, minHeight, maxHeight uint64) *ScriptE
 
 	return &ScriptExecutor{
 		log:                 logger,
+		versionControl:      versionControl,
 		initialized:         atomic.NewBool(false),
 		minCompatibleHeight: atomic.NewUint64(minHeight),
 		maxCompatibleHeight: atomic.NewUint64(maxHeight),
