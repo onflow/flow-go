@@ -697,7 +697,7 @@ func (s *Suite) RunTestEpochJoinAndLeave(role flow.Role, checkNetworkHealth node
 // DynamicEpochTransitionSuite  is the suite used for epoch transitions tests
 // with a dynamic identity table.
 type DynamicEpochTransitionSuite struct {
-	Suite
+	*Suite
 }
 
 func (s *DynamicEpochTransitionSuite) SetupTest() {

@@ -16,7 +16,7 @@ func TestEpochJoinAndLeaveVN(t *testing.T) {
 }
 
 type EpochJoinAndLeaveVNSuite struct {
-	epochs.DynamicEpochTransitionSuite
+	*epochs.DynamicEpochTransitionSuite
 }
 
 func (s *EpochJoinAndLeaveVNSuite) SetupTest() {
