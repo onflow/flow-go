@@ -1691,7 +1691,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		return nil
 	})
 	builder.Module("script executor", func(node *cmd.NodeConfig) error {
-		builder.ScriptExecutor = backend.NewScriptExecutor(builder.Logger, builder.scriptExecMinBlock, builder.scriptExecMaxBlock)
+		builder.ScriptExecutor = backend.NewScriptExecutor(builder.Logger, nil, builder.scriptExecMinBlock, builder.scriptExecMaxBlock)
 		return nil
 	})
 	builder.Component("RPC engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {

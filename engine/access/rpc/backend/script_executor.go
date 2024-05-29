@@ -3,11 +3,11 @@ package backend
 import (
 	"context"
 	"fmt"
-	"github.com/onflow/flow-go/engine/access/ingestion/version"
 
 	"github.com/rs/zerolog"
 	"go.uber.org/atomic"
 
+	"github.com/onflow/flow-go/engine/access/ingestion/version"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/execution"
 	"github.com/onflow/flow-go/module/state_synchronization"
@@ -88,6 +88,12 @@ func (s *ScriptExecutor) Initialize(indexReporter state_synchronization.IndexRep
 func (s *ScriptExecutor) ExecuteAtBlockHeight(ctx context.Context, script []byte, arguments [][]byte, height uint64) ([]byte, error) {
 	if err := s.checkDataAvailable(height); err != nil {
 		return nil, err
+	}
+
+	if !s.versionControl.CompatibleAtBlock(height) {
+		//TODO: Add an error
+		return nil, fmt.Errorf("")
+
 	}
 
 	return s.scriptExecutor.ExecuteAtBlockHeight(ctx, script, arguments, height)
