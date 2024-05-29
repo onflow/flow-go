@@ -90,7 +90,7 @@ func TestRootQCVoter(t *testing.T) {
 	suite.Run(t, new(Suite))
 }
 
-// should fail if this node isn't in any cluster next epoch
+// TestNonClusterParticipant should fail if this node isn't in any cluster next epoch.
 func (suite *Suite) TestNonClusterParticipant() {
 
 	// change our identity so we aren't in the cluster assignment
@@ -100,7 +100,7 @@ func (suite *Suite) TestNonClusterParticipant() {
 	suite.Assert().True(epochs.IsClusterQCNoVoteError(err))
 }
 
-// should fail if we are not in setup phase
+// TestInvalidPhase should fail if we are not in setup phase.
 func (suite *Suite) TestInvalidPhase() {
 
 	suite.phase = flow.EpochPhaseStaking
@@ -109,7 +109,7 @@ func (suite *Suite) TestInvalidPhase() {
 	suite.Assert().True(epochs.IsClusterQCNoVoteError(err))
 }
 
-// should succeed and exit if we've already voted
+// TestAlreadyVoted should succeed and exit if we've already voted.
 func (suite *Suite) TestAlreadyVoted() {
 
 	suite.voted = true
@@ -117,8 +117,17 @@ func (suite *Suite) TestAlreadyVoted() {
 	suite.Assert().NoError(err)
 }
 
-// should succeed and exit if voting succeeds
+// TestVoting should succeed and exit if voting succeeds.
 func (suite *Suite) TestVoting() {
 	err := suite.voter.Vote(context.Background(), suite.epoch)
 	suite.Assert().NoError(err)
+}
+
+// TestStopVoting should stop in progress voting.
+func (suite *Suite) TestStopVoting() {
+	// call stop voting, on the next call to Vote an error should be returned immediately
+	suite.voter.StopVoting()
+	err := suite.voter.Vote(context.Background(), suite.epoch)
+	suite.Assert().Error(err)
+	suite.Assert().True(epochs.IsQCVoteStoppedError(err), "expected QCVoteStoppedError when StopVoting is called during or before a call to Vote")
 }
