@@ -122,6 +122,36 @@ func (setup *EpochSetup) EqualTo(other *EpochSetup) bool {
 	return bytes.Equal(setup.RandomSource, other.RandomSource)
 }
 
+// EpochRecover service event is emitted when network is in Epoch Fallback Mode(EFM) in an attempt to return to happy path.
+// It contains data from EpochSetup, and EpochCommit events to so replicas can create a committed epoch from which they
+// can continue operating on the happy path.
+type EpochRecover struct {
+	EpochSetup
+	EpochCommit
+}
+
+func (er *EpochRecover) ServiceEvent() ServiceEvent {
+	return ServiceEvent{
+		Type:  ServiceEventRecover,
+		Event: er,
+	}
+}
+
+// ID returns the hash of the event contents.
+func (er *EpochRecover) ID() Identifier {
+	return MakeID(er)
+}
+
+func (er *EpochRecover) EqualTo(other *EpochRecover) bool {
+	if !er.EpochSetup.EqualTo(&other.EpochSetup) {
+		return false
+	}
+	if !er.EpochCommit.EqualTo(&other.EpochCommit) {
+		return false
+	}
+	return true
+}
+
 // EpochCommit is a service event emitted when epoch setup has been completed.
 // When an EpochCommit event is emitted, the network is ready to transition to
 // the epoch.

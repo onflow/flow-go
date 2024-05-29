@@ -3,6 +3,7 @@ package flow
 import (
 	"fmt"
 
+	clone "github.com/huandu/go-clone/generic"
 	"golang.org/x/exp/slices"
 )
 
@@ -59,6 +60,21 @@ type EpochStateContainer struct {
 	// epoch are only allowed to listen to the network but not actively contribute. Such
 	// nodes are _not_ part of `Identities`.
 	ActiveIdentities DynamicIdentityEntryList
+
+	// EpochExtensions contains potential EFM-extensions of this epoch. In the happy path
+	// it is nil or empty. An Epoch in which Epoch-Fallback-Mode [EFM] is triggered, will
+	// have at least one extension. By convention, the initial extension must satisfy
+	//   EpochSetup.FinalView + 1 = EpochExtensions[0].FirstView
+	// and each consecutive pair of slice elements must obey
+	//   EpochExtensions[i].FinalView+1 = EpochExtensions[i+1].FirstView
+	EpochExtensions []EpochExtension
+}
+
+// EpochExtension represents a range of views, which contiguously extends this epoch.
+type EpochExtension struct {
+	FirstView     uint64
+	FinalView     uint64
+	TargetEndTime uint64
 }
 
 // ID returns an identifier for this EpochStateContainer by hashing internal fields.
@@ -90,6 +106,7 @@ func (c *EpochStateContainer) Copy() *EpochStateContainer {
 		SetupID:          c.SetupID,
 		CommitID:         c.CommitID,
 		ActiveIdentities: c.ActiveIdentities.Copy(),
+		EpochExtensions:  clone.Clone(c.EpochExtensions),
 	}
 }
 
@@ -149,11 +166,18 @@ func NewRichProtocolStateEntry(
 
 	// If previous epoch is specified: ensure respective epoch service events are not nil and consistent with commitments in `ProtocolStateEntry.PreviousEpoch`
 	if protocolState.PreviousEpoch != nil {
-		if protocolState.PreviousEpoch.SetupID != previousEpochSetup.ID() { // calling ID() will panic is EpochSetup event is nil
+		if protocolState.PreviousEpoch.SetupID != previousEpochSetup.ID() { // calling ID() will panic if EpochSetup event is nil
 			return nil, fmt.Errorf("supplied previous epoch's setup event (%x) does not match commitment (%x) in ProtocolStateEntry", previousEpochSetup.ID(), protocolState.PreviousEpoch.SetupID)
 		}
-		if protocolState.PreviousEpoch.CommitID != previousEpochCommit.ID() { // calling ID() will panic is EpochCommit event is nil
+		if protocolState.PreviousEpoch.CommitID != previousEpochCommit.ID() { // calling ID() will panic if EpochCommit event is nil
 			return nil, fmt.Errorf("supplied previous epoch's commit event (%x) does not match commitment (%x) in ProtocolStateEntry", previousEpochCommit.ID(), protocolState.PreviousEpoch.CommitID)
+		}
+	} else {
+		if previousEpochSetup != nil {
+			return nil, fmt.Errorf("no previous epoch but gotten non-nil EpochSetup event")
+		}
+		if previousEpochCommit != nil {
+			return nil, fmt.Errorf("no previous epoch but gotten non-nil EpochCommit event")
 		}
 	}
 
@@ -175,6 +199,13 @@ func NewRichProtocolStateEntry(
 	var err error
 	nextEpoch := protocolState.NextEpoch
 	if nextEpoch == nil { // in staking phase: build full identity table for current epoch according to (1)
+		if nextEpochSetup != nil {
+			return nil, fmt.Errorf("no next epoch but gotten non-nil EpochSetup event")
+		}
+		if nextEpochCommit != nil {
+			return nil, fmt.Errorf("no next epoch but gotten non-nil EpochCommit event")
+		}
+
 		var previousEpochIdentitySkeletons IdentitySkeletonList
 		var previousEpochDynamicIdentities DynamicIdentityEntryList
 		if previousEpochSetup != nil {
@@ -199,6 +230,10 @@ func NewRichProtocolStateEntry(
 		if nextEpoch.CommitID != ZeroID {
 			if nextEpoch.CommitID != nextEpochCommit.ID() {
 				return nil, fmt.Errorf("supplied next epoch's commit event (%x) does not match commitment (%x) in ProtocolStateEntry", nextEpoch.CommitID, nextEpochCommit.ID())
+			}
+		} else {
+			if nextEpochCommit != nil {
+				return nil, fmt.Errorf("next epoch not yet committed but got EpochCommit event")
 			}
 		}
 
@@ -278,6 +313,17 @@ func (e *RichProtocolStateEntry) Copy() *RichProtocolStateEntry {
 		CurrentEpochIdentityTable: e.CurrentEpochIdentityTable.Copy(),
 		NextEpochIdentityTable:    e.NextEpochIdentityTable.Copy(),
 	}
+}
+
+// CurrentEpochFinalView returns the final view of the current epoch, taking into account possible epoch extensions.
+// If there are no epoch extensions, the final view is the final view of the current epoch setup,
+// otherwise it is the final view of the last epoch extension.
+func (e *RichProtocolStateEntry) CurrentEpochFinalView() uint64 {
+	l := len(e.CurrentEpoch.EpochExtensions)
+	if l > 0 {
+		return e.CurrentEpoch.EpochExtensions[l-1].FinalView
+	}
+	return e.CurrentEpochSetup.FinalView
 }
 
 // EpochPhase returns the current epoch phase.

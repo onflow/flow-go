@@ -27,7 +27,11 @@ type BaseStateMachineSuite struct {
 }
 
 func (s *BaseStateMachineSuite) SetupTest() {
-	s.parentProtocolState = unittest.EpochStateFixture()
+	s.parentProtocolState = unittest.EpochStateFixture(func(entry *flow.RichProtocolStateEntry) {
+		// have a fixed boundary for the current epoch
+		entry.CurrentEpochSetup.FinalView = 5_000
+		entry.CurrentEpoch.SetupID = entry.CurrentEpochSetup.ID()
+	})
 	s.parentBlock = unittest.BlockHeaderFixture(unittest.HeaderWithView(s.parentProtocolState.CurrentEpochSetup.FirstView + 1))
 	s.candidate = unittest.BlockHeaderWithParentFixture(s.parentBlock)
 }
