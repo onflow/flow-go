@@ -34,6 +34,7 @@ type Machine struct {
 }
 
 type CollectionRequester interface {
+	module.ReadyDoneAware
 	WithHandle(requester.HandleFunc)
 }
 
