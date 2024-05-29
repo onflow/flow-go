@@ -23,7 +23,7 @@ import (
 
 	"google.golang.org/grpc/credentials"
 
-	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow/protobuf/go/flow/access"
 
 	"github.com/onflow/flow-go/admin/commands"
 	stateSyncCommands "github.com/onflow/flow-go/admin/commands/state_synchronization"
@@ -37,6 +37,7 @@ import (
 	hotstuffvalidator "github.com/onflow/flow-go/consensus/hotstuff/validator"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
+	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/apiproxy"
 	"github.com/onflow/flow-go/engine/access/rest"
@@ -1620,6 +1621,8 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		}
 
 		rpcHandler := &apiproxy.FlowAccessAPIRouter{
+			UnimplementedAccessAPIServer: access.UnimplementedAccessAPIServer{},
+
 			Logger:   builder.Logger,
 			Metrics:  observerCollector,
 			Upstream: forwarder,

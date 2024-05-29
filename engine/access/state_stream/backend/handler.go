@@ -17,7 +17,8 @@ import (
 )
 
 type Handler struct {
-	api   state_stream.API
+	api state_stream.API
+	executiondata.UnimplementedExecutionDataAPIServer
 	chain flow.Chain
 
 	eventFilterConfig state_stream.EventFilterConfig

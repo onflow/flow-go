@@ -358,6 +358,21 @@ func (b *Backend) GetCollectionByID(_ context.Context, colID flow.Identifier) (*
 	return col, nil
 }
 
+func (b *Backend) GetFullCollectionByID(_ context.Context, colID flow.Identifier) (*flow.Collection, error) {
+	// retrieve the collection from the collection storage
+	col, err := b.collections.ByID(colID)
+	if err != nil {
+		// Collections are retrieved asynchronously as we finalize blocks, so
+		// it is possible for a client to request a finalized block from us
+		// containing some collection, then get a not found error when requesting
+		// that collection. These clients should retry.
+		err = rpc.ConvertStorageError(fmt.Errorf("please retry for collection in finalized block: %w", err))
+		return nil, err
+	}
+
+	return col, nil
+}
+
 func (b *Backend) GetNetworkParameters(_ context.Context) access.NetworkParameters {
 	return access.NetworkParameters{
 		ChainID: b.chainID,
