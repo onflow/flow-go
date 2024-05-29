@@ -89,7 +89,7 @@ func NewVersionControl(
 			Logger()
 	}
 
-	log.Info().Msg("Created")
+	log.Info().Msg("system initialized")
 
 	// Setup component manager for handling worker functions.
 	cm := component.NewComponentManagerBuilder()
@@ -146,7 +146,7 @@ func (v *VersionControl) checkInitialVersionBeacon(
 			// when indexing it
 			ctx.Throw(
 				fmt.Errorf(
-					"failed to parse semver: %w",
+					"failed to parse semver during version control setup: %w",
 					err))
 			return
 		}
