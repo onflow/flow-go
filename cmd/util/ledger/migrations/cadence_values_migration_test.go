@@ -185,11 +185,24 @@ func checkMigratedState(
 
 	visitMigration := &visitMigration{}
 
-	validationMigration.Migrate(
-		validationMigration.NewValueMigrationsPathMigrator(nil, visitMigration),
+	reportWriter := &testReportWriter{}
+
+	errorMessageHandler := &errorMessageHandler{}
+
+	reporter := newValueMigrationReporter(
+		reportWriter,
+		zerolog.Nop(),
+		errorMessageHandler,
+		true,
 	)
 
-	require.Equal(t,
+	validationMigration.Migrate(
+		validationMigration.NewValueMigrationsPathMigrator(reporter, visitMigration),
+	)
+
+	assert.Empty(t, reportWriter.entries)
+
+	assert.Equal(t,
 		[]migrationVisit{
 			{
 				storageKey:    interpreter.StorageKey{Key: "storage", Address: address},
