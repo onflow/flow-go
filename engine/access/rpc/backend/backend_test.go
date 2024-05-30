@@ -1794,8 +1794,9 @@ func (suite *Suite) TestExecutionNodesForBlockID() {
 		expectedList := allExecutionNodes[0:maxNodesCnt]
 		testExecutionNodesForBlockID(preferredENs, nil, expectedList)
 	})
-
-	suite.Run("add nodes in the correct order 2", func() {
+	// if preferredENIdentifiers was set and there are less than maxNodesCnt nodes selected than check the order
+	// of adding ENs ids
+	suite.Run("add nodes in the correct order", func() {
 		//  mark the first EN as preferred
 		preferredENIdentifiers = allExecutionNodes[0:1].NodeIDs()
 		//  mark the fourth EN with receipt
@@ -1816,62 +1817,6 @@ func (suite *Suite) TestExecutionNodesForBlockID() {
 		require.ElementsMatch(suite.T(), chosenIDs, expectedOrder)
 		require.Equal(suite.T(), len(chosenIDs), maxNodesCnt)
 	})
-
-	// Test for correct order of node addition. First add any EN with a receipt and then
-	//any preferred node not already selected
-	//suite.Run("add nodes in the correct order 2", func() {
-	//	// Setup nodes and receipts
-	//	receiptNodes := allExecutionNodes[0:2]   // first two nodes have receipts
-	//	preferredNodes := allExecutionNodes[2:3] // next two nodes are preferred
-	//	additionalNode := allExecutionNodes[4:5] // last node to be added in the final step
-	//
-	//	// Set up the preferred and additional nodes to ensure the order is checked
-	//	attempt1Receipts = flow.ExecutionReceiptList{
-	//		receipts[0], // First receipt node
-	//		receipts[1], // Second receipt node
-	//	}
-	//	attempt2Receipts = attempt1Receipts
-	//	attempt3Receipts = attempt1Receipts
-	//
-	//	suite.state.On("AtBlockID", mock.Anything).Return(suite.snapshot)
-	//	expectedOrder := flow.IdentityList{
-	//		receiptNodes[0],   // Nodes with receipts
-	//		preferredNodes[0], // Preferred nodes
-	//		additionalNode[0], // Additional node not already selected
-	//	}
-	//
-	//	expectedList := allExecutionNodes[0:maxNodesCnt]
-	//
-	//	testExecutionNodesForBlockID(preferredNodes, nil, expectedList)
-	//})
-	//
-	//suite.Run("add nodes in the correct order 3", func() {
-	//	// Setup nodes and receipts
-	//	//receiptNodes := allExecutionNodes[0:1]   // first two nodes have receipts
-	//
-	//	preferredENs := unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
-	//	//additionalNode := allExecutionNodes[4:5] // last node to be added in the final step
-	//
-	//	// Set up the preferred and additional nodes to ensure the order is checked
-	//	attempt1Receipts = flow.ExecutionReceiptList{
-	//		receipts[0], // First receipt node
-	//		receipts[1], // Second receipt node
-	//	}
-	//	attempt2Receipts = attempt1Receipts
-	//	attempt3Receipts = attempt1Receipts
-	//
-	//	suite.state.On("AtBlockID", mock.Anything).Return(suite.snapshot)
-	//	//expectedOrder := flow.IdentityList{
-	//	//	receiptNodes[0],   // Nodes with receipts
-	//	//	preferredNodes[0], // Preferred nodes
-	//	//	additionalNode[0], // Additional node not already selected
-	//	//}
-	//
-	//	expectedList := allExecutionNodes[0:maxNodesCnt]
-	//
-	//	testExecutionNodesForBlockID(preferredENs, nil, expectedList)
-	//})
-
 }
 
 // TestGetTransactionResultEventEncodingVersion tests the GetTransactionResult function with different event encoding versions.
