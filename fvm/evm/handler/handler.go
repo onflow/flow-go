@@ -1,16 +1,15 @@
 package handler
 
 import (
-	"encoding/json"
 	"math/big"
 
 	"github.com/onflow/cadence/runtime/common"
 	gethCommon "github.com/onflow/go-ethereum/common"
 	gethTypes "github.com/onflow/go-ethereum/core/types"
-	"github.com/onflow/go-ethereum/eth/tracers"
 
 	"github.com/onflow/flow-go/fvm/environment"
 	fvmErrors "github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/fvm/evm/debug"
 	"github.com/onflow/flow-go/fvm/evm/handler/coa"
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/model/flow"
@@ -324,6 +323,11 @@ func (h *ContractHandler) run(
 	if err != nil {
 		return nil, err
 	}
+
+	if h.tracingEnabled {
+		ctx.Tracer.Upload()
+	}
+
 	return res, nil
 }
 
@@ -424,33 +428,7 @@ func (h *ContractHandler) getBlockContext() (types.BlockContext, error) {
 		return types.BlockContext{}, err
 	}
 
-	// todo temporray
-	var tracer tracers.Tracer
-	if h.tracingEnabled {
-		h, err := bp.Hash()
-		if err != nil {
-			return types.BlockContext{}, err
-		}
-		// todo redesign where we fill in the information
-		txCtx := tracers.Context{
-			BlockHash:   h,
-			BlockNumber: big.NewInt(int64(bp.Height)),
-			TxIndex:     0,                 // todo not correct or availalbe at this stage
-			TxHash:      gethCommon.Hash{}, // todo not correct or availalbe at this stage
-		}
-
-		tracerConf := json.RawMessage{}
-		if err := tracerConf.UnmarshalJSON([]byte(`{ "onlyTopCall": true }`)); err != nil {
-			return types.BlockContext{}, err
-		}
-
-		tracer, err = tracers.DefaultDirectory.New("callTracer", &txCtx, tracerConf)
-		if err != nil {
-			return types.BlockContext{}, err
-		}
-	}
-
-	return types.BlockContext{
+	ctx := types.BlockContext{
 		ChainID:                types.EVMChainIDFromFlowChainID(h.flowChainID),
 		BlockNumber:            bp.Height,
 		BlockTimestamp:         bp.Timestamp,
@@ -462,8 +440,17 @@ func (h *ContractHandler) getBlockContext() (types.BlockContext, error) {
 		},
 		ExtraPrecompiles: h.precompiles,
 		Random:           rand,
-		Tracer:           tracer,
-	}, nil
+	}
+
+	if h.tracingEnabled {
+		tracer, err := debug.NewTransactionTracer()
+		if err != nil {
+			return types.BlockContext{}, err
+		}
+		ctx.Tracer = tracer
+	}
+
+	return ctx, nil
 }
 
 func (h *ContractHandler) executeAndHandleCall(
