@@ -69,6 +69,8 @@ func NewAccessCollectionFetcher(
 		return nil, fmt.Errorf("failed to connect to collection rpc: %w", err)
 	}
 
+	lg.Info().Msgf("connected to access rpc at %s", accessAddress)
+
 	noopHandler := func(flow.Identifier, flow.Entity) {}
 	e := &AccessCollectionFetcher{
 		log:            lg,
@@ -76,7 +78,7 @@ func NewAccessCollectionFetcher(
 		client:         access.NewAccessAPIClient(collectionRPCConn),
 		chain:          chain,
 		originID:       nodeID,
-		guaranteeInfos: make(chan guaranteeInfo, 100),
+		guaranteeInfos: make(chan guaranteeInfo, 10000),
 	}
 
 	builder := component.NewComponentManagerBuilder().AddWorker(e.launchWorker)
@@ -98,6 +100,7 @@ func convertAccessAddrFromState(address string) string {
 }
 
 func (f *AccessCollectionFetcher) FetchCollection(blockID flow.Identifier, height uint64, guarantee *flow.CollectionGuarantee) error {
+	f.log.Info().Msgf("fetching collection %v, block %v, height %v", guarantee.CollectionID, blockID, height)
 	f.guaranteeInfos <- guaranteeInfo{
 		blockID: blockID,
 		height:  height,
@@ -116,6 +119,8 @@ func (f *AccessCollectionFetcher) WithHandle(handler requester.HandleFunc) {
 
 func (f *AccessCollectionFetcher) launchWorker(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
+
+	f.log.Info().Msg("launching collection fetcher worker")
 
 	for {
 		select {
