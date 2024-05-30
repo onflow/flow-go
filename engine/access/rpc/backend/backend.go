@@ -583,11 +583,15 @@ func chooseFromPreferredENIDs(allENs flow.IdentityList, executorIDs flow.Identif
 		filter.HasNodeID[flow.Identity](executorIDs...),
 	))
 
+	if len(chosenIDs) >= maxNodesCnt {
+		return chosenIDs
+	}
+
 	// function to add nodes to chosenIDs if they are not already included
 	addIfNotExists := func(candidates flow.IdentityList) {
 		for _, en := range candidates {
 			_, exists := chosenIDs.ByNodeID(en.NodeID)
-			if !exists && len(chosenIDs) < maxNodesCnt {
+			if !exists {
 				chosenIDs = append(chosenIDs, en)
 				if len(chosenIDs) >= maxNodesCnt {
 					return
