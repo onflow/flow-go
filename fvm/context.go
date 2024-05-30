@@ -7,6 +7,7 @@ import (
 	otelTrace "go.opentelemetry.io/otel/trace"
 
 	"github.com/onflow/flow-go/fvm/environment"
+	"github.com/onflow/flow-go/fvm/evm/debug"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/fvm/storage/state"
@@ -29,7 +30,6 @@ type Context struct {
 	// limits and set them to MaxUint64, effectively disabling these limits.
 	DisableMemoryAndInteractionLimits bool
 	EVMEnabled                        bool
-	EVMTracingEnabled                 bool
 	ComputationLimit                  uint64
 	MemoryLimit                       uint64
 	MaxStateKeySize                   uint64
@@ -47,6 +47,8 @@ type Context struct {
 	// AllowProgramCacheWritesInScripts determines if the program cache can be written to in scripts
 	// By default, the program cache is only updated by transactions.
 	AllowProgramCacheWritesInScripts bool
+
+	debug.EVMDebugParams
 }
 
 // NewContext initializes a new execution context with the provided options.
