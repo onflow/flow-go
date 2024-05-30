@@ -4,6 +4,9 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/onflow/flow-go/fvm/environment"
+	"github.com/onflow/flow-go/fvm/tracing"
+
 	"github.com/onflow/cadence/runtime/parser"
 	"github.com/onflow/crypto"
 
@@ -155,6 +158,11 @@ func (v *TransactionValidator) Validate(tx *flow.TransactionBody) (err error) {
 	}
 
 	err = v.checkSignatureDuplications(tx)
+	if err != nil {
+		return err
+	}
+
+	err = v.checkSufficientFlowAmountToPayForTransaction(tx)
 	if err != nil {
 		return err
 	}
@@ -344,6 +352,19 @@ func (v *TransactionValidator) checkSignatureFormat(tx *flow.TransactionBody) er
 	}
 
 	return nil
+}
+
+func (v *TransactionValidator) checkSufficientFlowAmountToPayForTransaction(tx *flow.TransactionBody) error {
+	tracer := tracing.NewMockTracerSpan()
+	systemContracts := environment.NewSystemContracts(
+		v.chain,
+		tracer,
+		environment.NewProgramLogger(tracer, environment.DefaultProgramLoggerParams()),
+		environment.NewRuntime(environment.DefaultRuntimeParams()),
+	)
+
+	_, err := systemContracts.CheckPayerBalanceAndGetMaxTxFees(tx.Payer, tx.InclusionEffort(), tx.GasLimit)
+	return err
 }
 
 func remove(s []string, r string) []string {
