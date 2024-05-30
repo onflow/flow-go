@@ -209,7 +209,7 @@ func (m *FixSlabsWithBrokenReferencesMigration) writeBrokenPayloads() error {
 
 func getAtreePayloadsByID(
 	registers *registers.AccountRegisters,
-	ids map[atree.StorageID][]atree.StorageID,
+	ids map[atree.SlabID][]atree.SlabID,
 ) (
 	[]*ledger.Payload,
 	error,
@@ -225,12 +225,12 @@ func getAtreePayloadsByID(
 			return nil
 		}
 
-		storageID := atree.NewStorageID(
+		slabID := atree.NewSlabID(
 			atree.Address([]byte(owner)),
-			atree.StorageIndex([]byte(key[1:])),
+			atree.SlabIndex([]byte(key[1:])),
 		)
 
-		_, ok := ids[storageID]
+		_, ok := ids[slabID]
 		if !ok {
 			return nil
 		}

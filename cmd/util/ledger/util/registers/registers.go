@@ -343,7 +343,7 @@ func (l ReadOnlyLedger) SetValue(_, _, _ []byte) error {
 	panic("unexpected call of SetValue")
 }
 
-func (l ReadOnlyLedger) AllocateStorageIndex(_ []byte) (atree.StorageIndex, error) {
+func (l ReadOnlyLedger) AllocateSlabIndex(_ []byte) (atree.SlabIndex, error) {
 	panic("unexpected call of AllocateStorageIndex")
 }
 

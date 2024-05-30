@@ -49,6 +49,7 @@ var (
 	flagFixSlabsWithBrokenReferences       bool
 	flagFilterUnreferencedSlabs            bool
 	flagCPUProfile                         string
+	flagReportMetrics                      bool
 )
 
 var Cmd = &cobra.Command{
@@ -163,6 +164,9 @@ func init() {
 
 	Cmd.Flags().StringVar(&flagCPUProfile, "cpu-profile", "",
 		"enable CPU profiling")
+
+	Cmd.Flags().BoolVar(&flagReportMetrics, "report-metrics", false,
+		"report migration metrics")
 }
 
 func run(*cobra.Command, []string) {
@@ -375,6 +379,7 @@ func run(*cobra.Command, []string) {
 		VerboseErrorOutput:                flagVerboseErrorOutput,
 		FixSlabsWithBrokenReferences:      chainID == flow.Testnet && flagFixSlabsWithBrokenReferences,
 		FilterUnreferencedSlabs:           flagFilterUnreferencedSlabs,
+		ReportMetrics:                     flagReportMetrics,
 	}
 
 	if len(flagInputPayloadFileName) > 0 {
