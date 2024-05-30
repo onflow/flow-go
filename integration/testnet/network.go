@@ -1165,7 +1165,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 	}
 	root.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(
 		networkConf.KVStoreFactory(
-			inmem.ProtocolStateFromEpochServiceEvents(epochSetup, epochCommit).ID(),
+			inmem.EpochProtocolStateFromServiceEvents(epochSetup, epochCommit).ID(),
 		).ID(),
 	)))
 
