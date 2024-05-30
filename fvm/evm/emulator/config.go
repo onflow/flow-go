@@ -9,6 +9,7 @@ import (
 	gethVM "github.com/onflow/go-ethereum/core/vm"
 	gethParams "github.com/onflow/go-ethereum/params"
 
+	"github.com/onflow/flow-go/fvm/evm/debug"
 	"github.com/onflow/flow-go/fvm/evm/types"
 )
 
@@ -209,9 +210,11 @@ func WithRandom(rand *gethCommon.Hash) Option {
 }
 
 // WithTransactionTracer sets a transaction tracer
-func WithTransactionTracer(tracer gethVM.EVMLogger) Option {
+func WithTransactionTracer(tracer *debug.TransactionTracer) Option {
 	return func(c *Config) *Config {
-		c.EVMConfig.Tracer = tracer
+		if tracer != nil {
+			c.EVMConfig.Tracer = tracer.Tracer()
+		}
 		return c
 	}
 }
