@@ -600,25 +600,22 @@ func chooseFromPreferredENIDs(allENs flow.IdentityList, executorIDs flow.Identif
 		}
 	}
 
-	// pad the list if needed
-	if len(chosenIDs) < maxNodesCnt {
-		// add any EN with a receipt
-		receiptENs := allENs.Filter(filter.HasNodeID[flow.Identity](executorIDs...))
-		addIfNotExists(receiptENs)
-		if len(chosenIDs) >= maxNodesCnt {
-			return chosenIDs
-		}
-
-		// add any preferred node not already selected
-		preferredENs := allENs.Filter(filter.HasNodeID[flow.Identity](preferredENIdentifiers...))
-		addIfNotExists(preferredENs)
-		if len(chosenIDs) >= maxNodesCnt {
-			return chosenIDs
-		}
-
-		// add any EN not already selected
-		addIfNotExists(allENs)
+	// add any EN with a receipt
+	receiptENs := allENs.Filter(filter.HasNodeID[flow.Identity](executorIDs...))
+	addIfNotExists(receiptENs)
+	if len(chosenIDs) >= maxNodesCnt {
+		return chosenIDs
 	}
+
+	// add any preferred node not already selected
+	preferredENs := allENs.Filter(filter.HasNodeID[flow.Identity](preferredENIdentifiers...))
+	addIfNotExists(preferredENs)
+	if len(chosenIDs) >= maxNodesCnt {
+		return chosenIDs
+	}
+
+	// add any EN not already selected
+	addIfNotExists(allENs)
 
 	return chosenIDs
 }
