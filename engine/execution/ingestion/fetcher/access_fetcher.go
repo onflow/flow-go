@@ -107,6 +107,9 @@ func convertAccessAddrFromState(address string) string {
 }
 
 func (f *AccessCollectionFetcher) FetchCollection(blockID flow.Identifier, height uint64, guarantee *flow.CollectionGuarantee) error {
+	f.log.Debug().Hex("blockID", blockID[:]).Uint64("height", height).Hex("col_id", guarantee.CollectionID[:]).
+		Msgf("fetching collection guarantee")
+
 	f.guaranteeInfos <- guaranteeInfo{
 		blockID: blockID,
 		height:  height,
