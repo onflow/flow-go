@@ -69,6 +69,15 @@ func NewAccessCollectionFetcher(
 		return nil, fmt.Errorf("failed to connect to collection rpc: %w", err)
 	}
 
+	lg.Info().Msgf("connected to access rpc at %s", accessAddress)
+
+	// make a large enough buffer so that it is able to hold all the guarantees
+	// on startup and not block the main thread.
+	// this case would only happen if there are lots of un-executed finalized blocks.
+	// making sure the --enable-new-ingestion-engine=true flag is on to make use
+	// of the new ingestion engine for catching up, which loads less un-executed blocks
+	// during startup.
+	bufferSize := 100_000
 	noopHandler := func(flow.Identifier, flow.Entity) {}
 	e := &AccessCollectionFetcher{
 		log:            lg,
@@ -76,7 +85,7 @@ func NewAccessCollectionFetcher(
 		client:         access.NewAccessAPIClient(collectionRPCConn),
 		chain:          chain,
 		originID:       nodeID,
-		guaranteeInfos: make(chan guaranteeInfo, 100),
+		guaranteeInfos: make(chan guaranteeInfo, bufferSize),
 	}
 
 	builder := component.NewComponentManagerBuilder().AddWorker(e.launchWorker)
@@ -98,6 +107,9 @@ func convertAccessAddrFromState(address string) string {
 }
 
 func (f *AccessCollectionFetcher) FetchCollection(blockID flow.Identifier, height uint64, guarantee *flow.CollectionGuarantee) error {
+	f.log.Debug().Hex("blockID", blockID[:]).Uint64("height", height).Hex("col_id", guarantee.CollectionID[:]).
+		Msgf("fetching collection guarantee")
+
 	f.guaranteeInfos <- guaranteeInfo{
 		blockID: blockID,
 		height:  height,
@@ -116,6 +128,8 @@ func (f *AccessCollectionFetcher) WithHandle(handler requester.HandleFunc) {
 
 func (f *AccessCollectionFetcher) launchWorker(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
+
+	f.log.Info().Msg("launching collection fetcher worker")
 
 	for {
 		select {
