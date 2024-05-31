@@ -51,4 +51,9 @@ func TestCallTracer(t *testing.T) {
 
 		tracer.Collect(txID)
 	})
+
+	t.Run("nop tracer", func(t *testing.T) {
+		tracer := NopTracer{}
+		require.Nil(t, tracer.TxTracer())
+	})
 }
