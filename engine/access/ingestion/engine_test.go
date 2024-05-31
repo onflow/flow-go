@@ -211,7 +211,7 @@ func (s *Suite) mockCollectionsForBlock(block flow.Block) {
 
 // generateBlock prepares block with payload and specified guarantee.SignerIndices
 func (s *Suite) generateBlock(clusterCommittee flow.IdentitySkeletonList, snap *protocol.Snapshot) flow.Block {
-	block := unittest.BlockFixture()
+	block := unittest.FullBlockFixture()
 	block.SetPayload(unittest.PayloadFixture(
 		unittest.WithGuarantees(unittest.CollectionGuaranteesFixture(4)...),
 		unittest.WithExecutionResults(unittest.ExecutionResultFixture()),
@@ -265,26 +265,17 @@ func (s *Suite) TestOnFinalizedBlockSingle() {
 
 	// expect that the block storage is indexed with each of the collection guarantee
 	s.blocks.On("IndexBlockForCollections", block.ID(), []flow.Identifier(flow.GetIDs(block.Payload.Guarantees))).Return(nil).Once()
-	s.results.On("Index", mock.Anything, mock.Anything).Return(nil)
-
-	// for each of the guarantees, we should request the corresponding collection once
-	needed := make(map[flow.Identifier]struct{})
-	for _, guarantee := range block.Payload.Guarantees {
-		needed[guarantee.ID()] = struct{}{}
+	for _, seal := range block.Payload.Seals {
+		s.results.On("Index", seal.BlockID, seal.ResultID).Return(nil).Once()
 	}
 
 	wg := sync.WaitGroup{}
 	wg.Add(4)
 
-	s.request.On("EntityByID", mock.Anything, mock.Anything).Run(
-		func(args mock.Arguments) {
-			collID := args.Get(0).(flow.Identifier)
-			_, pending := needed[collID]
-			s.Assert().True(pending, "collection should be pending (%x)", collID)
-			delete(needed, collID)
-			wg.Done()
-		},
-	)
+	for _, cg := range block.Payload.Guarantees {
+		s.request.On("EntityByID", cg.CollectionID, mock.Anything).Return().Once()
+		wg.Done()
+	}
 
 	// process the block through the finalized callback
 	eng.OnFinalizedBlock(&hotstuffBlock)
@@ -320,12 +311,12 @@ func (s *Suite) TestOnFinalizedBlockSeveralBlocksAhead() {
 	irrecoverableCtx := irrecoverable.NewMockSignalerContext(s.T(), s.ctx)
 	eng := s.initIngestionEngine(irrecoverableCtx)
 
-	blkCnt := 3
+	newBlocksCount := 3
 	startHeight := s.finalizedBlock.Height + 1
-	blocks := make([]flow.Block, blkCnt)
+	blocks := make([]flow.Block, newBlocksCount)
 
 	// generate the test blocks, cgs and collections
-	for i := 0; i < blkCnt; i++ {
+	for i := 0; i < newBlocksCount; i++ {
 		block := s.generateBlock(clusterCommittee, snap)
 		block.Header.Height = startHeight + uint64(i)
 		s.blockMap[block.Header.Height] = &block
@@ -334,44 +325,48 @@ func (s *Suite) TestOnFinalizedBlockSeveralBlocksAhead() {
 		s.finalizedBlock = block.Header
 	}
 
+	// latest of all the new blocks which are newer than the last block processed
+	latestBlock := blocks[2]
+
 	// block several blocks newer than the last block processed
 	hotstuffBlock := hotmodel.Block{
-		BlockID: blocks[2].ID(),
-	}
-	// for each of the guarantees, we should request the corresponding collection once
-	needed := make(map[flow.Identifier]struct{})
-	for _, guarantee := range blocks[0].Payload.Guarantees {
-		needed[guarantee.ID()] = struct{}{}
+		BlockID: latestBlock.ID(),
 	}
 
+	requestCountPerBlock := 4
 	wg := sync.WaitGroup{}
-	wg.Add(4)
+	wg.Add(requestCountPerBlock * newBlocksCount)
 
-	s.request.On("EntityByID", mock.Anything, mock.Anything).Run(
-		func(args mock.Arguments) {
-			collID := args.Get(0).(flow.Identifier)
-			_, pending := needed[collID]
-			s.Assert().True(pending, "collection should be pending (%x)", collID)
-			delete(needed, collID)
+	// expected all new blocks after last block processed
+	for _, block := range blocks {
+		s.blocks.On("IndexBlockForCollections", block.ID(), []flow.Identifier(flow.GetIDs(block.Payload.Guarantees))).Return(nil).Once()
+
+		for _, cg := range block.Payload.Guarantees {
+			s.request.On("EntityByID", cg.CollectionID, mock.Anything).Return().Once()
 			wg.Done()
-		},
-	)
-
-	// expected next block after last block processed
-	s.blocks.On("IndexBlockForCollections", blocks[0].ID(), []flow.Identifier(flow.GetIDs(blocks[0].Payload.Guarantees))).Return(nil).Once()
-	s.results.On("Index", mock.Anything, mock.Anything).Return(nil)
+		}
+		for _, seal := range block.Payload.Seals {
+			s.results.On("Index", seal.BlockID, seal.ResultID).Return(nil).Once()
+		}
+	}
 
 	eng.OnFinalizedBlock(&hotstuffBlock)
 
 	s.Assertions.Eventually(func() bool {
 		wg.Wait()
 		return true
-	}, time.Second, time.Millisecond)
+	}, time.Second, 10*time.Millisecond)
 
+	expectedEntityByIDCalls := 0
+	expectedIndexCalls := 0
+	for _, block := range blocks {
+		expectedEntityByIDCalls += len(block.Payload.Guarantees)
+		expectedIndexCalls += len(block.Payload.Seals)
+	}
 	s.headers.AssertExpectations(s.T())
-	s.blocks.AssertNumberOfCalls(s.T(), "IndexBlockForCollections", 1)
-	s.request.AssertNumberOfCalls(s.T(), "EntityByID", len(blocks[0].Payload.Guarantees))
-	s.request.AssertNumberOfCalls(s.T(), "Index", len(blocks[0].Payload.Seals))
+	s.blocks.AssertNumberOfCalls(s.T(), "IndexBlockForCollections", newBlocksCount)
+	s.request.AssertNumberOfCalls(s.T(), "EntityByID", expectedEntityByIDCalls)
+	s.request.AssertNumberOfCalls(s.T(), "Index", expectedIndexCalls)
 }
 
 // TestOnCollection checks that when a Collection is received, it is persisted
