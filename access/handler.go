@@ -8,7 +8,6 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	"github.com/onflow/flow-go/module/state_synchronization/indexer"
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/signature"
 	"github.com/onflow/flow-go/engine/access/subscription"
@@ -18,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/counters"
 	"github.com/onflow/flow-go/module/state_synchronization"
+	"github.com/onflow/flow-go/module/state_synchronization/indexer"
 
 	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/flow/protobuf/go/flow/entities"
@@ -230,7 +230,10 @@ func (h *Handler) GetFullCollectionByID(
 	ctx context.Context,
 	req *access.GetFullCollectionByIDRequest,
 ) (*access.FullCollectionResponse, error) {
-	metadata := h.buildMetadataResponse()
+	metadata, err := h.buildMetadataResponse()
+	if err != nil {
+		return nil, err
+	}
 
 	id, err := convert.CollectionID(req.GetId())
 	if err != nil {
@@ -1281,8 +1284,9 @@ func (h *Handler) blockHeaderResponse(header *flow.Header, status flow.BlockStat
 }
 
 // buildMetadataResponse builds and returns the metadata response object.
-// Expected error returns during normal operations:
-// - codes.Internal if an error is encountered getting the highest indexed height from indexer.
+// Expected errors during normal operation:
+//   - codes.NotFound if result cannot be provided by storage due to the absence of data.
+//   - storage.ErrHeightNotIndexed when data is unavailable
 func (h *Handler) buildMetadataResponse() (*entities.Metadata, error) {
 	lastFinalizedHeader := h.finalizedHeaderCache.Get()
 	blockId := lastFinalizedHeader.ID()
