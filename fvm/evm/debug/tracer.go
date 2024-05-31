@@ -4,12 +4,13 @@ import (
 	"encoding/json"
 	"fmt"
 
+	gethCommon "github.com/onflow/go-ethereum/common"
 	"github.com/onflow/go-ethereum/eth/tracers"
 )
 
 type EVMTracer interface {
 	TxTracer() tracers.Tracer
-	Collect()
+	Collect(id gethCommon.Hash)
 }
 
 var _ EVMTracer = &CallTracer{}
@@ -36,13 +37,13 @@ func (t *CallTracer) TxTracer() tracers.Tracer {
 	return t.tracer
 }
 
-func (t *CallTracer) Collect() {
+func (t *CallTracer) Collect(id gethCommon.Hash) {
 	res, err := t.tracer.GetResult()
 	if err != nil {
 		fmt.Println(err)
 	}
 
-	err = t.uploader.Upload(res)
+	err = t.uploader.Upload(id.String(), res)
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -56,4 +57,4 @@ func (n NopTracer) TxTracer() tracers.Tracer {
 	return nil
 }
 
-func (n NopTracer) Collect() {}
+func (n NopTracer) Collect(_ gethCommon.Hash) {}
