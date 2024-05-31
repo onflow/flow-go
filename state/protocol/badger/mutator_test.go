@@ -2002,7 +2002,8 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 
 	// assertCorrectRecovery checks that the recovery epoch is correctly setup.
 	// We expect the next epoch will use setup and commit events from EpochRecover service event.
-	// According to the specification, recovery epoch has to be in committed phase since it contains EpochSetup and EpochCommit events.
+	// According to the specification, the current epoch after processing an EpochRecover event must be in committed phase,
+	// since it contains EpochSetup and EpochCommit events.
 	assertCorrectRecovery := func(state *protocol.ParticipantState, epochRecover *flow.EpochRecover) {
 		epochState, err := state.Final().EpochProtocolState()
 		require.NoError(t, err)
@@ -2016,7 +2017,7 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 
 		require.Equal(t, &epochRecover.EpochSetup, nextEpochSetup, "next epoch has to be setup according to EpochRecover")
 		require.Equal(t, &epochRecover.EpochCommit, nextEpochCommit, "next epoch has to be committed according to EpochRecover")
-		require.Equal(t, flow.EpochPhaseCommitted, epochPhase, "next epoch has to be in committed phase")
+		require.Equal(t, flow.EpochPhaseCommitted, epochPhase, "next epoch has to be committed")
 	}
 
 	// if we enter EFM in the EpochStaking phase, we should be able to recover by incorporating a valid EpochRecover event
@@ -2041,7 +2042,6 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 
 			epoch1Setup := rootResult.ServiceEvents[0].Event.(*flow.EpochSetup)
 
-			// finalizing block 1 should trigger EFM
 			metricsMock.On("EpochEmergencyFallbackTriggered").Once()
 			protoEventsMock.On("EpochEmergencyFallbackTriggered").Once()
 
@@ -2129,7 +2129,6 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 
 			epoch1Setup := rootResult.ServiceEvents[0].Event.(*flow.EpochSetup)
 
-			// finalizing block 1 should trigger EFM
 			metricsMock.On("EpochEmergencyFallbackTriggered").Once()
 			protoEventsMock.On("EpochEmergencyFallbackTriggered").Once()
 
@@ -2251,7 +2250,6 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 
 			epoch1Setup := rootResult.ServiceEvents[0].Event.(*flow.EpochSetup)
 
-			// finalizing block 1 should trigger EFM
 			metricsMock.On("EpochEmergencyFallbackTriggered").Once()
 			protoEventsMock.On("EpochEmergencyFallbackTriggered").Once()
 

@@ -185,7 +185,7 @@ func buildNextEpochActiveParticipants(activeIdentitiesLookup map[flow.Identifier
 
 		// sanity checking invariant (II.i):
 		currentEpochDynamicProperties, found := activeIdentitiesLookup[nextEpochIdentitySkeleton.NodeID]
-		if found && currentEpochDynamicProperties.Ejected { // invariance violated
+		if found && currentEpochDynamicProperties.Ejected { // invariant violated
 			return nil, protocol.NewInvalidServiceEventErrorf("node %v is ejected in current epoch %d but readmitted by EpochSetup event for epoch %d", nextEpochIdentitySkeleton.NodeID, currentEpochSetup.Counter, nextEpochSetup.Counter)
 		}
 
