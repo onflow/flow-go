@@ -9,6 +9,8 @@ import (
 	"cloud.google.com/go/storage"
 )
 
+const bucketName = "evm-tx-trace"
+
 type Uploader interface {
 	Upload(id string, data json.RawMessage) error
 }
@@ -28,7 +30,6 @@ func NewGCPUploader() (*GCPUploader, error) {
 	if err != nil {
 		return nil, fmt.Errorf("cannot create GCP Bucket client: %w", err)
 	}
-	const bucketName = "evm-tx-trace"
 	bucket := client.Bucket(bucketName)
 
 	// try accessing buckets to validate settings
