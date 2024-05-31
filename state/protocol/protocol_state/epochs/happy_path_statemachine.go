@@ -30,7 +30,7 @@ var _ StateMachine = (*HappyPathStateMachine)(nil)
 // NewHappyPathStateMachine creates a new HappyPathStateMachine.
 // An exception is returned in case the `InvalidEpochTransitionAttempted` flag is set in the `parentState`. This means that
 // the protocol state evolution has reached an undefined state from the perspective of the happy path state machine.
-func NewHappyPathStateMachine(view uint64, parentState *flow.RichProtocolStateEntry) (*HappyPathStateMachine, error) {
+func NewHappyPathStateMachine(view uint64, parentState *flow.RichEpochProtocolStateEntry) (*HappyPathStateMachine, error) {
 	if parentState.InvalidEpochTransitionAttempted {
 		return nil, irrecoverable.NewExceptionf("cannot create happy path protocol state machine at view (%d) for a parent state"+
 			"which is in Epoch Fallback Mode", view)
@@ -38,7 +38,7 @@ func NewHappyPathStateMachine(view uint64, parentState *flow.RichProtocolStateEn
 	return &HappyPathStateMachine{
 		baseStateMachine: baseStateMachine{
 			parentState: parentState,
-			state:       parentState.ProtocolStateEntry.Copy(),
+			state:       parentState.EpochProtocolStateEntry.Copy(),
 			view:        view,
 		},
 	}, nil
@@ -57,7 +57,7 @@ func NewHappyPathStateMachine(view uint64, parentState *flow.RichProtocolStateEn
 //     CAUTION: the HappyPathStateMachine is left with a potentially dysfunctional state when this error occurs. Do NOT call the Build method
 //     after such error and discard the HappyPathStateMachine!
 func (u *HappyPathStateMachine) ProcessEpochSetup(epochSetup *flow.EpochSetup) (bool, error) {
-	err := protocol.IsValidExtendingEpochSetup(epochSetup, u.parentState.ProtocolStateEntry, u.parentState.CurrentEpochSetup)
+	err := protocol.IsValidExtendingEpochSetup(epochSetup, u.parentState.EpochProtocolStateEntry, u.parentState.CurrentEpochSetup)
 	if err != nil {
 		return false, fmt.Errorf("invalid epoch setup event: %w", err)
 	}
@@ -65,7 +65,7 @@ func (u *HappyPathStateMachine) ProcessEpochSetup(epochSetup *flow.EpochSetup) (
 		return false, protocol.NewInvalidServiceEventErrorf("repeated setup for epoch %d", epochSetup.Counter)
 	}
 
-	// When observing setup event for subsequent epoch, construct the EpochStateContainer for `ProtocolStateEntry.NextEpoch`.
+	// When observing setup event for subsequent epoch, construct the EpochStateContainer for `EpochProtocolStateEntry.NextEpoch`.
 	// Context:
 	// Note that the `EpochStateContainer.ActiveIdentities` only contains the nodes that are *active* in the next epoch. Active means
 	// that these nodes are authorized to contribute to extending the chain. Nodes are listed in `ActiveIdentities` if and only if
@@ -144,7 +144,7 @@ func (u *HappyPathStateMachine) ProcessEpochCommit(epochCommit *flow.EpochCommit
 	if u.state.NextEpoch.CommitID != flow.ZeroID {
 		return false, protocol.NewInvalidServiceEventErrorf("protocol state has already a commit event")
 	}
-	err := protocol.IsValidExtendingEpochCommit(epochCommit, u.parentState.ProtocolStateEntry, u.parentState.NextEpochSetup)
+	err := protocol.IsValidExtendingEpochCommit(epochCommit, u.parentState.EpochProtocolStateEntry, u.parentState.NextEpochSetup)
 	if err != nil {
 		return false, fmt.Errorf("invalid epoch commit event: %w", err)
 	}
@@ -174,7 +174,7 @@ func (u *HappyPathStateMachine) TransitionToNextEpoch() error {
 	if u.view < u.parentState.NextEpochSetup.FirstView {
 		return fmt.Errorf("protocol state transition is only allowed when enterring next epoch")
 	}
-	u.state = &flow.ProtocolStateEntry{
+	u.state = &flow.EpochProtocolStateEntry{
 		PreviousEpoch:                   &u.state.CurrentEpoch,
 		CurrentEpoch:                    *u.state.NextEpoch,
 		InvalidEpochTransitionAttempted: false,
