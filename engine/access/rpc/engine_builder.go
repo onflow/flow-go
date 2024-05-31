@@ -4,20 +4,21 @@ import (
 	"fmt"
 
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
+	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
+	legacyaccessproto "github.com/onflow/flow/protobuf/go/flow/legacy/access"
 
 	"github.com/onflow/flow-go/access"
 	legacyaccess "github.com/onflow/flow-go/access/legacy"
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/module"
-
-	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
-	legacyaccessproto "github.com/onflow/flow/protobuf/go/flow/legacy/access"
+	"github.com/onflow/flow-go/module/state_synchronization"
 )
 
 type RPCEngineBuilder struct {
 	*Engine
 	me                   module.Local
 	finalizedHeaderCache module.FinalizedHeaderCache
+	indexReporter        state_synchronization.IndexReporter
 
 	// optional parameters, only one can be set during build phase
 	signerIndicesDecoder hotstuff.BlockSignerDecoder
@@ -25,12 +26,13 @@ type RPCEngineBuilder struct {
 }
 
 // NewRPCEngineBuilder helps to build a new RPC engine.
-func NewRPCEngineBuilder(engine *Engine, me module.Local, finalizedHeaderCache module.FinalizedHeaderCache) *RPCEngineBuilder {
+func NewRPCEngineBuilder(engine *Engine, me module.Local, finalizedHeaderCache module.FinalizedHeaderCache, indexReporter state_synchronization.IndexReporter) *RPCEngineBuilder {
 	// the default handler will use the engine.backend implementation
 	return &RPCEngineBuilder{
 		Engine:               engine,
 		me:                   me,
 		finalizedHeaderCache: finalizedHeaderCache,
+		indexReporter:        indexReporter,
 	}
 }
 
@@ -80,9 +82,9 @@ func (builder *RPCEngineBuilder) WithLegacy() *RPCEngineBuilder {
 
 func (builder *RPCEngineBuilder) DefaultHandler(signerIndicesDecoder hotstuff.BlockSignerDecoder) *access.Handler {
 	if signerIndicesDecoder == nil {
-		return access.NewHandler(builder.Engine.backend, builder.Engine.chain, builder.finalizedHeaderCache, builder.me, builder.stateStreamConfig.MaxGlobalStreams)
+		return access.NewHandler(builder.Engine.backend, builder.Engine.chain, builder.finalizedHeaderCache, builder.me, builder.stateStreamConfig.MaxGlobalStreams, access.WithIndexReporter(builder.indexReporter))
 	} else {
-		return access.NewHandler(builder.Engine.backend, builder.Engine.chain, builder.finalizedHeaderCache, builder.me, builder.stateStreamConfig.MaxGlobalStreams, access.WithBlockSignerDecoder(signerIndicesDecoder))
+		return access.NewHandler(builder.Engine.backend, builder.Engine.chain, builder.finalizedHeaderCache, builder.me, builder.stateStreamConfig.MaxGlobalStreams, access.WithBlockSignerDecoder(signerIndicesDecoder), access.WithIndexReporter(builder.indexReporter))
 	}
 }
 
