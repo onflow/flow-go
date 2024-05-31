@@ -250,9 +250,6 @@ func (s *Suite) TestOnFinalizedBlockSingle() {
 	irrecoverableCtx := irrecoverable.NewMockSignalerContext(s.T(), s.ctx)
 	eng := s.initIngestionEngine(irrecoverableCtx)
 
-	lastFinalizedHeight := s.finalizedBlock.Height
-	s.blocks.On("GetLastFullBlockHeight").Return(lastFinalizedHeight, nil).Maybe()
-
 	block := s.generateBlock(clusterCommittee, snap)
 	block.Header.Height = s.finalizedBlock.Height + 1
 	s.blockMap[block.Header.Height] = &block
@@ -282,7 +279,7 @@ func (s *Suite) TestOnFinalizedBlockSingle() {
 	s.Assertions.Eventually(func() bool {
 		wg.Wait()
 		return true
-	}, time.Second, time.Millisecond)
+	}, time.Second, 10*time.Millisecond)
 
 	// assert that the block was retrieved and all collections were requested
 	s.headers.AssertExpectations(s.T())
@@ -304,9 +301,6 @@ func (s *Suite) TestOnFinalizedBlockSeveralBlocksAhead() {
 	// prepare cluster committee members
 	clusterCommittee := unittest.IdentityListFixture(32 * 4).Filter(filter.HasRole[flow.Identity](flow.RoleCollection)).ToSkeleton()
 	cluster.On("Members").Return(clusterCommittee, nil)
-
-	lastFinalizedHeight := s.finalizedBlock.Height
-	s.blocks.On("GetLastFullBlockHeight").Return(lastFinalizedHeight, nil).Maybe()
 
 	irrecoverableCtx := irrecoverable.NewMockSignalerContext(s.T(), s.ctx)
 	eng := s.initIngestionEngine(irrecoverableCtx)
