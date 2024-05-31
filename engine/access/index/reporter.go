@@ -41,7 +41,7 @@ func (s *Reporter) Initialize(indexReporter state_synchronization.IndexReporter)
 
 // LowestIndexedHeight returns the lowest height indexed by the execution state indexer.
 // Expected errors:
-// - indexer.ErrIndexNotInitialized if the EventsIndex has not been initialized
+// - indexer.ErrIndexNotInitialized if the IndexReporter has not been initialized
 func (s *Reporter) LowestIndexedHeight() (uint64, error) {
 	reporter, err := s.getReporter()
 	if err != nil {
@@ -53,7 +53,7 @@ func (s *Reporter) LowestIndexedHeight() (uint64, error) {
 
 // HighestIndexedHeight returns the highest height indexed by the execution state indexer.
 // Expected errors:
-// - indexer.ErrIndexNotInitialized if the EventsIndex has not been initialized
+// - indexer.ErrIndexNotInitialized if the IndexReporter has not been initialized
 func (s *Reporter) HighestIndexedHeight() (uint64, error) {
 	reporter, err := s.getReporter()
 	if err != nil {
@@ -66,7 +66,7 @@ func (s *Reporter) HighestIndexedHeight() (uint64, error) {
 // checkDataAvailability checks the availability of data at the given height by comparing it with the highest and lowest
 // indexed heights. If the height is beyond the indexed range, an error is returned.
 // Expected errors:
-//   - indexer.ErrIndexNotInitialized if the `TransactionResultsIndex` has not been initialized
+//   - indexer.ErrIndexNotInitialized if the `IndexReporter` has not been initialized
 //   - storage.ErrHeightNotIndexed if the block at the provided height is not indexed yet
 //   - all other errors are unexpected
 func (s *Reporter) checkDataAvailability(height uint64) error {
