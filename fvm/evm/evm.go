@@ -6,6 +6,7 @@ import (
 
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/evm/backends"
+	"github.com/onflow/flow-go/fvm/evm/debug"
 	evm "github.com/onflow/flow-go/fvm/evm/emulator"
 	"github.com/onflow/flow-go/fvm/evm/handler"
 	"github.com/onflow/flow-go/fvm/evm/stdlib"
@@ -32,7 +33,7 @@ func SetupEnvironment(
 	fvmEnv environment.Environment,
 	runtimeEnv runtime.Environment,
 	flowToken flow.Address,
-	tracingEnabled bool,
+	tracer debug.EVMTracer,
 ) error {
 	evmStorageAccountAddress, err := StorageAccountAddress(chainID)
 	if err != nil {
@@ -63,7 +64,7 @@ func SetupEnvironment(
 		addressAllocator,
 		backend,
 		emulator,
-		tracingEnabled,
+		tracer,
 	)
 
 	stdlib.SetupEnvironment(
