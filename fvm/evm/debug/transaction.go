@@ -7,31 +7,53 @@ import (
 	"github.com/onflow/go-ethereum/eth/tracers"
 )
 
-type TransactionTracer struct {
-	tracer tracers.Tracer
+type EVMTracer interface {
+	TxTracer() tracers.Tracer
+	Collect()
 }
 
-func NewTransactionTracer() (*TransactionTracer, error) {
-	tracerConf := json.RawMessage{}
-	if err := tracerConf.UnmarshalJSON([]byte(`{ "onlyTopCall": true }`)); err != nil {
-		return nil, err
-	}
+var _ EVMTracer = &CallTracer{}
 
-	tracer, err := tracers.DefaultDirectory.New("callTracer", &tracers.Context{}, tracerConf)
+type CallTracer struct {
+	tracer   tracers.Tracer
+	uploader Uploader
+}
+
+func NewEVMCallTracer(uploader Uploader) (*CallTracer, error) {
+	tracerType := json.RawMessage(`{ "onlyTopCall": true }`)
+	tracer, err := tracers.DefaultDirectory.New("callTracer", &tracers.Context{}, tracerType)
 	if err != nil {
 		return nil, err
 	}
 
-	return &TransactionTracer{
-		tracer,
+	return &CallTracer{
+		tracer:   tracer,
+		uploader: uploader,
 	}, nil
 }
 
-func (t *TransactionTracer) Tracer() tracers.Tracer {
+func (t *CallTracer) TxTracer() tracers.Tracer {
 	return t.tracer
 }
 
-func (t *TransactionTracer) Upload() {
-	res, _ := t.tracer.GetResult()
-	fmt.Println(res)
+func (t *CallTracer) Collect() {
+	res, err := t.tracer.GetResult()
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	err = t.uploader.Upload(res)
+	if err != nil {
+		fmt.Println(err)
+	}
 }
+
+var _ EVMTracer = &NopTracer{}
+
+type NopTracer struct{}
+
+func (n NopTracer) TxTracer() tracers.Tracer {
+	return nil
+}
+
+func (n NopTracer) Collect() {}

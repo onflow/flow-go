@@ -26,7 +26,7 @@ type ContractHandler struct {
 	backend            types.Backend
 	emulator           types.Emulator
 	precompiles        []types.Precompile
-	tracingEnabled     bool
+	tracer             debug.EVMTracer
 }
 
 func (h *ContractHandler) FlowTokenAddress() common.Address {
@@ -48,7 +48,7 @@ func NewContractHandler(
 	addressAllocator types.AddressAllocator,
 	backend types.Backend,
 	emulator types.Emulator,
-	tracingEnabled bool,
+	tracer debug.EVMTracer,
 ) *ContractHandler {
 	return &ContractHandler{
 		flowChainID:        flowChainID,
@@ -58,7 +58,7 @@ func NewContractHandler(
 		addressAllocator:   addressAllocator,
 		backend:            backend,
 		emulator:           emulator,
-		tracingEnabled:     tracingEnabled,
+		tracer:             tracer,
 		precompiles:        preparePrecompiles(evmContractAddress, randomBeaconAddress, addressAllocator, backend),
 	}
 }
@@ -324,9 +324,7 @@ func (h *ContractHandler) run(
 		return nil, err
 	}
 
-	if h.tracingEnabled {
-		ctx.Tracer.Upload()
-	}
+	h.tracer.Collect()
 
 	return res, nil
 }
@@ -428,7 +426,7 @@ func (h *ContractHandler) getBlockContext() (types.BlockContext, error) {
 		return types.BlockContext{}, err
 	}
 
-	ctx := types.BlockContext{
+	return types.BlockContext{
 		ChainID:                types.EVMChainIDFromFlowChainID(h.flowChainID),
 		BlockNumber:            bp.Height,
 		BlockTimestamp:         bp.Timestamp,
@@ -440,17 +438,8 @@ func (h *ContractHandler) getBlockContext() (types.BlockContext, error) {
 		},
 		ExtraPrecompiles: h.precompiles,
 		Random:           rand,
-	}
-
-	if h.tracingEnabled {
-		tracer, err := debug.NewTransactionTracer()
-		if err != nil {
-			return types.BlockContext{}, err
-		}
-		ctx.Tracer = tracer
-	}
-
-	return ctx, nil
+		Tracer:           h.tracer.Tracer(),
+	}, nil
 }
 
 func (h *ContractHandler) executeAndHandleCall(
