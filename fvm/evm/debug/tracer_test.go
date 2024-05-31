@@ -20,7 +20,7 @@ func (m mockUploader) Upload(id string, data json.RawMessage) error {
 
 var _ Uploader = &mockUploader{}
 
-func TestCallTracer(t *testing.T) {
+func Test_CallTracer(t *testing.T) {
 	t.Run("collect traces and upload them", func(t *testing.T) {
 		txID := gethCommon.Hash{0x05}
 		var res json.RawMessage
