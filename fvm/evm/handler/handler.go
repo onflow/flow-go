@@ -438,7 +438,7 @@ func (h *ContractHandler) getBlockContext() (types.BlockContext, error) {
 		},
 		ExtraPrecompiles: h.precompiles,
 		Random:           rand,
-		Tracer:           h.tracer.Tracer(),
+		Tracer:           h.tracer.TxTracer(),
 	}, nil
 }
 
