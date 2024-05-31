@@ -8,11 +8,21 @@ import (
 	"cloud.google.com/go/storage"
 )
 
-type Uploader struct {
+type Uploader interface {
+	Upload(data json.RawMessage) error
+}
+
+var _ Uploader = &GCPUploader{}
+
+func NewGCPUploader() *GCPUploader {
+	return &GCPUploader{}
+}
+
+type GCPUploader struct {
 	client *storage.Client
 }
 
-func (u *Uploader) Upload(data json.RawMessage) {
+func (g *GCPUploader) Upload(data json.RawMessage) error {
 	ctx := context.Background()
 	client, err := storage.NewClient(ctx)
 	if err != nil {
@@ -29,11 +39,11 @@ func (u *Uploader) Upload(data json.RawMessage) {
 		NewWriter(ctx)
 
 	if _, err = wc.Write(data); err != nil {
-
+		return err
 	}
 
 	if err := wc.Close(); err != nil {
-
+		return err
 	}
 
 	return nil
