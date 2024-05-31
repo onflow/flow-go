@@ -39,13 +39,16 @@ func Test_CallTracer(t *testing.T) {
 		from := gethCommon.HexToAddress("0x01")
 		to := gethCommon.HexToAddress("0x02")
 
-		tracer.TxTracer().CaptureStart(nil, from, to, true, []byte{0x01, 0x02}, 10, big.NewInt(1))
-		tracer.TxTracer().CaptureTxStart(100)
-		tracer.TxTracer().CaptureEnter(vm.ADD, from, to, []byte{0x02, 0x04}, 20, big.NewInt(2))
-		tracer.TxTracer().CaptureTxEnd(500)
-		tracer.TxTracer().CaptureEnd([]byte{0x02}, 200, nil)
+		tr := tracer.TxTracer()
+		require.NotNil(t, tr)
 
-		res, err = tracer.TxTracer().GetResult()
+		tr.CaptureStart(nil, from, to, true, []byte{0x01, 0x02}, 10, big.NewInt(1))
+		tr.CaptureTxStart(100)
+		tr.CaptureEnter(vm.ADD, from, to, []byte{0x02, 0x04}, 20, big.NewInt(2))
+		tr.CaptureTxEnd(500)
+		tr.CaptureEnd([]byte{0x02}, 200, nil)
+
+		res, err = tr.GetResult()
 		require.NoError(t, err)
 		require.NotNil(t, res)
 
