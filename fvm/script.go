@@ -208,7 +208,7 @@ func (executor *scriptExecutor) executeScript() error {
 			executor.env,
 			rt.ScriptRuntimeEnv,
 			sc.FlowToken.Address,
-			executor.ctx.EVMTracingEnabled,
+			executor.ctx.EVMTracer,
 		)
 		if err != nil {
 			return err

@@ -191,7 +191,7 @@ func (executor *transactionExecutor) preprocessTransactionBody() error {
 			executor.env,
 			executor.cadenceRuntime.TxRuntimeEnv,
 			sc.FlowToken.Address,
-			executor.ctx.EVMTracingEnabled,
+			executor.ctx.EVMTracer,
 		)
 		if err != nil {
 			return err
@@ -251,7 +251,7 @@ func (executor *transactionExecutor) ExecuteTransactionBody() error {
 			executor.env,
 			executor.cadenceRuntime.TxRuntimeEnv,
 			sc.FlowToken.Address,
-			executor.ctx.EVMTracingEnabled,
+			executor.ctx.EVMTracer,
 		)
 		if err != nil {
 			return err
