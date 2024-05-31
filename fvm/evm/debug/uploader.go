@@ -3,42 +3,53 @@ package debug
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"cloud.google.com/go/storage"
 )
 
 type Uploader interface {
-	Upload(data json.RawMessage) error
+	Upload(id string, data json.RawMessage) error
 }
 
 var _ Uploader = &GCPUploader{}
 
-func NewGCPUploader() *GCPUploader {
-	return &GCPUploader{}
-}
-
 type GCPUploader struct {
 	client *storage.Client
+	bucket *storage.BucketHandle
 }
 
-func (g *GCPUploader) Upload(data json.RawMessage) error {
+func NewGCPUploader() (*GCPUploader, error) {
+	// no need to close the client according to documentation
+	// https://pkg.go.dev/cloud.google.com/go/storage#Client.Close
 	ctx := context.Background()
 	client, err := storage.NewClient(ctx)
 	if err != nil {
-
+		return nil, fmt.Errorf("cannot create GCP Bucket client: %w", err)
 	}
-	defer client.Close()
+	const bucketName = "evm-tx-trace"
+	bucket := client.Bucket(bucketName)
 
-	ctx, cancel := context.WithTimeout(ctx, time.Second*50)
+	// try accessing buckets to validate settings
+	_, err = bucket.Attrs(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("error while listing bucket attributes: %w", err)
+	}
+
+	return &GCPUploader{
+		bucket: bucket,
+	}, nil
+}
+
+func (g *GCPUploader) Upload(id string, data json.RawMessage) error {
+	const uploadTimeout = time.Second * 60
+	ctx, cancel := context.WithTimeout(context.Background(), uploadTimeout)
 	defer cancel()
 
-	wc := client.
-		Bucket("evm-tx-traces").
-		Object("tx-id1").
-		NewWriter(ctx)
+	wc := g.bucket.Object(id).NewWriter(ctx)
 
-	if _, err = wc.Write(data); err != nil {
+	if _, err := wc.Write(data); err != nil {
 		return err
 	}
 
