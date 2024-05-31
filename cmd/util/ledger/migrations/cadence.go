@@ -307,6 +307,7 @@ func NewCadence1ValueMigrations(
 				opts.NWorker,
 				[]AccountBasedMigration{
 					NewMetricsCollectingMigration(
+						log,
 						opts.ChainID,
 						rwf,
 						programs,
