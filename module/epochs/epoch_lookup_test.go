@@ -66,7 +66,7 @@ func (suite *EpochLookupSuite) SetupTest() {
 		func() error { return nil })
 
 	epochProtocolState := mockprotocol.NewDynamicProtocolState(suite.T())
-	epochProtocolState.On("InvalidEpochTransitionAttempted").Return(
+	epochProtocolState.On("EpochFallbackTriggered").Return(
 		suite.EpochFallbackTriggered,
 		func() error { return nil },
 	)
@@ -247,7 +247,7 @@ func testEpochForViewWithFallback(t *testing.T, lookup *EpochLookup, state proto
 	epochProtocolState, err := state.Final().EpochProtocolState()
 	require.NoError(t, err)
 
-	epochFallbackTriggered := epochProtocolState.InvalidEpochTransitionAttempted()
+	epochFallbackTriggered := epochProtocolState.EpochFallbackTriggered()
 
 	t.Run("should have set epoch fallback triggered correctly", func(t *testing.T) {
 		assert.Equal(t, epochFallbackTriggered, lookup.epochFallbackIsTriggered.Load())

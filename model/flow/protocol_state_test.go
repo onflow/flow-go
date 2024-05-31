@@ -33,7 +33,7 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 				CommitID:         currentEpochCommit.ID(),
 				ActiveIdentities: identities,
 			},
-			InvalidEpochTransitionAttempted: false,
+			EpochFallbackTriggered: false,
 		}
 		entry, err := flow.NewRichProtocolStateEntry(
 			stateEntry,
@@ -274,7 +274,7 @@ func TestProtocolStateEntry_Copy(t *testing.T) {
 	assert.NotSame(t, entry.PreviousEpoch, cpy.PreviousEpoch)
 	assert.NotSame(t, entry.CurrentEpoch, cpy.CurrentEpoch)
 
-	cpy.InvalidEpochTransitionAttempted = !entry.InvalidEpochTransitionAttempted
+	cpy.EpochFallbackTriggered = !entry.EpochFallbackTriggered
 	assert.NotEqual(t, entry, cpy)
 
 	assert.Equal(t, entry.CurrentEpoch.ActiveIdentities[0], cpy.CurrentEpoch.ActiveIdentities[0])

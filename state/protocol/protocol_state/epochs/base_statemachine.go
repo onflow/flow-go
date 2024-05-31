@@ -117,9 +117,9 @@ func (u *baseStateMachine) TransitionToNextEpoch() error {
 		return fmt.Errorf("epoch transition is only allowed when entering next epoch")
 	}
 	u.state = &flow.ProtocolStateEntry{
-		PreviousEpoch:                   &u.state.CurrentEpoch,
-		CurrentEpoch:                    *u.state.NextEpoch,
-		InvalidEpochTransitionAttempted: u.state.InvalidEpochTransitionAttempted,
+		PreviousEpoch:          &u.state.CurrentEpoch,
+		CurrentEpoch:           *u.state.NextEpoch,
+		EpochFallbackTriggered: u.state.EpochFallbackTriggered,
 	}
 	u.rebuildIdentityLookup()
 	return nil

@@ -2094,7 +2094,7 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 			// check on fork, invalid epoch transition attempted should be false
 			epochState, err := state.AtBlockID(epochRecoverSealingBlock.ID()).EpochProtocolState()
 			require.NoError(t, err)
-			require.False(t, epochState.InvalidEpochTransitionAttempted())
+			require.False(t, epochState.EpochFallbackTriggered())
 
 			assertEpochEmergencyFallbackTriggered(t, state, true) // should be set since it wasn't finalized yet
 
@@ -2197,7 +2197,7 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 			// check on fork, invalid epoch transition attempted should be false
 			epochState, err := state.AtBlockID(epochRecoverSealingBlock.ID()).EpochProtocolState()
 			require.NoError(t, err)
-			require.False(t, epochState.InvalidEpochTransitionAttempted())
+			require.False(t, epochState.EpochFallbackTriggered())
 
 			assertEpochEmergencyFallbackTriggered(t, state, true) // should be set since it wasn't finalized yet
 
@@ -2396,7 +2396,7 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 			// check on fork, invalid epoch transition attempted should be false
 			epochState, err := state.AtBlockID(epochRecoverSealingBlock.ID()).EpochProtocolState()
 			require.NoError(t, err)
-			require.False(t, epochState.InvalidEpochTransitionAttempted())
+			require.False(t, epochState.EpochFallbackTriggered())
 
 			assertEpochEmergencyFallbackTriggered(t, state, true) // should be set since it wasn't finalized yet
 
@@ -3095,7 +3095,7 @@ func TestProtocolStateIdempotent(t *testing.T) {
 func assertEpochEmergencyFallbackTriggered(t *testing.T, state realprotocol.State, expected bool) {
 	epochState, err := state.Final().EpochProtocolState()
 	require.NoError(t, err)
-	assert.Equal(t, expected, epochState.InvalidEpochTransitionAttempted())
+	assert.Equal(t, expected, epochState.EpochFallbackTriggered())
 }
 
 // mockMetricsForRootSnapshot mocks the given metrics mock object to expect all

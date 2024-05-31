@@ -29,12 +29,12 @@ type ProtocolStateEntry struct {
 	CurrentEpoch  EpochStateContainer  // minimal dynamic properties for current epoch
 	NextEpoch     *EpochStateContainer // minimal dynamic properties for next epoch [optional, nil iff we are in staking phase]
 
-	// InvalidEpochTransitionAttempted encodes whether an invalid epoch transition
+	// EpochFallbackTriggered encodes whether an invalid epoch transition
 	// has been detected in this fork. Under normal operations, this value is false.
 	// Node-internally, the EpochFallback notification is emitted when a block is
 	// finalized that changes this flag from false to true.
 	// A state transition from true -> false is possible only when protocol undergoes epoch recovery.
-	InvalidEpochTransitionAttempted bool
+	EpochFallbackTriggered bool
 }
 
 // EpochStateContainer holds the data pertaining to a _single_ epoch but no information about
@@ -266,15 +266,15 @@ func (e *ProtocolStateEntry) ID() Identifier {
 		return ZeroID
 	}
 	body := struct {
-		PreviousEpochID                 Identifier
-		CurrentEpochID                  Identifier
-		NextEpochID                     Identifier
-		InvalidEpochTransitionAttempted bool
+		PreviousEpochID        Identifier
+		CurrentEpochID         Identifier
+		NextEpochID            Identifier
+		EpochFallbackTriggered bool
 	}{
-		PreviousEpochID:                 e.PreviousEpoch.ID(),
-		CurrentEpochID:                  e.CurrentEpoch.ID(),
-		NextEpochID:                     e.NextEpoch.ID(),
-		InvalidEpochTransitionAttempted: e.InvalidEpochTransitionAttempted,
+		PreviousEpochID:        e.PreviousEpoch.ID(),
+		CurrentEpochID:         e.CurrentEpoch.ID(),
+		NextEpochID:            e.NextEpoch.ID(),
+		EpochFallbackTriggered: e.EpochFallbackTriggered,
 	}
 	return MakeID(body)
 }
@@ -286,10 +286,10 @@ func (e *ProtocolStateEntry) Copy() *ProtocolStateEntry {
 		return nil
 	}
 	return &ProtocolStateEntry{
-		PreviousEpoch:                   e.PreviousEpoch.Copy(),
-		CurrentEpoch:                    *e.CurrentEpoch.Copy(),
-		NextEpoch:                       e.NextEpoch.Copy(),
-		InvalidEpochTransitionAttempted: e.InvalidEpochTransitionAttempted,
+		PreviousEpoch:          e.PreviousEpoch.Copy(),
+		CurrentEpoch:           *e.CurrentEpoch.Copy(),
+		NextEpoch:              e.NextEpoch.Copy(),
+		EpochFallbackTriggered: e.EpochFallbackTriggered,
 	}
 }
 

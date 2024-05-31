@@ -358,7 +358,7 @@ func (s *EpochStateMachineSuite) TestEpochStateMachine_Constructor() {
 			assert.Nil(s.T(), stateMachine)
 		})
 		s.Run("epoch-fallback", func() {
-			s.parentEpochState.InvalidEpochTransitionAttempted = true // ensure we use epoch-fallback state machine
+			s.parentEpochState.EpochFallbackTriggered = true // ensure we use epoch-fallback state machine
 			exception := irrecoverable.NewExceptionf("exception")
 			happyPathStateMachineFactory := mock.NewStateMachineFactoryMethod(s.T())
 			fallbackPathStateMachineFactory := mock.NewStateMachineFactoryMethod(s.T())
@@ -515,7 +515,7 @@ func (s *EpochStateMachineSuite) TestEvolveState_EventsAreFiltered() {
 // TestEvolveStateTransitionToNextEpoch_WithInvalidStateTransition tests that EpochStateMachine transitions to the next epoch
 // if an invalid state transition has been detected in a block which triggers transitioning to the next epoch.
 // In such situation, we still need to enter the next epoch (because it has already been committed), but persist in the
-// state that we have entered Epoch fallback mode (`flow.ProtocolStateEntry.InvalidEpochTransitionAttempted` is set to `true`).
+// state that we have entered Epoch fallback mode (`flow.ProtocolStateEntry.EpochFallbackTriggered` is set to `true`).
 // This test ensures that we don't drop previously committed next epoch.
 func (s *EpochStateMachineSuite) TestEvolveStateTransitionToNextEpoch_WithInvalidStateTransition() {
 	unittest.SkipUnless(s.T(), unittest.TEST_TODO,
@@ -540,10 +540,10 @@ func (s *EpochStateMachineSuite) TestEvolveStateTransitionToNextEpoch_WithInvali
 	s.epochStateDB.On("Index", s.candidate.ID(), mocks.Anything).Return(indexTxDeferredUpdate.Execute, nil).Once()
 
 	expectedEpochState := &flow.ProtocolStateEntry{
-		PreviousEpoch:                   s.parentEpochState.CurrentEpoch.Copy(),
-		CurrentEpoch:                    *s.parentEpochState.NextEpoch.Copy(),
-		NextEpoch:                       nil,
-		InvalidEpochTransitionAttempted: true,
+		PreviousEpoch:          s.parentEpochState.CurrentEpoch.Copy(),
+		CurrentEpoch:           *s.parentEpochState.NextEpoch.Copy(),
+		NextEpoch:              nil,
+		EpochFallbackTriggered: true,
 	}
 
 	storeTxDeferredUpdate := storagemock.NewDeferredDBUpdate(s.T())

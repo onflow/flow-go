@@ -60,7 +60,7 @@ func (suite *ConsensusSuite) SetupTest() {
 	suite.state.On("Final").Return(suite.snapshot)
 	suite.state.On("Params").Return(suite.params)
 	epochProtocolState := protocolmock.NewDynamicProtocolState(suite.T())
-	epochProtocolState.On("InvalidEpochTransitionAttempted").Return(
+	epochProtocolState.On("EpochFallbackTriggered").Return(
 		func() bool { return suite.epochFallbackTriggered },
 		func() error { return nil },
 	).Maybe()
@@ -617,7 +617,7 @@ func TestRemoveOldEpochs(t *testing.T) {
 	state.On("Final").Return(snapshot)
 
 	epochProtocolState := protocolmock.NewDynamicProtocolState(t)
-	epochProtocolState.On("InvalidEpochTransitionAttempted").Return(false, nil)
+	epochProtocolState.On("EpochFallbackTriggered").Return(false, nil)
 	snapshot.On("EpochProtocolState").Return(epochProtocolState, nil)
 
 	epochQuery := mocks.NewEpochQuery(t, currentEpochCounter, epoch1)

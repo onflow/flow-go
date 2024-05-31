@@ -181,7 +181,7 @@ func NewConsensusCommittee(state protocol.State, me flow.Identifier) (*Consensus
 
 	// if epoch emergency fallback was triggered, inject the fallback epoch
 	// TODO: consider replacing with phase check when it's available
-	if epochStateSnapshot.InvalidEpochTransitionAttempted() {
+	if epochStateSnapshot.EpochFallbackTriggered() {
 		err = com.onEpochEmergencyFallbackTriggered()
 		if err != nil {
 			return nil, fmt.Errorf("could not prepare emergency fallback epoch: %w", err)

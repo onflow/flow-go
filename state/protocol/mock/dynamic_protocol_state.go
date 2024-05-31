@@ -112,6 +112,20 @@ func (_m *DynamicProtocolState) EpochCommit() *flow.EpochCommit {
 	return r0
 }
 
+// EpochFallbackTriggered provides a mock function with given fields:
+func (_m *DynamicProtocolState) EpochFallbackTriggered() bool {
+	ret := _m.Called()
+
+	var r0 bool
+	if rf, ok := ret.Get(0).(func() bool); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	return r0
+}
+
 // EpochPhase provides a mock function with given fields:
 func (_m *DynamicProtocolState) EpochPhase() flow.EpochPhase {
 	ret := _m.Called()
@@ -169,20 +183,6 @@ func (_m *DynamicProtocolState) Identities() flow.GenericIdentityList[flow.Ident
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(flow.GenericIdentityList[flow.Identity])
 		}
-	}
-
-	return r0
-}
-
-// InvalidEpochTransitionAttempted provides a mock function with given fields:
-func (_m *DynamicProtocolState) InvalidEpochTransitionAttempted() bool {
-	ret := _m.Called()
-
-	var r0 bool
-	if rf, ok := ret.Get(0).(func() bool); ok {
-		r0 = rf()
-	} else {
-		r0 = ret.Get(0).(bool)
 	}
 
 	return r0

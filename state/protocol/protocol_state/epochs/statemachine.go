@@ -137,9 +137,9 @@ func NewEpochStateMachine(
 	}
 
 	var stateMachine StateMachine
-	candidateAttemptsInvalidEpochTransition := epochFallbackTriggeredByIncorporatingCandidate(candidateView, params, parentEpochState)
-	if parentEpochState.InvalidEpochTransitionAttempted || candidateAttemptsInvalidEpochTransition {
-		// Case 1: InvalidEpochTransitionAttempted is true, indicating that we have encountered an invalid
+	candidateTriggersEpochFallback := epochFallbackTriggeredByIncorporatingCandidate(candidateView, params, parentEpochState)
+	if parentEpochState.EpochFallbackTriggered || candidateTriggersEpochFallback {
+		// Case 1: EpochFallbackTriggered is true, indicating that we have encountered an invalid
 		//         epoch service event or an invalid state transition previously in this fork.
 		// Case 2: Incorporating the candidate block is itself an invalid epoch transition.
 		//

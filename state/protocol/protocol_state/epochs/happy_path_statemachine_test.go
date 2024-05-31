@@ -134,10 +134,10 @@ func (s *ProtocolStateMachineSuite) TestBuild() {
 	require.Equal(s.T(), s.parentProtocolState.ID(), s.stateMachine.ParentState().ID(), "should not modify parent protocol state")
 }
 
-// TestCreateStateMachineAfterInvalidStateTransitionAttempted tests if creating state machine after observing invalid state transition
+// TestCreateStateMachineAfterEFMTriggered tests if creating state machine after observing invalid state transition
 // results in error .
-func (s *ProtocolStateMachineSuite) TestCreateStateMachineAfterInvalidStateTransitionAttempted() {
-	s.parentProtocolState.InvalidEpochTransitionAttempted = true
+func (s *ProtocolStateMachineSuite) TestCreateStateMachineAfterEFMTriggered() {
+	s.parentProtocolState.EpochFallbackTriggered = true
 	var err error
 	// create new HappyPathStateMachine with next epoch information
 	s.stateMachine, err = NewHappyPathStateMachine(s.candidate.View, s.parentProtocolState.Copy())

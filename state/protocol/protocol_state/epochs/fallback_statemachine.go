@@ -25,18 +25,18 @@ type FallbackStateMachine struct {
 var _ StateMachine = (*FallbackStateMachine)(nil)
 
 // NewFallbackStateMachine constructs a state machine for epoch fallback, it automatically sets
-// InvalidEpochTransitionAttempted to true, thereby recording that we have entered epoch fallback mode.
+// EpochFallbackTriggered to true, thereby recording that we have entered epoch fallback mode.
 // No errors are expected during normal operations.
 func NewFallbackStateMachine(params protocol.GlobalParams, view uint64, parentState *flow.RichProtocolStateEntry) (*FallbackStateMachine, error) {
 	state := parentState.ProtocolStateEntry.Copy()
 	nextEpochCommitted := state.EpochPhase() == flow.EpochPhaseCommitted
 	// we are entering fallback mode, this logic needs to be executed only once
-	if !state.InvalidEpochTransitionAttempted {
+	if !state.EpochFallbackTriggered {
 		// the next epoch has not been committed, but possibly setup, make sure it is cleared
 		if !nextEpochCommitted {
 			state.NextEpoch = nil
 		}
-		state.InvalidEpochTransitionAttempted = true
+		state.EpochFallbackTriggered = true
 	}
 
 	sm := &FallbackStateMachine{
@@ -133,6 +133,6 @@ func (m *FallbackStateMachine) ProcessEpochRecover(epochRecover *flow.EpochRecov
 		ActiveIdentities: nextEpochParticipants,
 		EpochExtensions:  nil,
 	}
-	m.state.InvalidEpochTransitionAttempted = false
+	m.state.EpochFallbackTriggered = false
 	return true, nil
 }

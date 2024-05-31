@@ -718,7 +718,7 @@ func OpenState(
 	}
 
 	// update all epoch related metrics
-	err = updateEpochMetrics(metrics, finalSnapshot, epochStateSnapshot.InvalidEpochTransitionAttempted())
+	err = updateEpochMetrics(metrics, finalSnapshot, epochStateSnapshot.EpochFallbackTriggered())
 	if err != nil {
 		return nil, fmt.Errorf("failed to update epoch metrics: %w", err)
 	}

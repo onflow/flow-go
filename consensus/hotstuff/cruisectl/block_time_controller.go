@@ -200,7 +200,7 @@ func (ctl *BlockTimeController) initEpochInfo() error {
 	if err != nil {
 		return fmt.Errorf("could not check epoch fallback: %w", err)
 	}
-	ctl.epochFallbackTriggered = epochProtocolState.InvalidEpochTransitionAttempted()
+	ctl.epochFallbackTriggered = epochProtocolState.EpochFallbackTriggered()
 
 	return nil
 }
