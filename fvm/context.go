@@ -48,7 +48,7 @@ type Context struct {
 	// By default, the program cache is only updated by transactions.
 	AllowProgramCacheWritesInScripts bool
 
-	debug.EVMDebugParams
+	debug.EVMTracer
 }
 
 // NewContext initializes a new execution context with the provided options.
@@ -380,6 +380,14 @@ func WithEVMEnabled(enabled bool) Option {
 func WithAllowProgramCacheWritesInScriptsEnabled(enabled bool) Option {
 	return func(ctx Context) Context {
 		ctx.AllowProgramCacheWritesInScripts = enabled
+		return ctx
+	}
+}
+
+// WithEVMTracer will set the evm execution tracer
+func WithEVMTracer(tracer debug.EVMTracer) Option {
+	return func(ctx Context) Context {
+		ctx.EVMTracer = tracer
 		return ctx
 	}
 }
