@@ -324,7 +324,7 @@ func (h *ContractHandler) run(
 		return nil, err
 	}
 
-	h.tracer.Collect()
+	h.tracer.Collect(tx.Hash())
 
 	return res, nil
 }
