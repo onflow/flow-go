@@ -543,7 +543,6 @@ func chooseExecutionNodes(state protocol.State, executorIDs flow.IdentifierList)
 	}
 
 	// choose from preferred EN IDs
-	var chosenIDs flow.IdentityList
 	if len(preferredENIdentifiers) > 0 {
 		chosenIDs := chooseFromPreferredENIDs(allENs, executorIDs)
 		return chosenIDs.ToSkeleton(), nil
@@ -552,7 +551,7 @@ func chooseExecutionNodes(state protocol.State, executorIDs flow.IdentifierList)
 	// if no preferred EN ID is found, then choose from the fixed EN IDs
 	if len(fixedENIdentifiers) > 0 {
 		// choose fixed ENs which have executed the transaction
-		chosenIDs = allENs.Filter(filter.And(
+		chosenIDs := allENs.Filter(filter.And(
 			filter.HasNodeID[flow.Identity](fixedENIdentifiers...),
 			filter.HasNodeID[flow.Identity](executorIDs...),
 		))

@@ -1777,7 +1777,8 @@ func (suite *Suite) TestExecutionNodesForBlockID() {
 		fixedENs := allExecutionNodes[0:2]
 		// specify two ENs not specified in the ERs as preferred
 		preferredENs := unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
-		expectedList := allExecutionNodes[0:maxNodesCnt]
+		// add one more node ID besides of the fixed ENs list cause expected length of the list should be maxNodesCnt
+		expectedList := append(fixedENs, allExecutionNodes[2])
 		testExecutionNodesForBlockID(preferredENs, fixedENs, expectedList)
 	})
 	// if execution receipts are not yet available, the ExecutionNodesForBlockID function should retry twice
