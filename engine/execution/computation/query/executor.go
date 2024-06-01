@@ -50,6 +50,26 @@ type Executor interface {
 		*flow.Account,
 		error,
 	)
+
+	GetAccountBalance(
+		ctx context.Context,
+		addr flow.Address,
+		header *flow.Header,
+		snapshot snapshot.StorageSnapshot,
+	) (
+		*flow.Account,
+		error,
+	)
+
+	GetAccountKeys(
+		ctx context.Context,
+		addr flow.Address,
+		header *flow.Header,
+		snapshot snapshot.StorageSnapshot,
+	) (
+		*flow.Account,
+		error,
+	)
 }
 
 type QueryConfig struct {
@@ -247,4 +267,20 @@ func (e *QueryExecutor) GetAccount(
 	}
 
 	return account, nil
+}
+
+func (e *QueryExecutor) GetAccountBalance(ctx context.Context, addr flow.Address, blockHeader *flow.Header, snapshot snapshot.StorageSnapshot) (*flow.Account, error) {
+
+	// TODO(ramtin): utilize ctx
+	blockCtx := fvm.NewContextFromParent(
+		e.vmCtx,
+		fvm.WithBlockHeader(blockHeader),
+		fvm.WithDerivedBlockData(
+			e.derivedChainData.NewDerivedBlockDataForScript(blockHeader.ID())))
+
+}
+
+func (e *QueryExecutor) GetAccountKeys(ctx context.Context, addr flow.Address, header *flow.Header, snapshot snapshot.StorageSnapshot) (*flow.Account, error) {
+	//TODO implement me
+	panic("implement me")
 }

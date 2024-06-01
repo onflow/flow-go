@@ -42,6 +42,10 @@ type ScriptExecutor interface {
 	// Expected errors:
 	// - storage.ErrHeightNotIndexed if the data for the block height is not available
 	GetAccountAtBlockHeight(ctx context.Context, address flow.Address, height uint64) (*flow.Account, error)
+
+	GetAccountBalance(ctx context.Context, address flow.Address, height uint64) (*flow.Account, error)
+
+	GetAccountKeys(ctx context.Context, address flow.Address, height uint64) (*flow.Account, error)
 }
 
 var _ ScriptExecutor = (*Scripts)(nil)
@@ -118,6 +122,32 @@ func (s *Scripts) ExecuteAtBlockHeight(
 // - Script execution related errors
 // - storage.ErrHeightNotIndexed if the data for the block height is not available
 func (s *Scripts) GetAccountAtBlockHeight(ctx context.Context, address flow.Address, height uint64) (*flow.Account, error) {
+	snap, header, err := s.snapshotWithBlock(height)
+	if err != nil {
+		return nil, err
+	}
+
+	return s.executor.GetAccount(ctx, address, header, snap)
+}
+
+// GetAccountBalance returns a Flow account by the provided address and block height.
+// Expected errors:
+// - Script execution related errors
+// - storage.ErrHeightNotIndexed if the data for the block height is not available
+func (s *Scripts) GetAccountBalance(ctx context.Context, address flow.Address, height uint64) (*flow.Account, error) {
+	snap, header, err := s.snapshotWithBlock(height)
+	if err != nil {
+		return nil, err
+	}
+
+	return s.executor.GetAccount(ctx, address, header, snap)
+}
+
+// GetAccountKeys returns a Flow account by the provided address and block height.
+// Expected errors:
+// - Script execution related errors
+// - storage.ErrHeightNotIndexed if the data for the block height is not available
+func (s *Scripts) GetAccountKeys(ctx context.Context, address flow.Address, height uint64) (*flow.Account, error) {
 	snap, header, err := s.snapshotWithBlock(height)
 	if err != nil {
 		return nil, err
