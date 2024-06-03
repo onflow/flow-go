@@ -146,8 +146,6 @@ func NewConsensusCommittee(state protocol.State, me flow.Identifier) (*Consensus
 
 	// pre-compute leader selection for all presently relevant committed epochs
 	epochs := make([]protocol.Epoch, 0, 3)
-	// we always prepare the current epoch
-	epochs = append(epochs, final.Epochs().Current())
 
 	// we prepare the previous epoch, if one exists
 	exists, err := protocol.PreviousEpochExists(final)
@@ -157,6 +155,9 @@ func NewConsensusCommittee(state protocol.State, me flow.Identifier) (*Consensus
 	if exists {
 		epochs = append(epochs, final.Epochs().Previous())
 	}
+
+	// we always prepare the current epoch
+	epochs = append(epochs, final.Epochs().Current())
 
 	// we prepare the next epoch, if it is committed
 	phase, err := final.Phase()
@@ -180,7 +181,7 @@ func NewConsensusCommittee(state protocol.State, me flow.Identifier) (*Consensus
 	}
 
 	// if epoch emergency fallback was triggered, inject the fallback epoch
-	// TODO: consider replacing with phase check when it's available
+	// TODO(EFM, #6020): consider replacing with phase check when it's available
 	if epochStateSnapshot.EpochFallbackTriggered() {
 		err = com.onEpochEmergencyFallbackTriggered()
 		if err != nil {

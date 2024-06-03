@@ -164,7 +164,7 @@ func NewEpochLookup(state protocol.State) (*EpochLookup, error) {
 	}
 
 	// if epoch fallback was triggered, note it here
-	// TODO: consider replacing with phase check when it's available
+	// TODO(EFM, 6020): consider replacing with phase check when it's available
 	if epochStateSnapshot.EpochFallbackTriggered() {
 		lookup.epochFallbackIsTriggered.Store(true)
 	}
