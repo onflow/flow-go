@@ -33,7 +33,7 @@ func NewEVMCallTracer(uploader Uploader, logger zerolog.Logger) (*CallTracer, er
 	}
 
 	return &CallTracer{
-		logger:   logger.With().Str("component", "evm-tracer").Logger(),
+		logger:   logger.With().Str("module", "evm-tracer").Logger(),
 		tracer:   tracer,
 		uploader: uploader,
 	}, nil
