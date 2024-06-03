@@ -7,7 +7,6 @@ import (
 	"io"
 	"math/big"
 	"math/rand"
-	"os"
 	"testing"
 
 	"cloud.google.com/go/storage"
@@ -15,14 +14,14 @@ import (
 	"github.com/onflow/go-ethereum/core/vm"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
+
+	testutils "github.com/onflow/flow-go/utils/unittest"
 )
 
 func Test_Uploader(t *testing.T) {
-	//testutils.SkipUnless(t, testutils.TEST_REQUIRES_GCP_ACCESS, "requires GCP Bucket setup")
+	testutils.SkipUnless(t, testutils.TEST_REQUIRES_GCP_ACCESS, "requires GCP Bucket setup")
 
 	t.Run("successfuly upload traces", func(t *testing.T) {
-		os.Setenv("STORAGE_EMULATOR_HOST", "localhost:9023") // todo remove after local
-
 		uploader, err := NewGCPUploader()
 		require.NoError(t, err)
 
@@ -49,11 +48,9 @@ func Test_Uploader(t *testing.T) {
 }
 
 func Test_TracerUploaderIntegration(t *testing.T) {
-	//testutils.SkipUnless(t, testutils.TEST_REQUIRES_GCP_ACCESS, "requires GCP Bucket setup")
+	testutils.SkipUnless(t, testutils.TEST_REQUIRES_GCP_ACCESS, "requires GCP Bucket setup")
 
 	t.Run("successfuly uploads traces", func(t *testing.T) {
-		os.Setenv("STORAGE_EMULATOR_HOST", "localhost:9023") // todo remove after local
-
 		uploader, err := NewGCPUploader()
 		require.NoError(t, err)
 
