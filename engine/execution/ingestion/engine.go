@@ -417,6 +417,7 @@ func (s snapshotLoggingWrapper) Get(id flow.RegisterID) (flow.RegisterValue, err
 
 	if id.Owner == string(flow.HexToAddress("0x8c5303eaa26202d6").Bytes()) {
 		log.Debug().
+			Err(err).
 			Str("key", id.String()).
 			Str("value", hex.EncodeToString(value)).
 			Msg("get register from storage")
