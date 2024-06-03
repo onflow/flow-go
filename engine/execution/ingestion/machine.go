@@ -2,6 +2,7 @@ package ingestion
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 
 	"github.com/rs/zerolog"
@@ -13,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/ingestion/uploader"
 	"github.com/onflow/flow-go/engine/execution/provider"
 	"github.com/onflow/flow-go/engine/execution/state"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/mempool/entity"
@@ -163,6 +165,8 @@ func (e *Machine) ExecuteBlock(ctx context.Context, executableBlock *entity.Exec
 		executableBlock.Block.Header.Height-1,
 	)
 
+	snapshot = snapshotLoggingWrapper{snapshot, e.log}
+
 	computationResult, err := e.computationManager.ComputeBlock(
 		ctx,
 		parentErID,
@@ -173,4 +177,23 @@ func (e *Machine) ExecuteBlock(ctx context.Context, executableBlock *entity.Exec
 	}
 
 	return computationResult, nil
+}
+
+type snapshotLoggingWrapper struct {
+	snapshot.StorageSnapshot
+
+	log zerolog.Logger
+}
+
+func (s snapshotLoggingWrapper) Get(id flow.RegisterID) (flow.RegisterValue, error) {
+	value, err := s.StorageSnapshot.Get(id)
+
+	if id.Owner == string(flow.HexToAddress("0x8c5303eaa26202d6").Bytes()) {
+		s.log.Info().
+			Str("key", id.String()).
+			Str("value", hex.EncodeToString(value)).
+			Msg("get register from storage")
+	}
+
+	return value, err
 }
