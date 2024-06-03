@@ -760,18 +760,14 @@ func TestCallingExtraPrecompiles(t *testing.T) {
 
 func TestTransactionTracing(t *testing.T) {
 
-	t.Run("contract call", func(t *testing.T) {
-
+	// runWithDeployedContract is a helper function that will deploy a contract we can use to interact with
+	runWithDeployedContract := func(t *testing.T, f func(*testutils.TestContract, *testutils.EOATestAccount, *emulator.Emulator)) {
 		testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
 			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
 				testutils.RunWithEOATestAccount(t, backend, rootAddr, func(testAccount *testutils.EOATestAccount) {
 					RunWithNewEmulator(t, backend, rootAddr, func(emu *emulator.Emulator) {
 						testContract := testutils.GetStorageTestContract(t)
 						nonce := testAccount.Nonce()
-
-						var txID gethCommon.Hash
-						var contractAddr types.Address
-						var trace json.RawMessage
 
 						// deploy contract
 						RunWithNewBlockView(t, emu, func(blk types.BlockView) {
@@ -785,55 +781,151 @@ func TestTransactionTracing(t *testing.T) {
 							res, err := blk.DirectCall(call)
 							require.NoError(t, err)
 							require.NotNil(t, res.DeployedContractAddress)
-							contractAddr = *res.DeployedContractAddress
-							nonce += 1
+
+							testContract.DeployedAt = *res.DeployedContractAddress
+							f(testContract, testAccount, emu)
 						})
-
-						uploaded := make(chan struct{})
-						uploader := testutils.MockUploader{
-							UploadFunc: func(id string, message json.RawMessage) error {
-								uploaded <- struct{}{}
-								require.Equal(t, txID.String(), id)
-								require.Equal(t, trace, message)
-								return nil
-							},
-						}
-
-						tracer, err := debug.NewEVMCallTracer(uploader, zerolog.Nop())
-						require.NoError(t, err)
-
-						// manually create block with provided tracer
-						defaultCtx.Tracer = tracer.TxTracer()
-						blk, err := emu.NewBlockView(defaultCtx)
-						require.NoError(t, err)
-
-						// interact and record trace
-						res, err := blk.DirectCall(
-							types.NewContractCall(
-								testAccount.Address(),
-								contractAddr,
-								testContract.MakeCallData(t, "store", big.NewInt(2)),
-								1_000_000,
-								big.NewInt(0),
-								nonce,
-							),
-						)
-						require.NoError(t, err)
-						txID = res.TxHash
-						trace, err = tracer.TxTracer().GetResult()
-						require.NoError(t, err)
-
-						tracer.Collect(txID)
-
-						require.Eventuallyf(t, func() bool {
-							<-uploaded
-							return true
-						}, time.Second, time.Millisecond*100, "upload did not execute")
 					})
-
 				})
 			})
 		})
+	}
+
+	// manually create block with the provided tracer injected
+	blockWithTracer := func(t *testing.T, emu *emulator.Emulator) (types.BlockView, *testutils.MockUploader, *debug.CallTracer) {
+		uploader := &testutils.MockUploader{}
+		tracer, err := debug.NewEVMCallTracer(uploader, zerolog.Nop())
+		require.NoError(t, err)
+
+		// manually create block with provided tracer
+		defaultCtx.Tracer = tracer.TxTracer()
+		blk, err := emu.NewBlockView(defaultCtx)
+		require.NoError(t, err)
+
+		return blk, uploader, tracer
+	}
+
+	t.Run("contract interaction using direct call", func(t *testing.T) {
+		runWithDeployedContract(t, func(testContract *testutils.TestContract, testAccount *testutils.EOATestAccount, emu *emulator.Emulator) {
+			blk, uploader, tracer := blockWithTracer(t, emu)
+
+			var txID gethCommon.Hash
+			var trace json.RawMessage
+			uploaded := make(chan struct{})
+
+			uploader.UploadFunc = func(id string, message json.RawMessage) error {
+				uploaded <- struct{}{}
+				require.Equal(t, txID.String(), id)
+				require.Equal(t, trace, message)
+				return nil
+			}
+
+			// interact and record trace
+			res, err := blk.DirectCall(
+				types.NewContractCall(
+					testAccount.Address(),
+					testContract.DeployedAt,
+					testContract.MakeCallData(t, "store", big.NewInt(2)),
+					1_000_000,
+					big.NewInt(0),
+					testAccount.Nonce(),
+				),
+			)
+			require.NoError(t, err)
+			txID = res.TxHash
+			trace, err = tracer.TxTracer().GetResult()
+			require.NoError(t, err)
+
+			tracer.Collect(txID)
+
+			require.Eventuallyf(t, func() bool {
+				<-uploaded
+				return true
+			}, time.Second, time.Millisecond*100, "upload did not execute")
+		})
+	})
+
+	t.Run("contract interaction using run transaction", func(t *testing.T) {
+		runWithDeployedContract(t, func(testContract *testutils.TestContract, testAccount *testutils.EOATestAccount, emu *emulator.Emulator) {
+			blk, uploader, tracer := blockWithTracer(t, emu)
+
+			var txID gethCommon.Hash
+			var trace json.RawMessage
+			uploaded := make(chan struct{})
+
+			uploader.UploadFunc = func(id string, message json.RawMessage) error {
+				uploaded <- struct{}{}
+				require.Equal(t, txID.String(), id)
+				require.Equal(t, trace, message)
+				return nil
+			}
+
+			tx := testAccount.PrepareAndSignTx(
+				t,
+				testContract.DeployedAt.ToCommon(),
+				testContract.MakeCallData(t, "store", big.NewInt(2)),
+				big.NewInt(0),
+				1_000_000,
+				big.NewInt(0),
+			)
+
+			// interact and record trace
+			res, err := blk.RunTransaction(tx)
+			require.NoError(t, err)
+			txID = res.TxHash
+			trace, err = tracer.TxTracer().GetResult()
+			require.NoError(t, err)
+
+			tracer.Collect(txID)
+
+			require.Eventuallyf(t, func() bool {
+				<-uploaded
+				return true
+			}, time.Second, time.Millisecond*100, "upload did not execute")
+		})
+
+	})
+
+	t.Run("contract interaction using run batch transaction", func(t *testing.T) {
+		runWithDeployedContract(t, func(testContract *testutils.TestContract, testAccount *testutils.EOATestAccount, emu *emulator.Emulator) {
+			blk, uploader, tracer := blockWithTracer(t, emu)
+
+			var txID gethCommon.Hash
+			var trace json.RawMessage
+			uploaded := make(chan struct{})
+
+			uploader.UploadFunc = func(id string, message json.RawMessage) error {
+				uploaded <- struct{}{}
+				require.Equal(t, txID.String(), id)
+				require.Equal(t, trace, message)
+				return nil
+			}
+
+			tx := testAccount.PrepareAndSignTx(
+				t,
+				testContract.DeployedAt.ToCommon(),
+				testContract.MakeCallData(t, "store", big.NewInt(2)),
+				big.NewInt(0),
+				1_000_000,
+				big.NewInt(0),
+			)
+
+			// interact and record trace
+			results, err := blk.BatchRunTransactions([]*gethTypes.Transaction{tx})
+			require.NoError(t, err)
+			require.Len(t, results, 1)
+			txID = results[0].TxHash
+			trace, err = tracer.TxTracer().GetResult()
+			require.NoError(t, err)
+
+			tracer.Collect(txID)
+
+			require.Eventuallyf(t, func() bool {
+				<-uploaded
+				return true
+			}, time.Second, time.Millisecond*100, "upload did not execute")
+		})
+
 	})
 
 }
