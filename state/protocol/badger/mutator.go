@@ -694,8 +694,10 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 		events = append(events, epochTransitionEvents...)
 	}
 
-	// Determine metric updates and protocol events related to epoch phase
-	// changes and epoch transitions.
+	// Determine metric updates and protocol events related to epoch phase changes and epoch transitions.
+	// If epoch emergency fallback is triggered, the current epoch continues until
+	// the next spork - so skip these updates.
+	// TODO(EFM, #5732, 6013): needs update for EFM recovery
 	if !epochFallbackTriggered {
 		epochPhaseMetrics, epochPhaseEvents, err := m.epochPhaseMetricsAndEventsOnBlockFinalized(block)
 		if err != nil {

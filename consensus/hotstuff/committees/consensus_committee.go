@@ -112,6 +112,7 @@ func newEmergencyFallbackEpoch(lastCommittedEpoch *staticEpochInfo) (*staticEpoc
 
 // Consensus represents the main committee for consensus nodes. The consensus
 // committee might be active for multiple successive epochs.
+// TODO(EFM, #5730): This implementation does not yet understand EFM recovery and needs to be updated.
 type Consensus struct {
 	state                  protocol.State              // the protocol state
 	me                     flow.Identifier             // the node ID of this node
