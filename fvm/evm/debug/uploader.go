@@ -9,8 +9,6 @@ import (
 	"cloud.google.com/go/storage"
 )
 
-const bucketName = "evm-tx-trace"
-
 type Uploader interface {
 	Upload(id string, data json.RawMessage) error
 }
@@ -22,7 +20,7 @@ type GCPUploader struct {
 	bucket *storage.BucketHandle
 }
 
-func NewGCPUploader() (*GCPUploader, error) {
+func NewGCPUploader(bucketName string) (*GCPUploader, error) {
 	// no need to close the client according to documentation
 	// https://pkg.go.dev/cloud.google.com/go/storage#Client.Close
 	ctx := context.Background()

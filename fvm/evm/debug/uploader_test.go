@@ -18,14 +18,17 @@ import (
 	testutils "github.com/onflow/flow-go/utils/unittest"
 )
 
+// we use previewnet bucket for integraiton test
+const bucket = "previewnet1-evm-execution-traces"
+
 func Test_Uploader(t *testing.T) {
 	testutils.SkipUnless(t, testutils.TEST_REQUIRES_GCP_ACCESS, "requires GCP Bucket setup")
 
 	t.Run("successfuly upload traces", func(t *testing.T) {
-		uploader, err := NewGCPUploader()
+		uploader, err := NewGCPUploader(bucket)
 		require.NoError(t, err)
 
-		const testID = "test_1"
+		const testID = "test_p"
 
 		data := json.RawMessage(fmt.Sprintf(`{ "test": %d }`, rand.Int()))
 
@@ -35,7 +38,7 @@ func Test_Uploader(t *testing.T) {
 		// check uploaded object
 		client, err := storage.NewClient(context.Background())
 		require.NoError(t, err)
-		bucket := client.Bucket(bucketName)
+		bucket := client.Bucket(bucket)
 
 		reader, err := bucket.Object(testID).NewReader(context.Background())
 		require.NoError(t, err)
@@ -51,7 +54,7 @@ func Test_TracerUploaderIntegration(t *testing.T) {
 	testutils.SkipUnless(t, testutils.TEST_REQUIRES_GCP_ACCESS, "requires GCP Bucket setup")
 
 	t.Run("successfuly uploads traces", func(t *testing.T) {
-		uploader, err := NewGCPUploader()
+		uploader, err := NewGCPUploader(bucket)
 		require.NoError(t, err)
 
 		tracer, err := NewEVMCallTracer(uploader, zerolog.Nop())
@@ -73,7 +76,7 @@ func Test_TracerUploaderIntegration(t *testing.T) {
 		// check uploaded object
 		client, err := storage.NewClient(context.Background())
 		require.NoError(t, err)
-		bucket := client.Bucket(bucketName)
+		bucket := client.Bucket(bucket)
 
 		reader, err := bucket.
 			Object(id.String()).
