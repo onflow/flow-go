@@ -53,12 +53,16 @@ type StateMachine interface {
 	//     after such error and discard the StateMachine!
 	ProcessEpochCommit(epochCommit *flow.EpochCommit) (bool, error)
 
-	// ProcessEpochRecover updates the internally-maintained interim Epoch state with data from epoch recover event
-	// in an attempt to recover from Epoch Fallback Mode(EFM) and get back on happy path track.
-	// Specifically, after successfully processing this event, we will have a next epoch in committed phase and leave the EFM.
-	// As a result of this operation protocol state for the next epoch will be created.
-	// Returned boolean indicates if event triggered a transition in the state machine or not.
-	// Implementors must never return (true, error).
+	// ProcessEpochRecover updates the internally-maintained interim Epoch state with data from epoch recover
+	// event in an attempt to recover from Epoch Fallback Mode [EFM] and get back on happy path.
+	// Specifically, after successfully processing this event, we will have a next epoch (as specified by the
+	// EpochRecover event) in the protocol state, which is in the committed phase. Subsequently, the epoch
+	// protocol can proceed following the happy path. Therefore, we set `EpochFallbackTriggered` back to false.
+	//
+	// The boolean return indicates if the input event triggered a transition in the state machine or not.
+	// For the EpochRecover event, we return false if and only if there is an error. The reason is that
+	// either the `EpochRecover` event is rejected (leading to `InvalidServiceEventError`) or there is an
+	// exception processing the event. Otherwise, an `EpochRecover` event must always lead to a state change.
 	// Expected errors during normal operations:
 	//   - `protocol.InvalidServiceEventError` - if the service event is invalid or is not a valid state transition for the current protocol state.
 	ProcessEpochRecover(epochRecover *flow.EpochRecover) (bool, error)

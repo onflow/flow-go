@@ -137,10 +137,8 @@ func (u *HappyPathStateMachine) ProcessEpochCommit(epochCommit *flow.EpochCommit
 	return true, nil
 }
 
-// ProcessEpochRecover returns a sentinel error, indicating that the HappyPathStateMachine does not process epoch recover events.
-// It is not expected that we receive such an event while on the happy path.
-// Expected error returns during normal operations:
-//   - `protocol.InvalidServiceEventError` - if service event was received while on the happy path.
+// ProcessEpochRecover returns the sentinel error `protocol.InvalidServiceEventError`, which
+// indicates that `EpochRecover` are not expected on the happy path of epoch lifecycle.
 func (u *HappyPathStateMachine) ProcessEpochRecover(*flow.EpochRecover) (bool, error) {
 	return false, protocol.NewInvalidServiceEventErrorf("epoch recover event received while on happy path")
 }
