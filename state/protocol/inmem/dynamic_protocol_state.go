@@ -31,8 +31,8 @@ func (s *DynamicProtocolStateAdapter) GlobalParams() protocol.GlobalParams {
 }
 
 // EpochFallbackTriggered denotes whether an invalid epoch state transition was attempted
-// on the fork ending this block. Once the first block where this flag is true is finalized, epoch
-// fallback mode is triggered. This flag is reset to false when the block which recovers epoch has been finalized.
+// on the fork ending in this block. Once the first block where this flag is true is finalized, epoch
+// fallback mode is triggered. This flag is reset to false when finalizing a block that seals a valid EpochRecover service event.
 func (s *DynamicProtocolStateAdapter) EpochFallbackTriggered() bool {
 	return s.ProtocolStateEntry.EpochFallbackTriggered
 }
