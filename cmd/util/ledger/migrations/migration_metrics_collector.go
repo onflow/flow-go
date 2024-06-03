@@ -22,14 +22,15 @@ import (
 const metricsCollectingMigrationName = "metrics_collecting_migration"
 
 type MetricsCollectingMigration struct {
-	name             string
-	chainID          flow.ChainID
-	log              zerolog.Logger
-	mutex            sync.RWMutex
-	reporter         reporters.ReportWriter
-	metricsCollector *MigrationMetricsCollector
-	migratedTypes    map[common.TypeID]struct{}
-	programs         map[common.Location]*interpreter.Program
+	name              string
+	chainID           flow.ChainID
+	log               zerolog.Logger
+	mutex             sync.RWMutex
+	reporter          reporters.ReportWriter
+	metricsCollector  *MigrationMetricsCollector
+	migratedTypes     map[common.TypeID]struct{}
+	migratedContracts map[common.Location]struct{}
+	programs          map[common.Location]*interpreter.Program
 }
 
 var _ migrations.ValueMigration = &MetricsCollectingMigration{}
@@ -62,6 +63,7 @@ func (m *MetricsCollectingMigration) InitMigration(
 	_ int,
 ) error {
 	m.migratedTypes = make(map[common.TypeID]struct{})
+	m.migratedContracts = make(map[common.Location]struct{})
 
 	// If the program is available, that means the associated contracts is compatible with Cadence 1.0.
 	// i.e: the contract is either migrated to be compatible with 1.0 or existing contract already compatible.
@@ -71,12 +73,20 @@ func (m *MetricsCollectingMigration) InitMigration(
 		contract := program.Program.SoleContractDeclaration()
 		if contract != nil {
 			nestedDecls = contract.Members
+
+			contractType := program.Elaboration.CompositeDeclarationType(contract)
+			m.migratedTypes[contractType.ID()] = struct{}{}
+			m.migratedContracts[contractType.Location] = struct{}{}
 		} else {
 			contractInterface := program.Program.SoleContractInterfaceDeclaration()
 			if contractInterface == nil {
 				panic(errors.NewUnreachableError())
 			}
 			nestedDecls = contractInterface.Members
+
+			contractInterfaceType := program.Elaboration.InterfaceDeclarationType(contractInterface)
+			m.migratedTypes[contractInterfaceType.ID()] = struct{}{}
+			m.migratedContracts[contractInterfaceType.Location] = struct{}{}
 		}
 
 		for _, compositeDecl := range nestedDecls.Composites() {
@@ -105,7 +115,8 @@ func (m *MetricsCollectingMigration) InitMigration(
 
 		// Entitlements are not needed, since old values won't have them.
 
-		// TODO: also add the contract type itself?
+		// TODO: Anything else? e.g: Enum cases?
+
 	}
 
 	return nil
@@ -284,6 +295,17 @@ func (m *MetricsCollectingMigration) checkAndRecordIsTypeMigrated(typeID sema.Ty
 		// If this type is not migrated/usable with cadence 1.0,
 		// then record this as an erroneous value.
 		m.metricsCollector.RecordErrorForContract(location)
+
+		// If the type is not migrated, but the contract is migrated, then report an error.
+		// This is more likely to be an implementation error, where the typeID haven't got added to the list.
+		_, ok := m.migratedContracts[location]
+		if ok {
+			m.log.Error().Msgf(
+				"contract `%s` is migrated, but the cannot find the migrated type: `%s`",
+				location,
+				typeID,
+			)
+		}
 	}
 
 	return ok
