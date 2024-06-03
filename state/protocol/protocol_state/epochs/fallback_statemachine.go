@@ -24,7 +24,7 @@ type FallbackStateMachine struct {
 
 var _ StateMachine = (*FallbackStateMachine)(nil)
 
-// NewFallbackStateMachine constructs a state machine for epoch fallback, it automatically sets
+// NewFallbackStateMachine constructs a state machine for epoch fallback. It automatically sets
 // EpochFallbackTriggered to true, thereby recording that we have entered epoch fallback mode.
 // No errors are expected during normal operations.
 func NewFallbackStateMachine(params protocol.GlobalParams, view uint64, parentState *flow.RichProtocolStateEntry) (*FallbackStateMachine, error) {

@@ -20,8 +20,8 @@ func IsValidExtendingEpochSetup(extendingSetup *flow.EpochSetup, protocolStateEn
 		// true iff EpochSetup event for NEXT epoch was already included before
 		return NewInvalidServiceEventErrorf("duplicate epoch setup service event: %x", protocolStateEntry.NextEpoch.SetupID)
 	}
-	if extendingSetup.Counter != protocolStateEntry.CurrentEpochSetup.Counter+1 { // The setup event should have the counter increased by one.
-		return NewInvalidServiceEventErrorf("next epoch setup has invalid counter (%d => %d)", protocolStateEntry.CurrentEpochSetup.Counter, extendingSetup.Counter)
+	if extendingSetup.Counter != protocolStateEntry.EpochCounter()+1 { // The setup event should have the counter increased by one.
+		return NewInvalidServiceEventErrorf("next epoch setup has invalid counter (%d => %d)", protocolStateEntry.EpochCounter(), extendingSetup.Counter)
 	}
 	if extendingSetup.FirstView != protocolStateEntry.CurrentEpochFinalView()+1 { // The first view needs to be exactly one greater than the current epoch final view
 		return NewInvalidServiceEventErrorf(
