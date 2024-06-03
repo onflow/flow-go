@@ -62,7 +62,7 @@ func (s *EpochFallbackStateMachineSuite) TestProcessEpochCommitIsNoop() {
 	require.Equal(s.T(), s.parentProtocolState.ID(), s.stateMachine.ParentState().ID())
 }
 
-// TestProcessEpochRecover ensures that after processing EpochRecover event the state machine initializes
+// TestProcessEpochRecover ensures that after processing EpochRecover event, the state machine initializes
 // correctly the next epoch with expected values. Tests happy path scenario where the next epoch has been set up correctly.
 func (s *EpochFallbackStateMachineSuite) TestProcessEpochRecover() {
 	nextEpochParticipants := s.parentProtocolState.CurrentEpochIdentityTable.Copy()
@@ -111,7 +111,7 @@ func (s *EpochFallbackStateMachineSuite) TestProcessInvalidEpochRecover() {
 		require.True(s.T(), protocol.IsInvalidServiceEventError(err))
 		require.False(s.T(), processed)
 	})
-	s.Run("invalid-first-view-with-extension", func() {
+	s.Run("invalid-first-view_ignores-epoch-extension", func() {
 		epochRecover := unittest.EpochRecoverFixture(func(setup *flow.EpochSetup) {
 			setup.Participants = nextEpochParticipants.ToSkeleton()
 			setup.Assignments = unittest.ClusterAssignment(1, nextEpochParticipants.ToSkeleton())
@@ -171,7 +171,7 @@ func (s *EpochFallbackStateMachineSuite) TestProcessInvalidEpochRecover() {
 		require.True(s.T(), protocol.IsInvalidServiceEventError(err))
 		require.False(s.T(), processed)
 	})
-	s.Run("reached-threshold", func() {
+	s.Run("reached-CommitSafetyThreshold_without-next-epoch-committed", func() {
 		epochRecover := unittest.EpochRecoverFixture(func(setup *flow.EpochSetup) {
 			setup.Participants = nextEpochParticipants.ToSkeleton()
 			setup.Assignments = unittest.ClusterAssignment(1, nextEpochParticipants.ToSkeleton())
