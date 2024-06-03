@@ -12,7 +12,6 @@ import (
 	gethParams "github.com/onflow/go-ethereum/params"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/fvm/evm/debug"
 	"github.com/onflow/flow-go/fvm/evm/emulator"
 	"github.com/onflow/flow-go/fvm/evm/testutils"
 	"github.com/onflow/flow-go/fvm/evm/types"
@@ -176,35 +175,21 @@ func TestContractInteraction(t *testing.T) {
 			t.Run("call contract", func(t *testing.T) {
 				num := big.NewInt(10)
 				RunWithNewEmulator(t, backend, rootAddr, func(env *emulator.Emulator) {
-					ctx := types.NewDefaultBlockContext(1)
-
-					uploader, err := debug.NewGCPUploader()
-					require.NoError(t, err)
-
-					tracer, err := debug.NewEVMCallTracer(uploader)
-					require.NoError(t, err)
-
-					ctx.Tracer = tracer.TxTracer()
-
-					blk, err := env.NewBlockView(ctx)
-					require.NoError(t, err)
-
-					res, err := blk.DirectCall(
-						types.NewContractCall(
-							testAccount,
-							contractAddr,
-							testContract.MakeCallData(t, "store", num),
-							1_000_000,
-							big.NewInt(0), // this should be zero because the contract doesn't have receiver
-							nonce,
-						),
-					)
-					require.NoError(t, err)
-					require.GreaterOrEqual(t, res.GasConsumed, uint64(40_000))
-					nonce += 1
-
-					tracer.Collect(res.TxHash)
-					require.NoError(t, err)
+					RunWithNewBlockView(t, env, func(blk types.BlockView) {
+						res, err := blk.DirectCall(
+							types.NewContractCall(
+								testAccount,
+								contractAddr,
+								testContract.MakeCallData(t, "store", num),
+								1_000_000,
+								big.NewInt(0), // this should be zero because the contract doesn't have receiver
+								nonce,
+							),
+						)
+						require.NoError(t, err)
+						require.GreaterOrEqual(t, res.GasConsumed, uint64(40_000))
+						nonce += 1
+					})
 				})
 
 				RunWithNewEmulator(t, backend, rootAddr, func(env *emulator.Emulator) {
