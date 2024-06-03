@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -22,7 +23,6 @@ import (
 	"github.com/onflow/flow-go/module/counters"
 	downloadermock "github.com/onflow/flow-go/module/executiondatasync/execution_data/mock"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
 	modulemock "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/signature"
@@ -267,20 +267,21 @@ func (s *Suite) TestOnFinalizedBlockSingle() {
 		s.results.On("Index", seal.BlockID, seal.ResultID).Return(nil).Once()
 	}
 
+	missingCollectionCount := 4
 	wg := sync.WaitGroup{}
-	wg.Add(4)
+	wg.Add(missingCollectionCount)
 
 	for _, cg := range block.Payload.Guarantees {
-		s.request.On("EntityByID", cg.CollectionID, mock.Anything).Return().Once()
-		wg.Done()
+		s.request.On("EntityByID", cg.CollectionID, mock.Anything).Return().Run(func(args mock.Arguments) {
+			// Ensure the test does not complete its work faster than necessary
+			wg.Done()
+		}).Once()
 	}
 
 	// process the block through the finalized callback
 	eng.OnFinalizedBlock(&hotstuffBlock)
-	s.Assertions.Eventually(func() bool {
-		wg.Wait()
-		return true
-	}, time.Second, 10*time.Millisecond)
+
+	unittest.RequireReturnsBefore(s.T(), wg.Wait, 100*time.Millisecond, "expect to process new block before timeout")
 
 	// assert that the block was retrieved and all collections were requested
 	s.headers.AssertExpectations(s.T())
@@ -328,17 +329,19 @@ func (s *Suite) TestOnFinalizedBlockSeveralBlocksAhead() {
 		BlockID: latestBlock.ID(),
 	}
 
-	requestCountPerBlock := 4
+	missingCollectionCountPerBlock := 4
 	wg := sync.WaitGroup{}
-	wg.Add(requestCountPerBlock * newBlocksCount)
+	wg.Add(missingCollectionCountPerBlock * newBlocksCount)
 
 	// expected all new blocks after last block processed
 	for _, block := range blocks {
 		s.blocks.On("IndexBlockForCollections", block.ID(), []flow.Identifier(flow.GetIDs(block.Payload.Guarantees))).Return(nil).Once()
 
 		for _, cg := range block.Payload.Guarantees {
-			s.request.On("EntityByID", cg.CollectionID, mock.Anything).Return().Once()
-			wg.Done()
+			s.request.On("EntityByID", cg.CollectionID, mock.Anything).Return().Run(func(args mock.Arguments) {
+				// Ensure the test does not complete its work faster than necessary, so we can check all expected results
+				wg.Done()
+			}).Once()
 		}
 		for _, seal := range block.Payload.Seals {
 			s.results.On("Index", seal.BlockID, seal.ResultID).Return(nil).Once()
@@ -347,10 +350,7 @@ func (s *Suite) TestOnFinalizedBlockSeveralBlocksAhead() {
 
 	eng.OnFinalizedBlock(&hotstuffBlock)
 
-	s.Assertions.Eventually(func() bool {
-		wg.Wait()
-		return true
-	}, time.Second, 10*time.Millisecond)
+	unittest.RequireReturnsBefore(s.T(), wg.Wait, 100*time.Millisecond, "expect to process all blocks before timeout")
 
 	expectedEntityByIDCalls := 0
 	expectedIndexCalls := 0
