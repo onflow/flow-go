@@ -211,10 +211,11 @@ func (s *Suite) mockCollectionsForBlock(block flow.Block) {
 
 // generateBlock prepares block with payload and specified guarantee.SignerIndices
 func (s *Suite) generateBlock(clusterCommittee flow.IdentitySkeletonList, snap *protocol.Snapshot) flow.Block {
-	block := unittest.FullBlockFixture()
+	block := unittest.BlockFixture()
 	block.SetPayload(unittest.PayloadFixture(
 		unittest.WithGuarantees(unittest.CollectionGuaranteesFixture(4)...),
 		unittest.WithExecutionResults(unittest.ExecutionResultFixture()),
+		unittest.WithSeals(unittest.Seal.Fixture()),
 	))
 
 	refBlockID := unittest.IdentifierFixture()
@@ -284,7 +285,7 @@ func (s *Suite) TestOnFinalizedBlockSingle() {
 	// assert that the block was retrieved and all collections were requested
 	s.headers.AssertExpectations(s.T())
 	s.request.AssertNumberOfCalls(s.T(), "EntityByID", len(block.Payload.Guarantees))
-	s.request.AssertNumberOfCalls(s.T(), "Index", len(block.Payload.Seals))
+	s.results.AssertNumberOfCalls(s.T(), "Index", len(block.Payload.Seals))
 }
 
 // TestOnFinalizedBlockSeveralBlocksAhead checks OnFinalizedBlock with a block several blocks newer than the last block processed
@@ -357,10 +358,11 @@ func (s *Suite) TestOnFinalizedBlockSeveralBlocksAhead() {
 		expectedEntityByIDCalls += len(block.Payload.Guarantees)
 		expectedIndexCalls += len(block.Payload.Seals)
 	}
+
 	s.headers.AssertExpectations(s.T())
 	s.blocks.AssertNumberOfCalls(s.T(), "IndexBlockForCollections", newBlocksCount)
 	s.request.AssertNumberOfCalls(s.T(), "EntityByID", expectedEntityByIDCalls)
-	s.request.AssertNumberOfCalls(s.T(), "Index", expectedIndexCalls)
+	s.results.AssertNumberOfCalls(s.T(), "Index", expectedIndexCalls)
 }
 
 // TestOnCollection checks that when a Collection is received, it is persisted
