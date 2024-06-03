@@ -412,16 +412,14 @@ type snapshotLoggingWrapper struct {
 	log zerolog.Logger
 }
 
-func (s snapshotLoggingWrapper) Get(id flow.RegisterID) (flow.RegisterValue, error) {
+func (s *snapshotLoggingWrapper) Get(id flow.RegisterID) (flow.RegisterValue, error) {
 	value, err := s.StorageSnapshot.Get(id)
 
-	if id.Owner == string(flow.HexToAddress("0x8c5303eaa26202d6").Bytes()) {
-		log.Debug().
-			Err(err).
-			Str("key", id.String()).
-			Str("value", hex.EncodeToString(value)).
-			Msg("get register from storage")
-	}
+	log.Info().
+		Err(err).
+		Str("key", id.String()).
+		Str("value", hex.EncodeToString(value)).
+		Msg("get register from storage")
 
 	return value, err
 }
@@ -465,7 +463,7 @@ func (e *Engine) executeBlock(
 		executableBlock.Block.Header.Height-1,
 	)
 
-	snapshot = snapshotLoggingWrapper{snapshot, lg}
+	snapshot = &snapshotLoggingWrapper{snapshot, lg}
 
 	computationResult, err := e.computationManager.ComputeBlock(
 		ctx,
