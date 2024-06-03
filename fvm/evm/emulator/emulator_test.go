@@ -817,6 +817,7 @@ func TestTransactionTracing(t *testing.T) {
 				uploaded <- struct{}{}
 				require.Equal(t, txID.String(), id)
 				require.Equal(t, trace, message)
+				require.Greater(t, len(message), 0)
 				return nil
 			}
 
@@ -826,6 +827,47 @@ func TestTransactionTracing(t *testing.T) {
 					testAccount.Address(),
 					testContract.DeployedAt,
 					testContract.MakeCallData(t, "store", big.NewInt(2)),
+					1_000_000,
+					big.NewInt(0),
+					testAccount.Nonce(),
+				),
+			)
+			require.NoError(t, err)
+			txID = res.TxHash
+			trace, err = tracer.TxTracer().GetResult()
+			require.NoError(t, err)
+
+			tracer.Collect(txID)
+
+			require.Eventuallyf(t, func() bool {
+				<-uploaded
+				return true
+			}, time.Second, time.Millisecond*100, "upload did not execute")
+		})
+	})
+
+	t.Run("contract deploy at using direct call", func(t *testing.T) {
+		runWithDeployedContract(t, func(testContract *testutils.TestContract, testAccount *testutils.EOATestAccount, emu *emulator.Emulator) {
+			blk, uploader, tracer := blockWithTracer(t, emu)
+
+			var txID gethCommon.Hash
+			var trace json.RawMessage
+			uploaded := make(chan struct{})
+
+			uploader.UploadFunc = func(id string, message json.RawMessage) error {
+				uploaded <- struct{}{}
+				require.Equal(t, txID.String(), id)
+				require.Equal(t, trace, message)
+				require.Greater(t, len(message), 0)
+				return nil
+			}
+
+			// interact and record trace
+			res, err := blk.DirectCall(
+				types.NewDeployCallWithTargetAddress(
+					testAccount.Address(),
+					types.Address{0x01, 0x02},
+					testContract.ByteCode,
 					1_000_000,
 					big.NewInt(0),
 					testAccount.Nonce(),
@@ -857,6 +899,7 @@ func TestTransactionTracing(t *testing.T) {
 				uploaded <- struct{}{}
 				require.Equal(t, txID.String(), id)
 				require.Equal(t, trace, message)
+				require.Greater(t, len(message), 0)
 				return nil
 			}
 
@@ -898,6 +941,7 @@ func TestTransactionTracing(t *testing.T) {
 				uploaded <- struct{}{}
 				require.Equal(t, txID.String(), id)
 				require.Equal(t, trace, message)
+				require.Greater(t, len(message), 0)
 				return nil
 			}
 
