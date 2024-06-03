@@ -152,7 +152,7 @@ func TestEVMRun(t *testing.T) {
 				require.Equal(t, blockEventPayload.Hash, txEventPayload.BlockHash)
 				require.Equal(t, blockEventPayload.Height, txEventPayload.BlockHeight)
 				require.Equal(t, blockEventPayload.TotalGasUsed, txEventPayload.GasConsumed)
-				require.Greater(t, blockEventPayload.TotalGasUsed, uint64(0))
+				require.Equal(t, uint64(43807), blockEventPayload.TotalGasUsed)
 				require.Empty(t, txEventPayload.ContractAddress)
 
 				// append the state
@@ -533,7 +533,7 @@ func TestEVMBatchRun(t *testing.T) {
 				blockEventPayload, err := types.DecodeBlockEventPayload(cadenceEvent)
 				require.NoError(t, err)
 				require.NotEmpty(t, blockEventPayload.Hash)
-				require.Greater(t, blockEventPayload.TotalGasUsed, uint64(0))
+				require.Equal(t, uint64(155183), blockEventPayload.TotalGasUsed)
 
 				// append the state
 				snapshot = snapshot.Append(state)
@@ -1012,7 +1012,7 @@ func TestEVMAddressDeposit(t *testing.T) {
 			blockEventPayload, err := types.DecodeBlockEventPayload(cadenceEvent)
 			require.NoError(t, err)
 			require.NotEmpty(t, blockEventPayload.Hash)
-			require.Greater(t, blockEventPayload.TotalGasUsed, uint64(0))
+			require.Equal(t, uint64(21000), blockEventPayload.TotalGasUsed)
 		})
 }
 
