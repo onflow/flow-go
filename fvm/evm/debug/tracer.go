@@ -2,10 +2,10 @@ package debug
 
 import (
 	"encoding/json"
-	"fmt"
 
 	gethCommon "github.com/onflow/go-ethereum/common"
 	"github.com/onflow/go-ethereum/eth/tracers"
+	"github.com/rs/zerolog"
 
 	// this import is needed for side-effects, because the
 	// tracers.DefaultDirectory is relying on the init function
@@ -20,11 +20,12 @@ type EVMTracer interface {
 var _ EVMTracer = &CallTracer{}
 
 type CallTracer struct {
+	logger   zerolog.Logger
 	tracer   tracers.Tracer
 	uploader Uploader
 }
 
-func NewEVMCallTracer(uploader Uploader) (*CallTracer, error) {
+func NewEVMCallTracer(uploader Uploader, logger zerolog.Logger) (*CallTracer, error) {
 	tracerType := json.RawMessage(`{ "onlyTopCall": true }`)
 	tracer, err := tracers.DefaultDirectory.New("callTracer", &tracers.Context{}, tracerType)
 	if err != nil {
@@ -32,6 +33,7 @@ func NewEVMCallTracer(uploader Uploader) (*CallTracer, error) {
 	}
 
 	return &CallTracer{
+		logger:   logger.With().Str("component", "evm-tracer").Logger(),
 		tracer:   tracer,
 		uploader: uploader,
 	}, nil
@@ -42,15 +44,23 @@ func (t *CallTracer) TxTracer() tracers.Tracer {
 }
 
 func (t *CallTracer) Collect(id gethCommon.Hash) {
-	res, err := t.tracer.GetResult()
-	if err != nil {
-		fmt.Println(err)
-	}
+	// upload is concurrent and it doesn't produce any errors, as the
+	// client doesn't expect it, we don't want to break execution flow,
+	// in case there are errors we retry, and if we fail after retries
+	// we log them and continue.
+	go func() {
+		l := t.logger.With().Str("tx-id", id.String()).Logger()
 
-	err = t.uploader.Upload(id.String(), res)
-	if err != nil {
-		fmt.Println(err)
-	}
+		res, err := t.tracer.GetResult()
+		if err != nil {
+			l.Error().Err(err).Msg("failed to produce trace results")
+		}
+
+		err = t.uploader.Upload(id.String(), res)
+		if err != nil {
+			l.Error().Err(err).Msg("failed to upload trace results")
+		}
+	}()
 }
 
 var _ EVMTracer = &NopTracer{}
