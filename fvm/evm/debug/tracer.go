@@ -63,12 +63,14 @@ func (t *CallTracer) Collect(id gethCommon.Hash) {
 	}()
 }
 
-var _ EVMTracer = &NopTracer{}
+var NopTracer = &nopTracer{}
 
-type NopTracer struct{}
+var _ EVMTracer = &nopTracer{}
 
-func (n NopTracer) TxTracer() tracers.Tracer {
+type nopTracer struct{}
+
+func (n nopTracer) TxTracer() tracers.Tracer {
 	return nil
 }
 
-func (n NopTracer) Collect(_ gethCommon.Hash) {}
+func (n nopTracer) Collect(_ gethCommon.Hash) {}
