@@ -2,6 +2,7 @@ package ingestion
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"sync"
@@ -17,6 +18,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/ingestion/uploader"
 	"github.com/onflow/flow-go/engine/execution/provider"
 	"github.com/onflow/flow-go/engine/execution/state"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/executiondatasync/pruner"
@@ -404,6 +406,25 @@ func (e *Engine) enqueueBlockAndCheckExecutable(
 	return missingCollections, nil
 }
 
+type snapshotLoggingWrapper struct {
+	snapshot.StorageSnapshot
+
+	log zerolog.Logger
+}
+
+func (s snapshotLoggingWrapper) Get(id flow.RegisterID) (flow.RegisterValue, error) {
+	value, err := s.StorageSnapshot.Get(id)
+
+	if id.Owner == string(flow.HexToAddress("0x8c5303eaa26202d6").Bytes()) {
+		log.Debug().
+			Str("key", id.String()).
+			Str("value", hex.EncodeToString(value)).
+			Msg("get register from storage")
+	}
+
+	return value, err
+}
+
 // executeBlock will execute the block.
 // When finish executing, it will check if the children becomes executable and execute them if yes.
 func (e *Engine) executeBlock(
@@ -442,6 +463,8 @@ func (e *Engine) executeBlock(
 		executableBlock.Block.Header.ParentID,
 		executableBlock.Block.Header.Height-1,
 	)
+
+	snapshot = snapshotLoggingWrapper{snapshot, lg}
 
 	computationResult, err := e.computationManager.ComputeBlock(
 		ctx,
