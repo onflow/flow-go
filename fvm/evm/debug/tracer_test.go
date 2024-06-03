@@ -9,25 +9,17 @@ import (
 	"github.com/onflow/go-ethereum/core/vm"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
+
+	"github.com/onflow/flow-go/fvm/evm/testutils"
 )
-
-type mockUploader struct {
-	uploadFunc func(string, json.RawMessage) error
-}
-
-func (m mockUploader) Upload(id string, data json.RawMessage) error {
-	return m.uploadFunc(id, data)
-}
-
-var _ Uploader = &mockUploader{}
 
 func Test_CallTracer(t *testing.T) {
 	t.Run("collect traces and upload them", func(t *testing.T) {
 		txID := gethCommon.Hash{0x05}
 		var res json.RawMessage
 
-		mockUpload := &mockUploader{
-			uploadFunc: func(id string, message json.RawMessage) error {
+		mockUpload := &testutils.MockUploader{
+			UploadFunc: func(id string, message json.RawMessage) error {
 				require.Equal(t, txID.String(), id)
 				require.Equal(t, res, message)
 				return nil

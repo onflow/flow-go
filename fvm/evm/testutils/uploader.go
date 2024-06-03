@@ -7,11 +7,11 @@ import (
 )
 
 type MockUploader struct {
-	uploadFunc func(string, json.RawMessage) error
+	UploadFunc func(string, json.RawMessage) error
 }
 
 func (m MockUploader) Upload(id string, data json.RawMessage) error {
-	return m.uploadFunc(id, data)
+	return m.UploadFunc(id, data)
 }
 
 var _ debug.Uploader = &MockUploader{}
