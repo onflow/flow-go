@@ -246,7 +246,6 @@ func (suite *EpochLookupSuite) TestProtocolEvents_CommittedEpoch() {
 func testEpochForViewWithFallback(t *testing.T, lookup *EpochLookup, state protocol.State, epochs ...epochRange) {
 	epochProtocolState, err := state.Final().EpochProtocolState()
 	require.NoError(t, err)
-
 	epochFallbackTriggered := epochProtocolState.EpochFallbackTriggered()
 
 	t.Run("should have set epoch fallback triggered correctly", func(t *testing.T) {

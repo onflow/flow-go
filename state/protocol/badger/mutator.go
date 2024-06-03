@@ -684,9 +684,8 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 	if err != nil {
 		return fmt.Errorf("could not check if block is first of epoch: %w", err)
 	}
-
 	if isFirstBlockOfEpoch {
-		epochTransitionMetrics, epochTransitionEvents := m.epochTransitionMetricsAndEventsOnBlockFinalized(header, epochStateSnapshot.EpochSetup())
+		epochTransitionMetrics, epochTransitionEvents := m.epochTransitionMetricsAndEventsOnBlockFinalized(header, currentEpochSetup)
 		if err != nil {
 			return fmt.Errorf("could not determine epoch transition metrics/events for finalized block: %w", err)
 		}
