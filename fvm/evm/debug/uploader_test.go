@@ -13,6 +13,7 @@ import (
 	"cloud.google.com/go/storage"
 	gethCommon "github.com/onflow/go-ethereum/common"
 	"github.com/onflow/go-ethereum/core/vm"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 )
 
@@ -56,7 +57,7 @@ func Test_TracerUploaderIntegration(t *testing.T) {
 		uploader, err := NewGCPUploader()
 		require.NoError(t, err)
 
-		tracer, err := NewEVMCallTracer(uploader)
+		tracer, err := NewEVMCallTracer(uploader, zerolog.Nop())
 		require.NoError(t, err)
 
 		tr := tracer.TxTracer()

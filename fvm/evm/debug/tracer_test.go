@@ -7,6 +7,7 @@ import (
 
 	gethCommon "github.com/onflow/go-ethereum/common"
 	"github.com/onflow/go-ethereum/core/vm"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 )
 
@@ -33,7 +34,7 @@ func Test_CallTracer(t *testing.T) {
 			},
 		}
 
-		tracer, err := NewEVMCallTracer(mockUpload)
+		tracer, err := NewEVMCallTracer(mockUpload, zerolog.Nop())
 		require.NoError(t, err)
 
 		from := gethCommon.HexToAddress("0x01")
