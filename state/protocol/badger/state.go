@@ -712,12 +712,11 @@ func OpenState(
 	}
 	metrics.SealedHeight(sealed.Height)
 
+	// initialize epoch-related metrics using the Protocol State from the latest finalized block
 	epochStateSnapshot, err := finalSnapshot.EpochProtocolState()
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve epoch protocol state: %w", err)
 	}
-
-	// update all epoch related metrics
 	err = updateEpochMetrics(metrics, finalSnapshot, epochStateSnapshot.EpochFallbackTriggered())
 	if err != nil {
 		return nil, fmt.Errorf("failed to update epoch metrics: %w", err)

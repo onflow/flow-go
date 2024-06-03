@@ -98,6 +98,7 @@ type StateMachineFactoryMethod func(candidateView uint64, parentState *flow.Rich
 // EpochStateMachine delegates the processing of service events to an embedded StateMachine,
 // which is either a HappyPathStateMachine or a FallbackStateMachine depending on the operation mode of the protocol.
 // It relies on Key-Value Store to read the parent state and to persist the snapshot of the updated Epoch state.
+// TODO(EFM, #6019): this structure needs to be updated to stop using parent state.
 type EpochStateMachine struct {
 	activeStateMachine               StateMachine
 	parentState                      protocol.KVStoreReader

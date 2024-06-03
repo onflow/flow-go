@@ -8,7 +8,7 @@ import (
 )
 
 // DefaultEpochExtensionViewCount is a default length of epoch extension in views, approximately 1 day.
-// TODO(efm-recovery): replace this with value from KV store or protocol.GlobalParams
+// TODO(EFM, #6020): replace this with value from KV store or protocol.GlobalParams
 const DefaultEpochExtensionViewCount = 100_000
 
 // FallbackStateMachine is a special structure that encapsulates logic for processing service events
@@ -16,7 +16,7 @@ const DefaultEpochExtensionViewCount = 100_000
 // events but still processes ejection events.
 //
 // Whenever invalid epoch state transition has been observed only epochFallbackStateMachines must be created for subsequent views.
-// TODO for 'leaving Epoch Fallback via special service event': this might need to change.
+// TODO(EFM, #6019): this structure needs to be updated to stop using parent state.
 type FallbackStateMachine struct {
 	baseStateMachine
 	params protocol.GlobalParams
@@ -53,8 +53,8 @@ func NewFallbackStateMachine(params protocol.GlobalParams, view uint64, parentSt
 		// prepare a new extension for the current epoch.
 		err := sm.extendCurrentEpoch(flow.EpochExtension{
 			FirstView:     parentState.CurrentEpochFinalView() + 1,
-			FinalView:     parentState.CurrentEpochFinalView() + DefaultEpochExtensionViewCount, // TODO: replace with EpochExtensionLength
-			TargetEndTime: 0,                                                                    // TODO: calculate and set target end time
+			FinalView:     parentState.CurrentEpochFinalView() + DefaultEpochExtensionViewCount, // TODO(EFM, #6020): replace with EpochExtensionLength
+			TargetEndTime: 0,                                                                    // TODO(EFM, #6020): calculate and set target end time
 		})
 		if err != nil {
 			return nil, err
@@ -111,14 +111,15 @@ func (m *FallbackStateMachine) ProcessEpochCommit(_ *flow.EpochCommit) (bool, er
 // For the EpochRecover event, we return false if and only if there is an error. The reason is that
 // either the `EpochRecover` event is rejected (leading to `InvalidServiceEventError`) or there is an
 // exception processing the event. Otherwise, an `EpochRecover` event must always lead to a state change.
+// TODO(EFM, #6018): this function needs to be updated to handle errors internally.
 func (m *FallbackStateMachine) ProcessEpochRecover(epochRecover *flow.EpochRecover) (bool, error) {
+	if m.view+m.params.EpochCommitSafetyThreshold() >= m.parentState.CurrentEpochFinalView() {
+		return false, protocol.NewInvalidServiceEventErrorf("could not process epoch recover, safety threshold reached")
+	}
+
 	err := protocol.IsValidExtendingEpochSetup(&epochRecover.EpochSetup, m.parentState)
 	if err != nil {
 		return false, fmt.Errorf("invalid epoch recovery event: %w", err)
-	}
-
-	if m.view+m.params.EpochCommitSafetyThreshold() >= m.parentState.CurrentEpochFinalView() {
-		return false, protocol.NewInvalidServiceEventErrorf("could not process epoch recover, safety threshold reached")
 	}
 
 	nextEpochParticipants, err := buildNextEpochActiveParticipants(
