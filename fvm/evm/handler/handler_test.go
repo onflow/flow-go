@@ -2,11 +2,13 @@ package handler_test
 
 import (
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"math"
 	"math/big"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
@@ -17,6 +19,7 @@ import (
 	gethVM "github.com/onflow/go-ethereum/core/vm"
 	gethParams "github.com/onflow/go-ethereum/params"
 	"github.com/onflow/go-ethereum/rlp"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -1034,6 +1037,154 @@ func TestHandler_TransactionRun(t *testing.T) {
 					require.Equal(t, result.GasConsumed, rs.GasConsumed)
 					require.Equal(t, types.ErrCodeNoError, rs.ErrorCode)
 					require.True(t, called)
+				})
+			})
+		})
+	})
+
+	t.Run("transaction run with tracing", func(t *testing.T) {
+		t.Parallel()
+
+		testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
+			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
+				testutils.RunWithEOATestAccount(t, backend, rootAddr, func(eoa *testutils.EOATestAccount) {
+
+					var traceResult json.RawMessage
+					txID := gethCommon.HexToHash("0x1")
+					uploaded := make(chan struct{})
+					result := &types.Result{
+						TxHash:        txID,
+						ReturnedValue: testutils.RandomData(t),
+						Logs: []*gethTypes.Log{
+							testutils.GetRandomLogFixture(t),
+						},
+					}
+
+					uploader := &testutils.MockUploader{
+						UploadFunc: func(id string, message json.RawMessage) error {
+							fmt.Println("###", string(message))
+							assert.Equal(t, traceResult, message)
+							assert.Equal(t, txID.String(), id)
+							close(uploaded)
+							return nil
+						},
+					}
+
+					tracer, err := debug.NewEVMCallTracer(uploader, zerolog.Nop())
+					require.NoError(t, err)
+
+					bs := handler.NewBlockStore(backend, rootAddr)
+					aa := handler.NewAddressAllocator()
+
+					em := &testutils.TestEmulator{
+						RunTransactionFunc: func(tx *gethTypes.Transaction) (*types.Result, error) {
+							tr := tracer.TxTracer()
+							// mock some calls
+							tr.CaptureTxStart(100)
+							tr.CaptureTxEnd(60)
+							traceResult, err = tr.GetResult()
+							require.NoError(t, err)
+							return result, nil
+						},
+					}
+
+					handler := handler.NewContractHandler(flow.Testnet, rootAddr, flowTokenAddress, rootAddr, bs, aa, backend, em, tracer)
+
+					tx := eoa.PrepareSignAndEncodeTx(
+						t,
+						gethCommon.Address{},
+						nil,
+						nil,
+						100_000,
+						big.NewInt(1),
+					)
+
+					_ = handler.Run(tx, types.NewAddress(gethCommon.Address{}))
+
+					assert.Eventuallyf(t, func() bool {
+						<-uploaded
+						return true
+					}, time.Second, time.Millisecond*100, "upload not executed")
+				})
+			})
+		})
+	})
+
+	t.Run("test - transaction batch run with tracing", func(t *testing.T) {
+		t.Parallel()
+
+		testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
+			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
+				testutils.RunWithEOATestAccount(t, backend, rootAddr, func(eoa *testutils.EOATestAccount) {
+					bs := handler.NewBlockStore(backend, rootAddr)
+					aa := handler.NewAddressAllocator()
+
+					const batchSize = 3
+					runResults := make([]*types.Result, batchSize)
+					traceResults := make([]json.RawMessage, batchSize)
+					uploaded := make(chan struct{}, batchSize)
+					uploadedVals := make(map[string]json.RawMessage)
+
+					uploader := &testutils.MockUploader{
+						UploadFunc: func(id string, message json.RawMessage) error {
+							uploadedVals[id] = message
+							uploaded <- struct{}{}
+							return nil
+						},
+					}
+
+					tracer, err := debug.NewEVMCallTracer(uploader, zerolog.Nop())
+					require.NoError(t, err)
+
+					em := &testutils.TestEmulator{
+						BatchRunTransactionFunc: func(txs []*gethTypes.Transaction) ([]*types.Result, error) {
+							runResults = make([]*types.Result, len(txs))
+							for i, tx := range txs {
+								tr := tracer.TxTracer()
+								tr.CaptureTxStart(200)
+								tr.CaptureTxEnd(150)
+
+								traceResults[i], _ = tr.GetResult()
+								runResults[i] = &types.Result{
+									TxHash: tx.Hash(),
+									Logs: []*gethTypes.Log{
+										testutils.GetRandomLogFixture(t),
+									},
+								}
+							}
+							return runResults, nil
+						},
+					}
+					handler := handler.NewContractHandler(flow.Testnet, rootAddr, flowTokenAddress, randomBeaconAddress, bs, aa, backend, em, tracer)
+
+					coinbase := types.NewAddress(gethCommon.Address{})
+
+					txs := make([][]byte, batchSize)
+					for i := range txs {
+						txs[i] = eoa.PrepareSignAndEncodeTx(
+							t,
+							gethCommon.Address{},
+							nil,
+							nil,
+							100_000,
+							big.NewInt(1),
+						)
+					}
+
+					_ = handler.BatchRun(txs, coinbase)
+
+					for i := 0; i < batchSize; i++ {
+						assert.Eventuallyf(t, func() bool {
+							<-uploaded
+							return true
+						}, time.Second, time.Millisecond*100, "upload not executed")
+					}
+
+					for i, r := range runResults {
+						val, ok := uploadedVals[r.TxHash.String()]
+						require.True(t, ok)
+						require.Equal(t, traceResults[i], val)
+					}
 				})
 			})
 		})
