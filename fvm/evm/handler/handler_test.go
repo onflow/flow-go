@@ -1062,7 +1062,6 @@ func TestHandler_TransactionRun(t *testing.T) {
 
 					uploader := &testutils.MockUploader{
 						UploadFunc: func(id string, message json.RawMessage) error {
-							fmt.Println("###", string(message))
 							assert.Equal(t, traceResult, message)
 							assert.Equal(t, txID.String(), id)
 							close(uploaded)
@@ -1105,6 +1104,75 @@ func TestHandler_TransactionRun(t *testing.T) {
 						<-uploaded
 						return true
 					}, time.Second, time.Millisecond*100, "upload not executed")
+				})
+			})
+		})
+	})
+
+	// this test makes sure that even if tracing process fails it doesn't affect the execution flow
+	// it also makes sure the upload is retried and then we panic
+	t.Run("test - transaction run with tracing failure", func(t *testing.T) {
+		t.Parallel()
+
+		testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
+			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
+				testutils.RunWithEOATestAccount(t, backend, rootAddr, func(eoa *testutils.EOATestAccount) {
+
+					uploaded := make(chan struct{})
+					result := &types.Result{
+						TxHash:        gethCommon.HexToHash("0x1"),
+						ReturnedValue: testutils.RandomData(t),
+						Logs: []*gethTypes.Log{
+							testutils.GetRandomLogFixture(t),
+						},
+					}
+
+					// make sure upload gets re-called after the first time it returns the error
+					// then second time around it should panic so we can make sure the handler
+					// stil successfuly finish execution
+					retried := 0
+					uploader := &testutils.MockUploader{
+						UploadFunc: func(id string, message json.RawMessage) error {
+							if retried == 1 {
+								close(uploaded)
+								panic("total failure")
+							}
+							retried++
+							return fmt.Errorf("failed to upload")
+						},
+					}
+
+					tracer, err := debug.NewEVMCallTracer(uploader, zerolog.Nop())
+					require.NoError(t, err)
+
+					bs := handler.NewBlockStore(backend, rootAddr)
+					aa := handler.NewAddressAllocator()
+
+					em := &testutils.TestEmulator{
+						RunTransactionFunc: func(tx *gethTypes.Transaction) (*types.Result, error) {
+							return result, nil
+						},
+					}
+
+					handler := handler.NewContractHandler(flow.Testnet, rootAddr, flowTokenAddress, rootAddr, bs, aa, backend, em, tracer)
+
+					tx := eoa.PrepareSignAndEncodeTx(
+						t,
+						gethCommon.Address{},
+						nil,
+						nil,
+						100_000,
+						big.NewInt(1),
+					)
+
+					res := handler.Run(tx, types.NewAddress(gethCommon.Address{}))
+
+					assert.Eventuallyf(t, func() bool {
+						<-uploaded
+						return true
+					}, time.Second*5, time.Millisecond*100, "upload not executed")
+
+					require.Equal(t, types.StatusSuccessful, res.Status)
 				})
 			})
 		})
