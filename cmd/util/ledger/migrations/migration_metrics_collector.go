@@ -22,19 +22,22 @@ import (
 const metricsCollectingMigrationName = "metrics_collecting_migration"
 
 type MetricsCollectingMigration struct {
-	name             string
-	chainID          flow.ChainID
-	mutex            sync.RWMutex
-	reporter         reporters.ReportWriter
-	metricsCollector *MigrationMetricsCollector
-	migratedTypes    map[common.TypeID]struct{}
-	programs         map[common.Location]*interpreter.Program
+	name              string
+	chainID           flow.ChainID
+	log               zerolog.Logger
+	mutex             sync.RWMutex
+	reporter          reporters.ReportWriter
+	metricsCollector  *MigrationMetricsCollector
+	migratedTypes     map[common.TypeID]struct{}
+	migratedContracts map[common.Location]struct{}
+	programs          map[common.Location]*interpreter.Program
 }
 
 var _ migrations.ValueMigration = &MetricsCollectingMigration{}
 var _ AccountBasedMigration = &MetricsCollectingMigration{}
 
 func NewMetricsCollectingMigration(
+	log zerolog.Logger,
 	chainID flow.ChainID,
 	rwf reporters.ReportWriterFactory,
 	programs map[common.Location]*interpreter.Program,
@@ -42,6 +45,7 @@ func NewMetricsCollectingMigration(
 
 	return &MetricsCollectingMigration{
 		name:             metricsCollectingMigrationName,
+		log:              log,
 		reporter:         rwf.ReportWriter("metrics-collecting-migration"),
 		metricsCollector: NewMigrationMetricsCollector(),
 		chainID:          chainID,
@@ -59,6 +63,7 @@ func (m *MetricsCollectingMigration) InitMigration(
 	_ int,
 ) error {
 	m.migratedTypes = make(map[common.TypeID]struct{})
+	m.migratedContracts = make(map[common.Location]struct{})
 
 	// If the program is available, that means the associated contracts is compatible with Cadence 1.0.
 	// i.e: the contract is either migrated to be compatible with 1.0 or existing contract already compatible.
@@ -68,12 +73,20 @@ func (m *MetricsCollectingMigration) InitMigration(
 		contract := program.Program.SoleContractDeclaration()
 		if contract != nil {
 			nestedDecls = contract.Members
+
+			contractType := program.Elaboration.CompositeDeclarationType(contract)
+			m.migratedTypes[contractType.ID()] = struct{}{}
+			m.migratedContracts[contractType.Location] = struct{}{}
 		} else {
 			contractInterface := program.Program.SoleContractInterfaceDeclaration()
 			if contractInterface == nil {
 				panic(errors.NewUnreachableError())
 			}
 			nestedDecls = contractInterface.Members
+
+			contractInterfaceType := program.Elaboration.InterfaceDeclarationType(contractInterface)
+			m.migratedTypes[contractInterfaceType.ID()] = struct{}{}
+			m.migratedContracts[contractInterfaceType.Location] = struct{}{}
 		}
 
 		for _, compositeDecl := range nestedDecls.Composites() {
@@ -102,7 +115,8 @@ func (m *MetricsCollectingMigration) InitMigration(
 
 		// Entitlements are not needed, since old values won't have them.
 
-		// TODO: also add the contract type itself?
+		// TODO: Anything else? e.g: Enum cases?
+
 	}
 
 	return nil
@@ -137,7 +151,7 @@ func (m *MetricsCollectingMigration) MigrateAccount(
 
 	migration.Migrate(
 		migration.NewValueMigrationsPathMigrator(
-			nil, // No need to report
+			NewStorageVisitingErrorReporter(m.log),
 			m,
 		),
 	)
@@ -155,6 +169,7 @@ func (m *MetricsCollectingMigration) Migrate(
 	_ interpreter.StorageMapKey,
 	value interpreter.Value,
 	_ *interpreter.Interpreter,
+	_ migrations.ValueMigrationPosition,
 ) (
 	newValue interpreter.Value,
 	err error,
@@ -281,6 +296,17 @@ func (m *MetricsCollectingMigration) checkAndRecordIsTypeMigrated(typeID sema.Ty
 		// If this type is not migrated/usable with cadence 1.0,
 		// then record this as an erroneous value.
 		m.metricsCollector.RecordErrorForContract(location)
+
+		// If the type is not migrated, but the contract is migrated, then report an error.
+		// This is more likely to be an implementation error, where the typeID haven't got added to the list.
+		_, ok := m.migratedContracts[location]
+		if ok {
+			m.log.Error().Msgf(
+				"contract `%s` is migrated, but cannot find the migrated type: `%s`",
+				location,
+				typeID,
+			)
+		}
 	}
 
 	return ok
@@ -307,10 +333,10 @@ func (m *MetricsCollectingMigration) Domains() map[string]struct{} {
 
 type MigrationMetricsCollector struct {
 	mutex             sync.RWMutex
-	TotalValues       int                     `json:"totalValues"`
-	TotalErrors       int                     `json:"totalErrors"`
-	ValuesPerContract map[common.Location]int `json:"valuesPerContract"`
-	ErrorsPerContract map[common.Location]int `json:"errorsPerContract"`
+	TotalValues       int
+	TotalErrors       int
+	ValuesPerContract map[common.Location]int
+	ErrorsPerContract map[common.Location]int
 }
 
 func NewMigrationMetricsCollector() *MigrationMetricsCollector {
@@ -378,4 +404,32 @@ type Metrics struct {
 
 	// Total values related to each contract
 	ValuesPerContract map[string]int `json:"valuesPerContract"`
+}
+
+type storageVisitingErrorReporter struct {
+	log zerolog.Logger
+}
+
+func NewStorageVisitingErrorReporter(log zerolog.Logger) *storageVisitingErrorReporter {
+	return &storageVisitingErrorReporter{
+		log: log,
+	}
+}
+
+var _ migrations.Reporter = &storageVisitingErrorReporter{}
+
+func (p *storageVisitingErrorReporter) Migrated(
+	_ interpreter.StorageKey,
+	_ interpreter.StorageMapKey,
+	_ string,
+) {
+	// Ignore
+}
+
+func (p *storageVisitingErrorReporter) DictionaryKeyConflict(addressPath interpreter.AddressPath) {
+	p.log.Error().Msgf("dictionary key conflict for %s", addressPath)
+}
+
+func (p *storageVisitingErrorReporter) Error(err error) {
+	p.log.Error().Msgf("%s", err.Error())
 }

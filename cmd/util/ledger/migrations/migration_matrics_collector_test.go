@@ -5,6 +5,7 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/cadence/runtime/common"
@@ -32,7 +33,7 @@ func TestMigrationMetricsCollection(t *testing.T) {
 		rwf := &testReportWriterFactory{}
 
 		logWriter := &writer{}
-		logger := zerolog.New(logWriter).Level(zerolog.InfoLevel)
+		logger := zerolog.New(logWriter).Level(zerolog.ErrorLevel)
 
 		const nWorker = 2
 
@@ -71,6 +72,12 @@ func TestMigrationMetricsCollection(t *testing.T) {
 
 		require.NoError(t, err)
 
+		// Should have 1 error:
+		// - The `Test` contract checking error
+		logs := logWriter.logs
+		require.Len(t, logs, 1)
+		assert.Contains(t, logs[0], "`pub` is no longer a valid access keyword")
+
 		reportWriter := rwf.reportWriters["metrics-collecting-migration"]
 		require.Len(t, reportWriter.entries, 1)
 
@@ -80,8 +87,7 @@ func TestMigrationMetricsCollection(t *testing.T) {
 		require.Equal(
 			t,
 			Metrics{
-				// TODO: should be 752, like on master
-				TotalValues: 750,
+				TotalValues: 752,
 				TotalErrors: 6,
 				ErrorsPerContract: map[string]int{
 					"A.01cf0e2f2f715450.Test": 6,
@@ -118,7 +124,7 @@ func TestMigrationMetricsCollection(t *testing.T) {
 		rwf := &testReportWriterFactory{}
 
 		logWriter := &writer{}
-		logger := zerolog.New(logWriter).Level(zerolog.InfoLevel)
+		logger := zerolog.New(logWriter).Level(zerolog.ErrorLevel)
 
 		const nWorker = 2
 
@@ -164,6 +170,14 @@ func TestMigrationMetricsCollection(t *testing.T) {
 
 		require.NoError(t, err)
 
+		// Should have 2 errors:
+		// - Contract update failure error
+		// - The `Test` contract checking error
+		logs := logWriter.logs
+		require.Len(t, logs, 2)
+		assert.Contains(t, logs[0], `"migration":"StagedContractsMigration","account":"0x01cf0e2f2f715450","contract":"Test"`)
+		assert.Contains(t, logs[1], "`pub` is no longer a valid access keyword")
+
 		reportWriter := rwf.reportWriters["metrics-collecting-migration"]
 		require.Len(t, reportWriter.entries, 1)
 
@@ -173,8 +187,7 @@ func TestMigrationMetricsCollection(t *testing.T) {
 		require.Equal(
 			t,
 			Metrics{
-				// TODO: should be 752, like on master
-				TotalValues: 750,
+				TotalValues: 752,
 				TotalErrors: 6,
 				ErrorsPerContract: map[string]int{
 					"A.01cf0e2f2f715450.Test": 6,
