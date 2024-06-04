@@ -201,6 +201,7 @@ type TransactionEventPayload struct {
 	Logs            string `cadence:"logs"`
 	BlockHeight     uint64 `cadence:"blockHeight"`
 	BlockHash       string `cadence:"blockHash"`
+	ErrorMessage    string `cadence:"errorMessage"`
 }
 
 // DecodeTransactionEventPayload decodes Cadence event into transaction event payload.
