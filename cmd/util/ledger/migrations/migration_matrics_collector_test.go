@@ -87,8 +87,7 @@ func TestMigrationMetricsCollection(t *testing.T) {
 		require.Equal(
 			t,
 			Metrics{
-				// TODO: should be 752, like on master
-				TotalValues: 750,
+				TotalValues: 752,
 				TotalErrors: 6,
 				ErrorsPerContract: map[string]int{
 					"A.01cf0e2f2f715450.Test": 6,
@@ -188,8 +187,7 @@ func TestMigrationMetricsCollection(t *testing.T) {
 		require.Equal(
 			t,
 			Metrics{
-				// TODO: should be 752, like on master
-				TotalValues: 750,
+				TotalValues: 752,
 				TotalErrors: 6,
 				ErrorsPerContract: map[string]int{
 					"A.01cf0e2f2f715450.Test": 6,
