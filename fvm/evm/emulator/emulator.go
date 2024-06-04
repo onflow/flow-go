@@ -403,6 +403,14 @@ func (proc *procedure) deployAt(
 		)
 	}
 
+	if tracer := proc.evm.Config.Tracer; tracer != nil {
+		tracer.CaptureStart(proc.evm, caller.ToCommon(), to.ToCommon(), true, data, gasLimit, value)
+
+		defer func() {
+			tracer.CaptureEnd(res.ReturnedValue, res.GasConsumed, res.VMError)
+		}()
+	}
+
 	// run code through interpreter
 	// this would check for errors and computes the final bytes to be stored under account
 	var err error
