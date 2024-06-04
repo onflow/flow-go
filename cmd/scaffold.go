@@ -1536,6 +1536,8 @@ func (fnb *FlowNodeBuilder) initFvmOptions() {
 		fvm.WithChain(fnb.RootChainID.Chain()),
 		fvm.WithBlocks(blockFinder),
 		fvm.WithAccountStorageLimit(true),
+		// temporarily enable dependency check for all networks
+		fvm.WithDependencyCheckEnabled(true),
 	}
 	if fnb.RootChainID == flow.Testnet || fnb.RootChainID == flow.Sandboxnet || fnb.RootChainID == flow.Mainnet {
 		vmOpts = append(vmOpts,
@@ -1545,12 +1547,6 @@ func (fnb *FlowNodeBuilder) initFvmOptions() {
 	if fnb.RootChainID == flow.Testnet || fnb.RootChainID == flow.Sandboxnet || fnb.RootChainID == flow.Localnet || fnb.RootChainID == flow.Benchnet {
 		vmOpts = append(vmOpts,
 			fvm.WithContractDeploymentRestricted(false),
-		)
-	}
-	// temporarily enable dependency check for testnet
-	if fnb.RootChainID == flow.Testnet {
-		vmOpts = append(vmOpts,
-			fvm.WithDependencyCheckEnabled(true),
 		)
 	}
 
