@@ -301,7 +301,7 @@ func (m *MetricsCollectingMigration) checkAndRecordIsTypeMigrated(typeID sema.Ty
 		_, ok := m.migratedContracts[location]
 		if ok {
 			m.log.Error().Msgf(
-				"contract `%s` is migrated, but the cannot find the migrated type: `%s`",
+				"contract `%s` is migrated, but cannot find the migrated type: `%s`",
 				location,
 				typeID,
 			)
