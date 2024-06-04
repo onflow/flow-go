@@ -57,7 +57,7 @@ func Test_TracerUploaderIntegration(t *testing.T) {
 		uploader, err := NewGCPUploader(bucket)
 		require.NoError(t, err)
 
-		tracer, err := NewCallTracer(uploader, zerolog.Nop())
+		tracer, err := NewEVMCallTracer(uploader, zerolog.Nop())
 		require.NoError(t, err)
 
 		tr := tracer.TxTracer()

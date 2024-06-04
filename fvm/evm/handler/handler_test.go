@@ -1069,7 +1069,7 @@ func TestHandler_TransactionRun(t *testing.T) {
 						},
 					}
 
-					tracer, err := debug.NewCallTracer(uploader, zerolog.Nop())
+					tracer, err := debug.NewEVMCallTracer(uploader, zerolog.Nop())
 					require.NoError(t, err)
 
 					bs := handler.NewBlockStore(backend, rootAddr)
@@ -1142,7 +1142,7 @@ func TestHandler_TransactionRun(t *testing.T) {
 						},
 					}
 
-					tracer, err := debug.NewCallTracer(uploader, zerolog.Nop())
+					tracer, err := debug.NewEVMCallTracer(uploader, zerolog.Nop())
 					require.NoError(t, err)
 
 					bs := handler.NewBlockStore(backend, rootAddr)
@@ -1201,7 +1201,7 @@ func TestHandler_TransactionRun(t *testing.T) {
 						},
 					}
 
-					tracer, err := debug.NewCallTracer(uploader, zerolog.Nop())
+					tracer, err := debug.NewEVMCallTracer(uploader, zerolog.Nop())
 					require.NoError(t, err)
 
 					em := &testutils.TestEmulator{

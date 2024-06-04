@@ -26,7 +26,7 @@ func Test_CallTracer(t *testing.T) {
 			},
 		}
 
-		tracer, err := NewCallTracer(mockUpload, zerolog.Nop())
+		tracer, err := NewEVMCallTracer(mockUpload, zerolog.Nop())
 		require.NoError(t, err)
 
 		from := gethCommon.HexToAddress("0x01")
