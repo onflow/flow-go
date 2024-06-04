@@ -158,6 +158,7 @@ func (m *MetricsCollectingMigration) Migrate(
 	_ interpreter.StorageMapKey,
 	value interpreter.Value,
 	_ *interpreter.Interpreter,
+	_ migrations.ValueMigrationPosition,
 ) (
 	newValue interpreter.Value,
 	err error,
