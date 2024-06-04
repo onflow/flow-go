@@ -41,13 +41,14 @@ func NewGCPUploader(bucketName string) (*GCPUploader, error) {
 	}, nil
 }
 
+// Upload traces to the GCP for the given id.
+// The upload will be retried by the client if the error is transient.
 func (g *GCPUploader) Upload(id string, data json.RawMessage) error {
-	const uploadTimeout = time.Second * 60
+	const uploadTimeout = time.Minute * 5
 	ctx, cancel := context.WithTimeout(context.Background(), uploadTimeout)
 	defer cancel()
 
 	wc := g.bucket.Object(id).NewWriter(ctx)
-
 	if _, err := wc.Write(data); err != nil {
 		return err
 	}
