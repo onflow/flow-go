@@ -16,8 +16,12 @@ import (
 	_ "github.com/onflow/go-ethereum/eth/tracers/native"
 )
 
-const initialTimeout = 2 * time.Second
-const maxRetryNumber = 10
+const (
+	initialTimeout = 2 * time.Second
+	maxRetryNumber = 10
+	tracerConfig   = `{ "onlyTopCall": true }`
+	tracerName     = "callTracer"
+)
 
 type EVMTracer interface {
 	TxTracer() tracers.Tracer
@@ -33,8 +37,7 @@ type CallTracer struct {
 }
 
 func NewEVMCallTracer(uploader Uploader, logger zerolog.Logger) (*CallTracer, error) {
-	tracerType := json.RawMessage(`{ "onlyTopCall": true }`)
-	tracer, err := tracers.DefaultDirectory.New("callTracer", &tracers.Context{}, tracerType)
+	tracer, err := tracers.DefaultDirectory.New(tracerName, &tracers.Context{}, json.RawMessage(tracerConfig))
 	if err != nil {
 		return nil, err
 	}
