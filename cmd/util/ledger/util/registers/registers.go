@@ -149,6 +149,11 @@ func (b *ByAccount) AccountCount() int {
 	return len(b.registers)
 }
 
+func (b *ByAccount) HasAccountOwner(owner string) bool {
+	_, ok := b.registers[owner]
+	return ok
+}
+
 func (b *ByAccount) AccountRegisters(owner string) *AccountRegisters {
 	accountRegisters, ok := b.registers[owner]
 	if !ok {
