@@ -320,13 +320,13 @@ func (h *ContractHandler) run(
 		return nil, err
 	}
 
-	h.tracer.Collect(tx.Hash())
-
 	// step 5 - commit block proposal
 	err = h.blockStore.CommitBlockProposal()
 	if err != nil {
 		return nil, err
 	}
+
+	h.tracer.Collect(tx.Hash())
 
 	return res, nil
 }
@@ -523,13 +523,13 @@ func (h *ContractHandler) executeAndHandleCall(
 		return nil, err
 	}
 
-	h.tracer.Collect(res.TxHash)
-
 	// commit block proposal
 	err = h.blockStore.CommitBlockProposal()
 	if err != nil {
 		return nil, err
 	}
+
+	h.tracer.Collect(res.TxHash)
 
 	return res, nil
 }
