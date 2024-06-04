@@ -5,11 +5,12 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"sync"
+	syncAtomic "sync/atomic"
 	"time"
 
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/rs/zerolog"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
 	"github.com/onflow/flow-go/cmd/util/ledger/util/registers"
@@ -76,11 +77,13 @@ func MigrateByAccount(
 		Int("nWorker", nWorker).
 		Msgf("created account migrations")
 
-	for i, migration := range migrations {
+	for migrationIndex, migration := range migrations {
+		logger := log.With().
+			Int("migration_index", migrationIndex).
+			Logger()
+
 		err := migration.InitMigration(
-			log.With().
-				Int("migration_index", i).
-				Logger(),
+			logger,
 			registersByAccount,
 			nWorker,
 		)
@@ -90,7 +93,7 @@ func MigrateByAccount(
 	}
 
 	err := withMigrations(log, migrations, func() error {
-		return MigrateGroupConcurrently(
+		return MigrateAccountsConcurrently(
 			log,
 			migrations,
 			registersByAccount,
@@ -135,85 +138,73 @@ func withMigrations(
 	return f()
 }
 
-// MigrateGroupConcurrently migrate the registers in the given account groups.
+// MigrateAccountsConcurrently migrate the registers in the given account groups.
 // The registers in each account are processed sequentially by the given migrations in order.
-func MigrateGroupConcurrently(
+func MigrateAccountsConcurrently(
 	log zerolog.Logger,
 	migrations []AccountBasedMigration,
 	registersByAccount *registers.ByAccount,
 	nWorker int,
 ) error {
 
-	ctx := context.Background()
-	ctx, cancel := context.WithCancelCause(ctx)
-	defer cancel(nil)
-
 	accountCount := registersByAccount.AccountCount()
 
-	jobs := make(chan jobMigrateAccountGroup, accountCount)
+	g, ctx := errgroup.WithContext(context.Background())
 
-	wg := sync.WaitGroup{}
-	wg.Add(nWorker)
-	resultCh := make(chan migrationDuration, accountCount)
-	for i := 0; i < nWorker; i++ {
-		go func() {
-			defer wg.Done()
+	jobs := make(chan migrateAccountGroupJob, accountCount)
+	results := make(chan migrationDuration, accountCount)
 
-			for {
-				select {
-				case <-ctx.Done():
-					return
-				case job, ok := <-jobs:
-					if !ok {
-						return
-					}
-					start := time.Now()
+	workersLeft := int64(nWorker)
 
-					address := job.Address
-					accountRegisters := job.AccountRegisters
+	for workerIndex := 0; workerIndex < nWorker; workerIndex++ {
+		g.Go(func() error {
+			defer func() {
+				if syncAtomic.AddInt64(&workersLeft, -1) == 0 {
+					close(results)
+				}
+			}()
 
-					// This is not an account, but service level keys.
-					if util.IsServiceLevelAddress(address) {
-						resultCh <- migrationDuration{
-							Address:       address,
-							Duration:      time.Since(start),
-							RegisterCount: accountRegisters.Count(),
-						}
-						continue
-					}
+			for job := range jobs {
+				start := time.Now()
+
+				address := job.Address
+				accountRegisters := job.AccountRegisters
+
+				// Only migrate accounts, not global registers
+				if !util.IsServiceLevelAddress(address) {
 
 					for migrationIndex, migration := range migrations {
 
-						select {
-						case <-ctx.Done():
-							return
-						default:
-						}
-
 						err := migration.MigrateAccount(ctx, address, accountRegisters)
 						if err != nil {
-							log.Error().
-								Err(err).
+							log.Err(err).
 								Int("migration_index", migrationIndex).
 								Type("migration", migration).
 								Hex("address", address[:]).
 								Msg("could not migrate account")
-							cancel(fmt.Errorf("could not migrate account: %w", err))
-							return
+							return err
 						}
 					}
+				}
 
-					resultCh <- migrationDuration{
-						Address:       address,
-						Duration:      time.Since(start),
-						RegisterCount: accountRegisters.Count(),
-					}
+				migrationDuration := migrationDuration{
+					Address:       address,
+					Duration:      time.Since(start),
+					RegisterCount: accountRegisters.Count(),
+				}
+
+				select {
+				case <-ctx.Done():
+					return ctx.Err()
+				case results <- migrationDuration:
 				}
 			}
-		}()
+
+			return nil
+		})
 	}
 
-	go func() {
+	g.Go(func() error {
 		defer close(jobs)
 
 		// TODO: maybe adjust, make configurable, or dependent on chain
@@ -247,7 +238,7 @@ func MigrateGroupConcurrently(
 			},
 		)
 		if err != nil {
-			cancel(fmt.Errorf("failed to get all account registers: %w", err))
+			return fmt.Errorf("failed to get all account registers: %w", err)
 		}
 
 		// Add the largest account registers to the account registers.
@@ -262,22 +253,23 @@ func MigrateGroupConcurrently(
 
 			address, err := common.BytesToAddress([]byte(owner))
 			if err != nil {
-				cancel(fmt.Errorf("failed to convert owner to address: %w", err))
-				return
+				return fmt.Errorf("failed to convert owner to address: %w", err)
 			}
 
-			job := jobMigrateAccountGroup{
+			job := migrateAccountGroupJob{
 				Address:          address,
 				AccountRegisters: accountRegisters,
 			}
 
 			select {
 			case <-ctx.Done():
-				return
+				return ctx.Err()
 			case jobs <- job:
 			}
 		}
-	}()
+
+		return nil
+	})
 
 	// read job results
 	logAccount := moduleUtil.LogProgress(
@@ -295,40 +287,31 @@ func MigrateGroupConcurrently(
 		},
 	)
 
-accountLoop:
-	for accountIndex := 0; accountIndex < accountCount; accountIndex++ {
-		select {
-		case <-ctx.Done():
-			break accountLoop
-		case duration := <-resultCh:
+	g.Go(func() error {
+		for duration := range results {
 			topDurations.Add(duration)
 			logAccount(1)
 		}
-	}
+
+		return nil
+	})
 
 	// make sure to exit all workers before returning from this function
 	// so that the migration can be closed properly
 	log.Info().Msg("waiting for migration workers to finish")
-	wg.Wait()
+	err := g.Wait()
+	if err != nil {
+		return fmt.Errorf("failed to migrate accounts: %w", err)
+	}
 
 	log.Info().
 		Array("top_longest_migrations", loggableMigrationDurations(topDurations)).
 		Msgf("Top longest migrations")
 
-	err := ctx.Err()
-	if err != nil {
-		cause := context.Cause(ctx)
-		if cause != nil {
-			err = cause
-		}
-
-		return fmt.Errorf("failed to migrate payload: %w", err)
-	}
-
 	return nil
 }
 
-type jobMigrateAccountGroup struct {
+type migrateAccountGroupJob struct {
 	Address          common.Address
 	AccountRegisters *registers.AccountRegisters
 }
