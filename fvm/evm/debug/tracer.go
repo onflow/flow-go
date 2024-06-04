@@ -26,6 +26,7 @@ const (
 
 type TracerManager struct {
 	logger    zerolog.Logger
+	traces    map[uint64]map[flow.Identifier][]json.RawMessage
 	traceChan chan *CallTracer
 	uploader  Uploader
 	headers   storage.Headers
@@ -36,6 +37,7 @@ func NewTracerManager(uploader Uploader, logger zerolog.Logger) *TracerManager {
 
 	return &TracerManager{
 		logger:    logger.With().Str("module", "evm-tracer").Logger(),
+		traces:    make(map[uint64]map[flow.Identifier][]json.RawMessage),
 		traceChan: make(chan *CallTracer, bufferSize),
 		uploader:  uploader,
 	}
