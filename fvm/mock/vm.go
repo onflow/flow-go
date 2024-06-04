@@ -44,6 +44,56 @@ func (_m *VM) GetAccount(_a0 fvm.Context, _a1 flow.Address, _a2 snapshot.Storage
 	return r0, r1
 }
 
+// GetAccountBalance provides a mock function with given fields: _a0, _a1, _a2
+func (_m *VM) GetAccountBalance(_a0 fvm.Context, _a1 flow.Address, _a2 snapshot.StorageSnapshot) (uint64, error) {
+	ret := _m.Called(_a0, _a1, _a2)
+
+	var r0 uint64
+	var r1 error
+	if rf, ok := ret.Get(0).(func(fvm.Context, flow.Address, snapshot.StorageSnapshot) (uint64, error)); ok {
+		return rf(_a0, _a1, _a2)
+	}
+	if rf, ok := ret.Get(0).(func(fvm.Context, flow.Address, snapshot.StorageSnapshot) uint64); ok {
+		r0 = rf(_a0, _a1, _a2)
+	} else {
+		r0 = ret.Get(0).(uint64)
+	}
+
+	if rf, ok := ret.Get(1).(func(fvm.Context, flow.Address, snapshot.StorageSnapshot) error); ok {
+		r1 = rf(_a0, _a1, _a2)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetAccountKeys provides a mock function with given fields: _a0, _a1, _a2
+func (_m *VM) GetAccountKeys(_a0 fvm.Context, _a1 flow.Address, _a2 snapshot.StorageSnapshot) ([]flow.AccountPublicKey, error) {
+	ret := _m.Called(_a0, _a1, _a2)
+
+	var r0 []flow.AccountPublicKey
+	var r1 error
+	if rf, ok := ret.Get(0).(func(fvm.Context, flow.Address, snapshot.StorageSnapshot) ([]flow.AccountPublicKey, error)); ok {
+		return rf(_a0, _a1, _a2)
+	}
+	if rf, ok := ret.Get(0).(func(fvm.Context, flow.Address, snapshot.StorageSnapshot) []flow.AccountPublicKey); ok {
+		r0 = rf(_a0, _a1, _a2)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]flow.AccountPublicKey)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(fvm.Context, flow.Address, snapshot.StorageSnapshot) error); ok {
+		r1 = rf(_a0, _a1, _a2)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // NewExecutor provides a mock function with given fields: _a0, _a1, _a2
 func (_m *VM) NewExecutor(_a0 fvm.Context, _a1 fvm.Procedure, _a2 storage.TransactionPreparer) fvm.ProcedureExecutor {
 	ret := _m.Called(_a0, _a1, _a2)

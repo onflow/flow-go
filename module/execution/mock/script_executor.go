@@ -67,6 +67,56 @@ func (_m *ScriptExecutor) GetAccountAtBlockHeight(ctx context.Context, address f
 	return r0, r1
 }
 
+// GetAccountBalance provides a mock function with given fields: ctx, address, height
+func (_m *ScriptExecutor) GetAccountBalance(ctx context.Context, address flow.Address, height uint64) (uint64, error) {
+	ret := _m.Called(ctx, address, height)
+
+	var r0 uint64
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Address, uint64) (uint64, error)); ok {
+		return rf(ctx, address, height)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Address, uint64) uint64); ok {
+		r0 = rf(ctx, address, height)
+	} else {
+		r0 = ret.Get(0).(uint64)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, flow.Address, uint64) error); ok {
+		r1 = rf(ctx, address, height)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetAccountKeys provides a mock function with given fields: ctx, address, height
+func (_m *ScriptExecutor) GetAccountKeys(ctx context.Context, address flow.Address, height uint64) ([]flow.AccountPublicKey, error) {
+	ret := _m.Called(ctx, address, height)
+
+	var r0 []flow.AccountPublicKey
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Address, uint64) ([]flow.AccountPublicKey, error)); ok {
+		return rf(ctx, address, height)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Address, uint64) []flow.AccountPublicKey); ok {
+		r0 = rf(ctx, address, height)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]flow.AccountPublicKey)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, flow.Address, uint64) error); ok {
+		r1 = rf(ctx, address, height)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 type mockConstructorTestingTNewScriptExecutor interface {
 	mock.TestingT
 	Cleanup(func())

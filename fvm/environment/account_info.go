@@ -15,12 +15,14 @@ import (
 // AccountInfo exposes various account balance and storage statistics.
 type AccountInfo interface {
 	// Cadence's runtime APIs.
-	GetStorageUsed(runtimeaddress common.Address) (uint64, error)
+	GetStorageUsed(runtimeAddress common.Address) (uint64, error)
 	GetStorageCapacity(runtimeAddress common.Address) (uint64, error)
 	GetAccountBalance(runtimeAddress common.Address) (uint64, error)
 	GetAccountAvailableBalance(runtimeAddress common.Address) (uint64, error)
 
 	GetAccount(address flow.Address) (*flow.Account, error)
+
+	GetAccountKeys(address flow.Address) ([]flow.AccountPublicKey, error)
 }
 
 type ParseRestrictedAccountInfo struct {
@@ -100,6 +102,19 @@ func (info ParseRestrictedAccountInfo) GetAccount(
 		info.txnState,
 		trace.FVMEnvGetAccount,
 		info.impl.GetAccount,
+		address)
+}
+
+func (info ParseRestrictedAccountInfo) GetAccountKeys(
+	address flow.Address,
+) (
+	[]flow.AccountPublicKey,
+	error,
+) {
+	return parseRestrict1Arg1Ret(
+		info.txnState,
+		trace.FVMEnvGetAccount,
+		info.impl.GetAccountKeys,
 		address)
 }
 
@@ -253,4 +268,22 @@ func (info *accountInfo) GetAccount(
 	}
 
 	return account, nil
+}
+
+func (info *accountInfo) GetAccountKeys(
+	address flow.Address,
+) (
+	[]flow.AccountPublicKey,
+	error,
+) {
+	defer info.tracer.StartChildSpan(trace.FVMEnvGetAccount).End()
+
+	//accountKeys, err := info.accounts.GetPublicKey(address, 0)
+
+	account, err := info.accounts.Get(address)
+	if err != nil {
+		return nil, err
+	}
+
+	return account.Keys, nil
 }

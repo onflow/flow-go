@@ -57,7 +57,7 @@ type Executor interface {
 		header *flow.Header,
 		snapshot snapshot.StorageSnapshot,
 	) (
-		*flow.Account,
+		uint64,
 		error,
 	)
 
@@ -67,7 +67,7 @@ type Executor interface {
 		header *flow.Header,
 		snapshot snapshot.StorageSnapshot,
 	) (
-		*flow.Account,
+		[]flow.AccountPublicKey,
 		error,
 	)
 }
@@ -269,7 +269,7 @@ func (e *QueryExecutor) GetAccount(
 	return account, nil
 }
 
-func (e *QueryExecutor) GetAccountBalance(ctx context.Context, addr flow.Address, blockHeader *flow.Header, snapshot snapshot.StorageSnapshot) (*flow.Account, error) {
+func (e *QueryExecutor) GetAccountBalance(ctx context.Context, address flow.Address, blockHeader *flow.Header, snapshot snapshot.StorageSnapshot) (uint64, error) {
 
 	// TODO(ramtin): utilize ctx
 	blockCtx := fvm.NewContextFromParent(
@@ -278,9 +278,41 @@ func (e *QueryExecutor) GetAccountBalance(ctx context.Context, addr flow.Address
 		fvm.WithDerivedBlockData(
 			e.derivedChainData.NewDerivedBlockDataForScript(blockHeader.ID())))
 
+	accountBalance, err := e.vm.GetAccountBalance(
+		blockCtx,
+		address,
+		snapshot)
+
+	if err != nil {
+		return 0, fmt.Errorf(
+			"failed to get account balance (%s) at block (%s): %w",
+			address.String(),
+			blockHeader.ID(),
+			err)
+	}
+
+	return accountBalance, nil
 }
 
-func (e *QueryExecutor) GetAccountKeys(ctx context.Context, addr flow.Address, header *flow.Header, snapshot snapshot.StorageSnapshot) (*flow.Account, error) {
-	//TODO implement me
-	panic("implement me")
+func (e *QueryExecutor) GetAccountKeys(ctx context.Context, address flow.Address, blockHeader *flow.Header, snapshot snapshot.StorageSnapshot) ([]flow.AccountPublicKey, error) {
+	// TODO(ramtin): utilize ctx
+	blockCtx := fvm.NewContextFromParent(
+		e.vmCtx,
+		fvm.WithBlockHeader(blockHeader),
+		fvm.WithDerivedBlockData(
+			e.derivedChainData.NewDerivedBlockDataForScript(blockHeader.ID())))
+
+	accountKeys, err := e.vm.GetAccountKeys(blockCtx,
+		address,
+		snapshot)
+	if err != nil {
+		return nil, fmt.Errorf(
+			"failed to get account keys (%s) at block (%s): %w",
+			address.String(),
+			blockHeader.ID(),
+			err)
+	}
+
+	return accountKeys, nil
+
 }

@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/onflow/cadence"
+	"github.com/onflow/cadence/runtime/common"
 
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
@@ -83,7 +84,7 @@ func Run(executor ProcedureExecutor) error {
 	return executor.Execute()
 }
 
-// An Procedure is an operation (or set of operations) that reads or writes ledger state.
+// A Procedure is an operation (or set of operations) that reads or writes ledger state.
 type Procedure interface {
 	NewExecutor(
 		ctx Context,
@@ -120,6 +121,10 @@ type VM interface {
 	)
 
 	GetAccount(Context, flow.Address, snapshot.StorageSnapshot) (*flow.Account, error)
+
+	GetAccountBalance(Context, flow.Address, snapshot.StorageSnapshot) (uint64, error)
+
+	GetAccountKeys(Context, flow.Address, snapshot.StorageSnapshot) ([]flow.AccountPublicKey, error)
 }
 
 var _ VM = (*VirtualMachine)(nil)
@@ -241,4 +246,75 @@ func (vm *VirtualMachine) GetAccount(
 		return nil, fmt.Errorf("cannot get account: %w", err)
 	}
 	return account, nil
+}
+
+// GetAccountBalance returns an account balance by address or an error if none exists.
+func (vm *VirtualMachine) GetAccountBalance(
+	ctx Context,
+	address flow.Address,
+	storageSnapshot snapshot.StorageSnapshot,
+) (
+	uint64,
+	error,
+) {
+	blockDatabase := storage.NewBlockDatabase(
+		storageSnapshot,
+		0,
+		ctx.DerivedBlockData)
+
+	storageTxn := blockDatabase.NewSnapshotReadTransaction(
+		state.DefaultParameters().
+			WithMaxKeySizeAllowed(ctx.MaxStateKeySize).
+			WithMaxValueSizeAllowed(ctx.MaxStateValueSize).
+			WithMeterParameters(
+				meter.DefaultParameters().
+					WithStorageInteractionLimit(ctx.MaxStateInteractionSize)))
+
+	env := environment.NewScriptEnv(
+		context.Background(),
+		ctx.TracerSpan,
+		ctx.EnvironmentParams,
+		storageTxn)
+	accountBalance, err := env.GetAccountBalance(common.MustBytesToAddress(address.Bytes()))
+
+	if err != nil {
+		return 0, fmt.Errorf("cannot get account balance: %w", err)
+	}
+	return accountBalance, nil
+}
+
+// GetAccountKeys returns an account balance by address or an error if none exists.
+func (vm *VirtualMachine) GetAccountKeys(
+	ctx Context,
+	address flow.Address,
+	storageSnapshot snapshot.StorageSnapshot,
+) (
+	[]flow.AccountPublicKey,
+	error,
+) {
+	blockDatabase := storage.NewBlockDatabase(
+		storageSnapshot,
+		0,
+		ctx.DerivedBlockData)
+
+	storageTxn := blockDatabase.NewSnapshotReadTransaction(
+		state.DefaultParameters().
+			WithMaxKeySizeAllowed(ctx.MaxStateKeySize).
+			WithMaxValueSizeAllowed(ctx.MaxStateValueSize).
+			WithMeterParameters(
+				meter.DefaultParameters().
+					WithStorageInteractionLimit(ctx.MaxStateInteractionSize)))
+
+	env := environment.NewScriptEnv(
+		context.Background(),
+		ctx.TracerSpan,
+		ctx.EnvironmentParams,
+		storageTxn)
+
+	accountKeys, err := env.GetAccountKeys(address)
+
+	if err != nil {
+		return nil, fmt.Errorf("cannot get account balance: %w", err)
+	}
+	return accountKeys, nil
 }
