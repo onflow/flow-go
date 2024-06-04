@@ -1,31 +1,27 @@
 package debug
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
-	"time"
 
 	gethCommon "github.com/onflow/go-ethereum/common"
 	"github.com/onflow/go-ethereum/eth/tracers"
 	"github.com/rs/zerolog"
-	"github.com/sethvargo/go-retry"
-
 	// this import is needed for side-effects, because the
 	// tracers.DefaultDirectory is relying on the init function
 	_ "github.com/onflow/go-ethereum/eth/tracers/native"
+
+	"github.com/onflow/flow-go/model/flow"
 )
 
 const (
-	initialTimeout = 2 * time.Second
-	maxRetryNumber = 10
-	tracerConfig   = `{ "onlyTopCall": true }`
-	tracerName     = "callTracer"
+	tracerConfig = `{ "onlyTopCall": true }`
+	tracerName   = "callTracer"
 )
 
 type EVMTracer interface {
 	TxTracer() tracers.Tracer
-	Collect(id gethCommon.Hash)
+	Collect(txID gethCommon.Hash, blockID flow.Identifier)
 }
 
 var _ EVMTracer = &CallTracer{}
@@ -53,13 +49,13 @@ func (t *CallTracer) TxTracer() tracers.Tracer {
 	return t.tracer
 }
 
-func (t *CallTracer) Collect(id gethCommon.Hash) {
+func (t *CallTracer) Collect(txID gethCommon.Hash, blockID flow.Identifier) {
 	// upload is concurrent and it doesn't produce any errors, as the
 	// client doesn't expect it, we don't want to break execution flow,
 	// in case there are errors we retry, and if we fail after retries
 	// we log them and continue.
 	go func() {
-		l := t.logger.With().Str("tx-id", id.String()).Logger()
+		l := t.logger.With().Str("tx-id", txID.String()).Logger()
 
 		defer func() {
 			if r := recover(); r != nil {
@@ -79,18 +75,8 @@ func (t *CallTracer) Collect(id gethCommon.Hash) {
 			l.Error().Err(err).Msg("failed to produce trace results")
 		}
 
-		backoff := retry.NewFibonacci(initialTimeout)
-		backoff = retry.WithMaxRetries(maxRetryNumber, backoff)
-
-		err = retry.Do(context.Background(), backoff, func(ctx context.Context) error {
-			err = t.uploader.Upload(id.String(), res)
-			if err != nil {
-				l.Error().Err(err).Msg("failed to upload trace results, retrying")
-				err = retry.RetryableError(err) // all upload errors should be retried
-			}
-			return err
-		})
-		if err != nil {
+		uploadID := fmt.Sprintf("%s-%s", blockID.String(), txID.String())
+		if err = t.uploader.Upload(uploadID, res); err != nil {
 			l.Error().Err(err).
 				Str("traces", string(res)).
 				Msg("failed to upload trace results, no more retries")
@@ -111,4 +97,4 @@ func (n nopTracer) TxTracer() tracers.Tracer {
 	return nil
 }
 
-func (n nopTracer) Collect(_ gethCommon.Hash) {}
+func (n nopTracer) Collect(_ gethCommon.Hash, _ flow.Identifier) {}
