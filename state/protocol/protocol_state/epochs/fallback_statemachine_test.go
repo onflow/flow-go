@@ -151,6 +151,62 @@ func (s *EpochFallbackStateMachineSuite) TestProcessInvalidEpochRecover() {
 		require.True(s.T(), protocol.IsInvalidServiceEventError(err))
 		require.False(s.T(), processed)
 	})
+	s.Run("invalid-commit-counter", func() {
+		epochRecover := unittest.EpochRecoverFixture(func(setup *flow.EpochSetup) {
+			setup.Participants = nextEpochParticipants.ToSkeleton()
+			setup.Assignments = unittest.ClusterAssignment(1, nextEpochParticipants.ToSkeleton())
+			setup.Counter = s.parentProtocolState.CurrentEpochSetup.Counter + 1
+			setup.FirstView = s.parentProtocolState.CurrentEpochSetup.FinalView + 1
+			setup.FinalView = setup.FirstView + 10_000
+		})
+		epochRecover.EpochCommit.Counter += 1 // invalid commit counter
+		processed, err := s.stateMachine.ProcessEpochRecover(epochRecover)
+		require.Error(s.T(), err)
+		require.True(s.T(), protocol.IsInvalidServiceEventError(err))
+		require.False(s.T(), processed)
+	})
+	s.Run("invalid-cluster-qcs", func() {
+		epochRecover := unittest.EpochRecoverFixture(func(setup *flow.EpochSetup) {
+			setup.Participants = nextEpochParticipants.ToSkeleton()
+			setup.Assignments = unittest.ClusterAssignment(1, nextEpochParticipants.ToSkeleton())
+			setup.Counter = s.parentProtocolState.CurrentEpochSetup.Counter + 1
+			setup.FirstView = s.parentProtocolState.CurrentEpochSetup.FinalView + 1
+			setup.FinalView = setup.FirstView + 10_000
+		})
+		epochRecover.EpochCommit.ClusterQCs = epochRecover.EpochCommit.ClusterQCs[1:] // invalid cluster QCs
+		processed, err := s.stateMachine.ProcessEpochRecover(epochRecover)
+		require.Error(s.T(), err)
+		require.True(s.T(), protocol.IsInvalidServiceEventError(err))
+		require.False(s.T(), processed)
+	})
+	s.Run("invalid-DKG-group-key", func() {
+		epochRecover := unittest.EpochRecoverFixture(func(setup *flow.EpochSetup) {
+			setup.Participants = nextEpochParticipants.ToSkeleton()
+			setup.Assignments = unittest.ClusterAssignment(1, nextEpochParticipants.ToSkeleton())
+			setup.Counter = s.parentProtocolState.CurrentEpochSetup.Counter + 1
+			setup.FirstView = s.parentProtocolState.CurrentEpochSetup.FinalView + 1
+			setup.FinalView = setup.FirstView + 10_000
+		})
+		epochRecover.EpochCommit.DKGGroupKey = nil // no DKG public group key
+		processed, err := s.stateMachine.ProcessEpochRecover(epochRecover)
+		require.Error(s.T(), err)
+		require.True(s.T(), protocol.IsInvalidServiceEventError(err))
+		require.False(s.T(), processed)
+	})
+	s.Run("invalid-dkg-participants", func() {
+		epochRecover := unittest.EpochRecoverFixture(func(setup *flow.EpochSetup) {
+			setup.Participants = nextEpochParticipants.ToSkeleton()
+			setup.Assignments = unittest.ClusterAssignment(1, nextEpochParticipants.ToSkeleton())
+			setup.Counter = s.parentProtocolState.CurrentEpochSetup.Counter + 1
+			setup.FirstView = s.parentProtocolState.CurrentEpochSetup.FinalView + 1
+			setup.FinalView = setup.FirstView + 10_000
+		})
+		epochRecover.EpochCommit.DKGParticipantKeys = epochRecover.EpochCommit.DKGParticipantKeys[1:] // invalid DKG participants
+		processed, err := s.stateMachine.ProcessEpochRecover(epochRecover)
+		require.Error(s.T(), err)
+		require.True(s.T(), protocol.IsInvalidServiceEventError(err))
+		require.False(s.T(), processed)
+	})
 	s.Run("next-epoch-present", func() {
 		epochRecover := unittest.EpochRecoverFixture(func(setup *flow.EpochSetup) {
 			setup.Participants = nextEpochParticipants.ToSkeleton()
