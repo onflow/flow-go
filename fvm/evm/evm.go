@@ -1,6 +1,8 @@
 package evm
 
 import (
+	"fmt"
+
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 
@@ -55,8 +57,22 @@ func SetupEnvironment(
 
 	addressAllocator := handler.NewAddressAllocator()
 
+	height, err := backend.GetCurrentBlockHeight()
+	if err != nil {
+		return err
+	}
+
+	block, ok, err := backend.GetBlockAtHeight(height)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return fmt.Errorf("could not retrieve the block at height")
+	}
+
 	contractHandler := handler.NewContractHandler(
 		chainID,
+		flow.Identifier(block.Hash),
 		evmContractAccountAddress,
 		common.Address(flowToken),
 		randomBeaconAddress,
