@@ -246,6 +246,8 @@ func (executor *transactionExecutor) ExecuteTransactionBody() error {
 	if executor.ctx.EVMEnabled {
 		chain := executor.ctx.Chain
 		sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+
+		blockID := executor.ctx.BlockInfoParams.BlockHeader.ID()
 		err := evm.SetupEnvironment(
 			chain.ChainID(),
 			executor.env,

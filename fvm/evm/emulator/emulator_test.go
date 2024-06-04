@@ -794,7 +794,7 @@ func TestTransactionTracing(t *testing.T) {
 	// manually create block with the provided tracer injected
 	blockWithTracer := func(t *testing.T, emu *emulator.Emulator) (types.BlockView, *testutils.MockUploader, *debug.CallTracer) {
 		uploader := &testutils.MockUploader{}
-		tracer, err := debug.NewEVMCallTracer(uploader, zerolog.Nop())
+		tracer, err := debug.NewCallTracer(uploader, zerolog.Nop())
 		require.NoError(t, err)
 
 		// manually create block with provided tracer

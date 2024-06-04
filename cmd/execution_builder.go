@@ -541,7 +541,7 @@ func (exeNode *ExecutionNode) LoadProviderEngine(
 		if err != nil {
 			return nil, fmt.Errorf("could not create evm trace uploader: %w", err)
 		}
-		evmTracer, err := debug.NewEVMCallTracer(evmTraceUploader, node.Logger)
+		evmTracer, err := debug.NewCallTracer(evmTraceUploader, node.Logger)
 		if err != nil {
 			return nil, fmt.Errorf("could not create evm tracer: %w", err)
 		}
