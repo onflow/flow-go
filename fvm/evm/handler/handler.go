@@ -19,6 +19,7 @@ import (
 // event emission and updating the block
 type ContractHandler struct {
 	flowChainID        flow.ChainID
+	blockID            flow.Identifier
 	evmContractAddress flow.Address
 	flowTokenAddress   common.Address
 	blockStore         types.BlockStore
@@ -41,6 +42,7 @@ var _ types.ContractHandler = &ContractHandler{}
 
 func NewContractHandler(
 	flowChainID flow.ChainID,
+	blockID flow.Identifier,
 	evmContractAddress flow.Address,
 	flowTokenAddress common.Address,
 	randomBeaconAddress flow.Address,
@@ -52,6 +54,7 @@ func NewContractHandler(
 ) *ContractHandler {
 	return &ContractHandler{
 		flowChainID:        flowChainID,
+		blockID:            blockID,
 		evmContractAddress: evmContractAddress,
 		flowTokenAddress:   flowTokenAddress,
 		blockStore:         blockStore,
@@ -229,7 +232,7 @@ func (h *ContractHandler) batchRun(rlpEncodedTxs [][]byte, coinbase types.Addres
 			return nil, err
 		}
 
-		h.tracer.Collect(r.TxHash)
+		h.tracer.Collect(r.TxHash, h.blockID)
 	}
 
 	err = h.emitEvent(types.NewBlockEvent(bp))
@@ -326,7 +329,7 @@ func (h *ContractHandler) run(
 		return nil, err
 	}
 
-	h.tracer.Collect(tx.Hash())
+	h.tracer.Collect(res.TxHash, h.blockID)
 
 	return res, nil
 }
@@ -529,7 +532,7 @@ func (h *ContractHandler) executeAndHandleCall(
 		return nil, err
 	}
 
-	h.tracer.Collect(res.TxHash)
+	h.tracer.Collect(res.TxHash, h.blockID)
 
 	return res, nil
 }
