@@ -17,6 +17,8 @@ import (
 )
 
 type Handler struct {
+	// only for v0.33, to be backward compatible
+	access.UnimplementedAccessAPIServer
 	api                  API
 	chain                flow.Chain
 	signerIndicesDecoder hotstuff.BlockSignerDecoder
@@ -31,11 +33,12 @@ var _ access.AccessAPIServer = (*Handler)(nil)
 
 func NewHandler(api API, chain flow.Chain, finalizedHeader module.FinalizedHeaderCache, me module.Local, options ...HandlerOption) *Handler {
 	h := &Handler{
-		api:                  api,
-		chain:                chain,
-		finalizedHeaderCache: finalizedHeader,
-		me:                   me,
-		signerIndicesDecoder: &signature.NoopBlockSignerDecoder{},
+		UnimplementedAccessAPIServer: access.UnimplementedAccessAPIServer{},
+		api:                          api,
+		chain:                        chain,
+		finalizedHeaderCache:         finalizedHeader,
+		me:                           me,
+		signerIndicesDecoder:         &signature.NoopBlockSignerDecoder{},
 	}
 	for _, opt := range options {
 		opt(h)
@@ -191,6 +194,33 @@ func (h *Handler) GetCollectionByID(
 	return &access.CollectionResponse{
 		Collection: colMsg,
 		Metadata:   metadata,
+	}, nil
+}
+
+func (h *Handler) GetFullCollectionByID(
+	ctx context.Context,
+	req *access.GetFullCollectionByIDRequest,
+) (*access.FullCollectionResponse, error) {
+	metadata := h.buildMetadataResponse()
+
+	id, err := convert.CollectionID(req.GetId())
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid collection id: %v", err)
+	}
+
+	col, err := h.api.GetFullCollectionByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	transactions, err := convert.FullCollectionToMessage(col)
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	return &access.FullCollectionResponse{
+		Transactions: transactions,
+		Metadata:     metadata,
 	}, nil
 }
 

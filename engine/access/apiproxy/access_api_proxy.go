@@ -19,6 +19,8 @@ import (
 // FlowAccessAPIRouter is a structure that represents the routing proxy algorithm.
 // It splits requests between a local and a remote API service.
 type FlowAccessAPIRouter struct {
+	// only for v0.33, to be backward compatible
+	access.UnimplementedAccessAPIServer
 	Logger   zerolog.Logger
 	Metrics  *metrics.ObserverCollector
 	Upstream *FlowAccessAPIForwarder
@@ -95,6 +97,12 @@ func (h *FlowAccessAPIRouter) GetBlockByHeight(context context.Context, req *acc
 func (h *FlowAccessAPIRouter) GetCollectionByID(context context.Context, req *access.GetCollectionByIDRequest) (*access.CollectionResponse, error) {
 	res, err := h.Upstream.GetCollectionByID(context, req)
 	h.log("upstream", "GetCollectionByID", err)
+	return res, err
+}
+
+func (h *FlowAccessAPIRouter) GetFullCollectionByID(context context.Context, req *access.GetFullCollectionByIDRequest) (*access.FullCollectionResponse, error) {
+	res, err := h.Upstream.GetFullCollectionByID(context, req)
+	h.log("upstream", "GetFullCollectionByID", err)
 	return res, err
 }
 
@@ -336,6 +344,16 @@ func (h *FlowAccessAPIForwarder) GetCollectionByID(context context.Context, req 
 	}
 	defer closer.Close()
 	return upstream.GetCollectionByID(context, req)
+}
+
+func (h *FlowAccessAPIForwarder) GetFullCollectionByID(context context.Context, req *access.GetFullCollectionByIDRequest) (*access.FullCollectionResponse, error) {
+	// This is a passthrough request
+	upstream, closer, err := h.FaultTolerantClient()
+	if err != nil {
+		return nil, err
+	}
+	defer closer.Close()
+	return upstream.GetFullCollectionByID(context, req)
 }
 
 func (h *FlowAccessAPIForwarder) SendTransaction(context context.Context, req *access.SendTransactionRequest) (*access.SendTransactionResponse, error) {

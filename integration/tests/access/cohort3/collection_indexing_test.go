@@ -39,7 +39,7 @@ func (s *CollectionIndexingSuite) SetupTest() {
 	}
 	// access_2 is running the indexer, so all collections are indexed using the indexer
 	testANOpts := append(defaultAccessOpts,
-		testnet.WithLogLevel(zerolog.DebugLevel),
+		testnet.WithLogLevel(zerolog.InfoLevel),
 		testnet.WithAdditionalFlag("--execution-data-indexing-enabled=true"),
 	)
 
