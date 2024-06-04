@@ -1,6 +1,7 @@
 package version
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"sync"
@@ -15,6 +16,12 @@ import (
 	psEvents "github.com/onflow/flow-go/state/protocol/events"
 	"github.com/onflow/flow-go/storage"
 )
+
+// ErrUnhandledHeight
+var ErrUnhandledHeight = errors.New("unhandled height")
+
+// ErrUnhandledVersionBeacon
+var ErrUnhandledVersionBeacon = errors.New("unhandled version beacon")
 
 // VersionControlConsumer defines a function type that consumes version control updates.
 // It is called with the block height and the corresponding sem-version.
@@ -50,7 +57,8 @@ type VersionControl struct {
 	blockFinalizedChan chan *flow.Header
 
 	// lastHandledBlock the las block
-	lastHandledBlock *flow.Header
+	lastHandledBlock       *flow.Header
+	lastHandledBlockHeight uint64
 
 	// startHeight and endHeight define the height boundaries for version compatibility.
 	startHeight uint64
@@ -97,7 +105,7 @@ func NewVersionControl(
 	// Setup component manager for handling worker functions.
 	cm := component.NewComponentManagerBuilder()
 	cm.AddWorker(vc.processEvents)
-	cm.AddWorker(vc.checkInitialVersionBeacon(latestFinalizedBlock))
+	cm.AddWorker(vc.checkInitialVersionBeacon(latestFinalizedBlock.Height))
 
 	vc.Component = cm.Build()
 
@@ -109,13 +117,13 @@ func NewVersionControl(
 // checkInitialVersionBeacon checks the initial version beacon at the latest finalized block.
 // It ensures the component is not ready until the initial version beacon is checked.
 func (v *VersionControl) checkInitialVersionBeacon(
-	latestFinalizedBlock *flow.Header,
+	latestFinalizedBlockHeight uint64,
 ) func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	return func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 		// component is not ready until we checked the initial version beacon
 		defer ready()
 
-		vb, err := v.versionBeacons.Highest(latestFinalizedBlock.Height)
+		vb, err := v.versionBeacons.Highest(latestFinalizedBlockHeight)
 		if err != nil {
 			ctx.Throw(
 				fmt.Errorf(
@@ -131,15 +139,15 @@ func (v *VersionControl) checkInitialVersionBeacon(
 			// It can happen if the node starts before bootstrap is finished.
 			// TODO: remove when we can guarantee that there will always be a version beacon
 			v.log.Info().
-				Uint64("height", latestFinalizedBlock.Height).
+				Uint64("height", latestFinalizedBlockHeight).
 				Msg("No version beacon found for version control")
 			return
 		}
 
 		v.versionBeacon = vb
-		v.lastHandledBlock = latestFinalizedBlock
+		v.lastHandledBlockHeight = latestFinalizedBlockHeight
 
-		lastCompatibleHeight := latestFinalizedBlock.Height
+		lastCompatibleHeight := v.lastHandledBlockHeight
 
 		// version boundaries are sorted by version
 		for _, boundary := range vb.VersionBoundaries {
@@ -181,23 +189,35 @@ func (v *VersionControl) BlockFinalizedForTesting(h *flow.Header) {
 
 // CompatibleAtBlock checks if the node's version is compatible at a given block height.
 // It returns true if the node's version is compatible within the specified height range.
-// TODO needs to return an error for height, that does not handled yet
+// Returns expected errors:
+// - ErrUnhandledVersionBeacon if no version beacon was handled yet
+// - ErrUnhandledHeight if incoming block height is higher that last handled block height
 func (v *VersionControl) CompatibleAtBlock(height uint64) (bool, error) {
 	v.RLock()
 	defer v.RUnlock()
 
-	//isHandledHeight := v.lastHandledBlock.Height >= height
+	// Check if the version beacon is nil. If so, return an error indicating that the version beacon is unhandled.
+	if v.versionBeacon == nil {
+		return false, fmt.Errorf("could not check compatibility for height %d: %w", height, ErrUnhandledVersionBeacon)
+	}
 
-	//TODO return immediately
-	hasVersionBeacon := v.versionBeacon != nil
+	// Check if the height is greater than the last handled block height. If so, return an error indicating that the height is unhandled.
+	if height > v.lastHandledBlockHeight {
+		return false, fmt.Errorf("could not check compatibility for height %d: last handled height is %d: %w", height, v.lastHandledBlockHeight, ErrUnhandledHeight)
+	}
 
-	compatibleWithStartHeight := v.startHeight == NoHeight || height >= v.startHeight
+	// Check if the start height is set and the height is less than the start height. If so, return false indicating that the height is not compatible.
+	if v.startHeight != NoHeight && height < v.startHeight {
+		return false, nil
+	}
 
-	compatibleWithEndHeight := v.endHeight == NoHeight || height <= v.endHeight
+	// Check if the end height is set and the height is greater than the end height. If so, return false indicating that the height is not compatible.
+	if v.endHeight != NoHeight && height > v.endHeight {
+		return false, nil
+	}
 
-	return hasVersionBeacon &&
-		compatibleWithStartHeight &&
-		compatibleWithEndHeight, nil
+	// If none of the above conditions are met, the height is compatible.
+	return true, nil
 }
 
 // AddVersionUpdatesConsumer adds a consumer for version update events.
