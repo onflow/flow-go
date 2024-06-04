@@ -15,6 +15,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/model/flow"
 	testutils "github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -71,7 +72,8 @@ func Test_TracerUploaderIntegration(t *testing.T) {
 		require.NoError(t, err)
 
 		id := gethCommon.BytesToHash([]byte("test-tx"))
-		tracer.Collect(id)
+		blockID := flow.Identifier{0x02}
+		tracer.Collect(id, blockID)
 
 		// check uploaded object
 		client, err := storage.NewClient(context.Background())

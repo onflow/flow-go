@@ -2,6 +2,7 @@ package debug
 
 import (
 	"encoding/json"
+	"fmt"
 	"math/big"
 	"testing"
 
@@ -11,16 +12,18 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm/evm/testutils"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 func Test_CallTracer(t *testing.T) {
 	t.Run("collect traces and upload them", func(t *testing.T) {
 		txID := gethCommon.Hash{0x05}
+		blockID := flow.Identifier{0x01}
 		var res json.RawMessage
 
 		mockUpload := &testutils.MockUploader{
 			UploadFunc: func(id string, message json.RawMessage) error {
-				require.Equal(t, txID.String(), id)
+				require.Equal(t, fmt.Sprintf("%s-%s", blockID.String(), txID.String()), id)
 				require.Equal(t, res, message)
 				return nil
 			},
@@ -45,7 +48,7 @@ func Test_CallTracer(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, res)
 
-		tracer.Collect(txID)
+		tracer.Collect(txID, blockID)
 	})
 
 	t.Run("nop tracer", func(t *testing.T) {
