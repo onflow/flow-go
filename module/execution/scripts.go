@@ -42,7 +42,7 @@ type ScriptExecutor interface {
 	// - storage.ErrHeightNotIndexed if the data for the block height is not available
 	GetAccountAtBlockHeight(ctx context.Context, address flow.Address, height uint64) (*flow.Account, error)
 
-	// GetAccountBalance returns a
+	// GetAccountBalance returns
 	// Expected errors:
 	// - storage.ErrHeightNotIndexed if the data for the block height is not available
 	GetAccountBalance(ctx context.Context, address flow.Address, height uint64) (uint64, error)
