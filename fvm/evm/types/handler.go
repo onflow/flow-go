@@ -86,7 +86,4 @@ type BlockStore interface {
 
 	// CommitBlockProposal commits the block proposal and update the chain of blocks
 	CommitBlockProposal() error
-
-	// ResetBlockProposal resets the block proposal
-	ResetBlockProposal() error
 }

@@ -48,7 +48,7 @@ func (bs *BlockStore) BlockProposal() (*types.Block, error) {
 		return nil, err
 	}
 	if !found {
-		return nil, fmt.Errorf("cadence block not found")
+		return nil, fmt.Errorf("cadence block at height: %d not found", cadenceHeight)
 	}
 
 	lastExecutedBlock, err := bs.LatestBlock()
@@ -98,12 +98,6 @@ func (bs *BlockStore) CommitBlockProposal() error {
 		return err
 	}
 
-	bs.blockProposal = nil
-	return nil
-}
-
-// ResetBlockProposal resets the block proposal
-func (bs *BlockStore) ResetBlockProposal() error {
 	bs.blockProposal = nil
 	return nil
 }
