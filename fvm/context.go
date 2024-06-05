@@ -79,6 +79,7 @@ func defaultContext() Context {
 		MaxStateInteractionSize:           DefaultMaxInteractionSize,
 		TransactionExecutorParams:         DefaultTransactionExecutorParams(),
 		EnvironmentParams:                 environment.DefaultEnvironmentParams(),
+		EVMTracer:                         debug.NopTracer,
 	}
 	return ctx
 }
