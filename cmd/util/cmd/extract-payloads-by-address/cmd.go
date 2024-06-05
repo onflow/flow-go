@@ -18,7 +18,7 @@ var (
 )
 
 var Cmd = &cobra.Command{
-	Use:   "extract-payload-by-address",
+	Use:   "extract-payloads-by-address",
 	Short: "Read payload file and generate payload file containing payloads with specified addresses",
 	Run:   run,
 }
@@ -59,7 +59,7 @@ func run(*cobra.Command, []string) {
 
 	owners, err := common.ParseOwners(strings.Split(flagAddresses, ","))
 	if err != nil {
-		log.Fatal().Err(err)
+		log.Fatal().Err(err).Msg("failed to parse addresses")
 	}
 
 	log.Info().Msgf(
@@ -71,7 +71,7 @@ func run(*cobra.Command, []string) {
 
 	inputPayloadsFromPartialState, payloads, err := util.ReadPayloadFile(log.Logger, flagInputPayloadFileName)
 	if err != nil {
-		log.Fatal().Err(err)
+		log.Fatal().Err(err).Msg("failed to read payloads")
 	}
 
 	numOfPayloadWritten, err := util.CreatePayloadFile(
@@ -82,7 +82,7 @@ func run(*cobra.Command, []string) {
 		inputPayloadsFromPartialState,
 	)
 	if err != nil {
-		log.Fatal().Err(err)
+		log.Fatal().Err(err).Msg("failed to create payloads file")
 	}
 
 	log.Info().Msgf(
