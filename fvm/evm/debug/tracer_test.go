@@ -51,6 +51,24 @@ func Test_CallTracer(t *testing.T) {
 		tracer.Collect(txID, blockID)
 	})
 
+	t.Run("collector panic recovery", func(t *testing.T) {
+		txID := gethCommon.Hash{0x05}
+		blockID := flow.Identifier{0x01}
+
+		mockUpload := &testutils.MockUploader{
+			UploadFunc: func(id string, message json.RawMessage) error {
+				panic("nooooo")
+			},
+		}
+
+		tracer, err := NewEVMCallTracer(mockUpload, zerolog.Nop())
+		require.NoError(t, err)
+
+		require.NotPanics(t, func() {
+			tracer.Collect(txID, blockID)
+		})
+	})
+
 	t.Run("nop tracer", func(t *testing.T) {
 		tracer := nopTracer{}
 		require.Nil(t, tracer.TxTracer())
