@@ -16,7 +16,6 @@ type Uploader interface {
 var _ Uploader = &GCPUploader{}
 
 type GCPUploader struct {
-	client *storage.Client
 	bucket *storage.BucketHandle
 }
 
