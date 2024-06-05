@@ -50,10 +50,10 @@ func run(*cobra.Command, []string) {
 func findFirstMismatch(datadir string, startHeight, endHeight uint64) error {
 	fmt.Printf("initializing database\n")
 	headers, results, seals, state, db, err := createStorages(datadir)
-	defer db.Close()
 	if err != nil {
 		return fmt.Errorf("could not create storages: %v", err)
 	}
+	defer db.Close()
 
 	c := &checker{
 		headers: headers,
