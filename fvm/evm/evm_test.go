@@ -1941,14 +1941,14 @@ func TestCadenceArch(t *testing.T) {
 				sig, err := privateKey.PrivateKey.Sign(data.Bytes(), hasher)
 				require.NoError(t, err)
 
-				proof := types.COAOwnershipProof{
+				validProof := types.COAOwnershipProof{
 					KeyIndices:     []uint64{0},
 					Address:        types.FlowAddress(flowAccount),
 					CapabilityPath: "coa",
 					Signatures:     []types.Signature{types.Signature(sig)},
 				}
 
-				encodedProof, err := proof.Encode()
+				encodedValidProof, err := validProof.Encode()
 				require.NoError(t, err)
 
 				// create transaction for proof verification
@@ -1971,7 +1971,7 @@ func TestCadenceArch(t *testing.T) {
 						true,
 						coaAddress.ToCommon(),
 						data,
-						encodedProof),
+						encodedValidProof),
 					big.NewInt(0),
 					uint64(10_000_000),
 					big.NewInt(0),
@@ -2000,6 +2000,54 @@ func TestCadenceArch(t *testing.T) {
 					snapshot)
 				require.NoError(t, err)
 				require.NoError(t, output.Err)
+
+				invalidProof := types.COAOwnershipProof{
+					KeyIndices:     []uint64{1000},
+					Address:        types.FlowAddress(flowAccount),
+					CapabilityPath: "coa",
+					Signatures:     []types.Signature{types.Signature(sig)},
+				}
+
+				encodedInvalidProof, err := invalidProof.Encode()
+				require.NoError(t, err)
+
+				// invalid proof tx
+				innerTxBytes = testAccount.PrepareSignAndEncodeTx(t,
+					testContract.DeployedAt.ToCommon(),
+					testContract.MakeCallData(t, "verifyArchCallToVerifyCOAOwnershipProof",
+						true,
+						coaAddress.ToCommon(),
+						data,
+						encodedInvalidProof),
+					big.NewInt(0),
+					uint64(10_000_000),
+					big.NewInt(0),
+				)
+
+				verifyScript = fvm.Script(code).WithArguments(
+					json.MustEncode(
+						cadence.NewArray(
+							ConvertToCadence(innerTxBytes),
+						).WithType(
+							stdlib.EVMTransactionBytesCadenceType,
+						)),
+					json.MustEncode(
+						cadence.NewArray(
+							ConvertToCadence(
+								testAccount.Address().Bytes(),
+							),
+						).WithType(
+							stdlib.EVMAddressBytesCadenceType,
+						),
+					),
+				)
+				// run proof transaction
+				_, output, err = vm.Run(
+					ctx,
+					verifyScript,
+					snapshot)
+				require.NoError(t, err)
+				require.Error(t, output.Err)
 			})
 	})
 }
