@@ -2040,9 +2040,6 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 
 			calculateExpectedStateId := calculateExpectedStateId(t, mutableProtocolState)
 
-			metricsMock.On("EpochEmergencyFallbackTriggered").Once()
-			protoEventsMock.On("EpochEmergencyFallbackTriggered").Once()
-
 			// add a block for the first seal to reference
 			block1 := unittest.BlockWithParentFixture(head)
 			block1.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(calculateExpectedStateId(block1.Header, nil))))
@@ -2071,6 +2068,8 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 			assertEpochEmergencyFallbackTriggered(t, state.Final(), false)               // EFM should still not be triggered after finalizing block 2
 			assertEpochEmergencyFallbackTriggered(t, state.AtBlockID(block3.ID()), true) // but EFM has to be triggered at block 3, when we are observing the fork
 
+			metricsMock.On("EpochEmergencyFallbackTriggered").Once()
+			protoEventsMock.On("EpochEmergencyFallbackTriggered").Once()
 			err = state.Finalize(context.Background(), block3.ID())
 			require.NoError(t, err)
 			assertEpochEmergencyFallbackTriggered(t, state.Final(), true) // finalizing block 3 should have triggered EFM
@@ -2124,9 +2123,6 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 
 			calculateExpectedStateId := calculateExpectedStateId(t, mutableProtocolState)
 
-			metricsMock.On("EpochEmergencyFallbackTriggered").Once()
-			protoEventsMock.On("EpochEmergencyFallbackTriggered").Once()
-
 			// add a block for the first seal to reference
 			block1 := unittest.BlockWithParentFixture(head)
 			block1.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(calculateExpectedStateId(block1.Header, nil))))
@@ -2145,13 +2141,6 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 				unittest.WithFirstView(epoch1Setup.FinalView+1),
 			)
 
-			epochRecover := unittest.EpochRecoverFixture(
-				unittest.WithParticipants(epoch2Participants),
-				unittest.SetupWithCounter(epoch1Setup.Counter+1),
-				unittest.WithFinalView(epoch1Setup.FinalView+1000),
-				unittest.WithFirstView(epoch1Setup.FinalView+1),
-			)
-
 			receipt, seal := unittest.ReceiptAndSealForBlock(block1)
 			receipt.ExecutionResult.ServiceEvents = []flow.ServiceEvent{epoch2Setup.ServiceEvent()}
 			seal.ResultID = receipt.ExecutionResult.ID()
@@ -2162,9 +2151,9 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 			block2, block3 := unittest.SealBlock(t, state, mutableProtocolState, block1, receipt, seal)
 			err = state.Finalize(context.Background(), block2.ID())
 			require.NoError(t, err)
-
 			err = state.Finalize(context.Background(), block3.ID())
 			require.NoError(t, err)
+			assertEpochEmergencyFallbackTriggered(t, state.Final(), false) // EFM is not expected
 
 			invalidEpochCommit := unittest.EpochCommitFixture() // a random epoch commit event will be invalid
 			receipt, seal = unittest.ReceiptAndSealForBlock(block2)
@@ -2177,6 +2166,8 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 			assertEpochEmergencyFallbackTriggered(t, state.Final(), false)               // EFM should still not be triggered after finalizing block 4
 			assertEpochEmergencyFallbackTriggered(t, state.AtBlockID(block5.ID()), true) // but it has to be triggered at fork
 
+			metricsMock.On("EpochEmergencyFallbackTriggered").Once()
+			protoEventsMock.On("EpochEmergencyFallbackTriggered").Once()
 			err = state.Finalize(context.Background(), block5.ID())
 			require.NoError(t, err)
 			assertEpochEmergencyFallbackTriggered(t, state.Final(), true) // finalizing block 5 should have triggered EFM
@@ -2184,6 +2175,12 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 			// Block 6 incorporates Execution Result [ER] for block2, where the ER also includes EpochRecover event.
 			// Only when ingesting block 5, which _seals_ the EpochRecover event, the state should switch back to
 			// `EpochFallbackTriggered` being false.
+			epochRecover := unittest.EpochRecoverFixture(
+				unittest.WithParticipants(epoch2Participants),
+				unittest.SetupWithCounter(epoch1Setup.Counter+1),
+				unittest.WithFinalView(epoch1Setup.FinalView+1000),
+				unittest.WithFirstView(epoch1Setup.FinalView+1),
+			)
 			receipt, seal = unittest.ReceiptAndSealForBlock(block4)
 			receipt.ExecutionResult.ServiceEvents = []flow.ServiceEvent{epochRecover.ServiceEvent()}
 			seal.ResultID = receipt.ExecutionResult.ID()
@@ -2242,9 +2239,6 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 
 			calculateExpectedStateId := calculateExpectedStateId(t, mutableProtocolState)
 
-			metricsMock.On("EpochEmergencyFallbackTriggered").Once()
-			protoEventsMock.On("EpochEmergencyFallbackTriggered").Once()
-
 			// add a block for the first seal to reference
 			block1 := unittest.BlockWithParentFixture(head)
 			block1.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(calculateExpectedStateId(block1.Header, nil))))
@@ -2276,9 +2270,9 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 			block2, block3 := unittest.SealBlock(t, state, mutableProtocolState, block1, receipt, seal)
 			err = state.Finalize(context.Background(), block2.ID())
 			require.NoError(t, err)
-
 			err = state.Finalize(context.Background(), block3.ID())
 			require.NoError(t, err)
+			assertEpochEmergencyFallbackTriggered(t, state.Final(), false) // EFM is not expected
 
 			// B2 contains a valid commit event for the next epoch
 			epoch2Commit := unittest.EpochCommitFixture(
@@ -2298,9 +2292,9 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 			block4, block5 := unittest.SealBlock(t, state, mutableProtocolState, block3, receipt, seal)
 			err = state.Finalize(context.Background(), block4.ID())
 			require.NoError(t, err)
-
 			err = state.Finalize(context.Background(), block5.ID())
 			require.NoError(t, err)
+			assertEpochEmergencyFallbackTriggered(t, state.Final(), false) // EFM is not expected
 
 			// B4 contains an invalid commit event, this is needed to trigger EFM.
 			invalidCommit := unittest.EpochCommitFixture()
@@ -2315,6 +2309,8 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 			assertEpochEmergencyFallbackTriggered(t, state.Final(), false)               // EFM should still not be triggered after finalizing block 6
 			assertEpochEmergencyFallbackTriggered(t, state.AtBlockID(block7.ID()), true) // but EFM has to be triggered at block 7, when we are observing the fork
 
+			metricsMock.On("EpochEmergencyFallbackTriggered").Once()
+			protoEventsMock.On("EpochEmergencyFallbackTriggered").Once()
 			err = state.Finalize(context.Background(), block7.ID())
 			require.NoError(t, err)
 			assertEpochEmergencyFallbackTriggered(t, state.Final(), true) // finalizing block 7 should have triggered EFM
