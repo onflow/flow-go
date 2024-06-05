@@ -70,7 +70,7 @@ func (ch *ChunkDataPacks) Remove(chunkIDs []flow.Identifier) error {
 // No errors are expected during normal operation, but it may return generic error
 // if entity is not serializable or Badger unexpectedly fails to process request
 func (ch *ChunkDataPacks) BatchStore(c *flow.ChunkDataPack, batch storage.BatchStorage) error {
-	sc := toStoredChunkDataPack(c)
+	sc := storage.ToStoredChunkDataPack(c)
 	writeBatch := batch.GetWriter()
 	batch.OnSucceed(func() {
 		ch.byChunkIDCache.Insert(sc.ChunkID, sc)
@@ -152,23 +152,4 @@ func (ch *ChunkDataPacks) retrieveCHDP(chunkID flow.Identifier) func(*badger.Txn
 		}
 		return val, nil
 	}
-}
-
-func toStoredChunkDataPack(c *flow.ChunkDataPack) *storage.StoredChunkDataPack {
-	sc := &storage.StoredChunkDataPack{
-		ChunkID:           c.ChunkID,
-		StartState:        c.StartState,
-		Proof:             c.Proof,
-		SystemChunk:       false,
-		ExecutionDataRoot: c.ExecutionDataRoot,
-	}
-
-	if c.Collection != nil {
-		// non system chunk
-		sc.CollectionID = c.Collection.ID()
-	} else {
-		sc.SystemChunk = true
-	}
-
-	return sc
 }
