@@ -122,7 +122,7 @@ func (m *FallbackStateMachine) ProcessEpochRecover(epochRecover *flow.EpochRecov
 		return false, fmt.Errorf("invalid epoch recovery event(setup): %w", err)
 	}
 
-	err = protocol.IsValidExtendingEpochCommit(&epochRecover.EpochCommit, m.state, &epochRecover.EpochSetup)
+	err = protocol.IsValidEpochCommit(&epochRecover.EpochCommit, &epochRecover.EpochSetup)
 	if err != nil {
 		return false, fmt.Errorf("invalid epoch recovery event(commit): %w", err)
 	}
