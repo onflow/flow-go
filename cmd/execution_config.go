@@ -71,6 +71,7 @@ type ExecutionConfig struct {
 	enableStorehouse         bool
 	enableChecker            bool
 	enableNewIngestionEngine bool
+	publicAccessID           string
 }
 
 func (exeConf *ExecutionConfig) SetupFlags(flags *pflag.FlagSet) {
@@ -128,6 +129,7 @@ func (exeConf *ExecutionConfig) SetupFlags(flags *pflag.FlagSet) {
 	flags.BoolVar(&exeConf.enableStorehouse, "enable-storehouse", false, "enable storehouse to store registers on disk, default is false")
 	flags.BoolVar(&exeConf.enableChecker, "enable-checker", true, "enable checker to check the correctness of the execution result, default is true")
 	flags.BoolVar(&exeConf.enableNewIngestionEngine, "enable-new-ingestion-engine", false, "enable new ingestion engine, default is false")
+	flags.StringVar(&exeConf.publicAccessID, "public-access-id", "", "public access ID for the node")
 
 }
 

@@ -38,6 +38,7 @@ func TestEVMRun(t *testing.T) {
 	t.Parallel()
 
 	chain := flow.Emulator.Chain()
+
 	t.Run("testing EVM.run (happy case)", func(t *testing.T) {
 
 		t.Parallel()
@@ -151,6 +152,7 @@ func TestEVMRun(t *testing.T) {
 				require.Equal(t, blockEventPayload.Hash, txEventPayload.BlockHash)
 				require.Equal(t, blockEventPayload.Height, txEventPayload.BlockHeight)
 				require.Equal(t, blockEventPayload.TotalGasUsed, txEventPayload.GasConsumed)
+				require.Equal(t, uint64(43807), blockEventPayload.TotalGasUsed)
 				require.Empty(t, txEventPayload.ContractAddress)
 
 				// append the state
@@ -509,6 +511,29 @@ func TestEVMBatchRun(t *testing.T) {
 					last := log.Topics[len(log.Topics)-1] // last topic is the value set in the store method
 					assert.Equal(t, storedValues[i], last.Big().Int64())
 				}
+
+				// last one is block executed, make sure TotalGasUsed is non-zero
+				blockEvent := output.Events[batchCount]
+
+				assert.Equal(
+					t,
+					common.NewAddressLocation(
+						nil,
+						common.Address(sc.EVMContract.Address),
+						string(types.EventTypeBlockExecuted),
+					).ID(),
+					string(blockEvent.Type),
+				)
+
+				ev, err := ccf.Decode(nil, blockEvent.Payload)
+				require.NoError(t, err)
+				cadenceEvent, ok := ev.(cadence.Event)
+				require.True(t, ok)
+
+				blockEventPayload, err := types.DecodeBlockEventPayload(cadenceEvent)
+				require.NoError(t, err)
+				require.NotEmpty(t, blockEventPayload.Hash)
+				require.Equal(t, uint64(155183), blockEventPayload.TotalGasUsed)
 
 				// append the state
 				snapshot = snapshot.Append(state)
@@ -965,6 +990,29 @@ func TestEVMAddressDeposit(t *testing.T) {
 			expectedBalance := types.OneFlowBalance
 			bal := getEVMAccountBalance(t, ctx, vm, snapshot, addr)
 			require.Equal(t, expectedBalance, bal)
+
+			// block executed event, make sure TotalGasUsed is non-zero
+			blockEvent := output.Events[3]
+
+			assert.Equal(
+				t,
+				common.NewAddressLocation(
+					nil,
+					common.Address(sc.EVMContract.Address),
+					string(types.EventTypeBlockExecuted),
+				).ID(),
+				string(blockEvent.Type),
+			)
+
+			ev, err := ccf.Decode(nil, blockEvent.Payload)
+			require.NoError(t, err)
+			cadenceEvent, ok := ev.(cadence.Event)
+			require.True(t, ok)
+
+			blockEventPayload, err := types.DecodeBlockEventPayload(cadenceEvent)
+			require.NoError(t, err)
+			require.NotEmpty(t, blockEventPayload.Hash)
+			require.Equal(t, uint64(21000), blockEventPayload.TotalGasUsed)
 		})
 }
 
@@ -2196,8 +2244,7 @@ func RunWithNewEnvironment(
 		*EOATestAccount,
 	),
 ) {
-	rootAddr, err := evm.StorageAccountAddress(chain.ChainID())
-	require.NoError(t, err)
+	rootAddr := evm.StorageAccountAddress(chain.ChainID())
 
 	RunWithTestBackend(t, func(backend *TestBackend) {
 		RunWithDeployedContract(t, GetStorageTestContract(t), backend, rootAddr, func(testContract *TestContract) {

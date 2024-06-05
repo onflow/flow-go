@@ -149,6 +149,11 @@ func (b *ByAccount) AccountCount() int {
 	return len(b.registers)
 }
 
+func (b *ByAccount) HasAccountOwner(owner string) bool {
+	_, ok := b.registers[owner]
+	return ok
+}
+
 func (b *ByAccount) AccountRegisters(owner string) *AccountRegisters {
 	accountRegisters, ok := b.registers[owner]
 	if !ok {
@@ -273,6 +278,16 @@ func (a *AccountRegisters) Merge(other *AccountRegisters) error {
 			return fmt.Errorf("key already exists: %s", key)
 		}
 		a.registers[key] = value
+	}
+	return nil
+}
+
+func (a *AccountRegisters) ForEachKey(f func(key string) error) error {
+	for key := range a.registers {
+		err := f(key)
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }

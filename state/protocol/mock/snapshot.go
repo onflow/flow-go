@@ -67,19 +67,19 @@ func (_m *Snapshot) Descendants() ([]flow.Identifier, error) {
 }
 
 // EpochProtocolState provides a mock function with given fields:
-func (_m *Snapshot) EpochProtocolState() (protocol.DynamicProtocolState, error) {
+func (_m *Snapshot) EpochProtocolState() (protocol.EpochProtocolState, error) {
 	ret := _m.Called()
 
-	var r0 protocol.DynamicProtocolState
+	var r0 protocol.EpochProtocolState
 	var r1 error
-	if rf, ok := ret.Get(0).(func() (protocol.DynamicProtocolState, error)); ok {
+	if rf, ok := ret.Get(0).(func() (protocol.EpochProtocolState, error)); ok {
 		return rf()
 	}
-	if rf, ok := ret.Get(0).(func() protocol.DynamicProtocolState); ok {
+	if rf, ok := ret.Get(0).(func() protocol.EpochProtocolState); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(protocol.DynamicProtocolState)
+			r0 = ret.Get(0).(protocol.EpochProtocolState)
 		}
 	}
 

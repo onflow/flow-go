@@ -13,7 +13,6 @@ import (
 	"github.com/onflow/flow-go/fvm/evm"
 	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/storage/logical"
-	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/hash"
 )
@@ -202,12 +201,10 @@ func (executor *scriptExecutor) executeScript() error {
 
 	if executor.ctx.EVMEnabled {
 		chain := executor.ctx.Chain
-		sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 		err := evm.SetupEnvironment(
 			chain.ChainID(),
 			executor.env,
 			rt.ScriptRuntimeEnv,
-			sc.FlowToken.Address,
 			nil, // we shouldn't trace during script execution
 		)
 		if err != nil {

@@ -13,20 +13,20 @@ type StateMachine struct {
 }
 
 // Build provides a mock function with given fields:
-func (_m *StateMachine) Build() (*flow.ProtocolStateEntry, flow.Identifier, bool) {
+func (_m *StateMachine) Build() (*flow.EpochProtocolStateEntry, flow.Identifier, bool) {
 	ret := _m.Called()
 
-	var r0 *flow.ProtocolStateEntry
+	var r0 *flow.EpochProtocolStateEntry
 	var r1 flow.Identifier
 	var r2 bool
-	if rf, ok := ret.Get(0).(func() (*flow.ProtocolStateEntry, flow.Identifier, bool)); ok {
+	if rf, ok := ret.Get(0).(func() (*flow.EpochProtocolStateEntry, flow.Identifier, bool)); ok {
 		return rf()
 	}
-	if rf, ok := ret.Get(0).(func() *flow.ProtocolStateEntry); ok {
+	if rf, ok := ret.Get(0).(func() *flow.EpochProtocolStateEntry); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*flow.ProtocolStateEntry)
+			r0 = ret.Get(0).(*flow.EpochProtocolStateEntry)
 		}
 	}
 
@@ -62,15 +62,15 @@ func (_m *StateMachine) EjectIdentity(nodeID flow.Identifier) error {
 }
 
 // ParentState provides a mock function with given fields:
-func (_m *StateMachine) ParentState() *flow.RichProtocolStateEntry {
+func (_m *StateMachine) ParentState() *flow.RichEpochProtocolStateEntry {
 	ret := _m.Called()
 
-	var r0 *flow.RichProtocolStateEntry
-	if rf, ok := ret.Get(0).(func() *flow.RichProtocolStateEntry); ok {
+	var r0 *flow.RichEpochProtocolStateEntry
+	if rf, ok := ret.Get(0).(func() *flow.RichEpochProtocolStateEntry); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*flow.RichProtocolStateEntry)
+			r0 = ret.Get(0).(*flow.RichEpochProtocolStateEntry)
 		}
 	}
 
