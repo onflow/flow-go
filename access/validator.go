@@ -1,14 +1,14 @@
 package access
 
 import (
+	"context"
 	"errors"
 	"fmt"
-
-	"github.com/onflow/flow-go/fvm/environment"
-	"github.com/onflow/flow-go/fvm/tracing"
-
 	"github.com/onflow/cadence/runtime/parser"
 	"github.com/onflow/crypto"
+	"github.com/onflow/flow-go/fvm/environment"
+	"github.com/onflow/flow-go/fvm/storage"
+	"github.com/onflow/flow-go/fvm/tracing"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state"
@@ -356,14 +356,34 @@ func (v *TransactionValidator) checkSignatureFormat(tx *flow.TransactionBody) er
 
 func (v *TransactionValidator) checkSufficientFlowAmountToPayForTransaction(tx *flow.TransactionBody) error {
 	tracer := tracing.NewMockTracerSpan()
-	systemContracts := environment.NewSystemContracts(
+
+	runtimeParams := environment.DefaultRuntimeParams()
+	runtime := environment.NewRuntime(runtimeParams)
+
+	envParams := environment.DefaultEnvironmentParams()
+	envParams.Chain = v.chain
+
+	// TODO: replace with a real context (have to pass it to validator). it is possible!
+	ctx := context.Background()
+
+	var txState storage.TransactionPreparer
+	// TODO: how to init txState?
+
+	env := environment.NewScriptEnv(ctx, tracer, envParams, txState)
+	runtime.SetEnvironment(env)
+
+	invoker := environment.NewSystemContracts(
 		v.chain,
 		tracer,
 		environment.NewProgramLogger(tracer, environment.DefaultProgramLoggerParams()),
-		environment.NewRuntime(environment.DefaultRuntimeParams()),
+		runtime,
 	)
+	if invoker == nil {
+		return errors.New("couldn't create system contracts")
+	}
 
-	_, err := systemContracts.CheckPayerBalanceAndGetMaxTxFees(tx.Payer, tx.InclusionEffort(), tx.GasLimit)
+	// TODO: check balance?
+	_, err := invoker.CheckPayerBalanceAndGetMaxTxFees(tx.Payer, tx.InclusionEffort(), tx.GasLimit)
 	return err
 }
 
