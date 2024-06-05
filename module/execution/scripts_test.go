@@ -3,6 +3,7 @@ package execution
 import (
 	"context"
 	"fmt"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"os"
 	"testing"
 
@@ -23,6 +24,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/state_synchronization/indexer"
@@ -128,6 +130,30 @@ func (s *scriptTestSuite) TestGetAccount() {
 		s.Require().NoError(err)
 		s.Require().Equal(address, account.Address)
 		s.Assert().Zero(account.Balance)
+	})
+}
+
+func (s *scriptTestSuite) TestGetAccountBalance() {
+	s.Run("Get Account Balance", func() {
+		address := s.createAccount()
+
+		//txBody := transferTokensTx(s.chain).
+		//	AddArgument(jsoncdc.MustEncode(cadence.UFix64(100_000_000))).
+		//	AddArgument(jsoncdc.MustEncode(cadence.Address(address))).
+		//	AddAuthorizer(s.chain.ServiceAddress())
+		//
+		//executionSnapshot, _, err := s.vm.Run(
+		//	s.vmCtx,
+		//	fvm.Transaction(txBody, 0),
+		//	s.snapshot,
+		//)
+		//s.Require().NoError(err)
+		//
+		//s.snapshot = s.snapshot.Append(executionSnapshot)
+
+		balance, err := s.scripts.GetAccountBalance(context.Background(), address, s.height)
+		s.Require().NoError(err)
+		s.Require().Equal(100_000_000, balance)
 	})
 }
 
@@ -256,6 +282,27 @@ func (s *scriptTestSuite) createAccount() flow.Address {
 	data, err := ccf.Decode(nil, accountCreatedEvents[0].Payload)
 	s.Require().NoError(err)
 
+	////////////////////////////////////////
+	txBody = transferTokensTx(s.chain).
+		AddArgument(jsoncdc.MustEncode(cadence.UFix64(100_000_000))).
+		AddArgument(jsoncdc.MustEncode(cadence.Address(flow.ConvertAddress(
+			cadence.SearchFieldByName(
+				data.(cadence.Event),
+				stdlib.AccountEventAddressParameter.Identifier,
+			).(cadence.Address),
+		)))).
+		AddAuthorizer(s.chain.ServiceAddress())
+
+	executionSnapshot, _, err = s.vm.Run(
+		s.vmCtx,
+		fvm.Transaction(txBody, 0),
+		s.snapshot,
+	)
+	s.Require().NoError(err)
+
+	s.snapshot = s.snapshot.Append(executionSnapshot)
+	//////////////////////////////////////////
+
 	return flow.ConvertAddress(
 		cadence.SearchFieldByName(
 			data.(cadence.Event),
@@ -271,4 +318,53 @@ func newBlockHeadersStorage(blocks []*flow.Block) storage.Headers {
 	}
 
 	return synctest.MockBlockHeaderStorage(synctest.WithByHeight(blocksByHeight))
+}
+
+func transferTokensTx(chain flow.Chain) *flow.TransactionBody {
+	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+	return flow.NewTransactionBody().
+		SetScript([]byte(fmt.Sprintf(
+			`
+							// This transaction is a template for a transaction that
+							// could be used by anyone to send tokens to another account
+							// that has been set up to receive tokens.
+							//
+							// The withdraw amount and the account from getAccount
+							// would be the parameters to the transaction
+
+							import FungibleToken from 0x%s
+							import FlowToken from 0x%s
+
+							transaction(amount: UFix64, to: Address) {
+
+								// The Vault resource that holds the tokens that are being transferred
+								let sentVault: @{FungibleToken.Vault}
+
+								prepare(signer: auth(BorrowValue) &Account) {
+
+									// Get a reference to the signer's stored vault
+									let vaultRef = signer.storage.borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(from: /storage/flowTokenVault)
+										?? panic("Could not borrow reference to the owner's Vault!")
+
+									// Withdraw tokens from the signer's stored vault
+									self.sentVault <- vaultRef.withdraw(amount: amount)
+								}
+
+								execute {
+
+									// Get the recipient's public account object
+									let recipient = getAccount(to)
+
+									// Get a reference to the recipient's Receiver
+									let receiverRef = recipient.capabilities.borrow<&{FungibleToken.Receiver}>(/public/flowTokenReceiver)
+										?? panic("Could not borrow receiver reference to the recipient's Vault")
+
+									// Deposit the withdrawn tokens in the recipient's receiver
+									receiverRef.deposit(from: <-self.sentVault)
+								}
+							}`,
+			sc.FungibleToken.Address.Hex(),
+			sc.FlowToken.Address.Hex(),
+		)),
+		)
 }
