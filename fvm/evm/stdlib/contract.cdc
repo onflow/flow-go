@@ -258,6 +258,10 @@ contract EVM {
         access(all)
         let errorCode: UInt64
 
+        /// error message
+        access(all)
+        let errorMessage: String
+
         /// returns the amount of gas metered during
         /// evm execution
         access(all)
@@ -279,12 +283,14 @@ contract EVM {
         init(
             status: Status,
             errorCode: UInt64,
+            errorMessage: String,
             gasUsed: UInt64,
             data: [UInt8],
             contractAddress: [UInt8; 20]?
         ) {
             self.status = status
             self.errorCode = errorCode
+            self.errorMessage = errorMessage
             self.gasUsed = gasUsed
             self.data = data
 

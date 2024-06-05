@@ -73,6 +73,16 @@ func (p *transactionEvent) ToCadence(location common.Location) (cadence.Event, e
 		deployedAddress = cadence.String(p.Result.DeployedContractAddress.String())
 	}
 
+	errorMsg := ""
+	if p.Result.VMError != nil {
+		errorMsg = p.Result.VMError.Error()
+	}
+	// both error would never happen at the same time
+	// but in case the priority is by validation error
+	if p.Result.ValidationError != nil {
+		errorMsg = p.Result.ValidationError.Error()
+	}
+
 	eventType := cadence.NewEventType(
 		location,
 		string(EventTypeTransactionExecuted),
@@ -88,6 +98,7 @@ func (p *transactionEvent) ToCadence(location common.Location) (cadence.Event, e
 			cadence.NewField("blockHeight", cadence.UInt64Type),
 			// todo we can remove hash and just reference block by height (evm-gateway dependency)
 			cadence.NewField("blockHash", cadence.StringType),
+			cadence.NewField("errorMessage", cadence.StringType),
 		},
 		nil,
 	)
@@ -103,6 +114,7 @@ func (p *transactionEvent) ToCadence(location common.Location) (cadence.Event, e
 		cadence.String(hex.EncodeToString(encodedLogs)),
 		cadence.NewUInt64(p.BlockHeight),
 		cadence.String(p.BlockHash.String()),
+		cadence.String(errorMsg),
 	}).WithType(eventType), nil
 }
 
@@ -189,6 +201,7 @@ type TransactionEventPayload struct {
 	Logs            string `cadence:"logs"`
 	BlockHeight     uint64 `cadence:"blockHeight"`
 	BlockHash       string `cadence:"blockHash"`
+	ErrorMessage    string `cadence:"errorMessage"`
 }
 
 // DecodeTransactionEventPayload decodes Cadence event into transaction event payload.
