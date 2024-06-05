@@ -13,7 +13,7 @@ import (
 
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
-	badgerDB "github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble"
 	"github.com/ipfs/boxo/bitswap"
 	"github.com/ipfs/go-cid"
 	badger "github.com/ipfs/go-ds-badger2"
@@ -94,7 +94,6 @@ import (
 	storage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/badger/procedure"
 	storagepebble "github.com/onflow/flow-go/storage/pebble"
-	sutil "github.com/onflow/flow-go/storage/util"
 )
 
 const (
@@ -691,28 +690,39 @@ func (exeNode *ExecutionNode) LoadExecutionDataGetter(node *NodeConfig) error {
 	return nil
 }
 
-func openChunkDataPackDB(dbPath string, logger zerolog.Logger) (*badgerDB.DB, error) {
-	log := sutil.NewLogger(logger)
+// func openChunkDataPackDB(dbPath string, logger zerolog.Logger) (*badgerDB.DB, error) {
+// 	log := sutil.NewLogger(logger)
+//
+// 	opts := badgerDB.
+// 		DefaultOptions(dbPath).
+// 		WithKeepL0InMemory(true).
+// 		WithLogger(log).
+//
+// 		// the ValueLogFileSize option specifies how big the value of a
+// 		// key-value pair is allowed to be saved into badger.
+// 		// exceeding this limit, will fail with an error like this:
+// 		// could not store data: Value with size <xxxx> exceeded 1073741824 limit
+// 		// Maximum value size is 10G, needed by execution node
+// 		// TODO: finding a better max value for each node type
+// 		WithValueLogFileSize(256 << 23).
+// 		WithValueLogMaxEntries(100000) // Default is 1000000
+//
+// 	db, err := badgerDB.Open(opts)
+// 	if err != nil {
+// 		return nil, fmt.Errorf("could not open chunk data pack badger db at path %v: %w", dbPath, err)
+// 	}
+// 	return db, nil
+// }
 
-	opts := badgerDB.
-		DefaultOptions(dbPath).
-		WithKeepL0InMemory(true).
-		WithLogger(log).
-
-		// the ValueLogFileSize option specifies how big the value of a
-		// key-value pair is allowed to be saved into badger.
-		// exceeding this limit, will fail with an error like this:
-		// could not store data: Value with size <xxxx> exceeded 1073741824 limit
-		// Maximum value size is 10G, needed by execution node
-		// TODO: finding a better max value for each node type
-		WithValueLogFileSize(256 << 23).
-		WithValueLogMaxEntries(100000) // Default is 1000000
-
-	db, err := badgerDB.Open(opts)
+func openPebbleChunkDataPackDB(dbPath string, logger zerolog.Logger) (*pebble.DB, error) {
+	cache := pebble.NewCache(1 << 20)
+	defer cache.Unref()
+	opts := storagepebble.DefaultPebbleOptions(cache, pebble.DefaultComparer)
+	pebbledb, err := pebble.Open(dbPath, opts)
 	if err != nil {
-		return nil, fmt.Errorf("could not open chunk data pack badger db at path %v: %w", dbPath, err)
+		return nil, fmt.Errorf("could not open chunk data pack pebble db at path %v: %w", dbPath, err)
 	}
-	return db, nil
+	return pebbledb, nil
 }
 
 func (exeNode *ExecutionNode) LoadExecutionState(
@@ -722,7 +732,7 @@ func (exeNode *ExecutionNode) LoadExecutionState(
 	error,
 ) {
 
-	chunkDataPackDB, err := openChunkDataPackDB(exeNode.exeConf.chunkDataPackDir, node.Logger)
+	chunkDataPackDB, err := openPebbleChunkDataPackDB(exeNode.exeConf.chunkDataPackDir, node.Logger)
 	if err != nil {
 		return nil, err
 	}
@@ -732,7 +742,8 @@ func (exeNode *ExecutionNode) LoadExecutionState(
 		}
 		return nil
 	})
-	chunkDataPacks := storage.NewChunkDataPacks(node.Metrics.Cache, chunkDataPackDB, node.Storage.Collections, exeNode.exeConf.chunkDataPackCacheSize)
+	// chunkDataPacks := storage.NewChunkDataPacks(node.Metrics.Cache, chunkDataPackDB, node.Storage.Collections, exeNode.exeConf.chunkDataPackCacheSize)
+	chunkDataPacks := storagepebble.NewChunkDataPacks(chunkDataPackDB, node.Storage.Collections)
 
 	// Needed for gRPC server, make sure to assign to main scoped vars
 	exeNode.events = storage.NewEvents(node.Metrics.Cache, node.DB)
