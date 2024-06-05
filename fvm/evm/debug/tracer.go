@@ -7,6 +7,7 @@ import (
 	gethCommon "github.com/onflow/go-ethereum/common"
 	"github.com/onflow/go-ethereum/eth/tracers"
 	"github.com/rs/zerolog"
+
 	// this import is needed for side-effects, because the
 	// tracers.DefaultDirectory is relying on the init function
 	_ "github.com/onflow/go-ethereum/eth/tracers/native"
