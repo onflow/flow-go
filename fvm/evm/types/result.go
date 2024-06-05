@@ -37,6 +37,7 @@ var (
 type ResultSummary struct {
 	Status                  Status
 	ErrorCode               ErrorCode
+	ErrorMsg                string
 	GasConsumed             uint64
 	DeployedContractAddress *Address
 	ReturnedValue           Data
@@ -148,12 +149,14 @@ func (res *Result) ResultSummary() *ResultSummary {
 
 	if res.Invalid() {
 		rs.ErrorCode = ValidationErrorCode(res.ValidationError)
+		rs.ErrorMsg = res.ValidationError.Error()
 		rs.Status = StatusInvalid
 		return rs
 	}
 
 	if res.Failed() {
 		rs.ErrorCode = ExecutionErrorCode(res.VMError)
+		rs.ErrorMsg = res.VMError.Error()
 		rs.Status = StatusFailed
 		return rs
 	}
