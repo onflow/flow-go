@@ -27,6 +27,7 @@ const (
 	AddKeysLoadType            LoadType = "add-keys"
 	EVMTransferLoadType        LoadType = "evm-transfer"
 	CreateAccount              LoadType = "create-account"
+	EVMBatchTransferLoadType   LoadType = "evm-batch-transfer"
 )
 
 type LoadContext struct {
@@ -92,6 +93,8 @@ func CreateLoadType(log zerolog.Logger, t LoadType) Load {
 		return NewAddKeysLoad()
 	case EVMTransferLoadType:
 		return NewEVMTransferLoad(log)
+	case EVMBatchTransferLoadType:
+		return NewEVMBatchTransferLoad(log)
 	case CreateAccount:
 		return NewCreateAccountLoad()
 	default:

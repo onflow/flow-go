@@ -29,11 +29,23 @@ func nodeToLeaf(leaf *node.Node) *LeafNode {
 // OpenAndReadLeafNodesFromCheckpointV6 takes a channel for pushing the leaf nodes that are read from
 // the given checkpoint file specified by dir and fileName.
 // It returns when finish reading the checkpoint file and the input channel can be closed.
-func OpenAndReadLeafNodesFromCheckpointV6(allLeafNodesCh chan<- *LeafNode, dir string, fileName string, logger zerolog.Logger) (errToReturn error) {
+// It requires the checkpoint file only has one trie.
+func OpenAndReadLeafNodesFromCheckpointV6(
+	allLeafNodesCh chan<- *LeafNode,
+	dir string,
+	fileName string,
+	expectedRootHash ledger.RootHash,
+	logger zerolog.Logger) (
+	errToReturn error) {
 	// we are the only sender of the channel, closing it after done
 	defer func() {
 		close(allLeafNodesCh)
 	}()
+
+	err := checkpointHasSingleRootHash(logger, dir, fileName, expectedRootHash)
+	if err != nil {
+		return fmt.Errorf("fail to check checkpoint has single root hash: %w", err)
+	}
 
 	filepath := filePathCheckpointHeader(dir, fileName)
 
