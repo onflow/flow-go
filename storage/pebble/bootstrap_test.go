@@ -46,6 +46,8 @@ func TestRegisterBootstrap_IndexCheckpointFile_Happy(t *testing.T) {
 	rootHeight := uint64(10000)
 	unittest.RunWithTempDir(t, func(dir string) {
 		tries, registerIDs := simpleTrieWithValidRegisterIDs(t)
+		// exclude the empty trie
+		tries = tries[1:]
 		rootHash := tries[0].RootHash()
 		fileName := "simple-checkpoint"
 		require.NoErrorf(t, wal.StoreCheckpointV6Concurrently(tries, dir, fileName, log), "fail to store checkpoint")
