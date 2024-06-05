@@ -37,7 +37,7 @@ var (
 type ResultSummary struct {
 	Status                  Status
 	ErrorCode               ErrorCode
-	ErrorMessage                string
+	ErrorMessage            string
 	GasConsumed             uint64
 	DeployedContractAddress *Address
 	ReturnedValue           Data
