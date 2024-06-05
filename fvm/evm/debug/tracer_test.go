@@ -30,6 +30,7 @@ func Test_CallTracer(t *testing.T) {
 
 		tracer, err := NewEVMCallTracer(mockUpload, zerolog.Nop())
 		require.NoError(t, err)
+		tracer.WithBlockID(blockID)
 
 		from := gethCommon.HexToAddress("0x01")
 		to := gethCommon.HexToAddress("0x02")
@@ -47,7 +48,7 @@ func Test_CallTracer(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, res)
 
-		tracer.Collect(txID, blockID)
+		tracer.Collect(txID)
 	})
 
 	t.Run("collector panic recovery", func(t *testing.T) {
@@ -62,9 +63,10 @@ func Test_CallTracer(t *testing.T) {
 
 		tracer, err := NewEVMCallTracer(mockUpload, zerolog.Nop())
 		require.NoError(t, err)
+		tracer.WithBlockID(blockID)
 
 		require.NotPanics(t, func() {
-			tracer.Collect(txID, blockID)
+			tracer.Collect(txID)
 		})
 	})
 

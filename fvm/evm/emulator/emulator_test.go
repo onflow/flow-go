@@ -838,8 +838,9 @@ func TestTransactionTracing(t *testing.T) {
 			txID = res.TxHash
 			trace, err = tracer.TxTracer().GetResult()
 			require.NoError(t, err)
+			tracer.WithBlockID(blockID)
 
-			tracer.Collect(txID, blockID)
+			tracer.Collect(txID)
 
 			require.Eventuallyf(t, func() bool {
 				<-uploaded
@@ -881,8 +882,9 @@ func TestTransactionTracing(t *testing.T) {
 			txID = res.TxHash
 			trace, err = tracer.TxTracer().GetResult()
 			require.NoError(t, err)
+			tracer.WithBlockID(blockID)
 
-			tracer.Collect(txID, blockID)
+			tracer.Collect(txID)
 
 			require.Eventuallyf(t, func() bool {
 				<-uploaded
@@ -924,8 +926,9 @@ func TestTransactionTracing(t *testing.T) {
 			txID = res.TxHash
 			trace, err = tracer.TxTracer().GetResult()
 			require.NoError(t, err)
+			tracer.WithBlockID(blockID)
 
-			tracer.Collect(txID, blockID)
+			tracer.Collect(txID)
 
 			require.Eventuallyf(t, func() bool {
 				<-uploaded
@@ -969,8 +972,9 @@ func TestTransactionTracing(t *testing.T) {
 			txID = results[0].TxHash
 			trace, err = tracer.TxTracer().GetResult()
 			require.NoError(t, err)
+			tracer.WithBlockID(blockID)
 
-			tracer.Collect(txID, blockID)
+			tracer.Collect(txID)
 
 			require.Eventuallyf(t, func() bool {
 				<-uploaded

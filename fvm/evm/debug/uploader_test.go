@@ -73,7 +73,8 @@ func Test_TracerUploaderIntegration(t *testing.T) {
 
 		id := gethCommon.BytesToHash([]byte("test-tx"))
 		blockID := flow.Identifier{0x02}
-		tracer.Collect(id, blockID)
+		tracer.WithBlockID(blockID)
+		tracer.Collect(id)
 
 		// check uploaded object
 		client, err := storage.NewClient(context.Background())
