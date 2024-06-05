@@ -59,7 +59,7 @@ const (
 	evmResultTypeQualifiedIdentifier       = "EVM.Result"
 	evmResultTypeStatusFieldName           = "status"
 	evmResultTypeErrorCodeFieldName        = "errorCode"
-	evmResultTypeErrorMsgFieldName         = "errorMsg"
+	evmResultTypeErrorMessageFieldName     = "errorMessage"
 	evmResultTypeGasUsedFieldName          = "gasUsed"
 	evmResultTypeDataFieldName             = "data"
 	evmResultTypeDeployedContractFieldName = "deployedContract"
@@ -1274,11 +1274,11 @@ func NewResultValue(
 			}),
 		},
 		{
-			Name: "errorMsg",
+			Name: "errorMessage",
 			Value: interpreter.NewStringValue(inter,
-				common.NewStringMemoryUsage(len(result.ErrorMsg)),
+				common.NewStringMemoryUsage(len(result.ErrorMessage)),
 				func() string {
-					return result.ErrorMsg
+					return result.ErrorMessage
 				},
 			),
 		},
@@ -2321,7 +2321,7 @@ func ResultSummaryFromEVMResultValue(val cadence.Value) (*types.ResultSummary, e
 		return nil, fmt.Errorf("invalid input: unexpected type for error code field")
 	}
 
-	errorMsg, ok := fields[evmResultTypeErrorMsgFieldName].(cadence.String)
+	errorMsg, ok := fields[evmResultTypeErrorMessageFieldName].(cadence.String)
 	if !ok {
 		return nil, fmt.Errorf("invalid input: unexpected type for error msg field")
 	}
@@ -2370,7 +2370,7 @@ func ResultSummaryFromEVMResultValue(val cadence.Value) (*types.ResultSummary, e
 	return &types.ResultSummary{
 		Status:                  types.Status(status),
 		ErrorCode:               types.ErrorCode(errorCode),
-		ErrorMsg:                string(errorMsg),
+		ErrorMessage:            string(errorMsg),
 		GasConsumed:             uint64(gasUsed),
 		ReturnedValue:           convertedData,
 		DeployedContractAddress: convertedDeployedAddress,

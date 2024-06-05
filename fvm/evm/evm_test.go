@@ -204,7 +204,7 @@ func TestEVMRun(t *testing.T) {
 				require.NoError(t, err)
 				require.Equal(t, types.StatusSuccessful, res.Status)
 				require.Equal(t, types.ErrCodeNoError, res.ErrorCode)
-				require.Empty(t, res.ErrorMsg)
+				require.Empty(t, res.ErrorMessage)
 				require.Nil(t, res.DeployedContractAddress)
 				require.Equal(t, num, new(big.Int).SetBytes(res.ReturnedValue).Int64())
 			})
@@ -316,7 +316,7 @@ func TestEVMRun(t *testing.T) {
 				require.NoError(t, err)
 				require.Equal(t, types.StatusSuccessful, res.Status)
 				require.Equal(t, types.ErrCodeNoError, res.ErrorCode)
-				require.Empty(t, res.ErrorMsg)
+				require.Empty(t, res.ErrorMessage)
 				require.Equal(t, int64(0), new(big.Int).SetBytes(res.ReturnedValue).Int64())
 			})
 	})
@@ -583,7 +583,7 @@ func TestEVMBatchRun(t *testing.T) {
 				require.NoError(t, err)
 				require.Equal(t, types.StatusSuccessful, res.Status)
 				require.Equal(t, types.ErrCodeNoError, res.ErrorCode)
-				require.Empty(t, res.ErrorMsg)
+				require.Empty(t, res.ErrorMessage)
 				require.Equal(t, storedValues[len(storedValues)-1], new(big.Int).SetBytes(res.ReturnedValue).Int64())
 			})
 	})
@@ -723,7 +723,7 @@ func TestEVMBatchRun(t *testing.T) {
 				require.NoError(t, err)
 				require.Equal(t, types.StatusSuccessful, res.Status)
 				require.Equal(t, types.ErrCodeNoError, res.ErrorCode)
-				require.Empty(t, res.ErrorMsg)
+				require.Empty(t, res.ErrorMessage)
 				require.Equal(t, num, new(big.Int).SetBytes(res.ReturnedValue).Int64())
 			})
 	})
@@ -759,11 +759,11 @@ func TestEVMBatchRun(t *testing.T) {
 								if i %% 2 != 0 {
 									assert(res.status == EVM.Status.successful, message: "unexpected success status")
 									assert(res.errorCode == 0, message: "unexpected error code")
-									assert(res.errorMsg == "", message: "unexpected error msg")
+									assert(res.errorMessage == "", message: "unexpected error msg")
 								} else {
 									assert(res.status == EVM.Status.failed, message: "unexpected failed status")
 									assert(res.errorCode == 301, message: "unexpected error code")
-									assert(res.errorMsg == "out of gas", message: "unexpected error msg")
+									assert(res.errorMessage == "out of gas", message: "unexpected error msg")
 								}
 							}
 						}
@@ -868,7 +868,7 @@ func TestEVMBatchRun(t *testing.T) {
 				require.NoError(t, err)
 				require.Equal(t, types.ErrCodeNoError, res.ErrorCode)
 				require.Equal(t, types.StatusSuccessful, res.Status)
-				require.Empty(t, res.ErrorMsg)
+				require.Empty(t, res.ErrorMessage)
 				require.Equal(t, num, new(big.Int).SetBytes(res.ReturnedValue).Int64())
 			})
 	})
@@ -932,7 +932,7 @@ func TestEVMBlockData(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, types.StatusSuccessful, res.Status)
 			require.Equal(t, types.ErrCodeNoError, res.ErrorCode)
-			require.Empty(t, res.ErrorMsg)
+			require.Empty(t, res.ErrorMessage)
 			require.Equal(t, ctx.BlockHeader.Timestamp.Unix(), new(big.Int).SetBytes(res.ReturnedValue).Int64())
 
 		})
@@ -1361,7 +1361,7 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 				require.NoError(t, err)
 				require.Equal(t, types.StatusSuccessful, res.Status)
 				require.Equal(t, types.ErrCodeNoError, res.ErrorCode)
-				require.Empty(t, res.ErrorMsg)
+				require.Empty(t, res.ErrorMessage)
 				require.NotNil(t, res.DeployedContractAddress)
 				// we strip away first few bytes because they contain deploy code
 				require.Equal(t, testContract.ByteCode[17:], []byte(res.ReturnedValue))
