@@ -9,7 +9,6 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
-	badgermodel "github.com/onflow/flow-go/storage/badger/model"
 	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/storage/badger/transaction"
 )
@@ -17,25 +16,25 @@ import (
 type ChunkDataPacks struct {
 	db             *badger.DB
 	collections    storage.Collections
-	byChunkIDCache *Cache[flow.Identifier, *badgermodel.StoredChunkDataPack]
+	byChunkIDCache *Cache[flow.Identifier, *storage.StoredChunkDataPack]
 }
 
 func NewChunkDataPacks(collector module.CacheMetrics, db *badger.DB, collections storage.Collections, byChunkIDCacheSize uint) *ChunkDataPacks {
 
-	store := func(key flow.Identifier, val *badgermodel.StoredChunkDataPack) func(*transaction.Tx) error {
+	store := func(key flow.Identifier, val *storage.StoredChunkDataPack) func(*transaction.Tx) error {
 		return transaction.WithTx(operation.SkipDuplicates(operation.InsertChunkDataPack(val)))
 	}
 
-	retrieve := func(key flow.Identifier) func(tx *badger.Txn) (*badgermodel.StoredChunkDataPack, error) {
-		return func(tx *badger.Txn) (*badgermodel.StoredChunkDataPack, error) {
-			var c badgermodel.StoredChunkDataPack
+	retrieve := func(key flow.Identifier) func(tx *badger.Txn) (*storage.StoredChunkDataPack, error) {
+		return func(tx *badger.Txn) (*storage.StoredChunkDataPack, error) {
+			var c storage.StoredChunkDataPack
 			err := operation.RetrieveChunkDataPack(key, &c)(tx)
 			return &c, err
 		}
 	}
 
 	cache := newCache(collector, metrics.ResourceChunkDataPack,
-		withLimit[flow.Identifier, *badgermodel.StoredChunkDataPack](byChunkIDCacheSize),
+		withLimit[flow.Identifier, *storage.StoredChunkDataPack](byChunkIDCacheSize),
 		withStore(store),
 		withRetrieve(retrieve),
 	)
@@ -133,7 +132,7 @@ func (ch *ChunkDataPacks) ByChunkID(chunkID flow.Identifier) (*flow.ChunkDataPac
 	return chdp, nil
 }
 
-func (ch *ChunkDataPacks) byChunkID(chunkID flow.Identifier) (*badgermodel.StoredChunkDataPack, error) {
+func (ch *ChunkDataPacks) byChunkID(chunkID flow.Identifier) (*storage.StoredChunkDataPack, error) {
 	tx := ch.db.NewTransaction(false)
 	defer tx.Discard()
 
@@ -145,8 +144,8 @@ func (ch *ChunkDataPacks) byChunkID(chunkID flow.Identifier) (*badgermodel.Store
 	return schdp, nil
 }
 
-func (ch *ChunkDataPacks) retrieveCHDP(chunkID flow.Identifier) func(*badger.Txn) (*badgermodel.StoredChunkDataPack, error) {
-	return func(tx *badger.Txn) (*badgermodel.StoredChunkDataPack, error) {
+func (ch *ChunkDataPacks) retrieveCHDP(chunkID flow.Identifier) func(*badger.Txn) (*storage.StoredChunkDataPack, error) {
+	return func(tx *badger.Txn) (*storage.StoredChunkDataPack, error) {
 		val, err := ch.byChunkIDCache.Get(chunkID)(tx)
 		if err != nil {
 			return nil, err
@@ -155,8 +154,8 @@ func (ch *ChunkDataPacks) retrieveCHDP(chunkID flow.Identifier) func(*badger.Txn
 	}
 }
 
-func toStoredChunkDataPack(c *flow.ChunkDataPack) *badgermodel.StoredChunkDataPack {
-	sc := &badgermodel.StoredChunkDataPack{
+func toStoredChunkDataPack(c *flow.ChunkDataPack) *storage.StoredChunkDataPack {
+	sc := &storage.StoredChunkDataPack{
 		ChunkID:           c.ChunkID,
 		StartState:        c.StartState,
 		Proof:             c.Proof,
