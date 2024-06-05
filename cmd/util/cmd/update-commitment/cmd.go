@@ -78,7 +78,7 @@ func updateCommitment(datadir, blockIDStr, commitStr string, force bool) error {
 	if err != nil {
 		return fmt.Errorf("could not create storages: %v", err)
 	}
-	defer db.Close()	
+	defer db.Close()
 
 	commitToRemove, err := commits.ByBlockID(blockID)
 	if err != nil {
