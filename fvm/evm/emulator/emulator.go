@@ -46,6 +46,7 @@ func newConfig(ctx types.BlockContext) *Config {
 		WithExtraPrecompiles(ctx.ExtraPrecompiles),
 		WithGetBlockHashFunction(ctx.GetHashFunc),
 		WithRandom(&ctx.Random),
+		WithTransactionTracer(ctx.Tracer),
 	)
 }
 
@@ -400,6 +401,14 @@ func (proc *procedure) deployAt(
 			addr,
 			value,
 		)
+	}
+
+	if tracer := proc.evm.Config.Tracer; tracer != nil {
+		tracer.CaptureStart(proc.evm, caller.ToCommon(), to.ToCommon(), true, data, gasLimit, value)
+
+		defer func() {
+			tracer.CaptureEnd(res.ReturnedValue, res.GasConsumed, res.VMError)
+		}()
 	}
 
 	// run code through interpreter
