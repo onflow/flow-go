@@ -54,10 +54,9 @@ type VersionControl struct {
 	consumers []VersionControlConsumer
 
 	// blockFinalizedChan is a channel for receiving block finalized events.
-	blockFinalizedChan chan *flow.Header
+	blockFinalizedChan chan uint64
 
-	// lastHandledBlock the las block
-	lastHandledBlock       *flow.Header
+	// lastHandledBlockHeight the last handled block height
 	lastHandledBlockHeight uint64
 
 	// startHeight and endHeight define the height boundaries for version compatibility.
@@ -80,7 +79,7 @@ func NewVersionControl(
 	latestFinalizedBlock *flow.Header,
 ) *VersionControl {
 	// blockFinalizedChan is buffered to handle block finalized events.
-	blockFinalizedChan := make(chan *flow.Header, 1000)
+	blockFinalizedChan := make(chan uint64, 1000)
 
 	vc := &VersionControl{
 		log: log.With().
@@ -178,13 +177,13 @@ func (v *VersionControl) checkInitialVersionBeacon(
 // BlockFinalized is called when a block is finalized.
 // It implements the protocol.Consumer interface.
 func (v *VersionControl) BlockFinalized(h *flow.Header) {
-	v.blockFinalizedChan <- h
+	v.blockFinalizedChan <- h.Height
 }
 
 // BlockFinalizedForTesting is used for testing purposes only.
 // It simulates a block finalized event for testing the version control logic.
 func (v *VersionControl) BlockFinalizedForTesting(h *flow.Header) {
-	v.blockFinalized(irrecoverable.MockSignalerContext{}, h)
+	v.blockFinalized(irrecoverable.MockSignalerContext{}, h.Height)
 }
 
 // CompatibleAtBlock checks if the node's version is compatible at a given block height.
@@ -250,20 +249,20 @@ func (v *VersionControl) processEvents(
 // blockFinalized processes a block finalized event and updates the version control state.
 func (v *VersionControl) blockFinalized(
 	ctx irrecoverable.SignalerContext,
-	h *flow.Header,
+	height uint64,
 ) {
 	v.Lock()
 	defer v.Unlock()
 
-	if v.versionBeacon != nil && v.versionBeacon.SealHeight >= h.Height {
+	if v.versionBeacon != nil && v.versionBeacon.SealHeight >= height {
 		// already processed this or a higher version beacon
 		return
 	}
 
-	vb, err := v.versionBeacons.Highest(h.Height)
+	vb, err := v.versionBeacons.Highest(height)
 	if err != nil {
 		v.log.Err(err).
-			Uint64("height", h.Height).
+			Uint64("height", height).
 			Msg("Failed to get highest version beacon for version control")
 
 		ctx.Throw(
@@ -280,7 +279,7 @@ func (v *VersionControl) blockFinalized(
 		// It can happen if the node starts before bootstrap is finished.
 		// TODO: remove when we can guarantee that there will always be a version beacon
 		v.log.Info().
-			Uint64("height", h.Height).
+			Uint64("height", height).
 			Msg("No version beacon found for version control")
 		return
 	}
@@ -291,7 +290,7 @@ func (v *VersionControl) blockFinalized(
 	}
 
 	v.versionBeacon = vb
-	v.lastHandledBlock = h
+	v.lastHandledBlockHeight = height
 
 	// version boundaries are sorted by version
 	for _, boundary := range v.versionBeacon.VersionBoundaries {
