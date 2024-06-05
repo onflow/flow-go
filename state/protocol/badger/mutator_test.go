@@ -2433,6 +2433,13 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 			assertEpochEmergencyFallbackTriggered(t, state.Final(), false) // should be unset after finalization
 			assertCorrectRecovery(state, epochRecover)
 
+			// Constructing blocks
+			//   ... <- B13 <- B14
+			// B13 will be a child block of B12 to ensure that we don't transition into recovered epoch immediately the next block
+			// but actually finish the epoch extension. B14 will be the first block past the epoch extension,
+			// which will trigger epoch transition to the recovered epoch.
+			// We expect that Protocol state will be at first view of recovered epoch and in epoch staking phase after B14 is incorporated.
+
 			block13 := unittest.BlockWithParentProtocolState(block12)
 			unittest.InsertAndFinalize(t, state, block13)
 
