@@ -11,6 +11,7 @@ import (
 
 	"github.com/onflow/atree"
 
+	"github.com/onflow/cadence/migrations"
 	"github.com/onflow/cadence/runtime/common"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
@@ -89,10 +90,8 @@ func (m *FixSlabsWithBrokenReferencesMigration) MigrateAccount(
 	}
 
 	// Fix broken references
-	fixedStorageIDs, skippedStorageIDs, err := storage.FixLoadedBrokenReferences(func(old atree.Value) bool {
-		// TODO: Cadence may need to export functions to check type info, etc.
-		return true
-	})
+	fixedStorageIDs, skippedStorageIDs, err :=
+		storage.FixLoadedBrokenReferences(migrations.ShouldFixBrokenCompositeKeyedDictionary)
 	if err != nil {
 		return nil, err
 	}

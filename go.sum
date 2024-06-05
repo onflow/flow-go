@@ -1351,8 +1351,8 @@ github.com/onflow/atree v0.8.0-rc.3/go.mod h1:7YNAyCd5JENq+NzH+fR1ABUZVzbSq9dkt0
 github.com/onflow/boxo v0.0.0-20240201202436-f2477b92f483 h1:LpiQhTAfM9CAmNVEs0n//cBBgCg+vJSiIxTHYUklZ84=
 github.com/onflow/boxo v0.0.0-20240201202436-f2477b92f483/go.mod h1:pIZgTWdm3k3pLF9Uq6MB8JEcW07UDwNJjlXW1HELW80=
 github.com/onflow/cadence v0.20.1/go.mod h1:7mzUvPZUIJztIbr9eTvs+fQjWWHTF8veC+yk4ihcNIA=
-github.com/onflow/cadence v0.42.11-atree-register-inlining.2.0.20240521221904-9615ee937719 h1:A2Z8OK5NtJ4n6NRK2Oz65z8y0gRTcTslKG1vQy+wwck=
-github.com/onflow/cadence v0.42.11-atree-register-inlining.2.0.20240521221904-9615ee937719/go.mod h1:/qhvKrT4aNmq/cy5ngna493EljQvonQBYjyrbOELHUk=
+github.com/onflow/cadence v0.42.11-atree-register-inlining.2.0.20240604235655-945f0e65c1e6 h1:6TbpdIXayQUFsizmAGZEnDEI5+Yu/8wnQPU7LFCUaNA=
+github.com/onflow/cadence v0.42.11-atree-register-inlining.2.0.20240604235655-945f0e65c1e6/go.mod h1:/qhvKrT4aNmq/cy5ngna493EljQvonQBYjyrbOELHUk=
 github.com/onflow/crypto v0.25.1 h1:0txy2PKPMM873JbpxQNbJmuOJtD56bfs48RQfm0ts5A=
 github.com/onflow/crypto v0.25.1/go.mod h1:C8FbaX0x8y+FxWjbkHy0Q4EASCDR9bSPWZqlpCLYyVI=
 github.com/onflow/flow v0.3.4 h1:FXUWVdYB90f/rjNcY0Owo30gL790tiYff9Pb/sycXYE=
