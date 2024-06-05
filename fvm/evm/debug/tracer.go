@@ -21,8 +21,9 @@ const (
 )
 
 type EVMTracer interface {
+	WithBlockID(identifier flow.Identifier)
 	TxTracer() tracers.Tracer
-	Collect(txID gethCommon.Hash, blockID flow.Identifier)
+	Collect(txID gethCommon.Hash)
 }
 
 var _ EVMTracer = &CallTracer{}
@@ -31,6 +32,7 @@ type CallTracer struct {
 	logger   zerolog.Logger
 	tracer   tracers.Tracer
 	uploader Uploader
+	blockID  flow.Identifier
 }
 
 func NewEVMCallTracer(uploader Uploader, logger zerolog.Logger) (*CallTracer, error) {
@@ -50,7 +52,11 @@ func (t *CallTracer) TxTracer() tracers.Tracer {
 	return t.tracer
 }
 
-func (t *CallTracer) Collect(txID gethCommon.Hash, blockID flow.Identifier) {
+func (t *CallTracer) WithBlockID(id flow.Identifier) {
+	t.blockID = id
+}
+
+func (t *CallTracer) Collect(txID gethCommon.Hash) {
 	// upload is concurrent and it doesn't produce any errors, as the
 	// client doesn't expect it, we don't want to break execution flow,
 	// in case there are errors we retry, and if we fail after retries
@@ -58,7 +64,7 @@ func (t *CallTracer) Collect(txID gethCommon.Hash, blockID flow.Identifier) {
 	go func() {
 		l := t.logger.With().
 			Str("tx-id", txID.String()).
-			Str("block-id", blockID.String()).
+			Str("block-id", t.blockID.String()).
 			Logger()
 
 		defer func() {
@@ -79,7 +85,7 @@ func (t *CallTracer) Collect(txID gethCommon.Hash, blockID flow.Identifier) {
 			l.Error().Err(err).Msg("failed to produce trace results")
 		}
 
-		if err = t.uploader.Upload(TraceID(txID, blockID), res); err != nil {
+		if err = t.uploader.Upload(TraceID(txID, t.blockID), res); err != nil {
 			l.Error().Err(err).
 				Str("traces", string(res)).
 				Msg("failed to upload trace results, no more retries")
@@ -100,7 +106,9 @@ func (n nopTracer) TxTracer() tracers.Tracer {
 	return nil
 }
 
-func (n nopTracer) Collect(_ gethCommon.Hash, _ flow.Identifier) {}
+func (n nopTracer) WithBlockID(identifier flow.Identifier) {}
+
+func (n nopTracer) Collect(_ gethCommon.Hash) {}
 
 func TraceID(txID gethCommon.Hash, blockID flow.Identifier) string {
 	return fmt.Sprintf("%s-%s", blockID.String(), txID.String())

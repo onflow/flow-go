@@ -39,22 +39,25 @@ func SetupEnvironment(
 	blockStore := handler.NewBlockStore(backend, StorageAccountAddress(chainID))
 	addressAllocator := handler.NewAddressAllocator()
 
-	height, err := backend.GetCurrentBlockHeight()
-	if err != nil {
-		return err
-	}
+	if tracer != debug.NopTracer {
+		height, err := backend.GetCurrentBlockHeight()
+		if err != nil {
+			return err
+		}
 
-	block, ok, err := backend.GetBlockAtHeight(height)
-	if err != nil {
-		return err
-	}
-	if !ok {
-		return fmt.Errorf("could not retrieve the block at height")
+		block, ok, err := backend.GetBlockAtHeight(height)
+		if err != nil {
+			return err
+		}
+		if !ok {
+			return fmt.Errorf("could not retrieve the block at height")
+		}
+
+		tracer.WithBlockID(flow.Identifier(block.Hash))
 	}
 
 	contractHandler := handler.NewContractHandler(
 		chainID,
-		flow.Identifier(block.Hash),
 		ContractAccountAddress(chainID),
 		common.Address(flowTokenAddress),
 		randomBeaconAddress,
