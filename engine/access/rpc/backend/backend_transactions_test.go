@@ -205,7 +205,7 @@ func (suite *Suite) TestGetTransactionResultFromCache() {
 		}
 
 		suite.historicalAccessClient.
-			On("GetTransactionResult", mock.AnythingOfType("*context.emptyCtx"), mock.AnythingOfType("*access.GetTransactionRequest")).
+			On("GetTransactionResult", mock.Anything, mock.AnythingOfType("*access.GetTransactionRequest")).
 			Return(&transactionResultResponse, nil).Once()
 
 		params := suite.defaultBackendParams()
@@ -248,7 +248,7 @@ func (suite *Suite) TestGetTransactionResultFromCache() {
 func (suite *Suite) TestGetTransactionResultCacheNonExistent() {
 	suite.withGetTransactionCachingTestSetup(func(block *flow.Block, tx *flow.Transaction) {
 		suite.historicalAccessClient.
-			On("GetTransactionResult", mock.AnythingOfType("*context.emptyCtx"), mock.AnythingOfType("*access.GetTransactionRequest")).
+			On("GetTransactionResult", mock.Anything, mock.AnythingOfType("*access.GetTransactionRequest")).
 			Return(nil, status.Errorf(codes.NotFound, "no known transaction with ID %s", tx.ID())).Once()
 
 		params := suite.defaultBackendParams()
@@ -289,7 +289,7 @@ func (suite *Suite) TestGetTransactionResultCacheNonExistent() {
 func (suite *Suite) TestGetTransactionResultUnknownFromCache() {
 	suite.withGetTransactionCachingTestSetup(func(block *flow.Block, tx *flow.Transaction) {
 		suite.historicalAccessClient.
-			On("GetTransactionResult", mock.AnythingOfType("*context.emptyCtx"), mock.AnythingOfType("*access.GetTransactionRequest")).
+			On("GetTransactionResult", mock.Anything, mock.AnythingOfType("*access.GetTransactionRequest")).
 			Return(nil, status.Errorf(codes.NotFound, "no known transaction with ID %s", tx.ID())).Once()
 
 		params := suite.defaultBackendParams()
