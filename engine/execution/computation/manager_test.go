@@ -561,6 +561,28 @@ func (p *PanickingVM) GetAccount(
 	panic("not expected")
 }
 
+func (p *PanickingVM) GetAccountBalance(
+	ctx fvm.Context,
+	address flow.Address,
+	storageSnapshot snapshot.StorageSnapshot,
+) (
+	uint64,
+	error,
+) {
+	panic("not expected")
+}
+
+func (p *PanickingVM) GetAccountKeys(
+	ctx fvm.Context,
+	address flow.Address,
+	storageSnapshot snapshot.StorageSnapshot,
+) (
+	[]flow.AccountPublicKey,
+	error,
+) {
+	panic("not expected")
+}
+
 type LongRunningExecutor struct {
 	duration time.Duration
 }
@@ -620,6 +642,28 @@ func (l *LongRunningVM) GetAccount(
 	storageSnapshot snapshot.StorageSnapshot,
 ) (
 	*flow.Account,
+	error,
+) {
+	panic("not expected")
+}
+
+func (p *LongRunningVM) GetAccountBalance(
+	ctx fvm.Context,
+	address flow.Address,
+	storageSnapshot snapshot.StorageSnapshot,
+) (
+	uint64,
+	error,
+) {
+	panic("not expected")
+}
+
+func (p *LongRunningVM) GetAccountKeys(
+	ctx fvm.Context,
+	address flow.Address,
+	storageSnapshot snapshot.StorageSnapshot,
+) (
+	[]flow.AccountPublicKey,
 	error,
 ) {
 	panic("not expected")

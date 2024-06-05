@@ -1535,6 +1535,28 @@ func (testVM) GetAccount(
 	panic("not implemented")
 }
 
+func (testVM) GetAccountBalance(
+	_ fvm.Context,
+	_ flow.Address,
+	_ snapshot.StorageSnapshot,
+) (
+	uint64,
+	error,
+) {
+	panic("not expected")
+}
+
+func (testVM) GetAccountKeys(
+	_ fvm.Context,
+	_ flow.Address,
+	_ snapshot.StorageSnapshot,
+) (
+	[]flow.AccountPublicKey,
+	error,
+) {
+	panic("not expected")
+}
+
 func generateEvents(eventCount int, txIndex uint32) []flow.Event {
 	events := make([]flow.Event, eventCount)
 	for i := 0; i < eventCount; i++ {
@@ -1609,6 +1631,28 @@ func (errorVM) GetAccount(
 	error,
 ) {
 	panic("not implemented")
+}
+
+func (errorVM) GetAccountBalance(
+	ctx fvm.Context,
+	address flow.Address,
+	storageSnapshot snapshot.StorageSnapshot,
+) (
+	uint64,
+	error,
+) {
+	panic("not expected")
+}
+
+func (errorVM) GetAccountKeys(
+	ctx fvm.Context,
+	address flow.Address,
+	storageSnapshot snapshot.StorageSnapshot,
+) (
+	[]flow.AccountPublicKey,
+	error,
+) {
+	panic("not expected")
 }
 
 func getSetAProgram(
