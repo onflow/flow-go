@@ -129,3 +129,13 @@ func (s *ScriptExecutor) checkDataAvailable(height uint64) error {
 
 	return nil
 }
+
+// TODO: use it in validator
+func (s *ScriptExecutor) CheckPayerBalanceAndGetMaxTxFees(ctx context.Context, payer flow.Address, inclusionEffort uint64, gasLimit uint64, height uint64) (bool, error) {
+	res, err := s.scriptExecutor.CheckPayerBalanceAndGetMaxTxFees(ctx, payer, inclusionEffort, gasLimit, height)
+	if err != nil {
+		return false, err
+	}
+
+	return res, nil
+}

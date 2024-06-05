@@ -252,7 +252,7 @@ func New(params Params) (*Backend, error) {
 		chainID:                       params.ChainID,
 		transactions:                  params.Transactions,
 		executionReceipts:             params.ExecutionReceipts,
-		transactionValidator:          configureTransactionValidator(params.State, params.ChainID),
+		transactionValidator:          configureTransactionValidator(params.State, params.ChainID, params.ScriptExecutor),
 		transactionMetrics:            params.AccessMetrics,
 		retry:                         retry,
 		connFactory:                   params.ConnFactory,
@@ -304,7 +304,7 @@ func identifierList(ids []string) (flow.IdentifierList, error) {
 	return idList, nil
 }
 
-func configureTransactionValidator(state protocol.State, chainID flow.ChainID) *access.TransactionValidator {
+func configureTransactionValidator(state protocol.State, chainID flow.ChainID, executor *ScriptExecutor) *access.TransactionValidator {
 	return access.NewTransactionValidator(
 		access.NewProtocolStateBlocks(state),
 		chainID.Chain(),

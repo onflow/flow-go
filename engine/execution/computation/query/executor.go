@@ -248,3 +248,38 @@ func (e *QueryExecutor) GetAccount(
 
 	return account, nil
 }
+
+func (e *QueryExecutor) CheckPayerBalanceAndGetMaxTxFees(
+	ctx context.Context,
+	address flow.Address,
+	inclusionEffort uint64,
+	gasLimit uint64,
+	blockHeader *flow.Header,
+	snapshot snapshot.StorageSnapshot,
+) (
+	bool,
+	error,
+) {
+	// TODO(ramtin): utilize ctx
+	blockCtx := fvm.NewContextFromParent(
+		e.vmCtx,
+		fvm.WithBlockHeader(blockHeader),
+		fvm.WithDerivedBlockData(
+			e.derivedChainData.NewDerivedBlockDataForScript(blockHeader.ID())))
+
+	res, err := e.vm.CheckPayerBalanceAndGetMaxTxFees(
+		blockCtx,
+		address,
+		inclusionEffort,
+		gasLimit,
+		snapshot)
+	if err != nil {
+		return false, fmt.Errorf(
+			"failed to get account (%s) at block (%s): %w",
+			address.String(),
+			blockHeader.ID(),
+			err)
+	}
+
+	return res, nil
+}
