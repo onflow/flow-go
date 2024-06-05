@@ -1065,7 +1065,7 @@ func TestHandler_TransactionRun(t *testing.T) {
 					uploader := &testutils.MockUploader{
 						UploadFunc: func(id string, message json.RawMessage) error {
 							assert.Equal(t, traceResult, message)
-							assert.Equal(t, fmt.Sprintf("%s-%s", blockID.String(), txID.String()), id)
+							assert.Equal(t, debug.TraceID(txID, blockID), id)
 							close(uploaded)
 							return nil
 						},
@@ -1186,6 +1186,7 @@ func TestHandler_TransactionRun(t *testing.T) {
 					traceResults := make([]json.RawMessage, batchSize)
 					uploaded := make(chan struct{}, batchSize)
 					uploadedVals := make(map[string]json.RawMessage)
+					blockID := flow.Identifier{0x02}
 
 					uploader := &testutils.MockUploader{
 						UploadFunc: func(id string, message json.RawMessage) error {
@@ -1217,7 +1218,8 @@ func TestHandler_TransactionRun(t *testing.T) {
 							return runResults, nil
 						},
 					}
-					handler := handler.NewContractHandler(flow.Testnet, flow.Identifier{0x02}, rootAddr, flowTokenAddress, randomBeaconAddress, bs, aa, backend, em, tracer)
+
+					handler := handler.NewContractHandler(flow.Testnet, blockID, rootAddr, flowTokenAddress, randomBeaconAddress, bs, aa, backend, em, tracer)
 
 					coinbase := types.NewAddress(gethCommon.Address{})
 
@@ -1243,7 +1245,8 @@ func TestHandler_TransactionRun(t *testing.T) {
 					}
 
 					for i, r := range runResults {
-						val, ok := uploadedVals[r.TxHash.String()]
+						id := debug.TraceID(r.TxHash, blockID)
+						val, ok := uploadedVals[id]
 						require.True(t, ok)
 						require.Equal(t, traceResults[i], val)
 					}

@@ -817,7 +817,7 @@ func TestTransactionTracing(t *testing.T) {
 
 			uploader.UploadFunc = func(id string, message json.RawMessage) error {
 				uploaded <- struct{}{}
-				require.Equal(t, fmt.Sprintf("%s-%s", blockID.String(), txID.String()), id)
+				require.Equal(t, debug.TraceID(txID, blockID), id)
 				require.Equal(t, trace, message)
 				require.Greater(t, len(message), 0)
 				return nil
@@ -860,7 +860,7 @@ func TestTransactionTracing(t *testing.T) {
 
 			uploader.UploadFunc = func(id string, message json.RawMessage) error {
 				uploaded <- struct{}{}
-				require.Equal(t, fmt.Sprintf("%s-%s", blockID.String(), txID.String()), id)
+				require.Equal(t, debug.TraceID(txID, blockID), id)
 				require.Equal(t, trace, message)
 				require.Greater(t, len(message), 0)
 				return nil
@@ -903,7 +903,7 @@ func TestTransactionTracing(t *testing.T) {
 
 			uploader.UploadFunc = func(id string, message json.RawMessage) error {
 				uploaded <- struct{}{}
-				require.Equal(t, fmt.Sprintf("%s-%s", blockID.String(), txID.String()), id)
+				require.Equal(t, debug.TraceID(txID, blockID), id)
 				require.Equal(t, trace, message)
 				require.Greater(t, len(message), 0)
 				return nil
@@ -947,7 +947,7 @@ func TestTransactionTracing(t *testing.T) {
 
 			uploader.UploadFunc = func(id string, message json.RawMessage) error {
 				uploaded <- struct{}{}
-				require.Equal(t, fmt.Sprintf("%s-%s", blockID.String(), txID.String()), id)
+				require.Equal(t, debug.TraceID(txID, blockID), id)
 				require.Equal(t, trace, message)
 				require.Greater(t, len(message), 0)
 				return nil

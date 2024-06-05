@@ -56,7 +56,10 @@ func (t *CallTracer) Collect(txID gethCommon.Hash, blockID flow.Identifier) {
 	// in case there are errors we retry, and if we fail after retries
 	// we log them and continue.
 	go func() {
-		l := t.logger.With().Str("tx-id", txID.String()).Logger()
+		l := t.logger.With().
+			Str("tx-id", txID.String()).
+			Str("block-id", blockID.String()).
+			Logger()
 
 		defer func() {
 			if r := recover(); r != nil {
@@ -76,8 +79,7 @@ func (t *CallTracer) Collect(txID gethCommon.Hash, blockID flow.Identifier) {
 			l.Error().Err(err).Msg("failed to produce trace results")
 		}
 
-		uploadID := fmt.Sprintf("%s-%s", blockID.String(), txID.String())
-		if err = t.uploader.Upload(uploadID, res); err != nil {
+		if err = t.uploader.Upload(TraceID(txID, blockID), res); err != nil {
 			l.Error().Err(err).
 				Str("traces", string(res)).
 				Msg("failed to upload trace results, no more retries")
@@ -99,3 +101,7 @@ func (n nopTracer) TxTracer() tracers.Tracer {
 }
 
 func (n nopTracer) Collect(_ gethCommon.Hash, _ flow.Identifier) {}
+
+func TraceID(txID gethCommon.Hash, blockID flow.Identifier) string {
+	return fmt.Sprintf("%s-%s", blockID.String(), txID.String())
+}

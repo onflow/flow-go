@@ -2,7 +2,6 @@ package debug
 
 import (
 	"encoding/json"
-	"fmt"
 	"math/big"
 	"testing"
 
@@ -23,7 +22,7 @@ func Test_CallTracer(t *testing.T) {
 
 		mockUpload := &testutils.MockUploader{
 			UploadFunc: func(id string, message json.RawMessage) error {
-				require.Equal(t, fmt.Sprintf("%s-%s", blockID.String(), txID.String()), id)
+				require.Equal(t, TraceID(txID, blockID), id)
 				require.Equal(t, res, message)
 				return nil
 			},
