@@ -204,6 +204,7 @@ func TestEVMRun(t *testing.T) {
 				require.NoError(t, err)
 				require.Equal(t, types.StatusSuccessful, res.Status)
 				require.Equal(t, types.ErrCodeNoError, res.ErrorCode)
+				require.Empty(t, res.ErrorMessage)
 				require.Nil(t, res.DeployedContractAddress)
 				require.Equal(t, num, new(big.Int).SetBytes(res.ReturnedValue).Int64())
 			})
@@ -315,6 +316,7 @@ func TestEVMRun(t *testing.T) {
 				require.NoError(t, err)
 				require.Equal(t, types.StatusSuccessful, res.Status)
 				require.Equal(t, types.ErrCodeNoError, res.ErrorCode)
+				require.Empty(t, res.ErrorMessage)
 				require.Equal(t, int64(0), new(big.Int).SetBytes(res.ReturnedValue).Int64())
 			})
 	})
@@ -581,6 +583,7 @@ func TestEVMBatchRun(t *testing.T) {
 				require.NoError(t, err)
 				require.Equal(t, types.StatusSuccessful, res.Status)
 				require.Equal(t, types.ErrCodeNoError, res.ErrorCode)
+				require.Empty(t, res.ErrorMessage)
 				require.Equal(t, storedValues[len(storedValues)-1], new(big.Int).SetBytes(res.ReturnedValue).Int64())
 			})
 	})
@@ -720,6 +723,7 @@ func TestEVMBatchRun(t *testing.T) {
 				require.NoError(t, err)
 				require.Equal(t, types.StatusSuccessful, res.Status)
 				require.Equal(t, types.ErrCodeNoError, res.ErrorCode)
+				require.Empty(t, res.ErrorMessage)
 				require.Equal(t, num, new(big.Int).SetBytes(res.ReturnedValue).Int64())
 			})
 	})
@@ -755,9 +759,11 @@ func TestEVMBatchRun(t *testing.T) {
 								if i %% 2 != 0 {
 									assert(res.status == EVM.Status.successful, message: "unexpected success status")
 									assert(res.errorCode == 0, message: "unexpected error code")
+									assert(res.errorMessage == "", message: "unexpected error msg")
 								} else {
 									assert(res.status == EVM.Status.failed, message: "unexpected failed status")
 									assert(res.errorCode == 301, message: "unexpected error code")
+									assert(res.errorMessage == "out of gas", message: "unexpected error msg")
 								}
 							}
 						}
@@ -862,6 +868,7 @@ func TestEVMBatchRun(t *testing.T) {
 				require.NoError(t, err)
 				require.Equal(t, types.ErrCodeNoError, res.ErrorCode)
 				require.Equal(t, types.StatusSuccessful, res.Status)
+				require.Empty(t, res.ErrorMessage)
 				require.Equal(t, num, new(big.Int).SetBytes(res.ReturnedValue).Int64())
 			})
 	})
@@ -925,6 +932,7 @@ func TestEVMBlockData(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, types.StatusSuccessful, res.Status)
 			require.Equal(t, types.ErrCodeNoError, res.ErrorCode)
+			require.Empty(t, res.ErrorMessage)
 			require.Equal(t, ctx.BlockHeader.Timestamp.Unix(), new(big.Int).SetBytes(res.ReturnedValue).Int64())
 
 		})
@@ -1353,6 +1361,7 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 				require.NoError(t, err)
 				require.Equal(t, types.StatusSuccessful, res.Status)
 				require.Equal(t, types.ErrCodeNoError, res.ErrorCode)
+				require.Empty(t, res.ErrorMessage)
 				require.NotNil(t, res.DeployedContractAddress)
 				// we strip away first few bytes because they contain deploy code
 				require.Equal(t, testContract.ByteCode[17:], []byte(res.ReturnedValue))
@@ -1932,14 +1941,14 @@ func TestCadenceArch(t *testing.T) {
 				sig, err := privateKey.PrivateKey.Sign(data.Bytes(), hasher)
 				require.NoError(t, err)
 
-				proof := types.COAOwnershipProof{
+				validProof := types.COAOwnershipProof{
 					KeyIndices:     []uint64{0},
 					Address:        types.FlowAddress(flowAccount),
 					CapabilityPath: "coa",
 					Signatures:     []types.Signature{types.Signature(sig)},
 				}
 
-				encodedProof, err := proof.Encode()
+				encodedValidProof, err := validProof.Encode()
 				require.NoError(t, err)
 
 				// create transaction for proof verification
@@ -1962,7 +1971,7 @@ func TestCadenceArch(t *testing.T) {
 						true,
 						coaAddress.ToCommon(),
 						data,
-						encodedProof),
+						encodedValidProof),
 					big.NewInt(0),
 					uint64(10_000_000),
 					big.NewInt(0),
@@ -1991,6 +2000,54 @@ func TestCadenceArch(t *testing.T) {
 					snapshot)
 				require.NoError(t, err)
 				require.NoError(t, output.Err)
+
+				invalidProof := types.COAOwnershipProof{
+					KeyIndices:     []uint64{1000},
+					Address:        types.FlowAddress(flowAccount),
+					CapabilityPath: "coa",
+					Signatures:     []types.Signature{types.Signature(sig)},
+				}
+
+				encodedInvalidProof, err := invalidProof.Encode()
+				require.NoError(t, err)
+
+				// invalid proof tx
+				innerTxBytes = testAccount.PrepareSignAndEncodeTx(t,
+					testContract.DeployedAt.ToCommon(),
+					testContract.MakeCallData(t, "verifyArchCallToVerifyCOAOwnershipProof",
+						true,
+						coaAddress.ToCommon(),
+						data,
+						encodedInvalidProof),
+					big.NewInt(0),
+					uint64(10_000_000),
+					big.NewInt(0),
+				)
+
+				verifyScript = fvm.Script(code).WithArguments(
+					json.MustEncode(
+						cadence.NewArray(
+							ConvertToCadence(innerTxBytes),
+						).WithType(
+							stdlib.EVMTransactionBytesCadenceType,
+						)),
+					json.MustEncode(
+						cadence.NewArray(
+							ConvertToCadence(
+								testAccount.Address().Bytes(),
+							),
+						).WithType(
+							stdlib.EVMAddressBytesCadenceType,
+						),
+					),
+				)
+				// run proof transaction
+				_, output, err = vm.Run(
+					ctx,
+					verifyScript,
+					snapshot)
+				require.NoError(t, err)
+				require.Error(t, output.Err)
 			})
 	})
 }
