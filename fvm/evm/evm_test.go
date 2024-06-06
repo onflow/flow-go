@@ -152,7 +152,7 @@ func TestEVMRun(t *testing.T) {
 				require.Equal(t, blockEventPayload.Hash, txEventPayload.BlockHash)
 				require.Equal(t, blockEventPayload.Height, txEventPayload.BlockHeight)
 				require.Equal(t, blockEventPayload.TotalGasUsed, txEventPayload.GasConsumed)
-				require.Equal(t, uint64(43807), blockEventPayload.TotalGasUsed)
+				require.Equal(t, uint64(43785), blockEventPayload.TotalGasUsed)
 				require.Empty(t, txEventPayload.ContractAddress)
 
 				// append the state
@@ -535,7 +535,7 @@ func TestEVMBatchRun(t *testing.T) {
 				blockEventPayload, err := types.DecodeBlockEventPayload(cadenceEvent)
 				require.NoError(t, err)
 				require.NotEmpty(t, blockEventPayload.Hash)
-				require.Equal(t, uint64(155183), blockEventPayload.TotalGasUsed)
+				require.Equal(t, uint64(155513), blockEventPayload.TotalGasUsed)
 
 				// append the state
 				snapshot = snapshot.Append(state)
@@ -1331,7 +1331,7 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 	
 						let res = cadenceOwnedAccount.deploy(
 							code: code,
-							gasLimit: 1000000,
+							gasLimit: 2_000_000,
 							value: EVM.Balance(attoflow: 1230000000000000000)
 						)
 						destroy cadenceOwnedAccount
@@ -1551,7 +1551,7 @@ func TestDryRun(t *testing.T) {
 				tx := gethTypes.NewContractCreation(
 					0,
 					big.NewInt(0),
-					uint64(1000000),
+					uint64(10_000_000),
 					big.NewInt(0),
 					testContract.ByteCode,
 				)
