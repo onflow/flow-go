@@ -118,7 +118,7 @@ func main() {
 			"maximum per-transaction byte size")
 		flags.Uint64Var(&ingestConf.MaxCollectionByteSize, "ingest-max-col-byte-size", flow.DefaultMaxCollectionByteSize,
 			"maximum per-collection byte size")
-		flags.BoolVar(&ingestConf.CheckScriptsParse, "ingest-check-scripts-parse", true,
+		flags.BoolVar(&ingestConf.CheckScriptsParse, "ingest-check-scripts-parse", false,
 			"whether we check that inbound transactions are parse-able")
 		flags.UintVar(&ingestConf.ExpiryBuffer, "ingest-expiry-buffer", 30,
 			"expiry buffer for inbound transactions")
