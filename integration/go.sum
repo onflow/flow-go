@@ -1406,8 +1406,8 @@ github.com/onflow/atree v0.1.0-beta1.0.20211027184039-559ee654ece9/go.mod h1:+6x
 github.com/onflow/atree v0.8.0-rc.3 h1:BHVkJLrBHhHo7ET8gkuS1+lyQGNekYYOyoICGK3RFNM=
 github.com/onflow/atree v0.8.0-rc.3/go.mod h1:7YNAyCd5JENq+NzH+fR1ABUZVzbSq9dkt0+5fZH3L2A=
 github.com/onflow/cadence v0.20.1/go.mod h1:7mzUvPZUIJztIbr9eTvs+fQjWWHTF8veC+yk4ihcNIA=
-github.com/onflow/cadence v0.42.11-atree-register-inlining.2.0.20240521221904-9615ee937719 h1:A2Z8OK5NtJ4n6NRK2Oz65z8y0gRTcTslKG1vQy+wwck=
-github.com/onflow/cadence v0.42.11-atree-register-inlining.2.0.20240521221904-9615ee937719/go.mod h1:/qhvKrT4aNmq/cy5ngna493EljQvonQBYjyrbOELHUk=
+github.com/onflow/cadence v0.42.11-atree-register-inlining.2.0.20240604235655-945f0e65c1e6 h1:6TbpdIXayQUFsizmAGZEnDEI5+Yu/8wnQPU7LFCUaNA=
+github.com/onflow/cadence v0.42.11-atree-register-inlining.2.0.20240604235655-945f0e65c1e6/go.mod h1:/qhvKrT4aNmq/cy5ngna493EljQvonQBYjyrbOELHUk=
 github.com/onflow/crypto v0.25.1 h1:0txy2PKPMM873JbpxQNbJmuOJtD56bfs48RQfm0ts5A=
 github.com/onflow/crypto v0.25.1/go.mod h1:C8FbaX0x8y+FxWjbkHy0Q4EASCDR9bSPWZqlpCLYyVI=
 github.com/onflow/flow-core-contracts/lib/go/contracts v0.15.1 h1:xF5wHug6H8vKfz7p1LYy9jck6eD9K1HLjTdi6o4kg1k=
