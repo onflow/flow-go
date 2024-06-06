@@ -2057,7 +2057,6 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 				unittest.WithFinalView(epoch1Setup.FinalView+1000),
 				unittest.WithFirstView(epoch1Setup.FinalView+1),
 			)
-
 			receipt, seal := unittest.ReceiptAndSealForBlock(block1)
 			receipt.ExecutionResult.ServiceEvents = []flow.ServiceEvent{invalidSetup.ServiceEvent()}
 			seal.ResultID = receipt.ExecutionResult.ID()
