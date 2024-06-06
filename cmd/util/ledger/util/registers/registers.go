@@ -231,7 +231,7 @@ func (a *AccountRegisters) Owner() string {
 }
 
 func (a *AccountRegisters) Payloads() []*ledger.Payload {
-	payloads := make([]*ledger.Payload, 0, a.Count())
+	payloads := make([]*ledger.Payload, a.Count())
 	a.insertPayloads(payloads)
 	return payloads
 }
