@@ -902,11 +902,8 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 			unittest.WithFinalView(epoch1FinalView+1000),
 			unittest.WithFirstView(epoch1FinalView+1),
 		)
-
 		// create a receipt for block 1 containing the EpochSetup event
-		receipt1, seal1 := unittest.ReceiptAndSealForBlock(block1)
-		receipt1.ExecutionResult.ServiceEvents = []flow.ServiceEvent{epoch2Setup.ServiceEvent()}
-		seal1.ResultID = receipt1.ExecutionResult.ID()
+		receipt1, seal1 := unittest.ReceiptAndSealForBlock(block1, epoch2Setup.ServiceEvent())
 
 		// add a second block with the receipt for block 1
 		block2 := unittest.BlockWithParentFixture(block1.Header)
@@ -980,12 +977,9 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 			unittest.WithClusterQCsFromAssignments(epoch2Setup.Assignments),
 			unittest.WithDKGFromParticipants(epoch2Participants.ToSkeleton()),
 		)
-
 		// create receipt and seal for block 2
 		// the receipt for block 2 contains the EpochCommit event
-		receipt2, seal2 := unittest.ReceiptAndSealForBlock(block2)
-		receipt2.ExecutionResult.ServiceEvents = []flow.ServiceEvent{epoch2Commit.ServiceEvent()}
-		seal2.ResultID = receipt2.ExecutionResult.ID()
+		receipt2, seal2 := unittest.ReceiptAndSealForBlock(block2, epoch2Commit.ServiceEvent())
 
 		// block 5 contains the receipt for block 2
 		block5 := unittest.BlockWithParentFixture(block4.Header)
@@ -1379,9 +1373,7 @@ func TestExtendEpochSetupInvalid(t *testing.T) {
 			for _, apply := range opts {
 				apply(setup)
 			}
-			receipt, seal := unittest.ReceiptAndSealForBlock(block1)
-			receipt.ExecutionResult.ServiceEvents = []flow.ServiceEvent{setup.ServiceEvent()}
-			seal.ResultID = receipt.ExecutionResult.ID()
+			receipt, seal := unittest.ReceiptAndSealForBlock(block1, setup.ServiceEvent())
 			return setup, receipt, seal
 		}
 
@@ -1517,9 +1509,7 @@ func TestExtendEpochCommitInvalid(t *testing.T) {
 				unittest.WithFirstView(epoch1Setup.FinalView+1),
 			)
 
-			receipt, seal := unittest.ReceiptAndSealForBlock(block)
-			receipt.ExecutionResult.ServiceEvents = []flow.ServiceEvent{setup.ServiceEvent()}
-			seal.ResultID = receipt.ExecutionResult.ID()
+			receipt, seal := unittest.ReceiptAndSealForBlock(block, setup.ServiceEvent())
 			return setup, receipt, seal
 		}
 
@@ -1532,9 +1522,7 @@ func TestExtendEpochCommitInvalid(t *testing.T) {
 			for _, apply := range opts {
 				apply(commit)
 			}
-			receipt, seal := unittest.ReceiptAndSealForBlock(block)
-			receipt.ExecutionResult.ServiceEvents = []flow.ServiceEvent{commit.ServiceEvent()}
-			seal.ResultID = receipt.ExecutionResult.ID()
+			receipt, seal := unittest.ReceiptAndSealForBlock(block, commit.ServiceEvent())
 			return commit, receipt, seal
 		}
 
@@ -1698,9 +1686,7 @@ func TestExtendEpochTransitionWithoutCommit(t *testing.T) {
 			unittest.WithFinalView(epoch1FinalView+1000),
 			unittest.WithFirstView(epoch1FinalView+1),
 		)
-
-		receipt1, seal1 := unittest.ReceiptAndSealForBlock(block1)
-		receipt1.ExecutionResult.ServiceEvents = []flow.ServiceEvent{epoch2Setup.ServiceEvent()}
+		receipt1, seal1 := unittest.ReceiptAndSealForBlock(block1, epoch2Setup.ServiceEvent())
 
 		// add a block containing a receipt for block 1
 		block2 := unittest.BlockWithParentFixture(block1.Header)
@@ -1843,10 +1829,7 @@ func TestEmergencyEpochFallback(t *testing.T) {
 				unittest.WithFinalView(epoch1FinalView+1000),
 				unittest.WithFirstView(epoch1FinalView+1),
 			)
-
-			receipt1, seal1 := unittest.ReceiptAndSealForBlock(block1)
-			receipt1.ExecutionResult.ServiceEvents = []flow.ServiceEvent{epoch2Setup.ServiceEvent()}
-			seal1.ResultID = receipt1.ExecutionResult.ID()
+			receipt1, seal1 := unittest.ReceiptAndSealForBlock(block1, epoch2Setup.ServiceEvent())
 
 			// add a block containing a receipt for block 1
 			block2 := unittest.BlockWithParentFixture(block1.Header)
@@ -1940,10 +1923,7 @@ func TestEmergencyEpochFallback(t *testing.T) {
 				unittest.WithFinalView(epoch1FinalView+1000),
 				unittest.WithFirstView(epoch1FinalView+10), // invalid first view
 			)
-
-			receipt1, seal1 := unittest.ReceiptAndSealForBlock(block1)
-			receipt1.ExecutionResult.ServiceEvents = []flow.ServiceEvent{epoch2Setup.ServiceEvent()}
-			seal1.ResultID = receipt1.ExecutionResult.ID()
+			receipt1, seal1 := unittest.ReceiptAndSealForBlock(block1, epoch2Setup.ServiceEvent())
 
 			// add a block containing a receipt for block 1
 			block2 := unittest.BlockWithParentFixture(block1.Header)
@@ -2057,10 +2037,7 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 				unittest.WithFinalView(epoch1Setup.FinalView+1000),
 				unittest.WithFirstView(epoch1Setup.FinalView+1),
 			)
-
-			receipt, seal := unittest.ReceiptAndSealForBlock(block1)
-			receipt.ExecutionResult.ServiceEvents = []flow.ServiceEvent{invalidSetup.ServiceEvent()}
-			seal.ResultID = receipt.ExecutionResult.ID()
+			receipt, seal := unittest.ReceiptAndSealForBlock(block1, invalidSetup.ServiceEvent())
 
 			// ingesting block 2 and 3, block 3 seals the invalid setup event
 			block2, block3 := unittest.SealBlock(t, state, mutableProtocolState, block1, receipt, seal)
@@ -2087,9 +2064,7 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 				unittest.WithFinalView(epoch1Setup.FinalView+1000),
 				unittest.WithFirstView(epoch1Setup.FinalView+1),
 			)
-			receipt, seal = unittest.ReceiptAndSealForBlock(block2)
-			receipt.ExecutionResult.ServiceEvents = []flow.ServiceEvent{epochRecover.ServiceEvent()}
-			seal.ResultID = receipt.ExecutionResult.ID()
+			receipt, seal = unittest.ReceiptAndSealForBlock(block2, epochRecover.ServiceEvent())
 
 			// ingesting block 4 and 5, block 5 seals the EpochRecover event
 			block4, block5 := unittest.SealBlock(t, state, mutableProtocolState, block3, receipt, seal)
@@ -2147,10 +2122,7 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 				unittest.WithFinalView(epoch1Setup.FinalView+1000),
 				unittest.WithFirstView(epoch1Setup.FinalView+1),
 			)
-
-			receipt, seal := unittest.ReceiptAndSealForBlock(block1)
-			receipt.ExecutionResult.ServiceEvents = []flow.ServiceEvent{epoch2Setup.ServiceEvent()}
-			seal.ResultID = receipt.ExecutionResult.ID()
+			receipt, seal := unittest.ReceiptAndSealForBlock(block1, epoch2Setup.ServiceEvent())
 
 			// ingesting block 2 and 3, block 3 seals the EpochSetup event
 			block2, block3 := unittest.SealBlock(t, state, mutableProtocolState, block1, receipt, seal)
@@ -2167,9 +2139,7 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 			// Only when ingesting block 5, which _seals_ the invalid service event, the state should switch to
 			// `EpochFallbackTriggered` being true.
 			invalidEpochCommit := unittest.EpochCommitFixture() // a random epoch commit event will be invalid
-			receipt, seal = unittest.ReceiptAndSealForBlock(block2)
-			receipt.ExecutionResult.ServiceEvents = []flow.ServiceEvent{invalidEpochCommit.ServiceEvent()}
-			seal.ResultID = receipt.ExecutionResult.ID()
+			receipt, seal = unittest.ReceiptAndSealForBlock(block2, invalidEpochCommit.ServiceEvent())
 
 			// ingesting block 4 and 5, block 5 seals the invalid commit event
 			block4, block5 := unittest.SealBlock(t, state, mutableProtocolState, block3, receipt, seal)
@@ -2196,9 +2166,7 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 				unittest.WithFinalView(epoch1Setup.FinalView+1000),
 				unittest.WithFirstView(epoch1Setup.FinalView+1),
 			)
-			receipt, seal = unittest.ReceiptAndSealForBlock(block3)
-			receipt.ExecutionResult.ServiceEvents = []flow.ServiceEvent{epochRecover.ServiceEvent()}
-			seal.ResultID = receipt.ExecutionResult.ID()
+			receipt, seal = unittest.ReceiptAndSealForBlock(block3, epochRecover.ServiceEvent())
 
 			// ingesting block 6 and 7, block 7 seals the `epochRecover` event
 			block6, block7 := unittest.SealBlock(t, state, mutableProtocolState, block5, receipt, seal)
@@ -2281,10 +2249,7 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 				unittest.WithFinalView(epoch1Setup.FinalView+1000),
 				unittest.WithFirstView(epoch1Setup.FinalView+1),
 			)
-
-			receipt, seal := unittest.ReceiptAndSealForBlock(block1)
-			receipt.ExecutionResult.ServiceEvents = []flow.ServiceEvent{epoch2Setup.ServiceEvent()}
-			seal.ResultID = receipt.ExecutionResult.ID()
+			receipt, seal := unittest.ReceiptAndSealForBlock(block1, epoch2Setup.ServiceEvent())
 
 			// ingesting block 2 and 3, block 3 seals the `epochSetup` for the next epoch
 			block2, block3 := unittest.SealBlock(t, state, mutableProtocolState, block1, receipt, seal)
@@ -2304,9 +2269,7 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 				unittest.WithClusterQCsFromAssignments(epoch2Setup.Assignments),
 				unittest.WithDKGFromParticipants(epoch2Participants.ToSkeleton()),
 			)
-			receipt, seal = unittest.ReceiptAndSealForBlock(block2)
-			receipt.ExecutionResult.ServiceEvents = []flow.ServiceEvent{epoch2Commit.ServiceEvent()}
-			seal.ResultID = receipt.ExecutionResult.ID()
+			receipt, seal = unittest.ReceiptAndSealForBlock(block2, epoch2Commit.ServiceEvent())
 
 			// ingesting block 4 and 5, block 5 seals the `epochCommit` for the next epoch
 			block4, block5 := unittest.SealBlock(t, state, mutableProtocolState, block3, receipt, seal)
@@ -2331,9 +2294,7 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 			// Only when ingesting block 7, which _seals_ the invalid service event, the state should switch to
 			// `EpochFallbackTriggered` being true.
 			invalidCommit := unittest.EpochCommitFixture()
-			receipt, seal = unittest.ReceiptAndSealForBlock(block3)
-			receipt.ExecutionResult.ServiceEvents = []flow.ServiceEvent{invalidCommit.ServiceEvent()}
-			seal.ResultID = receipt.ExecutionResult.ID()
+			receipt, seal = unittest.ReceiptAndSealForBlock(block3, invalidCommit.ServiceEvent())
 
 			// seal B3 by building two blocks on top of B5 that contain ER and seal respectively
 			block6, block7 := unittest.SealBlock(t, state, mutableProtocolState, block5, receipt, seal)
@@ -2400,7 +2361,6 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 			// B10 will be the first block past the epoch extension
 			block10 := unittest.BlockWithParentProtocolState(block9)
 			block10.Header.View = epochExtensions[0].FirstView
-
 			unittest.InsertAndFinalize(t, state, block10)
 
 			// Block 11 incorporates Execution Result [ER] for block4, where the ER also includes EpochRecover event.
@@ -2412,10 +2372,7 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 				unittest.WithFinalView(epochExtensions[0].FinalView+1000),
 				unittest.WithFirstView(epochExtensions[0].FinalView+1),
 			)
-
-			receipt, seal = unittest.ReceiptAndSealForBlock(block4)
-			receipt.ExecutionResult.ServiceEvents = []flow.ServiceEvent{epochRecover.ServiceEvent()}
-			seal.ResultID = receipt.ExecutionResult.ID()
+			receipt, seal = unittest.ReceiptAndSealForBlock(block4, epochRecover.ServiceEvent())
 
 			// ingesting block 11 and 12, block 12 seals the `epochRecover` event
 			block11, block12 := unittest.SealBlock(t, state, mutableProtocolState, block10, receipt, seal)

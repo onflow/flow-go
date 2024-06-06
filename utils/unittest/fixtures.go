@@ -290,8 +290,10 @@ func AsSlashable[T any](msg T) flow.Slashable[T] {
 	return slashable
 }
 
-func ReceiptAndSealForBlock(block *flow.Block) (*flow.ExecutionReceipt, *flow.Seal) {
+// ReceiptAndSealForBlock returns a receipt with service events and a seal for them for a given block.
+func ReceiptAndSealForBlock(block *flow.Block, serviceEvents ...flow.ServiceEvent) (*flow.ExecutionReceipt, *flow.Seal) {
 	receipt := ReceiptForBlockFixture(block)
+	receipt.ExecutionResult.ServiceEvents = serviceEvents
 	seal := Seal.Fixture(Seal.WithBlock(block.Header), Seal.WithResult(&receipt.ExecutionResult))
 	return receipt, seal
 }
