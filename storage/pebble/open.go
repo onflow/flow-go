@@ -12,6 +12,8 @@ import (
 	"github.com/onflow/flow-go/storage/pebble/registers"
 )
 
+const DefaultPebbleCacheSize = 1 << 20
+
 // NewBootstrappedRegistersWithPath initializes a new Registers instance with a pebble db
 // if the database is not initialized, it close the database and return storage.ErrNotBootstrapped
 func NewBootstrappedRegistersWithPath(dir string) (*Registers, *pebble.DB, error) {
@@ -35,10 +37,22 @@ func NewBootstrappedRegistersWithPath(dir string) (*Registers, *pebble.DB, error
 
 // OpenRegisterPebbleDB opens the database
 func OpenRegisterPebbleDB(dir string) (*pebble.DB, error) {
-	cache := pebble.NewCache(1 << 20)
+	cache := pebble.NewCache(DefaultPebbleCacheSize)
 	defer cache.Unref()
 	// currently pebble is only used for registers
 	opts := DefaultPebbleOptions(cache, registers.NewMVCCComparer())
+	db, err := pebble.Open(dir, opts)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open db: %w", err)
+	}
+
+	return db, nil
+}
+
+func OpenDefaultPebbleDB(dir string) (*pebble.DB, error) {
+	cache := pebble.NewCache(DefaultPebbleCacheSize)
+	defer cache.Unref()
+	opts := DefaultPebbleOptions(cache, pebble.DefaultComparer)
 	db, err := pebble.Open(dir, opts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open db: %w", err)

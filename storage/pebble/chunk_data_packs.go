@@ -4,21 +4,45 @@ import (
 	"fmt"
 
 	"github.com/cockroachdb/pebble"
+	"github.com/dgraph-io/badger"
 	"github.com/vmihailenco/msgpack"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
 type ChunkDataPacks struct {
-	db          *pebble.DB
-	collections storage.Collections
+	db             *pebble.DB
+	collections    storage.Collections
+	byChunkIDCache *Cache[flow.Identifier, *storage.StoredChunkDataPack]
 }
 
 var _ storage.ChunkDataPacks = (*ChunkDataPacks)(nil)
 
 func NewChunkDataPacks(db *pebble.DB, collections storage.Collections) *ChunkDataPacks {
+
+	store := func(key flow.Identifier, val *storage.StoredChunkDataPack) func(*transaction.Tx) error {
+		return transaction.WithTx(operation.SkipDuplicates(operation.InsertChunkDataPack(val)))
+	}
+
+	retrieve := func(key flow.Identifier) func(tx *badger.Txn) (*storage.StoredChunkDataPack, error) {
+		return func(tx *badger.Txn) (*storage.StoredChunkDataPack, error) {
+			var c storage.StoredChunkDataPack
+			err := operation.RetrieveChunkDataPack(key, &c)(tx)
+			return &c, err
+		}
+	}
+
+	cache := newCache(collector, metrics.ResourceChunkDataPack,
+		withLimit[flow.Identifier, *storage.StoredChunkDataPack](byChunkIDCacheSize),
+		withStore(store),
+		withRetrieve(retrieve),
+	)
+
 	return &ChunkDataPacks{
 		db:          db,
 		collections: collections,

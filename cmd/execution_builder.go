@@ -13,7 +13,6 @@ import (
 
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"github.com/cockroachdb/pebble"
 	"github.com/ipfs/boxo/bitswap"
 	"github.com/ipfs/go-cid"
 	badger "github.com/ipfs/go-ds-badger2"
@@ -714,17 +713,6 @@ func (exeNode *ExecutionNode) LoadExecutionDataGetter(node *NodeConfig) error {
 // 	return db, nil
 // }
 
-func openPebbleChunkDataPackDB(dbPath string, logger zerolog.Logger) (*pebble.DB, error) {
-	cache := pebble.NewCache(1 << 20)
-	defer cache.Unref()
-	opts := storagepebble.DefaultPebbleOptions(cache, pebble.DefaultComparer)
-	pebbledb, err := pebble.Open(dbPath, opts)
-	if err != nil {
-		return nil, fmt.Errorf("could not open chunk data pack pebble db at path %v: %w", dbPath, err)
-	}
-	return pebbledb, nil
-}
-
 func (exeNode *ExecutionNode) LoadExecutionState(
 	node *NodeConfig,
 ) (
@@ -732,10 +720,11 @@ func (exeNode *ExecutionNode) LoadExecutionState(
 	error,
 ) {
 
-	chunkDataPackDB, err := openPebbleChunkDataPackDB(exeNode.exeConf.chunkDataPackDir, node.Logger)
+	chunkDataPackDB, err := storagepebble.OpenDefaultPebbleDB(exeNode.exeConf.chunkDataPackDir)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not open chunk data pack database: %w", err)
 	}
+
 	exeNode.builder.ShutdownFunc(func() error {
 		if err := chunkDataPackDB.Close(); err != nil {
 			return fmt.Errorf("error closing chunk data pack database: %w", err)
