@@ -40,7 +40,7 @@ type ResultSummary struct {
 	ErrorMessage            string
 	GasConsumed             uint64
 	DeployedContractAddress *Address
-	ReturnedValue           Data
+	ReturnedData            Data
 }
 
 // NewInvalidResult creates a new result that hold transaction validation
@@ -73,8 +73,8 @@ type Result struct {
 	GasConsumed uint64
 	// the address where the contract is deployed (if any)
 	DeployedContractAddress *Address
-	// returned value from a function call
-	ReturnedValue []byte
+	// returned data from a function call
+	ReturnedData []byte
 	// EVM logs (events that are emited by evm)
 	Logs []*gethTypes.Log
 	// TX hash holdes the cached value of tx hash
@@ -143,7 +143,7 @@ func (res *Result) ResultSummary() *ResultSummary {
 	rs := &ResultSummary{
 		GasConsumed:             res.GasConsumed,
 		DeployedContractAddress: res.DeployedContractAddress,
-		ReturnedValue:           res.ReturnedValue,
+		ReturnedData:            res.ReturnedData,
 		Status:                  StatusSuccessful,
 	}
 

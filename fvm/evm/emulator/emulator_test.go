@@ -212,7 +212,7 @@ func TestContractInteraction(t *testing.T) {
 						require.NoError(t, err)
 						nonce += 1
 
-						ret := new(big.Int).SetBytes(res.ReturnedValue)
+						ret := new(big.Int).SetBytes(res.ReturnedData)
 						require.Equal(t, num, ret)
 						require.GreaterOrEqual(t, res.GasConsumed, uint64(23_000))
 					})
@@ -233,7 +233,7 @@ func TestContractInteraction(t *testing.T) {
 						require.NoError(t, err)
 						nonce += 1
 
-						ret := new(big.Int).SetBytes(res.ReturnedValue)
+						ret := new(big.Int).SetBytes(res.ReturnedData)
 						require.Equal(t, blockNumber, ret)
 					})
 				})
@@ -253,7 +253,7 @@ func TestContractInteraction(t *testing.T) {
 						require.NoError(t, err)
 						nonce += 1
 						require.Error(t, res.VMError)
-						strings.Contains(string(res.ReturnedValue), "Assert Error Message")
+						strings.Contains(string(res.ReturnedData), "Assert Error Message")
 					})
 				})
 
@@ -272,7 +272,7 @@ func TestContractInteraction(t *testing.T) {
 						require.NoError(t, err)
 						nonce += 1
 						require.Error(t, res.VMError)
-						strings.Contains(string(res.ReturnedValue), "Value is too low")
+						strings.Contains(string(res.ReturnedData), "Value is too low")
 					})
 				})
 
@@ -293,7 +293,7 @@ func TestContractInteraction(t *testing.T) {
 					require.NoError(t, err)
 					nonce += 1
 
-					ret := new(big.Int).SetBytes(res.ReturnedValue)
+					ret := new(big.Int).SetBytes(res.ReturnedData)
 					require.Equal(t, types.FlowEVMPreviewNetChainID, ret)
 				})
 			})
@@ -791,7 +791,7 @@ func TestCallingExtraPrecompiles(t *testing.T) {
 					),
 				)
 				require.NoError(t, err)
-				require.Equal(t, output, res.ReturnedValue)
+				require.Equal(t, output, res.ReturnedData)
 			})
 		})
 	})

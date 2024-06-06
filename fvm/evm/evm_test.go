@@ -206,7 +206,7 @@ func TestEVMRun(t *testing.T) {
 				require.Equal(t, types.ErrCodeNoError, res.ErrorCode)
 				require.Empty(t, res.ErrorMessage)
 				require.Nil(t, res.DeployedContractAddress)
-				require.Equal(t, num, new(big.Int).SetBytes(res.ReturnedValue).Int64())
+				require.Equal(t, num, new(big.Int).SetBytes(res.ReturnedData).Int64())
 			})
 	})
 
@@ -317,7 +317,7 @@ func TestEVMRun(t *testing.T) {
 				require.Equal(t, types.StatusSuccessful, res.Status)
 				require.Equal(t, types.ErrCodeNoError, res.ErrorCode)
 				require.Empty(t, res.ErrorMessage)
-				require.Equal(t, int64(0), new(big.Int).SetBytes(res.ReturnedValue).Int64())
+				require.Equal(t, int64(0), new(big.Int).SetBytes(res.ReturnedData).Int64())
 			})
 	})
 
@@ -584,7 +584,7 @@ func TestEVMBatchRun(t *testing.T) {
 				require.Equal(t, types.StatusSuccessful, res.Status)
 				require.Equal(t, types.ErrCodeNoError, res.ErrorCode)
 				require.Empty(t, res.ErrorMessage)
-				require.Equal(t, storedValues[len(storedValues)-1], new(big.Int).SetBytes(res.ReturnedValue).Int64())
+				require.Equal(t, storedValues[len(storedValues)-1], new(big.Int).SetBytes(res.ReturnedData).Int64())
 			})
 	})
 
@@ -724,7 +724,7 @@ func TestEVMBatchRun(t *testing.T) {
 				require.Equal(t, types.StatusSuccessful, res.Status)
 				require.Equal(t, types.ErrCodeNoError, res.ErrorCode)
 				require.Empty(t, res.ErrorMessage)
-				require.Equal(t, num, new(big.Int).SetBytes(res.ReturnedValue).Int64())
+				require.Equal(t, num, new(big.Int).SetBytes(res.ReturnedData).Int64())
 			})
 	})
 
@@ -869,7 +869,7 @@ func TestEVMBatchRun(t *testing.T) {
 				require.Equal(t, types.ErrCodeNoError, res.ErrorCode)
 				require.Equal(t, types.StatusSuccessful, res.Status)
 				require.Empty(t, res.ErrorMessage)
-				require.Equal(t, num, new(big.Int).SetBytes(res.ReturnedValue).Int64())
+				require.Equal(t, num, new(big.Int).SetBytes(res.ReturnedData).Int64())
 			})
 	})
 }
@@ -933,7 +933,7 @@ func TestEVMBlockData(t *testing.T) {
 			require.Equal(t, types.StatusSuccessful, res.Status)
 			require.Equal(t, types.ErrCodeNoError, res.ErrorCode)
 			require.Empty(t, res.ErrorMessage)
-			require.Equal(t, ctx.BlockHeader.Timestamp.Unix(), new(big.Int).SetBytes(res.ReturnedValue).Int64())
+			require.Equal(t, ctx.BlockHeader.Timestamp.Unix(), new(big.Int).SetBytes(res.ReturnedData).Int64())
 
 		})
 }
@@ -1364,7 +1364,7 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 				require.Empty(t, res.ErrorMessage)
 				require.NotNil(t, res.DeployedContractAddress)
 				// we strip away first few bytes because they contain deploy code
-				require.Equal(t, testContract.ByteCode[17:], []byte(res.ReturnedValue))
+				require.Equal(t, testContract.ByteCode[17:], []byte(res.ReturnedData))
 			})
 	})
 }
@@ -1535,7 +1535,7 @@ func TestDryRun(t *testing.T) {
 				require.Equal(t, types.StatusSuccessful, res.Status)
 				require.Equal(t, types.ErrCodeNoError, res.ErrorCode)
 				// make sure the value we used in the dry-run is not the same as the value stored in contract
-				require.NotEqual(t, updatedValue, new(big.Int).SetBytes(res.ReturnedValue).Int64())
+				require.NotEqual(t, updatedValue, new(big.Int).SetBytes(res.ReturnedData).Int64())
 			})
 	})
 
@@ -1560,7 +1560,7 @@ func TestDryRun(t *testing.T) {
 				require.Equal(t, types.ErrCodeNoError, result.ErrorCode)
 				require.Equal(t, types.StatusSuccessful, result.Status)
 				require.Greater(t, result.GasConsumed, uint64(0))
-				require.NotNil(t, result.ReturnedValue)
+				require.NotNil(t, result.ReturnedData)
 				require.NotNil(t, result.DeployedContractAddress)
 				require.NotEmpty(t, result.DeployedContractAddress.String())
 			})

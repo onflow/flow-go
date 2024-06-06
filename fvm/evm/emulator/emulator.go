@@ -407,7 +407,7 @@ func (proc *procedure) deployAt(
 		tracer.CaptureStart(proc.evm, caller.ToCommon(), to.ToCommon(), true, data, gasLimit, value)
 
 		defer func() {
-			tracer.CaptureEnd(res.ReturnedValue, res.GasConsumed, res.VMError)
+			tracer.CaptureEnd(res.ReturnedData, res.GasConsumed, res.VMError)
 		}()
 	}
 
@@ -525,7 +525,7 @@ func (proc *procedure) run(
 		res.Index = uint16(txIndex)
 		// we need to capture the returned value no matter the status
 		// if the tx is reverted the error message is returned as returned value
-		res.ReturnedValue = execResult.ReturnData
+		res.ReturnedData = execResult.ReturnData
 
 		if !execResult.Failed() { // collect vm errors
 			// If the transaction created a contract, store the creation address in the receipt,

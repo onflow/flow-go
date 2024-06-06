@@ -116,7 +116,7 @@ func (p *transactionEvent) ToCadence(location common.Location) (cadence.Event, e
 		cadence.NewUInt64(p.BlockHeight),
 		cadence.String(p.BlockHash.String()),
 		cadence.String(errorMsg),
-		cadence.String(hex.EncodeToString(p.Result.ReturnedValue)),
+		cadence.String(hex.EncodeToString(p.Result.ReturnedData)),
 	}).WithType(eventType), nil
 }
 
