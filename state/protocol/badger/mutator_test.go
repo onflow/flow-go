@@ -1976,7 +1976,7 @@ func TestEmergencyEpochFallback(t *testing.T) {
 // TestRecoveryFromEpochFallbackMode tests a few scenarios where the protocol first enters EFM in different phases
 // and then recovers from it by incorporating and finalizing a valid EpochRecover service event.
 // We expect different behavior depending on the phase in which the protocol enters EFM, specifically for the committed phase,
-// as the protocol cannot be immediately recovered from it, first we need to enter the next epoch. Specifically, for this case
+// as the protocol cannot be immediately recovered from it. First, we need to enter the next epoch before we can accept an EpochRecover event. Specifically, for this case
 // we make progress till the epoch extension event to make sure that we cover the most complex scenario.
 func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 
