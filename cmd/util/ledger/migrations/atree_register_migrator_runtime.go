@@ -4,6 +4,7 @@ import (
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
+	"github.com/onflow/crypto/hash"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
 	"github.com/onflow/flow-go/cmd/util/ledger/util/registers"
@@ -19,11 +20,18 @@ func NewAtreeRegisterMigratorRuntime(
 	*AtreeRegisterMigratorRuntime,
 	error,
 ) {
-	transactionState := state.NewTransactionState(
-		registers.StorageSnapshot{
-			Registers: regs,
-		},
-		state.DefaultParameters(),
+	// Create a new transaction state with a dummy hasher
+	// because we do not need spock proofs for migrations.
+	transactionState := state.NewTransactionStateFromExecutionState(
+		state.NewExecutionStateWithSpockStateHasher(
+			registers.StorageSnapshot{
+				Registers: regs,
+			},
+			state.DefaultParameters(),
+			func() hash.Hasher {
+				return dummyHasher{}
+			},
+		),
 	)
 	accounts := environment.NewAccounts(transactionState)
 
@@ -57,3 +65,12 @@ type AtreeRegisterMigratorRuntime struct {
 	Address             common.Address
 	AccountsAtreeLedger *util.AccountsAtreeLedger
 }
+
+type dummyHasher struct{}
+
+func (d dummyHasher) Algorithm() hash.HashingAlgorithm { return hash.UnknownHashingAlgorithm }
+func (d dummyHasher) Size() int                        { return 0 }
+func (d dummyHasher) ComputeHash([]byte) hash.Hash     { return nil }
+func (d dummyHasher) Write([]byte) (int, error)        { return 0, nil }
+func (d dummyHasher) SumHash() hash.Hash               { return nil }
+func (d dummyHasher) Reset()                           {}
