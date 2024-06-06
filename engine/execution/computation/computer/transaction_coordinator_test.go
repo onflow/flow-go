@@ -39,39 +39,6 @@ func (testCoordinatorVM) Run(
 	panic("not implemented")
 }
 
-func (testCoordinatorVM) GetAccount(
-	_ fvm.Context,
-	_ flow.Address,
-	_ snapshot.StorageSnapshot,
-) (
-	*flow.Account,
-	error,
-) {
-	panic("not implemented")
-}
-
-func (testCoordinatorVM) GetAccountBalance(
-	_ fvm.Context,
-	_ flow.Address,
-	_ snapshot.StorageSnapshot,
-) (
-	uint64,
-	error,
-) {
-	panic("not expected")
-}
-
-func (testCoordinatorVM) GetAccountKeys(
-	_ fvm.Context,
-	_ flow.Address,
-	_ snapshot.StorageSnapshot,
-) (
-	[]flow.AccountPublicKey,
-	error,
-) {
-	panic("not expected")
-}
-
 type testCoordinatorExecutor struct {
 	executionTime logical.Time
 }

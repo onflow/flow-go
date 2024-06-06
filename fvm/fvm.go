@@ -119,9 +119,6 @@ type VM interface {
 		ProcedureOutput,
 		error,
 	)
-
-	//GetAccount(Context, flow.Address, snapshot.StorageSnapshot) (*flow.Account, error)
-
 }
 
 var _ VM = (*VirtualMachine)(nil)
