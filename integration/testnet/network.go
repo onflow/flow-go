@@ -920,8 +920,13 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 				// tests only start 1 verification node
 				nodeContainer.AddFlag("chunk-alpha", "1")
 			}
-			t.Logf("%v hotstuff startup time will be in 8 seconds: %v", time.Now().UTC(), hotstuffStartupTime)
-			nodeContainer.AddFlag("hotstuff-startup-time", hotstuffStartupTime)
+			// We generally don't need cruise control for integration tests, so disable it by default
+			if !nodeContainer.IsFlagSet("cruise-ctl-enabled") {
+				nodeContainer.AddFlag("cruise-ctl-enabled", "false")
+			}
+			if !nodeContainer.IsFlagSet("cruise-ctl-fallback-proposal-duration") {
+				nodeContainer.AddFlag("cruise-ctl-fallback-proposal-duration", "250ms")
+			}
 
 		case flow.RoleVerification:
 			if !nodeContainer.IsFlagSet("chunk-alpha") {
