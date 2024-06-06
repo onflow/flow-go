@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"cloud.google.com/go/storage"
+	"github.com/googleapis/gax-go/v2"
 )
 
 type Uploader interface {
@@ -27,6 +28,8 @@ func NewGCPUploader(bucketName string) (*GCPUploader, error) {
 	if err != nil {
 		return nil, fmt.Errorf("cannot create GCP Bucket client: %w", err)
 	}
+
+	client.SetRetry()
 	bucket := client.Bucket(bucketName)
 
 	// try accessing buckets to validate settings
@@ -47,7 +50,16 @@ func (g *GCPUploader) Upload(id string, data json.RawMessage) error {
 	ctx, cancel := context.WithTimeout(context.Background(), uploadTimeout)
 	defer cancel()
 
-	wc := g.bucket.Object(id).NewWriter(ctx)
+	// setup writer
+	wc := g.bucket.Object(id).Retryer(
+		// set retry with the exponential backoff
+		storage.WithBackoff(gax.Backoff{
+			Initial:    10 * time.Second,
+			Max:        uploadTimeout,
+			Multiplier: 2,
+		})).NewWriter(ctx)
+
+	// write data
 	if _, err := wc.Write(data); err != nil {
 		return err
 	}
