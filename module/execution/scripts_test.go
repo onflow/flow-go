@@ -3,7 +3,6 @@ package execution
 import (
 	"context"
 	"fmt"
-	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"os"
 	"testing"
 
@@ -24,6 +23,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"

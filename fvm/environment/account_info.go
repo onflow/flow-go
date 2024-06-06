@@ -21,7 +21,6 @@ type AccountInfo interface {
 	GetAccountAvailableBalance(runtimeAddress common.Address) (uint64, error)
 
 	GetAccount(address flow.Address) (*flow.Account, error)
-
 	GetAccountKeys(address flow.Address) ([]flow.AccountPublicKey, error)
 }
 
@@ -278,12 +277,11 @@ func (info *accountInfo) GetAccountKeys(
 ) {
 	defer info.tracer.StartChildSpan(trace.FVMEnvGetAccount).End()
 
-	//accountKeys, err := info.accounts.GetPublicKey(address, 0)
+	accountKeys, err := info.accounts.GetPublicKeys(address)
 
-	account, err := info.accounts.Get(address)
 	if err != nil {
 		return nil, err
 	}
 
-	return account.Keys, nil
+	return accountKeys, nil
 }

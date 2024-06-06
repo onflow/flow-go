@@ -135,7 +135,7 @@ func (s *Scripts) GetAccountAtBlockHeight(ctx context.Context, address flow.Addr
 	return s.executor.GetAccount(ctx, address, header, snap)
 }
 
-// GetAccountBalance returns
+// GetAccountBalance returns a balance of Flow account by the provided address and block height.
 // Expected errors:
 // - Script execution related errors
 // - storage.ErrHeightNotIndexed if the data for the block height is not available
@@ -148,7 +148,7 @@ func (s *Scripts) GetAccountBalance(ctx context.Context, address flow.Address, h
 	return s.executor.GetAccountBalance(ctx, address, header, snap)
 }
 
-// GetAccountKeys returns
+// GetAccountKeys returns a public keys of Flow account by the provided address and block height.
 // Expected errors:
 // - Script execution related errors
 // - storage.ErrHeightNotIndexed if the data for the block height is not available

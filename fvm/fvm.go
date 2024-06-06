@@ -120,11 +120,8 @@ type VM interface {
 		error,
 	)
 
-	GetAccount(Context, flow.Address, snapshot.StorageSnapshot) (*flow.Account, error)
+	//GetAccount(Context, flow.Address, snapshot.StorageSnapshot) (*flow.Account, error)
 
-	GetAccountBalance(Context, flow.Address, snapshot.StorageSnapshot) (uint64, error)
-
-	GetAccountKeys(Context, flow.Address, snapshot.StorageSnapshot) ([]flow.AccountPublicKey, error)
 }
 
 var _ VM = (*VirtualMachine)(nil)
@@ -208,7 +205,7 @@ func (vm *VirtualMachine) Run(
 }
 
 // GetAccount returns an account by address or an error if none exists.
-func (vm *VirtualMachine) GetAccount(
+func GetAccount(
 	ctx Context,
 	address flow.Address,
 	storageSnapshot snapshot.StorageSnapshot,
@@ -249,7 +246,7 @@ func (vm *VirtualMachine) GetAccount(
 }
 
 // GetAccountBalance returns an account balance by address or an error if none exists.
-func (vm *VirtualMachine) GetAccountBalance(
+func GetAccountBalance(
 	ctx Context,
 	address flow.Address,
 	storageSnapshot snapshot.StorageSnapshot,
@@ -283,8 +280,8 @@ func (vm *VirtualMachine) GetAccountBalance(
 	return accountBalance, nil
 }
 
-// GetAccountKeys returns an account balance by address or an error if none exists.
-func (vm *VirtualMachine) GetAccountKeys(
+// GetAccountKeys returns an account keys by address or an error if none exists.
+func GetAccountKeys(
 	ctx Context,
 	address flow.Address,
 	storageSnapshot snapshot.StorageSnapshot,
@@ -314,7 +311,7 @@ func (vm *VirtualMachine) GetAccountKeys(
 	accountKeys, err := env.GetAccountKeys(address)
 
 	if err != nil {
-		return nil, fmt.Errorf("cannot get account balance: %w", err)
+		return nil, fmt.Errorf("cannot get account keys: %w", err)
 	}
 	return accountKeys, nil
 }

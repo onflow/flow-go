@@ -254,7 +254,7 @@ func (e *QueryExecutor) GetAccount(
 		fvm.WithDerivedBlockData(
 			e.derivedChainData.NewDerivedBlockDataForScript(blockHeader.ID())))
 
-	account, err := e.vm.GetAccount(
+	account, err := fvm.GetAccount(
 		blockCtx,
 		address,
 		snapshot)
@@ -278,7 +278,7 @@ func (e *QueryExecutor) GetAccountBalance(ctx context.Context, address flow.Addr
 		fvm.WithDerivedBlockData(
 			e.derivedChainData.NewDerivedBlockDataForScript(blockHeader.ID())))
 
-	accountBalance, err := e.vm.GetAccountBalance(
+	accountBalance, err := fvm.GetAccountBalance(
 		blockCtx,
 		address,
 		snapshot)
@@ -302,7 +302,7 @@ func (e *QueryExecutor) GetAccountKeys(ctx context.Context, address flow.Address
 		fvm.WithDerivedBlockData(
 			e.derivedChainData.NewDerivedBlockDataForScript(blockHeader.ID())))
 
-	accountKeys, err := e.vm.GetAccountKeys(blockCtx,
+	accountKeys, err := fvm.GetAccountKeys(blockCtx,
 		address,
 		snapshot)
 	if err != nil {
@@ -314,5 +314,4 @@ func (e *QueryExecutor) GetAccountKeys(ctx context.Context, address flow.Address
 	}
 
 	return accountKeys, nil
-
 }
