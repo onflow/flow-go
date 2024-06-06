@@ -94,6 +94,7 @@ require (
 
 require (
 	github.com/cockroachdb/pebble v0.0.0-20230928194634-aa077af62593
+	github.com/cockroachdb/swiss v0.0.0-20240605133600-232b93a2b829
 	github.com/coreos/go-semver v0.3.0
 	github.com/docker/go-units v0.5.0
 	github.com/glebarez/go-sqlite v1.22.0
