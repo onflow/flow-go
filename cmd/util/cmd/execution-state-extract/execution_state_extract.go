@@ -1,14 +1,17 @@
 package extract
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"math"
 	"os"
+	syncAtomic "sync/atomic"
 	"time"
 
 	"github.com/rs/zerolog"
 	"go.uber.org/atomic"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/onflow/cadence/runtime/common"
 
@@ -432,11 +435,18 @@ func newMigration(
 		payloadCount := len(payloads)
 
 		logger.Info().Msgf(
-			"creating registers from grouped payloads (%d) ...",
+			"grouping %d payloads ...",
 			payloadCount,
 		)
 
-		registersByAccount, err := registers.NewByAccountFromPayloads(payloads)
+		payloadAccountGrouping := util.GroupPayloadsByAccount(logger, payloads, nWorker)
+
+		logger.Info().Msgf(
+			"creating registers from grouped payloads (%d groups) ...",
+			payloadAccountGrouping.Len(),
+		)
+
+		registersByAccount, err := newByAccountRegistersFromPayloadAccountGrouping(payloadAccountGrouping, nWorker)
 		if err != nil {
 			return nil, err
 		}
@@ -466,4 +476,82 @@ func newMigration(
 
 		return newPayloads, nil
 	}
+}
+
+func newByAccountRegistersFromPayloadAccountGrouping(
+	payloadAccountGrouping *util.PayloadAccountGrouping,
+	nWorker int,
+) (
+	*registers.ByAccount,
+	error,
+) {
+	g, ctx := errgroup.WithContext(context.Background())
+
+	jobs := make(chan *util.PayloadAccountGroup)
+	results := make(chan *registers.AccountRegisters)
+
+	g.Go(func() error {
+		defer close(jobs)
+		for {
+			payloadAccountGroup, err := payloadAccountGrouping.Next()
+			if err != nil {
+				return fmt.Errorf("failed to group payloads by account: %w", err)
+			}
+
+			if payloadAccountGroup == nil {
+				return nil
+			}
+
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case jobs <- payloadAccountGroup:
+			}
+		}
+	})
+
+	workersLeft := int64(nWorker)
+	for i := 0; i < nWorker; i++ {
+		g.Go(func() error {
+			defer func() {
+				if syncAtomic.AddInt64(&workersLeft, -1) == 0 {
+					close(results)
+				}
+			}()
+
+			for payloadAccountGroup := range jobs {
+				accountRegisters, err := registers.NewAccountRegistersFromPayloads(
+					string(payloadAccountGroup.Address[:]),
+					payloadAccountGroup.Payloads,
+				)
+				if err != nil {
+					return fmt.Errorf("failed to create account registers from payloads: %w", err)
+				}
+				select {
+				case <-ctx.Done():
+					return ctx.Err()
+				case results <- accountRegisters:
+				}
+			}
+
+			return nil
+		})
+	}
+
+	registersByAccount := registers.NewByAccount()
+	g.Go(func() error {
+		for accountRegisters := range results {
+			oldAccountRegisters := registersByAccount.SetAccountRegisters(accountRegisters)
+			if oldAccountRegisters != nil {
+				return fmt.Errorf(
+					"duplicate account registers for account %s",
+					accountRegisters.Owner(),
+				)
+			}
+		}
+
+		return nil
+	})
+
+	return registersByAccount, g.Wait()
 }
