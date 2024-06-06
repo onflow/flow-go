@@ -1,22 +1,28 @@
 package emulator_test
 
 import (
+	"encoding/json"
 	"fmt"
 	"math"
 	"math/big"
 	"strings"
 	"testing"
+	"time"
 
 	gethCommon "github.com/onflow/go-ethereum/common"
 	gethTypes "github.com/onflow/go-ethereum/core/types"
 	gethVM "github.com/onflow/go-ethereum/core/vm"
 	gethParams "github.com/onflow/go-ethereum/params"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/fvm/evm/debug"
 	"github.com/onflow/flow-go/fvm/evm/emulator"
 	"github.com/onflow/flow-go/fvm/evm/testutils"
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/model/flow"
+
+	_ "github.com/onflow/go-ethereum/eth/tracers/native" // imported so callTracers is registered in init
 )
 
 var blockNumber = big.NewInt(10)
@@ -789,6 +795,234 @@ func TestCallingExtraPrecompiles(t *testing.T) {
 			})
 		})
 	})
+}
+
+func TestTransactionTracing(t *testing.T) {
+
+	// runWithDeployedContract is a helper function that will deploy a contract we can use to interact with
+	runWithDeployedContract := func(t *testing.T, f func(*testutils.TestContract, *testutils.EOATestAccount, *emulator.Emulator)) {
+		testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
+			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
+				testutils.RunWithEOATestAccount(t, backend, rootAddr, func(testAccount *testutils.EOATestAccount) {
+					RunWithNewEmulator(t, backend, rootAddr, func(emu *emulator.Emulator) {
+						testContract := testutils.GetStorageTestContract(t)
+						nonce := testAccount.Nonce()
+
+						// deploy contract
+						RunWithNewBlockView(t, emu, func(blk types.BlockView) {
+							call := types.NewDeployCall(
+								testAccount.Address(),
+								testContract.ByteCode,
+								math.MaxUint64,
+								big.NewInt(0),
+								nonce)
+
+							res, err := blk.DirectCall(call)
+							require.NoError(t, err)
+							require.NotNil(t, res.DeployedContractAddress)
+
+							testContract.DeployedAt = *res.DeployedContractAddress
+							f(testContract, testAccount, emu)
+						})
+					})
+				})
+			})
+		})
+	}
+
+	// manually create block with the provided tracer injected
+	blockWithTracer := func(t *testing.T, emu *emulator.Emulator) (types.BlockView, *testutils.MockUploader, *debug.CallTracer) {
+		uploader := &testutils.MockUploader{}
+		tracer, err := debug.NewEVMCallTracer(uploader, zerolog.Nop())
+		require.NoError(t, err)
+
+		// manually create block with provided tracer
+		defaultCtx.Tracer = tracer.TxTracer()
+		blk, err := emu.NewBlockView(defaultCtx)
+		require.NoError(t, err)
+
+		return blk, uploader, tracer
+	}
+
+	t.Run("contract interaction using direct call", func(t *testing.T) {
+		runWithDeployedContract(t, func(testContract *testutils.TestContract, testAccount *testutils.EOATestAccount, emu *emulator.Emulator) {
+			blk, uploader, tracer := blockWithTracer(t, emu)
+
+			var txID gethCommon.Hash
+			var trace json.RawMessage
+
+			blockID := flow.Identifier{0x01}
+			uploaded := make(chan struct{})
+
+			uploader.UploadFunc = func(id string, message json.RawMessage) error {
+				uploaded <- struct{}{}
+				require.Equal(t, debug.TraceID(txID, blockID), id)
+				require.Equal(t, trace, message)
+				require.Greater(t, len(message), 0)
+				return nil
+			}
+
+			// interact and record trace
+			res, err := blk.DirectCall(
+				types.NewContractCall(
+					testAccount.Address(),
+					testContract.DeployedAt,
+					testContract.MakeCallData(t, "store", big.NewInt(2)),
+					1_000_000,
+					big.NewInt(0),
+					testAccount.Nonce(),
+				),
+			)
+			require.NoError(t, err)
+			txID = res.TxHash
+			trace, err = tracer.TxTracer().GetResult()
+			require.NoError(t, err)
+			tracer.WithBlockID(blockID)
+
+			tracer.Collect(txID)
+
+			require.Eventuallyf(t, func() bool {
+				<-uploaded
+				return true
+			}, time.Second, time.Millisecond*100, "upload did not execute")
+		})
+	})
+
+	t.Run("contract deploy at using direct call", func(t *testing.T) {
+		runWithDeployedContract(t, func(testContract *testutils.TestContract, testAccount *testutils.EOATestAccount, emu *emulator.Emulator) {
+			blk, uploader, tracer := blockWithTracer(t, emu)
+
+			var txID gethCommon.Hash
+			var trace json.RawMessage
+
+			uploaded := make(chan struct{})
+			blockID := flow.Identifier{0x01}
+
+			uploader.UploadFunc = func(id string, message json.RawMessage) error {
+				uploaded <- struct{}{}
+				require.Equal(t, debug.TraceID(txID, blockID), id)
+				require.Equal(t, trace, message)
+				require.Greater(t, len(message), 0)
+				return nil
+			}
+
+			// interact and record trace
+			res, err := blk.DirectCall(
+				types.NewDeployCallWithTargetAddress(
+					testAccount.Address(),
+					types.Address{0x01, 0x02},
+					testContract.ByteCode,
+					1_000_000,
+					big.NewInt(0),
+					testAccount.Nonce(),
+				),
+			)
+			require.NoError(t, err)
+			txID = res.TxHash
+			trace, err = tracer.TxTracer().GetResult()
+			require.NoError(t, err)
+			tracer.WithBlockID(blockID)
+
+			tracer.Collect(txID)
+
+			require.Eventuallyf(t, func() bool {
+				<-uploaded
+				return true
+			}, time.Second, time.Millisecond*100, "upload did not execute")
+		})
+	})
+
+	t.Run("contract interaction using run transaction", func(t *testing.T) {
+		runWithDeployedContract(t, func(testContract *testutils.TestContract, testAccount *testutils.EOATestAccount, emu *emulator.Emulator) {
+			blk, uploader, tracer := blockWithTracer(t, emu)
+
+			var txID gethCommon.Hash
+			var trace json.RawMessage
+
+			blockID := flow.Identifier{0x02}
+			uploaded := make(chan struct{})
+
+			uploader.UploadFunc = func(id string, message json.RawMessage) error {
+				uploaded <- struct{}{}
+				require.Equal(t, debug.TraceID(txID, blockID), id)
+				require.Equal(t, trace, message)
+				require.Greater(t, len(message), 0)
+				return nil
+			}
+
+			tx := testAccount.PrepareAndSignTx(
+				t,
+				testContract.DeployedAt.ToCommon(),
+				testContract.MakeCallData(t, "store", big.NewInt(2)),
+				big.NewInt(0),
+				1_000_000,
+				big.NewInt(0),
+			)
+
+			// interact and record trace
+			res, err := blk.RunTransaction(tx)
+			require.NoError(t, err)
+			txID = res.TxHash
+			trace, err = tracer.TxTracer().GetResult()
+			require.NoError(t, err)
+			tracer.WithBlockID(blockID)
+
+			tracer.Collect(txID)
+
+			require.Eventuallyf(t, func() bool {
+				<-uploaded
+				return true
+			}, time.Second, time.Millisecond*100, "upload did not execute")
+		})
+
+	})
+
+	t.Run("contract interaction using run batch transaction", func(t *testing.T) {
+		runWithDeployedContract(t, func(testContract *testutils.TestContract, testAccount *testutils.EOATestAccount, emu *emulator.Emulator) {
+			blk, uploader, tracer := blockWithTracer(t, emu)
+
+			var txID gethCommon.Hash
+			var trace json.RawMessage
+
+			blockID := flow.Identifier{0x02}
+			uploaded := make(chan struct{})
+
+			uploader.UploadFunc = func(id string, message json.RawMessage) error {
+				uploaded <- struct{}{}
+				require.Equal(t, debug.TraceID(txID, blockID), id)
+				require.Equal(t, trace, message)
+				require.Greater(t, len(message), 0)
+				return nil
+			}
+
+			tx := testAccount.PrepareAndSignTx(
+				t,
+				testContract.DeployedAt.ToCommon(),
+				testContract.MakeCallData(t, "store", big.NewInt(2)),
+				big.NewInt(0),
+				1_000_000,
+				big.NewInt(0),
+			)
+
+			// interact and record trace
+			results, err := blk.BatchRunTransactions([]*gethTypes.Transaction{tx})
+			require.NoError(t, err)
+			require.Len(t, results, 1)
+			txID = results[0].TxHash
+			trace, err = tracer.TxTracer().GetResult()
+			require.NoError(t, err)
+			tracer.WithBlockID(blockID)
+
+			tracer.Collect(txID)
+
+			require.Eventuallyf(t, func() bool {
+				<-uploaded
+				return true
+			}, time.Second, time.Millisecond*100, "upload did not execute")
+		})
+
+	})
+
 }
 
 type MockedPrecompile struct {
