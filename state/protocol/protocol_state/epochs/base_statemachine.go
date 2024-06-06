@@ -113,6 +113,7 @@ func (u *baseStateMachine) TransitionToNextEpoch() error {
 		return fmt.Errorf("protocol state for next epoch has not yet been committed")
 	}
 	// Check if we are at the next epoch, only then a transition is allowed
+	// TODO(EFM, #6019): Should address this when fixing accessing of 'parent state' vs 'state under evolution'
 	if u.view < u.parentState.NextEpochSetup.FirstView {
 		return fmt.Errorf("epoch transition is only allowed when entering next epoch")
 	}

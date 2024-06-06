@@ -31,10 +31,11 @@ type ConsensusSuite struct {
 	suite.Suite
 
 	// mocks
-	state    *protocolmock.State
-	snapshot *protocolmock.Snapshot
-	params   *protocolmock.Params
-	epochs   *mocks.EpochQuery
+	state              *protocolmock.State
+	snapshot           *protocolmock.Snapshot
+	params             *protocolmock.Params
+	epochs             *mocks.EpochQuery
+	epochProtocolState *protocolmock.DynamicProtocolState
 
 	// backend for mocked functions
 	phase                  flow.EpochPhase
@@ -59,12 +60,12 @@ func (suite *ConsensusSuite) SetupTest() {
 
 	suite.state.On("Final").Return(suite.snapshot)
 	suite.state.On("Params").Return(suite.params)
-	epochProtocolState := protocolmock.NewDynamicProtocolState(suite.T())
-	epochProtocolState.On("EpochFallbackTriggered").Return(
+	suite.epochProtocolState = protocolmock.NewDynamicProtocolState(suite.T())
+	suite.epochProtocolState.On("EpochFallbackTriggered").Return(
 		func() bool { return suite.epochFallbackTriggered },
 		func() error { return nil },
-	).Maybe()
-	suite.snapshot.On("EpochProtocolState").Return(epochProtocolState, nil)
+	)
+	suite.snapshot.On("EpochProtocolState").Return(suite.epochProtocolState, nil)
 	suite.snapshot.On("Phase").Return(
 		func() flow.EpochPhase { return suite.phase },
 		func() error { return nil },
