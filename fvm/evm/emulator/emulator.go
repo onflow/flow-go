@@ -514,9 +514,11 @@ func (proc *procedure) run(
 	if execResult != nil {
 		res.GasConsumed = execResult.UsedGas
 		res.Index = uint16(txIndex)
+		// we need to capture the returned value no matter the status
+		// if the tx is reverted the error message is returned as returned value
+		res.ReturnedValue = execResult.ReturnData
 
 		if !execResult.Failed() { // collect vm errors
-			res.ReturnedValue = execResult.ReturnData
 			// If the transaction created a contract, store the creation address in the receipt,
 			if msg.To == nil {
 				deployedAddress := types.NewAddress(gethCrypto.CreateAddress(msg.From, msg.Nonce))

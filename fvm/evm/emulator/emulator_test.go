@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"math/big"
+	"strings"
 	"testing"
 
 	gethCommon "github.com/onflow/go-ethereum/common"
@@ -228,6 +229,44 @@ func TestContractInteraction(t *testing.T) {
 
 						ret := new(big.Int).SetBytes(res.ReturnedValue)
 						require.Equal(t, blockNumber, ret)
+					})
+				})
+
+				RunWithNewEmulator(t, backend, rootAddr, func(env *emulator.Emulator) {
+					RunWithNewBlockView(t, env, func(blk types.BlockView) {
+						res, err := blk.DirectCall(
+							types.NewContractCall(
+								testAccount,
+								contractAddr,
+								testContract.MakeCallData(t, "assertError"),
+								1_000_000,
+								big.NewInt(0), // this should be zero because the contract doesn't have receiver
+								nonce,
+							),
+						)
+						require.NoError(t, err)
+						nonce += 1
+						require.Error(t, res.VMError)
+						strings.Contains(string(res.ReturnedValue), "Assert Error Message")
+					})
+				})
+
+				RunWithNewEmulator(t, backend, rootAddr, func(env *emulator.Emulator) {
+					RunWithNewBlockView(t, env, func(blk types.BlockView) {
+						res, err := blk.DirectCall(
+							types.NewContractCall(
+								testAccount,
+								contractAddr,
+								testContract.MakeCallData(t, "customError"),
+								1_000_000,
+								big.NewInt(0), // this should be zero because the contract doesn't have receiver
+								nonce,
+							),
+						)
+						require.NoError(t, err)
+						nonce += 1
+						require.Error(t, res.VMError)
+						strings.Contains(string(res.ReturnedValue), "Value is too low")
 					})
 				})
 
