@@ -24,7 +24,7 @@ import (
 )
 
 func registerFromSlabID(slabID atree.SlabID) (owner, key string) {
-	var address [8]byte
+	var address atree.Address
 	binary.BigEndian.PutUint64(address[:], slabID.AddressAsUint64())
 
 	slabIndex := slabID.Index()
@@ -84,14 +84,14 @@ func (m *FilterUnreferencedSlabsMigration) MigrateAccount(
 	accountRegisters *registers.AccountRegisters,
 ) error {
 
-	migrationRuntime, err := NewAtreeRegisterMigratorRuntime(address, oldPayloads)
-	if err != nil {
-		return fmt.Errorf("failed to create migrator runtime: %w", err)
-	}
+	storage := runtime.NewStorage(
+		registers.ReadOnlyLedger{
+			Registers: accountRegisters,
+		},
+		nil,
+	)
 
-	storage := migrationRuntime.Storage
-
-	err = checkStorageHealth(address, storage, accountRegisters)
+	err := checkStorageHealth(address, storage, accountRegisters, m.nWorkers, true)
 	if err == nil {
 		return nil
 	}
@@ -134,14 +134,14 @@ func (m *FilterUnreferencedSlabsMigration) MigrateAccount(
 		Msgf("filtering %d unreferenced slabs", len(unreferencedSlabIDs))
 
 	for storageID := range unreferencedSlabIDs {
-		owner, key := registerFromStorageID(storageID)
+		owner, key := registerFromSlabID(storageID)
 
 		value, err := accountRegisters.Get(owner, key)
 		if err != nil {
 			return fmt.Errorf(
 				"failed to get register for slab %x/%x: %w",
 				owner,
-				storageID.Index,
+				storageID.Index(),
 				err,
 			)
 		}
@@ -151,7 +151,7 @@ func (m *FilterUnreferencedSlabsMigration) MigrateAccount(
 			return fmt.Errorf(
 				"failed to set register for slab %x/%x: %w",
 				owner,
-				storageID.Index,
+				storageID.Index(),
 				err,
 			)
 		}

@@ -38,8 +38,45 @@ func getSlabIDsFromPayloads(payloads []*ledger.Payload) ([]atree.SlabID, error) 
 	return slabIDs, nil
 }
 
+func getSlabIDsFromRegisters(registers registers.Registers) ([]atree.SlabID, error) {
+	slabIDs := make([]atree.SlabID, 0, registers.Count())
+
+	err := registers.ForEach(func(owner string, key string, value []byte) error {
+		if !flow.IsSlabIndexKey(key) {
+			return nil
+		}
+
+		slabID := atree.NewSlabID(
+			atree.Address([]byte(owner)),
+			atree.SlabIndex([]byte(key[1:])),
+		)
+
+		slabIDs = append(slabIDs, slabID)
+
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return slabIDs, nil
+}
+
 func loadAtreeSlabsInStorge(storage *runtime.Storage, payloads []*ledger.Payload, nWorkers int) error {
 	slabIDs, err := getSlabIDsFromPayloads(payloads)
+	if err != nil {
+		return err
+	}
+
+	return storage.PersistentSlabStorage.BatchPreload(slabIDs, nWorkers)
+}
+
+func loadAtreeSlabsInRegisterStorage(
+	storage *runtime.Storage,
+	registers registers.Registers,
+	nWorkers int,
+) error {
+	slabIDs, err := getSlabIDsFromRegisters(registers)
 	if err != nil {
 		return err
 	}
@@ -50,13 +87,13 @@ func loadAtreeSlabsInStorge(storage *runtime.Storage, payloads []*ledger.Payload
 func checkStorageHealth(
 	address common.Address,
 	storage *runtime.Storage,
-	payloads []*ledger.Payload,
+	registers registers.Registers,
 	nWorkers int,
 	needToPreloadAtreeSlabs bool,
 ) error {
 
 	if needToPreloadAtreeSlabs {
-		err := loadAtreeSlabsInStorge(storage, payloads, nWorkers)
+		err := loadAtreeSlabsInRegisterStorage(storage, registers, nWorkers)
 		if err != nil {
 			return err
 		}
@@ -86,27 +123,4 @@ func init() {
 	for _, domain := range allStorageMapDomains {
 		allStorageMapDomainsSet[domain] = struct{}{}
 	}
-}
-
-func loadAtreeSlabsInStorage(storage *runtime.Storage, registers registers.Registers) error {
-
-	return registers.ForEach(func(owner string, key string, value []byte) error {
-
-		if !flow.IsSlabIndexKey(key) {
-			return nil
-		}
-
-		storageID := atree.NewSlabID(
-			atree.Address([]byte(owner)),
-			atree.SlabIndex([]byte(key[1:])),
-		)
-
-		// Retrieve the slab
-		_, _, err := storage.Retrieve(storageID)
-		if err != nil {
-			return fmt.Errorf("failed to retrieve slab %s: %w", storageID, err)
-		}
-
-		return nil
-	})
 }

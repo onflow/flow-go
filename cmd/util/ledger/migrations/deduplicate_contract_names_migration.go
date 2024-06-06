@@ -9,8 +9,7 @@ import (
 
 	"github.com/onflow/cadence/runtime/common"
 
-	"github.com/onflow/flow-go/ledger"
-	"github.com/onflow/flow-go/ledger/common/convert"
+	"github.com/onflow/flow-go/cmd/util/ledger/util/registers"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -28,7 +27,7 @@ func (d *DeduplicateContractNamesMigration) Close() error {
 
 func (d *DeduplicateContractNamesMigration) InitMigration(
 	log zerolog.Logger,
-	_ []*ledger.Payload,
+	_ *registers.ByAccount,
 	_ int,
 ) error {
 	d.log = log.
@@ -42,45 +41,25 @@ func (d *DeduplicateContractNamesMigration) InitMigration(
 func (d *DeduplicateContractNamesMigration) MigrateAccount(
 	ctx context.Context,
 	address common.Address,
-	payloads []*ledger.Payload,
-) ([]*ledger.Payload, error) {
+	accountRegisters *registers.AccountRegisters,
+) error {
 	flowAddress := flow.ConvertAddress(address)
-	contractNamesID := flow.ContractNamesRegisterID(flowAddress)
+	owner := flow.AddressToRegisterOwner(flowAddress)
 
-	var contractNamesPayload *ledger.Payload
-	contractNamesPayloadIndex := 0
-	for i, payload := range payloads {
-		key, err := payload.Key()
-		if err != nil {
-			return nil, err
-		}
-		id, err := convert.LedgerKeyToRegisterID(key)
-		if err != nil {
-			return nil, err
-		}
-		if id == contractNamesID {
-			contractNamesPayload = payload
-			contractNamesPayloadIndex = i
-			break
-		}
-	}
-	if contractNamesPayload == nil {
-		return payloads, nil
+	value, err := accountRegisters.Get(owner, flow.ContractNamesKey)
+	if err != nil {
+		return err
 	}
 
-	value := contractNamesPayload.Value()
 	if len(value) == 0 {
-		// Remove the empty payload
-		copy(payloads[contractNamesPayloadIndex:], payloads[contractNamesPayloadIndex+1:])
-		payloads = payloads[:len(payloads)-1]
-
-		return payloads, nil
+		// Remove the empty payload if exists
+		return accountRegisters.Set(owner, flow.ContractNamesKey, nil)
 	}
 
 	var contractNames []string
-	err := cbor.Unmarshal(value, &contractNames)
+	err = cbor.Unmarshal(value, &contractNames)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get contract names: %w", err)
+		return fmt.Errorf("failed to get contract names: %w", err)
 	}
 
 	var foundDuplicate bool
@@ -91,7 +70,7 @@ func (d *DeduplicateContractNamesMigration) MigrateAccount(
 			if contractNames[i-1] > contractNames[i] {
 				// this is not a valid state and we should fail.
 				// Contract names must be sorted by definition.
-				return nil, fmt.Errorf(
+				return fmt.Errorf(
 					"contract names for account %s are not sorted: %s",
 					address.Hex(),
 					contractNames,
@@ -109,7 +88,7 @@ func (d *DeduplicateContractNamesMigration) MigrateAccount(
 	}
 
 	if !foundDuplicate {
-		return payloads, nil
+		return nil
 	}
 
 	d.log.Info().
@@ -119,15 +98,14 @@ func (d *DeduplicateContractNamesMigration) MigrateAccount(
 
 	newContractNames, err := cbor.Marshal(contractNames)
 	if err != nil {
-		return nil, fmt.Errorf(
+		return fmt.Errorf(
 			"cannot encode contract names: %s",
 			contractNames,
 		)
 	}
 
-	payloads[contractNamesPayloadIndex] = ledger.NewPayload(convert.RegisterIDToLedgerKey(contractNamesID), newContractNames)
-	return payloads, nil
-
+	// Set deduplicated contract names
+	return accountRegisters.Set(owner, flow.ContractNamesKey, newContractNames)
 }
 
 var _ AccountBasedMigration = &DeduplicateContractNamesMigration{}

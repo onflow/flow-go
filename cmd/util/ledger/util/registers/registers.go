@@ -19,6 +19,7 @@ type Registers interface {
 	Set(owner string, key string, value []byte) error
 	ForEach(f ForEachCallback) error
 	Payloads() []*ledger.Payload
+	Count() int
 }
 
 // ByAccount represents the registers of all accounts

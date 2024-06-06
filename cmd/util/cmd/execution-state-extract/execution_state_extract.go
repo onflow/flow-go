@@ -7,13 +7,15 @@ import (
 	"os"
 	"time"
 
-	"github.com/onflow/cadence/runtime/common"
 	"github.com/rs/zerolog"
 	"go.uber.org/atomic"
+
+	"github.com/onflow/cadence/runtime/common"
 
 	migrators "github.com/onflow/flow-go/cmd/util/ledger/migrations"
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
+	"github.com/onflow/flow-go/cmd/util/ledger/util/registers"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/hash"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
@@ -93,17 +95,18 @@ func extractExecutionState(
 	migrations := newMigrations(
 		log,
 		dir,
-		nWorker,
 		runMigrations,
 		fixSlabsWithBrokenReferences,
 	)
+
+	migration := newMigration(log, migrations, nWorker)
 
 	newState := ledger.State(targetHash)
 
 	// migrate the trie if there are migrations
 	newTrie, err := led.MigrateAt(
 		newState,
-		migrations,
+		[]ledger.Migration{migration},
 		complete.DefaultPathFinderVersion,
 	)
 
@@ -233,12 +236,13 @@ func extractExecutionStateFromPayloads(
 	migrations := newMigrations(
 		log,
 		dir,
-		nWorker,
 		runMigrations,
 		fixSlabsWithBrokenReferences,
 	)
 
-	payloads, err = migratePayloads(log, payloads, migrations)
+	migration := newMigration(log, migrations, nWorker)
+
+	payloads, err = migratePayloads(log, payloads, []ledger.Migration{migration})
 	if err != nil {
 		return err
 	}
@@ -363,11 +367,11 @@ func createTrieFromPayloads(logger zerolog.Logger, payloads []*ledger.Payload) (
 func newMigrations(
 	log zerolog.Logger,
 	outputDir string,
-	nWorker int, // number of concurrent worker to migation payloads
 	runMigrations bool,
 	fixSlabsWithBrokenReferences bool,
-) []ledger.Migration {
+) []migrators.AccountBasedMigration {
 	if runMigrations {
+
 		rwf := reporters.NewReportFileWriterFactory(outputDir, log)
 
 		var accountBasedMigrations []migrators.AccountBasedMigration
@@ -407,17 +411,59 @@ func newMigrations(
 			&migrators.DeduplicateContractNamesMigration{},
 
 			// This will fix storage used discrepancies caused by the previous migrations
-			&migrators.AccountUsageMigrator{},
+			&migrators.AccountUsageMigration{},
 		)
 
-		return []ledger.Migration{
-			migrators.CreateAccountBasedMigration(
-				log,
-				nWorker,
-				accountBasedMigrations,
-			),
-		}
+		return accountBasedMigrations
 	}
-
 	return nil
+}
+
+func newMigration(
+	logger zerolog.Logger,
+	migrations []migrators.AccountBasedMigration,
+	nWorker int,
+) ledger.Migration {
+	return func(payloads []*ledger.Payload) ([]*ledger.Payload, error) {
+		if len(migrations) == 0 {
+			return payloads, nil
+		}
+
+		payloadCount := len(payloads)
+
+		logger.Info().Msgf(
+			"creating registers from grouped payloads (%d) ...",
+			payloadCount,
+		)
+
+		registersByAccount, err := registers.NewByAccountFromPayloads(payloads)
+		if err != nil {
+			return nil, err
+		}
+
+		logger.Info().Msgf(
+			"created registers from %d payloads (%d accounts)",
+			payloadCount,
+			registersByAccount.AccountCount(),
+		)
+
+		err = migrators.MigrateByAccount(
+			logger,
+			nWorker,
+			registersByAccount,
+			migrations,
+		)
+		if err != nil {
+			logger.Error().Err(err).Msgf("failed to migrate")
+			return nil, err
+		}
+
+		logger.Info().Msg("creating new payloads from registers ...")
+
+		newPayloads := registersByAccount.Payloads()
+
+		logger.Info().Msgf("created new payloads (%d) from registers", len(newPayloads))
+
+		return newPayloads, nil
+	}
 }

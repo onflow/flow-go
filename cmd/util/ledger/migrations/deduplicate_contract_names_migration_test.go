@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/migrations"
+	"github.com/onflow/flow-go/cmd/util/ledger/util/registers"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/convert"
@@ -67,14 +68,18 @@ func TestDeduplicateContractNamesMigration(t *testing.T) {
 	}
 
 	t.Run("no contract names", func(t *testing.T) {
-		payloads, err := migration.MigrateAccount(ctx, address,
-			[]*ledger.Payload{
-				accountStatusPayload(address),
-			},
-		)
+		payloads := []*ledger.Payload{
+			accountStatusPayload(address),
+		}
 
+		accountRegisters, err := registers.NewAccountRegistersFromPayloads(string(address[:]), payloads)
 		require.NoError(t, err)
-		require.Equal(t, 1, len(payloads))
+
+		err = migration.MigrateAccount(ctx, address, accountRegisters)
+		require.NoError(t, err)
+
+		newPayloads := accountRegisters.Payloads()
+		require.Equal(t, 1, len(newPayloads))
 	})
 
 	t.Run("one contract", func(t *testing.T) {
@@ -82,17 +87,21 @@ func TestDeduplicateContractNamesMigration(t *testing.T) {
 		newContractNames, err := cbor.Marshal(contractNames)
 		require.NoError(t, err)
 
-		payloads, err := migration.MigrateAccount(ctx, address,
-			[]*ledger.Payload{
-				accountStatusPayload(address),
-				contractNamesPayload(newContractNames),
-			},
-		)
+		payloads := []*ledger.Payload{
+			accountStatusPayload(address),
+			contractNamesPayload(newContractNames),
+		}
 
+		accountRegisters, err := registers.NewAccountRegistersFromPayloads(string(address[:]), payloads)
 		require.NoError(t, err)
-		require.Equal(t, 2, len(payloads))
 
-		requireContractNames(payloads, func(contracts []string) {
+		err = migration.MigrateAccount(ctx, address, accountRegisters)
+		require.NoError(t, err)
+
+		newPayloads := accountRegisters.Payloads()
+		require.Equal(t, 2, len(newPayloads))
+
+		requireContractNames(newPayloads, func(contracts []string) {
 			require.Equal(t, 1, len(contracts))
 			require.Equal(t, "test", contracts[0])
 		})
@@ -103,17 +112,21 @@ func TestDeduplicateContractNamesMigration(t *testing.T) {
 		newContractNames, err := cbor.Marshal(contractNames)
 		require.NoError(t, err)
 
-		payloads, err := migration.MigrateAccount(ctx, address,
-			[]*ledger.Payload{
-				accountStatusPayload(address),
-				contractNamesPayload(newContractNames),
-			},
-		)
+		payloads := []*ledger.Payload{
+			accountStatusPayload(address),
+			contractNamesPayload(newContractNames),
+		}
 
+		accountRegisters, err := registers.NewAccountRegistersFromPayloads(string(address[:]), payloads)
 		require.NoError(t, err)
-		require.Equal(t, 2, len(payloads))
 
-		requireContractNames(payloads, func(contracts []string) {
+		err = migration.MigrateAccount(ctx, address, accountRegisters)
+		require.NoError(t, err)
+
+		newPayloads := accountRegisters.Payloads()
+		require.Equal(t, 2, len(newPayloads))
+
+		requireContractNames(newPayloads, func(contracts []string) {
 			require.Equal(t, 2, len(contracts))
 			require.Equal(t, "test", contracts[0])
 			require.Equal(t, "test2", contracts[1])
@@ -125,17 +138,21 @@ func TestDeduplicateContractNamesMigration(t *testing.T) {
 		newContractNames, err := cbor.Marshal(contractNames)
 		require.NoError(t, err)
 
-		payloads, err := migration.MigrateAccount(ctx, address,
-			[]*ledger.Payload{
-				accountStatusPayload(address),
-				contractNamesPayload(newContractNames),
-			},
-		)
+		payloads := []*ledger.Payload{
+			accountStatusPayload(address),
+			contractNamesPayload(newContractNames),
+		}
 
+		accountRegisters, err := registers.NewAccountRegistersFromPayloads(string(address[:]), payloads)
 		require.NoError(t, err)
-		require.Equal(t, 2, len(payloads))
 
-		requireContractNames(payloads, func(contracts []string) {
+		err = migration.MigrateAccount(ctx, address, accountRegisters)
+		require.NoError(t, err)
+
+		newPayloads := accountRegisters.Payloads()
+		require.Equal(t, 2, len(newPayloads))
+
+		requireContractNames(newPayloads, func(contracts []string) {
 			require.Equal(t, 1, len(contracts))
 			require.Equal(t, "test", contracts[0])
 		})
@@ -146,13 +163,15 @@ func TestDeduplicateContractNamesMigration(t *testing.T) {
 		newContractNames, err := cbor.Marshal(contractNames)
 		require.NoError(t, err)
 
-		_, err = migration.MigrateAccount(ctx, address,
-			[]*ledger.Payload{
-				accountStatusPayload(address),
-				contractNamesPayload(newContractNames),
-			},
-		)
+		payloads := []*ledger.Payload{
+			accountStatusPayload(address),
+			contractNamesPayload(newContractNames),
+		}
 
+		accountRegisters, err := registers.NewAccountRegistersFromPayloads(string(address[:]), payloads)
+		require.NoError(t, err)
+
+		err = migration.MigrateAccount(ctx, address, accountRegisters)
 		require.Error(t, err)
 	})
 
@@ -161,17 +180,21 @@ func TestDeduplicateContractNamesMigration(t *testing.T) {
 		newContractNames, err := cbor.Marshal(contractNames)
 		require.NoError(t, err)
 
-		payloads, err := migration.MigrateAccount(ctx, address,
-			[]*ledger.Payload{
-				accountStatusPayload(address),
-				contractNamesPayload(newContractNames),
-			},
-		)
+		payloads := []*ledger.Payload{
+			accountStatusPayload(address),
+			contractNamesPayload(newContractNames),
+		}
 
+		accountRegisters, err := registers.NewAccountRegistersFromPayloads(string(address[:]), payloads)
 		require.NoError(t, err)
-		require.Equal(t, 2, len(payloads))
 
-		requireContractNames(payloads, func(contracts []string) {
+		err = migration.MigrateAccount(ctx, address, accountRegisters)
+		require.NoError(t, err)
+
+		newPayloads := accountRegisters.Payloads()
+		require.Equal(t, 2, len(newPayloads))
+
+		requireContractNames(newPayloads, func(contracts []string) {
 			require.Equal(t, 3, len(contracts))
 			require.Equal(t, "test", contracts[0])
 			require.Equal(t, "test2", contracts[1])
@@ -198,17 +221,21 @@ func TestDeduplicateContractNamesMigration(t *testing.T) {
 		newContractNames, err := cbor.Marshal(contractNames)
 		require.NoError(t, err)
 
-		payloads, err := migration.MigrateAccount(ctx, address,
-			[]*ledger.Payload{
-				accountStatusPayload(address),
-				contractNamesPayload(newContractNames),
-			},
-		)
+		payloads := []*ledger.Payload{
+			accountStatusPayload(address),
+			contractNamesPayload(newContractNames),
+		}
 
+		accountRegisters, err := registers.NewAccountRegistersFromPayloads(string(address[:]), payloads)
 		require.NoError(t, err)
-		require.Equal(t, 2, len(payloads))
 
-		requireContractNames(payloads, func(contracts []string) {
+		err = migration.MigrateAccount(ctx, address, accountRegisters)
+		require.NoError(t, err)
+
+		newPayloads := accountRegisters.Payloads()
+		require.Equal(t, 2, len(newPayloads))
+
+		requireContractNames(newPayloads, func(contracts []string) {
 			require.Equal(t, uniqueContracts, len(contracts))
 		})
 	})
