@@ -27,7 +27,7 @@ type BaseStateMachineSuite struct {
 }
 
 func (s *BaseStateMachineSuite) SetupTest() {
-	s.parentProtocolState = unittest.EpochStateFixture(func(entry *flow.RichProtocolStateEntry) {
+	s.parentProtocolState = unittest.EpochStateFixture(func(entry *flow.RichEpochProtocolStateEntry) {
 		// have a fixed boundary for the current epoch
 		entry.CurrentEpochSetup.FinalView = 5_000
 		entry.CurrentEpoch.SetupID = entry.CurrentEpochSetup.ID()

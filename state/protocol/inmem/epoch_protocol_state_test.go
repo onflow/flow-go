@@ -93,7 +93,7 @@ func TestEpochProtocolStateAdapter(t *testing.T) {
 	})
 	t.Run("invalid-state-transition-attempted", func(t *testing.T) {
 		entry := unittest.EpochStateFixture(func(entry *flow.RichEpochProtocolStateEntry) {
-			entry.InvalidEpochTransitionAttempted = true
+			entry.EpochFallbackTriggered = true
 		})
 		adapter := inmem.NewEpochProtocolStateAdapter(entry, globalParams)
 		assert.True(t, adapter.EpochFallbackTriggered())
