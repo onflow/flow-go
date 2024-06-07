@@ -91,13 +91,33 @@ func (m *FallbackStateMachine) extendCurrentEpoch(epochExtension flow.EpochExten
 
 // ProcessEpochSetup processes epoch setup service events, for epoch fallback we are ignoring this event.
 func (m *FallbackStateMachine) ProcessEpochSetup(_ *flow.EpochSetup) (bool, error) {
-	// won't process if we are in fallback mode
+	// Note that we are dropping _all_ EpochSetup events sealed by this block. As long as we are in EFM, this is
+	// the natural behaviour, as we have given up on following the instructions from the Epoch Smart Contracts.
+	//
+	// CAUTION: This leaves an edge case where, a valid `EpochRecover` event followed by an `EpochSetup` is sealed in the
+	// same block. Conceptually, this is a clear indication that the Epoch Smart contract is doing something unexpect. The
+	// reason is that the block with the `EpochRecover` event is at least `EpochCommitSafetyThreshold` views before the
+	// switchover to the recovery epoch. Otherwise, the FallbackStateMachine constructor would have added an extension to
+	// the current epoch. Axiomatically, the `EpochCommitSafetyThreshold` is large enough that we guarantee finalization of
+	// the epoch configuration (in this case the configuration of the recovery epoch provided by the `EpochRecover` event)
+	// _before_ the recovery epoch starts. For finalization, the block sealing the `EpochRecover` event must have descendants
+	// in the same epoch, i.e. an EpochSetup cannot occur in the same block as the `EpochRecover` event.
+	//
+	// Nevertheless, we ignore such an EpochSetup event here, despite knowing that it is an invalid input from the smart contract.
+	// If the epoch smart contract continues to behave unexpectedly, we will just re-enter EFM in a subsequent block. Though,
+	// if the smart contract happens to behave as expected for all subsequent blocks and manages to coordinate epoch transitions
+	// from here on, that is also acceptable.
+	// Essentially, the block sealing a valid EpochRecover event is a grace period, where we still tolerate unexpected events from
+	// the Epoch Smart Contract. This significantly simplifies the implementation of the FallbackStateMachine without impacting the
+	// robustness of the overall EFM mechanics.
 	return false, nil
 }
 
 // ProcessEpochCommit processes epoch commit service events, for epoch fallback we are ignoring this event.
 func (m *FallbackStateMachine) ProcessEpochCommit(_ *flow.EpochCommit) (bool, error) {
-	// won't process if we are in fallback mode
+	// We ignore _all_ EpochCommit events here. This includes scenarios where a valid `EpochRecover` event is sealed in
+	// a block followed by `EpochSetup` and/or `EpochCommit` events-- technically, clear indications that the Epoch Smart
+	// contract is doing something unexpect. For a detailed explanation why this is safe, see `ProcessEpochSetup` above.
 	return false, nil
 }
 
@@ -108,23 +128,19 @@ func (m *FallbackStateMachine) ProcessEpochCommit(_ *flow.EpochCommit) (bool, er
 // protocol can proceed following the happy path. Therefore, we set `EpochFallbackTriggered` back to false.
 //
 // The boolean return indicates if the input event triggered a transition in the state machine or not.
-// For the EpochRecover event, we return false if and only if there is an error. The reason is that
-// either the `EpochRecover` event is rejected (leading to `InvalidServiceEventError`) or there is an
-// exception processing the event. Otherwise, an `EpochRecover` event must always lead to a state change.
-// TODO(EFM, #6018): this function needs to be updated to handle errors internally.
+// For the EpochRecover event, we never return an error to ensure that FallbackStateMachine is robust against any input and doesn't
+// halt the chain even if the Epoch Smart Contract misbehaves. This is a safe choice since the error can only originate from
+// an invalid EpochRecover event, in this case we just ignore the event and continue with the fallback mode.
+//
+// CAUTION: Since EpochSetup and EpochCommit are ignored by the FallbackStateMachine, we don't care about such cases where we are processing
+// any amount of setup and commit events together with epoch recover event in the same block.
+// This leaves us with a scenario where we are processing multiple EpochRecover events in the same block.
+// This is an indication that the Epoch Smart contract is doing something unexpect. In this case, we have a simple rule:
+// subsequent EpochRecover events are accepted iff they are identical to the first EpochRecover event in the block.
 func (m *FallbackStateMachine) ProcessEpochRecover(epochRecover *flow.EpochRecover) (bool, error) {
-	if m.view+m.params.EpochCommitSafetyThreshold() >= m.parentState.CurrentEpochFinalView() {
-		return false, protocol.NewInvalidServiceEventErrorf("could not process epoch recover, safety threshold reached")
-	}
-
-	err := protocol.IsValidExtendingEpochSetup(&epochRecover.EpochSetup, m.parentState)
+	err := m.ensureValidEpochRecover(epochRecover)
 	if err != nil {
-		return false, fmt.Errorf("invalid epoch recovery event(setup): %w", err)
-	}
-
-	err = protocol.IsValidEpochCommit(&epochRecover.EpochCommit, &epochRecover.EpochSetup)
-	if err != nil {
-		return false, fmt.Errorf("invalid epoch recovery event(commit): %w", err)
+		return false, nil
 	}
 
 	nextEpochParticipants, err := buildNextEpochActiveParticipants(
@@ -132,15 +148,43 @@ func (m *FallbackStateMachine) ProcessEpochRecover(epochRecover *flow.EpochRecov
 		m.parentState.CurrentEpochSetup,
 		&epochRecover.EpochSetup)
 	if err != nil {
-		return false, fmt.Errorf("failed to build next epoch active participants: %w", err)
+		return false, nil
 	}
 
-	m.state.NextEpoch = &flow.EpochStateContainer{
-		SetupID:          epochRecover.EpochSetup.ID(),
-		CommitID:         epochRecover.EpochCommit.ID(),
-		ActiveIdentities: nextEpochParticipants,
-		EpochExtensions:  nil,
+	if nextEpoch := m.state.NextEpoch; nextEpoch != nil {
+		// accept iff the EpochRecover is the same as the one we have already recovered.
+		if nextEpoch.SetupID != epochRecover.EpochSetup.ID() ||
+			nextEpoch.CommitID != epochRecover.EpochCommit.ID() {
+			return false, nil
+		}
+	} else {
+		// setup next epoch if there is none
+		m.state.NextEpoch = &flow.EpochStateContainer{
+			SetupID:          epochRecover.EpochSetup.ID(),
+			CommitID:         epochRecover.EpochCommit.ID(),
+			ActiveIdentities: nextEpochParticipants,
+			EpochExtensions:  nil,
+		}
 	}
+	// if we have processed a valid EpochRecover event, we should exit EFM.
 	m.state.EpochFallbackTriggered = false
 	return true, nil
+}
+
+// ensureValidEpochRecover performs validity checks on the epoch recover event.
+// Expected errors during normal operations:
+//   - `protocol.InvalidServiceEventError` - if the service event is invalid or is not a valid state transition for the current protocol state.
+func (m *FallbackStateMachine) ensureValidEpochRecover(epochRecover *flow.EpochRecover) error {
+	if m.view+m.params.EpochCommitSafetyThreshold() >= m.parentState.CurrentEpochFinalView() {
+		return protocol.NewInvalidServiceEventErrorf("could not process epoch recover, safety threshold reached")
+	}
+	err := protocol.IsValidExtendingEpochSetup(&epochRecover.EpochSetup, m.parentState)
+	if err != nil {
+		return fmt.Errorf("invalid epoch recovery event(setup): %w", err)
+	}
+	err = protocol.IsValidEpochCommit(&epochRecover.EpochCommit, &epochRecover.EpochSetup)
+	if err != nil {
+		return fmt.Errorf("invalid epoch recovery event(commit): %w", err)
+	}
+	return nil
 }
