@@ -134,10 +134,10 @@ func (s *ProtocolStateMachineSuite) TestBuild() {
 	require.Equal(s.T(), s.parentProtocolState.ID(), s.stateMachine.ParentState().ID(), "should not modify parent protocol state")
 }
 
-// TestCreateStateMachineAfterInvalidStateTransitionAttempted tests if creating state machine after observing invalid state transition
+// TestCreateStateMachineAfterEFMTriggered tests if creating state machine after observing invalid state transition
 // results in error .
-func (s *ProtocolStateMachineSuite) TestCreateStateMachineAfterInvalidStateTransitionAttempted() {
-	s.parentProtocolState.InvalidEpochTransitionAttempted = true
+func (s *ProtocolStateMachineSuite) TestCreateStateMachineAfterEFMTriggered() {
+	s.parentProtocolState.EpochFallbackTriggered = true
 	var err error
 	// create new HappyPathStateMachine with next epoch information
 	s.stateMachine, err = NewHappyPathStateMachine(s.candidate.View, s.parentProtocolState.Copy())
@@ -513,4 +513,20 @@ func (s *ProtocolStateMachineSuite) TestEpochSetupAfterIdentityChange() {
 		_, foundInNextEpoch := nextEpochLookup[updated.NodeID]
 		require.False(s.T(), foundInNextEpoch)
 	}
+}
+
+// TestProcessEpochRecover ensures that HappyPathStateMachine returns a sentinel error when processing an EpochRecover event.
+func (s *ProtocolStateMachineSuite) TestProcessEpochRecover() {
+	nextEpochParticipants := s.parentProtocolState.CurrentEpochIdentityTable.Copy()
+	epochRecover := unittest.EpochRecoverFixture(func(setup *flow.EpochSetup) {
+		setup.Participants = nextEpochParticipants.ToSkeleton()
+		setup.Assignments = unittest.ClusterAssignment(1, nextEpochParticipants.ToSkeleton())
+		setup.Counter = s.parentProtocolState.CurrentEpochSetup.Counter + 1
+		setup.FirstView = s.parentProtocolState.CurrentEpochSetup.FinalView + 1
+		setup.FinalView = setup.FirstView + 10_000
+	})
+	processed, err := s.stateMachine.ProcessEpochRecover(epochRecover)
+	require.Error(s.T(), err)
+	require.True(s.T(), protocol.IsInvalidServiceEventError(err))
+	require.False(s.T(), processed)
 }

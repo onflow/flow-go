@@ -101,6 +101,30 @@ func (_m *StateMachine) ProcessEpochCommit(epochCommit *flow.EpochCommit) (bool,
 	return r0, r1
 }
 
+// ProcessEpochRecover provides a mock function with given fields: epochRecover
+func (_m *StateMachine) ProcessEpochRecover(epochRecover *flow.EpochRecover) (bool, error) {
+	ret := _m.Called(epochRecover)
+
+	var r0 bool
+	var r1 error
+	if rf, ok := ret.Get(0).(func(*flow.EpochRecover) (bool, error)); ok {
+		return rf(epochRecover)
+	}
+	if rf, ok := ret.Get(0).(func(*flow.EpochRecover) bool); ok {
+		r0 = rf(epochRecover)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	if rf, ok := ret.Get(1).(func(*flow.EpochRecover) error); ok {
+		r1 = rf(epochRecover)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // ProcessEpochSetup provides a mock function with given fields: epochSetup
 func (_m *StateMachine) ProcessEpochSetup(epochSetup *flow.EpochSetup) (bool, error) {
 	ret := _m.Called(epochSetup)

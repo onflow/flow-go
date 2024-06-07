@@ -28,7 +28,6 @@ import (
 	pbadger "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/events"
 	"github.com/onflow/flow-go/state/protocol/util"
-	"github.com/onflow/flow-go/storage/badger/operation"
 	storageutil "github.com/onflow/flow-go/storage/util"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -90,15 +89,6 @@ func TestFollowerHappyPath(t *testing.T) {
 		rootProtocolState, err := rootSnapshot.ProtocolState()
 		require.NoError(t, err)
 		rootProtocolStateID := rootProtocolState.ID()
-
-		// Hack EFM.
-		// Since root snapshot is created with 1000 views for first epoch, we will forcefully enter EFM to avoid errors
-		// related to epoch transitions.
-		db.NewTransaction(true)
-		err = db.Update(func(txn *badger.Txn) error {
-			return operation.SetEpochEmergencyFallbackTriggered(rootHeader.ID())(txn)
-		})
-		require.NoError(t, err)
 
 		consensusConsumer := pubsub.NewFollowerDistributor()
 		// use real consensus modules

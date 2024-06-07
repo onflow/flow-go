@@ -264,7 +264,7 @@ func ProtocolStateFromEpochServiceEvents(setup *flow.EpochSetup, commit *flow.Ep
 			CommitID:         commit.ID(),
 			ActiveIdentities: identities,
 		},
-		NextEpoch:                       nil,
-		InvalidEpochTransitionAttempted: false,
+		NextEpoch:              nil,
+		EpochFallbackTriggered: false,
 	}
 }

@@ -290,8 +290,10 @@ func AsSlashable[T any](msg T) flow.Slashable[T] {
 	return slashable
 }
 
-func ReceiptAndSealForBlock(block *flow.Block) (*flow.ExecutionReceipt, *flow.Seal) {
+// ReceiptAndSealForBlock returns a receipt with service events and a seal for them for a given block.
+func ReceiptAndSealForBlock(block *flow.Block, serviceEvents ...flow.ServiceEvent) (*flow.ExecutionReceipt, *flow.Seal) {
 	receipt := ReceiptForBlockFixture(block)
+	receipt.ExecutionResult.ServiceEvents = serviceEvents
 	seal := Seal.Fixture(Seal.WithBlock(block.Header), Seal.WithResult(&receipt.ExecutionResult))
 	return receipt, seal
 }
@@ -2101,6 +2103,28 @@ func EpochSetupFixture(opts ...func(setup *flow.EpochSetup)) *flow.EpochSetup {
 	return setup
 }
 
+// EpochRecoverFixture creates a valid EpochRecover with default properties for testing.
+// The default properties for setup part can be overwritten with optional parameter functions.
+// Commit part will be adjusted accordingly.
+func EpochRecoverFixture(opts ...func(setup *flow.EpochSetup)) *flow.EpochRecover {
+	setup := EpochSetupFixture()
+	for _, apply := range opts {
+		apply(setup)
+	}
+
+	commit := EpochCommitFixture(
+		CommitWithCounter(setup.Counter),
+		WithDKGFromParticipants(setup.Participants),
+		WithClusterQCsFromAssignments(setup.Assignments),
+	)
+
+	ev := &flow.EpochRecover{
+		EpochSetup:  *setup,
+		EpochCommit: *commit,
+	}
+	return ev
+}
+
 func IndexFixture() *flow.Index {
 	return &flow.Index{
 		CollectionIDs: IdentifierListFixture(5),
@@ -2668,8 +2692,8 @@ func RootProtocolStateFixture() *flow.RichProtocolStateEntry {
 				CommitID:         currentEpochCommit.ID(),
 				ActiveIdentities: flow.DynamicIdentityEntryListFromIdentities(allIdentities),
 			},
-			InvalidEpochTransitionAttempted: false,
-			NextEpoch:                       nil,
+			EpochFallbackTriggered: false,
+			NextEpoch:              nil,
 		},
 		PreviousEpochSetup:        nil,
 		PreviousEpochCommit:       nil,
@@ -2739,8 +2763,8 @@ func EpochStateFixture(options ...func(*flow.RichProtocolStateEntry)) *flow.Rich
 				CommitID:         prevEpochCommit.ID(),
 				ActiveIdentities: flow.DynamicIdentityEntryListFromIdentities(prevEpochIdentities),
 			},
-			InvalidEpochTransitionAttempted: false,
-			NextEpoch:                       nil,
+			EpochFallbackTriggered: false,
+			NextEpoch:              nil,
 		},
 		PreviousEpochSetup:        prevEpochSetup,
 		PreviousEpochCommit:       prevEpochCommit,

@@ -662,19 +662,19 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 
 	// We update metrics and emit protocol events for epoch state changes when
 	// the block corresponding to the state change is finalized
-	psSnapshot, err := m.protocolState.AtBlockID(blockID)
+	parentEpochStateSnapshot, err := m.protocolState.AtBlockID(header.ParentID)
+	if err != nil {
+		return fmt.Errorf("could not retrieve parent protocol state snapshot: %w", err)
+	}
+	epochStateSnapshot, err := m.protocolState.AtBlockID(blockID)
 	if err != nil {
 		return fmt.Errorf("could not retrieve protocol state snapshot: %w", err)
 	}
-	currentEpochSetup := psSnapshot.EpochSetup()
-	epochFallbackTriggered, err := m.isEpochEmergencyFallbackTriggered()
-	if err != nil {
-		return fmt.Errorf("could not check persisted epoch emergency fallback flag: %w", err)
-	}
+	currentEpochSetup := epochStateSnapshot.EpochSetup()
+	epochFallbackTriggered := epochStateSnapshot.EpochFallbackTriggered()
 
 	// if epoch fallback was not previously triggered, check whether this block triggers it
-	if !epochFallbackTriggered && psSnapshot.InvalidEpochTransitionAttempted() {
-		epochFallbackTriggered = true
+	if epochFallbackTriggered && !parentEpochStateSnapshot.EpochFallbackTriggered() {
 		// emit the protocol event only the first time epoch fallback is triggered
 		events = append(events, m.consumer.EpochEmergencyFallbackTriggered)
 		metrics = append(metrics, m.metrics.EpochEmergencyFallbackTriggered)
@@ -684,11 +684,19 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 	if err != nil {
 		return fmt.Errorf("could not check if block is first of epoch: %w", err)
 	}
+	if isFirstBlockOfEpoch {
+		epochTransitionMetrics, epochTransitionEvents := m.epochTransitionMetricsAndEventsOnBlockFinalized(header, currentEpochSetup)
+		if err != nil {
+			return fmt.Errorf("could not determine epoch transition metrics/events for finalized block: %w", err)
+		}
+		metrics = append(metrics, epochTransitionMetrics...)
+		events = append(events, epochTransitionEvents...)
+	}
 
-	// Determine metric updates and protocol events related to epoch phase
-	// changes and epoch transitions.
+	// Determine metric updates and protocol events related to epoch phase changes and epoch transitions.
 	// If epoch emergency fallback is triggered, the current epoch continues until
 	// the next spork - so skip these updates.
+	// TODO(EFM, #5732, #6013): needs update for EFM recovery
 	if !epochFallbackTriggered {
 		epochPhaseMetrics, epochPhaseEvents, err := m.epochPhaseMetricsAndEventsOnBlockFinalized(block)
 		if err != nil {
@@ -696,15 +704,6 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 		}
 		metrics = append(metrics, epochPhaseMetrics...)
 		events = append(events, epochPhaseEvents...)
-
-		if isFirstBlockOfEpoch {
-			epochTransitionMetrics, epochTransitionEvents := m.epochTransitionMetricsAndEventsOnBlockFinalized(header, psSnapshot.EpochSetup())
-			if err != nil {
-				return fmt.Errorf("could not determine epoch transition metrics/events for finalized block: %w", err)
-			}
-			metrics = append(metrics, epochTransitionMetrics...)
-			events = append(events, epochTransitionEvents...)
-		}
 	}
 
 	// Extract and validate version beacon events from the block seals.
@@ -733,13 +732,7 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 		if err != nil {
 			return fmt.Errorf("could not update sealed height: %w", err)
 		}
-		if epochFallbackTriggered {
-			err = operation.SetEpochEmergencyFallbackTriggered(blockID)(tx)
-			if err != nil {
-				return fmt.Errorf("could not set epoch fallback flag: %w", err)
-			}
-		}
-		if isFirstBlockOfEpoch && !epochFallbackTriggered {
+		if isFirstBlockOfEpoch {
 			err = operation.InsertEpochFirstHeight(currentEpochSetup.Counter, header.Height)(tx)
 			if err != nil {
 				return fmt.Errorf("could not insert epoch first block height: %w", err)
