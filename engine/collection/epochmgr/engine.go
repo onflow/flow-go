@@ -463,7 +463,6 @@ func (e *Engine) onEpochSetupPhaseStarted(ctx irrecoverable.SignalerContext, nex
 	voteProcessId := fmt.Sprintf("epoch-%d-%d", counter, time.Now().UnixNano())
 	ctxWithCancel, cancel := context.WithCancel(ctx)
 	e.trackInProgressVote(voteProcessId, cancel)
-	defer e.removeInProgressVote(voteProcessId)
 
 	err = e.voter.Vote(ctxWithCancel, nextEpoch)
 	if err != nil {
@@ -473,6 +472,7 @@ func (e *Engine) onEpochSetupPhaseStarted(ctx irrecoverable.SignalerContext, nex
 		}
 		ctx.Throw(fmt.Errorf("unexpected failure to submit QC vote for next epoch: %w", err))
 	}
+	e.removeInProgressVote(voteProcessId)
 }
 
 // startEpochComponents starts the components for the given epoch and adds them
@@ -558,12 +558,12 @@ func (e *Engine) removeEpoch(counter uint64) {
 // No errors are expected during normal operation.
 func (e *Engine) activeClusterIDs() (flow.ChainIDList, error) {
 	e.mu.RLock()
-	defer e.mu.RUnlock()
 	clusterIDs := make(flow.ChainIDList, len(e.epochs))
 	for i, epoch := range e.epochs {
 		chainID := epoch.state.Params().ChainID() // cached, does not hit database
 		clusterIDs[i] = chainID
 	}
+	e.mu.RUnlock()
 	return clusterIDs, nil
 }
 
