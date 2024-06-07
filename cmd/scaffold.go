@@ -1330,6 +1330,13 @@ func (fnb *FlowNodeBuilder) initState() error {
 				return fmt.Errorf("failed to read protocol snapshot from disk: %w", err)
 			}
 		}
+		// apply any extra validation steps to the root snapshot prior to bootstrapping
+		if fnb.extraRootSnapshotCheck != nil {
+			err = fnb.extraRootSnapshotCheck(rootSnapshot)
+			if err != nil {
+				return fmt.Errorf("failed validate root snapshot from disk: %w", err)
+			}
+		}
 		// set root snapshot fields
 		if err := fnb.setRootSnapshot(rootSnapshot); err != nil {
 			return err
@@ -1410,14 +1417,6 @@ func (fnb *FlowNodeBuilder) setRootSnapshot(rootSnapshot protocol.Snapshot) erro
 	err = badgerState.IsValidRootSnapshotQCs(rootSnapshot)
 	if err != nil {
 		return fmt.Errorf("failed to validate root snapshot QCs: %w", err)
-	}
-
-	// perform extra checks requested by specific node types
-	if fnb.extraRootSnapshotCheck != nil {
-		err = fnb.extraRootSnapshotCheck(rootSnapshot)
-		if err != nil {
-			return fmt.Errorf("failed to perform extra checks on root snapshot: %w", err)
-		}
 	}
 
 	fnb.RootSnapshot = rootSnapshot
