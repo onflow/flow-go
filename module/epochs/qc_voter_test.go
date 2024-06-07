@@ -122,12 +122,3 @@ func (suite *Suite) TestVoting() {
 	err := suite.voter.Vote(context.Background(), suite.epoch)
 	suite.Assert().NoError(err)
 }
-
-// TestStopVoting should stop in progress voting.
-func (suite *Suite) TestStopVoting() {
-	// call stop voting, on the next call to Vote an error should be returned immediately
-	suite.voter.StopVoting()
-	err := suite.voter.Vote(context.Background(), suite.epoch)
-	suite.Assert().Error(err)
-	suite.Assert().True(epochs.IsQCVoteStoppedError(err), "expected QCVoteStoppedError when StopVoting is called during or before a call to Vote")
-}

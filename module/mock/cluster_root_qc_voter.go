@@ -15,11 +15,6 @@ type ClusterRootQCVoter struct {
 	mock.Mock
 }
 
-// StopVoting provides a mock function with given fields:
-func (_m *ClusterRootQCVoter) StopVoting() {
-	_m.Called()
-}
-
 // Vote provides a mock function with given fields: _a0, _a1
 func (_m *ClusterRootQCVoter) Vote(_a0 context.Context, _a1 protocol.Epoch) error {
 	ret := _m.Called(_a0, _a1)
