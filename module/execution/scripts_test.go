@@ -16,6 +16,7 @@ import (
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/rs/zerolog"
 	mocks "github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/engine/execution/computation/query"
@@ -134,27 +135,26 @@ func (s *scriptTestSuite) TestGetAccount() {
 }
 
 func (s *scriptTestSuite) TestGetAccountBalance() {
-	s.Run("Get Account Balance", func() {
-		address := s.createAccount()
+	address := s.createAccount()
+	var transferAmount uint64 = 100000000
+	s.transferTokens(address, transferAmount)
+	balance, err := s.scripts.GetAccountBalance(context.Background(), address, s.height)
+	s.Require().NoError(err)
+	s.Require().Equal(transferAmount, balance)
+}
 
-		//txBody := transferTokensTx(s.chain).
-		//	AddArgument(jsoncdc.MustEncode(cadence.UFix64(100_000_000))).
-		//	AddArgument(jsoncdc.MustEncode(cadence.Address(address))).
-		//	AddAuthorizer(s.chain.ServiceAddress())
-		//
-		//executionSnapshot, _, err := s.vm.Run(
-		//	s.vmCtx,
-		//	fvm.Transaction(txBody, 0),
-		//	s.snapshot,
-		//)
-		//s.Require().NoError(err)
-		//
-		//s.snapshot = s.snapshot.Append(executionSnapshot)
+func (s *scriptTestSuite) TestGetAccountKeys() {
+	address := s.createAccount()
+	publicKey := s.addAccountKey(address, accountKeyAPIVersionV2)
 
-		balance, err := s.scripts.GetAccountBalance(context.Background(), address, s.height)
-		s.Require().NoError(err)
-		s.Require().Equal(100_000_000, balance)
-	})
+	accountKeys, err := s.scripts.GetAccountKeys(context.Background(), address, s.height)
+	s.Require().NoError(err)
+	s.Assert().Equal(1, len(accountKeys))
+	s.Assert().Equal(publicKey.PublicKey, accountKeys[0].PublicKey)
+	s.Assert().Equal(publicKey.SignAlgo, accountKeys[0].SignAlgo)
+	s.Assert().Equal(publicKey.HashAlgo, accountKeys[0].HashAlgo)
+	s.Assert().Equal(publicKey.Weight, accountKeys[0].Weight)
+
 }
 
 func (s *scriptTestSuite) SetupTest() {
@@ -282,33 +282,110 @@ func (s *scriptTestSuite) createAccount() flow.Address {
 	data, err := ccf.Decode(nil, accountCreatedEvents[0].Payload)
 	s.Require().NoError(err)
 
-	////////////////////////////////////////
-	txBody = transferTokensTx(s.chain).
-		AddArgument(jsoncdc.MustEncode(cadence.UFix64(100_000_000))).
-		AddArgument(jsoncdc.MustEncode(cadence.Address(flow.ConvertAddress(
-			cadence.SearchFieldByName(
-				data.(cadence.Event),
-				stdlib.AccountEventAddressParameter.Identifier,
-			).(cadence.Address),
-		)))).
-		AddAuthorizer(s.chain.ServiceAddress())
-
-	executionSnapshot, _, err = s.vm.Run(
-		s.vmCtx,
-		fvm.Transaction(txBody, 0),
-		s.snapshot,
-	)
-	s.Require().NoError(err)
-
-	s.snapshot = s.snapshot.Append(executionSnapshot)
-	//////////////////////////////////////////
-
 	return flow.ConvertAddress(
 		cadence.SearchFieldByName(
 			data.(cadence.Event),
 			stdlib.AccountEventAddressParameter.Identifier,
 		).(cadence.Address),
 	)
+}
+
+func (s *scriptTestSuite) transferTokens(accountAddress flow.Address, amount uint64) {
+	transferTx := transferTokensTx(s.chain).
+		AddArgument(jsoncdc.MustEncode(cadence.UFix64(amount))).
+		AddArgument(jsoncdc.MustEncode(cadence.Address(accountAddress))).
+		AddAuthorizer(s.chain.ServiceAddress())
+
+	executionSnapshot, _, err := s.vm.Run(
+		s.vmCtx,
+		fvm.Transaction(transferTx, 0),
+		s.snapshot,
+	)
+	s.Require().NoError(err)
+
+	s.height++
+	err = s.registerIndex.Store(executionSnapshot.UpdatedRegisters(), s.height)
+	s.Require().NoError(err)
+
+	s.snapshot = s.snapshot.Append(executionSnapshot)
+}
+
+type accountKeyAPIVersion string
+
+const (
+	accountKeyAPIVersionV1 accountKeyAPIVersion = "V1"
+	accountKeyAPIVersionV2 accountKeyAPIVersion = "V2"
+)
+
+func (s *scriptTestSuite) addAccountKey(
+	accountAddress flow.Address,
+	apiVersion accountKeyAPIVersion,
+) flow.AccountPublicKey {
+	const addAccountKeyTransaction = `
+transaction(key: [UInt8]) {
+  prepare(signer: auth(AddKey) &Account) {
+	let publicKey = PublicKey(
+		publicKey: key,
+		signatureAlgorithm: SignatureAlgorithm.ECDSA_P256
+	 )
+    signer.keys.add(
+		publicKey: publicKey,
+		hashAlgorithm: HashAlgorithm.SHA3_256,
+		weight: 1000.0
+	)
+  }
+}
+`
+	privateKey, err := unittest.AccountKeyDefaultFixture()
+	s.Require().NoError(err)
+
+	publicKey, encodedCadencePublicKey := newAccountKey(s.T(), privateKey, apiVersion)
+
+	txBody := flow.NewTransactionBody().
+		SetScript([]byte(addAccountKeyTransaction)).
+		AddArgument(encodedCadencePublicKey).
+		AddAuthorizer(accountAddress)
+
+	executionSnapshot, _, err := s.vm.Run(
+		s.vmCtx,
+		fvm.Transaction(txBody, 0),
+		s.snapshot,
+	)
+	s.Require().NoError(err)
+
+	s.height++
+	err = s.registerIndex.Store(executionSnapshot.UpdatedRegisters(), s.height)
+	s.Require().NoError(err)
+
+	s.snapshot = s.snapshot.Append(executionSnapshot)
+
+	return publicKey
+}
+
+func newAccountKey(
+	tb testing.TB,
+	privateKey *flow.AccountPrivateKey,
+	apiVersion accountKeyAPIVersion,
+) (
+	publicKey flow.AccountPublicKey,
+	encodedCadencePublicKey []byte,
+) {
+	publicKey = privateKey.PublicKey(fvm.AccountKeyWeightThreshold)
+
+	var publicKeyBytes []byte
+	if apiVersion == accountKeyAPIVersionV1 {
+		var err error
+		publicKeyBytes, err = flow.EncodeRuntimeAccountPublicKey(publicKey)
+		require.NoError(tb, err)
+	} else {
+		publicKeyBytes = publicKey.PublicKey.Encode()
+	}
+
+	cadencePublicKey := testutil.BytesToCadenceArray(publicKeyBytes)
+	encodedCadencePublicKey, err := jsoncdc.Encode(cadencePublicKey)
+	require.NoError(tb, err)
+
+	return publicKey, encodedCadencePublicKey
 }
 
 func newBlockHeadersStorage(blocks []*flow.Block) storage.Headers {
