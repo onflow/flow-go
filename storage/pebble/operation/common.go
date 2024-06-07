@@ -2,10 +2,12 @@ package operation
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/cockroachdb/pebble"
 	"github.com/vmihailenco/msgpack"
 
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/storage"
 )
@@ -40,6 +42,161 @@ func retrieve(key []byte, sc interface{}) func(r pebble.Reader) error {
 		}
 		return nil
 	}
+}
+
+func exists(key []byte, keyExists *bool) func(r pebble.Reader) error {
+	return func(r pebble.Reader) error {
+		_, closer, err := r.Get(key)
+		if err != nil {
+			if errors.Is(err, pebble.ErrNotFound) {
+				*keyExists = false
+				return nil
+			}
+
+			// exception while checking for the key
+			return irrecoverable.NewExceptionf("could not load data: %w", err)
+		}
+		*keyExists = true
+		defer closer.Close()
+		return nil
+	}
+}
+
+// checkFunc is called during key iteration through the badger DB in order to
+// check whether we should process the given key-value pair. It can be used to
+// avoid loading the value if its not of interest, as well as storing the key
+// for the current iteration step.
+type checkFunc func(key []byte) bool
+
+// createFunc returns a pointer to an initialized entity that we can potentially
+// decode the next value into during a badger DB iteration.
+type createFunc func() interface{}
+
+// handleFunc is a function that starts the processing of the current key-value
+// pair during a badger iteration. It should be called after the key was checked
+// and the entity was decoded.
+// No errors are expected during normal operation. Any errors will halt the iteration.
+type handleFunc func() error
+
+// iterationFunc is a function provided to our low-level iteration function that
+// allows us to pass badger efficiencies across badger boundaries. By calling it
+// for each iteration step, we can inject a function to check the key, a
+// function to create the decode target and a function to process the current
+// key-value pair. This a consumer of the API to decode when to skip the loading
+// of values, the initialization of entities and the processing.
+type iterationFunc func() (checkFunc, createFunc, handleFunc)
+
+type PebbleReaderWriter interface {
+	pebble.Reader
+	pebble.Writer
+}
+
+// update will encode the given entity with MsgPack and update the binary data
+// under the given key in the badger DB. The key must already exist.
+// Error returns:
+//   - storage.ErrNotFound if the key does not already exist in the database.
+//   - generic error in case of unexpected failure from the database layer or
+//     encoding failure.
+func update(key []byte, entity interface{}) func(PebbleReaderWriter) error {
+	return func(w PebbleReaderWriter) error {
+
+		// retrieve the item from the key-value store
+		_, closer, err := w.Get(key)
+		if errors.Is(err, pebble.ErrNotFound) {
+			return storage.ErrNotFound
+		}
+
+		if err != nil {
+			return irrecoverable.NewExceptionf("could not check key: %w", err)
+		}
+		err = closer.Close()
+		if err != nil {
+			return err
+		}
+
+		// serialize the entity data
+		val, err := msgpack.Marshal(entity)
+		if err != nil {
+			return irrecoverable.NewExceptionf("could not encode entity: %w", err)
+		}
+
+		// persist the entity data into the DB
+		err = w.Set(key, val, nil)
+		if err != nil {
+			return irrecoverable.NewExceptionf("could not replace data: %w", err)
+		}
+
+		return nil
+	}
+}
+
+// traverse iterates over a range of keys defined by a prefix.
+//
+// The prefix must be shared by all keys in the iteration.
+//
+// On each iteration, it will call the iteration function to initialize
+// functions specific to processing the given key-value pair.
+func traverse(prefix []byte, iteration iterationFunc) func(pebble.Reader) error {
+	return func(r pebble.Reader) error {
+		if len(prefix) == 0 {
+			return fmt.Errorf("prefix must not be empty")
+		}
+
+		// opts := badger.DefaultIteratorOptions
+		// NOTE: this is an optimization only, it does not enforce that all
+		// results in the iteration have this prefix.
+		// opts.Prefix = prefix
+
+		it, err := r.NewIter(nil)
+		if err != nil {
+			return fmt.Errorf("can not create iterator: %w", err)
+		}
+		defer it.Close()
+
+		// this is where we actually enforce that all results have the prefix
+		for it.SeekGE(prefix); it.Valid(); it.Next() {
+
+			item := it.Item()
+
+			// initialize processing functions for iteration
+			check, create, handle := iteration()
+
+			// check if we should process the item at all
+			key := item.Key()
+			ok := check(key)
+			if !ok {
+				continue
+			}
+
+			// process the actual item
+			err := item.Value(func(val []byte) error {
+
+				// decode into the entity
+				entity := create()
+				err := msgpack.Unmarshal(val, entity)
+				if err != nil {
+					return irrecoverable.NewExceptionf("could not decode entity: %w", err)
+				}
+
+				// process the entity
+				err = handle()
+				if err != nil {
+					return fmt.Errorf("could not handle entity: %w", err)
+				}
+
+				return nil
+			})
+			if err != nil {
+				return fmt.Errorf("could not process value: %w", err)
+			}
+		}
+
+		return nil
+	}
+}
+
+func makeKey(prefix byte, identifier flow.Identifier) []byte {
+	return append([]byte{prefix}, identifier[:]...)
 }
 
 func convertNotFoundError(err error) error {
