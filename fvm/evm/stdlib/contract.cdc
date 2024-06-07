@@ -271,6 +271,8 @@ contract EVM {
         /// the evm for the call. For coa.deploy
         /// calls it returns the code deployed to
         /// the address provided in the contractAddress field.
+        /// in case of revert, the smart contract custom error message
+        /// is also returned here (see EIP-140 for more details).
         access(all)
         let data: [UInt8]
 
