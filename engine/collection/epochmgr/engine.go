@@ -96,7 +96,7 @@ func New(
 		epochSetupPhaseStartedEvents: make(chan *flow.Header, 1),
 		epochStopEvents:              make(chan uint64, 1),
 		clusterIDUpdateDistributor:   clusterIDUpdateDistributor,
-		inProgressQCVotes:            make(map[string]context.CancelFunc),
+		inProgressQCVotes:            make(map[string]context.CancelFunc, 1),
 	}
 
 	e.cm = component.NewComponentManagerBuilder().
@@ -559,10 +559,10 @@ func (e *Engine) removeEpoch(counter uint64) {
 func (e *Engine) activeClusterIDs() (flow.ChainIDList, error) {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
-	clusterIDs := make(flow.ChainIDList, 0)
-	for _, epoch := range e.epochs {
+	clusterIDs := make(flow.ChainIDList, len(e.epochs))
+	for i, epoch := range e.epochs {
 		chainID := epoch.state.Params().ChainID() // cached, does not hit database
-		clusterIDs = append(clusterIDs, chainID)
+		clusterIDs[i] = chainID
 	}
 	return clusterIDs, nil
 }
