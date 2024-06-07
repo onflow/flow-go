@@ -1,7 +1,5 @@
 package operations
 
-package operation
-
 import (
 	"testing"
 

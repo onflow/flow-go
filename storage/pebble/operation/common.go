@@ -147,6 +147,7 @@ func traverse(prefix []byte, iteration iterationFunc) func(pebble.Reader) error 
 		// results in the iteration have this prefix.
 		// opts.Prefix = prefix
 
+		// TODO: add prefix to new iter, use `useL6Filter`
 		it, err := r.NewIter(nil)
 		if err != nil {
 			return fmt.Errorf("can not create iterator: %w", err)
@@ -156,39 +157,37 @@ func traverse(prefix []byte, iteration iterationFunc) func(pebble.Reader) error 
 		// this is where we actually enforce that all results have the prefix
 		for it.SeekGE(prefix); it.Valid(); it.Next() {
 
-			item := it.Item()
-
 			// initialize processing functions for iteration
 			check, create, handle := iteration()
 
 			// check if we should process the item at all
-			key := item.Key()
+			key := it.Key()
+
 			ok := check(key)
 			if !ok {
 				continue
 			}
 
-			// process the actual item
-			err := item.Value(func(val []byte) error {
-
-				// decode into the entity
-				entity := create()
-				err := msgpack.Unmarshal(val, entity)
-				if err != nil {
-					return irrecoverable.NewExceptionf("could not decode entity: %w", err)
-				}
-
-				// process the entity
-				err = handle()
-				if err != nil {
-					return fmt.Errorf("could not handle entity: %w", err)
-				}
-
-				return nil
-			})
+			binaryValue, err := it.ValueAndErr()
 			if err != nil {
-				return fmt.Errorf("could not process value: %w", err)
+				return fmt.Errorf("failed to get value: %w", err)
 			}
+
+			// preventing caller from modifying the iterator's value slices
+			valueCopy := make([]byte, len(binaryValue))
+			copy(valueCopy, binaryValue)
+
+			entity := create()
+			err = msgpack.Unmarshal(valueCopy, entity)
+			if err != nil {
+				return irrecoverable.NewExceptionf("could not decode entity: %w", err)
+			}
+			// process the entity
+			err = handle()
+			if err != nil {
+				return fmt.Errorf("could not handle entity: %w", err)
+			}
+
 		}
 
 		return nil
