@@ -1,12 +1,12 @@
 package pebble
 
 import (
+	"errors"
 	"path/filepath"
 	"testing"
 
 	"github.com/cockroachdb/pebble"
 	"github.com/dgraph-io/badger/v2"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/vmihailenco/msgpack"
 
@@ -35,20 +35,54 @@ func TestMsgPacks(t *testing.T) {
 // TestChunkDataPacks_Store evaluates correct storage and retrieval of chunk data packs in the storage.
 // It also evaluates that re-inserting is idempotent.
 func TestChunkDataPacks_Store(t *testing.T) {
-	WithChunkDataPacks(t, 100, func(t *testing.T, chunkDataPacks []*flow.ChunkDataPack, chunkDataPackStore *ChunkDataPacks, _ *pebble.DB) {
+	WithChunkDataPacks(t, 100, func(t *testing.T, chunkDataPacks []*flow.ChunkDataPack, chunkDataPackStore storage.ChunkDataPacks, _ *pebble.DB) {
+		// can store
 		require.NoError(t, chunkDataPackStore.Store(chunkDataPacks))
+
+		// can read back
+		for _, c := range chunkDataPacks {
+			c2, err := chunkDataPackStore.ByChunkID(c.ChunkID)
+			require.NoError(t, err)
+			require.Equal(t, c, c2)
+		}
+
+		// can store again
 		require.NoError(t, chunkDataPackStore.Store(chunkDataPacks))
+
+		cids := make([]flow.Identifier, 0, len(chunkDataPacks))
+		for i, c := range chunkDataPacks {
+			// remove everything except the first one
+			if i > 0 {
+				cids = append(cids, c.ChunkID)
+			}
+		}
+		// can remove
+		require.NoError(t, chunkDataPackStore.Remove(cids))
+		for i, c := range chunkDataPacks {
+			if i == 0 {
+				// the first one is not removed
+				_, err := chunkDataPackStore.ByChunkID(c.ChunkID)
+				require.NoError(t, err)
+				continue
+			}
+			// the rest are removed
+			_, err := chunkDataPackStore.ByChunkID(c.ChunkID)
+			require.True(t, errors.Is(err, storage.ErrNotFound))
+		}
+
+		// can remove again
+		require.NoError(t, chunkDataPackStore.Remove(cids))
 	})
 }
 
 // WithChunkDataPacks is a test helper that generates specified number of chunk data packs, store them using the storeFunc, and
 // then evaluates whether they are successfully retrieved from storage.
-func WithChunkDataPacks(t *testing.T, chunks int, storeFunc func(*testing.T, []*flow.ChunkDataPack, *ChunkDataPacks, *pebble.DB)) {
+func WithChunkDataPacks(t *testing.T, chunks int, storeFunc func(*testing.T, []*flow.ChunkDataPack, storage.ChunkDataPacks, *pebble.DB)) {
 	RunWithBadgerDBAndPebbleDB(t, func(badgerDB *badger.DB, db *pebble.DB) {
 		transactions := badgerstorage.NewTransactions(&metrics.NoopCollector{}, badgerDB)
 		collections := badgerstorage.NewCollections(badgerDB, transactions)
 		// keep the cache size at 1 to make sure that entries are written and read from storage itself.
-		store := NewChunkDataPacks(db, collections)
+		store := NewChunkDataPacks(&metrics.NoopCollector{}, db, collections, 1)
 
 		chunkDataPacks := unittest.ChunkDataPacksFixture(chunks)
 		for _, chunkDataPack := range chunkDataPacks {
@@ -59,14 +93,6 @@ func WithChunkDataPacks(t *testing.T, chunks int, storeFunc func(*testing.T, []*
 
 		// stores chunk data packs in the memory using provided store function.
 		storeFunc(t, chunkDataPacks, store, db)
-
-		// stored chunk data packs should be retrieved successfully.
-		for _, expected := range chunkDataPacks {
-			actual, err := store.ByChunkID(expected.ChunkID)
-			require.NoError(t, err)
-
-			assert.Equal(t, expected, actual)
-		}
 	})
 }
 

@@ -732,7 +732,7 @@ func (exeNode *ExecutionNode) LoadExecutionState(
 		return nil
 	})
 	// chunkDataPacks := storage.NewChunkDataPacks(node.Metrics.Cache, chunkDataPackDB, node.Storage.Collections, exeNode.exeConf.chunkDataPackCacheSize)
-	chunkDataPacks := storagepebble.NewChunkDataPacks(chunkDataPackDB, node.Storage.Collections)
+	chunkDataPacks := storagepebble.NewChunkDataPacks(node.Metrics.Cache, chunkDataPackDB, node.Storage.Collections, exeNode.exeConf.chunkDataPackCacheSize)
 
 	// Needed for gRPC server, make sure to assign to main scoped vars
 	exeNode.events = storage.NewEvents(node.Metrics.Cache, node.DB)
