@@ -482,7 +482,7 @@ func (e *Engine) startEpochComponents(engineCtx irrecoverable.SignalerContext, c
 	epochCtx, cancel, errCh := irrecoverable.WithSignallerAndCancel(engineCtx)
 	// start component using its own context
 	components.Start(epochCtx)
-	go e.handleEpochErrors(engineCtx, errCh)
+	go e.handleEpochErrors(epochCtx, errCh)
 
 	select {
 	case <-components.Ready():
