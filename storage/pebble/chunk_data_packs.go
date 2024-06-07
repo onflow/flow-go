@@ -4,13 +4,12 @@ import (
 	"fmt"
 
 	"github.com/cockroachdb/pebble"
-	"github.com/vmihailenco/msgpack"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/pebble/operations"
 )
 
 type ChunkDataPacks struct {
@@ -26,7 +25,7 @@ func NewChunkDataPacks(collector module.CacheMetrics, db *pebble.DB, collections
 	retrieve := func(key flow.Identifier) func(pebble.Reader) (*storage.StoredChunkDataPack, error) {
 		return func(r pebble.Reader) (*storage.StoredChunkDataPack, error) {
 			var c storage.StoredChunkDataPack
-			err := RetrieveChunkDataPack(key, &c)(r)
+			err := operations.RetrieveChunkDataPack(key, &c)(r)
 			return &c, err
 		}
 	}
@@ -93,7 +92,7 @@ func (ch *ChunkDataPacks) Remove(cs []flow.Identifier) error {
 
 func (ch *ChunkDataPacks) ByChunkID(chunkID flow.Identifier) (*flow.ChunkDataPack, error) {
 	var sc storage.StoredChunkDataPack
-	err := RetrieveChunkDataPack(chunkID, &sc)(ch.db)
+	err := operations.RetrieveChunkDataPack(chunkID, &sc)(ch.db)
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve stored chunk data pack: %w", err)
 	}
@@ -121,65 +120,14 @@ func (ch *ChunkDataPacks) BatchRemove(chunkID flow.Identifier, batch storage.Bat
 }
 
 func (ch *ChunkDataPacks) batchRemove(chunkID flow.Identifier, batch pebble.Writer) error {
-	return batch.Delete(makeKey(codeChunkDataPack, chunkID), nil)
+	return operations.RemoveChunkDataPack(chunkID)(batch)
 }
 
 func (ch *ChunkDataPacks) batchStore(c *flow.ChunkDataPack, batch *pebble.Batch) (*storage.StoredChunkDataPack, error) {
 	sc := storage.ToStoredChunkDataPack(c)
-	err := InsertChunkDataPack(sc)(batch)
+	err := operations.InsertChunkDataPack(sc)(batch)
 	if err != nil {
 		return nil, fmt.Errorf("failed to store chunk data pack: %w", err)
 	}
 	return sc, nil
-}
-
-// TODO: move to operation package
-func InsertChunkDataPack(sc *storage.StoredChunkDataPack) func(w pebble.Writer) error {
-	key := makeKey(codeChunkDataPack, sc.ChunkID)
-	return insert(key, sc)
-}
-
-func RetrieveChunkDataPack(chunkID flow.Identifier, sc *storage.StoredChunkDataPack) func(r pebble.Reader) error {
-	key := makeKey(codeChunkDataPack, chunkID)
-	return retrieve(key, sc)
-}
-
-func insert(key []byte, val interface{}) func(pebble.Writer) error {
-	return func(w pebble.Writer) error {
-		value, err := msgpack.Marshal(val)
-		if err != nil {
-			return irrecoverable.NewExceptionf("failed to encode value: %w", err)
-		}
-
-		err = w.Set(key, value, nil)
-		if err != nil {
-			return irrecoverable.NewExceptionf("failed to store data: %w", err)
-		}
-
-		return nil
-	}
-}
-
-func retrieve(key []byte, sc interface{}) func(r pebble.Reader) error {
-	return func(r pebble.Reader) error {
-		val, closer, err := r.Get(key)
-		if err != nil {
-			return convertNotFoundError(err)
-		}
-		defer closer.Close()
-
-		err = msgpack.Unmarshal(val, &sc)
-		if err != nil {
-			return irrecoverable.NewExceptionf("failed to decode value: %w", err)
-		}
-		return nil
-	}
-}
-
-const (
-	codeChunkDataPack = 100
-)
-
-func makeKey(prefix byte, chunkID flow.Identifier) []byte {
-	return append([]byte{prefix}, chunkID[:]...)
 }
