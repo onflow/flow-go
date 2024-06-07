@@ -43,26 +43,19 @@ func NewChunkDataPacks(collector module.CacheMetrics, db *pebble.DB, collections
 }
 
 func (ch *ChunkDataPacks) Store(cs []*flow.ChunkDataPack) error {
-	batch := ch.db.NewBatch()
+	batch := NewBatch(ch.db)
 	defer batch.Close()
 
-	scs := make([]*storage.StoredChunkDataPack, 0, len(cs))
 	for _, c := range cs {
-		sc, err := ch.batchStore(c, batch)
+		err := ch.batchStore(c, batch)
 		if err != nil {
 			return fmt.Errorf("cannot store chunk data pack: %w", err)
 		}
-		scs = append(scs, sc)
 	}
 
-	err := batch.Commit(pebble.Sync)
+	err := batch.Flush()
 	if err != nil {
 		return fmt.Errorf("cannot commit batch: %w", err)
-	}
-
-	// TODO: move to batchStore
-	for _, sc := range scs {
-		ch.byChunkIDCache.Insert(sc.ChunkID, sc)
 	}
 
 	return nil
@@ -123,11 +116,15 @@ func (ch *ChunkDataPacks) batchRemove(chunkID flow.Identifier, batch pebble.Writ
 	return operations.RemoveChunkDataPack(chunkID)(batch)
 }
 
-func (ch *ChunkDataPacks) batchStore(c *flow.ChunkDataPack, batch *pebble.Batch) (*storage.StoredChunkDataPack, error) {
+func (ch *ChunkDataPacks) batchStore(c *flow.ChunkDataPack, batch *Batch) error {
 	sc := storage.ToStoredChunkDataPack(c)
-	err := operations.InsertChunkDataPack(sc)(batch)
+	writer := batch.GetWriter()
+	batch.OnSucceed(func() {
+		ch.byChunkIDCache.Insert(sc.ChunkID, sc)
+	})
+	err := operations.InsertChunkDataPack(sc)(writer)
 	if err != nil {
-		return nil, fmt.Errorf("failed to store chunk data pack: %w", err)
+		return fmt.Errorf("failed to store chunk data pack: %w", err)
 	}
-	return sc, nil
+	return nil
 }

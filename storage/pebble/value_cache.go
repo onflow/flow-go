@@ -19,24 +19,22 @@ func withLimit[K comparable, V any](limit uint) func(*Cache[K, V]) {
 
 type storeFunc[K comparable, V any] func(key K, val V) func(pebble.Writer) error
 
-func withStore[K comparable, V any](store storeFunc[K, V]) func(*Cache[K, V]) {
-	return func(c *Cache[K, V]) {
-		c.store = store
-	}
-}
-
+//	func withStore[K comparable, V any](store storeFunc[K, V]) func(*Cache[K, V]) {
+//		return func(c *Cache[K, V]) {
+//			c.store = store
+//		}
+//	}
 func noStore[K comparable, V any](_ K, _ V) func(pebble.Writer) error {
 	return func(pebble.Writer) error {
 		return fmt.Errorf("no store function for cache put available")
 	}
 }
 
-func noopStore[K comparable, V any](_ K, _ V) func(pebble.Reader) error {
-	return func(pebble.Reader) error {
-		return nil
-	}
-}
-
+//	func noopStore[K comparable, V any](_ K, _ V) func(pebble.Reader) error {
+//		return func(pebble.Reader) error {
+//			return nil
+//		}
+//	}
 type retrieveFunc[K comparable, V any] func(key K) func(pebble.Reader) (V, error)
 
 func withRetrieve[K comparable, V any](retrieve retrieveFunc[K, V]) func(*Cache[K, V]) {
