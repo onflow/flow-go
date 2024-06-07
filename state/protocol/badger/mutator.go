@@ -830,11 +830,6 @@ func (m *FollowerState) epochMetricsAndEventsOnBlockFinalized(parentEpochState, 
 	events []func(),
 	err error,
 ) {
-	if finalizedEpochState.EpochFallbackTriggered() {
-		// No epoch state changes to notify on when EFM is triggered
-		return nil, nil, nil
-	}
-
 	parentEpochCounter := parentEpochState.Epoch()
 	childEpochCounter := finalizedEpochState.Epoch()
 	parentEpochPhase := parentEpochState.EpochPhase()
@@ -878,8 +873,10 @@ func (m *FollowerState) epochMetricsAndEventsOnBlockFinalized(parentEpochState, 
 		return
 	}
 
-	return nil, nil, fmt.Errorf("sanity check failed: invalid subsequent [epoch-phase] [%d-%s]->[%d-%s]",
-		parentEpochCounter, parentEpochPhase, childEpochCounter, childEpochPhase)
+	// TODO(6013) efm-recovery: need to update metrics logic for EFM recovery
+	return nil, nil, nil
+	//return nil, nil, fmt.Errorf("sanity check failed: invalid subsequent [epoch-phase] [%d-%s]->[%d-%s]",
+	//	parentEpochCounter, parentEpochPhase, childEpochCounter, childEpochPhase)
 }
 
 // versionBeaconOnBlockFinalized extracts and returns the VersionBeacons from the
