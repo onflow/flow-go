@@ -1,6 +1,7 @@
 package epochmgr
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"sync"
@@ -56,11 +57,13 @@ type Engine struct {
 	mu     sync.RWMutex                       // protects epochs map
 	epochs map[uint64]*RunningEpochComponents // epoch-scoped components per epoch
 
+	qcVoteMu          sync.Mutex                    // protects qc votes map
+	inProgressQCVotes map[string]context.CancelFunc // map of context cancel funcs, each cancel func maps to exactly 1 in progress qc voting process
+
 	// internal event notifications
 	epochTransitionEvents        chan *flow.Header        // sends first block of new epoch
 	epochSetupPhaseStartedEvents chan *flow.Header        // sends first block of EpochSetup phase
 	epochStopEvents              chan uint64              // sends counter of epoch to stop
-	efmEvents                    chan struct{}            // signals epoch emergency fallback has triggered
 	clusterIDUpdateDistributor   collection.ClusterEvents // sends cluster ID updates to consumers
 	cm                           *component.ComponentManager
 	component.Component
@@ -92,8 +95,8 @@ func New(
 		epochTransitionEvents:        make(chan *flow.Header, 1),
 		epochSetupPhaseStartedEvents: make(chan *flow.Header, 1),
 		epochStopEvents:              make(chan uint64, 1),
-		efmEvents:                    make(chan struct{}, 1),
 		clusterIDUpdateDistributor:   clusterIDUpdateDistributor,
+		inProgressQCVotes:            make(map[string]context.CancelFunc),
 	}
 
 	e.cm = component.NewComponentManagerBuilder().
@@ -317,7 +320,7 @@ func (e *Engine) EpochSetupPhaseStarted(_ uint64, first *flow.Header) {
 // EpochEmergencyFallbackTriggered handles the epoch emergency fallback triggered protocol event.
 // If epoch emeregency fallback is triggered root QC voting must be stopped.
 func (e *Engine) EpochEmergencyFallbackTriggered() {
-	e.efmEvents <- struct{}{}
+	e.stopAllInProgressQcVotes()
 }
 
 // handleEpochEvents handles events relating to the epoch lifecycle:
@@ -347,8 +350,6 @@ func (e *Engine) handleEpochEvents(ctx irrecoverable.SignalerContext, ready comp
 			if err != nil {
 				ctx.Throw(err)
 			}
-		case <-e.efmEvents:
-			e.stopRootQCVoting()
 		}
 	}
 }
@@ -454,7 +455,17 @@ func (e *Engine) prepareToStopEpochComponents(epochCounter, epochMaxHeight uint6
 // kicks off setup tasks for the phase, in particular submitting a vote for the
 // next epoch's root cluster QC.
 func (e *Engine) onEpochSetupPhaseStarted(ctx irrecoverable.SignalerContext, nextEpoch protocol.Epoch) {
-	err := e.voter.Vote(ctx, nextEpoch)
+	counter, err := nextEpoch.Counter()
+	if err != nil {
+		ctx.Throw(fmt.Errorf("unexpected failure to submit QC vote for next epoch: %w", err))
+	}
+
+	voteProcessId := fmt.Sprintf("epoch-%d-%d", counter, time.Now().UnixNano())
+	ctxWithCancel, cancel := context.WithCancel(ctx)
+	e.trackInProgressVote(voteProcessId, cancel)
+	defer e.removeInProgressVote(voteProcessId)
+
+	err = e.voter.Vote(ctxWithCancel, nextEpoch)
 	if err != nil {
 		if epochs.IsClusterQCNoVoteError(err) {
 			e.log.Warn().Err(err).Msg("unable to submit QC vote for next epoch")
@@ -517,11 +528,6 @@ func (e *Engine) stopEpochComponents(counter uint64) error {
 	}
 }
 
-// stopRootQCVoting sends signal to root qc voter to stop in progress voting.
-func (e *Engine) stopRootQCVoting() {
-	e.voter.StopVoting()
-}
-
 // getEpochComponents retrieves the stored (running) epoch components for the given epoch counter.
 // If no epoch with the counter is stored, returns (nil, false).
 // Safe for concurrent use.
@@ -559,4 +565,29 @@ func (e *Engine) activeClusterIDs() (flow.ChainIDList, error) {
 		clusterIDs = append(clusterIDs, chainID)
 	}
 	return clusterIDs, nil
+}
+
+// trackInProgressVote stores the context for an in progress vote process in the in progress vote map.
+func (e *Engine) trackInProgressVote(id string, cancel context.CancelFunc) {
+	e.qcVoteMu.Lock()
+	e.inProgressQCVotes[id] = cancel
+	e.qcVoteMu.Unlock()
+}
+
+// removeInProgressVote removes the context for an in progress vote process from the in progress vote map.
+func (e *Engine) removeInProgressVote(id string) {
+	e.qcVoteMu.Lock()
+	delete(e.inProgressQCVotes, id)
+	e.qcVoteMu.Unlock()
+}
+
+// stopAllInProgressQcVotes cancels the context for all in progress root qc voting.
+func (e *Engine) stopAllInProgressQcVotes() {
+	e.qcVoteMu.Lock()
+	for processId, cancel := range e.inProgressQCVotes {
+		cancel()
+		delete(e.inProgressQCVotes, processId)
+		e.log.Warn().Msgf("root qc vote process canceled: %s", processId)
+	}
+	e.qcVoteMu.Unlock()
 }

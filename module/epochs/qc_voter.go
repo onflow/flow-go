@@ -48,7 +48,6 @@ type RootQCVoter struct {
 	lastSuccessfulClientIndex int                       // index of the contract client that was last successful during retries
 	wait                      time.Duration             // how long to sleep in between vote attempts
 	mu                        sync.Mutex
-	stopVoting                chan struct{} // chan used to signal voting to stop
 }
 
 // NewRootQCVoter returns a new root QC voter, configured for a particular epoch.
@@ -59,7 +58,6 @@ func NewRootQCVoter(
 	state protocol.State,
 	contractClients []module.QCContractClient,
 ) *RootQCVoter {
-
 	voter := &RootQCVoter{
 		log:               log.With().Str("module", "root_qc_voter").Logger(),
 		me:                me,
@@ -68,7 +66,6 @@ func NewRootQCVoter(
 		qcContractClients: contractClients,
 		wait:              time.Second * 10,
 		mu:                sync.Mutex{},
-		stopVoting:        make(chan struct{}, 1),
 	}
 	return voter
 }
@@ -81,7 +78,6 @@ func NewRootQCVoter(
 //   - ErrWontVote if we fail to vote for a benign reason
 //   - generic error in case of critical unexpected failure
 func (voter *RootQCVoter) Vote(ctx context.Context, epoch protocol.Epoch) error {
-
 	counter, err := epoch.Counter()
 	if err != nil {
 		return fmt.Errorf("could not get epoch counter: %w", err)
@@ -173,26 +169,11 @@ func (voter *RootQCVoter) Vote(ctx context.Context, epoch protocol.Epoch) error 
 		voter.updateLastSuccessfulClient(clientIndex)
 		return nil
 	}
-	err = retry.Do(ctx, backoff, func(ctx context.Context) error {
-		select {
-		case <-voter.stopVoting:
-			err := NewQCVoteStoppedError()
-			log.Warn().Err(err).Msgf("root qc voting stopped")
-			return err
-		default:
-			return castVote(ctx)
-		}
-	})
+	err = retry.Do(ctx, backoff, castVote)
 	if network.IsTransientError(err) || errors.Is(err, errTransactionReverted) || errors.Is(err, errTransactionReverted) {
 		return NewClusterQCNoVoteErrorf("exceeded retry limit without successfully submitting our vote: %w", err)
 	}
 	return err
-}
-
-// StopVoting sends a signal on the stopVoting chan, when this signal is encountered the Vote func will
-// exit and return a non-retryable error.
-func (voter *RootQCVoter) StopVoting() {
-	voter.stopVoting <- struct{}{}
 }
 
 // updateContractClient will return the last successful client index by default for all initial operations or else
