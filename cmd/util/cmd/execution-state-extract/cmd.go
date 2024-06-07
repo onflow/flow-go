@@ -7,11 +7,11 @@ import (
 	"path"
 	"strings"
 
-	runtimeCommon "github.com/onflow/cadence/runtime/common"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
+	common2 "github.com/onflow/flow-go/cmd/util/common"
 	"github.com/onflow/flow-go/cmd/util/ledger/migrations"
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
 	"github.com/onflow/flow-go/model/bootstrap"
@@ -49,6 +49,7 @@ var (
 	flagFixSlabsWithBrokenReferences       bool
 	flagFilterUnreferencedSlabs            bool
 	flagCPUProfile                         string
+	flagReportMetrics                      bool
 )
 
 var Cmd = &cobra.Command{
@@ -163,6 +164,9 @@ func init() {
 
 	Cmd.Flags().StringVar(&flagCPUProfile, "cpu-profile", "",
 		"enable CPU profiling")
+
+	Cmd.Flags().BoolVar(&flagReportMetrics, "report-metrics", false,
+		"report migration metrics")
 }
 
 func run(*cobra.Command, []string) {
@@ -259,24 +263,13 @@ func run(*cobra.Command, []string) {
 		}
 	}
 
-	var exportedAddresses []runtimeCommon.Address
+	var exportPayloadsForOwners map[string]struct{}
 
 	if len(flagOutputPayloadByAddresses) > 0 {
-
-		addresses := strings.Split(flagOutputPayloadByAddresses, ",")
-
-		for _, hexAddr := range addresses {
-			b, err := hex.DecodeString(strings.TrimSpace(hexAddr))
-			if err != nil {
-				log.Fatal().Err(err).Msgf("cannot hex decode address %s for payload export", strings.TrimSpace(hexAddr))
-			}
-
-			addr, err := runtimeCommon.BytesToAddress(b)
-			if err != nil {
-				log.Fatal().Err(err).Msgf("cannot decode address %x for payload export", b)
-			}
-
-			exportedAddresses = append(exportedAddresses, addr)
+		var err error
+		exportPayloadsForOwners, err = common2.ParseOwners(strings.Split(flagOutputPayloadByAddresses, ","))
+		if err != nil {
+			log.Fatal().Err(err).Msgf("failed to parse addresses")
 		}
 	}
 
@@ -334,12 +327,12 @@ func run(*cobra.Command, []string) {
 	var outputMsg string
 	if len(flagOutputPayloadFileName) > 0 {
 		// Output is payload file
-		if len(exportedAddresses) == 0 {
+		if len(exportPayloadsForOwners) == 0 {
 			outputMsg = fmt.Sprintf("exporting all payloads to %s", flagOutputPayloadFileName)
 		} else {
 			outputMsg = fmt.Sprintf(
-				"exporting payloads by addresses %v to %s",
-				flagOutputPayloadByAddresses,
+				"exporting payloads for owners %v to %s",
+				common2.OwnersToString(exportPayloadsForOwners),
 				flagOutputPayloadFileName,
 			)
 		}
@@ -355,15 +348,16 @@ func run(*cobra.Command, []string) {
 	log.Info().Msgf("state extraction plan: %s, %s", inputMsg, outputMsg)
 
 	chainID := chain.ChainID()
-	// TODO:
-	evmContractChange := migrations.EVMContractChangeNone
 
-	var burnerContractChange migrations.BurnerContractChange
+	burnerContractChange := migrations.BurnerContractChangeNone
+	evmContractChange := migrations.EVMContractChangeNone
 	switch chainID {
 	case flow.Emulator:
 		burnerContractChange = migrations.BurnerContractChangeDeploy
+		evmContractChange = migrations.EVMContractChangeDeploy
 	case flow.Testnet, flow.Mainnet:
 		burnerContractChange = migrations.BurnerContractChangeUpdate
+		evmContractChange = migrations.EVMContractChangeUpdate
 	}
 
 	stagedContracts, err := migrations.StagedContractsFromCSV(flagStagedContractsFile)
@@ -385,6 +379,7 @@ func run(*cobra.Command, []string) {
 		VerboseErrorOutput:                flagVerboseErrorOutput,
 		FixSlabsWithBrokenReferences:      chainID == flow.Testnet && flagFixSlabsWithBrokenReferences,
 		FilterUnreferencedSlabs:           flagFilterUnreferencedSlabs,
+		ReportMetrics:                     flagReportMetrics,
 	}
 
 	if len(flagInputPayloadFileName) > 0 {
@@ -396,7 +391,7 @@ func run(*cobra.Command, []string) {
 			!flagNoMigration,
 			flagInputPayloadFileName,
 			flagOutputPayloadFileName,
-			exportedAddresses,
+			exportPayloadsForOwners,
 			flagSortPayloads,
 			opts,
 		)
@@ -409,7 +404,7 @@ func run(*cobra.Command, []string) {
 			flagNWorker,
 			!flagNoMigration,
 			flagOutputPayloadFileName,
-			exportedAddresses,
+			exportPayloadsForOwners,
 			flagSortPayloads,
 			opts,
 		)

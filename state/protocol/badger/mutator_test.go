@@ -3,6 +3,7 @@ package badger_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math/rand"
 	"sync"
 	"testing"
@@ -18,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
 	mockmodule "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/signature"
@@ -107,7 +109,7 @@ func TestExtendValid(t *testing.T) {
 			all.QuorumCertificates,
 			all.Setups,
 			all.EpochCommits,
-			all.EpochProtocolState,
+			all.EpochProtocolStateEntries,
 			all.ProtocolKVStore,
 			all.VersionBeacons,
 			rootSnapshot,
@@ -511,6 +513,9 @@ func TestExtendSealedBoundary(t *testing.T) {
 	})
 }
 
+// TestExtendMissingParent tests the behaviour when attempting to extend the protocol state by a block
+// whose parent is unknown. Per convention, the protocol state requires that the candidate's
+// parent has already been ingested. Otherwise, an exception is returned.
 func TestExtendMissingParent(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
 	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState) {
@@ -524,9 +529,10 @@ func TestExtendMissingParent(t *testing.T) {
 
 		err := state.Extend(context.Background(), &extend)
 		require.Error(t, err)
-		require.True(t, st.IsInvalidExtensionError(err), err)
+		require.False(t, st.IsInvalidExtensionError(err), err)
+		require.False(t, st.IsOutdatedExtensionError(err), err)
 
-		// verify seal not indexed
+		// verify seal that was contained in candidate block is not indexed
 		var sealID flow.Identifier
 		err = db.View(operation.LookupLatestSealAtBlock(extend.ID(), &sealID))
 		require.Error(t, err)
@@ -702,17 +708,10 @@ func TestExtendReceiptsInvalid(t *testing.T) {
 		head, err := rootSnapshot.Head()
 		require.NoError(t, err)
 
-		validator.On("ValidatePayload", mock.Anything).Return(nil).Once()
-
 		// create block2 and block3
 		block2 := unittest.BlockWithParentFixture(head)
 		block2.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
-		err = state.Extend(context.Background(), block2)
-		require.NoError(t, err)
-
-		// Add a receipt for block 2
-		receipt := unittest.ExecutionReceiptFixture()
-
+		receipt := unittest.ReceiptForBlockFixture(block2) // receipt for block 2
 		block3 := unittest.BlockWithParentFixture(block2.Header)
 		block3.SetPayload(flow.Payload{
 			Receipts:        []*flow.ExecutionReceiptMeta{receipt.Meta()},
@@ -720,12 +719,44 @@ func TestExtendReceiptsInvalid(t *testing.T) {
 			ProtocolStateID: rootProtocolStateID,
 		})
 
-		// force the receipt validator to refuse this payload
-		validator.On("ValidatePayload", block3).Return(engine.NewInvalidInputError("")).Once()
+		// validator accepts block 2
+		validator.On("ValidatePayload", block2).Return(nil).Once()
+		err = state.Extend(context.Background(), block2)
+		require.NoError(t, err)
 
+		// but receipt for block 2 is invalid, which the ParticipantState should reject with an InvalidExtensionError
+		validator.On("ValidatePayload", block3).Return(engine.NewInvalidInputError("")).Once()
 		err = state.Extend(context.Background(), block3)
 		require.Error(t, err)
 		require.True(t, st.IsInvalidExtensionError(err), err)
+	})
+}
+
+// TestOnReceiptValidatorExceptions tests that ParticipantState escalates unexpected errors and exceptions
+// returned by the ReceiptValidator. We expect that such errors are *not* interpreted as the block being invalid.
+func TestOnReceiptValidatorExceptions(t *testing.T) {
+	validator := mockmodule.NewReceiptValidator(t)
+
+	rootSnapshot := unittest.RootSnapshotFixture(participants)
+	util.RunWithFullProtocolStateAndValidator(t, rootSnapshot, validator, func(db *badger.DB, state *protocol.ParticipantState) {
+		head, err := rootSnapshot.Head()
+		require.NoError(t, err)
+		block := unittest.BlockWithParentFixture(head)
+
+		// Check that _unexpected_ failure causes the error to be escalated and is *not* interpreted as an invalid block.
+		validator.On("ValidatePayload", block).Return(fmt.Errorf("")).Once()
+		err = state.Extend(context.Background(), block)
+		require.Error(t, err)
+		require.False(t, st.IsInvalidExtensionError(err), err)
+
+		// Check that an `UnknownBlockError` causes the error to be escalated and is *not* interpreted as an invalid receipt.
+		// Reasoning: per convention, the ParticipantState requires that the candidate's parent has already been ingested.
+		// Otherwise, an exception is returned. The `ReceiptValidator.ValidatePayload(..)` returning an `UnknownBlockError`
+		// indicates exactly this situation, where the parent block is unknown.
+		validator.On("ValidatePayload", block).Return(module.NewUnknownBlockError("")).Once()
+		err = state.Extend(context.Background(), block)
+		require.Error(t, err)
+		require.False(t, st.IsInvalidExtensionError(err), err)
 	})
 }
 
@@ -838,7 +869,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 			all.QuorumCertificates,
 			all.Setups,
 			all.EpochCommits,
-			all.EpochProtocolState,
+			all.EpochProtocolStateEntries,
 			all.ProtocolKVStore,
 			all.VersionBeacons,
 			rootSnapshot,
@@ -860,7 +891,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		require.NoError(t, err)
 
 		mutableProtocolState := protocol_state.NewMutableProtocolState(
-			all.EpochProtocolState,
+			all.EpochProtocolStateEntries,
 			all.ProtocolKVStore,
 			state.Params(),
 			all.Headers,
@@ -2452,7 +2483,7 @@ func TestExtendInvalidSealsInBlock(t *testing.T) {
 			all.QuorumCertificates,
 			all.Setups,
 			all.EpochCommits,
-			all.EpochProtocolState,
+			all.EpochProtocolStateEntries,
 			all.ProtocolKVStore,
 			all.VersionBeacons,
 			rootSnapshot,
@@ -3013,7 +3044,7 @@ func TestHeaderInvalidTimestamp(t *testing.T) {
 			all.QuorumCertificates,
 			all.Setups,
 			all.EpochCommits,
-			all.EpochProtocolState,
+			all.EpochProtocolStateEntries,
 			all.ProtocolKVStore,
 			all.VersionBeacons,
 			rootSnapshot,
@@ -3082,7 +3113,7 @@ func TestProtocolStateIdempotent(t *testing.T) {
 	})
 }
 
-// assertEpochEmergencyFallbackTriggered tests that the given `stateSnapshot` has the `InvalidEpochTransitionAttempted` flag to the `expected` value.
+// assertEpochEmergencyFallbackTriggered tests that the given `stateSnapshot` has the `EpochFallbackTriggered` flag to the `expected` value.
 func assertEpochEmergencyFallbackTriggered(t *testing.T, stateSnapshot realprotocol.Snapshot, expected bool) {
 	epochState, err := stateSnapshot.EpochProtocolState()
 	require.NoError(t, err)
