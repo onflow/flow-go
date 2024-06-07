@@ -4,6 +4,7 @@ import (
 	"log"
 
 	"github.com/ipfs/go-cid"
+	"github.com/vmihailenco/msgpack/v4"
 )
 
 var EmptyEventCollectionID Identifier
@@ -191,4 +192,54 @@ type BlockExecutionDataRoot struct {
 	// ChunkExecutionDataIDs is a list of the root CIDs for each serialized execution_data.ChunkExecutionData
 	// associated with this block.
 	ChunkExecutionDataIDs []cid.Cid
+}
+
+// MarshalMsgpack implements the msgpack.Marshaler interface
+func (b BlockExecutionDataRoot) MarshalMsgpack() ([]byte, error) {
+	return msgpack.Marshal(struct {
+		BlockID               Identifier
+		ChunkExecutionDataIDs []string
+	}{
+		BlockID:               b.BlockID,
+		ChunkExecutionDataIDs: cidsToStrings(b.ChunkExecutionDataIDs),
+	})
+}
+
+// UnmarshalMsgpack implements the msgpack.Unmarshaler interface
+func (b *BlockExecutionDataRoot) UnmarshalMsgpack(data []byte) error {
+	var temp struct {
+		BlockID               Identifier
+		ChunkExecutionDataIDs []string
+	}
+
+	if err := msgpack.Unmarshal(data, &temp); err != nil {
+		return err
+	}
+
+	b.BlockID = temp.BlockID
+	b.ChunkExecutionDataIDs = stringsToCids(temp.ChunkExecutionDataIDs)
+
+	return nil
+}
+
+// Helper function to convert a slice of cid.Cid to a slice of strings
+func cidsToStrings(cids []cid.Cid) []string {
+	strs := make([]string, len(cids))
+	for i, c := range cids {
+		strs[i] = c.String()
+	}
+	return strs
+}
+
+// Helper function to convert a slice of strings to a slice of cid.Cid
+func stringsToCids(strs []string) []cid.Cid {
+	cids := make([]cid.Cid, len(strs))
+	for i, s := range strs {
+		c, err := cid.Decode(s)
+		if err != nil {
+			panic(err) // Handle error appropriately in real code
+		}
+		cids[i] = c
+	}
+	return cids
 }
