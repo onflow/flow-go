@@ -18,6 +18,7 @@ import (
 	ledger_json_exporter "github.com/onflow/flow-go/cmd/util/cmd/export-json-execution-state"
 	export_json_transactions "github.com/onflow/flow-go/cmd/util/cmd/export-json-transactions"
 	find_inconsistent_result "github.com/onflow/flow-go/cmd/util/cmd/find-inconsistent-result"
+	find_trie_root "github.com/onflow/flow-go/cmd/util/cmd/find-trie-root"
 	read_badger "github.com/onflow/flow-go/cmd/util/cmd/read-badger/cmd"
 	read_execution_state "github.com/onflow/flow-go/cmd/util/cmd/read-execution-state"
 	read_hotstuff "github.com/onflow/flow-go/cmd/util/cmd/read-hotstuff/cmd"
@@ -81,6 +82,7 @@ func addCommands() {
 	rootCmd.AddCommand(export_json_transactions.Cmd)
 	rootCmd.AddCommand(read_hotstuff.RootCmd)
 	rootCmd.AddCommand(find_inconsistent_result.Cmd)
+	rootCmd.AddCommand(find_trie_root.Cmd)
 	rootCmd.AddCommand(update_commitment.Cmd)
 }
 
