@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math"
+	"os"
 
 	prometheusWAL "github.com/onflow/wal/wal"
 	"github.com/prometheus/client_golang/prometheus"
@@ -85,8 +86,8 @@ func searchRootHashInSegments(
 	dir string,
 	wantFrom, wantTo int,
 ) (int, int64, error) {
-	log := zerolog.Logger{}
-	w, err := prometheusWAL.NewSize(log, prometheus.DefaultRegisterer, dir, wal.SegmentSize, false)
+	lg := zerolog.New(os.Stderr).With().Timestamp().Logger()
+	w, err := prometheusWAL.NewSize(lg, prometheus.DefaultRegisterer, dir, wal.SegmentSize, false)
 	if err != nil {
 		return 0, 0, fmt.Errorf("cannot create WAL: %w", err)
 	}
@@ -120,7 +121,7 @@ func searchRootHashInSegments(
 		Int("want-to", wantTo).
 		Msgf("searching for trie root hash %x in segments [%d,%d]", expectedHash, wantFrom, wantTo)
 
-	sr, err := prometheusWAL.NewSegmentsRangeReader(log, prometheusWAL.SegmentRange{
+	sr, err := prometheusWAL.NewSegmentsRangeReader(lg, prometheusWAL.SegmentRange{
 		Dir:   w.Dir(),
 		First: from,
 		Last:  to,
