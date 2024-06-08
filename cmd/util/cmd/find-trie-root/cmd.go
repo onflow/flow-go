@@ -148,7 +148,7 @@ func searchRootHashInSegments(
 
 		switch operation {
 		case wal.WALUpdate:
-			if rootHash == expectedHash {
+			if rootHash.Equals(expectedHash) {
 				log.Info().Msgf("found expected trie root hash %x", rootHash)
 				return reader.Segment(), reader.Offset(), nil
 			}
@@ -205,7 +205,7 @@ func copyWAL(dir, outputDir string, segment int, expectedRoot ledger.RootHash) e
 
 		switch operation {
 		case wal.WALUpdate:
-			if rootHash == expectedRoot {
+			if rootHash.Equals(expectedRoot) {
 				log.Info().Msgf("found expected trie root hash %x, finish writing", rootHash)
 				return nil
 			}
