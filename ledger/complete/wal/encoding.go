@@ -61,6 +61,7 @@ func Decode(data []byte) (operation WALOperation, rootHash ledger.RootHash, upda
 	switch operation {
 	case WALUpdate:
 		update, err = ledger.DecodeTrieUpdate(data[1:])
+		rootHash = update.RootHash
 		return
 	case WALDelete:
 		var rootHashBytes []byte

@@ -119,7 +119,7 @@ func searchRootHashInSegments(
 		Int("to", to).
 		Int("want-from", wantFrom).
 		Int("want-to", wantTo).
-		Msgf("searching for trie root hash %x in segments [%d,%d]", expectedHash, wantFrom, wantTo)
+		Msgf("searching for trie root hash %v in segments [%d,%d]", expectedHash, wantFrom, wantTo)
 
 	sr, err := prometheusWAL.NewSegmentsRangeReader(lg, prometheusWAL.SegmentRange{
 		Dir:   w.Dir(),
