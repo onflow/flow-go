@@ -166,14 +166,14 @@ func searchRootHashInSegments(
 }
 
 func copyWAL(dir, outputDir string, segment int, expectedRoot ledger.RootHash) error {
-	writer, err := prometheusWAL.NewSize(log.Logger, prometheus.DefaultRegisterer, outputDir, wal.SegmentSize, false)
+	writer, err := prometheusWAL.NewSize(log.Logger, nil, outputDir, wal.SegmentSize, false)
 	if err != nil {
 		return fmt.Errorf("cannot create writer WAL: %w", err)
 	}
 
 	defer writer.Close()
 
-	w, err := prometheusWAL.NewSize(log.Logger, prometheus.DefaultRegisterer, dir, wal.SegmentSize, false)
+	w, err := prometheusWAL.NewSize(log.Logger, nil, dir, wal.SegmentSize, false)
 	if err != nil {
 		return fmt.Errorf("cannot create WAL: %w", err)
 	}
