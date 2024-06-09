@@ -7,6 +7,7 @@ import (
 	gethTypes "github.com/onflow/go-ethereum/core/types"
 	gethVM "github.com/onflow/go-ethereum/core/vm"
 	gethCrypto "github.com/onflow/go-ethereum/crypto"
+	"github.com/onflow/go-ethereum/eth/tracers"
 )
 
 var (
@@ -32,6 +33,7 @@ type BlockContext struct {
 	GasFeeCollector        Address
 	GetHashFunc            func(n uint64) gethCommon.Hash
 	Random                 gethCommon.Hash
+	Tracer                 tracers.Tracer
 
 	// a set of extra precompiles to be injected
 	ExtraPrecompiles []Precompile
