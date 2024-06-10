@@ -5,19 +5,20 @@ import (
 	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
-// ProtocolState represents persistent storage for protocol state entries.
-type ProtocolState interface {
+// EpochProtocolStateEntries represents persistent, fork-aware storage for the Epoch-related
+// sub-state of the overall of the overall Protocol State (KV Store).
+type EpochProtocolStateEntries interface {
 	// StoreTx returns an anonymous function (intended to be executed as part of a badger transaction),
-	// which persists the given protocol state as part of a DB tx. Per convention, the identities in
+	// which persists the given epoch sub-state as part of a DB tx. Per convention, the identities in
 	// the Protocol State must be in canonical order for the current and next epoch (if present),
 	// otherwise an exception is returned.
 	// Expected errors of the returned anonymous function:
-	//   - storage.ErrAlreadyExists if a Protocol State with the given id is already stored
-	StoreTx(protocolStateID flow.Identifier, protocolState *flow.ProtocolStateEntry) func(*transaction.Tx) error
+	//   - storage.ErrAlreadyExists if an epoch sub-state with the given id is already stored
+	StoreTx(epochProtocolStateID flow.Identifier, epochProtocolStateEntry *flow.EpochProtocolStateEntry) func(*transaction.Tx) error
 
 	// Index returns an anonymous function that is intended to be executed as part of a database transaction.
-	// In a nutshell, we want to maintain a map from `blockID` to `protocolStateID`, where `blockID` references the
-	// block that _proposes_ the Protocol State.
+	// In a nutshell, we want to maintain a map from `blockID` to `epochProtocolStateID`, where `blockID` references the
+	// block that _proposes_ the epoch sub-state.
 	// Upon call, the anonymous function persists the specific map entry in the node's database.
 	// Protocol convention:
 	//   - Consider block B, whose ingestion might potentially lead to an updated protocol state. For example,
@@ -28,15 +29,15 @@ type ProtocolState interface {
 	//     _after_ validating the QC.
 	//
 	// Expected errors during normal operations:
-	//   - storage.ErrAlreadyExists if a Protocol State for the given blockID has already been indexed
-	Index(blockID flow.Identifier, protocolStateID flow.Identifier) func(*transaction.Tx) error
+	//   - storage.ErrAlreadyExists if a epoch sub-state for the given blockID has already been indexed
+	Index(blockID flow.Identifier, epochProtocolStateID flow.Identifier) func(*transaction.Tx) error
 
-	// ByID returns the protocol state by its ID.
+	// ByID returns the flow.RichEpochProtocolStateEntry by its ID.
 	// Expected errors during normal operations:
-	//   - storage.ErrNotFound if no protocol state with the given Identifier is known.
-	ByID(id flow.Identifier) (*flow.RichProtocolStateEntry, error)
+	//   - storage.ErrNotFound if no epoch state entry with the given Identifier is known.
+	ByID(id flow.Identifier) (*flow.RichEpochProtocolStateEntry, error)
 
-	// ByBlockID retrieves the Protocol State that the block with the given ID proposes.
+	// ByBlockID retrieves the flow.RichEpochProtocolStateEntry that the block with the given ID proposes.
 	// CAUTION: this protocol state requires confirmation by a QC and will only become active at the child block,
 	// _after_ validating the QC. Protocol convention:
 	//   - Consider block B, whose ingestion might potentially lead to an updated protocol state. For example,
@@ -47,6 +48,6 @@ type ProtocolState interface {
 	//     _after_ validating the QC.
 	//
 	// Expected errors during normal operations:
-	//   - storage.ErrNotFound if no protocol state has been indexed for the given block.
-	ByBlockID(blockID flow.Identifier) (*flow.RichProtocolStateEntry, error)
+	//   - storage.ErrNotFound if no epoch state entry has been indexed for the given block.
+	ByBlockID(blockID flow.Identifier) (*flow.RichEpochProtocolStateEntry, error)
 }

@@ -206,7 +206,7 @@ func (suite *Suite) TestGetTransactionResultFromCache() {
 		}
 
 		suite.historicalAccessClient.
-			On("GetTransactionResult", mock.AnythingOfType("*context.emptyCtx"), mock.AnythingOfType("*access.GetTransactionRequest")).
+			On("GetTransactionResult", mock.Anything, mock.AnythingOfType("*access.GetTransactionRequest")).
 			Return(&transactionResultResponse, nil).Once()
 
 		params := suite.defaultBackendParams()
@@ -249,7 +249,7 @@ func (suite *Suite) TestGetTransactionResultFromCache() {
 func (suite *Suite) TestGetTransactionResultCacheNonExistent() {
 	suite.withGetTransactionCachingTestSetup(func(block *flow.Block, tx *flow.Transaction) {
 		suite.historicalAccessClient.
-			On("GetTransactionResult", mock.AnythingOfType("*context.emptyCtx"), mock.AnythingOfType("*access.GetTransactionRequest")).
+			On("GetTransactionResult", mock.Anything, mock.AnythingOfType("*access.GetTransactionRequest")).
 			Return(nil, status.Errorf(codes.NotFound, "no known transaction with ID %s", tx.ID())).Once()
 
 		params := suite.defaultBackendParams()
@@ -290,7 +290,7 @@ func (suite *Suite) TestGetTransactionResultCacheNonExistent() {
 func (suite *Suite) TestGetTransactionResultUnknownFromCache() {
 	suite.withGetTransactionCachingTestSetup(func(block *flow.Block, tx *flow.Transaction) {
 		suite.historicalAccessClient.
-			On("GetTransactionResult", mock.AnythingOfType("*context.emptyCtx"), mock.AnythingOfType("*access.GetTransactionRequest")).
+			On("GetTransactionResult", mock.Anything, mock.AnythingOfType("*access.GetTransactionRequest")).
 			Return(nil, status.Errorf(codes.NotFound, "no known transaction with ID %s", tx.ID())).Once()
 
 		params := suite.defaultBackendParams()
@@ -461,7 +461,7 @@ func (suite *Suite) TestLookupTransactionErrorMessageByIndex_HappyPath() {
 	params.ConnFactory = connFactory
 	params.FixedExecutionNodeIDs = fixedENIDs.NodeIDs().Strings()
 
-	params.TxResultsIndex = index.NewTransactionResultsIndex(suite.transactionResults)
+	params.TxResultsIndex = index.NewTransactionResultsIndex(index.NewReporter(), suite.transactionResults)
 	err := params.TxResultsIndex.Initialize(reporter)
 	suite.Require().NoError(err)
 
@@ -511,7 +511,7 @@ func (suite *Suite) TestLookupTransactionErrorMessageByIndex_UnknownTransaction(
 
 	params := suite.defaultBackendParams()
 
-	params.TxResultsIndex = index.NewTransactionResultsIndex(suite.transactionResults)
+	params.TxResultsIndex = index.NewTransactionResultsIndex(index.NewReporter(), suite.transactionResults)
 	err := params.TxResultsIndex.Initialize(reporter)
 	suite.Require().NoError(err)
 
@@ -560,7 +560,7 @@ func (suite *Suite) TestLookupTransactionErrorMessageByIndex_FailedToFetch() {
 	params.ConnFactory = connFactory
 	params.FixedExecutionNodeIDs = fixedENIDs.NodeIDs().Strings()
 
-	params.TxResultsIndex = index.NewTransactionResultsIndex(suite.transactionResults)
+	params.TxResultsIndex = index.NewTransactionResultsIndex(index.NewReporter(), suite.transactionResults)
 	err := params.TxResultsIndex.Initialize(reporter)
 	suite.Require().NoError(err)
 
@@ -617,7 +617,7 @@ func (suite *Suite) TestLookupTransactionErrorMessages_HappyPath() {
 	params.ConnFactory = connFactory
 	params.FixedExecutionNodeIDs = fixedENIDs.NodeIDs().Strings()
 
-	params.TxResultsIndex = index.NewTransactionResultsIndex(suite.transactionResults)
+	params.TxResultsIndex = index.NewTransactionResultsIndex(index.NewReporter(), suite.transactionResults)
 	err := params.TxResultsIndex.Initialize(reporter)
 	suite.Require().NoError(err)
 
@@ -697,7 +697,7 @@ func (suite *Suite) TestLookupTransactionErrorMessages_HappyPath_NoFailedTxns() 
 
 	params := suite.defaultBackendParams()
 
-	params.TxResultsIndex = index.NewTransactionResultsIndex(suite.transactionResults)
+	params.TxResultsIndex = index.NewTransactionResultsIndex(index.NewReporter(), suite.transactionResults)
 	err := params.TxResultsIndex.Initialize(reporter)
 	suite.Require().NoError(err)
 
@@ -726,7 +726,7 @@ func (suite *Suite) TestLookupTransactionErrorMessages_UnknownTransaction() {
 
 	params := suite.defaultBackendParams()
 
-	params.TxResultsIndex = index.NewTransactionResultsIndex(suite.transactionResults)
+	params.TxResultsIndex = index.NewTransactionResultsIndex(index.NewReporter(), suite.transactionResults)
 	err := params.TxResultsIndex.Initialize(reporter)
 	suite.Require().NoError(err)
 
@@ -781,7 +781,7 @@ func (suite *Suite) TestLookupTransactionErrorMessages_FailedToFetch() {
 	params.ConnFactory = connFactory
 	params.FixedExecutionNodeIDs = fixedENIDs.NodeIDs().Strings()
 
-	params.TxResultsIndex = index.NewTransactionResultsIndex(suite.transactionResults)
+	params.TxResultsIndex = index.NewTransactionResultsIndex(index.NewReporter(), suite.transactionResults)
 	err := params.TxResultsIndex.Initialize(reporter)
 	suite.Require().NoError(err)
 
@@ -959,17 +959,16 @@ func (suite *Suite) TestGetSystemTransactionResultFromStorage() {
 	reporter.On("LowestIndexedHeight").Return(block.Header.Height, nil)
 	reporter.On("HighestIndexedHeight").Return(block.Header.Height+10, nil)
 
+	indexReporter := index.NewReporter()
+	err = indexReporter.Initialize(reporter)
+	suite.Require().NoError(err)
+
 	// Set up the backend parameters and the backend instance
 	params := suite.defaultBackendParams()
 	params.TxResultQueryMode = IndexQueryModeLocalOnly
 
-	params.EventsIndex = index.NewEventsIndex(suite.events)
-	err = params.EventsIndex.Initialize(reporter)
-	suite.Require().NoError(err)
-
-	params.TxResultsIndex = index.NewTransactionResultsIndex(suite.transactionResults)
-	err = params.TxResultsIndex.Initialize(reporter)
-	suite.Require().NoError(err)
+	params.EventsIndex = index.NewEventsIndex(indexReporter, suite.events)
+	params.TxResultsIndex = index.NewTransactionResultsIndex(indexReporter, suite.transactionResults)
 
 	backend, err := New(params)
 	suite.Require().NoError(err)
@@ -1185,6 +1184,10 @@ func (suite *Suite) TestTransactionResultFromStorage() {
 	reporter.On("LowestIndexedHeight").Return(block.Header.Height, nil)
 	reporter.On("HighestIndexedHeight").Return(block.Header.Height+10, nil)
 
+	indexReporter := index.NewReporter()
+	err := indexReporter.Initialize(reporter)
+	suite.Require().NoError(err)
+
 	// Set up the backend parameters and the backend instance
 	params := suite.defaultBackendParams()
 	// the connection factory should be used to get the execution node client
@@ -1192,13 +1195,8 @@ func (suite *Suite) TestTransactionResultFromStorage() {
 	params.FixedExecutionNodeIDs = fixedENIDs.NodeIDs().Strings()
 	params.TxResultQueryMode = IndexQueryModeLocalOnly
 
-	params.EventsIndex = index.NewEventsIndex(suite.events)
-	err := params.EventsIndex.Initialize(reporter)
-	suite.Require().NoError(err)
-
-	params.TxResultsIndex = index.NewTransactionResultsIndex(suite.transactionResults)
-	err = params.TxResultsIndex.Initialize(reporter)
-	suite.Require().NoError(err)
+	params.EventsIndex = index.NewEventsIndex(indexReporter, suite.events)
+	params.TxResultsIndex = index.NewTransactionResultsIndex(indexReporter, suite.transactionResults)
 
 	backend, err := New(params)
 	suite.Require().NoError(err)
@@ -1277,6 +1275,10 @@ func (suite *Suite) TestTransactionByIndexFromStorage() {
 	reporter.On("LowestIndexedHeight").Return(block.Header.Height, nil)
 	reporter.On("HighestIndexedHeight").Return(block.Header.Height+10, nil)
 
+	indexReporter := index.NewReporter()
+	err := indexReporter.Initialize(reporter)
+	suite.Require().NoError(err)
+
 	// Set up the backend parameters and the backend instance
 	params := suite.defaultBackendParams()
 	// the connection factory should be used to get the execution node client
@@ -1284,13 +1286,8 @@ func (suite *Suite) TestTransactionByIndexFromStorage() {
 	params.FixedExecutionNodeIDs = fixedENIDs.NodeIDs().Strings()
 	params.TxResultQueryMode = IndexQueryModeLocalOnly
 
-	params.EventsIndex = index.NewEventsIndex(suite.events)
-	err := params.EventsIndex.Initialize(reporter)
-	suite.Require().NoError(err)
-
-	params.TxResultsIndex = index.NewTransactionResultsIndex(suite.transactionResults)
-	err = params.TxResultsIndex.Initialize(reporter)
-	suite.Require().NoError(err)
+	params.EventsIndex = index.NewEventsIndex(indexReporter, suite.events)
+	params.TxResultsIndex = index.NewTransactionResultsIndex(indexReporter, suite.transactionResults)
 
 	backend, err := New(params)
 	suite.Require().NoError(err)
@@ -1375,19 +1372,18 @@ func (suite *Suite) TestTransactionResultsByBlockIDFromStorage() {
 	reporter.On("LowestIndexedHeight").Return(block.Header.Height, nil)
 	reporter.On("HighestIndexedHeight").Return(block.Header.Height+10, nil)
 
+	indexReporter := index.NewReporter()
+	err := indexReporter.Initialize(reporter)
+	suite.Require().NoError(err)
+
 	// Set up the state and snapshot mocks and the backend instance
 	params := suite.defaultBackendParams()
 	// the connection factory should be used to get the execution node client
 	params.ConnFactory = connFactory
 	params.FixedExecutionNodeIDs = fixedENIDs.NodeIDs().Strings()
 
-	params.EventsIndex = index.NewEventsIndex(suite.events)
-	err := params.EventsIndex.Initialize(reporter)
-	suite.Require().NoError(err)
-
-	params.TxResultsIndex = index.NewTransactionResultsIndex(suite.transactionResults)
-	err = params.TxResultsIndex.Initialize(reporter)
-	suite.Require().NoError(err)
+	params.EventsIndex = index.NewEventsIndex(indexReporter, suite.events)
+	params.TxResultsIndex = index.NewTransactionResultsIndex(indexReporter, suite.transactionResults)
 
 	params.TxResultQueryMode = IndexQueryModeLocalOnly
 

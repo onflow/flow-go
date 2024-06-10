@@ -20,7 +20,7 @@ type Snapshot struct {
 var _ protocol.Snapshot = (*Snapshot)(nil)
 
 func (s Snapshot) Head() (*flow.Header, error) {
-	return s.enc.Head, nil
+	return s.enc.Head(), nil
 }
 
 func (s Snapshot) QuorumCertificate() (*flow.QuorumCertificate, error) {
@@ -50,11 +50,23 @@ func (s Snapshot) Identity(nodeID flow.Identifier) (*flow.Identity, error) {
 }
 
 func (s Snapshot) Commit() (flow.StateCommitment, error) {
-	return s.enc.LatestSeal.FinalState, nil
+	latestSeal, err := s.enc.LatestSeal()
+	if err != nil {
+		return flow.StateCommitment{}, nil
+	}
+	return latestSeal.FinalState, nil
 }
 
 func (s Snapshot) SealedResult() (*flow.ExecutionResult, *flow.Seal, error) {
-	return s.enc.LatestResult, s.enc.LatestSeal, nil
+	latestSeal, err := s.enc.LatestSeal()
+	if err != nil {
+		return nil, nil, err
+	}
+	latestSealedResult, err := s.enc.LatestSealedResult()
+	if err != nil {
+		return nil, nil, err
+	}
+	return latestSealedResult, latestSeal, nil
 }
 
 func (s Snapshot) SealingSegment() (*flow.SealingSegment, error) {
@@ -92,9 +104,9 @@ func (s Snapshot) Encodable() EncodableSnapshot {
 	return s.enc
 }
 
-func (s Snapshot) EpochProtocolState() (protocol.DynamicProtocolState, error) {
+func (s Snapshot) EpochProtocolState() (protocol.EpochProtocolState, error) {
 	entry := s.enc.SealingSegment.LatestProtocolStateEntry()
-	return NewDynamicProtocolStateAdapter(entry.EpochEntry, s.Params()), nil
+	return NewEpochProtocolStateAdapter(entry.EpochEntry, s.Params()), nil
 }
 
 func (s Snapshot) ProtocolState() (protocol.KVStoreReader, error) {

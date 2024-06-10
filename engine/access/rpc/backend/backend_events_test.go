@@ -84,7 +84,7 @@ func (s *BackendEventsSuite) SetupTest() {
 
 	s.execClient = access.NewExecutionAPIClient(s.T())
 	s.executionNodes = unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
-	s.eventsIndex = index.NewEventsIndex(s.events)
+	s.eventsIndex = index.NewEventsIndex(index.NewReporter(), s.events)
 
 	blockCount := 5
 	s.blocks = make([]*flow.Block, blockCount)
@@ -310,7 +310,7 @@ func (s *BackendEventsSuite) TestGetEvents_HappyPaths() {
 
 		s.Run(fmt.Sprintf("all from en - %s - %s", tt.encoding.String(), tt.queryMode), func() {
 			events := storagemock.NewEvents(s.T())
-			eventsIndex := index.NewEventsIndex(events)
+			eventsIndex := index.NewEventsIndex(index.NewReporter(), events)
 
 			switch tt.queryMode {
 			case IndexQueryModeLocalOnly:
@@ -340,7 +340,7 @@ func (s *BackendEventsSuite) TestGetEvents_HappyPaths() {
 
 		s.Run(fmt.Sprintf("mixed storage & en - %s - %s", tt.encoding.String(), tt.queryMode), func() {
 			events := storagemock.NewEvents(s.T())
-			eventsIndex := index.NewEventsIndex(events)
+			eventsIndex := index.NewEventsIndex(index.NewReporter(), events)
 
 			switch tt.queryMode {
 			case IndexQueryModeLocalOnly, IndexQueryModeExecutionNodesOnly:

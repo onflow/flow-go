@@ -26,7 +26,7 @@ type StateMachine interface {
 	// Do NOT call Build, if the StateMachine instance has returned a `protocol.InvalidServiceEventError`
 	// at any time during its lifetime. After this error, the StateMachine is left with a potentially
 	// dysfunctional state and should be discarded.
-	Build() (updatedState *flow.ProtocolStateEntry, stateID flow.Identifier, hasChanges bool)
+	Build() (updatedState *flow.EpochProtocolStateEntry, stateID flow.Identifier, hasChanges bool)
 
 	// ProcessEpochSetup updates the internally-maintained interim Epoch state with data from epoch setup event.
 	// Processing an epoch setup event also affects the identity table for the current epoch.
@@ -85,13 +85,13 @@ type StateMachine interface {
 	View() uint64
 
 	// ParentState returns parent protocol state associated with this state machine.
-	ParentState() *flow.RichProtocolStateEntry
+	ParentState() *flow.RichEpochProtocolStateEntry
 }
 
 // StateMachineFactoryMethod is a factory method to create state machines for evolving the protocol's epoch state.
 // Currently, we have `HappyPathStateMachine` and `FallbackStateMachine` as StateMachine
 // implementations, whose constructors both have the same signature as StateMachineFactoryMethod.
-type StateMachineFactoryMethod func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (StateMachine, error)
+type StateMachineFactoryMethod func(candidateView uint64, parentState *flow.RichEpochProtocolStateEntry) (StateMachine, error)
 
 // EpochStateMachine is a hierarchical state machine that encapsulates the logic for protocol-compliant evolution of Epoch-related sub-state.
 // EpochStateMachine processes a subset of service events that are relevant for the Epoch state, and ignores all other events.
@@ -107,7 +107,7 @@ type EpochStateMachine struct {
 
 	setups               storage.EpochSetups
 	commits              storage.EpochCommits
-	epochProtocolStateDB storage.ProtocolState
+	epochProtocolStateDB storage.EpochProtocolStateEntries
 	pendingDbUpdates     *transaction.DeferredBlockPersist
 }
 
@@ -124,7 +124,7 @@ func NewEpochStateMachine(
 	params protocol.GlobalParams,
 	setups storage.EpochSetups,
 	commits storage.EpochCommits,
-	epochProtocolStateDB storage.ProtocolState,
+	epochProtocolStateDB storage.EpochProtocolStateEntries,
 	parentState protocol.KVStoreReader,
 	mutator protocol_state.KVStoreMutator,
 	happyPathStateMachineFactory StateMachineFactoryMethod,
@@ -329,7 +329,7 @@ func (e *EpochStateMachine) transitionToEpochFallbackMode(orderedUpdates []flow.
 //   - The seal for block A was included in some block C, s.t C is an ancestor of B.
 //
 // For further details see `params.EpochCommitSafetyThreshold()`.
-func epochFallbackTriggeredByIncorporatingCandidate(candidateView uint64, params protocol.GlobalParams, parentState *flow.RichProtocolStateEntry) bool {
+func epochFallbackTriggeredByIncorporatingCandidate(candidateView uint64, params protocol.GlobalParams, parentState *flow.RichEpochProtocolStateEntry) bool {
 	if parentState.EpochPhase() == flow.EpochPhaseCommitted { // Requirement 1
 		return false
 	}

@@ -65,7 +65,7 @@ func (suite *EpochLookupSuite) SetupTest() {
 		func() flow.EpochPhase { return suite.Phase() },
 		func() error { return nil })
 
-	epochProtocolState := mockprotocol.NewDynamicProtocolState(suite.T())
+	epochProtocolState := mockprotocol.NewEpochProtocolState(suite.T())
 	epochProtocolState.On("EpochFallbackTriggered").Return(
 		suite.EpochFallbackTriggered,
 		func() error { return nil },

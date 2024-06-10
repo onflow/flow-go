@@ -35,7 +35,7 @@ type ConsensusSuite struct {
 	snapshot           *protocolmock.Snapshot
 	params             *protocolmock.Params
 	epochs             *mocks.EpochQuery
-	epochProtocolState *protocolmock.DynamicProtocolState
+	epochProtocolState *protocolmock.EpochProtocolState
 
 	// backend for mocked functions
 	phase                  flow.EpochPhase
@@ -60,7 +60,7 @@ func (suite *ConsensusSuite) SetupTest() {
 
 	suite.state.On("Final").Return(suite.snapshot)
 	suite.state.On("Params").Return(suite.params)
-	suite.epochProtocolState = protocolmock.NewDynamicProtocolState(suite.T())
+	suite.epochProtocolState = protocolmock.NewEpochProtocolState(suite.T())
 	suite.epochProtocolState.On("EpochFallbackTriggered").Return(
 		func() bool { return suite.epochFallbackTriggered },
 		func() error { return nil },
@@ -617,7 +617,7 @@ func TestRemoveOldEpochs(t *testing.T) {
 	snapshot := protocolmock.NewSnapshot(t)
 	state.On("Final").Return(snapshot)
 
-	epochProtocolState := protocolmock.NewDynamicProtocolState(t)
+	epochProtocolState := protocolmock.NewEpochProtocolState(t)
 	epochProtocolState.On("EpochFallbackTriggered").Return(false, nil)
 	snapshot.On("EpochProtocolState").Return(epochProtocolState, nil)
 
