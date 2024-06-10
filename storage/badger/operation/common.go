@@ -477,13 +477,13 @@ func traverse(prefix []byte, iteration iterationFunc) func(*badger.Txn) error {
 		it := tx.NewIterator(opts)
 		defer it.Close()
 
+		// initialize processing functions for iteration
+		check, create, handle := iteration()
+
 		// this is where we actually enforce that all results have the prefix
 		for it.Seek(prefix); it.ValidForPrefix(prefix); it.Next() {
 
 			item := it.Item()
-
-			// initialize processing functions for iteration
-			check, create, handle := iteration()
 
 			// check if we should process the item at all
 			key := item.Key()
