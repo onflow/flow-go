@@ -5,6 +5,22 @@
 		"type": "constructor"
 	},
 	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "value",
+				"type": "uint256"
+			},
+			{
+				"internalType": "string",
+				"name": "message",
+				"type": "string"
+			}
+		],
+		"name": "MyCustomError",
+		"type": "error"
+	},
+	{
 		"anonymous": false,
 		"inputs": [
 			{
@@ -22,6 +38,13 @@
 		],
 		"name": "NewStore",
 		"type": "event"
+	},
+	{
+		"inputs": [],
+		"name": "assertError",
+		"outputs": [],
+		"stateMutability": "pure",
+		"type": "function"
 	},
 	{
 		"inputs": [
@@ -92,6 +115,13 @@
 			}
 		],
 		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "customError",
+		"outputs": [],
+		"stateMutability": "pure",
 		"type": "function"
 	},
 	{

@@ -139,6 +139,7 @@ func (m *visitMigration) Migrate(
 	storageMapKey interpreter.StorageMapKey,
 	value interpreter.Value,
 	_ *interpreter.Interpreter,
+	_ migrations2.ValueMigrationPosition,
 ) (newValue interpreter.Value, err error) {
 
 	m.visits = append(
@@ -872,8 +873,18 @@ func checkReporters(
 			},
 			cadenceValueMigrationEntry{
 				StorageKey:    interpreter.StorageKey{Key: "storage", Address: address},
+				StorageMapKey: interpreter.StringStorageMapKey("dictionary_with_auth_reference_typed_key"),
+				Migration:     "TypeKeyMigration",
+			},
+			cadenceValueMigrationEntry{
+				StorageKey:    interpreter.StorageKey{Key: "storage", Address: address},
 				StorageMapKey: interpreter.StringStorageMapKey("dictionary_with_reference_typed_key"),
 				Migration:     "EntitlementsMigration",
+			},
+			cadenceValueMigrationEntry{
+				StorageKey:    interpreter.StorageKey{Key: "storage", Address: address},
+				StorageMapKey: interpreter.StringStorageMapKey("dictionary_with_reference_typed_key"),
+				Migration:     "TypeKeyMigration",
 			},
 			cadenceValueMigrationEntry{
 				StorageKey:    interpreter.StorageKey{Key: "storage", Address: address},
@@ -888,7 +899,7 @@ func checkReporters(
 			cadenceValueMigrationEntry{
 				StorageKey:    interpreter.StorageKey{Key: "storage", Address: address},
 				StorageMapKey: interpreter.StringStorageMapKey("dictionary_with_account_type_keys"),
-				Migration:     "StaticTypeMigration",
+				Migration:     "TypeKeyMigration",
 			},
 			cadenceValueMigrationEntry{
 				StorageKey:    interpreter.StorageKey{Key: "storage", Address: address},
@@ -898,7 +909,7 @@ func checkReporters(
 			cadenceValueMigrationEntry{
 				StorageKey:    interpreter.StorageKey{Key: "storage", Address: address},
 				StorageMapKey: interpreter.StringStorageMapKey("dictionary_with_account_type_keys"),
-				Migration:     "StaticTypeMigration",
+				Migration:     "TypeKeyMigration",
 			},
 			cadenceValueMigrationEntry{
 				StorageKey:    interpreter.StorageKey{Key: "storage", Address: address},
@@ -908,7 +919,7 @@ func checkReporters(
 			cadenceValueMigrationEntry{
 				StorageKey:    interpreter.StorageKey{Key: "storage", Address: address},
 				StorageMapKey: interpreter.StringStorageMapKey("dictionary_with_account_type_keys"),
-				Migration:     "StaticTypeMigration",
+				Migration:     "TypeKeyMigration",
 			},
 			cadenceValueMigrationEntry{
 				StorageKey:    interpreter.StorageKey{Key: "storage", Address: address},
@@ -918,12 +929,57 @@ func checkReporters(
 			cadenceValueMigrationEntry{
 				StorageKey:    interpreter.StorageKey{Key: "storage", Address: address},
 				StorageMapKey: interpreter.StringStorageMapKey("dictionary_with_account_type_keys"),
-				Migration:     "StaticTypeMigration",
+				Migration:     "TypeKeyMigration",
 			},
 			cadenceValueMigrationEntry{
 				StorageKey:    interpreter.StorageKey{Key: "storage", Address: address},
 				StorageMapKey: interpreter.StringStorageMapKey("dictionary_with_account_type_keys"),
 				Migration:     "StaticTypeMigration",
+			},
+			cadenceValueMigrationEntry{
+				StorageKey:    interpreter.StorageKey{Key: "storage", Address: address},
+				StorageMapKey: interpreter.StringStorageMapKey("dictionary_with_account_type_keys"),
+				Migration:     "TypeKeyMigration",
+			},
+			cadenceValueMigrationEntry{
+				StorageKey:    interpreter.StorageKey{Key: "storage", Address: address},
+				StorageMapKey: interpreter.StringStorageMapKey("dictionary_with_account_type_keys"),
+				Migration:     "StaticTypeMigration",
+			},
+			cadenceValueMigrationEntry{
+				StorageKey:    interpreter.StorageKey{Key: "storage", Address: address},
+				StorageMapKey: interpreter.StringStorageMapKey("dictionary_with_account_type_keys"),
+				Migration:     "TypeKeyMigration",
+			},
+			cadenceValueMigrationEntry{
+				StorageKey:    interpreter.StorageKey{Key: "storage", Address: address},
+				StorageMapKey: interpreter.StringStorageMapKey("dictionary_with_account_type_keys"),
+				Migration:     "StaticTypeMigration",
+			},
+			cadenceValueMigrationEntry{
+				StorageKey:    interpreter.StorageKey{Key: "storage", Address: address},
+				StorageMapKey: interpreter.StringStorageMapKey("dictionary_with_account_type_keys"),
+				Migration:     "TypeKeyMigration",
+			},
+			cadenceValueMigrationEntry{
+				StorageKey:    interpreter.StorageKey{Key: "storage", Address: address},
+				StorageMapKey: interpreter.StringStorageMapKey("dictionary_with_account_type_keys"),
+				Migration:     "StaticTypeMigration",
+			},
+			cadenceValueMigrationEntry{
+				StorageKey:    interpreter.StorageKey{Key: "storage", Address: address},
+				StorageMapKey: interpreter.StringStorageMapKey("dictionary_with_account_type_keys"),
+				Migration:     "TypeKeyMigration",
+			},
+			cadenceValueMigrationEntry{
+				StorageKey:    interpreter.StorageKey{Key: "storage", Address: address},
+				StorageMapKey: interpreter.StringStorageMapKey("dictionary_with_account_type_keys"),
+				Migration:     "StaticTypeMigration",
+			},
+			cadenceValueMigrationEntry{
+				StorageKey:    interpreter.StorageKey{Key: "storage", Address: address},
+				StorageMapKey: interpreter.StringStorageMapKey("dictionary_with_account_type_keys"),
+				Migration:     "TypeKeyMigration",
 			},
 			cadenceValueMigrationEntry{
 				StorageKey:    interpreter.StorageKey{Key: "storage", Address: address},
@@ -943,7 +999,17 @@ func checkReporters(
 			cadenceValueMigrationEntry{
 				StorageKey:    interpreter.StorageKey{Key: "storage", Address: address},
 				StorageMapKey: interpreter.StringStorageMapKey("dictionary_with_restricted_typed_keys"),
+				Migration:     "TypeKeyMigration",
+			},
+			cadenceValueMigrationEntry{
+				StorageKey:    interpreter.StorageKey{Key: "storage", Address: address},
+				StorageMapKey: interpreter.StringStorageMapKey("dictionary_with_restricted_typed_keys"),
 				Migration:     "StaticTypeMigration",
+			},
+			cadenceValueMigrationEntry{
+				StorageKey:    interpreter.StorageKey{Key: "storage", Address: address},
+				StorageMapKey: interpreter.StringStorageMapKey("dictionary_with_restricted_typed_keys"),
+				Migration:     "TypeKeyMigration",
 			},
 			cadenceValueMigrationEntry{
 				StorageKey:    interpreter.StorageKey{Key: "public", Address: address},
