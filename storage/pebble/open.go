@@ -36,6 +36,10 @@ func NewBootstrappedRegistersWithPath(dir string) (*Registers, *pebble.DB, error
 }
 
 // OpenRegisterPebbleDB opens the database
+// The difference between OpenDefaultPebbleDB is that it uses
+// a customized comparer (NewMVCCComparer) which is needed to
+// implement finding register values at any given height using
+// pebble's SeekPrefixGE function
 func OpenRegisterPebbleDB(dir string) (*pebble.DB, error) {
 	cache := pebble.NewCache(DefaultPebbleCacheSize)
 	defer cache.Unref()
@@ -49,6 +53,8 @@ func OpenRegisterPebbleDB(dir string) (*pebble.DB, error) {
 	return db, nil
 }
 
+// OpenDefaultPebbleDB opens a pebble database using default options,
+// such as cache size and comparer
 func OpenDefaultPebbleDB(dir string) (*pebble.DB, error) {
 	cache := pebble.NewCache(DefaultPebbleCacheSize)
 	defer cache.Unref()

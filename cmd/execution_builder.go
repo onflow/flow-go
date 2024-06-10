@@ -751,7 +751,8 @@ func (exeNode *ExecutionNode) LoadExecutionState(
 			return nil, fmt.Errorf("could not open badger-based chunk data pack database: %w", err)
 		}
 		closer = chunkDataPackDB
-		chunkDataPacks = storage.NewChunkDataPacks(node.Metrics.Cache, chunkDataPackDB, node.Storage.Collections, exeNode.exeConf.chunkDataPackCacheSize)
+		chunkDataPacks = storage.NewChunkDataPacks(node.Metrics.Cache, chunkDataPackDB,
+			node.Storage.Collections, exeNode.exeConf.chunkDataPackCacheSize)
 	} else {
 		// either isPebble or isEmpty then use pebble
 
@@ -760,7 +761,8 @@ func (exeNode *ExecutionNode) LoadExecutionState(
 			return nil, fmt.Errorf("could not open pebble-based chunk data pack database: %w", err)
 		}
 		closer = chunkDataPackDB
-		chunkDataPacks = storagepebble.NewChunkDataPacks(node.Metrics.Cache, chunkDataPackDB, node.Storage.Collections, exeNode.exeConf.chunkDataPackCacheSize)
+		chunkDataPacks = storagepebble.NewChunkDataPacks(node.Metrics.Cache, chunkDataPackDB,
+			node.Storage.Collections, exeNode.exeConf.chunkDataPackCacheSize)
 	}
 
 	exeNode.builder.ShutdownFunc(func() error {
@@ -769,7 +771,6 @@ func (exeNode *ExecutionNode) LoadExecutionState(
 		}
 		return nil
 	})
-
 	// Needed for gRPC server, make sure to assign to main scoped vars
 	exeNode.events = storage.NewEvents(node.Metrics.Cache, node.DB)
 	exeNode.serviceEvents = storage.NewServiceEvents(node.Metrics.Cache, node.DB)

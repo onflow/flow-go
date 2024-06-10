@@ -38,6 +38,7 @@ func (b *Batch) OnSucceed(callback func()) {
 // Flush will call the badger Batch's Flush method, in
 // addition, it will call the callbacks added by
 // OnSucceed
+// any error are exceptions
 func (b *Batch) Flush() error {
 	err := b.writer.Commit(nil)
 	if err != nil {

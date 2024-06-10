@@ -1,6 +1,7 @@
 package flow
 
 import (
+	"fmt"
 	"log"
 
 	"github.com/ipfs/go-cid"
@@ -217,7 +218,13 @@ func (b *BlockExecutionDataRoot) UnmarshalMsgpack(data []byte) error {
 	}
 
 	b.BlockID = temp.BlockID
-	b.ChunkExecutionDataIDs = stringsToCids(temp.ChunkExecutionDataIDs)
+	cids, err := stringsToCids(temp.ChunkExecutionDataIDs)
+
+	if err != nil {
+		return fmt.Errorf("failed to decode chunk execution data ids: %w", err)
+	}
+
+	b.ChunkExecutionDataIDs = cids
 
 	return nil
 }
@@ -232,14 +239,17 @@ func cidsToStrings(cids []cid.Cid) []string {
 }
 
 // Helper function to convert a slice of strings to a slice of cid.Cid
-func stringsToCids(strs []string) []cid.Cid {
+func stringsToCids(strs []string) ([]cid.Cid, error) {
+	if strs == nil {
+		return nil, nil
+	}
 	cids := make([]cid.Cid, len(strs))
 	for i, s := range strs {
 		c, err := cid.Decode(s)
 		if err != nil {
-			panic(err) // Handle error appropriately in real code
+			return nil, fmt.Errorf("failed to decode cid %v: %w", s, err)
 		}
 		cids[i] = c
 	}
-	return cids
+	return cids, nil
 }

@@ -42,6 +42,8 @@ func NewChunkDataPacks(collector module.CacheMetrics, db *pebble.DB, collections
 	}
 }
 
+// Store stores the given chunk data pack lists, it stores them atomically.
+// Any error are exceptions
 func (ch *ChunkDataPacks) Store(cs []*flow.ChunkDataPack) error {
 	batch := NewBatch(ch.db)
 	defer batch.Close()
@@ -61,6 +63,8 @@ func (ch *ChunkDataPacks) Store(cs []*flow.ChunkDataPack) error {
 	return nil
 }
 
+// Remove removes chunk data packs by IDs, it removes them atomically.
+// Any errors are exceptions
 func (ch *ChunkDataPacks) Remove(cs []flow.Identifier) error {
 	batch := ch.db.NewBatch()
 
@@ -83,6 +87,9 @@ func (ch *ChunkDataPacks) Remove(cs []flow.Identifier) error {
 	return nil
 }
 
+// ByChunkID finds the chunk data pack by chunk ID.
+// it returns storage.ErrNotFound if not found
+// other errors are exceptions
 func (ch *ChunkDataPacks) ByChunkID(chunkID flow.Identifier) (*flow.ChunkDataPack, error) {
 	var sc storage.StoredChunkDataPack
 	err := operations.RetrieveChunkDataPack(chunkID, &sc)(ch.db)
@@ -108,6 +115,7 @@ func (ch *ChunkDataPacks) ByChunkID(chunkID flow.Identifier) (*flow.ChunkDataPac
 	return chdp, nil
 }
 
+// BatchRemove is not used in pebble implementation
 func (ch *ChunkDataPacks) BatchRemove(chunkID flow.Identifier, batch storage.BatchStorage) error {
 	return fmt.Errorf("not implemented")
 }
