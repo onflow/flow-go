@@ -50,6 +50,10 @@ func noRetrieve[K comparable, V any](_ K) func(pebble.Reader) (V, error) {
 	}
 }
 
+// Cache is a read-through cache for underlying storage layer.
+// Note: when a resource is not found in the cache nor the underlying storage, then
+// it will not be cached. In other words, finding the missing item again will
+// query the underlying storage again.
 type Cache[K comparable, V any] struct {
 	metrics  module.CacheMetrics
 	limit    uint
