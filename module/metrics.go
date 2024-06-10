@@ -468,15 +468,26 @@ type EngineMetrics interface {
 	OutboundMessageDropped(engine string, messages string)
 }
 
+// ComplianceMetrics reports metrics about the compliance layer, which processes, finalizes,
+// and seals blocks and tracks data in the Protocol State.
 type ComplianceMetrics interface {
+	// FinalizedHeight reports the latest finalized height known to this node.
 	FinalizedHeight(height uint64)
+	// EpochTransitionHeight reports the height of the most recently finalized epoch transition.
 	EpochTransitionHeight(height uint64)
+	// SealedHeight reports the latest sealed height known to this node.
 	SealedHeight(height uint64)
+	// BlockFinalized reports information about data contained within finalized blocks.
 	BlockFinalized(*flow.Block)
+	// BlockSealed reports information about data contained within sealed blocks.
 	BlockSealed(*flow.Block)
+	// CurrentEpochCounter reports the current epoch counter.
 	CurrentEpochCounter(counter uint64)
+	// CurrentEpochPhase reports the current epoch phase.
 	CurrentEpochPhase(phase flow.EpochPhase)
+	// CurrentEpochFinalView reports the final view of the current epoch, including epoch extensions.
 	CurrentEpochFinalView(view uint64) // TODO should this be updated by extension? I think so...
+	// TODO could combine 3 DKG metric funcs
 	CurrentDKGPhase1FinalView(view uint64)
 	CurrentDKGPhase2FinalView(view uint64)
 	CurrentDKGPhase3FinalView(view uint64)
