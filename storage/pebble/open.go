@@ -35,7 +35,7 @@ func NewBootstrappedRegistersWithPath(dir string) (*Registers, *pebble.DB, error
 
 // OpenRegisterPebbleDB opens the database
 func OpenRegisterPebbleDB(dir string) (*pebble.DB, error) {
-	cache := pebble.NewCache(1 << 20)
+	cache := pebble.NewCache(0)
 	defer cache.Unref()
 	// currently pebble is only used for registers
 	opts := DefaultPebbleOptions(cache, registers.NewMVCCComparer())
