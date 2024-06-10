@@ -2049,8 +2049,7 @@ func (suite *Suite) TestNodeCommunicator() {
 	// Simulate closed circuit breaker error
 	suite.execClient.
 		On("GetTransactionResultsByBlockID", ctx, exeEventReq).
-		Return(nil, gobreaker.ErrOpenState).
-		Once()
+		Return(nil, gobreaker.ErrOpenState)
 
 	result, err := backend.GetTransactionResultsByBlockID(ctx, blockId, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
 	suite.Assert().Nil(result)
