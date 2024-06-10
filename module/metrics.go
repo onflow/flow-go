@@ -476,11 +476,12 @@ type ComplianceMetrics interface {
 	BlockSealed(*flow.Block)
 	CurrentEpochCounter(counter uint64)
 	CurrentEpochPhase(phase flow.EpochPhase)
-	CurrentEpochFinalView(view uint64)
+	CurrentEpochFinalView(view uint64) // TODO should this be updated by extension? I think so...
 	CurrentDKGPhase1FinalView(view uint64)
 	CurrentDKGPhase2FinalView(view uint64)
 	CurrentDKGPhase3FinalView(view uint64)
-	EpochEmergencyFallbackTriggered()
+	EpochEmergencyFallbackTriggered() // TODO naming EFM
+	// EpochFallbackModeExited()
 }
 
 type CleanerMetrics interface {

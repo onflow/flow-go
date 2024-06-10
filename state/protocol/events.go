@@ -89,5 +89,7 @@ type Consumer interface {
 	// After this event is triggered, no further epoch transitions will occur,
 	// no further epoch phase transitions will occur, and no further epoch-related
 	// related protocol events (the events defined in this interface) will be emitted.
-	EpochEmergencyFallbackTriggered()
+	EpochEmergencyFallbackTriggered() // TODO naming EFM
+	// EpochFallbackModeExited()
+	// EpochExtended(ext flow.EpochExtension)
 }
