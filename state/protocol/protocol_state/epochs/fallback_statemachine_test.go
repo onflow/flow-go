@@ -5,6 +5,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+	"pgregory.net/rapid"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
@@ -662,4 +663,56 @@ func (s *EpochFallbackStateMachineSuite) TestEpochFallbackStateMachineInjectsMul
 		require.Greater(s.T(), parentProtocolState.CurrentEpochFinalView(), candidateView,
 			"final view should be greater than final view of test")
 	}
+}
+
+// TestProcessingMultipleEventsAtSameBlock tests that the state machine can process multiple events at the same block.
+// EpochFallbackStateMachineSuite has to be able to process any combination of events in any order at the same block.
+// This test generates a random amount of setup, commit and recover events and processes them in random order.
+func (s *EpochFallbackStateMachineSuite) TestProcessingMultipleEventsAtTheSameBlock() {
+	rapid.Check(s.T(), func(t *rapid.T) {
+		s.SetupTest() // start each time with clean state
+		var events []flow.ServiceEvent
+		setupEvents := rapid.IntRange(0, 5).Draw(t, "number-of-setup-events")
+		for i := 0; i < setupEvents; i++ {
+			events = append(events, unittest.EpochSetupFixture().ServiceEvent())
+		}
+		commitEvents := rapid.IntRange(0, 5).Draw(t, "number-of-commit-events")
+		for i := 0; i < commitEvents; i++ {
+			events = append(events, unittest.EpochCommitFixture().ServiceEvent())
+		}
+		recoverEvents := rapid.IntRange(0, 5).Draw(t, "number-of-recover-events")
+		for i := 0; i < recoverEvents; i++ {
+			events = append(events, unittest.EpochRecoverFixture().ServiceEvent())
+		}
+		includeValidRecover := rapid.Bool().Draw(t, "include-valid-recover-event")
+		if includeValidRecover {
+			events = append(events, unittest.EpochRecoverFixture(func(setup *flow.EpochSetup) {
+				nextEpochParticipants := s.parentProtocolState.CurrentEpochIdentityTable.Copy()
+				setup.Participants = nextEpochParticipants.ToSkeleton()
+				setup.Assignments = unittest.ClusterAssignment(1, nextEpochParticipants.ToSkeleton())
+				setup.Counter = s.parentProtocolState.CurrentEpochSetup.Counter + 1
+				setup.FirstView = s.parentProtocolState.CurrentEpochSetup.FinalView + 1
+				setup.FinalView = setup.FirstView + 10_000
+			}).ServiceEvent())
+		}
+		events = rapid.Permutation(events).Draw(t, "events-permutation")
+
+		for _, event := range events {
+			var err error
+			switch ev := event.Event.(type) {
+			case *flow.EpochSetup:
+				_, err = s.stateMachine.ProcessEpochSetup(ev)
+			case *flow.EpochCommit:
+				_, err = s.stateMachine.ProcessEpochCommit(ev)
+			case *flow.EpochRecover:
+				_, err = s.stateMachine.ProcessEpochRecover(ev)
+			}
+			require.NoError(s.T(), err)
+		}
+		updatedState, _, hasChanges := s.stateMachine.Build()
+		require.Equal(t, includeValidRecover, hasChanges, "should have changes if valid recover event is included")
+		if includeValidRecover {
+			require.NotNil(t, updatedState.NextEpoch, "next epoch should be present")
+		}
+	})
 }
