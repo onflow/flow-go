@@ -9,7 +9,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/pebble/common"
-	"github.com/onflow/flow-go/storage/pebble/operations"
+	"github.com/onflow/flow-go/storage/pebble/operation"
 )
 
 // IndexNewBlock will add parent-child index for the new block.
@@ -30,7 +30,7 @@ func IndexNewBlock(blockID flow.Identifier, parentID flow.Identifier) func(commo
 
 		// Step 1: index the child for the new block.
 		// the new block has no child, so adding an empty child index for it
-		err := operations.InsertBlockChildren(blockID, nil)(rw)
+		err := operation.InsertBlockChildren(blockID, nil)(rw)
 		if err != nil {
 			return fmt.Errorf("could not insert empty block children: %w", err)
 		}
@@ -47,10 +47,10 @@ func IndexNewBlock(blockID flow.Identifier, parentID flow.Identifier) func(commo
 		// when parent block doesn't exist, we will insert the block children.
 		// when parent block exists already, we will update the block children,
 		var childrenIDs flow.IdentifierList
-		err = operations.RetrieveBlockChildren(parentID, &childrenIDs)(rw)
+		err = operation.RetrieveBlockChildren(parentID, &childrenIDs)(rw)
 
 		if errors.Is(err, storage.ErrNotFound) {
-			return operations.InsertBlockChildren(parentID, flow.IdentifierList{blockID})(rw)
+			return operation.InsertBlockChildren(parentID, flow.IdentifierList{blockID})(rw)
 		} else if err != nil {
 			return fmt.Errorf("could not look up block children: %w", err)
 		}
@@ -66,12 +66,12 @@ func IndexNewBlock(blockID flow.Identifier, parentID flow.Identifier) func(commo
 		childrenIDs = append(childrenIDs, blockID)
 
 		// TODO: use transaction to avoid race condition
-		return operations.UpdateBlockChildren(parentID, childrenIDs)(rw)
+		return operation.UpdateBlockChildren(parentID, childrenIDs)(rw)
 	}
 
 }
 
 // LookupBlockChildren looks up the IDs of all child blocks of the given parent block.
 func LookupBlockChildren(blockID flow.Identifier, childrenIDs *flow.IdentifierList) func(pebble.Reader) error {
-	return operations.RetrieveBlockChildren(blockID, childrenIDs)
+	return operation.RetrieveBlockChildren(blockID, childrenIDs)
 }
