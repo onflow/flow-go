@@ -26,4 +26,6 @@ func (n Noop) EpochCommittedPhaseStarted(uint64, *flow.Header) {}
 
 func (n Noop) EpochEmergencyFallbackTriggered() {}
 
+func (n Noop) EpochExtended(uint64) {}
+
 func (n Noop) ActiveClustersChanged(flow.ChainIDList) {}

@@ -2009,6 +2009,7 @@ func TestEmergencyEpochFallback(t *testing.T) {
 // We expect different behavior depending on the phase in which the protocol enters EFM, specifically for the committed phase,
 // as the protocol cannot be immediately recovered from it. First, we need to enter the next epoch before we can accept an EpochRecover event. Specifically, for this case
 // we make progress till the epoch extension event to make sure that we cover the most complex scenario.
+// TODO update tests here
 func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 
 	// assertCorrectRecovery checks that the recovery epoch is correctly setup.

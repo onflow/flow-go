@@ -835,6 +835,13 @@ func (m *FollowerState) epochMetricsAndEventsOnBlockFinalized(parentEpochState, 
 	parentEpochPhase := parentEpochState.EpochPhase()
 	childEpochPhase := finalizedEpochState.EpochPhase()
 
+	// Check for a new epoch extension
+	if len(finalizedEpochState.EpochExtensions()) > len(parentEpochState.EpochExtensions()) {
+		finalizedExtension := finalizedEpochState.EpochExtensions()[len(parentEpochState.EpochExtensions())]
+		events = append(events, func() { m.consumer.EpochExtended(finalizedExtension) })
+		metrics = append(metrics, func() { m.metrics.CurrentEpochFinalView(finalizedExtension.FinalView) })
+	}
+
 	// Same epoch phase -> nothing to do
 	if parentEpochPhase == childEpochPhase {
 		return
