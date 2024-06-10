@@ -38,6 +38,7 @@ func TestEVMRun(t *testing.T) {
 	t.Parallel()
 
 	chain := flow.Emulator.Chain()
+
 	t.Run("testing EVM.run (happy case)", func(t *testing.T) {
 
 		t.Parallel()
@@ -151,6 +152,7 @@ func TestEVMRun(t *testing.T) {
 				require.Equal(t, blockEventPayload.Hash, txEventPayload.BlockHash)
 				require.Equal(t, blockEventPayload.Height, txEventPayload.BlockHeight)
 				require.Equal(t, blockEventPayload.TotalGasUsed, txEventPayload.GasConsumed)
+				require.Equal(t, uint64(43785), blockEventPayload.TotalGasUsed)
 				require.Empty(t, txEventPayload.ContractAddress)
 
 				// append the state
@@ -202,8 +204,9 @@ func TestEVMRun(t *testing.T) {
 				require.NoError(t, err)
 				require.Equal(t, types.StatusSuccessful, res.Status)
 				require.Equal(t, types.ErrCodeNoError, res.ErrorCode)
+				require.Empty(t, res.ErrorMessage)
 				require.Nil(t, res.DeployedContractAddress)
-				require.Equal(t, num, new(big.Int).SetBytes(res.ReturnedValue).Int64())
+				require.Equal(t, num, new(big.Int).SetBytes(res.ReturnedData).Int64())
 			})
 	})
 
@@ -313,7 +316,8 @@ func TestEVMRun(t *testing.T) {
 				require.NoError(t, err)
 				require.Equal(t, types.StatusSuccessful, res.Status)
 				require.Equal(t, types.ErrCodeNoError, res.ErrorCode)
-				require.Equal(t, int64(0), new(big.Int).SetBytes(res.ReturnedValue).Int64())
+				require.Empty(t, res.ErrorMessage)
+				require.Equal(t, int64(0), new(big.Int).SetBytes(res.ReturnedData).Int64())
 			})
 	})
 
@@ -510,6 +514,29 @@ func TestEVMBatchRun(t *testing.T) {
 					assert.Equal(t, storedValues[i], last.Big().Int64())
 				}
 
+				// last one is block executed, make sure TotalGasUsed is non-zero
+				blockEvent := output.Events[batchCount]
+
+				assert.Equal(
+					t,
+					common.NewAddressLocation(
+						nil,
+						common.Address(sc.EVMContract.Address),
+						string(types.EventTypeBlockExecuted),
+					).ID(),
+					string(blockEvent.Type),
+				)
+
+				ev, err := ccf.Decode(nil, blockEvent.Payload)
+				require.NoError(t, err)
+				cadenceEvent, ok := ev.(cadence.Event)
+				require.True(t, ok)
+
+				blockEventPayload, err := types.DecodeBlockEventPayload(cadenceEvent)
+				require.NoError(t, err)
+				require.NotEmpty(t, blockEventPayload.Hash)
+				require.Equal(t, uint64(155513), blockEventPayload.TotalGasUsed)
+
 				// append the state
 				snapshot = snapshot.Append(state)
 
@@ -556,7 +583,8 @@ func TestEVMBatchRun(t *testing.T) {
 				require.NoError(t, err)
 				require.Equal(t, types.StatusSuccessful, res.Status)
 				require.Equal(t, types.ErrCodeNoError, res.ErrorCode)
-				require.Equal(t, storedValues[len(storedValues)-1], new(big.Int).SetBytes(res.ReturnedValue).Int64())
+				require.Empty(t, res.ErrorMessage)
+				require.Equal(t, storedValues[len(storedValues)-1], new(big.Int).SetBytes(res.ReturnedData).Int64())
 			})
 	})
 
@@ -695,7 +723,8 @@ func TestEVMBatchRun(t *testing.T) {
 				require.NoError(t, err)
 				require.Equal(t, types.StatusSuccessful, res.Status)
 				require.Equal(t, types.ErrCodeNoError, res.ErrorCode)
-				require.Equal(t, num, new(big.Int).SetBytes(res.ReturnedValue).Int64())
+				require.Empty(t, res.ErrorMessage)
+				require.Equal(t, num, new(big.Int).SetBytes(res.ReturnedData).Int64())
 			})
 	})
 
@@ -730,9 +759,11 @@ func TestEVMBatchRun(t *testing.T) {
 								if i %% 2 != 0 {
 									assert(res.status == EVM.Status.successful, message: "unexpected success status")
 									assert(res.errorCode == 0, message: "unexpected error code")
+									assert(res.errorMessage == "", message: "unexpected error msg")
 								} else {
 									assert(res.status == EVM.Status.failed, message: "unexpected failed status")
 									assert(res.errorCode == 301, message: "unexpected error code")
+									assert(res.errorMessage == "out of gas", message: "unexpected error msg")
 								}
 							}
 						}
@@ -837,7 +868,8 @@ func TestEVMBatchRun(t *testing.T) {
 				require.NoError(t, err)
 				require.Equal(t, types.ErrCodeNoError, res.ErrorCode)
 				require.Equal(t, types.StatusSuccessful, res.Status)
-				require.Equal(t, num, new(big.Int).SetBytes(res.ReturnedValue).Int64())
+				require.Empty(t, res.ErrorMessage)
+				require.Equal(t, num, new(big.Int).SetBytes(res.ReturnedData).Int64())
 			})
 	})
 }
@@ -900,7 +932,8 @@ func TestEVMBlockData(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, types.StatusSuccessful, res.Status)
 			require.Equal(t, types.ErrCodeNoError, res.ErrorCode)
-			require.Equal(t, ctx.BlockHeader.Timestamp.Unix(), new(big.Int).SetBytes(res.ReturnedValue).Int64())
+			require.Empty(t, res.ErrorMessage)
+			require.Equal(t, ctx.BlockHeader.Timestamp.Unix(), new(big.Int).SetBytes(res.ReturnedData).Int64())
 
 		})
 }
@@ -965,6 +998,29 @@ func TestEVMAddressDeposit(t *testing.T) {
 			expectedBalance := types.OneFlowBalance
 			bal := getEVMAccountBalance(t, ctx, vm, snapshot, addr)
 			require.Equal(t, expectedBalance, bal)
+
+			// block executed event, make sure TotalGasUsed is non-zero
+			blockEvent := output.Events[3]
+
+			assert.Equal(
+				t,
+				common.NewAddressLocation(
+					nil,
+					common.Address(sc.EVMContract.Address),
+					string(types.EventTypeBlockExecuted),
+				).ID(),
+				string(blockEvent.Type),
+			)
+
+			ev, err := ccf.Decode(nil, blockEvent.Payload)
+			require.NoError(t, err)
+			cadenceEvent, ok := ev.(cadence.Event)
+			require.True(t, ok)
+
+			blockEventPayload, err := types.DecodeBlockEventPayload(cadenceEvent)
+			require.NoError(t, err)
+			require.NotEmpty(t, blockEventPayload.Hash)
+			require.Equal(t, uint64(21000), blockEventPayload.TotalGasUsed)
 		})
 }
 
@@ -1275,7 +1331,7 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 	
 						let res = cadenceOwnedAccount.deploy(
 							code: code,
-							gasLimit: 1000000,
+							gasLimit: 2_000_000,
 							value: EVM.Balance(attoflow: 1230000000000000000)
 						)
 						destroy cadenceOwnedAccount
@@ -1305,9 +1361,10 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 				require.NoError(t, err)
 				require.Equal(t, types.StatusSuccessful, res.Status)
 				require.Equal(t, types.ErrCodeNoError, res.ErrorCode)
+				require.Empty(t, res.ErrorMessage)
 				require.NotNil(t, res.DeployedContractAddress)
 				// we strip away first few bytes because they contain deploy code
-				require.Equal(t, testContract.ByteCode[17:], []byte(res.ReturnedValue))
+				require.Equal(t, testContract.ByteCode[17:], []byte(res.ReturnedData))
 			})
 	})
 }
@@ -1478,7 +1535,7 @@ func TestDryRun(t *testing.T) {
 				require.Equal(t, types.StatusSuccessful, res.Status)
 				require.Equal(t, types.ErrCodeNoError, res.ErrorCode)
 				// make sure the value we used in the dry-run is not the same as the value stored in contract
-				require.NotEqual(t, updatedValue, new(big.Int).SetBytes(res.ReturnedValue).Int64())
+				require.NotEqual(t, updatedValue, new(big.Int).SetBytes(res.ReturnedData).Int64())
 			})
 	})
 
@@ -1494,7 +1551,7 @@ func TestDryRun(t *testing.T) {
 				tx := gethTypes.NewContractCreation(
 					0,
 					big.NewInt(0),
-					uint64(1000000),
+					uint64(10_000_000),
 					big.NewInt(0),
 					testContract.ByteCode,
 				)
@@ -1503,7 +1560,7 @@ func TestDryRun(t *testing.T) {
 				require.Equal(t, types.ErrCodeNoError, result.ErrorCode)
 				require.Equal(t, types.StatusSuccessful, result.Status)
 				require.Greater(t, result.GasConsumed, uint64(0))
-				require.NotNil(t, result.ReturnedValue)
+				require.NotNil(t, result.ReturnedData)
 				require.NotNil(t, result.DeployedContractAddress)
 				require.NotEmpty(t, result.DeployedContractAddress.String())
 			})
@@ -1884,14 +1941,14 @@ func TestCadenceArch(t *testing.T) {
 				sig, err := privateKey.PrivateKey.Sign(data.Bytes(), hasher)
 				require.NoError(t, err)
 
-				proof := types.COAOwnershipProof{
+				validProof := types.COAOwnershipProof{
 					KeyIndices:     []uint64{0},
 					Address:        types.FlowAddress(flowAccount),
 					CapabilityPath: "coa",
 					Signatures:     []types.Signature{types.Signature(sig)},
 				}
 
-				encodedProof, err := proof.Encode()
+				encodedValidProof, err := validProof.Encode()
 				require.NoError(t, err)
 
 				// create transaction for proof verification
@@ -1914,7 +1971,7 @@ func TestCadenceArch(t *testing.T) {
 						true,
 						coaAddress.ToCommon(),
 						data,
-						encodedProof),
+						encodedValidProof),
 					big.NewInt(0),
 					uint64(10_000_000),
 					big.NewInt(0),
@@ -1943,6 +2000,54 @@ func TestCadenceArch(t *testing.T) {
 					snapshot)
 				require.NoError(t, err)
 				require.NoError(t, output.Err)
+
+				invalidProof := types.COAOwnershipProof{
+					KeyIndices:     []uint64{1000},
+					Address:        types.FlowAddress(flowAccount),
+					CapabilityPath: "coa",
+					Signatures:     []types.Signature{types.Signature(sig)},
+				}
+
+				encodedInvalidProof, err := invalidProof.Encode()
+				require.NoError(t, err)
+
+				// invalid proof tx
+				innerTxBytes = testAccount.PrepareSignAndEncodeTx(t,
+					testContract.DeployedAt.ToCommon(),
+					testContract.MakeCallData(t, "verifyArchCallToVerifyCOAOwnershipProof",
+						true,
+						coaAddress.ToCommon(),
+						data,
+						encodedInvalidProof),
+					big.NewInt(0),
+					uint64(10_000_000),
+					big.NewInt(0),
+				)
+
+				verifyScript = fvm.Script(code).WithArguments(
+					json.MustEncode(
+						cadence.NewArray(
+							ConvertToCadence(innerTxBytes),
+						).WithType(
+							stdlib.EVMTransactionBytesCadenceType,
+						)),
+					json.MustEncode(
+						cadence.NewArray(
+							ConvertToCadence(
+								testAccount.Address().Bytes(),
+							),
+						).WithType(
+							stdlib.EVMAddressBytesCadenceType,
+						),
+					),
+				)
+				// run proof transaction
+				_, output, err = vm.Run(
+					ctx,
+					verifyScript,
+					snapshot)
+				require.NoError(t, err)
+				require.Error(t, output.Err)
 			})
 	})
 }

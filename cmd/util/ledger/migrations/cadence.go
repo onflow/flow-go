@@ -444,6 +444,8 @@ type Options struct {
 	FixSlabsWithBrokenReferences      bool
 	FilterUnreferencedSlabs           bool
 	ReportMetrics                     bool
+	CacheStaticTypeMigrationResults   bool
+	CacheEntitlementsMigrationResults bool
 }
 
 func NewCadence1Migrations(
