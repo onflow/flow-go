@@ -406,7 +406,7 @@ func executionNodesForBlockID(
 		}
 		executorIDs = executorIdentities.NodeIDs()
 	} else {
-		// try to find atleast minExecutionNodesCnt execution node ids from the execution receipts for the given blockID
+		// try to find at least minExecutionNodesCnt execution node ids from the execution receipts for the given blockID
 		for attempt := 0; attempt < maxAttemptsForExecutionReceipt; attempt++ {
 			executorIDs, err = findAllExecutionNodes(blockID, executionReceipts, log)
 			if err != nil {
@@ -524,32 +524,82 @@ func chooseExecutionNodes(state protocol.State, executorIDs flow.IdentifierList)
 
 	allENs, err := state.Final().Identities(filter.HasRole(flow.RoleExecution))
 	if err != nil {
-		return nil, fmt.Errorf("failed to retreive all execution IDs: %w", err)
+		return nil, fmt.Errorf("failed to retrieve all execution IDs: %w", err)
 	}
 
-	// first try and choose from the preferred EN IDs
-	var chosenIDs flow.IdentityList
+	// choose from preferred EN IDs
 	if len(preferredENIdentifiers) > 0 {
-		// find the preferred execution node IDs which have executed the transaction
-		chosenIDs = allENs.Filter(filter.And(filter.HasNodeID(preferredENIdentifiers...),
-			filter.HasNodeID(executorIDs...)))
-		if len(chosenIDs) > 0 {
-			return chosenIDs, nil
-		}
+		chosenIDs := chooseFromPreferredENIDs(allENs, executorIDs)
+		return chosenIDs, nil
 	}
 
 	// if no preferred EN ID is found, then choose from the fixed EN IDs
 	if len(fixedENIdentifiers) > 0 {
 		// choose fixed ENs which have executed the transaction
-		chosenIDs = allENs.Filter(filter.And(filter.HasNodeID(fixedENIdentifiers...), filter.HasNodeID(executorIDs...)))
+		chosenIDs := allENs.Filter(filter.And(
+			filter.HasNodeID[flow.Identity](fixedENIdentifiers...),
+			filter.HasNodeID[flow.Identity](executorIDs...),
+		))
 		if len(chosenIDs) > 0 {
 			return chosenIDs, nil
 		}
-		// if no such ENs are found then just choose all fixed ENs
-		chosenIDs = allENs.Filter(filter.HasNodeID(fixedENIdentifiers...))
+		// if no such ENs are found, then just choose all fixed ENs
+		chosenIDs = allENs.Filter(filter.HasNodeID[flow.Identity](fixedENIdentifiers...))
 		return chosenIDs, nil
 	}
 
-	// If no preferred or fixed ENs have been specified, then return all executor IDs i.e. no preference at all
-	return allENs.Filter(filter.HasNodeID(executorIDs...)), nil
+	// if no preferred or fixed ENs have been specified, then return all executor IDs i.e., no preference at all
+	return allENs.Filter(filter.HasNodeID[flow.Identity](executorIDs...)), nil
+}
+
+// chooseFromPreferredENIDs finds the subset of execution nodes if preferred execution nodes are defined.
+// If preferredENIdentifiers is set and there are less than maxNodesCnt nodes selected, than the list is padded up to
+// maxNodesCnt nodes using the following order:
+// 1. Use any EN with a receipt.
+// 2. Use any preferred node not already selected.
+// 3. Use any EN not already selected.
+func chooseFromPreferredENIDs(allENs flow.IdentityList, executorIDs flow.IdentifierList) flow.IdentityList {
+	var chosenIDs flow.IdentityList
+
+	// filter for both preferred and executor IDs
+	chosenIDs = allENs.Filter(filter.And(
+		filter.HasNodeID[flow.Identity](preferredENIdentifiers...),
+		filter.HasNodeID[flow.Identity](executorIDs...),
+	))
+
+	if len(chosenIDs) >= maxNodesCnt {
+		return chosenIDs
+	}
+
+	// function to add nodes to chosenIDs if they are not already included
+	addIfNotExists := func(candidates flow.IdentityList) {
+		for _, en := range candidates {
+			_, exists := chosenIDs.ByNodeID(en.NodeID)
+			if !exists {
+				chosenIDs = append(chosenIDs, en)
+				if len(chosenIDs) >= maxNodesCnt {
+					return
+				}
+			}
+		}
+	}
+
+	// add any EN with a receipt
+	receiptENs := allENs.Filter(filter.HasNodeID[flow.Identity](executorIDs...))
+	addIfNotExists(receiptENs)
+	if len(chosenIDs) >= maxNodesCnt {
+		return chosenIDs
+	}
+
+	// add any preferred node not already selected
+	preferredENs := allENs.Filter(filter.HasNodeID[flow.Identity](preferredENIdentifiers...))
+	addIfNotExists(preferredENs)
+	if len(chosenIDs) >= maxNodesCnt {
+		return chosenIDs
+	}
+
+	// add any EN not already selected
+	addIfNotExists(allENs)
+
+	return chosenIDs
 }
