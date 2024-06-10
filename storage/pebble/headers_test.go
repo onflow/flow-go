@@ -4,22 +4,20 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/onflow/flow-go/storage/pebble/operation"
-
-	"github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
+	pebblestorage "github.com/onflow/flow-go/storage/pebble"
+	"github.com/onflow/flow-go/storage/pebble/operation"
 	"github.com/onflow/flow-go/utils/unittest"
-
-	badgerstorage "github.com/onflow/flow-go/storage/badger"
 )
 
 func TestHeaderStoreRetrieve(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
 		metrics := metrics.NewNoopCollector()
-		headers := badgerstorage.NewHeaders(metrics, db)
+		headers := pebblestorage.NewHeaders(metrics, db)
 
 		block := unittest.BlockFixture()
 
@@ -28,7 +26,7 @@ func TestHeaderStoreRetrieve(t *testing.T) {
 		require.NoError(t, err)
 
 		// index the header
-		err = operation.RetryOnConflict(db.Update, operation.IndexBlockHeight(block.Header.Height, block.ID()))
+		err = operation.IndexBlockHeight(block.Header.Height, block.ID())(db)
 		require.NoError(t, err)
 
 		// retrieve header by height
@@ -39,9 +37,9 @@ func TestHeaderStoreRetrieve(t *testing.T) {
 }
 
 func TestHeaderRetrieveWithoutStore(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
 		metrics := metrics.NewNoopCollector()
-		headers := badgerstorage.NewHeaders(metrics, db)
+		headers := pebblestorage.NewHeaders(metrics, db)
 
 		header := unittest.BlockHeaderFixture()
 
