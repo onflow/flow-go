@@ -235,6 +235,9 @@ func (b *BlockExecutionDataRoot) UnmarshalMsgpack(data []byte) error {
 
 // Helper function to convert a slice of cid.Cid to a slice of strings
 func cidsToStrings(cids []cid.Cid) []string {
+	if cids == nil {
+		return nil
+	}
 	strs := make([]string, len(cids))
 	for i, c := range cids {
 		strs[i] = c.String()
@@ -244,6 +247,9 @@ func cidsToStrings(cids []cid.Cid) []string {
 
 // Helper function to convert a slice of strings to a slice of cid.Cid
 func stringsToCids(strs []string) []cid.Cid {
+	if strs == nil {
+		return nil
+	}
 	cids := make([]cid.Cid, len(strs))
 	for i, s := range strs {
 		c, err := cid.Decode(s)
