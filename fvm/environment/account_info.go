@@ -166,7 +166,7 @@ func (info *accountInfo) GetStorageUsed(
 }
 
 // StorageMBUFixToBytesUInt converts the return type of storage capacity which
-// is a UFix64 with the unit of megabytes to UInt with the unit of bytes
+// is a UFix64 with the unit of megabytes to UInt with the unit of bytes.
 func StorageMBUFixToBytesUInt(result cadence.Value) uint64 {
 	// Divide the unsigned int by (1e8 (the scale of Fix64) / 1e6 (for mega))
 	// to get bytes (rounded down)
