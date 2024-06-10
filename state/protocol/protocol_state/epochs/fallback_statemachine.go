@@ -2,6 +2,7 @@ package epochs
 
 import (
 	"fmt"
+	"github.com/onflow/flow-go/state/protocol/protocol_state"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
@@ -27,7 +28,7 @@ var _ StateMachine = (*FallbackStateMachine)(nil)
 // NewFallbackStateMachine constructs a state machine for epoch fallback. It automatically sets
 // EpochFallbackTriggered to true, thereby recording that we have entered epoch fallback mode.
 // No errors are expected during normal operations.
-func NewFallbackStateMachine(params protocol.GlobalParams, view uint64, parentState *flow.RichProtocolStateEntry) (*FallbackStateMachine, error) {
+func NewFallbackStateMachine(params protocol.GlobalParams, consumer protocol_state.StateMachineConsumer, view uint64, parentState *flow.RichProtocolStateEntry) (*FallbackStateMachine, error) {
 	state := parentState.ProtocolStateEntry.Copy()
 	nextEpochCommitted := state.EpochPhase() == flow.EpochPhaseCommitted
 	// we are entering fallback mode, this logic needs to be executed only once
@@ -41,6 +42,7 @@ func NewFallbackStateMachine(params protocol.GlobalParams, view uint64, parentSt
 
 	sm := &FallbackStateMachine{
 		baseStateMachine: baseStateMachine{
+			consumer:    consumer,
 			parentState: parentState,
 			state:       state,
 			view:        view,
@@ -90,7 +92,8 @@ func (m *FallbackStateMachine) extendCurrentEpoch(epochExtension flow.EpochExten
 }
 
 // ProcessEpochSetup processes epoch setup service events, for epoch fallback we are ignoring this event.
-func (m *FallbackStateMachine) ProcessEpochSetup(_ *flow.EpochSetup) (bool, error) {
+func (m *FallbackStateMachine) ProcessEpochSetup(setup *flow.EpochSetup) (bool, error) {
+	m.consumer.OnServiceEventReceived(setup.ServiceEvent())
 	// Note that we are dropping _all_ EpochSetup events sealed by this block. As long as we are in EFM, this is
 	// the natural behaviour, as we have given up on following the instructions from the Epoch Smart Contracts.
 	//
@@ -114,7 +117,8 @@ func (m *FallbackStateMachine) ProcessEpochSetup(_ *flow.EpochSetup) (bool, erro
 }
 
 // ProcessEpochCommit processes epoch commit service events, for epoch fallback we are ignoring this event.
-func (m *FallbackStateMachine) ProcessEpochCommit(_ *flow.EpochCommit) (bool, error) {
+func (m *FallbackStateMachine) ProcessEpochCommit(setup *flow.EpochCommit) (bool, error) {
+	m.consumer.OnServiceEventReceived(setup.ServiceEvent())
 	// We ignore _all_ EpochCommit events here. This includes scenarios where a valid `EpochRecover` event is sealed in
 	// a block followed by `EpochSetup` and/or `EpochCommit` events-- technically, clear indications that the Epoch Smart
 	// contract is doing something unexpect. For a detailed explanation why this is safe, see `ProcessEpochSetup` above.
@@ -140,6 +144,7 @@ func (m *FallbackStateMachine) ProcessEpochCommit(_ *flow.EpochCommit) (bool, er
 func (m *FallbackStateMachine) ProcessEpochRecover(epochRecover *flow.EpochRecover) (bool, error) {
 	err := m.ensureValidEpochRecover(epochRecover)
 	if err != nil {
+		m.consumer.OnInvalidServiceEvent(epochRecover.ServiceEvent(), err)
 		return false, nil
 	}
 
@@ -148,6 +153,7 @@ func (m *FallbackStateMachine) ProcessEpochRecover(epochRecover *flow.EpochRecov
 		m.parentState.CurrentEpochSetup,
 		&epochRecover.EpochSetup)
 	if err != nil {
+		m.consumer.OnInvalidServiceEvent(epochRecover.ServiceEvent(), err)
 		return false, nil
 	}
 
@@ -155,6 +161,8 @@ func (m *FallbackStateMachine) ProcessEpochRecover(epochRecover *flow.EpochRecov
 		// accept iff the EpochRecover is the same as the one we have already recovered.
 		if nextEpoch.SetupID != epochRecover.EpochSetup.ID() ||
 			nextEpoch.CommitID != epochRecover.EpochCommit.ID() {
+			m.consumer.OnInvalidServiceEvent(epochRecover.ServiceEvent(),
+				protocol.NewInvalidServiceEventErrorf("multiple different EpochRecover events in the same block"))
 			return false, nil
 		}
 	} else {
@@ -168,6 +176,7 @@ func (m *FallbackStateMachine) ProcessEpochRecover(epochRecover *flow.EpochRecov
 	}
 	// if we have processed a valid EpochRecover event, we should exit EFM.
 	m.state.EpochFallbackTriggered = false
+	m.consumer.OnServiceEventProcessed(epochRecover.ServiceEvent())
 	return true, nil
 }
 
