@@ -8,7 +8,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/storage/pebble/operations"
+	"github.com/onflow/flow-go/storage/pebble/operation"
 	"github.com/onflow/flow-go/storage/pebble/procedure"
 )
 
@@ -21,19 +21,19 @@ type Headers struct {
 func NewHeaders(collector module.CacheMetrics, db *pebble.DB) *Headers {
 
 	store := func(blockID flow.Identifier, header *flow.Header) func(pebble.Writer) error {
-		return operations.InsertHeader(blockID, header)
+		return operation.InsertHeader(blockID, header)
 	}
 
 	// CAUTION: should only be used to index FINALIZED blocks by their
 	// respective height
 	storeHeight := func(height uint64, id flow.Identifier) func(pebble.Writer) error {
-		return operations.IndexBlockHeight(height, id)
+		return operation.IndexBlockHeight(height, id)
 	}
 
 	retrieve := func(blockID flow.Identifier) func(pebble.Reader) (*flow.Header, error) {
 		var header flow.Header
 		return func(r pebble.Reader) (*flow.Header, error) {
-			err := operations.RetrieveHeader(blockID, &header)(r)
+			err := operation.RetrieveHeader(blockID, &header)(r)
 			return &header, err
 		}
 	}
@@ -41,7 +41,7 @@ func NewHeaders(collector module.CacheMetrics, db *pebble.DB) *Headers {
 	retrieveHeight := func(height uint64) func(pebble.Reader) (flow.Identifier, error) {
 		return func(r pebble.Reader) (flow.Identifier, error) {
 			var id flow.Identifier
-			err := operations.LookupBlockHeight(height, &id)(r)
+			err := operation.LookupBlockHeight(height, &id)(r)
 			return id, err
 		}
 	}
@@ -100,7 +100,7 @@ func (h *Headers) Exists(blockID flow.Identifier) (bool, error) {
 	}
 	// otherwise, check badger store
 	var exists bool
-	err := operations.BlockExists(blockID, &exists)(h.db)
+	err := operation.BlockExists(blockID, &exists)(h.db)
 	if err != nil {
 		return false, fmt.Errorf("could not check existence: %w", err)
 	}
@@ -108,7 +108,7 @@ func (h *Headers) Exists(blockID flow.Identifier) (bool, error) {
 }
 
 // BlockIDByHeight returns the block ID that is finalized at the given height. It is an optimized
-// version of `ByHeight` that skips retrieving the block. Expected errors during normal operations:
+// version of `ByHeight` that skips retrieving the block. Expected errors during normal operation:
 //   - `storage.ErrNotFound` if no finalized block is known at given height.
 func (h *Headers) BlockIDByHeight(height uint64) (flow.Identifier, error) {
 	blockID, err := h.retrieveIdByHeightTx(height)(h.db)
@@ -137,7 +137,7 @@ func (h *Headers) ByParentID(parentID flow.Identifier) ([]*flow.Header, error) {
 
 func (h *Headers) FindHeaders(filter func(header *flow.Header) bool) ([]flow.Header, error) {
 	blocks := make([]flow.Header, 0, 1)
-	err := operations.FindHeaders(filter, &blocks)(h.db)
+	err := operation.FindHeaders(filter, &blocks)(h.db)
 	return blocks, err
 }
 
@@ -145,13 +145,14 @@ func (h *Headers) FindHeaders(filter func(header *flow.Header) bool) ([]flow.Hea
 // only useful for execution node to roll back executed block height
 func (h *Headers) RollbackExecutedBlock(header *flow.Header) error {
 	var blockID flow.Identifier
-	err := operations.RetrieveExecutedBlock(&blockID)(h.db)
+	batch := h.db.NewBatch()
+	err := operation.RetrieveExecutedBlock(&blockID)(batch)
 	if err != nil {
 		return fmt.Errorf("cannot lookup executed block: %w", err)
 	}
 
 	var highest flow.Header
-	err = operations.RetrieveHeader(blockID, &highest)(h.db)
+	err = operation.RetrieveHeader(blockID, &highest)(batch)
 	if err != nil {
 		return fmt.Errorf("cannot retrieve executed header: %w", err)
 	}
@@ -163,9 +164,14 @@ func (h *Headers) RollbackExecutedBlock(header *flow.Header) error {
 		)
 	}
 
-	err = operations.UpdateExecutedBlock(header.ID())(h.db)
+	err = operation.UpdateExecutedBlock(header.ID())(batch)
 	if err != nil {
 		return fmt.Errorf("cannot update highest executed block: %w", err)
+	}
+
+	err = batch.Commit(nil)
+	if err != nil {
+		return fmt.Errorf("cannot save updating highest executed block: %w", err)
 	}
 
 	return nil
