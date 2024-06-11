@@ -237,8 +237,6 @@ func (v *VersionControl) processEvents(
 ) {
 	ready()
 
-	// TODO: Height tracking mechanism
-
 	for {
 		select {
 		case <-ctx.Done():
