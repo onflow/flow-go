@@ -13,6 +13,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/onflow/flow-go/cmd/build"
+	"github.com/onflow/flow-go/engine/common/version"
+
 	"github.com/ipfs/boxo/bitswap"
 	badger "github.com/ipfs/go-ds-badger2"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
@@ -260,6 +263,7 @@ type ObserverServiceBuilder struct {
 	ExecutionIndexerCore *indexer.IndexerCore
 	TxResultsIndex       *index.TransactionResultsIndex
 	IndexerDependencies  *cmd.DependencyList
+	versionControl       *version.VersionControl
 
 	ExecutionDataDownloader execution_data.Downloader
 	ExecutionDataRequester  state_synchronization.ExecutionDataRequester
@@ -1693,6 +1697,40 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 	builder.Module("script executor", func(node *cmd.NodeConfig) error {
 		builder.ScriptExecutor = backend.NewScriptExecutor(builder.Logger, builder.scriptExecMinBlock, builder.scriptExecMaxBlock)
 		return nil
+	})
+	builder.Component("version control", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		ver, err := build.Semver()
+		if err != nil {
+			err = fmt.Errorf("could not set semver version for version control. "+
+				"version %s is not semver compliant: %w", build.Version(), err)
+
+			// The node would not know its own version. Without this the node would not know
+			// how to reach to version boundaries.
+			builder.Logger.
+				Err(err).
+				Msg("error starting version control")
+
+			return nil, err
+		}
+
+		latestFinalizedBlock, err := node.State.Final().Head()
+		if err != nil {
+			return nil, fmt.Errorf("could not get latest finalized block: %w", err)
+		}
+
+		versionControl := version.NewVersionControl(
+			builder.Logger,
+			node.Storage.VersionBeacons,
+			ver,
+			builder.FinalizedRootBlock.Header.Height,
+			latestFinalizedBlock.Height,
+		)
+		// VersionControl needs to consume BlockFinalized events.
+		node.ProtocolEvents.AddConsumer(versionControl)
+
+		builder.versionControl = versionControl
+
+		return versionControl, nil
 	})
 	builder.Component("RPC engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		accessMetrics := builder.AccessMetrics

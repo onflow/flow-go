@@ -22,33 +22,34 @@ func TestInitialization(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	finalizedRootBlockHeight := uint64(0)
 	sealedHeader := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(10))
 
 	t.Run("happy case", func(t *testing.T) {
 		// Set up a mock version beacons storage.
 		versionBeacons := storageMock.NewVersionBeacons(t)
-
-		// Create a new VersionControl instance with initial parameters.
-		vc := NewVersionControl(
-			unittest.Logger(),
-			versionBeacons,
-			semver.New("0.0.1"),
-			sealedHeader,
-		)
-
 		// Mock the Highest method to return a version beacon with a specific version.
 		versionBeacons.
 			On("Highest", testifyMock.AnythingOfType("uint64")).
-			Return(&flow.SealedVersionBeacon{
-				VersionBeacon: unittest.VersionBeaconFixture(
-					unittest.WithBoundaries(
-						flow.VersionBoundary{
-							BlockHeight: sealedHeader.Height,
-							Version:     "0.0.1",
-						}),
-				),
-				SealHeight: sealedHeader.Height,
-			}, nil).Once()
+			Return(func(height uint64) (*flow.SealedVersionBeacon, error) {
+				if height == sealedHeader.Height {
+					return &flow.SealedVersionBeacon{
+						VersionBeacon: unittest.VersionBeaconFixture(
+							unittest.WithBoundaries(
+								flow.VersionBoundary{
+									BlockHeight: sealedHeader.Height,
+									Version:     "0.0.1",
+								}),
+						),
+						SealHeight: sealedHeader.Height,
+					}, nil
+				} else {
+					return nil, nil
+				}
+			}, nil)
+
+		// Create a new VersionControl instance with initial parameters.
+		vc := NewVersionControl(unittest.Logger(), versionBeacons, semver.New("0.0.1"), finalizedRootBlockHeight, sealedHeader.Height)
 
 		// Create a mock signaler context for testing.
 		ictx := irrecoverable.NewMockSignalerContext(t, ctx)
@@ -59,26 +60,23 @@ func TestInitialization(t *testing.T) {
 		// Ensure the component is ready before proceeding.
 		unittest.RequireComponentsReadyBefore(t, 2*time.Second, vc)
 
+		compatible, err := vc.CompatibleAtBlock(sealedHeader.Height)
+		require.NoError(t, err)
+
 		// Assert that the VersionControl is compatible at the specified block height.
-		assert.True(t, vc.CompatibleAtBlock(sealedHeader.Height))
+		assert.True(t, compatible)
 	})
 
 	t.Run("no version beacon found", func(t *testing.T) {
 		// Set up a mock version beacons storage.
 		versionBeacons := storageMock.NewVersionBeacons(t)
-
-		// Create a new VersionControl instance with initial parameters.
-		vc := NewVersionControl(
-			unittest.Logger(),
-			versionBeacons,
-			semver.New("0.0.1"),
-			sealedHeader,
-		)
-
 		// Mock the Highest method to return nil, indicating no version beacon found.
 		versionBeacons.
 			On("Highest", testifyMock.AnythingOfType("uint64")).
-			Return(nil, nil).Once()
+			Return(nil, nil)
+
+		// Create a new VersionControl instance with initial parameters.
+		vc := NewVersionControl(unittest.Logger(), versionBeacons, semver.New("0.0.1"), finalizedRootBlockHeight, sealedHeader.Height)
 
 		// Create a mock signaler context for testing.
 		ictx := irrecoverable.NewMockSignalerContext(t, ctx)
@@ -89,8 +87,11 @@ func TestInitialization(t *testing.T) {
 		// Ensure the component is ready before proceeding.
 		unittest.RequireComponentsReadyBefore(t, 2*time.Second, vc)
 
-		// Assert that the VersionControl is not compatible at the specified block height.
-		assert.False(t, vc.CompatibleAtBlock(sealedHeader.Height))
+		compatible, err := vc.CompatibleAtBlock(sealedHeader.Height)
+		require.NoError(t, err)
+
+		// Should be compatible with all blocks in the network when there is no version beacon available
+		assert.True(t, compatible)
 	})
 
 	t.Run("version beacon highest error", func(t *testing.T) {
@@ -98,19 +99,13 @@ func TestInitialization(t *testing.T) {
 
 		// Set up a mock version beacons storage.
 		versionBeacons := storageMock.NewVersionBeacons(t)
-
-		// Create a new VersionControl instance with initial parameters.
-		vc := NewVersionControl(
-			unittest.Logger(),
-			versionBeacons,
-			semver.New("0.0.1"),
-			sealedHeader,
-		)
-
 		// Mock the Highest method to return an error.
 		versionBeacons.
 			On("Highest", testifyMock.AnythingOfType("uint64")).
-			Return(nil, decodeErr).Once()
+			Return(nil, decodeErr)
+
+		// Create a new VersionControl instance with initial parameters.
+		vc := NewVersionControl(unittest.Logger(), versionBeacons, semver.New("0.0.1"), finalizedRootBlockHeight, sealedHeader.Height)
 
 		// Create a mock signaler context that expects an error.
 		ictx := irrecoverable.NewMockSignalerContextExpectError(t, ctx, fmt.Errorf(
@@ -125,6 +120,116 @@ func TestInitialization(t *testing.T) {
 
 		// Wait for the asynchronous version controller initialization process.
 		time.Sleep(time.Second)
+	})
+
+	t.Run("start height available", func(t *testing.T) {
+		startHeight := sealedHeader.Height - 5
+		// Set up a mock version beacons storage.
+		versionBeacons := storageMock.NewVersionBeacons(t)
+		// Mock the Highest method to return a version beacon with a specific version.
+		versionBeacons.
+			On("Highest", testifyMock.AnythingOfType("uint64")).
+			Return(func(height uint64) (*flow.SealedVersionBeacon, error) {
+				if height == sealedHeader.Height {
+					return &flow.SealedVersionBeacon{
+						VersionBeacon: unittest.VersionBeaconFixture(
+							unittest.WithBoundaries(
+								flow.VersionBoundary{
+									BlockHeight: startHeight,
+									Version:     "0.0.1",
+								}),
+							unittest.WithBoundaries(
+								flow.VersionBoundary{
+									BlockHeight: sealedHeader.Height,
+									Version:     "0.0.2",
+								}),
+						),
+						SealHeight: sealedHeader.Height,
+					}, nil
+				} else {
+					return nil, nil
+				}
+			}, nil)
+
+		// Create a new VersionControl instance with initial parameters.
+		vc := NewVersionControl(unittest.Logger(), versionBeacons, semver.New("0.0.2"), finalizedRootBlockHeight, sealedHeader.Height)
+
+		// Create a mock signaler context for testing.
+		ictx := irrecoverable.NewMockSignalerContext(t, ctx)
+
+		// Start the VersionControl component.
+		vc.Start(ictx)
+
+		// Ensure the component is ready before proceeding.
+		unittest.RequireComponentsReadyBefore(t, 2*time.Second, vc)
+
+		compatible, err := vc.CompatibleAtBlock(sealedHeader.Height)
+		require.NoError(t, err)
+
+		// Assert that the VersionControl is compatible at the specified block height.
+		assert.True(t, compatible)
+
+		compatible, err = vc.CompatibleAtBlock(startHeight - 1)
+		require.NoError(t, err)
+
+		// Should be incompatible, as lover than start height
+		assert.False(t, compatible)
+	})
+
+	t.Run("start and end heights available", func(t *testing.T) {
+		startHeight := sealedHeader.Height - 5
+
+		endHeight := sealedHeader.Height - 1
+
+		// Set up a mock version beacons storage.
+		versionBeacons := storageMock.NewVersionBeacons(t)
+		// Mock the Highest method to return a version beacon with a specific version.
+		versionBeacons.
+			On("Highest", testifyMock.AnythingOfType("uint64")).
+			Return(func(height uint64) (*flow.SealedVersionBeacon, error) {
+				if height == sealedHeader.Height {
+					return &flow.SealedVersionBeacon{
+						VersionBeacon: unittest.VersionBeaconFixture(
+							unittest.WithBoundaries(
+								flow.VersionBoundary{
+									BlockHeight: startHeight,
+									Version:     "0.0.1",
+								}),
+							unittest.WithBoundaries(
+								flow.VersionBoundary{
+									BlockHeight: endHeight,
+									Version:     "0.0.2",
+								}),
+							unittest.WithBoundaries(
+								flow.VersionBoundary{
+									BlockHeight: sealedHeader.Height,
+									Version:     "0.0.3",
+								}),
+						),
+						SealHeight: sealedHeader.Height,
+					}, nil
+				} else {
+					return nil, nil
+				}
+			}, nil)
+
+		// Create a new VersionControl instance with initial parameters.
+		vc := NewVersionControl(unittest.Logger(), versionBeacons, semver.New("0.0.2"), finalizedRootBlockHeight, sealedHeader.Height)
+
+		// Create a mock signaler context for testing.
+		ictx := irrecoverable.NewMockSignalerContext(t, ctx)
+
+		// Start the VersionControl component.
+		vc.Start(ictx)
+
+		// Ensure the component is ready before proceeding.
+		unittest.RequireComponentsReadyBefore(t, 2*time.Second, vc)
+
+		compatible, err := vc.CompatibleAtBlock(sealedHeader.Height)
+		require.NoError(t, err)
+
+		// Should be incompatible, as end height is lover than sealedHeader height
+		assert.False(t, compatible)
 	})
 }
 
@@ -149,18 +254,18 @@ func TestVersionChanged(t *testing.T) {
 	versionBeacons := storageMock.NewVersionBeacons(t)
 
 	// Create a new VersionControl instance with initial parameters.
-	vc := NewVersionControl(
-		unittest.Logger(),
-		versionBeacons,
-		semver.New("0.0.1"),
-		sealedHeader,
-	)
+	vc := NewVersionControl(unittest.Logger(), versionBeacons, semver.New("0.0.1"), 0, sealedHeader.Height)
 
 	// Mock the Highest method to return a specific version beacon.
 	versionBeacons.
 		On("Highest", testifyMock.AnythingOfType("uint64")).
-		Return(func(belowOrEqualTo uint64) (*flow.SealedVersionBeacon, error) {
-			return sealedVersionBeacon, nil
+		Return(func(height uint64) (*flow.SealedVersionBeacon, error) {
+			if height == sealedVersionBeacon.SealHeight {
+				return sealedVersionBeacon, nil
+			} else {
+				return nil, nil
+			}
+
 		}, nil)
 
 	// Create a mock signaler context for testing.
@@ -175,15 +280,22 @@ func TestVersionChanged(t *testing.T) {
 	// Wait for the asynchronous version controller initialization process.
 	time.Sleep(time.Second)
 
+	compatible, err := vc.CompatibleAtBlock(sealedHeader.Height)
+	require.NoError(t, err)
+
 	// Assert that the VersionControl is compatible at the specified block height.
-	require.True(t, vc.CompatibleAtBlock(sealedHeader.Height))
+	require.True(t, compatible)
 
 	// Create a new block header for testing the block finalized event.
 	blockHeaderA := unittest.BlockHeaderWithParentFixture(sealedHeader) // Height 11
+	sealedVersionBeacon.SealHeight = blockHeaderA.Height
 	vc.BlockFinalizedForTesting(blockHeaderA)
 
+	compatible, err = vc.CompatibleAtBlock(blockHeaderA.Height)
+	require.NoError(t, err)
+
 	// Assert that the VersionControl is compatible at the new block height.
-	assert.True(t, vc.CompatibleAtBlock(blockHeaderA.Height))
+	assert.True(t, compatible)
 
 	// Create a new block header with a higher version.
 	newBlockHeaderWithHigherVersion := unittest.BlockHeaderWithParentFixture(blockHeaderA) // Height 12
@@ -213,7 +325,15 @@ func TestVersionChanged(t *testing.T) {
 	vc.BlockFinalizedForTesting(newBlockHeaderWithHigherVersion)
 
 	// Assert that the VersionControl is not compatible at the new block height.
-	assert.True(t, vc.CompatibleAtBlock(sealedHeader.Height))
-	assert.True(t, vc.CompatibleAtBlock(blockHeaderA.Height))
-	assert.False(t, vc.CompatibleAtBlock(newBlockHeaderWithHigherVersion.Height))
+	compatible, err = vc.CompatibleAtBlock(sealedHeader.Height)
+	require.NoError(t, err)
+	assert.True(t, compatible)
+
+	compatible, err = vc.CompatibleAtBlock(blockHeaderA.Height)
+	require.NoError(t, err)
+	assert.True(t, compatible)
+
+	compatible, err = vc.CompatibleAtBlock(newBlockHeaderWithHigherVersion.Height)
+	require.NoError(t, err)
+	assert.False(t, compatible)
 }

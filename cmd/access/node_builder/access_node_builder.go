@@ -11,6 +11,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/onflow/flow-go/cmd/build"
+
 	"github.com/ipfs/boxo/bitswap"
 	badger "github.com/ipfs/go-ds-badger2"
 	"github.com/libp2p/go-libp2p/core/host"
@@ -27,7 +29,6 @@ import (
 	stateSyncCommands "github.com/onflow/flow-go/admin/commands/state_synchronization"
 	storageCommands "github.com/onflow/flow-go/admin/commands/storage"
 	"github.com/onflow/flow-go/cmd"
-	"github.com/onflow/flow-go/cmd/build"
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
@@ -1607,6 +1608,40 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 
 			return nil
 		}).
+		Component("version control", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			ver, err := build.Semver()
+			if err != nil {
+				err = fmt.Errorf("could not set semver version for version control. "+
+					"version %s is not semver compliant: %w", build.Version(), err)
+
+				// The node would not know its own version. Without this the node would not know
+				// how to reach to version boundaries.
+				builder.Logger.
+					Err(err).
+					Msg("error starting version control")
+
+				return nil, err
+			}
+
+			latestFinalizedBlock, err := node.State.Final().Head()
+			if err != nil {
+				return nil, fmt.Errorf("could not get latest finalized block: %w", err)
+			}
+
+			versionControl := version.NewVersionControl(
+				builder.Logger,
+				node.Storage.VersionBeacons,
+				ver,
+				builder.FinalizedRootBlock.Header.Height,
+				latestFinalizedBlock.Height,
+			)
+			// VersionControl needs to consume BlockFinalized events.
+			node.ProtocolEvents.AddConsumer(versionControl)
+
+			builder.versionControl = versionControl
+
+			return versionControl, nil
+		}).
 		Module("backend script executor", func(node *cmd.NodeConfig) error {
 			builder.ScriptExecutor = backend.NewScriptExecutor(builder.Logger, builder.scriptExecMinBlock, builder.scriptExecMaxBlock)
 			return nil
@@ -1792,39 +1827,6 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			builder.FollowerDistributor.AddOnBlockFinalizedConsumer(builder.RpcEng.OnFinalizedBlock)
 
 			return builder.RpcEng, nil
-		}).
-		Component("version control", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			ver, err := build.Semver()
-			if err != nil {
-				err = fmt.Errorf("could not set semver version for version control. "+
-					"version %s is not semver compliant: %w", build.Version(), err)
-
-				// The node would not know its own version. Without this the node would not know
-				// how to reach to version boundaries.
-				builder.Logger.
-					Err(err).
-					Msg("error starting version control")
-
-				return nil, err
-			}
-
-			latestFinalizedBlock, err := node.State.Final().Head()
-			if err != nil {
-				return nil, fmt.Errorf("could not get latest finalized block: %w", err)
-			}
-
-			versionControl := version.NewVersionControl(
-				builder.Logger,
-				node.Storage.VersionBeacons,
-				ver,
-				latestFinalizedBlock,
-			)
-			// VersionControl needs to consume BlockFinalized events.
-			node.ProtocolEvents.AddConsumer(versionControl)
-
-			builder.versionControl = versionControl
-
-			return versionControl, nil
 		}).
 		Component("ingestion engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			var err error
