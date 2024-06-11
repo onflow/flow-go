@@ -1,4 +1,4 @@
-package operations
+package operation
 
 const (
 	codeChunkDataPack = 100
