@@ -273,7 +273,6 @@ type ObserverServiceBuilder struct {
 	ExecutionDataStore      execution_data.ExecutionDataStore
 	ExecutionDataBlobstore  blobs.Blobstore
 	ExecutionDataPruner     *pruner.Pruner
-	ExecutionDataTracker    tracker.Storage
 	ExecutionDataDatastore  *badger.Datastore
 
 	RegistersAsyncStore *execution.RegistersAsyncStore
@@ -1261,7 +1260,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 			}
 
 			trackerDir := filepath.Join(builder.executionDataDir, "tracker")
-			builder.ExecutionDataTracker, err = tracker.OpenStorage(
+			executionDataTracker, err := tracker.OpenStorage(
 				trackerDir,
 				sealed.Height,
 				node.Logger,
@@ -1271,20 +1270,44 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				}),
 			)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("failed to create execution data tracker: %w", err)
 			}
+
 			execDataDistributor.AddOnExecutionDataReceivedConsumer(func(data *execution_data.BlockExecutionDataEntity) {
 				header, err := node.Storage.Headers.ByBlockID(data.BlockID)
 				if err != nil {
-					// if the execution data is available, the block must be locally finalized
-					node.Logger.Info().Msg("failed to get header for execution data")
+					node.Logger.Fatal().Err(err).Msg("failed to get header for execution data")
 				}
-				if err = builder.ExecutionDataTracker.SetFulfilledHeight(header.Height); err != nil {
-					node.Logger.Info().Msg("failed to set fulfilled height")
+				err = executionDataTracker.SetFulfilledHeight(header.Height)
+				if err != nil {
+					node.Logger.Fatal().Err(err).Msg("failed to set fulfilled height")
+				}
+
+				if builder.ExecutionDataPruner != nil {
+					builder.ExecutionDataPruner.NotifyFulfilledHeight(header.Height)
 				}
 			})
 
-			return builder.LoadExecutionDataPruner(node)
+			var prunerMetrics module.ExecutionDataPrunerMetrics = metrics.NewNoopCollector()
+			if node.MetricsEnabled {
+				prunerMetrics = metrics.NewExecutionDataPrunerCollector()
+			}
+
+			builder.ExecutionDataPruner, err = pruner.NewPruner(
+				node.Logger,
+				prunerMetrics,
+				executionDataTracker,
+				pruner.WithPruneCallback(func(ctx context.Context) error {
+					return builder.ExecutionDataDatastore.CollectGarbage(ctx)
+				}),
+				pruner.WithHeightRangeTarget(builder.executionDataPrunerHeightRangeTarget),
+				pruner.WithThreshold(builder.executionDataPrunerThreshold),
+			)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create execution data pruner: %w", err)
+			}
+
+			return builder.ExecutionDataPruner, nil
 		})
 	if builder.executionDataIndexingEnabled {
 		var indexedBlockHeight storage.ConsumerProgress
@@ -1929,32 +1952,4 @@ func loadNetworkingKey(path string) (crypto.PrivateKey, error) {
 	}
 
 	return networkingKey, nil
-}
-
-func (builder *ObserverServiceBuilder) LoadExecutionDataPruner(
-	node *cmd.NodeConfig,
-) (
-	module.ReadyDoneAware,
-	error,
-) {
-	var prunerMetrics module.ExecutionDataPrunerMetrics = metrics.NewNoopCollector()
-	if node.MetricsEnabled {
-		prunerMetrics = metrics.NewExecutionDataPrunerCollector()
-	}
-
-	var err error
-	builder.ExecutionDataPruner, err = pruner.NewPruner(
-		node.Logger,
-		prunerMetrics,
-		builder.ExecutionDataTracker,
-		pruner.WithPruneCallback(func(ctx context.Context) error {
-			return builder.ExecutionDataDatastore.CollectGarbage(ctx)
-		}),
-		pruner.WithHeightRangeTarget(builder.executionDataPrunerHeightRangeTarget),
-		pruner.WithThreshold(builder.executionDataPrunerThreshold),
-	)
-	if err == nil {
-		node.Logger.Info().Msg("!!! builder.ExecutionDataPruner created")
-	}
-	return builder.ExecutionDataPruner, err
 }
