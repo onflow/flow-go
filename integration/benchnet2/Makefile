@@ -49,7 +49,6 @@ gen-bootstrap: clone-flow
 		--root-chain bench \
 		--root-height 0 \
 		--root-parent 0000000000000000000000000000000000000000000000000000000000000000 \
-		--epoch-counter 0 \
 		--epoch-length 5000 \
 		--epoch-staking-phase-length 500 \
 		--epoch-dkg-phase-length 1000 \
