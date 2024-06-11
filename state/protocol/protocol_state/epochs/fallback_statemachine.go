@@ -142,6 +142,7 @@ func (m *FallbackStateMachine) ProcessEpochCommit(setup *flow.EpochCommit) (bool
 // This is an indication that the Epoch Smart contract is doing something unexpect. In this case, we have a simple rule:
 // subsequent EpochRecover events are accepted iff they are identical to the first EpochRecover event in the block.
 func (m *FallbackStateMachine) ProcessEpochRecover(epochRecover *flow.EpochRecover) (bool, error) {
+	m.consumer.OnServiceEventReceived(epochRecover.ServiceEvent())
 	err := m.ensureValidEpochRecover(epochRecover)
 	if err != nil {
 		m.consumer.OnInvalidServiceEvent(epochRecover.ServiceEvent(), err)

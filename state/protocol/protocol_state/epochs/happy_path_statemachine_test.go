@@ -1,6 +1,7 @@
 package epochs
 
 import (
+	"github.com/onflow/flow-go/state/protocol/protocol_state/mock"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -24,6 +25,7 @@ type BaseStateMachineSuite struct {
 	parentProtocolState *flow.RichEpochProtocolStateEntry
 	parentBlock         *flow.Header
 	candidate           *flow.Header
+	consumer            *mock.StateMachineEventsConsumer
 }
 
 func (s *BaseStateMachineSuite) SetupTest() {
@@ -34,6 +36,7 @@ func (s *BaseStateMachineSuite) SetupTest() {
 	})
 	s.parentBlock = unittest.BlockHeaderFixture(unittest.HeaderWithView(s.parentProtocolState.CurrentEpochSetup.FirstView + 1))
 	s.candidate = unittest.BlockHeaderWithParentFixture(s.parentBlock)
+	s.consumer = mock.NewStateMachineEventsConsumer(s.T())
 }
 
 // ProtocolStateMachineSuite is a dedicated test suite for testing happy path state machine.

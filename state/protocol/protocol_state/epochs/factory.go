@@ -48,7 +48,7 @@ func (f *EpochStateMachineFactory) Create(candidateView uint64, parentBlockID fl
 			return NewHappyPathStateMachine(candidateView, parentState)
 		},
 		func(candidateView uint64, parentState *flow.RichEpochProtocolStateEntry) (StateMachine, error) {
-			return NewFallbackStateMachine(f.params, candidateView, parentState)
+			return NewFallbackStateMachine(f.params, nil, candidateView, parentState)
 		},
 	)
 }
