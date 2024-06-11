@@ -2088,10 +2088,9 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 			require.NoError(t, err)
 			assertEpochEmergencyFallbackTriggered(t, state.Final(), false) // EFM should still not be triggered after finalizing block 2
 
+			// Since we enter EFM before the commitment deadline, no epoch extension is added
 			metricsMock.On("EpochEmergencyFallbackTriggered").Once()
-			metricsMock.On("CurrentEpochFinalView", epoch1Setup.FinalView+epochs.DefaultEpochExtensionViewCount)
 			protoEventsMock.On("EpochEmergencyFallbackTriggered").Once()
-			protoEventsMock.On("EpochExtended", mock.Anything).Once()
 			err = state.Finalize(context.Background(), block3.ID())
 			require.NoError(t, err)
 			assertEpochEmergencyFallbackTriggered(t, state.Final(), true) // finalizing block 3 should have triggered EFM since it seals invalid setup event
