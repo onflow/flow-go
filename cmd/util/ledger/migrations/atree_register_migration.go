@@ -224,6 +224,24 @@ func (m *AtreeRegisterMigrator) convertStorageDomain(
 	}
 	storageMapIds[string(atree.SlabIndexToLedgerKey(storageMap.SlabID().Index()))] = struct{}{}
 
+	if storageMap.Count() == 0 {
+		// Migrate empty storage map by resetting storage map type
+		// so underlying slab can be stored and re-encoded (migrated).
+
+		storageMapID := storageMap.SlabID()
+
+		orderedMap, err := atree.NewMapWithRootID(
+			mr.Storage.PersistentSlabStorage,
+			storageMapID,
+			atree.NewDefaultDigesterBuilder(),
+		)
+		if err != nil {
+			return err
+		}
+
+		return orderedMap.SetType(orderedMap.Type())
+	}
+
 	iterator := storageMap.Iterator(nil)
 	keys := make([]interpreter.StorageMapKey, 0, storageMap.Count())
 	// to be safe avoid modifying the map while iterating
