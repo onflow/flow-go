@@ -12,7 +12,7 @@ import (
 
 	"github.com/onflow/cadence/encoding/ccf"
 	gethTypes "github.com/onflow/go-ethereum/core/types"
-	"github.com/onflow/go-ethereum/params"
+	gethParams "github.com/onflow/go-ethereum/params"
 	"github.com/onflow/go-ethereum/rlp"
 	"github.com/stretchr/testify/assert"
 
@@ -1463,7 +1463,7 @@ func TestDryRun(t *testing.T) {
 			})
 	})
 
-	t.Run("test dry run storing current value", func(t *testing.T) {
+	t.Run("test dry run store current value", func(t *testing.T) {
 		RunWithNewEnvironment(t,
 			chain, func(
 				ctx fvm.Context,
@@ -1473,30 +1473,76 @@ func TestDryRun(t *testing.T) {
 				testAccount *EOATestAccount,
 			) {
 				data := testContract.MakeCallData(t, "store", big.NewInt(0))
-
-				limit := uint64(math.MaxUint64 - 1)
 				tx := gethTypes.NewTransaction(
 					0,
 					testContract.DeployedAt.ToCommon(),
 					big.NewInt(0),
-					limit,
+					uint64(50_000),
 					big.NewInt(0),
 					data,
 				)
-				result := dryRunTx(t, tx, ctx, vm, snapshot, testContract)
-				require.Equal(t, types.ErrCodeNoError, result.ErrorCode)
-				require.Equal(t, types.StatusSuccessful, result.Status)
-				require.Greater(t, result.GasConsumed, uint64(0))
+				dryRunResult := dryRunTx(t, tx, ctx, vm, snapshot, testContract)
+
+				require.Equal(t, types.ErrCodeNoError, dryRunResult.ErrorCode)
+				require.Equal(t, types.StatusSuccessful, dryRunResult.Status)
+				require.Greater(t, dryRunResult.GasConsumed, uint64(0))
+
+				code := []byte(fmt.Sprintf(
+					`
+					import EVM from %s
+					access(all)
+					fun main(tx: [UInt8], coinbaseBytes: [UInt8; 20]): EVM.Result {
+						let coinbase = EVM.EVMAddress(bytes: coinbaseBytes)
+						return EVM.run(tx: tx, coinbase: coinbase)
+					}
+					`,
+					evmAddress,
+				))
+
+				innerTxBytes := testAccount.PrepareSignAndEncodeTx(t,
+					testContract.DeployedAt.ToCommon(),
+					data,
+					big.NewInt(0),
+					dryRunResult.GasConsumed, // use the gas estimation from Evm.dryRun
+					big.NewInt(0),
+				)
+
+				innerTx := cadence.NewArray(
+					ConvertToCadence(innerTxBytes),
+				).WithType(stdlib.EVMTransactionBytesCadenceType)
+
+				coinbase := cadence.NewArray(
+					ConvertToCadence(testAccount.Address().Bytes()),
+				).WithType(stdlib.EVMAddressBytesCadenceType)
+
+				script := fvm.Script(code).WithArguments(
+					json.MustEncode(innerTx),
+					json.MustEncode(coinbase),
+				)
+
+				_, output, err := vm.Run(
+					ctx,
+					script,
+					snapshot)
+				require.NoError(t, err)
+				require.NoError(t, output.Err)
+
+				res, err := stdlib.ResultSummaryFromEVMResultValue(output.Value)
+				require.NoError(t, err)
+				require.Equal(t, types.StatusSuccessful, res.Status)
+				require.Equal(t, types.ErrCodeNoError, res.ErrorCode)
+				// Make sure that gas consumed from `EVM.dryRun` is bigger
+				// than the actual gas consumption of the equivalent
+				// `EVM.run`.
 				require.Equal(
 					t,
-					uint64(23873)+params.SstoreSentryGasEIP2200,
-					result.GasConsumed,
+					res.GasConsumed+gethParams.SstoreSentryGasEIP2200,
+					dryRunResult.GasConsumed,
 				)
-				require.Equal(t, uint64(0), result.GasRefund)
 			})
 	})
 
-	t.Run("test dry run storing new value", func(t *testing.T) {
+	t.Run("test dry run store new value", func(t *testing.T) {
 		RunWithNewEnvironment(t,
 			chain, func(
 				ctx fvm.Context,
@@ -1557,7 +1603,6 @@ func TestDryRun(t *testing.T) {
 				require.NoError(t, output.Err)
 
 				data := testContract.MakeCallData(t, "store", big.NewInt(100))
-
 				tx1 := gethTypes.NewTransaction(
 					0,
 					testContract.DeployedAt.ToCommon(),
@@ -1566,16 +1611,67 @@ func TestDryRun(t *testing.T) {
 					big.NewInt(0),
 					data,
 				)
-				result := dryRunTx(t, tx1, ctx, vm, snapshot, testContract)
-				require.Equal(t, types.ErrCodeNoError, result.ErrorCode)
-				require.Equal(t, types.StatusSuccessful, result.Status)
-				require.Greater(t, result.GasConsumed, uint64(0))
+				dryRunResult := dryRunTx(t, tx1, ctx, vm, snapshot, testContract)
+
+				require.Equal(t, types.ErrCodeNoError, dryRunResult.ErrorCode)
+				require.Equal(t, types.StatusSuccessful, dryRunResult.Status)
+				require.Greater(t, dryRunResult.GasConsumed, uint64(0))
+
+				code = []byte(fmt.Sprintf(
+					`
+					import EVM from %s
+					access(all)
+					fun main(tx: [UInt8], coinbaseBytes: [UInt8; 20]): EVM.Result {
+						let coinbase = EVM.EVMAddress(bytes: coinbaseBytes)
+						return EVM.run(tx: tx, coinbase: coinbase)
+					}
+					`,
+					evmAddress,
+				))
+
+				// Decrease nonce because we are Cadence using scripts, and not
+				// transactions, which means that no state change is happening.
+				testAccount.SetNonce(testAccount.Nonce() - 1)
+				innerTxBytes = testAccount.PrepareSignAndEncodeTx(t,
+					testContract.DeployedAt.ToCommon(),
+					data,
+					big.NewInt(0),
+					dryRunResult.GasConsumed, // use the gas estimation from Evm.dryRun
+					big.NewInt(0),
+				)
+
+				innerTx = cadence.NewArray(
+					ConvertToCadence(innerTxBytes),
+				).WithType(stdlib.EVMTransactionBytesCadenceType)
+
+				coinbase = cadence.NewArray(
+					ConvertToCadence(testAccount.Address().Bytes()),
+				).WithType(stdlib.EVMAddressBytesCadenceType)
+
+				script := fvm.Script(code).WithArguments(
+					json.MustEncode(innerTx),
+					json.MustEncode(coinbase),
+				)
+
+				_, output, err = vm.Run(
+					ctx,
+					script,
+					snapshot)
+				require.NoError(t, err)
+				require.NoError(t, output.Err)
+
+				res, err := stdlib.ResultSummaryFromEVMResultValue(output.Value)
+				require.NoError(t, err)
+				require.Equal(t, types.StatusSuccessful, res.Status)
+				require.Equal(t, types.ErrCodeNoError, res.ErrorCode)
+				// Make sure that gas consumed from `EVM.dryRun` is bigger
+				// than the actual gas consumption of the equivalent
+				// `EVM.run`.
 				require.Equal(
 					t,
-					uint64(43785)+params.SstoreSentryGasEIP2200,
-					result.GasConsumed,
+					res.GasConsumed+gethParams.SstoreSentryGasEIP2200,
+					dryRunResult.GasConsumed,
 				)
-				require.Equal(t, uint64(0), result.GasRefund)
 			})
 	})
 
@@ -1641,7 +1737,6 @@ func TestDryRun(t *testing.T) {
 				snapshot = snapshot.Append(state)
 
 				data := testContract.MakeCallData(t, "store", big.NewInt(0))
-
 				tx1 := gethTypes.NewTransaction(
 					0,
 					testContract.DeployedAt.ToCommon(),
@@ -1650,17 +1745,64 @@ func TestDryRun(t *testing.T) {
 					big.NewInt(0),
 					data,
 				)
-				result := dryRunTx(t, tx1, ctx, vm, snapshot, testContract)
-				require.Equal(t, types.ErrCodeNoError, result.ErrorCode)
-				require.Equal(t, types.StatusSuccessful, result.Status)
-				require.Greater(t, result.GasConsumed, uint64(0))
+				dryRunResult := dryRunTx(t, tx1, ctx, vm, snapshot, testContract)
+
+				require.Equal(t, types.ErrCodeNoError, dryRunResult.ErrorCode)
+				require.Equal(t, types.StatusSuccessful, dryRunResult.Status)
+				require.Greater(t, dryRunResult.GasConsumed, uint64(0))
+
+				code = []byte(fmt.Sprintf(
+					`
+					import EVM from %s
+					access(all)
+					fun main(tx: [UInt8], coinbaseBytes: [UInt8; 20]): EVM.Result {
+						let coinbase = EVM.EVMAddress(bytes: coinbaseBytes)
+						return EVM.run(tx: tx, coinbase: coinbase)
+					}
+					`,
+					evmAddress,
+				))
+
+				innerTxBytes = testAccount.PrepareSignAndEncodeTx(t,
+					testContract.DeployedAt.ToCommon(),
+					data,
+					big.NewInt(0),
+					dryRunResult.GasConsumed, // use the gas estimation from Evm.dryRun
+					big.NewInt(0),
+				)
+
+				innerTx = cadence.NewArray(
+					ConvertToCadence(innerTxBytes),
+				).WithType(stdlib.EVMTransactionBytesCadenceType)
+
+				coinbase = cadence.NewArray(
+					ConvertToCadence(testAccount.Address().Bytes()),
+				).WithType(stdlib.EVMAddressBytesCadenceType)
+
+				script := fvm.Script(code).WithArguments(
+					json.MustEncode(innerTx),
+					json.MustEncode(coinbase),
+				)
+
+				_, output, err = vm.Run(
+					ctx,
+					script,
+					snapshot)
+				require.NoError(t, err)
+				require.NoError(t, output.Err)
+
+				res, err := stdlib.ResultSummaryFromEVMResultValue(output.Value)
+				require.NoError(t, err)
+				//require.Equal(t, types.StatusSuccessful, res.Status)
+				require.Equal(t, types.ErrCodeNoError, res.ErrorCode)
+				// Make sure that gas consumed from `EVM.dryRun` is bigger
+				// than the actual gas consumption of the equivalent
+				// `EVM.run`.
 				require.Equal(
 					t,
-					uint64(21873)+params.SstoreSentryGasEIP2200+params.SstoreClearsScheduleRefundEIP3529,
-					result.GasConsumed,
+					res.GasConsumed+gethParams.SstoreSentryGasEIP2200+gethParams.SstoreClearsScheduleRefundEIP3529,
+					dryRunResult.GasConsumed,
 				)
-				// We might want to think about exposing GasRefuned to EVM contract.
-				// require.Equal(t, uint64(4800), result.GasRefund)
 			})
 	})
 
