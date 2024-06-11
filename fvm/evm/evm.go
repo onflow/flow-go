@@ -1,11 +1,14 @@
 package evm
 
 import (
+	"fmt"
+
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/evm/backends"
+	"github.com/onflow/flow-go/fvm/evm/debug"
 	evm "github.com/onflow/flow-go/fvm/evm/emulator"
 	"github.com/onflow/flow-go/fvm/evm/handler"
 	"github.com/onflow/flow-go/fvm/evm/stdlib"
@@ -25,6 +28,7 @@ func SetupEnvironment(
 	chainID flow.ChainID,
 	fvmEnv environment.Environment,
 	runtimeEnv runtime.Environment,
+	tracer debug.EVMTracer,
 ) error {
 	sc := systemcontracts.SystemContractsForChain(chainID)
 	randomBeaconAddress := sc.RandomBeaconHistory.Address
@@ -35,6 +39,23 @@ func SetupEnvironment(
 	blockStore := handler.NewBlockStore(backend, StorageAccountAddress(chainID))
 	addressAllocator := handler.NewAddressAllocator()
 
+	if tracer != debug.NopTracer {
+		height, err := backend.GetCurrentBlockHeight()
+		if err != nil {
+			return err
+		}
+
+		block, ok, err := backend.GetBlockAtHeight(height)
+		if err != nil {
+			return err
+		}
+		if !ok {
+			return fmt.Errorf("could not retrieve the block at height")
+		}
+
+		tracer.WithBlockID(flow.Identifier(block.Hash))
+	}
+
 	contractHandler := handler.NewContractHandler(
 		chainID,
 		ContractAccountAddress(chainID),
@@ -44,6 +65,7 @@ func SetupEnvironment(
 		addressAllocator,
 		backend,
 		emulator,
+		tracer,
 	)
 
 	stdlib.SetupEnvironment(

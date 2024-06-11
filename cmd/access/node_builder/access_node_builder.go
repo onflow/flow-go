@@ -11,6 +11,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/onflow/flow-go/cmd/build"
+
 	"github.com/ipfs/boxo/bitswap"
 	badger "github.com/ipfs/go-ds-badger2"
 	"github.com/libp2p/go-libp2p/core/host"
@@ -27,7 +29,6 @@ import (
 	stateSyncCommands "github.com/onflow/flow-go/admin/commands/state_synchronization"
 	storageCommands "github.com/onflow/flow-go/admin/commands/storage"
 	"github.com/onflow/flow-go/cmd"
-	"github.com/onflow/flow-go/cmd/build"
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
@@ -40,7 +41,6 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/index"
 	"github.com/onflow/flow-go/engine/access/ingestion"
-	"github.com/onflow/flow-go/engine/access/ingestion/version"
 	pingeng "github.com/onflow/flow-go/engine/access/ping"
 	"github.com/onflow/flow-go/engine/access/rest"
 	"github.com/onflow/flow-go/engine/access/rest/routes"
@@ -53,6 +53,7 @@ import (
 	followereng "github.com/onflow/flow-go/engine/common/follower"
 	"github.com/onflow/flow-go/engine/common/requester"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
+	"github.com/onflow/flow-go/engine/common/version"
 	"github.com/onflow/flow-go/engine/execution/computation/query"
 	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/ledger"
@@ -295,6 +296,7 @@ type FlowAccessNodeBuilder struct {
 	ExecutionIndexerCore       *indexer.IndexerCore
 	ScriptExecutor             *backend.ScriptExecutor
 	RegistersAsyncStore        *execution.RegistersAsyncStore
+	Reporter                   *index.Reporter
 	EventsIndex                *index.EventsIndex
 	TxResultsIndex             *index.TransactionResultsIndex
 	IndexerDependencies        *cmd.DependencyList
@@ -875,12 +877,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					return nil, err
 				}
 
-				err = builder.EventsIndex.Initialize(builder.ExecutionIndexer)
-				if err != nil {
-					return nil, err
-				}
-
-				err = builder.TxResultsIndex.Initialize(builder.ExecutionIndexer)
+				err = builder.Reporter.Initialize(builder.ExecutionIndexer)
 				if err != nil {
 					return nil, err
 				}
@@ -1611,6 +1608,40 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 
 			return nil
 		}).
+		Component("version control", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			ver, err := build.Semver()
+			if err != nil {
+				err = fmt.Errorf("could not set semver version for version control. "+
+					"version %s is not semver compliant: %w", build.Version(), err)
+
+				// The node would not know its own version. Without this the node would not know
+				// how to reach to version boundaries.
+				builder.Logger.
+					Err(err).
+					Msg("error starting version control")
+
+				return nil, err
+			}
+
+			latestFinalizedBlock, err := node.State.Final().Head()
+			if err != nil {
+				return nil, fmt.Errorf("could not get latest finalized block: %w", err)
+			}
+
+			versionControl := version.NewVersionControl(
+				builder.Logger,
+				node.Storage.VersionBeacons,
+				ver,
+				builder.FinalizedRootBlock.Header.Height,
+				latestFinalizedBlock.Height,
+			)
+			// VersionControl needs to consume BlockFinalized events.
+			node.ProtocolEvents.AddConsumer(versionControl)
+
+			builder.versionControl = versionControl
+
+			return versionControl, nil
+		}).
 		Module("backend script executor", func(node *cmd.NodeConfig) error {
 			builder.ScriptExecutor = backend.NewScriptExecutor(builder.Logger, builder.versionControl, builder.scriptExecMinBlock, builder.scriptExecMaxBlock)
 			return nil
@@ -1623,12 +1654,16 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			builder.Storage.Events = bstorage.NewEvents(node.Metrics.Cache, node.DB)
 			return nil
 		}).
+		Module("reporter", func(node *cmd.NodeConfig) error {
+			builder.Reporter = index.NewReporter()
+			return nil
+		}).
 		Module("events index", func(node *cmd.NodeConfig) error {
-			builder.EventsIndex = index.NewEventsIndex(builder.Storage.Events)
+			builder.EventsIndex = index.NewEventsIndex(builder.Reporter, builder.Storage.Events)
 			return nil
 		}).
 		Module("transaction result index", func(node *cmd.NodeConfig) error {
-			builder.TxResultsIndex = index.NewTransactionResultsIndex(builder.Storage.LightTransactionResults)
+			builder.TxResultsIndex = index.NewTransactionResultsIndex(builder.Reporter, builder.Storage.LightTransactionResults)
 			return nil
 		}).
 		Module("processed block height consumer progress", func(node *cmd.NodeConfig) error {
@@ -1756,6 +1791,12 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				return nil, fmt.Errorf("could not initialize backend: %w", err)
 			}
 
+			// If execution data syncing and indexing is disabled, pass nil indexReporter
+			var indexReporter state_synchronization.IndexReporter
+			if builder.executionDataSyncEnabled && builder.executionDataIndexingEnabled {
+				indexReporter = builder.Reporter
+			}
+
 			engineBuilder, err := rpc.NewBuilder(
 				node.Logger,
 				node.State,
@@ -1770,6 +1811,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				builder.unsecureGrpcServer,
 				builder.stateStreamBackend,
 				builder.stateStreamConf,
+				indexReporter,
 			)
 			if err != nil {
 				return nil, err
@@ -1785,39 +1827,6 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			builder.FollowerDistributor.AddOnBlockFinalizedConsumer(builder.RpcEng.OnFinalizedBlock)
 
 			return builder.RpcEng, nil
-		}).
-		Component("version control", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			ver, err := build.Semver()
-			if err != nil {
-				err = fmt.Errorf("could not set semver version for version control. "+
-					"version %s is not semver compliant: %w", build.Version(), err)
-
-				// The node would not know its own version. Without this the node would not know
-				// how to reach to version boundaries.
-				builder.Logger.
-					Err(err).
-					Msg("error starting version control")
-
-				return nil, err
-			}
-
-			latestFinalizedBlock, err := node.State.Final().Head()
-			if err != nil {
-				return nil, fmt.Errorf("could not get latest finalized block: %w", err)
-			}
-
-			versionControl := version.NewVersionControl(
-				builder.Logger,
-				node.Storage.VersionBeacons,
-				ver,
-				latestFinalizedBlock,
-			)
-			// VersionControl needs to consume BlockFinalized events.
-			node.ProtocolEvents.AddConsumer(versionControl)
-
-			builder.versionControl = versionControl
-
-			return versionControl, nil
 		}).
 		Component("ingestion engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			var err error

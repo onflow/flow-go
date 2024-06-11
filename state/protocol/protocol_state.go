@@ -5,79 +5,86 @@ import (
 	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
-// InitialProtocolState returns constant data for given epoch.
-// This interface can be only obtained for epochs that have progressed to epoch commit event.
-type InitialProtocolState interface {
-	// Epoch returns counter of epoch.
+// EpochProtocolState represents the subset of the Protocol State KVStore related to epochs:
+// the Identity Table, DKG, cluster assignment, etc.
+// EpochProtocolState is fork-aware and can change on a block-by-block basis.
+// Each EpochProtocolState instance refers to the state with respect to some reference block.
+type EpochProtocolState interface {
+	// Epoch returns the current epoch counter.
 	Epoch() uint64
+
 	// Clustering returns initial clustering from epoch setup.
+	// CAUTION: This describes the initial epoch configuration from the view point of the Epoch
+	// Smart Contract. It does _not_ account for subsequent node ejections. For Byzantine Fault
+	// Tolerance, the calling code must account for ejections!
 	// No errors are expected during normal operations.
 	Clustering() (flow.ClusterList, error)
+
 	// EpochSetup returns original epoch setup event that was used to initialize the protocol state.
+	// CAUTION: This describes the initial epoch configuration from the view point of the Epoch
+	// Smart Contract. It does _not_ account for subsequent node ejections. For Byzantine Fault
+	// Tolerance, the calling code must account for ejections!
 	EpochSetup() *flow.EpochSetup
+
 	// EpochCommit returns original epoch commit event that was used to update the protocol state.
+	// CAUTION: This describes the initial epoch configuration from the view point of the Epoch
+	// Smart Contract. It does _not_ account for subsequent node ejections. For Byzantine Fault
+	// Tolerance, the calling code must account for ejections!
 	EpochCommit() *flow.EpochCommit
+
 	// DKG returns information about DKG that was obtained from EpochCommit event.
+	// CAUTION: This describes the initial epoch configuration from the view point of the Epoch
+	// Smart Contract. It does _not_ account for subsequent node ejections. For Byzantine Fault
+	// Tolerance, the calling code must account for ejections!
 	// No errors are expected during normal operations.
 	DKG() (DKG, error)
-	// Entry Returns low-level protocol state entry that was used to initialize this object.
-	// It shouldn't be used by high-level logic, it is useful for some cases such as bootstrapping.
-	// Prefer using other methods to access protocol state.
-	Entry() *flow.RichProtocolStateEntry
-}
-
-// DynamicProtocolState extends the InitialProtocolState with data that can change from block to block.
-// It can be used to access the identity table at given block.
-type DynamicProtocolState interface {
-	InitialProtocolState
 
 	// InvalidEpochTransitionAttempted denotes whether an invalid epoch state transition was attempted
 	// on the fork ending this block. Once the first block where this flag is true is finalized, epoch
 	// fallback mode is triggered.
 	// TODO for 'leaving Epoch Fallback via special service event': at the moment, this is a one-way transition and requires a spork to recover - need to revisit for sporkless EFM recovery
 	InvalidEpochTransitionAttempted() bool
+
 	// PreviousEpochExists returns true if a previous epoch exists. This is true for all epoch
 	// except those immediately following a spork.
 	PreviousEpochExists() bool
+
 	// EpochPhase returns the epoch phase for the current epoch.
 	EpochPhase() flow.EpochPhase
 
-	// Identities returns identities (in canonical ordering) that can participate in the current or previous
-	// or next epochs. Let P be the set of identities in the previous epoch, C be the set of identities in
-	// the current epoch, and N be the set of identities in the next epoch.
+	// Identities returns identities (in canonical ordering) that can participate in the current or
+	// previous or next epochs. Let P be the set of identities in the previous epoch, C be the set
+	// of identities in the current epoch, and S be the set of identities in the subsequent epoch.
+	// Let `\` denote the relative set complement (also called 'set difference').
 	// The set of authorized identities this function returns is different depending on epoch state:
 	// EpochStaking phase:
 	//   - nodes in C with status `flow.EpochParticipationStatusActive`
-	//   - nodes in P-C with status `flow.EpochParticipationStatusLeaving`
+	//   - nodes in P\C with status `flow.EpochParticipationStatusLeaving`
 	// EpochSetup/EpochCommitted phase:
 	//   - nodes in C with status `flow.EpochParticipationStatusActive`
-	//   - nodes in N-C with status `flow.EpochParticipationStatusJoining`
+	//   - nodes in S\C with status `flow.EpochParticipationStatusJoining`
 	Identities() flow.IdentityList
-	// GlobalParams returns params that are same for all nodes in the network.
+
+	// GlobalParams returns global, static network params that are same for all nodes in the network.
 	GlobalParams() GlobalParams
+
+	// Entry returns low-level protocol state entry that was used to initialize this object.
+	// It shouldn't be used by high-level logic, it is useful for some cases such as bootstrapping.
+	// Prefer using other methods to access protocol state.
+	Entry() *flow.RichEpochProtocolStateEntry
 }
 
-// ProtocolState is the read-only interface for protocol state, it allows to query information
-// on a per-block and per-epoch basis.
+// ProtocolState is the read-only interface for protocol state. It allows querying the
+// Protocol KVStore or Epoch sub-state by block, and retrieving global network params.
 type ProtocolState interface {
-	// ByEpoch returns an object with static protocol state information by epoch number.
-	// To be able to use this interface we need to observe both epoch setup and commit events.
-	// Not available for next epoch unless we have observed an EpochCommit event.
-	// No errors are expected during normal operations.
-	// TODO(yuraolex): check return types
-	// TODO(yuraolex): decide if we really need this approach. It's unclear if it's useful to query
-	//  by epoch counter. To implement it we need an additional index by epoch counter. Alternatively we need a way to map
-	//  epoch counter -> block ID. It gets worse if we consider that we need a way to get the epoch counter itself at caller side.
-	//ByEpoch(epoch uint64) (InitialProtocolState, error)
-
-	// AtBlockID returns epoch protocol state at block ID.
+	// EpochStateAtBlockID returns epoch protocol state at block ID.
 	// The resulting epoch protocol state is returned AFTER applying updates that are contained in block.
 	// Can be queried for any block that has been added to the block tree.
 	// Returns:
-	// - (DynamicProtocolState, nil) - if there is an epoch protocol state associated with given block ID.
+	// - (EpochProtocolState, nil) - if there is an epoch protocol state associated with given block ID.
 	// - (nil, storage.ErrNotFound) - if there is no epoch protocol state associated with given block ID.
 	// - (nil, exception) - any other error should be treated as exception.
-	AtBlockID(blockID flow.Identifier) (DynamicProtocolState, error)
+	EpochStateAtBlockID(blockID flow.Identifier) (EpochProtocolState, error)
 
 	// KVStoreAtBlockID returns protocol state at block ID.
 	// The resulting protocol state is returned AFTER applying updates that are contained in block.

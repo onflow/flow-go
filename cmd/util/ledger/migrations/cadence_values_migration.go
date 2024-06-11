@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/cadence/migrations/entitlements"
 	"github.com/onflow/cadence/migrations/statictypes"
 	"github.com/onflow/cadence/migrations/string_normalization"
+	"github.com/onflow/cadence/migrations/type_keys"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 	cadenceErrors "github.com/onflow/cadence/runtime/errors"
@@ -209,10 +210,22 @@ func (m *CadenceBaseMigration) MigrateAccount(
 			m.nWorkers,
 		)
 
+		owner := flow.AddressToRegisterOwner(flow.Address(address))
+
+		oldRegistersForDiff, err := registers.NewAccountRegistersFromPayloads(owner, oldPayloadsForDiff)
+		if err != nil {
+			return fmt.Errorf("failed to create registers from old payloads: %w", err)
+		}
+
+		newRegistersForDiff, err := registers.NewAccountRegistersFromPayloads(owner, newPayloadsForDiff)
+		if err != nil {
+			return fmt.Errorf("failed to create registers from new payloads: %w", err)
+		}
+
 		accountDiffReporter.DiffStates(
-			oldPayloadsForDiff,
-			newPayloadsForDiff,
-			allStorageMapDomains,
+			oldRegistersForDiff,
+			newRegistersForDiff,
+			AllStorageMapDomains,
 		)
 	}
 
@@ -229,13 +242,22 @@ func NewCadence1ValueMigration(
 	programs map[runtime.Location]*interpreter.Program,
 	compositeTypeConverter statictypes.CompositeTypeConverterFunc,
 	interfaceTypeConverter statictypes.InterfaceTypeConverterFunc,
-	staticTypeCache migrations.StaticTypeCache,
 	opts Options,
 ) *CadenceBaseMigration {
 
 	var diffReporter reporters.ReportWriter
 	if opts.DiffMigrations {
 		diffReporter = rwf.ReportWriter("cadence-value-migration-diff")
+	}
+
+	var staticTypeMigrationCache migrations.StaticTypeCache
+	if opts.CacheStaticTypeMigrationResults {
+		staticTypeMigrationCache = migrations.NewDefaultStaticTypeCache()
+	}
+
+	var entitlementsMigrationCache migrations.StaticTypeCache
+	if opts.CacheEntitlementsMigrationResults {
+		entitlementsMigrationCache = migrations.NewDefaultStaticTypeCache()
 	}
 
 	return &CadenceBaseMigration{
@@ -251,10 +273,15 @@ func NewCadence1ValueMigration(
 			reporter *cadenceValueMigrationReporter,
 		) []migrations.ValueMigration {
 			return []migrations.ValueMigration{
-				statictypes.NewStaticTypeMigration().
+				statictypes.NewStaticTypeMigrationWithCache(staticTypeMigrationCache).
 					WithCompositeTypeConverter(compositeTypeConverter).
 					WithInterfaceTypeConverter(interfaceTypeConverter),
-				entitlements.NewEntitlementsMigrationWithCache(inter, staticTypeCache),
+				entitlements.NewEntitlementsMigrationWithCache(inter, entitlementsMigrationCache),
+				// After the static type and entitlements migration, we run the type key migration,
+				// which ensures that even if the previous migrations failed to migrate `Type` values
+				// used as dictionary keys, they will get re-stored and are accessible by users
+				// and the mutating iterator of the inlined version of atree
+				type_keys.NewTypeKeyMigration(),
 				string_normalization.NewStringNormalizingMigration(),
 			}
 		},

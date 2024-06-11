@@ -130,6 +130,18 @@ func (h *FlowAccessAPIRouter) GetCollectionByID(context context.Context, req *ac
 	return res, err
 }
 
+func (h *FlowAccessAPIRouter) GetFullCollectionByID(context context.Context, req *access.GetFullCollectionByIDRequest) (*access.FullCollectionResponse, error) {
+	if h.useIndex {
+		res, err := h.local.GetFullCollectionByID(context, req)
+		h.log(LocalApiService, "GetFullCollectionByID", err)
+		return res, err
+	}
+
+	res, err := h.upstream.GetFullCollectionByID(context, req)
+	h.log(UpstreamApiService, "GetFullCollectionByID", err)
+	return res, err
+}
+
 func (h *FlowAccessAPIRouter) SendTransaction(context context.Context, req *access.SendTransactionRequest) (*access.SendTransactionResponse, error) {
 	res, err := h.upstream.SendTransaction(context, req)
 	h.log(UpstreamApiService, "SendTransaction", err)
@@ -505,6 +517,16 @@ func (h *FlowAccessAPIForwarder) GetCollectionByID(context context.Context, req 
 	}
 	defer closer.Close()
 	return upstream.GetCollectionByID(context, req)
+}
+
+func (h *FlowAccessAPIForwarder) GetFullCollectionByID(context context.Context, req *access.GetFullCollectionByIDRequest) (*access.FullCollectionResponse, error) {
+	// This is a passthrough request
+	upstream, closer, err := h.FaultTolerantClient()
+	if err != nil {
+		return nil, err
+	}
+	defer closer.Close()
+	return upstream.GetFullCollectionByID(context, req)
 }
 
 func (h *FlowAccessAPIForwarder) SendTransaction(context context.Context, req *access.SendTransactionRequest) (*access.SendTransactionResponse, error) {
