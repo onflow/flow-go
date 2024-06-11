@@ -16,6 +16,8 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/state/protocol/protocol_state/epochs"
+
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -1783,7 +1785,9 @@ func TestEmergencyEpochFallback(t *testing.T) {
 
 			// finalizing block 1 should trigger EFM
 			metricsMock.On("EpochEmergencyFallbackTriggered").Once()
+			metricsMock.On("CurrentEpochFinalView", epoch1FinalView+epochs.DefaultEpochExtensionViewCount)
 			protoEventsMock.On("EpochEmergencyFallbackTriggered").Once()
+			protoEventsMock.On("EpochExtended", mock.Anything).Once()
 
 			// we begin the epoch in the EpochStaking phase and
 			// block 1 will be the first block on or past the epoch commitment deadline
@@ -1886,7 +1890,9 @@ func TestEmergencyEpochFallback(t *testing.T) {
 
 			// finalizing block 3 should trigger EFM
 			metricsMock.On("EpochEmergencyFallbackTriggered").Once()
+			metricsMock.On("CurrentEpochFinalView", epoch1FinalView+epochs.DefaultEpochExtensionViewCount)
 			protoEventsMock.On("EpochEmergencyFallbackTriggered").Once()
+			protoEventsMock.On("EpochExtended", mock.Anything).Once()
 
 			assertEpochEmergencyFallbackTriggered(t, state.Final(), false) // not triggered before finalization
 			err = state.Finalize(context.Background(), block3.ID())
@@ -1979,7 +1985,9 @@ func TestEmergencyEpochFallback(t *testing.T) {
 
 			// incorporating the service event should trigger EFM
 			metricsMock.On("EpochEmergencyFallbackTriggered").Once()
+			metricsMock.On("CurrentEpochFinalView", epoch1FinalView+epochs.DefaultEpochExtensionViewCount)
 			protoEventsMock.On("EpochEmergencyFallbackTriggered").Once()
+			protoEventsMock.On("EpochExtended", mock.Anything).Once()
 
 			assertEpochEmergencyFallbackTriggered(t, state.Final(), false) // not triggered before finalization
 			err = state.Finalize(context.Background(), block3.ID())
@@ -2009,7 +2017,6 @@ func TestEmergencyEpochFallback(t *testing.T) {
 // We expect different behavior depending on the phase in which the protocol enters EFM, specifically for the committed phase,
 // as the protocol cannot be immediately recovered from it. First, we need to enter the next epoch before we can accept an EpochRecover event. Specifically, for this case
 // we make progress till the epoch extension event to make sure that we cover the most complex scenario.
-// TODO update tests here
 func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 
 	// assertCorrectRecovery checks that the recovery epoch is correctly setup.
@@ -2082,7 +2089,9 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 			assertEpochEmergencyFallbackTriggered(t, state.Final(), false) // EFM should still not be triggered after finalizing block 2
 
 			metricsMock.On("EpochEmergencyFallbackTriggered").Once()
+			metricsMock.On("CurrentEpochFinalView", epoch1Setup.FinalView+epochs.DefaultEpochExtensionViewCount)
 			protoEventsMock.On("EpochEmergencyFallbackTriggered").Once()
+			protoEventsMock.On("EpochExtended", mock.Anything).Once()
 			err = state.Finalize(context.Background(), block3.ID())
 			require.NoError(t, err)
 			assertEpochEmergencyFallbackTriggered(t, state.Final(), true) // finalizing block 3 should have triggered EFM since it seals invalid setup event
