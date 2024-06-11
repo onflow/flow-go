@@ -254,7 +254,7 @@ func (e *QueryExecutor) GetAccount(
 		fvm.WithDerivedBlockData(
 			e.derivedChainData.NewDerivedBlockDataForScript(blockHeader.ID())))
 
-	account, err := fvm.GetAccount(
+	account, err := e.vm.GetAccount(
 		blockCtx,
 		address,
 		snapshot)

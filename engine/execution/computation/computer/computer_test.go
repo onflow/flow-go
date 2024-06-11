@@ -1524,6 +1524,17 @@ func (vm *testVM) Run(
 	return executionSnapshot, executor.Output(), nil
 }
 
+func (testVM) GetAccount(
+	_ fvm.Context,
+	_ flow.Address,
+	_ snapshot.StorageSnapshot,
+) (
+	*flow.Account,
+	error,
+) {
+	panic("not implemented")
+}
+
 func generateEvents(eventCount int, txIndex uint32) []flow.Event {
 	events := make([]flow.Event, eventCount)
 	for i := 0; i < eventCount; i++ {
@@ -1587,6 +1598,16 @@ func (vm errorVM) Run(
 		err = fmt.Errorf("boom - internal error")
 	}
 	return &snapshot.ExecutionSnapshot{}, fvm.ProcedureOutput{}, err
+}
+func (errorVM) GetAccount(
+	ctx fvm.Context,
+	addr flow.Address,
+	storageSnapshot snapshot.StorageSnapshot,
+) (
+	*flow.Account,
+	error,
+) {
+	panic("not implemented")
 }
 
 func getSetAProgram(

@@ -119,6 +119,8 @@ type VM interface {
 		ProcedureOutput,
 		error,
 	)
+
+	GetAccount(Context, flow.Address, snapshot.StorageSnapshot) (*flow.Account, error)
 }
 
 var _ VM = (*VirtualMachine)(nil)
@@ -202,7 +204,7 @@ func (vm *VirtualMachine) Run(
 }
 
 // GetAccount returns an account by address or an error if none exists.
-func GetAccount(
+func (vm *VirtualMachine) GetAccount(
 	ctx Context,
 	address flow.Address,
 	storageSnapshot snapshot.StorageSnapshot,

@@ -550,6 +550,17 @@ func (p *PanickingVM) Run(
 	panic("panic, but expected with sentinel for test: Verunsicherung ")
 }
 
+func (p *PanickingVM) GetAccount(
+	ctx fvm.Context,
+	address flow.Address,
+	storageSnapshot snapshot.StorageSnapshot,
+) (
+	*flow.Account,
+	error,
+) {
+	panic("not expected")
+}
+
 type LongRunningExecutor struct {
 	duration time.Duration
 }
@@ -601,6 +612,17 @@ func (l *LongRunningVM) Run(
 		Value: cadence.NewVoid(),
 	}
 	return snapshot, output, nil
+}
+
+func (l *LongRunningVM) GetAccount(
+	ctx fvm.Context,
+	address flow.Address,
+	storageSnapshot snapshot.StorageSnapshot,
+) (
+	*flow.Account,
+	error,
+) {
+	panic("not expected")
 }
 
 type FakeBlockComputer struct {

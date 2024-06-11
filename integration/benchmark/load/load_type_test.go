@@ -300,7 +300,7 @@ func (t *TestAccountLoader) Load(
 	t.snapshot.Lock()
 	defer t.snapshot.Unlock()
 
-	acc, err := fvm.GetAccount(t.ctx, flow.ConvertAddress(address), t.snapshot)
+	acc, err := t.vm.GetAccount(t.ctx, flow.ConvertAddress(address), t.snapshot)
 	if err != nil {
 		return nil, wrapErr(err)
 	}

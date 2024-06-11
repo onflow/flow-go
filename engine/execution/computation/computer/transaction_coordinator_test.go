@@ -39,6 +39,17 @@ func (testCoordinatorVM) Run(
 	panic("not implemented")
 }
 
+func (testCoordinatorVM) GetAccount(
+	_ fvm.Context,
+	_ flow.Address,
+	_ snapshot.StorageSnapshot,
+) (
+	*flow.Account,
+	error,
+) {
+	panic("not implemented")
+}
+
 type testCoordinatorExecutor struct {
 	executionTime logical.Time
 }
