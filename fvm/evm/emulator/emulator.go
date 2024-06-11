@@ -235,7 +235,7 @@ func (bl *BlockView) DryRunTransaction(
 
 	// return without commiting the state
 	txResult, err := proc.run(msg, tx.Hash(), 0, tx.Type())
-	if txResult.VMError == nil && txResult.ValidationError == nil {
+	if txResult.Successful() {
 		// Adding `gethParams.SstoreSentryGasEIP2200` is needed for this condition:
 		// https://github.com/onflow/go-ethereum/blob/master/core/vm/operations_acl.go#L29-L32
 		txResult.GasConsumed += gethParams.SstoreSentryGasEIP2200

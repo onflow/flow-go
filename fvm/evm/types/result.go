@@ -96,6 +96,11 @@ func (res *Result) Failed() bool {
 	return res.VMError != nil
 }
 
+// Successful returns true if transaction has been executed without any errors
+func (res *Result) Successful() bool {
+	return !res.Failed() && !res.Invalid()
+}
+
 // SetValidationError sets the validation error
 // and also sets the gas used to the fixed invalid gas usage
 func (res *Result) SetValidationError(err error) {
