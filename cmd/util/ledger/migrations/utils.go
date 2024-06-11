@@ -123,6 +123,8 @@ var allStorageMapDomains = []string{
 	runtime.StorageDomainContract,
 	stdlib.InboxStorageDomain,
 	stdlib.CapabilityControllerStorageDomain,
+	stdlib.PathCapabilityStorageDomain,
+	stdlib.AccountCapabilityStorageDomain,
 }
 
 var allStorageMapDomainsSet = map[string]struct{}{}
