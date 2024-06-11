@@ -4,7 +4,6 @@ import (
 	_ "embed"
 	"fmt"
 
-	"github.com/onflow/cadence/migrations"
 	"github.com/onflow/cadence/migrations/capcons"
 	"github.com/onflow/cadence/migrations/statictypes"
 	"github.com/onflow/cadence/runtime/common"
@@ -227,11 +226,6 @@ func NewCadence1ValueMigrations(
 
 	errorMessageHandler := &errorMessageHandler{}
 
-	// As the proper migrated static type is computed for each old type,
-	// the entitlements migration will store that info in this cache to be
-	// reused across accounts for instances of the same types
-	staticTypeCache := migrations.NewDefaultStaticTypeCache()
-
 	// The value migrations are run as account-based migrations,
 	// i.e. the migrations are only given the payloads for the account to be migrated.
 	// However, the migrations need to be able to get the code for contracts of any account.
@@ -262,7 +256,6 @@ func NewCadence1ValueMigrations(
 				programs,
 				NewCadence1CompositeStaticTypeConverter(opts.ChainID),
 				NewCadence1InterfaceStaticTypeConverter(opts.ChainID),
-				staticTypeCache,
 				opts,
 			)
 		},
@@ -304,6 +297,24 @@ func NewCadence1ValueMigrations(
 				),
 			},
 		)
+	}
+
+	if opts.ReportMetrics {
+		migs = append(migs, NamedMigration{
+			Name: metricsCollectingMigrationName,
+			Migrate: NewAccountBasedMigration(
+				log,
+				opts.NWorker,
+				[]AccountBasedMigration{
+					NewMetricsCollectingMigration(
+						log,
+						opts.ChainID,
+						rwf,
+						programs,
+					),
+				},
+			),
+		})
 	}
 
 	return
@@ -349,6 +360,16 @@ func NewCadence1ContractsMigrations(
 			opts.NWorker,
 			[]AccountBasedMigration{
 				migration,
+			},
+		)
+	}
+
+	if opts.EVMContractChange == EVMContractChangeDeploy {
+		migs = append(
+			migs,
+			NamedMigration{
+				Name:    "evm-deployment-migration",
+				Migrate: NewEVMDeploymentMigration(opts.ChainID, log),
 			},
 		)
 	}
@@ -422,6 +443,7 @@ type Options struct {
 	MaxAccountSize                    uint64
 	FixSlabsWithBrokenReferences      bool
 	FilterUnreferencedSlabs           bool
+	ReportMetrics                     bool
 }
 
 func NewCadence1Migrations(

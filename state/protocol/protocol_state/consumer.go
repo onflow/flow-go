@@ -4,7 +4,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-type StateMachineConsumer interface {
+type StateMachineEventsConsumer interface {
 	OnInvalidServiceEvent(event flow.ServiceEvent, err error)
 
 	OnServiceEventReceived(event flow.ServiceEvent)

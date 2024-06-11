@@ -25,6 +25,7 @@ func preparePrecompiles(
 		blockHeightProvider(backend),
 		coaOwnershipProofValidator(evmContractAddress, backend),
 		randomSourceProvider(randomBeaconAddress, backend),
+		revertibleRandomGenerator(backend),
 	)
 	return []types.Precompile{archContract}
 }
@@ -77,6 +78,18 @@ func randomSourceProvider(contractAddress flow.Address, backend types.Backend) f
 		}
 
 		return binary.BigEndian.Uint64(source), nil
+	}
+}
+
+func revertibleRandomGenerator(backend types.Backend) func() (uint64, error) {
+	return func() (uint64, error) {
+		rand := make([]byte, 8)
+		err := backend.ReadRandom(rand)
+		if err != nil {
+			return 0, err
+		}
+
+		return binary.BigEndian.Uint64(rand), nil
 	}
 }
 

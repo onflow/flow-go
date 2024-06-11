@@ -40,7 +40,7 @@ type BlockTimeControllerSuite struct {
 	snapshot           mockprotocol.Snapshot
 	epochs             mocks.EpochQuery
 	curEpoch           mockprotocol.Epoch
-	epochProtocolState mockprotocol.DynamicProtocolState
+	epochProtocolState mockprotocol.EpochProtocolState
 
 	config *Config
 	ctx    irrecoverable.SignalerContext
@@ -87,7 +87,7 @@ func setupMocks(bs *BlockTimeControllerSuite) {
 	bs.state.On("Final").Return(&bs.snapshot)
 	bs.state.On("AtHeight", mock.Anything).Return(&bs.snapshot).Maybe()
 	bs.state.On("Params").Return(&bs.params)
-	bs.epochProtocolState = *mockprotocol.NewDynamicProtocolState(bs.T())
+	bs.epochProtocolState = *mockprotocol.NewEpochProtocolState(bs.T())
 	bs.epochProtocolState.On("EpochFallbackTriggered").Return(
 		func() bool { return bs.epochFallbackTriggered },
 		func() error { return nil },

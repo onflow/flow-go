@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"path"
+	"sort"
 	"sync"
 	"time"
 
@@ -215,7 +216,10 @@ func getAtreePayloadsByID(
 ) {
 	outputPayloads := make([]*ledger.Payload, 0, len(ids))
 
-	err := registers.ForEach(func(owner string, key string, value []byte) error {
+	owner := registers.Owner()
+
+	keys := make([]string, 0, len(ids))
+	err := registers.ForEachKey(func(key string) error {
 
 		if !flow.IsSlabIndexKey(key) {
 			return nil
@@ -231,17 +235,28 @@ func getAtreePayloadsByID(
 			return nil
 		}
 
+		keys = append(keys, key)
+
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	sort.Strings(keys)
+
+	for _, key := range keys {
+		value, err := registers.Get(owner, key)
+		if err != nil {
+			return nil, err
+		}
+
 		ledgerKey := convert.RegisterIDToLedgerKey(flow.RegisterID{
 			Owner: owner,
 			Key:   key,
 		})
 		payload := ledger.NewPayload(ledgerKey, value)
 		outputPayloads = append(outputPayloads, payload)
-
-		return nil
-	})
-	if err != nil {
-		return nil, err
 	}
 
 	return outputPayloads, nil
