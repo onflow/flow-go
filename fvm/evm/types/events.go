@@ -99,6 +99,7 @@ func (p *transactionEvent) ToCadence(location common.Location) (cadence.Event, e
 			// todo we can remove hash and just reference block by height (evm-gateway dependency)
 			cadence.NewField("blockHash", cadence.StringType),
 			cadence.NewField("errorMessage", cadence.StringType),
+			cadence.NewField("returnedData", cadence.StringType),
 		},
 		nil,
 	)
@@ -115,6 +116,7 @@ func (p *transactionEvent) ToCadence(location common.Location) (cadence.Event, e
 		cadence.NewUInt64(p.BlockHeight),
 		cadence.String(p.BlockHash.String()),
 		cadence.String(errorMsg),
+		cadence.String(hex.EncodeToString(p.Result.ReturnedData)),
 	}).WithType(eventType), nil
 }
 
@@ -202,6 +204,7 @@ type TransactionEventPayload struct {
 	BlockHeight     uint64 `cadence:"blockHeight"`
 	BlockHash       string `cadence:"blockHash"`
 	ErrorMessage    string `cadence:"errorMessage"`
+	ReturnedData    string `cadence:"returnedData"`
 }
 
 // DecodeTransactionEventPayload decodes Cadence event into transaction event payload.
