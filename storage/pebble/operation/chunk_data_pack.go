@@ -1,4 +1,4 @@
-package operations
+package operation
 
 import (
 	"github.com/cockroachdb/pebble"
@@ -28,4 +28,8 @@ func RemoveChunkDataPack(chunkID flow.Identifier) func(w pebble.Writer) error {
 	return func(w pebble.Writer) error {
 		return w.Delete(key, nil)
 	}
+}
+
+func makeKey(prefix byte, identifier flow.Identifier) []byte {
+	return append([]byte{prefix}, identifier[:]...)
 }

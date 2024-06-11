@@ -4,12 +4,13 @@ import (
 	"fmt"
 
 	"github.com/cockroachdb/pebble"
+	"github.com/rs/zerolog/log"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/pebble/operations"
+	"github.com/onflow/flow-go/storage/pebble/operation"
 )
 
 type ChunkDataPacks struct {
@@ -25,7 +26,7 @@ func NewChunkDataPacks(collector module.CacheMetrics, db *pebble.DB, collections
 	retrieve := func(key flow.Identifier) func(pebble.Reader) (*storage.StoredChunkDataPack, error) {
 		return func(r pebble.Reader) (*storage.StoredChunkDataPack, error) {
 			var c storage.StoredChunkDataPack
-			err := operations.RetrieveChunkDataPack(key, &c)(r)
+			err := operation.RetrieveChunkDataPack(key, &c)(r)
 			return &c, err
 		}
 	}
@@ -46,7 +47,12 @@ func NewChunkDataPacks(collector module.CacheMetrics, db *pebble.DB, collections
 // Any error are exceptions
 func (ch *ChunkDataPacks) Store(cs []*flow.ChunkDataPack) error {
 	batch := NewBatch(ch.db)
-	defer batch.Close()
+	defer func() {
+		err := batch.Close()
+		if err != nil {
+			log.Error().Err(err).Msgf("failed to close batch when storing chunk data pack")
+		}
+	}()
 
 	for _, c := range cs {
 		err := ch.batchStore(c, batch)
@@ -92,7 +98,7 @@ func (ch *ChunkDataPacks) Remove(cs []flow.Identifier) error {
 // other errors are exceptions
 func (ch *ChunkDataPacks) ByChunkID(chunkID flow.Identifier) (*flow.ChunkDataPack, error) {
 	var sc storage.StoredChunkDataPack
-	err := operations.RetrieveChunkDataPack(chunkID, &sc)(ch.db)
+	err := operation.RetrieveChunkDataPack(chunkID, &sc)(ch.db)
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve stored chunk data pack: %w", err)
 	}
@@ -121,7 +127,7 @@ func (ch *ChunkDataPacks) BatchRemove(chunkID flow.Identifier, batch storage.Bat
 }
 
 func (ch *ChunkDataPacks) batchRemove(chunkID flow.Identifier, batch pebble.Writer) error {
-	return operations.RemoveChunkDataPack(chunkID)(batch)
+	return operation.RemoveChunkDataPack(chunkID)(batch)
 }
 
 func (ch *ChunkDataPacks) batchStore(c *flow.ChunkDataPack, batch *Batch) error {
@@ -130,7 +136,7 @@ func (ch *ChunkDataPacks) batchStore(c *flow.ChunkDataPack, batch *Batch) error 
 	batch.OnSucceed(func() {
 		ch.byChunkIDCache.Insert(sc.ChunkID, sc)
 	})
-	err := operations.InsertChunkDataPack(sc)(writer)
+	err := operation.InsertChunkDataPack(sc)(writer)
 	if err != nil {
 		return fmt.Errorf("failed to store chunk data pack: %w", err)
 	}
