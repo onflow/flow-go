@@ -138,6 +138,10 @@ func (id RegisterID) IsSlabIndex() bool {
 	return len(id.Key) == 9 && id.Key[0] == SlabIndexPrefix
 }
 
+func IsSlabIndexKey(key string) bool {
+	return len(key) == 9 && key[0] == SlabIndexPrefix
+}
+
 // String returns formatted string representation of the RegisterID.
 func (id RegisterID) String() string {
 	formattedKey := ""
