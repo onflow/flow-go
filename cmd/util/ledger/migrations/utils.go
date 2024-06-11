@@ -19,6 +19,7 @@ var AllStorageMapDomains = []string{
 	runtime.StorageDomainContract,
 	stdlib.InboxStorageDomain,
 	stdlib.CapabilityControllerStorageDomain,
+	stdlib.PathCapabilityStorageDomain,
 }
 
 var allStorageMapDomainsSet = map[string]struct{}{}
