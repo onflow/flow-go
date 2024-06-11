@@ -1599,6 +1599,7 @@ func (vm errorVM) Run(
 	}
 	return &snapshot.ExecutionSnapshot{}, fvm.ProcedureOutput{}, err
 }
+
 func (errorVM) GetAccount(
 	ctx fvm.Context,
 	addr flow.Address,
