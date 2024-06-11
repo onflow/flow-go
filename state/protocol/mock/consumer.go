@@ -32,6 +32,11 @@ func (_m *Consumer) EpochEmergencyFallbackTriggered() {
 	_m.Called()
 }
 
+// EpochExtended provides a mock function with given fields: _a0
+func (_m *Consumer) EpochExtended(_a0 flow.EpochExtension) {
+	_m.Called(_a0)
+}
+
 // EpochSetupPhaseStarted provides a mock function with given fields: currentEpochCounter, first
 func (_m *Consumer) EpochSetupPhaseStarted(currentEpochCounter uint64, first *flow.Header) {
 	_m.Called(currentEpochCounter, first)

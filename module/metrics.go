@@ -486,7 +486,7 @@ type ComplianceMetrics interface {
 	// CurrentEpochPhase reports the current epoch phase.
 	CurrentEpochPhase(phase flow.EpochPhase)
 	// CurrentEpochFinalView reports the final view of the current epoch, including epoch extensions.
-	CurrentEpochFinalView(view uint64) // TODO should this be updated by extension? I think so...
+	CurrentEpochFinalView(view uint64)
 	// TODO could combine 3 DKG metric funcs
 	CurrentDKGPhase1FinalView(view uint64)
 	CurrentDKGPhase2FinalView(view uint64)
