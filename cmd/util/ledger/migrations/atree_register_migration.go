@@ -91,6 +91,13 @@ func (m *AtreeRegisterMigrator) MigrateAccount(
 	address common.Address,
 	oldPayloads []*ledger.Payload,
 ) ([]*ledger.Payload, error) {
+
+	err := CheckDomainPayloads(oldPayloads)
+	if err != nil {
+		// Log domain payload error for now
+		m.log.Warn().Msgf("unexpected domain payloads: %s", err.Error())
+	}
+
 	// create all the runtime components we need for the migration
 	mr, err := NewAtreeRegisterMigratorRuntime(address, oldPayloads)
 	if err != nil {
