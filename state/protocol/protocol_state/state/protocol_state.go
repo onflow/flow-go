@@ -3,6 +3,9 @@ package state
 import (
 	"errors"
 	"fmt"
+
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state/protocol"
@@ -14,7 +17,6 @@ import (
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/storage/badger/transaction"
-	"github.com/rs/zerolog"
 )
 
 // ProtocolState is an implementation of the read-only interface for protocol state, it allows querying information

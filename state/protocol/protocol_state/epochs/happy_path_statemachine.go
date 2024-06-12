@@ -2,11 +2,11 @@ package epochs
 
 import (
 	"fmt"
-	"github.com/onflow/flow-go/state/protocol/protocol_state"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/state/protocol/protocol_state"
 )
 
 // HappyPathStateMachine is a dedicated structure for evolving the Epoch-related portion of the overall Protocol State.

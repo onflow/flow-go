@@ -2,10 +2,10 @@ package epochs
 
 import (
 	"fmt"
-	"github.com/onflow/flow-go/state/protocol/protocol_state"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/state/protocol/protocol_state"
 )
 
 // DefaultEpochExtensionViewCount is a default length of epoch extension in views, approximately 1 day.

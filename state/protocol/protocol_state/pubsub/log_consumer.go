@@ -1,12 +1,14 @@
 package pubsub
 
 import (
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol/protocol_state"
 	"github.com/onflow/flow-go/utils/logging"
-	"github.com/rs/zerolog"
 )
 
+// LogConsumer implements protocol_state.StateMachineEventsConsumer and logs all events.
 type LogConsumer struct {
 	log zerolog.Logger
 }
