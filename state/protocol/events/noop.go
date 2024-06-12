@@ -24,7 +24,7 @@ func (n Noop) EpochSetupPhaseStarted(uint64, *flow.Header) {}
 
 func (n Noop) EpochCommittedPhaseStarted(uint64, *flow.Header) {}
 
-func (n Noop) EpochEmergencyFallbackTriggered() {}
+func (n Noop) EpochFallbackModeTriggered() {}
 
 func (n Noop) EpochExtended(flow.EpochExtension) {}
 

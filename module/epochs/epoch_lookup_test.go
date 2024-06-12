@@ -190,7 +190,7 @@ func (suite *EpochLookupSuite) TestProtocolEvents_EpochFallbackTriggered() {
 	suite.WithLock(func() {
 		suite.epochFallbackTriggered = true
 	})
-	suite.lookup.EpochEmergencyFallbackTriggered()
+	suite.lookup.EpochFallbackModeTriggered()
 
 	// wait for the protocol event to be processed (async)
 	assert.Eventually(suite.T(), func() bool {
@@ -202,9 +202,9 @@ func (suite *EpochLookupSuite) TestProtocolEvents_EpochFallbackTriggered() {
 	testEpochForViewWithFallback(suite.T(), suite.lookup, suite.state, suite.currEpoch)
 
 	// should handle multiple deliveries of the protocol event
-	suite.lookup.EpochEmergencyFallbackTriggered()
-	suite.lookup.EpochEmergencyFallbackTriggered()
-	suite.lookup.EpochEmergencyFallbackTriggered()
+	suite.lookup.EpochFallbackModeTriggered()
+	suite.lookup.EpochFallbackModeTriggered()
+	suite.lookup.EpochFallbackModeTriggered()
 
 	// validate queries are answered correctly
 	testEpochForViewWithFallback(suite.T(), suite.lookup, suite.state, suite.currEpoch)

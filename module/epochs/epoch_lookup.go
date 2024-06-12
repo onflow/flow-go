@@ -252,7 +252,7 @@ func (lookup *EpochLookup) EpochForViewWithFallback(view uint64) (uint64, error)
 }
 
 // handleProtocolEvents processes queued Epoch events `EpochCommittedPhaseStarted`
-// and `EpochEmergencyFallbackTriggered`. This function permanently utilizes a worker
+// and `EpochFallbackModeTriggered`. This function permanently utilizes a worker
 // routine until the `Component` terminates.
 // When we observe a new epoch being committed, we compute
 // the leader selection and cache static info for the epoch. When we observe
@@ -280,6 +280,6 @@ func (lookup *EpochLookup) EpochCommittedPhaseStarted(_ uint64, first *flow.Head
 }
 
 // EpochEmergencyFallbackTriggered passes the protocol event to the worker thread.
-func (lookup *EpochLookup) EpochEmergencyFallbackTriggered() {
+func (lookup *EpochLookup) EpochFallbackModeTriggered() {
 	lookup.epochFallbackIsTriggered.Store(true)
 }

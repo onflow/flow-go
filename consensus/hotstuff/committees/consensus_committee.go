@@ -334,7 +334,7 @@ func (c *Consensus) DKG(view uint64) (hotstuff.DKG, error) {
 }
 
 // handleProtocolEvents processes queued Epoch events `EpochCommittedPhaseStarted`
-// and `EpochEmergencyFallbackTriggered`. This function permanently utilizes a worker
+// and `EpochFallbackModeTriggered`. This function permanently utilizes a worker
 // routine until the `Component` terminates.
 // When we observe a new epoch being committed, we compute
 // the leader selection and cache static info for the epoch. When we observe
@@ -367,7 +367,7 @@ func (c *Consensus) EpochCommittedPhaseStarted(_ uint64, first *flow.Header) {
 }
 
 // EpochEmergencyFallbackTriggered passes the protocol event to the worker thread.
-func (c *Consensus) EpochEmergencyFallbackTriggered() {
+func (c *Consensus) EpochFallbackModeTriggered() {
 	c.epochEmergencyFallback <- struct{}{}
 }
 

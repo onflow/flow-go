@@ -1784,9 +1784,9 @@ func TestEmergencyEpochFallback(t *testing.T) {
 			epoch1CommitmentDeadline := epoch1FinalView - safetyThreshold
 
 			// finalizing block 1 should trigger EFM
-			metricsMock.On("EpochEmergencyFallbackTriggered").Once()
+			metricsMock.On("EpochFallbackModeTriggered").Once()
 			metricsMock.On("CurrentEpochFinalView", epoch1FinalView+epochs.DefaultEpochExtensionViewCount)
-			protoEventsMock.On("EpochEmergencyFallbackTriggered").Once()
+			protoEventsMock.On("EpochFallbackModeTriggered").Once()
 			protoEventsMock.On("EpochExtended", mock.Anything).Once()
 
 			// we begin the epoch in the EpochStaking phase and
@@ -1889,9 +1889,9 @@ func TestEmergencyEpochFallback(t *testing.T) {
 			require.NoError(t, err)
 
 			// finalizing block 3 should trigger EFM
-			metricsMock.On("EpochEmergencyFallbackTriggered").Once()
+			metricsMock.On("EpochFallbackModeTriggered").Once()
 			metricsMock.On("CurrentEpochFinalView", epoch1FinalView+epochs.DefaultEpochExtensionViewCount)
-			protoEventsMock.On("EpochEmergencyFallbackTriggered").Once()
+			protoEventsMock.On("EpochFallbackModeTriggered").Once()
 			protoEventsMock.On("EpochExtended", mock.Anything).Once()
 
 			assertEpochEmergencyFallbackTriggered(t, state.Final(), false) // not triggered before finalization
@@ -1984,9 +1984,9 @@ func TestEmergencyEpochFallback(t *testing.T) {
 			require.NoError(t, err)
 
 			// incorporating the service event should trigger EFM
-			metricsMock.On("EpochEmergencyFallbackTriggered").Once()
+			metricsMock.On("EpochFallbackModeTriggered").Once()
 			metricsMock.On("CurrentEpochFinalView", epoch1FinalView+epochs.DefaultEpochExtensionViewCount)
-			protoEventsMock.On("EpochEmergencyFallbackTriggered").Once()
+			protoEventsMock.On("EpochFallbackModeTriggered").Once()
 			protoEventsMock.On("EpochExtended", mock.Anything).Once()
 
 			assertEpochEmergencyFallbackTriggered(t, state.Final(), false) // not triggered before finalization
@@ -2089,8 +2089,8 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 			assertEpochEmergencyFallbackTriggered(t, state.Final(), false) // EFM should still not be triggered after finalizing block 2
 
 			// Since we enter EFM before the commitment deadline, no epoch extension is added
-			metricsMock.On("EpochEmergencyFallbackTriggered").Once()
-			protoEventsMock.On("EpochEmergencyFallbackTriggered").Once()
+			metricsMock.On("EpochFallbackModeTriggered").Once()
+			protoEventsMock.On("EpochFallbackModeTriggered").Once()
 			err = state.Finalize(context.Background(), block3.ID())
 			require.NoError(t, err)
 			assertEpochEmergencyFallbackTriggered(t, state.Final(), true) // finalizing block 3 should have triggered EFM since it seals invalid setup event
@@ -2191,8 +2191,8 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 			require.NoError(t, err)
 			assertEpochEmergencyFallbackTriggered(t, state.Final(), false) // EFM should still not be triggered after finalizing block 4
 
-			metricsMock.On("EpochEmergencyFallbackTriggered").Once()
-			protoEventsMock.On("EpochEmergencyFallbackTriggered").Once()
+			metricsMock.On("EpochFallbackModeTriggered").Once()
+			protoEventsMock.On("EpochFallbackModeTriggered").Once()
 			err = state.Finalize(context.Background(), block5.ID())
 			require.NoError(t, err)
 			assertEpochEmergencyFallbackTriggered(t, state.Final(), true) // finalizing block 5 should have triggered EFM
@@ -2346,8 +2346,8 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 			require.NoError(t, err)
 			assertEpochEmergencyFallbackTriggered(t, state.Final(), false) // EFM should still not be triggered after finalizing block 4
 
-			metricsMock.On("EpochEmergencyFallbackTriggered").Once()
-			protoEventsMock.On("EpochEmergencyFallbackTriggered").Once()
+			metricsMock.On("EpochFallbackModeTriggered").Once()
+			protoEventsMock.On("EpochFallbackModeTriggered").Once()
 			err = state.Finalize(context.Background(), block7.ID())
 			require.NoError(t, err)
 			assertEpochEmergencyFallbackTriggered(t, state.Final(), true) // finalizing block 7 should have triggered EFM

@@ -705,8 +705,8 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 	// if epoch fallback was not previously triggered, check whether this block triggers it
 	if epochFallbackTriggered && !parentEpochState.EpochFallbackTriggered() {
 		// emit the protocol event only the first time epoch fallback is triggered
-		events = append(events, m.consumer.EpochEmergencyFallbackTriggered)
-		metrics = append(metrics, m.metrics.EpochEmergencyFallbackTriggered)
+		events = append(events, m.consumer.EpochFallbackModeTriggered)
+		metrics = append(metrics, m.metrics.EpochFallbackModeTriggered)
 	}
 
 	// Determine metric updates and protocol events related to epoch phase changes and epoch transitions.

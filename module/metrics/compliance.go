@@ -213,6 +213,6 @@ func (cc *ComplianceCollector) CurrentDKGPhase3FinalView(view uint64) {
 	cc.currentDKGPhase3FinalView.Set(float64(view))
 }
 
-func (cc *ComplianceCollector) EpochEmergencyFallbackTriggered() {
+func (cc *ComplianceCollector) EpochFallbackModeTriggered() {
 	cc.epochEmergencyFallbackTriggered.Set(float64(1))
 }

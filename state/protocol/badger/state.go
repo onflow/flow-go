@@ -896,7 +896,7 @@ func updateEpochMetrics(metrics module.ComplianceMetrics, snap protocol.Snapshot
 	// EFM - check whether the epoch emergency fallback flag has been set
 	// in the database. If so, skip updating any epoch-related metrics.
 	if epochFallbackTriggered {
-		metrics.EpochEmergencyFallbackTriggered()
+		metrics.EpochFallbackModeTriggered()
 	}
 
 	return nil
