@@ -6,6 +6,7 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 	gethCommon "github.com/onflow/go-ethereum/common"
 	gethTypes "github.com/onflow/go-ethereum/core/types"
+	"go.opentelemetry.io/otel/attribute"
 
 	"github.com/onflow/flow-go/fvm/environment"
 	fvmErrors "github.com/onflow/flow-go/fvm/errors"
@@ -13,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/fvm/evm/handler/coa"
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/trace"
 )
 
 // ContractHandler is responsible for triggering calls to emulator, metering,
@@ -65,6 +67,8 @@ func NewContractHandler(
 
 // DeployCOA deploys a cadence-owned-account and returns the address
 func (h *ContractHandler) DeployCOA(uuid uint64) types.Address {
+	defer h.backend.StartChildSpan(trace.FVMEVMDeployCOA).End()
+
 	res, err := h.deployCOA(uuid)
 	panicOnErrorOrInvalidOrFailedState(res, err)
 	return *res.DeployedContractAddress
@@ -119,6 +123,8 @@ func (h *ContractHandler) RunOrPanic(rlpEncodedTx []byte, coinbase types.Address
 // Run tries to run an rlpencoded evm transaction and
 // collects the gas fees and pay it to the coinbase address provided.
 func (h *ContractHandler) Run(rlpEncodedTx []byte, coinbase types.Address) *types.ResultSummary {
+	defer h.backend.StartChildSpan(trace.FVMEVMRun).End()
+
 	res, err := h.run(rlpEncodedTx, coinbase)
 	panicOnError(err)
 	return res.ResultSummary()
@@ -129,6 +135,10 @@ func (h *ContractHandler) Run(rlpEncodedTx []byte, coinbase types.Address) *type
 // All transactions provided in the batch are included in a single block,
 // except for invalid transactions
 func (h *ContractHandler) BatchRun(rlpEncodedTxs [][]byte, coinbase types.Address) []*types.ResultSummary {
+	span := h.backend.StartChildSpan(trace.FVMEVMRun)
+	span.SetAttributes(attribute.Int("tx_counts", len(rlpEncodedTxs)))
+	defer span.End()
+
 	res, err := h.batchRun(rlpEncodedTxs, coinbase)
 	panicOnError(err)
 
@@ -341,6 +351,8 @@ func (h *ContractHandler) DryRun(
 	rlpEncodedTx []byte,
 	from types.Address,
 ) *types.ResultSummary {
+	defer h.backend.StartChildSpan(trace.FVMEVMRun).End()
+
 	res, err := h.dryRun(rlpEncodedTx, from)
 	panicOnError(err)
 	return res.ResultSummary()
@@ -667,6 +679,8 @@ func (a *Account) codeHash() ([]byte, error) {
 // Deposit deposits the token from the given vault into the flow evm main vault
 // and update the account balance with the new amount
 func (a *Account) Deposit(v *types.FLOWTokenVault) {
+	defer a.fch.backend.StartChildSpan(trace.FVMEVMDeposit).End()
+
 	res, err := a.deposit(v)
 	panicOnErrorOrInvalidOrFailedState(res, err)
 }
@@ -692,6 +706,8 @@ func (a *Account) deposit(v *types.FLOWTokenVault) (*types.Result, error) {
 // Withdraw deducts the balance from the account and
 // withdraw and return flow token from the Flex main vault.
 func (a *Account) Withdraw(b types.Balance) *types.FLOWTokenVault {
+	defer a.fch.backend.StartChildSpan(trace.FVMEVMWithdraw).End()
+
 	res, err := a.withdraw(b)
 	panicOnErrorOrInvalidOrFailedState(res, err)
 
@@ -745,6 +761,8 @@ func (a *Account) transfer(to types.Address, balance types.Balance) (*types.Resu
 // contained in the result summary as data and
 // the contract data is not controlled by the caller accounts
 func (a *Account) Deploy(code types.Code, gaslimit types.GasLimit, balance types.Balance) *types.ResultSummary {
+	defer a.fch.backend.StartChildSpan(trace.FVMEVMDeploy).End()
+
 	res, err := a.deploy(code, gaslimit, balance)
 	panicOnError(err)
 	return res.ResultSummary()
@@ -771,6 +789,8 @@ func (a *Account) deploy(code types.Code, gaslimit types.GasLimit, balance types
 // given it doesn't goes beyond what Flow transaction allows.
 // the balance would be deducted from the OFA account and would be transferred to the target address
 func (a *Account) Call(to types.Address, data types.Data, gaslimit types.GasLimit, balance types.Balance) *types.ResultSummary {
+	defer a.fch.backend.StartChildSpan(trace.FVMEVMCall).End()
+
 	res, err := a.call(to, data, gaslimit, balance)
 	panicOnError(err)
 	return res.ResultSummary()

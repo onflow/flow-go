@@ -194,5 +194,13 @@ const (
 	FVMEnvRemoveAccountContractCode   SpanName = "fvm.env.removeAccountContractCode"
 	FVMEnvGetSigningAccounts          SpanName = "fvm.env.getSigningAccounts"
 
+	FVMEVMDeployCOA SpanName = "fvm.evm.deployCOA"
+	FVMEVMRun       SpanName = "fvm.evm.run"
+	FVMEVMBatchRun  SpanName = "fvm.evm.batchRun"
+	FVMEVMDeposit   SpanName = "fvm.evm.deposit"
+	FVMEVMWithdraw  SpanName = "fvm.evm.withdraw"
+	FVMEVMDeploy    SpanName = "fvm.evm.deploy"
+	FVMEVMCall      SpanName = "fvm.evm.call"
+
 	FVMCadenceTrace SpanName = "fvm.cadence.trace"
 )
