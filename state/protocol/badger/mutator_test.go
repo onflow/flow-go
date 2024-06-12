@@ -662,27 +662,23 @@ func TestExtendInvalidChainID(t *testing.T) {
 	})
 }
 
+// TestExtendReceiptsNotSorted tests the case where receipts are included in a block payload
+// not sorted by height. Previously, this constraint was required (unordered receipts resulted
+// in an error). Now, any ordering of receipts should be accepted by the Mutator.
 func TestExtendReceiptsNotSorted(t *testing.T) {
-	// TODO: this test needs to be updated:
-	// We don't require the receipts to be sorted by height anymore
-	// We could require an "parent first" ordering, which is less strict than
-	// a full ordering by height
-	unittest.SkipUnless(t, unittest.TEST_TODO, "needs update")
-
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
+	rootProtocolStateID := getRootProtocolStateID(t, rootSnapshot)
 	head, err := rootSnapshot.Head()
 	require.NoError(t, err)
 	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState) {
 		// create block2 and block3
 		block2 := unittest.BlockWithParentFixture(head)
-		block2.Payload.Guarantees = nil
-		block2.Header.PayloadHash = block2.Payload.Hash()
+		block2.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
 		err := state.Extend(context.Background(), block2)
 		require.NoError(t, err)
 
 		block3 := unittest.BlockWithParentFixture(block2.Header)
-		block3.Payload.Guarantees = nil
-		block3.Header.PayloadHash = block3.Payload.Hash()
+		block3.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
 		err = state.Extend(context.Background(), block3)
 		require.NoError(t, err)
 
@@ -691,14 +687,12 @@ func TestExtendReceiptsNotSorted(t *testing.T) {
 
 		// insert a block with payload receipts not sorted by block height.
 		block4 := unittest.BlockWithParentFixture(block3.Header)
-		block4.Payload = &flow.Payload{
-			Receipts: []*flow.ExecutionReceiptMeta{receiptA.Meta(), receiptB.Meta()},
-			Results:  []*flow.ExecutionResult{&receiptA.ExecutionResult, &receiptB.ExecutionResult},
-		}
-		block4.Header.PayloadHash = block4.Payload.Hash()
+		block4.SetPayload(unittest.PayloadFixture(
+			unittest.WithProtocolStateID(rootProtocolStateID),
+			unittest.WithReceipts(receiptA, receiptB),
+		))
 		err = state.Extend(context.Background(), block4)
-		require.Error(t, err)
-		require.True(t, st.IsInvalidExtensionError(err), err)
+		require.NoError(t, err)
 	})
 }
 

@@ -91,9 +91,6 @@ func TestBootstrapAndOpen(t *testing.T) {
 // root snapshot from EpochCommitted phase  we should be able to open it and
 // got the same state.
 func TestBootstrapAndOpen_EpochCommitted(t *testing.T) {
-	unittest.SkipUnless(t, unittest.TEST_TODO, "such behavior is not supported yet since SealingSegment should"+
-		"contain blocks with the same protocol state ID. For this test it means that blocks needs to be selected"+
-		"from the same epoch phase and cannot cross epoch boundaries")
 	// create a state root and bootstrap the protocol state with it
 	participants := unittest.CompleteIdentitySet()
 	rootSnapshot := unittest.RootSnapshotFixture(participants, func(block *flow.Block) {
