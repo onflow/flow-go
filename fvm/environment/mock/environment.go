@@ -137,7 +137,7 @@ func (_m *Environment) AllocateSlabIndex(owner []byte) (atree.SlabIndex, error) 
 	ret := _m.Called(owner)
 
 	if len(ret) == 0 {
-		panic("no return value specified for AllocateStorageIndex")
+		panic("no return value specified for AllocateSlabIndex")
 	}
 
 	var r0 atree.SlabIndex

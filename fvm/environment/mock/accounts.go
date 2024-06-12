@@ -20,7 +20,7 @@ func (_m *Accounts) AllocateSlabIndex(address flow.Address) (atree.SlabIndex, er
 	ret := _m.Called(address)
 
 	if len(ret) == 0 {
-		panic("no return value specified for AllocateStorageIndex")
+		panic("no return value specified for AllocateSlabIndex")
 	}
 
 	var r0 atree.SlabIndex
