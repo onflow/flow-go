@@ -50,6 +50,8 @@ contract EVM {
         payload: String,
         // code indicating a specific validation (201-300) or execution (301-400) error
         errorCode: UInt16,
+        // a human-readable message about the error (if any)
+        errorMessage: String,
         // the amount of gas transaction used
         gasConsumed: UInt64,
         // if transaction was a deployment contains a newly deployed contract address
