@@ -85,11 +85,10 @@ type Consumer interface {
 	EpochCommittedPhaseStarted(currentEpochCounter uint64, first *flow.Header)
 
 	// EpochFallbackModeTriggered is called when epoch fallback mode [EFM] is triggered.
-	// Since EFM is a permanent, spork-scoped state, this event is triggered only once.
-	// After this event is triggered, no further epoch transitions will occur,
-	// no further epoch phase transitions will occur, and no further epoch-related
-	// related protocol events (the events defined in this interface) will be emitted.
-	// TODO(efm-recovery) update above docs. Also, define precisely when EFM is triggered and when it is exited
+	// EFM is triggered when an invalid or unexpected epoch-related service event is observed,
+	// or an expected service event is not observed before the epoch commitment deadline.
+	// After EFM is triggered, we remain in the current epoch until an EpochRecover
+	// event is observed, after which regular epoch transitions begins again.
 	// TODO(efm-recovery) add EpochFallbackModeExited()
 	EpochFallbackModeTriggered()
 
