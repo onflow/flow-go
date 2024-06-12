@@ -112,7 +112,7 @@ func (info ParseRestrictedAccountInfo) GetAccountKeys(
 ) {
 	return parseRestrict1Arg1Ret(
 		info.txnState,
-		trace.FVMEnvGetAccount,
+		trace.FVMEnvGetAccountKeys,
 		info.impl.GetAccountKeys,
 		address)
 }
@@ -275,7 +275,7 @@ func (info *accountInfo) GetAccountKeys(
 	[]flow.AccountPublicKey,
 	error,
 ) {
-	defer info.tracer.StartChildSpan(trace.FVMEnvGetAccount).End()
+	defer info.tracer.StartChildSpan(trace.FVMEnvGetAccountKeys).End()
 
 	accountKeys, err := info.accounts.GetPublicKeys(address)
 
