@@ -50,6 +50,8 @@ var (
 	flagFilterUnreferencedSlabs            bool
 	flagCPUProfile                         string
 	flagReportMetrics                      bool
+	flagCacheStaticTypeMigrationResults    bool
+	flagCacheEntitlementsMigrationResults  bool
 )
 
 var Cmd = &cobra.Command{
@@ -167,6 +169,12 @@ func init() {
 
 	Cmd.Flags().BoolVar(&flagReportMetrics, "report-metrics", false,
 		"report migration metrics")
+
+	Cmd.Flags().BoolVar(&flagCacheStaticTypeMigrationResults, "cache-static-type-migration", false,
+		"cache static type migration results")
+
+	Cmd.Flags().BoolVar(&flagCacheEntitlementsMigrationResults, "cache-entitlements-migration", false,
+		"cache entitlements migration results")
 }
 
 func run(*cobra.Command, []string) {
@@ -380,6 +388,8 @@ func run(*cobra.Command, []string) {
 		FixSlabsWithBrokenReferences:      chainID == flow.Testnet && flagFixSlabsWithBrokenReferences,
 		FilterUnreferencedSlabs:           flagFilterUnreferencedSlabs,
 		ReportMetrics:                     flagReportMetrics,
+		CacheStaticTypeMigrationResults:   flagCacheStaticTypeMigrationResults,
+		CacheEntitlementsMigrationResults: flagCacheEntitlementsMigrationResults,
 	}
 
 	if len(flagInputPayloadFileName) > 0 {

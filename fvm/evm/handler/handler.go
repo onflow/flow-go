@@ -9,6 +9,7 @@ import (
 
 	"github.com/onflow/flow-go/fvm/environment"
 	fvmErrors "github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/fvm/evm/debug"
 	"github.com/onflow/flow-go/fvm/evm/handler/coa"
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/model/flow"
@@ -25,6 +26,7 @@ type ContractHandler struct {
 	backend            types.Backend
 	emulator           types.Emulator
 	precompiles        []types.Precompile
+	tracer             debug.EVMTracer
 }
 
 func (h *ContractHandler) FlowTokenAddress() common.Address {
@@ -46,6 +48,7 @@ func NewContractHandler(
 	addressAllocator types.AddressAllocator,
 	backend types.Backend,
 	emulator types.Emulator,
+	tracer debug.EVMTracer,
 ) *ContractHandler {
 	return &ContractHandler{
 		flowChainID:        flowChainID,
@@ -55,6 +58,7 @@ func NewContractHandler(
 		addressAllocator:   addressAllocator,
 		backend:            backend,
 		emulator:           emulator,
+		tracer:             tracer,
 		precompiles:        preparePrecompiles(evmContractAddress, randomBeaconAddress, addressAllocator, backend),
 	}
 }
@@ -228,6 +232,8 @@ func (h *ContractHandler) batchRun(rlpEncodedTxs [][]byte, coinbase types.Addres
 		if err != nil {
 			return nil, err
 		}
+
+		h.tracer.Collect(r.TxHash)
 	}
 
 	err = h.emitEvent(types.NewBlockEvent(bp))
@@ -325,6 +331,9 @@ func (h *ContractHandler) run(
 	if err != nil {
 		return nil, err
 	}
+
+	h.tracer.Collect(res.TxHash)
+
 	return res, nil
 }
 
@@ -437,6 +446,7 @@ func (h *ContractHandler) getBlockContext() (types.BlockContext, error) {
 		},
 		ExtraPrecompiles: h.precompiles,
 		Random:           rand,
+		Tracer:           h.tracer.TxTracer(),
 	}, nil
 }
 
@@ -527,6 +537,8 @@ func (h *ContractHandler) executeAndHandleCall(
 	if err != nil {
 		return nil, err
 	}
+
+	h.tracer.Collect(res.TxHash)
 
 	return res, nil
 }
