@@ -1420,11 +1420,11 @@ func TestExtendEpochSetupInvalid(t *testing.T) {
 			err := state.Finalize(context.Background(), receiptBlock.ID())
 			require.NoError(t, err)
 			// epoch fallback not triggered before finalization
-			assertEpochEmergencyFallbackTriggered(t, state.Final(), false)
+			assertEpochFallbackTriggered(t, state.Final(), false)
 			err = state.Finalize(context.Background(), sealingBlock.ID())
 			require.NoError(t, err)
 			// epoch fallback triggered after finalization
-			assertEpochEmergencyFallbackTriggered(t, state.Final(), true)
+			assertEpochFallbackTriggered(t, state.Final(), true)
 		})
 	})
 
@@ -1441,11 +1441,11 @@ func TestExtendEpochSetupInvalid(t *testing.T) {
 			err := state.Finalize(context.Background(), receiptBlock.ID())
 			require.NoError(t, err)
 			// epoch fallback not triggered before finalization
-			assertEpochEmergencyFallbackTriggered(t, state.Final(), false)
+			assertEpochFallbackTriggered(t, state.Final(), false)
 			err = state.Finalize(context.Background(), sealingBlock.ID())
 			require.NoError(t, err)
 			// epoch fallback triggered after finalization
-			assertEpochEmergencyFallbackTriggered(t, state.Final(), true)
+			assertEpochFallbackTriggered(t, state.Final(), true)
 		})
 	})
 
@@ -1462,11 +1462,11 @@ func TestExtendEpochSetupInvalid(t *testing.T) {
 			err := state.Finalize(context.Background(), receiptBlock.ID())
 			require.NoError(t, err)
 			// epoch fallback not triggered before finalization
-			assertEpochEmergencyFallbackTriggered(t, state.Final(), false)
+			assertEpochFallbackTriggered(t, state.Final(), false)
 			err = state.Finalize(context.Background(), sealingBlock.ID())
 			require.NoError(t, err)
 			// epoch fallback triggered after finalization
-			assertEpochEmergencyFallbackTriggered(t, state.Final(), true)
+			assertEpochFallbackTriggered(t, state.Final(), true)
 		})
 	})
 
@@ -1484,11 +1484,11 @@ func TestExtendEpochSetupInvalid(t *testing.T) {
 			err := state.Finalize(context.Background(), receiptBlock.ID())
 			require.NoError(t, err)
 			// epoch fallback not triggered before finalization
-			assertEpochEmergencyFallbackTriggered(t, state.Final(), false)
+			assertEpochFallbackTriggered(t, state.Final(), false)
 			err = state.Finalize(context.Background(), sealingBlock.ID())
 			require.NoError(t, err)
 			// epoch fallback triggered after finalization
-			assertEpochEmergencyFallbackTriggered(t, state.Final(), true)
+			assertEpochFallbackTriggered(t, state.Final(), true)
 		})
 	})
 }
@@ -1566,11 +1566,11 @@ func TestExtendEpochCommitInvalid(t *testing.T) {
 			err := state.Finalize(context.Background(), receiptBlock.ID())
 			require.NoError(t, err)
 			// epoch fallback not triggered before finalization
-			assertEpochEmergencyFallbackTriggered(t, state.Final(), false)
+			assertEpochFallbackTriggered(t, state.Final(), false)
 			err = state.Finalize(context.Background(), sealingBlock.ID())
 			require.NoError(t, err)
 			// epoch fallback triggered after finalization
-			assertEpochEmergencyFallbackTriggered(t, state.Final(), true)
+			assertEpochFallbackTriggered(t, state.Final(), true)
 		})
 	})
 
@@ -1599,11 +1599,11 @@ func TestExtendEpochCommitInvalid(t *testing.T) {
 			err = state.Finalize(context.Background(), receiptBlock.ID())
 			require.NoError(t, err)
 			// epoch fallback not triggered before finalization
-			assertEpochEmergencyFallbackTriggered(t, state.Final(), false)
+			assertEpochFallbackTriggered(t, state.Final(), false)
 			err = state.Finalize(context.Background(), sealingBlock.ID())
 			require.NoError(t, err)
 			// epoch fallback triggered after finalization
-			assertEpochEmergencyFallbackTriggered(t, state.Final(), true)
+			assertEpochFallbackTriggered(t, state.Final(), true)
 		})
 	})
 
@@ -1632,11 +1632,11 @@ func TestExtendEpochCommitInvalid(t *testing.T) {
 			err = state.Finalize(context.Background(), receiptBlock.ID())
 			require.NoError(t, err)
 			// epoch fallback not triggered before finalization
-			assertEpochEmergencyFallbackTriggered(t, state.Final(), false)
+			assertEpochFallbackTriggered(t, state.Final(), false)
 			err = state.Finalize(context.Background(), sealingBlock.ID())
 			require.NoError(t, err)
 			// epoch fallback triggered after finalization
-			assertEpochEmergencyFallbackTriggered(t, state.Final(), true)
+			assertEpochFallbackTriggered(t, state.Final(), true)
 		})
 	})
 
@@ -1666,20 +1666,20 @@ func TestExtendEpochCommitInvalid(t *testing.T) {
 			err = state.Finalize(context.Background(), receiptBlock.ID())
 			require.NoError(t, err)
 			// epoch fallback not triggered before finalization
-			assertEpochEmergencyFallbackTriggered(t, state.Final(), false)
+			assertEpochFallbackTriggered(t, state.Final(), false)
 			err = state.Finalize(context.Background(), sealingBlock.ID())
 			require.NoError(t, err)
 			// epoch fallback triggered after finalization
-			assertEpochEmergencyFallbackTriggered(t, state.Final(), true)
+			assertEpochFallbackTriggered(t, state.Final(), true)
 		})
 	})
 }
 
-// TestEmergencyEpochFallback tests that epoch emergency fallback is triggered
+// TestEpochFallbackMode tests that epoch fallback mode is triggered
 // when an epoch fails to be committed before the epoch commitment deadline,
 // or when an invalid service event (indicating service account smart contract bug)
 // is sealed.
-func TestEmergencyEpochFallback(t *testing.T) {
+func TestEpochFallbackMode(t *testing.T) {
 
 	// if we finalize the first block past the epoch commitment deadline while
 	// in the EpochStaking phase, EFM should be triggered
@@ -1725,10 +1725,10 @@ func TestEmergencyEpochFallback(t *testing.T) {
 			block1.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(calculateExpectedStateId(block1.Header, nil))))
 			err = state.Extend(context.Background(), block1)
 			require.NoError(t, err)
-			assertEpochEmergencyFallbackTriggered(t, state.Final(), false) // not triggered before finalization
+			assertEpochFallbackTriggered(t, state.Final(), false) // not triggered before finalization
 			err = state.Finalize(context.Background(), block1.ID())
 			require.NoError(t, err)
-			assertEpochEmergencyFallbackTriggered(t, state.Final(), true) // triggered after finalization
+			assertEpochFallbackTriggered(t, state.Final(), true) // triggered after finalization
 
 			// block 2 will be the first block past the first epoch boundary
 			block2 := unittest.BlockWithParentProtocolState(block1)
@@ -1823,10 +1823,10 @@ func TestEmergencyEpochFallback(t *testing.T) {
 			protoEventsMock.On("EpochFallbackModeTriggered").Once()
 			protoEventsMock.On("EpochExtended", mock.Anything).Once()
 
-			assertEpochEmergencyFallbackTriggered(t, state.Final(), false) // not triggered before finalization
+			assertEpochFallbackTriggered(t, state.Final(), false) // not triggered before finalization
 			err = state.Finalize(context.Background(), block3.ID())
 			require.NoError(t, err)
-			assertEpochEmergencyFallbackTriggered(t, state.Final(), true) // triggered after finalization
+			assertEpochFallbackTriggered(t, state.Final(), true) // triggered after finalization
 
 			// block 4 will be the first block past the first epoch boundary
 			block4 := unittest.BlockWithParentProtocolState(block3)
@@ -1918,10 +1918,10 @@ func TestEmergencyEpochFallback(t *testing.T) {
 			protoEventsMock.On("EpochFallbackModeTriggered").Once()
 			protoEventsMock.On("EpochExtended", mock.Anything).Once()
 
-			assertEpochEmergencyFallbackTriggered(t, state.Final(), false) // not triggered before finalization
+			assertEpochFallbackTriggered(t, state.Final(), false) // not triggered before finalization
 			err = state.Finalize(context.Background(), block3.ID())
 			require.NoError(t, err)
-			assertEpochEmergencyFallbackTriggered(t, state.Final(), true) // triggered after finalization
+			assertEpochFallbackTriggered(t, state.Final(), true) // triggered after finalization
 
 			// block 4 is the first block past the current epoch boundary
 			block4 := unittest.BlockWithParentFixture(block3.Header)
@@ -2009,20 +2009,20 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 
 			// ingesting block 2 and 3, block 3 seals the invalid setup event
 			block2, block3 := unittest.SealBlock(t, state, mutableProtocolState, block1, receipt, seal)
-			assertEpochEmergencyFallbackTriggered(t, state.AtBlockID(block2.ID()), false) // EFM shouldn't be triggered since block 2 only incorporates the event, sealing happens in block 3
-			assertEpochEmergencyFallbackTriggered(t, state.AtBlockID(block3.ID()), true)  // EFM has to be triggered at block 3, since it seals the invalid setup event
-			assertEpochEmergencyFallbackTriggered(t, state.Final(), false)                // EFM should still not be triggered for finalized state since the invalid service event does not have a finalized seal
+			assertEpochFallbackTriggered(t, state.AtBlockID(block2.ID()), false) // EFM shouldn't be triggered since block 2 only incorporates the event, sealing happens in block 3
+			assertEpochFallbackTriggered(t, state.AtBlockID(block3.ID()), true)  // EFM has to be triggered at block 3, since it seals the invalid setup event
+			assertEpochFallbackTriggered(t, state.Final(), false)                // EFM should still not be triggered for finalized state since the invalid service event does not have a finalized seal
 
 			err = state.Finalize(context.Background(), block2.ID())
 			require.NoError(t, err)
-			assertEpochEmergencyFallbackTriggered(t, state.Final(), false) // EFM should still not be triggered after finalizing block 2
+			assertEpochFallbackTriggered(t, state.Final(), false) // EFM should still not be triggered after finalizing block 2
 
 			// Since we enter EFM before the commitment deadline, no epoch extension is added
 			metricsMock.On("EpochFallbackModeTriggered").Once()
 			protoEventsMock.On("EpochFallbackModeTriggered").Once()
 			err = state.Finalize(context.Background(), block3.ID())
 			require.NoError(t, err)
-			assertEpochEmergencyFallbackTriggered(t, state.Final(), true) // finalizing block 3 should have triggered EFM since it seals invalid setup event
+			assertEpochFallbackTriggered(t, state.Final(), true) // finalizing block 3 should have triggered EFM since it seals invalid setup event
 
 			// Block 4 incorporates Execution Result [ER] for block2, where the ER also includes EpochRecover event.
 			// Only when ingesting block 5, which _seals_ the EpochRecover event, the state should switch back to
@@ -2037,13 +2037,13 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 
 			// ingesting block 4 and 5, block 5 seals the EpochRecover event
 			block4, block5 := unittest.SealBlock(t, state, mutableProtocolState, block3, receipt, seal)
-			assertEpochEmergencyFallbackTriggered(t, state.AtBlockID(block4.ID()), true)
-			assertEpochEmergencyFallbackTriggered(t, state.AtBlockID(block5.ID()), false)
-			assertEpochEmergencyFallbackTriggered(t, state.Final(), true) // the latest finalized state should still be in EFM as `epochRecover` event does not have a finalized seal
+			assertEpochFallbackTriggered(t, state.AtBlockID(block4.ID()), true)
+			assertEpochFallbackTriggered(t, state.AtBlockID(block5.ID()), false)
+			assertEpochFallbackTriggered(t, state.Final(), true) // the latest finalized state should still be in EFM as `epochRecover` event does not have a finalized seal
 
 			err = state.Finalize(context.Background(), block4.ID())
 			require.NoError(t, err)
-			assertEpochEmergencyFallbackTriggered(t, state.Final(), true) // should still be in EFM as `epochRecover` is not yet finalized
+			assertEpochFallbackTriggered(t, state.Final(), true) // should still be in EFM as `epochRecover` is not yet finalized
 
 			// Epoch recovery results in entering Committed phase
 			metricsMock.On("CurrentEpochPhase", flow.EpochPhaseCommitted).Once()
@@ -2051,7 +2051,7 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 			// finalize the block sealing the EpochRecover event
 			err = state.Finalize(context.Background(), block5.ID())
 			require.NoError(t, err)
-			assertEpochEmergencyFallbackTriggered(t, state.Final(), false) // should be unset after finalizing block 5 which contains a seal for EpochRecover.
+			assertEpochFallbackTriggered(t, state.Final(), false) // should be unset after finalizing block 5 which contains a seal for EpochRecover.
 			assertCorrectRecovery(state, epochRecover)
 		})
 	})
@@ -2105,7 +2105,7 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 			protoEventsMock.On("EpochSetupPhaseStarted", epoch2Setup.Counter-1, mock.Anything)
 			err = state.Finalize(context.Background(), block3.ID())
 			require.NoError(t, err)
-			assertEpochEmergencyFallbackTriggered(t, state.Final(), false) // EFM is not expected
+			assertEpochFallbackTriggered(t, state.Final(), false) // EFM is not expected
 
 			// Block 4 incorporates Execution Result [ER] for block2, where the ER also includes invalid service event.
 			// Only when ingesting block 5, which _seals_ the invalid service event, the state should switch to
@@ -2115,19 +2115,19 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 
 			// ingesting block 4 and 5, block 5 seals the invalid commit event
 			block4, block5 := unittest.SealBlock(t, state, mutableProtocolState, block3, receipt, seal)
-			assertEpochEmergencyFallbackTriggered(t, state.AtBlockID(block4.ID()), false) // EFM shouldn't be triggered since block 4 only incorporates the event, sealing happens in block 5
-			assertEpochEmergencyFallbackTriggered(t, state.AtBlockID(block5.ID()), true)  // EFM has to be triggered at block 5, since it seals the invalid commit event
-			assertEpochEmergencyFallbackTriggered(t, state.Final(), false)                // EFM should still not be triggered for finalized state since the invalid service event does not have a finalized seal
+			assertEpochFallbackTriggered(t, state.AtBlockID(block4.ID()), false) // EFM shouldn't be triggered since block 4 only incorporates the event, sealing happens in block 5
+			assertEpochFallbackTriggered(t, state.AtBlockID(block5.ID()), true)  // EFM has to be triggered at block 5, since it seals the invalid commit event
+			assertEpochFallbackTriggered(t, state.Final(), false)                // EFM should still not be triggered for finalized state since the invalid service event does not have a finalized seal
 
 			err = state.Finalize(context.Background(), block4.ID())
 			require.NoError(t, err)
-			assertEpochEmergencyFallbackTriggered(t, state.Final(), false) // EFM should still not be triggered after finalizing block 4
+			assertEpochFallbackTriggered(t, state.Final(), false) // EFM should still not be triggered after finalizing block 4
 
 			metricsMock.On("EpochFallbackModeTriggered").Once()
 			protoEventsMock.On("EpochFallbackModeTriggered").Once()
 			err = state.Finalize(context.Background(), block5.ID())
 			require.NoError(t, err)
-			assertEpochEmergencyFallbackTriggered(t, state.Final(), true) // finalizing block 5 should have triggered EFM
+			assertEpochFallbackTriggered(t, state.Final(), true) // finalizing block 5 should have triggered EFM
 
 			// Block 6 incorporates Execution Result [ER] for block3, where the ER also includes EpochRecover event.
 			// Only when ingesting block 7, which _seals_ the EpochRecover event, the state should switch back to
@@ -2142,13 +2142,13 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 
 			// ingesting block 6 and 7, block 7 seals the `epochRecover` event
 			block6, block7 := unittest.SealBlock(t, state, mutableProtocolState, block5, receipt, seal)
-			assertEpochEmergencyFallbackTriggered(t, state.AtBlockID(block6.ID()), true)
-			assertEpochEmergencyFallbackTriggered(t, state.AtBlockID(block7.ID()), false)
-			assertEpochEmergencyFallbackTriggered(t, state.Final(), true) // the latest finalized state should still be in EFM as `epochRecover` event does not have a finalized seal
+			assertEpochFallbackTriggered(t, state.AtBlockID(block6.ID()), true)
+			assertEpochFallbackTriggered(t, state.AtBlockID(block7.ID()), false)
+			assertEpochFallbackTriggered(t, state.Final(), true) // the latest finalized state should still be in EFM as `epochRecover` event does not have a finalized seal
 
 			err = state.Finalize(context.Background(), block6.ID())
 			require.NoError(t, err)
-			assertEpochEmergencyFallbackTriggered(t, state.Final(), true) // should still be in EFM as `epochRecover` is not yet finalized
+			assertEpochFallbackTriggered(t, state.Final(), true) // should still be in EFM as `epochRecover` is not yet finalized
 
 			// Epoch recovery results in entering Committed phase
 			metricsMock.On("CurrentEpochPhase", flow.EpochPhaseCommitted).Once()
@@ -2156,7 +2156,7 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 			// finalize the block sealing the EpochRecover event
 			err = state.Finalize(context.Background(), block7.ID())
 			require.NoError(t, err)
-			assertEpochEmergencyFallbackTriggered(t, state.Final(), false) // should be unset after finalization
+			assertEpochFallbackTriggered(t, state.Final(), false) // should be unset after finalization
 			assertCorrectRecovery(state, epochRecover)
 		})
 	})
@@ -2235,7 +2235,7 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 			protoEventsMock.On("EpochSetupPhaseStarted", epoch2Setup.Counter-1, mock.Anything).Once()
 			err = state.Finalize(context.Background(), block3.ID())
 			require.NoError(t, err)
-			assertEpochEmergencyFallbackTriggered(t, state.Final(), false) // EFM is not expected
+			assertEpochFallbackTriggered(t, state.Final(), false) // EFM is not expected
 
 			// Block 4 incorporates Execution Result [ER] for block2, where the ER also includes `EpochCommit` event.
 			// Only when ingesting block 5, which _seals_ the `EpochCommit` event, the epoch moves to committed phase.
@@ -2255,7 +2255,7 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 			protoEventsMock.On("EpochCommittedPhaseStarted", epoch2Setup.Counter-1, mock.Anything).Once()
 			err = state.Finalize(context.Background(), block5.ID())
 			require.NoError(t, err)
-			assertEpochEmergencyFallbackTriggered(t, state.Final(), false) // EFM is not expected
+			assertEpochFallbackTriggered(t, state.Final(), false) // EFM is not expected
 
 			// Constructing blocks
 			//   ... <- B6(ER(B3, InvalidEpochCommit)) <- B7(S(ER(B3))) <- B8 <- B9 <- ...
@@ -2273,19 +2273,19 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 
 			// seal B3 by building two blocks on top of B5 that contain ER and seal respectively
 			block6, block7 := unittest.SealBlock(t, state, mutableProtocolState, block5, receipt, seal)
-			assertEpochEmergencyFallbackTriggered(t, state.AtBlockID(block6.ID()), false) // EFM shouldn't be triggered since block 6 only incorporates the event, sealing happens in block 7
-			assertEpochEmergencyFallbackTriggered(t, state.AtBlockID(block7.ID()), true)  // EFM has to be triggered at block 7, since it seals the invalid commit event
-			assertEpochEmergencyFallbackTriggered(t, state.Final(), false)                // EFM should still not be triggered for finalized state since the invalid service event does not have a finalized seal
+			assertEpochFallbackTriggered(t, state.AtBlockID(block6.ID()), false) // EFM shouldn't be triggered since block 6 only incorporates the event, sealing happens in block 7
+			assertEpochFallbackTriggered(t, state.AtBlockID(block7.ID()), true)  // EFM has to be triggered at block 7, since it seals the invalid commit event
+			assertEpochFallbackTriggered(t, state.Final(), false)                // EFM should still not be triggered for finalized state since the invalid service event does not have a finalized seal
 
 			err = state.Finalize(context.Background(), block6.ID())
 			require.NoError(t, err)
-			assertEpochEmergencyFallbackTriggered(t, state.Final(), false) // EFM should still not be triggered after finalizing block 4
+			assertEpochFallbackTriggered(t, state.Final(), false) // EFM should still not be triggered after finalizing block 4
 
 			metricsMock.On("EpochFallbackModeTriggered").Once()
 			protoEventsMock.On("EpochFallbackModeTriggered").Once()
 			err = state.Finalize(context.Background(), block7.ID())
 			require.NoError(t, err)
-			assertEpochEmergencyFallbackTriggered(t, state.Final(), true) // finalizing block 7 should have triggered EFM
+			assertEpochFallbackTriggered(t, state.Final(), true) // finalizing block 7 should have triggered EFM
 
 			// TODO: try submitting EpochRecover. We don't do this in current implementation since there is no way
 			//  to actually check that event was ignored. We will use pub/sub mechanism to notify about invalid service event.
@@ -2353,13 +2353,13 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 
 			// ingesting block 11 and 12, block 12 seals the `epochRecover` event
 			block11, block12 := unittest.SealBlock(t, state, mutableProtocolState, block10, receipt, seal)
-			assertEpochEmergencyFallbackTriggered(t, state.AtBlockID(block11.ID()), true)
-			assertEpochEmergencyFallbackTriggered(t, state.AtBlockID(block12.ID()), false)
-			assertEpochEmergencyFallbackTriggered(t, state.Final(), true) // the latest finalized state should still be in EFM as `epochRecover` event does not have a finalized seal
+			assertEpochFallbackTriggered(t, state.AtBlockID(block11.ID()), true)
+			assertEpochFallbackTriggered(t, state.AtBlockID(block12.ID()), false)
+			assertEpochFallbackTriggered(t, state.Final(), true) // the latest finalized state should still be in EFM as `epochRecover` event does not have a finalized seal
 
 			err = state.Finalize(context.Background(), block11.ID())
 			require.NoError(t, err)
-			assertEpochEmergencyFallbackTriggered(t, state.Final(), true) // should still be in EFM as `epochRecover` is not yet finalized
+			assertEpochFallbackTriggered(t, state.Final(), true) // should still be in EFM as `epochRecover` is not yet finalized
 
 			// Epoch recovery causes us to enter the Committed phase
 			metricsMock.On("CurrentEpochPhase", flow.EpochPhaseCommitted).Once()
@@ -2367,7 +2367,7 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 			// finalize the block sealing the EpochRecover event
 			err = state.Finalize(context.Background(), block12.ID())
 			require.NoError(t, err)
-			assertEpochEmergencyFallbackTriggered(t, state.Final(), false) // should be unset after finalization
+			assertEpochFallbackTriggered(t, state.Final(), false) // should be unset after finalization
 			assertCorrectRecovery(state, epochRecover)
 
 			// Constructing blocks
@@ -3062,8 +3062,8 @@ func TestProtocolStateIdempotent(t *testing.T) {
 	})
 }
 
-// assertEpochEmergencyFallbackTriggered tests that the given `stateSnapshot` has the `EpochFallbackTriggered` flag to the `expected` value.
-func assertEpochEmergencyFallbackTriggered(t *testing.T, stateSnapshot realprotocol.Snapshot, expected bool) {
+// assertEpochFallbackTriggered tests that the given `stateSnapshot` has the `EpochFallbackTriggered` flag to the `expected` value.
+func assertEpochFallbackTriggered(t *testing.T, stateSnapshot realprotocol.Snapshot, expected bool) {
 	epochState, err := stateSnapshot.EpochProtocolState()
 	require.NoError(t, err)
 	assert.Equal(t, expected, epochState.EpochFallbackTriggered())
