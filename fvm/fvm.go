@@ -212,24 +212,14 @@ func (vm *VirtualMachine) GetAccount(
 	*flow.Account,
 	error,
 ) {
-	blockDatabase := storage.NewBlockDatabase(
-		storageSnapshot,
-		0,
-		ctx.DerivedBlockData)
-
-	storageTxn := blockDatabase.NewSnapshotReadTransaction(
-		state.DefaultParameters().
-			WithMaxKeySizeAllowed(ctx.MaxStateKeySize).
-			WithMaxValueSizeAllowed(ctx.MaxStateValueSize).
-			WithMeterParameters(
-				meter.DefaultParameters().
-					WithStorageInteractionLimit(ctx.MaxStateInteractionSize)))
+	storageTxn := initializeStorageTransaction(ctx, storageSnapshot)
 
 	env := environment.NewScriptEnv(
 		context.Background(),
 		ctx.TracerSpan,
 		ctx.EnvironmentParams,
 		storageTxn)
+
 	account, err := env.GetAccount(address)
 	if err != nil {
 		if errors.IsLedgerFailure(err) {
@@ -253,24 +243,14 @@ func GetAccountBalance(
 	uint64,
 	error,
 ) {
-	blockDatabase := storage.NewBlockDatabase(
-		storageSnapshot,
-		0,
-		ctx.DerivedBlockData)
-
-	storageTxn := blockDatabase.NewSnapshotReadTransaction(
-		state.DefaultParameters().
-			WithMaxKeySizeAllowed(ctx.MaxStateKeySize).
-			WithMaxValueSizeAllowed(ctx.MaxStateValueSize).
-			WithMeterParameters(
-				meter.DefaultParameters().
-					WithStorageInteractionLimit(ctx.MaxStateInteractionSize)))
+	storageTxn := initializeStorageTransaction(ctx, storageSnapshot)
 
 	env := environment.NewScriptEnv(
 		context.Background(),
 		ctx.TracerSpan,
 		ctx.EnvironmentParams,
 		storageTxn)
+
 	accountBalance, err := env.GetAccountBalance(common.MustBytesToAddress(address.Bytes()))
 
 	if err != nil {
@@ -288,6 +268,23 @@ func GetAccountKeys(
 	[]flow.AccountPublicKey,
 	error,
 ) {
+	storageTxn := initializeStorageTransaction(ctx, storageSnapshot)
+
+	env := environment.NewScriptEnv(
+		context.Background(),
+		ctx.TracerSpan,
+		ctx.EnvironmentParams,
+		storageTxn)
+
+	accountKeys, err := env.GetAccountKeys(address)
+	if err != nil {
+		return nil, fmt.Errorf("cannot get account keys: %w", err)
+	}
+	return accountKeys, nil
+}
+
+// Helper function to initialize common components.
+func initializeStorageTransaction(ctx Context, storageSnapshot snapshot.StorageSnapshot) storage.Transaction {
 	blockDatabase := storage.NewBlockDatabase(
 		storageSnapshot,
 		0,
@@ -301,16 +298,5 @@ func GetAccountKeys(
 				meter.DefaultParameters().
 					WithStorageInteractionLimit(ctx.MaxStateInteractionSize)))
 
-	env := environment.NewScriptEnv(
-		context.Background(),
-		ctx.TracerSpan,
-		ctx.EnvironmentParams,
-		storageTxn)
-
-	accountKeys, err := env.GetAccountKeys(address)
-
-	if err != nil {
-		return nil, fmt.Errorf("cannot get account keys: %w", err)
-	}
-	return accountKeys, nil
+	return storageTxn
 }
