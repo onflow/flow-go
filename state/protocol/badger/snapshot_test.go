@@ -589,17 +589,17 @@ func TestSealingSegment(t *testing.T) {
 		})
 	})
 
-	// Root <- B1 <- B2 <- ... <- B700(Seal_B689)
-	// Expected sealing segment: [B689, B690], Extra blocks: [B98, B99, ..., B688]
-	// where ExtraBlocksInRootSealingSegment = 590
-	t.Run("test extra blocks contain exactly ExtraBlocksInRootSealingSegment number of blocks below the sealed block", func(t *testing.T) {
+	// Root <- B1 <- B2 <- ... <- B700(Seal_B699)
+	// Expected sealing segment: [B699, B700], Extra blocks: [B98, B99, ..., B698]
+	// where DefaultTransactionExpiry = 600
+	t.Run("test extra blocks contain exactly DefaultTransactionExpiry number of blocks below the sealed block", func(t *testing.T) {
 		util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.FollowerState) {
 			root := unittest.BlockWithParentFixture(head)
 			buildFinalizedBlock(t, state, root)
 
-			blocks := make([]*flow.Block, 0, flow.ExtraBlocksInRootSealingSegment+3)
+			blocks := make([]*flow.Block, 0, flow.DefaultTransactionExpiry+3)
 			parent := root
-			for i := 0; i < flow.ExtraBlocksInRootSealingSegment+1; i++ {
+			for i := 0; i < flow.DefaultTransactionExpiry+1; i++ {
 				next := unittest.BlockWithParentFixture(parent.Header)
 				next.Header.View = next.Header.Height + 1 // set view so we are still in the same epoch
 				buildFinalizedBlock(t, state, next)
@@ -634,9 +634,9 @@ func TestSealingSegment(t *testing.T) {
 			assert.Equal(t, lastBlock.Header, segment.Finalized().Header)
 			assert.Equal(t, lastSealedBlock.Header, segment.Sealed().Header)
 
-			// there are ExtraBlocksInRootSealingSegment number of blocks in total
-			unittest.AssertEqualBlocksLenAndOrder(t, blocks[:flow.ExtraBlocksInRootSealingSegment], segment.ExtraBlocks)
-			assert.Len(t, segment.ExtraBlocks, flow.ExtraBlocksInRootSealingSegment)
+			// there are DefaultTransactionExpiry number of blocks in total
+			unittest.AssertEqualBlocksLenAndOrder(t, blocks[:flow.DefaultTransactionExpiry], segment.ExtraBlocks)
+			assert.Len(t, segment.ExtraBlocks, flow.DefaultTransactionExpiry)
 			assertSealingSegmentBlocksQueryableAfterBootstrap(t, snapshot)
 
 		})
