@@ -304,7 +304,7 @@ func identifierList(ids []string) (flow.IdentifierList, error) {
 	return idList, nil
 }
 
-func configureTransactionValidator(state protocol.State, chainID flow.ChainID, executor *ScriptExecutor) *access.TransactionValidator {
+func configureTransactionValidator(state protocol.State, chainID flow.ChainID, executor execution.ScriptExecutor) *access.TransactionValidator {
 	return access.NewTransactionValidator(
 		access.NewProtocolStateBlocks(state),
 		chainID.Chain(),
@@ -318,6 +318,7 @@ func configureTransactionValidator(state protocol.State, chainID flow.ChainID, e
 			MaxTransactionByteSize:       flow.DefaultMaxTransactionByteSize,
 			MaxCollectionByteSize:        flow.DefaultMaxCollectionByteSize,
 		},
+		executor,
 	)
 }
 

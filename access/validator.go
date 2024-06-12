@@ -1,12 +1,17 @@
 package access
 
 import (
+	"context"
+	"encoding/binary"
 	"errors"
 	"fmt"
+	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime/parser"
 	"github.com/onflow/crypto"
-	"github.com/onflow/flow-go/engine/access/rpc/backend"
+	"github.com/onflow/flow-core-contracts/lib/go/templates"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/execution"
 	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/protocol"
 )
@@ -77,13 +82,14 @@ type TransactionValidator struct {
 	options               TransactionValidationOptions
 	serviceAccountAddress flow.Address
 	limiter               RateLimiter
-	scriptExecutor        *backend.ScriptExecutor
+	scriptExecutor        execution.ScriptExecutor
 }
 
 func NewTransactionValidator(
 	blocks Blocks,
 	chain flow.Chain,
 	options TransactionValidationOptions,
+	executor execution.ScriptExecutor,
 ) *TransactionValidator {
 	return &TransactionValidator{
 		blocks:                blocks,
@@ -91,6 +97,7 @@ func NewTransactionValidator(
 		options:               options,
 		serviceAccountAddress: chain.ServiceAddress(),
 		limiter:               NewNoopLimiter(),
+		scriptExecutor:        executor,
 	}
 }
 
@@ -109,7 +116,7 @@ func NewTransactionValidatorWithLimiter(
 	}
 }
 
-func (v *TransactionValidator) Validate(tx *flow.TransactionBody) (err error) {
+func (v *TransactionValidator) Validate(ctx context.Context, tx *flow.TransactionBody) (err error) {
 	// rate limit transactions for specific payers.
 	// a short term solution to prevent attacks that send too many failed transactions
 	// if a transaction is from a payer that should be rate limited, all the following
@@ -159,7 +166,7 @@ func (v *TransactionValidator) Validate(tx *flow.TransactionBody) (err error) {
 		return err
 	}
 
-	err = v.checkSufficientFlowAmountToPayForTransaction(tx)
+	err = v.checkSufficientFlowAmountToPayForTransaction(ctx, tx)
 	if err != nil {
 		return err
 	}
@@ -351,12 +358,34 @@ func (v *TransactionValidator) checkSignatureFormat(tx *flow.TransactionBody) er
 	return nil
 }
 
-func (v *TransactionValidator) checkSufficientFlowAmountToPayForTransaction(tx *flow.TransactionBody) error {
-	//script := tx.Script()
-	//scriptArgs := tx.wit
-	//v.scriptExecutor.execute()
+func (v *TransactionValidator) checkSufficientFlowAmountToPayForTransaction(ctx context.Context, tx *flow.TransactionBody) error {
+	header, err := v.blocks.HeaderByID(tx.ID())
+	if err != nil {
+		return err
+	}
 
-	return nil
+	inclusionEffort := make([]byte, 8)
+	binary.LittleEndian.PutUint64(inclusionEffort, tx.InclusionEffort())
+
+	gasLimit := make([]byte, 8)
+	// TODO: use cadence module to convert to byte
+	binary.LittleEndian.PutUint64(gasLimit, tx.GasLimit)
+
+	var args [][]byte
+	args = append(args, inclusionEffort)
+	args = append(args, gasLimit)
+
+	env := systemcontracts.SystemContractsForChain(v.chain.ChainID()).AsTemplateEnv()
+	script := templates.GenerateVerifyPayerBalanceForTxExecution(env)
+
+	result, err = v.scriptExecutor.ExecuteAtBlockHeight(ctx, script, args, header.Height)
+	resultStructValues := result.(cadence.Struct).GetFieldValues()
+	canExecuteTransaction := resultStructValues[0].ToGoValue().(bool)
+	if canExecuteTransaction {
+		return nil
+	}
+
+	return err
 }
 
 func remove(s []string, r string) []string {
