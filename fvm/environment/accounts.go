@@ -257,9 +257,7 @@ func (a *StatefulAccounts) GetPublicKeys(
 ) {
 	count, err := a.GetPublicKeyCount(address)
 	if err != nil {
-		return nil, fmt.Errorf(
-			"failed to get public key count of account: %w",
-			err)
+		return nil, err
 	}
 	publicKeys = make([]flow.AccountPublicKey, count)
 
