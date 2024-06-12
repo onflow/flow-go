@@ -517,17 +517,22 @@ func (s *EpochStateMachineSuite) TestEvolveState_EventsAreFiltered() {
 // In such situation, we still need to enter the next epoch (because it has already been committed), but persist in the
 // state that we have entered Epoch fallback mode (`flow.EpochProtocolStateEntry.EpochFallbackTriggered` is set to `true`).
 // This test ensures that we don't drop previously committed next epoch.
+// TODO(EFM, #6019): This test is broken with current implementation but must pass when EFM recovery has been implemented.
 func (s *EpochStateMachineSuite) TestEvolveStateTransitionToNextEpoch_WithInvalidStateTransition() {
 	unittest.SkipUnless(s.T(), unittest.TEST_TODO,
 		"This test is broken with current implementation but must pass when EFM recovery has been implemented."+
 			"See for details https://github.com/onflow/flow-go/issues/5631.")
 	s.parentEpochState = unittest.EpochStateFixture(unittest.WithNextEpochProtocolState())
 	s.candidate.View = s.parentEpochState.NextEpochSetup.FirstView
+	happyPathConsumerFactory := protocol_statemock.NewStateMachineEventsConsumerFactoryMethod(s.T())
+	fallbackConsumerFactory := protocol_statemock.NewStateMachineEventsConsumerFactoryMethod(s.T())
 	stateMachine, err := epochs.NewEpochStateMachineFactory(
 		s.globalParams,
 		s.setupsDB,
 		s.commitsDB,
 		s.epochStateDB,
+		happyPathConsumerFactory.Execute,
+		fallbackConsumerFactory.Execute,
 	).Create(s.candidate.View, s.candidate.ParentID, s.parentState, s.mutator)
 	require.NoError(s.T(), err)
 
