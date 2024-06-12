@@ -3489,8 +3489,8 @@ func TestCadenceOwnedAccountCall(t *testing.T) {
 					assert.Equal(t, types.NewBalanceFromUFix64(expectedBalance), balance)
 
 					return &types.ResultSummary{
-						Status:        types.StatusSuccessful,
-						ReturnedValue: types.Data{3, 1, 4},
+						Status:       types.StatusSuccessful,
+						ReturnedData: types.Data{3, 1, 4},
 					}
 				},
 			}
@@ -4034,7 +4034,7 @@ func TestCadenceOwnedAccountDeploy(t *testing.T) {
 					return &types.ResultSummary{
 						Status:                  types.StatusSuccessful,
 						DeployedContractAddress: &types.Address{4},
-						ReturnedValue:           types.Data{5},
+						ReturnedData:            types.Data{5},
 					}
 				},
 			}
