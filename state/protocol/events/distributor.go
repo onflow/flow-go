@@ -75,6 +75,14 @@ func (d *Distributor) EpochFallbackModeTriggered() {
 	}
 }
 
+func (d *Distributor) EpochFallbackModeExited() {
+	d.mu.RLock()
+	defer d.mu.RUnlock()
+	for _, sub := range d.subscribers {
+		sub.EpochFallbackModeExited()
+	}
+}
+
 func (d *Distributor) EpochExtended(ext flow.EpochExtension) {
 	d.mu.RLock()
 	defer d.mu.RUnlock()

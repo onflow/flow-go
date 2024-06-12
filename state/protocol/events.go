@@ -96,8 +96,7 @@ type Consumer interface {
 	// EFM is exited when an EpochRecover service event is processed, which defines
 	// a final view for the current epoch and fully specifies the subsequent epoch.
 	// NOTE: Only called once the block incorporating the EpochRecover is finalized.
-	// TODO: do we also call EpochCommittedPhaseStarted here, too?
-	//EpochFallbackModeExited()
+	EpochFallbackModeExited()
 
 	// EpochExtended is called when a flow.EpochExtension is added to the current epoch
 	// NOTE: Only called when the block including the new extension is finalized.

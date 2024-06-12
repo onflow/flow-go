@@ -11,22 +11,22 @@ import (
 )
 
 type ComplianceCollector struct {
-	finalizedHeight                 prometheus.Gauge
-	sealedHeight                    prometheus.Gauge
-	finalizedBlocks                 prometheus.Counter
-	sealedBlocks                    prometheus.Counter
-	finalizedPayload                *prometheus.CounterVec
-	sealedPayload                   *prometheus.CounterVec
-	lastBlockFinalizedAt            time.Time
-	finalizedBlocksPerSecond        prometheus.Summary
-	lastEpochTransitionHeight       prometheus.Gauge
-	currentEpochCounter             prometheus.Gauge
-	currentEpochPhase               prometheus.Gauge
-	currentEpochFinalView           prometheus.Gauge
-	currentDKGPhase1FinalView       prometheus.Gauge
-	currentDKGPhase2FinalView       prometheus.Gauge
-	currentDKGPhase3FinalView       prometheus.Gauge
-	epochEmergencyFallbackTriggered prometheus.Gauge
+	finalizedHeight            prometheus.Gauge
+	sealedHeight               prometheus.Gauge
+	finalizedBlocks            prometheus.Counter
+	sealedBlocks               prometheus.Counter
+	finalizedPayload           *prometheus.CounterVec
+	sealedPayload              *prometheus.CounterVec
+	lastBlockFinalizedAt       time.Time
+	finalizedBlocksPerSecond   prometheus.Summary
+	lastEpochTransitionHeight  prometheus.Gauge
+	currentEpochCounter        prometheus.Gauge
+	currentEpochPhase          prometheus.Gauge
+	currentEpochFinalView      prometheus.Gauge
+	currentDKGPhase1FinalView  prometheus.Gauge
+	currentDKGPhase2FinalView  prometheus.Gauge
+	currentDKGPhase3FinalView  prometheus.Gauge
+	epochFallbackModeTriggered prometheus.Gauge
 }
 
 var _ module.ComplianceMetrics = (*ComplianceCollector)(nil)
@@ -142,7 +142,7 @@ func NewComplianceCollector() *ComplianceCollector {
 			BufCap:     500,
 		}),
 
-		epochEmergencyFallbackTriggered: promauto.NewGauge(prometheus.GaugeOpts{
+		epochFallbackModeTriggered: promauto.NewGauge(prometheus.GaugeOpts{
 			Name:      "epoch_fallback_triggered",
 			Namespace: namespaceConsensus,
 			Subsystem: subsystemCompliance,
@@ -214,5 +214,9 @@ func (cc *ComplianceCollector) CurrentDKGPhase3FinalView(view uint64) {
 }
 
 func (cc *ComplianceCollector) EpochFallbackModeTriggered() {
-	cc.epochEmergencyFallbackTriggered.Set(float64(1))
+	cc.epochFallbackModeTriggered.Set(float64(1))
+}
+
+func (cc *ComplianceCollector) EpochFallbackModeExited() {
+	cc.epochFallbackModeTriggered.Set(float64(0))
 }
