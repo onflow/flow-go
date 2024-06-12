@@ -3,7 +3,6 @@ package state
 import (
 	"errors"
 	"fmt"
-
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state/protocol"
@@ -11,9 +10,11 @@ import (
 	"github.com/onflow/flow-go/state/protocol/protocol_state"
 	"github.com/onflow/flow-go/state/protocol/protocol_state/epochs"
 	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
+	"github.com/onflow/flow-go/state/protocol/protocol_state/pubsub"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/storage/badger/transaction"
+	"github.com/rs/zerolog"
 )
 
 // ProtocolState is an implementation of the read-only interface for protocol state, it allows querying information
@@ -86,6 +87,7 @@ var _ protocol.MutableProtocolState = (*MutableProtocolState)(nil)
 
 // NewMutableProtocolState creates a new instance of MutableProtocolState.
 func NewMutableProtocolState(
+	log zerolog.Logger,
 	epochProtocolStateDB storage.EpochProtocolStateEntries,
 	kvStoreSnapshots storage.ProtocolKVStore,
 	globalParams protocol.GlobalParams,
@@ -94,11 +96,29 @@ func NewMutableProtocolState(
 	setups storage.EpochSetups,
 	commits storage.EpochCommits,
 ) *MutableProtocolState {
+	epochHappyPathConsumerFactory := func(candidateView uint64) protocol_state.StateMachineEventsConsumer {
+		return pubsub.NewLogConsumer(
+			log.With().
+				Str("state_machine", "epoch_happy_path").
+				Uint64("candidate_view", candidateView).
+				Logger(),
+		)
+	}
+	epochFallbackConsumerFactory := func(candidateView uint64) protocol_state.StateMachineEventsConsumer {
+		return pubsub.NewLogConsumer(
+			log.With().
+				Str("state_machine", "epoch_fallback_path").
+				Uint64("candidate_view", candidateView).
+				Logger(),
+		)
+	}
+
 	// an ordered list of factories to create state machines for different sub-states of the Dynamic Protocol State.
 	// all factories are expected to be called in order defined here.
 	kvStateMachineFactories := []protocol_state.KeyValueStoreStateMachineFactory{
 		kvstore.NewPSVersionUpgradeStateMachineFactory(globalParams),
-		epochs.NewEpochStateMachineFactory(globalParams, setups, commits, epochProtocolStateDB),
+		epochs.NewEpochStateMachineFactory(globalParams, setups, commits, epochProtocolStateDB,
+			epochHappyPathConsumerFactory, epochFallbackConsumerFactory),
 	}
 	return newMutableProtocolState(epochProtocolStateDB, kvstore.NewProtocolKVStore(kvStoreSnapshots), globalParams, headers, results, kvStateMachineFactories)
 }

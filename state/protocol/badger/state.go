@@ -41,7 +41,7 @@ type State struct {
 	params                      protocol.Params
 	protocolKVStoreSnapshotsDB  storage.ProtocolKVStore
 	epochProtocolStateEntriesDB storage.EpochProtocolStateEntries // TODO remove when EpochProtocolStateEntry is stored in KVStore
-	protocolState               protocol.MutableProtocolState
+	protocolState               protocol.ProtocolState
 	versionBeacons              storage.VersionBeacons
 
 	// finalizedRootHeight marks the cutoff of the history this node knows about. We cache it in the state
@@ -824,14 +824,10 @@ func newState(
 		protocolKVStoreSnapshotsDB:  protocolKVStoreSnapshots,
 		epochProtocolStateEntriesDB: epochProtocolStateSnapshots,
 		protocolState: protocol_state.
-			NewMutableProtocolState(
+			NewProtocolState(
 				epochProtocolStateSnapshots,
 				protocolKVStoreSnapshots,
 				params,
-				headers,
-				results,
-				setups,
-				commits,
 			),
 		versionBeacons:     versionBeacons,
 		cachedLatestFinal:  new(atomic.Pointer[cachedHeader]),

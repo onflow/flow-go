@@ -10,10 +10,12 @@ import (
 // EpochStateMachineFactory is a factory for creating EpochStateMachine instances.
 // It holds all the necessary data to create a new instance of EpochStateMachine.
 type EpochStateMachineFactory struct {
-	params               protocol.GlobalParams
-	setups               storage.EpochSetups
-	commits              storage.EpochCommits
-	epochProtocolStateDB storage.EpochProtocolStateEntries
+	params                   protocol.GlobalParams
+	setups                   storage.EpochSetups
+	commits                  storage.EpochCommits
+	epochProtocolStateDB     storage.EpochProtocolStateEntries
+	happyPathConsumerFactory protocol_state.StateMachineEventsConsumerFactoryMethod
+	fallbackConsumerFactory  protocol_state.StateMachineEventsConsumerFactoryMethod
 }
 
 var _ protocol_state.KeyValueStoreStateMachineFactory = (*EpochStateMachineFactory)(nil)
@@ -23,12 +25,15 @@ func NewEpochStateMachineFactory(
 	setups storage.EpochSetups,
 	commits storage.EpochCommits,
 	epochProtocolStateDB storage.EpochProtocolStateEntries,
+	happyPathConsumerFactory, fallbackConsumerFactory protocol_state.StateMachineEventsConsumerFactoryMethod,
 ) *EpochStateMachineFactory {
 	return &EpochStateMachineFactory{
-		params:               params,
-		setups:               setups,
-		commits:              commits,
-		epochProtocolStateDB: epochProtocolStateDB,
+		params:                   params,
+		setups:                   setups,
+		commits:                  commits,
+		epochProtocolStateDB:     epochProtocolStateDB,
+		happyPathConsumerFactory: happyPathConsumerFactory,
+		fallbackConsumerFactory:  fallbackConsumerFactory,
 	}
 }
 
@@ -45,10 +50,10 @@ func (f *EpochStateMachineFactory) Create(candidateView uint64, parentBlockID fl
 		parentState,
 		mutator,
 		func(candidateView uint64, parentState *flow.RichEpochProtocolStateEntry) (StateMachine, error) {
-			return NewHappyPathStateMachine(nil, candidateView, parentState)
+			return NewHappyPathStateMachine(f.happyPathConsumerFactory(candidateView), candidateView, parentState)
 		},
 		func(candidateView uint64, parentState *flow.RichEpochProtocolStateEntry) (StateMachine, error) {
-			return NewFallbackStateMachine(f.params, nil, candidateView, parentState)
+			return NewFallbackStateMachine(f.params, f.fallbackConsumerFactory(candidateView), candidateView, parentState)
 		},
 	)
 }

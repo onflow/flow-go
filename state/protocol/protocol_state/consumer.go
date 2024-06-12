@@ -15,3 +15,5 @@ type StateMachineEventsConsumer interface {
 	// OnServiceEventProcessed notifications are produced when a service event is successfully processed by the state machine.
 	OnServiceEventProcessed(event flow.ServiceEvent)
 }
+
+type StateMachineEventsConsumerFactoryMethod func(candidateView uint64) StateMachineEventsConsumer
