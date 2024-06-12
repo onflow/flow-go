@@ -145,6 +145,7 @@ func (h *Headers) FindHeaders(filter func(header *flow.Header) bool) ([]flow.Hea
 // only useful for execution node to roll back executed block height
 func (h *Headers) RollbackExecutedBlock(header *flow.Header) error {
 	var blockID flow.Identifier
+
 	batch := h.db.NewBatch()
 	err := operation.RetrieveExecutedBlock(&blockID)(batch)
 	if err != nil {
