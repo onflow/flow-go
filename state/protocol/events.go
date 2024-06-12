@@ -89,8 +89,15 @@ type Consumer interface {
 	// or an expected service event is not observed before the epoch commitment deadline.
 	// After EFM is triggered, we remain in the current epoch until an EpochRecover
 	// event is observed, after which regular epoch transitions begins again.
-	// TODO(efm-recovery) add EpochFallbackModeExited()
+	// NOTE: Only called once the block triggering EFM is finalized.
 	EpochFallbackModeTriggered()
+
+	// EpochFallbackModeExited is called when epoch fallback mode [EFM] is exited.
+	// EFM is exited when an EpochRecover service event is processed, which defines
+	// a final view for the current epoch and fully specifies the subsequent epoch.
+	// NOTE: Only called once the block incorporating the EpochRecover is finalized.
+	// TODO: do we also call EpochCommittedPhaseStarted here, too?
+	//EpochFallbackModeExited()
 
 	// EpochExtended is called when a flow.EpochExtension is added to the current epoch
 	// NOTE: Only called when the block including the new extension is finalized.

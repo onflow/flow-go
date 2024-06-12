@@ -2116,6 +2116,9 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 			require.NoError(t, err)
 			assertEpochEmergencyFallbackTriggered(t, state.Final(), true) // should still be in EFM as `epochRecover` is not yet finalized
 
+			// Epoch recovery results in entering Committed phase
+			metricsMock.On("CurrentEpochPhase", flow.EpochPhaseCommitted).Once()
+			protoEventsMock.On("EpochCommittedPhaseStarted", mock.Anything, mock.Anything).Once()
 			// finalize the block sealing the EpochRecover event
 			err = state.Finalize(context.Background(), block5.ID())
 			require.NoError(t, err)
@@ -2218,6 +2221,9 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 			require.NoError(t, err)
 			assertEpochEmergencyFallbackTriggered(t, state.Final(), true) // should still be in EFM as `epochRecover` is not yet finalized
 
+			// Epoch recovery results in entering Committed phase
+			metricsMock.On("CurrentEpochPhase", flow.EpochPhaseCommitted).Once()
+			protoEventsMock.On("EpochCommittedPhaseStarted", mock.Anything, mock.Anything).Once()
 			// finalize the block sealing the EpochRecover event
 			err = state.Finalize(context.Background(), block7.ID())
 			require.NoError(t, err)
@@ -2389,6 +2395,8 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 			require.Len(t, epochExtensions, 1)
 			require.Equal(t, epochExtensions[0].FirstView, epoch2Setup.FinalView+1)
 
+			protoEventsMock.On("EpochExtended", mock.Anything).Once()
+			metricsMock.On("CurrentEpochFinalView", epoch2Setup.FinalView+epochs.DefaultEpochExtensionViewCount)
 			err = state.Finalize(context.Background(), block9.ID())
 			require.NoError(t, err)
 
@@ -2424,6 +2432,9 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 			require.NoError(t, err)
 			assertEpochEmergencyFallbackTriggered(t, state.Final(), true) // should still be in EFM as `epochRecover` is not yet finalized
 
+			// Epoch recovery causes us to enter the Committed phase
+			metricsMock.On("CurrentEpochPhase", flow.EpochPhaseCommitted).Once()
+			protoEventsMock.On("EpochCommittedPhaseStarted", epochRecover.EpochSetup.Counter-1, mock.Anything).Once()
 			// finalize the block sealing the EpochRecover event
 			err = state.Finalize(context.Background(), block12.ID())
 			require.NoError(t, err)
