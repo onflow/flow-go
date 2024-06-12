@@ -109,12 +109,6 @@ func IsInvalidServiceEventError(err error) bool {
 	return errors.As(err, &errInvalidServiceEventError)
 }
 
-func AsInvalidServiceEventError(err error) (InvalidServiceEventError, bool) {
-	var e InvalidServiceEventError
-	ok := errors.As(err, &e)
-	return e, ok
-}
-
 // NewInvalidServiceEventErrorf returns an invalid service event error. Since all invalid
 // service events indicate an invalid extension, the service event error is wrapped in
 // the invalid extension error at construction.

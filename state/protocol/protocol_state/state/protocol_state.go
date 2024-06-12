@@ -115,6 +115,8 @@ func NewMutableProtocolState(
 		)
 	}
 
+	// TODO(EFM, #6020): inject consumers into other state machine factories.
+
 	// an ordered list of factories to create state machines for different sub-states of the Dynamic Protocol State.
 	// all factories are expected to be called in order defined here.
 	kvStateMachineFactories := []protocol_state.KeyValueStoreStateMachineFactory{
