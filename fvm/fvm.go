@@ -120,7 +120,6 @@ type VM interface {
 	)
 
 	GetAccount(Context, flow.Address, snapshot.StorageSnapshot) (*flow.Account, error)
-	CheckPayerBalanceAndGetMaxTxFees(Context, flow.Address, uint64, uint64, snapshot.StorageSnapshot) (bool, error)
 }
 
 var _ VM = (*VirtualMachine)(nil)
@@ -242,48 +241,4 @@ func (vm *VirtualMachine) GetAccount(
 		return nil, fmt.Errorf("cannot get account: %w", err)
 	}
 	return account, nil
-}
-
-func (vm *VirtualMachine) CheckPayerBalanceAndGetMaxTxFees(
-	ctx Context,
-	payer flow.Address,
-	inclusionEffort uint64,
-	gasLimit uint64,
-	storageSnapshot snapshot.StorageSnapshot,
-) (
-	bool,
-	error,
-) {
-	blockDatabase := storage.NewBlockDatabase(
-		storageSnapshot,
-		0,
-		ctx.DerivedBlockData)
-
-	storageTxn := blockDatabase.NewSnapshotReadTransaction(
-		state.DefaultParameters().
-			WithMaxKeySizeAllowed(ctx.MaxStateKeySize).
-			WithMaxValueSizeAllowed(ctx.MaxStateValueSize).
-			WithMeterParameters(
-				meter.DefaultParameters().
-					WithStorageInteractionLimit(ctx.MaxStateInteractionSize)))
-
-	env := environment.NewScriptEnv(
-		context.Background(),
-		ctx.TracerSpan,
-		ctx.EnvironmentParams,
-		storageTxn)
-
-	_, err := env.CheckPayerBalanceAndGetMaxTxFees(payer, inclusionEffort, gasLimit)
-
-	if err != nil {
-		if errors.IsLedgerFailure(err) {
-			return false, fmt.Errorf(
-				"cannot get account, this error usually happens if the "+
-					"reference block for this query is not set to a recent "+
-					"block: %w",
-				err)
-		}
-		return false, fmt.Errorf("cannot get account: %w", err)
-	}
-	return true, nil
 }

@@ -2,13 +2,14 @@ package access
 
 import (
 	"context"
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"github.com/onflow/cadence"
+	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime/parser"
 	"github.com/onflow/crypto"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
+	"github.com/onflow/flow-go/fvm/evm/testutils"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/execution"
@@ -364,28 +365,27 @@ func (v *TransactionValidator) checkSufficientFlowAmountToPayForTransaction(ctx 
 		return err
 	}
 
-	inclusionEffort := make([]byte, 8)
-	binary.LittleEndian.PutUint64(inclusionEffort, tx.InclusionEffort())
-
-	gasLimit := make([]byte, 8)
-	// TODO: use cadence module to convert to byte
-	binary.LittleEndian.PutUint64(gasLimit, tx.GasLimit)
-
-	var args [][]byte
-	args = append(args, inclusionEffort)
-	args = append(args, gasLimit)
+	inclusionEffort := cadence.UInt64(tx.InclusionEffort())
+	gasLimit := cadence.UInt64(tx.GasLimit)
+	args := testutils.EncodeArgs([]cadence.Value{inclusionEffort, gasLimit}) //TODO: is it fine to use testutils?
 
 	env := systemcontracts.SystemContractsForChain(v.chain.ChainID()).AsTemplateEnv()
 	script := templates.GenerateVerifyPayerBalanceForTxExecution(env)
 
-	result, err = v.scriptExecutor.ExecuteAtBlockHeight(ctx, script, args, header.Height)
-	resultStructValues := result.(cadence.Struct).GetFieldValues()
-	canExecuteTransaction := resultStructValues[0].ToGoValue().(bool)
-	if canExecuteTransaction {
-		return nil
+	result, err := v.scriptExecutor.ExecuteAtBlockHeight(ctx, script, args, header.Height)
+
+	value, err := jsoncdc.Decode(nil, result)
+	fields := cadence.FieldsMappedByName(value.(cadence.Struct))
+	canExecuteTransaction, ok := fields["canExecuteTransaction"].(cadence.Bool)
+	if !ok {
+		return errors.New("couldn't parse canExecuteTransaction field")
 	}
 
-	return err
+	if bool(canExecuteTransaction) {
+		return nil
+	} else {
+		return errors.New("cannot execute transaction")
+	}
 }
 
 func remove(s []string, r string) []string {

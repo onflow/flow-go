@@ -126,15 +126,6 @@ func (s *Scripts) GetAccountAtBlockHeight(ctx context.Context, address flow.Addr
 	return s.executor.GetAccount(ctx, address, header, snap)
 }
 
-func (s *Scripts) CheckPayerBalanceAndGetMaxTxFees(ctx context.Context, payer flow.Address, inclusionEffort uint64, gasLimit uint64, height uint64) (bool, error) {
-	snap, header, err := s.snapshotWithBlock(height)
-	if err != nil {
-		return false, err
-	}
-
-	return s.executor.CheckPayerBalanceAndGetMaxTxFees(ctx, payer, inclusionEffort, gasLimit, header, snap)
-}
-
 // snapshotWithBlock is a common function for executing scripts and get account functionality.
 // It creates a storage snapshot that is needed by the FVM to execute scripts.
 func (s *Scripts) snapshotWithBlock(height uint64) (snapshot.StorageSnapshot, *flow.Header, error) {
