@@ -130,6 +130,20 @@ func update(key []byte, entity interface{}) func(PebbleReaderWriter) error {
 	}
 }
 
+// remove removes the entity with the given key, if it exists. If it doesn't
+// exist, this is a no-op.
+// Error returns:
+// * generic error in case of unexpected database error
+func remove(key []byte) func(pebble.Writer) error {
+	return func(w pebble.Writer) error {
+		err := w.Delete(key, nil)
+		if err != nil {
+			return irrecoverable.NewExceptionf("could not delete item: %w", err)
+		}
+		return nil
+	}
+}
+
 // traverse iterates over a range of keys defined by a prefix.
 //
 // The prefix must be shared by all keys in the iteration.
