@@ -4,7 +4,6 @@ import (
 	"github.com/cockroachdb/pebble"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/storage/pebble/common"
 )
 
 func RetrieveJobLatestIndex(queue string, index *uint64) func(pebble.Reader) error {
@@ -15,7 +14,7 @@ func InitJobLatestIndex(queue string, index uint64) func(pebble.Writer) error {
 	return insert(makePrefix(codeJobQueuePointer, queue), index)
 }
 
-func SetJobLatestIndex(queue string, index uint64) func(common.PebbleReaderWriter) error {
+func SetJobLatestIndex(queue string, index uint64) func(PebbleReaderWriter) error {
 	return update(makePrefix(codeJobQueuePointer, queue), index)
 }
 
@@ -39,6 +38,6 @@ func InsertProcessedIndex(jobName string, processed uint64) func(pebble.Writer) 
 }
 
 // SetProcessedIndex updates the processed index for a job consumer with given index
-func SetProcessedIndex(jobName string, processed uint64) func(common.PebbleReaderWriter) error {
+func SetProcessedIndex(jobName string, processed uint64) func(PebbleReaderWriter) error {
 	return update(makePrefix(codeJobConsumerProcessed, jobName), processed)
 }

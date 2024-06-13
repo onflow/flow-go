@@ -10,7 +10,6 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/pebble/common"
 	"github.com/onflow/flow-go/storage/pebble/operation"
 )
 
@@ -70,8 +69,8 @@ func (r *ResultApprovals) byChunk(resultID flow.Identifier, chunkIndex uint64) f
 	}
 }
 
-func (r *ResultApprovals) index(resultID flow.Identifier, chunkIndex uint64, approvalID flow.Identifier) func(common.PebbleReaderWriter) error {
-	return func(rw common.PebbleReaderWriter) error {
+func (r *ResultApprovals) index(resultID flow.Identifier, chunkIndex uint64, approvalID flow.Identifier) func(operation.PebbleReaderWriter) error {
+	return func(rw operation.PebbleReaderWriter) error {
 		// When trying to index an approval for a result, and there is already
 		// an approval for the result, double check if the indexed approval is
 		// the same.
