@@ -62,7 +62,7 @@ contract EVM {
         blockHeight: UInt64,
         // block hash in which transaction was included
         blockHash: String
-        /// captures the data that is returned from
+        /// captures the hex encoded data that is returned from
         /// the evm. For contract deployments
         /// it returns the code deployed to
         /// the address provided in the contractAddress field.
