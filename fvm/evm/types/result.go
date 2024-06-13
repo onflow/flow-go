@@ -39,6 +39,7 @@ type ResultSummary struct {
 	ErrorCode               ErrorCode
 	ErrorMessage            string
 	GasConsumed             uint64
+	GasRefund               uint64
 	DeployedContractAddress *Address
 	ReturnedData            Data
 }
@@ -71,6 +72,8 @@ type Result struct {
 	TxType uint8
 	// total gas consumed during an opeartion
 	GasConsumed uint64
+	// total gas refunds after transaction execution
+	GasRefund uint64
 	// the address where the contract is deployed (if any)
 	DeployedContractAddress *Address
 	// returned data from a function call
@@ -91,6 +94,11 @@ func (res *Result) Invalid() bool {
 // Failed returns true if transaction has been executed but VM has returned some error
 func (res *Result) Failed() bool {
 	return res.VMError != nil
+}
+
+// Successful returns true if transaction has been executed without any errors
+func (res *Result) Successful() bool {
+	return !res.Failed() && !res.Invalid()
 }
 
 // SetValidationError sets the validation error
@@ -142,6 +150,7 @@ func (res *Result) Receipt() *gethTypes.Receipt {
 func (res *Result) ResultSummary() *ResultSummary {
 	rs := &ResultSummary{
 		GasConsumed:             res.GasConsumed,
+		GasRefund:               res.GasRefund,
 		DeployedContractAddress: res.DeployedContractAddress,
 		ReturnedData:            res.ReturnedData,
 		Status:                  StatusSuccessful,
