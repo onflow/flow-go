@@ -10,8 +10,12 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/pebble/common"
 )
+
+type PebbleReaderWriter interface {
+	pebble.Reader
+	pebble.Writer
+}
 
 func insert(key []byte, val interface{}) func(pebble.Writer) error {
 	return func(w pebble.Writer) error {
@@ -93,8 +97,8 @@ type iterationFunc func() (checkFunc, createFunc, handleFunc)
 //   - storage.ErrNotFound if the key does not already exist in the database.
 //   - generic error in case of unexpected failure from the database layer or
 //     encoding failure.
-func update(key []byte, entity interface{}) func(common.PebbleReaderWriter) error {
-	return func(w common.PebbleReaderWriter) error {
+func update(key []byte, entity interface{}) func(PebbleReaderWriter) error {
+	return func(w PebbleReaderWriter) error {
 
 		// retrieve the item from the key-value store
 		_, closer, err := w.Get(key)

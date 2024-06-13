@@ -8,7 +8,6 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/pebble/common"
 	"github.com/onflow/flow-go/storage/pebble/operation"
 )
 
@@ -25,8 +24,8 @@ import (
 //     there are two special cases for (2):
 //     - if the parent block is zero, then we don't need to add this index.
 //     - if the parent block doesn't exist, then we will insert the child index instead of updating
-func IndexNewBlock(blockID flow.Identifier, parentID flow.Identifier) func(common.PebbleReaderWriter) error {
-	return func(rw common.PebbleReaderWriter) error {
+func IndexNewBlock(blockID flow.Identifier, parentID flow.Identifier) func(operation.PebbleReaderWriter) error {
+	return func(rw operation.PebbleReaderWriter) error {
 
 		// Step 1: index the child for the new block.
 		// the new block has no child, so adding an empty child index for it
