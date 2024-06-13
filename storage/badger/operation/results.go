@@ -4,6 +4,7 @@ import (
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/storage"
 )
 
 // InsertExecutionResult inserts an execution result by ID.
@@ -12,7 +13,7 @@ func InsertExecutionResult(result *flow.ExecutionResult) func(*badger.Txn) error
 }
 
 // BatchInsertExecutionResult inserts an execution result by ID.
-func BatchInsertExecutionResult(result *flow.ExecutionResult) func(batch *badger.WriteBatch) error {
+func BatchInsertExecutionResult(result *flow.ExecutionResult) func(batch storage.Transaction) error {
 	return batchWrite(makePrefix(codeExecutionResult, result.ID()), result)
 }
 
@@ -32,7 +33,7 @@ func ReindexExecutionResult(blockID flow.Identifier, resultID flow.Identifier) f
 }
 
 // BatchIndexExecutionResult inserts an execution result ID keyed by block ID into a batch
-func BatchIndexExecutionResult(blockID flow.Identifier, resultID flow.Identifier) func(batch *badger.WriteBatch) error {
+func BatchIndexExecutionResult(blockID flow.Identifier, resultID flow.Identifier) func(batch storage.Transaction) error {
 	return batchWrite(makePrefix(codeIndexExecutionResultByBlock, blockID), resultID)
 }
 
@@ -49,6 +50,6 @@ func RemoveExecutionResultIndex(blockID flow.Identifier) func(*badger.Txn) error
 // BatchRemoveExecutionResultIndex removes blockID-to-resultID index entries keyed by a blockID in a provided batch.
 // No errors are expected during normal operation, even if no entries are matched.
 // If Badger unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
-func BatchRemoveExecutionResultIndex(blockID flow.Identifier) func(*badger.WriteBatch) error {
+func BatchRemoveExecutionResultIndex(blockID flow.Identifier) func(storage.Transaction) error {
 	return batchRemove(makePrefix(codeIndexExecutionResultByBlock, blockID))
 }

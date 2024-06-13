@@ -4,6 +4,7 @@ import (
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/storage"
 )
 
 // InsertExecutionReceiptMeta inserts an execution receipt meta by ID.
@@ -13,7 +14,7 @@ func InsertExecutionReceiptMeta(receiptID flow.Identifier, meta *flow.ExecutionR
 
 // BatchInsertExecutionReceiptMeta inserts an execution receipt meta by ID.
 // TODO: rename to BatchUpdate
-func BatchInsertExecutionReceiptMeta(receiptID flow.Identifier, meta *flow.ExecutionReceiptMeta) func(batch *badger.WriteBatch) error {
+func BatchInsertExecutionReceiptMeta(receiptID flow.Identifier, meta *flow.ExecutionReceiptMeta) func(batch storage.Transaction) error {
 	return batchWrite(makePrefix(codeExecutionReceiptMeta, receiptID), meta)
 }
 
@@ -29,7 +30,7 @@ func IndexOwnExecutionReceipt(blockID flow.Identifier, receiptID flow.Identifier
 
 // BatchIndexOwnExecutionReceipt inserts an execution receipt ID keyed by block ID into a batch
 // TODO: rename to BatchUpdate
-func BatchIndexOwnExecutionReceipt(blockID flow.Identifier, receiptID flow.Identifier) func(batch *badger.WriteBatch) error {
+func BatchIndexOwnExecutionReceipt(blockID flow.Identifier, receiptID flow.Identifier) func(batch storage.Transaction) error {
 	return batchWrite(makePrefix(codeOwnBlockReceipt, blockID), receiptID)
 }
 
@@ -46,7 +47,7 @@ func RemoveOwnExecutionReceipt(blockID flow.Identifier) func(*badger.Txn) error 
 // BatchRemoveOwnExecutionReceipt removes blockID-to-my-receiptID index entries keyed by a blockID in a provided batch.
 // No errors are expected during normal operation, but it may return generic error
 // if badger fails to process request
-func BatchRemoveOwnExecutionReceipt(blockID flow.Identifier) func(batch *badger.WriteBatch) error {
+func BatchRemoveOwnExecutionReceipt(blockID flow.Identifier) func(batch storage.Transaction) error {
 	return batchRemove(makePrefix(codeOwnBlockReceipt, blockID))
 }
 
@@ -57,7 +58,7 @@ func IndexExecutionReceipts(blockID, receiptID flow.Identifier) func(*badger.Txn
 }
 
 // BatchIndexExecutionReceipts inserts an execution receipt ID keyed by block ID and receipt ID into a batch
-func BatchIndexExecutionReceipts(blockID, receiptID flow.Identifier) func(batch *badger.WriteBatch) error {
+func BatchIndexExecutionReceipts(blockID, receiptID flow.Identifier) func(batch storage.Transaction) error {
 	return batchWrite(makePrefix(codeAllBlockReceipts, blockID, receiptID), receiptID)
 }
 

@@ -8,17 +8,18 @@ import (
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/storage"
 )
 
 func InsertTransactionResult(blockID flow.Identifier, transactionResult *flow.TransactionResult) func(*badger.Txn) error {
 	return insert(makePrefix(codeTransactionResult, blockID, transactionResult.TransactionID), transactionResult)
 }
 
-func BatchInsertTransactionResult(blockID flow.Identifier, transactionResult *flow.TransactionResult) func(batch *badger.WriteBatch) error {
+func BatchInsertTransactionResult(blockID flow.Identifier, transactionResult *flow.TransactionResult) func(batch storage.Transaction) error {
 	return batchWrite(makePrefix(codeTransactionResult, blockID, transactionResult.TransactionID), transactionResult)
 }
 
-func BatchIndexTransactionResult(blockID flow.Identifier, txIndex uint32, transactionResult *flow.TransactionResult) func(batch *badger.WriteBatch) error {
+func BatchIndexTransactionResult(blockID flow.Identifier, txIndex uint32, transactionResult *flow.TransactionResult) func(batch storage.Transaction) error {
 	return batchWrite(makePrefix(codeTransactionResultIndex, blockID, txIndex), transactionResult)
 }
 
@@ -68,7 +69,7 @@ func RemoveTransactionResultsByBlockID(blockID flow.Identifier) func(*badger.Txn
 // BatchRemoveTransactionResultsByBlockID removes transaction results for the given blockID in a provided batch.
 // No errors are expected during normal operation, but it may return generic error
 // if badger fails to process request
-func BatchRemoveTransactionResultsByBlockID(blockID flow.Identifier, batch *badger.WriteBatch) func(*badger.Txn) error {
+func BatchRemoveTransactionResultsByBlockID(blockID flow.Identifier, batch storage.Transaction) func(*badger.Txn) error {
 	return func(txn *badger.Txn) error {
 
 		prefix := makePrefix(codeTransactionResult, blockID)
@@ -85,11 +86,11 @@ func InsertLightTransactionResult(blockID flow.Identifier, transactionResult *fl
 	return insert(makePrefix(codeLightTransactionResult, blockID, transactionResult.TransactionID), transactionResult)
 }
 
-func BatchInsertLightTransactionResult(blockID flow.Identifier, transactionResult *flow.LightTransactionResult) func(batch *badger.WriteBatch) error {
+func BatchInsertLightTransactionResult(blockID flow.Identifier, transactionResult *flow.LightTransactionResult) func(batch storage.Transaction) error {
 	return batchWrite(makePrefix(codeLightTransactionResult, blockID, transactionResult.TransactionID), transactionResult)
 }
 
-func BatchIndexLightTransactionResult(blockID flow.Identifier, txIndex uint32, transactionResult *flow.LightTransactionResult) func(batch *badger.WriteBatch) error {
+func BatchIndexLightTransactionResult(blockID flow.Identifier, txIndex uint32, transactionResult *flow.LightTransactionResult) func(batch storage.Transaction) error {
 	return batchWrite(makePrefix(codeLightTransactionResultIndex, blockID, txIndex), transactionResult)
 }
 
