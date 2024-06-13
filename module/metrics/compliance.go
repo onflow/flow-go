@@ -146,7 +146,7 @@ func NewComplianceCollector() *ComplianceCollector {
 			Name:      "epoch_fallback_triggered",
 			Namespace: namespaceConsensus,
 			Subsystem: subsystemCompliance,
-			Help:      "indicates whether epoch emergency fallback is triggered; if >0, the fallback is triggered",
+			Help:      "indicates whether epoch fallback mode is triggered; if >0, the fallback is triggered",
 		}),
 	}
 

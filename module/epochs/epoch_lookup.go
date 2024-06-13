@@ -256,7 +256,7 @@ func (lookup *EpochLookup) EpochForViewWithFallback(view uint64) (uint64, error)
 // routine until the `Component` terminates.
 // When we observe a new epoch being committed, we compute
 // the leader selection and cache static info for the epoch. When we observe
-// epoch emergency fallback being triggered, we inject a fallback epoch.
+// epoch fallback mode being triggered, we inject a fallback epoch.
 func (lookup *EpochLookup) handleProtocolEvents(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
 
@@ -279,7 +279,7 @@ func (lookup *EpochLookup) EpochCommittedPhaseStarted(_ uint64, first *flow.Head
 	lookup.committedEpochsCh <- first
 }
 
-// EpochEmergencyFallbackTriggered passes the protocol event to the worker thread.
+// EpochFallbackModeTriggered passes the protocol event to the worker thread.
 func (lookup *EpochLookup) EpochFallbackModeTriggered() {
 	lookup.epochFallbackIsTriggered.Store(true)
 }
