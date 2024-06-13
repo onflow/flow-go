@@ -23,15 +23,20 @@ type AccountsAtreeLedger struct {
 }
 
 func NewAccountsAtreeLedger(accounts environment.Accounts) *AccountsAtreeLedger {
-	return &AccountsAtreeLedger{Accounts: accounts}
+	return &AccountsAtreeLedger{
+		Accounts: accounts,
+	}
 }
 
 var _ atree.Ledger = &AccountsAtreeLedger{}
 
 func (a *AccountsAtreeLedger) GetValue(owner, key []byte) ([]byte, error) {
+	if common.Address(owner) == common.ZeroAddress {
+		return nil, nil
+	}
+
 	registerID := newRegisterID(owner, key)
-	v, err := a.Accounts.GetValue(
-		registerID)
+	v, err := a.Accounts.GetValue(registerID)
 	if err != nil {
 		return nil, fmt.Errorf("getting value failed: %w", err)
 	}
@@ -203,7 +208,7 @@ var _ atree.Ledger = &PayloadsReadonlyLedger{}
 type PayloadsLedger struct {
 	Payloads map[flow.RegisterID]*ledger.Payload
 
-	AllocateStorageIndexFunc func(owner []byte) (atree.SlabIndex, error)
+	AllocateSlabIndexFunc func(owner []byte) (atree.SlabIndex, error)
 }
 
 var _ atree.Ledger = &PayloadsLedger{}
@@ -237,8 +242,8 @@ func (p *PayloadsLedger) ValueExists(owner, key []byte) (exists bool, err error)
 }
 
 func (p *PayloadsLedger) AllocateSlabIndex(owner []byte) (atree.SlabIndex, error) {
-	if p.AllocateStorageIndexFunc != nil {
-		return p.AllocateStorageIndexFunc(owner)
+	if p.AllocateSlabIndexFunc != nil {
+		return p.AllocateSlabIndexFunc(owner)
 	}
 
 	panic("AllocateSlabIndex not expected to be called")

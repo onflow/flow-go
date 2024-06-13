@@ -41,6 +41,7 @@ var (
 	flagOutputPayloadByAddresses           string
 	flagFixSlabsWithBrokenReferences       bool
 	flagFilterUnreferencedSlabs            bool
+	flagCPUProfile                         string
 )
 
 var Cmd = &cobra.Command{
@@ -130,6 +131,9 @@ func init() {
 
 	Cmd.Flags().BoolVar(&flagFilterUnreferencedSlabs, "filter-unreferenced-slabs", false,
 		"filter unreferenced slabs")
+
+	Cmd.Flags().StringVar(&flagCPUProfile, "cpu-profile", "",
+		"enable CPU profiling")
 }
 
 func run(*cobra.Command, []string) {

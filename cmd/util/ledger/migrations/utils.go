@@ -9,35 +9,31 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/stdlib"
 
+	"github.com/onflow/flow-go/cmd/util/ledger/util/registers"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/model/flow"
 )
 
-func getDomainPayloads(payloads []*ledger.Payload) (map[flow.RegisterID]*ledger.Payload, error) {
-	domains := make(map[flow.RegisterID]*ledger.Payload)
+func getDomainPayloads(accountRegisters *registers.AccountRegisters) map[flow.RegisterID][]byte {
+	domains := make(map[flow.RegisterID][]byte)
 
-	for _, payload := range payloads {
-		registerID, _, err := convert.PayloadToRegister(payload)
-		if err != nil {
-			return nil, fmt.Errorf("failed to convert payload to register: %w", err)
-		}
+	_ = accountRegisters.ForEach(func(owner string, key string, value []byte) error {
+		registerID := flow.RegisterID{Owner: owner, Key: key}
 
 		if registerID.IsInternalState() || registerID.IsSlabIndex() {
-			continue
+			return nil
 		}
 
-		domains[registerID] = payload
-	}
+		domains[registerID] = value
+		return nil
+	})
 
-	return domains, nil
+	return domains
 }
 
-func CheckDomainPayloads(payloads []*ledger.Payload) error {
-	domainPayloads, err := getDomainPayloads(payloads)
-	if err != nil {
-		return err
-	}
+func CheckDomainPayloads(accountRegisters *registers.AccountRegisters) error {
+	domainPayloads := getDomainPayloads(accountRegisters)
 
 	if len(domainPayloads) == 0 {
 		return nil
@@ -47,12 +43,11 @@ func CheckDomainPayloads(payloads []*ledger.Payload) error {
 
 	slabIndexLength := len(atree.SlabIndex{})
 
-	for id, p := range domainPayloads {
+	for id, v := range domainPayloads {
 		if _, exist := allStorageMapDomainsSet[id.Key]; !exist {
 			errs = append(errs, fmt.Errorf("found unexpected domain: %s", id.Key))
 			continue
 		}
-		v := p.Value()
 		if len(v) != slabIndexLength {
 			errs = append(errs, fmt.Errorf("domain payload contains unexpected value: %s %x", id.Key, v))
 		}
@@ -85,8 +80,45 @@ func getSlabIDsFromPayloads(payloads []*ledger.Payload) ([]atree.SlabID, error) 
 	return slabIDs, nil
 }
 
+func getSlabIDsFromRegisters(registers registers.Registers) ([]atree.SlabID, error) {
+	slabIDs := make([]atree.SlabID, 0, registers.Count())
+
+	err := registers.ForEach(func(owner string, key string, value []byte) error {
+		if !flow.IsSlabIndexKey(key) {
+			return nil
+		}
+
+		slabID := atree.NewSlabID(
+			atree.Address([]byte(owner)),
+			atree.SlabIndex([]byte(key[1:])),
+		)
+
+		slabIDs = append(slabIDs, slabID)
+
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return slabIDs, nil
+}
+
 func loadAtreeSlabsInStorge(storage *runtime.Storage, payloads []*ledger.Payload, nWorkers int) error {
 	slabIDs, err := getSlabIDsFromPayloads(payloads)
+	if err != nil {
+		return err
+	}
+
+	return storage.PersistentSlabStorage.BatchPreload(slabIDs, nWorkers)
+}
+
+func loadAtreeSlabsInRegisterStorage(
+	storage *runtime.Storage,
+	registers registers.Registers,
+	nWorkers int,
+) error {
+	slabIDs, err := getSlabIDsFromRegisters(registers)
 	if err != nil {
 		return err
 	}
@@ -97,13 +129,13 @@ func loadAtreeSlabsInStorge(storage *runtime.Storage, payloads []*ledger.Payload
 func checkStorageHealth(
 	address common.Address,
 	storage *runtime.Storage,
-	payloads []*ledger.Payload,
+	registers registers.Registers,
 	nWorkers int,
 	needToPreloadAtreeSlabs bool,
 ) error {
 
 	if needToPreloadAtreeSlabs {
-		err := loadAtreeSlabsInStorge(storage, payloads, nWorkers)
+		err := loadAtreeSlabsInRegisterStorage(storage, registers, nWorkers)
 		if err != nil {
 			return err
 		}
@@ -115,6 +147,8 @@ func checkStorageHealth(
 
 	return storage.CheckHealth()
 }
+
+type RegistersMigration func(registersByAccount *registers.ByAccount) error
 
 var allStorageMapDomains = []string{
 	common.PathDomainStorage.Identifier(),

@@ -8,6 +8,7 @@ import (
 
 	"github.com/onflow/flow-go/cmd/util/ledger/migrations"
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
+	"github.com/onflow/flow-go/cmd/util/ledger/util/registers"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
@@ -28,7 +29,9 @@ func TestAtreeRegisterMigration(t *testing.T) {
 
 			log,
 			"test-data/bootstrapped_v0.31",
-			migrations.CreateAccountBasedMigration(log, 2,
+			migrations.CreateAccountBasedMigration(
+				log,
+				2,
 				[]migrations.AccountBasedMigration{
 					migrations.NewAtreeRegisterMigrator(
 						reporters.NewReportFileWriterFactory(dir, log),
@@ -96,7 +99,7 @@ func TestAtreeRegisterMigration(t *testing.T) {
 func testWithExistingState(
 	log zerolog.Logger,
 	inputDir string,
-	migration ledger.Migration,
+	migration migrations.RegistersMigration,
 	f func(
 		t *testing.T,
 		oldPayloads []*ledger.Payload,
@@ -134,7 +137,17 @@ func testWithExistingState(
 				return payloads, nil
 			},
 
-			migration,
+			func(payloads []*ledger.Payload) ([]*ledger.Payload, error) {
+				registersByAccount, err := registers.NewByAccountFromPayloads(payloads)
+				if err != nil {
+					return nil, err
+				}
+				err = migration(registersByAccount)
+				if err != nil {
+					return nil, err
+				}
+				return registersByAccount.Payloads(), nil
+			},
 
 			func(newPayloads []*ledger.Payload) ([]*ledger.Payload, error) {
 
