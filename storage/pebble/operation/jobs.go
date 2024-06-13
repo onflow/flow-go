@@ -14,8 +14,8 @@ func InitJobLatestIndex(queue string, index uint64) func(pebble.Writer) error {
 	return insert(makePrefix(codeJobQueuePointer, queue), index)
 }
 
-func SetJobLatestIndex(queue string, index uint64) func(PebbleReaderWriter) error {
-	return update(makePrefix(codeJobQueuePointer, queue), index)
+func SetJobLatestIndex(queue string, index uint64) func(pebble.Writer) error {
+	return insert(makePrefix(codeJobQueuePointer, queue), index)
 }
 
 // RetrieveJobAtIndex returns the entity at the given index
