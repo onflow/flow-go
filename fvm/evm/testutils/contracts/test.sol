@@ -7,6 +7,8 @@ contract Storage {
     address constant public cadenceArch = 0x0000000000000000000000010000000000000001;
     event NewStore(address indexed caller, uint256 indexed value);
 
+    error MyCustomError(uint value, string message);
+
     uint256 number;
 
     constructor() payable {
@@ -52,6 +54,14 @@ contract Storage {
 
     function destroy() public {
         selfdestruct(payable(msg.sender));
+    }
+
+    function assertError() public pure{
+        require(false, "Assert Error Message");
+    }
+
+    function customError() public pure{
+       revert MyCustomError(5, "Value is too low");
     }
 
     function verifyArchCallToRandomSource(uint64 height) public view returns (uint64) {
