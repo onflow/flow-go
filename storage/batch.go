@@ -1,15 +1,14 @@
 package storage
 
-import "github.com/dgraph-io/badger/v2"
-
 type Transaction interface {
 	Set(key, val []byte) error
+	Delete(key []byte) error
 }
 
 // BatchStorage serves as an abstraction over batch storage, adding ability to add ability to add extra
 // callbacks which fire after the batch is successfully flushed.
 type BatchStorage interface {
-	GetWriter() *badger.WriteBatch
+	GetWriter() Transaction
 
 	// OnSucceed adds a callback to execute after the batch has
 	// been successfully flushed.
