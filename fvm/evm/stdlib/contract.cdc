@@ -68,7 +68,7 @@ contract EVM {
         /// the address provided in the contractAddress field.
         /// in case of revert, the smart contract custom error message
         /// is also returned here (see EIP-140 for more details).
-        returnedData: 
+        returnedData: [UInt8]
     )
 
     access(all)
