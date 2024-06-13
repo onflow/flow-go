@@ -691,7 +691,7 @@ func (exeNode *ExecutionNode) LoadExecutionDataGetter(node *NodeConfig) error {
 	return nil
 }
 
-func openChunkDataPackDB(dbPath string, logger zerolog.Logger) (*badgerDB.DB, error) {
+func OpenChunkDataPackDB(dbPath string, logger zerolog.Logger) (*badgerDB.DB, error) {
 	log := sutil.NewLogger(logger)
 
 	opts := badgerDB.
@@ -722,17 +722,21 @@ func (exeNode *ExecutionNode) LoadExecutionState(
 	error,
 ) {
 
-	chunkDataPackDB, err := openChunkDataPackDB(exeNode.exeConf.chunkDataPackDir, node.Logger)
+	chunkDataPackDB, err := storagepebble.OpenDefaultPebbleDB(exeNode.exeConf.chunkDataPackDir)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not open chunk data pack database: %w", err)
 	}
+
 	exeNode.builder.ShutdownFunc(func() error {
 		if err := chunkDataPackDB.Close(); err != nil {
 			return fmt.Errorf("error closing chunk data pack database: %w", err)
 		}
 		return nil
 	})
-	chunkDataPacks := storage.NewChunkDataPacks(node.Metrics.Cache, chunkDataPackDB, node.Storage.Collections, exeNode.exeConf.chunkDataPackCacheSize)
+	// chunkDataPacks := storage.NewChunkDataPacks(node.Metrics.Cache,
+	// chunkDataPackDB, node.Storage.Collections, exeNode.exeConf.chunkDataPackCacheSize)
+	chunkDataPacks := storagepebble.NewChunkDataPacks(node.Metrics.Cache,
+		chunkDataPackDB, node.Storage.Collections, exeNode.exeConf.chunkDataPackCacheSize)
 
 	// Needed for gRPC server, make sure to assign to main scoped vars
 	exeNode.events = storage.NewEvents(node.Metrics.Cache, node.DB)

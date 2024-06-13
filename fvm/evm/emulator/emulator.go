@@ -234,7 +234,17 @@ func (bl *BlockView) DryRunTransaction(
 	msg.SkipAccountChecks = true
 
 	// return without commiting the state
-	return proc.run(msg, tx.Hash(), 0, tx.Type())
+	txResult, err := proc.run(msg, tx.Hash(), 0, tx.Type())
+	if txResult.Successful() {
+		// Adding `gethParams.SstoreSentryGasEIP2200` is needed for this condition:
+		// https://github.com/onflow/go-ethereum/blob/master/core/vm/operations_acl.go#L29-L32
+		txResult.GasConsumed += gethParams.SstoreSentryGasEIP2200
+		// Take into account any gas refunds, which are calculated only after
+		// transaction execution.
+		txResult.GasConsumed += txResult.GasRefund
+	}
+
+	return txResult, err
 }
 
 func (bl *BlockView) newProcedure() (*procedure, error) {
@@ -407,7 +417,7 @@ func (proc *procedure) deployAt(
 		tracer.CaptureStart(proc.evm, caller.ToCommon(), to.ToCommon(), true, data, gasLimit, value)
 
 		defer func() {
-			tracer.CaptureEnd(res.ReturnedValue, res.GasConsumed, res.VMError)
+			tracer.CaptureEnd(res.ReturnedData, res.GasConsumed, res.VMError)
 		}()
 	}
 
@@ -522,10 +532,13 @@ func (proc *procedure) run(
 	// if prechecks are passed, the exec result won't be nil
 	if execResult != nil {
 		res.GasConsumed = execResult.UsedGas
+		res.GasRefund = proc.state.GetRefund()
 		res.Index = uint16(txIndex)
+		// we need to capture the returned value no matter the status
+		// if the tx is reverted the error message is returned as returned value
+		res.ReturnedData = execResult.ReturnData
 
 		if !execResult.Failed() { // collect vm errors
-			res.ReturnedValue = execResult.ReturnData
 			// If the transaction created a contract, store the creation address in the receipt,
 			if msg.To == nil {
 				deployedAddress := types.NewAddress(gethCrypto.CreateAddress(msg.From, msg.Nonce))

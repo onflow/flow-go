@@ -1290,7 +1290,7 @@ func NewResultValue(
 		},
 		{
 			Name:  "data",
-			Value: interpreter.ByteSliceToByteArrayValue(inter, result.ReturnedValue),
+			Value: interpreter.ByteSliceToByteArrayValue(inter, result.ReturnedData),
 		},
 		{
 			Name:  "deployedContract",
@@ -2372,7 +2372,7 @@ func ResultSummaryFromEVMResultValue(val cadence.Value) (*types.ResultSummary, e
 		ErrorCode:               types.ErrorCode(errorCode),
 		ErrorMessage:            string(errorMsg),
 		GasConsumed:             uint64(gasUsed),
-		ReturnedValue:           convertedData,
+		ReturnedData:            convertedData,
 		DeployedContractAddress: convertedDeployedAddress,
 	}, nil
 
