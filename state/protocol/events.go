@@ -90,4 +90,15 @@ type Consumer interface {
 	// no further epoch phase transitions will occur, and no further epoch-related
 	// related protocol events (the events defined in this interface) will be emitted.
 	EpochEmergencyFallbackTriggered()
+
+	// EpochExtended is called when an extension is added to the current Epoch after epoch fallback mode is triggered. This callback is called
+	// with the information of the Epoch extension. This callback is not informationally idempotent. It may be called multiple
+	// times for the same epoch but with different epoch extension data. Consumers of this callback must handle repeated calls for the same epoch
+	// and appropriately process different epoch extension data.
+	EpochExtended(extension flow.EpochExtension)
+
+	// EpochRecovered is called after an EpochRecover service event is processed. This event is called with all the
+	// relevant epoch metadata of the recovery epoch. The recovery epoch may also need to be  adjusted itself in some scenarios.
+	// Thus, consumers of this callback must handle repeated calls that may contain different recovery epoch metadata.
+	EpochRecovered(nextEpochFinalView uint64)
 }

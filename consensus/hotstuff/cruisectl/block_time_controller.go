@@ -531,6 +531,18 @@ func (ctl *BlockTimeController) EpochEmergencyFallbackTriggered() {
 	ctl.epochFallbacks <- struct{}{}
 }
 
+// EpochExtended handles the epoch extended protocol event.
+func (ctl *BlockTimeController) EpochExtended(extension flow.EpochExtension) {
+	ctl.curEpochFinalView = extension.FinalView
+	ctl.curEpochTargetEndTime = extension.TargetEndTime
+	ctl.nextEpochFinalView = nil
+}
+
+// EpochRecovered handles the epoch recovered protocol event.
+func (ctl *BlockTimeController) EpochRecovered(nextEpochFinalView uint64) {
+	ctl.nextEpochFinalView = &nextEpochFinalView
+}
+
 // time2unix converts a time.Time to UNIX time represented as a uint64.
 // Returned timestamp is precise to within one second of input.
 func time2unix(t time.Time) uint64 {
