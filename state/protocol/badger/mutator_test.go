@@ -2047,6 +2047,8 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 
 			// Epoch recovery results in entering Committed phase
 			metricsMock.On("CurrentEpochPhase", flow.EpochPhaseCommitted).Once()
+			metricsMock.On("EpochFallbackModeExited").Once()
+			protoEventsMock.On("EpochFallbackModeExited").Once()
 			protoEventsMock.On("EpochCommittedPhaseStarted", mock.Anything, mock.Anything).Once()
 			// finalize the block sealing the EpochRecover event
 			err = state.Finalize(context.Background(), block5.ID())
@@ -2152,6 +2154,8 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 
 			// Epoch recovery results in entering Committed phase
 			metricsMock.On("CurrentEpochPhase", flow.EpochPhaseCommitted).Once()
+			metricsMock.On("EpochFallbackModeExited").Once()
+			protoEventsMock.On("EpochFallbackModeExited").Once()
 			protoEventsMock.On("EpochCommittedPhaseStarted", mock.Anything, mock.Anything).Once()
 			// finalize the block sealing the EpochRecover event
 			err = state.Finalize(context.Background(), block7.ID())
@@ -2363,6 +2367,8 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 
 			// Epoch recovery causes us to enter the Committed phase
 			metricsMock.On("CurrentEpochPhase", flow.EpochPhaseCommitted).Once()
+			metricsMock.On("EpochFallbackModeExited").Once()
+			protoEventsMock.On("EpochFallbackModeExited").Once()
 			protoEventsMock.On("EpochCommittedPhaseStarted", epochRecover.EpochSetup.Counter-1, mock.Anything).Once()
 			// finalize the block sealing the EpochRecover event
 			err = state.Finalize(context.Background(), block12.ID())

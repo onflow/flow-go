@@ -835,9 +835,8 @@ func (m *FollowerState) epochMetricsAndEventsOnBlockFinalized(parentEpochState, 
 	}
 	if parentEpochState.EpochFallbackTriggered() && !finalizedEpochState.EpochFallbackTriggered() {
 		// this block exits EFM
-		// TODO
-		//events = append(events, m.consumer.EpochFallbackModeExited)
-		//metrics = append(metrics, m.metrics.EpochFallbackModeExited)
+		events = append(events, m.consumer.EpochFallbackModeExited)
+		metrics = append(metrics, m.metrics.EpochFallbackModeExited)
 	}
 
 	// Check for a new epoch extension
