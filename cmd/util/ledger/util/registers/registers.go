@@ -263,6 +263,17 @@ func (a *AccountRegisters) insertPayloads(payloads []*ledger.Payload) {
 	}
 }
 
+func (a *AccountRegisters) Merge(other *AccountRegisters) error {
+	for key, value := range other.registers {
+		_, ok := a.registers[key]
+		if ok {
+			return fmt.Errorf("key already exists: %s", key)
+		}
+		a.registers[key] = value
+	}
+	return nil
+}
+
 func NewAccountRegistersFromPayloads(owner string, payloads []*ledger.Payload) (*AccountRegisters, error) {
 	accountRegisters := NewAccountRegisters(owner)
 

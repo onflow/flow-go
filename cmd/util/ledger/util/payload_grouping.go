@@ -13,13 +13,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// encodedKeyAddressPrefixLength is the length of the address prefix in the encoded key
-// 2 for uint16 of number of key parts
-// 4 for uint32 of the length of the first key part
-// 2 for uint16 of the key part type
-// 8 for the address which is the actual length of the first key part
-const encodedKeyAddressPrefixLength = 2 + 4 + 2 + flow.AddressLength
-
 // minSizeForSplitSortingIntoGoroutines below this size, no need to split
 // the sorting into goroutines
 const minSizeForSplitSortingIntoGoroutines = 100_000
@@ -135,11 +128,17 @@ func (s sortablePayloads) Less(i, j int) bool {
 }
 
 func (s sortablePayloads) Compare(i, j int) int {
-	// sort descending to force one of the big accounts to be more at the beginning
-	return bytes.Compare(
-		s[j].EncodedKey()[:encodedKeyAddressPrefixLength],
-		s[i].EncodedKey()[:encodedKeyAddressPrefixLength],
-	)
+	a, err := s[i].Address()
+	if err != nil {
+		panic(err)
+	}
+
+	b, err := s[j].Address()
+	if err != nil {
+		panic(err)
+	}
+
+	return bytes.Compare(a[:], b[:])
 }
 
 func (s sortablePayloads) Swap(i, j int) {
