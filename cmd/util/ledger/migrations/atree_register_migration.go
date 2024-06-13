@@ -10,6 +10,7 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/atree"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
@@ -89,6 +90,13 @@ func (m *AtreeRegisterMigrator) MigrateAccount(
 	address common.Address,
 	accountRegisters *registers.AccountRegisters,
 ) error {
+
+	err := CheckDomainPayloads(accountRegisters)
+	if err != nil {
+		// Log domain payload error for now
+		m.log.Warn().Msgf("unexpected domain payloads: %s", err.Error())
+	}
+
 	// create all the runtime components we need for the migration
 	mr, err := NewAtreeRegisterMigratorRuntime(address, accountRegisters)
 	if err != nil {
@@ -235,6 +243,24 @@ func (m *AtreeRegisterMigrator) convertStorageDomain(
 	if storageMap == nil {
 		// no storage for this domain
 		return nil
+	}
+
+	if storageMap.Count() == 0 {
+		// Migrate empty storage map by resetting storage map type
+		// so underlying slab can be stored and re-encoded (migrated).
+
+		storageMapID := storageMap.SlabID()
+
+		orderedMap, err := atree.NewMapWithRootID(
+			mr.Storage.PersistentSlabStorage,
+			storageMapID,
+			atree.NewDefaultDigesterBuilder(),
+		)
+		if err != nil {
+			return err
+		}
+
+		return orderedMap.SetType(orderedMap.Type())
 	}
 
 	iterator := storageMap.Iterator(nil)
