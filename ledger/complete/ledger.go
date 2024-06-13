@@ -324,6 +324,11 @@ func (l *Ledger) Tries() ([]*trie.MTrie, error) {
 	return l.forest.GetTries()
 }
 
+// Trie returns the trie stored in the forest
+func (l *Ledger) Trie(rootHash ledger.RootHash) (*trie.MTrie, error) {
+	return l.forest.GetTrie(rootHash)
+}
+
 // Checkpointer returns a checkpointer instance
 func (l *Ledger) Checkpointer() (*realWAL.Checkpointer, error) {
 	checkpointer, err := l.wal.NewCheckpointer()

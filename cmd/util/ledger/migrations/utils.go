@@ -1,6 +1,7 @@
 package migrations
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/onflow/atree"
@@ -13,6 +14,47 @@ import (
 	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/model/flow"
 )
+
+func getDomainPayloads(accountRegisters *registers.AccountRegisters) map[flow.RegisterID][]byte {
+	domains := make(map[flow.RegisterID][]byte)
+
+	_ = accountRegisters.ForEach(func(owner string, key string, value []byte) error {
+		registerID := flow.RegisterID{Owner: owner, Key: key}
+
+		if registerID.IsInternalState() || registerID.IsSlabIndex() {
+			return nil
+		}
+
+		domains[registerID] = value
+		return nil
+	})
+
+	return domains
+}
+
+func CheckDomainPayloads(accountRegisters *registers.AccountRegisters) error {
+	domainPayloads := getDomainPayloads(accountRegisters)
+
+	if len(domainPayloads) == 0 {
+		return nil
+	}
+
+	var errs []error
+
+	slabIndexLength := len(atree.SlabIndex{})
+
+	for id, v := range domainPayloads {
+		if _, exist := allStorageMapDomainsSet[id.Key]; !exist {
+			errs = append(errs, fmt.Errorf("found unexpected domain: %s", id.Key))
+			continue
+		}
+		if len(v) != slabIndexLength {
+			errs = append(errs, fmt.Errorf("domain payload contains unexpected value: %s %x", id.Key, v))
+		}
+	}
+
+	return errors.Join(errs...)
+}
 
 func getSlabIDsFromPayloads(payloads []*ledger.Payload) ([]atree.SlabID, error) {
 	slabIDs := make([]atree.SlabID, 0, len(payloads))
@@ -115,6 +157,8 @@ var allStorageMapDomains = []string{
 	runtime.StorageDomainContract,
 	stdlib.InboxStorageDomain,
 	stdlib.CapabilityControllerStorageDomain,
+	stdlib.PathCapabilityStorageDomain,
+	stdlib.AccountCapabilityStorageDomain,
 }
 
 var allStorageMapDomainsSet = map[string]struct{}{}
