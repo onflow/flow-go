@@ -4,6 +4,8 @@ import (
 	"sync"
 
 	"github.com/dgraph-io/badger/v2"
+
+	"github.com/onflow/flow-go/storage"
 )
 
 type BatchBuilder interface {
@@ -25,7 +27,7 @@ func NewBatch(db BatchBuilder) *Batch {
 	}
 }
 
-func (b *Batch) GetWriter() *badger.WriteBatch {
+func (b *Batch) GetWriter() storage.Transaction {
 	return b.writer
 }
 
