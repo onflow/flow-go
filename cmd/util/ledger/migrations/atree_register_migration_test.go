@@ -146,7 +146,8 @@ func testWithExistingState(
 				if err != nil {
 					return nil, err
 				}
-				return registersByAccount.Payloads(), nil
+				nWorkers := 2
+				return registersByAccount.DestructIntoPayloads(nWorkers), nil
 			},
 
 			func(newPayloads []*ledger.Payload) ([]*ledger.Payload, error) {
