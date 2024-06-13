@@ -135,7 +135,7 @@ func (h *ContractHandler) Run(rlpEncodedTx []byte, coinbase types.Address) *type
 // All transactions provided in the batch are included in a single block,
 // except for invalid transactions
 func (h *ContractHandler) BatchRun(rlpEncodedTxs [][]byte, coinbase types.Address) []*types.ResultSummary {
-	span := h.backend.StartChildSpan(trace.FVMEVMRun)
+	span := h.backend.StartChildSpan(trace.FVMEVMBatchRun)
 	span.SetAttributes(attribute.Int("tx_counts", len(rlpEncodedTxs)))
 	defer span.End()
 
@@ -351,7 +351,7 @@ func (h *ContractHandler) DryRun(
 	rlpEncodedTx []byte,
 	from types.Address,
 ) *types.ResultSummary {
-	defer h.backend.StartChildSpan(trace.FVMEVMRun).End()
+	defer h.backend.StartChildSpan(trace.FVMEVMDryRun).End()
 
 	res, err := h.dryRun(rlpEncodedTx, from)
 	panicOnError(err)

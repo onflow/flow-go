@@ -509,13 +509,23 @@ type TestTracer struct {
 
 var _ environment.Tracer = &TestTracer{}
 
-func (t *TestTracer) StartChildSpan(
+func (tt *TestTracer) StartChildSpan(
 	name trace.SpanName,
 	options ...otelTrace.SpanStartOption,
 ) tracing.TracerSpan {
 	// if not set we use noop tracer
-	if t.StartChildSpanFunc == nil {
+	if tt.StartChildSpanFunc == nil {
 		return tracing.NewMockTracerSpan()
 	}
-	return t.StartChildSpanFunc(name, options...)
+	return tt.StartChildSpanFunc(name, options...)
+}
+
+func (tt *TestTracer) ExpectedSpan(t *testing.T, expected trace.SpanName) {
+	tt.StartChildSpanFunc = func(
+		sn trace.SpanName,
+		sso ...otelTrace.SpanStartOption,
+	) tracing.TracerSpan {
+		require.Equal(t, expected, sn)
+		return tracing.NewMockTracerSpan()
+	}
 }

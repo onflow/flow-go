@@ -196,6 +196,7 @@ const (
 
 	FVMEVMDeployCOA SpanName = "fvm.evm.deployCOA"
 	FVMEVMRun       SpanName = "fvm.evm.run"
+	FVMEVMDryRun    SpanName = "fvm.evm.dryRun"
 	FVMEVMBatchRun  SpanName = "fvm.evm.batchRun"
 	FVMEVMDeposit   SpanName = "fvm.evm.deposit"
 	FVMEVMWithdraw  SpanName = "fvm.evm.withdraw"
