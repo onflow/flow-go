@@ -62,6 +62,13 @@ contract EVM {
         blockHeight: UInt64,
         // block hash in which transaction was included
         blockHash: String
+        /// captures the data that is returned from
+        /// the evm. For contract deployments
+        /// it returns the code deployed to
+        /// the address provided in the contractAddress field.
+        /// in case of revert, the smart contract custom error message
+        /// is also returned here (see EIP-140 for more details).
+        returnedData: 
     )
 
     access(all)
