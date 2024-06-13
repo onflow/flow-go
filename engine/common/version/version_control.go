@@ -140,7 +140,9 @@ func (v *VersionControl) checkInitialVersionBeacon(
 			}
 
 			// version boundaries are sorted by version
-			for _, boundary := range vb.VersionBoundaries {
+			for i := len(vb.VersionBoundaries) - 1; i >= 0; i-- {
+				boundary := vb.VersionBoundaries[i]
+
 				ver, err := boundary.Semver()
 				if err != nil || ver == nil {
 					// this should never happen as we already validated the version beacon
@@ -153,22 +155,21 @@ func (v *VersionControl) checkInitialVersionBeacon(
 				}
 
 				compResult := ver.Compare(*v.nodeVersion)
+				processedHeight = boundary.BlockHeight - 1
 
-				if compResult < 0 && v.startHeight == NoHeight {
+				if compResult < 0 {
 					v.startHeight = boundary.BlockHeight + 1
 					v.log.Info().
 						Uint64("startHeight", v.startHeight).
 						Msg("Found start block height")
+					// This is the lowest compatible height for this node version, stop search immediately
+					return
 				} else if compResult > 0 {
 					v.endHeight = boundary.BlockHeight - 1
 					v.log.Info().
 						Uint64("endHeight", v.endHeight).
 						Msg("Found end block height")
 				}
-			}
-
-			if len(vb.VersionBoundaries) > 0 {
-				processedHeight = vb.VersionBoundaries[0].BlockHeight - 1
 			}
 
 			// The search should continue only if we do not found start height and do not search below finalized root block height
@@ -236,8 +237,6 @@ func (v *VersionControl) processEvents(
 	ready component.ReadyFunc,
 ) {
 	ready()
-
-	// TODO: Height tracking mechanism
 
 	for {
 		select {
