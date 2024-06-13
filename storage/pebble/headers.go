@@ -143,17 +143,17 @@ func (h *Headers) FindHeaders(filter func(header *flow.Header) bool) ([]flow.Hea
 
 // RollbackExecutedBlock update the executed block header to the given header.
 // only useful for execution node to roll back executed block height
+// not concurrent safe
 func (h *Headers) RollbackExecutedBlock(header *flow.Header) error {
 	var blockID flow.Identifier
 
-	batch := h.db.NewBatch()
-	err := operation.RetrieveExecutedBlock(&blockID)(batch)
+	err := operation.RetrieveExecutedBlock(&blockID)(h.db)
 	if err != nil {
 		return fmt.Errorf("cannot lookup executed block: %w", err)
 	}
 
 	var highest flow.Header
-	err = operation.RetrieveHeader(blockID, &highest)(batch)
+	err = operation.RetrieveHeader(blockID, &highest)(h.db)
 	if err != nil {
 		return fmt.Errorf("cannot retrieve executed header: %w", err)
 	}
@@ -165,14 +165,9 @@ func (h *Headers) RollbackExecutedBlock(header *flow.Header) error {
 		)
 	}
 
-	err = operation.UpdateExecutedBlock(header.ID())(batch)
+	err = operation.UpdateExecutedBlock(header.ID())(h.db)
 	if err != nil {
 		return fmt.Errorf("cannot update highest executed block: %w", err)
-	}
-
-	err = batch.Commit(nil)
-	if err != nil {
-		return fmt.Errorf("cannot save updating highest executed block: %w", err)
 	}
 
 	return nil
