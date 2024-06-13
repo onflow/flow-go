@@ -19,7 +19,7 @@ func insert(key []byte, val interface{}) func(pebble.Writer) error {
 			return irrecoverable.NewExceptionf("failed to encode value: %w", err)
 		}
 
-		err = w.Set(key, value, nil)
+		err = w.Set(key, value, pebble.Sync)
 		if err != nil {
 			return irrecoverable.NewExceptionf("failed to store data: %w", err)
 		}
@@ -36,7 +36,7 @@ func retrieve(key []byte, sc interface{}) func(r pebble.Reader) error {
 		}
 		defer closer.Close()
 
-		err = msgpack.Unmarshal(val, &sc)
+		err = msgpack.Unmarshal(val, sc)
 		if err != nil {
 			return irrecoverable.NewExceptionf("failed to decode value: %w", err)
 		}
