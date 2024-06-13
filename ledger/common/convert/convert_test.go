@@ -36,7 +36,7 @@ func TestLedgerKeyToRegisterID(t *testing.T) {
 	address, err := p.Address()
 
 	require.NoError(t, err)
-	require.Equal(t, registerID.Owner, convert.AddressToRegisterOwner(address))
+	require.Equal(t, registerID.Owner, flow.AddressToRegisterOwner(address))
 	require.Equal(t, registerID.Owner, string(address[:]))
 }
 
@@ -64,7 +64,7 @@ func TestLedgerKeyToRegisterID_Global(t *testing.T) {
 	address, err := p.Address()
 
 	require.NoError(t, err)
-	require.Equal(t, registerID.Owner, convert.AddressToRegisterOwner(address))
+	require.Equal(t, registerID.Owner, flow.AddressToRegisterOwner(address))
 	require.NotEqual(t, registerID.Owner, string(address[:]))
 }
 
