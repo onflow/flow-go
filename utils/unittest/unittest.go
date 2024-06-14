@@ -314,7 +314,7 @@ func TempDir(t testing.TB) string {
 func RunWithTempDir(t testing.TB, f func(string)) {
 	dbDir := TempDir(t)
 	defer func() {
-		// require.NoError(t, os.RemoveAll(dbDir))
+		require.NoError(t, os.RemoveAll(dbDir))
 	}()
 	f(dbDir)
 }

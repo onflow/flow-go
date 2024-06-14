@@ -52,7 +52,7 @@ func CheckFolder(folderPath string) (isPebbleFolder, isBadgerFolder, isEmpty boo
 			hasBadgerManifest = true
 		case fileName == "CURRENT":
 			hasCurrent = true
-		case file.Name() == "KEYREGISTRY":
+		case fileName == "KEYREGISTRY":
 			hasKeyRegistery = true
 		case strings.HasSuffix(fileName, ".log"):
 			hasLog = true

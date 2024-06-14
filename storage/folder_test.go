@@ -38,7 +38,6 @@ func TestCheckFolderIsBadger(t *testing.T) {
 
 func TestCheckFolderIsPebble(t *testing.T) {
 	unittest.RunWithTempDir(t, func(dir string) {
-		fmt.Println("dir", dir)
 		db, err := pebble.OpenDefaultPebbleDB(dir)
 		require.NoError(t, err)
 		require.NoError(t, db.Close())
