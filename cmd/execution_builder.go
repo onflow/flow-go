@@ -736,6 +736,10 @@ func (exeNode *ExecutionNode) LoadExecutionState(
 		return nil, fmt.Errorf("chunk data pack directory is not a badger or pebble database: %s", exeNode.exeConf.chunkDataPackDir)
 	}
 
+	if isPebble && isBadger {
+		return nil, fmt.Errorf("chunk data pack directory is both a badger and pebble database: %s", exeNode.exeConf.chunkDataPackDir)
+	}
+
 	var closer io.Closer
 	var chunkDataPacks storageerr.ChunkDataPacks
 	node.Logger.Info().
