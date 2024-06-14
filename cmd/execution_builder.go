@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path"
 	"path/filepath"
@@ -692,6 +693,30 @@ func OpenChunkDataPackDB(dbPath string, logger zerolog.Logger) (*badgerDB.DB, er
 	return db, nil
 }
 
+func openChunkDataPackDB(dbPath string, logger zerolog.Logger) (*badgerDB.DB, error) {
+	log := sutil.NewLogger(logger)
+
+	opts := badgerDB.
+		DefaultOptions(dbPath).
+		WithKeepL0InMemory(true).
+		WithLogger(log).
+
+		// the ValueLogFileSize option specifies how big the value of a
+		// key-value pair is allowed to be saved into badger.
+		// exceeding this limit, will fail with an error like this:
+		// could not store data: Value with size <xxxx> exceeded 1073741824 limit
+		// Maximum value size is 10G, needed by execution node
+		// TODO: finding a better max value for each node type
+		WithValueLogFileSize(256 << 23).
+		WithValueLogMaxEntries(100000) // Default is 1000000
+
+	db, err := badgerDB.Open(opts)
+	if err != nil {
+		return nil, fmt.Errorf("could not open chunk data pack badger db at path %v: %w", dbPath, err)
+	}
+	return db, nil
+}
+
 func (exeNode *ExecutionNode) LoadExecutionState(
 	node *NodeConfig,
 ) (
@@ -699,19 +724,51 @@ func (exeNode *ExecutionNode) LoadExecutionState(
 	error,
 ) {
 
-	chunkDataPackDB, err := storagepebble.OpenDefaultPebbleDB(exeNode.exeConf.chunkDataPackDir)
+	// in order to be backward-compatible, we check whether the folder
+	// has been used by either badger or pebble database,
+	// and initialize the database accordingly.
+	isPebble, isBadger, isEmpty, err := storageerr.CheckFolder(exeNode.exeConf.chunkDataPackDir)
 	if err != nil {
-		return nil, fmt.Errorf("could not open chunk data pack database: %w", err)
+		return nil, fmt.Errorf("could not check chunk data pack directory: %w", err)
+	}
+
+	if !isPebble && !isBadger && !isEmpty {
+		return nil, fmt.Errorf("chunk data pack directory is not a badger or pebble database: %s", exeNode.exeConf.chunkDataPackDir)
+	}
+
+	var closer io.Closer
+	var chunkDataPacks storageerr.ChunkDataPacks
+	node.Logger.Info().
+		Bool("is_pebble", isPebble).
+		Bool("is_badger", isBadger).
+		Bool("is_empty", isEmpty).
+		Str("chunk_data_pack_dir", exeNode.exeConf.chunkDataPackDir).
+		Msgf("opening chunk data pack database")
+
+	if isBadger {
+		chunkDataPackDB, err := openChunkDataPackDB(exeNode.exeConf.chunkDataPackDir, node.Logger)
+		if err != nil {
+			return nil, fmt.Errorf("could not open badger-based chunk data pack database: %w", err)
+		}
+		closer = chunkDataPackDB
+		chunkDataPacks = storage.NewChunkDataPacks(node.Metrics.Cache, chunkDataPackDB, node.Storage.Collections, exeNode.exeConf.chunkDataPackCacheSize)
+	} else {
+		// either isPebble or isEmpty then use pebble
+
+		chunkDataPackDB, err := storagepebble.OpenDefaultPebbleDB(exeNode.exeConf.chunkDataPackDir)
+		if err != nil {
+			return nil, fmt.Errorf("could not open pebble-based chunk data pack database: %w", err)
+		}
+		closer = chunkDataPackDB
+		chunkDataPacks = storagepebble.NewChunkDataPacks(node.Metrics.Cache, chunkDataPackDB, node.Storage.Collections, exeNode.exeConf.chunkDataPackCacheSize)
 	}
 
 	exeNode.builder.ShutdownFunc(func() error {
-		if err := chunkDataPackDB.Close(); err != nil {
+		if err := closer.Close(); err != nil {
 			return fmt.Errorf("error closing chunk data pack database: %w", err)
 		}
 		return nil
 	})
-	// chunkDataPacks := storage.NewChunkDataPacks(node.Metrics.Cache, chunkDataPackDB, node.Storage.Collections, exeNode.exeConf.chunkDataPackCacheSize)
-	chunkDataPacks := storagepebble.NewChunkDataPacks(node.Metrics.Cache, chunkDataPackDB, node.Storage.Collections, exeNode.exeConf.chunkDataPackCacheSize)
 
 	// Needed for gRPC server, make sure to assign to main scoped vars
 	exeNode.events = storage.NewEvents(node.Metrics.Cache, node.DB)
