@@ -20,14 +20,14 @@ type Headers struct {
 
 func NewHeaders(collector module.CacheMetrics, db *pebble.DB) *Headers {
 
-	store := func(blockID flow.Identifier, header *flow.Header) func(pebble.Writer) error {
-		return operation.InsertHeader(blockID, header)
+	store := func(blockID flow.Identifier, header *flow.Header) func(operation.PebbleReaderWriter) error {
+		return operation.OnlyWrite(operation.InsertHeader(blockID, header))
 	}
 
 	// CAUTION: should only be used to index FINALIZED blocks by their
 	// respective height
-	storeHeight := func(height uint64, id flow.Identifier) func(pebble.Writer) error {
-		return operation.IndexBlockHeight(height, id)
+	storeHeight := func(height uint64, id flow.Identifier) func(operation.PebbleReaderWriter) error {
+		return operation.OnlyWrite(operation.IndexBlockHeight(height, id))
 	}
 
 	retrieve := func(blockID flow.Identifier) func(pebble.Reader) (*flow.Header, error) {
@@ -62,7 +62,7 @@ func NewHeaders(collector module.CacheMetrics, db *pebble.DB) *Headers {
 	return h
 }
 
-func (h *Headers) storeTx(header *flow.Header) func(pebble.Writer) error {
+func (h *Headers) storeTx(header *flow.Header) func(operation.PebbleReaderWriter) error {
 	return h.cache.PutTx(header.ID(), header)
 }
 

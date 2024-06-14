@@ -17,6 +17,41 @@ type PebbleReaderWriter interface {
 	pebble.Writer
 }
 
+func OnlyWrite(write func(pebble.Writer) error) func(PebbleReaderWriter) error {
+	return func(rw PebbleReaderWriter) error {
+		return write(rw)
+	}
+}
+
+// insertNew requires the key does not exist
+// Error returns: storage.ErrAlreadyExists
+func insertNew(key []byte, val interface{}) func(PebbleReaderWriter) error {
+	return func(rw PebbleReaderWriter) error {
+		_, closer, err := rw.Get(key)
+		if err == nil {
+			defer closer.Close()
+			return storage.ErrAlreadyExists
+		}
+
+		if !errors.Is(err, pebble.ErrNotFound) {
+			return irrecoverable.NewExceptionf("could not check key: %w", err)
+		}
+		defer closer.Close()
+
+		value, err := msgpack.Marshal(val)
+		if err != nil {
+			return irrecoverable.NewExceptionf("failed to encode value: %w", err)
+		}
+
+		err = rw.Set(key, value, pebble.Sync)
+		if err != nil {
+			return irrecoverable.NewExceptionf("failed to store data: %w", err)
+		}
+
+		return nil
+	}
+}
+
 func insert(key []byte, val interface{}) func(pebble.Writer) error {
 	return func(w pebble.Writer) error {
 		value, err := msgpack.Marshal(val)
