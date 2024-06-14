@@ -1363,7 +1363,7 @@ func (fnb *FlowNodeBuilder) initState() error {
 			return fmt.Errorf("could not bootstrap protocol state: %w", err)
 		}
 
-		// set root snapshot fields, it depends on the database, 
+		// set root snapshot fields, it depends on the database,
 		// so requires that the database has been initialized.
 		if err := fnb.setRootSnapshot(rootSnapshot); err != nil {
 			return err
