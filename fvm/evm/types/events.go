@@ -92,13 +92,13 @@ func (p *transactionEvent) ToCadence(location common.Location) (cadence.Event, e
 			cadence.NewField("type", cadence.UInt8Type),
 			cadence.NewField("payload", cadence.StringType),
 			cadence.NewField("errorCode", cadence.UInt16Type),
+			cadence.NewField("errorMessage", cadence.StringType),
 			cadence.NewField("gasConsumed", cadence.UInt64Type),
 			cadence.NewField("contractAddress", cadence.StringType),
 			cadence.NewField("logs", cadence.StringType),
 			cadence.NewField("blockHeight", cadence.UInt64Type),
 			// todo we can remove hash and just reference block by height (evm-gateway dependency)
 			cadence.NewField("blockHash", cadence.StringType),
-			cadence.NewField("errorMessage", cadence.StringType),
 			cadence.NewField("returnedData", cadence.StringType),
 		},
 		nil,
@@ -110,12 +110,12 @@ func (p *transactionEvent) ToCadence(location common.Location) (cadence.Event, e
 		cadence.NewUInt8(p.Result.TxType),
 		cadence.String(hex.EncodeToString(p.Payload)),
 		cadence.NewUInt16(uint16(p.Result.ResultSummary().ErrorCode)),
+		cadence.String(errorMsg),
 		cadence.NewUInt64(p.Result.GasConsumed),
 		deployedAddress,
 		cadence.String(hex.EncodeToString(encodedLogs)),
 		cadence.NewUInt64(p.BlockHeight),
 		cadence.String(p.BlockHash.String()),
-		cadence.String(errorMsg),
 		cadence.String(hex.EncodeToString(p.Result.ReturnedData)),
 	}).WithType(eventType), nil
 }
