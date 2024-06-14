@@ -573,12 +573,12 @@ func (suite *Suite) TestStopQcVoting() {
 	// start up the engine
 	suite.StartEngine()
 
-	require.Equal(suite.T(), 1, len(suite.engine.inProgressQCVotes))
+	require.NotNil(suite.T(), suite.engine.inProgressQCVote.Load(), "expected qc vote to be in progress")
 
 	// simulate processing efm triggered event, this should cancel all in progress voting
 	suite.engine.EpochEmergencyFallbackTriggered()
 
 	unittest.AssertClosesBefore(suite.T(), done, 3*time.Second)
 
-	require.Equal(suite.T(), 0, len(suite.engine.inProgressQCVotes))
+	require.Nil(suite.T(), suite.engine.inProgressQCVote.Load(), "expected qc vote to be cancelled")
 }

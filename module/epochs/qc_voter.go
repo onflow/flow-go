@@ -170,7 +170,7 @@ func (voter *RootQCVoter) Vote(ctx context.Context, epoch protocol.Epoch) error 
 		return nil
 	}
 	err = retry.Do(ctx, backoff, castVote)
-	if network.IsTransientError(err) || errors.Is(err, errTransactionReverted) || errors.Is(err, errTransactionReverted) {
+	if network.IsTransientError(err) || errors.Is(err, errTransactionReverted) || errors.Is(err, errTransactionReverted) || errors.Is(err, context.Canceled) {
 		return NewClusterQCNoVoteErrorf("exceeded retry limit without successfully submitting our vote: %w", err)
 	}
 	return err
