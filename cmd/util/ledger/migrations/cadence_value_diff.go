@@ -3,8 +3,10 @@ package migrations
 import (
 	"fmt"
 
+	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
@@ -72,6 +74,8 @@ type difference struct {
 	NewValueStaticType string `json:",omitempty"`
 }
 
+const minLargeAccountRegisterCount = 1_000
+
 type CadenceValueDiffReporter struct {
 	address        common.Address
 	chainID        flow.ChainID
@@ -96,62 +100,19 @@ func NewCadenceValueDiffReporter(
 	}
 }
 
-func (dr *CadenceValueDiffReporter) newStorageRuntime(
-	registers registers.Registers,
-) (
-	*InterpreterMigrationRuntime,
-	error,
-) {
-	// TODO: maybe make read-only again
-	runtimeInterface, err := NewInterpreterMigrationRuntime(
-		registers,
-		dr.chainID,
-		InterpreterMigrationRuntimeConfig{},
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	return runtimeInterface, nil
-}
-
 func (dr *CadenceValueDiffReporter) DiffStates(oldRegs, newRegs registers.Registers, domains []string) {
 
-	// Create all the runtime components we need for comparing Cadence values.
-	oldRuntime, err := dr.newStorageRuntime(oldRegs)
-	if err != nil {
-		dr.reportWriter.Write(
-			diffError{
-				Address: dr.address.Hex(),
-				Kind:    diffErrorKindString[abortErrorKind],
-				Msg:     fmt.Sprintf("failed to create runtime for old registers: %s", err),
-			})
-		return
-	}
+	oldStorage := newReadonlyStorage(oldRegs)
 
-	newRuntime, err := dr.newStorageRuntime(newRegs)
-	if err != nil {
-		dr.reportWriter.Write(
-			diffError{
-				Address: dr.address.Hex(),
-				Kind:    diffErrorKindString[abortErrorKind],
-				Msg:     fmt.Sprintf("failed to create runtime with new registers: %s", err),
-			})
-		return
-	}
+	newStorage := newReadonlyStorage(newRegs)
 
-	err = loadAtreeSlabsInStorage(oldRuntime.Storage, oldRegs, dr.nWorkers)
-	if err != nil {
-		dr.reportWriter.Write(
-			diffError{
-				Address: dr.address.Hex(),
-				Kind:    diffErrorKindString[abortErrorKind],
-				Msg:     fmt.Sprintf("failed to preload old atree registers: %s", err),
-			})
-		return
-	}
+	var loadAtreeStorageGroup errgroup.Group
 
-	err = loadAtreeSlabsInStorage(newRuntime.Storage, newRegs, dr.nWorkers)
+	loadAtreeStorageGroup.Go(func() (err error) {
+		return loadAtreeSlabsInStorage(oldStorage, oldRegs, dr.nWorkers)
+	})
+
+	err := loadAtreeSlabsInStorage(newStorage, newRegs, dr.nWorkers)
 	if err != nil {
 		dr.reportWriter.Write(
 			diffError{
@@ -162,15 +123,107 @@ func (dr *CadenceValueDiffReporter) DiffStates(oldRegs, newRegs registers.Regist
 		return
 	}
 
-	// Iterate through all domains and compare cadence values.
+	// Wait for old registers to be loaded in storage.
+	if err := loadAtreeStorageGroup.Wait(); err != nil {
+		dr.reportWriter.Write(
+			diffError{
+				Address: dr.address.Hex(),
+				Kind:    diffErrorKindString[abortErrorKind],
+				Msg:     fmt.Sprintf("failed to preload old atree registers: %s", err),
+			})
+		return
+	}
+
+	if oldRegs.Count() > minLargeAccountRegisterCount {
+		// Add concurrency to diff domains
+		var g errgroup.Group
+
+		// NOTE: preload storage map in the same goroutine
+		for _, domain := range domains {
+			_ = oldStorage.GetStorageMap(dr.address, domain, false)
+			_ = newStorage.GetStorageMap(dr.address, domain, false)
+		}
+
+		// Create goroutine to diff storage domain
+		g.Go(func() (err error) {
+			oldRuntime, err := newReadonlyStorageRuntimeWithStorage(oldStorage, oldRegs.Count())
+			if err != nil {
+				return fmt.Errorf("failed to create runtime for old registers: %s", err)
+			}
+
+			newRuntime, err := newReadonlyStorageRuntimeWithStorage(newStorage, newRegs.Count())
+			if err != nil {
+				return fmt.Errorf("failed to create runtime for new registers: %s", err)
+			}
+
+			dr.diffStorageDomain(oldRuntime, newRuntime, common.PathDomainStorage.Identifier())
+			return nil
+		})
+
+		// Create goroutine to diff other domains
+		g.Go(func() (err error) {
+			oldRuntime, err := newReadonlyStorageRuntimeWithStorage(oldStorage, oldRegs.Count())
+			if err != nil {
+				return fmt.Errorf("failed to create runtime for old registers: %s", err)
+			}
+
+			newRuntime, err := newReadonlyStorageRuntimeWithStorage(newStorage, oldRegs.Count())
+			if err != nil {
+				return fmt.Errorf("failed to create runtime for new registers: %s", err)
+			}
+
+			for _, domain := range domains {
+				if domain != common.PathDomainStorage.Identifier() {
+					dr.diffStorageDomain(oldRuntime, newRuntime, domain)
+				}
+			}
+			return nil
+		})
+
+		err = g.Wait()
+		if err != nil {
+			dr.reportWriter.Write(
+				diffError{
+					Address: dr.address.Hex(),
+					Kind:    diffErrorKindString[abortErrorKind],
+					Msg:     err.Error(),
+				})
+		}
+
+		return
+	}
+
+	// Skip goroutine overhead for smaller accounts
+	oldRuntime, err := newReadonlyStorageRuntimeWithStorage(oldStorage, oldRegs.Count())
+	if err != nil {
+		dr.reportWriter.Write(
+			diffError{
+				Address: dr.address.Hex(),
+				Kind:    diffErrorKindString[abortErrorKind],
+				Msg:     fmt.Sprintf("failed to create runtime for old registers: %s", err),
+			})
+		return
+	}
+
+	newRuntime, err := newReadonlyStorageRuntimeWithStorage(newStorage, newRegs.Count())
+	if err != nil {
+		dr.reportWriter.Write(
+			diffError{
+				Address: dr.address.Hex(),
+				Kind:    diffErrorKindString[abortErrorKind],
+				Msg:     fmt.Sprintf("failed to create runtime with new registers: %s", err),
+			})
+		return
+	}
+
 	for _, domain := range domains {
 		dr.diffStorageDomain(oldRuntime, newRuntime, domain)
 	}
 }
 
 func (dr *CadenceValueDiffReporter) diffStorageDomain(
-	oldRuntime *InterpreterMigrationRuntime,
-	newRuntime *InterpreterMigrationRuntime,
+	oldRuntime *readonlyStorageRuntime,
+	newRuntime *readonlyStorageRuntime,
 	domain string,
 ) {
 	defer func() {
@@ -965,4 +1018,34 @@ func min(a, b int) int {
 		return a
 	}
 	return b
+}
+
+func newReadonlyStorage(regs registers.Registers) *runtime.Storage {
+	ledger := &registers.ReadOnlyLedger{Registers: regs}
+	return runtime.NewStorage(ledger, nil)
+}
+
+type readonlyStorageRuntime struct {
+	Interpreter  *interpreter.Interpreter
+	Storage      *runtime.Storage
+	PayloadCount int
+}
+
+func newReadonlyStorageRuntimeWithStorage(storage *runtime.Storage, payloadCount int) (*readonlyStorageRuntime, error) {
+	inter, err := interpreter.NewInterpreter(
+		nil,
+		nil,
+		&interpreter.Config{
+			Storage: storage,
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return &readonlyStorageRuntime{
+		Interpreter:  inter,
+		Storage:      storage,
+		PayloadCount: payloadCount,
+	}, nil
 }
