@@ -492,7 +492,9 @@ type ComplianceMetrics interface {
 	CurrentDKGPhase1FinalView(view uint64)
 	CurrentDKGPhase2FinalView(view uint64)
 	CurrentDKGPhase3FinalView(view uint64)
+	// EpochFallbackModeTriggered reports that EFM is triggered.
 	EpochFallbackModeTriggered()
+	// EpochFallbackModeExited reports that EFM is no longer triggered.
 	EpochFallbackModeExited()
 }
 

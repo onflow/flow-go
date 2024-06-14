@@ -87,8 +87,11 @@ type Consumer interface {
 	// EpochFallbackModeTriggered is called when epoch fallback mode [EFM] is triggered.
 	// EFM is triggered when an invalid or unexpected epoch-related service event is observed,
 	// or an expected service event is not observed before the epoch commitment deadline.
-	// After EFM is triggered, we remain in the current epoch until an EpochRecover
-	// event is observed, after which regular epoch transitions begins again.
+	// After EFM is triggered, we do not transition into any not-yet-committed epoch until
+	// an EpochRecover event is observed, after which regular epoch transitions begins again.
+	// Usually, this means we remain in the current epoch until EFM is exited.
+	// If EFM was triggered within the EpochCommitted phase, then we complete the transition
+	// to the next, already-committed epoch, then remain in that epoch until EFM is exited.
 	// NOTE: Only called once the block triggering EFM is finalized.
 	EpochFallbackModeTriggered()
 
