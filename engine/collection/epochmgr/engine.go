@@ -323,7 +323,7 @@ func (e *Engine) EpochSetupPhaseStarted(_ uint64, first *flow.Header) {
 }
 
 // EpochEmergencyFallbackTriggered handles the epoch emergency fallback triggered protocol event.
-// If epoch emeregency fallback is triggered root QC voting must be stopped.
+// If epoch emergency fallback is triggered, root QC voting must be stopped.
 func (e *Engine) EpochEmergencyFallbackTriggered() {
 	e.stopInProgressQcVote()
 }
