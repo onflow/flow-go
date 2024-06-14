@@ -7,7 +7,7 @@ import (
 	"github.com/rs/zerolog"
 	"go.uber.org/atomic"
 
-	"github.com/onflow/flow-go/engine/access/ingestion/version"
+	"github.com/onflow/flow-go/engine/common/version"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/execution"
 	"github.com/onflow/flow-go/module/state_synchronization"
@@ -90,10 +90,13 @@ func (s *ScriptExecutor) ExecuteAtBlockHeight(ctx context.Context, script []byte
 		return nil, err
 	}
 
-	if !s.versionControl.CompatibleAtBlock(height) {
-		//TODO: Add an error
-		return nil, fmt.Errorf("")
+	compatible, err := s.versionControl.CompatibleAtBlock(height)
+	if err != nil {
+		return nil, err
+	}
 
+	if !compatible {
+		return nil, fmt.Errorf("node version is incompatible at block height %d", height)
 	}
 
 	return s.scriptExecutor.ExecuteAtBlockHeight(ctx, script, arguments, height)
