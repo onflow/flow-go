@@ -17,12 +17,6 @@ type PebbleReaderWriter interface {
 	pebble.Writer
 }
 
-func OnlyWrite(write func(pebble.Writer) error) func(PebbleReaderWriter) error {
-	return func(rw PebbleReaderWriter) error {
-		return write(rw)
-	}
-}
-
 // insertNew requires the key does not exist
 // Error returns: storage.ErrAlreadyExists
 func insertNew(key []byte, val interface{}) func(PebbleReaderWriter) error {
