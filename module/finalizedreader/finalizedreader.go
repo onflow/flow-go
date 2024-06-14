@@ -5,10 +5,9 @@ import (
 
 	"go.uber.org/atomic"
 
-	"github.com/onflow/flow-go/state/protocol/events"
-
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/state/protocol/events"
 	"github.com/onflow/flow-go/storage"
 )
 
