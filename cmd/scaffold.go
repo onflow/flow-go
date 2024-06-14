@@ -1337,10 +1337,6 @@ func (fnb *FlowNodeBuilder) initState() error {
 				return fmt.Errorf("failed validate root snapshot from disk: %w", err)
 			}
 		}
-		// set root snapshot fields
-		if err := fnb.setRootSnapshot(rootSnapshot); err != nil {
-			return err
-		}
 
 		// generate bootstrap config options as per NodeConfig
 		var options []badgerState.BootstrapConfigOptions
@@ -1360,11 +1356,17 @@ func (fnb *FlowNodeBuilder) initState() error {
 			fnb.Storage.EpochCommits,
 			fnb.Storage.Statuses,
 			fnb.Storage.VersionBeacons,
-			fnb.RootSnapshot,
+			rootSnapshot,
 			options...,
 		)
 		if err != nil {
 			return fmt.Errorf("could not bootstrap protocol state: %w", err)
+		}
+
+		// set root snapshot fields, it depends on the database,
+		// so requires that the database has been initialized.
+		if err := fnb.setRootSnapshot(rootSnapshot); err != nil {
+			return err
 		}
 
 		fnb.Logger.Info().
@@ -1426,13 +1428,20 @@ func (fnb *FlowNodeBuilder) setRootSnapshot(rootSnapshot protocol.Snapshot) erro
 		return fmt.Errorf("failed to read root sealed result: %w", err)
 	}
 
-	sealingSegment, err := fnb.RootSnapshot.SealingSegment()
+	rootHeader, err := fnb.RootSnapshot.Head()
 	if err != nil {
-		return fmt.Errorf("failed to read root sealing segment: %w", err)
+		return fmt.Errorf("could not read root header: %w", err)
+	}
+	rootBlockID := rootHeader.ID()
+	fnb.FinalizedRootBlock, err = fnb.Storage.Blocks.ByID(rootBlockID)
+	if err != nil {
+		return fmt.Errorf("could not read finalized root block (id=%x): %w", rootBlockID, err)
+	}
+	fnb.SealedRootBlock, err = fnb.Storage.Blocks.ByID(fnb.RootSeal.BlockID)
+	if err != nil {
+		return fmt.Errorf("could not read sealed root block (id=%x): %w", fnb.RootSeal.BlockID, err)
 	}
 
-	fnb.FinalizedRootBlock = sealingSegment.Highest()
-	fnb.SealedRootBlock = sealingSegment.Sealed()
 	fnb.RootQC, err = fnb.RootSnapshot.QuorumCertificate()
 	if err != nil {
 		return fmt.Errorf("failed to read root QC: %w", err)
