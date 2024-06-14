@@ -15,6 +15,9 @@ type ChunkDataPacks interface {
 	// No errors are expected during normal operation, but it may return generic error
 	Remove(cs []flow.Identifier) error
 
+	// BatchStore inserts the chunk header, keyed by chunk ID into a given batch
+	BatchStore(c *flow.ChunkDataPack, batch BatchStorage) error
+
 	// ByChunkID returns the chunk data for the given a chunk ID.
 	ByChunkID(chunkID flow.Identifier) (*flow.ChunkDataPack, error)
 
