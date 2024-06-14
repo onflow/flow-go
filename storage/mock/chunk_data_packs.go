@@ -28,20 +28,6 @@ func (_m *ChunkDataPacks) BatchRemove(chunkID flow.Identifier, batch storage.Bat
 	return r0
 }
 
-// BatchStore provides a mock function with given fields: c, batch
-func (_m *ChunkDataPacks) BatchStore(c *flow.ChunkDataPack, batch storage.BatchStorage) error {
-	ret := _m.Called(c, batch)
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(*flow.ChunkDataPack, storage.BatchStorage) error); ok {
-		r0 = rf(c, batch)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
 // ByChunkID provides a mock function with given fields: chunkID
 func (_m *ChunkDataPacks) ByChunkID(chunkID flow.Identifier) (*flow.ChunkDataPack, error) {
 	ret := _m.Called(chunkID)
