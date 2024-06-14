@@ -78,12 +78,12 @@ type resultCollector struct {
 	spockSignatures []crypto.Signature
 
 	blockStartTime time.Time
-	blockStats     module.ExecutionResultStats
+	blockStats     module.BlockExecutionResultStats
 	blockMeter     *meter.Meter
 
 	currentCollectionStartTime       time.Time
 	currentCollectionState           *state.ExecutionState
-	currentCollectionStats           module.ExecutionResultStats
+	currentCollectionStats           module.CollectionExecutionResultStats
 	currentCollectionStorageSnapshot execution.ExtendableStorageSnapshot
 }
 
@@ -123,9 +123,7 @@ func newResultCollector(
 		blockMeter:                   meter.NewMeter(meter.DefaultParameters()),
 		currentCollectionStartTime:   now,
 		currentCollectionState:       state.NewExecutionState(nil, state.DefaultParameters()),
-		currentCollectionStats: module.ExecutionResultStats{
-			NumberOfCollections: 1,
-		},
+		currentCollectionStats:       module.CollectionExecutionResultStats{},
 		currentCollectionStorageSnapshot: storehouse.NewExecutingBlockSnapshot(
 			previousBlockSnapshot,
 			*block.StartState,
@@ -201,27 +199,16 @@ func (collector *resultCollector) commitCollection(
 
 	collector.spockSignatures = append(collector.spockSignatures, spock)
 
-	collector.currentCollectionStats.EventCounts = len(events)
-	collector.currentCollectionStats.EventSize = events.ByteSize()
-	collector.currentCollectionStats.NumberOfRegistersTouched = len(
-		collectionExecutionSnapshot.AllRegisterIDs())
-	for _, entry := range collectionExecutionSnapshot.UpdatedRegisters() {
-		collector.currentCollectionStats.NumberOfBytesWrittenToRegisters += len(
-			entry.Value)
-	}
-
 	collector.metrics.ExecutionCollectionExecuted(
 		time.Since(startTime),
 		collector.currentCollectionStats)
 
-	collector.blockStats.Merge(collector.currentCollectionStats)
+	collector.blockStats.Add(collector.currentCollectionStats)
 	collector.blockMeter.MergeMeter(collectionExecutionSnapshot.Meter)
 
 	collector.currentCollectionStartTime = time.Now()
 	collector.currentCollectionState = state.NewExecutionState(nil, state.DefaultParameters())
-	collector.currentCollectionStats = module.ExecutionResultStats{
-		NumberOfCollections: 1,
-	}
+	collector.currentCollectionStats = module.CollectionExecutionResultStats{}
 
 	for _, consumer := range collector.consumers {
 		err = consumer.OnExecutedCollection(collector.result.CollectionExecutionResultAt(collection.collectionIndex))
@@ -269,14 +256,12 @@ func (collector *resultCollector) processTransactionResult(
 		logger.Info().Msg("transaction executed successfully")
 	}
 
-	collector.metrics.ExecutionTransactionExecuted(
+	collector.handleTransactionExecutionMetrics(
 		timeSpent,
+		output,
+		txnExecutionSnapshot,
+		txn,
 		numConflictRetries,
-		output.ComputationUsed,
-		output.MemoryEstimate,
-		len(output.Events),
-		flow.EventsList(output.Events).ByteSize(),
-		output.Err != nil,
 	)
 
 	txnResult := flow.TransactionResult{
@@ -302,10 +287,6 @@ func (collector *resultCollector) processTransactionResult(
 		return fmt.Errorf("failed to merge into collection view: %w", err)
 	}
 
-	collector.currentCollectionStats.ComputationUsed += output.ComputationUsed
-	collector.currentCollectionStats.MemoryUsed += output.MemoryEstimate
-	collector.currentCollectionStats.NumberOfTransactions += 1
-
 	if !txn.lastTransactionInCollection {
 		return nil
 	}
@@ -314,6 +295,38 @@ func (collector *resultCollector) processTransactionResult(
 		txn.collectionInfo,
 		collector.currentCollectionStartTime,
 		collector.currentCollectionState.Finalize())
+}
+
+func (collector *resultCollector) handleTransactionExecutionMetrics(
+	timeSpent time.Duration,
+	output fvm.ProcedureOutput,
+	txnExecutionSnapshot *snapshot.ExecutionSnapshot,
+	txn TransactionRequest,
+	numConflictRetries int,
+) {
+	transactionExecutionStats := module.TransactionExecutionResultStats{
+		ExecutionResultStats: module.ExecutionResultStats{
+			ComputationUsed:          output.ComputationUsed,
+			MemoryUsed:               output.MemoryEstimate,
+			EventCounts:              len(output.Events),
+			EventSize:                output.Events.ByteSize(),
+			NumberOfRegistersTouched: len(txnExecutionSnapshot.AllRegisterIDs()),
+		},
+		ComputationIntensities:     output.ComputationIntensities,
+		NumberOfTxnConflictRetries: numConflictRetries,
+		Failed:                     output.Err != nil,
+		SystemTransaction:          txn.isSystemTransaction,
+	}
+	for _, entry := range txnExecutionSnapshot.UpdatedRegisters() {
+		transactionExecutionStats.NumberOfBytesWrittenToRegisters += len(entry.Value)
+	}
+
+	collector.metrics.ExecutionTransactionExecuted(
+		timeSpent,
+		transactionExecutionStats,
+	)
+
+	collector.currentCollectionStats.Add(transactionExecutionStats)
 }
 
 func (collector *resultCollector) AddTransactionResult(

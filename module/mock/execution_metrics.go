@@ -37,7 +37,7 @@ func (_m *ExecutionMetrics) ExecutionBlockDataUploadStarted() {
 }
 
 // ExecutionBlockExecuted provides a mock function with given fields: dur, stats
-func (_m *ExecutionMetrics) ExecutionBlockExecuted(dur time.Duration, stats module.ExecutionResultStats) {
+func (_m *ExecutionMetrics) ExecutionBlockExecuted(dur time.Duration, stats module.BlockExecutionResultStats) {
 	_m.Called(dur, stats)
 }
 
@@ -57,7 +57,7 @@ func (_m *ExecutionMetrics) ExecutionChunkDataPackGenerated(proofSize int, numbe
 }
 
 // ExecutionCollectionExecuted provides a mock function with given fields: dur, stats
-func (_m *ExecutionMetrics) ExecutionCollectionExecuted(dur time.Duration, stats module.ExecutionResultStats) {
+func (_m *ExecutionMetrics) ExecutionCollectionExecuted(dur time.Duration, stats module.CollectionExecutionResultStats) {
 	_m.Called(dur, stats)
 }
 
@@ -106,9 +106,9 @@ func (_m *ExecutionMetrics) ExecutionSync(syncing bool) {
 	_m.Called(syncing)
 }
 
-// ExecutionTransactionExecuted provides a mock function with given fields: dur, numTxnConflictRetries, compUsed, memoryUsed, eventCounts, eventSize, failed
-func (_m *ExecutionMetrics) ExecutionTransactionExecuted(dur time.Duration, numTxnConflictRetries int, compUsed uint64, memoryUsed uint64, eventCounts int, eventSize int, failed bool) {
-	_m.Called(dur, numTxnConflictRetries, compUsed, memoryUsed, eventCounts, eventSize, failed)
+// ExecutionTransactionExecuted provides a mock function with given fields: dur, stats
+func (_m *ExecutionMetrics) ExecutionTransactionExecuted(dur time.Duration, stats module.TransactionExecutionResultStats) {
+	_m.Called(dur, stats)
 }
 
 // FinishBlockReceivedToExecuted provides a mock function with given fields: blockID

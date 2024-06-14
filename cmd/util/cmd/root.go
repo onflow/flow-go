@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/onflow/flow-go/cmd/util/cmd/addresses"
+	"github.com/onflow/flow-go/cmd/util/cmd/atree_inlined_status"
 	bootstrap_execution_state_payloads "github.com/onflow/flow-go/cmd/util/cmd/bootstrap-execution-state-payloads"
 	checkpoint_collect_stats "github.com/onflow/flow-go/cmd/util/cmd/checkpoint-collect-stats"
 	checkpoint_list_tries "github.com/onflow/flow-go/cmd/util/cmd/checkpoint-list-tries"
@@ -108,6 +109,7 @@ func addCommands() {
 	rootCmd.AddCommand(extractpayloads.Cmd)
 	rootCmd.AddCommand(find_inconsistent_result.Cmd)
 	rootCmd.AddCommand(diff_states.Cmd)
+	rootCmd.AddCommand(atree_inlined_status.Cmd)
 }
 
 func initConfig() {
