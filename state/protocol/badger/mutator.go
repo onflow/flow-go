@@ -887,7 +887,7 @@ func (m *FollowerState) epochMetricsAndEventsOnBlockFinalized(parentEpochState, 
 		return
 	}
 
-	// TODO(6092) efm-recovery: need to decide how an EpochFallback phase would like like to re-enable below sanity check
+	// TODO(EFM, #6092): need to decide how an EpochFallback phase would like like to re-enable below sanity check
 	return
 	//return nil, nil, fmt.Errorf("sanity check failed: invalid subsequent [epoch-phase] [%d-%s]->[%d-%s]",
 	//	parentEpochCounter, parentEpochPhase, childEpochCounter, childEpochPhase)
