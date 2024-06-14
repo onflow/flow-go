@@ -71,7 +71,7 @@ func addGenerateRecoverEpochTxArgsCmdFlags() error {
 	generateRecoverEpochTxArgsCmd.Flags().StringVar(&flagOut, "out", "", "file to write tx args output")
 	generateRecoverEpochTxArgsCmd.Flags().StringVar(&flagAnAddress, "access-address", "", "the address of the access node used for client connections")
 	generateRecoverEpochTxArgsCmd.Flags().StringVar(&flagAnPubkey, "access-network-key", "", "the network key of the access node used for client connections in hex string format")
-	generateRecoverEpochTxArgsCmd.Flags().BoolVar(&flagAnInsecure, "insecure", true, "set to true if the protocol snapshot should be retrieved from the secure AN endpoint")
+	generateRecoverEpochTxArgsCmd.Flags().BoolVar(&flagAnInsecure, "insecure", true, "set to true if the protocol snapshot should be retrieved from the insecure AN endpoint")
 	generateRecoverEpochTxArgsCmd.Flags().IntVar(&flagCollectionClusters, "collection-clusters", 0,
 		"number of collection clusters")
 	// required parameters for network configuration and generation of root node identities
@@ -82,7 +82,6 @@ func addGenerateRecoverEpochTxArgsCmdFlags() error {
 	generateRecoverEpochTxArgsCmd.Flags().Uint64Var(&flagNumViewsInEpoch, "epoch-length", 0, "length of each epoch measured in views")
 	generateRecoverEpochTxArgsCmd.Flags().Uint64Var(&flagNumViewsInStakingAuction, "epoch-staking-phase-length", 0, "length of the epoch staking phase measured in views")
 	generateRecoverEpochTxArgsCmd.Flags().Uint64Var(&flagEpochCounter, "epoch-counter", 0, "the epoch counter used to generate the root cluster block")
-	generateRecoverEpochTxArgsCmd.Flags().StringVar(&flagRandomSource, "random-source", "", "the random source for the epoch")
 	generateRecoverEpochTxArgsCmd.Flags().Uint64Var(&flagTargetDuration, "target-duration", 0, "the target duration of the epoch")
 	generateRecoverEpochTxArgsCmd.Flags().Uint64Var(&flagTargetEndTime, "target-end-time", 0, "the target end time for the epoch")
 
@@ -105,10 +104,6 @@ func addGenerateRecoverEpochTxArgsCmdFlags() error {
 	err = generateRecoverEpochTxArgsCmd.MarkFlagRequired("collection-clusters")
 	if err != nil {
 		return fmt.Errorf("failed to mark collection-clusters flag as required")
-	}
-	err = generateRecoverEpochTxArgsCmd.MarkFlagRequired("random-source")
-	if err != nil {
-		return fmt.Errorf("failed to mark random-source flag as required")
 	}
 	err = generateRecoverEpochTxArgsCmd.MarkFlagRequired("target-duration")
 	if err != nil {

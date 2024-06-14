@@ -33,10 +33,7 @@ func (s *RecoverEpochSuite) TestRecoverEpoch() {
 	_ = s.GetContainersByRole(flow.RoleExecution)[0].Pause()
 
 	// get the latest snapshot and start new container with it
-	rootSnapshot, err := s.Client.GetLatestProtocolSnapshot(s.Ctx)
-	require.NoError(s.T(), err)
-
-	epoch1FinalView, err := rootSnapshot.Epochs().Current().FinalView()
+	epoch1FinalView, err := s.Net.BootstrapSnapshot.Epochs().Current().FinalView()
 	require.NoError(s.T(), err)
 
 	// wait for at least the first block of the next epoch to be sealed before we pause our container to replace

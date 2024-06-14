@@ -169,8 +169,8 @@ func (s *BaseSuite) GetContainersByRole(role flow.Role) []*testnet.Container {
 // transition must have happened.
 func (s *BaseSuite) AwaitFinalizedView(ctx context.Context, view uint64, waitFor, tick time.Duration) {
 	require.Eventually(s.T(), func() bool {
-		sealed := s.getLatestFinalizedHeader(ctx)
-		return sealed.View >= view
+		finalized := s.getLatestFinalizedHeader(ctx)
+		return finalized.View >= view
 	}, waitFor, tick)
 }
 
