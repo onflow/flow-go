@@ -25,9 +25,18 @@ var (
 	flagOutputDir         string
 )
 
+// find trie root hash from the wal files.
+// useful for state extraction and rolling back executed height.
+// for instance, when extracting state for a target height, it requires the wal files
+// has the trie root hash of the target block as the latest few records. If not the case,
+// then it is necessary to trim the wal files to the last record with the target trie root hash.
+// in order to do that, this command can be used to find the trie root hash in the wal files,
+// and copy the wal that contains the trie root hash to a new directory and trim it to
+// have the target trie root hash as the last record.
+// after that, the new wal file can be used to extract the state for the target height.
 var Cmd = &cobra.Command{
 	Use:   "find-trie-root",
-	Short: "find trie root",
+	Short: "find trie root hash from the wal files",
 	Run:   run,
 }
 
