@@ -547,7 +547,7 @@ func (e *Engine) activeClusterIDs() (flow.ChainIDList, error) {
 }
 
 // EpochExtended handles the epoch extended protocol event.
-func (e *Engine) EpochExtended(extension flow.EpochExtension) {}
+func (e *Engine) EpochExtended(*flow.EpochExtension) {}
 
 // EpochRecovered handles the epoch recovered protocol event.
-func (e *Engine) EpochRecovered(nextEpochFinalView uint64) {}
+func (e *Engine) EpochRecovered(uint64) {}

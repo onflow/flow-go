@@ -711,6 +711,62 @@ func (bs *BlockTimeControllerSuite) Test_vs_PythonSimulation() {
 	}
 }
 
+// TestOnEpochExtended ensures that the epoch configuration is updated when EpochExtended events are processed..
+func (bs *BlockTimeControllerSuite) TestOnEpochExtended() {
+	nextEpoch := mockprotocol.NewEpoch(bs.T())
+	nextEpoch.On("Counter").Return(bs.epochCounter+1, nil)
+	nextEpoch.On("FinalView").Return(bs.curEpochFinalView*2, nil)
+	nextEpoch.On("TargetDuration").Return(bs.EpochDurationSeconds(), nil)
+	nextEpoch.On("TargetEndTime").Return(bs.curEpochTargetEndTime+bs.EpochDurationSeconds(), nil)
+	bs.epochs.Add(nextEpoch)
+	bs.CreateAndStartController()
+	defer bs.StopController()
+
+	expectedExtension := &flow.EpochExtension{
+		FirstView:     bs.curEpochFinalView + 1,
+		FinalView:     bs.curEpochFinalView * 2,
+		TargetEndTime: bs.curEpochTargetEndTime + bs.EpochDurationSeconds(),
+	}
+	bs.ctl.EpochExtended(expectedExtension)
+
+	assert.Nil(bs.T(), bs.ctl.nextEpochFinalView)
+	assert.Equal(bs.T(), bs.curEpochTargetEndTime+bs.EpochDurationSeconds(), bs.ctl.curEpochTargetEndTime)
+	assert.Equal(bs.T(), bs.curEpochFinalView*2, bs.ctl.curEpochFinalView)
+
+	// duplicate events should be no-ops
+	for i := 0; i <= cap(bs.ctl.epochSetups); i++ {
+		bs.ctl.EpochExtended(expectedExtension)
+	}
+
+	assert.Nil(bs.T(), bs.ctl.nextEpochFinalView)
+	assert.Equal(bs.T(), bs.curEpochTargetEndTime+bs.EpochDurationSeconds(), bs.ctl.curEpochTargetEndTime)
+	assert.Equal(bs.T(), bs.curEpochFinalView*2, bs.ctl.curEpochFinalView)
+}
+
+// TestEpochRecovered ensures that the epoch configuration is updated when EpochExtended events are processed..
+func (bs *BlockTimeControllerSuite) TestEpochRecovered() {
+	nextEpoch := mockprotocol.NewEpoch(bs.T())
+	nextEpoch.On("Counter").Return(bs.epochCounter+1, nil)
+	nextEpoch.On("FinalView").Return(bs.curEpochFinalView*2, nil)
+	nextEpoch.On("TargetDuration").Return(bs.EpochDurationSeconds(), nil)
+	nextEpoch.On("TargetEndTime").Return(bs.curEpochTargetEndTime+bs.EpochDurationSeconds(), nil)
+
+	bs.epochs.Add(nextEpoch)
+	bs.CreateAndStartController()
+	defer bs.StopController()
+
+	nextEpochFinalView := bs.curEpochFinalView * 2
+	bs.ctl.EpochRecovered(&nextEpochFinalView)
+	assert.Equal(bs.T(), nextEpochFinalView, *bs.ctl.nextEpochFinalView)
+
+	// duplicate events should be no-ops
+	for i := 0; i <= cap(bs.ctl.epochSetups); i++ {
+		bs.ctl.EpochRecovered(&nextEpochFinalView)
+	}
+
+	assert.Equal(bs.T(), nextEpochFinalView, *bs.ctl.nextEpochFinalView)
+}
+
 func makeTimedBlock(view uint64, parentID flow.Identifier, time time.Time) TimedBlock {
 	header := unittest.BlockHeaderFixture(unittest.HeaderWithView(view))
 	header.ParentID = parentID

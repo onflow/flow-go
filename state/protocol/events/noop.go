@@ -28,6 +28,6 @@ func (n Noop) EpochEmergencyFallbackTriggered() {}
 
 func (n Noop) ActiveClustersChanged(flow.ChainIDList) {}
 
-func (n Noop) EpochExtended(extension flow.EpochExtension) {}
+func (n Noop) EpochExtended(*flow.EpochExtension) {}
 
-func (n Noop) EpochRecovered(nextEpochFinalView uint64) {}
+func (n Noop) EpochRecovered(*uint64) {}

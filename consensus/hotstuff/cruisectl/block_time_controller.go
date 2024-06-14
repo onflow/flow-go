@@ -532,15 +532,15 @@ func (ctl *BlockTimeController) EpochEmergencyFallbackTriggered() {
 }
 
 // EpochExtended handles the epoch extended protocol event.
-func (ctl *BlockTimeController) EpochExtended(extension flow.EpochExtension) {
+func (ctl *BlockTimeController) EpochExtended(extension *flow.EpochExtension) {
 	ctl.curEpochFinalView = extension.FinalView
 	ctl.curEpochTargetEndTime = extension.TargetEndTime
 	ctl.nextEpochFinalView = nil
 }
 
 // EpochRecovered handles the epoch recovered protocol event.
-func (ctl *BlockTimeController) EpochRecovered(nextEpochFinalView uint64) {
-	ctl.nextEpochFinalView = &nextEpochFinalView
+func (ctl *BlockTimeController) EpochRecovered(nextEpochFinalView *uint64) {
+	ctl.nextEpochFinalView = nextEpochFinalView
 }
 
 // time2unix converts a time.Time to UNIX time represented as a uint64.

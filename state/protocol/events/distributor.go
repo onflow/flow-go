@@ -75,7 +75,7 @@ func (d *Distributor) EpochEmergencyFallbackTriggered() {
 	}
 }
 
-func (d *Distributor) EpochExtended(extension flow.EpochExtension) {
+func (d *Distributor) EpochExtended(extension *flow.EpochExtension) {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
 	for _, sub := range d.subscribers {
@@ -83,7 +83,7 @@ func (d *Distributor) EpochExtended(extension flow.EpochExtension) {
 	}
 }
 
-func (d *Distributor) EpochRecovered(nextEpochFinalView uint64) {
+func (d *Distributor) EpochRecovered(nextEpochFinalView *uint64) {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
 	for _, sub := range d.subscribers {
