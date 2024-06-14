@@ -1084,7 +1084,6 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 
 	// write staking and machine account private key files
 	writeJSONFile := func(relativePath string, val interface{}) error {
-		fmt.Println("BOOTSTRAP DIR: ", filepath.Join(bootstrapDir, relativePath))
 		return WriteJSON(filepath.Join(bootstrapDir, relativePath), val)
 	}
 	writeFile := func(relativePath string, data []byte) error {

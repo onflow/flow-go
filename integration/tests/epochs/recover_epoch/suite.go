@@ -52,7 +52,7 @@ func (s *Suite) getNodeInfoDirs(role flow.Role) (string, string) {
 //	targetEndTime: the target end time for the recover epoch.
 //	randomSource: the random source of the recover epoch.
 //	out: the tx args output file full path.
-func (s *Suite) executeEFMRecoverTXArgsCMD(role flow.Role, collectionClusters, numViewsInEpoch, numViewsInStakingAuction, epochCounter, targetDuration, targetEndTime uint64, randomSource, out string) {
+func (s *Suite) executeEFMRecoverTXArgsCMD(collectionClusters, numViewsInEpoch, numViewsInStakingAuction, epochCounter, targetDuration, targetEndTime uint64, randomSource, out string) {
 	// read internal node info from one of the consensus nodes
 	internalNodePrivInfoDir, nodeConfigJson := s.getNodeInfoDirs(role)
 	an1 := s.GetContainersByRole(flow.RoleAccess)[0]
