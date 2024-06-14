@@ -391,6 +391,20 @@ func RunWithPebbleDB(t testing.TB, f func(*pebble.DB)) {
 	})
 }
 
+func RunWithTypedPebbleDB(
+	t testing.TB,
+	create func(string, *pebble.Options) (*pebble.DB, error),
+	f func(*pebble.DB)) {
+	RunWithTempDir(t, func(dir string) {
+		db, err := create(dir, &pebble.Options{})
+		require.NoError(t, err)
+		defer func() {
+			assert.NoError(t, db.Close())
+		}()
+		f(db)
+	})
+}
+
 func Concurrently(n int, f func(int)) {
 	var wg sync.WaitGroup
 	for i := 0; i < n; i++ {

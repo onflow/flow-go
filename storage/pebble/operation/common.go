@@ -36,7 +36,6 @@ func insertNew(key []byte, val interface{}) func(PebbleReaderWriter) error {
 		if !errors.Is(err, pebble.ErrNotFound) {
 			return irrecoverable.NewExceptionf("could not check key: %w", err)
 		}
-		defer closer.Close()
 
 		value, err := msgpack.Marshal(val)
 		if err != nil {
