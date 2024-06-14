@@ -16,8 +16,8 @@ import (
 // used in the context of the secrets database. This is enforced in the above
 // layer (see storage.DKGState).
 // Error returns: storage.ErrAlreadyExists
-func InsertMyBeaconPrivateKey(epochCounter uint64, info *encodable.RandomBeaconPrivKey) func(pebble.Writer) error {
-	return insert(makePrefix(codeBeaconPrivateKey, epochCounter), info)
+func InsertMyBeaconPrivateKey(epochCounter uint64, info *encodable.RandomBeaconPrivKey) func(PebbleReaderWriter) error {
+	return insertNew(makePrefix(codeBeaconPrivateKey, epochCounter), info)
 }
 
 // RetrieveMyBeaconPrivateKey retrieves the random beacon private key for the given epoch.
@@ -33,8 +33,8 @@ func RetrieveMyBeaconPrivateKey(epochCounter uint64, info *encodable.RandomBeaco
 // InsertDKGStartedForEpoch stores a flag indicating that the DKG has been started for the given epoch.
 // Returns: storage.ErrAlreadyExists
 // Error returns: storage.ErrAlreadyExists
-func InsertDKGStartedForEpoch(epochCounter uint64) func(pebble.Writer) error {
-	return insert(makePrefix(codeDKGStarted, epochCounter), true)
+func InsertDKGStartedForEpoch(epochCounter uint64) func(PebbleReaderWriter) error {
+	return insertNew(makePrefix(codeDKGStarted, epochCounter), true)
 }
 
 // RetrieveDKGStartedForEpoch retrieves the DKG started flag for the given epoch.
@@ -58,8 +58,8 @@ func RetrieveDKGStartedForEpoch(epochCounter uint64, started *bool) func(pebble.
 
 // InsertDKGEndStateForEpoch stores the DKG end state for the epoch.
 // Error returns: storage.ErrAlreadyExists
-func InsertDKGEndStateForEpoch(epochCounter uint64, endState flow.DKGEndState) func(pebble.Writer) error {
-	return insert(makePrefix(codeDKGEnded, epochCounter), endState)
+func InsertDKGEndStateForEpoch(epochCounter uint64, endState flow.DKGEndState) func(PebbleReaderWriter) error {
+	return insertNew(makePrefix(codeDKGEnded, epochCounter), endState)
 }
 
 // RetrieveDKGEndStateForEpoch retrieves the DKG end state for the epoch.

@@ -27,7 +27,9 @@ func NewDKGState(collector module.CacheMetrics, db *pebble.DB) (*DKGState, error
 		return nil, fmt.Errorf("cannot instantiate dkg state storage in non-secret db: %w", err)
 	}
 
-	storeKey := operation.InsertMyBeaconPrivateKey
+	storeKey := func(epochCounter uint64, info *encodable.RandomBeaconPrivKey) func(rw operation.PebbleReaderWriter) error {
+		return operation.InsertMyBeaconPrivateKey(epochCounter, info)
+	}
 
 	retrieveKey := func(epochCounter uint64) func(pebble.Reader) (*encodable.RandomBeaconPrivKey, error) {
 		return func(tx pebble.Reader) (*encodable.RandomBeaconPrivKey, error) {
@@ -51,7 +53,7 @@ func NewDKGState(collector module.CacheMetrics, db *pebble.DB) (*DKGState, error
 	return dkgState, nil
 }
 
-func (ds *DKGState) storeKeyTx(epochCounter uint64, key *encodable.RandomBeaconPrivKey) func(pebble.Writer) error {
+func (ds *DKGState) storeKeyTx(epochCounter uint64, key *encodable.RandomBeaconPrivKey) func(operation.PebbleReaderWriter) error {
 	return ds.keyCache.PutTx(epochCounter, key)
 }
 
