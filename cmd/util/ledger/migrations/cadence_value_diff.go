@@ -805,7 +805,7 @@ func (dr *CadenceValueDiffReporter) diffCadenceDictionaryValue(
 		return true
 	})
 
-	onlyOldKeys, onlyNewKeys, sharedKeys := diffCadenceValues(oldKeys, newKeys)
+	onlyOldKeys, onlyNewKeys, sharedKeys := diffCadenceValues(vInterpreter, oldKeys, newKeys)
 
 	// Log keys only present in old dict value
 	if len(onlyOldKeys) > 0 {
@@ -915,7 +915,7 @@ func diff[T comparable](old, new []T) (onlyOld, onlyNew, shared []T) {
 	return
 }
 
-func diffCadenceValues(old, new []interpreter.Value) (onlyOld, onlyNew, shared []interpreter.Value) {
+func diffCadenceValues(oldInterpreter *interpreter.Interpreter, old, new []interpreter.Value) (onlyOld, onlyNew, shared []interpreter.Value) {
 	onlyOld = make([]interpreter.Value, 0, len(old))
 	onlyNew = make([]interpreter.Value, 0, len(new))
 	shared = make([]interpreter.Value, 0, min(len(old), len(new)))
@@ -929,7 +929,7 @@ func diffCadenceValues(old, new []interpreter.Value) (onlyOld, onlyNew, shared [
 			foundShared := false
 
 			if ev, ok := o.(interpreter.EquatableValue); ok {
-				if ev.Equal(nil, interpreter.EmptyLocationRange, n) {
+				if ev.Equal(oldInterpreter, interpreter.EmptyLocationRange, n) {
 					foundShared = true
 				}
 			} else {
