@@ -212,13 +212,7 @@ func (vm *VirtualMachine) GetAccount(
 	*flow.Account,
 	error,
 ) {
-	storageTxn := initializeStorageTransaction(ctx, storageSnapshot)
-
-	env := environment.NewScriptEnv(
-		context.Background(),
-		ctx.TracerSpan,
-		ctx.EnvironmentParams,
-		storageTxn)
+	env := getScriptEnvironment(ctx, storageSnapshot)
 
 	account, err := env.GetAccount(address)
 	if err != nil {
@@ -243,13 +237,7 @@ func GetAccountBalance(
 	uint64,
 	error,
 ) {
-	storageTxn := initializeStorageTransaction(ctx, storageSnapshot)
-
-	env := environment.NewScriptEnv(
-		context.Background(),
-		ctx.TracerSpan,
-		ctx.EnvironmentParams,
-		storageTxn)
+	env := getScriptEnvironment(ctx, storageSnapshot)
 
 	accountBalance, err := env.GetAccountBalance(common.MustBytesToAddress(address.Bytes()))
 
@@ -268,13 +256,7 @@ func GetAccountKeys(
 	[]flow.AccountPublicKey,
 	error,
 ) {
-	storageTxn := initializeStorageTransaction(ctx, storageSnapshot)
-
-	env := environment.NewScriptEnv(
-		context.Background(),
-		ctx.TracerSpan,
-		ctx.EnvironmentParams,
-		storageTxn)
+	env := getScriptEnvironment(ctx, storageSnapshot)
 
 	accountKeys, err := env.GetAccountKeys(address)
 	if err != nil {
@@ -284,7 +266,7 @@ func GetAccountKeys(
 }
 
 // Helper function to initialize common components.
-func initializeStorageTransaction(ctx Context, storageSnapshot snapshot.StorageSnapshot) storage.Transaction {
+func getScriptEnvironment(ctx Context, storageSnapshot snapshot.StorageSnapshot) environment.Environment {
 	blockDatabase := storage.NewBlockDatabase(
 		storageSnapshot,
 		0,
@@ -298,5 +280,11 @@ func initializeStorageTransaction(ctx Context, storageSnapshot snapshot.StorageS
 				meter.DefaultParameters().
 					WithStorageInteractionLimit(ctx.MaxStateInteractionSize)))
 
-	return storageTxn
+	env := environment.NewScriptEnv(
+		context.Background(),
+		ctx.TracerSpan,
+		ctx.EnvironmentParams,
+		storageTxn)
+
+	return env
 }
