@@ -1,12 +1,29 @@
 package storage
 
 import (
+	"fmt"
 	"os"
 	"strings"
 )
 
 // CheckFolder checks the given folder path and returns whether it is a Pebble folder, a Badger folder, if it is empty, and any error encountered.
 func CheckFolder(folderPath string) (isPebbleFolder, isBadgerFolder, isEmpty bool, err error) {
+	// Check if the folder exists
+	info, err := os.Stat(folderPath)
+	if os.IsNotExist(err) {
+		// if folder does not exist, consider it as empty, since
+		// the database module is able to create it.
+		return false, false, true, nil
+	}
+	if err != nil {
+		return false, false, false, err
+	}
+
+	// Check if the path is a directory
+	if !info.IsDir() {
+		return false, false, false, fmt.Errorf("provided path is not a directory")
+	}
+
 	files, err := os.ReadDir(folderPath)
 	if err != nil {
 		return false, false, false, err
@@ -19,34 +36,38 @@ func CheckFolder(folderPath string) (isPebbleFolder, isBadgerFolder, isEmpty boo
 	isPebbleFolder = false
 	isBadgerFolder = false
 
-	hasManifest := false
+	hasPebbleManifest := false
+	hasBadgerManifest := false
+	hasKeyRegistery := false
 	hasCurrent := false
 	hasLog := false
-	hasSst := false
 	hasVlog := false
 
 	for _, file := range files {
+		fileName := file.Name()
 		switch {
 		case strings.HasPrefix(file.Name(), "MANIFEST-"):
-			hasManifest = true
-		case file.Name() == "CURRENT":
+			hasPebbleManifest = true
+		case fileName == "MANIFEST":
+			hasBadgerManifest = true
+		case fileName == "CURRENT":
 			hasCurrent = true
-		case file.Name() == "LOG":
+		case file.Name() == "KEYREGISTRY":
+			hasKeyRegistery = true
+		case strings.HasSuffix(fileName, ".log"):
 			hasLog = true
-		case strings.HasSuffix(file.Name(), ".sst"):
-			hasSst = true
-		case strings.HasSuffix(file.Name(), ".vlog"):
+		case strings.HasSuffix(fileName, ".vlog"):
 			hasVlog = true
 		}
 	}
 
 	// Determine if the folder contains Pebble data
-	if hasManifest && hasCurrent && hasLog && hasSst {
+	if hasPebbleManifest && hasCurrent && hasLog {
 		isPebbleFolder = true
 	}
 
 	// Determine if the folder contains Badger data
-	if hasManifest && hasSst && hasVlog {
+	if hasBadgerManifest && hasKeyRegistery && hasVlog {
 		isBadgerFolder = true
 	}
 
