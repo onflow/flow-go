@@ -8,6 +8,7 @@ import (
 	rcmgr "github.com/libp2p/go-libp2p/p2p/host/resource-manager"
 	httpmetrics "github.com/slok/go-http-metrics/metrics"
 
+	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/model/chainsync"
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
@@ -909,8 +910,24 @@ type ExecutionResultStats struct {
 	EventSize                       int
 	NumberOfRegistersTouched        int
 	NumberOfBytesWrittenToRegisters int
-	NumberOfCollections             int
-	NumberOfTransactions            int
+}
+
+type BlockExecutionResultStats struct {
+	CollectionExecutionResultStats
+	NumberOfCollections int
+}
+
+type CollectionExecutionResultStats struct {
+	ExecutionResultStats
+	NumberOfTransactions int
+}
+
+type TransactionExecutionResultStats struct {
+	ExecutionResultStats
+	NumberOfTxnConflictRetries int
+	Failed                     bool
+	SystemTransaction          bool
+	ComputationIntensities     meter.MeteredComputationIntensities
 }
 
 func (stats *ExecutionResultStats) Merge(other ExecutionResultStats) {
@@ -920,8 +937,17 @@ func (stats *ExecutionResultStats) Merge(other ExecutionResultStats) {
 	stats.EventSize += other.EventSize
 	stats.NumberOfRegistersTouched += other.NumberOfRegistersTouched
 	stats.NumberOfBytesWrittenToRegisters += other.NumberOfBytesWrittenToRegisters
-	stats.NumberOfCollections += other.NumberOfCollections
+}
+
+func (stats *CollectionExecutionResultStats) Add(other TransactionExecutionResultStats) {
+	stats.ExecutionResultStats.Merge(other.ExecutionResultStats)
+	stats.NumberOfTransactions += 1
+}
+
+func (stats *BlockExecutionResultStats) Add(other CollectionExecutionResultStats) {
+	stats.CollectionExecutionResultStats.Merge(other.ExecutionResultStats)
 	stats.NumberOfTransactions += other.NumberOfTransactions
+	stats.NumberOfCollections += 1
 }
 
 type ExecutionMetrics interface {
@@ -948,7 +974,7 @@ type ExecutionMetrics interface {
 	ExecutionLastFinalizedExecutedBlockHeight(height uint64)
 
 	// ExecutionBlockExecuted reports the total time and computation spent on executing a block
-	ExecutionBlockExecuted(dur time.Duration, stats ExecutionResultStats)
+	ExecutionBlockExecuted(dur time.Duration, stats BlockExecutionResultStats)
 
 	// ExecutionBlockExecutionEffortVectorComponent reports the unweighted effort of given ComputationKind at block level
 	ExecutionBlockExecutionEffortVectorComponent(string, uint)
@@ -957,17 +983,10 @@ type ExecutionMetrics interface {
 	ExecutionBlockCachedPrograms(programs int)
 
 	// ExecutionCollectionExecuted reports the total time and computation spent on executing a collection
-	ExecutionCollectionExecuted(dur time.Duration, stats ExecutionResultStats)
+	ExecutionCollectionExecuted(dur time.Duration, stats CollectionExecutionResultStats)
 
 	// ExecutionTransactionExecuted reports stats on executing a single transaction
-	ExecutionTransactionExecuted(
-		dur time.Duration,
-		numTxnConflictRetries int,
-		compUsed uint64,
-		memoryUsed uint64,
-		eventCounts int,
-		eventSize int,
-		failed bool)
+	ExecutionTransactionExecuted(dur time.Duration, stats TransactionExecutionResultStats)
 
 	// ExecutionChunkDataPackGenerated reports stats on chunk data pack generation
 	ExecutionChunkDataPackGenerated(proofSize, numberOfTransactions int)
