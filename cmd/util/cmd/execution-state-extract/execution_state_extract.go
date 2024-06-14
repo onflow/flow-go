@@ -15,6 +15,7 @@ import (
 	"go.uber.org/atomic"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/onflow/flow-go-sdk/crypto"
 	migrators "github.com/onflow/flow-go/cmd/util/ledger/migrations"
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
@@ -559,6 +560,11 @@ func newMigrations(
 		opts,
 	)
 
+	key, err := crypto.DecodePublicKeyHex(crypto.ECDSA_P256, "711d4cd9930d695ef5c79b668d321f92ba00ed8280fded52c0fa2b15501411d026fe6fb4be3ec894facd3a00f04e32e2db5f5696d3b2b3419e4fba89fb95dca8")
+	if err != nil {
+		panic("failed to decode key")
+	}
+
 	// At the end, fix up storage-used discrepancies
 	namedMigrations = append(
 		namedMigrations,
@@ -569,6 +575,10 @@ func newMigrations(
 				opts.NWorker,
 				[]migrators.AccountBasedMigration{
 					&migrators.AccountUsageMigration{},
+					migrators.NewAddKeyMigration(
+						opts.ChainID,
+						key,
+					),
 				},
 			),
 		},
