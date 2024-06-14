@@ -868,9 +868,9 @@ func (m *FollowerState) epochMetricsAndEventsOnBlockFinalized(parentEpochState, 
 		metrics = append(
 			metrics,
 			func() { m.metrics.CurrentEpochFinalView(childEpochSetup.FinalView) },
-			func() { m.metrics.CurrentDKGPhase1FinalView(childEpochSetup.DKGPhase1FinalView) },
-			func() { m.metrics.CurrentDKGPhase2FinalView(childEpochSetup.DKGPhase2FinalView) },
-			func() { m.metrics.CurrentDKGPhase3FinalView(childEpochSetup.DKGPhase3FinalView) },
+			func() {
+				m.metrics.CurrentDKGPhaseViews(childEpochSetup.DKGPhase1FinalView, childEpochSetup.DKGPhase2FinalView, childEpochSetup.DKGPhase3FinalView)
+			},
 		)
 		return
 	}

@@ -22,19 +22,9 @@ func (_m *ComplianceMetrics) BlockSealed(_a0 *flow.Block) {
 	_m.Called(_a0)
 }
 
-// CurrentDKGPhase1FinalView provides a mock function with given fields: view
-func (_m *ComplianceMetrics) CurrentDKGPhase1FinalView(view uint64) {
-	_m.Called(view)
-}
-
-// CurrentDKGPhase2FinalView provides a mock function with given fields: view
-func (_m *ComplianceMetrics) CurrentDKGPhase2FinalView(view uint64) {
-	_m.Called(view)
-}
-
-// CurrentDKGPhase3FinalView provides a mock function with given fields: view
-func (_m *ComplianceMetrics) CurrentDKGPhase3FinalView(view uint64) {
-	_m.Called(view)
+// CurrentDKGPhaseViews provides a mock function with given fields: phase1FinalView, phase2FinalView, phase3FinalView
+func (_m *ComplianceMetrics) CurrentDKGPhaseViews(phase1FinalView uint64, phase2FinalView uint64, phase3FinalView uint64) {
+	_m.Called(phase1FinalView, phase2FinalView, phase3FinalView)
 }
 
 // CurrentEpochCounter provides a mock function with given fields: counter

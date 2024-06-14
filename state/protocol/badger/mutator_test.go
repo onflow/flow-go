@@ -847,9 +847,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 
 		dkgPhase1FinalView, dkgPhase2FinalView, dkgPhase3FinalView, err := realprotocol.DKGPhaseViews(initialCurrentEpoch)
 		require.NoError(t, err)
-		metrics.On("CurrentDKGPhase1FinalView", dkgPhase1FinalView).Once()
-		metrics.On("CurrentDKGPhase2FinalView", dkgPhase2FinalView).Once()
-		metrics.On("CurrentDKGPhase3FinalView", dkgPhase3FinalView).Once()
+		metrics.On("CurrentDKGPhaseViews", dkgPhase1FinalView, dkgPhase2FinalView, dkgPhase3FinalView).Once()
 
 		tracer := trace.NewNoopTracer()
 		log := zerolog.Nop()
@@ -1105,9 +1103,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		metrics.On("CurrentEpochCounter", epoch2Setup.Counter).Once()
 		metrics.On("CurrentEpochPhase", flow.EpochPhaseStaking).Once()
 		metrics.On("CurrentEpochFinalView", epoch2Setup.FinalView).Once()
-		metrics.On("CurrentDKGPhase1FinalView", epoch2Setup.DKGPhase1FinalView).Once()
-		metrics.On("CurrentDKGPhase2FinalView", epoch2Setup.DKGPhase2FinalView).Once()
-		metrics.On("CurrentDKGPhase3FinalView", epoch2Setup.DKGPhase3FinalView).Once()
+		metrics.On("CurrentDKGPhaseViews", epoch2Setup.DKGPhase1FinalView, epoch2Setup.DKGPhase2FinalView, epoch2Setup.DKGPhase3FinalView).Once()
 
 		// before block 9 is finalized, the epoch 1-2 boundary is unknown
 		_, err = state.AtBlockID(block8.ID()).Epochs().Current().FinalHeight()
@@ -3082,9 +3078,7 @@ func mockMetricsForRootSnapshot(metricsMock *mockmodule.ComplianceMetrics, rootS
 	metricsMock.On("CurrentEpochCounter", epochSetup.Counter)
 	metricsMock.On("CurrentEpochPhase", epochProtocolState.EpochPhase())
 	metricsMock.On("CurrentEpochFinalView", epochSetup.FinalView)
-	metricsMock.On("CurrentDKGPhase1FinalView", epochSetup.DKGPhase1FinalView)
-	metricsMock.On("CurrentDKGPhase2FinalView", epochSetup.DKGPhase2FinalView)
-	metricsMock.On("CurrentDKGPhase3FinalView", epochSetup.DKGPhase3FinalView)
+	metricsMock.On("CurrentDKGPhaseViews", epochSetup.DKGPhase1FinalView, epochSetup.DKGPhase2FinalView, epochSetup.DKGPhase3FinalView)
 	metricsMock.On("BlockSealed", mock.Anything)
 	metricsMock.On("BlockFinalized", mock.Anything)
 	metricsMock.On("FinalizedHeight", mock.Anything)

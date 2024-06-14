@@ -201,16 +201,10 @@ func (cc *ComplianceCollector) CurrentEpochFinalView(view uint64) {
 	cc.currentEpochFinalView.Set(float64(view))
 }
 
-func (cc *ComplianceCollector) CurrentDKGPhase1FinalView(view uint64) {
-	cc.currentDKGPhase1FinalView.Set(float64(view))
-}
-
-func (cc *ComplianceCollector) CurrentDKGPhase2FinalView(view uint64) {
-	cc.currentDKGPhase2FinalView.Set(float64(view))
-}
-
-func (cc *ComplianceCollector) CurrentDKGPhase3FinalView(view uint64) {
-	cc.currentDKGPhase3FinalView.Set(float64(view))
+func (cc *ComplianceCollector) CurrentDKGPhaseViews(phase1FinalView, phase2FinalView, phase3FinalView uint64) {
+	cc.currentDKGPhase1FinalView.Set(float64(phase1FinalView))
+	cc.currentDKGPhase2FinalView.Set(float64(phase2FinalView))
+	cc.currentDKGPhase3FinalView.Set(float64(phase3FinalView))
 }
 
 func (cc *ComplianceCollector) EpochFallbackModeTriggered() {

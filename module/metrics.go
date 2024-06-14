@@ -488,10 +488,8 @@ type ComplianceMetrics interface {
 	CurrentEpochPhase(phase flow.EpochPhase)
 	// CurrentEpochFinalView reports the final view of the current epoch, including epoch extensions.
 	CurrentEpochFinalView(view uint64)
-	// TODO could combine 3 DKG metric funcs
-	CurrentDKGPhase1FinalView(view uint64)
-	CurrentDKGPhase2FinalView(view uint64)
-	CurrentDKGPhase3FinalView(view uint64)
+	// CurrentDKGPhaseViews reports the final view of each DKG phase for the current epoch.
+	CurrentDKGPhaseViews(phase1FinalView, phase2FinalView, phase3FinalView uint64)
 	// EpochFallbackModeTriggered reports that EFM is triggered.
 	EpochFallbackModeTriggered()
 	// EpochFallbackModeExited reports that EFM is no longer triggered.

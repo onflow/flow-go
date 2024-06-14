@@ -889,9 +889,7 @@ func updateEpochMetrics(metrics module.ComplianceMetrics, snap protocol.Snapshot
 		return fmt.Errorf("could not get dkg phase final view: %w", err)
 	}
 
-	metrics.CurrentDKGPhase1FinalView(dkgPhase1FinalView)
-	metrics.CurrentDKGPhase2FinalView(dkgPhase2FinalView)
-	metrics.CurrentDKGPhase3FinalView(dkgPhase3FinalView)
+	metrics.CurrentDKGPhaseViews(dkgPhase1FinalView, dkgPhase2FinalView, dkgPhase3FinalView)
 
 	// notify whether epoch fallback mode is active
 	if epochFallbackTriggered {
