@@ -114,7 +114,6 @@ func (s *GrpcStateStreamSuite) SetupTest() {
 		testnet.AsGhost())
 
 	consensusConfigs := []func(config *testnet.NodeConfig){
-		testnet.WithAdditionalFlag("--cruise-ctl-fallback-proposal-duration=400ms"),
 		testnet.WithAdditionalFlag(fmt.Sprintf("--required-verification-seal-approvals=%d", 1)),
 		testnet.WithAdditionalFlag(fmt.Sprintf("--required-construction-seal-approvals=%d", 1)),
 		testnet.WithLogLevel(zerolog.FatalLevel),

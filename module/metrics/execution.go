@@ -719,7 +719,7 @@ func (ec *ExecutionCollector) FinishBlockReceivedToExecuted(blockID flow.Identif
 // ExecutionBlockExecuted reports execution meta data after executing a block
 func (ec *ExecutionCollector) ExecutionBlockExecuted(
 	dur time.Duration,
-	stats module.ExecutionResultStats,
+	stats module.BlockExecutionResultStats,
 ) {
 	ec.totalExecutedBlocksCounter.Inc()
 	ec.blockExecutionTime.Observe(float64(dur.Milliseconds()))
@@ -734,7 +734,7 @@ func (ec *ExecutionCollector) ExecutionBlockExecuted(
 // ExecutionCollectionExecuted reports stats for executing a collection
 func (ec *ExecutionCollector) ExecutionCollectionExecuted(
 	dur time.Duration,
-	stats module.ExecutionResultStats,
+	stats module.CollectionExecutionResultStats,
 ) {
 	ec.totalExecutedCollectionsCounter.Inc()
 	ec.collectionExecutionTime.Observe(float64(dur.Milliseconds()))
@@ -758,23 +758,18 @@ func (ec *ExecutionCollector) ExecutionBlockCachedPrograms(programs int) {
 // ExecutionTransactionExecuted reports stats for executing a transaction
 func (ec *ExecutionCollector) ExecutionTransactionExecuted(
 	dur time.Duration,
-	numConflictRetries int,
-	compUsed uint64,
-	memoryUsed uint64,
-	eventCounts int,
-	eventSize int,
-	failed bool,
+	stats module.TransactionExecutionResultStats,
 ) {
 	ec.totalExecutedTransactionsCounter.Inc()
 	ec.transactionExecutionTime.Observe(float64(dur.Milliseconds()))
-	ec.transactionConflictRetries.Observe(float64(numConflictRetries))
-	ec.transactionComputationUsed.Observe(float64(compUsed))
+	ec.transactionConflictRetries.Observe(float64(stats.NumberOfTxnConflictRetries))
+	ec.transactionComputationUsed.Observe(float64(stats.ComputationUsed))
 	ec.transactionNormalizedTimePerComputation.Observe(
-		flow.NormalizedExecutionTimePerComputationUnit(dur, compUsed))
-	ec.transactionMemoryEstimate.Observe(float64(memoryUsed))
-	ec.transactionEmittedEvents.Observe(float64(eventCounts))
-	ec.transactionEventSize.Observe(float64(eventSize))
-	if failed {
+		flow.NormalizedExecutionTimePerComputationUnit(dur, stats.ComputationUsed))
+	ec.transactionMemoryEstimate.Observe(float64(stats.MemoryUsed))
+	ec.transactionEmittedEvents.Observe(float64(stats.EventCounts))
+	ec.transactionEventSize.Observe(float64(stats.EventSize))
+	if stats.Failed {
 		ec.totalFailedTransactionsCounter.Inc()
 	}
 }
