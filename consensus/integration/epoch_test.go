@@ -188,6 +188,7 @@ func TestEpochTransition_IdentitiesDisjoint(t *testing.T) {
 
 // withNextEpoch adds a valid next epoch with the given identities to the input
 // snapshot. Also sets the length of the first (current) epoch to curEpochViews.
+// NOTE: the input initial snapshot must be a spork root snapshot.
 //
 // We make the first (current) epoch start in committed phase so we can transition
 // to the next epoch upon reaching the appropriate view without any further changes
@@ -205,6 +206,9 @@ func withNextEpoch(
 
 	// convert to encodable representation for simple modification
 	encodableSnapshot := snapshot.Encodable()
+	rootResult, rootSeal, err := snapshot.SealedResult()
+	require.NoError(t, err)
+	require.Len(t, encodableSnapshot.SealingSegment.Blocks, 1, "function `withNextEpoch` only works for spork-root/genesis snapshots")
 
 	rootProtocolState := encodableSnapshot.SealingSegment.LatestProtocolStateEntry()
 	epochProtocolState := rootProtocolState.EpochEntry
@@ -236,8 +240,8 @@ func withNextEpoch(
 		ActiveIdentities: flow.DynamicIdentityEntryListFromIdentities(nextEpochIdentities),
 	}
 	// Re-construct epoch protocol state with modified events (constructs ActiveIdentity fields)
-	epochProtocolState, err := flow.NewRichProtocolStateEntry(
-		epochProtocolState.ProtocolStateEntry,
+	epochProtocolState, err = flow.NewRichEpochProtocolStateEntry(
+		epochProtocolState.EpochProtocolStateEntry,
 		epochProtocolState.PreviousEpochSetup, epochProtocolState.PreviousEpochCommit,
 		currEpochSetup, currEpochCommit,
 		nextEpochSetup, nextEpochCommit)
@@ -258,16 +262,18 @@ func withNextEpoch(
 	}
 
 	// Since we modified the root protocol state, we need to update the root block's ProtocolStateID field.
+	// rootBlock is a pointer, so mutations apply to Snapshot
 	rootBlock := encodableSnapshot.SealingSegment.Blocks[0]
 	rootBlockPayload := rootBlock.Payload
 	rootBlockPayload.ProtocolStateID = rootKVStore.ID()
 	rootBlock.SetPayload(*rootBlockPayload)
 	// Since we changed the root block, we need to update the QC, root result, and root seal.
-	encodableSnapshot.LatestResult.BlockID = rootBlock.ID()
-	encodableSnapshot.LatestSeal.ResultID = encodableSnapshot.LatestResult.ID()
-	encodableSnapshot.LatestSeal.BlockID = rootBlock.ID()
+	// rootResult and rootSeal are pointers, so mutations apply to Snapshot
+	rootResult.BlockID = rootBlock.ID()
+	rootSeal.ResultID = rootResult.ID()
+	rootSeal.BlockID = rootBlock.ID()
 	encodableSnapshot.SealingSegment.LatestSeals = map[flow.Identifier]flow.Identifier{
-		rootBlock.ID(): encodableSnapshot.LatestSeal.ID(),
+		rootBlock.ID(): rootSeal.ID(),
 	}
 	encodableSnapshot.QuorumCertificate = createQC(rootBlock)
 

@@ -100,7 +100,7 @@ func (b *ByAccount) DestructIntoPayloads(nWorker int) []*ledger.Payload {
 	worker := func() {
 		defer wg.Done()
 		for job := range jobs {
-			job.registers.insertPayloads(job.payloads)
+			job.registers.insertIntoPayloads(job.payloads)
 		}
 	}
 
@@ -147,6 +147,11 @@ func (b *ByAccount) ForEachAccount(f func(accountRegisters *AccountRegisters) er
 
 func (b *ByAccount) AccountCount() int {
 	return len(b.registers)
+}
+
+func (b *ByAccount) HasAccountOwner(owner string) bool {
+	_, ok := b.registers[owner]
+	return ok
 }
 
 func (b *ByAccount) AccountRegisters(owner string) *AccountRegisters {
@@ -231,12 +236,14 @@ func (a *AccountRegisters) Owner() string {
 }
 
 func (a *AccountRegisters) Payloads() []*ledger.Payload {
-	payloads := make([]*ledger.Payload, 0, a.Count())
-	a.insertPayloads(payloads)
+	payloads := make([]*ledger.Payload, a.Count())
+	a.insertIntoPayloads(payloads)
 	return payloads
 }
 
-func (a *AccountRegisters) insertPayloads(payloads []*ledger.Payload) {
+// insertIntoPayloads inserts the registers into the given payloads slice.
+// The payloads slice must have the same size as the number of registers.
+func (a *AccountRegisters) insertIntoPayloads(payloads []*ledger.Payload) {
 	payloadCount := len(payloads)
 	registerCount := len(a.registers)
 	if payloadCount != registerCount {
@@ -261,6 +268,28 @@ func (a *AccountRegisters) insertPayloads(payloads []*ledger.Payload) {
 		payloads[index] = payload
 		index++
 	}
+}
+
+// Merge merges the registers from the other AccountRegisters into this AccountRegisters.
+func (a *AccountRegisters) Merge(other *AccountRegisters) error {
+	for key, value := range other.registers {
+		_, ok := a.registers[key]
+		if ok {
+			return fmt.Errorf("key already exists: %s", key)
+		}
+		a.registers[key] = value
+	}
+	return nil
+}
+
+func (a *AccountRegisters) ForEachKey(f func(key string) error) error {
+	for key := range a.registers {
+		err := f(key)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func NewAccountRegistersFromPayloads(owner string, payloads []*ledger.Payload) (*AccountRegisters, error) {

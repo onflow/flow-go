@@ -12,19 +12,21 @@ import (
 
 type RegistersMigration func(registersByAccount *registers.ByAccount) error
 
-var allStorageMapDomains = []string{
+var AllStorageMapDomains = []string{
 	common.PathDomainStorage.Identifier(),
 	common.PathDomainPrivate.Identifier(),
 	common.PathDomainPublic.Identifier(),
 	runtime.StorageDomainContract,
 	stdlib.InboxStorageDomain,
 	stdlib.CapabilityControllerStorageDomain,
+	stdlib.PathCapabilityStorageDomain,
+	stdlib.AccountCapabilityStorageDomain,
 }
 
 var allStorageMapDomainsSet = map[string]struct{}{}
 
 func init() {
-	for _, domain := range allStorageMapDomains {
+	for _, domain := range AllStorageMapDomains {
 		allStorageMapDomainsSet[domain] = struct{}{}
 	}
 }
@@ -80,7 +82,7 @@ func checkStorageHealth(
 		return err
 	}
 
-	for _, domain := range allStorageMapDomains {
+	for _, domain := range AllStorageMapDomains {
 		_ = storage.GetStorageMap(address, domain, false)
 	}
 
