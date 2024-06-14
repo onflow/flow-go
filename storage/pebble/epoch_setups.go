@@ -2,6 +2,7 @@ package pebble
 
 import (
 	"github.com/cockroachdb/pebble"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
@@ -30,7 +31,7 @@ func NewEpochSetups(collector module.CacheMetrics, db *pebble.DB) *EpochSetups {
 
 	es := &EpochSetups{
 		db: db,
-		cache: newCache[flow.Identifier, *flow.EpochSetup](collector, metrics.ResourceEpochSetup,
+		cache: newCache(collector, metrics.ResourceEpochSetup,
 			withLimit[flow.Identifier, *flow.EpochSetup](4*flow.DefaultTransactionExpiry),
 			withStore(store),
 			withRetrieve(retrieve)),
