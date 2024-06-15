@@ -1,6 +1,8 @@
 package transaction
 
 import (
+	"fmt"
+
 	dbbadger "github.com/dgraph-io/badger/v2"
 
 	ioutils "github.com/onflow/flow-go/utils/io"
@@ -46,6 +48,22 @@ func Update(db *dbbadger.DB, f func(*Tx) error) error {
 // WithTx is useful when transaction is used without adding callback.
 func WithTx(f func(*dbbadger.Txn) error) func(*Tx) error {
 	return func(tx *Tx) error {
+		return f(tx.DBTxn)
+	}
+}
+
+func FailInterface(e error) func(interface{}) error {
+	return func(interface{}) error {
+		return e
+	}
+}
+
+func WithTxInterface(f func(*dbbadger.Txn) error) func(interface{}) error {
+	return func(txinf interface{}) error {
+		tx, ok := txinf.(*Tx)
+		if !ok {
+			return fmt.Errorf("invalid transaction type")
+		}
 		return f(tx.DBTxn)
 	}
 }

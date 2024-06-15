@@ -31,11 +31,12 @@ func noStore[K comparable, V any](_ K, _ V) func(operation.PebbleReaderWriter) e
 	}
 }
 
-//	func noopStore[K comparable, V any](_ K, _ V) func(pebble.Reader) error {
-//		return func(pebble.Reader) error {
-//			return nil
-//		}
-//	}
+func noopStore[K comparable, V any](_ K, _ V) func(operation.PebbleReaderWriter) error {
+	return func(operation.PebbleReaderWriter) error {
+		return nil
+	}
+}
+
 type retrieveFunc[K comparable, V any] func(key K) func(pebble.Reader) (V, error)
 
 func withRetrieve[K comparable, V any](retrieve retrieveFunc[K, V]) func(*Cache[K, V]) {
@@ -142,6 +143,22 @@ func (c *Cache[K, V]) PutTx(key K, resource V) func(operation.PebbleReaderWriter
 	return func(w operation.PebbleReaderWriter) error {
 		// the storeOps must be sync operation
 		err := storeOps(w) // execute operations to store resource
+		if err != nil {
+			return fmt.Errorf("could not store resource: %w", err)
+		}
+
+		c.Insert(key, resource)
+
+		return nil
+	}
+}
+
+func (c *Cache[K, V]) PutTxInterface(key K, resource V) func(interface{}) error {
+	storeOps := c.store(key, resource) // assemble DB operations to store resource (no execution)
+
+	return func(wi interface{}) error {
+		// the storeOps must be sync operation
+		err := storeOps(wi.(operation.PebbleReaderWriter)) // execute operations to store resource
 		if err != nil {
 			return fmt.Errorf("could not store resource: %w", err)
 		}

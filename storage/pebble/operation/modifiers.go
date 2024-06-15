@@ -7,3 +7,9 @@ func OnlyWrite(write func(pebble.Writer) error) func(PebbleReaderWriter) error {
 		return write(rw)
 	}
 }
+
+func OnlyWriterInterface(write func(pebble.Writer) error) func(interface{}) error {
+	return func(rw interface{}) error {
+		return write(rw.(pebble.Writer))
+	}
+}

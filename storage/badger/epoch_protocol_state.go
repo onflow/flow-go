@@ -1,16 +1,17 @@
-package pebble
+package badger
 
 import (
 	"fmt"
 
-	"github.com/cockroachdb/pebble"
+	"github.com/dgraph-io/badger/v2"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/pebble/operation"
+	"github.com/onflow/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
 // DefaultEpochProtocolStateCacheSize is the default size for primary epoch protocol state entry cache.
@@ -26,7 +27,7 @@ var DefaultProtocolStateIndexCacheSize uint = 1000
 // sub-states of the overall of the overall Protocol State (KV Store). It uses an embedded cache
 // which is populated on first retrieval to speed up access to frequently used epoch sub-state.
 type EpochProtocolStateEntries struct {
-	db *pebble.DB
+	db *badger.DB
 
 	// cache is essentially an in-memory map from `EpochProtocolStateEntry.ID()` -> `RichEpochProtocolStateEntry`
 	// We do _not_ populate this cache which holds the RichEpochProtocolStateEntry's on store. This is because
@@ -66,13 +67,13 @@ var _ storage.EpochProtocolStateEntries = (*EpochProtocolStateEntries)(nil)
 func NewEpochProtocolStateEntries(collector module.CacheMetrics,
 	epochSetups storage.EpochSetups,
 	epochCommits storage.EpochCommits,
-	db *pebble.DB,
+	db *badger.DB,
 	stateCacheSize uint,
 	stateByBlockIDCacheSize uint,
 ) *EpochProtocolStateEntries {
-	retrieveByEntryID := func(epochProtocolStateEntryID flow.Identifier) func(tx pebble.Reader) (*flow.RichEpochProtocolStateEntry, error) {
+	retrieveByEntryID := func(epochProtocolStateEntryID flow.Identifier) func(tx *badger.Txn) (*flow.RichEpochProtocolStateEntry, error) {
 		var entry flow.EpochProtocolStateEntry
-		return func(tx pebble.Reader) (*flow.RichEpochProtocolStateEntry, error) {
+		return func(tx *badger.Txn) (*flow.RichEpochProtocolStateEntry, error) {
 			err := operation.RetrieveEpochProtocolState(epochProtocolStateEntryID, &entry)(tx)
 			if err != nil {
 				return nil, err
@@ -85,9 +86,9 @@ func NewEpochProtocolStateEntries(collector module.CacheMetrics,
 		}
 	}
 
-	storeByBlockID := func(blockID flow.Identifier, epochProtocolStateEntryID flow.Identifier) func(operation.PebbleReaderWriter) error {
-		return func(tx operation.PebbleReaderWriter) error {
-			err := operation.IndexEpochProtocolState(blockID, epochProtocolStateEntryID)(tx)
+	storeByBlockID := func(blockID flow.Identifier, epochProtocolStateEntryID flow.Identifier) func(*transaction.Tx) error {
+		return func(tx *transaction.Tx) error {
+			err := transaction.WithTx(operation.IndexEpochProtocolState(blockID, epochProtocolStateEntryID))(tx)
 			if err != nil {
 				return fmt.Errorf("could not index EpochProtocolState for block (%x): %w", blockID[:], err)
 			}
@@ -95,8 +96,8 @@ func NewEpochProtocolStateEntries(collector module.CacheMetrics,
 		}
 	}
 
-	retrieveByBlockID := func(blockID flow.Identifier) func(tx pebble.Reader) (flow.Identifier, error) {
-		return func(tx pebble.Reader) (flow.Identifier, error) {
+	retrieveByBlockID := func(blockID flow.Identifier) func(tx *badger.Txn) (flow.Identifier, error) {
+		return func(tx *badger.Txn) (flow.Identifier, error) {
 			var entryID flow.Identifier
 			err := operation.LookupEpochProtocolState(blockID, &entryID)(tx)
 			if err != nil {
@@ -108,37 +109,34 @@ func NewEpochProtocolStateEntries(collector module.CacheMetrics,
 
 	return &EpochProtocolStateEntries{
 		db: db,
-		cache: newCache(collector, metrics.ResourceProtocolState,
+		cache: newCache[flow.Identifier, *flow.RichEpochProtocolStateEntry](collector, metrics.ResourceProtocolState,
 			withLimit[flow.Identifier, *flow.RichEpochProtocolStateEntry](stateCacheSize),
 			withStore(noopStore[flow.Identifier, *flow.RichEpochProtocolStateEntry]),
 			withRetrieve(retrieveByEntryID)),
-		byBlockIdCache: newCache(collector, metrics.ResourceProtocolStateByBlockID,
+		byBlockIdCache: newCache[flow.Identifier, flow.Identifier](collector, metrics.ResourceProtocolStateByBlockID,
 			withLimit[flow.Identifier, flow.Identifier](stateByBlockIDCacheSize),
 			withStore(storeByBlockID),
 			withRetrieve(retrieveByBlockID)),
 	}
 }
 
-// StoreTx returns an anonymous function (intended to be executed as part of a pebble transaction),
+// StoreTx returns an anonymous function (intended to be executed as part of a badger transaction),
 // which persists the given epoch protocol state entry as part of a DB tx. Per convention, the identities in
 // the flow.EpochProtocolStateEntry must be in canonical order for the current and next epoch (if present),
 // otherwise an exception is returned.
 // Expected errors of the returned anonymous function:
+//   - storage.ErrAlreadyExists if a state entry with the given id is already stored
 func (s *EpochProtocolStateEntries) StoreTx(epochProtocolStateEntryID flow.Identifier, epochStateEntry *flow.EpochProtocolStateEntry) func(interface{}) error {
 	// front-load sanity checks:
 	if !epochStateEntry.CurrentEpoch.ActiveIdentities.Sorted(flow.IdentifierCanonical) {
-		return func(interface{}) error {
-			return fmt.Errorf("sanity check failed: identities are not sorted")
-		}
+		return transaction.FailInterface(fmt.Errorf("sanity check failed: identities are not sorted"))
 	}
 	if epochStateEntry.NextEpoch != nil && !epochStateEntry.NextEpoch.ActiveIdentities.Sorted(flow.IdentifierCanonical) {
-		return func(interface{}) error {
-			return fmt.Errorf("sanity check failed: next epoch identities are not sorted")
-		}
+		return transaction.FailInterface(fmt.Errorf("sanity check failed: next epoch identities are not sorted"))
 	}
 
 	// happy path: return anonymous function, whose future execution (as part of a transaction) will store the state entry.
-	return operation.OnlyWriterInterface(operation.InsertEpochProtocolState(epochProtocolStateEntryID, epochStateEntry))
+	return transaction.WithTxInterface(operation.InsertEpochProtocolState(epochProtocolStateEntryID, epochStateEntry))
 }
 
 // Index returns an anonymous function that is intended to be executed as part of a database transaction.
@@ -154,7 +152,6 @@ func (s *EpochProtocolStateEntries) StoreTx(epochProtocolStateEntryID flow.Ident
 //     _after_ validating the QC.
 //
 // Expected errors during normal operations:
-//   - TODO: add checks for this error
 //   - storage.ErrAlreadyExists if a state entry for the given blockID has already been indexed
 func (s *EpochProtocolStateEntries) Index(blockID flow.Identifier, epochProtocolStateEntryID flow.Identifier) func(interface{}) error {
 	return s.byBlockIdCache.PutTxInterface(blockID, epochProtocolStateEntryID)
@@ -164,7 +161,9 @@ func (s *EpochProtocolStateEntries) Index(blockID flow.Identifier, epochProtocol
 // Expected errors during normal operations:
 //   - storage.ErrNotFound if no protocol state with the given Identifier is known.
 func (s *EpochProtocolStateEntries) ByID(epochProtocolStateEntryID flow.Identifier) (*flow.RichEpochProtocolStateEntry, error) {
-	return s.cache.Get(epochProtocolStateEntryID)(s.db)
+	tx := s.db.NewTransaction(false)
+	defer tx.Discard()
+	return s.cache.Get(epochProtocolStateEntryID)(tx)
 }
 
 // ByBlockID retrieves the epoch protocol state entry that the block with the given ID proposes.
@@ -180,11 +179,13 @@ func (s *EpochProtocolStateEntries) ByID(epochProtocolStateEntryID flow.Identifi
 // Expected errors during normal operations:
 //   - storage.ErrNotFound if no state entry has been indexed for the given block.
 func (s *EpochProtocolStateEntries) ByBlockID(blockID flow.Identifier) (*flow.RichEpochProtocolStateEntry, error) {
-	epochProtocolStateEntryID, err := s.byBlockIdCache.Get(blockID)(s.db)
+	tx := s.db.NewTransaction(false)
+	defer tx.Discard()
+	epochProtocolStateEntryID, err := s.byBlockIdCache.Get(blockID)(tx)
 	if err != nil {
 		return nil, fmt.Errorf("could not lookup epoch protocol state ID for block (%x): %w", blockID[:], err)
 	}
-	return s.cache.Get(epochProtocolStateEntryID)(s.db)
+	return s.cache.Get(epochProtocolStateEntryID)(tx)
 }
 
 // newRichEpochProtocolStateEntry constructs a RichEpochProtocolStateEntry from an epoch sub-state entry.
