@@ -2,7 +2,6 @@ package storage
 
 import (
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
 // EpochProtocolStateEntries represents persistent, fork-aware storage for the Epoch-related
@@ -13,8 +12,9 @@ type EpochProtocolStateEntries interface {
 	// the Protocol State must be in canonical order for the current and next epoch (if present),
 	// otherwise an exception is returned.
 	// Expected errors of the returned anonymous function:
+	//   - TODO: no expected error to return
 	//   - storage.ErrAlreadyExists if an epoch sub-state with the given id is already stored
-	StoreTx(epochProtocolStateID flow.Identifier, epochProtocolStateEntry *flow.EpochProtocolStateEntry) func(*transaction.Tx) error
+	StoreTx(epochProtocolStateID flow.Identifier, epochProtocolStateEntry *flow.EpochProtocolStateEntry) func(interface{}) error
 
 	// Index returns an anonymous function that is intended to be executed as part of a database transaction.
 	// In a nutshell, we want to maintain a map from `blockID` to `epochProtocolStateID`, where `blockID` references the
@@ -29,8 +29,9 @@ type EpochProtocolStateEntries interface {
 	//     _after_ validating the QC.
 	//
 	// Expected errors during normal operations:
+	//   - TODO: no expected error to return
 	//   - storage.ErrAlreadyExists if a epoch sub-state for the given blockID has already been indexed
-	Index(blockID flow.Identifier, epochProtocolStateID flow.Identifier) func(*transaction.Tx) error
+	Index(blockID flow.Identifier, epochProtocolStateID flow.Identifier) func(interface{}) error
 
 	// ByID returns the flow.RichEpochProtocolStateEntry by its ID.
 	// Expected errors during normal operations:

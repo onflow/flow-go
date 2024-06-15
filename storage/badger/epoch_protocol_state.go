@@ -126,17 +126,17 @@ func NewEpochProtocolStateEntries(collector module.CacheMetrics,
 // otherwise an exception is returned.
 // Expected errors of the returned anonymous function:
 //   - storage.ErrAlreadyExists if a state entry with the given id is already stored
-func (s *EpochProtocolStateEntries) StoreTx(epochProtocolStateEntryID flow.Identifier, epochStateEntry *flow.EpochProtocolStateEntry) func(*transaction.Tx) error {
+func (s *EpochProtocolStateEntries) StoreTx(epochProtocolStateEntryID flow.Identifier, epochStateEntry *flow.EpochProtocolStateEntry) func(interface{}) error {
 	// front-load sanity checks:
 	if !epochStateEntry.CurrentEpoch.ActiveIdentities.Sorted(flow.IdentifierCanonical) {
-		return transaction.Fail(fmt.Errorf("sanity check failed: identities are not sorted"))
+		return transaction.FailInterface(fmt.Errorf("sanity check failed: identities are not sorted"))
 	}
 	if epochStateEntry.NextEpoch != nil && !epochStateEntry.NextEpoch.ActiveIdentities.Sorted(flow.IdentifierCanonical) {
-		return transaction.Fail(fmt.Errorf("sanity check failed: next epoch identities are not sorted"))
+		return transaction.FailInterface(fmt.Errorf("sanity check failed: next epoch identities are not sorted"))
 	}
 
 	// happy path: return anonymous function, whose future execution (as part of a transaction) will store the state entry.
-	return transaction.WithTx(operation.InsertEpochProtocolState(epochProtocolStateEntryID, epochStateEntry))
+	return transaction.WithTxInterface(operation.InsertEpochProtocolState(epochProtocolStateEntryID, epochStateEntry))
 }
 
 // Index returns an anonymous function that is intended to be executed as part of a database transaction.
@@ -153,8 +153,8 @@ func (s *EpochProtocolStateEntries) StoreTx(epochProtocolStateEntryID flow.Ident
 //
 // Expected errors during normal operations:
 //   - storage.ErrAlreadyExists if a state entry for the given blockID has already been indexed
-func (s *EpochProtocolStateEntries) Index(blockID flow.Identifier, epochProtocolStateEntryID flow.Identifier) func(*transaction.Tx) error {
-	return s.byBlockIdCache.PutTx(blockID, epochProtocolStateEntryID)
+func (s *EpochProtocolStateEntries) Index(blockID flow.Identifier, epochProtocolStateEntryID flow.Identifier) func(interface{}) error {
+	return s.byBlockIdCache.PutTxInterface(blockID, epochProtocolStateEntryID)
 }
 
 // ByID returns the epoch protocol state entry by its ID.
