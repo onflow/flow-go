@@ -7,7 +7,6 @@ import (
 	"os"
 
 	prometheusWAL "github.com/onflow/wal/wal"
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
@@ -60,6 +59,10 @@ func run(*cobra.Command, []string) {
 		log.Fatal().Err(err).Msg("cannot parse input")
 	}
 
+	if flagExecutionStateDir == flagOutputDir {
+		log.Fatal().Msg("output directory cannot be the same as the execution state directory")
+	}
+
 	segment, offset, err := searchRootHashInSegments(rootHash, flagExecutionStateDir, flagFrom, flagTo)
 	if err != nil {
 		log.Fatal().Err(err).Msg("cannot find root hash in segments")
@@ -96,14 +99,13 @@ func searchRootHashInSegments(
 	wantFrom, wantTo int,
 ) (int, int64, error) {
 	lg := zerolog.New(os.Stderr).With().Timestamp().Logger()
-	w, err := prometheusWAL.NewSize(lg, prometheus.DefaultRegisterer, dir, wal.SegmentSize, false)
-	if err != nil {
-		return 0, 0, fmt.Errorf("cannot create WAL: %w", err)
-	}
-
 	from, to, err := prometheusWAL.Segments(dir)
 	if err != nil {
 		return 0, 0, fmt.Errorf("cannot get segments: %w", err)
+	}
+
+	if from < 0 {
+		return 0, 0, fmt.Errorf("no segments found in %s", dir)
 	}
 
 	if wantFrom > to {
@@ -122,7 +124,7 @@ func searchRootHashInSegments(
 		to = wantTo
 	}
 
-	log.Info().
+	lg.Info().
 		Str("dir", dir).
 		Int("from", from).
 		Int("to", to).
@@ -131,7 +133,7 @@ func searchRootHashInSegments(
 		Msgf("searching for trie root hash %v in segments [%d,%d]", expectedHash, wantFrom, wantTo)
 
 	sr, err := prometheusWAL.NewSegmentsRangeReader(lg, prometheusWAL.SegmentRange{
-		Dir:   w.Dir(),
+		Dir:   dir,
 		First: from,
 		Last:  to,
 	})
