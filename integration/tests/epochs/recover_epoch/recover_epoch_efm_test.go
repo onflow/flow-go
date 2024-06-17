@@ -57,7 +57,6 @@ func (s *RecoverEpochSuite) TestRecoverEpoch() {
 	out := fmt.Sprintf("%s/recover-epoch-tx-args.josn", s.Net.BootstrapDir)
 
 	s.executeEFMRecoverTXArgsCMD(
-		flow.RoleConsensus,
 		collectionClusters,
 		numViewsInEpoch,
 		numViewsInStakingAuction,
