@@ -58,7 +58,7 @@ type Engine struct {
 	mu     sync.RWMutex                       // protects epochs map
 	epochs map[uint64]*RunningEpochComponents // epoch-scoped components per epoch
 
-	inProgressQCVote *atomic.Pointer[cancelFuncWrapper] // tracks the cancel callback of the in progress QC vote
+	inProgressQCVote *atomic.Pointer[context.CancelFunc] // tracks the cancel callback of the in progress QC vote
 
 	// internal event notifications
 	epochTransitionEvents        chan *flow.Header        // sends first block of new epoch
@@ -67,11 +67,6 @@ type Engine struct {
 	clusterIDUpdateDistributor   collection.ClusterEvents // sends cluster ID updates to consumers
 	cm                           *component.ComponentManager
 	component.Component
-}
-
-// cancelFuncWrapper wraps a context.CancelFunc, used to store the cancel func for an in progress QC vote.
-type cancelFuncWrapper struct {
-	cancel context.CancelFunc
 }
 
 var _ component.Component = (*Engine)(nil)
@@ -101,7 +96,7 @@ func New(
 		epochSetupPhaseStartedEvents: make(chan *flow.Header, 1),
 		epochStopEvents:              make(chan uint64, 1),
 		clusterIDUpdateDistributor:   clusterIDUpdateDistributor,
-		inProgressQCVote:             atomic.NewPointer[cancelFuncWrapper](&cancelFuncWrapper{cancel: nil}),
+		inProgressQCVote:             atomic.NewPointer[context.CancelFunc](nil),
 	}
 
 	e.cm = component.NewComponentManagerBuilder().
@@ -463,7 +458,7 @@ func (e *Engine) onEpochSetupPhaseStarted(ctx irrecoverable.SignalerContext, nex
 	ctxWithCancel, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	e.inProgressQCVote.Store(&cancelFuncWrapper{cancel})
+	e.inProgressQCVote.Store(&cancel)
 
 	err := e.voter.Vote(ctxWithCancel, nextEpoch)
 	if err != nil {
@@ -569,9 +564,9 @@ func (e *Engine) activeClusterIDs() (flow.ChainIDList, error) {
 
 // stopInProgressQcVote cancels the context for all in progress root qc voting.
 func (e *Engine) stopInProgressQcVote() {
-	c := e.inProgressQCVote.Load()
-	if c != nil && c.cancel != nil {
+	cancel := e.inProgressQCVote.Load()
+	if cancel != nil {
 		e.log.Warn().Msgf("voting for cluster root block cancelled")
-		c.cancel() // cancel
+		(*cancel)() // cancel
 	}
 }
