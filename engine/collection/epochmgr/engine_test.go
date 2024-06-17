@@ -534,9 +534,10 @@ func (suite *Suite) TestRespondToEpochTransition() {
 }
 
 // TestStopQcVoting tests that, if we encounter an EpochEmergencyFallbackTriggered event
-// the engine will stop in progress QC voting. The engine keeps track of current in process
-// qc voting by keeping a map of context cancel funcs. When the EFM event is encountered each
-// cancel func will be invoked and all voting processes will stop.
+// the engine will stop in progress QC voting. The engine keeps track of the current in progress
+// qc vote by keeping a pointer to the cancel func for the context of that process.
+// When the EFM event is encountered and voting is in progress the cancel func will be invoked
+// and the voting process will be stopped.
 func (suite *Suite) TestStopQcVoting() {
 	// we expect 1 ActiveClustersChanged events when the engine first starts and the first set of epoch components are started
 	suite.engineEventsDistributor.On("ActiveClustersChanged", mock.AnythingOfType("flow.ChainIDList")).Once()
