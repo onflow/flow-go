@@ -148,18 +148,23 @@ func searchRootHashInSegments(
 
 	for reader.Next() {
 		record := reader.Record()
-		operation, rootHash, _, err := wal.Decode(record)
+		operation, _, update, err := wal.Decode(record)
 		if err != nil {
 			return 0, 0, fmt.Errorf("cannot decode LedgerWAL record: %w", err)
 		}
 
-		log.Debug().
+		lg = lg.With().
 			Uint8("operation", uint8(operation)).
-			Str("root-hash", rootHash.String()).
-			Msgf("read LedgerWAL record")
+			Logger()
 
 		switch operation {
 		case wal.WALUpdate:
+			rootHash := update.RootHash
+
+			lg.Debug().
+				Str("root-hash", rootHash.String()).
+				Msg("found WALUpdate")
+
 			if rootHash.Equals(expectedHash) {
 				log.Info().Msgf("found expected trie root hash %v", rootHash)
 				return reader.Segment(), reader.Offset(), nil
@@ -204,19 +209,22 @@ func copyWAL(dir, outputDir string, segment int, expectedRoot ledger.RootHash) e
 
 	for reader.Next() {
 		record := reader.Record()
-		operation, rootHash, update, err := wal.Decode(record)
+		operation, _, update, err := wal.Decode(record)
 		if err != nil {
 			return fmt.Errorf("cannot decode LedgerWAL record: %w", err)
 		}
 
-		bytes := wal.EncodeUpdate(update)
-		_, err = writer.Log(bytes)
-		if err != nil {
-			return fmt.Errorf("cannot write LedgerWAL record: %w", err)
-		}
-
 		switch operation {
 		case wal.WALUpdate:
+
+			bytes := wal.EncodeUpdate(update)
+			_, err = writer.Log(bytes)
+			if err != nil {
+				return fmt.Errorf("cannot write LedgerWAL record: %w", err)
+			}
+
+			rootHash := update.RootHash
+
 			if rootHash.Equals(expectedRoot) {
 				log.Info().Msgf("found expected trie root hash %v, finish writing", rootHash)
 				return nil
