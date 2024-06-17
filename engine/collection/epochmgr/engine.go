@@ -472,7 +472,6 @@ func (e *Engine) onEpochSetupPhaseStarted(ctx irrecoverable.SignalerContext, nex
 		ctx.Throw(fmt.Errorf("unexpected failure to submit QC vote for next epoch: %w", err))
 	}
 
-	e.inProgressQCVote.Swap(nil)
 	cancel()
 }
 
