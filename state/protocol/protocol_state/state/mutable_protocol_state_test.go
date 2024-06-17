@@ -33,7 +33,7 @@ type StateMutatorSuite struct {
 	headersDB               storagemock.Headers
 	resultsDB               storagemock.ExecutionResults
 	protocolKVStoreDB       protocol_statemock.ProtocolKVStore
-	epochProtocolStateDB    storagemock.ProtocolState
+	epochProtocolStateDB    storagemock.EpochProtocolStateEntries
 	globalParams            psmock.GlobalParams
 	kvStateMachines         []protocol_statemock.OrthogonalStoreStateMachine[protocol.KVStoreReader]
 	kvStateMachineFactories []protocol_statemock.KeyValueStoreStateMachineFactory
@@ -48,7 +48,7 @@ type StateMutatorSuite struct {
 }
 
 func (s *StateMutatorSuite) SetupTest() {
-	s.epochProtocolStateDB = *storagemock.NewProtocolState(s.T())
+	s.epochProtocolStateDB = *storagemock.NewEpochProtocolStateEntries(s.T())
 	s.protocolKVStoreDB = *protocol_statemock.NewProtocolKVStore(s.T())
 	s.globalParams = *psmock.NewGlobalParams(s.T())
 	s.headersDB = *storagemock.NewHeaders(s.T())

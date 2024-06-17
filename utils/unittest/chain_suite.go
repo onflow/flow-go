@@ -258,6 +258,13 @@ func (bc *BaseChainSuite) SetupChain() {
 			return nil
 		},
 	)
+	bc.HeadersDB.On("Exists", mock.Anything).Return(
+		func(blockID flow.Identifier) bool {
+			_, found := bc.Blocks[blockID]
+			return found
+		},
+		func(blockID flow.Identifier) error { return nil },
+	)
 	bc.HeadersDB.On("ByHeight", mock.Anything).Return(
 		func(blockHeight uint64) *flow.Header {
 			for _, b := range bc.Blocks {
@@ -475,7 +482,7 @@ type subgraphFixture struct {
 	Approvals          map[uint64]map[flow.Identifier]*flow.ResultApproval // chunkIndex -> Verifier Node ID -> Approval
 }
 
-// Generates a valid subgraph:
+// ValidSubgraphFixture generates a valid subgraph:
 // let
 //   - R1 be a result which pertains to blockA
 //   - R2 be R1's previous result,
@@ -566,7 +573,7 @@ func (bc *BaseChainSuite) Extend(block *flow.Block) {
 	}
 }
 
-// addSubgraphFixtureToMempools adds add entities in subgraph to mempools and persistent storage mocks
+// AddSubgraphFixtureToMempools adds entities in subgraph to mempools and persistent storage mocks
 func (bc *BaseChainSuite) AddSubgraphFixtureToMempools(subgraph subgraphFixture) {
 	bc.Blocks[subgraph.ParentBlock.ID()] = subgraph.ParentBlock
 	bc.Blocks[subgraph.Block.ID()] = subgraph.Block

@@ -65,9 +65,12 @@ func (suite *EpochLookupSuite) SetupTest() {
 		func() flow.EpochPhase { return suite.Phase() },
 		func() error { return nil })
 
-	suite.params.On("EpochFallbackTriggered").Return(
-		func() bool { return suite.EpochFallbackTriggered() },
-		func() error { return nil })
+	epochProtocolState := mockprotocol.NewEpochProtocolState(suite.T())
+	epochProtocolState.On("EpochFallbackTriggered").Return(
+		suite.EpochFallbackTriggered,
+		func() error { return nil },
+	)
+	suite.snapshot.On("EpochProtocolState").Return(epochProtocolState, nil)
 
 	suite.state.On("Final").Return(suite.snapshot)
 	suite.state.On("Params").Return(suite.params)
@@ -241,8 +244,9 @@ func (suite *EpochLookupSuite) TestProtocolEvents_CommittedEpoch() {
 // validates correctness by issuing various queries, using the input state and
 // epochs as source of truth.
 func testEpochForViewWithFallback(t *testing.T, lookup *EpochLookup, state protocol.State, epochs ...epochRange) {
-	epochFallbackTriggered, err := state.Params().EpochFallbackTriggered()
+	epochProtocolState, err := state.Final().EpochProtocolState()
 	require.NoError(t, err)
+	epochFallbackTriggered := epochProtocolState.EpochFallbackTriggered()
 
 	t.Run("should have set epoch fallback triggered correctly", func(t *testing.T) {
 		assert.Equal(t, epochFallbackTriggered, lookup.epochFallbackIsTriggered.Load())

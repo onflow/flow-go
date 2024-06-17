@@ -112,6 +112,7 @@ func newEmergencyFallbackEpoch(lastCommittedEpoch *staticEpochInfo) (*staticEpoc
 
 // Consensus represents the main committee for consensus nodes. The consensus
 // committee might be active for multiple successive epochs.
+// TODO(EFM, #5730): This implementation does not yet understand EFM recovery and needs to be updated.
 type Consensus struct {
 	state                  protocol.State              // the protocol state
 	me                     flow.Identifier             // the node ID of this node
@@ -146,8 +147,6 @@ func NewConsensusCommittee(state protocol.State, me flow.Identifier) (*Consensus
 
 	// pre-compute leader selection for all presently relevant committed epochs
 	epochs := make([]protocol.Epoch, 0, 3)
-	// we always prepare the current epoch
-	epochs = append(epochs, final.Epochs().Current())
 
 	// we prepare the previous epoch, if one exists
 	exists, err := protocol.PreviousEpochExists(final)
@@ -157,6 +156,9 @@ func NewConsensusCommittee(state protocol.State, me flow.Identifier) (*Consensus
 	if exists {
 		epochs = append(epochs, final.Epochs().Previous())
 	}
+
+	// we always prepare the current epoch
+	epochs = append(epochs, final.Epochs().Current())
 
 	// we prepare the next epoch, if it is committed
 	phase, err := final.Phase()
@@ -174,12 +176,14 @@ func NewConsensusCommittee(state protocol.State, me flow.Identifier) (*Consensus
 		}
 	}
 
-	// if epoch emergency fallback was triggered, inject the fallback epoch
-	triggered, err := state.Params().EpochFallbackTriggered()
+	epochStateSnapshot, err := final.EpochProtocolState()
 	if err != nil {
-		return nil, fmt.Errorf("could not check epoch fallback: %w", err)
+		return nil, fmt.Errorf("could not retrieve epoch protocol state: %w", err)
 	}
-	if triggered {
+
+	// if epoch emergency fallback was triggered, inject the fallback epoch
+	// TODO(EFM, #6020): consider replacing with phase check when it's available
+	if epochStateSnapshot.EpochFallbackTriggered() {
 		err = com.onEpochEmergencyFallbackTriggered()
 		if err != nil {
 			return nil, fmt.Errorf("could not prepare emergency fallback epoch: %w", err)

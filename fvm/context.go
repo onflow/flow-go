@@ -7,6 +7,7 @@ import (
 	otelTrace "go.opentelemetry.io/otel/trace"
 
 	"github.com/onflow/flow-go/fvm/environment"
+	"github.com/onflow/flow-go/fvm/evm/debug"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/fvm/storage/state"
@@ -46,6 +47,8 @@ type Context struct {
 	// AllowProgramCacheWritesInScripts determines if the program cache can be written to in scripts
 	// By default, the program cache is only updated by transactions.
 	AllowProgramCacheWritesInScripts bool
+
+	debug.EVMTracer
 }
 
 // NewContext initializes a new execution context with the provided options.
@@ -76,6 +79,7 @@ func defaultContext() Context {
 		MaxStateInteractionSize:           DefaultMaxInteractionSize,
 		TransactionExecutorParams:         DefaultTransactionExecutorParams(),
 		EnvironmentParams:                 environment.DefaultEnvironmentParams(),
+		EVMTracer:                         debug.NopTracer,
 	}
 	return ctx
 }
@@ -377,6 +381,14 @@ func WithEVMEnabled(enabled bool) Option {
 func WithAllowProgramCacheWritesInScriptsEnabled(enabled bool) Option {
 	return func(ctx Context) Context {
 		ctx.AllowProgramCacheWritesInScripts = enabled
+		return ctx
+	}
+}
+
+// WithEVMTracer will set the evm execution tracer
+func WithEVMTracer(tracer debug.EVMTracer) Option {
+	return func(ctx Context) Context {
+		ctx.EVMTracer = tracer
 		return ctx
 	}
 }

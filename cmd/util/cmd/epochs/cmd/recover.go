@@ -14,6 +14,7 @@ import (
 	epochcmdutil "github.com/onflow/flow-go/cmd/util/cmd/epochs/utils"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/module/grpcclient"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 )
 
@@ -47,7 +48,6 @@ This recovery process has some constraints:
 	flagOut                      string
 	flagAnAddress                string
 	flagAnPubkey                 string
-	flagAnInsecure               bool
 	flagInternalNodePrivInfoDir  string
 	flagNodeConfigJson           string
 	flagCollectionClusters       int
@@ -71,7 +71,6 @@ func addGenerateRecoverEpochTxArgsCmdFlags() error {
 	generateRecoverEpochTxArgsCmd.Flags().StringVar(&flagOut, "out", "", "file to write tx args output")
 	generateRecoverEpochTxArgsCmd.Flags().StringVar(&flagAnAddress, "access-address", "", "the address of the access node used for client connections")
 	generateRecoverEpochTxArgsCmd.Flags().StringVar(&flagAnPubkey, "access-network-key", "", "the network key of the access node used for client connections in hex string format")
-	generateRecoverEpochTxArgsCmd.Flags().BoolVar(&flagAnInsecure, "insecure", true, "set to true if the protocol snapshot should be retrieved from the insecure AN endpoint")
 	generateRecoverEpochTxArgsCmd.Flags().IntVar(&flagCollectionClusters, "collection-clusters", 0,
 		"number of collection clusters")
 	// required parameters for network configuration and generation of root node identities
@@ -118,12 +117,12 @@ func addGenerateRecoverEpochTxArgsCmdFlags() error {
 
 func getSnapshot() *inmem.Snapshot {
 	// get flow client with secure client connection to download protocol snapshot from access node
-	config, err := common.NewFlowClientConfig(flagAnAddress, flagAnPubkey, flow.ZeroID, flagAnInsecure)
+	config, err := grpcclient.NewFlowClientConfig(flagAnAddress, flagAnPubkey, flow.ZeroID, false)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to create flow client config")
 	}
 
-	flowClient, err := common.FlowClient(config)
+	flowClient, err := grpcclient.FlowClient(config)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to create flow client")
 	}
