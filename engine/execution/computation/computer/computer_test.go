@@ -45,6 +45,7 @@ import (
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/epochs"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/provider"
@@ -155,13 +156,10 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			Times(2) // 1 collection + system collection
 
 		exemetrics.On("ExecutionTransactionExecuted",
-			mock.Anything, // duration
-			mock.Anything, // conflict retry count
-			mock.Anything, // computation used
-			mock.Anything, // memory used
-			mock.Anything, // number of events
-			mock.Anything, // size of events
-			false).        // no failure
+			mock.Anything,
+			mock.MatchedBy(func(arg module.TransactionExecutionResultStats) bool {
+				return !arg.Failed // only successful transactions
+			})).
 			Return(nil).
 			Times(2 + 1) // 2 txs in collection + system chunk tx
 
@@ -1267,12 +1265,11 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 
 	metrics.On("ExecutionTransactionExecuted",
 		mock.Anything, // duration
-		mock.Anything, // conflict retry count
-		mock.Anything, // computation used
-		mock.Anything, // memory used
-		expectedNumberOfEvents,
-		expectedEventSize,
-		false).
+		mock.MatchedBy(func(arg module.TransactionExecutionResultStats) bool {
+			return arg.EventCounts == expectedNumberOfEvents &&
+				arg.EventSize == expectedEventSize &&
+				!arg.Failed
+		})).
 		Return(nil).
 		Times(1) // system chunk tx
 

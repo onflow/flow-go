@@ -2,16 +2,14 @@ package diff_states
 
 import (
 	"bytes"
+	"context"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"fmt"
-	"math"
 
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
-	"go.uber.org/atomic"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/migrations"
@@ -19,11 +17,8 @@ import (
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
 	"github.com/onflow/flow-go/cmd/util/ledger/util/registers"
 	"github.com/onflow/flow-go/ledger"
-	"github.com/onflow/flow-go/ledger/common/pathfinder"
-	"github.com/onflow/flow-go/ledger/complete"
-	"github.com/onflow/flow-go/ledger/complete/wal"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/metrics"
+	moduleUtil "github.com/onflow/flow-go/module/util"
 )
 
 var (
@@ -46,6 +41,13 @@ var Cmd = &cobra.Command{
 }
 
 const ReporterName = "state-diff"
+
+type state uint8
+
+const (
+	oldState state = 1
+	newState state = 2
+)
 
 func init() {
 
@@ -184,7 +186,10 @@ func run(*cobra.Command, []string) {
 		}
 	}
 
-	diff(registers1, registers2, chainID, rw)
+	err := diff(registers1, registers2, chainID, rw, flagNWorker)
+	if err != nil {
+		log.Warn().Err(err).Msgf("failed to diff registers")
+	}
 }
 
 func loadPayloads() (payloads1, payloads2 []*ledger.Payload) {
@@ -199,8 +204,8 @@ func loadPayloads() (payloads1, payloads2 []*ledger.Payload) {
 		} else {
 			log.Info().Msg("Reading first trie")
 
-			stateCommitment := parseStateCommitment(flagStateCommitment1)
-			payloads1, err = readTrie(flagState1, stateCommitment)
+			stateCommitment := util.ParseStateCommitment(flagStateCommitment1)
+			payloads1, err = util.ReadTrie(flagState1, stateCommitment)
 		}
 		return
 	})
@@ -211,8 +216,8 @@ func loadPayloads() (payloads1, payloads2 []*ledger.Payload) {
 		} else {
 			log.Info().Msg("Reading second trie")
 
-			stateCommitment := parseStateCommitment(flagStateCommitment2)
-			payloads2, err = readTrie(flagState2, stateCommitment)
+			stateCommitment := util.ParseStateCommitment(flagStateCommitment2)
+			payloads2, err = util.ReadTrie(flagState2, stateCommitment)
 		}
 		return
 	})
@@ -273,195 +278,248 @@ func payloadsToRegisters(payloads1, payloads2 []*ledger.Payload) (registers1, re
 
 var accountsDiffer = errors.New("accounts differ")
 
+func diffAccount(
+	owner string,
+	accountRegisters1 *registers.AccountRegisters,
+	accountRegisters2 *registers.AccountRegisters,
+	chainID flow.ChainID,
+	rw reporters.ReportWriter,
+) (err error) {
+
+	if accountRegisters1.Count() != accountRegisters2.Count() {
+		rw.Write(countDiff{
+			Owner:  owner,
+			State1: accountRegisters1.Count(),
+			State2: accountRegisters2.Count(),
+		})
+	}
+
+	err = accountRegisters1.ForEach(func(owner, key string, value1 []byte) error {
+		var value2 []byte
+		value2, err = accountRegisters2.Get(owner, key)
+		if err != nil {
+			return err
+		}
+
+		if !bytes.Equal(value1, value2) {
+
+			if flagRaw {
+				rw.Write(rawDiff{
+					Owner:  owner,
+					Key:    key,
+					Value1: value1,
+					Value2: value2,
+				})
+			} else {
+				// stop on first difference in accounts
+				return accountsDiffer
+			}
+		}
+
+		return nil
+	})
+	if err != nil {
+		if flagRaw || !errors.Is(err, accountsDiffer) {
+			return err
+		}
+
+		address, err := common.BytesToAddress([]byte(owner))
+		if err != nil {
+			return err
+		}
+
+		migrations.NewCadenceValueDiffReporter(
+			address,
+			chainID,
+			rw,
+			true,
+			flagNWorker/2,
+		).DiffStates(
+			accountRegisters1,
+			accountRegisters2,
+			migrations.AllStorageMapDomains,
+		)
+	}
+
+	return nil
+}
+
 func diff(
 	registers1 *registers.ByAccount,
 	registers2 *registers.ByAccount,
 	chainID flow.ChainID,
 	rw reporters.ReportWriter,
-) {
-	log.Info().Msg("Diffing accounts")
+	nWorkers int,
+) error {
+	log.Info().Msgf("Diffing %d accounts", registers1.AccountCount())
 
-	err := registers1.ForEachAccount(func(accountRegisters1 *registers.AccountRegisters) (err error) {
-		owner := accountRegisters1.Owner()
+	if registers1.AccountCount() < nWorkers {
+		nWorkers = registers1.AccountCount()
+	}
 
-		if !registers2.HasAccountOwner(owner) {
-			rw.Write(accountMissing{
-				Owner: owner,
-				State: 2,
-			})
+	logAccount := moduleUtil.LogProgress(
+		log.Logger,
+		moduleUtil.DefaultLogProgressConfig(
+			"processing account group",
+			registers1.AccountCount(),
+		),
+	)
 
-			return nil
-		}
+	if nWorkers <= 1 {
+		foundAccountCountInRegisters2 := 0
 
-		accountRegisters2 := registers2.AccountRegisters(owner)
+		_ = registers1.ForEachAccount(func(accountRegisters1 *registers.AccountRegisters) (err error) {
+			owner := accountRegisters1.Owner()
 
-		if accountRegisters1.Count() != accountRegisters2.Count() {
-			rw.Write(countDiff{
-				Owner:  owner,
-				State1: accountRegisters1.Count(),
-				State2: accountRegisters2.Count(),
-			})
-		}
+			if !registers2.HasAccountOwner(owner) {
+				rw.Write(accountMissing{
+					Owner: owner,
+					State: int(newState),
+				})
 
-		err = accountRegisters1.ForEach(func(owner, key string, value1 []byte) error {
-			var value2 []byte
-			value2, err = accountRegisters2.Get(owner, key)
-			if err != nil {
-				return err
+				return nil
 			}
 
-			if !bytes.Equal(value1, value2) {
+			foundAccountCountInRegisters2++
 
-				if flagRaw {
-					rw.Write(rawDiff{
-						Owner:  owner,
-						Key:    key,
-						Value1: value1,
-						Value2: value2,
+			accountRegisters2 := registers2.AccountRegisters(owner)
+
+			err = diffAccount(
+				owner,
+				accountRegisters1,
+				accountRegisters2,
+				chainID,
+				rw,
+			)
+			if err != nil {
+				log.Warn().Err(err).Msgf("failed to diff account %x", []byte(owner))
+			}
+
+			logAccount(1)
+
+			return nil
+		})
+
+		if foundAccountCountInRegisters2 < registers2.AccountCount() {
+			_ = registers2.ForEachAccount(func(accountRegisters2 *registers.AccountRegisters) error {
+				owner := accountRegisters2.Owner()
+				if !registers1.HasAccountOwner(owner) {
+					rw.Write(accountMissing{
+						Owner: owner,
+						State: int(oldState),
 					})
-				} else {
-					// stop on first difference in accounts
-					return accountsDiffer
 				}
+				return nil
+			})
+		}
+
+		return nil
+	}
+
+	type job struct {
+		owner             string
+		accountRegisters1 *registers.AccountRegisters
+		accountRegisters2 *registers.AccountRegisters
+	}
+
+	type result struct {
+		owner string
+		err   error
+	}
+
+	jobs := make(chan job, nWorkers)
+
+	results := make(chan result, nWorkers)
+
+	g, ctx := errgroup.WithContext(context.Background())
+
+	// Launch goroutines to diff accounts
+	for i := 0; i < nWorkers; i++ {
+		g.Go(func() (err error) {
+			for job := range jobs {
+				err := diffAccount(
+					job.owner,
+					job.accountRegisters1,
+					job.accountRegisters2,
+					chainID,
+					rw,
+				)
+
+				select {
+				case results <- result{owner: job.owner, err: err}:
+				case <-ctx.Done():
+					return ctx.Err()
+				}
+			}
+			return nil
+		})
+	}
+
+	// Launch goroutine to wait for workers and close result channel
+	go func() {
+		_ = g.Wait()
+		close(results)
+	}()
+
+	// Launch goroutine to send account registers to jobs channel
+	go func() {
+		defer close(jobs)
+
+		foundAccountCountInRegisters2 := 0
+
+		_ = registers1.ForEachAccount(func(accountRegisters1 *registers.AccountRegisters) (err error) {
+			owner := accountRegisters1.Owner()
+			if !registers2.HasAccountOwner(owner) {
+				rw.Write(accountMissing{
+					Owner: owner,
+					State: int(newState),
+				})
+
+				return nil
+			}
+
+			foundAccountCountInRegisters2++
+
+			accountRegisters2 := registers2.AccountRegisters(owner)
+
+			jobs <- job{
+				owner:             owner,
+				accountRegisters1: accountRegisters1,
+				accountRegisters2: accountRegisters2,
 			}
 
 			return nil
 		})
-		if err != nil {
-			if flagRaw || !errors.Is(err, accountsDiffer) {
-				return err
-			}
 
-			address, err := common.BytesToAddress([]byte(owner))
-			if err != nil {
-				return err
-			}
-
-			migrations.NewCadenceValueDiffReporter(
-				address,
-				chainID,
-				rw,
-				true,
-				flagNWorker,
-			).DiffStates(
-				accountRegisters1,
-				accountRegisters2,
-				migrations.AllStorageMapDomains,
-			)
-		}
-
-		return nil
-	})
-	if err != nil {
-		log.Fatal().Err(err).Msg("failed to diff")
-	}
-
-	err = registers2.ForEachAccount(func(accountRegisters2 *registers.AccountRegisters) (err error) {
-		owner := accountRegisters2.Owner()
-
-		if !registers1.HasAccountOwner(owner) {
-			rw.Write(accountMissing{
-				Owner: owner,
-				State: 1,
+		if foundAccountCountInRegisters2 < registers2.AccountCount() {
+			_ = registers2.ForEachAccount(func(accountRegisters2 *registers.AccountRegisters) (err error) {
+				owner := accountRegisters2.Owner()
+				if !registers1.HasAccountOwner(owner) {
+					rw.Write(accountMissing{
+						Owner: owner,
+						State: int(oldState),
+					})
+				}
+				return nil
 			})
-			return nil
 		}
-
-		return nil
-	})
-	if err != nil {
-		log.Fatal().Err(err).Msg("failed to diff")
-	}
-
-	log.Info().Msg("Finished diffing accounts")
-
-}
-
-func readTrie(dir string, targetHash flow.StateCommitment) ([]*ledger.Payload, error) {
-	log.Info().Msg("init WAL")
-
-	diskWal, err := wal.NewDiskWAL(
-		log.Logger,
-		nil,
-		metrics.NewNoopCollector(),
-		dir,
-		complete.DefaultCacheSize,
-		pathfinder.PathByteSize,
-		wal.SegmentSize,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("cannot create disk WAL: %w", err)
-	}
-
-	log.Info().Msg("init ledger")
-
-	led, err := complete.NewLedger(
-		diskWal,
-		complete.DefaultCacheSize,
-		&metrics.NoopCollector{},
-		log.Logger,
-		complete.DefaultPathFinderVersion)
-	if err != nil {
-		return nil, fmt.Errorf("cannot create ledger from write-a-head logs and checkpoints: %w", err)
-	}
-
-	const (
-		checkpointDistance = math.MaxInt // A large number to prevent checkpoint creation.
-		checkpointsToKeep  = 1
-	)
-
-	log.Info().Msg("init compactor")
-
-	compactor, err := complete.NewCompactor(
-		led,
-		diskWal,
-		log.Logger,
-		complete.DefaultCacheSize,
-		checkpointDistance,
-		checkpointsToKeep,
-		atomic.NewBool(false),
-		&metrics.NoopCollector{},
-	)
-	if err != nil {
-		return nil, fmt.Errorf("cannot create compactor: %w", err)
-	}
-
-	log.Info().Msgf("waiting for compactor to load checkpoint and WAL")
-
-	<-compactor.Ready()
-
-	defer func() {
-		<-led.Done()
-		<-compactor.Done()
 	}()
 
-	state := ledger.State(targetHash)
-
-	trie, err := led.Trie(ledger.RootHash(state))
-	if err != nil {
-		s, _ := led.MostRecentTouchedState()
-		log.Info().
-			Str("hash", s.String()).
-			Msgf("Most recently touched state")
-		return nil, fmt.Errorf("cannot get trie at the given state commitment: %w", err)
+	// Gather results
+	for result := range results {
+		logAccount(1)
+		if result.err != nil {
+			log.Warn().Err(result.err).Msgf("failed to diff account %x", []byte(result.owner))
+		}
 	}
 
-	return trie.AllPayloads(), nil
-}
+	log.Info().Msgf("Finished diffing accounts, waiting for goroutines...")
 
-func parseStateCommitment(stateCommitmentHex string) flow.StateCommitment {
-	var err error
-	stateCommitmentBytes, err := hex.DecodeString(stateCommitmentHex)
-	if err != nil {
-		log.Fatal().Err(err).Msg("cannot get decode the state commitment")
+	if err := g.Wait(); err != nil {
+		return err
 	}
 
-	stateCommitment, err := flow.ToStateCommitment(stateCommitmentBytes)
-	if err != nil {
-		log.Fatal().Err(err).Msg("invalid state commitment length")
-	}
-
-	return stateCommitment
+	return nil
 }
 
 type rawDiff struct {
