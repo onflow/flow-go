@@ -554,9 +554,11 @@ func (e *Engine) removeEpoch(counter uint64) {
 func (e *Engine) activeClusterIDs() (flow.ChainIDList, error) {
 	e.mu.RLock()
 	clusterIDs := make(flow.ChainIDList, len(e.epochs))
-	for i, epoch := range e.epochs {
+	i := 0
+	for _, epoch := range e.epochs {
 		chainID := epoch.state.Params().ChainID() // cached, does not hit database
 		clusterIDs[i] = chainID
+		i++
 	}
 	e.mu.RUnlock()
 	return clusterIDs, nil
