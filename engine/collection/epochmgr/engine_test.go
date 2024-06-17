@@ -575,7 +575,7 @@ func (suite *Suite) TestStopQcVoting() {
 	// simulate processing efm triggered event, this should cancel all in progress voting
 	suite.engine.EpochEmergencyFallbackTriggered()
 
-	unittest.AssertClosesBefore(suite.T(), done, 3*time.Second)
+	unittest.AssertClosesBefore(suite.T(), done, time.Second)
 
 	require.Nil(suite.T(), suite.engine.inProgressQCVote.Load(), "expected qc vote to be cancelled")
 }
