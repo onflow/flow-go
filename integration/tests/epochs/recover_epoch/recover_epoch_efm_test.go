@@ -36,7 +36,8 @@ func (s *RecoverEpochSuite) TestRecoverEpoch() {
 	epoch1FinalView, err := s.Net.BootstrapSnapshot.Epochs().Current().FinalView()
 	require.NoError(s.T(), err)
 
-	// wait for at least the first block of the next epoch to be sealed before we pause our container to replace
+	// wait for at least the first block of the next epoch to be sealed so that we can
+	// ensure that we are still in the same epoch after the final view of that epoch indicating we are in EFM
 	s.TimedLogf("waiting for epoch transition (finalized view %d) before pausing container", epoch1FinalView+1)
 	s.AwaitFinalizedView(s.Ctx, epoch1FinalView+1, 2*time.Minute, 500*time.Millisecond)
 	s.TimedLogf("observed finalized view %d -> pausing container", epoch1FinalView+1)
