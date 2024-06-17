@@ -540,32 +540,15 @@ func (suite *Suite) TestRespondToEpochTransition() {
 func (suite *Suite) TestStopQcVoting() {
 	// we expect 1 ActiveClustersChanged events when the engine first starts and the first set of epoch components are started
 	suite.engineEventsDistributor.On("ActiveClustersChanged", mock.AnythingOfType("flow.ChainIDList")).Once()
-	defer suite.engineEventsDistributor.AssertExpectations(suite.T())
 
-	// wait for 2 seconds before returning from the Vote func, giving our engine enough time to cancel the context
-	waitFor := 2 * time.Second
-	numOfCancelledVotes := 0
-	// in addition to our 3 simulated votes the engine will attempt to vote on startup
-	expectedNumOfCancelledVotes := 1
-	done := make(chan struct{})
+	receivedCancelSignal := make(chan struct{})
 	suite.voter.On("Vote", mock.Anything, suite.epochQuery.Next()).
 		Return(nil).
 		Run(func(args mock.Arguments) {
 			ctx := args.Get(0).(context.Context)
-			timeout := time.After(waitFor)
-			for {
-				select {
-				case <-ctx.Done():
-					numOfCancelledVotes++
-					if numOfCancelledVotes == expectedNumOfCancelledVotes {
-						close(done)
-						return
-					}
-				case <-timeout:
-					return
-				}
-			}
-		}).Times(expectedNumOfCancelledVotes)
+			<-ctx.Done()
+			close(receivedCancelSignal)
+		}).Once()
 
 	// we are in setup phase, forces engine to start voting on startup
 	suite.phase = flow.EpochPhaseSetup
@@ -573,12 +556,12 @@ func (suite *Suite) TestStopQcVoting() {
 	// start up the engine
 	suite.StartEngine()
 
-	require.Equal(suite.T(), 1, len(suite.engine.inProgressQCVotes))
+	require.NotNil(suite.T(), suite.engine.inProgressQCVote.Load(), "expected qc vote to be in progress")
 
 	// simulate processing efm triggered event, this should cancel all in progress voting
 	suite.engine.EpochEmergencyFallbackTriggered()
 
-	unittest.AssertClosesBefore(suite.T(), done, 3*time.Second)
+	unittest.AssertClosesBefore(suite.T(), done, time.Second)
 
-	require.Equal(suite.T(), 0, len(suite.engine.inProgressQCVotes))
+	require.Nil(suite.T(), suite.engine.inProgressQCVote.Load(), "expected qc vote to be cancelled")
 }

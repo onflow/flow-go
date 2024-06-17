@@ -46,6 +46,7 @@ func TestRegisterBootstrap_IndexCheckpointFile_Happy(t *testing.T) {
 	rootHeight := uint64(10000)
 	unittest.RunWithTempDir(t, func(dir string) {
 		tries, registerIDs := simpleTrieWithValidRegisterIDs(t)
+		// exclude the empty trie
 		rootHash := tries[0].RootHash()
 		fileName := "simple-checkpoint"
 		require.NoErrorf(t, wal.StoreCheckpointV6Concurrently(tries, dir, fileName, log), "fail to store checkpoint")
@@ -221,7 +222,7 @@ func trieWithValidRegisterIDs(t *testing.T, n uint16) ([]*trie.MTrie, []*flow.Re
 	// make sure it has at least 1 leaf node
 	require.GreaterOrEqual(t, depth, uint16(1))
 	require.NoError(t, err)
-	resultTries := []*trie.MTrie{emptyTrie, populatedTrie}
+	resultTries := []*trie.MTrie{populatedTrie}
 	return resultTries, resultRegisterIDs
 }
 
@@ -231,8 +232,8 @@ func randomRegisterPayloads(n uint16) []ledger.Payload {
 		o := make([]byte, 0, 8)
 		o = binary.BigEndian.AppendUint16(o, n)
 		k := ledger.Key{KeyParts: []ledger.KeyPart{
-			{Type: convert.KeyPartOwner, Value: o},
-			{Type: convert.KeyPartKey, Value: o},
+			{Type: ledger.KeyPartOwner, Value: o},
+			{Type: ledger.KeyPartKey, Value: o},
 		}}
 		// values are always 'v' for ease of testing/checking
 		v := ledger.Value{defaultRegisterValue}

@@ -23,15 +23,6 @@ func FromSnapshot(from protocol.Snapshot) (*Snapshot, error) {
 	)
 
 	// convert top-level fields
-	snap.Head, err = from.Head()
-	if err != nil {
-		return nil, fmt.Errorf("could not get head: %w", err)
-	}
-	snap.LatestResult, snap.LatestSeal, err = from.SealedResult()
-	if err != nil {
-		return nil, fmt.Errorf("could not get seal: %w", err)
-	}
-
 	snap.SealingSegment, err = from.SealingSegment()
 	if err != nil {
 		return nil, fmt.Errorf("could not get sealing segment: %w", err)
@@ -192,7 +183,7 @@ func SnapshotFromBootstrapStateWithParams(
 		EpochCommitSafetyThreshold: epochCommitSafetyThreshold, // see protocol.Params for details
 	}
 
-	rootEpochState := ProtocolStateFromEpochServiceEvents(setup, commit)
+	rootEpochState := EpochProtocolStateFromServiceEvents(setup, commit)
 	rootEpochStateID := rootEpochState.ID()
 	rootKvStore := kvStoreFactory(rootEpochStateID)
 	if rootKvStore.ID() != root.Payload.ProtocolStateID {
@@ -204,7 +195,7 @@ func SnapshotFromBootstrapStateWithParams(
 		return nil, fmt.Errorf("could not encode kvstore: %w", err)
 	}
 
-	richRootEpochState, err := flow.NewRichProtocolStateEntry(rootEpochState, nil, nil, setup, commit, nil, nil)
+	richRootEpochState, err := flow.NewRichEpochProtocolStateEntry(rootEpochState, nil, nil, setup, commit, nil, nil)
 	if err != nil {
 		return nil, fmt.Errorf("could not construct root rich epoch state entry: %w", err)
 	}
@@ -218,9 +209,6 @@ func SnapshotFromBootstrapStateWithParams(
 	}
 
 	snap := SnapshotFromEncodable(EncodableSnapshot{
-		Head:         root.Header,
-		LatestSeal:   seal,
-		LatestResult: result,
 		SealingSegment: &flow.SealingSegment{
 			Blocks:           []*flow.Block{root},
 			ExecutionResults: flow.ExecutionResultList{result},
@@ -239,7 +227,7 @@ func SnapshotFromBootstrapStateWithParams(
 	return snap, nil
 }
 
-// ProtocolStateFromEpochServiceEvents generates a protocol.ProtocolStateEntry for a root protocol state which is used for bootstrapping.
+// EpochProtocolStateFromServiceEvents generates a protocol.EpochProtocolStateEntry for a root protocol state which is used for bootstrapping.
 //
 // CONTEXT: The EpochSetup event contains the IdentitySkeletons for each participant, thereby specifying active epoch members.
 // While ejection status is not part of the EpochSetup event, we can supplement this information as follows:
@@ -249,7 +237,7 @@ func SnapshotFromBootstrapStateWithParams(
 //     that happened before should be reflected in the EpochSetup event. Specifically, ejected
 //     nodes should be no longer listed in the EpochSetup event.
 //     Hence, when the EpochSetup event is emitted / processed, the ejected flag is false for all epoch participants.
-func ProtocolStateFromEpochServiceEvents(setup *flow.EpochSetup, commit *flow.EpochCommit) *flow.ProtocolStateEntry {
+func EpochProtocolStateFromServiceEvents(setup *flow.EpochSetup, commit *flow.EpochCommit) *flow.EpochProtocolStateEntry {
 	identities := make(flow.DynamicIdentityEntryList, 0, len(setup.Participants))
 	for _, identity := range setup.Participants {
 		identities = append(identities, &flow.DynamicIdentityEntry{
@@ -257,14 +245,14 @@ func ProtocolStateFromEpochServiceEvents(setup *flow.EpochSetup, commit *flow.Ep
 			Ejected: false,
 		})
 	}
-	return &flow.ProtocolStateEntry{
+	return &flow.EpochProtocolStateEntry{
 		PreviousEpoch: nil,
 		CurrentEpoch: flow.EpochStateContainer{
 			SetupID:          setup.ID(),
 			CommitID:         commit.ID(),
 			ActiveIdentities: identities,
 		},
-		NextEpoch:                       nil,
-		InvalidEpochTransitionAttempted: false,
+		NextEpoch:              nil,
+		EpochFallbackTriggered: false,
 	}
 }

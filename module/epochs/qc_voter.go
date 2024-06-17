@@ -75,7 +75,7 @@ func NewRootQCVoter(
 // It is safe to run multiple times within a single setup phase.
 //
 // Error returns:
-//   - ErrWontVote if we fail to vote for a benign reason
+//   - epochs.ClusterQCNoVoteError if we fail to vote for a benign reason
 //   - generic error in case of critical unexpected failure
 func (voter *RootQCVoter) Vote(ctx context.Context, epoch protocol.Epoch) error {
 	counter, err := epoch.Counter()
@@ -170,7 +170,7 @@ func (voter *RootQCVoter) Vote(ctx context.Context, epoch protocol.Epoch) error 
 		return nil
 	}
 	err = retry.Do(ctx, backoff, castVote)
-	if network.IsTransientError(err) || errors.Is(err, errTransactionReverted) || errors.Is(err, errTransactionReverted) {
+	if network.IsTransientError(err) || errors.Is(err, errTransactionReverted) || errors.Is(err, context.Canceled) {
 		return NewClusterQCNoVoteErrorf("exceeded retry limit without successfully submitting our vote: %w", err)
 	}
 	return err
