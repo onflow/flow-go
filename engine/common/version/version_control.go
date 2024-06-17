@@ -3,6 +3,8 @@ package version
 import (
 	"errors"
 	"fmt"
+	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/module/counters"
 	"math"
 	"sync"
 
@@ -17,11 +19,11 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-// ErrUnhandledHeight
-var ErrUnhandledHeight = errors.New("unhandled height")
+// ErrOutOfRange indicates that height is higher than last handled block height
+var ErrOutOfRange = errors.New("height is out of range")
 
 // VersionControlConsumer defines a function type that consumes version control updates.
-// It is called with the block height and the corresponding sem-version.
+// It is called with the block height and the corresponding semantic version.
 type VersionControlConsumer func(height uint64, semver string)
 
 // NoHeight represents the maximum possible height for blocks.
@@ -48,11 +50,13 @@ type VersionControl struct {
 	// consumers stores the list of consumers for version updates.
 	consumers []VersionControlConsumer
 
-	// blockFinalizedChan is a channel for receiving block finalized events.
-	blockFinalizedChan chan uint64
+	// Notifier for new finalized block height
+	finalizedHeightNotifier engine.Notifier
 
-	// lastHandledBlockHeight the last handled block height
-	lastHandledBlockHeight uint64
+	finalizedHeight counters.StrictMonotonousCounter
+
+	// lastProcessedHeight the last handled block height
+	lastProcessedHeight uint64
 
 	// startHeight and endHeight define the height boundaries for version compatibility.
 	startHeight uint64
@@ -66,28 +70,34 @@ var _ component.Component = (*VersionControl)(nil)
 //
 // We currently have no strong guarantee that the node version is a valid semver.
 // See build.SemverV2 for more details. That is why nil is a valid input for node version.
-// Without a node version, the stop control can still be used for manual stopping.
-func NewVersionControl(log zerolog.Logger, versionBeacons storage.VersionBeacons, nodeVersion *semver.Version, finalizedRootBlockHeight uint64, latestFinalizedBlockHeight uint64) *VersionControl {
-	// blockFinalizedChan is buffered to handle block finalized events.
-	blockFinalizedChan := make(chan uint64, 1000)
+func NewVersionControl(
+	log zerolog.Logger,
+	versionBeacons storage.VersionBeacons,
+	nodeVersion *semver.Version,
+	finalizedRootBlockHeight uint64,
+	latestFinalizedBlockHeight uint64,
+) (*VersionControl, error) {
 
 	vc := &VersionControl{
 		log: log.With().
 			Str("component", "version_control").
 			Logger(),
 
-		blockFinalizedChan: blockFinalizedChan,
-		nodeVersion:        nodeVersion,
-		versionBeacons:     versionBeacons,
-		startHeight:        NoHeight,
-		endHeight:          NoHeight,
+		nodeVersion:             nodeVersion,
+		versionBeacons:          versionBeacons,
+		finalizedHeight:         counters.NewMonotonousCounter(latestFinalizedBlockHeight),
+		finalizedHeightNotifier: engine.NewNotifier(),
+		startHeight:             NoHeight,
+		endHeight:               NoHeight,
 	}
 
-	if vc.nodeVersion != nil {
-		log = log.With().
-			Stringer("node_version", vc.nodeVersion).
-			Logger()
+	if vc.nodeVersion == nil {
+		return nil, fmt.Errorf("version control node version is empty")
 	}
+
+	log = log.With().
+		Stringer("node_version", vc.nodeVersion).
+		Logger()
 
 	log.Info().Msg("system initialized")
 
@@ -98,7 +108,7 @@ func NewVersionControl(log zerolog.Logger, versionBeacons storage.VersionBeacons
 
 	vc.Component = cm.Build()
 
-	return vc
+	return vc, nil
 }
 
 // checkInitialVersionBeacon checks the initial version beacon at the latest finalized block.
@@ -114,8 +124,8 @@ func (v *VersionControl) checkInitialVersionBeacon(
 		v.Lock()
 		defer v.Unlock()
 
-		v.lastHandledBlockHeight = latestFinalizedBlockHeight
-		processedHeight := v.lastHandledBlockHeight
+		v.lastProcessedHeight = latestFinalizedBlockHeight
+		processedHeight := v.lastProcessedHeight
 
 		for {
 			vb, err := v.versionBeacons.Highest(processedHeight)
@@ -187,7 +197,9 @@ func (v *VersionControl) checkInitialVersionBeacon(
 // BlockFinalized is called when a block is finalized.
 // It implements the protocol.Consumer interface.
 func (v *VersionControl) BlockFinalized(h *flow.Header) {
-	v.blockFinalizedChan <- h.Height
+	if v.finalizedHeight.Set(h.Height) {
+		v.finalizedHeightNotifier.Notify()
+	}
 }
 
 // BlockFinalizedForTesting is used for testing purposes only.
@@ -199,14 +211,14 @@ func (v *VersionControl) BlockFinalizedForTesting(h *flow.Header) {
 // CompatibleAtBlock checks if the node's version is compatible at a given block height.
 // It returns true if the node's version is compatible within the specified height range.
 // Returns expected errors:
-// - ErrUnhandledHeight if incoming block height is higher that last handled block height
+// - ErrOutOfRange if incoming block height is higher that last handled block height
 func (v *VersionControl) CompatibleAtBlock(height uint64) (bool, error) {
 	v.RLock()
 	defer v.RUnlock()
 
 	// Check if the height is greater than the last handled block height. If so, return an error indicating that the height is unhandled.
-	if height > v.lastHandledBlockHeight {
-		return false, fmt.Errorf("could not check compatibility for height %d: last handled height is %d: %w", height, v.lastHandledBlockHeight, ErrUnhandledHeight)
+	if height > v.lastProcessedHeight {
+		return false, fmt.Errorf("could not check compatibility for height %d: last handled height is %d: %w", height, v.lastProcessedHeight, ErrOutOfRange)
 	}
 
 	// Check if the start height is set and the height is less than the start height. If so, return false indicating that the height is not compatible.
@@ -242,8 +254,8 @@ func (v *VersionControl) processEvents(
 		select {
 		case <-ctx.Done():
 			return
-		case h := <-v.blockFinalizedChan:
-			v.blockFinalized(ctx, h)
+		case <-v.finalizedHeightNotifier.Channel():
+			v.blockFinalized(ctx, v.finalizedHeight.Value())
 		}
 	}
 }
@@ -251,64 +263,66 @@ func (v *VersionControl) processEvents(
 // blockFinalized processes a block finalized event and updates the version control state.
 func (v *VersionControl) blockFinalized(
 	ctx irrecoverable.SignalerContext,
-	height uint64,
+	newFinalizedHeight uint64,
 ) {
 	v.Lock()
 	defer v.Unlock()
 
-	if v.lastHandledBlockHeight >= height {
+	if v.lastProcessedHeight >= newFinalizedHeight {
 		// already processed this or a higher version beacon
 		return
 	}
 
-	vb, err := v.versionBeacons.Highest(height)
-	if err != nil {
-		v.log.Err(err).
-			Uint64("height", height).
-			Msg("Failed to get highest version beacon for version control")
+	for height := v.lastProcessedHeight + 1; newFinalizedHeight < height; height++ {
+		vb, err := v.versionBeacons.Highest(height)
+		if err != nil {
+			v.log.Err(err).
+				Uint64("height", height).
+				Msg("Failed to get highest version beacon for version control")
 
-		ctx.Throw(
-			fmt.Errorf(
-				"failed to get highest version beacon for version control: %w",
-				err))
-		return
-	}
-
-	if vb == nil {
-		// no version beacon found
-		// this is unexpected as there should always be at least the
-		// starting version beacon, but not fatal.
-		// It can happen if the node starts before bootstrap is finished.
-		// TODO: remove when we can guarantee that there will always be a version beacon
-		v.log.Info().
-			Uint64("height", height).
-			Msg("No version beacon found for version control")
-		return
-	}
-
-	v.lastHandledBlockHeight = height
-
-	// version boundaries are sorted by version
-	for _, boundary := range vb.VersionBoundaries {
-		ver, err := boundary.Semver()
-		if err != nil || ver == nil {
-			// this should never happen as we already validated the version beacon
-			// when indexing it
 			ctx.Throw(
 				fmt.Errorf(
-					"failed to parse semver: %w",
+					"failed to get highest version beacon for version control: %w",
 					err))
 			return
 		}
 
-		if ver.Compare(*v.nodeVersion) > 0 {
-			v.endHeight = boundary.BlockHeight - 1
+		if vb == nil {
+			// no version beacon found
+			// this is unexpected as there should always be at least the
+			// starting version beacon, but not fatal.
+			// It can happen if the node starts before bootstrap is finished.
+			// TODO: remove when we can guarantee that there will always be a version beacon
+			v.log.Info().
+				Uint64("height", height).
+				Msg("No version beacon found for version control")
+			return
+		}
 
-			for _, consumer := range v.consumers {
-				consumer(boundary.BlockHeight, ver.String())
+		v.lastProcessedHeight = height
+
+		// version boundaries are sorted by version
+		for _, boundary := range vb.VersionBoundaries {
+			ver, err := boundary.Semver()
+			if err != nil || ver == nil {
+				// this should never happen as we already validated the version beacon
+				// when indexing it
+				ctx.Throw(
+					fmt.Errorf(
+						"failed to parse semver: %w",
+						err))
+				return
 			}
 
-			break
+			if ver.Compare(*v.nodeVersion) > 0 {
+				v.endHeight = boundary.BlockHeight - 1
+
+				for _, consumer := range v.consumers {
+					consumer(boundary.BlockHeight, ver.String())
+				}
+
+				return
+			}
 		}
 	}
 }
