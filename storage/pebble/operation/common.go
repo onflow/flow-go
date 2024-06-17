@@ -7,7 +7,6 @@ import (
 	"github.com/cockroachdb/pebble"
 	"github.com/vmihailenco/msgpack"
 
-	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/storage"
 )
@@ -234,10 +233,6 @@ func traverse(prefix []byte, iteration iterationFunc) func(pebble.Reader) error 
 
 		return nil
 	}
-}
-
-func makeKey(prefix byte, identifier flow.Identifier) []byte {
-	return append([]byte{prefix}, identifier[:]...)
 }
 
 func convertNotFoundError(err error) error {

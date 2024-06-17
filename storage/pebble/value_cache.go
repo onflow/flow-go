@@ -31,11 +31,11 @@ func noStore[K comparable, V any](_ K, _ V) func(operation.PebbleReaderWriter) e
 	}
 }
 
-func noopStore[K comparable, V any](_ K, _ V) func(operation.PebbleReaderWriter) error {
-	return func(operation.PebbleReaderWriter) error {
-		return nil
-	}
-}
+// func noopStore[K comparable, V any](_ K, _ V) func(operation.PebbleReaderWriter) error {
+// 	return func(operation.PebbleReaderWriter) error {
+// 		return nil
+// 	}
+// }
 
 type retrieveFunc[K comparable, V any] func(key K) func(pebble.Reader) (V, error)
 
