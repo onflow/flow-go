@@ -147,10 +147,5 @@ func (suite *Suite) TestCancelVoting() {
 		close(voteReturned)
 	}()
 
-	select {
-	case <-voteReturned:
-		// expected behaviour
-	case <-time.NewTimer(1000 * time.Second).C:
-		suite.Fail("call of `Vote` method has not returned within the test's timeout")
-	}
+	unittest.AssertClosesBefore(suite.T(), voteReturned, time.Second, "call of `Vote` method has not returned within the test's timeout")
 }
