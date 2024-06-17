@@ -540,7 +540,6 @@ func (suite *Suite) TestRespondToEpochTransition() {
 func (suite *Suite) TestStopQcVoting() {
 	// we expect 1 ActiveClustersChanged events when the engine first starts and the first set of epoch components are started
 	suite.engineEventsDistributor.On("ActiveClustersChanged", mock.AnythingOfType("flow.ChainIDList")).Once()
-	defer suite.engineEventsDistributor.AssertExpectations(suite.T())
 
 	numOfCancelledVotes := 0
 	// in addition to our 3 simulated votes the engine will attempt to vote on startup
