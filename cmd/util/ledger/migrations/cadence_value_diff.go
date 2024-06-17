@@ -507,7 +507,15 @@ func (dr *CadenceValueDiffReporter) diffDomain(
 	}()
 
 	// Wait for workers
-	_ = g.Wait()
+	err := g.Wait()
+	if err != nil {
+		dr.reportWriter.Write(
+			diffError{
+				Address: dr.address.Hex(),
+				Kind:    diffErrorKindString[abortErrorKind],
+				Msg:     fmt.Sprintf("failed to diff domain %s: %s", domain, err),
+			})
+	}
 
 	log.Info().
 		Msgf(
