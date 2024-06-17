@@ -58,7 +58,7 @@ type Engine struct {
 	mu     sync.RWMutex                       // protects epochs map
 	epochs map[uint64]*RunningEpochComponents // epoch-scoped components per epoch
 
-	inProgressQCVote *atomic.Pointer[CancelFuncWrapper] // tracks the cancel callback of the in progress QC vote
+	inProgressQCVote *atomic.Pointer[cancelFuncWrapper] // tracks the cancel callback of the in progress QC vote
 
 	// internal event notifications
 	epochTransitionEvents        chan *flow.Header        // sends first block of new epoch
@@ -101,7 +101,7 @@ func New(
 		epochSetupPhaseStartedEvents: make(chan *flow.Header, 1),
 		epochStopEvents:              make(chan uint64, 1),
 		clusterIDUpdateDistributor:   clusterIDUpdateDistributor,
-		inProgressQCVote:             atomic.NewPointer[CancelFuncWrapper](&CancelFuncWrapper{Cancel: nil}),
+		inProgressQCVote:             atomic.NewPointer[cancelFuncWrapper](&cancelFuncWrapper{cancel: nil}),
 	}
 
 	e.cm = component.NewComponentManagerBuilder().
@@ -461,7 +461,9 @@ func (e *Engine) prepareToStopEpochComponents(epochCounter, epochMaxHeight uint6
 // next epoch's root cluster QC.
 func (e *Engine) onEpochSetupPhaseStarted(ctx irrecoverable.SignalerContext, nextEpoch protocol.Epoch) {
 	ctxWithCancel, cancel := context.WithCancel(ctx)
-	e.inProgressQCVote.Store(&CancelFuncWrapper{cancel})
+	defer cancel()
+
+	e.inProgressQCVote.Store(&cancelFuncWrapper{cancel})
 
 	err := e.voter.Vote(ctxWithCancel, nextEpoch)
 	if err != nil {
@@ -471,8 +473,6 @@ func (e *Engine) onEpochSetupPhaseStarted(ctx irrecoverable.SignalerContext, nex
 		}
 		ctx.Throw(fmt.Errorf("unexpected failure to submit QC vote for next epoch: %w", err))
 	}
-
-	cancel()
 }
 
 // startEpochComponents starts the components for the given epoch and adds them
@@ -570,8 +570,8 @@ func (e *Engine) activeClusterIDs() (flow.ChainIDList, error) {
 // stopInProgressQcVote cancels the context for all in progress root qc voting.
 func (e *Engine) stopInProgressQcVote() {
 	c := e.inProgressQCVote.Load()
-	if c != nil && c.Cancel != nil {
+	if c != nil && c.cancel != nil {
 		e.log.Warn().Msgf("voting for cluster root block cancelled")
-		c.Cancel() // cancel
+		c.cancel() // cancel
 	}
 }
