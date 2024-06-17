@@ -4,17 +4,19 @@ import (
 	"context"
 	"errors"
 	"fmt"
+
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime/parser"
 	"github.com/onflow/crypto"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
-	"github.com/onflow/flow-go/fvm/evm/testutils"
+
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/execution"
 	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/protocol"
+	cadenceutils "github.com/onflow/flow-go/utils/cadence"
 )
 
 type Blocks interface {
@@ -67,23 +69,25 @@ func (l *NoopLimiter) IsRateLimited(address flow.Address) bool {
 }
 
 type TransactionValidationOptions struct {
-	Expiry                       uint
-	ExpiryBuffer                 uint
-	AllowEmptyReferenceBlockID   bool
-	AllowUnknownReferenceBlockID bool
-	MaxGasLimit                  uint64
-	CheckScriptsParse            bool
-	MaxTransactionByteSize       uint64
-	MaxCollectionByteSize        uint64
+	Expiry                                   uint
+	ExpiryBuffer                             uint
+	AllowEmptyReferenceBlockID               bool
+	AllowUnknownReferenceBlockID             bool
+	MaxGasLimit                              uint64
+	CheckScriptsParse                        bool
+	MaxTransactionByteSize                   uint64
+	MaxCollectionByteSize                    uint64
+	ShouldCheckIfTxPayerHasSufficientBalance bool
 }
 
 type TransactionValidator struct {
-	blocks                Blocks     // for looking up blocks to check transaction expiry
-	chain                 flow.Chain // for checking validity of addresses
-	options               TransactionValidationOptions
-	serviceAccountAddress flow.Address
-	limiter               RateLimiter
-	scriptExecutor        execution.ScriptExecutor
+	blocks                   Blocks     // for looking up blocks to check transaction expiry
+	chain                    flow.Chain // for checking validity of addresses
+	options                  TransactionValidationOptions
+	serviceAccountAddress    flow.Address
+	limiter                  RateLimiter
+	scriptExecutor           execution.ScriptExecutor
+	verifyPayerBalanceScript []byte
 }
 
 func NewTransactionValidator(
@@ -92,13 +96,15 @@ func NewTransactionValidator(
 	options TransactionValidationOptions,
 	executor execution.ScriptExecutor,
 ) *TransactionValidator {
+	env := systemcontracts.SystemContractsForChain(chain.ChainID()).AsTemplateEnv()
 	return &TransactionValidator{
-		blocks:                blocks,
-		chain:                 chain,
-		options:               options,
-		serviceAccountAddress: chain.ServiceAddress(),
-		limiter:               NewNoopLimiter(),
-		scriptExecutor:        executor,
+		blocks:                   blocks,
+		chain:                    chain,
+		options:                  options,
+		serviceAccountAddress:    chain.ServiceAddress(),
+		limiter:                  NewNoopLimiter(),
+		scriptExecutor:           executor,
+		verifyPayerBalanceScript: templates.GenerateVerifyPayerBalanceForTxExecution(env),
 	}
 }
 
@@ -108,12 +114,14 @@ func NewTransactionValidatorWithLimiter(
 	options TransactionValidationOptions,
 	rateLimiter RateLimiter,
 ) *TransactionValidator {
+	env := systemcontracts.SystemContractsForChain(chain.ChainID()).AsTemplateEnv()
 	return &TransactionValidator{
-		blocks:                blocks,
-		chain:                 chain,
-		options:               options,
-		serviceAccountAddress: chain.ServiceAddress(),
-		limiter:               rateLimiter,
+		blocks:                   blocks,
+		chain:                    chain,
+		options:                  options,
+		serviceAccountAddress:    chain.ServiceAddress(),
+		limiter:                  rateLimiter,
+		verifyPayerBalanceScript: templates.GenerateVerifyPayerBalanceForTxExecution(env),
 	}
 }
 
@@ -360,32 +368,54 @@ func (v *TransactionValidator) checkSignatureFormat(tx *flow.TransactionBody) er
 }
 
 func (v *TransactionValidator) checkSufficientFlowAmountToPayForTransaction(ctx context.Context, tx *flow.TransactionBody) error {
+	if !v.options.ShouldCheckIfTxPayerHasSufficientBalance {
+		return nil
+	}
+
 	header, err := v.blocks.HeaderByID(tx.ID())
+	if err != nil {
+		return fmt.Errorf("couldn't fetch header block: %w", err)
+	}
+
+	payerAddress := cadence.NewAddress(tx.Payer)
+	inclusionEffort := cadence.UInt64(tx.InclusionEffort())
+	gasLimit := cadence.UInt64(tx.GasLimit)
+
+	args, err := cadenceutils.EncodeArgs([]cadence.Value{payerAddress, inclusionEffort, gasLimit})
 	if err != nil {
 		return err
 	}
 
-	inclusionEffort := cadence.UInt64(tx.InclusionEffort())
-	gasLimit := cadence.UInt64(tx.GasLimit)
-	args := testutils.EncodeArgs([]cadence.Value{inclusionEffort, gasLimit}) //TODO: is it fine to use testutils?
-
-	env := systemcontracts.SystemContractsForChain(v.chain.ChainID()).AsTemplateEnv()
-	script := templates.GenerateVerifyPayerBalanceForTxExecution(env)
-
-	result, err := v.scriptExecutor.ExecuteAtBlockHeight(ctx, script, args, header.Height)
+	result, err := v.scriptExecutor.ExecuteAtBlockHeight(ctx, v.verifyPayerBalanceScript, args, header.Height)
+	if err != nil {
+		return fmt.Errorf("script finished with error: %w", err)
+	}
 
 	value, err := jsoncdc.Decode(nil, result)
-	fields := cadence.FieldsMappedByName(value.(cadence.Struct))
-	canExecuteTransaction, ok := fields["canExecuteTransaction"].(cadence.Bool)
+	if err != nil {
+		return fmt.Errorf("couldn't decode result value returned by script executor: %w", err)
+	}
+
+	structValue, ok := value.(cadence.Struct)
 	if !ok {
-		return errors.New("couldn't parse canExecuteTransaction field")
+		return errors.New("couldn't parse result value as a Cadence struct")
+	}
+
+	canExecuteTxValue := cadence.SearchFieldByName(structValue, "canExecuteTransaction")
+	if canExecuteTxValue != nil {
+		return fmt.Errorf("couldn't parse canExecuteTransaction: %w", err)
+	}
+
+	canExecuteTransaction, ok := canExecuteTxValue.(cadence.Bool)
+	if !ok {
+		return errors.New("couldn't parse canExecuteTransaction as a Cadence bool")
 	}
 
 	if bool(canExecuteTransaction) {
 		return nil
-	} else {
-		return errors.New("cannot execute transaction")
 	}
+
+	return errors.New("cannot execute transaction. tx payer doesn't have enough Flow")
 }
 
 func remove(s []string, r string) []string {

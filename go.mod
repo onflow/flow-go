@@ -255,7 +255,9 @@ require (
 	github.com/nxadm/tail v1.4.8 // indirect
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
 	github.com/onflow/flow-ft/lib/go/contracts v1.0.0 // indirect
+	github.com/onflow/flow-ft/lib/go/templates v1.0.0 // indirect
 	github.com/onflow/flow-nft/lib/go/contracts v1.2.1 // indirect
+	github.com/onflow/flow-nft/lib/go/templates v1.2.0 // indirect
 	github.com/onflow/sdks v0.5.1-0.20230912225508-b35402f12bba // indirect
 	github.com/onsi/ginkgo/v2 v2.13.2 // indirect
 	github.com/opencontainers/runtime-spec v1.1.0 // indirect
@@ -327,4 +329,4 @@ require (
 // Using custom fork until https://github.com/onflow/flow-go/issues/5338 is resolved
 replace github.com/ipfs/boxo => github.com/onflow/boxo v0.0.0-20240201202436-f2477b92f483
 
-replace github.com/onflow/flow-core-contracts/lib/go/templates => github.com/The-K-R-O-K/flow-core-contracts/lib/go/templates v0.15.2-0.20240611100143-0707fa3a3718
+replace github.com/onflow/flow-core-contracts/lib/go/templates => github.com/The-K-R-O-K/flow-core-contracts/lib/go/templates v0.15.2-0.20240613090439-5d81fb0db262
