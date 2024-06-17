@@ -50,6 +50,8 @@ contract EVM {
         payload: String,
         // code indicating a specific validation (201-300) or execution (301-400) error
         errorCode: UInt16,
+        // a human-readable message about the error (if any)
+        errorMessage: String,
         // the amount of gas transaction used
         gasConsumed: UInt64,
         // if transaction was a deployment contains a newly deployed contract address
@@ -59,7 +61,14 @@ contract EVM {
         // block height in which transaction was inclued
         blockHeight: UInt64,
         // block hash in which transaction was included
-        blockHash: String
+        blockHash: String,
+        /// captures the hex encoded data that is returned from
+        /// the evm. For contract deployments
+        /// it returns the code deployed to
+        /// the address provided in the contractAddress field.
+        /// in case of revert, the smart contract custom error message
+        /// is also returned here (see EIP-140 for more details).
+        returnedData: String
     )
 
     access(all)
