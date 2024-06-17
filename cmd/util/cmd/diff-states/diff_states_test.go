@@ -1,6 +1,7 @@
 package diff_states
 
 import (
+	"encoding/json"
 	"io/fs"
 	"path/filepath"
 	"strings"
@@ -82,18 +83,14 @@ func TestDiffStates(t *testing.T) {
 		report, err := io.ReadFile(reportPath)
 		require.NoError(t, err)
 
-		assert.JSONEq(
-			t,
-			`
-              [
-                {"kind":"raw-diff", "owner":"0100000000000000", "key":"62", "value1":"03", "value2":"05"},
-                {"kind":"account-missing", "owner":"0200000000000000", "state":2},
-                {"kind":"account-missing", "owner":"0300000000000000", "state":1},
-                {"kind":"account-missing", "owner":"0400000000000000", "state":1}
-              ]
-            `,
-			string(report),
-		)
+		var msgs []any
+		err = json.Unmarshal(report, &msgs)
+		require.NoError(t, err)
 
+		assert.Equal(t, 4, len(msgs))
+		assert.Containsf(t, string(report), `{"kind":"raw-diff","owner":"0100000000000000","key":"62","value1":"03","value2":"05"}`, "diff report contains raw-diff")
+		assert.Containsf(t, string(report), `{"kind":"account-missing","owner":"0200000000000000","state":2}`, "diff report contains account-missing for 0200000000000000")
+		assert.Containsf(t, string(report), `{"kind":"account-missing","owner":"0300000000000000","state":1}`, "diff report contains account-missing for 0300000000000000")
+		assert.Containsf(t, string(report), `{"kind":"account-missing","owner":"0400000000000000","state":1}`, "diff report contains account-missing for 0400000000000000")
 	})
 }
