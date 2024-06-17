@@ -307,8 +307,8 @@ type FlowAccessNodeBuilder struct {
 	IndexerDependencies        *cmd.DependencyList
 	collectionExecutedMetric   module.CollectionExecutedMetric
 	ExecutionDataPruner        *pruner.Pruner
-	ExecutionDataTracker       tracker.Storage
 	ExecutionDataDatastore     *badger.Datastore
+	ExecutionDataTracker       tracker.Storage
 
 	// The sync engine participants provider is the libp2p peer store for the access node
 	// which is not available until after the network has started.
@@ -622,8 +622,35 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			// to be ready before starting
 			bsDependable.Init(bs)
 
-			builder.ExecutionDataDownloader = execution_data.NewDownloader(bs)
+			var downloaderOpts []execution_data.DownloaderOption
 
+			if builder.executionDataPrunerHeightRangeTarget != 0 {
+				sealed, err := node.State.Sealed().Head()
+				if err != nil {
+					return nil, fmt.Errorf("cannot get the sealed block: %w", err)
+				}
+
+				trackerDir := filepath.Join(builder.executionDataDir, "tracker")
+				builder.ExecutionDataTracker, err = tracker.OpenStorage(
+					trackerDir,
+					sealed.Height,
+					node.Logger,
+					tracker.WithPruneCallback(func(c cid.Cid) error {
+						// TODO: use a proper context here
+						return builder.ExecutionDataBlobstore.DeleteBlob(context.TODO(), c)
+					}),
+				)
+				if err != nil {
+					return nil, fmt.Errorf("failed to create execution data tracker: %w", err)
+				}
+
+				downloaderOpts = []execution_data.DownloaderOption{
+					execution_data.WithExecutionDataTracker(builder.ExecutionDataTracker),
+					execution_data.WithHeaders(node.Storage.Headers),
+				}
+			}
+
+			builder.ExecutionDataDownloader = execution_data.NewDownloader(bs, downloaderOpts...)
 			return builder.ExecutionDataDownloader, nil
 		}).
 		Component("execution data requester", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
@@ -701,36 +728,44 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				return &module.NoopReadyDoneAware{}, nil
 			}
 
-			sealed, err := node.State.Sealed().Head()
-			if err != nil {
-				return nil, fmt.Errorf("cannot get the sealed block: %w", err)
-			}
-
-			trackerDir := filepath.Join(builder.executionDataDir, "tracker")
-			builder.ExecutionDataTracker, err = tracker.OpenStorage(
-				trackerDir,
-				sealed.Height,
-				node.Logger,
-				tracker.WithPruneCallback(func(c cid.Cid) error {
-					// TODO: use a proper context here
-					return builder.ExecutionDataBlobstore.DeleteBlob(context.TODO(), c)
-				}),
-			)
-			if err != nil {
-				return nil, err
-			}
-
 			execDataDistributor.AddOnExecutionDataReceivedConsumer(func(data *execution_data.BlockExecutionDataEntity) {
 				header, err := node.Storage.Headers.ByBlockID(data.BlockID)
 				if err != nil {
 					// if the execution data is available, the block must be locally finalized
-					node.Logger.Info().Msg("failed to get header for execution data")
+					node.Logger.Fatal().Err(err).Msg("failed to get header for execution data")
 				}
-				if err = builder.ExecutionDataTracker.SetFulfilledHeight(header.Height); err != nil {
-					node.Logger.Info().Msg("failed to gset")
+
+				if builder.ExecutionDataPruner != nil {
+					err = builder.ExecutionDataTracker.SetFulfilledHeight(header.Height)
+					if err != nil {
+						node.Logger.Fatal().Err(err).Msg("failed to set fulfilled height")
+					}
+
+					builder.ExecutionDataPruner.NotifyFulfilledHeight(header.Height)
 				}
 			})
-			return builder.LoadExecutionDataPruner(node)
+
+			var prunerMetrics module.ExecutionDataPrunerMetrics = metrics.NewNoopCollector()
+			if node.MetricsEnabled {
+				prunerMetrics = metrics.NewExecutionDataPrunerCollector()
+			}
+
+			var err error
+			builder.ExecutionDataPruner, err = pruner.NewPruner(
+				node.Logger,
+				prunerMetrics,
+				builder.ExecutionDataTracker,
+				pruner.WithPruneCallback(func(ctx context.Context) error {
+					return builder.ExecutionDataDatastore.CollectGarbage(ctx)
+				}),
+				pruner.WithHeightRangeTarget(builder.executionDataPrunerHeightRangeTarget),
+				pruner.WithThreshold(builder.executionDataPrunerThreshold),
+			)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create execution data pruner: %w", err)
+			}
+
+			return builder.ExecutionDataPruner, nil
 		})
 
 	if builder.publicNetworkExecutionDataEnabled {
@@ -2078,30 +2113,4 @@ func (builder *FlowAccessNodeBuilder) initPublicLibp2pNode(networkKey crypto.Pri
 	}
 
 	return libp2pNode, nil
-}
-
-func (builder *FlowAccessNodeBuilder) LoadExecutionDataPruner(
-	node *cmd.NodeConfig,
-) (
-	module.ReadyDoneAware,
-	error,
-) {
-	var prunerMetrics module.ExecutionDataPrunerMetrics = metrics.NewNoopCollector()
-	if node.MetricsEnabled {
-		prunerMetrics = metrics.NewExecutionDataPrunerCollector()
-	}
-
-	//execDataDistributor.AddOnExecutionDataReceivedConsumer()
-	var err error
-	builder.ExecutionDataPruner, err = pruner.NewPruner(
-		node.Logger,
-		prunerMetrics,
-		builder.ExecutionDataTracker,
-		pruner.WithPruneCallback(func(ctx context.Context) error {
-			return builder.ExecutionDataDatastore.CollectGarbage(ctx)
-		}),
-		pruner.WithHeightRangeTarget(builder.executionDataPrunerHeightRangeTarget),
-		pruner.WithThreshold(builder.executionDataPrunerThreshold),
-	)
-	return builder.ExecutionDataPruner, err
 }

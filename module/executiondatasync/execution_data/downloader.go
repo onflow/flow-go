@@ -12,7 +12,9 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/blobs"
+	"github.com/onflow/flow-go/module/executiondatasync/tracker"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/storage"
 )
 
 // Downloader is used to download execution data blobs from the network via a blob service.
@@ -27,6 +29,8 @@ type downloader struct {
 	blobService network.BlobService
 	maxBlobSize int
 	serializer  Serializer
+	storage     tracker.Storage
+	headers     storage.Headers
 }
 
 type DownloaderOption func(*downloader)
@@ -38,12 +42,26 @@ func WithSerializer(serializer Serializer) DownloaderOption {
 	}
 }
 
+// WithExecutionDataTracker configures the execution data tracker for the downloader
+func WithExecutionDataTracker(storage tracker.Storage) DownloaderOption {
+	return func(d *downloader) {
+		d.storage = storage
+	}
+}
+
+// WithHeaders configures the storage headers for the downloader
+func WithHeaders(headers storage.Headers) DownloaderOption {
+	return func(d *downloader) {
+		d.headers = headers
+	}
+}
+
 // NewDownloader creates a new Downloader instance
 func NewDownloader(blobService network.BlobService, opts ...DownloaderOption) *downloader {
 	d := &downloader{
-		blobService,
-		DefaultMaxBlobSize,
-		DefaultSerializer,
+		blobService: blobService,
+		maxBlobSize: DefaultMaxBlobSize,
+		serializer:  DefaultSerializer,
 	}
 
 	for _, opt := range opts {
@@ -83,12 +101,15 @@ func (d *downloader) Get(ctx context.Context, executionDataID flow.Identifier) (
 
 	// Next, download each of the chunk execution data blobs
 	chunkExecutionDatas := make([]*ChunkExecutionData, len(edRoot.ChunkExecutionDataIDs))
+	// Execution data cids
+	var edCids = []cid.Cid{flow.IdToCid(executionDataID)}
+
 	for i, chunkDataID := range edRoot.ChunkExecutionDataIDs {
 		i := i
 		chunkDataID := chunkDataID
 
 		g.Go(func() error {
-			ced, err := d.getChunkExecutionData(
+			ced, cids, err := d.getChunkExecutionData(
 				gCtx,
 				chunkDataID,
 				blobGetter,
@@ -99,6 +120,7 @@ func (d *downloader) Get(ctx context.Context, executionDataID flow.Identifier) (
 			}
 
 			chunkExecutionDatas[i] = ced
+			edCids = append(edCids, cids...)
 
 			return nil
 		})
@@ -106,6 +128,11 @@ func (d *downloader) Get(ctx context.Context, executionDataID flow.Identifier) (
 
 	if err := g.Wait(); err != nil {
 		return nil, err
+	}
+
+	err = d.trackBlobs(edRoot.BlockID, edCids)
+	if err != nil {
+		return nil, fmt.Errorf("failed to track blob: %w", err)
 	}
 
 	// Finally, recombine data into original record.
@@ -160,7 +187,7 @@ func (d *downloader) getExecutionDataRoot(
 }
 
 // getChunkExecutionData downloads a chunk execution data blob from the network and returns the
-// deserialized ChunkExecutionData struct.
+// deserialized ChunkExecutionData struct with list of cids from all levels of the blob tree.
 //
 // Expected errors during normal operations:
 // - context.Canceled or context.DeadlineExceeded if the context is canceled or times out
@@ -171,26 +198,57 @@ func (d *downloader) getChunkExecutionData(
 	ctx context.Context,
 	chunkExecutionDataID cid.Cid,
 	blobGetter network.BlobGetter,
-) (*ChunkExecutionData, error) {
+) (*ChunkExecutionData, []cid.Cid, error) {
 	cids := []cid.Cid{chunkExecutionDataID}
+	cidsFromAllLevels := []cid.Cid{chunkExecutionDataID}
 
 	// iteratively process each level of the blob tree until a ChunkExecutionData is returned or an
 	// error is encountered
 	for i := 0; ; i++ {
 		v, err := d.getBlobs(ctx, blobGetter, cids)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get level %d of blob tree: %w", i, err)
+			return nil, nil, fmt.Errorf("failed to get level %d of blob tree: %w", i, err)
 		}
 
 		switch v := v.(type) {
 		case *ChunkExecutionData:
-			return v, nil
+			return v, cidsFromAllLevels, nil
 		case *[]cid.Cid:
+			cidsFromAllLevels = append(cidsFromAllLevels, *v...)
 			cids = *v
 		default:
-			return nil, NewMalformedDataError(fmt.Errorf("blob tree contains unexpected type %T at level %d", v, i))
+			return nil, nil, NewMalformedDataError(fmt.Errorf("blob tree contains unexpected type %T at level %d", v, i))
 		}
 	}
+}
+
+// trackBlobs updates the storage to track the provided CIDs for a given block.
+// This is used to ensure that the blobs can be pruned later.
+//
+// Parameters:
+// - blockID: The identifier of the block to which the blobs belong.
+// - cids: CIDs to be tracked.
+//
+// No errors are expected during normal operations.
+func (d *downloader) trackBlobs(blockID flow.Identifier, cids []cid.Cid) error {
+	if d.storage == nil || d.headers == nil {
+		return nil
+	}
+
+	return d.storage.Update(func(trackBlobs tracker.TrackBlobsFn) error {
+		header, err := d.headers.ByBlockID(blockID)
+		if err != nil {
+			return err
+		}
+
+		// track new blobs so that they can be pruned later
+		err = trackBlobs(header.Height, cids...)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
 }
 
 // getBlobs gets the given CIDs from the blobservice, reassembles the blobs, and deserializes the reassembled data into an object.

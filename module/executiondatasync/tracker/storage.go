@@ -52,13 +52,13 @@ const blobRecordKeyLength = 1 + 8 + blobs.CidLength
 func makeBlobRecordKey(blockHeight uint64, c cid.Cid) []byte {
 	blobRecordKey := make([]byte, blobRecordKeyLength)
 	blobRecordKey[0] = prefixBlobRecord
-	binary.LittleEndian.PutUint64(blobRecordKey[1:], blockHeight)
+	binary.BigEndian.PutUint64(blobRecordKey[1:], blockHeight)
 	copy(blobRecordKey[1+8:], c.Bytes())
 	return blobRecordKey
 }
 
 func parseBlobRecordKey(key []byte) (uint64, cid.Cid, error) {
-	blockHeight := binary.LittleEndian.Uint64(key[1:])
+	blockHeight := binary.BigEndian.Uint64(key[1:])
 	c, err := cid.Cast(key[1+8:])
 	return blockHeight, c, err
 }
