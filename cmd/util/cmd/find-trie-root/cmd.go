@@ -3,6 +3,7 @@ package find_trie_root
 import (
 	"encoding/hex"
 	"fmt"
+	"io"
 	"math"
 	"os"
 
@@ -63,7 +64,7 @@ func run(*cobra.Command, []string) {
 	}
 
 	if flagExecutionStateDir == flagBackupDir {
-		log.Fatal().Msg("backup directory cannot be the same as the execution state directory")
+		log.Fatal().Msg("--backup-dir directory cannot be the same as the execution state directory")
 	}
 
 	segment, offset, err := searchRootHashInSegments(rootHash, flagExecutionStateDir, flagFrom, flagTo)
@@ -81,7 +82,7 @@ func run(*cobra.Command, []string) {
 	}
 
 	if len(flagBackupDir) == 0 {
-		log.Error().Msgf("backup directory is not provided")
+		log.Error().Msgf("--backup-dir directory is not provided")
 		return
 	}
 
@@ -341,10 +342,36 @@ func backupRollbackedWALsAndMoveLastSegmentFile(
 
 	log.Info().Msgf("moving segment file %s to %s", newSegmentFile, segmentToBeReplaced)
 
-	err = os.Rename(newSegmentFile, segmentToBeReplaced)
+	_, err = copyFile(newSegmentFile, segmentToBeReplaced)
 	if err != nil {
 		return fmt.Errorf("cannot move segment file %s to %s: %w", newSegmentFile, segmentToBeReplaced, err)
 	}
 
 	return nil
+}
+
+func copyFile(src, dst string) (int64, error) {
+	sourceFile, err := os.Open(src)
+	if err != nil {
+		return 0, err
+	}
+	defer sourceFile.Close()
+
+	destinationFile, err := os.Create(dst)
+	if err != nil {
+		return 0, err
+	}
+	defer destinationFile.Close()
+
+	bytesCopied, err := io.Copy(destinationFile, sourceFile)
+	if err != nil {
+		return 0, err
+	}
+
+	err = destinationFile.Sync()
+	if err != nil {
+		return 0, err
+	}
+
+	return bytesCopied, nil
 }
