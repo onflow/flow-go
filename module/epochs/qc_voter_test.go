@@ -132,7 +132,7 @@ func (suite *Suite) TestCancelVoting() {
 	// that it could not interact with the system smart contract. To create a realistic test scenario, we cancel
 	// the context injected into the voter, when it is trying to submit a vote for the first time.
 	// The returned transient error will cause a retry, during which the retry logic will observe the context
-	// has been cancelled and exit with the context error. 
+	// has been cancelled and exit with the context error.
 	ctxWithCancel, cancel := context.WithCancel(context.Background())
 	suite.client.On("SubmitVote", mock.Anything, mock.Anything).Unset()
 	suite.client.On("SubmitVote", mock.Anything, mock.Anything).
