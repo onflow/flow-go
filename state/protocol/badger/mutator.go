@@ -675,6 +675,7 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 	// if epoch fallback was not previously triggered, check whether this block triggers it
 	if !epochFallbackTriggered && psSnapshot.InvalidEpochTransitionAttempted() {
 		epochFallbackTriggered = true
+		m.logger.Warn().Msg("epoch emergency fallback triggered")
 		// emit the protocol event only the first time epoch fallback is triggered
 		events = append(events, m.consumer.EpochEmergencyFallbackTriggered)
 		metrics = append(metrics, m.metrics.EpochEmergencyFallbackTriggered)
@@ -734,7 +735,6 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 			return fmt.Errorf("could not update sealed height: %w", err)
 		}
 		if epochFallbackTriggered {
-			m.logger.Warn().Msg("epoch emergency fallback triggered")
 			err = operation.SetEpochEmergencyFallbackTriggered(blockID)(tx)
 			if err != nil {
 				return fmt.Errorf("could not set epoch fallback flag: %w", err)
