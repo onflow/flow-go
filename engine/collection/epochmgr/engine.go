@@ -69,9 +69,9 @@ type Engine struct {
 	component.Component
 }
 
-// CancelFuncWrapper wraps a context.CancelFunc, used to store the cancel func for an in progress QC vote.
-type CancelFuncWrapper struct {
-	Cancel context.CancelFunc
+// cancelFuncWrapper wraps a context.CancelFunc, used to store the cancel func for an in progress QC vote.
+type cancelFuncWrapper struct {
+	cancel context.CancelFunc
 }
 
 var _ component.Component = (*Engine)(nil)
