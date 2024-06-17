@@ -2,10 +2,12 @@ package migrations
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
+	"github.com/rs/zerolog/log"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
@@ -74,7 +76,7 @@ type difference struct {
 	NewValueStaticType string `json:",omitempty"`
 }
 
-const minLargeAccountRegisterCount = 1_000
+const minLargeAccountRegisterCount = 1_000_000
 
 type CadenceValueDiffReporter struct {
 	address        common.Address
@@ -156,7 +158,7 @@ func (dr *CadenceValueDiffReporter) DiffStates(oldRegs, newRegs registers.Regist
 				return fmt.Errorf("failed to create runtime for new registers: %s", err)
 			}
 
-			dr.diffStorageDomain(oldRuntime, newRuntime, common.PathDomainStorage.Identifier())
+			dr.diffDomain(oldRuntime, newRuntime, common.PathDomainStorage.Identifier())
 			return nil
 		})
 
@@ -174,7 +176,7 @@ func (dr *CadenceValueDiffReporter) DiffStates(oldRegs, newRegs registers.Regist
 
 			for _, domain := range domains {
 				if domain != common.PathDomainStorage.Identifier() {
-					dr.diffStorageDomain(oldRuntime, newRuntime, domain)
+					dr.diffDomain(oldRuntime, newRuntime, domain)
 				}
 			}
 			return nil
@@ -217,11 +219,11 @@ func (dr *CadenceValueDiffReporter) DiffStates(oldRegs, newRegs registers.Regist
 	}
 
 	for _, domain := range domains {
-		dr.diffStorageDomain(oldRuntime, newRuntime, domain)
+		dr.diffDomain(oldRuntime, newRuntime, domain)
 	}
 }
 
-func (dr *CadenceValueDiffReporter) diffStorageDomain(
+func (dr *CadenceValueDiffReporter) diffDomain(
 	oldRuntime *readonlyStorageRuntime,
 	newRuntime *readonlyStorageRuntime,
 	domain string,
@@ -317,8 +319,11 @@ func (dr *CadenceValueDiffReporter) diffStorageDomain(
 			})
 	}
 
-	// Compare elements present in both storage maps
-	for _, key := range sharedKeys {
+	if len(sharedKeys) == 0 {
+		return
+	}
+
+	getValues := func(key any) (interpreter.Value, interpreter.Value, *util.Trace, bool) {
 
 		trace := util.NewTrace(fmt.Sprintf("%s[%v]", domain, key))
 
@@ -350,17 +355,27 @@ func (dr *CadenceValueDiffReporter) diffStorageDomain(
 						key,
 					),
 				})
-			continue
+			return nil, nil, nil, false
 		}
 
 		oldValue := oldStorageMap.ReadValue(nil, mapKey)
 
 		newValue := newStorageMap.ReadValue(nil, mapKey)
 
+		return oldValue, newValue, trace, true
+	}
+
+	diffValues := func(
+		oldInterpreter *interpreter.Interpreter,
+		oldValue interpreter.Value,
+		newInterpreter *interpreter.Interpreter,
+		newValue interpreter.Value,
+		trace *util.Trace,
+	) {
 		hasDifference := dr.diffValues(
-			oldRuntime.Interpreter,
+			oldInterpreter,
 			oldValue,
-			newRuntime.Interpreter,
+			newInterpreter,
 			newValue,
 			domain,
 			trace,
@@ -377,13 +392,139 @@ func (dr *CadenceValueDiffReporter) diffStorageDomain(
 						Trace:              trace.String(),
 						OldValue:           oldValue.String(),
 						NewValue:           newValue.String(),
-						OldValueStaticType: oldValue.StaticType(oldRuntime.Interpreter).String(),
-						NewValueStaticType: newValue.StaticType(newRuntime.Interpreter).String(),
+						OldValueStaticType: oldValue.StaticType(oldInterpreter).String(),
+						NewValueStaticType: newValue.StaticType(newInterpreter).String(),
 					})
 			}
 		}
-
 	}
+
+	// Skip goroutine overhead for non-storage domain and small accounts.
+	if domain != common.PathDomainStorage.Identifier() ||
+		oldRuntime.PayloadCount < minLargeAccountRegisterCount ||
+		len(sharedKeys) == 1 {
+
+		for _, key := range sharedKeys {
+			oldValue, newValue, trace, canDiff := getValues(key)
+			if canDiff {
+				diffValues(
+					oldRuntime.Interpreter,
+					oldValue,
+					newRuntime.Interpreter,
+					newValue,
+					trace,
+				)
+			}
+		}
+		return
+	}
+
+	startTime := time.Now()
+
+	log.Info().Msgf(
+		"Diffing %x storage domain containing %d elements (%d payloads) ...",
+		dr.address[:],
+		len(sharedKeys),
+		oldRuntime.PayloadCount,
+	)
+
+	// Diffing storage domain in large account
+
+	type job struct {
+		oldValue interpreter.Value
+		newValue interpreter.Value
+		trace    *util.Trace
+	}
+
+	nWorkers := dr.nWorkers
+	if len(sharedKeys) < nWorkers {
+		nWorkers = len(sharedKeys)
+	}
+
+	jobs := make(chan job, nWorkers)
+
+	var g errgroup.Group
+
+	for i := 0; i < nWorkers; i++ {
+
+		g.Go(func() error {
+			oldInterpreter, err := interpreter.NewInterpreter(
+				nil,
+				nil,
+				&interpreter.Config{
+					Storage: oldRuntime.Storage,
+				},
+			)
+			if err != nil {
+				dr.reportWriter.Write(
+					diffError{
+						Address: dr.address.Hex(),
+						Kind:    diffErrorKindString[abortErrorKind],
+						Msg:     fmt.Sprintf("failed to create interpreter for old registers: %s", err),
+					})
+				return nil
+			}
+
+			newInterpreter, err := interpreter.NewInterpreter(
+				nil,
+				nil,
+				&interpreter.Config{
+					Storage: newRuntime.Storage,
+				},
+			)
+			if err != nil {
+				dr.reportWriter.Write(
+					diffError{
+						Address: dr.address.Hex(),
+						Kind:    diffErrorKindString[abortErrorKind],
+						Msg:     fmt.Sprintf("failed to create interpreter for new registers: %s", err),
+					})
+				return nil
+			}
+
+			for job := range jobs {
+				diffValues(oldInterpreter, job.oldValue, newInterpreter, job.newValue, job.trace)
+			}
+
+			return nil
+		})
+	}
+
+	// Launch goroutine to send account registers to jobs channel
+	go func() {
+		defer close(jobs)
+
+		for _, key := range sharedKeys {
+			oldValue, newValue, trace, canDiff := getValues(key)
+			if canDiff {
+				jobs <- job{
+					oldValue: oldValue,
+					newValue: newValue,
+					trace:    trace,
+				}
+			}
+		}
+	}()
+
+	// Wait for workers
+	err := g.Wait()
+	if err != nil {
+		dr.reportWriter.Write(
+			diffError{
+				Address: dr.address.Hex(),
+				Kind:    diffErrorKindString[abortErrorKind],
+				Msg:     fmt.Sprintf("failed to diff domain %s: %s", domain, err),
+			})
+	}
+
+	log.Info().
+		Msgf(
+			"Finished diffing %x storage domain containing %d elements (%d payloads) in %s",
+			dr.address[:],
+			len(sharedKeys),
+			oldRuntime.PayloadCount,
+			time.Since(startTime),
+		)
 }
 
 func (dr *CadenceValueDiffReporter) diffValues(
@@ -858,9 +999,36 @@ func (dr *CadenceValueDiffReporter) diffCadenceDictionaryValue(
 		return true
 	})
 
-	onlyOldKeys, onlyNewKeys, sharedKeys := diffCadenceValues(vInterpreter, oldKeys, newKeys)
+	onlyOldKeys := make([]interpreter.Value, 0, len(oldKeys))
+
+	// Compare elements in both dict values
+
+	for _, key := range oldKeys {
+		valueTrace := trace.Append(fmt.Sprintf("[%v]", key))
+
+		oldValue, _ := v.Get(vInterpreter, interpreter.EmptyLocationRange, key)
+
+		newValue, found := otherDictionary.Get(otherInterpreter, interpreter.EmptyLocationRange, key)
+		if !found {
+			onlyOldKeys = append(onlyOldKeys, key)
+			continue
+		}
+
+		elementHasDifference := dr.diffValues(
+			vInterpreter,
+			oldValue,
+			otherInterpreter,
+			newValue,
+			domain,
+			valueTrace,
+		)
+		if elementHasDifference {
+			hasDifference = true
+		}
+	}
 
 	// Log keys only present in old dict value
+
 	if len(onlyOldKeys) > 0 {
 		hasDifference = true
 
@@ -878,42 +1046,34 @@ func (dr *CadenceValueDiffReporter) diffCadenceDictionaryValue(
 			})
 	}
 
-	// Log field names only present in new composite value
-	if len(onlyNewKeys) > 0 {
-		hasDifference = true
+	// Log keys only present in new dict value
 
-		dr.reportWriter.Write(
-			difference{
-				Address: dr.address.Hex(),
-				Domain:  domain,
-				Kind:    diffKindString[cadenceValueDiffKind],
-				Trace:   trace.String(),
-				Msg: fmt.Sprintf(
-					"new dict value has %d elements with keys %v, that are not present in old dict value",
-					len(onlyNewKeys),
-					onlyNewKeys,
-				),
-			})
-	}
+	if len(oldKeys) != len(newKeys) || len(onlyOldKeys) > 0 {
+		onlyNewKeys := make([]interpreter.Value, 0, len(newKeys))
 
-	// Compare elements in both dict values
-	for _, key := range sharedKeys {
-		valueTrace := trace.Append(fmt.Sprintf("[%v]", key))
+		// find keys only present in new dict
+		for _, key := range newKeys {
+			found := v.ContainsKey(vInterpreter, interpreter.EmptyLocationRange, key)
+			if !found {
+				onlyNewKeys = append(onlyNewKeys, key)
+			}
+		}
 
-		oldValue, _ := v.Get(vInterpreter, interpreter.EmptyLocationRange, key)
-
-		newValue, _ := otherDictionary.Get(otherInterpreter, interpreter.EmptyLocationRange, key)
-
-		elementHasDifference := dr.diffValues(
-			vInterpreter,
-			oldValue,
-			otherInterpreter,
-			newValue,
-			domain,
-			valueTrace,
-		)
-		if elementHasDifference {
+		if len(onlyNewKeys) > 0 {
 			hasDifference = true
+
+			dr.reportWriter.Write(
+				difference{
+					Address: dr.address.Hex(),
+					Domain:  domain,
+					Kind:    diffKindString[cadenceValueDiffKind],
+					Trace:   trace.String(),
+					Msg: fmt.Sprintf(
+						"new dict value has %d elements with keys %v, that are not present in old dict value",
+						len(onlyNewKeys),
+						onlyNewKeys,
+					),
+				})
 		}
 	}
 
@@ -947,51 +1107,6 @@ func diff[T comparable](old, new []T) (onlyOld, onlyNew, shared []T) {
 
 		for i, n := range new {
 			if o == n {
-				shared = append(shared, o)
-				found = true
-				sharedNew[i] = true
-				break
-			}
-		}
-
-		if !found {
-			onlyOld = append(onlyOld, o)
-		}
-	}
-
-	for i, shared := range sharedNew {
-		if !shared {
-			onlyNew = append(onlyNew, new[i])
-		}
-	}
-
-	return
-}
-
-func diffCadenceValues(oldInterpreter *interpreter.Interpreter, old, new []interpreter.Value) (onlyOld, onlyNew, shared []interpreter.Value) {
-	onlyOld = make([]interpreter.Value, 0, len(old))
-	onlyNew = make([]interpreter.Value, 0, len(new))
-	shared = make([]interpreter.Value, 0, min(len(old), len(new)))
-
-	sharedNew := make([]bool, len(new))
-
-	for _, o := range old {
-		found := false
-
-		for i, n := range new {
-			foundShared := false
-
-			if ev, ok := o.(interpreter.EquatableValue); ok {
-				if ev.Equal(oldInterpreter, interpreter.EmptyLocationRange, n) {
-					foundShared = true
-				}
-			} else {
-				if o == n {
-					foundShared = true
-				}
-			}
-
-			if foundShared {
 				shared = append(shared, o)
 				found = true
 				sharedNew[i] = true
