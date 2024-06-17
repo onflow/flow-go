@@ -76,7 +76,7 @@ type difference struct {
 	NewValueStaticType string `json:",omitempty"`
 }
 
-const minLargeAccountRegisterCount = 50_000
+const minLargeAccountRegisterCount = 1_000_000
 
 type CadenceValueDiffReporter struct {
 	address        common.Address
