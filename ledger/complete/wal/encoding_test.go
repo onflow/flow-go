@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/hash"
 	"github.com/onflow/flow-go/ledger/common/testutils"
 	realWAL "github.com/onflow/flow-go/ledger/complete/wal"
 )
@@ -43,7 +44,7 @@ func TestUpdate(t *testing.T) {
 		operation, stateCommitment, up, err := realWAL.Decode(data)
 		require.NoError(t, err)
 		assert.Equal(t, realWAL.WALUpdate, operation)
-		assert.Equal(t, stateCommitment, ledger.RootHash(rootHash))
+		assert.Equal(t, stateCommitment, ledger.RootHash(hash.DummyHash))
 		assert.Equal(t, update, up)
 	})
 }
