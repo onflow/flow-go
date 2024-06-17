@@ -569,14 +569,9 @@ func (e *Engine) activeClusterIDs() (flow.ChainIDList, error) {
 
 // stopInProgressQcVote cancels the context for all in progress root qc voting.
 func (e *Engine) stopInProgressQcVote() {
-	for {
-		c := e.inProgressQCVote.Load()
-		if c != nil {
-			e.log.Warn().Msgf("voting for cluster root block cancelled")
-			c.Cancel() // cancel
-		}
-		if e.inProgressQCVote.CompareAndSwap(c, nil) {
-			break
-		}
+	c := e.inProgressQCVote.Load()
+	if c != nil && c.Cancel != nil {
+		e.log.Warn().Msgf("voting for cluster root block cancelled")
+		c.Cancel() // cancel
 	}
 }
