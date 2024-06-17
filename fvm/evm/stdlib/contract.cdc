@@ -84,7 +84,8 @@ contract EVM {
     event FLOWTokensDeposited(
         address: String, 
         amount: UFix64, 
-        depositedUUID: UInt64)
+        depositedUUID: UInt64
+    )
 
     /// FLOWTokensWithdrawn is emitted when FLOW tokens are bridged
     /// out of the EVM environment. Note that this event is not emitted
@@ -96,7 +97,8 @@ contract EVM {
     event FLOWTokensWithdrawn(
         address: String, 
         amount: UFix64, 
-        withdrawnUUID: UInt64)
+        withdrawnUUID: UInt64
+    )
 
     /// BridgeAccessorUpdated is emitted when the BridgeAccessor Capability
     /// is updated in the stored BridgeRouter along with identifying
@@ -169,7 +171,11 @@ contract EVM {
                 from: <-from,
                 to: self.bytes
             )
-            emit FLOWTokensDeposited(address: self.toString(), amount: amount, depositedUUID: depositedUUID)
+            emit FLOWTokensDeposited(
+                address: self.toString(), 
+                amount: amount, 
+                depositedUUID: depositedUUID
+            )
         }
 
         /// Serializes the address to a hex string without the 0x prefix
@@ -396,7 +402,11 @@ contract EVM {
                 from: self.addressBytes,
                 amount: balance.attoflow
             ) as! @FlowToken.Vault
-            emit FLOWTokensWithdrawn(address: self.address().toString(), amount: balance.inFLOW(), withdrawnUUID: vault.uuid)
+            emit FLOWTokensWithdrawn(
+                address: self.address().toString(),
+                amount: balance.inFLOW(),
+                withdrawnUUID: vault.uuid
+            )
             return <-vault
         }
 
