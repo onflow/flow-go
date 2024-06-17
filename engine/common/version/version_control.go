@@ -3,16 +3,16 @@ package version
 import (
 	"errors"
 	"fmt"
-	"github.com/onflow/flow-go/engine"
-	"github.com/onflow/flow-go/module/counters"
 	"math"
 	"sync"
 
 	"github.com/coreos/go-semver/semver"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/counters"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state/protocol"
 	psEvents "github.com/onflow/flow-go/state/protocol/events"
@@ -273,7 +273,7 @@ func (v *VersionControl) blockFinalized(
 		return
 	}
 
-	for height := v.lastProcessedHeight + 1; newFinalizedHeight < height; height++ {
+	for height := v.lastProcessedHeight + 1; newFinalizedHeight >= height; height++ {
 		vb, err := v.versionBeacons.Highest(height)
 		if err != nil {
 			v.log.Err(err).
