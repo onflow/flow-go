@@ -54,7 +54,7 @@ func (s *Suite) getNodeInfoDirs(role flow.Role) (string, string) {
 //	out: the tx args output file full path.
 func (s *Suite) executeEFMRecoverTXArgsCMD(collectionClusters, numViewsInEpoch, numViewsInStakingAuction, epochCounter, targetDuration, targetEndTime uint64, randomSource, out string) {
 	// read internal node info from one of the consensus nodes
-	internalNodePrivInfoDir, nodeConfigJson := s.getNodeInfoDirs(role)
+	internalNodePrivInfoDir, nodeConfigJson := s.getNodeInfoDirs(flow.RoleConsensus)
 	an1 := s.GetContainersByRole(flow.RoleAccess)[0]
 	anAddress := an1.Addr(testnet.GRPCPort)
 	// set command line arguments
