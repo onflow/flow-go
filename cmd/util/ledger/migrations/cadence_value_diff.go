@@ -858,9 +858,36 @@ func (dr *CadenceValueDiffReporter) diffCadenceDictionaryValue(
 		return true
 	})
 
-	onlyOldKeys, onlyNewKeys, sharedKeys := diffCadenceValues(vInterpreter, oldKeys, newKeys)
+	onlyOldKeys := make([]interpreter.Value, 0, len(oldKeys))
+
+	// Compare elements in both dict values
+
+	for _, key := range oldKeys {
+		valueTrace := trace.Append(fmt.Sprintf("[%v]", key))
+
+		oldValue, _ := v.Get(vInterpreter, interpreter.EmptyLocationRange, key)
+
+		newValue, found := otherDictionary.Get(otherInterpreter, interpreter.EmptyLocationRange, key)
+		if !found {
+			onlyOldKeys = append(onlyOldKeys, key)
+			continue
+		}
+
+		elementHasDifference := dr.diffValues(
+			vInterpreter,
+			oldValue,
+			otherInterpreter,
+			newValue,
+			domain,
+			valueTrace,
+		)
+		if elementHasDifference {
+			hasDifference = true
+		}
+	}
 
 	// Log keys only present in old dict value
+
 	if len(onlyOldKeys) > 0 {
 		hasDifference = true
 
@@ -878,42 +905,34 @@ func (dr *CadenceValueDiffReporter) diffCadenceDictionaryValue(
 			})
 	}
 
-	// Log field names only present in new composite value
-	if len(onlyNewKeys) > 0 {
-		hasDifference = true
+	// Log keys only present in new dict value
 
-		dr.reportWriter.Write(
-			difference{
-				Address: dr.address.Hex(),
-				Domain:  domain,
-				Kind:    diffKindString[cadenceValueDiffKind],
-				Trace:   trace.String(),
-				Msg: fmt.Sprintf(
-					"new dict value has %d elements with keys %v, that are not present in old dict value",
-					len(onlyNewKeys),
-					onlyNewKeys,
-				),
-			})
-	}
+	if len(oldKeys) != len(newKeys) || len(onlyOldKeys) > 0 {
+		onlyNewKeys := make([]interpreter.Value, 0, len(newKeys))
 
-	// Compare elements in both dict values
-	for _, key := range sharedKeys {
-		valueTrace := trace.Append(fmt.Sprintf("[%v]", key))
+		// find keys only present in new dict
+		for _, key := range newKeys {
+			found := v.ContainsKey(vInterpreter, interpreter.EmptyLocationRange, key)
+			if !found {
+				onlyNewKeys = append(onlyNewKeys, key)
+			}
+		}
 
-		oldValue, _ := v.Get(vInterpreter, interpreter.EmptyLocationRange, key)
-
-		newValue, _ := otherDictionary.Get(otherInterpreter, interpreter.EmptyLocationRange, key)
-
-		elementHasDifference := dr.diffValues(
-			vInterpreter,
-			oldValue,
-			otherInterpreter,
-			newValue,
-			domain,
-			valueTrace,
-		)
-		if elementHasDifference {
+		if len(onlyNewKeys) > 0 {
 			hasDifference = true
+
+			dr.reportWriter.Write(
+				difference{
+					Address: dr.address.Hex(),
+					Domain:  domain,
+					Kind:    diffKindString[cadenceValueDiffKind],
+					Trace:   trace.String(),
+					Msg: fmt.Sprintf(
+						"new dict value has %d elements with keys %v, that are not present in old dict value",
+						len(onlyNewKeys),
+						onlyNewKeys,
+					),
+				})
 		}
 	}
 
@@ -947,51 +966,6 @@ func diff[T comparable](old, new []T) (onlyOld, onlyNew, shared []T) {
 
 		for i, n := range new {
 			if o == n {
-				shared = append(shared, o)
-				found = true
-				sharedNew[i] = true
-				break
-			}
-		}
-
-		if !found {
-			onlyOld = append(onlyOld, o)
-		}
-	}
-
-	for i, shared := range sharedNew {
-		if !shared {
-			onlyNew = append(onlyNew, new[i])
-		}
-	}
-
-	return
-}
-
-func diffCadenceValues(oldInterpreter *interpreter.Interpreter, old, new []interpreter.Value) (onlyOld, onlyNew, shared []interpreter.Value) {
-	onlyOld = make([]interpreter.Value, 0, len(old))
-	onlyNew = make([]interpreter.Value, 0, len(new))
-	shared = make([]interpreter.Value, 0, min(len(old), len(new)))
-
-	sharedNew := make([]bool, len(new))
-
-	for _, o := range old {
-		found := false
-
-		for i, n := range new {
-			foundShared := false
-
-			if ev, ok := o.(interpreter.EquatableValue); ok {
-				if ev.Equal(oldInterpreter, interpreter.EmptyLocationRange, n) {
-					foundShared = true
-				}
-			} else {
-				if o == n {
-					foundShared = true
-				}
-			}
-
-			if foundShared {
 				shared = append(shared, o)
 				found = true
 				sharedNew[i] = true
