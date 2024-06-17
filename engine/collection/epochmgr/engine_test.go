@@ -541,28 +541,14 @@ func (suite *Suite) TestStopQcVoting() {
 	// we expect 1 ActiveClustersChanged events when the engine first starts and the first set of epoch components are started
 	suite.engineEventsDistributor.On("ActiveClustersChanged", mock.AnythingOfType("flow.ChainIDList")).Once()
 
-	numOfCancelledVotes := 0
-	// in addition to our 3 simulated votes the engine will attempt to vote on startup
-	expectedNumOfCancelledVotes := 1
-	done := make(chan struct{})
+	receivedCancelSignal := make(chan struct{})
 	suite.voter.On("Vote", mock.Anything, suite.epochQuery.Next()).
 		Return(nil).
 		Run(func(args mock.Arguments) {
 			ctx := args.Get(0).(context.Context)
-			timeout := time.After(waitFor)
-			for {
-				select {
-				case <-ctx.Done():
-					numOfCancelledVotes++
-					if numOfCancelledVotes == expectedNumOfCancelledVotes {
-						close(done)
-						return
-					}
-				case <-timeout:
-					return
-				}
-			}
-		}).Times(expectedNumOfCancelledVotes)
+			<-ctx.Done()
+			close(receivedCancelSignal)
+		}).Once()
 
 	// we are in setup phase, forces engine to start voting on startup
 	suite.phase = flow.EpochPhaseSetup
