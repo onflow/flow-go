@@ -542,8 +542,6 @@ func (suite *Suite) TestStopQcVoting() {
 	suite.engineEventsDistributor.On("ActiveClustersChanged", mock.AnythingOfType("flow.ChainIDList")).Once()
 	defer suite.engineEventsDistributor.AssertExpectations(suite.T())
 
-	// wait for 2 seconds before returning from the Vote func, giving our engine enough time to cancel the context
-	waitFor := 2 * time.Second
 	numOfCancelledVotes := 0
 	// in addition to our 3 simulated votes the engine will attempt to vote on startup
 	expectedNumOfCancelledVotes := 1
