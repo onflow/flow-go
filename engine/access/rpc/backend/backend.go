@@ -247,7 +247,7 @@ func New(params Params) (*Backend, error) {
 	}
 
 	txValidator, err := configureTransactionValidator(params.State, params.ChainID, params.ScriptExecutor, params.CheckPayerBalance)
-	if err == nil {
+	if err != nil {
 		return nil, fmt.Errorf("could not create transaction validator: %w", err)
 	}
 
