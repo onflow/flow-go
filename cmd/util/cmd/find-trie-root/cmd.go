@@ -195,15 +195,12 @@ func searchRootHashInSegments(
 			return 0, 0, fmt.Errorf("cannot decode LedgerWAL record: %w", err)
 		}
 
-		lg = lg.With().
-			Uint8("operation", uint8(operation)).
-			Logger()
-
 		switch operation {
 		case wal.WALUpdate:
 			rootHash := update.RootHash
 
-			lg.Debug().
+			log.Debug().
+				Uint8("operation", uint8(operation)).
 				Str("root-hash", rootHash.String()).
 				Msg("found WALUpdate")
 
