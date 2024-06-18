@@ -158,6 +158,7 @@ type AccessNodeConfig struct {
 	registerCacheType                 string
 	registerCacheSize                 uint
 	programCacheSize                  uint
+	checkPayerBalance                 bool
 }
 
 type PublicNetworkConfig struct {
@@ -255,6 +256,7 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 		registerCacheType:            pStorage.CacheTypeTwoQueue.String(),
 		registerCacheSize:            0,
 		programCacheSize:             0,
+		checkPayerBalance:            true,
 	}
 }
 
@@ -1271,6 +1273,10 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 			"program-cache-size",
 			defaultConfig.programCacheSize,
 			"[experimental] number of blocks to cache for cadence programs. use 0 to disable cache. default: 0. Note: this is an experimental feature and may cause nodes to become unstable under certain workloads. Use with caution.")
+		flags.BoolVar(&builder.checkPayerBalance,
+			"check-payer-balance",
+			defaultConfig.checkPayerBalance,
+			"checks transaction payer balance via script executor before submitting it to execution node")
 	}).ValidateFlags(func() error {
 		if builder.supportsObserver && (builder.PublicNetworkConfig.BindAddress == cmd.NotSet || builder.PublicNetworkConfig.BindAddress == "") {
 			return errors.New("public-network-address must be set if supports-observer is true")
@@ -1735,6 +1741,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				TxErrorMessagesCacheSize:  builder.TxErrorMessagesCacheSize,
 				ScriptExecutor:            builder.ScriptExecutor,
 				ScriptExecutionMode:       scriptExecMode,
+				CheckPayerBalance:         builder.checkPayerBalance,
 				EventQueryMode:            eventQueryMode,
 				BlockTracker:              blockTracker,
 				SubscriptionHandler: subscription.NewSubscriptionHandler(

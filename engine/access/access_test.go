@@ -186,9 +186,6 @@ func (suite *Suite) TestSendAndGetTransaction() {
 		referenceBlock := unittest.BlockHeaderFixture()
 		transaction := unittest.TransactionFixture()
 		transaction.SetReferenceBlockID(referenceBlock.ID())
-		account, err := unittest.AccountFixture()
-		assert.NoError(suite.T(), err)
-		transaction.Payer = account.Address
 
 		refSnapshot := new(protocol.Snapshot)
 

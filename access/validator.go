@@ -69,15 +69,15 @@ func (l *NoopLimiter) IsRateLimited(address flow.Address) bool {
 }
 
 type TransactionValidationOptions struct {
-	Expiry                                   uint
-	ExpiryBuffer                             uint
-	AllowEmptyReferenceBlockID               bool
-	AllowUnknownReferenceBlockID             bool
-	MaxGasLimit                              uint64
-	CheckScriptsParse                        bool
-	MaxTransactionByteSize                   uint64
-	MaxCollectionByteSize                    uint64
-	ShouldCheckIfTxPayerHasSufficientBalance bool
+	Expiry                       uint
+	ExpiryBuffer                 uint
+	AllowEmptyReferenceBlockID   bool
+	AllowUnknownReferenceBlockID bool
+	MaxGasLimit                  uint64
+	CheckScriptsParse            bool
+	MaxTransactionByteSize       uint64
+	MaxCollectionByteSize        uint64
+	CheckPayerBalance            bool
 }
 
 type TransactionValidator struct {
@@ -95,8 +95,12 @@ func NewTransactionValidator(
 	chain flow.Chain,
 	options TransactionValidationOptions,
 	executor execution.ScriptExecutor,
-) *TransactionValidator {
+) (*TransactionValidator, error) {
 	env := systemcontracts.SystemContractsForChain(chain.ChainID()).AsTemplateEnv()
+	if options.CheckPayerBalance && executor == nil {
+		return nil, errors.New("transaction validator cannot use checkPayerBalance with nil executor")
+	}
+
 	return &TransactionValidator{
 		blocks:                   blocks,
 		chain:                    chain,
@@ -105,7 +109,7 @@ func NewTransactionValidator(
 		limiter:                  NewNoopLimiter(),
 		scriptExecutor:           executor,
 		verifyPayerBalanceScript: templates.GenerateVerifyPayerBalanceForTxExecution(env),
-	}
+	}, nil
 }
 
 func NewTransactionValidatorWithLimiter(
@@ -114,14 +118,12 @@ func NewTransactionValidatorWithLimiter(
 	options TransactionValidationOptions,
 	rateLimiter RateLimiter,
 ) *TransactionValidator {
-	env := systemcontracts.SystemContractsForChain(chain.ChainID()).AsTemplateEnv()
 	return &TransactionValidator{
-		blocks:                   blocks,
-		chain:                    chain,
-		options:                  options,
-		serviceAccountAddress:    chain.ServiceAddress(),
-		limiter:                  rateLimiter,
-		verifyPayerBalanceScript: templates.GenerateVerifyPayerBalanceForTxExecution(env),
+		blocks:                blocks,
+		chain:                 chain,
+		options:               options,
+		serviceAccountAddress: chain.ServiceAddress(),
+		limiter:               rateLimiter,
 	}
 }
 
@@ -175,9 +177,12 @@ func (v *TransactionValidator) Validate(ctx context.Context, tx *flow.Transactio
 		return err
 	}
 
-	err = v.checkSufficientFlowAmountToPayForTransaction(ctx, tx)
+	err = v.checkSufficientBalanceToPayForTransaction(ctx, tx)
 	if err != nil {
-		return err
+		var balanceError InsufficientBalanceError
+		if errors.As(err, &balanceError) {
+			return balanceError
+		}
 	}
 
 	// TODO replace checkSignatureFormat by verifying the account/payer signatures
@@ -367,14 +372,14 @@ func (v *TransactionValidator) checkSignatureFormat(tx *flow.TransactionBody) er
 	return nil
 }
 
-func (v *TransactionValidator) checkSufficientFlowAmountToPayForTransaction(ctx context.Context, tx *flow.TransactionBody) error {
-	if !v.options.ShouldCheckIfTxPayerHasSufficientBalance {
+func (v *TransactionValidator) checkSufficientBalanceToPayForTransaction(ctx context.Context, tx *flow.TransactionBody) error {
+	if !v.options.CheckPayerBalance {
 		return nil
 	}
 
 	header, err := v.blocks.HeaderByID(tx.ID())
 	if err != nil {
-		return fmt.Errorf("couldn't fetch header block: %w", err)
+		return fmt.Errorf("could not fetch block header: %w", err)
 	}
 
 	payerAddress := cadence.NewAddress(tx.Payer)
@@ -393,29 +398,40 @@ func (v *TransactionValidator) checkSufficientFlowAmountToPayForTransaction(ctx 
 
 	value, err := jsoncdc.Decode(nil, result)
 	if err != nil {
-		return fmt.Errorf("couldn't decode result value returned by script executor: %w", err)
+		return fmt.Errorf("could not decode result value returned by script executor: %w", err)
 	}
 
 	structValue, ok := value.(cadence.Struct)
 	if !ok {
-		return errors.New("couldn't parse result value as a Cadence struct")
+		return errors.New("could not parse result value as a Cadence struct")
 	}
 
-	canExecuteTxValue := cadence.SearchFieldByName(structValue, "canExecuteTransaction")
-	if canExecuteTxValue != nil {
-		return fmt.Errorf("couldn't parse canExecuteTransaction: %w", err)
+	fields := cadence.FieldsMappedByName(structValue)
+	canExecuteTxValue, ok := fields["canExecuteTransaction"]
+	if !ok {
+		return errors.New("canExecuteTransaction value missing in response")
 	}
 
 	canExecuteTransaction, ok := canExecuteTxValue.(cadence.Bool)
 	if !ok {
-		return errors.New("couldn't parse canExecuteTransaction as a Cadence bool")
+		return errors.New("could not parse canExecuteTransaction as a Cadence bool")
 	}
 
 	if bool(canExecuteTransaction) {
 		return nil
 	}
 
-	return errors.New("cannot execute transaction. tx payer doesn't have enough Flow")
+	requiredBalanceValue, ok := fields["requiredBalance"]
+	if !ok {
+		return errors.New("requiredBalance value missing in response")
+	}
+
+	requiredBalance, ok := requiredBalanceValue.(cadence.UFix64)
+	if !ok {
+		return errors.New("could not parse requiredBalance as a Cadence UFix64")
+	}
+
+	return InsufficientBalanceError{Payer: tx.Payer, RequiredBalance: uint64(requiredBalance)}
 }
 
 func remove(s []string, r string) []string {

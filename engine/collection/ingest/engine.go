@@ -64,13 +64,12 @@ func New(
 		access.NewProtocolStateBlocks(state),
 		chain,
 		access.TransactionValidationOptions{
-			Expiry:                                   flow.DefaultTransactionExpiry,
-			ExpiryBuffer:                             config.ExpiryBuffer,
-			MaxGasLimit:                              config.MaxGasLimit,
-			CheckScriptsParse:                        config.CheckScriptsParse,
-			MaxTransactionByteSize:                   config.MaxTransactionByteSize,
-			MaxCollectionByteSize:                    config.MaxCollectionByteSize,
-			ShouldCheckIfTxPayerHasSufficientBalance: true,
+			Expiry:                 flow.DefaultTransactionExpiry,
+			ExpiryBuffer:           config.ExpiryBuffer,
+			MaxGasLimit:            config.MaxGasLimit,
+			CheckScriptsParse:      config.CheckScriptsParse,
+			MaxTransactionByteSize: config.MaxTransactionByteSize,
+			MaxCollectionByteSize:  config.MaxCollectionByteSize,
 		},
 		limiter,
 	)
@@ -358,8 +357,8 @@ func (e *Engine) ingestTransaction(
 		return nil
 	}
 
-	// check if the transaction is valid
-	err = e.transactionValidator.Validate(ctx, tx)
+	// we don't pass actual ctx as we don't execute any scripts inside for now
+	err = e.transactionValidator.Validate(context.Background(), tx)
 	if err != nil {
 		return engine.NewInvalidInputErrorf("invalid transaction (%x): %w", txID, err)
 	}
