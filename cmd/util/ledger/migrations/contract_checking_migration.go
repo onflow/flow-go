@@ -43,6 +43,8 @@ func NewContractCheckingMigration(
 
 		// Gather all contracts
 
+		log.Info().Msg("Gathering contracts ...")
+
 		contractsForPrettyPrinting := make(map[common.Location][]byte, contractCountEstimate)
 
 		type contract struct {
@@ -101,6 +103,8 @@ func NewContractCheckingMigration(
 			b := contracts[j]
 			return a.location.ID() < b.location.ID()
 		})
+
+		log.Info().Msgf("Gathered all contracts (%d)", len(contracts))
 
 		// Check all contracts
 
