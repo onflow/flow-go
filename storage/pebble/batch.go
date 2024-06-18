@@ -4,6 +4,8 @@ import (
 	"sync"
 
 	"github.com/cockroachdb/pebble"
+
+	"github.com/onflow/flow-go/storage"
 )
 
 type Batch struct {
@@ -13,6 +15,8 @@ type Batch struct {
 	callbacks []func()
 }
 
+var _ storage.BatchStorage = (*Batch)(nil)
+
 func NewBatch(db *pebble.DB) *Batch {
 	batch := db.NewBatch()
 	return &Batch{
@@ -21,7 +25,7 @@ func NewBatch(db *pebble.DB) *Batch {
 	}
 }
 
-func (b *Batch) GetWriter() *pebble.Batch {
+func (b *Batch) GetWriter() storage.Transaction {
 	return b.writer
 }
 
