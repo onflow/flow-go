@@ -12,6 +12,7 @@ import (
 
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/cmd/util/ledger/util/registers"
+	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -50,35 +51,49 @@ func NewContractCheckingMigration(
 		}
 		contracts := make([]contract, 0, contractCountEstimate)
 
-		err = registersByAccount.ForEach(func(owner string, key string, value []byte) error {
+		err = registersByAccount.ForEachAccount(func(accountRegisters *registers.AccountRegisters) error {
+			owner := accountRegisters.Owner()
 
-			// Skip payloads that are not contract code
-			contractName := flow.KeyContractName(key)
-			if contractName == "" {
-				return nil
+			encodedContractNames, err := accountRegisters.Get(owner, flow.ContractNamesKey)
+			if err != nil {
+				return err
 			}
 
-			address := common.Address([]byte(owner))
-			code := value
-			location := common.AddressLocation{
-				Address: address,
-				Name:    contractName,
+			contractNames, err := environment.DecodeContractNames(encodedContractNames)
+			if err != nil {
+				return err
 			}
 
-			contracts = append(
-				contracts,
-				contract{
-					location: location,
-					code:     code,
-				},
-			)
+			for _, contractName := range contractNames {
 
-			contractsForPrettyPrinting[location] = code
+				contractKey := flow.ContractKey(contractName)
+
+				code, err := accountRegisters.Get(owner, contractKey)
+				if err != nil {
+					return err
+				}
+
+				address := common.Address([]byte(owner))
+				location := common.AddressLocation{
+					Address: address,
+					Name:    contractName,
+				}
+
+				contracts = append(
+					contracts,
+					contract{
+						location: location,
+						code:     code,
+					},
+				)
+
+				contractsForPrettyPrinting[location] = code
+			}
 
 			return nil
 		})
 		if err != nil {
-			return fmt.Errorf("failed to iterate over registers: %w", err)
+			return fmt.Errorf("failed to get contracts of accounts: %w", err)
 		}
 
 		sort.Slice(contracts, func(i, j int) bool {
