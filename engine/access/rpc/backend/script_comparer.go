@@ -2,6 +2,8 @@ package backend
 
 import (
 	"bytes"
+	"crypto/md5" //nolint:gosec
+	"encoding/base64"
 	"strings"
 	"time"
 
@@ -14,6 +16,7 @@ import (
 
 const (
 	executeErrorPrefix = "failed to execute script at block"
+	logDiffAsError     = false
 )
 
 type scriptResult struct {
@@ -31,20 +34,23 @@ func newScriptResult(result []byte, duration time.Duration, err error) *scriptRe
 }
 
 type scriptResultComparison struct {
-	log     zerolog.Logger
-	metrics module.BackendScriptsMetrics
-	request *scriptExecutionRequest
+	log             zerolog.Logger
+	metrics         module.BackendScriptsMetrics
+	request         *scriptExecutionRequest
+	shouldLogScript func(time.Time, [md5.Size]byte) bool
 }
 
 func newScriptResultComparison(
 	log zerolog.Logger,
 	metrics module.BackendScriptsMetrics,
+	shouldLogScript func(time.Time, [md5.Size]byte) bool,
 	request *scriptExecutionRequest,
 ) *scriptResultComparison {
 	return &scriptResultComparison{
-		log:     log,
-		metrics: metrics,
-		request: request,
+		log:             log,
+		metrics:         metrics,
+		request:         request,
+		shouldLogScript: shouldLogScript,
 	}
 }
 
@@ -66,7 +72,7 @@ func (c *scriptResultComparison) compare(execResult, localResult *scriptResult) 
 
 		c.metrics.ScriptExecutionErrorMismatch()
 		c.logComparison(execResult, localResult,
-			"cadence errors from local execution do not match EN", true)
+			"cadence errors from local execution do not match EN", logDiffAsError)
 		return false
 	}
 
@@ -77,7 +83,7 @@ func (c *scriptResultComparison) compare(execResult, localResult *scriptResult) 
 
 	c.metrics.ScriptExecutionResultMismatch()
 	c.logComparison(execResult, localResult,
-		"script execution results from local execution do not match EN", true)
+		"script execution results from local execution do not match EN", logDiffAsError)
 	return false
 }
 
@@ -91,20 +97,23 @@ func (c *scriptResultComparison) logComparison(execResult, localResult *scriptRe
 	lgCtx := c.log.With().
 		Hex("block_id", c.request.blockID[:]).
 		Hex("script_hash", c.request.insecureScriptHash[:]).
-		Str("script", string(c.request.script)).
 		Strs("args", args)
+
+	if c.shouldLogScript(time.Now(), c.request.insecureScriptHash) {
+		lgCtx = lgCtx.Str("script", string(c.request.script))
+	}
 
 	if execResult.err != nil {
 		lgCtx = lgCtx.AnErr("execution_node_error", execResult.err)
 	} else {
-		lgCtx = lgCtx.Hex("execution_node_result", execResult.result)
+		lgCtx = lgCtx.Str("execution_node_result", base64.StdEncoding.EncodeToString(execResult.result))
 	}
 	lgCtx = lgCtx.Dur("execution_node_duration_ms", execResult.duration)
 
 	if localResult.err != nil {
 		lgCtx = lgCtx.AnErr("local_error", localResult.err)
 	} else {
-		lgCtx = lgCtx.Hex("local_result", localResult.result)
+		lgCtx = lgCtx.Str("local_result", base64.StdEncoding.EncodeToString(localResult.result))
 	}
 	lgCtx = lgCtx.Dur("local_duration_ms", localResult.duration)
 
