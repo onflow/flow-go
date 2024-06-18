@@ -214,7 +214,9 @@ func findRootHashAndCreateTrimmed(dir string, segment int, expectedRoot ledger.R
 		return "", fmt.Errorf("cannot create temporary folder: %w", err)
 	}
 
-	newSegmentFile := prometheusWAL.SegmentName(tmpFolder, segment)
+	// the new segment file will be created in the temporary folder
+	// and it's always 00000000
+	newSegmentFile := prometheusWAL.SegmentName(tmpFolder, 0)
 
 	log.Info().Msgf("writing new segment file to %v", newSegmentFile)
 
