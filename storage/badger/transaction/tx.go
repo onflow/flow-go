@@ -67,3 +67,9 @@ func WithTxInterface(f func(*dbbadger.Txn) error) func(interface{}) error {
 		return f(tx.DBTxn)
 	}
 }
+
+func ToTx(f func(interface{}) error) func(*Tx) error {
+	return func(tx *Tx) error {
+		return f(tx)
+	}
+}
