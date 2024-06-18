@@ -42,7 +42,8 @@ var Cmd = &cobra.Command{
 }
 
 func init() {
-	Cmd.Flags().StringVar(&flagExecutionStateDir, "execution-state-dir", "/var/flow/data/execution", "directory to the execution state")
+	Cmd.Flags().StringVar(&flagExecutionStateDir, "execution-state-dir", "/var/flow/data/execution",
+		"directory to the execution state")
 	_ = Cmd.MarkFlagRequired("execution-state-dir")
 
 	Cmd.Flags().StringVar(&flagRootHash, "root-hash", "",
@@ -52,9 +53,11 @@ func init() {
 	Cmd.Flags().IntVar(&flagFrom, "from", 0, "from segment")
 	Cmd.Flags().IntVar(&flagTo, "to", math.MaxInt32, "to segment")
 
-	Cmd.Flags().StringVar(&flagBackupDir, "backup-dir", "", "directory for backup wal files. must be not exist or empty folder. required when --trim-as-latest-wal flag is set to true.")
+	Cmd.Flags().StringVar(&flagBackupDir, "backup-dir", "",
+		"directory for backup wal files. must be not exist or empty folder. required when --trim-as-latest-wal flag is set to true.")
 
-	Cmd.Flags().BoolVar(&flagTrimAsLatestWAL, "trim-as-latest-wal", false, "trim the wal file to the last record with the target trie root hash")
+	Cmd.Flags().BoolVar(&flagTrimAsLatestWAL, "trim-as-latest-wal", false,
+		"trim the wal file to the last record with the target trie root hash")
 }
 
 func run(*cobra.Command, []string) {
@@ -65,6 +68,16 @@ func run(*cobra.Command, []string) {
 
 	if flagExecutionStateDir == flagBackupDir {
 		log.Fatal().Msg("--backup-dir directory cannot be the same as the execution state directory")
+	}
+
+	// making sure the backup dir is empty
+	empty, err := checkFolderIsEmpty(flagBackupDir)
+	if err != nil {
+		log.Fatal().Msgf("--backup-dir directory %v must exist and empty", flagBackupDir)
+	}
+
+	if !empty {
+		log.Fatal().Msgf("--backup-dir directory %v must be empty", flagBackupDir)
 	}
 
 	segment, offset, err := searchRootHashInSegments(rootHash, flagExecutionStateDir, flagFrom, flagTo)
@@ -114,7 +127,8 @@ func run(*cobra.Command, []string) {
 
 	// before replacing the last wal file with the newly generated one, backup the rollbacked wals
 	// then move the last segment file to the execution state directory
-	err = backupRollbackedWALsAndMoveLastSegmentFile(segment, flagExecutionStateDir, flagBackupDir, newSegmentFile)
+	err = backupRollbackedWALsAndMoveLastSegmentFile(
+		segment, flagExecutionStateDir, flagBackupDir, newSegmentFile)
 	if err != nil {
 		log.Fatal().Err(err).Msg("cannot backup rollbacked WALs")
 	}
@@ -223,7 +237,8 @@ func searchRootHashInSegments(
 // findRootHashAndCreateTrimmed finds the root hash in the segment file from the given dir folder
 // and creates a new segment file with the expected root hash as the last record in a temporary folder.
 // it return the path to the new segment file.
-func findRootHashAndCreateTrimmed(dir string, segment int, expectedRoot ledger.RootHash, tmpFolder string) (string, error) {
+func findRootHashAndCreateTrimmed(
+	dir string, segment int, expectedRoot ledger.RootHash, tmpFolder string) (string, error) {
 	// the new segment file will be created in the temporary folder
 	// and it's always 00000000
 	newSegmentFile := prometheusWAL.SegmentName(tmpFolder, 0)
@@ -284,11 +299,17 @@ func findRootHashAndCreateTrimmed(dir string, segment int, expectedRoot ledger.R
 	return "", fmt.Errorf("finish reading all segment files from %d to %d, but not found", segment, segment)
 }
 
-func checkFolderNotExistOrEmpty(folderPath string) (bool, error) {
+func checkFolderIsEmpty(folderPath string) (bool, error) {
 	// Check if the folder exists
 	info, err := os.Stat(folderPath)
 	if err != nil {
 		if os.IsNotExist(err) {
+			// create the folder if not exist
+			err = os.MkdirAll(folderPath, os.ModePerm)
+			if err != nil {
+				return false, fmt.Errorf("Cannot create the folder.")
+			}
+
 			return true, nil
 		}
 		return false, err
@@ -311,22 +332,6 @@ func checkFolderNotExistOrEmpty(folderPath string) (bool, error) {
 // backup new wals before replacing
 func backupRollbackedWALsAndMoveLastSegmentFile(
 	segment int, walDir, backupDir string, newSegmentFile string) error {
-	// making sure the backup dir is empty
-	empty, err := checkFolderNotExistOrEmpty(backupDir)
-	if err != nil {
-		return fmt.Errorf("cannot check backup directory: %w", err)
-	}
-
-	if !empty {
-		return fmt.Errorf("backup directory %s is not empty", backupDir)
-	}
-
-	// Create the backup directory
-	err = os.MkdirAll(backupDir, os.ModePerm)
-	if err != nil {
-		return fmt.Errorf("cannot create backup directory: %w", err)
-	}
-
 	first, last, err := prometheusWAL.Segments(walDir)
 	if err != nil {
 		return fmt.Errorf("cannot get segments: %w", err)
