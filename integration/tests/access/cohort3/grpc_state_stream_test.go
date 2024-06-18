@@ -9,14 +9,15 @@ import (
 	"testing"
 	"time"
 
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 	"github.com/onflow/flow/protobuf/go/flow/executiondata"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 
 	sdk "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go-sdk/test"
@@ -108,7 +109,7 @@ func (s *GrpcStateStreamSuite) SetupTest() {
 	// add the observer node config
 	observers := []testnet.ObserverConfig{{
 		ContainerName: testnet.PrimaryON,
-		LogLevel:      zerolog.DebugLevel,
+		LogLevel:      zerolog.InfoLevel,
 		AdditionalFlags: []string{
 			fmt.Sprintf("--execution-data-dir=%s", testnet.DefaultExecutionDataServiceDir),
 			fmt.Sprintf("--execution-state-dir=%s", testnet.DefaultExecutionStateDir),
@@ -195,18 +196,15 @@ func (s *GrpcStateStreamSuite) TestHappyPath() {
 			s.Require().NoErrorf(err, "unexpected test ON error")
 		case event := <-testANEvents:
 			if has(event.Events, targetEvent) {
-				s.T().Logf("adding access test events: %d %d %v", event.BlockHeight, len(event.Events), event.Events)
 				r.Add(s.T(), event.BlockHeight, "access_test", &event)
 				foundANTxCount++
 			}
 		case event := <-controlANEvents:
 			if has(event.Events, targetEvent) {
-				s.T().Logf("adding control events: %d %d %v", event.BlockHeight, len(event.Events), event.Events)
 				r.Add(s.T(), event.BlockHeight, "access_control", &event)
 			}
 		case event := <-testONEvents:
 			if has(event.Events, targetEvent) {
-				s.T().Logf("adding observer test events: %d %d %v", event.BlockHeight, len(event.Events), event.Events)
 				r.Add(s.T(), event.BlockHeight, "observer_test", &event)
 				foundONTxCount++
 			}
@@ -285,6 +283,7 @@ func SubscribeEventsByBlockHeight(
 		Filter:               filter,
 		HeartbeatInterval:    1,
 	}
+	// nolint
 	stream, err := client.SubscribeEvents(ctx, req)
 	if err != nil {
 		return nil, nil, err

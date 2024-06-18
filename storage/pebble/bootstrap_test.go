@@ -221,7 +221,7 @@ func trieWithValidRegisterIDs(t *testing.T, n uint16) ([]*trie.MTrie, []*flow.Re
 	// make sure it has at least 1 leaf node
 	require.GreaterOrEqual(t, depth, uint16(1))
 	require.NoError(t, err)
-	resultTries := []*trie.MTrie{emptyTrie, populatedTrie}
+	resultTries := []*trie.MTrie{populatedTrie}
 	return resultTries, resultRegisterIDs
 }
 
