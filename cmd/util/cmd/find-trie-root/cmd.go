@@ -3,9 +3,9 @@ package find_trie_root
 import (
 	"encoding/hex"
 	"fmt"
-	"io"
 	"math"
 	"os"
+	"path/filepath"
 
 	prometheusWAL "github.com/onflow/wal/wal"
 	"github.com/rs/zerolog"
@@ -86,8 +86,26 @@ func run(*cobra.Command, []string) {
 		return
 	}
 
+	// create a temporary folder in the backup folder to store the new segment file
+	tmpFolder := filepath.Join(flagBackupDir, "flow-last-segment-file")
+
+	log.Info().Msgf("creating temporary folder %v", tmpFolder)
+
+	err = os.Mkdir(tmpFolder, os.ModePerm)
+	if err != nil {
+		log.Fatal().Err(err).Msg("cannot create temporary folder")
+	}
+
+	defer func() {
+		log.Info().Msgf("removing temporary folder %v", tmpFolder)
+		err := os.RemoveAll(tmpFolder)
+		if err != nil {
+			log.Error().Err(err).Msg("cannot remove temporary folder")
+		}
+	}()
+
 	// genereate a segment file to the temporary folder with the root hash as its last record
-	newSegmentFile, err := findRootHashAndCreateTrimmed(flagExecutionStateDir, segment, rootHash)
+	newSegmentFile, err := findRootHashAndCreateTrimmed(flagExecutionStateDir, segment, rootHash, tmpFolder)
 	if err != nil {
 		log.Fatal().Err(err).Msg("cannot copy WAL")
 	}
@@ -208,12 +226,7 @@ func searchRootHashInSegments(
 // findRootHashAndCreateTrimmed finds the root hash in the segment file from the given dir folder
 // and creates a new segment file with the expected root hash as the last record in a temporary folder.
 // it return the path to the new segment file.
-func findRootHashAndCreateTrimmed(dir string, segment int, expectedRoot ledger.RootHash) (string, error) {
-	tmpFolder, err := os.MkdirTemp("", "flow-last-segment-file")
-	if err != nil {
-		return "", fmt.Errorf("cannot create temporary folder: %w", err)
-	}
-
+func findRootHashAndCreateTrimmed(dir string, segment int, expectedRoot ledger.RootHash, tmpFolder string) (string, error) {
 	// the new segment file will be created in the temporary folder
 	// and it's always 00000000
 	newSegmentFile := prometheusWAL.SegmentName(tmpFolder, 0)
@@ -281,7 +294,7 @@ func checkFolderNotExistOrEmpty(folderPath string) (bool, error) {
 		if os.IsNotExist(err) {
 			return true, nil
 		}
-		return false, nil
+		return false, err
 	}
 
 	// Check if the path is a directory
@@ -344,36 +357,10 @@ func backupRollbackedWALsAndMoveLastSegmentFile(
 
 	log.Info().Msgf("moving segment file %s to %s", newSegmentFile, segmentToBeReplaced)
 
-	_, err = copyFile(newSegmentFile, segmentToBeReplaced)
+	err = os.Rename(newSegmentFile, segmentToBeReplaced)
 	if err != nil {
 		return fmt.Errorf("cannot move segment file %s to %s: %w", newSegmentFile, segmentToBeReplaced, err)
 	}
 
 	return nil
-}
-
-func copyFile(src, dst string) (int64, error) {
-	sourceFile, err := os.Open(src)
-	if err != nil {
-		return 0, err
-	}
-	defer sourceFile.Close()
-
-	destinationFile, err := os.Create(dst)
-	if err != nil {
-		return 0, err
-	}
-	defer destinationFile.Close()
-
-	bytesCopied, err := io.Copy(destinationFile, sourceFile)
-	if err != nil {
-		return 0, err
-	}
-
-	err = destinationFile.Sync()
-	if err != nil {
-		return 0, err
-	}
-
-	return bytesCopied, nil
 }
