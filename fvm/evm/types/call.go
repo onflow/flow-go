@@ -100,7 +100,7 @@ func (dc *DirectCall) Message() *gethCore.Message {
 
 // Transaction constructs a geth.Transaction from the direct call
 func (dc *DirectCall) Transaction() *gethTypes.Transaction {
-	// Since legacyTX for a direct call doesn't have a valid siganture
+	// Since a direct call doesn't have a valid siganture
 	// and we need to somehow include the From feild for the purpose
 	// of hash calculation. we define the canonical format by
 	// using the FROM bytes to set the bytes for the R part of the tx (big endian),
