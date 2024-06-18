@@ -26,7 +26,7 @@ func TestDirectCall(t *testing.T) {
 	t.Run("calculate hash", func(t *testing.T) {
 		h, err := dc.Hash()
 		require.NoError(t, err)
-		assert.Equal(t, "0xe087d6979a543d4b305f522b39a703307cbe97ed951b25d4134ec92e9e3965dd", h.Hex())
+		assert.Equal(t, "0xed76124cc3c59f13e1113f5c380e2a67dab9bf616afc645073d2491fe3aecb62", h.Hex())
 
 		// the hash should stay the same after RLP encoding and decoding
 		var b bytes.Buffer
@@ -39,7 +39,7 @@ func TestDirectCall(t *testing.T) {
 		require.NoError(t, err)
 
 		h = reconstructedTx.Hash()
-		assert.Equal(t, "0xe087d6979a543d4b305f522b39a703307cbe97ed951b25d4134ec92e9e3965dd", h.Hex())
+		assert.Equal(t, "0xed76124cc3c59f13e1113f5c380e2a67dab9bf616afc645073d2491fe3aecb62", h.Hex())
 	})
 
 	t.Run("same content except `from` should result in different hashes", func(t *testing.T) {
@@ -65,8 +65,8 @@ func TestDirectCall(t *testing.T) {
 		assert.Equal(t, uint64(0), tx.Nonce()) // no nonce exists for direct call
 
 		v, r, s := tx.RawSignatureValues()
-		require.Equal(t, dc.From.Bytes(), v.Bytes())
-		require.Empty(t, r.Bytes())
-		require.Equal(t, s.Bytes()[0], DirectCallTxType)
+		require.Equal(t, dc.From.Bytes(), r.Bytes())
+		require.Equal(t, []byte{dc.SubType}, s.Bytes())
+		require.Equal(t, []byte{DirectCallTxType}, v.Bytes())
 	})
 }

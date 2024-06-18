@@ -104,7 +104,7 @@ func (dc *DirectCall) Transaction() *gethTypes.Transaction {
 	// and we need to somehow include the From feild for the purpose
 	// of hash calculation. we define the canonical format by
 	// using the FROM bytes to set the bytes for the R part of the tx (big endian),
-	// all bytes are S is kept to zero and V is set to DirectCallTxType (255).
+	// S captures the subtype of transaction and V is set to DirectCallTxType (255).
 	return gethTypes.NewTx(&gethTypes.LegacyTx{
 		GasPrice: big.NewInt(0),
 		Gas:      dc.GasLimit,
@@ -112,8 +112,9 @@ func (dc *DirectCall) Transaction() *gethTypes.Transaction {
 		Value:    dc.Value,
 		Data:     dc.Data,
 		Nonce:    dc.Nonce,
-		V:        new(big.Int).SetBytes(dc.From.Bytes()),
-		S:        big.NewInt(255),
+		R:        new(big.Int).SetBytes(dc.From.Bytes()),
+		S:        new(big.Int).SetBytes([]byte{dc.SubType}),
+		V:        new(big.Int).SetBytes([]byte{DirectCallTxType}),
 	})
 }
 
