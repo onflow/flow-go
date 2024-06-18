@@ -22,6 +22,7 @@ import (
 type Blocks interface {
 	HeaderByID(id flow.Identifier) (*flow.Header, error)
 	FinalizedHeader() (*flow.Header, error)
+	SealedHeader() (*flow.Header, error)
 }
 
 type ProtocolStateBlocks struct {
@@ -47,6 +48,10 @@ func (b *ProtocolStateBlocks) HeaderByID(id flow.Identifier) (*flow.Header, erro
 
 func (b *ProtocolStateBlocks) FinalizedHeader() (*flow.Header, error) {
 	return b.state.Final().Head()
+}
+
+func (b *ProtocolStateBlocks) SealedHeader() (*flow.Header, error) {
+	return b.state.Sealed().Head()
 }
 
 // RateLimiter is an interface for checking if an address is rate limited.
@@ -377,7 +382,7 @@ func (v *TransactionValidator) checkSufficientBalanceToPayForTransaction(ctx con
 		return nil
 	}
 
-	header, err := v.blocks.HeaderByID(tx.ID())
+	header, err := v.blocks.SealedHeader()
 	if err != nil {
 		return fmt.Errorf("could not fetch block header: %w", err)
 	}
@@ -417,10 +422,6 @@ func (v *TransactionValidator) checkSufficientBalanceToPayForTransaction(ctx con
 		return errors.New("could not parse canExecuteTransaction as a Cadence bool")
 	}
 
-	if bool(canExecuteTransaction) {
-		return nil
-	}
-
 	requiredBalanceValue, ok := fields["requiredBalance"]
 	if !ok {
 		return errors.New("requiredBalance value missing in response")
@@ -429,6 +430,10 @@ func (v *TransactionValidator) checkSufficientBalanceToPayForTransaction(ctx con
 	requiredBalance, ok := requiredBalanceValue.(cadence.UFix64)
 	if !ok {
 		return errors.New("could not parse requiredBalance as a Cadence UFix64")
+	}
+
+	if bool(canExecuteTransaction) {
+		return nil
 	}
 
 	return InsufficientBalanceError{Payer: tx.Payer, RequiredBalance: uint64(requiredBalance)}
