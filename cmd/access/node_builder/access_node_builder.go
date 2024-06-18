@@ -256,7 +256,7 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 		registerCacheType:            pStorage.CacheTypeTwoQueue.String(),
 		registerCacheSize:            0,
 		programCacheSize:             0,
-		checkPayerBalance:            true,
+		checkPayerBalance:            false,
 	}
 }
 
