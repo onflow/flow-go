@@ -304,6 +304,8 @@ func checkFolderIsEmpty(folderPath string) (bool, error) {
 	info, err := os.Stat(folderPath)
 	if err != nil {
 		if os.IsNotExist(err) {
+			log.Info().Msgf("folder %v does not exist, creating the folder", folderPath)
+
 			// create the folder if not exist
 			err = os.MkdirAll(folderPath, os.ModePerm)
 			if err != nil {
