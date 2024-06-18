@@ -31,6 +31,7 @@ func NewContractCheckingMigration(
 	return func(registersByAccount *registers.ByAccount) error {
 
 		reporter := rwf.ReportWriter(contractCheckingReporterName)
+		defer reporter.Close()
 
 		mr, err := NewInterpreterMigrationRuntime(
 			registersByAccount,
@@ -152,8 +153,6 @@ func NewContractCheckingMigration(
 				programs[location] = program
 			}
 		}
-
-		reporter.Close()
 
 		return nil
 	}
