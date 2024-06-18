@@ -326,6 +326,7 @@ func (e *RichEpochProtocolStateEntry) CurrentEpochFinalView() uint64 {
 
 // EpochPhase returns the current epoch phase.
 // The receiver EpochProtocolStateEntry must be properly constructed.
+// TODO(EFM, #6092) update logic here
 func (e *EpochProtocolStateEntry) EpochPhase() EpochPhase {
 	// The epoch phase is determined by how much information we have about the next epoch
 	if e.NextEpoch == nil {

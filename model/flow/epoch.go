@@ -19,6 +19,7 @@ import (
 // An epoch begins in the staking phase, then transitions to the setup phase in
 // the block containing the EpochSetup service event, then to the committed
 // phase in the block containing the EpochCommit service event.
+// TODO(EFM, #6092) update these docs
 // |<--  EpochPhaseStaking -->|<-- EpochPhaseSetup -->|<-- EpochPhaseCommitted -->|<-- EpochPhaseStaking -->...
 // |<------------------------------- Epoch N ------------------------------------>|<-- Epoch N + 1 --...
 type EpochPhase int
@@ -28,6 +29,7 @@ const (
 	EpochPhaseStaking
 	EpochPhaseSetup
 	EpochPhaseCommitted
+	EpochPhaseFallback
 )
 
 func (p EpochPhase) String() string {
@@ -36,6 +38,7 @@ func (p EpochPhase) String() string {
 		"EpochPhaseStaking",
 		"EpochPhaseSetup",
 		"EpochPhaseCommitted",
+		"EpochPhaseFallback",
 	}[p]
 }
 
@@ -45,6 +48,7 @@ func GetEpochPhase(phase string) EpochPhase {
 		EpochPhaseStaking,
 		EpochPhaseSetup,
 		EpochPhaseCommitted,
+		EpochPhaseFallback,
 	}
 	for _, p := range phases {
 		if p.String() == phase {
