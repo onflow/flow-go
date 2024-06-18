@@ -333,7 +333,7 @@ func diffAccount(
 			chainID,
 			rw,
 			true,
-			flagNWorker,
+			flagNWorker/2,
 		).DiffStates(
 			accountRegisters1,
 			accountRegisters2,
