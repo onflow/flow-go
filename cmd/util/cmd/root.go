@@ -26,6 +26,7 @@ import (
 	rollback_executed_height "github.com/onflow/flow-go/cmd/util/cmd/rollback-executed-height/cmd"
 	"github.com/onflow/flow-go/cmd/util/cmd/snapshot"
 	truncate_database "github.com/onflow/flow-go/cmd/util/cmd/truncate-database"
+	update_commitment "github.com/onflow/flow-go/cmd/util/cmd/update-commitment"
 	"github.com/onflow/flow-go/cmd/util/cmd/version"
 )
 
@@ -80,6 +81,7 @@ func addCommands() {
 	rootCmd.AddCommand(export_json_transactions.Cmd)
 	rootCmd.AddCommand(read_hotstuff.RootCmd)
 	rootCmd.AddCommand(find_inconsistent_result.Cmd)
+	rootCmd.AddCommand(update_commitment.Cmd)
 }
 
 func initConfig() {

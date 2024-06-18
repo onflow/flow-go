@@ -231,7 +231,7 @@ func (s *Snapshot) SealingSegment() (*flow.SealingSegment, error) {
 	//       This is relevant if `head` does not contain any seals.
 	//  (ii) All blocks that are sealed by `head`. This is relevant if head` contains _multiple_ seals.
 	// (iii) The sealing segment should contain the history back to (including):
-	//       limitHeight := max(blockSealedAtHead.Height - flow.ExtraBlocksInRootSealingSegment, SporkRootBlockHeight)
+	//       limitHeight := max(blockSealedAtHead.Height - flow.DefaultTransactionExpiry, SporkRootBlockHeight)
 	// Per convention, we include the blocks for (i) in the `SealingSegment.Blocks`, while the
 	// additional blocks for (ii) and optionally (iii) are contained in as `SealingSegment.ExtraBlocks`.
 	head, err := s.state.blocks.ByID(s.blockID)
@@ -299,10 +299,10 @@ func (s *Snapshot) SealingSegment() (*flow.SealingSegment, error) {
 	}
 
 	// STEP (iii): extended history to allow checking for duplicated collections, i.e.
-	// limitHeight = max(blockSealedAtHead.Height - flow.ExtraBlocksInRootSealingSegment, SporkRootBlockHeight)
+	// limitHeight = max(blockSealedAtHead.Height - flow.DefaultTransactionExpiry, SporkRootBlockHeight)
 	limitHeight := s.state.sporkRootBlockHeight
-	if blockSealedAtHead.Height > s.state.sporkRootBlockHeight+flow.ExtraBlocksInRootSealingSegment {
-		limitHeight = blockSealedAtHead.Height - flow.ExtraBlocksInRootSealingSegment
+	if blockSealedAtHead.Height > s.state.sporkRootBlockHeight+flow.DefaultTransactionExpiry {
+		limitHeight = blockSealedAtHead.Height - flow.DefaultTransactionExpiry
 	}
 
 	// As we have to satisfy (ii) _and_ (iii), we have to take the longest history, i.e. the lowest height.

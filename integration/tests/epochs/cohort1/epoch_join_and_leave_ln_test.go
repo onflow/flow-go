@@ -10,7 +10,8 @@ import (
 )
 
 func TestEpochJoinAndLeaveLN(t *testing.T) {
-	suite.Run(t, new(EpochJoinAndLeaveLNSuite))
+	s := new(EpochJoinAndLeaveLNSuite)
+	suite.Run(t, &s.DynamicEpochTransitionSuite)
 }
 
 type EpochJoinAndLeaveLNSuite struct {
@@ -20,5 +21,5 @@ type EpochJoinAndLeaveLNSuite struct {
 // TestEpochJoinAndLeaveLN should update collection nodes and assert healthy network conditions
 // after the epoch transition completes. See health check function for details.
 func (s *EpochJoinAndLeaveLNSuite) TestEpochJoinAndLeaveLN() {
-	s.RunTestEpochJoinAndLeave(flow.RoleCollection, s.AssertNetworkHealthyAfterLNChange)
+	s.DynamicEpochTransitionSuite.RunTestEpochJoinAndLeave(flow.RoleCollection, s.DynamicEpochTransitionSuite.AssertNetworkHealthyAfterLNChange)
 }

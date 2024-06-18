@@ -314,6 +314,7 @@ func (suite *SameGRPCPortTestSuite) TestEnginesOnTheSameGrpcPort() {
 
 		client := suite.unsecureExecutionDataAPIClient(conn)
 
+		//nolint
 		_, err := client.SubscribeEvents(ctx, req)
 		assert.NoError(suite.T(), err, "failed to subscribe events")
 	})

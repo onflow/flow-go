@@ -19,15 +19,15 @@ require (
 	github.com/ipfs/go-datastore v0.6.0
 	github.com/ipfs/go-ds-badger2 v0.1.3
 	github.com/libp2p/go-libp2p v0.32.2
-	github.com/onflow/cadence v0.42.11-atree-register-inlining.2.0.20240521221904-9615ee937719
+	github.com/onflow/cadence v0.42.13-0.20240618230131-8d6e12725ad0
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.15.1-0.20231219201108-fbdb10b0a2da
 	github.com/onflow/flow-core-contracts/lib/go/templates v0.15.1-0.20231219201108-fbdb10b0a2da
-	github.com/onflow/flow-emulator v0.59.0
+	github.com/onflow/flow-emulator v0.59.2
 	github.com/onflow/flow-go v0.32.7
 	github.com/onflow/flow-go-sdk v0.41.18
 	github.com/onflow/flow-go/crypto v0.25.0
 	github.com/onflow/flow-go/insecure v0.0.0-00010101000000-000000000000
-	github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20231213135419-ae911cc351a2
+	github.com/onflow/flow/protobuf/go/flow v0.4.4
 	github.com/plus3it/gorecurcopy v0.0.1
 	github.com/prometheus/client_golang v1.18.0
 	github.com/prometheus/client_model v0.5.0

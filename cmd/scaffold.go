@@ -1330,9 +1330,12 @@ func (fnb *FlowNodeBuilder) initState() error {
 				return fmt.Errorf("failed to read protocol snapshot from disk: %w", err)
 			}
 		}
-		// set root snapshot fields
-		if err := fnb.setRootSnapshot(rootSnapshot); err != nil {
-			return err
+		// apply any extra validation steps to the root snapshot prior to bootstrapping
+		if fnb.extraRootSnapshotCheck != nil {
+			err = fnb.extraRootSnapshotCheck(rootSnapshot)
+			if err != nil {
+				return fmt.Errorf("failed validate root snapshot from disk: %w", err)
+			}
 		}
 
 		// generate bootstrap config options as per NodeConfig
@@ -1353,11 +1356,17 @@ func (fnb *FlowNodeBuilder) initState() error {
 			fnb.Storage.EpochCommits,
 			fnb.Storage.Statuses,
 			fnb.Storage.VersionBeacons,
-			fnb.RootSnapshot,
+			rootSnapshot,
 			options...,
 		)
 		if err != nil {
 			return fmt.Errorf("could not bootstrap protocol state: %w", err)
+		}
+
+		// set root snapshot fields, it depends on the database,
+		// so requires that the database has been initialized.
+		if err := fnb.setRootSnapshot(rootSnapshot); err != nil {
+			return err
 		}
 
 		fnb.Logger.Info().
@@ -1412,14 +1421,6 @@ func (fnb *FlowNodeBuilder) setRootSnapshot(rootSnapshot protocol.Snapshot) erro
 		return fmt.Errorf("failed to validate root snapshot QCs: %w", err)
 	}
 
-	// perform extra checks requested by specific node types
-	if fnb.extraRootSnapshotCheck != nil {
-		err = fnb.extraRootSnapshotCheck(rootSnapshot)
-		if err != nil {
-			return fmt.Errorf("failed to perform extra checks on root snapshot: %w", err)
-		}
-	}
-
 	fnb.RootSnapshot = rootSnapshot
 	// cache properties of the root snapshot, for convenience
 	fnb.RootResult, fnb.RootSeal, err = fnb.RootSnapshot.SealedResult()
@@ -1427,13 +1428,20 @@ func (fnb *FlowNodeBuilder) setRootSnapshot(rootSnapshot protocol.Snapshot) erro
 		return fmt.Errorf("failed to read root sealed result: %w", err)
 	}
 
-	sealingSegment, err := fnb.RootSnapshot.SealingSegment()
+	rootHeader, err := fnb.RootSnapshot.Head()
 	if err != nil {
-		return fmt.Errorf("failed to read root sealing segment: %w", err)
+		return fmt.Errorf("could not read root header: %w", err)
+	}
+	rootBlockID := rootHeader.ID()
+	fnb.FinalizedRootBlock, err = fnb.Storage.Blocks.ByID(rootBlockID)
+	if err != nil {
+		return fmt.Errorf("could not read finalized root block (id=%x): %w", rootBlockID, err)
+	}
+	fnb.SealedRootBlock, err = fnb.Storage.Blocks.ByID(fnb.RootSeal.BlockID)
+	if err != nil {
+		return fmt.Errorf("could not read sealed root block (id=%x): %w", fnb.RootSeal.BlockID, err)
 	}
 
-	fnb.FinalizedRootBlock = sealingSegment.Highest()
-	fnb.SealedRootBlock = sealingSegment.Sealed()
 	fnb.RootQC, err = fnb.RootSnapshot.QuorumCertificate()
 	if err != nil {
 		return fmt.Errorf("failed to read root QC: %w", err)
@@ -1536,6 +1544,8 @@ func (fnb *FlowNodeBuilder) initFvmOptions() {
 		fvm.WithChain(fnb.RootChainID.Chain()),
 		fvm.WithBlocks(blockFinder),
 		fvm.WithAccountStorageLimit(true),
+		// temporarily enable dependency check for all networks
+		fvm.WithDependencyCheckEnabled(true),
 	}
 	if fnb.RootChainID == flow.Testnet || fnb.RootChainID == flow.Sandboxnet || fnb.RootChainID == flow.Mainnet {
 		vmOpts = append(vmOpts,
@@ -1545,12 +1555,6 @@ func (fnb *FlowNodeBuilder) initFvmOptions() {
 	if fnb.RootChainID == flow.Testnet || fnb.RootChainID == flow.Sandboxnet || fnb.RootChainID == flow.Localnet || fnb.RootChainID == flow.Benchnet {
 		vmOpts = append(vmOpts,
 			fvm.WithContractDeploymentRestricted(false),
-		)
-	}
-	// temporarily enable dependency check for testnet
-	if fnb.RootChainID == flow.Testnet {
-		vmOpts = append(vmOpts,
-			fvm.WithDependencyCheckEnabled(true),
 		)
 	}
 
