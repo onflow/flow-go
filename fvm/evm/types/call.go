@@ -76,6 +76,8 @@ func (dc *DirectCall) Encode() ([]byte, error) {
 func (dc *DirectCall) Hash() (gethCommon.Hash, error) {
 	// we use geth transaction hash calculation since direct call hash is included in the
 	// block transaction hashes, and thus observed as any other transaction
+	// We construct thislLegacy tx type so the external 3rd party tools
+	// doesn't have to support a new type for hash computation
 	return dc.Transaction().Hash(), nil
 }
 
@@ -98,6 +100,11 @@ func (dc *DirectCall) Message() *gethCore.Message {
 
 // Transaction constructs a geth.Transaction from the direct call
 func (dc *DirectCall) Transaction() *gethTypes.Transaction {
+	// Since legacyTX for a direct call doesn't have a valid siganture
+	// and we need to somehow include the From feild for the purpose
+	// of hash calculation. we define the canonical format by
+	// using the FROM bytes to set the bytes for the R part of the tx (big endian),
+	// all bytes are S is kept to zero and V is set to DirectCallTxType (255).
 	return gethTypes.NewTx(&gethTypes.LegacyTx{
 		GasPrice: big.NewInt(0),
 		Gas:      dc.GasLimit,
@@ -105,6 +112,8 @@ func (dc *DirectCall) Transaction() *gethTypes.Transaction {
 		Value:    dc.Value,
 		Data:     dc.Data,
 		Nonce:    dc.Nonce,
+		V:        new(big.Int).SetBytes(dc.From.Bytes()),
+		S:        big.NewInt(255),
 	})
 }
 
