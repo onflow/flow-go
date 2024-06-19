@@ -147,11 +147,6 @@ func (s *GrpcBlocksStreamSuite) TestHappyPath() {
 	currentFinalized := s.BlockState.HighestFinalizedHeight()
 	blockA := s.BlockState.WaitForHighestFinalizedProgress(s.T(), currentFinalized)
 
-	// Let the network run for this many blocks
-	blockCount := uint64(5)
-	// wait for the requested number of sealed blocks
-	s.BlockState.WaitForSealedHeight(s.T(), blockA.Header.Height+blockCount)
-
 	var startValue interface{}
 	txCount := 10
 
@@ -188,8 +183,12 @@ func (s *GrpcBlocksStreamSuite) TestHappyPath() {
 					foundANTxCount++
 				case block := <-observerBlocks:
 					s.T().Logf("ON block received: height: %d", block.Header.Height)
-					r.Add(s.T(), block.Header.Height, "observer", block)
-					foundONTxCount++
+
+					// check only that responses for ON which was tracked by AN and compare them
+					if len(r.r[block.Header.Height]) > 0 {
+						r.Add(s.T(), block.Header.Height, "observer", block)
+						foundONTxCount++
+					}
 				}
 
 				if foundANTxCount >= txCount && foundONTxCount >= txCount {
