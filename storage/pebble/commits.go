@@ -18,9 +18,7 @@ type Commits struct {
 func NewCommits(collector module.CacheMetrics, db *pebble.DB) *Commits {
 
 	store := func(blockID flow.Identifier, commit flow.StateCommitment) func(rw operation.PebbleReaderWriter) error {
-		return func(rw operation.PebbleReaderWriter) error {
-			return operation.IndexStateCommitment(blockID, commit)(rw)
-		}
+		return operation.OnlyWrite(operation.IndexStateCommitment(blockID, commit))
 	}
 
 	retrieve := func(blockID flow.Identifier) func(tx pebble.Reader) (flow.StateCommitment, error) {
