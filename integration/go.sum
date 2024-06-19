@@ -949,6 +949,8 @@ gioui.org v0.0.0-20210308172011-57750fc8a0a6/go.mod h1:RSH6KIUZ0p2xy5zHDxgAM4zum
 git.apache.org/thrift.git v0.0.0-20180902110319-2566ecd5d999/go.mod h1:fPE2ZNJGynbRyZ4dJvy6G277gSllfV2HJqblrnkyeyg=
 git.sr.ht/~sbinet/gg v0.3.1/go.mod h1:KGYtlADtqsqANL9ueOFkWymvzUvLMQllU5Ixo+8v3pc=
 github.com/AndreasBriese/bbloom v0.0.0-20190306092124-e2d15f34fcf9/go.mod h1:bOvUY6CB00SOBii9/FifXqc0awNKxLFCL/+pkDPuyl8=
+github.com/AndriiDiachuk/flow/protobuf/go/flow v0.0.0-20240618133318-9190c3ebb0b4 h1:UnAlOtUP+mWaxJCo4h9pRJTgIuDK3Tgzk2rbRWSvMPg=
+github.com/AndriiDiachuk/flow/protobuf/go/flow v0.0.0-20240618133318-9190c3ebb0b4/go.mod h1:NA2pX2nw8zuaxfKphhKsk00kWLwfd+tv8mS23YXO4Sk=
 github.com/Azure/azure-sdk-for-go/sdk/azcore v0.21.1/go.mod h1:fBF9PQNqB8scdgpZ3ufzaLntG0AG7C1WjPMsiFOmfHM=
 github.com/Azure/azure-sdk-for-go/sdk/azcore v1.0.0/go.mod h1:uGG2W01BaETf0Ozp+QxxKJdMBNRWPdstHG0Fmdwn1/U=
 github.com/Azure/azure-sdk-for-go/sdk/azcore v1.6.0/go.mod h1:bjGvMhVMb+EEm3VRNQawDMUyMMjo+S5ewNjflkep/0Q=
@@ -2173,8 +2175,6 @@ github.com/onflow/flow-nft/lib/go/contracts v1.2.1/go.mod h1:2gpbza+uzs1k7x31hkp
 github.com/onflow/flow-nft/lib/go/templates v1.2.0 h1:JSQyh9rg0RC+D1930BiRXN8lrtMs+ubVMK6aQPon6Yc=
 github.com/onflow/flow-nft/lib/go/templates v1.2.0/go.mod h1:p+2hRvtjLUR3MW1NsoJe5Gqgr2eeH49QB6+s6ze00w0=
 github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20231121210617-52ee94b830c2/go.mod h1:NA2pX2nw8zuaxfKphhKsk00kWLwfd+tv8mS23YXO4Sk=
-github.com/onflow/flow/protobuf/go/flow v0.4.4 h1:lD1owoZGFgLcvdLZDmP0Kc4GOuQeSU3/d7hrujFzt6k=
-github.com/onflow/flow/protobuf/go/flow v0.4.4/go.mod h1:NA2pX2nw8zuaxfKphhKsk00kWLwfd+tv8mS23YXO4Sk=
 github.com/onflow/go-ethereum v1.13.4 h1:iNO86fm8RbBbhZ87ZulblInqCdHnAQVY8okBrNsTevc=
 github.com/onflow/go-ethereum v1.13.4/go.mod h1:cE/gEUkAffhwbVmMJYz+t1dAfVNHNwZCgc3BWtZxBGY=
 github.com/onflow/sdks v0.5.1-0.20230912225508-b35402f12bba h1:rIehuhO6bj4FkwE4VzwEjX7MoAlOhUJENBJLqDqVxAo=

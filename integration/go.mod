@@ -356,3 +356,5 @@ require (
 replace github.com/onflow/flow-go => ../
 
 replace github.com/onflow/flow-go/insecure => ../insecure
+
+replace github.com/onflow/flow/protobuf/go/flow v0.4.4 => github.com/AndriiDiachuk/flow/protobuf/go/flow v0.0.0-20240618133318-9190c3ebb0b4

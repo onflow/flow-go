@@ -550,6 +550,7 @@ func (h *Handler) GetAccountAtLatestBlock(
 	}, nil
 }
 
+// GetAccountAtBlockHeight returns an account by address at the given block height.
 func (h *Handler) GetAccountAtBlockHeight(
 	ctx context.Context,
 	req *access.GetAccountAtBlockHeightRequest,
@@ -577,6 +578,84 @@ func (h *Handler) GetAccountAtBlockHeight(
 	return &access.AccountResponse{
 		Account:  accountMsg,
 		Metadata: metadata,
+	}, nil
+}
+
+// GetAccountBalance returns an account balance by address at the latest sealed block.
+func (h *Handler) GetAccountBalance(
+	ctx context.Context,
+	req *access.GetAccountBalanceRequest,
+) (*access.AccountBalanceResponse, error) {
+	metadata, err := h.buildMetadataResponse()
+	if err != nil {
+		return nil, err
+	}
+
+	address, err := convert.Address(req.GetAddress(), h.chain)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid address: %v", err)
+	}
+
+	accountBalance, err := h.api.GetAccountBalance(ctx, address)
+	if err != nil {
+		return nil, err
+	}
+
+	return &access.AccountBalanceResponse{
+		AccountBalance: accountBalance,
+		Metadata:       metadata,
+	}, nil
+}
+
+// GetAccountBalanceAtLatestBlock returns an account balance by address at the latest sealed block.
+func (h *Handler) GetAccountBalanceAtLatestBlock(
+	ctx context.Context,
+	req *access.GetAccountBalanceAtLatestBlockRequest,
+) (*access.AccountBalanceResponse, error) {
+	metadata, err := h.buildMetadataResponse()
+	if err != nil {
+		return nil, err
+	}
+
+	address, err := convert.Address(req.GetAddress(), h.chain)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid address: %v", err)
+	}
+
+	accountBalance, err := h.api.GetAccountBalanceAtLatestBlock(ctx, address)
+	if err != nil {
+		return nil, err
+	}
+
+	return &access.AccountBalanceResponse{
+		AccountBalance: accountBalance,
+		Metadata:       metadata,
+	}, nil
+}
+
+// GetAccountBalanceAtBlockHeight returns an account balance by address at the given block height
+func (h *Handler) GetAccountBalanceAtBlockHeight(
+	ctx context.Context,
+	req *access.GetAccountBalanceAtBlockHeightRequest,
+) (*access.AccountBalanceResponse, error) {
+	metadata, err := h.buildMetadataResponse()
+	if err != nil {
+		return nil, err
+	}
+
+	address, err := convert.Address(req.GetAddress(), h.chain)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid address: %v", err)
+	}
+
+	accountBalance, err := h.api.GetAccountBalanceAtBlockHeight(ctx, address, req.GetBlockHeight())
+	if err != nil {
+		return nil, err
+	}
+
+	return &access.AccountBalanceResponse{
+		AccountBalance: accountBalance,
+		Metadata:       metadata,
 	}, nil
 }
 
