@@ -101,10 +101,11 @@ func NewTransactionValidator(
 	options TransactionValidationOptions,
 	executor execution.ScriptExecutor,
 ) (*TransactionValidator, error) {
-	env := systemcontracts.SystemContractsForChain(chain.ChainID()).AsTemplateEnv()
 	if options.CheckPayerBalance && executor == nil {
 		return nil, errors.New("transaction validator cannot use checkPayerBalance with nil executor")
 	}
+
+	env := systemcontracts.SystemContractsForChain(chain.ChainID()).AsTemplateEnv()
 
 	return &TransactionValidator{
 		blocks:                   blocks,
@@ -422,6 +423,11 @@ func (v *TransactionValidator) checkSufficientBalanceToPayForTransaction(ctx con
 		return errors.New("could not parse canExecuteTransaction as a Cadence bool")
 	}
 
+	// return no error if payer has sufficient balance
+	if bool(canExecuteTransaction) {
+		return nil
+	}
+
 	requiredBalanceValue, ok := fields["requiredBalance"]
 	if !ok {
 		return errors.New("requiredBalance value missing in response")
@@ -430,10 +436,6 @@ func (v *TransactionValidator) checkSufficientBalanceToPayForTransaction(ctx con
 	requiredBalance, ok := requiredBalanceValue.(cadence.UFix64)
 	if !ok {
 		return errors.New("could not parse requiredBalance as a Cadence UFix64")
-	}
-
-	if bool(canExecuteTransaction) {
-		return nil
 	}
 
 	return InsufficientBalanceError{Payer: tx.Payer, RequiredBalance: uint64(requiredBalance)}

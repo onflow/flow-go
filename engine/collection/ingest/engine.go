@@ -161,8 +161,7 @@ func (e *Engine) ProcessTransaction(tx *flow.TransactionBody) error {
 	default:
 	}
 
-	//TODO: replace context.Background() with actual ctx
-	return e.onTransaction(context.Background(), e.me.NodeID(), tx)
+	return e.onTransaction(e.me.NodeID(), tx)
 }
 
 // processQueuedTransactions is the main message processing loop for transaction messages.
@@ -199,7 +198,7 @@ func (e *Engine) processAvailableMessages(ctx context.Context) error {
 
 		msg, ok := e.pendingTransactions.Get()
 		if ok {
-			err := e.onTransaction(ctx, msg.OriginID, msg.Payload.(*flow.TransactionBody))
+			err := e.onTransaction(msg.OriginID, msg.Payload.(*flow.TransactionBody))
 			// log warnings for expected error conditions
 			if engine.IsUnverifiableInputError(err) {
 				e.log.Warn().Err(err).Msg("unable to process unverifiable transaction")
@@ -226,7 +225,7 @@ func (e *Engine) processAvailableMessages(ctx context.Context) error {
 //     node is not a member of any cluster in the reference epoch.
 //   - engine.InvalidInputError if the transaction is invalid.
 //   - other error for any other unexpected error condition.
-func (e *Engine) onTransaction(ctx context.Context, originID flow.Identifier, tx *flow.TransactionBody) error {
+func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBody) error {
 
 	defer e.engMetrics.MessageHandled(metrics.EngineCollectionIngest, metrics.MessageTransaction)
 
@@ -273,7 +272,7 @@ func (e *Engine) onTransaction(ctx context.Context, originID flow.Identifier, tx
 
 	// validate and ingest the transaction, so it is eligible for inclusion in
 	// a future collection proposed by this node
-	err = e.ingestTransaction(ctx, log, refEpoch, tx, txID, localClusterFingerPrint, txClusterFingerPrint)
+	err = e.ingestTransaction(log, refEpoch, tx, txID, localClusterFingerPrint, txClusterFingerPrint)
 	if err != nil {
 		return fmt.Errorf("could not ingest transaction: %w", err)
 	}
@@ -335,7 +334,6 @@ func (e *Engine) getLocalCluster(refEpoch protocol.Epoch) (flow.IdentitySkeleton
 // * engine.InvalidInputError if the transaction is invalid.
 // * other error for any other unexpected error condition.
 func (e *Engine) ingestTransaction(
-	ctx context.Context,
 	log zerolog.Logger,
 	refEpoch protocol.Epoch,
 	tx *flow.TransactionBody,

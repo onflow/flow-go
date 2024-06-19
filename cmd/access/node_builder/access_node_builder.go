@@ -1276,7 +1276,7 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		flags.BoolVar(&builder.checkPayerBalance,
 			"check-payer-balance",
 			defaultConfig.checkPayerBalance,
-			"checks transaction payer balance via script executor before submitting it to execution node")
+			"checks that a transaction payer has sufficient balance to pay fees before submitting it to collection nodes")
 	}).ValidateFlags(func() error {
 		if builder.supportsObserver && (builder.PublicNetworkConfig.BindAddress == cmd.NotSet || builder.PublicNetworkConfig.BindAddress == "") {
 			return errors.New("public-network-address must be set if supports-observer is true")
