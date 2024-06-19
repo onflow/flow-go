@@ -8,9 +8,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/rs/zerolog"
-
 	"github.com/onflow/cadence/runtime/common"
+	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
 	"github.com/onflow/flow-go/cmd/util/ledger/util/registers"
@@ -156,7 +155,7 @@ func MigrateGroupConcurrently(
 
 	wg := sync.WaitGroup{}
 	wg.Add(nWorker)
-	resultCh := make(chan *migrationResult, accountCount)
+	resultCh := make(chan migrationDuration, accountCount)
 	for i := 0; i < nWorker; i++ {
 		go func() {
 			defer wg.Done()
@@ -176,12 +175,10 @@ func MigrateGroupConcurrently(
 
 					// This is not an account, but service level keys.
 					if util.IsServiceLevelAddress(address) {
-						resultCh <- &migrationResult{
-							migrationDuration: migrationDuration{
-								Address:       address,
-								Duration:      time.Since(start),
-								RegisterCount: accountRegisters.Count(),
-							},
+						resultCh <- migrationDuration{
+							Address:       address,
+							Duration:      time.Since(start),
+							RegisterCount: accountRegisters.Count(),
 						}
 						continue
 					}
@@ -207,12 +204,10 @@ func MigrateGroupConcurrently(
 						}
 					}
 
-					resultCh <- &migrationResult{
-						migrationDuration: migrationDuration{
-							Address:       address,
-							Duration:      time.Since(start),
-							RegisterCount: accountRegisters.Count(),
-						},
+					resultCh <- migrationDuration{
+						Address:       address,
+						Duration:      time.Since(start),
+						RegisterCount: accountRegisters.Count(),
 					}
 				}
 			}
@@ -221,28 +216,67 @@ func MigrateGroupConcurrently(
 
 	go func() {
 		defer close(jobs)
-		err := registersByAccount.ForEachAccount(
-			func(owner string, accountRegisters *registers.AccountRegisters) error {
-				address, err := common.BytesToAddress([]byte(owner))
-				if err != nil {
-					return err
-				}
-				job := jobMigrateAccountGroup{
-					Address:          address,
-					AccountRegisters: accountRegisters,
-				}
 
-				select {
-				case <-ctx.Done():
-					return nil
-				case jobs <- job:
+		// TODO: maybe adjust, make configurable, or dependent on chain
+		const keepTopNAccountRegisters = 20
+		largestAccountRegisters := util.NewTopN[*registers.AccountRegisters](
+			keepTopNAccountRegisters,
+			func(a, b *registers.AccountRegisters) bool {
+				return a.Count() < b.Count()
+			},
+		)
+
+		allAccountRegisters := make([]*registers.AccountRegisters, accountCount)
+
+		smallerAccountRegisterIndex := keepTopNAccountRegisters
+		err := registersByAccount.ForEachAccount(
+			func(accountRegisters *registers.AccountRegisters) error {
+
+				// Try to add the account registers to the top N largest account registers.
+				// If there is an "overflow" element (either the added element, or an existing element),
+				// add it to the account registers.
+				// This way we can process the largest account registers first,
+				// and do not need to sort all account registers.
+
+				popped, didPop := largestAccountRegisters.Add(accountRegisters)
+				if didPop {
+					allAccountRegisters[smallerAccountRegisterIndex] = popped
+					smallerAccountRegisterIndex++
 				}
 
 				return nil
 			},
 		)
 		if err != nil {
-			cancel(fmt.Errorf("failed to schedule jobs for all accounts: %w", err))
+			cancel(fmt.Errorf("failed to get all account registers: %w", err))
+		}
+
+		// Add the largest account registers to the account registers.
+		// The elements in the top N largest account registers are returned in reverse order.
+		for index := largestAccountRegisters.Len() - 1; index >= 0; index-- {
+			accountRegisters := heap.Pop(largestAccountRegisters).(*registers.AccountRegisters)
+			allAccountRegisters[index] = accountRegisters
+		}
+
+		for _, accountRegisters := range allAccountRegisters {
+			owner := accountRegisters.Owner()
+
+			address, err := common.BytesToAddress([]byte(owner))
+			if err != nil {
+				cancel(fmt.Errorf("failed to convert owner to address: %w", err))
+				return
+			}
+
+			job := jobMigrateAccountGroup{
+				Address:          address,
+				AccountRegisters: accountRegisters,
+			}
+
+			select {
+			case <-ctx.Done():
+				return
+			case jobs <- job:
+			}
 		}
 	}()
 
@@ -255,14 +289,20 @@ func MigrateGroupConcurrently(
 		),
 	)
 
-	durations := newMigrationDurations(logTopNDurations)
+	topDurations := util.NewTopN[migrationDuration](
+		logTopNDurations,
+		func(duration migrationDuration, duration2 migrationDuration) bool {
+			return duration.Duration < duration2.Duration
+		},
+	)
+
 accountLoop:
 	for accountIndex := 0; accountIndex < accountCount; accountIndex++ {
 		select {
 		case <-ctx.Done():
 			break accountLoop
-		case result := <-resultCh:
-			durations.Add(result)
+		case duration := <-resultCh:
+			topDurations.Add(duration)
 			logAccount(1)
 		}
 	}
@@ -273,7 +313,7 @@ accountLoop:
 	wg.Wait()
 
 	log.Info().
-		Array("top_longest_migrations", durations.Array()).
+		Array("top_longest_migrations", loggableMigrationDurations(topDurations)).
 		Msgf("Top longest migrations")
 
 	err := ctx.Err()
@@ -324,67 +364,24 @@ type jobMigrateAccountGroup struct {
 	AccountRegisters *registers.AccountRegisters
 }
 
-type migrationResult struct {
-	migrationDuration
-}
-
 type migrationDuration struct {
 	Address       common.Address
 	Duration      time.Duration
 	RegisterCount int
 }
 
-// migrationDurations implements heap methods for the timer results
-type migrationDurations struct {
-	v []migrationDuration
-
-	KeepTopN int
-}
-
-// newMigrationDurations creates a new migrationDurations which are used to track the
-// accounts that took the longest time to migrate.
-func newMigrationDurations(keepTopN int) *migrationDurations {
-	return &migrationDurations{
-		v:        make([]migrationDuration, 0, keepTopN),
-		KeepTopN: keepTopN,
-	}
-}
-
-func (h *migrationDurations) Len() int { return len(h.v) }
-func (h *migrationDurations) Less(i, j int) bool {
-	return h.v[i].Duration < h.v[j].Duration
-}
-func (h *migrationDurations) Swap(i, j int) {
-	h.v[i], h.v[j] = h.v[j], h.v[i]
-}
-func (h *migrationDurations) Push(x interface{}) {
-	h.v = append(h.v, x.(migrationDuration))
-}
-func (h *migrationDurations) Pop() interface{} {
-	old := h.v
-	n := len(old)
-	x := old[n-1]
-	h.v = old[0 : n-1]
-	return x
-}
-
-func (h *migrationDurations) Array() zerolog.LogArrayMarshaler {
+func loggableMigrationDurations(durations *util.TopN[migrationDuration]) zerolog.LogArrayMarshaler {
 	array := zerolog.Arr()
-	for _, result := range h.v {
-		array = array.Str(fmt.Sprintf("%s [registers: %d]: %s",
-			result.Address.Hex(),
-			result.RegisterCount,
-			result.Duration.String(),
+
+	for index := durations.Len() - 1; index >= 0; index-- {
+		duration := heap.Pop(durations).(migrationDuration)
+		array = array.Str(fmt.Sprintf(
+			"%s [registers: %d]: %s",
+			duration.Address.Hex(),
+			duration.RegisterCount,
+			duration.Duration.String(),
 		))
 	}
-	return array
-}
 
-func (h *migrationDurations) Add(result *migrationResult) {
-	if h.Len() < h.KeepTopN || result.Duration > h.v[0].Duration {
-		if h.Len() == h.KeepTopN {
-			heap.Pop(h) // remove the element with the smallest duration
-		}
-		heap.Push(h, result.migrationDuration)
-	}
+	return array
 }
