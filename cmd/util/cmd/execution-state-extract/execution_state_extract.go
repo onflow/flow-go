@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"math"
 	"os"
-	"runtime/pprof"
 	syncAtomic "sync/atomic"
 	"time"
 
@@ -325,19 +324,6 @@ func newMigration(
 	nWorker int,
 ) ledger.Migration {
 	return func(payloads []*ledger.Payload) ([]*ledger.Payload, error) {
-		if flagCPUProfile != "" {
-			f, err := os.Create(flagCPUProfile)
-			if err != nil {
-				logger.Fatal().Err(err).Msg("could not create CPU profile")
-			}
-
-			err = pprof.StartCPUProfile(f)
-			if err != nil {
-				logger.Fatal().Err(err).Msg("could not start CPU profile")
-			}
-
-			defer pprof.StopCPUProfile()
-		}
 
 		if len(migrations) == 0 {
 			return payloads, nil
