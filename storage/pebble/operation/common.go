@@ -241,3 +241,43 @@ func convertNotFoundError(err error) error {
 	}
 	return err
 }
+
+// TODO: TOFIX
+func findHighestAtOrBelow(
+	prefix []byte,
+	height uint64,
+	entity interface{},
+) func(pebble.Reader) error {
+	return func(r pebble.Reader) error {
+		if len(prefix) == 0 {
+			return fmt.Errorf("prefix must not be empty")
+		}
+
+		// opts := badger.DefaultIteratorOptions
+		// opts.Prefix = prefix
+		// opts.Reverse = true
+
+		it, err := r.NewIter(nil)
+		if err != nil {
+			return fmt.Errorf("can not create iterator: %w", err)
+		}
+
+		it.SeekGE(append(prefix, b(height)...))
+
+		if !it.Valid() {
+			return storage.ErrNotFound
+		}
+
+		val, err := it.ValueAndErr()
+		if err != nil {
+			return fmt.Errorf("could not get value: %w", err)
+		}
+
+		err = msgpack.Unmarshal(val, entity)
+		if err != nil {
+			return fmt.Errorf("could not decode entity: %w", err)
+		}
+
+		return nil
+	}
+}
