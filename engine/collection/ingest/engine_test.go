@@ -395,7 +395,7 @@ func (suite *Suite) TestRoutingLocalClusterFromOtherNode() {
 	// should not route to any node
 	suite.conduit.AssertNumberOfCalls(suite.T(), "Multicast", 0)
 
-	err := suite.engine.onTransaction(context.Background(), sender.NodeID, &tx)
+	err := suite.engine.onTransaction(sender.NodeID, &tx)
 	suite.Assert().NoError(err)
 
 	// should be added to local mempool for current epoch
