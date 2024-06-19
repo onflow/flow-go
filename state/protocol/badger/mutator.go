@@ -814,7 +814,7 @@ func isFirstBlockOfEpoch(parentEpochState, blockEpochState protocol.EpochProtoco
 //   - We notify about an epoch transition when the first block of the new epoch is finalized
 //   - We notify about an epoch phase transition when the first block within the new epoch phase is finalized
 //
-// TODO(EFM, #5732, #6013): needs update for EFM recovery
+// TODO(EFM, #6092): needs update for EFM recovery
 // This method must be called for each finalized block.
 // No errors are expected during normal operation.
 func (m *FollowerState) epochMetricsAndEventsOnBlockFinalized(parentEpochState, finalizedEpochState protocol.EpochProtocolState, finalized *flow.Header) (
