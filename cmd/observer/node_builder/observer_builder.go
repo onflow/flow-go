@@ -13,9 +13,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/onflow/flow-go/cmd/build"
-	"github.com/onflow/flow-go/engine/common/version"
-
 	"github.com/ipfs/boxo/bitswap"
 	badger "github.com/ipfs/go-ds-badger2"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
@@ -30,6 +27,7 @@ import (
 	"github.com/onflow/flow-go/admin/commands"
 	stateSyncCommands "github.com/onflow/flow-go/admin/commands/state_synchronization"
 	"github.com/onflow/flow-go/cmd"
+	"github.com/onflow/flow-go/cmd/build"
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
@@ -53,6 +51,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/engine/common/follower"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
+	"github.com/onflow/flow-go/engine/common/version"
 	"github.com/onflow/flow-go/engine/execution/computation/query"
 	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/ledger"
@@ -153,6 +152,7 @@ type ObserverServiceConfig struct {
 	executionDataSyncEnabled     bool
 	executionDataIndexingEnabled bool
 	localServiceAPIEnabled       bool
+	versionControlEnabled        bool
 	executionDataDir             string
 	executionDataStartHeight     uint64
 	executionDataConfig          edrequester.ExecutionDataConfig
@@ -223,6 +223,7 @@ func DefaultObserverServiceConfig() *ObserverServiceConfig {
 		executionDataSyncEnabled:     false,
 		executionDataIndexingEnabled: false,
 		localServiceAPIEnabled:       false,
+		versionControlEnabled:        true,
 		executionDataDir:             filepath.Join(homedir, ".flow", "execution_data"),
 		executionDataStartHeight:     0,
 		executionDataConfig: edrequester.ExecutionDataConfig{
@@ -657,6 +658,10 @@ func (builder *ObserverServiceBuilder) extraFlags() {
 			"execution-data-indexing-enabled",
 			defaultConfig.executionDataIndexingEnabled,
 			"whether to enable the execution data indexing")
+		flags.BoolVar(&builder.versionControlEnabled,
+			"version-control-enabled",
+			defaultConfig.versionControlEnabled,
+			"whether to enable the version control feature. Default value is true")
 		flags.BoolVar(&builder.localServiceAPIEnabled, "local-service-api-enabled", defaultConfig.localServiceAPIEnabled, "whether to use local indexed data for api queries")
 		flags.StringVar(&builder.registersDBPath, "execution-state-dir", defaultConfig.registersDBPath, "directory to use for execution-state database")
 		flags.StringVar(&builder.checkpointFile, "execution-state-checkpoint", defaultConfig.checkpointFile, "execution-state checkpoint file")
@@ -1698,40 +1703,40 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		builder.ScriptExecutor = backend.NewScriptExecutor(builder.Logger, nil, builder.scriptExecMinBlock, builder.scriptExecMaxBlock)
 		return nil
 	})
-	builder.Component("version control", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-		ver, err := build.Semver()
-		if err != nil {
-			err = fmt.Errorf("could not set semver version for version control. "+
-				"version %s is not semver compliant: %w", build.Version(), err)
+	if builder.versionControlEnabled {
+		builder.Component("version control", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			ver, err := build.Semver()
+			if err != nil {
+				err = fmt.Errorf("could not load node version for version control. "+
+					"version %s is not semver compliant: %w", build.Version(), err)
 
-			// The node would not know its own version. Without this the node would not know
-			// how to reach to version boundaries.
-			builder.Logger.
-				Err(err).
-				Msg("error starting version control")
+				return nil, err
+			}
 
-			return nil, err
-		}
+			latestFinalizedBlock, err := node.State.Final().Head()
+			if err != nil {
+				return nil, fmt.Errorf("could not get latest finalized block: %w", err)
+			}
 
-		latestFinalizedBlock, err := node.State.Final().Head()
-		if err != nil {
-			return nil, fmt.Errorf("could not get latest finalized block: %w", err)
-		}
+			versionControl, err := version.NewVersionControl(
+				builder.Logger,
+				node.Storage.VersionBeacons,
+				ver,
+				builder.FinalizedRootBlock.Header.Height,
+				latestFinalizedBlock.Height,
+			)
+			if err != nil {
+				return nil, fmt.Errorf("could not create version control: %w", err)
+			}
 
-		versionControl := version.NewVersionControl(
-			builder.Logger,
-			node.Storage.VersionBeacons,
-			ver,
-			builder.FinalizedRootBlock.Header.Height,
-			latestFinalizedBlock.Height,
-		)
-		// VersionControl needs to consume BlockFinalized events.
-		node.ProtocolEvents.AddConsumer(versionControl)
+			// VersionControl needs to consume BlockFinalized events.
+			node.ProtocolEvents.AddConsumer(versionControl)
 
-		builder.versionControl = versionControl
+			builder.versionControl = versionControl
 
-		return versionControl, nil
-	})
+			return versionControl, nil
+		})
+	}
 	builder.Component("RPC engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		accessMetrics := builder.AccessMetrics
 		config := builder.rpcConf

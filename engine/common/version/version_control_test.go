@@ -49,7 +49,8 @@ func TestInitialization(t *testing.T) {
 			}, nil)
 
 		// Create a new VersionControl instance with initial parameters.
-		vc := NewVersionControl(unittest.Logger(), versionBeacons, semver.New("0.0.1"), finalizedRootBlockHeight, sealedHeader.Height)
+		vc, err := NewVersionControl(unittest.Logger(), versionBeacons, semver.New("0.0.1"), finalizedRootBlockHeight, sealedHeader.Height)
+		require.NoError(t, err)
 
 		// Create a mock signaler context for testing.
 		ictx := irrecoverable.NewMockSignalerContext(t, ctx)
@@ -76,7 +77,8 @@ func TestInitialization(t *testing.T) {
 			Return(nil, nil)
 
 		// Create a new VersionControl instance with initial parameters.
-		vc := NewVersionControl(unittest.Logger(), versionBeacons, semver.New("0.0.1"), finalizedRootBlockHeight, sealedHeader.Height)
+		vc, err := NewVersionControl(unittest.Logger(), versionBeacons, semver.New("0.0.1"), finalizedRootBlockHeight, sealedHeader.Height)
+		require.NoError(t, err)
 
 		// Create a mock signaler context for testing.
 		ictx := irrecoverable.NewMockSignalerContext(t, ctx)
@@ -105,7 +107,8 @@ func TestInitialization(t *testing.T) {
 			Return(nil, decodeErr)
 
 		// Create a new VersionControl instance with initial parameters.
-		vc := NewVersionControl(unittest.Logger(), versionBeacons, semver.New("0.0.1"), finalizedRootBlockHeight, sealedHeader.Height)
+		vc, err := NewVersionControl(unittest.Logger(), versionBeacons, semver.New("0.0.1"), finalizedRootBlockHeight, sealedHeader.Height)
+		require.NoError(t, err)
 
 		// Create a mock signaler context that expects an error.
 		ictx := irrecoverable.NewMockSignalerContextExpectError(t, ctx, fmt.Errorf(
@@ -152,7 +155,8 @@ func TestInitialization(t *testing.T) {
 			}, nil)
 
 		// Create a new VersionControl instance with initial parameters.
-		vc := NewVersionControl(unittest.Logger(), versionBeacons, semver.New("0.0.2"), finalizedRootBlockHeight, sealedHeader.Height)
+		vc, err := NewVersionControl(unittest.Logger(), versionBeacons, semver.New("0.0.2"), finalizedRootBlockHeight, sealedHeader.Height)
+		require.NoError(t, err)
 
 		// Create a mock signaler context for testing.
 		ictx := irrecoverable.NewMockSignalerContext(t, ctx)
@@ -214,7 +218,8 @@ func TestInitialization(t *testing.T) {
 			}, nil)
 
 		// Create a new VersionControl instance with initial parameters.
-		vc := NewVersionControl(unittest.Logger(), versionBeacons, semver.New("0.0.2"), finalizedRootBlockHeight, sealedHeader.Height)
+		vc, err := NewVersionControl(unittest.Logger(), versionBeacons, semver.New("0.0.2"), finalizedRootBlockHeight, sealedHeader.Height)
+		require.NoError(t, err)
 
 		// Create a mock signaler context for testing.
 		ictx := irrecoverable.NewMockSignalerContext(t, ctx)
@@ -254,7 +259,8 @@ func TestVersionChanged(t *testing.T) {
 	versionBeacons := storageMock.NewVersionBeacons(t)
 
 	// Create a new VersionControl instance with initial parameters.
-	vc := NewVersionControl(unittest.Logger(), versionBeacons, semver.New("0.0.1"), 0, sealedHeader.Height)
+	vc, err := NewVersionControl(unittest.Logger(), versionBeacons, semver.New("0.0.1"), 0, sealedHeader.Height)
+	require.NoError(t, err)
 
 	// Mock the Highest method to return a specific version beacon.
 	versionBeacons.

@@ -11,8 +11,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/onflow/flow-go/cmd/build"
-
 	"github.com/ipfs/boxo/bitswap"
 	badger "github.com/ipfs/go-ds-badger2"
 	"github.com/libp2p/go-libp2p/core/host"
@@ -29,6 +27,7 @@ import (
 	stateSyncCommands "github.com/onflow/flow-go/admin/commands/state_synchronization"
 	storageCommands "github.com/onflow/flow-go/admin/commands/storage"
 	"github.com/onflow/flow-go/cmd"
+	"github.com/onflow/flow-go/cmd/build"
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
@@ -161,6 +160,7 @@ type AccessNodeConfig struct {
 	registerCacheType                 string
 	registerCacheSize                 uint
 	programCacheSize                  uint
+	versionControlEnabled             bool
 }
 
 type PublicNetworkConfig struct {
@@ -258,6 +258,7 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 		registerCacheType:            pStorage.CacheTypeTwoQueue.String(),
 		registerCacheSize:            0,
 		programCacheSize:             0,
+		versionControlEnabled:        true,
 	}
 }
 
@@ -1149,6 +1150,10 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 			"circuit-breaker-max-requests",
 			defaultConfig.rpcConf.BackendConfig.CircuitBreakerConfig.MaxRequests,
 			"maximum number of requests to check if connection restored after timeout. Default value is 1")
+		flags.BoolVar(&builder.versionControlEnabled,
+			"version-control-enabled",
+			defaultConfig.versionControlEnabled,
+			"whether to enable the version control feature. Default value is true")
 		// ExecutionDataRequester config
 		flags.BoolVar(&builder.executionDataSyncEnabled,
 			"execution-data-sync-enabled",
@@ -1608,40 +1613,6 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 
 			return nil
 		}).
-		Component("version control", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			ver, err := build.Semver()
-			if err != nil {
-				err = fmt.Errorf("could not set semver version for version control. "+
-					"version %s is not semver compliant: %w", build.Version(), err)
-
-				// The node would not know its own version. Without this the node would not know
-				// how to reach to version boundaries.
-				builder.Logger.
-					Err(err).
-					Msg("error starting version control")
-
-				return nil, err
-			}
-
-			latestFinalizedBlock, err := node.State.Final().Head()
-			if err != nil {
-				return nil, fmt.Errorf("could not get latest finalized block: %w", err)
-			}
-
-			versionControl := version.NewVersionControl(
-				builder.Logger,
-				node.Storage.VersionBeacons,
-				ver,
-				builder.FinalizedRootBlock.Header.Height,
-				latestFinalizedBlock.Height,
-			)
-			// VersionControl needs to consume BlockFinalized events.
-			node.ProtocolEvents.AddConsumer(versionControl)
-
-			builder.versionControl = versionControl
-
-			return versionControl, nil
-		}).
 		Module("backend script executor", func(node *cmd.NodeConfig) error {
 			builder.ScriptExecutor = backend.NewScriptExecutor(builder.Logger, builder.versionControl, builder.scriptExecMinBlock, builder.scriptExecMaxBlock)
 			return nil
@@ -1876,6 +1847,41 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			// be handled by the scaffold.
 			return builder.RequestEng, nil
 		})
+
+	if builder.versionControlEnabled {
+		builder.Component("version control", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			ver, err := build.Semver()
+			if err != nil {
+				err = fmt.Errorf("could not load node version for version control. "+
+					"version %s is not semver compliant: %w. Make sure a valid semantic version is provided in the VERSION environment variable", build.Version(), err)
+
+				return nil, err
+			}
+
+			latestFinalizedBlock, err := node.State.Final().Head()
+			if err != nil {
+				return nil, fmt.Errorf("could not get latest finalized block: %w", err)
+			}
+
+			versionControl, err := version.NewVersionControl(
+				builder.Logger,
+				node.Storage.VersionBeacons,
+				ver,
+				builder.FinalizedRootBlock.Header.Height,
+				latestFinalizedBlock.Height,
+			)
+			if err != nil {
+				return nil, fmt.Errorf("could not create version control: %w", err)
+			}
+
+			// VersionControl needs to consume BlockFinalized events.
+			node.ProtocolEvents.AddConsumer(versionControl)
+
+			builder.versionControl = versionControl
+
+			return versionControl, nil
+		})
+	}
 
 	if builder.supportsObserver {
 		builder.Component("public sync request handler", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
