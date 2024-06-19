@@ -19,6 +19,7 @@ func IndexVersionBeaconByHeight(
 // LookupLastVersionBeaconByHeight finds the highest flow.VersionBeacon but no higher
 // than maxHeight. Returns storage.ErrNotFound if no version beacon exists at or below
 // the given height.
+// TODO: fix it
 func LookupLastVersionBeaconByHeight(
 	maxHeight uint64,
 	versionBeacon *flow.SealedVersionBeacon,
