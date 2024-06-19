@@ -183,7 +183,10 @@ func (s *GrpcBlocksStreamSuite) TestHappyPath() {
 				case block := <-observerBlocks:
 					s.T().Logf("ON block received: height: %d", block.Header.Height)
 
-					// check only that responses for ON which was tracked by AN and compare them
+					// the response tracker expects to receive data for the same heights from each node.
+					// when subscribing to the latest block, the specific start height depends on the node's
+					// local sealed height, so it may vary.
+					// check only the responses for ON that are also tracked by AN and compare them
 					if len(r.r[block.Header.Height]) > 0 {
 						r.Add(s.T(), block.Header.Height, "observer", block)
 						foundONTxCount++
