@@ -465,6 +465,7 @@ func iterate(start []byte, end []byte, iteration iterationFunc, opts ...func(*ba
 //
 // On each iteration, it will call the iteration function to initialize
 // functions specific to processing the given key-value pair.
+// TODO: doesn't work. fix it.
 func traverse(prefix []byte, iteration iterationFunc) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 		if len(prefix) == 0 {
