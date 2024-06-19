@@ -2,6 +2,7 @@ package operation
 
 import (
 	"fmt"
+	"io"
 
 	"github.com/cockroachdb/pebble"
 
@@ -12,12 +13,13 @@ type batchWriter struct {
 	batch storage.Transaction
 }
 
-var _ pebble.Writer = (*batchWriter)(nil)
+var _ PebbleReaderWriter = (*batchWriter)(nil)
 
 func NewBatchWriter(batch storage.Transaction) pebble.Writer {
 	return batchWriter{batch: batch}
 }
 
+// pebble.Writer implementation
 func (b batchWriter) Set(key, value []byte, o *pebble.WriteOptions) error {
 	return b.batch.Set(key, value)
 }
@@ -60,4 +62,17 @@ func (b batchWriter) RangeKeyUnset(start, end, suffix []byte, opts *pebble.Write
 
 func (b batchWriter) RangeKeyDelete(start, end []byte, opts *pebble.WriteOptions) error {
 	return fmt.Errorf("RangeKeyDelete not implemented")
+}
+
+// pebble.Reader implementation
+func (b batchWriter) Get(key []byte) ([]byte, io.Closer, error) {
+	return nil, nil, fmt.Errorf("Get not implemented")
+}
+
+func (b batchWriter) NewIter(o *pebble.IterOptions) (*pebble.Iterator, error) {
+	return nil, fmt.Errorf("NewIter not implemented")
+}
+
+func (b batchWriter) Close() error {
+	return fmt.Errorf("Close not implemented")
 }
