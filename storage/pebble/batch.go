@@ -26,7 +26,7 @@ func NewBatch(db *pebble.DB) *Batch {
 }
 
 func (b *Batch) GetWriter() storage.Transaction {
-	return b.writer
+	return &Transaction{b.writer}
 }
 
 // OnSucceed adds a callback to execute after the batch has
@@ -59,4 +59,18 @@ func (b *Batch) Flush() error {
 
 func (b *Batch) Close() error {
 	return b.writer.Close()
+}
+
+type Transaction struct {
+	writer *pebble.Batch
+}
+
+var _ storage.Transaction = (*Transaction)(nil)
+
+func (t *Transaction) Set(key, value []byte) error {
+	return t.writer.Set(key, value, pebble.Sync)
+}
+
+func (t *Transaction) Delete(key []byte) error {
+	return t.writer.Delete(key, pebble.Sync)
 }
