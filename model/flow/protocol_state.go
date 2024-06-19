@@ -327,21 +327,16 @@ func (e *RichEpochProtocolStateEntry) CurrentEpochFinalView() uint64 {
 // EpochPhase returns the current epoch phase.
 // The receiver EpochProtocolStateEntry must be properly constructed.
 func (e *EpochProtocolStateEntry) EpochPhase() EpochPhase {
-	tentativePhase := e.unsafeEpochPhase()
-	if tentativePhase == EpochPhaseCommitted {
+	if e.EpochFallbackTriggered {
 		// If the next epoch has been committed, we are in EpochPhaseCommitted regardless of EFM status.
 		// We will enter EpochPhaseFallback after completing the transition into the committed next epoch.
-		return EpochPhaseCommitted
-	}
-	if e.EpochFallbackTriggered {
+		if e.NextEpoch != nil && e.NextEpoch.CommitID != ZeroID {
+			return EpochPhaseCommitted
+		}
 		// If the next epoch has not been committed and EFM is triggered, we immediately enter EpochPhaseFallback.
 		return EpochPhaseFallback
 	}
-	return tentativePhase
-}
 
-// unsafeEpochPhase returns the current epoch phase, assuming we are NOT in EFM.
-func (e *EpochProtocolStateEntry) unsafeEpochPhase() EpochPhase {
 	// The epoch phase is determined by how much information we have about the next epoch
 	if e.NextEpoch == nil {
 		return EpochPhaseStaking // if no information about the next epoch is known, we are in the Staking Phase
