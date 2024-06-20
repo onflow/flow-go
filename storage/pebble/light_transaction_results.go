@@ -1,30 +1,29 @@
-package badger
+package pebble
 
 import (
 	"fmt"
 
-	"github.com/dgraph-io/badger/v2"
-
+	"github.com/cockroachdb/pebble"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/storage/pebble/operation"
 )
 
 var _ storage.LightTransactionResults = (*LightTransactionResults)(nil)
 
 type LightTransactionResults struct {
-	db         *badger.DB
+	db         *pebble.DB
 	cache      *Cache[string, flow.LightTransactionResult]
 	indexCache *Cache[string, flow.LightTransactionResult]
 	blockCache *Cache[string, []flow.LightTransactionResult]
 }
 
-func NewLightTransactionResults(collector module.CacheMetrics, db *badger.DB, transactionResultsCacheSize uint) *LightTransactionResults {
-	retrieve := func(key string) func(tx *badger.Txn) (flow.LightTransactionResult, error) {
+func NewLightTransactionResults(collector module.CacheMetrics, db *pebble.DB, transactionResultsCacheSize uint) *LightTransactionResults {
+	retrieve := func(key string) func(tx pebble.Reader) (flow.LightTransactionResult, error) {
 		var txResult flow.LightTransactionResult
-		return func(tx *badger.Txn) (flow.LightTransactionResult, error) {
+		return func(tx pebble.Reader) (flow.LightTransactionResult, error) {
 
 			blockID, txID, err := storage.KeyToBlockIDTransactionID(key)
 			if err != nil {
@@ -38,9 +37,9 @@ func NewLightTransactionResults(collector module.CacheMetrics, db *badger.DB, tr
 			return txResult, nil
 		}
 	}
-	retrieveIndex := func(key string) func(tx *badger.Txn) (flow.LightTransactionResult, error) {
+	retrieveIndex := func(key string) func(tx pebble.Reader) (flow.LightTransactionResult, error) {
 		var txResult flow.LightTransactionResult
-		return func(tx *badger.Txn) (flow.LightTransactionResult, error) {
+		return func(tx pebble.Reader) (flow.LightTransactionResult, error) {
 
 			blockID, txIndex, err := storage.KeyToBlockIDIndex(key)
 			if err != nil {
@@ -54,9 +53,9 @@ func NewLightTransactionResults(collector module.CacheMetrics, db *badger.DB, tr
 			return txResult, nil
 		}
 	}
-	retrieveForBlock := func(key string) func(tx *badger.Txn) ([]flow.LightTransactionResult, error) {
+	retrieveForBlock := func(key string) func(tx pebble.Reader) ([]flow.LightTransactionResult, error) {
 		var txResults []flow.LightTransactionResult
-		return func(tx *badger.Txn) ([]flow.LightTransactionResult, error) {
+		return func(tx pebble.Reader) ([]flow.LightTransactionResult, error) {
 
 			blockID, err := storage.KeyToBlockID(key)
 			if err != nil {
@@ -125,10 +124,8 @@ func (tr *LightTransactionResults) BatchStore(blockID flow.Identifier, transacti
 
 // ByBlockIDTransactionID returns the transaction result for the given block ID and transaction ID
 func (tr *LightTransactionResults) ByBlockIDTransactionID(blockID flow.Identifier, txID flow.Identifier) (*flow.LightTransactionResult, error) {
-	tx := tr.db.NewTransaction(false)
-	defer tx.Discard()
 	key := storage.KeyFromBlockIDTransactionID(blockID, txID)
-	transactionResult, err := tr.cache.Get(key)(tx)
+	transactionResult, err := tr.cache.Get(key)(tr.db)
 	if err != nil {
 		return nil, err
 	}
@@ -137,10 +134,8 @@ func (tr *LightTransactionResults) ByBlockIDTransactionID(blockID flow.Identifie
 
 // ByBlockIDTransactionIndex returns the transaction result for the given blockID and transaction index
 func (tr *LightTransactionResults) ByBlockIDTransactionIndex(blockID flow.Identifier, txIndex uint32) (*flow.LightTransactionResult, error) {
-	tx := tr.db.NewTransaction(false)
-	defer tx.Discard()
 	key := storage.KeyFromBlockIDIndex(blockID, txIndex)
-	transactionResult, err := tr.indexCache.Get(key)(tx)
+	transactionResult, err := tr.indexCache.Get(key)(tr.db)
 	if err != nil {
 		return nil, err
 	}
@@ -149,10 +144,8 @@ func (tr *LightTransactionResults) ByBlockIDTransactionIndex(blockID flow.Identi
 
 // ByBlockID gets all transaction results for a block, ordered by transaction index
 func (tr *LightTransactionResults) ByBlockID(blockID flow.Identifier) ([]flow.LightTransactionResult, error) {
-	tx := tr.db.NewTransaction(false)
-	defer tx.Discard()
 	key := storage.KeyFromBlockID(blockID)
-	transactionResults, err := tr.blockCache.Get(key)(tx)
+	transactionResults, err := tr.blockCache.Get(key)(tr.db)
 	if err != nil {
 		return nil, err
 	}

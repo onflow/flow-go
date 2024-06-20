@@ -5,7 +5,6 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
-	badgermodel "github.com/onflow/flow-go/storage/badger/model"
 )
 
 // InsertChunkDataPack inserts a chunk data pack keyed by chunk ID.
@@ -14,7 +13,7 @@ func InsertChunkDataPack(c *storage.StoredChunkDataPack) func(*badger.Txn) error
 }
 
 // BatchInsertChunkDataPack inserts a chunk data pack keyed by chunk ID into a batch
-func BatchInsertChunkDataPack(c *badgermodel.StoredChunkDataPack) func(batch storage.Transaction) error {
+func BatchInsertChunkDataPack(c *storage.StoredChunkDataPack) func(batch storage.Transaction) error {
 	return batchWrite(makePrefix(codeChunkDataPack, c.ChunkID), c)
 }
 
