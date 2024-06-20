@@ -814,7 +814,6 @@ func isFirstBlockOfEpoch(parentEpochState, blockEpochState protocol.EpochProtoco
 //   - We notify about an epoch transition when the first block of the new epoch is finalized
 //   - We notify about an epoch phase transition when the first block within the new epoch phase is finalized
 //
-// TODO(EFM, #6092): needs update for EFM recovery
 // This method must be called for each finalized block.
 // No errors are expected during normal operation.
 func (m *FollowerState) epochMetricsAndEventsOnBlockFinalized(parentEpochState, finalizedEpochState protocol.EpochProtocolState, finalized *flow.Header) (
@@ -858,7 +857,7 @@ func (m *FollowerState) epochMetricsAndEventsOnBlockFinalized(parentEpochState, 
 		return
 	}
 
-	// Different counter -> must be an epoch transition
+	// Different counter - handle epoch transition and phase transition Committed->Staking
 	if parentEpochCounter != childEpochCounter {
 		childEpochSetup := finalizedEpochState.EpochSetup()
 		events = append(events, func() { m.consumer.EpochTransition(childEpochSetup.Counter, finalized) })
@@ -880,24 +879,30 @@ func (m *FollowerState) epochMetricsAndEventsOnBlockFinalized(parentEpochState, 
 		)
 		return
 	}
-	// Transition from Staking phase to Setup phase. `finalized` is first block in Setup phase.
+
+	// Update the phase metric when any phase change occurs
+	events = append(events, func() { m.metrics.CurrentEpochPhase(childEpochPhase) })
+
+	// Handle phase transition Staking->Setup. `finalized` is first block in Setup phase.
 	if parentEpochPhase == flow.EpochPhaseStaking && childEpochPhase == flow.EpochPhaseSetup {
-		events = append(events, func() { m.metrics.CurrentEpochPhase(flow.EpochPhaseSetup) })
 		events = append(events, func() { m.consumer.EpochSetupPhaseStarted(childEpochCounter, finalized) })
 		return
 	}
-	// Transition from Setup phase to Committed phase. `finalized` is first block in Committed phase.
-	if parentEpochPhase != flow.EpochPhaseCommitted && childEpochPhase == flow.EpochPhaseCommitted {
-		events = append(events, func() { m.metrics.CurrentEpochPhase(flow.EpochPhaseCommitted) })
+	// Handle phase transition Setup/Fallback->Committed phase. `finalized` is first block in Committed phase.
+	if (parentEpochPhase == flow.EpochPhaseSetup || parentEpochPhase == flow.EpochPhaseFallback) && childEpochPhase == flow.EpochPhaseCommitted {
 		events = append(events, func() { m.consumer.EpochCommittedPhaseStarted(childEpochCounter, finalized) })
 		return
 	}
+	// Handle phase transition Staking/Setup->Fallback phase
+	// NOTE: we can have the phase transition Committed->Fallback, but only across an epoch boundary (handled above)
+	if parentEpochPhase != flow.EpochPhaseCommitted && childEpochPhase == flow.EpochPhaseFallback {
+		// This conditional exists to capture this final set of valid phase transitions, to allow sanity check below
+		// In the future we could add a protocol event here for transition into the Fallback phase, if any consumers need this.
+		return
+	}
 
-	// TODO(EFM, #6092): with the addition of an EpochFallback phase, we should re-enable the sanity check below for protocol-compliant phase transitions
-	// TODO(EFM, #6013): proper event emission and metrics for epoch extensions; CAUTION: metrics.CurrentEpochFinalView needs to be updated despite the epoch phase remaining at EpochFallback phase
-	return
-	//return nil, nil, fmt.Errorf("sanity check failed: invalid subsequent [epoch-phase] [%d-%s]->[%d-%s]",
-	//	parentEpochCounter, parentEpochPhase, childEpochCounter, childEpochPhase)
+	return nil, nil, fmt.Errorf("sanity check failed: invalid subsequent [epoch-phase] [%d-%s]->[%d-%s]",
+		parentEpochCounter, parentEpochPhase, childEpochCounter, childEpochPhase)
 }
 
 // versionBeaconOnBlockFinalized extracts and returns the VersionBeacons from the
