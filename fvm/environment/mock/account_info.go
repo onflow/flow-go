@@ -101,6 +101,36 @@ func (_m *AccountInfo) GetAccountBalance(runtimeAddress common.Address) (uint64,
 	return r0, r1
 }
 
+// GetAccountKeys provides a mock function with given fields: address
+func (_m *AccountInfo) GetAccountKeys(address flow.Address) ([]flow.AccountPublicKey, error) {
+	ret := _m.Called(address)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetAccountKeys")
+	}
+
+	var r0 []flow.AccountPublicKey
+	var r1 error
+	if rf, ok := ret.Get(0).(func(flow.Address) ([]flow.AccountPublicKey, error)); ok {
+		return rf(address)
+	}
+	if rf, ok := ret.Get(0).(func(flow.Address) []flow.AccountPublicKey); ok {
+		r0 = rf(address)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]flow.AccountPublicKey)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(flow.Address) error); ok {
+		r1 = rf(address)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetStorageCapacity provides a mock function with given fields: runtimeAddress
 func (_m *AccountInfo) GetStorageCapacity(runtimeAddress common.Address) (uint64, error) {
 	ret := _m.Called(runtimeAddress)
@@ -129,9 +159,9 @@ func (_m *AccountInfo) GetStorageCapacity(runtimeAddress common.Address) (uint64
 	return r0, r1
 }
 
-// GetStorageUsed provides a mock function with given fields: runtimeaddress
-func (_m *AccountInfo) GetStorageUsed(runtimeaddress common.Address) (uint64, error) {
-	ret := _m.Called(runtimeaddress)
+// GetStorageUsed provides a mock function with given fields: runtimeAddress
+func (_m *AccountInfo) GetStorageUsed(runtimeAddress common.Address) (uint64, error) {
+	ret := _m.Called(runtimeAddress)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetStorageUsed")
@@ -140,16 +170,16 @@ func (_m *AccountInfo) GetStorageUsed(runtimeaddress common.Address) (uint64, er
 	var r0 uint64
 	var r1 error
 	if rf, ok := ret.Get(0).(func(common.Address) (uint64, error)); ok {
-		return rf(runtimeaddress)
+		return rf(runtimeAddress)
 	}
 	if rf, ok := ret.Get(0).(func(common.Address) uint64); ok {
-		r0 = rf(runtimeaddress)
+		r0 = rf(runtimeAddress)
 	} else {
 		r0 = ret.Get(0).(uint64)
 	}
 
 	if rf, ok := ret.Get(1).(func(common.Address) error); ok {
-		r1 = rf(runtimeaddress)
+		r1 = rf(runtimeAddress)
 	} else {
 		r1 = ret.Error(1)
 	}
