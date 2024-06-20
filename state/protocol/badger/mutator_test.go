@@ -900,6 +900,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		require.NoError(t, err)
 
 		// we should begin the epoch in the staking phase
+		// TODO(EFM, #6092)
 		phase, err := state.AtBlockID(head.ID()).Phase()
 		assert.NoError(t, err)
 		require.Equal(t, flow.EpochPhaseStaking, phase)
@@ -951,6 +952,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		require.NoError(t, err)
 
 		// now that the setup event has been emitted, we should be in the setup phase
+		// TODO(EFM, #6092)
 		phase, err = state.AtBlockID(block3.ID()).Phase()
 		assert.NoError(t, err)
 		require.Equal(t, flow.EpochPhaseSetup, phase)
@@ -988,6 +990,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		metrics.AssertCalled(t, "CurrentEpochPhase", flow.EpochPhaseSetup)
 
 		// now that the setup event has been emitted, we should be in the setup phase
+		// TODO(EFM, #6092)
 		phase, err = state.AtBlockID(block3.ID()).Phase()
 		require.NoError(t, err)
 		require.Equal(t, flow.EpochPhaseSetup, phase)
@@ -1041,6 +1044,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		assert.NoError(t, err)
 
 		// now that the commit event has been emitted, we should be in the committed phase
+		// TODO(EFM, #6092)
 		phase, err = state.AtBlockID(block6.ID()).Phase()
 		assert.NoError(t, err)
 		require.Equal(t, flow.EpochPhaseCommitted, phase)
@@ -1093,6 +1097,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 
 		// we should begin epoch 2 in staking phase
 		// how that the commit event has been emitted, we should be in the committed phase
+		// TODO(EFM, #6092)
 		phase, err = state.AtBlockID(block8.ID()).Phase()
 		assert.NoError(t, err)
 		require.Equal(t, flow.EpochPhaseStaking, phase)

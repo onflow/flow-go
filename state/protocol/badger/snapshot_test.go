@@ -1473,6 +1473,7 @@ func TestSnapshot_CrossEpochIdentities(t *testing.T) {
 			snapshots := []protocol.Snapshot{state.AtHeight(epoch1.Setup), state.AtHeight(epoch1.Committed)}
 
 			for _, snapshot := range snapshots {
+				// TODO(EFM, #6092)
 				phase, err := snapshot.Phase()
 				require.NoError(t, err)
 
@@ -1521,6 +1522,7 @@ func TestSnapshot_CrossEpochIdentities(t *testing.T) {
 			snapshots := []protocol.Snapshot{state.AtHeight(epoch2.Setup), state.AtHeight(epoch2.Committed)}
 
 			for _, snapshot := range snapshots {
+				// TODO(EFM, #6092)
 				phase, err := snapshot.Phase()
 				require.NoError(t, err)
 

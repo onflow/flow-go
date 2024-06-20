@@ -88,8 +88,7 @@ func GetSnapshotAtEpochAndPhase(ctx context.Context, log zerolog.Logger, startup
 			return fmt.Errorf("failed to get the current epoch phase: %w", err)
 		}
 
-		// check if we are in or past the target epoch and phase
-		if currEpochCounter > startupEpoch || (currEpochCounter == startupEpoch && currEpochPhase >= startupEpochPhase) {
+		if shouldStartAtEpochPhase(currEpochCounter, startupEpoch, currEpochPhase, startupEpochPhase) {
 			head, err := snapshot.Head()
 			if err != nil {
 				return fmt.Errorf("could not get Dynamic Startup snapshot header: %w", err)
@@ -119,4 +118,23 @@ func GetSnapshotAtEpochAndPhase(ctx context.Context, log zerolog.Logger, startup
 	}
 
 	return snapshot, nil
+}
+
+// shouldStartAtEpochPhase determines whether Dynamic Startup should start up the node, based on a
+// target epoch/phase and a current epoch/phase.
+func shouldStartAtEpochPhase(currentEpoch, targetEpoch uint64, currentPhase, targetPhase flow.EpochPhase) bool {
+	// if the current epoch is after the target epoch, start up regardless of phase
+	if currentEpoch > targetEpoch {
+		return true
+	}
+	// if the current epoch is before the target epoch, do not start up regardless of phase
+	if currentEpoch < targetEpoch {
+		return false
+	}
+	// if the target phase is EpochPhaseFallback, only start up if the current phase exactly matches
+	if targetPhase == flow.EpochPhaseFallback {
+		return currentPhase == flow.EpochPhaseFallback
+	}
+	// for any other target phase, start up if current phase is >= target
+	return currentPhase >= targetPhase
 }

@@ -103,6 +103,7 @@ func TestBootstrapAndOpen_EpochCommitted(t *testing.T) {
 
 		// find the point where we transition to the epoch committed phase
 		for height := rootBlock.Height + 1; ; height++ {
+			// TODO(EFM, #6092)
 			phase, err := state.AtHeight(height).Phase()
 			require.NoError(t, err)
 			if phase == flow.EpochPhaseCommitted {
@@ -121,6 +122,7 @@ func TestBootstrapAndOpen_EpochCommitted(t *testing.T) {
 		complianceMetrics.On("CurrentEpochCounter", counter).Once()
 
 		// expect epoch phase to be set to current phase
+		// TODO(EFM, #6092)
 		phase, err := committedPhaseSnapshot.Phase()
 		require.NoError(t, err)
 		complianceMetrics.On("CurrentEpochPhase", phase).Once()
@@ -377,6 +379,7 @@ func TestBootstrapNonRoot(t *testing.T) {
 
 			// find the point where we transition to the epoch setup phase
 			for height := rootBlock.Height + 1; ; height++ {
+				// TODO(EFM, #6092)
 				phase, err := state.AtHeight(height).Phase()
 				require.NoError(t, err)
 				if phase == flow.EpochPhaseSetup {
@@ -408,6 +411,7 @@ func TestBootstrapNonRoot(t *testing.T) {
 
 			// find the point where we transition to the epoch committed phase
 			for height := rootBlock.Height + 1; ; height++ {
+				// TODO(EFM, #6092)
 				phase, err := state.AtHeight(height).Phase()
 				require.NoError(t, err)
 				if phase == flow.EpochPhaseCommitted {
@@ -446,6 +450,7 @@ func TestBootstrapNonRoot(t *testing.T) {
 				snap := state.AtHeight(height)
 				counter, err := snap.Epochs().Current().Counter()
 				require.NoError(t, err)
+				// TODO(EFM, #6092)
 				phase, err := snap.Phase()
 				require.NoError(t, err)
 				if phase == flow.EpochPhaseSetup && counter == epoch1Counter+1 {
