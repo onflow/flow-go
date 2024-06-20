@@ -1534,9 +1534,10 @@ func TestDryRun(t *testing.T) {
 				// Make sure that gas consumed from `EVM.dryRun` is bigger
 				// than the actual gas consumption of the equivalent
 				// `EVM.run`.
+				expected := res.GasConsumed + (res.GasConsumed / 64) + gethParams.SstoreSentryGasEIP2200
 				require.Equal(
 					t,
-					res.GasConsumed+gethParams.SstoreSentryGasEIP2200,
+					expected,
 					dryRunResult.GasConsumed,
 				)
 			})
@@ -1667,9 +1668,10 @@ func TestDryRun(t *testing.T) {
 				// Make sure that gas consumed from `EVM.dryRun` is bigger
 				// than the actual gas consumption of the equivalent
 				// `EVM.run`.
+				expected := res.GasConsumed + (res.GasConsumed / 64) + gethParams.SstoreSentryGasEIP2200
 				require.Equal(
 					t,
-					res.GasConsumed+gethParams.SstoreSentryGasEIP2200,
+					expected,
 					dryRunResult.GasConsumed,
 				)
 			})
@@ -1798,9 +1800,10 @@ func TestDryRun(t *testing.T) {
 				// Make sure that gas consumed from `EVM.dryRun` is bigger
 				// than the actual gas consumption of the equivalent
 				// `EVM.run`.
+				expected := res.GasConsumed + (res.GasConsumed / 64) + gethParams.SstoreSentryGasEIP2200 + gethParams.SstoreClearsScheduleRefundEIP3529
 				require.Equal(
 					t,
-					res.GasConsumed+gethParams.SstoreSentryGasEIP2200+gethParams.SstoreClearsScheduleRefundEIP3529,
+					expected,
 					dryRunResult.GasConsumed,
 				)
 			})
