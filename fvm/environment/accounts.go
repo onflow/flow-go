@@ -431,6 +431,20 @@ func (a *StatefulAccounts) setContract(
 	return nil
 }
 
+func EncodeContractNames(contractNames contractNames) ([]byte, error) {
+	var buf bytes.Buffer
+	cborEncoder := cbor.NewEncoder(&buf)
+	err := cborEncoder.Encode(contractNames)
+	if err != nil {
+		return nil, errors.NewEncodingFailuref(
+			err,
+			"cannot encode contract names: %s",
+			contractNames,
+		)
+	}
+	return buf.Bytes(), nil
+}
+
 func (a *StatefulAccounts) setContractNames(
 	contractNames contractNames,
 	address flow.Address,
@@ -443,16 +457,11 @@ func (a *StatefulAccounts) setContractNames(
 	if !ok {
 		return errors.NewAccountNotFoundError(address)
 	}
-	var buf bytes.Buffer
-	cborEncoder := cbor.NewEncoder(&buf)
-	err = cborEncoder.Encode(contractNames)
+
+	newContractNames, err := EncodeContractNames(contractNames)
 	if err != nil {
-		return errors.NewEncodingFailuref(
-			err,
-			"cannot encode contract names: %s",
-			contractNames)
+		return err
 	}
-	newContractNames := buf.Bytes()
 
 	id := flow.ContractNamesRegisterID(address)
 	prevContractNames, err := a.GetValue(id)
@@ -607,20 +616,26 @@ func (a *StatefulAccounts) getContractNames(
 	error,
 ) {
 	// TODO return fatal error if can't fetch
-	encContractNames, err := a.GetValue(flow.ContractNamesRegisterID(address))
+	encodedContractNames, err := a.GetValue(flow.ContractNamesRegisterID(address))
 	if err != nil {
 		return nil, fmt.Errorf("cannot get deployed contract names: %w", err)
 	}
+
+	return DecodeContractNames(encodedContractNames)
+}
+
+func DecodeContractNames(encodedContractNames []byte) ([]string, error) {
 	identifiers := make([]string, 0)
-	if len(encContractNames) > 0 {
-		buf := bytes.NewReader(encContractNames)
+	if len(encodedContractNames) > 0 {
+		buf := bytes.NewReader(encodedContractNames)
 		cborDecoder := cbor.NewDecoder(buf)
-		err = cborDecoder.Decode(&identifiers)
+		err := cborDecoder.Decode(&identifiers)
 		if err != nil {
 			return nil, fmt.Errorf(
 				"cannot decode deployed contract names %x: %w",
-				encContractNames,
-				err)
+				encodedContractNames,
+				err,
+			)
 		}
 	}
 	return identifiers, nil

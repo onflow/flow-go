@@ -1274,6 +1274,16 @@ func TestProgramParsingError(t *testing.T) {
 	)
 	require.NoError(t, err)
 
+	encodedContractNames, err := environment.EncodeContractNames([]string{contractName})
+	require.NoError(t, err)
+
+	err = registersByAccount.Set(
+		string(testAddress[:]),
+		flow.ContractNamesKey,
+		encodedContractNames,
+	)
+	require.NoError(t, err)
+
 	// Migrate
 
 	// TODO: EVM contract is not deployed in snapshot yet, so can't update it
