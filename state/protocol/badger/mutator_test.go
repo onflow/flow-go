@@ -1717,7 +1717,7 @@ func TestEpochFallbackMode(t *testing.T) {
 			metricsMock.On("EpochFallbackModeTriggered").Once()
 			metricsMock.On("CurrentEpochFinalView", epoch1FinalView+epochs.DefaultEpochExtensionViewCount)
 			protoEventsMock.On("EpochFallbackModeTriggered", epoch1Setup.Counter, block1.Header).Once()
-			protoEventsMock.On("EpochExtended", mock.Anything, mock.Anything, mock.Anything).Once()
+			protoEventsMock.On("EpochExtended", epoch1Setup.Counter, block1.Header, unittest.MatchEpochExtension(epoch1FinalView, epochs.DefaultEpochExtensionViewCount)).Once()
 
 			err = state.Extend(context.Background(), block1)
 			require.NoError(t, err)
@@ -1817,7 +1817,7 @@ func TestEpochFallbackMode(t *testing.T) {
 			metricsMock.On("EpochFallbackModeTriggered").Once()
 			metricsMock.On("CurrentEpochFinalView", epoch1FinalView+epochs.DefaultEpochExtensionViewCount)
 			protoEventsMock.On("EpochFallbackModeTriggered", epoch1Setup.Counter, block3.Header).Once()
-			protoEventsMock.On("EpochExtended", mock.Anything, mock.Anything, mock.Anything).Once()
+			protoEventsMock.On("EpochExtended", epoch1Setup.Counter, block3.Header, unittest.MatchEpochExtension(epoch1FinalView, epochs.DefaultEpochExtensionViewCount)).Once()
 
 			assertEpochFallbackTriggered(t, state.Final(), false) // not triggered before finalization
 			err = state.Finalize(context.Background(), block3.ID())
@@ -1912,7 +1912,6 @@ func TestEpochFallbackMode(t *testing.T) {
 			metricsMock.On("EpochFallbackModeTriggered").Once()
 			metricsMock.On("CurrentEpochFinalView", epoch1FinalView+epochs.DefaultEpochExtensionViewCount)
 			protoEventsMock.On("EpochFallbackModeTriggered", epoch1Setup.Counter, block3.Header).Once()
-			protoEventsMock.On("EpochExtended", mock.Anything, mock.Anything, mock.Anything).Once()
 
 			assertEpochFallbackTriggered(t, state.Final(), false) // not triggered before finalization
 			err = state.Finalize(context.Background(), block3.ID())
@@ -1927,6 +1926,10 @@ func TestEpochFallbackMode(t *testing.T) {
 			})
 			err = state.Extend(context.Background(), block4)
 			require.NoError(t, err)
+
+			// we add the epoch extension after the epoch transition
+			protoEventsMock.On("EpochExtended", epoch1Setup.Counter, block4.Header, unittest.MatchEpochExtension(epoch1FinalView, epochs.DefaultEpochExtensionViewCount)).Once()
+
 			err = state.Finalize(context.Background(), block4.ID())
 			require.NoError(t, err)
 
@@ -2324,7 +2327,7 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 			require.Len(t, epochExtensions, 1)
 			require.Equal(t, epochExtensions[0].FirstView, epoch2Setup.FinalView+1)
 
-			protoEventsMock.On("EpochExtended", mock.Anything, mock.Anything, mock.Anything).Once()
+			protoEventsMock.On("EpochExtended", epoch2Setup.Counter, block9.Header, unittest.MatchEpochExtension(epoch2Setup.FinalView, epochs.DefaultEpochExtensionViewCount)).Once()
 			metricsMock.On("CurrentEpochFinalView", epoch2Setup.FinalView+epochs.DefaultEpochExtensionViewCount)
 			err = state.Finalize(context.Background(), block9.ID())
 			require.NoError(t, err)
