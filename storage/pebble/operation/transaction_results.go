@@ -12,8 +12,10 @@ func InsertTransactionResult(blockID flow.Identifier, transactionResult *flow.Tr
 	return insert(makePrefix(codeTransactionResult, blockID, transactionResult.TransactionID), transactionResult)
 }
 
-func BatchIndexTransactionResult(blockID flow.Identifier, txIndex uint32, transactionResult *flow.TransactionResult) func(batch storage.Transaction) error {
-	return insert(makePrefix(codeTransactionResultIndex, blockID, txIndex), transactionResult)
+func BatchIndexTransactionResult(blockID flow.Identifier, txIndex uint32, transactionResult *flow.TransactionResult) func(storage.Transaction) error {
+	return func(batch storage.Transaction) error {
+		return insert(makePrefix(codeTransactionResultIndex, blockID, txIndex), transactionResult)(NewBatchWriter(batch))
+	}
 }
 
 func RetrieveTransactionResult(blockID flow.Identifier, transactionID flow.Identifier, transactionResult *flow.TransactionResult) func(pebble.Reader) error {
@@ -46,8 +48,8 @@ func LookupTransactionResultsByBlockIDUsingIndex(blockID flow.Identifier, txResu
 }
 
 // RemoveTransactionResultsByBlockID removes the transaction results for the given blockID
-func RemoveTransactionResultsByBlockID(blockID flow.Identifier) func(pebble.Reader) error {
-	return func(txn pebble.Reader) error {
+func RemoveTransactionResultsByBlockID(blockID flow.Identifier) func(pebble.Writer) error {
+	return func(txn pebble.Writer) error {
 
 		prefix := makePrefix(codeTransactionResult, blockID)
 		err := removeByPrefix(prefix)(txn)
@@ -62,11 +64,10 @@ func RemoveTransactionResultsByBlockID(blockID flow.Identifier) func(pebble.Read
 // BatchRemoveTransactionResultsByBlockID removes transaction results for the given blockID in a provided batch.
 // No errors are expected during normal operation, but it may return generic error
 // if pebble fails to process request
-func BatchRemoveTransactionResultsByBlockID(blockID flow.Identifier, batch storage.Transaction) func(pebble.Reader) error {
-	return func(txn pebble.Reader) error {
-
+func BatchRemoveTransactionResultsByBlockID(blockID flow.Identifier, batch storage.Transaction) func(pebble.Writer) error {
+	return func(txn pebble.Writer) error {
 		prefix := makePrefix(codeTransactionResult, blockID)
-		err := batchRemoveByPrefix(prefix)(txn, batch)
+		err := removeByPrefix(prefix)(txn)
 		if err != nil {
 			return fmt.Errorf("could not remove transaction results for block %v: %w", blockID, err)
 		}
@@ -80,7 +81,9 @@ func InsertLightTransactionResult(blockID flow.Identifier, transactionResult *fl
 }
 
 func BatchIndexLightTransactionResult(blockID flow.Identifier, txIndex uint32, transactionResult *flow.LightTransactionResult) func(batch storage.Transaction) error {
-	return batchWrite(makePrefix(codeLightTransactionResultIndex, blockID, txIndex), transactionResult)
+	return func(batch storage.Transaction) error {
+		return insert(makePrefix(codeLightTransactionResultIndex, blockID, txIndex), transactionResult)(NewBatchWriter(batch))
+	}
 }
 
 func RetrieveLightTransactionResult(blockID flow.Identifier, transactionID flow.Identifier, transactionResult *flow.LightTransactionResult) func(pebble.Reader) error {

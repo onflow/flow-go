@@ -168,5 +168,5 @@ func (tr *TransactionResults) RemoveByBlockID(blockID flow.Identifier) error {
 // BatchRemoveByBlockID batch removes transaction results by block ID
 func (tr *TransactionResults) BatchRemoveByBlockID(blockID flow.Identifier, batch storage.BatchStorage) error {
 	writeBatch := batch.GetWriter()
-	return tr.db.View(operation.BatchRemoveTransactionResultsByBlockID(blockID, writeBatch))
+	return tr.db.Update(operation.BatchRemoveTransactionResultsByBlockID(blockID, writeBatch))
 }

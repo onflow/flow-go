@@ -235,6 +235,31 @@ func traverse(prefix []byte, iteration iterationFunc) func(pebble.Reader) error 
 	}
 }
 
+// removeByPrefix removes all the entities if the prefix of the key matches the given prefix.
+// if no key matches, this is a no-op
+// No errors are expected during normal operation.
+func removeByPrefix(prefix []byte) func(pebble.Writer) error {
+	return func(tx pebble.Writer) error {
+		start, end := getStartEndKeys(prefix)
+		return tx.DeleteRange(start, end, nil)
+	}
+}
+
+// getStartEndKeys calculates the start and end keys for a given prefix.
+func getStartEndKeys(prefix []byte) (start, end []byte) {
+	start = prefix
+
+	// End key is the prefix with the last byte incremented by 1
+	end = append([]byte{}, prefix...)
+	end = append(end, 0)
+	for i := len(end) - 2; i >= 0 && end[i] == 0xff; i-- {
+		end[i] = 0
+	}
+	end[len(end)-2]++
+
+	return start, end
+}
+
 func convertNotFoundError(err error) error {
 	if errors.Is(err, pebble.ErrNotFound) {
 		return storage.ErrNotFound
