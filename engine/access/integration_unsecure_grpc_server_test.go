@@ -215,7 +215,6 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 		suite.unsecureGrpcServer,
 		nil,
 		stateStreamConfig,
-		nil,
 	)
 	assert.NoError(suite.T(), err)
 	suite.rpcEng, err = rpcEngBuilder.WithLegacy().Build()
@@ -250,7 +249,7 @@ func (suite *SameGRPCPortTestSuite) SetupTest() {
 		subscription.DefaultSendBufferSize,
 	)
 
-	eventIndexer := index.NewEventsIndex(index.NewReporter(), suite.events)
+	eventIndexer := index.NewEventsIndex(suite.events)
 
 	suite.executionDataTracker = subscription.NewExecutionDataTracker(
 		suite.log,

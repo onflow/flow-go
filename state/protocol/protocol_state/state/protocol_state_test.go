@@ -17,20 +17,20 @@ import (
 )
 
 // Test_ProtocolState verifies the different scenarios of retrieving a protocol state, global parameters
-// and KV store snapshots by block ID for the `EpochProtocolStateEntries`. Happy and unhappy paths are covered.
+// and KV store snapshots by block ID for the `ProtocolState`. Happy and unhappy paths are covered.
 func Test_ProtocolState(t *testing.T) {
-	epochProtocolStateDB := storagemock.NewEpochProtocolStateEntries(t)
+	epochProtocolStateDB := storagemock.NewProtocolState(t)
 	protocolKVStoreDB := storagemock.NewProtocolKVStore(t)
 	globalParams := psmock.NewGlobalParams(t)
 	protocolState := NewProtocolState(epochProtocolStateDB, protocolKVStoreDB, globalParams)
 
-	t.Run("testing `EpochProtocolStateEntries.AtBlockID`", func(t *testing.T) {
+	t.Run("testing `ProtocolState.AtBlockID`", func(t *testing.T) {
 		test_AtBlockID(t, protocolState, epochProtocolStateDB)
 	})
-	t.Run("testing `EpochProtocolStateEntries.GlobalParams`", func(t *testing.T) {
+	t.Run("testing `ProtocolState.GlobalParams`", func(t *testing.T) {
 		test_GlobalParams(t, protocolState, globalParams)
 	})
-	t.Run("testing `EpochProtocolStateEntries.KVStoreAtBlockID`", func(t *testing.T) {
+	t.Run("testing `ProtocolState.KVStoreAtBlockID`", func(t *testing.T) {
 		test_KVStoreAtBlockID(t, protocolState, protocolKVStoreDB)
 	})
 }
@@ -38,7 +38,7 @@ func Test_ProtocolState(t *testing.T) {
 // Test_MutableProtocolState verifies the different scenarios of retrieving a protocol state, global parameters
 // and KV store snapshots by block ID for the `MutableProtocolState`. Happy and unhappy paths are covered.
 func Test_MutableProtocolState(t *testing.T) {
-	epochProtocolStateDB := storagemock.NewEpochProtocolStateEntries(t)
+	epochProtocolStateDB := storagemock.NewProtocolState(t)
 	protocolKVStoreDB := storagemock.NewProtocolKVStore(t)
 	globalParams := psmock.NewGlobalParams(t)
 	headersDB := storagemock.NewHeaders(t)
@@ -66,26 +66,26 @@ func Test_MutableProtocolState(t *testing.T) {
 	})
 }
 
-func test_AtBlockID(t *testing.T, protocolState protocol.ProtocolState, epochProtocolStateDB *storagemock.EpochProtocolStateEntries) {
+func test_AtBlockID(t *testing.T, protocolState protocol.ProtocolState, epochProtocolStateDB *storagemock.ProtocolState) {
 	blockID := unittest.IdentifierFixture()
 
 	t.Run("retrieve epoch state for existing blocks", func(t *testing.T) {
 		epochState := unittest.EpochStateFixture(unittest.WithValidDKG())
 		epochProtocolStateDB.On("ByBlockID", blockID).Return(epochState, nil).Once()
 
-		epochProtocolState, err := protocolState.EpochStateAtBlockID(blockID)
+		dynamicProtocolState, err := protocolState.AtBlockID(blockID)
 		require.NoError(t, err)
-		assert.Equal(t, epochState.CurrentEpochIdentityTable, epochProtocolState.Identities())
+		assert.Equal(t, epochState.CurrentEpochIdentityTable, dynamicProtocolState.Identities())
 	})
 	t.Run("retrieving epoch state for non-existing block yields storage.ErrNotFound error", func(t *testing.T) {
 		epochProtocolStateDB.On("ByBlockID", blockID).Return(nil, storage.ErrNotFound).Once()
-		_, err := protocolState.EpochStateAtBlockID(blockID)
+		_, err := protocolState.AtBlockID(blockID)
 		require.ErrorIs(t, err, storage.ErrNotFound)
 	})
 	t.Run("exception during retrieve is propagated", func(t *testing.T) {
 		exception := errors.New("exception")
 		epochProtocolStateDB.On("ByBlockID", blockID).Return(nil, exception).Once()
-		_, err := protocolState.EpochStateAtBlockID(blockID)
+		_, err := protocolState.AtBlockID(blockID)
 		require.ErrorIs(t, err, exception)
 	})
 }

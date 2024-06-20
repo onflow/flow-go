@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/grpcclient"
 	"github.com/onflow/flow-go/state/protocol"
 )
 
@@ -32,7 +31,7 @@ func validateFlags(accessNodeIDS []string, snapshot protocol.Snapshot) ([]flow.I
 	}
 
 	if accessNodeIDS[0] == "*" {
-		anIDS, err := grpcclient.DefaultAccessNodeIDS(snapshot)
+		anIDS, err := DefaultAccessNodeIDS(snapshot)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get default access node ids %w", err)
 		}
@@ -60,7 +59,7 @@ func validateFlagsMainNet(accessNodeIDS []string) ([]flow.Identifier, error) {
 
 // convertIDS converts a list of access node id hex strings to flow.Identifier
 func convertIDS(accessNodeIDS []string) ([]flow.Identifier, error) {
-	anIDS, err := grpcclient.FlowIDFromHexString(accessNodeIDS...)
+	anIDS, err := FlowIDFromHexString(accessNodeIDS...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert access node ID(s) into flow identifier(s) %w", err)
 	}

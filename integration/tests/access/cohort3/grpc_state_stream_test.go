@@ -114,6 +114,7 @@ func (s *GrpcStateStreamSuite) SetupTest() {
 		testnet.AsGhost())
 
 	consensusConfigs := []func(config *testnet.NodeConfig){
+		testnet.WithAdditionalFlag("--cruise-ctl-fallback-proposal-duration=400ms"),
 		testnet.WithAdditionalFlag(fmt.Sprintf("--required-verification-seal-approvals=%d", 1)),
 		testnet.WithAdditionalFlag(fmt.Sprintf("--required-construction-seal-approvals=%d", 1)),
 		testnet.WithLogLevel(zerolog.FatalLevel),
@@ -233,10 +234,8 @@ func (s *GrpcStateStreamSuite) TestHappyPath() {
 
 			targetEvent := flow.EventType("flow.AccountCreated")
 
-			foundANTxTestCount := 0
-			foundANTxControlCount := 0
+			foundANTxCount := 0
 			foundONTxCount := 0
-
 			messageIndex := counters.NewMonotonousCounter(0)
 
 			r := NewResponseTracker(compareEventsResponse, 3)
@@ -253,16 +252,16 @@ func (s *GrpcStateStreamSuite) TestHappyPath() {
 					if has(event.Events, targetEvent) {
 						s.T().Logf("adding access test events: %d %d %v", event.Height, len(event.Events), event.Events)
 						r.Add(s.T(), event.Height, "access_test", event)
-						foundANTxTestCount++
+						foundANTxCount++
 					}
 				case event := <-controlANEvents:
 					if has(event.Events, targetEvent) {
 						if ok := messageIndex.Set(event.MessageIndex); !ok {
 							s.Require().NoErrorf(err, "messageIndex isn`t sequential")
 						}
+
 						s.T().Logf("adding control events: %d %d %v", event.Height, len(event.Events), event.Events)
 						r.Add(s.T(), event.Height, "access_control", event)
-						foundANTxControlCount++
 					}
 				case event := <-testONEvents:
 					if has(event.Events, targetEvent) {
@@ -272,9 +271,7 @@ func (s *GrpcStateStreamSuite) TestHappyPath() {
 					}
 				}
 
-				if foundANTxTestCount >= txCount &&
-					foundONTxCount >= txCount &&
-					foundANTxControlCount >= txCount {
+				if foundANTxCount >= txCount && foundONTxCount >= txCount {
 					break
 				}
 			}

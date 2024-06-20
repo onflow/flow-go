@@ -281,7 +281,7 @@ func createRootBlockData(participantData *run.ParticipantData) (*flow.Block, *fl
 		},
 	)
 
-	epochProtocolStateID := inmem.EpochProtocolStateFromServiceEvents(setup, commit).ID()
+	epochProtocolStateID := inmem.ProtocolStateFromEpochServiceEvents(setup, commit).ID()
 	root.SetPayload(flow.Payload{ProtocolStateID: kvstore.NewDefaultKVStore(epochProtocolStateID).ID()})
 	result := unittest.BootstrapExecutionResultFixture(root, unittest.GenesisStateCommitment)
 	result.ServiceEvents = []flow.ServiceEvent{setup.ServiceEvent(), commit.ServiceEvent()}
@@ -378,8 +378,8 @@ func createNode(
 	qcsDB := storage.NewQuorumCertificates(metricsCollector, db, storage.DefaultCacheSize)
 	setupsDB := storage.NewEpochSetups(metricsCollector, db)
 	commitsDB := storage.NewEpochCommits(metricsCollector, db)
-	protocolStateDB := storage.NewEpochProtocolStateEntries(metricsCollector, setupsDB, commitsDB, db,
-		storage.DefaultEpochProtocolStateCacheSize, storage.DefaultProtocolStateIndexCacheSize)
+	protocolStateDB := storage.NewProtocolState(metricsCollector, setupsDB, commitsDB, db,
+		storage.DefaultProtocolStateCacheSize, storage.DefaultProtocolStateByBlockIDCacheSize)
 	protocokKVStoreDB := storage.NewProtocolKVStore(metricsCollector, db,
 		storage.DefaultProtocolKVStoreCacheSize, storage.DefaultProtocolKVStoreByBlockIDCacheSize)
 	versionBeaconDB := storage.NewVersionBeacons(db)

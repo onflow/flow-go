@@ -1744,6 +1744,14 @@ func (suite *Suite) TestExecutionNodesForBlockID() {
 	suite.Run("no preferred or fixed ENs", func() {
 		testExecutionNodesForBlockID(nil, nil, allExecutionNodes)
 	})
+	// if only preferred ENs are specified, the ExecutionNodesForBlockID function should
+	// return the preferred ENs list
+	suite.Run("two preferred ENs with zero fixed EN", func() {
+		// mark the first two ENs as preferred
+		preferredENs := allExecutionNodes[0:2]
+		expectedList := preferredENs
+		testExecutionNodesForBlockID(preferredENs, nil, expectedList)
+	})
 	// if only fixed ENs are specified, the ExecutionNodesForBlockID function should
 	// return the fixed ENs list
 	suite.Run("two fixed ENs with zero preferred EN", func() {
@@ -1752,14 +1760,6 @@ func (suite *Suite) TestExecutionNodesForBlockID() {
 		expectedList := fixedENs
 		testExecutionNodesForBlockID(nil, fixedENs, expectedList)
 	})
-	// if only preferred ENs are specified, the ExecutionNodesForBlockID function should
-	// return the preferred ENs list
-	suite.Run("two preferred ENs with zero fixed EN", func() {
-		// mark the first two ENs as preferred
-		preferredENs := allExecutionNodes[0:2]
-		expectedList := allExecutionNodes[0:maxNodesCnt]
-		testExecutionNodesForBlockID(preferredENs, nil, expectedList)
-	})
 	// if both are specified, the ExecutionNodesForBlockID function should
 	// return the preferred ENs list
 	suite.Run("four fixed ENs of which two are preferred ENs", func() {
@@ -1767,7 +1767,7 @@ func (suite *Suite) TestExecutionNodesForBlockID() {
 		fixedENs := allExecutionNodes[0:5]
 		// mark the first two of the fixed ENs as preferred ENs
 		preferredENs := fixedENs[0:2]
-		expectedList := fixedENs[0:maxNodesCnt]
+		expectedList := preferredENs
 		testExecutionNodesForBlockID(preferredENs, fixedENs, expectedList)
 	})
 	// if both are specified, but the preferred ENs don't match the ExecutorIDs in the ER,
@@ -1777,8 +1777,7 @@ func (suite *Suite) TestExecutionNodesForBlockID() {
 		fixedENs := allExecutionNodes[0:2]
 		// specify two ENs not specified in the ERs as preferred
 		preferredENs := unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
-		// add one more node ID besides of the fixed ENs list cause expected length of the list should be maxNodesCnt
-		expectedList := append(fixedENs, allExecutionNodes[2])
+		expectedList := fixedENs
 		testExecutionNodesForBlockID(preferredENs, fixedENs, expectedList)
 	})
 	// if execution receipts are not yet available, the ExecutionNodesForBlockID function should retry twice
@@ -1792,31 +1791,8 @@ func (suite *Suite) TestExecutionNodesForBlockID() {
 		currentAttempt = 0
 		// mark the first two ENs as preferred
 		preferredENs := allExecutionNodes[0:2]
-		expectedList := allExecutionNodes[0:maxNodesCnt]
+		expectedList := preferredENs
 		testExecutionNodesForBlockID(preferredENs, nil, expectedList)
-	})
-	// if preferredENIdentifiers was set and there are less than maxNodesCnt nodes selected than check the order
-	// of adding ENs ids
-	suite.Run("add nodes in the correct order", func() {
-		//  mark the first EN as preferred
-		preferredENIdentifiers = allExecutionNodes[0:1].NodeIDs()
-		//  mark the fourth EN with receipt
-		executorIDs := allExecutionNodes[3:4].NodeIDs()
-
-		receiptNodes := allExecutionNodes[3:4]   // any EN with a receipt
-		preferredNodes := allExecutionNodes[0:1] // preferred EN node not already selected
-		additionalNode := allExecutionNodes[1:2] // any EN not already selected
-
-		expectedOrder := flow.IdentityList{
-			receiptNodes[0],
-			preferredNodes[0],
-			additionalNode[0],
-		}
-
-		chosenIDs := chooseFromPreferredENIDs(allExecutionNodes, executorIDs)
-
-		require.ElementsMatch(suite.T(), chosenIDs, expectedOrder)
-		require.Equal(suite.T(), len(chosenIDs), maxNodesCnt)
 	})
 }
 
@@ -2049,7 +2025,8 @@ func (suite *Suite) TestNodeCommunicator() {
 	// Simulate closed circuit breaker error
 	suite.execClient.
 		On("GetTransactionResultsByBlockID", ctx, exeEventReq).
-		Return(nil, gobreaker.ErrOpenState)
+		Return(nil, gobreaker.ErrOpenState).
+		Once()
 
 	result, err := backend.GetTransactionResultsByBlockID(ctx, blockId, entitiesproto.EventEncodingVersion_JSON_CDC_V0)
 	suite.Assert().Nil(result)

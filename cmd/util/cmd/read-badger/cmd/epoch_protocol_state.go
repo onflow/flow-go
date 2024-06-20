@@ -30,7 +30,7 @@ var epochProtocolStateCmd = &cobra.Command{
 		}
 
 		log.Info().Msgf("getting protocol state by block id: %v", blockID)
-		protocolState, err := storages.EpochProtocolStateEntries.ByBlockID(blockID)
+		protocolState, err := storages.EpochProtocolState.ByBlockID(blockID)
 		if err != nil {
 			log.Error().Err(err).Msgf("could not get protocol state for block id: %v", blockID)
 			return

@@ -186,9 +186,7 @@ func (suite *RateLimitTestSuite) SetupTest() {
 		suite.secureGrpcServer,
 		suite.unsecureGrpcServer,
 		nil,
-		stateStreamConfig,
-		nil,
-	)
+		stateStreamConfig)
 	require.NoError(suite.T(), err)
 	suite.rpcEng, err = rpcEngBuilder.WithLegacy().Build()
 	require.NoError(suite.T(), err)

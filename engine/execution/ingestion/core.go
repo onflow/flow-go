@@ -14,7 +14,6 @@ import (
 	"github.com/onflow/flow-go/engine/execution/ingestion/stop"
 	"github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool/entity"
@@ -59,7 +58,6 @@ type Core struct {
 	executor          BlockExecutor
 	collectionFetcher CollectionFetcher
 	eventConsumer     EventConsumer
-	metrics           module.ExecutionMetrics
 }
 
 type BlockExecutor interface {
@@ -81,7 +79,6 @@ func NewCore(
 	executor BlockExecutor,
 	collectionFetcher CollectionFetcher,
 	eventConsumer EventConsumer,
-	metrics module.ExecutionMetrics,
 ) (*Core, error) {
 	e := &Core{
 		log:               logger.With().Str("engine", "ingestion_core").Logger(),
@@ -96,7 +93,6 @@ func NewCore(
 		executor:          executor,
 		collectionFetcher: collectionFetcher,
 		eventConsumer:     eventConsumer,
-		metrics:           metrics,
 	}
 
 	err := e.throttle.Init(e.processables, DefaultCatchUpThreshold)
@@ -329,8 +325,6 @@ func (e *Core) onBlockExecuted(
 ) error {
 	commit := computationResult.CurrentEndState()
 
-	e.metrics.ExecutionLastExecutedBlockHeight(block.Block.Header.Height)
-
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 	defer wg.Wait()
@@ -522,7 +516,6 @@ func (e *Core) fetch(missingColls []*block_queue.MissingCollection) (int, error)
 
 	if missingCount > 0 {
 		e.collectionFetcher.Force()
-		e.metrics.ExecutionCollectionRequestSent()
 	}
 
 	return missingCount, nil

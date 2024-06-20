@@ -56,34 +56,6 @@ func MessageToLightCollection(m *entities.Collection) (*flow.LightCollection, er
 	}, nil
 }
 
-func FullCollectionToMessage(c *flow.Collection) ([]*entities.Transaction, error) {
-	if c == nil {
-		return nil, fmt.Errorf("invalid collection")
-	}
-
-	transactions := make([]*entities.Transaction, len(c.Transactions))
-	for i, tx := range c.Transactions {
-		transactions[i] = TransactionToMessage(*tx)
-	}
-
-	return transactions, nil
-}
-
-func MessageToFullCollection(m []*entities.Transaction, chain flow.Chain) (*flow.Collection, error) {
-	transactions := make([]*flow.TransactionBody, len(m))
-	for i, tx := range m {
-		t, err := MessageToTransaction(tx, chain)
-		if err != nil {
-			return nil, err
-		}
-		transactions[i] = &t
-	}
-
-	return &flow.Collection{
-		Transactions: transactions,
-	}, nil
-}
-
 // CollectionGuaranteeToMessage converts a collection guarantee to a protobuf message
 func CollectionGuaranteeToMessage(g *flow.CollectionGuarantee) *entities.CollectionGuarantee {
 	id := g.ID()

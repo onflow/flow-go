@@ -10,8 +10,16 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/model/flow"
 )
+
+// encodedKeyAddressPrefixLength is the length of the address prefix in the encoded key
+// 2 for uint16 of number of key parts
+// 4 for uint32 of the length of the first key part
+// 2 for uint16 of the key part type
+// 8 for the address which is the actual length of the first key part
+const encodedKeyAddressPrefixLength = 2 + 4 + 2 + flow.AddressLength
 
 // minSizeForSplitSortingIntoGoroutines below this size, no need to split
 // the sorting into goroutines
@@ -48,7 +56,7 @@ func (g *PayloadAccountGrouping) Next() (*PayloadAccountGroup, error) {
 	}
 	g.current++
 
-	address, err := g.payloads[accountStartIndex].Address()
+	address, err := PayloadToAddress(g.payloads[accountStartIndex])
 	if err != nil {
 		return nil, fmt.Errorf("failed to get address from payload: %w", err)
 	}
@@ -117,6 +125,31 @@ func GroupPayloadsByAccount(
 	}
 }
 
+// PayloadToAddress takes a payload and return:
+// - (address, nil) if the payload is for an account, the account address is returned
+// - (common.ZeroAddress, nil) if the payload is not for an account
+// - (common.ZeroAddress, err) if running into any exception
+// The zero address is used for global Payloads and is not an actual account
+func PayloadToAddress(p *ledger.Payload) (flow.Address, error) {
+	k, err := p.Key()
+	if err != nil {
+		return flow.EmptyAddress, fmt.Errorf("could not find key for payload: %w", err)
+	}
+
+	id, err := convert.LedgerKeyToRegisterID(k)
+	if err != nil {
+		return flow.EmptyAddress, fmt.Errorf("error converting key to register ID")
+	}
+
+	if len([]byte(id.Owner)) != flow.AddressLength {
+		return flow.EmptyAddress, nil
+	}
+
+	address := flow.BytesToAddress([]byte(id.Owner))
+
+	return address, nil
+}
+
 type sortablePayloads []*ledger.Payload
 
 func (s sortablePayloads) Len() int {
@@ -128,17 +161,11 @@ func (s sortablePayloads) Less(i, j int) bool {
 }
 
 func (s sortablePayloads) Compare(i, j int) int {
-	a, err := s[i].Address()
-	if err != nil {
-		panic(err)
-	}
-
-	b, err := s[j].Address()
-	if err != nil {
-		panic(err)
-	}
-
-	return bytes.Compare(a[:], b[:])
+	// sort descending to force one of the big accounts to be more at the beginning
+	return bytes.Compare(
+		s[j].EncodedKey()[:encodedKeyAddressPrefixLength],
+		s[i].EncodedKey()[:encodedKeyAddressPrefixLength],
+	)
 }
 
 func (s sortablePayloads) Swap(i, j int) {

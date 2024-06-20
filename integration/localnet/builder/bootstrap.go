@@ -664,15 +664,6 @@ func getAccessGatewayPublicKey(flowNodeContainerConfigs []testnet.ContainerConfi
 	return "", fmt.Errorf("Unable to find public key for Access Gateway expected in container '%s'", testnet.PrimaryAN)
 }
 
-func getAccessID(flowNodeContainerConfigs []testnet.ContainerConfig) (string, error) {
-	for _, container := range flowNodeContainerConfigs {
-		if container.Role == flow.RoleAccess {
-			return container.NodeID.String(), nil
-		}
-	}
-	return "", fmt.Errorf("Unable to find Access node")
-}
-
 func getExecutionNodeConfig(flowNodeContainerConfigs []testnet.ContainerConfig) (testnet.ContainerConfig, error) {
 	for _, container := range flowNodeContainerConfigs {
 		if container.Role == flow.RoleExecution {
@@ -732,11 +723,6 @@ func prepareTestExecutionService(dockerServices Services, flowNodeContainerConfi
 		panic(err)
 	}
 
-	publicAccessID, err := getAccessID(flowNodeContainerConfigs)
-	if err != nil {
-		panic(err)
-	}
-
 	containerConfig, err := getExecutionNodeConfig(flowNodeContainerConfigs)
 	if err != nil {
 		panic(err)
@@ -762,7 +748,6 @@ func prepareTestExecutionService(dockerServices Services, flowNodeContainerConfi
 		"--observer-mode=true",
 		fmt.Sprintf("--observer-mode-bootstrap-node-addresses=%s:%s", testnet.PrimaryAN, testnet.PublicNetworkPort),
 		fmt.Sprintf("--observer-mode-bootstrap-node-public-keys=%s", agPublicKey),
-		fmt.Sprintf("--public-access-id=%s", publicAccessID),
 	)
 
 	// Add a docker container for this named Observer

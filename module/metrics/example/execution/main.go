@@ -41,17 +41,13 @@ func main() {
 
 			collector.ExecutionBlockExecuted(
 				duration,
-				module.BlockExecutionResultStats{
-					CollectionExecutionResultStats: module.CollectionExecutionResultStats{
-						ExecutionResultStats: module.ExecutionResultStats{
-							EventSize:       100,
-							EventCounts:     2,
-							MemoryUsed:      uint64(rand.Int63n(1e6)),
-							ComputationUsed: uint64(rand.Int63n(1e6)),
-						},
-						NumberOfTransactions: 1,
-					},
-					NumberOfCollections: 1,
+				module.ExecutionResultStats{
+					ComputationUsed:      uint64(rand.Int63n(1e6)),
+					MemoryUsed:           uint64(rand.Int63n(1e6)),
+					EventCounts:          2,
+					EventSize:            100,
+					NumberOfCollections:  1,
+					NumberOfTransactions: 1,
 				})
 
 			diskIncrease := rand.Int63n(1024 * 1024)

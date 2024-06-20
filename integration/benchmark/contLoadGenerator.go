@@ -176,6 +176,7 @@ func New(
 	}
 
 	lg.workFunc = func(workerID int) {
+
 		wlc := lc
 		wlc.WorkerContext.WorkerID = workerID
 

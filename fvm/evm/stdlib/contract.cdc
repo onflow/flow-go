@@ -50,8 +50,6 @@ contract EVM {
         payload: String,
         // code indicating a specific validation (201-300) or execution (301-400) error
         errorCode: UInt16,
-        // a human-readable message about the error (if any)
-        errorMessage: String,
         // the amount of gas transaction used
         gasConsumed: UInt64,
         // if transaction was a deployment contains a newly deployed contract address
@@ -61,30 +59,23 @@ contract EVM {
         // block height in which transaction was inclued
         blockHeight: UInt64,
         // block hash in which transaction was included
-        blockHash: String,
-        /// captures the hex encoded data that is returned from
-        /// the evm. For contract deployments
-        /// it returns the code deployed to
-        /// the address provided in the contractAddress field.
-        /// in case of revert, the smart contract custom error message
-        /// is also returned here (see EIP-140 for more details).
-        returnedData: String
+        blockHash: String
     )
 
     access(all)
-    event CadenceOwnedAccountCreated(address: String)
+    event CadenceOwnedAccountCreated(addressBytes: [UInt8; 20])
 
     /// FLOWTokensDeposited is emitted when FLOW tokens is bridged
     /// into the EVM environment. Note that this event is not emitted
     /// for transfer of flow tokens between two EVM addresses.
     access(all)
-    event FLOWTokensDeposited(address: String, amount: UFix64)
+    event FLOWTokensDeposited(addressBytes: [UInt8; 20], amount: UFix64)
 
     /// FLOWTokensWithdrawn is emitted when FLOW tokens are bridged
     /// out of the EVM environment. Note that this event is not emitted
     /// for transfer of flow tokens between two EVM addresses.
     access(all)
-    event FLOWTokensWithdrawn(address: String, amount: UFix64)
+    event FLOWTokensWithdrawn(addressBytes: [UInt8; 20], amount: UFix64)
 
     /// BridgeAccessorUpdated is emitted when the BridgeAccessor Capability
     /// is updated in the stored BridgeRouter along with identifying
@@ -156,7 +147,7 @@ contract EVM {
                 from: <-from,
                 to: self.bytes
             )
-            emit FLOWTokensDeposited(address: self.toString(), amount: amount)
+            emit FLOWTokensDeposited(addressBytes: self.bytes, amount: amount)
         }
 
         /// Serializes the address to a hex string without the 0x prefix
@@ -267,10 +258,6 @@ contract EVM {
         access(all)
         let errorCode: UInt64
 
-        /// error message
-        access(all)
-        let errorMessage: String
-
         /// returns the amount of gas metered during
         /// evm execution
         access(all)
@@ -280,8 +267,6 @@ contract EVM {
         /// the evm for the call. For coa.deploy
         /// calls it returns the code deployed to
         /// the address provided in the contractAddress field.
-        /// in case of revert, the smart contract custom error message
-        /// is also returned here (see EIP-140 for more details).
         access(all)
         let data: [UInt8]
 
@@ -294,14 +279,12 @@ contract EVM {
         init(
             status: Status,
             errorCode: UInt64,
-            errorMessage: String,
             gasUsed: UInt64,
             data: [UInt8],
             contractAddress: [UInt8; 20]?
         ) {
             self.status = status
             self.errorCode = errorCode
-            self.errorMessage = errorMessage
             self.gasUsed = gasUsed
             self.data = data
 
@@ -383,7 +366,7 @@ contract EVM {
                 from: self.addressBytes,
                 amount: balance.attoflow
             ) as! @FlowToken.Vault
-            emit FLOWTokensWithdrawn(address: self.address().toString(), amount: balance.inFLOW())
+            emit FLOWTokensWithdrawn(addressBytes: self.addressBytes, amount: balance.inFLOW())
             return <-vault
         }
 
@@ -482,8 +465,7 @@ contract EVM {
         let acc <-create CadenceOwnedAccount()
         let addr = InternalEVM.createCadenceOwnedAccount(uuid: acc.uuid)
         acc.initAddress(addressBytes: addr)
-
-        emit CadenceOwnedAccountCreated(address: acc.address().toString())
+        emit CadenceOwnedAccountCreated(addressBytes: addr)
         return <-acc
     }
 
@@ -626,20 +608,8 @@ contract EVM {
         // constructing key list
         let keyList = Crypto.KeyList()
         for signature in signatureSet {
-            let keyRef = acc.keys.get(keyIndex: signature.keyIndex)
-            if keyRef == nil {
-                return ValidationResult(
-                    isValid: false,
-                    problem: "invalid key index"
-                )
-            }
-            let key = keyRef!
-            if key.isRevoked {
-                return ValidationResult(
-                    isValid: false,
-                    problem: "account key is revoked"
-                )
-            }
+            let key = acc.keys.get(keyIndex: signature.keyIndex)!
+            assert(!key.isRevoked, message: "revoked key is used")
             keyList.add(
               key.publicKey,
               hashAlgorithm: key.hashAlgorithm,

@@ -50,7 +50,6 @@ import (
 	dkgmodule "github.com/onflow/flow-go/module/dkg"
 	"github.com/onflow/flow-go/module/epochs"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
-	"github.com/onflow/flow-go/module/grpcclient"
 	"github.com/onflow/flow-go/module/mempool"
 	consensusMempools "github.com/onflow/flow-go/module/mempool/consensus"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
@@ -100,7 +99,7 @@ func main() {
 
 		// DKG contract client
 		machineAccountInfo *bootstrap.NodeMachineAccountInfo
-		flowClientConfigs  []*grpcclient.FlowClientConfig
+		flowClientConfigs  []*common.FlowClientConfig
 		insecureAccessAPI  bool
 		accessNodeIDS      []string
 
@@ -409,7 +408,7 @@ func main() {
 				return fmt.Errorf("failed to validate flag --access-node-ids %w", err)
 			}
 
-			flowClientConfigs, err = grpcclient.FlowClientConfigs(anIDS, insecureAccessAPI, node.State.Sealed())
+			flowClientConfigs, err = common.FlowClientConfigs(anIDS, insecureAccessAPI, node.State.Sealed())
 			if err != nil {
 				return fmt.Errorf("failed to prepare flow client connection configs for each access node id %w", err)
 			}
@@ -418,7 +417,7 @@ func main() {
 		}).
 		Component("machine account config validator", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			// @TODO use fallback logic for flowClient similar to DKG/QC contract clients
-			flowClient, err := grpcclient.FlowClient(flowClientConfigs[0])
+			flowClient, err := common.FlowClient(flowClientConfigs[0])
 			if err != nil {
 				return nil, fmt.Errorf("failed to get flow client connection option for access node (0): %s %w", flowClientConfigs[0].AccessAddress, err)
 			}
@@ -717,7 +716,7 @@ func main() {
 		}).
 		Component("consensus participant", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			mutableProtocolState := protocol_state.NewMutableProtocolState(
-				node.Storage.EpochProtocolStateEntries,
+				node.Storage.EpochProtocolState,
 				node.Storage.ProtocolKVStore,
 				node.State.Params(),
 				node.Storage.Headers,
@@ -982,11 +981,11 @@ func createDKGContractClient(node *cmd.NodeConfig, machineAccountInfo *bootstrap
 }
 
 // createDKGContractClients creates an array dkgContractClient that is sorted by retry fallback priority
-func createDKGContractClients(node *cmd.NodeConfig, machineAccountInfo *bootstrap.NodeMachineAccountInfo, flowClientOpts []*grpcclient.FlowClientConfig) ([]module.DKGContractClient, error) {
+func createDKGContractClients(node *cmd.NodeConfig, machineAccountInfo *bootstrap.NodeMachineAccountInfo, flowClientOpts []*common.FlowClientConfig) ([]module.DKGContractClient, error) {
 	dkgClients := make([]module.DKGContractClient, 0)
 
 	for _, opt := range flowClientOpts {
-		flowClient, err := grpcclient.FlowClient(opt)
+		flowClient, err := common.FlowClient(opt)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create flow client for dkg contract client with options: %s %w", flowClientOpts, err)
 		}

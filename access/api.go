@@ -26,7 +26,6 @@ type API interface {
 	GetBlockByID(ctx context.Context, id flow.Identifier) (*flow.Block, flow.BlockStatus, error)
 
 	GetCollectionByID(ctx context.Context, id flow.Identifier) (*flow.LightCollection, error)
-	GetFullCollectionByID(ctx context.Context, id flow.Identifier) (*flow.Collection, error)
 
 	SendTransaction(ctx context.Context, tx *flow.TransactionBody) error
 	GetTransaction(ctx context.Context, id flow.Identifier) (*flow.TransactionBody, error)

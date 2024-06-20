@@ -62,7 +62,7 @@ func run(*cobra.Command, []string) {
 		storageSnapshot,
 	)
 	if err != nil {
-		log.Fatal().Err(err).Msg("failed to run bootstrap procedure")
+		log.Fatal().Err(err)
 	}
 
 	payloads := make([]*ledger.Payload, 0, len(executionSnapshot.WriteSet))
@@ -83,7 +83,7 @@ func run(*cobra.Command, []string) {
 		false,
 	)
 	if err != nil {
-		log.Fatal().Err(err).Msg("failed to create payloads")
+		log.Fatal().Err(err)
 	}
 
 	log.Info().Msgf("wrote %d payloads", numOfPayloadWritten)

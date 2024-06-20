@@ -7,19 +7,19 @@ import (
 	"strings"
 	"time"
 
+	"github.com/onflow/flow-go/integration/benchmark/load"
+
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"gopkg.in/yaml.v3"
-
-	"github.com/prometheus/client_golang/prometheus"
 
 	flowsdk "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go-sdk/access"
 	client "github.com/onflow/flow-go-sdk/access/grpc"
 
 	"github.com/onflow/flow-go/integration/benchmark"
-	"github.com/onflow/flow-go/integration/benchmark/load"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -34,6 +34,7 @@ const (
 	defaultLoadType             = load.TokenTransferLoadType
 	metricport                  = uint(8080)
 	accessNodeAddress           = "127.0.0.1:4001"
+	pushgateway                 = "127.0.0.1:9091"
 	accountMultiplier           = 50
 	feedbackEnabled             = true
 	serviceAccountPrivateKeyHex = unittest.ServiceAccountPrivateKeyHex
@@ -63,7 +64,6 @@ func main() {
 	gitRepoPathFlag := flag.String("git-repo-path", "../..", "git repo path of the filesystem")
 	gitRepoURLFlag := flag.String("git-repo-url", "https://github.com/onflow/flow-go.git", "git repo URL")
 	bigQueryUpload := flag.Bool("bigquery-upload", true, "whether to upload results to BigQuery (true / false)")
-	pushgateway := flag.String("pushgateway", "disabled", "host:port for pushgateway")
 	bigQueryProjectFlag := flag.String("bigquery-project", "dapperlabs-data", "project name for the bigquery uploader")
 	bigQueryDatasetFlag := flag.String("bigquery-dataset", "dev_src_flow_tps_metrics", "dataset name for the bigquery uploader")
 	bigQueryRawTableFlag := flag.String("bigquery-raw-table", "rawResults", "table name for the bigquery raw results")
@@ -92,10 +92,8 @@ func main() {
 	<-server.Ready()
 	loaderMetrics := metrics.NewLoaderCollector()
 
-	if *pushgateway != "disabled" {
-		sp := benchmark.NewStatsPusher(ctx, log, *pushgateway, "loader", prometheus.DefaultGatherer)
-		defer sp.Stop()
-	}
+	sp := benchmark.NewStatsPusher(ctx, log, pushgateway, "loader", prometheus.DefaultGatherer)
+	defer sp.Stop()
 
 	addressGen := flowsdk.NewAddressGenerator(flowsdk.Emulator)
 	serviceAccountAddress := addressGen.NextAddress()
@@ -139,12 +137,6 @@ func main() {
 	statsLogger.Start()
 	defer statsLogger.Stop()
 
-	loadParams := benchmark.LoadParams{
-		NumberOfAccounts: maxInflight,
-		LoadConfig:       loadConfig,
-		FeedbackEnabled:  feedbackEnabled,
-	}
-
 	lg, err := benchmark.New(
 		bCtx,
 		log,
@@ -155,34 +147,38 @@ func main() {
 			ServAccPrivKeyHex: serviceAccountPrivateKeyHex,
 			ChainId:           flow.Emulator,
 		},
-		loadParams,
+		benchmark.LoadParams{
+			NumberOfAccounts: maxInflight,
+			LoadConfig:       loadConfig,
+			FeedbackEnabled:  feedbackEnabled,
+		},
 	)
-
 	if err != nil {
 		log.Fatal().Err(err).Msg("unable to create new cont load generator")
 	}
 
-	adjuster := benchmark.NewTPSAdjuster(
-		ctx,
-		log,
-		lg,
-		workerStatsTracker,
-		benchmark.AdjusterParams{
-			Delay:       *adjustDelayFlag,
-			Interval:    *adjustIntervalFlag,
-			InitialTPS:  uint(loadParams.LoadConfig.TPSInitial),
-			MinTPS:      uint(loadParams.LoadConfig.TpsMin),
-			MaxTPS:      uint(loadParams.LoadConfig.TpsMax),
-			MaxInflight: uint(loadParams.NumberOfAccounts / 2),
-		},
-	)
-	defer adjuster.Stop()
-
-	// start the load with the initial TPS
-	err = lg.SetTPS(uint(loadConfig.TPSInitial))
+	// run load
+	err = lg.SetTPS(uint(*initialTPSFlag))
 	if err != nil {
 		log.Fatal().Err(err).Msg("unable to set tps")
 	}
+
+	adjuster := NewTPSAdjuster(
+		bCtx,
+		log,
+		lg,
+		workerStatsTracker,
+
+		AdjusterParams{
+			Delay:       *adjustDelayFlag,
+			Interval:    *adjustIntervalFlag,
+			InitialTPS:  uint(loadConfig.TPSInitial),
+			MinTPS:      uint(loadConfig.TpsMin),
+			MaxTPS:      uint(loadConfig.TpsMax),
+			MaxInflight: uint(maxInflight / 2),
+		},
+	)
+	defer adjuster.Stop()
 
 	recorder := NewTPSRecorder(bCtx, workerStatsTracker, *statIntervalFlag)
 	defer recorder.Stop()
@@ -197,6 +193,7 @@ func main() {
 	log.Info().Msg("Cancelling benchmark context")
 	bCancel()
 	recorder.Stop()
+	adjuster.Stop()
 
 	log.Info().Msg("Stopping load generator")
 	lg.Stop()

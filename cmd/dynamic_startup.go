@@ -13,7 +13,6 @@ import (
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/grpcclient"
 	"github.com/onflow/flow-go/state/protocol"
 	badgerstate "github.com/onflow/flow-go/state/protocol/badger"
 	utilsio "github.com/onflow/flow-go/utils/io"
@@ -48,59 +47,45 @@ func ValidateDynamicStartupFlags(accessPublicKey, accessAddress string, startPha
 // DynamicStartPreInit is the pre-init func that will check if a node has already bootstrapped
 // from a root protocol snapshot. If not attempt to get a protocol snapshot where the following
 // conditions are met.
-//  1. Target epoch < current epoch (in the past), set root snapshot to current snapshot
-//  2. Target epoch == "current", wait until target phase == current phase before setting root snapshot
-//  3. Target epoch > current epoch (in future), wait until target epoch and target phase is reached before
-//
+// 1. Target epoch < current epoch (in the past), set root snapshot to current snapshot
+// 2. Target epoch == "current", wait until target phase == current phase before setting root snapshot
+// 3. Target epoch > current epoch (in future), wait until target epoch and target phase is reached before
 // setting root snapshot
 func DynamicStartPreInit(nodeConfig *NodeConfig) error {
 	ctx := context.Background()
 
 	log := nodeConfig.Logger.With().Str("component", "dynamic-startup").Logger()
 
-	// CASE 1: The state is already bootstrapped - nothing to do
+	// skip dynamic startup if the protocol state is bootstrapped
 	isBootstrapped, err := badgerstate.IsBootstrapped(nodeConfig.DB)
 	if err != nil {
 		return fmt.Errorf("could not check if state is boostrapped: %w", err)
 	}
 	if isBootstrapped {
-		log.Debug().Msg("protocol state already bootstrapped, skipping dynamic startup")
+		log.Info().Msg("protocol state already bootstrapped, skipping dynamic startup")
 		return nil
 	}
 
-	// CASE 2: The state is not already bootstrapped.
-	// We will either bootstrap from a file or using Dynamic Startup.
+	// skip dynamic startup if a root snapshot file is specified - this takes priority
 	rootSnapshotPath := filepath.Join(nodeConfig.BootstrapDir, bootstrap.PathRootProtocolStateSnapshot)
-	rootSnapshotFileExists := utilsio.FileExists(rootSnapshotPath)
-	dynamicStartupFlagsSet := anyDynamicStartupFlagsAreSet(nodeConfig)
-
-	// If the user has provided both a root snapshot file AND dynamic startup specification, return an error.
-	// Previously, the snapshot file would take precedence over the Dynamic Startup flags.
-	// This caused operators to inadvertently bootstrap from an old snapshot file when attempting to use Dynamic Startup.
-	// Therefore, we instead require the operator to explicitly choose one option or the other.
-	if rootSnapshotFileExists && dynamicStartupFlagsSet {
-		return fmt.Errorf("must specify either a root snapshot file (%s) or Dynamic Startup flags (--dynamic-startup-*) but not both", rootSnapshotPath)
-	}
-
-	// CASE 2.1: Use the root snapshot file to bootstrap.
-	if rootSnapshotFileExists {
-		log.Debug().
+	if utilsio.FileExists(rootSnapshotPath) {
+		log.Info().
 			Str("root_snapshot_path", rootSnapshotPath).
 			Msg("protocol state is not bootstrapped, will bootstrap using configured root snapshot file, skipping dynamic startup")
 		return nil
 	}
 
-	// CASE 2.2: Use Dynamic Startup to bootstrap.
-
 	// get flow client with secure client connection to download protocol snapshot from access node
-	config, err := grpcclient.NewFlowClientConfig(nodeConfig.DynamicStartupANAddress, nodeConfig.DynamicStartupANPubkey, flow.ZeroID, false)
+	config, err := common.NewFlowClientConfig(nodeConfig.DynamicStartupANAddress, nodeConfig.DynamicStartupANPubkey, flow.ZeroID, false)
 	if err != nil {
 		return fmt.Errorf("failed to create flow client config for node dynamic startup pre-init: %w", err)
 	}
-	flowClient, err := grpcclient.FlowClient(config)
+
+	flowClient, err := common.FlowClient(config)
 	if err != nil {
 		return fmt.Errorf("failed to create flow client for node dynamic startup pre-init: %w", err)
 	}
+
 	getSnapshotFunc := func(ctx context.Context) (protocol.Snapshot, error) {
 		return common.GetSnapshot(ctx, flowClient)
 	}
@@ -110,6 +95,7 @@ func DynamicStartPreInit(nodeConfig *NodeConfig) error {
 	if err != nil {
 		return fmt.Errorf("failed to validate flag --dynamic-start-epoch: %w", err)
 	}
+
 	startupPhase := flow.GetEpochPhase(nodeConfig.DynamicStartupEpochPhase)
 
 	// validate the rest of the dynamic startup flags
@@ -133,16 +119,6 @@ func DynamicStartPreInit(nodeConfig *NodeConfig) error {
 	// set the root snapshot in the config - we will use this later to bootstrap
 	nodeConfig.RootSnapshot = snapshot
 	return nil
-}
-
-// anyDynamicStartupFlagsAreSet returns true if either the AN address or AN public key for Dynamic Startup are set.
-// All other Dynamic Startup flags have default values (and aren't required) hence they aren't checked here.
-// Both these flags must be set for Dynamic Startup to occur.
-func anyDynamicStartupFlagsAreSet(config *NodeConfig) bool {
-	if len(config.DynamicStartupANAddress) > 0 || len(config.DynamicStartupANPubkey) > 0 {
-		return true
-	}
-	return false
 }
 
 // validateDynamicStartEpochFlags parse the start epoch flag and return the uin64 value,

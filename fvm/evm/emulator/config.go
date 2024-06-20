@@ -7,7 +7,6 @@ import (
 	gethCommon "github.com/onflow/go-ethereum/common"
 	gethCore "github.com/onflow/go-ethereum/core"
 	gethVM "github.com/onflow/go-ethereum/core/vm"
-	"github.com/onflow/go-ethereum/eth/tracers"
 	gethParams "github.com/onflow/go-ethereum/params"
 
 	"github.com/onflow/flow-go/fvm/evm/types"
@@ -205,14 +204,6 @@ func WithExtraPrecompiles(precompiles []types.Precompile) Option {
 func WithRandom(rand *gethCommon.Hash) Option {
 	return func(c *Config) *Config {
 		c.BlockContext.Random = rand
-		return c
-	}
-}
-
-// WithTransactionTracer sets a transaction tracer
-func WithTransactionTracer(tracer tracers.Tracer) Option {
-	return func(c *Config) *Config {
-		c.EVMConfig.Tracer = tracer
 		return c
 	}
 }

@@ -32,7 +32,6 @@ func ReadTriesRootHash(logger zerolog.Logger, dir string, fileName string) (
 }
 
 var CheckpointHasRootHash = checkpointHasRootHash
-var CheckpointHasSingleRootHash = checkpointHasSingleRootHash
 
 // readCheckpointV6 reads checkpoint file from a main file and 17 file parts.
 // the main file stores:
@@ -723,23 +722,6 @@ func checkpointHasRootHash(logger zerolog.Logger, bootstrapDir, filename string,
 	}
 
 	return fmt.Errorf("could not find expected root hash %v in checkpoint file which contains: %v ", expectedRootHash, roots)
-}
-
-func checkpointHasSingleRootHash(logger zerolog.Logger, bootstrapDir, filename string, expectedRootHash ledger.RootHash) error {
-	roots, err := ReadTriesRootHash(logger, bootstrapDir, filename)
-	if err != nil {
-		return fmt.Errorf("could not read checkpoint root hash: %w", err)
-	}
-
-	if len(roots) != 1 {
-		return fmt.Errorf("expected 1 root hash in checkpoint file, but got %v", len(roots))
-	}
-
-	if roots[0] != expectedRootHash {
-		return fmt.Errorf("expected root hash %v, but got %v", expectedRootHash, roots[0])
-	}
-
-	return nil
 }
 
 func readFileHeader(reader io.Reader) (uint16, uint16, error) {

@@ -82,7 +82,7 @@ type GenericNode struct {
 	Results            storage.ExecutionResults
 	Setups             storage.EpochSetups
 	EpochCommits       storage.EpochCommits
-	EpochProtocolState storage.EpochProtocolStateEntries
+	EpochProtocolState storage.ProtocolState
 	ProtocolKVStore    storage.ProtocolKVStore
 	State              protocol.ParticipantState
 	Index              storage.Index

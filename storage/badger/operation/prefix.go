@@ -46,14 +46,14 @@ const (
 	codeExecutionReceiptMeta = 39 // NOTE: prior to Mainnet25, this erroneously had the same value as codeExecutionResult (36)
 
 	// codes for indexing single identifier by identifier/integer
-	codeHeightToBlock               = 40 // index mapping height to block ID
-	codeBlockIDToLatestSealID       = 41 // index mapping a block its last payload seal
-	codeClusterBlockToRefBlock      = 42 // index cluster block ID to reference block ID
-	codeRefHeightToClusterBlock     = 43 // index reference block height to cluster block IDs
-	codeBlockIDToFinalizedSeal      = 44 // index _finalized_ seal by sealed block ID
-	codeBlockIDToQuorumCertificate  = 45 // index of quorum certificates by block ID
-	codeEpochProtocolStateByBlockID = 46 // index of epoch protocol state entry by block ID
-	codeProtocolKVStoreByBlockID    = 47 // index of protocol KV store entry by block ID
+	codeHeightToBlock              = 40 // index mapping height to block ID
+	codeBlockIDToLatestSealID      = 41 // index mapping a block its last payload seal
+	codeClusterBlockToRefBlock     = 42 // index cluster block ID to reference block ID
+	codeRefHeightToClusterBlock    = 43 // index reference block height to cluster block IDs
+	codeBlockIDToFinalizedSeal     = 44 // index _finalized_ seal by sealed block ID
+	codeBlockIDToQuorumCertificate = 45 // index of quorum certificates by block ID
+	codeProtocolStateByBlockID     = 46 // index of protocol state entry by block ID
+	codeProtocolKVStoreByBlockID   = 47 // index of protocol KV store entry by block ID
 
 	// codes for indexing multiple identifiers by identifier
 	codeBlockChildren          = 50 // index mapping block ID to children blocks
@@ -69,14 +69,14 @@ const (
 	codePayloadProtocolStateID = 60 // index mapping block ID to payload protocol state ID
 
 	// codes related to protocol level information
-	codeEpochSetup         = 61 // EpochSetup service event, keyed by ID
-	codeEpochCommit        = 62 // EpochCommit service event, keyed by ID
-	codeBeaconPrivateKey   = 63 // BeaconPrivateKey, keyed by epoch counter
-	codeDKGStarted         = 64 // flag that the DKG for an epoch has been started
-	codeDKGEnded           = 65 // flag that the DKG for an epoch has ended (stores end state)
-	codeVersionBeacon      = 67 // flag for storing version beacons
-	codeEpochProtocolState = 68
-	codeProtocolKVStore    = 69
+	codeEpochSetup       = 61 // EpochSetup service event, keyed by ID
+	codeEpochCommit      = 62 // EpochCommit service event, keyed by ID
+	codeBeaconPrivateKey = 63 // BeaconPrivateKey, keyed by epoch counter
+	codeDKGStarted       = 64 // flag that the DKG for an epoch has been started
+	codeDKGEnded         = 65 // flag that the DKG for an epoch has ended (stores end state)
+	codeVersionBeacon    = 67 // flag for storing version beacons
+	codeProtocolState    = 68
+	codeProtocolKVStore  = 69
 
 	// code for ComputationResult upload status storage
 	// NOTE: for now only GCP uploader is supported. When other uploader (AWS e.g.) needs to

@@ -17,7 +17,6 @@ import (
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/grpcclient"
 )
 
 const (
@@ -118,12 +117,12 @@ func getFlowClient() *client.Client {
 		insecureClient = false
 	}
 
-	config, err := grpcclient.NewFlowClientConfig(flagANAddress, strings.TrimPrefix(flagANNetworkKey, "0x"), flow.ZeroID, insecureClient)
+	config, err := common.NewFlowClientConfig(flagANAddress, strings.TrimPrefix(flagANNetworkKey, "0x"), flow.ZeroID, insecureClient)
 	if err != nil {
 		log.Fatal().Err(err).Msgf("could not get flow client config with address (%s) and network key (%s)", flagANAddress, flagANNetworkKey)
 	}
 
-	flowClient, err := grpcclient.FlowClient(config)
+	flowClient, err := common.FlowClient(config)
 	if err != nil {
 		log.Fatal().Err(err).Msgf("could not get flow client with address (%s) and network key (%s)", flagANAddress, flagANNetworkKey)
 	}

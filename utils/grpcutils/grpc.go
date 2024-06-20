@@ -111,7 +111,6 @@ func DefaultClientTLSConfig(publicKey crypto.PublicKey) (*tls.Config, error) {
 	config := &tls.Config{
 		MinVersion: tls.VersionTLS13,
 		// This is not insecure here. We will verify the cert chain ourselves.
-		// nolint
 		InsecureSkipVerify: true,
 		ClientAuth:         tls.RequireAnyClientCert,
 	}

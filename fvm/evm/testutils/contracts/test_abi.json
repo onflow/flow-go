@@ -5,22 +5,6 @@
 		"type": "constructor"
 	},
 	{
-		"inputs": [
-			{
-				"internalType": "uint256",
-				"name": "value",
-				"type": "uint256"
-			},
-			{
-				"internalType": "string",
-				"name": "message",
-				"type": "string"
-			}
-		],
-		"name": "MyCustomError",
-		"type": "error"
-	},
-	{
 		"anonymous": false,
 		"inputs": [
 			{
@@ -38,13 +22,6 @@
 		],
 		"name": "NewStore",
 		"type": "event"
-	},
-	{
-		"inputs": [],
-		"name": "assertError",
-		"outputs": [],
-		"stateMutability": "pure",
-		"type": "function"
 	},
 	{
 		"inputs": [
@@ -115,13 +92,6 @@
 			}
 		],
 		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "customError",
-		"outputs": [],
-		"stateMutability": "pure",
 		"type": "function"
 	},
 	{
@@ -224,19 +194,6 @@
 			}
 		],
 		"name": "verifyArchCallToRandomSource",
-		"outputs": [
-			{
-				"internalType": "uint64",
-				"name": "",
-				"type": "uint64"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "verifyArchCallToRevertibleRandom",
 		"outputs": [
 			{
 				"internalType": "uint64",

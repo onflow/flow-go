@@ -12,28 +12,28 @@ import (
 )
 
 // TestInsertProtocolState tests if basic badger operations on EpochProtocolState work as expected.
-func TestInsertEpochProtocolState(t *testing.T) {
+func TestInsertProtocolState(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		expected := unittest.EpochStateFixture().EpochProtocolStateEntry
+		expected := unittest.EpochStateFixture().ProtocolStateEntry
 
-		epochProtocolStateEntryID := expected.ID()
-		err := db.Update(InsertEpochProtocolState(epochProtocolStateEntryID, expected))
+		protocolStateID := expected.ID()
+		err := db.Update(InsertProtocolState(protocolStateID, expected))
 		require.Nil(t, err)
 
-		var actual flow.EpochProtocolStateEntry
-		err = db.View(RetrieveEpochProtocolState(epochProtocolStateEntryID, &actual))
+		var actual flow.ProtocolStateEntry
+		err = db.View(RetrieveProtocolState(protocolStateID, &actual))
 		require.Nil(t, err)
 
 		assert.Equal(t, expected, &actual)
 
 		blockID := unittest.IdentifierFixture()
-		err = db.Update(IndexEpochProtocolState(blockID, epochProtocolStateEntryID))
+		err = db.Update(IndexProtocolState(blockID, protocolStateID))
 		require.Nil(t, err)
 
 		var actualProtocolStateID flow.Identifier
-		err = db.View(LookupEpochProtocolState(blockID, &actualProtocolStateID))
+		err = db.View(LookupProtocolState(blockID, &actualProtocolStateID))
 		require.Nil(t, err)
 
-		assert.Equal(t, epochProtocolStateEntryID, actualProtocolStateID)
+		assert.Equal(t, protocolStateID, actualProtocolStateID)
 	})
 }

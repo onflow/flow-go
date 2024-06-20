@@ -1181,30 +1181,30 @@ func (fnb *FlowNodeBuilder) initStorage() error {
 	setups := bstorage.NewEpochSetups(fnb.Metrics.Cache, fnb.DB)
 	epochCommits := bstorage.NewEpochCommits(fnb.Metrics.Cache, fnb.DB)
 	commits := bstorage.NewCommits(fnb.Metrics.Cache, fnb.DB)
-	protocolState := bstorage.NewEpochProtocolStateEntries(fnb.Metrics.Cache, setups, epochCommits, fnb.DB,
-		bstorage.DefaultEpochProtocolStateCacheSize, bstorage.DefaultProtocolStateIndexCacheSize)
+	protocolState := bstorage.NewProtocolState(fnb.Metrics.Cache, setups, epochCommits, fnb.DB,
+		bstorage.DefaultProtocolStateCacheSize, bstorage.DefaultProtocolStateByBlockIDCacheSize)
 	protocolKVStores := bstorage.NewProtocolKVStore(fnb.Metrics.Cache, fnb.DB,
 		bstorage.DefaultProtocolKVStoreCacheSize, bstorage.DefaultProtocolKVStoreByBlockIDCacheSize)
 	versionBeacons := bstorage.NewVersionBeacons(fnb.DB)
 
 	fnb.Storage = Storage{
-		Headers:                   headers,
-		Guarantees:                guarantees,
-		Receipts:                  receipts,
-		Results:                   results,
-		Seals:                     seals,
-		Index:                     index,
-		Payloads:                  payloads,
-		Blocks:                    blocks,
-		QuorumCertificates:        qcs,
-		Transactions:              transactions,
-		Collections:               collections,
-		Setups:                    setups,
-		EpochCommits:              epochCommits,
-		VersionBeacons:            versionBeacons,
-		EpochProtocolStateEntries: protocolState,
-		ProtocolKVStore:           protocolKVStores,
-		Commits:                   commits,
+		Headers:            headers,
+		Guarantees:         guarantees,
+		Receipts:           receipts,
+		Results:            results,
+		Seals:              seals,
+		Index:              index,
+		Payloads:           payloads,
+		Blocks:             blocks,
+		QuorumCertificates: qcs,
+		Transactions:       transactions,
+		Collections:        collections,
+		Setups:             setups,
+		EpochCommits:       epochCommits,
+		VersionBeacons:     versionBeacons,
+		EpochProtocolState: protocolState,
+		ProtocolKVStore:    protocolKVStores,
+		Commits:            commits,
 	}
 
 	return nil
@@ -1293,7 +1293,7 @@ func (fnb *FlowNodeBuilder) initState() error {
 			fnb.Storage.QuorumCertificates,
 			fnb.Storage.Setups,
 			fnb.Storage.EpochCommits,
-			fnb.Storage.EpochProtocolStateEntries,
+			fnb.Storage.EpochProtocolState,
 			fnb.Storage.ProtocolKVStore,
 			fnb.Storage.VersionBeacons,
 		)
@@ -1342,7 +1342,7 @@ func (fnb *FlowNodeBuilder) initState() error {
 			fnb.Storage.QuorumCertificates,
 			fnb.Storage.Setups,
 			fnb.Storage.EpochCommits,
-			fnb.Storage.EpochProtocolStateEntries,
+			fnb.Storage.EpochProtocolState,
 			fnb.Storage.ProtocolKVStore,
 			fnb.Storage.VersionBeacons,
 			fnb.RootSnapshot,

@@ -406,22 +406,10 @@ func TestExtractPayloadsFromExecutionState(t *testing.T) {
 			// Verify exported payloads.
 			partialState, payloadsFromFile, err := util.ReadPayloadFile(zerolog.Nop(), outputPayloadFileName)
 			require.NoError(t, err)
+			require.Equal(t, len(selectedKeysValues), len(payloadsFromFile))
 			require.True(t, partialState)
 
-			nonGlobalPayloads := make([]*ledger.Payload, 0, len(selectedKeysValues))
 			for _, payloadFromFile := range payloadsFromFile {
-				key, err := payloadFromFile.Key()
-				require.NoError(t, err)
-
-				owner := key.KeyParts[0].Value
-				if len(owner) > 0 {
-					nonGlobalPayloads = append(nonGlobalPayloads, payloadFromFile)
-				}
-			}
-
-			require.Equal(t, len(selectedKeysValues), len(nonGlobalPayloads))
-
-			for _, payloadFromFile := range nonGlobalPayloads {
 				k, err := payloadFromFile.Key()
 				require.NoError(t, err)
 

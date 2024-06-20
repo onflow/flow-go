@@ -20,14 +20,14 @@ func IsValidRootSnapshot(snap protocol.Snapshot, verifyResultID bool) error {
 	if err != nil {
 		return fmt.Errorf("could not get sealing segment: %w", err)
 	}
-	err = segment.Validate()
-	if err != nil {
-		return fmt.Errorf("invalid root sealing segment: %w", err)
-	}
-
 	result, seal, err := snap.SealedResult()
 	if err != nil {
 		return fmt.Errorf("could not latest sealed result: %w", err)
+	}
+
+	err = segment.Validate()
+	if err != nil {
+		return fmt.Errorf("invalid root sealing segment: %w", err)
 	}
 
 	highest := segment.Highest() // reference block of the snapshot

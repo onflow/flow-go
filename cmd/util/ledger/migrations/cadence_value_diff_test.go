@@ -34,8 +34,8 @@ func TestDiffCadenceValues(t *testing.T) {
 		diffReporter := NewCadenceValueDiffReporter(address, flow.Emulator, writer, true, runtime.NumCPU())
 
 		diffReporter.DiffStates(
-			createTestRegisters(t, address, domain),
-			createTestRegisters(t, address, domain),
+			createTestPayloads(t, address, domain),
+			createTestPayloads(t, address, domain),
 			[]string{domain},
 		)
 		require.NoError(t, err)
@@ -50,8 +50,8 @@ func TestDiffCadenceValues(t *testing.T) {
 		diffReporter := NewCadenceValueDiffReporter(address, flow.Emulator, writer, true, runtime.NumCPU())
 
 		diffReporter.DiffStates(
-			createTestRegisters(t, address, domain),
-			registers.NewByAccount(),
+			createTestPayloads(t, address, domain),
+			nil,
 			[]string{domain},
 		)
 		require.NoError(t, err)
@@ -71,8 +71,8 @@ func TestDiffCadenceValues(t *testing.T) {
 		diffReporter := NewCadenceValueDiffReporter(address, flow.Emulator, writer, true, runtime.NumCPU())
 
 		diffReporter.DiffStates(
-			createTestRegisters(t, address, domain),
-			createStorageMapRegisters(t, address, domain, []string{"unique_key"}, []interpreter.Value{interpreter.UInt64Value(0)}),
+			createTestPayloads(t, address, domain),
+			createStorageMapPayloads(t, address, domain, []string{"unique_key"}, []interpreter.Value{interpreter.UInt64Value(0)}),
 			[]string{domain},
 		)
 		require.NoError(t, err)
@@ -98,8 +98,8 @@ func TestDiffCadenceValues(t *testing.T) {
 		diffReporter := NewCadenceValueDiffReporter(address, flow.Emulator, writer, true, runtime.NumCPU())
 
 		diffReporter.DiffStates(
-			createStorageMapRegisters(t, address, domain, []string{"0", "1"}, []interpreter.Value{interpreter.UInt64Value(0), interpreter.UInt64Value(0)}),
-			createStorageMapRegisters(t, address, domain, []string{"2", "0"}, []interpreter.Value{interpreter.UInt64Value(0), interpreter.UInt64Value(0)}),
+			createStorageMapPayloads(t, address, domain, []string{"0", "1"}, []interpreter.Value{interpreter.UInt64Value(0), interpreter.UInt64Value(0)}),
+			createStorageMapPayloads(t, address, domain, []string{"2", "0"}, []interpreter.Value{interpreter.UInt64Value(0), interpreter.UInt64Value(0)}),
 			[]string{domain},
 		)
 		require.NoError(t, err)
@@ -125,8 +125,8 @@ func TestDiffCadenceValues(t *testing.T) {
 		diffReporter := NewCadenceValueDiffReporter(address, flow.Emulator, writer, false, runtime.NumCPU())
 
 		diffReporter.DiffStates(
-			createStorageMapRegisters(t, address, domain, []string{"0", "1"}, []interpreter.Value{interpreter.UInt64Value(100), interpreter.UInt64Value(101)}),
-			createStorageMapRegisters(t, address, domain, []string{"0", "1"}, []interpreter.Value{interpreter.UInt64Value(111), interpreter.UInt64Value(101)}),
+			createStorageMapPayloads(t, address, domain, []string{"0", "1"}, []interpreter.Value{interpreter.UInt64Value(100), interpreter.UInt64Value(101)}),
+			createStorageMapPayloads(t, address, domain, []string{"0", "1"}, []interpreter.Value{interpreter.UInt64Value(111), interpreter.UInt64Value(101)}),
 			[]string{domain},
 		)
 		require.NoError(t, err)
@@ -152,8 +152,8 @@ func TestDiffCadenceValues(t *testing.T) {
 		diffReporter := NewCadenceValueDiffReporter(address, flow.Emulator, writer, false, runtime.NumCPU())
 
 		diffReporter.DiffStates(
-			createStorageMapRegisters(t, address, domain, []string{"0", "1"}, []interpreter.Value{interpreter.UInt64Value(100), interpreter.UInt64Value(101)}),
-			createStorageMapRegisters(t, address, domain, []string{"0", "1"}, []interpreter.Value{interpreter.UInt64Value(111), interpreter.UInt64Value(102)}),
+			createStorageMapPayloads(t, address, domain, []string{"0", "1"}, []interpreter.Value{interpreter.UInt64Value(100), interpreter.UInt64Value(101)}),
+			createStorageMapPayloads(t, address, domain, []string{"0", "1"}, []interpreter.Value{interpreter.UInt64Value(111), interpreter.UInt64Value(102)}),
 			[]string{domain},
 		)
 		require.NoError(t, err)
@@ -177,7 +177,7 @@ func TestDiffCadenceValues(t *testing.T) {
 
 		diffReporter := NewCadenceValueDiffReporter(address, flow.Emulator, writer, false, runtime.NumCPU())
 
-		createRegisters := func(arrayValues []interpreter.Value) registers.Registers {
+		createPayloads := func(arrayValues []interpreter.Value) []*ledger.Payload {
 
 			// Create account status payload
 			accountStatus := environment.NewAccountStatus()
@@ -243,23 +243,12 @@ func TestDiffCadenceValues(t *testing.T) {
 				payloads = append(payloads, ledger.NewPayload(key, value))
 			}
 
-			registers, err := registers.NewByAccountFromPayloads(payloads)
-			require.NoError(t, err)
-
-			return registers
+			return payloads
 		}
 
 		diffReporter.DiffStates(
-			createRegisters([]interpreter.Value{
-				interpreter.UInt64Value(0),
-				interpreter.UInt64Value(2),
-				interpreter.UInt64Value(4),
-			}),
-			createRegisters([]interpreter.Value{
-				interpreter.UInt64Value(1),
-				interpreter.UInt64Value(3),
-				interpreter.UInt64Value(5),
-			}),
+			createPayloads([]interpreter.Value{interpreter.UInt64Value(0), interpreter.UInt64Value(2), interpreter.UInt64Value(4)}),
+			createPayloads([]interpreter.Value{interpreter.UInt64Value(1), interpreter.UInt64Value(3), interpreter.UInt64Value(5)}),
 			[]string{domain},
 		)
 		require.NoError(t, err)
@@ -298,7 +287,7 @@ func TestDiffCadenceValues(t *testing.T) {
 
 		diffReporter := NewCadenceValueDiffReporter(address, flow.Emulator, writer, false, runtime.NumCPU())
 
-		createRegisters := func(dictValues []interpreter.Value) registers.Registers {
+		createPayloads := func(dictValues []interpreter.Value) []*ledger.Payload {
 
 			// Create account status payload
 			accountStatus := environment.NewAccountStatus()
@@ -365,20 +354,17 @@ func TestDiffCadenceValues(t *testing.T) {
 				payloads = append(payloads, ledger.NewPayload(key, value))
 			}
 
-			registers, err := registers.NewByAccountFromPayloads(payloads)
-			require.NoError(t, err)
-
-			return registers
+			return payloads
 		}
 
 		diffReporter.DiffStates(
-			createRegisters(
+			createPayloads(
 				[]interpreter.Value{interpreter.NewUnmeteredStringValue("dict_key_0"),
 					interpreter.UInt64Value(0),
 					interpreter.NewUnmeteredStringValue("dict_key_1"),
 					interpreter.UInt64Value(2),
 				}),
-			createRegisters(
+			createPayloads(
 				[]interpreter.Value{interpreter.NewUnmeteredStringValue("dict_key_0"),
 					interpreter.UInt64Value(1),
 					interpreter.NewUnmeteredStringValue("dict_key_1"),
@@ -418,7 +404,7 @@ func TestDiffCadenceValues(t *testing.T) {
 
 		diffReporter := NewCadenceValueDiffReporter(address, flow.Emulator, writer, false, runtime.NumCPU())
 
-		createRegisters := func(compositeFields []string, compositeValues []interpreter.Value) registers.Registers {
+		createPayloads := func(compositeFields []string, compositeValues []interpreter.Value) []*ledger.Payload {
 
 			// Create account status payload
 			accountStatus := environment.NewAccountStatus()
@@ -490,14 +476,11 @@ func TestDiffCadenceValues(t *testing.T) {
 				payloads = append(payloads, ledger.NewPayload(key, value))
 			}
 
-			registers, err := registers.NewByAccountFromPayloads(payloads)
-			require.NoError(t, err)
-
-			return registers
+			return payloads
 		}
 
 		diffReporter.DiffStates(
-			createRegisters(
+			createPayloads(
 				[]string{
 					"Field_0",
 					"Field_1",
@@ -506,7 +489,7 @@ func TestDiffCadenceValues(t *testing.T) {
 					interpreter.UInt64Value(0),
 					interpreter.UInt64Value(2),
 				}),
-			createRegisters(
+			createPayloads(
 				[]string{
 					"Field_0",
 					"Field_1",
@@ -549,7 +532,7 @@ func TestDiffCadenceValues(t *testing.T) {
 
 		diffReporter := NewCadenceValueDiffReporter(address, flow.Emulator, writer, true, runtime.NumCPU())
 
-		createRegisters := func(compositeFields []string, compositeValues []interpreter.Value) registers.Registers {
+		createPayloads := func(compositeFields []string, compositeValues []interpreter.Value) []*ledger.Payload {
 
 			// Create account status payload
 			accountStatus := environment.NewAccountStatus()
@@ -621,14 +604,11 @@ func TestDiffCadenceValues(t *testing.T) {
 				payloads = append(payloads, ledger.NewPayload(key, value))
 			}
 
-			registers, err := registers.NewByAccountFromPayloads(payloads)
-			require.NoError(t, err)
-
-			return registers
+			return payloads
 		}
 
 		diffReporter.DiffStates(
-			createRegisters(
+			createPayloads(
 				[]string{
 					"Field_0",
 					"Field_1",
@@ -637,7 +617,7 @@ func TestDiffCadenceValues(t *testing.T) {
 					interpreter.UInt64Value(0),
 					interpreter.UInt64Value(2),
 				}),
-			createRegisters(
+			createPayloads(
 				[]string{
 					"Field_0",
 					"Field_1",
@@ -685,13 +665,7 @@ func TestDiffCadenceValues(t *testing.T) {
 	})
 }
 
-func createStorageMapRegisters(
-	t *testing.T,
-	address common.Address,
-	domain string,
-	keys []string,
-	values []interpreter.Value,
-) registers.Registers {
+func createStorageMapPayloads(t *testing.T, address common.Address, domain string, keys []string, values []interpreter.Value) []*ledger.Payload {
 
 	// Create account status payload
 	accountStatus := environment.NewAccountStatus()
@@ -741,13 +715,10 @@ func createStorageMapRegisters(
 		payloads = append(payloads, ledger.NewPayload(key, value))
 	}
 
-	registers, err := registers.NewByAccountFromPayloads(payloads)
-	require.NoError(t, err)
-
-	return registers
+	return payloads
 }
 
-func createTestRegisters(t *testing.T, address common.Address, domain string) registers.Registers {
+func createTestPayloads(t *testing.T, address common.Address, domain string) []*ledger.Payload {
 
 	// Create account status payload
 	accountStatus := environment.NewAccountStatus()
@@ -893,8 +864,5 @@ func createTestRegisters(t *testing.T, address common.Address, domain string) re
 		payloads = append(payloads, ledger.NewPayload(key, value))
 	}
 
-	registers, err := registers.NewByAccountFromPayloads(payloads)
-	require.NoError(t, err)
-
-	return registers
+	return payloads
 }

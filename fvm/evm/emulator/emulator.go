@@ -46,7 +46,6 @@ func newConfig(ctx types.BlockContext) *Config {
 		WithExtraPrecompiles(ctx.ExtraPrecompiles),
 		WithGetBlockHashFunction(ctx.GetHashFunc),
 		WithRandom(&ctx.Random),
-		WithTransactionTracer(ctx.Tracer),
 	)
 }
 
@@ -234,17 +233,7 @@ func (bl *BlockView) DryRunTransaction(
 	msg.SkipAccountChecks = true
 
 	// return without commiting the state
-	txResult, err := proc.run(msg, tx.Hash(), 0, tx.Type())
-	if txResult.Successful() {
-		// Adding `gethParams.SstoreSentryGasEIP2200` is needed for this condition:
-		// https://github.com/onflow/go-ethereum/blob/master/core/vm/operations_acl.go#L29-L32
-		txResult.GasConsumed += gethParams.SstoreSentryGasEIP2200
-		// Take into account any gas refunds, which are calculated only after
-		// transaction execution.
-		txResult.GasConsumed += txResult.GasRefund
-	}
-
-	return txResult, err
+	return proc.run(msg, tx.Hash(), 0, tx.Type())
 }
 
 func (bl *BlockView) newProcedure() (*procedure, error) {
@@ -413,14 +402,6 @@ func (proc *procedure) deployAt(
 		)
 	}
 
-	if tracer := proc.evm.Config.Tracer; tracer != nil {
-		tracer.CaptureStart(proc.evm, caller.ToCommon(), to.ToCommon(), true, data, gasLimit, value)
-
-		defer func() {
-			tracer.CaptureEnd(res.ReturnedData, res.GasConsumed, res.VMError)
-		}()
-	}
-
 	// run code through interpreter
 	// this would check for errors and computes the final bytes to be stored under account
 	var err error
@@ -532,13 +513,10 @@ func (proc *procedure) run(
 	// if prechecks are passed, the exec result won't be nil
 	if execResult != nil {
 		res.GasConsumed = execResult.UsedGas
-		res.GasRefund = proc.state.GetRefund()
 		res.Index = uint16(txIndex)
-		// we need to capture the returned value no matter the status
-		// if the tx is reverted the error message is returned as returned value
-		res.ReturnedData = execResult.ReturnData
 
 		if !execResult.Failed() { // collect vm errors
+			res.ReturnedValue = execResult.ReturnData
 			// If the transaction created a contract, store the creation address in the receipt,
 			if msg.To == nil {
 				deployedAddress := types.NewAddress(gethCrypto.CreateAddress(msg.From, msg.Nonce))

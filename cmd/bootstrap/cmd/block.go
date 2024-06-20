@@ -34,7 +34,7 @@ func constructRootBlock(rootHeader *flow.Header, setup *flow.EpochSetup, commit 
 		Receipts:   nil,
 		Results:    nil,
 		// TODO: shortcut in bootstrapping; we will probably have to start with a non-empty KV store in the future
-		ProtocolStateID: kvstore.NewDefaultKVStore(inmem.EpochProtocolStateFromServiceEvents(setup, commit).ID()).ID(),
+		ProtocolStateID: kvstore.NewDefaultKVStore(inmem.ProtocolStateFromEpochServiceEvents(setup, commit).ID()).ID(),
 	})
 	return block
 }

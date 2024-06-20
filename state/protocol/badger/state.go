@@ -38,11 +38,11 @@ type State struct {
 		setups  storage.EpochSetups
 		commits storage.EpochCommits
 	}
-	params                      protocol.Params
-	protocolKVStoreSnapshotsDB  storage.ProtocolKVStore
-	epochProtocolStateEntriesDB storage.EpochProtocolStateEntries // TODO remove when EpochProtocolStateEntry is stored in KVStore
-	protocolState               protocol.MutableProtocolState
-	versionBeacons              storage.VersionBeacons
+	params                     protocol.Params
+	protocolKVStoreSnapshotsDB storage.ProtocolKVStore
+	protocolStateSnapshotsDB   storage.ProtocolState // TODO remove when ProtocolStateEntry is stored in KVStore
+	protocolState              protocol.MutableProtocolState
+	versionBeacons             storage.VersionBeacons
 
 	// finalizedRootHeight marks the cutoff of the history this node knows about. We cache it in the state
 	// because it cannot change over the lifecycle of a protocol state instance. It is frequently
@@ -95,7 +95,7 @@ func Bootstrap(
 	qcs storage.QuorumCertificates,
 	setups storage.EpochSetups,
 	commits storage.EpochCommits,
-	epochProtocolStateSnapshots storage.EpochProtocolStateEntries,
+	epochProtocolStateSnapshots storage.ProtocolState,
 	protocolKVStoreSnapshots storage.ProtocolKVStore,
 	versionBeacons storage.VersionBeacons,
 	root protocol.Snapshot,
@@ -237,7 +237,7 @@ func Bootstrap(
 func bootstrapProtocolState(
 	segment *flow.SealingSegment,
 	params protocol.GlobalParams,
-	epochProtocolStateSnapshots storage.EpochProtocolStateEntries,
+	epochProtocolStateSnapshots storage.ProtocolState,
 	protocolKVStoreSnapshots storage.ProtocolKVStore,
 	epochSetups storage.EpochSetups,
 	epochCommits storage.EpochCommits,
@@ -253,7 +253,7 @@ func bootstrapProtocolState(
 			}
 
 			// Store the epoch portion of the protocol state, including underlying EpochSetup/EpochCommit service events
-			dynamicEpochProtocolState := inmem.NewEpochProtocolStateAdapter(stateEntry.EpochEntry, params)
+			dynamicEpochProtocolState := inmem.NewDynamicProtocolStateAdapter(stateEntry.EpochEntry, params)
 			err = bootstrapEpochForProtocolStateEntry(epochProtocolStateSnapshots, epochSetups, epochCommits, dynamicEpochProtocolState, verifyNetworkAddress)(tx)
 			if err != nil {
 				return fmt.Errorf("could not store epoch service events for state entry (id=%x): %w", stateEntry.EpochEntry.ID(), err)
@@ -484,10 +484,10 @@ func bootstrapStatePointers(root protocol.Snapshot) func(*transaction.Tx) error 
 // epoch information (service events) they reference, which case duplicate writes of
 // the same data are ignored.
 func bootstrapEpochForProtocolStateEntry(
-	epochProtocolStateSnapshots storage.EpochProtocolStateEntries,
+	epochProtocolStateSnapshots storage.ProtocolState,
 	epochSetups storage.EpochSetups,
 	epochCommits storage.EpochCommits,
-	epochProtocolStateEntry protocol.EpochProtocolState,
+	epochProtocolStateEntry protocol.DynamicProtocolState,
 	verifyNetworkAddress bool,
 ) func(*transaction.Tx) error {
 	return func(tx *transaction.Tx) error {
@@ -562,7 +562,7 @@ func bootstrapEpochForProtocolStateEntry(
 		}
 
 		// insert epoch protocol state entry, which references above service events
-		err := operation.SkipDuplicatesTx(epochProtocolStateSnapshots.StoreTx(richEntry.ID(), richEntry.EpochProtocolStateEntry))(tx)
+		err := operation.SkipDuplicatesTx(epochProtocolStateSnapshots.StoreTx(richEntry.ID(), richEntry.ProtocolStateEntry))(tx)
 		if err != nil {
 			return fmt.Errorf("could not store epoch protocol state entry: %w", err)
 		}
@@ -655,7 +655,7 @@ func OpenState(
 	qcs storage.QuorumCertificates,
 	setups storage.EpochSetups,
 	commits storage.EpochCommits,
-	epochProtocolState storage.EpochProtocolStateEntries,
+	epochProtocolState storage.ProtocolState,
 	protocolKVStoreSnapshots storage.ProtocolKVStore,
 	versionBeacons storage.VersionBeacons,
 ) (*State, error) {
@@ -712,12 +712,13 @@ func OpenState(
 	}
 	metrics.SealedHeight(sealed.Height)
 
-	// initialize epoch-related metrics using the Protocol State from the latest finalized block
-	epochStateSnapshot, err := finalSnapshot.EpochProtocolState()
+	epochFallbackTriggered, err := state.isEpochEmergencyFallbackTriggered()
 	if err != nil {
-		return nil, fmt.Errorf("could not retrieve epoch protocol state: %w", err)
+		return nil, fmt.Errorf("could not check epoch emergency fallback flag: %w", err)
 	}
-	err = updateEpochMetrics(metrics, finalSnapshot, epochStateSnapshot.EpochFallbackTriggered())
+
+	// update all epoch related metrics
+	err = updateEpochMetrics(metrics, finalSnapshot, epochFallbackTriggered)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update epoch metrics: %w", err)
 	}
@@ -800,7 +801,7 @@ func newState(
 	qcs storage.QuorumCertificates,
 	setups storage.EpochSetups,
 	commits storage.EpochCommits,
-	epochProtocolStateSnapshots storage.EpochProtocolStateEntries,
+	epochProtocolStateSnapshots storage.ProtocolState,
 	protocolKVStoreSnapshots storage.ProtocolKVStore,
 	versionBeacons storage.VersionBeacons,
 	params protocol.Params,
@@ -820,9 +821,9 @@ func newState(
 			setups:  setups,
 			commits: commits,
 		},
-		params:                      params,
-		protocolKVStoreSnapshotsDB:  protocolKVStoreSnapshots,
-		epochProtocolStateEntriesDB: epochProtocolStateSnapshots,
+		params:                     params,
+		protocolKVStoreSnapshotsDB: protocolKVStoreSnapshots,
+		protocolStateSnapshotsDB:   epochProtocolStateSnapshots,
 		protocolState: protocol_state.
 			NewMutableProtocolState(
 				epochProtocolStateSnapshots,
@@ -967,4 +968,15 @@ func (state *State) populateCache() error {
 	}
 
 	return nil
+}
+
+// isEpochEmergencyFallbackTriggered checks whether epoch fallback has been globally triggered.
+// Returns:
+// * (true, nil) if epoch fallback is triggered
+// * (false, nil) if epoch fallback is not triggered (including if the flag is not set)
+// * (false, err) if an unexpected error occurs
+func (state *State) isEpochEmergencyFallbackTriggered() (bool, error) {
+	var triggered bool
+	err := state.db.View(operation.CheckEpochEmergencyFallbackTriggered(&triggered))
+	return triggered, err
 }

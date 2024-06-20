@@ -34,7 +34,6 @@ type Machine struct {
 }
 
 type CollectionRequester interface {
-	module.ReadyDoneAware
 	WithHandle(requester.HandleFunc)
 }
 
@@ -85,7 +84,6 @@ func NewMachine(
 		e,
 		collectionFetcher,
 		e,
-		metrics,
 	)
 
 	if err != nil {

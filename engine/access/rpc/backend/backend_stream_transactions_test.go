@@ -66,7 +66,6 @@ type TransactionStatusSuite struct {
 	communicator      *backendmock.Communicator
 	blockTracker      *subscriptionmock.BlockTracker
 	reporter          *syncmock.IndexReporter
-	indexReporter     *index.Reporter
 
 	chainID flow.ChainID
 
@@ -149,9 +148,6 @@ func (s *TransactionStatusSuite) SetupTest() {
 	}
 
 	s.reporter = syncmock.NewIndexReporter(s.T())
-	s.indexReporter = index.NewReporter()
-	err = s.indexReporter.Initialize(s.reporter)
-	require.NoError(s.T(), err)
 
 	s.blocks.On("ByHeight", mock.AnythingOfType("uint64")).Return(mocks.StorageMapGetter(s.blockMap))
 	s.state.On("Final").Return(s.finalSnapshot, nil)
@@ -185,6 +181,11 @@ func (s *TransactionStatusSuite) SetupTest() {
 	}, nil)
 
 	backendParams := s.backendParams()
+	err = backendParams.EventsIndex.Initialize(s.reporter)
+	require.NoError(s.T(), err)
+	err = backendParams.TxResultsIndex.Initialize(s.reporter)
+	require.NoError(s.T(), err)
+
 	s.backend, err = New(backendParams)
 	require.NoError(s.T(), err)
 }
@@ -221,10 +222,10 @@ func (s *TransactionStatusSuite) backendParams() Params {
 			subscription.DefaultResponseLimit,
 			subscription.DefaultSendBufferSize,
 		),
-		TxResultsIndex:      index.NewTransactionResultsIndex(s.indexReporter, s.transactionResults),
+		TxResultsIndex:      index.NewTransactionResultsIndex(s.transactionResults),
 		EventQueryMode:      IndexQueryModeLocalOnly,
 		TxResultQueryMode:   IndexQueryModeLocalOnly,
-		EventsIndex:         index.NewEventsIndex(s.indexReporter, s.events),
+		EventsIndex:         index.NewEventsIndex(s.events),
 		LastFullBlockHeight: s.lastFullBlockHeight,
 	}
 }

@@ -1,11 +1,9 @@
 package flow
 
 import (
-	"fmt"
 	"log"
 
 	"github.com/ipfs/go-cid"
-	"github.com/vmihailenco/msgpack/v4"
 )
 
 var EmptyEventCollectionID Identifier
@@ -204,66 +202,4 @@ type BlockExecutionDataRoot struct {
 	// ChunkExecutionDataIDs is a list of the root CIDs for each serialized execution_data.ChunkExecutionData
 	// associated with this block.
 	ChunkExecutionDataIDs []cid.Cid
-}
-
-// MarshalMsgpack implements the msgpack.Marshaler interface
-func (b BlockExecutionDataRoot) MarshalMsgpack() ([]byte, error) {
-	return msgpack.Marshal(struct {
-		BlockID               Identifier
-		ChunkExecutionDataIDs []string
-	}{
-		BlockID:               b.BlockID,
-		ChunkExecutionDataIDs: cidsToStrings(b.ChunkExecutionDataIDs),
-	})
-}
-
-// UnmarshalMsgpack implements the msgpack.Unmarshaler interface
-func (b *BlockExecutionDataRoot) UnmarshalMsgpack(data []byte) error {
-	var temp struct {
-		BlockID               Identifier
-		ChunkExecutionDataIDs []string
-	}
-
-	if err := msgpack.Unmarshal(data, &temp); err != nil {
-		return err
-	}
-
-	b.BlockID = temp.BlockID
-	cids, err := stringsToCids(temp.ChunkExecutionDataIDs)
-
-	if err != nil {
-		return fmt.Errorf("failed to decode chunk execution data ids: %w", err)
-	}
-
-	b.ChunkExecutionDataIDs = cids
-
-	return nil
-}
-
-// Helper function to convert a slice of cid.Cid to a slice of strings
-func cidsToStrings(cids []cid.Cid) []string {
-	if cids == nil {
-		return nil
-	}
-	strs := make([]string, len(cids))
-	for i, c := range cids {
-		strs[i] = c.String()
-	}
-	return strs
-}
-
-// Helper function to convert a slice of strings to a slice of cid.Cid
-func stringsToCids(strs []string) ([]cid.Cid, error) {
-	if strs == nil {
-		return nil, nil
-	}
-	cids := make([]cid.Cid, len(strs))
-	for i, s := range strs {
-		c, err := cid.Decode(s)
-		if err != nil {
-			return nil, fmt.Errorf("failed to decode cid %v: %w", s, err)
-		}
-		cids[i] = c
-	}
-	return cids, nil
 }

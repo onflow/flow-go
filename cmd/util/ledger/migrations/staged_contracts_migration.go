@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"sort"
 	"strings"
 	"sync"
 
@@ -426,14 +425,7 @@ func (m *StagedContractsMigration) MigrateAccount(
 		return nil
 	}
 
-	var contractNames []string
-	for name := range contractUpdates {
-		contractNames = append(contractNames, name)
-	}
-	sort.Strings(contractNames)
-
-	for _, name := range contractNames {
-		contract := contractUpdates[name]
+	for name, contract := range contractUpdates {
 
 		owner := string(address[:])
 		key := flow.ContractKey(name)

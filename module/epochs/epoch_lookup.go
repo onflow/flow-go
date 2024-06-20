@@ -101,7 +101,6 @@ func (cache *epochRangeCache) add(epoch epochRange) error {
 
 // EpochLookup implements the EpochLookup interface using protocol state to match views to epochs.
 // CAUTION: EpochLookup should only be used for querying the previous, current, or next epoch.
-// TODO(EFM, #5763): This implementation does not yet understand EFM recovery and needs to be updated.
 type EpochLookup struct {
 	state                    protocol.State
 	mu                       sync.RWMutex
@@ -159,14 +158,12 @@ func NewEpochLookup(state protocol.State) (*EpochLookup, error) {
 		}
 	}
 
-	epochStateSnapshot, err := final.EpochProtocolState()
+	// if epoch fallback was triggered, note it here
+	triggered, err := state.Params().EpochFallbackTriggered()
 	if err != nil {
-		return nil, fmt.Errorf("could not retrieve epoch protocol state: %w", err)
+		return nil, fmt.Errorf("could not check epoch fallback: %w", err)
 	}
-
-	// if epoch fallback was triggered, cache it here
-	// TODO(EFM, #6020): consider replacing with phase check when it's available
-	if epochStateSnapshot.EpochFallbackTriggered() {
+	if triggered {
 		lookup.epochFallbackIsTriggered.Store(true)
 	}
 

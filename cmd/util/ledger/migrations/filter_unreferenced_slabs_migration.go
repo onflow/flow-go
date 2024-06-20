@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"path"
-	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -129,20 +128,7 @@ func (m *FilterUnreferencedSlabsMigration) MigrateAccount(
 		Str("account", address.HexWithPrefix()).
 		Msgf("filtering %d unreferenced slabs", len(unreferencedSlabIDs))
 
-	var storageIDs []atree.StorageID
 	for storageID := range unreferencedSlabIDs {
-		storageIDs = append(storageIDs, storageID)
-	}
-	sort.Slice(
-		storageIDs,
-		func(i, j int) bool {
-			a := storageIDs[i]
-			b := storageIDs[j]
-			return a.Compare(b) < 0
-		},
-	)
-
-	for _, storageID := range storageIDs {
 		owner, key := registerFromStorageID(storageID)
 
 		value, err := accountRegisters.Get(owner, key)

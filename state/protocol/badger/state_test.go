@@ -71,7 +71,7 @@ func TestBootstrapAndOpen(t *testing.T) {
 			all.QuorumCertificates,
 			all.Setups,
 			all.EpochCommits,
-			all.EpochProtocolStateEntries,
+			all.EpochProtocolState,
 			all.ProtocolKVStore,
 			all.VersionBeacons,
 		)
@@ -154,7 +154,7 @@ func TestBootstrapAndOpen_EpochCommitted(t *testing.T) {
 			all.QuorumCertificates,
 			all.Setups,
 			all.EpochCommits,
-			all.EpochProtocolStateEntries,
+			all.EpochProtocolState,
 			all.ProtocolKVStore,
 			all.VersionBeacons,
 		)
@@ -180,7 +180,7 @@ func TestBootstrap_EpochHeightBoundaries(t *testing.T) {
 	t.Parallel()
 	// start with a regular post-spork root snapshot
 	rootSnapshot := unittest.RootSnapshotFixture(unittest.CompleteIdentitySet())
-	epoch1FirstHeight := rootSnapshot.Encodable().Head().Height
+	epoch1FirstHeight := rootSnapshot.Encodable().Head.Height
 
 	// For the spork root snapshot, only the first height of the root epoch should be indexed.
 	// [x]
@@ -609,9 +609,7 @@ func TestBootstrap_SealMismatch(t *testing.T) {
 		rootSnapshot := unittest.RootSnapshotFixture(unittest.CompleteIdentitySet())
 		// convert to encodable to easily modify snapshot
 		encodable := rootSnapshot.Encodable()
-		latestSeal, err := encodable.LatestSeal()
-		require.NoError(t, err)
-		latestSeal.BlockID = unittest.IdentifierFixture()
+		encodable.LatestSeal.BlockID = unittest.IdentifierFixture()
 
 		bootstrap(t, rootSnapshot, func(state *bprotocol.State, err error) {
 			assert.Error(t, err)
@@ -622,9 +620,7 @@ func TestBootstrap_SealMismatch(t *testing.T) {
 		rootSnapshot := unittest.RootSnapshotFixture(unittest.CompleteIdentitySet())
 		// convert to encodable to easily modify snapshot
 		encodable := rootSnapshot.Encodable()
-		latestSealedResult, err := encodable.LatestSealedResult()
-		require.NoError(t, err)
-		latestSealedResult.BlockID = unittest.IdentifierFixture()
+		encodable.LatestResult.BlockID = unittest.IdentifierFixture()
 
 		bootstrap(t, rootSnapshot, func(state *bprotocol.State, err error) {
 			assert.Error(t, err)
@@ -635,9 +631,7 @@ func TestBootstrap_SealMismatch(t *testing.T) {
 		rootSnapshot := unittest.RootSnapshotFixture(unittest.CompleteIdentitySet())
 		// convert to encodable to easily modify snapshot
 		encodable := rootSnapshot.Encodable()
-		latestSeal, err := encodable.LatestSeal()
-		require.NoError(t, err)
-		latestSeal.ResultID = unittest.IdentifierFixture()
+		encodable.LatestSeal.ResultID = unittest.IdentifierFixture()
 
 		bootstrap(t, rootSnapshot, func(state *bprotocol.State, err error) {
 			assert.Error(t, err)
@@ -664,7 +658,7 @@ func bootstrap(t *testing.T, rootSnapshot protocol.Snapshot, f func(*bprotocol.S
 		all.QuorumCertificates,
 		all.Setups,
 		all.EpochCommits,
-		all.EpochProtocolStateEntries,
+		all.EpochProtocolState,
 		all.ProtocolKVStore,
 		all.VersionBeacons,
 		rootSnapshot,

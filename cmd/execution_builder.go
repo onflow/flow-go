@@ -24,6 +24,7 @@ import (
 	"github.com/shirou/gopsutil/v3/cpu"
 	"github.com/shirou/gopsutil/v3/host"
 	"github.com/shirou/gopsutil/v3/mem"
+	"github.com/vmihailenco/msgpack"
 	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/admin/commands"
@@ -61,7 +62,6 @@ import (
 	"github.com/onflow/flow-go/engine/execution/state/bootstrap"
 	"github.com/onflow/flow-go/engine/execution/storehouse"
 	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/fvm/evm/debug"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	ledgerpkg "github.com/onflow/flow-go/ledger"
@@ -72,17 +72,21 @@ import (
 	modelbootstrap "github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/chainsync"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
+	execdatacache "github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
 	exedataprovider "github.com/onflow/flow-go/module/executiondatasync/provider"
 	"github.com/onflow/flow-go/module/executiondatasync/pruner"
 	"github.com/onflow/flow-go/module/executiondatasync/tracker"
 	"github.com/onflow/flow-go/module/finalizedreader"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
+	"github.com/onflow/flow-go/module/mempool/herocache"
 	"github.com/onflow/flow-go/module/mempool/queue"
 	"github.com/onflow/flow-go/module/metrics"
+	edrequester "github.com/onflow/flow-go/module/state_synchronization/requester"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p/blob"
@@ -91,6 +95,7 @@ import (
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
 	storageerr "github.com/onflow/flow-go/storage"
+	bstorage "github.com/onflow/flow-go/storage/badger"
 	storage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/badger/procedure"
 	storagepebble "github.com/onflow/flow-go/storage/pebble"
@@ -145,7 +150,7 @@ type ExecutionNode struct {
 	followerCore           *hotstuff.FollowerLoop        // follower hotstuff logic
 	followerEng            *followereng.ComplianceEngine // to sync blocks from consensus nodes
 	computationManager     *computation.Manager
-	collectionRequester    ingestion.CollectionRequester
+	collectionRequester    *requester.Engine
 	scriptsEng             *scripts.Engine
 	followerDistributor    *pubsub.FollowerDistributor
 	checkAuthorizedAtBlock func(blockID flow.Identifier) (bool, error)
@@ -238,7 +243,8 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 		Component("collection requester engine", exeNode.LoadCollectionRequesterEngine).
 		Component("receipt provider engine", exeNode.LoadReceiptProviderEngine).
 		Component("synchronization engine", exeNode.LoadSynchronizationEngine).
-		Component("grpc server", exeNode.LoadGrpcServer)
+		Component("grpc server", exeNode.LoadGrpcServer).
+		Component("observer collection indexer", exeNode.LoadObserverCollectionIndexer)
 }
 
 func (exeNode *ExecutionNode) LoadMutableFollowerState(node *NodeConfig) error {
@@ -524,24 +530,6 @@ func (exeNode *ExecutionNode) LoadProviderEngine(
 		)},
 		node.FvmOptions...,
 	)
-
-	if exeNode.exeConf.evmTracingEnabled {
-		if exeNode.exeConf.evmTracesGCPBucket == "" {
-			return nil, fmt.Errorf("must provide GCP bucket name when EVM tracing is enabled")
-		}
-
-		evmTraceUploader, err := debug.NewGCPUploader(exeNode.exeConf.evmTracesGCPBucket)
-		if err != nil {
-			return nil, fmt.Errorf("could not create evm trace uploader: %w", err)
-		}
-		evmTracer, err := debug.NewEVMCallTracer(evmTraceUploader, node.Logger)
-		if err != nil {
-			return nil, fmt.Errorf("could not create evm tracer: %w", err)
-		}
-
-		opts = append(opts, fvm.WithEVMTracer(evmTracer))
-	}
-
 	vmCtx := fvm.NewContext(opts...)
 
 	ledgerViewCommitter := committer.NewLedgerViewCommitter(exeNode.ledgerStorage, node.Tracer)
@@ -691,7 +679,7 @@ func (exeNode *ExecutionNode) LoadExecutionDataGetter(node *NodeConfig) error {
 	return nil
 }
 
-func OpenChunkDataPackDB(dbPath string, logger zerolog.Logger) (*badgerDB.DB, error) {
+func openChunkDataPackDB(dbPath string, logger zerolog.Logger) (*badgerDB.DB, error) {
 	log := sutil.NewLogger(logger)
 
 	opts := badgerDB.
@@ -722,21 +710,17 @@ func (exeNode *ExecutionNode) LoadExecutionState(
 	error,
 ) {
 
-	chunkDataPackDB, err := storagepebble.OpenDefaultPebbleDB(exeNode.exeConf.chunkDataPackDir)
+	chunkDataPackDB, err := openChunkDataPackDB(exeNode.exeConf.chunkDataPackDir, node.Logger)
 	if err != nil {
-		return nil, fmt.Errorf("could not open chunk data pack database: %w", err)
+		return nil, err
 	}
-
 	exeNode.builder.ShutdownFunc(func() error {
 		if err := chunkDataPackDB.Close(); err != nil {
 			return fmt.Errorf("error closing chunk data pack database: %w", err)
 		}
 		return nil
 	})
-	// chunkDataPacks := storage.NewChunkDataPacks(node.Metrics.Cache,
-	// chunkDataPackDB, node.Storage.Collections, exeNode.exeConf.chunkDataPackCacheSize)
-	chunkDataPacks := storagepebble.NewChunkDataPacks(node.Metrics.Cache,
-		chunkDataPackDB, node.Storage.Collections, exeNode.exeConf.chunkDataPackCacheSize)
+	chunkDataPacks := storage.NewChunkDataPacks(node.Metrics.Cache, chunkDataPackDB, node.Storage.Collections, exeNode.exeConf.chunkDataPackCacheSize)
 
 	// Needed for gRPC server, make sure to assign to main scoped vars
 	exeNode.events = storage.NewEvents(node.Metrics.Cache, node.DB)
@@ -982,6 +966,87 @@ func (exeNode *ExecutionNode) LoadExecutionDataPruner(
 	return exeNode.executionDataPruner, err
 }
 
+func (exeNode *ExecutionNode) LoadObserverCollectionIndexer(
+	node *NodeConfig,
+) (
+	module.ReadyDoneAware,
+	error,
+) {
+	if !node.ObserverMode {
+		node.Logger.Info().Msg("execution data downloader is disabled")
+		return &module.NoopReadyDoneAware{}, nil
+	}
+
+	node.Logger.Info().Msg("observer-mode is enabled, creating execution data downloader")
+
+	execDataDistributor := edrequester.NewExecutionDataDistributor()
+
+	executionDataDownloader := execution_data.NewDownloader(exeNode.blobService)
+
+	var heroCacheCollector module.HeroCacheMetrics = metrics.NewNoopCollector()
+	execDataCacheBackend := herocache.NewBlockExecutionData(10, node.Logger, heroCacheCollector)
+
+	// Execution Data cache that a downloader as the backend
+	// If the execution data doesn't exist, it uses the downloader to fetch it
+	executionDataCache := execdatacache.NewExecutionDataCache(
+		executionDataDownloader,
+		node.Storage.Headers,
+		node.Storage.Seals,
+		node.Storage.Results,
+		execDataCacheBackend,
+	)
+
+	processedBlockHeight := bstorage.NewConsumerProgress(node.DB, module.ConsumeProgressExecutionDataRequesterBlockHeight)
+	processedNotifications := bstorage.NewConsumerProgress(node.DB, module.ConsumeProgressExecutionDataRequesterNotification)
+
+	executionDataConfig := edrequester.ExecutionDataConfig{
+		InitialBlockHeight: node.SealedRootBlock.Header.Height,
+		MaxSearchAhead:     edrequester.DefaultMaxSearchAhead,
+		FetchTimeout:       edrequester.DefaultFetchTimeout,
+		MaxFetchTimeout:    edrequester.DefaultMaxFetchTimeout,
+		RetryDelay:         edrequester.DefaultRetryDelay,
+		MaxRetryDelay:      edrequester.DefaultMaxRetryDelay,
+	}
+
+	r, err := edrequester.New(
+		node.Logger,
+		metrics.NewExecutionDataRequesterCollector(),
+		executionDataDownloader,
+		executionDataCache,
+		processedBlockHeight,
+		processedNotifications,
+		node.State,
+		node.Storage.Headers,
+		executionDataConfig,
+		execDataDistributor,
+	)
+
+	if err != nil {
+		return &module.NoopReadyDoneAware{}, err
+	}
+
+	// subscribe the block finalization event, and trigger workers to fetch execution data
+	exeNode.followerDistributor.AddOnBlockFinalizedConsumer(r.OnBlockFinalized)
+
+	execDataDistributor.AddOnExecutionDataReceivedConsumer(func(data *execution_data.BlockExecutionDataEntity) {
+		res := &messages.EntityResponse{}
+		for _, chunk := range data.BlockExecutionData.ChunkExecutionDatas {
+			col := chunk.Collection
+			blob, _ := msgpack.Marshal(col)
+			res.EntityIDs = append(res.EntityIDs, col.ID())
+			res.Blobs = append(res.Blobs, blob)
+		}
+
+		// notify the collection requester that collections have been received
+		err := exeNode.collectionRequester.ProcessLocal(res)
+		if err != nil {
+			node.Logger.Fatal().Err(err).Msgf("failed to process collection from local execution data for block %v", data.BlockExecutionData.BlockID)
+		}
+	})
+
+	return r, nil
+}
+
 func (exeNode *ExecutionNode) LoadCheckerEngine(
 	node *NodeConfig,
 ) (
@@ -1010,60 +1075,35 @@ func (exeNode *ExecutionNode) LoadIngestionEngine(
 	module.ReadyDoneAware,
 	error,
 ) {
-	var colFetcher ingestion.CollectionFetcher
-	var err error
-
+	engineRegister := node.EngineRegistry
 	if node.ObserverMode {
-		anID, err := flow.HexStringToIdentifier(exeNode.exeConf.publicAccessID)
-		if err != nil {
-			return nil, fmt.Errorf("could not parse public access ID: %w", err)
-		}
-
-		anNode, ok := exeNode.builder.IdentityProvider.ByNodeID(anID)
-		if !ok {
-			return nil, fmt.Errorf("could not find public access node with ID %s", anID)
-		}
-
-		if anNode.Role != flow.RoleAccess {
-			return nil, fmt.Errorf("public access node with ID %s is not an access node", anID)
-		}
-
-		if anNode.IsEjected() {
-			return nil, fmt.Errorf("public access node with ID %s is ejected", anID)
-		}
-
-		accessFetcher, err := fetcher.NewAccessCollectionFetcher(node.Logger, anNode.Address, anNode.NetworkPubKey, anNode.NodeID, node.RootChainID.Chain())
-		if err != nil {
-			return nil, fmt.Errorf("could not create access collection fetcher: %w", err)
-		}
-		colFetcher = accessFetcher
-		exeNode.collectionRequester = accessFetcher
-	} else {
-		reqEng, err := requester.New(node.Logger, node.Metrics.Engine, node.EngineRegistry, node.Me, node.State,
-			channels.RequestCollections,
-			filter.Any,
-			func() flow.Entity { return &flow.Collection{} },
-			// we are manually triggering batches in execution, but lets still send off a batch once a minute, as a safety net for the sake of retries
-			requester.WithBatchInterval(exeNode.exeConf.requestInterval),
-			// consistency of collection can be checked by checking hash, and hash comes from trusted source (blocks from consensus follower)
-			// hence we not need to check origin
-			requester.WithValidateStaking(false),
-		)
-
-		if err != nil {
-			return nil, fmt.Errorf("could not create requester engine: %w", err)
-		}
-
-		colFetcher = fetcher.NewCollectionFetcher(node.Logger, reqEng, node.State, exeNode.exeConf.onflowOnlyLNs)
-		exeNode.collectionRequester = reqEng
+		engineRegister = &underlay.NoopEngineRegister{}
 	}
+
+	var err error
+	exeNode.collectionRequester, err = requester.New(node.Logger, node.Metrics.Engine, engineRegister, node.Me, node.State,
+		channels.RequestCollections,
+		filter.Any,
+		func() flow.Entity { return &flow.Collection{} },
+		// we are manually triggering batches in execution, but lets still send off a batch once a minute, as a safety net for the sake of retries
+		requester.WithBatchInterval(exeNode.exeConf.requestInterval),
+		// consistency of collection can be checked by checking hash, and hash comes from trusted source (blocks from consensus follower)
+		// hence we not need to check origin
+		requester.WithValidateStaking(false),
+	)
+
+	if err != nil {
+		return nil, fmt.Errorf("could not create requester engine: %w", err)
+	}
+
+	fetcher := fetcher.NewCollectionFetcher(node.Logger, exeNode.collectionRequester, node.State, exeNode.exeConf.onflowOnlyLNs)
 
 	if exeNode.exeConf.enableNewIngestionEngine {
 		_, core, err := ingestion.NewMachine(
 			node.Logger,
 			node.ProtocolEvents,
 			exeNode.collectionRequester,
-			colFetcher,
+			fetcher,
 			node.Storage.Headers,
 			node.Storage.Blocks,
 			node.Storage.Collections,
@@ -1090,7 +1130,7 @@ func (exeNode *ExecutionNode) LoadIngestionEngine(
 		exeNode.ingestionUnit,
 		node.Logger,
 		node.EngineRegistry,
-		colFetcher,
+		fetcher,
 		node.Storage.Headers,
 		node.Storage.Blocks,
 		node.Storage.Collections,

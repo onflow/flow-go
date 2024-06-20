@@ -1,14 +1,15 @@
-package benchmark
+package main
 
 import (
 	"context"
 	"errors"
 	"fmt"
-	"math"
 	"time"
 
 	"github.com/rs/zerolog"
 	"go.einride.tech/pid"
+
+	"github.com/onflow/flow-go/integration/benchmark"
 )
 
 type Adjuster struct {
@@ -19,8 +20,8 @@ type Adjuster struct {
 	controller *pid.Controller
 	params     AdjusterParams
 
-	lg                 *ContLoadGenerator
-	workerStatsTracker *WorkerStatsTracker
+	lg                 *benchmark.ContLoadGenerator
+	workerStatsTracker *benchmark.WorkerStatsTracker
 	log                zerolog.Logger
 }
 type AdjusterParams struct {
@@ -38,14 +39,14 @@ type adjusterState struct {
 
 	executed  uint
 	timedout  uint
-	targetTPS float64
+	targetTPS uint
 }
 
 func NewTPSAdjuster(
 	ctx context.Context,
 	log zerolog.Logger,
-	lg *ContLoadGenerator,
-	workerStatsTracker *WorkerStatsTracker,
+	lg *benchmark.ContLoadGenerator,
+	workerStatsTracker *benchmark.WorkerStatsTracker,
 	params AdjusterParams,
 ) *Adjuster {
 	ctx, cancel := context.WithCancel(ctx)
@@ -104,7 +105,7 @@ func (a *Adjuster) adjustTPSForever() (err error) {
 	lastState := adjusterState{
 		timestamp: time.Now(),
 		tps:       0,
-		targetTPS: float64(a.params.InitialTPS),
+		targetTPS: a.params.InitialTPS,
 		executed:  uint(initialStats.TxsExecuted),
 		timedout:  uint(initialStats.TxsTimedout),
 	}
@@ -146,26 +147,25 @@ func (a *Adjuster) adjustOnce(nowTs time.Time, lastState adjusterState) (adjuste
 	ratio := 1. + a.controller.State.ControlSignal
 	targetInflight := inflight * ratio
 
-	unboundedTPS := float64(lastState.targetTPS) * ratio
+	unboundedTPS := uint(float64(lastState.targetTPS) * ratio)
 	boundedTPS := boundTPS(unboundedTPS, a.params.MinTPS, a.params.MaxTPS)
-	roundedTPS := uint(math.Round(boundedTPS))
 
 	// number of timed out transactions in the last interval
 	txsTimedout := currentStats.TxsTimedout - int(lastState.timedout)
 	currentTPS := float64(currentStats.TxsExecuted-int(lastState.executed)) / timeDiff.Seconds()
 	a.log.Info().
-		Float64("lastTargetTPS", lastState.targetTPS).
+		Uint("lastTargetTPS", lastState.targetTPS).
 		Float64("lastTPS", lastState.tps).
 		Float64("currentTPS", currentTPS).
-		Float64("unboundedTPS", unboundedTPS).
-		Uint("targetTPS", roundedTPS).
+		Uint("unboundedTPS", unboundedTPS).
+		Uint("targetTPS", boundedTPS).
 		Interface("pid", a.controller.State).
 		Float64("targetInflight", targetInflight).
 		Float64("inflight", inflight).
 		Int("txsTimedout", txsTimedout).
 		Msg("adjusting TPS")
 
-	err := a.lg.SetTPS(roundedTPS)
+	err := a.lg.SetTPS(boundedTPS)
 	if err != nil {
 		return lastState, fmt.Errorf("unable to set tps: %w", err)
 	}
@@ -180,12 +180,12 @@ func (a *Adjuster) adjustOnce(nowTs time.Time, lastState adjusterState) (adjuste
 	}, nil
 }
 
-func boundTPS(tps float64, min, max uint) float64 {
+func boundTPS(tps, min, max uint) uint {
 	switch {
-	case tps < float64(min):
-		return float64(min)
-	case tps > float64(max):
-		return float64(max)
+	case tps < min:
+		return min
+	case tps > max:
+		return max
 	default:
 		return tps
 	}

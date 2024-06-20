@@ -40,7 +40,7 @@ func TestUnknownReferenceBlock(t *testing.T) {
 
 	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
 		// build some finalized non-root blocks (heights 101-110)
-		head := unittest.BlockWithParentFixture(rootSnapshot.Encodable().Head())
+		head := unittest.BlockWithParentFixture(rootSnapshot.Encodable().Head)
 		head.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
 		buildFinalizedBlock(t, state, head)
 
@@ -236,7 +236,7 @@ func TestClusters(t *testing.T) {
 	commit.ClusterQCs = flow.ClusterQCVoteDatasFromQCs(clusterQCs)
 	seal.ResultID = result.ID()
 	root.Payload.ProtocolStateID = kvstore.NewDefaultKVStore(
-		inmem.EpochProtocolStateFromServiceEvents(setup, commit).ID()).ID()
+		inmem.ProtocolStateFromEpochServiceEvents(setup, commit).ID()).ID()
 
 	rootSnapshot, err := inmem.SnapshotFromBootstrapState(root, result, seal, qc)
 	require.NoError(t, err)
@@ -808,7 +808,7 @@ func TestSealingSegment_FailureCases(t *testing.T) {
 	// Here, we want to specifically test correct handling of the edge case, where a block exists in storage
 	// that has _lower height_ than the node's local root block. Such blocks are typically contained in the
 	// bootstrapping data, such that all entities referenced in the local root block can be resolved.
-	// It is possible to retrieve blocks that are lower than the local root block from storage, directly
+	// Is is possible to retrieve blocks that are lower than the local root block from storage, directly
 	// via their ID. Despite these blocks existing in storage, SealingSegment construction should be
 	// because the known history is potentially insufficient when going below the root block.
 	t.Run("sealing segment from block below local state root", func(t *testing.T) {

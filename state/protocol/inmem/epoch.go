@@ -12,9 +12,9 @@ import (
 	"github.com/onflow/flow-go/state/protocol/invalid"
 )
 
-// Epochs provides access to epoch data, backed by a rich epoch protocol state entry.
+// Epochs provides access to epoch data, backed by a rich protocol state entry.
 type Epochs struct {
-	entry flow.RichEpochProtocolStateEntry
+	entry flow.RichProtocolStateEntry
 }
 
 var _ protocol.EpochQuery = (*Epochs)(nil)

@@ -82,21 +82,21 @@ func (s *Snapshot) QuorumCertificate() (*flow.QuorumCertificate, error) {
 }
 
 func (s *Snapshot) Phase() (flow.EpochPhase, error) {
-	epochState, err := s.state.protocolState.EpochStateAtBlockID(s.blockID)
+	psSnapshot, err := s.state.protocolState.AtBlockID(s.blockID)
 	if err != nil {
 		return flow.EpochPhaseUndefined, fmt.Errorf("could not retrieve protocol state snapshot: %w", err)
 	}
-	return epochState.EpochPhase(), nil
+	return psSnapshot.EpochPhase(), nil
 }
 
 func (s *Snapshot) Identities(selector flow.IdentityFilter[flow.Identity]) (flow.IdentityList, error) {
-	epochState, err := s.state.protocolState.EpochStateAtBlockID(s.blockID)
+	psSnapshot, err := s.state.protocolState.AtBlockID(s.blockID)
 	if err != nil {
 		return nil, err
 	}
 
 	// apply the filter to the participants
-	identities := epochState.Identities().Filter(selector)
+	identities := psSnapshot.Identities().Filter(selector)
 	return identities, nil
 }
 
@@ -199,7 +199,7 @@ func (s *Snapshot) SealingSegment() (*flow.SealingSegment, error) {
 		if err != nil {
 			return nil, fmt.Errorf("could not decode kv store entry: %w", err)
 		}
-		epochDataEntry, err := s.state.epochProtocolStateEntriesDB.ByID(kvStoreReader.GetEpochStateID())
+		epochDataEntry, err := s.state.protocolStateSnapshotsDB.ByID(kvStoreReader.GetEpochStateID())
 		if err != nil {
 			return nil, fmt.Errorf("could not get epoch data: %w", err)
 		}
@@ -354,8 +354,8 @@ func (s *Snapshot) Params() protocol.GlobalParams {
 // Returns state.ErrUnknownSnapshotReference if snapshot reference block is unknown.
 // All other errors should be treated as exceptions.
 // For each block stored there should be a protocol state stored.
-func (s *Snapshot) EpochProtocolState() (protocol.EpochProtocolState, error) {
-	return s.state.protocolState.EpochStateAtBlockID(s.blockID)
+func (s *Snapshot) EpochProtocolState() (protocol.DynamicProtocolState, error) {
+	return s.state.protocolState.AtBlockID(s.blockID)
 }
 
 // ProtocolState returns the dynamic protocol state that the Head block commits to.
@@ -385,13 +385,13 @@ type EpochQuery struct {
 func (q *EpochQuery) Current() protocol.Epoch {
 	// all errors returned from storage reads here are unexpected, because all
 	// snapshots reside within a current epoch, which must be queryable
-	epochState, err := q.snap.state.protocolState.EpochStateAtBlockID(q.snap.blockID)
+	psSnapshot, err := q.snap.state.protocolState.AtBlockID(q.snap.blockID)
 	if err != nil {
 		return invalid.NewEpochf("could not get protocol state snapshot at block %x: %w", q.snap.blockID, err)
 	}
 
-	setup := epochState.EpochSetup()
-	commit := epochState.EpochCommit()
+	setup := psSnapshot.EpochSetup()
+	commit := psSnapshot.EpochCommit()
 	firstHeight, _, isFirstHeightKnown, _, err := q.retrieveEpochHeightBounds(setup.Counter)
 	if err != nil {
 		return invalid.NewEpochf("could not get current epoch height bounds: %s", err.Error())
@@ -405,12 +405,12 @@ func (q *EpochQuery) Current() protocol.Epoch {
 // Next returns the next epoch, if it is available.
 func (q *EpochQuery) Next() protocol.Epoch {
 
-	epochState, err := q.snap.state.protocolState.EpochStateAtBlockID(q.snap.blockID)
+	psSnapshot, err := q.snap.state.protocolState.AtBlockID(q.snap.blockID)
 	if err != nil {
 		return invalid.NewEpochf("could not get protocol state snapshot at block %x: %w", q.snap.blockID, err)
 	}
-	phase := epochState.EpochPhase()
-	entry := epochState.Entry()
+	phase := psSnapshot.EpochPhase()
+	entry := psSnapshot.Entry()
 
 	// if we are in the staking phase, the next epoch is not setup yet
 	if phase == flow.EpochPhaseStaking {
@@ -434,15 +434,15 @@ func (q *EpochQuery) Next() protocol.Epoch {
 // For all other epochs, returns the previous epoch.
 func (q *EpochQuery) Previous() protocol.Epoch {
 
-	epochState, err := q.snap.state.protocolState.EpochStateAtBlockID(q.snap.blockID)
+	psSnapshot, err := q.snap.state.protocolState.AtBlockID(q.snap.blockID)
 	if err != nil {
 		return invalid.NewEpochf("could not get protocol state snapshot at block %x: %w", q.snap.blockID, err)
 	}
-	entry := epochState.Entry()
+	entry := psSnapshot.Entry()
 
 	// CASE 1: there is no previous epoch - this indicates we are in the first
 	// epoch after a spork root or genesis block
-	if !epochState.PreviousEpochExists() {
+	if !psSnapshot.PreviousEpochExists() {
 		return invalid.NewEpoch(protocol.ErrNoPreviousEpoch)
 	}
 

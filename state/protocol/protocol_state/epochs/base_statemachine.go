@@ -10,8 +10,8 @@ import (
 // baseStateMachine implements common logic for evolving protocol state both in happy path and epoch fallback
 // operation modes. It partially implements `StateMachine` and is used as building block for more complex implementations.
 type baseStateMachine struct {
-	parentState *flow.RichEpochProtocolStateEntry
-	state       *flow.EpochProtocolStateEntry
+	parentState *flow.RichProtocolStateEntry
+	state       *flow.ProtocolStateEntry
 	view        uint64
 
 	// The following fields are maps from NodeID → DynamicIdentityEntry for the nodes that are *active* in the respective epoch.
@@ -29,7 +29,7 @@ type baseStateMachine struct {
 // Do NOT call Build, if the baseStateMachine instance has returned a `protocol.InvalidServiceEventError`
 // at any time during its lifetime. After this error, the baseStateMachine is left with a potentially
 // dysfunctional state and should be discarded.
-func (u *baseStateMachine) Build() (updatedState *flow.EpochProtocolStateEntry, stateID flow.Identifier, hasChanges bool) {
+func (u *baseStateMachine) Build() (updatedState *flow.ProtocolStateEntry, stateID flow.Identifier, hasChanges bool) {
 	updatedState = u.state.Copy()
 	stateID = updatedState.ID()
 	hasChanges = stateID != u.parentState.ID()
@@ -43,7 +43,7 @@ func (u *baseStateMachine) View() uint64 {
 }
 
 // ParentState returns parent protocol state associated with this state machine.
-func (u *baseStateMachine) ParentState() *flow.RichEpochProtocolStateEntry {
+func (u *baseStateMachine) ParentState() *flow.RichProtocolStateEntry {
 	return u.parentState
 }
 
@@ -113,14 +113,13 @@ func (u *baseStateMachine) TransitionToNextEpoch() error {
 		return fmt.Errorf("protocol state for next epoch has not yet been committed")
 	}
 	// Check if we are at the next epoch, only then a transition is allowed
-	// TODO(EFM, #6019): Should address this when fixing accessing of 'parent state' vs 'state under evolution'
 	if u.view < u.parentState.NextEpochSetup.FirstView {
 		return fmt.Errorf("epoch transition is only allowed when entering next epoch")
 	}
-	u.state = &flow.EpochProtocolStateEntry{
-		PreviousEpoch:          &u.state.CurrentEpoch,
-		CurrentEpoch:           *u.state.NextEpoch,
-		EpochFallbackTriggered: u.state.EpochFallbackTriggered,
+	u.state = &flow.ProtocolStateEntry{
+		PreviousEpoch:                   &u.state.CurrentEpoch,
+		CurrentEpoch:                    *u.state.NextEpoch,
+		InvalidEpochTransitionAttempted: u.state.InvalidEpochTransitionAttempted,
 	}
 	u.rebuildIdentityLookup()
 	return nil

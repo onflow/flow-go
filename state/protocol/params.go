@@ -29,6 +29,14 @@ type InstanceParams interface {
 	// Seal returns the root block seal of the current protocol state. This is the seal for the
 	// `SealedRoot` block that was used to bootstrap this state. It may differ from node to node.
 	Seal() *flow.Seal
+
+	// EpochFallbackTriggered returns whether Epoch Fallback Mode [EFM] has been triggered.
+	// EFM is a permanent, spork-scoped state which is triggered when the next
+	// epoch fails to be committed in the allocated time. Once EFM is triggered,
+	// it will remain in effect until the next spork.
+	// TODO for 'leaving Epoch Fallback via special service event'
+	// No errors are expected during normal operation.
+	EpochFallbackTriggered() (bool, error)
 }
 
 // GlobalParams represents protocol state parameters that do not vary between instances.

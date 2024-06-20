@@ -26,7 +26,7 @@ type StateMachine interface {
 	// Do NOT call Build, if the StateMachine instance has returned a `protocol.InvalidServiceEventError`
 	// at any time during its lifetime. After this error, the StateMachine is left with a potentially
 	// dysfunctional state and should be discarded.
-	Build() (updatedState *flow.EpochProtocolStateEntry, stateID flow.Identifier, hasChanges bool)
+	Build() (updatedState *flow.ProtocolStateEntry, stateID flow.Identifier, hasChanges bool)
 
 	// ProcessEpochSetup updates the internally-maintained interim Epoch state with data from epoch setup event.
 	// Processing an epoch setup event also affects the identity table for the current epoch.
@@ -53,20 +53,6 @@ type StateMachine interface {
 	//     after such error and discard the StateMachine!
 	ProcessEpochCommit(epochCommit *flow.EpochCommit) (bool, error)
 
-	// ProcessEpochRecover updates the internally-maintained interim Epoch state with data from epoch recover
-	// event in an attempt to recover from Epoch Fallback Mode [EFM] and get back on happy path.
-	// Specifically, after successfully processing this event, we will have a next epoch (as specified by the
-	// EpochRecover event) in the protocol state, which is in the committed phase. Subsequently, the epoch
-	// protocol can proceed following the happy path. Therefore, we set `EpochFallbackTriggered` back to false.
-	//
-	// The boolean return indicates if the input event triggered a transition in the state machine or not.
-	// For the EpochRecover event, we return false if and only if there is an error. The reason is that
-	// either the `EpochRecover` event is rejected (leading to `InvalidServiceEventError`) or there is an
-	// exception processing the event. Otherwise, an `EpochRecover` event must always lead to a state change.
-	// Expected errors during normal operations:
-	//   - `protocol.InvalidServiceEventError` - if the service event is invalid or is not a valid state transition for the current protocol state.
-	ProcessEpochRecover(epochRecover *flow.EpochRecover) (bool, error)
-
 	// EjectIdentity updates identity table by changing the node's participation status to 'ejected'.
 	// Should pass identity which is already present in the table, otherwise an exception will be raised.
 	// Expected errors during normal operations:
@@ -85,20 +71,19 @@ type StateMachine interface {
 	View() uint64
 
 	// ParentState returns parent protocol state associated with this state machine.
-	ParentState() *flow.RichEpochProtocolStateEntry
+	ParentState() *flow.RichProtocolStateEntry
 }
 
 // StateMachineFactoryMethod is a factory method to create state machines for evolving the protocol's epoch state.
 // Currently, we have `HappyPathStateMachine` and `FallbackStateMachine` as StateMachine
 // implementations, whose constructors both have the same signature as StateMachineFactoryMethod.
-type StateMachineFactoryMethod func(candidateView uint64, parentState *flow.RichEpochProtocolStateEntry) (StateMachine, error)
+type StateMachineFactoryMethod func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (StateMachine, error)
 
 // EpochStateMachine is a hierarchical state machine that encapsulates the logic for protocol-compliant evolution of Epoch-related sub-state.
 // EpochStateMachine processes a subset of service events that are relevant for the Epoch state, and ignores all other events.
 // EpochStateMachine delegates the processing of service events to an embedded StateMachine,
 // which is either a HappyPathStateMachine or a FallbackStateMachine depending on the operation mode of the protocol.
 // It relies on Key-Value Store to read the parent state and to persist the snapshot of the updated Epoch state.
-// TODO(EFM, #6019): this structure needs to be updated to stop using parent state.
 type EpochStateMachine struct {
 	activeStateMachine               StateMachine
 	parentState                      protocol.KVStoreReader
@@ -107,7 +92,7 @@ type EpochStateMachine struct {
 
 	setups               storage.EpochSetups
 	commits              storage.EpochCommits
-	epochProtocolStateDB storage.EpochProtocolStateEntries
+	epochProtocolStateDB storage.ProtocolState
 	pendingDbUpdates     *transaction.DeferredBlockPersist
 }
 
@@ -124,7 +109,7 @@ func NewEpochStateMachine(
 	params protocol.GlobalParams,
 	setups storage.EpochSetups,
 	commits storage.EpochCommits,
-	epochProtocolStateDB storage.EpochProtocolStateEntries,
+	epochProtocolStateDB storage.ProtocolState,
 	parentState protocol.KVStoreReader,
 	mutator protocol_state.KVStoreMutator,
 	happyPathStateMachineFactory StateMachineFactoryMethod,
@@ -142,9 +127,9 @@ func NewEpochStateMachine(
 	}
 
 	var stateMachine StateMachine
-	candidateTriggersEpochFallback := epochFallbackTriggeredByIncorporatingCandidate(candidateView, params, parentEpochState)
-	if parentEpochState.EpochFallbackTriggered || candidateTriggersEpochFallback {
-		// Case 1: EpochFallbackTriggered is true, indicating that we have encountered an invalid
+	candidateAttemptsInvalidEpochTransition := epochFallbackTriggeredByIncorporatingCandidate(candidateView, params, parentEpochState)
+	if parentEpochState.InvalidEpochTransitionAttempted || candidateAttemptsInvalidEpochTransition {
+		// Case 1: InvalidEpochTransitionAttempted is true, indicating that we have encountered an invalid
 		//         epoch service event or an invalid state transition previously in this fork.
 		// Case 2: Incorporating the candidate block is itself an invalid epoch transition.
 		//
@@ -219,7 +204,13 @@ func (e *EpochStateMachine) EvolveState(sealedServiceEvents []flow.ServiceEvent)
 	//       However, this code will likely need to be changed when working on EFM recovery.
 	phase := parentProtocolState.EpochPhase()
 	if phase == flow.EpochPhaseCommitted {
-		if e.activeStateMachine.View() > parentProtocolState.CurrentEpochFinalView() {
+		activeSetup := parentProtocolState.CurrentEpochSetup
+		// TODO(efm-recovery): This logic needs to be updated when injection of EFM recovery service event is implemented.
+		// 				       For now, we are only checking transition to next epoch when the next epoch is committed.
+		//                     There is no logic yet to leave EFM, but once we have it, the following logic
+		//                     will be incorrect as we need to check the epoch final view including the extensions but not
+		//					   only the final view of the setup.
+		if e.activeStateMachine.View() > activeSetup.FinalView {
 			err := e.activeStateMachine.TransitionToNextEpoch()
 			if err != nil {
 				return fmt.Errorf("could not transition protocol state to next epoch: %w", err)
@@ -280,19 +271,6 @@ func (e *EpochStateMachine) applyServiceEventsFromOrderedResults(orderedUpdates 
 			if processed {
 				dbUpdates.AddDbOp(e.commits.StoreTx(ev)) // we'll insert the commit event when we insert the block
 			}
-		case *flow.EpochRecover:
-			processed, err := e.activeStateMachine.ProcessEpochRecover(ev)
-			if err != nil {
-				// TODO(EFM, #6018): this function needs to be updated to handle errors internally and propagate only exceptions.
-				if protocol.IsInvalidServiceEventError(err) {
-					// TODO for 'leaving Epoch Fallback via special service event': add reporting of invalid service event, at least a log.
-					continue
-				}
-				return nil, fmt.Errorf("could not process epoch recover event: %w", err)
-			}
-			if processed {
-				dbUpdates.AddDbOps(e.setups.StoreTx(&ev.EpochSetup), e.commits.StoreTx(&ev.EpochCommit)) // we'll insert the setup & commit events when we insert the block
-			}
 		default:
 			continue
 		}
@@ -329,7 +307,7 @@ func (e *EpochStateMachine) transitionToEpochFallbackMode(orderedUpdates []flow.
 //   - The seal for block A was included in some block C, s.t C is an ancestor of B.
 //
 // For further details see `params.EpochCommitSafetyThreshold()`.
-func epochFallbackTriggeredByIncorporatingCandidate(candidateView uint64, params protocol.GlobalParams, parentState *flow.RichEpochProtocolStateEntry) bool {
+func epochFallbackTriggeredByIncorporatingCandidate(candidateView uint64, params protocol.GlobalParams, parentState *flow.RichProtocolStateEntry) bool {
 	if parentState.EpochPhase() == flow.EpochPhaseCommitted { // Requirement 1
 		return false
 	}

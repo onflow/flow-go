@@ -43,7 +43,6 @@ import (
 	modulecompliance "github.com/onflow/flow-go/module/compliance"
 	"github.com/onflow/flow-go/module/epochs"
 	confinalizer "github.com/onflow/flow-go/module/finalizer/consensus"
-	"github.com/onflow/flow-go/module/grpcclient"
 	"github.com/onflow/flow-go/module/mempool"
 	epochpool "github.com/onflow/flow-go/module/mempool/epochs"
 	"github.com/onflow/flow-go/module/mempool/herocache"
@@ -99,7 +98,7 @@ func main() {
 
 		// epoch qc contract client
 		machineAccountInfo *bootstrap.NodeMachineAccountInfo
-		flowClientConfigs  []*grpcclient.FlowClientConfig
+		flowClientConfigs  []*common.FlowClientConfig
 		insecureAccessAPI  bool
 		accessNodeIDS      []string
 		apiRatelimits      map[string]int
@@ -126,7 +125,7 @@ func main() {
 			"maximum per-transaction byte size")
 		flags.Uint64Var(&ingestConf.MaxCollectionByteSize, "ingest-max-col-byte-size", flow.DefaultMaxCollectionByteSize,
 			"maximum per-collection byte size")
-		flags.BoolVar(&ingestConf.CheckScriptsParse, "ingest-check-scripts-parse", false,
+		flags.BoolVar(&ingestConf.CheckScriptsParse, "ingest-check-scripts-parse", true,
 			"whether we check that inbound transactions are parse-able")
 		flags.UintVar(&ingestConf.ExpiryBuffer, "ingest-expiry-buffer", 30,
 			"expiry buffer for inbound transactions")
@@ -285,7 +284,7 @@ func main() {
 				return fmt.Errorf("failed to validate flag --access-node-ids %w", err)
 			}
 
-			flowClientConfigs, err = grpcclient.FlowClientConfigs(anIDS, insecureAccessAPI, node.State.Sealed())
+			flowClientConfigs, err = common.FlowClientConfigs(anIDS, insecureAccessAPI, node.State.Sealed())
 			if err != nil {
 				return fmt.Errorf("failed to prepare flow client connection configs for each access node id %w", err)
 			}
@@ -294,7 +293,7 @@ func main() {
 		}).
 		Component("machine account config validator", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			// @TODO use fallback logic for flowClient similar to DKG/QC contract clients
-			flowClient, err := grpcclient.FlowClient(flowClientConfigs[0])
+			flowClient, err := common.FlowClient(flowClientConfigs[0])
 			if err != nil {
 				return nil, fmt.Errorf("failed to get flow client connection option for access node (0): %s %w", flowClientConfigs[0].AccessAddress, err)
 			}
@@ -683,11 +682,11 @@ func createQCContractClient(node *cmd.NodeConfig, machineAccountInfo *bootstrap.
 }
 
 // createQCContractClients creates priority ordered array of QCContractClient
-func createQCContractClients(node *cmd.NodeConfig, machineAccountInfo *bootstrap.NodeMachineAccountInfo, flowClientOpts []*grpcclient.FlowClientConfig) ([]module.QCContractClient, error) {
+func createQCContractClients(node *cmd.NodeConfig, machineAccountInfo *bootstrap.NodeMachineAccountInfo, flowClientOpts []*common.FlowClientConfig) ([]module.QCContractClient, error) {
 	qcClients := make([]module.QCContractClient, 0)
 
 	for _, opt := range flowClientOpts {
-		flowClient, err := grpcclient.FlowClient(opt)
+		flowClient, err := common.FlowClient(opt)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create flow client for qc contract client with options: %s %w", flowClientOpts, err)
 		}

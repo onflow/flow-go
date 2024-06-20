@@ -59,7 +59,6 @@ const (
 	evmResultTypeQualifiedIdentifier       = "EVM.Result"
 	evmResultTypeStatusFieldName           = "status"
 	evmResultTypeErrorCodeFieldName        = "errorCode"
-	evmResultTypeErrorMessageFieldName     = "errorMessage"
 	evmResultTypeGasUsedFieldName          = "gasUsed"
 	evmResultTypeDataFieldName             = "data"
 	evmResultTypeDeployedContractFieldName = "deployedContract"
@@ -1274,15 +1273,6 @@ func NewResultValue(
 			}),
 		},
 		{
-			Name: "errorMessage",
-			Value: interpreter.NewStringValue(inter,
-				common.NewStringMemoryUsage(len(result.ErrorMessage)),
-				func() string {
-					return result.ErrorMessage
-				},
-			),
-		},
-		{
 			Name: "gasUsed",
 			Value: interpreter.NewUInt64Value(gauge, func() uint64 {
 				return result.GasConsumed
@@ -1290,7 +1280,7 @@ func NewResultValue(
 		},
 		{
 			Name:  "data",
-			Value: interpreter.ByteSliceToByteArrayValue(inter, result.ReturnedData),
+			Value: interpreter.ByteSliceToByteArrayValue(inter, result.ReturnedValue),
 		},
 		{
 			Name:  "deployedContract",
@@ -2297,7 +2287,7 @@ func ResultSummaryFromEVMResultValue(val cadence.Value) (*types.ResultSummary, e
 
 	fields := cadence.FieldsMappedByName(str)
 
-	const expectedFieldCount = 6
+	const expectedFieldCount = 5
 	if len(fields) != expectedFieldCount {
 		return nil, fmt.Errorf(
 			"invalid input: field count mismatch: expected %d, got %d",
@@ -2319,11 +2309,6 @@ func ResultSummaryFromEVMResultValue(val cadence.Value) (*types.ResultSummary, e
 	errorCode, ok := fields[evmResultTypeErrorCodeFieldName].(cadence.UInt64)
 	if !ok {
 		return nil, fmt.Errorf("invalid input: unexpected type for error code field")
-	}
-
-	errorMsg, ok := fields[evmResultTypeErrorMessageFieldName].(cadence.String)
-	if !ok {
-		return nil, fmt.Errorf("invalid input: unexpected type for error msg field")
 	}
 
 	gasUsed, ok := fields[evmResultTypeGasUsedFieldName].(cadence.UInt64)
@@ -2370,9 +2355,8 @@ func ResultSummaryFromEVMResultValue(val cadence.Value) (*types.ResultSummary, e
 	return &types.ResultSummary{
 		Status:                  types.Status(status),
 		ErrorCode:               types.ErrorCode(errorCode),
-		ErrorMessage:            string(errorMsg),
 		GasConsumed:             uint64(gasUsed),
-		ReturnedData:            convertedData,
+		ReturnedValue:           convertedData,
 		DeployedContractAddress: convertedDeployedAddress,
 	}, nil
 

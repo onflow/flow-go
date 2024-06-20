@@ -142,16 +142,10 @@ func TestPayloadFile(t *testing.T) {
 			keysValues := make(map[string]keyPair)
 			var payloads []*ledger.Payload
 
-			var globalRegisterCount int
 			for i := 0; i < size; i++ {
 				keys, values := getSampleKeyValues(i)
 
 				for j, key := range keys {
-
-					if len(key.KeyParts[0].Value) == 0 {
-						globalRegisterCount++
-					}
-
 					keysValues[key.String()] = keyPair{
 						key:   key,
 						value: values[j],
@@ -182,9 +176,9 @@ func TestPayloadFile(t *testing.T) {
 				}
 			}
 
-			addresses := make(map[string]struct{}, len(selectedAddresses))
+			addresses := make([]common.Address, 0, len(selectedAddresses))
 			for address := range selectedAddresses {
-				addresses[string(address[:])] = struct{}{}
+				addresses = append(addresses, address)
 			}
 
 			numOfPayloadWritten, err := util.CreatePayloadFile(
@@ -195,11 +189,7 @@ func TestPayloadFile(t *testing.T) {
 				false, // input payloads represent entire state
 			)
 			require.NoError(t, err)
-			require.Equal(
-				t,
-				len(selectedKeysValues)+globalRegisterCount,
-				numOfPayloadWritten,
-			)
+			require.Equal(t, len(selectedKeysValues), numOfPayloadWritten)
 
 			partialState, err := util.IsPayloadFilePartialState(payloadFileName)
 			require.NoError(t, err)
@@ -207,22 +197,10 @@ func TestPayloadFile(t *testing.T) {
 
 			partialState, payloadsFromFile, err := util.ReadPayloadFile(zerolog.Nop(), payloadFileName)
 			require.NoError(t, err)
+			require.Equal(t, len(selectedKeysValues), len(payloadsFromFile))
 			require.True(t, partialState)
 
-			nonGlobalPayloads := make([]*ledger.Payload, 0, len(selectedKeysValues))
 			for _, payloadFromFile := range payloadsFromFile {
-				key, err := payloadFromFile.Key()
-				require.NoError(t, err)
-
-				owner := key.KeyParts[0].Value
-				if len(owner) > 0 {
-					nonGlobalPayloads = append(nonGlobalPayloads, payloadFromFile)
-				}
-			}
-
-			require.Equal(t, len(selectedKeysValues), len(nonGlobalPayloads))
-
-			for _, payloadFromFile := range nonGlobalPayloads {
 				k, err := payloadFromFile.Key()
 				require.NoError(t, err)
 
@@ -235,7 +213,6 @@ func TestPayloadFile(t *testing.T) {
 	})
 
 	t.Run("no payloads found with filter", func(t *testing.T) {
-
 		emptyAddress := common.Address{}
 
 		unittest.RunWithTempDir(t, func(datadir string) {
@@ -247,20 +224,13 @@ func TestPayloadFile(t *testing.T) {
 			keysValues := make(map[string]keyPair)
 			var payloads []*ledger.Payload
 
-			var globalRegisterCount int
-
 			for i := 0; i < size; i++ {
 				keys, values := getSampleKeyValues(i)
 
 				for j, key := range keys {
-					if len(key.KeyParts[0].Value) == 0 {
-						globalRegisterCount++
-					}
-
 					if bytes.Equal(key.KeyParts[0].Value, emptyAddress[:]) {
 						continue
 					}
-
 					keysValues[key.String()] = keyPair{
 						key:   key,
 						value: values[j],
@@ -274,13 +244,11 @@ func TestPayloadFile(t *testing.T) {
 				zerolog.Nop(),
 				payloadFileName,
 				payloads,
-				map[string]struct{}{
-					string(emptyAddress[:]): {},
-				},
+				[]common.Address{emptyAddress},
 				false,
 			)
 			require.NoError(t, err)
-			require.Equal(t, globalRegisterCount, numOfPayloadWritten)
+			require.Equal(t, 0, numOfPayloadWritten)
 
 			partialState, err := util.IsPayloadFilePartialState(payloadFileName)
 			require.NoError(t, err)
@@ -288,7 +256,7 @@ func TestPayloadFile(t *testing.T) {
 
 			partialState, payloadsFromFile, err := util.ReadPayloadFile(zerolog.Nop(), payloadFileName)
 			require.NoError(t, err)
-			require.Equal(t, globalRegisterCount, len(payloadsFromFile))
+			require.Equal(t, 0, len(payloadsFromFile))
 			require.True(t, partialState)
 		})
 	})

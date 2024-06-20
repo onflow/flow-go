@@ -196,11 +196,11 @@ func (ctl *BlockTimeController) initEpochInfo() error {
 		ctl.nextEpochTargetEndTime = &nextEpochTargetEndTime
 	}
 
-	epochProtocolState, err := ctl.state.Final().EpochProtocolState()
+	epochFallbackTriggered, err := ctl.state.Params().EpochFallbackTriggered()
 	if err != nil {
 		return fmt.Errorf("could not check epoch fallback: %w", err)
 	}
-	ctl.epochFallbackTriggered = epochProtocolState.EpochFallbackTriggered()
+	ctl.epochFallbackTriggered = epochFallbackTriggered
 
 	return nil
 }

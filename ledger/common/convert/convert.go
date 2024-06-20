@@ -7,6 +7,14 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+const (
+	KeyPartOwner = uint16(0)
+	// Deprecated: KeyPartController was only used by the very first
+	// version of Cadence for access control, which was later retired
+	_          = uint16(1) // DO NOT REUSE
+	KeyPartKey = uint16(2)
+)
+
 // UnexpectedLedgerKeyFormat is returned when a ledger key is not in the expected format
 var UnexpectedLedgerKeyFormat = fmt.Errorf("unexpected ledger key format")
 
@@ -15,8 +23,8 @@ var UnexpectedLedgerKeyFormat = fmt.Errorf("unexpected ledger key format")
 func LedgerKeyToRegisterID(key ledger.Key) (flow.RegisterID, error) {
 	parts := key.KeyParts
 	if len(parts) != 2 ||
-		parts[0].Type != ledger.KeyPartOwner ||
-		parts[1].Type != ledger.KeyPartKey {
+		parts[0].Type != KeyPartOwner ||
+		parts[1].Type != KeyPartKey {
 		return flow.RegisterID{}, fmt.Errorf("ledger key %s: %w", key.String(), UnexpectedLedgerKeyFormat)
 	}
 
@@ -31,11 +39,11 @@ func RegisterIDToLedgerKey(registerID flow.RegisterID) ledger.Key {
 	return ledger.Key{
 		KeyParts: []ledger.KeyPart{
 			{
-				Type:  ledger.KeyPartOwner,
+				Type:  KeyPartOwner,
 				Value: []byte(registerID.Owner),
 			},
 			{
-				Type:  ledger.KeyPartKey,
+				Type:  KeyPartKey,
 				Value: []byte(registerID.Key),
 			},
 		},

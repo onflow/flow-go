@@ -30,12 +30,12 @@ func TestEpochStateMachine(t *testing.T) {
 // Tests in this suite are designed to rely on automatic assertions when leaving the scope of the test.
 type EpochStateMachineSuite struct {
 	suite.Suite
-	epochStateDB                    *storagemock.EpochProtocolStateEntries
+	epochStateDB                    *storagemock.ProtocolState
 	setupsDB                        *storagemock.EpochSetups
 	commitsDB                       *storagemock.EpochCommits
 	globalParams                    *protocolmock.GlobalParams
 	parentState                     *protocolmock.KVStoreReader
-	parentEpochState                *flow.RichEpochProtocolStateEntry
+	parentEpochState                *flow.RichProtocolStateEntry
 	mutator                         *protocol_statemock.KVStoreMutator
 	happyPathStateMachine           *mock.StateMachine
 	happyPathStateMachineFactory    *mock.StateMachineFactoryMethod
@@ -46,7 +46,7 @@ type EpochStateMachineSuite struct {
 }
 
 func (s *EpochStateMachineSuite) SetupTest() {
-	s.epochStateDB = storagemock.NewEpochProtocolStateEntries(s.T())
+	s.epochStateDB = storagemock.NewProtocolState(s.T())
 	s.setupsDB = storagemock.NewEpochSetups(s.T())
 	s.commitsDB = storagemock.NewEpochCommits(s.T())
 	s.globalParams = protocolmock.NewGlobalParams(s.T())
@@ -59,7 +59,7 @@ func (s *EpochStateMachineSuite) SetupTest() {
 	s.happyPathStateMachineFactory = mock.NewStateMachineFactoryMethod(s.T())
 	s.fallbackPathStateMachineFactory = mock.NewStateMachineFactoryMethod(s.T())
 
-	s.epochStateDB.On("ByBlockID", mocks.Anything).Return(func(_ flow.Identifier) *flow.RichEpochProtocolStateEntry {
+	s.epochStateDB.On("ByBlockID", mocks.Anything).Return(func(_ flow.Identifier) *flow.RichProtocolStateEntry {
 		return s.parentEpochState
 	}, func(_ flow.Identifier) error {
 		return nil
@@ -93,7 +93,7 @@ func (s *EpochStateMachineSuite) SetupTest() {
 // epoch state ID in the KV store even when there were no events to process.
 func (s *EpochStateMachineSuite) TestBuild_NoChanges() {
 	s.happyPathStateMachine.On("ParentState").Return(s.parentEpochState)
-	s.happyPathStateMachine.On("Build").Return(s.parentEpochState.EpochProtocolStateEntry, s.parentEpochState.ID(), false).Once()
+	s.happyPathStateMachine.On("Build").Return(s.parentEpochState.ProtocolStateEntry, s.parentEpochState.ID(), false).Once()
 
 	err := s.stateMachine.EvolveState(nil)
 	require.NoError(s.T(), err)
@@ -117,7 +117,7 @@ func (s *EpochStateMachineSuite) TestBuild_NoChanges() {
 // This test also ensures that updated state ID is committed in the KV store.
 func (s *EpochStateMachineSuite) TestBuild_HappyPath() {
 	s.happyPathStateMachine.On("ParentState").Return(s.parentEpochState)
-	updatedState := unittest.EpochStateFixture().EpochProtocolStateEntry
+	updatedState := unittest.EpochStateFixture().ProtocolStateEntry
 	updatedStateID := updatedState.ID()
 	s.happyPathStateMachine.On("Build").Return(updatedState, updatedStateID, true).Once()
 
@@ -358,7 +358,7 @@ func (s *EpochStateMachineSuite) TestEpochStateMachine_Constructor() {
 			assert.Nil(s.T(), stateMachine)
 		})
 		s.Run("epoch-fallback", func() {
-			s.parentEpochState.EpochFallbackTriggered = true // ensure we use epoch-fallback state machine
+			s.parentEpochState.InvalidEpochTransitionAttempted = true // ensure we use epoch-fallback state machine
 			exception := irrecoverable.NewExceptionf("exception")
 			happyPathStateMachineFactory := mock.NewStateMachineFactoryMethod(s.T())
 			fallbackPathStateMachineFactory := mock.NewStateMachineFactoryMethod(s.T())
@@ -515,7 +515,7 @@ func (s *EpochStateMachineSuite) TestEvolveState_EventsAreFiltered() {
 // TestEvolveStateTransitionToNextEpoch_WithInvalidStateTransition tests that EpochStateMachine transitions to the next epoch
 // if an invalid state transition has been detected in a block which triggers transitioning to the next epoch.
 // In such situation, we still need to enter the next epoch (because it has already been committed), but persist in the
-// state that we have entered Epoch fallback mode (`flow.EpochProtocolStateEntry.EpochFallbackTriggered` is set to `true`).
+// state that we have entered Epoch fallback mode (`flow.ProtocolStateEntry.InvalidEpochTransitionAttempted` is set to `true`).
 // This test ensures that we don't drop previously committed next epoch.
 func (s *EpochStateMachineSuite) TestEvolveStateTransitionToNextEpoch_WithInvalidStateTransition() {
 	unittest.SkipUnless(s.T(), unittest.TEST_TODO,
@@ -539,11 +539,11 @@ func (s *EpochStateMachineSuite) TestEvolveStateTransitionToNextEpoch_WithInvali
 	indexTxDeferredUpdate.On("Execute", mocks.Anything).Return(nil).Once()
 	s.epochStateDB.On("Index", s.candidate.ID(), mocks.Anything).Return(indexTxDeferredUpdate.Execute, nil).Once()
 
-	expectedEpochState := &flow.EpochProtocolStateEntry{
-		PreviousEpoch:          s.parentEpochState.CurrentEpoch.Copy(),
-		CurrentEpoch:           *s.parentEpochState.NextEpoch.Copy(),
-		NextEpoch:              nil,
-		EpochFallbackTriggered: true,
+	expectedEpochState := &flow.ProtocolStateEntry{
+		PreviousEpoch:                   s.parentEpochState.CurrentEpoch.Copy(),
+		CurrentEpoch:                    *s.parentEpochState.NextEpoch.Copy(),
+		NextEpoch:                       nil,
+		InvalidEpochTransitionAttempted: true,
 	}
 
 	storeTxDeferredUpdate := storagemock.NewDeferredDBUpdate(s.T())

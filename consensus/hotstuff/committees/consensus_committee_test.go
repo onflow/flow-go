@@ -31,11 +31,10 @@ type ConsensusSuite struct {
 	suite.Suite
 
 	// mocks
-	state              *protocolmock.State
-	snapshot           *protocolmock.Snapshot
-	params             *protocolmock.Params
-	epochs             *mocks.EpochQuery
-	epochProtocolState *protocolmock.EpochProtocolState
+	state    *protocolmock.State
+	snapshot *protocolmock.Snapshot
+	params   *protocolmock.Params
+	epochs   *mocks.EpochQuery
 
 	// backend for mocked functions
 	phase                  flow.EpochPhase
@@ -60,12 +59,10 @@ func (suite *ConsensusSuite) SetupTest() {
 
 	suite.state.On("Final").Return(suite.snapshot)
 	suite.state.On("Params").Return(suite.params)
-	suite.epochProtocolState = protocolmock.NewEpochProtocolState(suite.T())
-	suite.epochProtocolState.On("EpochFallbackTriggered").Return(
+	suite.params.On("EpochFallbackTriggered").Return(
 		func() bool { return suite.epochFallbackTriggered },
 		func() error { return nil },
 	)
-	suite.snapshot.On("EpochProtocolState").Return(suite.epochProtocolState, nil)
 	suite.snapshot.On("Phase").Return(
 		func() flow.EpochPhase { return suite.phase },
 		func() error { return nil },
@@ -613,13 +610,12 @@ func TestRemoveOldEpochs(t *testing.T) {
 	epoch1 := newMockEpoch(currentEpochCounter, identities, 1, epochFinalView, unittest.SeedFixture(prg.RandomSourceLength), true)
 
 	// create mocks
-	state := protocolmock.NewState(t)
-	snapshot := protocolmock.NewSnapshot(t)
+	state := new(protocolmock.State)
+	snapshot := new(protocolmock.Snapshot)
+	params := new(protocolmock.Params)
 	state.On("Final").Return(snapshot)
-
-	epochProtocolState := protocolmock.NewEpochProtocolState(t)
-	epochProtocolState.On("EpochFallbackTriggered").Return(false, nil)
-	snapshot.On("EpochProtocolState").Return(epochProtocolState, nil)
+	state.On("Params").Return(params)
+	params.On("EpochFallbackTriggered").Return(false, nil)
 
 	epochQuery := mocks.NewEpochQuery(t, currentEpochCounter, epoch1)
 	snapshot.On("Epochs").Return(epochQuery)

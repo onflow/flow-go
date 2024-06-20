@@ -44,7 +44,7 @@ func TestGetEvents(t *testing.T) {
 		return storedEvents, nil
 	})
 
-	eventsIndex := NewEventsIndex(NewReporter(), events)
+	eventsIndex := NewEventsIndex(events)
 	err := eventsIndex.Initialize(&mockIndexReporter{})
 	require.NoError(t, err)
 

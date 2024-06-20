@@ -69,7 +69,7 @@ func (b *Block) PopulateReceiptRoot(results []*Result) {
 }
 
 // CalculateGasUsage sums up all the gas transactions in the block used
-func (b *Block) CalculateGasUsage(results []*Result) {
+func (b *Block) CalculateGasUsage(results []Result) {
 	for _, res := range results {
 		b.TotalGasUsed += res.GasConsumed
 	}

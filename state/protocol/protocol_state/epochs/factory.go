@@ -13,7 +13,7 @@ type EpochStateMachineFactory struct {
 	params               protocol.GlobalParams
 	setups               storage.EpochSetups
 	commits              storage.EpochCommits
-	epochProtocolStateDB storage.EpochProtocolStateEntries
+	epochProtocolStateDB storage.ProtocolState
 }
 
 var _ protocol_state.KeyValueStoreStateMachineFactory = (*EpochStateMachineFactory)(nil)
@@ -22,7 +22,7 @@ func NewEpochStateMachineFactory(
 	params protocol.GlobalParams,
 	setups storage.EpochSetups,
 	commits storage.EpochCommits,
-	epochProtocolStateDB storage.EpochProtocolStateEntries,
+	epochProtocolStateDB storage.ProtocolState,
 ) *EpochStateMachineFactory {
 	return &EpochStateMachineFactory{
 		params:               params,
@@ -44,10 +44,10 @@ func (f *EpochStateMachineFactory) Create(candidateView uint64, parentBlockID fl
 		f.epochProtocolStateDB,
 		parentState,
 		mutator,
-		func(candidateView uint64, parentState *flow.RichEpochProtocolStateEntry) (StateMachine, error) {
+		func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (StateMachine, error) {
 			return NewHappyPathStateMachine(candidateView, parentState)
 		},
-		func(candidateView uint64, parentState *flow.RichEpochProtocolStateEntry) (StateMachine, error) {
+		func(candidateView uint64, parentState *flow.RichProtocolStateEntry) (StateMachine, error) {
 			return NewFallbackStateMachine(f.params, candidateView, parentState)
 		},
 	)

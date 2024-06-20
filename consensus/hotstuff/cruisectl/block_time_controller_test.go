@@ -34,13 +34,12 @@ type BlockTimeControllerSuite struct {
 	curEpochTargetEndTime  uint64
 	epochFallbackTriggered bool
 
-	metrics            mockmodule.CruiseCtlMetrics
-	state              mockprotocol.State
-	params             mockprotocol.Params
-	snapshot           mockprotocol.Snapshot
-	epochs             mocks.EpochQuery
-	curEpoch           mockprotocol.Epoch
-	epochProtocolState mockprotocol.EpochProtocolState
+	metrics  mockmodule.CruiseCtlMetrics
+	state    mockprotocol.State
+	params   mockprotocol.Params
+	snapshot mockprotocol.Snapshot
+	epochs   mocks.EpochQuery
+	curEpoch mockprotocol.Epoch
 
 	config *Config
 	ctx    irrecoverable.SignalerContext
@@ -87,12 +86,9 @@ func setupMocks(bs *BlockTimeControllerSuite) {
 	bs.state.On("Final").Return(&bs.snapshot)
 	bs.state.On("AtHeight", mock.Anything).Return(&bs.snapshot).Maybe()
 	bs.state.On("Params").Return(&bs.params)
-	bs.epochProtocolState = *mockprotocol.NewEpochProtocolState(bs.T())
-	bs.epochProtocolState.On("EpochFallbackTriggered").Return(
+	bs.params.On("EpochFallbackTriggered").Return(
 		func() bool { return bs.epochFallbackTriggered },
-		func() error { return nil },
-	)
-	bs.snapshot.On("EpochProtocolState").Return(&bs.epochProtocolState, nil)
+		func() error { return nil })
 	bs.snapshot.On("Phase").Return(
 		func() flow.EpochPhase { return bs.epochs.Phase() },
 		func() error { return nil })
