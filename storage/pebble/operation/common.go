@@ -251,11 +251,16 @@ func getStartEndKeys(prefix []byte) (start, end []byte) {
 
 	// End key is the prefix with the last byte incremented by 1
 	end = append([]byte{}, prefix...)
-	end = append(end, 0)
-	for i := len(end) - 2; i >= 0 && end[i] == 0xff; i-- {
+	for i := len(end) - 1; i >= 0; i-- {
+		if end[i] < 0xff {
+			end[i]++
+			break
+		}
 		end[i] = 0
+		if i == 0 {
+			end = append(end, 0)
+		}
 	}
-	end[len(end)-2]++
 
 	return start, end
 }
