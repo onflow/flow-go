@@ -182,15 +182,7 @@ func (s *GrpcBlocksStreamSuite) TestHappyPath() {
 					foundANTxCount++
 				case block := <-observerBlocks:
 					s.T().Logf("ON block received: height: %d", block.Header.Height)
-
-					// the response tracker expects to receive data for the same heights from each node.
-					// when subscribing to the latest block, the specific start height depends on the node's
-					// local sealed height, so it may vary.
-					// check only the responses for ON that are also tracked by AN and compare them
-					if len(r.r[block.Header.Height]) > 0 {
-						r.Add(s.T(), block.Header.Height, "observer", block)
-						foundONTxCount++
-					}
+					s.addObserverBlock(block, r, rpc.name, &foundONTxCount)
 				}
 
 				if foundANTxCount >= txCount && foundONTxCount >= txCount {
@@ -201,6 +193,33 @@ func (s *GrpcBlocksStreamSuite) TestHappyPath() {
 			r.AssertAllResponsesHandled(t, txCount)
 		})
 	}
+}
+
+// addObserverBlock adds a block received from the observer node to the response tracker
+// and increments the transaction count for that node.
+//
+// Parameters:
+//   - block: The block received from the node.
+//   - responseTracker: The response tracker to which the block should be added.
+//   - rpcCallName: The name of the rpc subscription call which is testing.
+//   - txCount: A pointer to an integer that tracks the number of transactions received from the node.
+func (s *GrpcBlocksStreamSuite) addObserverBlock(
+	block *flow.Block,
+	responseTracker *ResponseTracker[*flow.Block],
+	rpcCallName string,
+	txCount *int,
+) {
+	// the response tracker expects to receive data for the same heights from each node.
+	// when subscribing to the latest block, the specific start height depends on the node's
+	// local sealed height, so it may vary.
+	// check only the responses for ON that are also tracked by AN and compare them
+	isANResponseExist := len(responseTracker.r[block.Header.Height]) > 0
+	if rpcCallName == "SubscribeBlocksFromLatest" && !isANResponseExist {
+		return
+	}
+
+	responseTracker.Add(s.T(), block.Header.Height, "observer", block)
+	*txCount++
 }
 
 func blockResponseHandler(msg *accessproto.SubscribeBlocksResponse) (*flow.Block, error) {
