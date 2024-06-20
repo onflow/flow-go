@@ -413,7 +413,7 @@ func (q *EpochQuery) Next() protocol.Epoch {
 	entry := epochState.Entry()
 
 	// if we are in the staking phase, the next epoch is not setup yet
-	if phase == flow.EpochPhaseStaking {
+	if phase == flow.EpochPhaseStaking || phase == flow.EpochPhaseFallback {
 		return invalid.NewEpoch(protocol.ErrNextEpochNotSetup)
 	}
 	// if we are in setup phase, return a SetupEpoch
