@@ -1707,17 +1707,18 @@ func TestEpochFallbackMode(t *testing.T) {
 			epoch1FinalView := epoch1Setup.FinalView
 			epoch1CommitmentDeadline := epoch1FinalView - safetyThreshold
 
-			// finalizing block 1 should trigger EFM
-			metricsMock.On("EpochFallbackModeTriggered").Once()
-			metricsMock.On("CurrentEpochFinalView", epoch1FinalView+epochs.DefaultEpochExtensionViewCount)
-			protoEventsMock.On("EpochFallbackModeTriggered").Once()
-			protoEventsMock.On("EpochExtended", mock.Anything).Once()
-
 			// we begin the epoch in the EpochStaking phase and
 			// block 1 will be the first block on or past the epoch commitment deadline
 			block1 := unittest.BlockWithParentFixture(head)
 			block1.Header.View = epoch1CommitmentDeadline + rand.Uint64()%2
 			block1.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(calculateExpectedStateId(block1.Header, nil))))
+
+			// finalizing block 1 should trigger EFM
+			metricsMock.On("EpochFallbackModeTriggered").Once()
+			metricsMock.On("CurrentEpochFinalView", epoch1FinalView+epochs.DefaultEpochExtensionViewCount)
+			protoEventsMock.On("EpochFallbackModeTriggered", epoch1Setup.Counter, block1.Header).Once()
+			protoEventsMock.On("EpochExtended", mock.Anything, mock.Anything, mock.Anything).Once()
+
 			err = state.Extend(context.Background(), block1)
 			require.NoError(t, err)
 			assertEpochFallbackTriggered(t, state.Final(), false) // not triggered before finalization
@@ -1815,8 +1816,8 @@ func TestEpochFallbackMode(t *testing.T) {
 			// finalizing block 3 should trigger EFM
 			metricsMock.On("EpochFallbackModeTriggered").Once()
 			metricsMock.On("CurrentEpochFinalView", epoch1FinalView+epochs.DefaultEpochExtensionViewCount)
-			protoEventsMock.On("EpochFallbackModeTriggered").Once()
-			protoEventsMock.On("EpochExtended", mock.Anything).Once()
+			protoEventsMock.On("EpochFallbackModeTriggered", epoch1Setup.Counter, block3.Header).Once()
+			protoEventsMock.On("EpochExtended", mock.Anything, mock.Anything, mock.Anything).Once()
 
 			assertEpochFallbackTriggered(t, state.Final(), false) // not triggered before finalization
 			err = state.Finalize(context.Background(), block3.ID())
@@ -1910,8 +1911,8 @@ func TestEpochFallbackMode(t *testing.T) {
 			// incorporating the service event should trigger EFM
 			metricsMock.On("EpochFallbackModeTriggered").Once()
 			metricsMock.On("CurrentEpochFinalView", epoch1FinalView+epochs.DefaultEpochExtensionViewCount)
-			protoEventsMock.On("EpochFallbackModeTriggered").Once()
-			protoEventsMock.On("EpochExtended", mock.Anything).Once()
+			protoEventsMock.On("EpochFallbackModeTriggered", epoch1Setup.Counter, block3.Header).Once()
+			protoEventsMock.On("EpochExtended", mock.Anything, mock.Anything, mock.Anything).Once()
 
 			assertEpochFallbackTriggered(t, state.Final(), false) // not triggered before finalization
 			err = state.Finalize(context.Background(), block3.ID())
@@ -1939,8 +1940,8 @@ func TestEpochFallbackMode(t *testing.T) {
 // TestRecoveryFromEpochFallbackMode tests a few scenarios where the protocol first enters EFM in different phases
 // and then recovers from it by incorporating and finalizing a valid EpochRecover service event.
 // We expect different behavior depending on the phase in which the protocol enters EFM, specifically for the committed phase,
-// as the protocol cannot be immediately recovered from it. First, we need to enter the next epoch before we can accept an EpochRecover event. Specifically, for this case
-// we make progress till the epoch extension event to make sure that we cover the most complex scenario.
+// as the protocol cannot be immediately recovered from it. First, we need to enter the next epoch before we can accept an EpochRecover event.
+// Specifically, for this case we make progress till the epoch extension event to make sure that we cover the most complex scenario.
 func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 
 	// assertCorrectRecovery checks that the recovery epoch is correctly setup.
@@ -2014,7 +2015,7 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 
 			// Since we enter EFM before the commitment deadline, no epoch extension is added
 			metricsMock.On("EpochFallbackModeTriggered").Once()
-			protoEventsMock.On("EpochFallbackModeTriggered").Once()
+			protoEventsMock.On("EpochFallbackModeTriggered", epoch1Setup.Counter, block3.Header).Once()
 			err = state.Finalize(context.Background(), block3.ID())
 			require.NoError(t, err)
 			assertEpochFallbackTriggered(t, state.Final(), true) // finalizing block 3 should have triggered EFM since it seals invalid setup event
@@ -2043,7 +2044,7 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 			// Epoch recovery results in entering Committed phase
 			metricsMock.On("CurrentEpochPhase", flow.EpochPhaseCommitted).Once()
 			metricsMock.On("EpochFallbackModeExited").Once()
-			protoEventsMock.On("EpochFallbackModeExited").Once()
+			protoEventsMock.On("EpochFallbackModeExited", epoch1Setup.Counter, block5.Header).Once()
 			protoEventsMock.On("EpochCommittedPhaseStarted", mock.Anything, mock.Anything).Once()
 			// finalize the block sealing the EpochRecover event
 			err = state.Finalize(context.Background(), block5.ID())
@@ -2121,7 +2122,7 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 			assertEpochFallbackTriggered(t, state.Final(), false) // EFM should still not be triggered after finalizing block 4
 
 			metricsMock.On("EpochFallbackModeTriggered").Once()
-			protoEventsMock.On("EpochFallbackModeTriggered").Once()
+			protoEventsMock.On("EpochFallbackModeTriggered", epoch1Setup.Counter, block5.Header).Once()
 			err = state.Finalize(context.Background(), block5.ID())
 			require.NoError(t, err)
 			assertEpochFallbackTriggered(t, state.Final(), true) // finalizing block 5 should have triggered EFM
@@ -2150,7 +2151,7 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 			// Epoch recovery results in entering Committed phase
 			metricsMock.On("CurrentEpochPhase", flow.EpochPhaseCommitted).Once()
 			metricsMock.On("EpochFallbackModeExited").Once()
-			protoEventsMock.On("EpochFallbackModeExited").Once()
+			protoEventsMock.On("EpochFallbackModeExited", epoch1Setup.Counter, block7.Header).Once()
 			protoEventsMock.On("EpochCommittedPhaseStarted", mock.Anything, mock.Anything).Once()
 			// finalize the block sealing the EpochRecover event
 			err = state.Finalize(context.Background(), block7.ID())
@@ -2281,7 +2282,7 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 			assertEpochFallbackTriggered(t, state.Final(), false) // EFM should still not be triggered after finalizing block 4
 
 			metricsMock.On("EpochFallbackModeTriggered").Once()
-			protoEventsMock.On("EpochFallbackModeTriggered").Once()
+			protoEventsMock.On("EpochFallbackModeTriggered", epoch1Setup.Counter, block7.Header).Once()
 			err = state.Finalize(context.Background(), block7.ID())
 			require.NoError(t, err)
 			assertEpochFallbackTriggered(t, state.Final(), true) // finalizing block 7 should have triggered EFM
@@ -2323,7 +2324,7 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 			require.Len(t, epochExtensions, 1)
 			require.Equal(t, epochExtensions[0].FirstView, epoch2Setup.FinalView+1)
 
-			protoEventsMock.On("EpochExtended", mock.Anything).Once()
+			protoEventsMock.On("EpochExtended", mock.Anything, mock.Anything, mock.Anything).Once()
 			metricsMock.On("CurrentEpochFinalView", epoch2Setup.FinalView+epochs.DefaultEpochExtensionViewCount)
 			err = state.Finalize(context.Background(), block9.ID())
 			require.NoError(t, err)
@@ -2363,7 +2364,7 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 			// Epoch recovery causes us to enter the Committed phase
 			metricsMock.On("CurrentEpochPhase", flow.EpochPhaseCommitted).Once()
 			metricsMock.On("EpochFallbackModeExited").Once()
-			protoEventsMock.On("EpochFallbackModeExited").Once()
+			protoEventsMock.On("EpochFallbackModeExited", epochRecover.EpochSetup.Counter-1, block12.Header).Once()
 			protoEventsMock.On("EpochCommittedPhaseStarted", epochRecover.EpochSetup.Counter-1, mock.Anything).Once()
 			// finalize the block sealing the EpochRecover event
 			err = state.Finalize(context.Background(), block12.ID())
