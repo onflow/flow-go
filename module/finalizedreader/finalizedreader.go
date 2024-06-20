@@ -27,7 +27,7 @@ func NewFinalizedReader(headers storage.Headers, lastHeight uint64) *FinalizedRe
 }
 
 // FinalizedBlockIDAtHeight returns the block ID of the finalized block at the given height.
-// It return storage.NotFound if the given height has not been finalized yet
+// It returns storage.NotFound if the given height has not been finalized yet
 // any other error returned are exceptions
 func (r *FinalizedReader) FinalizedBlockIDAtHeight(height uint64) (flow.Identifier, error) {
 	if height > r.lastHeight.Load() {

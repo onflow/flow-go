@@ -91,6 +91,7 @@ func (s *EpochProtocolStateAdapter) PreviousEpochExists() bool {
 	return s.PreviousEpoch != nil
 }
 
+// EpochExtensions returns the epoch extensions associated with the current epoch, if any.
 func (s *EpochProtocolStateAdapter) EpochExtensions() []flow.EpochExtension {
 	return s.CurrentEpoch.EpochExtensions
 }

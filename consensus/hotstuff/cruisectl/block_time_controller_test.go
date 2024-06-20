@@ -247,7 +247,7 @@ func (bs *BlockTimeControllerSuite) TestEpochFallbackTriggered() {
 	assert.NotEqual(bs.T(), bs.config.FallbackProposalDelay, bs.ctl.getProposalTiming())
 
 	// send the event
-	bs.ctl.EpochFallbackModeTriggered()
+	bs.ctl.EpochFallbackModeTriggered(0, nil)
 	// async: should revert to default GetProposalTiming
 	require.Eventually(bs.T(), func() bool {
 		now := time.Now().UTC()
@@ -257,7 +257,7 @@ func (bs *BlockTimeControllerSuite) TestEpochFallbackTriggered() {
 	// additional EpochFallbackModeTriggered events should be no-ops
 	// (send capacity+1 events to guarantee one is processed)
 	for i := 0; i <= cap(bs.ctl.epochFallbacks); i++ {
-		bs.ctl.EpochFallbackModeTriggered()
+		bs.ctl.EpochFallbackModeTriggered(0, nil)
 	}
 	// state should be unchanged
 	now := time.Now().UTC()

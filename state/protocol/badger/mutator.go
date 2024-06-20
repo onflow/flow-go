@@ -830,12 +830,16 @@ func (m *FollowerState) epochMetricsAndEventsOnBlockFinalized(parentEpochState, 
 	// Check for entering or exiting EFM
 	if !parentEpochState.EpochFallbackTriggered() && finalizedEpochState.EpochFallbackTriggered() {
 		// this block triggers EFM
-		events = append(events, m.consumer.EpochFallbackModeTriggered)
+		events = append(events, func() {
+			m.consumer.EpochFallbackModeTriggered(childEpochCounter, finalized)
+		})
 		metrics = append(metrics, m.metrics.EpochFallbackModeTriggered)
 	}
 	if parentEpochState.EpochFallbackTriggered() && !finalizedEpochState.EpochFallbackTriggered() {
 		// this block exits EFM
-		events = append(events, m.consumer.EpochFallbackModeExited)
+		events = append(events, func() {
+			m.consumer.EpochFallbackModeExited(childEpochCounter, finalized)
+		})
 		metrics = append(metrics, m.metrics.EpochFallbackModeExited)
 	}
 
@@ -844,7 +848,7 @@ func (m *FollowerState) epochMetricsAndEventsOnBlockFinalized(parentEpochState, 
 		// We expect at most one additional epoch extension per block, but tolerate more here
 		for i := len(parentEpochState.EpochExtensions()); i < len(finalizedEpochState.EpochExtensions()); i++ {
 			finalizedExtension := finalizedEpochState.EpochExtensions()[i]
-			events = append(events, func() { m.consumer.EpochExtended(finalizedExtension) })
+			events = append(events, func() { m.consumer.EpochExtended(childEpochCounter, finalized, finalizedExtension) })
 			metrics = append(metrics, func() { m.metrics.CurrentEpochFinalView(finalizedExtension.FinalView) })
 		}
 	}
@@ -863,10 +867,12 @@ func (m *FollowerState) epochMetricsAndEventsOnBlockFinalized(parentEpochState, 
 		// denote the most recent epoch transition height
 		metrics = append(metrics, func() { m.metrics.EpochTransitionHeight(finalized.Height) })
 		// set epoch phase - since we are starting a new epoch we begin in the staking phase
-		metrics = append(metrics, func() { m.metrics.CurrentEpochPhase(flow.EpochPhaseStaking) })
+		metrics = append(metrics, func() { m.metrics.CurrentEpochPhase(childEpochPhase) })
 		// set current epoch view values
 		metrics = append(
 			metrics,
+			// Since we have just started a new epoch, there cannot be any extensions yet.
+			// Therefore, it is safe to directly use EpochSetup.FinalView here (epoch extensions are handled above).
 			func() { m.metrics.CurrentEpochFinalView(childEpochSetup.FinalView) },
 			func() {
 				m.metrics.CurrentDKGPhaseViews(childEpochSetup.DKGPhase1FinalView, childEpochSetup.DKGPhase2FinalView, childEpochSetup.DKGPhase3FinalView)
@@ -887,7 +893,8 @@ func (m *FollowerState) epochMetricsAndEventsOnBlockFinalized(parentEpochState, 
 		return
 	}
 
-	// TODO(EFM, #6092): need to decide how an EpochFallback phase would like like to re-enable below sanity check
+	// TODO(EFM, #6092): with the addition of an EpochFallback phase, we should re-enable the sanity check below for protocol-compliant phase transitions
+	// TODO(EFM, #6013): proper event emission and metrics for epoch extensions; CAUTION: metrics.CurrentEpochFinalView needs to be updated despite the epoch phase remaining at EpochFallback phase
 	return
 	//return nil, nil, fmt.Errorf("sanity check failed: invalid subsequent [epoch-phase] [%d-%s]->[%d-%s]",
 	//	parentEpochCounter, parentEpochPhase, childEpochCounter, childEpochPhase)

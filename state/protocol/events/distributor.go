@@ -67,26 +67,26 @@ func (d *Distributor) EpochCommittedPhaseStarted(epoch uint64, first *flow.Heade
 	}
 }
 
-func (d *Distributor) EpochFallbackModeTriggered() {
+func (d *Distributor) EpochFallbackModeTriggered(epochCounter uint64, header *flow.Header) {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
 	for _, sub := range d.subscribers {
-		sub.EpochFallbackModeTriggered()
+		sub.EpochFallbackModeTriggered(epochCounter, header)
 	}
 }
 
-func (d *Distributor) EpochFallbackModeExited() {
+func (d *Distributor) EpochFallbackModeExited(epochCounter uint64, header *flow.Header) {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
 	for _, sub := range d.subscribers {
-		sub.EpochFallbackModeExited()
+		sub.EpochFallbackModeExited(epochCounter, header)
 	}
 }
 
-func (d *Distributor) EpochExtended(ext flow.EpochExtension) {
+func (d *Distributor) EpochExtended(epochCounter uint64, header *flow.Header, extension flow.EpochExtension) {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
 	for _, sub := range d.subscribers {
-		sub.EpochExtended(ext)
+		sub.EpochExtended(epochCounter, header, extension)
 	}
 }
