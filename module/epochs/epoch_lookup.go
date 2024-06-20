@@ -280,6 +280,6 @@ func (lookup *EpochLookup) EpochCommittedPhaseStarted(_ uint64, first *flow.Head
 }
 
 // EpochFallbackModeTriggered passes the protocol event to the worker thread.
-func (lookup *EpochLookup) EpochFallbackModeTriggered() {
+func (lookup *EpochLookup) EpochFallbackModeTriggered(uint64, *flow.Header) {
 	lookup.epochFallbackIsTriggered.Store(true)
 }

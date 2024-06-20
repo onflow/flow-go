@@ -830,12 +830,16 @@ func (m *FollowerState) epochMetricsAndEventsOnBlockFinalized(parentEpochState, 
 	// Check for entering or exiting EFM
 	if !parentEpochState.EpochFallbackTriggered() && finalizedEpochState.EpochFallbackTriggered() {
 		// this block triggers EFM
-		events = append(events, m.consumer.EpochFallbackModeTriggered)
+		events = append(events, func() {
+			m.consumer.EpochFallbackModeTriggered(childEpochCounter, finalized)
+		})
 		metrics = append(metrics, m.metrics.EpochFallbackModeTriggered)
 	}
 	if parentEpochState.EpochFallbackTriggered() && !finalizedEpochState.EpochFallbackTriggered() {
 		// this block exits EFM
-		events = append(events, m.consumer.EpochFallbackModeExited)
+		events = append(events, func() {
+			m.consumer.EpochFallbackModeExited(childEpochCounter, finalized)
+		})
 		metrics = append(metrics, m.metrics.EpochFallbackModeExited)
 	}
 
@@ -844,7 +848,7 @@ func (m *FollowerState) epochMetricsAndEventsOnBlockFinalized(parentEpochState, 
 		// We expect at most one additional epoch extension per block, but tolerate more here
 		for i := len(parentEpochState.EpochExtensions()); i < len(finalizedEpochState.EpochExtensions()); i++ {
 			finalizedExtension := finalizedEpochState.EpochExtensions()[i]
-			events = append(events, func() { m.consumer.EpochExtended(finalizedExtension) })
+			events = append(events, func() { m.consumer.EpochExtended(childEpochCounter, finalized, finalizedExtension) })
 			metrics = append(metrics, func() { m.metrics.CurrentEpochFinalView(finalizedExtension.FinalView) })
 		}
 	}

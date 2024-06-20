@@ -92,16 +92,28 @@ type Consumer interface {
 	// Usually, this means we remain in the current epoch until EFM is exited.
 	// If EFM was triggered within the EpochCommitted phase, then we complete the transition
 	// to the next, already-committed epoch, then remain in that epoch until EFM is exited.
+	// Consumers can get context for handling events from:
+	//   - epochCounter is the current epoch counter at the block when EFM was triggered
+	//   - header is the block when EFM was triggered
+	//
 	// NOTE: This notification is emitted when the block triggering EFM is finalized.
-	EpochFallbackModeTriggered()
+	EpochFallbackModeTriggered(epochCounter uint64, header *flow.Header)
 
 	// EpochFallbackModeExited is called when epoch fallback mode [EFM] is exited.
 	// EFM is exited when an EpochRecover service event is processed, which defines
 	// a final view for the current epoch and fully specifies the subsequent epoch.
+	// Consumers can get context for handling events from:
+	//   - epochCounter is the current epoch counter at the block when EFM was triggered
+	//   - header is the block when EFM was triggered
+	//
 	// NOTE: Only called once the block incorporating the EpochRecover is finalized.
-	EpochFallbackModeExited()
+	EpochFallbackModeExited(epochCounter uint64, header *flow.Header)
 
 	// EpochExtended is called when a flow.EpochExtension is added to the current epoch
+	// Consumers can get context for handling events from:
+	//   - epochCounter is the current epoch counter at the block when EFM was triggered
+	//   - header is the block when EFM was triggered
+	//
 	// NOTE: This notification is emitted when the block triggering the EFM extension is finalized.
-	EpochExtended(flow.EpochExtension)
+	EpochExtended(epochCounter uint64, header *flow.Header, extension flow.EpochExtension)
 }

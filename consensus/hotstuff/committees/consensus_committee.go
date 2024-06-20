@@ -368,7 +368,7 @@ func (c *Consensus) EpochCommittedPhaseStarted(_ uint64, first *flow.Header) {
 }
 
 // EpochFallbackModeTriggered passes the protocol event to the worker thread.
-func (c *Consensus) EpochFallbackModeTriggered() {
+func (c *Consensus) EpochFallbackModeTriggered(uint64, *flow.Header) {
 	c.epochFallbackTriggeredCh <- struct{}{}
 }
 
