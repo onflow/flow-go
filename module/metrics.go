@@ -476,11 +476,15 @@ type ComplianceMetrics interface {
 	FinalizedHeight(height uint64)
 	// EpochTransitionHeight reports the height of the most recently finalized epoch transition.
 	EpochTransitionHeight(height uint64)
-	// SealedHeight reports the latest sealed height known to this node.
+	// SealedHeight reports the latest block that has a finalized seal known to this node.
 	SealedHeight(height uint64)
 	// BlockFinalized reports information about data contained within finalized blocks.
 	BlockFinalized(*flow.Block)
-	// BlockSealed reports information about data contained within sealed blocks.
+	// BlockSealed reports information about data contained within blocks with a finalized seal.
+	// When a new block is finalized, this method is called for every seal in the finalized block,
+	// in the order the seals are listed.
+	// CAUTION: within a block, seals can be included in any permutation (not necessarily in order
+	// of increasing height).
 	BlockSealed(*flow.Block)
 	// CurrentEpochCounter reports the current epoch counter.
 	CurrentEpochCounter(counter uint64)

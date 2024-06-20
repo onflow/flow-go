@@ -84,15 +84,15 @@ type Consumer interface {
 	// NOTE: Only called once the phase transition has been finalized.
 	EpochCommittedPhaseStarted(currentEpochCounter uint64, first *flow.Header)
 
-	// EpochFallbackModeTriggered is called when epoch fallback mode [EFM] is triggered.
+	// EpochFallbackModeTriggered is called when Epoch Fallback Mode [EFM] is triggered.
 	// EFM is triggered when an invalid or unexpected epoch-related service event is observed,
 	// or an expected service event is not observed before the epoch commitment deadline.
-	// After EFM is triggered, we do not transition into any not-yet-committed epoch until
-	// an EpochRecover event is observed, after which regular epoch transitions begins again.
+	// After EFM is triggered, we drop any potentially pending but uncommitted future epoch setup.
+	// When an EpochRecover event is observed, regular epoch transitions begin again.
 	// Usually, this means we remain in the current epoch until EFM is exited.
 	// If EFM was triggered within the EpochCommitted phase, then we complete the transition
 	// to the next, already-committed epoch, then remain in that epoch until EFM is exited.
-	// NOTE: Only called once the block triggering EFM is finalized.
+	// NOTE: This notification is emitted when the block triggering EFM is finalized.
 	EpochFallbackModeTriggered()
 
 	// EpochFallbackModeExited is called when epoch fallback mode [EFM] is exited.
@@ -102,6 +102,6 @@ type Consumer interface {
 	EpochFallbackModeExited()
 
 	// EpochExtended is called when a flow.EpochExtension is added to the current epoch
-	// NOTE: Only called when the block including the new extension is finalized.
+	// NOTE: This notification is emitted when the block triggering the EFM extension is finalized.
 	EpochExtended(flow.EpochExtension)
 }

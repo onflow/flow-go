@@ -82,6 +82,7 @@ func newStaticEpochInfo(epoch protocol.Epoch) (*staticEpochInfo, error) {
 // * begins after the last committed epoch
 // * lasts until the next spork (estimated 6 months)
 // * has the same static committee as the last committed epoch
+// TODO(EFM, #5730): needs update to represent EFM epoch extension; see https://github.com/onflow/flow-go/issues/5730
 func newFallbackModeEpoch(lastCommittedEpoch *staticEpochInfo) (*staticEpochInfo, error) {
 	rng, err := prg.New(lastCommittedEpoch.randomSource, prg.ConsensusLeaderSelection, nil)
 	if err != nil {
@@ -376,7 +377,6 @@ func (c *Consensus) EpochFallbackModeTriggered() {
 // This method must also be called on initialization, if epoch fallback mode was triggered in the past.
 // No errors are expected during normal operation.
 func (c *Consensus) onEpochFallbackModeTriggered() error {
-
 	// we respond to epoch fallback being triggered at most once, therefore
 	// the core logic is protected by an atomic bool.
 	// although it is only valid for epoch fallback to be triggered once per spork,

@@ -887,7 +887,8 @@ func (m *FollowerState) epochMetricsAndEventsOnBlockFinalized(parentEpochState, 
 		return
 	}
 
-	// TODO(EFM, #6092): need to decide how an EpochFallback phase would like like to re-enable below sanity check
+	// TODO(EFM, #6092): with the addition of an EpochFallback phase, we should re-enable the sanity check below for protocol-compliant phase transitions
+	// TODO(EFM, #6013): proper event emission and metrics for epoch extensions; CAUTION: metrics.CurrentEpochFinalView needs to be updated despite the epoch phase remaining at EpochFallback phase
 	return
 	//return nil, nil, fmt.Errorf("sanity check failed: invalid subsequent [epoch-phase] [%d-%s]->[%d-%s]",
 	//	parentEpochCounter, parentEpochPhase, childEpochCounter, childEpochPhase)
