@@ -863,10 +863,12 @@ func (m *FollowerState) epochMetricsAndEventsOnBlockFinalized(parentEpochState, 
 		// denote the most recent epoch transition height
 		metrics = append(metrics, func() { m.metrics.EpochTransitionHeight(finalized.Height) })
 		// set epoch phase - since we are starting a new epoch we begin in the staking phase
-		metrics = append(metrics, func() { m.metrics.CurrentEpochPhase(flow.EpochPhaseStaking) })
+		metrics = append(metrics, func() { m.metrics.CurrentEpochPhase(childEpochPhase) })
 		// set current epoch view values
 		metrics = append(
 			metrics,
+			// Since we have just started a new epoch, there cannot be any extensions yet.
+			// Therefore, it is safe to directly use EpochSetup.FinalView here (epoch extensions are handled above).
 			func() { m.metrics.CurrentEpochFinalView(childEpochSetup.FinalView) },
 			func() {
 				m.metrics.CurrentDKGPhaseViews(childEpochSetup.DKGPhase1FinalView, childEpochSetup.DKGPhase2FinalView, childEpochSetup.DKGPhase3FinalView)
