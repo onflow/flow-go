@@ -80,6 +80,81 @@ func (b *backendAccounts) GetAccountAtBlockHeight(
 	return account, nil
 }
 
+func (b *backendAccounts) GetAccountBalance(ctx context.Context, address flow.Address) (uint64, error) {
+	return b.GetAccountBalanceAtLatestBlock(ctx, address)
+}
+
+func (b *backendAccounts) GetAccountBalanceAtLatestBlock(ctx context.Context, address flow.Address) (uint64, error) {
+	sealed, err := b.state.Sealed().Head()
+	if err != nil {
+		err := irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err)
+		irrecoverable.Throw(ctx, err)
+		return 0, err
+	}
+
+	sealedBlockID := sealed.ID()
+
+	accountBalance, err := b.scriptExecutor.GetAccountBalance(ctx, address, sealed.Height)
+	if err != nil {
+		b.log.Debug().Err(err).Msgf("failed to get account balance at blockID: %v", sealedBlockID)
+		return 0, err
+	}
+
+	return accountBalance, nil
+}
+
+func (b *backendAccounts) GetAccountBalanceAtBlockHeight(
+	ctx context.Context,
+	address flow.Address,
+	height uint64,
+) (uint64, error) {
+	accountBalance, err := b.scriptExecutor.GetAccountBalance(ctx, address, height)
+
+	if err != nil {
+		b.log.Debug().Err(err).Msgf("failed to get account balance at height: %d", height)
+		return 0, err
+	}
+
+	return accountBalance, nil
+}
+
+func (b *backendAccounts) GetAccountKeys(ctx context.Context, address flow.Address) ([]flow.AccountPublicKey, error) {
+	return b.GetAccountKeysAtLatestBlock(ctx, address)
+}
+
+func (b *backendAccounts) GetAccountKeysAtLatestBlock(ctx context.Context, address flow.Address) ([]flow.AccountPublicKey, error) {
+	sealed, err := b.state.Sealed().Head()
+	if err != nil {
+		err := irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err)
+		irrecoverable.Throw(ctx, err)
+		return nil, err
+	}
+
+	sealedBlockID := sealed.ID()
+
+	accountKeys, err := b.scriptExecutor.GetAccountKeys(ctx, address, sealed.Height)
+	if err != nil {
+		b.log.Debug().Err(err).Msgf("failed to get account keys at blockID: %v", sealedBlockID)
+		return nil, err
+	}
+
+	return accountKeys, nil
+}
+
+func (b *backendAccounts) GetAccountKeysAtBlockHeight(
+	ctx context.Context,
+	address flow.Address,
+	height uint64,
+) ([]flow.AccountPublicKey, error) {
+	accountKeys, err := b.scriptExecutor.GetAccountKeys(ctx, address, height)
+	if err != nil {
+		b.log.Debug().Err(err).Msgf("failed to get account keys at height: %d", height)
+		return nil, err
+	}
+
+	return accountKeys, nil
+}
+
 // getAccountAtBlock returns the account details at the given block
 //
 // The data may be sourced from the local storage or from an execution node depending on the nodes's
