@@ -64,11 +64,11 @@ func (a *AccountsAtreeLedger) ValueExists(owner, key []byte) (exists bool, err e
 	return len(v) > 0, nil
 }
 
-// AllocateStorageIndex allocates new storage index under the owner accounts to store a new register
-func (a *AccountsAtreeLedger) AllocateStorageIndex(owner []byte) (atree.StorageIndex, error) {
-	v, err := a.Accounts.AllocateStorageIndex(flow.BytesToAddress(owner))
+// AllocateSlabIndex allocates new storage index under the owner accounts to store a new register
+func (a *AccountsAtreeLedger) AllocateSlabIndex(owner []byte) (atree.SlabIndex, error) {
+	v, err := a.Accounts.AllocateSlabIndex(flow.BytesToAddress(owner))
 	if err != nil {
-		return atree.StorageIndex{}, fmt.Errorf("storage index allocation failed: %w", err)
+		return atree.SlabIndex{}, fmt.Errorf("storage index allocation failed: %w", err)
 	}
 	return v, nil
 }
@@ -205,7 +205,7 @@ type PayloadMetaInfo struct {
 type PayloadsLedger struct {
 	Payloads map[flow.RegisterID]*ledger.Payload
 
-	AllocateStorageIndexFunc func(owner []byte) (atree.StorageIndex, error)
+	AllocateSlabIndexFunc func(owner []byte) (atree.SlabIndex, error)
 }
 
 var _ atree.Ledger = &PayloadsLedger{}
@@ -238,9 +238,9 @@ func (p *PayloadsLedger) ValueExists(owner, key []byte) (exists bool, err error)
 	return ok, nil
 }
 
-func (p *PayloadsLedger) AllocateStorageIndex(owner []byte) (atree.StorageIndex, error) {
-	if p.AllocateStorageIndexFunc != nil {
-		return p.AllocateStorageIndexFunc(owner)
+func (p *PayloadsLedger) AllocateSlabIndex(owner []byte) (atree.SlabIndex, error) {
+	if p.AllocateSlabIndexFunc != nil {
+		return p.AllocateSlabIndexFunc(owner)
 	}
 
 	panic("AllocateStorageIndex not expected to be called")

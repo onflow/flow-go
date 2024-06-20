@@ -457,6 +457,46 @@ func checkMigratedState(
 				storageMapKey: interpreter.Uint64StorageMapKey(0x3),
 				value:         "StorageCapabilityController(borrowType: Type<&A.0ae53cb6e3f42a79.FlowToken.Vault>(), capabilityID: 3, target: /storage/flowTokenVault)",
 			},
+			{
+				storageKey:    interpreter.StorageKey{Key: "path_cap", Address: address},
+				storageMapKey: interpreter.StringStorageMapKey("flowTokenVault"),
+				value:         "3",
+			},
+			{
+				storageKey:    interpreter.StorageKey{Key: "path_cap", Address: address},
+				storageMapKey: interpreter.StringStorageMapKey("flowTokenVault"),
+				value:         "1",
+			},
+			{
+				storageKey:    interpreter.StorageKey{Key: "path_cap", Address: address},
+				storageMapKey: interpreter.StringStorageMapKey("flowTokenVault"),
+				value:         "nil",
+			},
+			{
+				storageKey:    interpreter.StorageKey{Key: "path_cap", Address: address},
+				storageMapKey: interpreter.StringStorageMapKey("flowTokenVault"),
+				value:         "nil",
+			},
+			{
+				storageKey:    interpreter.StorageKey{Key: "path_cap", Address: address},
+				storageMapKey: interpreter.StringStorageMapKey("flowTokenVault"),
+				value:         "{3: nil, 1: nil}",
+			},
+			{
+				storageKey:    interpreter.StorageKey{Key: "path_cap", Address: address},
+				storageMapKey: interpreter.StringStorageMapKey("r"),
+				value:         "2",
+			},
+			{
+				storageKey:    interpreter.StorageKey{Key: "path_cap", Address: address},
+				storageMapKey: interpreter.StringStorageMapKey("r"),
+				value:         "nil",
+			},
+			{
+				storageKey:    interpreter.StorageKey{Key: "path_cap", Address: address},
+				storageMapKey: interpreter.StringStorageMapKey("r"),
+				value:         "{2: nil}",
+			},
 		},
 		visitMigration.visits,
 	)
@@ -1207,6 +1247,16 @@ func TestProgramParsingError(t *testing.T) {
 		string(testAddress[:]),
 		flow.ContractKey(contractName),
 		[]byte(`pub contract C {}`),
+	)
+	require.NoError(t, err)
+
+	encodedContractNames, err := environment.EncodeContractNames([]string{contractName})
+	require.NoError(t, err)
+
+	err = registersByAccount.Set(
+		string(testAddress[:]),
+		flow.ContractNamesKey,
+		encodedContractNames,
 	)
 	require.NoError(t, err)
 
