@@ -2,15 +2,19 @@ package backend
 
 import (
 	"context"
-	pebbleStorage "github.com/onflow/flow-go/storage/pebble"
-	"math"
-	"testing"
-
 	"github.com/coreos/go-semver/semver"
+	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
+	"github.com/onflow/flow-go/module/irrecoverable"
+	storageMock "github.com/onflow/flow-go/storage/mock"
+	pebbleStorage "github.com/onflow/flow-go/storage/pebble"
 	"github.com/rs/zerolog"
 	testifyMock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+	"math"
+	"testing"
+	"time"
 
 	"github.com/onflow/flow-go/engine/access/index"
 	"github.com/onflow/flow-go/engine/common/version"
@@ -25,7 +29,6 @@ import (
 	syncmock "github.com/onflow/flow-go/module/state_synchronization/mock"
 	synctest "github.com/onflow/flow-go/module/state_synchronization/requester/unittest"
 	"github.com/onflow/flow-go/storage"
-	storageMock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -41,6 +44,10 @@ type ScriptExecutorSuite struct {
 	chain          flow.Chain
 	dbDir          string
 	height         uint64
+	headers        storage.Headers
+	vm             *fvm.VirtualMachine
+	vmCtx          fvm.Context
+	snapshot       snapshot.SnapshotTree
 }
 
 func TestScriptExecutorSuite(t *testing.T) {
@@ -56,6 +63,26 @@ func newBlockHeadersStorage(blocks []*flow.Block) storage.Headers {
 	return synctest.MockBlockHeaderStorage(synctest.WithByHeight(blocksByHeight))
 }
 
+func (s *ScriptExecutorSuite) bootstrap() {
+	bootstrapOpts := []fvm.BootstrapProcedureOption{
+		fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply),
+	}
+
+	executionSnapshot, out, err := s.vm.Run(
+		s.vmCtx,
+		fvm.Bootstrap(unittest.ServiceAccountPublicKey, bootstrapOpts...),
+		s.snapshot)
+
+	s.Require().NoError(err)
+	s.Require().NoError(out.Err)
+
+	s.height++
+	err = s.registerIndex.Store(executionSnapshot.UpdatedRegisters(), s.height)
+	s.Require().NoError(err)
+
+	s.snapshot = s.snapshot.Append(executionSnapshot)
+}
+
 func (s *ScriptExecutorSuite) SetupTest() {
 	s.log = unittest.Logger()
 	s.chain = flow.Emulator.Chain()
@@ -65,47 +92,24 @@ func (s *ScriptExecutorSuite) SetupTest() {
 	err := s.indexReporter.Initialize(s.reporter)
 	require.NoError(s.T(), err)
 
-	entropyProvider := testutil.EntropyProviderFixture(nil)
 	blockchain := unittest.BlockchainFixture(10)
-	headers := newBlockHeadersStorage(blockchain)
+	s.headers = newBlockHeadersStorage(blockchain)
 	s.height = blockchain[0].Header.Height
+	s.reporter.On("LowestIndexedHeight").Return(s.height, nil)
 
+	entropyProvider := testutil.EntropyProviderFixture(nil)
 	entropyBlock := mock.NewEntropyProviderPerBlock(s.T())
 	entropyBlock.
 		On("AtBlockID", testifyMock.AnythingOfType("flow.Identifier")).
 		Return(entropyProvider).
 		Maybe()
 
-	sealedHeader := unittest.BlockHeaderWithParentFixture(blockchain[len(blockchain)-1].Header) // height 11
-
-	// Set up a mock version beacons storage.
-	versionBeacons := storageMock.NewVersionBeacons(s.T())
-	// Mock the Highest method to return a version beacon with a specific version.
-	versionBeacons.
-		On("Highest", testifyMock.AnythingOfType("uint64")).
-		Return(func(height uint64) (*flow.SealedVersionBeacon, error) {
-			if height == sealedHeader.Height {
-				return &flow.SealedVersionBeacon{
-					VersionBeacon: unittest.VersionBeaconFixture(
-						unittest.WithBoundaries(
-							flow.VersionBoundary{
-								BlockHeight: sealedHeader.Height,
-								Version:     "0.0.1",
-							}),
-					),
-					SealHeight: sealedHeader.Height,
-				}, nil
-			} else {
-				return nil, nil
-			}
-		}, nil)
-
-	s.versionControl = version.NewVersionControl(
-		s.log,
-		versionBeacons,
-		semver.New("0.0.1"),
-		blockchain[0].Header.Height,
-		sealedHeader.Height,
+	s.snapshot = snapshot.NewSnapshotTree(nil)
+	s.vm = fvm.NewVirtualMachine()
+	s.vmCtx = fvm.NewContext(
+		fvm.WithChain(s.chain),
+		fvm.WithAuthorizationChecksEnabled(false),
+		fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
 	)
 
 	s.dbDir = unittest.TempDir(s.T())
@@ -122,7 +126,7 @@ func (s *ScriptExecutorSuite) SetupTest() {
 		metrics.NewNoopCollector(),
 		nil,
 		s.registerIndex,
-		headers,
+		s.headers,
 		nil,
 		nil,
 		nil,
@@ -138,25 +142,146 @@ func (s *ScriptExecutorSuite) SetupTest() {
 		metrics.NewNoopCollector(),
 		s.chain.ChainID(),
 		entropyBlock,
-		headers,
+		s.headers,
 		indexerCore.RegisterValue,
 		query.NewDefaultConfig(),
 		derivedChainData,
 		true,
 	)
+	s.bootstrap()
 }
 
 func (s *ScriptExecutorSuite) TestExecuteAtBlockHeight() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	scriptExec := NewScriptExecutor(s.log, s.versionControl, uint64(0), math.MaxUint64)
+	script := []byte("access(all) fun main() { }")
+	var scriptArgs [][]byte
+	var expectedResult = []byte("{\"type\":\"Void\"}\n")
 
-	err := scriptExec.Initialize(s.indexReporter, s.scripts)
-	s.Require().NoError(err)
+	s.Run("test scrypt execution without version control", func() {
+		scriptExec := NewScriptExecutor(s.log, nil, uint64(0), math.MaxUint64)
+		s.reporter.On("HighestIndexedHeight").Return(s.height+1, nil)
 
-	script := []byte("access(all) fun main() { return 1 }")
-	arguments := [][]byte{[]byte("arg1"), []byte("arg2")}
-	_, err = scriptExec.ExecuteAtBlockHeight(ctx, script, arguments, 11)
-	s.Require().NoError(err)
+		err := scriptExec.Initialize(s.indexReporter, s.scripts)
+		s.Require().NoError(err)
+
+		res, err := scriptExec.ExecuteAtBlockHeight(ctx, script, scriptArgs, s.height)
+		s.Assert().NoError(err)
+		s.Assert().NotNil(res)
+		s.Assert().Equal(expectedResult, res)
+	})
+
+	s.Run("test scrypt execution with version control with compatible version", func() {
+		// Set up a mock version beacons storage.
+		versionBeacons := storageMock.NewVersionBeacons(s.T())
+		// Mock the Highest method to return a version beacon with a specific version.
+		versionBeacons.
+			On("Highest", testifyMock.AnythingOfType("uint64")).
+			Return(func(height uint64) (*flow.SealedVersionBeacon, error) {
+				if height == s.height {
+					return &flow.SealedVersionBeacon{
+						VersionBeacon: unittest.VersionBeaconFixture(
+							unittest.WithBoundaries(
+								flow.VersionBoundary{
+									BlockHeight: s.height,
+									Version:     "0.0.1",
+								}),
+						),
+						SealHeight: s.height,
+					}, nil
+				} else {
+					return nil, nil
+				}
+			}, nil)
+
+		var err error
+		s.versionControl, err = version.NewVersionControl(
+			s.log,
+			versionBeacons,
+			semver.New("0.0.1"),
+			s.height-1,
+			s.height,
+		)
+		require.NoError(s.T(), err)
+
+		// Create a mock signaler context for testing.
+		ictx := irrecoverable.NewMockSignalerContext(s.T(), ctx)
+
+		// Start the VersionControl component.
+		s.versionControl.Start(ictx)
+
+		// Ensure the component is ready before proceeding.
+		unittest.RequireComponentsReadyBefore(s.T(), 2*time.Second, s.versionControl)
+
+		// Wait for the asynchronous version controller initialization process.
+		time.Sleep(time.Second)
+
+		scriptExec := NewScriptExecutor(s.log, s.versionControl, uint64(0), math.MaxUint64)
+		s.reporter.On("HighestIndexedHeight").Return(s.height+1, nil)
+
+		err = scriptExec.Initialize(s.indexReporter, s.scripts)
+		s.Require().NoError(err)
+
+		res, err := scriptExec.ExecuteAtBlockHeight(ctx, script, scriptArgs, s.height)
+		s.Assert().NoError(err)
+		s.Assert().NotNil(res)
+		s.Assert().Equal(expectedResult, res)
+	})
+
+	s.Run("test scrypt execution with version control with compatible version", func() {
+		// Set up a mock version beacons storage.
+		versionBeacons := storageMock.NewVersionBeacons(s.T())
+		// Mock the Highest method to return a version beacon with a specific version.
+		versionBeacons.
+			On("Highest", testifyMock.AnythingOfType("uint64")).
+			Return(func(height uint64) (*flow.SealedVersionBeacon, error) {
+				if height == s.height {
+					return &flow.SealedVersionBeacon{
+						VersionBeacon: unittest.VersionBeaconFixture(
+							unittest.WithBoundaries(
+								flow.VersionBoundary{
+									BlockHeight: s.height,
+									Version:     "0.0.1",
+								}),
+						),
+						SealHeight: s.height,
+					}, nil
+				} else {
+					return nil, nil
+				}
+			}, nil)
+
+		var err error
+		s.versionControl, err = version.NewVersionControl(
+			s.log,
+			versionBeacons,
+			semver.New("0.0.2"),
+			s.height-1,
+			s.height,
+		)
+		require.NoError(s.T(), err)
+
+		// Create a mock signaler context for testing.
+		ictx := irrecoverable.NewMockSignalerContext(s.T(), ctx)
+
+		// Start the VersionControl component.
+		s.versionControl.Start(ictx)
+
+		// Ensure the component is ready before proceeding.
+		unittest.RequireComponentsReadyBefore(s.T(), 2*time.Second, s.versionControl)
+
+		// Wait for the asynchronous version controller initialization process.
+		time.Sleep(time.Second)
+
+		scriptExec := NewScriptExecutor(s.log, s.versionControl, uint64(0), math.MaxUint64)
+		s.reporter.On("HighestIndexedHeight").Return(s.height+1, nil)
+
+		err = scriptExec.Initialize(s.indexReporter, s.scripts)
+		s.Require().NoError(err)
+
+		res, err := scriptExec.ExecuteAtBlockHeight(ctx, script, scriptArgs, s.height)
+		s.Assert().Error(err)
+		s.Assert().Nil(res)
+	})
 }

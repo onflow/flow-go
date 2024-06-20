@@ -90,13 +90,16 @@ func (s *ScriptExecutor) ExecuteAtBlockHeight(ctx context.Context, script []byte
 		return nil, err
 	}
 
-	compatible, err := s.versionControl.CompatibleAtBlock(height)
-	if err != nil {
-		return nil, err
-	}
+	// Version control feature could be disabled by cmd argument "--version-control-enabled". In such a case, ignore related functionality.
+	if s.versionControl != nil {
+		compatible, err := s.versionControl.CompatibleAtBlock(height)
+		if err != nil {
+			return nil, err
+		}
 
-	if !compatible {
-		return nil, fmt.Errorf("node version is incompatible at block height %d", height)
+		if !compatible {
+			return nil, fmt.Errorf("node version is incompatible at block height %d", height)
+		}
 	}
 
 	return s.scriptExecutor.ExecuteAtBlockHeight(ctx, script, arguments, height)
