@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/cockroachdb/pebble"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
@@ -93,7 +94,7 @@ func (tr *LightTransactionResults) BatchStore(blockID flow.Identifier, transacti
 	writeBatch := batch.GetWriter()
 
 	for i, result := range transactionResults {
-		err := operation.BatchInsertLightTransactionResult(blockID, &result)(writeBatch)
+		err := operation.InsertLightTransactionResult(blockID, &result)(operation.NewBatchWriter(writeBatch))
 		if err != nil {
 			return fmt.Errorf("cannot batch insert tx result: %w", err)
 		}

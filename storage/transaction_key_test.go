@@ -4,9 +4,10 @@ import (
 	"math/rand"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/stretchr/testify/require"
 )
 
 func TestKeyConversion(t *testing.T) {
