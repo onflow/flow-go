@@ -471,6 +471,11 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			peerManagerFilters)
 	})
 
+	fnb.Module("epoch transition logger", func(node *NodeConfig) error {
+		node.ProtocolEvents.AddConsumer(events.NewEventLogger(node.Logger))
+		return nil
+	})
+
 	fnb.Module("network underlay dependency", func(node *NodeConfig) error {
 		fnb.networkUnderlayDependable = module.NewProxiedReadyDoneAware()
 		fnb.PeerManagerDependencies.Add(fnb.networkUnderlayDependable)
