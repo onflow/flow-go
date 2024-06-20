@@ -60,7 +60,7 @@ func (b *backendAccounts) GetAccountAtLatestBlock(ctx context.Context, address f
 	return account, nil
 }
 
-// GetAccountAtBlockHeight returns the account details at the given block height
+// GetAccountAtBlockHeight returns the account details at the given block height.
 func (b *backendAccounts) GetAccountAtBlockHeight(
 	ctx context.Context,
 	address flow.Address,
@@ -80,10 +80,13 @@ func (b *backendAccounts) GetAccountAtBlockHeight(
 	return account, nil
 }
 
+// GetAccountBalance returns the account balance at the latest sealed block.
+// Alias for GetAccountBalanceAtLatestBlock
 func (b *backendAccounts) GetAccountBalance(ctx context.Context, address flow.Address) (uint64, error) {
 	return b.GetAccountBalanceAtLatestBlock(ctx, address)
 }
 
+// GetAccountBalanceAtLatestBlock returns the account balance at the latest sealed block.
 func (b *backendAccounts) GetAccountBalanceAtLatestBlock(ctx context.Context, address flow.Address) (uint64, error) {
 	sealed, err := b.state.Sealed().Head()
 	if err != nil {
@@ -103,6 +106,7 @@ func (b *backendAccounts) GetAccountBalanceAtLatestBlock(ctx context.Context, ad
 	return accountBalance, nil
 }
 
+// GetAccountBalanceAtBlockHeight returns the account balance at the given block height.
 func (b *backendAccounts) GetAccountBalanceAtBlockHeight(
 	ctx context.Context,
 	address flow.Address,
@@ -118,10 +122,13 @@ func (b *backendAccounts) GetAccountBalanceAtBlockHeight(
 	return accountBalance, nil
 }
 
+// GetAccountKeys returns the account public keys at the latest sealed block.
+// Alias for GetAccountKeysAtLatestBlock
 func (b *backendAccounts) GetAccountKeys(ctx context.Context, address flow.Address) ([]flow.AccountPublicKey, error) {
 	return b.GetAccountKeysAtLatestBlock(ctx, address)
 }
 
+// GetAccountKeysAtLatestBlock returns the account public keys at the latest sealed block.
 func (b *backendAccounts) GetAccountKeysAtLatestBlock(ctx context.Context, address flow.Address) ([]flow.AccountPublicKey, error) {
 	sealed, err := b.state.Sealed().Head()
 	if err != nil {
@@ -141,6 +148,7 @@ func (b *backendAccounts) GetAccountKeysAtLatestBlock(ctx context.Context, addre
 	return accountKeys, nil
 }
 
+// GetAccountKeysAtBlockHeight returns the account public keys at the given block height.
 func (b *backendAccounts) GetAccountKeysAtBlockHeight(
 	ctx context.Context,
 	address flow.Address,
