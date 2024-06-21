@@ -2,7 +2,6 @@ package procedure_test
 
 import (
 	"errors"
-	"fmt"
 	"testing"
 
 	"github.com/cockroachdb/pebble"
@@ -109,7 +108,6 @@ func TestDirectChildren(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, flow.IdentifierList{b4}, retrievedIDs)
 
-		fmt.Println("lookup")
 		err = procedure.LookupBlockChildren(b4, &retrievedIDs)(db)
 		require.NoError(t, err)
 		require.Nil(t, retrievedIDs)
