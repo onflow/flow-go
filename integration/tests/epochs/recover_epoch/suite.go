@@ -52,7 +52,7 @@ func (s *Suite) getNodeInfoDirs(role flow.Role) (string, string) {
 //	targetEndTime: the target end time for the recover epoch.
 //	randomSource: the random source of the recover epoch.
 //	out: the tx args output file full path.
-func (s *Suite) executeEFMRecoverTXArgsCMD(collectionClusters, numViewsInEpoch, numViewsInStakingAuction, epochCounter, targetDuration, targetEndTime uint64, randomSource, out string) {
+func (s *Suite) executeEFMRecoverTXArgsCMD(collectionClusters, numViewsInEpoch, numViewsInStakingAuction, epochCounter, targetDuration, targetEndTime uint64, out string) {
 	// read internal node info from one of the consensus nodes
 	internalNodePrivInfoDir, nodeConfigJson := s.getNodeInfoDirs(flow.RoleConsensus)
 	an1 := s.GetContainersByRole(flow.RoleAccess)[0]
@@ -69,7 +69,6 @@ func (s *Suite) executeEFMRecoverTXArgsCMD(collectionClusters, numViewsInEpoch, 
 		fmt.Sprintf("--epoch-length=%d", numViewsInEpoch),
 		fmt.Sprintf("--epoch-staking-phase-length=%d", numViewsInStakingAuction),
 		fmt.Sprintf("--epoch-counter=%d", epochCounter),
-		fmt.Sprintf("--random-source=%s", randomSource),
 		fmt.Sprintf("--target-duration=%d", targetDuration),
 		fmt.Sprintf("--target-end-time=%d", targetEndTime),
 	}
@@ -87,7 +86,6 @@ func (s *Suite) recoverEpoch(env templates.Environment, args []cadence.Value) *s
 	latestBlockID, err := s.Client.GetLatestBlockID(s.Ctx)
 	require.NoError(s.T(), err)
 
-	// create and register node
 	tx, err := utils.MakeRecoverEpochTx(
 		env,
 		s.Client.Account(),
@@ -95,6 +93,8 @@ func (s *Suite) recoverEpoch(env templates.Environment, args []cadence.Value) *s
 		sdk.Identifier(latestBlockID),
 		args,
 	)
+
+	fmt.Println("TRANSACTION SCRIPT \n", string(tx.Script))
 	require.NoError(s.T(), err)
 
 	err = s.Client.SignAndSendTransaction(s.Ctx, tx)
@@ -103,5 +103,6 @@ func (s *Suite) recoverEpoch(env templates.Environment, args []cadence.Value) *s
 	require.NoError(s.T(), err)
 	s.Client.Account().Keys[0].SequenceNumber++
 	require.NoError(s.T(), result.Error)
+
 	return result
 }

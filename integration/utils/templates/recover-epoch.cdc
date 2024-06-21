@@ -8,30 +8,41 @@ import FlowClusterQC from "FlowClusterQC"
 // state with the new Epoch data.
 // This transaction should only be used with the output of the bootstrap utility:
 //   util epoch efm-recover-tx-args
-transaction(randomSource: String,
-            startView: UInt64,
+transaction(startView: UInt64,
             stakingEndView: UInt64,
             endView: UInt64,
             targetDuration: UInt64,
             targetEndTime: UInt64,
-            collectorClusters: [[String]],
+            clusterAssignments: [[String]],
             clusterQCVoteData: [FlowClusterQC.ClusterQCVoteData],
             dkgPubKeys: [String],
-            nodeIDs: [String]) {
+            nodeIDs: [String],
+            initNewEpoch: Bool) {
 
     prepare(signer: auth(BorrowValue) &Account) {
         let epochAdmin = signer.storage.borrow<&FlowEpoch.Admin>(from: FlowEpoch.adminStoragePath)
             ?? panic("Could not borrow epoch admin from storage path")
 
-        epochAdmin.recoverEpoch(randomSource: randomSource,
-                            startView: startView,
-                            stakingEndView: stakingEndView,
-                            endView: endView,
-                            targetDuration: targetDuration,
-                            targetEndTime: targetEndTime,
-                            collectorClusters: collectorClusters,
-                            clusterQCVoteData: clusterQCVoteData,
-                            dkgPubKeys: dkgPubKeys,
-                            nodeIDs: nodeIDs)
+        if initNewEpoch {
+            epochAdmin.recoverNewEpoch(startView: startView,
+                    stakingEndView: stakingEndView,
+                    endView: endView,
+                    targetDuration: targetDuration,
+                    targetEndTime: targetEndTime,
+                    clusterAssignments: clusterAssignments  ,
+                    clusterQCVoteData: clusterQCVoteData,
+                    dkgPubKeys: dkgPubKeys,
+                    nodeIDs: nodeIDs)
+        } else {
+            epochAdmin.recoverCurrentEpoch(startView: startView,
+                    stakingEndView: stakingEndView,
+                    endView: endView,
+                    targetDuration: targetDuration,
+                    targetEndTime: targetEndTime,
+                    clusterAssignments: clusterAssignments  ,
+                    clusterQCVoteData: clusterQCVoteData,
+                    dkgPubKeys: dkgPubKeys,
+                    nodeIDs: nodeIDs)
+        }
     }
 }

@@ -27,10 +27,11 @@ type RecoverEpochSuite struct {
 // ensure the network is healthy.
 func (s *RecoverEpochSuite) TestRecoverEpoch() {
 	// wait until the epoch setup phase to force network into EFM
-	s.AwaitEpochPhase(s.Ctx, 0, flow.EpochPhaseSetup, 30*time.Second, 4*time.Second)
+	s.AwaitEpochPhase(s.Ctx, 0, flow.EpochPhaseSetup, 10*time.Second, 4*time.Second)
 
 	// pausing execution node will force the network into EFM
-	_ = s.GetContainersByRole(flow.RoleExecution)[0].Pause()
+	enContainer := s.GetContainersByRole(flow.RoleExecution)[0]
+	_ = enContainer.Pause()
 
 	// get the latest snapshot and start new container with it
 	epoch1FinalView, err := s.Net.BootstrapSnapshot.Epochs().Current().FinalView()
@@ -42,16 +43,18 @@ func (s *RecoverEpochSuite) TestRecoverEpoch() {
 	s.AwaitFinalizedView(s.Ctx, epoch1FinalView+1, 2*time.Minute, 500*time.Millisecond)
 	s.TimedLogf("observed finalized view %d -> pausing container", epoch1FinalView+1)
 
-	// assert transition to second epoch did not happen
-	// if counter is still 0, epoch emergency fallback was triggered as expected
+	//assert transition to second epoch did not happen
+	//if counter is still 0, epoch emergency fallback was triggered as expected
 	s.AssertInEpoch(s.Ctx, 0)
+
+	// start the paused execution node now that we are in EFM
+	enContainer.Start()
 
 	// generate epoch recover transaction args
 	collectionClusters := uint64(1)
 	numViewsInEpoch := uint64(4000)
 	numViewsInStakingAuction := uint64(100)
 	epochCounter := uint64(2)
-	randomSource := "ohsorandom"
 	targetDuration := uint64(3000)
 	targetEndTime := uint64(4000)
 	out := fmt.Sprintf("%s/recover-epoch-tx-args.josn", s.Net.BootstrapDir)
@@ -63,7 +66,6 @@ func (s *RecoverEpochSuite) TestRecoverEpoch() {
 		epochCounter,
 		targetDuration,
 		targetEndTime,
-		randomSource,
 		out,
 	)
 	b, err := os.ReadFile(out)
@@ -74,6 +76,6 @@ func (s *RecoverEpochSuite) TestRecoverEpoch() {
 
 	env := utils.LocalnetEnv()
 	result := s.recoverEpoch(env, txArgs)
-	fmt.Println("TX RESULT: ", result)
+	fmt.Println("TX RESULT STATUS: ", result)
 	// submit recover epoch transaction to recover the network
 }
