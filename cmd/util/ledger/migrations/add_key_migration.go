@@ -86,6 +86,18 @@ func (m *AddKeyMigration) MigrateAccount(
 		return err
 	}
 
+	account, err := migrationRuntime.Accounts.Get(flow.ConvertAddress(address))
+	if err != nil {
+		return fmt.Errorf("could not find account at address %s", address)
+	}
+	if len(account.Keys) == 0 {
+		// this is unexpected,
+		// all core contract accounts should have at least one key
+		m.log.Warn().
+			Str("address", address.String()).
+			Msg("account has no keys")
+	}
+
 	key := flow.AccountPublicKey{
 		PublicKey: keyData.PublicKey,
 		SignAlgo:  keyData.PublicKey.Algorithm(),

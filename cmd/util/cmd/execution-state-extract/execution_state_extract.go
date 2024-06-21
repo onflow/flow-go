@@ -390,11 +390,11 @@ func newMigrations(
 				log,
 				opts.NWorker,
 				[]migrators.AccountBasedMigration{
-					migrators.NewAccountUsageMigration(rwf),
 					migrators.NewAddKeyMigration(
 						opts.ChainID,
 						key,
 					),
+					migrators.NewAccountUsageMigration(rwf),
 				},
 			),
 		},
