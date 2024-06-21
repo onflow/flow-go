@@ -55,7 +55,6 @@ This recovery process has some constraints:
 	flagNumViewsInEpoch          uint64
 	flagNumViewsInStakingAuction uint64
 	flagEpochCounter             uint64
-	flagRandomSource             string
 	flagTargetDuration           uint64
 	flagTargetEndTime            uint64
 )
@@ -72,7 +71,7 @@ func addGenerateRecoverEpochTxArgsCmdFlags() error {
 	generateRecoverEpochTxArgsCmd.Flags().StringVar(&flagOut, "out", "", "file to write tx args output")
 	generateRecoverEpochTxArgsCmd.Flags().StringVar(&flagAnAddress, "access-address", "", "the address of the access node used for client connections")
 	generateRecoverEpochTxArgsCmd.Flags().StringVar(&flagAnPubkey, "access-network-key", "", "the network key of the access node used for client connections in hex string format")
-	generateRecoverEpochTxArgsCmd.Flags().BoolVar(&flagAnInsecure, "insecure", true, "set to true if the protocol snapshot should be retrieved from the insecure AN endpoint")
+	generateRecoverEpochTxArgsCmd.Flags().BoolVar(&flagAnInsecure, "insecure", false, "set to true if the protocol snapshot should be retrieved from the insecure AN endpoint")
 	generateRecoverEpochTxArgsCmd.Flags().IntVar(&flagCollectionClusters, "collection-clusters", 0,
 		"number of collection clusters")
 	// required parameters for network configuration and generation of root node identities
@@ -253,10 +252,7 @@ func extractRecoverEpochArgs(snapshot *inmem.Snapshot) []cadence.Value {
 		nodeIds = append(nodeIds, nodeIdCdc)
 	}
 
-	// @TODO: cluster qcs are converted into flow.ClusterQCVoteData types,
-	// we need a corresponding type in cadence on the FlowClusterQC contract
-	// to store this struct.
-	_, err = common.ConvertClusterQcsCdc(clusterQCs, clusters)
+	qcVoteData, err := common.ConvertClusterQcsCdc(clusterQCs, clusters)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to convert cluster qcs to cadence type")
 	}
@@ -267,8 +263,6 @@ func extractRecoverEpochArgs(snapshot *inmem.Snapshot) []cadence.Value {
 	}
 
 	args := []cadence.Value{
-		// random source
-		cadence.String(flagRandomSource),
 		// epoch start view
 		cadence.NewUInt64(currEpochFinalView + 1),
 		// staking phase end view
@@ -281,7 +275,8 @@ func extractRecoverEpochArgs(snapshot *inmem.Snapshot) []cadence.Value {
 		cadence.NewUInt64(flagTargetEndTime),
 		// clusters,
 		common.ConvertClusterAssignmentsCdc(assignments),
-		// @TODO: cluster QC voter data
+		// qcVoteData
+		cadence.NewArray(qcVoteData),
 		// dkg pub keys
 		cadence.NewArray(dkgPubKeys),
 		// node ids
