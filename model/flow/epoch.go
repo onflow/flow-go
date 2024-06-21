@@ -14,14 +14,32 @@ import (
 	"github.com/onflow/flow-go/model/encodable"
 )
 
-// EpochPhase represents a phase of the Epoch Preparation Protocol. The phase
-// of an epoch is resolved based on a block reference and is fork-dependent.
-// An epoch begins in the staking phase, then transitions to the setup phase in
-// the block containing the EpochSetup service event, then to the committed
-// phase in the block containing the EpochCommit service event.
-// TODO(EFM, #6092) update these docs
+// EpochPhase represents a phase of the Epoch Preparation Protocol.
+// The phase of an epoch is resolved based on a block reference and is fork-dependent.
+// In the happy-path, an epoch:
+//  1. begins in EpochPhaseStaking
+//  2. transitions to EpochPhaseSetup in the block sealing the EpochSetup service event
+//  3. transitions to EpochPhaseCommitted in the block sealing the EpochCommit service event
+//
+// HAPPY PATH:
 // |<--  EpochPhaseStaking -->|<-- EpochPhaseSetup -->|<-- EpochPhaseCommitted -->|<-- EpochPhaseStaking -->...
 // |<------------------------------- Epoch N ------------------------------------>|<-- Epoch N + 1 --...
+//
+// If the Protocol State encounters any unexpected service events, or fails to observe an expected
+// service event before the Epoch Commitment Deadline, then we enter Epoch Fallback Mode [EFM].
+// When EFM is triggered, we transition to EpochPhaseFallback as soon as we enter the latest committed epoch:
+//   - if epoch is in EpochPhaseStaking or EpochPhaseSetup -> transition to EpochPhaseFallback immediately
+//   - if epoch is in EpochPhaseCommitted -> wait until next epoch, which begins in EpochPhaseFallback.
+//
+// If an epoch is in EpochPhaseFallback, it can only transition into EpochPhaseCommitted, via an EpochRecover service event.
+//
+//	         ┌──────────────────────────────────────────────────────────┐
+//	┌────────▼────────┐     ┌───────────────┐     ┌───────────────────┐ │
+//	│EpochPhaseStaking├─────►EpochPhaseSetup├─────►EpochPhaseCommitted├─┘
+//	└────────┬────────┘     └───────────┬───┘     └───┬──────────▲────┘
+//	         │                        ┌─▼─────────────▼──┐       │
+//	         └────────────────────────►EpochPhaseFallback├───────┘
+//	                                  └──────────────────┘
 type EpochPhase int
 
 const (

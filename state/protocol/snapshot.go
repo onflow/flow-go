@@ -130,7 +130,6 @@ type Snapshot interface {
 
 	// Phase returns the epoch phase for the current epoch, as of the Head block.
 	// TODO document error returns
-	// TODO(EFM, #6092) update these docs
 	Phase() (flow.EpochPhase, error)
 
 	// Epochs returns a query object enabling querying detailed information about
