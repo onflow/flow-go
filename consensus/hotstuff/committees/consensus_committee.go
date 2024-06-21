@@ -76,13 +76,14 @@ func newStaticEpochInfo(epoch protocol.Epoch) (*staticEpochInfo, error) {
 	return epochInfo, nil
 }
 
-// newEmergencyFallbackEpoch creates an artificial fallback epoch generated from
-// the last committed epoch at the time epoch emergency fallback is triggered.
+// newFallbackModeEpoch creates an artificial fallback epoch generated from
+// the last committed epoch at the time epoch fallback mode is triggered.
 // The fallback epoch:
 // * begins after the last committed epoch
 // * lasts until the next spork (estimated 6 months)
 // * has the same static committee as the last committed epoch
-func newEmergencyFallbackEpoch(lastCommittedEpoch *staticEpochInfo) (*staticEpochInfo, error) {
+// TODO(EFM, #5730): needs update to represent EFM epoch extension; see https://github.com/onflow/flow-go/issues/5730
+func newFallbackModeEpoch(lastCommittedEpoch *staticEpochInfo) (*staticEpochInfo, error) {
 	rng, err := prg.New(lastCommittedEpoch.randomSource, prg.ConsensusLeaderSelection, nil)
 	if err != nil {
 		return nil, fmt.Errorf("could not create rng from seed: %w", err)
@@ -112,15 +113,16 @@ func newEmergencyFallbackEpoch(lastCommittedEpoch *staticEpochInfo) (*staticEpoc
 
 // Consensus represents the main committee for consensus nodes. The consensus
 // committee might be active for multiple successive epochs.
+// TODO(EFM, #5730): This implementation does not yet understand EFM recovery and needs to be updated.
 type Consensus struct {
-	state                  protocol.State              // the protocol state
-	me                     flow.Identifier             // the node ID of this node
-	mu                     sync.RWMutex                // protects access to epochs
-	epochs                 map[uint64]*staticEpochInfo // cache of initial committee & leader selection per epoch
-	committedEpochsCh      chan *flow.Header           // protocol events for newly committed epochs (the first block of the epoch is passed over the channel)
-	epochEmergencyFallback chan struct{}               // protocol event for epoch emergency fallback
-	isEpochFallbackHandled *atomic.Bool                // ensure we only inject fallback epoch once
-	events.Noop                                        // implements protocol.Consumer
+	state                    protocol.State              // the protocol state
+	me                       flow.Identifier             // the node ID of this node
+	mu                       sync.RWMutex                // protects access to epochs
+	epochs                   map[uint64]*staticEpochInfo // cache of initial committee & leader selection per epoch
+	committedEpochsCh        chan *flow.Header           // protocol events for newly committed epochs (the first block of the epoch is passed over the channel)
+	epochFallbackTriggeredCh chan struct{}               // protocol event for epoch fallback mode
+	isEpochFallbackHandled   *atomic.Bool                // ensure we only inject fallback epoch once
+	events.Noop                                          // implements protocol.Consumer
 	component.Component
 }
 
@@ -130,12 +132,12 @@ var _ hotstuff.DynamicCommittee = (*Consensus)(nil)
 
 func NewConsensusCommittee(state protocol.State, me flow.Identifier) (*Consensus, error) {
 	com := &Consensus{
-		state:                  state,
-		me:                     me,
-		epochs:                 make(map[uint64]*staticEpochInfo),
-		committedEpochsCh:      make(chan *flow.Header, 1),
-		epochEmergencyFallback: make(chan struct{}, 1),
-		isEpochFallbackHandled: atomic.NewBool(false),
+		state:                    state,
+		me:                       me,
+		epochs:                   make(map[uint64]*staticEpochInfo),
+		committedEpochsCh:        make(chan *flow.Header, 1),
+		epochFallbackTriggeredCh: make(chan struct{}, 1),
+		isEpochFallbackHandled:   atomic.NewBool(false),
 	}
 
 	com.Component = component.NewComponentManagerBuilder().
@@ -146,8 +148,6 @@ func NewConsensusCommittee(state protocol.State, me flow.Identifier) (*Consensus
 
 	// pre-compute leader selection for all presently relevant committed epochs
 	epochs := make([]protocol.Epoch, 0, 3)
-	// we always prepare the current epoch
-	epochs = append(epochs, final.Epochs().Current())
 
 	// we prepare the previous epoch, if one exists
 	exists, err := protocol.PreviousEpochExists(final)
@@ -157,6 +157,9 @@ func NewConsensusCommittee(state protocol.State, me flow.Identifier) (*Consensus
 	if exists {
 		epochs = append(epochs, final.Epochs().Previous())
 	}
+
+	// we always prepare the current epoch
+	epochs = append(epochs, final.Epochs().Current())
 
 	// we prepare the next epoch, if it is committed
 	phase, err := final.Phase()
@@ -174,15 +177,17 @@ func NewConsensusCommittee(state protocol.State, me flow.Identifier) (*Consensus
 		}
 	}
 
-	// if epoch emergency fallback was triggered, inject the fallback epoch
-	triggered, err := state.Params().EpochFallbackTriggered()
+	epochStateSnapshot, err := final.EpochProtocolState()
 	if err != nil {
-		return nil, fmt.Errorf("could not check epoch fallback: %w", err)
+		return nil, fmt.Errorf("could not retrieve epoch protocol state: %w", err)
 	}
-	if triggered {
-		err = com.onEpochEmergencyFallbackTriggered()
+
+	// if epoch fallback mode was triggered, inject the fallback epoch
+	// TODO(EFM, #6020): consider replacing with phase check when it's available
+	if epochStateSnapshot.EpochFallbackTriggered() {
+		err = com.onEpochFallbackModeTriggered()
 		if err != nil {
-			return nil, fmt.Errorf("could not prepare emergency fallback epoch: %w", err)
+			return nil, fmt.Errorf("could not prepare fallback epoch in epoch fallback mode: %w", err)
 		}
 	}
 
@@ -330,11 +335,11 @@ func (c *Consensus) DKG(view uint64) (hotstuff.DKG, error) {
 }
 
 // handleProtocolEvents processes queued Epoch events `EpochCommittedPhaseStarted`
-// and `EpochEmergencyFallbackTriggered`. This function permanently utilizes a worker
+// and `EpochFallbackModeTriggered`. This function permanently utilizes a worker
 // routine until the `Component` terminates.
 // When we observe a new epoch being committed, we compute
 // the leader selection and cache static info for the epoch. When we observe
-// epoch emergency fallback being triggered, we inject a fallback epoch.
+// epoch fallback mode being triggered, we inject a fallback epoch.
 func (c *Consensus) handleProtocolEvents(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
 
@@ -348,8 +353,8 @@ func (c *Consensus) handleProtocolEvents(ctx irrecoverable.SignalerContext, read
 			if err != nil {
 				ctx.Throw(err)
 			}
-		case <-c.epochEmergencyFallback:
-			err := c.onEpochEmergencyFallbackTriggered()
+		case <-c.epochFallbackTriggeredCh:
+			err := c.onEpochFallbackModeTriggered()
 			if err != nil {
 				ctx.Throw(err)
 			}
@@ -362,19 +367,16 @@ func (c *Consensus) EpochCommittedPhaseStarted(_ uint64, first *flow.Header) {
 	c.committedEpochsCh <- first
 }
 
-// EpochEmergencyFallbackTriggered passes the protocol event to the worker thread.
-func (c *Consensus) EpochEmergencyFallbackTriggered() {
-	c.epochEmergencyFallback <- struct{}{}
+// EpochFallbackModeTriggered passes the protocol event to the worker thread.
+func (c *Consensus) EpochFallbackModeTriggered(uint64, *flow.Header) {
+	c.epochFallbackTriggeredCh <- struct{}{}
 }
 
-// onEpochEmergencyFallbackTriggered handles the protocol event for emergency epoch
-// fallback mode being triggered. When this occurs, we inject a fallback epoch
-// to the committee which extends the current epoch.
-// This method must also be called on initialization, if emergency fallback mode
-// was triggered in the past.
+// onEpochFallbackModeTriggered handles the protocol event for epoch fallback mode being triggered.
+// When this occurs, we inject a fallback epoch to the committee which extends the current epoch.
+// This method must also be called on initialization, if epoch fallback mode was triggered in the past.
 // No errors are expected during normal operation.
-func (c *Consensus) onEpochEmergencyFallbackTriggered() error {
-
+func (c *Consensus) onEpochFallbackModeTriggered() error {
 	// we respond to epoch fallback being triggered at most once, therefore
 	// the core logic is protected by an atomic bool.
 	// although it is only valid for epoch fallback to be triggered once per spork,
@@ -402,7 +404,7 @@ func (c *Consensus) onEpochEmergencyFallbackTriggered() error {
 		return fmt.Errorf("epoch fallback: next epoch (counter=%d) is cached contrary to expectation", currentEpochCounter+1)
 	}
 
-	fallbackEpoch, err := newEmergencyFallbackEpoch(currentEpoch)
+	fallbackEpoch, err := newFallbackModeEpoch(currentEpoch)
 	if err != nil {
 		return fmt.Errorf("could not construct fallback epoch: %w", err)
 	}

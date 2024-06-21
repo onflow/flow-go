@@ -10,8 +10,8 @@ import (
 	syncAtomic "sync/atomic"
 	"time"
 
-	"github.com/onflow/cadence/runtime/common"
 	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"go.uber.org/atomic"
 	"golang.org/x/sync/errgroup"
 
@@ -38,7 +38,7 @@ func extractExecutionState(
 	nWorker int, // number of concurrent worker to migration payloads
 	runMigrations bool,
 	outputPayloadFile string,
-	exportPayloadsByAddresses []common.Address,
+	exportPayloadsForOwners map[string]struct{},
 	sortPayloads bool,
 	opts migrators.Options,
 ) error {
@@ -144,7 +144,7 @@ func extractExecutionState(
 			payloads,
 			nWorker,
 			outputPayloadFile,
-			exportPayloadsByAddresses,
+			exportPayloadsForOwners,
 			false, // payloads represents entire state.
 			sortPayloads,
 		)
@@ -216,7 +216,7 @@ func extractExecutionStateFromPayloads(
 	runMigrations bool,
 	inputPayloadFile string,
 	outputPayloadFile string,
-	exportPayloadsByAddresses []common.Address,
+	exportPayloadsForOwners map[string]struct{},
 	sortPayloads bool,
 	opts migrators.Options,
 ) error {
@@ -252,7 +252,7 @@ func extractExecutionStateFromPayloads(
 			payloads,
 			nWorker,
 			outputPayloadFile,
-			exportPayloadsByAddresses,
+			exportPayloadsForOwners,
 			inputPayloadsFromPartialState,
 			sortPayloads,
 		)
@@ -287,7 +287,7 @@ func exportPayloads(
 	payloads []*ledger.Payload,
 	nWorker int,
 	outputPayloadFile string,
-	exportPayloadsByAddresses []common.Address,
+	exportPayloadsForOwners map[string]struct{},
 	inputPayloadsFromPartialState bool,
 	sortPayloads bool,
 ) error {
@@ -307,7 +307,7 @@ func exportPayloads(
 		log,
 		outputPayloadFile,
 		payloads,
-		exportPayloadsByAddresses,
+		exportPayloadsForOwners,
 		inputPayloadsFromPartialState,
 	)
 	if err != nil {
@@ -488,10 +488,21 @@ func newByAccountRegistersFromPayloadAccountGrouping(
 		for accountRegisters := range results {
 			oldAccountRegisters := registersByAccount.SetAccountRegisters(accountRegisters)
 			if oldAccountRegisters != nil {
-				return fmt.Errorf(
-					"duplicate account registers for account %s",
+				// Account grouping should never create multiple groups for an account.
+				// In case it does anyway, merge the groups together,
+				// by merging the existing registers into the new ones.
+
+				log.Warn().Msgf(
+					"account registers already exist for account %x. merging %d existing registers into %d new",
 					accountRegisters.Owner(),
+					oldAccountRegisters.Count(),
+					accountRegisters.Count(),
 				)
+
+				err := accountRegisters.Merge(oldAccountRegisters)
+				if err != nil {
+					return fmt.Errorf("failed to merge account registers: %w", err)
+				}
 			}
 		}
 

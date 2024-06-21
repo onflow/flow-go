@@ -101,6 +101,7 @@ func (cache *epochRangeCache) add(epoch epochRange) error {
 
 // EpochLookup implements the EpochLookup interface using protocol state to match views to epochs.
 // CAUTION: EpochLookup should only be used for querying the previous, current, or next epoch.
+// TODO(EFM, #5763): This implementation does not yet understand EFM recovery and needs to be updated.
 type EpochLookup struct {
 	state                    protocol.State
 	mu                       sync.RWMutex
@@ -158,12 +159,14 @@ func NewEpochLookup(state protocol.State) (*EpochLookup, error) {
 		}
 	}
 
-	// if epoch fallback was triggered, note it here
-	triggered, err := state.Params().EpochFallbackTriggered()
+	epochStateSnapshot, err := final.EpochProtocolState()
 	if err != nil {
-		return nil, fmt.Errorf("could not check epoch fallback: %w", err)
+		return nil, fmt.Errorf("could not retrieve epoch protocol state: %w", err)
 	}
-	if triggered {
+
+	// if epoch fallback was triggered, cache it here
+	// TODO(EFM, #6020): consider replacing with phase check when it's available
+	if epochStateSnapshot.EpochFallbackTriggered() {
 		lookup.epochFallbackIsTriggered.Store(true)
 	}
 
@@ -249,11 +252,11 @@ func (lookup *EpochLookup) EpochForViewWithFallback(view uint64) (uint64, error)
 }
 
 // handleProtocolEvents processes queued Epoch events `EpochCommittedPhaseStarted`
-// and `EpochEmergencyFallbackTriggered`. This function permanently utilizes a worker
+// and `EpochFallbackModeTriggered`. This function permanently utilizes a worker
 // routine until the `Component` terminates.
 // When we observe a new epoch being committed, we compute
 // the leader selection and cache static info for the epoch. When we observe
-// epoch emergency fallback being triggered, we inject a fallback epoch.
+// epoch fallback mode being triggered, we inject a fallback epoch.
 func (lookup *EpochLookup) handleProtocolEvents(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
 
@@ -276,7 +279,7 @@ func (lookup *EpochLookup) EpochCommittedPhaseStarted(_ uint64, first *flow.Head
 	lookup.committedEpochsCh <- first
 }
 
-// EpochEmergencyFallbackTriggered passes the protocol event to the worker thread.
-func (lookup *EpochLookup) EpochEmergencyFallbackTriggered() {
+// EpochFallbackModeTriggered passes the protocol event to the worker thread.
+func (lookup *EpochLookup) EpochFallbackModeTriggered(uint64, *flow.Header) {
 	lookup.epochFallbackIsTriggered.Store(true)
 }

@@ -654,7 +654,7 @@ func bootstrapSystem(
 		identities = append(identities, verID.Identity())
 
 		mutableProtocolState := protocol_state.NewMutableProtocolState(
-			stateFixture.Storage.EpochProtocolState,
+			stateFixture.Storage.EpochProtocolStateEntries,
 			stateFixture.Storage.ProtocolKVStore,
 			stateFixture.State.Params(),
 			stateFixture.Storage.Headers,

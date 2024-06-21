@@ -34,12 +34,13 @@ type BlockTimeControllerSuite struct {
 	curEpochTargetEndTime  uint64
 	epochFallbackTriggered bool
 
-	metrics  mockmodule.CruiseCtlMetrics
-	state    mockprotocol.State
-	params   mockprotocol.Params
-	snapshot mockprotocol.Snapshot
-	epochs   mocks.EpochQuery
-	curEpoch mockprotocol.Epoch
+	metrics            mockmodule.CruiseCtlMetrics
+	state              mockprotocol.State
+	params             mockprotocol.Params
+	snapshot           mockprotocol.Snapshot
+	epochs             mocks.EpochQuery
+	curEpoch           mockprotocol.Epoch
+	epochProtocolState mockprotocol.EpochProtocolState
 
 	config *Config
 	ctx    irrecoverable.SignalerContext
@@ -86,9 +87,12 @@ func setupMocks(bs *BlockTimeControllerSuite) {
 	bs.state.On("Final").Return(&bs.snapshot)
 	bs.state.On("AtHeight", mock.Anything).Return(&bs.snapshot).Maybe()
 	bs.state.On("Params").Return(&bs.params)
-	bs.params.On("EpochFallbackTriggered").Return(
+	bs.epochProtocolState = *mockprotocol.NewEpochProtocolState(bs.T())
+	bs.epochProtocolState.On("EpochFallbackTriggered").Return(
 		func() bool { return bs.epochFallbackTriggered },
-		func() error { return nil })
+		func() error { return nil },
+	)
+	bs.snapshot.On("EpochProtocolState").Return(&bs.epochProtocolState, nil)
 	bs.snapshot.On("Phase").Return(
 		func() flow.EpochPhase { return bs.epochs.Phase() },
 		func() error { return nil })
@@ -243,17 +247,17 @@ func (bs *BlockTimeControllerSuite) TestEpochFallbackTriggered() {
 	assert.NotEqual(bs.T(), bs.config.FallbackProposalDelay, bs.ctl.getProposalTiming())
 
 	// send the event
-	bs.ctl.EpochEmergencyFallbackTriggered()
+	bs.ctl.EpochFallbackModeTriggered(0, nil)
 	// async: should revert to default GetProposalTiming
 	require.Eventually(bs.T(), func() bool {
 		now := time.Now().UTC()
 		return now.Add(bs.config.FallbackProposalDelay.Load()) == bs.ctl.getProposalTiming().TargetPublicationTime(7, now, unittest.IdentifierFixture())
 	}, time.Second, time.Millisecond)
 
-	// additional EpochEmergencyFallbackTriggered events should be no-ops
+	// additional EpochFallbackModeTriggered events should be no-ops
 	// (send capacity+1 events to guarantee one is processed)
 	for i := 0; i <= cap(bs.ctl.epochFallbacks); i++ {
-		bs.ctl.EpochEmergencyFallbackTriggered()
+		bs.ctl.EpochFallbackModeTriggered(0, nil)
 	}
 	// state should be unchanged
 	now := time.Now().UTC()

@@ -1,9 +1,7 @@
 package extractpayloads
 
 import (
-	"bytes"
 	"crypto/rand"
-	"encoding/hex"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -94,10 +92,22 @@ func TestExtractPayloads(t *testing.T) {
 			// Verify exported payloads.
 			partialState, payloadsFromFile, err := util.ReadPayloadFile(zerolog.Nop(), outputFile)
 			require.NoError(t, err)
-			require.Equal(t, len(selectedKeysValues), len(payloadsFromFile))
 			require.True(t, partialState)
 
+			nonGlobalPayloads := make([]*ledger.Payload, 0, len(selectedKeysValues))
 			for _, payloadFromFile := range payloadsFromFile {
+				key, err := payloadFromFile.Key()
+				require.NoError(t, err)
+
+				owner := key.KeyParts[0].Value
+				if len(owner) > 0 {
+					nonGlobalPayloads = append(nonGlobalPayloads, payloadFromFile)
+				}
+			}
+
+			require.Equal(t, len(selectedKeysValues), len(nonGlobalPayloads))
+
+			for _, payloadFromFile := range nonGlobalPayloads {
 				k, err := payloadFromFile.Key()
 				require.NoError(t, err)
 
@@ -108,9 +118,7 @@ func TestExtractPayloads(t *testing.T) {
 		})
 	})
 
-	t.Run("no payloads", func(t *testing.T) {
-
-		emptyAddress := common.Address{}
+	t.Run("empty address", func(t *testing.T) {
 
 		unittest.RunWithTempDir(t, func(datadir string) {
 
@@ -127,9 +135,6 @@ func TestExtractPayloads(t *testing.T) {
 				keys, values := getSampleKeyValues(i)
 
 				for j, key := range keys {
-					if bytes.Equal(key.KeyParts[0].Value, emptyAddress[:]) {
-						continue
-					}
 					keysValues[key.String()] = keyPair{
 						key:   key,
 						value: values[j],
@@ -147,7 +152,7 @@ func TestExtractPayloads(t *testing.T) {
 			Cmd.SetArgs([]string{
 				"--input-filename", inputFile,
 				"--output-filename", outputFile,
-				"--addresses", hex.EncodeToString(emptyAddress[:]),
+				"--addresses", ",",
 			})
 
 			err = Cmd.Execute()
@@ -156,8 +161,21 @@ func TestExtractPayloads(t *testing.T) {
 			// Verify exported payloads.
 			partialState, payloadsFromFile, err := util.ReadPayloadFile(zerolog.Nop(), outputFile)
 			require.NoError(t, err)
-			require.Equal(t, 0, len(payloadsFromFile))
 			require.True(t, partialState)
+
+			var nonGlobalPayloads []*ledger.Payload
+			for _, payloadFromFile := range payloadsFromFile {
+				key, err := payloadFromFile.Key()
+				require.NoError(t, err)
+
+				owner := key.KeyParts[0].Value
+				if len(owner) > 0 {
+					nonGlobalPayloads = append(nonGlobalPayloads, payloadFromFile)
+				}
+			}
+
+			require.Equal(t, 0, len(nonGlobalPayloads))
+
 		})
 	})
 }

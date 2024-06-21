@@ -37,9 +37,11 @@ var (
 type ResultSummary struct {
 	Status                  Status
 	ErrorCode               ErrorCode
+	ErrorMessage            string
 	GasConsumed             uint64
+	GasRefund               uint64
 	DeployedContractAddress *Address
-	ReturnedValue           Data
+	ReturnedData            Data
 }
 
 // NewInvalidResult creates a new result that hold transaction validation
@@ -70,10 +72,12 @@ type Result struct {
 	TxType uint8
 	// total gas consumed during an opeartion
 	GasConsumed uint64
+	// total gas refunds after transaction execution
+	GasRefund uint64
 	// the address where the contract is deployed (if any)
 	DeployedContractAddress *Address
-	// returned value from a function call
-	ReturnedValue []byte
+	// returned data from a function call
+	ReturnedData []byte
 	// EVM logs (events that are emited by evm)
 	Logs []*gethTypes.Log
 	// TX hash holdes the cached value of tx hash
@@ -90,6 +94,11 @@ func (res *Result) Invalid() bool {
 // Failed returns true if transaction has been executed but VM has returned some error
 func (res *Result) Failed() bool {
 	return res.VMError != nil
+}
+
+// Successful returns true if transaction has been executed without any errors
+func (res *Result) Successful() bool {
+	return !res.Failed() && !res.Invalid()
 }
 
 // SetValidationError sets the validation error
@@ -141,19 +150,22 @@ func (res *Result) Receipt() *gethTypes.Receipt {
 func (res *Result) ResultSummary() *ResultSummary {
 	rs := &ResultSummary{
 		GasConsumed:             res.GasConsumed,
+		GasRefund:               res.GasRefund,
 		DeployedContractAddress: res.DeployedContractAddress,
-		ReturnedValue:           res.ReturnedValue,
+		ReturnedData:            res.ReturnedData,
 		Status:                  StatusSuccessful,
 	}
 
 	if res.Invalid() {
 		rs.ErrorCode = ValidationErrorCode(res.ValidationError)
+		rs.ErrorMessage = res.ValidationError.Error()
 		rs.Status = StatusInvalid
 		return rs
 	}
 
 	if res.Failed() {
 		rs.ErrorCode = ExecutionErrorCode(res.VMError)
+		rs.ErrorMessage = res.VMError.Error()
 		rs.Status = StatusFailed
 		return rs
 	}

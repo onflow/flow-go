@@ -97,21 +97,6 @@ func ReadInstanceParams(db *badger.DB, headers storage.Headers, seals storage.Se
 	return params, nil
 }
 
-// EpochFallbackTriggered returns whether epoch fallback mode [EFM] has been triggered.
-// EFM is a permanent, spork-scoped state which is triggered when the next
-// epoch fails to be committed in the allocated time. Once EFM is triggered,
-// it will remain in effect until the next spork.
-// TODO for 'leaving Epoch Fallback via special service event'
-// No errors are expected during normal operation.
-func (p *InstanceParams) EpochFallbackTriggered() (bool, error) {
-	var triggered bool
-	err := p.db.View(operation.CheckEpochEmergencyFallbackTriggered(&triggered))
-	if err != nil {
-		return false, fmt.Errorf("could not check epoch fallback triggered: %w", err)
-	}
-	return triggered, nil
-}
-
 // FinalizedRoot returns the finalized root header of the current protocol state. This will be
 // the head of the protocol state snapshot used to bootstrap this state and
 // may differ from node to node for the same protocol state.
