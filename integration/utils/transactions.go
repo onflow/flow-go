@@ -32,6 +32,7 @@ var setProtocolStateVersionScript string
 
 func LocalnetEnv() templates.Environment {
 	return templates.Environment{
+		EpochAddress:             "f8d6e0586b0a20c7",
 		IDTableAddress:           "f8d6e0586b0a20c7",
 		FungibleTokenAddress:     "ee82856bf20e2aa6",
 		FlowTokenAddress:         "0ae53cb6e3f42a79",
@@ -249,7 +250,7 @@ func MakeRecoverEpochTx(
 ) (*sdk.Transaction, error) {
 	accountKey := adminAccount.Keys[adminAccountKeyID]
 	tx := sdk.NewTransaction().
-		SetScript([]byte(templates.ReplaceAddresses(removeNodeTxScript, env))).
+		SetScript([]byte(templates.ReplaceAddresses(recoverEpochTxScript, env))).
 		SetComputeLimit(9999).
 		SetReferenceBlockID(latestBlockID).
 		SetProposalKey(adminAccount.Address, adminAccountKeyID, accountKey.SequenceNumber).
