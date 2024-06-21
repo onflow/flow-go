@@ -21,12 +21,11 @@ require (
 	github.com/libp2p/go-libp2p v0.32.2
 	github.com/onflow/cadence v1.0.0-preview.28
 	github.com/onflow/crypto v0.25.1
-	github.com/onflow/flow-core-contracts/lib/go/contracts v1.0.0
-	github.com/onflow/flow-core-contracts/lib/go/templates v1.0.0
+	github.com/onflow/flow-core-contracts/lib/go/contracts v1.3.1-0.20240620231448-967aae8f8ff4
+	github.com/onflow/flow-core-contracts/lib/go/templates v1.3.1-0.20240620231448-967aae8f8ff4
 	github.com/onflow/flow-emulator v1.0.0-preview.21.0.20240501034320-e644fcba11e2
 	github.com/onflow/flow-go v0.34.0-crescendo-preview.10-staged-contracts-3.0.20240501031941-53ca114d9c37
 	github.com/onflow/flow-go-sdk v1.0.0-preview.29
-	github.com/onflow/flow-go/insecure v0.0.0-00010101000000-000000000000
 	github.com/onflow/flow/protobuf/go/flow v0.4.3
 	github.com/onflow/go-ethereum v1.13.4
 	github.com/plus3it/gorecurcopy v0.0.1
@@ -99,6 +98,7 @@ require (
 	github.com/davidlazar/go-crypto v0.0.0-20200604182044-b73af7476f6c // indirect
 	github.com/deckarep/golang-set/v2 v2.1.0 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.2.0 // indirect
+	github.com/desertbit/timer v0.0.0-20180107155436-c41aec40b27f // indirect
 	github.com/dgraph-io/ristretto v0.1.0 // indirect
 	github.com/dgryski/go-farm v0.0.0-20200201041132-a6ae2369ad13 // indirect
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
@@ -170,6 +170,7 @@ require (
 	github.com/huandu/go-clone/generic v1.7.2 // indirect
 	github.com/huin/goupnp v1.3.0 // indirect
 	github.com/imdario/mergo v0.3.13 // indirect
+	github.com/improbable-eng/grpc-web v0.15.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/ipfs/bbloom v0.0.4 // indirect
 	github.com/ipfs/go-block-format v0.2.0 // indirect
@@ -244,7 +245,8 @@ require (
 	github.com/onflow/atree v0.7.0-rc.2 // indirect
 	github.com/onflow/flow-ft/lib/go/contracts v1.0.0 // indirect
 	github.com/onflow/flow-ft/lib/go/templates v1.0.0 // indirect
-	github.com/onflow/flow-nft/lib/go/contracts v1.2.0 // indirect
+	github.com/onflow/flow-go/insecure v0.0.0-20240620180250-796c5177c05d // indirect
+	github.com/onflow/flow-nft/lib/go/contracts v1.2.1 // indirect
 	github.com/onflow/flow-nft/lib/go/templates v1.2.0 // indirect
 	github.com/onflow/sdks v0.5.1-0.20230912225508-b35402f12bba // indirect
 	github.com/onflow/wal v1.0.2 // indirect
@@ -274,6 +276,7 @@ require (
 	github.com/rivo/uniseg v0.4.4 // indirect
 	github.com/rogpeppe/go-internal v1.10.0 // indirect
 	github.com/rootless-containers/rootlesskit v1.1.1 // indirect
+	github.com/rs/cors v1.8.0 // indirect
 	github.com/schollz/progressbar/v3 v3.13.1 // indirect
 	github.com/sergi/go-diff v1.2.0 // indirect
 	github.com/sethvargo/go-retry v0.2.3 // indirect
@@ -347,6 +350,7 @@ require (
 	modernc.org/mathutil v1.6.0 // indirect
 	modernc.org/memory v1.7.2 // indirect
 	modernc.org/sqlite v1.28.0 // indirect
+	nhooyr.io/websocket v1.8.7 // indirect
 	rsc.io/tmplfunc v0.0.3 // indirect
 )
 
