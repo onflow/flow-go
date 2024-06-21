@@ -1,6 +1,7 @@
 package migrations
 
 import (
+	"encoding/json"
 	"fmt"
 	"sort"
 	"strings"
@@ -18,6 +19,11 @@ import (
 
 const contractCheckingReporterName = "contract-checking"
 const contractCountEstimate = 1000
+
+type AddressContract struct {
+	location common.AddressLocation
+	code     []byte
+}
 
 // NewContractCheckingMigration returns a migration that checks all contracts.
 // It parses and checks all contract code and stores the programs in the provided map.
@@ -48,11 +54,7 @@ func NewContractCheckingMigration(
 
 		contractsForPrettyPrinting := make(map[common.Location][]byte, contractCountEstimate)
 
-		type contract struct {
-			location common.AddressLocation
-			code     []byte
-		}
-		contracts := make([]contract, 0, contractCountEstimate)
+		contracts := make([]AddressContract, 0, contractCountEstimate)
 
 		err = registersByAccount.ForEachAccount(func(accountRegisters *registers.AccountRegisters) error {
 			owner := accountRegisters.Owner()
@@ -84,7 +86,7 @@ func NewContractCheckingMigration(
 
 				contracts = append(
 					contracts,
-					contract{
+					AddressContract{
 						location: location,
 						code:     code,
 					},
@@ -110,56 +112,126 @@ func NewContractCheckingMigration(
 		// Check all contracts
 
 		for _, contract := range contracts {
-			location := contract.location
-			code := contract.code
-
-			log.Info().Msgf("checking contract %s ...", location)
-
-			// Check contract code
-			const getAndSetProgram = true
-			program, err := mr.ContractAdditionHandler.ParseAndCheckProgram(code, location, getAndSetProgram)
-			if err != nil {
-
-				// Pretty print the error
-				var builder strings.Builder
-				errorPrinter := pretty.NewErrorPrettyPrinter(&builder, false)
-
-				printErr := errorPrinter.PrettyPrintError(err, location, contractsForPrettyPrinting)
-
-				var errorDetails string
-				if printErr == nil {
-					errorDetails = builder.String()
-				} else {
-					errorDetails = err.Error()
-				}
-
-				if verboseErrorOutput {
-					log.Error().Msgf(
-						"error checking contract %s: %s",
-						location,
-						errorDetails,
-					)
-				}
-
-				reporter.Write(contractCheckingFailure{
-					AccountAddressHex: location.Address.HexWithPrefix(),
-					ContractName:      location.Name,
-					Error:             errorDetails,
-				})
-
-				continue
-			} else {
-				// Record the checked program for future use
-				programs[location] = program
-			}
+			checkContract(
+				contract,
+				log,
+				mr,
+				contractsForPrettyPrinting,
+				verboseErrorOutput,
+				reporter,
+				programs,
+			)
 		}
 
 		return nil
 	}
 }
 
+func checkContract(
+	contract AddressContract,
+	log zerolog.Logger,
+	mr *InterpreterMigrationRuntime,
+	contractsForPrettyPrinting map[common.Location][]byte,
+	verboseErrorOutput bool,
+	reporter reporters.ReportWriter,
+	programs map[common.Location]*interpreter.Program,
+) {
+	location := contract.location
+	code := contract.code
+
+	log.Info().Msgf("checking contract %s ...", location)
+
+	// Check contract code
+	const getAndSetProgram = true
+	program, err := mr.ContractAdditionHandler.ParseAndCheckProgram(code, location, getAndSetProgram)
+	if err != nil {
+
+		// Pretty print the error
+		var builder strings.Builder
+		errorPrinter := pretty.NewErrorPrettyPrinter(&builder, false)
+
+		printErr := errorPrinter.PrettyPrintError(err, location, contractsForPrettyPrinting)
+
+		var errorDetails string
+		if printErr == nil {
+			errorDetails = builder.String()
+		} else {
+			errorDetails = err.Error()
+		}
+
+		if verboseErrorOutput {
+			log.Error().Msgf(
+				"error checking contract %s: %s",
+				location,
+				errorDetails,
+			)
+		}
+
+		reporter.Write(contractCheckingFailure{
+			AccountAddress: location.Address,
+			ContractName:   location.Name,
+			Code:           string(code),
+			Error:          errorDetails,
+		})
+
+		return
+	}
+
+	// Record the checked program for future use
+	programs[location] = program
+
+	reporter.Write(contractCheckingSuccess{
+		AccountAddress: location.Address,
+		ContractName:   location.Name,
+		Code:           string(code),
+	})
+
+	log.Info().Msgf("finished checking contract %s", location)
+}
+
 type contractCheckingFailure struct {
-	AccountAddressHex string `json:"address"`
-	ContractName      string `json:"name"`
-	Error             string `json:"error"`
+	AccountAddress common.Address
+	ContractName   string
+	Code           string
+	Error          string
+}
+
+var _ json.Marshaler = contractCheckingFailure{}
+
+func (e contractCheckingFailure) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		Kind           string `json:"kind"`
+		AccountAddress string `json:"address"`
+		ContractName   string `json:"name"`
+		Code           string `json:"code"`
+		Error          string `json:"error"`
+	}{
+		Kind:           "checking-failure",
+		AccountAddress: e.AccountAddress.HexWithPrefix(),
+		ContractName:   e.ContractName,
+		Code:           e.Code,
+		Error:          e.Error,
+	})
+}
+
+type contractCheckingSuccess struct {
+	AccountAddress common.Address
+	ContractName   string
+	Code           string
+}
+
+var _ json.Marshaler = contractCheckingSuccess{}
+
+func (e contractCheckingSuccess) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		Kind           string `json:"kind"`
+		AccountAddress string `json:"address"`
+		ContractName   string `json:"name"`
+		Code           string `json:"code"`
+	}{
+		Kind:           "checking-success",
+		AccountAddress: e.AccountAddress.HexWithPrefix(),
+		ContractName:   e.ContractName,
+		Code:           e.Code,
+	})
 }
