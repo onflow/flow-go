@@ -245,7 +245,7 @@ func (bl *BlockView) DryRunTransaction(
 		// allowed amount, call with all but one 64th of the maximum allowed amount of
 		// gas (this is equivalent to a version of EIP-901 plus EIP-1142).
 		// CREATE only provides all but one 64th of the parent gas to the child call.
-		txResult.GasConsumed = txResult.GasConsumed + (txResult.GasConsumed / 64)
+		txResult.GasConsumed = AddOne64th(txResult.GasConsumed)
 
 		// Adding `gethParams.SstoreSentryGasEIP2200` is needed for this condition:
 		// https://github.com/onflow/go-ethereum/blob/master/core/vm/operations_acl.go#L29-L32
@@ -568,4 +568,9 @@ func (proc *procedure) run(
 		}
 	}
 	return &res, nil
+}
+
+func AddOne64th(n uint64) uint64 {
+	// NOTE: Go's integer division floors, but that is desirable here
+	return n + (n / 64)
 }
