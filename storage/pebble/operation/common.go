@@ -312,7 +312,7 @@ func findHighestAtOrBelow(
 	}
 }
 
-func BatchUpdate(db *pebble.DB, fn func(tx pebble.Writer) error) error {
+func BatchUpdate(db *pebble.DB, fn func(tx PebbleReaderWriter) error) error {
 	batch := db.NewBatch()
 	err := fn(batch)
 	if err != nil {
