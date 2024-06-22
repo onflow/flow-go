@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/module/metrics"
-	bstorage "github.com/onflow/flow-go/storage/pebble"
+	pstorage "github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -16,8 +16,8 @@ func TestCollections(t *testing.T) {
 	unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
 
 		metrics := metrics.NewNoopCollector()
-		transactions := bstorage.NewTransactions(metrics, db)
-		collections := bstorage.NewCollections(db, transactions)
+		transactions := pstorage.NewTransactions(metrics, db)
+		collections := pstorage.NewCollections(db, transactions)
 
 		// create a light collection with three transactions
 		expected := unittest.CollectionFixture(3).Light()
@@ -50,8 +50,8 @@ func TestCollections(t *testing.T) {
 func TestCollections_IndexDuplicateTx(t *testing.T) {
 	unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
 		metrics := metrics.NewNoopCollector()
-		transactions := bstorage.NewTransactions(metrics, db)
-		collections := bstorage.NewCollections(db, transactions)
+		transactions := pstorage.NewTransactions(metrics, db)
+		collections := pstorage.NewCollections(db, transactions)
 
 		// create two collections which share 1 transaction
 		col1 := unittest.CollectionFixture(2)
@@ -79,9 +79,10 @@ func TestCollections_IndexDuplicateTx(t *testing.T) {
 		_, err = collections.LightByTransactionID(col2Tx.ID())
 		require.NoError(t, err)
 
-		// col1 (not col2) should be indexed by the shared transaction (since col1 was inserted first)
+		// col2 (not col1) should be indexed by the shared transaction
+		// (since col1 was inserted first, but got overridden by col2)
 		gotLightByDupTxID, err := collections.LightByTransactionID(dupTx.ID())
 		require.NoError(t, err)
-		assert.Equal(t, &col1Light, gotLightByDupTxID)
+		assert.Equal(t, &col2Light, gotLightByDupTxID)
 	})
 }

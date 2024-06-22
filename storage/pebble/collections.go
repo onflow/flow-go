@@ -33,20 +33,20 @@ func (c *Collections) StoreLight(collection *flow.LightCollection) error {
 
 func (c *Collections) Store(collection *flow.Collection) error {
 	light := collection.Light()
-	ttx := c.db.NewBatch()
-	err := operation.InsertCollection(&light)(ttx)
-	if err != nil {
-		return fmt.Errorf("could not insert collection: %w", err)
-	}
-
-	for _, tx := range collection.Transactions {
-		err = c.transactions.storeTx(tx)(ttx)
+	return operation.BatchUpdate(c.db, func(ttx operation.PebbleReaderWriter) error {
+		err := operation.InsertCollection(&light)(ttx)
 		if err != nil {
-			return fmt.Errorf("could not insert transaction: %w", err)
+			return fmt.Errorf("could not insert collection: %w", err)
 		}
-	}
 
-	return ttx.Commit(nil)
+		for _, tx := range collection.Transactions {
+			err = c.transactions.storeTx(tx)(ttx)
+			if err != nil {
+				return fmt.Errorf("could not insert transaction: %w", err)
+			}
+		}
+		return nil
+	})
 }
 
 func (c *Collections) ByID(colID flow.Identifier) (*flow.Collection, error) {
@@ -96,21 +96,22 @@ func (c *Collections) Remove(colID flow.Identifier) error {
 }
 
 func (c *Collections) StoreLightAndIndexByTransaction(collection *flow.LightCollection) error {
-	tx := c.db.NewBatch()
+	return operation.BatchUpdate(c.db, func(tx operation.PebbleReaderWriter) error {
 
-	err := operation.InsertCollection(collection)(tx)
-	if err != nil {
-		return fmt.Errorf("could not insert collection: %w", err)
-	}
-
-	for _, txID := range collection.Transactions {
-		err = operation.IndexCollectionByTransaction(txID, collection.ID())(tx)
+		err := operation.InsertCollection(collection)(tx)
 		if err != nil {
-			return fmt.Errorf("could not insert transaction ID: %w", err)
+			return fmt.Errorf("could not insert collection: %w", err)
 		}
-	}
 
-	return nil
+		for _, txID := range collection.Transactions {
+			err = operation.IndexCollectionByTransaction(txID, collection.ID())(tx)
+			if err != nil {
+				return fmt.Errorf("could not insert transaction ID: %w", err)
+			}
+		}
+
+		return nil
+	})
 }
 
 func (c *Collections) LightByTransactionID(txID flow.Identifier) (*flow.LightCollection, error) {
