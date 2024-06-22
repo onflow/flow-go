@@ -45,7 +45,7 @@ func TestCollections(t *testing.T) {
 			expected := unittest.CollectionFixture(1).Light()
 			blockID := unittest.IdentifierFixture()
 
-			_ = BatchUpdate(db, func(tx pebble.Writer) error {
+			_ = BatchUpdate(db, func(tx PebbleReaderWriter) error {
 				err := InsertCollection(&expected)(tx)
 				assert.Nil(t, err)
 				err = IndexCollectionPayload(blockID, expected.Transactions)(tx)

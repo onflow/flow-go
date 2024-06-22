@@ -31,8 +31,8 @@ func InsertIndex(blockID flow.Identifier, index *flow.Index) func(tx pebble.Writ
 	}
 }
 
-func RetrieveIndex(blockID flow.Identifier, index *flow.Index) func(tx *pebble.DB) error {
-	return func(tx *pebble.DB) error {
+func RetrieveIndex(blockID flow.Identifier, index *flow.Index) func(tx pebble.Reader) error {
+	return func(tx pebble.Reader) error {
 		var collIDs []flow.Identifier
 		err := operation.LookupPayloadGuarantees(blockID, &collIDs)(tx)
 		if err != nil {

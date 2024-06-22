@@ -4,6 +4,7 @@ package pebble
 
 import (
 	"github.com/cockroachdb/pebble"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
