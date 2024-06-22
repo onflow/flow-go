@@ -25,6 +25,14 @@ func RetrieveEpochCommit(eventID flow.Identifier, event *flow.EpochCommit) func(
 	return retrieve(makePrefix(codeEpochCommit, eventID), event)
 }
 
+func InsertEpochStatus(blockID flow.Identifier, status *flow.EpochStatus) func(pebble.Writer) error {
+	return insert(makePrefix(codeBlockEpochStatus, blockID), status)
+}
+
+func RetrieveEpochStatus(blockID flow.Identifier, status *flow.EpochStatus) func(pebble.Reader) error {
+	return retrieve(makePrefix(codeBlockEpochStatus, blockID), status)
+}
+
 // SetEpochEmergencyFallbackTriggered sets a flag in the DB indicating that
 // epoch emergency fallback has been triggered, and the block where it was triggered.
 //

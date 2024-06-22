@@ -66,7 +66,7 @@ const (
 	codePayloadSeals           = 53 // index mapping block ID to payload seals
 	codeCollectionBlock        = 54 // index mapping collection ID to block ID
 	codeOwnBlockReceipt        = 55 // index mapping block ID to execution receipt ID for execution nodes
-	_                          = 56 // DEPRECATED: 56 was used for block->epoch status prior to Dynamic Protocol State in Mainnet25
+	codeBlockEpochStatus       = 56 // DEPRECATED: 56 was used for block->epoch status prior to Dynamic Protocol State in Mainnet25
 	codePayloadReceipts        = 57 // index mapping block ID to payload receipts
 	codePayloadResults         = 58 // index mapping block ID to payload results
 	codeAllBlockReceipts       = 59 // index mapping of blockID to multiple receipts
