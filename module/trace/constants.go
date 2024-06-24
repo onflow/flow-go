@@ -162,6 +162,7 @@ const (
 	FVMEnvGetStorageCapacity          SpanName = "fvm.env.getStorageCapacity"
 	FVMEnvGetAccountBalance           SpanName = "fvm.env.getAccountBalance"
 	FVMEnvGetAccountAvailableBalance  SpanName = "fvm.env.getAccountAvailableBalance"
+	FVMEnvGetAccountKeys              SpanName = "fvm.env.getAccountKeys"
 	FVMEnvResolveLocation             SpanName = "fvm.env.resolveLocation"
 	FVMEnvGetCode                     SpanName = "fvm.env.getCode"
 	FVMEnvGetAccountContractNames     SpanName = "fvm.env.getAccountContractNames"

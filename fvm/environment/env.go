@@ -63,6 +63,7 @@ type Environment interface {
 
 	// AccountInfo
 	GetAccount(address flow.Address) (*flow.Account, error)
+	GetAccountKeys(address flow.Address) ([]flow.AccountPublicKey, error)
 
 	// RandomSourceHistory is the current block's derived random source.
 	// This source is only used by the core-contract that tracks the random source
