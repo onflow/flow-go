@@ -165,7 +165,7 @@ func (h *Headers) RollbackExecutedBlock(header *flow.Header) error {
 		)
 	}
 
-	err = operation.UpdateExecutedBlock(header.ID())(h.db)
+	err = operation.InsertExecutedBlock(header.ID())(h.db)
 	if err != nil {
 		return fmt.Errorf("cannot update highest executed block: %w", err)
 	}

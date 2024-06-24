@@ -35,10 +35,6 @@ func InsertExecutedBlock(blockID flow.Identifier) func(pebble.Writer) error {
 	return insert(makePrefix(codeExecutedBlock), blockID)
 }
 
-func UpdateExecutedBlock(blockID flow.Identifier) func(PebbleReaderWriter) error {
-	return update(makePrefix(codeExecutedBlock), blockID)
-}
-
 func RetrieveExecutedBlock(blockID *flow.Identifier) func(pebble.Reader) error {
 	return retrieve(makePrefix(codeExecutedBlock), blockID)
 }
