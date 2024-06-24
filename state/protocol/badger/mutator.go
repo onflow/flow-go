@@ -712,14 +712,6 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 		return fmt.Errorf("could not retrieve protocol state snapshot: %w", err)
 	}
 	currentEpochSetup := finalizingEpochState.EpochSetup()
-	epochFallbackTriggered := finalizingEpochState.EpochFallbackTriggered()
-
-	// if epoch fallback was not previously triggered, check whether this block triggers it
-	if epochFallbackTriggered && !parentEpochState.EpochFallbackTriggered() {
-		// emit the protocol event only the first time epoch fallback is triggered
-		events = append(events, m.consumer.EpochEmergencyFallbackTriggered)
-		metrics = append(metrics, m.metrics.EpochEmergencyFallbackTriggered)
-	}
 
 	// Determine metric updates and protocol events related to epoch phase changes and epoch transitions.
 	epochPhaseMetrics, epochPhaseEvents, err := m.epochMetricsAndEventsOnBlockFinalized(parentEpochState, finalizingEpochState, header)
@@ -847,6 +839,32 @@ func (m *FollowerState) epochMetricsAndEventsOnBlockFinalized(parentEpochState, 
 	parentEpochPhase := parentEpochState.EpochPhase()
 	childEpochPhase := finalizedEpochState.EpochPhase()
 
+	// Check for entering or exiting EFM
+	if !parentEpochState.EpochFallbackTriggered() && finalizedEpochState.EpochFallbackTriggered() {
+		// this block triggers EFM
+		events = append(events, func() {
+			m.consumer.EpochFallbackModeTriggered(childEpochCounter, finalized)
+		})
+		metrics = append(metrics, m.metrics.EpochFallbackModeTriggered)
+	}
+	if parentEpochState.EpochFallbackTriggered() && !finalizedEpochState.EpochFallbackTriggered() {
+		// this block exits EFM
+		events = append(events, func() {
+			m.consumer.EpochFallbackModeExited(childEpochCounter, finalized)
+		})
+		metrics = append(metrics, m.metrics.EpochFallbackModeExited)
+	}
+
+	// Check for a new epoch extension
+	if len(finalizedEpochState.EpochExtensions()) > len(parentEpochState.EpochExtensions()) {
+		// We expect at most one additional epoch extension per block, but tolerate more here
+		for i := len(parentEpochState.EpochExtensions()); i < len(finalizedEpochState.EpochExtensions()); i++ {
+			finalizedExtension := finalizedEpochState.EpochExtensions()[i]
+			events = append(events, func() { m.consumer.EpochExtended(childEpochCounter, finalized, finalizedExtension) })
+			metrics = append(metrics, func() { m.metrics.CurrentEpochFinalView(finalizedExtension.FinalView) })
+		}
+	}
+
 	// Same epoch phase -> nothing to do
 	if parentEpochPhase == childEpochPhase {
 		return
@@ -861,14 +879,16 @@ func (m *FollowerState) epochMetricsAndEventsOnBlockFinalized(parentEpochState, 
 		// denote the most recent epoch transition height
 		metrics = append(metrics, func() { m.metrics.EpochTransitionHeight(finalized.Height) })
 		// set epoch phase - since we are starting a new epoch we begin in the staking phase
-		metrics = append(metrics, func() { m.metrics.CurrentEpochPhase(flow.EpochPhaseStaking) })
+		metrics = append(metrics, func() { m.metrics.CurrentEpochPhase(childEpochPhase) })
 		// set current epoch view values
 		metrics = append(
 			metrics,
+			// Since we have just started a new epoch, there cannot be any extensions yet.
+			// Therefore, it is safe to directly use EpochSetup.FinalView here (epoch extensions are handled above).
 			func() { m.metrics.CurrentEpochFinalView(childEpochSetup.FinalView) },
-			func() { m.metrics.CurrentDKGPhase1FinalView(childEpochSetup.DKGPhase1FinalView) },
-			func() { m.metrics.CurrentDKGPhase2FinalView(childEpochSetup.DKGPhase2FinalView) },
-			func() { m.metrics.CurrentDKGPhase3FinalView(childEpochSetup.DKGPhase3FinalView) },
+			func() {
+				m.metrics.CurrentDKGPhaseViews(childEpochSetup.DKGPhase1FinalView, childEpochSetup.DKGPhase2FinalView, childEpochSetup.DKGPhase3FinalView)
+			},
 		)
 		return
 	}
@@ -879,14 +899,15 @@ func (m *FollowerState) epochMetricsAndEventsOnBlockFinalized(parentEpochState, 
 		return
 	}
 	// Transition from Setup phase to Committed phase. `finalized` is first block in Committed phase.
-	if parentEpochPhase == flow.EpochPhaseSetup && childEpochPhase == flow.EpochPhaseCommitted {
+	if parentEpochPhase != flow.EpochPhaseCommitted && childEpochPhase == flow.EpochPhaseCommitted {
 		events = append(events, func() { m.metrics.CurrentEpochPhase(flow.EpochPhaseCommitted) })
 		events = append(events, func() { m.consumer.EpochCommittedPhaseStarted(childEpochCounter, finalized) })
 		return
 	}
 
-	// TODO(6013) efm-recovery: need to update metrics logic for EFM recovery
-	return nil, nil, nil
+	// TODO(EFM, #6092): with the addition of an EpochFallback phase, we should re-enable the sanity check below for protocol-compliant phase transitions
+	// TODO(EFM, #6013): proper event emission and metrics for epoch extensions; CAUTION: metrics.CurrentEpochFinalView needs to be updated despite the epoch phase remaining at EpochFallback phase
+	return
 	//return nil, nil, fmt.Errorf("sanity check failed: invalid subsequent [epoch-phase] [%d-%s]->[%d-%s]",
 	//	parentEpochCounter, parentEpochPhase, childEpochCounter, childEpochPhase)
 }

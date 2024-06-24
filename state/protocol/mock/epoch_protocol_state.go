@@ -132,6 +132,26 @@ func (_m *EpochProtocolState) EpochCommit() *flow.EpochCommit {
 	return r0
 }
 
+// EpochExtensions provides a mock function with given fields:
+func (_m *EpochProtocolState) EpochExtensions() []flow.EpochExtension {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for EpochExtensions")
+	}
+
+	var r0 []flow.EpochExtension
+	if rf, ok := ret.Get(0).(func() []flow.EpochExtension); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]flow.EpochExtension)
+		}
+	}
+
+	return r0
+}
+
 // EpochFallbackTriggered provides a mock function with given fields:
 func (_m *EpochProtocolState) EpochFallbackTriggered() bool {
 	ret := _m.Called()

@@ -50,9 +50,8 @@ type BaseSuite struct {
 
 // SetupTest is run automatically by the testing framework before each test case.
 func (s *BaseSuite) SetupTest() {
-	// If unset, use default value 100ms
 	if s.ConsensusProposalDuration == 0 {
-		s.ConsensusProposalDuration = time.Millisecond * 100
+		s.ConsensusProposalDuration = time.Millisecond * 250
 	}
 
 	minEpochLength := s.StakingAuctionLen + s.DKGPhaseLen*3 + 20
