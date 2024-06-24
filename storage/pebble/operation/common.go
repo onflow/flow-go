@@ -40,6 +40,15 @@ func NewPebbleReaderBatchWriter(db *pebble.DB) *ReaderBatchWriter {
 	}
 }
 
+func WithReaderBatchWriter(db *pebble.DB, fn func(PebbleReaderBatchWriter) error) error {
+	batch := NewPebbleReaderBatchWriter(db)
+	err := fn(batch)
+	if err != nil {
+		return err
+	}
+	return batch.Commit()
+}
+
 // insertNew requires the key does not exist
 // Error returns: storage.ErrAlreadyExists
 func insertNew(key []byte, val interface{}) func(PebbleReaderWriter) error {
