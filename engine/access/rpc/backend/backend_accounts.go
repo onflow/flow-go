@@ -97,13 +97,23 @@ func (b *backendAccounts) GetAccountBalanceAtLatestBlock(ctx context.Context, ad
 
 	sealedBlockID := sealed.ID()
 
-	accountBalance, err := b.scriptExecutor.GetAccountBalance(ctx, address, sealed.Height)
+	if b.scriptExecutor != nil {
+		accountBalance, err := b.scriptExecutor.GetAccountBalance(ctx, address, sealed.Height)
+		if err != nil {
+			b.log.Debug().Err(err).Msgf("failed to get account balance at blockID: %v", sealedBlockID)
+			return 0, err
+		}
+
+		return accountBalance, nil
+	}
+
+	account, err := b.getAccountAtBlock(ctx, address, sealedBlockID, sealed.Height)
 	if err != nil {
 		b.log.Debug().Err(err).Msgf("failed to get account balance at blockID: %v", sealedBlockID)
 		return 0, err
 	}
 
-	return accountBalance, nil
+	return account.Balance, nil
 }
 
 // GetAccountBalanceAtBlockHeight returns the account balance at the given block height.
@@ -112,14 +122,22 @@ func (b *backendAccounts) GetAccountBalanceAtBlockHeight(
 	address flow.Address,
 	height uint64,
 ) (uint64, error) {
-	accountBalance, err := b.scriptExecutor.GetAccountBalance(ctx, address, height)
+	if b.scriptExecutor != nil {
+		accountBalance, err := b.scriptExecutor.GetAccountBalance(ctx, address, height)
 
+		if err != nil {
+			b.log.Debug().Err(err).Msgf("failed to get account balance at height: %d", height)
+			return 0, err
+		}
+		return accountBalance, nil
+	}
+
+	account, err := b.GetAccountAtBlockHeight(ctx, address, height)
 	if err != nil {
-		b.log.Debug().Err(err).Msgf("failed to get account balance at height: %d", height)
 		return 0, err
 	}
 
-	return accountBalance, nil
+	return account.Balance, nil
 }
 
 // GetAccountKeys returns the account public keys at the latest sealed block.
@@ -139,13 +157,23 @@ func (b *backendAccounts) GetAccountKeysAtLatestBlock(ctx context.Context, addre
 
 	sealedBlockID := sealed.ID()
 
-	accountKeys, err := b.scriptExecutor.GetAccountKeys(ctx, address, sealed.Height)
+	if b.scriptExecutor != nil {
+		accountKeys, err := b.scriptExecutor.GetAccountKeys(ctx, address, sealed.Height)
+		if err != nil {
+			b.log.Debug().Err(err).Msgf("failed to get account keys at blockID: %v", sealedBlockID)
+			return nil, err
+		}
+		return accountKeys, nil
+	}
+
+	account, err := b.getAccountAtBlock(ctx, address, sealedBlockID, sealed.Height)
 	if err != nil {
 		b.log.Debug().Err(err).Msgf("failed to get account keys at blockID: %v", sealedBlockID)
 		return nil, err
 	}
 
-	return accountKeys, nil
+	return account.Keys, nil
+
 }
 
 // GetAccountKeysAtBlockHeight returns the account public keys at the given block height.
@@ -154,13 +182,22 @@ func (b *backendAccounts) GetAccountKeysAtBlockHeight(
 	address flow.Address,
 	height uint64,
 ) ([]flow.AccountPublicKey, error) {
-	accountKeys, err := b.scriptExecutor.GetAccountKeys(ctx, address, height)
+	if b.scriptExecutor != nil {
+		accountKeys, err := b.scriptExecutor.GetAccountKeys(ctx, address, height)
+		if err != nil {
+			b.log.Debug().Err(err).Msgf("failed to get account keys at height: %d", height)
+			return nil, err
+		}
+
+		return accountKeys, nil
+	}
+
+	account, err := b.GetAccountAtBlockHeight(ctx, address, height)
 	if err != nil {
-		b.log.Debug().Err(err).Msgf("failed to get account keys at height: %d", height)
 		return nil, err
 	}
 
-	return accountKeys, nil
+	return account.Keys, nil
 }
 
 // getAccountAtBlock returns the account details at the given block
