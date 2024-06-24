@@ -186,6 +186,7 @@ func (suite *ConsensusSuite) TestConstruction_CommittedNextEpoch() {
 
 // TestConstruction_EpochFallbackTriggered tests construction when EFM has been triggered.
 // Both current and the injected fallback epoch should be cached after construction.
+// TODO
 func (suite *ConsensusSuite) TestConstruction_EpochFallbackTriggered() {
 	curEpoch := newMockEpoch(suite.currentEpochCounter, unittest.IdentityListFixture(10), 101, 200, unittest.SeedFixture(32), true)
 	suite.epochs.Add(curEpoch)
@@ -194,6 +195,17 @@ func (suite *ConsensusSuite) TestConstruction_EpochFallbackTriggered() {
 	suite.CreateAndStartCommittee()
 	suite.Assert().Len(suite.committee.epochs, 2)
 	suite.AssertStoredEpochCounterRange(suite.currentEpochCounter, suite.currentEpochCounter+1)
+}
+
+// TODO: test starting up:
+//   - EFM is triggered and no extensions have been added (above)
+//   - EFM is triggered and some extensions have been added
+//   - EFM was triggered (since recovered) and some extensions have been added
+func (suite *ConsensusSuite) TestConstruction_EpochFallbackTriggered_WithExtensions() {
+	suite.T().Fail()
+}
+func (suite *ConsensusSuite) TestConstruction_EpochCommitted_WithExtensions() {
+	suite.T().Fail()
 }
 
 // TestProtocolEvents_CommittedEpoch tests that protocol events notifying of a newly
@@ -233,6 +245,7 @@ func (suite *ConsensusSuite) TestProtocolEvents_CommittedEpoch() {
 // TestProtocolEvents_EpochFallback tests that protocol events notifying of epoch
 // fallback are handled correctly. Epoch fallback triggering should result in a
 // fallback epoch being injected, and repeated events should be no-ops.
+// TODO
 func (suite *ConsensusSuite) TestProtocolEvents_EpochFallback() {
 	curEpoch := newMockEpoch(suite.currentEpochCounter, unittest.IdentityListFixture(10), 101, 200, unittest.SeedFixture(32), true)
 	suite.epochs.Add(curEpoch)
@@ -256,6 +269,10 @@ func (suite *ConsensusSuite) TestProtocolEvents_EpochFallback() {
 
 	suite.Assert().Len(suite.committee.epochs, 2)
 	suite.AssertStoredEpochCounterRange(suite.currentEpochCounter, suite.currentEpochCounter+1)
+}
+
+func (suite *ConsensusSuite) TestProtocolEvents_EpochExtended() {
+	suite.T().Fail()
 }
 
 // TestIdentitiesByBlock tests retrieving committee members by block.
