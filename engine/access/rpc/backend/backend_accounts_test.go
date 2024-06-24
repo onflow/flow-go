@@ -341,6 +341,108 @@ func (s *BackendAccountsSuite) TestGetAccountAtLatestBlockFromStorage_Inconsiste
 	})
 }
 
+// TestGetAccountBalanceScriptExecutionEnabled_HappyPath tests successfully getting accounts balance when
+// script execution is enabled.
+func (s *BackendAccountsSuite) TestGetAccountBalanceScriptExecutionEnabled_HappyPath() {
+	ctx := context.Background()
+
+	scriptExecutor := execmock.NewScriptExecutor(s.T())
+	scriptExecutor.On("GetAccountBalance", mock.Anything, s.account.Address, s.block.Header.Height).
+		Return(s.account.Balance, nil)
+
+	backend := s.defaultBackend()
+	backend.scriptExecMode = IndexQueryModeLocalOnly
+	backend.scriptExecutor = scriptExecutor
+
+	s.Run("GetAccountBalance - happy path", func() {
+		s.testGetAccountBalance(ctx, backend)
+	})
+
+	s.Run("GetAccountBalanceAtLatestBlock - happy path", func() {
+		s.testGetAccountBalanceAtLatestBlock(ctx, backend)
+	})
+
+	s.Run("GetAccountBalanceAtBlockHeight - happy path", func() {
+		s.testGetAccountBalanceAtBlockHeight(ctx, backend)
+	})
+}
+
+// TestGetAccountBalanceScriptExecutionDisabled_HappyPath tests successfully getting accounts balance from execution node
+// when script execution is disabled.
+func (s *BackendAccountsSuite) TestGetAccountBalanceScriptExecutionDisabled_HappyPath() {
+	ctx := context.Background()
+
+	s.setupExecutionNodes(s.block)
+	s.setupENSuccessResponse(s.block.ID())
+
+	backend := s.defaultBackend()
+	backend.scriptExecMode = IndexQueryModeExecutionNodesOnly
+
+	s.Run("GetAccountBalance - happy path", func() {
+		s.testGetAccountBalance(ctx, backend)
+	})
+
+	s.Run("GetAccountBalanceAtLatestBlock - happy path", func() {
+		s.testGetAccountBalanceAtLatestBlock(ctx, backend)
+	})
+
+	s.Run("GetAccountBalanceAtBlockHeight - happy path", func() {
+		s.headers.On("BlockIDByHeight", s.block.Header.Height).Return(s.block.Header.ID(), nil).Once()
+		s.testGetAccountBalanceAtBlockHeight(ctx, backend)
+	})
+}
+
+// TestGetAccountKeysScriptExecutionEnabled_HappyPath tests successfully getting accounts keys when
+// script execution is enabled.
+func (s *BackendAccountsSuite) TestGetAccountKeysScriptExecutionEnabled_HappyPath() {
+	ctx := context.Background()
+
+	scriptExecutor := execmock.NewScriptExecutor(s.T())
+	scriptExecutor.On("GetAccountKeys", mock.Anything, s.account.Address, s.block.Header.Height).
+		Return(s.account.Keys, nil)
+
+	backend := s.defaultBackend()
+	backend.scriptExecMode = IndexQueryModeLocalOnly
+	backend.scriptExecutor = scriptExecutor
+
+	s.Run("GetAccountKeys - happy path", func() {
+		s.testGetAccountKeys(ctx, backend)
+	})
+
+	s.Run("GetAccountKeysAtLatestBlock - happy path", func() {
+		s.testGetAccountKeysAtLatestBlock(ctx, backend)
+	})
+
+	s.Run("GetAccountKeysAtBlockHeight - happy path", func() {
+		s.testGetAccountKeysAtBlockHeight(ctx, backend)
+	})
+}
+
+// TestGetAccountKeysScriptExecutionDisabled_HappyPath tests successfully getting accounts keys when
+// script execution is disabled.
+func (s *BackendAccountsSuite) TestGetAccountKeysScriptExecutionDisabled_HappyPath() {
+	ctx := context.Background()
+
+	s.setupExecutionNodes(s.block)
+	s.setupENSuccessResponse(s.block.ID())
+
+	backend := s.defaultBackend()
+	backend.scriptExecMode = IndexQueryModeExecutionNodesOnly
+
+	s.Run("GetAccountKeys - happy path", func() {
+		s.testGetAccountKeys(ctx, backend)
+	})
+
+	s.Run("GetAccountKeysAtLatestBlock - happy path", func() {
+		s.testGetAccountKeysAtLatestBlock(ctx, backend)
+	})
+
+	s.Run("GetAccountKeysAtBlockHeight - happy path", func() {
+		s.headers.On("BlockIDByHeight", s.block.Header.Height).Return(s.block.Header.ID(), nil).Once()
+		s.testGetAccountKeysAtBlockHeight(ctx, backend)
+	})
+}
+
 func (s *BackendAccountsSuite) testGetAccount(ctx context.Context, backend *backendAccounts, statusCode codes.Code) {
 	s.state.On("Sealed").Return(s.snapshot, nil).Once()
 	s.snapshot.On("Head").Return(s.block.Header, nil).Once()
@@ -387,4 +489,52 @@ func (s *BackendAccountsSuite) testGetAccountAtBlockHeight(ctx context.Context, 
 		s.Require().Equal(statusCode, status.Code(err))
 		s.Require().Nil(actual)
 	}
+}
+
+func (s *BackendAccountsSuite) testGetAccountBalance(ctx context.Context, backend *backendAccounts) {
+	s.state.On("Sealed").Return(s.snapshot, nil).Once()
+	s.snapshot.On("Head").Return(s.block.Header, nil).Once()
+
+	actual, err := backend.GetAccountBalance(ctx, s.account.Address)
+	s.Require().NoError(err)
+	s.Require().Equal(s.account.Balance, actual)
+}
+
+func (s *BackendAccountsSuite) testGetAccountBalanceAtLatestBlock(ctx context.Context, backend *backendAccounts) {
+	s.state.On("Sealed").Return(s.snapshot, nil).Once()
+	s.snapshot.On("Head").Return(s.block.Header, nil).Once()
+
+	actual, err := backend.GetAccountBalanceAtLatestBlock(ctx, s.account.Address)
+	s.Require().NoError(err)
+	s.Require().Equal(s.account.Balance, actual)
+}
+
+func (s *BackendAccountsSuite) testGetAccountBalanceAtBlockHeight(ctx context.Context, backend *backendAccounts) {
+	actual, err := backend.GetAccountBalanceAtBlockHeight(ctx, s.account.Address, s.block.Header.Height)
+	s.Require().NoError(err)
+	s.Require().Equal(s.account.Balance, actual)
+}
+
+func (s *BackendAccountsSuite) testGetAccountKeys(ctx context.Context, backend *backendAccounts) {
+	s.state.On("Sealed").Return(s.snapshot, nil).Once()
+	s.snapshot.On("Head").Return(s.block.Header, nil).Once()
+
+	actual, err := backend.GetAccountKeys(ctx, s.account.Address)
+	s.Require().NoError(err)
+	s.Require().Equal(s.account.Keys, actual)
+}
+
+func (s *BackendAccountsSuite) testGetAccountKeysAtLatestBlock(ctx context.Context, backend *backendAccounts) {
+	s.state.On("Sealed").Return(s.snapshot, nil).Once()
+	s.snapshot.On("Head").Return(s.block.Header, nil).Once()
+
+	actual, err := backend.GetAccountKeysAtLatestBlock(ctx, s.account.Address)
+	s.Require().NoError(err)
+	s.Require().Equal(s.account.Keys, actual)
+}
+
+func (s *BackendAccountsSuite) testGetAccountKeysAtBlockHeight(ctx context.Context, backend *backendAccounts) {
+	actual, err := backend.GetAccountKeysAtBlockHeight(ctx, s.account.Address, s.block.Header.Height)
+	s.Require().NoError(err)
+	s.Require().Equal(s.account.Keys, actual)
 }
