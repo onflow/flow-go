@@ -98,7 +98,7 @@ func NewMutableProtocolState(
 	setups storage.EpochSetups,
 	commits storage.EpochCommits,
 ) *MutableProtocolState {
-	epochHappyPathConsumerFactory := func(candidateView uint64) protocol_state.StateMachineTelemetryConsumer {
+	epochhappyPathTelemetryFactory := func(candidateView uint64) protocol_state.StateMachineTelemetryConsumer {
 		return pubsub.NewLogConsumer(
 			log.With().
 				Str("state_machine", "epoch_happy_path").
@@ -106,7 +106,7 @@ func NewMutableProtocolState(
 				Logger(),
 		)
 	}
-	epochFallbackConsumerFactory := func(candidateView uint64) protocol_state.StateMachineTelemetryConsumer {
+	epochfallbackTelemetryFactory := func(candidateView uint64) protocol_state.StateMachineTelemetryConsumer {
 		return pubsub.NewLogConsumer(
 			log.With().
 				Str("state_machine", "epoch_fallback_path").
@@ -122,7 +122,7 @@ func NewMutableProtocolState(
 	kvStateMachineFactories := []protocol_state.KeyValueStoreStateMachineFactory{
 		kvstore.NewPSVersionUpgradeStateMachineFactory(globalParams),
 		epochs.NewEpochStateMachineFactory(globalParams, setups, commits, epochProtocolStateDB,
-			epochHappyPathConsumerFactory, epochFallbackConsumerFactory),
+			epochhappyPathTelemetryFactory, epochfallbackTelemetryFactory),
 	}
 	return newMutableProtocolState(epochProtocolStateDB, kvstore.NewProtocolKVStore(kvStoreSnapshots), globalParams, headers, results, kvStateMachineFactories)
 }

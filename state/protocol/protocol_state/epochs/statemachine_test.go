@@ -524,15 +524,15 @@ func (s *EpochStateMachineSuite) TestEvolveStateTransitionToNextEpoch_WithInvali
 			"See for details https://github.com/onflow/flow-go/issues/5631.")
 	s.parentEpochState = unittest.EpochStateFixture(unittest.WithNextEpochProtocolState())
 	s.candidate.View = s.parentEpochState.NextEpochSetup.FirstView
-	happyPathConsumerFactory := protocol_statemock.NewStateMachineEventsTelemetryFactory(s.T())
-	fallbackConsumerFactory := protocol_statemock.NewStateMachineEventsTelemetryFactory(s.T())
+	happyPathTelemetryFactory := protocol_statemock.NewStateMachineEventsTelemetryFactory(s.T())
+	fallbackTelemetryFactory := protocol_statemock.NewStateMachineEventsTelemetryFactory(s.T())
 	stateMachine, err := epochs.NewEpochStateMachineFactory(
 		s.globalParams,
 		s.setupsDB,
 		s.commitsDB,
 		s.epochStateDB,
-		happyPathConsumerFactory.Execute,
-		fallbackConsumerFactory.Execute,
+		happyPathTelemetryFactory.Execute,
+		fallbackTelemetryFactory.Execute,
 	).Create(s.candidate.View, s.candidate.ParentID, s.parentState, s.mutator)
 	require.NoError(s.T(), err)
 
