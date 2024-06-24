@@ -37,8 +37,7 @@ do
         destination_file="$destination_directory/$destination_base$extension"
         # Move the file
         echo "Moved: $(realpath "$file") -> $(realpath "$destination_file")"
-
-        echo "Moved: $file -> $destination_file"
+        mv "$file" "$destination_file"
     fi
 done
 
