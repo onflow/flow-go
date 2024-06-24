@@ -9,6 +9,7 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/pebble/operation"
 	"github.com/onflow/flow-go/storage/pebble/procedure"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -20,8 +21,10 @@ func TestIndexAndLookupChild(t *testing.T) {
 		parentID := unittest.IdentifierFixture()
 		childID := unittest.IdentifierFixture()
 
-		err := procedure.IndexNewBlock(childID, parentID)(db)
+		rw := operation.NewPebbleReaderBatchWriter(db)
+		err := procedure.IndexNewBlock(childID, parentID)(rw)
 		require.NoError(t, err)
+		require.NoError(t, rw.Commit())
 
 		// retrieve child
 		var retrievedIDs flow.IdentifierList
@@ -43,13 +46,17 @@ func TestIndexTwiceAndRetrieve(t *testing.T) {
 		child1ID := unittest.IdentifierFixture()
 		child2ID := unittest.IdentifierFixture()
 
+		rw := operation.NewPebbleReaderBatchWriter(db)
 		// index the first child
-		err := procedure.IndexNewBlock(child1ID, parentID)(db)
+		err := procedure.IndexNewBlock(child1ID, parentID)(rw)
 		require.NoError(t, err)
+		require.NoError(t, rw.Commit())
 
 		// index the second child
-		err = procedure.IndexNewBlock(child2ID, parentID)(db)
+		rw = operation.NewPebbleReaderBatchWriter(db)
+		err = procedure.IndexNewBlock(child2ID, parentID)(rw)
 		require.NoError(t, err)
+		require.NoError(t, rw.Commit())
 
 		var retrievedIDs flow.IdentifierList
 		err = procedure.LookupBlockChildren(parentID, &retrievedIDs)(db)
@@ -65,8 +72,10 @@ func TestIndexZeroParent(t *testing.T) {
 
 		childID := unittest.IdentifierFixture()
 
-		err := procedure.IndexNewBlock(childID, flow.ZeroID)(db)
+		rw := operation.NewPebbleReaderBatchWriter(db)
+		err := procedure.IndexNewBlock(childID, flow.ZeroID)(rw)
 		require.NoError(t, err)
+		require.NoError(t, rw.Commit())
 
 		// zero id should have no children
 		var retrievedIDs flow.IdentifierList
@@ -84,14 +93,20 @@ func TestDirectChildren(t *testing.T) {
 		b3 := unittest.IdentifierFixture()
 		b4 := unittest.IdentifierFixture()
 
-		err := procedure.IndexNewBlock(b2, b1)(db)
+		rw := operation.NewPebbleReaderBatchWriter(db)
+		err := procedure.IndexNewBlock(b2, b1)(rw)
 		require.NoError(t, err)
+		require.NoError(t, rw.Commit())
 
-		err = procedure.IndexNewBlock(b3, b2)(db)
+		rw = operation.NewPebbleReaderBatchWriter(db)
+		err = procedure.IndexNewBlock(b3, b2)(rw)
 		require.NoError(t, err)
+		require.NoError(t, rw.Commit())
 
-		err = procedure.IndexNewBlock(b4, b3)(db)
+		rw = operation.NewPebbleReaderBatchWriter(db)
+		err = procedure.IndexNewBlock(b4, b3)(rw)
 		require.NoError(t, err)
+		require.NoError(t, rw.Commit())
 
 		// check the children of the first block
 		var retrievedIDs flow.IdentifierList

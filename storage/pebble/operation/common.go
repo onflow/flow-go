@@ -20,6 +20,26 @@ type PebbleReaderBatchWriter interface {
 	ReaderWriter() (pebble.Reader, pebble.Writer)
 }
 
+type ReaderBatchWriter struct {
+	db    *pebble.DB
+	batch *pebble.Batch
+}
+
+func (b *ReaderBatchWriter) ReaderWriter() (pebble.Reader, pebble.Writer) {
+	return b.db, b.batch
+}
+
+func (b *ReaderBatchWriter) Commit() error {
+	return b.batch.Commit(nil)
+}
+
+func NewPebbleReaderBatchWriter(db *pebble.DB) *ReaderBatchWriter {
+	return &ReaderBatchWriter{
+		db:    db,
+		batch: db.NewBatch(),
+	}
+}
+
 // insertNew requires the key does not exist
 // Error returns: storage.ErrAlreadyExists
 func insertNew(key []byte, val interface{}) func(PebbleReaderWriter) error {
