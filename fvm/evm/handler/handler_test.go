@@ -99,50 +99,16 @@ func TestHandler_TransactionRunOrPanic(t *testing.T) {
 
 					// check events (1 extra for block event)
 					events := backend.Events()
-
 					require.Len(t, events, 2)
-
-					event := events[0]
-					assert.Equal(t, event.Type, types.EventTypeTransactionExecuted)
-					ev, err := jsoncdc.Decode(nil, event.Payload)
-					require.NoError(t, err)
-					cadenceEvent, ok := ev.(cadence.Event)
-					require.True(t, ok)
-
-					// TODO: add an event decoder in types.event
-					cadenceLogs := cadence.SearchFieldByName(cadenceEvent, "logs")
-
-					encodedLogs, err := hex.DecodeString(strings.ReplaceAll(cadenceLogs.String(), "\"", ""))
-					require.NoError(t, err)
-
-					var logs []*gethTypes.Log
-					err = rlp.DecodeBytes(encodedLogs, &logs)
-					require.NoError(t, err)
-
-					for i, l := range result.Logs {
-						assert.Equal(t, l, logs[i])
-					}
+					testutils.CheckTransactionExecutedEvent(t, events, 0).
+						HasBlockIndex(0).
+						// HasBlockHash(). // TODO how to check the block hash
+						MatchesResult(result)
 
 					// check block event
-					event = events[1]
-
-					assert.Equal(t, event.Type, types.EventTypeBlockExecuted)
-					ev, err = jsoncdc.Decode(nil, event.Payload)
-					require.NoError(t, err)
-
-					// make sure block transaction list references the above transaction id
-					cadenceEvent, ok = ev.(cadence.Event)
-					require.True(t, ok)
-					blockEvent, err := types.DecodeBlockEventPayload(cadenceEvent)
-					require.NoError(t, err)
-
-					eventTxID := blockEvent.TransactionHashes[0] // only one hash in block
-					// make sure the transaction id included in the block transaction list is the same as tx sumbmitted
-					assert.Equal(
-						t,
-						evmTx.Hash().String(),
-						string(eventTxID),
-					)
+					testutils.CheckBlockExecutedEvent(t, events, 1).
+						HasHeight(1).
+						HasTransactionHashes([]string{evmTx.Hash().String()})
 				})
 			})
 		})
