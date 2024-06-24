@@ -513,7 +513,6 @@ func (builder *FlowAccessNodeBuilder) BuildConsensusFollower() *FlowAccessNodeBu
 }
 
 func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccessNodeBuilder {
-	var ds *badger.Datastore
 	var bs network.BlobService
 	var processedBlockHeight storage.ConsumerProgress
 	var processedNotifications storage.ConsumerProgress
@@ -537,13 +536,12 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				return err
 			}
 
-			ds, err = badger.NewDatastore(datastoreDir, &badger.DefaultOptions)
+			builder.ExecutionDataDatastore, err = badger.NewDatastore(datastoreDir, &badger.DefaultOptions)
 			if err != nil {
 				return err
 			}
-			builder.ExecutionDataDatastore = ds
 			builder.ShutdownFunc(func() error {
-				if err := ds.Close(); err != nil {
+				if err := builder.ExecutionDataDatastore.Close(); err != nil {
 					return fmt.Errorf("could not close execution data datastore: %w", err)
 				}
 				return nil
@@ -645,8 +643,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				}
 
 				downloaderOpts = []execution_data.DownloaderOption{
-					execution_data.WithExecutionDataTracker(builder.ExecutionDataTracker),
-					execution_data.WithHeaders(node.Storage.Headers),
+					execution_data.WithExecutionDataTracker(builder.ExecutionDataTracker, node.Storage.Headers),
 				}
 			}
 
@@ -723,7 +720,6 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			return builder.ExecutionDataRequester, nil
 		}).
 		Component("execution data pruner", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			// by default, pruning is disabled
 			if builder.executionDataPrunerHeightRangeTarget == 0 {
 				return &module.NoopReadyDoneAware{}, nil
 			}
@@ -1262,8 +1258,14 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 			"execution-data-max-retry-delay",
 			defaultConfig.executionDataConfig.MaxRetryDelay,
 			"maximum delay for exponential backoff when fetching execution data fails e.g. 5m")
-		flags.Uint64Var(&builder.executionDataPrunerHeightRangeTarget, "execution-data-height-range-target", defaultConfig.executionDataPrunerHeightRangeTarget, "target height range size used to limit the amount of Execution Data kept on disk")
-		flags.Uint64Var(&builder.executionDataPrunerThreshold, "execution-data-height-range-threshold", defaultConfig.executionDataPrunerThreshold, "height threshold used to trigger Execution Data pruning")
+		flags.Uint64Var(&builder.executionDataPrunerHeightRangeTarget,
+			"execution-data-height-range-target",
+			defaultConfig.executionDataPrunerHeightRangeTarget,
+			"number of blocks of Execution Data to keep on disk. older data is pruned")
+		flags.Uint64Var(&builder.executionDataPrunerThreshold,
+			"execution-data-height-range-threshold",
+			defaultConfig.executionDataPrunerThreshold,
+			"number of unpruned blocks of Execution Data beyond the height range target to allow before pruning")
 
 		// Execution State Streaming API
 		flags.Uint32Var(&builder.stateStreamConf.ExecutionDataCacheSize, "execution-data-cache-size", defaultConfig.stateStreamConf.ExecutionDataCacheSize, "block execution data cache size")

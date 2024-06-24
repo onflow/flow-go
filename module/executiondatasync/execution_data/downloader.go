@@ -42,16 +42,10 @@ func WithSerializer(serializer Serializer) DownloaderOption {
 	}
 }
 
-// WithExecutionDataTracker configures the execution data tracker for the downloader
-func WithExecutionDataTracker(storage tracker.Storage) DownloaderOption {
+// WithExecutionDataTracker configures the execution data tracker and the storage headers for the downloader
+func WithExecutionDataTracker(storage tracker.Storage, headers storage.Headers) DownloaderOption {
 	return func(d *downloader) {
 		d.storage = storage
-	}
-}
-
-// WithHeaders configures the storage headers for the downloader
-func WithHeaders(headers storage.Headers) DownloaderOption {
-	return func(d *downloader) {
 		d.headers = headers
 	}
 }

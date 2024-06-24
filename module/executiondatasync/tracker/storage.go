@@ -74,7 +74,7 @@ func makeLatestHeightKey(c cid.Cid) []byte {
 
 func makeUint64Value(v uint64) []byte {
 	value := make([]byte, 8)
-	binary.LittleEndian.PutUint64(value, v)
+	binary.BigEndian.PutUint64(value, v)
 	return value
 }
 
@@ -84,7 +84,7 @@ func getUint64Value(item *badger.Item) (uint64, error) {
 		return 0, err
 	}
 
-	return binary.LittleEndian.Uint64(value), nil
+	return binary.BigEndian.Uint64(value), nil
 }
 
 // getBatchItemCountLimit returns the maximum number of items that can be included in a single batch
