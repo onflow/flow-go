@@ -4,18 +4,31 @@
 set -e
 
 # Check if exactly two arguments are provided
-if [ "$#" -ne 2 ]; then
+usage() {
     echo "Description: move checkpoint files from one directory to another"
-    echo "Usage: $0 source_file destination_file"
-    echo "Example: $0 /var/flow/from-folder/checkpoint.000010 /var/flow/to-folder/root.checkpoint"
-    echo "The above command will move the checkpoint files including its 17 subfiles to the destination folder and rename them"
-
+    echo "Usage: $0 source_file destination_file [--run]"
+    echo "Example: $0 /var/flow/from-folder/checkpoint.000010 /var/flow/to-folder/root.checkpoint [--run]"
+    echo "The above command will preview the checkpoint files to be moved including its 17 subfiles to the destination folder and rename them."
+    echo "Preview mode is default. Use --run to actually move the files."
     exit 1
+}
+
+# Check if at least two arguments are provided
+if [ "$#" -lt 2 ] || [ "$#" -gt 3 ]; then
+    usage
 fi
 
 # Assign arguments to variables
 source_file_pattern=$1
 destination_file_base=$2
+run_mode=false
+
+# Check for run mode
+if [ "$#" -eq 3 ] && [ "$3" == "--run" ]; then
+    run_mode=true
+elif [ "$#" -eq 3 ]; then
+    usage
+fi
 
 # Extract the basename from the source file pattern
 source_base=$(basename "$source_file_pattern")
@@ -35,10 +48,20 @@ do
         extension="${file#$source_file_pattern}"
         # Construct the destination file name
         destination_file="$destination_directory/$destination_base$extension"
-        # Move the file
-        echo "Moving: $(realpath "$file") -> $(realpath "$destination_file")"
-        mv "$file" "$destination_file"
+
+        # Preview or move the file
+        if [ "$run_mode" = true ]; then
+            echo "Moving: $(realpath "$file") -> $(realpath "$destination_file")"
+            mv "$file" "$destination_file"
+        else
+            echo "Preview: $(realpath "$file") -> $(realpath "$destination_file")"
+        fi
     fi
 done
 
-echo "Checkpoint files are moved successfully."
+
+if [ "$run_mode" = true ]; then
+    echo "Checkpoint files have been moved successfully."
+else
+    echo "Preview complete. No files have been moved. add --run flag to move the files."
+fi
