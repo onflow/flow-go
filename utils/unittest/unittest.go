@@ -391,6 +391,34 @@ func RunWithPebbleDB(t testing.TB, f func(*pebble.DB)) {
 	})
 }
 
+type PebbleWrapper struct {
+	db *pebble.DB
+}
+
+func (p *PebbleWrapper) View(fn func(pebble.Reader) error) error {
+	return fn(p.db)
+}
+
+func (p *PebbleWrapper) Update(fn func(pebble.Writer) error) error {
+	return fn(p.db)
+}
+
+func (p *PebbleWrapper) DB() *pebble.DB {
+	return p.db
+}
+
+func RunWithWrappedPebbleDB(t testing.TB, f func(p *PebbleWrapper)) {
+	RunWithTempDir(t, func(dir string) {
+		db, err := pebble.Open(dir, &pebble.Options{})
+		require.NoError(t, err)
+		defer func() {
+			assert.NoError(t, db.Close())
+		}()
+		f(&PebbleWrapper{db})
+	})
+
+}
+
 func RunWithTypedPebbleDB(
 	t testing.TB,
 	create func(string, *pebble.Options) (*pebble.DB, error),
