@@ -14,8 +14,8 @@ func InsertComputationResultUploadStatus(blockID flow.Identifier,
 
 // UpdateComputationResult updates given existing instance of ComputationResult in local BadgerDB.
 func UpdateComputationResultUploadStatus(blockID flow.Identifier,
-	wasUploadCompleted bool) func(PebbleReaderWriter) error {
-	return update(makePrefix(codeComputationResults, blockID), wasUploadCompleted)
+	wasUploadCompleted bool) func(pebble.Writer) error {
+	return InsertComputationResultUploadStatus(blockID, wasUploadCompleted)
 }
 
 // UpsertComputationResult upserts given existing instance of ComputationResult in local BadgerDB.

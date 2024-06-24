@@ -9,7 +9,6 @@ import (
 
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/pebble/operation"
 )
 
 func withLimit[K comparable, V any](limit uint) func(*Cache[K, V]) {
@@ -18,21 +17,21 @@ func withLimit[K comparable, V any](limit uint) func(*Cache[K, V]) {
 	}
 }
 
-type storeFunc[K comparable, V any] func(key K, val V) func(operation.PebbleReaderWriter) error
+type storeFunc[K comparable, V any] func(key K, val V) func(pebble.Writer) error
 
 func withStore[K comparable, V any](store storeFunc[K, V]) func(*Cache[K, V]) {
 	return func(c *Cache[K, V]) {
 		c.store = store
 	}
 }
-func noStore[K comparable, V any](_ K, _ V) func(operation.PebbleReaderWriter) error {
-	return func(operation.PebbleReaderWriter) error {
+func noStore[K comparable, V any](_ K, _ V) func(pebble.Writer) error {
+	return func(pebble.Writer) error {
 		return fmt.Errorf("no store function for cache put available")
 	}
 }
 
-func noopStore[K comparable, V any](_ K, _ V) func(operation.PebbleReaderWriter) error {
-	return func(operation.PebbleReaderWriter) error {
+func noopStore[K comparable, V any](_ K, _ V) func(pebble.Writer) error {
+	return func(pebble.Writer) error {
 		return nil
 	}
 }
@@ -137,10 +136,10 @@ func (c *Cache[K, V]) Insert(key K, resource V) {
 }
 
 // PutTx will return tx which adds a resource to the cache with the given ID.
-func (c *Cache[K, V]) PutTx(key K, resource V) func(operation.PebbleReaderWriter) error {
+func (c *Cache[K, V]) PutTx(key K, resource V) func(pebble.Writer) error {
 	storeOps := c.store(key, resource) // assemble DB operations to store resource (no execution)
 
-	return func(w operation.PebbleReaderWriter) error {
+	return func(w pebble.Writer) error {
 		// the storeOps must be sync operation
 		err := storeOps(w) // execute operations to store resource
 		if err != nil {
@@ -158,7 +157,7 @@ func (c *Cache[K, V]) PutTxInterface(key K, resource V) func(interface{}) error 
 
 	return func(wi interface{}) error {
 		// the storeOps must be sync operation
-		err := storeOps(wi.(operation.PebbleReaderWriter)) // execute operations to store resource
+		err := storeOps(wi.(pebble.Writer)) // execute operations to store resource
 		if err != nil {
 			return fmt.Errorf("could not store resource: %w", err)
 		}

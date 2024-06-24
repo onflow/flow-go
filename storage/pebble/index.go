@@ -8,7 +8,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/storage/pebble/operation"
 	"github.com/onflow/flow-go/storage/pebble/procedure"
 )
 
@@ -20,8 +19,8 @@ type Index struct {
 
 func NewIndex(collector module.CacheMetrics, db *pebble.DB) *Index {
 
-	store := func(blockID flow.Identifier, index *flow.Index) func(operation.PebbleReaderWriter) error {
-		return operation.OnlyWrite(procedure.InsertIndex(blockID, index))
+	store := func(blockID flow.Identifier, index *flow.Index) func(pebble.Writer) error {
+		return procedure.InsertIndex(blockID, index)
 	}
 
 	retrieve := func(blockID flow.Identifier) func(tx pebble.Reader) (*flow.Index, error) {
@@ -43,7 +42,7 @@ func NewIndex(collector module.CacheMetrics, db *pebble.DB) *Index {
 	return p
 }
 
-func (i *Index) storeTx(blockID flow.Identifier, index *flow.Index) func(operation.PebbleReaderWriter) error {
+func (i *Index) storeTx(blockID flow.Identifier, index *flow.Index) func(pebble.Writer) error {
 	return i.cache.PutTx(blockID, index)
 }
 

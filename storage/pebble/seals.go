@@ -18,8 +18,8 @@ type Seals struct {
 
 func NewSeals(collector module.CacheMetrics, db *pebble.DB) *Seals {
 
-	store := func(sealID flow.Identifier, seal *flow.Seal) func(rw operation.PebbleReaderWriter) error {
-		return operation.OnlyWrite(operation.InsertSeal(sealID, seal))
+	store := func(sealID flow.Identifier, seal *flow.Seal) func(rw pebble.Writer) error {
+		return operation.InsertSeal(sealID, seal)
 	}
 
 	retrieve := func(sealID flow.Identifier) func(pebble.Reader) (*flow.Seal, error) {
@@ -41,7 +41,7 @@ func NewSeals(collector module.CacheMetrics, db *pebble.DB) *Seals {
 	return s
 }
 
-func (s *Seals) storeTx(seal *flow.Seal) func(operation.PebbleReaderWriter) error {
+func (s *Seals) storeTx(seal *flow.Seal) func(pebble.Writer) error {
 	return s.cache.PutTx(seal.ID(), seal)
 }
 

@@ -25,7 +25,7 @@ type MyExecutionReceipts struct {
 // NewMyExecutionReceipts creates instance of MyExecutionReceipts which is a wrapper wrapper around pebble.ExecutionReceipts
 // It's useful for execution nodes to keep track of produced execution receipts.
 func NewMyExecutionReceipts(collector module.CacheMetrics, db *pebble.DB, receipts *ExecutionReceipts) *MyExecutionReceipts {
-	store := func(key flow.Identifier, receipt *flow.ExecutionReceipt) func(operation.PebbleReaderWriter) error {
+	store := func(key flow.Identifier, receipt *flow.ExecutionReceipt) func(pebble.Writer) error {
 		// assemble DB operations to store receipt (no execution)
 		storeReceiptOps := receipts.storeTx(receipt)
 		// assemble DB operations to index receipt as one of my own (no execution)
@@ -33,7 +33,7 @@ func NewMyExecutionReceipts(collector module.CacheMetrics, db *pebble.DB, receip
 		receiptID := receipt.ID()
 		indexOwnReceiptOps := operation.IndexOwnExecutionReceipt(blockID, receiptID)
 
-		return func(tx operation.PebbleReaderWriter) error {
+		return func(tx pebble.Writer) error {
 			err := storeReceiptOps(tx) // execute operations to store receipt
 			if err != nil {
 				return fmt.Errorf("could not store receipt: %w", err)
@@ -72,7 +72,7 @@ func NewMyExecutionReceipts(collector module.CacheMetrics, db *pebble.DB, receip
 }
 
 // storeMyReceipt assembles the operations to store the receipt and marks it as mine (trusted).
-func (m *MyExecutionReceipts) storeMyReceipt(receipt *flow.ExecutionReceipt) func(operation.PebbleReaderWriter) error {
+func (m *MyExecutionReceipts) storeMyReceipt(receipt *flow.ExecutionReceipt) func(pebble.Writer) error {
 	return m.cache.PutTx(receipt.ExecutionResult.BlockID, receipt)
 }
 

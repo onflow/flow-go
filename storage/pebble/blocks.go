@@ -1,12 +1,11 @@
 package pebble
 
 import (
-	"errors"
 	"fmt"
 
+	"github.com/cockroachdb/pebble"
 	"github.com/onflow/flow-go/model/flow"
 
-	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/pebble/operation"
 )
 
@@ -16,6 +15,8 @@ type Blocks struct {
 	headers  *Headers
 	payloads *Payloads
 }
+
+// var _ storage.Blocks = (*Blocks)(nil)
 
 // NewBlocks ...
 func NewBlocks(db *pebble.DB, headers *Headers, payloads *Payloads) *Blocks {
@@ -27,13 +28,13 @@ func NewBlocks(db *pebble.DB, headers *Headers, payloads *Payloads) *Blocks {
 	return b
 }
 
-func (b *Blocks) StoreTx(block *flow.Block) func(operation.PebbleReaderWriter) error {
-	return func(tx operation.PebbleReaderWriter) error {
-		err := b.headers.storeTx(block.Header)(tx)
+func (b *Blocks) StoreTx(block *flow.Block) func(operation.PebbleReaderBatchWriter) error {
+	return func(rw operation.PebbleReaderBatchWriter) error {
+		err := b.headers.storeTx(block.Header)(rw)
 		if err != nil {
 			return fmt.Errorf("could not store header %v: %w", block.Header.ID(), err)
 		}
-		err = b.payloads.storeTx(block.ID(), block.Payload)(tx)
+		err = b.payloads.storeTx(block.ID(), block.Payload)(rw)
 		if err != nil {
 			return fmt.Errorf("could not store payload: %w", err)
 		}
@@ -41,8 +42,8 @@ func (b *Blocks) StoreTx(block *flow.Block) func(operation.PebbleReaderWriter) e
 	}
 }
 
-func (b *Blocks) retrieveTx(blockID flow.Identifier) func(*pebble.Txn) (*flow.Block, error) {
-	return func(tx *pebble.Txn) (*flow.Block, error) {
+func (b *Blocks) retrieveTx(blockID flow.Identifier) func(pebble.Reader) (*flow.Block, error) {
+	return func(tx pebble.Reader) (*flow.Block, error) {
 		header, err := b.headers.retrieveTx(blockID)(tx)
 		if err != nil {
 			return nil, fmt.Errorf("could not retrieve header: %w", err)
@@ -102,43 +103,18 @@ func (b *Blocks) IndexBlockForCollections(blockID flow.Identifier, collIDs []flo
 // InsertLastFullBlockHeightIfNotExists inserts the last full block height
 // Calling this function multiple times is a no-op and returns no expected errors.
 func (b *Blocks) InsertLastFullBlockHeightIfNotExists(height uint64) error {
-	return operation.RetryOnConflict(b.db.Update, func(tx *pebble.Txn) error {
-		err := operation.InsertLastCompleteBlockHeightIfNotExists(height)(tx)
-		if err != nil {
-			return fmt.Errorf("could not set LastFullBlockHeight: %w", err)
-		}
-		return nil
-	})
+	return operation.InsertLastCompleteBlockHeightIfNotExists(height)(b.db)
 }
 
 // UpdateLastFullBlockHeight upsert (update or insert) the last full block height
 func (b *Blocks) UpdateLastFullBlockHeight(height uint64) error {
-	return operation.RetryOnConflict(b.db.Update, func(tx *pebble.Txn) error {
-
-		// try to update
-		err := operation.UpdateLastCompleteBlockHeight(height)(tx)
-		if err == nil {
-			return nil
-		}
-
-		if !errors.Is(err, storage.ErrNotFound) {
-			return fmt.Errorf("could not update LastFullBlockHeight: %w", err)
-		}
-
-		// if key does not exist, try insert.
-		err = operation.InsertLastCompleteBlockHeight(height)(tx)
-		if err != nil {
-			return fmt.Errorf("could not insert LastFullBlockHeight: %w", err)
-		}
-
-		return nil
-	})
+	return operation.InsertLastCompleteBlockHeight(height)(b.db)
 }
 
 // GetLastFullBlockHeight ...
 func (b *Blocks) GetLastFullBlockHeight() (uint64, error) {
 	var h uint64
-	err := b.db.View(operation.RetrieveLastCompleteBlockHeight(&h))
+	err := operation.RetrieveLastCompleteBlockHeight(&h)(b.db)
 	if err != nil {
 		return 0, fmt.Errorf("failed to retrieve LastFullBlockHeight: %w", err)
 	}

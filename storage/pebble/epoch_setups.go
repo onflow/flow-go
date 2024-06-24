@@ -17,8 +17,8 @@ type EpochSetups struct {
 // NewEpochSetups instantiates a new EpochSetups storage.
 func NewEpochSetups(collector module.CacheMetrics, db *pebble.DB) *EpochSetups {
 
-	store := func(id flow.Identifier, setup *flow.EpochSetup) func(operation.PebbleReaderWriter) error {
-		return operation.OnlyWrite(operation.InsertEpochSetup(id, setup))
+	store := func(id flow.Identifier, setup *flow.EpochSetup) func(pebble.Writer) error {
+		return operation.InsertEpochSetup(id, setup)
 	}
 
 	retrieve := func(id flow.Identifier) func(pebble.Reader) (*flow.EpochSetup, error) {
@@ -40,7 +40,7 @@ func NewEpochSetups(collector module.CacheMetrics, db *pebble.DB) *EpochSetups {
 	return es
 }
 
-func (es *EpochSetups) StoreTx(setup *flow.EpochSetup) func(operation.PebbleReaderWriter) error {
+func (es *EpochSetups) StoreTx(setup *flow.EpochSetup) func(pebble.Writer) error {
 	return es.cache.PutTx(setup.ID(), setup)
 }
 

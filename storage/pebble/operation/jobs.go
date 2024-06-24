@@ -38,6 +38,6 @@ func InsertProcessedIndex(jobName string, processed uint64) func(pebble.Writer) 
 }
 
 // SetProcessedIndex updates the processed index for a job consumer with given index
-func SetProcessedIndex(jobName string, processed uint64) func(PebbleReaderWriter) error {
-	return update(makePrefix(codeJobConsumerProcessed, jobName), processed)
+func SetProcessedIndex(jobName string, processed uint64) func(pebble.Writer) error {
+	return insert(makePrefix(codeJobConsumerProcessed, jobName), processed)
 }

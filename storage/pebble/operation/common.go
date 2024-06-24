@@ -11,11 +11,6 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-type PebbleReaderWriter interface {
-	pebble.Reader
-	pebble.Writer
-}
-
 type PebbleReaderBatchWriter interface {
 	ReaderWriter() (pebble.Reader, pebble.Writer)
 }
@@ -51,9 +46,10 @@ func WithReaderBatchWriter(db *pebble.DB, fn func(PebbleReaderBatchWriter) error
 
 // insertNew requires the key does not exist
 // Error returns: storage.ErrAlreadyExists
-func insertNew(key []byte, val interface{}) func(PebbleReaderWriter) error {
-	return func(rw PebbleReaderWriter) error {
-		_, closer, err := rw.Get(key)
+func insertNew(key []byte, val interface{}) func(PebbleReaderBatchWriter) error {
+	return func(rw PebbleReaderBatchWriter) error {
+		r, tx := rw.ReaderWriter()
+		_, closer, err := r.Get(key)
 		if err == nil {
 			defer closer.Close()
 			return storage.ErrAlreadyExists
@@ -68,7 +64,7 @@ func insertNew(key []byte, val interface{}) func(PebbleReaderWriter) error {
 			return irrecoverable.NewExceptionf("failed to encode value: %w", err)
 		}
 
-		err = rw.Set(key, value, pebble.Sync)
+		err = tx.Set(key, value, pebble.Sync)
 		if err != nil {
 			return irrecoverable.NewExceptionf("failed to store data: %w", err)
 		}
@@ -157,11 +153,12 @@ type iterationFunc func() (checkFunc, createFunc, handleFunc)
 //   - storage.ErrNotFound if the key does not already exist in the database.
 //   - generic error in case of unexpected failure from the database layer or
 //     encoding failure.
-func update(key []byte, entity interface{}) func(PebbleReaderWriter) error {
-	return func(w PebbleReaderWriter) error {
+func update(key []byte, entity interface{}) func(PebbleReaderBatchWriter) error {
+	return func(rw PebbleReaderBatchWriter) error {
+		r, tx := rw.ReaderWriter()
 
 		// retrieve the item from the key-value store
-		_, closer, err := w.Get(key)
+		_, closer, err := r.Get(key)
 		if errors.Is(err, pebble.ErrNotFound) {
 			return storage.ErrNotFound
 		}
@@ -181,7 +178,7 @@ func update(key []byte, entity interface{}) func(PebbleReaderWriter) error {
 		}
 
 		// persist the entity data into the DB
-		err = w.Set(key, val, nil)
+		err = tx.Set(key, val, nil)
 		if err != nil {
 			return irrecoverable.NewExceptionf("could not replace data: %w", err)
 		}
@@ -345,7 +342,7 @@ func findHighestAtOrBelow(
 	}
 }
 
-func BatchUpdate(db *pebble.DB, fn func(tx PebbleReaderWriter) error) error {
+func BatchUpdate(db *pebble.DB, fn func(tx pebble.Writer) error) error {
 	batch := db.NewBatch()
 	err := fn(batch)
 	if err != nil {

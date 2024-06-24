@@ -17,8 +17,8 @@ type Guarantees struct {
 
 func NewGuarantees(collector module.CacheMetrics, db *pebble.DB, cacheSize uint) *Guarantees {
 
-	store := func(collID flow.Identifier, guarantee *flow.CollectionGuarantee) func(operation.PebbleReaderWriter) error {
-		return operation.OnlyWrite(operation.InsertGuarantee(collID, guarantee))
+	store := func(collID flow.Identifier, guarantee *flow.CollectionGuarantee) func(pebble.Writer) error {
+		return operation.InsertGuarantee(collID, guarantee)
 	}
 
 	retrieve := func(collID flow.Identifier) func(pebble.Reader) (*flow.CollectionGuarantee, error) {
@@ -40,8 +40,8 @@ func NewGuarantees(collector module.CacheMetrics, db *pebble.DB, cacheSize uint)
 	return g
 }
 
-func (g *Guarantees) storeTx(guarantee *flow.CollectionGuarantee) func(interface{}) error {
-	return g.cache.PutTxInterface(guarantee.ID(), guarantee)
+func (g *Guarantees) storeTx(guarantee *flow.CollectionGuarantee) func(pebble.Writer) error {
+	return g.cache.PutTx(guarantee.ID(), guarantee)
 }
 
 func (g *Guarantees) retrieveTx(collID flow.Identifier) func(pebble.Reader) (*flow.CollectionGuarantee, error) {
@@ -52,10 +52,6 @@ func (g *Guarantees) retrieveTx(collID flow.Identifier) func(pebble.Reader) (*fl
 		}
 		return val, nil
 	}
-}
-
-func (g *Guarantees) Store(guarantee *flow.CollectionGuarantee) error {
-	return g.storeTx(guarantee)(g.db)
 }
 
 func (g *Guarantees) ByCollectionID(collID flow.Identifier) (*flow.CollectionGuarantee, error) {

@@ -10,6 +10,8 @@ import (
 type Payloads interface {
 
 	// Store will store a payload and index its contents.
+	// deprecated: the storing of payloads should be handled by the blocks storage.
+	// TODO: remove
 	Store(blockID flow.Identifier, payload *flow.Payload) error
 
 	// ByBlockID returns the payload with the given hash. It is available for

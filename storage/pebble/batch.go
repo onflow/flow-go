@@ -11,6 +11,7 @@ import (
 type Batch struct {
 	writer *pebble.Batch
 
+	db        *pebble.DB
 	lock      sync.RWMutex
 	callbacks []func()
 }
@@ -20,6 +21,7 @@ var _ storage.BatchStorage = (*Batch)(nil)
 func NewBatch(db *pebble.DB) *Batch {
 	batch := db.NewBatch()
 	return &Batch{
+		db:        db,
 		writer:    batch,
 		callbacks: make([]func(), 0),
 	}
@@ -27,6 +29,23 @@ func NewBatch(db *pebble.DB) *Batch {
 
 func (b *Batch) GetWriter() storage.Transaction {
 	return &Transaction{b.writer}
+}
+
+type reader struct {
+	db *pebble.DB
+}
+
+func (r *reader) Get(key []byte) ([]byte, error) {
+	val, closer, err := r.db.Get(key)
+	if err != nil {
+		return nil, err
+	}
+	defer closer.Close()
+	return val, nil
+}
+
+func (b *Batch) GetReader() storage.Reader {
+	return &reader{db: b.db}
 }
 
 // OnSucceed adds a callback to execute after the batch has

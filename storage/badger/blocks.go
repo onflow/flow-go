@@ -21,6 +21,8 @@ type Blocks struct {
 	payloads *Payloads
 }
 
+var _ storage.Blocks = (*Blocks)(nil)
+
 // NewBlocks ...
 func NewBlocks(db *badger.DB, headers *Headers, payloads *Payloads) *Blocks {
 	b := &Blocks{

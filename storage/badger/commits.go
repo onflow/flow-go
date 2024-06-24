@@ -70,6 +70,10 @@ func (c *Commits) BatchStore(blockID flow.Identifier, commit flow.StateCommitmen
 	return operation.BatchIndexStateCommitment(blockID, commit)(writeBatch)
 }
 
+func (c *Commits) BatchStore2(blockID flow.Identifier, commit flow.StateCommitment, tx storage.Transaction) error {
+	return operation.BatchIndexStateCommitment(blockID, commit)(tx)
+}
+
 func (c *Commits) ByBlockID(blockID flow.Identifier) (flow.StateCommitment, error) {
 	tx := c.db.NewTransaction(false)
 	defer tx.Discard()

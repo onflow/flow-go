@@ -18,8 +18,8 @@ type EpochCommits struct {
 
 func NewEpochCommits(collector module.CacheMetrics, db *pebble.DB) *EpochCommits {
 
-	store := func(id flow.Identifier, commit *flow.EpochCommit) func(operation.PebbleReaderWriter) error {
-		return operation.OnlyWrite(operation.InsertEpochCommit(id, commit))
+	store := func(id flow.Identifier, commit *flow.EpochCommit) func(pebble.Writer) error {
+		return operation.InsertEpochCommit(id, commit)
 	}
 
 	retrieve := func(id flow.Identifier) func(pebble.Reader) (*flow.EpochCommit, error) {
@@ -41,7 +41,7 @@ func NewEpochCommits(collector module.CacheMetrics, db *pebble.DB) *EpochCommits
 	return ec
 }
 
-func (ec *EpochCommits) StoreTx(commit *flow.EpochCommit) func(operation.PebbleReaderWriter) error {
+func (ec *EpochCommits) StoreTx(commit *flow.EpochCommit) func(pebble.Writer) error {
 	return ec.cache.PutTx(commit.ID(), commit)
 }
 

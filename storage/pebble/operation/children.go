@@ -12,8 +12,8 @@ func InsertBlockChildren(blockID flow.Identifier, childrenIDs flow.IdentifierLis
 }
 
 // UpdateBlockChildren updates the children for a block.
-func UpdateBlockChildren(blockID flow.Identifier, childrenIDs flow.IdentifierList) func(PebbleReaderWriter) error {
-	return update(makePrefix(codeBlockChildren, blockID), childrenIDs)
+func UpdateBlockChildren(blockID flow.Identifier, childrenIDs flow.IdentifierList) func(pebble.Writer) error {
+	return InsertBlockChildren(blockID, childrenIDs)
 }
 
 // RetrieveBlockChildren the child block ID by parent block ID

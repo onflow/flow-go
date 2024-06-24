@@ -23,7 +23,7 @@ type ExecutionReceipts struct {
 // NewExecutionReceipts Creates ExecutionReceipts instance which is a database of receipts which
 // supports storing and indexing receipts by receipt ID and block ID.
 func NewExecutionReceipts(collector module.CacheMetrics, db *pebble.DB, results *ExecutionResults, cacheSize uint) *ExecutionReceipts {
-	store := func(receiptTD flow.Identifier, receipt *flow.ExecutionReceipt) func(operation.PebbleReaderWriter) error {
+	store := func(receiptTD flow.Identifier, receipt *flow.ExecutionReceipt) func(pebble.Writer) error {
 		receiptID := receipt.ID()
 
 		// assemble DB operations to store result (no execution)
@@ -33,7 +33,7 @@ func NewExecutionReceipts(collector module.CacheMetrics, db *pebble.DB, results 
 		// assemble DB operations to index receipt by the block it computes (no execution)
 		indexReceiptOps := operation.IndexExecutionReceipts(receipt.ExecutionResult.BlockID, receiptID)
 
-		return func(tx operation.PebbleReaderWriter) error {
+		return func(tx pebble.Writer) error {
 			err := storeResultOps(tx) // execute operations to store results
 			if err != nil {
 				return fmt.Errorf("could not store result: %w", err)
@@ -76,7 +76,7 @@ func NewExecutionReceipts(collector module.CacheMetrics, db *pebble.DB, results 
 }
 
 // storeMyReceipt assembles the operations to store an arbitrary receipt.
-func (r *ExecutionReceipts) storeTx(receipt *flow.ExecutionReceipt) func(operation.PebbleReaderWriter) error {
+func (r *ExecutionReceipts) storeTx(receipt *flow.ExecutionReceipt) func(pebble.Writer) error {
 	return r.cache.PutTx(receipt.ID(), receipt)
 }
 

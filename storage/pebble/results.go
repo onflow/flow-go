@@ -22,8 +22,8 @@ var _ storage.ExecutionResults = (*ExecutionResults)(nil)
 
 func NewExecutionResults(collector module.CacheMetrics, db *pebble.DB) *ExecutionResults {
 
-	store := func(_ flow.Identifier, result *flow.ExecutionResult) func(operation.PebbleReaderWriter) error {
-		return operation.OnlyWrite(operation.InsertExecutionResult(result))
+	store := func(_ flow.Identifier, result *flow.ExecutionResult) func(pebble.Writer) error {
+		return operation.InsertExecutionResult(result)
 	}
 
 	retrieve := func(resultID flow.Identifier) func(tx pebble.Reader) (*flow.ExecutionResult, error) {
@@ -45,8 +45,8 @@ func NewExecutionResults(collector module.CacheMetrics, db *pebble.DB) *Executio
 	return res
 }
 
-func (r *ExecutionResults) store(result *flow.ExecutionResult) func(interface{}) error {
-	return r.cache.PutTxInterface(result.ID(), result)
+func (r *ExecutionResults) store(result *flow.ExecutionResult) func(pebble.Writer) error {
+	return r.cache.PutTx(result.ID(), result)
 }
 
 func (r *ExecutionResults) byID(resultID flow.Identifier) func(pebble.Reader) (*flow.ExecutionResult, error) {
@@ -80,7 +80,7 @@ func (r *ExecutionResults) Store(result *flow.ExecutionResult) error {
 
 func (r *ExecutionResults) BatchStore(result *flow.ExecutionResult, batch storage.BatchStorage) error {
 	writeBatch := batch.GetWriter()
-	return r.store(result)(operation.NewBatchWriter(writeBatch))
+	return operation.InsertExecutionResult(result)(operation.NewBatchWriter(writeBatch))
 }
 
 func (r *ExecutionResults) BatchIndex(blockID flow.Identifier, resultID flow.Identifier, batch storage.BatchStorage) error {

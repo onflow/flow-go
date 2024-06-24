@@ -33,7 +33,7 @@ func (c *Collections) StoreLight(collection *flow.LightCollection) error {
 
 func (c *Collections) Store(collection *flow.Collection) error {
 	light := collection.Light()
-	return operation.BatchUpdate(c.db, func(ttx operation.PebbleReaderWriter) error {
+	return operation.BatchUpdate(c.db, func(ttx pebble.Writer) error {
 		err := operation.InsertCollection(&light)(ttx)
 		if err != nil {
 			return fmt.Errorf("could not insert collection: %w", err)
@@ -96,7 +96,7 @@ func (c *Collections) Remove(colID flow.Identifier) error {
 }
 
 func (c *Collections) StoreLightAndIndexByTransaction(collection *flow.LightCollection) error {
-	return operation.BatchUpdate(c.db, func(tx operation.PebbleReaderWriter) error {
+	return operation.BatchUpdate(c.db, func(tx pebble.Writer) error {
 
 		err := operation.InsertCollection(collection)(tx)
 		if err != nil {

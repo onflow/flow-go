@@ -35,20 +35,21 @@ func NewPayloads(db *pebble.DB, index *Index, guarantees *Guarantees, seals *Sea
 	return p
 }
 
-func (p *Payloads) storeTx(blockID flow.Identifier, payload *flow.Payload) func(*pebble.DB) error {
+func (p *Payloads) storeTx(blockID flow.Identifier, payload *flow.Payload) func(operation.PebbleReaderBatchWriter) error {
 	// For correct payloads, the execution result is part of the payload or it's already stored
 	// in storage. If execution result is not present in either of those places, we error.
 	// ATTENTION: this is unnecessarily complex if we have execution receipt which points an execution result
 	// which is not included in current payload but was incorporated in one of previous blocks.
 
-	return func(db *pebble.DB) error {
+	return func(rw operation.PebbleReaderBatchWriter) error {
+		r, _ := rw.ReaderWriter()
 		resultsByID := payload.Results.Lookup()
 		fullReceipts := make([]*flow.ExecutionReceipt, 0, len(payload.Receipts))
 		var err error
 		for _, meta := range payload.Receipts {
 			result, ok := resultsByID[meta.ResultID]
 			if !ok {
-				result, err = p.results.ByIDTx(meta.ResultID)(db)
+				result, err = p.results.ByIDTx(meta.ResultID)(r)
 				if err != nil {
 					if errors.Is(err, storage.ErrNotFound) {
 						err = fmt.Errorf("invalid payload referencing unknown execution result %v, err: %w", meta.ResultID, err)
@@ -59,13 +60,14 @@ func (p *Payloads) storeTx(blockID flow.Identifier, payload *flow.Payload) func(
 			fullReceipts = append(fullReceipts, flow.ExecutionReceiptFromMeta(*meta, *result))
 		}
 
-		return p.storePayloads(db, blockID, payload, fullReceipts)
+		return p.storePayloads(rw, blockID, payload, fullReceipts)
 	}
 }
 
 func (p *Payloads) storePayloads(
-	db *pebble.DB, blockID flow.Identifier, payload *flow.Payload, fullReceipts []*flow.ExecutionReceipt) error {
-	return operation.BatchUpdate(db, func(tx operation.PebbleReaderWriter) error {
+	rw operation.PebbleReaderBatchWriter, blockID flow.Identifier, payload *flow.Payload, fullReceipts []*flow.ExecutionReceipt) error {
+	return func(rw operation.PebbleReaderBatchWriter) error {
+		_, tx := rw.ReaderWriter()
 		// make sure all payload guarantees are stored
 		for _, guarantee := range payload.Guarantees {
 			err := p.guarantees.storeTx(guarantee)(tx)
@@ -97,7 +99,7 @@ func (p *Payloads) storePayloads(
 		}
 
 		return nil
-	})
+	}
 }
 
 func (p *Payloads) retrieveTx(blockID flow.Identifier) func(tx pebble.Reader) (*flow.Payload, error) {
@@ -157,10 +159,6 @@ func (p *Payloads) retrieveTx(blockID flow.Identifier) func(tx pebble.Reader) (*
 
 		return payload, nil
 	}
-}
-
-func (p *Payloads) Store(blockID flow.Identifier, payload *flow.Payload) error {
-	return p.storeTx(blockID, payload)(p.db)
 }
 
 func (p *Payloads) ByBlockID(blockID flow.Identifier) (*flow.Payload, error) {

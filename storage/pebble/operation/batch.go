@@ -13,8 +13,6 @@ type batchWriter struct {
 	batch storage.Transaction
 }
 
-var _ PebbleReaderWriter = (*batchWriter)(nil)
-
 func NewBatchWriter(batch storage.Transaction) pebble.Writer {
 	return batchWriter{batch: batch}
 }

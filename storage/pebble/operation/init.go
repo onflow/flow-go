@@ -26,12 +26,12 @@ const (
 	dbMarkerSecret
 )
 
-func InsertPublicDBMarker(txn *pebble.DB) error {
-	return insertDBTypeMarker(dbMarkerPublic)(txn)
+func InsertPublicDBMarker(db *pebble.DB) error {
+	return insertDBTypeMarker(dbMarkerPublic)(NewPebbleReaderBatchWriter(db))
 }
 
-func InsertSecretDBMarker(txn *pebble.DB) error {
-	return insertDBTypeMarker(dbMarkerSecret)(txn)
+func InsertSecretDBMarker(db *pebble.DB) error {
+	return insertDBTypeMarker(dbMarkerSecret)(NewPebbleReaderBatchWriter(db))
 }
 
 func EnsurePublicDB(db *pebble.DB) error {
@@ -45,10 +45,11 @@ func EnsureSecretDB(db *pebble.DB) error {
 // insertDBTypeMarker inserts a database type marker if none exists. If a marker
 // already exists in the database, this function will return an error if the
 // marker does not match the argument, or return nil if it matches.
-func insertDBTypeMarker(marker dbTypeMarker) func(PebbleReaderWriter) error {
-	return func(txn PebbleReaderWriter) error {
+func insertDBTypeMarker(marker dbTypeMarker) func(PebbleReaderBatchWriter) error {
+	return func(rw PebbleReaderBatchWriter) error {
+		r, txn := rw.ReaderWriter()
 		var storedMarker dbTypeMarker
-		err := retrieveDBType(&storedMarker)(txn)
+		err := retrieveDBType(&storedMarker)(r)
 		if err != nil && !errors.Is(err, storage.ErrNotFound) {
 			return fmt.Errorf("could not check db type marker: %w", err)
 		}
