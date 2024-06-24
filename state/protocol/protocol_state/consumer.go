@@ -4,9 +4,13 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// StateMachineEventsConsumer consumers notifications produced by OrthogonalStoreStateMachine instances. Any state machine
+// StateMachineEventsConsumer consumes notifications produced by OrthogonalStoreStateMachine instances. Any state machine
 // that performs processing of service events should notify the consumer about the events it received, successfully processed or
 // detected as invalid.
+// Implementations must:
+//   - be concurrency safe
+//   - be non-blocking
+//   - handle repetition of the same events (with some processing overhead).
 type StateMachineEventsConsumer interface {
 	// OnInvalidServiceEvent notifications are produced when a service event is detected as invalid by the state machine.
 	OnInvalidServiceEvent(event flow.ServiceEvent, err error)
