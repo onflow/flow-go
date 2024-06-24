@@ -64,10 +64,10 @@ func (u *HappyPathStateMachine) ProcessEpochSetup(epochSetup *flow.EpochSetup) (
 	err := protocol.IsValidExtendingEpochSetup(epochSetup, u.parentState)
 	if err != nil {
 		u.consumer.OnInvalidServiceEvent(epochSetup.ServiceEvent(), err)
-		return false, fmt.Errorf("invalid epoch setup event: %w", err)
+		return false, fmt.Errorf("invalid epoch setup event for epoch %d: %w", epochSetup.Counter, err)
 	}
 	if u.state.NextEpoch != nil {
-		err := protocol.NewInvalidServiceEventErrorf("repeated setup for epoch %d", epochSetup.Counter)
+		err := protocol.NewInvalidServiceEventErrorf("repeated EpochSetup event for epoch %d", epochSetup.Counter)
 		u.consumer.OnInvalidServiceEvent(epochSetup.ServiceEvent(), err)
 		return false, err
 	}
@@ -134,19 +134,19 @@ func (u *HappyPathStateMachine) ProcessEpochSetup(epochSetup *flow.EpochSetup) (
 func (u *HappyPathStateMachine) ProcessEpochCommit(epochCommit *flow.EpochCommit) (bool, error) {
 	u.consumer.OnServiceEventReceived(epochCommit.ServiceEvent())
 	if u.state.NextEpoch == nil {
-		err := protocol.NewInvalidServiceEventErrorf("protocol state has been setup yet")
+		err := protocol.NewInvalidServiceEventErrorf("received EpochCommit without prior EpochSetup")
 		u.consumer.OnInvalidServiceEvent(epochCommit.ServiceEvent(), err)
 		return false, err
 	}
 	if u.state.NextEpoch.CommitID != flow.ZeroID {
-		err := protocol.NewInvalidServiceEventErrorf("protocol state has already a commit event")
+		err := protocol.NewInvalidServiceEventErrorf("repeated EpochCommit event for epoch %d", epochCommit.Counter)
 		u.consumer.OnInvalidServiceEvent(epochCommit.ServiceEvent(), err)
 		return false, err
 	}
 	err := protocol.IsValidExtendingEpochCommit(epochCommit, u.parentState.EpochProtocolStateEntry, u.parentState.NextEpochSetup)
 	if err != nil {
 		u.consumer.OnInvalidServiceEvent(epochCommit.ServiceEvent(), err)
-		return false, fmt.Errorf("invalid epoch commit event: %w", err)
+		return false, fmt.Errorf("invalid epoch commit event for epoch %d: %w", epochCommit.Counter, err)
 	}
 
 	u.state.NextEpoch.CommitID = epochCommit.ID()
@@ -158,7 +158,7 @@ func (u *HappyPathStateMachine) ProcessEpochCommit(epochCommit *flow.EpochCommit
 // indicates that `EpochRecover` are not expected on the happy path of epoch lifecycle.
 func (u *HappyPathStateMachine) ProcessEpochRecover(epochRecover *flow.EpochRecover) (bool, error) {
 	u.consumer.OnServiceEventReceived(epochRecover.ServiceEvent())
-	err := protocol.NewInvalidServiceEventErrorf("epoch recover event received while on happy path")
+	err := protocol.NewInvalidServiceEventErrorf("epoch recover event for epoch %d received while on happy path", epochRecover.EpochSetup.Counter)
 	u.consumer.OnInvalidServiceEvent(epochRecover.ServiceEvent(), err)
 	return false, err
 }
