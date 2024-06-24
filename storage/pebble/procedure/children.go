@@ -24,12 +24,13 @@ import (
 //     there are two special cases for (2):
 //     - if the parent block is zero, then we don't need to add this index.
 //     - if the parent block doesn't exist, then we will insert the child index instead of updating
-func IndexNewBlock(blockID flow.Identifier, parentID flow.Identifier) func(operation.PebbleReaderWriter) error {
-	return func(rw operation.PebbleReaderWriter) error {
+func IndexNewBlock(blockID flow.Identifier, parentID flow.Identifier) func(operation.PebbleReaderBatchWriter) error {
+	return func(rw operation.PebbleReaderBatchWriter) error {
+		r, tx := rw.ReaderWriter()
 
 		// Step 1: index the child for the new block.
 		// the new block has no child, so adding an empty child index for it
-		err := operation.InsertBlockChildren(blockID, nil)(rw)
+		err := operation.InsertBlockChildren(blockID, nil)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert empty block children: %w", err)
 		}
@@ -46,10 +47,10 @@ func IndexNewBlock(blockID flow.Identifier, parentID flow.Identifier) func(opera
 		// when parent block doesn't exist, we will insert the block children.
 		// when parent block exists already, we will update the block children,
 		var childrenIDs flow.IdentifierList
-		err = operation.RetrieveBlockChildren(parentID, &childrenIDs)(rw)
+		err = operation.RetrieveBlockChildren(parentID, &childrenIDs)(r)
 
 		if errors.Is(err, storage.ErrNotFound) {
-			return operation.InsertBlockChildren(parentID, flow.IdentifierList{blockID})(rw)
+			return operation.InsertBlockChildren(parentID, flow.IdentifierList{blockID})(tx)
 		} else if err != nil {
 			return fmt.Errorf("could not look up block children: %w", err)
 		}
@@ -65,7 +66,7 @@ func IndexNewBlock(blockID flow.Identifier, parentID flow.Identifier) func(opera
 		childrenIDs = append(childrenIDs, blockID)
 
 		// TODO: use transaction to avoid race condition
-		return operation.UpdateBlockChildren(parentID, childrenIDs)(rw)
+		return operation.InsertBlockChildren(parentID, childrenIDs)(tx)
 	}
 
 }
