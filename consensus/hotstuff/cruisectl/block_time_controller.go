@@ -527,7 +527,7 @@ func (ctl *BlockTimeController) EpochSetupPhaseStarted(_ uint64, first *flow.Hea
 }
 
 // EpochEmergencyFallbackTriggered responds to epoch fallback mode being triggered.
-func (ctl *BlockTimeController) EpochEmergencyFallbackTriggered() {
+func (ctl *BlockTimeController) EpochFallbackModeTriggered(uint64, *flow.Header) {
 	ctl.epochFallbacks <- struct{}{}
 }
 

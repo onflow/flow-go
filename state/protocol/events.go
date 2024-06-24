@@ -84,20 +84,36 @@ type Consumer interface {
 	// NOTE: Only called once the phase transition has been finalized.
 	EpochCommittedPhaseStarted(currentEpochCounter uint64, first *flow.Header)
 
-	// EpochEmergencyFallbackTriggered is called when epoch fallback mode [EFM] is triggered.
-	// Since EFM is a permanent, spork-scoped state, this event is triggered only once.
-	// After this event is triggered, no further epoch transitions will occur,
-	// no further epoch phase transitions will occur, and no further epoch-related
-	// related protocol events (the events defined in this interface) will be emitted.
-	EpochEmergencyFallbackTriggered()
+	// EpochFallbackModeTriggered is called when Epoch Fallback Mode [EFM] is triggered.
+	// EFM is triggered when an invalid or unexpected epoch-related service event is observed,
+	// or an expected service event is not observed before the epoch commitment deadline.
+	// After EFM is triggered, we drop any potentially pending but uncommitted future epoch setup.
+	// When an EpochRecover event is observed, regular epoch transitions begin again.
+	// Usually, this means we remain in the current epoch until EFM is exited.
+	// If EFM was triggered within the EpochCommitted phase, then we complete the transition
+	// to the next, already-committed epoch, then remain in that epoch until EFM is exited.
+	// Consumers can get context for handling events from:
+	//   - epochCounter is the current epoch counter at the block when EFM was triggered
+	//   - header is the block when EFM was triggered
+	//
+	// NOTE: This notification is emitted when the block triggering EFM is finalized.
+	EpochFallbackModeTriggered(epochCounter uint64, header *flow.Header)
 
-	// EpochExtended is called when an extension is added to the current Epoch after epoch fallback mode is triggered. This callback is called
-	// with the information of the Epoch extension. This callback is informationally idempotent, I.e. the consumer
-	// of this callback must handle repeated calls for the same extension.
-	EpochExtended(extension *flow.EpochExtension)
+	// EpochFallbackModeExited is called when epoch fallback mode [EFM] is exited.
+	// EFM is exited when an EpochRecover service event is processed, which defines
+	// a final view for the current epoch and fully specifies the subsequent epoch.
+	// Consumers can get context for handling events from:
+	//   - epochCounter is the current epoch counter at the block when EFM was triggered
+	//   - header is the block when EFM was triggered
+	//
+	// NOTE: Only called once the block incorporating the EpochRecover is finalized.
+	EpochFallbackModeExited(epochCounter uint64, header *flow.Header)
 
-	// EpochRecovered is called after an EpochRecover service event is processed. This event is called with all the
-	// relevant epoch metadata of the recovery epoch. This callback is informationally idempotent, I.e. the consumer
-	// of this callback must handle repeated calls for the same metadata.
-	EpochRecovered(nextEpochFinalView *uint64)
+	// EpochExtended is called when a flow.EpochExtension is added to the current epoch
+	// Consumers can get context for handling events from:
+	//   - epochCounter is the current epoch counter at the block when EFM was triggered
+	//   - header is the block when EFM was triggered
+	//
+	// NOTE: This notification is emitted when the block triggering the EFM extension is finalized.
+	EpochExtended(epochCounter uint64, header *flow.Header, extension flow.EpochExtension)
 }

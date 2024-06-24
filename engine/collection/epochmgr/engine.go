@@ -1,12 +1,14 @@
 package epochmgr
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"sync"
 	"time"
 
 	"github.com/rs/zerolog"
+	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/engine/collection"
 	"github.com/onflow/flow-go/model/flow"
@@ -56,6 +58,8 @@ type Engine struct {
 	mu     sync.RWMutex                       // protects epochs map
 	epochs map[uint64]*RunningEpochComponents // epoch-scoped components per epoch
 
+	inProgressQCVote *atomic.Pointer[context.CancelFunc] // tracks the cancel callback of the in progress QC vote
+
 	// internal event notifications
 	epochTransitionEvents        chan *flow.Header        // sends first block of new epoch
 	epochSetupPhaseStartedEvents chan *flow.Header        // sends first block of EpochSetup phase
@@ -92,6 +96,7 @@ func New(
 		epochSetupPhaseStartedEvents: make(chan *flow.Header, 1),
 		epochStopEvents:              make(chan uint64, 1),
 		clusterIDUpdateDistributor:   clusterIDUpdateDistributor,
+		inProgressQCVote:             atomic.NewPointer[context.CancelFunc](nil),
 	}
 
 	e.cm = component.NewComponentManagerBuilder().
@@ -312,6 +317,12 @@ func (e *Engine) EpochSetupPhaseStarted(_ uint64, first *flow.Header) {
 	e.epochSetupPhaseStartedEvents <- first
 }
 
+// EpochEmergencyFallbackTriggered handles the epoch emergency fallback triggered protocol event.
+// If epoch emergency fallback is triggered, root QC voting must be stopped.
+func (e *Engine) EpochEmergencyFallbackTriggered() {
+	e.stopInProgressQcVote()
+}
+
 // handleEpochEvents handles events relating to the epoch lifecycle:
 //   - EpochTransition protocol event - we start epoch components for the starting epoch,
 //     and schedule shutdown for the ending epoch
@@ -444,7 +455,12 @@ func (e *Engine) prepareToStopEpochComponents(epochCounter, epochMaxHeight uint6
 // kicks off setup tasks for the phase, in particular submitting a vote for the
 // next epoch's root cluster QC.
 func (e *Engine) onEpochSetupPhaseStarted(ctx irrecoverable.SignalerContext, nextEpoch protocol.Epoch) {
-	err := e.voter.Vote(ctx, nextEpoch)
+	ctxWithCancel, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	e.inProgressQCVote.Store(&cancel)
+
+	err := e.voter.Vote(ctxWithCancel, nextEpoch)
 	if err != nil {
 		if epochs.IsClusterQCNoVoteError(err) {
 			e.log.Warn().Err(err).Msg("unable to submit QC vote for next epoch")
@@ -461,7 +477,7 @@ func (e *Engine) startEpochComponents(engineCtx irrecoverable.SignalerContext, c
 	epochCtx, cancel, errCh := irrecoverable.WithSignallerAndCancel(engineCtx)
 	// start component using its own context
 	components.Start(epochCtx)
-	go e.handleEpochErrors(engineCtx, errCh)
+	go e.handleEpochErrors(epochCtx, errCh)
 
 	select {
 	case <-components.Ready():
@@ -537,17 +553,22 @@ func (e *Engine) removeEpoch(counter uint64) {
 // No errors are expected during normal operation.
 func (e *Engine) activeClusterIDs() (flow.ChainIDList, error) {
 	e.mu.RLock()
-	defer e.mu.RUnlock()
-	clusterIDs := make(flow.ChainIDList, 0)
+	clusterIDs := make(flow.ChainIDList, len(e.epochs))
+	i := 0
 	for _, epoch := range e.epochs {
 		chainID := epoch.state.Params().ChainID() // cached, does not hit database
-		clusterIDs = append(clusterIDs, chainID)
+		clusterIDs[i] = chainID
+		i++
 	}
+	e.mu.RUnlock()
 	return clusterIDs, nil
 }
 
-// EpochExtended handles the epoch extended protocol event.
-func (e *Engine) EpochExtended(*flow.EpochExtension) {}
-
-// EpochRecovered handles the epoch recovered protocol event.
-func (e *Engine) EpochRecovered(*uint64) {}
+// stopInProgressQcVote cancels the context for all in progress root qc voting.
+func (e *Engine) stopInProgressQcVote() {
+	cancel := e.inProgressQCVote.Load()
+	if cancel != nil {
+		e.log.Warn().Msgf("voting for cluster root block cancelled")
+		(*cancel)() // cancel
+	}
+}

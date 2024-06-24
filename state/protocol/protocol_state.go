@@ -52,6 +52,9 @@ type EpochProtocolState interface {
 	// EpochPhase returns the epoch phase for the current epoch.
 	EpochPhase() flow.EpochPhase
 
+	// EpochExtensions returns the epoch extensions associated with the current epoch, if any.
+	EpochExtensions() []flow.EpochExtension
+
 	// Identities returns identities (in canonical ordering) that can participate in the current or
 	// previous or next epochs. Let P be the set of identities in the previous epoch, C be the set
 	// of identities in the current epoch, and S be the set of identities in the subsequent epoch.
