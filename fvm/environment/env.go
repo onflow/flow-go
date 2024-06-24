@@ -4,12 +4,9 @@ import (
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
 	"github.com/rs/zerolog"
-	otelTrace "go.opentelemetry.io/otel/trace"
 
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
-	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/trace"
 )
 
 // Environment implements the accounts business logic and exposes cadence
@@ -17,11 +14,7 @@ import (
 type Environment interface {
 	runtime.Interface
 
-	// Tracer
-	StartChildSpan(
-		name trace.SpanName,
-		options ...otelTrace.SpanStartOption,
-	) tracing.TracerSpan
+	Tracer
 
 	Meter
 
