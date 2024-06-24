@@ -108,12 +108,22 @@ func (db *StateDB) HasSelfDestructed(addr gethCommon.Address) bool {
 
 // SubBalance substitutes the amount from the balance of the given address
 func (db *StateDB) SubBalance(addr gethCommon.Address, amount *big.Int) {
+	// negative amounts are not accepted.
+	if amount.Sign() < 0 {
+		db.handleError(types.ErrInvalidBalance)
+		return
+	}
 	err := db.lastestView().SubBalance(addr, amount)
 	db.handleError(err)
 }
 
 // AddBalance adds the amount from the balance of the given address
 func (db *StateDB) AddBalance(addr gethCommon.Address, amount *big.Int) {
+	// negative amounts are not accepted.
+	if amount.Sign() < 0 {
+		db.handleError(types.ErrInvalidBalance)
+		return
+	}
 	err := db.lastestView().AddBalance(addr, amount)
 	db.handleError(err)
 }

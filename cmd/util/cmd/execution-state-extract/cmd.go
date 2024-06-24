@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"runtime/pprof"
 	"strings"
 
 	"github.com/rs/zerolog/log"
@@ -178,6 +179,20 @@ func init() {
 }
 
 func run(*cobra.Command, []string) {
+	if flagCPUProfile != "" {
+		f, err := os.Create(flagCPUProfile)
+		if err != nil {
+			log.Fatal().Err(err).Msg("could not create CPU profile")
+		}
+
+		err = pprof.StartCPUProfile(f)
+		if err != nil {
+			log.Fatal().Err(err).Msg("could not start CPU profile")
+		}
+
+		defer pprof.StopCPUProfile()
+	}
+
 	var stateCommitment flow.StateCommitment
 
 	if len(flagBlockHash) > 0 && len(flagStateCommitment) > 0 {

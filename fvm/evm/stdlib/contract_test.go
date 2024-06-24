@@ -3834,6 +3834,14 @@ func TestCOADeposit(t *testing.T) {
 		expectedBalance,
 		tokenDepositEventFields["amount"],
 	)
+
+	// check depositedUUID, based on the transaction content
+	// its expected the uuid of 4 be allocated to the source vault.
+	expectedDepositedUUID := cadence.UInt64(4)
+	require.Equal(t,
+		expectedDepositedUUID,
+		tokenDepositEventFields["depositedUUID"],
+	)
 }
 
 func TestCadenceOwnedAccountWithdraw(t *testing.T) {
@@ -4003,6 +4011,14 @@ func TestCadenceOwnedAccountWithdraw(t *testing.T) {
 	require.Equal(t,
 		expectedWithdrawBalance,
 		tokenWithdrawEventFields["amount"],
+	)
+
+	// check expectedWithdrawnUUID
+	// last allocated UUID is 1
+	expectedWithdrawnUUID := cadence.UInt64(1)
+	require.Equal(t,
+		expectedWithdrawnUUID,
+		tokenWithdrawEventFields["withdrawnUUID"],
 	)
 }
 
