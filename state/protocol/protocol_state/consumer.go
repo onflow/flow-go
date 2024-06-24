@@ -4,14 +4,14 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// StateMachineEventsConsumer consumes notifications produced by OrthogonalStoreStateMachine instances. Any state machine
+// StateMachineTelemetryConsumer consumes notifications produced by OrthogonalStoreStateMachine instances. Any state machine
 // that performs processing of service events should notify the consumer about the events it received, successfully processed or
 // detected as invalid.
 // Implementations must:
 //   - be concurrency safe
 //   - be non-blocking
 //   - handle repetition of the same events (with some processing overhead).
-type StateMachineEventsConsumer interface {
+type StateMachineTelemetryConsumer interface {
 	// OnInvalidServiceEvent notifications are produced when a service event is detected as invalid by the state machine.
 	OnInvalidServiceEvent(event flow.ServiceEvent, err error)
 	// OnServiceEventReceived notifications are produced when a service event is received by the state machine.
@@ -20,8 +20,8 @@ type StateMachineEventsConsumer interface {
 	OnServiceEventProcessed(event flow.ServiceEvent)
 }
 
-// StateMachineEventsConsumerFactoryMethod is a factory method for creating StateMachineEventsConsumer instances.
+// StateMachineEventsTelemetryFactory is a factory method for creating StateMachineTelemetryConsumer instances.
 // It is useful for creating consumers that provide extra information about the context in which they are operating.
 // State machines evolve state based on inputs in the form of service events that are incorporated in blocks. Thus, the consumer
 // can be created based on the block carrying the service events.
-type StateMachineEventsConsumerFactoryMethod func(candidateView uint64) StateMachineEventsConsumer
+type StateMachineEventsTelemetryFactory func(candidateView uint64) StateMachineTelemetryConsumer

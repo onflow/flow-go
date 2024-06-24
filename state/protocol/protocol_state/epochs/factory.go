@@ -14,8 +14,8 @@ type EpochStateMachineFactory struct {
 	setups                   storage.EpochSetups
 	commits                  storage.EpochCommits
 	epochProtocolStateDB     storage.EpochProtocolStateEntries
-	happyPathConsumerFactory protocol_state.StateMachineEventsConsumerFactoryMethod
-	fallbackConsumerFactory  protocol_state.StateMachineEventsConsumerFactoryMethod
+	happyPathConsumerFactory protocol_state.StateMachineEventsTelemetryFactory
+	fallbackConsumerFactory  protocol_state.StateMachineEventsTelemetryFactory
 }
 
 var _ protocol_state.KeyValueStoreStateMachineFactory = (*EpochStateMachineFactory)(nil)
@@ -25,7 +25,7 @@ func NewEpochStateMachineFactory(
 	setups storage.EpochSetups,
 	commits storage.EpochCommits,
 	epochProtocolStateDB storage.EpochProtocolStateEntries,
-	happyPathConsumerFactory, fallbackConsumerFactory protocol_state.StateMachineEventsConsumerFactoryMethod,
+	happyPathConsumerFactory, fallbackConsumerFactory protocol_state.StateMachineEventsTelemetryFactory,
 ) *EpochStateMachineFactory {
 	return &EpochStateMachineFactory{
 		params:                   params,

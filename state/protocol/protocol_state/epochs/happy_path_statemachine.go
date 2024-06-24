@@ -32,7 +32,7 @@ var _ StateMachine = (*HappyPathStateMachine)(nil)
 // NewHappyPathStateMachine creates a new HappyPathStateMachine.
 // An exception is returned in case the `EpochFallbackTriggered` flag is set in the `parentState`. This means that
 // the protocol state evolution has reached an undefined state from the perspective of the happy path state machine.
-func NewHappyPathStateMachine(consumer protocol_state.StateMachineEventsConsumer, view uint64, parentState *flow.RichEpochProtocolStateEntry) (*HappyPathStateMachine, error) {
+func NewHappyPathStateMachine(consumer protocol_state.StateMachineTelemetryConsumer, view uint64, parentState *flow.RichEpochProtocolStateEntry) (*HappyPathStateMachine, error) {
 	if parentState.EpochFallbackTriggered {
 		return nil, irrecoverable.NewExceptionf("cannot create happy path protocol state machine at view (%d) for a parent state"+
 			"which is in Epoch Fallback Mode", view)

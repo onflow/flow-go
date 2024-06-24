@@ -8,12 +8,12 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
-// LogConsumer implements protocol_state.StateMachineEventsConsumer and logs all events.
+// LogConsumer implements protocol_state.StateMachineTelemetryConsumer and logs all events.
 type LogConsumer struct {
 	log zerolog.Logger
 }
 
-var _ protocol_state.StateMachineEventsConsumer = (*LogConsumer)(nil)
+var _ protocol_state.StateMachineTelemetryConsumer = (*LogConsumer)(nil)
 
 func NewLogConsumer(log zerolog.Logger) *LogConsumer {
 	lc := &LogConsumer{

@@ -11,7 +11,7 @@ import (
 // baseStateMachine implements common logic for evolving protocol state both in happy path and epoch fallback
 // operation modes. It partially implements `StateMachine` and is used as building block for more complex implementations.
 type baseStateMachine struct {
-	consumer    protocol_state.StateMachineEventsConsumer
+	consumer    protocol_state.StateMachineTelemetryConsumer
 	parentState *flow.RichEpochProtocolStateEntry
 	state       *flow.EpochProtocolStateEntry
 	view        uint64

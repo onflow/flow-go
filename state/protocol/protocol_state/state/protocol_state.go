@@ -98,7 +98,7 @@ func NewMutableProtocolState(
 	setups storage.EpochSetups,
 	commits storage.EpochCommits,
 ) *MutableProtocolState {
-	epochHappyPathConsumerFactory := func(candidateView uint64) protocol_state.StateMachineEventsConsumer {
+	epochHappyPathConsumerFactory := func(candidateView uint64) protocol_state.StateMachineTelemetryConsumer {
 		return pubsub.NewLogConsumer(
 			log.With().
 				Str("state_machine", "epoch_happy_path").
@@ -106,7 +106,7 @@ func NewMutableProtocolState(
 				Logger(),
 		)
 	}
-	epochFallbackConsumerFactory := func(candidateView uint64) protocol_state.StateMachineEventsConsumer {
+	epochFallbackConsumerFactory := func(candidateView uint64) protocol_state.StateMachineTelemetryConsumer {
 		return pubsub.NewLogConsumer(
 			log.With().
 				Str("state_machine", "epoch_fallback_path").

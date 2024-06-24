@@ -26,7 +26,7 @@ type BaseStateMachineSuite struct {
 	parentProtocolState *flow.RichEpochProtocolStateEntry
 	parentBlock         *flow.Header
 	candidate           *flow.Header
-	consumer            *protocol_statemock.StateMachineEventsConsumer
+	consumer            *protocol_statemock.StateMachineTelemetryConsumer
 }
 
 func (s *BaseStateMachineSuite) SetupTest() {
@@ -37,7 +37,7 @@ func (s *BaseStateMachineSuite) SetupTest() {
 	})
 	s.parentBlock = unittest.BlockHeaderFixture(unittest.HeaderWithView(s.parentProtocolState.CurrentEpochSetup.FirstView + 1))
 	s.candidate = unittest.BlockHeaderWithParentFixture(s.parentBlock)
-	s.consumer = protocol_statemock.NewStateMachineEventsConsumer(s.T())
+	s.consumer = protocol_statemock.NewStateMachineTelemetryConsumer(s.T())
 }
 
 // ProtocolStateMachineSuite is a dedicated test suite for testing happy path state machine.
