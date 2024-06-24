@@ -106,6 +106,11 @@ type BlockView struct {
 
 // DirectCall executes a direct call
 func (bl *BlockView) DirectCall(call *types.DirectCall) (*types.Result, error) {
+	// negative amounts are not acceptable.
+	if call.Value.Sign() < 0 {
+		return nil, types.ErrInvalidBalance
+	}
+
 	proc, err := bl.newProcedure()
 	if err != nil {
 		return nil, err
@@ -150,6 +155,11 @@ func (bl *BlockView) RunTransaction(
 		return types.NewInvalidResult(tx, err), nil
 	}
 
+	// negative amounts are not acceptable.
+	if msg.Value.Sign() < 0 {
+		return nil, types.ErrInvalidBalance
+	}
+
 	// update tx context origin
 	proc.evm.TxContext.Origin = msg.From
 	res, err := proc.run(msg, tx.Hash(), 0, tx.Type())
@@ -180,6 +190,11 @@ func (bl *BlockView) BatchRunTransactions(txs []*gethTypes.Transaction) ([]*type
 		if err != nil {
 			batchResults[i] = types.NewInvalidResult(tx, err)
 			continue
+		}
+
+		// negative amounts are not acceptable.
+		if msg.Value.Sign() < 0 {
+			return nil, types.ErrInvalidBalance
 		}
 
 		// update tx context origin
@@ -222,6 +237,11 @@ func (bl *BlockView) DryRunTransaction(
 		GetSigner(bl.config),
 		proc.config.BlockContext.BaseFee,
 	)
+	// negative amounts are not acceptable.
+	if msg.Value.Sign() < 0 {
+		return nil, types.ErrInvalidBalance
+	}
+
 	// we can ignore invalid signature errors since we don't expect signed transctions
 	if !errors.Is(err, gethTypes.ErrInvalidSig) {
 		return nil, err
@@ -236,9 +256,21 @@ func (bl *BlockView) DryRunTransaction(
 	// return without commiting the state
 	txResult, err := proc.run(msg, tx.Hash(), 0, tx.Type())
 	if txResult.Successful() {
+		// As mentioned in https://github.com/ethereum/EIPs/blob/master/EIPS/eip-150.md#specification
+		// Define "all but one 64th" of N as N - floor(N / 64).
+		// If a call asks for more gas than the maximum allowed amount
+		// (i.e. the total amount of gas remaining in the parent after subtracting
+		// the gas cost of the call and memory expansion), do not return an OOG error;
+		// instead, if a call asks for more gas than all but one 64th of the maximum
+		// allowed amount, call with all but one 64th of the maximum allowed amount of
+		// gas (this is equivalent to a version of EIP-901 plus EIP-1142).
+		// CREATE only provides all but one 64th of the parent gas to the child call.
+		txResult.GasConsumed = AddOne64th(txResult.GasConsumed)
+
 		// Adding `gethParams.SstoreSentryGasEIP2200` is needed for this condition:
 		// https://github.com/onflow/go-ethereum/blob/master/core/vm/operations_acl.go#L29-L32
 		txResult.GasConsumed += gethParams.SstoreSentryGasEIP2200
+
 		// Take into account any gas refunds, which are calculated only after
 		// transaction execution.
 		txResult.GasConsumed += txResult.GasRefund
@@ -291,6 +323,11 @@ func (proc *procedure) mintTo(
 	call *types.DirectCall,
 	txHash gethCommon.Hash,
 ) (*types.Result, error) {
+	// negative amounts are not acceptable.
+	if call.Value.Sign() < 0 {
+		return nil, types.ErrInvalidBalance
+	}
+
 	bridge := call.From.ToCommon()
 
 	// create bridge account if not exist
@@ -325,6 +362,11 @@ func (proc *procedure) withdrawFrom(
 	call *types.DirectCall,
 	txHash gethCommon.Hash,
 ) (*types.Result, error) {
+	// negative amounts are not acceptable.
+	if call.Value.Sign() < 0 {
+		return nil, types.ErrInvalidBalance
+	}
+
 	bridge := call.To.ToCommon()
 
 	// create bridge account if not exist
@@ -556,4 +598,9 @@ func (proc *procedure) run(
 		}
 	}
 	return &res, nil
+}
+
+func AddOne64th(n uint64) uint64 {
+	// NOTE: Go's integer division floors, but that is desirable here
+	return n + (n / 64)
 }
