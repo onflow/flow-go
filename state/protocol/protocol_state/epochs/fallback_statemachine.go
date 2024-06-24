@@ -120,8 +120,8 @@ func (m *FallbackStateMachine) ProcessEpochSetup(setup *flow.EpochSetup) (bool, 
 func (m *FallbackStateMachine) ProcessEpochCommit(setup *flow.EpochCommit) (bool, error) {
 	m.consumer.OnServiceEventReceived(setup.ServiceEvent())
 	// We ignore _all_ EpochCommit events here. This includes scenarios where a valid `EpochRecover` event is sealed in
-	// a block followed by `EpochSetup` and/or `EpochCommit` events-- technically, clear indications that the Epoch Smart
-	// contract is doing something unexpect. For a detailed explanation why this is safe, see `ProcessEpochSetup` above.
+	// a block followed by `EpochSetup` and/or `EpochCommit` events -- technically, a clear indication that the Epoch Smart
+	// contract is doing something unexpected. For a detailed explanation why this is safe, see `ProcessEpochSetup` above.
 	return false, nil
 }
 
@@ -136,11 +136,21 @@ func (m *FallbackStateMachine) ProcessEpochCommit(setup *flow.EpochCommit) (bool
 // halt the chain even if the Epoch Smart Contract misbehaves. This is a safe choice since the error can only originate from
 // an invalid EpochRecover event, in this case we just ignore the event and continue with the fallback mode.
 //
-// CAUTION: Since EpochSetup and EpochCommit are ignored by the FallbackStateMachine, we don't care about such cases where we are processing
-// any amount of setup and commit events together with epoch recover event in the same block.
-// This leaves us with a scenario where we are processing multiple EpochRecover events in the same block.
-// This is an indication that the Epoch Smart contract is doing something unexpect. In this case, we have a simple rule:
-// subsequent EpochRecover events are accepted iff they are identical to the first EpochRecover event in the block.
+// EDGE CASES: due to manual interventions for Epoch Recovery, there is a notable risk of unintended side-effects
+// in terms of emitted events. Therefore, we aim to be resilient against invalid and/or inconsistent events:
+//  1. Any amount of setup and commit events being sealed in the same block as an epoch recover event:
+//     EpochSetup and EpochCommit are consistently ignored by the FallbackStateMachine, also after a successful recovery.
+//  2. Multiple EpochRecover events sealed in the same block:
+//     - Invalid `EpochRecover` events are reported to telemetry and dropped.
+//     - The first valid `EpochRecover` event is accepted (if any is sealed in block)
+//     - Subsequent valid events are no-ops iff they are identical to the first valid EpochRecover event.
+//     Otherwise, they are reported to telemetry and dropped.
+//     An `EpochRecover` event is considered valid in this context if it specifies a valid successor of the
+//     current epoch (irrespective whether a `NextEpoch` in the `ProtocolStateEntry`)
+//
+// Error returns:
+//   - During normal operations, this method internally handle erroneous inputs. Error returns are
+//     symptoms of internal state corruption or critical bugs, making continuation impossible.
 func (m *FallbackStateMachine) ProcessEpochRecover(epochRecover *flow.EpochRecover) (bool, error) {
 	m.consumer.OnServiceEventReceived(epochRecover.ServiceEvent())
 	err := m.ensureValidEpochRecover(epochRecover)
@@ -150,6 +160,8 @@ func (m *FallbackStateMachine) ProcessEpochRecover(epochRecover *flow.EpochRecov
 	}
 
 	nextEpochParticipants, err := buildNextEpochActiveParticipants(
+		// TOTO: The following usage of the _parent_ state Active identities might lose ejections 
+		//       sealed in this block. See https://github.com/onflow/flow-go/issues/6019
 		m.parentState.CurrentEpoch.ActiveIdentities.Lookup(),
 		m.parentState.CurrentEpochSetup,
 		&epochRecover.EpochSetup)
@@ -163,7 +175,7 @@ func (m *FallbackStateMachine) ProcessEpochRecover(epochRecover *flow.EpochRecov
 		if nextEpoch.SetupID != epochRecover.EpochSetup.ID() ||
 			nextEpoch.CommitID != epochRecover.EpochCommit.ID() {
 			m.consumer.OnInvalidServiceEvent(epochRecover.ServiceEvent(),
-				protocol.NewInvalidServiceEventErrorf("multiple different EpochRecover events in the same block"))
+				protocol.NewInvalidServiceEventErrorf("multiple inconsistent EpochRecover events sealed in the same block"))
 			return false, nil
 		}
 	} else {
