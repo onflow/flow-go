@@ -2,8 +2,12 @@ package cohort3
 
 import (
 	"context"
+	sdk "github.com/onflow/flow-go-sdk"
+	"github.com/onflow/flow-go/integration/tests/lib"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/suite"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 	"testing"
 
 	client "github.com/onflow/flow-go-sdk/access/grpc"
@@ -85,13 +89,41 @@ func (s *AccessNodeTransactionValidatorTestSuite) SetupTest() {
 }
 
 func (s *AccessNodeTransactionValidatorTestSuite) TestTransactionValidatorExecutesScript() {
-	//var err error
-	//s.accessNodeGrpcClient, err = s.flowNetwork.ContainerByName(testnet.PrimaryAN).SDKClient()
-	//s.Require().NoError(err)
+	accessNodeContainer := s.flowNetwork.ContainerByName(testnet.PrimaryAN)
 
-	s.log.Info().Msg("TestTransactionValidatorExecutesScript is running")
-	//address := s.flowNetwork.ContainerByName(testnet.PrimaryAN).Addr(testnet.GRPCPort)
-	//s.log.Info().Msg("Address:" + address)
-	//tx := testutil.CreateAccountCreationTransaction()
-	//s.accessNodeGrpcClient.SendTransaction(s.ctx, tx)
+	// Establish a gRPC connection to the access API
+	conn, err := grpc.Dial(accessNodeContainer.Addr(testnet.GRPCPort), grpc.WithTransportCredentials(insecure.NewCredentials()))
+	s.Require().NoError(err)
+	s.Require().NotNil(conn)
+
+	// Create a client for the access API
+	serviceClient, err := accessNodeContainer.TestnetClient()
+	s.Require().NoError(err)
+	s.Require().NotNil(serviceClient)
+
+	header, err := serviceClient.GetLatestSealedBlockHeader(s.ctx)
+	s.Require().NoError(err)
+
+	serviceAddress := serviceClient.SDKServiceAddress()
+	tx := sdk.NewTransaction().
+		SetScript([]byte(lib.CreateCounterTx(serviceAddress).ToCadence())).
+		SetReferenceBlockID(header.ID).
+		SetProposalKey(serviceAddress, 0, serviceClient.GetAndIncrementSeqNumber()).
+		SetPayer(serviceAddress).
+		AddAuthorizer(serviceAddress).
+		SetComputeLimit(9999)
+
+	err = serviceClient.SignAndSendTransaction(s.ctx, tx)
+	s.Require().NoError(err)
+
+	//accessClient.SendTransaction()
+	// TODO:
+	// 1.
+	// - create account without money (sign with service account)
+	// - send some write tx
+	// - check if validator rejects tx
+	// 2.
+	// - create account with money
+	// - send write tx
+	// - check if validator accepts tx
 }
