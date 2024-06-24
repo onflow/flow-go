@@ -110,10 +110,7 @@ func (bl *BlockView) DirectCall(call *types.DirectCall) (*types.Result, error) {
 	if err != nil {
 		return nil, err
 	}
-	txHash, err := call.Hash()
-	if err != nil {
-		return nil, err
-	}
+	txHash := call.Hash()
 	switch call.SubType {
 	case types.DepositCallSubType:
 		return proc.mintTo(call, txHash)

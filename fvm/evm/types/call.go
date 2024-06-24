@@ -73,12 +73,12 @@ func (dc *DirectCall) Encode() ([]byte, error) {
 }
 
 // Hash computes the hash of a direct call
-func (dc *DirectCall) Hash() (gethCommon.Hash, error) {
+func (dc *DirectCall) Hash() gethCommon.Hash {
 	// we use geth transaction hash calculation since direct call hash is included in the
 	// block transaction hashes, and thus observed as any other transaction
 	// We construct this Legacy tx type so the external 3rd party tools
 	// don't have to support a new type for the purpose of hash computation
-	return dc.Transaction().Hash(), nil
+	return dc.Transaction().Hash()
 }
 
 // Message constructs a core.Message from the direct call

@@ -60,9 +60,7 @@ func TestNativeTokenBridging(t *testing.T) {
 						res, err := blk.DirectCall(call)
 						require.NoError(t, err)
 						require.Equal(t, defaultCtx.DirectCallBaseGasUsage, res.GasConsumed)
-						expectedHash, err := call.Hash()
-						require.NoError(t, err)
-						require.Equal(t, expectedHash, res.TxHash)
+						require.Equal(t, call.Hash(), res.TxHash)
 						nonce += 1
 					})
 				})
@@ -94,9 +92,7 @@ func TestNativeTokenBridging(t *testing.T) {
 						res, err := blk.DirectCall(call)
 						require.NoError(t, err)
 						require.Equal(t, defaultCtx.DirectCallBaseGasUsage, res.GasConsumed)
-						expectedHash, err := call.Hash()
-						require.NoError(t, err)
-						require.Equal(t, expectedHash, res.TxHash)
+						require.Equal(t, call.Hash(), res.TxHash)
 						nonce += 1
 					})
 				})
@@ -155,9 +151,7 @@ func TestContractInteraction(t *testing.T) {
 						require.NoError(t, err)
 						require.NotNil(t, res.DeployedContractAddress)
 						contractAddr = *res.DeployedContractAddress
-						expectedHash, err := call.Hash()
-						require.NoError(t, err)
-						require.Equal(t, expectedHash, res.TxHash)
+						require.Equal(t, call.Hash(), res.TxHash)
 						nonce += 1
 					})
 					RunWithNewReadOnlyBlockView(t, env, func(blk types.ReadOnlyBlockView) {
