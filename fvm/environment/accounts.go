@@ -27,6 +27,7 @@ type Accounts interface {
 	AppendPublicKey(address flow.Address, key flow.AccountPublicKey) error
 	GetPublicKey(address flow.Address, keyIndex uint64) (flow.AccountPublicKey, error)
 	SetPublicKey(address flow.Address, keyIndex uint64, publicKey flow.AccountPublicKey) ([]byte, error)
+	GetPublicKeys(address flow.Address) ([]flow.AccountPublicKey, error)
 	GetContractNames(address flow.Address) ([]string, error)
 	GetContract(contractName string, address flow.Address) ([]byte, error)
 	ContractExists(contractName string, address flow.Address) (bool, error)
@@ -256,9 +257,7 @@ func (a *StatefulAccounts) GetPublicKeys(
 ) {
 	count, err := a.GetPublicKeyCount(address)
 	if err != nil {
-		return nil, fmt.Errorf(
-			"failed to get public key count of account: %w",
-			err)
+		return nil, err
 	}
 	publicKeys = make([]flow.AccountPublicKey, count)
 
@@ -431,6 +430,20 @@ func (a *StatefulAccounts) setContract(
 	return nil
 }
 
+func EncodeContractNames(contractNames contractNames) ([]byte, error) {
+	var buf bytes.Buffer
+	cborEncoder := cbor.NewEncoder(&buf)
+	err := cborEncoder.Encode(contractNames)
+	if err != nil {
+		return nil, errors.NewEncodingFailuref(
+			err,
+			"cannot encode contract names: %s",
+			contractNames,
+		)
+	}
+	return buf.Bytes(), nil
+}
+
 func (a *StatefulAccounts) setContractNames(
 	contractNames contractNames,
 	address flow.Address,
@@ -443,16 +456,11 @@ func (a *StatefulAccounts) setContractNames(
 	if !ok {
 		return errors.NewAccountNotFoundError(address)
 	}
-	var buf bytes.Buffer
-	cborEncoder := cbor.NewEncoder(&buf)
-	err = cborEncoder.Encode(contractNames)
+
+	newContractNames, err := EncodeContractNames(contractNames)
 	if err != nil {
-		return errors.NewEncodingFailuref(
-			err,
-			"cannot encode contract names: %s",
-			contractNames)
+		return err
 	}
-	newContractNames := buf.Bytes()
 
 	id := flow.ContractNamesRegisterID(address)
 	prevContractNames, err := a.GetValue(id)
@@ -607,20 +615,26 @@ func (a *StatefulAccounts) getContractNames(
 	error,
 ) {
 	// TODO return fatal error if can't fetch
-	encContractNames, err := a.GetValue(flow.ContractNamesRegisterID(address))
+	encodedContractNames, err := a.GetValue(flow.ContractNamesRegisterID(address))
 	if err != nil {
 		return nil, fmt.Errorf("cannot get deployed contract names: %w", err)
 	}
+
+	return DecodeContractNames(encodedContractNames)
+}
+
+func DecodeContractNames(encodedContractNames []byte) ([]string, error) {
 	identifiers := make([]string, 0)
-	if len(encContractNames) > 0 {
-		buf := bytes.NewReader(encContractNames)
+	if len(encodedContractNames) > 0 {
+		buf := bytes.NewReader(encodedContractNames)
 		cborDecoder := cbor.NewDecoder(buf)
-		err = cborDecoder.Decode(&identifiers)
+		err := cborDecoder.Decode(&identifiers)
 		if err != nil {
 			return nil, fmt.Errorf(
 				"cannot decode deployed contract names %x: %w",
-				encContractNames,
-				err)
+				encodedContractNames,
+				err,
+			)
 		}
 	}
 	return identifiers, nil

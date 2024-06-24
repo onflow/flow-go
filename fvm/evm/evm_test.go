@@ -25,6 +25,7 @@ import (
 	"github.com/onflow/flow-go/fvm/crypto"
 	envMock "github.com/onflow/flow-go/fvm/environment/mock"
 	"github.com/onflow/flow-go/fvm/evm"
+	"github.com/onflow/flow-go/fvm/evm/emulator"
 	"github.com/onflow/flow-go/fvm/evm/stdlib"
 	"github.com/onflow/flow-go/fvm/evm/testutils"
 	. "github.com/onflow/flow-go/fvm/evm/testutils"
@@ -1534,9 +1535,10 @@ func TestDryRun(t *testing.T) {
 				// Make sure that gas consumed from `EVM.dryRun` is bigger
 				// than the actual gas consumption of the equivalent
 				// `EVM.run`.
+				totalGas := emulator.AddOne64th(res.GasConsumed) + gethParams.SstoreSentryGasEIP2200
 				require.Equal(
 					t,
-					res.GasConsumed+gethParams.SstoreSentryGasEIP2200,
+					totalGas,
 					dryRunResult.GasConsumed,
 				)
 			})
@@ -1667,9 +1669,10 @@ func TestDryRun(t *testing.T) {
 				// Make sure that gas consumed from `EVM.dryRun` is bigger
 				// than the actual gas consumption of the equivalent
 				// `EVM.run`.
+				totalGas := emulator.AddOne64th(res.GasConsumed) + gethParams.SstoreSentryGasEIP2200
 				require.Equal(
 					t,
-					res.GasConsumed+gethParams.SstoreSentryGasEIP2200,
+					totalGas,
 					dryRunResult.GasConsumed,
 				)
 			})
@@ -1798,9 +1801,10 @@ func TestDryRun(t *testing.T) {
 				// Make sure that gas consumed from `EVM.dryRun` is bigger
 				// than the actual gas consumption of the equivalent
 				// `EVM.run`.
+				totalGas := emulator.AddOne64th(res.GasConsumed) + gethParams.SstoreSentryGasEIP2200 + gethParams.SstoreClearsScheduleRefundEIP3529
 				require.Equal(
 					t,
-					res.GasConsumed+gethParams.SstoreSentryGasEIP2200+gethParams.SstoreClearsScheduleRefundEIP3529,
+					totalGas,
 					dryRunResult.GasConsumed,
 				)
 			})
