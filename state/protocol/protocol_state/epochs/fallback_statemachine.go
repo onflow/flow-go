@@ -204,7 +204,8 @@ func (m *FallbackStateMachine) ProcessEpochRecover(epochRecover *flow.EpochRecov
 
 // ensureValidEpochRecover performs validity checks on the epoch recover event.
 // Expected errors during normal operations:
-//   - `protocol.InvalidServiceEventError` - if the service event is invalid or is not a valid state transition for the current protocol state.
+// * `protocol.InvalidServiceEventError` - if the service event is invalid or is not a valid state transition for the current protocol state.
+// This is a side-effect-free function. This function only returns protocol.InvalidServiceEventError as errors.
 func (m *FallbackStateMachine) ensureValidEpochRecover(epochRecover *flow.EpochRecover) error {
 	if m.view+m.params.EpochCommitSafetyThreshold() >= m.parentState.CurrentEpochFinalView() {
 		return protocol.NewInvalidServiceEventErrorf("could not process epoch recover, safety threshold reached")

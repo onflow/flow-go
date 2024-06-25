@@ -192,6 +192,7 @@ func (u *HappyPathStateMachine) ProcessEpochRecover(epochRecover *flow.EpochReco
 
 // For collector clusters, we rely on invariants (I) and (II) holding. See `committees.Cluster` for details, specifically function
 // `constructInitialClusterIdentities(..)`. While the system smart contract must satisfy this invariant, we run a sanity check below.
+// This is a side-effect-free function. This function only returns protocol.InvalidServiceEventError as errors.
 func buildNextEpochActiveParticipants(activeIdentitiesLookup map[flow.Identifier]*flow.DynamicIdentityEntry, currentEpochSetup, nextEpochSetup *flow.EpochSetup) (flow.DynamicIdentityEntryList, error) {
 	nextEpochActiveIdentities := make(flow.DynamicIdentityEntryList, 0, len(nextEpochSetup.Participants))
 	prevNodeID := nextEpochSetup.Participants[0].NodeID

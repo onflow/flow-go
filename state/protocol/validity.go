@@ -14,6 +14,7 @@ import (
 // CAUTION: This function assumes that all inputs besides extendingCommit are already validated.
 // Expected errors during normal operations:
 // * protocol.InvalidServiceEventError if the input service event is invalid to extend the currently active epoch status
+// This is a side-effect-free function. This function only returns protocol.InvalidServiceEventError as errors.
 // TODO(EFM, #6019): This function has to be refactored to stop using RichProtocolStateEntry
 func IsValidExtendingEpochSetup(extendingSetup *flow.EpochSetup, protocolStateEntry *flow.RichEpochProtocolStateEntry) error {
 	// Enforce EpochSetup is valid w.r.t to current epoch state
@@ -130,6 +131,7 @@ func IsValidEpochSetup(setup *flow.EpochSetup, verifyNetworkAddress bool) error 
 // CAUTION: This function assumes that all inputs besides extendingCommit are already validated.
 // Expected errors during normal operations:
 // * protocol.InvalidServiceEventError if the input service event is invalid to extend the currently active epoch
+// This is a side-effect-free function. This function only returns protocol.InvalidServiceEventError as errors.
 func IsValidExtendingEpochCommit(extendingCommit *flow.EpochCommit, protocolStateEntry *flow.EpochProtocolStateEntry, nextEpochSetupEvent *flow.EpochSetup) error {
 	// The epoch setup event needs to happen before the commit.
 	if protocolStateEntry.NextEpoch == nil {
