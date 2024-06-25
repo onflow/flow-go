@@ -84,7 +84,7 @@ func (e *ReactorEngine) Ready() <-chan struct{} {
 		// and fail this epoch's DKG.
 		snap := e.State.Final()
 
-		phase, err := snap.Phase()
+		phase, err := snap.EpochPhase()
 		if err != nil {
 			// unexpected storage-level error
 			// TODO use irrecoverable context

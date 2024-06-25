@@ -3,8 +3,9 @@
 package mock
 
 import (
-	flow "github.com/onflow/flow-go/model/flow"
 	mock "github.com/stretchr/testify/mock"
+
+	flow "github.com/onflow/flow-go/model/flow"
 
 	protocol "github.com/onflow/flow-go/state/protocol"
 )
@@ -235,11 +236,11 @@ func (_m *Snapshot) Params() protocol.GlobalParams {
 }
 
 // Phase provides a mock function with given fields:
-func (_m *Snapshot) Phase() (flow.EpochPhase, error) {
+func (_m *Snapshot) EpochPhase() (flow.EpochPhase, error) {
 	ret := _m.Called()
 
 	if len(ret) == 0 {
-		panic("no return value specified for Phase")
+		panic("no return value specified for EpochPhase")
 	}
 
 	var r0 flow.EpochPhase

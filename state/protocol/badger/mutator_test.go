@@ -838,7 +838,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		require.NoError(t, err)
 		finalView, err := initialCurrentEpoch.FinalView()
 		require.NoError(t, err)
-		initialPhase, err := rootSnapshot.Phase()
+		initialPhase, err := rootSnapshot.EpochPhase()
 		require.NoError(t, err)
 		metrics.On("CurrentEpochCounter", counter).Once()
 		metrics.On("CurrentEpochPhase", initialPhase).Once()
@@ -900,7 +900,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		require.NoError(t, err)
 
 		// we should begin the epoch in the staking phase
-		phase, err := state.AtBlockID(head.ID()).Phase()
+		phase, err := state.AtBlockID(head.ID()).EpochPhase()
 		assert.NoError(t, err)
 		require.Equal(t, flow.EpochPhaseStaking, phase)
 
@@ -951,7 +951,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		require.NoError(t, err)
 
 		// now that the setup event has been emitted, we should be in the setup phase
-		phase, err = state.AtBlockID(block3.ID()).Phase()
+		phase, err = state.AtBlockID(block3.ID()).EpochPhase()
 		assert.NoError(t, err)
 		require.Equal(t, flow.EpochPhaseSetup, phase)
 
@@ -988,7 +988,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		metrics.AssertCalled(t, "CurrentEpochPhase", flow.EpochPhaseSetup)
 
 		// now that the setup event has been emitted, we should be in the setup phase
-		phase, err = state.AtBlockID(block3.ID()).Phase()
+		phase, err = state.AtBlockID(block3.ID()).EpochPhase()
 		require.NoError(t, err)
 		require.Equal(t, flow.EpochPhaseSetup, phase)
 
@@ -1041,7 +1041,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		assert.NoError(t, err)
 
 		// now that the commit event has been emitted, we should be in the committed phase
-		phase, err = state.AtBlockID(block6.ID()).Phase()
+		phase, err = state.AtBlockID(block6.ID()).EpochPhase()
 		assert.NoError(t, err)
 		require.Equal(t, flow.EpochPhaseCommitted, phase)
 
@@ -1093,7 +1093,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 
 		// we should begin epoch 2 in staking phase
 		// now that we have entered view range of epoch 2, should be in staking phase
-		phase, err = state.AtBlockID(block8.ID()).Phase()
+		phase, err = state.AtBlockID(block8.ID()).EpochPhase()
 		assert.NoError(t, err)
 		require.Equal(t, flow.EpochPhaseStaking, phase)
 
@@ -3092,7 +3092,7 @@ func assertEpochFallbackTriggered(t *testing.T, stateSnapshot realprotocol.Snaps
 
 // assertInPhase tests that the input snapshot is in the expected epoch phase.
 func assertInPhase(t *testing.T, snap realprotocol.Snapshot, expectedPhase flow.EpochPhase) {
-	phase, err := snap.Phase()
+	phase, err := snap.EpochPhase()
 	require.NoError(t, err)
 	assert.Equal(t, expectedPhase, phase)
 }

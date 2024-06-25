@@ -97,6 +97,7 @@ func (s *EpochProtocolStateAdapter) EpochExtensions() []flow.EpochExtension {
 }
 
 // EpochPhase returns the epoch phase for the current epoch.
+// The receiver must be properly constructed.
 func (s *EpochProtocolStateAdapter) EpochPhase() flow.EpochPhase {
 	return s.Entry().EpochPhase()
 }
