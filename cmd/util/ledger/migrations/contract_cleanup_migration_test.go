@@ -67,20 +67,25 @@ func TestContractCleanupMigration1(t *testing.T) {
 
 	// Act
 
-	checkingMigration := NewContractCleanupMigration()
+	rwf := &testReportWriterFactory{}
+
+	cleanupMigration := NewContractCleanupMigration(rwf)
 
 	log := zerolog.Nop()
 
-	err = checkingMigration.InitMigration(log, registersByAccount, 1)
+	err = cleanupMigration.InitMigration(log, registersByAccount, 1)
 	require.NoError(t, err)
 
 	accountRegisters := registersByAccount.AccountRegisters(owner)
 
-	err = checkingMigration.MigrateAccount(
+	err = cleanupMigration.MigrateAccount(
 		context.Background(),
 		address,
 		accountRegisters,
 	)
+	require.NoError(t, err)
+
+	err = cleanupMigration.Close()
 	require.NoError(t, err)
 
 	// Assert
@@ -113,6 +118,34 @@ func TestContractCleanupMigration1(t *testing.T) {
 	)
 	require.NoError(t, err)
 	assert.NotEmpty(t, contractNonEmpty)
+
+	reporter := rwf.reportWriters[contractCleanupReporterName]
+	require.NotNil(t, reporter)
+
+	assert.Equal(t,
+		[]any{
+			emptyContractRemoved{
+				AccountAddress: address,
+				ContractName:   contractNameEmpty,
+			},
+			contractNamesChanged{
+				AccountAddress: address,
+				Old: []string{
+					contractNameEmpty,
+					contractNameNonEmpty,
+					contractNameEmpty,
+					contractNameNonEmpty,
+					contractNameEmpty,
+					contractNameEmpty,
+					contractNameNonEmpty,
+				},
+				New: []string{
+					contractNameNonEmpty,
+				},
+			},
+		},
+		reporter.entries,
+	)
 }
 
 func TestContractCleanupMigration2(t *testing.T) {
@@ -168,20 +201,25 @@ func TestContractCleanupMigration2(t *testing.T) {
 
 	// Act
 
-	checkingMigration := NewContractCleanupMigration()
+	rwf := &testReportWriterFactory{}
+
+	cleanupMigration := NewContractCleanupMigration(rwf)
 
 	log := zerolog.Nop()
 
-	err = checkingMigration.InitMigration(log, registersByAccount, 1)
+	err = cleanupMigration.InitMigration(log, registersByAccount, 1)
 	require.NoError(t, err)
 
 	accountRegisters := registersByAccount.AccountRegisters(owner)
 
-	err = checkingMigration.MigrateAccount(
+	err = cleanupMigration.MigrateAccount(
 		context.Background(),
 		address,
 		accountRegisters,
 	)
+	require.NoError(t, err)
+
+	err = cleanupMigration.Close()
 	require.NoError(t, err)
 
 	// Assert
@@ -206,4 +244,34 @@ func TestContractCleanupMigration2(t *testing.T) {
 	)
 	require.NoError(t, err)
 	assert.Nil(t, contractEmpty2)
+
+	reporter := rwf.reportWriters[contractCleanupReporterName]
+	require.NotNil(t, reporter)
+
+	assert.Equal(t,
+		[]any{
+			emptyContractRemoved{
+				AccountAddress: address,
+				ContractName:   contractNameEmpty1,
+			},
+			emptyContractRemoved{
+				AccountAddress: address,
+				ContractName:   contractNameEmpty2,
+			},
+			contractNamesChanged{
+				AccountAddress: address,
+				Old: []string{
+					contractNameEmpty1,
+					contractNameEmpty2,
+					contractNameEmpty1,
+					contractNameEmpty2,
+					contractNameEmpty1,
+					contractNameEmpty1,
+					contractNameEmpty2,
+				},
+				New: []string{},
+			},
+		},
+		reporter.entries,
+	)
 }

@@ -242,7 +242,7 @@ func NewCadence1ValueMigrations(
 				log,
 				opts.NWorker,
 				[]AccountBasedMigration{
-					NewContractCleanupMigration(),
+					NewContractCleanupMigration(rwf),
 				},
 			),
 		},

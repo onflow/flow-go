@@ -3,6 +3,7 @@ package migrations
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"sort"
 
@@ -10,6 +11,7 @@ import (
 
 	"github.com/onflow/cadence/runtime/common"
 
+	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/cmd/util/ledger/util/registers"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/model/flow"
@@ -17,13 +19,18 @@ import (
 
 // ContractCleanupMigration normalized account's contract names and removes empty contracts.
 type ContractCleanupMigration struct {
-	log zerolog.Logger
+	log      zerolog.Logger
+	reporter reporters.ReportWriter
 }
+
+const contractCleanupReporterName = "contract-cleanup"
 
 var _ AccountBasedMigration = &ContractCleanupMigration{}
 
-func NewContractCleanupMigration() *ContractCleanupMigration {
-	return &ContractCleanupMigration{}
+func NewContractCleanupMigration(rwf reporters.ReportWriterFactory) *ContractCleanupMigration {
+	return &ContractCleanupMigration{
+		reporter: rwf.ReportWriter(contractCleanupReporterName),
+	}
 }
 
 func (d *ContractCleanupMigration) InitMigration(
@@ -47,7 +54,7 @@ func (d *ContractCleanupMigration) MigrateAccount(
 
 	// Get the set of all contract names for the account.
 
-	contractNames, err := d.getContractNames(accountRegisters)
+	oldContractNames, err := d.getContractNames(accountRegisters)
 	if err != nil {
 		return fmt.Errorf(
 			"failed to get contract names for %s: %w",
@@ -57,7 +64,7 @@ func (d *ContractCleanupMigration) MigrateAccount(
 	}
 
 	contractNameSet := make(map[string]struct{})
-	for _, contractName := range contractNames {
+	for _, contractName := range oldContractNames {
 		contractNameSet[contractName] = struct{}{}
 	}
 
@@ -65,8 +72,12 @@ func (d *ContractCleanupMigration) MigrateAccount(
 	// If the contract code is empty, the contract code register will be removed,
 	// and the contract name will be removed from the account's contract names.
 
-	for _, contractName := range contractNames {
-		removed, err := d.cleanupContractCode(accountRegisters, contractName)
+	for contractName := range contractNameSet {
+		removed, err := d.cleanupContractCode(
+			address,
+			accountRegisters,
+			contractName,
+		)
 		if err != nil {
 			return fmt.Errorf(
 				"failed to cleanup contract code for %s: %w",
@@ -100,6 +111,14 @@ func (d *ContractCleanupMigration) MigrateAccount(
 			address.HexWithPrefix(),
 			err,
 		)
+	}
+
+	if !stringSlicesEqual(newContractNames, oldContractNames) {
+		d.reporter.Write(contractNamesChanged{
+			AccountAddress: address,
+			Old:            oldContractNames,
+			New:            newContractNames,
+		})
 	}
 
 	return nil
@@ -171,6 +190,7 @@ func (d *ContractCleanupMigration) setContractNames(
 // cleanupContractCode removes the code for the contract if it is empty.
 // Returns true if the contract code was removed.
 func (d *ContractCleanupMigration) cleanupContractCode(
+	address common.Address,
 	accountRegisters *registers.AccountRegisters,
 	contractName string,
 ) (removed bool, err error) {
@@ -199,6 +219,11 @@ func (d *ContractCleanupMigration) cleanupContractCode(
 			)
 		}
 
+		d.reporter.Write(emptyContractRemoved{
+			AccountAddress: address,
+			ContractName:   contractName,
+		})
+
 		removed = true
 	}
 
@@ -206,5 +231,62 @@ func (d *ContractCleanupMigration) cleanupContractCode(
 }
 
 func (d *ContractCleanupMigration) Close() error {
+	d.reporter.Close()
+
 	return nil
+}
+
+type emptyContractRemoved struct {
+	AccountAddress common.Address
+	ContractName   string
+}
+
+var _ json.Marshaler = emptyContractRemoved{}
+
+func (e emptyContractRemoved) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		Kind           string `json:"kind"`
+		AccountAddress string `json:"address"`
+		ContractName   string `json:"name"`
+	}{
+		Kind:           "empty-contract-removed",
+		AccountAddress: e.AccountAddress.HexWithPrefix(),
+		ContractName:   e.ContractName,
+	})
+}
+
+func stringSlicesEqual(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+
+	return true
+}
+
+type contractNamesChanged struct {
+	AccountAddress common.Address `json:"address"`
+	Old            []string       `json:"old"`
+	New            []string       `json:"new"`
+}
+
+var _ json.Marshaler = contractNamesChanged{}
+
+func (e contractNamesChanged) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		Kind           string   `json:"kind"`
+		AccountAddress string   `json:"address"`
+		Old            []string `json:"old"`
+		New            []string `json:"new"`
+	}{
+		Kind:           "contract-names-changed",
+		AccountAddress: e.AccountAddress.HexWithPrefix(),
+		Old:            e.Old,
+		New:            e.New,
+	})
 }
