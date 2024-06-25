@@ -106,9 +106,14 @@ func updateCommitment(datadir, blockIDStr, commitStr string, force bool) error {
 
 	log.Info().Msgf("storing new commitment: %x", commit)
 
-	err = commits.Store(blockID, commit)
+	writeBatch = storagebadger.NewBatch(db)
+	err = commits.BatchStore(blockID, commit, writeBatch)
 	if err != nil {
 		return fmt.Errorf("could not store commit: %v", err)
+	}
+	err = writeBatch.Flush()
+	if err != nil {
+		return fmt.Errorf("could not flush write batch: %v", err)
 	}
 
 	log.Info().Msgf("commitment successfully stored for block %s", blockIDStr)

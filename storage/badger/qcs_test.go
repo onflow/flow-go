@@ -22,7 +22,7 @@ func TestQuorumCertificates_StoreTx(t *testing.T) {
 		store := bstorage.NewQuorumCertificates(metrics, db, 10)
 		qc := unittest.QuorumCertificateFixture()
 
-		err := operation.RetryOnConflictTx(db, transaction.Update, transaction.ToTx(store.StoreTx(qc)))
+		err := operation.RetryOnConflictTx(db, transaction.Update, store.StoreTx(qc))
 		require.NoError(t, err)
 
 		actual, err := store.ByBlockID(qc.BlockID)
@@ -44,10 +44,10 @@ func TestQuorumCertificates_StoreTx_OtherQC(t *testing.T) {
 			otherQC.BlockID = qc.BlockID
 		})
 
-		err := operation.RetryOnConflictTx(db, transaction.Update, transaction.ToTx(store.StoreTx(qc)))
+		err := operation.RetryOnConflictTx(db, transaction.Update, store.StoreTx(qc))
 		require.NoError(t, err)
 
-		err = operation.RetryOnConflictTx(db, transaction.Update, transaction.ToTx(store.StoreTx(otherQC)))
+		err = operation.RetryOnConflictTx(db, transaction.Update, store.StoreTx(otherQC))
 		require.ErrorIs(t, err, storage.ErrAlreadyExists)
 
 		actual, err := store.ByBlockID(otherQC.BlockID)

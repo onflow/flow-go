@@ -9,6 +9,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/pebble"
+	"github.com/onflow/flow-go/storage/pebble/operation"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -19,7 +20,7 @@ func TestQuorumCertificates_StoreTx(t *testing.T) {
 		store := bstorage.NewQuorumCertificates(metrics, db, 10)
 		qc := unittest.QuorumCertificateFixture()
 
-		err := store.StoreTx(qc)(db)
+		err := operation.WithReaderBatchWriter(db, store.StorePebble(qc))
 		require.NoError(t, err)
 
 		actual, err := store.ByBlockID(qc.BlockID)

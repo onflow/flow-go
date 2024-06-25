@@ -151,25 +151,3 @@ func (c *Cache[K, V]) PutTx(key K, resource V) func(*transaction.Tx) error {
 		return nil
 	}
 }
-
-func (c *Cache[K, V]) PutTxInterface(key K, resource V) func(interface{}) error {
-	storeOps := c.store(key, resource) // assemble DB operations to store resource (no execution)
-
-	return func(txinf interface{}) error {
-		tx, ok := txinf.(*transaction.Tx)
-		if !ok {
-			return fmt.Errorf("invalid transaction type")
-		}
-
-		err := storeOps(tx) // execute operations to store resource
-		if err != nil {
-			return fmt.Errorf("could not store resource: %w", err)
-		}
-
-		tx.OnSucceed(func() {
-			c.Insert(key, resource)
-		})
-
-		return nil
-	}
-}

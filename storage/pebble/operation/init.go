@@ -27,11 +27,11 @@ const (
 )
 
 func InsertPublicDBMarker(db *pebble.DB) error {
-	return insertDBTypeMarker(dbMarkerPublic)(NewPebbleReaderBatchWriter(db))
+	return WithReaderBatchWriter(db, insertDBTypeMarker(dbMarkerPublic))
 }
 
 func InsertSecretDBMarker(db *pebble.DB) error {
-	return insertDBTypeMarker(dbMarkerSecret)(NewPebbleReaderBatchWriter(db))
+	return WithReaderBatchWriter(db, insertDBTypeMarker(dbMarkerSecret))
 }
 
 func EnsurePublicDB(db *pebble.DB) error {

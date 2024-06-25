@@ -8,6 +8,7 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/pebble/operation"
 )
 
 type Payloads struct {
@@ -99,6 +100,10 @@ func (p *Payloads) storePayloads(
 	}
 
 	return nil
+}
+
+func (p *Payloads) Store(blockID flow.Identifier, payload *flow.Payload) error {
+	return p.storeTx(blockID, payload)(operation.NewPebbleReaderBatchWriter(p.db))
 }
 
 func (p *Payloads) retrieveTx(blockID flow.Identifier) func(tx pebble.Reader) (*flow.Payload, error) {

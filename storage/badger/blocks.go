@@ -47,7 +47,7 @@ func (b *Blocks) StoreTx(block *flow.Block) func(*transaction.Tx) error {
 	}
 }
 
-func (b *Blocks) StoreBatch(block *flow.Block) func(storage.PebbleReaderBatchWriter) error {
+func (b *Blocks) StorePebble(block *flow.Block) func(storage.PebbleReaderBatchWriter) error {
 	return nil
 }
 

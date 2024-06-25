@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/dgraph-io/badger/v2"
 	"github.com/rs/zerolog"
 	"golang.org/x/sync/errgroup"
 
@@ -30,7 +31,7 @@ type IndexerCore struct {
 	collections  storage.Collections
 	transactions storage.Transactions
 	results      storage.LightTransactionResults
-	batcher      bstorage.BatchBuilder
+	batcher      *badger.DB
 
 	collectionExecutedMetric module.CollectionExecutedMetric
 
@@ -44,7 +45,7 @@ type IndexerCore struct {
 func New(
 	log zerolog.Logger,
 	metrics module.ExecutionStateIndexerMetrics,
-	batcher bstorage.BatchBuilder,
+	batcher *badger.DB,
 	registers storage.RegisterIndex,
 	headers storage.Headers,
 	events storage.Events,

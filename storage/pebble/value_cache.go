@@ -151,19 +151,3 @@ func (c *Cache[K, V]) PutTx(key K, resource V) func(pebble.Writer) error {
 		return nil
 	}
 }
-
-func (c *Cache[K, V]) PutTxInterface(key K, resource V) func(interface{}) error {
-	storeOps := c.store(key, resource) // assemble DB operations to store resource (no execution)
-
-	return func(wi interface{}) error {
-		// the storeOps must be sync operation
-		err := storeOps(wi.(pebble.Writer)) // execute operations to store resource
-		if err != nil {
-			return fmt.Errorf("could not store resource: %w", err)
-		}
-
-		c.Insert(key, resource)
-
-		return nil
-	}
-}

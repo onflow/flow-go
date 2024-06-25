@@ -7,6 +7,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/badger/transaction"
 	"github.com/onflow/flow-go/storage/pebble/operation"
 )
 
@@ -42,13 +43,14 @@ func NewQuorumCertificates(collector module.CacheMetrics, db *pebble.DB, cacheSi
 	}
 }
 
-func (q *QuorumCertificates) StoreTx(qc *flow.QuorumCertificate) func(interface{}) error {
-	return q.cache.PutTxInterface(qc.BlockID, qc)
+func (q *QuorumCertificates) StoreTx(qc *flow.QuorumCertificate) func(*transaction.Tx) error {
+	return nil
 }
 
 func (q *QuorumCertificates) StorePebble(qc *flow.QuorumCertificate) func(storage.PebbleReaderBatchWriter) error {
 	return func(rw storage.PebbleReaderBatchWriter) error {
-		return q.cache.PutTxInterface(qc.BlockID, qc)(rw)
+		_, tx := rw.ReaderWriter()
+		return q.cache.PutTx(qc.BlockID, qc)(tx)
 	}
 }
 

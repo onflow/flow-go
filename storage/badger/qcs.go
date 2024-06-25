@@ -43,8 +43,8 @@ func NewQuorumCertificates(collector module.CacheMetrics, db *badger.DB, cacheSi
 	}
 }
 
-func (q *QuorumCertificates) StoreTx(qc *flow.QuorumCertificate) func(interface{}) error {
-	return q.cache.PutTxInterface(qc.BlockID, qc)
+func (q *QuorumCertificates) StoreTx(qc *flow.QuorumCertificate) func(*transaction.Tx) error {
+	return q.cache.PutTx(qc.BlockID, qc)
 }
 
 func (q *QuorumCertificates) StorePebble(qc *flow.QuorumCertificate) func(storage.PebbleReaderBatchWriter) error {

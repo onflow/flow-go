@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 
 	pebblestorage "github.com/onflow/flow-go/storage/pebble"
+	"github.com/onflow/flow-go/storage/pebble/operation"
 )
 
 // TestEpochCommitStoreAndRetrieve tests that a commit can be stored, retrieved and attempted to be stored again without an error
@@ -27,8 +28,10 @@ func TestEpochCommitStoreAndRetrieve(t *testing.T) {
 
 		// store a commit in db
 		expected := unittest.EpochCommitFixture()
-		err = store.StoreTx(expected)(db)
+		writer := operation.NewPebbleReaderBatchWriter(db)
+		err = store.StorePebble(expected)(writer)
 		require.NoError(t, err)
+		require.NoError(t, writer.Commit())
 
 		// retrieve the commit by ID
 		actual, err := store.ByID(expected.ID())
@@ -36,7 +39,9 @@ func TestEpochCommitStoreAndRetrieve(t *testing.T) {
 		assert.Equal(t, expected, actual)
 
 		// test storing same epoch commit
-		err = store.StoreTx(expected)(db)
+		writer = operation.NewPebbleReaderBatchWriter(db)
+		err = store.StorePebble(expected)(writer)
 		require.NoError(t, err)
+		require.NoError(t, writer.Commit())
 	})
 }

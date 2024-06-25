@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 
 	pebblestorage "github.com/onflow/flow-go/storage/pebble"
+	"github.com/onflow/flow-go/storage/pebble/operation"
 )
 
 // TestEpochSetupStoreAndRetrieve tests that a setup can be stored, retrieved and attempted to be stored again without an error
@@ -27,7 +28,7 @@ func TestEpochSetupStoreAndRetrieve(t *testing.T) {
 
 		// store a setup in db
 		expected := unittest.EpochSetupFixture()
-		err = store.StoreTx(expected)(db)
+		err = operation.WithReaderBatchWriter(db, store.StorePebble(expected))
 		require.NoError(t, err)
 
 		// retrieve the setup by ID
@@ -36,7 +37,7 @@ func TestEpochSetupStoreAndRetrieve(t *testing.T) {
 		assert.Equal(t, expected, actual)
 
 		// test storing same epoch setup
-		err = store.StoreTx(expected)(db)
+		err = operation.WithReaderBatchWriter(db, store.StorePebble(expected))
 		require.NoError(t, err)
 	})
 }

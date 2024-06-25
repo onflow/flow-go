@@ -14,7 +14,7 @@ type Blocks interface {
 	// still going through the caching layer.
 	StoreTx(block *flow.Block) func(*transaction.Tx) error
 
-	StoreBatch(block *flow.Block) func(PebbleReaderBatchWriter) error
+	StorePebble(block *flow.Block) func(PebbleReaderBatchWriter) error
 
 	// ByID returns the block with the given hash. It is available for
 	// finalized and ambiguous blocks.

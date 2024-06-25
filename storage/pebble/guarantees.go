@@ -54,6 +54,10 @@ func (g *Guarantees) retrieveTx(collID flow.Identifier) func(pebble.Reader) (*fl
 	}
 }
 
+func (g *Guarantees) Store(guarantee *flow.CollectionGuarantee) error {
+	return g.storeTx(guarantee)(g.db)
+}
+
 func (g *Guarantees) ByCollectionID(collID flow.Identifier) (*flow.CollectionGuarantee, error) {
 	return g.retrieveTx(collID)(g.db)
 }
