@@ -33,6 +33,7 @@ import (
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/trace"
 )
 
 // TODO add test for fatal errors
@@ -1253,6 +1254,57 @@ func TestHandler_TransactionRun(t *testing.T) {
 						require.True(t, ok)
 						require.Equal(t, traceResults[i], val)
 					}
+				})
+			})
+		})
+	})
+
+	t.Run("test - open tracing", func(t *testing.T) {
+		t.Parallel()
+
+		testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
+			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
+				testutils.RunWithEOATestAccount(t, backend, rootAddr, func(eoa *testutils.EOATestAccount) {
+
+					tx := gethTypes.NewTransaction(
+						uint64(1),
+						gethCommon.Address{1, 2},
+						big.NewInt(13),
+						uint64(0),
+						big.NewInt(1000),
+						[]byte{},
+					)
+
+					rlpTx, err := tx.MarshalBinary()
+					require.NoError(t, err)
+
+					handler := SetupHandler(t, backend, rootAddr)
+
+					backend.ExpectedSpan(t, trace.FVMEVMDryRun)
+					handler.DryRun(rlpTx, types.EmptyAddress)
+
+					backend.ExpectedSpan(t, trace.FVMEVMRun)
+					handler.Run(rlpTx, types.EmptyAddress)
+
+					backend.ExpectedSpan(t, trace.FVMEVMBatchRun)
+					handler.BatchRun([][]byte{rlpTx}, types.EmptyAddress)
+
+					backend.ExpectedSpan(t, trace.FVMEVMDeployCOA)
+					coa := handler.DeployCOA(1)
+
+					acc := handler.AccountByAddress(coa, true)
+
+					backend.ExpectedSpan(t, trace.FVMEVMCall)
+					acc.Call(types.EmptyAddress, nil, 1000, types.EmptyBalance)
+
+					backend.ExpectedSpan(t, trace.FVMEVMDeposit)
+					acc.Deposit(types.NewFlowTokenVault(types.EmptyBalance))
+
+					backend.ExpectedSpan(t, trace.FVMEVMWithdraw)
+					acc.Withdraw(types.EmptyBalance)
+
+					backend.ExpectedSpan(t, trace.FVMEVMDeploy)
+					acc.Deploy(nil, 1, types.EmptyBalance)
 				})
 			})
 		})
