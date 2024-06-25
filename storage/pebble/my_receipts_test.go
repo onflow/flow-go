@@ -52,7 +52,7 @@ func TestMyExecutionReceiptsStorage(t *testing.T) {
 		})
 	})
 
-	t.Run("store different receipt for same block should fail", func(t *testing.T) {
+	t.Run("store different receipt for same block should not fail", func(t *testing.T) {
 		withStore(t, func(store *bstorage.MyExecutionReceipts) {
 			block := unittest.BlockFixture()
 
@@ -66,7 +66,7 @@ func TestMyExecutionReceiptsStorage(t *testing.T) {
 			require.NoError(t, err)
 
 			err = store.StoreMyReceipt(receipt2)
-			require.Error(t, err)
+			require.NoError(t, err)
 		})
 	})
 }
