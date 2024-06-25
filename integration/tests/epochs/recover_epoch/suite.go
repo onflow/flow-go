@@ -24,8 +24,8 @@ type Suite struct {
 func (s *Suite) SetupTest() {
 	// use a shorter staking auction because we don't have staking operations in this case
 	s.StakingAuctionLen = 2
-	s.DKGPhaseLen = 50
-	s.EpochLen = 250
+	s.DKGPhaseLen = 10
+	s.EpochLen = 80
 	s.EpochCommitSafetyThreshold = 20
 
 	// run the generic setup, which starts up the network
@@ -93,12 +93,11 @@ func (s *Suite) recoverEpoch(env templates.Environment, args []cadence.Value) *s
 		sdk.Identifier(latestBlockID),
 		args,
 	)
-
-	fmt.Println("TRANSACTION SCRIPT \n", string(tx.Script))
 	require.NoError(s.T(), err)
 
 	err = s.Client.SignAndSendTransaction(s.Ctx, tx)
 	require.NoError(s.T(), err)
+	fmt.Println("")
 	result, err := s.Client.WaitForSealed(s.Ctx, tx.ID())
 	require.NoError(s.T(), err)
 	s.Client.Account().Keys[0].SequenceNumber++

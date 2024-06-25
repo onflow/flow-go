@@ -27,11 +27,16 @@ type RecoverEpochSuite struct {
 // ensure the network is healthy.
 func (s *RecoverEpochSuite) TestRecoverEpoch() {
 	// wait until the epoch setup phase to force network into EFM
-	s.AwaitEpochPhase(s.Ctx, 0, flow.EpochPhaseSetup, 10*time.Second, 4*time.Second)
+	s.AwaitEpochPhase(s.Ctx, 0, flow.EpochPhaseSetup, 10*time.Second, 500*time.Millisecond)
 
-	// pausing execution node will force the network into EFM
-	enContainer := s.GetContainersByRole(flow.RoleExecution)[0]
+	// pausing consensus node will force the network into EFM
+	enContainer := s.GetContainersByRole(flow.RoleCollection)[0]
 	_ = enContainer.Pause()
+
+	s.AwaitFinalizedView(s.Ctx, 32, 2*time.Minute, 500*time.Millisecond)
+
+	// start the paused execution node now that we are in EFM
+	require.NoError(s.T(), enContainer.Start())
 
 	// get the latest snapshot and start new container with it
 	epoch1FinalView, err := s.Net.BootstrapSnapshot.Epochs().Current().FinalView()
@@ -47,18 +52,14 @@ func (s *RecoverEpochSuite) TestRecoverEpoch() {
 	//if counter is still 0, epoch emergency fallback was triggered as expected
 	s.AssertInEpoch(s.Ctx, 0)
 
-	// start the paused execution node now that we are in EFM
-	enContainer.Start()
-
 	// generate epoch recover transaction args
 	collectionClusters := uint64(1)
-	numViewsInEpoch := uint64(4000)
-	numViewsInStakingAuction := uint64(100)
-	epochCounter := uint64(2)
+	numViewsInEpoch := uint64(80)
+	numViewsInStakingAuction := uint64(2)
+	epochCounter := uint64(1)
 	targetDuration := uint64(3000)
 	targetEndTime := uint64(4000)
-	out := fmt.Sprintf("%s/recover-epoch-tx-args.josn", s.Net.BootstrapDir)
-
+	out := fmt.Sprintf("%s/recover-epoch-tx-args.json", s.Net.BootstrapDir)
 	s.executeEFMRecoverTXArgsCMD(
 		collectionClusters,
 		numViewsInEpoch,
@@ -73,9 +74,8 @@ func (s *RecoverEpochSuite) TestRecoverEpoch() {
 
 	txArgs, err := utils.ParseJSON(b)
 	require.NoError(s.T(), err)
-
 	env := utils.LocalnetEnv()
 	result := s.recoverEpoch(env, txArgs)
 	fmt.Println("TX RESULT STATUS: ", result)
-	// submit recover epoch transaction to recover the network
+	// wait until recover event is processed and we transition into new epoch
 }
