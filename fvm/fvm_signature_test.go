@@ -586,7 +586,7 @@ func TestBLSMultiSignature(t *testing.T) {
 
 					script := fvm.Script(code).WithArguments(
 						jsoncdc.MustEncode(cadence.Array{
-							Values: signatures,
+							Values:    signatures,
 							ArrayType: uint8ArrayArrayType,
 						}),
 					)
@@ -605,7 +605,7 @@ func TestBLSMultiSignature(t *testing.T) {
 					signatures := []cadence.Value{}
 					script := fvm.Script(code).WithArguments(
 						jsoncdc.MustEncode(cadence.Array{
-							Values: signatures,
+							Values:    signatures,
 							ArrayType: uint8ArrayArrayType,
 						}),
 					)
@@ -671,7 +671,7 @@ func TestBLSMultiSignature(t *testing.T) {
 
 					script := fvm.Script(code(BLSSignatureAlgorithm)).WithArguments(
 						jsoncdc.MustEncode(cadence.Array{
-							Values: publicKeys,
+							Values:    publicKeys,
 							ArrayType: uint8ArrayArrayType,
 						}),
 					)
@@ -701,7 +701,7 @@ func TestBLSMultiSignature(t *testing.T) {
 
 						script := fvm.Script(code(signatureAlgorithm)).WithArguments(
 							jsoncdc.MustEncode(cadence.Array{
-								Values: publicKeys,
+								Values:    publicKeys,
 								ArrayType: uint8ArrayArrayType,
 							}),
 						)
@@ -717,7 +717,7 @@ func TestBLSMultiSignature(t *testing.T) {
 					var publicKeys []cadence.Value
 					script := fvm.Script(code(BLSSignatureAlgorithm)).WithArguments(
 						jsoncdc.MustEncode(cadence.Array{
-							Values: publicKeys,
+							Values:    publicKeys,
 							ArrayType: uint8ArrayArrayType,
 						}),
 					)
@@ -793,11 +793,11 @@ func TestBLSMultiSignature(t *testing.T) {
 
 				script := fvm.Script(code).WithArguments(
 					jsoncdc.MustEncode(cadence.Array{ // keys
-						Values: publicKeys,
+						Values:    publicKeys,
 						ArrayType: uint8ArrayArrayType,
 					}),
 					jsoncdc.MustEncode(cadence.Array{ // signatures
-						Values: signatures,
+						Values:    signatures,
 						ArrayType: uint8ArrayArrayType,
 					}),
 					jsoncdc.MustEncode(cadenceMessage),
