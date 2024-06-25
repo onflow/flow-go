@@ -147,13 +147,12 @@ func traverse(prefix []byte, iteration iterationFunc) func(pebble.Reader) error 
 			return fmt.Errorf("prefix must not be empty")
 		}
 
-		// opts := badger.DefaultIteratorOptions
-		// NOTE: this is an optimization only, it does not enforce that all
-		// results in the iteration have this prefix.
-		// opts.Prefix = prefix
-
 		// TODO: add prefix to new iter, use `useL6Filter`
-		it, err := r.NewIter(nil)
+		it, err := r.NewIter(&pebble.IterOptions{
+			LowerBound: prefix,
+			UpperBound: append(prefix, 0xFF),
+		})
+
 		if err != nil {
 			return fmt.Errorf("can not create iterator: %w", err)
 		}
