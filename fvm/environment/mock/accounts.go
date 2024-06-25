@@ -329,6 +329,36 @@ func (_m *Accounts) GetPublicKeyCount(address flow.Address) (uint64, error) {
 	return r0, r1
 }
 
+// GetPublicKeys provides a mock function with given fields: address
+func (_m *Accounts) GetPublicKeys(address flow.Address) ([]flow.AccountPublicKey, error) {
+	ret := _m.Called(address)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetPublicKeys")
+	}
+
+	var r0 []flow.AccountPublicKey
+	var r1 error
+	if rf, ok := ret.Get(0).(func(flow.Address) ([]flow.AccountPublicKey, error)); ok {
+		return rf(address)
+	}
+	if rf, ok := ret.Get(0).(func(flow.Address) []flow.AccountPublicKey); ok {
+		r0 = rf(address)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]flow.AccountPublicKey)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(flow.Address) error); ok {
+		r1 = rf(address)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetStorageUsed provides a mock function with given fields: address
 func (_m *Accounts) GetStorageUsed(address flow.Address) (uint64, error) {
 	ret := _m.Called(address)
