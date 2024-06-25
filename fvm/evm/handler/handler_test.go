@@ -101,7 +101,7 @@ func TestHandler_TransactionRunOrPanic(t *testing.T) {
 					events := backend.Events()
 					require.Len(t, events, 2)
 					testutils.CheckTransactionExecutedEvent(t, events, 0).
-						HasBlockIndex(0).
+						HasIndex(0).
 						// HasBlockHash(). // TODO how to check the block hash
 						MatchesResult(result)
 
@@ -329,28 +329,28 @@ func TestHandler_COA(t *testing.T) {
 				events := backend.Events()
 				require.Len(t, events, 6)
 
-				// first two transactions are for COA setup
+				// the first four events are for COA setup
+				testutils.CheckTransactionExecutedEvent(t, events, 0).
+					HasIndex(0)
+				testutils.CheckBlockExecutedEvent(t, events, 1).
+					HasHeight(1)
+				testutils.CheckTransactionExecutedEvent(t, events, 2).
+					HasIndex(0)
+				testutils.CheckBlockExecutedEvent(t, events, 3).
+					HasHeight(2)
 
 				// transaction event
-				event := events[2]
-				assert.Equal(t, event.Type, types.EventTypeTransactionExecuted)
+				testutils.CheckTransactionExecutedEvent(t, events, 4).
+					HasIndex(0).
+					HasErrorCode(0)
 
-				// block event
-				event = events[3]
-				assert.Equal(t, event.Type, types.EventTypeBlockExecuted)
-
-				// transaction event
-				event = events[4]
-				assert.Equal(t, event.Type, types.EventTypeTransactionExecuted)
-				_, err := jsoncdc.Decode(nil, event.Payload)
-				require.NoError(t, err)
 				// TODO: decode encoded tx and check for the amount and value
 				// assert.Equal(t, foa.Address(), ret.Address)
 				// assert.Equal(t, balance, ret.Amount)
 
 				// block event
-				event = events[5]
-				assert.Equal(t, event.Type, types.EventTypeBlockExecuted)
+				testutils.CheckBlockExecutedEvent(t, events, 5).
+					HasHeight(2)
 
 				// check gas usage
 				computationUsed, err := backend.ComputationUsed()

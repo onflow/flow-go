@@ -57,21 +57,8 @@ type TransactionEventValidator struct {
 	payload *types.TransactionEventPayload
 }
 
-func (tx *TransactionEventValidator) MatchesResult(result *types.Result) *TransactionEventValidator {
-	resSummary := result.ResultSummary()
-	require.Equal(tx.t, result.TxHash.String(), tx.payload.Hash)
-	require.Equal(tx.t, result.Index, tx.payload.Index)
-	require.Equal(tx.t, result.TxType, tx.payload.TransactionType)
-	require.Equal(tx.t, int(resSummary.ErrorCode), int(tx.payload.ErrorCode))
-	require.Equal(tx.t, resSummary.ErrorMessage, tx.payload.ErrorMessage)
-	require.Equal(tx.t, result.GasConsumed, tx.payload.GasConsumed)
-	deployedAddress := ""
-	if result.DeployedContractAddress != nil {
-		deployedAddress = result.DeployedContractAddress.String()
-	}
-	require.Equal(tx.t, deployedAddress, tx.payload.ContractAddress)
-	require.Equal(tx.t, hex.EncodeToString(result.ReturnedData), tx.payload.ReturnedData)
-	tx.HasLogs(result.Logs)
+func (tx *TransactionEventValidator) HasIndex(index uint16) *TransactionEventValidator {
+	require.Equal(tx.t, index, int(tx.payload.Index))
 	return tx
 }
 
@@ -80,8 +67,42 @@ func (tx *TransactionEventValidator) HasBlockHash(blockHash string) *Transaction
 	return tx
 }
 
-func (tx *TransactionEventValidator) HasBlockIndex(blockIndex int) *TransactionEventValidator {
-	require.Equal(tx.t, blockIndex, int(tx.payload.Index))
+func (tx *TransactionEventValidator) HasTxType(txType uint8) *TransactionEventValidator {
+	require.Equal(tx.t, txType, tx.payload.TransactionType)
+	return tx
+}
+
+func (tx *TransactionEventValidator) HasTxHash(txHash string) *TransactionEventValidator {
+	require.Equal(tx.t, txHash, tx.payload.Hash)
+	return tx
+}
+
+func (tx *TransactionEventValidator) HasErrorCode(code types.ErrorCode) *TransactionEventValidator {
+	require.Equal(tx.t, code, int(tx.payload.ErrorCode))
+	return tx
+}
+
+func (tx *TransactionEventValidator) HasErrorMessage(msg string) *TransactionEventValidator {
+	require.Equal(tx.t, msg, tx.payload.ErrorMessage)
+	return tx
+}
+
+func (tx *TransactionEventValidator) HasGasConsumed(gas uint64) *TransactionEventValidator {
+	require.Equal(tx.t, gas, tx.payload.GasConsumed)
+	return tx
+}
+
+func (tx *TransactionEventValidator) HasReturnedData(retData []byte) *TransactionEventValidator {
+	require.Equal(tx.t, hex.EncodeToString(retData), tx.payload.ReturnedData)
+	return tx
+}
+
+func (tx *TransactionEventValidator) HasDeployedContractAddress(addr *types.Address) *TransactionEventValidator {
+	deployedAddress := ""
+	if addr != nil {
+		deployedAddress = addr.String()
+	}
+	require.Equal(tx.t, deployedAddress, tx.payload.ContractAddress)
 	return tx
 }
 
@@ -93,6 +114,19 @@ func (tx *TransactionEventValidator) HasLogs(expectedLogs []*gethTypes.Log) *Tra
 	require.NoError(tx.t, err)
 
 	require.Equal(tx.t, expectedEncoded, encodedLogs)
+	return tx
+}
+
+func (tx *TransactionEventValidator) MatchesResult(result *types.Result) *TransactionEventValidator {
+	tx.HasTxHash(result.TxHash.String())
+	tx.HasIndex(result.Index)
+	tx.HasTxType(result.TxType)
+	tx.HasErrorCode(result.ResultSummary().ErrorCode)
+	tx.HasErrorMessage(result.ResultSummary().ErrorMessage)
+	tx.HasGasConsumed(result.GasConsumed)
+	tx.HasDeployedContractAddress(result.DeployedContractAddress)
+	tx.HasReturnedData(result.ReturnedData)
+	tx.HasLogs(result.Logs)
 	return tx
 }
 
@@ -108,6 +142,7 @@ func CheckTransactionExecutedEvent(
 	cev, ok := ev.(cadence.Event)
 	require.True(t, ok)
 	// TODO add check for the location in the cev.EventType
+	// 	location := common.NewAddressLocation(nil, common.Address(h.evmContractAddress), "EVM")
 	// require.Equal(t, cev.EventType, types.EventTypeTransactionExecuted)
 	payload, err := types.DecodeTransactionEventPayload(cev)
 	require.NoError(t, err)
