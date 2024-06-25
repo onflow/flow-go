@@ -724,8 +724,20 @@ func (s *EpochFallbackStateMachineSuite) TestProcesingMultipleEventsAtTheSameBlo
 			s.consumer.On("OnServiceEventProcessed", serviceEvent).Once()
 			events = append(events, serviceEvent)
 		}
+		includeEjection := rapid.Bool().Draw(t, "eject-node")
+		ejectionGen := rapid.SampledFrom(s.parentProtocolState.CurrentEpoch.ActiveIdentities)
+		var ejectedNodes flow.IdentifierList
+		if includeEjection {
+			identity := ejectionGen.Draw(t, "ejection-node")
+			// TODO(EFM, #6020): this needs to be updated when a proper ejection event is implemented
+			serviceEvent := flow.ServiceEvent{
+				Type:  "ejection",
+				Event: identity.NodeID,
+			}
+			events = append(events, serviceEvent)
+			ejectedNodes = append(ejectedNodes, identity.NodeID)
+		}
 		events = rapid.Permutation(events).Draw(t, "events-permutation")
-
 		for _, event := range events {
 			var err error
 			switch ev := event.Event.(type) {
@@ -735,13 +747,35 @@ func (s *EpochFallbackStateMachineSuite) TestProcesingMultipleEventsAtTheSameBlo
 				_, err = s.stateMachine.ProcessEpochCommit(ev)
 			case *flow.EpochRecover:
 				_, err = s.stateMachine.ProcessEpochRecover(ev)
+			case flow.Identifier:
+				err = s.stateMachine.EjectIdentity(ev)
 			}
 			require.NoError(s.T(), err)
 		}
 		updatedState, _, hasChanges := s.stateMachine.Build()
-		require.Equal(t, includeValidRecover, hasChanges, "should have changes if valid recover event is included")
+		for _, nodeID := range ejectedNodes {
+			ejectedIdentity, found := updatedState.CurrentEpoch.ActiveIdentities.ByNodeID(nodeID)
+			require.True(s.T(), found)
+			require.True(s.T(), ejectedIdentity.Ejected)
+		}
+
+		// TODO(EFM, #6019): next section needs to be updated when implementing related issue.
+		// Extra context: logic in this test is based on the assumption that recover event readmits the same identity table.
+		// This means if there is an ejection event in the same block and it precedes the recovery event then the recovery event needs to be rejected
+		// since it tries to readmit an ejected identity.
+		// Based on the setup of the test we will have changes to the state in next cases:
+		// 1. includeValidRecover == true, includeEjection == false, in this case epoch is recovered and NextEpoch != nil.
+		// 2. includeValidRecover == false, includeEjection == true, in this case we eject nodes and NextEpoch == nil.
+		// 3. includeValidRecover == true, includeEjection == true, recover precedes ejection event, in this case epoch is recovered and NextEpoch != nil
+		//    and nodes are ejected in both current and next epoch.
+		// In all other cases there shouldn't be changes to the resulting state.
+		require.Equal(t, includeValidRecover || includeEjection, hasChanges, "always should have changes since we eject nodes")
 		if includeValidRecover {
-			require.NotNil(t, updatedState.NextEpoch, "next epoch should be present")
+			if includeEjection {
+				//require.Nil(t, updatedState.NextEpoch, "recover event shouldn't be accepted since it readmits an ejected identity")
+			} else {
+				require.NotNil(t, updatedState.NextEpoch, "next epoch should be present")
+			}
 		}
 	})
 }
