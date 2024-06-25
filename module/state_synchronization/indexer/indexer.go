@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/jobqueue"
 	"github.com/onflow/flow-go/module/state_synchronization"
+	"github.com/onflow/flow-go/module/state_synchronization/requester"
 	"github.com/onflow/flow-go/module/state_synchronization/requester/jobs"
 	"github.com/onflow/flow-go/storage"
 )
@@ -52,6 +53,7 @@ type Indexer struct {
 	indexer         *IndexerCore
 	jobConsumer     *jobqueue.ComponentConsumer
 	registers       storage.RegisterIndex
+	distributor     *requester.ExecutionDataDistributor
 }
 
 // NewIndexer creates a new execution worker.
@@ -63,12 +65,14 @@ func NewIndexer(
 	executionCache *cache.ExecutionDataCache,
 	executionDataLatestHeight func() (uint64, error),
 	processedHeight storage.ConsumerProgress,
+	distributor *requester.ExecutionDataDistributor,
 ) (*Indexer, error) {
 	r := &Indexer{
 		log:             log.With().Str("module", "execution_indexer").Logger(),
 		exeDataNotifier: engine.NewNotifier(),
 		indexer:         indexer,
 		registers:       registers,
+		distributor:     distributor,
 	}
 
 	r.exeDataReader = jobs.NewExecutionDataReader(executionCache, fetchTimeout, executionDataLatestHeight)
@@ -144,6 +148,8 @@ func (i *Indexer) processExecutionData(ctx irrecoverable.SignalerContext, job mo
 		i.log.Error().Err(err).Str("job_id", string(job.ID())).Msg("error during execution data index processing job")
 		ctx.Throw(err)
 	}
+	// send notifications
+	i.distributor.OnExecutionDataReceived(entry.ExecutionData)
 
 	done()
 }

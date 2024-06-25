@@ -1085,6 +1085,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 	var processedNotifications storage.ConsumerProgress
 	var publicBsDependable *module.ProxiedReadyDoneAware
 	var execDataDistributor *edrequester.ExecutionDataDistributor
+	var indexedExecDataDistributor *edrequester.ExecutionDataDistributor
 	var execDataCacheBackend *herocache.BlockExecutionData
 	var executionDataStoreCache *execdatacache.ExecutionDataCache
 
@@ -1285,7 +1286,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				return &module.NoopReadyDoneAware{}, nil
 			}
 
-			execDataDistributor.AddOnExecutionDataReceivedConsumer(func(data *execution_data.BlockExecutionDataEntity) {
+			indexedExecDataDistributor.AddOnExecutionDataReceivedConsumer(func(data *execution_data.BlockExecutionDataEntity) {
 				header, err := node.Storage.Headers.ByBlockID(data.BlockID)
 				if err != nil {
 					node.Logger.Fatal().Err(err).Msg("failed to get header for execution data")
@@ -1436,6 +1437,8 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 			}
 			builder.ExecutionIndexerCore = indexerCore
 
+			indexedExecDataDistributor = edrequester.NewExecutionDataDistributor()
+
 			// execution state worker uses a jobqueue to process new execution data and indexes it by using the indexer.
 			builder.ExecutionIndexer, err = indexer.NewIndexer(
 				builder.Logger,
@@ -1445,6 +1448,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				executionDataStoreCache,
 				builder.ExecutionDataRequester.HighestConsecutiveHeight,
 				indexedBlockHeight,
+				indexedExecDataDistributor,
 			)
 			if err != nil {
 				return nil, err
