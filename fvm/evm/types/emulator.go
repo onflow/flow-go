@@ -21,7 +21,24 @@ var (
 type Precompile interface {
 	gethVM.PrecompiledContract
 	Address() Address
+	RequiredGasCalls() []RequiredGasCall
+	RunCalls() []RunCall
 }
+
+type RequiredGasCall struct {
+	Input  []byte
+	Output uint64
+}
+
+// TODO add encoding
+
+type RunCall struct {
+	Input    []byte
+	Output   []byte
+	ErrorMsg string
+}
+
+// TODO add encoding
 
 // BlockContext holds the context needed for the emulator operations
 type BlockContext struct {

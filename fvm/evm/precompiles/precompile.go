@@ -6,6 +6,8 @@ import (
 	"github.com/onflow/flow-go/fvm/evm/types"
 )
 
+// TODO from here: add test for captures
+
 // InvalidMethodCallGasUsage captures how much gas we charge for invalid method call
 const InvalidMethodCallGasUsage = uint64(1)
 
@@ -30,8 +32,10 @@ func MultiFunctionPrecompileContract(
 	functions []Function,
 ) types.Precompile {
 	pc := &precompile{
-		functions: make(map[FunctionSelector]Function),
-		address:   address,
+		functions:        make(map[FunctionSelector]Function),
+		address:          address,
+		requiredGasCalls: make([]types.RequiredGasCall, 0),
+		runCalls:         make([]types.RunCall, 0),
 	}
 	for _, f := range functions {
 		pc.functions[f.FunctionSelector()] = f
@@ -40,8 +44,10 @@ func MultiFunctionPrecompileContract(
 }
 
 type precompile struct {
-	address   types.Address
-	functions map[FunctionSelector]Function
+	address          types.Address
+	functions        map[FunctionSelector]Function
+	requiredGasCalls []types.RequiredGasCall
+	runCalls         []types.RunCall
 }
 
 func (p *precompile) Address() types.Address {
@@ -50,26 +56,63 @@ func (p *precompile) Address() types.Address {
 
 // RequiredGas calculates the contract gas use
 func (p *precompile) RequiredGas(input []byte) uint64 {
+	var output uint64
+	defer func() {
+		p.requiredGasCalls = append(
+			p.requiredGasCalls,
+			types.RequiredGasCall{
+				Input:  input,
+				Output: output,
+			})
+	}()
 	if len(input) < FunctionSelectorLength {
-		return InvalidMethodCallGasUsage
+		output = InvalidMethodCallGasUsage
+		return output
 	}
 	sig, data := SplitFunctionSelector(input)
 	callable, found := p.functions[sig]
 	if !found {
-		return InvalidMethodCallGasUsage
+		output = InvalidMethodCallGasUsage
+		return output
 	}
-	return callable.ComputeGas(data)
+	output = callable.ComputeGas(data)
+	return output
 }
 
 // Run runs the precompiled contract
 func (p *precompile) Run(input []byte) ([]byte, error) {
+	var output []byte
+	var err error
+	defer func() {
+		p.runCalls = append(
+			p.runCalls,
+			types.RunCall{
+				Input:    input,
+				Output:   output,
+				ErrorMsg: err.Error(),
+			})
+	}()
+
 	if len(input) < FunctionSelectorLength {
-		return nil, ErrInvalidMethodCall
+		output = nil
+		err = ErrInvalidMethodCall
+		return output, err
 	}
 	sig, data := SplitFunctionSelector(input)
 	callable, found := p.functions[sig]
 	if !found {
-		return nil, ErrInvalidMethodCall
+		output = nil
+		err = ErrInvalidMethodCall
+		return output, err
 	}
-	return callable.Run(data)
+	output, err = callable.Run(data)
+	return output, err
+}
+
+func (p *precompile) RequiredGasCalls() []types.RequiredGasCall {
+	return p.requiredGasCalls
+}
+
+func (p *precompile) RunCalls() []types.RunCall {
+	return p.runCalls
 }
