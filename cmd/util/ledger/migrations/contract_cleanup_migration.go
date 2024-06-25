@@ -45,23 +45,28 @@ func (d *ContractCleanupMigration) MigrateAccount(
 	accountRegisters *registers.AccountRegisters,
 ) error {
 
-	// Normalize the account's contract names.
-	// This will deduplicate and sort the contract names.
+	// Get the set of all contract names for the account.
 
-	contractNames, err := d.normalizeContractNames(accountRegisters)
+	contractNames, err := d.getContractNames(accountRegisters)
 	if err != nil {
 		return fmt.Errorf(
-			"failed to normalize contract names for %s: %w",
+			"failed to get contract names for %s: %w",
 			address.HexWithPrefix(),
 			err,
 		)
 	}
 
-	// Cleanup the code for each contract.
-	// If the contract code is empty, it will be removed.
+	contractNameSet := make(map[string]struct{})
+	for _, contractName := range contractNames {
+		contractNameSet[contractName] = struct{}{}
+	}
+
+	// Cleanup the code for each contract in the account.
+	// If the contract code is empty, the contract code register will be removed,
+	// and the contract name will be removed from the account's contract names.
 
 	for _, contractName := range contractNames {
-		err = d.cleanupContractCode(accountRegisters, contractName)
+		removed, err := d.cleanupContractCode(accountRegisters, contractName)
 		if err != nil {
 			return fmt.Errorf(
 				"failed to cleanup contract code for %s: %w",
@@ -69,18 +74,40 @@ func (d *ContractCleanupMigration) MigrateAccount(
 				err,
 			)
 		}
+
+		if removed {
+			delete(contractNameSet, contractName)
+		}
+	}
+
+	// Sort the contract names and set them back to the account.
+
+	newContractNames := make([]string, 0, len(contractNameSet))
+	for contractName := range contractNameSet {
+		newContractNames = append(newContractNames, contractName)
+	}
+
+	sort.Strings(newContractNames)
+
+	// NOTE: Always set the contract names back to the account,
+	// even if there are no contract names.
+	// This effectively clears the contract names register.
+
+	err = d.setContractNames(accountRegisters, newContractNames)
+	if err != nil {
+		return fmt.Errorf(
+			"failed to set contract names for %s: %w",
+			address.HexWithPrefix(),
+			err,
+		)
 	}
 
 	return nil
 }
 
-// normalizeContractNames deduplicates and sorts the account's contract names.
-func (d *ContractCleanupMigration) normalizeContractNames(
+func (d *ContractCleanupMigration) getContractNames(
 	accountRegisters *registers.AccountRegisters,
-) (
-	[]string,
-	error,
-) {
+) ([]string, error) {
 	owner := accountRegisters.Owner()
 
 	encodedContractNames, err := accountRegisters.Get(owner, flow.ContractNamesKey)
@@ -103,76 +130,79 @@ func (d *ContractCleanupMigration) normalizeContractNames(
 		)
 	}
 
-	contractNames = normalizeContractNames(contractNames)
-
-	newEncodedContractNames, err := environment.EncodeContractNames(contractNames)
-	if err != nil {
-		return nil, fmt.Errorf(
-			"failed to encode contract names: %w",
-			err,
-		)
-	}
-
-	err = accountRegisters.Set(owner, flow.ContractNamesKey, newEncodedContractNames)
-	if err != nil {
-		return nil, fmt.Errorf(
-			"failed to set new contract names: %w",
-			err,
-		)
-	}
-
 	return contractNames, nil
 }
 
-// normalizeContractNames deduplicates and sorts the contract names.
-func normalizeContractNames(names []string) []string {
-	seen := make(map[string]struct{}, len(names))
-	deduplicated := make([]string, 0, len(names))
+func (d *ContractCleanupMigration) setContractNames(
+	accountRegisters *registers.AccountRegisters,
+	contractNames []string,
+) error {
+	owner := accountRegisters.Owner()
 
-	for _, name := range names {
-		if _, ok := seen[name]; ok {
-			continue
+	var newEncodedContractNames []byte
+	var err error
+
+	// Encode the new contract names, if there are any.
+
+	if len(contractNames) > 0 {
+		newEncodedContractNames, err = environment.EncodeContractNames(contractNames)
+		if err != nil {
+			return fmt.Errorf(
+				"failed to encode contract names: %w",
+				err,
+			)
 		}
-
-		seen[name] = struct{}{}
-		deduplicated = append(deduplicated, name)
 	}
 
-	sort.Strings(deduplicated)
+	// NOTE: always set the contract names register, even if there are not contract names.
+	// This effectively clears the contract names register.
 
-	return deduplicated
+	err = accountRegisters.Set(owner, flow.ContractNamesKey, newEncodedContractNames)
+	if err != nil {
+		return fmt.Errorf(
+			"failed to set contract names: %w",
+			err,
+		)
+	}
+
+	return nil
 }
 
 // cleanupContractCode removes the code for the contract if it is empty.
+// Returns true if the contract code was removed.
 func (d *ContractCleanupMigration) cleanupContractCode(
 	accountRegisters *registers.AccountRegisters,
 	contractName string,
-) error {
+) (removed bool, err error) {
 	owner := accountRegisters.Owner()
 
 	contractKey := flow.ContractKey(contractName)
 
 	code, err := accountRegisters.Get(owner, contractKey)
 	if err != nil {
-		return fmt.Errorf(
+		return false, fmt.Errorf(
 			"failed to get contract code for %s: %w",
 			contractName,
 			err,
 		)
 	}
 
+	// If the contract code is empty, remove the contract code register.
+
 	if len(bytes.TrimSpace(code)) == 0 {
 		err = accountRegisters.Set(owner, contractKey, nil)
 		if err != nil {
-			return fmt.Errorf(
+			return false, fmt.Errorf(
 				"failed to clear contract code for %s: %w",
 				contractName,
 				err,
 			)
 		}
+
+		removed = true
 	}
 
-	return nil
+	return removed, nil
 }
 
 func (d *ContractCleanupMigration) Close() error {

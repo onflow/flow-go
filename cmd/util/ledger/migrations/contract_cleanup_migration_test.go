@@ -14,7 +14,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-func TestContractCleanupMigration(t *testing.T) {
+func TestContractCleanupMigration1(t *testing.T) {
 
 	t.Parallel()
 
@@ -96,7 +96,6 @@ func TestContractCleanupMigration(t *testing.T) {
 	assert.Equal(t,
 		[]string{
 			contractNameNonEmpty,
-			contractNameEmpty,
 		},
 		contractNames,
 	)
@@ -114,4 +113,97 @@ func TestContractCleanupMigration(t *testing.T) {
 	)
 	require.NoError(t, err)
 	assert.NotEmpty(t, contractNonEmpty)
+}
+
+func TestContractCleanupMigration2(t *testing.T) {
+
+	t.Parallel()
+
+	// Arrange
+
+	address, err := common.HexToAddress("0x4184b8bdf78db9eb")
+	require.NoError(t, err)
+
+	flowAddress := flow.ConvertAddress(address)
+	owner := flow.AddressToRegisterOwner(flowAddress)
+
+	const contractNameEmpty1 = "Foo"
+	const contractNameEmpty2 = "Bar"
+
+	registersByAccount := registers.NewByAccount()
+
+	err = registersByAccount.Set(
+		owner,
+		flow.ContractKey(contractNameEmpty1),
+		// Some whitespace for testing purposes
+		[]byte(" \t  \n  "),
+	)
+	require.NoError(t, err)
+
+	err = registersByAccount.Set(
+		owner,
+		flow.ContractKey(contractNameEmpty2),
+		[]byte("\n  \t  \n  \t"),
+	)
+	require.NoError(t, err)
+
+	encodedContractNames, err := environment.EncodeContractNames([]string{
+		// Unsorted and duplicates for testing purposes
+		contractNameEmpty1,
+		contractNameEmpty2,
+		contractNameEmpty1,
+		contractNameEmpty2,
+		contractNameEmpty1,
+		contractNameEmpty1,
+		contractNameEmpty2,
+	})
+	require.NoError(t, err)
+
+	err = registersByAccount.Set(
+		owner,
+		flow.ContractNamesKey,
+		encodedContractNames,
+	)
+	require.NoError(t, err)
+
+	// Act
+
+	checkingMigration := NewContractCleanupMigration()
+
+	log := zerolog.Nop()
+
+	err = checkingMigration.InitMigration(log, registersByAccount, 1)
+	require.NoError(t, err)
+
+	accountRegisters := registersByAccount.AccountRegisters(owner)
+
+	err = checkingMigration.MigrateAccount(
+		context.Background(),
+		address,
+		accountRegisters,
+	)
+	require.NoError(t, err)
+
+	// Assert
+
+	encodedContractNames, err = registersByAccount.Get(
+		owner,
+		flow.ContractNamesKey,
+	)
+	require.NoError(t, err)
+	assert.Nil(t, encodedContractNames)
+
+	contractEmpty1, err := registersByAccount.Get(
+		owner,
+		flow.ContractKey(contractNameEmpty1),
+	)
+	require.NoError(t, err)
+	assert.Nil(t, contractEmpty1)
+
+	contractEmpty2, err := registersByAccount.Get(
+		owner,
+		flow.ContractKey(contractNameEmpty2),
+	)
+	require.NoError(t, err)
+	assert.Nil(t, contractEmpty2)
 }
