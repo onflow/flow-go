@@ -2,6 +2,7 @@ package testutils
 
 import (
 	"encoding/hex"
+	"math/big"
 	"testing"
 
 	"github.com/onflow/cadence"
@@ -49,8 +50,8 @@ func (bv *BlockEventValidator) HasTimestamp(timestamp uint64) *BlockEventValidat
 	return bv
 }
 
-func (bv *BlockEventValidator) HasTotalSupply(totalSupply cadence.Int) *BlockEventValidator {
-	require.Equal(bv.t, totalSupply, bv.payload.TotalSupply)
+func (bv *BlockEventValidator) HasTotalSupply(totalSupply *big.Int) *BlockEventValidator {
+	require.Equal(bv.t, totalSupply, bv.payload.TotalSupply.Value)
 	return bv
 }
 
@@ -96,7 +97,7 @@ func IsTransactionExecutedEvent(
 	return &TransactionEventValidator{t, payload}
 }
 
-func (tx *TransactionEventValidator) HasIndex(index uint16) *TransactionEventValidator {
+func (tx *TransactionEventValidator) HasIndex(index int) *TransactionEventValidator {
 	require.Equal(tx.t, index, int(tx.payload.Index))
 	return tx
 }
@@ -117,7 +118,7 @@ func (tx *TransactionEventValidator) HasTxHash(txHash string) *TransactionEventV
 }
 
 func (tx *TransactionEventValidator) HasErrorCode(code types.ErrorCode) *TransactionEventValidator {
-	require.Equal(tx.t, code, int(tx.payload.ErrorCode))
+	require.Equal(tx.t, int(code), int(tx.payload.ErrorCode))
 	return tx
 }
 
@@ -156,9 +157,18 @@ func (tx *TransactionEventValidator) HasLogs(expectedLogs []*gethTypes.Log) *Tra
 	return tx
 }
 
+func (tx *TransactionEventValidator) MatchesResultSummary(result *types.ResultSummary) *TransactionEventValidator {
+	tx.HasErrorCode(result.ErrorCode)
+	tx.HasErrorMessage(result.ErrorMessage)
+	tx.HasGasConsumed(result.GasConsumed)
+	tx.HasDeployedContractAddress(result.DeployedContractAddress)
+	tx.HasReturnedData(result.ReturnedData)
+	return tx
+}
+
 func (tx *TransactionEventValidator) MatchesResult(result *types.Result) *TransactionEventValidator {
 	tx.HasTxHash(result.TxHash.String())
-	tx.HasIndex(result.Index)
+	tx.HasIndex(int(result.Index))
 	tx.HasTxType(result.TxType)
 	tx.HasErrorCode(result.ResultSummary().ErrorCode)
 	tx.HasErrorMessage(result.ResultSummary().ErrorMessage)
