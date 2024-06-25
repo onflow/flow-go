@@ -1,6 +1,4 @@
-// (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
-
-package badger
+package pebble
 
 import (
 	"errors"
@@ -8,7 +6,6 @@ import (
 	"sync/atomic"
 
 	"github.com/cockroachdb/pebble"
-	"github.com/dgraph-io/badger"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/model/flow"
@@ -18,7 +15,6 @@ import (
 	"github.com/onflow/flow-go/state/protocol/invalid"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/pebble/operation"
-	"github.com/onflow/flow-go/storage/pebble/transaction"
 )
 
 // cachedHeader caches a block header and its ID.
@@ -82,7 +78,7 @@ func SkipNetworkAddressValidation(conf *BootstrapConfig) {
 
 func Bootstrap(
 	metrics module.ComplianceMetrics,
-	db *badger.DB,
+	db *pebble.DB,
 	headers storage.Headers,
 	seals storage.Seals,
 	results storage.ExecutionResults,
@@ -137,7 +133,8 @@ func Bootstrap(
 		return nil, fmt.Errorf("could not get sealed result for sealing segment: %w", err)
 	}
 
-	err = operation.RetryOnConflictTx(db, transaction.Update, func(tx *transaction.Tx) error {
+	err = operation.WithReaderBatchWriter(db, func(tx storage.PebbleReaderBatchWriter) error {
+		_, w := tx.ReaderWriter()
 		// sealing segment is in ascending height order, so the tail is the
 		// oldest ancestor and head is the newest child in the segment
 		// TAIL <- ... <- HEAD
@@ -157,13 +154,13 @@ func Bootstrap(
 		if err != nil {
 			return fmt.Errorf("could not get root qc: %w", err)
 		}
-		err = qcs.StoreTx(qc)(tx)
+		err = qcs.StorePebble(qc)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert root qc: %w", err)
 		}
 
 		// 3) initialize the current protocol state height/view pointers
-		err = transaction.WithTx(state.bootstrapStatePointers(root))(tx)
+		err = state.bootstrapStatePointers(root)(tx)
 		if err != nil {
 			return fmt.Errorf("could not bootstrap height/view pointers: %w", err)
 		}
@@ -175,7 +172,7 @@ func Bootstrap(
 		}
 
 		// 5) initialize spork params
-		err = transaction.WithTx(state.bootstrapSporkInfo(root))(tx)
+		err = state.bootstrapSporkInfo(root)(w)
 		if err != nil {
 			return fmt.Errorf("could not bootstrap spork info: %w", err)
 		}
@@ -193,7 +190,7 @@ func Bootstrap(
 		}
 
 		// 7) initialize version beacon
-		err = transaction.WithTx(state.boostrapVersionBeacon(root))(tx)
+		err = state.boostrapVersionBeacon(root)(w)
 		if err != nil {
 			return fmt.Errorf("could not bootstrap version beacon: %w", err)
 		}
@@ -215,15 +212,16 @@ func Bootstrap(
 
 // bootstrapSealingSegment inserts all blocks and associated metadata for the
 // protocol state root snapshot to disk.
-func (state *State) bootstrapSealingSegment(segment *flow.SealingSegment, head *flow.Block, rootSeal *flow.Seal) func(tx *transaction.Tx) error {
-	return func(tx *transaction.Tx) error {
+func (state *State) bootstrapSealingSegment(segment *flow.SealingSegment, head *flow.Block, rootSeal *flow.Seal) func(tx storage.PebbleReaderBatchWriter) error {
+	return func(tx storage.PebbleReaderBatchWriter) error {
+		r, w := tx.ReaderWriter()
 
 		for _, result := range segment.ExecutionResults {
-			err := transaction.WithTx(operation.SkipDuplicates(operation.InsertExecutionResult(result)))(tx)
+			err := operation.InsertExecutionResult(result)(w)
 			if err != nil {
 				return fmt.Errorf("could not insert execution result: %w", err)
 			}
-			err = transaction.WithTx(operation.IndexExecutionResult(result.BlockID, result.ID()))(tx)
+			err = operation.IndexExecutionResult(result.BlockID, result.ID())(w)
 			if err != nil {
 				return fmt.Errorf("could not index execution result: %w", err)
 			}
@@ -231,7 +229,7 @@ func (state *State) bootstrapSealingSegment(segment *flow.SealingSegment, head *
 
 		// insert the first seal (in case the segment's first block contains no seal)
 		if segment.FirstSeal != nil {
-			err := transaction.WithTx(operation.InsertSeal(segment.FirstSeal.ID(), segment.FirstSeal))(tx)
+			err := operation.InsertSeal(segment.FirstSeal.ID(), segment.FirstSeal)(w)
 			if err != nil {
 				return fmt.Errorf("could not insert first seal: %w", err)
 			}
@@ -241,7 +239,7 @@ func (state *State) bootstrapSealingSegment(segment *flow.SealingSegment, head *
 		// different from the finalized root block, then it means the node dynamically bootstrapped.
 		// In that case, we should index the result of the sealed root block so that the EN is able
 		// to execute the next block.
-		err := transaction.WithTx(operation.SkipDuplicates(operation.IndexExecutionResult(rootSeal.BlockID, rootSeal.ResultID)))(tx)
+		err := operation.IndexExecutionResult(rootSeal.BlockID, rootSeal.ResultID)(w)
 		if err != nil {
 			return fmt.Errorf("could not index root result: %w", err)
 		}
@@ -249,15 +247,15 @@ func (state *State) bootstrapSealingSegment(segment *flow.SealingSegment, head *
 		for _, block := range segment.ExtraBlocks {
 			blockID := block.ID()
 			height := block.Header.Height
-			err := state.blocks.StoreTx(block)(tx)
+			err := state.blocks.StorePebble(block)(tx)
 			if err != nil {
 				return fmt.Errorf("could not insert SealingSegment extra block: %w", err)
 			}
-			err = transaction.WithTx(operation.IndexBlockHeight(height, blockID))(tx)
+			err = operation.IndexBlockHeight(height, blockID)(w)
 			if err != nil {
 				return fmt.Errorf("could not index SealingSegment extra block (id=%x): %w", blockID, err)
 			}
-			err = state.qcs.StoreTx(block.Header.QuorumCertificate())(tx)
+			err = state.qcs.StorePebble(block.Header.QuorumCertificate())(tx)
 			if err != nil {
 				return fmt.Errorf("could not store qc for SealingSegment extra block (id=%x): %w", blockID, err)
 			}
@@ -267,15 +265,15 @@ func (state *State) bootstrapSealingSegment(segment *flow.SealingSegment, head *
 			blockID := block.ID()
 			height := block.Header.Height
 
-			err := state.blocks.StoreTx(block)(tx)
+			err := state.blocks.StorePebble(block)(tx)
 			if err != nil {
 				return fmt.Errorf("could not insert SealingSegment block: %w", err)
 			}
-			err = transaction.WithTx(operation.IndexBlockHeight(height, blockID))(tx)
+			err = operation.IndexBlockHeight(height, blockID)(w)
 			if err != nil {
 				return fmt.Errorf("could not index SealingSegment block (id=%x): %w", blockID, err)
 			}
-			err = state.qcs.StoreTx(block.Header.QuorumCertificate())(tx)
+			err = state.qcs.StorePebble(block.Header.QuorumCertificate())(tx)
 			if err != nil {
 				return fmt.Errorf("could not store qc for SealingSegment block (id=%x): %w", blockID, err)
 			}
@@ -287,18 +285,18 @@ func (state *State) bootstrapSealingSegment(segment *flow.SealingSegment, head *
 			}
 			// sanity check: make sure the seal exists
 			var latestSeal flow.Seal
-			err = transaction.WithTx(operation.RetrieveSeal(latestSealID, &latestSeal))(tx)
+			err = operation.RetrieveSeal(latestSealID, &latestSeal)(r)
 			if err != nil {
 				return fmt.Errorf("could not verify latest seal for block (id=%x) exists: %w", blockID, err)
 			}
-			err = transaction.WithTx(operation.IndexLatestSealAtBlock(blockID, latestSealID))(tx)
+			err = operation.IndexLatestSealAtBlock(blockID, latestSealID)(w)
 			if err != nil {
 				return fmt.Errorf("could not index block seal: %w", err)
 			}
 
 			// for all but the first block in the segment, index the parent->child relationship
 			if i > 0 {
-				err = transaction.WithTx(operation.InsertBlockChildren(block.Header.ParentID, []flow.Identifier{blockID}))(tx)
+				err = operation.InsertBlockChildren(block.Header.ParentID, []flow.Identifier{blockID})(w)
 				if err != nil {
 					return fmt.Errorf("could not insert child index for block (id=%x): %w", blockID, err)
 				}
@@ -306,7 +304,7 @@ func (state *State) bootstrapSealingSegment(segment *flow.SealingSegment, head *
 		}
 
 		// insert an empty child index for the final block in the segment
-		err = transaction.WithTx(operation.InsertBlockChildren(head.ID(), nil))(tx)
+		err = operation.InsertBlockChildren(head.ID(), nil)(w)
 		if err != nil {
 			return fmt.Errorf("could not insert child index for head block (id=%x): %w", head.ID(), err)
 		}
@@ -317,8 +315,9 @@ func (state *State) bootstrapSealingSegment(segment *flow.SealingSegment, head *
 
 // bootstrapStatePointers instantiates special pointers used to by the protocol
 // state to keep track of special block heights and views.
-func (state *State) bootstrapStatePointers(root protocol.Snapshot) func(*badger.Txn) error {
-	return func(tx *badger.Txn) error {
+func (state *State) bootstrapStatePointers(root protocol.Snapshot) func(storage.PebbleReaderBatchWriter) error {
+	return func(tx storage.PebbleReaderBatchWriter) error {
+		_, w := tx.ReaderWriter()
 		segment, err := root.SealingSegment()
 		if err != nil {
 			return fmt.Errorf("could not get sealing segment: %w", err)
@@ -363,34 +362,34 @@ func (state *State) bootstrapStatePointers(root protocol.Snapshot) func(*badger.
 		}
 
 		// insert initial views for HotStuff
-		err = operation.InsertSafetyData(highest.Header.ChainID, safetyData)(tx)
+		err = operation.InsertSafetyData(highest.Header.ChainID, safetyData)(w)
 		if err != nil {
 			return fmt.Errorf("could not insert safety data: %w", err)
 		}
-		err = operation.InsertLivenessData(highest.Header.ChainID, livenessData)(tx)
+		err = operation.InsertLivenessData(highest.Header.ChainID, livenessData)(w)
 		if err != nil {
 			return fmt.Errorf("could not insert liveness data: %w", err)
 		}
 
 		// insert height pointers
-		err = operation.InsertRootHeight(highest.Header.Height)(tx)
+		err = operation.InsertRootHeight(highest.Header.Height)(w)
 		if err != nil {
 			return fmt.Errorf("could not insert finalized root height: %w", err)
 		}
 		// the sealed root height is the lowest block in sealing segment
-		err = operation.InsertSealedRootHeight(lowest.Header.Height)(tx)
+		err = operation.InsertSealedRootHeight(lowest.Header.Height)(w)
 		if err != nil {
 			return fmt.Errorf("could not insert sealed root height: %w", err)
 		}
-		err = operation.InsertFinalizedHeight(highest.Header.Height)(tx)
+		err = operation.InsertFinalizedHeight(highest.Header.Height)(w)
 		if err != nil {
 			return fmt.Errorf("could not insert finalized height: %w", err)
 		}
-		err = operation.InsertSealedHeight(lowest.Header.Height)(tx)
+		err = operation.InsertSealedHeight(lowest.Header.Height)(w)
 		if err != nil {
 			return fmt.Errorf("could not insert sealed height: %w", err)
 		}
-		err = operation.IndexFinalizedSealByBlockID(seal.BlockID, seal.ID())(tx)
+		err = operation.IndexFinalizedSealByBlockID(seal.BlockID, seal.ID())(w)
 		if err != nil {
 			return fmt.Errorf("could not index sealed block: %w", err)
 		}
@@ -404,8 +403,9 @@ func (state *State) bootstrapStatePointers(root protocol.Snapshot) func(*badger.
 //
 // The root snapshot's sealing segment must not straddle any epoch transitions
 // or epoch phase transitions.
-func (state *State) bootstrapEpoch(epochs protocol.EpochQuery, segment *flow.SealingSegment, verifyNetworkAddress bool) func(*transaction.Tx) error {
-	return func(tx *transaction.Tx) error {
+func (state *State) bootstrapEpoch(epochs protocol.EpochQuery, segment *flow.SealingSegment, verifyNetworkAddress bool) func(storage.PebbleReaderBatchWriter) error {
+	return func(tx storage.PebbleReaderBatchWriter) error {
+		_, w := tx.ReaderWriter()
 		previous := epochs.Previous()
 		current := epochs.Current()
 		next := epochs.Next()
@@ -435,7 +435,7 @@ func (state *State) bootstrapEpoch(epochs protocol.EpochQuery, segment *flow.Sea
 				return fmt.Errorf("invalid commit: %w", err)
 			}
 
-			err = indexFirstHeight(previous)(tx.DBTxn)
+			err = indexFirstHeight(previous)(w)
 			if err != nil {
 				return fmt.Errorf("could not index epoch first height: %w", err)
 			}
@@ -465,7 +465,7 @@ func (state *State) bootstrapEpoch(epochs protocol.EpochQuery, segment *flow.Sea
 			return fmt.Errorf("invalid commit: %w", err)
 		}
 
-		err = indexFirstHeight(current)(tx.DBTxn)
+		err = indexFirstHeight(current)(w)
 		if err != nil {
 			return fmt.Errorf("could not index epoch first height: %w", err)
 		}
@@ -513,13 +513,13 @@ func (state *State) bootstrapEpoch(epochs protocol.EpochQuery, segment *flow.Sea
 
 		// insert all epoch setup/commit service events
 		for _, setup := range setups {
-			err = state.epoch.setups.StoreTx(setup)(tx)
+			err = state.epoch.setups.StorePebble(setup)(tx)
 			if err != nil {
 				return fmt.Errorf("could not store epoch setup event: %w", err)
 			}
 		}
 		for _, commit := range commits {
-			err = state.epoch.commits.StoreTx(commit)(tx)
+			err = state.epoch.commits.StorePebble(commit)(tx)
 			if err != nil {
 				return fmt.Errorf("could not store epoch commit event: %w", err)
 			}
@@ -529,7 +529,7 @@ func (state *State) bootstrapEpoch(epochs protocol.EpochQuery, segment *flow.Sea
 		// in the sealing segment in within the same phase within the same epoch.
 		for _, block := range segment.AllBlocks() {
 			blockID := block.ID()
-			err = state.epoch.statuses.StoreTx(blockID, status)(tx)
+			err = state.epoch.statuses.StorePebble(blockID, status)(tx)
 			if err != nil {
 				return fmt.Errorf("could not store epoch status for block (id=%x): %w", blockID, err)
 			}
@@ -541,8 +541,8 @@ func (state *State) bootstrapEpoch(epochs protocol.EpochQuery, segment *flow.Sea
 
 // bootstrapSporkInfo bootstraps the protocol state with information about the
 // spork which is used to disambiguate Flow networks.
-func (state *State) bootstrapSporkInfo(root protocol.Snapshot) func(*badger.Txn) error {
-	return func(tx *badger.Txn) error {
+func (state *State) bootstrapSporkInfo(root protocol.Snapshot) func(pebble.Writer) error {
+	return func(tx pebble.Writer) error {
 		params := root.Params()
 
 		sporkID, err := params.SporkID()
@@ -588,8 +588,8 @@ func (state *State) bootstrapSporkInfo(root protocol.Snapshot) func(*badger.Txn)
 // indexFirstHeight indexes the first height for the epoch, as part of bootstrapping.
 // The input epoch must have been started (the first block of the epoch has been finalized).
 // No errors are expected during normal operation.
-func indexFirstHeight(epoch protocol.Epoch) func(*badger.Txn) error {
-	return func(tx *badger.Txn) error {
+func indexFirstHeight(epoch protocol.Epoch) func(pebble.Writer) error {
+	return func(tx pebble.Writer) error {
 		counter, err := epoch.Counter()
 		if err != nil {
 			return fmt.Errorf("could not get epoch counter: %w", err)
@@ -608,7 +608,7 @@ func indexFirstHeight(epoch protocol.Epoch) func(*badger.Txn) error {
 
 func OpenState(
 	metrics module.ComplianceMetrics,
-	db *badger.DB,
+	db *pebble.DB,
 	headers storage.Headers,
 	seals storage.Seals,
 	results storage.ExecutionResults,
@@ -728,13 +728,13 @@ func (state *State) AtBlockID(blockID flow.Identifier) protocol.Snapshot {
 	return newSnapshotWithIncorporatedReferenceBlock(state, blockID)
 }
 
-// newState initializes a new state backed by the provided a badger database,
+// newState initializes a new state backed by the provided a pebble database,
 // mempools and service components.
 // The parameter `expectedBootstrappedState` indicates whether the database
 // is expected to contain an already bootstrapped state or not
 func newState(
 	metrics module.ComplianceMetrics,
-	db *badger.DB,
+	db *pebble.DB,
 	headers storage.Headers,
 	seals storage.Seals,
 	results storage.ExecutionResults,
@@ -837,8 +837,8 @@ func (state *State) updateEpochMetrics(snap protocol.Snapshot) error {
 // to an index, if present.
 func (state *State) boostrapVersionBeacon(
 	snapshot protocol.Snapshot,
-) func(*badger.Txn) error {
-	return func(txn *badger.Txn) error {
+) func(pebble.Writer) error {
+	return func(txn pebble.Writer) error {
 		versionBeacon, err := snapshot.VersionBeacon()
 		if err != nil {
 			return err
@@ -953,6 +953,6 @@ func (state *State) updateCommittedEpochFinalView(snap protocol.Snapshot) error 
 // * (false, err) if an unexpected error occurs
 func (state *State) isEpochEmergencyFallbackTriggered() (bool, error) {
 	var triggered bool
-	err := state.db.View(operation.CheckEpochEmergencyFallbackTriggered(&triggered))
+	err := operation.CheckEpochEmergencyFallbackTriggered(&triggered)(state.db)
 	return triggered, err
 }

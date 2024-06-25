@@ -1,6 +1,4 @@
-// (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
-
-package badger_test
+package pebble_test
 
 import (
 	"context"

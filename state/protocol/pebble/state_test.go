@@ -1,4 +1,4 @@
-package badger_test
+package pebble_test
 
 import (
 	"context"
