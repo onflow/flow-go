@@ -366,7 +366,7 @@ func (s *DynamicEpochTransitionSuite) AssertInEpochPhase(ctx context.Context, ex
 	require.NoError(s.T(), err)
 	actualEpoch, err := snapshot.Epochs().Current().Counter()
 	require.NoError(s.T(), err)
-	actualPhase, err := snapshot.Phase()
+	actualPhase, err := snapshot.EpochPhase()
 	require.NoError(s.T(), err)
 	require.Equal(s.T(), expectedPhase, actualPhase, "not in correct phase")
 	require.Equal(s.T(), expectedEpoch, actualEpoch, "not in correct epoch")

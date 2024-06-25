@@ -27,6 +27,7 @@ var _ StateMachine = (*FallbackStateMachine)(nil)
 
 // NewFallbackStateMachine constructs a state machine for epoch fallback. It automatically sets
 // EpochFallbackTriggered to true, thereby recording that we have entered epoch fallback mode.
+// See flow.EpochPhase for detailed documentation about EFM and epoch phase transitions.
 // No errors are expected during normal operations.
 func NewFallbackStateMachine(params protocol.GlobalParams, telemetry protocol_state.StateMachineTelemetryConsumer, view uint64, parentState *flow.RichEpochProtocolStateEntry) (*FallbackStateMachine, error) {
 	state := parentState.EpochProtocolStateEntry.Copy()

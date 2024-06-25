@@ -162,7 +162,8 @@ func NewConsensusCommittee(state protocol.State, me flow.Identifier) (*Consensus
 	epochs = append(epochs, final.Epochs().Current())
 
 	// we prepare the next epoch, if it is committed
-	phase, err := final.Phase()
+	// TODO(EFM, #5730): update phase logic if needed
+	phase, err := final.EpochPhase()
 	if err != nil {
 		return nil, fmt.Errorf("could not check epoch phase: %w", err)
 	}
@@ -183,7 +184,7 @@ func NewConsensusCommittee(state protocol.State, me flow.Identifier) (*Consensus
 	}
 
 	// if epoch fallback mode was triggered, inject the fallback epoch
-	// TODO(EFM, #6020): consider replacing with phase check when it's available
+	// TODO(EFM, #5730): consider replacing with phase check when it's available
 	if epochStateSnapshot.EpochFallbackTriggered() {
 		err = com.onEpochFallbackModeTriggered()
 		if err != nil {

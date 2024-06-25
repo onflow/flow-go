@@ -61,7 +61,7 @@ func (suite *EpochLookupSuite) SetupTest() {
 	suite.epochQuery = mocks.NewEpochQuery(suite.T(), suite.currentEpochCounter)
 
 	suite.snapshot.On("Epochs").Return(suite.epochQuery)
-	suite.snapshot.On("Phase").Return(
+	suite.snapshot.On("EpochPhase").Return(
 		func() flow.EpochPhase { return suite.Phase() },
 		func() error { return nil })
 
