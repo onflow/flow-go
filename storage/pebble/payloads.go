@@ -66,40 +66,38 @@ func (p *Payloads) storeTx(blockID flow.Identifier, payload *flow.Payload) func(
 
 func (p *Payloads) storePayloads(
 	rw operation.PebbleReaderBatchWriter, blockID flow.Identifier, payload *flow.Payload, fullReceipts []*flow.ExecutionReceipt) error {
-	return func(rw operation.PebbleReaderBatchWriter) error {
-		_, tx := rw.ReaderWriter()
-		// make sure all payload guarantees are stored
-		for _, guarantee := range payload.Guarantees {
-			err := p.guarantees.storeTx(guarantee)(tx)
-			if err != nil {
-				return fmt.Errorf("could not store guarantee: %w", err)
-			}
-		}
-
-		// make sure all payload seals are stored
-		for _, seal := range payload.Seals {
-			err := p.seals.storeTx(seal)(tx)
-			if err != nil {
-				return fmt.Errorf("could not store seal: %w", err)
-			}
-		}
-
-		// store all payload receipts
-		for _, receipt := range fullReceipts {
-			err := p.receipts.storeTx(receipt)(tx)
-			if err != nil {
-				return fmt.Errorf("could not store receipt: %w", err)
-			}
-		}
-
-		// store the index
-		err := p.index.storeTx(blockID, payload.Index())(tx)
+	_, tx := rw.ReaderWriter()
+	// make sure all payload guarantees are stored
+	for _, guarantee := range payload.Guarantees {
+		err := p.guarantees.storeTx(guarantee)(tx)
 		if err != nil {
-			return fmt.Errorf("could not store index: %w", err)
+			return fmt.Errorf("could not store guarantee: %w", err)
 		}
-
-		return nil
 	}
+
+	// make sure all payload seals are stored
+	for _, seal := range payload.Seals {
+		err := p.seals.storeTx(seal)(tx)
+		if err != nil {
+			return fmt.Errorf("could not store seal: %w", err)
+		}
+	}
+
+	// store all payload receipts
+	for _, receipt := range fullReceipts {
+		err := p.receipts.storeTx(receipt)(tx)
+		if err != nil {
+			return fmt.Errorf("could not store receipt: %w", err)
+		}
+	}
+
+	// store the index
+	err := p.index.storeTx(blockID, payload.Index())(tx)
+	if err != nil {
+		return fmt.Errorf("could not store index: %w", err)
+	}
+
+	return nil
 }
 
 func (p *Payloads) retrieveTx(blockID flow.Identifier) func(tx pebble.Reader) (*flow.Payload, error) {

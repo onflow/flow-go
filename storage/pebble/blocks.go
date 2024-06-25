@@ -30,7 +30,8 @@ func NewBlocks(db *pebble.DB, headers *Headers, payloads *Payloads) *Blocks {
 
 func (b *Blocks) StoreTx(block *flow.Block) func(operation.PebbleReaderBatchWriter) error {
 	return func(rw operation.PebbleReaderBatchWriter) error {
-		err := b.headers.storeTx(block.Header)(rw)
+		_, tx := rw.ReaderWriter()
+		err := b.headers.storeTx(block.Header)(tx)
 		if err != nil {
 			return fmt.Errorf("could not store header %v: %w", block.Header.ID(), err)
 		}
@@ -62,7 +63,7 @@ func (b *Blocks) retrieveTx(blockID flow.Identifier) func(pebble.Reader) (*flow.
 
 // Store ...
 func (b *Blocks) Store(block *flow.Block) error {
-	return b.StoreTx(block)(b.db)
+	return b.StoreTx(block)(operation.NewPebbleReaderBatchWriter(b.db))
 }
 
 // ByID ...
