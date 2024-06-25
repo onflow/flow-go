@@ -16,22 +16,63 @@ import (
 
 // EpochPhase represents a phase of the Epoch Preparation Protocol.
 // The phase of an epoch is resolved based on a block reference and is fork-dependent.
-// In the happy-path, an epoch:
-//  1. begins in EpochPhaseStaking
-//  2. transitions to EpochPhaseSetup in the block sealing the EpochSetup service event
-//  3. transitions to EpochPhaseCommitted in the block sealing the EpochCommit service event
+// During normal operations, each Epoch transitions through the phases:
 //
-// HAPPY PATH:
-// |<--  EpochPhaseStaking -->|<-- EpochPhaseSetup -->|<-- EpochPhaseCommitted -->|<-- EpochPhaseStaking -->...
-// |<------------------------------- Epoch N ------------------------------------>|<-- Epoch N + 1 --...
+//	║                                       Epoch N
+//	║       ╭─────────────────────────────────┴─────────────────────────────────╮
+//	║   finalize view            EpochSetup            EpochCommit
+//	║     in epoch N            service event         service event
+//	║        ⇣                       ⇣                     ⇣
+//	║        ┌─────────────────┐     ┌───────────────┐     ┌───────────────────┐
+//	║        │EpochPhaseStaking├─────►EpochPhaseSetup├─────►EpochPhaseCommitted├ ┄>
+//	║        └─────────────────┘     └───────────────┘     └───────────────────┘
+//	║        ⇣                       ⇣                     ⇣
+//	║   EpochTransition     EpochSetupPhaseStarted    EpochCommittedPhaseStarted
+//	║    Notification            Notification               Notification
 //
-// If the Protocol State encounters any unexpected service events, or fails to observe an expected
-// service event before the Epoch Commitment Deadline, then we enter Epoch Fallback Mode [EFM].
-// When EFM is triggered, we transition to EpochPhaseFallback as soon as we enter the latest committed epoch:
-//   - if epoch is in EpochPhaseStaking or EpochPhaseSetup -> transition to EpochPhaseFallback immediately
-//   - if epoch is in EpochPhaseCommitted -> wait until next epoch, which begins in EpochPhaseFallback.
+// However, if the Protocol State encounters any unexpected epoch service events, or the subsequent epoch
+// fails to be committed by the `EpochCommitSafetyThreshold`, then we enter Epoch Fallback Mode [EFM].
+// Depending on whether the subsequent epoch has already been committed, the EFM progress differs slightly.
+// In a nutshell, we always enter the _latest_ epoch already committed on the happy path (if there is any)
+// and the follow the fallback protocol.
 //
-// If an epoch is in EpochPhaseFallback, it can only transition into EpochPhaseCommitted, via an EpochRecover service event.
+// SCENARIO A: the future Epoch N is already committed, when we enter EFM
+//
+//	║      Epoch N-1                            Epoch N
+//	║   ···──┴─────────────────────────╮ ╭─────────────┴───────────────────────────────────────────────╮
+//	║      invalid service                finalize view                   EpochRecover
+//	║            event                    in epoch N                      service event
+//	║              ⇣                      ⇣                    ┊          ⇣
+//	║     ┌──────────────────────────┐    ┌────────────────────┊────┐     ┌───────────────────────────┐
+//	║     │   EpochPhaseCommitted    ├────►    EpochPhaseFallback   ├─────►    EpochPhaseCommitted    ├ ┄>
+//	║     └──────────────────────────┘    └────────────────────┊────┘     └───────────────────────────┘
+//	║              ⇣                      ⇣                    ┊          ⇣
+//	║   EpochFallbackModeTriggered     EpochTransition   EpochExtended*   EpochFallbackModeExited
+//	║          Notification             Notification      Notification    + EpochCommittedPhaseStarted Notifications
+//	║              ┆                                                      ┆
+//	║              ╰┄┄┄┄┄┄┄┄┄┄ EpochFallbackTriggered is true ┄┄┄┄┄┄┄┄┄┄┄┄╯
+//
+// With 'EpochExtended*' we denote that there can be zero, one, or more Epoch Extension (depending on when
+// we receive a valid EpochRecover service event.
+//
+// SCENARIO B: we are in Epoch N without any subsequent epoch being committed when entering EFM
+//
+//	║                         Epoch N
+//	║ ···────────────────────────┴───────────────────────────────────────────────────────────────╮
+//	║              invalid service event or                         EpochRecover
+//	║         EpochCommitSafetyThreshold reached                    service event
+//	║                           ⇣                      ┊            ⇣
+//	║  ┌────────────────────┐   ┌──────────────────────┊──────┐     ┌───────────────────────────┐
+//	║  │ EpochPhaseStaking  │   │     EpochPhaseFallback      │     │   EpochPhaseCommitted     │
+//	║  │ or EpochPhaseSetup ├───►                      ┊      ├─────►                           ├ ┄>
+//	║  └────────────────────┘   └──────────────────────┊──────┘     └───────────────────────────┘
+//	║                           ⇣                      ┊            ⇣
+//	║            EpochFallbackModeTriggered     EpochExtended*      EpochFallbackModeExited
+//	║                     Notification           Notification       + EpochCommittedPhaseStarted Notifications
+//	║                           ┆                                   ┆
+//	║                           ╰┄┄ EpochFallbackTriggered true ┄┄┄┄╯
+//
+// A state machine diagram containing all possible phase transitions is below:
 //
 //	         ┌──────────────────────────────────────────────────────────┐
 //	┌────────▼────────┐     ┌───────────────┐     ┌───────────────────┐ │

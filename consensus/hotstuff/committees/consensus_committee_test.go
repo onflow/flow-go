@@ -66,7 +66,7 @@ func (suite *ConsensusSuite) SetupTest() {
 		func() error { return nil },
 	)
 	suite.snapshot.On("EpochProtocolState").Return(suite.epochProtocolState, nil)
-	suite.snapshot.On("Phase").Return(
+	suite.snapshot.On("EpochPhase").Return(
 		func() flow.EpochPhase { return suite.phase },
 		func() error { return nil },
 	)
@@ -641,7 +641,7 @@ func TestRemoveOldEpochs(t *testing.T) {
 	epochQuery := mocks.NewEpochQuery(t, currentEpochCounter, epoch1)
 	snapshot.On("Epochs").Return(epochQuery)
 	currentEpochPhase := flow.EpochPhaseStaking
-	snapshot.On("Phase").Return(
+	snapshot.On("EpochPhase").Return(
 		func() flow.EpochPhase { return currentEpochPhase },
 		func() error { return nil },
 	)

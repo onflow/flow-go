@@ -98,7 +98,7 @@ func (s *Suite) TestEpochQuorumCertificate() {
 		hotSigner.On("CreateVote", mock.Anything).Return(vote, nil)
 
 		snapshot := &protomock.Snapshot{}
-		snapshot.On("Phase").Return(flow.EpochPhaseSetup, nil)
+		snapshot.On("EpochPhase").Return(flow.EpochPhaseSetup, nil)
 
 		state := &protomock.State{}
 		state.On("CanonicalRootBlock").Return(rootBlock)

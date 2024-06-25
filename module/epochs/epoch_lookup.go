@@ -148,7 +148,7 @@ func NewEpochLookup(state protocol.State) (*EpochLookup, error) {
 	}
 
 	// we cache the next epoch, if it is committed
-	phase, err := final.Phase()
+	phase, err := final.EpochPhase()
 	if err != nil {
 		return nil, fmt.Errorf("could not check epoch phase: %w", err)
 	}

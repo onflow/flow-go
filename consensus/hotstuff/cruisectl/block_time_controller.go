@@ -172,7 +172,7 @@ func (ctl *BlockTimeController) initEpochInfo() error {
 	}
 	ctl.curEpochTargetEndTime = curEpochTargetEndTime
 
-	phase, err := finalSnapshot.Phase()
+	phase, err := finalSnapshot.EpochPhase()
 	if err != nil {
 		return fmt.Errorf("could not check snapshot phase: %w", err)
 	}

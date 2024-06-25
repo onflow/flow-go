@@ -163,7 +163,7 @@ func NewConsensusCommittee(state protocol.State, me flow.Identifier) (*Consensus
 
 	// we prepare the next epoch, if it is committed
 	// TODO(EFM, #5730): update phase logic if needed
-	phase, err := final.Phase()
+	phase, err := final.EpochPhase()
 	if err != nil {
 		return nil, fmt.Errorf("could not check epoch phase: %w", err)
 	}

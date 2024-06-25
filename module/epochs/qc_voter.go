@@ -124,7 +124,7 @@ func (voter *RootQCVoter) Vote(ctx context.Context, epoch protocol.Epoch) error 
 	castVote := func(ctx context.Context) error {
 		// check that we're still in the setup phase, if we're not we can't
 		// submit a vote anyway and must exit this process
-		phase, err := voter.state.Final().Phase()
+		phase, err := voter.state.Final().EpochPhase()
 		if err != nil {
 			return fmt.Errorf("unexpected error - unable to get current epoch phase: %w", err)
 		} else if phase != flow.EpochPhaseSetup {

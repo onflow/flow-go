@@ -852,12 +852,7 @@ func (m *FollowerState) epochMetricsAndEventsOnBlockFinalized(parentEpochState, 
 		}
 	}
 
-	// Same epoch phase -> nothing to do
-	if parentEpochPhase == childEpochPhase {
-		return
-	}
-
-	// Different counter - handle epoch transition and phase transition Committed->Staking
+	// Different epoch counter - handle epoch transition and phase transition Committed->Staking
 	if parentEpochCounter != childEpochCounter {
 		childEpochSetup := finalizedEpochState.EpochSetup()
 		events = append(events, func() { m.consumer.EpochTransition(childEpochSetup.Counter, finalized) })
@@ -880,6 +875,11 @@ func (m *FollowerState) epochMetricsAndEventsOnBlockFinalized(parentEpochState, 
 		return
 	}
 
+	// Same epoch phase -> nothing to do
+	if parentEpochPhase == childEpochPhase {
+		return
+	}
+
 	// Update the phase metric when any phase change occurs
 	events = append(events, func() { m.metrics.CurrentEpochPhase(childEpochPhase) })
 
@@ -895,7 +895,7 @@ func (m *FollowerState) epochMetricsAndEventsOnBlockFinalized(parentEpochState, 
 	}
 	// Handle phase transition Staking/Setup->Fallback phase
 	// NOTE: we can have the phase transition Committed->Fallback, but only across an epoch boundary (handled above)
-	if parentEpochPhase != flow.EpochPhaseCommitted && childEpochPhase == flow.EpochPhaseFallback {
+	if (parentEpochPhase == flow.EpochPhaseStaking || parentEpochPhase == flow.EpochPhaseSetup) && childEpochPhase == flow.EpochPhaseFallback {
 		// This conditional exists to capture this final set of valid phase transitions, to allow sanity check below
 		// In the future we could add a protocol event here for transition into the Fallback phase, if any consumers need this.
 		return
