@@ -30,6 +30,7 @@ var (
 	flagStateCommitment1 string
 	flagStateCommitment2 string
 	flagRaw              bool
+	flagAlwaysDiffValues bool
 	flagNWorker          int
 	flagChain            string
 )
@@ -111,6 +112,13 @@ func init() {
 		"raw",
 		true,
 		"Raw or value",
+	)
+
+	Cmd.Flags().BoolVar(
+		&flagAlwaysDiffValues,
+		"always-diff-values",
+		false,
+		"always diff on value level. useful when trying to test iteration, by diffing same state.",
 	)
 
 	Cmd.Flags().IntVar(
@@ -294,6 +302,8 @@ func diffAccount(
 		})
 	}
 
+	diffValues := flagAlwaysDiffValues
+
 	err = accountRegisters1.ForEach(func(owner, key string, value1 []byte) error {
 		var value2 []byte
 		value2, err = accountRegisters2.Get(owner, key)
@@ -323,6 +333,10 @@ func diffAccount(
 			return err
 		}
 
+		diffValues = true
+	}
+
+	if diffValues {
 		address, err := common.BytesToAddress([]byte(owner))
 		if err != nil {
 			return err
