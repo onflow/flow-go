@@ -82,7 +82,7 @@ func newStaticEpochInfo(epoch protocol.Epoch) (*staticEpochInfo, error) {
 // * begins after the last committed epoch
 // * lasts until the next spork (estimated 6 months)
 // * has the same static committee as the last committed epoch
-// TODO(EFM, #5730): needs update to represent EFM epoch extension; see https://github.com/onflow/flow-go/issues/5730
+// TODO remove
 func newFallbackModeEpoch(lastCommittedEpoch *staticEpochInfo) (*staticEpochInfo, error) {
 	rng, err := prg.New(lastCommittedEpoch.randomSource, prg.ConsensusLeaderSelection, nil)
 	if err != nil {
@@ -113,16 +113,16 @@ func newFallbackModeEpoch(lastCommittedEpoch *staticEpochInfo) (*staticEpochInfo
 
 // Consensus represents the main committee for consensus nodes. The consensus
 // committee might be active for multiple successive epochs.
-// TODO(EFM, #5730): This implementation does not yet understand EFM recovery and needs to be updated.
 type Consensus struct {
-	state                    protocol.State              // the protocol state
-	me                       flow.Identifier             // the node ID of this node
-	mu                       sync.RWMutex                // protects access to epochs
-	epochs                   map[uint64]*staticEpochInfo // cache of initial committee & leader selection per epoch
-	committedEpochsCh        chan *flow.Header           // protocol events for newly committed epochs (the first block of the epoch is passed over the channel)
-	epochFallbackTriggeredCh chan struct{}               // protocol event for epoch fallback mode
-	isEpochFallbackHandled   *atomic.Bool                // ensure we only inject fallback epoch once
-	events.Noop                                          // implements protocol.Consumer
+	state  protocol.State              // the protocol state
+	me     flow.Identifier             // the node ID of this node
+	mu     sync.RWMutex                // protects access to epochs
+	epochs map[uint64]*staticEpochInfo // cache of initial committee & leader selection per epoch
+	// TODO do we need to strictly order events across types? Yes, I think we do
+	committedEpochsCh        chan *flow.Header // protocol events for newly committed epochs (the first block of the epoch is passed over the channel)
+	epochFallbackTriggeredCh chan struct{}     // protocol event for epoch fallback mode
+	isEpochFallbackHandled   *atomic.Bool      // ensure we only inject fallback epoch once
+	events.Noop                                // implements protocol.Consumer
 	component.Component
 }
 
@@ -368,6 +368,10 @@ func (c *Consensus) EpochCommittedPhaseStarted(_ uint64, first *flow.Header) {
 	c.committedEpochsCh <- first
 }
 
+func (c *Consensus) EpochExtended(_ uint64, _ *flow.Header, extension flow.EpochExtension) {
+	// TODO
+}
+
 // EpochFallbackModeTriggered passes the protocol event to the worker thread.
 func (c *Consensus) EpochFallbackModeTriggered(uint64, *flow.Header) {
 	c.epochFallbackTriggeredCh <- struct{}{}
@@ -377,6 +381,7 @@ func (c *Consensus) EpochFallbackModeTriggered(uint64, *flow.Header) {
 // When this occurs, we inject a fallback epoch to the committee which extends the current epoch.
 // This method must also be called on initialization, if epoch fallback mode was triggered in the past.
 // No errors are expected during normal operation.
+// TODO remove
 func (c *Consensus) onEpochFallbackModeTriggered() error {
 	// we respond to epoch fallback being triggered at most once, therefore
 	// the core logic is protected by an atomic bool.
@@ -448,6 +453,7 @@ func (c *Consensus) staticEpochInfoByView(view uint64) (*staticEpochInfo, error)
 // for the same epoch returns cached static epoch information.
 // Input must be a committed epoch.
 // No errors are expected during normal operation.
+// TODO: add epoch extensions here if needed (past epoch may also have extensions)
 func (c *Consensus) prepareEpoch(epoch protocol.Epoch) (*staticEpochInfo, error) {
 
 	counter, err := epoch.Counter()
