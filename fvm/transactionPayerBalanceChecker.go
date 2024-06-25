@@ -16,23 +16,6 @@ const VerifyPayerBalanceResultTypeCanExecuteTransactionFieldName = "canExecuteTr
 const VerifyPayerBalanceResultTypeRequiredBalanceFieldName = "requiredBalance"
 const VerifyPayerBalanceResultTypeMaximumTransactionFeesFieldName = "maximumTransactionFees"
 
-var VerifyPayerBalanceResultType = &cadence.StructType{
-	Fields: []cadence.Field{
-		{
-			Identifier: VerifyPayerBalanceResultTypeCanExecuteTransactionFieldName,
-			Type:       cadence.BoolType,
-		},
-		{
-			Identifier: VerifyPayerBalanceResultTypeRequiredBalanceFieldName,
-			Type:       cadence.UFix64Type,
-		},
-		{
-			Identifier: VerifyPayerBalanceResultTypeMaximumTransactionFeesFieldName,
-			Type:       cadence.UFix64Type,
-		},
-	},
-}
-
 // decodeVerifyPayerBalanceResult decodes the VerifyPayerBalanceResult struct
 // https://github.com/onflow/flow-core-contracts/blob/7c70c6a1d33c2879b60c78e363fa68fc6fce13b9/contracts/FlowFees.cdc#L75
 func decodeVerifyPayerBalanceResult(resultValue cadence.Value) (

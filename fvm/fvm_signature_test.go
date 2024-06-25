@@ -27,6 +27,12 @@ var createMessage = func(m string) (signableMessage []byte, message cadence.Arra
 	return signableMessage, message
 }
 
+var uint8ArrayArrayType = cadence.NewVariableSizedArrayType(
+	cadence.NewVariableSizedArrayType(
+		cadence.UInt8Type,
+	),
+)
+
 func TestKeyListSignature(t *testing.T) {
 
 	t.Parallel()
@@ -552,12 +558,8 @@ func TestBLSMultiSignature(t *testing.T) {
 
 					script := fvm.Script(code).WithArguments(
 						jsoncdc.MustEncode(cadence.Array{
-							Values: signatures,
-							ArrayType: &cadence.VariableSizedArrayType{
-								ElementType: &cadence.VariableSizedArrayType{
-									ElementType: cadence.UInt8Type,
-								},
-							},
+							Values:    signatures,
+							ArrayType: uint8ArrayArrayType,
 						}),
 					)
 
@@ -585,11 +587,7 @@ func TestBLSMultiSignature(t *testing.T) {
 					script := fvm.Script(code).WithArguments(
 						jsoncdc.MustEncode(cadence.Array{
 							Values: signatures,
-							ArrayType: &cadence.VariableSizedArrayType{
-								ElementType: &cadence.VariableSizedArrayType{
-									ElementType: cadence.UInt8Type,
-								},
-							},
+							ArrayType: uint8ArrayArrayType,
 						}),
 					)
 
@@ -608,11 +606,7 @@ func TestBLSMultiSignature(t *testing.T) {
 					script := fvm.Script(code).WithArguments(
 						jsoncdc.MustEncode(cadence.Array{
 							Values: signatures,
-							ArrayType: &cadence.VariableSizedArrayType{
-								ElementType: &cadence.VariableSizedArrayType{
-									ElementType: cadence.UInt8Type,
-								},
-							},
+							ArrayType: uint8ArrayArrayType,
 						}),
 					)
 
@@ -678,11 +672,7 @@ func TestBLSMultiSignature(t *testing.T) {
 					script := fvm.Script(code(BLSSignatureAlgorithm)).WithArguments(
 						jsoncdc.MustEncode(cadence.Array{
 							Values: publicKeys,
-							ArrayType: &cadence.VariableSizedArrayType{
-								ElementType: &cadence.VariableSizedArrayType{
-									ElementType: cadence.UInt8Type,
-								},
-							},
+							ArrayType: uint8ArrayArrayType,
 						}),
 					)
 
@@ -712,11 +702,7 @@ func TestBLSMultiSignature(t *testing.T) {
 						script := fvm.Script(code(signatureAlgorithm)).WithArguments(
 							jsoncdc.MustEncode(cadence.Array{
 								Values: publicKeys,
-								ArrayType: &cadence.VariableSizedArrayType{
-									ElementType: &cadence.VariableSizedArrayType{
-										ElementType: cadence.UInt8Type,
-									},
-								},
+								ArrayType: uint8ArrayArrayType,
 							}),
 						)
 
@@ -732,11 +718,7 @@ func TestBLSMultiSignature(t *testing.T) {
 					script := fvm.Script(code(BLSSignatureAlgorithm)).WithArguments(
 						jsoncdc.MustEncode(cadence.Array{
 							Values: publicKeys,
-							ArrayType: &cadence.VariableSizedArrayType{
-								ElementType: &cadence.VariableSizedArrayType{
-									ElementType: cadence.UInt8Type,
-								},
-							},
+							ArrayType: uint8ArrayArrayType,
 						}),
 					)
 
@@ -812,19 +794,11 @@ func TestBLSMultiSignature(t *testing.T) {
 				script := fvm.Script(code).WithArguments(
 					jsoncdc.MustEncode(cadence.Array{ // keys
 						Values: publicKeys,
-						ArrayType: &cadence.VariableSizedArrayType{
-							ElementType: &cadence.VariableSizedArrayType{
-								ElementType: cadence.UInt8Type,
-							},
-						},
+						ArrayType: uint8ArrayArrayType,
 					}),
 					jsoncdc.MustEncode(cadence.Array{ // signatures
 						Values: signatures,
-						ArrayType: &cadence.VariableSizedArrayType{
-							ElementType: &cadence.VariableSizedArrayType{
-								ElementType: cadence.UInt8Type,
-							},
-						},
+						ArrayType: uint8ArrayArrayType,
 					}),
 					jsoncdc.MustEncode(cadenceMessage),
 					jsoncdc.MustEncode(cadence.String(tag)),
