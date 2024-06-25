@@ -1,5 +1,7 @@
 package storage
 
+import "github.com/cockroachdb/pebble"
+
 // TODO: rename to writer
 type BatchWriter interface {
 	Set(key, val []byte) error
@@ -26,10 +28,6 @@ type BatchStorage interface {
 	Flush() error
 }
 
-type TxOps interface {
-	Insert(key, val []byte) error
-	Update(key, val []byte) error
-	Upsert(key, val []byte) error
-	Delete(key []byte) error
-	Get(key []byte) ([]byte, error)
+type PebbleReaderBatchWriter interface {
+	ReaderWriter() (pebble.Reader, pebble.Writer)
 }

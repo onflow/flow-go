@@ -7,6 +7,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
 
+	"github.com/onflow/flow-go/storage/badger/transaction"
 	"github.com/onflow/flow-go/storage/pebble/operation"
 )
 
@@ -29,12 +30,17 @@ func NewBlocks(db *pebble.DB, headers *Headers, payloads *Payloads) *Blocks {
 	return b
 }
 
-func (b *Blocks) StoreTx(block *flow.Block) error {
-	return b.storeTx(block)(operation.NewPebbleReaderBatchWriter(b.db))
+// Ignored
+func (b *Blocks) StoreTx(block *flow.Block) func(*transaction.Tx) error {
+	return nil
 }
 
-func (b *Blocks) storeTx(block *flow.Block) func(operation.PebbleReaderBatchWriter) error {
-	return func(rw operation.PebbleReaderBatchWriter) error {
+func (b *Blocks) StoreBatch(block *flow.Block) func(storage.PebbleReaderBatchWriter) error {
+	return b.storeTx(block)
+}
+
+func (b *Blocks) storeTx(block *flow.Block) func(storage.PebbleReaderBatchWriter) error {
+	return func(rw storage.PebbleReaderBatchWriter) error {
 		_, tx := rw.ReaderWriter()
 		err := b.headers.storeTx(block.Header)(tx)
 		if err != nil {

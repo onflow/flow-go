@@ -27,7 +27,7 @@ func NewBatch(db *pebble.DB) *Batch {
 	}
 }
 
-func (b *Batch) GetWriter() storage.Transaction {
+func (b *Batch) GetWriter() storage.BatchWriter {
 	return &Transaction{b.writer}
 }
 
@@ -84,7 +84,7 @@ type Transaction struct {
 	writer *pebble.Batch
 }
 
-var _ storage.Transaction = (*Transaction)(nil)
+var _ storage.BatchWriter = (*Transaction)(nil)
 
 func (t *Transaction) Set(key, value []byte) error {
 	return t.writer.Set(key, value, pebble.Sync)

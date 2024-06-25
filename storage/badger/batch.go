@@ -27,7 +27,7 @@ func NewBatch(db *badger.DB) *Batch {
 	}
 }
 
-func (b *Batch) GetWriter() storage.Transaction {
+func (b *Batch) GetWriter() storage.BatchWriter {
 	return b.writer
 }
 

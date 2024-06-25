@@ -47,6 +47,10 @@ func (q *QuorumCertificates) StoreTx(qc *flow.QuorumCertificate) func(interface{
 	return q.cache.PutTxInterface(qc.BlockID, qc)
 }
 
+func (q *QuorumCertificates) StorePebble(qc *flow.QuorumCertificate) func(storage.PebbleReaderBatchWriter) error {
+	return nil
+}
+
 func (q *QuorumCertificates) ByBlockID(blockID flow.Identifier) (*flow.QuorumCertificate, error) {
 	tx := q.db.NewTransaction(false)
 	defer tx.Discard()

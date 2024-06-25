@@ -15,8 +15,8 @@ import (
 // if the input block has a greater height than the currently stored latest executed block.
 // The executed block index must have been initialized before calling this function.
 // Returns storage.ErrNotFound if the input block does not exist in storage.
-func UpdateHighestExecutedBlockIfHigher(header *flow.Header) func(operation.PebbleReaderBatchWriter) error {
-	return func(rw operation.PebbleReaderBatchWriter) error {
+func UpdateHighestExecutedBlockIfHigher(header *flow.Header) func(storage.PebbleReaderBatchWriter) error {
+	return func(rw storage.PebbleReaderBatchWriter) error {
 		r, tx := rw.ReaderWriter()
 		var blockID flow.Identifier
 		err := operation.RetrieveExecutedBlock(&blockID)(r)

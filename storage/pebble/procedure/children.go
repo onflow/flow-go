@@ -24,8 +24,8 @@ import (
 //     there are two special cases for (2):
 //     - if the parent block is zero, then we don't need to add this index.
 //     - if the parent block doesn't exist, then we will insert the child index instead of updating
-func IndexNewBlock(blockID flow.Identifier, parentID flow.Identifier) func(operation.PebbleReaderBatchWriter) error {
-	return func(rw operation.PebbleReaderBatchWriter) error {
+func IndexNewBlock(blockID flow.Identifier, parentID flow.Identifier) func(storage.PebbleReaderBatchWriter) error {
+	return func(rw storage.PebbleReaderBatchWriter) error {
 		r, tx := rw.ReaderWriter()
 
 		// Step 1: index the child for the new block.

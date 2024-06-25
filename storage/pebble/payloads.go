@@ -8,7 +8,6 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/pebble/operation"
 )
 
 type Payloads struct {
@@ -37,13 +36,13 @@ func NewPayloads(db *pebble.DB, index *Index, guarantees *Guarantees, seals *Sea
 	return p
 }
 
-func (p *Payloads) storeTx(blockID flow.Identifier, payload *flow.Payload) func(operation.PebbleReaderBatchWriter) error {
+func (p *Payloads) storeTx(blockID flow.Identifier, payload *flow.Payload) func(storage.PebbleReaderBatchWriter) error {
 	// For correct payloads, the execution result is part of the payload or it's already stored
 	// in storage. If execution result is not present in either of those places, we error.
 	// ATTENTION: this is unnecessarily complex if we have execution receipt which points an execution result
 	// which is not included in current payload but was incorporated in one of previous blocks.
 
-	return func(rw operation.PebbleReaderBatchWriter) error {
+	return func(rw storage.PebbleReaderBatchWriter) error {
 		r, _ := rw.ReaderWriter()
 		resultsByID := payload.Results.Lookup()
 		fullReceipts := make([]*flow.ExecutionReceipt, 0, len(payload.Receipts))
@@ -67,7 +66,7 @@ func (p *Payloads) storeTx(blockID flow.Identifier, payload *flow.Payload) func(
 }
 
 func (p *Payloads) storePayloads(
-	rw operation.PebbleReaderBatchWriter, blockID flow.Identifier, payload *flow.Payload, fullReceipts []*flow.ExecutionReceipt) error {
+	rw storage.PebbleReaderBatchWriter, blockID flow.Identifier, payload *flow.Payload, fullReceipts []*flow.ExecutionReceipt) error {
 	_, tx := rw.ReaderWriter()
 	// make sure all payload guarantees are stored
 	for _, guarantee := range payload.Guarantees {

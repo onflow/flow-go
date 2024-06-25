@@ -8,6 +8,8 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/badger/transaction"
 	"github.com/onflow/flow-go/storage/pebble/operation"
 )
 
@@ -15,6 +17,8 @@ type EpochCommits struct {
 	db    *pebble.DB
 	cache *Cache[flow.Identifier, *flow.EpochCommit]
 }
+
+var _ storage.EpochCommits = (*EpochCommits)(nil)
 
 func NewEpochCommits(collector module.CacheMetrics, db *pebble.DB) *EpochCommits {
 
@@ -41,8 +45,15 @@ func NewEpochCommits(collector module.CacheMetrics, db *pebble.DB) *EpochCommits
 	return ec
 }
 
-func (ec *EpochCommits) StoreTx(commit *flow.EpochCommit) func(pebble.Writer) error {
-	return ec.cache.PutTx(commit.ID(), commit)
+func (ec *EpochCommits) StoreTx(commit *flow.EpochCommit) func(*transaction.Tx) error {
+	return nil
+}
+
+func (ec *EpochCommits) StorePebble(commit *flow.EpochCommit) func(storage.PebbleReaderBatchWriter) error {
+	return func(rw storage.PebbleReaderBatchWriter) error {
+		_, tx := rw.ReaderWriter()
+		return ec.cache.PutTx(commit.ID(), commit)(tx)
+	}
 }
 
 func (ec *EpochCommits) retrieveTx(commitID flow.Identifier) func(tx pebble.Reader) (*flow.EpochCommit, error) {

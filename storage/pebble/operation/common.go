@@ -11,10 +11,6 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-type PebbleReaderBatchWriter interface {
-	ReaderWriter() (pebble.Reader, pebble.Writer)
-}
-
 type ReaderBatchWriter struct {
 	db    *pebble.DB
 	batch *pebble.Batch
@@ -28,6 +24,13 @@ func (b *ReaderBatchWriter) Commit() error {
 	return b.batch.Commit(nil)
 }
 
+func NewPebbleReaderBatchWriterWithBatch(db *pebble.DB, batch *pebble.Batch) *ReaderBatchWriter {
+	return &ReaderBatchWriter{
+		db:    db,
+		batch: batch,
+	}
+}
+
 func NewPebbleReaderBatchWriter(db *pebble.DB) *ReaderBatchWriter {
 	return &ReaderBatchWriter{
 		db:    db,
@@ -35,7 +38,7 @@ func NewPebbleReaderBatchWriter(db *pebble.DB) *ReaderBatchWriter {
 	}
 }
 
-func WithReaderBatchWriter(db *pebble.DB, fn func(PebbleReaderBatchWriter) error) error {
+func WithReaderBatchWriter(db *pebble.DB, fn func(storage.PebbleReaderBatchWriter) error) error {
 	batch := NewPebbleReaderBatchWriter(db)
 	err := fn(batch)
 	if err != nil {

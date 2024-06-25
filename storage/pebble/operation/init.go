@@ -45,8 +45,8 @@ func EnsureSecretDB(db *pebble.DB) error {
 // insertDBTypeMarker inserts a database type marker if none exists. If a marker
 // already exists in the database, this function will return an error if the
 // marker does not match the argument, or return nil if it matches.
-func insertDBTypeMarker(marker dbTypeMarker) func(PebbleReaderBatchWriter) error {
-	return func(rw PebbleReaderBatchWriter) error {
+func insertDBTypeMarker(marker dbTypeMarker) func(storage.PebbleReaderBatchWriter) error {
+	return func(rw storage.PebbleReaderBatchWriter) error {
 		r, txn := rw.ReaderWriter()
 		var storedMarker dbTypeMarker
 		err := retrieveDBType(&storedMarker)(r)
