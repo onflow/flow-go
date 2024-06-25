@@ -42,6 +42,8 @@ func (s *EpochFallbackStateMachineSuite) SetupTest() {
 func (s *EpochFallbackStateMachineSuite) TestProcessEpochSetupIsNoop() {
 	setup := unittest.EpochSetupFixture()
 	s.consumer.On("OnServiceEventReceived", setup.ServiceEvent()).Once()
+	s.consumer.On("OnInvalidServiceEvent", setup.ServiceEvent(),
+		mock.MatchedBy(func(err error) bool { return protocol.IsInvalidServiceEventError(err) })).Once()
 	applied, err := s.stateMachine.ProcessEpochSetup(setup)
 	require.NoError(s.T(), err)
 	require.False(s.T(), applied)
@@ -56,6 +58,8 @@ func (s *EpochFallbackStateMachineSuite) TestProcessEpochSetupIsNoop() {
 func (s *EpochFallbackStateMachineSuite) TestProcessEpochCommitIsNoop() {
 	commit := unittest.EpochCommitFixture()
 	s.consumer.On("OnServiceEventReceived", commit.ServiceEvent()).Once()
+	s.consumer.On("OnInvalidServiceEvent", commit.ServiceEvent(),
+		mock.MatchedBy(func(err error) bool { return protocol.IsInvalidServiceEventError(err) })).Once()
 	applied, err := s.stateMachine.ProcessEpochCommit(commit)
 	require.NoError(s.T(), err)
 	require.False(s.T(), applied)
@@ -686,12 +690,16 @@ func (s *EpochFallbackStateMachineSuite) TestProcesingMultipleEventsAtTheSameBlo
 		for i := 0; i < setupEvents; i++ {
 			serviceEvent := unittest.EpochSetupFixture().ServiceEvent()
 			s.consumer.On("OnServiceEventReceived", serviceEvent).Once()
+			s.consumer.On("OnInvalidServiceEvent", serviceEvent,
+				mock.MatchedBy(func(err error) bool { return protocol.IsInvalidServiceEventError(err) })).Once()
 			events = append(events, serviceEvent)
 		}
 		commitEvents := rapid.IntRange(0, 5).Draw(t, "number-of-commit-events")
 		for i := 0; i < commitEvents; i++ {
 			serviceEvent := unittest.EpochCommitFixture().ServiceEvent()
 			s.consumer.On("OnServiceEventReceived", serviceEvent).Once()
+			s.consumer.On("OnInvalidServiceEvent", serviceEvent,
+				mock.MatchedBy(func(err error) bool { return protocol.IsInvalidServiceEventError(err) })).Once()
 			events = append(events, serviceEvent)
 		}
 		recoverEvents := rapid.IntRange(0, 5).Draw(t, "number-of-recover-events")

@@ -34,6 +34,11 @@ func NewFallbackStateMachine(params protocol.GlobalParams, telemetry protocol_st
 	// we are entering fallback mode, this logic needs to be executed only once
 	if !state.EpochFallbackTriggered {
 		// the next epoch has not been committed, but possibly setup, make sure it is cleared
+		// CAUTION: this logic must be consistent with the `EpochProtocolStateEntry.EpochPhase()`, which
+		// determines the epoch phase based on the configuration of the fields we set here!
+		// Specifically, if and only if the next epoch is already committed as of the parent state,
+		// we go through with that committed epoch. Otherwise, we have a tentative values of an epoch
+		// not yet properly specified, which we have to clear out.
 		if !nextEpochCommitted {
 			state.NextEpoch = nil
 		}
@@ -94,6 +99,7 @@ func (m *FallbackStateMachine) extendCurrentEpoch(epochExtension flow.EpochExten
 // ProcessEpochSetup processes epoch setup service events, for epoch fallback we are ignoring this event.
 func (m *FallbackStateMachine) ProcessEpochSetup(setup *flow.EpochSetup) (bool, error) {
 	m.telemetry.OnServiceEventReceived(setup.ServiceEvent())
+	m.telemetry.OnInvalidServiceEvent(setup.ServiceEvent(), protocol.NewInvalidServiceEventErrorf("received EpochSetup in Epoch Fallback Mode"))
 	// Note that we are dropping _all_ EpochSetup events sealed by this block. As long as we are in EFM, this is
 	// the natural behaviour, as we have given up on following the instructions from the Epoch Smart Contracts.
 	//
@@ -119,6 +125,7 @@ func (m *FallbackStateMachine) ProcessEpochSetup(setup *flow.EpochSetup) (bool, 
 // ProcessEpochCommit processes epoch commit service events, for epoch fallback we are ignoring this event.
 func (m *FallbackStateMachine) ProcessEpochCommit(setup *flow.EpochCommit) (bool, error) {
 	m.telemetry.OnServiceEventReceived(setup.ServiceEvent())
+	m.telemetry.OnInvalidServiceEvent(setup.ServiceEvent(), protocol.NewInvalidServiceEventErrorf("received EpochCommit in Epoch Fallback Mode"))
 	// We ignore _all_ EpochCommit events here. This includes scenarios where a valid `EpochRecover` event is sealed in
 	// a block followed by `EpochSetup` and/or `EpochCommit` events -- technically, a clear indication that the Epoch Smart
 	// contract is doing something unexpected. For a detailed explanation why this is safe, see `ProcessEpochSetup` above.
