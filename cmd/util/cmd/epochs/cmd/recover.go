@@ -57,6 +57,7 @@ This recovery process has some constraints:
 	flagEpochCounter             uint64
 	flagTargetDuration           uint64
 	flagTargetEndTime            uint64
+	flagInitNewEpoch             bool
 )
 
 func init() {
@@ -84,6 +85,7 @@ func addGenerateRecoverEpochTxArgsCmdFlags() error {
 	generateRecoverEpochTxArgsCmd.Flags().Uint64Var(&flagEpochCounter, "epoch-counter", 0, "the epoch counter used to generate the root cluster block")
 	generateRecoverEpochTxArgsCmd.Flags().Uint64Var(&flagTargetDuration, "target-duration", 0, "the target duration of the epoch")
 	generateRecoverEpochTxArgsCmd.Flags().Uint64Var(&flagTargetEndTime, "target-end-time", 0, "the target end time for the epoch")
+	generateRecoverEpochTxArgsCmd.Flags().BoolVar(&flagInitNewEpoch, "init", true, "set to false if the recover transaction should overwrite the current epoch rather than initialize a new recover epoch")
 
 	err := generateRecoverEpochTxArgsCmd.MarkFlagRequired("access-address")
 	if err != nil {
@@ -118,7 +120,7 @@ func addGenerateRecoverEpochTxArgsCmdFlags() error {
 
 func getSnapshot() *inmem.Snapshot {
 	// get flow client with secure client connection to download protocol snapshot from access node
-	config, err := grpcclient.NewFlowClientConfig(flagAnAddress, flagAnPubkey, flow.ZeroID, false)
+	config, err := grpcclient.NewFlowClientConfig(flagAnAddress, flagAnPubkey, flow.ZeroID, flagAnInsecure)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to create flow client config")
 	}
@@ -281,6 +283,9 @@ func extractRecoverEpochArgs(snapshot *inmem.Snapshot) []cadence.Value {
 		cadence.NewArray(dkgPubKeys),
 		// node ids
 		cadence.NewArray(nodeIds),
+		// recover the network by initializing a new recover epoch which will increment the smart contract epoch counter
+		// or overwrite the epoch metadata for the current epoch
+		cadence.NewBool(flagInitNewEpoch),
 	}
 
 	return args

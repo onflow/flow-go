@@ -200,9 +200,9 @@ func ConvertClusterQcsCdc(qcs []*flow.QuorumCertificate, clusterList flow.Cluste
 
 func newFlowClusterQCVoteDataStructType() *cadence.StructType {
 
-	// A.01cf0e2f2f715450.FlowClusterQC.ClusterQCVoteData
+	// A.0xf8d6e0586b0a20c7.FlowClusterQC.ClusterQCVoteData
 
-	address, _ := cdcCommon.HexToAddress("01cf0e2f2f715450")
+	address, _ := cdcCommon.HexToAddress("f8d6e0586b0a20c7")
 	location := cdcCommon.NewAddressLocation(nil, address, "FlowClusterQC")
 
 	return &cadence.StructType{

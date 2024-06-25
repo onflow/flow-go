@@ -90,7 +90,7 @@ func (s *BaseSuite) SetupTest() {
 		testnet.NewNodeConfig(flow.RoleCollection, collectionConfigs...),
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
-		testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.WarnLevel), testnet.WithAdditionalFlag("--extensive-logging=true")),
+		testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.InfoLevel), testnet.WithAdditionalFlag("--extensive-logging=true")),
 		testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.WarnLevel)),
 		testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.WarnLevel)),
 		ghostNode,
