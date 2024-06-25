@@ -10,6 +10,41 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+// TestEpochProtocolStateEntry_EpochPhase tests that all possible instances of an EpochProtocolStateEntry
+// correctly compute the current epoch phase, taking into account EFM status and incorporated service events.
+func TestEpochProtocolStateEntry_EpochPhase(t *testing.T) {
+
+	t.Run("EFM triggered", func(t *testing.T) {
+		t.Run("tentatively in staking phase", func(t *testing.T) {
+			entry := unittest.EpochProtocolStateEntryFixture(flow.EpochPhaseStaking, true)
+			assert.Equal(t, flow.EpochPhaseFallback, entry.EpochPhase())
+		})
+		t.Run("tentatively in setup phase", func(t *testing.T) {
+			entry := unittest.EpochProtocolStateEntryFixture(flow.EpochPhaseSetup, true)
+			assert.Equal(t, flow.EpochPhaseFallback, entry.EpochPhase())
+		})
+		t.Run("tentatively in committed phase", func(t *testing.T) {
+			entry := unittest.EpochProtocolStateEntryFixture(flow.EpochPhaseCommitted, true)
+			assert.Equal(t, flow.EpochPhaseCommitted, entry.EpochPhase())
+		})
+	})
+
+	t.Run("EFM not triggered", func(t *testing.T) {
+		t.Run("tentatively in staking phase", func(t *testing.T) {
+			entry := unittest.EpochProtocolStateEntryFixture(flow.EpochPhaseStaking, false)
+			assert.Equal(t, flow.EpochPhaseStaking, entry.EpochPhase())
+		})
+		t.Run("tentatively in setup phase", func(t *testing.T) {
+			entry := unittest.EpochProtocolStateEntryFixture(flow.EpochPhaseSetup, false)
+			assert.Equal(t, flow.EpochPhaseSetup, entry.EpochPhase())
+		})
+		t.Run("tentatively in committed phase", func(t *testing.T) {
+			entry := unittest.EpochProtocolStateEntryFixture(flow.EpochPhaseCommitted, false)
+			assert.Equal(t, flow.EpochPhaseCommitted, entry.EpochPhase())
+		})
+	})
+}
+
 // TestNewRichProtocolStateEntry checks that NewRichEpochProtocolStateEntry creates valid identity tables depending on the state
 // of epoch which is derived from the protocol state entry.
 func TestNewRichProtocolStateEntry(t *testing.T) {

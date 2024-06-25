@@ -42,7 +42,7 @@ func (u *Snapshot) QuorumCertificate() (*flow.QuorumCertificate, error) {
 	return nil, u.err
 }
 
-func (u *Snapshot) Phase() (flow.EpochPhase, error) {
+func (u *Snapshot) EpochPhase() (flow.EpochPhase, error) {
 	return 0, u.err
 }
 

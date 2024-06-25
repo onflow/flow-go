@@ -32,7 +32,7 @@ func (eq Epochs) Current() protocol.Epoch {
 
 func (eq Epochs) Next() protocol.Epoch {
 	switch eq.entry.EpochPhase() {
-	case flow.EpochPhaseStaking:
+	case flow.EpochPhaseStaking, flow.EpochPhaseFallback:
 		return invalid.NewEpoch(protocol.ErrNextEpochNotSetup)
 	case flow.EpochPhaseSetup:
 		return NewSetupEpoch(eq.entry.NextEpochSetup)

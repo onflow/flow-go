@@ -22,6 +22,7 @@ import (
 //
 // All updates are applied to a copy of parent protocol state, so parent protocol state is not modified. The stateMachine internally
 // tracks the current protocol state. A separate instance should be created for each block to process the updates therein.
+// See flow.EpochPhase for detailed documentation about EFM and epoch phase transitions.
 // TODO(EFM, #6019): this structure needs to be updated to stop using parent state.
 type HappyPathStateMachine struct {
 	baseStateMachine
