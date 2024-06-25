@@ -12,7 +12,7 @@ type EpochSetups interface {
 	// StoreTx allows us to store a new epoch setup in a DB transaction while going through the cache.
 	StoreTx(*flow.EpochSetup) func(*transaction.Tx) error
 
-	StorePebbleTx(*flow.EpochSetup) func(PebbleReaderBatchWriter) error
+	StorePebble(*flow.EpochSetup) func(PebbleReaderBatchWriter) error
 
 	// ByID will return the EpochSetup event by its ID.
 	// Error returns:

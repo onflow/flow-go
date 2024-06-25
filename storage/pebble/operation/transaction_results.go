@@ -65,7 +65,7 @@ func RemoveTransactionResultsByBlockID(blockID flow.Identifier) func(pebble.Writ
 // BatchRemoveTransactionResultsByBlockID removes transaction results for the given blockID in a provided batch.
 // No errors are expected during normal operation, but it may return generic error
 // if pebble fails to process request
-func BatchRemoveTransactionResultsByBlockID(blockID flow.Identifier, batch storage.BatchWriter) func(pebble.Writer) error {
+func BatchRemoveTransactionResultsByBlockID(blockID flow.Identifier) func(pebble.Writer) error {
 	return func(txn pebble.Writer) error {
 		prefix := makePrefix(codeTransactionResult, blockID)
 		err := removeByPrefix(prefix)(txn)
