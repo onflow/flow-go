@@ -39,6 +39,36 @@ func (bv *BlockEventValidator) HasHeight(height int) *BlockEventValidator {
 	return bv
 }
 
+func (bv *BlockEventValidator) HasHash(hash string) *BlockEventValidator {
+	require.Equal(bv.t, hash, bv.payload.Hash)
+	return bv
+}
+
+func (bv *BlockEventValidator) HasTimestamp(timestamp uint64) *BlockEventValidator {
+	require.Equal(bv.t, timestamp, bv.payload.Timestamp)
+	return bv
+}
+
+func (bv *BlockEventValidator) HasTotalSupply(totalSupply cadence.Int) *BlockEventValidator {
+	require.Equal(bv.t, totalSupply, bv.payload.TotalSupply)
+	return bv
+}
+
+func (bv *BlockEventValidator) HasTotalGasUsed(totalGasUsed uint64) *BlockEventValidator {
+	require.Equal(bv.t, totalGasUsed, bv.payload.TotalGasUsed)
+	return bv
+}
+
+func (bv *BlockEventValidator) HasParentBlockHash(parentBlockHash string) *BlockEventValidator {
+	require.Equal(bv.t, parentBlockHash, bv.payload.ParentBlockHash)
+	return bv
+}
+
+func (bv *BlockEventValidator) HasReceiptRoot(receiptRoot string) *BlockEventValidator {
+	require.Equal(bv.t, receiptRoot, bv.payload.ReceiptRoot)
+	return bv
+}
+
 func (bv *BlockEventValidator) HasTransactionHashes(txHashes []string) *BlockEventValidator {
 	require.Equal(bv.t, len(bv.payload.TransactionHashes), len(txHashes))
 	for i, txHash := range txHashes {
