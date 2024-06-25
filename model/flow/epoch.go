@@ -14,13 +14,73 @@ import (
 	"github.com/onflow/flow-go/model/encodable"
 )
 
-// EpochPhase represents a phase of the Epoch Preparation Protocol. The phase
-// of an epoch is resolved based on a block reference and is fork-dependent.
-// An epoch begins in the staking phase, then transitions to the setup phase in
-// the block containing the EpochSetup service event, then to the committed
-// phase in the block containing the EpochCommit service event.
-// |<--  EpochPhaseStaking -->|<-- EpochPhaseSetup -->|<-- EpochPhaseCommitted -->|<-- EpochPhaseStaking -->...
-// |<------------------------------- Epoch N ------------------------------------>|<-- Epoch N + 1 --...
+// EpochPhase represents a phase of the Epoch Preparation Protocol.
+// The phase of an epoch is resolved based on a block reference and is fork-dependent.
+// During normal operations, each Epoch transitions through the phases:
+//
+//	║                                       Epoch N
+//	║       ╭─────────────────────────────────┴─────────────────────────────────╮
+//	║   finalize view            EpochSetup            EpochCommit
+//	║     in epoch N            service event         service event
+//	║        ⇣                       ⇣                     ⇣
+//	║        ┌─────────────────┐     ┌───────────────┐     ┌───────────────────┐
+//	║        │EpochPhaseStaking├─────►EpochPhaseSetup├─────►EpochPhaseCommitted├ ┄>
+//	║        └─────────────────┘     └───────────────┘     └───────────────────┘
+//	║        ⇣                       ⇣                     ⇣
+//	║   EpochTransition     EpochSetupPhaseStarted    EpochCommittedPhaseStarted
+//	║    Notification            Notification               Notification
+//
+// However, if the Protocol State encounters any unexpected epoch service events, or the subsequent epoch
+// fails to be committed by the `EpochCommitSafetyThreshold`, then we enter Epoch Fallback Mode [EFM].
+// Depending on whether the subsequent epoch has already been committed, the EFM progress differs slightly.
+// In a nutshell, we always enter the _latest_ epoch already committed on the happy path (if there is any)
+// and the follow the fallback protocol.
+//
+// SCENARIO A: the future Epoch N is already committed, when we enter EFM
+//
+//	║      Epoch N-1                            Epoch N
+//	║   ···──┴─────────────────────────╮ ╭─────────────┴───────────────────────────────────────────────╮
+//	║      invalid service                finalize view                   EpochRecover
+//	║            event                    in epoch N                      service event
+//	║              ⇣                      ⇣                    ┊          ⇣
+//	║     ┌──────────────────────────┐    ┌────────────────────┊────┐     ┌───────────────────────────┐
+//	║     │   EpochPhaseCommitted    ├────►    EpochPhaseFallback   ├─────►    EpochPhaseCommitted    ├ ┄>
+//	║     └──────────────────────────┘    └────────────────────┊────┘     └───────────────────────────┘
+//	║              ⇣                      ⇣                    ┊          ⇣
+//	║   EpochFallbackModeTriggered     EpochTransition   EpochExtended*   EpochFallbackModeExited
+//	║          Notification             Notification      Notification    + EpochCommittedPhaseStarted Notifications
+//	║              ┆                                                      ┆
+//	║              ╰┄┄┄┄┄┄┄┄┄┄ EpochFallbackTriggered is true ┄┄┄┄┄┄┄┄┄┄┄┄╯
+//
+// With 'EpochExtended*' we denote that there can be zero, one, or more Epoch Extension (depending on when
+// we receive a valid EpochRecover service event.
+//
+// SCENARIO B: we are in Epoch N without any subsequent epoch being committed when entering EFM
+//
+//	║                         Epoch N
+//	║ ···────────────────────────┴───────────────────────────────────────────────────────────────╮
+//	║              invalid service event or                         EpochRecover
+//	║         EpochCommitSafetyThreshold reached                    service event
+//	║                           ⇣                      ┊            ⇣
+//	║  ┌────────────────────┐   ┌──────────────────────┊──────┐     ┌───────────────────────────┐
+//	║  │ EpochPhaseStaking  │   │     EpochPhaseFallback      │     │   EpochPhaseCommitted     │
+//	║  │ or EpochPhaseSetup ├───►                      ┊      ├─────►                           ├ ┄>
+//	║  └────────────────────┘   └──────────────────────┊──────┘     └───────────────────────────┘
+//	║                           ⇣                      ┊            ⇣
+//	║            EpochFallbackModeTriggered     EpochExtended*      EpochFallbackModeExited
+//	║                     Notification           Notification       + EpochCommittedPhaseStarted Notifications
+//	║                           ┆                                   ┆
+//	║                           ╰┄┄ EpochFallbackTriggered true ┄┄┄┄╯
+//
+// A state machine diagram containing all possible phase transitions is below:
+//
+//	         ┌──────────────────────────────────────────────────────────┐
+//	┌────────▼────────┐     ┌───────────────┐     ┌───────────────────┐ │
+//	│EpochPhaseStaking├─────►EpochPhaseSetup├─────►EpochPhaseCommitted├─┘
+//	└────────┬────────┘     └───────────┬───┘     └───┬──────────▲────┘
+//	         │                        ┌─▼─────────────▼──┐       │
+//	         └────────────────────────►EpochPhaseFallback├───────┘
+//	                                  └──────────────────┘
 type EpochPhase int
 
 const (
@@ -28,6 +88,7 @@ const (
 	EpochPhaseStaking
 	EpochPhaseSetup
 	EpochPhaseCommitted
+	EpochPhaseFallback
 )
 
 func (p EpochPhase) String() string {
@@ -36,6 +97,7 @@ func (p EpochPhase) String() string {
 		"EpochPhaseStaking",
 		"EpochPhaseSetup",
 		"EpochPhaseCommitted",
+		"EpochPhaseFallback",
 	}[p]
 }
 
@@ -45,6 +107,7 @@ func GetEpochPhase(phase string) EpochPhase {
 		EpochPhaseStaking,
 		EpochPhaseSetup,
 		EpochPhaseCommitted,
+		EpochPhaseFallback,
 	}
 	for _, p := range phases {
 		if p.String() == phase {

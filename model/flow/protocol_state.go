@@ -326,7 +326,21 @@ func (e *RichEpochProtocolStateEntry) CurrentEpochFinalView() uint64 {
 
 // EpochPhase returns the current epoch phase.
 // The receiver EpochProtocolStateEntry must be properly constructed.
+// See flow.EpochPhase for detailed documentation.
 func (e *EpochProtocolStateEntry) EpochPhase() EpochPhase {
+	// CAUTION: the logic below that deduces the EpochPhase must be consistent with `epochs.FallbackStateMachine`,
+	// which sets the fields we are using here. Specifically, we require that the FallbackStateMachine clears out
+	// any tentative values for a subsequent epoch _unless_ that epoch is already committed.
+	if e.EpochFallbackTriggered {
+		// If the next epoch has been committed, we are in EpochPhaseCommitted regardless of EFM status.
+		// We will enter EpochPhaseFallback after completing the transition into the committed next epoch.
+		if e.NextEpoch != nil && e.NextEpoch.CommitID != ZeroID {
+			return EpochPhaseCommitted
+		}
+		// If the next epoch has not been committed and EFM is triggered, we immediately enter EpochPhaseFallback.
+		return EpochPhaseFallback
+	}
+
 	// The epoch phase is determined by how much information we have about the next epoch
 	if e.NextEpoch == nil {
 		return EpochPhaseStaking // if no information about the next epoch is known, we are in the Staking Phase

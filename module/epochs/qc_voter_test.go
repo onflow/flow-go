@@ -62,7 +62,7 @@ func (suite *Suite) SetupTest() {
 	suite.snap = new(protocol.Snapshot)
 	suite.state.On("Final").Return(suite.snap)
 	suite.phase = flow.EpochPhaseSetup
-	suite.snap.On("Phase").Return(
+	suite.snap.On("EpochPhase").Return(
 		func() flow.EpochPhase { return suite.phase },
 		func() error { return nil },
 	)

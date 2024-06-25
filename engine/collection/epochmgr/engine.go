@@ -240,7 +240,7 @@ func (e *Engine) checkShouldStartPreviousEpochComponentsOnStartup(engineCtx irre
 func (e *Engine) checkShouldVoteOnStartup(finalSnapshot protocol.Snapshot) error {
 	// check the current phase on startup, in case we are in setup phase
 	// and haven't yet voted for the next root QC
-	phase, err := finalSnapshot.Phase()
+	phase, err := finalSnapshot.EpochPhase()
 	if err != nil {
 		return fmt.Errorf("could not get epoch phase for finalized snapshot: %w", err)
 	}

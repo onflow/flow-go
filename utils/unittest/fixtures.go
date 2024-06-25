@@ -1301,6 +1301,17 @@ func IdentityListFixture(n int, opts ...func(*flow.Identity)) flow.IdentityList 
 	return identities
 }
 
+func DynamicIdentityEntryListFixture(n int) flow.DynamicIdentityEntryList {
+	list := make(flow.DynamicIdentityEntryList, n)
+	for i := 0; i < n; i++ {
+		list[i] = &flow.DynamicIdentityEntry{
+			NodeID:  IdentifierFixture(),
+			Ejected: false,
+		}
+	}
+	return list
+}
+
 func WithChunkStartState(startState flow.StateCommitment) func(chunk *flow.Chunk) {
 	return func(chunk *flow.Chunk) {
 		chunk.StartState = startState
@@ -2846,6 +2857,44 @@ func WithValidDKG() func(*flow.RichEpochProtocolStateEntry) {
 			commit.DKGParticipantKeys[participant.Index] = participant.KeyShare
 		}
 	}
+}
+
+// EpochProtocolStateEntryFixture returns a flow.EpochProtocolStateEntry fixture.
+//   - PreviousEpoch is always nil
+//   - tentativePhase defines what service events should be defined for the NextEpoch
+//   - efmTriggered defines whether the EpochFallbackTriggered flag should be set.
+func EpochProtocolStateEntryFixture(tentativePhase flow.EpochPhase, efmTriggered bool) flow.EpochProtocolStateEntry {
+	identities := DynamicIdentityEntryListFixture(5)
+	entry := flow.EpochProtocolStateEntry{
+		EpochFallbackTriggered: efmTriggered,
+		PreviousEpoch:          nil,
+		CurrentEpoch: flow.EpochStateContainer{
+			SetupID:          IdentifierFixture(),
+			CommitID:         IdentifierFixture(),
+			ActiveIdentities: identities,
+		},
+		NextEpoch: nil,
+	}
+
+	switch tentativePhase {
+	case flow.EpochPhaseStaking:
+		break
+	case flow.EpochPhaseSetup:
+		entry.NextEpoch = &flow.EpochStateContainer{
+			SetupID:          IdentifierFixture(),
+			CommitID:         flow.ZeroID,
+			ActiveIdentities: identities,
+		}
+	case flow.EpochPhaseCommitted:
+		entry.NextEpoch = &flow.EpochStateContainer{
+			SetupID:          IdentifierFixture(),
+			CommitID:         IdentifierFixture(),
+			ActiveIdentities: identities,
+		}
+	default:
+		panic("unexpected input phase: " + tentativePhase.String())
+	}
+	return entry
 }
 
 func CreateSendTxHttpPayload(tx flow.TransactionBody) map[string]interface{} {

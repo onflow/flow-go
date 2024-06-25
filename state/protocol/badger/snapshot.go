@@ -81,7 +81,7 @@ func (s *Snapshot) QuorumCertificate() (*flow.QuorumCertificate, error) {
 	return qc, nil
 }
 
-func (s *Snapshot) Phase() (flow.EpochPhase, error) {
+func (s *Snapshot) EpochPhase() (flow.EpochPhase, error) {
 	epochState, err := s.state.protocolState.EpochStateAtBlockID(s.blockID)
 	if err != nil {
 		return flow.EpochPhaseUndefined, fmt.Errorf("could not retrieve protocol state snapshot: %w", err)
@@ -412,8 +412,8 @@ func (q *EpochQuery) Next() protocol.Epoch {
 	phase := epochState.EpochPhase()
 	entry := epochState.Entry()
 
-	// if we are in the staking phase, the next epoch is not setup yet
-	if phase == flow.EpochPhaseStaking {
+	// if we are in the staking or fallback phase, the next epoch is not setup yet
+	if phase == flow.EpochPhaseStaking || phase == flow.EpochPhaseFallback {
 		return invalid.NewEpoch(protocol.ErrNextEpochNotSetup)
 	}
 	// if we are in setup phase, return a SetupEpoch

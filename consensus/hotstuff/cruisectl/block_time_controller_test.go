@@ -93,7 +93,7 @@ func setupMocks(bs *BlockTimeControllerSuite) {
 		func() error { return nil },
 	)
 	bs.snapshot.On("EpochProtocolState").Return(&bs.epochProtocolState, nil)
-	bs.snapshot.On("Phase").Return(
+	bs.snapshot.On("EpochPhase").Return(
 		func() flow.EpochPhase { return bs.epochs.Phase() },
 		func() error { return nil })
 	bs.snapshot.On("Head").Return(unittest.BlockHeaderFixture(unittest.HeaderWithView(bs.initialView+11)), nil).Maybe()
