@@ -46,6 +46,10 @@ func (q *QuorumCertificates) StoreTx(qc *flow.QuorumCertificate) func(interface{
 	return q.cache.PutTxInterface(qc.BlockID, qc)
 }
 
+func (q *QuorumCertificates) StoreTx2(qc *flow.QuorumCertificate, ops storage.TxOps) error {
+	return operation.InsertQuorumCertificateOps(qc, ops)
+}
+
 func (q *QuorumCertificates) ByBlockID(blockID flow.Identifier) (*flow.QuorumCertificate, error) {
 	return q.retrieveTx(blockID)(q.db)
 }

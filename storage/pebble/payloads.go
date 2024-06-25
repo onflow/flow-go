@@ -20,6 +20,8 @@ type Payloads struct {
 	results    *ExecutionResults
 }
 
+var _ storage.Payloads = (*Payloads)(nil)
+
 func NewPayloads(db *pebble.DB, index *Index, guarantees *Guarantees, seals *Seals, receipts *ExecutionReceipts,
 	results *ExecutionResults) *Payloads {
 

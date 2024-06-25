@@ -70,7 +70,7 @@ func (c *Commits) BatchStore(blockID flow.Identifier, commit flow.StateCommitmen
 	return operation.BatchIndexStateCommitment(blockID, commit)(writeBatch)
 }
 
-func (c *Commits) BatchStore2(blockID flow.Identifier, commit flow.StateCommitment, tx storage.Transaction) error {
+func (c *Commits) BatchStore2(blockID flow.Identifier, commit flow.StateCommitment, tx storage.BatchWriter) error {
 	return operation.BatchIndexStateCommitment(blockID, commit)(tx)
 }
 

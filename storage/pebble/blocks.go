@@ -5,6 +5,7 @@ import (
 
 	"github.com/cockroachdb/pebble"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/storage"
 
 	"github.com/onflow/flow-go/storage/pebble/operation"
 )
@@ -16,7 +17,7 @@ type Blocks struct {
 	payloads *Payloads
 }
 
-// var _ storage.Blocks = (*Blocks)(nil)
+var _ storage.Blocks = (*Blocks)(nil)
 
 // NewBlocks ...
 func NewBlocks(db *pebble.DB, headers *Headers, payloads *Payloads) *Blocks {
@@ -28,7 +29,11 @@ func NewBlocks(db *pebble.DB, headers *Headers, payloads *Payloads) *Blocks {
 	return b
 }
 
-func (b *Blocks) StoreTx(block *flow.Block) func(operation.PebbleReaderBatchWriter) error {
+func (b *Blocks) StoreTx(block *flow.Block) error {
+	return b.storeTx(block)(operation.NewPebbleReaderBatchWriter(b.db))
+}
+
+func (b *Blocks) storeTx(block *flow.Block) func(operation.PebbleReaderBatchWriter) error {
 	return func(rw operation.PebbleReaderBatchWriter) error {
 		_, tx := rw.ReaderWriter()
 		err := b.headers.storeTx(block.Header)(tx)
@@ -63,7 +68,7 @@ func (b *Blocks) retrieveTx(blockID flow.Identifier) func(pebble.Reader) (*flow.
 
 // Store ...
 func (b *Blocks) Store(block *flow.Block) error {
-	return b.StoreTx(block)(operation.NewPebbleReaderBatchWriter(b.db))
+	return b.storeTx(block)(operation.NewPebbleReaderBatchWriter(b.db))
 }
 
 // ByID ...

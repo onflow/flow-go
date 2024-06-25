@@ -44,35 +44,6 @@ func WithReaderBatchWriter(db *pebble.DB, fn func(PebbleReaderBatchWriter) error
 	return batch.Commit()
 }
 
-// insertNew requires the key does not exist
-// Error returns: storage.ErrAlreadyExists
-func insertNew(key []byte, val interface{}) func(PebbleReaderBatchWriter) error {
-	return func(rw PebbleReaderBatchWriter) error {
-		r, tx := rw.ReaderWriter()
-		_, closer, err := r.Get(key)
-		if err == nil {
-			defer closer.Close()
-			return storage.ErrAlreadyExists
-		}
-
-		if !errors.Is(err, pebble.ErrNotFound) {
-			return irrecoverable.NewExceptionf("could not check key: %w", err)
-		}
-
-		value, err := msgpack.Marshal(val)
-		if err != nil {
-			return irrecoverable.NewExceptionf("failed to encode value: %w", err)
-		}
-
-		err = tx.Set(key, value, pebble.Sync)
-		if err != nil {
-			return irrecoverable.NewExceptionf("failed to store data: %w", err)
-		}
-
-		return nil
-	}
-}
-
 func insert(key []byte, val interface{}) func(pebble.Writer) error {
 	return func(w pebble.Writer) error {
 		value, err := msgpack.Marshal(val)
@@ -146,46 +117,6 @@ type handleFunc func() error
 // key-value pair. This a consumer of the API to decode when to skip the loading
 // of values, the initialization of entities and the processing.
 type iterationFunc func() (checkFunc, createFunc, handleFunc)
-
-// update will encode the given entity with MsgPack and update the binary data
-// under the given key in the badger DB. The key must already exist.
-// Error returns:
-//   - storage.ErrNotFound if the key does not already exist in the database.
-//   - generic error in case of unexpected failure from the database layer or
-//     encoding failure.
-func update(key []byte, entity interface{}) func(PebbleReaderBatchWriter) error {
-	return func(rw PebbleReaderBatchWriter) error {
-		r, tx := rw.ReaderWriter()
-
-		// retrieve the item from the key-value store
-		_, closer, err := r.Get(key)
-		if errors.Is(err, pebble.ErrNotFound) {
-			return storage.ErrNotFound
-		}
-
-		if err != nil {
-			return irrecoverable.NewExceptionf("could not check key: %w", err)
-		}
-		err = closer.Close()
-		if err != nil {
-			return err
-		}
-
-		// serialize the entity data
-		val, err := msgpack.Marshal(entity)
-		if err != nil {
-			return irrecoverable.NewExceptionf("could not encode entity: %w", err)
-		}
-
-		// persist the entity data into the DB
-		err = tx.Set(key, val, nil)
-		if err != nil {
-			return irrecoverable.NewExceptionf("could not replace data: %w", err)
-		}
-
-		return nil
-	}
-}
 
 // remove removes the entity with the given key, if it exists. If it doesn't
 // exist, this is a no-op.

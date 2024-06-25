@@ -13,14 +13,14 @@ func InsertChunkDataPack(c *storage.StoredChunkDataPack) func(*badger.Txn) error
 }
 
 // BatchInsertChunkDataPack inserts a chunk data pack keyed by chunk ID into a batch
-func BatchInsertChunkDataPack(c *storage.StoredChunkDataPack) func(batch storage.Transaction) error {
+func BatchInsertChunkDataPack(c *storage.StoredChunkDataPack) func(batch storage.BatchWriter) error {
 	return batchWrite(makePrefix(codeChunkDataPack, c.ChunkID), c)
 }
 
 // BatchRemoveChunkDataPack removes a chunk data pack keyed by chunk ID, in a batch.
 // No errors are expected during normal operation, even if no entries are matched.
 // If Badger unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
-func BatchRemoveChunkDataPack(chunkID flow.Identifier) func(batch storage.Transaction) error {
+func BatchRemoveChunkDataPack(chunkID flow.Identifier) func(batch storage.BatchWriter) error {
 	return batchRemove(makePrefix(codeChunkDataPack, chunkID))
 }
 

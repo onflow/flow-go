@@ -10,10 +10,10 @@ import (
 )
 
 type batchWriter struct {
-	batch storage.Transaction
+	batch storage.BatchWriter
 }
 
-func NewBatchWriter(batch storage.Transaction) pebble.Writer {
+func NewBatchWriter(batch storage.BatchWriter) pebble.Writer {
 	return batchWriter{batch: batch}
 }
 

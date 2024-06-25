@@ -19,8 +19,8 @@ import (
 // binary data in the badger wrote batch under the provided key - if the value already exists
 // in the database it will be overridden.
 // No errors are expected during normal operation.
-func batchWrite(key []byte, entity interface{}) func(writeBatch storage.Transaction) error {
-	return func(writeBatch storage.Transaction) error {
+func batchWrite(key []byte, entity interface{}) func(writeBatch storage.BatchWriter) error {
+	return func(writeBatch storage.BatchWriter) error {
 
 		// update the maximum key size if the inserted key is bigger
 		if uint32(len(key)) > max {
@@ -180,8 +180,8 @@ func remove(key []byte) func(*badger.Txn) error {
 // batchRemove removes entry under a given key in a write-batch.
 // if key doesn't exist, does nothing.
 // No errors are expected during normal operation.
-func batchRemove(key []byte) func(writeBatch storage.Transaction) error {
-	return func(writeBatch storage.Transaction) error {
+func batchRemove(key []byte) func(writeBatch storage.BatchWriter) error {
+	return func(writeBatch storage.BatchWriter) error {
 		err := writeBatch.Delete(key)
 		if err != nil {
 			return irrecoverable.NewExceptionf("could not batch delete data: %w", err)
@@ -216,8 +216,8 @@ func removeByPrefix(prefix []byte) func(*badger.Txn) error {
 // batchRemoveByPrefix removes all items under the keys match the given prefix in a batch write transaction.
 // no error would be returned if no key was found with the given prefix.
 // all error returned should be exception
-func batchRemoveByPrefix(prefix []byte) func(tx *badger.Txn, writeBatch storage.Transaction) error {
-	return func(tx *badger.Txn, writeBatch storage.Transaction) error {
+func batchRemoveByPrefix(prefix []byte) func(tx *badger.Txn, writeBatch storage.BatchWriter) error {
+	return func(tx *badger.Txn, writeBatch storage.BatchWriter) error {
 
 		opts := badger.DefaultIteratorOptions
 		opts.AllVersions = false

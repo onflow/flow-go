@@ -19,7 +19,6 @@ func InitAll(metrics module.CacheMetrics, db *pebble.DB) *storage.All {
 	qcs := NewQuorumCertificates(metrics, db, DefaultCacheSize)
 	setups := NewEpochSetups(metrics, db)
 	epochCommits := NewEpochCommits(metrics, db)
-	statuses := NewEpochStatuses(metrics, db)
 	versionBeacons := NewVersionBeacons(db)
 
 	commits := NewCommits(metrics, db)
@@ -39,7 +38,7 @@ func InitAll(metrics module.CacheMetrics, db *pebble.DB) *storage.All {
 		QuorumCertificates: qcs,
 		Setups:             setups,
 		EpochCommits:       epochCommits,
-		Statuses:           statuses,
+		Statuses:           nil,
 		VersionBeacons:     versionBeacons,
 		Results:            results,
 		Receipts:           receipts,

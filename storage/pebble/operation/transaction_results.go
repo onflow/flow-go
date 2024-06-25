@@ -13,8 +13,8 @@ func InsertTransactionResult(blockID flow.Identifier, transactionResult *flow.Tr
 	return insert(makePrefix(codeTransactionResult, blockID, transactionResult.TransactionID), transactionResult)
 }
 
-func BatchIndexTransactionResult(blockID flow.Identifier, txIndex uint32, transactionResult *flow.TransactionResult) func(storage.Transaction) error {
-	return func(batch storage.Transaction) error {
+func BatchIndexTransactionResult(blockID flow.Identifier, txIndex uint32, transactionResult *flow.TransactionResult) func(storage.BatchWriter) error {
+	return func(batch storage.BatchWriter) error {
 		return insert(makePrefix(codeTransactionResultIndex, blockID, txIndex), transactionResult)(NewBatchWriter(batch))
 	}
 }
@@ -65,7 +65,7 @@ func RemoveTransactionResultsByBlockID(blockID flow.Identifier) func(pebble.Writ
 // BatchRemoveTransactionResultsByBlockID removes transaction results for the given blockID in a provided batch.
 // No errors are expected during normal operation, but it may return generic error
 // if pebble fails to process request
-func BatchRemoveTransactionResultsByBlockID(blockID flow.Identifier, batch storage.Transaction) func(pebble.Writer) error {
+func BatchRemoveTransactionResultsByBlockID(blockID flow.Identifier, batch storage.BatchWriter) func(pebble.Writer) error {
 	return func(txn pebble.Writer) error {
 		prefix := makePrefix(codeTransactionResult, blockID)
 		err := removeByPrefix(prefix)(txn)
@@ -81,8 +81,8 @@ func InsertLightTransactionResult(blockID flow.Identifier, transactionResult *fl
 	return insert(makePrefix(codeLightTransactionResult, blockID, transactionResult.TransactionID), transactionResult)
 }
 
-func BatchIndexLightTransactionResult(blockID flow.Identifier, txIndex uint32, transactionResult *flow.LightTransactionResult) func(batch storage.Transaction) error {
-	return func(batch storage.Transaction) error {
+func BatchIndexLightTransactionResult(blockID flow.Identifier, txIndex uint32, transactionResult *flow.LightTransactionResult) func(batch storage.BatchWriter) error {
+	return func(batch storage.BatchWriter) error {
 		return insert(makePrefix(codeLightTransactionResultIndex, blockID, txIndex), transactionResult)(NewBatchWriter(batch))
 	}
 }
