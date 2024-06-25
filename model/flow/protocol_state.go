@@ -326,6 +326,7 @@ func (e *RichEpochProtocolStateEntry) CurrentEpochFinalView() uint64 {
 
 // EpochPhase returns the current epoch phase.
 // The receiver EpochProtocolStateEntry must be properly constructed.
+// See flow.EpochPhase for detailed documentation.
 func (e *EpochProtocolStateEntry) EpochPhase() EpochPhase {
 	// CAUTION: the logic below that deduces the EpochPhase must be consistent with `epochs.FallbackStateMachine`,
 	// which sets the fields we are using here. Specifically, we require that the FallbackStateMachine clears out
