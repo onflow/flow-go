@@ -31,7 +31,3 @@ func (n Noop) EpochFallbackModeExited(uint64, *flow.Header) {}
 func (n Noop) EpochExtended(uint64, *flow.Header, flow.EpochExtension) {}
 
 func (n Noop) ActiveClustersChanged(flow.ChainIDList) {}
-
-func (n Noop) EpochExtended(*flow.EpochExtension) {}
-
-func (n Noop) EpochRecovered(*uint64) {}

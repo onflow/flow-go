@@ -80,9 +80,11 @@ type BlockTimeController struct {
 	// TODO for 'leaving Epoch Fallback via special service event' this might need to change.
 	epochFallbackTriggered bool
 
-	incorporatedBlocks chan TimedBlock   // OnBlockIncorporated events, we desire these blocks to be processed in a timely manner and therefore use a small channel capacity
-	epochSetups        chan *flow.Header // EpochSetupPhaseStarted events (block header within setup phase)
-	epochFallbacks     chan struct{}     // EpochFallbackTriggered events
+	incorporatedBlocks      chan TimedBlock   // OnBlockIncorporated events, we desire these blocks to be processed in a timely manner and therefore use a small channel capacity
+	epochSetups             chan *flow.Header // EpochSetupPhaseStarted events (block header within setup phase)
+	epochFallbacks          chan struct{}     // EpochFallbackTriggered events
+	epochExtensions         chan struct{}     // EpochExtended events
+	epochFallbackModeExited chan struct{}     // EpochFallbackModeExited events
 
 	proportionalErr Ewma
 	integralErr     LeakyIntegrator
@@ -532,10 +534,14 @@ func (ctl *BlockTimeController) EpochFallbackModeTriggered(uint64, *flow.Header)
 }
 
 // EpochExtended handles the epoch extended protocol event.
-func (ctl *BlockTimeController) EpochExtended(extension *flow.EpochExtension) {
+func (ctl *BlockTimeController) EpochExtended(_ uint64, _ *flow.Header, extension flow.EpochExtension) {
 	ctl.curEpochFinalView = extension.FinalView
 	ctl.curEpochTargetEndTime = extension.TargetEndTime
 	ctl.nextEpochFinalView = nil
+}
+
+func (ctl *BlockTimeController) EpochCommittedPhaseStarted(currentEpochCounter uint64, first *flow.Header) {
+
 }
 
 // EpochRecovered handles the epoch recovered protocol event.

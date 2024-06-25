@@ -90,19 +90,3 @@ func (d *Distributor) EpochExtended(epochCounter uint64, header *flow.Header, ex
 		sub.EpochExtended(epochCounter, header, extension)
 	}
 }
-
-func (d *Distributor) EpochExtended(extension *flow.EpochExtension) {
-	d.mu.RLock()
-	defer d.mu.RUnlock()
-	for _, sub := range d.subscribers {
-		sub.EpochExtended(extension)
-	}
-}
-
-func (d *Distributor) EpochRecovered(nextEpochFinalView *uint64) {
-	d.mu.RLock()
-	defer d.mu.RUnlock()
-	for _, sub := range d.subscribers {
-		sub.EpochRecovered(nextEpochFinalView)
-	}
-}
