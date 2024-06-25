@@ -100,13 +100,13 @@ func TestHandler_TransactionRunOrPanic(t *testing.T) {
 					// check events (1 extra for block event)
 					events := backend.Events()
 					require.Len(t, events, 2)
-					testutils.CheckTransactionExecutedEvent(t, events, 0).
+					testutils.IsTransactionExecutedEvent(t, events[0]).
 						HasIndex(0).
 						// HasBlockHash(). // TODO how to check the block hash
 						MatchesResult(result)
 
 					// check block event
-					testutils.CheckBlockExecutedEvent(t, events, 1).
+					testutils.IsBlockExecutedEvent(t, events[1]).
 						HasHeight(1).
 						HasTransactionHashes([]string{evmTx.Hash().String()})
 				})
@@ -330,17 +330,17 @@ func TestHandler_COA(t *testing.T) {
 				require.Len(t, events, 6)
 
 				// the first four events are for COA setup
-				testutils.CheckTransactionExecutedEvent(t, events, 0).
+				testutils.IsTransactionExecutedEvent(t, events[0]).
 					HasIndex(0)
-				testutils.CheckBlockExecutedEvent(t, events, 1).
+				testutils.IsBlockExecutedEvent(t, events[1]).
 					HasHeight(1)
-				testutils.CheckTransactionExecutedEvent(t, events, 2).
+				testutils.IsTransactionExecutedEvent(t, events[2]).
 					HasIndex(0)
-				testutils.CheckBlockExecutedEvent(t, events, 3).
+				testutils.IsBlockExecutedEvent(t, events[3]).
 					HasHeight(2)
 
 				// transaction event
-				testutils.CheckTransactionExecutedEvent(t, events, 4).
+				testutils.IsTransactionExecutedEvent(t, events[4]).
 					HasIndex(0).
 					HasErrorCode(0)
 
@@ -349,7 +349,7 @@ func TestHandler_COA(t *testing.T) {
 				// assert.Equal(t, balance, ret.Amount)
 
 				// block event
-				testutils.CheckBlockExecutedEvent(t, events, 5).
+				testutils.IsBlockExecutedEvent(t, events[5]).
 					HasHeight(2)
 
 				// check gas usage

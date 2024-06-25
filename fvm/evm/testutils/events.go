@@ -20,6 +20,20 @@ type BlockEventValidator struct {
 	payload *types.BlockEventPayload
 }
 
+func IsBlockExecutedEvent(
+	t testing.TB,
+	event flow.Event,
+) *BlockEventValidator {
+	assert.Equal(t, event.Type, types.EventTypeBlockExecuted)
+	ev, err := jsoncdc.Decode(nil, event.Payload)
+	require.NoError(t, err)
+	cev, ok := ev.(cadence.Event)
+	require.True(t, ok)
+	payload, err := types.DecodeBlockEventPayload(cev)
+	require.NoError(t, err)
+	return &BlockEventValidator{t, payload}
+}
+
 func (bv *BlockEventValidator) HasHeight(height int) *BlockEventValidator {
 	require.Equal(bv.t, height, int(bv.payload.Height))
 	return bv
@@ -33,28 +47,23 @@ func (bv *BlockEventValidator) HasTransactionHashes(txHashes []string) *BlockEve
 	return bv
 }
 
-func CheckBlockExecutedEvent(
+type TransactionEventValidator struct {
+	t       testing.TB
+	payload *types.TransactionEventPayload
+}
+
+func IsTransactionExecutedEvent(
 	t testing.TB,
-	events []flow.Event,
-	index int,
-) *BlockEventValidator {
-	event := events[index]
-	assert.Equal(t, event.Type, types.EventTypeBlockExecuted)
+	event flow.Event,
+) *TransactionEventValidator {
+	assert.Equal(t, event.Type, types.EventTypeTransactionExecuted)
 	ev, err := jsoncdc.Decode(nil, event.Payload)
 	require.NoError(t, err)
 	cev, ok := ev.(cadence.Event)
 	require.True(t, ok)
-	// TODO: add cev.EventType check with location
-	// require.Equal(t, cev.EventType, types.EventTypeBlockExecuted)
-
-	payload, err := types.DecodeBlockEventPayload(cev)
+	payload, err := types.DecodeTransactionEventPayload(cev)
 	require.NoError(t, err)
-	return &BlockEventValidator{t, payload}
-}
-
-type TransactionEventValidator struct {
-	t       testing.TB
-	payload *types.TransactionEventPayload
+	return &TransactionEventValidator{t, payload}
 }
 
 func (tx *TransactionEventValidator) HasIndex(index uint16) *TransactionEventValidator {
@@ -128,23 +137,4 @@ func (tx *TransactionEventValidator) MatchesResult(result *types.Result) *Transa
 	tx.HasReturnedData(result.ReturnedData)
 	tx.HasLogs(result.Logs)
 	return tx
-}
-
-func CheckTransactionExecutedEvent(
-	t testing.TB,
-	events []flow.Event,
-	index int,
-) *TransactionEventValidator {
-	event := events[index]
-	assert.Equal(t, event.Type, types.EventTypeTransactionExecuted)
-	ev, err := jsoncdc.Decode(nil, event.Payload)
-	require.NoError(t, err)
-	cev, ok := ev.(cadence.Event)
-	require.True(t, ok)
-	// TODO add check for the location in the cev.EventType
-	// 	location := common.NewAddressLocation(nil, common.Address(h.evmContractAddress), "EVM")
-	// require.Equal(t, cev.EventType, types.EventTypeTransactionExecuted)
-	payload, err := types.DecodeTransactionEventPayload(cev)
-	require.NoError(t, err)
-	return &TransactionEventValidator{t, payload}
 }
