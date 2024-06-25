@@ -18,9 +18,9 @@ import (
 	"github.com/onflow/flow-go/state/protocol/prg"
 )
 
-// staticEpochInfo contains leader selection and the initial committee for one epoch.
-// This data structure must not be mutated after construction.
-type staticEpochInfo struct {
+// epochInfo contains leader selection and the initial committee for one epoch.
+// epochInfo may only be mutated by addExtension, when we observe a new epoch extension.
+type epochInfo struct {
 	firstView            uint64                  // first view of the epoch (inclusive)
 	finalView            uint64                  // final view of the epoch (inclusive)
 	randomSource         []byte                  // random source of epoch
@@ -32,9 +32,18 @@ type staticEpochInfo struct {
 	dkg                  hotstuff.DKG
 }
 
+// addExtension
+func (info *epochInfo) addExtension(ext flow.EpochExtension) error {
+	// check that extension is contiguous
+	info.finalView = ext.FinalView
+	// TODO update leader selection
+	//  leader selection for 6 months takes ~500ms, for 1 week about 20ms -> just re-compute selection for entire range
+	panic(nil)
+}
+
 // newStaticEpochInfo returns the static epoch information from the epoch.
 // This can be cached and used for all by-view queries for this epoch.
-func newStaticEpochInfo(epoch protocol.Epoch) (*staticEpochInfo, error) {
+func newStaticEpochInfo(epoch protocol.Epoch) (*epochInfo, error) {
 	firstView, err := epoch.FirstView()
 	if err != nil {
 		return nil, fmt.Errorf("could not get first view: %w", err)
@@ -62,7 +71,7 @@ func newStaticEpochInfo(epoch protocol.Epoch) (*staticEpochInfo, error) {
 	}
 
 	totalWeight := initialCommittee.TotalWeight()
-	epochInfo := &staticEpochInfo{
+	epochInfo := &epochInfo{
 		firstView:            firstView,
 		finalView:            finalView,
 		randomSource:         randomSource,
@@ -83,7 +92,7 @@ func newStaticEpochInfo(epoch protocol.Epoch) (*staticEpochInfo, error) {
 // * lasts until the next spork (estimated 6 months)
 // * has the same static committee as the last committed epoch
 // TODO remove
-func newFallbackModeEpoch(lastCommittedEpoch *staticEpochInfo) (*staticEpochInfo, error) {
+func newFallbackModeEpoch(lastCommittedEpoch *epochInfo) (*epochInfo, error) {
 	rng, err := prg.New(lastCommittedEpoch.randomSource, prg.ConsensusLeaderSelection, nil)
 	if err != nil {
 		return nil, fmt.Errorf("could not create rng from seed: %w", err)
@@ -97,7 +106,7 @@ func newFallbackModeEpoch(lastCommittedEpoch *staticEpochInfo) (*staticEpochInfo
 	if err != nil {
 		return nil, fmt.Errorf("could not compute leader selection for fallback epoch: %w", err)
 	}
-	epochInfo := &staticEpochInfo{
+	epochInfo := &epochInfo{
 		firstView:            lastCommittedEpoch.finalView + 1,
 		finalView:            lastCommittedEpoch.finalView + leader.EstimatedSixMonthOfViews,
 		randomSource:         lastCommittedEpoch.randomSource,
@@ -114,10 +123,10 @@ func newFallbackModeEpoch(lastCommittedEpoch *staticEpochInfo) (*staticEpochInfo
 // Consensus represents the main committee for consensus nodes. The consensus
 // committee might be active for multiple successive epochs.
 type Consensus struct {
-	state  protocol.State              // the protocol state
-	me     flow.Identifier             // the node ID of this node
-	mu     sync.RWMutex                // protects access to epochs
-	epochs map[uint64]*staticEpochInfo // cache of initial committee & leader selection per epoch
+	state  protocol.State        // the protocol state
+	me     flow.Identifier       // the node ID of this node
+	mu     sync.RWMutex          // protects access to epochs
+	epochs map[uint64]*epochInfo // cache of initial committee & leader selection per epoch
 	// TODO do we need to strictly order events across types? Yes, I think we do
 	committedEpochsCh        chan *flow.Header // protocol events for newly committed epochs (the first block of the epoch is passed over the channel)
 	epochFallbackTriggeredCh chan struct{}     // protocol event for epoch fallback mode
@@ -134,7 +143,7 @@ func NewConsensusCommittee(state protocol.State, me flow.Identifier) (*Consensus
 	com := &Consensus{
 		state:                    state,
 		me:                       me,
-		epochs:                   make(map[uint64]*staticEpochInfo),
+		epochs:                   make(map[uint64]*epochInfo),
 		committedEpochsCh:        make(chan *flow.Header, 1),
 		epochFallbackTriggeredCh: make(chan struct{}, 1),
 		isEpochFallbackHandled:   atomic.NewBool(false),
@@ -162,7 +171,6 @@ func NewConsensusCommittee(state protocol.State, me flow.Identifier) (*Consensus
 	epochs = append(epochs, final.Epochs().Current())
 
 	// we prepare the next epoch, if it is committed
-	// TODO(EFM, #5730): update phase logic if needed
 	phase, err := final.EpochPhase()
 	if err != nil {
 		return nil, fmt.Errorf("could not check epoch phase: %w", err)
@@ -184,7 +192,7 @@ func NewConsensusCommittee(state protocol.State, me flow.Identifier) (*Consensus
 	}
 
 	// if epoch fallback mode was triggered, inject the fallback epoch
-	// TODO(EFM, #5730): consider replacing with phase check when it's available
+	// TODO remove
 	if epochStateSnapshot.EpochFallbackTriggered() {
 		err = com.onEpochFallbackModeTriggered()
 		if err != nil {
@@ -430,7 +438,7 @@ func (c *Consensus) onEpochFallbackModeTriggered() error {
 // Error returns:
 //   - model.ErrViewForUnknownEpoch if no committed epoch containing the given view is known
 //   - unspecific error in case of unexpected problems and bugs
-func (c *Consensus) staticEpochInfoByView(view uint64) (*staticEpochInfo, error) {
+func (c *Consensus) staticEpochInfoByView(view uint64) (*epochInfo, error) {
 
 	// look for an epoch matching this view for which we have already pre-computed
 	// leader selection. Epochs last ~500k views, so we find the epoch here 99.99%
@@ -454,7 +462,7 @@ func (c *Consensus) staticEpochInfoByView(view uint64) (*staticEpochInfo, error)
 // Input must be a committed epoch.
 // No errors are expected during normal operation.
 // TODO: add epoch extensions here if needed (past epoch may also have extensions)
-func (c *Consensus) prepareEpoch(epoch protocol.Epoch) (*staticEpochInfo, error) {
+func (c *Consensus) prepareEpoch(epoch protocol.Epoch) (*epochInfo, error) {
 
 	counter, err := epoch.Counter()
 	if err != nil {
@@ -500,16 +508,16 @@ func (c *Consensus) prepareEpoch(epoch protocol.Epoch) (*staticEpochInfo, error)
 // NOTE: Not safe for concurrent use - the caller must first acquire the lock.
 func (c *Consensus) pruneEpochInfo() {
 	// find the maximum counter, including the epoch we just computed
-	max := uint64(0)
+	maxCounter := uint64(0)
 	for counter := range c.epochs {
-		if counter > max {
-			max = counter
+		if counter > maxCounter {
+			maxCounter = counter
 		}
 	}
 
 	// remove any epochs which aren't within the most recent 3
 	for counter := range c.epochs {
-		if counter+3 <= max {
+		if counter+3 <= maxCounter {
 			delete(c.epochs, counter)
 		}
 	}
