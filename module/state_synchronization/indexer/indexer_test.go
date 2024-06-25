@@ -17,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data/mock"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	mempool "github.com/onflow/flow-go/module/mempool/mock"
+	"github.com/onflow/flow-go/module/state_synchronization/requester"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -83,6 +84,7 @@ func newIndexerTest(t *testing.T, availableBlocks int, lastIndexedIndex int) *in
 		exeCache,
 		test.latestHeight,
 		progress,
+		requester.NewExecutionDataDistributor(),
 	)
 	require.NoError(t, err)
 
