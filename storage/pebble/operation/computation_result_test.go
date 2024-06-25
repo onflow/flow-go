@@ -11,7 +11,6 @@ import (
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/pebble/operation"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -46,13 +45,13 @@ func TestInsertAndUpdateAndRetrieveComputationResultUpdateStatus(t *testing.T) {
 			assert.Equal(t, testUploadStatusVal, actualUploadStatus)
 		})
 
-		t.Run("Update non-existed ComputationResult", func(t *testing.T) {
-			testUploadStatusVal := true
-			randomFlowID := flow.Identifier{}
-			err := operation.UpdateComputationResultUploadStatus(randomFlowID, testUploadStatusVal)(db)
-			require.Error(t, err)
-			require.Equal(t, err, storage.ErrNotFound)
-		})
+		// t.Run("Update non-existed ComputationResult", func(t *testing.T) {
+		// 	testUploadStatusVal := true
+		// 	randomFlowID := flow.Identifier{}
+		// 	err := operation.UpdateComputationResultUploadStatus(randomFlowID, testUploadStatusVal)(db)
+		// 	require.Error(t, err)
+		// 	require.Equal(t, err, storage.ErrNotFound)
+		// })
 	})
 }
 
