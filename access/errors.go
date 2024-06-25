@@ -98,3 +98,12 @@ type InvalidTxRateLimitedError struct {
 func (e InvalidTxRateLimitedError) Error() string {
 	return fmt.Sprintf("transaction rate limited for payer (%s)", e.Payer)
 }
+
+type InsufficientBalanceError struct {
+	Payer           flow.Address
+	RequiredBalance uint64
+}
+
+func (e InsufficientBalanceError) Error() string {
+	return fmt.Sprintf("transaction payer (%s) has insufficient balance to pay transaction fee. Required balance: %v", e.Payer, e.RequiredBalance)
+}

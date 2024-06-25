@@ -305,3 +305,5 @@ require (
 )
 
 replace github.com/onflow/flow-go => ../
+
+replace github.com/onflow/flow-core-contracts/lib/go/templates => github.com/The-K-R-O-K/flow-core-contracts/lib/go/templates v0.15.2-0.20240613090439-5d81fb0db262

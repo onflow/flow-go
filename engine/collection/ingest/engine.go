@@ -355,8 +355,8 @@ func (e *Engine) ingestTransaction(
 		return nil
 	}
 
-	// check if the transaction is valid
-	err = e.transactionValidator.Validate(tx)
+	// we don't pass actual ctx as we don't execute any scripts inside for now
+	err = e.transactionValidator.Validate(context.Background(), tx)
 	if err != nil {
 		return engine.NewInvalidInputErrorf("invalid transaction (%x): %w", txID, err)
 	}
