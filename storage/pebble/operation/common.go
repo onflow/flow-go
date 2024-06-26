@@ -1,6 +1,7 @@
 package operation
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 
@@ -131,6 +132,110 @@ func remove(key []byte) func(pebble.Writer) error {
 		if err != nil {
 			return irrecoverable.NewExceptionf("could not delete item: %w", err)
 		}
+		return nil
+	}
+}
+
+// iterate iterates over a range of keys defined by a start and end key. The
+// start key may be higher than the end key, in which case we iterate in
+// reverse order.
+//
+// The iteration range uses prefix-wise semantics. Specifically, all keys that
+// meet ANY of the following conditions are included in the iteration:
+//   - have a prefix equal to the start key OR
+//   - have a prefix equal to the end key OR
+//   - have a prefix that is lexicographically between start and end
+//
+// On each iteration, it will call the iteration function to initialize
+// functions specific to processing the given key-value pair.
+//
+// TODO: this function is unbounded – pass context.Context to this or calling functions to allow timing functions out.
+// No errors are expected during normal operation. Any errors returned by the
+// provided handleFunc will be propagated back to the caller of iterate.
+func iterate(start []byte, end []byte, iteration iterationFunc, opts ...func(*pebble.IterOptions)) func(pebble.Reader) error {
+	return func(tx pebble.Reader) error {
+
+		// Reverse iteration is not supported by pebble
+		if bytes.Compare(start, end) > 0 {
+			return fmt.Errorf("start key must be less than or equal to end key")
+		}
+
+		// initialize the default options and comparison modifier for iteration
+		options := pebble.IterOptions{}
+
+		for _, apply := range opts {
+			apply(&options)
+		}
+
+		// In order to satisfy this function's prefix-wise inclusion semantics,
+		// we append 0xff bytes to the largest of start and end.
+		// This ensures Badger will seek to the largest key with that prefix
+		// for reverse iteration, thus including all keys with a prefix matching
+		// the starting key. It also enables us to detect boundary conditions by
+		// simple lexicographic comparison (ie. bytes.Compare) rather than
+		// explicitly comparing prefixes.
+		//
+		// See https://github.com/onflow/flow-go/pull/3310#issuecomment-618127494
+		// for discussion and more detail on this.
+
+		// If start is bigger than end, we have a backwards iteration:
+		// 1) We set the reverse option on the iterator, so we step through all
+		//    the keys backwards. This modifies the behaviour of Seek to go to
+		//    the first key that is less than or equal to the start key (as
+		//    opposed to greater than or equal in a regular iteration).
+		// 2) In order to satisfy this function's prefix-wise inclusion semantics,
+		//    we append a 0xff-byte suffix to the start key so the seek will go
+		// to the right place.
+		// 3) For a regular iteration, we break the loop upon hitting the first
+		//    item that has a key higher than the end prefix. In order to reverse
+		//    this, we use a modifier for the comparison that reverses the check
+		//    and makes it stop upon the first item lower than the end prefix.
+		// for forward iteration, add the 0xff-bytes suffix to the end
+		// prefix, to ensure we include all keys with that prefix before
+		// finishing.
+		it, err := tx.NewIter(&options)
+		if err != nil {
+			return fmt.Errorf("can not create iterator: %w", err)
+		}
+		defer it.Close()
+
+		for it.SeekGE(start); it.Valid(); it.Next() {
+			key := it.Key()
+			// Break the loop if we have passed the end key prefix
+			if bytes.Compare(key, end) > 0 && !startsWithPrefix(key, end) {
+				break
+			}
+
+			// initialize processing functions for iteration
+			check, create, handle := iteration()
+
+			// check if we should process the item at all
+			ok := check(key)
+			if !ok {
+				continue
+			}
+
+			binaryValue, err := it.ValueAndErr()
+			if err != nil {
+				return fmt.Errorf("failed to get value: %w", err)
+			}
+
+			// preventing caller from modifying the iterator's value slices
+			valueCopy := make([]byte, len(binaryValue))
+			copy(valueCopy, binaryValue)
+
+			entity := create()
+			err = msgpack.Unmarshal(valueCopy, entity)
+			if err != nil {
+				return irrecoverable.NewExceptionf("could not decode entity: %w", err)
+			}
+			// process the entity
+			err = handle()
+			if err != nil {
+				return fmt.Errorf("could not handle entity: %w", err)
+			}
+		}
+
 		return nil
 	}
 }
@@ -288,4 +393,17 @@ func BatchUpdate(db *pebble.DB, fn func(tx pebble.Writer) error) error {
 		return err
 	}
 	return batch.Commit(nil)
+}
+
+// startsWithPrefix checks if a key starts with the given prefix
+func startsWithPrefix(key, prefix []byte) bool {
+	if len(key) < len(prefix) {
+		return false
+	}
+	for i := range prefix {
+		if key[i] != prefix[i] {
+			return false
+		}
+	}
+	return true
 }
