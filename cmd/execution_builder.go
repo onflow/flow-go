@@ -1198,7 +1198,7 @@ func (exeNode *ExecutionNode) LoadFollowerCore(
 ) {
 	// create a finalizer that handles updating the protocol
 	// state when the follower detects newly finalized blocks
-	final := finalizer.NewFinalizer(node.DB, node.Storage.Headers, exeNode.followerState, node.Tracer)
+	final := finalizer.NewFinalizerPebble(node.DB, node.Storage.Headers, exeNode.followerState, node.Tracer)
 
 	finalized, pending, err := recovery.FindLatest(node.State, node.Storage.Headers)
 	if err != nil {

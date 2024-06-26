@@ -359,7 +359,7 @@ func createNode(
 	epochLookup module.EpochLookup,
 ) *Node {
 
-	db, dbDir := unittest.TempBadgerDB(t)
+	db, dbDir := unittest.TempPebbleDB(t)
 	metricsCollector := metrics.NewNoopCollector()
 	tracer := trace.NewNoopTracer()
 
@@ -477,7 +477,7 @@ func createNode(
 	protocolStateEvents.AddConsumer(committee)
 
 	// initialize the block finalizer
-	final := finalizer.NewFinalizer(db, headersDB, fullState, trace.NewNoopTracer())
+	final := finalizer.NewFinalizerPebble(db, headersDB, fullState, trace.NewNoopTracer())
 
 	syncCore, err := synccore.New(log, synccore.DefaultConfig(), metricsCollector, rootHeader.ChainID)
 	require.NoError(t, err)

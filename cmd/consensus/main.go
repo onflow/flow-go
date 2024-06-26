@@ -559,12 +559,12 @@ func main() {
 		}).
 		Component("hotstuff modules", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			// initialize the block finalizer
-			finalize := finalizer.NewFinalizer(
+			finalize := finalizer.NewFinalizerPebble(
 				node.DB,
 				node.Storage.Headers,
 				mutableState,
 				node.Tracer,
-				finalizer.WithCleanup(finalizer.CleanupMempools(
+				finalizer.WithCleanupPebble(finalizer.CleanupMempools(
 					node.Metrics.Mempool,
 					conMetrics,
 					node.Storage.Payloads,

@@ -213,7 +213,7 @@ func (builder *FollowerServiceBuilder) buildFollowerCore() *FollowerServiceBuild
 	builder.Component("follower core", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		// create a finalizer that will handle updating the protocol
 		// state when the follower detects newly finalized blocks
-		final := finalizer.NewFinalizer(node.DB, node.Storage.Headers, builder.FollowerState, node.Tracer)
+		final := finalizer.NewFinalizerPebble(node.DB, node.Storage.Headers, builder.FollowerState, node.Tracer)
 
 		followerCore, err := consensus.NewFollower(
 			node.Logger,

@@ -327,7 +327,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 		Component("follower core", func(node *NodeConfig) (module.ReadyDoneAware, error) {
 			// create a finalizer that handles updating the protocol
 			// state when the follower detects newly finalized blocks
-			final := finalizer.NewFinalizer(node.DB, node.Storage.Headers, followerState, node.Tracer)
+			final := finalizer.NewFinalizerPebble(node.DB, node.Storage.Headers, followerState, node.Tracer)
 
 			finalized, pending, err := recoveryprotocol.FindLatest(node.State, node.Storage.Headers)
 			if err != nil {

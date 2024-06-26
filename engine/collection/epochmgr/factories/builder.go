@@ -76,7 +76,7 @@ func (f *BuilderFactory) Create(
 		return nil, nil, fmt.Errorf("could not create builder: %w", err)
 	}
 
-	final := finalizer.NewFinalizer(
+	final := finalizer.NewFinalizerPebble(
 		f.db,
 		pool,
 		f.pusher,

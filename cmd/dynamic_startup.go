@@ -18,7 +18,7 @@ import (
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/state/protocol"
-	badgerstate "github.com/onflow/flow-go/state/protocol/badger"
+	pebblestate "github.com/onflow/flow-go/state/protocol/pebble"
 	utilsio "github.com/onflow/flow-go/utils/io"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -152,7 +152,7 @@ func DynamicStartPreInit(nodeConfig *NodeConfig) error {
 	log := nodeConfig.Logger.With().Str("component", "dynamic-startup").Logger()
 
 	// skip dynamic startup if the protocol state is bootstrapped
-	isBootstrapped, err := badgerstate.IsBootstrapped(nodeConfig.DB)
+	isBootstrapped, err := pebblestate.IsBootstrapped(nodeConfig.DB)
 	if err != nil {
 		return fmt.Errorf("could not check if state is boostrapped: %w", err)
 	}
