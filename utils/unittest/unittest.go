@@ -391,6 +391,12 @@ func RunWithPebbleDB(t testing.TB, f func(*pebble.DB)) {
 	})
 }
 
+func PebbleDB(t testing.TB, dir string) *pebble.DB {
+	db, err := pebble.Open(dir, &pebble.Options{})
+	require.NoError(t, err)
+	return db
+}
+
 type PebbleWrapper struct {
 	db *pebble.DB
 }
