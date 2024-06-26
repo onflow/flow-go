@@ -722,7 +722,7 @@ func main() {
 		Component("consensus participant", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			// initialize the block builder
 			var build module.Builder
-			build, err = builder.NewBuilder(
+			build, err = builder.NewBuilderPebble(
 				node.Metrics.Mempool,
 				node.DB,
 				mutableState,

@@ -59,7 +59,7 @@ func (f *BuilderFactory) Create(
 	epoch uint64,
 ) (module.Builder, *finalizer.Finalizer, error) {
 
-	build, err := builder.NewBuilder(
+	build, err := builder.NewBuilderPebble(
 		f.db,
 		f.trace,
 		f.protoState,
