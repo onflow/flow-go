@@ -37,7 +37,7 @@ func TestFinalizerPebble(t *testing.T) {
 		// a helper function to clean up shared state between tests
 		cleanup := func() {
 			// wipe the DB
-			err := db.DropAll()
+			err := dropAll(db)
 			require.Nil(t, err)
 			// clear the mempool
 			for _, tx := range pool.All() {
@@ -371,4 +371,30 @@ func assertClusterBlocksIndexedByReferenceHeightPebble(t *testing.T, db *pebble.
 	err := operation.LookupClusterBlocksByReferenceHeightRange(refHeight, refHeight, &ids)(db)
 	require.NoError(t, err)
 	assert.ElementsMatch(t, clusterBlockIDs, ids)
+}
+
+func dropAll(db *pebble.DB) error {
+	// Create an iterator to go through all keys
+	iter, err := db.NewIter(nil)
+	if err != nil {
+		return err
+	}
+	defer iter.Close()
+
+	batch := db.NewBatch()
+	defer batch.Close()
+
+	// Iterate over all keys and delete them
+	for iter.First(); iter.Valid(); iter.Next() {
+		err := batch.Delete(iter.Key(), nil)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Apply the batch to the database
+	if err := batch.Commit(nil); err != nil {
+		return err
+	}
+	return nil
 }
