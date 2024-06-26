@@ -34,7 +34,7 @@ func NewPebbleReaderBatchWriterWithBatch(db *pebble.DB, batch *pebble.Batch) *Re
 func NewPebbleReaderBatchWriter(db *pebble.DB) *ReaderBatchWriter {
 	return &ReaderBatchWriter{
 		db:    db,
-		batch: db.NewBatch(),
+		batch: db.NewIndexedBatch(),
 	}
 }
 
@@ -276,7 +276,7 @@ func findHighestAtOrBelow(
 }
 
 func BatchUpdate(db *pebble.DB, fn func(tx pebble.Writer) error) error {
-	batch := db.NewBatch()
+	batch := db.NewIndexedBatch()
 	err := fn(batch)
 	if err != nil {
 		return err

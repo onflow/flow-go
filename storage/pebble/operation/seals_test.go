@@ -26,6 +26,20 @@ func TestSealInsertCheckRetrieve(t *testing.T) {
 	})
 }
 
+func TestSealInsertAndRetrieveWithinTx(t *testing.T) {
+	unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
+		batch := db.NewIndexedBatch()
+		seal := unittest.Seal.Fixture()
+
+		require.NoError(t, InsertSeal(seal.ID(), seal)(batch))
+
+		var seal2 flow.Seal
+		require.NoError(t, RetrieveSeal(seal.ID(), &seal2)(batch))
+
+		require.Equal(t, seal, &seal2)
+	})
+}
+
 func TestSealIndexAndLookup(t *testing.T) {
 	unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
 		seal1 := unittest.Seal.Fixture()

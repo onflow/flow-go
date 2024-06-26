@@ -214,7 +214,7 @@ func Bootstrap(
 // protocol state root snapshot to disk.
 func (state *State) bootstrapSealingSegment(segment *flow.SealingSegment, head *flow.Block, rootSeal *flow.Seal) func(tx storage.PebbleReaderBatchWriter) error {
 	return func(tx storage.PebbleReaderBatchWriter) error {
-		r, w := tx.ReaderWriter()
+		_, w := tx.ReaderWriter()
 
 		for _, result := range segment.ExecutionResults {
 			err := operation.InsertExecutionResult(result)(w)
@@ -261,6 +261,11 @@ func (state *State) bootstrapSealingSegment(segment *flow.SealingSegment, head *
 			}
 		}
 
+		// TODO: use WithIndexedReaderBatchWriter
+		indexedBatch, ok := w.(*pebble.Batch)
+		if !ok {
+			return fmt.Errorf("could not get indexed batch")
+		}
 		for i, block := range segment.Blocks {
 			blockID := block.ID()
 			height := block.Header.Height
@@ -285,7 +290,7 @@ func (state *State) bootstrapSealingSegment(segment *flow.SealingSegment, head *
 			}
 			// sanity check: make sure the seal exists
 			var latestSeal flow.Seal
-			err = operation.RetrieveSeal(latestSealID, &latestSeal)(r)
+			err = operation.RetrieveSeal(latestSealID, &latestSeal)(indexedBatch)
 			if err != nil {
 				return fmt.Errorf("could not verify latest seal for block (id=%x) exists: %w", blockID, err)
 			}

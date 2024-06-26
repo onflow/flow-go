@@ -216,6 +216,7 @@ func Bootstrap(
 // protocol state root snapshot to disk.
 func (state *State) bootstrapSealingSegment(segment *flow.SealingSegment, head *flow.Block, rootSeal *flow.Seal) func(tx *transaction.Tx) error {
 	return func(tx *transaction.Tx) error {
+		fmt.Println("rootSeal", rootSeal.ID())
 
 		for _, result := range segment.ExecutionResults {
 			err := transaction.WithTx(operation.SkipDuplicates(operation.InsertExecutionResult(result)))(tx)
@@ -230,6 +231,7 @@ func (state *State) bootstrapSealingSegment(segment *flow.SealingSegment, head *
 
 		// insert the first seal (in case the segment's first block contains no seal)
 		if segment.FirstSeal != nil {
+			fmt.Println("first seal", segment.FirstSeal.ID())
 			err := transaction.WithTx(operation.InsertSeal(segment.FirstSeal.ID(), segment.FirstSeal))(tx)
 			if err != nil {
 				return fmt.Errorf("could not insert first seal: %w", err)
@@ -284,6 +286,7 @@ func (state *State) bootstrapSealingSegment(segment *flow.SealingSegment, head *
 			if !ok {
 				return fmt.Errorf("missing latest seal for sealing segment block (id=%s)", blockID)
 			}
+			fmt.Println("height =====", height, latestSealID)
 			// sanity check: make sure the seal exists
 			var latestSeal flow.Seal
 			err = transaction.WithTx(operation.RetrieveSeal(latestSealID, &latestSeal))(tx)
