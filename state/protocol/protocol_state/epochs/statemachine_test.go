@@ -93,7 +93,7 @@ func (s *EpochStateMachineSuite) SetupTest() {
 // epoch state ID in the KV store even when there were no events to process.
 func (s *EpochStateMachineSuite) TestBuild_NoChanges() {
 	s.happyPathStateMachine.On("ParentState").Return(s.parentEpochState)
-	s.happyPathStateMachine.On("Build").Return(s.parentEpochState.EpochMinStateEntry, s.parentEpochState.ID(), false).Once()
+	s.happyPathStateMachine.On("Build").Return(s.parentEpochState.EpochStateEntry, s.parentEpochState.ID(), false).Once()
 
 	err := s.stateMachine.EvolveState(nil)
 	require.NoError(s.T(), err)
@@ -117,7 +117,7 @@ func (s *EpochStateMachineSuite) TestBuild_NoChanges() {
 // This test also ensures that updated state ID is committed in the KV store.
 func (s *EpochStateMachineSuite) TestBuild_HappyPath() {
 	s.happyPathStateMachine.On("ParentState").Return(s.parentEpochState)
-	updatedState := unittest.EpochStateFixture().EpochMinStateEntry
+	updatedState := unittest.EpochStateFixture().EpochStateEntry
 	updatedStateID := updatedState.ID()
 	s.happyPathStateMachine.On("Build").Return(updatedState, updatedStateID, true).Once()
 
@@ -148,7 +148,7 @@ func (s *EpochStateMachineSuite) TestBuild_HappyPath() {
 	storeTxDeferredUpdate.On("Execute", mocks.Anything).Return(nil).Once()
 
 	s.epochStateDB.On("Index", s.candidate.ID(), updatedStateID).Return(indexTxDeferredUpdate.Execute, nil).Once()
-	s.epochStateDB.On("StoreTx", updatedStateID, updatedState).Return(storeTxDeferredUpdate.Execute, nil).Once()
+	s.epochStateDB.On("StoreTx", updatedStateID, updatedState.EpochMinStateEntry).Return(storeTxDeferredUpdate.Execute, nil).Once()
 	s.mutator.On("SetEpochStateID", updatedStateID).Return(nil).Once()
 
 	dbUpdates, err := s.stateMachine.Build()

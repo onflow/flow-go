@@ -101,7 +101,7 @@ func (s *EpochFallbackStateMachineSuite) TestProcessEpochRecover() {
 		},
 		EpochFallbackTriggered: false,
 	}
-	require.Equal(s.T(), expectedState, updatedState, "updatedState should be equal to expected one")
+	require.Equal(s.T(), expectedState, updatedState.EpochMinStateEntry, "updatedState should be equal to expected one")
 }
 
 // TestProcessInvalidEpochRecover tests that processing epoch recover event which is invalid or is not compatible with current
@@ -270,11 +270,19 @@ func (s *EpochFallbackStateMachineSuite) TestTransitionToNextEpoch() {
 	candidate := unittest.BlockHeaderFixture(
 		unittest.HeaderWithView(s.parentProtocolState.CurrentEpochSetup.FinalView + 1))
 
-	expectedState := &flow.EpochMinStateEntry{
-		PreviousEpoch:          s.parentProtocolState.CurrentEpoch.Copy(),
-		CurrentEpoch:           *s.parentProtocolState.NextEpoch.Copy(),
-		NextEpoch:              nil,
-		EpochFallbackTriggered: true,
+	expectedState := &flow.EpochStateEntry{
+		EpochMinStateEntry: &flow.EpochMinStateEntry{
+			PreviousEpoch:          s.parentProtocolState.CurrentEpoch.Copy(),
+			CurrentEpoch:           *s.parentProtocolState.NextEpoch.Copy(),
+			NextEpoch:              nil,
+			EpochFallbackTriggered: true,
+		},
+		PreviousEpochSetup:  s.parentProtocolState.CurrentEpochSetup,
+		PreviousEpochCommit: s.parentProtocolState.CurrentEpochCommit,
+		CurrentEpochSetup:   s.parentProtocolState.NextEpochSetup,
+		CurrentEpochCommit:  s.parentProtocolState.NextEpochCommit,
+		NextEpochSetup:      nil,
+		NextEpochCommit:     nil,
 	}
 
 	// Irrespective of whether the parent state is in EFM, the FallbackStateMachine should always set
@@ -293,7 +301,7 @@ func (s *EpochFallbackStateMachineSuite) TestTransitionToNextEpoch() {
 		require.True(s.T(), hasChanges)
 		require.NotEqual(s.T(), parentProtocolState.ID(), updatedState.ID())
 		require.Equal(s.T(), updatedState.ID(), stateID)
-		require.Equal(s.T(), updatedState, expectedState, "FallbackStateMachine produced unexpected Protocol State")
+		require.Equal(s.T(), expectedState, updatedState, "FallbackStateMachine produced unexpected Protocol State")
 	}
 }
 
@@ -368,7 +376,7 @@ func (s *EpochFallbackStateMachineSuite) TestNewEpochFallbackStateMachine() {
 			NextEpoch:              nil,
 			EpochFallbackTriggered: true,
 		}
-		require.Equal(s.T(), expectedProtocolState, updatedState, "state should be equal to expected one")
+		require.Equal(s.T(), expectedProtocolState, updatedState.EpochMinStateEntry, "state should be equal to expected one")
 	})
 
 	// The view we enter EFM is in the staking phase. The resulting epoch state should set `EpochFallbackTriggered` to true.
@@ -401,7 +409,7 @@ func (s *EpochFallbackStateMachineSuite) TestNewEpochFallbackStateMachine() {
 			NextEpoch:              nil,
 			EpochFallbackTriggered: true,
 		}
-		require.Equal(s.T(), expectedProtocolState, updatedState, "state should be equal to expected one")
+		require.Equal(s.T(), expectedProtocolState, updatedState.EpochMinStateEntry, "state should be equal to expected one")
 	})
 
 	// The view we enter EFM is in the epoch setup phase. This means that a SetupEvent for the next epoch is in the parent block's
@@ -441,7 +449,7 @@ func (s *EpochFallbackStateMachineSuite) TestNewEpochFallbackStateMachine() {
 			NextEpoch:              nil,
 			EpochFallbackTriggered: true,
 		}
-		require.Equal(s.T(), expectedProtocolState, updatedState, "state should be equal to expected one")
+		require.Equal(s.T(), expectedProtocolState, updatedState.EpochMinStateEntry, "state should be equal to expected one")
 	})
 
 	// If the next epoch has been committed, the extension shouldn't be added to the current epoch (verified below). Instead, the
@@ -475,7 +483,7 @@ func (s *EpochFallbackStateMachineSuite) TestNewEpochFallbackStateMachine() {
 			NextEpoch:              parentProtocolState.NextEpoch,
 			EpochFallbackTriggered: true,
 		}
-		require.Equal(s.T(), expectedProtocolState, updatedState, "state should be equal to expected one")
+		require.Equal(s.T(), expectedProtocolState, updatedState.EpochMinStateEntry, "state should be equal to expected one")
 	})
 }
 

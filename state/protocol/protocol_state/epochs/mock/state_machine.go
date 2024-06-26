@@ -13,24 +13,24 @@ type StateMachine struct {
 }
 
 // Build provides a mock function with given fields:
-func (_m *StateMachine) Build() (*flow.EpochMinStateEntry, flow.Identifier, bool) {
+func (_m *StateMachine) Build() (*flow.EpochStateEntry, flow.Identifier, bool) {
 	ret := _m.Called()
 
 	if len(ret) == 0 {
 		panic("no return value specified for Build")
 	}
 
-	var r0 *flow.EpochMinStateEntry
+	var r0 *flow.EpochStateEntry
 	var r1 flow.Identifier
 	var r2 bool
-	if rf, ok := ret.Get(0).(func() (*flow.EpochMinStateEntry, flow.Identifier, bool)); ok {
+	if rf, ok := ret.Get(0).(func() (*flow.EpochStateEntry, flow.Identifier, bool)); ok {
 		return rf()
 	}
-	if rf, ok := ret.Get(0).(func() *flow.EpochMinStateEntry); ok {
+	if rf, ok := ret.Get(0).(func() *flow.EpochStateEntry); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*flow.EpochMinStateEntry)
+			r0 = ret.Get(0).(*flow.EpochStateEntry)
 		}
 	}
 

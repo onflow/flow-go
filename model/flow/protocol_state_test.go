@@ -61,7 +61,7 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 				Ejected: false,
 			})
 		}
-		stateEntry := &flow.EpochMinStateEntry{
+		minStateEntry := &flow.EpochMinStateEntry{
 			PreviousEpoch: nil,
 			CurrentEpoch: flow.EpochStateContainer{
 				SetupID:          setup.ID(),
@@ -70,8 +70,8 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 			},
 			EpochFallbackTriggered: false,
 		}
-		entry, err := flow.NewEpochRichStateEntry(
-			stateEntry,
+		stateEntry, err := flow.NewEpochStateEntry(
+			minStateEntry,
 			nil,
 			nil,
 			setup,
@@ -80,7 +80,10 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 			nil,
 		)
 		assert.NoError(t, err)
-		assert.Equal(t, flow.EpochPhaseStaking, entry.EpochPhase())
+		assert.Equal(t, flow.EpochPhaseStaking, stateEntry.EpochPhase())
+
+		richStateEntry, err := flow.NewEpochRichStateEntry(stateEntry)
+		assert.NoError(t, err)
 
 		expectedIdentities, err := flow.BuildIdentityTable(
 			setup.Participants,
@@ -90,7 +93,7 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 			flow.EpochParticipationStatusLeaving,
 		)
 		assert.NoError(t, err)
-		assert.Equal(t, expectedIdentities, entry.CurrentEpochIdentityTable, "should be equal to current epoch setup participants")
+		assert.Equal(t, expectedIdentities, richStateEntry.CurrentEpochIdentityTable, "should be equal to current epoch setup participants")
 	})
 
 	// Common situation during the staking phase for epoch N+1
@@ -98,29 +101,31 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 	//  * previous epoch N-1 is known (specifically EpochSetup and EpochCommit events)
 	//  * network is currently in the staking phase for the next epoch, hence no service events for the next epoch exist
 	t.Run("staking-phase", func(t *testing.T) {
-		stateEntry := unittest.EpochStateFixture()
-		richEntry, err := flow.NewEpochRichStateEntry(
-			stateEntry.EpochMinStateEntry,
-			stateEntry.PreviousEpochSetup,
-			stateEntry.PreviousEpochCommit,
-			stateEntry.CurrentEpochSetup,
-			stateEntry.CurrentEpochCommit,
+		stateEntryFixture := unittest.EpochStateFixture()
+		epochStateEntry, err := flow.NewEpochStateEntry(
+			stateEntryFixture.EpochMinStateEntry,
+			stateEntryFixture.PreviousEpochSetup,
+			stateEntryFixture.PreviousEpochCommit,
+			stateEntryFixture.CurrentEpochSetup,
+			stateEntryFixture.CurrentEpochCommit,
 			nil,
 			nil,
 		)
 		assert.NoError(t, err)
-		assert.Equal(t, flow.EpochPhaseStaking, richEntry.EpochPhase())
+		assert.Equal(t, flow.EpochPhaseStaking, epochStateEntry.EpochPhase())
 
+		epochRichStateEntry, err := flow.NewEpochRichStateEntry(epochStateEntry)
+		assert.NoError(t, err)
 		expectedIdentities, err := flow.BuildIdentityTable(
-			stateEntry.CurrentEpochSetup.Participants,
-			stateEntry.CurrentEpoch.ActiveIdentities,
-			stateEntry.PreviousEpochSetup.Participants,
-			stateEntry.PreviousEpoch.ActiveIdentities,
+			stateEntryFixture.CurrentEpochSetup.Participants,
+			stateEntryFixture.CurrentEpoch.ActiveIdentities,
+			stateEntryFixture.PreviousEpochSetup.Participants,
+			stateEntryFixture.PreviousEpoch.ActiveIdentities,
 			flow.EpochParticipationStatusLeaving,
 		)
 		assert.NoError(t, err)
-		assert.Equal(t, expectedIdentities, richEntry.CurrentEpochIdentityTable, "should be equal to current epoch setup participants + previous epoch setup participants")
-		assert.Nil(t, richEntry.NextEpoch)
+		assert.Equal(t, expectedIdentities, epochRichStateEntry.CurrentEpochIdentityTable, "should be equal to current epoch setup participants + previous epoch setup participants")
+		assert.Nil(t, epochRichStateEntry.NextEpoch)
 	})
 
 	// Common situation during the epoch setup phase for epoch N+1
@@ -128,46 +133,48 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 	//  * previous epoch N-1 is known (specifically EpochSetup and EpochCommit events)
 	//  * network is currently in the setup phase for the next epoch, i.e. EpochSetup event (starting setup phase) has already been observed
 	t.Run("setup-phase", func(t *testing.T) {
-		stateEntry := unittest.EpochStateFixture(unittest.WithNextEpochProtocolState(), func(entry *flow.EpochRichStateEntry) {
+		stateEntryFixture := unittest.EpochStateFixture(unittest.WithNextEpochProtocolState(), func(entry *flow.EpochRichStateEntry) {
 			entry.NextEpochCommit = nil
 			entry.NextEpoch.CommitID = flow.ZeroID
 		})
 
-		richEntry, err := flow.NewEpochRichStateEntry(
-			stateEntry.EpochMinStateEntry,
-			stateEntry.PreviousEpochSetup,
-			stateEntry.PreviousEpochCommit,
-			stateEntry.CurrentEpochSetup,
-			stateEntry.CurrentEpochCommit,
-			stateEntry.NextEpochSetup,
+		stateEntry, err := flow.NewEpochStateEntry(
+			stateEntryFixture.EpochMinStateEntry,
+			stateEntryFixture.PreviousEpochSetup,
+			stateEntryFixture.PreviousEpochCommit,
+			stateEntryFixture.CurrentEpochSetup,
+			stateEntryFixture.CurrentEpochCommit,
+			stateEntryFixture.NextEpochSetup,
 			nil,
 		)
 		assert.NoError(t, err)
-		assert.Equal(t, flow.EpochPhaseSetup, richEntry.EpochPhase())
+		assert.Equal(t, flow.EpochPhaseSetup, stateEntry.EpochPhase())
 
+		richStateEntry, err := flow.NewEpochRichStateEntry(stateEntry)
+		assert.NoError(t, err)
 		expectedIdentities, err := flow.BuildIdentityTable(
-			stateEntry.CurrentEpochSetup.Participants,
-			stateEntry.CurrentEpoch.ActiveIdentities,
-			stateEntry.NextEpochSetup.Participants,
-			stateEntry.NextEpoch.ActiveIdentities,
+			stateEntryFixture.CurrentEpochSetup.Participants,
+			stateEntryFixture.CurrentEpoch.ActiveIdentities,
+			stateEntryFixture.NextEpochSetup.Participants,
+			stateEntryFixture.NextEpoch.ActiveIdentities,
 			flow.EpochParticipationStatusJoining,
 		)
 		assert.NoError(t, err)
-		assert.Equal(t, expectedIdentities, richEntry.CurrentEpochIdentityTable, "should be equal to current epoch setup participants + next epoch setup participants")
-		assert.Nil(t, richEntry.NextEpochCommit)
+		assert.Equal(t, expectedIdentities, richStateEntry.CurrentEpochIdentityTable, "should be equal to current epoch setup participants + next epoch setup participants")
+		assert.Nil(t, richStateEntry.NextEpochCommit)
 		expectedIdentities, err = flow.BuildIdentityTable(
-			stateEntry.NextEpochSetup.Participants,
-			stateEntry.NextEpoch.ActiveIdentities,
-			stateEntry.CurrentEpochSetup.Participants,
-			stateEntry.CurrentEpoch.ActiveIdentities,
+			stateEntryFixture.NextEpochSetup.Participants,
+			stateEntryFixture.NextEpoch.ActiveIdentities,
+			stateEntryFixture.CurrentEpochSetup.Participants,
+			stateEntryFixture.CurrentEpoch.ActiveIdentities,
 			flow.EpochParticipationStatusLeaving,
 		)
 		assert.NoError(t, err)
-		assert.Equal(t, expectedIdentities, richEntry.NextEpochIdentityTable, "should be equal to next epoch setup participants + current epoch setup participants")
+		assert.Equal(t, expectedIdentities, richStateEntry.NextEpochIdentityTable, "should be equal to next epoch setup participants + current epoch setup participants")
 	})
 
 	t.Run("setup-after-spork", func(t *testing.T) {
-		stateEntry := unittest.EpochStateFixture(unittest.WithNextEpochProtocolState(), func(entry *flow.EpochRichStateEntry) {
+		stateEntryFixture := unittest.EpochStateFixture(unittest.WithNextEpochProtocolState(), func(entry *flow.EpochRichStateEntry) {
 			// no previous epoch since we are in the first epoch
 			entry.PreviousEpochSetup = nil
 			entry.PreviousEpochCommit = nil
@@ -178,22 +185,24 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 			entry.NextEpoch.CommitID = flow.ZeroID
 		})
 		// sanity check that previous epoch is not populated in `stateEntry`
-		assert.Nil(t, stateEntry.PreviousEpoch)
-		assert.Nil(t, stateEntry.PreviousEpochSetup)
-		assert.Nil(t, stateEntry.PreviousEpochCommit)
+		assert.Nil(t, stateEntryFixture.PreviousEpoch)
+		assert.Nil(t, stateEntryFixture.PreviousEpochSetup)
+		assert.Nil(t, stateEntryFixture.PreviousEpochCommit)
 
-		richEntry, err := flow.NewEpochRichStateEntry(
-			stateEntry.EpochMinStateEntry,
-			stateEntry.PreviousEpochSetup,
-			stateEntry.PreviousEpochCommit,
-			stateEntry.CurrentEpochSetup,
-			stateEntry.CurrentEpochCommit,
-			stateEntry.NextEpochSetup,
+		stateEntry, err := flow.NewEpochStateEntry(
+			stateEntryFixture.EpochMinStateEntry,
+			stateEntryFixture.PreviousEpochSetup,
+			stateEntryFixture.PreviousEpochCommit,
+			stateEntryFixture.CurrentEpochSetup,
+			stateEntryFixture.CurrentEpochCommit,
+			stateEntryFixture.NextEpochSetup,
 			nil,
 		)
 		assert.NoError(t, err)
-		assert.Equal(t, flow.EpochPhaseSetup, richEntry.EpochPhase())
+		assert.Equal(t, flow.EpochPhaseSetup, stateEntry.EpochPhase())
 
+		richStateEntry, err := flow.NewEpochRichStateEntry(stateEntry)
+		assert.NoError(t, err)
 		expectedIdentities, err := flow.BuildIdentityTable(
 			stateEntry.CurrentEpochSetup.Participants,
 			stateEntry.CurrentEpoch.ActiveIdentities,
@@ -202,8 +211,8 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 			flow.EpochParticipationStatusJoining,
 		)
 		assert.NoError(t, err)
-		assert.Equal(t, expectedIdentities, richEntry.CurrentEpochIdentityTable, "should be equal to current epoch setup participants + next epoch setup participants")
-		assert.Nil(t, richEntry.NextEpochCommit)
+		assert.Equal(t, expectedIdentities, richStateEntry.CurrentEpochIdentityTable, "should be equal to current epoch setup participants + next epoch setup participants")
+		assert.Nil(t, richStateEntry.NextEpochCommit)
 		expectedIdentities, err = flow.BuildIdentityTable(
 			stateEntry.NextEpochSetup.Participants,
 			stateEntry.NextEpoch.ActiveIdentities,
@@ -212,7 +221,7 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 			flow.EpochParticipationStatusLeaving,
 		)
 		assert.NoError(t, err)
-		assert.Equal(t, expectedIdentities, richEntry.NextEpochIdentityTable, "should be equal to next epoch setup participants + current epoch setup participants")
+		assert.Equal(t, expectedIdentities, richStateEntry.NextEpochIdentityTable, "should be equal to next epoch setup participants + current epoch setup participants")
 	})
 
 	// Common situation during the epoch commit phase for epoch N+1
@@ -220,20 +229,22 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 	//  * previous epoch N-1 is known (specifically EpochSetup and EpochCommit events)
 	//  * The network has completed the epoch setup phase, i.e. published the EpochSetup and EpochCommit events for epoch N+1.
 	t.Run("commit-phase", func(t *testing.T) {
-		stateEntry := unittest.EpochStateFixture(unittest.WithNextEpochProtocolState())
+		stateEntryFixture := unittest.EpochStateFixture(unittest.WithNextEpochProtocolState())
 
-		richEntry, err := flow.NewEpochRichStateEntry(
-			stateEntry.EpochMinStateEntry,
-			stateEntry.PreviousEpochSetup,
-			stateEntry.PreviousEpochCommit,
-			stateEntry.CurrentEpochSetup,
-			stateEntry.CurrentEpochCommit,
-			stateEntry.NextEpochSetup,
-			stateEntry.NextEpochCommit,
+		stateEntry, err := flow.NewEpochStateEntry(
+			stateEntryFixture.EpochMinStateEntry,
+			stateEntryFixture.PreviousEpochSetup,
+			stateEntryFixture.PreviousEpochCommit,
+			stateEntryFixture.CurrentEpochSetup,
+			stateEntryFixture.CurrentEpochCommit,
+			stateEntryFixture.NextEpochSetup,
+			stateEntryFixture.NextEpochCommit,
 		)
 		assert.NoError(t, err)
-		assert.Equal(t, flow.EpochPhaseCommitted, richEntry.EpochPhase())
+		assert.Equal(t, flow.EpochPhaseCommitted, stateEntry.EpochPhase())
 
+		richStateEntry, err := flow.NewEpochRichStateEntry(stateEntry)
+		assert.NoError(t, err)
 		expectedIdentities, err := flow.BuildIdentityTable(
 			stateEntry.CurrentEpochSetup.Participants,
 			stateEntry.CurrentEpoch.ActiveIdentities,
@@ -242,7 +253,7 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 			flow.EpochParticipationStatusJoining,
 		)
 		assert.NoError(t, err)
-		assert.Equal(t, expectedIdentities, richEntry.CurrentEpochIdentityTable, "should be equal to current epoch setup participants + next epoch setup participants")
+		assert.Equal(t, expectedIdentities, richStateEntry.CurrentEpochIdentityTable, "should be equal to current epoch setup participants + next epoch setup participants")
 		expectedIdentities, err = flow.BuildIdentityTable(
 			stateEntry.NextEpochSetup.Participants,
 			stateEntry.NextEpoch.ActiveIdentities,
@@ -251,51 +262,53 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 			flow.EpochParticipationStatusLeaving,
 		)
 		assert.NoError(t, err)
-		assert.Equal(t, expectedIdentities, richEntry.NextEpochIdentityTable, "should be equal to next epoch setup participants + current epoch setup participants")
+		assert.Equal(t, expectedIdentities, richStateEntry.NextEpochIdentityTable, "should be equal to next epoch setup participants + current epoch setup participants")
 	})
 
 	t.Run("commit-after-spork", func(t *testing.T) {
-		stateEntry := unittest.EpochStateFixture(unittest.WithNextEpochProtocolState(), func(entry *flow.EpochRichStateEntry) {
+		stateEntryFixture := unittest.EpochStateFixture(unittest.WithNextEpochProtocolState(), func(entry *flow.EpochRichStateEntry) {
 			// no previous epoch since we are in the first epoch
 			entry.PreviousEpochSetup = nil
 			entry.PreviousEpochCommit = nil
 			entry.PreviousEpoch = nil
 		})
-		// sanity check that previous epoch is not populated in `stateEntry`
-		assert.Nil(t, stateEntry.PreviousEpoch)
-		assert.Nil(t, stateEntry.PreviousEpochSetup)
-		assert.Nil(t, stateEntry.PreviousEpochCommit)
+		// sanity check that previous epoch is not populated in `stateEntryFixture`
+		assert.Nil(t, stateEntryFixture.PreviousEpoch)
+		assert.Nil(t, stateEntryFixture.PreviousEpochSetup)
+		assert.Nil(t, stateEntryFixture.PreviousEpochCommit)
 
-		richEntry, err := flow.NewEpochRichStateEntry(
-			stateEntry.EpochMinStateEntry,
-			stateEntry.PreviousEpochSetup,
-			stateEntry.PreviousEpochCommit,
-			stateEntry.CurrentEpochSetup,
-			stateEntry.CurrentEpochCommit,
-			stateEntry.NextEpochSetup,
-			stateEntry.NextEpochCommit,
+		stateEntry, err := flow.NewEpochStateEntry(
+			stateEntryFixture.EpochMinStateEntry,
+			stateEntryFixture.PreviousEpochSetup,
+			stateEntryFixture.PreviousEpochCommit,
+			stateEntryFixture.CurrentEpochSetup,
+			stateEntryFixture.CurrentEpochCommit,
+			stateEntryFixture.NextEpochSetup,
+			stateEntryFixture.NextEpochCommit,
 		)
 		assert.NoError(t, err)
-		assert.Equal(t, flow.EpochPhaseCommitted, richEntry.EpochPhase())
+		assert.Equal(t, flow.EpochPhaseCommitted, stateEntry.EpochPhase())
 
+		richStateEntry, err := flow.NewEpochRichStateEntry(stateEntry)
+		assert.NoError(t, err)
 		expectedIdentities, err := flow.BuildIdentityTable(
-			stateEntry.CurrentEpochSetup.Participants,
-			stateEntry.CurrentEpoch.ActiveIdentities,
-			stateEntry.NextEpochSetup.Participants,
-			stateEntry.NextEpoch.ActiveIdentities,
+			stateEntryFixture.CurrentEpochSetup.Participants,
+			stateEntryFixture.CurrentEpoch.ActiveIdentities,
+			stateEntryFixture.NextEpochSetup.Participants,
+			stateEntryFixture.NextEpoch.ActiveIdentities,
 			flow.EpochParticipationStatusJoining,
 		)
 		assert.NoError(t, err)
-		assert.Equal(t, expectedIdentities, richEntry.CurrentEpochIdentityTable, "should be equal to current epoch setup participants + next epoch setup participants")
+		assert.Equal(t, expectedIdentities, richStateEntry.CurrentEpochIdentityTable, "should be equal to current epoch setup participants + next epoch setup participants")
 		expectedIdentities, err = flow.BuildIdentityTable(
-			stateEntry.NextEpochSetup.Participants,
-			stateEntry.NextEpoch.ActiveIdentities,
-			stateEntry.CurrentEpochSetup.Participants,
-			stateEntry.CurrentEpoch.ActiveIdentities,
+			stateEntryFixture.NextEpochSetup.Participants,
+			stateEntryFixture.NextEpoch.ActiveIdentities,
+			stateEntryFixture.CurrentEpochSetup.Participants,
+			stateEntryFixture.CurrentEpoch.ActiveIdentities,
 			flow.EpochParticipationStatusLeaving,
 		)
 		assert.NoError(t, err)
-		assert.Equal(t, expectedIdentities, richEntry.NextEpochIdentityTable, "should be equal to next epoch setup participants + current epoch setup participants")
+		assert.Equal(t, expectedIdentities, richStateEntry.NextEpochIdentityTable, "should be equal to next epoch setup participants + current epoch setup participants")
 	})
 }
 
