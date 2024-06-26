@@ -6,7 +6,6 @@ import (
 	"fmt"
 
 	"github.com/cockroachdb/pebble"
-	"github.com/dgraph-io/badger/v2"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine/execution/state"
@@ -16,8 +15,8 @@ import (
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/badger/operation"
 	pStorage "github.com/onflow/flow-go/storage/pebble"
+	"github.com/onflow/flow-go/storage/pebble/operation"
 )
 
 // an increased limit for bootstrapping
@@ -77,17 +76,13 @@ func (b *Bootstrapper) BootstrapLedger(
 
 // IsBootstrapped returns whether the execution database has been bootstrapped, if yes, returns the
 // root statecommitment
-func (b *Bootstrapper) IsBootstrapped(db *badger.DB) (flow.StateCommitment, bool, error) {
+func (b *Bootstrapper) IsBootstrapped(db *pebble.DB) (flow.StateCommitment, bool, error) {
 	var commit flow.StateCommitment
 
-	err := db.View(func(txn *badger.Txn) error {
-		err := operation.LookupStateCommitment(flow.ZeroID, &commit)(txn)
-		if err != nil {
-			return fmt.Errorf("could not lookup state commitment: %w", err)
-		}
-
-		return nil
-	})
+	err := operation.LookupStateCommitment(flow.ZeroID, &commit)(db)
+	if err != nil {
+		return flow.DummyStateCommitment, false, fmt.Errorf("could not lookup state commitment: %w", err)
+	}
 
 	if errors.Is(err, storage.ErrNotFound) {
 		return flow.DummyStateCommitment, false, nil
@@ -101,35 +96,36 @@ func (b *Bootstrapper) IsBootstrapped(db *badger.DB) (flow.StateCommitment, bool
 }
 
 func (b *Bootstrapper) BootstrapExecutionDatabase(
-	db *badger.DB,
+	db *pebble.DB,
 	rootSeal *flow.Seal,
 ) error {
 
 	commit := rootSeal.FinalState
-	err := operation.RetryOnConflict(db.Update, func(txn *badger.Txn) error {
+	err := operation.WithReaderBatchWriter(db, func(txn storage.PebbleReaderBatchWriter) error {
+		_, w := txn.ReaderWriter()
 
-		err := operation.InsertExecutedBlock(rootSeal.BlockID)(txn)
+		err := operation.InsertExecutedBlock(rootSeal.BlockID)(w)
 		if err != nil {
 			return fmt.Errorf("could not index initial genesis execution block: %w", err)
 		}
 
-		err = operation.SkipDuplicates(operation.IndexExecutionResult(rootSeal.BlockID, rootSeal.ResultID))(txn)
+		err = operation.IndexExecutionResult(rootSeal.BlockID, rootSeal.ResultID)(w)
 		if err != nil {
 			return fmt.Errorf("could not index result for root result: %w", err)
 		}
 
-		err = operation.IndexStateCommitment(flow.ZeroID, commit)(txn)
+		err = operation.IndexStateCommitment(flow.ZeroID, commit)(w)
 		if err != nil {
 			return fmt.Errorf("could not index void state commitment: %w", err)
 		}
 
-		err = operation.IndexStateCommitment(rootSeal.BlockID, commit)(txn)
+		err = operation.IndexStateCommitment(rootSeal.BlockID, commit)(w)
 		if err != nil {
 			return fmt.Errorf("could not index genesis state commitment: %w", err)
 		}
 
 		snapshots := make([]*snapshot.ExecutionSnapshot, 0)
-		err = operation.InsertExecutionStateInteractions(rootSeal.BlockID, snapshots)(txn)
+		err = operation.InsertExecutionStateInteractions(rootSeal.BlockID, snapshots)(w)
 		if err != nil {
 			return fmt.Errorf("could not bootstrap execution state interactions: %w", err)
 		}
