@@ -68,7 +68,7 @@ contract EVM {
         /// the address provided in the contractAddress field.
         /// in case of revert, the smart contract custom error message
         /// is also returned here (see EIP-140 for more details).
-        returnedData: String
+        returnedData: String,
         /// captures the input and output of the calls to the extra precompiled 
         /// contracts (e.g. Cadence Arch) during the transaction execution.
         /// This data helps to replay the transactions without the need to
