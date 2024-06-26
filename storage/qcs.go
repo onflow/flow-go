@@ -15,6 +15,7 @@ type QuorumCertificates interface {
 	// * storage.ErrAlreadyExists if any QC for blockID is already stored
 	StoreTx(qc *flow.QuorumCertificate) func(*transaction.Tx) error
 
+	// * storage.ErrAlreadyExists if any QC for blockID is already stored
 	StorePebble(qc *flow.QuorumCertificate) func(PebbleReaderBatchWriter) error
 	// ByBlockID returns QC that certifies block referred by blockID.
 	// * storage.ErrNotFound if no QC for blockID doesn't exist.
