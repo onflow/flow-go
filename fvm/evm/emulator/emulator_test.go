@@ -188,6 +188,7 @@ func TestContractInteraction(t *testing.T) {
 						require.NoError(t, err)
 						require.GreaterOrEqual(t, res.GasConsumed, uint64(40_000))
 						nonce += 1
+						require.Empty(t, res.PrecompiledCalls)
 					})
 				})
 
@@ -756,6 +757,18 @@ func TestCallingExtraPrecompiles(t *testing.T) {
 				output := []byte{3, 4}
 				addr := testutils.RandomAddress(t)
 				isCalled := false
+				capturedCall := &types.PrecompiledCalls{
+					Address: addr,
+					RequiredGasCalls: []types.RequiredGasCall{{
+						Input:  input,
+						Output: uint64(10),
+					}},
+					RunCalls: []types.RunCall{{
+						Input:    input,
+						Output:   output,
+						ErrorMsg: "",
+					}},
+				}
 				pc := &MockedPrecompiled{
 					AddressFunc: func() types.Address {
 						return addr
@@ -773,18 +786,7 @@ func TestCallingExtraPrecompiles(t *testing.T) {
 						return isCalled
 					},
 					CapturedCallsFunc: func() *types.PrecompiledCalls {
-						return &types.PrecompiledCalls{
-							Address: addr,
-							RequiredGasCalls: []types.RequiredGasCall{{
-								Input:  input,
-								Output: uint64(10),
-							}},
-							RunCalls: []types.RunCall{{
-								Input:    input,
-								Output:   output,
-								ErrorMsg: "",
-							}},
-						}
+						return capturedCall
 					},
 					ResetFunc: func() {
 					},
@@ -808,6 +810,12 @@ func TestCallingExtraPrecompiles(t *testing.T) {
 				)
 				require.NoError(t, err)
 				require.Equal(t, output, res.ReturnedData)
+				require.NotEmpty(t, res.PrecompiledCalls)
+
+				apc, err := types.AggregatedPrecompileCallsFromEncoded(res.PrecompiledCalls)
+				require.NoError(t, err)
+				require.Len(t, apc, 1)
+				require.Equal(t, *capturedCall, apc[0])
 			})
 		})
 	})
