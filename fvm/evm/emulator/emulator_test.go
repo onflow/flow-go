@@ -1023,7 +1023,8 @@ type MockedPrecompile struct {
 	AddressFunc       func() types.Address
 	RequiredGasFunc   func(input []byte) uint64
 	RunFunc           func(input []byte) ([]byte, error)
-	CapturedCallsFunc func() *types.PrecompileCalls
+	CapturedCallsFunc func() *types.PrecompiledCalls
+	ResetFunc         func()
 }
 
 var _ types.Precompile = &MockedPrecompile{}
@@ -1049,9 +1050,16 @@ func (mp *MockedPrecompile) Run(input []byte) ([]byte, error) {
 	return mp.RunFunc(input)
 }
 
-func (mp *MockedPrecompile) CapturedCalls() *types.PrecompileCalls {
+func (mp *MockedPrecompile) CapturedCalls() *types.PrecompiledCalls {
 	if mp.CapturedCallsFunc == nil {
 		panic("CapturedCalls not set for the mocked precompile")
 	}
 	return mp.CapturedCallsFunc()
+}
+
+func (mp *MockedPrecompile) Reset() {
+	if mp.ResetFunc == nil {
+		panic("Reset not set for the mocked precompile")
+	}
+	mp.ResetFunc()
 }

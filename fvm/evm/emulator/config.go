@@ -32,6 +32,8 @@ type Config struct {
 	TxContext *gethVM.TxContext
 	// base unit of gas for direct calls
 	DirectCallBaseGasUsage uint64
+	// list of precompiles
+	ExtraPrecompiles []types.Precompile
 }
 
 func (c *Config) ChainRules() gethParams.Rules {
@@ -197,6 +199,7 @@ func WithExtraPrecompiles(precompiles []types.Precompile) Option {
 			}
 			return gethCore.GetPrecompile(rules, addr)
 		}
+		c.ExtraPrecompiles = precompiles
 		return c
 	}
 }

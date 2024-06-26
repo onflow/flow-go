@@ -119,7 +119,7 @@ func TestEVMTransactionExecutedEventCCFEncodingDecoding(t *testing.T) {
 	}
 
 	t.Run("evm.TransactionExecuted with failed status", func(t *testing.T) {
-		event := types.NewTransactionEvent(txResult, txBytes, blockHeight, blockHash, "")
+		event := types.NewTransactionEvent(txResult, txBytes, blockHeight, blockHash)
 		ev, err := event.Payload.ToCadence(evmLocation)
 		require.NoError(t, err)
 
@@ -161,7 +161,7 @@ func TestEVMTransactionExecutedEventCCFEncodingDecoding(t *testing.T) {
 	t.Run("evm.TransactionExecuted with non-failed status", func(t *testing.T) {
 		txResult.VMError = nil
 
-		event := types.NewTransactionEvent(txResult, txBytes, blockHeight, blockHash, "")
+		event := types.NewTransactionEvent(txResult, txBytes, blockHeight, blockHash)
 		ev, err := event.Payload.ToCadence(evmLocation)
 		require.NoError(t, err)
 

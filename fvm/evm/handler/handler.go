@@ -230,7 +230,6 @@ func (h *ContractHandler) batchRun(rlpEncodedTxs [][]byte, coinbase types.Addres
 	}
 
 	for i, r := range res {
-		// TODO from here
 		if r.Invalid() { // don't emit events for invalid tx
 			continue
 		}

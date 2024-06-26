@@ -109,10 +109,15 @@ func (p *precompile) Run(input []byte) ([]byte, error) {
 	return output, err
 }
 
-func (p *precompile) CapturedCalls() *types.PrecompileCalls {
-	return &types.PrecompileCalls{
+func (p *precompile) CapturedCalls() *types.PrecompiledCalls {
+	return &types.PrecompiledCalls{
 		Address:          p.address,
 		RequiredGasCalls: p.requiredGasCalls,
 		RunCalls:         p.runCalls,
 	}
+}
+
+func (p *precompile) Reset() {
+	p.requiredGasCalls = make([]types.RequiredGasCall, 0)
+	p.runCalls = make([]types.RunCall, 0)
 }

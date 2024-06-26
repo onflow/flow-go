@@ -95,9 +95,6 @@ func (bv *ReadOnlyBlockView) CodeHashOf(address types.Address) ([]byte, error) {
 }
 
 // BlockView allows mutation of the evm state as part of a block
-//
-// TODO: allow  multiple calls per block view
-// TODO: add block level commit (separation of trie commit to storage)
 type BlockView struct {
 	config   *Config
 	rootAddr flow.Address
@@ -545,11 +542,14 @@ func (proc *procedure) run(
 	txIndex uint,
 	txType uint8,
 ) (*types.Result, error) {
+	var err error
 	res := types.Result{
 		TxType: txType,
 		TxHash: txHash,
 	}
 
+	// reset precompile tracking
+	proc.resetPrecompileTracking()
 	gasPool := (*gethCore.GasPool)(&proc.config.BlockContext.GasLimit)
 	execResult, err := gethCore.NewStateTransition(
 		proc.evm,
@@ -573,6 +573,12 @@ func (proc *procedure) run(
 		res.GasConsumed = execResult.UsedGas
 		res.GasRefund = proc.state.GetRefund()
 		res.Index = uint16(txIndex)
+
+		res.PrecompiledCalls, err = proc.capturePrecompiledCalls()
+		if err != nil {
+			return nil, err
+		}
+
 		// we need to capture the returned value no matter the status
 		// if the tx is reverted the error message is returned as returned value
 		res.ReturnedData = execResult.ReturnData
@@ -595,6 +601,20 @@ func (proc *procedure) run(
 		}
 	}
 	return &res, nil
+}
+
+func (proc *procedure) resetPrecompileTracking() {
+	for _, pc := range proc.config.ExtraPrecompiles {
+		pc.Reset()
+	}
+}
+
+func (proc *procedure) capturePrecompiledCalls() ([]byte, error) {
+	apc := make(types.AggregatedPrecompiledCalls, 0)
+	for _, pc := range proc.config.ExtraPrecompiles {
+		apc = append(apc, *pc.CapturedCalls())
+	}
+	return apc.Encode()
 }
 
 func AddOne64th(n uint64) uint64 {
