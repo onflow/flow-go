@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"sync"
 
-	"go.uber.org/atomic"
-
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees/leader"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
@@ -15,7 +13,6 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/events"
-	"github.com/onflow/flow-go/state/protocol/prg"
 )
 
 // epochInfo contains leader selection and the initial committee for one epoch.
@@ -80,41 +77,6 @@ func newStaticEpochInfo(epoch protocol.Epoch) (*epochInfo, error) {
 	return epochInfo, nil
 }
 
-// newFallbackModeEpoch creates an artificial fallback epoch generated from
-// the last committed epoch at the time epoch fallback mode is triggered.
-// The fallback epoch:
-// * begins after the last committed epoch
-// * lasts until the next spork (estimated 6 months)
-// * has the same static committee as the last committed epoch
-// TODO remove
-func newFallbackModeEpoch(lastCommittedEpoch *epochInfo) (*epochInfo, error) {
-	rng, err := prg.New(lastCommittedEpoch.randomSource, prg.ConsensusLeaderSelection, nil)
-	if err != nil {
-		return nil, fmt.Errorf("could not create rng from seed: %w", err)
-	}
-	leaders, err := leader.ComputeLeaderSelection(
-		lastCommittedEpoch.finalView+1,
-		rng,
-		leader.EstimatedSixMonthOfViews,
-		lastCommittedEpoch.initialCommittee,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("could not compute leader selection for fallback epoch: %w", err)
-	}
-	epochInfo := &epochInfo{
-		firstView:            lastCommittedEpoch.finalView + 1,
-		finalView:            lastCommittedEpoch.finalView + leader.EstimatedSixMonthOfViews,
-		randomSource:         lastCommittedEpoch.randomSource,
-		leaders:              leaders,
-		initialCommittee:     lastCommittedEpoch.initialCommittee,
-		initialCommitteeMap:  lastCommittedEpoch.initialCommitteeMap,
-		weightThresholdForQC: lastCommittedEpoch.weightThresholdForQC,
-		weightThresholdForTO: lastCommittedEpoch.weightThresholdForTO,
-		dkg:                  lastCommittedEpoch.dkg,
-	}
-	return epochInfo, nil
-}
-
 // Consensus represents the main committee for consensus nodes. The consensus
 // committee might be active for multiple successive epochs.
 type Consensus struct {
@@ -123,11 +85,9 @@ type Consensus struct {
 	mu     sync.RWMutex          // protects access to epochs
 	epochs map[uint64]*epochInfo // cache of initial committee & leader selection per epoch
 	// TODO do we need to strictly order events across types? Yes, I think we do
-	committedEpochsCh        chan *flow.Header // protocol events for newly committed epochs (the first block of the epoch is passed over the channel)
-	epochFallbackTriggeredCh chan struct{}     // protocol event for epoch fallback mode
-	events                   chan eventHandlerFunc
-	isEpochFallbackHandled   *atomic.Bool // ensure we only inject fallback epoch once
-	events.Noop                           // implements protocol.Consumer
+	committedEpochsCh chan *flow.Header // protocol events for newly committed epochs (the first block of the epoch is passed over the channel)
+	events            chan eventHandlerFunc
+	events.Noop       // implements protocol.Consumer
 	component.Component
 }
 
@@ -142,12 +102,10 @@ type eventHandlerFunc func() error
 
 func NewConsensusCommittee(state protocol.State, me flow.Identifier) (*Consensus, error) {
 	com := &Consensus{
-		state:                    state,
-		me:                       me,
-		epochs:                   make(map[uint64]*epochInfo),
-		committedEpochsCh:        make(chan *flow.Header, 1),
-		epochFallbackTriggeredCh: make(chan struct{}, 1),
-		isEpochFallbackHandled:   atomic.NewBool(false),
+		state:             state,
+		me:                me,
+		epochs:            make(map[uint64]*epochInfo),
+		committedEpochsCh: make(chan *flow.Header, 1),
 	}
 
 	com.Component = component.NewComponentManagerBuilder().
@@ -184,20 +142,6 @@ func NewConsensusCommittee(state protocol.State, me flow.Identifier) (*Consensus
 		_, err = com.prepareEpoch(epoch)
 		if err != nil {
 			return nil, fmt.Errorf("could not prepare initial epochs: %w", err)
-		}
-	}
-
-	epochStateSnapshot, err := final.EpochProtocolState()
-	if err != nil {
-		return nil, fmt.Errorf("could not retrieve epoch protocol state: %w", err)
-	}
-
-	// if epoch fallback mode was triggered, inject the fallback epoch
-	// TODO remove
-	if epochStateSnapshot.EpochFallbackTriggered() {
-		err = com.onEpochFallbackModeTriggered()
-		if err != nil {
-			return nil, fmt.Errorf("could not prepare fallback epoch in epoch fallback mode: %w", err)
 		}
 	}
 
@@ -418,58 +362,6 @@ func (c *Consensus) handleEpochCommittedPhaseStarted(refBlock *flow.Header) erro
 	if err != nil {
 		return fmt.Errorf("could not cache data for committed next epoch: %w", err)
 	}
-	return nil
-}
-
-// EpochFallbackModeTriggered passes the protocol event to the worker thread.
-// TODO remove
-func (c *Consensus) EpochFallbackModeTriggered(uint64, *flow.Header) {
-	c.epochFallbackTriggeredCh <- struct{}{}
-}
-
-// onEpochFallbackModeTriggered handles the protocol event for epoch fallback mode being triggered.
-// When this occurs, we inject a fallback epoch to the committee which extends the current epoch.
-// This method must also be called on initialization, if epoch fallback mode was triggered in the past.
-// No errors are expected during normal operation.
-// TODO remove
-func (c *Consensus) onEpochFallbackModeTriggered() error {
-	// we respond to epoch fallback being triggered at most once, therefore
-	// the core logic is protected by an atomic bool.
-	// although it is only valid for epoch fallback to be triggered once per spork,
-	// we must account for repeated delivery of protocol events.
-	if !c.isEpochFallbackHandled.CompareAndSwap(false, true) {
-		return nil
-	}
-
-	currentEpochCounter, err := c.state.Final().Epochs().Current().Counter()
-	if err != nil {
-		return fmt.Errorf("could not get current epoch counter: %w", err)
-	}
-
-	c.mu.RLock()
-	// sanity check: current epoch must be cached already
-	currentEpoch, ok := c.epochs[currentEpochCounter]
-	if !ok {
-		c.mu.RUnlock()
-		return fmt.Errorf("epoch fallback: could not find current epoch (counter=%d) info", currentEpochCounter)
-	}
-	// sanity check: next epoch must never be committed, therefore must not be cached
-	_, ok = c.epochs[currentEpochCounter+1]
-	c.mu.RUnlock()
-	if ok {
-		return fmt.Errorf("epoch fallback: next epoch (counter=%d) is cached contrary to expectation", currentEpochCounter+1)
-	}
-
-	fallbackEpoch, err := newFallbackModeEpoch(currentEpoch)
-	if err != nil {
-		return fmt.Errorf("could not construct fallback epoch: %w", err)
-	}
-
-	// cache the epoch info
-	c.mu.Lock()
-	c.epochs[currentEpochCounter+1] = fallbackEpoch
-	c.mu.Unlock()
-
 	return nil
 }
 
