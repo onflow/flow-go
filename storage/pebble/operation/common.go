@@ -247,30 +247,34 @@ func findHighestAtOrBelow(
 
 		key := append(prefix, b(height)...)
 		it, err := r.NewIter(&pebble.IterOptions{
-			LowerBound: prefix,
-			UpperBound: append(prefix, 0xFF),
+			UpperBound: append(key, 0xFF),
 		})
 		if err != nil {
 			return fmt.Errorf("can not create iterator: %w", err)
 		}
 		defer it.Close()
 
-		notFound := true
-		for it.SeekGE(key); it.Valid(); it.Next() {
-			val, err := it.ValueAndErr()
-			if err != nil {
-				return fmt.Errorf("could not get value: %w", err)
-			}
-
-			err = msgpack.Unmarshal(val, entity)
-			if err != nil {
-				return fmt.Errorf("could not decode entity: %w", err)
-			}
-			notFound = false
+		var highestKey []byte
+		// find highest value below the given height
+		for it.SeekGE(prefix); it.Valid(); it.Next() {
+			highestKey = it.Key()
 		}
 
-		if notFound {
+		if len(highestKey) == 0 {
 			return storage.ErrNotFound
+		}
+
+		// read the value of the highest key
+		val, closer, err := r.Get(highestKey)
+		if err != nil {
+			return convertNotFoundError(err)
+		}
+
+		defer closer.Close()
+
+		err = msgpack.Unmarshal(val, entity)
+		if err != nil {
+			return irrecoverable.NewExceptionf("failed to decode value: %w", err)
 		}
 
 		return nil
