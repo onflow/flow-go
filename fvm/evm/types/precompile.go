@@ -5,26 +5,29 @@ import (
 	"github.com/onflow/go-ethereum/rlp"
 )
 
-// Precompile wraps gethVM precompiles with
+// PrecompiledContract wraps gethVM precompiles with
 // functionality to hold on to the deployed address
 // and captures calls to its method.
-type Precompile interface {
+type PrecompiledContract interface {
+	// PrecompiledContract provides an interface for
+	// calling requiredGas and run
 	gethVM.PrecompiledContract
-	// returns the address where the precompile is deployed
+	// Address returns the address where the precompile is deployed
 	Address() Address
-	// CapturedCalls returns a list of calls to the Run and RequiredGas
+	// CapturedCalls returns a list of calls to the Run and RequiredGas methods
+	// it includes the input and returned value for each call
 	CapturedCalls() *PrecompiledCalls
 	// Reset resets the list of captured calls
 	Reset()
 }
 
-// RunCall captures a call to the RequiredGas method of a precompile contract
+// RunCall captures a call to the RequiredGas method of a precompiled contract
 type RequiredGasCall struct {
 	Input  []byte
 	Output uint64
 }
 
-// RunCall captures a call to the Run method of a precompile contract
+// RunCall captures a call to the Run method of a precompiled contract
 type RunCall struct {
 	Input    []byte
 	Output   []byte

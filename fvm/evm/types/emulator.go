@@ -29,8 +29,8 @@ type BlockContext struct {
 	Random                 gethCommon.Hash
 	Tracer                 tracers.Tracer
 
-	// a set of extra precompiles to be injected
-	ExtraPrecompiles []Precompile
+	// a set of extra precompiled contracts to be injected
+	ExtraPrecompiledContracts []PrecompiledContract
 }
 
 // NewDefaultBlockContext returns a new default block context

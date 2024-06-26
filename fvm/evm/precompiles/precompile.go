@@ -26,11 +26,11 @@ type Function interface {
 	Run(input []byte) ([]byte, error)
 }
 
-// MultiFunctionPrecompileContract constructs a multi-function precompile smart contract
-func MultiFunctionPrecompileContract(
+// MultiFunctionPrecompiledContract constructs a multi-function precompile smart contract
+func MultiFunctionPrecompiledContract(
 	address types.Address,
 	functions []Function,
-) types.Precompile {
+) types.PrecompiledContract {
 	pc := &precompile{
 		functions:        make(map[FunctionSelector]Function),
 		address:          address,

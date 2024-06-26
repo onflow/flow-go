@@ -755,7 +755,7 @@ func TestCallingExtraPrecompiles(t *testing.T) {
 				input := []byte{1, 2}
 				output := []byte{3, 4}
 				addr := testutils.RandomAddress(t)
-				pc := &MockedPrecompile{
+				pc := &MockedPrecompiled{
 					AddressFunc: func() types.Address {
 						return addr
 					},
@@ -785,7 +785,7 @@ func TestCallingExtraPrecompiles(t *testing.T) {
 				}
 
 				ctx := types.NewDefaultBlockContext(blockNumber.Uint64())
-				ctx.ExtraPrecompiles = []types.Precompile{pc}
+				ctx.ExtraPrecompiledContracts = []types.PrecompiledContract{pc}
 
 				blk, err := em.NewBlockView(ctx)
 				require.NoError(t, err)
@@ -1035,7 +1035,7 @@ func TestTransactionTracing(t *testing.T) {
 
 }
 
-type MockedPrecompile struct {
+type MockedPrecompiled struct {
 	AddressFunc       func() types.Address
 	RequiredGasFunc   func(input []byte) uint64
 	RunFunc           func(input []byte) ([]byte, error)
@@ -1043,39 +1043,39 @@ type MockedPrecompile struct {
 	ResetFunc         func()
 }
 
-var _ types.Precompile = &MockedPrecompile{}
+var _ types.PrecompiledContract = &MockedPrecompiled{}
 
-func (mp *MockedPrecompile) Address() types.Address {
+func (mp *MockedPrecompiled) Address() types.Address {
 	if mp.AddressFunc == nil {
-		panic("Address not set for the mocked precompile")
+		panic("Address not set for the mocked precompiled contract")
 	}
 	return mp.AddressFunc()
 }
 
-func (mp *MockedPrecompile) RequiredGas(input []byte) uint64 {
+func (mp *MockedPrecompiled) RequiredGas(input []byte) uint64 {
 	if mp.RequiredGasFunc == nil {
-		panic("RequiredGas not set for the mocked precompile")
+		panic("RequiredGas not set for the mocked precompiled contract")
 	}
 	return mp.RequiredGasFunc(input)
 }
 
-func (mp *MockedPrecompile) Run(input []byte) ([]byte, error) {
+func (mp *MockedPrecompiled) Run(input []byte) ([]byte, error) {
 	if mp.RunFunc == nil {
-		panic("Run not set for the mocked precompile")
+		panic("Run not set for the mocked precompiled contract")
 	}
 	return mp.RunFunc(input)
 }
 
-func (mp *MockedPrecompile) CapturedCalls() *types.PrecompiledCalls {
+func (mp *MockedPrecompiled) CapturedCalls() *types.PrecompiledCalls {
 	if mp.CapturedCallsFunc == nil {
-		panic("CapturedCalls not set for the mocked precompile")
+		panic("CapturedCalls not set for the mocked precompiled contract")
 	}
 	return mp.CapturedCallsFunc()
 }
 
-func (mp *MockedPrecompile) Reset() {
+func (mp *MockedPrecompiled) Reset() {
 	if mp.ResetFunc == nil {
-		panic("Reset not set for the mocked precompile")
+		panic("Reset not set for the mocked precompiled contract")
 	}
 	mp.ResetFunc()
 }
