@@ -3,7 +3,6 @@ package pebble_test
 import (
 	"context"
 	"errors"
-	"fmt"
 	"math/rand"
 	"sync"
 	"testing"
@@ -43,7 +42,6 @@ var participants = unittest.IdentityListFixture(5, unittest.WithAllRoles())
 func TestBootstrapValid(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
 	util.RunWithPebbleBootstrapState(t, rootSnapshot, func(db *pebble.DB, state *protocol.State) {
-		fmt.Println("=======")
 		var finalized uint64
 		err := operation.RetrieveFinalizedHeight(&finalized)(db)
 		require.NoError(t, err)

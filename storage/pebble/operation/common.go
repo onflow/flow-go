@@ -147,7 +147,6 @@ func traverse(prefix []byte, iteration iterationFunc) func(pebble.Reader) error 
 			return fmt.Errorf("prefix must not be empty")
 		}
 
-		// TODO: add prefix to new iter, use `useL6Filter`
 		it, err := r.NewIter(&pebble.IterOptions{
 			LowerBound: prefix,
 			UpperBound: append(prefix, 0xFF),
@@ -235,7 +234,7 @@ func convertNotFoundError(err error) error {
 	return err
 }
 
-// TODO: TOFIX
+// O(N) performance
 func findHighestAtOrBelow(
 	prefix []byte,
 	height uint64,
@@ -246,29 +245,32 @@ func findHighestAtOrBelow(
 			return fmt.Errorf("prefix must not be empty")
 		}
 
-		// opts := badger.DefaultIteratorOptions
-		// opts.Prefix = prefix
-		// opts.Reverse = true
-
-		it, err := r.NewIter(nil)
+		key := append(prefix, b(height)...)
+		it, err := r.NewIter(&pebble.IterOptions{
+			LowerBound: prefix,
+			UpperBound: append(prefix, 0xFF),
+		})
 		if err != nil {
 			return fmt.Errorf("can not create iterator: %w", err)
 		}
+		defer it.Close()
 
-		it.SeekGE(append(prefix, b(height)...))
+		notFound := true
+		for it.SeekGE(key); it.Valid(); it.Next() {
+			val, err := it.ValueAndErr()
+			if err != nil {
+				return fmt.Errorf("could not get value: %w", err)
+			}
 
-		if !it.Valid() {
+			err = msgpack.Unmarshal(val, entity)
+			if err != nil {
+				return fmt.Errorf("could not decode entity: %w", err)
+			}
+			notFound = false
+		}
+
+		if notFound {
 			return storage.ErrNotFound
-		}
-
-		val, err := it.ValueAndErr()
-		if err != nil {
-			return fmt.Errorf("could not get value: %w", err)
-		}
-
-		err = msgpack.Unmarshal(val, entity)
-		if err != nil {
-			return fmt.Errorf("could not decode entity: %w", err)
 		}
 
 		return nil
