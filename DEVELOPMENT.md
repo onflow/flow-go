@@ -1,4 +1,4 @@
-# Developement
+# Development
 
 ## Feature Release Flow
 
