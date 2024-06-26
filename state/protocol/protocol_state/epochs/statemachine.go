@@ -26,7 +26,7 @@ type StateMachine interface {
 	// Do NOT call Build, if the StateMachine instance has returned a `protocol.InvalidServiceEventError`
 	// at any time during its lifetime. After this error, the StateMachine is left with a potentially
 	// dysfunctional state and should be discarded.
-	Build() (updatedState *flow.EpochProtocolStateEntry, stateID flow.Identifier, hasChanges bool)
+	Build() (updatedState *flow.EpochMinStateEntry, stateID flow.Identifier, hasChanges bool)
 
 	// ProcessEpochSetup updates the internally-maintained interim Epoch state with data from epoch setup event.
 	// Processing an epoch setup event also affects the identity table for the current epoch.

@@ -93,7 +93,7 @@ func (s *EpochStateMachineSuite) SetupTest() {
 // epoch state ID in the KV store even when there were no events to process.
 func (s *EpochStateMachineSuite) TestBuild_NoChanges() {
 	s.happyPathStateMachine.On("ParentState").Return(s.parentEpochState)
-	s.happyPathStateMachine.On("Build").Return(s.parentEpochState.EpochProtocolStateEntry, s.parentEpochState.ID(), false).Once()
+	s.happyPathStateMachine.On("Build").Return(s.parentEpochState.EpochMinStateEntry, s.parentEpochState.ID(), false).Once()
 
 	err := s.stateMachine.EvolveState(nil)
 	require.NoError(s.T(), err)
@@ -117,7 +117,7 @@ func (s *EpochStateMachineSuite) TestBuild_NoChanges() {
 // This test also ensures that updated state ID is committed in the KV store.
 func (s *EpochStateMachineSuite) TestBuild_HappyPath() {
 	s.happyPathStateMachine.On("ParentState").Return(s.parentEpochState)
-	updatedState := unittest.EpochStateFixture().EpochProtocolStateEntry
+	updatedState := unittest.EpochStateFixture().EpochMinStateEntry
 	updatedStateID := updatedState.ID()
 	s.happyPathStateMachine.On("Build").Return(updatedState, updatedStateID, true).Once()
 
@@ -515,7 +515,7 @@ func (s *EpochStateMachineSuite) TestEvolveState_EventsAreFiltered() {
 // TestEvolveStateTransitionToNextEpoch_WithInvalidStateTransition tests that EpochStateMachine transitions to the next epoch
 // if an invalid state transition has been detected in a block which triggers transitioning to the next epoch.
 // In such situation, we still need to enter the next epoch (because it has already been committed), but persist in the
-// state that we have entered Epoch fallback mode (`flow.EpochProtocolStateEntry.EpochFallbackTriggered` is set to `true`).
+// state that we have entered Epoch fallback mode (`flow.EpochMinStateEntry.EpochFallbackTriggered` is set to `true`).
 // This test ensures that we don't drop previously committed next epoch.
 // TODO(EFM, #6019): This test is broken with current implementation but must pass when EFM recovery has been implemented.
 func (s *EpochStateMachineSuite) TestEvolveStateTransitionToNextEpoch_WithInvalidStateTransition() {
@@ -544,7 +544,7 @@ func (s *EpochStateMachineSuite) TestEvolveStateTransitionToNextEpoch_WithInvali
 	indexTxDeferredUpdate.On("Execute", mocks.Anything).Return(nil).Once()
 	s.epochStateDB.On("Index", s.candidate.ID(), mocks.Anything).Return(indexTxDeferredUpdate.Execute, nil).Once()
 
-	expectedEpochState := &flow.EpochProtocolStateEntry{
+	expectedEpochState := &flow.EpochMinStateEntry{
 		PreviousEpoch:          s.parentEpochState.CurrentEpoch.Copy(),
 		CurrentEpoch:           *s.parentEpochState.NextEpoch.Copy(),
 		NextEpoch:              nil,

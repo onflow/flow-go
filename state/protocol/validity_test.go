@@ -205,7 +205,7 @@ func TestIsValidExtendingEpochCommit(t *testing.T) {
 			unittest.CommitWithCounter(nextEpochSetup.Counter),
 			unittest.WithDKGFromParticipants(nextEpochSetup.Participants),
 		)
-		err := protocol.IsValidExtendingEpochCommit(extendingSetup, protocolState.EpochProtocolStateEntry, nextEpochSetup)
+		err := protocol.IsValidExtendingEpochCommit(extendingSetup, protocolState.EpochMinStateEntry, nextEpochSetup)
 		require.NoError(t, err)
 	})
 	t.Run("(a) The epoch setup event needs to happen before the commit", func(t *testing.T) {
@@ -221,7 +221,7 @@ func TestIsValidExtendingEpochCommit(t *testing.T) {
 			unittest.CommitWithCounter(nextEpochSetup.Counter),
 			unittest.WithDKGFromParticipants(nextEpochSetup.Participants),
 		)
-		err := protocol.IsValidExtendingEpochCommit(extendingSetup, protocolState.EpochProtocolStateEntry, nextEpochSetup)
+		err := protocol.IsValidExtendingEpochCommit(extendingSetup, protocolState.EpochMinStateEntry, nextEpochSetup)
 		require.Error(t, err)
 	})
 	t.Run("We should only have a single epoch commit event per epoch", func(t *testing.T) {
@@ -232,7 +232,7 @@ func TestIsValidExtendingEpochCommit(t *testing.T) {
 			unittest.CommitWithCounter(nextEpochSetup.Counter),
 			unittest.WithDKGFromParticipants(nextEpochSetup.Participants),
 		)
-		err := protocol.IsValidExtendingEpochCommit(extendingSetup, protocolState.EpochProtocolStateEntry, nextEpochSetup)
+		err := protocol.IsValidExtendingEpochCommit(extendingSetup, protocolState.EpochMinStateEntry, nextEpochSetup)
 		require.Error(t, err)
 	})
 }

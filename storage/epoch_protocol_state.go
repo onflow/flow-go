@@ -14,7 +14,7 @@ type EpochProtocolStateEntries interface {
 	// otherwise an exception is returned.
 	// Expected errors of the returned anonymous function:
 	//   - storage.ErrAlreadyExists if an epoch sub-state with the given id is already stored
-	StoreTx(epochProtocolStateID flow.Identifier, epochProtocolStateEntry *flow.EpochProtocolStateEntry) func(*transaction.Tx) error
+	StoreTx(epochProtocolStateID flow.Identifier, epochProtocolStateEntry *flow.EpochMinStateEntry) func(*transaction.Tx) error
 
 	// Index returns an anonymous function that is intended to be executed as part of a database transaction.
 	// In a nutshell, we want to maintain a map from `blockID` to `epochProtocolStateID`, where `blockID` references the

@@ -90,7 +90,7 @@ func (s *EpochFallbackStateMachineSuite) TestProcessEpochRecover() {
 	require.True(s.T(), hasChanges, "should have changes")
 	require.Equal(s.T(), updatedState.ID(), updatedStateID, "state ID should be equal to updated state ID")
 
-	expectedState := &flow.EpochProtocolStateEntry{
+	expectedState := &flow.EpochMinStateEntry{
 		PreviousEpoch: s.parentProtocolState.PreviousEpoch.Copy(),
 		CurrentEpoch:  s.parentProtocolState.CurrentEpoch,
 		NextEpoch: &flow.EpochStateContainer{
@@ -270,7 +270,7 @@ func (s *EpochFallbackStateMachineSuite) TestTransitionToNextEpoch() {
 	candidate := unittest.BlockHeaderFixture(
 		unittest.HeaderWithView(s.parentProtocolState.CurrentEpochSetup.FinalView + 1))
 
-	expectedState := &flow.EpochProtocolStateEntry{
+	expectedState := &flow.EpochMinStateEntry{
 		PreviousEpoch:          s.parentProtocolState.CurrentEpoch.Copy(),
 		CurrentEpoch:           *s.parentProtocolState.NextEpoch.Copy(),
 		NextEpoch:              nil,
@@ -357,7 +357,7 @@ func (s *EpochFallbackStateMachineSuite) TestNewEpochFallbackStateMachine() {
 		require.Equal(s.T(), updatedState.ID(), stateID)
 		require.NotEqual(s.T(), parentProtocolState.ID(), stateID)
 
-		expectedProtocolState := &flow.EpochProtocolStateEntry{
+		expectedProtocolState := &flow.EpochMinStateEntry{
 			PreviousEpoch: parentProtocolState.PreviousEpoch,
 			CurrentEpoch: flow.EpochStateContainer{
 				SetupID:          parentProtocolState.CurrentEpoch.SetupID,
@@ -384,7 +384,7 @@ func (s *EpochFallbackStateMachineSuite) TestNewEpochFallbackStateMachine() {
 		require.Equal(s.T(), updatedState.ID(), stateID)
 		require.NotEqual(s.T(), parentProtocolState.ID(), stateID)
 
-		expectedProtocolState := &flow.EpochProtocolStateEntry{
+		expectedProtocolState := &flow.EpochMinStateEntry{
 			PreviousEpoch: parentProtocolState.PreviousEpoch,
 			CurrentEpoch: flow.EpochStateContainer{
 				SetupID:          parentProtocolState.CurrentEpoch.SetupID,
@@ -424,7 +424,7 @@ func (s *EpochFallbackStateMachineSuite) TestNewEpochFallbackStateMachine() {
 		require.Equal(s.T(), updatedState.ID(), stateID)
 		require.NotEqual(s.T(), parentProtocolState.ID(), stateID)
 
-		expectedProtocolState := &flow.EpochProtocolStateEntry{
+		expectedProtocolState := &flow.EpochMinStateEntry{
 			PreviousEpoch: parentProtocolState.PreviousEpoch,
 			CurrentEpoch: flow.EpochStateContainer{
 				SetupID:          parentProtocolState.CurrentEpoch.SetupID,
@@ -464,7 +464,7 @@ func (s *EpochFallbackStateMachineSuite) TestNewEpochFallbackStateMachine() {
 		require.Equal(s.T(), updatedState.ID(), stateID)
 		require.NotEqual(s.T(), parentProtocolState.ID(), stateID)
 
-		expectedProtocolState := &flow.EpochProtocolStateEntry{
+		expectedProtocolState := &flow.EpochMinStateEntry{
 			PreviousEpoch: parentProtocolState.PreviousEpoch,
 			CurrentEpoch: flow.EpochStateContainer{
 				SetupID:          parentProtocolState.CurrentEpoch.SetupID,
@@ -553,7 +553,7 @@ func (s *EpochFallbackStateMachineSuite) TestEpochFallbackStateMachineInjectsMul
 		} {
 			evolveStateToView(data.TargetView)
 
-			expectedState := &flow.EpochProtocolStateEntry{
+			expectedState := &flow.EpochMinStateEntry{
 				PreviousEpoch: originalParentState.PreviousEpoch,
 				CurrentEpoch: flow.EpochStateContainer{
 					SetupID:          originalParentState.CurrentEpoch.SetupID,
@@ -564,7 +564,7 @@ func (s *EpochFallbackStateMachineSuite) TestEpochFallbackStateMachineInjectsMul
 				NextEpoch:              nil,
 				EpochFallbackTriggered: true,
 			}
-			require.Equal(s.T(), expectedState, parentProtocolState.EpochProtocolStateEntry)
+			require.Equal(s.T(), expectedState, parentProtocolState.EpochMinStateEntry)
 			require.Greater(s.T(), parentProtocolState.CurrentEpochFinalView(), candidateView,
 				"final view should be greater than final view of test")
 		}
@@ -662,7 +662,7 @@ func (s *EpochFallbackStateMachineSuite) TestEpochFallbackStateMachineInjectsMul
 	} {
 		evolveStateToView(data.TargetView)
 
-		expectedState := &flow.EpochProtocolStateEntry{
+		expectedState := &flow.EpochMinStateEntry{
 			PreviousEpoch: originalParentState.CurrentEpoch.Copy(),
 			CurrentEpoch: flow.EpochStateContainer{
 				SetupID:          originalParentState.NextEpoch.SetupID,
@@ -673,7 +673,7 @@ func (s *EpochFallbackStateMachineSuite) TestEpochFallbackStateMachineInjectsMul
 			NextEpoch:              nil,
 			EpochFallbackTriggered: true,
 		}
-		require.Equal(s.T(), expectedState, parentProtocolState.EpochProtocolStateEntry)
+		require.Equal(s.T(), expectedState, parentProtocolState.EpochMinStateEntry)
 		require.Greater(s.T(), parentProtocolState.CurrentEpochFinalView(), candidateView,
 			"final view should be greater than final view of test")
 	}

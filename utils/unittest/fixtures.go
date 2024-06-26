@@ -1676,7 +1676,7 @@ func WithChunkID(chunkID flow.Identifier) func(*verification.ChunkDataPackReques
 // and height of zero.
 // Use options to customize the request.
 func ChunkDataPackRequestFixture(opts ...func(*verification.ChunkDataPackRequest)) *verification.
-	ChunkDataPackRequest {
+ChunkDataPackRequest {
 
 	req := &verification.ChunkDataPackRequest{
 		Locator: chunks.Locator{
@@ -2697,7 +2697,7 @@ func RootEpochProtocolStateFixture() *flow.RichEpochProtocolStateEntry {
 		})
 	}
 	return &flow.RichEpochProtocolStateEntry{
-		EpochProtocolStateEntry: &flow.EpochProtocolStateEntry{
+		EpochMinStateEntry: &flow.EpochMinStateEntry{
 			PreviousEpoch: nil,
 			CurrentEpoch: flow.EpochStateContainer{
 				SetupID:          currentEpochSetup.ID(),
@@ -2764,7 +2764,7 @@ func EpochStateFixture(options ...func(*flow.RichEpochProtocolStateEntry)) *flow
 		prevEpochIdentities.Map(mapfunc.WithEpochParticipationStatus(flow.EpochParticipationStatusLeaving)))
 
 	entry := &flow.RichEpochProtocolStateEntry{
-		EpochProtocolStateEntry: &flow.EpochProtocolStateEntry{
+		EpochMinStateEntry: &flow.EpochMinStateEntry{
 			CurrentEpoch: flow.EpochStateContainer{
 				SetupID:          currentEpochSetup.ID(),
 				CommitID:         currentEpochCommit.ID(),
@@ -2859,13 +2859,13 @@ func WithValidDKG() func(*flow.RichEpochProtocolStateEntry) {
 	}
 }
 
-// EpochProtocolStateEntryFixture returns a flow.EpochProtocolStateEntry fixture.
+// EpochProtocolStateEntryFixture returns a flow.EpochMinStateEntry fixture.
 //   - PreviousEpoch is always nil
 //   - tentativePhase defines what service events should be defined for the NextEpoch
 //   - efmTriggered defines whether the EpochFallbackTriggered flag should be set.
-func EpochProtocolStateEntryFixture(tentativePhase flow.EpochPhase, efmTriggered bool) flow.EpochProtocolStateEntry {
+func EpochProtocolStateEntryFixture(tentativePhase flow.EpochPhase, efmTriggered bool) flow.EpochMinStateEntry {
 	identities := DynamicIdentityEntryListFixture(5)
-	entry := flow.EpochProtocolStateEntry{
+	entry := flow.EpochMinStateEntry{
 		EpochFallbackTriggered: efmTriggered,
 		PreviousEpoch:          nil,
 		CurrentEpoch: flow.EpochStateContainer{

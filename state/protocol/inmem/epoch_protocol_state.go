@@ -82,7 +82,7 @@ func (s *EpochProtocolStateAdapter) GlobalParams() protocol.GlobalParams {
 // fallback mode is triggered.
 // TODO for 'leaving Epoch Fallback via special service event': at the moment, this is a one-way transition and requires a spork to recover - need to revisit for sporkless EFM recovery
 func (s *EpochProtocolStateAdapter) EpochFallbackTriggered() bool {
-	return s.EpochProtocolStateEntry.EpochFallbackTriggered
+	return s.EpochMinStateEntry.EpochFallbackTriggered
 }
 
 // PreviousEpochExists returns true if a previous epoch exists. This is true for all epoch

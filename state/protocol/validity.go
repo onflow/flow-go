@@ -132,7 +132,7 @@ func IsValidEpochSetup(setup *flow.EpochSetup, verifyNetworkAddress bool) error 
 // Expected errors during normal operations:
 // * protocol.InvalidServiceEventError if the input service event is invalid to extend the currently active epoch
 // This is a side-effect-free function. This function only returns protocol.InvalidServiceEventError as errors.
-func IsValidExtendingEpochCommit(extendingCommit *flow.EpochCommit, protocolStateEntry *flow.EpochProtocolStateEntry, nextEpochSetupEvent *flow.EpochSetup) error {
+func IsValidExtendingEpochCommit(extendingCommit *flow.EpochCommit, protocolStateEntry *flow.EpochMinStateEntry, nextEpochSetupEvent *flow.EpochSetup) error {
 	// The epoch setup event needs to happen before the commit.
 	if protocolStateEntry.NextEpoch == nil {
 		return NewInvalidServiceEventErrorf("missing epoch setup for epoch commit")

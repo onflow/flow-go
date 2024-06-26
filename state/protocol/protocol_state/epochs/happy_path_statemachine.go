@@ -42,7 +42,7 @@ func NewHappyPathStateMachine(telemetry protocol_state.StateMachineTelemetryCons
 		baseStateMachine: baseStateMachine{
 			telemetry:   telemetry,
 			parentState: parentState,
-			state:       parentState.EpochProtocolStateEntry.Copy(),
+			state:       parentState.EpochMinStateEntry.Copy(),
 			view:        view,
 		},
 	}, nil
@@ -73,7 +73,7 @@ func (u *HappyPathStateMachine) ProcessEpochSetup(epochSetup *flow.EpochSetup) (
 		return false, err
 	}
 
-	// When observing setup event for subsequent epoch, construct the EpochStateContainer for `EpochProtocolStateEntry.NextEpoch`.
+	// When observing setup event for subsequent epoch, construct the EpochStateContainer for `EpochMinStateEntry.NextEpoch`.
 	// Context:
 	// Note that the `EpochStateContainer.ActiveIdentities` only contains the nodes that are *active* in the next epoch. Active means
 	// that these nodes are authorized to contribute to extending the chain. Nodes are listed in `ActiveIdentities` if and only if
@@ -144,7 +144,7 @@ func (u *HappyPathStateMachine) ProcessEpochCommit(epochCommit *flow.EpochCommit
 		u.telemetry.OnInvalidServiceEvent(epochCommit.ServiceEvent(), err)
 		return false, err
 	}
-	err := protocol.IsValidExtendingEpochCommit(epochCommit, u.parentState.EpochProtocolStateEntry, u.parentState.NextEpochSetup)
+	err := protocol.IsValidExtendingEpochCommit(epochCommit, u.parentState.EpochMinStateEntry, u.parentState.NextEpochSetup)
 	if err != nil {
 		u.telemetry.OnInvalidServiceEvent(epochCommit.ServiceEvent(), err)
 		return false, fmt.Errorf("invalid epoch commit event for epoch %d: %w", epochCommit.Counter, err)

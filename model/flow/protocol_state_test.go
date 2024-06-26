@@ -10,7 +10,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// TestEpochProtocolStateEntry_EpochPhase tests that all possible instances of an EpochProtocolStateEntry
+// TestEpochProtocolStateEntry_EpochPhase tests that all possible instances of an EpochMinStateEntry
 // correctly compute the current epoch phase, taking into account EFM status and incorporated service events.
 func TestEpochProtocolStateEntry_EpochPhase(t *testing.T) {
 
@@ -61,7 +61,7 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 				Ejected: false,
 			})
 		}
-		stateEntry := &flow.EpochProtocolStateEntry{
+		stateEntry := &flow.EpochMinStateEntry{
 			PreviousEpoch: nil,
 			CurrentEpoch: flow.EpochStateContainer{
 				SetupID:          setup.ID(),
@@ -100,7 +100,7 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 	t.Run("staking-phase", func(t *testing.T) {
 		stateEntry := unittest.EpochStateFixture()
 		richEntry, err := flow.NewRichEpochProtocolStateEntry(
-			stateEntry.EpochProtocolStateEntry,
+			stateEntry.EpochMinStateEntry,
 			stateEntry.PreviousEpochSetup,
 			stateEntry.PreviousEpochCommit,
 			stateEntry.CurrentEpochSetup,
@@ -134,7 +134,7 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 		})
 
 		richEntry, err := flow.NewRichEpochProtocolStateEntry(
-			stateEntry.EpochProtocolStateEntry,
+			stateEntry.EpochMinStateEntry,
 			stateEntry.PreviousEpochSetup,
 			stateEntry.PreviousEpochCommit,
 			stateEntry.CurrentEpochSetup,
@@ -183,7 +183,7 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 		assert.Nil(t, stateEntry.PreviousEpochCommit)
 
 		richEntry, err := flow.NewRichEpochProtocolStateEntry(
-			stateEntry.EpochProtocolStateEntry,
+			stateEntry.EpochMinStateEntry,
 			stateEntry.PreviousEpochSetup,
 			stateEntry.PreviousEpochCommit,
 			stateEntry.CurrentEpochSetup,
@@ -223,7 +223,7 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 		stateEntry := unittest.EpochStateFixture(unittest.WithNextEpochProtocolState())
 
 		richEntry, err := flow.NewRichEpochProtocolStateEntry(
-			stateEntry.EpochProtocolStateEntry,
+			stateEntry.EpochMinStateEntry,
 			stateEntry.PreviousEpochSetup,
 			stateEntry.PreviousEpochCommit,
 			stateEntry.CurrentEpochSetup,
@@ -267,7 +267,7 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 		assert.Nil(t, stateEntry.PreviousEpochCommit)
 
 		richEntry, err := flow.NewRichEpochProtocolStateEntry(
-			stateEntry.EpochProtocolStateEntry,
+			stateEntry.EpochMinStateEntry,
 			stateEntry.PreviousEpochSetup,
 			stateEntry.PreviousEpochCommit,
 			stateEntry.CurrentEpochSetup,
@@ -302,7 +302,7 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 // TestProtocolStateEntry_Copy tests if the copy method returns a deep copy of the entry.
 // All changes to copy shouldn't affect the original entry -- except for key changes.
 func TestProtocolStateEntry_Copy(t *testing.T) {
-	entry := unittest.EpochStateFixture(unittest.WithNextEpochProtocolState()).EpochProtocolStateEntry
+	entry := unittest.EpochStateFixture(unittest.WithNextEpochProtocolState()).EpochMinStateEntry
 	cpy := entry.Copy()
 	assert.Equal(t, entry, cpy)
 	assert.NotSame(t, entry.NextEpoch, cpy.NextEpoch)

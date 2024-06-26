@@ -30,12 +30,12 @@ var _ StateMachine = (*FallbackStateMachine)(nil)
 // See flow.EpochPhase for detailed documentation about EFM and epoch phase transitions.
 // No errors are expected during normal operations.
 func NewFallbackStateMachine(params protocol.GlobalParams, telemetry protocol_state.StateMachineTelemetryConsumer, view uint64, parentState *flow.RichEpochProtocolStateEntry) (*FallbackStateMachine, error) {
-	state := parentState.EpochProtocolStateEntry.Copy()
+	state := parentState.EpochMinStateEntry.Copy()
 	nextEpochCommitted := state.EpochPhase() == flow.EpochPhaseCommitted
 	// we are entering fallback mode, this logic needs to be executed only once
 	if !state.EpochFallbackTriggered {
 		// the next epoch has not been committed, but possibly setup, make sure it is cleared
-		// CAUTION: this logic must be consistent with the `EpochProtocolStateEntry.EpochPhase()`, which
+		// CAUTION: this logic must be consistent with the `EpochMinStateEntry.EpochPhase()`, which
 		// determines the epoch phase based on the configuration of the fields we set here!
 		// Specifically, if and only if the next epoch is already committed as of the parent state,
 		// we go through with that committed epoch. Otherwise, we have a tentative values of an epoch

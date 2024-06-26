@@ -95,7 +95,7 @@ func (_m *EpochProtocolStateEntries) Index(blockID flow.Identifier, epochProtoco
 }
 
 // StoreTx provides a mock function with given fields: epochProtocolStateID, epochProtocolStateEntry
-func (_m *EpochProtocolStateEntries) StoreTx(epochProtocolStateID flow.Identifier, epochProtocolStateEntry *flow.EpochProtocolStateEntry) func(*transaction.Tx) error {
+func (_m *EpochProtocolStateEntries) StoreTx(epochProtocolStateID flow.Identifier, epochProtocolStateEntry *flow.EpochMinStateEntry) func(*transaction.Tx) error {
 	ret := _m.Called(epochProtocolStateID, epochProtocolStateEntry)
 
 	if len(ret) == 0 {
@@ -103,7 +103,7 @@ func (_m *EpochProtocolStateEntries) StoreTx(epochProtocolStateID flow.Identifie
 	}
 
 	var r0 func(*transaction.Tx) error
-	if rf, ok := ret.Get(0).(func(flow.Identifier, *flow.EpochProtocolStateEntry) func(*transaction.Tx) error); ok {
+	if rf, ok := ret.Get(0).(func(flow.Identifier, *flow.EpochMinStateEntry) func(*transaction.Tx) error); ok {
 		r0 = rf(epochProtocolStateID, epochProtocolStateEntry)
 	} else {
 		if ret.Get(0) != nil {

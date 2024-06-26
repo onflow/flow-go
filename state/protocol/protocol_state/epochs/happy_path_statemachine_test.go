@@ -381,7 +381,7 @@ func (s *ProtocolStateMachineSuite) TestProcessEpochSetupInvariants() {
 		require.True(s.T(), protocol.IsInvalidServiceEventError(err))
 	})
 	s.Run("epoch setup state conflicts with protocol state", func() {
-		conflictingIdentity := s.parentProtocolState.EpochProtocolStateEntry.CurrentEpoch.ActiveIdentities[0]
+		conflictingIdentity := s.parentProtocolState.EpochMinStateEntry.CurrentEpoch.ActiveIdentities[0]
 		conflictingIdentity.Ejected = true
 
 		stateMachine, err := NewHappyPathStateMachine(s.consumer, s.candidate.View, s.parentProtocolState.Copy())
@@ -496,7 +496,7 @@ func (s *ProtocolStateMachineSuite) TestEpochSetupAfterIdentityChange() {
 	// Construct a valid flow.RichEpochProtocolStateEntry for next block
 	// We do this by copying the parent protocol state and updating the identities manually
 	updatedRichProtocolState := &flow.RichEpochProtocolStateEntry{
-		EpochProtocolStateEntry:   updatedState,
+		EpochMinStateEntry:        updatedState,
 		PreviousEpochSetup:        s.parentProtocolState.PreviousEpochSetup,
 		PreviousEpochCommit:       s.parentProtocolState.PreviousEpochCommit,
 		CurrentEpochSetup:         s.parentProtocolState.CurrentEpochSetup,
