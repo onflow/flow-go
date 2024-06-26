@@ -6,6 +6,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/state/protocol/protocol_state"
 )
 
 // HappyPathStateMachine is a dedicated structure for evolving the Epoch-related portion of the overall Protocol State.
@@ -32,13 +33,14 @@ var _ StateMachine = (*HappyPathStateMachine)(nil)
 // NewHappyPathStateMachine creates a new HappyPathStateMachine.
 // An exception is returned in case the `EpochFallbackTriggered` flag is set in the `parentState`. This means that
 // the protocol state evolution has reached an undefined state from the perspective of the happy path state machine.
-func NewHappyPathStateMachine(view uint64, parentState *flow.RichEpochProtocolStateEntry) (*HappyPathStateMachine, error) {
+func NewHappyPathStateMachine(telemetry protocol_state.StateMachineTelemetryConsumer, view uint64, parentState *flow.RichEpochProtocolStateEntry) (*HappyPathStateMachine, error) {
 	if parentState.EpochFallbackTriggered {
 		return nil, irrecoverable.NewExceptionf("cannot create happy path protocol state machine at view (%d) for a parent state"+
 			"which is in Epoch Fallback Mode", view)
 	}
 	return &HappyPathStateMachine{
 		baseStateMachine: baseStateMachine{
+			telemetry:   telemetry,
 			parentState: parentState,
 			state:       parentState.EpochProtocolStateEntry.Copy(),
 			view:        view,
@@ -59,12 +61,16 @@ func NewHappyPathStateMachine(view uint64, parentState *flow.RichEpochProtocolSt
 //     CAUTION: the HappyPathStateMachine is left with a potentially dysfunctional state when this error occurs. Do NOT call the Build method
 //     after such error and discard the HappyPathStateMachine!
 func (u *HappyPathStateMachine) ProcessEpochSetup(epochSetup *flow.EpochSetup) (bool, error) {
+	u.telemetry.OnServiceEventReceived(epochSetup.ServiceEvent())
 	err := protocol.IsValidExtendingEpochSetup(epochSetup, u.parentState)
 	if err != nil {
-		return false, fmt.Errorf("invalid epoch setup event: %w", err)
+		u.telemetry.OnInvalidServiceEvent(epochSetup.ServiceEvent(), err)
+		return false, fmt.Errorf("invalid epoch setup event for epoch %d: %w", epochSetup.Counter, err)
 	}
 	if u.state.NextEpoch != nil {
-		return false, protocol.NewInvalidServiceEventErrorf("repeated setup for epoch %d", epochSetup.Counter)
+		err := protocol.NewInvalidServiceEventErrorf("repeated EpochSetup event for epoch %d", epochSetup.Counter)
+		u.telemetry.OnInvalidServiceEvent(epochSetup.ServiceEvent(), err)
+		return false, err
 	}
 
 	// When observing setup event for subsequent epoch, construct the EpochStateContainer for `EpochProtocolStateEntry.NextEpoch`.
@@ -99,6 +105,7 @@ func (u *HappyPathStateMachine) ProcessEpochSetup(epochSetup *flow.EpochSetup) (
 	activeIdentitiesLookup := u.parentState.CurrentEpoch.ActiveIdentities.Lookup() // lookup NodeID → DynamicIdentityEntry for nodes _active_ in the current epoch
 	nextEpochActiveIdentities, err := buildNextEpochActiveParticipants(activeIdentitiesLookup, u.parentState.CurrentEpochSetup, epochSetup)
 	if err != nil {
+		u.telemetry.OnInvalidServiceEvent(epochSetup.ServiceEvent(), err)
 		return false, fmt.Errorf("failed to construct next epoch active participants: %w", err)
 	}
 
@@ -111,6 +118,7 @@ func (u *HappyPathStateMachine) ProcessEpochSetup(epochSetup *flow.EpochSetup) (
 
 	// subsequent epoch commit event and update identities afterwards.
 	u.nextEpochIdentitiesLookup = u.state.NextEpoch.ActiveIdentities.Lookup()
+	u.telemetry.OnServiceEventProcessed(epochSetup.ServiceEvent())
 	return true, nil
 }
 
@@ -125,25 +133,35 @@ func (u *HappyPathStateMachine) ProcessEpochSetup(epochSetup *flow.EpochSetup) (
 //     CAUTION: the HappyPathStateMachine is left with a potentially dysfunctional state when this error occurs. Do NOT call the Build method
 //     after such error and discard the HappyPathStateMachine!
 func (u *HappyPathStateMachine) ProcessEpochCommit(epochCommit *flow.EpochCommit) (bool, error) {
+	u.telemetry.OnServiceEventReceived(epochCommit.ServiceEvent())
 	if u.state.NextEpoch == nil {
-		return false, protocol.NewInvalidServiceEventErrorf("protocol state has been setup yet")
+		err := protocol.NewInvalidServiceEventErrorf("received EpochCommit without prior EpochSetup")
+		u.telemetry.OnInvalidServiceEvent(epochCommit.ServiceEvent(), err)
+		return false, err
 	}
 	if u.state.NextEpoch.CommitID != flow.ZeroID {
-		return false, protocol.NewInvalidServiceEventErrorf("protocol state has already a commit event")
+		err := protocol.NewInvalidServiceEventErrorf("repeated EpochCommit event for epoch %d", epochCommit.Counter)
+		u.telemetry.OnInvalidServiceEvent(epochCommit.ServiceEvent(), err)
+		return false, err
 	}
 	err := protocol.IsValidExtendingEpochCommit(epochCommit, u.parentState.EpochProtocolStateEntry, u.parentState.NextEpochSetup)
 	if err != nil {
-		return false, fmt.Errorf("invalid epoch commit event: %w", err)
+		u.telemetry.OnInvalidServiceEvent(epochCommit.ServiceEvent(), err)
+		return false, fmt.Errorf("invalid epoch commit event for epoch %d: %w", epochCommit.Counter, err)
 	}
 
 	u.state.NextEpoch.CommitID = epochCommit.ID()
+	u.telemetry.OnServiceEventProcessed(epochCommit.ServiceEvent())
 	return true, nil
 }
 
 // ProcessEpochRecover returns the sentinel error `protocol.InvalidServiceEventError`, which
 // indicates that `EpochRecover` are not expected on the happy path of epoch lifecycle.
-func (u *HappyPathStateMachine) ProcessEpochRecover(*flow.EpochRecover) (bool, error) {
-	return false, protocol.NewInvalidServiceEventErrorf("epoch recover event received while on happy path")
+func (u *HappyPathStateMachine) ProcessEpochRecover(epochRecover *flow.EpochRecover) (bool, error) {
+	u.telemetry.OnServiceEventReceived(epochRecover.ServiceEvent())
+	err := protocol.NewInvalidServiceEventErrorf("epoch recover event for epoch %d received while on happy path", epochRecover.EpochSetup.Counter)
+	u.telemetry.OnInvalidServiceEvent(epochRecover.ServiceEvent(), err)
+	return false, err
 }
 
 // When observing setup event for subsequent epoch, construct the EpochStateContainer for `ProtocolStateEntry.NextEpoch`.
@@ -174,6 +192,7 @@ func (u *HappyPathStateMachine) ProcessEpochRecover(*flow.EpochRecover) (bool, e
 
 // For collector clusters, we rely on invariants (I) and (II) holding. See `committees.Cluster` for details, specifically function
 // `constructInitialClusterIdentities(..)`. While the system smart contract must satisfy this invariant, we run a sanity check below.
+// This is a side-effect-free function. This function only returns protocol.InvalidServiceEventError as errors.
 func buildNextEpochActiveParticipants(activeIdentitiesLookup map[flow.Identifier]*flow.DynamicIdentityEntry, currentEpochSetup, nextEpochSetup *flow.EpochSetup) (flow.DynamicIdentityEntryList, error) {
 	nextEpochActiveIdentities := make(flow.DynamicIdentityEntryList, 0, len(nextEpochSetup.Participants))
 	prevNodeID := nextEpochSetup.Participants[0].NodeID

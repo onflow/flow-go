@@ -3,12 +3,14 @@ package epochs
 import (
 	"testing"
 
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/state/protocol"
+	protocol_statemock "github.com/onflow/flow-go/state/protocol/protocol_state/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -24,6 +26,7 @@ type BaseStateMachineSuite struct {
 	parentProtocolState *flow.RichEpochProtocolStateEntry
 	parentBlock         *flow.Header
 	candidate           *flow.Header
+	consumer            *protocol_statemock.StateMachineTelemetryConsumer
 }
 
 func (s *BaseStateMachineSuite) SetupTest() {
@@ -34,6 +37,7 @@ func (s *BaseStateMachineSuite) SetupTest() {
 	})
 	s.parentBlock = unittest.BlockHeaderFixture(unittest.HeaderWithView(s.parentProtocolState.CurrentEpochSetup.FirstView + 1))
 	s.candidate = unittest.BlockHeaderWithParentFixture(s.parentBlock)
+	s.consumer = protocol_statemock.NewStateMachineTelemetryConsumer(s.T())
 }
 
 // ProtocolStateMachineSuite is a dedicated test suite for testing happy path state machine.
@@ -45,7 +49,7 @@ type ProtocolStateMachineSuite struct {
 func (s *ProtocolStateMachineSuite) SetupTest() {
 	s.BaseStateMachineSuite.SetupTest()
 	var err error
-	s.stateMachine, err = NewHappyPathStateMachine(s.candidate.View, s.parentProtocolState.Copy())
+	s.stateMachine, err = NewHappyPathStateMachine(s.consumer, s.candidate.View, s.parentProtocolState.Copy())
 	require.NoError(s.T(), err)
 }
 
@@ -68,7 +72,7 @@ func (s *ProtocolStateMachineSuite) TestTransitionToNextEpoch() {
 		unittest.HeaderWithView(s.parentProtocolState.CurrentEpochSetup.FinalView + 1))
 	var err error
 	// since the candidate block is from next epoch, HappyPathStateMachine should transition to next epoch
-	s.stateMachine, err = NewHappyPathStateMachine(candidate.View, s.parentProtocolState.Copy())
+	s.stateMachine, err = NewHappyPathStateMachine(s.consumer, candidate.View, s.parentProtocolState.Copy())
 	require.NoError(s.T(), err)
 	err = s.stateMachine.TransitionToNextEpoch()
 	require.NoError(s.T(), err)
@@ -87,7 +91,7 @@ func (s *ProtocolStateMachineSuite) TestTransitionToNextEpochNotAllowed() {
 		protocolState := unittest.EpochStateFixture()
 		candidate := unittest.BlockHeaderFixture(
 			unittest.HeaderWithView(protocolState.CurrentEpochSetup.FinalView + 1))
-		stateMachine, err := NewHappyPathStateMachine(candidate.View, protocolState)
+		stateMachine, err := NewHappyPathStateMachine(s.consumer, candidate.View, protocolState)
 		require.NoError(s.T(), err)
 		err = stateMachine.TransitionToNextEpoch()
 		require.Error(s.T(), err, "should not allow transition to next epoch if there is no next epoch protocol state")
@@ -99,7 +103,7 @@ func (s *ProtocolStateMachineSuite) TestTransitionToNextEpochNotAllowed() {
 		})
 		candidate := unittest.BlockHeaderFixture(
 			unittest.HeaderWithView(protocolState.CurrentEpochSetup.FinalView + 1))
-		stateMachine, err := NewHappyPathStateMachine(candidate.View, protocolState)
+		stateMachine, err := NewHappyPathStateMachine(s.consumer, candidate.View, protocolState)
 		require.NoError(s.T(), err)
 		err = stateMachine.TransitionToNextEpoch()
 		require.Error(s.T(), err, "should not allow transition to next epoch if it is not committed")
@@ -108,7 +112,7 @@ func (s *ProtocolStateMachineSuite) TestTransitionToNextEpochNotAllowed() {
 		protocolState := unittest.EpochStateFixture(unittest.WithNextEpochProtocolState())
 		candidate := unittest.BlockHeaderFixture(
 			unittest.HeaderWithView(protocolState.CurrentEpochSetup.FinalView))
-		stateMachine, err := NewHappyPathStateMachine(candidate.View, protocolState)
+		stateMachine, err := NewHappyPathStateMachine(s.consumer, candidate.View, protocolState)
 		require.NoError(s.T(), err)
 		err = stateMachine.TransitionToNextEpoch()
 		require.Error(s.T(), err, "should not allow transition to next epoch if next block is not first block from next epoch")
@@ -140,36 +144,43 @@ func (s *ProtocolStateMachineSuite) TestCreateStateMachineAfterEFMTriggered() {
 	s.parentProtocolState.EpochFallbackTriggered = true
 	var err error
 	// create new HappyPathStateMachine with next epoch information
-	s.stateMachine, err = NewHappyPathStateMachine(s.candidate.View, s.parentProtocolState.Copy())
+	s.stateMachine, err = NewHappyPathStateMachine(s.consumer, s.candidate.View, s.parentProtocolState.Copy())
 	require.Error(s.T(), err)
 }
 
 // TestProcessEpochCommit tests if processing epoch commit event correctly updates internal state of HappyPathStateMachine and
 // correctly behaves when invariants are violated.
 func (s *ProtocolStateMachineSuite) TestProcessEpochCommit() {
+	mockConsumer := func(commit *flow.EpochCommit) {
+		s.consumer.On("OnServiceEventReceived", commit.ServiceEvent()).Once()
+		s.consumer.On("OnInvalidServiceEvent", commit.ServiceEvent(),
+			mock.MatchedBy(func(err error) bool { return protocol.IsInvalidServiceEventError(err) })).Once()
+	}
 	var err error
 	s.Run("invalid counter", func() {
-		s.stateMachine, err = NewHappyPathStateMachine(s.candidate.View, s.parentProtocolState.Copy())
+		s.stateMachine, err = NewHappyPathStateMachine(s.consumer, s.candidate.View, s.parentProtocolState.Copy())
 		require.NoError(s.T(), err)
 		commit := unittest.EpochCommitFixture(func(commit *flow.EpochCommit) {
 			commit.Counter = s.parentProtocolState.CurrentEpochSetup.Counter + 10 // set invalid counter for next epoch
 		})
+		mockConsumer(commit)
 		_, err := s.stateMachine.ProcessEpochCommit(commit)
 		require.Error(s.T(), err)
 		require.True(s.T(), protocol.IsInvalidServiceEventError(err))
 	})
 	s.Run("no next epoch protocol state", func() {
-		s.stateMachine, err = NewHappyPathStateMachine(s.candidate.View, s.parentProtocolState.Copy())
+		s.stateMachine, err = NewHappyPathStateMachine(s.consumer, s.candidate.View, s.parentProtocolState.Copy())
 		require.NoError(s.T(), err)
 		commit := unittest.EpochCommitFixture(func(commit *flow.EpochCommit) {
 			commit.Counter = s.parentProtocolState.CurrentEpochSetup.Counter + 1
 		})
+		mockConsumer(commit)
 		_, err := s.stateMachine.ProcessEpochCommit(commit)
 		require.Error(s.T(), err)
 		require.True(s.T(), protocol.IsInvalidServiceEventError(err))
 	})
 	s.Run("conflicting epoch commit", func() {
-		s.stateMachine, err = NewHappyPathStateMachine(s.candidate.View, s.parentProtocolState.Copy())
+		s.stateMachine, err = NewHappyPathStateMachine(s.consumer, s.candidate.View, s.parentProtocolState.Copy())
 		require.NoError(s.T(), err)
 		setup := unittest.EpochSetupFixture(
 			unittest.SetupWithCounter(s.parentProtocolState.CurrentEpochSetup.Counter+1),
@@ -177,6 +188,8 @@ func (s *ProtocolStateMachineSuite) TestProcessEpochCommit() {
 			unittest.WithFinalView(s.parentProtocolState.CurrentEpochSetup.FinalView+1000),
 		)
 		// processing setup event results in creating next epoch protocol state
+		s.consumer.On("OnServiceEventReceived", setup.ServiceEvent()).Once()
+		s.consumer.On("OnServiceEventProcessed", setup.ServiceEvent()).Once()
 		_, err := s.stateMachine.ProcessEpochSetup(setup)
 		require.NoError(s.T(), err)
 
@@ -191,17 +204,21 @@ func (s *ProtocolStateMachineSuite) TestProcessEpochCommit() {
 			nil,
 		)
 		require.NoError(s.T(), err)
-		s.stateMachine, err = NewHappyPathStateMachine(s.candidate.View+1, parentState)
+
+		s.stateMachine, err = NewHappyPathStateMachine(s.consumer, s.candidate.View+1, parentState)
 		require.NoError(s.T(), err)
 		commit := unittest.EpochCommitFixture(
 			unittest.CommitWithCounter(setup.Counter),
 			unittest.WithDKGFromParticipants(setup.Participants),
 		)
 
+		s.consumer.On("OnServiceEventReceived", commit.ServiceEvent()).Once()
+		s.consumer.On("OnServiceEventProcessed", commit.ServiceEvent()).Once()
 		_, err = s.stateMachine.ProcessEpochCommit(commit)
 		require.NoError(s.T(), err)
 
 		// processing another epoch commit has to be an error since we have already processed one
+		mockConsumer(commit)
 		_, err = s.stateMachine.ProcessEpochCommit(commit)
 		require.Error(s.T(), err)
 		require.True(s.T(), protocol.IsInvalidServiceEventError(err))
@@ -210,7 +227,7 @@ func (s *ProtocolStateMachineSuite) TestProcessEpochCommit() {
 		require.Equal(s.T(), commit.ID(), newState.NextEpoch.CommitID, "next epoch should be committed since we have observed, a valid event")
 	})
 	s.Run("happy path processing", func() {
-		s.stateMachine, err = NewHappyPathStateMachine(s.candidate.View, s.parentProtocolState.Copy())
+		s.stateMachine, err = NewHappyPathStateMachine(s.consumer, s.candidate.View, s.parentProtocolState.Copy())
 		require.NoError(s.T(), err)
 		setup := unittest.EpochSetupFixture(
 			unittest.SetupWithCounter(s.parentProtocolState.CurrentEpochSetup.Counter+1),
@@ -218,6 +235,8 @@ func (s *ProtocolStateMachineSuite) TestProcessEpochCommit() {
 			unittest.WithFinalView(s.parentProtocolState.CurrentEpochSetup.FinalView+1000),
 		)
 		// processing setup event results in creating next epoch protocol state
+		s.consumer.On("OnServiceEventReceived", setup.ServiceEvent()).Once()
+		s.consumer.On("OnServiceEventProcessed", setup.ServiceEvent()).Once()
 		_, err := s.stateMachine.ProcessEpochSetup(setup)
 		require.NoError(s.T(), err)
 
@@ -236,13 +255,14 @@ func (s *ProtocolStateMachineSuite) TestProcessEpochCommit() {
 			nil,
 		)
 		require.NoError(s.T(), err)
-		s.stateMachine, err = NewHappyPathStateMachine(s.candidate.View+1, parentState.Copy())
+		s.stateMachine, err = NewHappyPathStateMachine(s.consumer, s.candidate.View+1, parentState.Copy())
 		require.NoError(s.T(), err)
 		commit := unittest.EpochCommitFixture(
 			unittest.CommitWithCounter(setup.Counter),
 			unittest.WithDKGFromParticipants(setup.Participants),
 		)
-
+		s.consumer.On("OnServiceEventReceived", commit.ServiceEvent()).Once()
+		s.consumer.On("OnServiceEventProcessed", commit.ServiceEvent()).Once()
 		_, err = s.stateMachine.ProcessEpochCommit(commit)
 		require.NoError(s.T(), err)
 
@@ -274,7 +294,7 @@ func (s *ProtocolStateMachineSuite) TestUpdateIdentityHappyPath() {
 	// update protocol state to have next epoch protocol state
 	unittest.WithNextEpochProtocolState()(s.parentProtocolState)
 	var err error
-	s.stateMachine, err = NewHappyPathStateMachine(s.candidate.View, s.parentProtocolState.Copy())
+	s.stateMachine, err = NewHappyPathStateMachine(s.consumer, s.candidate.View, s.parentProtocolState.Copy())
 	require.NoError(s.T(), err)
 
 	currentEpochParticipants := s.parentProtocolState.CurrentEpochIdentityTable.Copy()
@@ -314,31 +334,40 @@ func (s *ProtocolStateMachineSuite) TestUpdateIdentityHappyPath() {
 
 // TestProcessEpochSetupInvariants tests if processing epoch setup when invariants are violated doesn't update internal structures.
 func (s *ProtocolStateMachineSuite) TestProcessEpochSetupInvariants() {
+	mockConsumer := func(setup *flow.EpochSetup) {
+		s.consumer.On("OnServiceEventReceived", setup.ServiceEvent()).Once()
+		s.consumer.On("OnInvalidServiceEvent", setup.ServiceEvent(),
+			mock.MatchedBy(func(err error) bool { return protocol.IsInvalidServiceEventError(err) })).Once()
+	}
 	s.Run("invalid counter", func() {
 		setup := unittest.EpochSetupFixture(func(setup *flow.EpochSetup) {
 			setup.Counter = s.parentProtocolState.CurrentEpochSetup.Counter + 10 // set invalid counter for next epoch
 		})
+		mockConsumer(setup)
 		_, err := s.stateMachine.ProcessEpochSetup(setup)
 		require.Error(s.T(), err)
 		require.True(s.T(), protocol.IsInvalidServiceEventError(err))
 	})
 	s.Run("processing second epoch setup", func() {
-		stateMachine, err := NewHappyPathStateMachine(s.candidate.View, s.parentProtocolState.Copy())
+		stateMachine, err := NewHappyPathStateMachine(s.consumer, s.candidate.View, s.parentProtocolState.Copy())
 		require.NoError(s.T(), err)
 		setup := unittest.EpochSetupFixture(
 			unittest.SetupWithCounter(s.parentProtocolState.CurrentEpochSetup.Counter+1),
 			unittest.WithFirstView(s.parentProtocolState.CurrentEpochSetup.FinalView+1),
 			unittest.WithFinalView(s.parentProtocolState.CurrentEpochSetup.FinalView+1000),
 		)
+		s.consumer.On("OnServiceEventReceived", setup.ServiceEvent()).Once()
+		s.consumer.On("OnServiceEventProcessed", setup.ServiceEvent()).Once()
 		_, err = stateMachine.ProcessEpochSetup(setup)
 		require.NoError(s.T(), err)
 
+		mockConsumer(setup)
 		_, err = stateMachine.ProcessEpochSetup(setup)
 		require.Error(s.T(), err)
 		require.True(s.T(), protocol.IsInvalidServiceEventError(err))
 	})
 	s.Run("participants not sorted", func() {
-		stateMachine, err := NewHappyPathStateMachine(s.candidate.View, s.parentProtocolState.Copy())
+		stateMachine, err := NewHappyPathStateMachine(s.consumer, s.candidate.View, s.parentProtocolState.Copy())
 		require.NoError(s.T(), err)
 		setup := unittest.EpochSetupFixture(func(setup *flow.EpochSetup) {
 			setup.Counter = s.parentProtocolState.CurrentEpochSetup.Counter + 1
@@ -346,6 +375,7 @@ func (s *ProtocolStateMachineSuite) TestProcessEpochSetupInvariants() {
 			setup.Participants, err = setup.Participants.Shuffle()
 			require.NoError(s.T(), err)
 		})
+		mockConsumer(setup)
 		_, err = stateMachine.ProcessEpochSetup(setup)
 		require.Error(s.T(), err)
 		require.True(s.T(), protocol.IsInvalidServiceEventError(err))
@@ -354,7 +384,7 @@ func (s *ProtocolStateMachineSuite) TestProcessEpochSetupInvariants() {
 		conflictingIdentity := s.parentProtocolState.EpochProtocolStateEntry.CurrentEpoch.ActiveIdentities[0]
 		conflictingIdentity.Ejected = true
 
-		stateMachine, err := NewHappyPathStateMachine(s.candidate.View, s.parentProtocolState.Copy())
+		stateMachine, err := NewHappyPathStateMachine(s.consumer, s.candidate.View, s.parentProtocolState.Copy())
 		require.NoError(s.T(), err)
 		setup := unittest.EpochSetupFixture(func(setup *flow.EpochSetup) {
 			setup.Counter = s.parentProtocolState.CurrentEpochSetup.Counter + 1
@@ -364,6 +394,7 @@ func (s *ProtocolStateMachineSuite) TestProcessEpochSetupInvariants() {
 			setup.Participants = s.parentProtocolState.CurrentEpochSetup.Participants
 		})
 
+		mockConsumer(setup)
 		_, err = stateMachine.ProcessEpochSetup(setup)
 		require.Error(s.T(), err)
 		require.True(s.T(), protocol.IsInvalidServiceEventError(err))
@@ -388,6 +419,8 @@ func (s *ProtocolStateMachineSuite) TestProcessEpochSetupHappyPath() {
 	expectedNextEpochActiveIdentities := flow.DynamicIdentityEntryListFromIdentities(setupParticipants)
 
 	// process actual event
+	s.consumer.On("OnServiceEventReceived", setup.ServiceEvent()).Once()
+	s.consumer.On("OnServiceEventProcessed", setup.ServiceEvent()).Once()
 	_, err := s.stateMachine.ProcessEpochSetup(setup)
 	require.NoError(s.T(), err)
 
@@ -430,6 +463,8 @@ func (s *ProtocolStateMachineSuite) TestProcessEpochSetupWithSameParticipants() 
 		unittest.WithFinalView(s.parentProtocolState.CurrentEpochSetup.FinalView+1000),
 		unittest.WithParticipants(setupParticipants.ToSkeleton()),
 	)
+	s.consumer.On("OnServiceEventReceived", setup.ServiceEvent()).Once()
+	s.consumer.On("OnServiceEventProcessed", setup.ServiceEvent()).Once()
 	_, err = s.stateMachine.ProcessEpochSetup(setup)
 	require.NoError(s.T(), err)
 	updatedState, _, _ := s.stateMachine.Build()
@@ -479,7 +514,7 @@ func (s *ProtocolStateMachineSuite) TestEpochSetupAfterIdentityChange() {
 
 	// now we can use it to construct HappyPathStateMachine for next block, which will process epoch setup event.
 	nextBlock := unittest.BlockHeaderWithParentFixture(s.candidate)
-	s.stateMachine, err = NewHappyPathStateMachine(nextBlock.View, updatedRichProtocolState)
+	s.stateMachine, err = NewHappyPathStateMachine(s.consumer, nextBlock.View, updatedRichProtocolState)
 	require.NoError(s.T(), err)
 
 	setup := unittest.EpochSetupFixture(
@@ -496,6 +531,8 @@ func (s *ProtocolStateMachineSuite) TestEpochSetupAfterIdentityChange() {
 		},
 	)
 
+	s.consumer.On("OnServiceEventReceived", setup.ServiceEvent()).Once()
+	s.consumer.On("OnServiceEventProcessed", setup.ServiceEvent()).Once()
 	_, err = s.stateMachine.ProcessEpochSetup(setup)
 	require.NoError(s.T(), err)
 
@@ -525,6 +562,9 @@ func (s *ProtocolStateMachineSuite) TestProcessEpochRecover() {
 		setup.FirstView = s.parentProtocolState.CurrentEpochSetup.FinalView + 1
 		setup.FinalView = setup.FirstView + 10_000
 	})
+	s.consumer.On("OnServiceEventReceived", epochRecover.ServiceEvent()).Once()
+	s.consumer.On("OnInvalidServiceEvent", epochRecover.ServiceEvent(),
+		mock.MatchedBy(func(err error) bool { return protocol.IsInvalidServiceEventError(err) })).Once()
 	processed, err := s.stateMachine.ProcessEpochRecover(epochRecover)
 	require.Error(s.T(), err)
 	require.True(s.T(), protocol.IsInvalidServiceEventError(err))

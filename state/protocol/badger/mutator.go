@@ -16,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/protocol"
+	protocol_state "github.com/onflow/flow-go/state/protocol/protocol_state/state"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/storage/badger/procedure"
@@ -35,12 +36,13 @@ import (
 type FollowerState struct {
 	*State
 
-	index      storage.Index
-	payloads   storage.Payloads
-	tracer     module.Tracer
-	logger     zerolog.Logger
-	consumer   protocol.Consumer
-	blockTimer protocol.BlockTimer
+	index         storage.Index
+	payloads      storage.Payloads
+	tracer        module.Tracer
+	logger        zerolog.Logger
+	consumer      protocol.Consumer
+	blockTimer    protocol.BlockTimer
+	protocolState protocol.MutableProtocolState
 }
 
 var _ protocol.FollowerState = (*FollowerState)(nil)
@@ -74,6 +76,16 @@ func NewFollowerState(
 		logger:     logger,
 		consumer:   consumer,
 		blockTimer: blockTimer,
+		protocolState: protocol_state.NewMutableProtocolState(
+			logger,
+			state.epochProtocolStateEntriesDB,
+			state.protocolKVStoreSnapshotsDB,
+			state.params,
+			state.headers,
+			state.results,
+			state.epoch.setups,
+			state.epoch.commits,
+		),
 	}
 	return followerState, nil
 }
