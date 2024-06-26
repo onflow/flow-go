@@ -51,8 +51,7 @@ func (p *precompile) Address() types.Address {
 }
 
 // RequiredGas calculates the contract gas use
-func (p *precompile) RequiredGas(input []byte) uint64 {
-	var output uint64
+func (p *precompile) RequiredGas(input []byte) (output uint64) {
 	defer func() {
 		// lazy allocation
 		if p.requiredGasCalls == nil {
@@ -67,16 +66,16 @@ func (p *precompile) RequiredGas(input []byte) uint64 {
 	}()
 	if len(input) < FunctionSelectorLength {
 		output = InvalidMethodCallGasUsage
-		return output
+		return
 	}
 	sig, data := SplitFunctionSelector(input)
 	callable, found := p.functions[sig]
 	if !found {
 		output = InvalidMethodCallGasUsage
-		return output
+		return
 	}
 	output = callable.ComputeGas(data)
-	return output
+	return
 }
 
 // Run runs the precompiled contract
