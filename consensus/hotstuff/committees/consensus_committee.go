@@ -16,38 +16,20 @@ import (
 )
 
 // epochInfo contains leader selection and the initial committee for one epoch.
-// epochInfo may only be mutated by addExtension, when we observe a new epoch extension.
+// TODO more docs
 type epochInfo struct {
-	// TODO: Could remove these and use LeaderSelection getters instead
-	firstView uint64 // first view of the epoch (inclusive)
-	finalView uint64 // final view of the epoch (inclusive)
-	// TODO can remove randsrc
-	randomSource []byte // random source of epoch
-
-	leaders              *leader.LeaderSelection // pre-computed leader selection for the epoch
-	initialCommittee     flow.IdentitySkeletonList
-	initialCommitteeMap  map[flow.Identifier]*flow.IdentitySkeleton
-	weightThresholdForQC uint64 // computed based on initial committee weights
-	weightThresholdForTO uint64 // computed based on initial committee weights
-	dkg                  hotstuff.DKG
+	*leader.LeaderSelection // pre-computed leader selection for the epoch
+	initialCommittee        flow.IdentitySkeletonList
+	initialCommitteeMap     map[flow.Identifier]*flow.IdentitySkeleton
+	weightThresholdForQC    uint64 // computed based on initial committee weights
+	weightThresholdForTO    uint64 // computed based on initial committee weights
+	dkg                     hotstuff.DKG
 }
 
 // newStaticEpochInfo returns the static epoch information from the epoch.
 // This can be cached and used for all by-view queries for this epoch.
 // TODO update static terminology (not really static any more)
 func newStaticEpochInfo(epoch protocol.Epoch) (*epochInfo, error) {
-	firstView, err := epoch.FirstView()
-	if err != nil {
-		return nil, fmt.Errorf("could not get first view: %w", err)
-	}
-	finalView, err := epoch.FinalView()
-	if err != nil {
-		return nil, fmt.Errorf("could not get final view: %w", err)
-	}
-	randomSource, err := epoch.RandomSource()
-	if err != nil {
-		return nil, fmt.Errorf("could not get random source: %w", err)
-	}
 	leaders, err := leader.SelectionForConsensus(epoch)
 	if err != nil {
 		return nil, fmt.Errorf("could not get leader selection: %w", err)
@@ -64,10 +46,7 @@ func newStaticEpochInfo(epoch protocol.Epoch) (*epochInfo, error) {
 
 	totalWeight := initialCommittee.TotalWeight()
 	epochInfo := &epochInfo{
-		firstView:            firstView,
-		finalView:            finalView,
-		randomSource:         randomSource,
-		leaders:              leaders,
+		LeaderSelection:      leaders,
 		initialCommittee:     initialCommittee,
 		initialCommitteeMap:  initialCommittee.Lookup(),
 		weightThresholdForQC: WeightThresholdToBuildQC(totalWeight),
@@ -76,6 +55,11 @@ func newStaticEpochInfo(epoch protocol.Epoch) (*epochInfo, error) {
 	}
 	return epochInfo, nil
 }
+
+// eventHandlerFunc represents an event wrapped in a closure which will execute any required local
+// state changes upon execution by the single event processing worker goroutine.
+// No errors are expected under normal conditions.
+type eventHandlerFunc func() error
 
 // Consensus represents the main committee for consensus nodes. The consensus
 // committee might be active for multiple successive epochs.
@@ -95,17 +79,13 @@ var _ protocol.Consumer = (*Consensus)(nil)
 var _ hotstuff.Replicas = (*Consensus)(nil)
 var _ hotstuff.DynamicCommittee = (*Consensus)(nil)
 
-// eventHandlerFunc represents an event wrapped in a closure which will execute any required local
-// state changes upon execution by the single event processing worker goroutine.
-// No errors are expected under normal conditions.
-type eventHandlerFunc func() error
-
 func NewConsensusCommittee(state protocol.State, me flow.Identifier) (*Consensus, error) {
 	com := &Consensus{
 		state:             state,
 		me:                me,
 		epochs:            make(map[uint64]*epochInfo),
 		committedEpochsCh: make(chan *flow.Header, 1),
+		events:            make(chan eventHandlerFunc, 5),
 	}
 
 	com.Component = component.NewComponentManagerBuilder().
@@ -230,7 +210,7 @@ func (c *Consensus) LeaderForView(view uint64) (flow.Identifier, error) {
 	if err != nil {
 		return flow.ZeroID, err
 	}
-	leaderID, err := epochInfo.leaders.LeaderForView(view)
+	leaderID, err := epochInfo.LeaderForView(view)
 	if leader.IsInvalidViewError(err) {
 		// an invalid view error indicates that no leader was computed for this view
 		// this is a fatal internal error, because the view necessarily is within an
@@ -345,7 +325,7 @@ func (c *Consensus) handleEpochExtended(refBlock *flow.Header) error {
 	if !ok {
 		return fmt.Errorf("sanity check failed: current epoch committee info does not exist")
 	}
-	epochInfo.leaders, err = leader.SelectionForConsensus(currentEpoch)
+	epochInfo.LeaderSelection, err = leader.SelectionForConsensus(currentEpoch)
 	if err != nil {
 		return fmt.Errorf("could not re-compute leader selection for epoch after extension: %w", err)
 	}
@@ -381,7 +361,7 @@ func (c *Consensus) staticEpochInfoByView(view uint64) (*epochInfo, error) {
 	// this linear map iteration is inexpensive.
 	c.mu.RLock()
 	for _, epoch := range c.epochs {
-		if epoch.firstView <= view && view <= epoch.finalView {
+		if epoch.FirstView() <= view && view <= epoch.FinalView() {
 			c.mu.RUnlock()
 			return epoch, nil
 		}
@@ -420,10 +400,10 @@ func (c *Consensus) prepareEpoch(epoch protocol.Epoch) (*epochInfo, error) {
 	// sanity check: ensure new epoch has contiguous views with the prior epoch
 	prevEpochInfo, exists := c.epochs[counter-1]
 	if exists {
-		if epochInfo.firstView != prevEpochInfo.finalView+1 {
+		if epochInfo.FirstView() != prevEpochInfo.FinalView()+1 {
 			return nil, fmt.Errorf("non-contiguous view ranges between consecutive epochs (epoch_%d=[%d,%d], epoch_%d=[%d,%d])",
-				counter-1, prevEpochInfo.firstView, prevEpochInfo.finalView,
-				counter, epochInfo.firstView, epochInfo.finalView)
+				counter-1, prevEpochInfo.FirstView(), prevEpochInfo.FinalView(),
+				counter, epochInfo.FirstView(), epochInfo.FinalView())
 		}
 	}
 
