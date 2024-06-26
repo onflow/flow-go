@@ -87,8 +87,8 @@ const (
 )
 
 var (
-	// ErrInvalidBalance is returned when an invalid balance is provided for transfer (e.g. negative)
-	ErrInvalidBalance = errors.New("invalid balance for transfer")
+	// ErrInvalidBalance is returned when an invalid amount is provided for transfer or balance change (e.g. negative)
+	ErrInvalidBalance = errors.New("invalid amount for transfer or balance change")
 
 	// ErrInsufficientComputation is returned when not enough computation is
 	// left in the context of flow transaction to execute the evm operation.

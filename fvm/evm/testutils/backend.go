@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/onflow/cadence/runtime/stdlib"
+	otelTrace "go.opentelemetry.io/otel/trace"
 
 	"github.com/onflow/atree"
 	"github.com/onflow/cadence"
@@ -19,7 +20,9 @@ import (
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/fvm/meter"
+	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/trace"
 )
 
 var TestFlowEVMRootAddress = flow.BytesToAddress([]byte("FlowEVM"))
@@ -40,6 +43,7 @@ func RunWithTestBackend(t testing.TB, f func(*TestBackend)) {
 		TestBlockInfo:               getSimpleBlockStore(),
 		TestRandomGenerator:         getSimpleRandomGenerator(),
 		TestContractFunctionInvoker: &TestContractFunctionInvoker{},
+		TestTracer:                  &TestTracer{},
 	}
 	f(tb)
 }
@@ -185,6 +189,7 @@ type TestBackend struct {
 	*TestRandomGenerator
 	*TestContractFunctionInvoker
 	*testUUIDGenerator
+	*TestTracer
 }
 
 var _ types.Backend = &TestBackend{}
@@ -496,4 +501,31 @@ func (t *testUUIDGenerator) GenerateUUID() (uint64, error) {
 		panic("generateUUID method is not set")
 	}
 	return t.generateUUID()
+}
+
+type TestTracer struct {
+	StartChildSpanFunc func(trace.SpanName, ...otelTrace.SpanStartOption) tracing.TracerSpan
+}
+
+var _ environment.Tracer = &TestTracer{}
+
+func (tt *TestTracer) StartChildSpan(
+	name trace.SpanName,
+	options ...otelTrace.SpanStartOption,
+) tracing.TracerSpan {
+	// if not set we use noop tracer
+	if tt.StartChildSpanFunc == nil {
+		return tracing.NewMockTracerSpan()
+	}
+	return tt.StartChildSpanFunc(name, options...)
+}
+
+func (tt *TestTracer) ExpectedSpan(t *testing.T, expected trace.SpanName) {
+	tt.StartChildSpanFunc = func(
+		sn trace.SpanName,
+		sso ...otelTrace.SpanStartOption,
+	) tracing.TracerSpan {
+		require.Equal(t, expected, sn)
+		return tracing.NewMockTracerSpan()
+	}
 }

@@ -162,6 +162,7 @@ const (
 	FVMEnvGetStorageCapacity          SpanName = "fvm.env.getStorageCapacity"
 	FVMEnvGetAccountBalance           SpanName = "fvm.env.getAccountBalance"
 	FVMEnvGetAccountAvailableBalance  SpanName = "fvm.env.getAccountAvailableBalance"
+	FVMEnvGetAccountKeys              SpanName = "fvm.env.getAccountKeys"
 	FVMEnvResolveLocation             SpanName = "fvm.env.resolveLocation"
 	FVMEnvGetCode                     SpanName = "fvm.env.getCode"
 	FVMEnvGetAccountContractNames     SpanName = "fvm.env.getAccountContractNames"
@@ -193,6 +194,15 @@ const (
 	FVMEnvGetAccountContractCode      SpanName = "fvm.env.getAccountContractCode"
 	FVMEnvRemoveAccountContractCode   SpanName = "fvm.env.removeAccountContractCode"
 	FVMEnvGetSigningAccounts          SpanName = "fvm.env.getSigningAccounts"
+
+	FVMEVMDeployCOA SpanName = "fvm.evm.deployCOA"
+	FVMEVMRun       SpanName = "fvm.evm.run"
+	FVMEVMDryRun    SpanName = "fvm.evm.dryRun"
+	FVMEVMBatchRun  SpanName = "fvm.evm.batchRun"
+	FVMEVMDeposit   SpanName = "fvm.evm.deposit"
+	FVMEVMWithdraw  SpanName = "fvm.evm.withdraw"
+	FVMEVMDeploy    SpanName = "fvm.evm.deploy"
+	FVMEVMCall      SpanName = "fvm.evm.call"
 
 	FVMCadenceTrace SpanName = "fvm.cadence.trace"
 )
