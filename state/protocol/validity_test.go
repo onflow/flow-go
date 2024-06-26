@@ -195,7 +195,7 @@ func TestIsValidExtendingEpochSetup(t *testing.T) {
 // additionally we require other conditions, but they are tested by separate test `TestEpochCommitValidity`.
 func TestIsValidExtendingEpochCommit(t *testing.T) {
 	t.Run("happy path", func(t *testing.T) {
-		protocolState := unittest.EpochStateFixture(unittest.WithNextEpochProtocolState(), func(entry *flow.RichEpochProtocolStateEntry) {
+		protocolState := unittest.EpochStateFixture(unittest.WithNextEpochProtocolState(), func(entry *flow.EpochRichStateEntry) {
 			entry.NextEpochCommit = nil
 			entry.NextEpoch.CommitID = flow.ZeroID
 		})

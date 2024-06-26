@@ -108,7 +108,18 @@ func (c *EpochStateContainer) Copy() *EpochStateContainer {
 	}
 }
 
-// RichEpochProtocolStateEntry is a EpochMinStateEntry which has additional fields that are cached
+type EpochStateEntry struct {
+	*EpochMinStateEntry
+
+	PreviousEpochSetup  *EpochSetup
+	PreviousEpochCommit *EpochCommit
+	CurrentEpochSetup   *EpochSetup
+	CurrentEpochCommit  *EpochCommit
+	NextEpochSetup      *EpochSetup
+	NextEpochCommit     *EpochCommit
+}
+
+// EpochRichStateEntry is a EpochMinStateEntry which has additional fields that are cached
 // from storage layer for convenience.
 // Using this structure instead of EpochMinStateEntry allows us to avoid querying
 // the database for epoch setups and commits and full identity table.
@@ -126,22 +137,16 @@ func (c *EpochStateContainer) Copy() *EpochStateContainer {
 // the Identity Table additionally contains nodes (with weight zero) from the previous or
 // upcoming epoch, which are transitioning into / out of the network and are only allowed
 // to listen but not to actively contribute.
-type RichEpochProtocolStateEntry struct {
-	*EpochMinStateEntry
+type EpochRichStateEntry struct {
+	*EpochStateEntry
 
-	PreviousEpochSetup        *EpochSetup
-	PreviousEpochCommit       *EpochCommit
-	CurrentEpochSetup         *EpochSetup
-	CurrentEpochCommit        *EpochCommit
-	NextEpochSetup            *EpochSetup
-	NextEpochCommit           *EpochCommit
 	CurrentEpochIdentityTable IdentityList
 	NextEpochIdentityTable    IdentityList
 }
 
-// NewRichEpochProtocolStateEntry constructs a RichEpochProtocolStateEntry from an EpochMinStateEntry and additional data.
+// NewEpochRichStateEntry constructs a EpochRichStateEntry from an EpochMinStateEntry and additional data.
 // No errors are expected during normal operation. All errors indicate inconsistent or invalid inputs.
-func NewRichEpochProtocolStateEntry(
+func NewEpochRichStateEntry(
 	protocolState *EpochMinStateEntry,
 	previousEpochSetup *EpochSetup,
 	previousEpochCommit *EpochCommit,
@@ -149,8 +154,8 @@ func NewRichEpochProtocolStateEntry(
 	currentEpochCommit *EpochCommit,
 	nextEpochSetup *EpochSetup,
 	nextEpochCommit *EpochCommit,
-) (*RichEpochProtocolStateEntry, error) {
-	result := &RichEpochProtocolStateEntry{
+) (*EpochRichStateEntry, error) {
+	result := &EpochRichStateEntry{
 		EpochMinStateEntry:        protocolState,
 		PreviousEpochSetup:        previousEpochSetup,
 		PreviousEpochCommit:       previousEpochCommit,
@@ -293,14 +298,14 @@ func (e *EpochMinStateEntry) Copy() *EpochMinStateEntry {
 	}
 }
 
-// Copy returns a full copy of the RichEpochProtocolStateEntry.
+// Copy returns a full copy of the EpochRichStateEntry.
 //   - Embedded service events are copied by reference (not deep-copied).
 //   - CurrentEpochIdentityTable and NextEpochIdentityTable are deep-copied, _except_ for their keys, which are copied by reference.
-func (e *RichEpochProtocolStateEntry) Copy() *RichEpochProtocolStateEntry {
+func (e *EpochRichStateEntry) Copy() *EpochRichStateEntry {
 	if e == nil {
 		return nil
 	}
-	return &RichEpochProtocolStateEntry{
+	return &EpochRichStateEntry{
 		EpochMinStateEntry:        e.EpochMinStateEntry.Copy(),
 		PreviousEpochSetup:        e.PreviousEpochSetup,
 		PreviousEpochCommit:       e.PreviousEpochCommit,
@@ -316,7 +321,7 @@ func (e *RichEpochProtocolStateEntry) Copy() *RichEpochProtocolStateEntry {
 // CurrentEpochFinalView returns the final view of the current epoch, taking into account possible epoch extensions.
 // If there are no epoch extensions, the final view is the final view of the current epoch setup,
 // otherwise it is the final view of the last epoch extension.
-func (e *RichEpochProtocolStateEntry) CurrentEpochFinalView() uint64 {
+func (e *EpochRichStateEntry) CurrentEpochFinalView() uint64 {
 	l := len(e.CurrentEpoch.EpochExtensions)
 	if l > 0 {
 		return e.CurrentEpoch.EpochExtensions[l-1].FinalView
@@ -353,8 +358,8 @@ func (e *EpochMinStateEntry) EpochPhase() EpochPhase {
 }
 
 // EpochCounter returns the current epoch counter.
-// The receiver RichEpochProtocolStateEntry must be properly constructed.
-func (e *RichEpochProtocolStateEntry) EpochCounter() uint64 {
+// The receiver EpochRichStateEntry must be properly constructed.
+func (e *EpochRichStateEntry) EpochCounter() uint64 {
 	return e.CurrentEpochSetup.Counter
 }
 

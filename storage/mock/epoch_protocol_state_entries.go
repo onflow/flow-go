@@ -15,23 +15,23 @@ type EpochProtocolStateEntries struct {
 }
 
 // ByBlockID provides a mock function with given fields: blockID
-func (_m *EpochProtocolStateEntries) ByBlockID(blockID flow.Identifier) (*flow.RichEpochProtocolStateEntry, error) {
+func (_m *EpochProtocolStateEntries) ByBlockID(blockID flow.Identifier) (*flow.EpochRichStateEntry, error) {
 	ret := _m.Called(blockID)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ByBlockID")
 	}
 
-	var r0 *flow.RichEpochProtocolStateEntry
+	var r0 *flow.EpochRichStateEntry
 	var r1 error
-	if rf, ok := ret.Get(0).(func(flow.Identifier) (*flow.RichEpochProtocolStateEntry, error)); ok {
+	if rf, ok := ret.Get(0).(func(flow.Identifier) (*flow.EpochRichStateEntry, error)); ok {
 		return rf(blockID)
 	}
-	if rf, ok := ret.Get(0).(func(flow.Identifier) *flow.RichEpochProtocolStateEntry); ok {
+	if rf, ok := ret.Get(0).(func(flow.Identifier) *flow.EpochRichStateEntry); ok {
 		r0 = rf(blockID)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*flow.RichEpochProtocolStateEntry)
+			r0 = ret.Get(0).(*flow.EpochRichStateEntry)
 		}
 	}
 
@@ -45,23 +45,23 @@ func (_m *EpochProtocolStateEntries) ByBlockID(blockID flow.Identifier) (*flow.R
 }
 
 // ByID provides a mock function with given fields: id
-func (_m *EpochProtocolStateEntries) ByID(id flow.Identifier) (*flow.RichEpochProtocolStateEntry, error) {
+func (_m *EpochProtocolStateEntries) ByID(id flow.Identifier) (*flow.EpochRichStateEntry, error) {
 	ret := _m.Called(id)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ByID")
 	}
 
-	var r0 *flow.RichEpochProtocolStateEntry
+	var r0 *flow.EpochRichStateEntry
 	var r1 error
-	if rf, ok := ret.Get(0).(func(flow.Identifier) (*flow.RichEpochProtocolStateEntry, error)); ok {
+	if rf, ok := ret.Get(0).(func(flow.Identifier) (*flow.EpochRichStateEntry, error)); ok {
 		return rf(id)
 	}
-	if rf, ok := ret.Get(0).(func(flow.Identifier) *flow.RichEpochProtocolStateEntry); ok {
+	if rf, ok := ret.Get(0).(func(flow.Identifier) *flow.EpochRichStateEntry); ok {
 		r0 = rf(id)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*flow.RichEpochProtocolStateEntry)
+			r0 = ret.Get(0).(*flow.EpochRichStateEntry)
 		}
 	}
 

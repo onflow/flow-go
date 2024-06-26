@@ -184,7 +184,7 @@ func TestProtocolStateRootSnapshot(t *testing.T) {
 }
 
 // assertRichProtocolStateValidity checks if RichProtocolState holds its invariant and is correctly populated by storage layer.
-func assertRichProtocolStateValidity(t *testing.T, state *flow.RichEpochProtocolStateEntry) {
+func assertRichProtocolStateValidity(t *testing.T, state *flow.EpochRichStateEntry) {
 	// invariants:
 	//  - CurrentEpochSetup and CurrentEpochCommit are for the same epoch. Never nil.
 	//  - CurrentEpochSetup and CurrentEpochCommit IDs match respective commitments in the `EpochMinStateEntry`.

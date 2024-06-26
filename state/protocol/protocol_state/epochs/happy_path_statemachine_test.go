@@ -23,14 +23,14 @@ func TestProtocolStateMachine(t *testing.T) {
 type BaseStateMachineSuite struct {
 	suite.Suite
 
-	parentProtocolState *flow.RichEpochProtocolStateEntry
+	parentProtocolState *flow.EpochRichStateEntry
 	parentBlock         *flow.Header
 	candidate           *flow.Header
 	consumer            *protocol_statemock.StateMachineTelemetryConsumer
 }
 
 func (s *BaseStateMachineSuite) SetupTest() {
-	s.parentProtocolState = unittest.EpochStateFixture(func(entry *flow.RichEpochProtocolStateEntry) {
+	s.parentProtocolState = unittest.EpochStateFixture(func(entry *flow.EpochRichStateEntry) {
 		// have a fixed boundary for the current epoch
 		entry.CurrentEpochSetup.FinalView = 5_000
 		entry.CurrentEpoch.SetupID = entry.CurrentEpochSetup.ID()
@@ -97,7 +97,7 @@ func (s *ProtocolStateMachineSuite) TestTransitionToNextEpochNotAllowed() {
 		require.Error(s.T(), err, "should not allow transition to next epoch if there is no next epoch protocol state")
 	})
 	s.Run("next epoch not committed", func() {
-		protocolState := unittest.EpochStateFixture(unittest.WithNextEpochProtocolState(), func(entry *flow.RichEpochProtocolStateEntry) {
+		protocolState := unittest.EpochStateFixture(unittest.WithNextEpochProtocolState(), func(entry *flow.EpochRichStateEntry) {
 			entry.NextEpoch.CommitID = flow.ZeroID
 			entry.NextEpochCommit = nil
 		})
@@ -195,7 +195,7 @@ func (s *ProtocolStateMachineSuite) TestProcessEpochCommit() {
 
 		updatedState, _, _ := s.stateMachine.Build()
 
-		parentState, err := flow.NewRichEpochProtocolStateEntry(updatedState,
+		parentState, err := flow.NewEpochRichStateEntry(updatedState,
 			s.parentProtocolState.PreviousEpochSetup,
 			s.parentProtocolState.PreviousEpochCommit,
 			s.parentProtocolState.CurrentEpochSetup,
@@ -246,7 +246,7 @@ func (s *ProtocolStateMachineSuite) TestProcessEpochCommit() {
 		require.Equal(s.T(), updatedState.ID(), stateID)
 		require.Equal(s.T(), s.parentProtocolState.ID(), s.stateMachine.ParentState().ID(), "should not modify parent protocol state")
 
-		parentState, err := flow.NewRichEpochProtocolStateEntry(updatedState,
+		parentState, err := flow.NewEpochRichStateEntry(updatedState,
 			s.parentProtocolState.PreviousEpochSetup,
 			s.parentProtocolState.PreviousEpochCommit,
 			s.parentProtocolState.CurrentEpochSetup,
@@ -493,9 +493,9 @@ func (s *ProtocolStateMachineSuite) TestEpochSetupAfterIdentityChange() {
 	}
 	updatedState, _, _ := s.stateMachine.Build()
 
-	// Construct a valid flow.RichEpochProtocolStateEntry for next block
+	// Construct a valid flow.EpochRichStateEntry for next block
 	// We do this by copying the parent protocol state and updating the identities manually
-	updatedRichProtocolState := &flow.RichEpochProtocolStateEntry{
+	updatedRichProtocolState := &flow.EpochRichStateEntry{
 		EpochMinStateEntry:        updatedState,
 		PreviousEpochSetup:        s.parentProtocolState.PreviousEpochSetup,
 		PreviousEpochCommit:       s.parentProtocolState.PreviousEpochCommit,

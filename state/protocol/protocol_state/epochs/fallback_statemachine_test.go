@@ -309,7 +309,7 @@ func (s *EpochFallbackStateMachineSuite) TestTransitionToNextEpochNotAllowed() {
 		require.Error(s.T(), err, "should not allow transition to next epoch if there is no next epoch protocol state")
 	})
 	s.Run("next epoch not committed", func() {
-		protocolState := unittest.EpochStateFixture(unittest.WithNextEpochProtocolState(), func(entry *flow.RichEpochProtocolStateEntry) {
+		protocolState := unittest.EpochStateFixture(unittest.WithNextEpochProtocolState(), func(entry *flow.EpochRichStateEntry) {
 			entry.NextEpoch.CommitID = flow.ZeroID
 			entry.NextEpochCommit = nil
 			entry.NextEpochIdentityTable = nil
@@ -492,7 +492,7 @@ func (s *EpochFallbackStateMachineSuite) TestEpochFallbackStateMachineInjectsMul
 	parentStateInSetupPhase.NextEpoch.CommitID = flow.ZeroID
 	parentStateInSetupPhase.NextEpochCommit = nil
 
-	for _, originalParentState := range []*flow.RichEpochProtocolStateEntry{parentStateInStakingPhase, parentStateInSetupPhase} {
+	for _, originalParentState := range []*flow.EpochRichStateEntry{parentStateInStakingPhase, parentStateInSetupPhase} {
 		// In the previous test `TestNewEpochFallbackStateMachine`, we verified that the first extension is added correctly. Below we
 		// test proper addition of the subsequent extension. A new extension should be added when we reach `firstExtensionViewThreshold`.
 		// When reaching (equality) this threshold, the next extension should be added
@@ -524,7 +524,7 @@ func (s *EpochFallbackStateMachineSuite) TestEpochFallbackStateMachineInjectsMul
 				require.NoError(s.T(), err)
 				updatedState, _, _ := stateMachine.Build()
 
-				parentProtocolState, err = flow.NewRichEpochProtocolStateEntry(updatedState,
+				parentProtocolState, err = flow.NewEpochRichStateEntry(updatedState,
 					parentProtocolState.PreviousEpochSetup,
 					parentProtocolState.PreviousEpochCommit,
 					parentProtocolState.CurrentEpochSetup,
@@ -630,7 +630,7 @@ func (s *EpochFallbackStateMachineSuite) TestEpochFallbackStateMachineInjectsMul
 			}
 
 			updatedState, _, _ := stateMachine.Build()
-			parentProtocolState, err = flow.NewRichEpochProtocolStateEntry(updatedState,
+			parentProtocolState, err = flow.NewEpochRichStateEntry(updatedState,
 				previousEpochSetup,
 				previousEpochCommit,
 				currentEpochSetup,

@@ -12,7 +12,7 @@ import (
 // operation modes. It partially implements `StateMachine` and is used as building block for more complex implementations.
 type baseStateMachine struct {
 	telemetry   protocol_state.StateMachineTelemetryConsumer
-	parentState *flow.RichEpochProtocolStateEntry
+	parentState *flow.EpochRichStateEntry
 	state       *flow.EpochMinStateEntry
 	view        uint64
 
@@ -45,7 +45,7 @@ func (u *baseStateMachine) View() uint64 {
 }
 
 // ParentState returns parent protocol state associated with this state machine.
-func (u *baseStateMachine) ParentState() *flow.RichEpochProtocolStateEntry {
+func (u *baseStateMachine) ParentState() *flow.EpochRichStateEntry {
 	return u.parentState
 }
 

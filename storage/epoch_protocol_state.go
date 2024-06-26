@@ -32,12 +32,12 @@ type EpochProtocolStateEntries interface {
 	//   - storage.ErrAlreadyExists if a epoch sub-state for the given blockID has already been indexed
 	Index(blockID flow.Identifier, epochProtocolStateID flow.Identifier) func(*transaction.Tx) error
 
-	// ByID returns the flow.RichEpochProtocolStateEntry by its ID.
+	// ByID returns the flow.EpochRichStateEntry by its ID.
 	// Expected errors during normal operations:
 	//   - storage.ErrNotFound if no epoch state entry with the given Identifier is known.
-	ByID(id flow.Identifier) (*flow.RichEpochProtocolStateEntry, error)
+	ByID(id flow.Identifier) (*flow.EpochRichStateEntry, error)
 
-	// ByBlockID retrieves the flow.RichEpochProtocolStateEntry that the block with the given ID proposes.
+	// ByBlockID retrieves the flow.EpochRichStateEntry that the block with the given ID proposes.
 	// CAUTION: this protocol state requires confirmation by a QC and will only become active at the child block,
 	// _after_ validating the QC. Protocol convention:
 	//   - Consider block B, whose ingestion might potentially lead to an updated protocol state. For example,
@@ -49,5 +49,5 @@ type EpochProtocolStateEntries interface {
 	//
 	// Expected errors during normal operations:
 	//   - storage.ErrNotFound if no epoch state entry has been indexed for the given block.
-	ByBlockID(blockID flow.Identifier) (*flow.RichEpochProtocolStateEntry, error)
+	ByBlockID(blockID flow.Identifier) (*flow.EpochRichStateEntry, error)
 }

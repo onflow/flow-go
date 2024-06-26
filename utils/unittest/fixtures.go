@@ -1676,7 +1676,7 @@ func WithChunkID(chunkID flow.Identifier) func(*verification.ChunkDataPackReques
 // and height of zero.
 // Use options to customize the request.
 func ChunkDataPackRequestFixture(opts ...func(*verification.ChunkDataPackRequest)) *verification.
-ChunkDataPackRequest {
+	ChunkDataPackRequest {
 
 	req := &verification.ChunkDataPackRequest{
 		Locator: chunks.Locator{
@@ -2679,7 +2679,7 @@ func ChunkExecutionDataFixture(t *testing.T, minSize int, opts ...func(*executio
 // RootEpochProtocolStateFixture creates a fixture with correctly structured Epoch sub-state.
 // The epoch substate is part of the overall protocol state (KV store).
 // This can be useful for testing bootstrap when there is no previous epoch.
-func RootEpochProtocolStateFixture() *flow.RichEpochProtocolStateEntry {
+func RootEpochProtocolStateFixture() *flow.EpochRichStateEntry {
 	currentEpochSetup := EpochSetupFixture(func(setup *flow.EpochSetup) {
 		setup.Counter = 1
 	})
@@ -2696,7 +2696,7 @@ func RootEpochProtocolStateFixture() *flow.RichEpochProtocolStateEntry {
 			},
 		})
 	}
-	return &flow.RichEpochProtocolStateEntry{
+	return &flow.EpochRichStateEntry{
 		EpochMinStateEntry: &flow.EpochMinStateEntry{
 			PreviousEpoch: nil,
 			CurrentEpoch: flow.EpochStateContainer{
@@ -2729,7 +2729,7 @@ func RootEpochProtocolStateFixture() *flow.RichEpochProtocolStateEntry {
 //   - Epoch setup and commit counters are set to match.
 //   - Identities are constructed from setup events.
 //   - Identities are sorted in canonical order.
-func EpochStateFixture(options ...func(*flow.RichEpochProtocolStateEntry)) *flow.RichEpochProtocolStateEntry {
+func EpochStateFixture(options ...func(*flow.EpochRichStateEntry)) *flow.EpochRichStateEntry {
 	prevEpochSetup := EpochSetupFixture()
 	prevEpochCommit := EpochCommitFixture(func(commit *flow.EpochCommit) {
 		commit.Counter = prevEpochSetup.Counter
@@ -2763,7 +2763,7 @@ func EpochStateFixture(options ...func(*flow.RichEpochProtocolStateEntry)) *flow
 	allIdentities := currentEpochIdentities.Union(
 		prevEpochIdentities.Map(mapfunc.WithEpochParticipationStatus(flow.EpochParticipationStatusLeaving)))
 
-	entry := &flow.RichEpochProtocolStateEntry{
+	entry := &flow.EpochRichStateEntry{
 		EpochMinStateEntry: &flow.EpochMinStateEntry{
 			CurrentEpoch: flow.EpochStateContainer{
 				SetupID:          currentEpochSetup.ID(),
@@ -2800,8 +2800,8 @@ func EpochStateFixture(options ...func(*flow.RichEpochProtocolStateEntry)) *flow
 //   - We are currently in Epoch N.
 //   - The previous epoch N-1 is known (specifically EpochSetup and EpochCommit events).
 //   - The network has completed the epoch setup phase, i.e. published the EpochSetup and EpochCommit events for epoch N+1.
-func WithNextEpochProtocolState() func(entry *flow.RichEpochProtocolStateEntry) {
-	return func(entry *flow.RichEpochProtocolStateEntry) {
+func WithNextEpochProtocolState() func(entry *flow.EpochRichStateEntry) {
+	return func(entry *flow.EpochRichStateEntry) {
 		nextEpochSetup := EpochSetupFixture(func(setup *flow.EpochSetup) {
 			setup.Counter = entry.CurrentEpochSetup.Counter + 1
 			setup.FirstView = entry.CurrentEpochSetup.FinalView + 1
@@ -2847,8 +2847,8 @@ func WithNextEpochProtocolState() func(entry *flow.RichEpochProtocolStateEntry) 
 }
 
 // WithValidDKG updated protocol state with correctly structured data for DKG.
-func WithValidDKG() func(*flow.RichEpochProtocolStateEntry) {
-	return func(entry *flow.RichEpochProtocolStateEntry) {
+func WithValidDKG() func(*flow.EpochRichStateEntry) {
+	return func(entry *flow.EpochRichStateEntry) {
 		commit := entry.CurrentEpochCommit
 		dkgParticipants := entry.CurrentEpochSetup.Participants.Filter(filter.IsValidDKGParticipant)
 		lookup := DKGParticipantLookup(dkgParticipants)

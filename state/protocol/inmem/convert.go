@@ -195,7 +195,7 @@ func SnapshotFromBootstrapStateWithParams(
 		return nil, fmt.Errorf("could not encode kvstore: %w", err)
 	}
 
-	richRootEpochState, err := flow.NewRichEpochProtocolStateEntry(rootEpochState, nil, nil, setup, commit, nil, nil)
+	richRootEpochState, err := flow.NewEpochRichStateEntry(rootEpochState, nil, nil, setup, commit, nil, nil)
 	if err != nil {
 		return nil, fmt.Errorf("could not construct root rich epoch state entry: %w", err)
 	}

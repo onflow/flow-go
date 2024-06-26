@@ -35,7 +35,7 @@ type EpochStateMachineSuite struct {
 	commitsDB                       *storagemock.EpochCommits
 	globalParams                    *protocolmock.GlobalParams
 	parentState                     *protocolmock.KVStoreReader
-	parentEpochState                *flow.RichEpochProtocolStateEntry
+	parentEpochState                *flow.EpochRichStateEntry
 	mutator                         *protocol_statemock.KVStoreMutator
 	happyPathStateMachine           *mock.StateMachine
 	happyPathStateMachineFactory    *mock.StateMachineFactoryMethod
@@ -59,7 +59,7 @@ func (s *EpochStateMachineSuite) SetupTest() {
 	s.happyPathStateMachineFactory = mock.NewStateMachineFactoryMethod(s.T())
 	s.fallbackPathStateMachineFactory = mock.NewStateMachineFactoryMethod(s.T())
 
-	s.epochStateDB.On("ByBlockID", mocks.Anything).Return(func(_ flow.Identifier) *flow.RichEpochProtocolStateEntry {
+	s.epochStateDB.On("ByBlockID", mocks.Anything).Return(func(_ flow.Identifier) *flow.EpochRichStateEntry {
 		return s.parentEpochState
 	}, func(_ flow.Identifier) error {
 		return nil
