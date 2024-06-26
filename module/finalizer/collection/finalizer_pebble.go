@@ -55,56 +55,58 @@ func NewFinalizerPebble(
 // pools and persistent storage.
 // No errors are expected during normal operation.
 func (f *FinalizerPebble) MakeFinal(blockID flow.Identifier) error {
-	return operation.WithReaderBatchWriter(f.db, func(tx storage.PebbleReaderBatchWriter) error {
-		r, w := tx.ReaderWriter()
+	// retrieve the header of the block we want to finalize
+	var header flow.Header
+	err := operation.RetrieveHeader(blockID, &header)(f.db)
+	if err != nil {
+		return fmt.Errorf("could not retrieve header: %w", err)
+	}
 
-		// retrieve the header of the block we want to finalize
-		var header flow.Header
-		err := operation.RetrieveHeader(blockID, &header)(r)
+	// retrieve the current finalized cluster state boundary
+	var boundary uint64
+	err = operation.RetrieveClusterFinalizedHeight(header.ChainID, &boundary)(f.db)
+	if err != nil {
+		return fmt.Errorf("could not retrieve boundary: %w", err)
+	}
+
+	// retrieve the ID of the last finalized block as marker for stopping
+	var headID flow.Identifier
+	err = operation.LookupClusterBlockHeight(header.ChainID, boundary, &headID)(f.db)
+	if err != nil {
+		return fmt.Errorf("could not retrieve head: %w", err)
+	}
+
+	// there are no blocks to finalize, we may have already finalized
+	// this block - exit early
+	if boundary >= header.Height {
+		return nil
+	}
+
+	// To finalize all blocks from the currently finalized one up to and
+	// including the current, we first enumerate each of these blocks.
+	// We start at the youngest block and remember all visited blocks,
+	// while tracing back until we reach the finalized state
+	steps := []*flow.Header{&header}
+	parentID := header.ParentID
+	for parentID != headID {
+		var parent flow.Header
+		err = operation.RetrieveHeader(parentID, &parent)(f.db)
 		if err != nil {
-			return fmt.Errorf("could not retrieve header: %w", err)
+			return fmt.Errorf("could not retrieve parent (%x): %w", parentID, err)
 		}
+		steps = append(steps, &parent)
+		parentID = parent.ParentID
+	}
 
-		// retrieve the current finalized cluster state boundary
-		var boundary uint64
-		err = operation.RetrieveClusterFinalizedHeight(header.ChainID, &boundary)(r)
-		if err != nil {
-			return fmt.Errorf("could not retrieve boundary: %w", err)
-		}
+	// now we can step backwards in order to go from oldest to youngest; for
+	// each header, we reconstruct the block and then apply the related
+	// changes to the protocol state
+	// finalizing blocks one by one, each through a database batch update
+	for i := len(steps) - 1; i >= 0; i-- {
 
-		// retrieve the ID of the last finalized block as marker for stopping
-		var headID flow.Identifier
-		err = operation.LookupClusterBlockHeight(header.ChainID, boundary, &headID)(r)
-		if err != nil {
-			return fmt.Errorf("could not retrieve head: %w", err)
-		}
+		err := operation.WithReaderBatchWriter(f.db, func(tx storage.PebbleReaderBatchWriter) error {
+			r, w := tx.ReaderWriter()
 
-		// there are no blocks to finalize, we may have already finalized
-		// this block - exit early
-		if boundary >= header.Height {
-			return nil
-		}
-
-		// To finalize all blocks from the currently finalized one up to and
-		// including the current, we first enumerate each of these blocks.
-		// We start at the youngest block and remember all visited blocks,
-		// while tracing back until we reach the finalized state
-		steps := []*flow.Header{&header}
-		parentID := header.ParentID
-		for parentID != headID {
-			var parent flow.Header
-			err = operation.RetrieveHeader(parentID, &parent)(r)
-			if err != nil {
-				return fmt.Errorf("could not retrieve parent (%x): %w", parentID, err)
-			}
-			steps = append(steps, &parent)
-			parentID = parent.ParentID
-		}
-
-		// now we can step backwards in order to go from oldest to youngest; for
-		// each header, we reconstruct the block and then apply the related
-		// changes to the protocol state
-		for i := len(steps) - 1; i >= 0; i-- {
 			clusterBlockID := steps[i].ID()
 
 			// look up the transactions included in the payload
@@ -137,7 +139,7 @@ func (f *FinalizerPebble) MakeFinal(blockID flow.Identifier) error {
 			// if the finalized collection is empty, we don't need to include it
 			// in the reference height index or submit it to consensus nodes
 			if len(payload.Collection.Transactions) == 0 {
-				continue
+				return nil
 			}
 
 			// look up the reference block height to populate index
@@ -171,8 +173,13 @@ func (f *FinalizerPebble) MakeFinal(blockID flow.Identifier) error {
 					Signature:        nil, // TODO: to remove because it's not easily verifiable by consensus nodes
 				},
 			})
-		}
+			return nil
+		})
 
-		return nil
-	})
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
