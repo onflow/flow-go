@@ -30,10 +30,8 @@ func MultiFunctionPrecompiledContract(
 	functions []Function,
 ) types.PrecompiledContract {
 	pc := &precompile{
-		functions:        make(map[FunctionSelector]Function),
-		address:          address,
-		requiredGasCalls: make([]types.RequiredGasCall, 0),
-		runCalls:         make([]types.RunCall, 0),
+		functions: make(map[FunctionSelector]Function),
+		address:   address,
 	}
 	for _, f := range functions {
 		pc.functions[f.FunctionSelector()] = f
@@ -56,6 +54,10 @@ func (p *precompile) Address() types.Address {
 func (p *precompile) RequiredGas(input []byte) uint64 {
 	var output uint64
 	defer func() {
+		// lazy allocation
+		if p.requiredGasCalls == nil {
+			p.requiredGasCalls = make([]types.RequiredGasCall, 0)
+		}
 		p.requiredGasCalls = append(
 			p.requiredGasCalls,
 			types.RequiredGasCall{
@@ -83,6 +85,10 @@ func (p *precompile) Run(input []byte) (output []byte, err error) {
 		errMsg := ""
 		if err != nil {
 			errMsg = err.Error()
+		}
+		// lazy allocation
+		if p.runCalls == nil {
+			p.runCalls = make([]types.RunCall, 0)
 		}
 		p.runCalls = append(
 			p.runCalls,
@@ -118,6 +124,6 @@ func (p *precompile) CapturedCalls() *types.PrecompiledCalls {
 }
 
 func (p *precompile) Reset() {
-	p.requiredGasCalls = make([]types.RequiredGasCall, 0)
-	p.runCalls = make([]types.RunCall, 0)
+	p.requiredGasCalls = nil
+	p.runCalls = nil
 }
