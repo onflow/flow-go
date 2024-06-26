@@ -193,7 +193,7 @@ func (b *BuilderPebble) BuildOn(parentID flow.Identifier, setter func(*flow.Head
 
 	// STEP 4: insert the cluster block to the database.
 	span, _ = b.tracer.StartSpanFromContext(ctx, trace.COLBuildOnDBInsert)
-	err = procedure.InsertClusterBlock(&proposal)(b.db)
+	err = operation.WithReaderBatchWriter(b.db, procedure.InsertClusterBlock(&proposal))
 	span.End()
 	if err != nil {
 		return nil, fmt.Errorf("could not insert built block: %w", err)
@@ -331,7 +331,7 @@ func (b *BuilderPebble) populateFinalizedAncestryLookup(ctx *blockBuildContext) 
 	// the finalized cluster blocks which could possibly contain any conflicting transactions
 	var clusterBlockIDs []flow.Identifier
 	start, end := findRefHeightSearchRangeForConflictingClusterBlocks(minRefHeight, maxRefHeight)
-	err := operation.LookupClusterBlocksByReferenceHeightRange(start, end, &clusterBlockIDs)(p.db)
+	err := operation.LookupClusterBlocksByReferenceHeightRange(start, end, &clusterBlockIDs)(b.db)
 	if err != nil {
 		return fmt.Errorf("could not lookup finalized cluster blocks by reference height range [%d,%d]: %w", start, end, err)
 	}
