@@ -2697,22 +2697,24 @@ func RootEpochProtocolStateFixture() *flow.EpochRichStateEntry {
 		})
 	}
 	return &flow.EpochRichStateEntry{
-		EpochMinStateEntry: &flow.EpochMinStateEntry{
-			PreviousEpoch: nil,
-			CurrentEpoch: flow.EpochStateContainer{
-				SetupID:          currentEpochSetup.ID(),
-				CommitID:         currentEpochCommit.ID(),
-				ActiveIdentities: flow.DynamicIdentityEntryListFromIdentities(allIdentities),
+		EpochStateEntry: &flow.EpochStateEntry{
+			EpochMinStateEntry: &flow.EpochMinStateEntry{
+				PreviousEpoch: nil,
+				CurrentEpoch: flow.EpochStateContainer{
+					SetupID:          currentEpochSetup.ID(),
+					CommitID:         currentEpochCommit.ID(),
+					ActiveIdentities: flow.DynamicIdentityEntryListFromIdentities(allIdentities),
+				},
+				EpochFallbackTriggered: false,
+				NextEpoch:              nil,
 			},
-			EpochFallbackTriggered: false,
-			NextEpoch:              nil,
+			PreviousEpochSetup:  nil,
+			PreviousEpochCommit: nil,
+			CurrentEpochSetup:   currentEpochSetup,
+			CurrentEpochCommit:  currentEpochCommit,
+			NextEpochSetup:      nil,
+			NextEpochCommit:     nil,
 		},
-		PreviousEpochSetup:        nil,
-		PreviousEpochCommit:       nil,
-		CurrentEpochSetup:         currentEpochSetup,
-		CurrentEpochCommit:        currentEpochCommit,
-		NextEpochSetup:            nil,
-		NextEpochCommit:           nil,
 		CurrentEpochIdentityTable: allIdentities,
 		NextEpochIdentityTable:    flow.IdentityList{},
 	}
@@ -2764,26 +2766,28 @@ func EpochStateFixture(options ...func(*flow.EpochRichStateEntry)) *flow.EpochRi
 		prevEpochIdentities.Map(mapfunc.WithEpochParticipationStatus(flow.EpochParticipationStatusLeaving)))
 
 	entry := &flow.EpochRichStateEntry{
-		EpochMinStateEntry: &flow.EpochMinStateEntry{
-			CurrentEpoch: flow.EpochStateContainer{
-				SetupID:          currentEpochSetup.ID(),
-				CommitID:         currentEpochCommit.ID(),
-				ActiveIdentities: flow.DynamicIdentityEntryListFromIdentities(currentEpochIdentities),
+		EpochStateEntry: &flow.EpochStateEntry{
+			EpochMinStateEntry: &flow.EpochMinStateEntry{
+				CurrentEpoch: flow.EpochStateContainer{
+					SetupID:          currentEpochSetup.ID(),
+					CommitID:         currentEpochCommit.ID(),
+					ActiveIdentities: flow.DynamicIdentityEntryListFromIdentities(currentEpochIdentities),
+				},
+				PreviousEpoch: &flow.EpochStateContainer{
+					SetupID:          prevEpochSetup.ID(),
+					CommitID:         prevEpochCommit.ID(),
+					ActiveIdentities: flow.DynamicIdentityEntryListFromIdentities(prevEpochIdentities),
+				},
+				EpochFallbackTriggered: false,
+				NextEpoch:              nil,
 			},
-			PreviousEpoch: &flow.EpochStateContainer{
-				SetupID:          prevEpochSetup.ID(),
-				CommitID:         prevEpochCommit.ID(),
-				ActiveIdentities: flow.DynamicIdentityEntryListFromIdentities(prevEpochIdentities),
-			},
-			EpochFallbackTriggered: false,
-			NextEpoch:              nil,
+			PreviousEpochSetup:  prevEpochSetup,
+			PreviousEpochCommit: prevEpochCommit,
+			CurrentEpochSetup:   currentEpochSetup,
+			CurrentEpochCommit:  currentEpochCommit,
+			NextEpochSetup:      nil,
+			NextEpochCommit:     nil,
 		},
-		PreviousEpochSetup:        prevEpochSetup,
-		PreviousEpochCommit:       prevEpochCommit,
-		CurrentEpochSetup:         currentEpochSetup,
-		CurrentEpochCommit:        currentEpochCommit,
-		NextEpochSetup:            nil,
-		NextEpochCommit:           nil,
 		CurrentEpochIdentityTable: allIdentities,
 		NextEpochIdentityTable:    flow.IdentityList{},
 	}

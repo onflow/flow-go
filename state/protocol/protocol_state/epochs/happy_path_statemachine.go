@@ -42,7 +42,7 @@ func NewHappyPathStateMachine(telemetry protocol_state.StateMachineTelemetryCons
 		baseStateMachine: baseStateMachine{
 			telemetry:   telemetry,
 			parentState: parentState,
-			state:       parentState.EpochMinStateEntry.Copy(),
+			state:       parentState.EpochStateEntry.Copy(),
 			view:        view,
 		},
 	}, nil
@@ -115,6 +115,7 @@ func (u *HappyPathStateMachine) ProcessEpochSetup(epochSetup *flow.EpochSetup) (
 		CommitID:         flow.ZeroID,
 		ActiveIdentities: nextEpochActiveIdentities,
 	}
+	u.state.NextEpochSetup = epochSetup
 
 	// subsequent epoch commit event and update identities afterwards.
 	u.nextEpochIdentitiesLookup = u.state.NextEpoch.ActiveIdentities.Lookup()
@@ -151,6 +152,7 @@ func (u *HappyPathStateMachine) ProcessEpochCommit(epochCommit *flow.EpochCommit
 	}
 
 	u.state.NextEpoch.CommitID = epochCommit.ID()
+	u.state.NextEpochCommit = epochCommit
 	u.telemetry.OnServiceEventProcessed(epochCommit.ServiceEvent())
 	return true, nil
 }

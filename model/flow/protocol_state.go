@@ -119,34 +119,7 @@ type EpochStateEntry struct {
 	NextEpochCommit     *EpochCommit
 }
 
-// EpochRichStateEntry is a EpochMinStateEntry which has additional fields that are cached
-// from storage layer for convenience.
-// Using this structure instead of EpochMinStateEntry allows us to avoid querying
-// the database for epoch setups and commits and full identity table.
-// It holds several invariants, such as:
-//   - CurrentEpochSetup and CurrentEpochCommit are for the same epoch. Never nil.
-//   - PreviousEpochSetup and PreviousEpochCommit are for the same epoch. Can be nil.
-//   - CurrentEpochIdentityTable is the full (dynamic) identity table for the current epoch.
-//     Identities are sorted in canonical order. Without duplicates. Never nil.
-//   - NextEpochIdentityTable is the full (dynamic) identity table for the next epoch. Can be nil.
-//
-// NOTE regarding `CurrentEpochIdentityTable` and `NextEpochIdentityTable`:
-// The Identity Table is generally a super-set of the identities listed in the Epoch
-// Service Events for the respective epoch. This is because the service events only list
-// nodes that are authorized to _actively_ contribute to extending the chain. In contrast,
-// the Identity Table additionally contains nodes (with weight zero) from the previous or
-// upcoming epoch, which are transitioning into / out of the network and are only allowed
-// to listen but not to actively contribute.
-type EpochRichStateEntry struct {
-	*EpochStateEntry
-
-	CurrentEpochIdentityTable IdentityList
-	NextEpochIdentityTable    IdentityList
-}
-
-// NewEpochRichStateEntry constructs a EpochRichStateEntry from an EpochMinStateEntry and additional data.
-// No errors are expected during normal operation. All errors indicate inconsistent or invalid inputs.
-func NewEpochRichStateEntry(
+func NewEpochStateEntry(
 	protocolState *EpochMinStateEntry,
 	previousEpochSetup *EpochSetup,
 	previousEpochCommit *EpochCommit,
@@ -154,17 +127,15 @@ func NewEpochRichStateEntry(
 	currentEpochCommit *EpochCommit,
 	nextEpochSetup *EpochSetup,
 	nextEpochCommit *EpochCommit,
-) (*EpochRichStateEntry, error) {
-	result := &EpochRichStateEntry{
-		EpochMinStateEntry:        protocolState,
-		PreviousEpochSetup:        previousEpochSetup,
-		PreviousEpochCommit:       previousEpochCommit,
-		CurrentEpochSetup:         currentEpochSetup,
-		CurrentEpochCommit:        currentEpochCommit,
-		NextEpochSetup:            nextEpochSetup,
-		NextEpochCommit:           nextEpochCommit,
-		CurrentEpochIdentityTable: IdentityList{},
-		NextEpochIdentityTable:    IdentityList{},
+) (*EpochStateEntry, error) {
+	result := &EpochStateEntry{
+		EpochMinStateEntry:  protocolState,
+		PreviousEpochSetup:  previousEpochSetup,
+		PreviousEpochCommit: previousEpochCommit,
+		CurrentEpochSetup:   currentEpochSetup,
+		CurrentEpochCommit:  currentEpochCommit,
+		NextEpochSetup:      nextEpochSetup,
+		NextEpochCommit:     nextEpochCommit,
 	}
 
 	// If previous epoch is specified: ensure respective epoch service events are not nil and consistent with commitments in `EpochMinStateEntry.PreviousEpoch`
@@ -199,7 +170,6 @@ func NewEpochRichStateEntry(
 	//  (2a) Full identity table contains active identities from current epoch + nodes joining in next epoch with `EpochParticipationStatusJoining` status.
 	//  (2b) Furthermore, we also build the full identity table for the next epoch's staking phase:
 	//       active identities from next epoch + nodes from current epoch that are leaving at the end of the current epoch with `flow.EpochParticipationStatusLeaving` status.
-	var err error
 	nextEpoch := protocolState.NextEpoch
 	if nextEpoch == nil { // in staking phase: build full identity table for current epoch according to (1)
 		if nextEpochSetup != nil {
@@ -207,23 +177,6 @@ func NewEpochRichStateEntry(
 		}
 		if nextEpochCommit != nil {
 			return nil, fmt.Errorf("no next epoch but gotten non-nil EpochCommit event")
-		}
-
-		var previousEpochIdentitySkeletons IdentitySkeletonList
-		var previousEpochDynamicIdentities DynamicIdentityEntryList
-		if previousEpochSetup != nil {
-			previousEpochIdentitySkeletons = previousEpochSetup.Participants
-			previousEpochDynamicIdentities = protocolState.PreviousEpoch.ActiveIdentities
-		}
-		result.CurrentEpochIdentityTable, err = BuildIdentityTable(
-			currentEpochSetup.Participants,
-			protocolState.CurrentEpoch.ActiveIdentities,
-			previousEpochIdentitySkeletons,
-			previousEpochDynamicIdentities,
-			EpochParticipationStatusLeaving,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("could not build identity table for staking phase: %w", err)
 		}
 	} else { // protocolState.NextEpoch ≠ nil, i.e. we are in epoch setup or epoch commit phase
 		// ensure respective epoch service events are not nil and consistent with commitments in `EpochMinStateEntry.NextEpoch`
@@ -239,11 +192,76 @@ func NewEpochRichStateEntry(
 				return nil, fmt.Errorf("next epoch not yet committed but got EpochCommit event")
 			}
 		}
+	}
+	return result, nil
+}
 
+// EpochRichStateEntry is a EpochMinStateEntry which has additional fields that are cached
+// from storage layer for convenience.
+// Using this structure instead of EpochMinStateEntry allows us to avoid querying
+// the database for epoch setups and commits and full identity table.
+// It holds several invariants, such as:
+//   - CurrentEpochSetup and CurrentEpochCommit are for the same epoch. Never nil.
+//   - PreviousEpochSetup and PreviousEpochCommit are for the same epoch. Can be nil.
+//   - CurrentEpochIdentityTable is the full (dynamic) identity table for the current epoch.
+//     Identities are sorted in canonical order. Without duplicates. Never nil.
+//   - NextEpochIdentityTable is the full (dynamic) identity table for the next epoch. Can be nil.
+//
+// NOTE regarding `CurrentEpochIdentityTable` and `NextEpochIdentityTable`:
+// The Identity Table is generally a super-set of the identities listed in the Epoch
+// Service Events for the respective epoch. This is because the service events only list
+// nodes that are authorized to _actively_ contribute to extending the chain. In contrast,
+// the Identity Table additionally contains nodes (with weight zero) from the previous or
+// upcoming epoch, which are transitioning into / out of the network and are only allowed
+// to listen but not to actively contribute.
+type EpochRichStateEntry struct {
+	*EpochStateEntry
+
+	CurrentEpochIdentityTable IdentityList
+	NextEpochIdentityTable    IdentityList
+}
+
+// NewEpochRichStateEntry constructs a EpochRichStateEntry from an EpochMinStateEntry and additional data.
+// No errors are expected during normal operation. All errors indicate inconsistent or invalid inputs.
+func NewEpochRichStateEntry(
+	protocolState *EpochStateEntry,
+) (*EpochRichStateEntry, error) {
+	result := &EpochRichStateEntry{
+		EpochStateEntry:           protocolState,
+		CurrentEpochIdentityTable: IdentityList{},
+		NextEpochIdentityTable:    IdentityList{},
+	}
+	// If we are in staking phase (i.e. protocolState.NextEpoch == nil):
+	//  (1) Full identity table contains active identities from current epoch.
+	//      If previous epoch exists, we add nodes from previous epoch that are leaving in the current epoch with `EpochParticipationStatusLeaving` status.
+	// Otherwise, we are in epoch setup or epoch commit phase (i.e. protocolState.NextEpoch ≠ nil):
+	//  (2a) Full identity table contains active identities from current epoch + nodes joining in next epoch with `EpochParticipationStatusJoining` status.
+	//  (2b) Furthermore, we also build the full identity table for the next epoch's staking phase:
+	//       active identities from next epoch + nodes from current epoch that are leaving at the end of the current epoch with `flow.EpochParticipationStatusLeaving` status.
+	var err error
+	nextEpoch := protocolState.NextEpoch
+	if nextEpoch == nil { // in staking phase: build full identity table for current epoch according to (1)
+		var previousEpochIdentitySkeletons IdentitySkeletonList
+		var previousEpochDynamicIdentities DynamicIdentityEntryList
+		if previousEpochSetup := protocolState.PreviousEpochSetup; previousEpochSetup != nil {
+			previousEpochIdentitySkeletons = previousEpochSetup.Participants
+			previousEpochDynamicIdentities = protocolState.PreviousEpoch.ActiveIdentities
+		}
 		result.CurrentEpochIdentityTable, err = BuildIdentityTable(
-			currentEpochSetup.Participants,
+			protocolState.CurrentEpochSetup.Participants,
 			protocolState.CurrentEpoch.ActiveIdentities,
-			nextEpochSetup.Participants,
+			previousEpochIdentitySkeletons,
+			previousEpochDynamicIdentities,
+			EpochParticipationStatusLeaving,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("could not build identity table for staking phase: %w", err)
+		}
+	} else { // protocolState.NextEpoch ≠ nil, i.e. we are in epoch setup or epoch commit phase
+		result.CurrentEpochIdentityTable, err = BuildIdentityTable(
+			protocolState.CurrentEpochSetup.Participants,
+			protocolState.CurrentEpoch.ActiveIdentities,
+			protocolState.NextEpochSetup.Participants,
 			nextEpoch.ActiveIdentities,
 			EpochParticipationStatusJoining,
 		)
@@ -252,9 +270,9 @@ func NewEpochRichStateEntry(
 		}
 
 		result.NextEpochIdentityTable, err = BuildIdentityTable(
-			nextEpochSetup.Participants,
+			protocolState.NextEpochSetup.Participants,
 			nextEpoch.ActiveIdentities,
-			currentEpochSetup.Participants,
+			protocolState.CurrentEpochSetup.Participants,
 			protocolState.CurrentEpoch.ActiveIdentities,
 			EpochParticipationStatusLeaving,
 		)
@@ -298,6 +316,23 @@ func (e *EpochMinStateEntry) Copy() *EpochMinStateEntry {
 	}
 }
 
+// Copy returns a full copy of the EpochStateEntry.
+//   - Embedded service events are copied by reference (not deep-copied).
+func (e *EpochStateEntry) Copy() *EpochStateEntry {
+	if e == nil {
+		return nil
+	}
+	return &EpochStateEntry{
+		EpochMinStateEntry:  e.EpochMinStateEntry.Copy(),
+		PreviousEpochSetup:  e.PreviousEpochSetup,
+		PreviousEpochCommit: e.PreviousEpochCommit,
+		CurrentEpochSetup:   e.CurrentEpochSetup,
+		CurrentEpochCommit:  e.CurrentEpochCommit,
+		NextEpochSetup:      e.NextEpochSetup,
+		NextEpochCommit:     e.NextEpochCommit,
+	}
+}
+
 // Copy returns a full copy of the EpochRichStateEntry.
 //   - Embedded service events are copied by reference (not deep-copied).
 //   - CurrentEpochIdentityTable and NextEpochIdentityTable are deep-copied, _except_ for their keys, which are copied by reference.
@@ -306,13 +341,7 @@ func (e *EpochRichStateEntry) Copy() *EpochRichStateEntry {
 		return nil
 	}
 	return &EpochRichStateEntry{
-		EpochMinStateEntry:        e.EpochMinStateEntry.Copy(),
-		PreviousEpochSetup:        e.PreviousEpochSetup,
-		PreviousEpochCommit:       e.PreviousEpochCommit,
-		CurrentEpochSetup:         e.CurrentEpochSetup,
-		CurrentEpochCommit:        e.CurrentEpochCommit,
-		NextEpochSetup:            e.NextEpochSetup,
-		NextEpochCommit:           e.NextEpochCommit,
+		EpochStateEntry:           e.EpochStateEntry.Copy(),
 		CurrentEpochIdentityTable: e.CurrentEpochIdentityTable.Copy(),
 		NextEpochIdentityTable:    e.NextEpochIdentityTable.Copy(),
 	}

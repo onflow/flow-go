@@ -524,14 +524,7 @@ func (s *EpochFallbackStateMachineSuite) TestEpochFallbackStateMachineInjectsMul
 				require.NoError(s.T(), err)
 				updatedState, _, _ := stateMachine.Build()
 
-				parentProtocolState, err = flow.NewEpochRichStateEntry(updatedState,
-					parentProtocolState.PreviousEpochSetup,
-					parentProtocolState.PreviousEpochCommit,
-					parentProtocolState.CurrentEpochSetup,
-					parentProtocolState.CurrentEpochCommit,
-					nil, // as the next epoch was not yet committed, when we entered EFM, the state machine removed the outdated setup event
-					nil)
-
+				parentProtocolState, err = flow.NewEpochRichStateEntry(updatedState)
 				require.NoError(s.T(), err)
 			}
 		}
@@ -616,27 +609,12 @@ func (s *EpochFallbackStateMachineSuite) TestEpochFallbackStateMachineInjectsMul
 			stateMachine, err := NewFallbackStateMachine(s.params, s.consumer, candidateView, parentProtocolState.Copy())
 			require.NoError(s.T(), err)
 
-			previousEpochSetup, previousEpochCommit := parentProtocolState.PreviousEpochSetup, parentProtocolState.PreviousEpochCommit
-			currentEpochSetup, currentEpochCommit := parentProtocolState.CurrentEpochSetup, parentProtocolState.CurrentEpochCommit
-			nextEpochSetup, nextEpochCommit := parentProtocolState.NextEpochSetup, parentProtocolState.NextEpochCommit
 			if candidateView > parentProtocolState.CurrentEpochFinalView() {
 				require.NoError(s.T(), stateMachine.TransitionToNextEpoch())
-
-				// after we have transitioned to the next epoch, we need to update the current epoch
-				// for the next iteration we can use parent protocol state again
-				previousEpochSetup, previousEpochCommit = currentEpochSetup, currentEpochCommit
-				currentEpochSetup, currentEpochCommit = parentProtocolState.NextEpochSetup, parentProtocolState.NextEpochCommit
-				nextEpochSetup, nextEpochCommit = nil, nil
 			}
 
 			updatedState, _, _ := stateMachine.Build()
-			parentProtocolState, err = flow.NewEpochRichStateEntry(updatedState,
-				previousEpochSetup,
-				previousEpochCommit,
-				currentEpochSetup,
-				currentEpochCommit,
-				nextEpochSetup,
-				nextEpochCommit)
+			parentProtocolState, err = flow.NewEpochRichStateEntry(updatedState)
 			require.NoError(s.T(), err)
 		}
 	}

@@ -183,8 +183,8 @@ func SnapshotFromBootstrapStateWithParams(
 		EpochCommitSafetyThreshold: epochCommitSafetyThreshold, // see protocol.Params for details
 	}
 
-	rootEpochState := EpochProtocolStateFromServiceEvents(setup, commit)
-	rootEpochStateID := rootEpochState.ID()
+	rootMinEpochState := EpochProtocolStateFromServiceEvents(setup, commit)
+	rootEpochStateID := rootMinEpochState.ID()
 	rootKvStore := kvStoreFactory(rootEpochStateID)
 	if rootKvStore.ID() != root.Payload.ProtocolStateID {
 		return nil, fmt.Errorf("incorrect protocol state ID in root block, expected (%x) but got (%x)",
@@ -195,7 +195,11 @@ func SnapshotFromBootstrapStateWithParams(
 		return nil, fmt.Errorf("could not encode kvstore: %w", err)
 	}
 
-	richRootEpochState, err := flow.NewEpochRichStateEntry(rootEpochState, nil, nil, setup, commit, nil, nil)
+	rootEpochState, err := flow.NewEpochStateEntry(rootMinEpochState, nil, nil, setup, commit, nil, nil)
+	if err != nil {
+		return nil, fmt.Errorf("could not construct root epoch state entry: %w", err)
+	}
+	richRootEpochState, err := flow.NewEpochRichStateEntry(rootEpochState)
 	if err != nil {
 		return nil, fmt.Errorf("could not construct root rich epoch state entry: %w", err)
 	}

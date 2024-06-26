@@ -13,7 +13,7 @@ import (
 type baseStateMachine struct {
 	telemetry   protocol_state.StateMachineTelemetryConsumer
 	parentState *flow.EpochRichStateEntry
-	state       *flow.EpochMinStateEntry
+	state       *flow.EpochStateEntry
 	view        uint64
 
 	// The following fields are maps from NodeID → DynamicIdentityEntry for the nodes that are *active* in the respective epoch.
@@ -31,7 +31,7 @@ type baseStateMachine struct {
 // Do NOT call Build, if the baseStateMachine instance has returned a `protocol.InvalidServiceEventError`
 // at any time during its lifetime. After this error, the baseStateMachine is left with a potentially
 // dysfunctional state and should be discarded.
-func (u *baseStateMachine) Build() (updatedState *flow.EpochMinStateEntry, stateID flow.Identifier, hasChanges bool) {
+func (u *baseStateMachine) Build() (updatedState *flow.EpochStateEntry, stateID flow.Identifier, hasChanges bool) {
 	updatedState = u.state.Copy()
 	stateID = updatedState.ID()
 	hasChanges = stateID != u.parentState.ID()
@@ -119,10 +119,19 @@ func (u *baseStateMachine) TransitionToNextEpoch() error {
 	if u.view < u.parentState.NextEpochSetup.FirstView {
 		return fmt.Errorf("epoch transition is only allowed when entering next epoch")
 	}
-	u.state = &flow.EpochMinStateEntry{
-		PreviousEpoch:          &u.state.CurrentEpoch,
-		CurrentEpoch:           *u.state.NextEpoch,
-		EpochFallbackTriggered: u.state.EpochFallbackTriggered,
+	u.state = &flow.EpochStateEntry{
+		EpochMinStateEntry: &flow.EpochMinStateEntry{
+			PreviousEpoch:          &u.state.CurrentEpoch,
+			CurrentEpoch:           *u.state.NextEpoch,
+			NextEpoch:              nil,
+			EpochFallbackTriggered: u.state.EpochFallbackTriggered,
+		},
+		PreviousEpochSetup:  u.state.CurrentEpochSetup,
+		PreviousEpochCommit: u.state.CurrentEpochCommit,
+		CurrentEpochSetup:   u.state.NextEpochSetup,
+		CurrentEpochCommit:  u.state.NextEpochCommit,
+		NextEpochSetup:      nil,
+		NextEpochCommit:     nil,
 	}
 	u.rebuildIdentityLookup()
 	return nil

@@ -192,7 +192,7 @@ func (s *EpochProtocolStateEntries) ByBlockID(blockID flow.Identifier) (*flow.Ep
 // It queries and fills in epoch setups and commits for previous and current epochs and possibly next epoch.
 // No errors are expected during normal operation.
 func newRichEpochProtocolStateEntry(
-	protocolState *flow.EpochMinStateEntry,
+	minEpochStateEntry *flow.EpochMinStateEntry,
 	setups storage.EpochSetups,
 	commits storage.EpochCommits,
 ) (*flow.EpochRichStateEntry, error) {
@@ -204,28 +204,28 @@ func newRichEpochProtocolStateEntry(
 		err                 error
 	)
 	// query and fill in epoch setups and commits for previous and current epochs
-	if protocolState.PreviousEpoch != nil {
-		previousEpochSetup, err = setups.ByID(protocolState.PreviousEpoch.SetupID)
+	if minEpochStateEntry.PreviousEpoch != nil {
+		previousEpochSetup, err = setups.ByID(minEpochStateEntry.PreviousEpoch.SetupID)
 		if err != nil {
 			return nil, fmt.Errorf("could not retrieve previous epoch setup: %w", err)
 		}
-		previousEpochCommit, err = commits.ByID(protocolState.PreviousEpoch.CommitID)
+		previousEpochCommit, err = commits.ByID(minEpochStateEntry.PreviousEpoch.CommitID)
 		if err != nil {
 			return nil, fmt.Errorf("could not retrieve previous epoch commit: %w", err)
 		}
 	}
 
-	currentEpochSetup, err := setups.ByID(protocolState.CurrentEpoch.SetupID)
+	currentEpochSetup, err := setups.ByID(minEpochStateEntry.CurrentEpoch.SetupID)
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve current epoch setup: %w", err)
 	}
-	currentEpochCommit, err := commits.ByID(protocolState.CurrentEpoch.CommitID)
+	currentEpochCommit, err := commits.ByID(minEpochStateEntry.CurrentEpoch.CommitID)
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve current epoch commit: %w", err)
 	}
 
 	// if next epoch has been set up, fill in data for it as well
-	nextEpoch := protocolState.NextEpoch
+	nextEpoch := minEpochStateEntry.NextEpoch
 	if nextEpoch != nil {
 		nextEpochSetup, err = setups.ByID(nextEpoch.SetupID)
 		if err != nil {
@@ -239,15 +239,20 @@ func newRichEpochProtocolStateEntry(
 		}
 	}
 
-	result, err := flow.NewEpochRichStateEntry(
-		protocolState,
+	epochStateEntry, err := flow.NewEpochStateEntry(minEpochStateEntry,
 		previousEpochSetup,
 		previousEpochCommit,
 		currentEpochSetup,
 		currentEpochCommit,
 		nextEpochSetup,
-		nextEpochCommit,
-	)
+		nextEpochCommit)
+	if err != nil {
+		// observing an error here would be an indication of severe data corruption or bug in our code since
+		// all data should be available and correctly structured at this point.
+		return nil, irrecoverable.NewExceptionf("critical failure while instantiating EpochStateEntry: %w", err)
+	}
+
+	result, err := flow.NewEpochRichStateEntry(epochStateEntry)
 	if err != nil {
 		// observing an error here would be an indication of severe data corruption or bug in our code since
 		// all data should be available and correctly structured at this point.

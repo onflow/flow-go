@@ -195,14 +195,7 @@ func (s *ProtocolStateMachineSuite) TestProcessEpochCommit() {
 
 		updatedState, _, _ := s.stateMachine.Build()
 
-		parentState, err := flow.NewEpochRichStateEntry(updatedState,
-			s.parentProtocolState.PreviousEpochSetup,
-			s.parentProtocolState.PreviousEpochCommit,
-			s.parentProtocolState.CurrentEpochSetup,
-			s.parentProtocolState.CurrentEpochCommit,
-			setup,
-			nil,
-		)
+		parentState, err := flow.NewEpochRichStateEntry(updatedState)
 		require.NoError(s.T(), err)
 
 		s.stateMachine, err = NewHappyPathStateMachine(s.consumer, s.candidate.View+1, parentState)
@@ -246,14 +239,7 @@ func (s *ProtocolStateMachineSuite) TestProcessEpochCommit() {
 		require.Equal(s.T(), updatedState.ID(), stateID)
 		require.Equal(s.T(), s.parentProtocolState.ID(), s.stateMachine.ParentState().ID(), "should not modify parent protocol state")
 
-		parentState, err := flow.NewEpochRichStateEntry(updatedState,
-			s.parentProtocolState.PreviousEpochSetup,
-			s.parentProtocolState.PreviousEpochCommit,
-			s.parentProtocolState.CurrentEpochSetup,
-			s.parentProtocolState.CurrentEpochCommit,
-			setup,
-			nil,
-		)
+		parentState, err := flow.NewEpochRichStateEntry(updatedState)
 		require.NoError(s.T(), err)
 		s.stateMachine, err = NewHappyPathStateMachine(s.consumer, s.candidate.View+1, parentState.Copy())
 		require.NoError(s.T(), err)
@@ -496,13 +482,7 @@ func (s *ProtocolStateMachineSuite) TestEpochSetupAfterIdentityChange() {
 	// Construct a valid flow.EpochRichStateEntry for next block
 	// We do this by copying the parent protocol state and updating the identities manually
 	updatedRichProtocolState := &flow.EpochRichStateEntry{
-		EpochMinStateEntry:        updatedState,
-		PreviousEpochSetup:        s.parentProtocolState.PreviousEpochSetup,
-		PreviousEpochCommit:       s.parentProtocolState.PreviousEpochCommit,
-		CurrentEpochSetup:         s.parentProtocolState.CurrentEpochSetup,
-		CurrentEpochCommit:        s.parentProtocolState.CurrentEpochCommit,
-		NextEpochSetup:            nil,
-		NextEpochCommit:           nil,
+		EpochStateEntry:           updatedState,
 		CurrentEpochIdentityTable: s.parentProtocolState.CurrentEpochIdentityTable.Copy(),
 		NextEpochIdentityTable:    flow.IdentityList{},
 	}
