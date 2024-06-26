@@ -26,10 +26,9 @@ type epochInfo struct {
 	dkg                     hotstuff.DKG
 }
 
-// newStaticEpochInfo returns the static epoch information from the epoch.
+// newEpochInfo retrieves the committee information and computes leader selection.
 // This can be cached and used for all by-view queries for this epoch.
-// TODO update static terminology (not really static any more)
-func newStaticEpochInfo(epoch protocol.Epoch) (*epochInfo, error) {
+func newEpochInfo(epoch protocol.Epoch) (*epochInfo, error) {
 	leaders, err := leader.SelectionForConsensus(epoch)
 	if err != nil {
 		return nil, fmt.Errorf("could not get leader selection: %w", err)
@@ -168,7 +167,7 @@ func (c *Consensus) IdentityByBlock(blockID flow.Identifier, nodeID flow.Identif
 //     This is an expected error and must be handled.
 //   - unspecific error in case of unexpected problems and bugs
 func (c *Consensus) IdentitiesByEpoch(view uint64) (flow.IdentitySkeletonList, error) {
-	epochInfo, err := c.staticEpochInfoByView(view)
+	epochInfo, err := c.epochInfoByView(view)
 	if err != nil {
 		return nil, err
 	}
@@ -187,7 +186,7 @@ func (c *Consensus) IdentitiesByEpoch(view uint64) (flow.IdentitySkeletonList, e
 //     authorized consensus participants.
 //   - unspecific error in case of unexpected problems and bugs
 func (c *Consensus) IdentityByEpoch(view uint64, participantID flow.Identifier) (*flow.IdentitySkeleton, error) {
-	epochInfo, err := c.staticEpochInfoByView(view)
+	epochInfo, err := c.epochInfoByView(view)
 	if err != nil {
 		return nil, err
 	}
@@ -206,7 +205,7 @@ func (c *Consensus) IdentityByEpoch(view uint64, participantID flow.Identifier) 
 //   - unspecific error in case of unexpected problems and bugs
 func (c *Consensus) LeaderForView(view uint64) (flow.Identifier, error) {
 
-	epochInfo, err := c.staticEpochInfoByView(view)
+	epochInfo, err := c.epochInfoByView(view)
 	if err != nil {
 		return flow.ZeroID, err
 	}
@@ -232,7 +231,7 @@ func (c *Consensus) LeaderForView(view uint64) (flow.Identifier, error) {
 //     This is an expected error and must be handled.
 //   - unspecific error in case of unexpected problems and bugs
 func (c *Consensus) QuorumThresholdForView(view uint64) (uint64, error) {
-	epochInfo, err := c.staticEpochInfoByView(view)
+	epochInfo, err := c.epochInfoByView(view)
 	if err != nil {
 		return 0, err
 	}
@@ -247,7 +246,7 @@ func (c *Consensus) Self() flow.Identifier {
 // to safely immediately timeout for the current view. The weight threshold only
 // changes at epoch boundaries and is computed based on the initial committee weights.
 func (c *Consensus) TimeoutThresholdForView(view uint64) (uint64, error) {
-	epochInfo, err := c.staticEpochInfoByView(view)
+	epochInfo, err := c.epochInfoByView(view)
 	if err != nil {
 		return 0, err
 	}
@@ -261,19 +260,18 @@ func (c *Consensus) TimeoutThresholdForView(view uint64) (uint64, error) {
 //     This is an expected error and must be handled.
 //   - unspecific error in case of unexpected problems and bugs
 func (c *Consensus) DKG(view uint64) (hotstuff.DKG, error) {
-	epochInfo, err := c.staticEpochInfoByView(view)
+	epochInfo, err := c.epochInfoByView(view)
 	if err != nil {
 		return nil, err
 	}
 	return epochInfo.dkg, nil
 }
 
+// TODO docs
 // handleProtocolEvents processes queued Epoch events `EpochCommittedPhaseStarted`
 // and `EpochFallbackModeTriggered`. This function permanently utilizes a worker
 // routine until the `Component` terminates.
-// When we observe a new epoch being committed, we compute
-// the leader selection and cache static info for the epoch. When we observe
-// epoch fallback mode being triggered, we inject a fallback epoch.
+// When we observe a new epoch being committed, we compute the leader selection and cache the epoch.
 func (c *Consensus) handleProtocolEvents(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
 
@@ -345,15 +343,11 @@ func (c *Consensus) handleEpochCommittedPhaseStarted(refBlock *flow.Header) erro
 	return nil
 }
 
-// staticEpochInfoByView retrieves the previously cached static epoch info for
-// the epoch which includes the given view. If no epoch is known for the given
-// view, we will attempt to cache the next epoch.
-// TODO name
-//
+// epochInfoByView retrieves the cached epoch info for the epoch which includes the given view.
 // Error returns:
 //   - model.ErrViewForUnknownEpoch if no committed epoch containing the given view is known
 //   - unspecific error in case of unexpected problems and bugs
-func (c *Consensus) staticEpochInfoByView(view uint64) (*epochInfo, error) {
+func (c *Consensus) epochInfoByView(view uint64) (*epochInfo, error) {
 
 	// look for an epoch matching this view for which we have already pre-computed
 	// leader selection. Epochs last ~500k views, so we find the epoch here 99.99%
@@ -371,9 +365,8 @@ func (c *Consensus) staticEpochInfoByView(view uint64) (*epochInfo, error) {
 	return nil, model.ErrViewForUnknownEpoch
 }
 
-// prepareEpoch pre-computes and stores the static epoch information for the
-// given epoch, including leader selection. Calling prepareEpoch multiple times
-// for the same epoch returns cached static epoch information.
+// prepareEpoch pre-computes and caches the epoch information for the given epoch, including leader selection.
+// Calling prepareEpoch multiple times for the same epoch returns cached epoch information.
 // Input must be a committed epoch.
 // No errors are expected during normal operation.
 func (c *Consensus) prepareEpoch(epoch protocol.Epoch) (*epochInfo, error) {
@@ -386,15 +379,15 @@ func (c *Consensus) prepareEpoch(epoch protocol.Epoch) (*epochInfo, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	// this is a no-op if we have already computed static info for this epoch
+	// this is a no-op if we have already cached this epoch
 	epochInfo, exists := c.epochs[counter]
 	if exists {
 		return epochInfo, nil
 	}
 
-	epochInfo, err = newStaticEpochInfo(epoch)
+	epochInfo, err = newEpochInfo(epoch)
 	if err != nil {
-		return nil, fmt.Errorf("could not create static epoch info for epch %d: %w", counter, err)
+		return nil, fmt.Errorf("could not create epoch info for epoch %d: %w", counter, err)
 	}
 
 	// sanity check: ensure new epoch has contiguous views with the prior epoch
@@ -409,14 +402,13 @@ func (c *Consensus) prepareEpoch(epoch protocol.Epoch) (*epochInfo, error) {
 
 	// cache the epoch info
 	c.epochs[counter] = epochInfo
-	// now prune any old epochs, if we have exceeded our maximum of 3
-	// if we have fewer than 3 epochs, this is a no-op
+	// now prune any old epochs; if we have cached fewer than 3 epochs, this is a no-op
 	c.pruneEpochInfo()
 	return epochInfo, nil
 }
 
 // pruneEpochInfo removes any epochs older than the most recent 3.
-// NOTE: Not safe for concurrent use - the caller must first acquire the lock.
+// CAUTION: Not safe for concurrent use - the caller must first acquire the lock.
 func (c *Consensus) pruneEpochInfo() {
 	// find the maximum counter, including the epoch we just computed
 	maxCounter := uint64(0)
