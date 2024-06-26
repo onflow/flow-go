@@ -6,8 +6,6 @@ import (
 	"github.com/onflow/flow-go/fvm/evm/types"
 )
 
-// TODO from here: add test for captures
-
 // InvalidMethodCallGasUsage captures how much gas we charge for invalid method call
 const InvalidMethodCallGasUsage = uint64(1)
 
@@ -80,33 +78,35 @@ func (p *precompile) RequiredGas(input []byte) uint64 {
 }
 
 // Run runs the precompiled contract
-func (p *precompile) Run(input []byte) ([]byte, error) {
-	var output []byte
-	var err error
+func (p *precompile) Run(input []byte) (output []byte, err error) {
 	defer func() {
+		errMsg := ""
+		if err != nil {
+			errMsg = err.Error()
+		}
 		p.runCalls = append(
 			p.runCalls,
 			types.RunCall{
 				Input:    input,
 				Output:   output,
-				ErrorMsg: err.Error(),
+				ErrorMsg: errMsg,
 			})
 	}()
 
 	if len(input) < FunctionSelectorLength {
 		output = nil
 		err = ErrInvalidMethodCall
-		return output, err
+		return
 	}
 	sig, data := SplitFunctionSelector(input)
 	callable, found := p.functions[sig]
 	if !found {
 		output = nil
 		err = ErrInvalidMethodCall
-		return output, err
+		return
 	}
 	output, err = callable.Run(data)
-	return output, err
+	return
 }
 
 func (p *precompile) CapturedCalls() *types.PrecompiledCalls {

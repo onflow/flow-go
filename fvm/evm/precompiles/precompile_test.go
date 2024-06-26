@@ -44,7 +44,26 @@ func TestMutiFunctionContract(t *testing.T) {
 	_, err = pc.Run(input2)
 	require.Equal(t, precompiles.ErrInvalidMethodCall, err)
 
-	// TODO add test here for the
+	calls := pc.CapturedCalls()
+	require.Equal(t, address, calls.Address)
+	require.Len(t, calls.RequiredGasCalls, 1)
+	require.Equal(t, input, calls.RequiredGasCalls[0].Input)
+	require.Equal(t, gas, calls.RequiredGasCalls[0].Output)
+	require.Len(t, calls.RunCalls, 2)
+	require.Equal(t, input, calls.RunCalls[0].Input)
+	require.Equal(t, output, calls.RunCalls[0].Output)
+	require.Empty(t, calls.RunCalls[0].ErrorMsg)
+	require.Equal(t, input2, calls.RunCalls[1].Input)
+	require.Empty(t, calls.RunCalls[1].Output)
+	require.Equal(t, precompiles.ErrInvalidMethodCall.Error(), calls.RunCalls[1].ErrorMsg)
+
+	// test reset functionality
+	pc.Reset()
+
+	calls = pc.CapturedCalls()
+	require.Equal(t, address, calls.Address)
+	require.Len(t, calls.RequiredGasCalls, 0)
+	require.Len(t, calls.RunCalls, 0)
 }
 
 type mockedFunction struct {
