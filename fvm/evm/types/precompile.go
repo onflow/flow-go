@@ -62,7 +62,7 @@ func (apc AggregatedPrecompiledCalls) IsEmpty() bool {
 	return isEmpty
 }
 
-// Encode encodes the a precompile calls type using rlp encoding
+// Encode encodes the aggregated precompile calls using rlp encoding
 // if there is no underlying call, we encode to empty bytes to save
 // space on transaction results (common case)
 func (apc AggregatedPrecompiledCalls) Encode() ([]byte, error) {
