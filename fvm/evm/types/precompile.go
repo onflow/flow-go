@@ -36,7 +36,7 @@ type RunCall struct {
 	ErrorMsg string
 }
 
-// PrecompiledCalls captures all the called to a precompiled contract
+// PrecompiledCalls captures all the calls to a precompiled contract
 type PrecompiledCalls struct {
 	Address          Address
 	RequiredGasCalls []RequiredGasCall
@@ -62,7 +62,7 @@ func (apc AggregatedPrecompiledCalls) IsEmpty() bool {
 	return isEmpty
 }
 
-// Encode encodes the a precompile calls type using rlp encoding
+// Encode encodes the aggregated precompile calls using rlp encoding
 // if there is no underlying call, we encode to empty bytes to save
 // space on transaction results (common case)
 func (apc AggregatedPrecompiledCalls) Encode() ([]byte, error) {
