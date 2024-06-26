@@ -41,16 +41,19 @@ type PrecompiledCalls struct {
 	RunCalls         []RunCall
 }
 
-func (pc *PrecompiledCalls) isEmpty() bool {
+// IsEmpty returns true if no requiredGas or run calls is captured
+func (pc *PrecompiledCalls) IsEmpty() bool {
 	return len(pc.RequiredGasCalls) == 0 && len(pc.RunCalls) == 0
 }
 
+// AggregatedPrecompiledCalls aggregates a list of precompiled calls
 type AggregatedPrecompiledCalls []PrecompiledCalls
 
-func (apc AggregatedPrecompiledCalls) isEmpty() bool {
+// IsEmpty returns true if all of the underlying precompiled calls are empty
+func (apc AggregatedPrecompiledCalls) IsEmpty() bool {
 	isEmpty := true
 	for _, ap := range apc {
-		if !ap.isEmpty() {
+		if !ap.IsEmpty() {
 			isEmpty = false
 		}
 	}
@@ -58,9 +61,11 @@ func (apc AggregatedPrecompiledCalls) isEmpty() bool {
 }
 
 // Encode encodes the a precompile calls type using rlp encoding
+// if there is no underlying call, we encode to empty bytes to save
+// space on transaction results (common case)
 func (apc AggregatedPrecompiledCalls) Encode() ([]byte, error) {
 	// optimization for empty case which would be most of transactions
-	if apc.isEmpty() {
+	if apc.IsEmpty() {
 		return []byte{}, nil
 	}
 	return rlp.EncodeToBytes(apc)
