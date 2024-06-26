@@ -1,6 +1,7 @@
 package migrations
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"sort"
@@ -76,6 +77,10 @@ func NewContractCheckingMigration(
 				code, err := accountRegisters.Get(owner, contractKey)
 				if err != nil {
 					return err
+				}
+
+				if len(bytes.TrimSpace(code)) == 0 {
+					continue
 				}
 
 				address := common.Address([]byte(owner))
