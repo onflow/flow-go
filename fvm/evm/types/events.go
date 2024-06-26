@@ -100,7 +100,7 @@ func (p *transactionEvent) ToCadence(location common.Location) (cadence.Event, e
 			// todo we can remove hash and just reference block by height (evm-gateway dependency)
 			cadence.NewField("blockHash", cadence.StringType),
 			cadence.NewField("returnedData", cadence.StringType),
-			cadence.NewField("precompiledCalls", cadence.StringType),
+			cadence.NewField("encodedPrecompiledCalls", cadence.StringType),
 		},
 		nil,
 	)
