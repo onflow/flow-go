@@ -15,8 +15,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol/events"
 )
 
-// epochInfo contains leader selection and the initial committee for one epoch.
-// TODO more docs
+// epochInfo caches data about one epoch that is pertinent to the consensus committee.
 type epochInfo struct {
 	*leader.LeaderSelection // pre-computed leader selection for the epoch
 	initialCommittee        flow.IdentitySkeletonList
@@ -24,6 +23,18 @@ type epochInfo struct {
 	weightThresholdForQC    uint64 // computed based on initial committee weights
 	weightThresholdForTO    uint64 // computed based on initial committee weights
 	dkg                     hotstuff.DKG
+}
+
+// recomputeLeaderSelectionForExtendedViewRange re-computes the LeaderSelection field
+// for the input epoch's entire view range, including extensions.
+// This should be called each time an extension is added to an epoch.
+func (e *epochInfo) recomputeLeaderSelectionForExtendedViewRange(epoch protocol.Epoch) error {
+	leaderSelection, err := leader.SelectionForConsensus(epoch)
+	if err != nil {
+		return fmt.Errorf("could not re-compute leader selection for epoch after extension: %w", err)
+	}
+	e.LeaderSelection = leaderSelection
+	return nil
 }
 
 // newEpochInfo retrieves the committee information and computes leader selection.
@@ -63,14 +74,12 @@ type eventHandlerFunc func() error
 // Consensus represents the main committee for consensus nodes. The consensus
 // committee might be active for multiple successive epochs.
 type Consensus struct {
-	state  protocol.State        // the protocol state
-	me     flow.Identifier       // the node ID of this node
-	mu     sync.RWMutex          // protects access to epochs
-	epochs map[uint64]*epochInfo // cache of initial committee & leader selection per epoch
-	// TODO do we need to strictly order events across types? Yes, I think we do
-	committedEpochsCh chan *flow.Header // protocol events for newly committed epochs (the first block of the epoch is passed over the channel)
-	events            chan eventHandlerFunc
-	events.Noop       // implements protocol.Consumer
+	state       protocol.State        // the protocol state
+	me          flow.Identifier       // the node ID of this node
+	mu          sync.RWMutex          // protects access to epochs
+	epochs      map[uint64]*epochInfo // cache of initial committee & leader selection per epoch
+	events      chan eventHandlerFunc
+	events.Noop // implements protocol.Consumer
 	component.Component
 }
 
@@ -80,11 +89,10 @@ var _ hotstuff.DynamicCommittee = (*Consensus)(nil)
 
 func NewConsensusCommittee(state protocol.State, me flow.Identifier) (*Consensus, error) {
 	com := &Consensus{
-		state:             state,
-		me:                me,
-		epochs:            make(map[uint64]*epochInfo),
-		committedEpochsCh: make(chan *flow.Header, 1),
-		events:            make(chan eventHandlerFunc, 5),
+		state:  state,
+		me:     me,
+		epochs: make(map[uint64]*epochInfo),
+		events: make(chan eventHandlerFunc, 5),
 	}
 
 	com.Component = component.NewComponentManagerBuilder().
@@ -267,11 +275,9 @@ func (c *Consensus) DKG(view uint64) (hotstuff.DKG, error) {
 	return epochInfo.dkg, nil
 }
 
-// TODO docs
-// handleProtocolEvents processes queued Epoch events `EpochCommittedPhaseStarted`
-// and `EpochFallbackModeTriggered`. This function permanently utilizes a worker
-// routine until the `Component` terminates.
-// When we observe a new epoch being committed, we compute the leader selection and cache the epoch.
+// handleProtocolEvents processes queued protocol events.
+// When we are notified of a new protocol event, the consumer function enqueues an eventHandlerFunc
+// in the events channel. This function then executes each event handler in the order they were emitted.
 func (c *Consensus) handleProtocolEvents(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
 
@@ -323,9 +329,9 @@ func (c *Consensus) handleEpochExtended(refBlock *flow.Header) error {
 	if !ok {
 		return fmt.Errorf("sanity check failed: current epoch committee info does not exist")
 	}
-	epochInfo.LeaderSelection, err = leader.SelectionForConsensus(currentEpoch)
+	err = epochInfo.recomputeLeaderSelectionForExtendedViewRange(currentEpoch)
 	if err != nil {
-		return fmt.Errorf("could not re-compute leader selection for epoch after extension: %w", err)
+		return fmt.Errorf("could not recompute leader selection for current epoch upon extension: %w", err)
 	}
 	return nil
 }
