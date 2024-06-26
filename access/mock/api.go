@@ -201,36 +201,8 @@ func (_m *API) GetAccountAtLatestBlock(ctx context.Context, address flow.Address
 	return r0, r1
 }
 
-// GetAccountBalance provides a mock function with given fields: ctx, address
-func (_m *API) GetAccountBalance(ctx context.Context, address flow.Address) (uint64, error) {
-	ret := _m.Called(ctx, address)
-
-	if len(ret) == 0 {
-		panic("no return value specified for GetAccountBalance")
-	}
-
-	var r0 uint64
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Address) (uint64, error)); ok {
-		return rf(ctx, address)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Address) uint64); ok {
-		r0 = rf(ctx, address)
-	} else {
-		r0 = ret.Get(0).(uint64)
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, flow.Address) error); ok {
-		r1 = rf(ctx, address)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
 // GetAccountBalanceAtBlockHeight provides a mock function with given fields: ctx, address, height
-func (_m *API) GetAccountBalanceAtBlockHeight(ctx context.Context, address flow.Address, height uint64) (uint64, error) {
+func (_m *API) GetAccountBalanceAtBlockHeight(ctx context.Context, address flow.Address, height uint64) (uint64, uint64, error) {
 	ret := _m.Called(ctx, address, height)
 
 	if len(ret) == 0 {
@@ -238,8 +210,9 @@ func (_m *API) GetAccountBalanceAtBlockHeight(ctx context.Context, address flow.
 	}
 
 	var r0 uint64
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Address, uint64) (uint64, error)); ok {
+	var r1 uint64
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Address, uint64) (uint64, uint64, error)); ok {
 		return rf(ctx, address, height)
 	}
 	if rf, ok := ret.Get(0).(func(context.Context, flow.Address, uint64) uint64); ok {
@@ -248,17 +221,23 @@ func (_m *API) GetAccountBalanceAtBlockHeight(ctx context.Context, address flow.
 		r0 = ret.Get(0).(uint64)
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, flow.Address, uint64) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, flow.Address, uint64) uint64); ok {
 		r1 = rf(ctx, address, height)
 	} else {
-		r1 = ret.Error(1)
+		r1 = ret.Get(1).(uint64)
 	}
 
-	return r0, r1
+	if rf, ok := ret.Get(2).(func(context.Context, flow.Address, uint64) error); ok {
+		r2 = rf(ctx, address, height)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
 }
 
 // GetAccountBalanceAtLatestBlock provides a mock function with given fields: ctx, address
-func (_m *API) GetAccountBalanceAtLatestBlock(ctx context.Context, address flow.Address) (uint64, error) {
+func (_m *API) GetAccountBalanceAtLatestBlock(ctx context.Context, address flow.Address) (uint64, uint64, error) {
 	ret := _m.Called(ctx, address)
 
 	if len(ret) == 0 {
@@ -266,8 +245,9 @@ func (_m *API) GetAccountBalanceAtLatestBlock(ctx context.Context, address flow.
 	}
 
 	var r0 uint64
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Address) (uint64, error)); ok {
+	var r1 uint64
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Address) (uint64, uint64, error)); ok {
 		return rf(ctx, address)
 	}
 	if rf, ok := ret.Get(0).(func(context.Context, flow.Address) uint64); ok {
@@ -276,48 +256,24 @@ func (_m *API) GetAccountBalanceAtLatestBlock(ctx context.Context, address flow.
 		r0 = ret.Get(0).(uint64)
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, flow.Address) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, flow.Address) uint64); ok {
 		r1 = rf(ctx, address)
 	} else {
-		r1 = ret.Error(1)
+		r1 = ret.Get(1).(uint64)
 	}
 
-	return r0, r1
+	if rf, ok := ret.Get(2).(func(context.Context, flow.Address) error); ok {
+		r2 = rf(ctx, address)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
 }
 
-// GetAccountKeys provides a mock function with given fields: ctx, address
-func (_m *API) GetAccountKeys(ctx context.Context, address flow.Address) ([]flow.AccountPublicKey, error) {
-	ret := _m.Called(ctx, address)
-
-	if len(ret) == 0 {
-		panic("no return value specified for GetAccountKeys")
-	}
-
-	var r0 []flow.AccountPublicKey
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Address) ([]flow.AccountPublicKey, error)); ok {
-		return rf(ctx, address)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Address) []flow.AccountPublicKey); ok {
-		r0 = rf(ctx, address)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]flow.AccountPublicKey)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, flow.Address) error); ok {
-		r1 = rf(ctx, address)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// GetAccountKeysAtBlockHeight provides a mock function with given fields: ctx, address, height
-func (_m *API) GetAccountKeysAtBlockHeight(ctx context.Context, address flow.Address, height uint64) ([]flow.AccountPublicKey, error) {
-	ret := _m.Called(ctx, address, height)
+// GetAccountKeysAtBlockHeight provides a mock function with given fields: ctx, address, keyIndex, height
+func (_m *API) GetAccountKeysAtBlockHeight(ctx context.Context, address flow.Address, keyIndex int, height uint64) ([]flow.AccountPublicKey, error) {
+	ret := _m.Called(ctx, address, keyIndex, height)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetAccountKeysAtBlockHeight")
@@ -325,19 +281,19 @@ func (_m *API) GetAccountKeysAtBlockHeight(ctx context.Context, address flow.Add
 
 	var r0 []flow.AccountPublicKey
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Address, uint64) ([]flow.AccountPublicKey, error)); ok {
-		return rf(ctx, address, height)
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Address, int, uint64) ([]flow.AccountPublicKey, error)); ok {
+		return rf(ctx, address, keyIndex, height)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Address, uint64) []flow.AccountPublicKey); ok {
-		r0 = rf(ctx, address, height)
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Address, int, uint64) []flow.AccountPublicKey); ok {
+		r0 = rf(ctx, address, keyIndex, height)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]flow.AccountPublicKey)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, flow.Address, uint64) error); ok {
-		r1 = rf(ctx, address, height)
+	if rf, ok := ret.Get(1).(func(context.Context, flow.Address, int, uint64) error); ok {
+		r1 = rf(ctx, address, keyIndex, height)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -345,9 +301,9 @@ func (_m *API) GetAccountKeysAtBlockHeight(ctx context.Context, address flow.Add
 	return r0, r1
 }
 
-// GetAccountKeysAtLatestBlock provides a mock function with given fields: ctx, address
-func (_m *API) GetAccountKeysAtLatestBlock(ctx context.Context, address flow.Address) ([]flow.AccountPublicKey, error) {
-	ret := _m.Called(ctx, address)
+// GetAccountKeysAtLatestBlock provides a mock function with given fields: ctx, address, keyIndex
+func (_m *API) GetAccountKeysAtLatestBlock(ctx context.Context, address flow.Address, keyIndex int) ([]flow.AccountPublicKey, error) {
+	ret := _m.Called(ctx, address, keyIndex)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetAccountKeysAtLatestBlock")
@@ -355,19 +311,19 @@ func (_m *API) GetAccountKeysAtLatestBlock(ctx context.Context, address flow.Add
 
 	var r0 []flow.AccountPublicKey
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Address) ([]flow.AccountPublicKey, error)); ok {
-		return rf(ctx, address)
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Address, int) ([]flow.AccountPublicKey, error)); ok {
+		return rf(ctx, address, keyIndex)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Address) []flow.AccountPublicKey); ok {
-		r0 = rf(ctx, address)
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Address, int) []flow.AccountPublicKey); ok {
+		r0 = rf(ctx, address, keyIndex)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]flow.AccountPublicKey)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, flow.Address) error); ok {
-		r1 = rf(ctx, address)
+	if rf, ok := ret.Get(1).(func(context.Context, flow.Address, int) error); ok {
+		r1 = rf(ctx, address, keyIndex)
 	} else {
 		r1 = ret.Error(1)
 	}

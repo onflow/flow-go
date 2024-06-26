@@ -239,43 +239,6 @@ func (_m *AccessAPIClient) GetAccountAtLatestBlock(ctx context.Context, in *acce
 	return r0, r1
 }
 
-// GetAccountBalance provides a mock function with given fields: ctx, in, opts
-func (_m *AccessAPIClient) GetAccountBalance(ctx context.Context, in *access.GetAccountBalanceRequest, opts ...grpc.CallOption) (*access.AccountBalanceResponse, error) {
-	_va := make([]interface{}, len(opts))
-	for _i := range opts {
-		_va[_i] = opts[_i]
-	}
-	var _ca []interface{}
-	_ca = append(_ca, ctx, in)
-	_ca = append(_ca, _va...)
-	ret := _m.Called(_ca...)
-
-	if len(ret) == 0 {
-		panic("no return value specified for GetAccountBalance")
-	}
-
-	var r0 *access.AccountBalanceResponse
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, *access.GetAccountBalanceRequest, ...grpc.CallOption) (*access.AccountBalanceResponse, error)); ok {
-		return rf(ctx, in, opts...)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, *access.GetAccountBalanceRequest, ...grpc.CallOption) *access.AccountBalanceResponse); ok {
-		r0 = rf(ctx, in, opts...)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*access.AccountBalanceResponse)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, *access.GetAccountBalanceRequest, ...grpc.CallOption) error); ok {
-		r1 = rf(ctx, in, opts...)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
 // GetAccountBalanceAtBlockHeight provides a mock function with given fields: ctx, in, opts
 func (_m *AccessAPIClient) GetAccountBalanceAtBlockHeight(ctx context.Context, in *access.GetAccountBalanceAtBlockHeightRequest, opts ...grpc.CallOption) (*access.AccountBalanceResponse, error) {
 	_va := make([]interface{}, len(opts))
@@ -342,43 +305,6 @@ func (_m *AccessAPIClient) GetAccountBalanceAtLatestBlock(ctx context.Context, i
 	}
 
 	if rf, ok := ret.Get(1).(func(context.Context, *access.GetAccountBalanceAtLatestBlockRequest, ...grpc.CallOption) error); ok {
-		r1 = rf(ctx, in, opts...)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// GetAccountKeys provides a mock function with given fields: ctx, in, opts
-func (_m *AccessAPIClient) GetAccountKeys(ctx context.Context, in *access.GetAccountKeysRequest, opts ...grpc.CallOption) (*access.AccountKeysResponse, error) {
-	_va := make([]interface{}, len(opts))
-	for _i := range opts {
-		_va[_i] = opts[_i]
-	}
-	var _ca []interface{}
-	_ca = append(_ca, ctx, in)
-	_ca = append(_ca, _va...)
-	ret := _m.Called(_ca...)
-
-	if len(ret) == 0 {
-		panic("no return value specified for GetAccountKeys")
-	}
-
-	var r0 *access.AccountKeysResponse
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, *access.GetAccountKeysRequest, ...grpc.CallOption) (*access.AccountKeysResponse, error)); ok {
-		return rf(ctx, in, opts...)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, *access.GetAccountKeysRequest, ...grpc.CallOption) *access.AccountKeysResponse); ok {
-		r0 = rf(ctx, in, opts...)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*access.AccountKeysResponse)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, *access.GetAccountKeysRequest, ...grpc.CallOption) error); ok {
 		r1 = rf(ctx, in, opts...)
 	} else {
 		r1 = ret.Error(1)

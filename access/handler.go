@@ -581,32 +581,6 @@ func (h *Handler) GetAccountAtBlockHeight(
 	}, nil
 }
 
-// GetAccountBalance returns an account balance by address at the latest sealed block.
-func (h *Handler) GetAccountBalance(
-	ctx context.Context,
-	req *access.GetAccountBalanceRequest,
-) (*access.AccountBalanceResponse, error) {
-	metadata, err := h.buildMetadataResponse()
-	if err != nil {
-		return nil, err
-	}
-
-	address, err := convert.Address(req.GetAddress(), h.chain)
-	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid address: %v", err)
-	}
-
-	accountBalance, err := h.api.GetAccountBalance(ctx, address)
-	if err != nil {
-		return nil, err
-	}
-
-	return &access.AccountBalanceResponse{
-		AccountBalance: accountBalance,
-		Metadata:       metadata,
-	}, nil
-}
-
 // GetAccountBalanceAtLatestBlock returns an account balance by address at the latest sealed block.
 func (h *Handler) GetAccountBalanceAtLatestBlock(
 	ctx context.Context,
@@ -622,14 +596,15 @@ func (h *Handler) GetAccountBalanceAtLatestBlock(
 		return nil, status.Errorf(codes.InvalidArgument, "invalid address: %v", err)
 	}
 
-	accountBalance, err := h.api.GetAccountBalanceAtLatestBlock(ctx, address)
+	accountBalance, availableBalance, err := h.api.GetAccountBalanceAtLatestBlock(ctx, address)
 	if err != nil {
 		return nil, err
 	}
 
 	return &access.AccountBalanceResponse{
-		AccountBalance: accountBalance,
-		Metadata:       metadata,
+		Balance:          accountBalance,
+		AvailableBalance: availableBalance,
+		Metadata:         metadata,
 	}, nil
 }
 
@@ -648,51 +623,15 @@ func (h *Handler) GetAccountBalanceAtBlockHeight(
 		return nil, status.Errorf(codes.InvalidArgument, "invalid address: %v", err)
 	}
 
-	accountBalance, err := h.api.GetAccountBalanceAtBlockHeight(ctx, address, req.GetBlockHeight())
+	accountBalance, availableBalance, err := h.api.GetAccountBalanceAtBlockHeight(ctx, address, req.GetBlockHeight())
 	if err != nil {
 		return nil, err
 	}
 
 	return &access.AccountBalanceResponse{
-		AccountBalance: accountBalance,
-		Metadata:       metadata,
-	}, nil
-}
-
-// GetAccountKeys returns an account public keys by address at the latest sealed block.
-func (h *Handler) GetAccountKeys(
-	ctx context.Context,
-	req *access.GetAccountKeysRequest,
-) (*access.AccountKeysResponse, error) {
-	metadata, err := h.buildMetadataResponse()
-	if err != nil {
-		return nil, err
-	}
-
-	address, err := convert.Address(req.GetAddress(), h.chain)
-	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid address: %v", err)
-	}
-
-	accountKeys, err := h.api.GetAccountKeys(ctx, address)
-	if err != nil {
-		return nil, err
-	}
-
-	var publicKeys []*entities.AccountKey
-
-	for i, key := range accountKeys {
-		accountKey, err := convert.AccountKeyToMessage(key)
-		if err != nil {
-			return nil, status.Errorf(codes.InvalidArgument, "invalid key: %v", err)
-		}
-
-		publicKeys[i] = accountKey
-	}
-
-	return &access.AccountKeysResponse{
-		AccountKeys: publicKeys,
-		Metadata:    metadata,
+		Balance:          accountBalance,
+		AvailableBalance: availableBalance,
+		Metadata:         metadata,
 	}, nil
 }
 
@@ -711,7 +650,12 @@ func (h *Handler) GetAccountKeysAtLatestBlock(
 		return nil, status.Errorf(codes.InvalidArgument, "invalid address: %v", err)
 	}
 
-	accountKeys, err := h.api.GetAccountKeysAtLatestBlock(ctx, address)
+	var keyIndex int
+	if req.GetIndex() != nil {
+		keyIndex = int(req.GetIndex().GetValue())
+	}
+
+	accountKeys, err := h.api.GetAccountKeysAtLatestBlock(ctx, address, keyIndex)
 	if err != nil {
 		return nil, err
 	}
@@ -748,7 +692,12 @@ func (h *Handler) GetAccountKeysAtBlockHeight(
 		return nil, status.Errorf(codes.InvalidArgument, "invalid address: %v", err)
 	}
 
-	accountKeys, err := h.api.GetAccountKeysAtBlockHeight(ctx, address, req.GetBlockHeight())
+	var keyIndex int
+	if req.GetIndex() != nil {
+		keyIndex = int(req.GetIndex().GetValue())
+	}
+
+	accountKeys, err := h.api.GetAccountKeysAtBlockHeight(ctx, address, keyIndex, req.GetBlockHeight())
 	if err != nil {
 		return nil, err
 	}
