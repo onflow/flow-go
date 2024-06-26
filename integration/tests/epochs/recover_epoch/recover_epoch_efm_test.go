@@ -54,7 +54,7 @@ func (s *RecoverEpochSuite) TestRecoverEpoch() {
 
 	// generate epoch recover transaction args
 	collectionClusters := uint64(1)
-	numViewsInEpoch := uint64(80)
+	numViewsInRecoveryEpoch := uint64(80)
 	numViewsInStakingAuction := uint64(2)
 	epochCounter := uint64(1)
 	targetDuration := uint64(3000)
@@ -62,7 +62,7 @@ func (s *RecoverEpochSuite) TestRecoverEpoch() {
 	out := fmt.Sprintf("%s/recover-epoch-tx-args.json", s.Net.BootstrapDir)
 	s.executeEFMRecoverTXArgsCMD(
 		collectionClusters,
-		numViewsInEpoch,
+		numViewsInRecoveryEpoch,
 		numViewsInStakingAuction,
 		epochCounter,
 		targetDuration,
@@ -76,6 +76,20 @@ func (s *RecoverEpochSuite) TestRecoverEpoch() {
 	require.NoError(s.T(), err)
 	env := utils.LocalnetEnv()
 	result := s.recoverEpoch(env, txArgs)
+
+	latestFinalizedHeader := s.GetLatestFinalizedHeader(s.Ctx)
+	// wait for at-least 2 epoch transitions to ensure successful recovery
+	waitForView := latestFinalizedHeader.View + numViewsInRecoveryEpoch
+	s.TimedLogf("waiting for at-least 2 epoch transitions (finalized view %d)", waitForView)
+	s.AwaitFinalizedView(s.Ctx, waitForView, 2*time.Minute, 500*time.Millisecond)
+	s.TimedLogf("observed finalized view %d", waitForView)
+
+	snap := s.GetLatestProtocolSnapshot(s.Ctx)
+	c, _ := snap.Epochs().Next().Counter()
+	fmt.Println("NEXT EPOCH COUNTER", c)
+	currentEpoch := s.CurrentEpoch(s.Ctx)
+	// assert we have transitioned out of Epoch 0 indicating a successful recovery.
+	require.Greater(s.T(), currentEpoch, uint64(0))
+
 	fmt.Println("TX RESULT STATUS: ", result)
-	// wait until recover event is processed and we transition into new epoch
 }

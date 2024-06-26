@@ -29,6 +29,7 @@ func ServiceEvent(chainID flow.ChainID, event flow.Event) (*flow.ServiceEvent, e
 	case events.EpochCommit.EventType():
 		return convertServiceEventEpochCommit(event)
 	case events.EpochRecover.EventType():
+		fmt.Println("RECEIVED EPOCH RECOVER SERVICE EVENT")
 		return convertServiceEventEpochRecover(event)
 	case events.VersionBeacon.EventType():
 		return convertServiceEventVersionBeacon(event)
@@ -733,11 +734,6 @@ func convertClusterQCVoteData(cdcClusterQCVoteData []cadence.Value) ([]flow.Clus
 			)
 		}
 
-		cdcRawVotes, err := getField[cadence.Array](fields, "voteSignatures")
-		if err != nil {
-			return nil, fmt.Errorf("failed to decode clusterQCVoteData struct: %w", err)
-		}
-
 		cdcVoterIDs, err := getField[cadence.Array](fields, "voterIDs")
 		if err != nil {
 			return nil, fmt.Errorf("failed to decode clusterQCVoteData struct: %w", err)
@@ -760,32 +756,14 @@ func convertClusterQCVoteData(cdcClusterQCVoteData []cadence.Value) ([]flow.Clus
 			voterIDs = append(voterIDs, voterID)
 		}
 
-		// gather all the vote signatures
-		signatures := make([]crypto.Signature, 0, len(cdcRawVotes.Values))
-		for _, cdcRawVote := range cdcRawVotes.Values {
-			rawVoteHex, ok := cdcRawVote.(cadence.String)
-			if !ok {
-				return nil, invalidCadenceTypeError(
-					"clusterQC[i].vote",
-					cdcRawVote,
-					cadence.String(""),
-				)
-			}
-			rawVoteBytes, err := hex.DecodeString(string(rawVoteHex))
-			if err != nil {
-				return nil, fmt.Errorf("could not convert raw vote from hex: %w", err)
-			}
-			signatures = append(signatures, rawVoteBytes)
-		}
-		// Aggregate BLS signatures
-		aggregatedSignature, err := crypto.AggregateBLSSignatures(signatures)
+		cdcVoteSignatures, err := getField[cadence.String](fields, "voteSignatures")
 		if err != nil {
-			// expected errors of the function are:
-			//  - empty list of signatures
-			//  - an input signature does not deserialize to a valid point
-			// Both are not expected at this stage because list is guaranteed not to be
-			// empty and individual signatures have been validated.
-			return nil, fmt.Errorf("cluster qc vote aggregation failed: %w", err)
+			return nil, fmt.Errorf("failed to decode clusterQCVoteData struct: %w", err)
+		}
+
+		rawVoteBytes, err := hex.DecodeString(string(cdcVoteSignatures))
+		if err != nil {
+			return nil, fmt.Errorf("could not convert raw vote from hex: %w", err)
 		}
 
 		// check that aggregated signature is not identity, because an identity signature
@@ -804,13 +782,13 @@ func convertClusterQCVoteData(cdcClusterQCVoteData []cadence.Value) ([]flow.Clus
 		//  w.r.t their corresponding staking public key. It is therefore enough to check
 		//  the aggregated signature to conclude whether the aggregated public key is identity.
 		//  This check is therefore a sanity check to catch a potential issue early.
-		if crypto.IsBLSSignatureIdentity(aggregatedSignature) {
+		if crypto.IsBLSSignatureIdentity(rawVoteBytes) {
 			return nil, fmt.Errorf("cluster qc vote aggregation failed because resulting BLS signature is identity")
 		}
 
 		// set the fields on the QC vote data object
 		qcVoteDatas = append(qcVoteDatas, flow.ClusterQCVoteData{
-			SigData:  aggregatedSignature,
+			SigData:  rawVoteBytes,
 			VoterIDs: voterIDs,
 		})
 	}

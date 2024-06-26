@@ -21,6 +21,7 @@ import (
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/integration/tests/lib"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -74,7 +75,7 @@ func (s *BaseSuite) SetupTest() {
 		testnet.WithAdditionalFlag("--cruise-ctl-enabled=false"), // disable cruise control for integration tests
 		testnet.WithAdditionalFlag(fmt.Sprintf("--required-verification-seal-approvals=%d", s.RequiredSealApprovals)),
 		testnet.WithAdditionalFlag(fmt.Sprintf("--required-construction-seal-approvals=%d", s.RequiredSealApprovals)),
-		testnet.WithLogLevel(zerolog.InfoLevel)}
+		testnet.WithLogLevel(zerolog.ErrorLevel)}
 
 	// a ghost node masquerading as an access node
 	s.ghostID = unittest.IdentifierFixture()
@@ -90,8 +91,8 @@ func (s *BaseSuite) SetupTest() {
 		testnet.NewNodeConfig(flow.RoleCollection, collectionConfigs...),
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
-		testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.InfoLevel), testnet.WithAdditionalFlag("--extensive-logging=true")),
-		testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.WarnLevel)),
+		testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.ErrorLevel), testnet.WithAdditionalFlag("--extensive-logging=true")),
+		testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.ErrorLevel), testnet.WithAdditionalFlag("--extensive-logging=true")),
 		testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.WarnLevel)),
 		ghostNode,
 	}
@@ -168,15 +169,14 @@ func (s *BaseSuite) GetContainersByRole(role flow.Role) []*testnet.Container {
 // transition must have happened.
 func (s *BaseSuite) AwaitFinalizedView(ctx context.Context, view uint64, waitFor, tick time.Duration) {
 	require.Eventually(s.T(), func() bool {
-		finalized := s.getLatestFinalizedHeader(ctx)
+		finalized := s.GetLatestFinalizedHeader(ctx)
 		return finalized.View >= view
 	}, waitFor, tick)
 }
 
-// getLatestFinalizedHeader retrieves the latest finalized block, as reported in LatestSnapshot.
-func (s *BaseSuite) getLatestFinalizedHeader(ctx context.Context) *flow.Header {
-	snapshot, err := s.Client.GetLatestProtocolSnapshot(ctx)
-	require.NoError(s.T(), err)
+// GetLatestFinalizedHeader retrieves the latest finalized block, as reported in LatestSnapshot.
+func (s *BaseSuite) GetLatestFinalizedHeader(ctx context.Context) *flow.Header {
+	snapshot := s.GetLatestProtocolSnapshot(ctx)
 	finalized, err := snapshot.Head()
 	require.NoError(s.T(), err)
 	return finalized
@@ -184,9 +184,21 @@ func (s *BaseSuite) getLatestFinalizedHeader(ctx context.Context) *flow.Header {
 
 // AssertInEpoch requires actual epoch counter is equal to counter provided.
 func (s *BaseSuite) AssertInEpoch(ctx context.Context, expectedEpoch uint64) {
+	actualEpoch := s.CurrentEpoch(ctx)
+	require.Equalf(s.T(), expectedEpoch, actualEpoch, "expected to be in epoch %d got %d", expectedEpoch, actualEpoch)
+}
+
+// CurrentEpoch returns the current epoch.
+func (s *BaseSuite) CurrentEpoch(ctx context.Context) uint64 {
+	snapshot := s.GetLatestProtocolSnapshot(ctx)
+	counter, err := snapshot.Epochs().Current().Counter()
+	require.NoError(s.T(), err)
+	return counter
+}
+
+// GetLatestProtocolSnapshot returns the latest protocol snapshot.
+func (s *BaseSuite) GetLatestProtocolSnapshot(ctx context.Context) *inmem.Snapshot {
 	snapshot, err := s.Client.GetLatestProtocolSnapshot(ctx)
 	require.NoError(s.T(), err)
-	actualEpoch, err := snapshot.Epochs().Current().Counter()
-	require.NoError(s.T(), err)
-	require.Equalf(s.T(), expectedEpoch, actualEpoch, "expected to be in epoch %d got %d", expectedEpoch, actualEpoch)
+	return snapshot
 }
