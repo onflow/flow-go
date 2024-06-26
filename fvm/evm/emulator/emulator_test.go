@@ -766,6 +766,22 @@ func TestCallingExtraPrecompiles(t *testing.T) {
 						require.Equal(t, input, inp)
 						return output, nil
 					},
+					CapturedCallsFunc: func() *types.PrecompiledCalls {
+						return &types.PrecompiledCalls{
+							Address: addr,
+							RequiredGasCalls: []types.RequiredGasCall{{
+								Input:  input,
+								Output: uint64(10),
+							}},
+							RunCalls: []types.RunCall{{
+								Input:    input,
+								Output:   output,
+								ErrorMsg: "",
+							}},
+						}
+					},
+					ResetFunc: func() {
+					},
 				}
 
 				ctx := types.NewDefaultBlockContext(blockNumber.Uint64())
