@@ -72,5 +72,5 @@ func AggregatedPrecompileCallsFromEncoded(encoded []byte) (AggregatedPrecompiled
 	if len(encoded) == 0 {
 		return apc, nil
 	}
-	return apc, rlp.DecodeBytes(encoded, apc)
+	return apc, rlp.DecodeBytes(encoded, &apc)
 }
