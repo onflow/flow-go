@@ -77,7 +77,12 @@ func (b *BaseSuite) SetupSuite() {
 			testnet.WithLogLevel(zerolog.FatalLevel),
 			testnet.WithAdditionalFlag("--required-verification-seal-approvals=1"),
 			testnet.WithAdditionalFlag("--required-construction-seal-approvals=1"),
-			testnet.WithAdditionalFlag("--cruise-ctl-fallback-proposal-duration=1ms"),
+			// `cruise-ctl-fallback-proposal-duration` is set to 250ms instead to of 1ms
+			// to purposely slow down the block rate. This is needed since the crypto module
+			// update providing faster BLS operations.
+			// TODO: fix the access integration test logic to function without slowing down
+			// the block rate
+			testnet.WithAdditionalFlag("--cruise-ctl-fallback-proposal-duration=250ms"),
 		)
 		b.NodeConfigs = append(b.NodeConfigs, nodeConfig)
 	}

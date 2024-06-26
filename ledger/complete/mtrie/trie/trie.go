@@ -78,7 +78,7 @@ func (mt *MTrie) AllocatedRegCount() uint64 {
 	return mt.regCount
 }
 
-// AllocatedRegSize returns the size of allocated registers in the trie.
+// AllocatedRegSize returns the size (number of bytes) of allocated registers in the trie.
 // Concurrency safe (as Tries are immutable structures by convention)
 func (mt *MTrie) AllocatedRegSize() uint64 {
 	return mt.regSize
@@ -748,7 +748,7 @@ func EmptyTrieRootHash() ledger.RootHash {
 }
 
 // AllPayloads returns all payloads
-func (mt *MTrie) AllPayloads() []ledger.Payload {
+func (mt *MTrie) AllPayloads() []*ledger.Payload {
 	return mt.root.AllPayloads()
 }
 

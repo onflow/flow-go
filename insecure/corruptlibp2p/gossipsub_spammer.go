@@ -51,7 +51,11 @@ func NewGossipSubRouterSpammer(t *testing.T, sporkId flow.Identifier, role flow.
 // - inspector: the RPC inspector.
 // Returns:
 // - the GossipSubRouterSpammer.
-func NewGossipSubRouterSpammerWithRpcInspector(t *testing.T, sporkId flow.Identifier, role flow.Role, provider module.IdentityProvider, inspector func(id peer.ID, rpc *corrupt.RPC) error) *GossipSubRouterSpammer {
+func NewGossipSubRouterSpammerWithRpcInspector(t *testing.T,
+	sporkId flow.Identifier,
+	role flow.Role,
+	provider module.IdentityProvider,
+	inspector func(id peer.ID, rpc *corrupt.RPC) error) *GossipSubRouterSpammer {
 	spammerNode, spammerId, router := newSpammerNodeWithRpcInspector(t, sporkId, role, provider, inspector)
 	return &GossipSubRouterSpammer{
 		router:      router,
@@ -70,10 +74,10 @@ func (s *GossipSubRouterSpammer) SpamControlMessage(t *testing.T, victim p2p.Lib
 
 // GenerateCtlMessages generates control messages before they are sent so the test can prepare
 // to expect receiving them before they are sent by the spammer.
-func (s *GossipSubRouterSpammer) GenerateCtlMessages(msgCount int, opts ...GossipSubCtrlOption) []pb.ControlMessage {
+func (s *GossipSubRouterSpammer) GenerateCtlMessages(msgCount int, opts ...p2ptest.GossipSubCtrlOption) []pb.ControlMessage {
 	var ctlMgs []pb.ControlMessage
 	for i := 0; i < msgCount; i++ {
-		ctlMsg := GossipSubCtrlFixture(opts...)
+		ctlMsg := p2ptest.GossipSubCtrlFixture(opts...)
 		ctlMgs = append(ctlMgs, *ctlMsg)
 	}
 	return ctlMgs

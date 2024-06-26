@@ -6,10 +6,10 @@ import (
 	"sort"
 	"testing"
 
+	"github.com/onflow/crypto/random"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/crypto/random"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -23,9 +23,9 @@ var someSeed = []uint8{0x6A, 0x23, 0x41, 0xB7, 0x80, 0xE1, 0x64, 0x59,
 // We test that leader selection works for a committee of size one
 func TestSingleConsensusNode(t *testing.T) {
 
-	identity := unittest.IdentityFixture(unittest.WithWeight(8))
+	identity := unittest.IdentityFixture(unittest.WithInitialWeight(8))
 	rng := getPRG(t, someSeed)
-	selection, err := ComputeLeaderSelection(0, rng, 10, []*flow.Identity{identity})
+	selection, err := ComputeLeaderSelection(0, rng, 10, flow.IdentitySkeletonList{&identity.IdentitySkeleton})
 	require.NoError(t, err)
 	for i := uint64(0); i < 10; i++ {
 		leaderID, err := selection.LeaderForView(i)
@@ -126,9 +126,9 @@ func TestDeterministic(t *testing.T) {
 	const N_VIEWS = 100
 	const N_NODES = 4
 
-	identities := unittest.IdentityListFixture(N_NODES)
+	identities := unittest.IdentityListFixture(N_NODES).ToSkeleton()
 	for i, identity := range identities {
-		identity.Weight = uint64(i + 1)
+		identity.InitialWeight = uint64(i + 1)
 	}
 	rng := getPRG(t, someSeed)
 
@@ -158,16 +158,16 @@ func TestInputValidation(t *testing.T) {
 	// should return an error if we request to compute leader selection for <1 views
 	t.Run("epoch containing no views", func(t *testing.T) {
 		count := 0
-		_, err := ComputeLeaderSelection(0, rng, count, unittest.IdentityListFixture(4))
+		_, err := ComputeLeaderSelection(0, rng, count, unittest.IdentityListFixture(4).ToSkeleton())
 		assert.Error(t, err)
 		count = -1
-		_, err = ComputeLeaderSelection(0, rng, count, unittest.IdentityListFixture(4))
+		_, err = ComputeLeaderSelection(0, rng, count, unittest.IdentityListFixture(4).ToSkeleton())
 		assert.Error(t, err)
 	})
 
 	// epoch with no possible leaders should return an error
 	t.Run("epoch without participants", func(t *testing.T) {
-		identities := unittest.IdentityListFixture(0)
+		identities := unittest.IdentityListFixture(0).ToSkeleton()
 		_, err := ComputeLeaderSelection(0, rng, 100, identities)
 		assert.Error(t, err)
 	})
@@ -181,7 +181,7 @@ func TestViewOutOfRange(t *testing.T) {
 	firstView := uint64(100)
 	finalView := uint64(200)
 
-	identities := unittest.IdentityListFixture(4)
+	identities := unittest.IdentityListFixture(4).ToSkeleton()
 	leaders, err := ComputeLeaderSelection(firstView, rng, int(finalView-firstView+1), identities)
 	require.Nil(t, err)
 
@@ -227,7 +227,7 @@ func TestDifferentSeedWillProduceDifferentSelection(t *testing.T) {
 
 	identities := unittest.IdentityListFixture(N_NODES)
 	for i, identity := range identities {
-		identity.Weight = uint64(i)
+		identity.InitialWeight = uint64(i)
 	}
 
 	rng1 := getPRG(t, someSeed)
@@ -236,10 +236,10 @@ func TestDifferentSeedWillProduceDifferentSelection(t *testing.T) {
 	seed2[0] = 8
 	rng2 := getPRG(t, seed2)
 
-	leaders1, err := ComputeLeaderSelection(0, rng1, N_VIEWS, identities)
+	leaders1, err := ComputeLeaderSelection(0, rng1, N_VIEWS, identities.ToSkeleton())
 	require.NoError(t, err)
 
-	leaders2, err := ComputeLeaderSelection(0, rng2, N_VIEWS, identities)
+	leaders2, err := ComputeLeaderSelection(0, rng2, N_VIEWS, identities.ToSkeleton())
 	require.NoError(t, err)
 
 	diff := 0
@@ -267,9 +267,9 @@ func TestLeaderSelectionAreWeighted(t *testing.T) {
 	const N_VIEWS = 100000
 	const N_NODES = 4
 
-	identities := unittest.IdentityListFixture(N_NODES)
+	identities := unittest.IdentityListFixture(N_NODES).ToSkeleton()
 	for i, identity := range identities {
-		identity.Weight = uint64(i + 1)
+		identity.InitialWeight = uint64(i + 1)
 	}
 
 	leaders, err := ComputeLeaderSelection(0, rng, N_VIEWS, identities)
@@ -287,7 +287,7 @@ func TestLeaderSelectionAreWeighted(t *testing.T) {
 	for nodeID, selectedCount := range selected {
 		identity, ok := identities.ByNodeID(nodeID)
 		require.True(t, ok)
-		target := uint64(N_VIEWS) * identity.Weight / 10
+		target := uint64(N_VIEWS) * identity.InitialWeight / 10
 
 		var diff uint64
 		if selectedCount > target {
@@ -307,14 +307,15 @@ func BenchmarkLeaderSelection(b *testing.B) {
 	const N_VIEWS = 15000000
 	const N_NODES = 20
 
-	identities := make([]*flow.Identity, 0, N_NODES)
+	identities := make(flow.IdentityList, 0, N_NODES)
 	for i := 0; i < N_NODES; i++ {
-		identities = append(identities, unittest.IdentityFixture(unittest.WithWeight(uint64(i))))
+		identities = append(identities, unittest.IdentityFixture(unittest.WithInitialWeight(uint64(i))))
 	}
+	skeletonIdentities := identities.ToSkeleton()
 	rng := getPRG(b, someSeed)
 
 	for n := 0; n < b.N; n++ {
-		_, err := ComputeLeaderSelection(0, rng, N_VIEWS, identities)
+		_, err := ComputeLeaderSelection(0, rng, N_VIEWS, skeletonIdentities)
 
 		require.NoError(b, err)
 	}
@@ -322,8 +323,8 @@ func BenchmarkLeaderSelection(b *testing.B) {
 
 func TestInvalidTotalWeight(t *testing.T) {
 	rng := getPRG(t, someSeed)
-	identities := unittest.IdentityListFixture(4, unittest.WithWeight(0))
-	_, err := ComputeLeaderSelection(0, rng, 10, identities)
+	identities := unittest.IdentityListFixture(4, unittest.WithInitialWeight(0))
+	_, err := ComputeLeaderSelection(0, rng, 10, identities.ToSkeleton())
 	require.Error(t, err)
 }
 
@@ -338,10 +339,10 @@ func TestZeroWeightNodeWillNotBeSelected(t *testing.T) {
 	t.Run("small dataset", func(t *testing.T) {
 		const N_VIEWS = 100
 
-		weightless := unittest.IdentityListFixture(5, unittest.WithWeight(0))
-		weightful := unittest.IdentityListFixture(5)
+		weightless := unittest.IdentityListFixture(5, unittest.WithInitialWeight(0)).ToSkeleton()
+		weightful := unittest.IdentityListFixture(5).ToSkeleton()
 		for i, identity := range weightful {
-			identity.Weight = uint64(i + 1)
+			identity.InitialWeight = uint64(i + 1)
 		}
 
 		identities := append(weightless, weightful...)
@@ -368,23 +369,24 @@ func TestZeroWeightNodeWillNotBeSelected(t *testing.T) {
 		toolRng := getPRG(t, someSeed)
 
 		// create 1002 nodes with all 0 weight
-		identities := unittest.IdentityListFixture(1002, unittest.WithWeight(0))
+		fullIdentities := unittest.IdentityListFixture(1002, unittest.WithInitialWeight(0))
 
 		// create 2 nodes with 1 weight, and place them in between
 		// index 233-777
 		n := toolRng.UintN(777-233) + 233
 		m := toolRng.UintN(777-233) + 233
-		identities[n].Weight = 1
-		identities[m].Weight = 1
+		fullIdentities[n].InitialWeight = 1
+		fullIdentities[m].InitialWeight = 1
 
-		// the following code check the zero weight node should not be selected
-		weightful := identities.Filter(filter.HasWeight(true))
+		// the following code checks that zero-weight nodes are not selected (selection probability is proportional to weight)
+		votingConsensusNodes := fullIdentities.Filter(filter.HasInitialWeight[flow.Identity](true)).ToSkeleton()
+		allEpochConsensusNodes := fullIdentities.ToSkeleton() // including zero-weight nodes
 
 		count := 1000
-		selectionFromAll, err := ComputeLeaderSelection(0, rng, count, identities)
+		selectionFromAll, err := ComputeLeaderSelection(0, rng, count, allEpochConsensusNodes)
 		require.NoError(t, err)
 
-		selectionFromWeightful, err := ComputeLeaderSelection(0, rng_copy, count, weightful)
+		selectionFromWeightful, err := ComputeLeaderSelection(0, rng_copy, count, votingConsensusNodes)
 		require.NoError(t, err)
 
 		for i := 0; i < count; i++ {
@@ -401,11 +403,11 @@ func TestZeroWeightNodeWillNotBeSelected(t *testing.T) {
 		t.Run("if there is only 1 node has weight, then it will be always be the leader and the only leader", func(t *testing.T) {
 			toolRng := getPRG(t, someSeed)
 
-			identities := unittest.IdentityListFixture(1000, unittest.WithWeight(0))
+			identities := unittest.IdentityListFixture(1000, unittest.WithInitialWeight(0)).ToSkeleton()
 
 			n := rng.UintN(1000)
 			weight := n + 1
-			identities[n].Weight = weight
+			identities[n].InitialWeight = weight
 			onlyNodeWithWeight := identities[n]
 
 			selections, err := ComputeLeaderSelection(0, toolRng, 1000, identities)

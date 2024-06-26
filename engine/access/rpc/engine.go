@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"sync"
 
+	"github.com/onflow/flow-go/module/state_synchronization"
+
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc/credentials"
 
@@ -15,6 +17,8 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine/access/rest"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
+	"github.com/onflow/flow-go/engine/access/state_stream"
+	statestreambackend "github.com/onflow/flow-go/engine/access/state_stream/backend"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
@@ -35,9 +39,10 @@ type Config struct {
 	CollectionAddr         string                           // the address of the upstream collection node
 	HistoricalAccessAddrs  string                           // the list of all access nodes from previous spork
 
-	BackendConfig backend.Config // configurable options for creating Backend
-	RestConfig    rest.Config    // the REST server configuration
-	MaxMsgSize    uint           // GRPC max message size
+	BackendConfig  backend.Config // configurable options for creating Backend
+	RestConfig     rest.Config    // the REST server configuration
+	MaxMsgSize     uint           // GRPC max message size
+	CompressorName string         // GRPC compressor name
 }
 
 // Engine exposes the server with a simplified version of the Access API.
@@ -64,6 +69,9 @@ type Engine struct {
 
 	addrLock       sync.RWMutex
 	restAPIAddress net.Addr
+
+	stateStreamBackend state_stream.API
+	stateStreamConfig  statestreambackend.Config
 }
 type Option func(*RPCEngineBuilder)
 
@@ -79,6 +87,9 @@ func NewBuilder(log zerolog.Logger,
 	restHandler access.API,
 	secureGrpcServer *grpcserver.GrpcServer,
 	unsecureGrpcServer *grpcserver.GrpcServer,
+	stateStreamBackend state_stream.API,
+	stateStreamConfig statestreambackend.Config,
+	indexReporter state_synchronization.IndexReporter,
 ) (*RPCEngineBuilder, error) {
 	log = log.With().Str("engine", "rpc").Logger()
 
@@ -102,8 +113,10 @@ func NewBuilder(log zerolog.Logger,
 		chain:                     chainID.Chain(),
 		restCollector:             accessMetrics,
 		restHandler:               restHandler,
+		stateStreamBackend:        stateStreamBackend,
+		stateStreamConfig:         stateStreamConfig,
 	}
-	backendNotifierActor, backendNotifierWorker := events.NewFinalizationActor(eng.notifyBackendOnBlockFinalized)
+	backendNotifierActor, backendNotifierWorker := events.NewFinalizationActor(eng.processOnFinalizedBlock)
 	eng.backendNotifierActor = backendNotifierActor
 
 	eng.Component = component.NewComponentManagerBuilder().
@@ -122,7 +135,7 @@ func NewBuilder(log zerolog.Logger,
 		AddWorker(eng.shutdownWorker).
 		Build()
 
-	builder := NewRPCEngineBuilder(eng, me, finalizedCache)
+	builder := NewRPCEngineBuilder(eng, me, finalizedCache, indexReporter)
 	if rpcMetricsEnabled {
 		builder.WithMetrics()
 	}
@@ -161,11 +174,27 @@ func (e *Engine) OnFinalizedBlock(block *model.Block) {
 	e.backendNotifierActor.OnFinalizedBlock(block)
 }
 
-// notifyBackendOnBlockFinalized is invoked by the FinalizationActor when a new block is finalized.
-// It notifies the backend of the newly finalized block.
-func (e *Engine) notifyBackendOnBlockFinalized(_ *model.Block) error {
+// processOnFinalizedBlock is invoked by the FinalizationActor when a new block is finalized.
+// It informs the backend of the newly finalized block.
+// The input to this callback is treated as trusted.
+// No errors expected during normal operations.
+func (e *Engine) processOnFinalizedBlock(_ *model.Block) error {
 	finalizedHeader := e.finalizedHeaderCache.Get()
-	e.backend.NotifyFinalizedBlockHeight(finalizedHeader.Height)
+
+	var err error
+	// NOTE: The BlockTracker is currently only used by the access node and not by the observer node.
+	if e.backend.BlockTracker != nil {
+		err = e.backend.BlockTracker.ProcessOnFinalizedBlock()
+		if err != nil {
+			return err
+		}
+	}
+
+	err = e.backend.ProcessFinalizedBlockHeight(finalizedHeader.Height)
+	if err != nil {
+		return fmt.Errorf("could not process finalized block height %d: %w", finalizedHeader.Height, err)
+	}
+
 	return nil
 }
 
@@ -202,6 +231,7 @@ func (e *Engine) serveGRPCWebProxyWorker(ctx irrecoverable.SignalerContext, read
 
 // serveREST is a worker routine which starts the HTTP REST server.
 // The ready callback is called after the server address is bound and set.
+// Note: The original REST BaseContext is discarded, and the irrecoverable.SignalerContext is used for error handling.
 func (e *Engine) serveREST(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	if e.config.RestConfig.ListenAddress == "" {
 		e.log.Debug().Msg("no REST API address specified - not starting the server")
@@ -211,13 +241,19 @@ func (e *Engine) serveREST(ctx irrecoverable.SignalerContext, ready component.Re
 
 	e.log.Info().Str("rest_api_address", e.config.RestConfig.ListenAddress).Msg("starting REST server on address")
 
-	r, err := rest.NewServer(e.restHandler, e.config.RestConfig, e.log, e.chain, e.restCollector)
+	r, err := rest.NewServer(e.restHandler, e.config.RestConfig, e.log, e.chain, e.restCollector, e.stateStreamBackend,
+		e.stateStreamConfig)
 	if err != nil {
 		e.log.Err(err).Msg("failed to initialize the REST server")
 		ctx.Throw(err)
 		return
 	}
 	e.restServer = r
+
+	// Set up the irrecoverable.SignalerContext for error handling in the REST server.
+	e.restServer.BaseContext = func(_ net.Listener) context.Context {
+		return irrecoverable.WithSignalerContext(ctx, ctx)
+	}
 
 	l, err := net.Listen("tcp", e.config.RestConfig.ListenAddress)
 	if err != nil {

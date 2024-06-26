@@ -12,6 +12,52 @@ import (
 
 type TransactionPayerBalanceChecker struct{}
 
+const VerifyPayerBalanceResultTypeCanExecuteTransactionFieldName = "canExecuteTransaction"
+const VerifyPayerBalanceResultTypeRequiredBalanceFieldName = "requiredBalance"
+const VerifyPayerBalanceResultTypeMaximumTransactionFeesFieldName = "maximumTransactionFees"
+
+// decodeVerifyPayerBalanceResult decodes the VerifyPayerBalanceResult struct
+// https://github.com/onflow/flow-core-contracts/blob/7c70c6a1d33c2879b60c78e363fa68fc6fce13b9/contracts/FlowFees.cdc#L75
+func decodeVerifyPayerBalanceResult(resultValue cadence.Value) (
+	canExecuteTransaction cadence.Bool,
+	requiredBalance cadence.UFix64,
+	maximumTransactionFees cadence.UFix64,
+	err error,
+) {
+	result, ok := resultValue.(cadence.Struct)
+	if !ok {
+		return false, 0, 0, fmt.Errorf("invalid VerifyPayerBalanceResult value: not a struct")
+	}
+
+	fields := cadence.FieldsMappedByName(result)
+
+	canExecuteTransaction, ok = fields[VerifyPayerBalanceResultTypeCanExecuteTransactionFieldName].(cadence.Bool)
+	if !ok {
+		return false, 0, 0, fmt.Errorf(
+			"invalid VerifyPayerBalanceResult field: %s",
+			VerifyPayerBalanceResultTypeCanExecuteTransactionFieldName,
+		)
+	}
+
+	requiredBalance, ok = fields[VerifyPayerBalanceResultTypeRequiredBalanceFieldName].(cadence.UFix64)
+	if !ok {
+		return false, 0, 0, fmt.Errorf(
+			"invalid VerifyPayerBalanceResult field: %s",
+			VerifyPayerBalanceResultTypeRequiredBalanceFieldName,
+		)
+	}
+
+	maximumTransactionFees, ok = fields[VerifyPayerBalanceResultTypeMaximumTransactionFeesFieldName].(cadence.UFix64)
+	if !ok {
+		return false, 0, 0, fmt.Errorf(
+			"invalid VerifyPayerBalanceResult field: %s",
+			VerifyPayerBalanceResultTypeMaximumTransactionFeesFieldName,
+		)
+	}
+
+	return canExecuteTransaction, requiredBalance, maximumTransactionFees, nil
+}
+
 func (_ TransactionPayerBalanceChecker) CheckPayerBalanceAndReturnMaxFees(
 	proc *TransactionProcedure,
 	txnState storage.TransactionPreparer,
@@ -40,21 +86,14 @@ func (_ TransactionPayerBalanceChecker) CheckPayerBalanceAndReturnMaxFees(
 		return 0, errors.NewPayerBalanceCheckFailure(proc.Transaction.Payer, err)
 	}
 
-	// parse expected result from the Cadence runtime
-	// https://github.com/onflow/flow-core-contracts/blob/7c70c6a1d33c2879b60c78e363fa68fc6fce13b9/contracts/FlowFees.cdc#L75
-	result, ok := resultValue.(cadence.Struct)
-	if ok && len(result.Fields) == 3 {
-		payerCanPay, okBool := result.Fields[0].(cadence.Bool)
-		requiredBalance, okBalance := result.Fields[1].(cadence.UFix64)
-		maxFees, okFees := result.Fields[2].(cadence.UFix64)
-
-		if okBool && okBalance && okFees {
-			if !payerCanPay {
-				return 0, errors.NewInsufficientPayerBalanceError(proc.Transaction.Payer, requiredBalance)
-			}
-			return uint64(maxFees), nil
-		}
+	payerCanPay, requiredBalance, maxFees, err := decodeVerifyPayerBalanceResult(resultValue)
+	if err != nil {
+		return 0, errors.NewPayerBalanceCheckFailure(proc.Transaction.Payer, err)
 	}
 
-	return 0, errors.NewPayerBalanceCheckFailure(proc.Transaction.Payer, fmt.Errorf("invalid result type"))
+	if !payerCanPay {
+		return 0, errors.NewInsufficientPayerBalanceError(proc.Transaction.Payer, requiredBalance)
+	}
+
+	return uint64(maxFees), nil
 }

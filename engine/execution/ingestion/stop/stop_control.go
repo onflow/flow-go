@@ -148,7 +148,7 @@ func (s stopBoundary) String() string {
 // StopControlHeaders is an interface for fetching headers
 // Its jut a small subset of storage.Headers for comments see storage.Headers
 type StopControlHeaders interface {
-	ByHeight(height uint64) (*flow.Header, error)
+	BlockIDByHeight(height uint64) (flow.Identifier, error)
 }
 
 // NewStopControl creates new StopControl.
@@ -394,7 +394,7 @@ func (s *StopControl) GetStopParameters() StopParameters {
 // s.stopBoundary.StopBeforeHeight.
 //
 // It returns a boolean indicating if the block should be executed.
-func (s *StopControl) ShouldExecuteBlock(b *flow.Header) bool {
+func (s *StopControl) ShouldExecuteBlock(blockID flow.Identifier, height uint64) bool {
 	s.Lock()
 	defer s.Unlock()
 
@@ -405,15 +405,15 @@ func (s *StopControl) ShouldExecuteBlock(b *flow.Header) bool {
 
 	// Skips blocks at or above requested stopHeight
 	// doing so means we have started the stopping process
-	if b.Height < s.stopBoundary.StopBeforeHeight {
+	if height < s.stopBoundary.StopBeforeHeight {
 		return true
 	}
 
 	s.log.Info().
 		Msgf("Skipping execution of %s at height %d"+
 			" because stop has been requested %s",
-			b.ID(),
-			b.Height,
+			blockID,
+			height,
 			s.stopBoundary)
 
 	// stopBoundary is now immutable, because it started affecting execution
@@ -476,12 +476,12 @@ func (s *StopControl) blockFinalized(
 
 		// Let's find the ID of the block that should be executed last
 		// which is the parent of the block at the stopHeight
-		header, err := s.headers.ByHeight(s.stopBoundary.StopBeforeHeight - 1)
+		finalizedID, err := s.headers.BlockIDByHeight(s.stopBoundary.StopBeforeHeight - 1)
 		if err != nil {
 			handleErr(fmt.Errorf("failed to get header by height: %w", err))
 			return
 		}
-		parentID = header.ID()
+		parentID = finalizedID
 	}
 
 	s.stopBoundary.stopAfterExecuting = parentID
@@ -493,7 +493,7 @@ func (s *StopControl) blockFinalized(
 		Msgf("Found ID of the block that should be executed last")
 
 	// check if the parent block has been executed then stop right away
-	executed, err := state.IsBlockExecuted(ctx, s.exeState, h.ParentID)
+	executed, err := state.IsParentExecuted(s.exeState, h)
 	if err != nil {
 		handleErr(fmt.Errorf(
 			"failed to check if the block has been executed: %w",
@@ -622,10 +622,11 @@ func (s *StopControl) processNewVersionBeacons(
 		return
 	}
 
-	s.log.Info().
+	lg := s.log.With().
+		Str("node_version", s.nodeVersion.String()).
+		Str("beacon", vb.String()).
 		Uint64("vb_seal_height", vb.SealHeight).
-		Uint64("vb_sequence", vb.Sequence).
-		Msg("New version beacon found")
+		Uint64("vb_sequence", vb.Sequence).Logger()
 
 	// this is now the last handled version beacon
 	s.versionBeacon = vb
@@ -642,6 +643,10 @@ func (s *StopControl) processNewVersionBeacons(
 		return
 	}
 
+	lg.Info().
+		Uint64("stop_height", stopHeight).
+		Msg("New version beacon found")
+
 	var newStop = stopBoundary{
 		StopParameters: StopParameters{
 			StopBeforeHeight: stopHeight,
@@ -655,6 +660,7 @@ func (s *StopControl) processNewVersionBeacons(
 		// This is just informational and is expected to sometimes happen during
 		// normal operation. The causes for this are described here: validateStopChange.
 		s.log.Info().
+			Uint64("stop_height", stopHeight).
 			Err(err).
 			Msg("Cannot change stop boundary when detecting new version beacon")
 	}

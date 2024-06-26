@@ -3,14 +3,14 @@ package dkg
 import (
 	"testing"
 
+	"github.com/onflow/crypto"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestBeaconKG(t *testing.T) {
-	seed := unittest.SeedFixture(2 * crypto.SeedMinLenDKG)
+	seed := unittest.SeedFixture(2 * crypto.KeyGenSeedMinLen)
 
 	// n = 0
 	_, err := RandomBeaconKG(0, seed)

@@ -4,12 +4,11 @@ import (
 	"fmt"
 	"path"
 
-	"github.com/onflow/flow-go/crypto"
-
-	"github.com/onflow/flow-go/cmd/bootstrap/utils"
-
+	"github.com/onflow/crypto"
 	"github.com/spf13/cobra"
 
+	"github.com/onflow/flow-go/cmd/bootstrap/utils"
+	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	model "github.com/onflow/flow-go/model/bootstrap"
 )
 
@@ -39,7 +38,7 @@ func machineAccountKeyRun(_ *cobra.Command, _ []string) {
 
 	// check if node-machine-account-key.priv.json path exists
 	machineAccountKeyPath := fmt.Sprintf(model.PathNodeMachineAccountPrivateKey, nodeID)
-	keyExists, err := pathExists(path.Join(flagOutdir, machineAccountKeyPath))
+	keyExists, err := common.PathExists(path.Join(flagOutdir, machineAccountKeyPath))
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not check if node-machine-account-key.priv.json exists")
 	}
@@ -58,5 +57,9 @@ func machineAccountKeyRun(_ *cobra.Command, _ []string) {
 	// also write the public key to terminal for entry in Flow Port
 	machineAccountPriv := assembleNodeMachineAccountKey(machineKey)
 
-	writeJSON(machineAccountKeyPath, machineAccountPriv)
+	err = common.WriteJSON(machineAccountKeyPath, flagOutdir, machineAccountPriv)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to write json")
+	}
+	log.Info().Msg(fmt.Sprintf("wrote file %s/%s", flagOutdir, machineAccountKeyPath))
 }

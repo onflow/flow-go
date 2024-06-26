@@ -2,7 +2,6 @@ package p2p
 
 import (
 	"context"
-	"time"
 
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/connmgr"
@@ -19,11 +18,18 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	flownet "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/channels"
-	"github.com/onflow/flow-go/network/p2p/p2pconf"
+	p2pconfig "github.com/onflow/flow-go/network/p2p/config"
 )
 
 type GossipSubFactoryFunc func(context.Context, zerolog.Logger, host.Host, PubSubAdapterConfig, CollectionClusterChangesConsumer) (PubSubAdapter, error)
-type CreateNodeFunc func(zerolog.Logger, host.Host, ProtocolPeerCache, PeerManager, *DisallowListCacheConfig) LibP2PNode
+
+// NodeConstructor is a function that creates a new libp2p node.
+// Args:
+// - config: configuration for the node
+// Returns:
+// - LibP2PNode: new libp2p node
+// - error: error if any, any returned error is irrecoverable.
+type NodeConstructor func(config *NodeConfig) (LibP2PNode, error)
 type GossipSubAdapterConfigFunc func(*BasePubSubAdapterConfig) PubSubAdapterConfig
 
 // GossipSubBuilder provides a builder pattern for creating a GossipSub pubsub system.
@@ -55,24 +61,16 @@ type GossipSubBuilder interface {
 	// none
 	EnableGossipSubScoringWithOverride(*PeerScoringConfigOverride)
 
-	// SetGossipSubScoreTracerInterval sets the gossipsub score tracer interval of the builder.
-	// If the gossipsub score tracer interval has already been set, a fatal error is logged.
-	SetGossipSubScoreTracerInterval(time.Duration)
-
-	// SetGossipSubTracer sets the gossipsub tracer of the builder.
-	// If the gossipsub tracer has already been set, a fatal error is logged.
-	SetGossipSubTracer(PubSubTracer)
-
 	// SetRoutingSystem sets the routing system of the builder.
 	// If the routing system has already been set, a fatal error is logged.
 	SetRoutingSystem(routing.Routing)
 
-	// OverrideDefaultRpcInspectorSuiteFactory overrides the default RPC inspector suite factory of the builder.
+	// OverrideDefaultRpcInspectorFactory overrides the default RPC inspector suite factory of the builder.
 	// A default RPC inspector suite factory is provided by the node. This function overrides the default factory.
 	// The purpose of override is to allow the node to provide a custom RPC inspector suite factory for sake of testing
 	// or experimentation.
 	// It is NOT recommended to override the default RPC inspector suite factory in production unless you know what you are doing.
-	OverrideDefaultRpcInspectorSuiteFactory(GossipSubRpcInspectorSuiteFactoryFunc)
+	OverrideDefaultRpcInspectorFactory(GossipSubRpcInspectorFactoryFunc)
 
 	// Build creates a new GossipSub pubsub system.
 	// It returns the newly created GossipSub pubsub system and any errors encountered during its creation.
@@ -87,8 +85,8 @@ type GossipSubBuilder interface {
 	Build(irrecoverable.SignalerContext) (PubSubAdapter, error)
 }
 
-// GossipSubRpcInspectorSuiteFactoryFunc is a function that creates a new RPC inspector suite. It is used to create
-// RPC inspectors for the gossipsub protocol. The RPC inspectors are used to inspect and validate
+// GossipSubRpcInspectorFactoryFunc is a function that creates a new RPC inspector. It is used to create
+// an RPC inspector for the gossipsub protocol. The RPC inspectors are used to inspect and validate
 // incoming RPC messages before they are processed by the gossipsub protocol.
 // Args:
 // - logger: logger to use
@@ -99,17 +97,19 @@ type GossipSubBuilder interface {
 // - networkingType: networking type of the node, i.e., public or private
 // - identityProvider: identity provider of the node
 // Returns:
-// - p2p.GossipSubInspectorSuite: new RPC inspector suite
+// - GossipSubRPCInspector: new RPC inspector suite
 // - error: error if any, any returned error is irrecoverable.
-type GossipSubRpcInspectorSuiteFactoryFunc func(
-	irrecoverable.SignalerContext,
+type GossipSubRpcInspectorFactoryFunc func(
 	zerolog.Logger,
 	flow.Identifier,
-	*p2pconf.GossipSubRPCInspectorsConfig,
+	*p2pconfig.RpcInspectorParameters,
 	module.GossipSubMetrics,
 	metrics.HeroCacheMetricsFactory,
 	flownet.NetworkingType,
-	module.IdentityProvider) (GossipSubInspectorSuite, error)
+	module.IdentityProvider,
+	func() TopicProvider,
+	GossipSubInvCtrlMsgNotifConsumer,
+) (GossipSubRPCInspector, error)
 
 // NodeBuilder is a builder pattern for creating a libp2p Node instance.
 type NodeBuilder interface {
@@ -120,23 +120,52 @@ type NodeBuilder interface {
 	SetConnectionGater(ConnectionGater) NodeBuilder
 	SetRoutingSystem(func(context.Context, host.Host) (routing.Routing, error)) NodeBuilder
 
-	// EnableGossipSubScoringWithOverride enables peer scoring for the GossipSub pubsub system with the given override.
+	// OverrideGossipSubScoringConfig overrides the default peer scoring config for the GossipSub protocol.
+	// Note that it does not enable peer scoring. The peer scoring is enabled directly by setting the `peer-scoring-enabled` flag to true in `default-config.yaml`, or
+	// by setting the `gossipsub-peer-scoring-enabled` runtime flag to true. This function only overrides the default peer scoring config which takes effect
+	// only if the peer scoring is enabled (mostly for testing purposes).
 	// Any existing peer scoring config attribute that is set in the override will override the default peer scoring config.
 	// Anything that is left to nil or zero value in the override will be ignored and the default value will be used.
 	// Note: it is not recommended to override the default peer scoring config in production unless you know what you are doing.
-	// Production Tip: use PeerScoringConfigNoOverride as the argument to this function to enable peer scoring without any override.
 	// Args:
 	// - PeerScoringConfigOverride: override for the peer scoring config- Recommended to use PeerScoringConfigNoOverride for production.
 	// Returns:
 	// none
-	EnableGossipSubScoringWithOverride(*PeerScoringConfigOverride) NodeBuilder
-	SetCreateNode(CreateNodeFunc) NodeBuilder
-	SetGossipSubFactory(GossipSubFactoryFunc, GossipSubAdapterConfigFunc) NodeBuilder
-	SetStreamCreationRetryInterval(time.Duration) NodeBuilder
-	SetRateLimiterDistributor(UnicastRateLimiterDistributor) NodeBuilder
-	SetGossipSubTracer(PubSubTracer) NodeBuilder
-	SetGossipSubScoreTracerInterval(time.Duration) NodeBuilder
-	OverrideDefaultRpcInspectorSuiteFactory(GossipSubRpcInspectorSuiteFactoryFunc) NodeBuilder
+	OverrideGossipSubScoringConfig(*PeerScoringConfigOverride) NodeBuilder
+
+	// OverrideNodeConstructor overrides the default node constructor, i.e., the function that creates a new libp2p node.
+	// The purpose of override is to allow the node to provide a custom node constructor for sake of testing or experimentation.
+	// It is NOT recommended to override the default node constructor in production unless you know what you are doing.
+	// Args:
+	// - NodeConstructor: custom node constructor
+	// Returns:
+	// none
+	OverrideNodeConstructor(NodeConstructor) NodeBuilder
+
+	// OverrideGossipSubFactory overrides the default gossipsub factory for the GossipSub protocol.
+	// The purpose of override is to allow the node to provide a custom gossipsub factory for sake of testing or experimentation.
+	// Note: it is not recommended to override the default gossipsub factory in production unless you know what you are doing.
+	// Args:
+	// - factory: custom gossipsub factory
+	// Returns:
+	// - NodeBuilder: the node builder
+	OverrideGossipSubFactory(GossipSubFactoryFunc, GossipSubAdapterConfigFunc) NodeBuilder
+
+	// OverrideDefaultRpcInspectorFactory overrides the default rpc inspector factory for the GossipSub protocol.
+	// The purpose of override is to allow the node to provide a custom rpc inspector factory for sake of testing or experimentation.
+	// Note: it is not recommended to override the default rpc inspector factory in production unless you know what you are doing.
+	// Args:
+	// - factory: custom rpc inspector factory
+	// Returns:
+	// - NodeBuilder: the node builder
+	OverrideDefaultRpcInspectorFactory(GossipSubRpcInspectorFactoryFunc) NodeBuilder
+
+	// Build creates a new libp2p node. It returns the newly created libp2p node and any errors encountered during its creation.
+	// Args:
+	// none
+	// Returns:
+	// - LibP2PNode: a new libp2p node
+	// - error: if an error occurs during the creation of the libp2p node, it is returned. Otherwise, nil is returned. Any error returned is unexpected and should be handled as irrecoverable.
 	Build() (LibP2PNode, error)
 }
 
@@ -155,16 +184,21 @@ type PeerScoringConfigOverride struct {
 	// Override criteria: if the function is not nil, it will override the default application specific score parameters.
 	// If the function is nil, the default application specific score parameters are used.
 	AppSpecificScoreParams func(peer.ID) float64
-
-	// DecayInterval is the interval over which we decay the effect of past behavior, so that
-	// a good or bad behavior will not have a permanent effect on the penalty. It is also the interval
-	// that GossipSub uses to refresh the scores of all peers.
-	// Override criteria: if the value is not zero, it will override the default decay interval.
-	// If the value is zero, the default decay interval is used.
-	DecayInterval time.Duration
 }
 
-// PeerScoringConfigNoOverride is a default peer scoring configuration for a GossipSub pubsub system.
-// It is set to nil, which means that no override is done to the default peer scoring configuration.
-// It is the recommended way to use the default peer scoring configuration.
-var PeerScoringConfigNoOverride = (*PeerScoringConfigOverride)(nil)
+// NodeParameters are the numerical values that are used to configure the libp2p node.
+type NodeParameters struct {
+	EnableProtectedStreams bool `validate:"required"`
+}
+
+// NodeConfig is the configuration for the libp2p node, it contains the parameters as well as the essential components for setting up the node.
+// It is used to create a new libp2p node.
+type NodeConfig struct {
+	Parameters *NodeParameters `validate:"required"`
+	// logger used to provide logging
+	Logger zerolog.Logger `validate:"required"`
+	// reference to the libp2p host (https://godoc.org/github.com/libp2p/go-libp2p/core/host)
+	Host                 host.Host `validate:"required"`
+	PeerManager          PeerManager
+	DisallowListCacheCfg *DisallowListCacheConfig `validate:"required"`
+}

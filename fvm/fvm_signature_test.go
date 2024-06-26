@@ -10,8 +10,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/crypto/hash"
+	"github.com/onflow/crypto"
+	"github.com/onflow/crypto/hash"
 
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
@@ -26,6 +26,12 @@ var createMessage = func(m string) (signableMessage []byte, message cadence.Arra
 	message = testutil.BytesToCadenceArray(signableMessage)
 	return signableMessage, message
 }
+
+var uint8ArrayArrayType = cadence.NewVariableSizedArrayType(
+	cadence.NewVariableSizedArrayType(
+		cadence.UInt8Type,
+	),
+)
 
 func TestKeyListSignature(t *testing.T) {
 
@@ -86,7 +92,8 @@ func TestKeyListSignature(t *testing.T) {
 				`
                       import Crypto
 
-                      pub fun main(
+                      access(all)
+                      fun main(
                           rawPublicKeys: [[UInt8]],
                           message: [UInt8],
                           signatures: [[UInt8]],
@@ -121,11 +128,13 @@ func TestKeyListSignature(t *testing.T) {
                           return keyList.verify(
                               signatureSet: signatureSet,
                               signedData: message,
+                              domainSeparationTag: "%s"
                           )
                       }
                     `,
 				signatureAlgorithm.name,
 				hashAlgorithm.name,
+				tag,
 			),
 		)
 
@@ -403,7 +412,8 @@ func TestBLSMultiSignature(t *testing.T) {
 							`
 								import Crypto
 		
-								pub fun main(
+								access(all)
+								fun main(
 									publicKey: [UInt8],
 									proof: [UInt8]
 								): Bool {
@@ -512,7 +522,7 @@ func TestBLSMultiSignature(t *testing.T) {
 					`
 							import Crypto
 	
-							pub fun main(
+							access(all) fun main(
 							signatures: [[UInt8]],
 							): [UInt8]? {
 								return BLS.aggregateSignatures(signatures)!
@@ -548,12 +558,8 @@ func TestBLSMultiSignature(t *testing.T) {
 
 					script := fvm.Script(code).WithArguments(
 						jsoncdc.MustEncode(cadence.Array{
-							Values: signatures,
-							ArrayType: &cadence.VariableSizedArrayType{
-								ElementType: &cadence.VariableSizedArrayType{
-									ElementType: cadence.UInt8Type{},
-								},
-							},
+							Values:    signatures,
+							ArrayType: uint8ArrayArrayType,
 						}),
 					)
 
@@ -580,12 +586,8 @@ func TestBLSMultiSignature(t *testing.T) {
 
 					script := fvm.Script(code).WithArguments(
 						jsoncdc.MustEncode(cadence.Array{
-							Values: signatures,
-							ArrayType: &cadence.VariableSizedArrayType{
-								ElementType: &cadence.VariableSizedArrayType{
-									ElementType: cadence.UInt8Type{},
-								},
-							},
+							Values:    signatures,
+							ArrayType: uint8ArrayArrayType,
 						}),
 					)
 
@@ -603,12 +605,8 @@ func TestBLSMultiSignature(t *testing.T) {
 					signatures := []cadence.Value{}
 					script := fvm.Script(code).WithArguments(
 						jsoncdc.MustEncode(cadence.Array{
-							Values: signatures,
-							ArrayType: &cadence.VariableSizedArrayType{
-								ElementType: &cadence.VariableSizedArrayType{
-									ElementType: cadence.UInt8Type{},
-								},
-							},
+							Values:    signatures,
+							ArrayType: uint8ArrayArrayType,
 						}),
 					)
 
@@ -637,7 +635,7 @@ func TestBLSMultiSignature(t *testing.T) {
 							`
 								import Crypto
 		
-								pub fun main(
+								access(all) fun main(
 									publicKeys: [[UInt8]]
 								): [UInt8]? {
 									let pks: [PublicKey] = []
@@ -673,12 +671,8 @@ func TestBLSMultiSignature(t *testing.T) {
 
 					script := fvm.Script(code(BLSSignatureAlgorithm)).WithArguments(
 						jsoncdc.MustEncode(cadence.Array{
-							Values: publicKeys,
-							ArrayType: &cadence.VariableSizedArrayType{
-								ElementType: &cadence.VariableSizedArrayType{
-									ElementType: cadence.UInt8Type{},
-								},
-							},
+							Values:    publicKeys,
+							ArrayType: uint8ArrayArrayType,
 						}),
 					)
 
@@ -707,12 +701,8 @@ func TestBLSMultiSignature(t *testing.T) {
 
 						script := fvm.Script(code(signatureAlgorithm)).WithArguments(
 							jsoncdc.MustEncode(cadence.Array{
-								Values: publicKeys,
-								ArrayType: &cadence.VariableSizedArrayType{
-									ElementType: &cadence.VariableSizedArrayType{
-										ElementType: cadence.UInt8Type{},
-									},
-								},
+								Values:    publicKeys,
+								ArrayType: uint8ArrayArrayType,
 							}),
 						)
 
@@ -727,12 +717,8 @@ func TestBLSMultiSignature(t *testing.T) {
 					var publicKeys []cadence.Value
 					script := fvm.Script(code(BLSSignatureAlgorithm)).WithArguments(
 						jsoncdc.MustEncode(cadence.Array{
-							Values: publicKeys,
-							ArrayType: &cadence.VariableSizedArrayType{
-								ElementType: &cadence.VariableSizedArrayType{
-									ElementType: cadence.UInt8Type{},
-								},
-							},
+							Values:    publicKeys,
+							ArrayType: uint8ArrayArrayType,
 						}),
 					)
 
@@ -761,7 +747,7 @@ func TestBLSMultiSignature(t *testing.T) {
 				code := []byte(`
 							import Crypto
 
-							pub fun main(
+							access(all) fun main(
 								publicKeys: [[UInt8]],
 								signatures: [[UInt8]],
 								message:  [UInt8],
@@ -807,20 +793,12 @@ func TestBLSMultiSignature(t *testing.T) {
 
 				script := fvm.Script(code).WithArguments(
 					jsoncdc.MustEncode(cadence.Array{ // keys
-						Values: publicKeys,
-						ArrayType: &cadence.VariableSizedArrayType{
-							ElementType: &cadence.VariableSizedArrayType{
-								ElementType: cadence.UInt8Type{},
-							},
-						},
+						Values:    publicKeys,
+						ArrayType: uint8ArrayArrayType,
 					}),
 					jsoncdc.MustEncode(cadence.Array{ // signatures
-						Values: signatures,
-						ArrayType: &cadence.VariableSizedArrayType{
-							ElementType: &cadence.VariableSizedArrayType{
-								ElementType: cadence.UInt8Type{},
-							},
-						},
+						Values:    signatures,
+						ArrayType: uint8ArrayArrayType,
 					}),
 					jsoncdc.MustEncode(cadenceMessage),
 					jsoncdc.MustEncode(cadence.String(tag)),

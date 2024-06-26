@@ -63,6 +63,7 @@ func TestProtocolConstants(t *testing.T) {
 		ConsensusLeaderSelection,
 		VerificationChunkAssignment,
 		ExecutionEnvironment,
+		ExecutionRandomSourceHistory,
 		customizerFromIndices(clusterLeaderSelectionPrefix...),
 	}
 

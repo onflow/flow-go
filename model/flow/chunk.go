@@ -1,8 +1,24 @@
 package flow
 
 import (
+	"fmt"
+	"log"
+
 	"github.com/ipfs/go-cid"
+	"github.com/vmihailenco/msgpack/v4"
 )
+
+var EmptyEventCollectionID Identifier
+
+func init() {
+	// Convert hexadecimal string to a byte slice.
+	var err error
+	emptyEventCollectionHex := "0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8"
+	EmptyEventCollectionID, err = HexStringToIdentifier(emptyEventCollectionHex)
+	if err != nil {
+		log.Fatalf("Failed to decode hex: %v", err)
+	}
+}
 
 type ChunkBody struct {
 	CollectionIndex uint
@@ -60,14 +76,25 @@ func (ch *Chunk) Checksum() Identifier {
 
 // ChunkDataPack holds all register touches (any read, or write).
 //
-// Note that we have to capture a read proof for each write before updating the registers.
-// `Proof` includes proofs for all registers read to execute the chunk.
+// Note that we have to include merkle paths as storage proof for all registers touched (read or written) for
+// the _starting_ state of the chunk (i.e. before the chunk computation updates the registers).
+// For instance, if an execution state contains three registers: { A: 1, B: 2, C: 3}, and a certain
+// chunk has a tx that assigns A = A + B, then its chunk data pack should include the merkle
+// paths for { A: 1, B: 2 } as storage proof.
+// C is not included because it's neither read or written by the chunk.
+// B is included because it's read by the chunk.
+// A is included because it's updated by the chunk, and its value 1 is included because it's
+// the value before the chunk computation.
+// This is necessary for Verification Nodes to (i) check that the read register values are
+// consistent with the starting state's root hash and (ii) verify the correctness of the resulting
+// state after the chunk computation. `Proof` includes merkle proofs for all touched registers
+// during the execution of the chunk.
 // Register proofs order must not be correlated to the order of register reads during
 // the chunk execution in order to enforce the SPoCK secret high entropy.
 type ChunkDataPack struct {
 	ChunkID    Identifier      // ID of the chunk this data pack is for
 	StartState StateCommitment // commitment for starting state
-	Proof      StorageProof    // proof for all registers read during the chunk execution
+	Proof      StorageProof    // proof for all registers touched (read or written) during the chunk execution
 	Collection *Collection     // collection executed in this chunk
 
 	// ExecutionDataRoot is the root data structure of an execution_data.BlockExecutionData.
@@ -177,4 +204,66 @@ type BlockExecutionDataRoot struct {
 	// ChunkExecutionDataIDs is a list of the root CIDs for each serialized execution_data.ChunkExecutionData
 	// associated with this block.
 	ChunkExecutionDataIDs []cid.Cid
+}
+
+// MarshalMsgpack implements the msgpack.Marshaler interface
+func (b BlockExecutionDataRoot) MarshalMsgpack() ([]byte, error) {
+	return msgpack.Marshal(struct {
+		BlockID               Identifier
+		ChunkExecutionDataIDs []string
+	}{
+		BlockID:               b.BlockID,
+		ChunkExecutionDataIDs: cidsToStrings(b.ChunkExecutionDataIDs),
+	})
+}
+
+// UnmarshalMsgpack implements the msgpack.Unmarshaler interface
+func (b *BlockExecutionDataRoot) UnmarshalMsgpack(data []byte) error {
+	var temp struct {
+		BlockID               Identifier
+		ChunkExecutionDataIDs []string
+	}
+
+	if err := msgpack.Unmarshal(data, &temp); err != nil {
+		return err
+	}
+
+	b.BlockID = temp.BlockID
+	cids, err := stringsToCids(temp.ChunkExecutionDataIDs)
+
+	if err != nil {
+		return fmt.Errorf("failed to decode chunk execution data ids: %w", err)
+	}
+
+	b.ChunkExecutionDataIDs = cids
+
+	return nil
+}
+
+// Helper function to convert a slice of cid.Cid to a slice of strings
+func cidsToStrings(cids []cid.Cid) []string {
+	if cids == nil {
+		return nil
+	}
+	strs := make([]string, len(cids))
+	for i, c := range cids {
+		strs[i] = c.String()
+	}
+	return strs
+}
+
+// Helper function to convert a slice of strings to a slice of cid.Cid
+func stringsToCids(strs []string) ([]cid.Cid, error) {
+	if strs == nil {
+		return nil, nil
+	}
+	cids := make([]cid.Cid, len(strs))
+	for i, s := range strs {
+		c, err := cid.Decode(s)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode cid %v: %w", s, err)
+		}
+		cids[i] = c
+	}
+	return cids, nil
 }

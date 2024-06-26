@@ -79,6 +79,11 @@ type GenericNode struct {
 	Payloads           storage.Payloads
 	Blocks             storage.Blocks
 	QuorumCertificates storage.QuorumCertificates
+	Results            storage.ExecutionResults
+	Setups             storage.EpochSetups
+	EpochCommits       storage.EpochCommits
+	EpochProtocolState storage.EpochProtocolStateEntries
+	ProtocolKVStore    storage.ProtocolKVStore
 	State              protocol.ParticipantState
 	Index              storage.Index
 	Me                 module.Local
@@ -203,6 +208,7 @@ type ExecutionNode struct {
 	Collections         storage.Collections
 	Finalizer           *consensus.Finalizer
 	MyExecutionReceipts storage.MyExecutionReceipts
+	StorehouseEnabled   bool
 }
 
 func (en ExecutionNode) Ready(ctx context.Context) {
@@ -247,12 +253,23 @@ func (en ExecutionNode) Done(cancelFunc context.CancelFunc) {
 }
 
 func (en ExecutionNode) AssertHighestExecutedBlock(t *testing.T, header *flow.Header) {
-
 	height, blockID, err := en.ExecutionState.GetHighestExecutedBlockID(context.Background())
 	require.NoError(t, err)
 
 	require.Equal(t, header.ID(), blockID)
 	require.Equal(t, header.Height, height)
+}
+
+func (en ExecutionNode) AssertBlockIsExecuted(t *testing.T, header *flow.Header) {
+	executed, err := en.ExecutionState.IsBlockExecuted(header.Height, header.ID())
+	require.NoError(t, err)
+	require.True(t, executed)
+}
+
+func (en ExecutionNode) AssertBlockNotExecuted(t *testing.T, header *flow.Header) {
+	executed, err := en.ExecutionState.IsBlockExecuted(header.Height, header.ID())
+	require.NoError(t, err)
+	require.False(t, executed)
 }
 
 // VerificationNode implements an in-process verification node for tests.

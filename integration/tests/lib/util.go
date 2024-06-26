@@ -14,11 +14,17 @@ import (
 	sdk "github.com/onflow/flow-go-sdk"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 
-	"github.com/onflow/flow-go/integration/convert"
-	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/dsl"
 	"github.com/onflow/flow-go/utils/unittest"
+
+	"github.com/onflow/flow-go/integration/convert"
+	"github.com/onflow/flow-go/integration/testnet"
+)
+
+const (
+	CounterDefaultValue     = -3
+	CounterInitializedValue = 2
 )
 
 var (
@@ -29,17 +35,17 @@ var (
 			dsl.Resource{
 				Name: "Counter",
 				Code: `
-				pub var count: Int
+				access(all) var count: Int
 
 				init() {
 					self.count = 0
 				}
-				pub fun add(_ count: Int) {
+				access(all) fun add(_ count: Int) {
 					self.count = self.count + count
 				}`,
 			},
 			dsl.Code(`
-				pub fun createCounter(): @Counter {
+				access(all) fun createCounter(): @Counter {
 					return <-create Counter()
 				}`,
 			),
@@ -53,18 +59,22 @@ func CreateCounterTx(counterAddress sdk.Address) dsl.Transaction {
 	return dsl.Transaction{
 		Import: dsl.Import{Address: counterAddress},
 		Content: dsl.Prepare{
-			Content: dsl.Code(`
-				var maybeCounter <- signer.load<@Testing.Counter>(from: /storage/counter)
+			Content: dsl.Code(fmt.Sprintf(
+				`
+					var maybeCounter <- signer.storage.load<@Testing.Counter>(from: /storage/counter)
 
-				if maybeCounter == nil {
-					maybeCounter <-! Testing.createCounter()
-				}
+					if maybeCounter == nil {
+						maybeCounter <-! Testing.createCounter()
+					}
 
-				maybeCounter?.add(2)
-				signer.save(<-maybeCounter!, to: /storage/counter)
+					maybeCounter?.add(%d)
+					signer.storage.save(<-maybeCounter!, to: /storage/counter)
 
-				signer.link<&Testing.Counter>(/public/counter, target: /storage/counter)
-				`),
+					let counterCap = signer.capabilities.storage.issue<&Testing.Counter>(/storage/counter)
+					signer.capabilities.publish(counterCap, at: /public/counter)
+				`,
+				CounterInitializedValue,
+			)),
 		},
 	}
 }
@@ -80,10 +90,11 @@ func ReadCounterScript(contractAddress sdk.Address, accountAddress sdk.Address) 
 		Code: fmt.Sprintf(
 			`
 			  let account = getAccount(0x%s)
-			  let cap = account.getCapability(/public/counter)
-              return cap.borrow<&Testing.Counter>()?.count ?? -3
+			  let counter = account.capabilities.borrow<&Testing.Counter>(/public/counter)
+              return counter?.count ?? %d
             `,
 			accountAddress.Hex(),
+			CounterDefaultValue,
 		),
 	}
 }
@@ -96,16 +107,17 @@ func CreateCounterPanicTx(chain flow.Chain) dsl.Transaction {
 		Import: dsl.Import{Address: sdk.Address(chain.ServiceAddress())},
 		Content: dsl.Prepare{
 			Content: dsl.Code(`
-				var maybeCounter <- signer.load<@Testing.Counter>(from: /storage/counter)
+				var maybeCounter <- signer.storage.load<@Testing.Counter>(from: /storage/counter)
 
 				if maybeCounter == nil {
 					maybeCounter <-! Testing.createCounter()
 				}
 
 				maybeCounter?.add(2)
-				signer.save(<-maybeCounter!, to: /storage/counter)
+				signer.storage.save(<-maybeCounter!, to: /storage/counter)
 
-				signer.link<&Testing.Counter>(/public/counter, target: /storage/counter)
+				let counterCap = signer.capabilities.storage.issue<&Testing.Counter>(/storage/counter)
+				signer.capabilities.publish(counterCap, at: /public/counter)
 
 				panic("fail for testing purposes")
 				`),
@@ -163,7 +175,7 @@ func RandomPrivateKey() sdkcrypto.PrivateKey {
 
 func SDKTransactionFixture(opts ...func(*sdk.Transaction)) sdk.Transaction {
 	tx := sdk.Transaction{
-		Script:             []byte("pub fun main() {}"),
+		Script:             []byte("access(all) fun main() {}"),
 		ReferenceBlockID:   sdk.Identifier(unittest.IdentifierFixture()),
 		GasLimit:           10,
 		ProposalKey:        convert.ToSDKProposalKey(unittest.ProposalKeyFixture()),
@@ -214,28 +226,28 @@ func WithChainID(chainID flow.ChainID) func(tx *sdk.Transaction) {
 
 // LogStatus logs current information about the test network state.
 func LogStatus(t *testing.T, ctx context.Context, log zerolog.Logger, client *testnet.Client) {
+	// retrieves latest FINALIZED snapshot
 	snapshot, err := client.GetLatestProtocolSnapshot(ctx)
 	if err != nil {
-		log.Err(err).Msg("failed to get sealed snapshot")
-		return
-	}
-	finalized, err := client.GetLatestFinalizedBlockHeader(ctx)
-	if err != nil {
-		log.Err(err).Msg("failed to get finalized header")
+		log.Err(err).Msg("failed to get finalized snapshot")
 		return
 	}
 
-	sealed, err := snapshot.Head()
+	sealingSegment, err := snapshot.SealingSegment()
 	require.NoError(t, err)
+	sealed := sealingSegment.Sealed()
+	finalized := sealingSegment.Finalized()
+
 	phase, err := snapshot.Phase()
 	require.NoError(t, err)
 	epoch := snapshot.Epochs().Current()
 	counter, err := epoch.Counter()
 	require.NoError(t, err)
 
-	log.Info().Uint64("final_height", finalized.Height).
-		Uint64("sealed_height", sealed.Height).
-		Uint64("sealed_view", sealed.View).
+	log.Info().Uint64("final_height", finalized.Header.Height).
+		Uint64("final_view", finalized.Header.View).
+		Uint64("sealed_height", sealed.Header.Height).
+		Uint64("sealed_view", sealed.Header.View).
 		Str("cur_epoch_phase", phase.String()).
 		Uint64("cur_epoch_counter", counter).
 		Msg("test run status")

@@ -11,7 +11,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/crypto"
+
 	"github.com/onflow/flow-go/model/flow"
 	msig "github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -50,16 +51,16 @@ func (s *EmulatorSuite) runTest(goodNodes int, emulatorProblems bool) {
 		DKGPhase2FinalView: 200,
 		DKGPhase3FinalView: 250,
 		FinalView:          300,
-		Participants:       s.netIDs,
-		RandomSource:       []byte("random bytes for seed"),
+		Participants:       s.netIDs.ToSkeleton(),
+		RandomSource:       unittest.EpochSetupRandomSourceFixture(),
 	}
 
 	// create the EpochSetup that will trigger the next DKG run with all the
 	// desired parameters
 	nextEpochSetup := flow.EpochSetup{
 		Counter:      currentCounter + 1,
-		Participants: s.netIDs,
-		RandomSource: []byte("random bytes for seed"),
+		Participants: s.netIDs.ToSkeleton(),
+		RandomSource: unittest.EpochSetupRandomSourceFixture(),
 		FirstView:    301,
 		FinalView:    600,
 	}

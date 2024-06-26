@@ -7,6 +7,7 @@ import (
 	otelTrace "go.opentelemetry.io/otel/trace"
 
 	"github.com/onflow/flow-go/fvm/environment"
+	"github.com/onflow/flow-go/fvm/evm/debug"
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/fvm/storage/state"
@@ -28,6 +29,7 @@ type Context struct {
 	// DisableMemoryAndInteractionLimits will override memory and interaction
 	// limits and set them to MaxUint64, effectively disabling these limits.
 	DisableMemoryAndInteractionLimits bool
+	EVMEnabled                        bool
 	ComputationLimit                  uint64
 	MemoryLimit                       uint64
 	MaxStateKeySize                   uint64
@@ -41,6 +43,12 @@ type Context struct {
 	tracing.TracerSpan
 
 	environment.EnvironmentParams
+
+	// AllowProgramCacheWritesInScripts determines if the program cache can be written to in scripts
+	// By default, the program cache is only updated by transactions.
+	AllowProgramCacheWritesInScripts bool
+
+	debug.EVMTracer
 }
 
 // NewContext initializes a new execution context with the provided options.
@@ -62,7 +70,7 @@ func newContext(ctx Context, opts ...Option) Context {
 }
 
 func defaultContext() Context {
-	return Context{
+	ctx := Context{
 		DisableMemoryAndInteractionLimits: false,
 		ComputationLimit:                  DefaultComputationLimit,
 		MemoryLimit:                       DefaultMemoryLimit,
@@ -71,7 +79,9 @@ func defaultContext() Context {
 		MaxStateInteractionSize:           DefaultMaxInteractionSize,
 		TransactionExecutorParams:         DefaultTransactionExecutorParams(),
 		EnvironmentParams:                 environment.DefaultEnvironmentParams(),
+		EVMTracer:                         debug.NopTracer,
 	}
+	return ctx
 }
 
 // An Option sets a configuration parameter for a virtual machine context.
@@ -176,14 +186,6 @@ func WithEntropyProvider(source environment.EntropyProvider) Option {
 func WithBlockHeader(header *flow.Header) Option {
 	return func(ctx Context) Context {
 		ctx.BlockHeader = header
-		return ctx
-	}
-}
-
-// WithServiceEventCollectionEnabled enables service event collection
-func WithServiceEventCollectionEnabled() Option {
-	return func(ctx Context) Context {
-		ctx.ServiceEventCollectionEnabled = true
 		return ctx
 	}
 }
@@ -330,6 +332,15 @@ func WithTransactionFeesEnabled(enabled bool) Option {
 	}
 }
 
+// WithRandomSourceHistoryCallAllowed enables or disables calling the `entropy` function
+// within cadence
+func WithRandomSourceHistoryCallAllowed(allowed bool) Option {
+	return func(ctx Context) Context {
+		ctx.RandomSourceHistoryCallAllowed = allowed
+		return ctx
+	}
+}
+
 // WithReusableCadenceRuntimePool set the (shared) RedusableCadenceRuntimePool
 // use for creating the cadence runtime.
 func WithReusableCadenceRuntimePool(
@@ -354,6 +365,30 @@ func WithDerivedBlockData(derivedBlockData *derived.DerivedBlockData) Option {
 func WithEventEncoder(encoder environment.EventEncoder) Option {
 	return func(ctx Context) Context {
 		ctx.EventEncoder = encoder
+		return ctx
+	}
+}
+
+// WithEVMEnabled enables access to the evm environment
+func WithEVMEnabled(enabled bool) Option {
+	return func(ctx Context) Context {
+		ctx.EVMEnabled = enabled
+		return ctx
+	}
+}
+
+// WithAllowProgramCacheWritesInScriptsEnabled enables caching of programs accessed by scripts
+func WithAllowProgramCacheWritesInScriptsEnabled(enabled bool) Option {
+	return func(ctx Context) Context {
+		ctx.AllowProgramCacheWritesInScripts = enabled
+		return ctx
+	}
+}
+
+// WithEVMTracer will set the evm execution tracer
+func WithEVMTracer(tracer debug.EVMTracer) Option {
+	return func(ctx Context) Context {
+		ctx.EVMTracer = tracer
 		return ctx
 	}
 }

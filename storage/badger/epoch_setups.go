@@ -1,6 +1,8 @@
 package badger
 
 import (
+	"fmt"
+
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -49,7 +51,7 @@ func (es *EpochSetups) retrieveTx(setupID flow.Identifier) func(tx *badger.Txn) 
 	return func(tx *badger.Txn) (*flow.EpochSetup, error) {
 		val, err := es.cache.Get(setupID)(tx)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("could not retrieve EpochSetup event with id %x: %w", setupID, err)
 		}
 		return val, nil
 	}

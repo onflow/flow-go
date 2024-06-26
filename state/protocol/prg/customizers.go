@@ -16,14 +16,18 @@ import (
 
 var (
 	// ConsensusLeaderSelection is the customizer for consensus leader selection
-	ConsensusLeaderSelection = customizerFromIndices(0, 1, 1)
+	ConsensusLeaderSelection = customizerFromIndices(0)
 	// VerificationChunkAssignment is the customizer for verification chunk assignment
-	VerificationChunkAssignment = customizerFromIndices(0, 2, 0)
+	VerificationChunkAssignment = customizerFromIndices(2)
 	// ExecutionEnvironment is the customizer for Flow's transaction execution environment
-	ExecutionEnvironment = customizerFromIndices(1)
+	// (used for Cadence `random` function)
+	ExecutionEnvironment = customizerFromIndices(1, 0)
+	// ExecutionRandomSourceHistory is the customizer for Flow's transaction execution environment
+	// (used for the source of randomness history core-contract)
+	ExecutionRandomSourceHistory = customizerFromIndices(1, 1)
 	//
 	// clusterLeaderSelectionPrefix is the prefix used for CollectorClusterLeaderSelection
-	clusterLeaderSelectionPrefix = []uint16{0, 0}
+	clusterLeaderSelectionPrefix = []uint16{3}
 )
 
 // CollectorClusterLeaderSelection returns the indices for the leader selection for the i-th collector cluster

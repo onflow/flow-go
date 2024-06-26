@@ -3,6 +3,7 @@ package stdmap_test
 import (
 	"runtime"
 	"runtime/debug"
+	"sync"
 	"testing"
 	"time"
 
@@ -110,6 +111,11 @@ func testAddEntities(t testing.TB, limit uint, b *stdmap.Backend, entities []*un
 type baselineLRU struct {
 	c     *lru.Cache // used to incorporate an LRU cache
 	limit int
+
+	// atomicAdjustMutex is used to synchronize concurrent access to the
+	// underlying LRU cache. This is needed because hashicorp LRU does not
+	// provide thread-safety for atomic adjust-with-init or get-with-init operations.
+	atomicAdjustMutex sync.Mutex
 }
 
 func newBaselineLRU(limit int) *baselineLRU {
@@ -167,6 +173,40 @@ func (b *baselineLRU) Adjust(entityID flow.Identifier, f func(flow.Entity) flow.
 	return newEntity, true
 }
 
+// AdjustWithInit will adjust the value item using the given function if the given key can be found.
+// If the key is not found, the init function will be called to create a new value.
+// Returns a bool which indicates whether the value was updated as well as the updated value and
+// a bool indicating whether the value was initialized.
+// Note: this is a benchmark helper, hence, the adjust-with-init provides serializability w.r.t other concurrent adjust-with-init or get-with-init operations,
+// and does not provide serializability w.r.t concurrent add, adjust or get operations.
+func (b *baselineLRU) AdjustWithInit(entityID flow.Identifier, adjust func(flow.Entity) flow.Entity, init func() flow.Entity) (flow.Entity, bool) {
+	b.atomicAdjustMutex.Lock()
+	defer b.atomicAdjustMutex.Unlock()
+
+	if b.Has(entityID) {
+		return b.Adjust(entityID, adjust)
+	}
+	added := b.Add(entityID, init())
+	if !added {
+		return nil, false
+	}
+	return b.Adjust(entityID, adjust)
+}
+
+// GetWithInit will retrieve the value item if the given key can be found.
+// If the key is not found, the init function will be called to create a new value.
+// Returns a bool which indicates whether the entity was found (or created).
+func (b *baselineLRU) GetWithInit(entityID flow.Identifier, init func() flow.Entity) (flow.Entity, bool) {
+	newE := init()
+	e, ok, _ := b.c.PeekOrAdd(entityID, newE)
+	if !ok {
+		// if the entity was not found, it means that the new entity was added to the cache.
+		return newE, true
+	}
+	// if the entity was found, it means that the new entity was not added to the cache.
+	return e.(flow.Entity), true
+}
+
 // ByID returns the given item from the pool.
 func (b *baselineLRU) ByID(entityID flow.Identifier) (flow.Entity, bool) {
 	e, ok := b.c.Get(entityID)
@@ -182,12 +222,12 @@ func (b *baselineLRU) ByID(entityID flow.Identifier) (flow.Entity, bool) {
 }
 
 // Size will return the total of the backend.
-func (b baselineLRU) Size() uint {
+func (b *baselineLRU) Size() uint {
 	return uint(b.c.Len())
 }
 
 // All returns all entities from the pool.
-func (b baselineLRU) All() map[flow.Identifier]flow.Entity {
+func (b *baselineLRU) All() map[flow.Identifier]flow.Entity {
 	all := make(map[flow.Identifier]flow.Entity)
 	for _, entityID := range b.c.Keys() {
 		id, ok := entityID.(flow.Identifier)
@@ -205,7 +245,7 @@ func (b baselineLRU) All() map[flow.Identifier]flow.Entity {
 	return all
 }
 
-func (b baselineLRU) Identifiers() flow.IdentifierList {
+func (b *baselineLRU) Identifiers() flow.IdentifierList {
 	ids := make(flow.IdentifierList, b.c.Len())
 	entityIds := b.c.Keys()
 	total := len(entityIds)
@@ -219,7 +259,7 @@ func (b baselineLRU) Identifiers() flow.IdentifierList {
 	return ids
 }
 
-func (b baselineLRU) Entities() []flow.Entity {
+func (b *baselineLRU) Entities() []flow.Entity {
 	entities := make([]flow.Entity, b.c.Len())
 	entityIds := b.c.Keys()
 	total := len(entityIds)

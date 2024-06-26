@@ -21,6 +21,7 @@ func (id NestedTransactionId) StateForTestingOnly() *ExecutionState {
 
 type Meter interface {
 	MeterComputation(kind common.ComputationKind, intensity uint) error
+	ComputationAvailable(kind common.ComputationKind, intensity uint) bool
 	ComputationIntensities() meter.MeteredComputationIntensities
 	TotalComputationLimit() uint
 	TotalComputationUsed() uint64
@@ -176,9 +177,17 @@ func NewTransactionState(
 	params StateParameters,
 ) NestedTransactionPreparer {
 	startState := NewExecutionState(snapshot, params)
+	return NewTransactionStateFromExecutionState(startState)
+}
+
+// NewTransactionStateFromExecutionState constructs a new state transaction directly
+// from an execution state.
+func NewTransactionStateFromExecutionState(
+	startState *ExecutionState,
+) NestedTransactionPreparer {
 	return &transactionState{
 		nestedTransactions: []nestedTransactionStackFrame{
-			nestedTransactionStackFrame{
+			{
 				ExecutionState:   startState,
 				parseRestriction: nil,
 			},
@@ -433,6 +442,13 @@ func (txnState *transactionState) MeterComputation(
 	intensity uint,
 ) error {
 	return txnState.current().MeterComputation(kind, intensity)
+}
+
+func (txnState *transactionState) ComputationAvailable(
+	kind common.ComputationKind,
+	intensity uint,
+) bool {
+	return txnState.current().ComputationAvailable(kind, intensity)
 }
 
 func (txnState *transactionState) MeterMemory(

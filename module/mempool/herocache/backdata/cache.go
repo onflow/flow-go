@@ -59,6 +59,7 @@ type slotBucket struct {
 }
 
 // Cache implements an array-based generic memory pool backed by a fixed total array.
+// Note that this implementation is NOT thread-safe, and the higher-level Backend is responsible for concurrency management.
 type Cache struct {
 	logger    zerolog.Logger
 	collector module.HeroCacheMetrics
@@ -108,12 +109,14 @@ type Cache struct {
 // The default overSizeFactor factor is different in the package code because slotsPerBucket is > 3.
 const DefaultOversizeFactor = uint32(8)
 
-func NewCache(sizeLimit uint32,
+func NewCache(
+	sizeLimit uint32,
 	oversizeFactor uint32,
 	ejectionMode heropool.EjectionMode,
 	logger zerolog.Logger,
 	collector module.HeroCacheMetrics,
-	opts ...CacheOpt) *Cache {
+	opts ...CacheOpt,
+) *Cache {
 
 	// total buckets.
 	capacity := uint64(sizeLimit * oversizeFactor)
@@ -199,6 +202,45 @@ func (c *Cache) Adjust(entityID flow.Identifier, f func(flow.Entity) flow.Entity
 	c.put(newEntityID, newEntity)
 
 	return newEntity, true
+}
+
+// AdjustWithInit adjusts the entity using the given function if the given identifier can be found. When the
+// entity is not found, it initializes the entity using the given init function and then applies the adjust function.
+// Args:
+// - entityID: the identifier of the entity to adjust.
+// - adjust: the function that adjusts the entity.
+// - init: the function that initializes the entity when it is not found.
+// Returns:
+//   - the adjusted entity.
+//
+// - a bool which indicates whether the entity was adjusted.
+func (c *Cache) AdjustWithInit(entityID flow.Identifier, adjust func(flow.Entity) flow.Entity, init func() flow.Entity) (flow.Entity, bool) {
+	defer c.logTelemetry()
+
+	if c.Has(entityID) {
+		return c.Adjust(entityID, adjust)
+	}
+	c.put(entityID, init())
+	return c.Adjust(entityID, adjust)
+}
+
+// GetWithInit returns the given entity from the backdata. If the entity does not exist, it creates a new entity
+// using the factory function and stores it in the backdata.
+// Args:
+// - entityID: the identifier of the entity to get.
+// - init: the function that initializes the entity when it is not found.
+// Returns:
+//   - the entity.
+//
+// - a bool which indicates whether the entity was found (or created).
+func (c *Cache) GetWithInit(entityID flow.Identifier, init func() flow.Entity) (flow.Entity, bool) {
+	defer c.logTelemetry()
+
+	if c.Has(entityID) {
+		return c.ByID(entityID)
+	}
+	c.put(entityID, init())
+	return c.ByID(entityID)
 }
 
 // ByID returns the given entity from the backdata.
@@ -483,7 +525,7 @@ func (c *Cache) logTelemetry() {
 			Logger()
 	}
 
-	lg.Info().Msg("logging telemetry")
+	lg.Debug().Msg("logging telemetry")
 	c.lastTelemetryDump.Store(runtimeNano())
 }
 

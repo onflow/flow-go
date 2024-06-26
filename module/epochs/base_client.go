@@ -34,8 +34,7 @@ var (
 type BaseClient struct {
 	Log zerolog.Logger // default logger
 
-	ContractAddress string                  // contract address
-	FlowClient      module.SDKClientWrapper // flow access node client
+	FlowClient module.SDKClientWrapper // flow access node client
 
 	AccountAddress  sdk.Address      // account belonging to node interacting with the contract
 	AccountKeyIndex uint             // account key index
@@ -49,12 +48,10 @@ func NewBaseClient(
 	accountAddress string,
 	accountKeyIndex uint,
 	signer sdkcrypto.Signer,
-	contractAddress string,
 ) *BaseClient {
 
 	return &BaseClient{
 		Log:             log,
-		ContractAddress: contractAddress,
 		FlowClient:      flowClient,
 		AccountKeyIndex: accountKeyIndex,
 		Signer:          signer,

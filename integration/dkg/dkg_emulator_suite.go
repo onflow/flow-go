@@ -20,11 +20,12 @@ import (
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 	sdktemplates "github.com/onflow/flow-go-sdk/templates"
 	"github.com/onflow/flow-go-sdk/test"
+
 	"github.com/onflow/flow-go/module/metrics"
 
 	dkgeng "github.com/onflow/flow-go/engine/consensus/dkg"
 	"github.com/onflow/flow-go/engine/testutil"
-	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/integration/tests/lib"
 	"github.com/onflow/flow-go/integration/utils"
 	"github.com/onflow/flow-go/model/bootstrap"
@@ -64,9 +65,10 @@ func (s *EmulatorSuite) SetupTest() {
 	s.deployDKGContract()
 	s.setupDKGAdmin()
 
-	s.netIDs = unittest.IdentityListFixture(numberOfNodes, unittest.WithRole(flow.RoleConsensus))
-	for _, id := range s.netIDs {
+	boostrapNodesInfo := unittest.PrivateNodeInfosFixture(numberOfNodes, unittest.WithRole(flow.RoleConsensus))
+	for _, id := range boostrapNodesInfo {
 		s.nodeAccounts = append(s.nodeAccounts, s.createAndFundAccount(id))
+		s.netIDs = append(s.netIDs, id.Identity())
 	}
 
 	for _, acc := range s.nodeAccounts {
@@ -88,6 +90,7 @@ func (s *EmulatorSuite) BeforeTest(_, testName string) {
 	}
 	// We need to initialise the nodes with a list of identities that contain
 	// all roles, otherwise there would be an error initialising the first epoch
+
 	identities := unittest.CompleteIdentitySet(s.netIDs...)
 	for _, node := range s.nodes {
 		s.initEngines(node, identities)
@@ -158,7 +161,7 @@ func (s *EmulatorSuite) deployDKGContract() {
 func (s *EmulatorSuite) setupDKGAdmin() {
 	setUpAdminTx := sdk.NewTransaction().
 		SetScript(templates.GeneratePublishDKGParticipantScript(s.env)).
-		SetGasLimit(9999).
+		SetComputeLimit(9999).
 		SetProposalKey(
 			s.blockchain.ServiceKey().Address,
 			s.blockchain.ServiceKey().Index,
@@ -175,7 +178,7 @@ func (s *EmulatorSuite) setupDKGAdmin() {
 }
 
 // createAndFundAccount creates a nodeAccount and funds it in the emulator
-func (s *EmulatorSuite) createAndFundAccount(netID *flow.Identity) *nodeAccount {
+func (s *EmulatorSuite) createAndFundAccount(netID bootstrap.NodeInfo) *nodeAccount {
 	accountPrivateKey := lib.RandomPrivateKey()
 	accountKey := sdk.NewAccountKey().
 		FromPrivateKey(accountPrivateKey).
@@ -185,6 +188,8 @@ func (s *EmulatorSuite) createAndFundAccount(netID *flow.Identity) *nodeAccount 
 	accountID := netID.NodeID.String()
 	accountSigner, err := sdkcrypto.NewInMemorySigner(accountPrivateKey, accountKey.HashAlgo)
 	require.NoError(s.T(), err)
+
+	sc := systemcontracts.SystemContractsForChain(s.chainID)
 
 	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 	create Flow account
@@ -208,22 +213,21 @@ func (s *EmulatorSuite) createAndFundAccount(netID *flow.Identity) *nodeAccount 
 				import FlowToken from 0x%s
 
 				transaction(amount: UFix64, recipient: Address) {
-				  let sentVault: @FungibleToken.Vault
-				  prepare(signer: AuthAccount) {
-					let vaultRef = signer.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
+				  let sentVault: @{FungibleToken.Vault}
+				  prepare(signer: auth(BorrowValue) &Account) {
+					let vaultRef = signer.storage.borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(from: /storage/flowTokenVault)
 					  ?? panic("failed to borrow reference to sender vault")
 					self.sentVault <- vaultRef.withdraw(amount: amount)
 				  }
 				  execute {
 					let receiverRef =  getAccount(recipient)
-					  .getCapability(/public/flowTokenReceiver)
-					  .borrow<&{FungibleToken.Receiver}>()
+					  .capabilities.borrow<&{FungibleToken.Receiver}>(/public/flowTokenReceiver)
 						?? panic("failed to borrow reference to recipient vault")
 					receiverRef.deposit(from: <-self.sentVault)
 				  }
 				}`,
-					fvm.FungibleTokenAddress(s.chainID.Chain()).Hex(),
-					fvm.FlowTokenAddress(s.chainID.Chain()).Hex(),
+					sc.FungibleToken.Address.Hex(),
+					sc.FlowToken.Address.Hex(),
 				))).
 		AddAuthorizer(s.blockchain.ServiceKey().Address).
 		SetProposalKey(
@@ -301,7 +305,7 @@ func (s *EmulatorSuite) startDKGWithParticipants(accounts []*nodeAccount) {
 	// start DKG using admin resource
 	startDKGTx := sdk.NewTransaction().
 		SetScript(templates.GenerateStartDKGScript(s.env)).
-		SetGasLimit(9999).
+		SetComputeLimit(9999).
 		SetProposalKey(
 			s.blockchain.ServiceKey().Address,
 			s.blockchain.ServiceKey().Index,
@@ -328,7 +332,7 @@ func (s *EmulatorSuite) startDKGWithParticipants(accounts []*nodeAccount) {
 func (s *EmulatorSuite) claimDKGParticipant(node *node) {
 	createParticipantTx := sdk.NewTransaction().
 		SetScript(templates.GenerateCreateDKGParticipantScript(s.env)).
-		SetGasLimit(9999).
+		SetComputeLimit(9999).
 		SetProposalKey(
 			s.blockchain.ServiceKey().Address,
 			s.blockchain.ServiceKey().Index,
@@ -390,28 +394,31 @@ func (s *EmulatorSuite) sendDummyTx() (*flow.Block, error) {
 func (s *EmulatorSuite) isDKGCompleted() bool {
 	template := templates.GenerateGetDKGCompletedScript(s.env)
 	value := s.executeScript(template, nil)
-	return value.ToGoValue().(bool)
+	return bool(value.(cadence.Bool))
 }
 
 func (s *EmulatorSuite) getResult() []string {
 	script := fmt.Sprintf(`
 	import FlowDKG from 0x%s
 
-	pub fun main(): [String?]? {
+	access(all) fun main(): [String?]? {
 		return FlowDKG.dkgCompleted()
 	} `,
 		s.env.DkgAddress,
 	)
 
 	res := s.executeScript([]byte(script), nil)
-	value := res.(cadence.Optional).ToGoValue()
+	value := res.(cadence.Optional).Value
 	if value == nil {
 		return []string{}
 	}
+
 	dkgResult := []string{}
-	for _, item := range value.([]interface{}) {
-		s := item.(string)
-		dkgResult = append(dkgResult, s)
+	for _, item := range value.(cadence.Array).Values {
+		dkgResult = append(
+			dkgResult,
+			string(item.(cadence.Optional).Value.(cadence.String)),
+		)
 	}
 
 	return dkgResult
@@ -459,12 +466,6 @@ func (s *EmulatorSuite) initEngines(node *node, ids flow.IdentityList) {
 		controllerFactoryLogger = zerolog.New(os.Stdout).Hook(hook)
 	}
 
-	// create a config with no delays for tests
-	config := dkg.ControllerConfig{
-		BaseStartDelay:                0,
-		BaseHandleFirstBroadcastDelay: 0,
-	}
-
 	// the reactor engine reacts to new views being finalized and drives the
 	// DKG protocol
 	reactorEngine := dkgeng.NewReactorEngine(
@@ -477,7 +478,6 @@ func (s *EmulatorSuite) initEngines(node *node, ids flow.IdentityList) {
 			core.Me,
 			[]module.DKGContractClient{node.dkgContractClient},
 			brokerTunnel,
-			config,
 		),
 		viewsObserver,
 	)

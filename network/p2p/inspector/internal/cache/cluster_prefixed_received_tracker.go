@@ -3,6 +3,7 @@ package cache
 import (
 	"fmt"
 
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/rs/zerolog"
 	"go.uber.org/atomic"
 
@@ -18,7 +19,8 @@ type ClusterPrefixedMessagesReceivedTracker struct {
 }
 
 // NewClusterPrefixedMessagesReceivedTracker returns a new *ClusterPrefixedMessagesReceivedTracker.
-func NewClusterPrefixedMessagesReceivedTracker(logger zerolog.Logger, sizeLimit uint32, clusterPrefixedCacheCollector module.HeroCacheMetrics, decay float64) (*ClusterPrefixedMessagesReceivedTracker, error) {
+func NewClusterPrefixedMessagesReceivedTracker(logger zerolog.Logger, sizeLimit uint32, clusterPrefixedCacheCollector module.HeroCacheMetrics, decay float64) (*ClusterPrefixedMessagesReceivedTracker,
+	error) {
 	config := &RecordCacheConfig{
 		sizeLimit:   sizeLimit,
 		logger:      logger,
@@ -34,20 +36,20 @@ func NewClusterPrefixedMessagesReceivedTracker(logger zerolog.Logger, sizeLimit 
 
 // Inc increments the cluster prefixed control messages received Gauge for the peer.
 // All errors returned from this func are unexpected and irrecoverable.
-func (c *ClusterPrefixedMessagesReceivedTracker) Inc(nodeID flow.Identifier) (float64, error) {
-	count, err := c.cache.ReceivedClusterPrefixedMessage(nodeID)
+func (c *ClusterPrefixedMessagesReceivedTracker) Inc(pid peer.ID) (float64, error) {
+	count, err := c.cache.ReceivedClusterPrefixedMessage(pid)
 	if err != nil {
-		return 0, fmt.Errorf("failed to increment cluster prefixed received tracker gauge value for peer %s: %w", nodeID, err)
+		return 0, fmt.Errorf("failed to increment cluster prefixed received tracker gauge value for peer %s: %w", pid, err)
 	}
 	return count, nil
 }
 
 // Load loads the current number of cluster prefixed control messages received by a peer.
 // All errors returned from this func are unexpected and irrecoverable.
-func (c *ClusterPrefixedMessagesReceivedTracker) Load(nodeID flow.Identifier) (float64, error) {
-	count, _, err := c.cache.Get(nodeID)
+func (c *ClusterPrefixedMessagesReceivedTracker) Load(pid peer.ID) (float64, error) {
+	count, _, err := c.cache.GetWithInit(pid)
 	if err != nil {
-		return 0, fmt.Errorf("failed to get cluster prefixed received tracker gauge value for peer %s: %w", nodeID, err)
+		return 0, fmt.Errorf("failed to get cluster prefixed received tracker gauge value for peer %s: %w", pid, err)
 	}
 	return count, nil
 }

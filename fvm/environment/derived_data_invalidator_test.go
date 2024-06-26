@@ -300,19 +300,21 @@ func TestMeterParamOverridesUpdated(t *testing.T) {
 	executionSnapshot, err = txnState.FinalizeMainTransaction()
 	require.NoError(t, err)
 
+	owner := ctx.Chain.ServiceAddress()
+	otherOwner := unittest.RandomAddressFixtureForChain(ctx.Chain.ChainID())
+
 	for _, registerId := range executionSnapshot.AllRegisterIDs() {
 		checkForUpdates(registerId, true)
 		checkForUpdates(
-			flow.NewRegisterID("other owner", registerId.Key),
+			flow.NewRegisterID(otherOwner, registerId.Key),
 			false)
 	}
 
-	owner := string(ctx.Chain.ServiceAddress().Bytes())
 	stabIndexKey := flow.NewRegisterID(owner, "$12345678")
 	require.True(t, stabIndexKey.IsSlabIndex())
 
 	checkForUpdates(stabIndexKey, true)
 	checkForUpdates(flow.NewRegisterID(owner, "other keys"), false)
-	checkForUpdates(flow.NewRegisterID("other owner", stabIndexKey.Key), false)
-	checkForUpdates(flow.NewRegisterID("other owner", "other key"), false)
+	checkForUpdates(flow.NewRegisterID(otherOwner, stabIndexKey.Key), false)
+	checkForUpdates(flow.NewRegisterID(otherOwner, "other key"), false)
 }

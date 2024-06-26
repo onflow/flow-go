@@ -1,6 +1,8 @@
 package execution
 
 import (
+	"fmt"
+
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
@@ -31,7 +33,7 @@ func (er *BlockExecutionResult) Size() int {
 }
 
 func (er *BlockExecutionResult) CollectionExecutionResultAt(colIndex int) *CollectionExecutionResult {
-	if colIndex < 0 && colIndex > len(er.collectionExecutionResults) {
+	if colIndex < 0 || colIndex > len(er.collectionExecutionResults) {
 		return nil
 	}
 	return &er.collectionExecutionResults[colIndex]
@@ -90,6 +92,25 @@ func (er *BlockExecutionResult) AllConvertedServiceEvents() flow.ServiceEventLis
 		if len(ce.convertedServiceEvents) > 0 {
 			res = append(res, ce.convertedServiceEvents...)
 		}
+	}
+	return res
+}
+
+// AllUpdatedRegisters returns all updated unique register entries
+// Note: order is not determinstic
+func (er *BlockExecutionResult) AllUpdatedRegisters() []flow.RegisterEntry {
+	updates := make(map[flow.RegisterID]flow.RegisterValue)
+	for _, ce := range er.collectionExecutionResults {
+		for regID, regVal := range ce.executionSnapshot.WriteSet {
+			updates[regID] = regVal
+		}
+	}
+	res := make([]flow.RegisterEntry, 0, len(updates))
+	for regID, regVal := range updates {
+		res = append(res, flow.RegisterEntry{
+			Key:   regID,
+			Value: regVal,
+		})
 	}
 	return res
 }
@@ -165,6 +186,12 @@ func (ar *BlockAttestationResult) ChunkAt(index int) *flow.Chunk {
 
 	execRes := ar.collectionExecutionResults[index]
 	attestRes := ar.collectionAttestationResults[index]
+
+	if execRes.executionSnapshot == nil {
+		// This should never happen
+		// In case it does, attach additional information to the error message
+		panic(fmt.Sprintf("execution snapshot is nil. Block ID: %s, EndState: %s", ar.Block.ID(), attestRes.endStateCommit))
+	}
 
 	return flow.NewChunk(
 		ar.Block.ID(),

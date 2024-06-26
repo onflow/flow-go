@@ -1,6 +1,8 @@
 package routes
 
 import (
+	entitiesproto "github.com/onflow/flow/protobuf/go/flow/entities"
+
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rest/models"
 	"github.com/onflow/flow-go/engine/access/rest/request"
@@ -21,7 +23,13 @@ func GetTransactionByID(r *request.Request, backend access.API, link models.Link
 	var txr *access.TransactionResult
 	// only lookup result if transaction result is to be expanded
 	if req.ExpandsResult {
-		txr, err = backend.GetTransactionResult(r.Context(), req.ID, req.BlockID, req.CollectionID)
+		txr, err = backend.GetTransactionResult(
+			r.Context(),
+			req.ID,
+			req.BlockID,
+			req.CollectionID,
+			entitiesproto.EventEncodingVersion_JSON_CDC_V0,
+		)
 		if err != nil {
 			return nil, err
 		}
@@ -39,7 +47,13 @@ func GetTransactionResultByID(r *request.Request, backend access.API, link model
 		return nil, models.NewBadRequestError(err)
 	}
 
-	txr, err := backend.GetTransactionResult(r.Context(), req.ID, req.BlockID, req.CollectionID)
+	txr, err := backend.GetTransactionResult(
+		r.Context(),
+		req.ID,
+		req.BlockID,
+		req.CollectionID,
+		entitiesproto.EventEncodingVersion_JSON_CDC_V0,
+	)
 	if err != nil {
 		return nil, err
 	}

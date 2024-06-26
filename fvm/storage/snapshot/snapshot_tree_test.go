@@ -10,10 +10,10 @@ import (
 )
 
 func TestSnapshotTree(t *testing.T) {
-	id1 := flow.NewRegisterID("1", "")
-	id2 := flow.NewRegisterID("2", "")
-	id3 := flow.NewRegisterID("3", "")
-	missingId := flow.NewRegisterID("missing", "")
+	id1 := flow.NewRegisterID(flow.HexToAddress("0x1"), "")
+	id2 := flow.NewRegisterID(flow.HexToAddress("0x2"), "")
+	id3 := flow.NewRegisterID(flow.HexToAddress("0x3"), "")
+	missingId := flow.NewRegisterID(flow.HexToAddress("0x99"), "")
 
 	value1v0 := flow.RegisterValue("1v0")
 

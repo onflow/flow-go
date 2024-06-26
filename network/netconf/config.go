@@ -3,18 +3,23 @@ package netconf
 import (
 	"time"
 
-	"github.com/onflow/flow-go/network/p2p/p2pconf"
+	p2pconfig "github.com/onflow/flow-go/network/p2p/config"
+)
+
+const (
+	gossipsubKey         = "gossipsub"
+	unicastKey           = "unicast"
+	connectionManagerKey = "connection-manager"
 )
 
 // Config encapsulation of configuration structs for all components related to the Flow network.
 type Config struct {
-	// UnicastRateLimitersConfig configuration for all unicast rate limiters.
-	UnicastRateLimitersConfig     `mapstructure:",squash"`
-	p2pconf.ResourceManagerConfig `mapstructure:",squash"`
-	ConnectionManagerConfig       `mapstructure:",squash"`
-	// GossipSubConfig core gossipsub configuration.
-	p2pconf.GossipSubConfig `mapstructure:",squash"`
-	AlspConfig              `mapstructure:",squash"`
+	Unicast           Unicast                         `mapstructure:"unicast"`
+	ResourceManager   p2pconfig.ResourceManagerConfig `mapstructure:"libp2p-resource-manager"`
+	ConnectionManager ConnectionManager               `mapstructure:"connection-manager"`
+	// GossipSub core gossipsub configuration.
+	GossipSub  p2pconfig.GossipSubParameters `mapstructure:"gossipsub"`
+	AlspConfig `mapstructure:",squash"`
 
 	// NetworkConnectionPruning determines whether connections to nodes
 	// that are not part of protocol state should be trimmed
@@ -24,27 +29,10 @@ type Config struct {
 	PreferredUnicastProtocols       []string      `mapstructure:"preferred-unicast-protocols"`
 	NetworkReceivedMessageCacheSize uint32        `validate:"gt=0" mapstructure:"received-message-cache-size"`
 	PeerUpdateInterval              time.Duration `validate:"gt=0s" mapstructure:"peerupdate-interval"`
-	UnicastMessageTimeout           time.Duration `validate:"gt=0s" mapstructure:"unicast-message-timeout"`
-	// UnicastCreateStreamRetryDelay initial delay used in the exponential backoff for create stream retries
-	UnicastCreateStreamRetryDelay time.Duration `validate:"gt=0s" mapstructure:"unicast-create-stream-retry-delay"`
-	DNSCacheTTL                   time.Duration `validate:"gt=0s" mapstructure:"dns-cache-ttl"`
+
+	DNSCacheTTL time.Duration `validate:"gt=0s" mapstructure:"dns-cache-ttl"`
 	// DisallowListNotificationCacheSize size of the queue for notifications about new peers in the disallow list.
 	DisallowListNotificationCacheSize uint32 `validate:"gt=0" mapstructure:"disallow-list-notification-cache-size"`
-}
-
-// UnicastRateLimitersConfig unicast rate limiter configuration for the message and bandwidth rate limiters.
-type UnicastRateLimitersConfig struct {
-	// DryRun setting this to true will disable connection disconnects and gating when unicast rate limiters are configured
-	DryRun bool `mapstructure:"unicast-dry-run"`
-	// LockoutDuration the number of seconds a peer will be forced to wait before being allowed to successfully reconnect to the node
-	// after being rate limited.
-	LockoutDuration time.Duration `validate:"gte=0" mapstructure:"unicast-lockout-duration"`
-	// MessageRateLimit amount of unicast messages that can be sent by a peer per second.
-	MessageRateLimit int `validate:"gte=0" mapstructure:"unicast-message-rate-limit"`
-	// BandwidthRateLimit bandwidth size in bytes a peer is allowed to send via unicast streams per second.
-	BandwidthRateLimit int `validate:"gte=0" mapstructure:"unicast-bandwidth-rate-limit"`
-	// BandwidthBurstLimit bandwidth size in bytes a peer is allowed to send via unicast streams at once.
-	BandwidthBurstLimit int `validate:"gte=0" mapstructure:"unicast-bandwidth-burst-limit"`
 }
 
 // AlspConfig is the config for the Application Layer Spam Prevention (ALSP) protocol.
@@ -67,4 +55,24 @@ type AlspConfig struct {
 	// HeartBeatInterval is the interval between heartbeats sent by the ALSP module. The heartbeats are recurring
 	// events that are used to perform critical ALSP tasks, such as updating the spam records cache.
 	HearBeatInterval time.Duration `mapstructure:"alsp-heart-beat-interval"`
+
+	SyncEngine SyncEngineAlspConfig `mapstructure:",squash"`
+}
+
+// SyncEngineAlspConfig is the ALSP config for the SyncEngine.
+type SyncEngineAlspConfig struct {
+	// BatchRequestBaseProb is the base probability in [0,1] that's used in creating the final probability of creating a
+	// misbehavior report for a BatchRequest message. This is why the word "base" is used in the name of this field,
+	// since it's not the final probability and there are other factors that determine the final probability.
+	// The reason for this is that we want to increase the probability of creating a misbehavior report for a large batch.
+	BatchRequestBaseProb float32 `validate:"gte=0,lte=1" mapstructure:"alsp-sync-engine-batch-request-base-prob"`
+
+	// RangeRequestBaseProb is the base probability in [0,1] that's used in creating the final probability of creating a
+	// misbehavior report for a RangeRequest message. This is why the word "base" is used in the name of this field,
+	// since it's not the final probability and there are other factors that determine the final probability.
+	// The reason for this is that we want to increase the probability of creating a misbehavior report for a large range.
+	RangeRequestBaseProb float32 `validate:"gte=0,lte=1" mapstructure:"alsp-sync-engine-range-request-base-prob"`
+
+	// SyncRequestProb is the probability in [0,1] of creating a misbehavior report for a SyncRequest message.
+	SyncRequestProb float32 `validate:"gte=0,lte=1" mapstructure:"alsp-sync-engine-sync-request-prob"`
 }

@@ -2,7 +2,10 @@ package upgrades
 
 import (
 	"context"
-	"fmt"
+	"time"
+
+	"github.com/onflow/flow-go/state/protocol/inmem"
+	"github.com/onflow/flow-go/state/protocol/protocol_state"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
@@ -23,6 +26,9 @@ type Suite struct {
 	net     *testnet.FlowNetwork
 	ghostID flow.Identifier
 	exe1ID  flow.Identifier
+
+	// Determines which kvstore version is used for root state
+	KVStoreFactory func(flow.Identifier) protocol_state.KVStoreAPI
 }
 
 func (s *Suite) Ghost() *client.GhostClient {
@@ -45,25 +51,15 @@ func (s *Suite) SetupTest() {
 	}()
 
 	collectionConfigs := []func(*testnet.NodeConfig){
-		testnet.WithAdditionalFlag("--hotstuff-proposal-duration=10ms"),
+		testnet.WithAdditionalFlag("--hotstuff-proposal-duration=100ms"),
 		testnet.WithLogLevel(zerolog.WarnLevel),
 	}
 
 	consensusConfigs := []func(config *testnet.NodeConfig){
-		testnet.WithAdditionalFlag("--cruise-ctl-fallback-proposal-duration=10ms"),
-		testnet.WithAdditionalFlag(
-			fmt.Sprintf(
-				"--required-verification-seal-approvals=%d",
-				1,
-			),
-		),
-		testnet.WithAdditionalFlag(
-			fmt.Sprintf(
-				"--required-construction-seal-approvals=%d",
-				1,
-			),
-		),
-		testnet.WithLogLevel(zerolog.WarnLevel),
+		testnet.WithAdditionalFlag("--cruise-ctl-fallback-proposal-duration=500ms"),
+		testnet.WithAdditionalFlag("--required-verification-seal-approvals=0"),
+		testnet.WithAdditionalFlag("--required-construction-seal-approvals=0"),
+		testnet.WithLogLevel(zerolog.InfoLevel),
 	}
 
 	// a ghost node masquerading as an access node
@@ -83,10 +79,12 @@ func (s *Suite) SetupTest() {
 			testnet.WithLogLevel(zerolog.WarnLevel),
 			testnet.WithID(s.exe1ID),
 			testnet.WithAdditionalFlag("--extensive-logging=true"),
+			testnet.WithAdditionalFlag("--max-graceful-stop-duration=1s"),
 		),
 		testnet.NewNodeConfig(
 			flow.RoleExecution,
 			testnet.WithLogLevel(zerolog.WarnLevel),
+			testnet.WithAdditionalFlag("--max-graceful-stop-duration=1s"),
 		),
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
@@ -98,13 +96,16 @@ func (s *Suite) SetupTest() {
 		ghostNode,
 	}
 
-	netConfig := testnet.NewNetworkConfig(
-		"upgrade_tests",
-		confs,
+	netConfigOpts := []testnet.NetworkConfigOpt{
 		// set long staking phase to avoid QC/DKG transactions during test run
 		testnet.WithViewsInStakingAuction(10_000),
 		testnet.WithViewsInEpoch(100_000),
-	)
+		testnet.WithEpochCommitSafetyThreshold(5),
+	}
+	if s.KVStoreFactory != nil {
+		netConfigOpts = append(netConfigOpts, testnet.WithKVStoreFactory(s.KVStoreFactory))
+	}
+	netConfig := testnet.NewNetworkConfig("upgrade_tests", confs, netConfigOpts...)
 	// initialize the network
 	s.net = testnet.PrepareFlowNetwork(s.T(), netConfig, flow.Localnet)
 
@@ -115,6 +116,24 @@ func (s *Suite) SetupTest() {
 
 	// start tracking blocks
 	s.Track(s.T(), ctx, s.Ghost())
+}
+
+func (s *Suite) LatestProtocolStateSnapshot() *inmem.Snapshot {
+	snap, err := s.AccessClient().GetLatestProtocolSnapshot(context.Background())
+	require.NoError(s.T(), err)
+	return snap
+}
+
+// AwaitSnapshotAtView polls until it observes a finalized snapshot with a reference
+// block greater than or equal to the input target view.
+func (s *Suite) AwaitSnapshotAtView(view uint64, waitFor, tick time.Duration) (snapshot *inmem.Snapshot) {
+	require.Eventually(s.T(), func() bool {
+		snapshot = s.LatestProtocolStateSnapshot()
+		head, err := snapshot.Head()
+		require.NoError(s.T(), err)
+		return head.View >= view
+	}, waitFor, tick)
+	return
 }
 
 func (s *Suite) TearDownTest() {

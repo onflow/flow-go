@@ -30,9 +30,9 @@ import (
 	"github.com/onflow/flow-go/network/internal/testutils"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/network/p2p"
-	"github.com/onflow/flow-go/network/p2p/p2pnet"
 	p2ptest "github.com/onflow/flow-go/network/p2p/test"
 	"github.com/onflow/flow-go/network/slashing"
+	"github.com/onflow/flow-go/network/underlay"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -60,7 +60,7 @@ func TestNetworkPassesReportedMisbehavior(t *testing.T) {
 	ids, nodes := testutils.LibP2PNodeForNetworkFixture(t, sporkId, 1)
 	idProvider := id.NewFixedIdentityProvider(ids)
 	networkCfg := testutils.NetworkConfigFixture(t, *ids[0], idProvider, sporkId, nodes[0])
-	net, err := p2pnet.NewNetwork(networkCfg, p2pnet.WithAlspManager(misbehaviorReportManger))
+	net, err := underlay.NewNetwork(networkCfg, underlay.WithAlspManager(misbehaviorReportManger))
 	require.NoError(t, err)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -117,8 +117,8 @@ func TestHandleReportedMisbehavior_Cache_Integration(t *testing.T) {
 	sporkId := unittest.IdentifierFixture()
 	ids, nodes := testutils.LibP2PNodeForNetworkFixture(t, sporkId, 1)
 	idProvider := id.NewFixedIdentityProvider(ids)
-	networkCfg := testutils.NetworkConfigFixture(t, *ids[0], idProvider, sporkId, nodes[0], p2pnet.WithAlspConfig(cfg))
-	net, err := p2pnet.NewNetwork(networkCfg)
+	networkCfg := testutils.NetworkConfigFixture(t, *ids[0], idProvider, sporkId, nodes[0], underlay.WithAlspConfig(cfg))
+	net, err := underlay.NewNetwork(networkCfg)
 	require.NoError(t, err)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -217,8 +217,8 @@ func TestHandleReportedMisbehavior_And_DisallowListing_Integration(t *testing.T)
 		p2ptest.WithPeerManagerEnabled(p2ptest.PeerManagerConfigFixture(), nil))
 
 	idProvider := id.NewFixedIdentityProvider(ids)
-	networkCfg := testutils.NetworkConfigFixture(t, *ids[0], idProvider, sporkId, nodes[0], p2pnet.WithAlspConfig(cfg))
-	victimNetwork, err := p2pnet.NewNetwork(networkCfg)
+	networkCfg := testutils.NetworkConfigFixture(t, *ids[0], idProvider, sporkId, nodes[0], underlay.WithAlspConfig(cfg))
+	victimNetwork, err := underlay.NewNetwork(networkCfg)
 	require.NoError(t, err)
 
 	// index of the victim node in the nodes slice.
@@ -310,9 +310,9 @@ func TestHandleReportedMisbehavior_And_DisallowListing_RepeatOffender_Integratio
 	ids, nodes := testutils.LibP2PNodeForNetworkFixture(t, sporkId, 3,
 		p2ptest.WithPeerManagerEnabled(p2ptest.PeerManagerConfigFixture(p2ptest.WithZeroJitterAndZeroBackoff(t)), nil))
 	idProvider := unittest.NewUpdatableIDProvider(ids)
-	networkCfg := testutils.NetworkConfigFixture(t, *ids[0], idProvider, sporkId, nodes[0], p2pnet.WithAlspConfig(cfg))
+	networkCfg := testutils.NetworkConfigFixture(t, *ids[0], idProvider, sporkId, nodes[0], underlay.WithAlspConfig(cfg))
 
-	victimNetwork, err := p2pnet.NewNetwork(networkCfg)
+	victimNetwork, err := underlay.NewNetwork(networkCfg)
 	require.NoError(t, err)
 
 	// index of the victim node in the nodes slice.
@@ -470,12 +470,12 @@ func TestHandleReportedMisbehavior_And_SlashingViolationsConsumer_Integration(t 
 		idProvider,
 		sporkId,
 		nodes[0],
-		p2pnet.WithAlspConfig(managerCfgFixture(t)),
-		p2pnet.WithSlashingViolationConsumerFactory(func(adapter network.ConduitAdapter) network.ViolationsConsumer {
+		underlay.WithAlspConfig(managerCfgFixture(t)),
+		underlay.WithSlashingViolationConsumerFactory(func(adapter network.ConduitAdapter) network.ViolationsConsumer {
 			violationsConsumer = slashing.NewSlashingViolationsConsumer(unittest.Logger(), metrics.NewNoopCollector(), adapter)
 			return violationsConsumer
 		}))
-	victimNetwork, err := p2pnet.NewNetwork(networkCfg)
+	victimNetwork, err := underlay.NewNetwork(networkCfg)
 	require.NoError(t, err)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -563,8 +563,8 @@ func TestMisbehaviorReportMetrics(t *testing.T) {
 	ids, nodes := testutils.LibP2PNodeForNetworkFixture(t, sporkId, 1)
 	idProvider := id.NewFixedIdentityProvider(ids)
 
-	networkCfg := testutils.NetworkConfigFixture(t, *ids[0], idProvider, sporkId, nodes[0], p2pnet.WithAlspConfig(cfg))
-	net, err := p2pnet.NewNetwork(networkCfg)
+	networkCfg := testutils.NetworkConfigFixture(t, *ids[0], idProvider, sporkId, nodes[0], underlay.WithAlspConfig(cfg))
+	net, err := underlay.NewNetwork(networkCfg)
 	require.NoError(t, err)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -1602,7 +1602,7 @@ func TestDecayMisbehaviorPenalty_DecayToZero_AllowListing(t *testing.T) {
 
 	// simulates a disallow-listed peer in cache.
 	originId := unittest.IdentifierFixture()
-	penalty, err := cache.Adjust(originId, func(record model.ProtocolSpamRecord) (model.ProtocolSpamRecord, error) {
+	penalty, err := cache.AdjustWithInit(originId, func(record model.ProtocolSpamRecord) (model.ProtocolSpamRecord, error) {
 		record.Penalty = -10 // set the penalty to -10 to simulate that the penalty has already been decayed for a while.
 		record.CutoffCounter = 1
 		record.DisallowListed = true
@@ -1740,7 +1740,7 @@ func TestDisallowListNotification(t *testing.T) {
 	}, 2*time.Second, 10*time.Millisecond, "ALSP manager did not handle the misbehavior report")
 }
 
-////////////////////////////// TEST HELPERS ///////////////////////////////////////////////////////////////////////////////
+// //////////////////////////// TEST HELPERS ///////////////////////////////////////////////////////////////////////////////
 // The following functions are helpers for the tests. It wasn't feasible to put them in a helper file in the alspmgr_test
 // package because that would break encapsulation of the ALSP manager and require making some fields exportable.
 // Putting them in alspmgr package would cause a circular import cycle. Therefore, they are put in the internal test package here.

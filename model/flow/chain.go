@@ -24,6 +24,8 @@ const (
 	Testnet ChainID = "flow-testnet"
 	// Sandboxnet is the chain ID for internal sandboxnet chain.
 	Sandboxnet ChainID = "flow-sandboxnet"
+	// Previewet is the chain ID for an external preview chain.
+	Previewnet ChainID = "flow-previewnet"
 
 	// Transient test networks
 
@@ -40,9 +42,24 @@ const (
 	MonotonicEmulator ChainID = "flow-emulator-monotonic"
 )
 
+// AllChainIDs returns a list of all supported chain IDs.
+func AllChainIDs() ChainIDList {
+	return ChainIDList{
+		Mainnet,
+		Testnet,
+		Sandboxnet,
+		Previewnet,
+		Benchnet,
+		Localnet,
+		Emulator,
+		BftTestnet,
+		MonotonicEmulator,
+	}
+}
+
 // Transient returns whether the chain ID is for a transient network.
 func (c ChainID) Transient() bool {
-	return c == Emulator || c == Localnet || c == Benchnet || c == BftTestnet
+	return c == Emulator || c == Localnet || c == Benchnet || c == BftTestnet || c == Previewnet
 }
 
 // getChainCodeWord derives the network type used for address generation from the globally
@@ -55,6 +72,8 @@ func (c ChainID) getChainCodeWord() uint64 {
 		return invalidCodeTestNetwork
 	case Sandboxnet:
 		return invalidCodeSandboxNetwork
+	case Previewnet:
+		return invalidCodePreviewNetwork
 	case Emulator, Localnet, Benchnet, BftTestnet:
 		return invalidCodeTransientNetwork
 	default:
@@ -182,6 +201,12 @@ var sandboxnet = &addressedChain{
 	},
 }
 
+var previewnet = &addressedChain{
+	chainImpl: &linearCodeImpl{
+		chainID: Previewnet,
+	},
+}
+
 var benchnet = &addressedChain{
 	chainImpl: &linearCodeImpl{
 		chainID: Benchnet,
@@ -213,6 +238,8 @@ func (c ChainID) Chain() Chain {
 		return testnet
 	case Sandboxnet:
 		return sandboxnet
+	case Previewnet:
+		return previewnet
 	case Benchnet:
 		return benchnet
 	case Localnet:

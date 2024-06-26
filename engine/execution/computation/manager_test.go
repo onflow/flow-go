@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ipfs/boxo/blockstore"
 	"github.com/ipfs/go-datastore"
 	dssync "github.com/ipfs/go-datastore/sync"
-	blockstore "github.com/ipfs/go-ipfs-blockstore"
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime/common"
@@ -33,6 +33,7 @@ import (
 	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
 	"github.com/onflow/flow-go/model/flow"
@@ -67,7 +68,7 @@ func TestComputeBlockWithStorage(t *testing.T) {
 
 	tx1 := testutil.DeployCounterContractTransaction(accounts[0], chain)
 	tx1.SetProposalKey(chain.ServiceAddress(), 0, 0).
-		SetGasLimit(1000).
+		SetComputeLimit(1000).
 		SetPayer(chain.ServiceAddress())
 
 	err = testutil.SignPayload(tx1, accounts[0], privateKeys[0])
@@ -78,7 +79,7 @@ func TestComputeBlockWithStorage(t *testing.T) {
 
 	tx2 := testutil.CreateCounterTransaction(accounts[0], accounts[1])
 	tx2.SetProposalKey(chain.ServiceAddress(), 0, 0).
-		SetGasLimit(1000).
+		SetComputeLimit(1000).
 		SetPayer(chain.ServiceAddress())
 
 	err = testutil.SignPayload(tx2, accounts[1], privateKeys[1])
@@ -240,13 +241,15 @@ func TestExecuteScript(t *testing.T) {
 
 	ledger := testutil.RootBootstrappedLedger(vm, execCtx, fvm.WithExecutionMemoryLimit(math.MaxUint64))
 
+	sc := systemcontracts.SystemContractsForChain(execCtx.Chain.ChainID())
+
 	script := []byte(fmt.Sprintf(
 		`
 			import FungibleToken from %s
 
-			pub fun main() {}
+			access(all) fun main() {}
 		`,
-		fvm.FungibleTokenAddress(execCtx.Chain).HexWithPrefix(),
+		sc.FungibleToken.Address.HexWithPrefix(),
 	))
 
 	bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
@@ -264,7 +267,7 @@ func TestExecuteScript(t *testing.T) {
 		metrics.NewNoopCollector(),
 		trace.NewNoopTracer(),
 		me,
-		nil,
+		testutil.ProtocolStateWithSourceFixture(nil),
 		execCtx,
 		committer.NewNoopViewCommitter(),
 		prov,
@@ -277,7 +280,7 @@ func TestExecuteScript(t *testing.T) {
 	require.NoError(t, err)
 
 	header := unittest.BlockHeaderFixture()
-	_, err = engine.ExecuteScript(
+	_, _, err = engine.ExecuteScript(
 		context.Background(),
 		script,
 		nil,
@@ -305,13 +308,15 @@ func TestExecuteScript_BalanceScriptFailsIfViewIsEmpty(t *testing.T) {
 			return nil, fmt.Errorf("error getting register")
 		})
 
+	sc := systemcontracts.SystemContractsForChain(execCtx.Chain.ChainID())
+
 	script := []byte(fmt.Sprintf(
 		`
-			pub fun main(): UFix64 {
+			access(all) fun main(): UFix64 {
 				return getAccount(%s).balance
 			}
 		`,
-		fvm.FungibleTokenAddress(execCtx.Chain).HexWithPrefix(),
+		sc.FungibleToken.Address.HexWithPrefix(),
 	))
 
 	bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
@@ -329,7 +334,7 @@ func TestExecuteScript_BalanceScriptFailsIfViewIsEmpty(t *testing.T) {
 		metrics.NewNoopCollector(),
 		trace.NewNoopTracer(),
 		me,
-		nil,
+		testutil.ProtocolStateWithSourceFixture(nil),
 		execCtx,
 		committer.NewNoopViewCommitter(),
 		prov,
@@ -342,7 +347,7 @@ func TestExecuteScript_BalanceScriptFailsIfViewIsEmpty(t *testing.T) {
 	require.NoError(t, err)
 
 	header := unittest.BlockHeaderFixture()
-	_, err = engine.ExecuteScript(
+	_, _, err = engine.ExecuteScript(
 		context.Background(),
 		script,
 		nil,
@@ -375,7 +380,7 @@ func TestExecuteScripPanicsAreHandled(t *testing.T) {
 		metrics.NewNoopCollector(),
 		trace.NewNoopTracer(),
 		nil,
-		nil,
+		testutil.ProtocolStateWithSourceFixture(nil),
 		ctx,
 		committer.NewNoopViewCommitter(),
 		prov,
@@ -390,7 +395,7 @@ func TestExecuteScripPanicsAreHandled(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	_, err = manager.ExecuteScript(
+	_, _, err = manager.ExecuteScript(
 		context.Background(),
 		[]byte("whatever"),
 		nil,
@@ -398,7 +403,6 @@ func TestExecuteScripPanicsAreHandled(t *testing.T) {
 		nil)
 
 	require.Error(t, err)
-
 	require.Contains(t, buffer.String(), "Verunsicherung")
 }
 
@@ -426,7 +430,7 @@ func TestExecuteScript_LongScriptsAreLogged(t *testing.T) {
 		metrics.NewNoopCollector(),
 		trace.NewNoopTracer(),
 		nil,
-		nil,
+		testutil.ProtocolStateWithSourceFixture(nil),
 		ctx,
 		committer.NewNoopViewCommitter(),
 		prov,
@@ -444,7 +448,7 @@ func TestExecuteScript_LongScriptsAreLogged(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	_, err = manager.ExecuteScript(
+	_, _, err = manager.ExecuteScript(
 		context.Background(),
 		[]byte("whatever"),
 		nil,
@@ -452,7 +456,6 @@ func TestExecuteScript_LongScriptsAreLogged(t *testing.T) {
 		nil)
 
 	require.NoError(t, err)
-
 	require.Contains(t, buffer.String(), "exceeded threshold")
 }
 
@@ -480,7 +483,7 @@ func TestExecuteScript_ShortScriptsAreNotLogged(t *testing.T) {
 		metrics.NewNoopCollector(),
 		trace.NewNoopTracer(),
 		nil,
-		nil,
+		testutil.ProtocolStateWithSourceFixture(nil),
 		ctx,
 		committer.NewNoopViewCommitter(),
 		prov,
@@ -498,7 +501,7 @@ func TestExecuteScript_ShortScriptsAreNotLogged(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	_, err = manager.ExecuteScript(
+	_, _, err = manager.ExecuteScript(
 		context.Background(),
 		[]byte("whatever"),
 		nil,
@@ -506,7 +509,6 @@ func TestExecuteScript_ShortScriptsAreNotLogged(t *testing.T) {
 		nil)
 
 	require.NoError(t, err)
-
 	require.NotContains(t, buffer.String(), "exceeded threshold")
 }
 
@@ -648,7 +650,7 @@ func TestExecuteScriptTimeout(t *testing.T) {
 		metrics.NewNoopCollector(),
 		trace.NewNoopTracer(),
 		nil,
-		nil,
+		testutil.ProtocolStateWithSourceFixture(nil),
 		fvm.NewContext(),
 		committer.NewNoopViewCommitter(),
 		nil,
@@ -665,7 +667,7 @@ func TestExecuteScriptTimeout(t *testing.T) {
 	require.NoError(t, err)
 
 	script := []byte(`
-	pub fun main(): Int {
+	access(all) fun main(): Int {
 		var i = 0
 		while i < 10000 {
 			i = i + 1
@@ -675,7 +677,7 @@ func TestExecuteScriptTimeout(t *testing.T) {
 	`)
 
 	header := unittest.BlockHeaderFixture()
-	value, err := manager.ExecuteScript(
+	value, _, err := manager.ExecuteScript(
 		context.Background(),
 		script,
 		nil,
@@ -695,7 +697,7 @@ func TestExecuteScriptCancelled(t *testing.T) {
 		metrics.NewNoopCollector(),
 		trace.NewNoopTracer(),
 		nil,
-		nil,
+		testutil.ProtocolStateWithSourceFixture(nil),
 		fvm.NewContext(),
 		committer.NewNoopViewCommitter(),
 		nil,
@@ -712,7 +714,7 @@ func TestExecuteScriptCancelled(t *testing.T) {
 	require.NoError(t, err)
 
 	script := []byte(`
-	pub fun main(): Int {
+	access(all) fun main(): Int {
 		var i = 0
 		var j = 0 
 		while i < 10000000 {
@@ -729,7 +731,7 @@ func TestExecuteScriptCancelled(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		header := unittest.BlockHeaderFixture()
-		value, err = manager.ExecuteScript(
+		value, _, err = manager.ExecuteScript(
 			reqCtx,
 			script,
 			nil,
@@ -906,7 +908,7 @@ func TestScriptStorageMutationsDiscarded(t *testing.T) {
 		metrics.NewExecutionCollector(ctx.Tracer),
 		trace.NewNoopTracer(),
 		nil,
-		nil,
+		testutil.ProtocolStateWithSourceFixture(nil),
 		ctx,
 		committer.NewNoopViewCommitter(),
 		nil,
@@ -938,14 +940,14 @@ func TestScriptStorageMutationsDiscarded(t *testing.T) {
 	commonAddress, _ := common.HexToAddress(address.Hex())
 
 	script := []byte(`
-	pub fun main(account: Address) {
-		let acc = getAuthAccount(account)
-		acc.save(3, to: /storage/x)
+	access(all) fun main(account: Address) {
+		let acc = getAuthAccount<auth(SaveValue) &Account>(account)
+		acc.storage.save(3, to: /storage/x)
 	}
 	`)
 
 	header := unittest.BlockHeaderFixture()
-	_, err = manager.ExecuteScript(
+	_, compUsed, err := manager.ExecuteScript(
 		context.Background(),
 		script,
 		[][]byte{jsoncdc.MustEncode(address)},
@@ -953,6 +955,7 @@ func TestScriptStorageMutationsDiscarded(t *testing.T) {
 		snapshotTree)
 
 	require.NoError(t, err)
+	require.Greater(t, compUsed, uint64(0))
 
 	env := environment.NewScriptEnvironmentFromStorageSnapshot(
 		ctx.EnvironmentParams,

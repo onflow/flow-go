@@ -8,10 +8,12 @@ func (c ControlMessageType) String() string {
 }
 
 const (
-	CtrlMsgIHave ControlMessageType = "IHAVE"
-	CtrlMsgIWant ControlMessageType = "IWANT"
-	CtrlMsgGraft ControlMessageType = "GRAFT"
-	CtrlMsgPrune ControlMessageType = "PRUNE"
+	CtrlMsgRPC        ControlMessageType = "RPC"
+	CtrlMsgIHave      ControlMessageType = "IHAVE"
+	CtrlMsgIWant      ControlMessageType = "IWANT"
+	CtrlMsgGraft      ControlMessageType = "GRAFT"
+	CtrlMsgPrune      ControlMessageType = "PRUNE"
+	RpcPublishMessage ControlMessageType = "RpcPublishMessage"
 )
 
 // ControlMessageTypes returns list of all libp2p control message types.

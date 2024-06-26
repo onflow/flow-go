@@ -16,11 +16,12 @@ func (g *GetAccount) Build(r *Request) error {
 	return g.Parse(
 		r.GetVar(addressVar),
 		r.GetQueryParam(blockHeightQuery),
+		r.Chain,
 	)
 }
 
-func (g *GetAccount) Parse(rawAddress string, rawHeight string) error {
-	address, err := ParseAddress(rawAddress)
+func (g *GetAccount) Parse(rawAddress string, rawHeight string, chain flow.Chain) error {
+	address, err := ParseAddress(rawAddress, chain)
 	if err != nil {
 		return err
 	}

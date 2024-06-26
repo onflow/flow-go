@@ -12,6 +12,7 @@ import (
 
 	"github.com/onflow/flow-go/engine/collection"
 	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/network/channels"
 )
 
 type ValidationResult int
@@ -54,6 +55,13 @@ type PubSubAdapter interface {
 	// subscribed peers for topics A and B, and querying for topic C will return an empty list.
 	ListPeers(topic string) []peer.ID
 
+	// GetLocalMeshPeers returns the list of peers in the local mesh for the given topic.
+	// Args:
+	// - topic: the topic.
+	// Returns:
+	// - []peer.ID: the list of peers in the local mesh for the given topic.
+	GetLocalMeshPeers(topic channels.Topic) []peer.ID
+
 	// PeerScoreExposer returns the peer score exposer for the gossipsub adapter. The exposer is a read-only interface
 	// for querying peer scores and returns the local scoring table of the underlying gossipsub node.
 	// The exposer is only available if the gossipsub adapter was configured with a score tracer.
@@ -75,19 +83,18 @@ type PubSubAdapterConfig interface {
 	// WithScoreTracer sets the tracer for the underlying pubsub score implementation.
 	// This is used to expose the local scoring table of the GossipSub node to its higher level components.
 	WithScoreTracer(tracer PeerScoreTracer)
-	WithInspectorSuite(GossipSubInspectorSuite)
+	WithRpcInspector(GossipSubRPCInspector)
 }
 
-// GossipSubControlMetricsObserver funcs used to observe gossipsub related metrics.
-type GossipSubControlMetricsObserver interface {
-	ObserveRPC(peer.ID, *pubsub.RPC)
-}
-
-// GossipSubRPCInspector app specific RPC inspector used to inspect and validate incoming RPC messages before they are processed by libp2p.
+// GossipSubRPCInspector abstracts the general behavior of an app specific RPC inspector specifically
+// used to inspect and validate incoming. It is used to implement custom message validation logic. It is injected into
+// the GossipSubRouter and run on every incoming RPC message before the message is processed by libp2p. If the message
+// is invalid the RPC message will be dropped.
 // Implementations must:
 //   - be concurrency safe
 //   - be non-blocking
 type GossipSubRPCInspector interface {
+	collection.ClusterEvents
 	component.Component
 
 	// Name returns the name of the rpc inspector.
@@ -97,18 +104,6 @@ type GossipSubRPCInspector interface {
 	// on ever RPC message received before the message is processed by libp2p.
 	// If this func returns any error the RPC message will be dropped.
 	Inspect(peer.ID, *pubsub.RPC) error
-}
-
-// GossipSubMsgValidationRpcInspector abstracts the general behavior of an app specific RPC inspector specifically
-// used to inspect and validate incoming. It is used to implement custom message validation logic. It is injected into
-// the GossipSubRouter and run on every incoming RPC message before the message is processed by libp2p. If the message
-// is invalid the RPC message will be dropped.
-// Implementations must:
-//   - be concurrency safe
-//   - be non-blocking
-type GossipSubMsgValidationRpcInspector interface {
-	collection.ClusterEvents
-	GossipSubRPCInspector
 }
 
 // Topic is the abstraction of the underlying pubsub topic that is used by the Flow network.
@@ -128,6 +123,7 @@ type Topic interface {
 
 // ScoreOptionBuilder abstracts the configuration for the underlying pubsub score implementation.
 type ScoreOptionBuilder interface {
+	component.Component
 	// BuildFlowPubSubScoreOption builds the pubsub score options as pubsub.Option for the Flow network.
 	BuildFlowPubSubScoreOption() (*pubsub.PeerScoreParams, *pubsub.PeerScoreThresholds)
 	// TopicScoreParams returns the topic score params for the given topic.
@@ -171,6 +167,18 @@ type PubSubTracer interface {
 	component.Component
 	pubsub.RawTracer
 	RpcControlTracking
+	// DuplicateMessageCount returns the current duplicate message count for the peer.
+	// Args:
+	// - peer.ID: the peer ID.
+	// Returns:
+	// - float64: duplicate message count.
+	DuplicateMessageCount(peer.ID) float64
+	// GetLocalMeshPeers returns the list of peers in the mesh for the given topic.
+	// Args:
+	// - topic: the topic.
+	// Returns:
+	// - []peer.ID: the list of peers in the mesh for the given topic.
+	GetLocalMeshPeers(topic channels.Topic) []peer.ID
 }
 
 // RpcControlTracking is the abstraction of the underlying libp2p control message tracker used to track message ids advertised by the iHave control messages.
@@ -224,24 +232,26 @@ func (p PeerScoreSnapshot) IsWarning() bool {
 
 	// Check overall score.
 	switch {
-	case p.Score < 0:
+	case p.Score < -1:
 		// If the overall score is negative, the peer is in warning state, it means that the peer is suspected to be
 		// misbehaving at the GossipSub level.
 		return true
 	// Check app-specific score.
-	case p.AppSpecificScore < 0:
+	case p.AppSpecificScore < -1:
 		// If the app specific score is negative, the peer is in warning state, it means that the peer behaves in a way
 		// that is not allowed by the Flow protocol.
 		return true
 	// Check IP colocation factor.
-	case p.IPColocationFactor > 0:
+	case p.IPColocationFactor > 5:
 		// If the IP colocation factor is positive, the peer is in warning state, it means that the peer is running on the
-		// same IP as another peer and is suspected to be a sybil node.
+		// same IP as another peer and is suspected to be a sybil node. For now, we set it to a high value to make sure
+		// that peers from the same operator are not marked as sybil nodes.
+		// TODO: this should be revisited once the collocation penalty is enabled.
 		return true
 	// Check behaviour penalty.
-	case p.BehaviourPenalty > 0:
+	case p.BehaviourPenalty > 20:
 		// If the behaviour penalty is positive, the peer is in warning state, it means that the peer is suspected to be
-		// misbehaving at the GossipSub level, e.g. sending too many duplicate messages.
+		// misbehaving at the GossipSub level, e.g. sending too many duplicate messages. Setting it to 20 to reduce the noise; 20 is twice the threshold (defaultBehaviourPenaltyThreshold).
 		return true
 	// If none of the conditions are met, return false.
 	default:

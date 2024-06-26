@@ -10,12 +10,6 @@ import (
 	"github.com/onflow/flow-go/network/channels"
 )
 
-var (
-	// gossipSubScoreBuckets is a list of buckets for gossipsub score metrics.
-	// There is almost no limit to the score, so we use a large range of buckets to capture the full range.
-	gossipSubScoreBuckets = []float64{-10e6, -10e5, -10e4, -10e3, -10e2, -10e1, -10e0, 0, 10e0, 10e1, 10e2, 10e3, 10e4, 10e5, 10e6}
-)
-
 type GossipSubScoreMetrics struct {
 	peerScore           prometheus.Histogram
 	appSpecificScore    prometheus.Histogram
@@ -42,7 +36,7 @@ func NewGossipSubScoreMetrics(prefix string) *GossipSubScoreMetrics {
 			Subsystem: subsystemGossip,
 			Name:      prefix + "gossipsub_overall_peer_score",
 			Help:      "overall peer score from gossipsub peer scoring",
-			Buckets:   gossipSubScoreBuckets,
+			Buckets:   []float64{-100, 0, 100},
 		},
 	)
 
@@ -52,7 +46,7 @@ func NewGossipSubScoreMetrics(prefix string) *GossipSubScoreMetrics {
 			Subsystem: subsystemGossip,
 			Name:      prefix + "gossipsub_app_specific_score",
 			Help:      "app specific score from gossipsub peer scoring",
-			Buckets:   gossipSubScoreBuckets,
+			Buckets:   []float64{-100, 0, 100},
 		},
 	)
 
@@ -62,7 +56,7 @@ func NewGossipSubScoreMetrics(prefix string) *GossipSubScoreMetrics {
 			Subsystem: subsystemGossip,
 			Name:      prefix + "gossipsub_behaviour_penalty_score",
 			Help:      "behaviour penalty from gossipsub peer scoring",
-			Buckets:   gossipSubScoreBuckets,
+			Buckets:   []float64{10, 100, 1000},
 		},
 	)
 
@@ -72,7 +66,7 @@ func NewGossipSubScoreMetrics(prefix string) *GossipSubScoreMetrics {
 			Subsystem: subsystemGossip,
 			Name:      prefix + "gossipsub_ip_collocation_factor_score",
 			Help:      "ip collocation factor from gossipsub peer scoring",
-			Buckets:   gossipSubScoreBuckets,
+			Buckets:   []float64{10, 100, 1000},
 		},
 	)
 
@@ -80,9 +74,9 @@ func NewGossipSubScoreMetrics(prefix string) *GossipSubScoreMetrics {
 		prometheus.HistogramOpts{
 			Namespace: namespaceNetwork,
 			Subsystem: subsystemGossip,
-			Name:      prefix + "gossipsub_time_in_mesh_score",
-			Help:      "time in mesh from gossipsub scoring",
-			Buckets:   gossipSubScoreBuckets,
+			Name:      prefix + "gossipsub_time_in_mesh_quantum_count",
+			Help:      "time in mesh from gossipsub scoring; number of the time quantum a peer has been in the mesh",
+			Buckets:   []float64{1, 24, 168}, // 1h, 1d, 1w with quantum of 1h
 		},
 		[]string{LabelChannel},
 	)
@@ -91,8 +85,9 @@ func NewGossipSubScoreMetrics(prefix string) *GossipSubScoreMetrics {
 		prometheus.HistogramOpts{
 			Namespace: namespaceNetwork,
 			Subsystem: subsystemGossip,
-			Name:      prefix + "gossipsub_mesh_message_delivery_score",
-			Help:      "mesh message delivery from gossipsub peer scoring",
+			Name:      prefix + "gossipsub_mesh_message_delivery",
+			Buckets:   []float64{100, 1000, 10_000},
+			Help:      "mesh message delivery from gossipsub peer scoring; number of messages delivered to the mesh of local peer; decayed over time; and capped at certain value",
 		},
 		[]string{LabelChannel},
 	)
@@ -101,8 +96,9 @@ func NewGossipSubScoreMetrics(prefix string) *GossipSubScoreMetrics {
 		prometheus.HistogramOpts{
 			Namespace: namespaceNetwork,
 			Subsystem: subsystemGossip,
-			Name:      prefix + "gossipsub_invalid_message_delivery_score",
-			Help:      "invalid message delivery from gossipsub peer scoring",
+			Buckets:   []float64{10, 100, 1000},
+			Name:      prefix + "gossipsub_invalid_message_delivery_count",
+			Help:      "invalid message delivery from gossipsub peer scoring; number of invalid messages delivered to the mesh of local peer; decayed over time; and capped at certain value",
 		},
 		[]string{LabelChannel},
 	)
@@ -111,8 +107,9 @@ func NewGossipSubScoreMetrics(prefix string) *GossipSubScoreMetrics {
 		prometheus.HistogramOpts{
 			Namespace: namespaceNetwork,
 			Subsystem: subsystemGossip,
-			Name:      prefix + "gossipsub_first_message_delivery_score",
-			Help:      "first message delivery from gossipsub peer scoring",
+			Buckets:   []float64{100, 1000, 10_000},
+			Name:      prefix + "gossipsub_first_message_delivery_count",
+			Help:      "first message delivery from gossipsub peer scoring; number of fresh messages delivered to the mesh of local peer; decayed over time; and capped at certain value",
 		},
 		[]string{LabelChannel},
 	)

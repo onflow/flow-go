@@ -8,6 +8,8 @@ import (
 // SyncRequest is part of the synchronization protocol and represents a node on
 // the network sharing the height of its latest finalized block and requesting
 // the same information from the recipient.
+// All SyncRequest messages are validated before being processed. If validation fails, then a misbehavior report is created.
+// See synchronization.validateSyncRequestForALSP for more details.
 type SyncRequest struct {
 	Nonce  uint64
 	Height uint64
@@ -25,15 +27,19 @@ type SyncResponse struct {
 // (pulling) attempt to synchronize with the consensus state of the network. It
 // requests finalized blocks by a range of block heights, including from and to
 // heights.
+// All RangeRequest messages are validated before being processed. If validation fails, then a misbehavior report is created.
+// See synchronization.validateRangeRequestForALSP for more details.
 type RangeRequest struct {
 	Nonce      uint64
 	FromHeight uint64
 	ToHeight   uint64
 }
 
-// BatchRequest is part of the sychronization protocol and represents an active
+// BatchRequest is part of the synchronization protocol and represents an active
 // (pulling) attempt to synchronize with the consensus state of the network. It
 // requests finalized or unfinalized blocks by a list of block IDs.
+// All BatchRequest messages are validated before being processed. If validation fails, then a misbehavior report is created.
+// See synchronization.validateBatchRequestForALSP for more details.
 type BatchRequest struct {
 	Nonce    uint64
 	BlockIDs []flow.Identifier

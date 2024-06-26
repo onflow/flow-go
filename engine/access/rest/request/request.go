@@ -96,6 +96,12 @@ func (rd *Request) CreateTransactionRequest() (CreateTransaction, error) {
 	return req, err
 }
 
+func (rd *Request) SubscribeEventsRequest() (SubscribeEvents, error) {
+	var req SubscribeEvents
+	err := req.Build(rd)
+	return req, err
+}
+
 func (rd *Request) Expands(field string) bool {
 	return rd.ExpandFields[field]
 }

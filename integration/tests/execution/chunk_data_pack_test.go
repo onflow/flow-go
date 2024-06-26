@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	sdk "github.com/onflow/flow-go-sdk"
+
 	"github.com/onflow/flow-go/integration/tests/lib"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/proof"
@@ -43,15 +44,14 @@ func (gs *ChunkDataPacksSuite) TestVerificationNodesRequestChunkDataPacks() {
 		"expected no ChunkDataRequest to be sent before a transaction existed")
 
 	// send transaction
-	err = gs.AccessClient().DeployContract(context.Background(), sdk.Identifier(gs.net.Root().ID()), lib.CounterContract)
+	tx, err := gs.AccessClient().DeployContract(context.Background(), sdk.Identifier(gs.net.Root().ID()), lib.CounterContract)
 	require.NoError(gs.T(), err, "could not deploy counter")
 
-	// wait until we see a different state commitment for a finalized block, call that block blockB
-	blockB, _ := lib.WaitUntilFinalizedStateCommitmentChanged(gs.T(), gs.BlockState, gs.ReceiptState)
-	gs.T().Logf("got blockB height %v ID %v", blockB.Header.Height, blockB.Header.ID())
+	txRes, err := gs.AccessClient().WaitForExecuted(context.Background(), tx.ID())
+	require.NoError(gs.T(), err, "could not wait for tx to be executed")
 
 	// wait for execution receipt for blockB from execution node 1
-	erExe1BlockB := gs.ReceiptState.WaitForReceiptFrom(gs.T(), blockB.Header.ID(), gs.exe1ID)
+	erExe1BlockB := gs.ReceiptState.WaitForReceiptFrom(gs.T(), flow.Identifier(txRes.BlockID), gs.exe1ID)
 	finalStateErExec1BlockB, err := erExe1BlockB.ExecutionResult.FinalStateCommitment()
 	require.NoError(gs.T(), err)
 	gs.T().Logf("got erExe1BlockB with SC %x", finalStateErExec1BlockB)

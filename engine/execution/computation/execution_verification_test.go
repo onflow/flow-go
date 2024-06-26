@@ -6,16 +6,16 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/ipfs/boxo/blockstore"
 	"github.com/ipfs/go-datastore"
 	dssync "github.com/ipfs/go-datastore/sync"
-	blockstore "github.com/ipfs/go-ipfs-blockstore"
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/crypto"
 
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/computation/committer"
@@ -31,6 +31,7 @@ import (
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/storage/derived"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	completeLedger "github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
 	"github.com/onflow/flow-go/model/flow"
@@ -46,9 +47,7 @@ import (
 )
 
 const (
-	// TODO: enable parallel execution once cadence type equivalence check issue
-	// is resolved.
-	testVerifyMaxConcurrency = 1
+	testVerifyMaxConcurrency = 2
 )
 
 var chain = flow.Emulator.Chain()
@@ -67,10 +66,10 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 	t.Run("single transaction event", func(t *testing.T) {
 
 		deployTx := blueprints.DeployContractTransaction(chain.ServiceAddress(), []byte(""+
-			`pub contract Foo {
-				pub event FooEvent(x: Int, y: Int)
+			`access(all) contract Foo {
+				access(all) event FooEvent(x: Int, y: Int)
 
-				pub fun event() { 
+				access(all) fun emitEvent() { 
 					emit FooEvent(x: 2, y: 1)
 				}
 			}`), "Foo")
@@ -81,7 +80,7 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 			transaction {
 				prepare() {}
 				execute {
-					Foo.event()
+					Foo.emitEvent()
 				}
 			}`, chain.ServiceAddress())),
 		}
@@ -111,10 +110,10 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 	t.Run("multiple collections events", func(t *testing.T) {
 
 		deployTx := blueprints.DeployContractTransaction(chain.ServiceAddress(), []byte(""+
-			`pub contract Foo {
-				pub event FooEvent(x: Int, y: Int)
+			`access(all) contract Foo {
+				access(all) event FooEvent(x: Int, y: Int)
 
-				pub fun event() { 
+				access(all) fun emitEvent() { 
 					emit FooEvent(x: 2, y: 1)
 				}
 			}`), "Foo")
@@ -125,7 +124,7 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 			transaction {
 				prepare() {}
 				execute {
-					Foo.event()
+					Foo.emitEvent()
 				}
 			}`, chain.ServiceAddress())),
 		}
@@ -195,7 +194,7 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 		accountPrivKey, createAccountTx := testutil.CreateAccountCreationTransaction(t, chain)
 
 		// this should return the address of newly created account
-		accountAddress, err := chain.AddressAtIndex(5)
+		accountAddress, err := chain.AddressAtIndex(systemcontracts.LastSystemAccountIndex + 1)
 		require.NoError(t, err)
 
 		err = testutil.SignTransactionAsServiceAccount(createAccountTx, 0, chain)
@@ -205,7 +204,7 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 		err = testutil.SignTransaction(addKeyTx, accountAddress, accountPrivKey, 0)
 		require.NoError(t, err)
 
-		minimumStorage, err := cadence.NewUFix64("0.00010807")
+		minimumStorage, err := cadence.NewUFix64("0.00011661")
 		require.NoError(t, err)
 
 		cr := executeBlockAndVerify(t, [][]*flow.TransactionBody{
@@ -221,9 +220,9 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 		txResults := colResult.TransactionResults()
 		// storage limit error
 		assert.Len(t, txResults, 1)
-		assert.Equal(t, txResults[0].ErrorMessage, "")
+		assert.Equal(t, "", txResults[0].ErrorMessage)
 		// ensure events from the first transaction is emitted
-		require.Len(t, colResult.Events(), 10)
+		require.Len(t, colResult.Events(), 14)
 
 		colResult = cr.CollectionExecutionResultAt(1)
 		txResults = colResult.TransactionResults()
@@ -231,13 +230,13 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 		// storage limit error
 		assert.Contains(t, txResults[0].ErrorMessage, errors.ErrCodeStorageCapacityExceeded.String())
 		// ensure fee deduction events are emitted even though tx fails
-		require.Len(t, colResult.Events(), 3)
+		require.Len(t, colResult.Events(), 5)
 	})
 
 	t.Run("with failed transaction fee deduction", func(t *testing.T) {
 		accountPrivKey, createAccountTx := testutil.CreateAccountCreationTransaction(t, chain)
 		// this should return the address of newly created account
-		accountAddress, err := chain.AddressAtIndex(5)
+		accountAddress, err := chain.AddressAtIndex(systemcontracts.LastSystemAccountIndex + 1)
 		require.NoError(t, err)
 
 		err = testutil.SignTransactionAsServiceAccount(createAccountTx, 0, chain)
@@ -264,7 +263,7 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 			}`),
 		}
 
-		spamTx.SetGasLimit(800000)
+		spamTx.SetComputeLimit(800000)
 		err = testutil.SignTransaction(spamTx, accountAddress, accountPrivKey, 0)
 		require.NoError(t, err)
 
@@ -303,7 +302,7 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 				transactionEvents += 1
 			}
 		}
-		require.Equal(t, 10, transactionEvents)
+		require.Equal(t, 14, transactionEvents)
 
 		assert.Contains(t, txResults[1].ErrorMessage, errors.ErrCodeStorageCapacityExceeded.String())
 
@@ -314,7 +313,7 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 				transactionEvents += 1
 			}
 		}
-		require.Equal(t, 3, transactionEvents)
+		require.Equal(t, 5, transactionEvents)
 	})
 
 }
@@ -331,6 +330,11 @@ func TestTransactionFeeDeduction(t *testing.T) {
 	txFees := uint64(1_000)
 	fundingAmount := uint64(100_000_000)
 	transferAmount := uint64(123_456)
+
+	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+
+	depositedEvent := fmt.Sprintf("A.%s.FlowToken.TokensDeposited", sc.FlowToken.Address)
+	withdrawnEvent := fmt.Sprintf("A.%s.FlowToken.TokensWithdrawn", sc.FlowToken.Address)
 
 	testCases := []testCase{
 		{
@@ -350,15 +354,15 @@ func TestTransactionFeeDeduction(t *testing.T) {
 				// events of the first collection
 				events := cr.CollectionExecutionResultAt(2).Events()
 				for _, e := range events {
-					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensDeposited", fvm.FlowTokenAddress(chain)) {
+					if string(e.Type) == depositedEvent {
 						deposits = append(deposits, e)
 					}
-					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensWithdrawn", fvm.FlowTokenAddress(chain)) {
+					if string(e.Type) == withdrawnEvent {
 						withdraws = append(withdraws, e)
 					}
 				}
 
-				require.Len(t, deposits, 2)
+				require.Len(t, deposits, 1)
 				require.Len(t, withdraws, 2)
 			},
 		},
@@ -379,15 +383,15 @@ func TestTransactionFeeDeduction(t *testing.T) {
 				// events of the last collection
 				events := cr.CollectionExecutionResultAt(2).Events()
 				for _, e := range events {
-					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensDeposited", fvm.FlowTokenAddress(chain)) {
+					if string(e.Type) == depositedEvent {
 						deposits = append(deposits, e)
 					}
-					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensWithdrawn", fvm.FlowTokenAddress(chain)) {
+					if string(e.Type) == withdrawnEvent {
 						withdraws = append(withdraws, e)
 					}
 				}
 
-				require.Len(t, deposits, 2)
+				require.Len(t, deposits, 1)
 				require.Len(t, withdraws, 2)
 			},
 		},
@@ -410,15 +414,15 @@ func TestTransactionFeeDeduction(t *testing.T) {
 				// events of the last collection
 				events := cr.CollectionExecutionResultAt(2).Events()
 				for _, e := range events {
-					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensDeposited", fvm.FlowTokenAddress(chain)) {
+					if string(e.Type) == depositedEvent {
 						deposits = append(deposits, e)
 					}
-					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensWithdrawn", fvm.FlowTokenAddress(chain)) {
+					if string(e.Type) == withdrawnEvent {
 						withdraws = append(withdraws, e)
 					}
 				}
 
-				require.Len(t, deposits, 2)
+				require.Len(t, deposits, 1)
 				require.Len(t, withdraws, 2)
 			},
 		},
@@ -439,10 +443,10 @@ func TestTransactionFeeDeduction(t *testing.T) {
 				// events of the last collection
 				events := cr.CollectionExecutionResultAt(2).Events()
 				for _, e := range events {
-					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensDeposited", fvm.FlowTokenAddress(chain)) {
+					if string(e.Type) == depositedEvent {
 						deposits = append(deposits, e)
 					}
-					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensWithdrawn", fvm.FlowTokenAddress(chain)) {
+					if string(e.Type) == withdrawnEvent {
 						withdraws = append(withdraws, e)
 					}
 				}
@@ -471,15 +475,15 @@ func TestTransactionFeeDeduction(t *testing.T) {
 				// events of the last collection
 				events := cr.CollectionExecutionResultAt(2).Events()
 				for _, e := range events {
-					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensDeposited", fvm.FlowTokenAddress(chain)) {
+					if string(e.Type) == depositedEvent {
 						deposits = append(deposits, e)
 					}
-					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensWithdrawn", fvm.FlowTokenAddress(chain)) {
+					if string(e.Type) == withdrawnEvent {
 						withdraws = append(withdraws, e)
 					}
 				}
 
-				require.Len(t, deposits, 2)
+				require.Len(t, deposits, 1)
 				require.Len(t, withdraws, 2)
 			},
 		},
@@ -500,15 +504,15 @@ func TestTransactionFeeDeduction(t *testing.T) {
 				// events of the last collection
 				events := cr.CollectionExecutionResultAt(2).Events()
 				for _, e := range events {
-					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensDeposited", fvm.FlowTokenAddress(chain)) {
+					if string(e.Type) == depositedEvent {
 						deposits = append(deposits, e)
 					}
-					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensWithdrawn", fvm.FlowTokenAddress(chain)) {
+					if string(e.Type) == withdrawnEvent {
 						withdraws = append(withdraws, e)
 					}
 				}
 
-				require.Len(t, deposits, 2)
+				require.Len(t, deposits, 1)
 				require.Len(t, withdraws, 2)
 			},
 		},
@@ -529,10 +533,10 @@ func TestTransactionFeeDeduction(t *testing.T) {
 				// events of the last collection
 				events := cr.CollectionExecutionResultAt(2).Events()
 				for _, e := range events {
-					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensDeposited", fvm.FlowTokenAddress(chain)) {
+					if string(e.Type) == depositedEvent {
 						deposits = append(deposits, e)
 					}
-					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensWithdrawn", fvm.FlowTokenAddress(chain)) {
+					if string(e.Type) == withdrawnEvent {
 						withdraws = append(withdraws, e)
 					}
 				}
@@ -558,10 +562,10 @@ func TestTransactionFeeDeduction(t *testing.T) {
 				// events of the last collection
 				events := cr.CollectionExecutionResultAt(2).Events()
 				for _, e := range events {
-					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensDeposited", fvm.FlowTokenAddress(chain)) {
+					if string(e.Type) == depositedEvent {
 						deposits = append(deposits, e)
 					}
-					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensWithdrawn", fvm.FlowTokenAddress(chain)) {
+					if string(e.Type) == withdrawnEvent {
 						withdraws = append(withdraws, e)
 					}
 				}
@@ -588,12 +592,12 @@ func TestTransactionFeeDeduction(t *testing.T) {
 							transaction(amount: UFix64, to: Address) {
 							
 								// The Vault resource that holds the tokens that are being transferred
-								let sentVault: @FungibleToken.Vault
+								let sentVault: @{FungibleToken.Vault}
 							
-								prepare(signer: AuthAccount) {
+								prepare(signer: auth(BorrowValue) &Account) {
 							
 									// Get a reference to the signer's stored vault
-									let vaultRef = signer.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
+									let vaultRef = signer.storage.borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(from: /storage/flowTokenVault)
 										?? panic("Could not borrow reference to the owner's Vault!")
 							
 									// Withdraw tokens from the signer's stored vault
@@ -606,14 +610,13 @@ func TestTransactionFeeDeduction(t *testing.T) {
 									let recipient = getAccount(to)
 							
 									// Get a reference to the recipient's Receiver
-									let receiverRef = recipient.getCapability(/public/flowTokenReceiver)
-										.borrow<&{FungibleToken.Receiver}>()
+									let receiverRef = recipient.capabilities.borrow<&{FungibleToken.Receiver}>(/public/flowTokenReceiver)
 										?? panic("Could not borrow receiver reference to the recipient's Vault")
 							
 									// Deposit the withdrawn tokens in the recipient's receiver
 									receiverRef.deposit(from: <-self.sentVault)
 								}
-							}`, fvm.FungibleTokenAddress(chain), fvm.FlowTokenAddress(chain))),
+							}`, sc.FungibleToken.Address, sc.FlowToken.Address)),
 			)
 	}
 
@@ -625,7 +628,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 			privateKey, createAccountTx := testutil.CreateAccountCreationTransaction(t, chain)
 
 			// this should return the address of newly created account
-			address, err := chain.AddressAtIndex(5)
+			address, err := chain.AddressAtIndex(systemcontracts.LastSystemAccountIndex + 1)
 			require.NoError(t, err)
 
 			err = testutil.SignTransactionAsServiceAccount(createAccountTx, 0, chain)
@@ -771,6 +774,9 @@ func executeBlockAndVerifyWithParameters(t *testing.T,
 	myIdentity.StakingPubKey = sk.PublicKey()
 	me := mocklocal.NewMockLocal(sk, myIdentity.ID(), t)
 
+	// used by computer to generate the prng used in the service tx
+	stateForRandomSource := testutil.ProtocolStateWithSourceFixture(nil)
+
 	blockComputer, err := computer.NewBlockComputer(
 		vm,
 		fvmContext,
@@ -781,7 +787,7 @@ func executeBlockAndVerifyWithParameters(t *testing.T,
 		me,
 		prov,
 		nil,
-		testutil.ProtocolStateWithSourceFixture(nil),
+		stateForRandomSource,
 		testVerifyMaxConcurrency)
 	require.NoError(t, err)
 
@@ -845,6 +851,8 @@ func executeBlockAndVerifyWithParameters(t *testing.T,
 			ChunkDataPack:     chdps[i],
 			EndState:          chunk.EndState,
 			TransactionOffset: offsetForChunk,
+			// returns the same RandomSource used by the computer
+			Snapshot: stateForRandomSource.AtBlockID(chunk.BlockID),
 		}
 	}
 

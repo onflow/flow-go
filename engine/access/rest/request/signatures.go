@@ -14,8 +14,9 @@ func (s *TransactionSignature) Parse(
 	rawAddress string,
 	rawKeyIndex string,
 	rawSignature string,
+	chain flow.Chain,
 ) error {
-	address, err := ParseAddress(rawAddress)
+	address, err := ParseAddress(rawAddress, chain)
 	if err != nil {
 		return err
 	}
@@ -46,11 +47,11 @@ func (s TransactionSignature) Flow() flow.TransactionSignature {
 
 type TransactionSignatures []TransactionSignature
 
-func (t *TransactionSignatures) Parse(rawSigs []models.TransactionSignature) error {
+func (t *TransactionSignatures) Parse(rawSigs []models.TransactionSignature, chain flow.Chain) error {
 	signatures := make([]TransactionSignature, len(rawSigs))
 	for i, sig := range rawSigs {
 		var signature TransactionSignature
-		err := signature.Parse(sig.Address, sig.KeyIndex, sig.Signature)
+		err := signature.Parse(sig.Address, sig.KeyIndex, sig.Signature, chain)
 		if err != nil {
 			return err
 		}

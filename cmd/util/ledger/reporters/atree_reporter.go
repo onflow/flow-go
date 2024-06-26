@@ -117,7 +117,7 @@ func getPayloadType(p *ledger.Payload) (payloadType, error) {
 	}
 
 	id := flow.NewRegisterID(
-		string(k.KeyParts[0].Value),
+		flow.BytesToAddress(k.KeyParts[0].Value),
 		string(k.KeyParts[1].Value))
 	if id.IsInternalState() {
 		return fvmPayloadType, nil

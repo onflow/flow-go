@@ -35,6 +35,7 @@ type ComputationManager interface {
 		snapshot snapshot.StorageSnapshot,
 	) (
 		[]byte,
+		uint64,
 		error,
 	)
 
@@ -106,25 +107,7 @@ func New(
 	}
 
 	chainID := vmCtx.Chain.ChainID()
-	options := []fvm.Option{
-		fvm.WithReusableCadenceRuntimePool(
-			reusableRuntime.NewReusableCadenceRuntimePool(
-				ReusableCadenceRuntimePoolSize,
-				runtime.Config{
-					TracingEnabled:        params.CadenceTracing,
-					AccountLinkingEnabled: true,
-					// Attachments are enabled everywhere except for Mainnet
-					AttachmentsEnabled: chainID != flow.Mainnet,
-					// Capability Controllers are enabled everywhere except for Mainnet
-					CapabilityControllersEnabled: chainID != flow.Mainnet,
-				},
-			)),
-	}
-
-	if params.ExtensiveTracing {
-		options = append(options, fvm.WithExtensiveTracing())
-	}
-
+	options := DefaultFVMOptions(chainID, params.CadenceTracing, params.ExtensiveTracing)
 	vmCtx = fvm.NewContextFromParent(vmCtx, options...)
 
 	blockComputer, err := computer.NewBlockComputer(
@@ -157,6 +140,7 @@ func New(
 		vm,
 		vmCtx,
 		derivedChainData,
+		query.NewProtocolStateWrapper(protoState),
 	)
 
 	e := Manager{
@@ -196,10 +180,6 @@ func (e *Manager) ComputeBlock(
 		snapshot,
 		derivedBlockData)
 	if err != nil {
-		e.log.Error().
-			Hex("block_id", logging.Entity(block.Block)).
-			Msg("failed to compute block result")
-
 		return nil, fmt.Errorf("failed to execute block: %w", err)
 	}
 
@@ -216,7 +196,7 @@ func (e *Manager) ExecuteScript(
 	arguments [][]byte,
 	blockHeader *flow.Header,
 	snapshot snapshot.StorageSnapshot,
-) ([]byte, error) {
+) ([]byte, uint64, error) {
 	return e.queryExecutor.ExecuteScript(ctx,
 		code,
 		arguments,
@@ -242,4 +222,25 @@ func (e *Manager) GetAccount(
 
 func (e *Manager) QueryExecutor() query.Executor {
 	return e.queryExecutor
+}
+
+func DefaultFVMOptions(chainID flow.ChainID, cadenceTracing bool, extensiveTracing bool) []fvm.Option {
+	options := []fvm.Option{
+		fvm.WithChain(chainID.Chain()),
+		fvm.WithReusableCadenceRuntimePool(
+			reusableRuntime.NewReusableCadenceRuntimePool(
+				ReusableCadenceRuntimePoolSize,
+				runtime.Config{
+					TracingEnabled:     cadenceTracing,
+					AttachmentsEnabled: true,
+				},
+			)),
+		fvm.WithEVMEnabled(true),
+	}
+
+	if extensiveTracing {
+		options = append(options, fvm.WithExtensiveTracing())
+	}
+
+	return options
 }

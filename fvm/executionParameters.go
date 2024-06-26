@@ -268,7 +268,7 @@ func cadenceValueToWeights(value cadence.Value) (map[uint]uint64, bool) {
 			return nil, false
 		}
 
-		result[uint(key.ToGoValue().(uint64))] = uint64(value)
+		result[uint(key)] = uint64(value)
 	}
 
 	return result, true
@@ -331,5 +331,5 @@ func GetExecutionMemoryLimit(
 			blueprints.TransactionFeesExecutionMemoryLimitPath.String())
 	}
 
-	return memoryLimitRaw.ToGoValue().(uint64), nil
+	return uint64(memoryLimitRaw), nil
 }

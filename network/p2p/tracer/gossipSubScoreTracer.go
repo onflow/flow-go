@@ -12,7 +12,7 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/p2p"
-	"github.com/onflow/flow-go/network/p2p/p2plogging"
+	p2plogging "github.com/onflow/flow-go/network/p2p/logging"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
@@ -256,6 +256,6 @@ func (g *GossipSubScoreTracer) logPeerScore(peerID peer.ID) bool {
 		return true
 	}
 
-	lg.Info().Msg(PeerScoreLogMessage)
+	lg.Debug().Msg(PeerScoreLogMessage)
 	return false
 }

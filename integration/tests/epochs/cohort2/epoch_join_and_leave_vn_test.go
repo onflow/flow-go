@@ -28,7 +28,7 @@ func (s *EpochJoinAndLeaveVNSuite) SetupTest() {
 	s.DKGPhaseLen = 100
 	s.EpochLen = 450
 	s.EpochCommitSafetyThreshold = 20
-	s.DynamicEpochTransitionSuite.SetupTest()
+	s.BaseSuite.SetupTest()
 }
 
 // TestEpochJoinAndLeaveVN should update verification nodes and assert healthy network conditions

@@ -5,6 +5,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	model "github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -56,14 +57,18 @@ func genconfigCmdRun(_ *cobra.Command, _ []string) {
 		configs = append(configs, createConf(flow.RoleVerification, i))
 	}
 
-	writeJSON(flagConfig, configs)
+	err := common.WriteJSON(flagConfig, flagOutdir, configs)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to write json")
+	}
+	log.Info().Msgf("wrote file %s/%s", flagOutdir, flagConfig)
 }
 
 // genconfigCmd represents the genconfig command
 var genconfigCmd = &cobra.Command{
 	Use:   "genconfig",
 	Short: "Generate node-config.json",
-	Long:  "example: go run -tags relic ./cmd/bootstrap genconfig --address-format \"%s-%03d.devnet19.nodes.onflow.org:3569\" --access 2 --collection 3 --consensus 3 --execution 2 --verification 1 --weight 100",
+	Long:  "example: go run ./cmd/bootstrap genconfig --address-format \"%s-%03d.devnet19.nodes.onflow.org:3569\" --access 2 --collection 3 --consensus 3 --execution 2 --verification 1 --weight 100",
 	Run:   genconfigCmdRun,
 }
 

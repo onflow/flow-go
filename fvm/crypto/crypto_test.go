@@ -8,11 +8,11 @@ import (
 
 	"github.com/fxamacker/cbor/v2"
 	"github.com/onflow/cadence/runtime"
+	onflowCrypto "github.com/onflow/crypto"
+	"github.com/onflow/crypto/hash"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	gocrypto "github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/fvm/crypto"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/model/flow"
@@ -90,7 +90,7 @@ func TestVerifySignatureFromRuntime(t *testing.T) {
 					seed := make([]byte, seedLength)
 					_, err := rand.Read(seed)
 					require.NoError(t, err)
-					pk, err := gocrypto.GeneratePrivateKey(crypto.RuntimeToCryptoSigningAlgorithm(s), seed)
+					pk, err := onflowCrypto.GeneratePrivateKey(crypto.RuntimeToCryptoSigningAlgorithm(s), seed)
 					require.NoError(t, err)
 
 					tag := "random_tag"
@@ -182,7 +182,7 @@ func TestVerifySignatureFromRuntime(t *testing.T) {
 			seed := make([]byte, seedLength)
 			_, err := rand.Read(seed)
 			require.NoError(t, err)
-			pk, err := gocrypto.GeneratePrivateKey(gocrypto.BLSBLS12381, seed)
+			pk, err := onflowCrypto.GeneratePrivateKey(onflowCrypto.BLSBLS12381, seed)
 			require.NoError(t, err)
 
 			hasher := msig.NewBLSHasher(string(c.signTag))
@@ -265,7 +265,7 @@ func TestVerifySignatureFromRuntime(t *testing.T) {
 						seed := make([]byte, seedLength)
 						_, err := rand.Read(seed)
 						require.NoError(t, err)
-						pk, err := gocrypto.GeneratePrivateKey(crypto.RuntimeToCryptoSigningAlgorithm(s), seed)
+						pk, err := onflowCrypto.GeneratePrivateKey(crypto.RuntimeToCryptoSigningAlgorithm(s), seed)
 						require.NoError(t, err)
 
 						hasher, err := crypto.NewPrefixedHashing(crypto.RuntimeToCryptoHashingAlgorithm(h), c.signTag)
@@ -298,12 +298,12 @@ func TestVerifySignatureFromTransaction(t *testing.T) {
 	// make sure the seed length is larger than miniumum seed lengths of all signature schemes
 	seedLength := 64
 
-	correctCombinations := map[gocrypto.SigningAlgorithm]map[hash.HashingAlgorithm]struct{}{
-		gocrypto.ECDSAP256: {
+	correctCombinations := map[onflowCrypto.SigningAlgorithm]map[hash.HashingAlgorithm]struct{}{
+		onflowCrypto.ECDSAP256: {
 			hash.SHA2_256: {},
 			hash.SHA3_256: {},
 		},
-		gocrypto.ECDSASecp256k1: {
+		onflowCrypto.ECDSASecp256k1: {
 			hash.SHA2_256: {},
 			hash.SHA3_256: {},
 		},
@@ -311,10 +311,10 @@ func TestVerifySignatureFromTransaction(t *testing.T) {
 
 	t.Run("verify should fail on incorrect combinations", func(t *testing.T) {
 
-		signatureAlgos := []gocrypto.SigningAlgorithm{
-			gocrypto.ECDSAP256,
-			gocrypto.ECDSASecp256k1,
-			gocrypto.BLSBLS12381,
+		signatureAlgos := []onflowCrypto.SigningAlgorithm{
+			onflowCrypto.ECDSAP256,
+			onflowCrypto.ECDSASecp256k1,
+			onflowCrypto.BLSBLS12381,
 		}
 		hashAlgos := []hash.HashingAlgorithm{
 			hash.SHA2_256,
@@ -331,7 +331,7 @@ func TestVerifySignatureFromTransaction(t *testing.T) {
 					seed := make([]byte, seedLength)
 					_, err := rand.Read(seed)
 					require.NoError(t, err)
-					sk, err := gocrypto.GeneratePrivateKey(s, seed)
+					sk, err := onflowCrypto.GeneratePrivateKey(s, seed)
 					require.NoError(t, err)
 
 					tag := string(flow.TransactionDomainTag[:])
@@ -403,7 +403,7 @@ func TestVerifySignatureFromTransaction(t *testing.T) {
 						seed := make([]byte, seedLength)
 						_, err := rand.Read(seed)
 						require.NoError(t, err)
-						sk, err := gocrypto.GeneratePrivateKey(s, seed)
+						sk, err := onflowCrypto.GeneratePrivateKey(s, seed)
 						require.NoError(t, err)
 
 						hasher, err := crypto.NewPrefixedHashing(h, c.signTag)
@@ -425,16 +425,13 @@ func TestVerifySignatureFromTransaction(t *testing.T) {
 
 func TestValidatePublicKey(t *testing.T) {
 
-	// make sure the seed length is larger than miniumum seed lengths of all signature schemes
-	seedLength := 64
-
 	validPublicKey := func(t *testing.T, s runtime.SignatureAlgorithm) []byte {
-		seed := make([]byte, seedLength)
+		seed := make([]byte, onflowCrypto.KeyGenSeedMinLen)
 		_, err := rand.Read(seed)
 		require.NoError(t, err)
-		pk, err := gocrypto.GeneratePrivateKey(crypto.RuntimeToCryptoSigningAlgorithm(s), seed)
+		sk, err := onflowCrypto.GeneratePrivateKey(crypto.RuntimeToCryptoSigningAlgorithm(s), seed)
 		require.NoError(t, err)
-		return pk.PublicKey().Encode()
+		return sk.PublicKey().Encode()
 	}
 
 	t.Run("Unknown algorithm should return false", func(t *testing.T) {
@@ -463,12 +460,14 @@ func TestValidatePublicKey(t *testing.T) {
 			runtime.SignatureAlgorithmBLS_BLS12_381,
 		}
 		for i, s := range signatureAlgos {
+
 			t.Run(fmt.Sprintf("case %v: %v", i, s), func(t *testing.T) {
 				key := validPublicKey(t, s)
+				// This may cause flakiness depending on the public key
+				// deserialization scheme used!!
 				key[0] ^= 1 // alter one bit of the valid key
-
 				err := crypto.ValidatePublicKey(s, key)
-				require.Error(t, err)
+				require.Errorf(t, err, "key is %#x", key)
 			})
 		}
 	})
@@ -491,10 +490,10 @@ func TestHashingAlgorithmConversion(t *testing.T) {
 }
 
 func TestSigningAlgorithmConversion(t *testing.T) {
-	signingAlgoMapping := map[runtime.SignatureAlgorithm]gocrypto.SigningAlgorithm{
-		runtime.SignatureAlgorithmECDSA_P256:      gocrypto.ECDSAP256,
-		runtime.SignatureAlgorithmECDSA_secp256k1: gocrypto.ECDSASecp256k1,
-		runtime.SignatureAlgorithmBLS_BLS12_381:   gocrypto.BLSBLS12381,
+	signingAlgoMapping := map[runtime.SignatureAlgorithm]onflowCrypto.SigningAlgorithm{
+		runtime.SignatureAlgorithmECDSA_P256:      onflowCrypto.ECDSAP256,
+		runtime.SignatureAlgorithmECDSA_secp256k1: onflowCrypto.ECDSASecp256k1,
+		runtime.SignatureAlgorithmBLS_BLS12_381:   onflowCrypto.BLSBLS12381,
 	}
 
 	for runtimeAlgo, cryptoAlgo := range signingAlgoMapping {

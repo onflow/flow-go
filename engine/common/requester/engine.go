@@ -43,7 +43,7 @@ type Engine struct {
 	state    protocol.State
 	con      network.Conduit
 	channel  channels.Channel
-	selector flow.IdentityFilter
+	selector flow.IdentityFilter[flow.Identity]
 	create   CreateFunc
 	handle   HandleFunc
 
@@ -57,7 +57,7 @@ type Engine struct {
 // within the set obtained by applying the provided selector filter. The options allow customization of the parameters
 // related to the batch and retry logic.
 func New(log zerolog.Logger, metrics module.EngineMetrics, net network.EngineRegistry, me module.Local, state protocol.State,
-	channel channels.Channel, selector flow.IdentityFilter, create CreateFunc, options ...OptionFunc) (*Engine, error) {
+	channel channels.Channel, selector flow.IdentityFilter[flow.Identity], create CreateFunc, options ...OptionFunc) (*Engine, error) {
 
 	// initialize the default config
 	cfg := Config{
@@ -89,15 +89,16 @@ func New(log zerolog.Logger, metrics module.EngineMetrics, net network.EngineReg
 	// make sure we don't send requests from self
 	selector = filter.And(
 		selector,
-		filter.Not(filter.HasNodeID(me.NodeID())),
-		filter.Not(filter.Ejected),
+		filter.Not(filter.HasNodeID[flow.Identity](me.NodeID())),
+		filter.Not(filter.HasParticipationStatus(flow.EpochParticipationStatusEjected)),
 	)
 
-	// make sure we don't send requests to unauthorized nodes
+	// make sure we only send requests to nodes that are active in the current epoch and have positive weight
 	if cfg.ValidateStaking {
 		selector = filter.And(
 			selector,
-			filter.HasWeight(true),
+			filter.HasInitialWeight[flow.Identity](true),
+			filter.HasParticipationStatus(flow.EpochParticipationStatusActive),
 		)
 	}
 
@@ -133,9 +134,8 @@ func New(log zerolog.Logger, metrics module.EngineMetrics, net network.EngineReg
 // function. It is done in a separate call so that the requester can be injected
 // into engines upon construction, and then provide a handle function to the
 // requester from that engine itself.
-func (e *Engine) WithHandle(handle HandleFunc) *Engine {
+func (e *Engine) WithHandle(handle HandleFunc) {
 	e.handle = handle
-	return e
 }
 
 // Ready returns a ready channel that is closed once the engine has fully
@@ -201,7 +201,7 @@ func (e *Engine) Process(channel channels.Channel, originID flow.Identifier, mes
 // control over which subset of providers to request a given entity from, such as
 // selection of a collection cluster. Use `filter.Any` if no additional selection
 // is required. Checks integrity of response to make sure that we got entity that we were requesting.
-func (e *Engine) EntityByID(entityID flow.Identifier, selector flow.IdentityFilter) {
+func (e *Engine) EntityByID(entityID flow.Identifier, selector flow.IdentityFilter[flow.Identity]) {
 	e.addEntityRequest(entityID, selector, true)
 }
 
@@ -210,11 +210,11 @@ func (e *Engine) EntityByID(entityID flow.Identifier, selector flow.IdentityFilt
 // of valid providers for the data and allows finer-grained control
 // over which providers to request data from. Doesn't perform integrity check
 // can be used to get entities without knowing their ID.
-func (e *Engine) Query(key flow.Identifier, selector flow.IdentityFilter) {
+func (e *Engine) Query(key flow.Identifier, selector flow.IdentityFilter[flow.Identity]) {
 	e.addEntityRequest(key, selector, false)
 }
 
-func (e *Engine) addEntityRequest(entityID flow.Identifier, selector flow.IdentityFilter, checkIntegrity bool) {
+func (e *Engine) addEntityRequest(entityID flow.Identifier, selector flow.IdentityFilter[flow.Identity], checkIntegrity bool) {
 	e.unit.Lock()
 	defer e.unit.Unlock()
 
@@ -312,24 +312,11 @@ func (e *Engine) dispatchRequest() (bool, error) {
 		return false, fmt.Errorf("could not get providers: %w", err)
 	}
 
-	// randomize order of items, so that they can be requested in different order each time
-	rndItems := make([]flow.Identifier, 0, len(e.items))
-	for k := range e.items {
-		rndItems = append(rndItems, e.items[k].EntityID)
-	}
-	err = rand.Shuffle(uint(len(rndItems)), func(i, j uint) {
-		rndItems[i], rndItems[j] = rndItems[j], rndItems[i]
-	})
-	if err != nil {
-		return false, fmt.Errorf("shuffle failed: %w", err)
-	}
-
 	// go through each item and decide if it should be requested again
 	now := time.Now().UTC()
 	var providerID flow.Identifier
 	var entityIDs []flow.Identifier
-	for _, entityID := range rndItems {
-		item := e.items[entityID]
+	for entityID, item := range e.items {
 
 		// if the item should not be requested yet, ignore
 		cutoff := item.LastRequested.Add(item.RetryAfter)
@@ -349,7 +336,7 @@ func (e *Engine) dispatchRequest() (bool, error) {
 		// for now, so it will be part of the next batch request
 		if providerID != flow.ZeroID {
 			overlap := providers.Filter(filter.And(
-				filter.HasNodeID(providerID),
+				filter.HasNodeID[flow.Identity](providerID),
 				item.ExtraSelector,
 			))
 			if len(overlap) == 0 {
@@ -363,15 +350,18 @@ func (e *Engine) dispatchRequest() (bool, error) {
 		// order is random and will skip the item most of the times
 		// when other items are available
 		if providerID == flow.ZeroID {
-			providers = providers.Filter(item.ExtraSelector)
-			if len(providers) == 0 {
-				return false, fmt.Errorf("no valid providers available")
+			filteredProviders := providers.Filter(item.ExtraSelector)
+			if len(filteredProviders) == 0 {
+				return false, fmt.Errorf("no valid providers available for item %s, total providers: %v", entityID.String(), len(providers))
 			}
-			id, err := providers.Sample(1)
+			// ramdonly select a provider from the filtered set
+			// to send as many item requests as possible.
+			id, err := filteredProviders.Sample(1)
 			if err != nil {
 				return false, fmt.Errorf("sampling failed: %w", err)
 			}
 			providerID = id[0].NodeID
+			providers = filteredProviders
 		}
 
 		// add item to list and set retry parameters
@@ -486,7 +476,7 @@ func (e *Engine) onEntityResponse(originID flow.Identifier, res *messages.Entity
 		// check that the response comes from a valid provider
 		providers, err := e.state.Final().Identities(filter.And(
 			e.selector,
-			filter.HasNodeID(originID),
+			filter.HasNodeID[flow.Identity](originID),
 		))
 		if err != nil {
 			return fmt.Errorf("could not get providers: %w", err)

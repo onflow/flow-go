@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/onflow/cadence/runtime/common"
+	"github.com/onflow/crypto/hash"
 
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/meter"
@@ -103,10 +104,23 @@ func NewExecutionState(
 	snapshot snapshot.StorageSnapshot,
 	params StateParameters,
 ) *ExecutionState {
+	return NewExecutionStateWithSpockStateHasher(
+		snapshot,
+		params,
+		DefaultSpockSecretHasher,
+	)
+}
+
+// NewExecutionStateWithSpockStateHasher constructs a new state with a custom hasher
+func NewExecutionStateWithSpockStateHasher(
+	snapshot snapshot.StorageSnapshot,
+	params StateParameters,
+	getHasher func() hash.Hasher,
+) *ExecutionState {
 	m := meter.NewMeter(params.MeterParameters)
 	return &ExecutionState{
 		finalized:        false,
-		spockState:       newSpockState(snapshot),
+		spockState:       newSpockState(snapshot, getHasher),
 		meter:            m,
 		limitsController: newLimitsController(params),
 	}
@@ -206,6 +220,19 @@ func (state *ExecutionState) MeterComputation(kind common.ComputationKind, inten
 		return state.meter.MeterComputation(kind, intensity)
 	}
 	return nil
+}
+
+// ComputationAvailable checks if enough computation capacity is available without metering
+func (state *ExecutionState) ComputationAvailable(kind common.ComputationKind, intensity uint) bool {
+	if state.finalized {
+		// if state is finalized return false
+		return false
+	}
+
+	if state.enforceLimits {
+		return state.meter.ComputationAvailable(kind, intensity)
+	}
+	return true
 }
 
 // TotalComputationUsed returns total computation used

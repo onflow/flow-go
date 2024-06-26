@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	mempool "github.com/onflow/flow-go/module/mempool/mock"
 	module "github.com/onflow/flow-go/module/mock"
+	"github.com/onflow/flow-go/state"
 	realproto "github.com/onflow/flow-go/state/protocol"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	storerr "github.com/onflow/flow-go/storage"
@@ -257,6 +258,13 @@ func (bc *BaseChainSuite) SetupChain() {
 			return nil
 		},
 	)
+	bc.HeadersDB.On("Exists", mock.Anything).Return(
+		func(blockID flow.Identifier) bool {
+			_, found := bc.Blocks[blockID]
+			return found
+		},
+		func(blockID flow.Identifier) error { return nil },
+	)
 	bc.HeadersDB.On("ByHeight", mock.Anything).Return(
 		func(blockHeight uint64) *flow.Header {
 			for _, b := range bc.Blocks {
@@ -393,13 +401,13 @@ func (bc *BaseChainSuite) SetupChain() {
 func StateSnapshotForUnknownBlock() *protocol.Snapshot {
 	snapshot := &protocol.Snapshot{}
 	snapshot.On("Identity", mock.Anything).Return(
-		nil, storerr.ErrNotFound,
+		nil, state.ErrUnknownSnapshotReference,
 	)
 	snapshot.On("Identities", mock.Anything).Return(
-		nil, storerr.ErrNotFound,
+		nil, state.ErrUnknownSnapshotReference,
 	)
 	snapshot.On("Head", mock.Anything).Return(
-		nil, storerr.ErrNotFound,
+		nil, state.ErrUnknownSnapshotReference,
 	)
 	return snapshot
 }
@@ -419,7 +427,7 @@ func StateSnapshotForKnownBlock(block *flow.Header, identities map[flow.Identifi
 		},
 	)
 	snapshot.On("Identities", mock.Anything).Return(
-		func(selector flow.IdentityFilter) flow.IdentityList {
+		func(selector flow.IdentityFilter[flow.Identity]) flow.IdentityList {
 			var idts flow.IdentityList
 			for _, i := range identities {
 				if selector(i) {
@@ -428,7 +436,7 @@ func StateSnapshotForKnownBlock(block *flow.Header, identities map[flow.Identifi
 			}
 			return idts
 		},
-		func(selector flow.IdentityFilter) error {
+		func(selector flow.IdentityFilter[flow.Identity]) error {
 			return nil
 		},
 	)
@@ -474,7 +482,7 @@ type subgraphFixture struct {
 	Approvals          map[uint64]map[flow.Identifier]*flow.ResultApproval // chunkIndex -> Verifier Node ID -> Approval
 }
 
-// Generates a valid subgraph:
+// ValidSubgraphFixture generates a valid subgraph:
 // let
 //   - R1 be a result which pertains to blockA
 //   - R2 be R1's previous result,
@@ -565,7 +573,7 @@ func (bc *BaseChainSuite) Extend(block *flow.Block) {
 	}
 }
 
-// addSubgraphFixtureToMempools adds add entities in subgraph to mempools and persistent storage mocks
+// AddSubgraphFixtureToMempools adds entities in subgraph to mempools and persistent storage mocks
 func (bc *BaseChainSuite) AddSubgraphFixtureToMempools(subgraph subgraphFixture) {
 	bc.Blocks[subgraph.ParentBlock.ID()] = subgraph.ParentBlock
 	bc.Blocks[subgraph.Block.ID()] = subgraph.Block

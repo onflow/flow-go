@@ -27,10 +27,7 @@ func runGetSafetyData(*cobra.Command, []string) {
 		log.Fatal().Err(err).Msg("could not init protocol state")
 	}
 
-	rootBlock, err := state.Params().FinalizedRoot()
-	if err != nil {
-		log.Fatal().Err(err).Msgf("could not get root block")
-	}
+	rootBlock := state.Params().FinalizedRoot()
 
 	reader := NewHotstuffReader(db, rootBlock.ChainID)
 

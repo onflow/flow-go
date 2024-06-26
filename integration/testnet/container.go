@@ -11,7 +11,9 @@ import (
 	"github.com/dapperlabs/testingdock"
 	"github.com/dgraph-io/badger/v2"
 	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
 	"github.com/docker/go-connections/nat"
+	"github.com/onflow/crypto"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
@@ -21,7 +23,6 @@ import (
 	sdkclient "github.com/onflow/flow-go-sdk/access/grpc"
 
 	"github.com/onflow/flow-go/cmd/bootstrap/utils"
-	"github.com/onflow/flow-go/crypto"
 	ghostclient "github.com/onflow/flow-go/engine/ghost/client"
 	"github.com/onflow/flow-go/integration/client"
 	"github.com/onflow/flow-go/model/bootstrap"
@@ -287,7 +288,11 @@ func (c *Container) Pause() error {
 	ctx, cancel := context.WithTimeout(context.Background(), checkContainerTimeout)
 	defer cancel()
 
-	err := c.net.cli.ContainerStop(ctx, c.ID, &checkContainerTimeout)
+	timeout := int(checkContainerTimeout.Seconds())
+	err := c.net.cli.ContainerStop(ctx, c.ID,
+		container.StopOptions{
+			Timeout: &timeout,
+		})
 	if err != nil {
 		return fmt.Errorf("could not stop container with ID (%s): %w", c.ID, err)
 	}
@@ -390,7 +395,10 @@ func (c *Container) OpenState() (*state.State, error) {
 	qcs := storage.NewQuorumCertificates(metrics, db, storage.DefaultCacheSize)
 	setups := storage.NewEpochSetups(metrics, db)
 	commits := storage.NewEpochCommits(metrics, db)
-	statuses := storage.NewEpochStatuses(metrics, db)
+	protocolState := storage.NewEpochProtocolStateEntries(metrics, setups, commits, db,
+		storage.DefaultEpochProtocolStateCacheSize, storage.DefaultProtocolStateIndexCacheSize)
+	protocolKVStates := storage.NewProtocolKVStore(metrics, db,
+		storage.DefaultProtocolKVStoreCacheSize, storage.DefaultProtocolKVStoreByBlockIDCacheSize)
 	versionBeacons := storage.NewVersionBeacons(db)
 
 	return state.OpenState(
@@ -403,7 +411,8 @@ func (c *Container) OpenState() (*state.State, error) {
 		qcs,
 		setups,
 		commits,
-		statuses,
+		protocolState,
+		protocolKVStates,
 		versionBeacons,
 	)
 }
@@ -470,7 +479,12 @@ func (c *Container) SDKClient() (*sdkclient.Client, error) {
 		return nil, fmt.Errorf("container does not implement flow.access.AccessAPI")
 	}
 
-	return sdkclient.NewClient(c.Addr(GRPCPort), grpc.WithTransportCredentials(insecure.NewCredentials()))
+	return sdkclient.NewClient(
+		c.Addr(GRPCPort),
+		sdkclient.WithGRPCDialOptions(
+			grpc.WithTransportCredentials(insecure.NewCredentials()),
+		),
+	)
 }
 
 // GhostClient returns a ghostnode client that connects to this node.

@@ -9,13 +9,12 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/onflow/flow-go/engine/access/rest/util"
-
 	mocks "github.com/stretchr/testify/mock"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/access/mock"
+	"github.com/onflow/flow-go/engine/access/rest/util"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -39,7 +38,7 @@ func scriptReq(id string, height string, body interface{}) *http.Request {
 }
 
 func TestScripts(t *testing.T) {
-	validCode := []byte(`pub fun main(foo: String): String { return foo }`)
+	validCode := []byte(`access(all) fun main(foo: String): String { return foo }`)
 	validArgs := []byte(`{ "type": "String", "value": "hello world" }`)
 	validBody := map[string]interface{}{
 		"script":    util.ToBase64(validCode),

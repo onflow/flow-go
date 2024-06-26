@@ -4,6 +4,10 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/onflow/cadence"
+	"github.com/onflow/cadence/encoding/ccf"
+
+	"github.com/onflow/flow-go/model/events"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -16,28 +20,36 @@ const (
 
 	// DefaultMaxContracts is the default maximum number of contracts that can be specified in a filter
 	DefaultMaxContracts = 1000
+
+	// DefaultMaxAccountAddresses specifies limitation for possible number of accounts that could be used in filter
+	DefaultMaxAccountAddresses = 100
 )
 
 // EventFilterConfig is used to configure the limits for EventFilters
 type EventFilterConfig struct {
-	MaxEventTypes int
-	MaxAddresses  int
-	MaxContracts  int
+	MaxEventTypes     int
+	MaxAddresses      int
+	MaxContracts      int
+	MaxAccountAddress int
 }
 
 // DefaultEventFilterConfig is the default configuration for EventFilters
 var DefaultEventFilterConfig = EventFilterConfig{
-	MaxEventTypes: DefaultMaxEventTypes,
-	MaxAddresses:  DefaultMaxAddresses,
-	MaxContracts:  DefaultMaxContracts,
+	MaxEventTypes:     DefaultMaxEventTypes,
+	MaxAddresses:      DefaultMaxAddresses,
+	MaxContracts:      DefaultMaxContracts,
+	MaxAccountAddress: DefaultMaxAccountAddresses,
 }
+
+type FieldFilter map[string]map[string]struct{}
 
 // EventFilter represents a filter applied to events for a given subscription
 type EventFilter struct {
-	hasFilters bool
-	EventTypes map[flow.EventType]struct{}
-	Addresses  map[string]struct{}
-	Contracts  map[string]struct{}
+	hasFilters        bool
+	EventTypes        map[flow.EventType]struct{}
+	Addresses         map[string]struct{}
+	Contracts         map[string]struct{}
+	EventFieldFilters map[flow.EventType]FieldFilter
 }
 
 func NewEventFilter(
@@ -62,16 +74,17 @@ func NewEventFilter(
 	}
 
 	f := EventFilter{
-		EventTypes: make(map[flow.EventType]struct{}, len(eventTypes)),
-		Addresses:  make(map[string]struct{}, len(addresses)),
-		Contracts:  make(map[string]struct{}, len(contracts)),
+		EventTypes:        make(map[flow.EventType]struct{}, len(eventTypes)),
+		Addresses:         make(map[string]struct{}, len(addresses)),
+		Contracts:         make(map[string]struct{}, len(contracts)),
+		EventFieldFilters: make(map[flow.EventType]FieldFilter),
 	}
 
 	// Check all of the filters to ensure they are correctly formatted. This helps avoid searching
 	// with criteria that will never match.
 	for _, event := range eventTypes {
 		eventType := flow.EventType(event)
-		if err := validateEventType(eventType); err != nil {
+		if err := validateEventType(eventType, chain); err != nil {
 			return EventFilter{}, err
 		}
 		f.EventTypes[eventType] = struct{}{}
@@ -97,8 +110,7 @@ func NewEventFilter(
 	return f, nil
 }
 
-// Filter applies the all filters on the provided list of events, and returns a list of events that
-// match
+// Filter applies the all filters on the provided list of events, and returns a list of events that match
 func (f *EventFilter) Filter(events flow.EventsList) flow.EventsList {
 	var filteredEvents flow.EventsList
 	for _, event := range events {
@@ -116,11 +128,15 @@ func (f *EventFilter) Match(event flow.Event) bool {
 		return true
 	}
 
+	if fieldFilter, ok := f.EventFieldFilters[event.Type]; ok {
+		return f.matchFieldFilter(&event, fieldFilter)
+	}
+
 	if _, ok := f.EventTypes[event.Type]; ok {
 		return true
 	}
 
-	parsed, err := ParseEvent(event.Type)
+	parsed, err := events.ParseEvent(event.Type)
 	if err != nil {
 		// TODO: log this error
 		return false
@@ -130,7 +146,7 @@ func (f *EventFilter) Match(event flow.Event) bool {
 		return true
 	}
 
-	if parsed.Type == AccountEventType {
+	if parsed.Type == events.AccountEventType {
 		_, ok := f.Addresses[parsed.Address]
 		return ok
 	}
@@ -138,9 +154,61 @@ func (f *EventFilter) Match(event flow.Event) bool {
 	return false
 }
 
+// matchFieldFilter checks if the given event matches the specified field filters.
+// It returns true if the event matches any of the provided field filters, otherwise false.
+func (f *EventFilter) matchFieldFilter(event *flow.Event, fieldFilters FieldFilter) bool {
+	if len(fieldFilters) == 0 {
+		return true // empty list always matches
+	}
+
+	fields, err := getEventFields(event)
+	if err != nil {
+		return false
+	}
+
+	for name, value := range fields {
+		filters, ok := fieldFilters[name]
+		if !ok {
+			continue // no filter for this field
+		}
+
+		fieldValue := value.String()
+		if _, ok := filters[fieldValue]; ok {
+			return true
+		}
+	}
+
+	return false
+}
+
+// getEventFields extracts field values and field names from the payload of a flow event.
+// It decodes the event payload into a Cadence event, retrieves the field values and fields, and returns them.
+// Parameters:
+// - event: The Flow event to extract field values and field names from.
+// Returns:
+// - map[string]cadence.Value: A map containing name and value for each field extracted from the event payload.
+// - error: An error, if any, encountered during event decoding or if the fields are empty.
+func getEventFields(event *flow.Event) (map[string]cadence.Value, error) {
+	data, err := ccf.Decode(nil, event.Payload)
+	if err != nil {
+		return nil, err
+	}
+
+	cdcEvent, ok := data.(cadence.Event)
+	if !ok {
+		return nil, err
+	}
+
+	fields := cadence.FieldsMappedByName(cdcEvent)
+	if fields == nil {
+		return nil, fmt.Errorf("fields are empty")
+	}
+	return fields, nil
+}
+
 // validateEventType ensures that the event type matches the expected format
-func validateEventType(eventType flow.EventType) error {
-	_, err := ParseEvent(flow.EventType(eventType))
+func validateEventType(eventType flow.EventType, chain flow.Chain) error {
+	_, err := events.ValidateEvent(eventType, chain)
 	if err != nil {
 		return fmt.Errorf("invalid event type %s: %w", eventType, err)
 	}

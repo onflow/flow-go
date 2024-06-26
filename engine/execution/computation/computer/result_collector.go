@@ -6,12 +6,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/onflow/crypto"
+	"github.com/onflow/crypto/hash"
 	otelTrace "go.opentelemetry.io/otel/trace"
 
-	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/computation/result"
+	"github.com/onflow/flow-go/engine/execution/storehouse"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/meter"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
@@ -31,11 +32,12 @@ type ViewCommitter interface {
 	// CommitView commits an execution snapshot and collects proofs
 	CommitView(
 		*snapshot.ExecutionSnapshot,
-		flow.StateCommitment,
+		execution.ExtendableStorageSnapshot,
 	) (
-		flow.StateCommitment,
+		flow.StateCommitment, // TODO(leo): deprecate. see storehouse.ExtendableStorageSnapshot.Commitment()
 		[]byte,
 		*ledger.TrieUpdate,
+		execution.ExtendableStorageSnapshot,
 		error,
 	)
 }
@@ -76,12 +78,13 @@ type resultCollector struct {
 	spockSignatures []crypto.Signature
 
 	blockStartTime time.Time
-	blockStats     module.ExecutionResultStats
+	blockStats     module.BlockExecutionResultStats
 	blockMeter     *meter.Meter
 
-	currentCollectionStartTime time.Time
-	currentCollectionState     *state.ExecutionState
-	currentCollectionStats     module.ExecutionResultStats
+	currentCollectionStartTime       time.Time
+	currentCollectionState           *state.ExecutionState
+	currentCollectionStats           module.CollectionExecutionResultStats
+	currentCollectionStorageSnapshot execution.ExtendableStorageSnapshot
 }
 
 func newResultCollector(
@@ -97,6 +100,7 @@ func newResultCollector(
 	block *entity.ExecutableBlock,
 	numTransactions int,
 	consumers []result.ExecutedCollectionConsumer,
+	previousBlockSnapshot snapshot.StorageSnapshot,
 ) *resultCollector {
 	numCollections := len(block.Collections()) + 1
 	now := time.Now()
@@ -119,9 +123,11 @@ func newResultCollector(
 		blockMeter:                   meter.NewMeter(meter.DefaultParameters()),
 		currentCollectionStartTime:   now,
 		currentCollectionState:       state.NewExecutionState(nil, state.DefaultParameters()),
-		currentCollectionStats: module.ExecutionResultStats{
-			NumberOfCollections: 1,
-		},
+		currentCollectionStats:       module.CollectionExecutionResultStats{},
+		currentCollectionStorageSnapshot: storehouse.NewExecutingBlockSnapshot(
+			previousBlockSnapshot,
+			*block.StartState,
+		),
 	}
 
 	go collector.runResultProcessor()
@@ -138,13 +144,18 @@ func (collector *resultCollector) commitCollection(
 		collector.blockSpan,
 		trace.EXECommitDelta).End()
 
-	startState := collector.result.CurrentEndState()
-	endState, proof, trieUpdate, err := collector.committer.CommitView(
+	startState := collector.currentCollectionStorageSnapshot.Commitment()
+
+	_, proof, trieUpdate, newSnapshot, err := collector.committer.CommitView(
 		collectionExecutionSnapshot,
-		startState)
+		collector.currentCollectionStorageSnapshot,
+	)
 	if err != nil {
 		return fmt.Errorf("commit view failed: %w", err)
 	}
+
+	endState := newSnapshot.Commitment()
+	collector.currentCollectionStorageSnapshot = newSnapshot
 
 	execColRes := collector.result.CollectionExecutionResultAt(collection.collectionIndex)
 	execColRes.UpdateExecutionSnapshot(collectionExecutionSnapshot)
@@ -155,11 +166,15 @@ func (collector *resultCollector) commitCollection(
 		return fmt.Errorf("hash events failed: %w", err)
 	}
 
+	txResults := execColRes.TransactionResults()
+	convertedTxResults := execution_data.ConvertTransactionResults(txResults)
+
 	col := collection.Collection()
 	chunkExecData := &execution_data.ChunkExecutionData{
-		Collection: &col,
-		Events:     events,
-		TrieUpdate: trieUpdate,
+		Collection:         &col,
+		Events:             events,
+		TrieUpdate:         trieUpdate,
+		TransactionResults: convertedTxResults,
 	}
 
 	collector.result.AppendCollectionAttestationResult(
@@ -177,34 +192,23 @@ func (collector *resultCollector) commitCollection(
 	spock, err := collector.signer.SignFunc(
 		collectionExecutionSnapshot.SpockSecret,
 		collector.spockHasher,
-		SPOCKProve)
+		crypto.SPOCKProve)
 	if err != nil {
 		return fmt.Errorf("signing spock hash failed: %w", err)
 	}
 
 	collector.spockSignatures = append(collector.spockSignatures, spock)
 
-	collector.currentCollectionStats.EventCounts = len(events)
-	collector.currentCollectionStats.EventSize = events.ByteSize()
-	collector.currentCollectionStats.NumberOfRegistersTouched = len(
-		collectionExecutionSnapshot.AllRegisterIDs())
-	for _, entry := range collectionExecutionSnapshot.UpdatedRegisters() {
-		collector.currentCollectionStats.NumberOfBytesWrittenToRegisters += len(
-			entry.Value)
-	}
-
 	collector.metrics.ExecutionCollectionExecuted(
 		time.Since(startTime),
 		collector.currentCollectionStats)
 
-	collector.blockStats.Merge(collector.currentCollectionStats)
+	collector.blockStats.Add(collector.currentCollectionStats)
 	collector.blockMeter.MergeMeter(collectionExecutionSnapshot.Meter)
 
 	collector.currentCollectionStartTime = time.Now()
 	collector.currentCollectionState = state.NewExecutionState(nil, state.DefaultParameters())
-	collector.currentCollectionStats = module.ExecutionResultStats{
-		NumberOfCollections: 1,
-	}
+	collector.currentCollectionStats = module.CollectionExecutionResultStats{}
 
 	for _, consumer := range collector.consumers {
 		err = consumer.OnExecutedCollection(collector.result.CollectionExecutionResultAt(collection.collectionIndex))
@@ -227,6 +231,7 @@ func (collector *resultCollector) processTransactionResult(
 		Uint64("computation_used", output.ComputationUsed).
 		Uint64("memory_used", output.MemoryEstimate).
 		Int64("time_spent_in_ms", timeSpent.Milliseconds()).
+		Float64("normalized_time_per_computation", flow.NormalizedExecutionTimePerComputationUnit(timeSpent, output.ComputationUsed)).
 		Logger()
 
 	if output.Err != nil {
@@ -251,14 +256,12 @@ func (collector *resultCollector) processTransactionResult(
 		logger.Info().Msg("transaction executed successfully")
 	}
 
-	collector.metrics.ExecutionTransactionExecuted(
+	collector.handleTransactionExecutionMetrics(
 		timeSpent,
+		output,
+		txnExecutionSnapshot,
+		txn,
 		numConflictRetries,
-		output.ComputationUsed,
-		output.MemoryEstimate,
-		len(output.Events),
-		flow.EventsList(output.Events).ByteSize(),
-		output.Err != nil,
 	)
 
 	txnResult := flow.TransactionResult{
@@ -284,10 +287,6 @@ func (collector *resultCollector) processTransactionResult(
 		return fmt.Errorf("failed to merge into collection view: %w", err)
 	}
 
-	collector.currentCollectionStats.ComputationUsed += output.ComputationUsed
-	collector.currentCollectionStats.MemoryUsed += output.MemoryEstimate
-	collector.currentCollectionStats.NumberOfTransactions += 1
-
 	if !txn.lastTransactionInCollection {
 		return nil
 	}
@@ -296,6 +295,38 @@ func (collector *resultCollector) processTransactionResult(
 		txn.collectionInfo,
 		collector.currentCollectionStartTime,
 		collector.currentCollectionState.Finalize())
+}
+
+func (collector *resultCollector) handleTransactionExecutionMetrics(
+	timeSpent time.Duration,
+	output fvm.ProcedureOutput,
+	txnExecutionSnapshot *snapshot.ExecutionSnapshot,
+	txn TransactionRequest,
+	numConflictRetries int,
+) {
+	transactionExecutionStats := module.TransactionExecutionResultStats{
+		ExecutionResultStats: module.ExecutionResultStats{
+			ComputationUsed:          output.ComputationUsed,
+			MemoryUsed:               output.MemoryEstimate,
+			EventCounts:              len(output.Events),
+			EventSize:                output.Events.ByteSize(),
+			NumberOfRegistersTouched: len(txnExecutionSnapshot.AllRegisterIDs()),
+		},
+		ComputationIntensities:     output.ComputationIntensities,
+		NumberOfTxnConflictRetries: numConflictRetries,
+		Failed:                     output.Err != nil,
+		SystemTransaction:          txn.isSystemTransaction,
+	}
+	for _, entry := range txnExecutionSnapshot.UpdatedRegisters() {
+		transactionExecutionStats.NumberOfBytesWrittenToRegisters += len(entry.Value)
+	}
+
+	collector.metrics.ExecutionTransactionExecuted(
+		timeSpent,
+		transactionExecutionStats,
+	)
+
+	collector.currentCollectionStats.Add(transactionExecutionStats)
 }
 
 func (collector *resultCollector) AddTransactionResult(

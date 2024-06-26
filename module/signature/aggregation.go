@@ -1,14 +1,11 @@
-//go:build relic
-// +build relic
-
 package signature
 
 import (
 	"fmt"
 	"sync"
 
-	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/crypto/hash"
+	"github.com/onflow/crypto"
+	"github.com/onflow/crypto/hash"
 )
 
 // SignatureAggregatorSameMessage aggregates BLS signatures of the same message from different signers.

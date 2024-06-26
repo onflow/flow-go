@@ -1,4 +1,3 @@
-// (c) 2020 Dapper Labs - ALL RIGHTS RESERVED
 package committees
 
 import (
@@ -43,14 +42,14 @@ func (w CommitteeMetricsWrapper) IdentityByBlock(blockID flow.Identifier, partic
 	return identity, err
 }
 
-func (w CommitteeMetricsWrapper) IdentitiesByEpoch(view uint64) (flow.IdentityList, error) {
+func (w CommitteeMetricsWrapper) IdentitiesByEpoch(view uint64) (flow.IdentitySkeletonList, error) {
 	processStart := time.Now()
 	identities, err := w.committee.IdentitiesByEpoch(view)
 	w.metrics.CommitteeProcessingDuration(time.Since(processStart))
 	return identities, err
 }
 
-func (w CommitteeMetricsWrapper) IdentityByEpoch(view uint64, participantID flow.Identifier) (*flow.Identity, error) {
+func (w CommitteeMetricsWrapper) IdentityByEpoch(view uint64, participantID flow.Identifier) (*flow.IdentitySkeleton, error) {
 	processStart := time.Now()
 	identity, err := w.committee.IdentityByEpoch(view, participantID)
 	w.metrics.CommitteeProcessingDuration(time.Since(processStart))

@@ -9,58 +9,15 @@ import (
 	"github.com/onflow/atree"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/sema"
+	"github.com/onflow/crypto"
+	"github.com/onflow/crypto/hash"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/model/flow"
 )
-
-func TestAddEncodedAccountKey_error_handling_produces_valid_utf8(t *testing.T) {
-
-	akh := environment.NewAccountKeyUpdater(
-		tracing.NewTracerSpan(),
-		nil,
-		FakeAccounts{},
-		nil,
-		nil)
-
-	address := flow.BytesToAddress([]byte{1, 2, 3, 4})
-
-	// emulate encoded public key (which comes as a user input)
-	// containing bytes which are invalid UTF8
-
-	invalidEncodedKey := make([]byte, 64)
-	invalidUTF8 := []byte{0xc3, 0x28}
-	copy(invalidUTF8, invalidEncodedKey)
-	accountPublicKey := FakePublicKey{data: invalidEncodedKey}.toAccountPublicKey()
-
-	encodedPublicKey, err := flow.EncodeRuntimeAccountPublicKey(accountPublicKey)
-	require.NoError(t, err)
-
-	err = akh.InternalAddEncodedAccountKey(address, encodedPublicKey)
-	require.Error(t, err)
-
-	require.True(t, errors.IsValueError(err))
-
-	errorString := err.Error()
-	assert.True(t, utf8.ValidString(errorString))
-
-	// check if they can encoded and decoded using CBOR
-	marshalledBytes, err := cbor.Marshal(errorString)
-	require.NoError(t, err)
-
-	var unmarshalledString string
-
-	err = cbor.Unmarshal(marshalledBytes, &unmarshalledString)
-	require.NoError(t, err)
-
-	require.Equal(t, errorString, unmarshalledString)
-}
 
 func TestNewAccountKey_error_handling_produces_valid_utf8_and_sign_algo(t *testing.T) {
 
@@ -207,6 +164,9 @@ func (f FakeAccounts) GetPublicKey(address flow.Address, keyIndex uint64) (flow.
 
 func (f FakeAccounts) SetPublicKey(_ flow.Address, _ uint64, _ flow.AccountPublicKey) ([]byte, error) {
 	return nil, nil
+}
+func (f FakeAccounts) GetPublicKeys(address flow.Address) ([]flow.AccountPublicKey, error) {
+	return make([]flow.AccountPublicKey, f.keyCount), nil
 }
 func (f FakeAccounts) GetContractNames(_ flow.Address) ([]string, error)      { return nil, nil }
 func (f FakeAccounts) GetContract(_ string, _ flow.Address) ([]byte, error)   { return nil, nil }

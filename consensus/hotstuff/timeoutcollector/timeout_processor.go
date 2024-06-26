@@ -12,7 +12,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/tracker"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/module/signature"
 )
 
@@ -266,8 +265,8 @@ func (p *TimeoutProcessor) buildTC() (*flow.TimeoutCertificate, error) {
 	// we need to canonically order the respective `newestQCView`, so we can properly map signer to `newestQCView` after decoding.
 
 	// sort data in canonical order
-	slices.SortFunc(signersData, func(lhs, rhs hotstuff.TimeoutSignerInfo) bool {
-		return order.IdentifierCanonical(lhs.Signer, rhs.Signer)
+	slices.SortFunc(signersData, func(lhs, rhs hotstuff.TimeoutSignerInfo) int {
+		return flow.IdentifierCanonical(lhs.Signer, rhs.Signer)
 	})
 
 	// extract signers and data separately

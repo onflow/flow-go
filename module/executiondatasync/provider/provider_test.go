@@ -33,9 +33,9 @@ func getExecutionDataStore(ds datastore.Batching) execution_data.ExecutionDataSt
 	return execution_data.NewExecutionDataStore(blobs.NewBlobstore(ds), execution_data.DefaultSerializer)
 }
 
-func getBlobservice(ds datastore.Batching) network.BlobService {
+func getBlobservice(t *testing.T, ds datastore.Batching) network.BlobService {
 	blobstore := blobs.NewBlobstore(ds)
-	blobService := new(mocknetwork.BlobService)
+	blobService := mocknetwork.NewBlobService(t)
 	blobService.On("AddBlobs", mock.Anything, mock.AnythingOfType("[]blocks.Block")).Return(blobstore.PutMany)
 	return blobService
 }
@@ -78,7 +78,7 @@ func TestHappyPath(t *testing.T) {
 	t.Parallel()
 
 	ds := getDatastore()
-	provider := getProvider(getBlobservice(ds))
+	provider := getProvider(getBlobservice(t, ds))
 	store := getExecutionDataStore(ds)
 
 	test := func(numChunks int, minSerializedSizePerChunk uint64) {
@@ -103,11 +103,11 @@ func TestProvideContextCanceled(t *testing.T) {
 
 	bed := generateBlockExecutionData(t, 5, 5*execution_data.DefaultMaxBlobSize)
 
-	provider := getProvider(getBlobservice(getDatastore()))
+	provider := getProvider(getBlobservice(t, getDatastore()))
 	_, _, err := provider.Provide(context.Background(), 0, bed)
 	require.NoError(t, err)
 
-	blobService := new(mocknetwork.BlobService)
+	blobService := mocknetwork.NewBlobService(t)
 	blobService.On("AddBlobs", mock.Anything, mock.AnythingOfType("[]blocks.Block")).
 		Return(func(ctx context.Context, blobs []blobs.Blob) error {
 			<-ctx.Done()
@@ -144,24 +144,39 @@ func TestCalculateExecutionDataRootID(t *testing.T) {
 }
 
 // TestCalculateChunkExecutionDataID tests that CalculateChunkExecutionDataID calculates the correct ID given a static ChunkExecutionData
+// This is used to ensure library updates or modification to the provider do not change the ID calculation logic
 func TestCalculateChunkExecutionDataID(t *testing.T) {
 	t.Parallel()
 
 	rootHash, err := ledger.ToRootHash([]byte("0123456789acbdef0123456789acbdef"))
 	require.NoError(t, err)
 
-	expected := cid.MustParse("QmYSvEvCYCaMJXjCdWLzFYqMBzxgiE5GzEGQCKqHKM8KkP")
+	expected := cid.MustParse("QmWJsC7DTufdGijftpphuxZ6EbNsDar1knP2BnvgBaMf9n")
+
 	ced := execution_data.ChunkExecutionData{
 		Collection: &flow.Collection{
 			Transactions: []*flow.TransactionBody{
-				{Script: []byte("pub fun main() {}")},
+				{Script: []byte("access(all) fun main() {}")},
 			},
 		},
 		Events: []flow.Event{
-			unittest.EventFixture(flow.EventType("A.0123456789abcdef.SomeContract.SomeEvent"), 1, 2, flow.MustHexStringToIdentifier("95e0929839063afbe334a3d175bea0775cdf5d93f64299e369d16ce21aa423d3"), 0),
+			unittest.EventFixture(
+				"A.0123456789abcdef.SomeContract.SomeEvent",
+				1,
+				2,
+				flow.MustHexStringToIdentifier("95e0929839063afbe334a3d175bea0775cdf5d93f64299e369d16ce21aa423d3"),
+				0,
+			),
 		},
 		TrieUpdate: &ledger.TrieUpdate{
 			RootHash: rootHash,
+		},
+		TransactionResults: []flow.LightTransactionResult{
+			{
+				TransactionID:   flow.MustHexStringToIdentifier("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"),
+				ComputationUsed: 100,
+				Failed:          true,
+			},
 		},
 	}
 
@@ -169,5 +184,13 @@ func TestCalculateChunkExecutionDataID(t *testing.T) {
 	actual, err := cidProvider.CalculateChunkExecutionDataID(ced)
 	require.NoError(t, err)
 
-	assert.Equal(t, expected, actual)
+	// This can be used for updating the expected ID when the format is *intentionally* updated
+	t.Log(actual)
+
+	assert.Equal(t,
+		expected, actual,
+		"expected and actual CID do not match: expected %s, actual %s",
+		expected,
+		actual,
+	)
 }

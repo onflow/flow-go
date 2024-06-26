@@ -2,36 +2,37 @@ package connection
 
 import (
 	"context"
+	"crypto/rand"
 	"fmt"
+	"math/big"
 	"net"
-	"strconv"
-	"strings"
 	"sync"
 	"testing"
 	"time"
 
-	"github.com/sony/gobreaker"
-
-	"go.uber.org/atomic"
-	"pgregory.net/rapid"
-
-	lru "github.com/hashicorp/golang-lru"
+	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/flow/protobuf/go/flow/execution"
+	"github.com/sony/gobreaker"
 	"github.com/stretchr/testify/assert"
 	testifymock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/atomic"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/connectivity"
 	"google.golang.org/grpc/status"
+	"pgregory.net/rapid"
 
-	"github.com/onflow/flow-go/engine/access/mock"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/utils/grpcutils"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestProxyAccessAPI(t *testing.T) {
+	logger := unittest.Logger()
+	metrics := metrics.NewNoopCollector()
+
 	// create a collection node
 	cn := new(collectionNode)
 	cn.start(t)
@@ -46,13 +47,14 @@ func TestProxyAccessAPI(t *testing.T) {
 	// set the collection grpc port
 	connectionFactory.CollectionGRPCPort = cn.port
 	// set metrics reporting
-	connectionFactory.AccessMetrics = metrics.NewNoopCollector()
+	connectionFactory.AccessMetrics = metrics
 	connectionFactory.Manager = NewManager(
-		nil,
-		unittest.Logger(),
+		logger,
 		connectionFactory.AccessMetrics,
+		nil,
 		0,
 		CircuitBreakerConfig{},
+		grpcutils.NoCompressor,
 	)
 
 	proxyConnectionFactory := ProxyConnectionFactory{
@@ -61,7 +63,7 @@ func TestProxyAccessAPI(t *testing.T) {
 	}
 
 	// get a collection API client
-	client, conn, err := proxyConnectionFactory.GetAccessAPIClient("foo")
+	client, conn, err := proxyConnectionFactory.GetAccessAPIClient("foo", nil)
 	defer conn.Close()
 	assert.NoError(t, err)
 
@@ -73,6 +75,9 @@ func TestProxyAccessAPI(t *testing.T) {
 }
 
 func TestProxyExecutionAPI(t *testing.T) {
+	logger := unittest.Logger()
+	metrics := metrics.NewNoopCollector()
+
 	// create an execution node
 	en := new(executionNode)
 	en.start(t)
@@ -88,13 +93,14 @@ func TestProxyExecutionAPI(t *testing.T) {
 	connectionFactory.ExecutionGRPCPort = en.port
 
 	// set metrics reporting
-	connectionFactory.AccessMetrics = metrics.NewNoopCollector()
+	connectionFactory.AccessMetrics = metrics
 	connectionFactory.Manager = NewManager(
-		nil,
-		unittest.Logger(),
+		logger,
 		connectionFactory.AccessMetrics,
+		nil,
 		0,
 		CircuitBreakerConfig{},
+		grpcutils.NoCompressor,
 	)
 
 	proxyConnectionFactory := ProxyConnectionFactory{
@@ -114,6 +120,9 @@ func TestProxyExecutionAPI(t *testing.T) {
 }
 
 func TestProxyAccessAPIConnectionReuse(t *testing.T) {
+	logger := unittest.Logger()
+	metrics := metrics.NewNoopCollector()
+
 	// create a collection node
 	cn := new(collectionNode)
 	cn.start(t)
@@ -127,21 +136,21 @@ func TestProxyAccessAPIConnectionReuse(t *testing.T) {
 	connectionFactory := new(ConnectionFactoryImpl)
 	// set the collection grpc port
 	connectionFactory.CollectionGRPCPort = cn.port
+
 	// set the connection pool cache size
 	cacheSize := 1
-	cache, _ := lru.NewWithEvict(cacheSize, func(_, evictedValue interface{}) {
-		evictedValue.(*CachedClient).Close()
-	})
-	connectionCache := NewCache(cache, cacheSize)
+	connectionCache, err := NewCache(logger, metrics, cacheSize)
+	require.NoError(t, err)
 
 	// set metrics reporting
-	connectionFactory.AccessMetrics = metrics.NewNoopCollector()
+	connectionFactory.AccessMetrics = metrics
 	connectionFactory.Manager = NewManager(
-		connectionCache,
-		unittest.Logger(),
+		logger,
 		connectionFactory.AccessMetrics,
+		connectionCache,
 		0,
 		CircuitBreakerConfig{},
+		grpcutils.NoCompressor,
 	)
 
 	proxyConnectionFactory := ProxyConnectionFactory{
@@ -150,15 +159,15 @@ func TestProxyAccessAPIConnectionReuse(t *testing.T) {
 	}
 
 	// get a collection API client
-	_, closer, err := proxyConnectionFactory.GetAccessAPIClient("foo")
+	_, closer, err := proxyConnectionFactory.GetAccessAPIClient("foo", nil)
 	assert.Equal(t, connectionCache.Len(), 1)
 	assert.NoError(t, err)
 	assert.Nil(t, closer.Close())
 
 	var conn *grpc.ClientConn
-	res, ok := connectionCache.Get(proxyConnectionFactory.targetAddress)
+	res, ok := connectionCache.cache.Get(proxyConnectionFactory.targetAddress)
 	assert.True(t, ok)
-	conn = res.ClientConn
+	conn = res.ClientConn()
 
 	// check if api client can be rebuilt with retrieved connection
 	accessAPIClient := access.NewAccessAPIClient(conn)
@@ -169,6 +178,9 @@ func TestProxyAccessAPIConnectionReuse(t *testing.T) {
 }
 
 func TestProxyExecutionAPIConnectionReuse(t *testing.T) {
+	logger := unittest.Logger()
+	metrics := metrics.NewNoopCollector()
+
 	// create an execution node
 	en := new(executionNode)
 	en.start(t)
@@ -182,20 +194,21 @@ func TestProxyExecutionAPIConnectionReuse(t *testing.T) {
 	connectionFactory := new(ConnectionFactoryImpl)
 	// set the execution grpc port
 	connectionFactory.ExecutionGRPCPort = en.port
+
 	// set the connection pool cache size
 	cacheSize := 5
-	cache, _ := lru.NewWithEvict(cacheSize, func(_, evictedValue interface{}) {
-		evictedValue.(*CachedClient).Close()
-	})
-	connectionCache := NewCache(cache, cacheSize)
+	connectionCache, err := NewCache(logger, metrics, cacheSize)
+	require.NoError(t, err)
+
 	// set metrics reporting
-	connectionFactory.AccessMetrics = metrics.NewNoopCollector()
+	connectionFactory.AccessMetrics = metrics
 	connectionFactory.Manager = NewManager(
-		connectionCache,
-		unittest.Logger(),
+		logger,
 		connectionFactory.AccessMetrics,
+		connectionCache,
 		0,
 		CircuitBreakerConfig{},
+		grpcutils.NoCompressor,
 	)
 
 	proxyConnectionFactory := ProxyConnectionFactory{
@@ -210,9 +223,9 @@ func TestProxyExecutionAPIConnectionReuse(t *testing.T) {
 	assert.Nil(t, closer.Close())
 
 	var conn *grpc.ClientConn
-	res, ok := connectionCache.Get(proxyConnectionFactory.targetAddress)
+	res, ok := connectionCache.cache.Get(proxyConnectionFactory.targetAddress)
 	assert.True(t, ok)
-	conn = res.ClientConn
+	conn = res.ClientConn()
 
 	// check if api client can be rebuilt with retrieved connection
 	executionAPIClient := execution.NewExecutionAPIClient(conn)
@@ -224,6 +237,8 @@ func TestProxyExecutionAPIConnectionReuse(t *testing.T) {
 
 // TestExecutionNodeClientTimeout tests that the execution API client times out after the timeout duration
 func TestExecutionNodeClientTimeout(t *testing.T) {
+	logger := unittest.Logger()
+	metrics := metrics.NewNoopCollector()
 
 	timeout := 10 * time.Millisecond
 
@@ -243,20 +258,21 @@ func TestExecutionNodeClientTimeout(t *testing.T) {
 	connectionFactory.ExecutionGRPCPort = en.port
 	// set the execution grpc client timeout
 	connectionFactory.ExecutionNodeGRPCTimeout = timeout
+
 	// set the connection pool cache size
 	cacheSize := 5
-	cache, _ := lru.NewWithEvict(cacheSize, func(_, evictedValue interface{}) {
-		evictedValue.(*CachedClient).Close()
-	})
-	connectionCache := NewCache(cache, cacheSize)
+	connectionCache, err := NewCache(logger, metrics, cacheSize)
+	require.NoError(t, err)
+
 	// set metrics reporting
-	connectionFactory.AccessMetrics = metrics.NewNoopCollector()
+	connectionFactory.AccessMetrics = metrics
 	connectionFactory.Manager = NewManager(
-		connectionCache,
-		unittest.Logger(),
+		logger,
 		connectionFactory.AccessMetrics,
+		connectionCache,
 		0,
 		CircuitBreakerConfig{},
+		grpcutils.NoCompressor,
 	)
 
 	// create the execution API client
@@ -273,6 +289,8 @@ func TestExecutionNodeClientTimeout(t *testing.T) {
 
 // TestCollectionNodeClientTimeout tests that the collection API client times out after the timeout duration
 func TestCollectionNodeClientTimeout(t *testing.T) {
+	logger := unittest.Logger()
+	metrics := metrics.NewNoopCollector()
 
 	timeout := 10 * time.Millisecond
 
@@ -292,24 +310,25 @@ func TestCollectionNodeClientTimeout(t *testing.T) {
 	connectionFactory.CollectionGRPCPort = cn.port
 	// set the collection grpc client timeout
 	connectionFactory.CollectionNodeGRPCTimeout = timeout
+
 	// set the connection pool cache size
 	cacheSize := 5
-	cache, _ := lru.NewWithEvict(cacheSize, func(_, evictedValue interface{}) {
-		evictedValue.(*CachedClient).Close()
-	})
-	connectionCache := NewCache(cache, cacheSize)
+	connectionCache, err := NewCache(logger, metrics, cacheSize)
+	require.NoError(t, err)
+
 	// set metrics reporting
-	connectionFactory.AccessMetrics = metrics.NewNoopCollector()
+	connectionFactory.AccessMetrics = metrics
 	connectionFactory.Manager = NewManager(
-		connectionCache,
-		unittest.Logger(),
+		logger,
 		connectionFactory.AccessMetrics,
+		connectionCache,
 		0,
 		CircuitBreakerConfig{},
+		grpcutils.NoCompressor,
 	)
 
 	// create the collection API client
-	client, _, err := connectionFactory.GetAccessAPIClient(cn.listener.Addr().String())
+	client, _, err := connectionFactory.GetAccessAPIClient(cn.listener.Addr().String(), nil)
 	assert.NoError(t, err)
 
 	ctx := context.Background()
@@ -322,6 +341,9 @@ func TestCollectionNodeClientTimeout(t *testing.T) {
 
 // TestConnectionPoolFull tests that the LRU cache replaces connections when full
 func TestConnectionPoolFull(t *testing.T) {
+	logger := unittest.Logger()
+	metrics := metrics.NewNoopCollector()
+
 	// create a collection node
 	cn1, cn2, cn3 := new(collectionNode), new(collectionNode), new(collectionNode)
 	cn1.start(t)
@@ -341,20 +363,21 @@ func TestConnectionPoolFull(t *testing.T) {
 	connectionFactory := new(ConnectionFactoryImpl)
 	// set the collection grpc port
 	connectionFactory.CollectionGRPCPort = cn1.port
+
 	// set the connection pool cache size
 	cacheSize := 2
-	cache, _ := lru.NewWithEvict(cacheSize, func(_, evictedValue interface{}) {
-		evictedValue.(*CachedClient).Close()
-	})
-	connectionCache := NewCache(cache, cacheSize)
+	connectionCache, err := NewCache(logger, metrics, cacheSize)
+	require.NoError(t, err)
+
 	// set metrics reporting
-	connectionFactory.AccessMetrics = metrics.NewNoopCollector()
+	connectionFactory.AccessMetrics = metrics
 	connectionFactory.Manager = NewManager(
-		connectionCache,
-		unittest.Logger(),
+		logger,
 		connectionFactory.AccessMetrics,
+		connectionCache,
 		0,
 		CircuitBreakerConfig{},
+		grpcutils.NoCompressor,
 	)
 
 	cn1Address := "foo1:123"
@@ -363,47 +386,49 @@ func TestConnectionPoolFull(t *testing.T) {
 
 	// get a collection API client
 	// Create and add first client to cache
-	_, _, err := connectionFactory.GetAccessAPIClient(cn1Address)
+	_, _, err = connectionFactory.GetAccessAPIClient(cn1Address, nil)
 	assert.Equal(t, connectionCache.Len(), 1)
 	assert.NoError(t, err)
 
 	// Create and add second client to cache
-	_, _, err = connectionFactory.GetAccessAPIClient(cn2Address)
+	_, _, err = connectionFactory.GetAccessAPIClient(cn2Address, nil)
 	assert.Equal(t, connectionCache.Len(), 2)
 	assert.NoError(t, err)
 
-	// Peek first client from cache. "recently used"-ness will not be updated, so it will be wiped out first.
-	_, _, err = connectionFactory.GetAccessAPIClient(cn1Address)
+	// Get the first client from cache.
+	_, _, err = connectionFactory.GetAccessAPIClient(cn1Address, nil)
 	assert.Equal(t, connectionCache.Len(), 2)
 	assert.NoError(t, err)
 
-	// Create and add third client to cache, firs client will be removed from cache
-	_, _, err = connectionFactory.GetAccessAPIClient(cn3Address)
+	// Create and add third client to cache, second client will be removed from cache
+	_, _, err = connectionFactory.GetAccessAPIClient(cn3Address, nil)
 	assert.Equal(t, connectionCache.Len(), 2)
 	assert.NoError(t, err)
 
 	var hostnameOrIP string
+
 	hostnameOrIP, _, err = net.SplitHostPort(cn1Address)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	grpcAddress1 := fmt.Sprintf("%s:%d", hostnameOrIP, connectionFactory.CollectionGRPCPort)
+
 	hostnameOrIP, _, err = net.SplitHostPort(cn2Address)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	grpcAddress2 := fmt.Sprintf("%s:%d", hostnameOrIP, connectionFactory.CollectionGRPCPort)
+
 	hostnameOrIP, _, err = net.SplitHostPort(cn3Address)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	grpcAddress3 := fmt.Sprintf("%s:%d", hostnameOrIP, connectionFactory.CollectionGRPCPort)
 
-	contains1 := connectionCache.Contains(grpcAddress1)
-	contains2 := connectionCache.Contains(grpcAddress2)
-	contains3 := connectionCache.Contains(grpcAddress3)
-
-	assert.False(t, contains1)
-	assert.True(t, contains2)
-	assert.True(t, contains3)
+	assert.True(t, connectionCache.cache.Contains(grpcAddress1))
+	assert.False(t, connectionCache.cache.Contains(grpcAddress2))
+	assert.True(t, connectionCache.cache.Contains(grpcAddress3))
 }
 
 // TestConnectionPoolStale tests that a new connection will be established if the old one cached is stale
 func TestConnectionPoolStale(t *testing.T) {
+	logger := unittest.Logger()
+	metrics := metrics.NewNoopCollector()
+
 	// create a collection node
 	cn := new(collectionNode)
 	cn.start(t)
@@ -417,20 +442,21 @@ func TestConnectionPoolStale(t *testing.T) {
 	connectionFactory := new(ConnectionFactoryImpl)
 	// set the collection grpc port
 	connectionFactory.CollectionGRPCPort = cn.port
+
 	// set the connection pool cache size
 	cacheSize := 5
-	cache, _ := lru.NewWithEvict(cacheSize, func(_, evictedValue interface{}) {
-		evictedValue.(*CachedClient).Close()
-	})
-	connectionCache := NewCache(cache, cacheSize)
+	connectionCache, err := NewCache(logger, metrics, cacheSize)
+	require.NoError(t, err)
+
 	// set metrics reporting
-	connectionFactory.AccessMetrics = metrics.NewNoopCollector()
+	connectionFactory.AccessMetrics = metrics
 	connectionFactory.Manager = NewManager(
-		connectionCache,
-		unittest.Logger(),
+		logger,
 		connectionFactory.AccessMetrics,
+		connectionCache,
 		0,
 		CircuitBreakerConfig{},
+		grpcutils.NoCompressor,
 	)
 
 	proxyConnectionFactory := ProxyConnectionFactory{
@@ -439,14 +465,14 @@ func TestConnectionPoolStale(t *testing.T) {
 	}
 
 	// get a collection API client
-	client, _, err := proxyConnectionFactory.GetAccessAPIClient("foo")
+	client, _, err := proxyConnectionFactory.GetAccessAPIClient("foo", nil)
 	assert.Equal(t, connectionCache.Len(), 1)
 	assert.NoError(t, err)
 	// close connection to simulate something "going wrong" with our stored connection
-	res, _ := connectionCache.Get(proxyConnectionFactory.targetAddress)
+	cachedClient, _ := connectionCache.cache.Get(proxyConnectionFactory.targetAddress)
 
-	connectionCache.Remove(proxyConnectionFactory.targetAddress)
-	res.Close()
+	cachedClient.Invalidate()
+	cachedClient.Close()
 
 	ctx := context.Background()
 	// make the call to the collection node (should fail, connection closed)
@@ -454,13 +480,13 @@ func TestConnectionPoolStale(t *testing.T) {
 	assert.Error(t, err)
 
 	// re-access, should replace stale connection in cache with new one
-	_, _, _ = proxyConnectionFactory.GetAccessAPIClient("foo")
+	_, _, _ = proxyConnectionFactory.GetAccessAPIClient("foo", nil)
 	assert.Equal(t, connectionCache.Len(), 1)
 
 	var conn *grpc.ClientConn
-	res, ok := connectionCache.Get(proxyConnectionFactory.targetAddress)
+	res, ok := connectionCache.cache.Get(proxyConnectionFactory.targetAddress)
 	assert.True(t, ok)
-	conn = res.ClientConn
+	conn = res.ClientConn()
 
 	// check if api client can be rebuilt with retrieved connection
 	accessAPIClient := access.NewAccessAPIClient(conn)
@@ -478,6 +504,9 @@ func TestConnectionPoolStale(t *testing.T) {
 // - Wait for all goroutines to finish.
 // - Verify that the number of completed requests matches the number of sent responses.
 func TestExecutionNodeClientClosedGracefully(t *testing.T) {
+	logger := unittest.Logger()
+	metrics := metrics.NewNoopCollector()
+
 	// Add createExecNode function to recreate it each time for rapid test
 	createExecNode := func() (*executionNode, func()) {
 		en := new(executionNode)
@@ -488,7 +517,7 @@ func TestExecutionNodeClientClosedGracefully(t *testing.T) {
 	}
 
 	// Add rapid test, to check graceful close on different number of requests
-	rapid.Check(t, func(t *rapid.T) {
+	rapid.Check(t, func(tt *rapid.T) {
 		en, closer := createExecNode()
 		defer closer()
 
@@ -506,20 +535,21 @@ func TestExecutionNodeClientClosedGracefully(t *testing.T) {
 		connectionFactory.ExecutionGRPCPort = en.port
 		// set the execution grpc client timeout
 		connectionFactory.ExecutionNodeGRPCTimeout = time.Second
+
 		// set the connection pool cache size
 		cacheSize := 1
-		cache, _ := lru.NewWithEvict(cacheSize, func(_, evictedValue interface{}) {
-			evictedValue.(*CachedClient).Close()
-		})
-		connectionCache := NewCache(cache, cacheSize)
+		connectionCache, err := NewCache(logger, metrics, cacheSize)
+		require.NoError(t, err)
+
 		// set metrics reporting
-		connectionFactory.AccessMetrics = metrics.NewNoopCollector()
+		connectionFactory.AccessMetrics = metrics
 		connectionFactory.Manager = NewManager(
-			connectionCache,
-			unittest.Logger(),
+			logger,
 			connectionFactory.AccessMetrics,
+			connectionCache,
 			0,
 			CircuitBreakerConfig{},
+			grpcutils.NoCompressor,
 		)
 
 		clientAddress := en.listener.Addr().String()
@@ -530,7 +560,7 @@ func TestExecutionNodeClientClosedGracefully(t *testing.T) {
 		ctx := context.Background()
 
 		// Generate random number of requests
-		nofRequests := rapid.IntRange(10, 100).Draw(t, "nofRequests").(int)
+		nofRequests := rapid.IntRange(10, 100).Draw(tt, "nofRequests")
 		reqCompleted := atomic.NewUint64(0)
 
 		var waitGroup sync.WaitGroup
@@ -552,7 +582,7 @@ func TestExecutionNodeClientClosedGracefully(t *testing.T) {
 		}
 
 		// Close connection
-		connectionFactory.InvalidateExecutionAPIClient(clientAddress)
+		// connectionFactory.Manager.Remove(clientAddress)
 
 		waitGroup.Wait()
 
@@ -560,29 +590,43 @@ func TestExecutionNodeClientClosedGracefully(t *testing.T) {
 	})
 }
 
-// TestExecutionEvictingCacheClients tests the eviction of cached clients in the execution flow.
+// TestEvictingCacheClients tests the eviction of cached clients.
 // It verifies that when a client is evicted from the cache, subsequent requests are handled correctly.
 //
 // Test Steps:
-//   - Call the gRPC method Ping with a delayed response.
-//   - Invalidate the access API client during the Ping call and verify the expected behavior.
+//   - Call the gRPC method Ping
+//   - While the request is still in progress, remove the connection
 //   - Call the gRPC method GetNetworkParameters on the client immediately after eviction and assert the expected
 //     error response.
 //   - Wait for the client state to change from "Ready" to "Shutdown", indicating that the client connection was closed.
-func TestExecutionEvictingCacheClients(t *testing.T) {
+func TestEvictingCacheClients(t *testing.T) {
+	logger := unittest.Logger()
+	metrics := metrics.NewNoopCollector()
+
 	// Create a new collection node for testing
 	cn := new(collectionNode)
 	cn.start(t)
 	defer cn.stop(t)
 
+	// Channels used to synchronize test with grpc calls
+	startPing := make(chan struct{})      // notify Ping in progress
+	returnFromPing := make(chan struct{}) // notify OK to return from Ping
+
 	// Set up mock handlers for Ping and GetNetworkParameters
 	pingReq := &access.PingRequest{}
 	pingResp := &access.PingResponse{}
-	cn.handler.On("Ping", testifymock.Anything, pingReq).After(time.Second).Return(pingResp, nil)
+	cn.handler.On("Ping", testifymock.Anything, pingReq).Return(
+		func(context.Context, *access.PingRequest) *access.PingResponse {
+			close(startPing)
+			<-returnFromPing // keeps request open until returnFromPing is closed
+			return pingResp
+		},
+		func(context.Context, *access.PingRequest) error { return nil },
+	)
 
 	netReq := &access.GetNetworkParametersRequest{}
 	netResp := &access.GetNetworkParametersResponse{}
-	cn.handler.On("GetNetworkParameters", testifymock.Anything).Return(netResp, nil)
+	cn.handler.On("GetNetworkParameters", testifymock.Anything, netReq).Return(netResp, nil)
 
 	// Create the connection factory
 	connectionFactory := new(ConnectionFactoryImpl)
@@ -592,45 +636,66 @@ func TestExecutionEvictingCacheClients(t *testing.T) {
 	connectionFactory.CollectionNodeGRPCTimeout = 5 * time.Second
 	// Set the connection pool cache size
 	cacheSize := 1
-	cache, err := lru.New(cacheSize)
+
+	connectionCache, err := NewCache(logger, metrics, cacheSize)
 	require.NoError(t, err)
 
-	connectionCache := NewCache(cache, cacheSize)
+	// create a non-blocking cache
+	connectionCache.cache, err = lru.NewWithEvict[string, *CachedClient](cacheSize, func(_ string, client *CachedClient) {
+		go client.Close()
+	})
+	require.NoError(t, err)
+
 	// set metrics reporting
-	connectionFactory.AccessMetrics = metrics.NewNoopCollector()
+	connectionFactory.AccessMetrics = metrics
 	connectionFactory.Manager = NewManager(
-		connectionCache,
-		unittest.Logger(),
+		logger,
 		connectionFactory.AccessMetrics,
+		connectionCache,
 		0,
 		CircuitBreakerConfig{},
+		grpcutils.NoCompressor,
 	)
 
 	clientAddress := cn.listener.Addr().String()
 	// Create the execution API client
-	client, _, err := connectionFactory.GetAccessAPIClient(clientAddress)
+	client, _, err := connectionFactory.GetAccessAPIClient(clientAddress, nil)
 	require.NoError(t, err)
 
 	ctx := context.Background()
 
 	// Retrieve the cached client from the cache
-	result, _ := cache.Get(clientAddress)
-	cachedClient := result.(*CachedClient)
+	cachedClient, ok := connectionCache.cache.Get(clientAddress)
+	require.True(t, ok)
 
-	// Schedule the invalidation of the access API client after a delay
-	time.AfterFunc(250*time.Millisecond, func() {
+	// wait until the client connection is ready
+	require.Eventually(t, func() bool {
+		return cachedClient.ClientConn().GetState() == connectivity.Ready
+	}, 100*time.Millisecond, 10*time.Millisecond, "client timed out before ready")
+
+	// Schedule the invalidation of the access API client while the Ping call is in progress
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+
+		<-startPing // wait until Ping is called
+
 		// Invalidate the access API client
-		connectionFactory.InvalidateAccessAPIClient(clientAddress)
+		cachedClient.Invalidate()
 
-		// Assert that the cached client is marked for closure but still waiting for previous request
-		assert.True(t, cachedClient.closeRequested.Load())
-		assert.Equal(t, cachedClient.ClientConn.GetState(), connectivity.Ready)
+		// Invalidate marks the connection for closure asynchronously, so give it some time to run
+		require.Eventually(t, func() bool {
+			return cachedClient.closeRequested.Load()
+		}, 100*time.Millisecond, 10*time.Millisecond, "client timed out closing connection")
 
-		// Call a gRPC method on the client, that was already evicted
+		// Call a gRPC method on the client, requests should be blocked since the connection is invalidated
 		resp, err := client.GetNetworkParameters(ctx, netReq)
 		assert.Equal(t, status.Errorf(codes.Unavailable, "the connection to %s was closed", clientAddress), err)
 		assert.Nil(t, resp)
-	})
+
+		close(returnFromPing) // signal it's ok to return from Ping
+	}()
 
 	// Call a gRPC method on the client
 	_, err = client.Ping(ctx, pingReq)
@@ -639,14 +704,132 @@ func TestExecutionEvictingCacheClients(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Wait for the client connection to change state from "Ready" to "Shutdown" as connection was closed.
-	changed := cachedClient.ClientConn.WaitForStateChange(ctx, connectivity.Ready)
-	assert.True(t, changed)
-	assert.Equal(t, connectivity.Shutdown, cachedClient.ClientConn.GetState())
-	assert.Equal(t, 0, cache.Len())
+	require.Eventually(t, func() bool {
+		return cachedClient.ClientConn().WaitForStateChange(ctx, connectivity.Ready)
+	}, 100*time.Millisecond, 10*time.Millisecond, "client timed out transitioning state")
+
+	assert.Equal(t, connectivity.Shutdown, cachedClient.ClientConn().GetState())
+	assert.Equal(t, 0, connectionCache.Len())
+
+	wg.Wait() // wait until the move test routine is done
 }
 
-// TestCircuitBreakerExecutionNode tests the circuit breaker state changes for execution nodes.
+func TestConcurrentConnections(t *testing.T) {
+	logger := unittest.Logger()
+	metrics := metrics.NewNoopCollector()
+
+	// Add createExecNode function to recreate it each time for rapid test
+	createExecNode := func() (*executionNode, func()) {
+		en := new(executionNode)
+		en.start(t)
+		return en, func() {
+			en.stop(t)
+		}
+	}
+
+	// setup the handler mock
+	req := &execution.PingRequest{}
+	resp := &execution.PingResponse{}
+
+	// Note: rapid will randomly fail with an error: "group did not use any data from bitstream"
+	// See https://github.com/flyingmutant/rapid/issues/65
+	rapid.Check(t, func(tt *rapid.T) {
+		en, closer := createExecNode()
+		defer closer()
+
+		// Note: rapid does not support concurrent calls to Draw for a given T, so they must be serialized
+		mu := sync.Mutex{}
+		getSleep := func() time.Duration {
+			mu.Lock()
+			defer mu.Unlock()
+			return time.Duration(rapid.Int64Range(100, 10_000).Draw(tt, "s"))
+		}
+
+		requestCount := rapid.IntRange(50, 1000).Draw(tt, "r")
+		responsesSent := atomic.NewInt32(0)
+		en.handler.
+			On("Ping", testifymock.Anything, req).
+			Return(func(_ context.Context, _ *execution.PingRequest) (*execution.PingResponse, error) {
+				time.Sleep(getSleep() * time.Microsecond)
+
+				// randomly fail ~25% of the time to test that client connection and reuse logic
+				// handles concurrent connect/disconnects
+				fail, err := rand.Int(rand.Reader, big.NewInt(4))
+				require.NoError(tt, err)
+
+				if fail.Uint64()%4 == 0 {
+					err = status.Errorf(codes.Unavailable, "random error")
+				}
+
+				responsesSent.Inc()
+				return resp, err
+			})
+
+		connectionCache, err := NewCache(logger, metrics, 1)
+		require.NoError(tt, err)
+
+		connectionFactory := &ConnectionFactoryImpl{
+			ExecutionGRPCPort:        en.port,
+			ExecutionNodeGRPCTimeout: time.Second,
+			AccessMetrics:            metrics,
+			Manager: NewManager(
+				logger,
+				metrics,
+				connectionCache,
+				0,
+				CircuitBreakerConfig{},
+				grpcutils.NoCompressor,
+			),
+		}
+
+		clientAddress := en.listener.Addr().String()
+
+		ctx := context.Background()
+
+		// Generate random number of requests
+		var wg sync.WaitGroup
+		wg.Add(requestCount)
+
+		for i := 0; i < requestCount; i++ {
+			go func() {
+				defer wg.Done()
+
+				client, _, err := connectionFactory.GetExecutionAPIClient(clientAddress)
+				require.NoError(tt, err)
+
+				_, err = client.Ping(ctx, req)
+
+				if err != nil {
+					// Note: for some reason, when Unavailable is returned, the error message is
+					// changed to "the connection to 127.0.0.1:57753 was closed". Other error codes
+					// preserve the message.
+					require.Equalf(tt, codes.Unavailable, status.Code(err), "unexpected error: %v", err)
+				}
+			}()
+		}
+		wg.Wait()
+
+		// the grpc client seems to throttle requests to servers that return Unavailable, so not
+		// all of the requests make it through to the backend every test. Requiring that at least 1
+		// request is handled for these cases, but all should be handled in most runs.
+		assert.LessOrEqual(tt, responsesSent.Load(), int32(requestCount))
+		assert.Greater(tt, responsesSent.Load(), int32(0))
+	})
+}
+
+var successCodes = []codes.Code{
+	codes.Canceled,
+	codes.InvalidArgument,
+	codes.NotFound,
+	codes.Unimplemented,
+	codes.OutOfRange,
+}
+
+// TestCircuitBreakerExecutionNode tests the circuit breaker for execution nodes.
 func TestCircuitBreakerExecutionNode(t *testing.T) {
+	logger := unittest.Logger()
+	metrics := metrics.NewNoopCollector()
+
 	requestTimeout := 500 * time.Millisecond
 	circuitBreakerRestoreTimeout := 1500 * time.Millisecond
 
@@ -654,11 +837,6 @@ func TestCircuitBreakerExecutionNode(t *testing.T) {
 	en := new(executionNode)
 	en.start(t)
 	defer en.stop(t)
-
-	// Set up the handler mock to not respond within the requestTimeout.
-	req := &execution.PingRequest{}
-	resp := &execution.PingResponse{}
-	en.handler.On("Ping", testifymock.Anything, req).After(2*requestTimeout).Return(resp, nil)
 
 	// Create the connection factory.
 	connectionFactory := new(ConnectionFactoryImpl)
@@ -671,12 +849,13 @@ func TestCircuitBreakerExecutionNode(t *testing.T) {
 
 	// Set the connection pool cache size.
 	cacheSize := 1
-	connectionCache, _ := lru.New(cacheSize)
+	connectionCache, err := NewCache(logger, metrics, cacheSize)
+	require.NoError(t, err)
 
 	connectionFactory.Manager = NewManager(
-		NewCache(connectionCache, cacheSize),
-		unittest.Logger(),
+		logger,
 		connectionFactory.AccessMetrics,
+		connectionCache,
 		0,
 		CircuitBreakerConfig{
 			Enabled:        true,
@@ -684,19 +863,21 @@ func TestCircuitBreakerExecutionNode(t *testing.T) {
 			MaxRequests:    1,
 			RestoreTimeout: circuitBreakerRestoreTimeout,
 		},
+		grpcutils.NoCompressor,
 	)
 
 	// Set metrics reporting.
-	connectionFactory.AccessMetrics = metrics.NewNoopCollector()
+	connectionFactory.AccessMetrics = metrics
 
 	// Create the execution API client.
 	client, _, err := connectionFactory.GetExecutionAPIClient(en.listener.Addr().String())
 	require.NoError(t, err)
 
-	ctx := context.Background()
+	req := &execution.PingRequest{}
+	resp := &execution.PingResponse{}
 
 	// Helper function to make the Ping call to the execution node and measure the duration.
-	callAndMeasurePingDuration := func() (time.Duration, error) {
+	callAndMeasurePingDuration := func(ctx context.Context) (time.Duration, error) {
 		start := time.Now()
 
 		// Make the call to the execution node.
@@ -706,31 +887,55 @@ func TestCircuitBreakerExecutionNode(t *testing.T) {
 		return time.Since(start), err
 	}
 
-	// Call and measure the duration for the first invocation.
-	duration, err := callAndMeasurePingDuration()
-	assert.Equal(t, codes.DeadlineExceeded, status.Code(err))
-	assert.LessOrEqual(t, requestTimeout, duration)
+	t.Run("test different states of the circuit breaker", func(t *testing.T) {
+		ctx := context.Background()
 
-	// Call and measure the duration for the second invocation (circuit breaker state is now "Open").
-	duration, err = callAndMeasurePingDuration()
-	assert.Equal(t, gobreaker.ErrOpenState, err)
-	assert.Greater(t, requestTimeout, duration)
+		// Set up the handler mock to not respond within the requestTimeout.
+		en.handler.On("Ping", testifymock.Anything, req).After(2*requestTimeout).Return(resp, nil)
 
-	// Reset the mock Ping for the next invocation to return response without delay
-	en.handler.On("Ping", testifymock.Anything, req).Unset()
-	en.handler.On("Ping", testifymock.Anything, req).Return(resp, nil)
+		// Call and measure the duration for the first invocation.
+		duration, err := callAndMeasurePingDuration(ctx)
+		assert.Equal(t, codes.DeadlineExceeded, status.Code(err))
+		assert.LessOrEqual(t, requestTimeout, duration)
 
-	// Wait until the circuit breaker transitions to the "HalfOpen" state.
-	time.Sleep(circuitBreakerRestoreTimeout + (500 * time.Millisecond))
+		// Call and measure the duration for the second invocation (circuit breaker state is now "Open").
+		duration, err = callAndMeasurePingDuration(ctx)
+		assert.Equal(t, gobreaker.ErrOpenState, err)
+		assert.Greater(t, requestTimeout, duration)
 
-	// Call and measure the duration for the third invocation (circuit breaker state is now "HalfOpen").
-	duration, err = callAndMeasurePingDuration()
-	assert.Greater(t, requestTimeout, duration)
-	assert.Equal(t, nil, err)
+		// Reset the mock Ping for the next invocation to return response without delay
+		en.handler.On("Ping", testifymock.Anything, req).Unset()
+		en.handler.On("Ping", testifymock.Anything, req).Return(resp, nil)
+
+		// Wait until the circuit breaker transitions to the "HalfOpen" state.
+		time.Sleep(circuitBreakerRestoreTimeout + (500 * time.Millisecond))
+
+		// Call and measure the duration for the third invocation (circuit breaker state is now "HalfOpen").
+		duration, err = callAndMeasurePingDuration(ctx)
+		assert.Greater(t, requestTimeout, duration)
+		assert.Equal(t, nil, err)
+	})
+
+	for _, code := range successCodes {
+		t.Run(fmt.Sprintf("test error %s treated as a success for circuit breaker ", code.String()), func(t *testing.T) {
+			ctx := context.Background()
+
+			en.handler.On("Ping", testifymock.Anything, req).Unset()
+			en.handler.On("Ping", testifymock.Anything, req).Return(nil, status.Error(code, code.String()))
+
+			duration, err := callAndMeasurePingDuration(ctx)
+			require.Error(t, err)
+			require.Equal(t, code, status.Code(err))
+			require.Greater(t, requestTimeout, duration)
+		})
+	}
 }
 
-// TestCircuitBreakerCollectionNode tests the circuit breaker state changes for collection nodes.
+// TestCircuitBreakerCollectionNode tests the circuit breaker for collection nodes.
 func TestCircuitBreakerCollectionNode(t *testing.T) {
+	logger := unittest.Logger()
+	metrics := metrics.NewNoopCollector()
+
 	requestTimeout := 500 * time.Millisecond
 	circuitBreakerRestoreTimeout := 1500 * time.Millisecond
 
@@ -738,11 +943,6 @@ func TestCircuitBreakerCollectionNode(t *testing.T) {
 	cn := new(collectionNode)
 	cn.start(t)
 	defer cn.stop(t)
-
-	// Set up the handler mock to not respond within the requestTimeout.
-	req := &access.PingRequest{}
-	resp := &access.PingResponse{}
-	cn.handler.On("Ping", testifymock.Anything, req).After(2*requestTimeout).Return(resp, nil)
 
 	// Create the connection factory.
 	connectionFactory := new(ConnectionFactoryImpl)
@@ -755,12 +955,13 @@ func TestCircuitBreakerCollectionNode(t *testing.T) {
 
 	// Set the connection pool cache size.
 	cacheSize := 1
-	connectionCache, _ := lru.New(cacheSize)
+	connectionCache, err := NewCache(logger, metrics, cacheSize)
+	require.NoError(t, err)
 
 	connectionFactory.Manager = NewManager(
-		NewCache(connectionCache, cacheSize),
-		unittest.Logger(),
+		logger,
 		connectionFactory.AccessMetrics,
+		connectionCache,
 		0,
 		CircuitBreakerConfig{
 			Enabled:        true,
@@ -768,19 +969,21 @@ func TestCircuitBreakerCollectionNode(t *testing.T) {
 			MaxRequests:    1,
 			RestoreTimeout: circuitBreakerRestoreTimeout,
 		},
+		grpcutils.NoCompressor,
 	)
 
 	// Set metrics reporting.
-	connectionFactory.AccessMetrics = metrics.NewNoopCollector()
+	connectionFactory.AccessMetrics = metrics
 
 	// Create the collection API client.
-	client, _, err := connectionFactory.GetAccessAPIClient(cn.listener.Addr().String())
+	client, _, err := connectionFactory.GetAccessAPIClient(cn.listener.Addr().String(), nil)
 	assert.NoError(t, err)
 
-	ctx := context.Background()
+	req := &access.PingRequest{}
+	resp := &access.PingResponse{}
 
 	// Helper function to make the Ping call to the collection node and measure the duration.
-	callAndMeasurePingDuration := func() (time.Duration, error) {
+	callAndMeasurePingDuration := func(ctx context.Context) (time.Duration, error) {
 		start := time.Now()
 
 		// Make the call to the collection node.
@@ -790,101 +993,46 @@ func TestCircuitBreakerCollectionNode(t *testing.T) {
 		return time.Since(start), err
 	}
 
-	// Call and measure the duration for the first invocation.
-	duration, err := callAndMeasurePingDuration()
-	assert.Equal(t, codes.DeadlineExceeded, status.Code(err))
-	assert.LessOrEqual(t, requestTimeout, duration)
+	t.Run("test different states of the circuit breaker", func(t *testing.T) {
+		ctx := context.Background()
 
-	// Call and measure the duration for the second invocation (circuit breaker state is now "Open").
-	duration, err = callAndMeasurePingDuration()
-	assert.Equal(t, gobreaker.ErrOpenState, err)
-	assert.Greater(t, requestTimeout, duration)
+		// Set up the handler mock to not respond within the requestTimeout.
+		cn.handler.On("Ping", testifymock.Anything, req).After(2*requestTimeout).Return(resp, nil)
 
-	// Reset the mock Ping for the next invocation to return response without delay
-	cn.handler.On("Ping", testifymock.Anything, req).Unset()
-	cn.handler.On("Ping", testifymock.Anything, req).Return(resp, nil)
+		// Call and measure the duration for the first invocation.
+		duration, err := callAndMeasurePingDuration(ctx)
+		assert.Equal(t, codes.DeadlineExceeded, status.Code(err))
+		assert.LessOrEqual(t, requestTimeout, duration)
 
-	// Wait until the circuit breaker transitions to the "HalfOpen" state.
-	time.Sleep(circuitBreakerRestoreTimeout + (500 * time.Millisecond))
+		// Call and measure the duration for the second invocation (circuit breaker state is now "Open").
+		duration, err = callAndMeasurePingDuration(ctx)
+		assert.Equal(t, gobreaker.ErrOpenState, err)
+		assert.Greater(t, requestTimeout, duration)
 
-	// Call and measure the duration for the third invocation (circuit breaker state is now "HalfOpen").
-	duration, err = callAndMeasurePingDuration()
-	assert.Greater(t, requestTimeout, duration)
-	assert.Equal(t, nil, err)
-}
+		// Reset the mock Ping for the next invocation to return response without delay
+		cn.handler.On("Ping", testifymock.Anything, req).Unset()
+		cn.handler.On("Ping", testifymock.Anything, req).Return(resp, nil)
 
-// node mocks a flow node that runs a GRPC server
-type node struct {
-	server   *grpc.Server
-	listener net.Listener
-	port     uint
-}
+		// Wait until the circuit breaker transitions to the "HalfOpen" state.
+		time.Sleep(circuitBreakerRestoreTimeout + (500 * time.Millisecond))
 
-func (n *node) setupNode(t *testing.T) {
-	n.server = grpc.NewServer()
-	listener, err := net.Listen("tcp4", unittest.DefaultAddress)
-	assert.NoError(t, err)
-	n.listener = listener
-	assert.Eventually(t, func() bool {
-		return !strings.HasSuffix(listener.Addr().String(), ":0")
-	}, time.Second*4, 10*time.Millisecond)
+		// Call and measure the duration for the third invocation (circuit breaker state is now "HalfOpen").
+		duration, err = callAndMeasurePingDuration(ctx)
+		assert.Greater(t, requestTimeout, duration)
+		assert.Equal(t, nil, err)
+	})
 
-	_, port, err := net.SplitHostPort(listener.Addr().String())
-	assert.NoError(t, err)
-	portAsUint, err := strconv.ParseUint(port, 10, 32)
-	assert.NoError(t, err)
-	n.port = uint(portAsUint)
-}
+	for _, code := range successCodes {
+		t.Run(fmt.Sprintf("test error %s treated as a success for circuit breaker ", code.String()), func(t *testing.T) {
+			ctx := context.Background()
 
-func (n *node) start(t *testing.T) {
-	// using a wait group here to ensure the goroutine has started before returning. Otherwise,
-	// there's a race condition where the server is sometimes stopped before it has started
-	wg := sync.WaitGroup{}
-	wg.Add(1)
-	go func() {
-		wg.Done()
-		err := n.server.Serve(n.listener)
-		assert.NoError(t, err)
-	}()
-	unittest.RequireReturnsBefore(t, wg.Wait, 10*time.Millisecond, "could not start goroutine on time")
-}
+			cn.handler.On("Ping", testifymock.Anything, req).Unset()
+			cn.handler.On("Ping", testifymock.Anything, req).Return(nil, status.Error(code, code.String()))
 
-func (n *node) stop(t *testing.T) {
-	if n.server != nil {
-		n.server.Stop()
+			duration, err := callAndMeasurePingDuration(ctx)
+			require.Error(t, err)
+			require.Equal(t, code, status.Code(err))
+			require.Greater(t, requestTimeout, duration)
+		})
 	}
-}
-
-type executionNode struct {
-	node
-	handler *mock.ExecutionAPIServer
-}
-
-func (en *executionNode) start(t *testing.T) {
-	en.setupNode(t)
-	handler := new(mock.ExecutionAPIServer)
-	execution.RegisterExecutionAPIServer(en.server, handler)
-	en.handler = handler
-	en.node.start(t)
-}
-
-func (en *executionNode) stop(t *testing.T) {
-	en.node.stop(t)
-}
-
-type collectionNode struct {
-	node
-	handler *mock.AccessAPIServer
-}
-
-func (cn *collectionNode) start(t *testing.T) {
-	cn.setupNode(t)
-	handler := new(mock.AccessAPIServer)
-	access.RegisterAccessAPIServer(cn.server, handler)
-	cn.handler = handler
-	cn.node.start(t)
-}
-
-func (cn *collectionNode) stop(t *testing.T) {
-	cn.node.stop(t)
 }

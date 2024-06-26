@@ -3,17 +3,18 @@ package local
 import (
 	"fmt"
 
-	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/crypto/hash"
+	"github.com/onflow/crypto"
+	"github.com/onflow/crypto/hash"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 )
 
 type LocalNoKey struct {
-	me *flow.Identity
+	me flow.IdentitySkeleton
 }
 
-func NewNoKey(id *flow.Identity) (*LocalNoKey, error) {
+func NewNoKey(id flow.IdentitySkeleton) (*LocalNoKey, error) {
 	l := &LocalNoKey{
 		me: id,
 	}
@@ -32,8 +33,8 @@ func (l *LocalNoKey) Sign(msg []byte, hasher hash.Hasher) (crypto.Signature, err
 	return nil, fmt.Errorf("no private key")
 }
 
-func (l *LocalNoKey) NotMeFilter() flow.IdentityFilter {
-	return filter.Not(filter.HasNodeID(l.NodeID()))
+func (l *LocalNoKey) NotMeFilter() flow.IdentityFilter[flow.Identity] {
+	return filter.Not(filter.HasNodeID[flow.Identity](l.NodeID()))
 }
 
 // SignFunc provides a signature oracle that given a message, a hasher, and a signing function, it

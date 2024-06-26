@@ -8,13 +8,15 @@ on:
   push:
     paths:
       - '.github/workflows/flaky-test-monitor.yml'
-      - '.github/workflows/ci.yml'
+permissions:
+  id-token: write
+  contents: read
 
 env:
-  BIGQUERY_DATASET: production_src_flow_test_metrics
+  BIGQUERY_DATASET: dev_src_flow_test_metrics
   BIGQUERY_TABLE: skipped_tests
   BIGQUERY_TABLE2: test_results
-  GO_VERSION: "1.20"
+  GO_VERSION: "1.22"
   SKIPPED_TESTS_FILE: skipped-tests
   RESULTS_FILE: test-results
   COMMIT_SHA: ${{ github.sha }}
@@ -37,7 +39,7 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v3
       - name: Setup Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v4
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
@@ -58,7 +60,7 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v3
       - name: Setup Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v4
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
@@ -74,7 +76,8 @@ jobs:
           TEST_CATEGORY: unit
         uses: ./.github/workflows/actions/test-monitor-process-results
         with:
-          gcp_sa_key: ${{ secrets.GCP_SA_KEY }}
+          service_account: ${{ secrets.FLAKY_TEST_SERVICE_ACCOUNT }} 
+          workload_identity_provider: ${{ secrets.FLAKY_TEST_WORKLOAD_IDENTITY_PROVIDER }}
 
   unit-test-modules:
     name: Unit Tests (Modules)
@@ -83,18 +86,15 @@ jobs:
       matrix:
         include:
           - name: crypto
-            make1: -C crypto setup
-            make2: unittest
+            setup: noop
             race: 1
             test_category: unit-crypto
           - name: insecure
-            make1: install-tools
-            make2: test
+            setup: install-tools
             race: 0
             test_category: unit-insecure
           - name: integration
-            make1: install-tools
-            make2: test
+            setup: install-tools
             race: 0
             test_category: unit-integration
     runs-on: ubuntu-latest
@@ -102,16 +102,16 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v3
       - name: Setup Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v4
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
       - name: Setup tests (${{ matrix.name }})
-        run: make ${{ matrix.make1 }}
+        run: make ${{ matrix.setup }}
       - name: Run tests (${{ matrix.name }})
         env:
           RACE_DETECTOR: ${{ matrix.race }}
-        run: make -es -C ${{ matrix.name }} ${{ matrix.make2 }} > test-output
+        run: make -es -C ${{ matrix.name }} test > test-output
         timeout-minutes: 100
         continue-on-error: true
       - name: Process test results (${{ matrix.name }})
@@ -119,7 +119,8 @@ jobs:
           TEST_CATEGORY: ${{ matrix.test_category }}
         uses: ./.github/workflows/actions/test-monitor-process-results
         with:
-          gcp_sa_key: ${{ secrets.GCP_SA_KEY }}
+          service_account: ${{ secrets.FLAKY_TEST_SERVICE_ACCOUNT }} 
+          workload_identity_provider: ${{ secrets.FLAKY_TEST_WORKLOAD_IDENTITY_PROVIDER }}
 
   integration-test:
     name: Integration Tests
@@ -164,14 +165,12 @@ jobs:
           # all tags are needed for integration tests
           fetch-depth: 0
       - name: Setup Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v4
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
-      - name: Build relic
-        run: make crypto_setup_gopath
       - name: Docker build
-        run: make docker-build-flow docker-build-flow-corrupt
+        run: make docker-native-build-flow docker-native-build-flow-corrupt
       - name: Run tests
         run: make -es -C integration ${{ matrix.target }} > test-output
         timeout-minutes: 100
@@ -181,4 +180,6 @@ jobs:
           TEST_CATEGORY: ${{ matrix.test_category }}
         uses: ./.github/workflows/actions/test-monitor-process-results
         with:
-          gcp_sa_key: ${{ secrets.GCP_SA_KEY }}
+          service_account: ${{ secrets.FLAKY_TEST_SERVICE_ACCOUNT }} 
+          workload_identity_provider: ${{ secrets.FLAKY_TEST_WORKLOAD_IDENTITY_PROVIDER }}
+

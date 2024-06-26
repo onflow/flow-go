@@ -4,6 +4,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	"github.com/onflow/flow-go/model/flow"
 )
 
 func Test_GetAccountKey_InvalidParse(t *testing.T) {
@@ -39,9 +41,10 @@ func Test_GetAccountKey_InvalidParse(t *testing.T) {
 		},
 	}
 
+	chain := flow.Localnet.Chain()
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			err := getAccountKey.Parse(test.address, test.index, test.height)
+			err := getAccountKey.Parse(test.address, test.index, test.height, chain)
 			assert.EqualError(t, err, test.err)
 		})
 	}
@@ -53,25 +56,26 @@ func Test_GetAccountKey_ValidParse(t *testing.T) {
 	addr := "f8d6e0586b0a20c7"
 	keyIndex := "5"
 	height := "100"
-	err := getAccountKey.Parse(addr, keyIndex, height)
+	chain := flow.Localnet.Chain()
+	err := getAccountKey.Parse(addr, keyIndex, height, chain)
 	assert.NoError(t, err)
 	assert.Equal(t, getAccountKey.Address.String(), addr)
 	assert.Equal(t, getAccountKey.Index, uint64(5))
 	assert.Equal(t, getAccountKey.Height, uint64(100))
 
-	err = getAccountKey.Parse(addr, keyIndex, "")
+	err = getAccountKey.Parse(addr, keyIndex, "", chain)
 	assert.NoError(t, err)
 	assert.Equal(t, getAccountKey.Address.String(), addr)
 	assert.Equal(t, getAccountKey.Index, uint64(5))
 	assert.Equal(t, getAccountKey.Height, SealedHeight)
 
-	err = getAccountKey.Parse(addr, keyIndex, "sealed")
+	err = getAccountKey.Parse(addr, keyIndex, "sealed", chain)
 	assert.NoError(t, err)
 	assert.Equal(t, getAccountKey.Address.String(), addr)
 	assert.Equal(t, getAccountKey.Index, uint64(5))
 	assert.Equal(t, getAccountKey.Height, SealedHeight)
 
-	err = getAccountKey.Parse(addr, keyIndex, "final")
+	err = getAccountKey.Parse(addr, keyIndex, "final", chain)
 	assert.NoError(t, err)
 	assert.Equal(t, getAccountKey.Address.String(), addr)
 	assert.Equal(t, getAccountKey.Index, uint64(5))

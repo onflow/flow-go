@@ -1,5 +1,3 @@
-// (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
-
 package synchronization
 
 import (
@@ -42,7 +40,7 @@ type Engine struct {
 	log          zerolog.Logger
 	metrics      module.EngineMetrics
 	me           module.Local
-	participants flow.IdentityList
+	participants flow.IdentitySkeletonList
 	con          network.Conduit
 	comp         collection.Compliance // compliance layer engine
 
@@ -64,7 +62,7 @@ func New(
 	metrics module.EngineMetrics,
 	net network.EngineRegistry,
 	me module.Local,
-	participants flow.IdentityList,
+	participants flow.IdentitySkeletonList,
 	state cluster.State,
 	blocks storage.ClusterBlocks,
 	comp collection.Compliance,
@@ -88,7 +86,7 @@ func New(
 		log:          log.With().Str("engine", "cluster_synchronization").Logger(),
 		metrics:      metrics,
 		me:           me,
-		participants: participants.Filter(filter.Not(filter.HasNodeID(me.NodeID()))),
+		participants: participants.Filter(filter.Not(filter.HasNodeID[flow.IdentitySkeleton](me.NodeID()))),
 		comp:         comp,
 		core:         core,
 		pollInterval: opt.PollInterval,
@@ -100,11 +98,7 @@ func New(
 	if err != nil {
 		return nil, fmt.Errorf("could not setup message handler")
 	}
-
-	chainID, err := state.Params().ChainID()
-	if err != nil {
-		return nil, fmt.Errorf("could not get chain ID: %w", err)
-	}
+	chainID := state.Params().ChainID()
 
 	// register the engine with the network layer and store the conduit
 	con, err := net.Register(channels.SyncCluster(chainID), e)

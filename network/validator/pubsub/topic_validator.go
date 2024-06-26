@@ -12,7 +12,7 @@ import (
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p"
-	"github.com/onflow/flow-go/network/p2p/p2plogging"
+	p2plogging "github.com/onflow/flow-go/network/p2p/logging"
 	"github.com/onflow/flow-go/network/validator"
 	_ "github.com/onflow/flow-go/utils/binstat"
 	"github.com/onflow/flow-go/utils/logging"
@@ -73,9 +73,9 @@ func TopicValidator(log zerolog.Logger, peerFilter func(peer.ID) error, validato
 	return func(ctx context.Context, receivedFrom peer.ID, rawMsg *pubsub.Message) p2p.ValidationResult {
 		var msg message.Message
 		// convert the incoming raw message payload to Message type
-		//bs := binstat.EnterTimeVal(binstat.BinNet+":wire>1protobuf2message", int64(len(rawMsg.Data)))
+		// bs := binstat.EnterTimeVal(binstat.BinNet+":wire>1protobuf2message", int64(len(rawMsg.Data)))
 		err := msg.Unmarshal(rawMsg.Data)
-		//binstat.Leave(bs)
+		// binstat.Leave(bs)
 		if err != nil {
 			return p2p.ValidationReject
 		}

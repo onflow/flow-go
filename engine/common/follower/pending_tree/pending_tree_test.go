@@ -154,8 +154,8 @@ func (s *PendingTreeSuite) TestBatchWithSkipsAndInRandomOrder() {
 	require.NoError(s.T(), err)
 
 	// restore view based order since that's what we will get from PendingTree
-	slices.SortFunc(blocks, func(lhs flow.CertifiedBlock, rhs flow.CertifiedBlock) bool {
-		return lhs.View() < rhs.View()
+	slices.SortFunc(blocks, func(lhs flow.CertifiedBlock, rhs flow.CertifiedBlock) int {
+		return int(lhs.View()) - int(rhs.View())
 	})
 
 	assert.Equal(s.T(), blocks, connectedBlocks)

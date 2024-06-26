@@ -17,6 +17,10 @@ type EpochJoinAndLeaveSNSuite struct {
 	epochs.DynamicEpochTransitionSuite
 }
 
+func (s *EpochJoinAndLeaveSNSuite) SetupTest() {
+	s.DynamicEpochTransitionSuite.SetupTest()
+}
+
 // TestEpochJoinAndLeaveSN should update consensus nodes and assert healthy network conditions
 // after the epoch transition completes. See health check function for details.
 func (s *EpochJoinAndLeaveSNSuite) TestEpochJoinAndLeaveSN() {

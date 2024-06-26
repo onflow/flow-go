@@ -73,7 +73,16 @@ func (s *Suite) TestEpochQuorumCertificate() {
 		address, err := s.emulatorClient.CreateAccount([]*sdk.AccountKey{key}, []sdktemplates.Contract{})
 		s.Require().NoError(err)
 
-		client := epochs.NewQCContractClient(zerolog.Nop(), s.emulatorClient, flow.ZeroID, nodeID, address.String(), 0, s.qcAddress.String(), signer)
+		client := epochs.NewQCContractClient(
+			zerolog.Nop(),
+			s.emulatorClient,
+			flow.ZeroID,
+			nodeID,
+			address.String(),
+			0,
+			s.qcAddress.String(),
+			signer,
+		)
 		s.Require().NoError(err)
 
 		local := &modulemock.Local{}

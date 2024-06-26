@@ -7,11 +7,14 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 )
 
-// Distributor distributes events to a list of subscribers.
+// Distributor implements the `protocol.Consumer` interface for ingesting notifications emitted
+// by the protocol state. It distributes the notifications to all registered consumers.
 type Distributor struct {
 	subscribers []protocol.Consumer
 	mu          sync.RWMutex
 }
+
+var _ protocol.Consumer = (*Distributor)(nil)
 
 // NewDistributor returns a new events distributor.
 func NewDistributor() *Distributor {

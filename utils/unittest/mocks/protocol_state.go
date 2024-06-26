@@ -42,40 +42,40 @@ type Params struct {
 	state *ProtocolState
 }
 
-func (p *Params) ChainID() (flow.ChainID, error) {
-	return p.state.root.Header.ChainID, nil
+func (p *Params) ChainID() flow.ChainID {
+	return p.state.root.Header.ChainID
 }
 
-func (p *Params) SporkID() (flow.Identifier, error) {
-	return flow.ZeroID, fmt.Errorf("not implemented")
+func (p *Params) SporkID() flow.Identifier {
+	return flow.ZeroID
 }
 
-func (p *Params) SporkRootBlockHeight() (uint64, error) {
-	return 0, fmt.Errorf("not implemented")
+func (p *Params) SporkRootBlockHeight() uint64 {
+	return 0
 }
 
-func (p *Params) ProtocolVersion() (uint, error) {
-	return 0, fmt.Errorf("not implemented")
+func (p *Params) ProtocolVersion() uint {
+	return 0
 }
 
-func (p *Params) EpochCommitSafetyThreshold() (uint64, error) {
-	return 0, fmt.Errorf("not implemented")
+func (p *Params) EpochCommitSafetyThreshold() uint64 {
+	return 0
 }
 
 func (p *Params) EpochFallbackTriggered() (bool, error) {
 	return false, fmt.Errorf("not implemented")
 }
 
-func (p *Params) FinalizedRoot() (*flow.Header, error) {
-	return p.state.root.Header, nil
+func (p *Params) FinalizedRoot() *flow.Header {
+	return p.state.root.Header
 }
 
-func (p *Params) SealedRoot() (*flow.Header, error) {
+func (p *Params) SealedRoot() *flow.Header {
 	return p.FinalizedRoot()
 }
 
-func (p *Params) Seal() (*flow.Seal, error) {
-	return nil, fmt.Errorf("not implemented")
+func (p *Params) Seal() *flow.Seal {
+	return nil
 }
 
 func (ps *ProtocolState) Params() protocol.Params {
@@ -106,6 +106,12 @@ func (ps *ProtocolState) AtHeight(height uint64) protocol.Snapshot {
 	block, ok := ps.heights[height]
 	if ok {
 		snapshot.On("Head").Return(block.Header, nil)
+		mocked := snapshot.On("Descendants")
+		mocked.RunFn = func(args mock.Arguments) {
+			pendings := pending(ps, block.Header.ID())
+			mocked.ReturnArguments = mock.Arguments{pendings, nil}
+		}
+
 	} else {
 		snapshot.On("Head").Return(nil, storage.ErrNotFound)
 	}

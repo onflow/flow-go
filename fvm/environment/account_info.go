@@ -15,12 +15,13 @@ import (
 // AccountInfo exposes various account balance and storage statistics.
 type AccountInfo interface {
 	// Cadence's runtime APIs.
-	GetStorageUsed(runtimeaddress common.Address) (uint64, error)
+	GetStorageUsed(runtimeAddress common.Address) (uint64, error)
 	GetStorageCapacity(runtimeAddress common.Address) (uint64, error)
 	GetAccountBalance(runtimeAddress common.Address) (uint64, error)
 	GetAccountAvailableBalance(runtimeAddress common.Address) (uint64, error)
 
 	GetAccount(address flow.Address) (*flow.Account, error)
+	GetAccountKeys(address flow.Address) ([]flow.AccountPublicKey, error)
 }
 
 type ParseRestrictedAccountInfo struct {
@@ -103,6 +104,19 @@ func (info ParseRestrictedAccountInfo) GetAccount(
 		address)
 }
 
+func (info ParseRestrictedAccountInfo) GetAccountKeys(
+	address flow.Address,
+) (
+	[]flow.AccountPublicKey,
+	error,
+) {
+	return parseRestrict1Arg1Ret(
+		info.txnState,
+		trace.FVMEnvGetAccountKeys,
+		info.impl.GetAccountKeys,
+		address)
+}
+
 type accountInfo struct {
 	tracer tracing.TracerSpan
 	meter  Meter
@@ -152,11 +166,11 @@ func (info *accountInfo) GetStorageUsed(
 }
 
 // StorageMBUFixToBytesUInt converts the return type of storage capacity which
-// is a UFix64 with the unit of megabytes to UInt with the unit of bytes
+// is a UFix64 with the unit of megabytes to UInt with the unit of bytes.
 func StorageMBUFixToBytesUInt(result cadence.Value) uint64 {
 	// Divide the unsigned int by (1e8 (the scale of Fix64) / 1e6 (for mega))
 	// to get bytes (rounded down)
-	return result.ToGoValue().(uint64) / 100
+	return uint64(result.(cadence.UFix64) / 100)
 }
 
 func (info *accountInfo) GetStorageCapacity(
@@ -197,12 +211,12 @@ func (info *accountInfo) GetAccountBalance(
 		return 0, fmt.Errorf("get account balance failed: %w", err)
 	}
 
-	result, invokeErr := info.systemContracts.AccountBalance(
-		flow.ConvertAddress(runtimeAddress))
+	result, invokeErr := info.systemContracts.AccountBalance(flow.ConvertAddress(runtimeAddress))
 	if invokeErr != nil {
 		return 0, invokeErr
 	}
-	return result.ToGoValue().(uint64), nil
+
+	return uint64(result.(cadence.UFix64)), nil
 }
 
 func (info *accountInfo) GetAccountAvailableBalance(
@@ -221,12 +235,12 @@ func (info *accountInfo) GetAccountAvailableBalance(
 		return 0, fmt.Errorf("get account available balance failed: %w", err)
 	}
 
-	result, invokeErr := info.systemContracts.AccountAvailableBalance(
-		flow.ConvertAddress(runtimeAddress))
+	result, invokeErr := info.systemContracts.AccountAvailableBalance(flow.ConvertAddress(runtimeAddress))
 	if invokeErr != nil {
 		return 0, invokeErr
 	}
-	return result.ToGoValue().(uint64), nil
+
+	return uint64(result.(cadence.UFix64)), nil
 }
 
 func (info *accountInfo) GetAccount(
@@ -253,4 +267,21 @@ func (info *accountInfo) GetAccount(
 	}
 
 	return account, nil
+}
+
+func (info *accountInfo) GetAccountKeys(
+	address flow.Address,
+) (
+	[]flow.AccountPublicKey,
+	error,
+) {
+	defer info.tracer.StartChildSpan(trace.FVMEnvGetAccountKeys).End()
+
+	accountKeys, err := info.accounts.GetPublicKeys(address)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return accountKeys, nil
 }

@@ -89,6 +89,11 @@ func TestParseURL(t *testing.T) {
 			url:      "/v1/node_version_info",
 			expected: "getNodeVersionInfo",
 		},
+		{
+			name:     "/v1/subscribe_events",
+			url:      "/v1/subscribe_events",
+			expected: "subscribeEvents",
+		},
 	}
 
 	for _, tt := range tests {
@@ -180,6 +185,11 @@ func TestBenchmarkParseURL(t *testing.T) {
 			name:     "/v1/node_version_info",
 			url:      "/v1/node_version_info",
 			expected: "getNodeVersionInfo",
+		},
+		{
+			name:     "/v1/subscribe_events",
+			url:      "/v1/subscribe_events",
+			expected: "subscribeEvents",
 		},
 	}
 

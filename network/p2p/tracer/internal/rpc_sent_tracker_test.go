@@ -228,10 +228,10 @@ func mockTracker(t *testing.T, lastHighestIhavesSentResetInterval time.Duration)
 	require.NoError(t, err)
 	tracker := NewRPCSentTracker(&RPCSentTrackerConfig{
 		Logger:                             zerolog.Nop(),
-		RPCSentCacheSize:                   cfg.NetworkConfig.GossipSubConfig.RPCSentTrackerCacheSize,
+		RPCSentCacheSize:                   cfg.NetworkConfig.GossipSub.RpcTracer.RPCSentTrackerCacheSize,
 		RPCSentCacheCollector:              metrics.NewNoopCollector(),
 		WorkerQueueCacheCollector:          metrics.NewNoopCollector(),
-		WorkerQueueCacheSize:               cfg.NetworkConfig.GossipSubConfig.RPCSentTrackerQueueCacheSize,
+		WorkerQueueCacheSize:               cfg.NetworkConfig.GossipSub.RpcTracer.RPCSentTrackerQueueCacheSize,
 		NumOfWorkers:                       1,
 		LastHighestIhavesSentResetInterval: lastHighestIhavesSentResetInterval,
 	})

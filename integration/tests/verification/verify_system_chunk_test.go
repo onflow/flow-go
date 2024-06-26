@@ -37,14 +37,6 @@ func (suite *VerifySystemChunkSuite) TestSystemChunkIDsShouldBeDifferent() {
 	resultBId := receiptB.ExecutionResult.ID()
 	suite.T().Logf("receipt for blockB generated: result ID: %x\n", resultBId)
 
-	// Todo: drop this part once system chunk changes the state
-	// requires that execution state is not changed between block A and B
-	stateA, err := receiptA.ExecutionResult.FinalStateCommitment()
-	require.NoError(suite.T(), err)
-	stateB, err := receiptB.ExecutionResult.FinalStateCommitment()
-	require.NoError(suite.T(), err)
-	require.Equal(suite.T(), stateA, stateB)
-
 	// computes ids of system chunk for result A and B
 	systemChunkA := receiptA.ExecutionResult.Chunks[0]
 	systemChunkAId := systemChunkA.ID()

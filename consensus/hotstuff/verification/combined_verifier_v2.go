@@ -1,15 +1,13 @@
-//go:build relic
-// +build relic
-
 package verification
 
 import (
 	"errors"
 	"fmt"
 
+	"github.com/onflow/crypto/hash"
+
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
-	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/model/flow"
 	msig "github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/state/protocol"
@@ -53,7 +51,7 @@ func NewCombinedVerifier(committee hotstuff.Replicas, packer hotstuff.Packer) *C
 //   - model.ErrViewForUnknownEpoch if no epoch containing the given view is known
 //   - unexpected errors should be treated as symptoms of bugs or uncovered
 //     edge cases in the logic (i.e. as fatal)
-func (c *CombinedVerifier) VerifyVote(signer *flow.Identity, sigData []byte, view uint64, blockID flow.Identifier) error {
+func (c *CombinedVerifier) VerifyVote(signer *flow.IdentitySkeleton, sigData []byte, view uint64, blockID flow.Identifier) error {
 
 	// create the to-be-signed message
 	msg := MakeVoteMessage(view, blockID)
@@ -120,7 +118,7 @@ func (c *CombinedVerifier) VerifyVote(signer *flow.Identity, sigData []byte, vie
 //   - model.ErrInvalidSignature if a signature is invalid
 //   - model.ErrViewForUnknownEpoch if no epoch containing the given view is known
 //   - error if running into any unexpected exception (i.e. fatal error)
-func (c *CombinedVerifier) VerifyQC(signers flow.IdentityList, sigData []byte, view uint64, blockID flow.Identifier) error {
+func (c *CombinedVerifier) VerifyQC(signers flow.IdentitySkeletonList, sigData []byte, view uint64, blockID flow.Identifier) error {
 	dkg, err := c.committee.DKG(view)
 	if err != nil {
 		return fmt.Errorf("could not get dkg data: %w", err)
@@ -160,7 +158,7 @@ func (c *CombinedVerifier) VerifyQC(signers flow.IdentityList, sigData []byte, v
 //   - model.ErrInvalidSignature if a signature is invalid
 //   - unexpected errors should be treated as symptoms of bugs or uncovered
 //     edge cases in the logic (i.e. as fatal)
-func (c *CombinedVerifier) VerifyTC(signers flow.IdentityList, sigData []byte, view uint64, highQCViews []uint64) error {
+func (c *CombinedVerifier) VerifyTC(signers flow.IdentitySkeletonList, sigData []byte, view uint64, highQCViews []uint64) error {
 	stakingPks := signers.PublicStakingKeys()
 	return verifyTCSignatureManyMessages(stakingPks, sigData, view, highQCViews, c.timeoutObjectHasher)
 }

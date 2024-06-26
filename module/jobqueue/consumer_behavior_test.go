@@ -89,15 +89,15 @@ func TestConsumer(t *testing.T) {
 }
 
 func testOnStartup(t *testing.T) {
-	runWith(t, func(c module.JobConsumer, cp storage.ConsumerProgress, w *mockWorker, j *jobqueue.MockJobs, db *badgerdb.DB) {
-		require.NoError(t, c.Start(DefaultIndex))
+	runWith(t, DefaultIndex, func(c module.JobConsumer, cp storage.ConsumerProgress, w *mockWorker, j *jobqueue.MockJobs, db *badgerdb.DB) {
+		require.NoError(t, c.Start())
 		assertProcessed(t, cp, 0)
 	})
 }
 
 func TestProcessedOrder(t *testing.T) {
-	runWith(t, func(c module.JobConsumer, cp storage.ConsumerProgress, w *mockWorker, j *jobqueue.MockJobs, db *badgerdb.DB) {
-		require.NoError(t, c.Start(5))
+	runWith(t, 5, func(c module.JobConsumer, cp storage.ConsumerProgress, w *mockWorker, j *jobqueue.MockJobs, db *badgerdb.DB) {
+		require.NoError(t, c.Start())
 		assertProcessed(t, cp, 5)
 	})
 }
@@ -105,8 +105,8 @@ func TestProcessedOrder(t *testing.T) {
 // [+1] => 									[0#, 1!]
 // when received job 1, it will be processed
 func testOnReceiveOneJob(t *testing.T) {
-	runWith(t, func(c module.JobConsumer, cp storage.ConsumerProgress, w *mockWorker, j *jobqueue.MockJobs, db *badgerdb.DB) {
-		require.NoError(t, c.Start(DefaultIndex))
+	runWith(t, DefaultIndex, func(c module.JobConsumer, cp storage.ConsumerProgress, w *mockWorker, j *jobqueue.MockJobs, db *badgerdb.DB) {
+		require.NoError(t, c.Start())
 		require.NoError(t, j.PushOne()) // +1
 
 		c.Check()
@@ -121,8 +121,8 @@ func testOnReceiveOneJob(t *testing.T) {
 // [+1, 1*] => 							[0#, 1#]
 // when job 1 is finished, it will be marked as processed
 func testOnJobFinished(t *testing.T) {
-	runWith(t, func(c module.JobConsumer, cp storage.ConsumerProgress, w *mockWorker, j *jobqueue.MockJobs, db *badgerdb.DB) {
-		require.NoError(t, c.Start(DefaultIndex))
+	runWith(t, DefaultIndex, func(c module.JobConsumer, cp storage.ConsumerProgress, w *mockWorker, j *jobqueue.MockJobs, db *badgerdb.DB) {
+		require.NoError(t, c.Start())
 		require.NoError(t, j.PushOne()) // +1
 
 		c.Check()
@@ -138,8 +138,8 @@ func testOnJobFinished(t *testing.T) {
 // [+1, +2, 1*, 2*] => 			[0#, 1#, 2#]
 // when job 2 and 1 are finished, they will be marked as processed
 func testOnJobsFinished(t *testing.T) {
-	runWith(t, func(c module.JobConsumer, cp storage.ConsumerProgress, w *mockWorker, j *jobqueue.MockJobs, db *badgerdb.DB) {
-		require.NoError(t, c.Start(DefaultIndex))
+	runWith(t, DefaultIndex, func(c module.JobConsumer, cp storage.ConsumerProgress, w *mockWorker, j *jobqueue.MockJobs, db *badgerdb.DB) {
+		require.NoError(t, c.Start())
 		require.NoError(t, j.PushOne()) // +1
 		c.Check()
 
@@ -159,8 +159,8 @@ func testOnJobsFinished(t *testing.T) {
 // [+1, +2, +3, +4] => 			[0#, 1!, 2!, 3!, 4]
 // when more jobs are arrived than the max number of workers, only the first 3 jobs will be processed
 func testMaxWorker(t *testing.T) {
-	runWith(t, func(c module.JobConsumer, cp storage.ConsumerProgress, w *mockWorker, j *jobqueue.MockJobs, db *badgerdb.DB) {
-		require.NoError(t, c.Start(DefaultIndex))
+	runWith(t, DefaultIndex, func(c module.JobConsumer, cp storage.ConsumerProgress, w *mockWorker, j *jobqueue.MockJobs, db *badgerdb.DB) {
+		require.NoError(t, c.Start())
 		require.NoError(t, j.PushOne()) // +1
 		c.Check()
 
@@ -183,8 +183,8 @@ func testMaxWorker(t *testing.T) {
 // [+1, +2, +3, +4, +5, +6] => [0#, !1, *2, *3, *4, *5, 6, +7] => [0#, *1, *2, *3, *4, *5, !6, !7]
 // when processing lags behind, the consumer is paused until processing catches up
 func testPauseResume(t *testing.T) {
-	runWithSeatchAhead(t, 5, func(c module.JobConsumer, cp storage.ConsumerProgress, w *mockWorker, j *jobqueue.MockJobs, db *badgerdb.DB) {
-		require.NoError(t, c.Start(DefaultIndex))
+	runWithSeatchAhead(t, 5, DefaultIndex, func(c module.JobConsumer, cp storage.ConsumerProgress, w *mockWorker, j *jobqueue.MockJobs, db *badgerdb.DB) {
+		require.NoError(t, c.Start())
 		require.NoError(t, j.PushOne()) // +1
 		c.Check()
 
@@ -229,8 +229,8 @@ func testPauseResume(t *testing.T) {
 // [+1, +2, +3, +4, 3*] => 	[0#, 1!, 2!, 3*, 4!]
 // when job 3 is finished, which is not the next processing job 1, the processed index won't change
 func testNonNextFinished(t *testing.T) {
-	runWith(t, func(c module.JobConsumer, cp storage.ConsumerProgress, w *mockWorker, j *jobqueue.MockJobs, db *badgerdb.DB) {
-		require.NoError(t, c.Start(DefaultIndex))
+	runWith(t, DefaultIndex, func(c module.JobConsumer, cp storage.ConsumerProgress, w *mockWorker, j *jobqueue.MockJobs, db *badgerdb.DB) {
+		require.NoError(t, c.Start())
 		require.NoError(t, j.PushOne()) // +1
 		c.Check()
 
@@ -259,8 +259,8 @@ func testNonNextFinished(t *testing.T) {
 //
 // [+1, +2, +3, +3, +4] => 	[1, 2, 3*, 4] => [1, 2, 3*, 4*] => => [1#, 2, 3*, 4*] => [1#, 2#, 3#, 4#]
 func testMovingProcessedIndex(t *testing.T) {
-	runWith(t, func(c module.JobConsumer, cp storage.ConsumerProgress, w *mockWorker, j *jobqueue.MockJobs, db *badgerdb.DB) {
-		require.NoError(t, c.Start(DefaultIndex))
+	runWith(t, DefaultIndex, func(c module.JobConsumer, cp storage.ConsumerProgress, w *mockWorker, j *jobqueue.MockJobs, db *badgerdb.DB) {
+		require.NoError(t, c.Start())
 		require.NoError(t, j.PushOne()) // +1
 		c.Check()
 
@@ -312,8 +312,8 @@ func testMovingProcessedIndex(t *testing.T) {
 // [+1, +2, +3, +4, 3*, 2*] => 			[0#, 1!, 2*, 3*, 4!]
 // when job 3 and 2 are finished, the processed index won't change, because 1 is still not finished
 func testTwoNonNextFinished(t *testing.T) {
-	runWith(t, func(c module.JobConsumer, cp storage.ConsumerProgress, w *mockWorker, j *jobqueue.MockJobs, db *badgerdb.DB) {
-		require.NoError(t, c.Start(DefaultIndex))
+	runWith(t, DefaultIndex, func(c module.JobConsumer, cp storage.ConsumerProgress, w *mockWorker, j *jobqueue.MockJobs, db *badgerdb.DB) {
+		require.NoError(t, c.Start())
 		require.NoError(t, j.PushOne()) // +1
 		c.Check()
 
@@ -339,8 +339,8 @@ func testTwoNonNextFinished(t *testing.T) {
 // [+1, +2, +3, +4, 3*, 2*, +5] =>	[0#, 1!, 2*, 3*, 4!, 5!]
 // when job 5 is received, it will be processed, because the worker has capacity
 func testProcessingWithNonNextFinished(t *testing.T) {
-	runWith(t, func(c module.JobConsumer, cp storage.ConsumerProgress, w *mockWorker, j *jobqueue.MockJobs, db *badgerdb.DB) {
-		require.NoError(t, c.Start(DefaultIndex))
+	runWith(t, DefaultIndex, func(c module.JobConsumer, cp storage.ConsumerProgress, w *mockWorker, j *jobqueue.MockJobs, db *badgerdb.DB) {
+		require.NoError(t, c.Start())
 		require.NoError(t, j.PushOne()) // +1
 		c.Check()
 
@@ -369,8 +369,8 @@ func testProcessingWithNonNextFinished(t *testing.T) {
 // [+1, +2, +3, +4, 3*, 2*, +5, +6] =>	[0#, 1!, 2*, 3*, 4!, 5!, 6]
 // when job 6 is received, no more worker can process it, it will be buffered
 func testMaxWorkerWithFinishedNonNexts(t *testing.T) {
-	runWith(t, func(c module.JobConsumer, cp storage.ConsumerProgress, w *mockWorker, j *jobqueue.MockJobs, db *badgerdb.DB) {
-		require.NoError(t, c.Start(DefaultIndex))
+	runWith(t, DefaultIndex, func(c module.JobConsumer, cp storage.ConsumerProgress, w *mockWorker, j *jobqueue.MockJobs, db *badgerdb.DB) {
+		require.NoError(t, c.Start())
 		require.NoError(t, j.PushOne()) // +1
 		c.Check()
 
@@ -402,8 +402,8 @@ func testMaxWorkerWithFinishedNonNexts(t *testing.T) {
 // [+1, +2, +3, +4, 3*, 2*, +5, 1*] => [0#, 1#, 2#, 3#, 4!, 5!]
 // when job 1 is finally finished, it will fast forward the processed index to 3
 func testFastforward(t *testing.T) {
-	runWith(t, func(c module.JobConsumer, cp storage.ConsumerProgress, w *mockWorker, j *jobqueue.MockJobs, db *badgerdb.DB) {
-		require.NoError(t, c.Start(DefaultIndex))
+	runWith(t, DefaultIndex, func(c module.JobConsumer, cp storage.ConsumerProgress, w *mockWorker, j *jobqueue.MockJobs, db *badgerdb.DB) {
+		require.NoError(t, c.Start())
 		require.NoError(t, j.PushOne()) // +1
 		c.Check()
 
@@ -434,8 +434,8 @@ func testFastforward(t *testing.T) {
 // [+1, +2, +3, +4, 3*, 2*, +5, 1*, +6, +7, 6*], restart => [0#, 1#, 2#, 3#, 4!, 5!, 6*, 7!]
 // when job queue crashed and restarted, the queue can be resumed
 func testWorkOnNextAfterFastforward(t *testing.T) {
-	runWith(t, func(c module.JobConsumer, cp storage.ConsumerProgress, w *mockWorker, j *jobqueue.MockJobs, db *badgerdb.DB) {
-		require.NoError(t, c.Start(DefaultIndex))
+	runWith(t, DefaultIndex, func(c module.JobConsumer, cp storage.ConsumerProgress, w *mockWorker, j *jobqueue.MockJobs, db *badgerdb.DB) {
+		require.NoError(t, c.Start())
 		require.NoError(t, j.PushOne()) // +1
 		c.Check()
 
@@ -470,9 +470,9 @@ func testWorkOnNextAfterFastforward(t *testing.T) {
 		// jobs need to be reused, since it stores all the jobs
 		reWorker := newMockWorker()
 		reProgress := badger.NewConsumerProgress(db, ConsumerTag)
-		reConsumer := newTestConsumer(reProgress, j, reWorker, 0)
+		reConsumer := newTestConsumer(t, reProgress, j, reWorker, 0, DefaultIndex)
 
-		err := reConsumer.Start(DefaultIndex)
+		err := reConsumer.Start()
 		require.NoError(t, err)
 
 		time.Sleep(1 * time.Millisecond)
@@ -485,8 +485,8 @@ func testWorkOnNextAfterFastforward(t *testing.T) {
 // [+1, +2, +3, +4, Stop, 2*] => [0#, 1!, 2*, 3!, 4]
 // when Stop is called, it won't work on any job any more
 func testStopRunning(t *testing.T) {
-	runWith(t, func(c module.JobConsumer, cp storage.ConsumerProgress, w *mockWorker, j *jobqueue.MockJobs, db *badgerdb.DB) {
-		require.NoError(t, c.Start(DefaultIndex))
+	runWith(t, DefaultIndex, func(c module.JobConsumer, cp storage.ConsumerProgress, w *mockWorker, j *jobqueue.MockJobs, db *badgerdb.DB) {
+		require.NoError(t, c.Start())
 		for i := 0; i < 4; i++ {
 			require.NoError(t, j.PushOne())
 			c.Check()
@@ -507,8 +507,8 @@ func testStopRunning(t *testing.T) {
 }
 
 func testConcurrency(t *testing.T) {
-	runWith(t, func(c module.JobConsumer, cp storage.ConsumerProgress, w *mockWorker, j *jobqueue.MockJobs, db *badgerdb.DB) {
-		require.NoError(t, c.Start(DefaultIndex))
+	runWith(t, DefaultIndex, func(c module.JobConsumer, cp storage.ConsumerProgress, w *mockWorker, j *jobqueue.MockJobs, db *badgerdb.DB) {
+		require.NoError(t, c.Start())
 		var finishAll sync.WaitGroup
 		finishAll.Add(100)
 		// Finish job concurrently
@@ -549,16 +549,19 @@ func testConcurrency(t *testing.T) {
 type JobID = module.JobID
 type Job = module.Job
 
-func runWith(t testing.TB, runTestWith func(module.JobConsumer, storage.ConsumerProgress, *mockWorker, *jobqueue.MockJobs, *badgerdb.DB)) {
-	runWithSeatchAhead(t, 0, runTestWith)
+func runWith(t testing.TB,
+	defaultIndex uint64,
+	runTestWith func(module.JobConsumer, storage.ConsumerProgress, *mockWorker, *jobqueue.MockJobs, *badgerdb.DB)) {
+	runWithSeatchAhead(t, 0, defaultIndex, runTestWith)
 }
 
-func runWithSeatchAhead(t testing.TB, maxSearchAhead uint64, runTestWith func(module.JobConsumer, storage.ConsumerProgress, *mockWorker, *jobqueue.MockJobs, *badgerdb.DB)) {
+func runWithSeatchAhead(t testing.TB, maxSearchAhead uint64, defaultIndex uint64,
+	runTestWith func(module.JobConsumer, storage.ConsumerProgress, *mockWorker, *jobqueue.MockJobs, *badgerdb.DB)) {
 	unittest.RunWithBadgerDB(t, func(db *badgerdb.DB) {
 		jobs := jobqueue.NewMockJobs()
 		worker := newMockWorker()
 		progress := badger.NewConsumerProgress(db, ConsumerTag)
-		consumer := newTestConsumer(progress, jobs, worker, maxSearchAhead)
+		consumer := newTestConsumer(t, progress, jobs, worker, maxSearchAhead, defaultIndex)
 		runTestWith(consumer, progress, worker, jobs, db)
 	})
 }
@@ -569,10 +572,12 @@ func assertProcessed(t testing.TB, cp storage.ConsumerProgress, expectProcessed 
 	require.Equal(t, expectProcessed, processed)
 }
 
-func newTestConsumer(cp storage.ConsumerProgress, jobs module.Jobs, worker jobqueue.Worker, maxSearchAhead uint64) module.JobConsumer {
+func newTestConsumer(t testing.TB, cp storage.ConsumerProgress, jobs module.Jobs, worker jobqueue.Worker, maxSearchAhead uint64, defaultIndex uint64) module.JobConsumer {
 	log := unittest.Logger().With().Str("module", "consumer").Logger()
 	maxProcessing := uint64(3)
-	return jobqueue.NewConsumer(log, jobs, cp, worker, maxProcessing, maxSearchAhead)
+	c, err := jobqueue.NewConsumer(log, jobs, cp, worker, maxProcessing, maxSearchAhead, defaultIndex)
+	require.NoError(t, err)
+	return c
 }
 
 // a Mock worker that stores all the jobs that it was asked to work on
@@ -629,7 +634,7 @@ func (w *mockWorker) AssertCalled(t *testing.T, expectCalled []int64) {
 // 0.22 ms to finish job
 func BenchmarkPushAndConsume(b *testing.B) {
 	b.StopTimer()
-	runWith(b, func(c module.JobConsumer, cp storage.ConsumerProgress, w *mockWorker, j *jobqueue.MockJobs, db *badgerdb.DB) {
+	runWith(b, DefaultIndex, func(c module.JobConsumer, cp storage.ConsumerProgress, w *mockWorker, j *jobqueue.MockJobs, db *badgerdb.DB) {
 		var wg sync.WaitGroup
 		wg.Add(b.N)
 
@@ -641,7 +646,7 @@ func BenchmarkPushAndConsume(b *testing.B) {
 			}()
 		}
 
-		require.NoError(b, c.Start(DefaultIndex))
+		require.NoError(b, c.Start())
 
 		b.StartTimer()
 		for i := 0; i < b.N; i++ {

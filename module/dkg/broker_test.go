@@ -27,12 +27,12 @@ var (
 	dkgInstanceID = "flow-testnet-42"     // dkg instance identifier
 )
 
-func initCommittee(n int) (identities flow.IdentityList, locals []module.Local) {
+func initCommittee(n int) (identities flow.IdentitySkeletonList, locals []module.Local) {
 	privateStakingKeys := unittest.StakingKeys(n)
 	for i, key := range privateStakingKeys {
 		id := unittest.IdentityFixture(unittest.WithStakingPubKey(key.PublicKey()))
-		identities = append(identities, id)
-		local, _ := local.New(id, privateStakingKeys[i])
+		identities = append(identities, &id.IdentitySkeleton)
+		local, _ := local.New(id.IdentitySkeleton, privateStakingKeys[i])
 		locals = append(locals, local)
 	}
 	return identities, locals

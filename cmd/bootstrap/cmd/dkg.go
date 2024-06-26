@@ -3,8 +3,10 @@ package cmd
 import (
 	"fmt"
 
+	"github.com/onflow/crypto"
+
 	bootstrapDKG "github.com/onflow/flow-go/cmd/bootstrap/dkg"
-	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	model "github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/dkg"
 	"github.com/onflow/flow-go/model/encodable"
@@ -19,7 +21,7 @@ func runBeaconKG(nodes []model.NodeInfo) dkg.DKGData {
 	log.Debug().Msgf("will run DKG")
 	var dkgData dkg.DKGData
 	var err error
-	dkgData, err = bootstrapDKG.RandomBeaconKG(n, GenerateRandomSeed(crypto.SeedMinLenDKG))
+	dkgData, err = bootstrapDKG.RandomBeaconKG(n, GenerateRandomSeed(crypto.KeyGenSeedMinLen))
 	if err != nil {
 		log.Fatal().Err(err).Msg("error running DKG")
 	}
@@ -37,17 +39,25 @@ func runBeaconKG(nodes []model.NodeInfo) dkg.DKGData {
 		encKey := encodable.RandomBeaconPrivKey{PrivateKey: privKey}
 		privKeyShares = append(privKeyShares, encKey)
 
-		writeJSON(fmt.Sprintf(model.PathRandomBeaconPriv, nodeID), encKey)
+		err = common.WriteJSON(fmt.Sprintf(model.PathRandomBeaconPriv, nodeID), flagOutdir, encKey)
+		if err != nil {
+			log.Fatal().Err(err).Msg("failed to write json")
+		}
+		log.Info().Msgf("wrote file %s/%s", flagOutdir, fmt.Sprintf(model.PathRandomBeaconPriv, nodeID))
 	}
 
 	// write full DKG info that will be used to construct QC
-	writeJSON(model.PathRootDKGData, inmem.EncodableFullDKG{
+	err = common.WriteJSON(model.PathRootDKGData, flagOutdir, inmem.EncodableFullDKG{
 		GroupKey: encodable.RandomBeaconPubKey{
 			PublicKey: dkgData.PubGroupKey,
 		},
 		PubKeyShares:  pubKeyShares,
 		PrivKeyShares: privKeyShares,
 	})
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to write json")
+	}
+	log.Info().Msgf("wrote file %s/%s", flagOutdir, model.PathRootDKGData)
 
 	return dkgData
 }

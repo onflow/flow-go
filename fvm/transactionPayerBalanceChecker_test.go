@@ -16,6 +16,28 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+var verifyPayerBalanceResultType = cadence.NewStructType(
+	// TODO: location
+	nil,
+	// TODO: qualified identifier
+	"",
+	[]cadence.Field{
+		{
+			Identifier: fvm.VerifyPayerBalanceResultTypeCanExecuteTransactionFieldName,
+			Type:       cadence.BoolType,
+		},
+		{
+			Identifier: fvm.VerifyPayerBalanceResultTypeRequiredBalanceFieldName,
+			Type:       cadence.UFix64Type,
+		},
+		{
+			Identifier: fvm.VerifyPayerBalanceResultTypeMaximumTransactionFeesFieldName,
+			Type:       cadence.UFix64Type,
+		},
+	},
+	nil,
+)
+
 func TestTransactionPayerBalanceChecker(t *testing.T) {
 	payer := flow.HexToAddress("1")
 	t.Run("TransactionFeesEnabled == false disables the balance check", func(t *testing.T) {
@@ -52,7 +74,7 @@ func TestTransactionPayerBalanceChecker(t *testing.T) {
 		d := fvm.TransactionPayerBalanceChecker{}
 		maxFees, err := d.CheckPayerBalanceAndReturnMaxFees(proc, txnState, env)
 		require.Error(t, err)
-		require.True(t, errors.HasErrorCode(err, errors.FailureCodePayerBalanceCheckFailure))
+		require.True(t, errors.HasFailureCode(err, errors.FailureCodePayerBalanceCheckFailure))
 		require.ErrorIs(t, err, someError)
 		require.Equal(t, uint64(0), maxFees)
 	})
@@ -73,22 +95,26 @@ func TestTransactionPayerBalanceChecker(t *testing.T) {
 		d := fvm.TransactionPayerBalanceChecker{}
 		maxFees, err := d.CheckPayerBalanceAndReturnMaxFees(proc, txnState, env)
 		require.Error(t, err)
-		require.True(t, errors.HasErrorCode(err, errors.FailureCodePayerBalanceCheckFailure))
+		require.True(t, errors.HasFailureCode(err, errors.FailureCodePayerBalanceCheckFailure))
 		require.Equal(t, uint64(0), maxFees)
 	})
 
 	t.Run("if payer can pay return max fees", func(t *testing.T) {
 		env := &fvmmock.Environment{}
 		env.On("TransactionFeesEnabled").Return(true)
-		env.On("CheckPayerBalanceAndGetMaxTxFees", mock.Anything, mock.Anything, mock.Anything).Return(
-			cadence.Struct{
-				Fields: []cadence.Value{
-					cadence.NewBool(true),
-					cadence.UFix64(100),
-					cadence.UFix64(100),
-				},
-			},
-			nil)
+		env.On(
+			"CheckPayerBalanceAndGetMaxTxFees",
+			mock.Anything,
+			mock.Anything,
+			mock.Anything,
+		).Return(
+			cadence.NewStruct([]cadence.Value{
+				cadence.NewBool(true),
+				cadence.UFix64(100),
+				cadence.UFix64(100),
+			}).WithType(verifyPayerBalanceResultType),
+			nil,
+		)
 
 		proc := &fvm.TransactionProcedure{}
 		proc.Transaction = &flow.TransactionBody{}
@@ -105,15 +131,19 @@ func TestTransactionPayerBalanceChecker(t *testing.T) {
 	t.Run("if payer cannot pay return insufficient balance error", func(t *testing.T) {
 		env := &fvmmock.Environment{}
 		env.On("TransactionFeesEnabled").Return(true)
-		env.On("CheckPayerBalanceAndGetMaxTxFees", mock.Anything, mock.Anything, mock.Anything).Return(
-			cadence.Struct{
-				Fields: []cadence.Value{
-					cadence.NewBool(false),
-					cadence.UFix64(100),
-					cadence.UFix64(101),
-				},
-			},
-			nil)
+		env.On(
+			"CheckPayerBalanceAndGetMaxTxFees",
+			mock.Anything,
+			mock.Anything,
+			mock.Anything,
+		).Return(
+			cadence.NewStruct([]cadence.Value{
+				cadence.NewBool(false),
+				cadence.UFix64(100),
+				cadence.UFix64(101),
+			}).WithType(verifyPayerBalanceResultType),
+			nil,
+		)
 
 		proc := &fvm.TransactionProcedure{}
 		proc.Transaction = &flow.TransactionBody{}

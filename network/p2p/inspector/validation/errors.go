@@ -4,22 +4,25 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/libp2p/go-libp2p/core/peer"
+
 	"github.com/onflow/flow-go/network/channels"
+	p2pmsg "github.com/onflow/flow-go/network/p2p/message"
 )
 
 // IWantDuplicateMsgIDThresholdErr indicates that the amount of duplicate message ids exceeds the allowed threshold.
 type IWantDuplicateMsgIDThresholdErr struct {
 	duplicates int
 	sampleSize uint
-	threshold  float64
+	threshold  int
 }
 
 func (e IWantDuplicateMsgIDThresholdErr) Error() string {
-	return fmt.Sprintf("%d/%d iWant duplicate message ids exceeds the allowed threshold: %f", e.duplicates, e.sampleSize, e.threshold)
+	return fmt.Sprintf("%d/%d iWant duplicate message ids exceeds the allowed threshold: %d", e.duplicates, e.sampleSize, e.threshold)
 }
 
 // NewIWantDuplicateMsgIDThresholdErr returns a new IWantDuplicateMsgIDThresholdErr.
-func NewIWantDuplicateMsgIDThresholdErr(duplicates int, sampleSize uint, threshold float64) IWantDuplicateMsgIDThresholdErr {
+func NewIWantDuplicateMsgIDThresholdErr(duplicates int, sampleSize uint, threshold int) IWantDuplicateMsgIDThresholdErr {
 	return IWantDuplicateMsgIDThresholdErr{duplicates, sampleSize, threshold}
 }
 
@@ -33,15 +36,15 @@ func IsIWantDuplicateMsgIDThresholdErr(err error) bool {
 type IWantCacheMissThresholdErr struct {
 	cacheMissCount int // total iwant cache misses
 	sampleSize     uint
-	threshold      float64
+	threshold      int
 }
 
 func (e IWantCacheMissThresholdErr) Error() string {
-	return fmt.Sprintf("%d/%d iWant cache misses exceeds the allowed threshold: %f", e.cacheMissCount, e.sampleSize, e.threshold)
+	return fmt.Sprintf("%d/%d iWant cache misses exceeds the allowed threshold: %d", e.cacheMissCount, e.sampleSize, e.threshold)
 }
 
 // NewIWantCacheMissThresholdErr returns a new IWantCacheMissThresholdErr.
-func NewIWantCacheMissThresholdErr(cacheMissCount int, sampleSize uint, threshold float64) IWantCacheMissThresholdErr {
+func NewIWantCacheMissThresholdErr(cacheMissCount int, sampleSize uint, threshold int) IWantCacheMissThresholdErr {
 	return IWantCacheMissThresholdErr{cacheMissCount, sampleSize, threshold}
 }
 
@@ -51,23 +54,62 @@ func IsIWantCacheMissThresholdErr(err error) bool {
 	return errors.As(err, &e)
 }
 
-// DuplicateFoundErr error that indicates a duplicate has been detected. This can be duplicate topic or message ID tracking.
-type DuplicateFoundErr struct {
-	err error
+// DuplicateTopicErr error that indicates a duplicate has been detected. This can be duplicate topic or message ID tracking.
+type DuplicateTopicErr struct {
+	topic   string                    // the topic that is duplicated
+	count   int                       // the number of times the topic has been duplicated
+	msgType p2pmsg.ControlMessageType // the control message type that the topic was found in
 }
 
-func (e DuplicateFoundErr) Error() string {
-	return e.err.Error()
+func (e DuplicateTopicErr) Error() string {
+	return fmt.Sprintf("duplicate topic found in %s control message type: %s", e.msgType, e.topic)
 }
 
-// NewDuplicateFoundErr returns a new DuplicateFoundErr.
-func NewDuplicateFoundErr(err error) DuplicateFoundErr {
-	return DuplicateFoundErr{err}
+// NewDuplicateTopicErr returns a new DuplicateTopicErr.
+// Args:
+//
+//	topic: the topic that is duplicated
+//	count: the number of times the topic has been duplicated
+//	msgType: the control message type that the topic was found in
+//
+// Returns:
+//
+//	A new DuplicateTopicErr.
+func NewDuplicateTopicErr(topic string, count int, msgType p2pmsg.ControlMessageType) DuplicateTopicErr {
+
+	return DuplicateTopicErr{topic, count, msgType}
 }
 
-// IsDuplicateFoundErr returns true if an error is DuplicateFoundErr.
-func IsDuplicateFoundErr(err error) bool {
-	var e DuplicateFoundErr
+// IsDuplicateTopicErr returns true if an error is DuplicateTopicErr.
+func IsDuplicateTopicErr(err error) bool {
+	var e DuplicateTopicErr
+	return errors.As(err, &e)
+}
+
+// DuplicateMessageIDErr error that indicates a duplicate message ID has been detected in a IHAVE or IWANT control message.
+type DuplicateMessageIDErr struct {
+	id      string                    // id of the message that is duplicated
+	count   int                       // the number of times the message ID has been duplicated
+	msgType p2pmsg.ControlMessageType // the control message type that the message ID was found in
+}
+
+func (e DuplicateMessageIDErr) Error() string {
+	return fmt.Sprintf("duplicate message ID foud in %s control message type: %s", e.msgType, e.id)
+}
+
+// NewDuplicateMessageIDErr returns a new DuplicateMessageIDErr.
+// Args:
+//
+//	id: id of the message that is duplicated
+//	count: the number of times the message ID has been duplicated
+//	msgType: the control message type that the message ID was found in.
+func NewDuplicateMessageIDErr(id string, count int, msgType p2pmsg.ControlMessageType) DuplicateMessageIDErr {
+	return DuplicateMessageIDErr{id, count, msgType}
+}
+
+// IsDuplicateMessageIDErr returns true if an error is DuplicateMessageIDErr.
+func IsDuplicateMessageIDErr(err error) bool {
+	var e DuplicateMessageIDErr
 	return errors.As(err, &e)
 }
 
@@ -93,20 +135,106 @@ func IsErrActiveClusterIDsNotSet(err error) bool {
 
 // ErrUnstakedPeer error that indicates a cluster prefixed control message has been from an unstaked peer.
 type ErrUnstakedPeer struct {
-	err error
+	pid peer.ID
 }
 
 func (e ErrUnstakedPeer) Error() string {
-	return e.err.Error()
+	return fmt.Sprintf("unstaked peer: %s", e.pid)
 }
 
 // NewUnstakedPeerErr returns a new ErrUnstakedPeer.
-func NewUnstakedPeerErr(err error) ErrUnstakedPeer {
-	return ErrUnstakedPeer{err: err}
+func NewUnstakedPeerErr(pid peer.ID) ErrUnstakedPeer {
+	return ErrUnstakedPeer{pid: pid}
 }
 
 // IsErrUnstakedPeer returns true if an error is ErrUnstakedPeer.
 func IsErrUnstakedPeer(err error) bool {
 	var e ErrUnstakedPeer
+	return errors.As(err, &e)
+}
+
+// ErrEjectedPeer error that indicates a cluster prefixed control message has been received from an ejected peer.
+type ErrEjectedPeer struct {
+	pid peer.ID
+}
+
+func (e ErrEjectedPeer) Error() string {
+	return fmt.Sprintf("ejected peer: %s", e.pid)
+}
+
+// NewEjectedPeerErr returns a new ErrEjectedPeer.
+func NewEjectedPeerErr(pid peer.ID) ErrEjectedPeer {
+	return ErrEjectedPeer{pid: pid}
+}
+
+// IsErrEjectedPeer returns true if an error is ErrEjectedPeer.
+func IsErrEjectedPeer(err error) bool {
+	var e ErrEjectedPeer
+	return errors.As(err, &e)
+}
+
+// InvalidRpcPublishMessagesErr error indicates that rpc publish message validation failed.
+type InvalidRpcPublishMessagesErr struct {
+	// err the original error returned by the calling func.
+	err error
+	// count the number of times this err was encountered.
+	count int
+}
+
+func (e InvalidRpcPublishMessagesErr) Error() string {
+	return fmt.Errorf("rpc publish messages validation failed %d error(s) encountered: %w", e.count, e.err).Error()
+}
+
+// NewInvalidRpcPublishMessagesErr returns a new InvalidRpcPublishMessagesErr.
+func NewInvalidRpcPublishMessagesErr(err error, count int) InvalidRpcPublishMessagesErr {
+	return InvalidRpcPublishMessagesErr{err: err, count: count}
+}
+
+// IsInvalidRpcPublishMessagesErr returns true if an error is InvalidRpcPublishMessagesErr.
+func IsInvalidRpcPublishMessagesErr(err error) bool {
+	var e InvalidRpcPublishMessagesErr
+	return errors.As(err, &e)
+}
+
+// DuplicateTopicIDThresholdExceeded indicates that the number of duplicate topic IDs exceeds the allowed threshold.
+type DuplicateTopicIDThresholdExceeded struct {
+	duplicates int
+	sampleSize int
+	threshold  int
+}
+
+func (e DuplicateTopicIDThresholdExceeded) Error() string {
+	return fmt.Sprintf("%d/%d duplicate topic IDs exceed the allowed threshold: %d", e.duplicates, e.sampleSize, e.threshold)
+}
+
+// NewDuplicateTopicIDThresholdExceeded returns a new DuplicateTopicIDThresholdExceeded error.
+func NewDuplicateTopicIDThresholdExceeded(duplicates int, sampleSize int, threshold int) DuplicateTopicIDThresholdExceeded {
+	return DuplicateTopicIDThresholdExceeded{duplicates, sampleSize, threshold}
+}
+
+// IsDuplicateTopicIDThresholdExceeded returns true if an error is DuplicateTopicIDThresholdExceeded
+func IsDuplicateTopicIDThresholdExceeded(err error) bool {
+	var e DuplicateTopicIDThresholdExceeded
+	return errors.As(err, &e)
+}
+
+// InvalidTopicIDThresholdExceeded indicates that the number of invalid topic IDs exceeds the allowed threshold.
+type InvalidTopicIDThresholdExceeded struct {
+	invalidCount int
+	threshold    int
+}
+
+func (e InvalidTopicIDThresholdExceeded) Error() string {
+	return fmt.Sprintf("%d invalid topic IDs exceed the allowed threshold: %d", e.invalidCount, e.threshold)
+}
+
+// NewInvalidTopicIDThresholdExceeded returns a new InvalidTopicIDThresholdExceeded error.
+func NewInvalidTopicIDThresholdExceeded(invalidCount, threshold int) InvalidTopicIDThresholdExceeded {
+	return InvalidTopicIDThresholdExceeded{invalidCount, threshold}
+}
+
+// IsInvalidTopicIDThresholdExceeded returns true if an error is InvalidTopicIDThresholdExceeded.
+func IsInvalidTopicIDThresholdExceeded(err error) bool {
+	var e InvalidTopicIDThresholdExceeded
 	return errors.As(err, &e)
 }

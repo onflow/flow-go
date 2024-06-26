@@ -13,6 +13,27 @@ import (
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 )
 
+// BlockExecutionDataEventPayloadsToVersion converts all event payloads to version
+func BlockExecutionDataEventPayloadsToVersion(
+	m *entities.BlockExecutionData,
+	to entities.EventEncodingVersion,
+) error {
+	if to == entities.EventEncodingVersion_CCF_V0 {
+		return nil
+	}
+
+	for i, chunk := range m.ChunkExecutionData {
+		for j, e := range chunk.Events {
+			converted, err := CcfPayloadToJsonPayload(e.Payload)
+			if err != nil {
+				return fmt.Errorf("failed to convert payload for event %d to json: %w", j, err)
+			}
+			m.ChunkExecutionData[i].Events[j].Payload = converted
+		}
+	}
+	return nil
+}
+
 // BlockExecutionDataToMessage converts a BlockExecutionData to a protobuf message
 func BlockExecutionDataToMessage(data *execution_data.BlockExecutionData) (
 	*entities.BlockExecutionData,
@@ -77,10 +98,23 @@ func ChunkExecutionDataToMessage(data *execution_data.ChunkExecutionData) (
 		return nil, err
 	}
 
+	var results []*entities.ExecutionDataTransactionResult
+	if len(data.TransactionResults) > 0 {
+		results = make([]*entities.ExecutionDataTransactionResult, len(data.TransactionResults))
+		for i, result := range data.TransactionResults {
+			results[i] = &entities.ExecutionDataTransactionResult{
+				TransactionId:   IdentifierToMessage(result.TransactionID),
+				Failed:          result.Failed,
+				ComputationUsed: result.ComputationUsed,
+			}
+		}
+	}
+
 	return &entities.ChunkExecutionData{
-		Collection: collection,
-		Events:     events,
-		TrieUpdate: trieUpdate,
+		Collection:         collection,
+		Events:             events,
+		TrieUpdate:         trieUpdate,
+		TransactionResults: results,
 	}, nil
 }
 
@@ -107,10 +141,23 @@ func MessageToChunkExecutionData(
 		events = nil
 	}
 
+	var results []flow.LightTransactionResult
+	if len(m.GetTransactionResults()) > 0 {
+		results = make([]flow.LightTransactionResult, len(m.GetTransactionResults()))
+		for i, result := range m.GetTransactionResults() {
+			results[i] = flow.LightTransactionResult{
+				TransactionID:   MessageToIdentifier(result.GetTransactionId()),
+				Failed:          result.GetFailed(),
+				ComputationUsed: result.GetComputationUsed(),
+			}
+		}
+	}
+
 	return &execution_data.ChunkExecutionData{
-		Collection: collection,
-		Events:     events,
-		TrieUpdate: trieUpdate,
+		Collection:         collection,
+		Events:             events,
+		TrieUpdate:         trieUpdate,
+		TransactionResults: results,
 	}, nil
 }
 
@@ -190,6 +237,10 @@ func messageToTrustedCollection(
 	chain flow.Chain,
 ) (*flow.Collection, error) {
 	messages := m.GetTransactions()
+	if len(messages) == 0 {
+		return &flow.Collection{}, nil
+	}
+
 	transactions := make([]*flow.TransactionBody, len(messages))
 	for i, message := range messages {
 		transaction, err := messageToTrustedTransaction(message, chain)
@@ -197,10 +248,6 @@ func messageToTrustedCollection(
 			return nil, fmt.Errorf("could not convert transaction %d: %w", i, err)
 		}
 		transactions[i] = &transaction
-	}
-
-	if len(transactions) == 0 {
-		return nil, nil
 	}
 
 	return &flow.Collection{Transactions: transactions}, nil
@@ -221,7 +268,7 @@ func messageToTrustedTransaction(
 
 	proposalKey := m.GetProposalKey()
 	if proposalKey != nil {
-		proposalAddress, err := insecureAddress(proposalKey.GetAddress(), chain)
+		proposalAddress, err := insecureAddress(proposalKey.GetAddress())
 		if err != nil {
 			return *t, fmt.Errorf("could not convert proposer address: %w", err)
 		}
@@ -230,7 +277,7 @@ func messageToTrustedTransaction(
 
 	payer := m.GetPayer()
 	if payer != nil {
-		payerAddress, err := insecureAddress(payer, chain)
+		payerAddress, err := insecureAddress(payer)
 		if err != nil {
 			return *t, fmt.Errorf("could not convert payer address: %w", err)
 		}
@@ -264,15 +311,57 @@ func messageToTrustedTransaction(
 	t.SetScript(m.GetScript())
 	t.SetArguments(m.GetArguments())
 	t.SetReferenceBlockID(flow.HashToID(m.GetReferenceBlockId()))
-	t.SetGasLimit(m.GetGasLimit())
+	t.SetComputeLimit(m.GetGasLimit())
 
 	return *t, nil
+}
+
+func MessageToRegisterID(m *entities.RegisterID, chain flow.Chain) (flow.RegisterID, error) {
+	if m == nil {
+		return flow.RegisterID{}, ErrEmptyMessage
+	}
+
+	owner := flow.EmptyAddress
+	if len(m.GetOwner()) > 0 {
+		var err error
+		owner, err = Address(m.GetOwner(), chain)
+		if err != nil {
+			return flow.RegisterID{}, fmt.Errorf("could not convert owner address: %w", err)
+		}
+	}
+
+	key := string(m.GetKey())
+
+	return flow.NewRegisterID(owner, key), nil
+}
+
+// MessagesToRegisterIDs converts a protobuf message to RegisterIDs
+func MessagesToRegisterIDs(m []*entities.RegisterID, chain flow.Chain) (flow.RegisterIDs, error) {
+	if m == nil {
+		return nil, ErrEmptyMessage
+	}
+	result := make(flow.RegisterIDs, len(m))
+	for i, entry := range m {
+		regID, err := MessageToRegisterID(entry, chain)
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert register id %d: %w", i, err)
+		}
+		result[i] = regID
+	}
+	return result, nil
+}
+
+func RegisterIDToMessage(id flow.RegisterID) *entities.RegisterID {
+	return &entities.RegisterID{
+		Owner: []byte(id.Owner),
+		Key:   []byte(id.Key),
+	}
 }
 
 // insecureAddress converts a raw address to a flow.Address, skipping validation
 // This is useful when converting transactions from trusted state like BlockExecutionData.
 // This should only be used for trusted inputs
-func insecureAddress(rawAddress []byte, chain flow.Chain) (flow.Address, error) {
+func insecureAddress(rawAddress []byte) (flow.Address, error) {
 	if len(rawAddress) == 0 {
 		return flow.EmptyAddress, status.Error(codes.InvalidArgument, "address cannot be empty")
 	}

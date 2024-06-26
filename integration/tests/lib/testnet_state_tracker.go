@@ -2,7 +2,6 @@ package lib
 
 import (
 	"context"
-	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -12,7 +11,6 @@ import (
 	"github.com/onflow/flow-go/engine/ghost/client"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
-	"github.com/onflow/flow-go/utils/unittest"
 )
 
 type TestnetStateTracker struct {
@@ -111,73 +109,16 @@ func (tst *TestnetStateTracker) Track(t *testing.T, ctx context.Context, ghost *
 					finalState,
 					m.ExecutionResult.ID(),
 					len(m.ExecutionResult.Chunks))
+			case *messages.ChunkDataResponse:
+				// consuming this explicitly to avoid logging full msg which is usually very large because of proof
+				t.Logf("%x chunk data pack received from %x\n",
+					m.ChunkDataPack.ChunkID,
+					sender)
 
 			default:
-				t.Logf("%v other msg received from %s: %#v\n", time.Now().UTC(), sender, msg)
+				t.Logf("%v other msg received from %s: %T\n", time.Now().UTC(), sender, msg)
 				continue
 			}
 		}
 	}()
-}
-
-// WaitUntilFinalizedStateCommitmentChanged waits until a different state commitment for a finalized block is received
-// compared to the latest one from any execution node and returns the corresponding block and execution receipt
-func WaitUntilFinalizedStateCommitmentChanged(t *testing.T, bs *BlockState, rs *ReceiptState,
-	qualifiers ...func(receipt flow.ExecutionReceipt) bool) (*flow.Block, *flow.ExecutionReceipt) {
-
-	// get the state commitment for the highest finalized block
-	initialFinalizedSC := unittest.GenesisStateCommitment
-	var err error
-	b1, ok := bs.HighestFinalized()
-	if ok {
-		r1 := rs.WaitForReceiptFromAny(t, b1.Header.ID())
-		initialFinalizedSC, err = r1.ExecutionResult.FinalStateCommitment()
-		require.NoError(t, err)
-	}
-
-	initFinalizedheight := b1.Header.Height
-	currentHeight := initFinalizedheight + 1
-
-	currentID := b1.Header.ID()
-	var b2 *flow.Block
-	var r2 *flow.ExecutionReceipt
-	require.Eventually(t, func() bool {
-		var ok bool
-		b2, ok = bs.FinalizedHeight(currentHeight)
-		if !ok {
-			return false
-		}
-		currentID = b2.Header.ID()
-		r2 = rs.WaitForReceiptFromAny(t, b2.Header.ID())
-		r2finalState, err := r2.ExecutionResult.FinalStateCommitment()
-		require.NoError(t, err)
-		if initialFinalizedSC == r2finalState {
-			// received a new execution result for the next finalized block, but it has the same final state commitment
-			// check the next finalized block
-			currentHeight++
-			return false
-		}
-
-		for _, qualifier := range qualifiers {
-			if !qualifier(*r2) {
-				return false
-			}
-		}
-
-		return true
-	}, receiptStateTimeout, 100*time.Millisecond,
-		fmt.Sprintf("did not receive an execution receipt with a different state commitment from %x within %v seconds,"+
-			" initial finalized height: %v "+
-			" last block checked height %v, last block checked ID %x", initialFinalizedSC, receiptTimeout,
-			initFinalizedheight,
-			currentHeight, currentID))
-
-	return b2, r2
-}
-
-// WithMinimumChunks creates a qualifier that returns true if receipt has the specified minimum number of chunks.
-func WithMinimumChunks(chunkNum int) func(flow.ExecutionReceipt) bool {
-	return func(receipt flow.ExecutionReceipt) bool {
-		return len(receipt.ExecutionResult.Chunks) >= chunkNum
-	}
 }

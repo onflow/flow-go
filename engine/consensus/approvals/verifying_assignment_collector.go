@@ -396,9 +396,9 @@ func (ac *VerifyingAssignmentCollector) RequestMissingApprovals(observation cons
 func authorizedVerifiersAtBlock(state protocol.State, blockID flow.Identifier) (map[flow.Identifier]*flow.Identity, error) {
 	authorizedVerifierList, err := state.AtBlockID(blockID).Identities(
 		filter.And(
-			filter.HasRole(flow.RoleVerification),
-			filter.HasWeight(true),
-			filter.Not(filter.Ejected),
+			filter.HasRole[flow.Identity](flow.RoleVerification),
+			filter.HasInitialWeight[flow.Identity](true),
+			filter.IsValidCurrentEpochParticipant,
 		))
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve Identities for block %v: %w", blockID, err)

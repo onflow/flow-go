@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/onflow/crypto/hash"
 	"github.com/rs/zerolog"
 	"go.opentelemetry.io/otel/attribute"
 	otelTrace "go.opentelemetry.io/otel/trace"
 
-	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/computation/result"
 	"github.com/onflow/flow-go/engine/execution/utils"
@@ -118,7 +118,7 @@ type blockComputer struct {
 	maxConcurrency        int
 }
 
-func SystemChunkContext(vmCtx fvm.Context, logger zerolog.Logger) fvm.Context {
+func SystemChunkContext(vmCtx fvm.Context) fvm.Context {
 	return fvm.NewContextFromParent(
 		vmCtx,
 		fvm.WithContractDeploymentRestricted(false),
@@ -126,9 +126,10 @@ func SystemChunkContext(vmCtx fvm.Context, logger zerolog.Logger) fvm.Context {
 		fvm.WithAuthorizationChecksEnabled(false),
 		fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
 		fvm.WithTransactionFeesEnabled(false),
-		fvm.WithServiceEventCollectionEnabled(),
 		fvm.WithEventCollectionSizeLimit(SystemChunkEventCollectionMaxSize),
 		fvm.WithMemoryAndInteractionLimitsDisabled(),
+		// only the system transaction is allowed to call the block entropy provider
+		fvm.WithRandomSourceHistoryCallAllowed(true),
 	)
 }
 
@@ -149,7 +150,14 @@ func NewBlockComputer(
 	if maxConcurrency < 1 {
 		return nil, fmt.Errorf("invalid maxConcurrency: %d", maxConcurrency)
 	}
-	systemChunkCtx := SystemChunkContext(vmCtx, logger)
+
+	// this is a safeguard to prevent scripts from writing to the program cache on Execution nodes.
+	// writes are only allowed by transactions.
+	if vmCtx.AllowProgramCacheWritesInScripts {
+		return nil, fmt.Errorf("program cache writes are not allowed in scripts on Execution nodes")
+	}
+
+	systemChunkCtx := SystemChunkContext(vmCtx)
 	vmCtx = fvm.NewContextFromParent(
 		vmCtx,
 		fvm.WithMetricsReporter(metrics),
@@ -203,6 +211,7 @@ func (e *blockComputer) queueTransactionRequests(
 	rawCollections []*entity.CompleteCollection,
 	systemTxnBody *flow.TransactionBody,
 	requestQueue chan TransactionRequest,
+	numTxns int,
 ) {
 	txnIndex := uint32(0)
 
@@ -263,6 +272,8 @@ func (e *blockComputer) queueTransactionRequests(
 		Uint64("height", blockHeader.Height).
 		Bool("system_chunk", true).
 		Bool("system_transaction", true).
+		Int("num_collections", len(rawCollections)).
+		Int("num_txs", numTxns).
 		Logger()
 	systemCollectionInfo := collectionInfo{
 		blockId:         blockId,
@@ -341,7 +352,9 @@ func (e *blockComputer) executeBlock(
 		parentBlockExecutionResultID,
 		block,
 		numTxns,
-		e.colResCons)
+		e.colResCons,
+		baseSnapshot,
+	)
 	defer collector.Stop()
 
 	requestQueue := make(chan TransactionRequest, numTxns)
@@ -358,7 +371,9 @@ func (e *blockComputer) executeBlock(
 		block.Block.Header,
 		rawCollections,
 		systemTxn,
-		requestQueue)
+		requestQueue,
+		numTxns,
+	)
 	close(requestQueue)
 
 	wg := &sync.WaitGroup{}

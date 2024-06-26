@@ -13,24 +13,28 @@ import (
 	"github.com/onflow/cadence/encoding/ccf"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime"
+	"github.com/onflow/cadence/runtime/stdlib"
+	"github.com/onflow/crypto"
+	"github.com/onflow/crypto/hash"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/blueprints"
 	envMock "github.com/onflow/flow-go/fvm/environment/mock"
 	errors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func transferTokensTx(chain flow.Chain) *flow.TransactionBody {
+	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 	return flow.NewTransactionBody().
-		SetScript([]byte(fmt.Sprintf(`
+		SetScript([]byte(fmt.Sprintf(
+			`
 							// This transaction is a template for a transaction that
 							// could be used by anyone to send tokens to another account
 							// that has been set up to receive tokens.
@@ -44,12 +48,12 @@ func transferTokensTx(chain flow.Chain) *flow.TransactionBody {
 							transaction(amount: UFix64, to: Address) {
 
 								// The Vault resource that holds the tokens that are being transferred
-								let sentVault: @FungibleToken.Vault
+								let sentVault: @{FungibleToken.Vault}
 
-								prepare(signer: AuthAccount) {
+								prepare(signer: auth(BorrowValue) &Account) {
 
 									// Get a reference to the signer's stored vault
-									let vaultRef = signer.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
+									let vaultRef = signer.storage.borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(from: /storage/flowTokenVault)
 										?? panic("Could not borrow reference to the owner's Vault!")
 
 									// Withdraw tokens from the signer's stored vault
@@ -62,14 +66,16 @@ func transferTokensTx(chain flow.Chain) *flow.TransactionBody {
 									let recipient = getAccount(to)
 
 									// Get a reference to the recipient's Receiver
-									let receiverRef = recipient.getCapability(/public/flowTokenReceiver)
-										.borrow<&{FungibleToken.Receiver}>()
+									let receiverRef = recipient.capabilities.borrow<&{FungibleToken.Receiver}>(/public/flowTokenReceiver)
 										?? panic("Could not borrow receiver reference to the recipient's Vault")
 
 									// Deposit the withdrawn tokens in the recipient's receiver
 									receiverRef.deposit(from: <-self.sentVault)
 								}
-							}`, fvm.FungibleTokenAddress(chain), fvm.FlowTokenAddress(chain))),
+							}`,
+			sc.FungibleToken.Address.Hex(),
+			sc.FlowToken.Address.Hex(),
+		)),
 		)
 }
 
@@ -100,7 +106,7 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
 		txBody := flow.NewTransactionBody().
 			SetScript([]byte(`
 	            transaction {
-	              prepare(signer: AuthAccount) {}
+	              prepare(signer: &Account) {}
 	            }
 	        `)).
 			AddAuthorizer(unittest.AddressFixture())
@@ -122,7 +128,7 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
                 transaction {
                   var x: Int
 
-                  prepare(signer: AuthAccount) {
+                  prepare(signer: &Account) {
                     self.x = 0
                   }
 
@@ -175,8 +181,8 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
 		txBody := flow.NewTransactionBody().
 			SetScript([]byte(`
                 transaction {
-                  prepare(signer: AuthAccount) {
-                    AuthAccount(payer: signer)
+                  prepare(signer: auth(BorrowValue) &Account) {
+                    Account(payer: signer)
                   }
                 }
             `)).
@@ -286,9 +292,13 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		txBody = flow.NewTransactionBody().
 			SetScript([]byte(`
 				transaction {
-					prepare(signer: AuthAccount) {
+					prepare(signer: &Account) {
 						var s : String = ""
-						for name in signer.contracts.names {
+						let names = signer.contracts.names
+						var i = 0
+						while i < names.length {
+						    let name = names[i]
+						    i = i + 1
 							s = s.concat(name).concat(",")
 						}
 						if s != "Container," {
@@ -802,7 +812,7 @@ func TestBlockContext_ExecuteTransaction_WithArguments(t *testing.T) {
 			label: "Parameters and authorizer",
 			script: `
                 transaction(x: Int, y: String) {
-                    prepare(acct: AuthAccount) { log(acct.address) }
+                    prepare(acct: &Account) { log(acct.address) }
                     execute { log(x); log(y) }
                 }`,
 			args:        [][]byte{arg1, arg2},
@@ -842,7 +852,7 @@ func TestBlockContext_ExecuteTransaction_WithArguments(t *testing.T) {
 }
 func gasLimitScript(depth int) string {
 	return fmt.Sprintf(`
-        pub fun foo(_ i: Int) {
+        access(all) fun foo(_ i: Int) {
             if i <= 0 {
                 return
             }
@@ -903,7 +913,7 @@ func TestBlockContext_ExecuteTransaction_GasLimit(t *testing.T) {
 		t.Run(tt.label, func(t *testing.T) {
 			txBody := flow.NewTransactionBody().
 				SetScript([]byte(tt.script)).
-				SetGasLimit(tt.gasLimit)
+				SetComputeLimit(tt.gasLimit)
 
 			err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
 			require.NoError(t, err)
@@ -931,7 +941,7 @@ func TestBlockContext_ExecuteTransaction_StorageLimit(t *testing.T) {
 	script := fmt.Sprintf(`
 			access(all) contract Container {
 				access(all) resource Counter {
-					pub var longString: String
+					access(all) var longString: String
 					init() {
 						self.longString = "%s"
 					}
@@ -1009,28 +1019,32 @@ func TestBlockContext_ExecuteTransaction_StorageLimit(t *testing.T) {
 					chain)
 				require.NoError(t, err)
 
+				sc := systemcontracts.SystemContractsForChain(chain.ChainID())
 				// deposit more flow to increase capacity
 				txBody := flow.NewTransactionBody().
-					SetScript([]byte(fmt.Sprintf(`
+					SetScript([]byte(fmt.Sprintf(
+						`
 					import FungibleToken from %s
 					import FlowToken from %s
 
 					transaction {
-						prepare(signer: AuthAccount, service: AuthAccount) {
+						prepare(signer: auth(AddContract) &Account, service: auth(BorrowValue) &Account) {
 							signer.contracts.add(name: "%s", code: "%s".decodeHex())
 
-							let vaultRef = service.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)!
+							let vaultRef = service.storage.borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(from: /storage/flowTokenVault)!
 							// deposit additional flow
 							let payment <- vaultRef.withdraw(amount: 10.0) as! @FlowToken.Vault
 
-							let receiver = signer.getCapability(/public/flowTokenReceiver)!.borrow<&{FungibleToken.Receiver}>()
+							let receiver = signer.capabilities.borrow<&{FungibleToken.Receiver}>(/public/flowTokenReceiver)
 								?? panic("Could not borrow receiver reference to the recipient's Vault")
 							receiver.deposit(from: <-payment)
 						}
-					}`, fvm.FungibleTokenAddress(chain).HexWithPrefix(),
-						fvm.FlowTokenAddress(chain).HexWithPrefix(),
+					}`,
+						sc.FungibleToken.Address.HexWithPrefix(),
+						sc.FlowToken.Address.HexWithPrefix(),
 						"Container",
-						hex.EncodeToString([]byte(script))))).
+						hex.EncodeToString([]byte(script)),
+					))).
 					AddAuthorizer(accounts[0]).
 					AddAuthorizer(chain.ServiceAddress()).
 					SetProposalKey(chain.ServiceAddress(), 0, 0).
@@ -1066,7 +1080,7 @@ func TestBlockContext_ExecuteTransaction_InteractionLimitReached(t *testing.T) {
 	script := fmt.Sprintf(`
 			access(all) contract Container {
 				access(all) resource Counter {
-					pub var longString: String
+					access(all) var longString: String
 					init() {
 						self.longString = "%s"
 					}
@@ -1255,8 +1269,8 @@ func TestBlockContext_ExecuteTransaction_InteractionLimitReached(t *testing.T) {
 
 var createAccountScript = []byte(`
     transaction {
-        prepare(signer: AuthAccount) {
-            let acct = AuthAccount(payer: signer)
+        prepare(signer: auth(BorrowValue) &Account) {
+            let acct = Account(payer: signer)
         }
     }
 `)
@@ -1274,7 +1288,7 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
 
 	t.Run("script success", func(t *testing.T) {
 		code := []byte(`
-            pub fun main(): Int {
+            access(all) fun main(): Int {
                 return 42
             }
         `)
@@ -1290,7 +1304,7 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
 
 	t.Run("script failure", func(t *testing.T) {
 		code := []byte(`
-            pub fun main(): Int {
+            access(all) fun main(): Int {
                 assert(1 == 2)
                 return 42
             }
@@ -1307,7 +1321,7 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
 
 	t.Run("script logs", func(t *testing.T) {
 		code := []byte(`
-            pub fun main(): Int {
+            access(all) fun main(): Int {
                 log("foo")
                 log("bar")
                 return 42
@@ -1343,17 +1357,17 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
 		// Deploy the test contract
 
 		const contract = `
-			pub contract Test {
+			access(all) contract Test {
 
-				pub struct Foo {}
+				access(all) struct Foo {}
 
-                pub let foos: [Foo]
+                access(all) let foos: [Foo]
 
 				init() {
 					self.foos = []
 				}
 
-				pub fun add() {
+				access(all) fun add() {
 					self.foos.append(Foo())
 				}
 			}
@@ -1394,7 +1408,7 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
 			`
 			  import Test from 0x%s
 
-			  pub fun main() {
+			  access(all) fun main() {
 			      Test.add()
 			  }
 			`,
@@ -1484,7 +1498,7 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 
 	t.Run("works as script", func(t *testing.T) {
 		code := []byte(`
-            pub fun main() {
+            access(all) fun main() {
                 let block = getCurrentBlock()
                 log(block)
 
@@ -1548,7 +1562,7 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 
 	t.Run("panics if external function panics in script", func(t *testing.T) {
 		script := []byte(`
-            pub fun main() {
+            access(all) fun main() {
                 let block = getCurrentBlock()
                 let nextBlock = getBlock(at: block.height + UInt64(2))
             }
@@ -1616,16 +1630,19 @@ func TestBlockContext_GetAccount(t *testing.T) {
 		// to flow.address)
 		data, err := ccf.Decode(nil, accountCreatedEvents[0].Payload)
 		require.NoError(t, err)
-		address := flow.ConvertAddress(
-			data.(cadence.Event).Fields[0].(cadence.Address))
 
-		return address, privateKey.PublicKey(
-			fvm.AccountKeyWeightThreshold).PublicKey
+		address := flow.ConvertAddress(
+			cadence.SearchFieldByName(
+				data.(cadence.Event),
+				stdlib.AccountEventAddressParameter.Identifier,
+			).(cadence.Address),
+		)
+		return address, privateKey.PublicKey(fvm.AccountKeyWeightThreshold).PublicKey
 	}
 
 	addressGen := chain.NewAddressGenerator()
 	// skip the addresses of 4 reserved accounts
-	for i := 0; i < 4; i++ {
+	for i := 0; i < systemcontracts.LastSystemAccountIndex; i++ {
 		_, err := addressGen.NextAddress()
 		require.NoError(t, err)
 	}
@@ -1665,14 +1682,9 @@ func TestBlockContext_GetAccount(t *testing.T) {
 }
 
 func TestBlockContext_Random(t *testing.T) {
-
-	t.Parallel()
-
 	chain, vm := createChainAndVm(flow.Mainnet)
-
 	header := &flow.Header{Height: 42}
 	source := testutil.EntropyProviderFixture(nil)
-
 	ctx := fvm.NewContext(
 		fvm.WithChain(chain),
 		fvm.WithBlockHeader(header),
@@ -1680,17 +1692,19 @@ func TestBlockContext_Random(t *testing.T) {
 		fvm.WithCadenceLogging(true),
 	)
 
-	t.Run("works as transaction", func(t *testing.T) {
-		txBody := flow.NewTransactionBody().
-			SetScript([]byte(`
-                transaction {
-                    execute {
-                        let rand = unsafeRandom()
-                        log(rand)
-                    }
-                }
-            `))
+	txCode := []byte(`
+	transaction {
+		execute {
+			let rand1 = revertibleRandom<UInt64>()
+			log(rand1)
+			let rand2 = revertibleRandom<UInt64>()
+			log(rand2)
+		}
+	}
+	`)
 
+	getTxRandoms := func(t *testing.T) [2]uint64 {
+		txBody := flow.NewTransactionBody().SetScript(txCode)
 		err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
 		require.NoError(t, err)
 
@@ -1700,14 +1714,78 @@ func TestBlockContext_Random(t *testing.T) {
 			testutil.RootBootstrappedLedger(vm, ctx))
 		require.NoError(t, err)
 		require.NoError(t, output.Err)
+		require.Len(t, output.Logs, 2)
 
-		require.Len(t, output.Logs, 1)
-
-		// output cannot be deterministic because transaction signature is not deterministic
-		// (which makes the tx hash and the PRG seed used by the execution not deterministic)
-		_, err = strconv.ParseUint(output.Logs[0], 10, 64)
+		r1, err := strconv.ParseUint(output.Logs[0], 10, 64)
 		require.NoError(t, err)
+		r2, err := strconv.ParseUint(output.Logs[1], 10, 64)
+		require.NoError(t, err)
+		return [2]uint64{r1, r2}
+	}
+
+	// - checks that unsafeRandom works on transactions
+	// - (sanity) checks that two successive randoms aren't equal
+	t.Run("single transaction", func(t *testing.T) {
+		randoms := getTxRandoms(t)
+		require.NotEqual(t, randoms[1], randoms[0], "extremely unlikely to be equal")
 	})
+
+	// checks that two transactions with different IDs do not generate the same randoms
+	t.Run("two transactions", func(t *testing.T) {
+		// getLoggedRandoms generates different tx IDs because envelope signature is randomized
+		randoms1 := getTxRandoms(t)
+		randoms2 := getTxRandoms(t)
+		require.NotEqual(t, randoms1[0], randoms2[0], "extremely unlikely to be equal")
+	})
+
+	scriptCode := `
+	access(all)
+	fun main(a: Int8) {
+		let rand = revertibleRandom<UInt64>()
+		log(rand)
+		let rand%[1]d = revertibleRandom<UInt64>()
+		log(rand%[1]d)
+	}
+	`
+
+	getScriptRandoms := func(t *testing.T, codeSalt int, arg int) [2]uint64 {
+		script := fvm.Script([]byte(fmt.Sprintf(scriptCode, codeSalt))).
+			WithArguments(jsoncdc.MustEncode(cadence.Int8(arg)))
+
+		_, output, err := vm.Run(ctx, script, testutil.RootBootstrappedLedger(vm, ctx))
+		require.NoError(t, err)
+		require.NoError(t, output.Err)
+
+		r1, err := strconv.ParseUint(output.Logs[0], 10, 64)
+		require.NoError(t, err)
+		r2, err := strconv.ParseUint(output.Logs[1], 10, 64)
+		require.NoError(t, err)
+		return [2]uint64{r1, r2}
+	}
+
+	// - checks that unsafeRandom works on scripts
+	// - (sanity) checks that two successive randoms aren't equal
+	t.Run("single script", func(t *testing.T) {
+		randoms := getScriptRandoms(t, 1, 0)
+		require.NotEqual(t, randoms[1], randoms[0], "extremely unlikely to be equal")
+	})
+
+	// checks that two scripts with different codes do not generate the same randoms
+	t.Run("two script codes", func(t *testing.T) {
+		// getScriptRandoms generates different scripts IDs using different codes
+		randoms1 := getScriptRandoms(t, 1, 0)
+		randoms2 := getScriptRandoms(t, 2, 0)
+		require.NotEqual(t, randoms1[0], randoms2[0], "extremely unlikely to be equal")
+	})
+
+	// checks that two scripts with same codes but different arguments do not generate the same randoms
+	t.Run("same script codes different arguments", func(t *testing.T) {
+		// getScriptRandoms generates different scripts IDs using different arguments
+		randoms1 := getScriptRandoms(t, 1, 0)
+		randoms2 := getScriptRandoms(t, 1, 1)
+		require.NotEqual(t, randoms1[0], randoms2[0], "extremely unlikely to be equal")
+	})
+
 }
 
 func TestBlockContext_ExecuteTransaction_CreateAccount_WithMonotonicAddresses(t *testing.T) {
@@ -1740,10 +1818,17 @@ func TestBlockContext_ExecuteTransaction_CreateAccount_WithMonotonicAddresses(t 
 
 	data, err := ccf.Decode(nil, accountCreatedEvents[0].Payload)
 	require.NoError(t, err)
-	address := flow.ConvertAddress(
-		data.(cadence.Event).Fields[0].(cadence.Address))
 
-	require.Equal(t, flow.HexToAddress("05"), address)
+	address := flow.ConvertAddress(
+		cadence.SearchFieldByName(
+			data.(cadence.Event),
+			stdlib.AccountEventAddressParameter.Identifier,
+		).(cadence.Address),
+	)
+
+	// convert LastSystemAccountIndex + 1 to a flow.Address
+	expected := flow.HexToAddress(fmt.Sprintf("0x%02x", systemcontracts.LastSystemAccountIndex+1))
+	require.Equal(t, expected, address)
 }
 
 func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
@@ -1755,19 +1840,23 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 		address flow.Address,
 	) uint64 {
 
-		code := []byte(fmt.Sprintf(`
+		sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+		code := []byte(fmt.Sprintf(
+			`
 					import FungibleToken from 0x%s
 					import FlowToken from 0x%s
 
-					pub fun main(account: Address): UFix64 {
+					access(all) fun main(account: Address): UFix64 {
 						let acct = getAccount(account)
-						let vaultRef = acct.getCapability(/public/flowTokenBalance)
-							.borrow<&FlowToken.Vault{FungibleToken.Balance}>()
+						let vaultRef = acct.capabilities.borrow<&FlowToken.Vault>(/public/flowTokenBalance)
 							?? panic("Could not borrow Balance reference to the Vault")
 
 						return vaultRef.balance
 					}
-				`, fvm.FungibleTokenAddress(chain), fvm.FlowTokenAddress(chain)))
+				`,
+			sc.FungibleToken.Address.Hex(),
+			sc.FlowToken.Address.Hex(),
+		))
 		script := fvm.Script(code).WithArguments(
 			jsoncdc.MustEncode(cadence.NewAddress(address)),
 		)
@@ -1775,7 +1864,7 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 		_, output, err := vm.Run(ctx, script, storageSnapshot)
 		require.NoError(t, err)
 		require.NoError(t, output.Err)
-		return output.Value.ToGoValue().(uint64)
+		return uint64(output.Value.(cadence.UFix64))
 	}
 
 	t.Run("Transaction fails because of storage", newVMTest().withBootstrapProcedureOptions(
@@ -1783,6 +1872,8 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
 		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
 		fvm.WithExecutionMemoryLimit(math.MaxUint64),
+		// The evm account has a storage exception, and if we don't bootstrap with evm,
+		// the first created account will have that address.
 	).run(
 		func(t *testing.T, vm fvm.VM, chain flow.Chain, ctx fvm.Context, snapshotTree snapshot.SnapshotTree) {
 			ctx.LimitAccountStorage = true // this test requires storage limits to be enforced

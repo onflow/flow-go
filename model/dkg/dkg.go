@@ -1,7 +1,7 @@
 package dkg
 
 import (
-	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/crypto"
 )
 
 // DKGData represents all the output data from the DKG process, including private information.

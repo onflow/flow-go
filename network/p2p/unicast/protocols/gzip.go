@@ -7,7 +7,7 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network/compressor"
-	"github.com/onflow/flow-go/network/p2p/compressed"
+	"github.com/onflow/flow-go/network/p2p/unicast/protocols/internal"
 )
 
 const GzipCompressionUnicast = ProtocolName("gzip-compression")
@@ -33,7 +33,7 @@ func NewGzipCompressedUnicast(logger zerolog.Logger, sporkId flow.Identifier, de
 
 // UpgradeRawStream wraps gzip compression and decompression around the plain libp2p stream.
 func (g GzipStream) UpgradeRawStream(s libp2pnet.Stream) (libp2pnet.Stream, error) {
-	return compressed.NewCompressedStream(s, compressor.GzipStreamCompressor{})
+	return internal.NewCompressedStream(s, compressor.GzipStreamCompressor{})
 }
 
 func (g GzipStream) Handler(s libp2pnet.Stream) {

@@ -12,7 +12,7 @@ type SpamRecordCache interface {
 	// Returns the Penalty value of the record after the adjustment.
 	// It returns an error if the adjustFunc returns an error or if the record does not exist.
 	// Assuming that adjust is always called when the record exists, the error is irrecoverable and indicates a bug.
-	Adjust(originId flow.Identifier, adjustFunc model.RecordAdjustFunc) (float64, error)
+	AdjustWithInit(originId flow.Identifier, adjustFunc model.RecordAdjustFunc) (float64, error)
 
 	// Identities returns the list of identities of the nodes that have a spam record in the cache.
 	Identities() []flow.Identifier

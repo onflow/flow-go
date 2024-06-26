@@ -10,6 +10,7 @@ import (
 	"path"
 	"path/filepath"
 
+	"github.com/docker/go-units"
 	"github.com/hashicorp/go-multierror"
 	"github.com/rs/zerolog"
 
@@ -79,8 +80,10 @@ func storeCheckpointV6(
 	lg.Info().
 		Str("first_hash", first.RootHash().String()).
 		Uint64("first_reg_count", first.AllocatedRegCount()).
+		Str("first_reg_size", units.BytesSize(float64(first.AllocatedRegSize()))).
 		Str("last_hash", last.RootHash().String()).
 		Uint64("last_reg_count", last.AllocatedRegCount()).
+		Str("last_reg_size", units.BytesSize(float64(last.AllocatedRegSize()))).
 		Msg("storing checkpoint")
 
 	// make sure a checkpoint file with same name doesn't exist
@@ -737,4 +740,26 @@ func closeAndMergeError(closable io.Closer, err error) error {
 	}
 
 	return merr.ErrorOrNil()
+}
+
+// withFile opens the file at the given path, and calls the given function with the opened file.
+// it handles closing the file and evicting the file from Linux page cache.
+func withFile(logger zerolog.Logger, filepath string, f func(file *os.File) error) (
+	errToReturn error,
+) {
+
+	file, err := os.Open(filepath)
+	if err != nil {
+		return fmt.Errorf("could not open file %v: %w", filepath, err)
+	}
+	defer func(file *os.File) {
+		evictErr := evictFileFromLinuxPageCache(file, false, logger)
+		if evictErr != nil {
+			logger.Warn().Msgf("failed to evict top trie file %s from Linux page cache: %s", filepath, evictErr)
+			// No need to return this error because it's possible to continue normal operations.
+		}
+		errToReturn = closeAndMergeError(file, errToReturn)
+	}(file)
+
+	return f(file)
 }

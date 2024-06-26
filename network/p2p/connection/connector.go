@@ -8,7 +8,7 @@ import (
 
 	"github.com/onflow/flow-go/network/internal/p2putils"
 	"github.com/onflow/flow-go/network/p2p"
-	"github.com/onflow/flow-go/network/p2p/p2plogging"
+	p2plogging "github.com/onflow/flow-go/network/p2p/logging"
 	"github.com/onflow/flow-go/utils/logging"
 	"github.com/onflow/flow-go/utils/rand"
 )
@@ -59,7 +59,7 @@ var _ p2p.PeerUpdater = (*PeerUpdater)(nil)
 //   - error: an error if there is any error while creating the connector. The errors are irrecoverable and unexpected.
 func NewPeerUpdater(cfg *PeerUpdaterConfig) (*PeerUpdater, error) {
 	libP2PConnector := &PeerUpdater{
-		log:              cfg.Logger,
+		log:              cfg.Logger.With().Str("component", "peer-updater").Logger(),
 		connector:        cfg.Connector,
 		host:             cfg.Host,
 		pruneConnections: cfg.PruneConnections,

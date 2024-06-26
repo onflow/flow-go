@@ -1,15 +1,23 @@
 package extract
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"math"
 	"os"
+	syncAtomic "sync/atomic"
+	"time"
 
 	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"go.uber.org/atomic"
+	"golang.org/x/sync/errgroup"
 
+	migrators "github.com/onflow/flow-go/cmd/util/ledger/migrations"
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
+	"github.com/onflow/flow-go/cmd/util/ledger/util"
+	"github.com/onflow/flow-go/cmd/util/ledger/util/registers"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/hash"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
@@ -19,19 +27,19 @@ import (
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/storage"
 )
 
-func getStateCommitment(commits storage.Commits, blockHash flow.Identifier) (flow.StateCommitment, error) {
-	return commits.ByBlockID(blockHash)
-}
-
 func extractExecutionState(
+	log zerolog.Logger,
 	dir string,
 	targetHash flow.StateCommitment,
 	outputDir string,
-	log zerolog.Logger,
-	nWorker int, // number of concurrent worker to migation payloads
+	nWorker int, // number of concurrent worker to migration payloads
+	runMigrations bool,
+	outputPayloadFile string,
+	exportPayloadsForOwners map[string]struct{},
+	sortPayloads bool,
+	opts migrators.Options,
 ) error {
 
 	log.Info().Msg("init WAL")
@@ -68,7 +76,16 @@ func extractExecutionState(
 
 	log.Info().Msg("init compactor")
 
-	compactor, err := complete.NewCompactor(led, diskWal, log, complete.DefaultCacheSize, checkpointDistance, checkpointsToKeep, atomic.NewBool(false))
+	compactor, err := complete.NewCompactor(
+		led,
+		diskWal,
+		log,
+		complete.DefaultCacheSize,
+		checkpointDistance,
+		checkpointsToKeep,
+		atomic.NewBool(false),
+		&metrics.NoopCollector{},
+	)
 	if err != nil {
 		return fmt.Errorf("cannot create compactor: %w", err)
 	}
@@ -82,13 +99,21 @@ func extractExecutionState(
 		<-compactor.Done()
 	}()
 
-	var migrations []ledger.Migration
+	migrations := newMigrations(
+		log,
+		dir,
+		runMigrations,
+		opts,
+	)
+
+	migration := newMigration(log, migrations, nWorker)
+
 	newState := ledger.State(targetHash)
 
 	// migrate the trie if there are migrations
 	newTrie, err := led.MigrateAt(
 		newState,
-		migrations,
+		migration,
 		complete.DefaultPathFinderVersion,
 	)
 
@@ -99,13 +124,29 @@ func extractExecutionState(
 	// create reporter
 	reporter := reporters.NewExportReporter(
 		log,
-		func() flow.StateCommitment { return targetHash },
+		func() flow.StateCommitment {
+			return targetHash
+		},
 	)
 
 	newMigratedState := ledger.State(newTrie.RootHash())
 	err = reporter.Report(nil, newMigratedState)
 	if err != nil {
-		log.Error().Err(err).Msgf("can not generate report for migrated state: %v", newMigratedState)
+		log.Err(err).Msgf("can not generate report for migrated state: %v", newMigratedState)
+	}
+
+	if len(outputPayloadFile) > 0 {
+		payloads := newTrie.AllPayloads()
+
+		return exportPayloads(
+			log,
+			payloads,
+			nWorker,
+			outputPayloadFile,
+			exportPayloadsForOwners,
+			false, // payloads represents entire state.
+			sortPayloads,
+		)
 	}
 
 	migratedState, err := createCheckpoint(
@@ -133,9 +174,9 @@ func createCheckpoint(
 	outputDir,
 	outputFile string,
 ) (ledger.State, error) {
-	statecommitment := ledger.State(newTrie.RootHash())
+	stateCommitment := ledger.State(newTrie.RootHash())
 
-	log.Info().Msgf("successfully built new trie. NEW ROOT STATECOMMIEMENT: %v", statecommitment.String())
+	log.Info().Msgf("successfully built new trie. NEW ROOT STATECOMMIEMENT: %v", stateCommitment.String())
 
 	err := os.MkdirAll(outputDir, os.ModePerm)
 	if err != nil {
@@ -156,7 +197,7 @@ func createCheckpoint(
 	}
 
 	log.Info().Msgf("checkpoint file successfully stored at: %v %v", outputDir, outputFile)
-	return statecommitment, nil
+	return stateCommitment, nil
 }
 
 func writeStatusFile(fileName string, e error) error {
@@ -164,4 +205,362 @@ func writeStatusFile(fileName string, e error) error {
 	checkpointStatusJson, _ := json.MarshalIndent(checkpointStatus, "", " ")
 	err := os.WriteFile(fileName, checkpointStatusJson, 0644)
 	return err
+}
+
+func extractExecutionStateFromPayloads(
+	log zerolog.Logger,
+	dir string,
+	outputDir string,
+	nWorker int, // number of concurrent worker to migration payloads
+	runMigrations bool,
+	inputPayloadFile string,
+	outputPayloadFile string,
+	exportPayloadsForOwners map[string]struct{},
+	sortPayloads bool,
+	opts migrators.Options,
+) error {
+
+	inputPayloadsFromPartialState, payloads, err := util.ReadPayloadFile(log, inputPayloadFile)
+	if err != nil {
+		return err
+	}
+
+	log.Info().Msgf("read %d payloads", len(payloads))
+
+	migrations := newMigrations(
+		log,
+		dir,
+		runMigrations,
+		opts,
+	)
+
+	migration := newMigration(
+		log,
+		migrations,
+		nWorker,
+	)
+
+	payloads, err = migration(payloads)
+	if err != nil {
+		return err
+	}
+
+	if len(outputPayloadFile) > 0 {
+		return exportPayloads(
+			log,
+			payloads,
+			nWorker,
+			outputPayloadFile,
+			exportPayloadsForOwners,
+			inputPayloadsFromPartialState,
+			sortPayloads,
+		)
+	}
+
+	newTrie, err := createTrieFromPayloads(log, payloads)
+	if err != nil {
+		return err
+	}
+
+	migratedState, err := createCheckpoint(
+		newTrie,
+		log,
+		outputDir,
+		bootstrap.FilenameWALRootCheckpoint,
+	)
+	if err != nil {
+		return fmt.Errorf("cannot generate the output checkpoint: %w", err)
+	}
+
+	log.Info().Msgf(
+		"New state commitment for the exported state is: %s (base64: %s)",
+		migratedState.String(),
+		migratedState.Base64(),
+	)
+
+	return nil
+}
+
+func exportPayloads(
+	log zerolog.Logger,
+	payloads []*ledger.Payload,
+	nWorker int,
+	outputPayloadFile string,
+	exportPayloadsForOwners map[string]struct{},
+	inputPayloadsFromPartialState bool,
+	sortPayloads bool,
+) error {
+	if sortPayloads {
+		log.Info().Msgf("sorting %d payloads", len(payloads))
+
+		// Sort payloads to produce deterministic payload file with
+		// same sequence of payloads inside.
+		payloads = util.SortPayloadsByAddress(payloads, nWorker)
+
+		log.Info().Msgf("sorted %d payloads", len(payloads))
+	}
+
+	log.Info().Msgf("creating payloads file %s", outputPayloadFile)
+
+	exportedPayloadCount, err := util.CreatePayloadFile(
+		log,
+		outputPayloadFile,
+		payloads,
+		exportPayloadsForOwners,
+		inputPayloadsFromPartialState,
+	)
+	if err != nil {
+		return fmt.Errorf("cannot generate payloads file: %w", err)
+	}
+
+	log.Info().Msgf("exported %d payloads out of %d payloads", exportedPayloadCount, len(payloads))
+
+	return nil
+}
+
+func newMigration(
+	logger zerolog.Logger,
+	migrations []migrators.NamedMigration,
+	nWorker int,
+) ledger.Migration {
+	return func(payloads []*ledger.Payload) ([]*ledger.Payload, error) {
+
+		if len(migrations) == 0 {
+			return payloads, nil
+		}
+
+		payloadCount := len(payloads)
+
+		payloadAccountGrouping := util.GroupPayloadsByAccount(logger, payloads, nWorker)
+
+		logger.Info().Msgf(
+			"creating registers from grouped payloads (%d) ...",
+			payloadCount,
+		)
+
+		registersByAccount, err := newByAccountRegistersFromPayloadAccountGrouping(payloadAccountGrouping, nWorker)
+		if err != nil {
+			return nil, err
+		}
+
+		logger.Info().Msgf(
+			"created registers from payloads (%d accounts)",
+			registersByAccount.AccountCount(),
+		)
+
+		// Run all migrations on the registers
+		for index, migration := range migrations {
+			migrationStep := index + 1
+
+			logger.Info().
+				Str("migration", migration.Name).
+				Msgf(
+					"migration %d/%d is underway",
+					migrationStep,
+					len(migrations),
+				)
+
+			start := time.Now()
+			err := migration.Migrate(registersByAccount)
+			elapsed := time.Since(start)
+			if err != nil {
+				return nil, fmt.Errorf(
+					"error applying migration %s (%d/%d): %w",
+					migration.Name,
+					migrationStep,
+					len(migrations),
+					err,
+				)
+			}
+
+			newPayloadCount := registersByAccount.Count()
+
+			if payloadCount != newPayloadCount {
+				logger.Warn().
+					Int("migration_step", migrationStep).
+					Int("expected_size", payloadCount).
+					Int("outcome_size", newPayloadCount).
+					Msg("payload counts has changed during migration, make sure this is expected.")
+			}
+
+			logger.Info().
+				Str("timeTaken", elapsed.String()).
+				Str("migration", migration.Name).
+				Msgf(
+					"migration %d/%d is done",
+					migrationStep,
+					len(migrations),
+				)
+
+			payloadCount = newPayloadCount
+		}
+
+		logger.Info().Msg("creating new payloads from registers ...")
+
+		newPayloads := registersByAccount.DestructIntoPayloads(nWorker)
+
+		logger.Info().Msgf("created new payloads (%d) from registers", len(newPayloads))
+
+		return newPayloads, nil
+	}
+}
+
+func newByAccountRegistersFromPayloadAccountGrouping(
+	payloadAccountGrouping *util.PayloadAccountGrouping,
+	nWorker int,
+) (
+	*registers.ByAccount,
+	error,
+) {
+	g, ctx := errgroup.WithContext(context.Background())
+
+	jobs := make(chan *util.PayloadAccountGroup, nWorker)
+	results := make(chan *registers.AccountRegisters, nWorker)
+
+	g.Go(func() error {
+		defer close(jobs)
+		for {
+			payloadAccountGroup, err := payloadAccountGrouping.Next()
+			if err != nil {
+				return fmt.Errorf("failed to group payloads by account: %w", err)
+			}
+
+			if payloadAccountGroup == nil {
+				return nil
+			}
+
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case jobs <- payloadAccountGroup:
+			}
+		}
+	})
+
+	workersLeft := int64(nWorker)
+	for i := 0; i < nWorker; i++ {
+		g.Go(func() error {
+			defer func() {
+				if syncAtomic.AddInt64(&workersLeft, -1) == 0 {
+					close(results)
+				}
+			}()
+
+			for payloadAccountGroup := range jobs {
+
+				// Convert address to owner
+				payloadGroupOwner := flow.AddressToRegisterOwner(payloadAccountGroup.Address)
+
+				accountRegisters, err := registers.NewAccountRegistersFromPayloads(
+					payloadGroupOwner,
+					payloadAccountGroup.Payloads,
+				)
+				if err != nil {
+					return fmt.Errorf("failed to create account registers from payloads: %w", err)
+				}
+				select {
+				case <-ctx.Done():
+					return ctx.Err()
+				case results <- accountRegisters:
+				}
+			}
+
+			return nil
+		})
+	}
+
+	registersByAccount := registers.NewByAccount()
+	g.Go(func() error {
+		for accountRegisters := range results {
+			oldAccountRegisters := registersByAccount.SetAccountRegisters(accountRegisters)
+			if oldAccountRegisters != nil {
+				// Account grouping should never create multiple groups for an account.
+				// In case it does anyway, merge the groups together,
+				// by merging the existing registers into the new ones.
+
+				log.Warn().Msgf(
+					"account registers already exist for account %x. merging %d existing registers into %d new",
+					accountRegisters.Owner(),
+					oldAccountRegisters.Count(),
+					accountRegisters.Count(),
+				)
+
+				err := accountRegisters.Merge(oldAccountRegisters)
+				if err != nil {
+					return fmt.Errorf("failed to merge account registers: %w", err)
+				}
+			}
+		}
+
+		return nil
+	})
+
+	return registersByAccount, g.Wait()
+}
+
+func createTrieFromPayloads(logger zerolog.Logger, payloads []*ledger.Payload) (*trie.MTrie, error) {
+	// get paths
+	paths, err := pathfinder.PathsFromPayloads(payloads, complete.DefaultPathFinderVersion)
+	if err != nil {
+		return nil, fmt.Errorf("cannot export checkpoint, can't construct paths: %w", err)
+	}
+
+	logger.Info().Msgf("constructing a new trie with migrated payloads (count: %d)...", len(payloads))
+
+	emptyTrie := trie.NewEmptyMTrie()
+
+	derefPayloads := make([]ledger.Payload, len(payloads))
+	for i, p := range payloads {
+		derefPayloads[i] = *p
+	}
+
+	// no need to prune the data since it has already been prunned through migrations
+	const applyPruning = false
+	newTrie, _, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, derefPayloads, applyPruning)
+	if err != nil {
+		return nil, fmt.Errorf("constructing updated trie failed: %w", err)
+	}
+
+	return newTrie, nil
+}
+
+func newMigrations(
+	log zerolog.Logger,
+	outputDir string,
+	runMigrations bool,
+	opts migrators.Options,
+) []migrators.NamedMigration {
+	if !runMigrations {
+		return nil
+	}
+
+	log.Info().Msg("initializing migrations")
+
+	rwf := reporters.NewReportFileWriterFactory(outputDir, log)
+
+	namedMigrations := migrators.NewCadence1Migrations(
+		log,
+		outputDir,
+		rwf,
+		opts,
+	)
+
+	// At the end, fix up storage-used discrepancies
+	namedMigrations = append(
+		namedMigrations,
+		migrators.NamedMigration{
+			Name: "account-usage-migration",
+			Migrate: migrators.NewAccountBasedMigration(
+				log,
+				opts.NWorker,
+				[]migrators.AccountBasedMigration{
+					&migrators.AccountUsageMigration{},
+				},
+			),
+		},
+	)
+
+	log.Info().Msg("initialized migrations")
+
+	return namedMigrations
 }

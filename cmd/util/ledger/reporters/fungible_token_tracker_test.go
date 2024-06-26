@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/storage/state"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -69,29 +70,35 @@ func TestFungibleTokenTracker(t *testing.T) {
 	err = view.Merge(snapshot)
 	require.NoError(t, err)
 
+	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+
 	// deploy wrapper resource
 	testContract := fmt.Sprintf(`
 	import FungibleToken from 0x%s
 
-	pub contract WrappedToken {
-		pub resource WrappedVault {
-			pub var vault: @FungibleToken.Vault
+	access(all)
+	contract WrappedToken {
 
-			init(v: @FungibleToken.Vault) {
+		access(all)
+		resource WrappedVault {
+
+			access(all)
+			var vault: @{FungibleToken.Vault}
+
+			init(v: @{FungibleToken.Vault}) {
 				self.vault <- v
 			}
-			destroy() {
-			  destroy self.vault
-			}
 		}
-		pub fun CreateWrappedVault(inp: @FungibleToken.Vault): @WrappedToken.WrappedVault {
+
+		access(all)
+		fun CreateWrappedVault(inp: @{FungibleToken.Vault}): @WrappedToken.WrappedVault {
 			return <-create WrappedVault(v :<- inp)
 		}
-	}`, fvm.FungibleTokenAddress(chain))
+	}`, sc.FungibleToken.Address.Hex())
 
 	deployingTestContractScript := []byte(fmt.Sprintf(`
 	transaction {
-		prepare(signer: AuthAccount) {
+		prepare(signer: auth(AddContract) &Account) {
 				signer.contracts.add(name: "%s", code: "%s".decodeHex())
 		}
 	}
@@ -109,21 +116,26 @@ func TestFungibleTokenTracker(t *testing.T) {
 	err = view.Merge(snapshot)
 	require.NoError(t, err)
 
-	wrapTokenScript := []byte(fmt.Sprintf(`
+	wrapTokenScript := []byte(fmt.Sprintf(
+		`
 							import FungibleToken from 0x%s
 							import FlowToken from 0x%s
 							import WrappedToken from 0x%s
 
 							transaction(amount: UFix64) {
-								prepare(signer: AuthAccount) {
-									let vaultRef = signer.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
+								prepare(signer: auth(Storage) &Account) {
+									let vaultRef = signer.storage.borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(from: /storage/flowTokenVault)
 										?? panic("Could not borrow reference to the owner's Vault!")
 
 									let sentVault <- vaultRef.withdraw(amount: amount)
 									let wrappedFlow <- WrappedToken.CreateWrappedVault(inp :<- sentVault)
-									signer.save(<-wrappedFlow, to: /storage/wrappedToken)
+									signer.storage.save(<-wrappedFlow, to: /storage/wrappedToken)
 								}
-							}`, fvm.FungibleTokenAddress(chain), fvm.FlowTokenAddress(chain), chain.ServiceAddress()))
+							}`,
+		sc.FungibleToken.Address.Hex(),
+		sc.FlowToken.Address.Hex(),
+		sc.FlowServiceAccount.Address.Hex(),
+	))
 
 	txBody = flow.NewTransactionBody().
 		SetScript(wrapTokenScript).
@@ -154,10 +166,11 @@ func TestFungibleTokenTracker(t *testing.T) {
 	// wrappedToken
 	require.True(t, strings.Contains(string(data), `{"path":"storage/wrappedToken/vault","address":"8c5303eaa26202d6","balance":105,"type_id":"A.7e60df042a9c0868.FlowToken.Vault"}`))
 	// flowTokenVaults
-	require.True(t, strings.Contains(string(data), `{"path":"storage/flowTokenVault","address":"8c5303eaa26202d6","balance":99999999999699895,"type_id":"A.7e60df042a9c0868.FlowToken.Vault"}`))
+	require.True(t, strings.Contains(string(data), `{"path":"storage/flowTokenVault","address":"8c5303eaa26202d6","balance":99999999999599895,"type_id":"A.7e60df042a9c0868.FlowToken.Vault"}`))
 	require.True(t, strings.Contains(string(data), `{"path":"storage/flowTokenVault","address":"9a0766d93b6608b7","balance":100000,"type_id":"A.7e60df042a9c0868.FlowToken.Vault"}`))
 	require.True(t, strings.Contains(string(data), `{"path":"storage/flowTokenVault","address":"7e60df042a9c0868","balance":100000,"type_id":"A.7e60df042a9c0868.FlowToken.Vault"}`))
 	require.True(t, strings.Contains(string(data), `{"path":"storage/flowTokenVault","address":"912d5440f7e3769e","balance":100000,"type_id":"A.7e60df042a9c0868.FlowToken.Vault"}`))
+	require.True(t, strings.Contains(string(data), `{"path":"storage/flowTokenVault","address":"754aed9de6197641","balance":100000,"type_id":"A.7e60df042a9c0868.FlowToken.Vault"}`))
 
 	// do not remove this line, see https://github.com/onflow/flow-go/pull/2237
 	t.Log("success")

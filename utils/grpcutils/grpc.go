@@ -8,10 +8,13 @@ import (
 
 	lcrypto "github.com/libp2p/go-libp2p/core/crypto"
 	libp2ptls "github.com/libp2p/go-libp2p/p2p/security/tls"
+	"github.com/onflow/crypto"
 
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 )
+
+// NoCompressor use when no specific compressor name provided, which effectively means no compression.
+const NoCompressor = ""
 
 // DefaultMaxMsgSize use 1 GiB as the default message size limit.
 // This enforces a sane max message size, while still allowing for reasonably large messages.
@@ -108,6 +111,7 @@ func DefaultClientTLSConfig(publicKey crypto.PublicKey) (*tls.Config, error) {
 	config := &tls.Config{
 		MinVersion: tls.VersionTLS13,
 		// This is not insecure here. We will verify the cert chain ourselves.
+		// nolint
 		InsecureSkipVerify: true,
 		ClientAuth:         tls.RequireAnyClientCert,
 	}

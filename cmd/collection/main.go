@@ -5,10 +5,12 @@ import (
 	"time"
 
 	"github.com/spf13/pflag"
+	"golang.org/x/time/rate"
 
 	client "github.com/onflow/flow-go-sdk/access/grpc"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 	"github.com/onflow/flow-go/admin/commands"
+	collectionCommands "github.com/onflow/flow-go/admin/commands/collection"
 	storageCommands "github.com/onflow/flow-go/admin/commands/storage"
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
@@ -41,6 +43,7 @@ import (
 	modulecompliance "github.com/onflow/flow-go/module/compliance"
 	"github.com/onflow/flow-go/module/epochs"
 	confinalizer "github.com/onflow/flow-go/module/finalizer/consensus"
+	"github.com/onflow/flow-go/module/grpcclient"
 	"github.com/onflow/flow-go/module/mempool"
 	epochpool "github.com/onflow/flow-go/module/mempool/epochs"
 	"github.com/onflow/flow-go/module/mempool/herocache"
@@ -83,22 +86,27 @@ func main() {
 
 		pools               *epochpool.TransactionPools // epoch-scoped transaction pools
 		followerDistributor *pubsub.FollowerDistributor
+		addressRateLimiter  *ingest.AddressRateLimiter
 
-		push              *pusher.Engine
-		ing               *ingest.Engine
-		mainChainSyncCore *chainsync.Core
-		followerCore      *hotstuff.FollowerLoop // follower hotstuff logic
-		followerEng       *followereng.ComplianceEngine
-		colMetrics        module.CollectionMetrics
-		err               error
+		push                  *pusher.Engine
+		ing                   *ingest.Engine
+		mainChainSyncCore     *chainsync.Core
+		followerCore          *hotstuff.FollowerLoop // follower hotstuff logic
+		followerEng           *followereng.ComplianceEngine
+		colMetrics            module.CollectionMetrics
+		machineAccountMetrics module.MachineAccountMetrics
+		err                   error
 
 		// epoch qc contract client
 		machineAccountInfo *bootstrap.NodeMachineAccountInfo
-		flowClientConfigs  []*common.FlowClientConfig
+		flowClientConfigs  []*grpcclient.FlowClientConfig
 		insecureAccessAPI  bool
 		accessNodeIDS      []string
 		apiRatelimits      map[string]int
 		apiBurstlimits     map[string]int
+		txRatelimits       float64
+		txBurstlimits      int
+		txRatelimitPayers  string
 	)
 	var deprecatedFlagBlockRateDelay time.Duration
 
@@ -118,7 +126,7 @@ func main() {
 			"maximum per-transaction byte size")
 		flags.Uint64Var(&ingestConf.MaxCollectionByteSize, "ingest-max-col-byte-size", flow.DefaultMaxCollectionByteSize,
 			"maximum per-collection byte size")
-		flags.BoolVar(&ingestConf.CheckScriptsParse, "ingest-check-scripts-parse", true,
+		flags.BoolVar(&ingestConf.CheckScriptsParse, "ingest-check-scripts-parse", false,
 			"whether we check that inbound transactions are parse-able")
 		flags.UintVar(&ingestConf.ExpiryBuffer, "ingest-expiry-buffer", 30,
 			"expiry buffer for inbound transactions")
@@ -159,6 +167,17 @@ func main() {
 		flags.StringToIntVar(&apiRatelimits, "api-rate-limits", map[string]int{}, "per second rate limits for GRPC API methods e.g. Ping=300,SendTransaction=500 etc. note limits apply globally to all clients.")
 		flags.StringToIntVar(&apiBurstlimits, "api-burst-limits", map[string]int{}, "burst limits for gRPC API methods e.g. Ping=100,SendTransaction=100 etc. note limits apply globally to all clients.")
 
+		// rate limiting for accounts, default is 2 transactions every 2.5 seconds
+		// Note: The rate limit configured for each node may differ from the effective network-wide rate limit
+		// for a given payer. In particular, the number of clusters and the message propagation factor will
+		// influence how the individual rate limit translates to a network-wide rate limit.
+		// For example, suppose we have 5 collection clusters and configure each Collection Node with a rate
+		// limit of 1 message per second. Then, the effective network-wide rate limit for a payer address would
+		// be *at least* 5 messages per second.
+		flags.Float64Var(&txRatelimits, "ingest-tx-rate-limits", 2.5, "per second rate limits for processing transactions for limited account")
+		flags.IntVar(&txBurstlimits, "ingest-tx-burst-limits", 2, "burst limits for processing transactions for limited account")
+		flags.StringVar(&txRatelimitPayers, "ingest-tx-rate-limit-payers", "", "comma separated list of accounts to apply rate limiting to")
+
 		// deprecated flags
 		flags.DurationVar(&deprecatedFlagBlockRateDelay, "block-rate-delay", 0, "the delay to broadcast block proposal in order to control block production rate")
 	}).ValidateFlags(func() error {
@@ -181,6 +200,21 @@ func main() {
 
 	nodeBuilder.
 		PreInit(cmd.DynamicStartPreInit).
+		Module("transaction rate limiter", func(node *cmd.NodeConfig) error {
+			// To be managed by admin tool, and used by ingestion engine
+			addressRateLimiter = ingest.NewAddressRateLimiter(rate.Limit(txRatelimits), txBurstlimits)
+			// read the rate limit addresses from flag and add to the rate limiter
+			addrs, err := ingest.ParseAddresses(txRatelimitPayers)
+			if err != nil {
+				return fmt.Errorf("could not parse rate limit addresses: %w", err)
+			}
+			ingest.AddAddresses(addressRateLimiter, addrs)
+
+			return nil
+		}).
+		AdminCommand("ingest-tx-rate-limit", func(node *cmd.NodeConfig) commands.AdminCommand {
+			return collectionCommands.NewTxRateLimitCommand(addressRateLimiter)
+		}).
 		AdminCommand("read-range-cluster-blocks", func(conf *cmd.NodeConfig) commands.AdminCommand {
 			clusterPayloads := badger.NewClusterPayloads(&metrics.NoopCollector{}, conf.DB)
 			headers, ok := conf.Storage.Headers.(*badger.Headers)
@@ -228,17 +262,21 @@ func main() {
 			err := node.Metrics.Mempool.Register(metrics.ResourceTransaction, pools.CombinedSize)
 			return err
 		}).
-		Module("metrics", func(node *cmd.NodeConfig) error {
+		Module("machine account config", func(node *cmd.NodeConfig) error {
+			machineAccountInfo, err = cmd.LoadNodeMachineAccountInfoFile(node.BootstrapDir, node.NodeID)
+			return err
+		}).
+		Module("collection node metrics", func(node *cmd.NodeConfig) error {
 			colMetrics = metrics.NewCollectionCollector(node.Tracer)
+			return nil
+		}).
+		Module("machine account metrics", func(node *cmd.NodeConfig) error {
+			machineAccountMetrics = metrics.NewMachineAccountCollector(node.MetricsRegisterer, machineAccountInfo.FlowAddress())
 			return nil
 		}).
 		Module("main chain sync core", func(node *cmd.NodeConfig) error {
 			log := node.Logger.With().Str("sync_chain_id", node.RootChainID.String()).Logger()
 			mainChainSyncCore, err = chainsync.New(log, node.SyncCoreConfig, metrics.NewChainSyncCollector(node.RootChainID), node.RootChainID)
-			return err
-		}).
-		Module("machine account config", func(node *cmd.NodeConfig) error {
-			machineAccountInfo, err = cmd.LoadNodeMachineAccountInfoFile(node.BootstrapDir, node.NodeID)
 			return err
 		}).
 		Module("sdk client connection options", func(node *cmd.NodeConfig) error {
@@ -247,7 +285,7 @@ func main() {
 				return fmt.Errorf("failed to validate flag --access-node-ids %w", err)
 			}
 
-			flowClientConfigs, err = common.FlowClientConfigs(anIDS, insecureAccessAPI, node.State.Sealed())
+			flowClientConfigs, err = grpcclient.FlowClientConfigs(anIDS, insecureAccessAPI, node.State.Sealed())
 			if err != nil {
 				return fmt.Errorf("failed to prepare flow client connection configs for each access node id %w", err)
 			}
@@ -256,7 +294,7 @@ func main() {
 		}).
 		Component("machine account config validator", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			// @TODO use fallback logic for flowClient similar to DKG/QC contract clients
-			flowClient, err := common.FlowClient(flowClientConfigs[0])
+			flowClient, err := grpcclient.FlowClient(flowClientConfigs[0])
 			if err != nil {
 				return nil, fmt.Errorf("failed to get flow client connection option for access node (0): %s %w", flowClientConfigs[0].AccessAddress, err)
 			}
@@ -271,6 +309,7 @@ func main() {
 				flowClient,
 				flow.RoleCollection,
 				*machineAccountInfo,
+				machineAccountMetrics,
 				opts...,
 			)
 
@@ -354,6 +393,10 @@ func main() {
 			return followerEng, nil
 		}).
 		Component("main chain sync engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			spamConfig, err := consync.NewSpamDetectionConfig()
+			if err != nil {
+				return nil, fmt.Errorf("could not initialize spam detection config: %w", err)
+			}
 
 			// create a block synchronization engine to handle follower getting out of sync
 			sync, err := consync.New(
@@ -366,7 +409,7 @@ func main() {
 				followerEng,
 				mainChainSyncCore,
 				node.SyncEngineIdentifierProvider,
-				consync.NewSpamDetectionConfig(),
+				spamConfig,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create synchronization engine: %w", err)
@@ -387,6 +430,7 @@ func main() {
 				node.RootChainID.Chain(),
 				pools,
 				ingestConf,
+				addressRateLimiter,
 			)
 			return ing, err
 		}).
@@ -414,7 +458,7 @@ func main() {
 			collectionRequestQueue := queue.NewHeroStore(maxCollectionRequestCacheSize, node.Logger, collectionRequestMetrics)
 
 			return provider.New(
-				node.Logger,
+				node.Logger.With().Str("engine", "collection_provider").Logger(),
 				node.Metrics.Engine,
 				node.EngineRegistry,
 				node.Me,
@@ -423,8 +467,8 @@ func main() {
 				collectionProviderWorkers,
 				channels.ProvideCollections,
 				filter.And(
-					filter.HasWeight(true),
-					filter.HasRole(flow.RoleAccess, flow.RoleExecution),
+					filter.IsValidCurrentEpochParticipantOrJoining,
+					filter.HasRole[flow.Identity](flow.RoleAccess, flow.RoleExecution),
 				),
 				retrieve,
 			)
@@ -609,10 +653,7 @@ func createQCContractClient(node *cmd.NodeConfig, machineAccountInfo *bootstrap.
 
 	var qcContractClient module.QCContractClient
 
-	contracts, err := systemcontracts.SystemContractsForChain(node.RootChainID)
-	if err != nil {
-		return nil, err
-	}
+	contracts := systemcontracts.SystemContractsForChain(node.RootChainID)
 	qcContractAddress := contracts.ClusterQC.Address.Hex()
 
 	// construct signer from private key
@@ -627,17 +668,26 @@ func createQCContractClient(node *cmd.NodeConfig, machineAccountInfo *bootstrap.
 	}
 
 	// create actual qc contract client, all flags and machine account info file found
-	qcContractClient = epochs.NewQCContractClient(node.Logger, flowClient, anID, node.Me.NodeID(), machineAccountInfo.Address, machineAccountInfo.KeyIndex, qcContractAddress, txSigner)
+	qcContractClient = epochs.NewQCContractClient(
+		node.Logger,
+		flowClient,
+		anID,
+		node.Me.NodeID(),
+		machineAccountInfo.Address,
+		machineAccountInfo.KeyIndex,
+		qcContractAddress,
+		txSigner,
+	)
 
 	return qcContractClient, nil
 }
 
 // createQCContractClients creates priority ordered array of QCContractClient
-func createQCContractClients(node *cmd.NodeConfig, machineAccountInfo *bootstrap.NodeMachineAccountInfo, flowClientOpts []*common.FlowClientConfig) ([]module.QCContractClient, error) {
+func createQCContractClients(node *cmd.NodeConfig, machineAccountInfo *bootstrap.NodeMachineAccountInfo, flowClientOpts []*grpcclient.FlowClientConfig) ([]module.QCContractClient, error) {
 	qcClients := make([]module.QCContractClient, 0)
 
 	for _, opt := range flowClientOpts {
-		flowClient, err := common.FlowClient(opt)
+		flowClient, err := grpcclient.FlowClient(opt)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create flow client for qc contract client with options: %s %w", flowClientOpts, err)
 		}

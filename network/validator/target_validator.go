@@ -35,7 +35,8 @@ func (tv *TargetValidator) Validate(msg network.IncomingMessageScope) bool {
 		}
 	}
 	tv.log.Debug().
-		Hex("target", logging.ID(tv.target)).
+		Hex("message_target_id", logging.ID(tv.target)).
+		Hex("local_node_id", logging.ID(tv.target)).
 		Hex("event_id", msg.EventID()).
 		Msg("message not intended for target")
 	return false

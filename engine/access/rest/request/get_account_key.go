@@ -20,6 +20,7 @@ func (g *GetAccountKey) Build(r *Request) error {
 		r.GetVar(addressVar),
 		r.GetVar(indexVar),
 		r.GetQueryParam(blockHeightQuery),
+		r.Chain,
 	)
 }
 
@@ -27,8 +28,9 @@ func (g *GetAccountKey) Parse(
 	rawAddress string,
 	rawIndex string,
 	rawHeight string,
+	chain flow.Chain,
 ) error {
-	address, err := ParseAddress(rawAddress)
+	address, err := ParseAddress(rawAddress, chain)
 	if err != nil {
 		return err
 	}
