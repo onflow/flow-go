@@ -368,6 +368,11 @@ func TempBadgerDB(t testing.TB) (*badger.DB, string) {
 	return db, dir
 }
 
+func TempPebbleDB(t testing.TB) (*pebble.DB, string) {
+	dir := TempDir(t)
+	return PebbleDB(t, dir), dir
+}
+
 func TempPebblePath(t *testing.T) string {
 	return path.Join(TempDir(t), "pebble"+strconv.Itoa(rand.Int())+".db")
 }
