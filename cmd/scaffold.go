@@ -734,7 +734,7 @@ func (fnb *FlowNodeBuilder) EnqueueAdminServerInit() error {
 	return nil
 }
 
-func (fnb *FlowNodeBuilder) RegisterpebbleMetrics() error {
+func (fnb *FlowNodeBuilder) RegisterBadgerMetrics() error {
 	return metrics.RegisterBadgerMetrics()
 }
 
@@ -1966,7 +1966,7 @@ func (fnb *FlowNodeBuilder) Initialize() error {
 
 	if fnb.MetricsEnabled {
 		fnb.EnqueueMetricsServerInit()
-		if err := fnb.RegisterpebbleMetrics(); err != nil {
+		if err := fnb.RegisterBadgerMetrics(); err != nil {
 			return err
 		}
 	}
