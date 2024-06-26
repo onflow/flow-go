@@ -755,16 +755,22 @@ func TestCallingExtraPrecompiles(t *testing.T) {
 				input := []byte{1, 2}
 				output := []byte{3, 4}
 				addr := testutils.RandomAddress(t)
+				isCalled := false
 				pc := &MockedPrecompiled{
 					AddressFunc: func() types.Address {
 						return addr
 					},
 					RequiredGasFunc: func(input []byte) uint64 {
+						isCalled = true
 						return uint64(10)
 					},
 					RunFunc: func(inp []byte) ([]byte, error) {
+						isCalled = true
 						require.Equal(t, input, inp)
 						return output, nil
+					},
+					IsCalledFunc: func() bool {
+						return isCalled
 					},
 					CapturedCallsFunc: func() *types.PrecompiledCalls {
 						return &types.PrecompiledCalls{
@@ -1041,6 +1047,7 @@ type MockedPrecompiled struct {
 	RunFunc           func(input []byte) ([]byte, error)
 	CapturedCallsFunc func() *types.PrecompiledCalls
 	ResetFunc         func()
+	IsCalledFunc      func() bool
 }
 
 var _ types.PrecompiledContract = &MockedPrecompiled{}
@@ -1057,6 +1064,13 @@ func (mp *MockedPrecompiled) RequiredGas(input []byte) uint64 {
 		panic("RequiredGas not set for the mocked precompiled contract")
 	}
 	return mp.RequiredGasFunc(input)
+}
+
+func (mp *MockedPrecompiled) IsCalled() bool {
+	if mp.IsCalledFunc == nil {
+		panic("IsCalled not set for the mocked precompiled contract")
+	}
+	return mp.IsCalledFunc()
 }
 
 func (mp *MockedPrecompiled) Run(input []byte) ([]byte, error) {

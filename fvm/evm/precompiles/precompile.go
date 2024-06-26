@@ -114,6 +114,10 @@ func (p *precompile) Run(input []byte) (output []byte, err error) {
 	return
 }
 
+func (p *precompile) IsCalled() bool {
+	return len(p.requiredGasCalls) > 0 || len(p.runCalls) > 0
+}
+
 func (p *precompile) CapturedCalls() *types.PrecompiledCalls {
 	return &types.PrecompiledCalls{
 		Address:          p.address,

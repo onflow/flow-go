@@ -34,8 +34,10 @@ func TestMutiFunctionContract(t *testing.T) {
 			},
 		}})
 
+	require.False(t, pc.IsCalled())
 	require.Equal(t, address, pc.Address())
 	require.Equal(t, gas, pc.RequiredGas(input))
+	require.True(t, pc.IsCalled())
 	ret, err := pc.Run(input)
 	require.NoError(t, err)
 	require.Equal(t, output, ret)
@@ -59,6 +61,7 @@ func TestMutiFunctionContract(t *testing.T) {
 
 	// test reset functionality
 	pc.Reset()
+	require.False(t, pc.IsCalled())
 
 	calls = pc.CapturedCalls()
 	require.Equal(t, address, calls.Address)

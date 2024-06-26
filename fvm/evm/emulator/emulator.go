@@ -574,11 +574,12 @@ func (proc *procedure) run(
 		res.GasRefund = proc.state.GetRefund()
 		res.Index = uint16(txIndex)
 
-		res.PrecompiledCalls, err = proc.capturePrecompiledCalls()
-		if err != nil {
-			return nil, err
+		if proc.extraPrecompiledIsCalled() {
+			res.PrecompiledCalls, err = proc.capturePrecompiledCalls()
+			if err != nil {
+				return nil, err
+			}
 		}
-
 		// we need to capture the returned value no matter the status
 		// if the tx is reverted the error message is returned as returned value
 		res.ReturnedData = execResult.ReturnData
@@ -609,10 +610,22 @@ func (proc *procedure) resetPrecompileTracking() {
 	}
 }
 
+func (proc *procedure) extraPrecompiledIsCalled() bool {
+	isCalled := false
+	for _, pc := range proc.config.ExtraPrecompiles {
+		if pc.IsCalled() {
+			isCalled = true
+		}
+	}
+	return isCalled
+}
+
 func (proc *procedure) capturePrecompiledCalls() ([]byte, error) {
 	apc := make(types.AggregatedPrecompiledCalls, 0)
 	for _, pc := range proc.config.ExtraPrecompiles {
-		apc = append(apc, *pc.CapturedCalls())
+		if pc.IsCalled() {
+			apc = append(apc, *pc.CapturedCalls())
+		}
 	}
 	return apc.Encode()
 }

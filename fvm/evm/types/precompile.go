@@ -14,6 +14,8 @@ type PrecompiledContract interface {
 	gethVM.PrecompiledContract
 	// Address returns the address where the precompile is deployed
 	Address() Address
+	// IsCalled returned true if any of the methods on this precompiled is called
+	IsCalled() bool
 	// CapturedCalls returns a list of calls to the Run and RequiredGas methods
 	// it includes the input and returned value for each call
 	CapturedCalls() *PrecompiledCalls
