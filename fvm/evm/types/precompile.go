@@ -36,7 +36,7 @@ type RunCall struct {
 	ErrorMsg string
 }
 
-// PrecompiledCalls captures all the called to a precompiled contract
+// PrecompiledCalls captures all the calls to a precompiled contract
 type PrecompiledCalls struct {
 	Address          Address
 	RequiredGasCalls []RequiredGasCall
