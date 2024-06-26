@@ -152,7 +152,7 @@ func remove(key []byte) func(pebble.Writer) error {
 // TODO: this function is unbounded – pass context.Context to this or calling functions to allow timing functions out.
 // No errors are expected during normal operation. Any errors returned by the
 // provided handleFunc will be propagated back to the caller of iterate.
-func iterate(start []byte, end []byte, iteration iterationFunc, opts ...func(*pebble.IterOptions)) func(pebble.Reader) error {
+func iterate(start []byte, end []byte, iteration iterationFunc, prefetchValues bool) func(pebble.Reader) error {
 	return func(tx pebble.Reader) error {
 
 		// Reverse iteration is not supported by pebble
@@ -162,10 +162,6 @@ func iterate(start []byte, end []byte, iteration iterationFunc, opts ...func(*pe
 
 		// initialize the default options and comparison modifier for iteration
 		options := pebble.IterOptions{}
-
-		for _, apply := range opts {
-			apply(&options)
-		}
 
 		// In order to satisfy this function's prefix-wise inclusion semantics,
 		// we append 0xff bytes to the largest of start and end.
@@ -215,6 +211,11 @@ func iterate(start []byte, end []byte, iteration iterationFunc, opts ...func(*pe
 				continue
 			}
 
+			// when prefetchValues is false, we skip loading the value
+			if !prefetchValues {
+				continue
+			}
+
 			binaryValue, err := it.ValueAndErr()
 			if err != nil {
 				return fmt.Errorf("failed to get value: %w", err)
@@ -229,6 +230,7 @@ func iterate(start []byte, end []byte, iteration iterationFunc, opts ...func(*pe
 			if err != nil {
 				return irrecoverable.NewExceptionf("could not decode entity: %w", err)
 			}
+
 			// process the entity
 			err = handle()
 			if err != nil {

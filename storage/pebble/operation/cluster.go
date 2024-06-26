@@ -79,5 +79,5 @@ func LookupClusterBlocksByReferenceHeightRange(start, end uint64, clusterBlockID
 			return false
 		}
 		return check, nil, nil
-	}, withPrefetchValuesFalse)
+	}, false)
 }
