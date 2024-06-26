@@ -80,7 +80,6 @@ import (
 	pebbleState "github.com/onflow/flow-go/state/protocol/pebble"
 	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/pebble"
-	sutil "github.com/onflow/flow-go/storage/util"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
@@ -1101,24 +1100,11 @@ func (fnb *FlowNodeBuilder) initSecretsDB() error {
 		return fmt.Errorf("could not create secrets db dir (path: %s): %w", fnb.BaseConfig.secretsdir, err)
 	}
 
-	log := sutil.NewLogger(fnb.Logger)
-
 	// NOTE: SN nodes need to explicitly set --insecure-secrets-db to true in order to
 	// disable secrets database encryption
 	if fnb.NodeRole == flow.RoleConsensus.String() && fnb.InsecureSecretsDB {
 		fnb.Logger.Warn().Msg("starting with secrets database encryption disabled")
 	} else {
-		encryptionKey, err := loadSecretsEncryptionKey(fnb.BootstrapDir, fnb.NodeID)
-		if errors.Is(err, os.ErrNotExist) {
-			if fnb.NodeRole == flow.RoleConsensus.String() {
-				// missing key is a fatal error for SN nodes
-				return fmt.Errorf("secrets db encryption key not found: %w", err)
-			}
-			fnb.Logger.Warn().Msg("starting with secrets database encryption disabled")
-		} else if err != nil {
-			return fmt.Errorf("failed to read secrets db encryption key: %w", err)
-		} else {
-		}
 	}
 
 	secretsDB, err := bstorage.InitSecret(fnb.BaseConfig.secretsdir, nil)
