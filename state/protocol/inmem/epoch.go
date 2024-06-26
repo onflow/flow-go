@@ -42,11 +42,13 @@ func (eq Epochs) Next() protocol.Epoch {
 	return invalid.NewEpochf("unexpected unknown phase in protocol state entry")
 }
 
-// setupEpoch is an implementation of protocol.Epoch backed by an EpochSetup
-// service event. This is used for converting service events to inmem.Epoch.
+// setupEpoch is an implementation of protocol.Epoch backed by an EpochSetup service event.
+// Includes any extensions which have been included as of the reference block.
+// This is used for converting service events to inmem.Epoch.
 type setupEpoch struct {
 	// EpochSetup service event
 	setupEvent *flow.EpochSetup
+	extensions []flow.EpochExtension
 }
 
 func (es *setupEpoch) Counter() (uint64, error) {
@@ -69,6 +71,8 @@ func (es *setupEpoch) DKGPhase3FinalView() (uint64, error) {
 	return es.setupEvent.DKGPhase3FinalView, nil
 }
 
+// TODO
+//   - document that this can change, only increase
 func (es *setupEpoch) FinalView() (uint64, error) {
 	return es.setupEvent.FinalView, nil
 }

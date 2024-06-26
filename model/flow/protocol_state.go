@@ -317,11 +317,19 @@ func (e *RichEpochProtocolStateEntry) Copy() *RichEpochProtocolStateEntry {
 // If there are no epoch extensions, the final view is the final view of the current epoch setup,
 // otherwise it is the final view of the last epoch extension.
 func (e *RichEpochProtocolStateEntry) CurrentEpochFinalView() uint64 {
-	l := len(e.CurrentEpoch.EpochExtensions)
+	return ComputeExtendedFinalView(e.CurrentEpochSetup, &e.CurrentEpoch)
+}
+
+// ComputeExtendedFinalView computes the final view for an epoch, taking into account possible epoch extensions.
+// If there are no epoch extensions, the final view is the final view of the current epoch setup,
+// otherwise it is the final view of the last epoch extension.
+// CAUTION: caller is responsible for ensuring inputs correspond to the same epoch.
+func ComputeExtendedFinalView(epochSetup *EpochSetup, epochContainer *EpochStateContainer) uint64 {
+	l := len(epochContainer.EpochExtensions)
 	if l > 0 {
-		return e.CurrentEpoch.EpochExtensions[l-1].FinalView
+		return epochContainer.EpochExtensions[l-1].FinalView
 	}
-	return e.CurrentEpochSetup.FinalView
+	return epochSetup.FinalView
 }
 
 // EpochPhase returns the current epoch phase.

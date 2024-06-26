@@ -94,7 +94,7 @@ type Epoch interface {
 	DKGPhase3FinalView() (uint64, error)
 
 	// FinalView returns the largest view number which still belongs to this epoch.
-	// TODO: should this incorporate extensions?
+	// TODO: document that this will change (increase only) with epoch extensions
 	// Error returns:
 	// * protocol.ErrNoPreviousEpoch - if the epoch represents a previous epoch which does not exist.
 	// * protocol.ErrNextEpochNotSetup - if the epoch represents a next epoch which has not been set up.

@@ -21,6 +21,7 @@ import (
 // epochInfo contains leader selection and the initial committee for one epoch.
 // epochInfo may only be mutated by addExtension, when we observe a new epoch extension.
 type epochInfo struct {
+	// TODO: Could remove these and use LeaderSelection getters instead
 	firstView            uint64                  // first view of the epoch (inclusive)
 	finalView            uint64                  // final view of the epoch (inclusive)
 	randomSource         []byte                  // random source of epoch
@@ -34,7 +35,7 @@ type epochInfo struct {
 
 // addExtension
 func (info *epochInfo) addExtension(ext flow.EpochExtension) error {
-	// check that extension is contiguous
+	// TODO: check that extension is contiguous
 	info.finalView = ext.FinalView
 	// TODO update leader selection
 	//  leader selection for 6 months takes ~500ms, for 1 week about 20ms -> just re-compute selection for entire range
