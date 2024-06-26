@@ -8,6 +8,7 @@ import (
 	gethVM "github.com/onflow/go-ethereum/core/vm"
 	gethCrypto "github.com/onflow/go-ethereum/crypto"
 	"github.com/onflow/go-ethereum/eth/tracers"
+	"github.com/onflow/go-ethereum/rlp"
 )
 
 var (
@@ -18,27 +19,52 @@ var (
 	BlockNumberForEVMRules = big.NewInt(1)
 )
 
+// Precompile wraps gethVM precompiles with
+// functionality to hold on to the deployed address
+// and captures calls to its method.
 type Precompile interface {
 	gethVM.PrecompiledContract
 	Address() Address
-	RequiredGasCalls() []RequiredGasCall
-	RunCalls() []RunCall
+	CapturedCalls() *PrecompileCalls
 }
 
+// RunCall captures a call to the RequiredGas method of a precompile contract
 type RequiredGasCall struct {
 	Input  []byte
 	Output uint64
 }
 
-// TODO add encoding
-
+// RunCall captures a call to the Run method of a precompile contract
 type RunCall struct {
 	Input    []byte
 	Output   []byte
 	ErrorMsg string
 }
 
-// TODO add encoding
+// PrecompileCalls captures all the called to a precompiled contract
+type PrecompileCalls struct {
+	Address          Address
+	RequiredGasCalls []RequiredGasCall
+	RunCalls         []RunCall
+}
+
+// Encode encodes the a precompile calls type using rlp encoding
+func (pc *PrecompileCalls) Encode() ([]byte, error) {
+	// return empty byte array in case no call is captured (optimization)
+	if len(pc.RequiredGasCalls) == 0 && len(pc.RunCalls) == 0 {
+		return []byte{}, nil
+	}
+	return rlp.EncodeToBytes(pc)
+}
+
+// PrecompileCallsFromEncoded constructs a PrecompileCalls from encoded data
+func PrecompileCallsFromEncoded(encoded []byte) (*PrecompileCalls, error) {
+	dc := &PrecompileCalls{}
+	if len(encoded) == 0 {
+		return dc, nil
+	}
+	return dc, rlp.DecodeBytes(encoded, dc)
+}
 
 // BlockContext holds the context needed for the emulator operations
 type BlockContext struct {

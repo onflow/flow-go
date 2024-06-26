@@ -43,6 +43,8 @@ func TestMutiFunctionContract(t *testing.T) {
 	input2 := []byte("non existing signature and data")
 	_, err = pc.Run(input2)
 	require.Equal(t, precompiles.ErrInvalidMethodCall, err)
+
+	// TODO add test here for the
 }
 
 type mockedFunction struct {

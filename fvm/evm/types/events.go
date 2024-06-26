@@ -30,10 +30,11 @@ type Event struct {
 // todo we might have to break this event into two (tx included /tx executed) if size becomes an issue
 
 type transactionEvent struct {
-	Payload     []byte  // transaction RLP-encoded payload
-	Result      *Result // transaction execution result
-	BlockHeight uint64
-	BlockHash   gethCommon.Hash
+	Payload                 []byte  // transaction RLP-encoded payload
+	Result                  *Result // transaction execution result
+	BlockHeight             uint64
+	BlockHash               gethCommon.Hash
+	EncodedPrecompiledCalls string
 }
 
 // NewTransactionEvent creates a new transaction event with the given parameters
@@ -46,14 +47,16 @@ func NewTransactionEvent(
 	payload []byte,
 	blockHeight uint64,
 	blockHash gethCommon.Hash,
+	encodedPrecompiledCalls string,
 ) *Event {
 	return &Event{
 		Etype: EventTypeTransactionExecuted,
 		Payload: &transactionEvent{
-			BlockHeight: blockHeight,
-			BlockHash:   blockHash,
-			Payload:     payload,
-			Result:      result,
+			BlockHeight:             blockHeight,
+			BlockHash:               blockHash,
+			Payload:                 payload,
+			Result:                  result,
+			EncodedPrecompiledCalls: encodedPrecompiledCalls,
 		},
 	}
 }
@@ -100,6 +103,7 @@ func (p *transactionEvent) ToCadence(location common.Location) (cadence.Event, e
 			// todo we can remove hash and just reference block by height (evm-gateway dependency)
 			cadence.NewField("blockHash", cadence.StringType),
 			cadence.NewField("returnedData", cadence.StringType),
+			cadence.NewField("encodedPrecompiledCalls", cadence.StringType),
 		},
 		nil,
 	)
@@ -117,6 +121,7 @@ func (p *transactionEvent) ToCadence(location common.Location) (cadence.Event, e
 		cadence.NewUInt64(p.BlockHeight),
 		cadence.String(p.BlockHash.String()),
 		cadence.String(hex.EncodeToString(p.Result.ReturnedData)),
+		cadence.String(p.EncodedPrecompiledCalls),
 	}).WithType(eventType), nil
 }
 
@@ -193,18 +198,19 @@ func DecodeBlockEventPayload(event cadence.Event) (*BlockEventPayload, error) {
 }
 
 type TransactionEventPayload struct {
-	Hash            string `cadence:"hash"`
-	Index           uint16 `cadence:"index"`
-	TransactionType uint8  `cadence:"type"`
-	Payload         string `cadence:"payload"`
-	ErrorCode       uint16 `cadence:"errorCode"`
-	GasConsumed     uint64 `cadence:"gasConsumed"`
-	ContractAddress string `cadence:"contractAddress"`
-	Logs            string `cadence:"logs"`
-	BlockHeight     uint64 `cadence:"blockHeight"`
-	BlockHash       string `cadence:"blockHash"`
-	ErrorMessage    string `cadence:"errorMessage"`
-	ReturnedData    string `cadence:"returnedData"`
+	Hash                    string `cadence:"hash"`
+	Index                   uint16 `cadence:"index"`
+	TransactionType         uint8  `cadence:"type"`
+	Payload                 string `cadence:"payload"`
+	ErrorCode               uint16 `cadence:"errorCode"`
+	GasConsumed             uint64 `cadence:"gasConsumed"`
+	ContractAddress         string `cadence:"contractAddress"`
+	Logs                    string `cadence:"logs"`
+	BlockHeight             uint64 `cadence:"blockHeight"`
+	BlockHash               string `cadence:"blockHash"`
+	ErrorMessage            string `cadence:"errorMessage"`
+	ReturnedData            string `cadence:"returnedData"`
+	EncodedPrecompiledCalls string `cadence:"encodedPrecompiledCalls"`
 }
 
 // DecodeTransactionEventPayload decodes Cadence event into transaction event payload.

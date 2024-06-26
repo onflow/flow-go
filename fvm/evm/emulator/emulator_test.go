@@ -1020,10 +1020,13 @@ func TestTransactionTracing(t *testing.T) {
 }
 
 type MockedPrecompile struct {
-	AddressFunc     func() types.Address
-	RequiredGasFunc func(input []byte) uint64
-	RunFunc         func(input []byte) ([]byte, error)
+	AddressFunc       func() types.Address
+	RequiredGasFunc   func(input []byte) uint64
+	RunFunc           func(input []byte) ([]byte, error)
+	CapturedCallsFunc func() *types.PrecompileCalls
 }
+
+var _ types.Precompile = &MockedPrecompile{}
 
 func (mp *MockedPrecompile) Address() types.Address {
 	if mp.AddressFunc == nil {
@@ -1044,4 +1047,11 @@ func (mp *MockedPrecompile) Run(input []byte) ([]byte, error) {
 		panic("Run not set for the mocked precompile")
 	}
 	return mp.RunFunc(input)
+}
+
+func (mp *MockedPrecompile) CapturedCalls() *types.PrecompileCalls {
+	if mp.CapturedCallsFunc == nil {
+		panic("CapturedCalls not set for the mocked precompile")
+	}
+	return mp.CapturedCallsFunc()
 }
