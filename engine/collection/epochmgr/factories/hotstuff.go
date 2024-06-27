@@ -3,7 +3,7 @@ package factories
 import (
 	"fmt"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/consensus"
@@ -32,7 +32,7 @@ type HotStuffMetricsFunc func(chainID flow.ChainID) module.HotstuffMetrics
 type HotStuffFactory struct {
 	baseLogger     zerolog.Logger
 	me             module.Local
-	db             *badger.DB
+	db             *pebble.DB
 	protoState     protocol.State
 	engineMetrics  module.EngineMetrics
 	mempoolMetrics module.MempoolMetrics
@@ -43,7 +43,7 @@ type HotStuffFactory struct {
 func NewHotStuffFactory(
 	log zerolog.Logger,
 	me module.Local,
-	db *badger.DB,
+	db *pebble.DB,
 	protoState protocol.State,
 	engineMetrics module.EngineMetrics,
 	mempoolMetrics module.MempoolMetrics,
@@ -162,7 +162,7 @@ func (f *HotStuffFactory) CreateModules(
 		Notifier:                    notifier,
 		Committee:                   committee,
 		Signer:                      signer,
-		Persist:                     persister.New(f.db, cluster.ChainID()),
+		Persist:                     persister.NewPersisterPebble(f.db, cluster.ChainID()),
 		VoteAggregator:              voteAggregator,
 		TimeoutAggregator:           timeoutAggregator,
 		VoteCollectorDistributor:    voteAggregationDistributor.VoteCollectorDistributor,
