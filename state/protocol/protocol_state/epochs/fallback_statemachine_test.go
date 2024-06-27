@@ -665,10 +665,34 @@ func (s *EpochFallbackStateMachineSuite) TestEpochFallbackStateMachineInjectsMul
 	}
 }
 
-// TestProcessingMultipleEventsAtSameBlock tests that the state machine can process multiple events at the same block.
+// TestEpochRecoverAndEjectionInSameBlock tests that processing an epoch recover event which re-admits an ejected identity results in an error.
+// Such action should be considered illegal since smart contract emitted ejection before epoch recover and service events are delivered
+// in an order-preserving manner.
+func (s *EpochFallbackStateMachineSuite) TestEpochRecoverAndEjectionInSameBlock() {
+	nextEpochParticipants := s.parentProtocolState.CurrentEpochIdentityTable.Copy()
+	ejectedIdentityID := nextEpochParticipants[0].NodeID
+	epochRecover := unittest.EpochRecoverFixture(func(setup *flow.EpochSetup) {
+		setup.Participants = nextEpochParticipants.ToSkeleton()
+		setup.Assignments = unittest.ClusterAssignment(1, nextEpochParticipants.ToSkeleton())
+		setup.Counter = s.parentProtocolState.CurrentEpochSetup.Counter + 1
+		setup.FirstView = s.parentProtocolState.CurrentEpochSetup.FinalView + 1
+		setup.FinalView = setup.FirstView + 10_000
+	})
+	err := s.stateMachine.EjectIdentity(ejectedIdentityID)
+	require.NoError(s.T(), err)
+
+	s.consumer.On("OnServiceEventReceived", epochRecover.ServiceEvent()).Once()
+	s.consumer.On("OnInvalidServiceEvent", epochRecover.ServiceEvent(),
+		mock.MatchedBy(func(err error) bool { return protocol.IsInvalidServiceEventError(err) })).Once()
+	processed, err := s.stateMachine.ProcessEpochRecover(epochRecover)
+	require.NoError(s.T(), err)
+	require.False(s.T(), processed)
+}
+
+// TestProcessingMultipleEventsAtTheSameBlock tests that the state machine can process multiple events at the same block.
 // EpochFallbackStateMachineSuite has to be able to process any combination of events in any order at the same block.
 // This test generates a random amount of setup, commit and recover events and processes them in random order.
-func (s *EpochFallbackStateMachineSuite) TestProcesingMultipleEventsAtTheSameBlock() {
+func (s *EpochFallbackStateMachineSuite) TestProcessingMultipleEventsAtTheSameBlock() {
 	rapid.Check(s.T(), func(t *rapid.T) {
 		s.SetupTest() // start each time with clean state
 		var events []flow.ServiceEvent
