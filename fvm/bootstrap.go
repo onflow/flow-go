@@ -23,7 +23,7 @@ import (
 var (
 	DefaultAccountCreationFee = mustParseUFix64(
 		"account creation fee",
-		"0.00100000")
+		"0.10000000")
 
 	DefaultMinimumStorageReservation = mustParseUFix64(
 		"minimum storage reservation",
@@ -46,6 +46,16 @@ var (
 		ExecutionEffortCost: mustParseUFix64(
 			"fee execution effort cost",
 			"0.0"),
+	}
+
+	NonDefaultTransactionFees = BootstrapProcedureFeeParameters{
+		SurgeFactor: mustParseUFix64("fee surge factor", "1.0"),
+		InclusionEffortCost: mustParseUFix64(
+			"fee inclusion effort cost",
+			"100000000.0"),
+		ExecutionEffortCost: mustParseUFix64(
+			"fee execution effort cost",
+			"2.0"),
 	}
 
 	// DefaultVersionFreezePeriod is the default NodeVersionBeacon freeze period -
