@@ -17,7 +17,6 @@ const DefaultEpochExtensionViewCount = 100_000
 // events but still processes ejection events.
 //
 // Whenever invalid epoch state transition has been observed only epochFallbackStateMachines must be created for subsequent views.
-// TODO(EFM, #6019): this structure needs to be updated to stop using parent state.
 type FallbackStateMachine struct {
 	baseStateMachine
 	params protocol.GlobalParams
@@ -56,7 +55,7 @@ func NewFallbackStateMachine(params protocol.GlobalParams, telemetry protocol_st
 		params: params,
 	}
 
-	if !nextEpochCommitted && view+params.EpochCommitSafetyThreshold() >= parentState.CurrentEpochFinalView() {
+	if !nextEpochCommitted && view+params.EpochCommitSafetyThreshold() >= state.CurrentEpochFinalView() {
 		// we have reached safety threshold and we are still in the fallback mode
 		// prepare a new extension for the current epoch.
 		err := sm.extendCurrentEpoch(flow.EpochExtension{

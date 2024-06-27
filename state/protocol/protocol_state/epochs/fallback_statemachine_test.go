@@ -671,7 +671,7 @@ func (s *EpochFallbackStateMachineSuite) TestEpochFallbackStateMachineInjectsMul
 // in an order-preserving manner.
 func (s *EpochFallbackStateMachineSuite) TestEpochRecoverAndEjectionInSameBlock() {
 	nextEpochParticipants := s.parentProtocolState.CurrentEpochIdentityTable.Copy()
-	ejectedIdentityID := nextEpochParticipants[0].NodeID
+	ejectedIdentityID := nextEpochParticipants.Filter(filter.HasRole[flow.Identity](flow.RoleAccess))[0].NodeID
 	epochRecover := unittest.EpochRecoverFixture(func(setup *flow.EpochSetup) {
 		setup.Participants = nextEpochParticipants.ToSkeleton()
 		setup.Assignments = unittest.ClusterAssignment(1, nextEpochParticipants.ToSkeleton())
