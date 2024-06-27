@@ -94,6 +94,12 @@ type Epoch interface {
 	DKGPhase3FinalView() (uint64, error)
 
 	// FinalView returns the largest view number which still belongs to this epoch.
+	// The largest view number is the greatest of:
+	//   - the FinalView field of the flow.EpochSetup event for this epoch
+	//   - the FinalView field of the most recent flow.EpochExtension for this epoch
+	// If EFM is not triggered during this epoch, this value will be static.
+	// If EFM is triggered during this epoch, this value may increase with increasing
+	// reference block heights, as new epoch extensions are included.
 	// Error returns:
 	// * protocol.ErrNoPreviousEpoch - if the epoch represents a previous epoch which does not exist.
 	// * protocol.ErrNextEpochNotSetup - if the epoch represents a next epoch which has not been set up.

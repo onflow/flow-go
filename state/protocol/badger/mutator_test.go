@@ -2348,6 +2348,11 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 			err = state.Finalize(context.Background(), block9.ID())
 			require.NoError(t, err)
 
+			// After epoch extension, FinalView must be updated accordingly
+			finalView, err := state.Final().Epochs().Current().FinalView()
+			require.NoError(t, err)
+			assert.Equal(t, epochExtensions[0].FinalView, finalView)
+
 			// Constructing blocks
 			//   ... <- B10 <- B11(ER(B4, EpochRecover)) <- B12(S(ER(B4))) <- ...
 			// B10 will be the first block past the epoch extension. Block B11 incorporates the Execution Result [ER]

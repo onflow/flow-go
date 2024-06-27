@@ -156,33 +156,6 @@ func GetDKGParticipantKeys(dkg DKG, participants flow.IdentitySkeletonList) ([]c
 	return keys, nil
 }
 
-// ToDKGParticipantLookup computes the nodeID -> DKGParticipant lookup for a
-// DKG instance. The participants must exactly match the DKG instance configuration.
-// All errors indicate inconsistent or invalid inputs.
-// No errors are expected during normal operation.
-func ToDKGParticipantLookup(dkg DKG, participants flow.IdentitySkeletonList) (map[flow.Identifier]flow.DKGParticipant, error) {
-
-	lookup := make(map[flow.Identifier]flow.DKGParticipant)
-	for _, identity := range participants {
-
-		index, err := dkg.Index(identity.NodeID)
-		if err != nil {
-			return nil, fmt.Errorf("could not get index (node=%x): %w", identity.NodeID, err)
-		}
-		key, err := dkg.KeyShare(identity.NodeID)
-		if err != nil {
-			return nil, fmt.Errorf("could not get key share (node=%x): %w", identity.NodeID, err)
-		}
-
-		lookup[identity.NodeID] = flow.DKGParticipant{
-			Index:    index,
-			KeyShare: key,
-		}
-	}
-
-	return lookup, nil
-}
-
 // DKGPhaseViews returns the DKG final phase views for an epoch.
 // Error returns:
 // * protocol.ErrNoPreviousEpoch - if the epoch represents a previous epoch which does not exist.
