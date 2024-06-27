@@ -59,9 +59,9 @@ import (
 	"github.com/onflow/flow-go/network/underlay"
 	"github.com/onflow/flow-go/network/validator"
 	"github.com/onflow/flow-go/state/protocol"
-	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
+	pebbleState "github.com/onflow/flow-go/state/protocol/pebble"
 )
 
 // FlowBuilder extends cmd.NodeBuilder and declares additional functions needed to bootstrap an Access node
@@ -150,12 +150,12 @@ func (builder *FollowerServiceBuilder) buildFollowerState() *FollowerServiceBuil
 	builder.Module("mutable follower state", func(node *cmd.NodeConfig) error {
 		// For now, we only support state implementations from package badger.
 		// If we ever support different implementations, the following can be replaced by a type-aware factory
-		state, ok := node.State.(*badgerState.State)
+		state, ok := node.State.(*pebbleState.State)
 		if !ok {
 			return fmt.Errorf("only implementations of type badger.State are currently supported but read-only state has type %T", node.State)
 		}
 
-		followerState, err := badgerState.NewFollowerState(
+		followerState, err := pebbleState.NewFollowerState(
 			node.Logger,
 			node.Tracer,
 			node.ProtocolEvents,

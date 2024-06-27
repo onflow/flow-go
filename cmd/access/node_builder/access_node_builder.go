@@ -96,10 +96,10 @@ import (
 	"github.com/onflow/flow-go/network/validator"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
-	badgerState "github.com/onflow/flow-go/state/protocol/pebble"
+	pebbleState "github.com/onflow/flow-go/state/protocol/pebble"
 	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
-	pStorage "github.com/onflow/flow-go/storage/pebble"
+	pstorage "github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/utils/grpcutils"
 )
 
@@ -250,7 +250,7 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 		scriptExecutorConfig:         query.NewDefaultConfig(),
 		scriptExecMinBlock:           0,
 		scriptExecMaxBlock:           math.MaxUint64,
-		registerCacheType:            pStorage.CacheTypeTwoQueue.String(),
+		registerCacheType:            pstorage.CacheTypeTwoQueue.String(),
 		registerCacheSize:            0,
 		programCacheSize:             0,
 	}
@@ -320,12 +320,12 @@ func (builder *FlowAccessNodeBuilder) buildFollowerState() *FlowAccessNodeBuilde
 	builder.Module("mutable follower state", func(node *cmd.NodeConfig) error {
 		// For now, we only support state implementations from package badger.
 		// If we ever support different implementations, the following can be replaced by a type-aware factory
-		state, ok := node.State.(*badgerState.State)
+		state, ok := node.State.(*pebbleState.State)
 		if !ok {
 			return fmt.Errorf("only implementations of type badger.State are currently supported but read-only state has type %T", node.State)
 		}
 
-		followerState, err := badgerState.NewFollowerState(
+		followerState, err := pebbleState.NewFollowerState(
 			node.Logger,
 			node.Tracer,
 			node.ProtocolEvents,
@@ -725,11 +725,11 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			}).
 			Module("indexed block height consumer progress", func(node *cmd.NodeConfig) error {
 				// Note: progress is stored in the MAIN db since that is where indexed execution data is stored.
-				indexedBlockHeight = pStorage.NewConsumerProgress(builder.DB, module.ConsumeProgressExecutionDataIndexerBlockHeight)
+				indexedBlockHeight = pstorage.NewConsumerProgress(builder.DB, module.ConsumeProgressExecutionDataIndexerBlockHeight)
 				return nil
 			}).
 			Module("transaction results storage", func(node *cmd.NodeConfig) error {
-				builder.Storage.LightTransactionResults = pStorage.NewLightTransactionResults(node.Metrics.Cache, node.DB, pStorage.DefaultCacheSize)
+				builder.Storage.LightTransactionResults = pstorage.NewLightTransactionResults(node.Metrics.Cache, node.DB, pstorage.DefaultCacheSize)
 				return nil
 			}).
 			DependableComponent("execution data indexer", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
@@ -737,7 +737,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				// other components from starting while bootstrapping the register db since it may
 				// take hours to complete.
 
-				pdb, err := pStorage.OpenRegisterPebbleDB(builder.registersDBPath)
+				pdb, err := pstorage.OpenRegisterPebbleDB(builder.registersDBPath)
 				if err != nil {
 					return nil, fmt.Errorf("could not open registers db: %w", err)
 				}
@@ -745,7 +745,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					return pdb.Close()
 				})
 
-				bootstrapped, err := pStorage.IsBootstrapped(pdb)
+				bootstrapped, err := pstorage.IsBootstrapped(pdb)
 				if err != nil {
 					return nil, fmt.Errorf("could not check if registers db is bootstrapped: %w", err)
 				}
@@ -777,7 +777,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					}
 
 					rootHash := ledger.RootHash(builder.RootSeal.FinalState)
-					bootstrap, err := pStorage.NewRegisterBootstrap(pdb, checkpointFile, checkpointHeight, rootHash, builder.Logger)
+					bootstrap, err := pstorage.NewRegisterBootstrap(pdb, checkpointFile, checkpointHeight, rootHash, builder.Logger)
 					if err != nil {
 						return nil, fmt.Errorf("could not create registers bootstrap: %w", err)
 					}
@@ -790,18 +790,18 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					}
 				}
 
-				registers, err := pStorage.NewRegisters(pdb)
+				registers, err := pstorage.NewRegisters(pdb)
 				if err != nil {
 					return nil, fmt.Errorf("could not create registers storage: %w", err)
 				}
 
 				if builder.registerCacheSize > 0 {
-					cacheType, err := pStorage.ParseCacheType(builder.registerCacheType)
+					cacheType, err := pstorage.ParseCacheType(builder.registerCacheType)
 					if err != nil {
 						return nil, fmt.Errorf("could not parse register cache type: %w", err)
 					}
 					cacheMetrics := metrics.NewCacheCollector(builder.RootChainID)
-					registersCache, err := pStorage.NewRegistersCache(registers, cacheType, builder.registerCacheSize, cacheMetrics)
+					registersCache, err := pstorage.NewRegistersCache(registers, cacheType, builder.registerCacheSize, cacheMetrics)
 					if err != nil {
 						return nil, fmt.Errorf("could not create registers cache: %w", err)
 					}
@@ -1406,7 +1406,7 @@ func (builder *FlowAccessNodeBuilder) Initialize() error {
 
 	builder.EnqueueTracer()
 	builder.PreInit(cmd.DynamicStartPreInit)
-	builder.ValidateRootSnapshot(badgerState.ValidRootSnapshotContainsEntityExpiryRange)
+	builder.ValidateRootSnapshot(pebbleState.ValidRootSnapshotContainsEntityExpiryRange)
 
 	return nil
 }
@@ -1596,7 +1596,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			return nil
 		}).
 		Module("events storage", func(node *cmd.NodeConfig) error {
-			builder.Storage.Events = pStorage.NewEvents(node.Metrics.Cache, node.DB)
+			builder.Storage.Events = pstorage.NewEvents(node.Metrics.Cache, node.DB)
 			return nil
 		}).
 		Module("events index", func(node *cmd.NodeConfig) error {
