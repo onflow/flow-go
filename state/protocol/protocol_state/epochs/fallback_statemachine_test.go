@@ -1,6 +1,7 @@
 package epochs
 
 import (
+	"github.com/onflow/flow-go/model/flow/filter"
 	"testing"
 
 	"github.com/stretchr/testify/mock"
@@ -720,11 +721,33 @@ func (s *EpochFallbackStateMachineSuite) TestProcessingMultipleEventsAtTheSameBl
 				mock.MatchedBy(func(err error) bool { return protocol.IsInvalidServiceEventError(err) })).Once()
 			events = append(events, serviceEvent)
 		}
+
+		var ejectedNodes flow.IdentifierList
+		var ejectionEvents flow.ServiceEventList
+		includeEjection := rapid.Bool().Draw(t, "eject-node")
+		if includeEjection {
+			accessNodes := s.parentProtocolState.CurrentEpochSetup.Participants.Filter(filter.HasRole[flow.IdentitySkeleton](flow.RoleAccess))
+			identity := rapid.SampledFrom(accessNodes).Draw(t, "ejection-node")
+			// TODO(EFM, #6020): this needs to be updated when a proper ejection event is implemented
+			serviceEvent := flow.ServiceEvent{
+				Type:  "ejection",
+				Event: identity.NodeID,
+			}
+			ejectionEvents = append(ejectionEvents, serviceEvent)
+			ejectedNodes = append(ejectedNodes, identity.NodeID)
+		}
+
 		includeValidRecover := rapid.Bool().Draw(t, "include-valid-recover-event")
+		ejectionBeforeRecover := rapid.Bool().Draw(t, "ejection-before-recover")
 		if includeValidRecover {
 			serviceEvent := unittest.EpochRecoverFixture(func(setup *flow.EpochSetup) {
 				nextEpochParticipants := s.parentProtocolState.CurrentEpochIdentityTable.Copy()
-				setup.Participants = nextEpochParticipants.ToSkeleton()
+				if ejectionBeforeRecover {
+					setup.Participants = nextEpochParticipants.ToSkeleton().Filter(
+						filter.Not(filter.HasNodeID[flow.IdentitySkeleton](ejectedNodes...)))
+				} else {
+					setup.Participants = nextEpochParticipants.ToSkeleton()
+				}
 				setup.Assignments = unittest.ClusterAssignment(1, nextEpochParticipants.ToSkeleton())
 				setup.Counter = s.parentProtocolState.CurrentEpochSetup.Counter + 1
 				setup.FirstView = s.parentProtocolState.CurrentEpochSetup.FinalView + 1
@@ -734,20 +757,14 @@ func (s *EpochFallbackStateMachineSuite) TestProcessingMultipleEventsAtTheSameBl
 			s.consumer.On("OnServiceEventProcessed", serviceEvent).Once()
 			events = append(events, serviceEvent)
 		}
-		includeEjection := rapid.Bool().Draw(t, "eject-node")
-		ejectionGen := rapid.SampledFrom(s.parentProtocolState.CurrentEpoch.ActiveIdentities)
-		var ejectedNodes flow.IdentifierList
-		if includeEjection {
-			identity := ejectionGen.Draw(t, "ejection-node")
-			// TODO(EFM, #6020): this needs to be updated when a proper ejection event is implemented
-			serviceEvent := flow.ServiceEvent{
-				Type:  "ejection",
-				Event: identity.NodeID,
-			}
-			events = append(events, serviceEvent)
-			ejectedNodes = append(ejectedNodes, identity.NodeID)
-		}
+
 		events = rapid.Permutation(events).Draw(t, "events-permutation")
+		if ejectionBeforeRecover {
+			events = append(ejectionEvents, events...)
+		} else {
+			events = append(events, ejectionEvents...)
+		}
+
 		for _, event := range events {
 			var err error
 			switch ev := event.Event.(type) {
@@ -781,10 +798,15 @@ func (s *EpochFallbackStateMachineSuite) TestProcessingMultipleEventsAtTheSameBl
 		// In all other cases there shouldn't be changes to the resulting state.
 		require.Equal(t, includeValidRecover || includeEjection, hasChanges, "always should have changes since we eject nodes")
 		if includeValidRecover {
-			if includeEjection {
-				//require.Nil(t, updatedState.NextEpoch, "recover event shouldn't be accepted since it readmits an ejected identity")
-			} else {
-				require.NotNil(t, updatedState.NextEpoch, "next epoch should be present")
+			require.NotNil(t, updatedState.NextEpoch, "next epoch should be present")
+			for _, nodeID := range ejectedNodes {
+				ejectedIdentity, found := updatedState.NextEpoch.ActiveIdentities.ByNodeID(nodeID)
+				if ejectionBeforeRecover {
+					require.False(s.T(), found)
+				} else {
+					require.True(s.T(), found)
+					require.True(s.T(), ejectedIdentity.Ejected)
+				}
 			}
 		}
 	})
