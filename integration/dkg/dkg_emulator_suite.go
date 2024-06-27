@@ -33,7 +33,7 @@ import (
 	"github.com/onflow/flow-go/module/dkg"
 	"github.com/onflow/flow-go/network/stub"
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
-	"github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -430,7 +430,7 @@ func (s *EmulatorSuite) initEngines(node *node, ids flow.IdentityList) {
 
 	// dkgState is used to store the private key resulting from the node's
 	// participation in the DKG run
-	dkgState, err := badger.NewDKGState(core.Metrics, core.SecretsDB)
+	dkgState, err := pebble.NewDKGState(core.Metrics, core.SecretsDB)
 	s.Require().NoError(err)
 
 	// brokerTunnel is used to communicate between the messaging engine and the
@@ -483,7 +483,7 @@ func (s *EmulatorSuite) initEngines(node *node, ids flow.IdentityList) {
 	node.GenericNode = core
 	node.messagingEngine = messagingEngine
 	node.dkgState = dkgState
-	node.safeBeaconKeys = badger.NewSafeBeaconPrivateKeys(dkgState)
+	node.safeBeaconKeys = pebble.NewSafeBeaconPrivateKeys(dkgState)
 	node.reactorEngine = reactorEngine
 }
 
