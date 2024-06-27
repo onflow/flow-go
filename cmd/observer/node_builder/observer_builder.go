@@ -1093,6 +1093,8 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 	requesterDependable := module.NewProxiedReadyDoneAware()
 	builder.IndexerDependencies.Add(requesterDependable)
 
+	indexedExecDataDistributor = edrequester.NewExecutionDataDistributor()
+
 	builder.
 		AdminCommand("read-execution-data", func(config *cmd.NodeConfig) commands.AdminCommand {
 			return stateSyncCommands.NewReadExecutionDataCommand(builder.ExecutionDataStore)
@@ -1436,8 +1438,6 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				return nil, err
 			}
 			builder.ExecutionIndexerCore = indexerCore
-
-			indexedExecDataDistributor = edrequester.NewExecutionDataDistributor()
 
 			// execution state worker uses a jobqueue to process new execution data and indexes it by using the indexer.
 			builder.ExecutionIndexer, err = indexer.NewIndexer(
