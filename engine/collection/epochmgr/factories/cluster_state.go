@@ -3,21 +3,21 @@ package factories
 import (
 	"fmt"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble"
 
 	"github.com/onflow/flow-go/module"
-	clusterkv "github.com/onflow/flow-go/state/cluster/badger"
-	bstorage "github.com/onflow/flow-go/storage/badger"
+	clusterkv "github.com/onflow/flow-go/state/cluster/pebble"
+	bstorage "github.com/onflow/flow-go/storage/pebble"
 )
 
 type ClusterStateFactory struct {
-	db      *badger.DB
+	db      *pebble.DB
 	metrics module.CacheMetrics
 	tracer  module.Tracer
 }
 
 func NewClusterStateFactory(
-	db *badger.DB,
+	db *pebble.DB,
 	metrics module.CacheMetrics,
 	tracer module.Tracer,
 ) (*ClusterStateFactory, error) {
