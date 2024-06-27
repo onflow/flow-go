@@ -81,15 +81,12 @@ func (b *Bootstrapper) IsBootstrapped(db *pebble.DB) (flow.StateCommitment, bool
 
 	err := operation.LookupStateCommitment(flow.ZeroID, &commit)(db)
 	if err != nil {
+
+		if errors.Is(err, storage.ErrNotFound) {
+			return flow.DummyStateCommitment, false, nil
+		}
+
 		return flow.DummyStateCommitment, false, fmt.Errorf("could not lookup state commitment: %w", err)
-	}
-
-	if errors.Is(err, storage.ErrNotFound) {
-		return flow.DummyStateCommitment, false, nil
-	}
-
-	if err != nil {
-		return flow.DummyStateCommitment, false, err
 	}
 
 	return commit, true, nil
