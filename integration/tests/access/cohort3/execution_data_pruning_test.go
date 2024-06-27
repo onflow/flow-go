@@ -182,11 +182,7 @@ func (s *ExecutionDataPruningSuite) TestHappyPath() {
 
 		_, err = onEds.Get(s.ctx, result.ExecutionDataID)
 		require.Error(s.T(), err, "%s: could not prune execution data for height %v", s.observerName, i)
-		require.ErrorContains(
-			s.T(),
-			err,
-			fmt.Sprintf(
-				"not found"))
+		require.ErrorContains(s.T(), err, "not found")
 		s.T().Logf("%s: execution data for height was pruned %d, err: %v", s.observerName, i, err)
 	}
 }
