@@ -62,7 +62,7 @@ func NewHappyPathStateMachine(telemetry protocol_state.StateMachineTelemetryCons
 //     after such error and discard the HappyPathStateMachine!
 func (u *HappyPathStateMachine) ProcessEpochSetup(epochSetup *flow.EpochSetup) (bool, error) {
 	u.telemetry.OnServiceEventReceived(epochSetup.ServiceEvent())
-	err := protocol.IsValidExtendingEpochSetup(epochSetup, u.parentState)
+	err := protocol.IsValidExtendingEpochSetup(epochSetup, u.state)
 	if err != nil {
 		u.telemetry.OnInvalidServiceEvent(epochSetup.ServiceEvent(), err)
 		return false, fmt.Errorf("invalid epoch setup event for epoch %d: %w", epochSetup.Counter, err)
@@ -102,8 +102,8 @@ func (u *HappyPathStateMachine) ProcessEpochSetup(epochSetup *flow.EpochSetup) (
 	// For collector clusters, we rely on invariants (I) and (II) holding. See `committees.Cluster` for details, specifically function
 	// `constructInitialClusterIdentities(..)`. While the system smart contract must satisfy this invariant, we run a sanity check below.
 	// TODO(EFM, #6019): potential vulnerability because looking into parent state, some ejection events might be missing from the 'evolving state'.
-	activeIdentitiesLookup := u.parentState.CurrentEpoch.ActiveIdentities.Lookup() // lookup NodeID → DynamicIdentityEntry for nodes _active_ in the current epoch
-	nextEpochActiveIdentities, err := buildNextEpochActiveParticipants(activeIdentitiesLookup, u.parentState.CurrentEpochSetup, epochSetup)
+	activeIdentitiesLookup := u.state.CurrentEpoch.ActiveIdentities.Lookup() // lookup NodeID → DynamicIdentityEntry for nodes _active_ in the current epoch
+	nextEpochActiveIdentities, err := buildNextEpochActiveParticipants(activeIdentitiesLookup, u.state.CurrentEpochSetup, epochSetup)
 	if err != nil {
 		u.telemetry.OnInvalidServiceEvent(epochSetup.ServiceEvent(), err)
 		return false, fmt.Errorf("failed to construct next epoch active participants: %w", err)
@@ -145,7 +145,7 @@ func (u *HappyPathStateMachine) ProcessEpochCommit(epochCommit *flow.EpochCommit
 		u.telemetry.OnInvalidServiceEvent(epochCommit.ServiceEvent(), err)
 		return false, err
 	}
-	err := protocol.IsValidExtendingEpochCommit(epochCommit, u.parentState.EpochMinStateEntry, u.parentState.NextEpochSetup)
+	err := protocol.IsValidExtendingEpochCommit(epochCommit, u.state.EpochMinStateEntry, u.state.NextEpochSetup)
 	if err != nil {
 		u.telemetry.OnInvalidServiceEvent(epochCommit.ServiceEvent(), err)
 		return false, fmt.Errorf("invalid epoch commit event for epoch %d: %w", epochCommit.Counter, err)

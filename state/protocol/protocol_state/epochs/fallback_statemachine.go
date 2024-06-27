@@ -60,9 +60,9 @@ func NewFallbackStateMachine(params protocol.GlobalParams, telemetry protocol_st
 		// we have reached safety threshold and we are still in the fallback mode
 		// prepare a new extension for the current epoch.
 		err := sm.extendCurrentEpoch(flow.EpochExtension{
-			FirstView:     parentState.CurrentEpochFinalView() + 1,
-			FinalView:     parentState.CurrentEpochFinalView() + DefaultEpochExtensionViewCount, // TODO(EFM, #6020): replace with EpochExtensionLength
-			TargetEndTime: 0,                                                                    // TODO(EFM, #6020): calculate and set target end time
+			FirstView:     state.CurrentEpochFinalView() + 1,
+			FinalView:     state.CurrentEpochFinalView() + DefaultEpochExtensionViewCount, // TODO(EFM, #6020): replace with EpochExtensionLength
+			TargetEndTime: 0,                                                              // TODO(EFM, #6020): calculate and set target end time
 		})
 		if err != nil {
 			return nil, err
@@ -84,7 +84,7 @@ func (m *FallbackStateMachine) extendCurrentEpoch(epochExtension flow.EpochExten
 			return fmt.Errorf("epoch extension is not contiguous with the last extension")
 		}
 	} else {
-		if epochExtension.FirstView != m.parentState.CurrentEpochSetup.FinalView+1 {
+		if epochExtension.FirstView != m.state.CurrentEpochSetup.FinalView+1 {
 			return fmt.Errorf("first epoch extension is not contiguous with current epoch")
 		}
 	}
@@ -170,8 +170,8 @@ func (m *FallbackStateMachine) ProcessEpochRecover(epochRecover *flow.EpochRecov
 	nextEpochParticipants, err := buildNextEpochActiveParticipants(
 		// TOTO: The following usage of the _parent_ state Active identities might lose ejections
 		//       sealed in this block. See https://github.com/onflow/flow-go/issues/6019
-		m.parentState.CurrentEpoch.ActiveIdentities.Lookup(),
-		m.parentState.CurrentEpochSetup,
+		m.state.CurrentEpoch.ActiveIdentities.Lookup(),
+		m.state.CurrentEpochSetup,
 		&epochRecover.EpochSetup)
 	if err != nil {
 		m.telemetry.OnInvalidServiceEvent(epochRecover.ServiceEvent(), err)
@@ -207,13 +207,13 @@ func (m *FallbackStateMachine) ProcessEpochRecover(epochRecover *flow.EpochRecov
 // * `protocol.InvalidServiceEventError` - if the service event is invalid or is not a valid state transition for the current protocol state.
 // This is a side-effect-free function. This function only returns protocol.InvalidServiceEventError as errors.
 func (m *FallbackStateMachine) ensureValidEpochRecover(epochRecover *flow.EpochRecover) error {
-	if m.view+m.params.EpochCommitSafetyThreshold() >= m.parentState.CurrentEpochFinalView() {
+	if m.view+m.params.EpochCommitSafetyThreshold() >= m.state.CurrentEpochFinalView() {
 		return protocol.NewInvalidServiceEventErrorf("could not process epoch recover, safety threshold reached")
 	}
 	// TOTO: The following code is only safe if the parent state has the _identical_ `CurrentEpochFinalView` as the
 	//       evolving state. This is regularly violated at the block we insert the epoch extension.
 	//       see https://github.com/onflow/flow-go/issues/6019
-	err := protocol.IsValidExtendingEpochSetup(&epochRecover.EpochSetup, m.parentState)
+	err := protocol.IsValidExtendingEpochSetup(&epochRecover.EpochSetup, m.state)
 	if err != nil {
 		return fmt.Errorf("invalid epoch recovery event(setup): %w", err)
 	}

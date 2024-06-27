@@ -15,8 +15,7 @@ import (
 // Expected errors during normal operations:
 // * protocol.InvalidServiceEventError if the input service event is invalid to extend the currently active epoch status
 // This is a side-effect-free function. This function only returns protocol.InvalidServiceEventError as errors.
-// TODO(EFM, #6019): This function has to be refactored to stop using RichProtocolStateEntry
-func IsValidExtendingEpochSetup(extendingSetup *flow.EpochSetup, protocolStateEntry *flow.EpochRichStateEntry) error {
+func IsValidExtendingEpochSetup(extendingSetup *flow.EpochSetup, protocolStateEntry *flow.EpochStateEntry) error {
 	// Enforce EpochSetup is valid w.r.t to current epoch state
 	if protocolStateEntry.NextEpoch != nil { // We should only have a single epoch setup event per epoch.
 		// true iff EpochSetup event for NEXT epoch was already included before

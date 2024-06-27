@@ -350,7 +350,7 @@ func (e *EpochRichStateEntry) Copy() *EpochRichStateEntry {
 // CurrentEpochFinalView returns the final view of the current epoch, taking into account possible epoch extensions.
 // If there are no epoch extensions, the final view is the final view of the current epoch setup,
 // otherwise it is the final view of the last epoch extension.
-func (e *EpochRichStateEntry) CurrentEpochFinalView() uint64 {
+func (e *EpochStateEntry) CurrentEpochFinalView() uint64 {
 	l := len(e.CurrentEpoch.EpochExtensions)
 	if l > 0 {
 		return e.CurrentEpoch.EpochExtensions[l-1].FinalView
@@ -388,7 +388,7 @@ func (e *EpochMinStateEntry) EpochPhase() EpochPhase {
 
 // EpochCounter returns the current epoch counter.
 // The receiver EpochRichStateEntry must be properly constructed.
-func (e *EpochRichStateEntry) EpochCounter() uint64 {
+func (e *EpochStateEntry) EpochCounter() uint64 {
 	return e.CurrentEpochSetup.Counter
 }
 
