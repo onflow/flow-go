@@ -606,10 +606,6 @@ func TestRemoveOldEpochs(t *testing.T) {
 	snapshot := protocolmock.NewSnapshot(t)
 	state.On("Final").Return(snapshot)
 
-	epochProtocolState := protocolmock.NewEpochProtocolState(t)
-	epochProtocolState.On("EpochFallbackTriggered").Return(false, nil)
-	snapshot.On("EpochProtocolState").Return(epochProtocolState, nil)
-
 	epochQuery := mocks.NewEpochQuery(t, currentEpochCounter, epoch1)
 	snapshot.On("Epochs").Return(epochQuery)
 	currentEpochPhase := flow.EpochPhaseStaking
