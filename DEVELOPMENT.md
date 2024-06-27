@@ -13,7 +13,7 @@
 - For every HCU and spork, a branch will be created from master. This branch will be tagged and used to update testnet and then mainnet.
 - Only non-breaking changes which do not require an HCU or a spork can be committed to these HCU or spork specific branches.
 
-#### feature branches
+#### Feature branches
 - During development, all features should live on a feature branch.
 - For small features, this will be a simple working branch. These branches have the naming scheme `<contributor>/<issue #>-<short description>, for example `kan/123-fix-known-issue`
 - For larger features, this may be a shared feature branch with other team members. Feature branches have the naming scheme `feature/<name>`.
@@ -35,7 +35,7 @@
 - All HCU upgrades can go directly into the `master` branch
 - All spork upgrades must live on their own feature branch until the last HCU before the spork has been performed (usually approximately 1 month before the Spork).
     - It is the responsibility of the DRI to keep this feature branch in a mergeable state.
-    - If the spork is scheduled to occur within a month, all the feature branches can be merged into `master`. However, if the exact spork date has not been decided then a special spork branch may be created from master to merge all the feature branches. This is to consolidate of all the feature branches while accommodating any additional HCUs that may occur between then and the spork date.
+    - If the spork is scheduled to occur within a month, all the feature branches can be merged into `master`. However, if the exact spork date has not been decided then a special spork branch may be created from master to merge all the feature branches. This is to consolidate all the feature branches while accommodating any additional HCUs that may occur between then and the spork date.
     - Suggestion: once a sprint, merge `master` into the feature branch. More frequent merges are easier, as they avoid complex conflict resolutions
 
 
