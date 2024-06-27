@@ -517,7 +517,6 @@ func (s *EpochStateMachineSuite) TestEvolveState_EventsAreFiltered() {
 // In such situation, we still need to enter the next epoch (because it has already been committed), but persist in the
 // state that we have entered Epoch fallback mode (`flow.EpochMinStateEntry.EpochFallbackTriggered` is set to `true`).
 // This test ensures that we don't drop previously committed next epoch.
-// TODO(EFM, #6019): This test is broken with current implementation but must pass when EFM recovery has been implemented.
 func (s *EpochStateMachineSuite) TestEvolveStateTransitionToNextEpoch_WithInvalidStateTransition() {
 	unittest.SkipUnless(s.T(), unittest.TEST_TODO,
 		"This test is broken with current implementation but must pass when EFM recovery has been implemented."+
@@ -526,6 +525,10 @@ func (s *EpochStateMachineSuite) TestEvolveStateTransitionToNextEpoch_WithInvali
 	s.candidate.View = s.parentEpochState.NextEpochSetup.FirstView
 	happyPathTelemetryFactory := protocol_statemock.NewStateMachineEventsTelemetryFactory(s.T())
 	fallbackTelemetryFactory := protocol_statemock.NewStateMachineEventsTelemetryFactory(s.T())
+	happyPathTelemetry := protocol_statemock.NewStateMachineTelemetryConsumer(s.T())
+	fallbackPathTelemetry := protocol_statemock.NewStateMachineTelemetryConsumer(s.T())
+	happyPathTelemetryFactory.On("Execute", s.candidate.View).Return(happyPathTelemetry).Once()
+	fallbackTelemetryFactory.On("Execute", s.candidate.View).Return(fallbackPathTelemetry).Once()
 	stateMachine, err := epochs.NewEpochStateMachineFactory(
 		s.globalParams,
 		s.setupsDB,
@@ -537,6 +540,10 @@ func (s *EpochStateMachineSuite) TestEvolveStateTransitionToNextEpoch_WithInvali
 	require.NoError(s.T(), err)
 
 	invalidServiceEvent := unittest.EpochSetupFixture()
+	happyPathTelemetry.On("OnServiceEventReceived", invalidServiceEvent.ServiceEvent()).Return().Once()
+	happyPathTelemetry.On("OnInvalidServiceEvent", invalidServiceEvent.ServiceEvent(), mocks.Anything).Return().Once()
+	fallbackPathTelemetry.On("OnServiceEventReceived", invalidServiceEvent.ServiceEvent()).Return().Once()
+	fallbackPathTelemetry.On("OnInvalidServiceEvent", invalidServiceEvent.ServiceEvent(), mocks.Anything).Return().Once()
 	err = stateMachine.EvolveState([]flow.ServiceEvent{invalidServiceEvent.ServiceEvent()})
 	require.NoError(s.T(), err)
 

@@ -23,7 +23,6 @@ import (
 // All updates are applied to a copy of parent protocol state, so parent protocol state is not modified. The stateMachine internally
 // tracks the current protocol state. A separate instance should be created for each block to process the updates therein.
 // See flow.EpochPhase for detailed documentation about EFM and epoch phase transitions.
-// TODO(EFM, #6019): this structure needs to be updated to stop using parent state.
 type HappyPathStateMachine struct {
 	baseStateMachine
 }
@@ -101,7 +100,6 @@ func (u *HappyPathStateMachine) ProcessEpochSetup(epochSetup *flow.EpochSetup) (
 
 	// For collector clusters, we rely on invariants (I) and (II) holding. See `committees.Cluster` for details, specifically function
 	// `constructInitialClusterIdentities(..)`. While the system smart contract must satisfy this invariant, we run a sanity check below.
-	// TODO(EFM, #6019): potential vulnerability because looking into parent state, some ejection events might be missing from the 'evolving state'.
 	activeIdentitiesLookup := u.state.CurrentEpoch.ActiveIdentities.Lookup() // lookup NodeID → DynamicIdentityEntry for nodes _active_ in the current epoch
 	nextEpochActiveIdentities, err := buildNextEpochActiveParticipants(activeIdentitiesLookup, u.state.CurrentEpochSetup, epochSetup)
 	if err != nil {

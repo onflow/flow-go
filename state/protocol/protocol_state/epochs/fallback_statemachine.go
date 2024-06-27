@@ -167,8 +167,6 @@ func (m *FallbackStateMachine) ProcessEpochRecover(epochRecover *flow.EpochRecov
 	}
 
 	nextEpochParticipants, err := buildNextEpochActiveParticipants(
-		// TOTO: The following usage of the _parent_ state Active identities might lose ejections
-		//       sealed in this block. See https://github.com/onflow/flow-go/issues/6019
 		m.state.CurrentEpoch.ActiveIdentities.Lookup(),
 		m.state.CurrentEpochSetup,
 		&epochRecover.EpochSetup)
@@ -209,9 +207,6 @@ func (m *FallbackStateMachine) ensureValidEpochRecover(epochRecover *flow.EpochR
 	if m.view+m.params.EpochCommitSafetyThreshold() >= m.state.CurrentEpochFinalView() {
 		return protocol.NewInvalidServiceEventErrorf("could not process epoch recover, safety threshold reached")
 	}
-	// TOTO: The following code is only safe if the parent state has the _identical_ `CurrentEpochFinalView` as the
-	//       evolving state. This is regularly violated at the block we insert the epoch extension.
-	//       see https://github.com/onflow/flow-go/issues/6019
 	err := protocol.IsValidExtendingEpochSetup(&epochRecover.EpochSetup, m.state)
 	if err != nil {
 		return fmt.Errorf("invalid epoch recovery event(setup): %w", err)
