@@ -402,6 +402,12 @@ func PebbleDB(t testing.TB, dir string) *pebble.DB {
 	return db
 }
 
+func TypedPebbleDB(t testing.TB, dir string, create func(string, *pebble.Options) (*pebble.DB, error)) *pebble.DB {
+	db, err := create(dir, &pebble.Options{})
+	require.NoError(t, err)
+	return db
+}
+
 type PebbleWrapper struct {
 	db *pebble.DB
 }

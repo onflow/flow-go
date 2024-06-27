@@ -201,7 +201,7 @@ type ExecutionNode struct {
 	Ledger              ledger.Ledger
 	LevelDbDir          string
 	Collections         storage.Collections
-	Finalizer           *consensus.Finalizer
+	Finalizer           *consensus.FinalizerPebble
 	MyExecutionReceipts storage.MyExecutionReceipts
 	StorehouseEnabled   bool
 }
