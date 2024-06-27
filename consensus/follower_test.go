@@ -82,7 +82,7 @@ func (s *HotStuffFollowerSuite) SetupTest() {
 	s.headers = &mockstorage.Headers{}
 
 	// mock finalization finalizer
-	s.finalizer = mockmodule.NewFinalizerPebble(s.T())
+	s.finalizer = mockmodule.NewFinalizer(s.T())
 
 	// mock consumer for finalization notifications
 	s.notifier = mockhotstuff.NewFollowerConsumer(s.T())
