@@ -247,6 +247,48 @@ func (suite *ConsensusSuite) TestProtocolEvents_EpochExtended() {
 	suite.Assert().NoError(err)
 }
 
+// TestProtocolEvents_EpochExtendedMultiple tests that protocol events notifying of an epoch extension are handled correctly.
+// An EpochExtension event should result in a re-computation of the leader selection (including the new extension).
+// The Committee should handle multiple subsequent, contiguous epoch extensions.
+// Repeated events should be no-ops.
+func (suite *ConsensusSuite) TestProtocolEvents_EpochExtendedMultiple() {
+	curEpoch := newMockEpoch(suite.currentEpochCounter, unittest.IdentityListFixture(10), 101, 200, true)
+	suite.epochs.Add(curEpoch)
+
+	suite.CreateAndStartCommittee()
+
+	// Add several
+	for i := 0; i < 10; i++ {
+		finalView, err := curEpoch.FinalView()
+		require.NoError(suite.T(), err)
+		extension := flow.EpochExtension{
+			FirstView: finalView + 1,
+			FinalView: finalView + 100,
+		}
+		refBlock := unittest.BlockHeaderFixture()
+		addExtension(curEpoch, extension)
+		suite.state.On("AtBlockID", refBlock.ID()).Return(suite.snapshot)
+
+		suite.committee.EpochExtended(suite.currentEpochCounter, refBlock, extension)
+		// wait for the protocol event to be processed (async)
+		require.Eventually(suite.T(), func() bool {
+			_, err := suite.committee.IdentitiesByEpoch(unittest.Uint64InRange(extension.FirstView, extension.FinalView))
+			return err == nil
+		}, time.Second, 50*time.Millisecond)
+
+		// we should have the same number of cached epochs (an existing epoch has been extended
+		suite.Assert().Len(suite.committee.epochs, 1)
+		suite.AssertStoredEpochCounterRange(suite.currentEpochCounter, suite.currentEpochCounter)
+
+		// should respond to queries for view range of new extension
+		_, err = suite.committee.IdentitiesByEpoch(unittest.Uint64InRange(extension.FirstView, extension.FinalView))
+		suite.Assert().NoError(err)
+		// should return sentinel for view outside extension
+		_, err = suite.committee.IdentitiesByEpoch(extension.FinalView + 1)
+		suite.Assert().ErrorIs(err, model.ErrViewForUnknownEpoch)
+	}
+}
+
 // TestIdentitiesByBlock tests retrieving committee members by block.
 // * should use up-to-block committee information
 // * should exclude non-committee members

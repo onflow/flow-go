@@ -12,7 +12,6 @@ import (
 // in the given epoch. The consensus committee spans multiple epochs and the leader
 // selection returned here is only valid for the input epoch, so it is necessary to
 // call this for each upcoming epoch.
-// TODO: take into account extensions (then can re-compute in full upon observing a new extension)
 func SelectionForConsensus(epoch protocol.Epoch) (*LeaderSelection, error) {
 
 	// pre-compute leader selection for the epoch
