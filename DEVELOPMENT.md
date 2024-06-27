@@ -4,7 +4,7 @@
 
 ### Branching Strategy
 
-#### master branch
+#### The [master](https://github.com/onflow/flow-go/tree/master) branch
 
 - The `master` branch is intended to only contain features for the immediately upcoming release, whether it is a [Height Coordinated Upgrade (HCU) or a Spork](https://developers.flow.com/networks/node-ops/node-operation/hcu#hcu-versus-spork).
 
