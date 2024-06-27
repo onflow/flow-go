@@ -18,7 +18,6 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state/protocol"
 	protocolmock "github.com/onflow/flow-go/state/protocol/mock"
-	"github.com/onflow/flow-go/state/protocol/prg"
 	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/onflow/flow-go/utils/unittest/mocks"
 )
@@ -31,41 +30,31 @@ type ConsensusSuite struct {
 	suite.Suite
 
 	// mocks
-	state              *protocolmock.State
-	snapshot           *protocolmock.Snapshot
-	params             *protocolmock.Params
-	epochs             *mocks.EpochQuery
-	epochProtocolState *protocolmock.EpochProtocolState
+	state    *protocolmock.State
+	snapshot *protocolmock.Snapshot
+	epochs   *mocks.EpochQuery
 
 	// backend for mocked functions
-	phase                  flow.EpochPhase
-	epochFallbackTriggered bool
-	currentEpochCounter    uint64
-	myID                   flow.Identifier
+	phase               flow.EpochPhase
+	currentEpochCounter uint64
+	myID                flow.Identifier
 
 	committee *Consensus
 	cancel    context.CancelFunc
 }
 
+// SetupTest instantiates mocks for a test case.
+// By default, we start in the Staking phase with no epochs mocked; test cases must add their own epoch mocks.
 func (suite *ConsensusSuite) SetupTest() {
 	suite.phase = flow.EpochPhaseStaking
-	suite.epochFallbackTriggered = false
 	suite.currentEpochCounter = 1
 	suite.myID = unittest.IdentifierFixture()
 
 	suite.state = new(protocolmock.State)
 	suite.snapshot = new(protocolmock.Snapshot)
-	suite.params = new(protocolmock.Params)
 	suite.epochs = mocks.NewEpochQuery(suite.T(), suite.currentEpochCounter)
 
 	suite.state.On("Final").Return(suite.snapshot)
-	suite.state.On("Params").Return(suite.params)
-	suite.epochProtocolState = protocolmock.NewEpochProtocolState(suite.T())
-	suite.epochProtocolState.On("EpochFallbackTriggered").Return(
-		func() bool { return suite.epochFallbackTriggered },
-		func() error { return nil },
-	)
-	suite.snapshot.On("EpochProtocolState").Return(suite.epochProtocolState, nil)
 	suite.snapshot.On("EpochPhase").Return(
 		func() flow.EpochPhase { return suite.phase },
 		func() error { return nil },
@@ -77,6 +66,7 @@ func (suite *ConsensusSuite) TearDownTest() {
 	if suite.cancel != nil {
 		suite.cancel()
 	}
+	unittest.AssertClosesBefore(suite.T(), suite.committee.Done(), time.Second)
 }
 
 // CreateAndStartCommittee instantiates and starts the committee.
@@ -135,7 +125,7 @@ func (suite *ConsensusSuite) AssertStoredEpochCounterRange(from, to uint64) {
 // TestConstruction_CurrentEpoch tests construction with only a current epoch.
 // Only the current epoch should be cached after construction.
 func (suite *ConsensusSuite) TestConstruction_CurrentEpoch() {
-	curEpoch := newMockEpoch(suite.currentEpochCounter, unittest.IdentityListFixture(10), 101, 200, unittest.SeedFixture(32), true)
+	curEpoch := newMockEpoch(suite.currentEpochCounter, unittest.IdentityListFixture(10), 101, 200, true)
 	suite.epochs.Add(curEpoch)
 
 	suite.CreateAndStartCommittee()
@@ -146,8 +136,8 @@ func (suite *ConsensusSuite) TestConstruction_CurrentEpoch() {
 // TestConstruction_PreviousEpoch tests construction with a previous epoch.
 // Both current and previous epoch should be cached after construction.
 func (suite *ConsensusSuite) TestConstruction_PreviousEpoch() {
-	prevEpoch := newMockEpoch(suite.currentEpochCounter-1, unittest.IdentityListFixture(10), 1, 100, unittest.SeedFixture(32), true)
-	curEpoch := newMockEpoch(suite.currentEpochCounter, unittest.IdentityListFixture(10), 101, 200, unittest.SeedFixture(32), true)
+	prevEpoch := newMockEpoch(suite.currentEpochCounter-1, unittest.IdentityListFixture(10), 1, 100, true)
+	curEpoch := newMockEpoch(suite.currentEpochCounter, unittest.IdentityListFixture(10), 101, 200, true)
 	suite.epochs.Add(prevEpoch)
 	suite.epochs.Add(curEpoch)
 
@@ -160,8 +150,8 @@ func (suite *ConsensusSuite) TestConstruction_PreviousEpoch() {
 // Only the current epoch should be cached after construction.
 func (suite *ConsensusSuite) TestConstruction_UncommittedNextEpoch() {
 	suite.phase = flow.EpochPhaseSetup
-	curEpoch := newMockEpoch(suite.currentEpochCounter, unittest.IdentityListFixture(10), 101, 200, unittest.SeedFixture(32), true)
-	nextEpoch := newMockEpoch(suite.currentEpochCounter+1, unittest.IdentityListFixture(10), 201, 300, unittest.SeedFixture(32), false)
+	curEpoch := newMockEpoch(suite.currentEpochCounter, unittest.IdentityListFixture(10), 101, 200, true)
+	nextEpoch := newMockEpoch(suite.currentEpochCounter+1, unittest.IdentityListFixture(10), 201, 300, false)
 	suite.epochs.Add(curEpoch)
 	suite.epochs.Add(nextEpoch)
 
@@ -173,8 +163,8 @@ func (suite *ConsensusSuite) TestConstruction_UncommittedNextEpoch() {
 // TestConstruction_CommittedNextEpoch tests construction with a committed next epoch.
 // Both current and next epochs should be cached after construction.
 func (suite *ConsensusSuite) TestConstruction_CommittedNextEpoch() {
-	curEpoch := newMockEpoch(suite.currentEpochCounter, unittest.IdentityListFixture(10), 101, 200, unittest.SeedFixture(32), true)
-	nextEpoch := newMockEpoch(suite.currentEpochCounter+1, unittest.IdentityListFixture(10), 201, 300, unittest.SeedFixture(32), true)
+	curEpoch := newMockEpoch(suite.currentEpochCounter, unittest.IdentityListFixture(10), 101, 200, true)
+	nextEpoch := newMockEpoch(suite.currentEpochCounter+1, unittest.IdentityListFixture(10), 201, 300, true)
 	suite.epochs.Add(curEpoch)
 	suite.epochs.Add(nextEpoch)
 	suite.phase = flow.EpochPhaseCommitted
@@ -184,40 +174,16 @@ func (suite *ConsensusSuite) TestConstruction_CommittedNextEpoch() {
 	suite.AssertStoredEpochCounterRange(suite.currentEpochCounter, suite.currentEpochCounter+1)
 }
 
-// TestConstruction_EpochFallbackTriggered tests construction when EFM has been triggered.
-// Both current and the injected fallback epoch should be cached after construction.
-// TODO
-func (suite *ConsensusSuite) TestConstruction_EpochFallbackTriggered() {
-	curEpoch := newMockEpoch(suite.currentEpochCounter, unittest.IdentityListFixture(10), 101, 200, unittest.SeedFixture(32), true)
-	suite.epochs.Add(curEpoch)
-	suite.epochFallbackTriggered = true
-
-	suite.CreateAndStartCommittee()
-	suite.Assert().Len(suite.committee.epochs, 2)
-	suite.AssertStoredEpochCounterRange(suite.currentEpochCounter, suite.currentEpochCounter+1)
-}
-
-// TODO: test starting up:
-//   - EFM is triggered and no extensions have been added (above)
-//   - EFM is triggered and some extensions have been added
-//   - EFM was triggered (since recovered) and some extensions have been added
-func (suite *ConsensusSuite) TestConstruction_EpochFallbackTriggered_WithExtensions() {
-	suite.T().Fail()
-}
-func (suite *ConsensusSuite) TestConstruction_EpochCommitted_WithExtensions() {
-	suite.T().Fail()
-}
-
 // TestProtocolEvents_CommittedEpoch tests that protocol events notifying of a newly
 // committed epoch are handled correctly. A committed epoch should be cached, and
 // repeated events should be no-ops.
 func (suite *ConsensusSuite) TestProtocolEvents_CommittedEpoch() {
-	curEpoch := newMockEpoch(suite.currentEpochCounter, unittest.IdentityListFixture(10), 101, 200, unittest.SeedFixture(32), true)
+	curEpoch := newMockEpoch(suite.currentEpochCounter, unittest.IdentityListFixture(10), 101, 200, true)
 	suite.epochs.Add(curEpoch)
 
 	suite.CreateAndStartCommittee()
 
-	nextEpoch := newMockEpoch(suite.currentEpochCounter+1, unittest.IdentityListFixture(10), 201, 300, unittest.SeedFixture(32), true)
+	nextEpoch := newMockEpoch(suite.currentEpochCounter+1, unittest.IdentityListFixture(10), 201, 300, true)
 
 	firstBlockOfCommittedPhase := unittest.BlockHeaderFixture()
 	suite.state.On("AtBlockID", firstBlockOfCommittedPhase.ID()).Return(suite.snapshot)
@@ -245,34 +211,41 @@ func (suite *ConsensusSuite) TestProtocolEvents_CommittedEpoch() {
 // TestProtocolEvents_EpochFallback tests that protocol events notifying of epoch
 // fallback are handled correctly. Epoch fallback triggering should result in a
 // fallback epoch being injected, and repeated events should be no-ops.
-// TODO
-func (suite *ConsensusSuite) TestProtocolEvents_EpochFallback() {
-	curEpoch := newMockEpoch(suite.currentEpochCounter, unittest.IdentityListFixture(10), 101, 200, unittest.SeedFixture(32), true)
+// TODO docs
+func (suite *ConsensusSuite) TestProtocolEvents_EpochExtended() {
+	curEpoch := newMockEpoch(suite.currentEpochCounter, unittest.IdentityListFixture(10), 101, 200, true)
 	suite.epochs.Add(curEpoch)
 
 	suite.CreateAndStartCommittee()
 
-	suite.committee.EpochFallbackModeTriggered(0, nil)
+	extension := flow.EpochExtension{
+		FirstView: 201,
+		FinalView: 300,
+	}
+	refBlock := unittest.BlockHeaderFixture()
+	addExtension(curEpoch, extension)
+	suite.state.On("AtBlockID", refBlock.ID()).Return(suite.snapshot)
+
+	suite.committee.EpochExtended(suite.currentEpochCounter, refBlock, extension)
 	// wait for the protocol event to be processed (async)
 	require.Eventually(suite.T(), func() bool {
 		_, err := suite.committee.IdentitiesByEpoch(unittest.Uint64InRange(201, 300))
 		return err == nil
-	}, 30*time.Second, 50*time.Millisecond)
+	}, time.Second, 50*time.Millisecond)
 
-	suite.Assert().Len(suite.committee.epochs, 2)
-	suite.AssertStoredEpochCounterRange(suite.currentEpochCounter, suite.currentEpochCounter+1)
+	// we should have the same number of cached epochs (an existing epoch has been extended
+	suite.Assert().Len(suite.committee.epochs, 1)
+	suite.AssertStoredEpochCounterRange(suite.currentEpochCounter, suite.currentEpochCounter)
 
 	// should handle multiple deliveries of the protocol event
-	suite.committee.EpochFallbackModeTriggered(0, nil)
-	suite.committee.EpochFallbackModeTriggered(0, nil)
-	suite.committee.EpochFallbackModeTriggered(0, nil)
+	suite.committee.EpochExtended(suite.currentEpochCounter, refBlock, extension)
+	suite.committee.EpochExtended(suite.currentEpochCounter, refBlock, extension)
+	suite.committee.EpochExtended(suite.currentEpochCounter, refBlock, extension)
 
-	suite.Assert().Len(suite.committee.epochs, 2)
-	suite.AssertStoredEpochCounterRange(suite.currentEpochCounter, suite.currentEpochCounter+1)
-}
-
-func (suite *ConsensusSuite) TestProtocolEvents_EpochExtended() {
-	suite.T().Fail()
+	suite.Assert().Len(suite.committee.epochs, 1)
+	suite.AssertStoredEpochCounterRange(suite.currentEpochCounter, suite.currentEpochCounter)
+	_, err := suite.committee.IdentitiesByEpoch(unittest.Uint64InRange(201, 300))
+	suite.Assert().NoError(err)
 }
 
 // TestIdentitiesByBlock tests retrieving committee members by block.
@@ -297,7 +270,7 @@ func (suite *ConsensusSuite) TestIdentitiesByBlock() {
 	blockID := unittest.IdentifierFixture()
 
 	// create a mock epoch for leader selection setup in constructor
-	currEpoch := newMockEpoch(1, unittest.IdentityListFixture(10), 1, 100, unittest.SeedFixture(prg.RandomSourceLength), true)
+	currEpoch := newMockEpoch(1, unittest.IdentityListFixture(10), 1, 100, true)
 	suite.epochs.Add(currEpoch)
 
 	suite.state.On("AtBlockID", blockID).Return(suite.snapshot)
@@ -372,9 +345,9 @@ func (suite *ConsensusSuite) TestIdentitiesByEpoch() {
 	epoch2Identities := flow.IdentityList{epoch2Identity}
 
 	// create a mock epoch for leader selection setup in constructor
-	epoch1 := newMockEpoch(suite.currentEpochCounter, epoch1Identities, 1, 100, unittest.SeedFixture(prg.RandomSourceLength), true)
+	epoch1 := newMockEpoch(suite.currentEpochCounter, epoch1Identities, 1, 100, true)
 	// initially epoch 2 is not committed
-	epoch2 := newMockEpoch(suite.currentEpochCounter+1, epoch2Identities, 101, 200, unittest.SeedFixture(prg.RandomSourceLength), true)
+	epoch2 := newMockEpoch(suite.currentEpochCounter+1, epoch2Identities, 101, 200, true)
 	suite.epochs.Add(epoch1)
 
 	suite.CreateAndStartCommittee()
@@ -458,8 +431,8 @@ func (suite *ConsensusSuite) TestThresholds() {
 
 	identities := unittest.IdentityListFixture(10)
 
-	prevEpoch := newMockEpoch(suite.currentEpochCounter-1, identities.Map(mapfunc.WithInitialWeight(100)), 1, 100, unittest.SeedFixture(prg.RandomSourceLength), true)
-	currEpoch := newMockEpoch(suite.currentEpochCounter, identities.Map(mapfunc.WithInitialWeight(200)), 101, 200, unittest.SeedFixture(32), true)
+	prevEpoch := newMockEpoch(suite.currentEpochCounter-1, identities.Map(mapfunc.WithInitialWeight(100)), 1, 100, true)
+	currEpoch := newMockEpoch(suite.currentEpochCounter, identities.Map(mapfunc.WithInitialWeight(200)), 101, 200, true)
 	suite.epochs.Add(prevEpoch)
 	suite.epochs.Add(currEpoch)
 
@@ -496,7 +469,7 @@ func (suite *ConsensusSuite) TestThresholds() {
 	})
 
 	// now, add a valid next epoch
-	nextEpoch := newMockEpoch(suite.currentEpochCounter+1, identities.Map(mapfunc.WithInitialWeight(300)), 201, 300, unittest.SeedFixture(prg.RandomSourceLength), true)
+	nextEpoch := newMockEpoch(suite.currentEpochCounter+1, identities.Map(mapfunc.WithInitialWeight(300)), 201, 300, true)
 	suite.CommitEpoch(nextEpoch)
 
 	t.Run("next epoch ready", func(t *testing.T) {
@@ -547,8 +520,8 @@ func (suite *ConsensusSuite) TestLeaderForView() {
 
 	identities := unittest.IdentityListFixture(10)
 
-	prevEpoch := newMockEpoch(suite.currentEpochCounter-1, identities, 1, 100, unittest.SeedFixture(prg.RandomSourceLength), true)
-	currEpoch := newMockEpoch(suite.currentEpochCounter, identities, 101, 200, unittest.SeedFixture(32), true)
+	prevEpoch := newMockEpoch(suite.currentEpochCounter-1, identities, 1, 100, true)
+	currEpoch := newMockEpoch(suite.currentEpochCounter, identities, 101, 200, true)
 	suite.epochs.Add(currEpoch)
 	suite.epochs.Add(prevEpoch)
 
@@ -580,7 +553,7 @@ func (suite *ConsensusSuite) TestLeaderForView() {
 	})
 
 	// now, add a valid next epoch
-	nextEpoch := newMockEpoch(suite.currentEpochCounter+1, identities, 201, 300, unittest.SeedFixture(prg.RandomSourceLength), true)
+	nextEpoch := newMockEpoch(suite.currentEpochCounter+1, identities, 201, 300, true)
 	suite.CommitEpoch(nextEpoch)
 
 	t.Run("next epoch ready", func(t *testing.T) {
@@ -627,7 +600,7 @@ func TestRemoveOldEpochs(t *testing.T) {
 	currentEpochCounter := firstEpochCounter
 	epochFinalView := uint64(100)
 
-	epoch1 := newMockEpoch(currentEpochCounter, identities, 1, epochFinalView, unittest.SeedFixture(prg.RandomSourceLength), true)
+	epoch1 := newMockEpoch(currentEpochCounter, identities, 1, epochFinalView, true)
 
 	// create mocks
 	state := protocolmock.NewState(t)
@@ -665,7 +638,7 @@ func TestRemoveOldEpochs(t *testing.T) {
 		firstView := epochFinalView + 1
 		epochFinalView = epochFinalView + 100
 		currentEpochCounter++
-		nextEpoch := newMockEpoch(currentEpochCounter, identities, firstView, epochFinalView, unittest.SeedFixture(prg.RandomSourceLength), true)
+		nextEpoch := newMockEpoch(currentEpochCounter, identities, firstView, epochFinalView, true)
 		epochQuery.Add(nextEpoch)
 
 		currentEpochPhase = flow.EpochPhaseCommitted
@@ -705,11 +678,18 @@ func TestRemoveOldEpochs(t *testing.T) {
 	}
 }
 
+// addExtension adds the extension to the mocked epoch, by updating its final view.
+func addExtension(epoch *protocolmock.Epoch, ext flow.EpochExtension) {
+	epoch.On("FinalView").Unset()
+	epoch.On("FinalView").Return(ext.FinalView, nil)
+}
+
 // newMockEpoch returns a new mocked epoch with the given fields
-func newMockEpoch(counter uint64, identities flow.IdentityList, firstView uint64, finalView uint64, seed []byte, committed bool) *protocolmock.Epoch {
+func newMockEpoch(counter uint64, identities flow.IdentityList, firstView uint64, finalView uint64, committed bool) *protocolmock.Epoch {
 
 	epoch := new(protocolmock.Epoch)
 	epoch.On("Counter").Return(counter, nil)
+	epoch.On("RandomSource").Return(unittest.RandomBytes(32), nil)
 	epoch.On("InitialIdentities").Return(identities.ToSkeleton(), nil)
 	epoch.On("FirstView").Return(firstView, nil)
 	epoch.On("FinalView").Return(finalView, nil)
@@ -720,6 +700,5 @@ func newMockEpoch(counter uint64, identities flow.IdentityList, firstView uint64
 		epoch.On("DKG").Return(nil, protocol.ErrNextEpochNotCommitted)
 	}
 
-	epoch.On("RandomSource").Return(seed, nil)
 	return epoch
 }

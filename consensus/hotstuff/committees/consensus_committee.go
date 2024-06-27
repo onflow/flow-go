@@ -325,6 +325,7 @@ func (c *Consensus) handleEpochExtended(refBlock *flow.Header) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
+	// todo sanity check cur final view vs next
 	epochInfo, ok := c.epochs[counter]
 	if !ok {
 		return fmt.Errorf("sanity check failed: current epoch committee info does not exist")
