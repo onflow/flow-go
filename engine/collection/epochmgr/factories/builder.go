@@ -3,7 +3,7 @@ package factories
 import (
 	"fmt"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/module"
@@ -17,7 +17,7 @@ import (
 )
 
 type BuilderFactory struct {
-	db               *badger.DB
+	db               *pebble.DB
 	protoState       protocol.State
 	mainChainHeaders storage.Headers
 	trace            module.Tracer
@@ -28,7 +28,7 @@ type BuilderFactory struct {
 }
 
 func NewBuilderFactory(
-	db *badger.DB,
+	db *pebble.DB,
 	protoState protocol.State,
 	mainChainHeaders storage.Headers,
 	trace module.Tracer,
@@ -57,7 +57,7 @@ func (f *BuilderFactory) Create(
 	clusterPayloads storage.ClusterPayloads,
 	pool mempool.Transactions,
 	epoch uint64,
-) (module.Builder, *finalizer.Finalizer, error) {
+) (module.Builder, *finalizer.FinalizerPebble, error) {
 
 	build, err := builder.NewBuilderPebble(
 		f.db,
