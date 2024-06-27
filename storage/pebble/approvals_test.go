@@ -72,7 +72,7 @@ func TestApprovalStoreTwoDifferentApprovalsShouldFail(t *testing.T) {
 		err = store.Store(approval2)
 		require.NoError(t, err)
 
-		// TODO: fix it?
+		// TODO: fix later once implement insert and upsert
 		// err = store.Index(approval1.Body.ExecutionResultID, approval1.Body.ChunkIndex, approval2.ID())
 		// require.Error(t, err)
 		// require.True(t, errors.Is(err, storage.ErrDataMismatch))

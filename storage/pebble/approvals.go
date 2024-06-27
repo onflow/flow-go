@@ -72,6 +72,7 @@ func (r *ResultApprovals) byChunk(resultID flow.Identifier, chunkIndex uint64) f
 func (r *ResultApprovals) index(resultID flow.Identifier, chunkIndex uint64, approvalID flow.Identifier) func(storage.PebbleReaderBatchWriter) error {
 	return func(tx storage.PebbleReaderBatchWriter) error {
 		r, w := tx.ReaderWriter()
+
 		err := operation.IndexResultApproval(resultID, chunkIndex, approvalID)(w)
 		if err == nil {
 			return nil
