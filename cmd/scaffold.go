@@ -1104,7 +1104,6 @@ func (fnb *FlowNodeBuilder) initSecretsDB() error {
 	// disable secrets database encryption
 	if fnb.NodeRole == flow.RoleConsensus.String() && fnb.InsecureSecretsDB {
 		fnb.Logger.Warn().Msg("starting with secrets database encryption disabled")
-	} else {
 	}
 
 	secretsDB, err := bstorage.InitSecret(fnb.BaseConfig.secretsdir, nil)

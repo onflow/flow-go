@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble"
 	"github.com/rs/zerolog"
 	"golang.org/x/sync/errgroup"
 
@@ -16,7 +16,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/storage"
-	bstorage "github.com/onflow/flow-go/storage/badger"
+	bstorage "github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
@@ -31,7 +31,7 @@ type IndexerCore struct {
 	collections  storage.Collections
 	transactions storage.Transactions
 	results      storage.LightTransactionResults
-	batcher      *badger.DB
+	batcher      *pebble.DB
 
 	collectionExecutedMetric module.CollectionExecutedMetric
 
@@ -45,7 +45,7 @@ type IndexerCore struct {
 func New(
 	log zerolog.Logger,
 	metrics module.ExecutionStateIndexerMetrics,
-	batcher *badger.DB,
+	batcher *pebble.DB,
 	registers storage.RegisterIndex,
 	headers storage.Headers,
 	events storage.Events,
