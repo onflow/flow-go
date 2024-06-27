@@ -6,7 +6,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble"
 	"github.com/stretchr/testify/assert"
 	testmock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -15,12 +15,12 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/state/protocol"
-	bprotocol "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/inmem"
+	bprotocol "github.com/onflow/flow-go/state/protocol/pebble"
 	"github.com/onflow/flow-go/state/protocol/util"
 	protoutil "github.com/onflow/flow-go/state/protocol/util"
-	storagebadger "github.com/onflow/flow-go/storage/badger"
-	storutil "github.com/onflow/flow-go/storage/util"
+	storagepebble "github.com/onflow/flow-go/storage/pebble"
+	"github.com/onflow/flow-go/storage/testingutils"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -34,7 +34,7 @@ func TestBootstrapAndOpen(t *testing.T) {
 		block.Header.ParentID = unittest.IdentifierFixture()
 	})
 
-	protoutil.RunWithBootstrapState(t, rootSnapshot, func(db *badger.DB, _ *bprotocol.State) {
+	protoutil.RunWithPebbleBootstrapState(t, rootSnapshot, func(db *pebble.DB, _ *bprotocol.State) {
 
 		// expect the final view metric to be set to current epoch's final view
 		epoch := rootSnapshot.Epochs().Current()
@@ -60,7 +60,7 @@ func TestBootstrapAndOpen(t *testing.T) {
 		complianceMetrics.On("CurrentDKGPhase3FinalView", dkgPhase3FinalView).Once()
 
 		noopMetrics := new(metrics.NoopCollector)
-		all := storagebadger.InitAll(noopMetrics, db)
+		all := storagepebble.InitAll(noopMetrics, db)
 		// protocol state has been bootstrapped, now open a protocol state with the database
 		state, err := bprotocol.OpenState(
 			complianceMetrics,
@@ -114,7 +114,7 @@ func TestBootstrapAndOpen_EpochCommitted(t *testing.T) {
 		}
 	})
 
-	protoutil.RunWithBootstrapState(t, committedPhaseSnapshot, func(db *badger.DB, _ *bprotocol.State) {
+	protoutil.RunWithPebbleBootstrapState(t, committedPhaseSnapshot, func(db *pebble.DB, _ *bprotocol.State) {
 
 		complianceMetrics := new(mock.ComplianceMetrics)
 
@@ -146,7 +146,7 @@ func TestBootstrapAndOpen_EpochCommitted(t *testing.T) {
 		complianceMetrics.On("SealedHeight", testmock.Anything).Once()
 
 		noopMetrics := new(metrics.NoopCollector)
-		all := storagebadger.InitAll(noopMetrics, db)
+		all := storagepebble.InitAll(noopMetrics, db)
 		state, err := bprotocol.OpenState(
 			complianceMetrics,
 			db,
@@ -178,7 +178,7 @@ func TestBootstrap_EpochHeightBoundaries(t *testing.T) {
 	epoch1FirstHeight := rootSnapshot.Encodable().Head.Height
 
 	t.Run("root snapshot", func(t *testing.T) {
-		util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.FollowerState) {
+		util.RunWithPebbleFollowerProtocolState(t, rootSnapshot, func(db *pebble.DB, state *bprotocol.FollowerState) {
 			// first height of started current epoch should be known
 			firstHeight, err := state.Final().Epochs().Current().FirstHeight()
 			require.NoError(t, err)
@@ -528,9 +528,9 @@ func bootstrap(t *testing.T, rootSnapshot protocol.Snapshot, f func(*bprotocol.S
 	metrics := metrics.NewNoopCollector()
 	dir := unittest.TempDir(t)
 	defer os.RemoveAll(dir)
-	db := unittest.BadgerDB(t, dir)
+	db := unittest.PebbleDB(t, dir)
 	defer db.Close()
-	all := storutil.StorageLayer(t, db)
+	all := testingutils.PebbleStorageLayer(t, db)
 	state, err := bprotocol.Bootstrap(
 		metrics,
 		db,
@@ -556,7 +556,7 @@ func bootstrap(t *testing.T, rootSnapshot protocol.Snapshot, f func(*bprotocol.S
 // from non-root states.
 func snapshotAfter(t *testing.T, rootSnapshot protocol.Snapshot, f func(*bprotocol.FollowerState) protocol.Snapshot) protocol.Snapshot {
 	var after protocol.Snapshot
-	protoutil.RunWithFollowerProtocolState(t, rootSnapshot, func(_ *badger.DB, state *bprotocol.FollowerState) {
+	protoutil.RunWithPebbleFollowerProtocolState(t, rootSnapshot, func(_ *pebble.DB, state *bprotocol.FollowerState) {
 		snap := f(state)
 		var err error
 		after, err = inmem.FromSnapshot(snap)
@@ -619,7 +619,7 @@ func assertSealingSegmentBlocksQueryableAfterBootstrap(t *testing.T, snapshot pr
 
 // BenchmarkFinal benchmarks retrieving the latest finalized block from storage.
 func BenchmarkFinal(b *testing.B) {
-	util.RunWithBootstrapState(b, unittest.RootSnapshotFixture(unittest.CompleteIdentitySet()), func(db *badger.DB, state *bprotocol.State) {
+	util.RunWithPebbleBootstrapState(b, unittest.RootSnapshotFixture(unittest.CompleteIdentitySet()), func(db *pebble.DB, state *bprotocol.State) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			header, err := state.Final().Head()
@@ -631,7 +631,7 @@ func BenchmarkFinal(b *testing.B) {
 
 // BenchmarkFinal benchmarks retrieving the block by height from storage.
 func BenchmarkByHeight(b *testing.B) {
-	util.RunWithBootstrapState(b, unittest.RootSnapshotFixture(unittest.CompleteIdentitySet()), func(db *badger.DB, state *bprotocol.State) {
+	util.RunWithPebbleBootstrapState(b, unittest.RootSnapshotFixture(unittest.CompleteIdentitySet()), func(db *pebble.DB, state *bprotocol.State) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			header, err := state.AtHeight(0).Head()
