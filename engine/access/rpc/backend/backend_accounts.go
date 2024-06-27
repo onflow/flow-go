@@ -142,6 +142,8 @@ func (b *backendAccounts) GetAccountKeysAtLatestBlock(
 			b.log.Debug().Err(err).Msgf("failed to get account keys at blockID: %v", sealedBlockID)
 			return nil, err
 		}
+
+		return accountKeys, nil
 	}
 
 	accountKeys, err = b.getAccountKeyAtBlock(ctx, address, sealedBlockID, keyIndex, sealed.Height)
@@ -173,6 +175,8 @@ func (b *backendAccounts) GetAccountKeysAtBlockHeight(
 			b.log.Debug().Err(err).Msgf("failed to get account keys at height: %v", height)
 			return nil, err
 		}
+
+		return accountKeys, nil
 	}
 
 	accountKeys, err = b.getAccountKeyAtBlock(ctx, address, blockID, keyIndex, height)
@@ -243,7 +247,7 @@ func (b *backendAccounts) getAccountBalanceAtBlock(
 			b.log.Debug().Err(err).Msgf("failed to get account balance at blockID: %v", blockID)
 			return 0, 0, err
 		}
-		return account.Balance, 0, nil
+		return account.Balance, account.Balance, nil
 
 	case IndexQueryModeLocalOnly:
 		accountBalance, err := b.scriptExecutor.GetAccountBalance(ctx, address, height)
@@ -270,7 +274,7 @@ func (b *backendAccounts) getAccountBalanceAtBlock(
 		}
 		execResult, execErr := b.getAccountFromAnyExeNode(ctx, address, blockID)
 
-		return execResult.Balance, 0, execErr
+		return execResult.Balance, execResult.Balance, execErr
 
 	default:
 		return 0, 0, status.Errorf(codes.Internal, "unknown execution mode: %v", b.scriptExecMode)
@@ -335,7 +339,7 @@ func (b *backendAccounts) getAccountKeyAtBlock(
 			}
 		}
 
-		return nil, status.Errorf(codes.Internal, "unknown execution mode: %v", b.scriptExecMode)
+		return nil, status.Errorf(codes.Internal, "failed to get account key by index: %d", keyIndex)
 	case IndexQueryModeLocalOnly:
 		accountKey, err := b.scriptExecutor.GetAccountKey(ctx, address, keyIndex, height)
 		if err != nil {
@@ -356,7 +360,6 @@ func (b *backendAccounts) getAccountKeyAtBlock(
 	default:
 		return nil, status.Errorf(codes.Internal, "unknown execution mode: %v", b.scriptExecMode)
 	}
-
 }
 
 // getAccountFromLocalStorage retrieves the given account from the local storage.

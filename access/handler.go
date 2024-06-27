@@ -650,7 +650,7 @@ func (h *Handler) GetAccountKeysAtLatestBlock(
 		return nil, status.Errorf(codes.InvalidArgument, "invalid address: %v", err)
 	}
 
-	var keyIndex int
+	keyIndex := -1
 	if req.GetIndex() != nil {
 		keyIndex = int(req.GetIndex().GetValue())
 	}
@@ -692,7 +692,7 @@ func (h *Handler) GetAccountKeysAtBlockHeight(
 		return nil, status.Errorf(codes.InvalidArgument, "invalid address: %v", err)
 	}
 
-	var keyIndex int
+	keyIndex := -1
 	if req.GetIndex() != nil {
 		keyIndex = int(req.GetIndex().GetValue())
 	}
