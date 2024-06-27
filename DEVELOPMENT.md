@@ -11,7 +11,7 @@
 #### HCU or Spork specific branches
 
 - For every HCU and spork, a branch will be created from master. This branch will be tagged and used to update testnet and then mainnet.
-- Only non-breaking changes which do not require an HCU or a spork can be committed to these HCU or spork specific branches.
+- Only non-breaking changes (see: [breaking change classification](#breaking-change-classifications)) can be committed to these HCU or spork specific branches.
 
 #### Feature branches
 - During development, all features should live on a feature branch.
