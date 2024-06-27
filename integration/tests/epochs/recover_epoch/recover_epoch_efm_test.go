@@ -3,12 +3,14 @@ package recover_epoch
 import (
 	"fmt"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	sdk "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go/integration/utils"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -21,20 +23,21 @@ type RecoverEpochSuite struct {
 	Suite
 }
 
-// TestRecoverEpoch ensures that the recover_epoch transaction flow works as expected. This test will simulate the network going
-// into EFM by taking a consensus node offline before completing the DKG. While in EFM mode the test will execute the efm-recover-tx-args
-// CLI command to generate transaction arguments to submit a recover_epoch transaction, after submitting the transaction the test will
-// ensure the network is healthy.
+// TestRecoverEpoch ensures that the recover epoch governance transaction flow works as expected and a network that
+// enters Epoch Fallback Mode can successfully recover. This test will do the following:
+// 1. Manually triggers EFM by turning off a collection node before the end of the DKG forcing the DKG to fail.
+// 2. Generates epoch recover transaction args using the epoch efm-recover-tx-args.
+// 3. Submit recover epoch transaction.
+// 4. Ensure expected EpochRecover event is emitted.
+// Currently, this test does not test the processing of the EpochRecover event see this issue: https://github.com/onflow/flow-go/issues/6164
 func (s *RecoverEpochSuite) TestRecoverEpoch() {
+	// 1. Manually trigger EFM
 	// wait until the epoch setup phase to force network into EFM
 	s.AwaitEpochPhase(s.Ctx, 0, flow.EpochPhaseSetup, 10*time.Second, 500*time.Millisecond)
-
 	// pausing consensus node will force the network into EFM
 	enContainer := s.GetContainersByRole(flow.RoleCollection)[0]
 	_ = enContainer.Pause()
-
 	s.AwaitFinalizedView(s.Ctx, 32, 2*time.Minute, 500*time.Millisecond)
-
 	// start the paused execution node now that we are in EFM
 	require.NoError(s.T(), enContainer.Start())
 
@@ -52,6 +55,7 @@ func (s *RecoverEpochSuite) TestRecoverEpoch() {
 	//if counter is still 0, epoch emergency fallback was triggered as expected
 	s.AssertInEpoch(s.Ctx, 0)
 
+	// 2. Generate transaction arguments for epoch recover transaction.
 	// generate epoch recover transaction args
 	collectionClusters := uint64(1)
 	numViewsInRecoveryEpoch := uint64(80)
@@ -72,24 +76,26 @@ func (s *RecoverEpochSuite) TestRecoverEpoch() {
 	b, err := os.ReadFile(out)
 	require.NoError(s.T(), err)
 
+	// 3. Submit recover epoch transaction to the network.
+	// submit the recover epoch transaction
 	txArgs, err := utils.ParseJSON(b)
 	require.NoError(s.T(), err)
 	env := utils.LocalnetEnv()
 	result := s.recoverEpoch(env, txArgs)
+	require.NoError(s.T(), result.Error)
+	require.Equal(s.T(), result.Status, sdk.TransactionStatusSealed)
 
-	latestFinalizedHeader := s.GetLatestFinalizedHeader(s.Ctx)
-	// wait for at-least 2 epoch transitions to ensure successful recovery
-	waitForView := latestFinalizedHeader.View + numViewsInRecoveryEpoch
-	s.TimedLogf("waiting for at-least 2 epoch transitions (finalized view %d)", waitForView)
-	s.AwaitFinalizedView(s.Ctx, waitForView, 2*time.Minute, 500*time.Millisecond)
-	s.TimedLogf("observed finalized view %d", waitForView)
+	// 3. Ensure EpochRecover event was emitted.
+	eventType := ""
+	for _, evt := range result.Events {
+		if strings.Contains(evt.Type, "FlowEpoch.EpochRecover") {
+			eventType = evt.Type
+			break
+		}
+	}
+	events, err := s.Client.GetEventsForBlockIDs(s.Ctx, eventType, []sdk.Identifier{result.BlockID})
+	require.NoError(s.T(), err)
+	require.Equal(s.T(), events[0].Events[0].Type, eventType)
 
-	snap := s.GetLatestProtocolSnapshot(s.Ctx)
-	c, _ := snap.Epochs().Next().Counter()
-	fmt.Println("NEXT EPOCH COUNTER", c)
-	currentEpoch := s.CurrentEpoch(s.Ctx)
-	// assert we have transitioned out of Epoch 0 indicating a successful recovery.
-	require.Greater(s.T(), currentEpoch, uint64(0))
-
-	fmt.Println("TX RESULT STATUS: ", result)
+	// 4. @TODO ensure EpochRecover service event is processed by the fallback state machine and the network recovers.
 }
