@@ -247,7 +247,6 @@ func Test_ConflictingResults(t *testing.T) {
 func Test_ForkDetectionPersisted(t *testing.T) {
 	unittest.RunWithTempDir(t, func(dir string) {
 		db := unittest.PebbleDB(t, dir)
-		defer db.Close()
 
 		// initialize ExecForkSuppressor
 		wrappedMempool := &poolmock.IncorporatedResultSeals{}
