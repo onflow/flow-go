@@ -208,10 +208,9 @@ func (suite *ConsensusSuite) TestProtocolEvents_CommittedEpoch() {
 
 }
 
-// TestProtocolEvents_EpochFallback tests that protocol events notifying of epoch
-// fallback are handled correctly. Epoch fallback triggering should result in a
-// fallback epoch being injected, and repeated events should be no-ops.
-// TODO docs
+// TestProtocolEvents_EpochExtended tests that protocol events notifying of an epoch extension are handled correctly.
+// An EpochExtension event should result in a re-computation of the leader selection (including the new extension).
+// Repeated events should be no-ops.
 func (suite *ConsensusSuite) TestProtocolEvents_EpochExtended() {
 	curEpoch := newMockEpoch(suite.currentEpochCounter, unittest.IdentityListFixture(10), 101, 200, true)
 	suite.epochs.Add(curEpoch)

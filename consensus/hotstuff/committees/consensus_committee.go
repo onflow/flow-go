@@ -28,7 +28,17 @@ type epochInfo struct {
 // recomputeLeaderSelectionForExtendedViewRange re-computes the LeaderSelection field
 // for the input epoch's entire view range, including extensions.
 // This should be called each time an extension is added to an epoch.
+// No errors are expected during normal operation.
 func (e *epochInfo) recomputeLeaderSelectionForExtendedViewRange(epoch protocol.Epoch) error {
+	extendedFinalView, err := epoch.FinalView()
+	if err != nil {
+		return fmt.Errorf("could not get final view for extended epoch: %w", err)
+	}
+	// sanity check: ensure view range for which leader selection is defined strictly increases
+	if extendedFinalView <= e.FinalView() {
+		return nil
+	}
+
 	leaderSelection, err := leader.SelectionForConsensus(epoch)
 	if err != nil {
 		return fmt.Errorf("could not re-compute leader selection for epoch after extension: %w", err)
@@ -66,7 +76,7 @@ func newEpochInfo(epoch protocol.Epoch) (*epochInfo, error) {
 	return epochInfo, nil
 }
 
-// eventHandlerFunc represents an event wrapped in a closure which will execute any required local
+// eventHandlerFunc represents an event wrapped in a closure which will perform any required local
 // state changes upon execution by the single event processing worker goroutine.
 // No errors are expected under normal conditions.
 type eventHandlerFunc func() error
@@ -78,8 +88,8 @@ type Consensus struct {
 	me          flow.Identifier       // the node ID of this node
 	mu          sync.RWMutex          // protects access to epochs
 	epochs      map[uint64]*epochInfo // cache of initial committee & leader selection per epoch
-	events      chan eventHandlerFunc
-	events.Noop // implements protocol.Consumer
+	events      chan eventHandlerFunc // shared queue for all protocol events
+	events.Noop                       // implements protocol.Consumer
 	component.Component
 }
 
@@ -325,7 +335,6 @@ func (c *Consensus) handleEpochExtended(refBlock *flow.Header) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	// todo sanity check cur final view vs next
 	epochInfo, ok := c.epochs[counter]
 	if !ok {
 		return fmt.Errorf("sanity check failed: current epoch committee info does not exist")
