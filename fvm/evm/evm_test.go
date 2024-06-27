@@ -1195,14 +1195,15 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 				require.NoError(t, err)
 				require.NoError(t, output.Err)
 
-				withdrawEvent := output.Events[7]
+				withdrawEvent := output.Events[10]
 				ev, err := ccf.Decode(nil, withdrawEvent.Payload)
 				require.NoError(t, err)
 				cadenceEvent, ok := ev.(cadence.Event)
 				require.True(t, ok)
 
 				balanceAfter := cadence.SearchFieldByName(cadenceEvent, "balanceAfterInAttoFlow")
-				require.Equal(t, types.OneFlow, balanceAfter.(cadence.UInt).Value)
+				// 2.34 - 1.23 = 1.11
+				require.Equal(t, big.NewInt(1_110_000_000_000_000_000), balanceAfter.(cadence.UInt).Value)
 			})
 	})
 
