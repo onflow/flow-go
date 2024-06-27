@@ -62,11 +62,11 @@ import (
 	"github.com/onflow/flow-go/module/validation"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/state/protocol"
-	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
+	pebbleState "github.com/onflow/flow-go/state/protocol/pebble"
 	"github.com/onflow/flow-go/storage"
-	bstorage "github.com/onflow/flow-go/storage/badger"
+	bstorage "github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/utils/io"
 )
 
@@ -209,7 +209,7 @@ func main() {
 
 	nodeBuilder.
 		PreInit(cmd.DynamicStartPreInit).
-		ValidateRootSnapshot(badgerState.ValidRootSnapshotContainsEntityExpiryRange).
+		ValidateRootSnapshot(pebbleState.ValidRootSnapshotContainsEntityExpiryRange).
 		Module("consensus node metrics", func(node *cmd.NodeConfig) error {
 			conMetrics = metrics.NewConsensusCollector(node.Tracer, node.MetricsRegisterer)
 			return nil
@@ -244,11 +244,11 @@ func main() {
 			return err
 		}).
 		Module("mutable follower state", func(node *cmd.NodeConfig) error {
-			// For now, we only support state implementations from package badger.
+			// For now, we only support state implementations from package pebble.
 			// If we ever support different implementations, the following can be replaced by a type-aware factory
-			state, ok := node.State.(*badgerState.State)
+			state, ok := node.State.(*pebbleState.State)
 			if !ok {
-				return fmt.Errorf("only implementations of type badger.State are currently supported but read-only state has type %T", node.State)
+				return fmt.Errorf("only implementations of type pebble.State are currently supported but read-only state has type %T", node.State)
 			}
 
 			chunkAssigner, err = chmodule.NewChunkAssigner(chunkAlpha, node.State)
@@ -278,7 +278,7 @@ func main() {
 				return err
 			}
 
-			mutableState, err = badgerState.NewFullConsensusState(
+			mutableState, err = pebbleState.NewFullConsensusState(
 				node.Logger,
 				node.Tracer,
 				node.ProtocolEvents,
