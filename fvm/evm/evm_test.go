@@ -1026,13 +1026,13 @@ func TestEVMAddressDeposit(t *testing.T) {
 
 			// deposit event
 			depositEvent := output.Events[4]
-			ev, err = ccf.Decode(nil, depositEvent.Payload)
+			depEv, err := types.FlowEventToCadenceEvent(depositEvent)
 			require.NoError(t, err)
-			cadenceEvent, ok = ev.(cadence.Event)
-			require.True(t, ok)
 
-			balanceAfter := cadence.SearchFieldByName(cadenceEvent, "balanceAfterInAttoFlow")
-			require.Equal(t, types.OneFlow, balanceAfter.(cadence.UInt).Value)
+			depEvPayload, err := types.DecodeFLOWTokensDepositedEventPayload(depEv)
+			require.NoError(t, err)
+
+			require.Equal(t, types.OneFlow, depEvPayload.BalanceAfterInAttoFlow.Value)
 		})
 }
 
