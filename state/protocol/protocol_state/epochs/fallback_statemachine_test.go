@@ -693,6 +693,8 @@ func (s *EpochFallbackStateMachineSuite) TestEpochRecoverAndEjectionInSameBlock(
 // TestProcessingMultipleEventsAtTheSameBlock tests that the state machine can process multiple events at the same block.
 // EpochFallbackStateMachineSuite has to be able to process any combination of events in any order at the same block.
 // This test generates a random amount of setup, commit and recover events and processes them in random order.
+// A special rule is used to inject an ejection event, depending on the random draw we will inject an ejection event before or after the recover event.
+// Depending on the ordering of events, the recovering event needs to be structured differently.
 func (s *EpochFallbackStateMachineSuite) TestProcessingMultipleEventsAtTheSameBlock() {
 	rapid.Check(s.T(), func(t *rapid.T) {
 		s.SetupTest() // start each time with clean state
@@ -743,6 +745,7 @@ func (s *EpochFallbackStateMachineSuite) TestProcessingMultipleEventsAtTheSameBl
 			serviceEvent := unittest.EpochRecoverFixture(func(setup *flow.EpochSetup) {
 				nextEpochParticipants := s.parentProtocolState.CurrentEpochIdentityTable.Copy()
 				if ejectionBeforeRecover {
+					// a valid recovery event cannot readmit a node ejected previously
 					setup.Participants = nextEpochParticipants.ToSkeleton().Filter(
 						filter.Not(filter.HasNodeID[flow.IdentitySkeleton](ejectedNodes...)))
 				} else {
@@ -786,24 +789,17 @@ func (s *EpochFallbackStateMachineSuite) TestProcessingMultipleEventsAtTheSameBl
 			require.True(s.T(), ejectedIdentity.Ejected)
 		}
 
-		// TODO(EFM, #6019): next section needs to be updated when implementing related issue.
-		// Extra context: logic in this test is based on the assumption that recover event readmits the same identity table.
-		// This means if there is an ejection event in the same block and it precedes the recovery event then the recovery event needs to be rejected
-		// since it tries to readmit an ejected identity.
-		// Based on the setup of the test we will have changes to the state in next cases:
-		// 1. includeValidRecover == true, includeEjection == false, in this case epoch is recovered and NextEpoch != nil.
-		// 2. includeValidRecover == false, includeEjection == true, in this case we eject nodes and NextEpoch == nil.
-		// 3. includeValidRecover == true, includeEjection == true, recover precedes ejection event, in this case epoch is recovered and NextEpoch != nil
-		//    and nodes are ejected in both current and next epoch.
-		// In all other cases there shouldn't be changes to the resulting state.
-		require.Equal(t, includeValidRecover || includeEjection, hasChanges, "always should have changes since we eject nodes")
+		require.Equal(t, includeValidRecover || includeEjection, hasChanges,
+			"changes are expected if we include valid recovery or eject nodes")
 		if includeValidRecover {
 			require.NotNil(t, updatedState.NextEpoch, "next epoch should be present")
 			for _, nodeID := range ejectedNodes {
 				ejectedIdentity, found := updatedState.NextEpoch.ActiveIdentities.ByNodeID(nodeID)
 				if ejectionBeforeRecover {
+					// if ejection is before recover, the ejected node should not be present in the next epoch
 					require.False(s.T(), found)
 				} else {
+					// in-case of ejection after recover, the ejected node should be present in the next epoch, but it has to be 'ejected'.
 					require.True(s.T(), found)
 					require.True(s.T(), ejectedIdentity.Ejected)
 				}
