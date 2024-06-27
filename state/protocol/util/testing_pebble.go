@@ -14,14 +14,14 @@ import (
 	"github.com/onflow/flow-go/state/protocol/events"
 	pbadger "github.com/onflow/flow-go/state/protocol/pebble"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/util"
+	"github.com/onflow/flow-go/storage/testingutils"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func RunWithPebbleBootstrapState(t testing.TB, rootSnapshot protocol.Snapshot, f func(*pebble.DB, *pbadger.State)) {
 	unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
 		metrics := metrics.NewNoopCollector()
-		all := util.PebbleStorageLayer(t, db)
+		all := testingutils.PebbleStorageLayer(t, db)
 		state, err := pbadger.Bootstrap(
 			metrics,
 			db,
@@ -47,7 +47,7 @@ func RunWithPebbleFullProtocolState(t testing.TB, rootSnapshot protocol.Snapshot
 		tracer := trace.NewNoopTracer()
 		log := zerolog.Nop()
 		consumer := events.NewNoop()
-		all := util.PebbleStorageLayer(t, db)
+		all := testingutils.PebbleStorageLayer(t, db)
 		state, err := pbadger.Bootstrap(
 			metrics,
 			db,
@@ -77,7 +77,7 @@ func RunWithPebbleFullProtocolStateAndMetrics(t testing.TB, rootSnapshot protoco
 		tracer := trace.NewNoopTracer()
 		log := zerolog.Nop()
 		consumer := events.NewNoop()
-		all := util.PebbleStorageLayer(t, db)
+		all := testingutils.PebbleStorageLayer(t, db)
 		state, err := pbadger.Bootstrap(
 			metrics,
 			db,
@@ -108,7 +108,7 @@ func RunWithPebbleFullProtocolStateAndValidator(t testing.TB, rootSnapshot proto
 		tracer := trace.NewNoopTracer()
 		log := zerolog.Nop()
 		consumer := events.NewNoop()
-		all := util.PebbleStorageLayer(t, db)
+		all := testingutils.PebbleStorageLayer(t, db)
 		state, err := pbadger.Bootstrap(
 			metrics,
 			db,
@@ -138,7 +138,7 @@ func RunWithPebbleFollowerProtocolState(t testing.TB, rootSnapshot protocol.Snap
 		tracer := trace.NewNoopTracer()
 		log := zerolog.Nop()
 		consumer := events.NewNoop()
-		all := util.PebbleStorageLayer(t, db)
+		all := testingutils.PebbleStorageLayer(t, db)
 		state, err := pbadger.Bootstrap(
 			metrics,
 			db,
@@ -166,7 +166,7 @@ func RunWithPebbleFullProtocolStateAndConsumer(t testing.TB, rootSnapshot protoc
 		metrics := metrics.NewNoopCollector()
 		tracer := trace.NewNoopTracer()
 		log := zerolog.Nop()
-		all := util.PebbleStorageLayer(t, db)
+		all := testingutils.PebbleStorageLayer(t, db)
 		state, err := pbadger.Bootstrap(
 			metrics,
 			db,
@@ -195,7 +195,7 @@ func RunWithPebbleFullProtocolStateAndMetricsAndConsumer(t testing.TB, rootSnaps
 	unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
 		tracer := trace.NewNoopTracer()
 		log := zerolog.Nop()
-		all := util.PebbleStorageLayer(t, db)
+		all := testingutils.PebbleStorageLayer(t, db)
 		state, err := pbadger.Bootstrap(
 			metrics,
 			db,
@@ -226,7 +226,7 @@ func RunWithPebbleFollowerProtocolStateAndHeaders(t testing.TB, rootSnapshot pro
 		tracer := trace.NewNoopTracer()
 		log := zerolog.Nop()
 		consumer := events.NewNoop()
-		all := util.PebbleStorageLayer(t, db)
+		all := testingutils.PebbleStorageLayer(t, db)
 		state, err := pbadger.Bootstrap(
 			metrics,
 			db,

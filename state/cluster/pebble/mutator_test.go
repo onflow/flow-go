@@ -29,7 +29,7 @@ import (
 	pebblestorage "github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/storage/pebble/operation"
 	"github.com/onflow/flow-go/storage/pebble/procedure"
-	"github.com/onflow/flow-go/storage/util"
+	"github.com/onflow/flow-go/storage/testingutils"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -62,7 +62,7 @@ func (suite *MutatorSuite) SetupTest() {
 	metrics := metrics.NewNoopCollector()
 	tracer := trace.NewNoopTracer()
 	log := zerolog.Nop()
-	all := util.PebbleStorageLayer(suite.T(), suite.db)
+	all := testingutils.PebbleStorageLayer(suite.T(), suite.db)
 	colPayloads := pebblestorage.NewClusterPayloads(metrics, suite.db)
 
 	// just bootstrap with a genesis block, we'll use this as reference

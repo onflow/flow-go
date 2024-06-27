@@ -33,7 +33,7 @@ import (
 	stoerr "github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/storage/pebble/operation"
-	storeutil "github.com/onflow/flow-go/storage/util"
+	"github.com/onflow/flow-go/storage/testingutils"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -85,7 +85,7 @@ func TestExtendValid(t *testing.T) {
 		metrics := metrics.NewNoopCollector()
 		tracer := trace.NewNoopTracer()
 		log := zerolog.Nop()
-		all := storeutil.PebbleStorageLayer(t, db)
+		all := testingutils.PebbleStorageLayer(t, db)
 
 		distributor := events.NewDistributor()
 		consumer := mockprotocol.NewConsumer(t)
@@ -811,7 +811,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 
 		tracer := trace.NewNoopTracer()
 		log := zerolog.Nop()
-		all := storeutil.PebbleStorageLayer(t, db)
+		all := testingutils.PebbleStorageLayer(t, db)
 		protoState, err := protocol.Bootstrap(
 			metrics,
 			db,
@@ -1908,7 +1908,7 @@ func TestExtendInvalidSealsInBlock(t *testing.T) {
 		metrics := metrics.NewNoopCollector()
 		tracer := trace.NewNoopTracer()
 		log := zerolog.Nop()
-		all := storeutil.PebbleStorageLayer(t, db)
+		all := testingutils.PebbleStorageLayer(t, db)
 
 		// create a event consumer to test epoch transition events
 		distributor := events.NewDistributor()
@@ -2436,7 +2436,7 @@ func TestHeaderInvalidTimestamp(t *testing.T) {
 		metrics := metrics.NewNoopCollector()
 		tracer := trace.NewNoopTracer()
 		log := zerolog.Nop()
-		all := storeutil.PebbleStorageLayer(t, db)
+		all := testingutils.PebbleStorageLayer(t, db)
 
 		// create a event consumer to test epoch transition events
 		distributor := events.NewDistributor()

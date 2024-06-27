@@ -19,11 +19,6 @@ func StorageLayer(_ testing.TB, db *badger.DB) *storage.All {
 	return all
 }
 
-//	func PebbleStorageLayer(_ testing.TB, db *pebble.DB) *storage.All {
-//		metrics := metrics.NewNoopCollector()
-//		all := pstorage.InitAll(metrics, db)
-//		return all
-//	}
 func CreateFiles(t *testing.T, dir string, names ...string) {
 	for _, name := range names {
 		file, err := os.Create(filepath.Join(dir, name))
