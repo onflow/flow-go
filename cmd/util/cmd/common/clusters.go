@@ -7,6 +7,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/cadence"
+	cdcCommon "github.com/onflow/cadence/runtime/common"
 
 	"github.com/onflow/flow-go/cmd/bootstrap/run"
 	"github.com/onflow/flow-go/model/bootstrap"
@@ -163,8 +164,9 @@ func ConvertClusterAssignmentsCdc(assignments flow.AssignmentList) cadence.Array
 }
 
 // ConvertClusterQcsCdc converts cluster QCs from `QuorumCertificate` type to `ClusterQCVoteData` type.
-func ConvertClusterQcsCdc(qcs []*flow.QuorumCertificate, clusterList flow.ClusterList) ([]*flow.ClusterQCVoteData, error) {
-	voteData := make([]*flow.ClusterQCVoteData, len(qcs))
+func ConvertClusterQcsCdc(qcs []*flow.QuorumCertificate, clusterList flow.ClusterList, address string) ([]cadence.Value, error) {
+	voteDataType := newFlowClusterQCVoteDataStructType(address)
+	qcVoteData := make([]cadence.Value, len(qcs))
 	for i, qc := range qcs {
 		c, ok := clusterList.ByIndex(uint(i))
 		if !ok {
@@ -174,13 +176,44 @@ func ConvertClusterQcsCdc(qcs []*flow.QuorumCertificate, clusterList flow.Cluste
 		if err != nil {
 			return nil, fmt.Errorf("could not decode signer indices: %w", err)
 		}
-		voteData[i] = &flow.ClusterQCVoteData{
-			SigData:  qc.SigData,
-			VoterIDs: voterIds,
+		cdcVoterIds := make([]cadence.Value, len(voterIds))
+		for i, id := range voterIds {
+			cdcVoterIds[i] = cadence.String(id.String())
 		}
+
+		qcVoteData[i] = cadence.NewStruct([]cadence.Value{
+			// voteSignatures
+			cadence.String(fmt.Sprintf("%#x", qc.SigData)),
+			// voterIDs
+			cadence.NewArray(cdcVoterIds).WithType(cadence.NewVariableSizedArrayType(cadence.StringType)),
+		}).WithType(voteDataType)
+
 	}
 
-	return voteData, nil
+	return qcVoteData, nil
+}
+
+// newFlowClusterQCVoteDataStructType returns the FlowClusterQC cadence struct type.
+func newFlowClusterQCVoteDataStructType(clusterQcAddress string) *cadence.StructType {
+
+	// FlowClusterQC.ClusterQCVoteData
+	address, _ := cdcCommon.HexToAddress(clusterQcAddress)
+	location := cdcCommon.NewAddressLocation(nil, address, "FlowClusterQC")
+
+	return &cadence.StructType{
+		Location:            location,
+		QualifiedIdentifier: "FlowClusterQC.ClusterQCVoteData",
+		Fields: []cadence.Field{
+			{
+				Identifier: "voteSignatures",
+				Type:       cadence.StringType,
+			},
+			{
+				Identifier: "voterIDs",
+				Type:       cadence.NewVariableSizedArrayType(cadence.StringType),
+			},
+		},
+	}
 }
 
 // Filters a list of nodes to include only nodes that will sign the QC for the

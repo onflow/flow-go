@@ -21,6 +21,7 @@ import (
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/integration/tests/lib"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -30,7 +31,7 @@ type BaseSuite struct {
 	lib.TestnetStateTracker
 	cancel  context.CancelFunc
 	log     zerolog.Logger
-	net     *testnet.FlowNetwork
+	Net     *testnet.FlowNetwork
 	ghostID flow.Identifier
 
 	Client *testnet.Client
@@ -74,7 +75,7 @@ func (s *BaseSuite) SetupTest() {
 		testnet.WithAdditionalFlag("--cruise-ctl-enabled=false"), // disable cruise control for integration tests
 		testnet.WithAdditionalFlag(fmt.Sprintf("--required-verification-seal-approvals=%d", s.RequiredSealApprovals)),
 		testnet.WithAdditionalFlag(fmt.Sprintf("--required-construction-seal-approvals=%d", s.RequiredSealApprovals)),
-		testnet.WithLogLevel(zerolog.InfoLevel)}
+		testnet.WithLogLevel(zerolog.ErrorLevel)}
 
 	// a ghost node masquerading as an access node
 	s.ghostID = unittest.IdentifierFixture()
@@ -85,30 +86,30 @@ func (s *BaseSuite) SetupTest() {
 		testnet.AsGhost())
 
 	confs := []testnet.NodeConfig{
-		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.WarnLevel)),
-		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.WarnLevel)),
+		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.ErrorLevel)),
+		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.ErrorLevel)),
 		testnet.NewNodeConfig(flow.RoleCollection, collectionConfigs...),
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
-		testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.WarnLevel), testnet.WithAdditionalFlag("--extensive-logging=true")),
-		testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.WarnLevel)),
-		testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.WarnLevel)),
+		testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.ErrorLevel), testnet.WithAdditionalFlag("--extensive-logging=true")),
+		testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.ErrorLevel)),
+		testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.ErrorLevel)),
 		ghostNode,
 	}
 
 	netConf := testnet.NewNetworkConfigWithEpochConfig("epochs-tests", confs, s.StakingAuctionLen, s.DKGPhaseLen, s.EpochLen, s.EpochCommitSafetyThreshold)
 
 	// initialize the network
-	s.net = testnet.PrepareFlowNetwork(s.T(), netConf, flow.Localnet)
+	s.Net = testnet.PrepareFlowNetwork(s.T(), netConf, flow.Localnet)
 
 	// start the network
-	s.net.Start(s.Ctx)
+	s.Net.Start(s.Ctx)
 
 	// start tracking blocks
 	s.Track(s.T(), s.Ctx, s.Ghost())
 
 	// use AN1 for test-related queries - the AN join/leave test will replace AN2
-	client, err := s.net.ContainerByName(testnet.PrimaryAN).TestnetClient()
+	client, err := s.Net.ContainerByName(testnet.PrimaryAN).TestnetClient()
 	require.NoError(s.T(), err)
 
 	s.Client = client
@@ -117,8 +118,15 @@ func (s *BaseSuite) SetupTest() {
 	go lib.LogStatusPeriodically(s.T(), s.Ctx, s.log, s.Client, 5*time.Second)
 }
 
+func (s *BaseSuite) TearDownTest() {
+	s.log.Info().Msg("================> Start TearDownTest")
+	s.Net.Remove()
+	s.cancel()
+	s.log.Info().Msg("================> Finish TearDownTest")
+}
+
 func (s *BaseSuite) Ghost() *client.GhostClient {
-	client, err := s.net.ContainerByID(s.ghostID).GhostClient()
+	client, err := s.Net.ContainerByID(s.ghostID).GhostClient()
 	require.NoError(s.T(), err, "could not get ghost Client")
 	return client
 }
@@ -151,7 +159,46 @@ func (s *BaseSuite) AwaitEpochPhase(ctx context.Context, expectedEpoch uint64, e
 
 // GetContainersByRole returns all containers from the network for the specified role, making sure the containers are not ghost nodes.
 func (s *BaseSuite) GetContainersByRole(role flow.Role) []*testnet.Container {
-	nodes := s.net.ContainersByRole(role, false)
+	nodes := s.Net.ContainersByRole(role, false)
 	require.True(s.T(), len(nodes) > 0)
 	return nodes
+}
+
+// AwaitFinalizedView polls until it observes that the latest finalized block has a view
+// greater than or equal to the input view. This is used to wait until when an epoch
+// transition must have happened.
+func (s *BaseSuite) AwaitFinalizedView(ctx context.Context, view uint64, waitFor, tick time.Duration) {
+	require.Eventually(s.T(), func() bool {
+		finalized := s.GetLatestFinalizedHeader(ctx)
+		return finalized.View >= view
+	}, waitFor, tick)
+}
+
+// GetLatestFinalizedHeader retrieves the latest finalized block, as reported in LatestSnapshot.
+func (s *BaseSuite) GetLatestFinalizedHeader(ctx context.Context) *flow.Header {
+	snapshot := s.GetLatestProtocolSnapshot(ctx)
+	finalized, err := snapshot.Head()
+	require.NoError(s.T(), err)
+	return finalized
+}
+
+// AssertInEpoch requires actual epoch counter is equal to counter provided.
+func (s *BaseSuite) AssertInEpoch(ctx context.Context, expectedEpoch uint64) {
+	actualEpoch := s.CurrentEpoch(ctx)
+	require.Equalf(s.T(), expectedEpoch, actualEpoch, "expected to be in epoch %d got %d", expectedEpoch, actualEpoch)
+}
+
+// CurrentEpoch returns the current epoch.
+func (s *BaseSuite) CurrentEpoch(ctx context.Context) uint64 {
+	snapshot := s.GetLatestProtocolSnapshot(ctx)
+	counter, err := snapshot.Epochs().Current().Counter()
+	require.NoError(s.T(), err)
+	return counter
+}
+
+// GetLatestProtocolSnapshot returns the latest protocol snapshot.
+func (s *BaseSuite) GetLatestProtocolSnapshot(ctx context.Context) *inmem.Snapshot {
+	snapshot, err := s.Client.GetLatestProtocolSnapshot(ctx)
+	require.NoError(s.T(), err)
+	return snapshot
 }

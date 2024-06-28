@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"github.com/spf13/cobra"
 
@@ -15,6 +16,10 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module/grpcclient"
 	"github.com/onflow/flow-go/state/protocol/inmem"
+)
+
+const (
+	outputFileName = "recover-epoch-tx-args.json"
 )
 
 // generateRecoverEpochTxArgsCmd represents a command to generate the data needed to submit an epoch-recovery transaction
@@ -40,14 +45,20 @@ This recovery process has some constraints:
 		Run: generateRecoverEpochTxArgs(getSnapshot),
 	}
 
+	flagOut                      string
 	flagAnAddress                string
 	flagAnPubkey                 string
+	flagAnInsecure               bool
 	flagInternalNodePrivInfoDir  string
 	flagNodeConfigJson           string
 	flagCollectionClusters       int
 	flagNumViewsInEpoch          uint64
 	flagNumViewsInStakingAuction uint64
 	flagEpochCounter             uint64
+	flagTargetDuration           uint64
+	flagTargetEndTime            uint64
+	flagInitNewEpoch             bool
+	flagClusterQCAddress         string
 )
 
 func init() {
@@ -59,6 +70,11 @@ func init() {
 }
 
 func addGenerateRecoverEpochTxArgsCmdFlags() error {
+	generateRecoverEpochTxArgsCmd.Flags().StringVar(&flagOut, "out", "", "file to write tx args output")
+	generateRecoverEpochTxArgsCmd.Flags().StringVar(&flagAnAddress, "access-address", "", "the address of the access node used for client connections")
+	generateRecoverEpochTxArgsCmd.Flags().StringVar(&flagClusterQCAddress, "cluster-qc-contract-address", "", "the contract address for the FlowClusterQC smart contract")
+	generateRecoverEpochTxArgsCmd.Flags().StringVar(&flagAnPubkey, "access-network-key", "", "the network key of the access node used for client connections in hex string format")
+	generateRecoverEpochTxArgsCmd.Flags().BoolVar(&flagAnInsecure, "insecure", false, "set to true if the protocol snapshot should be retrieved from the insecure AN endpoint")
 	generateRecoverEpochTxArgsCmd.Flags().IntVar(&flagCollectionClusters, "collection-clusters", 0,
 		"number of collection clusters")
 	// required parameters for network configuration and generation of root node identities
@@ -69,8 +85,15 @@ func addGenerateRecoverEpochTxArgsCmdFlags() error {
 	generateRecoverEpochTxArgsCmd.Flags().Uint64Var(&flagNumViewsInEpoch, "epoch-length", 0, "length of each epoch measured in views")
 	generateRecoverEpochTxArgsCmd.Flags().Uint64Var(&flagNumViewsInStakingAuction, "epoch-staking-phase-length", 0, "length of the epoch staking phase measured in views")
 	generateRecoverEpochTxArgsCmd.Flags().Uint64Var(&flagEpochCounter, "epoch-counter", 0, "the epoch counter used to generate the root cluster block")
+	generateRecoverEpochTxArgsCmd.Flags().Uint64Var(&flagTargetDuration, "target-duration", 0, "the target duration of the epoch")
+	generateRecoverEpochTxArgsCmd.Flags().Uint64Var(&flagTargetEndTime, "target-end-time", 0, "the target end time for the epoch")
+	generateRecoverEpochTxArgsCmd.Flags().BoolVar(&flagInitNewEpoch, "init", true, "set to false if the recover transaction should overwrite the current epoch rather than initialize a new recover epoch")
 
-	err := generateRecoverEpochTxArgsCmd.MarkFlagRequired("epoch-length")
+	err := generateRecoverEpochTxArgsCmd.MarkFlagRequired("access-address")
+	if err != nil {
+		return fmt.Errorf("failed to mark access-address flag as required")
+	}
+	err = generateRecoverEpochTxArgsCmd.MarkFlagRequired("epoch-length")
 	if err != nil {
 		return fmt.Errorf("failed to mark epoch-length flag as required")
 	}
@@ -86,12 +109,24 @@ func addGenerateRecoverEpochTxArgsCmdFlags() error {
 	if err != nil {
 		return fmt.Errorf("failed to mark collection-clusters flag as required")
 	}
+	err = generateRecoverEpochTxArgsCmd.MarkFlagRequired("target-duration")
+	if err != nil {
+		return fmt.Errorf("failed to mark target-duration flag as required")
+	}
+	err = generateRecoverEpochTxArgsCmd.MarkFlagRequired("target-end-time")
+	if err != nil {
+		return fmt.Errorf("failed to mark target-end-time flag as required")
+	}
+	err = generateRecoverEpochTxArgsCmd.MarkFlagRequired("cluster-qc-contract-address")
+	if err != nil {
+		return fmt.Errorf("failed to mark cluster-qc-contract-address flag as required")
+	}
 	return nil
 }
 
 func getSnapshot() *inmem.Snapshot {
 	// get flow client with secure client connection to download protocol snapshot from access node
-	config, err := grpcclient.NewFlowClientConfig(flagAnAddress, flagAnPubkey, flow.ZeroID, false)
+	config, err := grpcclient.NewFlowClientConfig(flagAnAddress, flagAnPubkey, flow.ZeroID, flagAnInsecure)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to create flow client config")
 	}
@@ -112,8 +147,6 @@ func getSnapshot() *inmem.Snapshot {
 // generateRecoverEpochTxArgs generates recover epoch transaction arguments from a root protocol state snapshot and writes it to a JSON file
 func generateRecoverEpochTxArgs(getSnapshot func() *inmem.Snapshot) func(cmd *cobra.Command, args []string) {
 	return func(cmd *cobra.Command, args []string) {
-		stdout := cmd.OutOrStdout()
-
 		// extract arguments from recover epoch tx from snapshot
 		txArgs := extractRecoverEpochArgs(getSnapshot())
 
@@ -123,10 +156,19 @@ func generateRecoverEpochTxArgs(getSnapshot func() *inmem.Snapshot) func(cmd *co
 			log.Fatal().Err(err).Msg("could not encode recover epoch transaction arguments")
 		}
 
-		// write JSON args to stdout
-		_, err = stdout.Write(encodedTxArgs)
-		if err != nil {
-			log.Fatal().Err(err).Msg("could not write jsoncdc encoded arguments")
+		if flagOut == "" {
+			// write JSON args to stdout
+			_, err = cmd.OutOrStdout().Write(encodedTxArgs)
+			if err != nil {
+				log.Fatal().Err(err).Msg("could not write jsoncdc encoded arguments")
+			}
+		} else {
+			// write JSON args to stdout
+			err := os.WriteFile(flagOut, encodedTxArgs, 0644)
+			if err != nil {
+				log.Fatal().Err(err).Msg(fmt.Sprintf("could not write jsoncdc encoded arguments to file %s", flagOut))
+			}
+			log.Info().Msgf("wrote transaction args to output file %s", flagOut)
 		}
 	}
 }
@@ -218,10 +260,7 @@ func extractRecoverEpochArgs(snapshot *inmem.Snapshot) []cadence.Value {
 		nodeIds = append(nodeIds, nodeIdCdc)
 	}
 
-	// @TODO: cluster qcs are converted into flow.ClusterQCVoteData types,
-	// we need a corresponding type in cadence on the FlowClusterQC contract
-	// to store this struct.
-	_, err = common.ConvertClusterQcsCdc(clusterQCs, clusters)
+	qcVoteData, err := common.ConvertClusterQcsCdc(clusterQCs, clusters, flagClusterQCAddress)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to convert cluster qcs to cadence type")
 	}
@@ -238,12 +277,21 @@ func extractRecoverEpochArgs(snapshot *inmem.Snapshot) []cadence.Value {
 		cadence.NewUInt64(currEpochFinalView + flagNumViewsInStakingAuction),
 		// epoch end view
 		cadence.NewUInt64(currEpochFinalView + flagNumViewsInEpoch),
+		// target duration
+		cadence.NewUInt64(flagTargetDuration),
+		// target end time
+		cadence.NewUInt64(flagTargetEndTime),
+		// clusters,
+		common.ConvertClusterAssignmentsCdc(assignments),
+		// qcVoteData
+		cadence.NewArray(qcVoteData),
 		// dkg pub keys
 		cadence.NewArray(dkgPubKeys),
 		// node ids
 		cadence.NewArray(nodeIds),
-		// clusters,
-		common.ConvertClusterAssignmentsCdc(assignments),
+		// recover the network by initializing a new recover epoch which will increment the smart contract epoch counter
+		// or overwrite the epoch metadata for the current epoch
+		cadence.NewBool(flagInitNewEpoch),
 	}
 
 	return args
