@@ -69,11 +69,11 @@ contract EVM {
         /// in case of revert, the smart contract custom error message
         /// is also returned here (see EIP-140 for more details).
         returnedData: String,
-        /// captures the input and output of the calls to the extra precompiled 
-        /// contracts (e.g. Cadence Arch) during the transaction execution.
+        /// captures the input and output of the calls (rlp encoded) to the extra  
+        /// precompiled contracts (e.g. Cadence Arch) during the transaction execution.
         /// This data helps to replay the transactions without the need to
-        /// have access to the full cadence state data.
-        encodedPrecompiledCalls: String
+        /// have access to the full cadence state data. 
+        precompiledCalls: [UInt8]
     )
 
     access(all)
