@@ -1391,6 +1391,7 @@ func (exeNode *ExecutionNode) LoadBootstrapper(node *NodeConfig) error {
 
 	// if the execution database does not exist, then we need to bootstrap the execution database.
 	if !bootstrapped {
+
 		err := wal.CheckpointHasRootHash(
 			node.Logger,
 			path.Join(node.BootstrapDir, bootstrapFilenames.DirnameExecutionState),
@@ -1498,16 +1499,16 @@ func copyBootstrapState(dir, trie string) error {
 	from, to := path.Join(dir, bootstrapFilenames.DirnameExecutionState), trie
 
 	log.Info().Str("dir", dir).Str("trie", trie).
-		Msgf("copying checkpoint file %v from directory: %v, to: %v", filename, from, to)
+		Msgf("linking checkpoint file %v from directory: %v, to: %v", filename, from, to)
 
-	copiedFiles, err := wal.CopyCheckpointFile(filename, from, to)
+	copiedFiles, err := wal.SoftlinkCheckpointFile(filename, from, to)
 	if err != nil {
-		return fmt.Errorf("can not copy checkpoint file %s, from %s to %s",
-			filename, from, to)
+		return fmt.Errorf("can not link checkpoint file %s, from %s to %s, %w",
+			filename, from, to, err)
 	}
 
 	for _, newPath := range copiedFiles {
-		fmt.Printf("copied root checkpoint file from directory: %v, to: %v\n", from, newPath)
+		fmt.Printf("linked root checkpoint file from directory: %v, to: %v\n", from, newPath)
 	}
 
 	return nil
