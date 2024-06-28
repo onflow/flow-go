@@ -50,6 +50,8 @@ contract EVM {
         payload: String,
         // code indicating a specific validation (201-300) or execution (301-400) error
         errorCode: UInt16,
+        // a human-readable message about the error (if any)
+        errorMessage: String,
         // the amount of gas transaction used
         gasConsumed: UInt64,
         // if transaction was a deployment contains a newly deployed contract address
@@ -59,7 +61,14 @@ contract EVM {
         // block height in which transaction was inclued
         blockHeight: UInt64,
         // block hash in which transaction was included
-        blockHash: String
+        blockHash: String,
+        /// captures the hex encoded data that is returned from
+        /// the evm. For contract deployments
+        /// it returns the code deployed to
+        /// the address provided in the contractAddress field.
+        /// in case of revert, the smart contract custom error message
+        /// is also returned here (see EIP-140 for more details).
+        returnedData: String
     )
 
     access(all)
@@ -68,14 +77,28 @@ contract EVM {
     /// FLOWTokensDeposited is emitted when FLOW tokens is bridged
     /// into the EVM environment. Note that this event is not emitted
     /// for transfer of flow tokens between two EVM addresses.
+    /// Similar to the FungibleToken.Deposited event
+    /// this event includes a depositedUUID that captures the 
+    /// uuid of the source vault.
     access(all)
-    event FLOWTokensDeposited(address: String, amount: UFix64)
+    event FLOWTokensDeposited(
+        address: String, 
+        amount: UFix64, 
+        depositedUUID: UInt64
+    )
 
     /// FLOWTokensWithdrawn is emitted when FLOW tokens are bridged
     /// out of the EVM environment. Note that this event is not emitted
     /// for transfer of flow tokens between two EVM addresses.
+    /// similar to the FungibleToken.Withdrawn events
+    /// this event includes a withdrawnUUID that captures the 
+    /// uuid of the returning vault.
     access(all)
-    event FLOWTokensWithdrawn(address: String, amount: UFix64)
+    event FLOWTokensWithdrawn(
+        address: String, 
+        amount: UFix64, 
+        withdrawnUUID: UInt64
+    )
 
     /// BridgeAccessorUpdated is emitted when the BridgeAccessor Capability
     /// is updated in the stored BridgeRouter along with identifying
@@ -143,11 +166,16 @@ contract EVM {
             if amount == 0.0 {
                 panic("calling deposit function with an empty vault is not allowed")
             }
+            let depositedUUID = from.uuid
             InternalEVM.deposit(
                 from: <-from,
                 to: self.bytes
             )
-            emit FLOWTokensDeposited(address: self.toString(), amount: amount)
+            emit FLOWTokensDeposited(
+                address: self.toString(), 
+                amount: amount, 
+                depositedUUID: depositedUUID
+            )
         }
 
         /// Serializes the address to a hex string without the 0x prefix
@@ -374,7 +402,11 @@ contract EVM {
                 from: self.addressBytes,
                 amount: balance.attoflow
             ) as! @FlowToken.Vault
-            emit FLOWTokensWithdrawn(address: self.address().toString(), amount: balance.inFLOW())
+            emit FLOWTokensWithdrawn(
+                address: self.address().toString(),
+                amount: balance.inFLOW(),
+                withdrawnUUID: vault.uuid
+            )
             return <-vault
         }
 
