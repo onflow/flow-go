@@ -611,13 +611,12 @@ func (proc *procedure) resetPrecompileTracking() {
 }
 
 func (proc *procedure) extraPrecompiledIsCalled() bool {
-	isCalled := false
 	for _, pc := range proc.config.ExtraPrecompiles {
 		if pc.IsCalled() {
-			isCalled = true
+			return true
 		}
 	}
-	return isCalled
+	return false
 }
 
 func (proc *procedure) capturePrecompiledCalls() ([]byte, error) {
