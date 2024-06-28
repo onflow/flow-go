@@ -3,6 +3,7 @@ package backend
 import (
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -79,7 +80,8 @@ func TestCompare(t *testing.T) {
 	}
 
 	request := newScriptExecutionRequest(unittest.IdentifierFixture(), 1, []byte("script"), [][]byte{})
-	comparer := newScriptResultComparison(logger, m, request)
+	shouldLogScript := func(time.Time, [16]byte) bool { return true }
+	comparer := newScriptResultComparison(logger, m, shouldLogScript, request)
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
