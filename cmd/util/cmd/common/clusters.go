@@ -176,11 +176,6 @@ func ConvertClusterQcsCdc(qcs []*flow.QuorumCertificate, clusterList flow.Cluste
 		if err != nil {
 			return nil, fmt.Errorf("could not decode signer indices: %w", err)
 		}
-		voteData := &flow.ClusterQCVoteData{
-			SigData:  qc.SigData,
-			VoterIDs: voterIds,
-		}
-
 		cdcVoterIds := make([]cadence.Value, len(voterIds))
 		for i, id := range voterIds {
 			cdcVoterIds[i] = cadence.String(id.String())
@@ -188,7 +183,7 @@ func ConvertClusterQcsCdc(qcs []*flow.QuorumCertificate, clusterList flow.Cluste
 
 		qcVoteData[i] = cadence.NewStruct([]cadence.Value{
 			// voteSignatures
-			cadence.String(voteData.SigData.String()),
+			cadence.String(fmt.Sprintf("%#x", qc.SigData)),
 			// voterIDs
 			cadence.NewArray(cdcVoterIds).WithType(cadence.NewVariableSizedArrayType(cadence.StringType)),
 		}).WithType(voteDataType)
