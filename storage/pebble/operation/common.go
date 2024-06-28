@@ -242,6 +242,8 @@ func iterate(start []byte, end []byte, iteration iterationFunc, prefetchValues b
 	}
 }
 
+var ffBytes = bytes.Repeat([]byte{0xFF}, 32)
+
 // traverse iterates over a range of keys defined by a prefix.
 //
 // The prefix must be shared by all keys in the iteration.
@@ -256,7 +258,7 @@ func traverse(prefix []byte, iteration iterationFunc) func(pebble.Reader) error 
 
 		it, err := r.NewIter(&pebble.IterOptions{
 			LowerBound: prefix,
-			UpperBound: append(prefix, 0xFF),
+			UpperBound: append(prefix, ffBytes...),
 		})
 
 		if err != nil {
