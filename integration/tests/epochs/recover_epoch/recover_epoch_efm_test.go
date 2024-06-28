@@ -35,11 +35,11 @@ func (s *RecoverEpochSuite) TestRecoverEpoch() {
 	// wait until the epoch setup phase to force network into EFM
 	s.AwaitEpochPhase(s.Ctx, 0, flow.EpochPhaseSetup, 10*time.Second, 500*time.Millisecond)
 	// pausing consensus node will force the network into EFM
-	enContainer := s.GetContainersByRole(flow.RoleCollection)[0]
-	_ = enContainer.Pause()
+	ln := s.GetContainersByRole(flow.RoleCollection)[0]
+	_ = ln.Pause()
 	s.AwaitFinalizedView(s.Ctx, 32, 2*time.Minute, 500*time.Millisecond)
 	// start the paused execution node now that we are in EFM
-	require.NoError(s.T(), enContainer.Start())
+	require.NoError(s.T(), ln.Start())
 
 	// get the latest snapshot and start new container with it
 	epoch1FinalView, err := s.Net.BootstrapSnapshot.Epochs().Current().FinalView()

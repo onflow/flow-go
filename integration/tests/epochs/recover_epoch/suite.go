@@ -61,6 +61,7 @@ func (s *Suite) executeEFMRecoverTXArgsCMD(collectionClusters, numViewsInEpoch, 
 	os.Args = []string{
 		"epochs", "efm-recover-tx-args",
 		"--insecure=true",
+		"--cluster-qc-contract-address=0xf8d6e0586b0a20c7",
 		fmt.Sprintf("--out=%s", out),
 		fmt.Sprintf("--access-address=%s", anAddress),
 		fmt.Sprintf("--collection-clusters=%d", collectionClusters),

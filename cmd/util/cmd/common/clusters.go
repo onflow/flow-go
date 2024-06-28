@@ -164,8 +164,8 @@ func ConvertClusterAssignmentsCdc(assignments flow.AssignmentList) cadence.Array
 }
 
 // ConvertClusterQcsCdc converts cluster QCs from `QuorumCertificate` type to `ClusterQCVoteData` type.
-func ConvertClusterQcsCdc(qcs []*flow.QuorumCertificate, clusterList flow.ClusterList) ([]cadence.Value, error) {
-	voteDataType := newFlowClusterQCVoteDataStructType()
+func ConvertClusterQcsCdc(qcs []*flow.QuorumCertificate, clusterList flow.ClusterList, address string) ([]cadence.Value, error) {
+	voteDataType := newFlowClusterQCVoteDataStructType(address)
 	qcVoteData := make([]cadence.Value, len(qcs))
 	for i, qc := range qcs {
 		c, ok := clusterList.ByIndex(uint(i))
@@ -198,11 +198,11 @@ func ConvertClusterQcsCdc(qcs []*flow.QuorumCertificate, clusterList flow.Cluste
 	return qcVoteData, nil
 }
 
-func newFlowClusterQCVoteDataStructType() *cadence.StructType {
+// newFlowClusterQCVoteDataStructType returns the FlowClusterQC cadence struct type.
+func newFlowClusterQCVoteDataStructType(clusterQcAddress string) *cadence.StructType {
 
-	// A.0xf8d6e0586b0a20c7.FlowClusterQC.ClusterQCVoteData
-
-	address, _ := cdcCommon.HexToAddress("f8d6e0586b0a20c7")
+	// FlowClusterQC.ClusterQCVoteData
+	address, _ := cdcCommon.HexToAddress(clusterQcAddress)
 	location := cdcCommon.NewAddressLocation(nil, address, "FlowClusterQC")
 
 	return &cadence.StructType{

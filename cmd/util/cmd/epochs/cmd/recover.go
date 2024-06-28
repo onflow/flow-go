@@ -58,6 +58,7 @@ This recovery process has some constraints:
 	flagTargetDuration           uint64
 	flagTargetEndTime            uint64
 	flagInitNewEpoch             bool
+	flagClusterQCAddress         string
 )
 
 func init() {
@@ -71,6 +72,7 @@ func init() {
 func addGenerateRecoverEpochTxArgsCmdFlags() error {
 	generateRecoverEpochTxArgsCmd.Flags().StringVar(&flagOut, "out", "", "file to write tx args output")
 	generateRecoverEpochTxArgsCmd.Flags().StringVar(&flagAnAddress, "access-address", "", "the address of the access node used for client connections")
+	generateRecoverEpochTxArgsCmd.Flags().StringVar(&flagClusterQCAddress, "cluster-qc-contract-address", "", "the contract address for the FlowClusterQC smart contract")
 	generateRecoverEpochTxArgsCmd.Flags().StringVar(&flagAnPubkey, "access-network-key", "", "the network key of the access node used for client connections in hex string format")
 	generateRecoverEpochTxArgsCmd.Flags().BoolVar(&flagAnInsecure, "insecure", false, "set to true if the protocol snapshot should be retrieved from the insecure AN endpoint")
 	generateRecoverEpochTxArgsCmd.Flags().IntVar(&flagCollectionClusters, "collection-clusters", 0,
@@ -114,6 +116,10 @@ func addGenerateRecoverEpochTxArgsCmdFlags() error {
 	err = generateRecoverEpochTxArgsCmd.MarkFlagRequired("target-end-time")
 	if err != nil {
 		return fmt.Errorf("failed to mark target-end-time flag as required")
+	}
+	err = generateRecoverEpochTxArgsCmd.MarkFlagRequired("cluster-qc-contract-address")
+	if err != nil {
+		return fmt.Errorf("failed to mark cluster-qc-contract-address flag as required")
 	}
 	return nil
 }
@@ -254,7 +260,7 @@ func extractRecoverEpochArgs(snapshot *inmem.Snapshot) []cadence.Value {
 		nodeIds = append(nodeIds, nodeIdCdc)
 	}
 
-	qcVoteData, err := common.ConvertClusterQcsCdc(clusterQCs, clusters)
+	qcVoteData, err := common.ConvertClusterQcsCdc(clusterQCs, clusters, flagClusterQCAddress)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to convert cluster qcs to cadence type")
 	}

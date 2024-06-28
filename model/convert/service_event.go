@@ -29,7 +29,6 @@ func ServiceEvent(chainID flow.ChainID, event flow.Event) (*flow.ServiceEvent, e
 	case events.EpochCommit.EventType():
 		return convertServiceEventEpochCommit(event)
 	case events.EpochRecover.EventType():
-		fmt.Println("RECEIVED EPOCH RECOVER SERVICE EVENT")
 		return convertServiceEventEpochRecover(event)
 	case events.VersionBeacon.EventType():
 		return convertServiceEventVersionBeacon(event)

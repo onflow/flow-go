@@ -18,9 +18,6 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-//go:embed templates/recover-epoch.cdc
-var recoverEpochTxScript string
-
 //go:embed templates/create-and-setup-node.cdc
 var createAndSetupNodeTxScript string
 
@@ -250,7 +247,7 @@ func MakeRecoverEpochTx(
 ) (*sdk.Transaction, error) {
 	accountKey := adminAccount.Keys[adminAccountKeyID]
 	tx := sdk.NewTransaction().
-		SetScript([]byte(templates.ReplaceAddresses(recoverEpochTxScript, env))).
+		SetScript([]byte(templates.GenerateRecoverEpochScript(env))).
 		SetComputeLimit(9999).
 		SetReferenceBlockID(latestBlockID).
 		SetProposalKey(adminAccount.Address, adminAccountKeyID, accountKey.SequenceNumber).
