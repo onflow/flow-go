@@ -63,3 +63,24 @@ func TestEjector_ReadmitEjectedIdentity(t *testing.T) {
 	require.Error(t, err)
 	require.True(t, protocol.IsInvalidServiceEventError(err))
 }
+
+// TestEjector_IdentityNotFound ensures that ejector returns false when the identity is not tracked.
+// Tested different scenarios where the identity is not tracked.
+func TestEjector_IdentityNotFound(t *testing.T) {
+	t.Run("nothing-tracked", func(t *testing.T) {
+		ej := ejector{}
+		require.False(t, ej.Eject(unittest.IdentifierFixture()))
+	})
+	t.Run("list-tracked", func(t *testing.T) {
+		ej := ejector{}
+		require.NoError(t, ej.TrackDynamicIdentityList(unittest.DynamicIdentityEntryListFixture(3)))
+		require.False(t, ej.Eject(unittest.IdentifierFixture()))
+	})
+	t.Run("after-ejection", func(t *testing.T) {
+		ej := ejector{}
+		list := unittest.DynamicIdentityEntryListFixture(3)
+		require.NoError(t, ej.TrackDynamicIdentityList(list))
+		require.True(t, ej.Eject(list[0].NodeID))
+		require.False(t, ej.Eject(unittest.IdentifierFixture()))
+	})
+}
