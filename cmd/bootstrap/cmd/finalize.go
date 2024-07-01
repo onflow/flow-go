@@ -67,7 +67,7 @@ func addFinalizeCmdFlags() {
 		"containing the output from the `keygen` command for internal nodes")
 	finalizeCmd.Flags().StringVar(&flagPartnerNodeInfoDir, "partner-dir", "", "path to directory "+
 		"containing one JSON file starting with node-info.pub.<NODE_ID>.json for every partner node (fields "+
-		" in the JSON file: Role, Address, NodeID, NetworkPubKey, StakingPubKey)")
+		" in the JSON file: Role, Address, NodeID, NetworkPubKey, StakingPubKey, StakingKeyPoP)")
 	// Deprecated: remove this flag
 	finalizeCmd.Flags().StringVar(&deprecatedFlagPartnerStakes, "partner-stakes", "", "deprecated: use partner-weights instead")
 	finalizeCmd.Flags().StringVar(&flagPartnerWeights, "partner-weights", "", "path to a JSON file containing "+
