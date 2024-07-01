@@ -55,9 +55,10 @@ func TestHandler_TransactionRunOrPanic(t *testing.T) {
 
 					aa := handler.NewAddressAllocator()
 
+					gasConsumed := testutils.RandomGas(1000)
 					result := &types.Result{
 						ReturnedData: testutils.RandomData(t),
-						GasConsumed:  testutils.RandomGas(1000),
+						GasConsumed:  gasConsumed,
 						Logs: []*gethTypes.Log{
 							testutils.GetRandomLogFixture(t),
 							testutils.GetRandomLogFixture(t),
@@ -91,58 +92,18 @@ func TestHandler_TransactionRunOrPanic(t *testing.T) {
 					// successfully run (no-panic)
 					handler.RunOrPanic(tx, coinbase)
 
-					// check gas usage
-					// TODO: uncomment and investigate me
-					// computationUsed, err := backend.ComputationUsed()
-					// require.NoError(t, err)
-					// require.Equal(t, result.GasConsumed, computationUsed)
-
 					// check events (1 extra for block event)
 					events := backend.Events()
-
 					require.Len(t, events, 2)
-
-					event := events[0]
-					assert.Equal(t, event.Type, types.EventTypeTransactionExecuted)
-					ev, err := jsoncdc.Decode(nil, event.Payload)
-					require.NoError(t, err)
-					cadenceEvent, ok := ev.(cadence.Event)
-					require.True(t, ok)
-
-					// TODO: add an event decoder in types.event
-					cadenceLogs := cadence.SearchFieldByName(cadenceEvent, "logs")
-
-					encodedLogs, err := hex.DecodeString(strings.ReplaceAll(cadenceLogs.String(), "\"", ""))
-					require.NoError(t, err)
-
-					var logs []*gethTypes.Log
-					err = rlp.DecodeBytes(encodedLogs, &logs)
-					require.NoError(t, err)
-
-					for i, l := range result.Logs {
-						assert.Equal(t, l, logs[i])
-					}
+					testutils.IsTransactionExecutedEvent(t, events[0]).
+						HasIndex(0).
+						MatchesResult(result)
 
 					// check block event
-					event = events[1]
-
-					assert.Equal(t, event.Type, types.EventTypeBlockExecuted)
-					ev, err = jsoncdc.Decode(nil, event.Payload)
-					require.NoError(t, err)
-
-					// make sure block transaction list references the above transaction id
-					cadenceEvent, ok = ev.(cadence.Event)
-					require.True(t, ok)
-					blockEvent, err := types.DecodeBlockEventPayload(cadenceEvent)
-					require.NoError(t, err)
-
-					eventTxID := blockEvent.TransactionHashes[0] // only one hash in block
-					// make sure the transaction id included in the block transaction list is the same as tx sumbmitted
-					assert.Equal(
-						t,
-						evmTx.Hash().String(),
-						string(eventTxID),
-					)
+					testutils.IsBlockExecutedEvent(t, events[1]).
+						HasHeight(1).
+						HasTotalGasUsed(gasConsumed).
+						HasTransactionHashes([]string{evmTx.Hash().String()})
 				})
 			})
 		})
@@ -247,19 +208,39 @@ func TestHandler_TransactionRunOrPanic(t *testing.T) {
 
 				eoa := testutils.GetTestEOAAccount(t, testutils.EOATestAccount1KeyHex)
 
-				// deposit 1 Flow to the foa account
+				// deploy coa
 				addr := handler.DeployCOA(1)
+				events := backend.Events()
+				require.Len(t, events, 2)
+				testutils.IsTransactionExecutedEvent(t, events[0]).HasIndex(0).
+					HasDeployedContractAddress(&addr)
+				testutils.IsBlockExecutedEvent(t, events[1]).HasHeight(1)
+
+				// deposit 1 Flow to the coa account
 				orgBalance := types.NewBalanceFromUFix64(types.OneFlowInUFix64)
 				vault := types.NewFlowTokenVault(orgBalance)
 				foa := handler.AccountByAddress(addr, true)
 				foa.Deposit(vault)
 
+				events = backend.Events()
+				require.Len(t, events, 4)
+				testutils.IsTransactionExecutedEvent(t, events[2]).HasIndex(0)
+				testutils.IsBlockExecutedEvent(t, events[3]).HasHeight(2).
+					HasTotalSupply(types.OneFlowBalance)
+
 				// transfer 0.1 flow to the non-foa address
 				deduction := types.NewBalance(big.NewInt(1e17))
-				foa.Call(eoa.Address(), nil, 400000, deduction)
+				res := foa.Call(eoa.Address(), nil, 400000, deduction)
 				expected, err := types.SubBalance(orgBalance, deduction)
 				require.NoError(t, err)
 				require.Equal(t, expected, foa.Balance())
+
+				events = backend.Events()
+				require.Len(t, events, 6)
+				testutils.IsTransactionExecutedEvent(t, events[4]).
+					HasIndex(0).
+					MatchesResultSummary(res)
+				testutils.IsBlockExecutedEvent(t, events[5]).HasHeight(3)
 
 				// transfer 0.01 flow back to the foa through
 				addition := types.NewBalance(big.NewInt(1e16))
@@ -278,6 +259,12 @@ func TestHandler_TransactionRunOrPanic(t *testing.T) {
 				account2 := handler.AccountByAddress(foa2, true)
 				require.Equal(t, types.NewBalanceFromUFix64(0), account2.Balance())
 
+				events = backend.Events()
+				require.Len(t, events, 8)
+				testutils.IsTransactionExecutedEvent(t, events[6]).
+					HasDeployedContractAddress(&foa2)
+				testutils.IsBlockExecutedEvent(t, events[7]).HasHeight(4)
+
 				// no panic means success here
 				handler.RunOrPanic(tx, account2.Address())
 				expected, err = types.SubBalance(orgBalance, deduction)
@@ -287,6 +274,11 @@ func TestHandler_TransactionRunOrPanic(t *testing.T) {
 				require.Equal(t, expected, foa.Balance())
 
 				require.NotEqual(t, types.NewBalanceFromUFix64(0), account2.Balance())
+
+				events = backend.Events()
+				require.Len(t, events, 10)
+				testutils.IsTransactionExecutedEvent(t, events[8])
+				testutils.IsBlockExecutedEvent(t, events[9]).HasHeight(5)
 			})
 		})
 	})
@@ -363,28 +355,28 @@ func TestHandler_COA(t *testing.T) {
 				events := backend.Events()
 				require.Len(t, events, 6)
 
-				// first two transactions are for COA setup
+				// the first four events are for COA setup
+				testutils.IsTransactionExecutedEvent(t, events[0]).
+					HasIndex(0)
+				testutils.IsBlockExecutedEvent(t, events[1]).
+					HasHeight(1)
+				testutils.IsTransactionExecutedEvent(t, events[2]).
+					HasIndex(0)
+				testutils.IsBlockExecutedEvent(t, events[3]).
+					HasHeight(2)
 
 				// transaction event
-				event := events[2]
-				assert.Equal(t, event.Type, types.EventTypeTransactionExecuted)
+				testutils.IsTransactionExecutedEvent(t, events[4]).
+					HasIndex(0).
+					HasErrorCode(0)
 
-				// block event
-				event = events[3]
-				assert.Equal(t, event.Type, types.EventTypeBlockExecuted)
-
-				// transaction event
-				event = events[4]
-				assert.Equal(t, event.Type, types.EventTypeTransactionExecuted)
-				_, err := jsoncdc.Decode(nil, event.Payload)
-				require.NoError(t, err)
 				// TODO: decode encoded tx and check for the amount and value
 				// assert.Equal(t, foa.Address(), ret.Address)
 				// assert.Equal(t, balance, ret.Amount)
 
 				// block event
-				event = events[5]
-				assert.Equal(t, event.Type, types.EventTypeBlockExecuted)
+				testutils.IsBlockExecutedEvent(t, events[5]).
+					HasHeight(2)
 
 				// check gas usage
 				computationUsed, err := backend.ComputationUsed()
@@ -580,7 +572,14 @@ func TestHandler_COA(t *testing.T) {
 			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
 				handler := SetupHandler(t, backend, rootAddr)
 
-				foa := handler.AccountByAddress(handler.DeployCOA(1), true)
+				foaAddr := handler.DeployCOA(1)
+				events := backend.Events()
+				require.Len(t, events, 2)
+				testutils.IsTransactionExecutedEvent(t, events[0]).HasIndex(0).
+					HasDeployedContractAddress(&foaAddr)
+				testutils.IsBlockExecutedEvent(t, events[1]).HasHeight(1)
+
+				foa := handler.AccountByAddress(foaAddr, true)
 				require.NotNil(t, foa)
 
 				// deposit 10000 flow
@@ -611,6 +610,12 @@ func TestHandler_COA(t *testing.T) {
 					types.NewBalanceFromUFix64(0))
 
 				require.Equal(t, num, res.ReturnedData.AsBigInt())
+
+				events = backend.Events()
+				require.Len(t, events, 10)
+				testutils.IsTransactionExecutedEvent(t, events[8]).HasIndex(0).
+					MatchesResultSummary(res)
+				testutils.IsBlockExecutedEvent(t, events[9]).HasHeight(5)
 			})
 		})
 	})
