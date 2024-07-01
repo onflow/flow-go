@@ -69,11 +69,11 @@ contract EVM {
         /// in case of revert, the smart contract custom error message
         /// is also returned here (see EIP-140 for more details).
         returnedData: String,
-        /// captures the input and output of the calls to the extra precompiled 
-        /// contracts (e.g. Cadence Arch) during the transaction execution.
+        /// captures the input and output of the calls (rlp encoded) to the extra  
+        /// precompiled contracts (e.g. Cadence Arch) during the transaction execution.
         /// This data helps to replay the transactions without the need to
-        /// have access to the full cadence state data.
-        encodedPrecompiledCalls: String
+        /// have access to the full cadence state data. 
+        precompiledCalls: [UInt8]
     )
 
     access(all)
@@ -89,7 +89,8 @@ contract EVM {
     event FLOWTokensDeposited(
         address: String, 
         amount: UFix64, 
-        depositedUUID: UInt64
+        depositedUUID: UInt64,
+        balanceAfterInAttoFlow: UInt
     )
 
     /// FLOWTokensWithdrawn is emitted when FLOW tokens are bridged
@@ -102,7 +103,8 @@ contract EVM {
     event FLOWTokensWithdrawn(
         address: String, 
         amount: UFix64, 
-        withdrawnUUID: UInt64
+        withdrawnUUID: UInt64,
+        balanceAfterInAttoFlow: UInt
     )
 
     /// BridgeAccessorUpdated is emitted when the BridgeAccessor Capability
@@ -179,7 +181,8 @@ contract EVM {
             emit FLOWTokensDeposited(
                 address: self.toString(), 
                 amount: amount, 
-                depositedUUID: depositedUUID
+                depositedUUID: depositedUUID,
+                balanceAfterInAttoFlow: self.balance().attoflow
             )
         }
 
@@ -410,7 +413,8 @@ contract EVM {
             emit FLOWTokensWithdrawn(
                 address: self.address().toString(),
                 amount: balance.inFLOW(),
-                withdrawnUUID: vault.uuid
+                withdrawnUUID: vault.uuid, 
+                balanceAfterInAttoFlow: self.balance().attoflow
             )
             return <-vault
         }

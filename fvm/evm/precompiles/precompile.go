@@ -53,10 +53,6 @@ func (p *precompile) Address() types.Address {
 // RequiredGas calculates the contract gas use
 func (p *precompile) RequiredGas(input []byte) (output uint64) {
 	defer func() {
-		// lazy allocation
-		if p.requiredGasCalls == nil {
-			p.requiredGasCalls = make([]types.RequiredGasCall, 0)
-		}
 		p.requiredGasCalls = append(
 			p.requiredGasCalls,
 			types.RequiredGasCall{
@@ -65,17 +61,14 @@ func (p *precompile) RequiredGas(input []byte) (output uint64) {
 			})
 	}()
 	if len(input) < FunctionSelectorLength {
-		output = InvalidMethodCallGasUsage
-		return
+		return InvalidMethodCallGasUsage
 	}
 	sig, data := SplitFunctionSelector(input)
 	callable, found := p.functions[sig]
 	if !found {
-		output = InvalidMethodCallGasUsage
-		return
+		return InvalidMethodCallGasUsage
 	}
-	output = callable.ComputeGas(data)
-	return
+	return callable.ComputeGas(data)
 }
 
 // Run runs the precompiled contract
@@ -84,10 +77,6 @@ func (p *precompile) Run(input []byte) (output []byte, err error) {
 		errMsg := ""
 		if err != nil {
 			errMsg = err.Error()
-		}
-		// lazy allocation
-		if p.runCalls == nil {
-			p.runCalls = make([]types.RunCall, 0)
 		}
 		p.runCalls = append(
 			p.runCalls,
@@ -99,19 +88,14 @@ func (p *precompile) Run(input []byte) (output []byte, err error) {
 	}()
 
 	if len(input) < FunctionSelectorLength {
-		output = nil
-		err = ErrInvalidMethodCall
-		return
+		return nil, ErrInvalidMethodCall
 	}
 	sig, data := SplitFunctionSelector(input)
 	callable, found := p.functions[sig]
 	if !found {
-		output = nil
-		err = ErrInvalidMethodCall
-		return
+		return nil, ErrInvalidMethodCall
 	}
-	output, err = callable.Run(data)
-	return
+	return callable.Run(data)
 }
 
 func (p *precompile) IsCalled() bool {

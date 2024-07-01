@@ -649,9 +649,12 @@ func TestHandler_COA(t *testing.T) {
 				txEventPayload, err := types.DecodeTransactionEventPayload(cadenceEvent)
 				require.NoError(t, err)
 
-				decoded, err := hex.DecodeString(txEventPayload.EncodedPrecompiledCalls)
-				require.NoError(t, err)
-				apc, err := types.AggregatedPrecompileCallsFromEncoded(decoded)
+				values := txEventPayload.PrecompiledCalls.Values
+				aggregated := make([]byte, len(values))
+				for i, v := range values {
+					aggregated[i] = uint8(v.(cadence.UInt8))
+				}
+				apc, err := types.AggregatedPrecompileCallsFromEncoded(aggregated)
 				require.NoError(t, err)
 
 				require.False(t, apc.IsEmpty())
