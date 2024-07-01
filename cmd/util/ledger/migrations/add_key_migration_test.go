@@ -2,6 +2,7 @@ package migrations
 
 import (
 	"context"
+	"crypto/rand"
 	"testing"
 
 	"github.com/onflow/cadence/runtime/common"
@@ -31,16 +32,19 @@ func TestCoreContractsKeys(t *testing.T) {
 
 	chainID := flow.Emulator
 	sc := systemcontracts.SystemContractsForChain(chainID)
+	serviceAccountAddress := sc.FlowServiceAccount.Address
 
-	serviceRegisters := registersByAccount.AccountRegisters(string(sc.FlowServiceAccount.Address.Bytes()))
+	serviceRegisters := registersByAccount.AccountRegisters(string(serviceAccountAddress.Bytes()))
 
-	pk, err := crypto.GeneratePrivateKey(crypto.ECDSA_P256, nil)
+	pk, err := crypto.GeneratePrivateKey(crypto.ECDSA_P256, makeSeed(t))
 	require.NoError(t, err)
 	expectedKey := pk.PublicKey()
+	rwf := &testReportWriterFactory{}
 
 	mig := NewAddKeyMigration(
 		chainID,
 		expectedKey,
+		rwf,
 	)
 	defer func() {
 		err := mig.Close()
@@ -51,7 +55,7 @@ func TestCoreContractsKeys(t *testing.T) {
 	require.NoError(t, err)
 
 	ctx := context.Background()
-	err = mig.MigrateAccount(ctx, common.Address(sc.FlowServiceAccount.Address), serviceRegisters)
+	err = mig.MigrateAccount(ctx, common.Address(serviceAccountAddress), serviceRegisters)
 	require.NoError(t, err)
 
 	// Create all the runtime components we need for the migration
@@ -63,10 +67,10 @@ func TestCoreContractsKeys(t *testing.T) {
 	require.NoError(t, err)
 
 	// The last key should be the one we added
-	keys, err := migrationRuntime.Accounts.GetPublicKeyCount(sc.FlowServiceAccount.Address)
+	keys, err := migrationRuntime.Accounts.GetPublicKeyCount(serviceAccountAddress)
 	require.NoError(t, err)
 
-	key, err := migrationRuntime.Accounts.GetPublicKey(sc.FlowServiceAccount.Address, keys-1)
+	key, err := migrationRuntime.Accounts.GetPublicKey(serviceAccountAddress, keys-1)
 	require.NoError(t, err)
 
 	require.Equal(t, expectedKey.String(), key.PublicKey.String())
@@ -78,4 +82,11 @@ func Test_DO_NOT_MERGE(t *testing.T) {
 	// this branch should not be merged to master
 	// This is only to be used for migration mainnet testing
 	t.Fail()
+}
+
+func makeSeed(t *testing.T) []byte {
+	seed := make([]byte, 32)
+	_, err := rand.Read(seed)
+	require.NoError(t, err)
+	return seed
 }

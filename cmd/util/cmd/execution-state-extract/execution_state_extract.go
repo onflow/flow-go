@@ -563,6 +563,7 @@ func newMigrations(
 					migrators.NewAddKeyMigration(
 						opts.ChainID,
 						key,
+						rwf,
 					),
 					&migrators.AccountUsageMigration{},
 				},
