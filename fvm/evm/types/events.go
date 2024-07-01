@@ -2,7 +2,9 @@ package types
 
 import (
 	"encoding/hex"
+	"fmt"
 
+	"github.com/onflow/cadence/encoding/ccf"
 	"github.com/onflow/cadence/runtime/common"
 	gethCommon "github.com/onflow/go-ethereum/common"
 	"github.com/onflow/go-ethereum/rlp"
@@ -225,4 +227,49 @@ func bytesToCadenceUInt8ArrayValue(b []byte) cadence.Array {
 	return cadence.NewArray(values).WithType(
 		cadence.NewVariableSizedArrayType(cadence.UInt8Type),
 	)
+}
+
+// FLOWTokensEventPayload captures payloads for a FlowTokenDeposited event
+type FLOWTokensDepositedEventPayload struct {
+	Address                string         `cadence:"address"`
+	Amount                 cadence.UFix64 `cadence:"amount"`
+	DepositedUUID          uint64         `cadence:"depositedUUID"`
+	BalanceAfterInAttoFlow cadence.Int    `cadence:"balanceAfterInAttoFlow"`
+}
+
+// DecodeFLOWTokensDepositedEventPayload decodes a flow FLOWTokenDeposited
+// events into a FLOWTokensEventDepositedPayload
+func DecodeFLOWTokensDepositedEventPayload(event cadence.Event) (*FLOWTokensDepositedEventPayload, error) {
+	var payload FLOWTokensDepositedEventPayload
+	err := cadence.DecodeFields(event, &payload)
+	return &payload, err
+}
+
+// FLOWTokensWithdrawnEventPayload captures payloads for a FlowTokensWithdrawn event
+type FLOWTokensWithdrawnEventPayload struct {
+	Address                string         `cadence:"address"`
+	Amount                 cadence.UFix64 `cadence:"amount"`
+	WithdrawnUUID          uint64         `cadence:"withdrawnUUID"`
+	BalanceAfterInAttoFlow cadence.Int    `cadence:"balanceAfterInAttoFlow"`
+}
+
+// DecodeFLOWTokensWithdrawnEventPayload decodes a flow FLOWTokensWithdrawn
+// events into a FLOWTokensEventDepositedPayload
+func DecodeFLOWTokensWithdrawnEventPayload(event cadence.Event) (*FLOWTokensWithdrawnEventPayload, error) {
+	var payload FLOWTokensWithdrawnEventPayload
+	err := cadence.DecodeFields(event, &payload)
+	return &payload, err
+}
+
+func FlowEventToCadenceEvent(event flow.Event) (cadence.Event, error) {
+	ev, err := ccf.Decode(nil, event.Payload)
+	if err != nil {
+		return cadence.Event{}, err
+	}
+
+	cadenceEvent, ok := ev.(cadence.Event)
+	if !ok {
+		return cadence.Event{}, fmt.Errorf("event can not be casted to a cadence event")
+	}
+	return cadenceEvent, nil
 }
