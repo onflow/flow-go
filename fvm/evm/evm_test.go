@@ -2073,7 +2073,8 @@ func TestCadenceArch(t *testing.T) {
 				testAccount *EOATestAccount,
 			) {
 				entropy := []byte{13, 37}
-				source := []byte{91, 161, 206, 171, 100, 17, 141, 44} // coresponding out to the above entropy
+				// coresponding out to the above entropy
+				source := []byte{0x5b, 0xa1, 0xce, 0xab, 0x64, 0x11, 0x8d, 0x2c, 0xd8, 0xae, 0x8c, 0xbb, 0xf7, 0x50, 0x5e, 0xf5, 0xdf, 0xad, 0xfc, 0xf7, 0x2d, 0x3a, 0x46, 0x78, 0xd5, 0xe5, 0x1d, 0xb7, 0xf2, 0xb8, 0xe5, 0xd6}
 
 				// we must record a new heartbeat with a fixed block, we manually execute a transaction to do so,
 				// since doing this automatically would require a block computer and whole execution setup
@@ -2150,9 +2151,11 @@ func TestCadenceArch(t *testing.T) {
 				require.NoError(t, err)
 				require.NoError(t, output.Err)
 
-				res := make([]byte, 8)
+				const sourceLen = 32
+				res := make([]byte, sourceLen)
 				vals := output.Value.(cadence.Array).Values
-				vals = vals[len(vals)-8:] // only last 8 bytes is the value
+				require.Len(t, vals, sourceLen)
+
 				for i := range res {
 					res[i] = byte(vals[i].(cadence.UInt8))
 				}
