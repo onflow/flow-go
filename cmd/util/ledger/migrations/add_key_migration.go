@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
+
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/crypto/hash"
 	"github.com/rs/zerolog"
@@ -22,6 +24,8 @@ type AddKeyMigration struct {
 
 	accountsToAddKeyTo map[common.Address]AddKeyMigrationAccountPublicKeyData
 	chainID            flow.ChainID
+
+	reporter reporters.ReportWriter
 }
 
 var _ AccountBasedMigration = &AddKeyMigration{}
@@ -29,6 +33,7 @@ var _ AccountBasedMigration = &AddKeyMigration{}
 func NewAddKeyMigration(
 	chainID flow.ChainID,
 	key crypto.PublicKey,
+	rwf reporters.ReportWriterFactory,
 ) *AddKeyMigration {
 
 	addresses := make(map[common.Address]AddKeyMigrationAccountPublicKeyData)
@@ -59,6 +64,7 @@ func NewAddKeyMigration(
 	return &AddKeyMigration{
 		accountsToAddKeyTo: addresses,
 		chainID:            chainID,
+		reporter:           rwf.ReportWriter("add-key-migration"),
 	}
 }
 
@@ -121,9 +127,16 @@ func (m *AddKeyMigration) MigrateAccount(
 		Weight:    fvm.AccountKeyWeightThreshold,
 	}
 
-	err = migrationRuntime.Accounts.AppendPublicKey(flow.ConvertAddress(address), key)
+	flowAddress := flow.ConvertAddress(address)
+
+	keyIndex, err := migrationRuntime.Accounts.GetPublicKeyCount(flowAddress)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get public key count: %w", err)
+	}
+
+	err = migrationRuntime.Accounts.AppendPublicKey(flowAddress, key)
+	if err != nil {
+		return fmt.Errorf("failed to append public key: %w", err)
 	}
 
 	// Finalize the transaction
@@ -147,8 +160,20 @@ func (m *AddKeyMigration) MigrateAccount(
 		return fmt.Errorf("failed to apply register changes: %w", err)
 	}
 
+	m.reporter.Write(keyAddedReport{
+		Address: address.Hex(),
+		Index:   keyIndex,
+		Key:     key.PublicKey.String(),
+	})
+
 	return nil
 
+}
+
+type keyAddedReport struct {
+	Address string `json:"address"`
+	Index   uint64 `json:"index"`
+	Key     string `json:"key"`
 }
 
 var mainnetNodeAddresses = []string{
