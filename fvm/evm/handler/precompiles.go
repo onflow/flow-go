@@ -42,8 +42,8 @@ func blockHeightProvider(backend types.Backend) func() (uint64, error) {
 
 const RandomSourceTypeValueFieldName = "value"
 
-func randomSourceProvider(contractAddress flow.Address, backend types.Backend) func(uint64) (uint64, error) {
-	return func(blockHeight uint64) (uint64, error) {
+func randomSourceProvider(contractAddress flow.Address, backend types.Backend) func(uint64) ([]byte, error) {
+	return func(blockHeight uint64) ([]byte, error) {
 		value, err := backend.Invoke(
 			environment.ContractFunctionSpec{
 				AddressFromChain: func(_ flow.Chain) flow.Address {
@@ -63,21 +63,21 @@ func randomSourceProvider(contractAddress flow.Address, backend types.Backend) f
 			if types.IsAFatalError(err) || types.IsABackendError(err) {
 				panic(err)
 			}
-			return 0, err
+			return nil, err
 		}
 
 		data, ok := value.(cadence.Struct)
 		if !ok {
-			return 0, fmt.Errorf("invalid output data received from getRandomSource")
+			return nil, fmt.Errorf("invalid output data received from getRandomSource")
 		}
 
 		cadenceArray := cadence.SearchFieldByName(data, RandomSourceTypeValueFieldName).(cadence.Array)
-		source := make([]byte, 8)
+		source := make([]byte, 32)
 		for i := range source {
 			source[i] = byte(cadenceArray.Values[i].(cadence.UInt8))
 		}
 
-		return binary.BigEndian.Uint64(source), nil
+		return source, nil
 	}
 }
 
