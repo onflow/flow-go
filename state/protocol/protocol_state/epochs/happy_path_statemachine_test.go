@@ -23,14 +23,14 @@ func TestProtocolStateMachine(t *testing.T) {
 type BaseStateMachineSuite struct {
 	suite.Suite
 
-	parentProtocolState *flow.RichEpochProtocolStateEntry
+	parentProtocolState *flow.EpochRichStateEntry
 	parentBlock         *flow.Header
 	candidate           *flow.Header
 	consumer            *protocol_statemock.StateMachineTelemetryConsumer
 }
 
 func (s *BaseStateMachineSuite) SetupTest() {
-	s.parentProtocolState = unittest.EpochStateFixture(func(entry *flow.RichEpochProtocolStateEntry) {
+	s.parentProtocolState = unittest.EpochStateFixture(func(entry *flow.EpochRichStateEntry) {
 		// have a fixed boundary for the current epoch
 		entry.CurrentEpochSetup.FinalView = 5_000
 		entry.CurrentEpoch.SetupID = entry.CurrentEpochSetup.ID()
@@ -53,8 +53,8 @@ func (s *ProtocolStateMachineSuite) SetupTest() {
 	require.NoError(s.T(), err)
 }
 
-// TestNewstateMachine tests if the constructor correctly setups invariants for HappyPathStateMachine.
-func (s *ProtocolStateMachineSuite) TestNewstateMachine() {
+// TestNewStateMachine tests if the constructor correctly setups invariants for HappyPathStateMachine.
+func (s *ProtocolStateMachineSuite) TestNewStateMachine() {
 	require.NotSame(s.T(), s.stateMachine.parentState, s.stateMachine.state, "except to take deep copy of parent state")
 	require.Nil(s.T(), s.stateMachine.parentState.NextEpoch)
 	require.Nil(s.T(), s.stateMachine.state.NextEpoch)
@@ -97,7 +97,7 @@ func (s *ProtocolStateMachineSuite) TestTransitionToNextEpochNotAllowed() {
 		require.Error(s.T(), err, "should not allow transition to next epoch if there is no next epoch protocol state")
 	})
 	s.Run("next epoch not committed", func() {
-		protocolState := unittest.EpochStateFixture(unittest.WithNextEpochProtocolState(), func(entry *flow.RichEpochProtocolStateEntry) {
+		protocolState := unittest.EpochStateFixture(unittest.WithNextEpochProtocolState(), func(entry *flow.EpochRichStateEntry) {
 			entry.NextEpoch.CommitID = flow.ZeroID
 			entry.NextEpochCommit = nil
 		})
@@ -195,14 +195,7 @@ func (s *ProtocolStateMachineSuite) TestProcessEpochCommit() {
 
 		updatedState, _, _ := s.stateMachine.Build()
 
-		parentState, err := flow.NewRichEpochProtocolStateEntry(updatedState,
-			s.parentProtocolState.PreviousEpochSetup,
-			s.parentProtocolState.PreviousEpochCommit,
-			s.parentProtocolState.CurrentEpochSetup,
-			s.parentProtocolState.CurrentEpochCommit,
-			setup,
-			nil,
-		)
+		parentState, err := flow.NewEpochRichStateEntry(updatedState)
 		require.NoError(s.T(), err)
 
 		s.stateMachine, err = NewHappyPathStateMachine(s.consumer, s.candidate.View+1, parentState)
@@ -246,14 +239,7 @@ func (s *ProtocolStateMachineSuite) TestProcessEpochCommit() {
 		require.Equal(s.T(), updatedState.ID(), stateID)
 		require.Equal(s.T(), s.parentProtocolState.ID(), s.stateMachine.ParentState().ID(), "should not modify parent protocol state")
 
-		parentState, err := flow.NewRichEpochProtocolStateEntry(updatedState,
-			s.parentProtocolState.PreviousEpochSetup,
-			s.parentProtocolState.PreviousEpochCommit,
-			s.parentProtocolState.CurrentEpochSetup,
-			s.parentProtocolState.CurrentEpochCommit,
-			setup,
-			nil,
-		)
+		parentState, err := flow.NewEpochRichStateEntry(updatedState)
 		require.NoError(s.T(), err)
 		s.stateMachine, err = NewHappyPathStateMachine(s.consumer, s.candidate.View+1, parentState.Copy())
 		require.NoError(s.T(), err)
@@ -381,7 +367,7 @@ func (s *ProtocolStateMachineSuite) TestProcessEpochSetupInvariants() {
 		require.True(s.T(), protocol.IsInvalidServiceEventError(err))
 	})
 	s.Run("epoch setup state conflicts with protocol state", func() {
-		conflictingIdentity := s.parentProtocolState.EpochProtocolStateEntry.CurrentEpoch.ActiveIdentities[0]
+		conflictingIdentity := s.parentProtocolState.EpochMinStateEntry.CurrentEpoch.ActiveIdentities[0]
 		conflictingIdentity.Ejected = true
 
 		stateMachine, err := NewHappyPathStateMachine(s.consumer, s.candidate.View, s.parentProtocolState.Copy())
@@ -493,16 +479,10 @@ func (s *ProtocolStateMachineSuite) TestEpochSetupAfterIdentityChange() {
 	}
 	updatedState, _, _ := s.stateMachine.Build()
 
-	// Construct a valid flow.RichEpochProtocolStateEntry for next block
+	// Construct a valid flow.EpochRichStateEntry for next block
 	// We do this by copying the parent protocol state and updating the identities manually
-	updatedRichProtocolState := &flow.RichEpochProtocolStateEntry{
-		EpochProtocolStateEntry:   updatedState,
-		PreviousEpochSetup:        s.parentProtocolState.PreviousEpochSetup,
-		PreviousEpochCommit:       s.parentProtocolState.PreviousEpochCommit,
-		CurrentEpochSetup:         s.parentProtocolState.CurrentEpochSetup,
-		CurrentEpochCommit:        s.parentProtocolState.CurrentEpochCommit,
-		NextEpochSetup:            nil,
-		NextEpochCommit:           nil,
+	updatedRichProtocolState := &flow.EpochRichStateEntry{
+		EpochStateEntry:           updatedState,
 		CurrentEpochIdentityTable: s.parentProtocolState.CurrentEpochIdentityTable.Copy(),
 		NextEpochIdentityTable:    flow.IdentityList{},
 	}
@@ -550,6 +530,32 @@ func (s *ProtocolStateMachineSuite) TestEpochSetupAfterIdentityChange() {
 		_, foundInNextEpoch := nextEpochLookup[updated.NodeID]
 		require.False(s.T(), foundInNextEpoch)
 	}
+}
+
+// TestEpochSetupAndEjectionInSameBlock tests that processing an epoch setup event which re-admits an ejected identity results in an error.
+// Such action should be considered illegal since smart contract emitted ejection before epoch setup and service events are delivered
+// in an order-preserving manner.
+func (s *ProtocolStateMachineSuite) TestEpochSetupAndEjectionInSameBlock() {
+	setupParticipants := s.parentProtocolState.CurrentEpochSetup.Participants.Copy() // use same participants as in current epoch setup
+	ejectedIdentityID := setupParticipants[0].NodeID
+	setup := unittest.EpochSetupFixture(
+		unittest.SetupWithCounter(s.parentProtocolState.CurrentEpochSetup.Counter+1),
+		unittest.WithFirstView(s.parentProtocolState.CurrentEpochSetup.FinalView+1),
+		unittest.WithFinalView(s.parentProtocolState.CurrentEpochSetup.FinalView+1000),
+		unittest.WithParticipants(setupParticipants),
+	)
+	// ejected identity before processing epoch setup
+	err := s.stateMachine.EjectIdentity(ejectedIdentityID)
+	require.NoError(s.T(), err)
+
+	// epoch setup readmits the ejected identity, such events shouldn't be accepted.
+	s.consumer.On("OnServiceEventReceived", setup.ServiceEvent()).Once()
+	s.consumer.On("OnInvalidServiceEvent", setup.ServiceEvent(),
+		mock.MatchedBy(func(err error) bool { return protocol.IsInvalidServiceEventError(err) })).Once()
+	processed, err := s.stateMachine.ProcessEpochSetup(setup)
+	require.Error(s.T(), err)
+	require.True(s.T(), protocol.IsInvalidServiceEventError(err))
+	require.False(s.T(), processed)
 }
 
 // TestProcessEpochRecover ensures that HappyPathStateMachine returns a sentinel error when processing an EpochRecover event.

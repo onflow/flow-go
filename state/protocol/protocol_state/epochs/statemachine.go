@@ -26,7 +26,7 @@ type StateMachine interface {
 	// Do NOT call Build, if the StateMachine instance has returned a `protocol.InvalidServiceEventError`
 	// at any time during its lifetime. After this error, the StateMachine is left with a potentially
 	// dysfunctional state and should be discarded.
-	Build() (updatedState *flow.EpochProtocolStateEntry, stateID flow.Identifier, hasChanges bool)
+	Build() (updatedState *flow.EpochStateEntry, stateID flow.Identifier, hasChanges bool)
 
 	// ProcessEpochSetup updates the internally-maintained interim Epoch state with data from epoch setup event.
 	// Processing an epoch setup event also affects the identity table for the current epoch.
@@ -85,20 +85,19 @@ type StateMachine interface {
 	View() uint64
 
 	// ParentState returns parent protocol state associated with this state machine.
-	ParentState() *flow.RichEpochProtocolStateEntry
+	ParentState() *flow.EpochRichStateEntry
 }
 
 // StateMachineFactoryMethod is a factory method to create state machines for evolving the protocol's epoch state.
 // Currently, we have `HappyPathStateMachine` and `FallbackStateMachine` as StateMachine
 // implementations, whose constructors both have the same signature as StateMachineFactoryMethod.
-type StateMachineFactoryMethod func(candidateView uint64, parentState *flow.RichEpochProtocolStateEntry) (StateMachine, error)
+type StateMachineFactoryMethod func(candidateView uint64, parentState *flow.EpochRichStateEntry) (StateMachine, error)
 
 // EpochStateMachine is a hierarchical state machine that encapsulates the logic for protocol-compliant evolution of Epoch-related sub-state.
 // EpochStateMachine processes a subset of service events that are relevant for the Epoch state, and ignores all other events.
 // EpochStateMachine delegates the processing of service events to an embedded StateMachine,
 // which is either a HappyPathStateMachine or a FallbackStateMachine depending on the operation mode of the protocol.
 // It relies on Key-Value Store to read the parent state and to persist the snapshot of the updated Epoch state.
-// TODO(EFM, #6019): this structure needs to be updated to stop using parent state.
 type EpochStateMachine struct {
 	activeStateMachine               StateMachine
 	parentState                      protocol.KVStoreReader
@@ -187,7 +186,8 @@ func (e *EpochStateMachine) Build() (*transaction.DeferredBlockPersist, error) {
 		return e.epochProtocolStateDB.Index(blockID, updatedStateID)(tx)
 	})
 	if hasChanges {
-		e.pendingDbUpdates.AddDbOp(operation.SkipDuplicatesTx(e.epochProtocolStateDB.StoreTx(updatedStateID, updatedEpochState)))
+		e.pendingDbUpdates.AddDbOp(operation.SkipDuplicatesTx(
+			e.epochProtocolStateDB.StoreTx(updatedStateID, updatedEpochState.EpochMinStateEntry)))
 	}
 	e.mutator.SetEpochStateID(updatedStateID)
 
@@ -324,7 +324,7 @@ func (e *EpochStateMachine) transitionToEpochFallbackMode(orderedUpdates []flow.
 //   - The seal for block A was included in some block C, s.t C is an ancestor of B.
 //
 // For further details see `params.EpochCommitSafetyThreshold()`.
-func epochFallbackTriggeredByIncorporatingCandidate(candidateView uint64, params protocol.GlobalParams, parentState *flow.RichEpochProtocolStateEntry) bool {
+func epochFallbackTriggeredByIncorporatingCandidate(candidateView uint64, params protocol.GlobalParams, parentState *flow.EpochRichStateEntry) bool {
 	if parentState.EpochPhase() == flow.EpochPhaseCommitted { // Requirement 1
 		return false
 	}
