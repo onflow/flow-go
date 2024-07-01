@@ -41,12 +41,15 @@ func TestArchContract(t *testing.T) {
 
 	t.Run("test get random source", func(t *testing.T) {
 		address := testutils.RandomAddress(t)
-		rand := uint64(1337)
+		rand := make([]byte, 32)
+		err := precompiles.EncodeBytes32([]byte{13, 23}, rand, 0)
+		require.NoError(t, err)
+
 		pc := precompiles.ArchContract(
 			address,
 			nil,
 			nil,
-			func(u uint64) (uint64, error) {
+			func(u uint64) ([]byte, error) {
 				return rand, nil
 			},
 			nil,
@@ -63,7 +66,7 @@ func TestArchContract(t *testing.T) {
 		ret, err := pc.Run(input)
 		require.NoError(t, err)
 
-		resultRand, err := precompiles.ReadUint64(ret, 0)
+		resultRand, err := precompiles.ReadBytes32(ret, 0)
 		require.NoError(t, err)
 		require.Equal(t, rand, resultRand)
 	})
