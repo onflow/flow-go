@@ -393,6 +393,7 @@ func newCadence1Migrations(
 					migrators.NewAddKeyMigration(
 						opts.ChainID,
 						key,
+						rwf,
 					),
 					migrators.NewAccountUsageMigration(rwf),
 				},
