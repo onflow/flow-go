@@ -41,6 +41,7 @@ func (e *ejector) Eject(nodeID flow.Identifier) bool {
 		if found {
 			ejected = true
 			dynamicIdentity.Ejected = true
+			e.ejected = append(e.ejected, nodeID)
 		}
 	}
 	return ejected
