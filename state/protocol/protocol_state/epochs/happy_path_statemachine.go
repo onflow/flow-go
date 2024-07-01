@@ -37,13 +37,12 @@ func NewHappyPathStateMachine(telemetry protocol_state.StateMachineTelemetryCons
 		return nil, irrecoverable.NewExceptionf("cannot create happy path protocol state machine at view (%d) for a parent state"+
 			"which is in Epoch Fallback Mode", view)
 	}
+	base, err := newBaseStateMachine(telemetry, view, parentState, parentState.EpochStateEntry.Copy())
+	if err != nil {
+		return nil, fmt.Errorf("could not create base state machine: %w", err)
+	}
 	return &HappyPathStateMachine{
-		baseStateMachine: baseStateMachine{
-			telemetry:   telemetry,
-			parentState: parentState,
-			state:       parentState.EpochStateEntry.Copy(),
-			view:        view,
-		},
+		baseStateMachine: *base,
 	}, nil
 }
 
@@ -116,7 +115,12 @@ func (u *HappyPathStateMachine) ProcessEpochSetup(epochSetup *flow.EpochSetup) (
 	u.state.NextEpochSetup = epochSetup
 
 	// subsequent epoch commit event and update identities afterwards.
-	u.nextEpochIdentitiesLookup = u.state.NextEpoch.ActiveIdentities.Lookup()
+	err = u.ejector.TrackDynamicIdentityList(u.state.NextEpoch.ActiveIdentities)
+	if err != nil {
+		u.telemetry.OnInvalidServiceEvent(epochSetup.ServiceEvent(), err)
+		return false, fmt.Errorf("failed to track dynamic identity list for next epoch: %w", err)
+
+	}
 	u.telemetry.OnServiceEventProcessed(epochSetup.ServiceEvent())
 	return true, nil
 }

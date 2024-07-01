@@ -45,14 +45,13 @@ func NewFallbackStateMachine(params protocol.GlobalParams, telemetry protocol_st
 		state.EpochFallbackTriggered = true
 	}
 
+	base, err := newBaseStateMachine(telemetry, view, parentState, state)
+	if err != nil {
+		return nil, fmt.Errorf("could not create base state machine: %w", err)
+	}
 	sm := &FallbackStateMachine{
-		baseStateMachine: baseStateMachine{
-			telemetry:   telemetry,
-			parentState: parentState,
-			state:       state,
-			view:        view,
-		},
-		params: params,
+		baseStateMachine: *base,
+		params:           params,
 	}
 
 	if !nextEpochCommitted && view+params.EpochCommitSafetyThreshold() >= state.CurrentEpochFinalView() {
@@ -192,6 +191,11 @@ func (m *FallbackStateMachine) ProcessEpochRecover(epochRecover *flow.EpochRecov
 				protocol.NewInvalidServiceEventErrorf("multiple inconsistent EpochRecover events sealed in the same block"))
 			return false, nil
 		}
+	}
+	err = m.ejector.TrackDynamicIdentityList(m.state.NextEpoch.ActiveIdentities)
+	if err != nil {
+		m.telemetry.OnInvalidServiceEvent(epochRecover.ServiceEvent(), err)
+		return false, nil
 	}
 	// if we have processed a valid EpochRecover event, we should exit EFM.
 	m.state.EpochFallbackTriggered = false
