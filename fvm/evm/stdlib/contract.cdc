@@ -84,7 +84,8 @@ contract EVM {
     event FLOWTokensDeposited(
         address: String, 
         amount: UFix64, 
-        depositedUUID: UInt64
+        depositedUUID: UInt64,
+        balanceAfterInAttoFlow: UInt
     )
 
     /// FLOWTokensWithdrawn is emitted when FLOW tokens are bridged
@@ -97,7 +98,8 @@ contract EVM {
     event FLOWTokensWithdrawn(
         address: String, 
         amount: UFix64, 
-        withdrawnUUID: UInt64
+        withdrawnUUID: UInt64,
+        balanceAfterInAttoFlow: UInt
     )
 
     /// BridgeAccessorUpdated is emitted when the BridgeAccessor Capability
@@ -174,7 +176,8 @@ contract EVM {
             emit FLOWTokensDeposited(
                 address: self.toString(), 
                 amount: amount, 
-                depositedUUID: depositedUUID
+                depositedUUID: depositedUUID,
+                balanceAfterInAttoFlow: self.balance().attoflow
             )
         }
 
@@ -405,7 +408,8 @@ contract EVM {
             emit FLOWTokensWithdrawn(
                 address: self.address().toString(),
                 amount: balance.inFLOW(),
-                withdrawnUUID: vault.uuid
+                withdrawnUUID: vault.uuid, 
+                balanceAfterInAttoFlow: self.balance().attoflow
             )
             return <-vault
         }

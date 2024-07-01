@@ -237,6 +237,16 @@ func NewCadence1ValueMigrations(
 
 	migs = []NamedMigration{
 		{
+			Name: "cleanup-contracts",
+			Migrate: NewAccountBasedMigration(
+				log,
+				opts.NWorker,
+				[]AccountBasedMigration{
+					NewContractCleanupMigration(rwf),
+				},
+			),
+		},
+		{
 			Name: "check-contracts",
 			Migrate: NewContractCheckingMigration(
 				log,
