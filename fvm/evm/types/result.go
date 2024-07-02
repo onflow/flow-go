@@ -84,6 +84,9 @@ type Result struct {
 	TxHash gethCommon.Hash
 	// transaction block inclusion index
 	Index uint16
+	// PrecompiledCalls captures an encoded list of calls to the precompile
+	// during the execution of transaction
+	PrecompiledCalls []byte
 }
 
 // Invalid returns true if transaction has been rejected

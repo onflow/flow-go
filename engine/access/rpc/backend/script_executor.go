@@ -119,6 +119,30 @@ func (s *ScriptExecutor) GetAccountAtBlockHeight(ctx context.Context, address fl
 	return s.scriptExecutor.GetAccountAtBlockHeight(ctx, address, height)
 }
 
+// GetAccountBalance returns
+// Expected errors:
+// - Script execution related errors
+// - storage.ErrHeightNotIndexed if the data for the block height is not available
+func (s *ScriptExecutor) GetAccountBalance(ctx context.Context, address flow.Address, height uint64) (uint64, error) {
+	if err := s.checkDataAvailable(height); err != nil {
+		return 0, err
+	}
+
+	return s.scriptExecutor.GetAccountBalance(ctx, address, height)
+}
+
+// GetAccountKeys returns
+// Expected errors:
+// - Script execution related errors
+// - storage.ErrHeightNotIndexed if the data for the block height is not available
+func (s *ScriptExecutor) GetAccountKeys(ctx context.Context, address flow.Address, height uint64) ([]flow.AccountPublicKey, error) {
+	if err := s.checkDataAvailable(height); err != nil {
+		return nil, err
+	}
+
+	return s.scriptExecutor.GetAccountKeys(ctx, address, height)
+}
+
 func (s *ScriptExecutor) checkDataAvailable(height uint64) error {
 	if !s.initialized.Load() {
 		return fmt.Errorf("%w: script executor not initialized", storage.ErrHeightNotIndexed)
