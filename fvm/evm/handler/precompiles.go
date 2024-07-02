@@ -72,7 +72,7 @@ func randomSourceProvider(contractAddress flow.Address, backend types.Backend) f
 		}
 
 		cadenceArray := cadence.SearchFieldByName(data, RandomSourceTypeValueFieldName).(cadence.Array)
-		source := make([]byte, 32)
+		source := make([]byte, environment.RandomSourceHistoryLen)
 		for i := range source {
 			source[i] = byte(cadenceArray.Values[i].(cadence.UInt8))
 		}
