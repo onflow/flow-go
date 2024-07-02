@@ -61,6 +61,16 @@ type Executor interface {
 		error,
 	)
 
+	GetAccountAvailableBalance(
+		ctx context.Context,
+		addr flow.Address,
+		header *flow.Header,
+		snapshot snapshot.StorageSnapshot,
+	) (
+		uint64,
+		error,
+	)
+
 	GetAccountKeys(
 		ctx context.Context,
 		addr flow.Address,
@@ -68,6 +78,17 @@ type Executor interface {
 		snapshot snapshot.StorageSnapshot,
 	) (
 		[]flow.AccountPublicKey,
+		error,
+	)
+
+	GetAccountKey(
+		ctx context.Context,
+		addr flow.Address,
+		keyIndex int,
+		header *flow.Header,
+		snapshot snapshot.StorageSnapshot,
+	) (
+		*flow.AccountPublicKey,
 		error,
 	)
 }
@@ -269,7 +290,12 @@ func (e *QueryExecutor) GetAccount(
 	return account, nil
 }
 
-func (e *QueryExecutor) GetAccountBalance(ctx context.Context, address flow.Address, blockHeader *flow.Header, snapshot snapshot.StorageSnapshot) (uint64, error) {
+func (e *QueryExecutor) GetAccountBalance(
+	ctx context.Context,
+	address flow.Address,
+	blockHeader *flow.Header,
+	snapshot snapshot.StorageSnapshot,
+) (uint64, error) {
 
 	// TODO(ramtin): utilize ctx
 	blockCtx := fvm.NewContextFromParent(
@@ -294,7 +320,42 @@ func (e *QueryExecutor) GetAccountBalance(ctx context.Context, address flow.Addr
 	return accountBalance, nil
 }
 
-func (e *QueryExecutor) GetAccountKeys(ctx context.Context, address flow.Address, blockHeader *flow.Header, snapshot snapshot.StorageSnapshot) ([]flow.AccountPublicKey, error) {
+func (e *QueryExecutor) GetAccountAvailableBalance(
+	ctx context.Context,
+	address flow.Address,
+	blockHeader *flow.Header,
+	snapshot snapshot.StorageSnapshot,
+) (uint64, error) {
+
+	// TODO(ramtin): utilize ctx
+	blockCtx := fvm.NewContextFromParent(
+		e.vmCtx,
+		fvm.WithBlockHeader(blockHeader),
+		fvm.WithDerivedBlockData(
+			e.derivedChainData.NewDerivedBlockDataForScript(blockHeader.ID())))
+
+	accountAvailableBalance, err := fvm.GetAccountAvailableBalance(
+		blockCtx,
+		address,
+		snapshot)
+
+	if err != nil {
+		return 0, fmt.Errorf(
+			"failed to get account available balance (%s) at block (%s): %w",
+			address.String(),
+			blockHeader.ID(),
+			err)
+	}
+
+	return accountAvailableBalance, nil
+}
+
+func (e *QueryExecutor) GetAccountKeys(
+	ctx context.Context,
+	address flow.Address,
+	blockHeader *flow.Header,
+	snapshot snapshot.StorageSnapshot,
+) ([]flow.AccountPublicKey, error) {
 	// TODO(ramtin): utilize ctx
 	blockCtx := fvm.NewContextFromParent(
 		e.vmCtx,
@@ -314,4 +375,33 @@ func (e *QueryExecutor) GetAccountKeys(ctx context.Context, address flow.Address
 	}
 
 	return accountKeys, nil
+}
+
+func (e *QueryExecutor) GetAccountKey(
+	ctx context.Context,
+	address flow.Address,
+	keyIndex int,
+	blockHeader *flow.Header,
+	snapshot snapshot.StorageSnapshot,
+) (*flow.AccountPublicKey, error) {
+	// TODO(ramtin): utilize ctx
+	blockCtx := fvm.NewContextFromParent(
+		e.vmCtx,
+		fvm.WithBlockHeader(blockHeader),
+		fvm.WithDerivedBlockData(
+			e.derivedChainData.NewDerivedBlockDataForScript(blockHeader.ID())))
+
+	accountKey, err := fvm.GetAccountKey(blockCtx,
+		address,
+		keyIndex,
+		snapshot)
+	if err != nil {
+		return nil, fmt.Errorf(
+			"failed to get account key (%s) at block (%s): %w",
+			address.String(),
+			blockHeader.ID(),
+			err)
+	}
+
+	return accountKey, nil
 }

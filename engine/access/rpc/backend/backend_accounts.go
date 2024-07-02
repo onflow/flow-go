@@ -60,7 +60,7 @@ func (b *backendAccounts) GetAccountAtLatestBlock(ctx context.Context, address f
 	return account, nil
 }
 
-// GetAccountAtBlockHeight returns the account details at the given block height
+// GetAccountAtBlockHeight returns the account details at the given block height.
 func (b *backendAccounts) GetAccountAtBlockHeight(
 	ctx context.Context,
 	address flow.Address,
@@ -78,6 +78,114 @@ func (b *backendAccounts) GetAccountAtBlockHeight(
 	}
 
 	return account, nil
+}
+
+// GetAccountBalanceAtLatestBlock returns the account balance at the latest sealed block.
+func (b *backendAccounts) GetAccountBalanceAtLatestBlock(ctx context.Context, address flow.Address) (uint64, uint64, error) {
+	sealed, err := b.state.Sealed().Head()
+	if err != nil {
+		err := irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err)
+		irrecoverable.Throw(ctx, err)
+		return 0, 0, err
+	}
+
+	sealedBlockID := sealed.ID()
+
+	account, availableBalance, err := b.getAccountBalanceAtBlock(ctx, address, sealedBlockID, sealed.Height)
+	if err != nil {
+		b.log.Debug().Err(err).Msgf("failed to get account balance at blockID: %v", sealedBlockID)
+		return 0, 0, err
+	}
+
+	return account, availableBalance, nil
+}
+
+// GetAccountBalanceAtBlockHeight returns the account balance at the given block height.
+func (b *backendAccounts) GetAccountBalanceAtBlockHeight(
+	ctx context.Context,
+	address flow.Address,
+	height uint64,
+) (uint64, uint64, error) {
+	blockID, err := b.headers.BlockIDByHeight(height)
+	if err != nil {
+		return 0, 0, rpc.ConvertStorageError(err)
+	}
+
+	account, availableBalance, err := b.getAccountBalanceAtBlock(ctx, address, blockID, height)
+	if err != nil {
+		b.log.Debug().Err(err).Msgf("failed to get account balance at height: %v", height)
+		return 0, 0, err
+	}
+
+	return account, availableBalance, nil
+}
+
+// GetAccountKeysAtLatestBlock returns the account public keys at the latest sealed block.
+func (b *backendAccounts) GetAccountKeysAtLatestBlock(
+	ctx context.Context,
+	address flow.Address,
+	keyIndex int,
+) ([]flow.AccountPublicKey, error) {
+	sealed, err := b.state.Sealed().Head()
+	if err != nil {
+		err := irrecoverable.NewExceptionf("failed to lookup sealed header: %w", err)
+		irrecoverable.Throw(ctx, err)
+		return nil, err
+	}
+
+	sealedBlockID := sealed.ID()
+
+	var accountKeys []flow.AccountPublicKey
+	if keyIndex == -1 {
+		accountKeys, err = b.getAccountKeysAtBlock(ctx, address, sealedBlockID, sealed.Height)
+		if err != nil {
+			b.log.Debug().Err(err).Msgf("failed to get account keys at blockID: %v", sealedBlockID)
+			return nil, err
+		}
+
+		return accountKeys, nil
+	}
+
+	accountKeys, err = b.getAccountKeyAtBlock(ctx, address, sealedBlockID, keyIndex, sealed.Height)
+	if err != nil {
+		b.log.Debug().Err(err).Msgf("failed to get account keys at blockID: %v", sealedBlockID)
+		return nil, err
+	}
+
+	return accountKeys, nil
+}
+
+// GetAccountKeysAtBlockHeight returns the account public keys at the given block height.
+func (b *backendAccounts) GetAccountKeysAtBlockHeight(
+	ctx context.Context,
+	address flow.Address,
+	keyIndex int,
+	height uint64,
+) ([]flow.AccountPublicKey, error) {
+	blockID, err := b.headers.BlockIDByHeight(height)
+	if err != nil {
+		return nil, rpc.ConvertStorageError(err)
+	}
+
+	var accountKeys []flow.AccountPublicKey
+
+	if keyIndex == -1 {
+		accountKeys, err = b.getAccountKeysAtBlock(ctx, address, blockID, height)
+		if err != nil {
+			b.log.Debug().Err(err).Msgf("failed to get account keys at height: %v", height)
+			return nil, err
+		}
+
+		return accountKeys, nil
+	}
+
+	accountKeys, err = b.getAccountKeyAtBlock(ctx, address, blockID, keyIndex, height)
+	if err != nil {
+		b.log.Debug().Err(err).Msgf("failed to get account key at height: %v", height)
+		return nil, err
+	}
+
+	return accountKeys, nil
 }
 
 // getAccountAtBlock returns the account details at the given block
@@ -120,6 +228,134 @@ func (b *backendAccounts) getAccountAtBlock(
 
 		// always return EN results
 		return execResult, execErr
+
+	default:
+		return nil, status.Errorf(codes.Internal, "unknown execution mode: %v", b.scriptExecMode)
+	}
+}
+
+func (b *backendAccounts) getAccountBalanceAtBlock(
+	ctx context.Context,
+	address flow.Address,
+	blockID flow.Identifier,
+	height uint64,
+) (uint64, uint64, error) {
+	switch b.scriptExecMode {
+	case IndexQueryModeExecutionNodesOnly:
+		account, err := b.getAccountFromAnyExeNode(ctx, address, blockID)
+		if err != nil {
+			b.log.Debug().Err(err).Msgf("failed to get account balance at blockID: %v", blockID)
+			return 0, 0, err
+		}
+		return account.Balance, account.Balance, nil
+
+	case IndexQueryModeLocalOnly:
+		accountBalance, err := b.scriptExecutor.GetAccountBalance(ctx, address, height)
+		if err != nil {
+			b.log.Debug().Err(err).Msgf("failed to get account balance at blockID: %v", blockID)
+			return 0, 0, err
+		}
+
+		accountAvailableBalance, err := b.scriptExecutor.GetAccountAvailableBalance(ctx, address, height)
+		if err != nil {
+			b.log.Debug().Err(err).Msgf("failed to get account balance at blockID: %v", blockID)
+			return 0, 0, err
+		}
+
+		return accountBalance, accountAvailableBalance, nil
+	case IndexQueryModeFailover:
+		localAccountBalance, localErr := b.scriptExecutor.GetAccountBalance(ctx, address, height)
+		if localErr == nil {
+			accountAvailableBalance, localErr := b.scriptExecutor.GetAccountAvailableBalance(ctx, address, height)
+			if localErr == nil {
+				return localAccountBalance, accountAvailableBalance, nil
+			}
+			return localAccountBalance, 0, nil
+		}
+		execResult, execErr := b.getAccountFromAnyExeNode(ctx, address, blockID)
+
+		return execResult.Balance, execResult.Balance, execErr
+
+	default:
+		return 0, 0, status.Errorf(codes.Internal, "unknown execution mode: %v", b.scriptExecMode)
+	}
+}
+
+func (b *backendAccounts) getAccountKeysAtBlock(
+	ctx context.Context,
+	address flow.Address,
+	blockID flow.Identifier,
+	height uint64,
+) ([]flow.AccountPublicKey, error) {
+	switch b.scriptExecMode {
+	case IndexQueryModeExecutionNodesOnly:
+		account, err := b.getAccountFromAnyExeNode(ctx, address, blockID)
+		if err != nil {
+			b.log.Debug().Err(err).Msgf("failed to get account keys at blockID: %v", blockID)
+			return nil, err
+		}
+		return account.Keys, nil
+	case IndexQueryModeLocalOnly:
+		accountKeys, err := b.scriptExecutor.GetAccountKeys(ctx, address, height)
+		if err != nil {
+			b.log.Debug().Err(err).Msgf("failed to get account keys at height: %d", height)
+			return nil, err
+		}
+
+		return accountKeys, nil
+	case IndexQueryModeFailover:
+		localAccountKeys, localErr := b.scriptExecutor.GetAccountKeys(ctx, address, height)
+		if localErr == nil {
+			return localAccountKeys, nil
+		}
+
+		account, err := b.getAccountFromAnyExeNode(ctx, address, blockID)
+		return account.Keys, err
+
+	default:
+		return nil, status.Errorf(codes.Internal, "unknown execution mode: %v", b.scriptExecMode)
+	}
+
+}
+
+func (b *backendAccounts) getAccountKeyAtBlock(
+	ctx context.Context,
+	address flow.Address,
+	blockID flow.Identifier,
+	keyIndex int,
+	height uint64,
+) ([]flow.AccountPublicKey, error) {
+	switch b.scriptExecMode {
+	case IndexQueryModeExecutionNodesOnly:
+		account, err := b.getAccountFromAnyExeNode(ctx, address, blockID)
+		if err != nil {
+			b.log.Debug().Err(err).Msgf("failed to get account key at blockID: %v", blockID)
+			return nil, err
+		}
+
+		for _, key := range account.Keys {
+			if key.Index == keyIndex {
+				return []flow.AccountPublicKey{key}, nil
+			}
+		}
+
+		return nil, status.Errorf(codes.Internal, "failed to get account key by index: %d", keyIndex)
+	case IndexQueryModeLocalOnly:
+		accountKey, err := b.scriptExecutor.GetAccountKey(ctx, address, keyIndex, height)
+		if err != nil {
+			b.log.Debug().Err(err).Msgf("failed to get account key at height: %d", height)
+			return nil, err
+		}
+
+		return []flow.AccountPublicKey{*accountKey}, nil
+	case IndexQueryModeFailover:
+		localAccountKey, localErr := b.scriptExecutor.GetAccountKey(ctx, address, keyIndex, height)
+		if localErr == nil {
+			return []flow.AccountPublicKey{*localAccountKey}, nil
+		}
+
+		account, err := b.getAccountFromAnyExeNode(ctx, address, blockID)
+		return account.Keys, err
 
 	default:
 		return nil, status.Errorf(codes.Internal, "unknown execution mode: %v", b.scriptExecMode)

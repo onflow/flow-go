@@ -41,6 +41,12 @@ type API interface {
 	GetAccountAtLatestBlock(ctx context.Context, address flow.Address) (*flow.Account, error)
 	GetAccountAtBlockHeight(ctx context.Context, address flow.Address, height uint64) (*flow.Account, error)
 
+	GetAccountBalanceAtLatestBlock(ctx context.Context, address flow.Address) (uint64, uint64, error)
+	GetAccountBalanceAtBlockHeight(ctx context.Context, address flow.Address, height uint64) (uint64, uint64, error)
+
+	GetAccountKeysAtLatestBlock(ctx context.Context, address flow.Address, keyIndex int) ([]flow.AccountPublicKey, error)
+	GetAccountKeysAtBlockHeight(ctx context.Context, address flow.Address, keyIndex int, height uint64) ([]flow.AccountPublicKey, error)
+
 	ExecuteScriptAtLatestBlock(ctx context.Context, script []byte, arguments [][]byte) ([]byte, error)
 	ExecuteScriptAtBlockHeight(ctx context.Context, blockHeight uint64, script []byte, arguments [][]byte) ([]byte, error)
 	ExecuteScriptAtBlockID(ctx context.Context, blockID flow.Identifier, script []byte, arguments [][]byte) ([]byte, error)
