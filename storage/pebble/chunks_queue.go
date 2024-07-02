@@ -49,7 +49,18 @@ func (q *ChunksQueue) Init(defaultIndex uint64) (bool, error) {
 // A true will be returned, if the locator was new.
 // A false will be returned, if the locator was duplicate.
 func (q *ChunksQueue) StoreChunkLocator(locator *chunks.Locator) (bool, error) {
-	err := operation.WithReaderBatchWriter(q.db, func(tx storage.PebbleReaderBatchWriter) error {
+	var alreadyExist bool
+	err := operation.ExistsChunkLocator(locator.ID(), &alreadyExist)(q.db)
+	if err != nil {
+		return false, fmt.Errorf("could not check if chunk locator exists: %w", err)
+	}
+
+	// was trying to store a duplicate locator
+	if alreadyExist {
+		return false, nil
+	}
+
+	err = operation.WithReaderBatchWriter(q.db, func(tx storage.PebbleReaderBatchWriter) error {
 		r, w := tx.ReaderWriter()
 		// make sure the chunk locator is unique
 		err := operation.InsertChunkLocator(locator)(w)
@@ -80,10 +91,6 @@ func (q *ChunksQueue) StoreChunkLocator(locator *chunks.Locator) (bool, error) {
 		return nil
 	})
 
-	// was trying to store a duplicate locator
-	if errors.Is(err, storage.ErrAlreadyExists) {
-		return false, nil
-	}
 	if err != nil {
 		return false, fmt.Errorf("failed to store chunk locator: %w", err)
 	}
