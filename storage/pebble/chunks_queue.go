@@ -50,7 +50,7 @@ func (q *ChunksQueue) Init(defaultIndex uint64) (bool, error) {
 // A false will be returned, if the locator was duplicate.
 func (q *ChunksQueue) StoreChunkLocator(locator *chunks.Locator) (bool, error) {
 	var alreadyExist bool
-	err := operation.ExistsChunkLocator(locator.ID(), &alreadyExist)(q.db)
+	err := operation.HasChunkLocator(locator.ID(), &alreadyExist)(q.db)
 	if err != nil {
 		return false, fmt.Errorf("could not check if chunk locator exists: %w", err)
 	}
