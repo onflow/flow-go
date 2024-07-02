@@ -120,3 +120,66 @@ func TestPruneNonLatestHeight(t *testing.T) {
 	})
 	require.NoError(t, err)
 }
+
+// TestAscendingOrderOfRecords tests that order of data is ascending and all CIDs appearing at or below the pruned
+// height, and their associated tracking data, should be removed from the database.
+func TestAscendingOrderOfRecords(t *testing.T) {
+	expectedPrunedCIDs := make(map[cid.Cid]struct{})
+	storageDir := t.TempDir()
+	storage, err := OpenStorage(storageDir, 0, zerolog.Nop(), WithPruneCallback(func(c cid.Cid) error {
+		_, ok := expectedPrunedCIDs[c]
+		assert.True(t, ok, "unexpected CID pruned: %s", c.String())
+		delete(expectedPrunedCIDs, c)
+		return nil
+	}))
+	require.NoError(t, err)
+
+	// c1 is for height 1,
+	// c2 is for height 2,
+	// c3 is for height 256
+	// pruning up to height 1 will check if order of the records is ascending, c1 should be pruned
+	c1 := randomCid()
+	expectedPrunedCIDs[c1] = struct{}{}
+	c2 := randomCid()
+	c3 := randomCid()
+
+	require.NoError(t, storage.Update(func(tbf TrackBlobsFn) error {
+		require.NoError(t, tbf(1, c1))
+		require.NoError(t, tbf(2, c2))
+		// It is important to check if the record with height 256 does not precede
+		// the record with height 1 during pruning.
+		require.NoError(t, tbf(256, c3))
+
+		return nil
+	}))
+	require.NoError(t, storage.PruneUpToHeight(1))
+
+	prunedHeight, err := storage.GetPrunedHeight()
+	require.NoError(t, err)
+	assert.Equal(t, uint64(1), prunedHeight)
+
+	assert.Len(t, expectedPrunedCIDs, 0)
+
+	err = storage.db.View(func(txn *badger.Txn) error {
+		// expected that blob record with height 1 was removed
+		_, err := txn.Get(makeBlobRecordKey(1, c1))
+		assert.ErrorIs(t, err, badger.ErrKeyNotFound)
+		_, err = txn.Get(makeLatestHeightKey(c1))
+		assert.ErrorIs(t, err, badger.ErrKeyNotFound)
+
+		// expected that blob record with height 2 exists
+		_, err = txn.Get(makeBlobRecordKey(2, c2))
+		assert.NoError(t, err)
+		_, err = txn.Get(makeLatestHeightKey(c2))
+		assert.NoError(t, err)
+
+		// expected that blob record with height 256 exists
+		_, err = txn.Get(makeBlobRecordKey(256, c3))
+		assert.NoError(t, err)
+		_, err = txn.Get(makeLatestHeightKey(c3))
+		assert.NoError(t, err)
+
+		return nil
+	})
+	require.NoError(t, err)
+}
