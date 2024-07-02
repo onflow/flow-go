@@ -86,3 +86,11 @@ func TestRandomGenerator(t *testing.T) {
 		}
 	})
 }
+
+func TestRandomSourceHistoryProvider(t *testing.T) {
+	t.Run("source length", func(t *testing.T) {
+		// Sanity check that entropy source is at least 128 bits
+		const minimumEntropy = 128 / 8
+		require.GreaterOrEqual(t, environment.RandomSourceHistoryLen, minimumEntropy)
+	})
+}
