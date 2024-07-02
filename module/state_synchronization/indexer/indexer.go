@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/jobqueue"
 	"github.com/onflow/flow-go/module/state_synchronization"
+	"github.com/onflow/flow-go/module/state_synchronization/requester"
 	"github.com/onflow/flow-go/module/state_synchronization/requester/jobs"
 	"github.com/onflow/flow-go/storage"
 )
@@ -46,6 +47,8 @@ var _ state_synchronization.IndexReporter = (*Indexer)(nil)
 // notify new data is available and kick off indexing.
 type Indexer struct {
 	component.Component
+	*requester.BlockHeaderDistributor
+
 	log             zerolog.Logger
 	exeDataReader   *jobs.ExecutionDataReader
 	exeDataNotifier engine.Notifier
@@ -65,10 +68,11 @@ func NewIndexer(
 	processedHeight storage.ConsumerProgress,
 ) (*Indexer, error) {
 	r := &Indexer{
-		log:             log.With().Str("module", "execution_indexer").Logger(),
-		exeDataNotifier: engine.NewNotifier(),
-		indexer:         indexer,
-		registers:       registers,
+		log:                    log.With().Str("module", "execution_indexer").Logger(),
+		exeDataNotifier:        engine.NewNotifier(),
+		indexer:                indexer,
+		registers:              registers,
+		BlockHeaderDistributor: requester.NewBlockHeaderDistributor(),
 	}
 
 	r.exeDataReader = jobs.NewExecutionDataReader(executionCache, fetchTimeout, executionDataLatestHeight)
@@ -91,9 +95,27 @@ func NewIndexer(
 
 	r.jobConsumer = jobConsumer
 
+	// to separate processing execution data and updating the last indexed block
+	r.jobConsumer.SetPostNotifier(func(module.JobID) {
+		r.onBlockHeaderReceived()
+	})
+
 	r.Component = r.jobConsumer
 
 	return r, nil
+}
+
+// onBlockHeaderReceived notifies BlockHeaderDistributor that new block is indexed.
+//
+// No errors are expected during normal operations.
+func (i *Indexer) onBlockHeaderReceived() {
+	lastIndexedHeight := i.jobConsumer.LastProcessedIndex()
+	header, err := i.indexer.headers.ByHeight(lastIndexedHeight)
+	if err != nil {
+		// if the execution data is available, the block must be locally finalized
+		i.log.Error().Err(err).Msgf("could not get header for height %d:", lastIndexedHeight)
+	}
+	i.OnBlockHeaderReceived(header)
 }
 
 // Start the worker jobqueue to consume the available data.
