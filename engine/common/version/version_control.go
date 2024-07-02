@@ -117,74 +117,83 @@ func (v *VersionControl) checkInitialVersionBeacon(
 	finalizedRootBlockHeight uint64,
 ) func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	return func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-		// component is not ready until we checked the initial version beacon
-		defer ready()
+		err := v.initBoundaries(ctx, finalizedRootBlockHeight)
+		if err == nil {
+			ready()
+		}
+	}
+}
 
-		processedHeight := v.lastProcessedHeight.Load()
+func (v *VersionControl) initBoundaries(ctx irrecoverable.SignalerContext, finalizedRootBlockHeight uint64) error {
+	processedHeight := v.lastProcessedHeight.Load()
 
-		for {
-			vb, err := v.versionBeacons.Highest(processedHeight)
-			if err != nil {
+	for {
+		vb, err := v.versionBeacons.Highest(processedHeight)
+		if err != nil {
+			ctx.Throw(
+				fmt.Errorf(
+					"failed to get highest version beacon for version control: %w",
+					err))
+			return err
+		}
+
+		if vb == nil {
+			// no version beacon found
+			// this is unexpected on a live network as there should always be at least the
+			// starting version beacon, but not fatal.
+			// It can happen on new or test networks if the node starts before bootstrap is finished.
+			// TODO: remove when we can guarantee that there will always be a version beacon
+			v.log.Info().
+				Uint64("height", processedHeight).
+				Msg("No version beacon found for version control")
+
+			return nil
+		}
+
+		// version boundaries are sorted by blockHeight in ascending order
+		// the first version greater than the node's is the version transition height
+		for i := len(vb.VersionBoundaries) - 1; i >= 0; i-- {
+			boundary := vb.VersionBoundaries[i]
+
+			ver, err := boundary.Semver()
+			// this should never happen as we already validated the version beacon
+			// when indexing it
+			if err != nil || ver == nil {
+				if ver == nil {
+					err = fmt.Errorf("boundary semantic version is nil")
+				}
 				ctx.Throw(
 					fmt.Errorf(
-						"failed to get highest version beacon for version control: %w",
+						"failed to parse semver during version control setup: %w",
 						err))
-				return
+				return err
 			}
 
-			if vb == nil {
-				// no version beacon found
-				// this is unexpected on a live network as there should always be at least the
-				// starting version beacon, but not fatal.
-				// It can happen on new or test networks if the node starts before bootstrap is finished.
-				// TODO: remove when we can guarantee that there will always be a version beacon
+			compResult := ver.Compare(*v.nodeVersion)
+			processedHeight = boundary.BlockHeight - 1
+
+			if compResult <= 0 {
+				v.startHeight.Store(boundary.BlockHeight)
 				v.log.Info().
-					Uint64("height", processedHeight).
-					Msg("No version beacon found for version control")
-				return
-			}
-
-			// version boundaries are sorted by version
-			for i := len(vb.VersionBoundaries) - 1; i >= 0; i-- {
-				boundary := vb.VersionBoundaries[i]
-
-				ver, err := boundary.Semver()
-				if err != nil || ver == nil {
-					// this should never happen as we already validated the version beacon
-					// when indexing it
-					ctx.Throw(
-						fmt.Errorf(
-							"failed to parse semver during version control setup: %w",
-							err))
-					return
-				}
-
-				compResult := ver.Compare(*v.nodeVersion)
-				processedHeight = boundary.BlockHeight - 1
-
-				if compResult <= 0 {
-					v.startHeight.Store(boundary.BlockHeight)
-					v.log.Info().
-						Uint64("startHeight", boundary.BlockHeight).
-						Msg("Found start block height")
-					// This is the lowest compatible height for this node version, stop search immediately
-					return
-				} else if compResult > 0 {
-					v.endHeight.Store(boundary.BlockHeight - 1)
-					v.log.Info().
-						Uint64("endHeight", boundary.BlockHeight-1).
-						Msg("Found end block height")
-				}
-			}
-
-			// The search should continue until we find the start height or reach the finalized root block height
-			if v.startHeight.Load() == NoHeight && processedHeight <= finalizedRootBlockHeight {
+					Uint64("startHeight", boundary.BlockHeight).
+					Msg("Found start block height")
+				// This is the lowest compatible height for this node version, stop search immediately
+				return nil
+			} else {
+				v.endHeight.Store(boundary.BlockHeight - 1)
 				v.log.Info().
-					Uint64("processedHeight", processedHeight).
-					Uint64("finalizedRootBlockHeight", finalizedRootBlockHeight).
-					Msg("No start version beacon event found")
-				return
+					Uint64("endHeight", boundary.BlockHeight-1).
+					Msg("Found end block height")
 			}
+		}
+
+		// The search should continue until we find the start height or reach the finalized root block height
+		if v.startHeight.Load() == NoHeight && processedHeight <= finalizedRootBlockHeight {
+			v.log.Info().
+				Uint64("processedHeight", processedHeight).
+				Uint64("finalizedRootBlockHeight", finalizedRootBlockHeight).
+				Msg("No start version beacon event found")
+			return nil
 		}
 	}
 }
@@ -287,6 +296,14 @@ func (v *VersionControl) blockFinalized(
 
 		v.lastProcessedHeight.Store(height)
 
+		previousEndHeight := v.endHeight.Load()
+
+		if height > previousEndHeight {
+			//Stop here since it's outside our compatible range
+			return
+		}
+
+		newEndHeight := NoHeight
 		// version boundaries are sorted by version
 		for _, boundary := range vb.VersionBoundaries {
 			ver, err := boundary.Semver()
@@ -301,13 +318,22 @@ func (v *VersionControl) blockFinalized(
 			}
 
 			if ver.Compare(*v.nodeVersion) > 0 {
-				v.endHeight.Store(boundary.BlockHeight - 1)
+				newEndHeight = boundary.BlockHeight - 1
 
 				for _, consumer := range v.consumers {
 					consumer(boundary.BlockHeight, ver.String())
 				}
 
 				break
+			}
+		}
+
+		v.endHeight.Store(newEndHeight)
+
+		// Check if previous version was deleted. If yes, notify consumers about deletion
+		if previousEndHeight != NoHeight && newEndHeight == NoHeight {
+			for _, consumer := range v.consumers {
+				consumer(height, "")
 			}
 		}
 	}
