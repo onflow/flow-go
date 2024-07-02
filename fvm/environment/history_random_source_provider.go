@@ -85,7 +85,11 @@ func NewRandomSourceHistoryProvider(
 	return NewForbiddenRandomSourceHistoryProvider()
 }
 
-const randomSourceHistoryLen = 32
+// RandomSourceHistoryLen is the byte-size of the random source in the history
+// array.
+// It must be at least 16 (128 bits) to make sure it includes enough entropy
+// (assuming the randomness beacon also outputs more than 128 bits of entropy)
+const RandomSourceHistoryLen = 32
 
 func (b *historySourceProvider) RandomSourceHistory() ([]byte, error) {
 	defer b.tracer.StartExtensiveTracingChildSpan(
@@ -118,7 +122,7 @@ func (b *historySourceProvider) RandomSourceHistory() ([]byte, error) {
 		return nil, fmt.Errorf("failed to create a PRG from source: %w", err)
 	}
 
-	historySource := make([]byte, randomSourceHistoryLen)
+	historySource := make([]byte, RandomSourceHistoryLen)
 	csprg.Read(historySource)
 
 	return historySource, nil
