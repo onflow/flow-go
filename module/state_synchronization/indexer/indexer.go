@@ -47,13 +47,14 @@ var _ state_synchronization.IndexReporter = (*Indexer)(nil)
 // notify new data is available and kick off indexing.
 type Indexer struct {
 	component.Component
+	*requester.BlockHeaderDistributor
+
 	log             zerolog.Logger
 	exeDataReader   *jobs.ExecutionDataReader
 	exeDataNotifier engine.Notifier
 	indexer         *IndexerCore
 	jobConsumer     *jobqueue.ComponentConsumer
 	registers       storage.RegisterIndex
-	distributor     *requester.ExecutionDataDistributor
 }
 
 // NewIndexer creates a new execution worker.
@@ -65,14 +66,13 @@ func NewIndexer(
 	executionCache *cache.ExecutionDataCache,
 	executionDataLatestHeight func() (uint64, error),
 	processedHeight storage.ConsumerProgress,
-	distributor *requester.ExecutionDataDistributor,
 ) (*Indexer, error) {
 	r := &Indexer{
-		log:             log.With().Str("module", "execution_indexer").Logger(),
-		exeDataNotifier: engine.NewNotifier(),
-		indexer:         indexer,
-		registers:       registers,
-		distributor:     distributor,
+		log:                    log.With().Str("module", "execution_indexer").Logger(),
+		exeDataNotifier:        engine.NewNotifier(),
+		indexer:                indexer,
+		registers:              registers,
+		BlockHeaderDistributor: requester.NewBlockHeaderDistributor(),
 	}
 
 	r.exeDataReader = jobs.NewExecutionDataReader(executionCache, fetchTimeout, executionDataLatestHeight)
@@ -95,9 +95,27 @@ func NewIndexer(
 
 	r.jobConsumer = jobConsumer
 
+	// to separate processing execution data and updating the last indexed block
+	r.jobConsumer.SetPostNotifier(func(module.JobID) {
+		r.onBlockHeaderReceived()
+	})
+
 	r.Component = r.jobConsumer
 
 	return r, nil
+}
+
+// onBlockHeaderReceived notifies BlockHeaderDistributor that new block is indexed.
+//
+// No errors are expected during normal operations.
+func (i *Indexer) onBlockHeaderReceived() {
+	lastIndexedHeight := i.jobConsumer.LastProcessedIndex()
+	header, err := i.indexer.headers.ByHeight(lastIndexedHeight)
+	if err != nil {
+		// if the execution data is available, the block must be locally finalized
+		i.log.Error().Err(err).Msgf("could not get header for height %d:", lastIndexedHeight)
+	}
+	i.OnBlockHeaderReceived(header)
 }
 
 // Start the worker jobqueue to consume the available data.
@@ -148,8 +166,6 @@ func (i *Indexer) processExecutionData(ctx irrecoverable.SignalerContext, job mo
 		i.log.Error().Err(err).Str("job_id", string(job.ID())).Msg("error during execution data index processing job")
 		ctx.Throw(err)
 	}
-	// send notifications
-	i.distributor.OnExecutionDataReceived(entry.ExecutionData)
 
 	done()
 }

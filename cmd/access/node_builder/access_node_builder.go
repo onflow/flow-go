@@ -518,15 +518,18 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 	var processedNotifications storage.ConsumerProgress
 	var bsDependable *module.ProxiedReadyDoneAware
 	var execDataDistributor *edrequester.ExecutionDataDistributor
-	var indexedExecDataDistributor *edrequester.ExecutionDataDistributor
 	var execDataCacheBackend *herocache.BlockExecutionData
 	var executionDataStoreCache *execdatacache.ExecutionDataCache
+	var prunerDependencies *cmd.DependencyList
 
 	// setup dependency chain to ensure indexer starts after the requester
 	requesterDependable := module.NewProxiedReadyDoneAware()
 	builder.IndexerDependencies.Add(requesterDependable)
 
-	indexedExecDataDistributor = edrequester.NewExecutionDataDistributor()
+	// setup dependency chain to ensure pruner starts after the indexer
+	prunerDependencies = cmd.NewDependencyList()
+	indexerDependable := module.NewProxiedReadyDoneAware()
+	prunerDependencies.Add(indexerDependable)
 
 	builder.
 		AdminCommand("read-execution-data", func(config *cmd.NodeConfig) commands.AdminCommand {
@@ -721,50 +724,6 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			requesterDependable.Init(builder.ExecutionDataRequester)
 
 			return builder.ExecutionDataRequester, nil
-		}).
-		Component("execution data pruner", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			if builder.executionDataPrunerHeightRangeTarget == 0 {
-				return &module.NoopReadyDoneAware{}, nil
-			}
-
-			indexedExecDataDistributor.AddOnExecutionDataReceivedConsumer(func(data *execution_data.BlockExecutionDataEntity) {
-				header, err := node.Storage.Headers.ByBlockID(data.BlockID)
-				if err != nil {
-					// if the execution data is available, the block must be locally finalized
-					node.Logger.Fatal().Err(err).Msg("failed to get header for execution data")
-				}
-
-				if builder.ExecutionDataPruner != nil {
-					err = builder.ExecutionDataTracker.SetFulfilledHeight(header.Height)
-					if err != nil {
-						node.Logger.Fatal().Err(err).Msg("failed to set fulfilled height")
-					}
-
-					builder.ExecutionDataPruner.NotifyFulfilledHeight(header.Height)
-				}
-			})
-
-			var prunerMetrics module.ExecutionDataPrunerMetrics = metrics.NewNoopCollector()
-			if node.MetricsEnabled {
-				prunerMetrics = metrics.NewExecutionDataPrunerCollector()
-			}
-
-			var err error
-			builder.ExecutionDataPruner, err = pruner.NewPruner(
-				node.Logger,
-				prunerMetrics,
-				builder.ExecutionDataTracker,
-				pruner.WithPruneCallback(func(ctx context.Context) error {
-					return builder.ExecutionDataDatastore.CollectGarbage(ctx)
-				}),
-				pruner.WithHeightRangeTarget(builder.executionDataPrunerHeightRangeTarget),
-				pruner.WithThreshold(builder.executionDataPrunerThreshold),
-			)
-			if err != nil {
-				return nil, fmt.Errorf("failed to create execution data pruner: %w", err)
-			}
-
-			return builder.ExecutionDataPruner, nil
 		})
 
 	if builder.publicNetworkExecutionDataEnabled {
@@ -928,7 +887,6 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					executionDataStoreCache,
 					builder.ExecutionDataRequester.HighestConsecutiveHeight,
 					indexedBlockHeight,
-					indexedExecDataDistributor,
 				)
 				if err != nil {
 					return nil, err
@@ -966,8 +924,48 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					return nil, err
 				}
 
+				indexerDependable.Init(builder.ExecutionIndexer)
+
 				return builder.ExecutionIndexer, nil
-			}, builder.IndexerDependencies)
+			}, builder.IndexerDependencies,
+			).DependableComponent("execution data pruner", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			if builder.executionDataPrunerHeightRangeTarget == 0 {
+				return &module.NoopReadyDoneAware{}, nil
+			}
+
+			builder.ExecutionIndexer.AddOnBlockHeaderReceivedConsumer(func(header *flow.Header) {
+				if builder.ExecutionDataPruner != nil {
+					err := builder.ExecutionDataTracker.SetFulfilledHeight(header.Height)
+					if err != nil {
+						node.Logger.Fatal().Err(err).Msg("failed to set fulfilled height")
+					}
+
+					builder.ExecutionDataPruner.NotifyFulfilledHeight(header.Height)
+				}
+			})
+
+			var prunerMetrics module.ExecutionDataPrunerMetrics = metrics.NewNoopCollector()
+			if node.MetricsEnabled {
+				prunerMetrics = metrics.NewExecutionDataPrunerCollector()
+			}
+
+			var err error
+			builder.ExecutionDataPruner, err = pruner.NewPruner(
+				node.Logger,
+				prunerMetrics,
+				builder.ExecutionDataTracker,
+				pruner.WithPruneCallback(func(ctx context.Context) error {
+					return builder.ExecutionDataDatastore.CollectGarbage(ctx)
+				}),
+				pruner.WithHeightRangeTarget(builder.executionDataPrunerHeightRangeTarget),
+				pruner.WithThreshold(builder.executionDataPrunerThreshold),
+			)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create execution data pruner: %w", err)
+			}
+
+			return builder.ExecutionDataPruner, nil
+		}, prunerDependencies)
 	}
 
 	if builder.stateStreamConf.ListenAddr != "" {
