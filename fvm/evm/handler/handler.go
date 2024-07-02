@@ -20,15 +20,15 @@ import (
 // ContractHandler is responsible for triggering calls to emulator, metering,
 // event emission and updating the block
 type ContractHandler struct {
-	flowChainID        flow.ChainID
-	evmContractAddress flow.Address
-	flowTokenAddress   common.Address
-	blockStore         types.BlockStore
-	addressAllocator   types.AddressAllocator
-	backend            types.Backend
-	emulator           types.Emulator
-	precompiles        []types.Precompile
-	tracer             debug.EVMTracer
+	flowChainID          flow.ChainID
+	evmContractAddress   flow.Address
+	flowTokenAddress     common.Address
+	blockStore           types.BlockStore
+	addressAllocator     types.AddressAllocator
+	backend              types.Backend
+	emulator             types.Emulator
+	precompiledContracts []types.PrecompiledContract
+	tracer               debug.EVMTracer
 }
 
 func (h *ContractHandler) FlowTokenAddress() common.Address {
@@ -53,15 +53,15 @@ func NewContractHandler(
 	tracer debug.EVMTracer,
 ) *ContractHandler {
 	return &ContractHandler{
-		flowChainID:        flowChainID,
-		evmContractAddress: evmContractAddress,
-		flowTokenAddress:   flowTokenAddress,
-		blockStore:         blockStore,
-		addressAllocator:   addressAllocator,
-		backend:            backend,
-		emulator:           emulator,
-		tracer:             tracer,
-		precompiles:        preparePrecompiles(evmContractAddress, randomBeaconAddress, addressAllocator, backend),
+		flowChainID:          flowChainID,
+		evmContractAddress:   evmContractAddress,
+		flowTokenAddress:     flowTokenAddress,
+		blockStore:           blockStore,
+		addressAllocator:     addressAllocator,
+		backend:              backend,
+		emulator:             emulator,
+		tracer:               tracer,
+		precompiledContracts: preparePrecompiledContracts(evmContractAddress, randomBeaconAddress, addressAllocator, backend),
 	}
 }
 
@@ -456,9 +456,9 @@ func (h *ContractHandler) getBlockContext() (types.BlockContext, error) {
 			panicOnError(err) // we have to handle it here given we can't continue with it even in try case
 			return hash
 		},
-		ExtraPrecompiles: h.precompiles,
-		Random:           rand,
-		Tracer:           h.tracer.TxTracer(),
+		ExtraPrecompiledContracts: h.precompiledContracts,
+		Random:                    rand,
+		Tracer:                    h.tracer.TxTracer(),
 	}, nil
 }
 
