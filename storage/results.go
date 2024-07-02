@@ -4,7 +4,6 @@ package storage
 
 import (
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
 type ExecutionResults interface {
@@ -19,7 +18,7 @@ type ExecutionResults interface {
 	ByID(resultID flow.Identifier) (*flow.ExecutionResult, error)
 
 	// ByIDTx retrieves an execution result by its ID in the context of the given transaction
-	ByIDTx(resultID flow.Identifier) func(*transaction.Tx) (*flow.ExecutionResult, error)
+	ByIDTx(resultID flow.Identifier) func(interface{}) (*flow.ExecutionResult, error)
 
 	// Index indexes an execution result by block ID.
 	Index(blockID flow.Identifier, resultID flow.Identifier) error

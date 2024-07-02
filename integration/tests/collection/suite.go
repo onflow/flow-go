@@ -21,7 +21,7 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/messages"
 	clusterstate "github.com/onflow/flow-go/state/cluster"
-	clusterstateimpl "github.com/onflow/flow-go/state/cluster/badger"
+	clusterstateimpl "github.com/onflow/flow-go/state/cluster/pebble"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 

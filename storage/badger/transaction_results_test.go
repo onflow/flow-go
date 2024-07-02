@@ -2,7 +2,6 @@ package badger_test
 
 import (
 	"fmt"
-	mathRand "math/rand"
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
@@ -82,24 +81,4 @@ func TestReadingNotStoreTransaction(t *testing.T) {
 		_, err = store.ByBlockIDTransactionIndex(blockID, txIndex)
 		assert.ErrorIs(t, err, storage.ErrNotFound)
 	})
-}
-
-func TestKeyConversion(t *testing.T) {
-	blockID := unittest.IdentifierFixture()
-	txID := unittest.IdentifierFixture()
-	key := bstorage.KeyFromBlockIDTransactionID(blockID, txID)
-	bID, tID, err := bstorage.KeyToBlockIDTransactionID(key)
-	require.NoError(t, err)
-	require.Equal(t, blockID, bID)
-	require.Equal(t, txID, tID)
-}
-
-func TestIndexKeyConversion(t *testing.T) {
-	blockID := unittest.IdentifierFixture()
-	txIndex := mathRand.Uint32()
-	key := bstorage.KeyFromBlockIDIndex(blockID, txIndex)
-	bID, tID, err := bstorage.KeyToBlockIDIndex(key)
-	require.NoError(t, err)
-	require.Equal(t, blockID, bID)
-	require.Equal(t, txIndex, tID)
 }

@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/badger/transaction"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -49,7 +50,7 @@ func TestFindBlockTransactions(t *testing.T) {
 
 		// prepare dependencies
 		storages := common.InitStorages(db)
-		payloads, collections := storages.Payloads, storages.Collections
+		blocks, payloads, collections := storages.Blocks, storages.Payloads, storages.Collections
 		snap4 := &mock.Snapshot{}
 		snap4.On("Head").Return(b1.Header, nil)
 		snap5 := &mock.Snapshot{}
@@ -59,8 +60,8 @@ func TestFindBlockTransactions(t *testing.T) {
 		state.On("AtHeight", uint64(5)).Return(snap5, nil)
 
 		// store into database
-		require.NoError(t, payloads.Store(b1.ID(), b1.Payload))
-		require.NoError(t, payloads.Store(b2.ID(), b2.Payload))
+		require.NoError(t, transaction.Update(db, blocks.StoreTx(&b1)))
+		require.NoError(t, transaction.Update(db, blocks.StoreTx(&b2)))
 
 		require.NoError(t, collections.Store(&col1.Collection))
 		require.NoError(t, collections.Store(&col2.Collection))

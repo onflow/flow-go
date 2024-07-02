@@ -1,0 +1,225 @@
+package pebble
+
+import (
+	"fmt"
+
+	"github.com/cockroachdb/pebble"
+
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/pebble/operation"
+)
+
+type Events struct {
+	db    *pebble.DB
+	cache *Cache[flow.Identifier, []flow.Event]
+}
+
+func NewEvents(collector module.CacheMetrics, db *pebble.DB) *Events {
+	retrieve := func(blockID flow.Identifier) func(tx pebble.Reader) ([]flow.Event, error) {
+		var events []flow.Event
+		return func(tx pebble.Reader) ([]flow.Event, error) {
+			err := operation.LookupEventsByBlockID(blockID, &events)(tx)
+			return events, handleError(err, flow.Event{})
+		}
+	}
+
+	return &Events{
+		db: db,
+		cache: newCache[flow.Identifier, []flow.Event](collector, metrics.ResourceEvents,
+			withStore(noopStore[flow.Identifier, []flow.Event]),
+			withRetrieve(retrieve)),
+	}
+}
+
+// BatchStore stores events keyed by a blockID in provided batch
+// No errors are expected during normal operation, but it may return generic error
+// if pebble fails to process request
+func (e *Events) BatchStore(blockID flow.Identifier, blockEvents []flow.EventsList, batch storage.BatchStorage) error {
+	writeBatch := batch.GetWriter()
+	writer := operation.NewBatchWriter(writeBatch)
+
+	// pre-allocating and indexing slice is faster than appending
+	sliceSize := 0
+	for _, b := range blockEvents {
+		sliceSize += len(b)
+	}
+
+	combinedEvents := make([]flow.Event, sliceSize)
+
+	eventIndex := 0
+
+	for _, events := range blockEvents {
+		for _, event := range events {
+			err := operation.InsertEvent(blockID, event)(writer)
+			if err != nil {
+				return fmt.Errorf("cannot batch insert event: %w", err)
+			}
+			combinedEvents[eventIndex] = event
+			eventIndex++
+		}
+	}
+
+	callback := func() {
+		e.cache.Insert(blockID, combinedEvents)
+	}
+	batch.OnSucceed(callback)
+	return nil
+}
+
+// Store will store events for the given block ID
+func (e *Events) Store(blockID flow.Identifier, blockEvents []flow.EventsList) error {
+	batch := NewBatch(e.db)
+
+	err := e.BatchStore(blockID, blockEvents, batch)
+	if err != nil {
+		return err
+	}
+
+	err = batch.Flush()
+	if err != nil {
+		return fmt.Errorf("cannot flush batch: %w", err)
+	}
+
+	return nil
+}
+
+// ByBlockID returns the events for the given block ID
+// Note: This method will return an empty slice and no error if no entries for the blockID are found
+func (e *Events) ByBlockID(blockID flow.Identifier) ([]flow.Event, error) {
+	val, err := e.cache.Get(blockID)(e.db)
+	if err != nil {
+		return nil, err
+	}
+	return val, nil
+}
+
+// ByBlockIDTransactionID returns the events for the given block ID and transaction ID
+// Note: This method will return an empty slice and no error if no entries for the blockID are found
+func (e *Events) ByBlockIDTransactionID(blockID flow.Identifier, txID flow.Identifier) ([]flow.Event, error) {
+	events, err := e.ByBlockID(blockID)
+	if err != nil {
+		return nil, handleError(err, flow.Event{})
+	}
+
+	var matched []flow.Event
+	for _, event := range events {
+		if event.TransactionID == txID {
+			matched = append(matched, event)
+		}
+	}
+	return matched, nil
+}
+
+// ByBlockIDTransactionIndex returns the events for the given block ID and transaction index
+// Note: This method will return an empty slice and no error if no entries for the blockID are found
+func (e *Events) ByBlockIDTransactionIndex(blockID flow.Identifier, txIndex uint32) ([]flow.Event, error) {
+	events, err := e.ByBlockID(blockID)
+	if err != nil {
+		return nil, handleError(err, flow.Event{})
+	}
+
+	var matched []flow.Event
+	for _, event := range events {
+		if event.TransactionIndex == txIndex {
+			matched = append(matched, event)
+		}
+	}
+	return matched, nil
+}
+
+// ByBlockIDEventType returns the events for the given block ID and event type
+// Note: This method will return an empty slice and no error if no entries for the blockID are found
+func (e *Events) ByBlockIDEventType(blockID flow.Identifier, eventType flow.EventType) ([]flow.Event, error) {
+	events, err := e.ByBlockID(blockID)
+	if err != nil {
+		return nil, handleError(err, flow.Event{})
+	}
+
+	var matched []flow.Event
+	for _, event := range events {
+		if event.Type == eventType {
+			matched = append(matched, event)
+		}
+	}
+	return matched, nil
+}
+
+// RemoveByBlockID removes events by block ID
+func (e *Events) RemoveByBlockID(blockID flow.Identifier) error {
+	return operation.RemoveEventsByBlockID(blockID)(e.db)
+}
+
+// BatchRemoveByBlockID removes events keyed by a blockID in provided batch
+// No errors are expected during normal operation, even if no entries are matched.
+// If pebble unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
+func (e *Events) BatchRemoveByBlockID(blockID flow.Identifier, batch storage.BatchStorage) error {
+	writeBatch := batch.GetWriter()
+	return operation.RemoveEventsByBlockID(blockID)(operation.NewBatchWriter(writeBatch))
+}
+
+type ServiceEvents struct {
+	db    *pebble.DB
+	cache *Cache[flow.Identifier, []flow.Event]
+}
+
+func NewServiceEvents(collector module.CacheMetrics, db *pebble.DB) *ServiceEvents {
+	retrieve := func(blockID flow.Identifier) func(tx pebble.Reader) ([]flow.Event, error) {
+		var events []flow.Event
+		return func(tx pebble.Reader) ([]flow.Event, error) {
+			err := operation.LookupServiceEventsByBlockID(blockID, &events)(tx)
+			return events, handleError(err, flow.Event{})
+		}
+	}
+
+	return &ServiceEvents{
+		db: db,
+		cache: newCache[flow.Identifier, []flow.Event](collector, metrics.ResourceEvents,
+			withStore(noopStore[flow.Identifier, []flow.Event]),
+			withRetrieve(retrieve)),
+	}
+}
+
+// BatchStore stores service events keyed by a blockID in provided batch
+// No errors are expected during normal operation, even if no entries are matched.
+// If pebble unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
+func (e *ServiceEvents) BatchStore(blockID flow.Identifier, events []flow.Event, batch storage.BatchStorage) error {
+	writeBatch := batch.GetWriter()
+	writer := operation.NewBatchWriter(writeBatch)
+	for _, event := range events {
+		err := operation.InsertServiceEvent(blockID, event)(writer)
+		if err != nil {
+			return fmt.Errorf("cannot batch insert service event: %w", err)
+		}
+	}
+
+	callback := func() {
+		e.cache.Insert(blockID, events)
+	}
+	batch.OnSucceed(callback)
+	return nil
+}
+
+// ByBlockID returns the events for the given block ID
+func (e *ServiceEvents) ByBlockID(blockID flow.Identifier) ([]flow.Event, error) {
+	val, err := e.cache.Get(blockID)(e.db)
+	if err != nil {
+		return nil, err
+	}
+	return val, nil
+}
+
+// RemoveByBlockID removes service events by block ID
+func (e *ServiceEvents) RemoveByBlockID(blockID flow.Identifier) error {
+	return operation.RemoveServiceEventsByBlockID(blockID)(e.db)
+}
+
+// BatchRemoveByBlockID removes service events keyed by a blockID in provided batch
+// No errors are expected during normal operation, even if no entries are matched.
+// If pebble unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
+func (e *ServiceEvents) BatchRemoveByBlockID(blockID flow.Identifier, batch storage.BatchStorage) error {
+	writeBatch := batch.GetWriter()
+	return operation.RemoveServiceEventsByBlockID(blockID)(operation.NewBatchWriter(writeBatch))
+}

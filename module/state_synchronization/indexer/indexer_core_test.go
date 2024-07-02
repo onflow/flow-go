@@ -183,7 +183,7 @@ func (i *indexCoreTest) useDefaultTransactionResults() *indexCoreTest {
 }
 
 func (i *indexCoreTest) initIndexer() *indexCoreTest {
-	db, dbDir := unittest.TempBadgerDB(i.t)
+	db, dbDir := unittest.TempPebbleDB(i.t)
 	i.t.Cleanup(func() {
 		require.NoError(i.t, db.Close())
 		require.NoError(i.t, os.RemoveAll(dbDir))
@@ -679,7 +679,7 @@ func TestIndexerIntegration_StoreAndGet(t *testing.T) {
 	regKey := "code"
 	registerID := flow.NewRegisterID(regOwnerAddress, regKey)
 
-	db, dbDir := unittest.TempBadgerDB(t)
+	db, dbDir := unittest.TempPebbleDB(t)
 	t.Cleanup(func() {
 		require.NoError(t, os.RemoveAll(dbDir))
 	})

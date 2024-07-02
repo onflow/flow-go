@@ -21,7 +21,7 @@ import (
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/network/stub"
 	"github.com/onflow/flow-go/state/cluster"
-	bcluster "github.com/onflow/flow-go/state/cluster/badger"
+	bcluster "github.com/onflow/flow-go/state/cluster/pebble"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/utils/unittest"

@@ -24,7 +24,6 @@ import (
 	read_hotstuff "github.com/onflow/flow-go/cmd/util/cmd/read-hotstuff/cmd"
 	read_protocol_state "github.com/onflow/flow-go/cmd/util/cmd/read-protocol-state/cmd"
 	index_er "github.com/onflow/flow-go/cmd/util/cmd/reindex/cmd"
-	rollback_executed_height "github.com/onflow/flow-go/cmd/util/cmd/rollback-executed-height/cmd"
 	"github.com/onflow/flow-go/cmd/util/cmd/snapshot"
 	truncate_database "github.com/onflow/flow-go/cmd/util/cmd/truncate-database"
 	update_commitment "github.com/onflow/flow-go/cmd/util/cmd/update-commitment"
@@ -76,7 +75,6 @@ func addCommands() {
 	rootCmd.AddCommand(epochs.RootCmd)
 	rootCmd.AddCommand(edbs.RootCmd)
 	rootCmd.AddCommand(index_er.RootCmd)
-	rootCmd.AddCommand(rollback_executed_height.Cmd)
 	rootCmd.AddCommand(read_execution_state.Cmd)
 	rootCmd.AddCommand(snapshot.Cmd)
 	rootCmd.AddCommand(export_json_transactions.Cmd)

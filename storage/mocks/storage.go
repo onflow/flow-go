@@ -124,18 +124,18 @@ func (mr *MockBlocksMockRecorder) InsertLastFullBlockHeightIfNotExists(arg0 inte
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "InsertLastFullBlockHeightIfNotExists", reflect.TypeOf((*MockBlocks)(nil).InsertLastFullBlockHeightIfNotExists), arg0)
 }
 
-// Store mocks base method.
-func (m *MockBlocks) Store(arg0 *flow.Block) error {
+// StorePebble mocks base method.
+func (m *MockBlocks) StorePebble(arg0 *flow.Block) func(storage.PebbleReaderBatchWriter) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Store", arg0)
-	ret0, _ := ret[0].(error)
+	ret := m.ctrl.Call(m, "StorePebble", arg0)
+	ret0, _ := ret[0].(func(storage.PebbleReaderBatchWriter) error)
 	return ret0
 }
 
-// Store indicates an expected call of Store.
-func (mr *MockBlocksMockRecorder) Store(arg0 interface{}) *gomock.Call {
+// StorePebble indicates an expected call of StorePebble.
+func (mr *MockBlocksMockRecorder) StorePebble(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Store", reflect.TypeOf((*MockBlocks)(nil).Store), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StorePebble", reflect.TypeOf((*MockBlocks)(nil).StorePebble), arg0)
 }
 
 // StoreTx mocks base method.
@@ -314,20 +314,6 @@ func (m *MockPayloads) ByBlockID(arg0 flow.Identifier) (*flow.Payload, error) {
 func (mr *MockPayloadsMockRecorder) ByBlockID(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ByBlockID", reflect.TypeOf((*MockPayloads)(nil).ByBlockID), arg0)
-}
-
-// Store mocks base method.
-func (m *MockPayloads) Store(arg0 flow.Identifier, arg1 *flow.Payload) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Store", arg0, arg1)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// Store indicates an expected call of Store.
-func (mr *MockPayloadsMockRecorder) Store(arg0, arg1 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Store", reflect.TypeOf((*MockPayloads)(nil).Store), arg0, arg1)
 }
 
 // MockCollections is a mock of Collections interface.
@@ -518,20 +504,6 @@ func (m *MockCommits) ByBlockID(arg0 flow.Identifier) (flow.StateCommitment, err
 func (mr *MockCommitsMockRecorder) ByBlockID(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ByBlockID", reflect.TypeOf((*MockCommits)(nil).ByBlockID), arg0)
-}
-
-// Store mocks base method.
-func (m *MockCommits) Store(arg0 flow.Identifier, arg1 flow.StateCommitment) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Store", arg0, arg1)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// Store indicates an expected call of Store.
-func (mr *MockCommitsMockRecorder) Store(arg0, arg1 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Store", reflect.TypeOf((*MockCommits)(nil).Store), arg0, arg1)
 }
 
 // MockEvents is a mock of Events interface.

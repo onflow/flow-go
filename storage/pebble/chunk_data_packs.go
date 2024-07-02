@@ -136,7 +136,7 @@ func (ch *ChunkDataPacks) batchStore(c *flow.ChunkDataPack, batch *Batch) error 
 	batch.OnSucceed(func() {
 		ch.byChunkIDCache.Insert(sc.ChunkID, sc)
 	})
-	err := operation.InsertChunkDataPack(sc)(writer)
+	err := operation.InsertChunkDataPack(sc)(operation.NewBatchWriter(writer))
 	if err != nil {
 		return fmt.Errorf("failed to store chunk data pack: %w", err)
 	}
