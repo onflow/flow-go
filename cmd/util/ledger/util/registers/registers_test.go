@@ -1,6 +1,7 @@
 package registers
 
 import (
+	"math/rand"
 	"testing"
 
 	"github.com/rs/zerolog"
@@ -483,4 +484,31 @@ func TestApplyChanges_AccountRegisters(t *testing.T) {
 		},
 		newPayloads,
 	)
+}
+
+func BenchmarkAccountRegisters(b *testing.B) {
+
+	r := rand.New(rand.NewSource(0))
+
+	randBytes := func(maxLength int) []byte {
+		length := r.Intn(maxLength)
+		bytes := make([]byte, length)
+		_, _ = r.Read(bytes)
+		return bytes
+	}
+
+	const owner = "\x01\x00\x00\x00\x00\x00\x00\x00"
+
+	accountRegisters := NewAccountRegisters(owner)
+
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+
+		key := randBytes(64)
+		value := randBytes(2048)
+
+		_ = accountRegisters.Set(owner, string(key), value)
+		_, _ = accountRegisters.Get(owner, string(key))
+	}
 }

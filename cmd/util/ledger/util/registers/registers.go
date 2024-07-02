@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/cockroachdb/swiss"
 	"github.com/onflow/atree"
 	"github.com/rs/zerolog"
 
@@ -66,7 +67,8 @@ func (b *ByAccount) Get(owner string, key string) ([]byte, error) {
 	if !ok {
 		return nil, nil
 	}
-	return accountRegisters.registers[key], nil
+	value, _ := accountRegisters.registers.Get(key)
+	return value, nil
 }
 
 func (b *ByAccount) Set(owner string, key string, value []byte) error {
@@ -182,13 +184,13 @@ func (b *ByAccount) Count() int {
 // AccountRegisters represents the registers of an account
 type AccountRegisters struct {
 	owner     string
-	registers map[string][]byte
+	registers *swiss.Map[string, []byte]
 }
 
 func NewAccountRegisters(owner string) *AccountRegisters {
 	return &AccountRegisters{
 		owner:     owner,
-		registers: make(map[string][]byte),
+		registers: swiss.New[string, []byte](0),
 	}
 }
 
@@ -198,7 +200,8 @@ func (a *AccountRegisters) Get(owner string, key string) ([]byte, error) {
 	if owner != a.owner {
 		return nil, fmt.Errorf("owner mismatch: expected %s, got %s", a.owner, owner)
 	}
-	return a.registers[key], nil
+	value, _ := a.registers.Get(key)
+	return value, nil
 }
 
 func (a *AccountRegisters) Set(owner string, key string, value []byte) error {
@@ -211,24 +214,23 @@ func (a *AccountRegisters) Set(owner string, key string, value []byte) error {
 
 func (a *AccountRegisters) uncheckedSet(key string, value []byte) {
 	if len(value) == 0 {
-		delete(a.registers, key)
+		a.registers.Delete(key)
 	} else {
-		a.registers[key] = value
+		a.registers.Put(key, value)
 	}
 }
 
 func (a *AccountRegisters) ForEach(f ForEachCallback) error {
-	for key, value := range a.registers {
-		err := f(a.owner, key, value)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
+	var err error
+	a.registers.All(func(key string, value []byte) bool {
+		err = f(a.owner, key, value)
+		return err == nil
+	})
+	return err
 }
 
 func (a *AccountRegisters) Count() int {
-	return len(a.registers)
+	return a.registers.Len()
 }
 
 func (a *AccountRegisters) Owner() string {
@@ -245,7 +247,7 @@ func (a *AccountRegisters) Payloads() []*ledger.Payload {
 // The payloads slice must have the same size as the number of registers.
 func (a *AccountRegisters) insertIntoPayloads(payloads []*ledger.Payload) {
 	payloadCount := len(payloads)
-	registerCount := len(a.registers)
+	registerCount := a.registers.Len()
 	if payloadCount != registerCount {
 		panic(fmt.Errorf(
 			"given payloads slice has wrong size: got %d, expected %d",
@@ -255,7 +257,7 @@ func (a *AccountRegisters) insertIntoPayloads(payloads []*ledger.Payload) {
 	}
 
 	index := 0
-	for key, value := range a.registers {
+	a.registers.All(func(key string, value []byte) bool {
 		if len(value) == 0 {
 			panic(fmt.Errorf("unexpected empty register value: %x, %x", a.owner, key))
 		}
@@ -267,29 +269,33 @@ func (a *AccountRegisters) insertIntoPayloads(payloads []*ledger.Payload) {
 		payload := ledger.NewPayload(ledgerKey, value)
 		payloads[index] = payload
 		index++
-	}
+
+		return true
+	})
 }
 
 // Merge merges the registers from the other AccountRegisters into this AccountRegisters.
 func (a *AccountRegisters) Merge(other *AccountRegisters) error {
-	for key, value := range other.registers {
-		_, ok := a.registers[key]
+	var err error
+	other.registers.All(func(key string, value []byte) bool {
+		_, ok := a.registers.Get(key)
 		if ok {
-			return fmt.Errorf("key already exists: %s", key)
+			err = fmt.Errorf("key already exists: %s", key)
+			return false
 		}
-		a.registers[key] = value
-	}
-	return nil
+		a.registers.Put(key, value)
+		return true
+	})
+	return err
 }
 
 func (a *AccountRegisters) ForEachKey(f func(key string) error) error {
-	for key := range a.registers {
-		err := f(key)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
+	var err error
+	a.registers.All(func(key string, _ []byte) bool {
+		err = f(key)
+		return err == nil
+	})
+	return err
 }
 
 func NewAccountRegistersFromPayloads(owner string, payloads []*ledger.Payload) (*AccountRegisters, error) {
