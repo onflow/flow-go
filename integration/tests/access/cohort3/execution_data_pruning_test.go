@@ -143,55 +143,8 @@ func (s *ExecutionDataPruningSuite) TestHappyPath() {
 	accessNode := s.net.ContainerByName(s.accessNodeName)
 	observerNode := s.net.ContainerByName(s.observerNodeName)
 
-	// creating grpc client
-	grpcClient, err := s.getGRPCClient(observerNode.Addr(testnet.GRPCPort))
-	s.Require().NoError(err)
-
-	// creating execution data api client
-	client, err := getClient(fmt.Sprintf("localhost:%s", observerNode.Port(testnet.ExecutionStatePort)))
-	s.Require().NoError(err)
-
-	// pause until the observer node start indexing blocks
-	s.Require().Eventually(func() bool {
-		_, err := grpcClient.GetEventsForHeightRange(s.ctx, &accessproto.GetEventsForHeightRangeRequest{
-			Type:                 sdk.EventAccountCreated,
-			StartHeight:          1,
-			EndHeight:            1,
-			EventEncodingVersion: entities.EventEncodingVersion_CCF_V0,
-		})
-
-		return err == nil
-	}, 2*time.Minute, 10*time.Second)
-
-	// subscribe on events till waitingBlockHeight to make sure that block indexed till that height and prune
-	// pruned execution data at least once
 	waitingBlockHeight := uint64(200)
-
-	stream, err := client.SubscribeEventsFromStartHeight(s.ctx, &executiondata.SubscribeEventsFromStartHeightRequest{
-		EventEncodingVersion: entities.EventEncodingVersion_CCF_V0,
-		Filter:               &executiondata.EventFilter{},
-		HeartbeatInterval:    1,
-		StartBlockHeight:     0,
-	})
-	s.Require().NoError(err)
-	eventsChan, errChan, err := SubscribeHandler(s.ctx, stream.Recv, eventsResponseHandler)
-	s.Require().NoError(err)
-
-	var canCheckResults bool
-	for {
-		select {
-		case err := <-errChan:
-			s.Require().NoErrorf(err, "unexpected %s error", s.observerNodeName)
-		case event := <-eventsChan:
-			if event.Height > waitingBlockHeight {
-				canCheckResults = true
-			}
-		}
-
-		if canCheckResults {
-			break
-		}
-	}
+	s.waitUntilExecutionDataForBlockIndexed(waitingBlockHeight)
 	s.net.StopContainers()
 
 	metrics := metrics.NewNoopCollector()
@@ -215,13 +168,72 @@ func (s *ExecutionDataPruningSuite) TestHappyPath() {
 
 	onResults := storage.NewExecutionResults(metrics, onDB)
 
-	// checking execution results from 1 block
-	startBlockHeight := uint64(1)
+	s.checkResults(anHeaders, anResults, onResults, anEds, onEds)
+}
 
+// waitUntilExecutionDataForBlockIndexed waits until the execution data for the specified block height is indexed.
+func (s *ExecutionDataPruningSuite) waitUntilExecutionDataForBlockIndexed(waitingBlockHeight uint64) {
+	observerNode := s.net.ContainerByName(s.observerNodeName)
+
+	grpcClient, err := s.getGRPCClient(observerNode.Addr(testnet.GRPCPort))
+	s.Require().NoError(err)
+
+	// creating execution data api client
+	client, err := getClient(fmt.Sprintf("localhost:%s", observerNode.Port(testnet.ExecutionStatePort)))
+	s.Require().NoError(err)
+
+	// pause until the observer node start indexing blocks
+	s.Require().Eventually(func() bool {
+		_, err := grpcClient.GetEventsForHeightRange(s.ctx, &accessproto.GetEventsForHeightRangeRequest{
+			Type:                 sdk.EventAccountCreated,
+			StartHeight:          1,
+			EndHeight:            1,
+			EventEncodingVersion: entities.EventEncodingVersion_CCF_V0,
+		})
+
+		return err == nil
+	}, 2*time.Minute, 10*time.Second)
+
+	// subscribe on events till waitingBlockHeight to make sure that execution data for block indexed till waitingBlockHeight and pruner
+	// pruned execution data at least once
+	// SubscribeEventsFromStartHeight used as subscription here because we need to make sure that execution data are already indexed
+	stream, err := client.SubscribeEventsFromStartHeight(s.ctx, &executiondata.SubscribeEventsFromStartHeightRequest{
+		EventEncodingVersion: entities.EventEncodingVersion_CCF_V0,
+		Filter:               &executiondata.EventFilter{},
+		HeartbeatInterval:    1,
+		StartBlockHeight:     0,
+	})
+	s.Require().NoError(err)
+	eventsChan, errChan, err := SubscribeHandler(s.ctx, stream.Recv, eventsResponseHandler)
+	s.Require().NoError(err)
+
+	for {
+		select {
+		case err := <-errChan:
+			s.Require().NoErrorf(err, "unexpected %s error", s.observerNodeName)
+		case event := <-eventsChan:
+			if event.Height > waitingBlockHeight {
+				return
+			}
+		}
+	}
+}
+
+// checkResults checks the results of execution data pruning to ensure correctness.
+func (s *ExecutionDataPruningSuite) checkResults(
+	headers *storage.Headers,
+	anResults *storage.ExecutionResults,
+	onResults *storage.ExecutionResults,
+	anEds execution_data.ExecutionDataStore,
+	onEds execution_data.ExecutionDataStore,
+) {
 	// Loop through blocks and verify the execution data was pruned correctly
 	// execution data till height equal threshold + 1 should be pruned
+
+	// checking execution results from 1 block
+	startBlockHeight := uint64(1)
 	for i := startBlockHeight; i <= s.threshold+1; i++ {
-		header, err := anHeaders.ByHeight(i)
+		header, err := headers.ByHeight(i)
 		require.NoError(s.T(), err, "%s: could not get header", s.accessNodeName)
 
 		result, err := anResults.ByBlockID(header.ID())
