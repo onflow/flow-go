@@ -23,6 +23,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/crypto"
+	"github.com/onflow/flow-go/fvm/environment"
 	envMock "github.com/onflow/flow-go/fvm/environment/mock"
 	"github.com/onflow/flow-go/fvm/evm"
 	"github.com/onflow/flow-go/fvm/evm/emulator"
@@ -2176,10 +2177,9 @@ func TestCadenceArch(t *testing.T) {
 				require.NoError(t, err)
 				require.NoError(t, output.Err)
 
-				const sourceLen = 32
-				res := make([]byte, sourceLen)
+				res := make([]byte, environment.RandomSourceHistoryLength)
 				vals := output.Value.(cadence.Array).Values
-				require.Len(t, vals, sourceLen)
+				require.Len(t, vals, environment.RandomSourceHistoryLength)
 
 				for i := range res {
 					res[i] = byte(vals[i].(cadence.UInt8))
