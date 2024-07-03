@@ -19,13 +19,13 @@ require (
 	github.com/ipfs/go-datastore v0.6.0
 	github.com/ipfs/go-ds-badger2 v0.1.3
 	github.com/libp2p/go-libp2p v0.32.2
-	github.com/onflow/cadence v1.0.0-preview.34
+	github.com/onflow/cadence v1.0.0-preview.35
 	github.com/onflow/crypto v0.25.1
 	github.com/onflow/flow-core-contracts/lib/go/contracts v1.3.0
 	github.com/onflow/flow-core-contracts/lib/go/templates v1.3.0
 	github.com/onflow/flow-emulator v1.0.0-preview.24
 	github.com/onflow/flow-go v0.35.14-crescendo-preview.27
-	github.com/onflow/flow-go-sdk v1.0.0-preview.36
+	github.com/onflow/flow-go-sdk v1.0.0-preview.37
 	github.com/onflow/flow-go/insecure v0.0.0-00010101000000-000000000000
 	github.com/onflow/flow/protobuf/go/flow v0.4.4
 	github.com/onflow/go-ethereum v1.13.4
@@ -247,7 +247,7 @@ require (
 	github.com/onflow/flow-ft/lib/go/templates v1.0.0 // indirect
 	github.com/onflow/flow-nft/lib/go/contracts v1.2.1 // indirect
 	github.com/onflow/flow-nft/lib/go/templates v1.2.0 // indirect
-	github.com/onflow/sdks v0.5.1-0.20230912225508-b35402f12bba // indirect
+	github.com/onflow/sdks v0.6.0-preview.1 // indirect
 	github.com/onflow/wal v1.0.2 // indirect
 	github.com/onsi/ginkgo/v2 v2.13.2 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
