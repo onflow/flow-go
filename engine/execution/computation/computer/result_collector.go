@@ -324,6 +324,11 @@ func (collector *resultCollector) handleTransactionExecutionMetrics(
 	collector.metrics.ExecutionTransactionExecuted(
 		timeSpent,
 		transactionExecutionStats,
+		module.TransactionExecutionResultInfo{
+			TransactionID: txn.ID,
+			BlockID:       txn.blockId,
+			BlockHeight:   txn.blockHeight,
+		},
 	)
 
 	collector.currentCollectionStats.Add(transactionExecutionStats)
