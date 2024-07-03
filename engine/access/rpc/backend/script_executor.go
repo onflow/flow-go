@@ -2,6 +2,7 @@ package backend
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/rs/zerolog"
@@ -13,6 +14,9 @@ import (
 	"github.com/onflow/flow-go/module/state_synchronization"
 	"github.com/onflow/flow-go/storage"
 )
+
+// ErrIncompatibleNodeVersion indicates that node version is incompatible with the block version
+var ErrIncompatibleNodeVersion = errors.New("node version is incompatible with block version")
 
 type ScriptExecutor struct {
 	log zerolog.Logger
@@ -86,20 +90,8 @@ func (s *ScriptExecutor) Initialize(indexReporter state_synchronization.IndexRep
 //   - storage.ErrHeightNotIndexed if the data for the block height is not available. this could be because
 //     the height is not within the index block range, or the index is not ready.
 func (s *ScriptExecutor) ExecuteAtBlockHeight(ctx context.Context, script []byte, arguments [][]byte, height uint64) ([]byte, error) {
-	if err := s.checkDataAvailable(height); err != nil {
+	if err := s.checkHeight(height); err != nil {
 		return nil, err
-	}
-
-	// Version control feature could be disabled by cmd argument "--version-control-enabled". In such a case, ignore related functionality.
-	if s.versionControl != nil {
-		compatible, err := s.versionControl.CompatibleAtBlock(height)
-		if err != nil {
-			return nil, err
-		}
-
-		if !compatible {
-			return nil, fmt.Errorf("node version is incompatible at block height %d", height)
-		}
 	}
 
 	return s.scriptExecutor.ExecuteAtBlockHeight(ctx, script, arguments, height)
@@ -112,7 +104,7 @@ func (s *ScriptExecutor) ExecuteAtBlockHeight(ctx context.Context, script []byte
 //   - storage.ErrHeightNotIndexed if the data for the block height is not available. this could be because
 //     the height is not within the index block range, or the index is not ready.
 func (s *ScriptExecutor) GetAccountAtBlockHeight(ctx context.Context, address flow.Address, height uint64) (*flow.Account, error) {
-	if err := s.checkDataAvailable(height); err != nil {
+	if err := s.checkHeight(height); err != nil {
 		return nil, err
 	}
 
@@ -124,7 +116,7 @@ func (s *ScriptExecutor) GetAccountAtBlockHeight(ctx context.Context, address fl
 // - Script execution related errors
 // - storage.ErrHeightNotIndexed if the data for the block height is not available
 func (s *ScriptExecutor) GetAccountBalance(ctx context.Context, address flow.Address, height uint64) (uint64, error) {
-	if err := s.checkDataAvailable(height); err != nil {
+	if err := s.checkHeight(height); err != nil {
 		return 0, err
 	}
 
@@ -136,16 +128,28 @@ func (s *ScriptExecutor) GetAccountBalance(ctx context.Context, address flow.Add
 // - Script execution related errors
 // - storage.ErrHeightNotIndexed if the data for the block height is not available
 func (s *ScriptExecutor) GetAccountKeys(ctx context.Context, address flow.Address, height uint64) ([]flow.AccountPublicKey, error) {
-	if err := s.checkDataAvailable(height); err != nil {
+	if err := s.checkHeight(height); err != nil {
 		return nil, err
 	}
 
 	return s.scriptExecutor.GetAccountKeys(ctx, address, height)
 }
 
-func (s *ScriptExecutor) checkDataAvailable(height uint64) error {
+func (s *ScriptExecutor) checkHeight(height uint64) error {
 	if !s.initialized.Load() {
 		return fmt.Errorf("%w: script executor not initialized", storage.ErrHeightNotIndexed)
+	}
+
+	// Version control feature could be disabled. In such a case, ignore related functionality.
+	if s.versionControl != nil {
+		compatible, err := s.versionControl.CompatibleAtBlock(height)
+		if err != nil {
+			return err
+		}
+
+		if !compatible {
+			return ErrIncompatibleNodeVersion
+		}
 	}
 
 	highestHeight, err := s.indexReporter.HighestIndexedHeight()

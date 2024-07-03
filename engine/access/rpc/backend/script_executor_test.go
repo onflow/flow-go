@@ -2,34 +2,36 @@ package backend
 
 import (
 	"context"
+	"math"
+	"testing"
+	"time"
+
 	"github.com/coreos/go-semver/semver"
-	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/fvm/storage/snapshot"
-	"github.com/onflow/flow-go/module/irrecoverable"
-	storageMock "github.com/onflow/flow-go/storage/mock"
-	pebbleStorage "github.com/onflow/flow-go/storage/pebble"
 	"github.com/rs/zerolog"
 	testifyMock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	"math"
-	"testing"
-	"time"
 
 	"github.com/onflow/flow-go/engine/access/index"
 	"github.com/onflow/flow-go/engine/common/version"
 	"github.com/onflow/flow-go/engine/execution/computation/query"
 	"github.com/onflow/flow-go/engine/execution/computation/query/mock"
 	"github.com/onflow/flow-go/engine/execution/testutil"
+	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/storage/derived"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/execution"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/state_synchronization/indexer"
 	syncmock "github.com/onflow/flow-go/module/state_synchronization/mock"
 	synctest "github.com/onflow/flow-go/module/state_synchronization/requester/unittest"
 	"github.com/onflow/flow-go/storage"
+	storageMock "github.com/onflow/flow-go/storage/mock"
+	pebbleStorage "github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/utils/unittest/mocks"
 )
 
 type ScriptExecutorSuite struct {
@@ -95,7 +97,6 @@ func (s *ScriptExecutorSuite) SetupTest() {
 	blockchain := unittest.BlockchainFixture(10)
 	s.headers = newBlockHeadersStorage(blockchain)
 	s.height = blockchain[0].Header.Height
-	s.reporter.On("LowestIndexedHeight").Return(s.height, nil)
 
 	entropyProvider := testutil.EntropyProviderFixture(nil)
 	entropyBlock := mock.NewEntropyProviderPerBlock(s.T())
@@ -161,7 +162,8 @@ func (s *ScriptExecutorSuite) TestExecuteAtBlockHeight() {
 
 	s.Run("test scrypt execution without version control", func() {
 		scriptExec := NewScriptExecutor(s.log, nil, uint64(0), math.MaxUint64)
-		s.reporter.On("HighestIndexedHeight").Return(s.height+1, nil)
+		s.reporter.On("LowestIndexedHeight").Return(s.height, nil).Twice()
+		s.reporter.On("HighestIndexedHeight").Return(s.height+1, nil).Once()
 
 		err := scriptExec.Initialize(s.indexReporter, s.scripts)
 		s.Require().NoError(err)
@@ -172,28 +174,21 @@ func (s *ScriptExecutorSuite) TestExecuteAtBlockHeight() {
 		s.Assert().Equal(expectedResult, res)
 	})
 
-	s.Run("test scrypt execution with version control with compatible version", func() {
+	s.Run("test script execution with version control with compatible version", func() {
 		// Set up a mock version beacons storage.
 		versionBeacons := storageMock.NewVersionBeacons(s.T())
+		versionEvents := map[uint64]*flow.SealedVersionBeacon{
+			s.height: versionBeaconEvent(
+				s.T(),
+				s.height,
+				[]uint64{s.height},
+				[]string{"0.0.1"},
+			),
+		}
 		// Mock the Highest method to return a version beacon with a specific version.
 		versionBeacons.
 			On("Highest", testifyMock.AnythingOfType("uint64")).
-			Return(func(height uint64) (*flow.SealedVersionBeacon, error) {
-				if height == s.height {
-					return &flow.SealedVersionBeacon{
-						VersionBeacon: unittest.VersionBeaconFixture(
-							unittest.WithBoundaries(
-								flow.VersionBoundary{
-									BlockHeight: s.height,
-									Version:     "0.0.1",
-								}),
-						),
-						SealHeight: s.height,
-					}, nil
-				} else {
-					return nil, nil
-				}
-			}, nil)
+			Return(mocks.StorageMapGetter(versionEvents))
 
 		var err error
 		s.versionControl, err = version.NewVersionControl(
@@ -214,9 +209,6 @@ func (s *ScriptExecutorSuite) TestExecuteAtBlockHeight() {
 		// Ensure the component is ready before proceeding.
 		unittest.RequireComponentsReadyBefore(s.T(), 2*time.Second, s.versionControl)
 
-		// Wait for the asynchronous version controller initialization process.
-		time.Sleep(time.Second)
-
 		scriptExec := NewScriptExecutor(s.log, s.versionControl, uint64(0), math.MaxUint64)
 		s.reporter.On("HighestIndexedHeight").Return(s.height+1, nil)
 
@@ -229,34 +221,27 @@ func (s *ScriptExecutorSuite) TestExecuteAtBlockHeight() {
 		s.Assert().Equal(expectedResult, res)
 	})
 
-	s.Run("test scrypt execution with version control with compatible version", func() {
+	s.Run("test scrypt execution with version control with incompatible version", func() {
 		// Set up a mock version beacons storage.
 		versionBeacons := storageMock.NewVersionBeacons(s.T())
+		versionEvents := map[uint64]*flow.SealedVersionBeacon{
+			s.height: versionBeaconEvent(
+				s.T(),
+				s.height,
+				[]uint64{s.height},
+				[]string{"0.0.2"},
+			),
+		}
 		// Mock the Highest method to return a version beacon with a specific version.
 		versionBeacons.
 			On("Highest", testifyMock.AnythingOfType("uint64")).
-			Return(func(height uint64) (*flow.SealedVersionBeacon, error) {
-				if height == s.height {
-					return &flow.SealedVersionBeacon{
-						VersionBeacon: unittest.VersionBeaconFixture(
-							unittest.WithBoundaries(
-								flow.VersionBoundary{
-									BlockHeight: s.height,
-									Version:     "0.0.1",
-								}),
-						),
-						SealHeight: s.height,
-					}, nil
-				} else {
-					return nil, nil
-				}
-			}, nil)
+			Return(mocks.StorageMapGetter(versionEvents))
 
 		var err error
 		s.versionControl, err = version.NewVersionControl(
 			s.log,
 			versionBeacons,
-			semver.New("0.0.2"),
+			semver.New("0.0.1"),
 			s.height-1,
 			s.height,
 		)
@@ -269,10 +254,7 @@ func (s *ScriptExecutorSuite) TestExecuteAtBlockHeight() {
 		s.versionControl.Start(ictx)
 
 		// Ensure the component is ready before proceeding.
-		unittest.RequireComponentsReadyBefore(s.T(), 2*time.Second, s.versionControl)
-
-		// Wait for the asynchronous version controller initialization process.
-		time.Sleep(time.Second)
+		unittest.RequireComponentsReadyBefore(s.T(), 60*time.Second, s.versionControl)
 
 		scriptExec := NewScriptExecutor(s.log, s.versionControl, uint64(0), math.MaxUint64)
 		s.reporter.On("HighestIndexedHeight").Return(s.height+1, nil)
@@ -284,4 +266,23 @@ func (s *ScriptExecutorSuite) TestExecuteAtBlockHeight() {
 		s.Assert().Error(err)
 		s.Assert().Nil(res)
 	})
+}
+
+// versionBeaconEvent creates a SealedVersionBeacon for the given heights and versions.
+func versionBeaconEvent(t *testing.T, sealHeight uint64, heights []uint64, versions []string) *flow.SealedVersionBeacon {
+	require.Equal(t, len(heights), len(versions), "the heights array should be the same length as the versions array")
+	var vb []flow.VersionBoundary
+	for i := 0; i < len(heights); i++ {
+		vb = append(vb, flow.VersionBoundary{
+			BlockHeight: heights[i],
+			Version:     versions[i],
+		})
+	}
+
+	return &flow.SealedVersionBeacon{
+		VersionBeacon: unittest.VersionBeaconFixture(
+			unittest.WithBoundaries(vb...),
+		),
+		SealHeight: sealHeight,
+	}
 }
