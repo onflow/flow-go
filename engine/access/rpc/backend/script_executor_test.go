@@ -254,7 +254,7 @@ func (s *ScriptExecutorSuite) TestExecuteAtBlockHeight() {
 		s.versionControl.Start(ictx)
 
 		// Ensure the component is ready before proceeding.
-		unittest.RequireComponentsReadyBefore(s.T(), 60*time.Second, s.versionControl)
+		unittest.RequireComponentsReadyBefore(s.T(), 2*time.Second, s.versionControl)
 
 		scriptExec := NewScriptExecutor(s.log, s.versionControl, uint64(0), math.MaxUint64)
 		s.reporter.On("HighestIndexedHeight").Return(s.height+1, nil)
