@@ -849,6 +849,7 @@ func (ec *ExecutionCollector) ExecutionTransactionExecuted(
 	if stats.Failed {
 		ec.totalFailedTransactionsCounter.Inc()
 	}
+
 }
 
 // ExecutionChunkDataPackGenerated reports stats on chunk data pack generation
@@ -1080,4 +1081,45 @@ func (ec *ExecutionCollector) ExecutionComputationResultUploaded() {
 
 func (ec *ExecutionCollector) ExecutionComputationResultUploadRetried() {
 	ec.computationResultUploadRetriedCount.Inc()
+}
+
+type ExecutionCollectorWithTransactionCallback struct {
+	*ExecutionCollector
+	TransactionCallback func(
+		dur time.Duration,
+		stats module.TransactionExecutionResultStats,
+		info module.TransactionExecutionResultInfo,
+	)
+}
+
+func (ec *ExecutionCollector) WithTransactionCallback(
+	callback func(
+		time.Duration,
+		module.TransactionExecutionResultStats,
+		module.TransactionExecutionResultInfo,
+	),
+) *ExecutionCollectorWithTransactionCallback {
+	// if callback is nil, use a no-op callback
+	if callback == nil {
+		callback = func(
+			time.Duration,
+			module.TransactionExecutionResultStats,
+			module.TransactionExecutionResultInfo,
+		) {
+		}
+	}
+
+	return &ExecutionCollectorWithTransactionCallback{
+		ExecutionCollector:  ec,
+		TransactionCallback: callback,
+	}
+}
+
+func (ec *ExecutionCollectorWithTransactionCallback) ExecutionTransactionExecuted(
+	dur time.Duration,
+	stats module.TransactionExecutionResultStats,
+	info module.TransactionExecutionResultInfo,
+) {
+	ec.ExecutionCollector.ExecutionTransactionExecuted(dur, stats, info)
+	ec.TransactionCallback(dur, stats, info)
 }
