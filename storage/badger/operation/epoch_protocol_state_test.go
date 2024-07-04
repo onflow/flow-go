@@ -14,13 +14,13 @@ import (
 // TestInsertProtocolState tests if basic badger operations on EpochProtocolState work as expected.
 func TestInsertEpochProtocolState(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		expected := unittest.EpochStateFixture().EpochMinStateEntry
+		expected := unittest.EpochStateFixture().MinEpochStateEntry
 
 		epochProtocolStateEntryID := expected.ID()
 		err := db.Update(InsertEpochProtocolState(epochProtocolStateEntryID, expected))
 		require.Nil(t, err)
 
-		var actual flow.EpochMinStateEntry
+		var actual flow.MinEpochStateEntry
 		err = db.View(RetrieveEpochProtocolState(epochProtocolStateEntryID, &actual))
 		require.Nil(t, err)
 

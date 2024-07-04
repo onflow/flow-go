@@ -7,17 +7,17 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 )
 
-// EpochProtocolStateAdapter implements protocol.EpochProtocolState by wrapping a flow.EpochRichStateEntry.
+// EpochProtocolStateAdapter implements protocol.EpochProtocolState by wrapping a flow.RichEpochStateEntry.
 type EpochProtocolStateAdapter struct {
-	*flow.EpochRichStateEntry
+	*flow.RichEpochStateEntry
 	params protocol.GlobalParams
 }
 
 var _ protocol.EpochProtocolState = (*EpochProtocolStateAdapter)(nil)
 
-func NewEpochProtocolStateAdapter(entry *flow.EpochRichStateEntry, params protocol.GlobalParams) *EpochProtocolStateAdapter {
+func NewEpochProtocolStateAdapter(entry *flow.RichEpochStateEntry, params protocol.GlobalParams) *EpochProtocolStateAdapter {
 	return &EpochProtocolStateAdapter{
-		EpochRichStateEntry: entry,
+		RichEpochStateEntry: entry,
 		params:              params,
 	}
 }
@@ -63,13 +63,13 @@ func (s *EpochProtocolStateAdapter) DKG() (protocol.DKG, error) {
 // Entry Returns low-level protocol state entry that was used to initialize this object.
 // It shouldn't be used by high-level logic, it is useful for some cases such as bootstrapping.
 // Prefer using other methods to access protocol state.
-func (s *EpochProtocolStateAdapter) Entry() *flow.EpochRichStateEntry {
-	return s.EpochRichStateEntry.Copy()
+func (s *EpochProtocolStateAdapter) Entry() *flow.RichEpochStateEntry {
+	return s.RichEpochStateEntry.Copy()
 }
 
 // Identities returns the identity table as of the current block.
 func (s *EpochProtocolStateAdapter) Identities() flow.IdentityList {
-	return s.EpochRichStateEntry.CurrentEpochIdentityTable
+	return s.RichEpochStateEntry.CurrentEpochIdentityTable
 }
 
 // GlobalParams returns spork-scoped global network parameters.
@@ -82,7 +82,7 @@ func (s *EpochProtocolStateAdapter) GlobalParams() protocol.GlobalParams {
 // fallback mode is triggered.
 // TODO for 'leaving Epoch Fallback via special service event': at the moment, this is a one-way transition and requires a spork to recover - need to revisit for sporkless EFM recovery
 func (s *EpochProtocolStateAdapter) EpochFallbackTriggered() bool {
-	return s.EpochMinStateEntry.EpochFallbackTriggered
+	return s.MinEpochStateEntry.EpochFallbackTriggered
 }
 
 // PreviousEpochExists returns true if a previous epoch exists. This is true for all epoch

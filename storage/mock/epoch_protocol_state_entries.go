@@ -15,23 +15,23 @@ type EpochProtocolStateEntries struct {
 }
 
 // ByBlockID provides a mock function with given fields: blockID
-func (_m *EpochProtocolStateEntries) ByBlockID(blockID flow.Identifier) (*flow.EpochRichStateEntry, error) {
+func (_m *EpochProtocolStateEntries) ByBlockID(blockID flow.Identifier) (*flow.RichEpochStateEntry, error) {
 	ret := _m.Called(blockID)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ByBlockID")
 	}
 
-	var r0 *flow.EpochRichStateEntry
+	var r0 *flow.RichEpochStateEntry
 	var r1 error
-	if rf, ok := ret.Get(0).(func(flow.Identifier) (*flow.EpochRichStateEntry, error)); ok {
+	if rf, ok := ret.Get(0).(func(flow.Identifier) (*flow.RichEpochStateEntry, error)); ok {
 		return rf(blockID)
 	}
-	if rf, ok := ret.Get(0).(func(flow.Identifier) *flow.EpochRichStateEntry); ok {
+	if rf, ok := ret.Get(0).(func(flow.Identifier) *flow.RichEpochStateEntry); ok {
 		r0 = rf(blockID)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*flow.EpochRichStateEntry)
+			r0 = ret.Get(0).(*flow.RichEpochStateEntry)
 		}
 	}
 
@@ -45,23 +45,23 @@ func (_m *EpochProtocolStateEntries) ByBlockID(blockID flow.Identifier) (*flow.E
 }
 
 // ByID provides a mock function with given fields: id
-func (_m *EpochProtocolStateEntries) ByID(id flow.Identifier) (*flow.EpochRichStateEntry, error) {
+func (_m *EpochProtocolStateEntries) ByID(id flow.Identifier) (*flow.RichEpochStateEntry, error) {
 	ret := _m.Called(id)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ByID")
 	}
 
-	var r0 *flow.EpochRichStateEntry
+	var r0 *flow.RichEpochStateEntry
 	var r1 error
-	if rf, ok := ret.Get(0).(func(flow.Identifier) (*flow.EpochRichStateEntry, error)); ok {
+	if rf, ok := ret.Get(0).(func(flow.Identifier) (*flow.RichEpochStateEntry, error)); ok {
 		return rf(id)
 	}
-	if rf, ok := ret.Get(0).(func(flow.Identifier) *flow.EpochRichStateEntry); ok {
+	if rf, ok := ret.Get(0).(func(flow.Identifier) *flow.RichEpochStateEntry); ok {
 		r0 = rf(id)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*flow.EpochRichStateEntry)
+			r0 = ret.Get(0).(*flow.RichEpochStateEntry)
 		}
 	}
 
@@ -95,7 +95,7 @@ func (_m *EpochProtocolStateEntries) Index(blockID flow.Identifier, epochProtoco
 }
 
 // StoreTx provides a mock function with given fields: epochProtocolStateID, epochProtocolStateEntry
-func (_m *EpochProtocolStateEntries) StoreTx(epochProtocolStateID flow.Identifier, epochProtocolStateEntry *flow.EpochMinStateEntry) func(*transaction.Tx) error {
+func (_m *EpochProtocolStateEntries) StoreTx(epochProtocolStateID flow.Identifier, epochProtocolStateEntry *flow.MinEpochStateEntry) func(*transaction.Tx) error {
 	ret := _m.Called(epochProtocolStateID, epochProtocolStateEntry)
 
 	if len(ret) == 0 {
@@ -103,7 +103,7 @@ func (_m *EpochProtocolStateEntries) StoreTx(epochProtocolStateID flow.Identifie
 	}
 
 	var r0 func(*transaction.Tx) error
-	if rf, ok := ret.Get(0).(func(flow.Identifier, *flow.EpochMinStateEntry) func(*transaction.Tx) error); ok {
+	if rf, ok := ret.Get(0).(func(flow.Identifier, *flow.MinEpochStateEntry) func(*transaction.Tx) error); ok {
 		r0 = rf(epochProtocolStateID, epochProtocolStateEntry)
 	} else {
 		if ret.Get(0) != nil {

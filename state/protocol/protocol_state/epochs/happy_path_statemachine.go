@@ -32,7 +32,7 @@ var _ StateMachine = (*HappyPathStateMachine)(nil)
 // NewHappyPathStateMachine creates a new HappyPathStateMachine.
 // An exception is returned in case the `EpochFallbackTriggered` flag is set in the `parentState`. This means that
 // the protocol state evolution has reached an undefined state from the perspective of the happy path state machine.
-func NewHappyPathStateMachine(telemetry protocol_state.StateMachineTelemetryConsumer, view uint64, parentState *flow.EpochRichStateEntry) (*HappyPathStateMachine, error) {
+func NewHappyPathStateMachine(telemetry protocol_state.StateMachineTelemetryConsumer, view uint64, parentState *flow.RichEpochStateEntry) (*HappyPathStateMachine, error) {
 	if parentState.EpochFallbackTriggered {
 		return nil, irrecoverable.NewExceptionf("cannot create happy path protocol state machine at view (%d) for a parent state"+
 			"which is in Epoch Fallback Mode", view)
@@ -71,7 +71,7 @@ func (u *HappyPathStateMachine) ProcessEpochSetup(epochSetup *flow.EpochSetup) (
 		return false, err
 	}
 
-	// When observing setup event for subsequent epoch, construct the EpochStateContainer for `EpochMinStateEntry.NextEpoch`.
+	// When observing setup event for subsequent epoch, construct the EpochStateContainer for `MinEpochStateEntry.NextEpoch`.
 	// Context:
 	// Note that the `EpochStateContainer.ActiveIdentities` only contains the nodes that are *active* in the next epoch. Active means
 	// that these nodes are authorized to contribute to extending the chain. Nodes are listed in `ActiveIdentities` if and only if
@@ -147,7 +147,7 @@ func (u *HappyPathStateMachine) ProcessEpochCommit(epochCommit *flow.EpochCommit
 		u.telemetry.OnInvalidServiceEvent(epochCommit.ServiceEvent(), err)
 		return false, err
 	}
-	err := protocol.IsValidExtendingEpochCommit(epochCommit, u.state.EpochMinStateEntry, u.state.NextEpochSetup)
+	err := protocol.IsValidExtendingEpochCommit(epochCommit, u.state.MinEpochStateEntry, u.state.NextEpochSetup)
 	if err != nil {
 		u.telemetry.OnInvalidServiceEvent(epochCommit.ServiceEvent(), err)
 		return false, fmt.Errorf("invalid epoch commit event for epoch %d: %w", epochCommit.Counter, err)

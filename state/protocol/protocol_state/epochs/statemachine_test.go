@@ -35,7 +35,7 @@ type EpochStateMachineSuite struct {
 	commitsDB                       *storagemock.EpochCommits
 	globalParams                    *protocolmock.GlobalParams
 	parentState                     *protocolmock.KVStoreReader
-	parentEpochState                *flow.EpochRichStateEntry
+	parentEpochState                *flow.RichEpochStateEntry
 	mutator                         *protocol_statemock.KVStoreMutator
 	happyPathStateMachine           *mock.StateMachine
 	happyPathStateMachineFactory    *mock.StateMachineFactoryMethod
@@ -59,7 +59,7 @@ func (s *EpochStateMachineSuite) SetupTest() {
 	s.happyPathStateMachineFactory = mock.NewStateMachineFactoryMethod(s.T())
 	s.fallbackPathStateMachineFactory = mock.NewStateMachineFactoryMethod(s.T())
 
-	s.epochStateDB.On("ByBlockID", mocks.Anything).Return(func(_ flow.Identifier) *flow.EpochRichStateEntry {
+	s.epochStateDB.On("ByBlockID", mocks.Anything).Return(func(_ flow.Identifier) *flow.RichEpochStateEntry {
 		return s.parentEpochState
 	}, func(_ flow.Identifier) error {
 		return nil
@@ -148,7 +148,7 @@ func (s *EpochStateMachineSuite) TestBuild_HappyPath() {
 	storeTxDeferredUpdate.On("Execute", mocks.Anything).Return(nil).Once()
 
 	s.epochStateDB.On("Index", s.candidate.ID(), updatedStateID).Return(indexTxDeferredUpdate.Execute, nil).Once()
-	s.epochStateDB.On("StoreTx", updatedStateID, updatedState.EpochMinStateEntry).Return(storeTxDeferredUpdate.Execute, nil).Once()
+	s.epochStateDB.On("StoreTx", updatedStateID, updatedState.MinEpochStateEntry).Return(storeTxDeferredUpdate.Execute, nil).Once()
 	s.mutator.On("SetEpochStateID", updatedStateID).Return(nil).Once()
 
 	dbUpdates, err := s.stateMachine.Build()
@@ -515,7 +515,7 @@ func (s *EpochStateMachineSuite) TestEvolveState_EventsAreFiltered() {
 // TestEvolveStateTransitionToNextEpoch_WithInvalidStateTransition tests that EpochStateMachine transitions to the next epoch
 // if an invalid state transition has been detected in a block which triggers transitioning to the next epoch.
 // In such situation, we still need to enter the next epoch (because it has already been committed), but persist in the
-// state that we have entered Epoch fallback mode (`flow.EpochMinStateEntry.EpochFallbackTriggered` is set to `true`).
+// state that we have entered Epoch fallback mode (`flow.MinEpochStateEntry.EpochFallbackTriggered` is set to `true`).
 // This test ensures that we don't drop previously committed next epoch.
 func (s *EpochStateMachineSuite) TestEvolveStateTransitionToNextEpoch_WithInvalidStateTransition() {
 	unittest.SkipUnless(s.T(), unittest.TEST_TODO,
@@ -551,7 +551,7 @@ func (s *EpochStateMachineSuite) TestEvolveStateTransitionToNextEpoch_WithInvali
 	indexTxDeferredUpdate.On("Execute", mocks.Anything).Return(nil).Once()
 	s.epochStateDB.On("Index", s.candidate.ID(), mocks.Anything).Return(indexTxDeferredUpdate.Execute, nil).Once()
 
-	expectedEpochState := &flow.EpochMinStateEntry{
+	expectedEpochState := &flow.MinEpochStateEntry{
 		PreviousEpoch:          s.parentEpochState.CurrentEpoch.Copy(),
 		CurrentEpoch:           *s.parentEpochState.NextEpoch.Copy(),
 		NextEpoch:              nil,

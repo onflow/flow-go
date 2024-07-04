@@ -72,13 +72,13 @@ type SealingSegment struct {
 // per unique ProtocolStateID field within the segment's blocks.
 // Currently, although epoch data is conceptually a part of the protocol data entry associated
 // with each block, it is stored separately as a matter of technical debt (only a hash commitment
-// `EpochRichStateEntry.ID()` is stored within the `KVStoreEntry`.
+// `RichEpochStateEntry.ID()` is stored within the `KVStoreEntry`.
 //
 // Deprecated: avoid using this in new code; this is a temporary measure until epoch data is moved into protocol KV store
 // TODO: move epoch data into the KVStore as part of a future upgrade
 type ProtocolStateEntryWrapper struct {
 	KVStore    PSKeyValueStoreData
-	EpochEntry *EpochRichStateEntry
+	EpochEntry *RichEpochStateEntry
 }
 
 // Highest is the highest block in the sealing segment and the reference block from snapshot that was

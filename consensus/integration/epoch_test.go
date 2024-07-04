@@ -240,13 +240,13 @@ func withNextEpoch(
 		ActiveIdentities: flow.DynamicIdentityEntryListFromIdentities(nextEpochIdentities),
 	}
 	epochStateEntry, err := flow.NewEpochStateEntry(
-		epochRichProtocolState.EpochMinStateEntry,
+		epochRichProtocolState.MinEpochStateEntry,
 		epochRichProtocolState.PreviousEpochSetup, epochRichProtocolState.PreviousEpochCommit,
 		currEpochSetup, currEpochCommit,
 		nextEpochSetup, nextEpochCommit)
 	require.NoError(t, err)
 	// Re-construct epoch protocol state with modified events (constructs ActiveIdentity fields)
-	epochRichProtocolState, err = flow.NewEpochRichStateEntry(epochStateEntry)
+	epochRichProtocolState, err = flow.NewRichEpochStateEntry(epochStateEntry)
 	require.NoError(t, err)
 
 	// Store the modified epoch protocol state entry and corresponding KV store entry

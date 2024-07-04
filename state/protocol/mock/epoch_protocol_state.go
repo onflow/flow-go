@@ -75,19 +75,19 @@ func (_m *EpochProtocolState) DKG() (protocol.DKG, error) {
 }
 
 // Entry provides a mock function with given fields:
-func (_m *EpochProtocolState) Entry() *flow.EpochRichStateEntry {
+func (_m *EpochProtocolState) Entry() *flow.RichEpochStateEntry {
 	ret := _m.Called()
 
 	if len(ret) == 0 {
 		panic("no return value specified for Entry")
 	}
 
-	var r0 *flow.EpochRichStateEntry
-	if rf, ok := ret.Get(0).(func() *flow.EpochRichStateEntry); ok {
+	var r0 *flow.RichEpochStateEntry
+	if rf, ok := ret.Get(0).(func() *flow.RichEpochStateEntry); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*flow.EpochRichStateEntry)
+			r0 = ret.Get(0).(*flow.RichEpochStateEntry)
 		}
 	}
 

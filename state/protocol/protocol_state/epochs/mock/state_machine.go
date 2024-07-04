@@ -70,19 +70,19 @@ func (_m *StateMachine) EjectIdentity(nodeID flow.Identifier) error {
 }
 
 // ParentState provides a mock function with given fields:
-func (_m *StateMachine) ParentState() *flow.EpochRichStateEntry {
+func (_m *StateMachine) ParentState() *flow.RichEpochStateEntry {
 	ret := _m.Called()
 
 	if len(ret) == 0 {
 		panic("no return value specified for ParentState")
 	}
 
-	var r0 *flow.EpochRichStateEntry
-	if rf, ok := ret.Get(0).(func() *flow.EpochRichStateEntry); ok {
+	var r0 *flow.RichEpochStateEntry
+	if rf, ok := ret.Get(0).(func() *flow.RichEpochStateEntry); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*flow.EpochRichStateEntry)
+			r0 = ret.Get(0).(*flow.RichEpochStateEntry)
 		}
 	}
 

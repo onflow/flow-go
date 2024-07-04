@@ -10,7 +10,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// TestEpochProtocolStateEntry_EpochPhase tests that all possible instances of an EpochMinStateEntry
+// TestEpochProtocolStateEntry_EpochPhase tests that all possible instances of an MinEpochStateEntry
 // correctly compute the current epoch phase, taking into account EFM status and incorporated service events.
 func TestEpochProtocolStateEntry_EpochPhase(t *testing.T) {
 
@@ -45,7 +45,7 @@ func TestEpochProtocolStateEntry_EpochPhase(t *testing.T) {
 	})
 }
 
-// TestNewRichProtocolStateEntry checks that NewEpochRichStateEntry creates valid identity tables depending on the state
+// TestNewRichProtocolStateEntry checks that NewRichEpochStateEntry creates valid identity tables depending on the state
 // of epoch which is derived from the protocol state entry.
 func TestNewRichProtocolStateEntry(t *testing.T) {
 	// Conditions right after a spork:
@@ -61,7 +61,7 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 				Ejected: false,
 			})
 		}
-		minStateEntry := &flow.EpochMinStateEntry{
+		minStateEntry := &flow.MinEpochStateEntry{
 			PreviousEpoch: nil,
 			CurrentEpoch: flow.EpochStateContainer{
 				SetupID:          setup.ID(),
@@ -82,7 +82,7 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, flow.EpochPhaseStaking, stateEntry.EpochPhase())
 
-		richStateEntry, err := flow.NewEpochRichStateEntry(stateEntry)
+		richStateEntry, err := flow.NewRichEpochStateEntry(stateEntry)
 		assert.NoError(t, err)
 
 		expectedIdentities, err := flow.BuildIdentityTable(
@@ -103,7 +103,7 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 	t.Run("staking-phase", func(t *testing.T) {
 		stateEntryFixture := unittest.EpochStateFixture()
 		epochStateEntry, err := flow.NewEpochStateEntry(
-			stateEntryFixture.EpochMinStateEntry,
+			stateEntryFixture.MinEpochStateEntry,
 			stateEntryFixture.PreviousEpochSetup,
 			stateEntryFixture.PreviousEpochCommit,
 			stateEntryFixture.CurrentEpochSetup,
@@ -114,7 +114,7 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, flow.EpochPhaseStaking, epochStateEntry.EpochPhase())
 
-		epochRichStateEntry, err := flow.NewEpochRichStateEntry(epochStateEntry)
+		epochRichStateEntry, err := flow.NewRichEpochStateEntry(epochStateEntry)
 		assert.NoError(t, err)
 		expectedIdentities, err := flow.BuildIdentityTable(
 			stateEntryFixture.CurrentEpochSetup.Participants,
@@ -133,13 +133,13 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 	//  * previous epoch N-1 is known (specifically EpochSetup and EpochCommit events)
 	//  * network is currently in the setup phase for the next epoch, i.e. EpochSetup event (starting setup phase) has already been observed
 	t.Run("setup-phase", func(t *testing.T) {
-		stateEntryFixture := unittest.EpochStateFixture(unittest.WithNextEpochProtocolState(), func(entry *flow.EpochRichStateEntry) {
+		stateEntryFixture := unittest.EpochStateFixture(unittest.WithNextEpochProtocolState(), func(entry *flow.RichEpochStateEntry) {
 			entry.NextEpochCommit = nil
 			entry.NextEpoch.CommitID = flow.ZeroID
 		})
 
 		stateEntry, err := flow.NewEpochStateEntry(
-			stateEntryFixture.EpochMinStateEntry,
+			stateEntryFixture.MinEpochStateEntry,
 			stateEntryFixture.PreviousEpochSetup,
 			stateEntryFixture.PreviousEpochCommit,
 			stateEntryFixture.CurrentEpochSetup,
@@ -150,7 +150,7 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, flow.EpochPhaseSetup, stateEntry.EpochPhase())
 
-		richStateEntry, err := flow.NewEpochRichStateEntry(stateEntry)
+		richStateEntry, err := flow.NewRichEpochStateEntry(stateEntry)
 		assert.NoError(t, err)
 		expectedIdentities, err := flow.BuildIdentityTable(
 			stateEntryFixture.CurrentEpochSetup.Participants,
@@ -174,7 +174,7 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 	})
 
 	t.Run("setup-after-spork", func(t *testing.T) {
-		stateEntryFixture := unittest.EpochStateFixture(unittest.WithNextEpochProtocolState(), func(entry *flow.EpochRichStateEntry) {
+		stateEntryFixture := unittest.EpochStateFixture(unittest.WithNextEpochProtocolState(), func(entry *flow.RichEpochStateEntry) {
 			// no previous epoch since we are in the first epoch
 			entry.PreviousEpochSetup = nil
 			entry.PreviousEpochCommit = nil
@@ -190,7 +190,7 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 		assert.Nil(t, stateEntryFixture.PreviousEpochCommit)
 
 		stateEntry, err := flow.NewEpochStateEntry(
-			stateEntryFixture.EpochMinStateEntry,
+			stateEntryFixture.MinEpochStateEntry,
 			stateEntryFixture.PreviousEpochSetup,
 			stateEntryFixture.PreviousEpochCommit,
 			stateEntryFixture.CurrentEpochSetup,
@@ -201,7 +201,7 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, flow.EpochPhaseSetup, stateEntry.EpochPhase())
 
-		richStateEntry, err := flow.NewEpochRichStateEntry(stateEntry)
+		richStateEntry, err := flow.NewRichEpochStateEntry(stateEntry)
 		assert.NoError(t, err)
 		expectedIdentities, err := flow.BuildIdentityTable(
 			stateEntry.CurrentEpochSetup.Participants,
@@ -232,7 +232,7 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 		stateEntryFixture := unittest.EpochStateFixture(unittest.WithNextEpochProtocolState())
 
 		stateEntry, err := flow.NewEpochStateEntry(
-			stateEntryFixture.EpochMinStateEntry,
+			stateEntryFixture.MinEpochStateEntry,
 			stateEntryFixture.PreviousEpochSetup,
 			stateEntryFixture.PreviousEpochCommit,
 			stateEntryFixture.CurrentEpochSetup,
@@ -243,7 +243,7 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, flow.EpochPhaseCommitted, stateEntry.EpochPhase())
 
-		richStateEntry, err := flow.NewEpochRichStateEntry(stateEntry)
+		richStateEntry, err := flow.NewRichEpochStateEntry(stateEntry)
 		assert.NoError(t, err)
 		expectedIdentities, err := flow.BuildIdentityTable(
 			stateEntry.CurrentEpochSetup.Participants,
@@ -266,7 +266,7 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 	})
 
 	t.Run("commit-after-spork", func(t *testing.T) {
-		stateEntryFixture := unittest.EpochStateFixture(unittest.WithNextEpochProtocolState(), func(entry *flow.EpochRichStateEntry) {
+		stateEntryFixture := unittest.EpochStateFixture(unittest.WithNextEpochProtocolState(), func(entry *flow.RichEpochStateEntry) {
 			// no previous epoch since we are in the first epoch
 			entry.PreviousEpochSetup = nil
 			entry.PreviousEpochCommit = nil
@@ -278,7 +278,7 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 		assert.Nil(t, stateEntryFixture.PreviousEpochCommit)
 
 		stateEntry, err := flow.NewEpochStateEntry(
-			stateEntryFixture.EpochMinStateEntry,
+			stateEntryFixture.MinEpochStateEntry,
 			stateEntryFixture.PreviousEpochSetup,
 			stateEntryFixture.PreviousEpochCommit,
 			stateEntryFixture.CurrentEpochSetup,
@@ -289,7 +289,7 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, flow.EpochPhaseCommitted, stateEntry.EpochPhase())
 
-		richStateEntry, err := flow.NewEpochRichStateEntry(stateEntry)
+		richStateEntry, err := flow.NewRichEpochStateEntry(stateEntry)
 		assert.NoError(t, err)
 		expectedIdentities, err := flow.BuildIdentityTable(
 			stateEntryFixture.CurrentEpochSetup.Participants,
@@ -315,7 +315,7 @@ func TestNewRichProtocolStateEntry(t *testing.T) {
 // TestProtocolStateEntry_Copy tests if the copy method returns a deep copy of the entry.
 // All changes to copy shouldn't affect the original entry -- except for key changes.
 func TestProtocolStateEntry_Copy(t *testing.T) {
-	entry := unittest.EpochStateFixture(unittest.WithNextEpochProtocolState()).EpochMinStateEntry
+	entry := unittest.EpochStateFixture(unittest.WithNextEpochProtocolState()).MinEpochStateEntry
 	cpy := entry.Copy()
 	assert.Equal(t, entry, cpy)
 	assert.NotSame(t, entry.NextEpoch, cpy.NextEpoch)

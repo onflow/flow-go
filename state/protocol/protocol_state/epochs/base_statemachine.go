@@ -12,7 +12,7 @@ import (
 // operation modes. It partially implements `StateMachine` and is used as building block for more complex implementations.
 type baseStateMachine struct {
 	telemetry   protocol_state.StateMachineTelemetryConsumer
-	parentState *flow.EpochRichStateEntry
+	parentState *flow.RichEpochStateEntry
 	state       *flow.EpochStateEntry
 	ejector     ejector
 	view        uint64
@@ -21,7 +21,7 @@ type baseStateMachine struct {
 // newBaseStateMachine creates a new instance of baseStateMachine and performs initialization of the internal ejector
 // which keeps track of ejected identities.
 // A protocol.InvalidServiceEventError is returned if the ejector fails to track the identities.
-func newBaseStateMachine(telemetry protocol_state.StateMachineTelemetryConsumer, view uint64, parentState *flow.EpochRichStateEntry, state *flow.EpochStateEntry) (*baseStateMachine, error) {
+func newBaseStateMachine(telemetry protocol_state.StateMachineTelemetryConsumer, view uint64, parentState *flow.RichEpochStateEntry, state *flow.EpochStateEntry) (*baseStateMachine, error) {
 	ej := ejector{}
 	if state.PreviousEpoch != nil {
 		err := ej.TrackDynamicIdentityList(state.PreviousEpoch.ActiveIdentities)
@@ -67,7 +67,7 @@ func (u *baseStateMachine) View() uint64 {
 }
 
 // ParentState returns parent protocol state associated with this state machine.
-func (u *baseStateMachine) ParentState() *flow.EpochRichStateEntry {
+func (u *baseStateMachine) ParentState() *flow.RichEpochStateEntry {
 	return u.parentState
 }
 
@@ -103,7 +103,7 @@ func (u *baseStateMachine) TransitionToNextEpoch() error {
 		return fmt.Errorf("epoch transition is only allowed when entering next epoch")
 	}
 	u.state = &flow.EpochStateEntry{
-		EpochMinStateEntry: &flow.EpochMinStateEntry{
+		MinEpochStateEntry: &flow.MinEpochStateEntry{
 			PreviousEpoch:          &u.state.CurrentEpoch,
 			CurrentEpoch:           *u.state.NextEpoch,
 			NextEpoch:              nil,

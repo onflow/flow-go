@@ -199,7 +199,7 @@ func SnapshotFromBootstrapStateWithParams(
 	if err != nil {
 		return nil, fmt.Errorf("could not construct root epoch state entry: %w", err)
 	}
-	richRootEpochState, err := flow.NewEpochRichStateEntry(rootEpochState)
+	richRootEpochState, err := flow.NewRichEpochStateEntry(rootEpochState)
 	if err != nil {
 		return nil, fmt.Errorf("could not construct root rich epoch state entry: %w", err)
 	}
@@ -231,7 +231,7 @@ func SnapshotFromBootstrapStateWithParams(
 	return snap, nil
 }
 
-// EpochProtocolStateFromServiceEvents generates a protocol.EpochMinStateEntry for a root protocol state which is used for bootstrapping.
+// EpochProtocolStateFromServiceEvents generates a protocol.MinEpochStateEntry for a root protocol state which is used for bootstrapping.
 //
 // CONTEXT: The EpochSetup event contains the IdentitySkeletons for each participant, thereby specifying active epoch members.
 // While ejection status is not part of the EpochSetup event, we can supplement this information as follows:
@@ -241,7 +241,7 @@ func SnapshotFromBootstrapStateWithParams(
 //     that happened before should be reflected in the EpochSetup event. Specifically, ejected
 //     nodes should be no longer listed in the EpochSetup event.
 //     Hence, when the EpochSetup event is emitted / processed, the ejected flag is false for all epoch participants.
-func EpochProtocolStateFromServiceEvents(setup *flow.EpochSetup, commit *flow.EpochCommit) *flow.EpochMinStateEntry {
+func EpochProtocolStateFromServiceEvents(setup *flow.EpochSetup, commit *flow.EpochCommit) *flow.MinEpochStateEntry {
 	identities := make(flow.DynamicIdentityEntryList, 0, len(setup.Participants))
 	for _, identity := range setup.Participants {
 		identities = append(identities, &flow.DynamicIdentityEntry{
@@ -249,7 +249,7 @@ func EpochProtocolStateFromServiceEvents(setup *flow.EpochSetup, commit *flow.Ep
 			Ejected: false,
 		})
 	}
-	return &flow.EpochMinStateEntry{
+	return &flow.MinEpochStateEntry{
 		PreviousEpoch: nil,
 		CurrentEpoch: flow.EpochStateContainer{
 			SetupID:          setup.ID(),

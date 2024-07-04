@@ -85,13 +85,13 @@ type StateMachine interface {
 	View() uint64
 
 	// ParentState returns parent protocol state associated with this state machine.
-	ParentState() *flow.EpochRichStateEntry
+	ParentState() *flow.RichEpochStateEntry
 }
 
 // StateMachineFactoryMethod is a factory method to create state machines for evolving the protocol's epoch state.
 // Currently, we have `HappyPathStateMachine` and `FallbackStateMachine` as StateMachine
 // implementations, whose constructors both have the same signature as StateMachineFactoryMethod.
-type StateMachineFactoryMethod func(candidateView uint64, parentState *flow.EpochRichStateEntry) (StateMachine, error)
+type StateMachineFactoryMethod func(candidateView uint64, parentState *flow.RichEpochStateEntry) (StateMachine, error)
 
 // EpochStateMachine is a hierarchical state machine that encapsulates the logic for protocol-compliant evolution of Epoch-related sub-state.
 // EpochStateMachine processes a subset of service events that are relevant for the Epoch state, and ignores all other events.
@@ -187,7 +187,7 @@ func (e *EpochStateMachine) Build() (*transaction.DeferredBlockPersist, error) {
 	})
 	if hasChanges {
 		e.pendingDbUpdates.AddDbOp(operation.SkipDuplicatesTx(
-			e.epochProtocolStateDB.StoreTx(updatedStateID, updatedEpochState.EpochMinStateEntry)))
+			e.epochProtocolStateDB.StoreTx(updatedStateID, updatedEpochState.MinEpochStateEntry)))
 	}
 	e.mutator.SetEpochStateID(updatedStateID)
 
@@ -324,7 +324,7 @@ func (e *EpochStateMachine) transitionToEpochFallbackMode(orderedUpdates []flow.
 //   - The seal for block A was included in some block C, s.t C is an ancestor of B.
 //
 // For further details see `params.EpochCommitSafetyThreshold()`.
-func epochFallbackTriggeredByIncorporatingCandidate(candidateView uint64, params protocol.GlobalParams, parentState *flow.EpochRichStateEntry) bool {
+func epochFallbackTriggeredByIncorporatingCandidate(candidateView uint64, params protocol.GlobalParams, parentState *flow.RichEpochStateEntry) bool {
 	if parentState.EpochPhase() == flow.EpochPhaseCommitted { // Requirement 1
 		return false
 	}

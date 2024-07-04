@@ -195,7 +195,7 @@ func TestIsValidExtendingEpochSetup(t *testing.T) {
 // additionally we require other conditions, but they are tested by separate test `TestEpochCommitValidity`.
 func TestIsValidExtendingEpochCommit(t *testing.T) {
 	t.Run("happy path", func(t *testing.T) {
-		protocolState := unittest.EpochStateFixture(unittest.WithNextEpochProtocolState(), func(entry *flow.EpochRichStateEntry) {
+		protocolState := unittest.EpochStateFixture(unittest.WithNextEpochProtocolState(), func(entry *flow.RichEpochStateEntry) {
 			entry.NextEpochCommit = nil
 			entry.NextEpoch.CommitID = flow.ZeroID
 		})
@@ -205,7 +205,7 @@ func TestIsValidExtendingEpochCommit(t *testing.T) {
 			unittest.CommitWithCounter(nextEpochSetup.Counter),
 			unittest.WithDKGFromParticipants(nextEpochSetup.Participants),
 		)
-		err := protocol.IsValidExtendingEpochCommit(extendingSetup, protocolState.EpochMinStateEntry, nextEpochSetup)
+		err := protocol.IsValidExtendingEpochCommit(extendingSetup, protocolState.MinEpochStateEntry, nextEpochSetup)
 		require.NoError(t, err)
 	})
 	t.Run("(a) The epoch setup event needs to happen before the commit", func(t *testing.T) {
@@ -221,7 +221,7 @@ func TestIsValidExtendingEpochCommit(t *testing.T) {
 			unittest.CommitWithCounter(nextEpochSetup.Counter),
 			unittest.WithDKGFromParticipants(nextEpochSetup.Participants),
 		)
-		err := protocol.IsValidExtendingEpochCommit(extendingSetup, protocolState.EpochMinStateEntry, nextEpochSetup)
+		err := protocol.IsValidExtendingEpochCommit(extendingSetup, protocolState.MinEpochStateEntry, nextEpochSetup)
 		require.Error(t, err)
 	})
 	t.Run("We should only have a single epoch commit event per epoch", func(t *testing.T) {
@@ -232,7 +232,7 @@ func TestIsValidExtendingEpochCommit(t *testing.T) {
 			unittest.CommitWithCounter(nextEpochSetup.Counter),
 			unittest.WithDKGFromParticipants(nextEpochSetup.Participants),
 		)
-		err := protocol.IsValidExtendingEpochCommit(extendingSetup, protocolState.EpochMinStateEntry, nextEpochSetup)
+		err := protocol.IsValidExtendingEpochCommit(extendingSetup, protocolState.MinEpochStateEntry, nextEpochSetup)
 		require.Error(t, err)
 	})
 }

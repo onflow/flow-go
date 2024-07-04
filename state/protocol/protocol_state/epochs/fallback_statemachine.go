@@ -28,13 +28,13 @@ var _ StateMachine = (*FallbackStateMachine)(nil)
 // EpochFallbackTriggered to true, thereby recording that we have entered epoch fallback mode.
 // See flow.EpochPhase for detailed documentation about EFM and epoch phase transitions.
 // No errors are expected during normal operations.
-func NewFallbackStateMachine(params protocol.GlobalParams, telemetry protocol_state.StateMachineTelemetryConsumer, view uint64, parentState *flow.EpochRichStateEntry) (*FallbackStateMachine, error) {
+func NewFallbackStateMachine(params protocol.GlobalParams, telemetry protocol_state.StateMachineTelemetryConsumer, view uint64, parentState *flow.RichEpochStateEntry) (*FallbackStateMachine, error) {
 	state := parentState.EpochStateEntry.Copy()
 	nextEpochCommitted := state.EpochPhase() == flow.EpochPhaseCommitted
 	// we are entering fallback mode, this logic needs to be executed only once
 	if !state.EpochFallbackTriggered {
 		// the next epoch has not been committed, but possibly setup, make sure it is cleared
-		// CAUTION: this logic must be consistent with the `EpochMinStateEntry.EpochPhase()`, which
+		// CAUTION: this logic must be consistent with the `MinEpochStateEntry.EpochPhase()`, which
 		// determines the epoch phase based on the configuration of the fields we set here!
 		// Specifically, if and only if the next epoch is already committed as of the parent state,
 		// we go through with that committed epoch. Otherwise, we have a tentative values of an epoch
