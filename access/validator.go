@@ -11,12 +11,12 @@ import (
 	"github.com/onflow/crypto"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
 
+	cadenceutils "github.com/onflow/flow-go/access/utils"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/execution"
 	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/protocol"
-	cadenceutils "github.com/onflow/flow-go/utils/cadence"
 )
 
 type Blocks interface {

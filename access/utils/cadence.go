@@ -1,8 +1,7 @@
-package cadence
+package utils
 
 import (
 	"errors"
-
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/encoding/json"
 )
