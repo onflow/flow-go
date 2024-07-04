@@ -33,7 +33,17 @@ We only carry over a snapshot of the execution state but fully re-initialize the
 incl. migrations of the entire execution state to a new formats become reasonably straight forward.
 Additional context on HCU vs sporks can be found [here](https://developers.flow.com/networks/node-ops/node-operation/hcu#hcu-versus-spork).   
 
+<!---
+TEMPORARY to show the image, will be replaced with commented-out version below before merge 
+-->
+
+<img src='https://github.com/onflow/flow-go/blob/ff8882b2fcef5b7dfa86ac97cde407cc7b9ae3d5/docs/flow-go_branching-convention.png' width='300'>
+
+<!---
 <img src='https://github.com/onflow/flow-go/blob/master/docs/BranchingConvention.png' width='300'>
+-->
+
+
 
 #### Motivations
 * Based on the decentralized nature of blockchain networks, continuous deployment is practically intractable (without compromising decentralization).
