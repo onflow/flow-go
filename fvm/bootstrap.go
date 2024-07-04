@@ -23,7 +23,7 @@ import (
 var (
 	DefaultAccountCreationFee = mustParseUFix64(
 		"account creation fee",
-		"0.10000000")
+		"0.00100000")
 
 	DefaultMinimumStorageReservation = mustParseUFix64(
 		"minimum storage reservation",
