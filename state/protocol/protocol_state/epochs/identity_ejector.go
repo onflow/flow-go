@@ -54,7 +54,7 @@ func (e *ejector) Eject(nodeID flow.Identifier) bool {
 func (e *ejector) TrackDynamicIdentityList(list flow.DynamicIdentityEntryList) error {
 	tracker := trackedDynamicIdentityList{dynamicIdentites: list}
 	if len(e.ejected) > 0 {
-		// nodes were already ejected in this block, so their ejection should not be reverted by in the new `list`
+		// nodes were already ejected in this block, so their ejection should not be reverted in the new `list`
 		tracker.identityLookup = list.Lookup()
 		for _, id := range e.ejected {
 			dynamicIdentity, found := tracker.identityLookup[id]

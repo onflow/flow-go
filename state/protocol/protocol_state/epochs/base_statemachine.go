@@ -74,12 +74,11 @@ func (u *baseStateMachine) ParentState() *flow.RichEpochStateEntry {
 // EjectIdentity updates identity table by changing the node's participation status to 'ejected'.
 // Should pass identity which is already present in the table, otherwise an exception will be raised.
 // Expected errors during normal operations:
-// - `protocol.InvalidServiceEventError` if the updated identity is not found in current and adjacent epochs.
+// - `protocol.InvalidServiceEventError` if the updated identity is not found in current and adjacent epochs or if the identity has already been ejected
 func (u *baseStateMachine) EjectIdentity(nodeID flow.Identifier) error {
 	ejected := u.ejector.Eject(nodeID)
 	if !ejected {
-		return protocol.NewInvalidServiceEventErrorf("expected to find identity for "+
-			"prev, current or next epoch, but (%v) was not found", nodeID)
+		return protocol.NewInvalidServiceEventErrorf("node (%x) was not found or was already ejected", nodeID)
 	}
 	return nil
 }

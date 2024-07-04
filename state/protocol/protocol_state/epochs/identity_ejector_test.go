@@ -16,6 +16,7 @@ import (
 func TestEjectorRapid(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
 		ej := ejector{}
+		// track 1-3 identity lists, each containing 3-10 identities
 		trackedIdentities := rapid.Map(rapid.SliceOfN(rapid.IntRange(3, 10), 1, 3), func(n []int) []flow.DynamicIdentityEntryList {
 			var result []flow.DynamicIdentityEntryList
 			for _, count := range n {
