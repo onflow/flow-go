@@ -37,10 +37,10 @@ Additional context on HCU vs sporks can be found [here](https://developers.flow.
 TEMPORARY to show the image, will be replaced with commented-out version below before merge 
 -->
 
-<img src='https://github.com/onflow/flow-go/blob/ff8882b2fcef5b7dfa86ac97cde407cc7b9ae3d5/docs/flow-go_branching-convention.png' width='300'>
+<img src='https://github.com/onflow/flow-go/blob/ff8882b2fcef5b7dfa86ac97cde407cc7b9ae3d5/docs/flow-go_branching-convention.png' width='350'>
 
 <!---
-<img src='https://github.com/onflow/flow-go/blob/master/docs/BranchingConvention.png' width='300'>
+<img src='https://github.com/onflow/flow-go/blob/master/docs/BranchingConvention.png' width='350'>
 -->
 
 
