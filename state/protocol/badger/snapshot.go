@@ -450,6 +450,7 @@ func (q *EpochQuery) Previous() protocol.Epoch {
 	// for the previous epoch
 	setup := entry.PreviousEpochSetup
 	commit := entry.PreviousEpochCommit
+	extensions := entry.PreviousEpoch.EpochExtensions
 
 	firstHeight, finalHeight, firstHeightKnown, finalHeightKnown, err := q.retrieveEpochHeightBounds(setup.Counter)
 	if err != nil {
@@ -457,22 +458,22 @@ func (q *EpochQuery) Previous() protocol.Epoch {
 	}
 	if firstHeightKnown && finalHeightKnown {
 		// typical case - we usually know both boundaries for a past epoch
-		return inmem.NewEpochWithStartAndEndBoundaries(setup, entry.PreviousEpoch.EpochExtensions, commit, firstHeight, finalHeight)
+		return inmem.NewEpochWithStartAndEndBoundaries(setup, extensions, commit, firstHeight, finalHeight)
 	}
 	if firstHeightKnown && !finalHeightKnown {
 		// this case is possible when the snapshot reference block is un-finalized
 		// and is past an un-finalized epoch boundary
-		return inmem.NewEpochWithStartBoundary(setup, entry.PreviousEpoch.EpochExtensions, commit, firstHeight)
+		return inmem.NewEpochWithStartBoundary(setup, extensions, commit, firstHeight)
 	}
 	if !firstHeightKnown && finalHeightKnown {
 		// this case is possible when this node's lowest known block is after
 		// the queried epoch's start boundary
-		return inmem.NewEpochWithEndBoundary(setup, entry.PreviousEpoch.EpochExtensions, commit, finalHeight)
+		return inmem.NewEpochWithEndBoundary(setup, extensions, commit, finalHeight)
 	}
 	if !firstHeightKnown && !finalHeightKnown {
 		// this case is possible when this node's lowest known block is after
 		// the queried epoch's end boundary
-		return inmem.NewCommittedEpoch(setup, entry.PreviousEpoch.EpochExtensions, commit)
+		return inmem.NewCommittedEpoch(setup, extensions, commit)
 	}
 	return invalid.NewEpochf("sanity check failed: impossible combination of boundaries for previous epoch")
 }

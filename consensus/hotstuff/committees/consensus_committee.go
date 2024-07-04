@@ -63,14 +63,14 @@ func newEpochInfo(epoch protocol.Epoch) (*epochInfo, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not initial identities: %w", err)
 	}
-	initialCommittee := initialIdentities.Filter(filter.IsConsensusCommitteeMember).ToSkeleton()
+	initialCommittee := initialIdentities.Filter(filter.IsConsensusCommitteeMember)
 	dkg, err := epoch.DKG()
 	if err != nil {
 		return nil, fmt.Errorf("could not get dkg: %w", err)
 	}
 
 	totalWeight := initialCommittee.TotalWeight()
-	epochInfo := &epochInfo{
+	ei := &epochInfo{
 		LeaderSelection:      leaders,
 		initialCommittee:     initialCommittee,
 		initialCommitteeMap:  initialCommittee.Lookup(),
@@ -78,7 +78,7 @@ func newEpochInfo(epoch protocol.Epoch) (*epochInfo, error) {
 		weightThresholdForTO: WeightThresholdToTimeout(totalWeight),
 		dkg:                  dkg,
 	}
-	return epochInfo, nil
+	return ei, nil
 }
 
 // eventHandlerFunc represents an event wrapped in a closure which will perform any required local
@@ -331,7 +331,7 @@ func (c *Consensus) EpochExtended(_ uint64, refBlock *flow.Header, _ flow.EpochE
 // account the most recent extension (included as of refBlock).
 // No errors are expected during normal operation.
 func (c *Consensus) handleEpochExtended(refBlock *flow.Header) error {
-	currentEpoch := c.state.AtBlockID(refBlock.ID()).Epochs().Current()
+	currentEpoch := c.state.AtHeight(refBlock.Height).Epochs().Current()
 	counter, err := currentEpoch.Counter()
 	if err != nil {
 		return fmt.Errorf("could not read current epoch info: %w", err)
@@ -356,7 +356,7 @@ func (c *Consensus) handleEpochExtended(refBlock *flow.Header) error {
 // When the next epoch is committed, we compute leader selection for the epoch and cache it.
 // No errors are expected during normal operation.
 func (c *Consensus) handleEpochCommittedPhaseStarted(refBlock *flow.Header) error {
-	epoch := c.state.AtBlockID(refBlock.ID()).Epochs().Next()
+	epoch := c.state.AtHeight(refBlock.Height).Epochs().Next()
 	_, err := c.prepareEpoch(epoch)
 	if err != nil {
 		return fmt.Errorf("could not cache data for committed next epoch: %w", err)
