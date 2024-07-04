@@ -1206,7 +1206,6 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 		fvm.WithRootBlock(root.Header),
 		fvm.WithEpochConfig(epochConfig),
 		fvm.WithIdentities(participants),
-		fvm.WithTransactionFee(fvm.NonDefaultTransactionFees),
 	)
 	if err != nil {
 		return nil, err
