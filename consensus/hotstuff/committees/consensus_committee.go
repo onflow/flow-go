@@ -16,6 +16,8 @@ import (
 )
 
 // epochInfo caches data about one epoch that is pertinent to the consensus committee.
+// CAUTION: epochInfo's internal state may evolve over time. Guaranteeing concurrency
+// safety is delegated to the higher-level logic.
 type epochInfo struct {
 	*leader.LeaderSelection // pre-computed leader selection for the epoch
 	initialCommittee        flow.IdentitySkeletonList
@@ -26,8 +28,10 @@ type epochInfo struct {
 }
 
 // recomputeLeaderSelectionForExtendedViewRange re-computes the LeaderSelection field
-// for the input epoch's entire view range, including extensions.
-// This should be called each time an extension is added to an epoch.
+// for the input epoch's entire view range, including extensions. This must be called
+// each time an extension is added to an epoch. This method is idempotent, i.e.
+// repeated calls for the same final view are no-ops.
+// Caution, not concurrency safe.
 // No errors are expected during normal operation.
 func (e *epochInfo) recomputeLeaderSelectionForExtendedViewRange(epoch protocol.Epoch) error {
 	extendedFinalView, err := epoch.FinalView()
@@ -49,6 +53,7 @@ func (e *epochInfo) recomputeLeaderSelectionForExtendedViewRange(epoch protocol.
 
 // newEpochInfo retrieves the committee information and computes leader selection.
 // This can be cached and used for all by-view queries for this epoch.
+// No errors are expected during normal operation.
 func newEpochInfo(epoch protocol.Epoch) (*epochInfo, error) {
 	leaders, err := leader.SelectionForConsensus(epoch)
 	if err != nil {
