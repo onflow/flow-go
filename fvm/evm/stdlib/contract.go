@@ -1664,6 +1664,64 @@ func newInternalEVMTypeNonceFunction(
 	)
 }
 
+const internalEVMTypeStorageAtFunctionName = "storageAt"
+
+var internalEVMTypeStorageAtFunctionType = &sema.FunctionType{
+	Parameters: []sema.Parameter{
+		{
+			Label:          "address",
+			TypeAnnotation: sema.NewTypeAnnotation(evmAddressBytesType),
+		},
+		{
+			Label:          "key",
+			TypeAnnotation: sema.NewTypeAnnotation(sema.ByteArrayType),
+		},
+	},
+	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.ByteArrayType),
+}
+
+func newInternalEVMTypeStorageAtFunction(
+	gauge common.MemoryGauge,
+	handler types.ContractHandler,
+) *interpreter.HostFunctionValue {
+	return interpreter.NewStaticHostFunctionValue(
+		gauge,
+		internalEVMTypeCallFunctionType,
+		func(invocation interpreter.Invocation) interpreter.Value {
+			inter := invocation.Interpreter
+			locationRange := invocation.LocationRange
+
+			// Get address
+			addressValue, ok := invocation.Arguments[0].(*interpreter.ArrayValue)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
+
+			address, err := AddressBytesArrayValueToEVMAddress(inter, locationRange, addressValue)
+			if err != nil {
+				panic(err)
+			}
+
+			// Get key
+			keyValue, ok := invocation.Arguments[1].(*interpreter.ArrayValue)
+			if !ok {
+				panic(errors.NewUnreachableError())
+			}
+
+			key, err := interpreter.ByteArrayValueToByteSlice(inter, keyValue, locationRange)
+			if err != nil {
+				panic(err)
+			}
+
+			const isAuthorized = false
+			account := handler.AccountByAddress(address, isAuthorized)
+			storageValue := account.StorageAt(key)
+
+			return interpreter.ByteSliceToByteArrayValue(inter, storageValue)
+		},
+	)
+}
+
 const internalEVMTypeCodeFunctionName = "code"
 
 var internalEVMTypeCodeFunctionType = &sema.FunctionType{
@@ -2098,6 +2156,7 @@ func NewInternalEVMContractValue(
 			internalEVMTypeCastToFLOWFunctionName:                newInternalEVMTypeCastToFLOWFunction(gauge),
 			internalEVMTypeGetLatestBlockFunctionName:            newInternalEVMTypeGetLatestBlockFunction(gauge, handler),
 			internalEVMTypeDryRunFunctionName:                    newInternalEVMTypeDryRunFunction(gauge, handler),
+			internalEVMTypeStorageAtFunctionName:                 newInternalEVMTypeStorageAtFunction(gauge, handler),
 		},
 		nil,
 		nil,
@@ -2214,6 +2273,12 @@ var InternalEVMContractType = func() *sema.CompositeType {
 			ty,
 			internalEVMTypeGetLatestBlockFunctionName,
 			internalEVMTypeGetLatestBlockFunctionType,
+			"",
+		),
+		sema.NewUnmeteredPublicFunctionMember(
+			ty,
+			internalEVMTypeStorageAtFunctionName,
+			internalEVMTypeStorageAtFunctionType,
 			"",
 		),
 	})

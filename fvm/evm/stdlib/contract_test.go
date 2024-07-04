@@ -102,16 +102,17 @@ func (t *testContractHandler) GenerateResourceUUID() uint64 {
 }
 
 type testFlowAccount struct {
-	address  types.Address
-	balance  func() types.Balance
-	code     func() types.Code
-	codeHash func() []byte
-	nonce    func() uint64
-	transfer func(address types.Address, balance types.Balance)
-	deposit  func(vault *types.FLOWTokenVault)
-	withdraw func(balance types.Balance) *types.FLOWTokenVault
-	deploy   func(code types.Code, limit types.GasLimit, balance types.Balance) *types.ResultSummary
-	call     func(address types.Address, data types.Data, limit types.GasLimit, balance types.Balance) *types.ResultSummary
+	address   types.Address
+	balance   func() types.Balance
+	code      func() types.Code
+	storageAt func(key []byte) []byte
+	codeHash  func() []byte
+	nonce     func() uint64
+	transfer  func(address types.Address, balance types.Balance)
+	deposit   func(vault *types.FLOWTokenVault)
+	withdraw  func(balance types.Balance) *types.FLOWTokenVault
+	deploy    func(code types.Code, limit types.GasLimit, balance types.Balance) *types.ResultSummary
+	call      func(address types.Address, data types.Data, limit types.GasLimit, balance types.Balance) *types.ResultSummary
 }
 
 var _ types.Account = &testFlowAccount{}
@@ -132,6 +133,13 @@ func (t *testFlowAccount) Code() types.Code {
 		return types.Code{}
 	}
 	return t.code()
+}
+
+func (t *testFlowAccount) StorageAt(key []byte) []byte {
+	if t.storageAt == nil {
+		return []byte{}
+	}
+	return t.storageAt(key)
 }
 
 func (t *testFlowAccount) CodeHash() []byte {

@@ -653,6 +653,29 @@ func (a *Account) code() (types.Code, error) {
 	return blk.CodeOf(a.address)
 }
 
+// StorageAt returns the value existing at the given storage key on this account
+//
+// Note: we don't meter any extra computation given reading data
+// from the storage already transalates into computation
+func (a *Account) StorageAt(key []byte) []byte {
+	storageValue, err := a.storageAt(key)
+	panicOnError(err)
+	return storageValue
+}
+
+func (a *Account) storageAt(key []byte) ([]byte, error) {
+	ctx, err := a.fch.getBlockContext()
+	if err != nil {
+		return []byte{}, err
+	}
+
+	blk, err := a.fch.emulator.NewReadOnlyBlockView(ctx)
+	if err != nil {
+		return []byte{}, err
+	}
+	return blk.StorageAt(a.address, gethCommon.BytesToHash(key))
+}
+
 // CodeHash returns the code hash of this account
 //
 // Note: we don't meter any extra computation given reading data

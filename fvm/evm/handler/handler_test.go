@@ -592,7 +592,7 @@ func TestHandler_COA(t *testing.T) {
 				require.NotNil(t, result.DeployedContractAddress)
 				addr := *result.DeployedContractAddress
 				// skip first few bytes as they are deploy codes
-				assert.Equal(t, testContract.ByteCode[17:], []byte(result.ReturnedData))
+				assert.Equal(t, testContract.ByteCode[112:], []byte(result.ReturnedData))
 				require.NotNil(t, addr)
 
 				num := big.NewInt(22)

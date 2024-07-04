@@ -14,6 +14,7 @@ type TestEmulator struct {
 	BalanceOfFunc           func(address types.Address) (*big.Int, error)
 	NonceOfFunc             func(address types.Address) (uint64, error)
 	CodeOfFunc              func(address types.Address) (types.Code, error)
+	StorageAtFunc           func(address types.Address, key gethCommon.Hash) ([]byte, error)
 	CodeHashOfFunc          func(address types.Address) ([]byte, error)
 	DirectCallFunc          func(call *types.DirectCall) (*types.Result, error)
 	RunTransactionFunc      func(tx *gethTypes.Transaction) (*types.Result, error)
@@ -55,6 +56,14 @@ func (em *TestEmulator) CodeOf(address types.Address) (types.Code, error) {
 		panic("method not set")
 	}
 	return em.CodeOfFunc(address)
+}
+
+// StorageAt returns the value existing at the given storage key on this address
+func (em *TestEmulator) StorageAt(address types.Address, key gethCommon.Hash) ([]byte, error) {
+	if em.StorageAtFunc == nil {
+		panic("method not set")
+	}
+	return em.StorageAtFunc(address, key)
 }
 
 // CodeHashOf returns the code hash for this address

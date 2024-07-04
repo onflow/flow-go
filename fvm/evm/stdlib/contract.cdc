@@ -158,6 +158,15 @@ contract EVM {
             )
         }
 
+        /// Value existing at the given storage key on this address
+        access(all)
+        fun storageAt(key: [UInt8]): [UInt8] {
+            return InternalEVM.storageAt(
+                address: self.bytes,
+                key: key
+            )
+        }
+
         /// CodeHash of the address
         access(all)
         fun codeHash(): [UInt8] {

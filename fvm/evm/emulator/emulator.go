@@ -89,6 +89,11 @@ func (bv *ReadOnlyBlockView) CodeOf(address types.Address) (types.Code, error) {
 	return bv.state.GetCode(address.ToCommon()), nil
 }
 
+// StorageAt returns the value existing at the given storage key on the given address
+func (bv *ReadOnlyBlockView) StorageAt(address types.Address, key gethCommon.Hash) ([]byte, error) {
+	return bv.state.GetState(address.ToCommon(), key).Bytes(), nil
+}
+
 // CodeHashOf returns the code hash of the given address
 func (bv *ReadOnlyBlockView) CodeHashOf(address types.Address) ([]byte, error) {
 	return bv.state.GetCodeHash(address.ToCommon()).Bytes(), nil

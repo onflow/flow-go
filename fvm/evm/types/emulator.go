@@ -54,6 +54,8 @@ type ReadOnlyBlockView interface {
 	NonceOf(address Address) (uint64, error)
 	// CodeOf returns the code for this address
 	CodeOf(address Address) (Code, error)
+	// StorageAt returns the value existing at the given storage key on this address
+	StorageAt(address Address, key gethCommon.Hash) ([]byte, error)
 	// CodeHashOf returns the code hash for this address
 	CodeHashOf(address Address) ([]byte, error)
 }

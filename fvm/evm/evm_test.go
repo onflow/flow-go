@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"math/big"
+	"strings"
 	"testing"
 
 	"github.com/onflow/cadence/runtime/common"
@@ -1395,7 +1396,7 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 				require.Empty(t, res.ErrorMessage)
 				require.NotNil(t, res.DeployedContractAddress)
 				// we strip away first few bytes because they contain deploy code
-				require.Equal(t, testContract.ByteCode[17:], []byte(res.ReturnedData))
+				require.Equal(t, testContract.ByteCode[112:], []byte(res.ReturnedData))
 			})
 	})
 }
@@ -2427,6 +2428,173 @@ func TestCadenceArch(t *testing.T) {
 					snapshot)
 				require.NoError(t, err)
 				require.Error(t, output.Err)
+			})
+	})
+}
+
+func TestEVMAddressStorageAt(t *testing.T) {
+	t.Parallel()
+
+	chain := flow.Emulator.Chain()
+	sc := systemcontracts.SystemContractsForChain(chain.ChainID())
+
+	// get the storage at a given key and address
+	code := []byte(fmt.Sprintf(
+		`
+		import EVM from %s
+
+		access(all)
+		fun main(hexEncodedAddress: String, key: String): [UInt8] {
+			let addressBytes = hexEncodedAddress.decodeHex().toConstantSized<[UInt8; 20]>()!
+			let address = EVM.EVMAddress(bytes: addressBytes)
+
+			return address.storageAt(key: key.decodeHex())
+		}
+		`,
+		sc.EVMContract.Address.HexWithPrefix(),
+	))
+
+	t.Run("retrieve storage value from scalar field", func(t *testing.T) {
+		t.Parallel()
+
+		RunWithNewEnvironment(t,
+			chain, func(
+				ctx fvm.Context,
+				vm fvm.VM,
+				snapshot snapshot.SnapshotTree,
+				testContract *TestContract,
+				testAccount *EOATestAccount,
+			) {
+				address, err := cadence.NewString(
+					strings.TrimPrefix(testContract.DeployedAt.ToCommon().Hex(), "0x"),
+				)
+				require.NoError(t, err)
+
+				key, err := cadence.NewString(
+					"0000000000000000000000000000000000000000000000000000000000000002",
+				)
+				require.NoError(t, err)
+
+				script := fvm.Script(code).WithArguments(
+					json.MustEncode(address),
+					json.MustEncode(key),
+				)
+
+				_, output, err := vm.Run(
+					ctx,
+					script,
+					snapshot)
+				require.NoError(t, err)
+				require.NoError(t, output.Err)
+
+				val, ok := output.Value.(cadence.Array)
+				require.True(t, ok)
+
+				convertedValue := make([]byte, len(val.Values))
+				for i, value := range val.Values {
+					convertedValue[i] = byte(value.(cadence.UInt8))
+				}
+				assert.Equal(
+					t,
+					"000000000000000000000000000000000000000000000000000000000000002a", // 42 in hexadecimal
+					hex.EncodeToString(convertedValue),
+				)
+			})
+	})
+
+	t.Run("retrieve storage value from map field", func(t *testing.T) {
+		t.Parallel()
+
+		RunWithNewEnvironment(t,
+			chain, func(
+				ctx fvm.Context,
+				vm fvm.VM,
+				snapshot snapshot.SnapshotTree,
+				testContract *TestContract,
+				testAccount *EOATestAccount,
+			) {
+				address, err := cadence.NewString(
+					strings.TrimPrefix(testContract.DeployedAt.ToCommon().Hex(), "0x"),
+				)
+				require.NoError(t, err)
+
+				key, err := cadence.NewString(
+					"0de6f69cfe3771ec86e4afbac712b50b7aa5cce97b6efcf5a11e2bbbfc5e38c8",
+				)
+				require.NoError(t, err)
+
+				script := fvm.Script(code).WithArguments(
+					json.MustEncode(address),
+					json.MustEncode(key),
+				)
+
+				_, output, err := vm.Run(
+					ctx,
+					script,
+					snapshot)
+				require.NoError(t, err)
+				require.NoError(t, output.Err)
+
+				val, ok := output.Value.(cadence.Array)
+				require.True(t, ok)
+
+				convertedValue := make([]byte, len(val.Values))
+				for i, value := range val.Values {
+					convertedValue[i] = byte(value.(cadence.UInt8))
+				}
+				assert.Equal(
+					t,
+					"0000000000000000000000000000000000000000000000000000000000000064", // 100 in hexadecimal
+					hex.EncodeToString(convertedValue),
+				)
+			})
+	})
+
+	t.Run("retrieve storage value from non-existent position", func(t *testing.T) {
+		t.Parallel()
+
+		RunWithNewEnvironment(t,
+			chain, func(
+				ctx fvm.Context,
+				vm fvm.VM,
+				snapshot snapshot.SnapshotTree,
+				testContract *TestContract,
+				testAccount *EOATestAccount,
+			) {
+				address, err := cadence.NewString(
+					strings.TrimPrefix(testContract.DeployedAt.ToCommon().Hex(), "0x"),
+				)
+				require.NoError(t, err)
+
+				key, err := cadence.NewString(
+					"0000000000000000000000000000000000000000000000000000000000000009",
+				)
+				require.NoError(t, err)
+
+				script := fvm.Script(code).WithArguments(
+					json.MustEncode(address),
+					json.MustEncode(key),
+				)
+
+				_, output, err := vm.Run(
+					ctx,
+					script,
+					snapshot)
+				require.NoError(t, err)
+				require.NoError(t, output.Err)
+
+				val, ok := output.Value.(cadence.Array)
+				require.True(t, ok)
+
+				convertedValue := make([]byte, len(val.Values))
+				for i, value := range val.Values {
+					convertedValue[i] = byte(value.(cadence.UInt8))
+				}
+				assert.Equal(
+					t,
+					"0000000000000000000000000000000000000000000000000000000000000000", // zero value
+					hex.EncodeToString(convertedValue),
+				)
 			})
 	})
 }

@@ -10,8 +10,12 @@ contract Storage {
     error MyCustomError(uint value, string message);
 
     uint256 number;
+    mapping(address => uint) balances;
+    uint256 answer;
 
     constructor() payable {
+        balances[0xFACF71692421039876a5BB4F10EF7A439D8ef61E] = 100;
+        answer = 42;
     }
 
     function store(uint256 num) public {

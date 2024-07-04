@@ -24,6 +24,9 @@ type Account interface {
 	// CodeHash returns the code hash of this account
 	CodeHash() []byte
 
+	// StorageAt returns the value existing at the given storage key on this account
+	StorageAt(key []byte) []byte
+
 	// Nonce returns the nonce of this account
 	Nonce() uint64
 
