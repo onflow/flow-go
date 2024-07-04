@@ -16,11 +16,14 @@ import (
 func TestEjectorRapid(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
 		ej := ejector{}
-		// track 1-3 identity lists, each containing 3-10 identities
-		trackedIdentities := rapid.Map(rapid.SliceOfN(rapid.IntRange(3, 10), 1, 3), func(n []int) []flow.DynamicIdentityEntryList {
+		baseIdentities := unittest.DynamicIdentityEntryListFixture(5)
+		// track 1-3 identity lists, each containing extra 0-7 identities
+		trackedIdentities := rapid.Map(rapid.SliceOfN(rapid.IntRange(0, 7), 1, 3), func(n []int) []flow.DynamicIdentityEntryList {
 			var result []flow.DynamicIdentityEntryList
 			for _, count := range n {
-				result = append(result, unittest.DynamicIdentityEntryListFixture(count))
+				identities := append(baseIdentities.Copy(), unittest.DynamicIdentityEntryListFixture(count)...)
+				identities = rapid.Permutation(identities).Draw(t, "shuffled-identities")
+				result = append(result, identities)
 			}
 			return result
 		}).Draw(t, "tracked-identities")
