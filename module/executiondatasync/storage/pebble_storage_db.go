@@ -55,9 +55,9 @@ func (p *PebbleDBWrapper) Keys(prefix []byte) ([][]byte, error) {
 func (p *PebbleDBWrapper) Get(key []byte) (StorageItem, error) {
 	val, err := p.ds.Get(context.Background(), ds.NewKey(string(key)))
 	if err != nil {
-		return StorageItem{}, err
+		return &PebbleItem{}, err
 	}
-	return StorageItem{key: key, val: val}, nil
+	return &PebbleItem{key: key, val: val}, nil
 }
 
 func (p *PebbleDBWrapper) Set(key, val []byte) error {
@@ -89,4 +89,19 @@ func (p *PebbleDBWrapper) MaxBatchSize() int64 {
 func (p *PebbleDBWrapper) RunValueLogGC(_ float64) error {
 	// PebbleDB (go-ds-pebble) does not have a direct equivalent to Badger's value log GC.
 	return nil
+}
+
+var _ StorageItem = (*PebbleItem)(nil)
+
+type PebbleItem struct {
+	key []byte
+	val []byte
+}
+
+func (i *PebbleItem) ValueCopy(dst []byte) ([]byte, error) {
+	return append(dst, i.val...), nil
+}
+
+func (i *PebbleItem) Key() []byte {
+	return i.key
 }

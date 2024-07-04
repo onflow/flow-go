@@ -22,15 +22,7 @@ type StorageDB interface {
 	RunValueLogGC(discardRatio float64) error
 }
 
-type StorageItem struct {
-	key []byte
-	val []byte
-}
-
-func (i *StorageItem) ValueCopy(dst []byte) ([]byte, error) {
-	return append(dst, i.val...), nil
-}
-
-func (i *StorageItem) Key() []byte {
-	return i.key
+type StorageItem interface {
+	ValueCopy(dst []byte) ([]byte, error)
+	Key() []byte
 }

@@ -50,17 +50,13 @@ func (b *BadgerDBWrapper) Keys(prefix []byte) ([][]byte, error) {
 }
 
 func (b *BadgerDBWrapper) Get(key []byte) (StorageItem, error) {
-	var item StorageItem
-	err := b.ds.DB.View(func(txn *badger.Txn) error {
-		dbItem, err := txn.Get(key)
+	var item *badger.Item
+	var err error
+	err = b.ds.DB.View(func(txn *badger.Txn) error {
+		item, err = txn.Get(key)
 		if err != nil {
 			return err
 		}
-		val, err := dbItem.ValueCopy(nil)
-		if err != nil {
-			return err
-		}
-		item = StorageItem{key: key, val: val}
 		return nil
 	})
 	return item, err
