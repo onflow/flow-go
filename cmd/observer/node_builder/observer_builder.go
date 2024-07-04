@@ -14,12 +14,14 @@ import (
 	"time"
 
 	"github.com/ipfs/boxo/bitswap"
+	"github.com/ipfs/go-datastore"
 	badger "github.com/ipfs/go-ds-badger2"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/routing"
 	"github.com/onflow/crypto"
+	storage2 "github.com/onflow/flow-go/module/executiondatasync/storage"
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
 	"google.golang.org/grpc/credentials"
@@ -149,6 +151,7 @@ type ObserverServiceConfig struct {
 	logTxTimeToFinalizedExecuted bool
 	executionDataSyncEnabled     bool
 	executionDataIndexingEnabled bool
+	pebbleDBExecutionDataEnabled bool
 	localServiceAPIEnabled       bool
 	executionDataDir             string
 	executionDataStartHeight     uint64
@@ -219,6 +222,7 @@ func DefaultObserverServiceConfig() *ObserverServiceConfig {
 		logTxTimeToFinalizedExecuted: false,
 		executionDataSyncEnabled:     false,
 		executionDataIndexingEnabled: false,
+		pebbleDBExecutionDataEnabled: false,
 		localServiceAPIEnabled:       false,
 		executionDataDir:             filepath.Join(homedir, ".flow", "execution_data"),
 		executionDataStartHeight:     0,
@@ -656,6 +660,10 @@ func (builder *ObserverServiceBuilder) extraFlags() {
 		flags.BoolVar(&builder.localServiceAPIEnabled, "local-service-api-enabled", defaultConfig.localServiceAPIEnabled, "whether to use local indexed data for api queries")
 		flags.StringVar(&builder.registersDBPath, "execution-state-dir", defaultConfig.registersDBPath, "directory to use for execution-state database")
 		flags.StringVar(&builder.checkpointFile, "execution-state-checkpoint", defaultConfig.checkpointFile, "execution-state checkpoint file")
+		flags.BoolVar(&builder.pebbleDBExecutionDataEnabled,
+			"pebble-execution-data-db-enabled",
+			defaultConfig.pebbleDBExecutionDataEnabled,
+			"[experimental] whether to enable the pebble as the DB for execution data")
 
 		// ExecutionDataRequester config
 		flags.BoolVar(&builder.executionDataSyncEnabled,
@@ -1059,7 +1067,8 @@ func (builder *ObserverServiceBuilder) Build() (cmd.Node, error) {
 }
 
 func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverServiceBuilder {
-	var ds *badger.Datastore
+	var ds datastore.Batching
+	var storageDB storage2.StorageDB
 	var bs network.BlobService
 	var processedBlockHeight storage.ConsumerProgress
 	var processedNotifications storage.ConsumerProgress
@@ -1083,13 +1092,21 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				return err
 			}
 
-			ds, err = badger.NewDatastore(datastoreDir, &badger.DefaultOptions)
-			if err != nil {
-				return err
+			if builder.pebbleDBExecutionDataEnabled {
+				storageDB, err = storage2.NewPebbleDBWrapper(datastoreDir, nil)
+				if err != nil {
+					return err
+				}
+			} else {
+				storageDB, err = storage2.NewBadgerDBWrapper(datastoreDir, &badger.DefaultOptions)
+				if err != nil {
+					return err
+				}
 			}
+			ds = storageDB.Datastore()
 
 			builder.ShutdownFunc(func() error {
-				if err := ds.Close(); err != nil {
+				if err := storageDB.Close(); err != nil {
 					return fmt.Errorf("could not close execution data datastore: %w", err)
 				}
 				return nil
@@ -1100,13 +1117,13 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 		Module("processed block height consumer progress", func(node *cmd.NodeConfig) error {
 			// Note: progress is stored in the datastore's DB since that is where the jobqueue
 			// writes execution data to.
-			processedBlockHeight = bstorage.NewConsumerProgress(ds.DB, module.ConsumeProgressExecutionDataRequesterBlockHeight)
+			processedBlockHeight = bstorage.NewConsumerProgress(builder.DB, module.ConsumeProgressExecutionDataRequesterBlockHeight)
 			return nil
 		}).
 		Module("processed notifications consumer progress", func(node *cmd.NodeConfig) error {
 			// Note: progress is stored in the datastore's DB since that is where the jobqueue
 			// writes execution data to.
-			processedNotifications = bstorage.NewConsumerProgress(ds.DB, module.ConsumeProgressExecutionDataRequesterNotification)
+			processedNotifications = bstorage.NewConsumerProgress(builder.DB, module.ConsumeProgressExecutionDataRequesterNotification)
 			return nil
 		}).
 		Module("blobservice peer manager dependencies", func(node *cmd.NodeConfig) error {

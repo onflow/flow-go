@@ -12,10 +12,12 @@ import (
 	"time"
 
 	"github.com/ipfs/boxo/bitswap"
+	"github.com/ipfs/go-datastore"
 	badger "github.com/ipfs/go-ds-badger2"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/routing"
 	"github.com/onflow/crypto"
+	storage2 "github.com/onflow/flow-go/module/executiondatasync/storage"
 	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
@@ -146,6 +148,7 @@ type AccessNodeConfig struct {
 	executionDataDir                  string
 	executionDataStartHeight          uint64
 	executionDataConfig               edrequester.ExecutionDataConfig
+	pebbleDBExecutionDataEnabled      bool
 	PublicNetworkConfig               PublicNetworkConfig
 	TxResultCacheSize                 uint
 	TxErrorMessagesCacheSize          uint
@@ -247,6 +250,7 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 			MaxRetryDelay:      edrequester.DefaultMaxRetryDelay,
 		},
 		executionDataIndexingEnabled: false,
+		pebbleDBExecutionDataEnabled: false,
 		registersDBPath:              filepath.Join(homedir, ".flow", "execution_state"),
 		checkpointFile:               cmd.NotSet,
 		scriptExecutorConfig:         query.NewDefaultConfig(),
@@ -502,7 +506,8 @@ func (builder *FlowAccessNodeBuilder) BuildConsensusFollower() *FlowAccessNodeBu
 }
 
 func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccessNodeBuilder {
-	var ds *badger.Datastore
+	var ds datastore.Batching
+	var storageDB storage2.StorageDB
 	var bs network.BlobService
 	var processedBlockHeight storage.ConsumerProgress
 	var processedNotifications storage.ConsumerProgress
@@ -525,14 +530,21 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			if err != nil {
 				return err
 			}
-
-			ds, err = badger.NewDatastore(datastoreDir, &badger.DefaultOptions)
-			if err != nil {
-				return err
+			if builder.pebbleDBExecutionDataEnabled {
+				storageDB, err = storage2.NewPebbleDBWrapper(datastoreDir, nil)
+				if err != nil {
+					return err
+				}
+			} else {
+				storageDB, err = storage2.NewBadgerDBWrapper(datastoreDir, &badger.DefaultOptions)
+				if err != nil {
+					return err
+				}
 			}
+			ds = storageDB.Datastore()
 
 			builder.ShutdownFunc(func() error {
-				if err := ds.Close(); err != nil {
+				if err := storageDB.Close(); err != nil {
 					return fmt.Errorf("could not close execution data datastore: %w", err)
 				}
 				return nil
@@ -543,13 +555,15 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 		Module("processed block height consumer progress", func(node *cmd.NodeConfig) error {
 			// Note: progress is stored in the datastore's DB since that is where the jobqueue
 			// writes execution data to.
-			processedBlockHeight = bstorage.NewConsumerProgress(ds.DB, module.ConsumeProgressExecutionDataRequesterBlockHeight)
+			//TODO: Uliana: ask
+			processedBlockHeight = bstorage.NewConsumerProgress(builder.DB, module.ConsumeProgressExecutionDataRequesterBlockHeight)
 			return nil
 		}).
 		Module("processed notifications consumer progress", func(node *cmd.NodeConfig) error {
 			// Note: progress is stored in the datastore's DB since that is where the jobqueue
 			// writes execution data to.
-			processedNotifications = bstorage.NewConsumerProgress(ds.DB, module.ConsumeProgressExecutionDataRequesterNotification)
+			//TODO: Uliana: ask
+			processedNotifications = bstorage.NewConsumerProgress(builder.DB, module.ConsumeProgressExecutionDataRequesterNotification)
 			return nil
 		}).
 		Module("blobservice peer manager dependencies", func(node *cmd.NodeConfig) error {
@@ -1179,6 +1193,10 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 			"execution-data-max-retry-delay",
 			defaultConfig.executionDataConfig.MaxRetryDelay,
 			"maximum delay for exponential backoff when fetching execution data fails e.g. 5m")
+		flags.BoolVar(&builder.pebbleDBExecutionDataEnabled,
+			"pebble-execution-data-db-enabled",
+			defaultConfig.pebbleDBExecutionDataEnabled,
+			"[experimental] whether to enable the pebble as the DB for execution data")
 
 		// Execution State Streaming API
 		flags.Uint32Var(&builder.stateStreamConf.ExecutionDataCacheSize, "execution-data-cache-size", defaultConfig.stateStreamConf.ExecutionDataCacheSize, "block execution data cache size")
