@@ -389,8 +389,8 @@ func (v *TransactionValidator) checkSufficientBalanceToPayForTransaction(ctx con
 	}
 
 	payerAddress := cadence.NewAddress(tx.Payer)
-	inclusionEffort := cadence.UInt64(tx.InclusionEffort())
-	gasLimit := cadence.UInt64(tx.GasLimit)
+	inclusionEffort := cadence.UFix64(tx.InclusionEffort())
+	gasLimit := cadence.UFix64(tx.GasLimit)
 
 	args, err := cadenceutils.EncodeArgs([]cadence.Value{payerAddress, inclusionEffort, gasLimit})
 	if err != nil {
