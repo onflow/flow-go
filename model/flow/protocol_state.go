@@ -108,6 +108,14 @@ func (c *EpochStateContainer) Copy() *EpochStateContainer {
 	}
 }
 
+// EpochStateEntry is a MinEpochStateEntry which has additional fields that are cached
+// from storage layer for convenience.
+// Using this structure instead of MinEpochStateEntry allows us to avoid querying
+// the database for epoch setups and commits.
+// It holds several invariants, such as:
+//   - CurrentEpochSetup and CurrentEpochCommit are for the same epoch. Never nil.
+//   - PreviousEpochSetup and PreviousEpochCommit are for the same epoch. Can be nil.
+//   - NextEpochSetup and NextEpochCommit are for the same epoch. Can be nil.
 type EpochStateEntry struct {
 	*MinEpochStateEntry
 
@@ -119,8 +127,10 @@ type EpochStateEntry struct {
 	NextEpochCommit     *EpochCommit
 }
 
+// NewEpochStateEntry constructs a EpochStateEntry from an MinEpochStateEntry and additional data.
+// No errors are expected during normal operation. All errors indicate inconsistent or invalid inputs.
 func NewEpochStateEntry(
-	protocolState *MinEpochStateEntry,
+	epochState *MinEpochStateEntry,
 	previousEpochSetup *EpochSetup,
 	previousEpochCommit *EpochCommit,
 	currentEpochSetup *EpochSetup,
@@ -129,7 +139,7 @@ func NewEpochStateEntry(
 	nextEpochCommit *EpochCommit,
 ) (*EpochStateEntry, error) {
 	result := &EpochStateEntry{
-		MinEpochStateEntry:  protocolState,
+		MinEpochStateEntry:  epochState,
 		PreviousEpochSetup:  previousEpochSetup,
 		PreviousEpochCommit: previousEpochCommit,
 		CurrentEpochSetup:   currentEpochSetup,
@@ -139,12 +149,12 @@ func NewEpochStateEntry(
 	}
 
 	// If previous epoch is specified: ensure respective epoch service events are not nil and consistent with commitments in `MinEpochStateEntry.PreviousEpoch`
-	if protocolState.PreviousEpoch != nil {
-		if protocolState.PreviousEpoch.SetupID != previousEpochSetup.ID() { // calling ID() will panic is EpochSetup event is nil
-			return nil, fmt.Errorf("supplied previous epoch's setup event (%x) does not match commitment (%x) in MinEpochStateEntry", previousEpochSetup.ID(), protocolState.PreviousEpoch.SetupID)
+	if epochState.PreviousEpoch != nil {
+		if epochState.PreviousEpoch.SetupID != previousEpochSetup.ID() { // calling ID() will panic is EpochSetup event is nil
+			return nil, fmt.Errorf("supplied previous epoch's setup event (%x) does not match commitment (%x) in MinEpochStateEntry", previousEpochSetup.ID(), epochState.PreviousEpoch.SetupID)
 		}
-		if protocolState.PreviousEpoch.CommitID != previousEpochCommit.ID() { // calling ID() will panic is EpochCommit event is nil
-			return nil, fmt.Errorf("supplied previous epoch's commit event (%x) does not match commitment (%x) in MinEpochStateEntry", previousEpochCommit.ID(), protocolState.PreviousEpoch.CommitID)
+		if epochState.PreviousEpoch.CommitID != previousEpochCommit.ID() { // calling ID() will panic is EpochCommit event is nil
+			return nil, fmt.Errorf("supplied previous epoch's commit event (%x) does not match commitment (%x) in MinEpochStateEntry", previousEpochCommit.ID(), epochState.PreviousEpoch.CommitID)
 		}
 	} else {
 		if previousEpochSetup != nil {
@@ -156,21 +166,21 @@ func NewEpochStateEntry(
 	}
 
 	// For current epoch: ensure respective epoch service events are not nil and consistent with commitments in `MinEpochStateEntry.CurrentEpoch`
-	if protocolState.CurrentEpoch.SetupID != currentEpochSetup.ID() { // calling ID() will panic is EpochSetup event is nil
-		return nil, fmt.Errorf("supplied current epoch's setup event (%x) does not match commitment (%x) in MinEpochStateEntry", currentEpochSetup.ID(), protocolState.CurrentEpoch.SetupID)
+	if epochState.CurrentEpoch.SetupID != currentEpochSetup.ID() { // calling ID() will panic is EpochSetup event is nil
+		return nil, fmt.Errorf("supplied current epoch's setup event (%x) does not match commitment (%x) in MinEpochStateEntry", currentEpochSetup.ID(), epochState.CurrentEpoch.SetupID)
 	}
-	if protocolState.CurrentEpoch.CommitID != currentEpochCommit.ID() { // calling ID() will panic is EpochCommit event is nil
-		return nil, fmt.Errorf("supplied current epoch's commit event (%x) does not match commitment (%x) in MinEpochStateEntry", currentEpochCommit.ID(), protocolState.CurrentEpoch.CommitID)
+	if epochState.CurrentEpoch.CommitID != currentEpochCommit.ID() { // calling ID() will panic is EpochCommit event is nil
+		return nil, fmt.Errorf("supplied current epoch's commit event (%x) does not match commitment (%x) in MinEpochStateEntry", currentEpochCommit.ID(), epochState.CurrentEpoch.CommitID)
 	}
 
-	// If we are in staking phase (i.e. protocolState.NextEpoch == nil):
+	// If we are in staking phase (i.e. epochState.NextEpoch == nil):
 	//  (1) Full identity table contains active identities from current epoch.
 	//      If previous epoch exists, we add nodes from previous epoch that are leaving in the current epoch with `EpochParticipationStatusLeaving` status.
-	// Otherwise, we are in epoch setup or epoch commit phase (i.e. protocolState.NextEpoch ≠ nil):
+	// Otherwise, we are in epoch setup or epoch commit phase (i.e. epochState.NextEpoch ≠ nil):
 	//  (2a) Full identity table contains active identities from current epoch + nodes joining in next epoch with `EpochParticipationStatusJoining` status.
 	//  (2b) Furthermore, we also build the full identity table for the next epoch's staking phase:
 	//       active identities from next epoch + nodes from current epoch that are leaving at the end of the current epoch with `flow.EpochParticipationStatusLeaving` status.
-	nextEpoch := protocolState.NextEpoch
+	nextEpoch := epochState.NextEpoch
 	if nextEpoch == nil { // in staking phase: build full identity table for current epoch according to (1)
 		if nextEpochSetup != nil {
 			return nil, fmt.Errorf("no next epoch but gotten non-nil EpochSetup event")
@@ -178,7 +188,7 @@ func NewEpochStateEntry(
 		if nextEpochCommit != nil {
 			return nil, fmt.Errorf("no next epoch but gotten non-nil EpochCommit event")
 		}
-	} else { // protocolState.NextEpoch ≠ nil, i.e. we are in epoch setup or epoch commit phase
+	} else { // epochState.NextEpoch ≠ nil, i.e. we are in epoch setup or epoch commit phase
 		// ensure respective epoch service events are not nil and consistent with commitments in `MinEpochStateEntry.NextEpoch`
 		if nextEpoch.SetupID != nextEpochSetup.ID() {
 			return nil, fmt.Errorf("supplied next epoch's setup event (%x) does not match commitment (%x) in MinEpochStateEntry", nextEpoch.SetupID, nextEpochSetup.ID())
@@ -196,13 +206,11 @@ func NewEpochStateEntry(
 	return result, nil
 }
 
-// RichEpochStateEntry is a MinEpochStateEntry which has additional fields that are cached
+// RichEpochStateEntry is a EpochStateEntry which has additional fields that are cached
 // from storage layer for convenience.
-// Using this structure instead of MinEpochStateEntry allows us to avoid querying
-// the database for epoch setups and commits and full identity table.
+// This structure extends EpochStateEntry by adding full identity table.
 // It holds several invariants, such as:
-//   - CurrentEpochSetup and CurrentEpochCommit are for the same epoch. Never nil.
-//   - PreviousEpochSetup and PreviousEpochCommit are for the same epoch. Can be nil.
+//   - Invariants inherited from EpochStateEntry.
 //   - CurrentEpochIdentityTable is the full (dynamic) identity table for the current epoch.
 //     Identities are sorted in canonical order. Without duplicates. Never nil.
 //   - NextEpochIdentityTable is the full (dynamic) identity table for the next epoch. Can be nil.
@@ -221,7 +229,7 @@ type RichEpochStateEntry struct {
 	NextEpochIdentityTable    IdentityList
 }
 
-// NewRichEpochStateEntry constructs a RichEpochStateEntry from an MinEpochStateEntry and additional data.
+// NewRichEpochStateEntry constructs a RichEpochStateEntry from an EpochStateEntry.
 // No errors are expected during normal operation. All errors indicate inconsistent or invalid inputs.
 func NewRichEpochStateEntry(
 	epochState *EpochStateEntry,
