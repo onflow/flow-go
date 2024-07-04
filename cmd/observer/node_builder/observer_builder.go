@@ -21,7 +21,6 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/routing"
 	"github.com/onflow/crypto"
-	storage2 "github.com/onflow/flow-go/module/executiondatasync/storage"
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
 	"google.golang.org/grpc/credentials"
@@ -66,6 +65,7 @@ import (
 	"github.com/onflow/flow-go/module/execution"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	execdatacache "github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
+	storagedb "github.com/onflow/flow-go/module/executiondatasync/storage"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
 	"github.com/onflow/flow-go/module/grpcserver"
 	"github.com/onflow/flow-go/module/id"
@@ -1068,7 +1068,7 @@ func (builder *ObserverServiceBuilder) Build() (cmd.Node, error) {
 
 func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverServiceBuilder {
 	var ds datastore.Batching
-	var storageDB storage2.StorageDB
+	var storageDB storagedb.StorageDB
 	var bs network.BlobService
 	var processedBlockHeight storage.ConsumerProgress
 	var processedNotifications storage.ConsumerProgress
@@ -1093,12 +1093,12 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 			}
 
 			if builder.pebbleDBExecutionDataEnabled {
-				storageDB, err = storage2.NewPebbleDBWrapper(datastoreDir, nil)
+				storageDB, err = storagedb.NewPebbleDBWrapper(datastoreDir, nil)
 				if err != nil {
 					return err
 				}
 			} else {
-				storageDB, err = storage2.NewBadgerDBWrapper(datastoreDir, &badger.DefaultOptions)
+				storageDB, err = storagedb.NewBadgerDBWrapper(datastoreDir, &badger.DefaultOptions)
 				if err != nil {
 					return err
 				}

@@ -17,7 +17,6 @@ import (
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/routing"
 	"github.com/onflow/crypto"
-	storage2 "github.com/onflow/flow-go/module/executiondatasync/storage"
 	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
@@ -67,6 +66,7 @@ import (
 	"github.com/onflow/flow-go/module/execution"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	execdatacache "github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
+	storagedb "github.com/onflow/flow-go/module/executiondatasync/storage"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
 	"github.com/onflow/flow-go/module/grpcserver"
 	"github.com/onflow/flow-go/module/id"
@@ -507,7 +507,7 @@ func (builder *FlowAccessNodeBuilder) BuildConsensusFollower() *FlowAccessNodeBu
 
 func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccessNodeBuilder {
 	var ds datastore.Batching
-	var storageDB storage2.StorageDB
+	var storageDB storagedb.StorageDB
 	var bs network.BlobService
 	var processedBlockHeight storage.ConsumerProgress
 	var processedNotifications storage.ConsumerProgress
@@ -531,12 +531,12 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				return err
 			}
 			if builder.pebbleDBExecutionDataEnabled {
-				storageDB, err = storage2.NewPebbleDBWrapper(datastoreDir, nil)
+				storageDB, err = storagedb.NewPebbleDBWrapper(datastoreDir, nil)
 				if err != nil {
 					return err
 				}
 			} else {
-				storageDB, err = storage2.NewBadgerDBWrapper(datastoreDir, &badger.DefaultOptions)
+				storageDB, err = storagedb.NewBadgerDBWrapper(datastoreDir, &badger.DefaultOptions)
 				if err != nil {
 					return err
 				}
@@ -555,14 +555,12 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 		Module("processed block height consumer progress", func(node *cmd.NodeConfig) error {
 			// Note: progress is stored in the datastore's DB since that is where the jobqueue
 			// writes execution data to.
-			//TODO: Uliana: ask
 			processedBlockHeight = bstorage.NewConsumerProgress(builder.DB, module.ConsumeProgressExecutionDataRequesterBlockHeight)
 			return nil
 		}).
 		Module("processed notifications consumer progress", func(node *cmd.NodeConfig) error {
 			// Note: progress is stored in the datastore's DB since that is where the jobqueue
 			// writes execution data to.
-			//TODO: Uliana: ask
 			processedNotifications = bstorage.NewConsumerProgress(builder.DB, module.ConsumeProgressExecutionDataRequesterNotification)
 			return nil
 		}).
