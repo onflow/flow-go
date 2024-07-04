@@ -43,7 +43,7 @@ func newConfig(ctx types.BlockContext) *Config {
 		WithBlockTime(ctx.BlockTimestamp),
 		WithCoinbase(ctx.GasFeeCollector.ToCommon()),
 		WithDirectCallBaseGasUsage(ctx.DirectCallBaseGasUsage),
-		WithExtraPrecompiles(ctx.ExtraPrecompiles),
+		WithExtraPrecompiledContracts(ctx.ExtraPrecompiledContracts),
 		WithGetBlockHashFunction(ctx.GetHashFunc),
 		WithRandom(&ctx.Random),
 		WithTransactionTracer(ctx.Tracer),
@@ -95,9 +95,6 @@ func (bv *ReadOnlyBlockView) CodeHashOf(address types.Address) ([]byte, error) {
 }
 
 // BlockView allows mutation of the evm state as part of a block
-//
-// TODO: allow  multiple calls per block view
-// TODO: add block level commit (separation of trie commit to storage)
 type BlockView struct {
 	config   *Config
 	rootAddr flow.Address
@@ -106,14 +103,16 @@ type BlockView struct {
 
 // DirectCall executes a direct call
 func (bl *BlockView) DirectCall(call *types.DirectCall) (*types.Result, error) {
+	// negative amounts are not acceptable.
+	if call.Value.Sign() < 0 {
+		return nil, types.ErrInvalidBalance
+	}
+
 	proc, err := bl.newProcedure()
 	if err != nil {
 		return nil, err
 	}
-	txHash, err := call.Hash()
-	if err != nil {
-		return nil, err
-	}
+	txHash := call.Hash()
 	switch call.SubType {
 	case types.DepositCallSubType:
 		return proc.mintTo(call, txHash)
@@ -150,6 +149,11 @@ func (bl *BlockView) RunTransaction(
 		return types.NewInvalidResult(tx, err), nil
 	}
 
+	// negative amounts are not acceptable.
+	if msg.Value.Sign() < 0 {
+		return nil, types.ErrInvalidBalance
+	}
+
 	// update tx context origin
 	proc.evm.TxContext.Origin = msg.From
 	res, err := proc.run(msg, tx.Hash(), 0, tx.Type())
@@ -180,6 +184,11 @@ func (bl *BlockView) BatchRunTransactions(txs []*gethTypes.Transaction) ([]*type
 		if err != nil {
 			batchResults[i] = types.NewInvalidResult(tx, err)
 			continue
+		}
+
+		// negative amounts are not acceptable.
+		if msg.Value.Sign() < 0 {
+			return nil, types.ErrInvalidBalance
 		}
 
 		// update tx context origin
@@ -222,6 +231,11 @@ func (bl *BlockView) DryRunTransaction(
 		GetSigner(bl.config),
 		proc.config.BlockContext.BaseFee,
 	)
+	// negative amounts are not acceptable.
+	if msg.Value.Sign() < 0 {
+		return nil, types.ErrInvalidBalance
+	}
+
 	// we can ignore invalid signature errors since we don't expect signed transctions
 	if !errors.Is(err, gethTypes.ErrInvalidSig) {
 		return nil, err
@@ -234,7 +248,29 @@ func (bl *BlockView) DryRunTransaction(
 	msg.SkipAccountChecks = true
 
 	// return without commiting the state
-	return proc.run(msg, tx.Hash(), 0, tx.Type())
+	txResult, err := proc.run(msg, tx.Hash(), 0, tx.Type())
+	if txResult.Successful() {
+		// As mentioned in https://github.com/ethereum/EIPs/blob/master/EIPS/eip-150.md#specification
+		// Define "all but one 64th" of N as N - floor(N / 64).
+		// If a call asks for more gas than the maximum allowed amount
+		// (i.e. the total amount of gas remaining in the parent after subtracting
+		// the gas cost of the call and memory expansion), do not return an OOG error;
+		// instead, if a call asks for more gas than all but one 64th of the maximum
+		// allowed amount, call with all but one 64th of the maximum allowed amount of
+		// gas (this is equivalent to a version of EIP-901 plus EIP-1142).
+		// CREATE only provides all but one 64th of the parent gas to the child call.
+		txResult.GasConsumed = AddOne64th(txResult.GasConsumed)
+
+		// Adding `gethParams.SstoreSentryGasEIP2200` is needed for this condition:
+		// https://github.com/onflow/go-ethereum/blob/master/core/vm/operations_acl.go#L29-L32
+		txResult.GasConsumed += gethParams.SstoreSentryGasEIP2200
+
+		// Take into account any gas refunds, which are calculated only after
+		// transaction execution.
+		txResult.GasConsumed += txResult.GasRefund
+	}
+
+	return txResult, err
 }
 
 func (bl *BlockView) newProcedure() (*procedure, error) {
@@ -281,6 +317,11 @@ func (proc *procedure) mintTo(
 	call *types.DirectCall,
 	txHash gethCommon.Hash,
 ) (*types.Result, error) {
+	// negative amounts are not acceptable.
+	if call.Value.Sign() < 0 {
+		return nil, types.ErrInvalidBalance
+	}
+
 	bridge := call.From.ToCommon()
 
 	// create bridge account if not exist
@@ -315,6 +356,11 @@ func (proc *procedure) withdrawFrom(
 	call *types.DirectCall,
 	txHash gethCommon.Hash,
 ) (*types.Result, error) {
+	// negative amounts are not acceptable.
+	if call.Value.Sign() < 0 {
+		return nil, types.ErrInvalidBalance
+	}
+
 	bridge := call.To.ToCommon()
 
 	// create bridge account if not exist
@@ -496,11 +542,14 @@ func (proc *procedure) run(
 	txIndex uint,
 	txType uint8,
 ) (*types.Result, error) {
+	var err error
 	res := types.Result{
 		TxType: txType,
 		TxHash: txHash,
 	}
 
+	// reset precompile tracking
+	proc.resetPrecompileTracking()
 	gasPool := (*gethCore.GasPool)(&proc.config.BlockContext.GasLimit)
 	execResult, err := gethCore.NewStateTransition(
 		proc.evm,
@@ -522,7 +571,15 @@ func (proc *procedure) run(
 	// if prechecks are passed, the exec result won't be nil
 	if execResult != nil {
 		res.GasConsumed = execResult.UsedGas
+		res.GasRefund = proc.state.GetRefund()
 		res.Index = uint16(txIndex)
+
+		if proc.extraPrecompiledIsCalled() {
+			res.PrecompiledCalls, err = proc.capturePrecompiledCalls()
+			if err != nil {
+				return nil, err
+			}
+		}
 		// we need to capture the returned value no matter the status
 		// if the tx is reverted the error message is returned as returned value
 		res.ReturnedData = execResult.ReturnData
@@ -545,4 +602,34 @@ func (proc *procedure) run(
 		}
 	}
 	return &res, nil
+}
+
+func (proc *procedure) resetPrecompileTracking() {
+	for _, pc := range proc.config.ExtraPrecompiles {
+		pc.Reset()
+	}
+}
+
+func (proc *procedure) extraPrecompiledIsCalled() bool {
+	for _, pc := range proc.config.ExtraPrecompiles {
+		if pc.IsCalled() {
+			return true
+		}
+	}
+	return false
+}
+
+func (proc *procedure) capturePrecompiledCalls() ([]byte, error) {
+	apc := make(types.AggregatedPrecompiledCalls, 0)
+	for _, pc := range proc.config.ExtraPrecompiles {
+		if pc.IsCalled() {
+			apc = append(apc, *pc.CapturedCalls())
+		}
+	}
+	return apc.Encode()
+}
+
+func AddOne64th(n uint64) uint64 {
+	// NOTE: Go's integer division floors, but that is desirable here
+	return n + (n / 64)
 }

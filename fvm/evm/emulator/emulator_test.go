@@ -60,9 +60,7 @@ func TestNativeTokenBridging(t *testing.T) {
 						res, err := blk.DirectCall(call)
 						require.NoError(t, err)
 						require.Equal(t, defaultCtx.DirectCallBaseGasUsage, res.GasConsumed)
-						expectedHash, err := call.Hash()
-						require.NoError(t, err)
-						require.Equal(t, expectedHash, res.TxHash)
+						require.Equal(t, call.Hash(), res.TxHash)
 						nonce += 1
 					})
 				})
@@ -94,9 +92,7 @@ func TestNativeTokenBridging(t *testing.T) {
 						res, err := blk.DirectCall(call)
 						require.NoError(t, err)
 						require.Equal(t, defaultCtx.DirectCallBaseGasUsage, res.GasConsumed)
-						expectedHash, err := call.Hash()
-						require.NoError(t, err)
-						require.Equal(t, expectedHash, res.TxHash)
+						require.Equal(t, call.Hash(), res.TxHash)
 						nonce += 1
 					})
 				})
@@ -155,9 +151,7 @@ func TestContractInteraction(t *testing.T) {
 						require.NoError(t, err)
 						require.NotNil(t, res.DeployedContractAddress)
 						contractAddr = *res.DeployedContractAddress
-						expectedHash, err := call.Hash()
-						require.NoError(t, err)
-						require.Equal(t, expectedHash, res.TxHash)
+						require.Equal(t, call.Hash(), res.TxHash)
 						nonce += 1
 					})
 					RunWithNewReadOnlyBlockView(t, env, func(blk types.ReadOnlyBlockView) {
@@ -194,6 +188,7 @@ func TestContractInteraction(t *testing.T) {
 						require.NoError(t, err)
 						require.GreaterOrEqual(t, res.GasConsumed, uint64(40_000))
 						nonce += 1
+						require.Empty(t, res.PrecompiledCalls)
 					})
 				})
 
@@ -761,21 +756,44 @@ func TestCallingExtraPrecompiles(t *testing.T) {
 				input := []byte{1, 2}
 				output := []byte{3, 4}
 				addr := testutils.RandomAddress(t)
-				pc := &MockedPrecompile{
+				isCalled := false
+				capturedCall := &types.PrecompiledCalls{
+					Address: addr,
+					RequiredGasCalls: []types.RequiredGasCall{{
+						Input:  input,
+						Output: uint64(10),
+					}},
+					RunCalls: []types.RunCall{{
+						Input:    input,
+						Output:   output,
+						ErrorMsg: "",
+					}},
+				}
+				pc := &MockedPrecompiled{
 					AddressFunc: func() types.Address {
 						return addr
 					},
 					RequiredGasFunc: func(input []byte) uint64 {
+						isCalled = true
 						return uint64(10)
 					},
 					RunFunc: func(inp []byte) ([]byte, error) {
+						isCalled = true
 						require.Equal(t, input, inp)
 						return output, nil
+					},
+					IsCalledFunc: func() bool {
+						return isCalled
+					},
+					CapturedCallsFunc: func() *types.PrecompiledCalls {
+						return capturedCall
+					},
+					ResetFunc: func() {
 					},
 				}
 
 				ctx := types.NewDefaultBlockContext(blockNumber.Uint64())
-				ctx.ExtraPrecompiles = []types.Precompile{pc}
+				ctx.ExtraPrecompiledContracts = []types.PrecompiledContract{pc}
 
 				blk, err := em.NewBlockView(ctx)
 				require.NoError(t, err)
@@ -792,6 +810,12 @@ func TestCallingExtraPrecompiles(t *testing.T) {
 				)
 				require.NoError(t, err)
 				require.Equal(t, output, res.ReturnedData)
+				require.NotEmpty(t, res.PrecompiledCalls)
+
+				apc, err := types.AggregatedPrecompileCallsFromEncoded(res.PrecompiledCalls)
+				require.NoError(t, err)
+				require.Len(t, apc, 1)
+				require.Equal(t, *capturedCall, apc[0])
 			})
 		})
 	})
@@ -1025,29 +1049,55 @@ func TestTransactionTracing(t *testing.T) {
 
 }
 
-type MockedPrecompile struct {
-	AddressFunc     func() types.Address
-	RequiredGasFunc func(input []byte) uint64
-	RunFunc         func(input []byte) ([]byte, error)
+type MockedPrecompiled struct {
+	AddressFunc       func() types.Address
+	RequiredGasFunc   func(input []byte) uint64
+	RunFunc           func(input []byte) ([]byte, error)
+	CapturedCallsFunc func() *types.PrecompiledCalls
+	ResetFunc         func()
+	IsCalledFunc      func() bool
 }
 
-func (mp *MockedPrecompile) Address() types.Address {
+var _ types.PrecompiledContract = &MockedPrecompiled{}
+
+func (mp *MockedPrecompiled) Address() types.Address {
 	if mp.AddressFunc == nil {
-		panic("Address not set for the mocked precompile")
+		panic("Address not set for the mocked precompiled contract")
 	}
 	return mp.AddressFunc()
 }
 
-func (mp *MockedPrecompile) RequiredGas(input []byte) uint64 {
+func (mp *MockedPrecompiled) RequiredGas(input []byte) uint64 {
 	if mp.RequiredGasFunc == nil {
-		panic("RequiredGas not set for the mocked precompile")
+		panic("RequiredGas not set for the mocked precompiled contract")
 	}
 	return mp.RequiredGasFunc(input)
 }
 
-func (mp *MockedPrecompile) Run(input []byte) ([]byte, error) {
+func (mp *MockedPrecompiled) IsCalled() bool {
+	if mp.IsCalledFunc == nil {
+		panic("IsCalled not set for the mocked precompiled contract")
+	}
+	return mp.IsCalledFunc()
+}
+
+func (mp *MockedPrecompiled) Run(input []byte) ([]byte, error) {
 	if mp.RunFunc == nil {
-		panic("Run not set for the mocked precompile")
+		panic("Run not set for the mocked precompiled contract")
 	}
 	return mp.RunFunc(input)
+}
+
+func (mp *MockedPrecompiled) CapturedCalls() *types.PrecompiledCalls {
+	if mp.CapturedCallsFunc == nil {
+		panic("CapturedCalls not set for the mocked precompiled contract")
+	}
+	return mp.CapturedCallsFunc()
+}
+
+func (mp *MockedPrecompiled) Reset() {
+	if mp.ResetFunc == nil {
+		panic("Reset not set for the mocked precompiled contract")
+	}
+	mp.ResetFunc()
 }

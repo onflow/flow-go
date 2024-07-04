@@ -33,6 +33,7 @@ import (
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/trace"
 )
 
 // TODO add test for fatal errors
@@ -635,6 +636,47 @@ func TestHandler_COA(t *testing.T) {
 
 				ret := foa.Call(arch, precompiles.FlowBlockHeightFuncSig[:], math.MaxUint64, types.NewBalanceFromUFix64(0))
 				require.Equal(t, big.NewInt(int64(blockHeight)), new(big.Int).SetBytes(ret.ReturnedData))
+
+				events := backend.Events()
+				require.Len(t, events, 6)
+				// last transaction executed event
+				event := events[4]
+				assert.Equal(t, event.Type, types.EventTypeTransactionExecuted)
+				ev, err := jsoncdc.Decode(nil, event.Payload)
+				require.NoError(t, err)
+				cadenceEvent, ok := ev.(cadence.Event)
+				require.True(t, ok)
+				txEventPayload, err := types.DecodeTransactionEventPayload(cadenceEvent)
+				require.NoError(t, err)
+
+				values := txEventPayload.PrecompiledCalls.Values
+				aggregated := make([]byte, len(values))
+				for i, v := range values {
+					aggregated[i] = uint8(v.(cadence.UInt8))
+				}
+				apc, err := types.AggregatedPrecompileCallsFromEncoded(aggregated)
+				require.NoError(t, err)
+
+				require.False(t, apc.IsEmpty())
+				pc := apc[0]
+				require.Equal(t, arch, pc.Address)
+				require.Len(t, pc.RequiredGasCalls, 1)
+				require.Equal(t,
+					pc.RequiredGasCalls[0],
+					types.RequiredGasCall{
+						Input:  precompiles.FlowBlockHeightFuncSig[:],
+						Output: precompiles.FlowBlockHeightFixedGas,
+					},
+				)
+				require.Len(t, pc.RunCalls, 1)
+				require.Equal(t,
+					pc.RunCalls[0],
+					types.RunCall{
+						Input:    precompiles.FlowBlockHeightFuncSig[:],
+						Output:   ret.ReturnedData,
+						ErrorMsg: "",
+					},
+				)
 			})
 		})
 	})
@@ -1253,6 +1295,57 @@ func TestHandler_TransactionRun(t *testing.T) {
 						require.True(t, ok)
 						require.Equal(t, traceResults[i], val)
 					}
+				})
+			})
+		})
+	})
+
+	t.Run("test - open tracing", func(t *testing.T) {
+		t.Parallel()
+
+		testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
+			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
+				testutils.RunWithEOATestAccount(t, backend, rootAddr, func(eoa *testutils.EOATestAccount) {
+
+					tx := gethTypes.NewTransaction(
+						uint64(1),
+						gethCommon.Address{1, 2},
+						big.NewInt(13),
+						uint64(0),
+						big.NewInt(1000),
+						[]byte{},
+					)
+
+					rlpTx, err := tx.MarshalBinary()
+					require.NoError(t, err)
+
+					handler := SetupHandler(t, backend, rootAddr)
+
+					backend.ExpectedSpan(t, trace.FVMEVMDryRun)
+					handler.DryRun(rlpTx, types.EmptyAddress)
+
+					backend.ExpectedSpan(t, trace.FVMEVMRun)
+					handler.Run(rlpTx, types.EmptyAddress)
+
+					backend.ExpectedSpan(t, trace.FVMEVMBatchRun)
+					handler.BatchRun([][]byte{rlpTx}, types.EmptyAddress)
+
+					backend.ExpectedSpan(t, trace.FVMEVMDeployCOA)
+					coa := handler.DeployCOA(1)
+
+					acc := handler.AccountByAddress(coa, true)
+
+					backend.ExpectedSpan(t, trace.FVMEVMCall)
+					acc.Call(types.EmptyAddress, nil, 1000, types.EmptyBalance)
+
+					backend.ExpectedSpan(t, trace.FVMEVMDeposit)
+					acc.Deposit(types.NewFlowTokenVault(types.EmptyBalance))
+
+					backend.ExpectedSpan(t, trace.FVMEVMWithdraw)
+					acc.Withdraw(types.EmptyBalance)
+
+					backend.ExpectedSpan(t, trace.FVMEVMDeploy)
+					acc.Deploy(nil, 1, types.EmptyBalance)
 				})
 			})
 		})

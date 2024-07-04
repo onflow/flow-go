@@ -2,7 +2,9 @@ package types
 
 import (
 	"encoding/hex"
+	"fmt"
 
+	"github.com/onflow/cadence/encoding/ccf"
 	"github.com/onflow/cadence/runtime/common"
 	gethCommon "github.com/onflow/go-ethereum/common"
 	"github.com/onflow/go-ethereum/rlp"
@@ -92,14 +94,15 @@ func (p *transactionEvent) ToCadence(location common.Location) (cadence.Event, e
 			cadence.NewField("type", cadence.UInt8Type),
 			cadence.NewField("payload", cadence.StringType),
 			cadence.NewField("errorCode", cadence.UInt16Type),
+			cadence.NewField("errorMessage", cadence.StringType),
 			cadence.NewField("gasConsumed", cadence.UInt64Type),
 			cadence.NewField("contractAddress", cadence.StringType),
 			cadence.NewField("logs", cadence.StringType),
 			cadence.NewField("blockHeight", cadence.UInt64Type),
 			// todo we can remove hash and just reference block by height (evm-gateway dependency)
 			cadence.NewField("blockHash", cadence.StringType),
-			cadence.NewField("errorMessage", cadence.StringType),
 			cadence.NewField("returnedData", cadence.StringType),
+			cadence.NewField("precompiledCalls", cadence.NewVariableSizedArrayType(cadence.UInt8Type)),
 		},
 		nil,
 	)
@@ -110,13 +113,14 @@ func (p *transactionEvent) ToCadence(location common.Location) (cadence.Event, e
 		cadence.NewUInt8(p.Result.TxType),
 		cadence.String(hex.EncodeToString(p.Payload)),
 		cadence.NewUInt16(uint16(p.Result.ResultSummary().ErrorCode)),
+		cadence.String(errorMsg),
 		cadence.NewUInt64(p.Result.GasConsumed),
 		deployedAddress,
 		cadence.String(hex.EncodeToString(encodedLogs)),
 		cadence.NewUInt64(p.BlockHeight),
 		cadence.String(p.BlockHash.String()),
-		cadence.String(errorMsg),
 		cadence.String(hex.EncodeToString(p.Result.ReturnedData)),
+		bytesToCadenceUInt8ArrayValue(p.Result.PrecompiledCalls),
 	}).WithType(eventType), nil
 }
 
@@ -193,18 +197,19 @@ func DecodeBlockEventPayload(event cadence.Event) (*BlockEventPayload, error) {
 }
 
 type TransactionEventPayload struct {
-	Hash            string `cadence:"hash"`
-	Index           uint16 `cadence:"index"`
-	TransactionType uint8  `cadence:"type"`
-	Payload         string `cadence:"payload"`
-	ErrorCode       uint16 `cadence:"errorCode"`
-	GasConsumed     uint64 `cadence:"gasConsumed"`
-	ContractAddress string `cadence:"contractAddress"`
-	Logs            string `cadence:"logs"`
-	BlockHeight     uint64 `cadence:"blockHeight"`
-	BlockHash       string `cadence:"blockHash"`
-	ErrorMessage    string `cadence:"errorMessage"`
-	ReturnedData    string `cadence:"returnedData"`
+	Hash             string        `cadence:"hash"`
+	Index            uint16        `cadence:"index"`
+	TransactionType  uint8         `cadence:"type"`
+	Payload          string        `cadence:"payload"`
+	ErrorCode        uint16        `cadence:"errorCode"`
+	GasConsumed      uint64        `cadence:"gasConsumed"`
+	ContractAddress  string        `cadence:"contractAddress"`
+	Logs             string        `cadence:"logs"`
+	BlockHeight      uint64        `cadence:"blockHeight"`
+	BlockHash        string        `cadence:"blockHash"`
+	ErrorMessage     string        `cadence:"errorMessage"`
+	ReturnedData     string        `cadence:"returnedData"`
+	PrecompiledCalls cadence.Array `cadence:"precompiledCalls"`
 }
 
 // DecodeTransactionEventPayload decodes Cadence event into transaction event payload.
@@ -212,4 +217,59 @@ func DecodeTransactionEventPayload(event cadence.Event) (*TransactionEventPayloa
 	var tx TransactionEventPayload
 	err := cadence.DecodeFields(event, &tx)
 	return &tx, err
+}
+
+func bytesToCadenceUInt8ArrayValue(b []byte) cadence.Array {
+	values := make([]cadence.Value, len(b))
+	for i, v := range b {
+		values[i] = cadence.NewUInt8(v)
+	}
+	return cadence.NewArray(values).WithType(
+		cadence.NewVariableSizedArrayType(cadence.UInt8Type),
+	)
+}
+
+// FLOWTokensEventPayload captures payloads for a FlowTokenDeposited event
+type FLOWTokensDepositedEventPayload struct {
+	Address                string         `cadence:"address"`
+	Amount                 cadence.UFix64 `cadence:"amount"`
+	DepositedUUID          uint64         `cadence:"depositedUUID"`
+	BalanceAfterInAttoFlow cadence.Int    `cadence:"balanceAfterInAttoFlow"`
+}
+
+// DecodeFLOWTokensDepositedEventPayload decodes a flow FLOWTokenDeposited
+// events into a FLOWTokensEventDepositedPayload
+func DecodeFLOWTokensDepositedEventPayload(event cadence.Event) (*FLOWTokensDepositedEventPayload, error) {
+	var payload FLOWTokensDepositedEventPayload
+	err := cadence.DecodeFields(event, &payload)
+	return &payload, err
+}
+
+// FLOWTokensWithdrawnEventPayload captures payloads for a FlowTokensWithdrawn event
+type FLOWTokensWithdrawnEventPayload struct {
+	Address                string         `cadence:"address"`
+	Amount                 cadence.UFix64 `cadence:"amount"`
+	WithdrawnUUID          uint64         `cadence:"withdrawnUUID"`
+	BalanceAfterInAttoFlow cadence.Int    `cadence:"balanceAfterInAttoFlow"`
+}
+
+// DecodeFLOWTokensWithdrawnEventPayload decodes a flow FLOWTokensWithdrawn
+// events into a FLOWTokensEventDepositedPayload
+func DecodeFLOWTokensWithdrawnEventPayload(event cadence.Event) (*FLOWTokensWithdrawnEventPayload, error) {
+	var payload FLOWTokensWithdrawnEventPayload
+	err := cadence.DecodeFields(event, &payload)
+	return &payload, err
+}
+
+func FlowEventToCadenceEvent(event flow.Event) (cadence.Event, error) {
+	ev, err := ccf.Decode(nil, event.Payload)
+	if err != nil {
+		return cadence.Event{}, err
+	}
+
+	cadenceEvent, ok := ev.(cadence.Event)
+	if !ok {
+		return cadence.Event{}, fmt.Errorf("event can not be casted to a cadence event")
+	}
+	return cadenceEvent, nil
 }

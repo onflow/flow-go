@@ -5,7 +5,6 @@ import (
 
 	gethCommon "github.com/onflow/go-ethereum/common"
 	gethTypes "github.com/onflow/go-ethereum/core/types"
-	gethVM "github.com/onflow/go-ethereum/core/vm"
 	gethCrypto "github.com/onflow/go-ethereum/crypto"
 	"github.com/onflow/go-ethereum/eth/tracers"
 )
@@ -17,11 +16,6 @@ var (
 	// anything block number above 0 works here
 	BlockNumberForEVMRules = big.NewInt(1)
 )
-
-type Precompile interface {
-	gethVM.PrecompiledContract
-	Address() Address
-}
 
 // BlockContext holds the context needed for the emulator operations
 type BlockContext struct {
@@ -35,8 +29,8 @@ type BlockContext struct {
 	Random                 gethCommon.Hash
 	Tracer                 tracers.Tracer
 
-	// a set of extra precompiles to be injected
-	ExtraPrecompiles []Precompile
+	// a set of extra precompiled contracts to be injected
+	ExtraPrecompiledContracts []PrecompiledContract
 }
 
 // NewDefaultBlockContext returns a new default block context
