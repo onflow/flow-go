@@ -8,6 +8,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/pebble/operation"
 	"github.com/onflow/flow-go/storage/pebble/procedure"
 )
@@ -64,6 +65,21 @@ func NewHeaders(collector module.CacheMetrics, db *pebble.DB) *Headers {
 
 func (h *Headers) storeTx(header *flow.Header) func(pebble.Writer) error {
 	return h.cache.PutTx(header.ID(), header)
+}
+
+func (h *Headers) storePebble(header *flow.Header) func(storage.PebbleReaderBatchWriter) error {
+	return func(rw storage.PebbleReaderBatchWriter) error {
+		_, tx := rw.ReaderWriter()
+		err := h.storeTx(header)(tx)
+		if err != nil {
+			return fmt.Errorf("could not store header %v: %w", header.ID(), err)
+		}
+		rw.AddCallback(func() {
+			h.cache.Insert(header.ID(), header)
+		})
+
+		return nil
+	}
 }
 
 func (h *Headers) retrieveTx(blockID flow.Identifier) func(pebble.Reader) (*flow.Header, error) {
