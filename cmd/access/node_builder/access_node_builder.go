@@ -125,6 +125,7 @@ import (
 // while for a node running as a library, the config fields are expected to be initialized by the caller.
 type AccessNodeConfig struct {
 	supportsObserver                  bool // True if this is an Access node that supports observers and consensus follower engines
+	publicNetworkPeers                []string
 	collectionGRPCPort                uint
 	executionGRPCPort                 uint
 	pingEnabled                       bool
@@ -171,7 +172,6 @@ type PublicNetworkConfig struct {
 func DefaultAccessNodeConfig() *AccessNodeConfig {
 	homedir, _ := os.UserHomeDir()
 	return &AccessNodeConfig{
-		supportsObserver:   false,
 		collectionGRPCPort: 9000,
 		executionGRPCPort:  9000,
 		rpcConf: rpc.Config{
@@ -218,6 +218,8 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 			HeartbeatInterval:       subscription.DefaultHeartbeatInterval,
 		},
 		stateStreamFilterConf:        nil,
+		supportsObserver:             false,
+		publicNetworkPeers:           []string{},
 		ExecutionNodeAddress:         "localhost:9000",
 		logTxTimeToFinalized:         false,
 		logTxTimeToExecuted:          false,
@@ -1129,6 +1131,7 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		flags.StringToIntVar(&builder.apiBurstlimits, "api-burst-limits", defaultConfig.apiBurstlimits, "burst limits for Access API methods e.g. Ping=100,GetTransaction=100 etc.")
 		flags.BoolVar(&builder.supportsObserver, "supports-observer", defaultConfig.supportsObserver, "true if this staked access node supports observer or follower connections")
 		flags.StringVar(&builder.PublicNetworkConfig.BindAddress, "public-network-address", defaultConfig.PublicNetworkConfig.BindAddress, "staked access node's public network bind address")
+		flags.StringSliceVar(&builder.publicNetworkPeers, "public-network-peer-node-ids", defaultConfig.publicNetworkPeers, "comma separated list of access nodes ids to bridge to on the public network e.g. b4a4dbdcd443d...,fb386a6a... etc.")
 		flags.BoolVar(&builder.rpcConf.BackendConfig.CircuitBreakerConfig.Enabled,
 			"circuit-breaker-enabled",
 			defaultConfig.rpcConf.BackendConfig.CircuitBreakerConfig.Enabled,
@@ -1917,6 +1920,35 @@ func (builder *FlowAccessNodeBuilder) enqueuePublicNetworkInit() {
 		}).
 		Component("public network", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			msgValidators := publicNetworkMsgValidators(node.Logger.With().Bool("public", true).Logger(), node.IdentityProvider, builder.NodeID)
+
+			// by default, use an empty topology and discover peers using the DHT. this may result
+			// in a fragmented public networks if there are no ANs/ONs that connect between them.
+			top := topology.NewEmptyTopology()
+
+			// if configured, seed the topology with a list of ANs to include in the topology.
+			// this ensures the DHT of each peer is bridged, forming a single larger network.
+			if len(builder.publicNetworkPeers) > 0 {
+				var ids flow.IdentityList
+				for _, idStr := range builder.publicNetworkPeers {
+					nodeID, err := flow.HexStringToIdentifier(idStr)
+					if err != nil {
+						return nil, fmt.Errorf("could not parse public network peer (id: %s): %w", idStr, err)
+					}
+
+					id, ok := builder.IdentityProvider.ByNodeID(nodeID)
+					if !ok {
+						return nil, fmt.Errorf("public network peer must be a currently staked node (id: %s)", nodeID)
+					}
+
+					if id.Role != flow.RoleAccess {
+						return nil, fmt.Errorf("public network peer must be a staked access node (id: %s)", nodeID)
+					}
+
+					ids = append(ids, id)
+				}
+				top = topology.NewCustomTopology(ids)
+			}
+
 			receiveCache := netcache.NewHeroReceiveCache(builder.FlowConfig.NetworkConfig.NetworkReceivedMessageCacheSize,
 				builder.Logger,
 				metrics.NetworkReceiveCacheMetricsFactory(builder.HeroCacheMetricsFactory(), network.PublicNetwork))
@@ -1931,7 +1963,7 @@ func (builder *FlowAccessNodeBuilder) enqueuePublicNetworkInit() {
 				Libp2pNode:            publicLibp2pNode,
 				Codec:                 cborcodec.NewCodec(),
 				Me:                    builder.Me,
-				Topology:              topology.EmptyTopology{}, // topology returns empty list since peers are not known upfront
+				Topology:              top,
 				Metrics:               builder.PublicNetworkConfig.Metrics,
 				BitSwapMetrics:        builder.Metrics.Bitswap,
 				IdentityProvider:      builder.IdentityProvider,
