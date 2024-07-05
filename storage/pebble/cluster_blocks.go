@@ -41,8 +41,7 @@ func (b *ClusterBlocks) storeTx(block *cluster.Block) func(storage.PebbleReaderB
 			return fmt.Errorf("could not store header: %w", err)
 		}
 
-		_, w := tx.ReaderWriter()
-		err = b.payloads.storeTx(block.ID(), block.Payload)(w)
+		err = b.payloads.storeTx(block.ID(), block.Payload)(tx)
 		if err != nil {
 			return fmt.Errorf("could not store payload: %w", err)
 		}

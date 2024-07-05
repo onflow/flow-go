@@ -60,14 +60,15 @@ func NewHeaders(collector module.CacheMetrics, db *pebble.DB) *Headers {
 
 func (h *Headers) storePebble(blockID flow.Identifier, header *flow.Header) func(storage.PebbleReaderBatchWriter) error {
 	return func(rw storage.PebbleReaderBatchWriter) error {
+		rw.AddCallback(func() {
+			h.cache.Insert(blockID, header)
+		})
+
 		_, tx := rw.ReaderWriter()
 		err := operation.InsertHeader(blockID, header)(tx)
 		if err != nil {
 			return fmt.Errorf("could not store header %v: %w", blockID, err)
 		}
-		rw.AddCallback(func() {
-			h.cache.Insert(blockID, header)
-		})
 
 		return nil
 	}
