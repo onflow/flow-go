@@ -22,12 +22,12 @@ func (n Noop) EpochTransition(uint64, *flow.Header) {}
 
 func (n Noop) EpochSetupPhaseStarted(uint64, *flow.Header) {}
 
-func (n Noop) EpochCommittedPhaseStarted(uint64, *flow.Header) {}
+func (n Noop) EpochCommittedPhaseStarted(_ *protocol.EpochCommittedPhaseStartedData) {}
 
 func (n Noop) EpochFallbackModeTriggered(uint64, *flow.Header) {}
 
 func (n Noop) EpochFallbackModeExited(uint64, *flow.Header) {}
 
-func (n Noop) EpochExtended(uint64, *flow.Header, flow.EpochExtension) {}
+func (n Noop) EpochExtended(_ *protocol.EpochExtendedData) {}
 
 func (n Noop) ActiveClustersChanged(flow.ChainIDList) {}

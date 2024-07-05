@@ -4,6 +4,29 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+const (
+	EpochExtendedEvtType              = "EpochExtended"
+	EpochCommittedPhaseStartedEvtType = "EpochCommittedPhaseStarted"
+)
+
+// EpochCommittedPhaseStartedData EpochCommittedPhaseStarted event data.
+type EpochCommittedPhaseStartedData struct {
+	// EpochCounter is the current epoch counter.
+	CurrentEpochCounter uint64
+	// First header of the committed epoch.
+	First *flow.Header
+}
+
+// EpochExtendedData EpochExtended event data.
+type EpochExtendedData struct {
+	// EpochCounter is the current epoch counter at the block when EFM was triggered.
+	EpochCounter uint64
+	// Header is the block when EFM was triggered
+	Header *flow.Header
+	// Extension the epoch extension.
+	Extension *flow.EpochExtension
+}
+
 // Consumer defines a set of events that occur within the protocol state, that
 // can be propagated to other components via an implementation of this interface.
 // Collectively, these are referred to as "Protocol Events".
@@ -65,6 +88,7 @@ type Consumer interface {
 	//                      ^--- block b - contains seal for block A, first block of Setup phase
 	//                         ^--- block c - finalizes block b, triggers EpochSetupPhaseStarted event
 	//
+	//	- data the EpochExtendedData.
 	// NOTE: Only called once the phase transition has been finalized.
 	EpochSetupPhaseStarted(currentEpochCounter uint64, first *flow.Header)
 
@@ -82,7 +106,7 @@ type Consumer interface {
 	//                                            ^--- block f - finalizes block e, triggers EpochCommittedPhaseStarted event
 	//
 	// NOTE: Only called once the phase transition has been finalized.
-	EpochCommittedPhaseStarted(currentEpochCounter uint64, first *flow.Header)
+	EpochCommittedPhaseStarted(data *EpochCommittedPhaseStartedData)
 
 	// EpochFallbackModeTriggered is called when Epoch Fallback Mode [EFM] is triggered.
 	// EFM is triggered when an invalid or unexpected epoch-related service event is observed,
@@ -111,9 +135,8 @@ type Consumer interface {
 
 	// EpochExtended is called when a flow.EpochExtension is added to the current epoch
 	// Consumers can get context for handling events from:
-	//   - epochCounter is the current epoch counter at the block when EFM was triggered
-	//   - header is the block when EFM was triggered
+	//   - data the EpochExtendedData.
 	//
 	// NOTE: This notification is emitted when the block triggering the EFM extension is finalized.
-	EpochExtended(epochCounter uint64, header *flow.Header, extension flow.EpochExtension)
+	EpochExtended(data *EpochExtendedData)
 }
