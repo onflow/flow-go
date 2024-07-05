@@ -102,7 +102,7 @@ func (p *Payloads) storePayloads(
 }
 
 func (p *Payloads) Store(blockID flow.Identifier, payload *flow.Payload) error {
-	return p.storeTx(blockID, payload)(operation.NewPebbleReaderBatchWriter(p.db))
+	return operation.WithReaderBatchWriter(p.db, p.storeTx(blockID, payload))
 }
 
 func (p *Payloads) retrieveTx(blockID flow.Identifier) func(tx pebble.Reader) (*flow.Payload, error) {
