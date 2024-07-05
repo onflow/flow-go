@@ -17,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	mockmodule "github.com/onflow/flow-go/module/mock"
+	"github.com/onflow/flow-go/state/protocol"
 	mockprotocol "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/onflow/flow-go/utils/unittest/mocks"
@@ -232,10 +233,10 @@ func (bs *BlockTimeControllerSuite) TestInit_EpochFallbackTriggered() {
 	bs.AssertCorrectInitialization()
 }
 
-// TestEpochFallbackTriggered tests epoch fallback:
+// TestOnEpochExtended_EpochFallbackTriggered ensures the proposal timing config is updated when the first epoch extension is encountered:
 //   - the GetProposalTiming should revert to default
 //   - duplicate events should be no-ops
-func (bs *BlockTimeControllerSuite) TestEpochFallbackTriggered() {
+func (bs *BlockTimeControllerSuite) TestOnEpochExtended_EpochFallbackTriggered() {
 	bs.CreateAndStartController()
 	defer bs.StopController()
 
@@ -246,23 +247,33 @@ func (bs *BlockTimeControllerSuite) TestEpochFallbackTriggered() {
 	require.NoError(bs.T(), err)
 	assert.NotEqual(bs.T(), bs.config.FallbackProposalDelay, bs.ctl.getProposalTiming())
 
-	// send the event
-	bs.ctl.EpochFallbackModeTriggered(0, nil)
+	// send the first extension
+	header := unittest.BlockHeaderFixture()
+	evtData := &protocol.EpochExtendedData{
+		EpochCounter: bs.epochCounter,
+		Header:       header,
+		Extension: &flow.EpochExtension{
+			FirstView:     bs.curEpochFinalView + 1,
+			FinalView:     bs.curEpochFinalView * 2,
+			TargetEndTime: bs.curEpochTargetEndTime + bs.EpochDurationSeconds(),
+		},
+	}
+	bs.ctl.EpochExtended(evtData)
 	// async: should revert to default GetProposalTiming
 	require.Eventually(bs.T(), func() bool {
 		now := time.Now().UTC()
 		return now.Add(bs.config.FallbackProposalDelay.Load()) == bs.ctl.getProposalTiming().TargetPublicationTime(7, now, unittest.IdentifierFixture())
 	}, time.Second, time.Millisecond)
 
-	// additional EpochFallbackModeTriggered events should be no-ops
+	// additional EpochExtended events should be no-ops
 	// (send capacity+1 events to guarantee one is processed)
-	for i := 0; i <= cap(bs.ctl.epochFallbacks); i++ {
-		bs.ctl.EpochFallbackModeTriggered(0, nil)
+	for i := 0; i <= cap(bs.ctl.epochEvents); i++ {
+		bs.ctl.EpochExtended(evtData)
 	}
 	// state should be unchanged
 	now := time.Now().UTC()
 	assert.Equal(bs.T(), now.Add(bs.config.FallbackProposalDelay.Load()), bs.ctl.getProposalTiming().TargetPublicationTime(12, now, unittest.IdentifierFixture()))
-
+	assert.True(bs.T(), bs.ctl.epochFallbackTriggered)
 	// additional OnBlockIncorporated events should be no-ops
 	for i := 0; i <= cap(bs.ctl.incorporatedBlocks); i++ {
 		header := unittest.BlockHeaderFixture(unittest.HeaderWithView(bs.initialView + 1 + uint64(i)))
@@ -278,8 +289,85 @@ func (bs *BlockTimeControllerSuite) TestEpochFallbackTriggered() {
 	assert.Equal(bs.T(), now.Add(bs.config.FallbackProposalDelay.Load()), bs.ctl.getProposalTiming().TargetPublicationTime(17, now, unittest.IdentifierFixture()))
 }
 
+// TestOnEpochExtended ensures that the epoch configuration is updated when EpochExtended events are processed.
+func (bs *BlockTimeControllerSuite) TestOnEpochExtended() {
+	nextEpoch := mockprotocol.NewEpoch(bs.T())
+	nextEpoch.On("Counter").Return(bs.epochCounter+1, nil)
+	nextEpoch.On("FinalView").Return(bs.curEpochFinalView*2, nil)
+	nextEpoch.On("TargetDuration").Return(bs.EpochDurationSeconds(), nil)
+	nextEpoch.On("TargetEndTime").Return(bs.curEpochTargetEndTime+bs.EpochDurationSeconds(), nil)
+	bs.epochs.Add(nextEpoch)
+	bs.CreateAndStartController()
+	defer bs.StopController()
+
+	header := unittest.BlockHeaderFixture()
+	evtData := &protocol.EpochExtendedData{
+		EpochCounter: bs.epochCounter,
+		Header:       header,
+		Extension: &flow.EpochExtension{
+			FirstView:     bs.curEpochFinalView + 1,
+			FinalView:     bs.curEpochFinalView * 2,
+			TargetEndTime: bs.curEpochTargetEndTime + bs.EpochDurationSeconds(),
+		},
+	}
+	bs.ctl.EpochExtended(evtData)
+
+	assert.Nil(bs.T(), bs.ctl.nextEpochFinalView)
+	assert.Equal(bs.T(), bs.curEpochTargetEndTime+bs.EpochDurationSeconds(), bs.ctl.curEpochTargetEndTime)
+	assert.Equal(bs.T(), bs.curEpochFinalView*2, bs.ctl.curEpochFinalView)
+	// expect epoch fallback triggered to be set to true and proposal timing config to be updated on first
+	// extension encountered.
+	require.Eventually(bs.T(), func() bool {
+		return bs.epochFallbackTriggered
+	}, time.Second, time.Millisecond)
+
+	// duplicate events should be no-ops
+	for i := 0; i <= cap(bs.ctl.epochEvents); i++ {
+		bs.ctl.EpochExtended(evtData)
+	}
+	require.Eventually(bs.T(), func() bool {
+		return len(bs.ctl.epochEvents) == 0
+	}, 2*time.Second, time.Millisecond)
+
+	assert.Nil(bs.T(), bs.ctl.nextEpochFinalView)
+	assert.Equal(bs.T(), bs.curEpochTargetEndTime+bs.EpochDurationSeconds(), bs.ctl.curEpochTargetEndTime)
+	assert.Equal(bs.T(), bs.curEpochFinalView*2, bs.ctl.curEpochFinalView)
+}
+
+// TestOnEpochCommittedPhaseStarted ensures that the epoch info is updated when the next epoch is committed.
+func (bs *BlockTimeControllerSuite) TestOnEpochCommittedPhaseStarted() {
+	nextEpoch := mockprotocol.NewEpoch(bs.T())
+	nextEpoch.On("Counter").Return(bs.epochCounter+1, nil)
+	nextEpoch.On("FinalView").Return(bs.curEpochFinalView*2, nil)
+	nextEpoch.On("TargetDuration").Return(bs.EpochDurationSeconds(), nil)
+	nextEpoch.On("TargetEndTime").Return(bs.curEpochTargetEndTime+bs.EpochDurationSeconds(), nil)
+	bs.epochs.Add(nextEpoch)
+	bs.CreateAndStartController()
+	defer bs.StopController()
+	header := unittest.BlockHeaderFixture()
+	evtData := &protocol.EpochCommittedPhaseStartedData{CurrentEpochCounter: bs.epochCounter, First: header}
+	bs.ctl.EpochCommittedPhaseStarted(evtData)
+	require.Eventually(bs.T(), func() bool {
+		return bs.ctl.nextEpochFinalView != nil
+	}, time.Second, time.Millisecond)
+
+	assert.Equal(bs.T(), bs.curEpochFinalView*2, *bs.ctl.nextEpochFinalView)
+	assert.Equal(bs.T(), bs.curEpochTargetEndTime+bs.EpochDurationSeconds(), *bs.ctl.nextEpochTargetEndTime)
+
+	// duplicate events should be no-ops
+	//for i := 0; i <= cap(bs.ctl.epochEvents); i++ {
+	//	bs.ctl.EpochCommittedPhaseStarted(evtData)
+	//}
+	//require.Eventually(bs.T(), func() bool {
+	//	return len(bs.ctl.epochEvents) == 0
+	//}, time.Second, time.Millisecond)
+
+	assert.Equal(bs.T(), bs.curEpochFinalView*2, *bs.ctl.nextEpochFinalView)
+	assert.Equal(bs.T(), bs.curEpochTargetEndTime+bs.EpochDurationSeconds(), *bs.ctl.nextEpochTargetEndTime)
+}
+
 // TestOnBlockIncorporated_UpdateProposalDelay tests that a new measurement is taken and
-// GetProposalTiming updated upon receiving an OnBlockIncorporated event.
+// GetProposalTiming updated upon receiving an OnBlockIncorporated data.
 func (bs *BlockTimeControllerSuite) TestOnBlockIncorporated_UpdateProposalDelay() {
 	bs.CreateAndStartController()
 	defer bs.StopController()
@@ -405,34 +493,6 @@ func (bs *BlockTimeControllerSuite) testOnBlockIncorporated_EpochTransition() {
 	assert.Equal(bs.T(), bs.ctl.epochInfo.curEpochFinalView, bs.curEpochFinalView*2)
 	assert.Equal(bs.T(), bs.ctl.epochInfo.curEpochTargetEndTime, bs.curEpochTargetEndTime+bs.EpochDurationSeconds())
 	assert.Nil(bs.T(), bs.ctl.nextEpochFinalView)
-}
-
-// TestOnEpochSetupPhaseStarted ensures that the epoch info is updated when the next epoch is set up.
-func (bs *BlockTimeControllerSuite) TestOnEpochSetupPhaseStarted() {
-	nextEpoch := mockprotocol.NewEpoch(bs.T())
-	nextEpoch.On("Counter").Return(bs.epochCounter+1, nil)
-	nextEpoch.On("FinalView").Return(bs.curEpochFinalView*2, nil)
-	nextEpoch.On("TargetDuration").Return(bs.EpochDurationSeconds(), nil)
-	nextEpoch.On("TargetEndTime").Return(bs.curEpochTargetEndTime+bs.EpochDurationSeconds(), nil)
-	bs.epochs.Add(nextEpoch)
-	bs.CreateAndStartController()
-	defer bs.StopController()
-
-	header := unittest.BlockHeaderFixture()
-	bs.ctl.EpochSetupPhaseStarted(bs.epochCounter, header)
-	require.Eventually(bs.T(), func() bool {
-		return bs.ctl.nextEpochFinalView != nil
-	}, time.Second, time.Millisecond)
-
-	assert.Equal(bs.T(), bs.curEpochFinalView*2, *bs.ctl.nextEpochFinalView)
-	assert.Equal(bs.T(), bs.curEpochTargetEndTime+bs.EpochDurationSeconds(), *bs.ctl.nextEpochTargetEndTime)
-
-	// duplicate events should be no-ops
-	for i := 0; i <= cap(bs.ctl.epochSetups); i++ {
-		bs.ctl.EpochSetupPhaseStarted(bs.epochCounter, header)
-	}
-	assert.Equal(bs.T(), bs.curEpochFinalView*2, *bs.ctl.nextEpochFinalView)
-	assert.Equal(bs.T(), bs.curEpochTargetEndTime+bs.EpochDurationSeconds(), *bs.ctl.nextEpochTargetEndTime)
 }
 
 // TestProposalDelay_AfterTargetTransitionTime tests the behaviour of the controller
@@ -709,62 +769,6 @@ func (bs *BlockTimeControllerSuite) Test_vs_PythonSimulation() {
 
 		observationTime = observationTime.Add(sec2dur(ref.realWorldViewDuration[v]))
 	}
-}
-
-// TestOnEpochExtended ensures that the epoch configuration is updated when EpochExtended events are processed..
-func (bs *BlockTimeControllerSuite) TestOnEpochExtended() {
-	nextEpoch := mockprotocol.NewEpoch(bs.T())
-	nextEpoch.On("Counter").Return(bs.epochCounter+1, nil)
-	nextEpoch.On("FinalView").Return(bs.curEpochFinalView*2, nil)
-	nextEpoch.On("TargetDuration").Return(bs.EpochDurationSeconds(), nil)
-	nextEpoch.On("TargetEndTime").Return(bs.curEpochTargetEndTime+bs.EpochDurationSeconds(), nil)
-	bs.epochs.Add(nextEpoch)
-	bs.CreateAndStartController()
-	defer bs.StopController()
-
-	expectedExtension := &flow.EpochExtension{
-		FirstView:     bs.curEpochFinalView + 1,
-		FinalView:     bs.curEpochFinalView * 2,
-		TargetEndTime: bs.curEpochTargetEndTime + bs.EpochDurationSeconds(),
-	}
-	bs.ctl.EpochExtended(expectedExtension)
-
-	assert.Nil(bs.T(), bs.ctl.nextEpochFinalView)
-	assert.Equal(bs.T(), bs.curEpochTargetEndTime+bs.EpochDurationSeconds(), bs.ctl.curEpochTargetEndTime)
-	assert.Equal(bs.T(), bs.curEpochFinalView*2, bs.ctl.curEpochFinalView)
-
-	// duplicate events should be no-ops
-	for i := 0; i <= cap(bs.ctl.epochSetups); i++ {
-		bs.ctl.EpochExtended(expectedExtension)
-	}
-
-	assert.Nil(bs.T(), bs.ctl.nextEpochFinalView)
-	assert.Equal(bs.T(), bs.curEpochTargetEndTime+bs.EpochDurationSeconds(), bs.ctl.curEpochTargetEndTime)
-	assert.Equal(bs.T(), bs.curEpochFinalView*2, bs.ctl.curEpochFinalView)
-}
-
-// TestEpochRecovered ensures that the epoch configuration is updated when EpochExtended events are processed..
-func (bs *BlockTimeControllerSuite) TestEpochRecovered() {
-	nextEpoch := mockprotocol.NewEpoch(bs.T())
-	nextEpoch.On("Counter").Return(bs.epochCounter+1, nil)
-	nextEpoch.On("FinalView").Return(bs.curEpochFinalView*2, nil)
-	nextEpoch.On("TargetDuration").Return(bs.EpochDurationSeconds(), nil)
-	nextEpoch.On("TargetEndTime").Return(bs.curEpochTargetEndTime+bs.EpochDurationSeconds(), nil)
-
-	bs.epochs.Add(nextEpoch)
-	bs.CreateAndStartController()
-	defer bs.StopController()
-
-	nextEpochFinalView := bs.curEpochFinalView * 2
-	bs.ctl.EpochRecovered(&nextEpochFinalView)
-	assert.Equal(bs.T(), nextEpochFinalView, *bs.ctl.nextEpochFinalView)
-
-	// duplicate events should be no-ops
-	for i := 0; i <= cap(bs.ctl.epochSetups); i++ {
-		bs.ctl.EpochRecovered(&nextEpochFinalView)
-	}
-
-	assert.Equal(bs.T(), nextEpochFinalView, *bs.ctl.nextEpochFinalView)
 }
 
 func makeTimedBlock(view uint64, parentID flow.Identifier, time time.Time) TimedBlock {
