@@ -19,8 +19,8 @@ var _ storage.Commits = (*Commits)(nil)
 
 func NewCommits(collector module.CacheMetrics, db *pebble.DB) *Commits {
 
-	store := func(blockID flow.Identifier, commit flow.StateCommitment) func(rw pebble.Writer) error {
-		return operation.IndexStateCommitment(blockID, commit)
+	store := func(blockID flow.Identifier, commit flow.StateCommitment) func(rw storage.PebbleReaderBatchWriter) error {
+		return storage.OnlyWriter(operation.IndexStateCommitment(blockID, commit))
 	}
 
 	retrieve := func(blockID flow.Identifier) func(tx pebble.Reader) (flow.StateCommitment, error) {

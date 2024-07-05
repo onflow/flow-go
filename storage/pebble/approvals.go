@@ -21,8 +21,8 @@ type ResultApprovals struct {
 
 func NewResultApprovals(collector module.CacheMetrics, db *pebble.DB) *ResultApprovals {
 
-	store := func(key flow.Identifier, val *flow.ResultApproval) func(pebble.Writer) error {
-		return operation.InsertResultApproval(val)
+	store := func(key flow.Identifier, val *flow.ResultApproval) func(storage.PebbleReaderBatchWriter) error {
+		return storage.OnlyWriter(operation.InsertResultApproval(val))
 	}
 
 	retrieve := func(approvalID flow.Identifier) func(tx pebble.Reader) (*flow.ResultApproval, error) {

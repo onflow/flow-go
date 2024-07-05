@@ -18,8 +18,8 @@ type Guarantees struct {
 
 func NewGuarantees(collector module.CacheMetrics, db *pebble.DB, cacheSize uint) *Guarantees {
 
-	store := func(collID flow.Identifier, guarantee *flow.CollectionGuarantee) func(pebble.Writer) error {
-		return operation.InsertGuarantee(collID, guarantee)
+	store := func(collID flow.Identifier, guarantee *flow.CollectionGuarantee) func(storage.PebbleReaderBatchWriter) error {
+		return storage.OnlyWriter(operation.InsertGuarantee(collID, guarantee))
 	}
 
 	retrieve := func(collID flow.Identifier) func(pebble.Reader) (*flow.CollectionGuarantee, error) {

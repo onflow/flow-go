@@ -23,8 +23,8 @@ func NewHeaders(collector module.CacheMetrics, db *pebble.DB) *Headers {
 
 	// CAUTION: should only be used to index FINALIZED blocks by their
 	// respective height
-	storeHeight := func(height uint64, id flow.Identifier) func(pebble.Writer) error {
-		return operation.IndexBlockHeight(height, id)
+	storeHeight := func(height uint64, id flow.Identifier) func(storage.PebbleReaderBatchWriter) error {
+		return storage.OnlyWriter(operation.IndexBlockHeight(height, id))
 	}
 
 	retrieve := func(blockID flow.Identifier) func(pebble.Reader) (*flow.Header, error) {

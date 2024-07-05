@@ -22,8 +22,8 @@ var _ storage.QuorumCertificates = (*QuorumCertificates)(nil)
 // NewQuorumCertificates Creates QuorumCertificates instance which is a database of quorum certificates
 // which supports storing, caching and retrieving by block ID.
 func NewQuorumCertificates(collector module.CacheMetrics, db *pebble.DB, cacheSize uint) *QuorumCertificates {
-	store := func(_ flow.Identifier, qc *flow.QuorumCertificate) func(pebble.Writer) error {
-		return operation.InsertQuorumCertificate(qc)
+	store := func(_ flow.Identifier, qc *flow.QuorumCertificate) func(storage.PebbleReaderBatchWriter) error {
+		return storage.OnlyWriter(operation.InsertQuorumCertificate(qc))
 	}
 
 	retrieve := func(blockID flow.Identifier) func(tx pebble.Reader) (*flow.QuorumCertificate, error) {

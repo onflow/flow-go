@@ -18,8 +18,8 @@ type Transactions struct {
 
 // NewTransactions ...
 func NewTransactions(cacheMetrics module.CacheMetrics, db *pebble.DB) *Transactions {
-	store := func(txID flow.Identifier, flowTX *flow.TransactionBody) func(pebble.Writer) error {
-		return operation.InsertTransaction(txID, flowTX)
+	store := func(txID flow.Identifier, flowTX *flow.TransactionBody) func(storage.PebbleReaderBatchWriter) error {
+		return storage.OnlyWriter(operation.InsertTransaction(txID, flowTX))
 	}
 
 	retrieve := func(txID flow.Identifier) func(tx pebble.Reader) (*flow.TransactionBody, error) {

@@ -22,8 +22,8 @@ var _ storage.ExecutionResults = (*ExecutionResults)(nil)
 
 func NewExecutionResults(collector module.CacheMetrics, db *pebble.DB) *ExecutionResults {
 
-	store := func(_ flow.Identifier, result *flow.ExecutionResult) func(pebble.Writer) error {
-		return operation.InsertExecutionResult(result)
+	store := func(_ flow.Identifier, result *flow.ExecutionResult) func(storage.PebbleReaderBatchWriter) error {
+		return storage.OnlyWriter(operation.InsertExecutionResult(result))
 	}
 
 	retrieve := func(resultID flow.Identifier) func(tx pebble.Reader) (*flow.ExecutionResult, error) {

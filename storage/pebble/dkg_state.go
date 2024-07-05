@@ -10,6 +10,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/pebble/operation"
 )
 
@@ -27,8 +28,8 @@ func NewDKGState(collector module.CacheMetrics, db *pebble.DB) (*DKGState, error
 		return nil, fmt.Errorf("cannot instantiate dkg state storage in non-secret db: %w", err)
 	}
 
-	storeKey := func(epochCounter uint64, info *encodable.RandomBeaconPrivKey) func(pebble.Writer) error {
-		return operation.InsertMyBeaconPrivateKey(epochCounter, info)
+	storeKey := func(epochCounter uint64, info *encodable.RandomBeaconPrivKey) func(storage.PebbleReaderBatchWriter) error {
+		return storage.OnlyWriter(operation.InsertMyBeaconPrivateKey(epochCounter, info))
 	}
 
 	retrieveKey := func(epochCounter uint64) func(pebble.Reader) (*encodable.RandomBeaconPrivKey, error) {
@@ -53,8 +54,8 @@ func NewDKGState(collector module.CacheMetrics, db *pebble.DB) (*DKGState, error
 	return dkgState, nil
 }
 
-func (ds *DKGState) storeKeyTx(epochCounter uint64, key *encodable.RandomBeaconPrivKey) func(tx pebble.Writer) error {
-	return ds.keyCache.PutTx(epochCounter, key)
+func (ds *DKGState) storeKeyTx(epochCounter uint64, key *encodable.RandomBeaconPrivKey) func(storage.PebbleReaderBatchWriter) error {
+	return ds.keyCache.PutPebble(epochCounter, key)
 }
 
 func (ds *DKGState) retrieveKeyTx(epochCounter uint64) func(tx pebble.Reader) (*encodable.RandomBeaconPrivKey, error) {
@@ -77,7 +78,7 @@ func (ds *DKGState) InsertMyBeaconPrivateKey(epochCounter uint64, key crypto.Pri
 		return fmt.Errorf("will not store nil beacon key")
 	}
 	encodableKey := &encodable.RandomBeaconPrivKey{PrivateKey: key}
-	return ds.storeKeyTx(epochCounter, encodableKey)(ds.db)
+	return operation.WithReaderBatchWriter(ds.db, ds.storeKeyTx(epochCounter, encodableKey))
 }
 
 // RetrieveMyBeaconPrivateKey retrieves the random beacon private key for an epoch.

@@ -67,8 +67,7 @@ func (p *Payloads) storeTx(blockID flow.Identifier, payload *flow.Payload) func(
 }
 
 func (p *Payloads) storePayloads(
-	rw storage.PebbleReaderBatchWriter, blockID flow.Identifier, payload *flow.Payload, fullReceipts []*flow.ExecutionReceipt) error {
-	_, tx := rw.ReaderWriter()
+	tx storage.PebbleReaderBatchWriter, blockID flow.Identifier, payload *flow.Payload, fullReceipts []*flow.ExecutionReceipt) error {
 	// make sure all payload guarantees are stored
 	for _, guarantee := range payload.Guarantees {
 		err := p.guarantees.storeTx(guarantee)(tx)

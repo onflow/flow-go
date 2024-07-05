@@ -6,6 +6,7 @@ import (
 	"github.com/cockroachdb/pebble"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/pebble/operation"
 )
 
@@ -33,14 +34,15 @@ func (c *Collections) StoreLight(collection *flow.LightCollection) error {
 
 func (c *Collections) Store(collection *flow.Collection) error {
 	light := collection.Light()
-	return operation.BatchUpdate(c.db, func(ttx pebble.Writer) error {
-		err := operation.InsertCollection(&light)(ttx)
+	return operation.WithReaderBatchWriter(c.db, func(rw storage.PebbleReaderBatchWriter) error {
+		_, w := rw.ReaderWriter()
+		err := operation.InsertCollection(&light)(w)
 		if err != nil {
 			return fmt.Errorf("could not insert collection: %w", err)
 		}
 
 		for _, tx := range collection.Transactions {
-			err = c.transactions.storeTx(tx)(ttx)
+			err = c.transactions.storeTx(tx)(rw)
 			if err != nil {
 				return fmt.Errorf("could not insert transaction: %w", err)
 			}

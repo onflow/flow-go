@@ -21,8 +21,8 @@ type Index struct {
 
 func NewIndex(collector module.CacheMetrics, db *pebble.DB) *Index {
 
-	store := func(blockID flow.Identifier, index *flow.Index) func(pebble.Writer) error {
-		return procedure.InsertIndex(blockID, index)
+	store := func(blockID flow.Identifier, index *flow.Index) func(storage.PebbleReaderBatchWriter) error {
+		return storage.OnlyWriter(procedure.InsertIndex(blockID, index))
 	}
 
 	retrieve := func(blockID flow.Identifier) func(tx pebble.Reader) (*flow.Index, error) {

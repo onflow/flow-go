@@ -19,8 +19,8 @@ type Seals struct {
 
 func NewSeals(collector module.CacheMetrics, db *pebble.DB) *Seals {
 
-	store := func(sealID flow.Identifier, seal *flow.Seal) func(rw pebble.Writer) error {
-		return operation.InsertSeal(sealID, seal)
+	store := func(sealID flow.Identifier, seal *flow.Seal) func(rw storage.PebbleReaderBatchWriter) error {
+		return storage.OnlyWriter(operation.InsertSeal(sealID, seal))
 	}
 
 	retrieve := func(sealID flow.Identifier) func(pebble.Reader) (*flow.Seal, error) {
