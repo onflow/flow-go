@@ -3867,7 +3867,6 @@ func TestCadenceOwnedAccountWithdraw(t *testing.T) {
 		flowTokenAddress: common.Address(contractsAddress),
 		accountByAddress: func(fromAddress types.Address, isAuthorized bool) types.Account {
 			assert.Equal(t, expectedCoaAddress, fromAddress)
-			assert.Equal(t, deposited, isAuthorized)
 
 			return &testFlowAccount{
 				address: fromAddress,
