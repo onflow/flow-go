@@ -17,21 +17,21 @@ func withLimit[K comparable, V any](limit uint) func(*Cache[K, V]) {
 	}
 }
 
-type storeFunc[K comparable, V any] func(key K, val V) func(pebble.Writer) error
+type storeFunc[K comparable, V any] func(key K, val V) func(storage.PebbleReaderBatchWriter) error
 
 func withStore[K comparable, V any](store storeFunc[K, V]) func(*Cache[K, V]) {
 	return func(c *Cache[K, V]) {
 		c.store = store
 	}
 }
-func noStore[K comparable, V any](_ K, _ V) func(pebble.Writer) error {
-	return func(pebble.Writer) error {
+func noStore[K comparable, V any](_ K, _ V) func(storage.PebbleReaderBatchWriter) error {
+	return func(storage.PebbleReaderBatchWriter) error {
 		return fmt.Errorf("no store function for cache put available")
 	}
 }
 
-func noopStore[K comparable, V any](_ K, _ V) func(pebble.Writer) error {
-	return func(pebble.Writer) error {
+func noopStore[K comparable, V any](_ K, _ V) func(storage.PebbleReaderBatchWriter) error {
+	return func(storage.PebbleReaderBatchWriter) error {
 		return nil
 	}
 }
@@ -127,28 +127,12 @@ func (c *Cache[K, V]) Remove(key K) {
 
 // Insert will add a resource directly to the cache with the given ID
 // assuming the resource has been added to storage already.
+// make as private
 func (c *Cache[K, V]) Insert(key K, resource V) {
 	// cache the resource and eject least recently used one if we reached limit
 	evicted := c.cache.Add(key, resource)
 	if !evicted {
 		c.metrics.CacheEntries(c.resource, uint(c.cache.Len()))
-	}
-}
-
-// PutTx will return tx which adds a resource to the cache with the given ID.
-func (c *Cache[K, V]) PutTx(key K, resource V) func(pebble.Writer) error {
-	storeOps := c.store(key, resource) // assemble DB operations to store resource (no execution)
-
-	return func(w pebble.Writer) error {
-		// the storeOps must be sync operation
-		err := storeOps(w) // execute operations to store resource
-		if err != nil {
-			return fmt.Errorf("could not store resource: %w", err)
-		}
-
-		c.Insert(key, resource)
-
-		return nil
 	}
 }
 
@@ -160,8 +144,7 @@ func (c *Cache[K, V]) PutPebble(key K, resource V) func(storage.PebbleReaderBatc
 			c.Insert(key, resource)
 		})
 
-		_, w := rw.ReaderWriter()
-		err := storeOps(w)
+		err := storeOps(rw)
 		if err != nil {
 			return fmt.Errorf("could not store resource: %w", err)
 		}

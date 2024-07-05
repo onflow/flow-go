@@ -23,7 +23,7 @@ type ExecutionReceipts struct {
 // NewExecutionReceipts Creates ExecutionReceipts instance which is a database of receipts which
 // supports storing and indexing receipts by receipt ID and block ID.
 func NewExecutionReceipts(collector module.CacheMetrics, db *pebble.DB, results *ExecutionResults, cacheSize uint) *ExecutionReceipts {
-	store := func(receiptTD flow.Identifier, receipt *flow.ExecutionReceipt) func(pebble.Writer) error {
+	store := func(receiptTD flow.Identifier, receipt *flow.ExecutionReceipt) func(storage.PebbleReaderBatchWriter) error {
 		receiptID := receipt.ID()
 
 		// assemble DB operations to store result (no execution)
@@ -33,16 +33,17 @@ func NewExecutionReceipts(collector module.CacheMetrics, db *pebble.DB, results 
 		// assemble DB operations to index receipt by the block it computes (no execution)
 		indexReceiptOps := operation.IndexExecutionReceipts(receipt.ExecutionResult.BlockID, receiptID)
 
-		return func(tx pebble.Writer) error {
-			err := storeResultOps(tx) // execute operations to store results
+		return func(rw storage.PebbleReaderBatchWriter) error {
+			_, w := rw.ReaderWriter()
+			err := storeResultOps(rw) // execute operations to store results
 			if err != nil {
 				return fmt.Errorf("could not store result: %w", err)
 			}
-			err = storeReceiptOps(tx) // execute operations to store receipt-specific meta-data
+			err = storeReceiptOps(w) // execute operations to store receipt-specific meta-data
 			if err != nil {
 				return fmt.Errorf("could not store receipt metadata: %w", err)
 			}
-			err = indexReceiptOps(tx)
+			err = indexReceiptOps(w)
 			if err != nil {
 				return fmt.Errorf("could not index receipt by the block it computes: %w", err)
 			}
