@@ -49,10 +49,7 @@ func (es *EpochSetups) StoreTx(setup *flow.EpochSetup) func(*transaction.Tx) err
 }
 
 func (es *EpochSetups) StorePebble(setup *flow.EpochSetup) func(storage.PebbleReaderBatchWriter) error {
-	return func(rw storage.PebbleReaderBatchWriter) error {
-		_, tx := rw.ReaderWriter()
-		return es.cache.PutTx(setup.ID(), setup)(tx)
-	}
+	return es.cache.PutPebble(setup.ID(), setup)
 }
 
 func (es *EpochSetups) retrieveTx(setupID flow.Identifier) func(tx pebble.Reader) (*flow.EpochSetup, error) {

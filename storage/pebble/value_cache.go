@@ -151,3 +151,21 @@ func (c *Cache[K, V]) PutTx(key K, resource V) func(pebble.Writer) error {
 		return nil
 	}
 }
+
+func (c *Cache[K, V]) PutPebble(key K, resource V) func(storage.PebbleReaderBatchWriter) error {
+	storeOps := c.store(key, resource) // assemble DB operations to store resource (no execution)
+
+	return func(rw storage.PebbleReaderBatchWriter) error {
+		rw.AddCallback(func() {
+			c.Insert(key, resource)
+		})
+
+		_, w := rw.ReaderWriter()
+		err := storeOps(w)
+		if err != nil {
+			return fmt.Errorf("could not store resource: %w", err)
+		}
+
+		return nil
+	}
+}

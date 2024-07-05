@@ -50,10 +50,7 @@ func (ec *EpochCommits) StoreTx(commit *flow.EpochCommit) func(*transaction.Tx) 
 }
 
 func (ec *EpochCommits) StorePebble(commit *flow.EpochCommit) func(storage.PebbleReaderBatchWriter) error {
-	return func(rw storage.PebbleReaderBatchWriter) error {
-		_, tx := rw.ReaderWriter()
-		return ec.cache.PutTx(commit.ID(), commit)(tx)
-	}
+	return ec.cache.PutPebble(commit.ID(), commit)
 }
 
 func (ec *EpochCommits) retrieveTx(commitID flow.Identifier) func(tx pebble.Reader) (*flow.EpochCommit, error) {

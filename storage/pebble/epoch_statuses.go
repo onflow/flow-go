@@ -49,10 +49,7 @@ func (es *EpochStatuses) StoreTx(blockID flow.Identifier, status *flow.EpochStat
 }
 
 func (es *EpochStatuses) StorePebble(blockID flow.Identifier, status *flow.EpochStatus) func(storage.PebbleReaderBatchWriter) error {
-	return func(rw storage.PebbleReaderBatchWriter) error {
-		_, tx := rw.ReaderWriter()
-		return es.cache.PutTx(blockID, status)(tx)
-	}
+	return es.cache.PutPebble(blockID, status)
 }
 
 func (es *EpochStatuses) retrieveTx(blockID flow.Identifier) func(tx pebble.Reader) (*flow.EpochStatus, error) {
