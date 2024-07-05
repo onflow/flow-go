@@ -225,6 +225,15 @@ func (e *EpochStateMachine) EvolveState(sealedServiceEvents []flow.ServiceEvent)
 	return nil
 }
 
+// evolveActiveStateMachine applies the state change(s) on the Epoch sub-state based on information from the candidate block
+// (under construction). Information that potentially changes the state (compared to the parent block's state):
+//   - Service Events sealed in the candidate block
+//   - the candidate block's view (already provided at construction time)
+//
+// This function applies all evolving state operations to the active state machine. In case of successful evolution,
+// it returns the deferred DB updates to be applied to the storage.
+// Expected errors during normal operations:
+// - `protocol.InvalidServiceEventError` if any service event is invalid or is not a valid state transition for the current protocol state
 func (e *EpochStateMachine) evolveActiveStateMachine(sealedServiceEvents []flow.ServiceEvent) (*transaction.DeferredBlockPersist, error) {
 	parentProtocolState := e.activeStateMachine.ParentState()
 
@@ -296,8 +305,8 @@ func (e *EpochStateMachine) applyServiceEventsFromOrderedResults(orderedUpdates 
 }
 
 // transitionToEpochFallbackMode transitions the protocol state to Epoch Fallback Mode [EFM].
-// This is implemented by switching to a different state machine implementation, which ignores all service events and epoch transitions.
-// At the moment, this is a one-way transition: once we enter EFM, the only way to return to normal is with a spork.
+// This is implemented by switching to a different state machine implementation, which has different rules for processing service events.
+// Once we enter EFM, the only way to return to normal is by processing an epoch recover event by the fallback state machine.
 func (e *EpochStateMachine) transitionToEpochFallbackMode(orderedUpdates []flow.ServiceEvent) (*transaction.DeferredBlockPersist, error) {
 	var err error
 	e.activeStateMachine, err = e.epochFallbackStateMachineFactory()
