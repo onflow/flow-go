@@ -21,10 +21,6 @@ type Headers struct {
 
 func NewHeaders(collector module.CacheMetrics, db *pebble.DB) *Headers {
 
-	store := func(blockID flow.Identifier, header *flow.Header) func(pebble.Writer) error {
-		return operation.InsertHeader(blockID, header)
-	}
-
 	// CAUTION: should only be used to index FINALIZED blocks by their
 	// respective height
 	storeHeight := func(height uint64, id flow.Identifier) func(pebble.Writer) error {
@@ -51,7 +47,6 @@ func NewHeaders(collector module.CacheMetrics, db *pebble.DB) *Headers {
 		db: db,
 		cache: newCache(collector, metrics.ResourceHeader,
 			withLimit[flow.Identifier, *flow.Header](4*flow.DefaultTransactionExpiry),
-			withStore(store),
 			withRetrieve(retrieve)),
 
 		heightCache: newCache(collector, metrics.ResourceFinalizedHeight,
@@ -63,19 +58,15 @@ func NewHeaders(collector module.CacheMetrics, db *pebble.DB) *Headers {
 	return h
 }
 
-func (h *Headers) storeTx(header *flow.Header) func(pebble.Writer) error {
-	return h.cache.PutTx(header.ID(), header)
-}
-
-func (h *Headers) storePebble(header *flow.Header) func(storage.PebbleReaderBatchWriter) error {
+func (h *Headers) storePebble(blockID flow.Identifier, header *flow.Header) func(storage.PebbleReaderBatchWriter) error {
 	return func(rw storage.PebbleReaderBatchWriter) error {
 		_, tx := rw.ReaderWriter()
-		err := h.storeTx(header)(tx)
+		err := operation.InsertHeader(blockID, header)(tx)
 		if err != nil {
-			return fmt.Errorf("could not store header %v: %w", header.ID(), err)
+			return fmt.Errorf("could not store header %v: %w", blockID, err)
 		}
 		rw.AddCallback(func() {
-			h.cache.Insert(header.ID(), header)
+			h.cache.Insert(blockID, header)
 		})
 
 		return nil
@@ -92,7 +83,7 @@ func (h *Headers) retrieveIdByHeightTx(height uint64) func(pebble.Reader) (flow.
 }
 
 func (h *Headers) Store(header *flow.Header) error {
-	return h.storeTx(header)(h.db)
+	return operation.WithReaderBatchWriter(h.db, h.storePebble(header.ID(), header))
 }
 
 func (h *Headers) ByBlockID(blockID flow.Identifier) (*flow.Header, error) {

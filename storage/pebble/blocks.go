@@ -42,12 +42,13 @@ func (b *Blocks) StorePebble(block *flow.Block) func(storage.PebbleReaderBatchWr
 
 func (b *Blocks) storeTx(block *flow.Block) func(storage.PebbleReaderBatchWriter) error {
 	return func(rw storage.PebbleReaderBatchWriter) error {
-		err := b.headers.storePebble(block.Header)(rw)
+		blockID := block.ID()
+		err := b.headers.storePebble(blockID, block.Header)(rw)
 		if err != nil {
-			return fmt.Errorf("could not store header %v: %w", block.Header.ID(), err)
+			return fmt.Errorf("could not store header %v: %w", blockID, err)
 		}
 
-		err = b.payloads.storeTx(block.ID(), block.Payload)(rw)
+		err = b.payloads.storeTx(blockID, block.Payload)(rw)
 		if err != nil {
 			return fmt.Errorf("could not store payload: %w", err)
 		}
