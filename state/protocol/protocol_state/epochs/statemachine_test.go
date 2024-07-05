@@ -518,9 +518,6 @@ func (s *EpochStateMachineSuite) TestEvolveState_EventsAreFiltered() {
 // state that we have entered Epoch fallback mode (`flow.MinEpochStateEntry.EpochFallbackTriggered` is set to `true`).
 // This test ensures that we don't drop previously committed next epoch.
 func (s *EpochStateMachineSuite) TestEvolveStateTransitionToNextEpoch_WithInvalidStateTransition() {
-	unittest.SkipUnless(s.T(), unittest.TEST_TODO,
-		"This test is broken with current implementation but must pass when EFM recovery has been implemented."+
-			"See for details https://github.com/onflow/flow-go/issues/5631.")
 	s.parentEpochState = unittest.EpochStateFixture(unittest.WithNextEpochProtocolState())
 	s.candidate.View = s.parentEpochState.NextEpochSetup.FirstView
 	happyPathTelemetryFactory := protocol_statemock.NewStateMachineEventsTelemetryFactory(s.T())

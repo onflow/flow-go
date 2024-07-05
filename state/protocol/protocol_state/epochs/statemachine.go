@@ -242,6 +242,27 @@ func (e *EpochStateMachine) EvolveState(sealedServiceEvents []flow.ServiceEvent)
 	return nil
 }
 
+func (e *EpochStateMachine) evolveActiveStateMachine(sealedServiceEvents []flow.ServiceEvent) (*transaction.DeferredBlockPersist, error) {
+	parentProtocolState := e.activeStateMachine.ParentState()
+
+	// perform protocol state transition to next epoch if next epoch is committed, and we are at first block of epoch
+	// TODO: The current implementation has edge cases for future light clients and can potentially drive consensus
+	//       into an irreconcilable state (not sure). See for details https://github.com/onflow/flow-go/issues/5631
+	//       These edge cases are very unlikely, so this is an acceptable implementation in the short - mid term.
+	//       However, this code will likely need to be changed when working on EFM recovery.
+	phase := parentProtocolState.EpochPhase()
+	if phase == flow.EpochPhaseCommitted {
+		if e.activeStateMachine.View() > parentProtocolState.CurrentEpochFinalView() {
+			err := e.activeStateMachine.TransitionToNextEpoch()
+			if err != nil {
+				return nil, fmt.Errorf("could not transition protocol state to next epoch: %w", err)
+			}
+		}
+	}
+
+	return e.applyServiceEventsFromOrderedResults(sealedServiceEvents)
+}
+
 // View returns the view associated with this state machine.
 // The view of the state machine equals the view of the block carrying the respective updates.
 func (e *EpochStateMachine) View() uint64 {
@@ -304,7 +325,7 @@ func (e *EpochStateMachine) transitionToEpochFallbackMode(orderedUpdates []flow.
 	if err != nil {
 		return nil, fmt.Errorf("could not create epoch fallback state machine: %w", err)
 	}
-	dbUpdates, err := e.applyServiceEventsFromOrderedResults(orderedUpdates)
+	dbUpdates, err := e.evolveActiveStateMachine(orderedUpdates)
 	if err != nil {
 		return nil, irrecoverable.NewExceptionf("could not apply service events after transition to epoch fallback mode: %w", err)
 	}
