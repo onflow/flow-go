@@ -93,9 +93,7 @@ func (r *ExecutionResults) ByID(resultID flow.Identifier) (*flow.ExecutionResult
 }
 
 func (r *ExecutionResults) ByIDTx(resultID flow.Identifier) func(interface{}) (*flow.ExecutionResult, error) {
-	return func(interface{}) (*flow.ExecutionResult, error) {
-		return r.byID(resultID)(r.db)
-	}
+	return nil
 }
 
 func (r *ExecutionResults) Index(blockID flow.Identifier, resultID flow.Identifier) error {

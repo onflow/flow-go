@@ -24,6 +24,10 @@ func (b *ReaderBatchWriter) ReaderWriter() (pebble.Reader, pebble.Writer) {
 	return b.db, b.batch
 }
 
+func (b *ReaderBatchWriter) IndexedBatch() *pebble.Batch {
+	return b.batch
+}
+
 func (b *ReaderBatchWriter) Commit() error {
 	return b.batch.Commit(nil)
 }

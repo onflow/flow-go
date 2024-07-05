@@ -44,14 +44,14 @@ func (p *Payloads) storeTx(blockID flow.Identifier, payload *flow.Payload) func(
 	// which is not included in current payload but was incorporated in one of previous blocks.
 
 	return func(rw storage.PebbleReaderBatchWriter) error {
-		r, _ := rw.ReaderWriter()
 		resultsByID := payload.Results.Lookup()
 		fullReceipts := make([]*flow.ExecutionReceipt, 0, len(payload.Receipts))
 		var err error
+		batch := rw.IndexedBatch()
 		for _, meta := range payload.Receipts {
 			result, ok := resultsByID[meta.ResultID]
 			if !ok {
-				result, err = p.results.ByIDTx(meta.ResultID)(r)
+				result, err = p.results.byID(meta.ResultID)(batch)
 				if err != nil {
 					if errors.Is(err, storage.ErrNotFound) {
 						err = fmt.Errorf("invalid payload referencing unknown execution result %v, err: %w", meta.ResultID, err)
