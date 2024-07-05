@@ -1002,6 +1002,8 @@ github.com/StackExchange/wmi v1.2.1 h1:VIkavFPXSjcnS+O8yTq7NI32k0R5Aj+v39y29VYDO
 github.com/StackExchange/wmi v1.2.1/go.mod h1:rcmrprowKIVzvc+NUiLncP2uuArMWLCbu9SBzvHz7e8=
 github.com/The-K-R-O-K/flow-core-contracts/lib/go/templates v0.15.2-0.20240624091211-1812579d3242 h1:7vLo/AXTu0QdiRE04o1gctyB+u7NQz6K9GqENjW2O8Q=
 github.com/The-K-R-O-K/flow-core-contracts/lib/go/templates v0.15.2-0.20240624091211-1812579d3242/go.mod h1:NgbMOYnMh0GN48VsNKZuiwK7uyk38Wyo8jN9+C9QE30=
+github.com/The-K-R-O-K/flow-emulator v1.0.0-preview.12.0.20240705101722-b2d65da98aba h1:ZCj63SFNuELk01xBRBHTiNOEa/VSDyUChR38DqiaM9U=
+github.com/The-K-R-O-K/flow-emulator v1.0.0-preview.12.0.20240705101722-b2d65da98aba/go.mod h1:2Rmax7+J7Hnc3qL7+o7+osIeFPWhctGGsfPfTzFilRo=
 github.com/VictoriaMetrics/fastcache v1.6.0/go.mod h1:0qHz5QP0GMX4pfmMA/zt5RgfNuXJrTP0zS7DqpHGGTw=
 github.com/VictoriaMetrics/fastcache v1.12.1 h1:i0mICQuojGDL3KblA7wUNlY5lOK6a4bwt3uRKnkZU40=
 github.com/VictoriaMetrics/fastcache v1.12.1/go.mod h1:tX04vaqcNoQeGLD+ra5pU5sWkuxnzWhEzLwhP9w653o=
@@ -2159,8 +2161,6 @@ github.com/onflow/crypto v0.25.1 h1:0txy2PKPMM873JbpxQNbJmuOJtD56bfs48RQfm0ts5A=
 github.com/onflow/crypto v0.25.1/go.mod h1:C8FbaX0x8y+FxWjbkHy0Q4EASCDR9bSPWZqlpCLYyVI=
 github.com/onflow/flow-core-contracts/lib/go/contracts v1.3.0 h1:cq3RfBr9TnTSnsGlUHMjMGZib24Horfb1XJqMpkN5ew=
 github.com/onflow/flow-core-contracts/lib/go/contracts v1.3.0/go.mod h1:u/mkP/B+PbV33tEG3qfkhhBlydSvAKxfLZSfB4lsJHg=
-github.com/onflow/flow-emulator v1.0.0-preview.24 h1:SonXMBeYxVwNn94M+OUmKIYScIMQG22wugh9n/tHY5k=
-github.com/onflow/flow-emulator v1.0.0-preview.24/go.mod h1:QprPouTWO3iv9VF/y4Ksltv2XIbzNMzjjr5zzq51i7Q=
 github.com/onflow/flow-ft/lib/go/contracts v1.0.0 h1:mToacZ5NWqtlWwk/7RgIl/jeKB/Sy/tIXdw90yKHcV0=
 github.com/onflow/flow-ft/lib/go/contracts v1.0.0/go.mod h1:PwsL8fC81cjnUnTfmyL/HOIyHnyaw/JA474Wfj2tl6A=
 github.com/onflow/flow-ft/lib/go/templates v1.0.0 h1:6cMS/lUJJ17HjKBfMO/eh0GGvnpElPgBXx7h5aoWJhs=

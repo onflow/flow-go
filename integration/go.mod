@@ -359,3 +359,6 @@ replace github.com/onflow/flow-go => ../
 replace github.com/onflow/flow-go/insecure => ../insecure
 
 replace github.com/onflow/flow-core-contracts/lib/go/templates => github.com/The-K-R-O-K/flow-core-contracts/lib/go/templates v0.15.2-0.20240624091211-1812579d3242
+
+//TODO: remove when emulator is merged in
+replace github.com/onflow/flow-emulator v1.0.0-preview.24 => github.com/The-K-R-O-K/flow-emulator v1.0.0-preview.12.0.20240705101722-b2d65da98aba
