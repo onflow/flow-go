@@ -30,4 +30,5 @@ type BatchStorage interface {
 
 type PebbleReaderBatchWriter interface {
 	ReaderWriter() (pebble.Reader, pebble.Writer)
+	AddCallback(func())
 }
