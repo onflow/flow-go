@@ -45,7 +45,7 @@ func ArchContract(
 	address types.Address,
 	heightProvider func() (uint64, error),
 	proofVer func(*types.COAOwnershipProofInContext) (bool, error),
-	randomSourceProvider func(uint64) (uint64, error),
+	randomSourceProvider func(uint64) ([]byte, error),
 	revertibleRandomGenerator func() (uint64, error),
 ) types.PrecompiledContract {
 	return MultiFunctionPrecompiledContract(
@@ -139,7 +139,7 @@ func (f *proofVerifier) Run(input []byte) ([]byte, error) {
 var _ Function = &randomnessSource{}
 
 type randomnessSource struct {
-	randomSourceProvider func(uint64) (uint64, error)
+	randomSourceProvider func(uint64) ([]byte, error)
 }
 
 func (r *randomnessSource) FunctionSelector() FunctionSelector {
@@ -160,8 +160,8 @@ func (r *randomnessSource) Run(input []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	buf := make([]byte, EncodedUint64Size)
-	err = EncodeUint64(rand, buf, 0)
+	buf := make([]byte, EncodedBytes32Size)
+	err = EncodeBytes32(rand, buf, 0)
 	if err != nil {
 		return nil, err
 	}
