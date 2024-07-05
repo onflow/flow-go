@@ -10,8 +10,8 @@ If you feel that the branching convention could be improved, please prepare a co
 a [Core Protocol Working Group](https://github.com/onflow/Flow-Working-Groups/tree/main/core_protocol_working_group) meeting.
  
 ### Overview
-On a conceptual level, we maintain three categories of branches: 
-* The **deployment branches** version software was/is/should be running on testnet and mainnet. 
+On a conceptual level, we maintain four categories of branches: 
+* **deployment branches** contain software versions that was/is/should be running on testnet and mainnet. 
   The naming convention is `v0.minor` and loosely follows semantic versioning. The major version is currently pinned to `0`,
   as the Flow protocol is not yet fully implemented. The minor version increases at every Height-Coordinated-Upgrade [HCU] or spork (points of breaking downwards compatibility).
   In a nutshell, you can think of the minor as a version number for the overall protocol. Each time there is a change in the protocol, such that nodes
@@ -91,11 +91,11 @@ such as cryptographic stack (e.g. `v0.33-relic`), storage implementation (e.g. `
 
 ### The `spork` branch
 
-The spork branch was specifically introduced for managing spork-level changes. Sporks are very far apart (targeted at 12 months intervals) and for of the time in between sporks, 
-the `spork` branch is not needed. HCU-compatible features are merged to `master` and HCU-incompatible features live in their own feature branches until shortly before the spork.
+The spork branch was specifically introduced for managing spork-level changes. Sporks are very far apart (targeted at 12 months intervals), so the `spork` branch is not needed for the time in between sporks.
+HCU-compatible features are merged to `master` and HCU-incompatible features live in their own feature branches until shortly before the spork.
 In an ideal world, where we finalize the spork date a few months ahead of time and _always_ stick to it, the `spork` branch would not be needed at all. 
 
-Unfortunately, despite our best efforts it has happened that needed to postpone the spork just a few weeks before it was supposed to happen.
+Despite our best efforts, occasionally circumstances arise that require us to postpone the spork just a few weeks before it was supposed to happen.
 In fact, given the magnitude and depth of changes being rolled out in a spork, needing to postpone with short notice is actually a reasonably plausible scenario.
 And the `spork` branch helps us to handle this scenario: 
 
