@@ -30,19 +30,19 @@ func NewClusterBlocks(db *pebble.DB, chainID flow.ChainID, headers *Headers, pay
 }
 
 func (b *ClusterBlocks) Store(block *cluster.Block) error {
-	return operation.WithReaderBatchWriter(b.db, func(tx storage.PebbleReaderBatchWriter) error {
-		_, w := tx.ReaderWriter()
-		return b.storeTx(block)(w)
-	})
+	return operation.WithReaderBatchWriter(b.db, b.storeTx(block))
 }
 
-func (b *ClusterBlocks) storeTx(block *cluster.Block) func(pebble.Writer) error {
-	return func(tx pebble.Writer) error {
-		err := b.headers.storeTx(block.Header)(tx)
+func (b *ClusterBlocks) storeTx(block *cluster.Block) func(storage.PebbleReaderBatchWriter) error {
+	return func(tx storage.PebbleReaderBatchWriter) error {
+		blockID := block.ID()
+		err := b.headers.storePebble(blockID, block.Header)(tx)
 		if err != nil {
 			return fmt.Errorf("could not store header: %w", err)
 		}
-		err = b.payloads.storeTx(block.ID(), block.Payload)(tx)
+
+		_, w := tx.ReaderWriter()
+		err = b.payloads.storeTx(block.ID(), block.Payload)(w)
 		if err != nil {
 			return fmt.Errorf("could not store payload: %w", err)
 		}
