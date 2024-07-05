@@ -210,24 +210,7 @@ func (e *EpochStateMachine) Build() (*transaction.DeferredBlockPersist, error) {
 // contract, it could be that this happens too late, and we should trigger epoch fallback mode.
 // No errors are expected during normal operations.
 func (e *EpochStateMachine) EvolveState(sealedServiceEvents []flow.ServiceEvent) error {
-	parentProtocolState := e.activeStateMachine.ParentState()
-
-	// perform protocol state transition to next epoch if next epoch is committed, and we are at first block of epoch
-	// TODO: The current implementation has edge cases for future light clients and can potentially drive consensus
-	//       into an irreconcilable state (not sure). See for details https://github.com/onflow/flow-go/issues/5631
-	//       These edge cases are very unlikely, so this is an acceptable implementation in the short - mid term.
-	//       However, this code will likely need to be changed when working on EFM recovery.
-	phase := parentProtocolState.EpochPhase()
-	if phase == flow.EpochPhaseCommitted {
-		if e.activeStateMachine.View() > parentProtocolState.CurrentEpochFinalView() {
-			err := e.activeStateMachine.TransitionToNextEpoch()
-			if err != nil {
-				return fmt.Errorf("could not transition protocol state to next epoch: %w", err)
-			}
-		}
-	}
-
-	dbUpdates, err := e.applyServiceEventsFromOrderedResults(sealedServiceEvents)
+	dbUpdates, err := e.evolveActiveStateMachine(sealedServiceEvents)
 	if err != nil {
 		if protocol.IsInvalidServiceEventError(err) {
 			dbUpdates, err = e.transitionToEpochFallbackMode(sealedServiceEvents)
@@ -246,10 +229,6 @@ func (e *EpochStateMachine) evolveActiveStateMachine(sealedServiceEvents []flow.
 	parentProtocolState := e.activeStateMachine.ParentState()
 
 	// perform protocol state transition to next epoch if next epoch is committed, and we are at first block of epoch
-	// TODO: The current implementation has edge cases for future light clients and can potentially drive consensus
-	//       into an irreconcilable state (not sure). See for details https://github.com/onflow/flow-go/issues/5631
-	//       These edge cases are very unlikely, so this is an acceptable implementation in the short - mid term.
-	//       However, this code will likely need to be changed when working on EFM recovery.
 	phase := parentProtocolState.EpochPhase()
 	if phase == flow.EpochPhaseCommitted {
 		if e.activeStateMachine.View() > parentProtocolState.CurrentEpochFinalView() {

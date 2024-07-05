@@ -502,7 +502,8 @@ func (s *EpochStateMachineSuite) TestEvolveStateTransitionToNextEpoch_Error() {
 	exception := errors.New("exception")
 	s.happyPathStateMachine.On("TransitionToNextEpoch").Return(exception).Once()
 	err := s.stateMachine.EvolveState(nil)
-	require.ErrorIs(s.T(), err, exception)
+	require.Error(s.T(), err, exception)
+	require.ErrorContains(s.T(), err, "[exception!]")
 	require.False(s.T(), protocol.IsInvalidServiceEventError(err))
 }
 
