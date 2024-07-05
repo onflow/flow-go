@@ -21,8 +21,8 @@ var _ storage.EpochSetups = (*EpochSetups)(nil)
 // NewEpochSetups instantiates a new EpochSetups storage.
 func NewEpochSetups(collector module.CacheMetrics, db *pebble.DB) *EpochSetups {
 
-	store := func(id flow.Identifier, setup *flow.EpochSetup) func(pebble.Writer) error {
-		return operation.InsertEpochSetup(id, setup)
+	store := func(id flow.Identifier, setup *flow.EpochSetup) func(storage.PebbleReaderBatchWriter) error {
+		return storage.OnlyWriter(operation.InsertEpochSetup(id, setup))
 	}
 
 	retrieve := func(id flow.Identifier) func(pebble.Reader) (*flow.EpochSetup, error) {

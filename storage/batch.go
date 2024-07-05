@@ -32,3 +32,10 @@ type PebbleReaderBatchWriter interface {
 	ReaderWriter() (pebble.Reader, pebble.Writer)
 	AddCallback(func())
 }
+
+func OnlyWriter(fn func(pebble.Writer) error) func(PebbleReaderBatchWriter) error {
+	return func(rw PebbleReaderBatchWriter) error {
+		_, w := rw.ReaderWriter()
+		return fn(w)
+	}
+}

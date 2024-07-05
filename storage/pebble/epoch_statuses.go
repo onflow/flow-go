@@ -21,8 +21,8 @@ var _ storage.EpochStatuses = (*EpochStatuses)(nil)
 // NewEpochStatuses ...
 func NewEpochStatuses(collector module.CacheMetrics, db *pebble.DB) *EpochStatuses {
 
-	store := func(blockID flow.Identifier, status *flow.EpochStatus) func(pebble.Writer) error {
-		return operation.InsertEpochStatus(blockID, status)
+	store := func(blockID flow.Identifier, status *flow.EpochStatus) func(rw storage.PebbleReaderBatchWriter) error {
+		return storage.OnlyWriter(operation.InsertEpochStatus(blockID, status))
 	}
 
 	retrieve := func(blockID flow.Identifier) func(pebble.Reader) (*flow.EpochStatus, error) {

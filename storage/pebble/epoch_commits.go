@@ -22,8 +22,8 @@ var _ storage.EpochCommits = (*EpochCommits)(nil)
 
 func NewEpochCommits(collector module.CacheMetrics, db *pebble.DB) *EpochCommits {
 
-	store := func(id flow.Identifier, commit *flow.EpochCommit) func(pebble.Writer) error {
-		return operation.InsertEpochCommit(id, commit)
+	store := func(id flow.Identifier, commit *flow.EpochCommit) func(storage.PebbleReaderBatchWriter) error {
+		return storage.OnlyWriter(operation.InsertEpochCommit(id, commit))
 	}
 
 	retrieve := func(id flow.Identifier) func(pebble.Reader) (*flow.EpochCommit, error) {
