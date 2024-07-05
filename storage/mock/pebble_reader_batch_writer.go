@@ -12,6 +12,11 @@ type PebbleReaderBatchWriter struct {
 	mock.Mock
 }
 
+// AddCallback provides a mock function with given fields: _a0
+func (_m *PebbleReaderBatchWriter) AddCallback(_a0 func()) {
+	_m.Called(_a0)
+}
+
 // ReaderWriter provides a mock function with given fields:
 func (_m *PebbleReaderBatchWriter) ReaderWriter() (pebble.Reader, pebble.Writer) {
 	ret := _m.Called()
