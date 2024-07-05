@@ -411,6 +411,7 @@ func (s *EpochStateMachineSuite) TestEvolveState_InvalidEpochSetup() {
 			Return(false, protocol.NewInvalidServiceEventErrorf("")).Once()
 
 		fallbackStateMachine := mock.NewStateMachine(s.T())
+		fallbackStateMachine.On("ParentState").Return(s.parentEpochState)
 		fallbackStateMachine.On("ProcessEpochSetup", epochSetup).Return(false, nil).Once()
 		fallbackPathStateMachineFactory.On("Execute", s.candidate.View, s.parentEpochState).Return(fallbackStateMachine, nil).Once()
 
@@ -458,6 +459,7 @@ func (s *EpochStateMachineSuite) TestEvolveState_InvalidEpochCommit() {
 			Return(false, protocol.NewInvalidServiceEventErrorf("")).Once()
 
 		fallbackStateMachine := mock.NewStateMachine(s.T())
+		fallbackStateMachine.On("ParentState").Return(s.parentEpochState)
 		fallbackStateMachine.On("ProcessEpochCommit", epochCommit).Return(false, nil).Once()
 		fallbackPathStateMachineFactory.On("Execute", s.candidate.View, s.parentEpochState).Return(fallbackStateMachine, nil).Once()
 
