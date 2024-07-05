@@ -2,16 +2,22 @@
 
 Please carefully read our [Coding Conventions](./CodingConventions.md).
 
-## Branching Convention
+## Branching Policy
 
-**This convention is _binding_ for all PR requests in this repo!**
-Deviating from this convention has a significant risk of compromising mainnet. 
-If you feel that the branching convention could be improved, please prepare a concrete proposal and add an agenda item for
+**This convention is _binding_**<sup>⭒</sup> **for all PR requests in this repo**, as
+deviations pose a significant risk to mainnet liveness. If you believe the branching convention could be improved, 
+please prepare a concrete proposal and add an agenda item for
 a [Core Protocol Working Group](https://github.com/onflow/Flow-Working-Groups/tree/main/core_protocol_working_group) meeting.
- 
+
+(⭒) There may be scenarios where the Branching Policy has its limitations, and one-off deviations could be beneficial.
+This includes accidental deviations that, once discovered, are not easily undone.
+These cases should be carefully tracked and require awareness and detailed coordination.
+It is the responsibility of team members working on branches that break the policy to ensure
+the _entire_ engineering team working on `flow-go` is informed and stays in the loop.
+
 ### Overview
-On a conceptual level, we maintain four categories of branches: 
-* **deployment branches** contain software versions that was/is/should be running on testnet and mainnet. 
+Conceptually, we maintain four categories of branches:
+* **deployment branches** contain software versions that were/are/should be running on testnet and mainnet.
   The naming convention is `v0.minor` and loosely follows semantic versioning. The major version is currently pinned to `0`,
   as the Flow protocol is not yet fully implemented. The minor version increases at every Height-Coordinated-Upgrade [HCU] or spork (points of breaking downwards compatibility).
   In a nutshell, you can think of the minor as a version number for the overall protocol. Each time there is a change in the protocol, such that nodes
@@ -19,13 +25,13 @@ On a conceptual level, we maintain four categories of branches:
   (usually from `master`).
 * `master` accumulates all revisions and features that are either fully downwards compatible or can be rolled out via an HCU. Probably the majority of PRs
   can be merged directly to master or via a feature branch. Furthermore, our ability to roll out upgrades to the live network via HCUs will significantly increase over time.     
-* For most **feature branches**, the protocol changes they implement will hopefully be small enough to be deployed via an HCU (and hence can be merged to `master`).
-  Though, for the foreseeable future, large and broadly-breaking improvements will be necessary for a fast evolution and feature-completion of Flow.
-  Such features should be kept in their individual feature branches.  
-* The `spork` branch, will be created in preparation of a new spork from the most recent `master`. Feature branches holding HCU-**in**compatible upgrades will be
+* Most **feature branches** implement protocol changes small enough to be deployed via an HCU (and hence can be merged to `master`). 
+  However, for the foreseeable future, large and broadly-breaking improvements will be necessary for a fast evolution and
+  feature-completion of Flow. Such features should be kept in their individual feature branches.
+* The `spork` branch will be created in preparation of a new spork from the most recent `master`. Feature branches holding HCU-**in**compatible upgrades will be
   consolidated on this `spork` branch. The spork branch is intended to be very short-lived and only exist for a few weeks right before the testnet spork.
-  When the Flow network has committed to the spork on a governance level (at the moment, largely coordinated by the Flow Foundation), the `spork` branch will be
-  merged back to `master`.
+  When the Flow network has committed to the spork on a governance level (currently coordinated by the Flow Foundation), 
+  the `spork` branch will be merged back to `master`.
 
 We are purposefully continuing the usage of the 'spork' terminology here, to describe a "severely breaking change".
 Specifically, spork describes a deployment of new node software, which requires the entire network to be stopped and rebooted.
