@@ -6,6 +6,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/pebble/operation"
 )
 
@@ -42,7 +43,7 @@ func NewTransactions(cacheMetrics module.CacheMetrics, db *pebble.DB) *Transacti
 
 // Store ...
 func (t *Transactions) Store(flowTx *flow.TransactionBody) error {
-	return t.storeTx(flowTx)(t.db)
+	return operation.WithReaderBatchWriter(t.db, t.storeTx(flowTx))
 }
 
 // ByID ...
@@ -50,8 +51,8 @@ func (t *Transactions) ByID(txID flow.Identifier) (*flow.TransactionBody, error)
 	return t.retrieveTx(txID)(t.db)
 }
 
-func (t *Transactions) storeTx(flowTx *flow.TransactionBody) func(pebble.Writer) error {
-	return t.cache.PutTx(flowTx.ID(), flowTx)
+func (t *Transactions) storeTx(flowTx *flow.TransactionBody) func(storage.PebbleReaderBatchWriter) error {
+	return t.cache.PutPebble(flowTx.ID(), flowTx)
 }
 
 func (t *Transactions) retrieveTx(txID flow.Identifier) func(pebble.Reader) (*flow.TransactionBody, error) {

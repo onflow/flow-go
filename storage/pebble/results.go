@@ -45,8 +45,8 @@ func NewExecutionResults(collector module.CacheMetrics, db *pebble.DB) *Executio
 	return res
 }
 
-func (r *ExecutionResults) store(result *flow.ExecutionResult) func(pebble.Writer) error {
-	return r.cache.PutTx(result.ID(), result)
+func (r *ExecutionResults) store(result *flow.ExecutionResult) func(storage.PebbleReaderBatchWriter) error {
+	return r.cache.PutPebble(result.ID(), result)
 }
 
 func (r *ExecutionResults) byID(resultID flow.Identifier) func(pebble.Reader) (*flow.ExecutionResult, error) {
@@ -75,7 +75,7 @@ func (r *ExecutionResults) index(blockID, resultID flow.Identifier, force bool) 
 }
 
 func (r *ExecutionResults) Store(result *flow.ExecutionResult) error {
-	return r.store(result)(r.db)
+	return operation.WithReaderBatchWriter(r.db, r.store(result))
 }
 
 func (r *ExecutionResults) BatchStore(result *flow.ExecutionResult, batch storage.BatchStorage) error {

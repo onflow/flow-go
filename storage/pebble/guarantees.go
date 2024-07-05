@@ -6,6 +6,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/pebble/operation"
 )
 
@@ -40,8 +41,8 @@ func NewGuarantees(collector module.CacheMetrics, db *pebble.DB, cacheSize uint)
 	return g
 }
 
-func (g *Guarantees) storeTx(guarantee *flow.CollectionGuarantee) func(pebble.Writer) error {
-	return g.cache.PutTx(guarantee.ID(), guarantee)
+func (g *Guarantees) storeTx(guarantee *flow.CollectionGuarantee) func(storage.PebbleReaderBatchWriter) error {
+	return g.cache.PutPebble(guarantee.ID(), guarantee)
 }
 
 func (g *Guarantees) retrieveTx(collID flow.Identifier) func(pebble.Reader) (*flow.CollectionGuarantee, error) {
@@ -55,7 +56,7 @@ func (g *Guarantees) retrieveTx(collID flow.Identifier) func(pebble.Reader) (*fl
 }
 
 func (g *Guarantees) Store(guarantee *flow.CollectionGuarantee) error {
-	return g.storeTx(guarantee)(g.db)
+	return operation.WithReaderBatchWriter(g.db, g.storeTx(guarantee))
 }
 
 func (g *Guarantees) ByCollectionID(collID flow.Identifier) (*flow.CollectionGuarantee, error) {

@@ -76,8 +76,8 @@ func NewExecutionReceipts(collector module.CacheMetrics, db *pebble.DB, results 
 }
 
 // storeMyReceipt assembles the operations to store an arbitrary receipt.
-func (r *ExecutionReceipts) storeTx(receipt *flow.ExecutionReceipt) func(pebble.Writer) error {
-	return r.cache.PutTx(receipt.ID(), receipt)
+func (r *ExecutionReceipts) storeTx(receipt *flow.ExecutionReceipt) func(storage.PebbleReaderBatchWriter) error {
+	return r.cache.PutPebble(receipt.ID(), receipt)
 }
 
 func (r *ExecutionReceipts) byID(receiptID flow.Identifier) func(pebble.Reader) (*flow.ExecutionReceipt, error) {
@@ -112,7 +112,7 @@ func (r *ExecutionReceipts) byBlockID(blockID flow.Identifier) func(pebble.Reade
 }
 
 func (r *ExecutionReceipts) Store(receipt *flow.ExecutionReceipt) error {
-	return r.storeTx(receipt)(r.db)
+	return operation.WithReaderBatchWriter(r.db, r.storeTx(receipt))
 }
 
 func (r *ExecutionReceipts) BatchStore(receipt *flow.ExecutionReceipt, batch storage.BatchStorage) error {

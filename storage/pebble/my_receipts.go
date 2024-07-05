@@ -72,8 +72,8 @@ func NewMyExecutionReceipts(collector module.CacheMetrics, db *pebble.DB, receip
 }
 
 // storeMyReceipt assembles the operations to store the receipt and marks it as mine (trusted).
-func (m *MyExecutionReceipts) storeMyReceipt(receipt *flow.ExecutionReceipt) func(pebble.Writer) error {
-	return m.cache.PutTx(receipt.ExecutionResult.BlockID, receipt)
+func (m *MyExecutionReceipts) storeMyReceipt(receipt *flow.ExecutionReceipt) func(storage.PebbleReaderBatchWriter) error {
+	return m.cache.PutPebble(receipt.ExecutionResult.BlockID, receipt)
 }
 
 // storeMyReceipt assembles the operations to retrieve my receipt for the given block ID.
@@ -93,7 +93,7 @@ func (m *MyExecutionReceipts) myReceipt(blockID flow.Identifier) func(pebble.Rea
 // we only support indexing a _single_ receipt per block. Attempting to
 // store conflicting receipts for the same block will error.
 func (m *MyExecutionReceipts) StoreMyReceipt(receipt *flow.ExecutionReceipt) error {
-	return m.storeMyReceipt(receipt)(m.db)
+	return operation.WithReaderBatchWriter(m.db, m.storeMyReceipt(receipt))
 }
 
 // BatchStoreMyReceipt stores blockID-to-my-receipt index entry keyed by blockID in a provided batch.

@@ -44,8 +44,8 @@ func NewResultApprovals(collector module.CacheMetrics, db *pebble.DB) *ResultApp
 	return res
 }
 
-func (r *ResultApprovals) store(approval *flow.ResultApproval) func(pebble.Writer) error {
-	return r.cache.PutTx(approval.ID(), approval)
+func (r *ResultApprovals) store(approval *flow.ResultApproval) func(storage.PebbleReaderBatchWriter) error {
+	return r.cache.PutPebble(approval.ID(), approval)
 }
 
 func (r *ResultApprovals) byID(approvalID flow.Identifier) func(pebble.Reader) (*flow.ResultApproval, error) {
@@ -106,7 +106,7 @@ func (r *ResultApprovals) index(resultID flow.Identifier, chunkIndex uint64, app
 
 // Store stores a ResultApproval
 func (r *ResultApprovals) Store(approval *flow.ResultApproval) error {
-	return r.store(approval)(r.db)
+	return operation.WithReaderBatchWriter(r.db, r.store(approval))
 }
 
 // Index indexes a ResultApproval by chunk (ResultID + chunk index).

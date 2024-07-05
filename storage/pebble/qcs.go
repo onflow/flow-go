@@ -49,14 +49,14 @@ func (q *QuorumCertificates) StoreTx(qc *flow.QuorumCertificate) func(*transacti
 
 func (q *QuorumCertificates) StorePebble(qc *flow.QuorumCertificate) func(storage.PebbleReaderBatchWriter) error {
 	return func(rw storage.PebbleReaderBatchWriter) error {
-		r, tx := rw.ReaderWriter()
+		r, _ := rw.ReaderWriter()
 		_, err := q.retrieveTx(qc.BlockID)(r)
 		if err == nil {
 			// QC for blockID already exists
 			return storage.ErrAlreadyExists
 		}
 
-		return q.cache.PutTx(qc.BlockID, qc)(tx)
+		return q.cache.PutPebble(qc.BlockID, qc)(rw)
 	}
 }
 

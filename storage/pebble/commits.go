@@ -54,7 +54,7 @@ func (c *Commits) retrieveTx(blockID flow.Identifier) func(tx pebble.Reader) (fl
 }
 
 func (c *Commits) Store(blockID flow.Identifier, commit flow.StateCommitment) error {
-	return c.cache.PutTx(blockID, commit)(c.db)
+	return operation.WithReaderBatchWriter(c.db, c.cache.PutPebble(blockID, commit))
 }
 
 // BatchStore stores Commit keyed by blockID in provided batch

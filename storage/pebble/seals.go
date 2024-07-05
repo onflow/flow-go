@@ -8,6 +8,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/pebble/operation"
 )
 
@@ -41,8 +42,8 @@ func NewSeals(collector module.CacheMetrics, db *pebble.DB) *Seals {
 	return s
 }
 
-func (s *Seals) storeTx(seal *flow.Seal) func(pebble.Writer) error {
-	return s.cache.PutTx(seal.ID(), seal)
+func (s *Seals) storeTx(seal *flow.Seal) func(storage.PebbleReaderBatchWriter) error {
+	return s.cache.PutPebble(seal.ID(), seal)
 }
 
 func (s *Seals) retrieveTx(sealID flow.Identifier) func(pebble.Reader) (*flow.Seal, error) {
@@ -56,7 +57,7 @@ func (s *Seals) retrieveTx(sealID flow.Identifier) func(pebble.Reader) (*flow.Se
 }
 
 func (s *Seals) Store(seal *flow.Seal) error {
-	return s.storeTx(seal)(s.db)
+	return operation.WithReaderBatchWriter(s.db, s.storeTx(seal))
 }
 
 func (s *Seals) ByID(sealID flow.Identifier) (*flow.Seal, error) {
