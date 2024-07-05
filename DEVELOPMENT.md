@@ -11,7 +11,7 @@ a [Core Protocol Working Group](https://github.com/onflow/Flow-Working-Groups/tr
  
 ### Overview
 On a conceptual level, we maintain three categories of branches: 
-* The **deployment branches** version software is was/is/shoud be running on testnet and mainnet. 
+* The **deployment branches** version software was/is/should be running on testnet and mainnet. 
   The naming convention is `v0.minor` and loosely follows semantic versioning. The major version is currently pinned to `0`,
   as the Flow protocol is not yet fully implemented. The minor version increases at every Height-Coordinated-Upgrade [HCU] or spork (points of breaking downwards compatibility).
   In a nutshell, you can think of the minor as a version number for the overall protocol. Each time there is a change in the protocol, such that nodes
@@ -33,15 +33,9 @@ We only carry over a snapshot of the execution state but fully re-initialize the
 incl. migrations of the entire execution state to a new formats become reasonably straight forward.
 Additional context on HCU vs sporks can be found [here](https://developers.flow.com/networks/node-ops/node-operation/hcu#hcu-versus-spork).   
 
-<!---
-TEMPORARY to show the image, will be replaced with commented-out version below before merge 
--->
 
-<img src='https://github.com/onflow/flow-go/blob/ff8882b2fcef5b7dfa86ac97cde407cc7b9ae3d5/docs/flow-go_branching-convention.png' width='350'>
+<img src='./docs/flow-go_branching-convention.png' width='350'>
 
-<!---
-<img src='https://github.com/onflow/flow-go/blob/master/docs/BranchingConvention.png' width='350'>
--->
 
 
 
@@ -51,7 +45,7 @@ Therefore, longer wait times for features until their deployment must be account
 developed and refined based on the multi-year learnings of managing the deployment of the flow network.
 * Deployment branches, `master` containing a runnable snapshot of the most recent development state and feature branches are intuitively exactly what you
   would expect without further flow-specific context. We just _extend_ the common convention by a few edge cases accounting for the upgrade-constraints of a blockchain network:
-  * On a specific deployment branch, there can only be non-braking changes. This is to prevent accidents where we roll out new node
+  * On a specific deployment branch, there can only be non-breaking changes. This is to prevent accidents where we roll out new node
     software incrementally to one node after another, but then discover later that there is some specific case where the two versions don't work together and mainnet halts. 
   * Due to the limitations of upgrades that can be rolled out via HCUs, we have to separate spork-level features. That is the scenario we address with long-living
     feature branches and the spork branch.   
@@ -69,7 +63,7 @@ developed and refined based on the multi-year learnings of managing the deployme
 The `master` branch is intended to only contain features for the _immediately_ upcoming release.
 This is under the assumption that we already committed to the type of upgrade (HCU vs Spork).
 
-**Generally only HCU-compatible changes are allowed to be mered to `master`**. It is the responsibilities of the developers to provide conclusive evidence why
+**Generally only HCU-compatible changes are allowed to be merged to `master`**. It is the responsibilities of the developers to provide conclusive evidence why
 their change can be deployed via HCU. For fully downwards-compatible changes, this explanation can be omitted. Otherwise, please provide a brief summary in your PR
 targeting master as of why the code changes are HCU-compatible (for example "only affects transaction execution and verification"). More details are provided in the 
 [breaking change classification](#breaking-change-classifications) section below.
@@ -80,7 +74,7 @@ targeting master as of why the code changes are HCU-compatible (for example "onl
 - For every HCU and spork, a new deployment branch will be created from master. This branch will be tagged and used to update testnet and then mainnet.
 - **Only non-breaking changes** can be committed to a deployment branch, such that nodes running the older and newer version on this branch can be mixed.
   In other words, a single deployment branch spans _all_ patches that are protocol-compatible without an HCU. 
-- Each time there is a breacking-change in the protocol (see [breaking change classification](#breaking-change-classifications) below),
+- Each time there is a breaking-change in the protocol (see [breaking change classification](#breaking-change-classifications) below),
   the minor version increases and we create a new deployment branch from `master`.
 
 #### Naming Convention:
