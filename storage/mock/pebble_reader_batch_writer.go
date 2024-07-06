@@ -17,6 +17,22 @@ func (_m *PebbleReaderBatchWriter) AddCallback(_a0 func()) {
 	_m.Called(_a0)
 }
 
+// IndexedBatch provides a mock function with given fields:
+func (_m *PebbleReaderBatchWriter) IndexedBatch() *pebble.Batch {
+	ret := _m.Called()
+
+	var r0 *pebble.Batch
+	if rf, ok := ret.Get(0).(func() *pebble.Batch); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*pebble.Batch)
+		}
+	}
+
+	return r0
+}
+
 // ReaderWriter provides a mock function with given fields:
 func (_m *PebbleReaderBatchWriter) ReaderWriter() (pebble.Reader, pebble.Writer) {
 	ret := _m.Called()
