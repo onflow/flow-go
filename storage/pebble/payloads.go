@@ -51,11 +51,19 @@ func (p *Payloads) storeTx(blockID flow.Identifier, payload *flow.Payload) func(
 		for _, meta := range payload.Receipts {
 			result, ok := resultsByID[meta.ResultID]
 			if !ok {
+				// if result is not in the payload of the current block,
+				// it should be in either storage or previous blocks.
+				// reading from the indexed batch can read the block from previous block
 				result, err = p.results.byID(meta.ResultID)(batch)
-				if err != nil {
-					if errors.Is(err, storage.ErrNotFound) {
+				if errors.Is(err, storage.ErrNotFound) {
+					// if the result is not in the previous blocks, check storage
+					result, err = p.results.ByID(meta.ResultID)
+					if err != nil {
 						err = fmt.Errorf("invalid payload referencing unknown execution result %v, err: %w", meta.ResultID, err)
 					}
+				}
+
+				if err != nil {
 					return err
 				}
 			}
