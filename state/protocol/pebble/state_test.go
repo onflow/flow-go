@@ -545,7 +545,6 @@ func bootstrap(t *testing.T, rootSnapshot protocol.Snapshot, f func(*bprotocol.S
 		all.VersionBeacons,
 		rootSnapshot,
 	)
-	require.NoError(t, err)
 	f(state, err)
 }
 
