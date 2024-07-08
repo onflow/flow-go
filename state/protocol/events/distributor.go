@@ -59,11 +59,11 @@ func (d *Distributor) EpochSetupPhaseStarted(epoch uint64, first *flow.Header) {
 	}
 }
 
-func (d *Distributor) EpochCommittedPhaseStarted(currentEpochCounter uint64, first *flow.Header) {
+func (d *Distributor) EpochCommittedPhaseStarted(epoch uint64, first *flow.Header) {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
 	for _, sub := range d.subscribers {
-		sub.EpochCommittedPhaseStarted(currentEpochCounter, first)
+		sub.EpochCommittedPhaseStarted(epoch, first)
 	}
 }
 
