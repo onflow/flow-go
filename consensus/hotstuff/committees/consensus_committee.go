@@ -99,8 +99,10 @@ func newEpochInfo(epoch protocol.Epoch) (*epochInfo, error) {
 	return ei, nil
 }
 
-// eventHandlerFunc represents an event wrapped in a closure which will perform any required local
-// state changes upon execution by the single event processing worker goroutine.
+// eventHandlerFunc holds an epoch-related ServiceEvent wrapped in a closure, which will perform
+// the required local state changes upon execution. Pending eventHandlerFunc must be queued
+// and processed by a *single* worker goroutine following exactly the order in which the
+// epoch-related Service Events were delivered.
 // No errors are expected under normal conditions.
 type eventHandlerFunc func() error
 
