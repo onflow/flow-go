@@ -50,6 +50,7 @@ type EpochProtocolState interface {
 	PreviousEpochExists() bool
 
 	// EpochPhase returns the epoch phase for the current epoch.
+	// See flow.EpochPhase for detailed documentation.
 	EpochPhase() flow.EpochPhase
 
 	// EpochExtensions returns the epoch extensions associated with the current epoch, if any.

@@ -160,7 +160,7 @@ func (suite *Suite) SetupTest() {
 	suite.snap.On("Head").Return(
 		func() *flow.Header { return suite.header },
 		func() error { return nil })
-	suite.snap.On("Phase").Return(
+	suite.snap.On("EpochPhase").Return(
 		func() flow.EpochPhase { return suite.phase },
 		func() error { return nil })
 

@@ -91,12 +91,23 @@ func TestEpochProtocolStateAdapter(t *testing.T) {
 		assert.True(t, adapter.PreviousEpochExists())
 		assert.False(t, adapter.EpochFallbackTriggered())
 	})
-	t.Run("invalid-state-transition-attempted", func(t *testing.T) {
-		entry := unittest.EpochStateFixture(func(entry *flow.RichEpochProtocolStateEntry) {
-			entry.EpochFallbackTriggered = true
+	t.Run("epoch-fallback-triggered", func(t *testing.T) {
+		t.Run("tentatively staking phase", func(t *testing.T) {
+			entry := unittest.EpochStateFixture(func(entry *flow.RichEpochProtocolStateEntry) {
+				entry.EpochFallbackTriggered = true
+			})
+			adapter := inmem.NewEpochProtocolStateAdapter(entry, globalParams)
+			assert.True(t, adapter.EpochFallbackTriggered())
+			assert.Equal(t, flow.EpochPhaseFallback, entry.EpochPhase())
 		})
-		adapter := inmem.NewEpochProtocolStateAdapter(entry, globalParams)
-		assert.True(t, adapter.EpochFallbackTriggered())
+		t.Run("tentatively committed phase", func(t *testing.T) {
+			entry := unittest.EpochStateFixture(unittest.WithNextEpochProtocolState(), func(entry *flow.RichEpochProtocolStateEntry) {
+				entry.EpochFallbackTriggered = true
+			})
+			adapter := inmem.NewEpochProtocolStateAdapter(entry, globalParams)
+			assert.True(t, adapter.EpochFallbackTriggered())
+			assert.Equal(t, flow.EpochPhaseCommitted, entry.EpochPhase())
+		})
 	})
 	t.Run("no-previous-epoch", func(t *testing.T) {
 		entry := unittest.EpochStateFixture(func(entry *flow.RichEpochProtocolStateEntry) {

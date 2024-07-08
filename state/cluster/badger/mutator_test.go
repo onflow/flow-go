@@ -104,6 +104,7 @@ func (suite *MutatorSuite) SetupTest() {
 	require.NoError(suite.T(), err)
 
 	suite.mutableProtocolState = protocol_state.NewMutableProtocolState(
+		log,
 		all.EpochProtocolStateEntries,
 		all.ProtocolKVStore,
 		state.Params(),
