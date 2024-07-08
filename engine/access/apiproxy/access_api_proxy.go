@@ -274,6 +274,18 @@ func (h *FlowAccessAPIRouter) GetAccountBalanceAtBlockHeight(context context.Con
 	return res, err
 }
 
+func (h *FlowAccessAPIRouter) GetAccountKeyAtLatestBlock(context context.Context, req *access.GetAccountKeyAtLatestBlockRequest) (*access.AccountKeyResponse, error) {
+	if h.useIndex {
+		res, err := h.local.GetAccountKeyAtLatestBlock(context, req)
+		h.log(LocalApiService, "GetAccountKeyAtLatestBlock", err)
+		return res, err
+	}
+
+	res, err := h.upstream.GetAccountKeyAtLatestBlock(context, req)
+	h.log(UpstreamApiService, "GetAccountKeyAtLatestBlock", err)
+	return res, err
+}
+
 func (h *FlowAccessAPIRouter) GetAccountKeysAtLatestBlock(context context.Context, req *access.GetAccountKeysAtLatestBlockRequest) (*access.AccountKeysResponse, error) {
 	if h.useIndex {
 		res, err := h.local.GetAccountKeysAtLatestBlock(context, req)
@@ -283,6 +295,18 @@ func (h *FlowAccessAPIRouter) GetAccountKeysAtLatestBlock(context context.Contex
 
 	res, err := h.upstream.GetAccountKeysAtLatestBlock(context, req)
 	h.log(UpstreamApiService, "GetAccountKeysAtLatestBlock", err)
+	return res, err
+}
+
+func (h *FlowAccessAPIRouter) GetAccountKeyAtBlockHeight(context context.Context, req *access.GetAccountKeyAtBlockHeightRequest) (*access.AccountKeyResponse, error) {
+	if h.useIndex {
+		res, err := h.local.GetAccountKeyAtBlockHeight(context, req)
+		h.log(LocalApiService, "GetAccountKeyAtBlockHeight", err)
+		return res, err
+	}
+
+	res, err := h.upstream.GetAccountKeyAtBlockHeight(context, req)
+	h.log(UpstreamApiService, "GetAccountKeyAtBlockHeight", err)
 	return res, err
 }
 
@@ -706,6 +730,16 @@ func (h *FlowAccessAPIForwarder) GetAccountBalanceAtBlockHeight(context context.
 	return upstream.GetAccountBalanceAtBlockHeight(context, req)
 }
 
+func (h *FlowAccessAPIForwarder) GetAccountKeyAtLatestBlock(context context.Context, req *access.GetAccountKeyAtLatestBlockRequest) (*access.AccountKeyResponse, error) {
+	// This is a passthrough request
+	upstream, closer, err := h.FaultTolerantClient()
+	if err != nil {
+		return nil, err
+	}
+	defer closer.Close()
+	return upstream.GetAccountKeyAtLatestBlock(context, req)
+}
+
 func (h *FlowAccessAPIForwarder) GetAccountKeysAtLatestBlock(context context.Context, req *access.GetAccountKeysAtLatestBlockRequest) (*access.AccountKeysResponse, error) {
 	// This is a passthrough request
 	upstream, closer, err := h.FaultTolerantClient()
@@ -714,6 +748,16 @@ func (h *FlowAccessAPIForwarder) GetAccountKeysAtLatestBlock(context context.Con
 	}
 	defer closer.Close()
 	return upstream.GetAccountKeysAtLatestBlock(context, req)
+}
+
+func (h *FlowAccessAPIForwarder) GetAccountKeyAtBlockHeight(context context.Context, req *access.GetAccountKeyAtBlockHeightRequest) (*access.AccountKeyResponse, error) {
+	// This is a passthrough request
+	upstream, closer, err := h.FaultTolerantClient()
+	if err != nil {
+		return nil, err
+	}
+	defer closer.Close()
+	return upstream.GetAccountKeyAtBlockHeight(context, req)
 }
 
 func (h *FlowAccessAPIForwarder) GetAccountKeysAtBlockHeight(context context.Context, req *access.GetAccountKeysAtBlockHeightRequest) (*access.AccountKeysResponse, error) {

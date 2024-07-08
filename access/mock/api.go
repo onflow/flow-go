@@ -271,24 +271,24 @@ func (_m *API) GetAccountBalanceAtLatestBlock(ctx context.Context, address flow.
 	return r0, r1, r2
 }
 
-// GetAccountKeysAtBlockHeight provides a mock function with given fields: ctx, address, keyIndex, height
-func (_m *API) GetAccountKeysAtBlockHeight(ctx context.Context, address flow.Address, keyIndex int, height uint64) ([]flow.AccountPublicKey, error) {
+// GetAccountKeyAtBlockHeight provides a mock function with given fields: ctx, address, keyIndex, height
+func (_m *API) GetAccountKeyAtBlockHeight(ctx context.Context, address flow.Address, keyIndex int, height uint64) (*flow.AccountPublicKey, error) {
 	ret := _m.Called(ctx, address, keyIndex, height)
 
 	if len(ret) == 0 {
-		panic("no return value specified for GetAccountKeysAtBlockHeight")
+		panic("no return value specified for GetAccountKeyAtBlockHeight")
 	}
 
-	var r0 []flow.AccountPublicKey
+	var r0 *flow.AccountPublicKey
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Address, int, uint64) ([]flow.AccountPublicKey, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Address, int, uint64) (*flow.AccountPublicKey, error)); ok {
 		return rf(ctx, address, keyIndex, height)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Address, int, uint64) []flow.AccountPublicKey); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Address, int, uint64) *flow.AccountPublicKey); ok {
 		r0 = rf(ctx, address, keyIndex, height)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]flow.AccountPublicKey)
+			r0 = ret.Get(0).(*flow.AccountPublicKey)
 		}
 	}
 
@@ -301,9 +301,69 @@ func (_m *API) GetAccountKeysAtBlockHeight(ctx context.Context, address flow.Add
 	return r0, r1
 }
 
-// GetAccountKeysAtLatestBlock provides a mock function with given fields: ctx, address, keyIndex
-func (_m *API) GetAccountKeysAtLatestBlock(ctx context.Context, address flow.Address, keyIndex int) ([]flow.AccountPublicKey, error) {
+// GetAccountKeyAtLatestBlock provides a mock function with given fields: ctx, address, keyIndex
+func (_m *API) GetAccountKeyAtLatestBlock(ctx context.Context, address flow.Address, keyIndex int) (*flow.AccountPublicKey, error) {
 	ret := _m.Called(ctx, address, keyIndex)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetAccountKeyAtLatestBlock")
+	}
+
+	var r0 *flow.AccountPublicKey
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Address, int) (*flow.AccountPublicKey, error)); ok {
+		return rf(ctx, address, keyIndex)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Address, int) *flow.AccountPublicKey); ok {
+		r0 = rf(ctx, address, keyIndex)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*flow.AccountPublicKey)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, flow.Address, int) error); ok {
+		r1 = rf(ctx, address, keyIndex)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetAccountKeysAtBlockHeight provides a mock function with given fields: ctx, address, height
+func (_m *API) GetAccountKeysAtBlockHeight(ctx context.Context, address flow.Address, height uint64) ([]flow.AccountPublicKey, error) {
+	ret := _m.Called(ctx, address, height)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetAccountKeysAtBlockHeight")
+	}
+
+	var r0 []flow.AccountPublicKey
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Address, uint64) ([]flow.AccountPublicKey, error)); ok {
+		return rf(ctx, address, height)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Address, uint64) []flow.AccountPublicKey); ok {
+		r0 = rf(ctx, address, height)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]flow.AccountPublicKey)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, flow.Address, uint64) error); ok {
+		r1 = rf(ctx, address, height)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetAccountKeysAtLatestBlock provides a mock function with given fields: ctx, address
+func (_m *API) GetAccountKeysAtLatestBlock(ctx context.Context, address flow.Address) ([]flow.AccountPublicKey, error) {
+	ret := _m.Called(ctx, address)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetAccountKeysAtLatestBlock")
@@ -311,19 +371,19 @@ func (_m *API) GetAccountKeysAtLatestBlock(ctx context.Context, address flow.Add
 
 	var r0 []flow.AccountPublicKey
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Address, int) ([]flow.AccountPublicKey, error)); ok {
-		return rf(ctx, address, keyIndex)
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Address) ([]flow.AccountPublicKey, error)); ok {
+		return rf(ctx, address)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Address, int) []flow.AccountPublicKey); ok {
-		r0 = rf(ctx, address, keyIndex)
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Address) []flow.AccountPublicKey); ok {
+		r0 = rf(ctx, address)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]flow.AccountPublicKey)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, flow.Address, int) error); ok {
-		r1 = rf(ctx, address, keyIndex)
+	if rf, ok := ret.Get(1).(func(context.Context, flow.Address) error); ok {
+		r1 = rf(ctx, address)
 	} else {
 		r1 = ret.Error(1)
 	}

@@ -313,6 +313,80 @@ func (_m *AccessAPIClient) GetAccountBalanceAtLatestBlock(ctx context.Context, i
 	return r0, r1
 }
 
+// GetAccountKeyAtBlockHeight provides a mock function with given fields: ctx, in, opts
+func (_m *AccessAPIClient) GetAccountKeyAtBlockHeight(ctx context.Context, in *access.GetAccountKeyAtBlockHeightRequest, opts ...grpc.CallOption) (*access.AccountKeyResponse, error) {
+	_va := make([]interface{}, len(opts))
+	for _i := range opts {
+		_va[_i] = opts[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, in)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetAccountKeyAtBlockHeight")
+	}
+
+	var r0 *access.AccountKeyResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *access.GetAccountKeyAtBlockHeightRequest, ...grpc.CallOption) (*access.AccountKeyResponse, error)); ok {
+		return rf(ctx, in, opts...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *access.GetAccountKeyAtBlockHeightRequest, ...grpc.CallOption) *access.AccountKeyResponse); ok {
+		r0 = rf(ctx, in, opts...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*access.AccountKeyResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *access.GetAccountKeyAtBlockHeightRequest, ...grpc.CallOption) error); ok {
+		r1 = rf(ctx, in, opts...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetAccountKeyAtLatestBlock provides a mock function with given fields: ctx, in, opts
+func (_m *AccessAPIClient) GetAccountKeyAtLatestBlock(ctx context.Context, in *access.GetAccountKeyAtLatestBlockRequest, opts ...grpc.CallOption) (*access.AccountKeyResponse, error) {
+	_va := make([]interface{}, len(opts))
+	for _i := range opts {
+		_va[_i] = opts[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, in)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetAccountKeyAtLatestBlock")
+	}
+
+	var r0 *access.AccountKeyResponse
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *access.GetAccountKeyAtLatestBlockRequest, ...grpc.CallOption) (*access.AccountKeyResponse, error)); ok {
+		return rf(ctx, in, opts...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *access.GetAccountKeyAtLatestBlockRequest, ...grpc.CallOption) *access.AccountKeyResponse); ok {
+		r0 = rf(ctx, in, opts...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*access.AccountKeyResponse)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *access.GetAccountKeyAtLatestBlockRequest, ...grpc.CallOption) error); ok {
+		r1 = rf(ctx, in, opts...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetAccountKeysAtBlockHeight provides a mock function with given fields: ctx, in, opts
 func (_m *AccessAPIClient) GetAccountKeysAtBlockHeight(ctx context.Context, in *access.GetAccountKeysAtBlockHeightRequest, opts ...grpc.CallOption) (*access.AccountKeysResponse, error) {
 	_va := make([]interface{}, len(opts))
