@@ -34,6 +34,7 @@ import (
 // Guaranteeing concurrency safety is delegated to the higher-level logic.
 type epochInfo struct {
 	*leader.LeaderSelection // pre-computed leader selection for the epoch
+	randomSeed              []byte
 	initialCommittee        flow.IdentitySkeletonList
 	initialCommitteeMap     map[flow.Identifier]*flow.IdentitySkeleton
 	weightThresholdForQC    uint64 // computed based on initial committee weights
@@ -42,26 +43,22 @@ type epochInfo struct {
 }
 
 // recomputeLeaderSelectionForExtendedViewRange re-computes the LeaderSelection field
-// for the input epoch's entire view range, including extensions. This must be called
-// each time an extension is added to an epoch. This method is idempotent, i.e.
-// repeated calls for the same final view are no-ops.
+// for the input epoch's entire view range, including  the new extension.
+// This must be called each time an extension is added to an epoch.
+// This method is idempotent, i.e. repeated calls for the same final view are no-ops.
 // Caution, not concurrency safe.
 // No errors are expected during normal operation.
-func (e *epochInfo) recomputeLeaderSelectionForExtendedViewRange(epoch protocol.Epoch) error {
-	extendedFinalView, err := epoch.FinalView()
-	if err != nil {
-		return fmt.Errorf("could not get final view for extended epoch: %w", err)
-	}
+func (e *epochInfo) recomputeLeaderSelectionForExtendedViewRange(extension flow.EpochExtension) error {
 	// sanity check: ensure the final view of the current epoch monotonically increases
 	lastViewOfLeaderSelection := e.FinalView()
-	if extendedFinalView < lastViewOfLeaderSelection {
-		return fmt.Errorf("final view of epoch must be monotonically increases, but is decreasing from %d to %d", lastViewOfLeaderSelection, extendedFinalView)
+	if extension.FinalView < lastViewOfLeaderSelection {
+		return fmt.Errorf("final view of epoch must be monotonically increases, but is decreasing from %d to %d", lastViewOfLeaderSelection, extension.FinalView)
 	}
-	if extendedFinalView == lastViewOfLeaderSelection {
+	if extension.FinalView == lastViewOfLeaderSelection {
 		return nil
 	}
 
-	leaderSelection, err := leader.SelectionForConsensus(epoch)
+	leaderSelection, err := leader.SelectionForConsensus(e.initialCommittee, e.randomSeed, e.FirstView(), extension.FinalView)
 	if err != nil {
 		return fmt.Errorf("could not re-compute leader selection for epoch after extension: %w", err)
 	}
@@ -73,14 +70,27 @@ func (e *epochInfo) recomputeLeaderSelectionForExtendedViewRange(epoch protocol.
 // This can be cached and used for all by-view queries for this epoch.
 // No errors are expected during normal operation.
 func newEpochInfo(epoch protocol.Epoch) (*epochInfo, error) {
-	leaders, err := leader.SelectionForConsensus(epoch)
+	randomSeed, err := epoch.RandomSource()
 	if err != nil {
-		return nil, fmt.Errorf("could not get leader selection: %w", err)
+		return nil, fmt.Errorf("could not get epoch random source: %w", err)
+	}
+	firstView, err := epoch.FirstView()
+	if err != nil {
+		return nil, fmt.Errorf("could not get epoch first view: %w", err)
+	}
+	finalView, err := epoch.FinalView()
+	if err != nil {
+		return nil, fmt.Errorf("could not get epoch final view: %w", err)
 	}
 	initialIdentities, err := epoch.InitialIdentities()
 	if err != nil {
 		return nil, fmt.Errorf("could not initial identities: %w", err)
 	}
+	leaders, err := leader.SelectionForConsensus(initialIdentities, randomSeed, firstView, finalView)
+	if err != nil {
+		return nil, fmt.Errorf("could not get leader selection: %w", err)
+	}
+
 	initialCommittee := initialIdentities.Filter(filter.IsConsensusCommitteeMember)
 	dkg, err := epoch.DKG()
 	if err != nil {
@@ -90,6 +100,7 @@ func newEpochInfo(epoch protocol.Epoch) (*epochInfo, error) {
 	totalWeight := initialCommittee.TotalWeight()
 	ei := &epochInfo{
 		LeaderSelection:      leaders,
+		randomSeed:           randomSeed,
 		initialCommittee:     initialCommittee,
 		initialCommitteeMap:  initialCommittee.Lookup(),
 		weightThresholdForQC: WeightThresholdToBuildQC(totalWeight),
@@ -338,9 +349,9 @@ func (c *Consensus) EpochCommittedPhaseStarted(_ uint64, first *flow.Header) {
 
 // EpochExtended informs `committees.Consensus` that a block including a new epoch extension has been finalized.
 // This event consumer function enqueues an event handler function for the single event handler thread to execute.
-func (c *Consensus) EpochExtended(_ uint64, refBlock *flow.Header, _ flow.EpochExtension) {
+func (c *Consensus) EpochExtended(epochCounter uint64, _ *flow.Header, extension flow.EpochExtension) {
 	c.epochEvents <- func() error {
-		return c.handleEpochExtended(refBlock)
+		return c.handleEpochExtended(epochCounter, extension)
 	}
 }
 
@@ -349,25 +360,19 @@ func (c *Consensus) EpochExtended(_ uint64, refBlock *flow.Header, _ flow.EpochE
 // When an extension is observed, we re-compute leader selection for the current epoch, taking into
 // account the most recent extension (included as of refBlock).
 // No errors are expected during normal operation.
-func (c *Consensus) handleEpochExtended(refBlock *flow.Header) error {
-	currentEpoch := c.state.AtHeight(refBlock.Height).Epochs().Current()
-	counter, err := currentEpoch.Counter()
-	if err != nil {
-		return fmt.Errorf("could not read current epoch info: %w", err)
-	}
-
+func (c *Consensus) handleEpochExtended(epochCounter uint64, extension flow.EpochExtension) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	epochInf, ok := c.epochs[counter]
+	epochInf, ok := c.epochs[epochCounter]
 	if !ok {
 		return fmt.Errorf("sanity check failed: current epoch committee info does not exist")
 	}
 	// sanity check: we can only extend the current epoch, if the next epoch has not yet been committed:
-	if _, nextEpochCommitted := c.epochs[counter+1]; nextEpochCommitted {
-		return fmt.Errorf("sanity check failed: attempting to extend epoch %d, but subsequent epoch %d is already committed", counter, counter+1)
+	if _, nextEpochCommitted := c.epochs[epochCounter+1]; nextEpochCommitted {
+		return fmt.Errorf("sanity check failed: attempting to extend epoch %d, but subsequent epoch %d is already committed", epochCounter, epochCounter+1)
 	}
-	err = epochInf.recomputeLeaderSelectionForExtendedViewRange(currentEpoch)
+	err := epochInf.recomputeLeaderSelectionForExtendedViewRange(extension)
 	if err != nil {
 		return fmt.Errorf("could not recompute leader selection for current epoch upon extension: %w", err)
 	}
