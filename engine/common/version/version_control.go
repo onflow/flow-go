@@ -125,11 +125,12 @@ func (v *VersionControl) checkInitialVersionBeacon(
 }
 
 func (v *VersionControl) initBoundaries(ctx irrecoverable.SignalerContext, finalizedRootBlockHeight uint64) error {
-	processedHeight := v.lastProcessedHeight.Load()
+	latestHeight := v.lastProcessedHeight.Load()
+	processedHeight := latestHeight
 
 	for {
 		vb, err := v.versionBeacons.Highest(processedHeight)
-		if err != nil {
+		if err != nil && !errors.Is(err, storage.ErrNotFound) {
 			ctx.Throw(
 				fmt.Errorf(
 					"failed to get highest version beacon for version control: %w",
@@ -170,15 +171,18 @@ func (v *VersionControl) initBoundaries(ctx irrecoverable.SignalerContext, final
 			}
 
 			compResult := ver.Compare(*v.nodeVersion)
-			processedHeight = boundary.BlockHeight - 1
+			processedHeight = vb.SealHeight - 1
 
 			if compResult <= 0 {
-				v.startHeight.Store(boundary.BlockHeight)
-				v.log.Info().
-					Uint64("startHeight", boundary.BlockHeight).
-					Msg("Found start block height")
-				// This is the lowest compatible height for this node version, stop search immediately
-				return nil
+				// ignore boundaries above the latest finalized height
+				if boundary.BlockHeight < latestHeight {
+					v.startHeight.Store(boundary.BlockHeight)
+					v.log.Info().
+						Uint64("startHeight", boundary.BlockHeight).
+						Msg("Found start block height")
+					// This is the lowest compatible height for this node version, stop search immediately
+					return nil
+				}
 			} else {
 				v.endHeight.Store(boundary.BlockHeight - 1)
 				v.log.Info().
@@ -211,6 +215,8 @@ func (v *VersionControl) BlockFinalized(h *flow.Header) {
 // Returns expected errors:
 // - ErrOutOfRange if incoming block height is higher that last handled block height
 func (v *VersionControl) CompatibleAtBlock(height uint64) (bool, error) {
+	// TODO: needs check if height < finalized root (or set start = finalized root)
+
 	// Check if the height is greater than the last handled block height. If so, return an error indicating that the height is unhandled.
 	if height > v.lastProcessedHeight.Load() {
 		return false, fmt.Errorf("could not check compatibility for height %d: last handled height is %d: %w", height, v.lastProcessedHeight.Load(), ErrOutOfRange)
@@ -299,7 +305,7 @@ func (v *VersionControl) blockFinalized(
 		previousEndHeight := v.endHeight.Load()
 
 		if height > previousEndHeight {
-			//Stop here since it's outside our compatible range
+			// Stop here since it's outside our compatible range
 			return
 		}
 
@@ -333,7 +339,8 @@ func (v *VersionControl) blockFinalized(
 		// Check if previous version was deleted. If yes, notify consumers about deletion
 		if previousEndHeight != NoHeight && newEndHeight == NoHeight {
 			for _, consumer := range v.consumers {
-				consumer(height, "")
+				// Note: notifying for the boundary height, which is end height + 1
+				consumer(previousEndHeight+1, "")
 			}
 		}
 	}
