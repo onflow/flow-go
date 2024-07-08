@@ -256,7 +256,7 @@ func (c *Consensus) LeaderForView(view uint64) (flow.Identifier, error) {
 		// an invalid view error indicates that no leader was computed for this view
 		// this is a fatal internal error, because the view necessarily is within an
 		// epoch for which we have pre-computed leader selection
-		return flow.ZeroID, fmt.Errorf("unexpected inconsistency in epoch view spans for view %d: %v", view, err)
+		return flow.ZeroID, irrecoverable.NewExceptionf("unexpected inconsistency in epoch view spans for view %d: %v", view, err)
 	}
 	if err != nil {
 		return flow.ZeroID, err
