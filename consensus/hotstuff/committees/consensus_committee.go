@@ -52,8 +52,12 @@ func (e *epochInfo) recomputeLeaderSelectionForExtendedViewRange(epoch protocol.
 	if err != nil {
 		return fmt.Errorf("could not get final view for extended epoch: %w", err)
 	}
-	// sanity check: ensure view range for which leader selection is defined strictly increases
-	if extendedFinalView <= e.FinalView() {
+	// sanity check: ensure the final view of the current epoch monotonically increases
+	lastViewOfLeaderSelection := e.FinalView()
+	if extendedFinalView < lastViewOfLeaderSelection {
+		return fmt.Errorf("final view of epoch must be monotonically increases, but is decreasing from %d to %d", lastViewOfLeaderSelection, extendedFinalView)
+	}
+	if extendedFinalView == lastViewOfLeaderSelection {
 		return nil
 	}
 
@@ -357,10 +361,10 @@ func (c *Consensus) handleEpochExtended(refBlock *flow.Header) error {
 	if !ok {
 		return fmt.Errorf("sanity check failed: current epoch committee info does not exist")
 	}
-	// sanity check: we can only extend the current epoch, if the next epoch has not yet been committed: 
+	// sanity check: we can only extend the current epoch, if the next epoch has not yet been committed:
 	if _, nextEpochCommitted := c.epochs[counter+1]; nextEpochCommitted {
 		return fmt.Errorf("sanity check failed: attempting to extend epoch %d, but subsequent epoch %d is already committed", counter, counter+1)
-	}	
+	}
 	err = epochInfo.recomputeLeaderSelectionForExtendedViewRange(currentEpoch)
 	if err != nil {
 		return fmt.Errorf("could not recompute leader selection for current epoch upon extension: %w", err)
