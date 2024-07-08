@@ -364,7 +364,12 @@ func (ctl *BlockTimeController) checkForEpochTransition(tb TimedBlock) error {
 	ctl.nextEpochFinalView = nil
 	ctl.nextEpochTargetDuration = nil
 	ctl.nextEpochTargetEndTime = nil
-	ctl.epochFallbackTriggered = false
+
+	if ctl.epochFallbackTriggered {
+		// epoch transition detected epoch fallback must have been recovered.
+		ctl.epochFallbackTriggered = false
+	}
+	
 	return nil
 }
 
@@ -497,12 +502,6 @@ func (ctl *BlockTimeController) OnBlockIncorporated(block *model.Block) {
 	default:
 	}
 }
-
-// EpochSetupPhaseStarted this func is a  noop.
-func (ctl *BlockTimeController) EpochSetupPhaseStarted(uint64, *flow.Header) {}
-
-// EpochFallbackModeTriggered this func is a  noop.
-func (ctl *BlockTimeController) EpochFallbackModeTriggered(uint64, *flow.Header) {}
 
 // EpochExtended handles the EpochExtended protocol event.
 func (ctl *BlockTimeController) EpochExtended(epochCounter uint64, header *flow.Header, extension flow.EpochExtension) {
