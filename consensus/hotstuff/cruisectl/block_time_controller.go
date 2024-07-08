@@ -48,12 +48,6 @@ type epochInfo struct {
 	nextEpochTargetEndTime  *uint64 // the target end time of the next epoch, represented as Unix Time [seconds]
 }
 
-// epochEvent stores epoch related data info with the type.
-type epochEvent struct {
-	eventType string
-	data      interface{}
-}
-
 // targetViewTime returns τ[v], the ideal, steady-state view time for the current epoch.
 // For numerical stability, we avoid repetitive conversions between seconds and time.Duration.
 // Instead, internally within the controller, we work with float64 in units of seconds.
