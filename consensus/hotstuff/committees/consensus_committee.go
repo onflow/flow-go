@@ -111,7 +111,7 @@ type Consensus struct {
 	me          flow.Identifier       // the node ID of this node
 	mu          sync.RWMutex          // protects access to epochs
 	epochs      map[uint64]*epochInfo // caching per epoch: consensus committee (immutable) & leader selection (extendable)
-	events      chan eventHandlerFunc // shared queue for all protocol events
+	epochEvents chan eventHandlerFunc // order-preserving queue for relevant service events still pending processing
 	events.Noop                       // implements protocol.Consumer
 	component.Component
 }
@@ -122,10 +122,10 @@ var _ hotstuff.DynamicCommittee = (*Consensus)(nil)
 
 func NewConsensusCommittee(state protocol.State, me flow.Identifier) (*Consensus, error) {
 	com := &Consensus{
-		state:  state,
-		me:     me,
-		epochs: make(map[uint64]*epochInfo),
-		events: make(chan eventHandlerFunc, 5),
+		state:       state,
+		me:          me,
+		epochs:      make(map[uint64]*epochInfo),
+		epochEvents: make(chan eventHandlerFunc, 5),
 	}
 
 	com.Component = component.NewComponentManagerBuilder().
@@ -317,7 +317,7 @@ func (c *Consensus) handleProtocolEvents(ctx irrecoverable.SignalerContext, read
 		select {
 		case <-ctx.Done():
 			return
-		case handleEvent := <-c.events:
+		case handleEvent := <-c.epochEvents:
 			err := handleEvent()
 			if err != nil {
 				ctx.Throw(err)
@@ -329,7 +329,7 @@ func (c *Consensus) handleProtocolEvents(ctx irrecoverable.SignalerContext, read
 // EpochCommittedPhaseStarted informs `committees.Consensus` that the first block in flow.EpochPhaseCommitted has been finalized.
 // This event consumer function enqueues an event handler function for the single event handler thread to execute.
 func (c *Consensus) EpochCommittedPhaseStarted(_ uint64, first *flow.Header) {
-	c.events <- func() error {
+	c.epochEvents <- func() error {
 		return c.handleEpochCommittedPhaseStarted(first)
 	}
 }
@@ -337,7 +337,7 @@ func (c *Consensus) EpochCommittedPhaseStarted(_ uint64, first *flow.Header) {
 // EpochExtended informs `committees.Consensus` that a block including a new epoch extension has been finalized.
 // This event consumer function enqueues an event handler function for the single event handler thread to execute.
 func (c *Consensus) EpochExtended(_ uint64, refBlock *flow.Header, _ flow.EpochExtension) {
-	c.events <- func() error {
+	c.epochEvents <- func() error {
 		return c.handleEpochExtended(refBlock)
 	}
 }
