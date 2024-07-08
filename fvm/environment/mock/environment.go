@@ -774,6 +774,36 @@ func (_m *Environment) GetAccountKey(address common.Address, index int) (*stdlib
 	return r0, r1
 }
 
+// GetAccountKeys provides a mock function with given fields: address
+func (_m *Environment) GetAccountKeys(address flow.Address) ([]flow.AccountPublicKey, error) {
+	ret := _m.Called(address)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetAccountKeys")
+	}
+
+	var r0 []flow.AccountPublicKey
+	var r1 error
+	if rf, ok := ret.Get(0).(func(flow.Address) ([]flow.AccountPublicKey, error)); ok {
+		return rf(address)
+	}
+	if rf, ok := ret.Get(0).(func(flow.Address) []flow.AccountPublicKey); ok {
+		r0 = rf(address)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]flow.AccountPublicKey)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(flow.Address) error); ok {
+		r1 = rf(address)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetBlockAtHeight provides a mock function with given fields: height
 func (_m *Environment) GetBlockAtHeight(height uint64) (stdlib.Block, bool, error) {
 	ret := _m.Called(height)

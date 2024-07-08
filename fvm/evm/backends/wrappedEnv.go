@@ -5,12 +5,15 @@ import (
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
+	otelTrace "go.opentelemetry.io/otel/trace"
 
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/fvm/meter"
+	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/trace"
 )
 
 // WrappedEnvironment wraps an FVM environment
@@ -142,6 +145,13 @@ func (we *WrappedEnvironment) Invoke(
 func (we *WrappedEnvironment) GenerateUUID() (uint64, error) {
 	uuid, err := we.env.GenerateUUID()
 	return uuid, handleEnvironmentError(err)
+}
+
+func (we *WrappedEnvironment) StartChildSpan(
+	name trace.SpanName,
+	options ...otelTrace.SpanStartOption,
+) tracing.TracerSpan {
+	return we.env.StartChildSpan(name, options...)
 }
 
 func handleEnvironmentError(err error) error {

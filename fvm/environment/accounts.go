@@ -27,6 +27,7 @@ type Accounts interface {
 	AppendPublicKey(address flow.Address, key flow.AccountPublicKey) error
 	GetPublicKey(address flow.Address, keyIndex uint64) (flow.AccountPublicKey, error)
 	SetPublicKey(address flow.Address, keyIndex uint64, publicKey flow.AccountPublicKey) ([]byte, error)
+	GetPublicKeys(address flow.Address) ([]flow.AccountPublicKey, error)
 	GetContractNames(address flow.Address) ([]string, error)
 	GetContract(contractName string, address flow.Address) ([]byte, error)
 	ContractExists(contractName string, address flow.Address) (bool, error)
@@ -256,9 +257,7 @@ func (a *StatefulAccounts) GetPublicKeys(
 ) {
 	count, err := a.GetPublicKeyCount(address)
 	if err != nil {
-		return nil, fmt.Errorf(
-			"failed to get public key count of account: %w",
-			err)
+		return nil, err
 	}
 	publicKeys = make([]flow.AccountPublicKey, count)
 
