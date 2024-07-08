@@ -307,7 +307,7 @@ func (bs *BlockTimeControllerSuite) TestOnEpochCommittedPhaseStarted() {
 }
 
 // TestOnBlockIncorporated_UpdateProposalDelay tests that a new measurement is taken and
-// GetProposalTiming updated upon receiving an OnBlockIncorporated data.
+// GetProposalTiming updated upon receiving an OnBlockIncorporated event.
 func (bs *BlockTimeControllerSuite) TestOnBlockIncorporated_UpdateProposalDelay() {
 	bs.CreateAndStartController()
 	defer bs.StopController()

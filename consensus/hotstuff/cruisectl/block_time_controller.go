@@ -235,7 +235,7 @@ func (ctl *BlockTimeController) getProposalTiming() ProposalTiming {
 }
 
 // TargetPublicationTime is intended to be called by the EventHandler, whenever it
-// wants to publish a new proposal. The data handler inputs
+// wants to publish a new proposal. The event handler inputs
 //   - proposalView: the view it is proposing for,
 //   - timeViewEntered: the time when the EventHandler entered this view
 //   - parentBlockId: the ID of the parent block, which the EventHandler is building on
@@ -440,10 +440,8 @@ func (ctl *BlockTimeController) measureViewDuration(tb TimedBlock) error {
 
 // processEpochExtended processes the EpochExtended protocol data.
 // Whenever we encounter an epoch extension, we:
-//   - check if this epoch fallback triggered is true, if not this is our first extension we should update the epoch fallback triggered flag:
-//   - set ProposalTiming to the default value
-//   - set epoch fallback triggered, to disable the controller
-//   - update the curr epoch final view and target end time with the extension data
+//   - set epochFallbackTriggered to true if this is the first extension encountered.
+//   - update the curr epoch final view and target end time with the extension data.
 //
 // No errors are expected during normal operation.
 func (ctl *BlockTimeController) processEpochExtended(_ uint64, _ *flow.Header, extension flow.EpochExtension) error {
@@ -451,7 +449,6 @@ func (ctl *BlockTimeController) processEpochExtended(_ uint64, _ *flow.Header, e
 		// set epochFallbackTriggered to true when we encounter the first extension
 		ctl.epochFallbackTriggered = true
 	}
-
 	ctl.curEpochFinalView = extension.FinalView
 	ctl.curEpochTargetEndTime = extension.TargetEndTime
 	return nil
@@ -491,8 +488,8 @@ func (ctl *BlockTimeController) processEpochCommittedPhaseStarted(_ uint64, firs
 }
 
 // OnBlockIncorporated listens to notification from HotStuff about incorporating new blocks.
-// The data is queued for async processing by the worker. If the channel is full,
-// the data is discarded - since we are taking an average it doesn't matter if we
+// The event is queued for async processing by the worker. If the channel is full,
+// the event is discarded - since we are taking an average it doesn't matter if we
 // occasionally miss a sample.
 func (ctl *BlockTimeController) OnBlockIncorporated(block *model.Block) {
 	select {
