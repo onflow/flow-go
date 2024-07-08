@@ -10,8 +10,10 @@ import (
 	"github.com/onflow/cadence/runtime/parser"
 	"github.com/onflow/crypto"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
+	"github.com/rs/zerolog/log"
 
 	cadenceutils "github.com/onflow/flow-go/access/utils"
+	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/execution"
@@ -185,10 +187,16 @@ func (v *TransactionValidator) Validate(ctx context.Context, tx *flow.Transactio
 
 	err = v.checkSufficientBalanceToPayForTransaction(ctx, tx)
 	if err != nil {
-		var balanceError InsufficientBalanceError
-		if errors.As(err, &balanceError) {
-			return balanceError
+		// we only return InsufficientBalanceError as it's a client-side issue
+		// that requires action from a user. Other errors (e.g. parsing errors)
+		// are 'internal' and related to script execution process. they shouldn't
+		// prevent the transaction from proceeding.
+		if IsInsufficientBalanceError(err) {
+			return err
 		}
+
+		// log and ignore all other errors
+		log.Info().Msg("transaction validation failed due to error: " + err.Error())
 	}
 
 	// TODO replace checkSignatureFormat by verifying the account/payer signatures
@@ -394,7 +402,7 @@ func (v *TransactionValidator) checkSufficientBalanceToPayForTransaction(ctx con
 
 	args, err := cadenceutils.EncodeArgs([]cadence.Value{payerAddress, inclusionEffort, gasLimit})
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to encode cadence args for script executor: %w", err)
 	}
 
 	result, err := v.scriptExecutor.ExecuteAtBlockHeight(ctx, v.verifyPayerBalanceScript, args, header.Height)
@@ -407,20 +415,9 @@ func (v *TransactionValidator) checkSufficientBalanceToPayForTransaction(ctx con
 		return fmt.Errorf("could not decode result value returned by script executor: %w", err)
 	}
 
-	structValue, ok := value.(cadence.Struct)
-	if !ok {
-		return errors.New("could not parse result value as a Cadence struct")
-	}
-
-	fields := cadence.FieldsMappedByName(structValue)
-	canExecuteTxValue, ok := fields["canExecuteTransaction"]
-	if !ok {
-		return errors.New("canExecuteTransaction value missing in response")
-	}
-
-	canExecuteTransaction, ok := canExecuteTxValue.(cadence.Bool)
-	if !ok {
-		return errors.New("could not parse canExecuteTransaction as a Cadence bool")
+	canExecuteTransaction, requiredBalance, _, err := fvm.DecodeVerifyPayerBalanceResult(value)
+	if err != nil {
+		return fmt.Errorf("could not parse cadence value returned by script executor: %w", err)
 	}
 
 	// return no error if payer has sufficient balance
@@ -428,17 +425,13 @@ func (v *TransactionValidator) checkSufficientBalanceToPayForTransaction(ctx con
 		return nil
 	}
 
-	requiredBalanceValue, ok := fields["requiredBalance"]
-	if !ok {
-		return errors.New("requiredBalance value missing in response")
+	account, err := v.scriptExecutor.GetAccountAtBlockHeight(ctx, tx.Payer, header.Height)
+	if err != nil {
+		return fmt.Errorf("could not get account at block height %d. error: %w", header.Height, err)
 	}
+	balance := cadence.UFix64(account.Balance)
 
-	requiredBalance, ok := requiredBalanceValue.(cadence.UFix64)
-	if !ok {
-		return errors.New("could not parse requiredBalance as a Cadence UFix64")
-	}
-
-	return InsufficientBalanceError{Payer: tx.Payer, RequiredBalance: uint64(requiredBalance)}
+	return InsufficientBalanceError{Payer: tx.Payer, RequiredBalance: requiredBalance, ActualBalance: balance}
 }
 
 func remove(s []string, r string) []string {

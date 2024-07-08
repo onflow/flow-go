@@ -1340,6 +1340,10 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 			return errors.New("transaction-error-messages-cache-size must be greater than 0")
 		}
 
+		if builder.checkPayerBalance && !builder.executionDataIndexingEnabled {
+			return errors.New("execution-data-indexing-enabled must be set if check-payer-balance is enabled")
+		}
+
 		return nil
 	})
 }

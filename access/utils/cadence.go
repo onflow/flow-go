@@ -13,7 +13,7 @@ func EncodeArgs(argValues []cadence.Value) ([][]byte, error) {
 		var err error
 		args[i], err = json.Encode(arg)
 		if err != nil {
-			return nil, errors.New("couldn't encode cadence value: " + err.Error())
+			return nil, errors.New("could not encode cadence value: " + err.Error())
 		}
 	}
 	return args, nil
