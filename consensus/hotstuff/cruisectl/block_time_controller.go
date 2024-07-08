@@ -26,8 +26,8 @@ import (
 )
 
 const (
-	incorporatedBlocksQueueSize  = 3
-	epochProtocolEventsQueueSize = 20
+	incorporatedBlocksChanSize  = 3
+	epochProtocolEventsChanSize = 20
 )
 
 // TimedBlock represents a block, with a timestamp recording when the BlockTimeController received the block
@@ -91,10 +91,11 @@ type BlockTimeController struct {
 	// TODO for 'leaving Epoch Fallback via special service data' this might need to change.
 	epochFallbackTriggered bool
 
-	incorporatedBlocks chan TimedBlock  // OnBlockIncorporated events, we desire these blocks to be processed in a timely manner and therefore use a small channel capacity
-	epochEvents        chan *epochEvent // epoch related protocol events
-	proportionalErr    Ewma
-	integralErr        LeakyIntegrator
+	incorporatedBlocks chan TimedBlock   // OnBlockIncorporated events, we desire these blocks to be processed in a timely manner and therefore use a small channel capacity
+	epochEvents        chan func() error // epoch related protocol events chan, when epoch related events are received a function closure for
+	// the processing of the event is put on the epochEvents chan. Each epoch related event will be processed in the order it is received.
+	proportionalErr Ewma
+	integralErr     LeakyIntegrator
 
 	// latestProposalTiming holds the ProposalTiming that the controller generated in response to processing the latest observation
 	latestProposalTiming *atomic.Pointer[ProposalTiming]
@@ -123,8 +124,8 @@ func NewBlockTimeController(log zerolog.Logger, metrics module.CruiseCtlMetrics,
 		log:                  log.With().Str("hotstuff", "cruise_ctl").Logger(),
 		metrics:              metrics,
 		state:                state,
-		incorporatedBlocks:   make(chan TimedBlock, incorporatedBlocksQueueSize),
-		epochEvents:          make(chan *epochEvent, epochProtocolEventsQueueSize),
+		incorporatedBlocks:   make(chan TimedBlock, incorporatedBlocksChanSize),
+		epochEvents:          make(chan func() error, epochProtocolEventsChanSize),
 		proportionalErr:      proportionalErr,
 		integralErr:          integralErr,
 		latestProposalTiming: atomic.NewPointer[ProposalTiming](nil), // set in initProposalTiming
@@ -281,12 +282,14 @@ func (ctl *BlockTimeController) processEventsWorkerLogic(ctx irrecoverable.Signa
 
 	done := ctx.Done()
 	for {
-		// Priority 1: epoch related protocol events. These events need to be processed first and in order.
+		// Priority 1: epoch related protocol events.
 		select {
-		case evt := <-ctl.epochEvents:
-			err := ctl.processEpochEvent(evt)
-			ctl.log.Err(err).Msgf("fatal error handling epoch related event")
-			ctx.Throw(err)
+		case processEvtFn := <-ctl.epochEvents:
+			err := processEvtFn()
+			if err != nil {
+				ctl.log.Err(err).Msgf("fatal error handling epoch related event")
+				ctx.Throw(err)
+			}
 		default:
 		}
 
@@ -301,38 +304,9 @@ func (ctl *BlockTimeController) processEventsWorkerLogic(ctx irrecoverable.Signa
 				ctx.Throw(err)
 				return
 			}
-		case evt := <-ctl.epochEvents:
-			err := ctl.processEpochEvent(evt)
-			ctl.log.Err(err).Msgf("fatal error handling epoch related event")
-			ctx.Throw(err)
+		default:
 		}
 	}
-}
-
-// processEpochEvent process epoch related events.
-// No errors are expected during normal operation.
-func (ctl *BlockTimeController) processEpochEvent(evt *epochEvent) error {
-	switch evt.eventType {
-	case protocol.EpochCommittedPhaseStartedEvtType:
-		data, ok := evt.data.(*protocol.EpochCommittedPhaseStartedData)
-		if !ok {
-			return fmt.Errorf("unexpected event type expected %s", protocol.EpochCommittedPhaseStartedEvtType)
-		}
-		err := ctl.processEpochCommittedPhaseStarted(data)
-		if err != nil {
-			return fmt.Errorf("failed to process EpochCommittedPhaseStarted event: %w ", err)
-		}
-	case protocol.EpochExtendedEvtType:
-		data, ok := evt.data.(*protocol.EpochExtendedData)
-		if !ok {
-			return fmt.Errorf("unexpected event type expected %s", protocol.EpochExtendedEvtType)
-		}
-		err := ctl.processEpochExtended(data)
-		if err != nil {
-			return fmt.Errorf("failed to process EpochExtended event: %w ", err)
-		}
-	}
-	return nil
 }
 
 // processIncorporatedBlock processes `OnBlockIncorporated` events from HotStuff.
@@ -478,20 +452,14 @@ func (ctl *BlockTimeController) measureViewDuration(tb TimedBlock) error {
 //   - update the curr epoch final view and target end time with the extension data
 //
 // No errors are expected during normal operation.
-func (ctl *BlockTimeController) processEpochExtended(data *protocol.EpochExtendedData) error {
+func (ctl *BlockTimeController) processEpochExtended(_ uint64, _ *flow.Header, extension flow.EpochExtension) error {
 	if !ctl.epochFallbackTriggered {
+		// set epochFallbackTriggered to true when we encounter the first extension
 		ctl.epochFallbackTriggered = true
-		latestFinalized, err := ctl.state.Final().Head()
-		if err != nil {
-			return fmt.Errorf("failed to retrieve latest finalized block from protocol state %w", err)
-		}
-
-		ctl.storeProposalTiming(newFallbackTiming(latestFinalized.View, time.Now().UTC(), ctl.config.FallbackProposalDelay.Load()))
 	}
 
-	ctl.curEpochFinalView = data.Extension.FinalView
-	ctl.curEpochTargetEndTime = data.Extension.TargetEndTime
-	ctl.nextEpochFinalView = nil
+	ctl.curEpochFinalView = extension.FinalView
+	ctl.curEpochTargetEndTime = extension.TargetEndTime
 	return nil
 }
 
@@ -502,12 +470,12 @@ func (ctl *BlockTimeController) processEpochExtended(data *protocol.EpochExtende
 //   - store the next epoch's target end time
 //
 // No errors are expected during normal operation.
-func (ctl *BlockTimeController) processEpochCommittedPhaseStarted(data *protocol.EpochCommittedPhaseStartedData) error {
+func (ctl *BlockTimeController) processEpochCommittedPhaseStarted(_ uint64, first *flow.Header) error {
 	if ctl.epochFallbackTriggered {
 		return nil
 	}
 
-	snapshot := ctl.state.AtHeight(data.First.Height)
+	snapshot := ctl.state.AtHeight(first.Height)
 	nextEpoch := snapshot.Epochs().Next()
 	finalView, err := nextEpoch.FinalView()
 	if err != nil {
@@ -545,13 +513,18 @@ func (ctl *BlockTimeController) EpochSetupPhaseStarted(uint64, *flow.Header) {}
 // EpochFallbackModeTriggered this func is a  noop.
 func (ctl *BlockTimeController) EpochFallbackModeTriggered(uint64, *flow.Header) {}
 
-// EpochExtended handles the epoch extended protocol data.
-func (ctl *BlockTimeController) EpochExtended(data *protocol.EpochExtendedData) {
-	ctl.epochEvents <- &epochEvent{protocol.EpochExtendedEvtType, data}
+// EpochExtended handles the EpochExtended protocol event.
+func (ctl *BlockTimeController) EpochExtended(epochCounter uint64, header *flow.Header, extension flow.EpochExtension) {
+	ctl.epochEvents <- func() error {
+		return ctl.processEpochExtended(epochCounter, header, extension)
+	}
 }
 
-func (ctl *BlockTimeController) EpochCommittedPhaseStarted(data *protocol.EpochCommittedPhaseStartedData) {
-	ctl.epochEvents <- &epochEvent{protocol.EpochCommittedPhaseStartedEvtType, data}
+// EpochCommittedPhaseStarted handles the EpochCommittedPhaseStarted protocol event.
+func (ctl *BlockTimeController) EpochCommittedPhaseStarted(currentEpochCounter uint64, first *flow.Header) {
+	ctl.epochEvents <- func() error {
+		return ctl.processEpochCommittedPhaseStarted(currentEpochCounter, first)
+	}
 }
 
 // time2unix converts a time.Time to UNIX time represented as a uint64.

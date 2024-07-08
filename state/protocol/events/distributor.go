@@ -59,11 +59,11 @@ func (d *Distributor) EpochSetupPhaseStarted(epoch uint64, first *flow.Header) {
 	}
 }
 
-func (d *Distributor) EpochCommittedPhaseStarted(data *protocol.EpochCommittedPhaseStartedData) {
+func (d *Distributor) EpochCommittedPhaseStarted(currentEpochCounter uint64, first *flow.Header) {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
 	for _, sub := range d.subscribers {
-		sub.EpochCommittedPhaseStarted(data)
+		sub.EpochCommittedPhaseStarted(currentEpochCounter, first)
 	}
 }
 
@@ -83,10 +83,10 @@ func (d *Distributor) EpochFallbackModeExited(epochCounter uint64, header *flow.
 	}
 }
 
-func (d *Distributor) EpochExtended(data *protocol.EpochExtendedData) {
+func (d *Distributor) EpochExtended(epochCounter uint64, header *flow.Header, extension flow.EpochExtension) {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
 	for _, sub := range d.subscribers {
-		sub.EpochExtended(data)
+		sub.EpochExtended(epochCounter, header, extension)
 	}
 }
