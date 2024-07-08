@@ -83,10 +83,10 @@ func (d *Distributor) EpochFallbackModeExited(epochCounter uint64, header *flow.
 	}
 }
 
-func (d *Distributor) EpochExtended(epochCounter uint64, header *flow.Header, extension flow.EpochExtension) {
+func (d *Distributor) EpochExtended(epoch uint64, header *flow.Header, extension flow.EpochExtension) {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
 	for _, sub := range d.subscribers {
-		sub.EpochExtended(epochCounter, header, extension)
+		sub.EpochExtended(epoch, header, extension)
 	}
 }
