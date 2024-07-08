@@ -210,11 +210,11 @@ func (c *Consensus) IdentityByBlock(blockID flow.Identifier, nodeID flow.Identif
 //     This is an expected error and must be handled.
 //   - unspecific error in case of unexpected problems and bugs
 func (c *Consensus) IdentitiesByEpoch(view uint64) (flow.IdentitySkeletonList, error) {
-	epochInfo, err := c.epochInfoByView(view)
+	epochInf, err := c.epochInfoByView(view)
 	if err != nil {
 		return nil, err
 	}
-	return epochInfo.initialCommittee, nil
+	return epochInf.initialCommittee, nil
 }
 
 // IdentityByEpoch returns the identity for the given node ID, in the epoch which
@@ -229,11 +229,11 @@ func (c *Consensus) IdentitiesByEpoch(view uint64) (flow.IdentitySkeletonList, e
 //     authorized consensus participants.
 //   - unspecific error in case of unexpected problems and bugs
 func (c *Consensus) IdentityByEpoch(view uint64, participantID flow.Identifier) (*flow.IdentitySkeleton, error) {
-	epochInfo, err := c.epochInfoByView(view)
+	epochInf, err := c.epochInfoByView(view)
 	if err != nil {
 		return nil, err
 	}
-	identity, ok := epochInfo.initialCommitteeMap[participantID]
+	identity, ok := epochInf.initialCommitteeMap[participantID]
 	if !ok {
 		return nil, model.NewInvalidSignerErrorf("id %v is not a valid node id", participantID)
 	}
@@ -247,11 +247,11 @@ func (c *Consensus) IdentityByEpoch(view uint64, participantID flow.Identifier) 
 //     This is an expected error and must be handled.
 //   - unspecific error in case of unexpected problems and bugs
 func (c *Consensus) LeaderForView(view uint64) (flow.Identifier, error) {
-	epochInfo, err := c.epochInfoByView(view)
+	epochInf, err := c.epochInfoByView(view)
 	if err != nil {
 		return flow.ZeroID, err
 	}
-	leaderID, err := epochInfo.LeaderForView(view)
+	leaderID, err := epochInf.LeaderForView(view)
 	if leader.IsInvalidViewError(err) {
 		// an invalid view error indicates that no leader was computed for this view
 		// this is a fatal internal error, because the view necessarily is within an
@@ -273,11 +273,11 @@ func (c *Consensus) LeaderForView(view uint64) (flow.Identifier, error) {
 //     This is an expected error and must be handled.
 //   - unspecific error in case of unexpected problems and bugs
 func (c *Consensus) QuorumThresholdForView(view uint64) (uint64, error) {
-	epochInfo, err := c.epochInfoByView(view)
+	epochInf, err := c.epochInfoByView(view)
 	if err != nil {
 		return 0, err
 	}
-	return epochInfo.weightThresholdForQC, nil
+	return epochInf.weightThresholdForQC, nil
 }
 
 func (c *Consensus) Self() flow.Identifier {
@@ -288,11 +288,11 @@ func (c *Consensus) Self() flow.Identifier {
 // to safely immediately timeout for the current view. The weight threshold only
 // changes at epoch boundaries and is computed based on the initial committee weights.
 func (c *Consensus) TimeoutThresholdForView(view uint64) (uint64, error) {
-	epochInfo, err := c.epochInfoByView(view)
+	epochInf, err := c.epochInfoByView(view)
 	if err != nil {
 		return 0, err
 	}
-	return epochInfo.weightThresholdForTO, nil
+	return epochInf.weightThresholdForTO, nil
 }
 
 // DKG returns the DKG for epoch which includes the given view.
@@ -302,11 +302,11 @@ func (c *Consensus) TimeoutThresholdForView(view uint64) (uint64, error) {
 //     This is an expected error and must be handled.
 //   - unspecific error in case of unexpected problems and bugs
 func (c *Consensus) DKG(view uint64) (hotstuff.DKG, error) {
-	epochInfo, err := c.epochInfoByView(view)
+	epochInf, err := c.epochInfoByView(view)
 	if err != nil {
 		return nil, err
 	}
-	return epochInfo.dkg, nil
+	return epochInf.dkg, nil
 }
 
 // handleProtocolEvents processes queued protocol events.
@@ -359,7 +359,7 @@ func (c *Consensus) handleEpochExtended(refBlock *flow.Header) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	epochInfo, ok := c.epochs[counter]
+	epochInf, ok := c.epochs[counter]
 	if !ok {
 		return fmt.Errorf("sanity check failed: current epoch committee info does not exist")
 	}
@@ -367,7 +367,7 @@ func (c *Consensus) handleEpochExtended(refBlock *flow.Header) error {
 	if _, nextEpochCommitted := c.epochs[counter+1]; nextEpochCommitted {
 		return fmt.Errorf("sanity check failed: attempting to extend epoch %d, but subsequent epoch %d is already committed", counter, counter+1)
 	}
-	err = epochInfo.recomputeLeaderSelectionForExtendedViewRange(currentEpoch)
+	err = epochInf.recomputeLeaderSelectionForExtendedViewRange(currentEpoch)
 	if err != nil {
 		return fmt.Errorf("could not recompute leader selection for current epoch upon extension: %w", err)
 	}
@@ -422,12 +422,12 @@ func (c *Consensus) prepareEpoch(epoch protocol.Epoch) (*epochInfo, error) {
 	defer c.mu.Unlock()
 
 	// this is a no-op if we have already cached this epoch
-	epochInfo, exists := c.epochs[counter]
+	epochInf, exists := c.epochs[counter]
 	if exists {
-		return epochInfo, nil
+		return epochInf, nil
 	}
 
-	epochInfo, err = newEpochInfo(epoch)
+	epochInf, err = newEpochInfo(epoch)
 	if err != nil {
 		return nil, fmt.Errorf("could not create epoch info for epoch %d: %w", counter, err)
 	}
@@ -435,18 +435,18 @@ func (c *Consensus) prepareEpoch(epoch protocol.Epoch) (*epochInfo, error) {
 	// sanity check: ensure new epoch has contiguous views with the prior epoch
 	prevEpochInfo, exists := c.epochs[counter-1]
 	if exists {
-		if epochInfo.FirstView() != prevEpochInfo.FinalView()+1 {
+		if epochInf.FirstView() != prevEpochInfo.FinalView()+1 {
 			return nil, fmt.Errorf("non-contiguous view ranges between consecutive epochs (epoch_%d=[%d,%d], epoch_%d=[%d,%d])",
 				counter-1, prevEpochInfo.FirstView(), prevEpochInfo.FinalView(),
-				counter, epochInfo.FirstView(), epochInfo.FinalView())
+				counter, epochInf.FirstView(), epochInf.FinalView())
 		}
 	}
 
 	// cache the epoch info
-	c.epochs[counter] = epochInfo
+	c.epochs[counter] = epochInf
 	// now prune any old epochs; if we have cached fewer than 3 epochs, this is a no-op
 	c.pruneEpochInfo()
-	return epochInfo, nil
+	return epochInf, nil
 }
 
 // pruneEpochInfo removes any epochs older than the most recent 3.
