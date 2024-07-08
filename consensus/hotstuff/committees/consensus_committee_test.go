@@ -54,6 +54,9 @@ func (suite *ConsensusSuite) SetupTest() {
 	suite.snapshot = new(protocolmock.Snapshot)
 	suite.epochs = mocks.NewEpochQuery(suite.T(), suite.currentEpochCounter)
 
+	// TODO: temporary to make tests pass. Should replace instances of ByBlockID with this in tests and remove here
+	suite.state.On("AtHeight", mock.Anything).Return(suite.snapshot)
+
 	suite.state.On("Final").Return(suite.snapshot)
 	suite.snapshot.On("EpochPhase").Return(
 		func() flow.EpochPhase { return suite.phase },
@@ -680,7 +683,8 @@ func TestRemoveOldEpochs(t *testing.T) {
 
 		currentEpochPhase = flow.EpochPhaseCommitted
 		firstBlockOfCommittedPhase := unittest.BlockHeaderFixture()
-		state.On("AtBlockID", firstBlockOfCommittedPhase.ID()).Return(snapshot)
+		state.On("AtBlockID", firstBlockOfCommittedPhase.ID()).Return(snapshot).Maybe()
+		state.On("AtHeight", mock.Anything).Return(snapshot) // TODO remove
 		com.EpochCommittedPhaseStarted(currentEpochCounter, firstBlockOfCommittedPhase)
 		// wait for the protocol event to be processed (async)
 		require.Eventually(t, func() bool {
