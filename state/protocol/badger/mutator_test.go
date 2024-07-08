@@ -2335,8 +2335,6 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 			err = state.Extend(context.Background(), block9)
 			require.NoError(t, err)
 
-			// TODO: check EpochExtension notification using pub/sub mechanism when it is implemented.
-
 			epochProtocolState, err := state.AtBlockID(block9.ID()).EpochProtocolState()
 			require.NoError(t, err)
 			epochExtensions := epochProtocolState.Entry().CurrentEpoch.EpochExtensions
