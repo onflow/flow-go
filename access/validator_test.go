@@ -164,6 +164,6 @@ func (s *TransactionValidatorSuite) TestTransactionValidator_InsufficientBalance
 		ActualBalance:   cadence.UFix64(actualAccountResponse.Balance)}
 
 	actualErr := validator.Validate(context.Background(), &txBody)
-	
+
 	assert.ErrorIs(s.T(), actualErr, expectedError)
 }
