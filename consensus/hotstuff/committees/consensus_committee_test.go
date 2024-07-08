@@ -54,9 +54,6 @@ func (suite *ConsensusSuite) SetupTest() {
 	suite.snapshot = new(protocolmock.Snapshot)
 	suite.epochs = mocks.NewEpochQuery(suite.T(), suite.currentEpochCounter)
 
-	// TODO: temporary to make tests pass. Should replace instances of ByBlockID with this in tests and remove here
-	suite.state.On("AtHeight", mock.Anything).Return(suite.snapshot)
-
 	suite.state.On("Final").Return(suite.snapshot)
 	suite.snapshot.On("EpochPhase").Return(
 		func() flow.EpochPhase { return suite.phase },
@@ -90,7 +87,7 @@ func (suite *ConsensusSuite) CreateAndStartCommittee() {
 // behaviour when committing an epoch, by sending the protocol event to the committee.
 func (suite *ConsensusSuite) CommitEpoch(epoch protocol.Epoch) {
 	firstBlockOfCommittedPhase := unittest.BlockHeaderFixture()
-	suite.state.On("AtBlockID", firstBlockOfCommittedPhase.ID()).Return(suite.snapshot)
+	suite.state.On("AtHeight", firstBlockOfCommittedPhase.Height).Return(suite.snapshot)
 	suite.epochs.Add(epoch)
 	suite.committee.EpochCommittedPhaseStarted(1, firstBlockOfCommittedPhase)
 
@@ -189,7 +186,7 @@ func (suite *ConsensusSuite) TestProtocolEvents_CommittedEpoch() {
 	nextEpoch := newMockEpoch(suite.currentEpochCounter+1, unittest.IdentityListFixture(10), 201, 300, true)
 
 	firstBlockOfCommittedPhase := unittest.BlockHeaderFixture()
-	suite.state.On("AtBlockID", firstBlockOfCommittedPhase.ID()).Return(suite.snapshot)
+	suite.state.On("AtHeight", firstBlockOfCommittedPhase.Height).Return(suite.snapshot)
 	suite.epochs.Add(nextEpoch)
 	suite.committee.EpochCommittedPhaseStarted(suite.currentEpochCounter, firstBlockOfCommittedPhase)
 	// wait for the protocol event to be processed (async)
@@ -226,7 +223,7 @@ func (suite *ConsensusSuite) TestProtocolEvents_EpochExtended() {
 	}
 	refBlock := unittest.BlockHeaderFixture()
 	addExtension(curEpoch, extension)
-	suite.state.On("AtBlockID", refBlock.ID()).Return(suite.snapshot)
+	suite.state.On("AtHeight", refBlock.Height).Return(suite.snapshot)
 
 	suite.committee.EpochExtended(suite.currentEpochCounter, refBlock, extension)
 	// wait for the protocol event to be processed (async)
@@ -270,7 +267,7 @@ func (suite *ConsensusSuite) TestProtocolEvents_EpochExtendedMultiple() {
 		}
 		refBlock := unittest.BlockHeaderFixture()
 		addExtension(curEpoch, extension)
-		suite.state.On("AtBlockID", refBlock.ID()).Return(suite.snapshot)
+		suite.state.On("AtHeight", refBlock.Height).Return(suite.snapshot)
 
 		suite.committee.EpochExtended(suite.currentEpochCounter, refBlock, extension)
 		// wait for the protocol event to be processed (async)
@@ -683,8 +680,7 @@ func TestRemoveOldEpochs(t *testing.T) {
 
 		currentEpochPhase = flow.EpochPhaseCommitted
 		firstBlockOfCommittedPhase := unittest.BlockHeaderFixture()
-		state.On("AtBlockID", firstBlockOfCommittedPhase.ID()).Return(snapshot).Maybe()
-		state.On("AtHeight", mock.Anything).Return(snapshot) // TODO remove
+		state.On("AtHeight", firstBlockOfCommittedPhase.Height).Return(snapshot)
 		com.EpochCommittedPhaseStarted(currentEpochCounter, firstBlockOfCommittedPhase)
 		// wait for the protocol event to be processed (async)
 		require.Eventually(t, func() bool {
