@@ -163,7 +163,7 @@ type AccessNodeConfig struct {
 	registerCacheType                    string
 	registerCacheSize                    uint
 	programCacheSize                     uint
-	checkPayerBalance                 	 bool
+	checkPayerBalance                    bool
 }
 
 type PublicNetworkConfig struct {
@@ -263,7 +263,7 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 		registerCacheType:                    pStorage.CacheTypeTwoQueue.String(),
 		registerCacheSize:                    0,
 		programCacheSize:                     0,
-		checkPayerBalance:            		  false,
+		checkPayerBalance:                    false,
 	}
 }
 
