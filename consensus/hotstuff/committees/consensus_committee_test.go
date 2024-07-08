@@ -102,18 +102,17 @@ func (suite *ConsensusSuite) CommitEpoch(epoch protocol.Epoch) {
 	}, time.Second, time.Millisecond)
 }
 
-// AssertIdentitiesAvailableForViews asserts that no errors is returned when querying
-// identities by epoch for each of the input views.
-func (suite *ConsensusSuite) AssertIdentitiesAvailableForViews(views ...uint64) {
+// AssertKnownViews asserts that no errors is returned when querying identities by epoch for each of the input views.
+func (suite *ConsensusSuite) AssertKnownViews(views ...uint64) {
 	for _, view := range views {
 		_, err := suite.committee.IdentitiesByEpoch(view)
 		suite.Assert().NoError(err)
 	}
 }
 
-// AssertIdentitiesNotAvailableForViews asserts that a model.ErrViewForUnknownEpoch sentinel
+// AssertUnknownViews asserts that a model.ErrViewForUnknownEpoch sentinel
 // is returned when querying identities by epoch for each of the input views.
-func (suite *ConsensusSuite) AssertIdentitiesNotAvailableForViews(views ...uint64) {
+func (suite *ConsensusSuite) AssertUnknownViews(views ...uint64) {
 	for _, view := range views {
 		_, err := suite.committee.IdentitiesByEpoch(view)
 		suite.Assert().Error(err)
@@ -236,7 +235,7 @@ func (suite *ConsensusSuite) TestProtocolEvents_EpochExtended() {
 
 	suite.CreateAndStartCommittee()
 
-	suite.AssertIdentitiesNotAvailableForViews(100, 201, 300, 301)
+	suite.AssertUnknownViews(100, 201, 300, 301)
 
 	extension := flow.EpochExtension{
 		FirstView: 201,
@@ -265,8 +264,8 @@ func (suite *ConsensusSuite) TestProtocolEvents_EpochExtended() {
 	suite.Assert().Len(suite.committee.epochs, 1)
 	suite.AssertStoredEpochCounterRange(suite.currentEpochCounter, suite.currentEpochCounter)
 	// check the boundary values of the original epoch and the extension, plus a random view within the extension
-	suite.AssertIdentitiesAvailableForViews(101, 200, 201, unittest.Uint64InRange(201, 300), 300)
-	suite.AssertIdentitiesNotAvailableForViews(100, 301)
+	suite.AssertKnownViews(101, 200, 201, unittest.Uint64InRange(201, 300), 300)
+	suite.AssertUnknownViews(100, 301)
 }
 
 // TestProtocolEvents_EpochExtendedMultiple tests that protocol events notifying of an epoch extension are handled correctly.
@@ -280,8 +279,8 @@ func (suite *ConsensusSuite) TestProtocolEvents_EpochExtendedMultiple() {
 	suite.CreateAndStartCommittee()
 
 	expectedKnownViews := []uint64{101, unittest.Uint64InRange(101, 200), 200}
-	suite.AssertIdentitiesNotAvailableForViews(100, 201, 300, 301)
-	suite.AssertIdentitiesAvailableForViews(expectedKnownViews...)
+	suite.AssertUnknownViews(100, 201, 300, 301)
+	suite.AssertKnownViews(expectedKnownViews...)
 
 	// Add several extensions in series
 	for i := 0; i < 10; i++ {
@@ -308,9 +307,9 @@ func (suite *ConsensusSuite) TestProtocolEvents_EpochExtendedMultiple() {
 
 		// should respond to queries for view range of new extension
 		expectedKnownViews = append(expectedKnownViews, extension.FirstView, unittest.Uint64InRange(extension.FirstView, extension.FinalView), extension.FinalView)
-		suite.AssertIdentitiesAvailableForViews(expectedKnownViews...)
+		suite.AssertKnownViews(expectedKnownViews...)
 		// should return sentinel for view outside extension
-		suite.AssertIdentitiesNotAvailableForViews(100, extension.FinalView+1)
+		suite.AssertUnknownViews(100, extension.FinalView+1)
 	}
 }
 
