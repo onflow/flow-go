@@ -16,8 +16,22 @@ import (
 )
 
 // epochInfo caches data about one epoch that is pertinent to the consensus committee.
-// CAUTION: epochInfo's internal state may evolve over time. Guaranteeing concurrency
-// safety is delegated to the higher-level logic.
+// Per protocol definition, membership in the consensus committee is granted for an entire
+// epoch, because HotStuff requires that the leader selection is fork-independent. It is
+// important to note that a consensus committee member retains its proposer view slots
+// for the current epoch even if it is ejected. Nevertheless, proposals from ejected nodes
+// will not be certified, because the nodes' epoch participation status is no longer active,
+// and hence are not voted for.
+// The protocol convention implies that the leader selection is independent of the
+// `DynamicIdentity` of the nodes, which can be updated throughout the epoch. The consensus
+// committee is defined as the `Participants` in the EpochSetup event, filtered down to
+// consensus nodes with _positive_ `InitialWeight`.
+// Based on the same argument, the weight-threshold for creating a valid QuorumCertificate
+// and TimeoutCertificate are constant throughout an epoch. Together with the DKG, all
+// this information fully specified by the EpochSetup and EpochCommit events. Therefore,
+// we can cache it here.
+// CAUTION: epochInfo's LeaderSelection is the only field whose state may evolve over time.
+// Guaranteeing concurrency safety is delegated to the higher-level logic.
 type epochInfo struct {
 	*leader.LeaderSelection // pre-computed leader selection for the epoch
 	initialCommittee        flow.IdentitySkeletonList
@@ -92,7 +106,7 @@ type Consensus struct {
 	state       protocol.State        // the protocol state
 	me          flow.Identifier       // the node ID of this node
 	mu          sync.RWMutex          // protects access to epochs
-	epochs      map[uint64]*epochInfo // cache of initial committee & leader selection per epoch
+	epochs      map[uint64]*epochInfo // caching per epoch: consensus committee (immutable) & leader selection (extendable)
 	events      chan eventHandlerFunc // shared queue for all protocol events
 	events.Noop                       // implements protocol.Consumer
 	component.Component
@@ -227,7 +241,6 @@ func (c *Consensus) IdentityByEpoch(view uint64, participantID flow.Identifier) 
 //     This is an expected error and must be handled.
 //   - unspecific error in case of unexpected problems and bugs
 func (c *Consensus) LeaderForView(view uint64) (flow.Identifier, error) {
-
 	epochInfo, err := c.epochInfoByView(view)
 	if err != nil {
 		return flow.ZeroID, err
@@ -344,6 +357,10 @@ func (c *Consensus) handleEpochExtended(refBlock *flow.Header) error {
 	if !ok {
 		return fmt.Errorf("sanity check failed: current epoch committee info does not exist")
 	}
+	// sanity check: we can only extend the current epoch, if the next epoch has not yet been committed: 
+	if _, nextEpochCommitted := c.epochs[counter+1]; nextEpochCommitted {
+		return fmt.Errorf("sanity check failed: attempting to extend epoch %d, but subsequent epoch %d is already committed", counter, counter+1)
+	}	
 	err = epochInfo.recomputeLeaderSelectionForExtendedViewRange(currentEpoch)
 	if err != nil {
 		return fmt.Errorf("could not recompute leader selection for current epoch upon extension: %w", err)
@@ -369,7 +386,6 @@ func (c *Consensus) handleEpochCommittedPhaseStarted(refBlock *flow.Header) erro
 //   - model.ErrViewForUnknownEpoch if no committed epoch containing the given view is known
 //   - unspecific error in case of unexpected problems and bugs
 func (c *Consensus) epochInfoByView(view uint64) (*epochInfo, error) {
-
 	// look for an epoch matching this view for which we have already pre-computed
 	// leader selection. Epochs last ~500k views, so we find the epoch here 99.99%
 	// of the time. Since epochs are long-lived and we only cache the most recent 3,
@@ -391,7 +407,6 @@ func (c *Consensus) epochInfoByView(view uint64) (*epochInfo, error) {
 // Input must be a committed epoch.
 // No errors are expected during normal operation.
 func (c *Consensus) prepareEpoch(epoch protocol.Epoch) (*epochInfo, error) {
-
 	counter, err := epoch.Counter()
 	if err != nil {
 		return nil, fmt.Errorf("could not get counter for epoch to prepare: %w", err)
