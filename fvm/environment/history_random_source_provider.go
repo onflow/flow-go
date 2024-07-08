@@ -85,7 +85,7 @@ func NewRandomSourceHistoryProvider(
 	return NewForbiddenRandomSourceHistoryProvider()
 }
 
-const randomSourceHistoryLen = 32
+const RandomSourceHistoryLength = 32
 
 func (b *historySourceProvider) RandomSourceHistory() ([]byte, error) {
 	defer b.tracer.StartExtensiveTracingChildSpan(
@@ -104,7 +104,7 @@ func (b *historySourceProvider) RandomSourceHistory() ([]byte, error) {
 			"get random source for block randomSource failed: %w", err))
 	}
 
-	// A method that derives `randomSourceHistoryLen` bytes from `source` must:
+	// A method that derives `RandomSourceHistoryLength` bytes from `source` must:
 	//  - extract and expand the entropy in `source`
 	//  - output must be independent than the expanded bytes used for Cadence's `random` function
 	//
@@ -118,7 +118,7 @@ func (b *historySourceProvider) RandomSourceHistory() ([]byte, error) {
 		return nil, fmt.Errorf("failed to create a PRG from source: %w", err)
 	}
 
-	historySource := make([]byte, randomSourceHistoryLen)
+	historySource := make([]byte, RandomSourceHistoryLength)
 	csprg.Read(historySource)
 
 	return historySource, nil
