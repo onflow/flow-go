@@ -72,7 +72,8 @@ func (epoch *epochInfo) targetViewTime() float64 {
 // epoch fallback are implemented by other implementations of `ProposalTiming`.
 type BlockTimeController struct {
 	component.Component
-	protocol.Consumer // consumes protocol state events
+	// protocol.Consumer consumes protocol state events
+	protocol.Consumer
 
 	config *Config
 
@@ -80,14 +81,18 @@ type BlockTimeController struct {
 	log     zerolog.Logger
 	metrics module.CruiseCtlMetrics
 
-	epochInfo // scheduled transition view for current/next epoch
-	// Currently, the only possible state transition for `epochFallbackTriggered` is false → true.
-	// TODO for 'leaving Epoch Fallback via special service event' this might need to change.
+	// epochInfo scheduled transition view for current/next epoch
+	epochInfo
+	// epochFallbackTriggered is set to true when we receive an epoch extension which indicates that the network is in fallback mode.
+	// It is set to true the moment we incorporate a block and detect an epoch transition.
+	// Detecting an epoch transition after entering epoch fallback mode indicates the network has successfully recovered.
 	epochFallbackTriggered bool
 
-	incorporatedBlocks chan TimedBlock   // OnBlockIncorporated events, we desire these blocks to be processed in a timely manner and therefore use a small channel capacity
-	epochEvents        chan func() error // epoch related protocol events chan, when epoch related events are received a function closure for
-	// the processing of the event is put on the epochEvents chan. Each epoch related event will be processed in the order it is received.
+	// incorporatedBlocks OnBlockIncorporated events, we desire these blocks to be processed in a timely manner and therefore use a small channel capacity
+	incorporatedBlocks chan TimedBlock
+	// epochEvents epoch related protocol events chan that stores event processing callbacks.
+	// Each epoch related event will be processed in the order it is received.
+	epochEvents     chan func() error
 	proportionalErr Ewma
 	integralErr     LeakyIntegrator
 
