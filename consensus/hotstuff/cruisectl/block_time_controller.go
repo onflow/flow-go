@@ -369,7 +369,7 @@ func (ctl *BlockTimeController) checkForEpochTransition(tb TimedBlock) error {
 		// epoch transition detected epoch fallback must have been recovered.
 		ctl.epochFallbackTriggered = false
 	}
-	
+
 	return nil
 }
 
