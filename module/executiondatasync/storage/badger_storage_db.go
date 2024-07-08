@@ -40,7 +40,7 @@ func (b *BadgerDBWrapper) Keys(prefix []byte) ([][]byte, error) {
 		defer it.Close()
 
 		for it.Seek(prefix); it.ValidForPrefix(prefix); it.Next() {
-			keys = append(keys, it.Item().Key())
+			keys = append(keys, it.Item().KeyCopy(nil))
 		}
 		return nil
 	})
