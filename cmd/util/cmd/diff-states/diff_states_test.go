@@ -2,7 +2,9 @@ package diff_states
 
 import (
 	"encoding/json"
+	"io"
 	"io/fs"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -15,7 +17,6 @@ import (
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/utils/io"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -80,17 +81,26 @@ func TestDiffStates(t *testing.T) {
 		require.NoError(t, err)
 		require.NotEmpty(t, reportPath)
 
-		report, err := io.ReadFile(reportPath)
+		report, err := os.Open(reportPath)
 		require.NoError(t, err)
 
-		var msgs []any
-		err = json.Unmarshal(report, &msgs)
-		require.NoError(t, err)
+		var msgs [][]byte
+		decoder := json.NewDecoder(report)
+		for {
+			var msg json.RawMessage
+			err = decoder.Decode(&msg)
+			if err == io.EOF {
+				break
+			}
+			require.NoError(t, err)
+
+			msgs = append(msgs, msg)
+		}
 
 		assert.Equal(t, 4, len(msgs))
-		assert.Containsf(t, string(report), `{"kind":"raw-diff","owner":"0100000000000000","key":"62","value1":"03","value2":"05"}`, "diff report contains raw-diff")
-		assert.Containsf(t, string(report), `{"kind":"account-missing","owner":"0200000000000000","state":2}`, "diff report contains account-missing for 0200000000000000")
-		assert.Containsf(t, string(report), `{"kind":"account-missing","owner":"0300000000000000","state":1}`, "diff report contains account-missing for 0300000000000000")
-		assert.Containsf(t, string(report), `{"kind":"account-missing","owner":"0400000000000000","state":1}`, "diff report contains account-missing for 0400000000000000")
+		assert.Containsf(t, msgs, []byte(`{"kind":"account-missing","owner":"0200000000000000","state":2}`), "diff report contains account-missing for 0200000000000000")
+		assert.Containsf(t, msgs, []byte(`{"kind":"account-missing","owner":"0300000000000000","state":1}`), "diff report contains account-missing for 0300000000000000")
+		assert.Containsf(t, msgs, []byte(`{"kind":"account-missing","owner":"0400000000000000","state":1}`), "diff report contains account-missing for 0400000000000000")
+		assert.Containsf(t, msgs, []byte(`{"kind":"raw-diff","owner":"0100000000000000","key":"62","value1":"03","value2":"05"}`), "diff report contains raw-diff")
 	})
 }
