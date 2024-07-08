@@ -1,16 +1,13 @@
 package cohort1
 
 import (
+	"github.com/onflow/flow-go/integration/testnet"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/onflow/crypto"
-	sdk "github.com/onflow/flow-go-sdk"
-	"github.com/onflow/flow-go/cmd/bootstrap/cmd"
-	"github.com/onflow/flow-go/cmd/bootstrap/utils"
 	"github.com/onflow/flow-go/integration/tests/epochs"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -23,20 +20,13 @@ type DynamicBootstrapInEFMSuite struct {
 	epochs.DynamicEpochTransitionSuite
 }
 
-func (s *DynamicBootstrapInEFMSuite) SetupTest() {
-	// use extremely short DKG phase to ensure we will enter EFM because of missing DKG
-	s.StakingAuctionLen = 10
-	s.DKGPhaseLen = 1
-	s.EpochLen = 200
-	s.EpochCommitSafetyThreshold = 50
-
-	// run the generic setup, which starts up the network
-	s.BaseSuite.SetupTest()
-}
-
 func (s *DynamicBootstrapInEFMSuite) TestDynamicBootstrapInEFM() {
+	// pause collection node to trigger EFM because of failed DKG
+	ln := s.GetContainersByRole(flow.RoleCollection)[0]
+	_ = ln.Pause()
+
 	s.TimedLogf("waiting for EpochPhaseFallback phase of first epoch to begin")
-	s.AwaitEpochPhase(s.Ctx, 0, flow.EpochPhaseFallback, time.Minute, 500*time.Millisecond)
+	s.AwaitEpochPhase(s.Ctx, 0, flow.EpochPhaseFallback, 2*time.Minute, time.Second)
 	s.TimedLogf("successfully reached EpochPhaseFallback phase of first epoch")
 
 	snapshot, err := s.Client.GetLatestProtocolSnapshot(s.Ctx)
@@ -54,27 +44,14 @@ func (s *DynamicBootstrapInEFMSuite) TestDynamicBootstrapInEFM() {
 		segment.Sealed().Header.Height, segment.Highest().Header.Height,
 		segment.Sealed().Header.View, segment.Highest().Header.View)
 
-	networkSeed := cmd.GenerateRandomSeed(crypto.KeyGenSeedMinLen)
-	networkKey, err := utils.GeneratePublicNetworkingKey(networkSeed)
-	require.NoError(s.T(), err)
-
-	observerInfo := &epochs.StakedNodeOperationInfo{
-		NodeID:                  flow.Identifier{},
-		Role:                    flow.RoleAccess,
-		StakingAccountAddress:   sdk.Address{},
-		FullAccountKey:          nil,
-		StakingAccountKey:       nil,
-		NetworkingKey:           networkKey,
-		StakingKey:              nil,
-		MachineAccountAddress:   sdk.Address{},
-		MachineAccountKey:       nil,
-		MachineAccountPublicKey: nil,
-		ContainerName:           "observer_1",
+	observerConf := testnet.ObserverConfig{
+		ContainerName: "observer_1",
 	}
-
-	testContainer := s.NewTestContainerOnNetwork(flow.RoleAccess, observerInfo)
+	testContainer := s.Net.AddObserver(s.T(), observerConf)
 	testContainer.WriteRootSnapshot(snapshot)
 	testContainer.Container.Start(s.Ctx)
+
+	s.TimedLogf("successfully started observer")
 
 	observerClient, err := testContainer.TestnetClient()
 	require.NoError(s.T(), err)
@@ -85,6 +62,7 @@ func (s *DynamicBootstrapInEFMSuite) TestDynamicBootstrapInEFM() {
 		require.NoError(s.T(), err)
 		finalized, err := observerSnapshot.Head()
 		require.NoError(s.T(), err)
+		//s.TimedLogf("observer finalized view %d", finalized.View)
 		return finalized.View >= header.View+10
 	}, 30*time.Second, time.Second)
 }
