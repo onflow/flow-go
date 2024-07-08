@@ -137,7 +137,7 @@ func (b *backendAccounts) GetAccountKeyAtLatestBlock(
 
 	accountKey, err := b.getAccountKeyAtBlock(ctx, address, sealedBlockID, keyIndex, sealed.Height)
 	if err != nil {
-		b.log.Debug().Err(err).Msgf("failed to get account keys at blockID: %v", sealedBlockID)
+		b.log.Debug().Err(err).Msgf("failed to get account key at blockID: %v", sealedBlockID)
 		return nil, err
 	}
 
@@ -207,7 +207,6 @@ func (b *backendAccounts) GetAccountKeysAtBlockHeight(
 
 	return accountKeys, nil
 
-	return accountKeys, nil
 }
 
 // getAccountAtBlock returns the account details at the given block

@@ -428,47 +428,41 @@ func (s *BackendAccountsSuite) TestGetAccountKeysFromStorage_HappyPath() {
 	backend.scriptExecMode = IndexQueryModeLocalOnly
 	backend.scriptExecutor = scriptExecutor
 
-	findKeyByIndex := func(keyIndex int) *flow.AccountPublicKey {
-		for _, key := range s.account.Keys {
-			if key.Index == keyIndex {
-				return &key
-			}
-		}
-		return &flow.AccountPublicKey{}
-	}
-
-	s.Run("GetAccountKeysAtLatestBlock - all keys - happy path", func() {
-		keyIndex := -1 // -1 means that index of public key was not specified in request
-		s.testGetAccountKeysAtLatestBlock(ctx, backend, keyIndex)
+	s.Run("GetAccountKeysAtLatestBlock - happy path", func() {
+		s.testGetAccountKeysAtLatestBlock(ctx, backend)
 	})
 
-	s.Run("GetAccountKeysAtLatestBlock - by key index - happy path", func() {
-		keyIndex := 0
-		keyByIndex := findKeyByIndex(keyIndex)
+	s.Run("GetAccountKeysAtBlockHeight - happy path", func() {
+		s.headers.On("BlockIDByHeight", s.block.Header.Height).Return(s.block.Header.ID(), nil).Once()
 
-		scriptExecutor.On("GetAccountKey", mock.Anything, s.account.Address, keyIndex, s.block.Header.Height).
-			Return(keyByIndex, nil).Once()
+		s.testGetAccountKeysAtBlockHeight(ctx, backend)
 
+	})
+}
+
+// TestGetAccountKeyScriptExecutionEnabled_HappyPath tests successfully getting account key by key index when
+// script execution is enabled.
+func (s *BackendAccountsSuite) TestGetAccountKeyFromStorage_HappyPath() {
+	ctx := context.Background()
+	scriptExecutor := execmock.NewScriptExecutor(s.T())
+
+	backend := s.defaultBackend()
+	backend.scriptExecMode = IndexQueryModeLocalOnly
+	backend.scriptExecutor = scriptExecutor
+
+	keyIndex := 0
+	keyByIndex := findAccountKeyByIndex(s.account.Keys, keyIndex)
+	scriptExecutor.On("GetAccountKey", mock.Anything, s.account.Address, keyIndex, s.block.Header.Height).
+		Return(keyByIndex, nil).Twice()
+
+	s.Run("GetAccountKeyAtLatestBlock - by key index - happy path", func() {
 		s.testGetAccountKeyAtLatestBlock(ctx, backend, keyIndex)
 	})
 
-	s.Run("GetAccountKeysAtBlockHeight - all keys - happy path", func() {
+	s.Run("GetAccountKeyAtBlockHeight - by key index - happy path", func() {
 		s.headers.On("BlockIDByHeight", s.block.Header.Height).Return(s.block.Header.ID(), nil).Once()
 
-		keyIndex := -1
-		s.testGetAccountKeysAtBlockHeight(ctx, backend, keyIndex)
-
-	})
-
-	s.Run("GetAccountKeysAtBlockHeight - by key index - happy path", func() {
-		s.headers.On("BlockIDByHeight", s.block.Header.Height).Return(s.block.Header.ID(), nil).Once()
-
-		keyIndex := 0
-		keyByIndex := findKeyByIndex(keyIndex)
-		scriptExecutor.On("GetAccountKey", mock.Anything, s.account.Address, keyIndex, s.block.Header.Height).
-			Return(keyByIndex, nil).Once()
-		s.testGetAccountKeysAtBlockHeight(ctx, backend, keyIndex)
-
+		s.testGetAccountKeyAtBlockHeight(ctx, backend, keyIndex)
 	})
 }
 
@@ -483,9 +477,26 @@ func (s *BackendAccountsSuite) TestGetAccountKeysFromExecutionNode_HappyPath() {
 	backend.scriptExecMode = IndexQueryModeExecutionNodesOnly
 
 	s.Run("GetAccountKeysAtLatestBlock - all keys - happy path", func() {
-		keyIndex := -1 // -1 means that index of public key was not specified in request
-		s.testGetAccountKeysAtLatestBlock(ctx, backend, keyIndex)
+		s.testGetAccountKeysAtLatestBlock(ctx, backend)
 	})
+
+	s.Run("GetAccountKeysAtBlockHeight - all keys - happy path", func() {
+		s.headers.On("BlockIDByHeight", s.block.Header.Height).Return(s.block.Header.ID(), nil).Once()
+
+		s.testGetAccountKeysAtBlockHeight(ctx, backend)
+	})
+
+}
+
+// TestGetAccountKeyFromExecutionNode_HappyPath tests successfully getting accounts key by key index from execution nodes
+func (s *BackendAccountsSuite) TestGetAccountKeyFromExecutionNode_HappyPath() {
+	ctx := context.Background()
+
+	s.setupExecutionNodes(s.block)
+	s.setupENSuccessResponse(s.block.ID())
+
+	backend := s.defaultBackend()
+	backend.scriptExecMode = IndexQueryModeExecutionNodesOnly
 
 	s.Run("GetAccountKeysAtLatestBlock - by key index - happy path", func() {
 		keyIndex := 0
@@ -493,23 +504,16 @@ func (s *BackendAccountsSuite) TestGetAccountKeysFromExecutionNode_HappyPath() {
 		s.testGetAccountKeyAtLatestBlock(ctx, backend, keyIndex)
 	})
 
-	s.Run("GetAccountKeysAtBlockHeight - all keys - happy path", func() {
-		s.headers.On("BlockIDByHeight", s.block.Header.Height).Return(s.block.Header.ID(), nil).Once()
-
-		keyIndex := -1
-		s.testGetAccountKeysAtBlockHeight(ctx, backend, keyIndex)
-	})
-
 	s.Run("GetAccountKeysAtLatestBlock - by key index - happy path", func() {
 		s.headers.On("BlockIDByHeight", s.block.Header.Height).Return(s.block.Header.ID(), nil).Once()
 
 		keyIndex := 0
-		s.testGetAccountKeysAtBlockHeight(ctx, backend, keyIndex)
+		s.testGetAccountKeyAtBlockHeight(ctx, backend, keyIndex)
 	})
 }
 
 // TestGetAccountBalanceFromFailover_HappyPath tests that when an error is returned getting accounts keys
-// from local storage, the backend will attempt to get the account balances from an execution node
+// from local storage, the backend will attempt to get the account key from an execution node
 func (s *BackendAccountsSuite) TestGetAccountKeysFromFailover_HappyPath() {
 	ctx := context.Background()
 
@@ -526,33 +530,47 @@ func (s *BackendAccountsSuite) TestGetAccountKeysFromFailover_HappyPath() {
 		scriptExecutor.On("GetAccountKeys", mock.Anything, s.account.Address, s.block.Header.Height).
 			Return(nil, errToReturn).Times(2)
 
-		scriptExecutor.On("GetAccountKey", mock.Anything, s.account.Address, 0, s.block.Header.Height).
-			Return(nil, errToReturn).Times(2)
-
 		s.Run(fmt.Sprintf("testGetAccountKeysAtLatestBlock -all keys - happy path - recovers %v", errToReturn), func() {
-			keyIndex := -1 // -1 means that index of public key was not specified in request
-			s.testGetAccountKeysAtLatestBlock(ctx, backend, keyIndex)
+			s.testGetAccountKeysAtLatestBlock(ctx, backend)
 		})
 
 		s.Run(fmt.Sprintf("GetAccountKeysAtBlockHeight - all keys - happy path - recovers %v", errToReturn), func() {
 			s.headers.On("BlockIDByHeight", s.block.Header.Height).Return(s.block.Header.ID(), nil).Once()
 
-			keyIndex := -1
-			s.testGetAccountKeysAtBlockHeight(ctx, backend, keyIndex)
+			s.testGetAccountKeysAtBlockHeight(ctx, backend)
+		})
+	}
+}
+
+// TestGetAccountKeyFromFailover_HappyPath tests that when an error is returned getting account key by key index
+// from local storage, the backend will attempt to get the account key from an execution node
+func (s *BackendAccountsSuite) TestGetAccountKeyFromFailover_HappyPath() {
+	ctx := context.Background()
+
+	s.setupExecutionNodes(s.block)
+	s.setupENSuccessResponse(s.block.ID())
+
+	scriptExecutor := execmock.NewScriptExecutor(s.T())
+
+	backend := s.defaultBackend()
+	backend.scriptExecMode = IndexQueryModeFailover
+	backend.scriptExecutor = scriptExecutor
+
+	for _, errToReturn := range []error{storage.ErrHeightNotIndexed, storage.ErrNotFound} {
+		scriptExecutor.On("GetAccountKey", mock.Anything, s.account.Address, 0, s.block.Header.Height).
+			Return(nil, errToReturn).Times(2)
+
+		s.Run(fmt.Sprintf("testGetAccountKeysAtLatestBlock - by key index - happy path - recovers %v", errToReturn), func() {
+			keyIndex := 0
+			s.testGetAccountKeyAtLatestBlock(ctx, backend, keyIndex)
 		})
 
-		s.Run(fmt.Sprintf("testGetAccountKeysAtLatestBlock -by key index - happy path - recovers %v", errToReturn), func() {
-			keyIndex := -0
-			s.testGetAccountKeysAtLatestBlock(ctx, backend, keyIndex)
-		})
-
-		s.Run(fmt.Sprintf("GetAccountKeysAtBlockHeight -by key index - happy path - recovers %v", errToReturn), func() {
+		s.Run(fmt.Sprintf("GetAccountKeysAtBlockHeight - by key index - happy path - recovers %v", errToReturn), func() {
 			s.headers.On("BlockIDByHeight", s.block.Header.Height).Return(s.block.Header.ID(), nil).Once()
 
-			keyIndex := -0
-			s.testGetAccountKeysAtBlockHeight(ctx, backend, keyIndex)
+			keyIndex := 0
+			s.testGetAccountKeyAtBlockHeight(ctx, backend, keyIndex)
 		})
-
 	}
 }
 
@@ -621,7 +639,7 @@ func (s *BackendAccountsSuite) testGetAccountBalanceAtBlockHeight(ctx context.Co
 	s.Require().Equal(s.account.Balance, availableBalance)
 }
 
-func (s *BackendAccountsSuite) testGetAccountKeysAtLatestBlock(ctx context.Context, backend *backendAccounts, keyIndex int) {
+func (s *BackendAccountsSuite) testGetAccountKeysAtLatestBlock(ctx context.Context, backend *backendAccounts) {
 	s.state.On("Sealed").Return(s.snapshot, nil).Once()
 	s.snapshot.On("Head").Return(s.block.Header, nil).Once()
 
@@ -634,13 +652,31 @@ func (s *BackendAccountsSuite) testGetAccountKeyAtLatestBlock(ctx context.Contex
 	s.state.On("Sealed").Return(s.snapshot, nil).Once()
 	s.snapshot.On("Head").Return(s.block.Header, nil).Once()
 
-	actual, err := backend.GetAccountKeysAtLatestBlock(ctx, s.account.Address)
+	actual, err := backend.GetAccountKeyAtLatestBlock(ctx, s.account.Address, keyIndex)
+	expectedKeyByIndex := findAccountKeyByIndex(s.account.Keys, keyIndex)
+	s.Require().NoError(err)
+	s.Require().Equal(expectedKeyByIndex, actual)
+}
+
+func (s *BackendAccountsSuite) testGetAccountKeysAtBlockHeight(ctx context.Context, backend *backendAccounts) {
+	actual, err := backend.GetAccountKeysAtBlockHeight(ctx, s.account.Address, s.block.Header.Height)
 	s.Require().NoError(err)
 	s.Require().Equal(s.account.Keys, actual)
 }
 
-func (s *BackendAccountsSuite) testGetAccountKeysAtBlockHeight(ctx context.Context, backend *backendAccounts, keyIndex int) {
-	actual, err := backend.GetAccountKeysAtBlockHeight(ctx, s.account.Address, s.block.Header.Height)
+func (s *BackendAccountsSuite) testGetAccountKeyAtBlockHeight(ctx context.Context, backend *backendAccounts, keyIndex int) {
+
+	actual, err := backend.GetAccountKeyAtBlockHeight(ctx, s.account.Address, keyIndex, s.block.Header.Height)
+	expectedKeyByIndex := findAccountKeyByIndex(s.account.Keys, keyIndex)
 	s.Require().NoError(err)
-	s.Require().Equal(s.account.Keys, actual)
+	s.Require().Equal(expectedKeyByIndex, actual)
+}
+
+func findAccountKeyByIndex(keys []flow.AccountPublicKey, keyIndex int) *flow.AccountPublicKey {
+	for _, key := range keys {
+		if key.Index == keyIndex {
+			return &key
+		}
+	}
+	return &flow.AccountPublicKey{}
 }
