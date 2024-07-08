@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"context"
 	"errors"
 
 	"github.com/dgraph-io/badger/v2"
@@ -47,6 +48,10 @@ func (b *BadgerDBWrapper) Keys(prefix []byte) ([][]byte, error) {
 		return nil, err
 	}
 	return keys, nil
+}
+
+func (b *BadgerDBWrapper) CollectGarbage(ctx context.Context) error {
+	return b.ds.CollectGarbage(ctx)
 }
 
 func (b *BadgerDBWrapper) Get(key []byte) (StorageItem, error) {

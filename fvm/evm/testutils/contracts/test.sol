@@ -64,10 +64,10 @@ contract Storage {
        revert MyCustomError(5, "Value is too low");
     }
 
-    function verifyArchCallToRandomSource(uint64 height) public view returns (uint64) {
+    function verifyArchCallToRandomSource(uint64 height) public view returns (bytes32) {
         (bool ok, bytes memory data) = cadenceArch.staticcall(abi.encodeWithSignature("getRandomSource(uint64)", height));
         require(ok, "unsuccessful call to arch ");
-        uint64 output = abi.decode(data, (uint64));
+        bytes32 output = abi.decode(data, (bytes32));
         return output;
     }
 

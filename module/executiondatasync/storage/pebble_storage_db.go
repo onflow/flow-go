@@ -52,6 +52,10 @@ func (p *PebbleDBWrapper) Keys(prefix []byte) ([][]byte, error) {
 	return keys, nil
 }
 
+func (p *PebbleDBWrapper) CollectGarbage(ctx context.Context) error {
+	return nil
+}
+
 func (p *PebbleDBWrapper) Get(key []byte) (StorageItem, error) {
 	val, err := p.ds.Get(context.Background(), ds.NewKey(string(key)))
 	if err != nil {

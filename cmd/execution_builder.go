@@ -19,7 +19,6 @@ import (
 	badger "github.com/ipfs/go-ds-badger2"
 	"github.com/onflow/cadence"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
-	storage2 "github.com/onflow/flow-go/module/executiondatasync/storage"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/shirou/gopsutil/v3/cpu"
@@ -79,6 +78,7 @@ import (
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	exedataprovider "github.com/onflow/flow-go/module/executiondatasync/provider"
 	"github.com/onflow/flow-go/module/executiondatasync/pruner"
+	storagedb "github.com/onflow/flow-go/module/executiondatasync/storage"
 	"github.com/onflow/flow-go/module/executiondatasync/tracker"
 	"github.com/onflow/flow-go/module/finalizedreader"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
@@ -950,7 +950,7 @@ func (exeNode *ExecutionNode) LoadExecutionDataPruner(
 
 	options := badger.DefaultOptions
 	options.Options = badgerDB.LSMOnlyOptions(trackerDir)
-	badgerDBWrapper, err := storage2.NewBadgerDBWrapper(trackerDir, &options)
+	badgerDBWrapper, err := storagedb.NewBadgerDBWrapper(trackerDir, &options)
 	if err != nil {
 		return nil, fmt.Errorf("could not create BadgerDBWrapper: %w", err)
 	}

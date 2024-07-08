@@ -1,6 +1,8 @@
 package storage
 
 import (
+	"context"
+
 	"github.com/ipfs/go-datastore"
 )
 
@@ -15,6 +17,8 @@ type StorageDB interface {
 	Close() error
 
 	Keys(prefix []byte) ([][]byte, error)
+
+	CollectGarbage(ctx context.Context) error
 
 	RetryOnConflict(fn func() error) error
 	MaxBatchCount() int64
