@@ -625,7 +625,7 @@ func (s *BackendAccountsSuite) testGetAccountKeysAtLatestBlock(ctx context.Conte
 	s.state.On("Sealed").Return(s.snapshot, nil).Once()
 	s.snapshot.On("Head").Return(s.block.Header, nil).Once()
 
-	actual, err := backend.GetAccountKeysAtLatestBlock(ctx, s.account.Address, keyIndex)
+	actual, err := backend.GetAccountKeysAtLatestBlock(ctx, s.account.Address)
 	s.Require().NoError(err)
 	s.Require().Equal(s.account.Keys, actual)
 }
@@ -634,13 +634,13 @@ func (s *BackendAccountsSuite) testGetAccountKeyAtLatestBlock(ctx context.Contex
 	s.state.On("Sealed").Return(s.snapshot, nil).Once()
 	s.snapshot.On("Head").Return(s.block.Header, nil).Once()
 
-	actual, err := backend.GetAccountKeysAtLatestBlock(ctx, s.account.Address, keyIndex)
+	actual, err := backend.GetAccountKeysAtLatestBlock(ctx, s.account.Address)
 	s.Require().NoError(err)
 	s.Require().Equal(s.account.Keys, actual)
 }
 
 func (s *BackendAccountsSuite) testGetAccountKeysAtBlockHeight(ctx context.Context, backend *backendAccounts, keyIndex int) {
-	actual, err := backend.GetAccountKeysAtBlockHeight(ctx, s.account.Address, keyIndex, s.block.Header.Height)
+	actual, err := backend.GetAccountKeysAtBlockHeight(ctx, s.account.Address, s.block.Header.Height)
 	s.Require().NoError(err)
 	s.Require().Equal(s.account.Keys, actual)
 }
