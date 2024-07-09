@@ -20,7 +20,7 @@ func TestBlockStore(t *testing.T) {
 		testutils.RunWithTestFlowEVMRootAddress(t, backend, func(root flow.Address) {
 			bs := handler.NewBlockStore(backend, root)
 
-			// check gensis block
+			// check the Genesis block
 			b, err := bs.LatestBlock()
 			require.NoError(t, err)
 			require.Equal(t, types.GenesisBlock, b)
@@ -28,7 +28,7 @@ func TestBlockStore(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, types.GenesisBlockHash, h)
 
-			// test block proposal from genesis
+			// test block proposal construction from the Genesis block
 			bp, err := bs.BlockProposal()
 			require.NoError(t, err)
 			require.Equal(t, uint64(1), bp.Height)
@@ -36,9 +36,33 @@ func TestBlockStore(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, expectedParentHash, bp.ParentBlockHash)
 
-			// commit block proposal
+			// if no commit and again block proposal call should return the same
+			ret, err := bs.BlockProposal()
+			require.NoError(t, err)
+			require.Equal(t, bp, ret)
+
+			// update the block proposal
+			bp.TotalGasUsed += 100
+			err = bs.UpdateBlockProposal(bp)
+			require.NoError(t, err)
+
+			// reset the bs and check if it still return the block proposal
+			bs = handler.NewBlockStore(backend, root)
+			ret, err = bs.BlockProposal()
+			require.NoError(t, err)
+			require.Equal(t, bp, ret)
+
+			// update the block proposal again
 			supply := big.NewInt(100)
 			bp.TotalSupply = supply
+			err = bs.UpdateBlockProposal(bp)
+			require.NoError(t, err)
+			// this should still return the gensis block
+			ret, err = bs.LatestBlock()
+			require.NoError(t, err)
+			require.Equal(t, types.GenesisBlock, ret)
+
+			// commit the changes
 			err = bs.CommitBlockProposal()
 			require.NoError(t, err)
 			b, err = bs.LatestBlock()

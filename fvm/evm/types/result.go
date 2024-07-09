@@ -133,7 +133,7 @@ func (res *Result) Receipt() *gethTypes.Receipt {
 	}
 	receipt := &gethTypes.Receipt{
 		Type:              res.TxType,
-		CumulativeGasUsed: res.GasConsumed, // TODO: update to capture cumulative
+		CumulativeGasUsed: res.GasConsumed,
 		Logs:              res.Logs,
 	}
 	if res.DeployedContractAddress != nil {

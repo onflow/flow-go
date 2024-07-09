@@ -32,6 +32,9 @@ type Block struct {
 	// the same receipt root would be reported for block.
 	ReceiptRoot gethCommon.Hash
 
+	// Receipts keeps a order list of receipts generated during block execution
+	Receipts gethTypes.Receipts
+
 	// transaction hashes
 	TransactionHashes []gethCommon.Hash
 
@@ -50,34 +53,31 @@ func (b *Block) Hash() (gethCommon.Hash, error) {
 	return gethCrypto.Keccak256Hash(data), err
 }
 
-// PopulateReceiptRoot populates receipt root with the given results
-func (b *Block) PopulateReceiptRoot(results []*Result) {
-	if len(results) == 0 {
+// AppendTransaction appends a transaction hash to the list of transaction hashes of the block
+// and also update the receipts
+func (b *Block) AppendTransaction(res *Result) {
+	if res == nil {
+		return
+	}
+	b.TransactionHashes = append(b.TransactionHashes, res.TxHash)
+	r := res.Receipt()
+	if r == nil {
+		return
+	}
+	b.Receipts = append(b.Receipts, r)
+}
+
+// Finalize populates receipt roots and updates the total gas used
+func (b *Block) Finalize() {
+	if len(b.Receipts) == 0 {
 		b.ReceiptRoot = gethTypes.EmptyReceiptsHash
 		return
 	}
+	b.ReceiptRoot = gethTypes.DeriveSha(b.Receipts, gethTrie.NewStackTrie(nil))
 
-	receipts := make(gethTypes.Receipts, 0)
-	for _, res := range results {
-		r := res.Receipt()
-		if r == nil {
-			continue
-		}
-		receipts = append(receipts, r)
+	for _, res := range b.Receipts {
+		b.TotalGasUsed += res.CumulativeGasUsed
 	}
-	b.ReceiptRoot = gethTypes.DeriveSha(receipts, gethTrie.NewStackTrie(nil))
-}
-
-// CalculateGasUsage sums up all the gas transactions in the block used
-func (b *Block) CalculateGasUsage(results []*Result) {
-	for _, res := range results {
-		b.TotalGasUsed += res.GasConsumed
-	}
-}
-
-// AppendTxHash appends a transaction hash to the list of transaction hashes of the block
-func (b *Block) AppendTxHash(txHash gethCommon.Hash) {
-	b.TransactionHashes = append(b.TransactionHashes, txHash)
 }
 
 // NewBlock constructs a new block
@@ -86,6 +86,7 @@ func NewBlock(
 	height uint64,
 	timestamp uint64,
 	totalSupply *big.Int,
+	receipts gethTypes.Receipts,
 	receiptRoot gethCommon.Hash,
 	txHashes []gethCommon.Hash,
 ) *Block {
@@ -95,6 +96,7 @@ func NewBlock(
 		Timestamp:         timestamp,
 		TotalSupply:       totalSupply,
 		ReceiptRoot:       receiptRoot,
+		Receipts:          receipts,
 		TransactionHashes: txHashes,
 	}
 }

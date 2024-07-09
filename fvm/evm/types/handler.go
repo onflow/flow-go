@@ -81,12 +81,12 @@ type BlockStore interface {
 	// BlockHash returns the hash of the block at the given height
 	BlockHash(height uint64) (gethCommon.Hash, error)
 
-	// BlockProposal returns the block proposal
+	// BlockProposal returns the active block proposal
 	BlockProposal() (*Block, error)
+
+	// Updates the block proposal
+	UpdateBlockProposal(*Block) error
 
 	// CommitBlockProposal commits the block proposal and update the chain of blocks
 	CommitBlockProposal() error
-
-	// ResetBlockProposal resets the block proposal
-	ResetBlockProposal() error
 }

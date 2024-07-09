@@ -34,13 +34,15 @@ func Test_BlockHash(t *testing.T) {
 	// hashes should not equal if any data is changed
 	assert.NotEqual(t, h1, h2)
 
-	b.PopulateReceiptRoot(nil)
+	b.AppendTransaction(nil)
+	b.Finalize()
 	require.Equal(t, gethTypes.EmptyReceiptsHash, b.ReceiptRoot)
 
-	res := Result{
+	res := &Result{
 		GasConsumed: 10,
 	}
-	b.PopulateReceiptRoot([]*Result{&res})
+	b.AppendTransaction(res)
+	b.Finalize()
 	require.NotEqual(t, gethTypes.EmptyReceiptsHash, b.ReceiptRoot)
 }
 

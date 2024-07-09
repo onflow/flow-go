@@ -198,12 +198,6 @@ func (h *ContractHandler) batchRun(rlpEncodedTxs [][]byte, coinbase types.Addres
 		return nil, types.ErrUnexpectedEmptyResult
 	}
 
-	// Populate receipt root
-	bp.PopulateReceiptRoot(res)
-
-	// Populate total gas used
-	bp.CalculateGasUsage(res)
-
 	// meter all the transaction gas usage and append hashes to the block
 	for _, r := range res {
 		// meter gas anyway (even for invalid or failed states)
@@ -214,7 +208,7 @@ func (h *ContractHandler) batchRun(rlpEncodedTxs [][]byte, coinbase types.Addres
 
 		// include it in a block only if valid (not invalid)
 		if !r.Invalid() {
-			bp.AppendTxHash(r.TxHash)
+			bp.AppendTransaction(r)
 		}
 	}
 
@@ -246,17 +240,40 @@ func (h *ContractHandler) batchRun(rlpEncodedTxs [][]byte, coinbase types.Addres
 		h.tracer.Collect(r.TxHash)
 	}
 
-	err = h.emitEvent(types.NewBlockEvent(bp))
+	// update the block proposal
+	err = h.blockStore.UpdateBlockProposal(bp)
 	if err != nil {
 		return nil, err
 	}
 
-	err = h.blockStore.CommitBlockProposal()
+	// TODO: don't commit right away.
+	err = h.CommitBlockProposal()
 	if err != nil {
 		return nil, err
 	}
 
 	return res, nil
+}
+
+func (h *ContractHandler) CommitBlockProposal() error {
+	bp, err := h.blockStore.BlockProposal()
+	if err != nil {
+		return err
+	}
+	// update all values before commit
+	bp.Finalize()
+
+	err = h.emitEvent(types.NewBlockEvent(bp))
+	if err != nil {
+		return err
+	}
+
+	err = h.blockStore.CommitBlockProposal()
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (h *ContractHandler) run(
@@ -312,13 +329,8 @@ func (h *ContractHandler) run(
 		return nil, err
 	}
 
-	bp.AppendTxHash(res.TxHash)
-
-	// Populate receipt root
-	bp.PopulateReceiptRoot([]*types.Result{res})
-
-	// Populate total gas used
-	bp.CalculateGasUsage([]*types.Result{res})
+	// append tx to the block proposal
+	bp.AppendTransaction(res)
 
 	blockHash, err := bp.Hash()
 	if err != nil {
@@ -331,13 +343,14 @@ func (h *ContractHandler) run(
 		return nil, err
 	}
 
-	err = h.emitEvent(types.NewBlockEvent(bp))
+	// update the block proposal
+	err = h.blockStore.UpdateBlockProposal(bp)
 	if err != nil {
 		return nil, err
 	}
 
-	// step 5 - commit block proposal
-	err = h.blockStore.CommitBlockProposal()
+	// TODO: don't commit right away.
+	err = h.CommitBlockProposal()
 	if err != nil {
 		return nil, err
 	}
@@ -502,13 +515,8 @@ func (h *ContractHandler) executeAndHandleCall(
 		return nil, err
 	}
 
-	bp.AppendTxHash(res.TxHash)
-
-	// Populate receipt root
-	bp.PopulateReceiptRoot([]*types.Result{res})
-
-	// Populate total gas used
-	bp.CalculateGasUsage([]*types.Result{res})
+	// append transaction to the block proposal
+	bp.AppendTransaction(res)
 
 	if totalSupplyDiff != nil {
 		if deductSupplyDiff {
@@ -539,13 +547,14 @@ func (h *ContractHandler) executeAndHandleCall(
 		return nil, err
 	}
 
-	err = h.emitEvent(types.NewBlockEvent(bp))
+	// update the block proposal
+	err = h.blockStore.UpdateBlockProposal(bp)
 	if err != nil {
 		return nil, err
 	}
 
-	// commit block proposal
-	err = h.blockStore.CommitBlockProposal()
+	// TODO: don't commit right away.
+	err = h.CommitBlockProposal()
 	if err != nil {
 		return nil, err
 	}

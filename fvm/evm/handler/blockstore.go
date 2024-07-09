@@ -5,21 +5,22 @@ import (
 	"time"
 
 	gethCommon "github.com/onflow/go-ethereum/common"
+	gethTypes "github.com/onflow/go-ethereum/core/types"
 
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/model/flow"
 )
 
 const (
-	BlockHashListCapacity    = 16
-	BlockStoreLatestBlockKey = "LatestBlock"
-	BlockStoreBlockHashesKey = "LatestBlockHashes"
+	BlockHashListCapacity            = 16
+	BlockStoreLatestBlockKey         = "LatestBlock"
+	BlockStoreLatestBlockProposalKey = "LatestBlockProposal"
+	BlockStoreBlockHashesKey         = "LatestBlockHashes"
 )
 
 type BlockStore struct {
-	backend       types.Backend
-	rootAddress   flow.Address
-	blockProposal *types.Block
+	backend     types.Backend
+	rootAddress flow.Address
 }
 
 var _ types.BlockStore = &BlockStore{}
@@ -34,10 +35,16 @@ func NewBlockStore(backend types.Backend, rootAddress flow.Address) *BlockStore 
 
 // BlockProposal returns the block proposal to be updated by the handler
 func (bs *BlockStore) BlockProposal() (*types.Block, error) {
-	if bs.blockProposal != nil {
-		return bs.blockProposal, nil
+	// first fetch it from the storage
+	data, err := bs.backend.GetValue(bs.rootAddress[:], []byte(BlockStoreLatestBlockProposalKey))
+	if err != nil {
+		return nil, types.NewFatalError(err)
+	}
+	if len(data) != 0 {
+		return types.NewBlockFromBytes(data)
 	}
 
+	// if available construct a new one
 	cadenceHeight, err := bs.backend.GetCurrentBlockHeight()
 	if err != nil {
 		return nil, err
@@ -65,15 +72,44 @@ func (bs *BlockStore) BlockProposal() (*types.Block, error) {
 	// expect timestamps in unix seconds so we convert here
 	timestamp := uint64(cadenceBlock.Timestamp / int64(time.Second))
 
-	bs.blockProposal = types.NewBlock(
+	blockProposal := types.NewBlock(
 		parentHash,
 		lastExecutedBlock.Height+1,
 		timestamp,
 		lastExecutedBlock.TotalSupply,
+		make(gethTypes.Receipts, 0),
 		gethCommon.Hash{},
 		make([]gethCommon.Hash, 0),
 	)
-	return bs.blockProposal, nil
+
+	// store blockProposal
+	err = bs.UpdateBlockProposal(blockProposal)
+	if err != nil {
+		return nil, err
+	}
+	return blockProposal, nil
+}
+
+// UpdateBlockProposal updates the block proposal
+func (bs *BlockStore) UpdateBlockProposal(bp *types.Block) error {
+	blockBytes, err := bp.ToBytes()
+	if err != nil {
+		return types.NewFatalError(err)
+	}
+
+	return bs.backend.SetValue(
+		bs.rootAddress[:],
+		[]byte(BlockStoreLatestBlockProposalKey),
+		blockBytes,
+	)
+}
+
+func (bs *BlockStore) ResetBlockProposal() error {
+	return bs.backend.SetValue(
+		bs.rootAddress[:],
+		[]byte(BlockStoreLatestBlockProposalKey),
+		nil,
+	)
 }
 
 // CommitBlockProposal commits the block proposal to the chain
@@ -93,18 +129,16 @@ func (bs *BlockStore) CommitBlockProposal() error {
 		return err
 	}
 
-	err = bs.updateBlockHashList(bs.blockProposal)
+	err = bs.updateBlockHashList(bp)
 	if err != nil {
 		return err
 	}
 
-	bs.blockProposal = nil
-	return nil
-}
+	err = bs.ResetBlockProposal()
+	if err != nil {
+		return err
+	}
 
-// ResetBlockProposal resets the block proposal
-func (bs *BlockStore) ResetBlockProposal() error {
-	bs.blockProposal = nil
 	return nil
 }
 
