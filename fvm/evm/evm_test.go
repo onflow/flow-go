@@ -23,6 +23,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/crypto"
+	"github.com/onflow/flow-go/fvm/environment"
 	envMock "github.com/onflow/flow-go/fvm/environment/mock"
 	"github.com/onflow/flow-go/fvm/evm"
 	"github.com/onflow/flow-go/fvm/evm/emulator"
@@ -1023,6 +1024,16 @@ func TestEVMAddressDeposit(t *testing.T) {
 			require.NoError(t, err)
 			require.NotEmpty(t, blockEventPayload.Hash)
 			require.Equal(t, uint64(21000), blockEventPayload.TotalGasUsed)
+
+			// deposit event
+			depositEvent := output.Events[4]
+			depEv, err := types.FlowEventToCadenceEvent(depositEvent)
+			require.NoError(t, err)
+
+			depEvPayload, err := types.DecodeFLOWTokensDepositedEventPayload(depEv)
+			require.NoError(t, err)
+
+			require.Equal(t, types.OneFlow, depEvPayload.BalanceAfterInAttoFlow.Value)
 		})
 }
 
@@ -1147,40 +1158,55 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 				import EVM from %s
 				import FlowToken from %s
 
-				access(all)
-				fun main(): UFix64 {
-					let admin = getAuthAccount<auth(BorrowValue) &Account>(%s)
-						.storage.borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin)!
-					let minter <- admin.createNewMinter(allowedAmount: 2.34)
-					let vault <- minter.mintTokens(amount: 2.34)
-					destroy minter
+				transaction() {
+					prepare(account: auth(BorrowValue) &Account) {
+						let admin = account.storage
+							.borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin)!
 
-					let cadenceOwnedAccount <- EVM.createCadenceOwnedAccount()
-					cadenceOwnedAccount.deposit(from: <-vault)
+						let minter <- admin.createNewMinter(allowedAmount: 2.34)
+						let vault <- minter.mintTokens(amount: 2.34)
+						destroy minter
 
-					let bal = EVM.Balance(attoflow: 0)
-					bal.setFLOW(flow: 1.23)
-					let vault2 <- cadenceOwnedAccount.withdraw(balance: bal)
-					let balance = vault2.balance
-					destroy cadenceOwnedAccount
-					destroy vault2
+						let cadenceOwnedAccount <- EVM.createCadenceOwnedAccount()
+						cadenceOwnedAccount.deposit(from: <-vault)
 
-					return balance
+						let bal = EVM.Balance(attoflow: 0)
+						bal.setFLOW(flow: 1.23)
+						let vault2 <- cadenceOwnedAccount.withdraw(balance: bal)
+						let balance = vault2.balance
+						destroy cadenceOwnedAccount
+						destroy vault2
+					}
 				}
 				`,
 					sc.EVMContract.Address.HexWithPrefix(),
 					sc.FlowToken.Address.HexWithPrefix(),
-					sc.FlowServiceAccount.Address.HexWithPrefix(),
 				))
 
-				script := fvm.Script(code)
+				tx := fvm.Transaction(
+					flow.NewTransactionBody().
+						SetScript(code).
+						AddAuthorizer(sc.FlowServiceAccount.Address),
+					0)
 
 				_, output, err := vm.Run(
 					ctx,
-					script,
+					tx,
 					snapshot)
 				require.NoError(t, err)
 				require.NoError(t, output.Err)
+
+				withdrawEvent := output.Events[10]
+
+				ev, err := types.FlowEventToCadenceEvent(withdrawEvent)
+				require.NoError(t, err)
+
+				evPayload, err := types.DecodeFLOWTokensWithdrawnEventPayload(ev)
+				require.NoError(t, err)
+
+				// 2.34 - 1.23 = 1.11
+				expectedBalanceAfterWithdraw := big.NewInt(1_110_000_000_000_000_000)
+				require.Equal(t, expectedBalanceAfterWithdraw, evPayload.BalanceAfterInAttoFlow.Value)
 			})
 	})
 
@@ -2073,7 +2099,8 @@ func TestCadenceArch(t *testing.T) {
 				testAccount *EOATestAccount,
 			) {
 				entropy := []byte{13, 37}
-				source := []byte{91, 161, 206, 171, 100, 17, 141, 44} // coresponding out to the above entropy
+				// coresponding out to the above entropy
+				source := []byte{0x5b, 0xa1, 0xce, 0xab, 0x64, 0x11, 0x8d, 0x2c, 0xd8, 0xae, 0x8c, 0xbb, 0xf7, 0x50, 0x5e, 0xf5, 0xdf, 0xad, 0xfc, 0xf7, 0x2d, 0x3a, 0x46, 0x78, 0xd5, 0xe5, 0x1d, 0xb7, 0xf2, 0xb8, 0xe5, 0xd6}
 
 				// we must record a new heartbeat with a fixed block, we manually execute a transaction to do so,
 				// since doing this automatically would require a block computer and whole execution setup
@@ -2150,9 +2177,10 @@ func TestCadenceArch(t *testing.T) {
 				require.NoError(t, err)
 				require.NoError(t, output.Err)
 
-				res := make([]byte, 8)
+				res := make([]byte, environment.RandomSourceHistoryLength)
 				vals := output.Value.(cadence.Array).Values
-				vals = vals[len(vals)-8:] // only last 8 bytes is the value
+				require.Len(t, vals, environment.RandomSourceHistoryLength)
+
 				for i := range res {
 					res[i] = byte(vals[i].(cadence.UInt8))
 				}

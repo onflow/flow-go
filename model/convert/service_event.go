@@ -682,11 +682,14 @@ func invalidCadenceTypeError(
 	fieldName string,
 	actualType, expectedType cadence.Value,
 ) error {
+	// NOTE: This error is reported if the Go-types are different (not if Cadence types are different).
+	// Therefore, print the Go-type instead of cadence type.
+	// Cadence type can be `nil`, since the `expectedType` is always the zero-value of the Go type.
 	return fmt.Errorf(
-		"invalid Cadence type for field %s (got=%s, expected=%s)",
+		"invalid Cadence type for field %s (got=%T, expected=%T)",
 		fieldName,
-		actualType.Type().ID(),
-		expectedType.Type().ID(),
+		actualType,
+		expectedType,
 	)
 }
 

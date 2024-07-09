@@ -16,7 +16,8 @@ var (
 	UFixToAttoConversionMultiplier = new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(UFixedToAttoConversionScale)), nil)
 
 	OneFlowInUFix64 = cadence.UFix64(uint64(math.Pow(10, float64(UFixedScale))))
-	OneFlowBalance  = Balance(new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(AttoScale)), nil))
+	OneFlow         = new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(AttoScale)), nil)
+	OneFlowBalance  = Balance(OneFlow)
 	EmptyBalance    = Balance(new(big.Int))
 )
 
