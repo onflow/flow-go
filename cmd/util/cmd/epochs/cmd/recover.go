@@ -85,9 +85,13 @@ func addGenerateRecoverEpochTxArgsCmdFlags() error {
 	generateRecoverEpochTxArgsCmd.Flags().Uint64Var(&flagNumViewsInEpoch, "epoch-length", 0, "length of each epoch measured in views")
 	generateRecoverEpochTxArgsCmd.Flags().Uint64Var(&flagNumViewsInStakingAuction, "epoch-staking-phase-length", 0, "length of the epoch staking phase measured in views")
 	generateRecoverEpochTxArgsCmd.Flags().Uint64Var(&flagEpochCounter, "epoch-counter", 0, "the epoch counter used to generate the root cluster block")
-	generateRecoverEpochTxArgsCmd.Flags().Uint64Var(&flagTargetDuration, "target-duration", 0, "the target duration of the epoch")
-	generateRecoverEpochTxArgsCmd.Flags().Uint64Var(&flagTargetEndTime, "target-end-time", 0, "the target end time for the epoch")
-	generateRecoverEpochTxArgsCmd.Flags().BoolVar(&flagInitNewEpoch, "init", true, "set to false if the recover transaction should overwrite the current epoch rather than initialize a new recover epoch")
+	generateRecoverEpochTxArgsCmd.Flags().Uint64Var(&flagTargetDuration, "epoch-timing-duration", 0, "the target duration of the epoch, in seconds")
+	generateRecoverEpochTxArgsCmd.Flags().Uint64Var(&flagTargetEndTime, "epoch-timing-end-time", 0, "the target end time for the epoch, specified in second-precision Unix time")
+	// The following option allows the RecoveryEpoch specified by this command to overwrite an epoch which already exists in the smart contract.
+	// This is needed only if a previous recoverEpoch transaction was submitted and a race condition occurred such that:
+	//   - the RecoveryEpoch in the admin transaction was accepted by the smart contract
+	//   - the RecoveryEpoch service event (after sealing latency) was rejected by the Protocol State
+	generateRecoverEpochTxArgsCmd.Flags().BoolVar(&flagInitNewEpoch, "unsafe-overwrite-epoch-data", false, "set to true if the resulting transaction is allowed to overwrite an existing epoch data entry in the smart contract. ")
 
 	err := generateRecoverEpochTxArgsCmd.MarkFlagRequired("access-address")
 	if err != nil {
@@ -163,7 +167,7 @@ func generateRecoverEpochTxArgs(getSnapshot func() *inmem.Snapshot) func(cmd *co
 				log.Fatal().Err(err).Msg("could not write jsoncdc encoded arguments")
 			}
 		} else {
-			// write JSON args to stdout
+			// write JSON args to file specified by flag
 			err := os.WriteFile(flagOut, encodedTxArgs, 0644)
 			if err != nil {
 				log.Fatal().Err(err).Msg(fmt.Sprintf("could not write jsoncdc encoded arguments to file %s", flagOut))
