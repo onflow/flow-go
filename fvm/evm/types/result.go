@@ -132,7 +132,6 @@ func (res *Result) Receipt() *gethTypes.Receipt {
 		return nil
 	}
 	receipt := &gethTypes.Receipt{
-		Type:              res.TxType,
 		CumulativeGasUsed: res.GasConsumed,
 		Logs:              res.Logs,
 	}
