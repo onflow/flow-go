@@ -3,7 +3,7 @@ package operation
 import (
 	"testing"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -12,7 +12,7 @@ import (
 )
 
 func TestChunkDataPack(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
 		collectionID := unittest.IdentifierFixture()
 		expected := &storage.StoredChunkDataPack{
 			ChunkID:      unittest.IdentifierFixture(),
@@ -23,27 +23,27 @@ func TestChunkDataPack(t *testing.T) {
 
 		t.Run("Retrieve non-existent", func(t *testing.T) {
 			var actual storage.StoredChunkDataPack
-			err := db.View(RetrieveChunkDataPack(expected.ChunkID, &actual))
+			err := RetrieveChunkDataPack(expected.ChunkID, &actual)(db)
 			assert.Error(t, err)
 		})
 
 		t.Run("Save", func(t *testing.T) {
-			err := db.Update(InsertChunkDataPack(expected))
+			err := InsertChunkDataPack(expected)(db)
 			require.NoError(t, err)
 
 			var actual storage.StoredChunkDataPack
-			err = db.View(RetrieveChunkDataPack(expected.ChunkID, &actual))
+			err = RetrieveChunkDataPack(expected.ChunkID, &actual)(db)
 			assert.NoError(t, err)
 
 			assert.Equal(t, *expected, actual)
 		})
 
 		t.Run("Remove", func(t *testing.T) {
-			err := db.Update(RemoveChunkDataPack(expected.ChunkID))
+			err := RemoveChunkDataPack(expected.ChunkID)(db)
 			require.NoError(t, err)
 
 			var actual storage.StoredChunkDataPack
-			err = db.View(RetrieveChunkDataPack(expected.ChunkID, &actual))
+			err = RetrieveChunkDataPack(expected.ChunkID, &actual)(db)
 			assert.Error(t, err)
 		})
 	})

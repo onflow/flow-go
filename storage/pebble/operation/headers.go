@@ -1,63 +1,57 @@
-// (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
-
 package operation
 
 import (
-	"github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble"
 
 	"github.com/onflow/flow-go/model/flow"
 )
 
-func InsertHeader(headerID flow.Identifier, header *flow.Header) func(*badger.Txn) error {
+func InsertHeader(headerID flow.Identifier, header *flow.Header) func(pebble.Writer) error {
 	return insert(makePrefix(codeHeader, headerID), header)
 }
 
-func RetrieveHeader(blockID flow.Identifier, header *flow.Header) func(*badger.Txn) error {
+func RetrieveHeader(blockID flow.Identifier, header *flow.Header) func(pebble.Reader) error {
 	return retrieve(makePrefix(codeHeader, blockID), header)
 }
 
 // IndexBlockHeight indexes the height of a block. It should only be called on
 // finalized blocks.
-func IndexBlockHeight(height uint64, blockID flow.Identifier) func(*badger.Txn) error {
+func IndexBlockHeight(height uint64, blockID flow.Identifier) func(pebble.Writer) error {
 	return insert(makePrefix(codeHeightToBlock, height), blockID)
 }
 
 // LookupBlockHeight retrieves finalized blocks by height.
-func LookupBlockHeight(height uint64, blockID *flow.Identifier) func(*badger.Txn) error {
+func LookupBlockHeight(height uint64, blockID *flow.Identifier) func(pebble.Reader) error {
 	return retrieve(makePrefix(codeHeightToBlock, height), blockID)
 }
 
 // BlockExists checks whether the block exists in the database.
 // No errors are expected during normal operation.
-func BlockExists(blockID flow.Identifier, blockExists *bool) func(*badger.Txn) error {
+func BlockExists(blockID flow.Identifier, blockExists *bool) func(pebble.Reader) error {
 	return exists(makePrefix(codeHeader, blockID), blockExists)
 }
 
-func InsertExecutedBlock(blockID flow.Identifier) func(*badger.Txn) error {
+func InsertExecutedBlock(blockID flow.Identifier) func(pebble.Writer) error {
 	return insert(makePrefix(codeExecutedBlock), blockID)
 }
 
-func UpdateExecutedBlock(blockID flow.Identifier) func(*badger.Txn) error {
-	return update(makePrefix(codeExecutedBlock), blockID)
-}
-
-func RetrieveExecutedBlock(blockID *flow.Identifier) func(*badger.Txn) error {
+func RetrieveExecutedBlock(blockID *flow.Identifier) func(pebble.Reader) error {
 	return retrieve(makePrefix(codeExecutedBlock), blockID)
 }
 
 // IndexCollectionBlock indexes a block by a collection within that block.
-func IndexCollectionBlock(collID flow.Identifier, blockID flow.Identifier) func(*badger.Txn) error {
+func IndexCollectionBlock(collID flow.Identifier, blockID flow.Identifier) func(pebble.Writer) error {
 	return insert(makePrefix(codeCollectionBlock, collID), blockID)
 }
 
 // LookupCollectionBlock looks up a block by a collection within that block.
-func LookupCollectionBlock(collID flow.Identifier, blockID *flow.Identifier) func(*badger.Txn) error {
+func LookupCollectionBlock(collID flow.Identifier, blockID *flow.Identifier) func(pebble.Reader) error {
 	return retrieve(makePrefix(codeCollectionBlock, collID), blockID)
 }
 
 // FindHeaders iterates through all headers, calling `filter` on each, and adding
 // them to the `found` slice if `filter` returned true
-func FindHeaders(filter func(header *flow.Header) bool, found *[]flow.Header) func(*badger.Txn) error {
+func FindHeaders(filter func(header *flow.Header) bool, found *[]flow.Header) func(pebble.Reader) error {
 	return traverse(makePrefix(codeHeader), func() (checkFunc, createFunc, handleFunc) {
 		check := func(key []byte) bool {
 			return true

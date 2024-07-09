@@ -1,4 +1,4 @@
-package badger
+package pebble
 
 import (
 	"fmt"

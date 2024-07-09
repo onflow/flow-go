@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
@@ -46,7 +46,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/events"
 	"github.com/onflow/flow-go/storage"
-	bstorage "github.com/onflow/flow-go/storage/badger"
+	bstorage "github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -54,8 +54,8 @@ import (
 // as well as all of its backend dependencies.
 type StateFixture struct {
 	DBDir          string
-	PublicDB       *badger.DB
-	SecretsDB      *badger.DB
+	PublicDB       *pebble.DB
+	SecretsDB      *pebble.DB
 	Storage        *storage.All
 	ProtocolEvents *events.Distributor
 	State          protocol.ParticipantState
@@ -71,8 +71,8 @@ type GenericNode struct {
 	Log                zerolog.Logger
 	Metrics            *metrics.NoopCollector
 	Tracer             module.Tracer
-	PublicDB           *badger.DB
-	SecretsDB          *badger.DB
+	PublicDB           *pebble.DB
+	SecretsDB          *pebble.DB
 	Headers            storage.Headers
 	Guarantees         storage.Guarantees
 	Seals              storage.Seals
@@ -111,7 +111,7 @@ func RequireGenericNodesDoneBefore(t testing.TB, duration time.Duration, nodes .
 	unittest.RequireReturnsBefore(t, wg.Wait, duration, "failed to shutdown all components on time")
 }
 
-// CloseDB closes the badger database of the node
+// CloseDB closes the pebble database of the node
 func (g *GenericNode) CloseDB() error {
 	return g.PublicDB.Close()
 }
@@ -195,13 +195,13 @@ type ExecutionNode struct {
 	FollowerEngine      *followereng.ComplianceEngine
 	SyncEngine          *synchronization.Engine
 	Compactor           *complete.Compactor
-	BadgerDB            *badger.DB
+	PebbleDB            *pebble.DB
 	VM                  fvm.VM
 	ExecutionState      state.ExecutionState
 	Ledger              ledger.Ledger
 	LevelDbDir          string
 	Collections         storage.Collections
-	Finalizer           *consensus.Finalizer
+	Finalizer           *consensus.FinalizerPebble
 	MyExecutionReceipts storage.MyExecutionReceipts
 	StorehouseEnabled   bool
 }

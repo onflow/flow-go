@@ -1,29 +1,32 @@
-package badger
+package pebble
 
 import (
-	"github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/transaction"
+	"github.com/onflow/flow-go/storage/pebble/operation"
 )
 
 type EpochSetups struct {
-	db    *badger.DB
+	db    *pebble.DB
 	cache *Cache[flow.Identifier, *flow.EpochSetup]
 }
 
-// NewEpochSetups instantiates a new EpochSetups storage.
-func NewEpochSetups(collector module.CacheMetrics, db *badger.DB) *EpochSetups {
+var _ storage.EpochSetups = (*EpochSetups)(nil)
 
-	store := func(id flow.Identifier, setup *flow.EpochSetup) func(*transaction.Tx) error {
-		return transaction.WithTx(operation.SkipDuplicates(operation.InsertEpochSetup(id, setup)))
+// NewEpochSetups instantiates a new EpochSetups storage.
+func NewEpochSetups(collector module.CacheMetrics, db *pebble.DB) *EpochSetups {
+
+	store := func(id flow.Identifier, setup *flow.EpochSetup) func(storage.PebbleReaderBatchWriter) error {
+		return storage.OnlyWriter(operation.InsertEpochSetup(id, setup))
 	}
 
-	retrieve := func(id flow.Identifier) func(*badger.Txn) (*flow.EpochSetup, error) {
-		return func(tx *badger.Txn) (*flow.EpochSetup, error) {
+	retrieve := func(id flow.Identifier) func(pebble.Reader) (*flow.EpochSetup, error) {
+		return func(tx pebble.Reader) (*flow.EpochSetup, error) {
 			var setup flow.EpochSetup
 			err := operation.RetrieveEpochSetup(id, &setup)(tx)
 			return &setup, err
@@ -32,7 +35,7 @@ func NewEpochSetups(collector module.CacheMetrics, db *badger.DB) *EpochSetups {
 
 	es := &EpochSetups{
 		db: db,
-		cache: newCache[flow.Identifier, *flow.EpochSetup](collector, metrics.ResourceEpochSetup,
+		cache: newCache(collector, metrics.ResourceEpochSetup,
 			withLimit[flow.Identifier, *flow.EpochSetup](4*flow.DefaultTransactionExpiry),
 			withStore(store),
 			withRetrieve(retrieve)),
@@ -41,12 +44,16 @@ func NewEpochSetups(collector module.CacheMetrics, db *badger.DB) *EpochSetups {
 	return es
 }
 
-func (es *EpochSetups) StoreTx(setup *flow.EpochSetup) func(tx *transaction.Tx) error {
-	return es.cache.PutTx(setup.ID(), setup)
+func (es *EpochSetups) StoreTx(setup *flow.EpochSetup) func(*transaction.Tx) error {
+	return nil
 }
 
-func (es *EpochSetups) retrieveTx(setupID flow.Identifier) func(tx *badger.Txn) (*flow.EpochSetup, error) {
-	return func(tx *badger.Txn) (*flow.EpochSetup, error) {
+func (es *EpochSetups) StorePebble(setup *flow.EpochSetup) func(storage.PebbleReaderBatchWriter) error {
+	return es.cache.PutPebble(setup.ID(), setup)
+}
+
+func (es *EpochSetups) retrieveTx(setupID flow.Identifier) func(tx pebble.Reader) (*flow.EpochSetup, error) {
+	return func(tx pebble.Reader) (*flow.EpochSetup, error) {
 		val, err := es.cache.Get(setupID)(tx)
 		if err != nil {
 			return nil, err
@@ -59,7 +66,5 @@ func (es *EpochSetups) retrieveTx(setupID flow.Identifier) func(tx *badger.Txn) 
 // Error returns:
 // * storage.ErrNotFound if no EpochSetup with the ID exists
 func (es *EpochSetups) ByID(setupID flow.Identifier) (*flow.EpochSetup, error) {
-	tx := es.db.NewTransaction(false)
-	defer tx.Discard()
-	return es.retrieveTx(setupID)(tx)
+	return es.retrieveTx(setupID)(es.db)
 }

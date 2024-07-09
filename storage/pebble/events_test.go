@@ -1,22 +1,22 @@
-package badger_test
+package pebble_test
 
 import (
 	"math/rand"
 	"testing"
 
-	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
-	badgerstorage "github.com/onflow/flow-go/storage/badger"
+	badgerstorage "github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestEventStoreRetrieve(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithWrappedPebbleDB(t, func(w *unittest.PebbleWrapper) {
 		metrics := metrics.NewNoopCollector()
+		db := w.DB()
 		store := badgerstorage.NewEvents(metrics, db)
 
 		blockID := unittest.IdentifierFixture()
@@ -91,8 +91,9 @@ func TestEventStoreRetrieve(t *testing.T) {
 }
 
 func TestEventRetrieveWithoutStore(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithWrappedPebbleDB(t, func(w *unittest.PebbleWrapper) {
 		metrics := metrics.NewNoopCollector()
+		db := w.DB()
 		store := badgerstorage.NewEvents(metrics, db)
 
 		blockID := unittest.IdentifierFixture()

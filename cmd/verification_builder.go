@@ -34,9 +34,9 @@ import (
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/state/protocol"
-	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
-	"github.com/onflow/flow-go/storage/badger"
+	pebbleState "github.com/onflow/flow-go/state/protocol/pebble"
+	"github.com/onflow/flow-go/storage/pebble"
 )
 
 type VerificationConfig struct {
@@ -89,9 +89,9 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 
 		chunkStatuses        *stdmap.ChunkStatuses    // used in fetcher engine
 		chunkRequests        *stdmap.ChunkRequests    // used in requester engine
-		processedChunkIndex  *badger.ConsumerProgress // used in chunk consumer
-		processedBlockHeight *badger.ConsumerProgress // used in block consumer
-		chunkQueue           *badger.ChunksQueue      // used in chunk consumer
+		processedChunkIndex  *pebble.ConsumerProgress // used in chunk consumer
+		processedBlockHeight *pebble.ConsumerProgress // used in block consumer
+		chunkQueue           *pebble.ChunksQueue      // used in chunk consumer
 
 		syncCore            *chainsync.Core   // used in follower engine
 		assignerEngine      *assigner.Engine  // the assigner engine
@@ -112,13 +112,13 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 		PreInit(DynamicStartPreInit).
 		Module("mutable follower state", func(node *NodeConfig) error {
 			var err error
-			// For now, we only support state implementations from package badger.
+			// For now, we only support state implementations from package pebble.
 			// If we ever support different implementations, the following can be replaced by a type-aware factory
-			state, ok := node.State.(*badgerState.State)
+			state, ok := node.State.(*pebbleState.State)
 			if !ok {
-				return fmt.Errorf("only implementations of type badger.State are currently supported but read-only state has type %T", node.State)
+				return fmt.Errorf("only implementations of type pebble.State are currently supported but read-only state has type %T", node.State)
 			}
-			followerState, err = badgerState.NewFollowerState(
+			followerState, err = pebbleState.NewFollowerState(
 				node.Logger,
 				node.Tracer,
 				node.ProtocolEvents,
@@ -154,15 +154,15 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 			return nil
 		}).
 		Module("processed chunk index consumer progress", func(node *NodeConfig) error {
-			processedChunkIndex = badger.NewConsumerProgress(node.DB, module.ConsumeProgressVerificationChunkIndex)
+			processedChunkIndex = pebble.NewConsumerProgress(node.DB, module.ConsumeProgressVerificationChunkIndex)
 			return nil
 		}).
 		Module("processed block height consumer progress", func(node *NodeConfig) error {
-			processedBlockHeight = badger.NewConsumerProgress(node.DB, module.ConsumeProgressVerificationBlockHeight)
+			processedBlockHeight = pebble.NewConsumerProgress(node.DB, module.ConsumeProgressVerificationBlockHeight)
 			return nil
 		}).
 		Module("chunks queue", func(node *NodeConfig) error {
-			chunkQueue = badger.NewChunkQueue(node.DB)
+			chunkQueue = pebble.NewChunkQueue(node.DB)
 			ok, err := chunkQueue.Init(chunkconsumer.DefaultJobIndex)
 			if err != nil {
 				return fmt.Errorf("could not initialize default index in chunks queue: %w", err)
@@ -196,7 +196,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 			)
 			vmCtx := fvm.NewContext(fvmOptions...)
 			chunkVerifier := chunks.NewChunkVerifier(vm, vmCtx, node.Logger)
-			approvalStorage := badger.NewResultApprovals(node.Metrics.Cache, node.DB)
+			approvalStorage := pebble.NewResultApprovals(node.Metrics.Cache, node.DB)
 			verifierEng, err = verifier.New(
 				node.Logger,
 				collector,
@@ -327,7 +327,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 		Component("follower core", func(node *NodeConfig) (module.ReadyDoneAware, error) {
 			// create a finalizer that handles updating the protocol
 			// state when the follower detects newly finalized blocks
-			final := finalizer.NewFinalizer(node.DB, node.Storage.Headers, followerState, node.Tracer)
+			final := finalizer.NewFinalizerPebble(node.DB, node.Storage.Headers, followerState, node.Tracer)
 
 			finalized, pending, err := recoveryprotocol.FindLatest(node.State, node.Storage.Headers)
 			if err != nil {

@@ -1,7 +1,7 @@
 package operation
 
 import (
-	"github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble"
 
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -12,17 +12,18 @@ import (
 // No errors are expected during normal operation.
 func IndexVersionBeaconByHeight(
 	beacon *flow.SealedVersionBeacon,
-) func(*badger.Txn) error {
-	return upsert(makePrefix(codeVersionBeacon, beacon.SealHeight), beacon)
+) func(pebble.Writer) error {
+	return insert(makePrefix(codeVersionBeacon, beacon.SealHeight), beacon)
 }
 
 // LookupLastVersionBeaconByHeight finds the highest flow.VersionBeacon but no higher
 // than maxHeight. Returns storage.ErrNotFound if no version beacon exists at or below
 // the given height.
+// TODO: fix it
 func LookupLastVersionBeaconByHeight(
 	maxHeight uint64,
 	versionBeacon *flow.SealedVersionBeacon,
-) func(*badger.Txn) error {
+) func(pebble.Reader) error {
 	return findHighestAtOrBelow(
 		makePrefix(codeVersionBeacon),
 		maxHeight,

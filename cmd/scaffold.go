@@ -12,7 +12,7 @@ import (
 	"time"
 
 	gcemd "cloud.google.com/go/compute/metadata"
-	"github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble"
 	"github.com/hashicorp/go-multierror"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/libp2p/go-libp2p/core/host"
@@ -75,13 +75,11 @@ import (
 	"github.com/onflow/flow-go/network/topology"
 	"github.com/onflow/flow-go/network/underlay"
 	"github.com/onflow/flow-go/state/protocol"
-	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/events"
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
+	pebbleState "github.com/onflow/flow-go/state/protocol/pebble"
 	"github.com/onflow/flow-go/storage"
-	bstorage "github.com/onflow/flow-go/storage/badger"
-	"github.com/onflow/flow-go/storage/badger/operation"
-	sutil "github.com/onflow/flow-go/storage/util"
+	bstorage "github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
@@ -288,7 +286,7 @@ func (fnb *FlowNodeBuilder) EnqueuePingService() {
 		// only consensus roles will need to report hotstuff view
 		if fnb.BaseConfig.NodeRole == flow.RoleConsensus.String() {
 			// initialize the persister
-			persist := persister.New(node.DB, node.RootChainID)
+			persist := persister.NewPersisterPebble(node.DB, node.RootChainID)
 
 			pingInfoProvider.HotstuffViewFun = func() (uint64, error) {
 				livenessData, err := persist.GetLivenessData()
@@ -1063,33 +1061,13 @@ func (fnb *FlowNodeBuilder) initDB() error {
 		return nil
 	}
 
-	// Pre-create DB path (Badger creates only one-level dirs)
+	// Pre-create DB path (pebble creates only one-level dirs)
 	err := os.MkdirAll(fnb.BaseConfig.datadir, 0700)
 	if err != nil {
 		return fmt.Errorf("could not create datadir (path: %s): %w", fnb.BaseConfig.datadir, err)
 	}
 
-	log := sutil.NewLogger(fnb.Logger)
-
-	// we initialize the database with options that allow us to keep the maximum
-	// item size in the trie itself (up to 1MB) and where we keep all level zero
-	// tables in-memory as well; this slows down compaction and increases memory
-	// usage, but it improves overall performance and disk i/o
-	opts := badger.
-		DefaultOptions(fnb.BaseConfig.datadir).
-		WithKeepL0InMemory(true).
-		WithLogger(log).
-
-		// the ValueLogFileSize option specifies how big the value of a
-		// key-value pair is allowed to be saved into badger.
-		// exceeding this limit, will fail with an error like this:
-		// could not store data: Value with size <xxxx> exceeded 1073741824 limit
-		// Maximum value size is 10G, needed by execution node
-		// TODO: finding a better max value for each node type
-		WithValueLogFileSize(128 << 23).
-		WithValueLogMaxEntries(100000) // Default is 1000000
-
-	publicDB, err := bstorage.InitPublic(opts)
+	publicDB, err := bstorage.InitPublic(fnb.BaseConfig.datadir, nil)
 	if err != nil {
 		return fmt.Errorf("could not open public db: %w", err)
 	}
@@ -1100,10 +1078,6 @@ func (fnb *FlowNodeBuilder) initDB() error {
 			return fmt.Errorf("error closing protocol database: %w", err)
 		}
 		return nil
-	})
-
-	fnb.Component("badger log cleaner", func(node *NodeConfig) (module.ReadyDoneAware, error) {
-		return bstorage.NewCleaner(node.Logger, node.DB, node.Metrics.CleanCollector, flow.DefaultValueLogGCWaitDuration), nil
 	})
 
 	return nil
@@ -1126,30 +1100,13 @@ func (fnb *FlowNodeBuilder) initSecretsDB() error {
 		return fmt.Errorf("could not create secrets db dir (path: %s): %w", fnb.BaseConfig.secretsdir, err)
 	}
 
-	log := sutil.NewLogger(fnb.Logger)
-
-	opts := badger.DefaultOptions(fnb.BaseConfig.secretsdir).WithLogger(log)
-
 	// NOTE: SN nodes need to explicitly set --insecure-secrets-db to true in order to
 	// disable secrets database encryption
 	if fnb.NodeRole == flow.RoleConsensus.String() && fnb.InsecureSecretsDB {
 		fnb.Logger.Warn().Msg("starting with secrets database encryption disabled")
-	} else {
-		encryptionKey, err := loadSecretsEncryptionKey(fnb.BootstrapDir, fnb.NodeID)
-		if errors.Is(err, os.ErrNotExist) {
-			if fnb.NodeRole == flow.RoleConsensus.String() {
-				// missing key is a fatal error for SN nodes
-				return fmt.Errorf("secrets db encryption key not found: %w", err)
-			}
-			fnb.Logger.Warn().Msg("starting with secrets database encryption disabled")
-		} else if err != nil {
-			return fmt.Errorf("failed to read secrets db encryption key: %w", err)
-		} else {
-			opts = opts.WithEncryptionKey(encryptionKey)
-		}
 	}
 
-	secretsDB, err := bstorage.InitSecret(opts)
+	secretsDB, err := bstorage.InitSecret(fnb.BaseConfig.secretsdir, nil)
 	if err != nil {
 		return fmt.Errorf("could not open secrets db: %w", err)
 	}
@@ -1166,16 +1123,6 @@ func (fnb *FlowNodeBuilder) initSecretsDB() error {
 }
 
 func (fnb *FlowNodeBuilder) initStorage() error {
-
-	// in order to void long iterations with big keys when initializing with an
-	// already populated database, we bootstrap the initial maximum key size
-	// upon starting
-	err := operation.RetryOnConflict(fnb.DB.Update, func(tx *badger.Txn) error {
-		return operation.InitMax(tx)
-	})
-	if err != nil {
-		return fmt.Errorf("could not initialize max tracker: %w", err)
-	}
 
 	headers := bstorage.NewHeaders(fnb.Metrics.Cache, fnb.DB)
 	guarantees := bstorage.NewGuarantees(fnb.Metrics.Cache, fnb.DB, fnb.BaseConfig.guaranteesCacheSize)
@@ -1282,14 +1229,14 @@ func (fnb *FlowNodeBuilder) InitIDProviders() {
 func (fnb *FlowNodeBuilder) initState() error {
 	fnb.ProtocolEvents = events.NewDistributor()
 
-	isBootStrapped, err := badgerState.IsBootstrapped(fnb.DB)
+	isBootStrapped, err := pebbleState.IsBootstrapped(fnb.DB)
 	if err != nil {
 		return fmt.Errorf("failed to determine whether database contains bootstrapped state: %w", err)
 	}
 
 	if isBootStrapped {
 		fnb.Logger.Info().Msg("opening already bootstrapped protocol state")
-		state, err := badgerState.OpenState(
+		state, err := pebbleState.OpenState(
 			fnb.Metrics.Compliance,
 			fnb.DB,
 			fnb.Storage.Headers,
@@ -1339,12 +1286,12 @@ func (fnb *FlowNodeBuilder) initState() error {
 		}
 
 		// generate bootstrap config options as per NodeConfig
-		var options []badgerState.BootstrapConfigOptions
+		var options []pebbleState.BootstrapConfigOptions
 		if fnb.SkipNwAddressBasedValidations {
-			options = append(options, badgerState.SkipNetworkAddressValidation)
+			options = append(options, pebbleState.SkipNetworkAddressValidation)
 		}
 
-		fnb.State, err = badgerState.Bootstrap(
+		fnb.State, err = pebbleState.Bootstrap(
 			fnb.Metrics.Compliance,
 			fnb.DB,
 			fnb.Storage.Headers,
@@ -1416,7 +1363,7 @@ func (fnb *FlowNodeBuilder) setRootSnapshot(rootSnapshot protocol.Snapshot) erro
 	var err error
 
 	// validate the root snapshot QCs
-	err = badgerState.IsValidRootSnapshotQCs(rootSnapshot)
+	err = pebbleState.IsValidRootSnapshotQCs(rootSnapshot)
 	if err != nil {
 		return fmt.Errorf("failed to validate root snapshot QCs: %w", err)
 	}
@@ -1954,7 +1901,7 @@ func WithLogLevel(level string) Option {
 }
 
 // WithDB takes precedence over WithDataDir and datadir will be set to empty if DB is set using this option
-func WithDB(db *badger.DB) Option {
+func WithDB(db *pebble.DB) Option {
 	return func(config *BaseConfig) {
 		config.db = db
 		config.datadir = ""

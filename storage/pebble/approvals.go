@@ -1,34 +1,33 @@
-package badger
+package pebble
 
 import (
 	"errors"
 	"fmt"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/badger/operation"
-	"github.com/onflow/flow-go/storage/badger/transaction"
+	"github.com/onflow/flow-go/storage/pebble/operation"
 )
 
 // ResultApprovals implements persistent storage for result approvals.
 type ResultApprovals struct {
-	db    *badger.DB
+	db    *pebble.DB
 	cache *Cache[flow.Identifier, *flow.ResultApproval]
 }
 
-func NewResultApprovals(collector module.CacheMetrics, db *badger.DB) *ResultApprovals {
+func NewResultApprovals(collector module.CacheMetrics, db *pebble.DB) *ResultApprovals {
 
-	store := func(key flow.Identifier, val *flow.ResultApproval) func(*transaction.Tx) error {
-		return transaction.WithTx(operation.SkipDuplicates(operation.InsertResultApproval(val)))
+	store := func(key flow.Identifier, val *flow.ResultApproval) func(storage.PebbleReaderBatchWriter) error {
+		return storage.OnlyWriter(operation.InsertResultApproval(val))
 	}
 
-	retrieve := func(approvalID flow.Identifier) func(tx *badger.Txn) (*flow.ResultApproval, error) {
+	retrieve := func(approvalID flow.Identifier) func(tx pebble.Reader) (*flow.ResultApproval, error) {
 		var approval flow.ResultApproval
-		return func(tx *badger.Txn) (*flow.ResultApproval, error) {
+		return func(tx pebble.Reader) (*flow.ResultApproval, error) {
 			err := operation.RetrieveResultApproval(approvalID, &approval)(tx)
 			return &approval, err
 		}
@@ -45,12 +44,12 @@ func NewResultApprovals(collector module.CacheMetrics, db *badger.DB) *ResultApp
 	return res
 }
 
-func (r *ResultApprovals) store(approval *flow.ResultApproval) func(*transaction.Tx) error {
-	return r.cache.PutTx(approval.ID(), approval)
+func (r *ResultApprovals) store(approval *flow.ResultApproval) func(storage.PebbleReaderBatchWriter) error {
+	return r.cache.PutPebble(approval.ID(), approval)
 }
 
-func (r *ResultApprovals) byID(approvalID flow.Identifier) func(*badger.Txn) (*flow.ResultApproval, error) {
-	return func(tx *badger.Txn) (*flow.ResultApproval, error) {
+func (r *ResultApprovals) byID(approvalID flow.Identifier) func(pebble.Reader) (*flow.ResultApproval, error) {
+	return func(tx pebble.Reader) (*flow.ResultApproval, error) {
 		val, err := r.cache.Get(approvalID)(tx)
 		if err != nil {
 			return nil, err
@@ -59,8 +58,8 @@ func (r *ResultApprovals) byID(approvalID flow.Identifier) func(*badger.Txn) (*f
 	}
 }
 
-func (r *ResultApprovals) byChunk(resultID flow.Identifier, chunkIndex uint64) func(*badger.Txn) (*flow.ResultApproval, error) {
-	return func(tx *badger.Txn) (*flow.ResultApproval, error) {
+func (r *ResultApprovals) byChunk(resultID flow.Identifier, chunkIndex uint64) func(pebble.Reader) (*flow.ResultApproval, error) {
+	return func(tx pebble.Reader) (*flow.ResultApproval, error) {
 		var approvalID flow.Identifier
 		err := operation.LookupResultApproval(resultID, chunkIndex, &approvalID)(tx)
 		if err != nil {
@@ -70,9 +69,11 @@ func (r *ResultApprovals) byChunk(resultID flow.Identifier, chunkIndex uint64) f
 	}
 }
 
-func (r *ResultApprovals) index(resultID flow.Identifier, chunkIndex uint64, approvalID flow.Identifier) func(*badger.Txn) error {
-	return func(tx *badger.Txn) error {
-		err := operation.IndexResultApproval(resultID, chunkIndex, approvalID)(tx)
+func (r *ResultApprovals) index(resultID flow.Identifier, chunkIndex uint64, approvalID flow.Identifier) func(storage.PebbleReaderBatchWriter) error {
+	return func(tx storage.PebbleReaderBatchWriter) error {
+		r, w := tx.ReaderWriter()
+
+		err := operation.IndexResultApproval(resultID, chunkIndex, approvalID)(w)
 		if err == nil {
 			return nil
 		}
@@ -89,7 +90,7 @@ func (r *ResultApprovals) index(resultID flow.Identifier, chunkIndex uint64, app
 		// for a Verification node to compute different approvals for the same
 		// chunk.
 		var storedApprovalID flow.Identifier
-		err = operation.LookupResultApproval(resultID, chunkIndex, &storedApprovalID)(tx)
+		err = operation.LookupResultApproval(resultID, chunkIndex, &storedApprovalID)(r)
 		if err != nil {
 			return fmt.Errorf("there is an approval stored already, but cannot retrieve it: %w", err)
 		}
@@ -105,14 +106,14 @@ func (r *ResultApprovals) index(resultID flow.Identifier, chunkIndex uint64, app
 
 // Store stores a ResultApproval
 func (r *ResultApprovals) Store(approval *flow.ResultApproval) error {
-	return operation.RetryOnConflictTx(r.db, transaction.Update, r.store(approval))
+	return operation.WithReaderBatchWriter(r.db, r.store(approval))
 }
 
 // Index indexes a ResultApproval by chunk (ResultID + chunk index).
 // operation is idempotent (repeated calls with the same value are equivalent to
 // just calling the method once; still the method succeeds on each call).
 func (r *ResultApprovals) Index(resultID flow.Identifier, chunkIndex uint64, approvalID flow.Identifier) error {
-	err := operation.RetryOnConflict(r.db.Update, r.index(resultID, chunkIndex, approvalID))
+	err := operation.WithReaderBatchWriter(r.db, r.index(resultID, chunkIndex, approvalID))
 	if err != nil {
 		return fmt.Errorf("could not index result approval: %w", err)
 	}
@@ -121,16 +122,12 @@ func (r *ResultApprovals) Index(resultID flow.Identifier, chunkIndex uint64, app
 
 // ByID retrieves a ResultApproval by its ID
 func (r *ResultApprovals) ByID(approvalID flow.Identifier) (*flow.ResultApproval, error) {
-	tx := r.db.NewTransaction(false)
-	defer tx.Discard()
-	return r.byID(approvalID)(tx)
+	return r.byID(approvalID)(r.db)
 }
 
 // ByChunk retrieves a ResultApproval by result ID and chunk index. The
 // ResultApprovals store is only used within a verification node, where it is
 // assumed that there is never more than one approval per chunk.
 func (r *ResultApprovals) ByChunk(resultID flow.Identifier, chunkIndex uint64) (*flow.ResultApproval, error) {
-	tx := r.db.NewTransaction(false)
-	defer tx.Discard()
-	return r.byChunk(resultID, chunkIndex)(tx)
+	return r.byChunk(resultID, chunkIndex)(r.db)
 }

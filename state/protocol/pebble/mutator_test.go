@@ -1,6 +1,4 @@
-// (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
-
-package badger_test
+package pebble_test
 
 import (
 	"context"
@@ -10,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -26,16 +24,16 @@ import (
 	"github.com/onflow/flow-go/module/trace"
 	st "github.com/onflow/flow-go/state"
 	realprotocol "github.com/onflow/flow-go/state/protocol"
-	protocol "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/events"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	mockprotocol "github.com/onflow/flow-go/state/protocol/mock"
+	protocol "github.com/onflow/flow-go/state/protocol/pebble"
 	"github.com/onflow/flow-go/state/protocol/util"
 	"github.com/onflow/flow-go/storage"
 	stoerr "github.com/onflow/flow-go/storage"
-	bstorage "github.com/onflow/flow-go/storage/badger"
-	"github.com/onflow/flow-go/storage/badger/operation"
-	storeutil "github.com/onflow/flow-go/storage/util"
+	bstorage "github.com/onflow/flow-go/storage/pebble"
+	"github.com/onflow/flow-go/storage/pebble/operation"
+	"github.com/onflow/flow-go/storage/testingutils"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -43,30 +41,30 @@ var participants = unittest.IdentityListFixture(5, unittest.WithAllRoles())
 
 func TestBootstrapValid(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
-	util.RunWithBootstrapState(t, rootSnapshot, func(db *badger.DB, state *protocol.State) {
+	util.RunWithPebbleBootstrapState(t, rootSnapshot, func(db *pebble.DB, state *protocol.State) {
 		var finalized uint64
-		err := db.View(operation.RetrieveFinalizedHeight(&finalized))
+		err := operation.RetrieveFinalizedHeight(&finalized)(db)
 		require.NoError(t, err)
 
 		var sealed uint64
-		err = db.View(operation.RetrieveSealedHeight(&sealed))
+		err = operation.RetrieveSealedHeight(&sealed)(db)
 		require.NoError(t, err)
 
 		var genesisID flow.Identifier
-		err = db.View(operation.LookupBlockHeight(0, &genesisID))
+		err = operation.LookupBlockHeight(0, &genesisID)(db)
 		require.NoError(t, err)
 
 		var header flow.Header
-		err = db.View(operation.RetrieveHeader(genesisID, &header))
+		err = operation.RetrieveHeader(genesisID, &header)(db)
 		require.NoError(t, err)
 
 		var sealID flow.Identifier
-		err = db.View(operation.LookupLatestSealAtBlock(genesisID, &sealID))
+		err = operation.LookupLatestSealAtBlock(genesisID, &sealID)(db)
 		require.NoError(t, err)
 
 		_, seal, err := rootSnapshot.SealedResult()
 		require.NoError(t, err)
-		err = db.View(operation.RetrieveSeal(sealID, seal))
+		err = operation.RetrieveSeal(sealID, seal)(db)
 		require.NoError(t, err)
 
 		block, err := rootSnapshot.Head()
@@ -83,11 +81,11 @@ func TestBootstrapValid(t *testing.T) {
 // * BlockFinalized is emitted when the block is finalized
 // * BlockProcessable is emitted when a block's child is inserted
 func TestExtendValid(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
 		metrics := metrics.NewNoopCollector()
 		tracer := trace.NewNoopTracer()
 		log := zerolog.Nop()
-		all := storeutil.StorageLayer(t, db)
+		all := testingutils.PebbleStorageLayer(t, db)
 
 		distributor := events.NewDistributor()
 		consumer := mockprotocol.NewConsumer(t)
@@ -152,7 +150,7 @@ func TestExtendValid(t *testing.T) {
 
 func TestSealedIndex(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
-	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState) {
+	util.RunWithPebbleFullProtocolState(t, rootSnapshot, func(db *pebble.DB, state *protocol.ParticipantState) {
 		rootHeader, err := rootSnapshot.Head()
 		require.NoError(t, err)
 
@@ -271,7 +269,7 @@ func TestSealedIndex(t *testing.T) {
 
 func TestVersionBeaconIndex(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
-	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState) {
+	util.RunWithPebbleFullProtocolState(t, rootSnapshot, func(db *pebble.DB, state *protocol.ParticipantState) {
 		rootHeader, err := rootSnapshot.Head()
 		require.NoError(t, err)
 
@@ -438,7 +436,7 @@ func TestVersionBeaconIndex(t *testing.T) {
 
 func TestExtendSealedBoundary(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
-	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState) {
+	util.RunWithPebbleFullProtocolState(t, rootSnapshot, func(db *pebble.DB, state *protocol.ParticipantState) {
 		head, err := rootSnapshot.Head()
 		require.NoError(t, err)
 		_, seal, err := rootSnapshot.SealedResult()
@@ -501,7 +499,7 @@ func TestExtendSealedBoundary(t *testing.T) {
 
 func TestExtendMissingParent(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
-	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState) {
+	util.RunWithPebbleFullProtocolState(t, rootSnapshot, func(db *pebble.DB, state *protocol.ParticipantState) {
 		extend := unittest.BlockFixture()
 		extend.Payload.Guarantees = nil
 		extend.Payload.Seals = nil
@@ -516,7 +514,7 @@ func TestExtendMissingParent(t *testing.T) {
 
 		// verify seal not indexed
 		var sealID flow.Identifier
-		err = db.View(operation.LookupLatestSealAtBlock(extend.ID(), &sealID))
+		err = operation.LookupLatestSealAtBlock(extend.ID(), &sealID)(db)
 		require.Error(t, err)
 		require.ErrorIs(t, err, stoerr.ErrNotFound)
 	})
@@ -524,7 +522,7 @@ func TestExtendMissingParent(t *testing.T) {
 
 func TestExtendHeightTooSmall(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
-	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState) {
+	util.RunWithPebbleFullProtocolState(t, rootSnapshot, func(db *pebble.DB, state *protocol.ParticipantState) {
 		head, err := rootSnapshot.Head()
 		require.NoError(t, err)
 
@@ -548,7 +546,7 @@ func TestExtendHeightTooSmall(t *testing.T) {
 
 		// verify seal not indexed
 		var sealID flow.Identifier
-		err = db.View(operation.LookupLatestSealAtBlock(extend.ID(), &sealID))
+		err = operation.LookupLatestSealAtBlock(extend.ID(), &sealID)(db)
 		require.Error(t, err)
 		require.ErrorIs(t, err, stoerr.ErrNotFound)
 	})
@@ -556,7 +554,7 @@ func TestExtendHeightTooSmall(t *testing.T) {
 
 func TestExtendHeightTooLarge(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
-	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState) {
+	util.RunWithPebbleFullProtocolState(t, rootSnapshot, func(db *pebble.DB, state *protocol.ParticipantState) {
 
 		head, err := rootSnapshot.Head()
 		require.NoError(t, err)
@@ -575,7 +573,7 @@ func TestExtendHeightTooLarge(t *testing.T) {
 // with view of block referred by ParentID.
 func TestExtendInconsistentParentView(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
-	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState) {
+	util.RunWithPebbleFullProtocolState(t, rootSnapshot, func(db *pebble.DB, state *protocol.ParticipantState) {
 
 		head, err := rootSnapshot.Head()
 		require.NoError(t, err)
@@ -593,7 +591,7 @@ func TestExtendInconsistentParentView(t *testing.T) {
 
 func TestExtendBlockNotConnected(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
-	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState) {
+	util.RunWithPebbleFullProtocolState(t, rootSnapshot, func(db *pebble.DB, state *protocol.ParticipantState) {
 
 		head, err := rootSnapshot.Head()
 		require.NoError(t, err)
@@ -617,7 +615,7 @@ func TestExtendBlockNotConnected(t *testing.T) {
 
 		// verify seal not indexed
 		var sealID flow.Identifier
-		err = db.View(operation.LookupLatestSealAtBlock(extend.ID(), &sealID))
+		err = operation.LookupLatestSealAtBlock(extend.ID(), &sealID)(db)
 		require.Error(t, err)
 		require.ErrorIs(t, err, stoerr.ErrNotFound)
 	})
@@ -625,7 +623,7 @@ func TestExtendBlockNotConnected(t *testing.T) {
 
 func TestExtendInvalidChainID(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
-	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState) {
+	util.RunWithPebbleFullProtocolState(t, rootSnapshot, func(db *pebble.DB, state *protocol.ParticipantState) {
 		head, err := rootSnapshot.Head()
 		require.NoError(t, err)
 
@@ -650,7 +648,7 @@ func TestExtendReceiptsNotSorted(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
 	head, err := rootSnapshot.Head()
 	require.NoError(t, err)
-	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState) {
+	util.RunWithPebbleFullProtocolState(t, rootSnapshot, func(db *pebble.DB, state *protocol.ParticipantState) {
 		// create block2 and block3
 		block2 := unittest.BlockWithParentFixture(head)
 		block2.Payload.Guarantees = nil
@@ -684,7 +682,7 @@ func TestExtendReceiptsInvalid(t *testing.T) {
 	validator := mockmodule.NewReceiptValidator(t)
 
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
-	util.RunWithFullProtocolStateAndValidator(t, rootSnapshot, validator, func(db *badger.DB, state *protocol.ParticipantState) {
+	util.RunWithPebbleFullProtocolStateAndValidator(t, rootSnapshot, validator, func(db *pebble.DB, state *protocol.ParticipantState) {
 		head, err := rootSnapshot.Head()
 		require.NoError(t, err)
 
@@ -716,7 +714,7 @@ func TestExtendReceiptsInvalid(t *testing.T) {
 
 func TestExtendReceiptsValid(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
-	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState) {
+	util.RunWithPebbleFullProtocolState(t, rootSnapshot, func(db *pebble.DB, state *protocol.ParticipantState) {
 		head, err := rootSnapshot.Head()
 		require.NoError(t, err)
 		block2 := unittest.BlockWithParentFixture(head)
@@ -782,7 +780,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 	consumer.On("BlockProcessable", mock.Anything, mock.Anything)
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
 
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
 
 		// set up state and mock ComplianceMetrics object
 		metrics := mockmodule.NewComplianceMetrics(t)
@@ -813,7 +811,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 
 		tracer := trace.NewNoopTracer()
 		log := zerolog.Nop()
-		all := storeutil.StorageLayer(t, db)
+		all := testingutils.PebbleStorageLayer(t, db)
 		protoState, err := protocol.Bootstrap(
 			metrics,
 			db,
@@ -1086,7 +1084,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 //	         \--B2<--B4(R2)<--B6(S2)<--B8
 func TestExtendConflictingEpochEvents(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
-	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState) {
+	util.RunWithPebbleFullProtocolState(t, rootSnapshot, func(db *pebble.DB, state *protocol.ParticipantState) {
 
 		head, err := rootSnapshot.Head()
 		require.NoError(t, err)
@@ -1198,7 +1196,7 @@ func TestExtendConflictingEpochEvents(t *testing.T) {
 //	        \--B2<--B4(R2)<--B6(S2)<--B8
 func TestExtendDuplicateEpochEvents(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
-	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState) {
+	util.RunWithPebbleFullProtocolState(t, rootSnapshot, func(db *pebble.DB, state *protocol.ParticipantState) {
 
 		head, err := rootSnapshot.Head()
 		require.NoError(t, err)
@@ -1299,7 +1297,7 @@ func TestExtendEpochSetupInvalid(t *testing.T) {
 	// setupState initializes the protocol state for a test case
 	// * creates and finalizes a new block for the first seal to reference
 	// * creates a factory method for test cases to generated valid EpochSetup events
-	setupState := func(t *testing.T, db *badger.DB, state *protocol.ParticipantState) (
+	setupState := func(t *testing.T, db *pebble.DB, state *protocol.ParticipantState) (
 		*flow.Block,
 		func(...func(*flow.EpochSetup)) (*flow.EpochSetup, *flow.ExecutionReceipt, *flow.Seal),
 	) {
@@ -1343,7 +1341,7 @@ func TestExtendEpochSetupInvalid(t *testing.T) {
 
 	// expect a setup event with wrong counter to trigger EECC without error
 	t.Run("wrong counter (EECC)", func(t *testing.T) {
-		util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState) {
+		util.RunWithPebbleFullProtocolState(t, rootSnapshot, func(db *pebble.DB, state *protocol.ParticipantState) {
 			block1, createSetup := setupState(t, db, state)
 
 			_, receipt, seal := createSetup(func(setup *flow.EpochSetup) {
@@ -1364,7 +1362,7 @@ func TestExtendEpochSetupInvalid(t *testing.T) {
 
 	// expect a setup event with wrong final view to trigger EECC without error
 	t.Run("invalid final view (EECC)", func(t *testing.T) {
-		util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState) {
+		util.RunWithPebbleFullProtocolState(t, rootSnapshot, func(db *pebble.DB, state *protocol.ParticipantState) {
 			block1, createSetup := setupState(t, db, state)
 
 			_, receipt, seal := createSetup(func(setup *flow.EpochSetup) {
@@ -1385,7 +1383,7 @@ func TestExtendEpochSetupInvalid(t *testing.T) {
 
 	// expect a setup event with empty seed to trigger EECC without error
 	t.Run("empty seed (EECC)", func(t *testing.T) {
-		util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState) {
+		util.RunWithPebbleFullProtocolState(t, rootSnapshot, func(db *pebble.DB, state *protocol.ParticipantState) {
 			block1, createSetup := setupState(t, db, state)
 
 			_, receipt, seal := createSetup(func(setup *flow.EpochSetup) {
@@ -1472,7 +1470,7 @@ func TestExtendEpochCommitInvalid(t *testing.T) {
 	}
 
 	t.Run("without setup (EECC)", func(t *testing.T) {
-		util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState) {
+		util.RunWithPebbleFullProtocolState(t, rootSnapshot, func(db *pebble.DB, state *protocol.ParticipantState) {
 			block1, _, createCommit := setupState(t, state)
 
 			_, receipt, seal := createCommit(block1)
@@ -1491,7 +1489,7 @@ func TestExtendEpochCommitInvalid(t *testing.T) {
 
 	// expect a commit event with wrong counter to trigger EECC without error
 	t.Run("inconsistent counter (EECC)", func(t *testing.T) {
-		util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState) {
+		util.RunWithPebbleFullProtocolState(t, rootSnapshot, func(db *pebble.DB, state *protocol.ParticipantState) {
 			block1, createSetup, createCommit := setupState(t, state)
 
 			// seal block 1, in which EpochSetup was emitted
@@ -1524,7 +1522,7 @@ func TestExtendEpochCommitInvalid(t *testing.T) {
 
 	// expect a commit event with wrong cluster QCs to trigger EECC without error
 	t.Run("inconsistent cluster QCs (EECC)", func(t *testing.T) {
-		util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState) {
+		util.RunWithPebbleFullProtocolState(t, rootSnapshot, func(db *pebble.DB, state *protocol.ParticipantState) {
 			block1, createSetup, createCommit := setupState(t, state)
 
 			// seal block 1, in which EpochSetup was emitted
@@ -1557,7 +1555,7 @@ func TestExtendEpochCommitInvalid(t *testing.T) {
 
 	// expect a commit event with wrong dkg participants to trigger EECC without error
 	t.Run("inconsistent DKG participants (EECC)", func(t *testing.T) {
-		util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState) {
+		util.RunWithPebbleFullProtocolState(t, rootSnapshot, func(db *pebble.DB, state *protocol.ParticipantState) {
 			block1, createSetup, createCommit := setupState(t, state)
 
 			// seal block 1, in which EpochSetup was emitted
@@ -1600,7 +1598,7 @@ func TestExtendEpochTransitionWithoutCommit(t *testing.T) {
 	unittest.SkipUnless(t, unittest.TEST_TODO, "disabled as the current implementation uses a temporary fallback measure in this case (triggers EECC), rather than returning an error")
 
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
-	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState) {
+	util.RunWithPebbleFullProtocolState(t, rootSnapshot, func(db *pebble.DB, state *protocol.ParticipantState) {
 		head, err := rootSnapshot.Head()
 		require.NoError(t, err)
 		result, _, err := rootSnapshot.SealedResult()
@@ -1680,7 +1678,7 @@ func TestEmergencyEpochFallback(t *testing.T) {
 		protoEventsMock.On("BlockFinalized", mock.Anything)
 		protoEventsMock.On("BlockProcessable", mock.Anything, mock.Anything)
 
-		util.RunWithFullProtocolStateAndMetricsAndConsumer(t, rootSnapshot, metricsMock, protoEventsMock, func(db *badger.DB, state *protocol.ParticipantState) {
+		util.RunWithPebbleFullProtocolStateAndMetricsAndConsumer(t, rootSnapshot, metricsMock, protoEventsMock, func(db *pebble.DB, state *protocol.ParticipantState) {
 			head, err := rootSnapshot.Head()
 			require.NoError(t, err)
 			result, _, err := rootSnapshot.SealedResult()
@@ -1738,7 +1736,7 @@ func TestEmergencyEpochFallback(t *testing.T) {
 		protoEventsMock.On("BlockFinalized", mock.Anything)
 		protoEventsMock.On("BlockProcessable", mock.Anything, mock.Anything)
 
-		util.RunWithFullProtocolStateAndMetricsAndConsumer(t, rootSnapshot, metricsMock, protoEventsMock, func(db *badger.DB, state *protocol.ParticipantState) {
+		util.RunWithPebbleFullProtocolStateAndMetricsAndConsumer(t, rootSnapshot, metricsMock, protoEventsMock, func(db *pebble.DB, state *protocol.ParticipantState) {
 			head, err := rootSnapshot.Head()
 			require.NoError(t, err)
 			result, _, err := rootSnapshot.SealedResult()
@@ -1831,7 +1829,7 @@ func TestEmergencyEpochFallback(t *testing.T) {
 		protoEventsMock.On("BlockFinalized", mock.Anything)
 		protoEventsMock.On("BlockProcessable", mock.Anything, mock.Anything)
 
-		util.RunWithFullProtocolStateAndMetricsAndConsumer(t, rootSnapshot, metricsMock, protoEventsMock, func(db *badger.DB, state *protocol.ParticipantState) {
+		util.RunWithPebbleFullProtocolStateAndMetricsAndConsumer(t, rootSnapshot, metricsMock, protoEventsMock, func(db *pebble.DB, state *protocol.ParticipantState) {
 			head, err := rootSnapshot.Head()
 			require.NoError(t, err)
 			result, _, err := rootSnapshot.SealedResult()
@@ -1906,11 +1904,11 @@ func TestEmergencyEpochFallback(t *testing.T) {
 }
 
 func TestExtendInvalidSealsInBlock(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
 		metrics := metrics.NewNoopCollector()
 		tracer := trace.NewNoopTracer()
 		log := zerolog.Nop()
-		all := storeutil.StorageLayer(t, db)
+		all := testingutils.PebbleStorageLayer(t, db)
 
 		// create a event consumer to test epoch transition events
 		distributor := events.NewDistributor()
@@ -1995,7 +1993,7 @@ func TestExtendInvalidSealsInBlock(t *testing.T) {
 
 func TestHeaderExtendValid(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
-	util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.FollowerState) {
+	util.RunWithPebbleFollowerProtocolState(t, rootSnapshot, func(db *pebble.DB, state *protocol.FollowerState) {
 		head, err := rootSnapshot.Head()
 		require.NoError(t, err)
 		_, seal, err := rootSnapshot.SealedResult()
@@ -2015,7 +2013,7 @@ func TestHeaderExtendValid(t *testing.T) {
 
 func TestHeaderExtendMissingParent(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
-	util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.FollowerState) {
+	util.RunWithPebbleFollowerProtocolState(t, rootSnapshot, func(db *pebble.DB, state *protocol.FollowerState) {
 		extend := unittest.BlockFixture()
 		extend.Payload.Guarantees = nil
 		extend.Payload.Seals = nil
@@ -2030,7 +2028,7 @@ func TestHeaderExtendMissingParent(t *testing.T) {
 
 		// verify seal not indexed
 		var sealID flow.Identifier
-		err = db.View(operation.LookupLatestSealAtBlock(extend.ID(), &sealID))
+		err = operation.LookupLatestSealAtBlock(extend.ID(), &sealID)(db)
 		require.Error(t, err)
 		require.ErrorIs(t, err, stoerr.ErrNotFound)
 	})
@@ -2038,7 +2036,7 @@ func TestHeaderExtendMissingParent(t *testing.T) {
 
 func TestHeaderExtendHeightTooSmall(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
-	util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.FollowerState) {
+	util.RunWithPebbleFollowerProtocolState(t, rootSnapshot, func(db *pebble.DB, state *protocol.FollowerState) {
 		head, err := rootSnapshot.Head()
 		require.NoError(t, err)
 
@@ -2059,14 +2057,14 @@ func TestHeaderExtendHeightTooSmall(t *testing.T) {
 
 		// verify seal not indexed
 		var sealID flow.Identifier
-		err = db.View(operation.LookupLatestSealAtBlock(block2.ID(), &sealID))
+		err = operation.LookupLatestSealAtBlock(block2.ID(), &sealID)(db)
 		require.ErrorIs(t, err, stoerr.ErrNotFound)
 	})
 }
 
 func TestHeaderExtendHeightTooLarge(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
-	util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.FollowerState) {
+	util.RunWithPebbleFollowerProtocolState(t, rootSnapshot, func(db *pebble.DB, state *protocol.FollowerState) {
 		head, err := rootSnapshot.Head()
 		require.NoError(t, err)
 
@@ -2087,7 +2085,7 @@ func TestExtendBlockProcessable(t *testing.T) {
 	head, err := rootSnapshot.Head()
 	require.NoError(t, err)
 	consumer := mockprotocol.NewConsumer(t)
-	util.RunWithFullProtocolStateAndConsumer(t, rootSnapshot, consumer, func(db *badger.DB, state *protocol.ParticipantState) {
+	util.RunWithPebbleFullProtocolStateAndConsumer(t, rootSnapshot, consumer, func(db *pebble.DB, state *protocol.ParticipantState) {
 		block := unittest.BlockWithParentFixture(head)
 		child := unittest.BlockWithParentFixture(block.Header)
 		grandChild := unittest.BlockWithParentFixture(child.Header)
@@ -2119,7 +2117,7 @@ func TestExtendBlockProcessable(t *testing.T) {
 // The Follower should accept this block since tracking of orphan blocks is implemented by another component.
 func TestFollowerHeaderExtendBlockNotConnected(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
-	util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.FollowerState) {
+	util.RunWithPebbleFollowerProtocolState(t, rootSnapshot, func(db *pebble.DB, state *protocol.FollowerState) {
 		head, err := rootSnapshot.Head()
 		require.NoError(t, err)
 
@@ -2137,7 +2135,7 @@ func TestFollowerHeaderExtendBlockNotConnected(t *testing.T) {
 
 		// verify seal not indexed
 		var sealID flow.Identifier
-		err = db.View(operation.LookupLatestSealAtBlock(block2.ID(), &sealID))
+		err = operation.LookupLatestSealAtBlock(block2.ID(), &sealID)(db)
 		require.NoError(t, err)
 	})
 }
@@ -2149,7 +2147,7 @@ func TestFollowerHeaderExtendBlockNotConnected(t *testing.T) {
 // The Participant should reject this block as an outdated chain extension
 func TestParticipantHeaderExtendBlockNotConnected(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
-	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState) {
+	util.RunWithPebbleFullProtocolState(t, rootSnapshot, func(db *pebble.DB, state *protocol.ParticipantState) {
 		head, err := rootSnapshot.Head()
 		require.NoError(t, err)
 
@@ -2167,7 +2165,7 @@ func TestParticipantHeaderExtendBlockNotConnected(t *testing.T) {
 
 		// verify seal not indexed
 		var sealID flow.Identifier
-		err = db.View(operation.LookupLatestSealAtBlock(block2.ID(), &sealID))
+		err = operation.LookupLatestSealAtBlock(block2.ID(), &sealID)(db)
 		require.ErrorIs(t, err, stoerr.ErrNotFound)
 	})
 }
@@ -2176,7 +2174,7 @@ func TestHeaderExtendHighestSeal(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
 	head, err := rootSnapshot.Head()
 	require.NoError(t, err)
-	util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.FollowerState) {
+	util.RunWithPebbleFollowerProtocolState(t, rootSnapshot, func(db *pebble.DB, state *protocol.FollowerState) {
 		// create block2 and block3
 		block2 := unittest.BlockWithParentFixture(head)
 		block2.SetPayload(flow.EmptyPayload())
@@ -2222,7 +2220,7 @@ func TestExtendCertifiedInvalidQC(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
 	head, err := rootSnapshot.Head()
 	require.NoError(t, err)
-	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState) {
+	util.RunWithPebbleFullProtocolState(t, rootSnapshot, func(db *pebble.DB, state *protocol.ParticipantState) {
 		// create child block
 		block := unittest.BlockWithParentFixture(head)
 		block.SetPayload(flow.EmptyPayload())
@@ -2248,7 +2246,7 @@ func TestExtendCertifiedInvalidQC(t *testing.T) {
 // guarantees with invalid guarantors
 func TestExtendInvalidGuarantee(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
-	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState) {
+	util.RunWithPebbleFullProtocolState(t, rootSnapshot, func(db *pebble.DB, state *protocol.ParticipantState) {
 		// create a valid block
 		head, err := rootSnapshot.Head()
 		require.NoError(t, err)
@@ -2353,7 +2351,7 @@ func TestExtendInvalidGuarantee(t *testing.T) {
 // If block B is finalized and contains a seal for block A, then A is the last sealed block
 func TestSealed(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
-	util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.FollowerState) {
+	util.RunWithPebbleFollowerProtocolState(t, rootSnapshot, func(db *pebble.DB, state *protocol.FollowerState) {
 		head, err := rootSnapshot.Head()
 		require.NoError(t, err)
 
@@ -2399,8 +2397,8 @@ func TestSealed(t *testing.T) {
 // A non atomic bug would be: header is found in DB, but payload index is not found
 func TestCacheAtomicity(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
-	util.RunWithFollowerProtocolStateAndHeaders(t, rootSnapshot,
-		func(db *badger.DB, state *protocol.FollowerState, headers storage.Headers, index storage.Index) {
+	util.RunWithPebbleFollowerProtocolStateAndHeaders(t, rootSnapshot,
+		func(db *pebble.DB, state *protocol.FollowerState, headers storage.Headers, index storage.Index) {
 			head, err := rootSnapshot.Head()
 			require.NoError(t, err)
 
@@ -2434,11 +2432,11 @@ func TestCacheAtomicity(t *testing.T) {
 
 // TestHeaderInvalidTimestamp tests that extending header with invalid timestamp results in sentinel error
 func TestHeaderInvalidTimestamp(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
 		metrics := metrics.NewNoopCollector()
 		tracer := trace.NewNoopTracer()
 		log := zerolog.Nop()
-		all := storeutil.StorageLayer(t, db)
+		all := testingutils.PebbleStorageLayer(t, db)
 
 		// create a event consumer to test epoch transition events
 		distributor := events.NewDistributor()
@@ -2499,7 +2497,7 @@ func TestProtocolStateIdempotent(t *testing.T) {
 	head, err := rootSnapshot.Head()
 	require.NoError(t, err)
 	t.Run("follower", func(t *testing.T) {
-		util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.FollowerState) {
+		util.RunWithPebbleFollowerProtocolState(t, rootSnapshot, func(db *pebble.DB, state *protocol.FollowerState) {
 			block := unittest.BlockWithParentFixture(head)
 			err := state.ExtendCertified(context.Background(), block, unittest.CertifyBlock(block.Header))
 			require.NoError(t, err)
@@ -2510,7 +2508,7 @@ func TestProtocolStateIdempotent(t *testing.T) {
 		})
 	})
 	t.Run("participant", func(t *testing.T) {
-		util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState) {
+		util.RunWithPebbleFullProtocolState(t, rootSnapshot, func(db *pebble.DB, state *protocol.ParticipantState) {
 			block := unittest.BlockWithParentFixture(head)
 			err := state.Extend(context.Background(), block)
 			require.NoError(t, err)

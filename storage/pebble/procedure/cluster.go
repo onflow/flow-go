@@ -3,19 +3,21 @@ package procedure
 import (
 	"fmt"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble"
 
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/pebble/operation"
 )
 
 // This file implements storage functions for blocks in cluster consensus.
 
 // InsertClusterBlock inserts a cluster consensus block, updating all
 // associated indexes.
-func InsertClusterBlock(block *cluster.Block) func(*badger.Txn) error {
-	return func(tx *badger.Txn) error {
+func InsertClusterBlock(block *cluster.Block) func(storage.PebbleReaderBatchWriter) error {
+	return func(tx storage.PebbleReaderBatchWriter) error {
+		_, w := tx.ReaderWriter()
 
 		// check payload integrity
 		if block.Header.PayloadHash != block.Payload.Hash() {
@@ -24,13 +26,13 @@ func InsertClusterBlock(block *cluster.Block) func(*badger.Txn) error {
 
 		// store the block header
 		blockID := block.ID()
-		err := operation.InsertHeader(blockID, block.Header)(tx)
+		err := operation.InsertHeader(blockID, block.Header)(w)
 		if err != nil {
 			return fmt.Errorf("could not insert header: %w", err)
 		}
 
 		// insert the block payload
-		err = InsertClusterPayload(blockID, block.Payload)(tx)
+		err = InsertClusterPayload(blockID, block.Payload)(w)
 		if err != nil {
 			return fmt.Errorf("could not insert payload: %w", err)
 		}
@@ -45,8 +47,8 @@ func InsertClusterBlock(block *cluster.Block) func(*badger.Txn) error {
 }
 
 // RetrieveClusterBlock retrieves a cluster consensus block by block ID.
-func RetrieveClusterBlock(blockID flow.Identifier, block *cluster.Block) func(*badger.Txn) error {
-	return func(tx *badger.Txn) error {
+func RetrieveClusterBlock(blockID flow.Identifier, block *cluster.Block) func(pebble.Reader) error {
+	return func(tx pebble.Reader) error {
 
 		// retrieve the block header
 		var header flow.Header
@@ -74,8 +76,8 @@ func RetrieveClusterBlock(blockID flow.Identifier, block *cluster.Block) func(*b
 
 // RetrieveLatestFinalizedClusterHeader retrieves the latest finalized for the
 // given cluster chain ID.
-func RetrieveLatestFinalizedClusterHeader(chainID flow.ChainID, final *flow.Header) func(tx *badger.Txn) error {
-	return func(tx *badger.Txn) error {
+func RetrieveLatestFinalizedClusterHeader(chainID flow.ChainID, final *flow.Header) func(tx pebble.Reader) error {
+	return func(tx pebble.Reader) error {
 		var boundary uint64
 		err := operation.RetrieveClusterFinalizedHeight(chainID, &boundary)(tx)
 		if err != nil {
@@ -98,12 +100,13 @@ func RetrieveLatestFinalizedClusterHeader(chainID flow.ChainID, final *flow.Head
 }
 
 // FinalizeClusterBlock finalizes a block in cluster consensus.
-func FinalizeClusterBlock(blockID flow.Identifier) func(*badger.Txn) error {
-	return func(tx *badger.Txn) error {
+func FinalizeClusterBlock(blockID flow.Identifier) func(storage.PebbleReaderBatchWriter) error {
+	return func(tx storage.PebbleReaderBatchWriter) error {
+		r, w := tx.ReaderWriter()
 
 		// retrieve the header to check the parent
 		var header flow.Header
-		err := operation.RetrieveHeader(blockID, &header)(tx)
+		err := operation.RetrieveHeader(blockID, &header)(r)
 		if err != nil {
 			return fmt.Errorf("could not retrieve header: %w", err)
 		}
@@ -113,14 +116,14 @@ func FinalizeClusterBlock(blockID flow.Identifier) func(*badger.Txn) error {
 
 		// retrieve the current finalized state boundary
 		var boundary uint64
-		err = operation.RetrieveClusterFinalizedHeight(chainID, &boundary)(tx)
+		err = operation.RetrieveClusterFinalizedHeight(chainID, &boundary)(r)
 		if err != nil {
 			return fmt.Errorf("could not retrieve boundary: %w", err)
 		}
 
 		// retrieve the ID of the boundary head
 		var headID flow.Identifier
-		err = operation.LookupClusterBlockHeight(chainID, boundary, &headID)(tx)
+		err = operation.LookupClusterBlockHeight(chainID, boundary, &headID)(r)
 		if err != nil {
 			return fmt.Errorf("could not retrieve head: %w", err)
 		}
@@ -131,13 +134,13 @@ func FinalizeClusterBlock(blockID flow.Identifier) func(*badger.Txn) error {
 		}
 
 		// insert block view -> ID mapping
-		err = operation.IndexClusterBlockHeight(chainID, header.Height, header.ID())(tx)
+		err = operation.IndexClusterBlockHeight(chainID, header.Height, header.ID())(w)
 		if err != nil {
 			return fmt.Errorf("could not insert view->ID mapping: %w", err)
 		}
 
 		// update the finalized boundary
-		err = operation.UpdateClusterFinalizedHeight(chainID, header.Height)(tx)
+		err = operation.UpdateClusterFinalizedHeight(chainID, header.Height)(w)
 		if err != nil {
 			return fmt.Errorf("could not update finalized boundary: %w", err)
 		}
@@ -153,20 +156,20 @@ func FinalizeClusterBlock(blockID flow.Identifier) func(*badger.Txn) error {
 
 // InsertClusterPayload inserts the payload for a cluster block. It inserts
 // both the collection and all constituent transactions, allowing duplicates.
-func InsertClusterPayload(blockID flow.Identifier, payload *cluster.Payload) func(*badger.Txn) error {
-	return func(tx *badger.Txn) error {
+func InsertClusterPayload(blockID flow.Identifier, payload *cluster.Payload) func(pebble.Writer) error {
+	return func(tx pebble.Writer) error {
 
 		// cluster payloads only contain a single collection, allow duplicates,
 		// because it is valid for two competing forks to have the same payload.
 		light := payload.Collection.Light()
-		err := operation.SkipDuplicates(operation.InsertCollection(&light))(tx)
+		err := operation.InsertCollection(&light)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert payload collection: %w", err)
 		}
 
 		// insert constituent transactions
 		for _, colTx := range payload.Collection.Transactions {
-			err = operation.SkipDuplicates(operation.InsertTransaction(colTx.ID(), colTx))(tx)
+			err = operation.InsertTransaction(colTx.ID(), colTx)(tx)
 			if err != nil {
 				return fmt.Errorf("could not insert payload transaction: %w", err)
 			}
@@ -174,7 +177,7 @@ func InsertClusterPayload(blockID flow.Identifier, payload *cluster.Payload) fun
 
 		// index the transaction IDs within the collection
 		txIDs := payload.Collection.Light().Transactions
-		err = operation.SkipDuplicates(operation.IndexCollectionPayload(blockID, txIDs))(tx)
+		err = operation.IndexCollectionPayload(blockID, txIDs)(tx)
 		if err != nil {
 			return fmt.Errorf("could not index collection: %w", err)
 		}
@@ -190,8 +193,8 @@ func InsertClusterPayload(blockID flow.Identifier, payload *cluster.Payload) fun
 }
 
 // RetrieveClusterPayload retrieves a cluster consensus block payload by block ID.
-func RetrieveClusterPayload(blockID flow.Identifier, payload *cluster.Payload) func(*badger.Txn) error {
-	return func(tx *badger.Txn) error {
+func RetrieveClusterPayload(blockID flow.Identifier, payload *cluster.Payload) func(pebble.Reader) error {
+	return func(tx pebble.Reader) error {
 
 		// lookup the reference block ID
 		var refID flow.Identifier

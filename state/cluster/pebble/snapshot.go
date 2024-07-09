@@ -1,14 +1,14 @@
-package badger
+package pebble
 
 import (
 	"fmt"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble"
 
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/storage/badger/operation"
-	"github.com/onflow/flow-go/storage/badger/procedure"
+	"github.com/onflow/flow-go/storage/pebble/operation"
+	"github.com/onflow/flow-go/storage/pebble/procedure"
 )
 
 // Snapshot represents a snapshot of chain state anchored at a particular
@@ -25,7 +25,7 @@ func (s *Snapshot) Collection() (*flow.Collection, error) {
 	}
 
 	var collection flow.Collection
-	err := s.state.db.View(func(tx *badger.Txn) error {
+	err := (func(tx pebble.Reader) error {
 
 		// get the header for this snapshot
 		var header flow.Header
@@ -45,7 +45,7 @@ func (s *Snapshot) Collection() (*flow.Collection, error) {
 		collection = payload.Collection
 
 		return nil
-	})
+	})(s.state.db)
 
 	return &collection, err
 }
@@ -56,9 +56,7 @@ func (s *Snapshot) Head() (*flow.Header, error) {
 	}
 
 	var head flow.Header
-	err := s.state.db.View(func(tx *badger.Txn) error {
-		return s.head(&head)(tx)
-	})
+	err := s.head(&head)(s.state.db)
 	return &head, err
 }
 
@@ -70,8 +68,8 @@ func (s *Snapshot) Pending() ([]flow.Identifier, error) {
 }
 
 // head finds the header referenced by the snapshot.
-func (s *Snapshot) head(head *flow.Header) func(*badger.Txn) error {
-	return func(tx *badger.Txn) error {
+func (s *Snapshot) head(head *flow.Header) func(pebble.Reader) error {
+	return func(tx pebble.Reader) error {
 
 		// get the snapshot header
 		err := operation.RetrieveHeader(s.blockID, head)(tx)
@@ -86,7 +84,7 @@ func (s *Snapshot) head(head *flow.Header) func(*badger.Txn) error {
 func (s *Snapshot) pending(blockID flow.Identifier) ([]flow.Identifier, error) {
 
 	var pendingIDs flow.IdentifierList
-	err := s.state.db.View(procedure.LookupBlockChildren(blockID, &pendingIDs))
+	err := procedure.LookupBlockChildren(blockID, &pendingIDs)(s.state.db)
 	if err != nil {
 		return nil, fmt.Errorf("could not get pending children: %w", err)
 	}
