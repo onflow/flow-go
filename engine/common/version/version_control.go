@@ -174,15 +174,12 @@ func (v *VersionControl) initBoundaries(ctx irrecoverable.SignalerContext, final
 			processedHeight = vb.SealHeight - 1
 
 			if compResult <= 0 {
-				// ignore boundaries above the latest finalized height
-				if boundary.BlockHeight < latestHeight {
-					v.startHeight.Store(boundary.BlockHeight)
-					v.log.Info().
-						Uint64("startHeight", boundary.BlockHeight).
-						Msg("Found start block height")
-					// This is the lowest compatible height for this node version, stop search immediately
-					return nil
-				}
+				v.startHeight.Store(boundary.BlockHeight)
+				v.log.Info().
+					Uint64("startHeight", boundary.BlockHeight).
+					Msg("Found start block height")
+				// This is the lowest compatible height for this node version, stop search immediately
+				return nil
 			} else {
 				v.endHeight.Store(boundary.BlockHeight - 1)
 				v.log.Info().

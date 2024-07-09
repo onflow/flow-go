@@ -2,6 +2,7 @@ package version
 
 import (
 	"context"
+	"math"
 	"sort"
 	"testing"
 	"time"
@@ -108,7 +109,7 @@ func TestVersionControlInitialization(t *testing.T) {
 			expectedEnd:   latestBlockHeight - 9,
 		},
 		{
-			name:        "correct start and end version set",
+			name:        "correct start and end version found",
 			nodeVersion: "0.0.2",
 			versionEvents: []*flow.SealedVersionBeacon{
 				VersionBeaconEvent(finalizedRootBlockHeight+2,
@@ -122,6 +123,62 @@ func TestVersionControlInitialization(t *testing.T) {
 			},
 			expectedStart: finalizedRootBlockHeight + 12,
 			expectedEnd:   latestBlockHeight - 9,
+		},
+		{
+			name:        "node's version is too old for current latest",
+			nodeVersion: "0.0.1",
+			versionEvents: []*flow.SealedVersionBeacon{
+				// the node's version is too old for the earliest version boundary for the network
+				VersionBeaconEvent(finalizedRootBlockHeight-100,
+					flow.VersionBoundary{finalizedRootBlockHeight - 50, "0.0.2"}),
+			},
+			expectedStart: math.MaxUint64,
+			expectedEnd:   math.MaxUint64,
+		},
+		{
+			name:        "node's version is too new for current latest",
+			nodeVersion: "0.0.3",
+			versionEvents: []*flow.SealedVersionBeacon{
+				VersionBeaconEvent(finalizedRootBlockHeight-100,
+					flow.VersionBoundary{finalizedRootBlockHeight - 50, "0.0.2"}),
+
+				// the version boundary that transitions to the node's version applies after the
+				// latest finalized block, so the node's version is not compatible with any block
+				VersionBeaconEvent(latestBlockHeight-3,
+					flow.VersionBoundary{latestBlockHeight + 1, "0.0.3"}),
+				VersionBeaconEvent(latestBlockHeight-2,
+					flow.VersionBoundary{latestBlockHeight + 2, "0.0.4"}),
+			},
+			expectedStart: math.MaxUint64,
+			expectedEnd:   math.MaxUint64,
+		},
+		{
+			name:        "pre-release versions handled as expected",
+			nodeVersion: "0.0.1-pre-release.1",
+			versionEvents: []*flow.SealedVersionBeacon{
+				// 0.0.1-pre-release.1 > 0.0.1-pre-release.0
+				VersionBeaconEvent(finalizedRootBlockHeight+10,
+					flow.VersionBoundary{finalizedRootBlockHeight + 12, "0.0.1-pre-release.0"}),
+				// 0.0.1-pre-release.1 < 0.0.1
+				VersionBeaconEvent(finalizedRootBlockHeight+12,
+					flow.VersionBoundary{finalizedRootBlockHeight + 14, "0.0.1"}),
+			},
+			expectedStart: finalizedRootBlockHeight + 12,
+			expectedEnd:   finalizedRootBlockHeight + 13,
+		},
+		{
+			name:        "0.0.0 handled as expected",
+			nodeVersion: "0.0.0-20230101000000-c0c9f774e40c",
+			versionEvents: []*flow.SealedVersionBeacon{
+				// 0.0.0-20230101000000-c0c9f774e40c > 0.0.0-20220101000000-7b4eea64cf58
+				VersionBeaconEvent(finalizedRootBlockHeight+10,
+					flow.VersionBoundary{finalizedRootBlockHeight + 12, "0.0.0-20220101000000-7b4eea64cf58"}),
+				// 0.0.0-20230101000000-c0c9f774e40c < 0.0.0-20240101000000-6ceb2ff114de
+				VersionBeaconEvent(finalizedRootBlockHeight+12,
+					flow.VersionBoundary{finalizedRootBlockHeight + 14, "0.0.0-20240101000000-6ceb2ff114de"}),
+			},
+			expectedStart: finalizedRootBlockHeight + 12,
+			expectedEnd:   finalizedRootBlockHeight + 13,
 		},
 	}
 
@@ -159,18 +216,7 @@ func TestVersionControlInitialization(t *testing.T) {
 				signalerContext:            irrecoverable.NewMockSignalerContext(t, ctx),
 			})
 
-			checks := map[uint64]bool{
-				testCase.expectedStart: true,
-				testCase.expectedEnd:   true,
-			}
-			if testCase.expectedStart > finalizedRootBlockHeight {
-				checks[finalizedRootBlockHeight] = false
-				checks[testCase.expectedStart-1] = false
-			}
-			if testCase.expectedEnd < latestBlockHeight {
-				checks[testCase.expectedEnd+1] = false
-				checks[latestBlockHeight] = false
-			}
+			checks := generateChecks(testCase, finalizedRootBlockHeight, latestBlockHeight)
 
 			// TODO: check before root and after latest
 
@@ -181,6 +227,31 @@ func TestVersionControlInitialization(t *testing.T) {
 			}
 		})
 	}
+}
+
+func generateChecks(testCase testCaseConfig, finalizedRootBlockHeight, latestBlockHeight uint64) map[uint64]bool {
+	checks := map[uint64]bool{}
+	if testCase.expectedStart == math.MaxUint64 && testCase.expectedEnd == math.MaxUint64 {
+		for height := finalizedRootBlockHeight; height <= latestBlockHeight; height++ {
+			checks[height] = false
+		}
+		return checks
+	}
+
+	checks[testCase.expectedStart] = true
+	checks[testCase.expectedEnd] = true
+
+	if testCase.expectedStart > finalizedRootBlockHeight {
+		checks[finalizedRootBlockHeight] = false
+		checks[testCase.expectedStart-1] = false
+	}
+
+	if testCase.expectedEnd < latestBlockHeight {
+		checks[latestBlockHeight] = false
+		checks[testCase.expectedEnd+1] = false
+	}
+
+	return checks
 }
 
 // TestVersionBoundaryUpdated tests the behavior of the VersionControl component when the version is updated.
