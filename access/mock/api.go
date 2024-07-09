@@ -202,7 +202,7 @@ func (_m *API) GetAccountAtLatestBlock(ctx context.Context, address flow.Address
 }
 
 // GetAccountBalanceAtBlockHeight provides a mock function with given fields: ctx, address, height
-func (_m *API) GetAccountBalanceAtBlockHeight(ctx context.Context, address flow.Address, height uint64) (uint64, uint64, error) {
+func (_m *API) GetAccountBalanceAtBlockHeight(ctx context.Context, address flow.Address, height uint64) (uint64, error) {
 	ret := _m.Called(ctx, address, height)
 
 	if len(ret) == 0 {
@@ -210,9 +210,8 @@ func (_m *API) GetAccountBalanceAtBlockHeight(ctx context.Context, address flow.
 	}
 
 	var r0 uint64
-	var r1 uint64
-	var r2 error
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Address, uint64) (uint64, uint64, error)); ok {
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Address, uint64) (uint64, error)); ok {
 		return rf(ctx, address, height)
 	}
 	if rf, ok := ret.Get(0).(func(context.Context, flow.Address, uint64) uint64); ok {
@@ -221,23 +220,17 @@ func (_m *API) GetAccountBalanceAtBlockHeight(ctx context.Context, address flow.
 		r0 = ret.Get(0).(uint64)
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, flow.Address, uint64) uint64); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, flow.Address, uint64) error); ok {
 		r1 = rf(ctx, address, height)
 	} else {
-		r1 = ret.Get(1).(uint64)
+		r1 = ret.Error(1)
 	}
 
-	if rf, ok := ret.Get(2).(func(context.Context, flow.Address, uint64) error); ok {
-		r2 = rf(ctx, address, height)
-	} else {
-		r2 = ret.Error(2)
-	}
-
-	return r0, r1, r2
+	return r0, r1
 }
 
 // GetAccountBalanceAtLatestBlock provides a mock function with given fields: ctx, address
-func (_m *API) GetAccountBalanceAtLatestBlock(ctx context.Context, address flow.Address) (uint64, uint64, error) {
+func (_m *API) GetAccountBalanceAtLatestBlock(ctx context.Context, address flow.Address) (uint64, error) {
 	ret := _m.Called(ctx, address)
 
 	if len(ret) == 0 {
@@ -245,9 +238,8 @@ func (_m *API) GetAccountBalanceAtLatestBlock(ctx context.Context, address flow.
 	}
 
 	var r0 uint64
-	var r1 uint64
-	var r2 error
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Address) (uint64, uint64, error)); ok {
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Address) (uint64, error)); ok {
 		return rf(ctx, address)
 	}
 	if rf, ok := ret.Get(0).(func(context.Context, flow.Address) uint64); ok {
@@ -256,23 +248,17 @@ func (_m *API) GetAccountBalanceAtLatestBlock(ctx context.Context, address flow.
 		r0 = ret.Get(0).(uint64)
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, flow.Address) uint64); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, flow.Address) error); ok {
 		r1 = rf(ctx, address)
 	} else {
-		r1 = ret.Get(1).(uint64)
+		r1 = ret.Error(1)
 	}
 
-	if rf, ok := ret.Get(2).(func(context.Context, flow.Address) error); ok {
-		r2 = rf(ctx, address)
-	} else {
-		r2 = ret.Error(2)
-	}
-
-	return r0, r1, r2
+	return r0, r1
 }
 
 // GetAccountKeyAtBlockHeight provides a mock function with given fields: ctx, address, keyIndex, height
-func (_m *API) GetAccountKeyAtBlockHeight(ctx context.Context, address flow.Address, keyIndex int, height uint64) (*flow.AccountPublicKey, error) {
+func (_m *API) GetAccountKeyAtBlockHeight(ctx context.Context, address flow.Address, keyIndex uint64, height uint64) (*flow.AccountPublicKey, error) {
 	ret := _m.Called(ctx, address, keyIndex, height)
 
 	if len(ret) == 0 {
@@ -281,10 +267,10 @@ func (_m *API) GetAccountKeyAtBlockHeight(ctx context.Context, address flow.Addr
 
 	var r0 *flow.AccountPublicKey
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Address, int, uint64) (*flow.AccountPublicKey, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Address, uint64, uint64) (*flow.AccountPublicKey, error)); ok {
 		return rf(ctx, address, keyIndex, height)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Address, int, uint64) *flow.AccountPublicKey); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Address, uint64, uint64) *flow.AccountPublicKey); ok {
 		r0 = rf(ctx, address, keyIndex, height)
 	} else {
 		if ret.Get(0) != nil {
@@ -292,7 +278,7 @@ func (_m *API) GetAccountKeyAtBlockHeight(ctx context.Context, address flow.Addr
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, flow.Address, int, uint64) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, flow.Address, uint64, uint64) error); ok {
 		r1 = rf(ctx, address, keyIndex, height)
 	} else {
 		r1 = ret.Error(1)
@@ -302,7 +288,7 @@ func (_m *API) GetAccountKeyAtBlockHeight(ctx context.Context, address flow.Addr
 }
 
 // GetAccountKeyAtLatestBlock provides a mock function with given fields: ctx, address, keyIndex
-func (_m *API) GetAccountKeyAtLatestBlock(ctx context.Context, address flow.Address, keyIndex int) (*flow.AccountPublicKey, error) {
+func (_m *API) GetAccountKeyAtLatestBlock(ctx context.Context, address flow.Address, keyIndex uint64) (*flow.AccountPublicKey, error) {
 	ret := _m.Called(ctx, address, keyIndex)
 
 	if len(ret) == 0 {
@@ -311,10 +297,10 @@ func (_m *API) GetAccountKeyAtLatestBlock(ctx context.Context, address flow.Addr
 
 	var r0 *flow.AccountPublicKey
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Address, int) (*flow.AccountPublicKey, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Address, uint64) (*flow.AccountPublicKey, error)); ok {
 		return rf(ctx, address, keyIndex)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Address, int) *flow.AccountPublicKey); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Address, uint64) *flow.AccountPublicKey); ok {
 		r0 = rf(ctx, address, keyIndex)
 	} else {
 		if ret.Get(0) != nil {
@@ -322,7 +308,7 @@ func (_m *API) GetAccountKeyAtLatestBlock(ctx context.Context, address flow.Addr
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, flow.Address, int) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, flow.Address, uint64) error); ok {
 		r1 = rf(ctx, address, keyIndex)
 	} else {
 		r1 = ret.Error(1)

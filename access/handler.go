@@ -596,15 +596,14 @@ func (h *Handler) GetAccountBalanceAtLatestBlock(
 		return nil, status.Errorf(codes.InvalidArgument, "invalid address: %v", err)
 	}
 
-	accountBalance, availableBalance, err := h.api.GetAccountBalanceAtLatestBlock(ctx, address)
+	accountBalance, err := h.api.GetAccountBalanceAtLatestBlock(ctx, address)
 	if err != nil {
 		return nil, err
 	}
 
 	return &access.AccountBalanceResponse{
-		Balance:          accountBalance,
-		AvailableBalance: availableBalance,
-		Metadata:         metadata,
+		Balance:  accountBalance,
+		Metadata: metadata,
 	}, nil
 }
 
@@ -623,15 +622,14 @@ func (h *Handler) GetAccountBalanceAtBlockHeight(
 		return nil, status.Errorf(codes.InvalidArgument, "invalid address: %v", err)
 	}
 
-	accountBalance, availableBalance, err := h.api.GetAccountBalanceAtBlockHeight(ctx, address, req.GetBlockHeight())
+	accountBalance, err := h.api.GetAccountBalanceAtBlockHeight(ctx, address, req.GetBlockHeight())
 	if err != nil {
 		return nil, err
 	}
 
 	return &access.AccountBalanceResponse{
-		Balance:          accountBalance,
-		AvailableBalance: availableBalance,
-		Metadata:         metadata,
+		Balance:  accountBalance,
+		Metadata: metadata,
 	}, nil
 }
 
@@ -650,13 +648,7 @@ func (h *Handler) GetAccountKeyAtLatestBlock(
 		return nil, status.Errorf(codes.InvalidArgument, "invalid address: %v", err)
 	}
 
-	if req.GetIndex() == nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid key index: %v", err)
-	}
-
-	keyIndex := int(req.GetIndex().GetValue())
-
-	keyByIndex, err := h.api.GetAccountKeyAtLatestBlock(ctx, address, keyIndex)
+	keyByIndex, err := h.api.GetAccountKeyAtLatestBlock(ctx, address, uint64(req.GetIndex()))
 	if err != nil {
 		return nil, err
 	}
@@ -724,13 +716,7 @@ func (h *Handler) GetAccountKeyAtBlockHeight(
 		return nil, status.Errorf(codes.InvalidArgument, "invalid address: %v", err)
 	}
 
-	if req.GetIndex() == nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid key index: %v", err)
-	}
-
-	keyIndex := int(req.GetIndex().GetValue())
-
-	keyByIndex, err := h.api.GetAccountKeyAtBlockHeight(ctx, address, keyIndex, req.GetBlockHeight())
+	keyByIndex, err := h.api.GetAccountKeyAtBlockHeight(ctx, address, uint64(req.GetIndex()), req.GetBlockHeight())
 	if err != nil {
 		return nil, err
 	}

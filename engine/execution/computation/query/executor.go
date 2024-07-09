@@ -84,7 +84,7 @@ type Executor interface {
 	GetAccountKey(
 		ctx context.Context,
 		addr flow.Address,
-		keyIndex int,
+		keyIndex uint64,
 		header *flow.Header,
 		snapshot snapshot.StorageSnapshot,
 	) (
@@ -275,7 +275,7 @@ func (e *QueryExecutor) GetAccount(
 		fvm.WithDerivedBlockData(
 			e.derivedChainData.NewDerivedBlockDataForScript(blockHeader.ID())))
 
-	account, err := e.vm.GetAccount(
+	account, err := fvm.GetAccount(
 		blockCtx,
 		address,
 		snapshot)
@@ -380,7 +380,7 @@ func (e *QueryExecutor) GetAccountKeys(
 func (e *QueryExecutor) GetAccountKey(
 	ctx context.Context,
 	address flow.Address,
-	keyIndex int,
+	keyIndex uint64,
 	blockHeader *flow.Header,
 	snapshot snapshot.StorageSnapshot,
 ) (*flow.AccountPublicKey, error) {

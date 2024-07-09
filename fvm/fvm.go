@@ -119,8 +119,6 @@ type VM interface {
 		ProcedureOutput,
 		error,
 	)
-
-	GetAccount(Context, flow.Address, snapshot.StorageSnapshot) (*flow.Account, error)
 }
 
 var _ VM = (*VirtualMachine)(nil)
@@ -204,7 +202,7 @@ func (vm *VirtualMachine) Run(
 }
 
 // GetAccount returns an account by address or an error if none exists.
-func (vm *VirtualMachine) GetAccount(
+func GetAccount(
 	ctx Context,
 	address flow.Address,
 	storageSnapshot snapshot.StorageSnapshot,
@@ -288,14 +286,14 @@ func GetAccountKeys(
 func GetAccountKey(
 	ctx Context,
 	address flow.Address,
-	keyIndex int,
+	keyIndex uint64,
 	storageSnapshot snapshot.StorageSnapshot,
 ) (
 	*flow.AccountPublicKey,
 	error,
 ) {
 	_, accountInfo := getScriptEnvironment(ctx, storageSnapshot)
-	accountKey, err := accountInfo.GetAccountKeyByIndex(address, uint64(keyIndex))
+	accountKey, err := accountInfo.GetAccountKeyByIndex(address, keyIndex)
 
 	if err != nil {
 		return nil, fmt.Errorf("cannot get account keys: %w", err)

@@ -60,7 +60,7 @@ type ScriptExecutor interface {
 	// GetAccountKey returns a Flow account public key by the provided address, block height and index.
 	// Expected errors:
 	// - storage.ErrHeightNotIndexed if the data for the block height is not available
-	GetAccountKey(ctx context.Context, address flow.Address, keyIndex int, height uint64) (*flow.AccountPublicKey, error)
+	GetAccountKey(ctx context.Context, address flow.Address, keyIndex uint64, height uint64) (*flow.AccountPublicKey, error)
 }
 
 var _ ScriptExecutor = (*Scripts)(nil)
@@ -188,7 +188,7 @@ func (s *Scripts) GetAccountKeys(ctx context.Context, address flow.Address, heig
 // Expected errors:
 // - Script execution related errors
 // - storage.ErrHeightNotIndexed if the data for the block height is not available
-func (s *Scripts) GetAccountKey(ctx context.Context, address flow.Address, keyIndex int, height uint64) (*flow.AccountPublicKey, error) {
+func (s *Scripts) GetAccountKey(ctx context.Context, address flow.Address, keyIndex uint64, height uint64) (*flow.AccountPublicKey, error) {
 	snap, header, err := s.snapshotWithBlock(height)
 	if err != nil {
 		return nil, err
