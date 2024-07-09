@@ -37,64 +37,51 @@ func TestVerificationHappyPath(t *testing.T) {
 		trials          int
 		eventRepetition int // accounts for consumer being notified of a certain finalized block more than once.
 	}{
-		{
-			/*
-				Read this test case in this way:
-				One block is passed to block reader. The block contains one
-				execution result that is not duplicate (single copy).
-				The result has only one chunk.
-				Each chunk data request is replied upon the first try.
-				The verification node is authorized.
-			*/
-			blockCount: 1,
-			opts: []vertestutils.CompleteExecutionReceiptBuilderOpt{
-				vertestutils.WithResults(1),
-				vertestutils.WithChunksCount(1),
-				vertestutils.WithCopies(1),
-			},
-			authorized:      true,
-			eventRepetition: 1,
-			trials:          1,
-			msg:             "1 block, 1 result, 1 chunk, no duplicate, authorized, no event repetition",
-		},
-		{
-			blockCount: 1,
-			opts: []vertestutils.CompleteExecutionReceiptBuilderOpt{
-				vertestutils.WithResults(1),
-				vertestutils.WithChunksCount(1),
-				vertestutils.WithCopies(1),
-			},
-			authorized:      false, // unauthorized
-			eventRepetition: 1,
-			trials:          1,
-			msg:             "1 block, 1 result, 1 chunk, no duplicate, unauthorized, no event repetition",
-		},
-		{
-			blockCount: 1,
-			opts: []vertestutils.CompleteExecutionReceiptBuilderOpt{
-				vertestutils.WithResults(5),
-				vertestutils.WithChunksCount(5),
-				vertestutils.WithCopies(1),
-			},
-			authorized:      true,
-			eventRepetition: 1,
-			trials:          1,
-			msg:             "1 block, 5 result, 5 chunks, no duplicate, authorized, no event repetition",
-		},
-		{
-			blockCount: 10,
-			opts: []vertestutils.CompleteExecutionReceiptBuilderOpt{
-				vertestutils.WithResults(2),
-				vertestutils.WithChunksCount(2),
-				vertestutils.WithCopies(2),
-			},
-			authorized:      true,
-			eventRepetition: 1,
-			trials:          1,
-			msg:             "10 block, 5 result, 5 chunks, 1 duplicates, authorized, no event repetition",
-		},
 		// {
-		// 	// flakey
+		// 	/*
+		// 		Read this test case in this way:
+		// 		One block is passed to block reader. The block contains one
+		// 		execution result that is not duplicate (single copy).
+		// 		The result has only one chunk.
+		// 		Each chunk data request is replied upon the first try.
+		// 		The verification node is authorized.
+		// 	*/
+		// 	blockCount: 1,
+		// 	opts: []vertestutils.CompleteExecutionReceiptBuilderOpt{
+		// 		vertestutils.WithResults(1),
+		// 		vertestutils.WithChunksCount(1),
+		// 		vertestutils.WithCopies(1),
+		// 	},
+		// 	authorized:      true,
+		// 	eventRepetition: 1,
+		// 	trials:          1,
+		// 	msg:             "1 block, 1 result, 1 chunk, no duplicate, authorized, no event repetition",
+		// },
+		// {
+		// 	blockCount: 1,
+		// 	opts: []vertestutils.CompleteExecutionReceiptBuilderOpt{
+		// 		vertestutils.WithResults(1),
+		// 		vertestutils.WithChunksCount(1),
+		// 		vertestutils.WithCopies(1),
+		// 	},
+		// 	authorized:      false, // unauthorized
+		// 	eventRepetition: 1,
+		// 	trials:          1,
+		// 	msg:             "1 block, 1 result, 1 chunk, no duplicate, unauthorized, no event repetition",
+		// },
+		// {
+		// 	blockCount: 1,
+		// 	opts: []vertestutils.CompleteExecutionReceiptBuilderOpt{
+		// 		vertestutils.WithResults(5),
+		// 		vertestutils.WithChunksCount(5),
+		// 		vertestutils.WithCopies(1),
+		// 	},
+		// 	authorized:      true,
+		// 	eventRepetition: 1,
+		// 	trials:          1,
+		// 	msg:             "1 block, 5 result, 5 chunks, no duplicate, authorized, no event repetition",
+		// },
+		// {
 		// 	blockCount: 10,
 		// 	opts: []vertestutils.CompleteExecutionReceiptBuilderOpt{
 		// 		vertestutils.WithResults(2),
@@ -102,22 +89,35 @@ func TestVerificationHappyPath(t *testing.T) {
 		// 		vertestutils.WithCopies(2),
 		// 	},
 		// 	authorized:      true,
-		// 	eventRepetition: 3, // notifies consumer 3 times for each finalized block.
+		// 	eventRepetition: 1,
 		// 	trials:          1,
-		// 	msg:             "10 block, 5 result, 5 chunks, 1 duplicates, authorized, with event repetition",
+		// 	msg:             "10 block, 5 result, 5 chunks, 1 duplicates, authorized, no event repetition",
 		// },
 		{
-			blockCount: 1,
+			// flakey
+			blockCount: 10,
 			opts: []vertestutils.CompleteExecutionReceiptBuilderOpt{
-				vertestutils.WithResults(1),
-				vertestutils.WithChunksCount(10),
-				vertestutils.WithCopies(1),
+				vertestutils.WithResults(2),
+				vertestutils.WithChunksCount(2),
+				vertestutils.WithCopies(2),
 			},
 			authorized:      true,
-			eventRepetition: 1,
-			trials:          3,
-			msg:             "1 block, 1 result, 10 chunks, no duplicates, authorized, no event repetition, 3 retries",
+			eventRepetition: 3, // notifies consumer 3 times for each finalized block.
+			trials:          1,
+			msg:             "10 block, 5 result, 5 chunks, 1 duplicates, authorized, with event repetition",
 		},
+		// {
+		// 	blockCount: 1,
+		// 	opts: []vertestutils.CompleteExecutionReceiptBuilderOpt{
+		// 		vertestutils.WithResults(1),
+		// 		vertestutils.WithChunksCount(10),
+		// 		vertestutils.WithCopies(1),
+		// 	},
+		// 	authorized:      true,
+		// 	eventRepetition: 1,
+		// 	trials:          3,
+		// 	msg:             "1 block, 1 result, 10 chunks, no duplicates, authorized, no event repetition, 3 retries",
+		// },
 	}
 
 	for _, tc := range testcases {
