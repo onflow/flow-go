@@ -132,9 +132,6 @@ func CreatePayloadFile(
 	defer f.Close()
 
 	writer := bufio.NewWriterSize(f, defaultBufioWriteSize)
-	if err != nil {
-		return 0, fmt.Errorf("can't create bufio writer for %s: %w", payloadFile, err)
-	}
 	defer writer.Flush()
 
 	// TODO: replace CRC-32 checksum.
