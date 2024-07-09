@@ -38,6 +38,7 @@ type testContractHandler struct {
 	batchRun             func(txs [][]byte, coinbase types.Address) []*types.ResultSummary
 	generateResourceUUID func() uint64
 	dryRun               func(tx []byte, from types.Address) *types.ResultSummary
+	commitBlockProposal  func() error
 }
 
 var _ types.ContractHandler = &testContractHandler{}
@@ -99,6 +100,13 @@ func (t *testContractHandler) GenerateResourceUUID() uint64 {
 		panic("unexpected GenerateResourceUUID")
 	}
 	return t.generateResourceUUID()
+}
+
+func (t *testContractHandler) CommitBlockProposal() error {
+	if t.commitBlockProposal == nil {
+		panic("unexpected CommitBlockProposal")
+	}
+	return t.commitBlockProposal()
 }
 
 type testFlowAccount struct {

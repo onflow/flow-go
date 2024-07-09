@@ -249,18 +249,21 @@ func (h *ContractHandler) batchRun(rlpEncodedTxs [][]byte, coinbase types.Addres
 	return res, nil
 }
 
+// CommitBlockProposal commits the block proposal and add a new block to the EVM blockchain
 func (h *ContractHandler) CommitBlockProposal() error {
-	// load block proposal, finalize it and commit
+	// load latest block proposal
 	bp, err := h.blockStore.BlockProposal()
 	if err != nil {
 		return err
 	}
 
+	// commit the proposal
 	err = h.blockStore.CommitBlockProposal(bp)
 	if err != nil {
 		return err
 	}
 
+	// emit block executed event
 	err = h.emitEvent(types.NewBlockEvent(&bp.Block))
 	if err != nil {
 		return err
