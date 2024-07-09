@@ -1,14 +1,14 @@
 package cohort1
 
 import (
-	"github.com/onflow/flow-go/integration/testnet"
-	"github.com/rs/zerolog"
 	"testing"
 	"time"
 
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/integration/tests/epochs"
 	"github.com/onflow/flow-go/model/flow"
 )
