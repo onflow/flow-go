@@ -94,6 +94,7 @@ func TestVerificationHappyPath(t *testing.T) {
 			msg:             "10 block, 5 result, 5 chunks, 1 duplicates, authorized, no event repetition",
 		},
 		{
+			// flakey
 			blockCount: 10,
 			opts: []vertestutils.CompleteExecutionReceiptBuilderOpt{
 				vertestutils.WithResults(2),

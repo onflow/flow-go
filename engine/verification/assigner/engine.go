@@ -138,6 +138,8 @@ func (e *Engine) processChunk(chunk *flow.Chunk, resultID flow.Identifier, block
 	}
 
 	// pushes chunk locator to the chunks queue
+	// Note: StoreChunkLocator is not concurrent-safe, however, since ProcessFinalizedBlock is called
+	// sequentially, StoreChunkLocator won't be called concurrently.
 	ok, err := e.chunksQueue.StoreChunkLocator(locator)
 	if err != nil {
 		return false, fmt.Errorf("could not push chunk locator to chunks queue: %w", err)

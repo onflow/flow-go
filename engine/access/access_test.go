@@ -6,7 +6,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble"
 	"github.com/google/go-cmp/cmp"
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	entitiesproto "github.com/onflow/flow/protobuf/go/flow/entities"
@@ -42,9 +42,9 @@ import (
 	"github.com/onflow/flow-go/network/mocknetwork"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/storage"
-	bstorage "github.com/onflow/flow-go/storage/badger"
-	"github.com/onflow/flow-go/storage/badger/operation"
-	"github.com/onflow/flow-go/storage/util"
+	bstorage "github.com/onflow/flow-go/storage/pebble"
+	"github.com/onflow/flow-go/storage/pebble/operation"
+	"github.com/onflow/flow-go/storage/testingutils"
 	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/onflow/flow-go/utils/unittest/mocks"
 )
@@ -76,7 +76,7 @@ type Suite struct {
 }
 
 // TestAccess tests scenarios which exercise multiple API calls using both the RPC handler and the ingest engine
-// and using a real badger storage
+// and using a real pebble storage
 func TestAccess(t *testing.T) {
 	suite.Run(t, new(Suite))
 }
@@ -141,10 +141,10 @@ func (suite *Suite) SetupTest() {
 }
 
 func (suite *Suite) RunTest(
-	f func(handler *access.Handler, db *badger.DB, all *storage.All),
+	f func(handler *access.Handler, db *pebble.DB, all *storage.All),
 ) {
-	unittest.RunWithBadgerDB(suite.T(), func(db *badger.DB) {
-		all := util.StorageLayer(suite.T(), db)
+	unittest.RunWithPebbleDB(suite.T(), func(db *pebble.DB) {
+		all := testingutils.PebbleStorageLayer(suite.T(), db)
 
 		var err error
 		suite.backend, err = backend.New(backend.Params{
@@ -177,7 +177,7 @@ func (suite *Suite) RunTest(
 }
 
 func (suite *Suite) TestSendAndGetTransaction() {
-	suite.RunTest(func(handler *access.Handler, _ *badger.DB, _ *storage.All) {
+	suite.RunTest(func(handler *access.Handler, _ *pebble.DB, _ *storage.All) {
 		referenceBlock := unittest.BlockHeaderFixture()
 		transaction := unittest.TransactionFixture()
 		transaction.SetReferenceBlockID(referenceBlock.ID())
@@ -230,7 +230,7 @@ func (suite *Suite) TestSendAndGetTransaction() {
 }
 
 func (suite *Suite) TestSendExpiredTransaction() {
-	suite.RunTest(func(handler *access.Handler, _ *badger.DB, _ *storage.All) {
+	suite.RunTest(func(handler *access.Handler, _ *pebble.DB, _ *storage.All) {
 		referenceBlock := suite.finalizedBlock
 
 		transaction := unittest.TransactionFixture()
@@ -269,7 +269,7 @@ func (mc *mockCloser) Close() error { return nil }
 // TestSendTransactionToRandomCollectionNode tests that collection nodes are chosen from the appropriate cluster when
 // forwarding transactions by sending two transactions bound for two different collection clusters.
 func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
-	unittest.RunWithBadgerDB(suite.T(), func(db *badger.DB) {
+	unittest.RunWithPebbleDB(suite.T(), func(db *pebble.DB) {
 
 		// create a transaction
 		referenceBlock := unittest.BlockHeaderFixture()
@@ -374,7 +374,7 @@ func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 }
 
 func (suite *Suite) TestGetBlockByIDAndHeight() {
-	suite.RunTest(func(handler *access.Handler, db *badger.DB, all *storage.All) {
+	suite.RunTest(func(handler *access.Handler, db *pebble.DB, all *storage.All) {
 
 		// test block1 get by ID
 		block1 := unittest.BlockFixture()
@@ -382,11 +382,11 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 		block2 := unittest.BlockFixture()
 		block2.Header.Height = 2
 
-		require.NoError(suite.T(), all.Blocks.Store(&block1))
-		require.NoError(suite.T(), all.Blocks.Store(&block2))
+		require.NoError(suite.T(), operation.WithReaderBatchWriter(db, all.Blocks.StorePebble(&block1)))
+		require.NoError(suite.T(), operation.WithReaderBatchWriter(db, all.Blocks.StorePebble(&block2)))
 
 		// the follower logic should update height index on the block storage when a block is finalized
-		err := db.Update(operation.IndexBlockHeight(block2.Header.Height, block2.ID()))
+		err := operation.IndexBlockHeight(block2.Header.Height, block2.ID())(db)
 		require.NoError(suite.T(), err)
 
 		assertHeaderResp := func(
@@ -510,7 +510,7 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 }
 
 func (suite *Suite) TestGetExecutionResultByBlockID() {
-	suite.RunTest(func(handler *access.Handler, db *badger.DB, all *storage.All) {
+	suite.RunTest(func(handler *access.Handler, db *pebble.DB, all *storage.All) {
 
 		// test block1 get by ID
 		nonexistingID := unittest.IdentifierFixture()
@@ -592,8 +592,8 @@ func (suite *Suite) TestGetExecutionResultByBlockID() {
 // TestGetSealedTransaction tests that transactions status of transaction that belongs to a sealed block
 // is reported as sealed
 func (suite *Suite) TestGetSealedTransaction() {
-	unittest.RunWithBadgerDB(suite.T(), func(db *badger.DB) {
-		all := util.StorageLayer(suite.T(), db)
+	unittest.RunWithPebbleDB(suite.T(), func(db *pebble.DB) {
+		all := testingutils.PebbleStorageLayer(suite.T(), db)
 		results := bstorage.NewExecutionResults(suite.metrics, db)
 		receipts := bstorage.NewExecutionReceipts(suite.metrics, db, results, bstorage.DefaultCacheSize)
 		enIdentities := unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
@@ -678,8 +678,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 		require.NoError(suite.T(), err)
 
 		// 1. Assume that follower engine updated the block storage and the protocol state. The block is reported as sealed
-		err = all.Blocks.Store(block)
-		require.NoError(suite.T(), err)
+		require.NoError(suite.T(), operation.WithReaderBatchWriter(db, all.Blocks.StorePebble(block)))
 		suite.sealedBlock = block.Header
 
 		background, cancel := context.WithCancel(context.Background())
@@ -723,8 +722,8 @@ func (suite *Suite) TestGetSealedTransaction() {
 // TestGetTransactionResult tests different approaches to using the GetTransactionResult query, including using
 // transaction ID, block ID, and collection ID.
 func (suite *Suite) TestGetTransactionResult() {
-	unittest.RunWithBadgerDB(suite.T(), func(db *badger.DB) {
-		all := util.StorageLayer(suite.T(), db)
+	unittest.RunWithPebbleDB(suite.T(), func(db *pebble.DB) {
+		all := testingutils.PebbleStorageLayer(suite.T(), db)
 		results := bstorage.NewExecutionResults(suite.metrics, db)
 		receipts := bstorage.NewExecutionReceipts(suite.metrics, db, results, bstorage.DefaultCacheSize)
 
@@ -748,10 +747,8 @@ func (suite *Suite) TestGetTransactionResult() {
 		// specifically for this test we will consider that sealed block is far behind finalized, so we get EXECUTED status
 		suite.sealedSnapshot.On("Head").Return(sealedBlock, nil)
 
-		err := all.Blocks.Store(block)
-		require.NoError(suite.T(), err)
-		err = all.Blocks.Store(blockNegative)
-		require.NoError(suite.T(), err)
+		require.NoError(suite.T(), operation.WithReaderBatchWriter(db, all.Blocks.StorePebble(block)))
+		require.NoError(suite.T(), operation.WithReaderBatchWriter(db, all.Blocks.StorePebble(blockNegative)))
 
 		suite.state.On("AtBlockID", blockId).Return(suite.sealedSnapshot)
 
@@ -780,7 +777,7 @@ func (suite *Suite) TestGetTransactionResult() {
 		metrics := metrics.NewNoopCollector()
 		transactions := bstorage.NewTransactions(metrics, db)
 		collections := bstorage.NewCollections(db, transactions)
-		err = collections.Store(collectionNegative)
+		err := collections.Store(collectionNegative)
 		require.NoError(suite.T(), err)
 		collectionsToMarkFinalized, err := stdmap.NewTimes(100)
 		require.NoError(suite.T(), err)
@@ -977,8 +974,8 @@ func (suite *Suite) TestGetTransactionResult() {
 // TestExecuteScript tests the three execute Script related calls to make sure that the execution api is called with
 // the correct block id
 func (suite *Suite) TestExecuteScript() {
-	unittest.RunWithBadgerDB(suite.T(), func(db *badger.DB) {
-		all := util.StorageLayer(suite.T(), db)
+	unittest.RunWithPebbleDB(suite.T(), func(db *pebble.DB) {
+		all := testingutils.PebbleStorageLayer(suite.T(), db)
 		transactions := bstorage.NewTransactions(suite.metrics, db)
 		collections := bstorage.NewCollections(db, transactions)
 		results := bstorage.NewExecutionResults(suite.metrics, db)
@@ -1051,9 +1048,9 @@ func (suite *Suite) TestExecuteScript() {
 
 		// create a block and a seal pointing to that block
 		lastBlock := unittest.BlockWithParentFixture(prevBlock.Header)
-		err = all.Blocks.Store(lastBlock)
+		err = operation.WithReaderBatchWriter(db, all.Blocks.StorePebble(lastBlock))
 		require.NoError(suite.T(), err)
-		err = db.Update(operation.IndexBlockHeight(lastBlock.Header.Height, lastBlock.ID()))
+		err = operation.IndexBlockHeight(lastBlock.Header.Height, lastBlock.ID())(db)
 		require.NoError(suite.T(), err)
 		//update latest sealed block
 		suite.sealedBlock = lastBlock.Header
@@ -1065,9 +1062,9 @@ func (suite *Suite) TestExecuteScript() {
 			require.NoError(suite.T(), err)
 		}
 
-		err = all.Blocks.Store(prevBlock)
+		err = operation.WithReaderBatchWriter(db, all.Blocks.StorePebble(prevBlock))
 		require.NoError(suite.T(), err)
-		err = db.Update(operation.IndexBlockHeight(prevBlock.Header.Height, prevBlock.ID()))
+		err = operation.IndexBlockHeight(prevBlock.Header.Height, prevBlock.ID())(db)
 		require.NoError(suite.T(), err)
 
 		// create execution receipts for each of the execution node and the previous block
@@ -1163,7 +1160,7 @@ func (suite *Suite) TestExecuteScript() {
 // TestAPICallNodeVersionInfo tests the GetNodeVersionInfo query and check response returns correct node version
 // information
 func (suite *Suite) TestAPICallNodeVersionInfo() {
-	suite.RunTest(func(handler *access.Handler, db *badger.DB, all *storage.All) {
+	suite.RunTest(func(handler *access.Handler, db *pebble.DB, all *storage.All) {
 		req := &accessproto.GetNodeVersionInfoRequest{}
 		resp, err := handler.GetNodeVersionInfo(context.Background(), req)
 		require.NoError(suite.T(), err)
@@ -1183,12 +1180,12 @@ func (suite *Suite) TestAPICallNodeVersionInfo() {
 // field in the response matches the finalized header from cache. It also tests that the LastFinalizedBlock field is
 // updated correctly when a block with a greater height is finalized.
 func (suite *Suite) TestLastFinalizedBlockHeightResult() {
-	suite.RunTest(func(handler *access.Handler, db *badger.DB, all *storage.All) {
+	suite.RunTest(func(handler *access.Handler, db *pebble.DB, all *storage.All) {
 		block := unittest.BlockWithParentFixture(suite.finalizedBlock)
 		newFinalizedBlock := unittest.BlockWithParentFixture(block.Header)
 
 		// store new block
-		require.NoError(suite.T(), all.Blocks.Store(block))
+		require.NoError(suite.T(), operation.WithReaderBatchWriter(db, all.Blocks.StorePebble(block)))
 
 		assertFinalizedBlockHeader := func(resp *accessproto.BlockHeaderResponse, err error) {
 			require.NoError(suite.T(), err)

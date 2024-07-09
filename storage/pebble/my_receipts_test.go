@@ -1,19 +1,19 @@
-package badger_test
+package pebble_test
 
 import (
 	"testing"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/module/metrics"
-	bstorage "github.com/onflow/flow-go/storage/badger"
+	bstorage "github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestMyExecutionReceiptsStorage(t *testing.T) {
 	withStore := func(t *testing.T, f func(store *bstorage.MyExecutionReceipts)) {
-		unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+		unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
 			metrics := metrics.NewNoopCollector()
 			results := bstorage.NewExecutionResults(metrics, db)
 			receipts := bstorage.NewExecutionReceipts(metrics, db, results, bstorage.DefaultCacheSize)
@@ -52,7 +52,7 @@ func TestMyExecutionReceiptsStorage(t *testing.T) {
 		})
 	})
 
-	t.Run("store different receipt for same block should fail", func(t *testing.T) {
+	t.Run("store different receipt for same block should not fail", func(t *testing.T) {
 		withStore(t, func(store *bstorage.MyExecutionReceipts) {
 			block := unittest.BlockFixture()
 
@@ -66,7 +66,7 @@ func TestMyExecutionReceiptsStorage(t *testing.T) {
 			require.NoError(t, err)
 
 			err = store.StoreMyReceipt(receipt2)
-			require.Error(t, err)
+			require.NoError(t, err)
 		})
 	})
 }

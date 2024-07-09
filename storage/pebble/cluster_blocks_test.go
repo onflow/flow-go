@@ -1,35 +1,35 @@
-package badger
+package pebble
 
 import (
 	"testing"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/storage/badger/operation"
-	"github.com/onflow/flow-go/storage/badger/procedure"
+	"github.com/onflow/flow-go/storage/pebble/operation"
+	"github.com/onflow/flow-go/storage/pebble/procedure"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestClusterBlocksByHeight(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
 		chain := unittest.ClusterBlockChainFixture(5)
 		parent, blocks := chain[0], chain[1:]
 
 		// add parent as boundary
-		err := db.Update(operation.IndexClusterBlockHeight(parent.Header.ChainID, parent.Header.Height, parent.ID()))
+		err := operation.IndexClusterBlockHeight(parent.Header.ChainID, parent.Header.Height, parent.ID())(db)
 		require.NoError(t, err)
 
-		err = db.Update(operation.InsertClusterFinalizedHeight(parent.Header.ChainID, parent.Header.Height))
+		err = operation.InsertClusterFinalizedHeight(parent.Header.ChainID, parent.Header.Height)(db)
 		require.NoError(t, err)
 
 		// store a chain of blocks
 		for _, block := range blocks {
-			err := db.Update(procedure.InsertClusterBlock(&block))
+			err := operation.WithReaderBatchWriter(db, procedure.InsertClusterBlock(&block))
 			require.NoError(t, err)
 
-			err = db.Update(procedure.FinalizeClusterBlock(block.Header.ID()))
+			err = operation.WithReaderBatchWriter(db, procedure.FinalizeClusterBlock(block.Header.ID()))
 			require.NoError(t, err)
 		}
 

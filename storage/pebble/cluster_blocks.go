@@ -1,25 +1,25 @@
-package badger
+package pebble
 
 import (
 	"fmt"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble"
 
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/storage/badger/operation"
-	"github.com/onflow/flow-go/storage/badger/transaction"
+	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/pebble/operation"
 )
 
-// ClusterBlocks implements a simple block storage around a badger DB.
+// ClusterBlocks implements a simple block storage around a pebble DB.
 type ClusterBlocks struct {
-	db       *badger.DB
+	db       *pebble.DB
 	chainID  flow.ChainID
 	headers  *Headers
 	payloads *ClusterPayloads
 }
 
-func NewClusterBlocks(db *badger.DB, chainID flow.ChainID, headers *Headers, payloads *ClusterPayloads) *ClusterBlocks {
+func NewClusterBlocks(db *pebble.DB, chainID flow.ChainID, headers *Headers, payloads *ClusterPayloads) *ClusterBlocks {
 	b := &ClusterBlocks{
 		db:       db,
 		chainID:  chainID,
@@ -30,15 +30,17 @@ func NewClusterBlocks(db *badger.DB, chainID flow.ChainID, headers *Headers, pay
 }
 
 func (b *ClusterBlocks) Store(block *cluster.Block) error {
-	return operation.RetryOnConflictTx(b.db, transaction.Update, b.storeTx(block))
+	return operation.WithReaderBatchWriter(b.db, b.storeTx(block))
 }
 
-func (b *ClusterBlocks) storeTx(block *cluster.Block) func(*transaction.Tx) error {
-	return func(tx *transaction.Tx) error {
-		err := b.headers.storeTx(block.Header)(tx)
+func (b *ClusterBlocks) storeTx(block *cluster.Block) func(storage.PebbleReaderBatchWriter) error {
+	return func(tx storage.PebbleReaderBatchWriter) error {
+		blockID := block.ID()
+		err := b.headers.storePebble(blockID, block.Header)(tx)
 		if err != nil {
 			return fmt.Errorf("could not store header: %w", err)
 		}
+
 		err = b.payloads.storeTx(block.ID(), block.Payload)(tx)
 		if err != nil {
 			return fmt.Errorf("could not store payload: %w", err)
@@ -65,7 +67,7 @@ func (b *ClusterBlocks) ByID(blockID flow.Identifier) (*cluster.Block, error) {
 
 func (b *ClusterBlocks) ByHeight(height uint64) (*cluster.Block, error) {
 	var blockID flow.Identifier
-	err := b.db.View(operation.LookupClusterBlockHeight(b.chainID, height, &blockID))
+	err := operation.LookupClusterBlockHeight(b.chainID, height, &blockID)(b.db)
 	if err != nil {
 		return nil, fmt.Errorf("could not look up block: %w", err)
 	}

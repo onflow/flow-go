@@ -3,64 +3,66 @@ package operation
 import (
 	"errors"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
 )
 
-func InsertEpochSetup(eventID flow.Identifier, event *flow.EpochSetup) func(*badger.Txn) error {
+func InsertEpochSetup(eventID flow.Identifier, event *flow.EpochSetup) func(pebble.Writer) error {
 	return insert(makePrefix(codeEpochSetup, eventID), event)
 }
 
-func RetrieveEpochSetup(eventID flow.Identifier, event *flow.EpochSetup) func(*badger.Txn) error {
+func RetrieveEpochSetup(eventID flow.Identifier, event *flow.EpochSetup) func(pebble.Reader) error {
 	return retrieve(makePrefix(codeEpochSetup, eventID), event)
 }
 
-func InsertEpochCommit(eventID flow.Identifier, event *flow.EpochCommit) func(*badger.Txn) error {
+func InsertEpochCommit(eventID flow.Identifier, event *flow.EpochCommit) func(pebble.Writer) error {
 	return insert(makePrefix(codeEpochCommit, eventID), event)
 }
 
-func RetrieveEpochCommit(eventID flow.Identifier, event *flow.EpochCommit) func(*badger.Txn) error {
+func RetrieveEpochCommit(eventID flow.Identifier, event *flow.EpochCommit) func(pebble.Reader) error {
 	return retrieve(makePrefix(codeEpochCommit, eventID), event)
 }
 
-func InsertEpochStatus(blockID flow.Identifier, status *flow.EpochStatus) func(*badger.Txn) error {
+func InsertEpochStatus(blockID flow.Identifier, status *flow.EpochStatus) func(pebble.Writer) error {
 	return insert(makePrefix(codeBlockEpochStatus, blockID), status)
 }
 
-func RetrieveEpochStatus(blockID flow.Identifier, status *flow.EpochStatus) func(*badger.Txn) error {
+func RetrieveEpochStatus(blockID flow.Identifier, status *flow.EpochStatus) func(pebble.Reader) error {
 	return retrieve(makePrefix(codeBlockEpochStatus, blockID), status)
 }
 
 // SetEpochEmergencyFallbackTriggered sets a flag in the DB indicating that
 // epoch emergency fallback has been triggered, and the block where it was triggered.
 //
-// EECC can be triggered in two ways:
+// EFM can be triggered in two ways:
 //  1. Finalizing the first block past the epoch commitment deadline, when the
 //     next epoch has not yet been committed (see protocol.Params for more detail)
 //  2. Finalizing a fork in which an invalid service event was incorporated.
 //
-// Calling this function multiple times is a no-op and returns no expected errors.
-func SetEpochEmergencyFallbackTriggered(blockID flow.Identifier) func(txn *badger.Txn) error {
-	return SkipDuplicates(insert(makePrefix(codeEpochEmergencyFallbackTriggered), blockID))
+// TODO: in pebble/mutator.go must implement RetrieveEpochEmergencyFallbackTriggeredBlockID and
+// verify not exist
+// Note: The caller needs to ensure a previous value was not stored
+func SetEpochEmergencyFallbackTriggered(blockID flow.Identifier) func(txn pebble.Writer) error {
+	return insert(makePrefix(codeEpochEmergencyFallbackTriggered), blockID)
 }
 
 // RetrieveEpochEmergencyFallbackTriggeredBlockID gets the block ID where epoch
 // emergency was triggered.
-func RetrieveEpochEmergencyFallbackTriggeredBlockID(blockID *flow.Identifier) func(*badger.Txn) error {
+func RetrieveEpochEmergencyFallbackTriggeredBlockID(blockID *flow.Identifier) func(pebble.Reader) error {
 	return retrieve(makePrefix(codeEpochEmergencyFallbackTriggered), blockID)
 }
 
 // CheckEpochEmergencyFallbackTriggered retrieves the value of the flag
 // indicating whether epoch emergency fallback has been triggered. If the key
 // is not set, this results in triggered being set to false.
-func CheckEpochEmergencyFallbackTriggered(triggered *bool) func(*badger.Txn) error {
-	return func(tx *badger.Txn) error {
+func CheckEpochEmergencyFallbackTriggered(triggered *bool) func(pebble.Reader) error {
+	return func(tx pebble.Reader) error {
 		var blockID flow.Identifier
 		err := RetrieveEpochEmergencyFallbackTriggeredBlockID(&blockID)(tx)
 		if errors.Is(err, storage.ErrNotFound) {
-			// flag unset, EECC not triggered
+			// flag unset, EFM not triggered
 			*triggered = false
 			return nil
 		} else if err != nil {
@@ -68,7 +70,7 @@ func CheckEpochEmergencyFallbackTriggered(triggered *bool) func(*badger.Txn) err
 			*triggered = false
 			return err
 		}
-		// flag is set, EECC triggered
+		// flag is set, EFM triggered
 		*triggered = true
 		return err
 	}

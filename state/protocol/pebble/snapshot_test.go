@@ -1,6 +1,4 @@
-// (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
-
-package badger_test
+package pebble_test
 
 import (
 	"context"
@@ -8,7 +6,7 @@ import (
 	"math/rand"
 	"testing"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -18,8 +16,8 @@ import (
 	"github.com/onflow/flow-go/module/signature"
 	statepkg "github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/protocol"
-	bprotocol "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/inmem"
+	bprotocol "github.com/onflow/flow-go/state/protocol/pebble"
 	"github.com/onflow/flow-go/state/protocol/prg"
 	"github.com/onflow/flow-go/state/protocol/util"
 	"github.com/onflow/flow-go/storage"
@@ -38,7 +36,7 @@ func TestUnknownReferenceBlock(t *testing.T) {
 		block.Header.Height = rootHeight
 	})
 
-	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
+	util.RunWithPebbleFullProtocolState(t, rootSnapshot, func(db *pebble.DB, state *bprotocol.ParticipantState) {
 		// build some finalized non-root blocks (heights 101-110)
 		head := rootSnapshot.Encodable().Head
 		const nBlocks = 10
@@ -77,7 +75,7 @@ func TestHead(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
 	head, err := rootSnapshot.Head()
 	require.NoError(t, err)
-	util.RunWithBootstrapState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.State) {
+	util.RunWithPebbleBootstrapState(t, rootSnapshot, func(db *pebble.DB, state *bprotocol.State) {
 
 		t.Run("works with block number", func(t *testing.T) {
 			retrieved, err := state.AtHeight(head.Height).Head()
@@ -115,7 +113,7 @@ func TestSnapshot_Params(t *testing.T) {
 	rootHeader, err := rootSnapshot.Head()
 	require.NoError(t, err)
 
-	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
+	util.RunWithPebbleFullProtocolState(t, rootSnapshot, func(db *pebble.DB, state *bprotocol.ParticipantState) {
 		// build some non-root blocks
 		head := rootHeader
 		const nBlocks = 10
@@ -162,7 +160,7 @@ func TestSnapshot_Descendants(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
 	head, err := rootSnapshot.Head()
 	require.NoError(t, err)
-	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
+	util.RunWithPebbleFullProtocolState(t, rootSnapshot, func(db *pebble.DB, state *bprotocol.ParticipantState) {
 		var expectedBlocks []flow.Identifier
 		for i := 5; i > 3; i-- {
 			for _, block := range unittest.ChainFixtureFrom(i, head) {
@@ -181,7 +179,7 @@ func TestSnapshot_Descendants(t *testing.T) {
 func TestIdentities(t *testing.T) {
 	identities := unittest.IdentityListFixture(5, unittest.WithAllRoles())
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
-	util.RunWithBootstrapState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.State) {
+	util.RunWithPebbleBootstrapState(t, rootSnapshot, func(db *pebble.DB, state *bprotocol.State) {
 
 		t.Run("no filter", func(t *testing.T) {
 			actual, err := state.Final().Identities(filter.Any)
@@ -234,7 +232,7 @@ func TestClusters(t *testing.T) {
 	rootSnapshot, err := inmem.SnapshotFromBootstrapState(root, result, seal, qc)
 	require.NoError(t, err)
 
-	util.RunWithBootstrapState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.State) {
+	util.RunWithPebbleBootstrapState(t, rootSnapshot, func(db *pebble.DB, state *bprotocol.State) {
 		expectedClusters, err := factory.NewClusterList(setup.Assignments, collectors)
 		require.NoError(t, err)
 		actualClusters, err := state.Final().Epochs().Current().Clustering()
@@ -263,7 +261,7 @@ func TestSealingSegment(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("root sealing segment", func(t *testing.T) {
-		util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.FollowerState) {
+		util.RunWithPebbleFollowerProtocolState(t, rootSnapshot, func(db *pebble.DB, state *bprotocol.FollowerState) {
 			expected, err := rootSnapshot.SealingSegment()
 			require.NoError(t, err)
 			actual, err := state.AtBlockID(head.ID()).SealingSegment()
@@ -283,7 +281,7 @@ func TestSealingSegment(t *testing.T) {
 	// ROOT <- B1
 	// Expected sealing segment: [ROOT, B1], extra blocks: []
 	t.Run("non-root with root seal as latest seal", func(t *testing.T) {
-		util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.FollowerState) {
+		util.RunWithPebbleFollowerProtocolState(t, rootSnapshot, func(db *pebble.DB, state *bprotocol.FollowerState) {
 			// build an extra block on top of root
 			block1 := unittest.BlockWithParentFixture(head)
 			buildFinalizedBlock(t, state, block1)
@@ -308,7 +306,7 @@ func TestSealingSegment(t *testing.T) {
 	// ROOT <- B1 <- B2(R1) <- B3(S1)
 	// Expected sealing segment: [B1, B2, B3], extra blocks: [ROOT]
 	t.Run("non-root", func(t *testing.T) {
-		util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.FollowerState) {
+		util.RunWithPebbleFollowerProtocolState(t, rootSnapshot, func(db *pebble.DB, state *bprotocol.FollowerState) {
 			// build a block to seal
 			block1 := unittest.BlockWithParentFixture(head)
 			buildFinalizedBlock(t, state, block1)
@@ -347,7 +345,7 @@ func TestSealingSegment(t *testing.T) {
 	// ROOT <- B1 <- .... <- BN(S1)
 	// Expected sealing segment: [B1, ..., BN], extra blocks: [ROOT]
 	t.Run("long sealing segment", func(t *testing.T) {
-		util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.FollowerState) {
+		util.RunWithPebbleFollowerProtocolState(t, rootSnapshot, func(db *pebble.DB, state *bprotocol.FollowerState) {
 
 			// build a block to seal
 			block1 := unittest.BlockWithParentFixture(head)
@@ -394,7 +392,7 @@ func TestSealingSegment(t *testing.T) {
 	// ROOT <- B1 <- B2(R1) <- B3 <- B4(R2, S1) <- B5 <- B6(S2)
 	// Expected sealing segment: [B2, B3, B4], Extra blocks: [ROOT, B1]
 	t.Run("overlapping sealing segment", func(t *testing.T) {
-		util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.FollowerState) {
+		util.RunWithPebbleFollowerProtocolState(t, rootSnapshot, func(db *pebble.DB, state *bprotocol.FollowerState) {
 
 			block1 := unittest.BlockWithParentFixture(head)
 			buildFinalizedBlock(t, state, block1)
@@ -441,7 +439,7 @@ func TestSealingSegment(t *testing.T) {
 	// ROOT -> B1(Result_A, Receipt_A_1) -> B2(Result_B, Receipt_B, Receipt_A_2) -> B3(Receipt_C, Result_C) -> B4 -> B5(Seal_C)
 	// the segment for B5 should be `[B2,B3,B4,B5] + [Result_A]`
 	t.Run("sealing segment with 4 blocks and 1 execution result decoupled", func(t *testing.T) {
-		util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.FollowerState) {
+		util.RunWithPebbleFollowerProtocolState(t, rootSnapshot, func(db *pebble.DB, state *bprotocol.FollowerState) {
 			// simulate scenario where execution result is missing from block payload
 			// SealingSegment() should get result from results db and store it on ExecutionReceipts
 			// field on SealingSegment
@@ -493,7 +491,7 @@ func TestSealingSegment(t *testing.T) {
 	// block3 also references ResultB, so it should exist in the segment execution results as well.
 	// root -> B1[Result_A, Receipt_A_1] -> B2[Result_B, Receipt_B, Receipt_A_2] -> B3[Receipt_B_2, Receipt_for_seal, Receipt_A_3] -> B4 -> B5 (Seal_B2)
 	t.Run("sealing segment with 4 blocks and 2 execution result decoupled", func(t *testing.T) {
-		util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.FollowerState) {
+		util.RunWithPebbleFollowerProtocolState(t, rootSnapshot, func(db *pebble.DB, state *bprotocol.FollowerState) {
 			// simulate scenario where execution result is missing from block payload
 			// SealingSegment() should get result from results db and store it on ExecutionReceipts
 			// field on SealingSegment
@@ -552,7 +550,7 @@ func TestSealingSegment(t *testing.T) {
 	// ROOT <- B1 <- B2(R1) <- B3 <- B4(S1) <- B5
 	// Expected sealing segment: [B1, B2, B3, B4, B5], Extra blocks: [ROOT]
 	t.Run("sealing segment where highest block in segment does not seal lowest", func(t *testing.T) {
-		util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.FollowerState) {
+		util.RunWithPebbleFollowerProtocolState(t, rootSnapshot, func(db *pebble.DB, state *bprotocol.FollowerState) {
 			// build a block to seal
 			block1 := unittest.BlockWithParentFixture(head)
 			buildFinalizedBlock(t, state, block1)
@@ -593,7 +591,7 @@ func TestSealingSegment(t *testing.T) {
 	// Expected sealing segment: [B699, B700], Extra blocks: [B98, B99, ..., B698]
 	// where DefaultTransactionExpiry = 600
 	t.Run("test extra blocks contain exactly DefaultTransactionExpiry number of blocks below the sealed block", func(t *testing.T) {
-		util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.FollowerState) {
+		util.RunWithPebbleFollowerProtocolState(t, rootSnapshot, func(db *pebble.DB, state *bprotocol.FollowerState) {
 			root := unittest.BlockWithParentFixture(head)
 			buildFinalizedBlock(t, state, root)
 
@@ -646,7 +644,7 @@ func TestSealingSegment(t *testing.T) {
 	// ROOT <- B1 <- B2 <- B3(Seal_B1) <- B4 <- ... <- LastBlock(Seal_B2, Seal_B3, Seal_B4)
 	// Expected sealing segment: [B4, ..., B5], Extra blocks: [Root, B1, B2, B3]
 	t.Run("highest block seals outside segment", func(t *testing.T) {
-		util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.FollowerState) {
+		util.RunWithPebbleFollowerProtocolState(t, rootSnapshot, func(db *pebble.DB, state *bprotocol.FollowerState) {
 			// build a block to seal
 			block1 := unittest.BlockWithParentFixture(head)
 			buildFinalizedBlock(t, state, block1)
@@ -743,7 +741,7 @@ func TestSealingSegment_FailureCases(t *testing.T) {
 		// Step 2: bootstrapping new state based on sealing segment whose head is block b3.
 		// Thereby, the state should have b3 as its local root block. In addition, the blocks contained in the sealing
 		// segment, such as b2 should be stored in the state.
-		util.RunWithFollowerProtocolState(t, multipleBlockSnapshot, func(db *badger.DB, state *bprotocol.FollowerState) {
+		util.RunWithPebbleFollowerProtocolState(t, multipleBlockSnapshot, func(db *pebble.DB, state *bprotocol.FollowerState) {
 			localStateRootBlock, err := state.Params().FinalizedRoot()
 			require.NoError(t, err)
 			assert.Equal(t, b3.ID(), localStateRootBlock.ID())
@@ -762,7 +760,7 @@ func TestSealingSegment_FailureCases(t *testing.T) {
 
 	// SCENARIO 2a: A pending block is chosen as head; at this height no block has been finalized.
 	t.Run("sealing segment from unfinalized, pending block", func(t *testing.T) {
-		util.RunWithFollowerProtocolState(t, sporkRootSnapshot, func(db *badger.DB, state *bprotocol.FollowerState) {
+		util.RunWithPebbleFollowerProtocolState(t, sporkRootSnapshot, func(db *pebble.DB, state *bprotocol.FollowerState) {
 			// add _unfinalized_ blocks b1 and b2 to state (block b5 is necessary, so b1 has a QC, which is a consistency requirement for subsequent finality)
 			b1 := unittest.BlockWithParentFixture(sporkRoot)
 			b2 := unittest.BlockWithParentFixture(b1.Header)
@@ -781,7 +779,7 @@ func TestSealingSegment_FailureCases(t *testing.T) {
 
 	// SCENARIO 2b: An orphaned block is chosen as head; at this height a block other than the orphaned has been finalized.
 	t.Run("sealing segment from orphaned block", func(t *testing.T) {
-		util.RunWithFollowerProtocolState(t, sporkRootSnapshot, func(db *badger.DB, state *bprotocol.FollowerState) {
+		util.RunWithPebbleFollowerProtocolState(t, sporkRootSnapshot, func(db *pebble.DB, state *bprotocol.FollowerState) {
 			orphaned := unittest.BlockWithParentFixture(sporkRoot)
 			orphanedChild := unittest.BlockWithParentFixture(orphaned.Header)
 			require.NoError(t, state.ExtendCertified(context.Background(), orphaned, orphanedChild.Header.QuorumCertificate()))
@@ -815,7 +813,7 @@ func TestBootstrapSealingSegmentWithExtraBlocks(t *testing.T) {
 	collID := cluster.Members()[0].NodeID
 	head, err := rootSnapshot.Head()
 	require.NoError(t, err)
-	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
+	util.RunWithPebbleFullProtocolState(t, rootSnapshot, func(db *pebble.DB, state *bprotocol.ParticipantState) {
 		block1 := unittest.BlockWithParentFixture(head)
 		buildFinalizedBlock(t, state, block1)
 		receipt1, seal1 := unittest.ReceiptAndSealForBlock(block1)
@@ -856,7 +854,7 @@ func TestBootstrapSealingSegmentWithExtraBlocks(t *testing.T) {
 		assertSealingSegmentBlocksQueryableAfterBootstrap(t, snapshot)
 
 		// bootstrap from snapshot
-		util.RunWithFullProtocolState(t, snapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
+		util.RunWithPebbleFullProtocolState(t, snapshot, func(db *pebble.DB, state *bprotocol.ParticipantState) {
 			block7 := unittest.BlockWithParentFixture(block6.Header)
 			guarantee := unittest.CollectionGuaranteeFixture(unittest.WithCollRef(block1.ID()))
 			guarantee.ChainID = cluster.ChainID()
@@ -877,7 +875,7 @@ func TestLatestSealedResult(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
 
 	t.Run("root snapshot", func(t *testing.T) {
-		util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.FollowerState) {
+		util.RunWithPebbleFollowerProtocolState(t, rootSnapshot, func(db *pebble.DB, state *bprotocol.FollowerState) {
 			gotResult, gotSeal, err := state.Final().SealedResult()
 			require.NoError(t, err)
 			expectedResult, expectedSeal, err := rootSnapshot.SealedResult()
@@ -892,7 +890,7 @@ func TestLatestSealedResult(t *testing.T) {
 		head, err := rootSnapshot.Head()
 		require.NoError(t, err)
 
-		util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.FollowerState) {
+		util.RunWithPebbleFollowerProtocolState(t, rootSnapshot, func(db *pebble.DB, state *bprotocol.FollowerState) {
 			block1 := unittest.BlockWithParentFixture(head)
 
 			block2 := unittest.BlockWithParentFixture(block1.Header)
@@ -967,7 +965,7 @@ func TestQuorumCertificate(t *testing.T) {
 
 	// should not be able to get QC or random beacon seed from a block with no children
 	t.Run("no QC available", func(t *testing.T) {
-		util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
+		util.RunWithPebbleFullProtocolState(t, rootSnapshot, func(db *pebble.DB, state *bprotocol.ParticipantState) {
 
 			// create a block to query
 			block1 := unittest.BlockWithParentFixture(head)
@@ -985,7 +983,7 @@ func TestQuorumCertificate(t *testing.T) {
 
 	// should be able to get QC and random beacon seed from root block
 	t.Run("root block", func(t *testing.T) {
-		util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.FollowerState) {
+		util.RunWithPebbleFollowerProtocolState(t, rootSnapshot, func(db *pebble.DB, state *bprotocol.FollowerState) {
 			// since we bootstrap with a root snapshot, this will be the root block
 			_, err := state.AtBlockID(head.ID()).QuorumCertificate()
 			assert.NoError(t, err)
@@ -997,7 +995,7 @@ func TestQuorumCertificate(t *testing.T) {
 
 	// should be able to get QC and random beacon seed from a certified block
 	t.Run("follower-block-processable", func(t *testing.T) {
-		util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.FollowerState) {
+		util.RunWithPebbleFollowerProtocolState(t, rootSnapshot, func(db *pebble.DB, state *bprotocol.FollowerState) {
 
 			// add a block so we aren't testing against root
 			block1 := unittest.BlockWithParentFixture(head)
@@ -1021,7 +1019,7 @@ func TestQuorumCertificate(t *testing.T) {
 
 	// should be able to get QC and random beacon seed from a block with child(has to be certified)
 	t.Run("participant-block-processable", func(t *testing.T) {
-		util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
+		util.RunWithPebbleFullProtocolState(t, rootSnapshot, func(db *pebble.DB, state *bprotocol.ParticipantState) {
 			// create a block to query
 			block1 := unittest.BlockWithParentFixture(head)
 			block1.SetPayload(flow.EmptyPayload())
@@ -1053,7 +1051,7 @@ func TestSnapshot_EpochQuery(t *testing.T) {
 	result, _, err := rootSnapshot.SealedResult()
 	require.NoError(t, err)
 
-	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
+	util.RunWithPebbleFullProtocolState(t, rootSnapshot, func(db *pebble.DB, state *bprotocol.ParticipantState) {
 		epoch1Counter := result.ServiceEvents[0].Event.(*flow.EpochSetup).Counter
 		epoch2Counter := epoch1Counter + 1
 
@@ -1144,7 +1142,7 @@ func TestSnapshot_EpochFirstView(t *testing.T) {
 	result, _, err := rootSnapshot.SealedResult()
 	require.NoError(t, err)
 
-	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
+	util.RunWithPebbleFullProtocolState(t, rootSnapshot, func(db *pebble.DB, state *bprotocol.ParticipantState) {
 
 		epochBuilder := unittest.NewEpochBuilder(t, state)
 		// build epoch 1 (prepare epoch 2)
@@ -1225,7 +1223,7 @@ func TestSnapshot_EpochHeightBoundaries(t *testing.T) {
 	head, err := rootSnapshot.Head()
 	require.NoError(t, err)
 
-	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
+	util.RunWithPebbleFullProtocolState(t, rootSnapshot, func(db *pebble.DB, state *bprotocol.ParticipantState) {
 
 		epochBuilder := unittest.NewEpochBuilder(t, state)
 
@@ -1306,7 +1304,7 @@ func TestSnapshot_CrossEpochIdentities(t *testing.T) {
 	epoch3Identities := unittest.IdentityListFixture(10, unittest.WithAllRoles())
 
 	rootSnapshot := unittest.RootSnapshotFixture(epoch1Identities)
-	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
+	util.RunWithPebbleFullProtocolState(t, rootSnapshot, func(db *pebble.DB, state *bprotocol.ParticipantState) {
 
 		epochBuilder := unittest.NewEpochBuilder(t, state)
 		// build epoch 1 (prepare epoch 2)
@@ -1429,7 +1427,7 @@ func TestSnapshot_PostSporkIdentities(t *testing.T) {
 	rootSnapshot, err := inmem.SnapshotFromBootstrapState(root, result, seal, qc)
 	require.NoError(t, err)
 
-	util.RunWithBootstrapState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.State) {
+	util.RunWithPebbleBootstrapState(t, rootSnapshot, func(db *pebble.DB, state *bprotocol.State) {
 		actual, err := state.Final().Identities(filter.Any)
 		require.NoError(t, err)
 		assert.ElementsMatch(t, expected, actual)

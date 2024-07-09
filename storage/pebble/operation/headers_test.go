@@ -1,12 +1,10 @@
-// (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
-
 package operation
 
 import (
 	"testing"
 	"time"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -16,7 +14,7 @@ import (
 )
 
 func TestHeaderInsertCheckRetrieve(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
 		expected := &flow.Header{
 			View:               1337,
 			Timestamp:          time.Now().UTC(),
@@ -29,11 +27,11 @@ func TestHeaderInsertCheckRetrieve(t *testing.T) {
 		}
 		blockID := expected.ID()
 
-		err := db.Update(InsertHeader(expected.ID(), expected))
+		err := InsertHeader(expected.ID(), expected)(db)
 		require.Nil(t, err)
 
 		var actual flow.Header
-		err = db.View(RetrieveHeader(blockID, &actual))
+		err = RetrieveHeader(blockID, &actual)(db)
 		require.Nil(t, err)
 
 		assert.Equal(t, *expected, actual)
@@ -41,32 +39,32 @@ func TestHeaderInsertCheckRetrieve(t *testing.T) {
 }
 
 func TestHeaderIDIndexByCollectionID(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
 
 		headerID := unittest.IdentifierFixture()
 		collectionID := unittest.IdentifierFixture()
 
-		err := db.Update(IndexCollectionBlock(collectionID, headerID))
+		err := IndexCollectionBlock(collectionID, headerID)(db)
 		require.Nil(t, err)
 
 		actualID := &flow.Identifier{}
-		err = db.View(LookupCollectionBlock(collectionID, actualID))
+		err = LookupCollectionBlock(collectionID, actualID)(db)
 		require.Nil(t, err)
 		assert.Equal(t, headerID, *actualID)
 	})
 }
 
 func TestBlockHeightIndexLookup(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
 
 		height := uint64(1337)
 		expected := flow.Identifier{0x01, 0x02, 0x03}
 
-		err := db.Update(IndexBlockHeight(height, expected))
+		err := IndexBlockHeight(height, expected)(db)
 		require.Nil(t, err)
 
 		var actual flow.Identifier
-		err = db.View(LookupBlockHeight(height, &actual))
+		err = LookupBlockHeight(height, &actual)(db)
 		require.Nil(t, err)
 
 		assert.Equal(t, expected, actual)

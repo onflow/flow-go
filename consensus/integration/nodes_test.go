@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble"
 	"github.com/gammazero/workerpool"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
@@ -51,13 +51,13 @@ import (
 	msig "github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/state/protocol"
-	bprotocol "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
 	"github.com/onflow/flow-go/state/protocol/events"
 	"github.com/onflow/flow-go/state/protocol/inmem"
+	bprotocol "github.com/onflow/flow-go/state/protocol/pebble"
 	"github.com/onflow/flow-go/state/protocol/util"
-	storage "github.com/onflow/flow-go/storage/badger"
 	storagemock "github.com/onflow/flow-go/storage/mock"
+	storage "github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -134,7 +134,7 @@ func (p *ConsensusParticipants) Update(epochCounter uint64, data *run.Participan
 }
 
 type Node struct {
-	db                *badger.DB
+	db                *pebble.DB
 	dbDir             string
 	index             int
 	log               zerolog.Logger
@@ -359,7 +359,7 @@ func createNode(
 	epochLookup module.EpochLookup,
 ) *Node {
 
-	db, dbDir := unittest.TempBadgerDB(t)
+	db, dbDir := unittest.TempPebbleDB(t)
 	metricsCollector := metrics.NewNoopCollector()
 	tracer := trace.NewNoopTracer()
 
@@ -458,7 +458,7 @@ func createNode(
 	seals := stdmap.NewIncorporatedResultSeals(sealLimit)
 
 	// initialize the block builder
-	build, err := builder.NewBuilder(metricsCollector, db, fullState, headersDB, sealsDB, indexDB, blocksDB, resultsDB, receiptsDB,
+	build, err := builder.NewBuilderPebble(metricsCollector, db, fullState, headersDB, sealsDB, indexDB, blocksDB, resultsDB, receiptsDB,
 		guarantees, consensusMempools.NewIncorporatedResultSeals(seals, receiptsDB), receipts, tracer)
 	require.NoError(t, err)
 
@@ -477,7 +477,7 @@ func createNode(
 	protocolStateEvents.AddConsumer(committee)
 
 	// initialize the block finalizer
-	final := finalizer.NewFinalizer(db, headersDB, fullState, trace.NewNoopTracer())
+	final := finalizer.NewFinalizerPebble(db, headersDB, fullState, trace.NewNoopTracer())
 
 	syncCore, err := synccore.New(log, synccore.DefaultConfig(), metricsCollector, rootHeader.ChainID)
 	require.NoError(t, err)
@@ -512,7 +512,7 @@ func createNode(
 
 	signer := verification.NewCombinedSigner(me, beaconKeyStore)
 
-	persist := persister.New(db, rootHeader.ChainID)
+	persist := persister.NewPersisterPebble(db, rootHeader.ChainID)
 
 	livenessData, err := persist.GetLivenessData()
 	require.NoError(t, err)

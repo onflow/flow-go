@@ -1,10 +1,10 @@
-package badger_test
+package pebble_test
 
 import (
 	"errors"
 	"testing"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -12,14 +12,15 @@ import (
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/unittest"
 
-	badgerstorage "github.com/onflow/flow-go/storage/badger"
+	pebblestorage "github.com/onflow/flow-go/storage/pebble"
+	"github.com/onflow/flow-go/storage/pebble/operation"
 )
 
 // TestEpochCommitStoreAndRetrieve tests that a commit can be stored, retrieved and attempted to be stored again without an error
 func TestEpochCommitStoreAndRetrieve(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
 		metrics := metrics.NewNoopCollector()
-		store := badgerstorage.NewEpochCommits(metrics, db)
+		store := pebblestorage.NewEpochCommits(metrics, db)
 
 		// attempt to get a invalid commit
 		_, err := store.ByID(unittest.IdentifierFixture())
@@ -27,8 +28,10 @@ func TestEpochCommitStoreAndRetrieve(t *testing.T) {
 
 		// store a commit in db
 		expected := unittest.EpochCommitFixture()
-		err = store.Store(expected)
+		writer := operation.NewPebbleReaderBatchWriter(db)
+		err = store.StorePebble(expected)(writer)
 		require.NoError(t, err)
+		require.NoError(t, writer.Commit())
 
 		// retrieve the commit by ID
 		actual, err := store.ByID(expected.ID())
@@ -36,7 +39,9 @@ func TestEpochCommitStoreAndRetrieve(t *testing.T) {
 		assert.Equal(t, expected, actual)
 
 		// test storing same epoch commit
-		err = store.Store(expected)
+		writer = operation.NewPebbleReaderBatchWriter(db)
+		err = store.StorePebble(expected)(writer)
 		require.NoError(t, err)
+		require.NoError(t, writer.Commit())
 	})
 }

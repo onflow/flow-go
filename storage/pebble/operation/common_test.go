@@ -1,22 +1,44 @@
-// (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
-
 package operation
 
 import (
 	"bytes"
+	"encoding/hex"
 	"fmt"
-	"reflect"
 	"testing"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/vmihailenco/msgpack/v4"
+	"github.com/vmihailenco/msgpack"
 
-	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/unittest"
 )
+
+var upsert = insert
+var update = insert
+
+func TestGetStartEndKeys(t *testing.T) {
+	tests := []struct {
+		prefix        []byte
+		expectedStart []byte
+		expectedEnd   []byte
+	}{
+		{[]byte("a"), []byte("a"), []byte("b")},
+		{[]byte("abc"), []byte("abc"), []byte("abd")},
+		{[]byte("prefix"), []byte("prefix"), []byte("prefiy")},
+	}
+
+	for _, test := range tests {
+		start, end := getStartEndKeys(test.prefix)
+		if !bytes.Equal(start, test.expectedStart) {
+			t.Errorf("getStartEndKeys(%q) start = %q; want %q", test.prefix, start, test.expectedStart)
+		}
+		if !bytes.Equal(end, test.expectedEnd) {
+			t.Errorf("getStartEndKeys(%q) end = %q; want %q", test.prefix, end, test.expectedEnd)
+		}
+	}
+}
 
 type Entity struct {
 	ID uint64
@@ -44,197 +66,143 @@ func (a UnencodeableEntity) UnmarshalMsgpack(b []byte) error {
 }
 
 func TestInsertValid(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
 		e := Entity{ID: 1337}
 		key := []byte{0x01, 0x02, 0x03}
 		val, _ := msgpack.Marshal(e)
 
-		err := db.Update(insert(key, e))
+		err := insert(key, e)(db)
 		require.NoError(t, err)
 
 		var act []byte
-		_ = db.View(func(tx *badger.Txn) error {
-			item, err := tx.Get(key)
-			require.NoError(t, err)
-			act, err = item.ValueCopy(nil)
-			require.NoError(t, err)
-			return nil
-		})
+		act, closer, err := db.Get(key)
+		require.NoError(t, err)
+		defer require.NoError(t, closer.Close())
 
 		assert.Equal(t, val, act)
 	})
 }
 
 func TestInsertDuplicate(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
 		e := Entity{ID: 1337}
 		key := []byte{0x01, 0x02, 0x03}
-		val, _ := msgpack.Marshal(e)
 
 		// persist first time
-		err := db.Update(insert(key, e))
+		err := insert(key, e)(db)
 		require.NoError(t, err)
 
 		e2 := Entity{ID: 1338}
+		val, _ := msgpack.Marshal(e2)
 
-		// persist again
-		err = db.Update(insert(key, e2))
-		require.Error(t, err)
-		require.ErrorIs(t, err, storage.ErrAlreadyExists)
+		// persist again will override
+		err = insert(key, e2)(db)
+		require.NoError(t, err)
 
-		// ensure old value did not update
-		var act []byte
-		_ = db.View(func(tx *badger.Txn) error {
-			item, err := tx.Get(key)
-			require.NoError(t, err)
-			act, err = item.ValueCopy(nil)
-			require.NoError(t, err)
-			return nil
-		})
+		// ensure old value did not insert
+		act, closer, err := db.Get(key)
+		require.NoError(t, err)
+		defer require.NoError(t, closer.Close())
 
 		assert.Equal(t, val, act)
 	})
 }
 
 func TestInsertEncodingError(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
 		e := Entity{ID: 1337}
 		key := []byte{0x01, 0x02, 0x03}
 
-		err := db.Update(insert(key, UnencodeableEntity(e)))
+		err := insert(key, UnencodeableEntity(e))(db)
 		require.Error(t, err, errCantEncode)
 		require.NotErrorIs(t, err, storage.ErrNotFound)
 	})
 }
 
 func TestUpdateValid(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
 		e := Entity{ID: 1337}
 		key := []byte{0x01, 0x02, 0x03}
 		val, _ := msgpack.Marshal(e)
 
-		_ = db.Update(func(tx *badger.Txn) error {
-			err := tx.Set(key, []byte{})
-			require.NoError(t, err)
-			return nil
-		})
-
-		err := db.Update(update(key, e))
+		err := db.Set(key, []byte{}, nil)
 		require.NoError(t, err)
 
-		var act []byte
-		_ = db.View(func(tx *badger.Txn) error {
-			item, err := tx.Get(key)
-			require.NoError(t, err)
-			act, err = item.ValueCopy(nil)
-			require.NoError(t, err)
-			return nil
-		})
+		err = insert(key, e)(db)
+		require.NoError(t, err)
+
+		act, closer, err := db.Get(key)
+		require.NoError(t, err)
+		defer require.NoError(t, closer.Close())
 
 		assert.Equal(t, val, act)
 	})
 }
 
-func TestUpdateMissing(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		e := Entity{ID: 1337}
-		key := []byte{0x01, 0x02, 0x03}
-
-		err := db.Update(update(key, e))
-		require.ErrorIs(t, err, storage.ErrNotFound)
-
-		// ensure nothing was written
-		_ = db.View(func(tx *badger.Txn) error {
-			_, err := tx.Get(key)
-			require.Equal(t, badger.ErrKeyNotFound, err)
-			return nil
-		})
-	})
-}
-
 func TestUpdateEncodingError(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
 		e := Entity{ID: 1337}
 		key := []byte{0x01, 0x02, 0x03}
 		val, _ := msgpack.Marshal(e)
 
-		_ = db.Update(func(tx *badger.Txn) error {
-			err := tx.Set(key, val)
-			require.NoError(t, err)
-			return nil
-		})
+		err := db.Set(key, val, nil)
+		require.NoError(t, err)
 
-		err := db.Update(update(key, UnencodeableEntity(e)))
+		err = insert(key, UnencodeableEntity(e))(db)
 		require.Error(t, err)
 		require.NotErrorIs(t, err, storage.ErrNotFound)
 
 		// ensure value did not change
-		var act []byte
-		_ = db.View(func(tx *badger.Txn) error {
-			item, err := tx.Get(key)
-			require.NoError(t, err)
-			act, err = item.ValueCopy(nil)
-			require.NoError(t, err)
-			return nil
-		})
+		act, closer, err := db.Get(key)
+		require.NoError(t, err)
+		defer require.NoError(t, closer.Close())
 
 		assert.Equal(t, val, act)
 	})
 }
 
 func TestUpsertEntry(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
 		e := Entity{ID: 1337}
 		key := []byte{0x01, 0x02, 0x03}
 		val, _ := msgpack.Marshal(e)
 
 		// first upsert an non-existed entry
-		err := db.Update(insert(key, e))
+		err := insert(key, e)(db)
 		require.NoError(t, err)
 
-		var act []byte
-		_ = db.View(func(tx *badger.Txn) error {
-			item, err := tx.Get(key)
-			require.NoError(t, err)
-			act, err = item.ValueCopy(nil)
-			require.NoError(t, err)
-			return nil
-		})
+		act, closer, err := db.Get(key)
+		require.NoError(t, err)
+		defer require.NoError(t, closer.Close())
+		require.NoError(t, err)
 
 		assert.Equal(t, val, act)
 
 		// next upsert the value with the same key
 		newEntity := Entity{ID: 1338}
 		newVal, _ := msgpack.Marshal(newEntity)
-		err = db.Update(upsert(key, newEntity))
+		err = upsert(key, newEntity)(db)
 		require.NoError(t, err)
 
-		_ = db.View(func(tx *badger.Txn) error {
-			item, err := tx.Get(key)
-			require.NoError(t, err)
-			act, err = item.ValueCopy(nil)
-			require.NoError(t, err)
-			return nil
-		})
+		act, closer, err = db.Get(key)
+		require.NoError(t, err)
+		defer require.NoError(t, closer.Close())
 
 		assert.Equal(t, newVal, act)
 	})
 }
 
 func TestRetrieveValid(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
 		e := Entity{ID: 1337}
 		key := []byte{0x01, 0x02, 0x03}
 		val, _ := msgpack.Marshal(e)
 
-		_ = db.Update(func(tx *badger.Txn) error {
-			err := tx.Set(key, val)
-			require.NoError(t, err)
-			return nil
-		})
+		err := db.Set(key, val, nil)
+		require.NoError(t, err)
 
 		var act Entity
-		err := db.View(retrieve(key, &act))
+		err = retrieve(key, &act)(db)
 		require.NoError(t, err)
 
 		assert.Equal(t, e, act)
@@ -242,29 +210,26 @@ func TestRetrieveValid(t *testing.T) {
 }
 
 func TestRetrieveMissing(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
 		key := []byte{0x01, 0x02, 0x03}
 
 		var act Entity
-		err := db.View(retrieve(key, &act))
+		err := retrieve(key, &act)(db)
 		require.ErrorIs(t, err, storage.ErrNotFound)
 	})
 }
 
 func TestRetrieveUnencodeable(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
 		e := Entity{ID: 1337}
 		key := []byte{0x01, 0x02, 0x03}
 		val, _ := msgpack.Marshal(e)
 
-		_ = db.Update(func(tx *badger.Txn) error {
-			err := tx.Set(key, val)
-			require.NoError(t, err)
-			return nil
-		})
+		err := db.Set(key, val, nil)
+		require.NoError(t, err)
 
 		var act *UnencodeableEntity
-		err := db.View(retrieve(key, &act))
+		err = retrieve(key, &act)(db)
 		require.Error(t, err)
 		require.NotErrorIs(t, err, storage.ErrNotFound)
 	})
@@ -272,22 +237,22 @@ func TestRetrieveUnencodeable(t *testing.T) {
 
 // TestExists verifies that `exists` returns correct results in different scenarios.
 func TestExists(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
 		t.Run("non-existent key", func(t *testing.T) {
 			key := unittest.RandomBytes(32)
 			var _exists bool
-			err := db.View(exists(key, &_exists))
+			err := exists(key, &_exists)(db)
 			require.NoError(t, err)
 			assert.False(t, _exists)
 		})
 
 		t.Run("existent key", func(t *testing.T) {
 			key := unittest.RandomBytes(32)
-			err := db.Update(insert(key, unittest.RandomBytes(256)))
+			err := insert(key, unittest.RandomBytes(256))(db)
 			require.NoError(t, err)
 
 			var _exists bool
-			err = db.View(exists(key, &_exists))
+			err = exists(key, &_exists)(db)
 			require.NoError(t, err)
 			assert.True(t, _exists)
 		})
@@ -295,60 +260,40 @@ func TestExists(t *testing.T) {
 		t.Run("removed key", func(t *testing.T) {
 			key := unittest.RandomBytes(32)
 			// insert, then remove the key
-			err := db.Update(insert(key, unittest.RandomBytes(256)))
+			err := insert(key, unittest.RandomBytes(256))(db)
 			require.NoError(t, err)
-			err = db.Update(remove(key))
+			err = remove(key)(db)
 			require.NoError(t, err)
 
 			var _exists bool
-			err = db.View(exists(key, &_exists))
+			err = exists(key, &_exists)(db)
 			require.NoError(t, err)
 			assert.False(t, _exists)
 		})
 	})
 }
 
-func TestLookup(t *testing.T) {
-	expected := []flow.Identifier{
-		{0x01},
-		{0x02},
-		{0x03},
-		{0x04},
-	}
-	actual := []flow.Identifier{}
-
-	iterationFunc := lookup(&actual)
-
-	for _, e := range expected {
-		checkFunc, createFunc, handleFunc := iterationFunc()
-		assert.True(t, checkFunc([]byte{0x00}))
-		target := createFunc()
-		assert.IsType(t, &flow.Identifier{}, target)
-
-		// set the value to target. Need to use reflection here since target is not strongly typed
-		reflect.ValueOf(target).Elem().Set(reflect.ValueOf(e))
-
-		assert.NoError(t, handleFunc())
-	}
-
-	assert.Equal(t, expected, actual)
-}
-
 func TestIterate(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
 		keys := [][]byte{{0x00}, {0x12}, {0xf0}, {0xff}}
 		vals := []bool{false, false, true, true}
 		expected := []bool{false, true}
 
-		_ = db.Update(func(tx *badger.Txn) error {
+		require.NoError(t, WithReaderBatchWriter(db, func(tx storage.PebbleReaderBatchWriter) error {
+			_, w := tx.ReaderWriter()
 			for i, key := range keys {
 				enc, err := msgpack.Marshal(vals[i])
-				require.NoError(t, err)
-				err = tx.Set(key, enc)
-				require.NoError(t, err)
+				if err != nil {
+					return err
+				}
+
+				err = w.Set(key, enc, nil)
+				if err != nil {
+					return err
+				}
 			}
 			return nil
-		})
+		}))
 
 		actual := make([]bool, 0, len(keys))
 		iterationFunc := func() (checkFunc, createFunc, handleFunc) {
@@ -366,7 +311,7 @@ func TestIterate(t *testing.T) {
 			return check, create, handle
 		}
 
-		err := db.View(iterate(keys[0], keys[2], iterationFunc))
+		err := iterate(keys[0], keys[2], iterationFunc, true)(db)
 		require.Nil(t, err)
 
 		assert.Equal(t, expected, actual)
@@ -374,20 +319,21 @@ func TestIterate(t *testing.T) {
 }
 
 func TestTraverse(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
 		keys := [][]byte{{0x42, 0x00}, {0xff}, {0x42, 0x56}, {0x00}, {0x42, 0xff}}
 		vals := []bool{false, false, true, false, true}
 		expected := []bool{false, true}
 
-		_ = db.Update(func(tx *badger.Txn) error {
+		require.NoError(t, WithReaderBatchWriter(db, func(tx storage.PebbleReaderBatchWriter) error {
+			_, w := tx.ReaderWriter()
 			for i, key := range keys {
 				enc, err := msgpack.Marshal(vals[i])
 				require.NoError(t, err)
-				err = tx.Set(key, enc)
+				err = w.Set(key, enc, nil)
 				require.NoError(t, err)
 			}
 			return nil
-		})
+		}))
 
 		actual := make([]bool, 0, len(keys))
 		iterationFunc := func() (checkFunc, createFunc, handleFunc) {
@@ -405,7 +351,7 @@ func TestTraverse(t *testing.T) {
 			return check, create, handle
 		}
 
-		err := db.View(traverse([]byte{0x42}, iterationFunc))
+		err := traverse([]byte{0x42}, iterationFunc)(db)
 		require.Nil(t, err)
 
 		assert.Equal(t, expected, actual)
@@ -413,60 +359,46 @@ func TestTraverse(t *testing.T) {
 }
 
 func TestRemove(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
 		e := Entity{ID: 1337}
 		key := []byte{0x01, 0x02, 0x03}
 		val, _ := msgpack.Marshal(e)
 
-		_ = db.Update(func(tx *badger.Txn) error {
-			err := tx.Set(key, val)
-			require.NoError(t, err)
-			return nil
-		})
+		err := db.Set(key, val, nil)
+		require.NoError(t, err)
 
 		t.Run("should be able to remove", func(t *testing.T) {
-			_ = db.Update(func(txn *badger.Txn) error {
-				err := remove(key)(txn)
-				assert.NoError(t, err)
+			err := remove(key)(db)
+			assert.NoError(t, err)
 
-				_, err = txn.Get(key)
-				assert.ErrorIs(t, err, badger.ErrKeyNotFound)
-
-				return nil
-			})
+			_, _, err = db.Get(key)
+			assert.ErrorIs(t, convertNotFoundError(err), storage.ErrNotFound)
 		})
 
-		t.Run("should error when removing non-existing value", func(t *testing.T) {
+		t.Run("should ok when removing non-existing value", func(t *testing.T) {
 			nonexistantKey := append(key, 0x01)
-			_ = db.Update(func(txn *badger.Txn) error {
-				err := remove(nonexistantKey)(txn)
-				assert.ErrorIs(t, err, storage.ErrNotFound)
-				assert.Error(t, err)
-				return nil
-			})
+			err := remove(nonexistantKey)(db)
+			assert.NoError(t, err)
 		})
 	})
 }
 
 func TestRemoveByPrefix(t *testing.T) {
 	t.Run("should no-op when removing non-existing value", func(t *testing.T) {
-		unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+		unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
 			e := Entity{ID: 1337}
 			key := []byte{0x01, 0x02, 0x03}
 			val, _ := msgpack.Marshal(e)
 
-			_ = db.Update(func(tx *badger.Txn) error {
-				err := tx.Set(key, val)
-				assert.NoError(t, err)
-				return nil
-			})
+			err := db.Set(key, val, nil)
+			assert.NoError(t, err)
 
 			nonexistantKey := append(key, 0x01)
-			err := db.Update(removeByPrefix(nonexistantKey))
+			err = removeByPrefix(nonexistantKey)(db)
 			assert.NoError(t, err)
 
 			var act Entity
-			err = db.View(retrieve(key, &act))
+			err = retrieve(key, &act)(db)
 			require.NoError(t, err)
 
 			assert.Equal(t, e, act)
@@ -474,53 +406,39 @@ func TestRemoveByPrefix(t *testing.T) {
 	})
 
 	t.Run("should be able to remove", func(t *testing.T) {
-		unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+		unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
 			e := Entity{ID: 1337}
 			key := []byte{0x01, 0x02, 0x03}
 			val, _ := msgpack.Marshal(e)
 
-			_ = db.Update(func(tx *badger.Txn) error {
-				err := tx.Set(key, val)
-				assert.NoError(t, err)
-				return nil
-			})
+			err := db.Set(key, val, nil)
+			assert.NoError(t, err)
 
-			_ = db.Update(func(txn *badger.Txn) error {
-				prefix := []byte{0x01, 0x02}
-				err := removeByPrefix(prefix)(txn)
-				assert.NoError(t, err)
+			prefix := []byte{0x01, 0x02}
+			err = removeByPrefix(prefix)(db)
+			assert.NoError(t, err)
 
-				_, err = txn.Get(key)
-				assert.Error(t, err)
-				assert.IsType(t, badger.ErrKeyNotFound, err)
-
-				return nil
-			})
+			_, _, err = db.Get(key)
+			assert.Error(t, err)
+			assert.ErrorIs(t, convertNotFoundError(err), storage.ErrNotFound)
 		})
 	})
 
 	t.Run("should be able to remove by key", func(t *testing.T) {
-		unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+		unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
 			e := Entity{ID: 1337}
 			key := []byte{0x01, 0x02, 0x03}
 			val, _ := msgpack.Marshal(e)
 
-			_ = db.Update(func(tx *badger.Txn) error {
-				err := tx.Set(key, val)
-				assert.NoError(t, err)
-				return nil
-			})
+			err := db.Set(key, val, nil)
+			assert.NoError(t, err)
 
-			_ = db.Update(func(txn *badger.Txn) error {
-				err := removeByPrefix(key)(txn)
-				assert.NoError(t, err)
+			err = removeByPrefix(key)(db)
+			assert.NoError(t, err)
 
-				_, err = txn.Get(key)
-				assert.Error(t, err)
-				assert.IsType(t, badger.ErrKeyNotFound, err)
-
-				return nil
-			})
+			_, _, err = db.Get(key)
+			assert.Error(t, err)
+			assert.ErrorIs(t, convertNotFoundError(err), storage.ErrNotFound)
 		})
 	})
 }
@@ -550,34 +468,33 @@ func TestIterateBoundaries(t *testing.T) {
 		{0x21, 0x00},
 	}
 
-	// set the maximum current DB key range
-	for _, key := range keys {
-		if uint32(len(key)) > max {
-			max = uint32(len(key))
-		}
+	// keys within the expected range
+	keysInRange := make([]string, 0)
+	for i := 1; i < 11; i++ {
+		key := keys[i]
+		keysInRange = append(keysInRange, hex.EncodeToString(key))
 	}
 
-	// keys within the expected range
-	keysInRange := keys[1:11]
-
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
 
 		// insert the keys into the database
-		_ = db.Update(func(tx *badger.Txn) error {
+		require.NoError(t, WithReaderBatchWriter(db, func(tx storage.PebbleReaderBatchWriter) error {
+			_, w := tx.ReaderWriter()
 			for _, key := range keys {
-				err := tx.Set(key, []byte{0x00})
+				err := w.Set(key, []byte{0x00}, nil)
 				if err != nil {
 					return err
 				}
 			}
 			return nil
-		})
+		}))
 
 		// define iteration function that simply appends all traversed keys
-		var found [][]byte
+		found := make([]string, 0)
+
 		iteration := func() (checkFunc, createFunc, handleFunc) {
 			check := func(key []byte) bool {
-				found = append(found, key)
+				found = append(found, hex.EncodeToString(key))
 				return false
 			}
 			create := func() interface{} {
@@ -590,27 +507,19 @@ func TestIterateBoundaries(t *testing.T) {
 		}
 
 		// iterate forward and check boundaries are included correctly
-		found = nil
-		err := db.View(iterate(start, end, iteration))
+		err := iterate(start, end, iteration, false)(db)
 		for i, f := range found {
 			t.Logf("forward %d: %x", i, f)
 		}
 		require.NoError(t, err, "should iterate forward without error")
 		assert.ElementsMatch(t, keysInRange, found, "forward iteration should go over correct keys")
 
-		// iterate backward and check boundaries are included correctly
-		found = nil
-		err = db.View(iterate(end, start, iteration))
-		for i, f := range found {
-			t.Logf("backward %d: %x", i, f)
-		}
-		require.NoError(t, err, "should iterate backward without error")
-		assert.ElementsMatch(t, keysInRange, found, "backward iteration should go over correct keys")
+		// iterate backward and check boundaries are not supported
 	})
 }
 
 func TestFindHighestAtOrBelow(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
 		prefix := []byte("test_prefix")
 
 		type Entity struct {
@@ -621,13 +530,14 @@ func TestFindHighestAtOrBelow(t *testing.T) {
 		entity2 := Entity{Value: 42}
 		entity3 := Entity{Value: 43}
 
-		err := db.Update(func(tx *badger.Txn) error {
+		require.NoError(t, WithReaderBatchWriter(db, func(tx storage.PebbleReaderBatchWriter) error {
+			_, w := tx.ReaderWriter()
 			key := append(prefix, b(uint64(15))...)
 			val, err := msgpack.Marshal(entity3)
 			if err != nil {
 				return err
 			}
-			err = tx.Set(key, val)
+			err = w.Set(key, val, nil)
 			if err != nil {
 				return err
 			}
@@ -637,7 +547,7 @@ func TestFindHighestAtOrBelow(t *testing.T) {
 			if err != nil {
 				return err
 			}
-			err = tx.Set(key, val)
+			err = w.Set(key, val, nil)
 			if err != nil {
 				return err
 			}
@@ -647,56 +557,55 @@ func TestFindHighestAtOrBelow(t *testing.T) {
 			if err != nil {
 				return err
 			}
-			err = tx.Set(key, val)
+			err = w.Set(key, val, nil)
 			if err != nil {
 				return err
 			}
 			return nil
-		})
-		require.NoError(t, err)
+		}))
 
 		var entity Entity
 
 		t.Run("target height exists", func(t *testing.T) {
-			err = findHighestAtOrBelow(
+			err := findHighestAtOrBelow(
 				prefix,
 				10,
-				&entity)(db.NewTransaction(false))
+				&entity)(db)
 			require.NoError(t, err)
 			require.Equal(t, uint64(42), entity.Value)
 		})
 
 		t.Run("target height above", func(t *testing.T) {
-			err = findHighestAtOrBelow(
+			err := findHighestAtOrBelow(
 				prefix,
 				11,
-				&entity)(db.NewTransaction(false))
+				&entity)(db)
 			require.NoError(t, err)
 			require.Equal(t, uint64(42), entity.Value)
 		})
 
 		t.Run("target height above highest", func(t *testing.T) {
-			err = findHighestAtOrBelow(
+			err := findHighestAtOrBelow(
 				prefix,
 				20,
-				&entity)(db.NewTransaction(false))
+				&entity)(db)
 			require.NoError(t, err)
 			require.Equal(t, uint64(43), entity.Value)
 		})
 
 		t.Run("target height below lowest", func(t *testing.T) {
-			err = findHighestAtOrBelow(
+			err := findHighestAtOrBelow(
 				prefix,
 				4,
-				&entity)(db.NewTransaction(false))
+				&entity)(db)
 			require.ErrorIs(t, err, storage.ErrNotFound)
 		})
 
 		t.Run("empty prefix", func(t *testing.T) {
-			err = findHighestAtOrBelow(
+			err := findHighestAtOrBelow(
 				[]byte{},
 				5,
-				&entity)(db.NewTransaction(false))
+				&entity)(db)
 			require.Error(t, err)
 			require.Contains(t, err.Error(), "prefix must not be empty")
 		})

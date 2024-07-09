@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble"
 	madns "github.com/multiformats/go-multiaddr-dns"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
@@ -27,7 +27,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/events"
-	bstorage "github.com/onflow/flow-go/storage/badger"
+	bstorage "github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/utils/grpcutils"
 )
 
@@ -218,7 +218,7 @@ type BaseConfig struct {
 	MetricsEnabled              bool
 	guaranteesCacheSize         uint
 	receiptsCacheSize           uint
-	db                          *badger.DB
+	db                          *pebble.DB
 	HeroCacheMetricsEnable      bool
 	SyncCoreConfig              chainsync.Config
 	CodecFactory                func() network.Codec
@@ -254,8 +254,8 @@ type NodeConfig struct {
 	ConfigManager     *updatable_configs.Manager
 	MetricsRegisterer prometheus.Registerer
 	Metrics           Metrics
-	DB                *badger.DB
-	SecretsDB         *badger.DB
+	DB                *pebble.DB
+	SecretsDB         *pebble.DB
 	Storage           Storage
 	ProtocolEvents    *events.Distributor
 	State             protocol.State

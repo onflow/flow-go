@@ -1,4 +1,4 @@
-package badger
+package pebble
 
 import (
 	"context"
@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble"
 
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
@@ -17,8 +17,8 @@ import (
 	clusterstate "github.com/onflow/flow-go/state/cluster"
 	"github.com/onflow/flow-go/state/fork"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/badger/operation"
-	"github.com/onflow/flow-go/storage/badger/procedure"
+	"github.com/onflow/flow-go/storage/pebble/operation"
+	"github.com/onflow/flow-go/storage/pebble/procedure"
 )
 
 type MutableState struct {
@@ -57,7 +57,7 @@ func (m *MutableState) getExtendCtx(candidate *cluster.Block) (extendContext, er
 	var ctx extendContext
 	ctx.candidate = candidate
 
-	err := m.State.db.View(func(tx *badger.Txn) error {
+	err := (func(tx pebble.Reader) error {
 		// get the latest finalized cluster block and latest finalized consensus height
 		ctx.finalizedClusterBlock = new(flow.Header)
 		err := procedure.RetrieveLatestFinalizedClusterHeader(candidate.Header.ChainID, ctx.finalizedClusterBlock)(tx)
@@ -83,7 +83,7 @@ func (m *MutableState) getExtendCtx(candidate *cluster.Block) (extendContext, er
 		}
 		ctx.epochHasEnded = true
 		return nil
-	})
+	})(m.State.db)
 	if err != nil {
 		return extendContext{}, fmt.Errorf("could not read required state information for Extend checks: %w", err)
 	}
@@ -138,7 +138,7 @@ func (m *MutableState) Extend(candidate *cluster.Block) error {
 	}
 
 	span, _ = m.tracer.StartSpanFromContext(ctx, trace.COLClusterStateMutatorExtendDBInsert)
-	err = operation.RetryOnConflict(m.State.db.Update, procedure.InsertClusterBlock(candidate))
+	err = operation.WithReaderBatchWriter(m.State.db, procedure.InsertClusterBlock(candidate))
 	span.End()
 	if err != nil {
 		return fmt.Errorf("could not insert cluster block: %w", err)
@@ -400,7 +400,7 @@ func (m *MutableState) checkDupeTransactionsInFinalizedAncestry(includedTransact
 		start = 0 // overflow check
 	}
 	end := maxRefHeight
-	err := m.db.View(operation.LookupClusterBlocksByReferenceHeightRange(start, end, &clusterBlockIDs))
+	err := operation.LookupClusterBlocksByReferenceHeightRange(start, end, &clusterBlockIDs)(m.db)
 	if err != nil {
 		return nil, fmt.Errorf("could not lookup finalized cluster blocks by reference height range [%d,%d]: %w", start, end, err)
 	}
