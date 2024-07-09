@@ -52,7 +52,7 @@ developed and refined based on the multi-year learnings of managing the deployme
 * Deployment branches, `master` containing a runnable snapshot of the most recent development state and feature branches are intuitively exactly what you
   would expect without further flow-specific context. We just _extend_ the common convention by a few edge cases accounting for the upgrade-constraints of a blockchain network:
   * On a specific deployment branch, there can only be non-breaking changes. This is to prevent accidents where we roll out new node
-    software incrementally to one node after another, but then discover later that there is some specific case where the two versions don't work together and mainnet halts. 
+    software incrementally to one node after another, but then discover later that there is some specific case where the two versions don't work together and network halts. 
   * Due to the limitations of upgrades that can be rolled out via HCUs, we have to separate spork-level features. That is the scenario we address with long-living
     feature branches and the spork branch.   
 * You may wonder why we don't just use a single spork branch right away. So `master` would contain all HCU-compatible upgrades and the spork-branch _in addition_ also the HCU-**in**compatible upgrades.
