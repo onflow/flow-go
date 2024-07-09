@@ -2335,8 +2335,6 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 			err = state.Extend(context.Background(), block9)
 			require.NoError(t, err)
 
-			// TODO: check EpochExtension notification using pub/sub mechanism when it is implemented.
-
 			epochProtocolState, err := state.AtBlockID(block9.ID()).EpochProtocolState()
 			require.NoError(t, err)
 			epochExtensions := epochProtocolState.Entry().CurrentEpoch.EpochExtensions
@@ -2347,6 +2345,11 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 			metricsMock.On("CurrentEpochFinalView", epoch2Setup.FinalView+epochs.DefaultEpochExtensionViewCount)
 			err = state.Finalize(context.Background(), block9.ID())
 			require.NoError(t, err)
+
+			// After epoch extension, FinalView must be updated accordingly
+			finalView, err := state.Final().Epochs().Current().FinalView()
+			require.NoError(t, err)
+			assert.Equal(t, epochExtensions[0].FinalView, finalView)
 
 			// Constructing blocks
 			//   ... <- B10 <- B11(ER(B4, EpochRecover)) <- B12(S(ER(B4))) <- ...
