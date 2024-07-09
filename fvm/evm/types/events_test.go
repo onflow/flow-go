@@ -119,7 +119,7 @@ func TestEVMTransactionExecutedEventCCFEncodingDecoding(t *testing.T) {
 	}
 
 	t.Run("evm.TransactionExecuted with failed status", func(t *testing.T) {
-		event := types.NewTransactionEvent(txResult, txBytes, blockHeight, blockHash)
+		event := types.NewTransactionEvent(txResult, txBytes, blockHeight)
 		ev, err := event.Payload.ToCadence(evmLocation)
 		require.NoError(t, err)
 
@@ -127,7 +127,6 @@ func TestEVMTransactionExecutedEventCCFEncodingDecoding(t *testing.T) {
 		require.NoError(t, err)
 
 		assert.Equal(t, tep.BlockHeight, blockHeight)
-		assert.Equal(t, tep.BlockHash, blockHash.Hex())
 		assert.Equal(t, tep.Hash, txHash.Hex())
 		assert.Equal(t, tep.Payload, txEncoded)
 		assert.Equal(t, types.ErrorCode(tep.ErrorCode), types.ExecutionErrCodeOutOfGas)
@@ -161,7 +160,7 @@ func TestEVMTransactionExecutedEventCCFEncodingDecoding(t *testing.T) {
 	t.Run("evm.TransactionExecuted with non-failed status", func(t *testing.T) {
 		txResult.VMError = nil
 
-		event := types.NewTransactionEvent(txResult, txBytes, blockHeight, blockHash)
+		event := types.NewTransactionEvent(txResult, txBytes, blockHeight)
 		ev, err := event.Payload.ToCadence(evmLocation)
 		require.NoError(t, err)
 
@@ -169,7 +168,6 @@ func TestEVMTransactionExecutedEventCCFEncodingDecoding(t *testing.T) {
 		require.NoError(t, err)
 
 		assert.Equal(t, tep.BlockHeight, blockHeight)
-		assert.Equal(t, tep.BlockHash, blockHash.Hex())
 		assert.Equal(t, tep.Hash, txHash.Hex())
 		assert.Equal(t, tep.Payload, txEncoded)
 		assert.Equal(t, types.ErrCodeNoError, types.ErrorCode(tep.ErrorCode))

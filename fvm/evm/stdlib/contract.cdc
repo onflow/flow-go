@@ -60,8 +60,6 @@ contract EVM {
         logs: String,
         // block height in which transaction was inclued
         blockHeight: UInt64,
-        // block hash in which transaction was included
-        blockHash: String,
         /// captures the hex encoded data that is returned from
         /// the evm. For contract deployments
         /// it returns the code deployed to
