@@ -308,4 +308,4 @@ require (
 replace github.com/onflow/flow-go => ../
 
 // TODO: remove after merged
-replace github.com/onflow/go-ethereum v1.13.4 => github.com/The-K-R-O-K/go-ethereum v0.0.0-20240708135526-51ceb66eba17
+replace github.com/onflow/go-ethereum v1.13.4 => github.com/The-K-R-O-K/go-ethereum v0.0.0-20240709125751-036ea21774de
