@@ -37,9 +37,9 @@ func TestBlockStore(t *testing.T) {
 			require.Equal(t, expectedParentHash, bp.ParentBlockHash)
 
 			// if no commit and again block proposal call should return the same
-			ret, err := bs.BlockProposal()
+			retbp, err := bs.BlockProposal()
 			require.NoError(t, err)
-			require.Equal(t, bp, ret)
+			require.Equal(t, bp, retbp)
 
 			// update the block proposal
 			bp.TotalGasUsed += 100
@@ -48,9 +48,9 @@ func TestBlockStore(t *testing.T) {
 
 			// reset the bs and check if it still return the block proposal
 			bs = handler.NewBlockStore(backend, root)
-			ret, err = bs.BlockProposal()
+			retbp, err = bs.BlockProposal()
 			require.NoError(t, err)
-			require.Equal(t, bp, ret)
+			require.Equal(t, bp, retbp)
 
 			// update the block proposal again
 			supply := big.NewInt(100)
@@ -58,20 +58,21 @@ func TestBlockStore(t *testing.T) {
 			err = bs.UpdateBlockProposal(bp)
 			require.NoError(t, err)
 			// this should still return the gensis block
-			ret, err = bs.LatestBlock()
+			retb, err := bs.LatestBlock()
 			require.NoError(t, err)
-			require.Equal(t, types.GenesisBlock, ret)
+			require.Equal(t, types.GenesisBlock, retb)
 
 			// commit the changes
-			err = bs.CommitBlockProposal()
+			err = bs.CommitBlockProposal(bp)
 			require.NoError(t, err)
-			b, err = bs.LatestBlock()
+			retb, err = bs.LatestBlock()
 			require.NoError(t, err)
-			require.Equal(t, supply, b.TotalSupply)
-			require.Equal(t, uint64(1), b.Height)
-			bp, err = bs.BlockProposal()
+			require.Equal(t, supply, retb.TotalSupply)
+			require.Equal(t, uint64(1), retb.Height)
+
+			retbp, err = bs.BlockProposal()
 			require.NoError(t, err)
-			require.Equal(t, uint64(2), bp.Height)
+			require.Equal(t, uint64(2), retbp.Height)
 
 			// check block hashes
 			// genesis
@@ -82,7 +83,7 @@ func TestBlockStore(t *testing.T) {
 			// block 1
 			h, err = bs.BlockHash(1)
 			require.NoError(t, err)
-			expected, err := b.Hash()
+			expected, err := bp.Hash()
 			require.NoError(t, err)
 			require.Equal(t, expected, h)
 

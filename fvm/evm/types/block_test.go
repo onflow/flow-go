@@ -33,17 +33,28 @@ func Test_BlockHash(t *testing.T) {
 
 	// hashes should not equal if any data is changed
 	assert.NotEqual(t, h1, h2)
+}
 
-	b.AppendTransaction(nil)
-	b.Finalize()
-	require.Equal(t, gethTypes.EmptyReceiptsHash, b.ReceiptRoot)
+func Test_BlockProposal(t *testing.T) {
+	bp := NewBlockProposal(gethCommon.Hash{1}, 1, 0, nil)
+
+	bp.AppendTransaction(nil)
+	require.Empty(t, bp.TransactionHashes)
+	require.Equal(t, uint64(0), bp.TotalGasUsed)
+
+	bp.PopulateReceiptsHash()
+	require.Equal(t, gethTypes.EmptyReceiptsHash, bp.ReceiptRoot)
 
 	res := &Result{
+		TxHash:      gethCommon.Hash{2},
 		GasConsumed: 10,
 	}
-	b.AppendTransaction(res)
-	b.Finalize()
-	require.NotEqual(t, gethTypes.EmptyReceiptsHash, b.ReceiptRoot)
+	bp.AppendTransaction(res)
+	require.Equal(t, res.TxHash, bp.TransactionHashes[0])
+	require.Equal(t, res.GasConsumed, bp.TotalGasUsed)
+
+	bp.PopulateReceiptsHash()
+	require.NotEqual(t, gethTypes.EmptyReceiptsHash, bp.ReceiptRoot)
 }
 
 func Test_DecodeBlocks(t *testing.T) {

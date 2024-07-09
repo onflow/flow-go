@@ -82,11 +82,11 @@ type BlockStore interface {
 	BlockHash(height uint64) (gethCommon.Hash, error)
 
 	// BlockProposal returns the active block proposal
-	BlockProposal() (*Block, error)
+	BlockProposal() (*BlockProposal, error)
 
-	// Updates the block proposal
-	UpdateBlockProposal(*Block) error
+	// UpdateBlockProposal replaces the current block proposal with the ones passed
+	UpdateBlockProposal(*BlockProposal) error
 
 	// CommitBlockProposal commits the block proposal and update the chain of blocks
-	CommitBlockProposal() error
+	CommitBlockProposal(*BlockProposal) error
 }

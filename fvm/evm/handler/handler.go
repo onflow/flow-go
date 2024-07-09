@@ -256,19 +256,18 @@ func (h *ContractHandler) batchRun(rlpEncodedTxs [][]byte, coinbase types.Addres
 }
 
 func (h *ContractHandler) CommitBlockProposal() error {
+	// load block proposal, finalize it and commit
 	bp, err := h.blockStore.BlockProposal()
 	if err != nil {
 		return err
 	}
-	// update all values before commit
-	bp.Finalize()
 
-	err = h.emitEvent(types.NewBlockEvent(bp))
+	err = h.blockStore.CommitBlockProposal(bp)
 	if err != nil {
 		return err
 	}
 
-	err = h.blockStore.CommitBlockProposal()
+	err = h.emitEvent(types.NewBlockEvent(&bp.Block))
 	if err != nil {
 		return err
 	}

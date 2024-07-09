@@ -32,9 +32,6 @@ type Block struct {
 	// the same receipt root would be reported for block.
 	ReceiptRoot gethCommon.Hash
 
-	// Receipts keeps a order list of receipts generated during block execution
-	Receipts gethTypes.Receipts
-
 	// transaction hashes
 	TransactionHashes []gethCommon.Hash
 
@@ -53,51 +50,19 @@ func (b *Block) Hash() (gethCommon.Hash, error) {
 	return gethCrypto.Keccak256Hash(data), err
 }
 
-// AppendTransaction appends a transaction hash to the list of transaction hashes of the block
-// and also update the receipts
-func (b *Block) AppendTransaction(res *Result) {
-	if res == nil {
-		return
-	}
-	b.TransactionHashes = append(b.TransactionHashes, res.TxHash)
-	r := res.Receipt()
-	if r == nil {
-		return
-	}
-	b.Receipts = append(b.Receipts, r)
-}
-
-// Finalize populates receipt roots and updates the total gas used
-func (b *Block) Finalize() {
-	if len(b.Receipts) == 0 {
-		b.ReceiptRoot = gethTypes.EmptyReceiptsHash
-		return
-	}
-	b.ReceiptRoot = gethTypes.DeriveSha(b.Receipts, gethTrie.NewStackTrie(nil))
-
-	for _, res := range b.Receipts {
-		b.TotalGasUsed += res.CumulativeGasUsed
-	}
-}
-
 // NewBlock constructs a new block
 func NewBlock(
 	parentBlockHash gethCommon.Hash,
 	height uint64,
 	timestamp uint64,
 	totalSupply *big.Int,
-	receipts gethTypes.Receipts,
-	receiptRoot gethCommon.Hash,
-	txHashes []gethCommon.Hash,
 ) *Block {
 	return &Block{
-		ParentBlockHash:   parentBlockHash,
-		Height:            height,
-		Timestamp:         timestamp,
-		TotalSupply:       totalSupply,
-		ReceiptRoot:       receiptRoot,
-		Receipts:          receipts,
-		TransactionHashes: txHashes,
+		ParentBlockHash: parentBlockHash,
+		Height:          height,
+		Timestamp:       timestamp,
+		TotalSupply:     totalSupply,
+		ReceiptRoot:     gethTypes.EmptyReceiptsHash,
 	}
 }
 
@@ -112,7 +77,6 @@ func NewBlockFromBytes(encoded []byte) (*Block, error) {
 			return nil, err
 		}
 	}
-
 	return res, nil
 }
 
@@ -125,6 +89,67 @@ var GenesisBlock = &Block{
 }
 
 var GenesisBlockHash, _ = GenesisBlock.Hash()
+
+// BlockProposal represents a evm block proposal
+type BlockProposal struct {
+	Block
+
+	// Receipts keeps a order list of receipts generated during block execution
+	Receipts gethTypes.Receipts
+}
+
+// AppendTransaction appends a transaction hash to the list of transaction hashes of the block
+// and also update the receipts
+func (b *BlockProposal) AppendTransaction(res *Result) {
+	if res == nil {
+		return
+	}
+	b.TransactionHashes = append(b.TransactionHashes, res.TxHash)
+	r := res.Receipt()
+	if r == nil {
+		return
+	}
+	b.Receipts = append(b.Receipts, r)
+	b.TotalGasUsed += r.CumulativeGasUsed
+}
+
+// PopulateReceiptsHash populates receipt hash value
+func (b *BlockProposal) PopulateReceiptsHash() {
+	b.ReceiptRoot = gethTypes.EmptyReceiptsHash
+	if len(b.Receipts) != 0 {
+		b.ReceiptRoot = gethTypes.DeriveSha(b.Receipts, gethTrie.NewStackTrie(nil))
+	}
+}
+
+// ToBytes encodes the block proposal into bytes
+func (b *BlockProposal) ToBytes() ([]byte, error) {
+	return gethRLP.EncodeToBytes(b)
+}
+
+// NewBlockProposalFromBytes constructs a new block proposal from encoded data
+func NewBlockProposalFromBytes(encoded []byte) (*BlockProposal, error) {
+	res := &BlockProposal{}
+	return res, gethRLP.DecodeBytes(encoded, res)
+}
+
+func NewBlockProposal(
+	parentBlockHash gethCommon.Hash,
+	height uint64,
+	timestamp uint64,
+	totalSupply *big.Int,
+) *BlockProposal {
+	return &BlockProposal{
+		Block: Block{
+			ParentBlockHash:   parentBlockHash,
+			Height:            height,
+			Timestamp:         timestamp,
+			TotalSupply:       totalSupply,
+			ReceiptRoot:       gethTypes.EmptyRootHash,
+			TransactionHashes: make([]gethCommon.Hash, 0),
+		},
+		Receipts: make(gethTypes.Receipts, 0),
+	}
+}
 
 // todo remove this if confirmed we no longer need it on testnet, mainnet and previewnet.
 
