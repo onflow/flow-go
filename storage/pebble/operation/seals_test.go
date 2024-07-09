@@ -1,11 +1,9 @@
-// (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
-
 package operation
 
 import (
 	"testing"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -14,22 +12,36 @@ import (
 )
 
 func TestSealInsertCheckRetrieve(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
 		expected := unittest.Seal.Fixture()
 
-		err := db.Update(InsertSeal(expected.ID(), expected))
+		err := InsertSeal(expected.ID(), expected)(db)
 		require.Nil(t, err)
 
 		var actual flow.Seal
-		err = db.View(RetrieveSeal(expected.ID(), &actual))
+		err = RetrieveSeal(expected.ID(), &actual)(db)
 		require.Nil(t, err)
 
 		assert.Equal(t, expected, &actual)
 	})
 }
 
+func TestSealInsertAndRetrieveWithinTx(t *testing.T) {
+	unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
+		batch := db.NewIndexedBatch()
+		seal := unittest.Seal.Fixture()
+
+		require.NoError(t, InsertSeal(seal.ID(), seal)(batch))
+
+		var seal2 flow.Seal
+		require.NoError(t, RetrieveSeal(seal.ID(), &seal2)(batch))
+
+		require.Equal(t, seal, &seal2)
+	})
+}
+
 func TestSealIndexAndLookup(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
 		seal1 := unittest.Seal.Fixture()
 		seal2 := unittest.Seal.Fixture()
 
@@ -39,7 +51,9 @@ func TestSealIndexAndLookup(t *testing.T) {
 
 		expected := []flow.Identifier(flow.GetIDs(seals))
 
-		err := db.Update(func(tx *badger.Txn) error {
+		batch := db.NewBatch()
+
+		err := func(tx pebble.Writer) error {
 			for _, seal := range seals {
 				if err := InsertSeal(seal.ID(), seal)(tx); err != nil {
 					return err
@@ -48,12 +62,13 @@ func TestSealIndexAndLookup(t *testing.T) {
 			if err := IndexPayloadSeals(blockID, expected)(tx); err != nil {
 				return err
 			}
-			return nil
-		})
+
+			return batch.Commit(nil)
+		}(batch)
 		require.Nil(t, err)
 
 		var actual []flow.Identifier
-		err = db.View(LookupPayloadSeals(blockID, &actual))
+		err = LookupPayloadSeals(blockID, &actual)(db)
 		require.Nil(t, err)
 
 		assert.Equal(t, expected, actual)

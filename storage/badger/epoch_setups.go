@@ -6,6 +6,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/storage/badger/transaction"
 )
@@ -14,6 +15,8 @@ type EpochSetups struct {
 	db    *badger.DB
 	cache *Cache[flow.Identifier, *flow.EpochSetup]
 }
+
+var _ storage.EpochSetups = (*EpochSetups)(nil)
 
 // NewEpochSetups instantiates a new EpochSetups storage.
 func NewEpochSetups(collector module.CacheMetrics, db *badger.DB) *EpochSetups {
@@ -43,6 +46,10 @@ func NewEpochSetups(collector module.CacheMetrics, db *badger.DB) *EpochSetups {
 
 func (es *EpochSetups) StoreTx(setup *flow.EpochSetup) func(tx *transaction.Tx) error {
 	return es.cache.PutTx(setup.ID(), setup)
+}
+
+func (es *EpochSetups) StorePebble(setup *flow.EpochSetup) func(storage.PebbleReaderBatchWriter) error {
+	return nil
 }
 
 func (es *EpochSetups) retrieveTx(setupID flow.Identifier) func(tx *badger.Txn) (*flow.EpochSetup, error) {

@@ -6,18 +6,17 @@ import (
 	"math/rand"
 	"testing"
 
-	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/storage/pebble/operation"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestClusterHeights(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithWrappedPebbleDB(t, func(db *unittest.PebbleWrapper) {
 		var (
 			clusterID flow.ChainID = "cluster"
 			height    uint64       = 42
@@ -64,7 +63,7 @@ func TestClusterHeights(t *testing.T) {
 }
 
 func TestClusterBoundaries(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithWrappedPebbleDB(t, func(db *unittest.PebbleWrapper) {
 		var (
 			clusterID flow.ChainID = "cluster"
 			expected  uint64       = 42
@@ -114,7 +113,7 @@ func TestClusterBoundaries(t *testing.T) {
 
 func TestClusterBlockByReferenceHeight(t *testing.T) {
 
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithWrappedPebbleDB(t, func(db *unittest.PebbleWrapper) {
 		t.Run("should be able to index cluster block by reference height", func(t *testing.T) {
 			id := unittest.IdentifierFixture()
 			height := rand.Uint64()
@@ -129,7 +128,7 @@ func TestClusterBlockByReferenceHeight(t *testing.T) {
 		})
 	})
 
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithWrappedPebbleDB(t, func(db *unittest.PebbleWrapper) {
 		t.Run("should be able to index multiple cluster blocks at same reference height", func(t *testing.T) {
 			ids := unittest.IdentifierListFixture(10)
 			height := rand.Uint64()
@@ -146,7 +145,7 @@ func TestClusterBlockByReferenceHeight(t *testing.T) {
 		})
 	})
 
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithWrappedPebbleDB(t, func(db *unittest.PebbleWrapper) {
 		t.Run("should be able to lookup cluster blocks across height range", func(t *testing.T) {
 			ids := unittest.IdentifierListFixture(100)
 			nextHeight := rand.Uint64()
@@ -297,7 +296,7 @@ func BenchmarkLookupClusterBlocksByReferenceHeightRange_100_000(b *testing.B) {
 }
 
 func benchmarkLookupClusterBlocksByReferenceHeightRange(b *testing.B, n int) {
-	unittest.RunWithBadgerDB(b, func(db *badger.DB) {
+	unittest.RunWithWrappedPebbleDB(b, func(db *unittest.PebbleWrapper) {
 		for i := 0; i < n; i++ {
 			err := db.Update(operation.IndexClusterBlockByReferenceHeight(rand.Uint64()%1000, unittest.IdentifierFixture()))
 			require.NoError(b, err)

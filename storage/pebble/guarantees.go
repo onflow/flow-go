@@ -1,30 +1,30 @@
-package badger
+package pebble
 
 import (
-	"github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/storage/badger/operation"
-	"github.com/onflow/flow-go/storage/badger/transaction"
+	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/pebble/operation"
 )
 
 // Guarantees implements persistent storage for collection guarantees.
 type Guarantees struct {
-	db    *badger.DB
+	db    *pebble.DB
 	cache *Cache[flow.Identifier, *flow.CollectionGuarantee]
 }
 
-func NewGuarantees(collector module.CacheMetrics, db *badger.DB, cacheSize uint) *Guarantees {
+func NewGuarantees(collector module.CacheMetrics, db *pebble.DB, cacheSize uint) *Guarantees {
 
-	store := func(collID flow.Identifier, guarantee *flow.CollectionGuarantee) func(*transaction.Tx) error {
-		return transaction.WithTx(operation.SkipDuplicates(operation.InsertGuarantee(collID, guarantee)))
+	store := func(collID flow.Identifier, guarantee *flow.CollectionGuarantee) func(storage.PebbleReaderBatchWriter) error {
+		return storage.OnlyWriter(operation.InsertGuarantee(collID, guarantee))
 	}
 
-	retrieve := func(collID flow.Identifier) func(*badger.Txn) (*flow.CollectionGuarantee, error) {
+	retrieve := func(collID flow.Identifier) func(pebble.Reader) (*flow.CollectionGuarantee, error) {
 		var guarantee flow.CollectionGuarantee
-		return func(tx *badger.Txn) (*flow.CollectionGuarantee, error) {
+		return func(tx pebble.Reader) (*flow.CollectionGuarantee, error) {
 			err := operation.RetrieveGuarantee(collID, &guarantee)(tx)
 			return &guarantee, err
 		}
@@ -32,7 +32,7 @@ func NewGuarantees(collector module.CacheMetrics, db *badger.DB, cacheSize uint)
 
 	g := &Guarantees{
 		db: db,
-		cache: newCache[flow.Identifier, *flow.CollectionGuarantee](collector, metrics.ResourceGuarantee,
+		cache: newCache(collector, metrics.ResourceGuarantee,
 			withLimit[flow.Identifier, *flow.CollectionGuarantee](cacheSize),
 			withStore(store),
 			withRetrieve(retrieve)),
@@ -41,12 +41,12 @@ func NewGuarantees(collector module.CacheMetrics, db *badger.DB, cacheSize uint)
 	return g
 }
 
-func (g *Guarantees) storeTx(guarantee *flow.CollectionGuarantee) func(*transaction.Tx) error {
-	return g.cache.PutTx(guarantee.ID(), guarantee)
+func (g *Guarantees) storeTx(guarantee *flow.CollectionGuarantee) func(storage.PebbleReaderBatchWriter) error {
+	return g.cache.PutPebble(guarantee.ID(), guarantee)
 }
 
-func (g *Guarantees) retrieveTx(collID flow.Identifier) func(*badger.Txn) (*flow.CollectionGuarantee, error) {
-	return func(tx *badger.Txn) (*flow.CollectionGuarantee, error) {
+func (g *Guarantees) retrieveTx(collID flow.Identifier) func(pebble.Reader) (*flow.CollectionGuarantee, error) {
+	return func(tx pebble.Reader) (*flow.CollectionGuarantee, error) {
 		val, err := g.cache.Get(collID)(tx)
 		if err != nil {
 			return nil, err
@@ -56,11 +56,9 @@ func (g *Guarantees) retrieveTx(collID flow.Identifier) func(*badger.Txn) (*flow
 }
 
 func (g *Guarantees) Store(guarantee *flow.CollectionGuarantee) error {
-	return operation.RetryOnConflictTx(g.db, transaction.Update, g.storeTx(guarantee))
+	return operation.WithReaderBatchWriter(g.db, g.storeTx(guarantee))
 }
 
 func (g *Guarantees) ByCollectionID(collID flow.Identifier) (*flow.CollectionGuarantee, error) {
-	tx := g.db.NewTransaction(false)
-	defer tx.Discard()
-	return g.retrieveTx(collID)(tx)
+	return g.retrieveTx(collID)(g.db)
 }

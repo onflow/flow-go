@@ -4,7 +4,6 @@ import (
 	"math/rand"
 	"testing"
 
-	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -13,7 +12,7 @@ import (
 )
 
 func TestSporkID_InsertRetrieve(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithWrappedPebbleDB(t, func(db *unittest.PebbleWrapper) {
 		sporkID := unittest.IdentifierFixture()
 
 		err := db.Update(InsertSporkID(sporkID))
@@ -28,7 +27,7 @@ func TestSporkID_InsertRetrieve(t *testing.T) {
 }
 
 func TestProtocolVersion_InsertRetrieve(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithWrappedPebbleDB(t, func(db *unittest.PebbleWrapper) {
 		version := uint(rand.Uint32())
 
 		err := db.Update(InsertProtocolVersion(version))
@@ -45,7 +44,7 @@ func TestProtocolVersion_InsertRetrieve(t *testing.T) {
 // TestEpochCommitSafetyThreshold_InsertRetrieve tests that we can insert and
 // retrieve epoch commit safety threshold values.
 func TestEpochCommitSafetyThreshold_InsertRetrieve(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithWrappedPebbleDB(t, func(db *unittest.PebbleWrapper) {
 		threshold := rand.Uint64()
 
 		err := db.Update(InsertEpochCommitSafetyThreshold(threshold))

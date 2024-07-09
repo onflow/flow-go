@@ -1,28 +1,33 @@
-package badger
+package pebble
 
 import (
-	"github.com/dgraph-io/badger/v2"
+	"fmt"
+
+	"github.com/cockroachdb/pebble"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/transaction"
+	"github.com/onflow/flow-go/storage/pebble/operation"
 )
 
 type EpochCommits struct {
-	db    *badger.DB
+	db    *pebble.DB
 	cache *Cache[flow.Identifier, *flow.EpochCommit]
 }
 
-func NewEpochCommits(collector module.CacheMetrics, db *badger.DB) *EpochCommits {
+var _ storage.EpochCommits = (*EpochCommits)(nil)
 
-	store := func(id flow.Identifier, commit *flow.EpochCommit) func(*transaction.Tx) error {
-		return transaction.WithTx(operation.SkipDuplicates(operation.InsertEpochCommit(id, commit)))
+func NewEpochCommits(collector module.CacheMetrics, db *pebble.DB) *EpochCommits {
+
+	store := func(id flow.Identifier, commit *flow.EpochCommit) func(storage.PebbleReaderBatchWriter) error {
+		return storage.OnlyWriter(operation.InsertEpochCommit(id, commit))
 	}
 
-	retrieve := func(id flow.Identifier) func(*badger.Txn) (*flow.EpochCommit, error) {
-		return func(tx *badger.Txn) (*flow.EpochCommit, error) {
+	retrieve := func(id flow.Identifier) func(pebble.Reader) (*flow.EpochCommit, error) {
+		return func(tx pebble.Reader) (*flow.EpochCommit, error) {
 			var commit flow.EpochCommit
 			err := operation.RetrieveEpochCommit(id, &commit)(tx)
 			return &commit, err
@@ -41,29 +46,26 @@ func NewEpochCommits(collector module.CacheMetrics, db *badger.DB) *EpochCommits
 }
 
 func (ec *EpochCommits) StoreTx(commit *flow.EpochCommit) func(*transaction.Tx) error {
-	return ec.cache.PutTx(commit.ID(), commit)
+	return nil
 }
 
-func (ec *EpochCommits) retrieveTx(commitID flow.Identifier) func(tx *badger.Txn) (*flow.EpochCommit, error) {
-	return func(tx *badger.Txn) (*flow.EpochCommit, error) {
+func (ec *EpochCommits) StorePebble(commit *flow.EpochCommit) func(storage.PebbleReaderBatchWriter) error {
+	return ec.cache.PutPebble(commit.ID(), commit)
+}
+
+func (ec *EpochCommits) retrieveTx(commitID flow.Identifier) func(tx pebble.Reader) (*flow.EpochCommit, error) {
+	return func(tx pebble.Reader) (*flow.EpochCommit, error) {
 		val, err := ec.cache.Get(commitID)(tx)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("could not retrieve EpochCommit event with id %x: %w", commitID, err)
 		}
 		return val, nil
 	}
-}
-
-// TODO: can we remove this method? Its not contained in the interface.
-func (ec *EpochCommits) Store(commit *flow.EpochCommit) error {
-	return operation.RetryOnConflictTx(ec.db, transaction.Update, ec.StoreTx(commit))
 }
 
 // ByID will return the EpochCommit event by its ID.
 // Error returns:
 // * storage.ErrNotFound if no EpochCommit with the ID exists
 func (ec *EpochCommits) ByID(commitID flow.Identifier) (*flow.EpochCommit, error) {
-	tx := ec.db.NewTransaction(false)
-	defer tx.Discard()
-	return ec.retrieveTx(commitID)(tx)
+	return ec.retrieveTx(commitID)(ec.db)
 }

@@ -4,7 +4,7 @@ import (
 	"math/rand"
 	"testing"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -13,25 +13,18 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
 	mockprot "github.com/onflow/flow-go/state/protocol/mock"
-	storage "github.com/onflow/flow-go/storage/badger"
-	"github.com/onflow/flow-go/storage/badger/operation"
 	mockstor "github.com/onflow/flow-go/storage/mock"
+	storage "github.com/onflow/flow-go/storage/pebble"
+	"github.com/onflow/flow-go/storage/pebble/operation"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func LogCleanup(list *[]flow.Identifier) func(flow.Identifier) error {
-	return func(blockID flow.Identifier) error {
-		*list = append(*list, blockID)
-		return nil
-	}
-}
-
-func TestNewFinalizer(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+func TestNewFinalizerPebble(t *testing.T) {
+	unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
 		headers := &mockstor.Headers{}
 		state := &mockprot.FollowerState{}
 		tracer := trace.NewNoopTracer()
-		fin := NewFinalizer(db, headers, state, tracer)
+		fin := NewFinalizerPebble(db, headers, state, tracer)
 		assert.Equal(t, fin.db, db)
 		assert.Equal(t, fin.headers, headers)
 		assert.Equal(t, fin.state, state)
@@ -42,7 +35,7 @@ func TestNewFinalizer(t *testing.T) {
 // descendant block of the latest finalized header results in the finalization of the
 // valid descendant and all of its parents up to the finalized header, but excluding
 // the children of the valid descendant.
-func TestMakeFinalValidChain(t *testing.T) {
+func TestMakeFinalValidChainPebble(t *testing.T) {
 
 	// create one block that we consider the last finalized
 	final := unittest.BlockHeaderFixture()
@@ -74,29 +67,29 @@ func TestMakeFinalValidChain(t *testing.T) {
 	// this will hold the IDs of blocks clean up
 	var list []flow.Identifier
 
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
 
 		// insert the latest finalized height
-		err := db.Update(operation.InsertFinalizedHeight(final.Height))
+		err := operation.InsertFinalizedHeight(final.Height)(db)
 		require.NoError(t, err)
 
 		// map the finalized height to the finalized block ID
-		err = db.Update(operation.IndexBlockHeight(final.Height, final.ID()))
+		err = operation.IndexBlockHeight(final.Height, final.ID())(db)
 		require.NoError(t, err)
 
 		// insert the finalized block header into the DB
-		err = db.Update(operation.InsertHeader(final.ID(), final))
+		err = operation.InsertHeader(final.ID(), final)(db)
 		require.NoError(t, err)
 
 		// insert all of the pending blocks into the DB
 		for _, header := range pending {
-			err = db.Update(operation.InsertHeader(header.ID(), header))
+			err = operation.InsertHeader(header.ID(), header)(db)
 			require.NoError(t, err)
 		}
 
 		// initialize the finalizer with the dependencies and make the call
 		metrics := metrics.NewNoopCollector()
-		fin := Finalizer{
+		fin := FinalizerPebble{
 			db:      db,
 			headers: storage.NewHeaders(metrics, db),
 			state:   state,
@@ -116,7 +109,7 @@ func TestMakeFinalValidChain(t *testing.T) {
 
 // TestMakeFinalInvalidHeight checks whether we receive an error when calling `MakeFinal`
 // with a header that is at the same height as the already highest finalized header.
-func TestMakeFinalInvalidHeight(t *testing.T) {
+func TestMakeFinalInvalidHeightPebble(t *testing.T) {
 
 	// create one block that we consider the last finalized
 	final := unittest.BlockHeaderFixture()
@@ -132,27 +125,27 @@ func TestMakeFinalInvalidHeight(t *testing.T) {
 	// this will hold the IDs of blocks clean up
 	var list []flow.Identifier
 
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
 
 		// insert the latest finalized height
-		err := db.Update(operation.InsertFinalizedHeight(final.Height))
+		err := operation.InsertFinalizedHeight(final.Height)(db)
 		require.NoError(t, err)
 
 		// map the finalized height to the finalized block ID
-		err = db.Update(operation.IndexBlockHeight(final.Height, final.ID()))
+		err = operation.IndexBlockHeight(final.Height, final.ID())(db)
 		require.NoError(t, err)
 
 		// insert the finalized block header into the DB
-		err = db.Update(operation.InsertHeader(final.ID(), final))
+		err = operation.InsertHeader(final.ID(), final)(db)
 		require.NoError(t, err)
 
 		// insert all of the pending header into DB
-		err = db.Update(operation.InsertHeader(pending.ID(), pending))
+		err = operation.InsertHeader(pending.ID(), pending)(db)
 		require.NoError(t, err)
 
 		// initialize the finalizer with the dependencies and make the call
 		metrics := metrics.NewNoopCollector()
-		fin := Finalizer{
+		fin := FinalizerPebble{
 			db:      db,
 			headers: storage.NewHeaders(metrics, db),
 			state:   state,
@@ -172,7 +165,7 @@ func TestMakeFinalInvalidHeight(t *testing.T) {
 
 // TestMakeFinalDuplicate checks whether calling `MakeFinal` with the ID of the currently
 // highest finalized header is a no-op and does not result in an error.
-func TestMakeFinalDuplicate(t *testing.T) {
+func TestMakeFinalDuplicatePebble(t *testing.T) {
 
 	// create one block that we consider the last finalized
 	final := unittest.BlockHeaderFixture()
@@ -184,23 +177,23 @@ func TestMakeFinalDuplicate(t *testing.T) {
 	// this will hold the IDs of blocks clean up
 	var list []flow.Identifier
 
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
 
 		// insert the latest finalized height
-		err := db.Update(operation.InsertFinalizedHeight(final.Height))
+		err := operation.InsertFinalizedHeight(final.Height)(db)
 		require.NoError(t, err)
 
 		// map the finalized height to the finalized block ID
-		err = db.Update(operation.IndexBlockHeight(final.Height, final.ID()))
+		err = operation.IndexBlockHeight(final.Height, final.ID())(db)
 		require.NoError(t, err)
 
 		// insert the finalized block header into the DB
-		err = db.Update(operation.InsertHeader(final.ID(), final))
+		err = operation.InsertHeader(final.ID(), final)(db)
 		require.NoError(t, err)
 
 		// initialize the finalizer with the dependencies and make the call
 		metrics := metrics.NewNoopCollector()
-		fin := Finalizer{
+		fin := FinalizerPebble{
 			db:      db,
 			headers: storage.NewHeaders(metrics, db),
 			state:   state,

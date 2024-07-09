@@ -5,14 +5,14 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble"
 	"github.com/libp2p/go-libp2p/core/peer"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/storage/pebble/operation"
 )
 
 // IdentifierSet represents a set of node IDs (operator-defined) whose communication should be blocked.
@@ -38,7 +38,7 @@ func (s IdentifierSet) Contains(id flow.Identifier) bool {
 // TODO: terminology change - rename `blocklist` to `disallowList` everywhere to be consistent with the code.
 type NodeDisallowListingWrapper struct {
 	m  sync.RWMutex
-	db *badger.DB
+	db *pebble.DB
 
 	identityProvider module.IdentityProvider
 	disallowList     IdentifierSet // `IdentifierSet` is a map, hence efficient O(1) lookup
@@ -58,7 +58,7 @@ var _ module.IdentityProvider = (*NodeDisallowListingWrapper)(nil)
 // loaded from the database (or assumed to be empty if no database entry is present).
 func NewNodeDisallowListWrapper(
 	identityProvider module.IdentityProvider,
-	db *badger.DB,
+	db *pebble.DB,
 	updateConsumerOracle func() network.DisallowListNotificationConsumer) (*NodeDisallowListingWrapper, error) {
 
 	disallowList, err := retrieveDisallowList(db)
@@ -203,19 +203,19 @@ func (w *NodeDisallowListingWrapper) ByPeerID(p peer.ID) (*flow.Identity, bool) 
 // persistDisallowList writes the given disallowList to the database. To avoid legacy
 // entries in the database, we prune the entire data base entry if `disallowList` is
 // empty. No errors are expected during normal operations.
-func persistDisallowList(disallowList IdentifierSet, db *badger.DB) error {
+func persistDisallowList(disallowList IdentifierSet, db *pebble.DB) error {
 	if len(disallowList) == 0 {
-		return db.Update(operation.PurgeBlocklist())
+		return operation.PurgeBlocklist()(db)
 	}
-	return db.Update(operation.PersistBlocklist(disallowList))
+	return operation.PersistBlocklist(disallowList)(db)
 }
 
 // retrieveDisallowList reads the set of blocked nodes from the data base.
 // In case no database entry exists, an empty set (nil map) is returned.
 // No errors are expected during normal operations.
-func retrieveDisallowList(db *badger.DB) (IdentifierSet, error) {
+func retrieveDisallowList(db *pebble.DB) (IdentifierSet, error) {
 	var blocklist map[flow.Identifier]struct{}
-	err := db.View(operation.RetrieveBlocklist(&blocklist))
+	err := operation.RetrieveBlocklist(&blocklist)(db)
 	if err != nil && !errors.Is(err, storage.ErrNotFound) {
 		return nil, fmt.Errorf("unexpected error reading set of blocked nodes from data base: %w", err)
 	}

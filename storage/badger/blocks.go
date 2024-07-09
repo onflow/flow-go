@@ -21,6 +21,8 @@ type Blocks struct {
 	payloads *Payloads
 }
 
+var _ storage.Blocks = (*Blocks)(nil)
+
 // NewBlocks ...
 func NewBlocks(db *badger.DB, headers *Headers, payloads *Payloads) *Blocks {
 	b := &Blocks{
@@ -43,6 +45,10 @@ func (b *Blocks) StoreTx(block *flow.Block) func(*transaction.Tx) error {
 		}
 		return nil
 	}
+}
+
+func (b *Blocks) StorePebble(block *flow.Block) func(storage.PebbleReaderBatchWriter) error {
+	return nil
 }
 
 func (b *Blocks) retrieveTx(blockID flow.Identifier) func(*badger.Txn) (*flow.Block, error) {

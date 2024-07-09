@@ -4,15 +4,15 @@ import (
 	"context"
 	"testing"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble"
 	"github.com/stretchr/testify/require"
 
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
-	protocol "github.com/onflow/flow-go/state/protocol/badger"
+	protocol "github.com/onflow/flow-go/state/protocol/pebble"
 	"github.com/onflow/flow-go/state/protocol/util"
-	bstorage "github.com/onflow/flow-go/storage/badger"
+	bstorage "github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -23,7 +23,7 @@ func TestSaveBlockAsReplica(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
 	b0, err := rootSnapshot.Head()
 	require.NoError(t, err)
-	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState) {
+	util.RunWithPebbleFullProtocolState(t, rootSnapshot, func(db *pebble.DB, state *protocol.ParticipantState) {
 		b1 := unittest.BlockWithParentFixture(b0)
 		b1.SetPayload(flow.Payload{})
 

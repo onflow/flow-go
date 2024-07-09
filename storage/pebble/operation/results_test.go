@@ -1,11 +1,9 @@
-// (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
-
 package operation
 
 import (
 	"testing"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -14,14 +12,14 @@ import (
 )
 
 func TestResults_InsertRetrieve(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
 		expected := unittest.ExecutionResultFixture()
 
-		err := db.Update(InsertExecutionResult(expected))
+		err := InsertExecutionResult(expected)(db)
 		require.Nil(t, err)
 
 		var actual flow.ExecutionResult
-		err = db.View(RetrieveExecutionResult(expected.ID(), &actual))
+		err = RetrieveExecutionResult(expected.ID(), &actual)(db)
 		require.Nil(t, err)
 
 		assert.Equal(t, expected, &actual)

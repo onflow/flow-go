@@ -1,4 +1,4 @@
-package badger
+package pebble
 
 import (
 	"context"
@@ -8,7 +8,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -21,20 +21,21 @@ import (
 	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/cluster"
 	"github.com/onflow/flow-go/state/protocol"
-	pbadger "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/events"
 	"github.com/onflow/flow-go/state/protocol/inmem"
+	ppebble "github.com/onflow/flow-go/state/protocol/pebble"
 	protocolutil "github.com/onflow/flow-go/state/protocol/util"
-	storage "github.com/onflow/flow-go/storage/badger"
-	"github.com/onflow/flow-go/storage/badger/operation"
-	"github.com/onflow/flow-go/storage/badger/procedure"
-	"github.com/onflow/flow-go/storage/util"
+	"github.com/onflow/flow-go/storage"
+	pebblestorage "github.com/onflow/flow-go/storage/pebble"
+	"github.com/onflow/flow-go/storage/pebble/operation"
+	"github.com/onflow/flow-go/storage/pebble/procedure"
+	"github.com/onflow/flow-go/storage/testingutils"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
 type MutatorSuite struct {
 	suite.Suite
-	db    *badger.DB
+	db    *pebble.DB
 	dbdir string
 
 	genesis      *model.Block
@@ -56,13 +57,13 @@ func (suite *MutatorSuite) SetupTest() {
 	suite.chainID = suite.genesis.Header.ChainID
 
 	suite.dbdir = unittest.TempDir(suite.T())
-	suite.db = unittest.BadgerDB(suite.T(), suite.dbdir)
+	suite.db = unittest.PebbleDB(suite.T(), suite.dbdir)
 
 	metrics := metrics.NewNoopCollector()
 	tracer := trace.NewNoopTracer()
 	log := zerolog.Nop()
-	all := util.StorageLayer(suite.T(), suite.db)
-	colPayloads := storage.NewClusterPayloads(metrics, suite.db)
+	all := testingutils.PebbleStorageLayer(suite.T(), suite.db)
+	colPayloads := pebblestorage.NewClusterPayloads(metrics, suite.db)
 
 	// just bootstrap with a genesis block, we'll use this as reference
 	genesis, result, seal := unittest.BootstrapFixture(unittest.IdentityListFixture(5, unittest.WithAllRoles()))
@@ -75,7 +76,7 @@ func (suite *MutatorSuite) SetupTest() {
 	suite.epochCounter = rootSnapshot.Encodable().Epochs.Current.Counter
 
 	suite.protoGenesis = genesis.Header
-	state, err := pbadger.Bootstrap(
+	state, err := ppebble.Bootstrap(
 		metrics,
 		suite.db,
 		all.Headers,
@@ -90,7 +91,7 @@ func (suite *MutatorSuite) SetupTest() {
 		rootSnapshot,
 	)
 	require.NoError(suite.T(), err)
-	suite.protoState, err = pbadger.NewFollowerState(log, tracer, events.NewNoop(), state, all.Index, all.Payloads, protocolutil.MockBlockTimer())
+	suite.protoState, err = ppebble.NewFollowerState(log, tracer, events.NewNoop(), state, all.Index, all.Payloads, protocolutil.MockBlockTimer())
 	require.NoError(suite.T(), err)
 
 	clusterStateRoot, err := NewStateRoot(suite.genesis, unittest.QuorumCertificateFixture(), suite.epochCounter)
@@ -144,9 +145,10 @@ func (suite *MutatorSuite) Block() model.Block {
 }
 
 func (suite *MutatorSuite) FinalizeBlock(block model.Block) {
-	err := suite.db.Update(func(tx *badger.Txn) error {
+	err := operation.WithReaderBatchWriter(suite.db, func(tx storage.PebbleReaderBatchWriter) error {
+		r, w := tx.ReaderWriter()
 		var refBlock flow.Header
-		err := operation.RetrieveHeader(block.Payload.ReferenceBlockID, &refBlock)(tx)
+		err := operation.RetrieveHeader(block.Payload.ReferenceBlockID, &refBlock)(r)
 		if err != nil {
 			return err
 		}
@@ -154,7 +156,7 @@ func (suite *MutatorSuite) FinalizeBlock(block model.Block) {
 		if err != nil {
 			return err
 		}
-		err = operation.IndexClusterBlockByReferenceHeight(refBlock.Height, block.ID())(tx)
+		err = operation.IndexClusterBlockByReferenceHeight(refBlock.Height, block.ID())(w)
 		return err
 	})
 	suite.Assert().NoError(err)
@@ -203,7 +205,7 @@ func (suite *MutatorSuite) TestBootstrap_InvalidPayload() {
 }
 
 func (suite *MutatorSuite) TestBootstrap_Successful() {
-	err := suite.db.View(func(tx *badger.Txn) error {
+	err := (func(tx pebble.Reader) error {
 
 		// should insert collection
 		var collection flow.LightCollection
@@ -236,7 +238,7 @@ func (suite *MutatorSuite) TestBootstrap_Successful() {
 		suite.Assert().Equal(suite.genesis.Header.Height, boundary)
 
 		return nil
-	})
+	})(suite.db)
 	suite.Assert().Nil(err)
 }
 
@@ -317,13 +319,13 @@ func (suite *MutatorSuite) TestExtend_Success() {
 
 	// should be able to retrieve the block
 	var extended model.Block
-	err = suite.db.View(procedure.RetrieveClusterBlock(block.ID(), &extended))
+	err = procedure.RetrieveClusterBlock(block.ID(), &extended)(suite.db)
 	suite.Assert().Nil(err)
 	suite.Assert().Equal(*block.Payload, *extended.Payload)
 
 	// the block should be indexed by its parent
 	var childIDs flow.IdentifierList
-	err = suite.db.View(procedure.LookupBlockChildren(suite.genesis.ID(), &childIDs))
+	err = procedure.LookupBlockChildren(suite.genesis.ID(), &childIDs)(suite.db)
 	suite.Assert().Nil(err)
 	suite.Require().Len(childIDs, 1)
 	suite.Assert().Equal(block.ID(), childIDs[0])
@@ -565,7 +567,7 @@ func (suite *MutatorSuite) TestExtend_LargeHistory() {
 		// conflicting fork, build on the parent of the head
 		parent := head
 		if conflicting {
-			err = suite.db.View(procedure.RetrieveClusterBlock(parent.Header.ParentID, &parent))
+			err = procedure.RetrieveClusterBlock(parent.Header.ParentID, &parent)(suite.db)
 			assert.NoError(t, err)
 			// add the transaction to the invalidated list
 			invalidatedTransactions = append(invalidatedTransactions, &tx)

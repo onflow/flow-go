@@ -1,29 +1,32 @@
-package badger
+package pebble
 
 import (
-	"github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/transaction"
+	"github.com/onflow/flow-go/storage/pebble/operation"
 )
 
 type EpochStatuses struct {
-	db    *badger.DB
+	db    *pebble.DB
 	cache *Cache[flow.Identifier, *flow.EpochStatus]
 }
 
-// NewEpochStatuses ...
-func NewEpochStatuses(collector module.CacheMetrics, db *badger.DB) *EpochStatuses {
+var _ storage.EpochStatuses = (*EpochStatuses)(nil)
 
-	store := func(blockID flow.Identifier, status *flow.EpochStatus) func(*transaction.Tx) error {
-		return transaction.WithTx(operation.InsertEpochStatus(blockID, status))
+// NewEpochStatuses ...
+func NewEpochStatuses(collector module.CacheMetrics, db *pebble.DB) *EpochStatuses {
+
+	store := func(blockID flow.Identifier, status *flow.EpochStatus) func(rw storage.PebbleReaderBatchWriter) error {
+		return storage.OnlyWriter(operation.InsertEpochStatus(blockID, status))
 	}
 
-	retrieve := func(blockID flow.Identifier) func(*badger.Txn) (*flow.EpochStatus, error) {
-		return func(tx *badger.Txn) (*flow.EpochStatus, error) {
+	retrieve := func(blockID flow.Identifier) func(pebble.Reader) (*flow.EpochStatus, error) {
+		return func(tx pebble.Reader) (*flow.EpochStatus, error) {
 			var status flow.EpochStatus
 			err := operation.RetrieveEpochStatus(blockID, &status)(tx)
 			return &status, err
@@ -42,11 +45,15 @@ func NewEpochStatuses(collector module.CacheMetrics, db *badger.DB) *EpochStatus
 }
 
 func (es *EpochStatuses) StoreTx(blockID flow.Identifier, status *flow.EpochStatus) func(tx *transaction.Tx) error {
-	return es.cache.PutTx(blockID, status)
+	return nil
 }
 
-func (es *EpochStatuses) retrieveTx(blockID flow.Identifier) func(tx *badger.Txn) (*flow.EpochStatus, error) {
-	return func(tx *badger.Txn) (*flow.EpochStatus, error) {
+func (es *EpochStatuses) StorePebble(blockID flow.Identifier, status *flow.EpochStatus) func(storage.PebbleReaderBatchWriter) error {
+	return es.cache.PutPebble(blockID, status)
+}
+
+func (es *EpochStatuses) retrieveTx(blockID flow.Identifier) func(tx pebble.Reader) (*flow.EpochStatus, error) {
+	return func(tx pebble.Reader) (*flow.EpochStatus, error) {
 		val, err := es.cache.Get(blockID)(tx)
 		if err != nil {
 			return nil, err
@@ -59,7 +66,5 @@ func (es *EpochStatuses) retrieveTx(blockID flow.Identifier) func(tx *badger.Txn
 // Error returns:
 // * storage.ErrNotFound if EpochStatus for the block does not exist
 func (es *EpochStatuses) ByBlockID(blockID flow.Identifier) (*flow.EpochStatus, error) {
-	tx := es.db.NewTransaction(false)
-	defer tx.Discard()
-	return es.retrieveTx(blockID)(tx)
+	return es.retrieveTx(blockID)(es.db)
 }

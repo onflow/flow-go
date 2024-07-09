@@ -4,10 +4,9 @@ import (
 	"bytes"
 	"testing"
 
-	"golang.org/x/exp/slices"
-
-	"github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/exp/slices"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -16,7 +15,7 @@ import (
 // TestRetrieveEventByBlockIDTxID tests event insertion, event retrieval by block id, block id and transaction id,
 // and block id and event type
 func TestRetrieveEventByBlockIDTxID(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
 
 		// create block ids, transaction ids and event types slices
 		blockIDs := []flow.Identifier{flow.HashToID([]byte{0x01}), flow.HashToID([]byte{0x02})}
@@ -46,7 +45,7 @@ func TestRetrieveEventByBlockIDTxID(t *testing.T) {
 					event := unittest.EventFixture(etype, uint32(i), uint32(j), tx, 0)
 
 					// insert event into the db
-					err := db.Update(InsertEvent(b, event))
+					err := InsertEvent(b, event)(db)
 					require.Nil(t, err)
 
 					// update event arrays in the maps
@@ -78,7 +77,7 @@ func TestRetrieveEventByBlockIDTxID(t *testing.T) {
 				var actualEvents = make([]flow.Event, 0)
 
 				// lookup events by block id
-				err := db.View(LookupEventsByBlockID(b, &actualEvents))
+				err := LookupEventsByBlockID(b, &actualEvents)(db)
 
 				expectedEvents := blockMap[b.String()]
 				assertFunc(err, expectedEvents, actualEvents)
@@ -91,7 +90,7 @@ func TestRetrieveEventByBlockIDTxID(t *testing.T) {
 					var actualEvents = make([]flow.Event, 0)
 
 					//lookup events by block id and transaction id
-					err := db.View(RetrieveEvents(b, t, &actualEvents))
+					err := RetrieveEvents(b, t, &actualEvents)(db)
 
 					expectedEvents := txMap[b.String()+"_"+t.String()]
 					assertFunc(err, expectedEvents, actualEvents)
@@ -105,7 +104,7 @@ func TestRetrieveEventByBlockIDTxID(t *testing.T) {
 					var actualEvents = make([]flow.Event, 0)
 
 					//lookup events by block id and transaction id
-					err := db.View(LookupEventsByBlockIDEventType(b, et, &actualEvents))
+					err := LookupEventsByBlockIDEventType(b, et, &actualEvents)(db)
 
 					expectedEvents := typeMap[b.String()+"_"+string(et)]
 					assertFunc(err, expectedEvents, actualEvents)

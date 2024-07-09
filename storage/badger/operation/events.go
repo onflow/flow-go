@@ -6,6 +6,7 @@ import (
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/storage"
 )
 
 func eventPrefix(prefix byte, blockID flow.Identifier, event flow.Event) []byte {
@@ -16,7 +17,7 @@ func InsertEvent(blockID flow.Identifier, event flow.Event) func(*badger.Txn) er
 	return insert(eventPrefix(codeEvent, blockID, event), event)
 }
 
-func BatchInsertEvent(blockID flow.Identifier, event flow.Event) func(batch *badger.WriteBatch) error {
+func BatchInsertEvent(blockID flow.Identifier, event flow.Event) func(batch storage.BatchWriter) error {
 	return batchWrite(eventPrefix(codeEvent, blockID, event), event)
 }
 
@@ -24,7 +25,7 @@ func InsertServiceEvent(blockID flow.Identifier, event flow.Event) func(*badger.
 	return insert(eventPrefix(codeServiceEvent, blockID, event), event)
 }
 
-func BatchInsertServiceEvent(blockID flow.Identifier, event flow.Event) func(batch *badger.WriteBatch) error {
+func BatchInsertServiceEvent(blockID flow.Identifier, event flow.Event) func(batch storage.BatchWriter) error {
 	return batchWrite(eventPrefix(codeServiceEvent, blockID, event), event)
 }
 
@@ -55,7 +56,7 @@ func RemoveServiceEventsByBlockID(blockID flow.Identifier) func(*badger.Txn) err
 // BatchRemoveServiceEventsByBlockID removes all service events for the given blockID.
 // No errors are expected during normal operation, even if no entries are matched.
 // If Badger unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
-func BatchRemoveServiceEventsByBlockID(blockID flow.Identifier, batch *badger.WriteBatch) func(*badger.Txn) error {
+func BatchRemoveServiceEventsByBlockID(blockID flow.Identifier, batch storage.BatchWriter) func(*badger.Txn) error {
 	return func(txn *badger.Txn) error {
 		return batchRemoveByPrefix(makePrefix(codeServiceEvent, blockID))(txn, batch)
 	}
@@ -68,7 +69,7 @@ func RemoveEventsByBlockID(blockID flow.Identifier) func(*badger.Txn) error {
 // BatchRemoveEventsByBlockID removes all events for the given blockID.
 // No errors are expected during normal operation, even if no entries are matched.
 // If Badger unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
-func BatchRemoveEventsByBlockID(blockID flow.Identifier, batch *badger.WriteBatch) func(*badger.Txn) error {
+func BatchRemoveEventsByBlockID(blockID flow.Identifier, batch storage.BatchWriter) func(*badger.Txn) error {
 	return func(txn *badger.Txn) error {
 		return batchRemoveByPrefix(makePrefix(codeEvent, blockID))(txn, batch)
 	}
