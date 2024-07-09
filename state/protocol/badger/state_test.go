@@ -398,7 +398,13 @@ func TestBootstrapNonRoot(t *testing.T) {
 			child := unittest.BlockWithParentProtocolState(block3)
 			buildBlock(t, state, child)
 
-			return state.AtBlockID(block3.ID())
+			// ensure we have entered EFM
+			snapshot := state.AtBlockID(block3.ID())
+			epochState, err := snapshot.EpochProtocolState()
+			require.NoError(t, err)
+			require.Equal(t, flow.EpochPhaseFallback, epochState.EpochPhase())
+
+			return snapshot
 		})
 
 		bootstrap(t, after, func(state *bprotocol.State, err error) {
@@ -413,11 +419,12 @@ func TestBootstrapNonRoot(t *testing.T) {
 				require.NoError(t, err)
 				_, err = snapshot.RandomSource()
 				require.NoError(t, err)
-				epochState, err := snapshot.EpochProtocolState()
-				require.NoError(t, err)
-				require.True(t, epochState.EpochFallbackTriggered())
-				require.Equal(t, flow.EpochPhaseFallback, epochState.EpochPhase())
 			}
+
+			epochState, err := state.Final().EpochProtocolState()
+			require.NoError(t, err)
+			require.True(t, epochState.EpochFallbackTriggered())
+			require.Equal(t, flow.EpochPhaseFallback, epochState.EpochPhase())
 		})
 	})
 
