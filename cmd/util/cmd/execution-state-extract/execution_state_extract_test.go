@@ -65,18 +65,12 @@ func TestExtractExecutionState(t *testing.T) {
 
 	t.Run("empty WAL doesn't find anything", func(t *testing.T) {
 		withDirs(t, func(datadir, execdir, outdir string) {
-			err := extractExecutionState(
-				zerolog.Nop(),
-				execdir,
-				unittest.StateCommitmentFixture(),
-				outdir,
-				10,
-				false,
-				"",
-				nil,
-				false,
-			)
+			extractor := newExecutionStateExtractor(zerolog.Nop(), execdir, unittest.StateCommitmentFixture())
+
+			partialState, payloads, err := extractor.extract()
 			require.Error(t, err)
+			require.False(t, partialState)
+			require.Equal(t, 0, len(payloads))
 		})
 	})
 

@@ -13,6 +13,7 @@ import (
 	runtimeCommon "github.com/onflow/cadence/runtime/common"
 
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
+	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
@@ -314,36 +315,77 @@ func run(*cobra.Command, []string) {
 	chainID := flow.ChainID(flagChain)
 	fixSlabsWithBrokenReferences := chainID == flow.Testnet && flagFixSlabsWithBrokenReferences
 
-	var err error
+	var extractor extractor
 	if len(flagInputPayloadFileName) > 0 {
-		err = extractExecutionStateFromPayloads(
+		extractor = newPayloadFileExtractor(log.Logger, flagInputPayloadFileName)
+	} else {
+		extractor = newExecutionStateExtractor(log.Logger, flagExecutionStateDir, stateCommitment)
+	}
+
+	// Extract payloads.
+
+	payloadsFromPartialState, payloads, err := extractor.extract()
+	if err != nil {
+		log.Fatal().Err(err).Msgf("error extracting payloads: %s", err.Error())
+	}
+
+	log.Info().Msgf("extracted %d payloads", len(payloads))
+
+	// Migrate payloads.
+
+	if !flagNoMigration {
+		migrations := createMigration(log.Logger, flagOutputDir, flagNWorker, fixSlabsWithBrokenReferences)
+
+		payloads, err = migratePayloads(log.Logger, payloads, migrations)
+		if err != nil {
+			log.Fatal().Err(err).Msgf("error migrating payloads: %s", err.Error())
+		}
+
+		log.Info().Msgf("migrated %d payloads", len(payloads))
+	}
+
+	// Export migrated payloads.
+
+	var exporter exporter
+	if len(flagOutputPayloadFileName) > 0 {
+		exporter = newPayloadFileExporter(
 			log.Logger,
-			flagExecutionStateDir,
-			flagOutputDir,
 			flagNWorker,
-			!flagNoMigration,
-			flagInputPayloadFileName,
 			flagOutputPayloadFileName,
 			exportedAddresses,
-			fixSlabsWithBrokenReferences,
 		)
 	} else {
-		err = extractExecutionState(
+		exporter = newCheckpointFileExporter(
 			log.Logger,
-			flagExecutionStateDir,
-			stateCommitment,
 			flagOutputDir,
-			flagNWorker,
-			!flagNoMigration,
-			flagOutputPayloadFileName,
-			exportedAddresses,
-			fixSlabsWithBrokenReferences,
 		)
 	}
 
+	log.Info().Msgf("exporting %d payloads", len(payloads))
+
+	exportedState, err := exporter.export(payloadsFromPartialState, payloads)
 	if err != nil {
-		log.Fatal().Err(err).Msgf("error extracting the execution state: %s", err.Error())
+		log.Fatal().Err(err).Msgf("error exporting migrated payloads: %s", err.Error())
 	}
+
+	log.Info().Msgf("exported %d payloads", len(payloads))
+
+	// Create export reporter.
+	reporter := reporters.NewExportReporter(
+		log.Logger,
+		func() flow.StateCommitment { return stateCommitment },
+	)
+
+	err = reporter.Report(nil, exportedState)
+	if err != nil {
+		log.Error().Err(err).Msgf("can not generate report for migrated state: %v", exportedAddresses)
+	}
+
+	log.Info().Msgf(
+		"New state commitment for the exported state is: %s (base64: %s)",
+		exportedState.String(),
+		exportedState.Base64(),
+	)
 }
 
 // func ensureCheckpointFileExist(dir string) error {
