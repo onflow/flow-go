@@ -71,7 +71,7 @@ var DefaultChainConfig = &gethParams.ChainConfig{
 	// Fork scheduling based on timestamps
 	ShanghaiTime: &zero, // already on Shanghai
 	CancunTime:   &zero, // already on Cancun
-	PragueTime:   &zero, // already on Prague
+	PragueTime:   nil,   // not on Prague
 }
 
 // Default config supports the dynamic fee structure (EIP-1559)
