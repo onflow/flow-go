@@ -161,7 +161,7 @@ func run(*cobra.Command, []string) {
 		log.Fatal().Msg("--state-commitment-2 must be provided when --state-2 is provided")
 	}
 
-	rw := reporters.NewReportFileWriterFactory(flagOutputDirectory, log.Logger).
+	rw := reporters.NewReportFileWriterFactoryWithFormat(flagOutputDirectory, log.Logger, reporters.ReportFormatJSONL).
 		ReportWriter(ReporterName)
 	defer rw.Close()
 
