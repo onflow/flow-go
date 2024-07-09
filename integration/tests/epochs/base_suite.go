@@ -65,6 +65,11 @@ func (s *BaseSuite) SetupTest() {
 		s.log.Info().Msg("================> Finish SetupTest")
 	}()
 
+	accessConfig := []func(*testnet.NodeConfig){
+		testnet.WithLogLevel(zerolog.WarnLevel),
+		testnet.WithAdditionalFlag("--supports-observer=true"),
+	}
+
 	collectionConfigs := []func(*testnet.NodeConfig){
 		testnet.WithAdditionalFlag("--hotstuff-proposal-duration=100ms"),
 		testnet.WithLogLevel(zerolog.WarnLevel)}
@@ -85,7 +90,7 @@ func (s *BaseSuite) SetupTest() {
 		testnet.AsGhost())
 
 	confs := []testnet.NodeConfig{
-		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.WarnLevel)),
+		testnet.NewNodeConfig(flow.RoleAccess, accessConfig...),
 		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.WarnLevel)),
 		testnet.NewNodeConfig(flow.RoleCollection, collectionConfigs...),
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),

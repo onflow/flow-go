@@ -2,6 +2,7 @@ package cohort1
 
 import (
 	"github.com/onflow/flow-go/integration/testnet"
+	"github.com/rs/zerolog"
 	"testing"
 	"time"
 
@@ -20,6 +21,10 @@ type DynamicBootstrapInEFMSuite struct {
 	epochs.DynamicEpochTransitionSuite
 }
 
+// TestDynamicBootstrapInEFM tests the dynamic bootstrap in EFM. First, the test pauses the collection node to trigger EFM.
+// After triggering EFM, the test waits for the EpochPhaseFallback phase of the first epoch to begin and then starts an observer.
+// We specifically start an observer node since it can join the network anytime.
+// Finally, we ensure that the node makes progress and finalizes blocks after dynamic bootstrap in EFM.
 func (s *DynamicBootstrapInEFMSuite) TestDynamicBootstrapInEFM() {
 	// pause collection node to trigger EFM because of failed DKG
 	ln := s.GetContainersByRole(flow.RoleCollection)[0]
@@ -46,23 +51,23 @@ func (s *DynamicBootstrapInEFMSuite) TestDynamicBootstrapInEFM() {
 
 	observerConf := testnet.ObserverConfig{
 		ContainerName: "observer_1",
+		LogLevel:      zerolog.WarnLevel,
 	}
 	testContainer := s.Net.AddObserver(s.T(), observerConf)
 	testContainer.WriteRootSnapshot(snapshot)
 	testContainer.Container.Start(s.Ctx)
-
 	s.TimedLogf("successfully started observer")
 
 	observerClient, err := testContainer.TestnetClient()
 	require.NoError(s.T(), err)
 
 	// ensure node makes progress and finalizes blocks after dynamic bootstrap in EFM
+	targetFinalizedView := header.View + 10
 	require.Eventually(s.T(), func() bool {
 		observerSnapshot, err := observerClient.GetLatestProtocolSnapshot(s.Ctx)
 		require.NoError(s.T(), err)
 		finalized, err := observerSnapshot.Head()
 		require.NoError(s.T(), err)
-		//s.TimedLogf("observer finalized view %d", finalized.View)
-		return finalized.View >= header.View+10
+		return finalized.View >= targetFinalizedView
 	}, 30*time.Second, time.Second)
 }
