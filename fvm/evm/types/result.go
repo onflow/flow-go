@@ -1,6 +1,8 @@
 package types
 
 import (
+	"math/big"
+
 	gethCommon "github.com/onflow/go-ethereum/common"
 	gethTypes "github.com/onflow/go-ethereum/core/types"
 )
@@ -87,6 +89,8 @@ type Result struct {
 	// PrecompiledCalls captures an encoded list of calls to the precompile
 	// during the execution of transaction
 	PrecompiledCalls []byte
+	// Total supply diff
+	TotalSupplyDiff *big.Int
 }
 
 // Invalid returns true if transaction has been rejected
@@ -131,10 +135,17 @@ func (res *Result) Receipt() *gethTypes.Receipt {
 	if res.Invalid() {
 		return nil
 	}
+
 	receipt := &gethTypes.Receipt{
 		CumulativeGasUsed: res.GasConsumed,
 		Logs:              res.Logs,
 	}
+
+	// only add tx type if not direct call
+	if res.TxType != DirectCallTxType {
+		receipt.Type = res.TxType
+	}
+
 	if res.DeployedContractAddress != nil {
 		receipt.ContractAddress = res.DeployedContractAddress.ToCommon()
 	}
