@@ -3,6 +3,7 @@ package pebble
 import (
 	"errors"
 	"fmt"
+	"sync"
 
 	"github.com/cockroachdb/pebble"
 
@@ -16,7 +17,8 @@ import (
 // Job consumers can read the locators as job from the queue by index.
 // Chunk locators stored in this queue are unique.
 type ChunksQueue struct {
-	db *pebble.DB
+	db      *pebble.DB
+	storing sync.Mutex
 }
 
 const JobQueueChunksQueue = "JobQueueChunksQueue"
@@ -49,6 +51,9 @@ func (q *ChunksQueue) Init(defaultIndex uint64) (bool, error) {
 // A true will be returned, if the locator was new.
 // A false will be returned, if the locator was duplicate.
 func (q *ChunksQueue) StoreChunkLocator(locator *chunks.Locator) (bool, error) {
+	q.storing.Lock()
+	defer q.storing.Unlock()
+
 	var alreadyExist bool
 	err := operation.HasChunkLocator(locator.ID(), &alreadyExist)(q.db)
 	if err != nil {
