@@ -98,7 +98,6 @@ func (s *Suite) recoverEpoch(env templates.Environment, args []cadence.Value) *s
 
 	err = s.Client.SignAndSendTransaction(s.Ctx, tx)
 	require.NoError(s.T(), err)
-	fmt.Println("")
 	result, err := s.Client.WaitForSealed(s.Ctx, tx.ID())
 	require.NoError(s.T(), err)
 	s.Client.Account().Keys[0].SequenceNumber++
