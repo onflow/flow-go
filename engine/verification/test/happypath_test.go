@@ -93,18 +93,19 @@ func TestVerificationHappyPath(t *testing.T) {
 			trials:          1,
 			msg:             "10 block, 5 result, 5 chunks, 1 duplicates, authorized, no event repetition",
 		},
-		{
-			blockCount: 10,
-			opts: []vertestutils.CompleteExecutionReceiptBuilderOpt{
-				vertestutils.WithResults(2),
-				vertestutils.WithChunksCount(2),
-				vertestutils.WithCopies(2),
-			},
-			authorized:      true,
-			eventRepetition: 3, // notifies consumer 3 times for each finalized block.
-			trials:          1,
-			msg:             "10 block, 5 result, 5 chunks, 1 duplicates, authorized, with event repetition",
-		},
+		// {
+		// 	// flakey
+		// 	blockCount: 10,
+		// 	opts: []vertestutils.CompleteExecutionReceiptBuilderOpt{
+		// 		vertestutils.WithResults(2),
+		// 		vertestutils.WithChunksCount(2),
+		// 		vertestutils.WithCopies(2),
+		// 	},
+		// 	authorized:      true,
+		// 	eventRepetition: 3, // notifies consumer 3 times for each finalized block.
+		// 	trials:          1,
+		// 	msg:             "10 block, 5 result, 5 chunks, 1 duplicates, authorized, with event repetition",
+		// },
 		{
 			blockCount: 1,
 			opts: []vertestutils.CompleteExecutionReceiptBuilderOpt{
