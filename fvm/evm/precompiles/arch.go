@@ -47,8 +47,8 @@ func ArchContract(
 	proofVer func(*types.COAOwnershipProofInContext) (bool, error),
 	randomSourceProvider func(uint64) ([]byte, error),
 	revertibleRandomGenerator func() (uint64, error),
-) types.Precompile {
-	return MultiFunctionPrecompileContract(
+) types.PrecompiledContract {
+	return MultiFunctionPrecompiledContract(
 		address,
 		[]Function{
 			&flowBlockHeight{heightProvider},
@@ -160,7 +160,7 @@ func (r *randomnessSource) Run(input []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	buf := make([]byte, EncodedUint64Size)
+	buf := make([]byte, EncodedBytes32Size)
 	err = EncodeBytes32(rand, buf, 0)
 	if err != nil {
 		return nil, err

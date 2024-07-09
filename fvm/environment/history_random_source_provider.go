@@ -85,11 +85,11 @@ func NewRandomSourceHistoryProvider(
 	return NewForbiddenRandomSourceHistoryProvider()
 }
 
-// RandomSourceHistoryLen is the byte-size of the random source in the history
+// RandomSourceHistoryLength is the byte-size of the random source in the history
 // array.
 // It must be at least 16 (128 bits) to make sure it includes enough entropy
 // (assuming the randomness beacon also outputs more than 128 bits of entropy)
-const RandomSourceHistoryLen = 32
+const RandomSourceHistoryLength = 32
 
 func (b *historySourceProvider) RandomSourceHistory() ([]byte, error) {
 	defer b.tracer.StartExtensiveTracingChildSpan(
@@ -108,7 +108,7 @@ func (b *historySourceProvider) RandomSourceHistory() ([]byte, error) {
 			"get random source for block randomSource failed: %w", err))
 	}
 
-	// A method that derives `randomSourceHistoryLen` bytes from `source` must:
+	// A method that derives `RandomSourceHistoryLength` bytes from `source` must:
 	//  - extract and expand the entropy in `source`
 	//  - output must be independent than the expanded bytes used for Cadence's `random` function
 	//
@@ -122,7 +122,7 @@ func (b *historySourceProvider) RandomSourceHistory() ([]byte, error) {
 		return nil, fmt.Errorf("failed to create a PRG from source: %w", err)
 	}
 
-	historySource := make([]byte, RandomSourceHistoryLen)
+	historySource := make([]byte, RandomSourceHistoryLength)
 	csprg.Read(historySource)
 
 	return historySource, nil

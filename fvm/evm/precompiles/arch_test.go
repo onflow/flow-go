@@ -5,6 +5,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/evm/precompiles"
 	"github.com/onflow/flow-go/fvm/evm/testutils"
 	"github.com/onflow/flow-go/fvm/evm/types"
@@ -41,7 +42,7 @@ func TestArchContract(t *testing.T) {
 
 	t.Run("test get random source", func(t *testing.T) {
 		address := testutils.RandomAddress(t)
-		rand := make([]byte, 32)
+		rand := make([]byte, environment.RandomSourceHistoryLength)
 		err := precompiles.EncodeBytes32([]byte{13, 23}, rand, 0)
 		require.NoError(t, err)
 
@@ -64,6 +65,7 @@ func TestArchContract(t *testing.T) {
 		require.Equal(t, precompiles.RandomSourceGas, pc.RequiredGas(input))
 
 		ret, err := pc.Run(input)
+		require.Len(t, ret, environment.RandomSourceHistoryLength)
 		require.NoError(t, err)
 
 		resultRand, err := precompiles.ReadBytes32(ret, 0)

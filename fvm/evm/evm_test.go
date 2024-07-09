@@ -23,6 +23,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/crypto"
+	"github.com/onflow/flow-go/fvm/environment"
 	envMock "github.com/onflow/flow-go/fvm/environment/mock"
 	"github.com/onflow/flow-go/fvm/evm"
 	"github.com/onflow/flow-go/fvm/evm/emulator"
@@ -1023,6 +1024,16 @@ func TestEVMAddressDeposit(t *testing.T) {
 			require.NoError(t, err)
 			require.NotEmpty(t, blockEventPayload.Hash)
 			require.Equal(t, uint64(21000), blockEventPayload.TotalGasUsed)
+
+			// deposit event
+			depositEvent := output.Events[4]
+			depEv, err := types.FlowEventToCadenceEvent(depositEvent)
+			require.NoError(t, err)
+
+			depEvPayload, err := types.DecodeFLOWTokensDepositedEventPayload(depEv)
+			require.NoError(t, err)
+
+			require.Equal(t, types.OneFlow, depEvPayload.BalanceAfterInAttoFlow.Value)
 		})
 }
 
@@ -1147,40 +1158,55 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 				import EVM from %s
 				import FlowToken from %s
 
-				access(all)
-				fun main(): UFix64 {
-					let admin = getAuthAccount<auth(BorrowValue) &Account>(%s)
-						.storage.borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin)!
-					let minter <- admin.createNewMinter(allowedAmount: 2.34)
-					let vault <- minter.mintTokens(amount: 2.34)
-					destroy minter
+				transaction() {
+					prepare(account: auth(BorrowValue) &Account) {
+						let admin = account.storage
+							.borrow<&FlowToken.Administrator>(from: /storage/flowTokenAdmin)!
 
-					let cadenceOwnedAccount <- EVM.createCadenceOwnedAccount()
-					cadenceOwnedAccount.deposit(from: <-vault)
+						let minter <- admin.createNewMinter(allowedAmount: 2.34)
+						let vault <- minter.mintTokens(amount: 2.34)
+						destroy minter
 
-					let bal = EVM.Balance(attoflow: 0)
-					bal.setFLOW(flow: 1.23)
-					let vault2 <- cadenceOwnedAccount.withdraw(balance: bal)
-					let balance = vault2.balance
-					destroy cadenceOwnedAccount
-					destroy vault2
+						let cadenceOwnedAccount <- EVM.createCadenceOwnedAccount()
+						cadenceOwnedAccount.deposit(from: <-vault)
 
-					return balance
+						let bal = EVM.Balance(attoflow: 0)
+						bal.setFLOW(flow: 1.23)
+						let vault2 <- cadenceOwnedAccount.withdraw(balance: bal)
+						let balance = vault2.balance
+						destroy cadenceOwnedAccount
+						destroy vault2
+					}
 				}
 				`,
 					sc.EVMContract.Address.HexWithPrefix(),
 					sc.FlowToken.Address.HexWithPrefix(),
-					sc.FlowServiceAccount.Address.HexWithPrefix(),
 				))
 
-				script := fvm.Script(code)
+				tx := fvm.Transaction(
+					flow.NewTransactionBody().
+						SetScript(code).
+						AddAuthorizer(sc.FlowServiceAccount.Address),
+					0)
 
 				_, output, err := vm.Run(
 					ctx,
-					script,
+					tx,
 					snapshot)
 				require.NoError(t, err)
 				require.NoError(t, output.Err)
+
+				withdrawEvent := output.Events[10]
+
+				ev, err := types.FlowEventToCadenceEvent(withdrawEvent)
+				require.NoError(t, err)
+
+				evPayload, err := types.DecodeFLOWTokensWithdrawnEventPayload(ev)
+				require.NoError(t, err)
+
+				// 2.34 - 1.23 = 1.11
+				expectedBalanceAfterWithdraw := big.NewInt(1_110_000_000_000_000_000)
+				require.Equal(t, expectedBalanceAfterWithdraw, evPayload.BalanceAfterInAttoFlow.Value)
 			})
 	})
 
@@ -2151,10 +2177,9 @@ func TestCadenceArch(t *testing.T) {
 				require.NoError(t, err)
 				require.NoError(t, output.Err)
 
-				const sourceLen = 32
-				res := make([]byte, sourceLen)
+				res := make([]byte, environment.RandomSourceHistoryLength)
 				vals := output.Value.(cadence.Array).Values
-				require.Len(t, vals, sourceLen)
+				require.Len(t, vals, environment.RandomSourceHistoryLength)
 
 				for i := range res {
 					res[i] = byte(vals[i].(cadence.UInt8))

@@ -13,12 +13,12 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-func preparePrecompiles(
+func preparePrecompiledContracts(
 	evmContractAddress flow.Address,
 	randomBeaconAddress flow.Address,
 	addressAllocator types.AddressAllocator,
 	backend types.Backend,
-) []types.Precompile {
+) []types.PrecompiledContract {
 	archAddress := addressAllocator.AllocatePrecompileAddress(1)
 	archContract := precompiles.ArchContract(
 		archAddress,
@@ -27,7 +27,7 @@ func preparePrecompiles(
 		randomSourceProvider(randomBeaconAddress, backend),
 		revertibleRandomGenerator(backend),
 	)
-	return []types.Precompile{archContract}
+	return []types.PrecompiledContract{archContract}
 }
 
 func blockHeightProvider(backend types.Backend) func() (uint64, error) {
@@ -72,7 +72,7 @@ func randomSourceProvider(contractAddress flow.Address, backend types.Backend) f
 		}
 
 		cadenceArray := cadence.SearchFieldByName(data, RandomSourceTypeValueFieldName).(cadence.Array)
-		source := make([]byte, environment.RandomSourceHistoryLen)
+		source := make([]byte, environment.RandomSourceHistoryLength)
 		for i := range source {
 			source[i] = byte(cadenceArray.Values[i].(cadence.UInt8))
 		}
