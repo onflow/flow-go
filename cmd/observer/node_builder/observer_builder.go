@@ -13,11 +13,11 @@ import (
 	"strings"
 	"time"
 
-	badgerDB "github.com/dgraph-io/badger/v2"
+	"github.com/dgraph-io/badger/v2"
 	"github.com/ipfs/boxo/bitswap"
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
-	badger "github.com/ipfs/go-ds-badger2"
+	badgerds "github.com/ipfs/go-ds-badger2"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -1120,7 +1120,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 					return err
 				}
 			} else {
-				builder.ExecutionDataDatastore, err = storagedb.NewBadgerDBWrapper(datastoreDir, &badger.DefaultOptions)
+				builder.ExecutionDataDatastore, err = storagedb.NewBadgerDBWrapper(datastoreDir, &badgerds.DefaultOptions)
 				if err != nil {
 					return err
 				}
@@ -1216,8 +1216,8 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 					}
 
 				} else {
-					options := badger.DefaultOptions
-					options.Options = badgerDB.LSMOnlyOptions(trackerDir)
+					options := badgerds.DefaultOptions
+					options.Options = badger.LSMOnlyOptions(trackerDir)
 					storageDB, err = storagedb.NewBadgerDBWrapper(trackerDir, &options)
 					if err != nil {
 						return nil, fmt.Errorf("could not create tracker BadgerDBWrapper: %w", err)
