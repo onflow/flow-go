@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cockroachdb/pebble"
 	"github.com/dapperlabs/testingdock"
 	"github.com/dgraph-io/badger/v2"
 	"github.com/docker/docker/api/types"
@@ -29,9 +30,9 @@ import (
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
-	state "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/inmem"
-	storage "github.com/onflow/flow-go/storage/badger"
+	state "github.com/onflow/flow-go/state/protocol/pebble"
+	storage "github.com/onflow/flow-go/storage/pebble"
 )
 
 var (
@@ -232,13 +233,8 @@ func (c *Container) Name() string {
 }
 
 // DB returns the node's database.
-func (c *Container) DB() (*badger.DB, error) {
-	opts := badger.
-		DefaultOptions(c.DBPath()).
-		WithKeepL0InMemory(true).
-		WithLogger(nil)
-
-	db, err := badger.Open(opts)
+func (c *Container) DB() (*pebble.DB, error) {
+	db, err := pebble.Open(c.DBPath(), &pebble.Options{})
 	return db, err
 }
 

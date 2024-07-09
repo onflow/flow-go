@@ -48,10 +48,10 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/state/protocol"
-	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
-	"github.com/onflow/flow-go/storage/badger"
+	pebbleState "github.com/onflow/flow-go/state/protocol/pebble"
+	"github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/utils/grpcutils"
 )
 
@@ -182,10 +182,10 @@ func main() {
 	nodeBuilder.
 		PreInit(cmd.DynamicStartPreInit).
 		AdminCommand("read-range-cluster-blocks", func(conf *cmd.NodeConfig) commands.AdminCommand {
-			clusterPayloads := badger.NewClusterPayloads(&metrics.NoopCollector{}, conf.DB)
-			headers, ok := conf.Storage.Headers.(*badger.Headers)
+			clusterPayloads := pebble.NewClusterPayloads(&metrics.NoopCollector{}, conf.DB)
+			headers, ok := conf.Storage.Headers.(*pebble.Headers)
 			if !ok {
-				panic("fail to initialize admin tool, conf.Storage.Headers can not be casted as badger headers")
+				panic("fail to initialize admin tool, conf.Storage.Headers can not be casted as pebble headers")
 			}
 			return storageCommands.NewReadRangeClusterBlocksCommand(conf.DB, headers, clusterPayloads)
 		}).
@@ -195,13 +195,13 @@ func main() {
 			return nil
 		}).
 		Module("mutable follower state", func(node *cmd.NodeConfig) error {
-			// For now, we only support state implementations from package badger.
+			// For now, we only support state implementations from package pebble.
 			// If we ever support different implementations, the following can be replaced by a type-aware factory
-			state, ok := node.State.(*badgerState.State)
+			state, ok := node.State.(*pebbleState.State)
 			if !ok {
-				return fmt.Errorf("only implementations of type badger.State are currently supported but read-only state has type %T", node.State)
+				return fmt.Errorf("only implementations of type pebble.State are currently supported but read-only state has type %T", node.State)
 			}
-			followerState, err = badgerState.NewFollowerState(
+			followerState, err = pebbleState.NewFollowerState(
 				node.Logger,
 				node.Tracer,
 				node.ProtocolEvents,
@@ -287,7 +287,7 @@ func main() {
 		Component("follower core", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			// create a finalizer for updating the protocol
 			// state when the follower detects newly finalized blocks
-			finalizer := confinalizer.NewFinalizer(node.DB, node.Storage.Headers, followerState, node.Tracer)
+			finalizer := confinalizer.NewFinalizerPebble(node.DB, node.Storage.Headers, followerState, node.Tracer)
 			finalized, pending, err := recovery.FindLatest(node.State, node.Storage.Headers)
 			if err != nil {
 				return nil, fmt.Errorf("could not find latest finalized block and pending blocks to recover consensus follower: %w", err)

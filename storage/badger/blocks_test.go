@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
 	badgerstorage "github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/storage/badger/transaction"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -53,7 +54,7 @@ func TestBlockStoreAndRetrieve(t *testing.T) {
 		block := unittest.FullBlockFixture()
 		block.SetPayload(unittest.PayloadFixture(unittest.WithAllTheFixins))
 
-		err := blocks.Store(&block)
+		err := transaction.Update(db, blocks.StoreTx(&block))
 		require.NoError(t, err)
 
 		retrieved, err := blocks.ByID(block.ID())
