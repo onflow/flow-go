@@ -104,32 +104,21 @@ func TestEVMRun(t *testing.T) {
 				require.NoError(t, err)
 				require.NoError(t, output.Err)
 				require.NotEmpty(t, state.WriteSet)
+				snapshot = snapshot.Append(state)
 
 				// assert event fields are correct
 				require.Len(t, output.Events, 1)
 				txEvent := output.Events[0]
 
-				// TODO:
 				// commit block
-				blockEvent := output.Events[1]
+				var blockEventPayload *types.BlockEventPayload
+				blockEventPayload, snapshot = callEVMHeartBeat(t,
+					ctx,
+					vm,
+					snapshot)
 
-				assert.Equal(
-					t,
-					common.NewAddressLocation(
-						nil,
-						common.Address(sc.EVMContract.Address),
-						string(types.EventTypeBlockExecuted),
-					).ID(),
-					string(blockEvent.Type),
-				)
-
-				ev, err := ccf.Decode(nil, blockEvent.Payload)
-				require.NoError(t, err)
-				cadenceEvent, ok := ev.(cadence.Event)
-				require.True(t, ok)
-
-				blockEventPayload, err := types.DecodeBlockEventPayload(cadenceEvent)
-				require.NoError(t, err)
+				require.NotEmpty(t, blockEventPayload.Hash)
+				require.Equal(t, uint64(43785), blockEventPayload.TotalGasUsed)
 				require.NotEmpty(t, blockEventPayload.Hash)
 
 				assert.Equal(
@@ -142,9 +131,9 @@ func TestEVMRun(t *testing.T) {
 					string(txEvent.Type),
 				)
 
-				ev, err = ccf.Decode(nil, txEvent.Payload)
+				ev, err := ccf.Decode(nil, txEvent.Payload)
 				require.NoError(t, err)
-				cadenceEvent, ok = ev.(cadence.Event)
+				cadenceEvent, ok := ev.(cadence.Event)
 				require.True(t, ok)
 
 				txEventPayload, err := types.DecodeTransactionEventPayload(cadenceEvent)
@@ -521,57 +510,13 @@ func TestEVMBatchRun(t *testing.T) {
 				}
 
 				// commit block
-				heartBeatCode := []byte(fmt.Sprintf(
-					`
-					import EVM from %s
-					transaction {
-						prepare(serviceAccount: auth(BorrowValue) &Account) {
-							let evmHeartbeat = serviceAccount.storage
-								.borrow<&EVM.Heartbeat>(from: /storage/EVMHeartbeat)
-								?? panic("Couldn't borrow EVM.Heartbeat Resource")
-							evmHeartbeat.heartbeat()
-						}
-					}
-					`,
-					sc.EVMContract.Address.HexWithPrefix(),
-				))
-				tx = fvm.Transaction(
-					flow.NewTransactionBody().
-						SetScript(heartBeatCode).
-						AddAuthorizer(sc.FlowServiceAccount.Address),
-					0)
+				blockEventPayload, snapshot := callEVMHeartBeat(t,
+					ctx,
+					vm,
+					snapshot)
 
-				state, output, err = vm.Run(ctx, tx, snapshot)
-				require.NoError(t, err)
-				require.NoError(t, output.Err)
-				require.NotEmpty(t, state.WriteSet)
-				snapshot = snapshot.Append(state)
-
-				// last one is block executed, make sure TotalGasUsed is non-zero
-				blockEvent := output.Events[0]
-
-				assert.Equal(
-					t,
-					common.NewAddressLocation(
-						nil,
-						common.Address(sc.EVMContract.Address),
-						string(types.EventTypeBlockExecuted),
-					).ID(),
-					string(blockEvent.Type),
-				)
-
-				ev, err := ccf.Decode(nil, blockEvent.Payload)
-				require.NoError(t, err)
-				cadenceEvent, ok := ev.(cadence.Event)
-				require.True(t, ok)
-
-				blockEventPayload, err := types.DecodeBlockEventPayload(cadenceEvent)
-				require.NoError(t, err)
 				require.NotEmpty(t, blockEventPayload.Hash)
 				require.Equal(t, uint64(155513), blockEventPayload.TotalGasUsed)
-
-				// append the state
-				snapshot = snapshot.Append(state)
 
 				// retrieve the values
 				retrieveCode := []byte(fmt.Sprintf(
@@ -1043,51 +988,11 @@ func TestEVMAddressDeposit(t *testing.T) {
 			require.Equal(t, types.OneFlow, depEvPayload.BalanceAfterInAttoFlow.Value)
 
 			// commit block
-			heartBeatCode := []byte(fmt.Sprintf(
-				`
-								import EVM from %s
-								transaction {
-									prepare(serviceAccount: auth(BorrowValue) &Account) {
-										let evmHeartbeat = serviceAccount.storage
-											.borrow<&EVM.Heartbeat>(from: /storage/EVMHeartbeat)
-											?? panic("Couldn't borrow EVM.Heartbeat Resource")
-										evmHeartbeat.heartbeat()
-									}
-								}
-								`,
-				sc.EVMContract.Address.HexWithPrefix(),
-			))
-			tx = fvm.Transaction(
-				flow.NewTransactionBody().
-					SetScript(heartBeatCode).
-					AddAuthorizer(sc.FlowServiceAccount.Address),
-				0)
+			blockEventPayload, _ := callEVMHeartBeat(t,
+				ctx,
+				vm,
+				snapshot)
 
-			execSnap, output, err = vm.Run(ctx, tx, snapshot)
-			require.NoError(t, err)
-			require.NoError(t, output.Err)
-			require.NotEmpty(t, execSnap.WriteSet)
-
-			// block executed event, make sure TotalGasUsed is non-zero
-			blockEvent := output.Events[0]
-
-			assert.Equal(
-				t,
-				common.NewAddressLocation(
-					nil,
-					common.Address(sc.EVMContract.Address),
-					string(types.EventTypeBlockExecuted),
-				).ID(),
-				string(blockEvent.Type),
-			)
-
-			ev, err := ccf.Decode(nil, blockEvent.Payload)
-			require.NoError(t, err)
-			cadenceEvent, ok := ev.(cadence.Event)
-			require.True(t, ok)
-
-			blockEventPayload, err := types.DecodeBlockEventPayload(cadenceEvent)
-			require.NoError(t, err)
 			require.NotEmpty(t, blockEventPayload.Hash)
 			require.Equal(t, uint64(21000), blockEventPayload.TotalGasUsed)
 		})
@@ -1252,7 +1157,7 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 				require.NoError(t, err)
 				require.NoError(t, output.Err)
 
-				withdrawEvent := output.Events[8]
+				withdrawEvent := output.Events[7]
 
 				ev, err := types.FlowEventToCadenceEvent(withdrawEvent)
 				require.NoError(t, err)
@@ -2612,10 +2517,67 @@ func setupCOA(
 	snap = snap.Append(es)
 
 	// 3rd event is the cadence owned account created event
-	coaAddress, err := types.COAAddressFromFlowCOACreatedEvent(sc.EVMContract.Address, output.Events[2])
+	coaAddress, err := types.COAAddressFromFlowCOACreatedEvent(sc.EVMContract.Address, output.Events[1])
 	require.NoError(t, err)
 
 	return coaAddress, snap
+}
+
+func callEVMHeartBeat(
+	t *testing.T,
+	ctx fvm.Context,
+	vm fvm.VM,
+	snap snapshot.SnapshotTree,
+) (*types.BlockEventPayload, snapshot.SnapshotTree) {
+	sc := systemcontracts.SystemContractsForChain(ctx.Chain.ChainID())
+
+	heartBeatCode := []byte(fmt.Sprintf(
+		`
+	import EVM from %s
+	transaction {
+		prepare(serviceAccount: auth(BorrowValue) &Account) {
+			let evmHeartbeat = serviceAccount.storage
+				.borrow<&EVM.Heartbeat>(from: /storage/EVMHeartbeat)
+				?? panic("Couldn't borrow EVM.Heartbeat Resource")
+			evmHeartbeat.heartbeat()
+		}
+	}
+	`,
+		sc.EVMContract.Address.HexWithPrefix(),
+	))
+	tx := fvm.Transaction(
+		flow.NewTransactionBody().
+			SetScript(heartBeatCode).
+			AddAuthorizer(sc.FlowServiceAccount.Address),
+		0)
+
+	state, output, err := vm.Run(ctx, tx, snap)
+	require.NoError(t, err)
+	require.NoError(t, output.Err)
+	require.NotEmpty(t, state.WriteSet)
+	snap = snap.Append(state)
+
+	// last one is block executed, make sure TotalGasUsed is non-zero
+	blockEvent := output.Events[0]
+
+	assert.Equal(
+		t,
+		common.NewAddressLocation(
+			nil,
+			common.Address(sc.EVMContract.Address),
+			string(types.EventTypeBlockExecuted),
+		).ID(),
+		string(blockEvent.Type),
+	)
+
+	ev, err := ccf.Decode(nil, blockEvent.Payload)
+	require.NoError(t, err)
+	cadenceEvent, ok := ev.(cadence.Event)
+	require.True(t, ok)
+
+	blockEventPayload, err := types.DecodeBlockEventPayload(cadenceEvent)
+	require.NoError(t, err)
+	return blockEventPayload, snap
 }
 
 func getFlowAccountBalance(
