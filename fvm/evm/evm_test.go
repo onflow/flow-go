@@ -105,9 +105,12 @@ func TestEVMRun(t *testing.T) {
 				require.NoError(t, output.Err)
 				require.NotEmpty(t, state.WriteSet)
 
-				// assert event fiedls are correct
-				require.Len(t, output.Events, 2)
+				// assert event fields are correct
+				require.Len(t, output.Events, 1)
+				txEvent := output.Events[0]
 
+				// TODO:
+				// commit block
 				blockEvent := output.Events[1]
 
 				assert.Equal(
@@ -128,8 +131,6 @@ func TestEVMRun(t *testing.T) {
 				blockEventPayload, err := types.DecodeBlockEventPayload(cadenceEvent)
 				require.NoError(t, err)
 				require.NotEmpty(t, blockEventPayload.Hash)
-
-				txEvent := output.Events[0]
 
 				assert.Equal(
 					t,
@@ -488,7 +489,10 @@ func TestEVMBatchRun(t *testing.T) {
 				require.NoError(t, output.Err)
 				require.NotEmpty(t, state.WriteSet)
 
-				require.Len(t, output.Events, batchCount+1) // +1 block executed
+				// append the state
+				snapshot = snapshot.Append(state)
+
+				require.Len(t, output.Events, batchCount)
 				for i, event := range output.Events {
 					if i == batchCount { // last one is block executed
 						continue
@@ -516,8 +520,35 @@ func TestEVMBatchRun(t *testing.T) {
 					assert.Equal(t, storedValues[i], last.Big().Int64())
 				}
 
+				// commit block
+				heartBeatCode := []byte(fmt.Sprintf(
+					`
+					import EVM from %s
+					transaction {
+						prepare(serviceAccount: auth(BorrowValue) &Account) {
+							let evmHeartbeat = serviceAccount.storage
+								.borrow<&EVM.Heartbeat>(from: /storage/EVMHeartbeat)
+								?? panic("Couldn't borrow EVM.Heartbeat Resource")
+							evmHeartbeat.heartbeat()
+						}
+					}
+					`,
+					sc.EVMContract.Address.HexWithPrefix(),
+				))
+				tx = fvm.Transaction(
+					flow.NewTransactionBody().
+						SetScript(heartBeatCode).
+						AddAuthorizer(sc.FlowServiceAccount.Address),
+					0)
+
+				state, output, err = vm.Run(ctx, tx, snapshot)
+				require.NoError(t, err)
+				require.NoError(t, output.Err)
+				require.NotEmpty(t, state.WriteSet)
+				snapshot = snapshot.Append(state)
+
 				// last one is block executed, make sure TotalGasUsed is non-zero
-				blockEvent := output.Events[batchCount]
+				blockEvent := output.Events[0]
 
 				assert.Equal(
 					t,
@@ -1001,8 +1032,44 @@ func TestEVMAddressDeposit(t *testing.T) {
 			bal := getEVMAccountBalance(t, ctx, vm, snapshot, addr)
 			require.Equal(t, expectedBalance, bal)
 
+			// deposit event
+			depositEvent := output.Events[3]
+			depEv, err := types.FlowEventToCadenceEvent(depositEvent)
+			require.NoError(t, err)
+
+			depEvPayload, err := types.DecodeFLOWTokensDepositedEventPayload(depEv)
+			require.NoError(t, err)
+
+			require.Equal(t, types.OneFlow, depEvPayload.BalanceAfterInAttoFlow.Value)
+
+			// commit block
+			heartBeatCode := []byte(fmt.Sprintf(
+				`
+								import EVM from %s
+								transaction {
+									prepare(serviceAccount: auth(BorrowValue) &Account) {
+										let evmHeartbeat = serviceAccount.storage
+											.borrow<&EVM.Heartbeat>(from: /storage/EVMHeartbeat)
+											?? panic("Couldn't borrow EVM.Heartbeat Resource")
+										evmHeartbeat.heartbeat()
+									}
+								}
+								`,
+				sc.EVMContract.Address.HexWithPrefix(),
+			))
+			tx = fvm.Transaction(
+				flow.NewTransactionBody().
+					SetScript(heartBeatCode).
+					AddAuthorizer(sc.FlowServiceAccount.Address),
+				0)
+
+			execSnap, output, err = vm.Run(ctx, tx, snapshot)
+			require.NoError(t, err)
+			require.NoError(t, output.Err)
+			require.NotEmpty(t, execSnap.WriteSet)
+
 			// block executed event, make sure TotalGasUsed is non-zero
-			blockEvent := output.Events[3]
+			blockEvent := output.Events[0]
 
 			assert.Equal(
 				t,
@@ -1023,16 +1090,6 @@ func TestEVMAddressDeposit(t *testing.T) {
 			require.NoError(t, err)
 			require.NotEmpty(t, blockEventPayload.Hash)
 			require.Equal(t, uint64(21000), blockEventPayload.TotalGasUsed)
-
-			// deposit event
-			depositEvent := output.Events[4]
-			depEv, err := types.FlowEventToCadenceEvent(depositEvent)
-			require.NoError(t, err)
-
-			depEvPayload, err := types.DecodeFLOWTokensDepositedEventPayload(depEv)
-			require.NoError(t, err)
-
-			require.Equal(t, types.OneFlow, depEvPayload.BalanceAfterInAttoFlow.Value)
 		})
 }
 
@@ -1195,7 +1252,7 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 				require.NoError(t, err)
 				require.NoError(t, output.Err)
 
-				withdrawEvent := output.Events[10]
+				withdrawEvent := output.Events[8]
 
 				ev, err := types.FlowEventToCadenceEvent(withdrawEvent)
 				require.NoError(t, err)
