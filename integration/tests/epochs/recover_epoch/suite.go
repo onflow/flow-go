@@ -36,8 +36,9 @@ func (s *Suite) SetupTest() {
 
 // getNodeInfoDirs returns the internal node private info dir and the node config dir from a container with the specified role.
 func (s *Suite) getNodeInfoDirs(role flow.Role) (string, string) {
-	internalNodePrivInfoDir := fmt.Sprintf("%s/%s", s.GetContainersByRole(role)[0].BootstrapPath(), bootstrap.DirPrivateRoot)
-	nodeConfigJson := fmt.Sprintf("%s/%s", s.GetContainersByRole(role)[0].BootstrapPath(), bootstrap.PathNodeInfosPub)
+	bootstrapPath := s.GetContainersByRole(role)[0].BootstrapPath()
+	internalNodePrivInfoDir := fmt.Sprintf("%s/%s", bootstrapPath, bootstrap.DirPrivateRoot)
+	nodeConfigJson := fmt.Sprintf("%s/%s", bootstrapPath, bootstrap.PathNodeInfosPub)
 	return internalNodePrivInfoDir, nodeConfigJson
 }
 

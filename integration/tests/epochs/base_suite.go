@@ -159,6 +159,7 @@ func (s *BaseSuite) AwaitEpochPhase(ctx context.Context, expectedEpoch uint64, e
 }
 
 // GetContainersByRole returns all containers from the network for the specified role, making sure the containers are not ghost nodes.
+// Since go maps have random iteration order the list of containers returned will be in random order.
 func (s *BaseSuite) GetContainersByRole(role flow.Role) []*testnet.Container {
 	nodes := s.Net.ContainersByRole(role, false)
 	require.True(s.T(), len(nodes) > 0)
