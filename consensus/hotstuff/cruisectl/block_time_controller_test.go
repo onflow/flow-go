@@ -231,12 +231,6 @@ func (bs *BlockTimeControllerSuite) TestInit_EpochFallbackTriggered() {
 
 // TestOnEpochExtended ensures that the epoch configuration is updated when EpochExtended events are processed.
 func (bs *BlockTimeControllerSuite) TestOnEpochExtended() {
-	nextEpoch := mockprotocol.NewEpoch(bs.T())
-	nextEpoch.On("Counter").Return(bs.epochCounter+1, nil)
-	nextEpoch.On("FinalView").Return(bs.curEpochFinalView*2, nil)
-	nextEpoch.On("TargetDuration").Return(bs.EpochDurationSeconds(), nil)
-	nextEpoch.On("TargetEndTime").Return(bs.curEpochTargetEndTime+bs.EpochDurationSeconds(), nil)
-	bs.epochs.Add(nextEpoch)
 	bs.CreateAndStartController()
 	defer bs.StopController()
 
