@@ -433,7 +433,16 @@ func (ctl *BlockTimeController) measureViewDuration(tb TimedBlock) error {
 //   - update the curr epoch final view and target end time with the extension data.
 //
 // No errors are expected during normal operation.
-func (ctl *BlockTimeController) processEpochExtended(_ uint64, _ *flow.Header, extension flow.EpochExtension) error {
+func (ctl *BlockTimeController) processEpochExtended(extension flow.EpochExtension) error {
+	// sanity check: ensure the final view of the current epoch monotonically increases
+	if extension.FinalView < ctl.epochInfo.curEpochFinalView {
+		return fmt.Errorf("final view of epoch must be monotonically increases, but is decreasing from %d to %d", ctl.epochInfo.curEpochFinalView, extension.FinalView)
+	}
+
+	if extension.FinalView == ctl.epochInfo.curEpochFinalView {
+		return nil
+	}
+
 	ctl.curEpochFinalView = extension.FinalView
 	ctl.curEpochTargetEndTime = extension.TargetEndTime
 	return nil
@@ -480,9 +489,9 @@ func (ctl *BlockTimeController) OnBlockIncorporated(block *model.Block) {
 }
 
 // EpochExtended handles the EpochExtended protocol event.
-func (ctl *BlockTimeController) EpochExtended(epochCounter uint64, header *flow.Header, extension flow.EpochExtension) {
+func (ctl *BlockTimeController) EpochExtended(_ uint64, _ *flow.Header, extension flow.EpochExtension) {
 	ctl.epochEvents <- func() error {
-		return ctl.processEpochExtended(epochCounter, header, extension)
+		return ctl.processEpochExtended(extension)
 	}
 }
 
