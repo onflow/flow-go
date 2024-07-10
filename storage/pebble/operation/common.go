@@ -216,10 +216,12 @@ func iterate(start []byte, end []byte, iteration iterationFunc, prefetchValues b
 		}
 		defer it.Close()
 
+		maxEndWithPrefix := append(end, ffBytes...)
+
 		for it.SeekGE(start); it.Valid(); it.Next() {
 			key := it.Key()
 			// Break the loop if we have passed the end key prefix
-			if bytes.Compare(key, end) > 0 && !startsWithPrefix(key, end) {
+			if bytes.Compare(key, maxEndWithPrefix) > 0 {
 				break
 			}
 
@@ -418,17 +420,4 @@ func BatchUpdate(db *pebble.DB, fn func(tx pebble.Writer) error) error {
 		return err
 	}
 	return batch.Commit(nil)
-}
-
-// startsWithPrefix checks if a key starts with the given prefix
-func startsWithPrefix(key, prefix []byte) bool {
-	if len(key) < len(prefix) {
-		return false
-	}
-	for i := range prefix {
-		if key[i] != prefix[i] {
-			return false
-		}
-	}
-	return true
 }
