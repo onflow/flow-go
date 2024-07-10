@@ -121,8 +121,8 @@ func run(*cobra.Command, []string) {
 	}
 	defer db.Close()
 
-	storages := common.InitStorages(db)
-	state, err := common.InitProtocolState(db, storages)
+	storages := common.InitStoragesPebble(db)
+	state, err := common.InitProtocolStatePebble(db, storages)
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not init protocol state")
 	}
