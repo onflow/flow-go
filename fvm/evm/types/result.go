@@ -34,7 +34,7 @@ var (
 	StatusSuccessful Status = 3
 )
 
-// ResultSummary summerizes the outcome of a EVM call or tx run
+// ResultSummary summarizes the outcome of a EVM call or tx run
 type ResultSummary struct {
 	Status                  Status
 	ErrorCode               ErrorCode
@@ -61,7 +61,7 @@ func NewInvalidResult(tx *gethTypes.Transaction, err error) *Result {
 // evm transaction.
 // Its more comprehensive than typical evm receipt, usually
 // the receipt generation requires some extra calculation (e.g. Deployed contract address)
-// but we take a different apporach here and include more data so that
+// but we take a different approach here and include more data so that
 // it requires less work for anyone who tracks and consume results.
 type Result struct {
 	// captures error returned during validation step (pre-checks)
@@ -71,7 +71,7 @@ type Result struct {
 	// type of transaction defined by the evm package
 	// see DirectCallTxType as extra type we added type for direct calls.
 	TxType uint8
-	// total gas consumed during an opeartion
+	// total gas consumed during execution
 	GasConsumed uint64
 	// total gas refunds after transaction execution
 	GasRefund uint64
@@ -79,9 +79,9 @@ type Result struct {
 	DeployedContractAddress *Address
 	// returned data from a function call
 	ReturnedData []byte
-	// EVM logs (events that are emited by evm)
+	// EVM logs (events that are emitted by evm)
 	Logs []*gethTypes.Log
-	// TX hash holdes the cached value of tx hash
+	// TX hash holds the cached value of tx hash
 	TxHash gethCommon.Hash
 	// transaction block inclusion index
 	Index uint16
@@ -124,7 +124,7 @@ func (res *Result) VMErrorString() string {
 // can be used by json-rpc and other integration to be returned.
 //
 // This is method is also used to construct block receipt root hash
-// which requires the return receipt satisfy RLP encoding and cover these feilds
+// which requires the return receipt satisfy RLP encoding and cover these fields
 // Type (txType), PostState or Status, CumulativeGasUsed, Logs and Logs Bloom
 // and for each log, Address, Topics, Data (consensus fields)
 // During execution we also do fill in BlockNumber, TxIndex, Index (event index)
@@ -236,6 +236,8 @@ type LightLog struct {
 // Note that we don't store Bloom as we can reconstruct it
 // later. We don't have PostState and we use a uint8 for
 // status as there is currently only acts as boolean.
+// Data shows that using the light receipt results in 60% storage reduction
+// for block proposals and the extra overheads are manageable.
 type LightReceipt struct {
 	Type              uint8
 	Status            uint8
@@ -243,6 +245,10 @@ type LightReceipt struct {
 	Logs              []LightLog
 }
 
+// ToReceipt constructs a Receipt from the LightReceipt
+// Warning, this only populates the consensus fields
+// and if you want the full data, use the receipt
+// from the result.
 func (lr *LightReceipt) ToReceipt() *gethTypes.Receipt {
 	receipt := &gethTypes.Receipt{
 		Type:              lr.Type,
