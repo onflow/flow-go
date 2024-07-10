@@ -57,7 +57,7 @@ type ContractHandler interface {
 	GenerateResourceUUID() uint64
 
 	// Constructs and commits a new block from the block proposal
-	CommitBlockProposal() error
+	CommitBlockProposal()
 }
 
 // AddressAllocator allocates addresses, used by the handler

@@ -241,7 +241,7 @@ func (h *ContractHandler) batchRun(rlpEncodedTxs [][]byte, coinbase types.Addres
 	}
 
 	// TODO: don't commit right away.
-	err = h.CommitBlockProposal()
+	err = h.commitBlockProposal()
 	if err != nil {
 		return nil, err
 	}
@@ -250,7 +250,11 @@ func (h *ContractHandler) batchRun(rlpEncodedTxs [][]byte, coinbase types.Addres
 }
 
 // CommitBlockProposal commits the block proposal and add a new block to the EVM blockchain
-func (h *ContractHandler) CommitBlockProposal() error {
+func (h *ContractHandler) CommitBlockProposal() {
+	panicOnError(h.commitBlockProposal())
+}
+
+func (h *ContractHandler) commitBlockProposal() error {
 	// load latest block proposal
 	bp, err := h.blockStore.BlockProposal()
 	if err != nil {
@@ -341,7 +345,7 @@ func (h *ContractHandler) run(
 	}
 
 	// TODO: don't commit right away.
-	err = h.CommitBlockProposal()
+	err = h.commitBlockProposal()
 	if err != nil {
 		return nil, err
 	}
@@ -540,7 +544,7 @@ func (h *ContractHandler) executeAndHandleCall(
 	}
 
 	// TODO: don't commit right away.
-	err = h.CommitBlockProposal()
+	err = h.commitBlockProposal()
 	if err != nil {
 		return nil, err
 	}

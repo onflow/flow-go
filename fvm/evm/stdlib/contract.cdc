@@ -813,4 +813,20 @@ contract EVM {
             ?.borrowBridgeAccessor()
             ?? panic("Could not borrow reference to the EVM bridge")
     }
+
+    /// The Heartbeat resource controls the block production 
+    access(all) resource Heartbeat {
+
+        /// heartbeat calls commit block proposals and forms new blocks including all the 
+        /// recently executed transactions.
+        /// The Flow protocol makes sure to call this function once per block as a system call. 
+        access(all) fun heartbeat() {
+            InternalEVM.commitBlockProposal()
+        }
+    }
+    
+    init() { 
+        // TODO: we might store it somewhere else 
+        self.account.storage.save(<-create Heartbeat(), to: /storage/EVMHeartbeat)
+    }
 }
