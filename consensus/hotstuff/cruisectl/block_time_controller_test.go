@@ -243,7 +243,10 @@ func (bs *BlockTimeControllerSuite) TestOnEpochExtended() {
 	header := unittest.BlockHeaderFixture()
 	extensionFirstView := bs.curEpochFinalView + 1
 	extensionFinalView := bs.curEpochFinalView * 2
-	extensionTargetTime := bs.curEpochTargetEndTime + bs.EpochDurationSeconds()
+	extensionTargetTime, err := bs.snapshot.Epochs().Current().TargetEndTime()
+	require.NoError(bs.T(), err)
+	bs.state.On("AtBlockID", mock.Anything).Return(&bs.snapshot).Once()
+
 	extension := flow.EpochExtension{
 		FirstView:     extensionFirstView,
 		FinalView:     extensionFinalView,
