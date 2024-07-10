@@ -19,6 +19,7 @@ func TestLightReceipts(t *testing.T) {
 		receipts[i] = res.Receipt()
 		reconstructedReceipts[i] = res.LightReceipt().ToReceipt()
 	}
+	// the root hash for reconstructed receipts should match the receipts
 	root1 := gethTypes.DeriveSha(receipts, gethTrie.NewStackTrie(nil))
 	root2 := gethTypes.DeriveSha(reconstructedReceipts, gethTrie.NewStackTrie(nil))
 	require.Equal(t, root1, root2)
