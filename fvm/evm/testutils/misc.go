@@ -79,3 +79,13 @@ func COAOwnershipProofInContextFixture(t testing.TB) *types.COAOwnershipProofInC
 		EVMAddress:        RandomAddress(t),
 	}
 }
+
+func GetRandomResultFixture(t testing.TB) *types.Result {
+	return &types.Result{
+		GasConsumed: RandomGas(10000),
+		TxHash:      RandomCommonHash(t),
+		Logs: []*gethTypes.Log{
+			GetRandomLogFixture(t),
+		},
+	}
+}
