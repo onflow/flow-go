@@ -130,15 +130,12 @@ func (bs *BlockTimeControllerSuite) AssertCorrectInitialization() {
 	controllerTiming := bs.ctl.getProposalTiming()
 	now := time.Now().UTC()
 
-	if bs.ctl.epochFallbackTriggered || !bs.ctl.config.Enabled.Load() {
+	if !bs.ctl.config.Enabled.Load() {
 		// if epoch fallback is triggered or controller is disabled, use fallback timing
 		assert.Equal(bs.T(), now.Add(bs.ctl.config.FallbackProposalDelay.Load()), controllerTiming.TargetPublicationTime(7, now, unittest.IdentifierFixture()))
 	} else {
 		// otherwise should publish immediately
 		assert.Equal(bs.T(), now, controllerTiming.TargetPublicationTime(7, now, unittest.IdentifierFixture()))
-	}
-	if bs.ctl.epochFallbackTriggered {
-		return
 	}
 
 	// should initialize epoch info
@@ -256,7 +253,7 @@ func (bs *BlockTimeControllerSuite) TestOnEpochExtended() {
 
 	// expect epoch fallback triggered to be set to true when first extension is encountered indicating we are in epoch fallback mode
 	require.Eventually(bs.T(), func() bool {
-		return bs.ctl.epochFallbackTriggered
+		return len(bs.ctl.epochEvents) == 0
 	}, time.Second, time.Millisecond)
 
 	assert.Equal(bs.T(), extensionTargetTime, bs.ctl.curEpochTargetEndTime)

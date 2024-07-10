@@ -195,12 +195,6 @@ func (ctl *BlockTimeController) initEpochInfo() error {
 		ctl.nextEpochTargetEndTime = &nextEpochTargetEndTime
 	}
 
-	epochProtocolState, err := ctl.state.Final().EpochProtocolState()
-	if err != nil {
-		return fmt.Errorf("could not check epoch fallback: %w", err)
-	}
-	ctl.epochFallbackTriggered = epochProtocolState.EpochFallbackTriggered()
-
 	return nil
 }
 
@@ -208,7 +202,7 @@ func (ctl *BlockTimeController) initEpochInfo() error {
 // CAUTION: Must be called after initEpochInfo.
 func (ctl *BlockTimeController) initProposalTiming(curView uint64) {
 	// When disabled, or in epoch fallback, use fallback timing (constant ProposalDuration)
-	if ctl.epochFallbackTriggered || !ctl.config.Enabled.Load() {
+	if !ctl.config.Enabled.Load() {
 		ctl.storeProposalTiming(newFallbackTiming(curView, time.Now().UTC(), ctl.config.FallbackProposalDelay.Load()))
 		return
 	}
@@ -307,11 +301,6 @@ func (ctl *BlockTimeController) processEventsWorkerLogic(ctx irrecoverable.Signa
 //
 // No errors are expected during normal operation.
 func (ctl *BlockTimeController) processIncorporatedBlock(tb TimedBlock) error {
-	// if epoch fallback is triggered, we always use fallbackProposalTiming
-	if ctl.epochFallbackTriggered {
-		return nil
-	}
-
 	latest := ctl.getProposalTiming()
 	if tb.Block.View <= latest.ObservationView() { // we don't care about older blocks that are incorporated into the protocol state
 		return nil
@@ -493,9 +482,9 @@ func (ctl *BlockTimeController) EpochExtended(epochCounter uint64, header *flow.
 }
 
 // EpochCommittedPhaseStarted handles the EpochCommittedPhaseStarted protocol event.
-func (ctl *BlockTimeController) EpochCommittedPhaseStarted(currentEpochCounter uint64, first *flow.Header) {
+func (ctl *BlockTimeController) EpochCommittedPhaseStarted(_ uint64, first *flow.Header) {
 	ctl.epochEvents <- func() error {
-		return ctl.processEpochCommittedPhaseStarted(currentEpochCounter, first)
+		return ctl.processEpochCommittedPhaseStarted(first)
 	}
 }
 
