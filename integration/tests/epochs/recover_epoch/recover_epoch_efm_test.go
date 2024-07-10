@@ -61,16 +61,17 @@ func (s *RecoverEpochSuite) TestRecoverEpoch() {
 	numViewsInRecoveryEpoch := s.EpochLen
 	numViewsInStakingAuction := s.StakingAuctionLen
 	epochCounter := uint64(1)
-	targetDuration := uint64(3000)
-	targetEndTime := uint64(4000)
+
 	out := fmt.Sprintf("%s/recover-epoch-tx-args.json", s.Net.BootstrapDir)
 	s.executeEFMRecoverTXArgsCMD(
 		collectionClusters,
 		numViewsInRecoveryEpoch,
 		numViewsInStakingAuction,
 		epochCounter,
-		targetDuration,
-		targetEndTime,
+		// cruise control is disabled for integration tests
+		// targetDuration and targetEndTime will be ignored
+		3000,
+		4000,
 		out,
 	)
 	b, err := os.ReadFile(out)
