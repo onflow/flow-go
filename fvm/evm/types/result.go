@@ -256,9 +256,9 @@ func (lr *LightReceipt) ToReceipt() *gethTypes.Receipt {
 		CumulativeGasUsed: lr.CumulativeGasUsed,
 	}
 
-	logs := make([]*gethTypes.Log, len(lr.Logs))
+	receipt.Logs = make([]*gethTypes.Log, len(lr.Logs))
 	for i, l := range lr.Logs {
-		logs[i] = &gethTypes.Log{
+		receipt.Logs[i] = &gethTypes.Log{
 			Address: l.Address,
 			Topics:  l.Topics,
 			Data:    l.Data,
