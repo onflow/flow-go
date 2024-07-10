@@ -16,7 +16,7 @@ import (
 )
 
 // ErrIncompatibleNodeVersion indicates that node version is incompatible with the block version
-var ErrIncompatibleNodeVersion = errors.New("node version is incompatible with block version")
+var ErrIncompatibleNodeVersion = errors.New("node version is incompatible with data for block")
 
 type ScriptExecutor struct {
 	log zerolog.Logger
@@ -140,18 +140,6 @@ func (s *ScriptExecutor) checkHeight(height uint64) error {
 		return fmt.Errorf("%w: script executor not initialized", storage.ErrHeightNotIndexed)
 	}
 
-	// Version control feature could be disabled. In such a case, ignore related functionality.
-	if s.versionControl != nil {
-		compatible, err := s.versionControl.CompatibleAtBlock(height)
-		if err != nil {
-			return err
-		}
-
-		if !compatible {
-			return ErrIncompatibleNodeVersion
-		}
-	}
-
 	highestHeight, err := s.indexReporter.HighestIndexedHeight()
 	if err != nil {
 		return fmt.Errorf("could not get highest indexed height: %w", err)
@@ -164,12 +152,25 @@ func (s *ScriptExecutor) checkHeight(height uint64) error {
 	if err != nil {
 		return fmt.Errorf("could not get lowest indexed height: %w", err)
 	}
+
 	if height < lowestHeight {
-		return fmt.Errorf("%w: block is before lowest indexed height", storage.ErrHeightNotIndexed)
+		return ErrIncompatibleNodeVersion
 	}
 
 	if height > s.maxCompatibleHeight.Load() || height < s.minCompatibleHeight.Load() {
 		return fmt.Errorf("%w: node software is not compatible with version required to executed block", storage.ErrHeightNotIndexed)
+	}
+
+	// Version control feature could be disabled. In such a case, ignore related functionality.
+	if s.versionControl != nil {
+		compatible, err := s.versionControl.CompatibleAtBlock(height)
+		if err != nil {
+			return err
+		}
+
+		if !compatible {
+			return ErrIncompatibleNodeVersion
+		}
 	}
 
 	return nil
