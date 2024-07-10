@@ -51,6 +51,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/subscription"
 	followereng "github.com/onflow/flow-go/engine/common/follower"
 	"github.com/onflow/flow-go/engine/common/requester"
+	"github.com/onflow/flow-go/engine/common/stop"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/engine/common/version"
 	"github.com/onflow/flow-go/engine/execution/computation/query"
@@ -161,6 +162,7 @@ type AccessNodeConfig struct {
 	registerCacheSize                 uint
 	programCacheSize                  uint
 	versionControlEnabled             bool
+	stopControlEnabled                bool
 }
 
 type PublicNetworkConfig struct {
@@ -259,6 +261,7 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 		registerCacheSize:            0,
 		programCacheSize:             0,
 		versionControlEnabled:        true,
+		stopControlEnabled:           true,
 	}
 }
 
@@ -303,6 +306,7 @@ type FlowAccessNodeBuilder struct {
 	IndexerDependencies        *cmd.DependencyList
 	collectionExecutedMetric   module.CollectionExecutedMetric
 	versionControl             *version.VersionControl
+	stopControl                *stop.StopControl
 
 	// The sync engine participants provider is the libp2p peer store for the access node
 	// which is not available until after the network has started.
@@ -526,7 +530,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 		}).
 		Module("execution data datastore and blobstore", func(node *cmd.NodeConfig) error {
 			datastoreDir := filepath.Join(builder.executionDataDir, "blobstore")
-			err := os.MkdirAll(datastoreDir, 0700)
+			err := os.MkdirAll(datastoreDir, 0o700)
 			if err != nil {
 				return err
 			}
@@ -1154,6 +1158,10 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 			"version-control-enabled",
 			defaultConfig.versionControlEnabled,
 			"whether to enable the version control feature. Default value is true")
+		flags.BoolVar(&builder.stopControlEnabled,
+			"stop-control-enabled",
+			defaultConfig.stopControlEnabled,
+			"whether to enable the stop control feature. Default value is true")
 		// ExecutionDataRequester config
 		flags.BoolVar(&builder.executionDataSyncEnabled,
 			"execution-data-sync-enabled",
@@ -1881,6 +1889,19 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 
 			return versionControl, nil
 		})
+
+		if builder.stopControlEnabled {
+			builder.Component("stop control", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+				stopControl, err := stop.NewStopControl(builder.Logger, builder.versionControl)
+				if err != nil {
+					return nil, fmt.Errorf("could not create stop control: %w", err)
+				}
+
+				builder.stopControl = stopControl
+
+				return stopControl, nil
+			})
+		}
 	}
 
 	if builder.supportsObserver {
