@@ -13,7 +13,7 @@ var (
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "read-badger",
+	Use:   "read-pebble",
 	Short: "read storage data",
 }
 
@@ -27,7 +27,7 @@ func Execute() {
 }
 
 func init() {
-	rootCmd.PersistentFlags().StringVarP(&flagDatadir, "datadir", "d", "/var/flow/data/protocol", "directory to the badger dababase")
+	rootCmd.PersistentFlags().StringVarP(&flagDatadir, "datadir", "d", "/var/flow/data/protocol", "directory to the pebble dababase")
 	_ = rootCmd.MarkPersistentFlagRequired("data-dir")
 
 	cobra.OnInitialize(initConfig)

@@ -123,7 +123,8 @@ func (ch *ChunkDataPacks) ByChunkID(chunkID flow.Identifier) (*flow.ChunkDataPac
 
 // BatchRemove is not used in pebble implementation
 func (ch *ChunkDataPacks) BatchRemove(chunkID flow.Identifier, batch storage.BatchStorage) error {
-	return fmt.Errorf("not implemented")
+	w := operation.NewBatchWriter(batch.GetWriter())
+	return ch.batchRemove(chunkID, w)
 }
 
 func (ch *ChunkDataPacks) batchRemove(chunkID flow.Identifier, batch pebble.Writer) error {
