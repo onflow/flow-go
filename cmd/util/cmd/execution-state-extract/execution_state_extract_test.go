@@ -16,7 +16,7 @@ import (
 	"github.com/onflow/flow-go/ledger/complete/wal"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -31,10 +31,11 @@ func TestExtractExecutionState(t *testing.T) {
 	t.Run("missing block->state commitment mapping", func(t *testing.T) {
 
 		withDirs(t, func(datadir, execdir, outdir string) {
-			db := common.InitStorage(datadir)
-			commits := badger.NewCommits(metr, db)
+			db, err := common.InitStoragePebble(datadir)
+			require.NoError(t, err)
+			commits := pebble.NewCommits(metr, db)
 
-			_, err := getStateCommitment(commits, unittest.IdentifierFixture())
+			_, err = getStateCommitment(commits, unittest.IdentifierFixture())
 			require.Error(t, err)
 		})
 	})
@@ -42,13 +43,14 @@ func TestExtractExecutionState(t *testing.T) {
 	t.Run("retrieves block->state mapping", func(t *testing.T) {
 
 		withDirs(t, func(datadir, execdir, outdir string) {
-			db := common.InitStorage(datadir)
-			commits := badger.NewCommits(metr, db)
+			db, err := common.InitStoragePebble(datadir)
+			require.NoError(t, err)
+			commits := pebble.NewCommits(metr, db)
 
 			blockID := unittest.IdentifierFixture()
 			stateCommitment := unittest.StateCommitmentFixture()
 
-			err := commits.Store(blockID, stateCommitment)
+			err = commits.Store(blockID, stateCommitment)
 			require.NoError(t, err)
 
 			retrievedStateCommitment, err := getStateCommitment(commits, blockID)
@@ -79,8 +81,9 @@ func TestExtractExecutionState(t *testing.T) {
 				checkpointsToKeep  = 1
 			)
 
-			db := common.InitStorage(datadir)
-			commits := badger.NewCommits(metr, db)
+			db, err := common.InitStoragePebble(datadir)
+			require.NoError(t, err)
+			commits := pebble.NewCommits(metr, db)
 
 			// generate some oldLedger data
 			size := 10
