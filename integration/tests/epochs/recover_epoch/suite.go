@@ -45,15 +45,12 @@ func (s *Suite) getNodeInfoDirs(role flow.Role) (string, string) {
 // executeEFMRecoverTXArgsCMD executes the efm-recover-tx-args CLI command to generate EpochRecover transaction arguments.
 // Args:
 //
-//	role: the container role that will be used to read internal node private info and the node config json.
-//	snapshot: the protocol state snapshot.
 //	collectionClusters: the number of collector clusters.
 //	numViewsInEpoch: the number of views in the recovery epoch.
 //	numViewsInStakingAuction: the number of views in the staking auction of the recovery epoch.
 //	epochCounter: the epoch counter.
 //	targetDuration: the target duration for the recover epoch.
 //	targetEndTime: the target end time for the recover epoch.
-//	randomSource: the random source of the recover epoch.
 //	out: the tx args output file full path.
 func (s *Suite) executeEFMRecoverTXArgsCMD(collectionClusters, numViewsInEpoch, numViewsInStakingAuction, epochCounter, targetDuration, targetEndTime uint64, out string) {
 	// read internal node info from one of the consensus nodes
