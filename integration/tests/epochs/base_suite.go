@@ -188,7 +188,7 @@ func (s *BaseSuite) AssertInEpoch(ctx context.Context, expectedEpoch uint64) {
 	require.Equalf(s.T(), expectedEpoch, actualEpoch, "expected to be in epoch %d got %d", expectedEpoch, actualEpoch)
 }
 
-// CurrentEpoch returns the current epoch.
+// CurrentEpoch returns the current epoch counter.
 func (s *BaseSuite) CurrentEpoch(ctx context.Context) uint64 {
 	snapshot := s.GetLatestProtocolSnapshot(ctx)
 	counter, err := snapshot.Epochs().Current().Counter()
