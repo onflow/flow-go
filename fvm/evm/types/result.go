@@ -1,8 +1,6 @@
 package types
 
 import (
-	"math/big"
-
 	gethCommon "github.com/onflow/go-ethereum/common"
 	gethTypes "github.com/onflow/go-ethereum/core/types"
 )
@@ -89,8 +87,6 @@ type Result struct {
 	// PrecompiledCalls captures an encoded list of calls to the precompile
 	// during the execution of transaction
 	PrecompiledCalls []byte
-	// Total supply diff
-	TotalSupplyDiff *big.Int
 }
 
 // Invalid returns true if transaction has been rejected
