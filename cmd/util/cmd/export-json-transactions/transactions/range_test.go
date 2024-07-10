@@ -4,19 +4,19 @@ import (
 	"fmt"
 	"testing"
 
-	badger "github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/badger/transaction"
+	"github.com/onflow/flow-go/storage/pebble/operation"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestFindBlockTransactions(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
 		// prepare two blocks
 		// block 1 has 2 collections
 		// block 2 has 1 collection
@@ -49,7 +49,7 @@ func TestFindBlockTransactions(t *testing.T) {
 		b1.Header.Height = 5
 
 		// prepare dependencies
-		storages := common.InitStorages(db)
+		storages := common.InitStoragesPebble(db)
 		blocks, payloads, collections := storages.Blocks, storages.Payloads, storages.Collections
 		snap4 := &mock.Snapshot{}
 		snap4.On("Head").Return(b1.Header, nil)
@@ -60,8 +60,8 @@ func TestFindBlockTransactions(t *testing.T) {
 		state.On("AtHeight", uint64(5)).Return(snap5, nil)
 
 		// store into database
-		require.NoError(t, transaction.Update(db, blocks.StoreTx(&b1)))
-		require.NoError(t, transaction.Update(db, blocks.StoreTx(&b2)))
+		require.NoError(t, operation.WithReaderBatchWriter(db, blocks.StorePebble(&b1)))
+		require.NoError(t, operation.WithReaderBatchWriter(db, blocks.StorePebble(&b2)))
 
 		require.NoError(t, collections.Store(&col1.Collection))
 		require.NoError(t, collections.Store(&col2.Collection))
