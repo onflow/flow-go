@@ -92,6 +92,8 @@ func (es *setupEpoch) TargetDuration() (uint64, error) {
 // Unix Time (in units of seconds). This target is specified by the FlowEpoch smart contract in
 // the EpochSetup event and used by the Cruise Control system to moderate the block rate.
 func (es *setupEpoch) TargetEndTime() (uint64, error) {
+	//desiredViewDuration := es.setupEvent.TargetDuration / (es.setupEvent.FinalView - es.setupEvent.FirstView + 1)
+	//targetEndTime := es.setupEvent.TargetEndTime + (extension.FinalView-es.setupEvent.FinalView)*desiredViewDuration
 	return es.setupEvent.TargetEndTime, nil
 }
 
