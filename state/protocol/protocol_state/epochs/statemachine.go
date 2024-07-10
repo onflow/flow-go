@@ -17,7 +17,7 @@ import (
 // when Epoch-related Service Events are sealed or specific view-thresholds are reached.
 //
 // The StateMachine is fork-aware, in that it starts with the Epoch state of the parent block and
-// evolves the state based on the relevant information in the child block (specifically Service Events
+// evolves the state, based on the relevant information in the child block (specifically Service Events
 // sealed in the child block and the child block's view). A separate instance must be created for each
 // block that is being processed. Calling `Build()` constructs a snapshot of the resulting Epoch state.
 type StateMachine interface {
@@ -194,7 +194,7 @@ func (e *EpochStateMachine) Build() (*transaction.DeferredBlockPersist, error) {
 	return e.pendingDbUpdates, nil
 }
 
-// EvolveState applies the state change(s) on the Epoch sub-state based on information from the candidate block
+// EvolveState applies the state change(s) on the Epoch sub-state, based on information from the candidate block
 // (under construction). Information that potentially changes the state (compared to the parent block's state):
 //   - Service Events sealed in the candidate block
 //   - the candidate block's view (already provided at construction time)
@@ -237,8 +237,8 @@ func (e *EpochStateMachine) EvolveState(sealedServiceEvents []flow.ServiceEvent)
 	return nil
 }
 
-// evolveActiveStateMachine applies the state change(s) on the Epoch sub-state based on information from the candidate block
-// (under construction). Information that potentially changes the state (compared to the parent block's state):
+// evolveActiveStateMachine applies the state change(s) on the Epoch sub-state, based on information from the candidate
+// block (under construction). Information that potentially changes the state (compared to the parent block's state):
 //  1. the candidate block's view (already provided at construction time)
 //  2. Service Events sealed in the candidate block
 //
@@ -252,36 +252,15 @@ func (e *EpochStateMachine) evolveActiveStateMachine(sealedServiceEvents []flow.
 	// STEP 1: transition to next epoch if next epoch is committed *and* we are at first block of epoch
 	phase := parentProtocolState.EpochPhase()
 	if (phase == flow.EpochPhaseCommitted) && (e.activeStateMachine.View() > parentProtocolState.CurrentEpochFinalView()) {
-			err := e.activeStateMachine.TransitionToNextEpoch()
-			if err != nil {
-				return nil, fmt.Errorf("could not transition protocol state to next epoch: %w", err)
-			}
+		err := e.activeStateMachine.TransitionToNextEpoch()
+		if err != nil {
+			return nil, fmt.Errorf("could not transition protocol state to next epoch: %w", err)
 		}
 	}
 
-	return e.applyServiceEventsFromOrderedResults(sealedServiceEvents)
-}
-
-// View returns the view associated with this state machine.
-// The view of the state machine equals the view of the block carrying the respective updates.
-func (e *EpochStateMachine) View() uint64 {
-	return e.activeStateMachine.View()
-}
-
-// ParentState returns parent state associated with this state machine.
-func (e *EpochStateMachine) ParentState() protocol.KVStoreReader {
-	return e.parentState
-}
-
-// applyServiceEventsFromOrderedResults applies the service events contained within the list of results
-// to the pending state tracked by `stateMutator`.
-// Each result corresponds to one seal that was included in the payload of the block being processed by this `stateMutator`.
-// Results must be ordered by block height.
-// Expected errors during normal operations:
-// - `protocol.InvalidServiceEventError` if any service event is invalid or is not a valid state transition for the current protocol state
-func (e *EpochStateMachine) applyServiceEventsFromOrderedResults(orderedUpdates []flow.ServiceEvent) (*transaction.DeferredBlockPersist, error) {
+	// STEP 2: apply service events (input events already required to be ordered by block height).
 	dbUpdates := transaction.NewDeferredBlockPersist()
-	for _, event := range orderedUpdates {
+	for _, event := range sealedServiceEvents {
 		switch ev := event.Event.(type) {
 		case *flow.EpochSetup:
 			processed, err := e.activeStateMachine.ProcessEpochSetup(ev)
@@ -315,20 +294,15 @@ func (e *EpochStateMachine) applyServiceEventsFromOrderedResults(orderedUpdates 
 	return dbUpdates, nil
 }
 
-// transitionToEpochFallbackMode transitions the protocol state to Epoch Fallback Mode [EFM].
-// This is implemented by switching to a different state machine implementation, which has different rules for processing service events.
-// Once we enter EFM, the only way to return to normal is by processing an epoch recover event by the fallback state machine.
-func (e *EpochStateMachine) transitionToEpochFallbackMode(orderedUpdates []flow.ServiceEvent) (*transaction.DeferredBlockPersist, error) {
-	var err error
-	e.activeStateMachine, err = e.epochFallbackStateMachineFactory()
-	if err != nil {
-		return nil, fmt.Errorf("could not create epoch fallback state machine: %w", err)
-	}
-	dbUpdates, err := e.evolveActiveStateMachine(orderedUpdates)
-	if err != nil {
-		return nil, irrecoverable.NewExceptionf("could not apply service events after transition to epoch fallback mode: %w", err)
-	}
-	return dbUpdates, nil
+// View returns the view associated with this state machine.
+// The view of the state machine equals the view of the block carrying the respective updates.
+func (e *EpochStateMachine) View() uint64 {
+	return e.activeStateMachine.View()
+}
+
+// ParentState returns parent state associated with this state machine.
+func (e *EpochStateMachine) ParentState() protocol.KVStoreReader {
+	return e.parentState
 }
 
 // epochFallbackTriggeredByIncorporatingCandidate checks whether incorporating the input block B
