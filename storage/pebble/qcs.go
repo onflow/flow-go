@@ -1,6 +1,8 @@
 package pebble
 
 import (
+	"sync"
+
 	"github.com/cockroachdb/pebble"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -13,8 +15,9 @@ import (
 
 // QuorumCertificates implements persistent storage for quorum certificates.
 type QuorumCertificates struct {
-	db    *pebble.DB
-	cache *Cache[flow.Identifier, *flow.QuorumCertificate]
+	storing *sync.Mutex
+	db      *pebble.DB
+	cache   *Cache[flow.Identifier, *flow.QuorumCertificate]
 }
 
 var _ storage.QuorumCertificates = (*QuorumCertificates)(nil)
@@ -49,6 +52,10 @@ func (q *QuorumCertificates) StoreTx(qc *flow.QuorumCertificate) func(*transacti
 
 func (q *QuorumCertificates) StorePebble(qc *flow.QuorumCertificate) func(storage.PebbleReaderBatchWriter) error {
 	return func(rw storage.PebbleReaderBatchWriter) error {
+		// use lock to prevent dirty reads
+		q.storing.Lock()
+		defer q.storing.Unlock()
+
 		r, _ := rw.ReaderWriter()
 		_, err := q.retrieveTx(qc.BlockID)(r)
 		if err == nil {

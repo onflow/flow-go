@@ -283,7 +283,6 @@ func (state *State) bootstrapSealingSegment(segment *flow.SealingSegment, head *
 			if !ok {
 				return fmt.Errorf("missing latest seal for sealing segment block (id=%s)", blockID)
 			}
-			fmt.Println("height =====", height, latestSealID)
 			// sanity check: make sure the seal exists
 			var latestSeal flow.Seal
 			err = transaction.WithTx(operation.RetrieveSeal(latestSealID, &latestSeal))(tx)

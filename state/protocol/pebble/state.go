@@ -261,11 +261,7 @@ func (state *State) bootstrapSealingSegment(segment *flow.SealingSegment, head *
 			}
 		}
 
-		// TODO: use WithIndexedReaderBatchWriter
-		indexedBatch, ok := w.(*pebble.Batch)
-		if !ok {
-			return fmt.Errorf("could not get indexed batch")
-		}
+		indexedBatch := tx.IndexedBatch()
 		for i, block := range segment.Blocks {
 			blockID := block.ID()
 			height := block.Header.Height
