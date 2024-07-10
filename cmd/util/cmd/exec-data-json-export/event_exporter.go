@@ -11,7 +11,7 @@ import (
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/storage/pebble"
 )
 
 type event struct {
@@ -28,12 +28,15 @@ type event struct {
 func ExportEvents(blockID flow.Identifier, dbPath string, outputPath string) error {
 
 	// traverse backward from the given block (parent block) and fetch by blockHash
-	db := common.InitStorage(dbPath)
+	db, err := common.InitStoragePebble(dbPath)
+	if err != nil {
+		return fmt.Errorf("could not open db: %w", err)
+	}
 	defer db.Close()
 
 	cacheMetrics := &metrics.NoopCollector{}
-	headers := badger.NewHeaders(cacheMetrics, db)
-	events := badger.NewEvents(cacheMetrics, db)
+	headers := pebble.NewHeaders(cacheMetrics, db)
+	events := pebble.NewEvents(cacheMetrics, db)
 	activeBlockID := blockID
 
 	outputFile := filepath.Join(outputPath, "events.jsonl")

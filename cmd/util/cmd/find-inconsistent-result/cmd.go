@@ -4,14 +4,14 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble"
 	"github.com/spf13/cobra"
 
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/badger/procedure"
+	"github.com/onflow/flow-go/storage/pebble/procedure"
 )
 
 var NoMissmatchFoundError = errors.New("No missmatch found")
@@ -29,7 +29,7 @@ var Cmd = &cobra.Command{
 }
 
 func init() {
-	Cmd.Flags().StringVarP(&flagDatadir, "datadir", "d", "/var/flow/data/protocol", "directory to the badger dababase")
+	Cmd.Flags().StringVarP(&flagDatadir, "datadir", "d", "/var/flow/data/protocol", "directory to the pebble dababase")
 	_ = Cmd.MarkPersistentFlagRequired("datadir")
 
 	Cmd.Flags().Uint64Var(&flagEndHeight, "end-height", 0, "the last block height checks for result consistency")
@@ -96,11 +96,14 @@ func findFirstMismatch(datadir string, startHeight, endHeight uint64) error {
 }
 
 func createStorages(dir string) (
-	storage.Headers, storage.ExecutionResults, storage.Seals, protocol.State, *badger.DB, error) {
-	db := common.InitStorage(dir)
+	storage.Headers, storage.ExecutionResults, storage.Seals, protocol.State, *pebble.DB, error) {
+	db, err := common.InitStoragePebble(dir)
+	if err != nil {
+		return nil, nil, nil, nil, nil, fmt.Errorf("could not open db: %v", err)
+	}
 
-	storages := common.InitStorages(db)
-	state, err := common.InitProtocolState(db, storages)
+	storages := common.InitStoragesPebble(db)
+	state, err := common.InitProtocolStatePebble(db, storages)
 	if err != nil {
 		return nil, nil, nil, nil, db, fmt.Errorf("could not init protocol state: %v", err)
 	}
@@ -179,7 +182,7 @@ func findRootBlockHeight(state protocol.State) (uint64, error) {
 	return root.Height, nil
 }
 
-func findLastExecutedAndSealedHeight(state protocol.State, db *badger.DB) (uint64, error) {
+func findLastExecutedAndSealedHeight(state protocol.State, db *pebble.DB) (uint64, error) {
 	lastSealed, err := state.Sealed().Head()
 	if err != nil {
 		return 0, err
@@ -187,7 +190,7 @@ func findLastExecutedAndSealedHeight(state protocol.State, db *badger.DB) (uint6
 
 	var blockID flow.Identifier
 	var lastExecuted uint64
-	err = db.View(procedure.GetHighestExecutedBlock(&lastExecuted, &blockID))
+	err = procedure.GetHighestExecutedBlock(&lastExecuted, &blockID)(db)
 	if err != nil {
 		return 0, err
 	}

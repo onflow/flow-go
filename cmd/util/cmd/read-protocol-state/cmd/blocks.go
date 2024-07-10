@@ -115,7 +115,10 @@ func (r *Reader) GetBlockByID(blockID flow.Identifier) (*flow.Block, error) {
 }
 
 func run(*cobra.Command, []string) {
-	db := common.InitStorage(flagDatadir)
+	db, err := common.InitStoragePebble(flagDatadir)
+	if err != nil {
+		log.Fatal().Err(err).Msg("could not open db")
+	}
 	defer db.Close()
 
 	storages := common.InitStorages(db)

@@ -1,7 +1,7 @@
 package cmd
 
 import (
-	"github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/persister"
@@ -20,6 +20,6 @@ type HotstuffReader interface {
 }
 
 // NewHotstuffReader returns a new Persister, constrained to read-only operations.
-func NewHotstuffReader(db *badger.DB, chainID flow.ChainID) HotstuffReader {
-	return persister.New(db, chainID)
+func NewHotstuffReader(db *pebble.DB, chainID flow.ChainID) HotstuffReader {
+	return persister.NewPersisterPebble(db, chainID)
 }
