@@ -182,7 +182,12 @@ func iterate(start []byte, end []byte, iteration iterationFunc, prefetchValues b
 		}
 
 		// initialize the default options and comparison modifier for iteration
-		options := pebble.IterOptions{}
+		maxEndWithPrefix := append(end, ffBytes...)
+
+		options := pebble.IterOptions{
+			LowerBound: start,
+			UpperBound: maxEndWithPrefix,
+		}
 
 		// In order to satisfy this function's prefix-wise inclusion semantics,
 		// we append 0xff bytes to the largest of start and end.
@@ -216,14 +221,8 @@ func iterate(start []byte, end []byte, iteration iterationFunc, prefetchValues b
 		}
 		defer it.Close()
 
-		maxEndWithPrefix := append(end, ffBytes...)
-
 		for it.SeekGE(start); it.Valid(); it.Next() {
 			key := it.Key()
-			// Break the loop if we have passed the end key prefix
-			if bytes.Compare(key, maxEndWithPrefix) > 0 {
-				break
-			}
 
 			// initialize processing functions for iteration
 			check, create, handle := iteration()
