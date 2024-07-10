@@ -1793,25 +1793,18 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 	})
 	if builder.versionControlEnabled {
 		builder.Component("version control", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			ver, err := build.Semver()
+			nodeVersion, err := build.Semver()
 			if err != nil {
-				err = fmt.Errorf("could not load node version for version control. "+
-					"version %s is not semver compliant: %w", build.Version(), err)
-
-				return nil, err
-			}
-
-			latestFinalizedBlock, err := node.State.Final().Head()
-			if err != nil {
-				return nil, fmt.Errorf("could not get latest finalized block: %w", err)
+				return nil, fmt.Errorf("could not load node version for version control. "+
+					"version (%s) is not semver compliant: %w. Make sure a valid semantic version is provided in the VERSION environment variable", build.Version(), err)
 			}
 
 			versionControl, err := version.NewVersionControl(
 				builder.Logger,
 				node.Storage.VersionBeacons,
-				ver,
+				nodeVersion,
 				builder.FinalizedRootBlock.Header.Height,
-				latestFinalizedBlock.Height,
+				builder.LastFinalizedHeader.Height,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create version control: %w", err)
