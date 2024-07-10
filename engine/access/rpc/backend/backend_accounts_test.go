@@ -556,7 +556,7 @@ func (s *BackendAccountsSuite) TestGetAccountKeyFromFailover_HappyPath() {
 	var keyIndex uint64 = 0
 
 	for _, errToReturn := range []error{storage.ErrHeightNotIndexed, storage.ErrNotFound} {
-		scriptExecutor.On("GetAccountKey", mock.Anything, s.account.Address, 0, s.block.Header.Height).
+		scriptExecutor.On("GetAccountKey", mock.Anything, s.account.Address, keyIndex, s.block.Header.Height).
 			Return(nil, errToReturn).Times(2)
 
 		s.Run(fmt.Sprintf("testGetAccountKeysAtLatestBlock - by key index - happy path - recovers %v", errToReturn), func() {
