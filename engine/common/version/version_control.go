@@ -59,6 +59,9 @@ type VersionControl struct {
 	// lastProcessedHeight the last handled block height
 	lastProcessedHeight *atomic.Uint64
 
+	// finalizedRootBlockHeight the last finalized block height when node bootstrapped
+	finalizedRootBlockHeight *atomic.Uint64
+
 	// startHeight and endHeight define the height boundaries for version compatibility.
 	startHeight *atomic.Uint64
 	endHeight   *atomic.Uint64
@@ -84,13 +87,14 @@ func NewVersionControl(
 			Str("component", "version_control").
 			Logger(),
 
-		nodeVersion:             nodeVersion,
-		versionBeacons:          versionBeacons,
-		lastProcessedHeight:     atomic.NewUint64(latestFinalizedBlockHeight),
-		finalizedHeight:         counters.NewMonotonousCounter(latestFinalizedBlockHeight),
-		finalizedHeightNotifier: engine.NewNotifier(),
-		startHeight:             atomic.NewUint64(NoHeight),
-		endHeight:               atomic.NewUint64(NoHeight),
+		nodeVersion:              nodeVersion,
+		versionBeacons:           versionBeacons,
+		finalizedRootBlockHeight: atomic.NewUint64(finalizedRootBlockHeight),
+		lastProcessedHeight:      atomic.NewUint64(latestFinalizedBlockHeight),
+		finalizedHeight:          counters.NewMonotonousCounter(latestFinalizedBlockHeight),
+		finalizedHeightNotifier:  engine.NewNotifier(),
+		startHeight:              atomic.NewUint64(NoHeight),
+		endHeight:                atomic.NewUint64(NoHeight),
 	}
 
 	if vc.nodeVersion == nil {
@@ -104,7 +108,7 @@ func NewVersionControl(
 	// Setup component manager for handling worker functions.
 	cm := component.NewComponentManagerBuilder()
 	cm.AddWorker(vc.processEvents)
-	cm.AddWorker(vc.checkInitialVersionBeacon(finalizedRootBlockHeight))
+	cm.AddWorker(vc.checkInitialVersionBeacon)
 
 	vc.Component = cm.Build()
 
@@ -114,22 +118,36 @@ func NewVersionControl(
 // checkInitialVersionBeacon checks the initial version beacon at the latest finalized block.
 // It ensures the component is not ready until the initial version beacon is checked.
 func (v *VersionControl) checkInitialVersionBeacon(
-	finalizedRootBlockHeight uint64,
-) func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-	return func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-		err := v.initBoundaries(ctx, finalizedRootBlockHeight)
-		if err == nil {
-			ready()
-		}
+	ctx irrecoverable.SignalerContext,
+	ready component.ReadyFunc,
+) {
+	err := v.initBoundaries(ctx)
+	if err == nil {
+		ready()
 	}
 }
 
-func (v *VersionControl) initBoundaries(ctx irrecoverable.SignalerContext, finalizedRootBlockHeight uint64) error {
-	processedHeight := v.lastProcessedHeight.Load()
+// initBoundaries initializes the version boundaries for version control.
+//
+// It searches through version beacons to find the start and end block heights
+// for the current node version. The search continues until the start height
+// is found or until the finalized root block height is reached.
+//
+// Parameters:
+// - ctx: an irrecoverable.SignalerContext for error signaling.
+// - finalizedRootBlockHeight: the finalized root block height.
+//
+// Returns an error if initialization fails.
+func (v *VersionControl) initBoundaries(
+	ctx irrecoverable.SignalerContext,
+) error {
+	finalizedRootBlockHeight := v.finalizedRootBlockHeight.Load()
+	latestHeight := v.lastProcessedHeight.Load()
+	processedHeight := latestHeight
 
 	for {
 		vb, err := v.versionBeacons.Highest(processedHeight)
-		if err != nil {
+		if err != nil && !errors.Is(err, storage.ErrNotFound) {
 			ctx.Throw(
 				fmt.Errorf(
 					"failed to get highest version beacon for version control: %w",
@@ -170,7 +188,7 @@ func (v *VersionControl) initBoundaries(ctx irrecoverable.SignalerContext, final
 			}
 
 			compResult := ver.Compare(*v.nodeVersion)
-			processedHeight = boundary.BlockHeight - 1
+			processedHeight = vb.SealHeight - 1
 
 			if compResult <= 0 {
 				v.startHeight.Store(boundary.BlockHeight)
@@ -211,9 +229,16 @@ func (v *VersionControl) BlockFinalized(h *flow.Header) {
 // Returns expected errors:
 // - ErrOutOfRange if incoming block height is higher that last handled block height
 func (v *VersionControl) CompatibleAtBlock(height uint64) (bool, error) {
+	// Check, if the height smaller than finalized root block height. If so, return an error indicating that the height is unhandled.
+	finalizedRootHeight := v.finalizedRootBlockHeight.Load()
+	if height < finalizedRootHeight {
+		return false, fmt.Errorf("could not check compatibility for height %d: the provided height is smaller than finalized root height %d: %w", height, finalizedRootHeight, ErrOutOfRange)
+	}
+
 	// Check if the height is greater than the last handled block height. If so, return an error indicating that the height is unhandled.
-	if height > v.lastProcessedHeight.Load() {
-		return false, fmt.Errorf("could not check compatibility for height %d: last handled height is %d: %w", height, v.lastProcessedHeight.Load(), ErrOutOfRange)
+	lastProcessedHeight := v.lastProcessedHeight.Load()
+	if height > lastProcessedHeight {
+		return false, fmt.Errorf("could not check compatibility for height %d: last handled height is %d: %w", height, lastProcessedHeight, ErrOutOfRange)
 	}
 
 	startHeight := v.startHeight.Load()
@@ -299,7 +324,7 @@ func (v *VersionControl) blockFinalized(
 		previousEndHeight := v.endHeight.Load()
 
 		if height > previousEndHeight {
-			//Stop here since it's outside our compatible range
+			// Stop here since it's outside our compatible range
 			return
 		}
 
@@ -333,7 +358,8 @@ func (v *VersionControl) blockFinalized(
 		// Check if previous version was deleted. If yes, notify consumers about deletion
 		if previousEndHeight != NoHeight && newEndHeight == NoHeight {
 			for _, consumer := range v.consumers {
-				consumer(height, "")
+				// Note: notifying for the boundary height, which is end height + 1
+				consumer(previousEndHeight+1, "")
 			}
 		}
 	}

@@ -14,11 +14,9 @@ import (
 	"time"
 
 	"github.com/go-yaml/yaml"
-	"github.com/plus3it/gorecurcopy"
 
 	"github.com/onflow/flow-go/cmd/build"
 	"github.com/onflow/flow-go/integration/testnet"
-	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -389,13 +387,6 @@ func prepareExecutionService(container testnet.ContainerConfig, i int, n int) Se
 	trieDir := "./" + filepath.Join(TrieDir, container.Role.String(), container.NodeID.String())
 	err := os.MkdirAll(trieDir, 0755)
 	if err != nil && !errors.Is(err, fs.ErrExist) {
-		panic(err)
-	}
-
-	// we need to actually copy the execution state into the directory for bootstrapping
-	sourceDir := "./" + filepath.Join(BootstrapDir, bootstrap.DirnameExecutionState)
-	err = gorecurcopy.CopyDirectory(sourceDir, trieDir)
-	if err != nil {
 		panic(err)
 	}
 
