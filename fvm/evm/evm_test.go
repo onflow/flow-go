@@ -2557,7 +2557,8 @@ func callEVMHeartBeat(
 	require.NotEmpty(t, state.WriteSet)
 	snap = snap.Append(state)
 
-	// last one is block executed, make sure TotalGasUsed is non-zero
+	// validate block event
+	require.Len(t, output.Events, 1)
 	blockEvent := output.Events[0]
 
 	assert.Equal(
