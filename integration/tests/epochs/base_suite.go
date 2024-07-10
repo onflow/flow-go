@@ -42,6 +42,7 @@ type BaseSuite struct {
 	DKGPhaseLen                uint64
 	EpochLen                   uint64
 	EpochCommitSafetyThreshold uint64
+	NumOfCollectionClusters    uint64
 	// Whether approvals are required for sealing (we only enable for VN tests because
 	// requiring approvals requires a longer DKG period to avoid flakiness)
 	RequiredSealApprovals uint // defaults to 0 (no approvals required)

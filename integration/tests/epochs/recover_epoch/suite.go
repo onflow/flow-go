@@ -27,6 +27,7 @@ func (s *Suite) SetupTest() {
 	s.DKGPhaseLen = 10
 	s.EpochLen = 80
 	s.EpochCommitSafetyThreshold = 20
+	s.NumOfCollectionClusters = 1
 
 	// run the generic setup, which starts up the network
 	s.BaseSuite.SetupTest()

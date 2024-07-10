@@ -57,9 +57,9 @@ func (s *RecoverEpochSuite) TestRecoverEpoch() {
 
 	// 2. Generate transaction arguments for epoch recover transaction.
 	// generate epoch recover transaction args
-	collectionClusters := uint64(1)
-	numViewsInRecoveryEpoch := uint64(80)
-	numViewsInStakingAuction := uint64(2)
+	collectionClusters := s.NumOfCollectionClusters
+	numViewsInRecoveryEpoch := s.EpochLen
+	numViewsInStakingAuction := s.StakingAuctionLen
 	epochCounter := uint64(1)
 	targetDuration := uint64(3000)
 	targetEndTime := uint64(4000)
