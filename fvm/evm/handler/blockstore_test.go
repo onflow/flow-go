@@ -185,11 +185,7 @@ func TestBlockStore_AddedTimestamp(t *testing.T) {
 			bp, err := bs.BlockProposal()
 			require.NoError(t, err)
 
-			blockBytes, err = bp.ToBytes()
-			require.NoError(t, err)
-
-			err = backend.SetValue(root[:], []byte(handler.BlockStoreLatestBlockKey), blockBytes)
-			require.NoError(t, err)
+			bs.CommitBlockProposal(bp)
 
 			bb, err := bs.LatestBlock()
 			require.NoError(t, err)
