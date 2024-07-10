@@ -397,9 +397,9 @@ func (q *EpochQuery) Current() protocol.Epoch {
 		return invalid.NewEpochf("could not get current epoch height bounds: %s", err.Error())
 	}
 	if isFirstHeightKnown {
-		return inmem.NewEpochWithStartBoundary(setup, commit, firstHeight)
+		return inmem.NewEpochWithStartBoundary(setup, epochState.EpochExtensions(), commit, firstHeight)
 	}
-	return inmem.NewCommittedEpoch(setup, commit)
+	return inmem.NewCommittedEpoch(setup, epochState.EpochExtensions(), commit)
 }
 
 // Next returns the next epoch, if it is available.
@@ -419,12 +419,12 @@ func (q *EpochQuery) Next() protocol.Epoch {
 	// if we are in setup phase, return a SetupEpoch
 	nextSetup := entry.NextEpochSetup
 	if phase == flow.EpochPhaseSetup {
-		return inmem.NewSetupEpoch(nextSetup)
+		return inmem.NewSetupEpoch(nextSetup, entry.NextEpoch.EpochExtensions)
 	}
 	// if we are in committed phase, return a CommittedEpoch
 	nextCommit := entry.NextEpochCommit
 	if phase == flow.EpochPhaseCommitted {
-		return inmem.NewCommittedEpoch(nextSetup, nextCommit)
+		return inmem.NewCommittedEpoch(nextSetup, entry.NextEpoch.EpochExtensions, nextCommit)
 	}
 	return invalid.NewEpochf("data corruption: unknown epoch phase implies malformed protocol state epoch data")
 }
@@ -450,6 +450,7 @@ func (q *EpochQuery) Previous() protocol.Epoch {
 	// for the previous epoch
 	setup := entry.PreviousEpochSetup
 	commit := entry.PreviousEpochCommit
+	extensions := entry.PreviousEpoch.EpochExtensions
 
 	firstHeight, finalHeight, firstHeightKnown, finalHeightKnown, err := q.retrieveEpochHeightBounds(setup.Counter)
 	if err != nil {
@@ -457,22 +458,22 @@ func (q *EpochQuery) Previous() protocol.Epoch {
 	}
 	if firstHeightKnown && finalHeightKnown {
 		// typical case - we usually know both boundaries for a past epoch
-		return inmem.NewEpochWithStartAndEndBoundaries(setup, commit, firstHeight, finalHeight)
+		return inmem.NewEpochWithStartAndEndBoundaries(setup, extensions, commit, firstHeight, finalHeight)
 	}
 	if firstHeightKnown && !finalHeightKnown {
 		// this case is possible when the snapshot reference block is un-finalized
 		// and is past an un-finalized epoch boundary
-		return inmem.NewEpochWithStartBoundary(setup, commit, firstHeight)
+		return inmem.NewEpochWithStartBoundary(setup, extensions, commit, firstHeight)
 	}
 	if !firstHeightKnown && finalHeightKnown {
 		// this case is possible when this node's lowest known block is after
 		// the queried epoch's start boundary
-		return inmem.NewEpochWithEndBoundary(setup, commit, finalHeight)
+		return inmem.NewEpochWithEndBoundary(setup, extensions, commit, finalHeight)
 	}
 	if !firstHeightKnown && !finalHeightKnown {
 		// this case is possible when this node's lowest known block is after
 		// the queried epoch's end boundary
-		return inmem.NewCommittedEpoch(setup, commit)
+		return inmem.NewCommittedEpoch(setup, extensions, commit)
 	}
 	return invalid.NewEpochf("sanity check failed: impossible combination of boundaries for previous epoch")
 }
