@@ -80,11 +80,17 @@ func COAOwnershipProofInContextFixture(t testing.TB) *types.COAOwnershipProofInC
 	}
 }
 
-func GetRandomResultFixture(t testing.TB) *types.Result {
+func RandomResultFixture(t testing.TB) *types.Result {
+	contractAddress := RandomAddress(t)
 	return &types.Result{
-		GasConsumed: RandomGas(10000),
-		TxHash:      RandomCommonHash(t),
+		Index:                   1,
+		TxType:                  1,
+		TxHash:                  RandomCommonHash(t),
+		ReturnedData:            RandomData(t),
+		GasConsumed:             RandomGas(1000),
+		DeployedContractAddress: &contractAddress,
 		Logs: []*gethTypes.Log{
+			GetRandomLogFixture(t),
 			GetRandomLogFixture(t),
 		},
 	}

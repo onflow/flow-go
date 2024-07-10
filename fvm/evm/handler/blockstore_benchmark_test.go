@@ -20,7 +20,7 @@ func benchmarkBlockProposalGrowth(b *testing.B, txCounts int) {
 			for i := 0; i < txCounts; i++ {
 				bp, err := bs.BlockProposal()
 				require.NoError(b, err)
-				res := testutils.GetRandomResultFixture(b)
+				res := testutils.RandomResultFixture(b)
 				bp.AppendTransaction(res)
 				bs.UpdateBlockProposal(bp)
 			}
@@ -30,7 +30,7 @@ func benchmarkBlockProposalGrowth(b *testing.B, txCounts int) {
 			startTime := time.Now()
 			bp, err := bs.BlockProposal()
 			require.NoError(b, err)
-			res := testutils.GetRandomResultFixture(b)
+			res := testutils.RandomResultFixture(b)
 			bp.AppendTransaction(res)
 			bs.UpdateBlockProposal(bp)
 
