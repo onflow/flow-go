@@ -7,7 +7,7 @@ import (
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/storage/pebble"
 )
 
 var flagChainName string
@@ -29,14 +29,19 @@ var clusterBlocksCmd = &cobra.Command{
 	Short: "get cluster blocks",
 	Run: func(cmd *cobra.Command, args []string) {
 		metrics := metrics.NewNoopCollector()
-		db := common.InitStorage(flagDatadir)
-		headers := badger.NewHeaders(metrics, db)
-		clusterPayloads := badger.NewClusterPayloads(metrics, db)
+		db, err := common.InitStoragePebble(flagDatadir)
+		if err != nil {
+			log.Fatal().Err(err).Msg("could not initialize storage")
+		}
+		defer db.Close()
+
+		headers := pebble.NewHeaders(metrics, db)
+		clusterPayloads := pebble.NewClusterPayloads(metrics, db)
 
 		// get chain id
 		log.Info().Msgf("got flag chain name: %s", flagChainName)
 		chainID := flow.ChainID(flagChainName)
-		clusterBlocks := badger.NewClusterBlocks(db, chainID, headers, clusterPayloads)
+		clusterBlocks := pebble.NewClusterBlocks(db, chainID, headers, clusterPayloads)
 
 		if flagClusterBlockID != "" && flagHeight != 0 {
 			log.Error().Msg("provide either a --id or --height and not both")
