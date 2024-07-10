@@ -339,6 +339,7 @@ func removeByPrefix(prefix []byte) func(pebble.Writer) error {
 }
 
 // getStartEndKeys calculates the start and end keys for a given prefix.
+// note: DeleteRange takes [start, end) (inclusion on start, exclusive on end),
 func getStartEndKeys(prefix []byte) (start, end []byte) {
 	start = prefix
 
