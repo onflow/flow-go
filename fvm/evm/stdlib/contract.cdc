@@ -826,7 +826,6 @@ contract EVM {
     }
     
     init() { 
-        // TODO: we might store it somewhere else 
         self.account.storage.save(<-create Heartbeat(), to: /storage/EVMHeartbeat)
     }
 }
