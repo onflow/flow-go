@@ -25,11 +25,6 @@ import (
 	"github.com/onflow/flow-go/state/protocol/events"
 )
 
-const (
-	incorporatedBlocksChanSize  = 3
-	epochProtocolEventsChanSize = 20
-)
-
 // TimedBlock represents a block, with a timestamp recording when the BlockTimeController received the block
 type TimedBlock struct {
 	Block        *model.Block
@@ -83,10 +78,6 @@ type BlockTimeController struct {
 
 	// epochInfo scheduled transition view for current/next epoch
 	epochInfo
-	// epochFallbackTriggered is set to true when we receive an epoch extension which indicates that the network is in fallback mode.
-	// It is set to true the moment we incorporate a block and detect an epoch transition.
-	// Detecting an epoch transition after entering epoch fallback mode indicates the network has successfully recovered.
-	epochFallbackTriggered bool
 
 	// incorporatedBlocks OnBlockIncorporated events, we desire these blocks to be processed in a timely manner and therefore use a small channel capacity
 	incorporatedBlocks chan TimedBlock
@@ -123,8 +114,8 @@ func NewBlockTimeController(log zerolog.Logger, metrics module.CruiseCtlMetrics,
 		log:                  log.With().Str("hotstuff", "cruise_ctl").Logger(),
 		metrics:              metrics,
 		state:                state,
-		incorporatedBlocks:   make(chan TimedBlock, incorporatedBlocksChanSize),
-		epochEvents:          make(chan func() error, epochProtocolEventsChanSize),
+		incorporatedBlocks:   make(chan TimedBlock, 3),
+		epochEvents:          make(chan func() error, 20),
 		proportionalErr:      proportionalErr,
 		integralErr:          integralErr,
 		latestProposalTiming: atomic.NewPointer[ProposalTiming](nil), // set in initProposalTiming
@@ -370,11 +361,6 @@ func (ctl *BlockTimeController) checkForEpochTransition(tb TimedBlock) error {
 	ctl.nextEpochTargetDuration = nil
 	ctl.nextEpochTargetEndTime = nil
 
-	if ctl.epochFallbackTriggered {
-		// epoch transition detected epoch fallback must have been recovered.
-		ctl.epochFallbackTriggered = false
-	}
-
 	return nil
 }
 
@@ -450,15 +436,10 @@ func (ctl *BlockTimeController) measureViewDuration(tb TimedBlock) error {
 
 // processEpochExtended processes the EpochExtended protocol data.
 // Whenever we encounter an epoch extension, we:
-//   - set epochFallbackTriggered to true if this is the first extension encountered.
 //   - update the curr epoch final view and target end time with the extension data.
 //
 // No errors are expected during normal operation.
 func (ctl *BlockTimeController) processEpochExtended(_ uint64, _ *flow.Header, extension flow.EpochExtension) error {
-	if !ctl.epochFallbackTriggered {
-		// set epochFallbackTriggered to true when we encounter the first extension
-		ctl.epochFallbackTriggered = true
-	}
 	ctl.curEpochFinalView = extension.FinalView
 	ctl.curEpochTargetEndTime = extension.TargetEndTime
 	return nil
@@ -471,11 +452,7 @@ func (ctl *BlockTimeController) processEpochExtended(_ uint64, _ *flow.Header, e
 //   - store the next epoch's target end time
 //
 // No errors are expected during normal operation.
-func (ctl *BlockTimeController) processEpochCommittedPhaseStarted(_ uint64, first *flow.Header) error {
-	if ctl.epochFallbackTriggered {
-		return nil
-	}
-
+func (ctl *BlockTimeController) processEpochCommittedPhaseStarted(first *flow.Header) error {
 	snapshot := ctl.state.AtHeight(first.Height)
 	nextEpoch := snapshot.Epochs().Next()
 	finalView, err := nextEpoch.FinalView()
