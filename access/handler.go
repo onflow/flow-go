@@ -655,7 +655,7 @@ func (h *Handler) GetAccountKeyAtLatestBlock(
 
 	accountKey, err := convert.AccountKeyToMessage(*keyByIndex)
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid key: %v", err)
+		return nil, status.Errorf(codes.Internal, "failed to encode account key: %v", err)
 	}
 
 	return &access.AccountKeyResponse{
@@ -689,10 +689,10 @@ func (h *Handler) GetAccountKeysAtLatestBlock(
 	for i, key := range accountKeys {
 		accountKey, err := convert.AccountKeyToMessage(key)
 		if err != nil {
-			return nil, status.Errorf(codes.InvalidArgument, "invalid key: %v", err)
+			return nil, status.Errorf(codes.Internal, "failed to encode account key %d: %v", i, err)
 		}
 
-		publicKeys[i] = accountKey
+		publicKeys = append(publicKeys, accountKey)
 	}
 
 	return &access.AccountKeysResponse{
@@ -723,7 +723,7 @@ func (h *Handler) GetAccountKeyAtBlockHeight(
 
 	accountKey, err := convert.AccountKeyToMessage(*keyByIndex)
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid key: %v", err)
+		return nil, status.Errorf(codes.Internal, "failed to encode account key: %v", err)
 	}
 
 	return &access.AccountKeyResponse{
@@ -757,10 +757,10 @@ func (h *Handler) GetAccountKeysAtBlockHeight(
 	for i, key := range accountKeys {
 		accountKey, err := convert.AccountKeyToMessage(key)
 		if err != nil {
-			return nil, status.Errorf(codes.InvalidArgument, "invalid key: %v", err)
+			return nil, status.Errorf(codes.Internal, "failed to encode account key %d: %v", i, err)
 		}
 
-		publicKeys[i] = accountKey
+		publicKeys = append(publicKeys, accountKey)
 	}
 
 	return &access.AccountKeysResponse{

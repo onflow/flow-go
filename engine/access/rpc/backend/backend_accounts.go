@@ -135,7 +135,7 @@ func (b *backendAccounts) GetAccountKeyAtLatestBlock(
 
 	sealedBlockID := sealed.ID()
 
-	accountKey, err := b.getAccountKeyAtBlock(ctx, address, sealedBlockID, keyIndex, sealed.Height)
+	accountKey, err := b.getAccountKeyAtBlock(ctx, address, keyIndex, sealedBlockID, sealed.Height)
 	if err != nil {
 		b.log.Debug().Err(err).Msgf("failed to get account key at blockID: %v", sealedBlockID)
 		return nil, err
@@ -179,7 +179,7 @@ func (b *backendAccounts) GetAccountKeyAtBlockHeight(
 		return nil, rpc.ConvertStorageError(err)
 	}
 
-	accountKey, err := b.getAccountKeyAtBlock(ctx, address, blockID, keyIndex, height)
+	accountKey, err := b.getAccountKeyAtBlock(ctx, address, keyIndex, blockID, height)
 	if err != nil {
 		b.log.Debug().Err(err).Msgf("failed to get account key at height: %v", height)
 		return nil, err
@@ -339,8 +339,8 @@ func (b *backendAccounts) getAccountKeysAtBlock(
 func (b *backendAccounts) getAccountKeyAtBlock(
 	ctx context.Context,
 	address flow.Address,
-	blockID flow.Identifier,
 	keyIndex uint64,
+	blockID flow.Identifier,
 	height uint64,
 ) (*flow.AccountPublicKey, error) {
 	switch b.scriptExecMode {

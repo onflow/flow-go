@@ -352,8 +352,6 @@ func (s *BackendAccountsSuite) TestGetAccountBalanceFromStorage_HappyPath() {
 
 	scriptExecutor.On("GetAccountBalance", mock.Anything, s.account.Address, s.block.Header.Height).
 		Return(s.account.Balance, nil)
-	scriptExecutor.On("GetAccountAvailableBalance", mock.Anything, s.account.Address, s.block.Header.Height).
-		Return(s.account.Balance, nil)
 
 	s.Run("GetAccountBalanceAtLatestBlock - happy path", func() {
 		s.testGetAccountBalanceAtLatestBlock(ctx, backend)

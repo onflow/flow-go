@@ -207,7 +207,7 @@ require (
 	github.com/onflow/flow-go-sdk v1.0.0-preview.38 // indirect
 	github.com/onflow/flow-nft/lib/go/contracts v1.2.1 // indirect
 	github.com/onflow/flow-nft/lib/go/templates v1.2.0 // indirect
-	github.com/onflow/flow/protobuf/go/flow v0.4.4 // indirect
+	github.com/onflow/flow/protobuf/go/flow v0.4.5 // indirect
 	github.com/onflow/go-ethereum v1.13.4 // indirect
 	github.com/onflow/sdks v0.6.0-preview.1 // indirect
 	github.com/onflow/wal v1.0.2 // indirect
@@ -305,5 +305,3 @@ require (
 )
 
 replace github.com/onflow/flow-go => ../
-
-replace github.com/onflow/flow/protobuf/go/flow v0.4.4 => github.com/AndriiDiachuk/flow/protobuf/go/flow v0.0.0-20240709095322-eb4935aa35fb
