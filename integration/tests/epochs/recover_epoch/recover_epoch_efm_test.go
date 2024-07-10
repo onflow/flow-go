@@ -93,6 +93,7 @@ func (s *RecoverEpochSuite) TestRecoverEpoch() {
 			break
 		}
 	}
+	require.NotEmpty(s.T(), eventType, "expected FlowEpoch.EpochRecover event type")
 	events, err := s.Client.GetEventsForBlockIDs(s.Ctx, eventType, []sdk.Identifier{result.BlockID})
 	require.NoError(s.T(), err)
 	require.Equal(s.T(), events[0].Events[0].Type, eventType)
