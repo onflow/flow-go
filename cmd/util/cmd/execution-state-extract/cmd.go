@@ -11,7 +11,7 @@ import (
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/storage/pebble"
 )
 
 var (
@@ -77,11 +77,14 @@ func run(*cobra.Command, []string) {
 
 		log.Info().Msgf("extracting state by block ID: %v", blockID)
 
-		db := common.InitStorage(flagDatadir)
+		db, err := common.InitStoragePebble(flagDatadir)
+		if err != nil {
+			log.Fatal().Err(err).Msgf("could not init pebble database")
+		}
 		defer db.Close()
 
 		cache := &metrics.NoopCollector{}
-		commits := badger.NewCommits(cache, db)
+		commits := pebble.NewCommits(cache, db)
 
 		stateCommitment, err = getStateCommitment(commits, blockID)
 		if err != nil {
