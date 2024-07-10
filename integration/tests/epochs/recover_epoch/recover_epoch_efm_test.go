@@ -29,16 +29,16 @@ type RecoverEpochSuite struct {
 // 2. Generates epoch recover transaction args using the epoch efm-recover-tx-args.
 // 3. Submit recover epoch transaction.
 // 4. Ensure expected EpochRecover event is emitted.
-// Currently, this test does not test the processing of the EpochRecover event see this issue: https://github.com/onflow/flow-go/issues/6164
+// TODO(EFM, #6164): Currently, this test does not test the processing of the EpochRecover event
 func (s *RecoverEpochSuite) TestRecoverEpoch() {
 	// 1. Manually trigger EFM
 	// wait until the epoch setup phase to force network into EFM
 	s.AwaitEpochPhase(s.Ctx, 0, flow.EpochPhaseSetup, 10*time.Second, 500*time.Millisecond)
-	// pausing consensus node will force the network into EFM
+	// pausing collection node will force the network into EFM
 	ln := s.GetContainersByRole(flow.RoleCollection)[0]
 	_ = ln.Pause()
 	s.AwaitFinalizedView(s.Ctx, 32, 2*time.Minute, 500*time.Millisecond)
-	// start the paused execution node now that we are in EFM
+	// start the paused collection node now that we are in EFM
 	require.NoError(s.T(), ln.Start())
 
 	// get the latest snapshot and start new container with it
@@ -51,8 +51,8 @@ func (s *RecoverEpochSuite) TestRecoverEpoch() {
 	s.AwaitFinalizedView(s.Ctx, epoch1FinalView+1, 2*time.Minute, 500*time.Millisecond)
 	s.TimedLogf("observed finalized view %d -> pausing container", epoch1FinalView+1)
 
-	//assert transition to second epoch did not happen
-	//if counter is still 0, epoch emergency fallback was triggered as expected
+	// assert transition to second epoch did not happen
+	// if counter is still 0, epoch emergency fallback was triggered as expected
 	s.AssertInEpoch(s.Ctx, 0)
 
 	// 2. Generate transaction arguments for epoch recover transaction.
