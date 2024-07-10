@@ -11,7 +11,7 @@ import (
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/storage/pebble"
 )
 
 // TODO add status, events as repeated, gas used, ErrorMessage , register touches
@@ -42,20 +42,23 @@ type transactionInContext struct {
 func ExportExecutedTransactions(blockID flow.Identifier, dbPath string, outputPath string) error {
 
 	// traverse backward from the given block (parent block) and fetch by blockHash
-	db := common.InitStorage(dbPath)
+	db, err := common.InitStoragePebble(dbPath)
+	if err != nil {
+		return fmt.Errorf("could not open db: %w", err)
+	}
 	defer db.Close()
 
 	cacheMetrics := &metrics.NoopCollector{}
-	index := badger.NewIndex(cacheMetrics, db)
-	guarantees := badger.NewGuarantees(cacheMetrics, db, badger.DefaultCacheSize)
-	seals := badger.NewSeals(cacheMetrics, db)
-	results := badger.NewExecutionResults(cacheMetrics, db)
-	receipts := badger.NewExecutionReceipts(cacheMetrics, db, results, badger.DefaultCacheSize)
-	transactions := badger.NewTransactions(cacheMetrics, db)
-	headers := badger.NewHeaders(cacheMetrics, db)
-	payloads := badger.NewPayloads(db, index, guarantees, seals, receipts, results)
-	blocks := badger.NewBlocks(db, headers, payloads)
-	collections := badger.NewCollections(db, transactions)
+	index := pebble.NewIndex(cacheMetrics, db)
+	guarantees := pebble.NewGuarantees(cacheMetrics, db, pebble.DefaultCacheSize)
+	seals := pebble.NewSeals(cacheMetrics, db)
+	results := pebble.NewExecutionResults(cacheMetrics, db)
+	receipts := pebble.NewExecutionReceipts(cacheMetrics, db, results, pebble.DefaultCacheSize)
+	transactions := pebble.NewTransactions(cacheMetrics, db)
+	headers := pebble.NewHeaders(cacheMetrics, db)
+	payloads := pebble.NewPayloads(db, index, guarantees, seals, receipts, results)
+	blocks := pebble.NewBlocks(db, headers, payloads)
+	collections := pebble.NewCollections(db, transactions)
 
 	activeBlockID := blockID
 	outputFile := filepath.Join(outputPath, "transactions.jsonl")

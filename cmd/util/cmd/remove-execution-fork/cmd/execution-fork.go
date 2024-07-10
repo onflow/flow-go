@@ -6,7 +6,7 @@ import (
 
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/storage/pebble/operation"
 )
 
 func run(*cobra.Command, []string) {
@@ -14,10 +14,13 @@ func run(*cobra.Command, []string) {
 		Str("datadir", flagDatadir).
 		Msg("flags")
 
-	db := common.InitStorage(flagDatadir)
+	db, err := common.InitStoragePebble(flagDatadir)
+	if err != nil {
+		log.Fatal().Err(err).Msg("could not open db")
+	}
 	defer db.Close()
 
-	err := db.Update(operation.RemoveExecutionForkEvidence())
+	err = operation.RemoveExecutionForkEvidence()(db)
 
 	// for testing purpose
 	// expectedSeals := unittest.IncorporatedResultSeal.Fixtures(2)

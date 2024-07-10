@@ -5,14 +5,14 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
-	storagebadger "github.com/onflow/flow-go/storage/badger"
+	storagepebble "github.com/onflow/flow-go/storage/pebble"
 )
 
 var (
@@ -29,7 +29,7 @@ var Cmd = &cobra.Command{
 }
 
 func init() {
-	Cmd.Flags().StringVarP(&flagDatadir, "datadir", "d", "/var/flow/data/protocol", "directory to the badger dababase")
+	Cmd.Flags().StringVarP(&flagDatadir, "datadir", "d", "/var/flow/data/protocol", "directory to the pebble dababase")
 	_ = Cmd.MarkPersistentFlagRequired("datadir")
 
 	Cmd.Flags().StringVar(&flagBlockID, "block-id", "", "block id")
@@ -91,7 +91,7 @@ func updateCommitment(datadir, blockIDStr, commitStr string, force bool) error {
 
 	log.Info().Msgf("found commitment to be removed: %x", commitToRemove)
 
-	writeBatch := storagebadger.NewBatch(db)
+	writeBatch := storagepebble.NewBatch(db)
 	err = commits.BatchRemoveByBlockID(blockID, writeBatch)
 	if err != nil {
 		return fmt.Errorf("could not batch remove commit by block id: %v", err)
@@ -106,7 +106,7 @@ func updateCommitment(datadir, blockIDStr, commitStr string, force bool) error {
 
 	log.Info().Msgf("storing new commitment: %x", commit)
 
-	writeBatch = storagebadger.NewBatch(db)
+	writeBatch = storagepebble.NewBatch(db)
 	err = commits.BatchStore(blockID, commit, writeBatch)
 	if err != nil {
 		return fmt.Errorf("could not store commit: %v", err)
@@ -121,12 +121,12 @@ func updateCommitment(datadir, blockIDStr, commitStr string, force bool) error {
 	return nil
 }
 
-func createStorages(dir string) (storage.Commits, *badger.DB, error) {
-	db := common.InitStorage(dir)
-	if db == nil {
-		return nil, nil, fmt.Errorf("could not initialize db")
+func createStorages(dir string) (storage.Commits, *pebble.DB, error) {
+	db, err := common.InitStoragePebble(dir)
+	if err != nil {
+		return nil, nil, fmt.Errorf("could not open db: %v", err)
 	}
 
-	storages := common.InitStorages(db)
+	storages := common.InitStoragesPebble(db)
 	return storages.Commits, db, nil
 }
