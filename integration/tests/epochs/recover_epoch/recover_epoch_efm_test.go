@@ -34,7 +34,7 @@ func (s *RecoverEpochSuite) TestRecoverEpoch() {
 	// 1. Manually trigger EFM
 	// wait until the epoch setup phase to force network into EFM
 	s.AwaitEpochPhase(s.Ctx, 0, flow.EpochPhaseSetup, 10*time.Second, 500*time.Millisecond)
-	// pausing consensus node will force the network into EFM
+	// pausing collection node will force the network into EFM
 	ln := s.GetContainersByRole(flow.RoleCollection)[0]
 	_ = ln.Pause()
 	s.AwaitFinalizedView(s.Ctx, 32, 2*time.Minute, 500*time.Millisecond)
