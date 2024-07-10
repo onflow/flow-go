@@ -755,7 +755,7 @@ func convertClusterQCVoteData(cdcClusterQCVoteData []cadence.Value) ([]flow.Clus
 			voterIDs = append(voterIDs, voterID)
 		}
 
-		cdcAggSignature, err := getField[cadence.String](fields, "voteSignatures")
+		cdcAggSignature, err := getField[cadence.String](fields, "aggregatedSignature")
 		if err != nil {
 			return nil, fmt.Errorf("failed to decode clusterQCVoteData struct: %w", err)
 		}

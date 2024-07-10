@@ -1240,7 +1240,7 @@ func newFlowClusterQCClusterQCVoteDataStructType() *cadence.StructType {
 		QualifiedIdentifier: "FlowClusterQC.ClusterQCVoteData",
 		Fields: []cadence.Field{
 			{
-				Identifier: "voteSignatures",
+				Identifier: "aggregatedSignature",
 				Type:       cadence.NewVariableSizedArrayType(cadence.StringType),
 			},
 			{
