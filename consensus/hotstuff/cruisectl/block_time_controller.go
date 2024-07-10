@@ -288,7 +288,12 @@ func (ctl *BlockTimeController) processEventsWorkerLogic(ctx irrecoverable.Signa
 				ctx.Throw(err)
 				return
 			}
-		default:
+		case processEvtFn := <-ctl.epochEvents:
+			err := processEvtFn()
+			if err != nil {
+				ctl.log.Err(err).Msgf("fatal error handling epoch related event")
+				ctx.Throw(err)
+			}
 		}
 	}
 }
