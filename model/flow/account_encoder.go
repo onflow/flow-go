@@ -117,7 +117,7 @@ func decodeAccountPublicKeyWrapper(b []byte) (accountPublicKeyWrapper, error) {
 	return wrapper, nil
 }
 
-func DecodeAccountPublicKey(b []byte, index uint64) (AccountPublicKey, error) {
+func DecodeAccountPublicKey(b []byte, index uint32) (AccountPublicKey, error) {
 	w, err := decodeAccountPublicKeyWrapper(b)
 	if err != nil {
 		return AccountPublicKey{}, err

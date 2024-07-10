@@ -300,7 +300,7 @@ func (updater *accountKeyUpdater) revokeAccountKey(
 	var publicKey flow.AccountPublicKey
 	publicKey, err = updater.accounts.GetPublicKey(
 		address,
-		uint64(keyIndex))
+		uint32(keyIndex))
 	if err != nil {
 		// If a key is not found at a given index, then return a nil key with
 		// no errors.  This is to be inline with the Cadence runtime. Otherwise
@@ -317,7 +317,7 @@ func (updater *accountKeyUpdater) revokeAccountKey(
 
 	_, err = updater.accounts.SetPublicKey(
 		address,
-		uint64(keyIndex),
+		uint32(keyIndex),
 		publicKey)
 	if err != nil {
 		return nil, fmt.Errorf("revoking account key failed: %w", err)

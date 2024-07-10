@@ -122,7 +122,7 @@ func (reader *accountKeyReader) GetAccountKey(
 	// address verification is also done in this step
 	accountPublicKey, err := reader.accounts.GetPublicKey(
 		address,
-		uint64(keyIndex))
+		uint32(keyIndex))
 	if err != nil {
 		// If a key is not found at a given index, then return a nil key with
 		// no errors.  This is to be inline with the Cadence runtime. Otherwise,
@@ -162,8 +162,11 @@ func (reader *accountKeyReader) AccountKeysCount(
 	}
 
 	// address verification is also done in this step
-	return reader.accounts.GetPublicKeyCount(
+	keyCount, err := reader.accounts.GetPublicKeyCount(
 		flow.ConvertAddress(runtimeAddress))
+
+	// TODO: remove this cast once cadence runtime interface is updated
+	return uint64(keyCount), err
 }
 
 func FlowToRuntimeAccountKey(
