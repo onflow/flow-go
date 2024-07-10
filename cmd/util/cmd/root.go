@@ -25,7 +25,6 @@ import (
 	read_protocol_state "github.com/onflow/flow-go/cmd/util/cmd/read-protocol-state/cmd"
 	index_er "github.com/onflow/flow-go/cmd/util/cmd/reindex/cmd"
 	"github.com/onflow/flow-go/cmd/util/cmd/snapshot"
-	truncate_database "github.com/onflow/flow-go/cmd/util/cmd/truncate-database"
 	update_commitment "github.com/onflow/flow-go/cmd/util/cmd/update-commitment"
 	"github.com/onflow/flow-go/cmd/util/cmd/version"
 )
@@ -68,7 +67,6 @@ func addCommands() {
 	rootCmd.AddCommand(export.Cmd)
 	rootCmd.AddCommand(checkpoint_list_tries.Cmd)
 	rootCmd.AddCommand(checkpoint_collect_stats.Cmd)
-	rootCmd.AddCommand(truncate_database.Cmd)
 	rootCmd.AddCommand(read_pebble.RootCmd)
 	rootCmd.AddCommand(read_protocol_state.RootCmd)
 	rootCmd.AddCommand(ledger_json_exporter.Cmd)
