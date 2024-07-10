@@ -213,7 +213,19 @@ func (e *EpochStateMachine) EvolveState(sealedServiceEvents []flow.ServiceEvent)
 	dbUpdates, err := e.evolveActiveStateMachine(sealedServiceEvents)
 	if err != nil {
 		if protocol.IsInvalidServiceEventError(err) {
-			dbUpdates, err = e.transitionToEpochFallbackMode(sealedServiceEvents)
+			// When the happy path state machine returns an InvalidServiceEventError, we discard its state and use the fallback state machine
+			// to handle the block's epoch state evolution. The fallback state machine sets the state's EFM flag and gracefully handle all
+			// service events to keep the protocol alive, no matter whether the service events are incorrect, inconsistent or unexpected.
+			// Once we enter EFM, the only way to return to normal is by processing an epoch recover event by the fallback state machine.
+			//    Without loss of generality, we can assume that the error above is from the happy path state machine. In case of a bug, where
+			// the fallback state machine was already active above, yet it returned the `InvalidServiceEventError`, we would re-execute exactly
+			// that same logic below, arrive exactly at the same conclusion (fallback state machine returned an error which it shouldn't have)
+			// and crash.
+			e.activeStateMachine, err = e.epochFallbackStateMachineFactory()
+			if err != nil {
+				return fmt.Errorf("could not create epoch fallback state machine: %w", err)
+			}
+			dbUpdates, err = e.evolveActiveStateMachine(sealedServiceEvents)
 			if err != nil {
 				return irrecoverable.NewExceptionf("could not transition to epoch fallback mode: %w", err)
 			}
@@ -227,8 +239,8 @@ func (e *EpochStateMachine) EvolveState(sealedServiceEvents []flow.ServiceEvent)
 
 // evolveActiveStateMachine applies the state change(s) on the Epoch sub-state based on information from the candidate block
 // (under construction). Information that potentially changes the state (compared to the parent block's state):
-//   - Service Events sealed in the candidate block
-//   - the candidate block's view (already provided at construction time)
+//  1. the candidate block's view (already provided at construction time)
+//  2. Service Events sealed in the candidate block
 //
 // This function applies all evolving state operations to the active state machine. In case of successful evolution,
 // it returns the deferred DB updates to be applied to the storage.
@@ -237,10 +249,9 @@ func (e *EpochStateMachine) EvolveState(sealedServiceEvents []flow.ServiceEvent)
 func (e *EpochStateMachine) evolveActiveStateMachine(sealedServiceEvents []flow.ServiceEvent) (*transaction.DeferredBlockPersist, error) {
 	parentProtocolState := e.activeStateMachine.ParentState()
 
-	// perform protocol state transition to next epoch if next epoch is committed, and we are at first block of epoch
+	// STEP 1: transition to next epoch if next epoch is committed *and* we are at first block of epoch
 	phase := parentProtocolState.EpochPhase()
-	if phase == flow.EpochPhaseCommitted {
-		if e.activeStateMachine.View() > parentProtocolState.CurrentEpochFinalView() {
+	if (phase == flow.EpochPhaseCommitted) && (e.activeStateMachine.View() > parentProtocolState.CurrentEpochFinalView()) {
 			err := e.activeStateMachine.TransitionToNextEpoch()
 			if err != nil {
 				return nil, fmt.Errorf("could not transition protocol state to next epoch: %w", err)
