@@ -38,7 +38,7 @@ func (s *RecoverEpochSuite) TestRecoverEpoch() {
 	ln := s.GetContainersByRole(flow.RoleCollection)[0]
 	_ = ln.Pause()
 	s.AwaitFinalizedView(s.Ctx, 32, 2*time.Minute, 500*time.Millisecond)
-	// start the paused execution node now that we are in EFM
+	// start the paused collection node now that we are in EFM
 	require.NoError(s.T(), ln.Start())
 
 	// get the latest snapshot and start new container with it
