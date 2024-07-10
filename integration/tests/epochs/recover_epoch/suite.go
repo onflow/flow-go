@@ -70,8 +70,8 @@ func (s *Suite) executeEFMRecoverTXArgsCMD(collectionClusters, numViewsInEpoch, 
 		fmt.Sprintf("--epoch-length=%d", numViewsInEpoch),
 		fmt.Sprintf("--epoch-staking-phase-length=%d", numViewsInStakingAuction),
 		fmt.Sprintf("--epoch-counter=%d", epochCounter),
-		fmt.Sprintf("--target-duration=%d", targetDuration),
-		fmt.Sprintf("--target-end-time=%d", targetEndTime),
+		fmt.Sprintf("--epoch-timing-duration=%d", targetDuration),
+		fmt.Sprintf("--epoch-timing-end-time=%d", targetEndTime),
 	}
 
 	// execute the root command

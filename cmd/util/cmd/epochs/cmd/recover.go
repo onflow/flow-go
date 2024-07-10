@@ -18,10 +18,6 @@ import (
 	"github.com/onflow/flow-go/state/protocol/inmem"
 )
 
-const (
-	outputFileName = "recover-epoch-tx-args.json"
-)
-
 // generateRecoverEpochTxArgsCmd represents a command to generate the data needed to submit an epoch-recovery transaction
 // to the network when it is in EFM (epoch fallback mode).
 // EFM can be exited only by a special service event, EpochRecover, which initially originates from a manual service account transaction.
@@ -113,11 +109,11 @@ func addGenerateRecoverEpochTxArgsCmdFlags() error {
 	if err != nil {
 		return fmt.Errorf("failed to mark collection-clusters flag as required")
 	}
-	err = generateRecoverEpochTxArgsCmd.MarkFlagRequired("target-duration")
+	err = generateRecoverEpochTxArgsCmd.MarkFlagRequired("epoch-timing-duration")
 	if err != nil {
 		return fmt.Errorf("failed to mark target-duration flag as required")
 	}
-	err = generateRecoverEpochTxArgsCmd.MarkFlagRequired("target-end-time")
+	err = generateRecoverEpochTxArgsCmd.MarkFlagRequired("epoch-timing-end-time")
 	if err != nil {
 		return fmt.Errorf("failed to mark target-end-time flag as required")
 	}
