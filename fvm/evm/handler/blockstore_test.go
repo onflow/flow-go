@@ -185,7 +185,8 @@ func TestBlockStore_AddedTimestamp(t *testing.T) {
 			bp, err := bs.BlockProposal()
 			require.NoError(t, err)
 
-			bs.CommitBlockProposal(bp)
+			err = bs.CommitBlockProposal(bp)
+			require.NoError(t, err)
 
 			bb, err := bs.LatestBlock()
 			require.NoError(t, err)
