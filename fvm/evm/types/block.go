@@ -90,12 +90,13 @@ var GenesisBlock = &Block{
 
 var GenesisBlockHash, _ = GenesisBlock.Hash()
 
-// BlockProposal represents a evm block proposal
+// BlockProposal is a EVM block proposal
+// holding all the iterim data of block before commitment
 type BlockProposal struct {
 	Block
 
-	// Receipts keeps a order list of receipts generated during block execution
-	Receipts gethTypes.Receipts
+	// Receipts keeps a order list of light receipts generated during block execution
+	Receipts []LightReceipt
 }
 
 // AppendTransaction appends a transaction hash to the list of transaction hashes of the block
@@ -105,20 +106,26 @@ func (b *BlockProposal) AppendTransaction(res *Result) {
 		return
 	}
 	b.TransactionHashes = append(b.TransactionHashes, res.TxHash)
-	r := res.Receipt()
+	r := res.LightReceipt()
 	if r == nil {
 		return
 	}
-	b.Receipts = append(b.Receipts, r)
+	b.Receipts = append(b.Receipts, *r)
 	b.TotalGasUsed += r.CumulativeGasUsed
 }
 
 // PopulateReceiptsHash populates receipt hash value
 func (b *BlockProposal) PopulateReceiptsHash() {
-	b.ReceiptRoot = gethTypes.EmptyReceiptsHash
-	if len(b.Receipts) != 0 {
-		b.ReceiptRoot = gethTypes.DeriveSha(b.Receipts, gethTrie.NewStackTrie(nil))
+	if len(b.Receipts) == 0 {
+		b.ReceiptRoot = gethTypes.EmptyReceiptsHash
+		return
 	}
+	receipts := make(gethTypes.Receipts, len(b.Receipts))
+	for i, lr := range b.Receipts {
+		receipts[i] = lr.ToReceipt()
+	}
+
+	b.ReceiptRoot = gethTypes.DeriveSha(receipts, gethTrie.NewStackTrie(nil))
 }
 
 // ToBytes encodes the block proposal into bytes
@@ -147,7 +154,7 @@ func NewBlockProposal(
 			ReceiptRoot:       gethTypes.EmptyRootHash,
 			TransactionHashes: make([]gethCommon.Hash, 0),
 		},
-		Receipts: make(gethTypes.Receipts, 0),
+		Receipts: make([]LightReceipt, 0),
 	}
 }
 
