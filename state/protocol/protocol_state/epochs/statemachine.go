@@ -199,10 +199,15 @@ func (e *EpochStateMachine) Build() (*transaction.DeferredBlockPersist, error) {
 //   - Service Events sealed in the candidate block
 //   - the candidate block's view (already provided at construction time)
 //
-// CAUTION: EvolveState MUST be called for all candidate blocks, even if `sealedServiceEvents` is empty!
-// This is because also the absence of expected service events by a certain view can also result in the
-// Epoch state changing. (For example, not having received the EpochCommit event for the next epoch, but
-// approaching the end of the current epoch.)
+// SAFETY REQUIREMENTS:
+//   - The seals for the execution results, from which the `sealedServiceEvents` originate,
+//     must be protocol compliant.
+//   - `sealedServiceEvents` must list the service Events in chronological order. This can be
+//     achieved by arranging the sealed execution results in order of increasing block height.
+//     Within each execution result, the service events are in chronological order.
+//   - EvolveState MUST be called for all candidate blocks, even if `sealedServiceEvents` is empty!
+//     This is because reaching a specific view can also trigger in state changes. (e.g. not having
+//     received the EpochCommit event for the next epoch, but approaching the end of the current epoch.)
 //
 // The block's payload might contain epoch preparation service events for the next epoch. In this case,
 // we need to update the tentative protocol state. We need to validate whether all information is available
