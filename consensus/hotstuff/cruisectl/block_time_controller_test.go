@@ -68,7 +68,6 @@ func (bs *BlockTimeControllerSuite) SetupTest() {
 	bs.curEpochFinalView = bs.EpochDurationSeconds() - 1 // 1 view/sec for 1hr epoch; term `-1` is needed because view 0 also takes 1 second
 	bs.curEpochTargetDuration = bs.EpochDurationSeconds()
 	bs.curEpochTargetEndTime = uint64(time.Now().Unix()) + bs.EpochDurationSeconds()
-	bs.epochFallbackTriggered = false
 	setupMocks(bs)
 }
 
@@ -88,10 +87,6 @@ func setupMocks(bs *BlockTimeControllerSuite) {
 	bs.state.On("AtHeight", mock.Anything).Return(&bs.snapshot).Maybe()
 	bs.state.On("Params").Return(&bs.params)
 	bs.epochProtocolState = *mockprotocol.NewEpochProtocolState(bs.T())
-	bs.epochProtocolState.On("EpochFallbackTriggered").Return(
-		func() bool { return bs.epochFallbackTriggered },
-		func() error { return nil },
-	)
 	bs.snapshot.On("EpochProtocolState").Return(&bs.epochProtocolState, nil)
 	bs.snapshot.On("EpochPhase").Return(
 		func() flow.EpochPhase { return bs.epochs.Phase() },
@@ -215,15 +210,6 @@ func (bs *BlockTimeControllerSuite) TestInit_EpochSetupPhase() {
 	nextEpoch.On("TargetEndTime").Return(bs.curEpochTargetEndTime+bs.EpochDurationSeconds(), nil)
 	bs.epochs.Add(nextEpoch)
 
-	bs.CreateAndStartController()
-	defer bs.StopController()
-	bs.AssertCorrectInitialization()
-}
-
-// TestInit_EpochFallbackTriggered tests initializing the component when epoch fallback is triggered.
-// Default GetProposalTiming should be set.
-func (bs *BlockTimeControllerSuite) TestInit_EpochFallbackTriggered() {
-	bs.epochFallbackTriggered = true
 	bs.CreateAndStartController()
 	defer bs.StopController()
 	bs.AssertCorrectInitialization()
@@ -621,7 +607,6 @@ func (bs *BlockTimeControllerSuite) Test_vs_PythonSimulation() {
 	bs.curEpochFirstView, bs.curEpochFinalView = uint64(0), uint64(totalEpochViews-1) // views [0, .., totalEpochViews-1]
 	bs.curEpochTargetDuration = 7 * 24 * 60 * 60                                      // 1 week in seconds
 	bs.curEpochTargetEndTime = time2unix(refT) + bs.curEpochTargetDuration            // now + 1 week
-	bs.epochFallbackTriggered = false
 
 	bs.config = &Config{
 		TimingConfig: TimingConfig{
