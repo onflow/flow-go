@@ -93,3 +93,7 @@ func (t *Transaction) Set(key, value []byte) error {
 func (t *Transaction) Delete(key []byte) error {
 	return t.writer.Delete(key, pebble.Sync)
 }
+
+func (t *Transaction) DeleteRange(start, end []byte) error {
+	return t.writer.DeleteRange(start, end, pebble.Sync)
+}
