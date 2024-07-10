@@ -29,7 +29,7 @@ type RecoverEpochSuite struct {
 // 2. Generates epoch recover transaction args using the epoch efm-recover-tx-args.
 // 3. Submit recover epoch transaction.
 // 4. Ensure expected EpochRecover event is emitted.
-// Currently, this test does not test the processing of the EpochRecover event see this issue: https://github.com/onflow/flow-go/issues/6164
+// TODO(EFM, #6164): Currently, this test does not test the processing of the EpochRecover event
 func (s *RecoverEpochSuite) TestRecoverEpoch() {
 	// 1. Manually trigger EFM
 	// wait until the epoch setup phase to force network into EFM
