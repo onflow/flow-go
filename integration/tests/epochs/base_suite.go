@@ -202,3 +202,8 @@ func (s *BaseSuite) GetLatestProtocolSnapshot(ctx context.Context) *inmem.Snapsh
 	require.NoError(s.T(), err)
 	return snapshot
 }
+
+// GetDKGEndView returns the end view of the dkg.
+func (s *BaseSuite) GetDKGEndView() uint64 {
+	return s.StakingAuctionLen + (s.DKGPhaseLen * 3)
+}

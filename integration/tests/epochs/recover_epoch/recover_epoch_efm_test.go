@@ -37,7 +37,7 @@ func (s *RecoverEpochSuite) TestRecoverEpoch() {
 	// pausing collection node will force the network into EFM
 	ln := s.GetContainersByRole(flow.RoleCollection)[0]
 	_ = ln.Pause()
-	s.AwaitFinalizedView(s.Ctx, 32, 2*time.Minute, 500*time.Millisecond)
+	s.AwaitFinalizedView(s.Ctx, s.GetDKGEndView(), 2*time.Minute, 500*time.Millisecond)
 	// start the paused collection node now that we are in EFM
 	require.NoError(s.T(), ln.Start())
 
