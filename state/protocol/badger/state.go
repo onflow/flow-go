@@ -879,8 +879,12 @@ func updateEpochMetrics(metrics module.ComplianceMetrics, snap protocol.Snapshot
 
 	metrics.CurrentDKGPhaseViews(dkgPhase1FinalView, dkgPhase2FinalView, dkgPhase3FinalView)
 
+	epochProtocolState, err := snap.EpochProtocolState()
+	if err != nil {
+		return fmt.Errorf("could not get epoch protocol state: %w", err)
+	}
 	// notify whether epoch fallback mode is active
-	if phase == flow.EpochPhaseFallback {
+	if epochProtocolState.EpochFallbackTriggered() {
 		metrics.EpochFallbackModeTriggered()
 	}
 
