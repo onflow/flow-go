@@ -1,6 +1,7 @@
 package badger
 
 import (
+	"fmt"
 	"sync"
 
 	"github.com/dgraph-io/badger/v2"
@@ -10,7 +11,7 @@ import (
 
 type Batch struct {
 	db     *badger.DB
-	writer *badger.WriteBatch
+	writer *badgerWriterBatch
 
 	lock      sync.RWMutex
 	callbacks []func()
@@ -22,13 +23,35 @@ func NewBatch(db *badger.DB) *Batch {
 	batch := db.NewWriteBatch()
 	return &Batch{
 		db:        db,
-		writer:    batch,
+		writer:    &badgerWriterBatch{writer: batch},
 		callbacks: make([]func(), 0),
 	}
 }
 
 func (b *Batch) GetWriter() storage.BatchWriter {
 	return b.writer
+}
+
+type badgerWriterBatch struct {
+	writer *badger.WriteBatch
+}
+
+var _ storage.BatchWriter = (*badgerWriterBatch)(nil)
+
+func (w *badgerWriterBatch) Set(key, val []byte) error {
+	return w.writer.Set(key, val)
+}
+
+func (w *badgerWriterBatch) Delete(key []byte) error {
+	return w.writer.Delete(key)
+}
+
+func (w *badgerWriterBatch) DeleteRange(start, end []byte) error {
+	return fmt.Errorf("not implemented")
+}
+
+func (w *badgerWriterBatch) Flush() error {
+	return w.writer.Flush()
 }
 
 type reader struct {

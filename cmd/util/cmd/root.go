@@ -19,9 +19,9 @@ import (
 	export_json_transactions "github.com/onflow/flow-go/cmd/util/cmd/export-json-transactions"
 	find_inconsistent_result "github.com/onflow/flow-go/cmd/util/cmd/find-inconsistent-result"
 	find_trie_root "github.com/onflow/flow-go/cmd/util/cmd/find-trie-root"
-	read_badger "github.com/onflow/flow-go/cmd/util/cmd/read-badger/cmd"
 	read_execution_state "github.com/onflow/flow-go/cmd/util/cmd/read-execution-state"
 	read_hotstuff "github.com/onflow/flow-go/cmd/util/cmd/read-hotstuff/cmd"
+	read_pebble "github.com/onflow/flow-go/cmd/util/cmd/read-pebble/cmd"
 	read_protocol_state "github.com/onflow/flow-go/cmd/util/cmd/read-protocol-state/cmd"
 	index_er "github.com/onflow/flow-go/cmd/util/cmd/reindex/cmd"
 	"github.com/onflow/flow-go/cmd/util/cmd/snapshot"
@@ -69,7 +69,7 @@ func addCommands() {
 	rootCmd.AddCommand(checkpoint_list_tries.Cmd)
 	rootCmd.AddCommand(checkpoint_collect_stats.Cmd)
 	rootCmd.AddCommand(truncate_database.Cmd)
-	rootCmd.AddCommand(read_badger.RootCmd)
+	rootCmd.AddCommand(read_pebble.RootCmd)
 	rootCmd.AddCommand(read_protocol_state.RootCmd)
 	rootCmd.AddCommand(ledger_json_exporter.Cmd)
 	rootCmd.AddCommand(epochs.RootCmd)

@@ -43,7 +43,7 @@ func (b batchWriter) SingleDelete(key []byte, o *pebble.WriteOptions) error {
 }
 
 func (b batchWriter) DeleteRange(start, end []byte, o *pebble.WriteOptions) error {
-	return fmt.Errorf("DeleteRange not implemented")
+	return b.batch.DeleteRange(start, end)
 }
 
 func (b batchWriter) Merge(key, value []byte, o *pebble.WriteOptions) error {

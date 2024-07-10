@@ -59,7 +59,7 @@ func insert(key []byte, entity interface{}) func(*badger.Txn) error {
 		// update the maximum key size if the inserted key is bigger
 		if uint32(len(key)) > max {
 			max = uint32(len(key))
-			err := SetMax(tx)
+			err := SetMaxTxn(tx)
 			if err != nil {
 				return fmt.Errorf("could not update max tracker: %w", err)
 			}
@@ -131,7 +131,7 @@ func upsert(key []byte, entity interface{}) func(*badger.Txn) error {
 		// update the maximum key size if the inserted key is bigger
 		if uint32(len(key)) > max {
 			max = uint32(len(key))
-			err := SetMax(tx)
+			err := SetMaxTxn(tx)
 			if err != nil {
 				return fmt.Errorf("could not update max tracker: %w", err)
 			}

@@ -6,6 +6,7 @@ import "github.com/cockroachdb/pebble"
 type BatchWriter interface {
 	Set(key, val []byte) error
 	Delete(key []byte) error
+	DeleteRange(start, end []byte) error
 }
 
 type Reader interface {
