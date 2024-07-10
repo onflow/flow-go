@@ -240,12 +240,6 @@ func (h *ContractHandler) batchRun(rlpEncodedTxs [][]byte, coinbase types.Addres
 		return nil, err
 	}
 
-	// TODO: don't commit right away.
-	err = h.commitBlockProposal()
-	if err != nil {
-		return nil, err
-	}
-
 	return res, nil
 }
 
@@ -344,14 +338,7 @@ func (h *ContractHandler) run(
 		return nil, err
 	}
 
-	// TODO: don't commit right away.
-	err = h.commitBlockProposal()
-	if err != nil {
-		return nil, err
-	}
-
 	h.tracer.Collect(res.TxHash)
-
 	return res, nil
 }
 
@@ -543,14 +530,7 @@ func (h *ContractHandler) executeAndHandleCall(
 		return nil, err
 	}
 
-	// TODO: don't commit right away.
-	err = h.commitBlockProposal()
-	if err != nil {
-		return nil, err
-	}
-
 	h.tracer.Collect(res.TxHash)
-
 	return res, nil
 }
 

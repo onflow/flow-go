@@ -36,8 +36,6 @@ import (
 	"github.com/onflow/flow-go/module/trace"
 )
 
-// TODO add test for fatal errors
-
 var flowTokenAddress = common.MustBytesToAddress(systemcontracts.SystemContractsForChain(flow.Emulator).FlowToken.Address.Bytes())
 var randomBeaconAddress = systemcontracts.SystemContractsForChain(flow.Emulator).RandomBeaconHistory.Address
 
@@ -97,10 +95,9 @@ func TestHandler_TransactionRunOrPanic(t *testing.T) {
 					// require.NoError(t, err)
 					// require.Equal(t, result.GasConsumed, computationUsed)
 
-					// check events (1 extra for block event)
+					// check event
 					events := backend.Events()
-
-					require.Len(t, events, 2)
+					require.Len(t, events, 1)
 
 					event := events[0]
 					assert.Equal(t, event.Type, types.EventTypeTransactionExecuted)
@@ -123,7 +120,10 @@ func TestHandler_TransactionRunOrPanic(t *testing.T) {
 						assert.Equal(t, l, logs[i])
 					}
 
+					handler.CommitBlockProposal()
 					// check block event
+					events = backend.Events()
+					require.Len(t, events, 2)
 					event = events[1]
 
 					assert.Equal(t, event.Type, types.EventTypeBlockExecuted)
@@ -312,6 +312,7 @@ func TestHandler_OpsWithoutEmulator(t *testing.T) {
 				bal := types.OneFlowBalance
 				account.Deposit(types.NewFlowTokenVault(bal))
 
+				handler.CommitBlockProposal()
 				// check if block height has been incremented
 				b = handler.LastExecutedBlock()
 				require.Equal(t, uint64(1), b.Height)
@@ -361,20 +362,20 @@ func TestHandler_COA(t *testing.T) {
 				require.Equal(t, zeroBalance, foa.Balance())
 
 				events := backend.Events()
-				require.Len(t, events, 6)
+				require.Len(t, events, 3)
 
 				// first two transactions are for COA setup
 
 				// transaction event
-				event := events[2]
+				event := events[0]
 				assert.Equal(t, event.Type, types.EventTypeTransactionExecuted)
 
 				// block event
-				event = events[3]
-				assert.Equal(t, event.Type, types.EventTypeBlockExecuted)
+				event = events[1]
+				assert.Equal(t, event.Type, types.EventTypeTransactionExecuted)
 
 				// transaction event
-				event = events[4]
+				event = events[2]
 				assert.Equal(t, event.Type, types.EventTypeTransactionExecuted)
 				_, err := jsoncdc.Decode(nil, event.Payload)
 				require.NoError(t, err)
@@ -383,7 +384,10 @@ func TestHandler_COA(t *testing.T) {
 				// assert.Equal(t, balance, ret.Amount)
 
 				// block event
-				event = events[5]
+				handler.CommitBlockProposal()
+				events = backend.Events()
+				require.Len(t, events, 4)
+				event = events[3]
 				assert.Equal(t, event.Type, types.EventTypeBlockExecuted)
 
 				// check gas usage
@@ -638,9 +642,9 @@ func TestHandler_COA(t *testing.T) {
 				require.Equal(t, big.NewInt(int64(blockHeight)), new(big.Int).SetBytes(ret.ReturnedData))
 
 				events := backend.Events()
-				require.Len(t, events, 6)
+				require.Len(t, events, 3)
 				// last transaction executed event
-				event := events[4]
+				event := events[2]
 				assert.Equal(t, event.Type, types.EventTypeTransactionExecuted)
 				ev, err := jsoncdc.Decode(nil, event.Payload)
 				require.NoError(t, err)
@@ -923,6 +927,7 @@ func TestHandler_TransactionRun(t *testing.T) {
 						require.Equal(t, types.ErrCodeNoError, rs.ErrorCode)
 					}
 
+					handler.CommitBlockProposal()
 					events := backend.Events()
 					require.Len(t, events, batchSize+1) // +1 block event
 
