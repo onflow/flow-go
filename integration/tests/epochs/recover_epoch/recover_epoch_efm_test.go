@@ -51,8 +51,8 @@ func (s *RecoverEpochSuite) TestRecoverEpoch() {
 	s.AwaitFinalizedView(s.Ctx, epoch1FinalView+1, 2*time.Minute, 500*time.Millisecond)
 	s.TimedLogf("observed finalized view %d -> pausing container", epoch1FinalView+1)
 
-	//assert transition to second epoch did not happen
-	//if counter is still 0, epoch emergency fallback was triggered as expected
+	// assert transition to second epoch did not happen
+	// if counter is still 0, epoch emergency fallback was triggered as expected
 	s.AssertInEpoch(s.Ctx, 0)
 
 	// 2. Generate transaction arguments for epoch recover transaction.
