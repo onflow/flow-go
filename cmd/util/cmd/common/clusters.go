@@ -9,10 +9,6 @@ import (
 	"github.com/onflow/cadence"
 	cdcCommon "github.com/onflow/cadence/runtime/common"
 
-	"github.com/onflow/flow-go/cmd/bootstrap/run"
-	"github.com/onflow/flow-go/model/bootstrap"
-	model "github.com/onflow/flow-go/model/bootstrap"
-	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/assignment"
 	"github.com/onflow/flow-go/model/flow/factory"
@@ -115,36 +111,6 @@ func ConstructClusterAssignment(log zerolog.Logger, partnerNodes, internalNodes 
 	return assignments, clusters, nil
 }
 
-// ConstructRootQCsForClusters constructs a root QC for each cluster in the list.
-// Args:
-// - log: the logger instance.
-// - clusterList: list of clusters
-// - nodeInfos: list of NodeInfos (must contain all internal nodes)
-// - clusterBlocks: list of root blocks for each cluster
-// Returns:
-// - flow.AssignmentList: the generated assignment list.
-// - flow.ClusterList: the generate collection cluster list.
-func ConstructRootQCsForClusters(log zerolog.Logger, clusterList flow.ClusterList, nodeInfos []bootstrap.NodeInfo, clusterBlocks []*cluster.Block) []*flow.QuorumCertificate {
-
-	if len(clusterBlocks) != len(clusterList) {
-		log.Fatal().Int("len(clusterBlocks)", len(clusterBlocks)).Int("len(clusterList)", len(clusterList)).
-			Msg("number of clusters needs to equal number of cluster blocks")
-	}
-
-	qcs := make([]*flow.QuorumCertificate, len(clusterBlocks))
-	for i, cluster := range clusterList {
-		signers := filterClusterSigners(cluster, nodeInfos)
-
-		qc, err := run.GenerateClusterRootQC(signers, cluster, clusterBlocks[i])
-		if err != nil {
-			log.Fatal().Err(err).Int("cluster index", i).Msg("generating collector cluster root QC failed")
-		}
-		qcs[i] = qc
-	}
-
-	return qcs
-}
-
 // ConvertClusterAssignmentsCdc converts golang cluster assignments type to Cadence type `[[String]]`.
 func ConvertClusterAssignmentsCdc(assignments flow.AssignmentList) cadence.Array {
 	stringArrayType := cadence.NewVariableSizedArrayType(cadence.StringType)
@@ -214,22 +180,4 @@ func newFlowClusterQCVoteDataStructType(clusterQcAddress string) *cadence.Struct
 			},
 		},
 	}
-}
-
-// Filters a list of nodes to include only nodes that will sign the QC for the
-// given cluster. The resulting list of nodes is only nodes that are in the
-// given cluster AND are not partner nodes (ie. we have the private keys).
-func filterClusterSigners(cluster flow.IdentitySkeletonList, nodeInfos []model.NodeInfo) []model.NodeInfo {
-
-	var filtered []model.NodeInfo
-	for _, node := range nodeInfos {
-		_, isInCluster := cluster.ByNodeID(node.NodeID)
-		isNotPartner := node.Type() == model.NodeInfoTypePrivate
-
-		if isInCluster && isNotPartner {
-			filtered = append(filtered, node)
-		}
-	}
-
-	return filtered
 }

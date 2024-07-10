@@ -30,7 +30,7 @@ type BaseSuite struct {
 	suite.Suite
 	lib.TestnetStateTracker
 	cancel  context.CancelFunc
-	log     zerolog.Logger
+	Log     zerolog.Logger
 	Net     *testnet.FlowNetwork
 	ghostID flow.Identifier
 
@@ -42,7 +42,7 @@ type BaseSuite struct {
 	DKGPhaseLen                uint64
 	EpochLen                   uint64
 	EpochCommitSafetyThreshold uint64
-	NumOfCollectionClusters    uint64
+	NumOfCollectionClusters    int
 	// Whether approvals are required for sealing (we only enable for VN tests because
 	// requiring approvals requires a longer DKG period to avoid flakiness)
 	RequiredSealApprovals uint // defaults to 0 (no approvals required)
@@ -61,10 +61,10 @@ func (s *BaseSuite) SetupTest() {
 	require.Greater(s.T(), s.EpochLen, minEpochLength+s.EpochCommitSafetyThreshold, "epoch too short")
 
 	s.Ctx, s.cancel = context.WithCancel(context.Background())
-	s.log = unittest.LoggerForTest(s.Suite.T(), zerolog.InfoLevel)
-	s.log.Info().Msg("================> SetupTest")
+	s.Log = unittest.LoggerForTest(s.Suite.T(), zerolog.InfoLevel)
+	s.Log.Info().Msg("================> SetupTest")
 	defer func() {
-		s.log.Info().Msg("================> Finish SetupTest")
+		s.Log.Info().Msg("================> Finish SetupTest")
 	}()
 
 	collectionConfigs := []func(*testnet.NodeConfig){
@@ -115,15 +115,15 @@ func (s *BaseSuite) SetupTest() {
 
 	s.Client = client
 
-	// log network info periodically to aid in debugging future flaky tests
-	go lib.LogStatusPeriodically(s.T(), s.Ctx, s.log, s.Client, 5*time.Second)
+	// Log network info periodically to aid in debugging future flaky tests
+	go lib.LogStatusPeriodically(s.T(), s.Ctx, s.Log, s.Client, 5*time.Second)
 }
 
 func (s *BaseSuite) TearDownTest() {
-	s.log.Info().Msg("================> Start TearDownTest")
+	s.Log.Info().Msg("================> Start TearDownTest")
 	s.Net.Remove()
 	s.cancel()
-	s.log.Info().Msg("================> Finish TearDownTest")
+	s.Log.Info().Msg("================> Finish TearDownTest")
 }
 
 func (s *BaseSuite) Ghost() *client.GhostClient {
@@ -135,7 +135,7 @@ func (s *BaseSuite) Ghost() *client.GhostClient {
 // TimedLogf logs the message using t.Log and the suite logger, but prefixes the current time.
 // This enables viewing logs inline with Docker logs as well as other test logs.
 func (s *BaseSuite) TimedLogf(msg string, args ...interface{}) {
-	s.log.Info().Msgf(msg, args...)
+	s.Log.Info().Msgf(msg, args...)
 	args = append([]interface{}{time.Now().String()}, args...)
 	s.T().Logf("%s - "+msg, args...)
 }

@@ -1,8 +1,6 @@
 package recover_epoch
 
 import (
-	"fmt"
-	"os"
 	"strings"
 	"testing"
 	"time"
@@ -62,8 +60,7 @@ func (s *RecoverEpochSuite) TestRecoverEpoch() {
 	numViewsInStakingAuction := s.StakingAuctionLen
 	epochCounter := uint64(1)
 
-	out := fmt.Sprintf("%s/recover-epoch-tx-args.json", s.Net.BootstrapDir)
-	s.executeEFMRecoverTXArgsCMD(
+	txArgs := s.executeEFMRecoverTXArgsCMD(
 		collectionClusters,
 		numViewsInRecoveryEpoch,
 		numViewsInStakingAuction,
@@ -72,15 +69,10 @@ func (s *RecoverEpochSuite) TestRecoverEpoch() {
 		// targetDuration and targetEndTime will be ignored
 		3000,
 		4000,
-		out,
 	)
-	b, err := os.ReadFile(out)
-	require.NoError(s.T(), err)
 
 	// 3. Submit recover epoch transaction to the network.
 	// submit the recover epoch transaction
-	txArgs, err := utils.ParseJSON(b)
-	require.NoError(s.T(), err)
 	env := utils.LocalnetEnv()
 	result := s.recoverEpoch(env, txArgs)
 	require.NoError(s.T(), result.Error)

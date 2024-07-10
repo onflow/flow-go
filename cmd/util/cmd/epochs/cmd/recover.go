@@ -148,9 +148,24 @@ func getSnapshot() *inmem.Snapshot {
 // generateRecoverEpochTxArgs generates recover epoch transaction arguments from a root protocol state snapshot and writes it to a JSON file
 func generateRecoverEpochTxArgs(getSnapshot func() *inmem.Snapshot) func(cmd *cobra.Command, args []string) {
 	return func(cmd *cobra.Command, args []string) {
-		// extract arguments from recover epoch tx from snapshot
-		txArgs := extractRecoverEpochArgs(getSnapshot())
-
+		// generate transaction arguments
+		txArgs, err := run.GenerateRecoverEpochTxArgs(
+			log,
+			flagInternalNodePrivInfoDir,
+			flagNodeConfigJson,
+			flagCollectionClusters,
+			flagEpochCounter,
+			flow.ChainID(flagRootChainID),
+			flagNumViewsInStakingAuction,
+			flagNumViewsInEpoch,
+			flagTargetDuration,
+			flagTargetEndTime,
+			flagInitNewEpoch,
+			getSnapshot(),
+		)
+		if err != nil {
+			log.Fatal().Err(err).Msg("failed to generate recover epoch transaction arguments")
+		}
 		// encode to JSON
 		encodedTxArgs, err := epochcmdutil.EncodeArgs(txArgs)
 		if err != nil {
@@ -229,7 +244,7 @@ func extractRecoverEpochArgs(snapshot *inmem.Snapshot) []cadence.Value {
 	log.Info().Msg("")
 
 	log.Info().Msg("constructing root QCs for collection node clusters")
-	clusterQCs := common.ConstructRootQCsForClusters(log, clusters, internalNodes, clusterBlocks)
+	clusterQCs := run.ConstructRootQCsForClusters(log, clusters, internalNodes, clusterBlocks)
 	log.Info().Msg("")
 
 	dkgPubKeys := make([]cadence.Value, 0)
