@@ -2,10 +2,14 @@ package version
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"math"
 	"sort"
 	"testing"
 	"time"
+
+	"github.com/onflow/flow-go/utils/unittest/mocks"
 
 	"github.com/coreos/go-semver/semver"
 	"github.com/stretchr/testify/assert"
@@ -34,124 +38,94 @@ func TestVersionControlInitialization(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	finalizedRootBlockHeight := uint64(1000)
-	latestBlockHeight := finalizedRootBlockHeight + 100
+	sealedRootBlockHeight := uint64(1000)
+	latestBlockHeight := sealedRootBlockHeight + 100
 
 	testCases := []testCaseConfig{
 		{
 			name:        "no version beacon found",
 			nodeVersion: "0.0.1",
 			versionEvents: []*flow.SealedVersionBeacon{
-				VersionBeaconEvent(finalizedRootBlockHeight-100,
-					flow.VersionBoundary{BlockHeight: finalizedRootBlockHeight - 50, Version: "0.0.1"}),
+				VersionBeaconEvent(sealedRootBlockHeight-100,
+					flow.VersionBoundary{BlockHeight: sealedRootBlockHeight - 50, Version: "0.0.1"}),
 			},
-			expectedStart: finalizedRootBlockHeight,
+			expectedStart: sealedRootBlockHeight,
 			expectedEnd:   latestBlockHeight,
 		},
 		{
 			name:        "start version set",
 			nodeVersion: "0.0.1",
 			versionEvents: []*flow.SealedVersionBeacon{
-				VersionBeaconEvent(finalizedRootBlockHeight+10,
-					flow.VersionBoundary{BlockHeight: finalizedRootBlockHeight + 12, Version: "0.0.1"}),
+				VersionBeaconEvent(sealedRootBlockHeight+10,
+					flow.VersionBoundary{BlockHeight: sealedRootBlockHeight + 12, Version: "0.0.1"}),
 			},
-			expectedStart: finalizedRootBlockHeight + 12,
-			expectedEnd:   latestBlockHeight,
-		},
-		{
-			name:        "height is bigger than latest block height",
-			nodeVersion: "0.0.1",
-			versionEvents: []*flow.SealedVersionBeacon{
-				VersionBeaconEvent(finalizedRootBlockHeight+10,
-					flow.VersionBoundary{BlockHeight: finalizedRootBlockHeight + 12, Version: "0.0.1"}),
-			},
-			expectedStart: latestBlockHeight + 1,
-			expectedEnd:   latestBlockHeight + 1,
-		},
-		{
-			name:        "height is smaller than finalized root block height",
-			nodeVersion: "0.0.1",
-			versionEvents: []*flow.SealedVersionBeacon{
-				VersionBeaconEvent(finalizedRootBlockHeight+10,
-					flow.VersionBoundary{BlockHeight: finalizedRootBlockHeight + 12, Version: "0.0.1"}),
-			},
-			expectedStart: finalizedRootBlockHeight - 1,
-			expectedEnd:   finalizedRootBlockHeight - 1,
-		},
-		{
-			name:        "start version set",
-			nodeVersion: "0.0.1",
-			versionEvents: []*flow.SealedVersionBeacon{
-				VersionBeaconEvent(finalizedRootBlockHeight+10,
-					flow.VersionBoundary{BlockHeight: finalizedRootBlockHeight + 12, Version: "0.0.1"}),
-			},
-			expectedStart: finalizedRootBlockHeight + 12,
+			expectedStart: sealedRootBlockHeight + 12,
 			expectedEnd:   latestBlockHeight,
 		},
 		{
 			name:        "correct start version found",
 			nodeVersion: "0.0.3",
 			versionEvents: []*flow.SealedVersionBeacon{
-				VersionBeaconEvent(finalizedRootBlockHeight+2,
-					flow.VersionBoundary{BlockHeight: finalizedRootBlockHeight + 4, Version: "0.0.1"}),
-				VersionBeaconEvent(finalizedRootBlockHeight+5,
-					flow.VersionBoundary{BlockHeight: finalizedRootBlockHeight + 7, Version: "0.0.2"}),
+				VersionBeaconEvent(sealedRootBlockHeight+2,
+					flow.VersionBoundary{BlockHeight: sealedRootBlockHeight + 4, Version: "0.0.1"}),
+				VersionBeaconEvent(sealedRootBlockHeight+5,
+					flow.VersionBoundary{BlockHeight: sealedRootBlockHeight + 7, Version: "0.0.2"}),
 			},
-			expectedStart: finalizedRootBlockHeight + 7,
+			expectedStart: sealedRootBlockHeight + 7,
 			expectedEnd:   latestBlockHeight,
 		},
 		{
 			name:        "end version set",
 			nodeVersion: "0.0.1",
 			versionEvents: []*flow.SealedVersionBeacon{
-				VersionBeaconEvent(finalizedRootBlockHeight-100,
-					flow.VersionBoundary{BlockHeight: finalizedRootBlockHeight - 50, Version: "0.0.1"}),
+				VersionBeaconEvent(sealedRootBlockHeight-100,
+					flow.VersionBoundary{BlockHeight: sealedRootBlockHeight - 50, Version: "0.0.1"}),
 				VersionBeaconEvent(latestBlockHeight-10,
 					flow.VersionBoundary{BlockHeight: latestBlockHeight - 8, Version: "0.0.3"}),
 			},
-			expectedStart: finalizedRootBlockHeight,
+			expectedStart: sealedRootBlockHeight,
 			expectedEnd:   latestBlockHeight - 9,
 		},
 		{
 			name:        "correct end version found",
 			nodeVersion: "0.0.1",
 			versionEvents: []*flow.SealedVersionBeacon{
-				VersionBeaconEvent(finalizedRootBlockHeight-100,
-					flow.VersionBoundary{BlockHeight: finalizedRootBlockHeight - 50, Version: "0.0.1"}),
+				VersionBeaconEvent(sealedRootBlockHeight-100,
+					flow.VersionBoundary{BlockHeight: sealedRootBlockHeight - 50, Version: "0.0.1"}),
 				VersionBeaconEvent(latestBlockHeight-10,
 					flow.VersionBoundary{BlockHeight: latestBlockHeight - 8, Version: "0.0.3"}),
 				VersionBeaconEvent(latestBlockHeight-3,
 					flow.VersionBoundary{BlockHeight: latestBlockHeight - 1, Version: "0.0.4"}),
 			},
-			expectedStart: finalizedRootBlockHeight,
+			expectedStart: sealedRootBlockHeight,
 			expectedEnd:   latestBlockHeight - 9,
 		},
 		{
 			name:        "start and end version set",
 			nodeVersion: "0.0.2",
 			versionEvents: []*flow.SealedVersionBeacon{
-				VersionBeaconEvent(finalizedRootBlockHeight+10,
-					flow.VersionBoundary{BlockHeight: finalizedRootBlockHeight + 12, Version: "0.0.1"}),
+				VersionBeaconEvent(sealedRootBlockHeight+10,
+					flow.VersionBoundary{BlockHeight: sealedRootBlockHeight + 12, Version: "0.0.1"}),
 				VersionBeaconEvent(latestBlockHeight-10,
 					flow.VersionBoundary{BlockHeight: latestBlockHeight - 8, Version: "0.0.3"}),
 			},
-			expectedStart: finalizedRootBlockHeight + 12,
+			expectedStart: sealedRootBlockHeight + 12,
 			expectedEnd:   latestBlockHeight - 9,
 		},
 		{
 			name:        "correct start and end version found",
 			nodeVersion: "0.0.2",
 			versionEvents: []*flow.SealedVersionBeacon{
-				VersionBeaconEvent(finalizedRootBlockHeight+2,
-					flow.VersionBoundary{BlockHeight: finalizedRootBlockHeight + 4, Version: "0.0.1"}),
-				VersionBeaconEvent(finalizedRootBlockHeight+10,
-					flow.VersionBoundary{BlockHeight: finalizedRootBlockHeight + 12, Version: "0.0.2"}),
+				VersionBeaconEvent(sealedRootBlockHeight+2,
+					flow.VersionBoundary{BlockHeight: sealedRootBlockHeight + 4, Version: "0.0.1"}),
+				VersionBeaconEvent(sealedRootBlockHeight+10,
+					flow.VersionBoundary{BlockHeight: sealedRootBlockHeight + 12, Version: "0.0.2"}),
 				VersionBeaconEvent(latestBlockHeight-10,
 					flow.VersionBoundary{BlockHeight: latestBlockHeight - 8, Version: "0.0.3"}),
 				VersionBeaconEvent(latestBlockHeight-3,
 					flow.VersionBoundary{BlockHeight: latestBlockHeight - 1, Version: "0.0.4"}),
 			},
-			expectedStart: finalizedRootBlockHeight + 12,
+			expectedStart: sealedRootBlockHeight + 12,
 			expectedEnd:   latestBlockHeight - 9,
 		},
 		{
@@ -159,8 +133,8 @@ func TestVersionControlInitialization(t *testing.T) {
 			nodeVersion: "0.0.1",
 			versionEvents: []*flow.SealedVersionBeacon{
 				// the node's version is too old for the earliest version boundary for the network
-				VersionBeaconEvent(finalizedRootBlockHeight-100,
-					flow.VersionBoundary{BlockHeight: finalizedRootBlockHeight - 50, Version: "0.0.2"}),
+				VersionBeaconEvent(sealedRootBlockHeight-100,
+					flow.VersionBoundary{BlockHeight: sealedRootBlockHeight - 50, Version: "0.0.2"}),
 			},
 			expectedStart: math.MaxUint64,
 			expectedEnd:   math.MaxUint64,
@@ -169,8 +143,8 @@ func TestVersionControlInitialization(t *testing.T) {
 			name:        "node's version is too new for current latest",
 			nodeVersion: "0.0.3",
 			versionEvents: []*flow.SealedVersionBeacon{
-				VersionBeaconEvent(finalizedRootBlockHeight-100,
-					flow.VersionBoundary{BlockHeight: finalizedRootBlockHeight - 50, Version: "0.0.2"}),
+				VersionBeaconEvent(sealedRootBlockHeight-100,
+					flow.VersionBoundary{BlockHeight: sealedRootBlockHeight - 50, Version: "0.0.2"}),
 
 				// the version boundary that transitions to the node's version applies after the
 				// latest finalized block, so the node's version is not compatible with any block
@@ -187,28 +161,28 @@ func TestVersionControlInitialization(t *testing.T) {
 			nodeVersion: "0.0.1-pre-release.1",
 			versionEvents: []*flow.SealedVersionBeacon{
 				// 0.0.1-pre-release.1 > 0.0.1-pre-release.0
-				VersionBeaconEvent(finalizedRootBlockHeight+10,
-					flow.VersionBoundary{BlockHeight: finalizedRootBlockHeight + 12, Version: "0.0.1-pre-release.0"}),
+				VersionBeaconEvent(sealedRootBlockHeight+10,
+					flow.VersionBoundary{BlockHeight: sealedRootBlockHeight + 12, Version: "0.0.1-pre-release.0"}),
 				// 0.0.1-pre-release.1 < 0.0.1
-				VersionBeaconEvent(finalizedRootBlockHeight+12,
-					flow.VersionBoundary{BlockHeight: finalizedRootBlockHeight + 14, Version: "0.0.1"}),
+				VersionBeaconEvent(sealedRootBlockHeight+12,
+					flow.VersionBoundary{BlockHeight: sealedRootBlockHeight + 14, Version: "0.0.1"}),
 			},
-			expectedStart: finalizedRootBlockHeight + 12,
-			expectedEnd:   finalizedRootBlockHeight + 13,
+			expectedStart: sealedRootBlockHeight + 12,
+			expectedEnd:   sealedRootBlockHeight + 13,
 		},
 		{
 			name:        "0.0.0 handled as expected",
 			nodeVersion: "0.0.0-20230101000000-c0c9f774e40c",
 			versionEvents: []*flow.SealedVersionBeacon{
 				// 0.0.0-20230101000000-c0c9f774e40c > 0.0.0-20220101000000-7b4eea64cf58
-				VersionBeaconEvent(finalizedRootBlockHeight+10,
-					flow.VersionBoundary{BlockHeight: finalizedRootBlockHeight + 12, Version: "0.0.0-20220101000000-7b4eea64cf58"}),
+				VersionBeaconEvent(sealedRootBlockHeight+10,
+					flow.VersionBoundary{BlockHeight: sealedRootBlockHeight + 12, Version: "0.0.0-20220101000000-7b4eea64cf58"}),
 				// 0.0.0-20230101000000-c0c9f774e40c < 0.0.0-20240101000000-6ceb2ff114de
-				VersionBeaconEvent(finalizedRootBlockHeight+12,
-					flow.VersionBoundary{BlockHeight: finalizedRootBlockHeight + 14, Version: "0.0.0-20240101000000-6ceb2ff114de"}),
+				VersionBeaconEvent(sealedRootBlockHeight+12,
+					flow.VersionBoundary{BlockHeight: sealedRootBlockHeight + 14, Version: "0.0.0-20240101000000-6ceb2ff114de"}),
 			},
-			expectedStart: finalizedRootBlockHeight + 12,
-			expectedEnd:   finalizedRootBlockHeight + 13,
+			expectedStart: sealedRootBlockHeight + 12,
+			expectedEnd:   sealedRootBlockHeight + 13,
 		},
 	}
 
@@ -241,26 +215,86 @@ func TestVersionControlInitialization(t *testing.T) {
 			vc := createVersionControlComponent(t, versionComponentTestConfigs{
 				nodeVersion:                testCase.nodeVersion,
 				versionBeacons:             versionBeacons,
-				finalizedRootBlockHeight:   finalizedRootBlockHeight,
+				sealedRootBlockHeight:      sealedRootBlockHeight,
 				latestFinalizedBlockHeight: latestBlockHeight,
 				signalerContext:            irrecoverable.NewMockSignalerContext(t, ctx),
 			})
 
-			checks := generateChecks(testCase, finalizedRootBlockHeight, latestBlockHeight)
-			shouldExpectOutOfRangeError := finalizedRootBlockHeight > testCase.expectedStart || testCase.expectedEnd > latestBlockHeight
+			checks := generateChecks(testCase, sealedRootBlockHeight, latestBlockHeight)
 
 			for height, expected := range checks {
 				compatible, err := vc.CompatibleAtBlock(height)
 
-				if shouldExpectOutOfRangeError {
-					assert.Error(t, ErrOutOfRange)
-				} else {
-					require.NoError(t, err)
-					assert.Equal(t, expected, compatible, "unexpected compatibility at height %d. want: %t, got %t", height, expected, compatible)
-				}
+				require.NoError(t, err)
+				assert.Equal(t, expected, compatible, "unexpected compatibility at height %d. want: %t, got %t", height, expected, compatible)
 			}
 		})
 	}
+}
+
+// TestVersionControlInitializationWithErrors tests the initialization process of the VersionControl component with error cases
+func TestVersionControlInitializationWithErrors(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	sealedRootBlockHeight := uint64(1000)
+	latestBlockHeight := sealedRootBlockHeight + 100
+	eventMap := map[uint64]*flow.SealedVersionBeacon{
+		sealedRootBlockHeight + 10: VersionBeaconEvent(sealedRootBlockHeight+10,
+			flow.VersionBoundary{BlockHeight: sealedRootBlockHeight + 12, Version: "0.0.1"}),
+	}
+
+	versionBeacons := storageMock.NewVersionBeacons(t)
+
+	checkForError := func(height uint64) {
+		versionBeacons.
+			On("Highest", testifyMock.AnythingOfType("uint64")).
+			Return(mocks.StorageMapGetter(eventMap)).Once()
+
+		vc := createVersionControlComponent(t, versionComponentTestConfigs{
+			nodeVersion:                "0.0.1",
+			versionBeacons:             versionBeacons,
+			sealedRootBlockHeight:      sealedRootBlockHeight,
+			latestFinalizedBlockHeight: latestBlockHeight,
+			signalerContext:            irrecoverable.NewMockSignalerContext(t, ctx),
+		})
+
+		compatible, err := vc.CompatibleAtBlock(height)
+
+		assert.True(t, errors.Is(err, ErrOutOfRange))
+		assert.False(t, compatible)
+	}
+
+	t.Run("height is bigger than latest block height", func(t *testing.T) {
+		checkForError(latestBlockHeight + 1)
+	})
+
+	t.Run("height is smaller than sealed root block height", func(t *testing.T) {
+		checkForError(sealedRootBlockHeight - 1)
+	})
+
+	t.Run("failed to complete initialization due to \"Highest\" of version beacon returns error", func(t *testing.T) {
+		decodeErr := fmt.Errorf("test decode error")
+
+		versionBeacons.
+			On("Highest", testifyMock.AnythingOfType("uint64")).
+			Return(nil, decodeErr).Once()
+
+		vc, err := NewVersionControl(
+			unittest.Logger(),
+			versionBeacons,
+			semver.New("0.0.1"),
+			sealedRootBlockHeight,
+			latestBlockHeight,
+		)
+		require.NoError(t, err)
+
+		vc.Start(irrecoverable.NewMockSignalerContextExpectError(t, ctx, fmt.Errorf(
+			"failed to get highest version beacon for version control: %w",
+			decodeErr)))
+
+		unittest.AssertNotClosesBefore(t, vc.Ready(), 2*time.Second)
+	})
 }
 
 func generateChecks(testCase testCaseConfig, finalizedRootBlockHeight, latestBlockHeight uint64) map[uint64]bool {
@@ -301,7 +335,7 @@ func TestVersionBoundaryUpdated(t *testing.T) {
 	vc := createVersionControlComponent(t, versionComponentTestConfigs{
 		nodeVersion:                "0.0.1",
 		versionBeacons:             contract,
-		finalizedRootBlockHeight:   0,
+		sealedRootBlockHeight:      0,
 		latestFinalizedBlockHeight: latestHeight,
 		signalerContext:            signalCtx,
 	})
@@ -364,7 +398,7 @@ func TestVersionBoundaryDeleted(t *testing.T) {
 	vc := createVersionControlComponent(t, versionComponentTestConfigs{
 		nodeVersion:                "0.0.1",
 		versionBeacons:             contract,
-		finalizedRootBlockHeight:   0,
+		sealedRootBlockHeight:      0,
 		latestFinalizedBlockHeight: latestHeight,
 		signalerContext:            signalCtx,
 	})
@@ -426,7 +460,7 @@ func TestNotificationSkippedForCompatibleVersions(t *testing.T) {
 	vc := createVersionControlComponent(t, versionComponentTestConfigs{
 		nodeVersion:                "0.0.1",
 		versionBeacons:             contract,
-		finalizedRootBlockHeight:   0,
+		sealedRootBlockHeight:      0,
 		latestFinalizedBlockHeight: latestHeight,
 		signalerContext:            signalCtx,
 	})
@@ -477,7 +511,7 @@ func generateConsumerAssertions(
 type versionComponentTestConfigs struct {
 	nodeVersion                string
 	versionBeacons             storage.VersionBeacons
-	finalizedRootBlockHeight   uint64
+	sealedRootBlockHeight      uint64
 	latestFinalizedBlockHeight uint64
 	signalerContext            *irrecoverable.MockSignalerContext
 }
@@ -491,7 +525,7 @@ func createVersionControlComponent(
 		unittest.Logger(),
 		config.versionBeacons,
 		semver.New(config.nodeVersion),
-		config.finalizedRootBlockHeight,
+		config.sealedRootBlockHeight,
 		config.latestFinalizedBlockHeight,
 	)
 	require.NoError(t, err)
