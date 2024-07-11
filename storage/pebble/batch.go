@@ -1,27 +1,31 @@
-package pebble
+package badger
 
 import (
 	"sync"
 
-	"github.com/cockroachdb/pebble"
+	"github.com/dgraph-io/badger/v2"
 )
 
+type BatchBuilder interface {
+	NewWriteBatch() *badger.WriteBatch
+}
+
 type Batch struct {
-	writer *pebble.Batch
+	writer *badger.WriteBatch
 
 	lock      sync.RWMutex
 	callbacks []func()
 }
 
-func NewBatch(db *pebble.DB) *Batch {
-	batch := db.NewBatch()
+func NewBatch(db BatchBuilder) *Batch {
+	batch := db.NewWriteBatch()
 	return &Batch{
 		writer:    batch,
 		callbacks: make([]func(), 0),
 	}
 }
 
-func (b *Batch) GetWriter() *pebble.Batch {
+func (b *Batch) GetWriter() *badger.WriteBatch {
 	return b.writer
 }
 
@@ -38,9 +42,8 @@ func (b *Batch) OnSucceed(callback func()) {
 // Flush will call the badger Batch's Flush method, in
 // addition, it will call the callbacks added by
 // OnSucceed
-// any error are exceptions
 func (b *Batch) Flush() error {
-	err := b.writer.Commit(nil)
+	err := b.writer.Flush()
 	if err != nil {
 		return err
 	}
@@ -51,8 +54,4 @@ func (b *Batch) Flush() error {
 		callback()
 	}
 	return nil
-}
-
-func (b *Batch) Close() error {
-	return b.writer.Close()
 }

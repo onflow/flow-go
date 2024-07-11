@@ -1,167 +1,153 @@
-package pebble
+package badger
 
 import (
 	"errors"
 	"fmt"
 
+	"github.com/dgraph-io/badger/v2"
 	lru "github.com/hashicorp/golang-lru/v2"
 
-	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
-const DefaultCacheSize = uint(10_000)
-
-type CacheType int
-
-const (
-	CacheTypeLRU CacheType = iota + 1
-	CacheTypeTwoQueue
-)
-
-func ParseCacheType(s string) (CacheType, error) {
-	switch s {
-	case CacheTypeLRU.String():
-		return CacheTypeLRU, nil
-	case CacheTypeTwoQueue.String():
-		return CacheTypeTwoQueue, nil
-	default:
-		return 0, errors.New("invalid cache type")
+func withLimit[K comparable, V any](limit uint) func(*Cache[K, V]) {
+	return func(c *Cache[K, V]) {
+		c.limit = limit
 	}
 }
 
-func (m CacheType) String() string {
-	switch m {
-	case CacheTypeLRU:
-		return "lru"
-	case CacheTypeTwoQueue:
-		return "2q"
-	default:
-		return ""
+type storeFunc[K comparable, V any] func(key K, val V) func(*transaction.Tx) error
+
+const DefaultCacheSize = uint(1000)
+
+func withStore[K comparable, V any](store storeFunc[K, V]) func(*Cache[K, V]) {
+	return func(c *Cache[K, V]) {
+		c.store = store
 	}
 }
 
-type CacheBackend interface {
-	Get(key string) (value flow.RegisterValue, ok bool)
-	Add(key string, value flow.RegisterValue)
-	Contains(key string) bool
-	Len() int
-	Remove(key string)
+func noStore[K comparable, V any](_ K, _ V) func(*transaction.Tx) error {
+	return func(tx *transaction.Tx) error {
+		return fmt.Errorf("no store function for cache put available")
+	}
 }
 
-// wrapped is a wrapper around lru.Cache to implement CacheBackend
-// this is needed because the standard lru cache implementation provides additional features that
-// the 2Q cache do not. This standardizes the interface to allow swapping between types.
-type wrapped struct {
-	cache *lru.Cache[string, flow.RegisterValue]
+func noopStore[K comparable, V any](_ K, _ V) func(*transaction.Tx) error {
+	return func(tx *transaction.Tx) error {
+		return nil
+	}
 }
 
-func (c *wrapped) Get(key string) (value flow.RegisterValue, ok bool) {
-	return c.cache.Get(key)
-}
-func (c *wrapped) Add(key string, value flow.RegisterValue) {
-	_ = c.cache.Add(key, value)
-}
-func (c *wrapped) Contains(key string) bool {
-	return c.cache.Contains(key)
-}
-func (c *wrapped) Len() int {
-	return c.cache.Len()
-}
-func (c *wrapped) Remove(key string) {
-	_ = c.cache.Remove(key)
+type retrieveFunc[K comparable, V any] func(key K) func(*badger.Txn) (V, error)
+
+func withRetrieve[K comparable, V any](retrieve retrieveFunc[K, V]) func(*Cache[K, V]) {
+	return func(c *Cache[K, V]) {
+		c.retrieve = retrieve
+	}
 }
 
-type ReadCache struct {
+func noRetrieve[K comparable, V any](_ K) func(*badger.Txn) (V, error) {
+	return func(tx *badger.Txn) (V, error) {
+		var nullV V
+		return nullV, fmt.Errorf("no retrieve function for cache get available")
+	}
+}
+
+type Cache[K comparable, V any] struct {
 	metrics  module.CacheMetrics
+	limit    uint
+	store    storeFunc[K, V]
+	retrieve retrieveFunc[K, V]
 	resource string
-	cache    CacheBackend
-	retrieve func(key string) (flow.RegisterValue, error)
+	cache    *lru.Cache[K, V]
 }
 
-func newReadCache(
-	collector module.CacheMetrics,
-	resourceName string,
-	cacheType CacheType,
-	cacheSize uint,
-	retrieve func(key string) (flow.RegisterValue, error),
-) (*ReadCache, error) {
-	cache, err := getCache(cacheType, int(cacheSize))
-	if err != nil {
-		return nil, fmt.Errorf("could not create cache: %w", err)
-	}
-
-	c := ReadCache{
+func newCache[K comparable, V any](collector module.CacheMetrics, resourceName string, options ...func(*Cache[K, V])) *Cache[K, V] {
+	c := Cache[K, V]{
 		metrics:  collector,
+		limit:    1000,
+		store:    noStore[K, V],
+		retrieve: noRetrieve[K, V],
 		resource: resourceName,
-		cache:    cache,
-		retrieve: retrieve,
 	}
+	for _, option := range options {
+		option(&c)
+	}
+	c.cache, _ = lru.New[K, V](int(c.limit))
 	c.metrics.CacheEntries(c.resource, uint(c.cache.Len()))
-
-	return &c, nil
-}
-
-func getCache(cacheType CacheType, size int) (CacheBackend, error) {
-	switch cacheType {
-	case CacheTypeLRU:
-		cache, err := lru.New[string, flow.RegisterValue](size)
-		if err != nil {
-			return nil, err
-		}
-		return &wrapped{cache: cache}, nil
-	case CacheTypeTwoQueue:
-		return lru.New2Q[string, flow.RegisterValue](size)
-	default:
-		return nil, fmt.Errorf("unknown cache type: %d", cacheType)
-	}
+	return &c
 }
 
 // IsCached returns true if the key exists in the cache.
 // It DOES NOT check whether the key exists in the underlying data store.
-func (c *ReadCache) IsCached(key string) bool {
+func (c *Cache[K, V]) IsCached(key K) bool {
 	return c.cache.Contains(key)
 }
 
 // Get will try to retrieve the resource from cache first, and then from the
 // injected. During normal operations, the following error returns are expected:
 //   - `storage.ErrNotFound` if key is unknown.
-func (c *ReadCache) Get(key string) (flow.RegisterValue, error) {
-	resource, cached := c.cache.Get(key)
-	if cached {
-		c.metrics.CacheHit(c.resource)
-		if resource == nil {
-			return nil, storage.ErrNotFound
+func (c *Cache[K, V]) Get(key K) func(*badger.Txn) (V, error) {
+	return func(tx *badger.Txn) (V, error) {
+
+		// check if we have it in the cache
+		resource, cached := c.cache.Get(key)
+		if cached {
+			c.metrics.CacheHit(c.resource)
+			return resource, nil
 		}
+
+		// get it from the database
+		resource, err := c.retrieve(key)(tx)
+		if err != nil {
+			if errors.Is(err, storage.ErrNotFound) {
+				c.metrics.CacheNotFound(c.resource)
+			}
+			var nullV V
+			return nullV, fmt.Errorf("could not retrieve resource: %w", err)
+		}
+
+		c.metrics.CacheMiss(c.resource)
+
+		// cache the resource and eject least recently used one if we reached limit
+		evicted := c.cache.Add(key, resource)
+		if !evicted {
+			c.metrics.CacheEntries(c.resource, uint(c.cache.Len()))
+		}
+
 		return resource, nil
 	}
-
-	// get it from the database
-	resource, err := c.retrieve(key)
-	if err != nil {
-		if errors.Is(err, storage.ErrNotFound) {
-			c.cache.Add(key, nil)
-			c.metrics.CacheEntries(c.resource, uint(c.cache.Len()))
-			c.metrics.CacheNotFound(c.resource)
-		}
-		return nil, fmt.Errorf("could not retrieve resource: %w", err)
-	}
-
-	c.metrics.CacheMiss(c.resource)
-
-	c.cache.Add(key, resource)
-	c.metrics.CacheEntries(c.resource, uint(c.cache.Len()))
-
-	return resource, nil
 }
 
-func (c *ReadCache) Remove(key string) {
+func (c *Cache[K, V]) Remove(key K) {
 	c.cache.Remove(key)
 }
 
 // Insert will add a resource directly to the cache with the given ID
-func (c *ReadCache) Insert(key string, resource flow.RegisterValue) {
-	c.cache.Add(key, resource)
-	c.metrics.CacheEntries(c.resource, uint(c.cache.Len()))
+func (c *Cache[K, V]) Insert(key K, resource V) {
+	// cache the resource and eject least recently used one if we reached limit
+	evicted := c.cache.Add(key, resource)
+	if !evicted {
+		c.metrics.CacheEntries(c.resource, uint(c.cache.Len()))
+	}
+}
+
+// PutTx will return tx which adds a resource to the cache with the given ID.
+func (c *Cache[K, V]) PutTx(key K, resource V) func(*transaction.Tx) error {
+	storeOps := c.store(key, resource) // assemble DB operations to store resource (no execution)
+
+	return func(tx *transaction.Tx) error {
+		err := storeOps(tx) // execute operations to store resource
+		if err != nil {
+			return fmt.Errorf("could not store resource: %w", err)
+		}
+
+		tx.OnSucceed(func() {
+			c.Insert(key, resource)
+		})
+
+		return nil
+	}
 }
