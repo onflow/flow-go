@@ -47,7 +47,7 @@ var _ state_synchronization.IndexReporter = (*Indexer)(nil)
 // notify new data is available and kick off indexing.
 type Indexer struct {
 	component.Component
-	*requester.BlockHeaderDistributor
+	*requester.ExecutionDataIndexedDistributor
 
 	log             zerolog.Logger
 	exeDataReader   *jobs.ExecutionDataReader
@@ -68,11 +68,11 @@ func NewIndexer(
 	processedHeight storage.ConsumerProgress,
 ) (*Indexer, error) {
 	r := &Indexer{
-		log:                    log.With().Str("module", "execution_indexer").Logger(),
-		exeDataNotifier:        engine.NewNotifier(),
-		indexer:                indexer,
-		registers:              registers,
-		BlockHeaderDistributor: requester.NewBlockHeaderDistributor(),
+		log:                             log.With().Str("module", "execution_indexer").Logger(),
+		exeDataNotifier:                 engine.NewNotifier(),
+		indexer:                         indexer,
+		registers:                       registers,
+		ExecutionDataIndexedDistributor: requester.NewExecutionDataIndexedDistributor(),
 	}
 
 	r.exeDataReader = jobs.NewExecutionDataReader(executionCache, fetchTimeout, executionDataLatestHeight)
@@ -105,7 +105,7 @@ func NewIndexer(
 	return r, nil
 }
 
-// onBlockHeaderReceived notifies BlockHeaderDistributor that new block is indexed.
+// onBlockHeaderReceived notifies ExecutionDataIndexedDistributor that new block is indexed.
 //
 // No errors are expected during normal operations.
 func (i *Indexer) onBlockHeaderReceived() {

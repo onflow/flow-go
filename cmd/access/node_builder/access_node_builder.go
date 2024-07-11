@@ -953,7 +953,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					return nil, fmt.Errorf("failed to create execution data pruner: %w", err)
 				}
 
-				builder.ExecutionIndexer.AddOnBlockHeaderReceivedConsumer(func(header *flow.Header) {
+				builder.ExecutionIndexer.AddOnBlockIndexedConsumer(func(header *flow.Header) {
 					err := builder.ExecutionDataTracker.SetFulfilledHeight(header.Height)
 					if err != nil {
 						node.Logger.Fatal().Err(err).Msg("failed to set fulfilled height")
