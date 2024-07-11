@@ -918,6 +918,12 @@ type TransactionExecutionResultStats struct {
 	ComputationIntensities     meter.MeteredComputationIntensities
 }
 
+type TransactionExecutionResultInfo struct {
+	TransactionID flow.Identifier
+	BlockID       flow.Identifier
+	BlockHeight   uint64
+}
+
 func (stats *ExecutionResultStats) Merge(other ExecutionResultStats) {
 	stats.ComputationUsed += other.ComputationUsed
 	stats.MemoryUsed += other.MemoryUsed
@@ -974,7 +980,7 @@ type ExecutionMetrics interface {
 	ExecutionCollectionExecuted(dur time.Duration, stats CollectionExecutionResultStats)
 
 	// ExecutionTransactionExecuted reports stats on executing a single transaction
-	ExecutionTransactionExecuted(dur time.Duration, stats TransactionExecutionResultStats)
+	ExecutionTransactionExecuted(dur time.Duration, stats TransactionExecutionResultStats, info TransactionExecutionResultInfo)
 
 	// ExecutionChunkDataPackGenerated reports stats on chunk data pack generation
 	ExecutionChunkDataPackGenerated(proofSize, numberOfTransactions int)
