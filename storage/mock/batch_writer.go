@@ -23,6 +23,20 @@ func (_m *BatchWriter) Delete(key []byte) error {
 	return r0
 }
 
+// DeleteRange provides a mock function with given fields: start, end
+func (_m *BatchWriter) DeleteRange(start []byte, end []byte) error {
+	ret := _m.Called(start, end)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func([]byte, []byte) error); ok {
+		r0 = rf(start, end)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // Set provides a mock function with given fields: key, val
 func (_m *BatchWriter) Set(key []byte, val []byte) error {
 	ret := _m.Called(key, val)
