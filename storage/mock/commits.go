@@ -80,24 +80,6 @@ func (_m *Commits) ByBlockID(blockID flow.Identifier) (flow.StateCommitment, err
 	return r0, r1
 }
 
-// Store provides a mock function with given fields: blockID, commit
-func (_m *Commits) Store(blockID flow.Identifier, commit flow.StateCommitment) error {
-	ret := _m.Called(blockID, commit)
-
-	if len(ret) == 0 {
-		panic("no return value specified for Store")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(flow.Identifier, flow.StateCommitment) error); ok {
-		r0 = rf(blockID, commit)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
 // NewCommits creates a new instance of Commits. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
 // The first argument is typically a *testing.T value.
 func NewCommits(t interface {

@@ -3,7 +3,7 @@
 package mock
 
 import (
-	badger "github.com/dgraph-io/badger/v2"
+	storage "github.com/onflow/flow-go/storage"
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -30,20 +30,40 @@ func (_m *BatchStorage) Flush() error {
 	return r0
 }
 
+// GetReader provides a mock function with given fields:
+func (_m *BatchStorage) GetReader() storage.Reader {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetReader")
+	}
+
+	var r0 storage.Reader
+	if rf, ok := ret.Get(0).(func() storage.Reader); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(storage.Reader)
+		}
+	}
+
+	return r0
+}
+
 // GetWriter provides a mock function with given fields:
-func (_m *BatchStorage) GetWriter() *badger.WriteBatch {
+func (_m *BatchStorage) GetWriter() storage.BatchWriter {
 	ret := _m.Called()
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetWriter")
 	}
 
-	var r0 *badger.WriteBatch
-	if rf, ok := ret.Get(0).(func() *badger.WriteBatch); ok {
+	var r0 storage.BatchWriter
+	if rf, ok := ret.Get(0).(func() storage.BatchWriter); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*badger.WriteBatch)
+			r0 = ret.Get(0).(storage.BatchWriter)
 		}
 	}
 

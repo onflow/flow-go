@@ -126,8 +126,7 @@ func (r *ExecutionResults) ByID(resultID flow.Identifier) (*flow.ExecutionResult
 
 func (r *ExecutionResults) ByIDTx(resultID flow.Identifier) func(*transaction.Tx) (*flow.ExecutionResult, error) {
 	return func(tx *transaction.Tx) (*flow.ExecutionResult, error) {
-		result, err := r.byID(resultID)(tx.DBTxn)
-		return result, err
+		return r.byID(resultID)(tx.DBTxn)
 	}
 }
 

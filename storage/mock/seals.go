@@ -102,24 +102,6 @@ func (_m *Seals) HighestInFork(blockID flow.Identifier) (*flow.Seal, error) {
 	return r0, r1
 }
 
-// Store provides a mock function with given fields: seal
-func (_m *Seals) Store(seal *flow.Seal) error {
-	ret := _m.Called(seal)
-
-	if len(ret) == 0 {
-		panic("no return value specified for Store")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(*flow.Seal) error); ok {
-		r0 = rf(seal)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
 // NewSeals creates a new instance of Seals. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
 // The first argument is typically a *testing.T value.
 func NewSeals(t interface {

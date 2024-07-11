@@ -8,12 +8,11 @@ import (
 // Blocks represents persistent storage for blocks.
 type Blocks interface {
 
-	// Store will atomically store a block with all its dependencies.
-	Store(block *flow.Block) error
-
 	// StoreTx allows us to store a new block, including its payload & header, as part of a DB transaction, while
 	// still going through the caching layer.
 	StoreTx(block *flow.Block) func(*transaction.Tx) error
+
+	StorePebble(block *flow.Block) func(PebbleReaderBatchWriter) error
 
 	// ByID returns the block with the given hash. It is available for
 	// finalized and ambiguous blocks.
