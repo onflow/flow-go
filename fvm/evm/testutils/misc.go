@@ -6,6 +6,7 @@ import (
 	"math/rand"
 	"testing"
 
+	"github.com/holiman/uint256"
 	gethCommon "github.com/onflow/go-ethereum/common"
 	gethTypes "github.com/onflow/go-ethereum/core/types"
 	"github.com/stretchr/testify/require"
@@ -18,6 +19,10 @@ func RandomCommonHash(t testing.TB) gethCommon.Hash {
 	_, err := cryptoRand.Read(ret[:gethCommon.HashLength])
 	require.NoError(t, err)
 	return ret
+}
+
+func RandomUint256Int(limit int64) *uint256.Int {
+	return uint256.NewInt(uint64(rand.Int63n(limit) + 1))
 }
 
 func RandomBigInt(limit int64) *big.Int {

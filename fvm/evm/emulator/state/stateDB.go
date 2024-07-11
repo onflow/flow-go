@@ -4,13 +4,17 @@ import (
 	"bytes"
 	stdErrors "errors"
 	"fmt"
-	"math/big"
 	"sort"
 
+	"github.com/holiman/uint256"
 	"github.com/onflow/atree"
+	"github.com/onflow/go-ethereum/common"
 	gethCommon "github.com/onflow/go-ethereum/common"
+	"github.com/onflow/go-ethereum/core/stateless"
+	"github.com/onflow/go-ethereum/core/tracing"
 	gethTypes "github.com/onflow/go-ethereum/core/types"
 	gethParams "github.com/onflow/go-ethereum/params"
+	"github.com/onflow/go-ethereum/trie/utils"
 
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/model/flow"
@@ -79,9 +83,23 @@ func (db *StateDB) CreateAccount(addr gethCommon.Address) {
 	db.handleError(err)
 }
 
+// CreateContract is used whenever a contract is created. This may be preceded
+// by CreateAccount, but that is not required if it already existed in the
+// state due to funds sent beforehand.
+// This operation sets the 'newContract'-flag, which is required in order to
+// correctly handle EIP-6780 'delete-in-same-transaction' logic.
+func (db *StateDB) CreateContract(addr gethCommon.Address) {
+	// TODO: figure out this
+}
+
 // IsCreated returns true if address is recently created (context of a transaction)
 func (db *StateDB) IsCreated(addr gethCommon.Address) bool {
 	return db.lastestView().IsCreated(addr)
+}
+
+// IsCreated returns true if address is a new contract
+func (db *StateDB) IsNewContract(addr gethCommon.Address) bool {
+	return db.lastestView().IsNewContract(addr)
 }
 
 // SelfDestruct flags the address for deletion.
@@ -93,9 +111,10 @@ func (db *StateDB) SelfDestruct(addr gethCommon.Address) {
 	db.handleError(err)
 }
 
-// Selfdestruct6780 would only follow the self destruct steps if account is created
+// Selfdestruct6780 would only follow the self destruct steps if account is a new contract
+// either just created, or address had balance before but got a contract deployed to it (in this tx).
 func (db *StateDB) Selfdestruct6780(addr gethCommon.Address) {
-	if db.IsCreated(addr) {
+	if db.IsNewContract(addr) {
 		db.SelfDestruct(addr)
 	}
 }
@@ -107,7 +126,11 @@ func (db *StateDB) HasSelfDestructed(addr gethCommon.Address) bool {
 }
 
 // SubBalance substitutes the amount from the balance of the given address
-func (db *StateDB) SubBalance(addr gethCommon.Address, amount *big.Int) {
+func (db *StateDB) SubBalance(
+	addr gethCommon.Address,
+	amount *uint256.Int,
+	reason tracing.BalanceChangeReason,
+) {
 	// negative amounts are not accepted.
 	if amount.Sign() < 0 {
 		db.handleError(types.ErrInvalidBalance)
@@ -118,7 +141,11 @@ func (db *StateDB) SubBalance(addr gethCommon.Address, amount *big.Int) {
 }
 
 // AddBalance adds the amount from the balance of the given address
-func (db *StateDB) AddBalance(addr gethCommon.Address, amount *big.Int) {
+func (db *StateDB) AddBalance(
+	addr gethCommon.Address,
+	amount *uint256.Int,
+	reason tracing.BalanceChangeReason,
+) {
 	// negative amounts are not accepted.
 	if amount.Sign() < 0 {
 		db.handleError(types.ErrInvalidBalance)
@@ -129,7 +156,7 @@ func (db *StateDB) AddBalance(addr gethCommon.Address, amount *big.Int) {
 }
 
 // GetBalance returns the balance of the given address
-func (db *StateDB) GetBalance(addr gethCommon.Address) *big.Int {
+func (db *StateDB) GetBalance(addr gethCommon.Address) *uint256.Int {
 	bal, err := db.lastestView().GetBalance(addr)
 	db.handleError(err)
 	return bal
@@ -205,6 +232,24 @@ func (db *StateDB) GetState(addr gethCommon.Address, key gethCommon.Hash) gethCo
 	state, err := db.lastestView().GetState(types.SlotAddress{Address: addr, Key: key})
 	db.handleError(err)
 	return state
+}
+
+// GetStorageRoot returns some sort of root for the given address.
+// Since StateDB doesn't construct a Merkel tree
+// for each account hash of root slab as some sort of root hash.
+//
+// Warning the current behavior is as follow:
+// - if an account doesn't exist it returns common.Hash{}
+// - if account is EOA it returns gethCommon.EmptyRootHash
+// - else it returns a unique hash value as the root but this returned
+// this behavior is acceptable for this version of EVM as the only
+// use case in the EVM right now is here
+// https://github.com/onflow/go-ethereum/blob/37590b2c5579c36d846c788c70861685b0ea240e/core/vm/evm.go#L480
+// where the value that is returned is compared to make sure the storage is empty
+func (db *StateDB) GetStorageRoot(addr common.Address) common.Hash {
+	root, err := db.lastestView().GetStorageRoot(addr)
+	db.handleError(err)
+	return root
 }
 
 // SetState sets a value for the given storage slot
@@ -448,6 +493,17 @@ func (db *StateDB) Reset() {
 // Error returns the memorized database failure occurred earlier.
 func (s *StateDB) Error() error {
 	return wrapError(s.cachedError)
+}
+
+// PointCache method is not support currently.
+func (s *StateDB) PointCache() *utils.PointCache {
+	return nil
+}
+
+// Witness method is not support currently.
+func (s *StateDB) Witness() *stateless.Witness {
+
+	return nil
 }
 
 func (db *StateDB) lastestView() *DeltaView {
