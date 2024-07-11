@@ -124,14 +124,9 @@ func (r *ExecutionResults) ByID(resultID flow.Identifier) (*flow.ExecutionResult
 	return r.byID(resultID)(tx)
 }
 
-func (r *ExecutionResults) ByIDTx(resultID flow.Identifier) func(interface{}) (*flow.ExecutionResult, error) {
-	return func(txinf interface{}) (*flow.ExecutionResult, error) {
-		tx, ok := txinf.(*transaction.Tx)
-		if !ok {
-			return nil, fmt.Errorf("could not cast to *transaction.Tx")
-		}
-		result, err := r.byID(resultID)(tx.DBTxn)
-		return result, err
+func (r *ExecutionResults) ByIDTx(resultID flow.Identifier) func(*transaction.Tx) (*flow.ExecutionResult, error) {
+	return func(tx *transaction.Tx) (*flow.ExecutionResult, error) {
+		return r.byID(resultID)(tx.DBTxn)
 	}
 }
 

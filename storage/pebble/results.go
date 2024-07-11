@@ -9,6 +9,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/badger/transaction"
 	"github.com/onflow/flow-go/storage/pebble/operation"
 )
 
@@ -92,7 +93,7 @@ func (r *ExecutionResults) ByID(resultID flow.Identifier) (*flow.ExecutionResult
 	return r.byID(resultID)(r.db)
 }
 
-func (r *ExecutionResults) ByIDTx(resultID flow.Identifier) func(interface{}) (*flow.ExecutionResult, error) {
+func (r *ExecutionResults) ByIDTx(resultID flow.Identifier) func(*transaction.Tx) (*flow.ExecutionResult, error) {
 	return nil
 }
 
