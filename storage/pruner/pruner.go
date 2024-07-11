@@ -9,7 +9,6 @@ import (
 
 	"github.com/cockroachdb/pebble"
 	"github.com/rs/zerolog"
-	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -23,14 +22,17 @@ type PruneMethod int
 
 const (
 	// PruneByHeight prunes data using finalized block heights
-	// This is useful when a db does not include a view index
+	// This is should be used when a db does not include a view index
 	PruneByHeight PruneMethod = iota + 1
 
 	// PruneByView prunes data using views
 	// This is the simpler and more efficient method, but requires the node to have a view index
 	PruneByView
 
-	DefaultPruneInterval = 5 * time.Second
+	// DefaultPruneInterval is the default interval between pruning cycles
+	DefaultPruneInterval = 5 * time.Minute
+
+	// DefaultThrottleDelay is the default delay between pruning individual blocks
 	DefaultThrottleDelay = 20 * time.Millisecond
 )
 
@@ -98,11 +100,9 @@ func (p *Pruner) Register() *BlockProcessedProducer {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	producer := &BlockProcessedProducer{
-		// Note: since the initial height is 0, pruning will not start until all producers have
-		// completed processing at least one block
-		highestCompleteHeight: atomic.NewUint64(0),
-	}
+	// Note: the initial height is 0 so pruning will not start until all producers have completed
+	// processing at least one block
+	producer := NewBlockProcessedProducer()
 	p.producers = append(p.producers, producer)
 
 	return producer
@@ -126,22 +126,29 @@ func (p *Pruner) baseHeight() uint64 {
 	return lowest
 }
 
+// initProgress initializes the pruned height consumer progress
+// If the progress is not found, it is initialized to the root sealed block height
+// No errors are expected during normal operation.
 func (p *Pruner) initProgress() (uint64, error) {
 	lowestHeight, err := p.progress.ProcessedIndex()
-	if errors.Is(err, storage.ErrNotFound) {
-		err := p.progress.InitProcessedIndex(p.rootSealedHeader.Height)
-		if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
-			return 0, fmt.Errorf("could not init processed index: %w", err)
-		}
-
-		p.log.Warn().
-			Uint64("processed index", lowestHeight).
-			Msg("processed index not found, initialized.")
-
-		lowestHeight = p.rootSealedHeader.Height
+	if err == nil {
+		return lowestHeight, nil
 	}
 
-	return lowestHeight, nil
+	if !errors.Is(err, storage.ErrNotFound) {
+		return 0, fmt.Errorf("could not get processed index: %w", err)
+	}
+
+	err = p.progress.InitProcessedIndex(p.rootSealedHeader.Height)
+	if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
+		return 0, fmt.Errorf("could not init processed index: %w", err)
+	}
+
+	p.log.Warn().
+		Uint64("processed index", lowestHeight).
+		Msg("processed index not found, initialized.")
+
+	return p.progress.ProcessedIndex()
 }
 
 func (p *Pruner) loop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
@@ -172,9 +179,8 @@ func (p *Pruner) loop(ctx irrecoverable.SignalerContext, ready component.ReadyFu
 		// baseHeight is the highest height for which we have completed all processing
 		baseHeight := p.baseHeight()
 		if baseHeight < p.lowestHeader.Height {
-			// this should never happen and means there's a bug.
-			// the lowest fully processed height cannot be lower than the lowest height in the
-			// database
+			// this should never happen and means there's a bug. the lowest fully processed height
+			// cannot be lower than the lowest height in the database
 			ctx.Throw(errors.New("inconsistent state: base height must not be lower than the lowest height"))
 			return
 		}
@@ -201,6 +207,7 @@ func (p *Pruner) loop(ctx irrecoverable.SignalerContext, ready component.ReadyFu
 				return
 			}
 			ctx.Throw(err)
+			return
 		}
 
 		// finally, increment the lowest height
@@ -270,9 +277,10 @@ func (p *Pruner) pruneToView(ctx context.Context, lastView uint64, batch storage
 			}
 			return fmt.Errorf("could not get header for view %d: %w", currentView, err)
 		}
+		headerID := header.ID()
 
-		if err := p.pruneBlock(header.ID(), batch); err != nil {
-			return fmt.Errorf("could not prune block (id: %s): %w", header.ID(), err)
+		if err := p.pruneBlock(headerID, batch); err != nil {
+			return fmt.Errorf("could not prune block (id: %s): %w", headerID, err)
 		}
 
 		// store the recently pruned view as the processed index
