@@ -76,7 +76,7 @@ import (
 	"github.com/onflow/flow-go/module/chainsync"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	exedataprovider "github.com/onflow/flow-go/module/executiondatasync/provider"
-	"github.com/onflow/flow-go/module/executiondatasync/pruner"
+	edpruner "github.com/onflow/flow-go/module/executiondatasync/pruner"
 	"github.com/onflow/flow-go/module/executiondatasync/tracker"
 	"github.com/onflow/flow-go/module/finalizedreader"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
@@ -93,6 +93,7 @@ import (
 	storage "github.com/onflow/flow-go/storage/badger"
 	storagepebble "github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/storage/pebble/procedure"
+	ppruner "github.com/onflow/flow-go/storage/pruner"
 	sutil "github.com/onflow/flow-go/storage/util"
 )
 
@@ -154,7 +155,8 @@ type ExecutionNode struct {
 	toTriggerCheckpoint    *atomic.Bool      // create the checkpoint trigger to be controlled by admin tool, and listened by the compactor
 	stopControl            *stop.StopControl // stop the node at given block height
 	executionDataDatastore *badger.Datastore
-	executionDataPruner    *pruner.Pruner
+	executionDataPruner    *edpruner.Pruner
+	protocolDBPruner       *ppruner.Pruner
 	executionDataBlobstore blobs.Blobstore
 	executionDataTracker   tracker.Storage
 	blobService            network.BlobService
@@ -237,7 +239,8 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 		Component("collection requester engine", exeNode.LoadCollectionRequesterEngine).
 		Component("receipt provider engine", exeNode.LoadReceiptProviderEngine).
 		Component("synchronization engine", exeNode.LoadSynchronizationEngine).
-		Component("grpc server", exeNode.LoadGrpcServer)
+		Component("grpc server", exeNode.LoadGrpcServer).
+		Component("protocoldb pruner", exeNode.LoadProtocolDBPruner)
 }
 
 func (exeNode *ExecutionNode) LoadMutableFollowerState(node *NodeConfig) error {
@@ -1012,15 +1015,15 @@ func (exeNode *ExecutionNode) LoadExecutionDataPruner(
 		prunerMetrics = metrics.NewExecutionDataPrunerCollector()
 	}
 
-	exeNode.executionDataPruner, err = pruner.NewPruner(
+	exeNode.executionDataPruner, err = edpruner.NewPruner(
 		node.Logger,
 		prunerMetrics,
 		exeNode.executionDataTracker,
-		pruner.WithPruneCallback(func(ctx context.Context) error {
+		edpruner.WithPruneCallback(func(ctx context.Context) error {
 			return exeNode.executionDataDatastore.CollectGarbage(ctx)
 		}),
-		pruner.WithHeightRangeTarget(exeNode.exeConf.executionDataPrunerHeightRangeTarget),
-		pruner.WithThreshold(exeNode.exeConf.executionDataPrunerThreshold),
+		edpruner.WithHeightRangeTarget(exeNode.exeConf.executionDataPrunerHeightRangeTarget),
+		edpruner.WithThreshold(exeNode.exeConf.executionDataPrunerThreshold),
 	)
 	return exeNode.executionDataPruner, err
 }
@@ -1145,6 +1148,7 @@ func (exeNode *ExecutionNode) LoadIngestionEngine(
 		node.Tracer,
 		exeNode.exeConf.extensiveLog,
 		exeNode.executionDataPruner,
+		exeNode.protocolDBPruner,
 		exeNode.blockDataUploader,
 		exeNode.stopControl,
 		blockLoader,
@@ -1377,6 +1381,40 @@ func (exeNode *ExecutionNode) LoadGrpcServer(
 		exeNode.exeConf.apiRatelimits,
 		exeNode.exeConf.apiBurstlimits,
 	), nil
+}
+
+func (exeNode *ExecutionNode) LoadProtocolDBPruner(
+	node *NodeConfig,
+) (
+	module.ReadyDoneAware,
+	error,
+) {
+	if !exeNode.exeConf.enableProtocolDBPruner {
+		node.Logger.Info().Msg("protocol db pruner is disabled")
+		return &module.NoopReadyDoneAware{}, nil
+	}
+
+	progress := storagepebble.NewConsumerProgress(node.DB, module.ConsumeProgressProtocolDBPrunerByHeight)
+
+	exeNode.protocolDBPruner = ppruner.New(
+		node.Logger,
+		node.DB,
+		node.Storage.Headers,
+		node.Storage.ChunkDataPacks,
+		node.SealedRootBlock.Header,
+		progress,
+		// TODO: make these configurable with higher defaults
+		100,
+		10,
+	)
+
+	// configure default producer, which notifies about sealed blocks.
+	// Note: we must use sealed blocks instead of finalized to ensure unsealed finalized blocks are
+	// never pruned even in the event of a prolonged sealing halt.
+	sealedBlocksProducer := ppruner.NewSealedBlocksProducer(node.State, exeNode.protocolDBPruner.Register())
+	node.ProtocolEvents.AddConsumer(sealedBlocksProducer)
+
+	return exeNode.protocolDBPruner, nil
 }
 
 func (exeNode *ExecutionNode) LoadBootstrapper(node *NodeConfig) error {
