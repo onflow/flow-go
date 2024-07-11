@@ -379,7 +379,7 @@ func findHighestAtOrBelow(
 
 		key := append(prefix, b(height)...)
 		it, err := r.NewIter(&pebble.IterOptions{
-			UpperBound: append(key, 0xFF),
+			UpperBound: append(key, ffBytes...),
 		})
 		if err != nil {
 			return fmt.Errorf("can not create iterator: %w", err)
