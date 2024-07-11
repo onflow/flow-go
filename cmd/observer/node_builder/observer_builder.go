@@ -1803,7 +1803,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 				builder.Logger,
 				node.Storage.VersionBeacons,
 				nodeVersion,
-				builder.FinalizedRootBlock.Header.Height,
+				builder.SealedRootBlock.Header.Height,
 				builder.LastFinalizedHeader.Height,
 			)
 			if err != nil {

@@ -59,8 +59,8 @@ type VersionControl struct {
 	// lastProcessedHeight the last handled block height
 	lastProcessedHeight *atomic.Uint64
 
-	// finalizedRootBlockHeight the last finalized block height when node bootstrapped
-	finalizedRootBlockHeight *atomic.Uint64
+	// sealedRootBlockHeight the last sealed block height when node bootstrapped
+	sealedRootBlockHeight *atomic.Uint64
 
 	// startHeight and endHeight define the height boundaries for version compatibility.
 	startHeight *atomic.Uint64
@@ -78,7 +78,7 @@ func NewVersionControl(
 	log zerolog.Logger,
 	versionBeacons storage.VersionBeacons,
 	nodeVersion *semver.Version,
-	finalizedRootBlockHeight uint64,
+	sealedRootBlockHeight uint64,
 	latestFinalizedBlockHeight uint64,
 ) (*VersionControl, error) {
 
@@ -87,14 +87,14 @@ func NewVersionControl(
 			Str("component", "version_control").
 			Logger(),
 
-		nodeVersion:              nodeVersion,
-		versionBeacons:           versionBeacons,
-		finalizedRootBlockHeight: atomic.NewUint64(finalizedRootBlockHeight),
-		lastProcessedHeight:      atomic.NewUint64(latestFinalizedBlockHeight),
-		finalizedHeight:          counters.NewMonotonousCounter(latestFinalizedBlockHeight),
-		finalizedHeightNotifier:  engine.NewNotifier(),
-		startHeight:              atomic.NewUint64(NoHeight),
-		endHeight:                atomic.NewUint64(NoHeight),
+		nodeVersion:             nodeVersion,
+		versionBeacons:          versionBeacons,
+		sealedRootBlockHeight:   atomic.NewUint64(sealedRootBlockHeight),
+		lastProcessedHeight:     atomic.NewUint64(latestFinalizedBlockHeight),
+		finalizedHeight:         counters.NewMonotonousCounter(latestFinalizedBlockHeight),
+		finalizedHeightNotifier: engine.NewNotifier(),
+		startHeight:             atomic.NewUint64(NoHeight),
+		endHeight:               atomic.NewUint64(NoHeight),
 	}
 
 	if vc.nodeVersion == nil {
@@ -131,17 +131,13 @@ func (v *VersionControl) checkInitialVersionBeacon(
 //
 // It searches through version beacons to find the start and end block heights
 // for the current node version. The search continues until the start height
-// is found or until the finalized root block height is reached.
+// is found or until the sealed root block height is reached.
 //
-// Parameters:
-// - ctx: an irrecoverable.SignalerContext for error signaling.
-// - finalizedRootBlockHeight: the finalized root block height.
-//
-// Returns an error if initialization fails.
+// Returns an error when could not get the highest version beacon event
 func (v *VersionControl) initBoundaries(
 	ctx irrecoverable.SignalerContext,
 ) error {
-	finalizedRootBlockHeight := v.finalizedRootBlockHeight.Load()
+	sealedRootBlockHeight := v.sealedRootBlockHeight.Load()
 	latestHeight := v.lastProcessedHeight.Load()
 	processedHeight := latestHeight
 
@@ -205,11 +201,11 @@ func (v *VersionControl) initBoundaries(
 			}
 		}
 
-		// The search should continue until we find the start height or reach the finalized root block height
-		if v.startHeight.Load() == NoHeight && processedHeight <= finalizedRootBlockHeight {
+		// The search should continue until we find the start height or reach the sealed root block height
+		if v.startHeight.Load() == NoHeight && processedHeight <= sealedRootBlockHeight {
 			v.log.Info().
 				Uint64("processedHeight", processedHeight).
-				Uint64("finalizedRootBlockHeight", finalizedRootBlockHeight).
+				Uint64("sealedRootBlockHeight", sealedRootBlockHeight).
 				Msg("No start version beacon event found")
 			return nil
 		}
@@ -229,10 +225,10 @@ func (v *VersionControl) BlockFinalized(h *flow.Header) {
 // Returns expected errors:
 // - ErrOutOfRange if incoming block height is higher that last handled block height
 func (v *VersionControl) CompatibleAtBlock(height uint64) (bool, error) {
-	// Check, if the height smaller than finalized root block height. If so, return an error indicating that the height is unhandled.
-	finalizedRootHeight := v.finalizedRootBlockHeight.Load()
-	if height < finalizedRootHeight {
-		return false, fmt.Errorf("could not check compatibility for height %d: the provided height is smaller than finalized root height %d: %w", height, finalizedRootHeight, ErrOutOfRange)
+	// Check, if the height smaller than sealed root block height. If so, return an error indicating that the height is unhandled.
+	sealedRootHeight := v.sealedRootBlockHeight.Load()
+	if height < sealedRootHeight {
+		return false, fmt.Errorf("could not check compatibility for height %d: the provided height is smaller than sealed root height %d: %w", height, sealedRootHeight, ErrOutOfRange)
 	}
 
 	// Check if the height is greater than the last handled block height. If so, return an error indicating that the height is unhandled.
