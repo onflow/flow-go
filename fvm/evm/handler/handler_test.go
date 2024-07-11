@@ -16,6 +16,7 @@ import (
 	gethCommon "github.com/onflow/go-ethereum/common"
 	gethCore "github.com/onflow/go-ethereum/core"
 	gethTypes "github.com/onflow/go-ethereum/core/types"
+	"github.com/onflow/go-ethereum/core/vm"
 	gethVM "github.com/onflow/go-ethereum/core/vm"
 	gethParams "github.com/onflow/go-ethereum/params"
 	"github.com/onflow/go-ethereum/rlp"
@@ -1128,8 +1129,12 @@ func TestHandler_TransactionRun(t *testing.T) {
 						RunTransactionFunc: func(tx *gethTypes.Transaction) (*types.Result, error) {
 							tr := tracer.TxTracer()
 							// mock some calls
-							// tr.CaptureTxStart(100)
-							// tr.CaptureTxEnd(60)
+							from := eoa.Address().ToCommon()
+							tr.OnTxStart(nil, tx, from)
+							tr.OnEnter(0, byte(vm.ADD), from, *tx.To(), tx.Data(), 20, big.NewInt(2))
+							tr.OnExit(0, []byte{0x02}, 200, nil, false)
+							tr.OnTxEnd(result.Receipt(), nil)
+
 							traceResult, err = tr.GetResult()
 							require.NoError(t, err)
 							return result, nil
