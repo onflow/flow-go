@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
+
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -14,12 +16,20 @@ import (
 )
 
 // AccountUsageMigration iterates through each payload, and calculate the storage usage
-// and update the accounts status with the updated storage usage
+// and update the accounts status with the updated storage usage. It also upgrades the
+// account status registers to the latest version.
 type AccountUsageMigration struct {
 	log zerolog.Logger
+	rw  reporters.ReportWriter
 }
 
 var _ AccountBasedMigration = &AccountUsageMigration{}
+
+func NewAccountUsageMigration(rw reporters.ReportWriterFactory) *AccountUsageMigration {
+	return &AccountUsageMigration{
+		rw: rw.ReportWriter("account-usage-migration"),
+	}
+}
 
 func (m *AccountUsageMigration) InitMigration(
 	log zerolog.Logger,
@@ -29,8 +39,6 @@ func (m *AccountUsageMigration) InitMigration(
 	m.log = log.With().Str("component", "AccountUsageMigration").Logger()
 	return nil
 }
-
-const oldAccountStatusSize = 25
 
 func (m *AccountUsageMigration) Close() error {
 	return nil
@@ -44,7 +52,7 @@ func (m *AccountUsageMigration) MigrateAccount(
 
 	var status *environment.AccountStatus
 	var statusValue []byte
-	actualSize := uint64(0)
+	actualUsed := uint64(0)
 
 	// Find the account status register,
 	// and calculate the storage usage
@@ -60,7 +68,7 @@ func (m *AccountUsageMigration) MigrateAccount(
 			}
 		}
 
-		actualSize += uint64(environment.RegisterSize(
+		actualUsed += uint64(environment.RegisterSize(
 			flow.RegisterID{
 				Owner: owner,
 				Key:   key,
@@ -82,58 +90,57 @@ func (m *AccountUsageMigration) MigrateAccount(
 		log.Error().
 			Str("account", address.HexWithPrefix()).
 			Msgf("could not find account status register")
-		return nil
+		return fmt.Errorf("could not find account status register")
 	}
 
-	isOldVersionOfStatusRegister := len(statusValue) == oldAccountStatusSize
+	// reading the status will upgrade the status to the latest version, so it might
+	// have a different size than the one in the register
+	newStatusValue := status.ToBytes()
+	statusSizeDiff := len(newStatusValue) - len(statusValue)
 
-	same := m.compareUsage(isOldVersionOfStatusRegister, status, actualSize, address)
-	if same {
-		// there is no problem with the usage, return
-		return nil
+	// the status size diff should be added to the actual size
+	if statusSizeDiff < 0 {
+		if uint64(-statusSizeDiff) > actualUsed {
+			log.Error().
+				Str("account", address.HexWithPrefix()).
+				Msgf("account storage used would be negative")
+			return nil
+		}
+
+		actualUsed = actualUsed - uint64(-statusSizeDiff)
+	} else if statusSizeDiff > 0 {
+		actualUsed = actualUsed + uint64(statusSizeDiff)
 	}
 
-	if isOldVersionOfStatusRegister {
-		// size will grow by 8 bytes because of the on-the-fly
-		// migration of account status in AccountStatusFromBytes
-		actualSize += 8
-	}
+	currentUsed := status.StorageUsed()
 
-	// update storage used
-	status.SetStorageUsed(actualSize)
+	// update storage used if the actual size is different from the size in the status register
+	// or if the status size is different.
+	if actualUsed != currentUsed || statusSizeDiff != 0 {
+		// update storage used
+		status.SetStorageUsed(actualUsed)
 
-	err = accountRegisters.Set(
-		string(address[:]),
-		flow.AccountStatusKey,
-		status.ToBytes(),
-	)
-	if err != nil {
-		return fmt.Errorf("could not update account status register: %w", err)
+		err = accountRegisters.Set(
+			string(address[:]),
+			flow.AccountStatusKey,
+			status.ToBytes(),
+		)
+		if err != nil {
+			return fmt.Errorf("could not update account status register: %w", err)
+		}
+
+		m.rw.Write(accountUsageMigrationReportData{
+			AccountAddress: address,
+			OldStorageUsed: currentUsed,
+			NewStorageUsed: actualUsed,
+		})
 	}
 
 	return nil
 }
 
-func (m *AccountUsageMigration) compareUsage(
-	isOldVersionOfStatusRegister bool,
-	status *environment.AccountStatus,
-	actualSize uint64,
-	address common.Address,
-) bool {
-	oldSize := status.StorageUsed()
-	if isOldVersionOfStatusRegister {
-		// size will be reported as 8 bytes larger than the actual size due to on-the-fly
-		// migration of account status in AccountStatusFromBytes
-		oldSize -= 8
-	}
-
-	if oldSize != actualSize {
-		m.log.Warn().
-			Uint64("old_size", oldSize).
-			Uint64("new_size", actualSize).
-			Str("account", address.HexWithPrefix()).
-			Msg("account storage used usage mismatch")
-		return false
-	}
-	return true
+type accountUsageMigrationReportData struct {
+	AccountAddress common.Address
+	OldStorageUsed uint64
+	NewStorageUsed uint64
 }
