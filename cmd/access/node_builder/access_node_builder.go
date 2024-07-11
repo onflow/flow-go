@@ -927,45 +927,43 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				indexerDependable.Init(builder.ExecutionIndexer)
 
 				return builder.ExecutionIndexer, nil
-			}, builder.IndexerDependencies,
-			).DependableComponent("execution data pruner", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			if builder.executionDataPrunerHeightRangeTarget == 0 {
-				return &module.NoopReadyDoneAware{}, nil
-			}
+			}, builder.IndexerDependencies).
+			DependableComponent("execution data pruner", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+				if builder.executionDataPrunerHeightRangeTarget == 0 {
+					return &module.NoopReadyDoneAware{}, nil
+				}
 
-			builder.ExecutionIndexer.AddOnBlockHeaderReceivedConsumer(func(header *flow.Header) {
-				if builder.ExecutionDataPruner != nil {
+				var prunerMetrics module.ExecutionDataPrunerMetrics = metrics.NewNoopCollector()
+				if node.MetricsEnabled {
+					prunerMetrics = metrics.NewExecutionDataPrunerCollector()
+				}
+
+				var err error
+				builder.ExecutionDataPruner, err = pruner.NewPruner(
+					node.Logger,
+					prunerMetrics,
+					builder.ExecutionDataTracker,
+					pruner.WithPruneCallback(func(ctx context.Context) error {
+						return builder.ExecutionDataDatastore.CollectGarbage(ctx)
+					}),
+					pruner.WithHeightRangeTarget(builder.executionDataPrunerHeightRangeTarget),
+					pruner.WithThreshold(builder.executionDataPrunerThreshold),
+				)
+				if err != nil {
+					return nil, fmt.Errorf("failed to create execution data pruner: %w", err)
+				}
+
+				builder.ExecutionIndexer.AddOnBlockHeaderReceivedConsumer(func(header *flow.Header) {
 					err := builder.ExecutionDataTracker.SetFulfilledHeight(header.Height)
 					if err != nil {
 						node.Logger.Fatal().Err(err).Msg("failed to set fulfilled height")
 					}
 
 					builder.ExecutionDataPruner.NotifyFulfilledHeight(header.Height)
-				}
-			})
+				})
 
-			var prunerMetrics module.ExecutionDataPrunerMetrics = metrics.NewNoopCollector()
-			if node.MetricsEnabled {
-				prunerMetrics = metrics.NewExecutionDataPrunerCollector()
-			}
-
-			var err error
-			builder.ExecutionDataPruner, err = pruner.NewPruner(
-				node.Logger,
-				prunerMetrics,
-				builder.ExecutionDataTracker,
-				pruner.WithPruneCallback(func(ctx context.Context) error {
-					return builder.ExecutionDataDatastore.CollectGarbage(ctx)
-				}),
-				pruner.WithHeightRangeTarget(builder.executionDataPrunerHeightRangeTarget),
-				pruner.WithThreshold(builder.executionDataPrunerThreshold),
-			)
-			if err != nil {
-				return nil, fmt.Errorf("failed to create execution data pruner: %w", err)
-			}
-
-			return builder.ExecutionDataPruner, nil
-		}, prunerDependencies)
+				return builder.ExecutionDataPruner, nil
+			}, prunerDependencies)
 	}
 
 	if builder.stateStreamConf.ListenAddr != "" {
