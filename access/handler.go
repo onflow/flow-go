@@ -582,6 +582,10 @@ func (h *Handler) GetAccountAtBlockHeight(
 }
 
 // GetAccountBalanceAtLatestBlock returns an account balance by address at the latest sealed block.
+//
+// Expected errors during normal operation:
+// - codes.InvalidArgument - if invalid account address provided.
+// - codes.Internal - if failed to get account from the execution node or failed to convert account message.
 func (h *Handler) GetAccountBalanceAtLatestBlock(
 	ctx context.Context,
 	req *access.GetAccountBalanceAtLatestBlockRequest,
@@ -608,6 +612,11 @@ func (h *Handler) GetAccountBalanceAtLatestBlock(
 }
 
 // GetAccountBalanceAtBlockHeight returns an account balance by address at the given block height.
+//
+// Expected errors during normal operation:
+// - codes.InvalidArgument - if invalid account address provided.
+// - codes.Internal - if failed to get account from the execution node or failed to convert account message.
+
 func (h *Handler) GetAccountBalanceAtBlockHeight(
 	ctx context.Context,
 	req *access.GetAccountBalanceAtBlockHeightRequest,
@@ -634,6 +643,10 @@ func (h *Handler) GetAccountBalanceAtBlockHeight(
 }
 
 // GetAccountKeyAtLatestBlock returns an account public key by address and key index at the latest sealed block.
+//
+// Expected errors during normal operation:
+// - codes.InvalidArgument - if invalid account address provided.
+// - codes.Internal - if failed to get account from the execution node, ailed to convert account message or failed to encode account key.
 func (h *Handler) GetAccountKeyAtLatestBlock(
 	ctx context.Context,
 	req *access.GetAccountKeyAtLatestBlockRequest,
@@ -665,6 +678,11 @@ func (h *Handler) GetAccountKeyAtLatestBlock(
 }
 
 // GetAccountKeysAtLatestBlock returns an account public keys by address at the latest sealed block.
+// GetAccountKeyAtLatestBlock returns an account public key by address and key index at the latest sealed block.
+//
+// Expected errors during normal operation:
+// - codes.InvalidArgument - if invalid account address provided.
+// - codes.Internal - if failed to get account from the execution node, ailed to convert account message or failed to encode account key.
 func (h *Handler) GetAccountKeysAtLatestBlock(
 	ctx context.Context,
 	req *access.GetAccountKeysAtLatestBlockRequest,
@@ -702,6 +720,11 @@ func (h *Handler) GetAccountKeysAtLatestBlock(
 }
 
 // GetAccountKeyAtBlockHeight returns an account public keys by address and key index at the given block height.
+// GetAccountKeyAtLatestBlock returns an account public key by address and key index at the latest sealed block.
+//
+// Expected errors during normal operation:
+// - codes.InvalidArgument - if invalid account address provided.
+// - codes.Internal - if failed to get account from the execution node, ailed to convert account message or failed to encode account key.
 func (h *Handler) GetAccountKeyAtBlockHeight(
 	ctx context.Context,
 	req *access.GetAccountKeyAtBlockHeightRequest,
@@ -733,6 +756,11 @@ func (h *Handler) GetAccountKeyAtBlockHeight(
 }
 
 // GetAccountKeysAtBlockHeight returns an account public keys by address at the given block height.
+// GetAccountKeyAtLatestBlock returns an account public key by address and key index at the latest sealed block.
+//
+// Expected errors during normal operation:
+// - codes.InvalidArgument - if invalid account address provided.
+// - codes.Internal - if failed to get account from the execution node, ailed to convert account message or failed to encode account key.
 func (h *Handler) GetAccountKeysAtBlockHeight(
 	ctx context.Context,
 	req *access.GetAccountKeysAtBlockHeightRequest,
