@@ -73,7 +73,7 @@ func TestNativeTokenBridging(t *testing.T) {
 
 						retBalance, err = blk.BalanceOf(bridgeAccount)
 						require.NoError(t, err)
-						require.Equal(t, big.NewInt(0), retBalance)
+						require.Equal(t, big.NewInt(0).Uint64(), retBalance.Uint64())
 					})
 				})
 			})
@@ -105,7 +105,7 @@ func TestNativeTokenBridging(t *testing.T) {
 
 						retBalance, err = blk.BalanceOf(bridgeAccount)
 						require.NoError(t, err)
-						require.Equal(t, big.NewInt(0), retBalance)
+						require.Equal(t, big.NewInt(0).Uint64(), retBalance.Uint64())
 					})
 				})
 			})
@@ -660,7 +660,7 @@ func TestSelfdestruct(t *testing.T) {
 
 						bal, err = blk.BalanceOf(contractAddr)
 						require.NoError(t, err)
-						require.Equal(t, big.NewInt(0), bal)
+						require.Equal(t, big.NewInt(0).Uint64(), bal.Uint64())
 
 						nonce, err := blk.NonceOf(contractAddr)
 						require.NoError(t, err)
