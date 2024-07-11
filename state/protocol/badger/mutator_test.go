@@ -2431,6 +2431,10 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 	})
 }
 
+// TestEpochTargetEndTime ensurers that the target end time of an epoch is correctly calculated depending on if the epoch is extended or not.
+// When we haven't added an extension yet, then the TargetEndTime is simply the value from epoch setup event.
+// Otherwise, the TargetEndTime is calculated by adding the duration of the extension to the TargetEndTime of epoch setup.
+// We assume we keep the same view duration for all views in the epoch and all extensions.
 func TestEpochTargetEndTime(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
 	util.RunWithFullProtocolStateAndMutator(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState, mutableProtocolState realprotocol.MutableProtocolState) {
@@ -2446,13 +2450,13 @@ func TestEpochTargetEndTime(t *testing.T) {
 
 		calculateExpectedStateId := calculateExpectedStateId(t, mutableProtocolState)
 
-		// add a block for the first seal to reference
+		// add a block that will trigger EFM and add an epoch extension since the view of the epoch exceeds the safety threshold
 		block1 := unittest.BlockWithParentFixture(head)
 		block1.Header.View = epoch1Setup.FinalView
 		block1.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(calculateExpectedStateId(block1.Header, nil))))
 		unittest.InsertAndFinalize(t, state, block1)
 
-		assertEpochFallbackTriggered(t, state.Final(), true) // finalizing block 1 should have triggered EFM since it must reach safety threshold
+		assertEpochFallbackTriggered(t, state.Final(), true)
 		assertInPhase(t, state.Final(), flow.EpochPhaseFallback)
 
 		epochState, err := state.Final().EpochProtocolState()
@@ -2464,6 +2468,7 @@ func TestEpochTargetEndTime(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, expectedTargetEndTime, afterFirstExtensionTargetEndTime)
 
+		// add a second block that exceeds the safety threshold and triggers another epoch extension
 		block2 := unittest.BlockWithParentFixture(block1.Header)
 		block2.Header.View = firstExtension.FinalView
 		block2.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(calculateExpectedStateId(block2.Header, nil))))
