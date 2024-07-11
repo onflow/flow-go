@@ -26,7 +26,7 @@ func NewLightTransactionResults(collector module.CacheMetrics, db *badger.DB, tr
 		var txResult flow.LightTransactionResult
 		return func(tx *badger.Txn) (flow.LightTransactionResult, error) {
 
-			blockID, txID, err := KeyToBlockIDTransactionID(key)
+			blockID, txID, err := storage.KeyToBlockIDTransactionID(key)
 			if err != nil {
 				return flow.LightTransactionResult{}, fmt.Errorf("could not convert key: %w", err)
 			}
@@ -42,7 +42,7 @@ func NewLightTransactionResults(collector module.CacheMetrics, db *badger.DB, tr
 		var txResult flow.LightTransactionResult
 		return func(tx *badger.Txn) (flow.LightTransactionResult, error) {
 
-			blockID, txIndex, err := KeyToBlockIDIndex(key)
+			blockID, txIndex, err := storage.KeyToBlockIDIndex(key)
 			if err != nil {
 				return flow.LightTransactionResult{}, fmt.Errorf("could not convert index key: %w", err)
 			}
@@ -58,7 +58,7 @@ func NewLightTransactionResults(collector module.CacheMetrics, db *badger.DB, tr
 		var txResults []flow.LightTransactionResult
 		return func(tx *badger.Txn) ([]flow.LightTransactionResult, error) {
 
-			blockID, err := KeyToBlockID(key)
+			blockID, err := storage.KeyToBlockID(key)
 			if err != nil {
 				return nil, fmt.Errorf("could not convert index key: %w", err)
 			}
@@ -107,17 +107,17 @@ func (tr *LightTransactionResults) BatchStore(blockID flow.Identifier, transacti
 
 	batch.OnSucceed(func() {
 		for i, result := range transactionResults {
-			key := KeyFromBlockIDTransactionID(blockID, result.TransactionID)
+			key := storage.KeyFromBlockIDTransactionID(blockID, result.TransactionID)
 			// cache for each transaction, so that it's faster to retrieve
 			tr.cache.Insert(key, result)
 
 			index := uint32(i)
 
-			keyIndex := KeyFromBlockIDIndex(blockID, index)
+			keyIndex := storage.KeyFromBlockIDIndex(blockID, index)
 			tr.indexCache.Insert(keyIndex, result)
 		}
 
-		key := KeyFromBlockID(blockID)
+		key := storage.KeyFromBlockID(blockID)
 		tr.blockCache.Insert(key, transactionResults)
 	})
 	return nil
@@ -127,7 +127,7 @@ func (tr *LightTransactionResults) BatchStore(blockID flow.Identifier, transacti
 func (tr *LightTransactionResults) ByBlockIDTransactionID(blockID flow.Identifier, txID flow.Identifier) (*flow.LightTransactionResult, error) {
 	tx := tr.db.NewTransaction(false)
 	defer tx.Discard()
-	key := KeyFromBlockIDTransactionID(blockID, txID)
+	key := storage.KeyFromBlockIDTransactionID(blockID, txID)
 	transactionResult, err := tr.cache.Get(key)(tx)
 	if err != nil {
 		return nil, err
@@ -139,7 +139,7 @@ func (tr *LightTransactionResults) ByBlockIDTransactionID(blockID flow.Identifie
 func (tr *LightTransactionResults) ByBlockIDTransactionIndex(blockID flow.Identifier, txIndex uint32) (*flow.LightTransactionResult, error) {
 	tx := tr.db.NewTransaction(false)
 	defer tx.Discard()
-	key := KeyFromBlockIDIndex(blockID, txIndex)
+	key := storage.KeyFromBlockIDIndex(blockID, txIndex)
 	transactionResult, err := tr.indexCache.Get(key)(tx)
 	if err != nil {
 		return nil, err
@@ -151,7 +151,7 @@ func (tr *LightTransactionResults) ByBlockIDTransactionIndex(blockID flow.Identi
 func (tr *LightTransactionResults) ByBlockID(blockID flow.Identifier) ([]flow.LightTransactionResult, error) {
 	tx := tr.db.NewTransaction(false)
 	defer tx.Discard()
-	key := KeyFromBlockID(blockID)
+	key := storage.KeyFromBlockID(blockID)
 	transactionResults, err := tr.blockCache.Get(key)(tx)
 	if err != nil {
 		return nil, err

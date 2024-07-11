@@ -9,9 +9,6 @@ import (
 // Seals represents persistent storage for seals.
 type Seals interface {
 
-	// Store inserts the seal.
-	Store(seal *flow.Seal) error
-
 	// ByID retrieves the seal by the collection
 	// fingerprint.
 	ByID(sealID flow.Identifier) (*flow.Seal, error)
