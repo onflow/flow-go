@@ -8,8 +8,6 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/onflow/cadence/runtime/common"
-
 	"github.com/onflow/cadence/encoding/ccf"
 	gethTypes "github.com/onflow/go-ethereum/core/types"
 	gethParams "github.com/onflow/go-ethereum/params"
@@ -119,16 +117,8 @@ func TestEVMRun(t *testing.T) {
 				require.NotEmpty(t, blockEventPayload.Hash)
 				require.Equal(t, uint64(43785), blockEventPayload.TotalGasUsed)
 				require.NotEmpty(t, blockEventPayload.Hash)
-
-				assert.Equal(
-					t,
-					common.NewAddressLocation(
-						nil,
-						common.Address(sc.EVMContract.Address),
-						string(types.EventTypeTransactionExecuted),
-					).ID(),
-					string(txEvent.Type),
-				)
+				require.Len(t, blockEventPayload.TransactionHashes, 1)
+				require.NotEmpty(t, blockEventPayload.ReceiptRoot)
 
 				txEventPayload := testutils.TxEventToPayload(t, txEvent, sc.EVMContract.Address)
 				require.NotEmpty(t, txEventPayload.Hash)
@@ -505,6 +495,7 @@ func TestEVMBatchRun(t *testing.T) {
 
 				require.NotEmpty(t, blockEventPayload.Hash)
 				require.Equal(t, uint64(155513), blockEventPayload.TotalGasUsed)
+				require.Len(t, blockEventPayload.TransactionHashes, 5)
 
 				// retrieve the values
 				retrieveCode := []byte(fmt.Sprintf(
