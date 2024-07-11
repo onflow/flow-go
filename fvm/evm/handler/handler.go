@@ -213,7 +213,7 @@ func (h *ContractHandler) batchRun(rlpEncodedTxs [][]byte, coinbase types.Addres
 	}
 
 	// if there were no valid transactions skip emitting events
-	// and commiting a new block
+	// and committing a new block
 	if len(bp.TransactionHashes) == 0 {
 		return res, nil
 	}
@@ -317,14 +317,16 @@ func (h *ContractHandler) run(
 		return res, nil
 	}
 
-	// step 3 - update block proposal
+	// step 3 - update the block proposal
 	bp, err := h.blockStore.BlockProposal()
 	if err != nil {
 		return nil, err
 	}
-
-	// append tx to the block proposal
 	bp.AppendTransaction(res)
+	err = h.blockStore.UpdateBlockProposal(bp)
+	if err != nil {
+		return nil, err
+	}
 
 	// step 4 - emit events
 	err = h.emitEvent(types.NewTransactionEvent(res, rlpEncodedTx, bp.Height))
@@ -332,12 +334,7 @@ func (h *ContractHandler) run(
 		return nil, err
 	}
 
-	// update the block proposal
-	err = h.blockStore.UpdateBlockProposal(bp)
-	if err != nil {
-		return nil, err
-	}
-
+	// step 5 - collect traces
 	h.tracer.Collect(res.TxHash)
 	return res, nil
 }
@@ -475,7 +472,7 @@ func (h *ContractHandler) executeAndHandleCall(
 		return nil, err
 	}
 
-	// saftey check for result
+	// safety check for result
 	if res == nil {
 		return nil, types.ErrUnexpectedEmptyResult
 	}
@@ -511,6 +508,12 @@ func (h *ContractHandler) executeAndHandleCall(
 		}
 	}
 
+	// update the block proposal
+	err = h.blockStore.UpdateBlockProposal(bp)
+	if err != nil {
+		return nil, err
+	}
+
 	// emit events
 	encoded, err := call.Encode()
 	if err != nil {
@@ -524,12 +527,7 @@ func (h *ContractHandler) executeAndHandleCall(
 		return nil, err
 	}
 
-	// update the block proposal
-	err = h.blockStore.UpdateBlockProposal(bp)
-	if err != nil {
-		return nil, err
-	}
-
+	// collect traces
 	h.tracer.Collect(res.TxHash)
 	return res, nil
 }
