@@ -111,8 +111,7 @@ func TestEVMRun(t *testing.T) {
 				txEvent := output.Events[0]
 
 				// commit block
-				var blockEventPayload *types.BlockEventPayload
-				blockEventPayload, snapshot = callEVMHeartBeat(t,
+				blockEventPayload, snapshot := callEVMHeartBeat(t,
 					ctx,
 					vm,
 					snapshot)
@@ -131,13 +130,7 @@ func TestEVMRun(t *testing.T) {
 					string(txEvent.Type),
 				)
 
-				ev, err := ccf.Decode(nil, txEvent.Payload)
-				require.NoError(t, err)
-				cadenceEvent, ok := ev.(cadence.Event)
-				require.True(t, ok)
-
-				txEventPayload, err := types.DecodeTransactionEventPayload(cadenceEvent)
-				require.NoError(t, err)
+				txEventPayload := testutils.TxEventToPayload(t, txEvent, sc.EVMContract.Address)
 				require.NotEmpty(t, txEventPayload.Hash)
 				require.Equal(t, hex.EncodeToString(innerTxBytes), txEventPayload.Payload)
 				require.Equal(t, uint16(types.ErrCodeNoError), txEventPayload.ErrorCode)
@@ -375,16 +368,11 @@ func TestEVMRun(t *testing.T) {
 				require.NotEmpty(t, state.WriteSet)
 
 				txEvent := output.Events[0]
-				ev, err := ccf.Decode(nil, txEvent.Payload)
-				require.NoError(t, err)
-				cadenceEvent, ok := ev.(cadence.Event)
-				require.True(t, ok)
+				txEventPayload := testutils.TxEventToPayload(t, txEvent, sc.EVMContract.Address)
 
-				event, err := types.DecodeTransactionEventPayload(cadenceEvent)
-				require.NoError(t, err)
-				require.NotEmpty(t, event.Hash)
+				require.NotEmpty(t, txEventPayload.Hash)
 
-				encodedLogs, err := hex.DecodeString(event.Logs)
+				encodedLogs, err := hex.DecodeString(txEventPayload.Logs)
 				require.NoError(t, err)
 
 				var logs []*gethTypes.Log
@@ -2560,25 +2548,7 @@ func callEVMHeartBeat(
 	// validate block event
 	require.Len(t, output.Events, 1)
 	blockEvent := output.Events[0]
-
-	assert.Equal(
-		t,
-		common.NewAddressLocation(
-			nil,
-			common.Address(sc.EVMContract.Address),
-			string(types.EventTypeBlockExecuted),
-		).ID(),
-		string(blockEvent.Type),
-	)
-
-	ev, err := ccf.Decode(nil, blockEvent.Payload)
-	require.NoError(t, err)
-	cadenceEvent, ok := ev.(cadence.Event)
-	require.True(t, ok)
-
-	blockEventPayload, err := types.DecodeBlockEventPayload(cadenceEvent)
-	require.NoError(t, err)
-	return blockEventPayload, snap
+	return BlockEventToPayload(t, blockEvent, sc.EVMContract.Address), snap
 }
 
 func getFlowAccountBalance(
