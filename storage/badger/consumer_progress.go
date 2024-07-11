@@ -5,8 +5,11 @@ import (
 
 	"github.com/dgraph-io/badger/v2"
 
+	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
 )
+
+var _ storage.ConsumerProgress = (*ConsumerProgress)(nil)
 
 type ConsumerProgress struct {
 	db       *badger.DB
@@ -47,4 +50,8 @@ func (cp *ConsumerProgress) SetProcessedIndex(processed uint64) error {
 	}
 
 	return nil
+}
+
+func (cp *ConsumerProgress) Consumer() string {
+	return cp.consumer
 }

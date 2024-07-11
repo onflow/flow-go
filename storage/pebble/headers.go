@@ -83,6 +83,14 @@ func (h *Headers) retrieveIdByHeightTx(height uint64) func(pebble.Reader) (flow.
 	return h.heightCache.Get(height)
 }
 
+func (h *Headers) retrieveIdByViewTx(view uint64) func(pebble.Reader) (flow.Identifier, error) {
+	return func(r pebble.Reader) (flow.Identifier, error) {
+		var id flow.Identifier
+		err := operation.LookupViewBlock(view, &id)(r)
+		return id, err
+	}
+}
+
 func (h *Headers) Store(header *flow.Header) error {
 	return operation.WithReaderBatchWriter(h.db, h.storePebble(header.ID(), header))
 }
@@ -93,6 +101,14 @@ func (h *Headers) ByBlockID(blockID flow.Identifier) (*flow.Header, error) {
 
 func (h *Headers) ByHeight(height uint64) (*flow.Header, error) {
 	blockID, err := h.retrieveIdByHeightTx(height)(h.db)
+	if err != nil {
+		return nil, err
+	}
+	return h.retrieveTx(blockID)(h.db)
+}
+
+func (h *Headers) ByView(view uint64) (*flow.Header, error) {
+	blockID, err := h.retrieveIdByViewTx(view)(h.db)
 	if err != nil {
 		return nil, err
 	}

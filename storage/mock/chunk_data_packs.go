@@ -54,6 +54,20 @@ func (_m *ChunkDataPacks) ByChunkID(chunkID flow.Identifier) (*flow.ChunkDataPac
 	return r0, r1
 }
 
+// Prune provides a mock function with given fields: blockID, batch
+func (_m *ChunkDataPacks) Prune(blockID flow.Identifier, batch storage.BatchStorage) error {
+	ret := _m.Called(blockID, batch)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(flow.Identifier, storage.BatchStorage) error); ok {
+		r0 = rf(blockID, batch)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // Remove provides a mock function with given fields: cs
 func (_m *ChunkDataPacks) Remove(cs []flow.Identifier) error {
 	ret := _m.Called(cs)

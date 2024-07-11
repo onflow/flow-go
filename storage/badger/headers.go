@@ -100,6 +100,9 @@ func (h *Headers) ByBlockID(blockID flow.Identifier) (*flow.Header, error) {
 	defer tx.Discard()
 	return h.retrieveTx(blockID)(tx)
 }
+func (h *Headers) ByView(view uint64) (*flow.Header, error) {
+	return nil, fmt.Errorf("not implemented")
+}
 
 func (h *Headers) ByHeight(height uint64) (*flow.Header, error) {
 	tx := h.db.NewTransaction(false)

@@ -30,4 +30,7 @@ type Headers interface {
 	// might be unfinalized; if there is more than one, at least one of them has to
 	// be unfinalized.
 	ByParentID(parentID flow.Identifier) ([]*flow.Header, error)
+
+	// ByView returns the header for the block that was proposed during the given view
+	ByView(view uint64) (*flow.Header, error)
 }

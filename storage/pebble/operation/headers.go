@@ -39,6 +39,16 @@ func RetrieveExecutedBlock(blockID *flow.Identifier) func(pebble.Reader) error {
 	return retrieve(makePrefix(codeExecutedBlock), blockID)
 }
 
+// IndexViewBlock indexes a block by consensus view
+func IndexViewBlock(view uint64, blockID flow.Identifier) func(pebble.Writer) error {
+	return insert(makePrefix(codeViewBlock, view), blockID)
+}
+
+// LookupViewBlock looks up a block by consensus view
+func LookupViewBlock(view uint64, blockID *flow.Identifier) func(pebble.Reader) error {
+	return retrieve(makePrefix(codeViewBlock, view), blockID)
+}
+
 // IndexCollectionBlock indexes a block by a collection within that block.
 func IndexCollectionBlock(collID flow.Identifier, blockID flow.Identifier) func(pebble.Writer) error {
 	return insert(makePrefix(codeCollectionBlock, collID), blockID)
