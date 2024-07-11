@@ -4,10 +4,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/onflow/flow-go/fvm/evm/handler"
 	"github.com/onflow/flow-go/fvm/evm/testutils"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/stretchr/testify/require"
 )
 
 func BenchmarkProposalGrowth(b *testing.B) { benchmarkBlockProposalGrowth(b, 1000) }
