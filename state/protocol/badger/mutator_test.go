@@ -2351,6 +2351,14 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, epochExtensions[0].FinalView, finalView)
 
+			targetEndTime, err := state.Final().Epochs().Current().TargetEndTime()
+			require.NoError(t, err)
+			targetViewTime := float64(epoch2Setup.TargetDuration) / float64(epoch2Setup.FinalView-epoch2Setup.FirstView+1)
+			expectedTargetEndTime := epoch2Setup.TargetEndTime + uint64(float64(epochExtensions[0].FinalView-epoch2Setup.FinalView)*targetViewTime)
+			assert.Equal(t, expectedTargetEndTime, targetEndTime)
+
+			// After epoch extension, TargetEndTime must be updated accordingly
+
 			// Constructing blocks
 			//   ... <- B10 <- B11(ER(B4, EpochRecover)) <- B12(S(ER(B4))) <- ...
 			// B10 will be the first block past the epoch extension. Block B11 incorporates the Execution Result [ER]
