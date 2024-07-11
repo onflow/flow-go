@@ -159,7 +159,8 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			mock.Anything,
 			mock.MatchedBy(func(arg module.TransactionExecutionResultStats) bool {
 				return !arg.Failed // only successful transactions
-			})).
+			}),
+			mock.Anything).
 			Return(nil).
 			Times(2 + 1) // 2 txs in collection + system chunk tx
 
@@ -1269,7 +1270,8 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 			return arg.EventCounts == expectedNumberOfEvents &&
 				arg.EventSize == expectedEventSize &&
 				!arg.Failed
-		})).
+		}),
+		mock.Anything).
 		Return(nil).
 		Times(1) // system chunk tx
 
