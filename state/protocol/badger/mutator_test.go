@@ -2351,14 +2351,6 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, epochExtensions[0].FinalView, finalView)
 
-			targetEndTime, err := state.Final().Epochs().Current().TargetEndTime()
-			require.NoError(t, err)
-			targetViewTime := float64(epoch2Setup.TargetDuration) / float64(epoch2Setup.FinalView-epoch2Setup.FirstView+1)
-			expectedTargetEndTime := epoch2Setup.TargetEndTime + uint64(float64(epochExtensions[0].FinalView-epoch2Setup.FinalView)*targetViewTime)
-			assert.Equal(t, expectedTargetEndTime, targetEndTime)
-
-			// After epoch extension, TargetEndTime must be updated accordingly
-
 			// Constructing blocks
 			//   ... <- B10 <- B11(ER(B4, EpochRecover)) <- B12(S(ER(B4))) <- ...
 			// B10 will be the first block past the epoch extension. Block B11 incorporates the Execution Result [ER]
@@ -2436,6 +2428,53 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 			require.Equal(t, epochRecover.EpochSetup.Counter, epochProtocolState.Epoch(), "expect to be in recovered epoch")
 			require.Equal(t, flow.EpochPhaseStaking, epochProtocolState.EpochPhase(), "expect to be in staking phase")
 		})
+	})
+}
+
+func TestEpochTargetEndTime(t *testing.T) {
+	rootSnapshot := unittest.RootSnapshotFixture(participants)
+	util.RunWithFullProtocolStateAndMutator(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState, mutableProtocolState realprotocol.MutableProtocolState) {
+		head, err := rootSnapshot.Head()
+		require.NoError(t, err)
+		rootResult, _, err := rootSnapshot.SealedResult()
+		require.NoError(t, err)
+
+		epoch1Setup := rootResult.ServiceEvents[0].Event.(*flow.EpochSetup)
+		rootTargetEndTime, err := rootSnapshot.Epochs().Current().TargetEndTime()
+		require.NoError(t, err)
+		require.Equal(t, epoch1Setup.TargetEndTime, rootTargetEndTime)
+
+		calculateExpectedStateId := calculateExpectedStateId(t, mutableProtocolState)
+
+		// add a block for the first seal to reference
+		block1 := unittest.BlockWithParentFixture(head)
+		block1.Header.View = epoch1Setup.FinalView
+		block1.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(calculateExpectedStateId(block1.Header, nil))))
+		unittest.InsertAndFinalize(t, state, block1)
+
+		assertEpochFallbackTriggered(t, state.Final(), true) // finalizing block 1 should have triggered EFM since it must reach safety threshold
+		assertInPhase(t, state.Final(), flow.EpochPhaseFallback)
+
+		epochState, err := state.Final().EpochProtocolState()
+		require.NoError(t, err)
+		firstExtension := epochState.EpochExtensions()[0]
+		targetViewDuration := float64(epoch1Setup.TargetDuration) / float64(epoch1Setup.FinalView-epoch1Setup.FirstView+1)
+		expectedTargetEndTime := rootTargetEndTime + uint64(float64(firstExtension.FinalView-epoch1Setup.FinalView)*targetViewDuration)
+		afterFirstExtensionTargetEndTime, err := state.Final().Epochs().Current().TargetEndTime()
+		require.NoError(t, err)
+		require.Equal(t, expectedTargetEndTime, afterFirstExtensionTargetEndTime)
+
+		block2 := unittest.BlockWithParentFixture(block1.Header)
+		block2.Header.View = firstExtension.FinalView
+		block2.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(calculateExpectedStateId(block2.Header, nil))))
+		unittest.InsertAndFinalize(t, state, block2)
+
+		epochState, err = state.Final().EpochProtocolState()
+		require.NoError(t, err)
+		secondExtension := epochState.EpochExtensions()[1]
+		expectedTargetEndTime = rootTargetEndTime + uint64(float64(secondExtension.FinalView-epoch1Setup.FinalView)*targetViewDuration)
+		afterSecondExtensionTargetEndTime, err := state.Final().Epochs().Current().TargetEndTime()
+		require.Equal(t, expectedTargetEndTime, afterSecondExtensionTargetEndTime)
 	})
 }
 
