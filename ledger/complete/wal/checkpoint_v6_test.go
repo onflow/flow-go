@@ -131,7 +131,24 @@ func createMultipleRandomTries(t *testing.T) []*trie.MTrie {
 	require.NoError(t, err, "update registers")
 	tries = append(tries, activeTrie)
 
+	// trie must be deep enough to test the subtrie
+	if !isTrieDeepEnough(activeTrie) {
+		// if not deep enough, keep re-trying
+		return createMultipleRandomTries(t)
+	}
+
 	return tries
+}
+
+func isTrieDeepEnough(trie *trie.MTrie) bool {
+	nodes := getNodesAtLevel(trie.RootNode(), subtrieLevel)
+	for _, n := range nodes {
+		if n == nil || n.IsLeaf() {
+			return false
+		}
+	}
+
+	return true
 }
 
 func createMultipleRandomTriesMini(t *testing.T) []*trie.MTrie {
@@ -157,6 +174,12 @@ func createMultipleRandomTriesMini(t *testing.T) []*trie.MTrie {
 	activeTrie, _, err = trie.NewTrieWithUpdatedRegisters(activeTrie, sharedPaths, payloads2, false)
 	require.NoError(t, err, "update registers")
 	tries = append(tries, activeTrie)
+
+	// trie must be deep enough to test the subtrie
+	if !isTrieDeepEnough(activeTrie) {
+		// if not deep enough, keep re-trying
+		return createMultipleRandomTriesMini(t)
+	}
 
 	return tries
 }
@@ -375,7 +398,7 @@ func TestWriteAndReadCheckpointV6LeafMultipleTriesOK(t *testing.T) {
 		fileName := "checkpoint-multi-leaf-file"
 		multi := createMultipleRandomTriesMini(t)
 
-		tries := multi[1:2]
+		tries := multi[len(multi)-1:]
 
 		logger := unittest.Logger()
 		require.NoErrorf(t, StoreCheckpointV6Concurrently(tries, dir, fileName, logger), "fail to store checkpoint")
