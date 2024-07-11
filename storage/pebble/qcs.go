@@ -15,7 +15,7 @@ import (
 
 // QuorumCertificates implements persistent storage for quorum certificates.
 type QuorumCertificates struct {
-	storing *sync.Mutex
+	storing sync.Mutex
 	db      *pebble.DB
 	cache   *Cache[flow.Identifier, *flow.QuorumCertificate]
 }

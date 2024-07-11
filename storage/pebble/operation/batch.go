@@ -9,6 +9,7 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
+// batchWriter wraps the storage.BatchWriter to make it compatible with pebble.Writer
 type batchWriter struct {
 	batch storage.BatchWriter
 }

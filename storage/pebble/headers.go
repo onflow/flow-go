@@ -21,6 +21,10 @@ type Headers struct {
 
 func NewHeaders(collector module.CacheMetrics, db *pebble.DB) *Headers {
 
+	store := func(blockID flow.Identifier, header *flow.Header) func(storage.PebbleReaderBatchWriter) error {
+		return storage.OnlyWriter(operation.InsertHeader(blockID, header))
+	}
+
 	// CAUTION: should only be used to index FINALIZED blocks by their
 	// respective height
 	storeHeight := func(height uint64, id flow.Identifier) func(storage.PebbleReaderBatchWriter) error {
@@ -47,6 +51,7 @@ func NewHeaders(collector module.CacheMetrics, db *pebble.DB) *Headers {
 		db: db,
 		cache: newCache(collector, metrics.ResourceHeader,
 			withLimit[flow.Identifier, *flow.Header](4*flow.DefaultTransactionExpiry),
+			withStore(store),
 			withRetrieve(retrieve)),
 
 		heightCache: newCache(collector, metrics.ResourceFinalizedHeight,
@@ -59,19 +64,7 @@ func NewHeaders(collector module.CacheMetrics, db *pebble.DB) *Headers {
 }
 
 func (h *Headers) storePebble(blockID flow.Identifier, header *flow.Header) func(storage.PebbleReaderBatchWriter) error {
-	return func(rw storage.PebbleReaderBatchWriter) error {
-		rw.AddCallback(func() {
-			h.cache.Insert(blockID, header)
-		})
-
-		_, tx := rw.ReaderWriter()
-		err := operation.InsertHeader(blockID, header)(tx)
-		if err != nil {
-			return fmt.Errorf("could not store header %v: %w", blockID, err)
-		}
-
-		return nil
-	}
+	return h.cache.PutPebble(blockID, header)
 }
 
 func (h *Headers) retrieveTx(blockID flow.Identifier) func(pebble.Reader) (*flow.Header, error) {
