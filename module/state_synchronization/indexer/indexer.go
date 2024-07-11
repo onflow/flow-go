@@ -17,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/module/state_synchronization"
 	"github.com/onflow/flow-go/module/state_synchronization/requester"
 	"github.com/onflow/flow-go/module/state_synchronization/requester/jobs"
+	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/storage"
 )
 
@@ -49,12 +50,13 @@ type Indexer struct {
 	component.Component
 	*requester.ExecutionDataIndexedDistributor
 
-	log             zerolog.Logger
-	exeDataReader   *jobs.ExecutionDataReader
-	exeDataNotifier engine.Notifier
-	indexer         *IndexerCore
-	jobConsumer     *jobqueue.ComponentConsumer
-	registers       storage.RegisterIndex
+	log                  zerolog.Logger
+	exeDataReader        *jobs.ExecutionDataReader
+	exeDataNotifier      engine.Notifier
+	blockIndexedNotifier engine.Notifier
+	indexer              *IndexerCore
+	jobConsumer          *jobqueue.ComponentConsumer
+	registers            storage.RegisterIndex
 }
 
 // NewIndexer creates a new execution worker.
@@ -70,6 +72,7 @@ func NewIndexer(
 	r := &Indexer{
 		log:                             log.With().Str("module", "execution_indexer").Logger(),
 		exeDataNotifier:                 engine.NewNotifier(),
+		blockIndexedNotifier:            engine.NewNotifier(),
 		indexer:                         indexer,
 		registers:                       registers,
 		ExecutionDataIndexedDistributor: requester.NewExecutionDataIndexedDistributor(),
@@ -95,27 +98,64 @@ func NewIndexer(
 
 	r.jobConsumer = jobConsumer
 
-	// to separate processing execution data and updating the last indexed block
+	// SetPostNotifier will notify blockIndexedNotifier AFTER e.jobConsumer.LastProcessedIndex is updated.
 	r.jobConsumer.SetPostNotifier(func(module.JobID) {
-		r.onBlockHeaderReceived()
+		r.blockIndexedNotifier.Notify()
 	})
 
-	r.Component = r.jobConsumer
+	cm := component.NewComponentManagerBuilder()
+	cm.AddWorker(r.runExecutionDataConsumer)
+	cm.AddWorker(r.processBlockIndexed)
+	r.Component = cm.Build()
 
 	return r, nil
 }
 
-// onBlockHeaderReceived notifies ExecutionDataIndexedDistributor that new block is indexed.
+// runExecutionDataConsumer runs the jobConsumer component
 //
 // No errors are expected during normal operations.
-func (i *Indexer) onBlockHeaderReceived() {
+func (i *Indexer) runExecutionDataConsumer(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+	i.log.Info().Msg("starting execution data jobqueue")
+	i.jobConsumer.Start(ctx)
+	err := util.WaitClosed(ctx, i.jobConsumer.Ready())
+	if err == nil {
+		ready()
+	}
+
+	<-i.jobConsumer.Done()
+}
+
+// processBlockIndexed is a worker that processes indexed blocks.
+//
+// No errors are expected during normal operations.
+func (i *Indexer) processBlockIndexed(
+	ctx irrecoverable.SignalerContext,
+	ready component.ReadyFunc,
+) {
+	ready()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-i.blockIndexedNotifier.Channel():
+			i.onBlockIndexed(ctx)
+		}
+	}
+}
+
+// onBlockIndexed notifies ExecutionDataIndexedDistributor that new block is indexed.
+//
+// No errors are expected during normal operations.
+func (i *Indexer) onBlockIndexed(ctx irrecoverable.SignalerContext) {
 	lastIndexedHeight := i.jobConsumer.LastProcessedIndex()
 	header, err := i.indexer.headers.ByHeight(lastIndexedHeight)
 	if err != nil {
 		// if the execution data is available, the block must be locally finalized
 		i.log.Error().Err(err).Msgf("could not get header for height %d:", lastIndexedHeight)
+		ctx.Throw(err)
 	}
-	i.OnBlockHeaderReceived(header)
+	i.OnBlockIndexed(header)
 }
 
 // Start the worker jobqueue to consume the available data.
@@ -150,6 +190,7 @@ func (i *Indexer) HighestIndexedHeight() (uint64, error) {
 // OnExecutionData is used to notify when new execution data is downloaded by the execution data requester jobqueue.
 func (i *Indexer) OnExecutionData(_ *execution_data.BlockExecutionDataEntity) {
 	i.exeDataNotifier.Notify()
+
 }
 
 // processExecutionData is a worker method that is being called by the jobqueue when processing a new job.
@@ -166,6 +207,7 @@ func (i *Indexer) processExecutionData(ctx irrecoverable.SignalerContext, job mo
 		i.log.Error().Err(err).Str("job_id", string(job.ID())).Msg("error during execution data index processing job")
 		ctx.Throw(err)
 	}
+	// save height
 
 	done()
 }

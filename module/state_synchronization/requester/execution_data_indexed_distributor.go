@@ -29,8 +29,8 @@ func (p *ExecutionDataIndexedDistributor) AddOnBlockIndexedConsumer(consumer OnB
 	p.consumers = append(p.consumers, consumer)
 }
 
-// OnBlockHeaderReceived is called when new block header is received
-func (p *ExecutionDataIndexedDistributor) OnBlockHeaderReceived(header *flow.Header) {
+// OnBlockIndexed is called when new block header is received
+func (p *ExecutionDataIndexedDistributor) OnBlockIndexed(header *flow.Header) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 
