@@ -147,11 +147,6 @@ func (s *TransactionValidatorSuite) TestTransactionValidator_InsufficientBalance
 	assert.NoError(s.T(), err)
 	assert.NotNil(s.T(), actualAccountResponse)
 
-	scriptExecutor.
-		On("GetAccountAtBlockHeight", mock.Anything, mock.Anything, mock.Anything).
-		Return(actualAccountResponse, nil).
-		Once()
-
 	validator, err := access.NewTransactionValidator(s.blocks, s.chain, s.validatorOptions, scriptExecutor)
 	assert.NoError(s.T(), err)
 	assert.NotNil(s.T(), validator)
@@ -161,7 +156,7 @@ func (s *TransactionValidatorSuite) TestTransactionValidator_InsufficientBalance
 	expectedError := access.InsufficientBalanceError{
 		Payer:           unittest.AddressFixture(),
 		RequiredBalance: requiredBalance,
-		ActualBalance:   cadence.UFix64(actualAccountResponse.Balance)}
+	}
 
 	actualErr := validator.Validate(context.Background(), &txBody)
 

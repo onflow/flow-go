@@ -104,13 +104,11 @@ func (e InvalidTxRateLimitedError) Error() string {
 type InsufficientBalanceError struct {
 	Payer           flow.Address
 	RequiredBalance cadence.UFix64
-	ActualBalance   cadence.UFix64
 }
 
 func (e InsufficientBalanceError) Error() string {
 	return fmt.Sprintf("transaction payer (%s) has insufficient balance to pay transaction fee. "+
-		"Required balance: (%s). "+
-		"Actual balance: (%s)", e.Payer, e.RequiredBalance.String(), e.ActualBalance.String())
+		"Required balance: (%s). ", e.Payer, e.RequiredBalance.String())
 }
 
 func IsInsufficientBalanceError(err error) bool {

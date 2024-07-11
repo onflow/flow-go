@@ -196,7 +196,7 @@ func (v *TransactionValidator) Validate(ctx context.Context, tx *flow.Transactio
 		}
 
 		// log and ignore all other errors
-		log.Info().Msg("transaction validation failed due to error: " + err.Error())
+		log.Info().Err(err).Msg("check payer validation skipped due to error")
 	}
 
 	// TODO replace checkSignatureFormat by verifying the account/payer signatures
@@ -425,13 +425,7 @@ func (v *TransactionValidator) checkSufficientBalanceToPayForTransaction(ctx con
 		return nil
 	}
 
-	account, err := v.scriptExecutor.GetAccountAtBlockHeight(ctx, tx.Payer, header.Height)
-	if err != nil {
-		return fmt.Errorf("could not get account at block height %d. error: %w", header.Height, err)
-	}
-	balance := cadence.UFix64(account.Balance)
-
-	return InsufficientBalanceError{Payer: tx.Payer, RequiredBalance: requiredBalance, ActualBalance: balance}
+	return InsufficientBalanceError{Payer: tx.Payer, RequiredBalance: requiredBalance}
 }
 
 func remove(s []string, r string) []string {
