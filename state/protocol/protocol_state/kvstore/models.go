@@ -10,6 +10,9 @@ import (
 	"github.com/onflow/flow-go/state/protocol/protocol_state"
 )
 
+// defaultEpochExtensionViewCount is a default length of epoch extension in views, approximately 1 day.
+const defaultEpochExtensionViewCount = 100_000
+
 // This file contains the concrete types that define the structure of the underlying key-value store
 // for a particular Protocol State version.
 // Essentially enumerating the set of keys and values that are supported.
@@ -81,7 +84,8 @@ func (model *Modelv0) Replicate(protocolVersion uint64) (protocol_state.KVStoreM
 
 	// perform actual replication to the next version
 	v1 := &Modelv1{
-		Modelv0: clone.Clone(*model),
+		Modelv0:                        clone.Clone(*model),
+		DefaultEpochExtensionViewCount: defaultEpochExtensionViewCount,
 	}
 	return v1, nil
 }
@@ -114,11 +118,17 @@ func (model *Modelv0) SetEpochStateID(id flow.Identifier) {
 	model.EpochStateID = id
 }
 
+func (model *Modelv0) GetEpochExtensionViewCount() (uint64, error) {
+	return 0, ErrKeyNotSupported
+}
+
 // Modelv1 is v1 of the Protocol State key-value store.
 // This represents the first model version which will be considered "latest" by any
 // deployed software version.
 type Modelv1 struct {
 	Modelv0
+
+	DefaultEpochExtensionViewCount uint64
 }
 
 var _ protocol_state.KVStoreAPI = (*Modelv1)(nil)
@@ -161,6 +171,10 @@ func (model *Modelv1) GetProtocolStateVersion() uint64 {
 	return 1
 }
 
+func (model *Modelv1) GetEpochExtensionViewCount() (uint64, error) {
+	return model.DefaultEpochExtensionViewCount, nil
+}
+
 // NewDefaultKVStore constructs a default Key-Value Store of the *latest* protocol version for bootstrapping.
 // Currently, the KV store is largely empty.
 // TODO: Shortcut in bootstrapping; we will probably have to start with a non-empty KV store in the future;
@@ -171,6 +185,7 @@ func NewDefaultKVStore(epochStateID flow.Identifier) protocol_state.KVStoreAPI {
 			UpgradableModel: UpgradableModel{},
 			EpochStateID:    epochStateID,
 		},
+		DefaultEpochExtensionViewCount: defaultEpochExtensionViewCount,
 	}
 }
 

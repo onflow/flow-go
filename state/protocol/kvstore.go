@@ -23,7 +23,7 @@ type KVStoreReader interface {
 	// New models should use `makeVersionedModelID` to implement ID.
 	ID() flow.Identifier
 
-	// v0/v1
+	// v0
 
 	VersionedEncodable
 
@@ -45,6 +45,10 @@ type KVStoreReader interface {
 	// GetEpochStateID returns the state ID of the epoch state.
 	// This is part of the most basic model and is used to commit the epoch state to the KV store.
 	GetEpochStateID() flow.Identifier
+
+	// v1
+
+	GetEpochExtensionViewCount() (uint64, error)
 }
 
 // VersionedEncodable defines the interface for a versioned key-value store independent

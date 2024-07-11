@@ -8,10 +8,6 @@ import (
 	"github.com/onflow/flow-go/state/protocol/protocol_state"
 )
 
-// DefaultEpochExtensionViewCount is a default length of epoch extension in views, approximately 1 day.
-// TODO(EFM, #6020): replace this with value from KV store or protocol.GlobalParams
-const DefaultEpochExtensionViewCount = 100_000
-
 // FallbackStateMachine is a special structure that encapsulates logic for processing service events
 // when protocol is in epoch fallback mode. The FallbackStateMachine ignores EpochSetup and EpochCommit
 // events but still processes ejection events.
@@ -29,7 +25,7 @@ var _ StateMachine = (*FallbackStateMachine)(nil)
 // EpochFallbackTriggered to true, thereby recording that we have entered epoch fallback mode.
 // See flow.EpochPhase for detailed documentation about EFM and epoch phase transitions.
 // No errors are expected during normal operations.
-func NewFallbackStateMachine(params protocol.GlobalParams, telemetry protocol_state.StateMachineTelemetryConsumer, view uint64, parentState *flow.RichEpochProtocolStateEntry) (*FallbackStateMachine, error) {
+func NewFallbackStateMachine(kvstore protocol.KVStoreReader, params protocol.GlobalParams, telemetry protocol_state.StateMachineTelemetryConsumer, view uint64, parentState *flow.RichEpochProtocolStateEntry) (*FallbackStateMachine, error) {
 	state := parentState.EpochProtocolStateEntry.Copy()
 	nextEpochCommitted := state.EpochPhase() == flow.EpochPhaseCommitted
 	// we are entering fallback mode, this logic needs to be executed only once
@@ -57,12 +53,16 @@ func NewFallbackStateMachine(params protocol.GlobalParams, telemetry protocol_st
 	}
 
 	if !nextEpochCommitted && view+params.EpochCommitSafetyThreshold() >= parentState.CurrentEpochFinalView() {
+		epochExtensionViewCount, err := kvstore.GetEpochExtensionViewCount()
+		if err != nil {
+			return nil, fmt.Errorf("could not query epoch extension view count: %w", err)
+		}
 		// we have reached safety threshold and we are still in the fallback mode
 		// prepare a new extension for the current epoch.
-		err := sm.extendCurrentEpoch(flow.EpochExtension{
+		err = sm.extendCurrentEpoch(flow.EpochExtension{
 			FirstView:     parentState.CurrentEpochFinalView() + 1,
-			FinalView:     parentState.CurrentEpochFinalView() + DefaultEpochExtensionViewCount, // TODO(EFM, #6020): replace with EpochExtensionLength
-			TargetEndTime: 0,                                                                    // TODO(EFM, #6020): calculate and set target end time
+			FinalView:     parentState.CurrentEpochFinalView() + epochExtensionViewCount,
+			TargetEndTime: 0, // TODO(EFM, #6020): calculate and set target end time
 		})
 		if err != nil {
 			return nil, err
