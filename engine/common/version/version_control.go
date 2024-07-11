@@ -329,7 +329,7 @@ func (v *VersionControl) blockFinalized(
 		}
 
 		newEndHeight := NoHeight
-		// version boundaries are sorted by version
+		// version boundaries are sorted by blockHeight in ascending order
 		for _, boundary := range vb.VersionBoundaries {
 			ver, err := boundary.Semver()
 			if err != nil || ver == nil {

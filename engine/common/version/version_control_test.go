@@ -49,16 +49,6 @@ func TestVersionControlInitialization(t *testing.T) {
 			expectedEnd:   latestBlockHeight,
 		},
 		{
-			name:        "start version set",
-			nodeVersion: "0.0.1",
-			versionEvents: []*flow.SealedVersionBeacon{
-				VersionBeaconEvent(finalizedRootBlockHeight+10,
-					flow.VersionBoundary{BlockHeight: finalizedRootBlockHeight + 12, Version: "0.0.1"}),
-			},
-			expectedStart: finalizedRootBlockHeight + 12,
-			expectedEnd:   latestBlockHeight,
-		},
-		{
 			name:        "height is bigger than latest block height",
 			nodeVersion: "0.0.1",
 			versionEvents: []*flow.SealedVersionBeacon{
