@@ -72,6 +72,7 @@ func NewDeltaView(parent types.ReadOnlyView) *DeltaView {
 
 		dirtyAddresses: make(map[gethCommon.Address]struct{}),
 		created:        make(map[gethCommon.Address]struct{}),
+		newContract:    make(map[gethCommon.Address]struct{}),
 		toBeDestructed: make(map[gethCommon.Address]*uint256.Int),
 		recreated:      make(map[gethCommon.Address]struct{}),
 		balances:       make(map[gethCommon.Address]*uint256.Int),

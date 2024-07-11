@@ -89,7 +89,7 @@ func (db *StateDB) CreateAccount(addr gethCommon.Address) {
 // This operation sets the 'newContract'-flag, which is required in order to
 // correctly handle EIP-6780 'delete-in-same-transaction' logic.
 func (db *StateDB) CreateContract(addr gethCommon.Address) {
-	// TODO: figure out this
+	db.lastestView().CreateContract(addr)
 }
 
 // IsCreated returns true if address is recently created (context of a transaction)
@@ -235,17 +235,15 @@ func (db *StateDB) GetState(addr gethCommon.Address, key gethCommon.Hash) gethCo
 }
 
 // GetStorageRoot returns some sort of root for the given address.
-// Since StateDB doesn't construct a Merkel tree
-// for each account hash of root slab as some sort of root hash.
-//
-// Warning the current behavior is as follow:
+// Warning! Since StateDB doesn't construct a Merkel tree under the hood,
+// the behavior of this endpoint is as follow:
 // - if an account doesn't exist it returns common.Hash{}
 // - if account is EOA it returns gethCommon.EmptyRootHash
 // - else it returns a unique hash value as the root but this returned
-// this behavior is acceptable for this version of EVM as the only
+// This behavior is ok for this version of EVM as the only
 // use case in the EVM right now is here
 // https://github.com/onflow/go-ethereum/blob/37590b2c5579c36d846c788c70861685b0ea240e/core/vm/evm.go#L480
-// where the value that is returned is compared to make sure the storage is empty
+// where the value that is returned is compared to empty values to make sure the storage is empty
 func (db *StateDB) GetStorageRoot(addr common.Address) common.Hash {
 	root, err := db.lastestView().GetStorageRoot(addr)
 	db.handleError(err)
@@ -495,14 +493,13 @@ func (s *StateDB) Error() error {
 	return wrapError(s.cachedError)
 }
 
-// PointCache method is not support currently.
+// PointCache is not supported.
 func (s *StateDB) PointCache() *utils.PointCache {
 	return nil
 }
 
-// Witness method is not support currently.
+// Witness is not supported.
 func (s *StateDB) Witness() *stateless.Witness {
-
 	return nil
 }
 
