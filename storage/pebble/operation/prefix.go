@@ -95,6 +95,8 @@ const (
 	codeJobQueue             = 71
 	codeJobQueuePointer      = 72
 
+	codeViewBlock = 73 // index mapping of view to block I
+
 	// legacy codes (should be cleaned up)
 	codeChunkDataPack                = 100
 	codeCommit                       = 101

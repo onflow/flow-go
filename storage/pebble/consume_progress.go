@@ -5,8 +5,11 @@ import (
 
 	"github.com/cockroachdb/pebble"
 
+	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/pebble/operation"
 )
+
+var _ storage.ConsumerProgress = (*ConsumerProgress)(nil)
 
 type ConsumerProgress struct {
 	db       *pebble.DB
@@ -47,4 +50,8 @@ func (cp *ConsumerProgress) SetProcessedIndex(processed uint64) error {
 	}
 
 	return nil
+}
+
+func (cp *ConsumerProgress) Consumer() string {
+	return cp.consumer
 }
