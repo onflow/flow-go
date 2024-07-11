@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/onflow/flow-go/engine/common/stop"
+
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
@@ -96,6 +98,8 @@ type Engine struct {
 	maxReceiptHeight  uint64
 	executionResults  storage.ExecutionResults
 
+	stopControl *stop.StopControl
+
 	lastFullBlockHeight *counters.PersistentStrictMonotonicCounter
 	// metrics
 	collectionExecutedMetric module.CollectionExecutedMetric
@@ -121,6 +125,7 @@ func New(
 	collectionExecutedMetric module.CollectionExecutedMetric,
 	processedHeight storage.ConsumerProgress,
 	lastFullBlockHeight *counters.PersistentStrictMonotonicCounter,
+	stopControl *stop.StopControl,
 ) (*Engine, error) {
 	executionReceiptsRawQueue, err := fifoqueue.NewFifoQueue(defaultQueueCapacity)
 	if err != nil {
@@ -164,6 +169,7 @@ func New(
 		executionReceiptsNotifier: engine.NewNotifier(),
 		executionReceiptsQueue:    executionReceiptsQueue,
 		messageHandler:            messageHandler,
+		stopControl:               stopControl,
 	}
 
 	// jobqueue Jobs object that tracks finalized blocks by height. This is used by the finalizedBlockConsumer
@@ -239,6 +245,11 @@ func (e *Engine) processFinalizedBlockJob(ctx irrecoverable.SignalerContext, job
 	block, err := jobqueue.JobToBlock(job)
 	if err != nil {
 		ctx.Throw(fmt.Errorf("failed to convert job to block: %w", err))
+	}
+
+	// In case, stop control feature is enabled, the block should be checked before further processing for version compatibility
+	if e.stopControl != nil {
+		e.stopControl.OnProcessedBlock(ctx, block.Header.Height)
 	}
 
 	err = e.processFinalizedBlock(block)

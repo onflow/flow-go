@@ -1911,6 +1911,10 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				return nil, fmt.Errorf("could not create requester engine: %w", err)
 			}
 
+			if builder.stopControlEnabled {
+				builder.stopControl = stop.NewStopControl(builder.Logger, builder.versionControl)
+			}
+
 			builder.IngestEng, err = ingestion.New(
 				node.Logger,
 				node.EngineRegistry,
@@ -1926,6 +1930,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				builder.collectionExecutedMetric,
 				processedBlockHeight,
 				lastFullBlockHeight,
+				builder.stopControl,
 			)
 			if err != nil {
 				return nil, err
@@ -1969,19 +1974,6 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 
 			return versionControl, nil
 		})
-
-		if builder.stopControlEnabled {
-			builder.Component("stop control", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-				stopControl, err := stop.NewStopControl(builder.Logger, builder.versionControl)
-				if err != nil {
-					return nil, fmt.Errorf("could not create stop control: %w", err)
-				}
-
-				builder.stopControl = stopControl
-
-				return stopControl, nil
-			})
-		}
 	}
 
 	if builder.supportsObserver {

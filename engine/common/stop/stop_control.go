@@ -1,62 +1,81 @@
 package stop
 
 import (
+	"fmt"
+
 	"github.com/rs/zerolog"
+	"go.uber.org/atomic"
+
+	"github.com/onflow/flow-go/module/irrecoverable"
 
 	"github.com/onflow/flow-go/engine/common/version"
-	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/component"
-	"github.com/onflow/flow-go/state/protocol"
-	"github.com/onflow/flow-go/state/protocol/events"
 )
 
-// OnVersionUpdate which receives the signals from the VersionControl. This method is responsible for receiving notifications about the next version update event
-// OnProcessedBlock which receives a block header/height and is called by other subsystems on the node when they finished handling a block. This is equivalent to StopControl.OnBlockExecuted, and on the AN would subscribe to events from the indexer engine.
+// StopControl is responsible for managing the stopping behavior of the node
+// when an incompatible block height is encountered.
 type StopControl struct {
-	// Noop implements the protocol.Consumer interface with no operations.
-	events.Noop
-	component.Component
+	log zerolog.Logger
 
-	log            zerolog.Logger
-	versionControl *version.VersionControl
+	// incompatibleBlockHeight is the height of the block that is incompatible with the current node version.
+	incompatibleBlockHeight *atomic.Uint64
+	// updatedVersion is the expected node version to continue working with new blocks.
+	updatedVersion *atomic.String
 }
 
-var (
-	_ component.Component = (*StopControl)(nil)
-	_ protocol.Consumer   = (*StopControl)(nil)
-)
-
 // NewStopControl creates a new StopControl instance.
-//
-// We currently have no strong guarantee that the node version is a valid semver.
-// See build.SemverV2 for more details. That is why nil is a valid input for node version.
 func NewStopControl(
 	log zerolog.Logger,
 	versionControl *version.VersionControl,
-) (*StopControl, error) {
+) *StopControl {
 	sc := &StopControl{
 		log: log.With().
 			Str("component", "stop_control").
 			Logger(),
-		versionControl: versionControl,
+		incompatibleBlockHeight: atomic.NewUint64(0),
+		updatedVersion:          atomic.NewString(""),
 	}
 
-	versionControl.AddVersionUpdatesConsumer(sc.OnVersionUpdate)
+	if versionControl != nil {
+		// Subscribe for version updates
+		versionControl.AddVersionUpdatesConsumer(sc.OnVersionUpdate)
+	} else {
+		sc.log.Info().
+			Msg("version control is nil")
+	}
 
-	// Setup component manager for handling worker functions.
-	cm := component.NewComponentManagerBuilder()
-
-	sc.Component = cm.Build()
-
-	return sc, nil
+	return sc
 }
 
-func (sc *StopControl) BlockFinalized(h *flow.Header) {
-	sc.OnProcessedBlock(h)
-}
-
+// OnVersionUpdate is called when a version update occurs.
+//
+// It updates the incompatible block height and the expected node version
+// based on the provided height and semver.
 func (sc *StopControl) OnVersionUpdate(height uint64, semver string) {
+	sc.log.Info().
+		Uint64("height", height).
+		Str("semver", semver).
+		Msg("Received version update")
+
+	updateVersionData := func(height uint64, semver string) {
+		sc.incompatibleBlockHeight.Store(height)
+		sc.updatedVersion.Store(semver)
+	}
+
+	// If the version was updated, store new version information
+	if len(semver) > 0 {
+		updateVersionData(height, semver)
+		return
+	}
+
+	// If semver is 0, but notification was received, this means that the version update was deleted.
+	updateVersionData(0, "")
 }
 
-func (sc *StopControl) OnProcessedBlock(header *flow.Header) {
+// OnProcessedBlock is called when need to check processed block for compatibility with current node.
+func (sc *StopControl) OnProcessedBlock(ctx irrecoverable.SignalerContext, height uint64) {
+	incompatibleBlockHeight := sc.incompatibleBlockHeight.Load()
+	if height >= incompatibleBlockHeight {
+		ctx.Throw(fmt.Errorf("processed block at height %d is incompatible with the current node version, please upgrade to version %s starting from block height %d",
+			height, sc.updatedVersion.Load(), incompatibleBlockHeight))
+	}
 }
