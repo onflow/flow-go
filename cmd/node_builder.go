@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/cockroachdb/pebble"
+	"github.com/dgraph-io/badger/v2"
 	madns "github.com/multiformats/go-multiaddr-dns"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
