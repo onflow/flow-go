@@ -2479,6 +2479,7 @@ func TestEpochTargetEndTime(t *testing.T) {
 		secondExtension := epochState.EpochExtensions()[1]
 		expectedTargetEndTime = rootTargetEndTime + uint64(float64(secondExtension.FinalView-epoch1Setup.FinalView)*targetViewDuration)
 		afterSecondExtensionTargetEndTime, err := state.Final().Epochs().Current().TargetEndTime()
+		require.NoError(t, err)
 		require.Equal(t, expectedTargetEndTime, afterSecondExtensionTargetEndTime)
 	})
 }
