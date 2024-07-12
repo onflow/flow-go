@@ -139,6 +139,27 @@ func TestWeightedComputationMetering(t *testing.T) {
 		require.True(t, m.ComputationAvailable(1, 10))
 	})
 
+	t.Run("check computation remaining", func(t *testing.T) {
+		m := meter.NewMeter(
+			meter.DefaultParameters().
+				WithComputationLimit(10).
+				WithComputationWeights(
+					map[common.ComputationKind]uint64{0: 1 << meter.MeterExecutionInternalPrecisionBytes}),
+		)
+
+		remaining := m.ComputationRemaining(0)
+		require.Equal(t, uint(10), remaining)
+
+		err := m.MeterComputation(0, 1)
+		require.NoError(t, err)
+		require.Equal(t, uint64(1), m.TotalComputationUsed())
+
+		require.Equal(t, uint(9), m.ComputationRemaining(0))
+
+		// test a type without a weight (default zero)
+		require.Equal(t, uint(math.MaxUint), m.ComputationRemaining(1))
+	})
+
 	t.Run("merge meters", func(t *testing.T) {
 		compKind := common.ComputationKind(0)
 		m := meter.NewMeter(
