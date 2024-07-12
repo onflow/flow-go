@@ -449,6 +449,11 @@ func (ctl *BlockTimeController) processEpochExtended(header *flow.Header, extens
 		return fmt.Errorf("failed to retrieve target end time at block id %s", header.ID())
 	}
 	ctl.curEpochTargetEndTime = targetEndTime
+	targetDuration, err := ctl.state.AtBlockID(header.ID()).Epochs().Current().TargetDuration()
+	if err != nil {
+		return fmt.Errorf("failed to retrieve target end time at block id %s", header.ID())
+	}
+	ctl.curEpochTargetDuration = targetDuration
 	return nil
 }
 
