@@ -39,6 +39,7 @@ const (
 	ContractNameMetadataViews       = "MetadataViews"
 	ContractNameViewResolver        = "ViewResolver"
 	ContractNameEVM                 = "EVM"
+	ContractNameBurner              = "Burner"
 
 	// AccountNameEVMStorage is not a contract, but a special account that is used to store EVM state
 	AccountNameEVMStorage = "EVMStorageAccount"
@@ -155,6 +156,9 @@ type SystemContracts struct {
 	// EVM related contracts
 	EVMContract SystemContract
 	EVMStorage  SystemAccount
+
+	// Utility contracts
+	Burner SystemContract
 }
 
 // AsTemplateEnv returns a template environment with all system contracts filled in.
@@ -180,6 +184,8 @@ func (c SystemContracts) AsTemplateEnv() templates.Environment {
 		MetadataViewsAddress:            c.MetadataViews.Address.Hex(),
 		ViewResolverAddress:             c.ViewResolver.Address.Hex(),
 		FungibleTokenSwitchboardAddress: c.FungibleToken.Address.Hex(),
+
+		BurnerAddress: c.Burner.Address.Hex(),
 	}
 }
 
@@ -206,6 +212,8 @@ func (c SystemContracts) All() []SystemContract {
 
 		c.EVMContract,
 		// EVMStorage is not included here, since it is not a contract
+
+		c.Burner,
 	}
 }
 
@@ -328,6 +336,8 @@ func init() {
 
 		ContractNameEVM:       serviceAddressFunc,
 		AccountNameEVMStorage: evmStorageEVMFunc,
+
+		ContractNameBurner: serviceAddressFunc,
 	}
 
 	getSystemContractsForChain := func(chainID flow.ChainID) *SystemContracts {
@@ -379,6 +389,8 @@ func init() {
 
 			EVMContract: addressOfContract(ContractNameEVM),
 			EVMStorage:  addressOfAccount(AccountNameEVMStorage),
+
+			Burner: addressOfContract(ContractNameBurner),
 		}
 
 		return contracts
