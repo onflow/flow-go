@@ -30,7 +30,6 @@ import (
 	"github.com/onflow/flow-go/state/protocol/events"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	mockprotocol "github.com/onflow/flow-go/state/protocol/mock"
-	"github.com/onflow/flow-go/state/protocol/protocol_state/epochs"
 	protocol_state "github.com/onflow/flow-go/state/protocol/protocol_state/state"
 	"github.com/onflow/flow-go/state/protocol/util"
 	"github.com/onflow/flow-go/storage"
@@ -1701,6 +1700,9 @@ func TestEpochFallbackMode(t *testing.T) {
 			require.NoError(t, err)
 			safetyThreshold := rootSnapshot.Params().EpochCommitSafetyThreshold()
 			require.NoError(t, err)
+			rootProtocolState, err := rootSnapshot.ProtocolState()
+			require.NoError(t, err)
+			epochExtensionViewCount := rootProtocolState.GetEpochExtensionViewCount()
 
 			calculateExpectedStateId := calculateExpectedStateId(t, mutableProtocolState)
 
@@ -1717,9 +1719,9 @@ func TestEpochFallbackMode(t *testing.T) {
 			// finalizing block 1 should trigger EFM
 			metricsMock.On("EpochFallbackModeTriggered").Once()
 			metricsMock.On("CurrentEpochPhase", flow.EpochPhaseFallback).Once()
-			metricsMock.On("CurrentEpochFinalView", epoch1FinalView+epochs.DefaultEpochExtensionViewCount)
+			metricsMock.On("CurrentEpochFinalView", epoch1FinalView+epochExtensionViewCount)
 			protoEventsMock.On("EpochFallbackModeTriggered", epoch1Setup.Counter, block1.Header).Once()
-			protoEventsMock.On("EpochExtended", epoch1Setup.Counter, block1.Header, unittest.MatchEpochExtension(epoch1FinalView, epochs.DefaultEpochExtensionViewCount)).Once()
+			protoEventsMock.On("EpochExtended", epoch1Setup.Counter, block1.Header, unittest.MatchEpochExtension(epoch1FinalView, epochExtensionViewCount)).Once()
 
 			err = state.Extend(context.Background(), block1)
 			require.NoError(t, err)
@@ -1768,6 +1770,9 @@ func TestEpochFallbackMode(t *testing.T) {
 			require.NoError(t, err)
 			safetyThreshold := rootSnapshot.Params().EpochCommitSafetyThreshold()
 			require.NoError(t, err)
+			rootProtocolState, err := rootSnapshot.ProtocolState()
+			require.NoError(t, err)
+			epochExtensionViewCount := rootProtocolState.GetEpochExtensionViewCount()
 
 			// add a block for the first seal to reference
 			block1 := unittest.BlockWithParentFixture(head)
@@ -1819,9 +1824,9 @@ func TestEpochFallbackMode(t *testing.T) {
 			// finalizing block 3 should trigger EFM
 			metricsMock.On("EpochFallbackModeTriggered").Once()
 			metricsMock.On("CurrentEpochPhase", flow.EpochPhaseFallback).Once()
-			metricsMock.On("CurrentEpochFinalView", epoch1FinalView+epochs.DefaultEpochExtensionViewCount)
+			metricsMock.On("CurrentEpochFinalView", epoch1FinalView+epochExtensionViewCount)
 			protoEventsMock.On("EpochFallbackModeTriggered", epoch1Setup.Counter, block3.Header).Once()
-			protoEventsMock.On("EpochExtended", epoch1Setup.Counter, block3.Header, unittest.MatchEpochExtension(epoch1FinalView, epochs.DefaultEpochExtensionViewCount)).Once()
+			protoEventsMock.On("EpochExtended", epoch1Setup.Counter, block3.Header, unittest.MatchEpochExtension(epoch1FinalView, epochExtensionViewCount)).Once()
 
 			assertEpochFallbackTriggered(t, state.Final(), false) // not triggered before finalization
 			err = state.Finalize(context.Background(), block3.ID())
@@ -1866,6 +1871,9 @@ func TestEpochFallbackMode(t *testing.T) {
 			require.NoError(t, err)
 			result, _, err := rootSnapshot.SealedResult()
 			require.NoError(t, err)
+			rootProtocolState, err := rootSnapshot.ProtocolState()
+			require.NoError(t, err)
+			epochExtensionViewCount := rootProtocolState.GetEpochExtensionViewCount()
 
 			// add a block for the first seal to reference
 			block1 := unittest.BlockWithParentFixture(head)
@@ -1934,8 +1942,8 @@ func TestEpochFallbackMode(t *testing.T) {
 			require.NoError(t, err)
 
 			// we add the epoch extension after the epoch transition
-			metricsMock.On("CurrentEpochFinalView", epoch1FinalView+epochs.DefaultEpochExtensionViewCount).Once()
-			protoEventsMock.On("EpochExtended", epoch1Setup.Counter, block4.Header, unittest.MatchEpochExtension(epoch1FinalView, epochs.DefaultEpochExtensionViewCount)).Once()
+			metricsMock.On("CurrentEpochFinalView", epoch1FinalView+epochExtensionViewCount).Once()
+			protoEventsMock.On("EpochExtended", epoch1Setup.Counter, block4.Header, unittest.MatchEpochExtension(epoch1FinalView, epochExtensionViewCount)).Once()
 
 			err = state.Finalize(context.Background(), block4.ID())
 			require.NoError(t, err)
@@ -2212,6 +2220,9 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 			require.NoError(t, err)
 			safetyThreshold := rootSnapshot.Params().EpochCommitSafetyThreshold()
 			require.NoError(t, err)
+			rootProtocolState, err := rootSnapshot.ProtocolState()
+			require.NoError(t, err)
+			epochExtensionViewCount := rootProtocolState.GetEpochExtensionViewCount()
 
 			calculateExpectedStateId := calculateExpectedStateId(t, mutableProtocolState)
 
@@ -2341,8 +2352,8 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 			require.Len(t, epochExtensions, 1)
 			require.Equal(t, epochExtensions[0].FirstView, epoch2Setup.FinalView+1)
 
-			protoEventsMock.On("EpochExtended", epoch2Setup.Counter, block9.Header, unittest.MatchEpochExtension(epoch2Setup.FinalView, epochs.DefaultEpochExtensionViewCount)).Once()
-			metricsMock.On("CurrentEpochFinalView", epoch2Setup.FinalView+epochs.DefaultEpochExtensionViewCount)
+			protoEventsMock.On("EpochExtended", epoch2Setup.Counter, block9.Header, unittest.MatchEpochExtension(epoch2Setup.FinalView, epochExtensionViewCount)).Once()
+			metricsMock.On("CurrentEpochFinalView", epoch2Setup.FinalView+epochExtensionViewCount)
 			err = state.Finalize(context.Background(), block9.ID())
 			require.NoError(t, err)
 
