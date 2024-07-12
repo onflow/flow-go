@@ -4,10 +4,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/onflow/flow-go/fvm/evm/handler"
 	"github.com/onflow/flow-go/fvm/evm/testutils"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/stretchr/testify/require"
 )
 
 func BenchmarkProposalGrowth(b *testing.B) { benchmarkBlockProposalGrowth(b, 1000) }
@@ -22,7 +23,8 @@ func benchmarkBlockProposalGrowth(b *testing.B, txCounts int) {
 				require.NoError(b, err)
 				res := testutils.RandomResultFixture(b)
 				bp.AppendTransaction(res)
-				bs.UpdateBlockProposal(bp)
+				err = bs.UpdateBlockProposal(bp)
+				require.NoError(b, err)
 			}
 
 			// check the impact of updating block proposal after x number of transactions
@@ -32,7 +34,8 @@ func benchmarkBlockProposalGrowth(b *testing.B, txCounts int) {
 			require.NoError(b, err)
 			res := testutils.RandomResultFixture(b)
 			bp.AppendTransaction(res)
-			bs.UpdateBlockProposal(bp)
+			err = bs.UpdateBlockProposal(bp)
+			require.NoError(b, err)
 
 			b.ReportMetric(float64(time.Since(startTime).Nanoseconds()), "proposal_update_time_ns")
 			b.ReportMetric(float64(backend.TotalBytesRead()), "proposal_update_bytes_read")
@@ -44,7 +47,8 @@ func benchmarkBlockProposalGrowth(b *testing.B, txCounts int) {
 			startTime = time.Now()
 			bp, err = bs.BlockProposal()
 			require.NoError(b, err)
-			bs.CommitBlockProposal(bp)
+			err = bs.CommitBlockProposal(bp)
+			require.NoError(b, err)
 
 			b.ReportMetric(float64(time.Since(startTime).Nanoseconds()), "block_commit_time_ns")
 			b.ReportMetric(float64(backend.TotalBytesRead()), "block_commit_bytes_read")
