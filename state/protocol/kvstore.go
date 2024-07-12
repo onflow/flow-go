@@ -46,6 +46,7 @@ type KVStoreReader interface {
 	// This is part of the most basic model and is used to commit the epoch state to the KV store.
 	GetEpochStateID() flow.Identifier
 
+	// GetEpochExtensionViewCount returns the length of the epoch extension in views.
 	GetEpochExtensionViewCount() uint64
 }
 

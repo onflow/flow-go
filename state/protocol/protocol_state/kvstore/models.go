@@ -118,6 +118,7 @@ func (model *Modelv0) SetEpochStateID(id flow.Identifier) {
 	model.EpochStateID = id
 }
 
+// GetEpochExtensionViewCount returns the length of the epoch extension in views.
 func (model *Modelv0) GetEpochExtensionViewCount() uint64 {
 	return model.EpochExtensionViewCount
 }
