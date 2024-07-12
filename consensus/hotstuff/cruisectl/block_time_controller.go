@@ -429,39 +429,37 @@ func (ctl *BlockTimeController) measureViewDuration(tb TimedBlock) error {
 }
 
 // processEpochExtended processes the EpochExtended protocol data.
-// Whenever we encounter an epoch extension, we:
-//   - update the curr epoch final view and target end time with the extension data.
-//
+// When an EpochExtended event is processed we update the current epoch
+// final view, target end time, and target duration from the first block
+// of the extension.
 // No errors are expected during normal operation.
 func (ctl *BlockTimeController) processEpochExtended(first *flow.Header) error {
-	finalView, err := ctl.state.AtHeight(header.Height).Epochs().Current().FinalView()
+	finalView, err := ctl.state.AtHeight(first.Height).Epochs().Current().FinalView()
 	if err != nil {
-		return fmt.Errorf("failed to retrieve final view at block id %s", header.ID())
+		return fmt.Errorf("failed to retrieve final view at height id %d", first.Height)
 	}
-	targetEndTime, err := ctl.state.AtHeight(header.Height).Epochs().Current().TargetEndTime()
+	targetEndTime, err := ctl.state.AtHeight(first.Height).Epochs().Current().TargetEndTime()
 	if err != nil {
-		return fmt.Errorf("failed to retrieve target end time at block id %s", header.ID())
+		return fmt.Errorf("failed to retrieve target end time at height id %d", first.Height)
 	}
-	// sanity check: ensure the final view of the current epoch monotonically increases
-	if extension.FinalView < ctl.epochInfo.curEpochFinalView {
-		return fmt.Errorf("final view of epoch must be monotonically increases, but is decreasing from %d to %d", ctl.epochInfo.curEpochFinalView, extension.FinalView)
+	targetDuration, err := ctl.state.AtBlockID(first.ID()).Epochs().Current().TargetDuration()
+	if err != nil {
+		return fmt.Errorf("failed to retrieve target duration at height id %d", first.Height)
 	}
 
-	if extension.FinalView == ctl.epochInfo.curEpochFinalView {
+	// sanity check: ensure the final view of the current epoch monotonically increases
+	if finalView < ctl.epochInfo.curEpochFinalView {
+		return fmt.Errorf("final view of epoch must be monotonically increases, but is decreasing from %d to %d", ctl.epochInfo.curEpochFinalView, finalView)
+	}
+
+	if finalView == ctl.epochInfo.curEpochFinalView {
 		return nil
 	}
 
-	ctl.curEpochFinalView = extension.FinalView
-	targetEndTime, err := ctl.state.AtBlockID(header.ID()).Epochs().Current().TargetEndTime()
-	if err != nil {
-		return fmt.Errorf("failed to retrieve target end time at block id %s", header.ID())
-	}
+	ctl.curEpochFinalView = finalView
 	ctl.curEpochTargetEndTime = targetEndTime
-	targetDuration, err := ctl.state.AtBlockID(header.ID()).Epochs().Current().TargetDuration()
-	if err != nil {
-		return fmt.Errorf("failed to retrieve target end time at block id %s", header.ID())
-	}
 	ctl.curEpochTargetDuration = targetDuration
+
 	return nil
 }
 
@@ -506,9 +504,9 @@ func (ctl *BlockTimeController) OnBlockIncorporated(block *model.Block) {
 }
 
 // EpochExtended handles the EpochExtended protocol event.
-func (ctl *BlockTimeController) EpochExtended(_ uint64, header *flow.Header, extension flow.EpochExtension) {
+func (ctl *BlockTimeController) EpochExtended(_ uint64, first *flow.Header, _ flow.EpochExtension) {
 	ctl.epochEvents <- func() error {
-		return ctl.processEpochExtended(header, extension)
+		return ctl.processEpochExtended(first)
 	}
 }
 
