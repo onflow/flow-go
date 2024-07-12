@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/onflow/cadence"
-	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime/common"
 	gethCommon "github.com/onflow/go-ethereum/common"
 	gethCore "github.com/onflow/go-ethereum/core"
@@ -89,54 +88,31 @@ func TestHandler_TransactionRunOrPanic(t *testing.T) {
 					// successfully run (no-panic)
 					handler.RunOrPanic(tx, coinbase)
 
-					// check gas usage
-					// TODO: uncomment and investigate me
-					// computationUsed, err := backend.ComputationUsed()
-					// require.NoError(t, err)
-					// require.Equal(t, result.GasConsumed, computationUsed)
-
 					// check event
 					events := backend.Events()
 					require.Len(t, events, 1)
+					txEventPayload := testutils.TxEventToPayload(t, events[0], rootAddr)
 
-					event := events[0]
-					assert.Equal(t, event.Type, types.EventTypeTransactionExecuted)
-					ev, err := jsoncdc.Decode(nil, event.Payload)
+					// check logs
+					encodedLogs, err := hex.DecodeString(strings.ReplaceAll(txEventPayload.Logs, "\"", ""))
 					require.NoError(t, err)
-					cadenceEvent, ok := ev.(cadence.Event)
-					require.True(t, ok)
-
-					// TODO: add an event decoder in types.event
-					cadenceLogs := cadence.SearchFieldByName(cadenceEvent, "logs")
-
-					encodedLogs, err := hex.DecodeString(strings.ReplaceAll(cadenceLogs.String(), "\"", ""))
-					require.NoError(t, err)
-
 					var logs []*gethTypes.Log
 					err = rlp.DecodeBytes(encodedLogs, &logs)
 					require.NoError(t, err)
-
 					for i, l := range result.Logs {
 						assert.Equal(t, l, logs[i])
 					}
 
+					// form block
 					handler.CommitBlockProposal()
+
 					// check block event
 					events = backend.Events()
 					require.Len(t, events, 2)
-					event = events[1]
-
-					assert.Equal(t, event.Type, types.EventTypeBlockExecuted)
-					ev, err = jsoncdc.Decode(nil, event.Payload)
-					require.NoError(t, err)
-
+					blockEventPayload := testutils.BlockEventToPayload(t, events[1], rootAddr)
 					// make sure block transaction list references the above transaction id
-					cadenceEvent, ok = ev.(cadence.Event)
-					require.True(t, ok)
-					blockEvent, err := types.DecodeBlockEventPayload(cadenceEvent)
-					require.NoError(t, err)
-
-					eventTxID := blockEvent.TransactionHashes[0] // only one hash in block
+					require.Len(t, blockEventPayload.TransactionHashes, 1)
+					eventTxID := blockEventPayload.TransactionHashes[0] // only one hash in block
 					// make sure the transaction id included in the block transaction list is the same as tx sumbmitted
 					assert.Equal(
 						t,
@@ -364,31 +340,50 @@ func TestHandler_COA(t *testing.T) {
 				events := backend.Events()
 				require.Len(t, events, 3)
 
-				// first two transactions are for COA setup
+				// Block level expected values
+				txHashes := make([]gethCommon.Hash, 0)
+				totalGasUsed := uint64(0)
 
-				// transaction event
-				event := events[0]
-				assert.Equal(t, event.Type, types.EventTypeTransactionExecuted)
-
-				// block event
-				event = events[1]
-				assert.Equal(t, event.Type, types.EventTypeTransactionExecuted)
-
-				// transaction event
-				event = events[2]
-				assert.Equal(t, event.Type, types.EventTypeTransactionExecuted)
-				_, err := jsoncdc.Decode(nil, event.Payload)
+				// deploy COA transaction event
+				txEventPayload := testutils.TxEventToPayload(t, events[0], rootAddr)
+				txContent, err := hex.DecodeString(txEventPayload.Payload)
 				require.NoError(t, err)
-				// TODO: decode encoded tx and check for the amount and value
-				// assert.Equal(t, foa.Address(), ret.Address)
-				// assert.Equal(t, balance, ret.Amount)
+				tx, err := types.DirectCallFromEncoded(txContent)
+				require.NoError(t, err)
+				txHashes = append(txHashes, tx.Hash())
+				totalGasUsed += txEventPayload.GasConsumed
+
+				// deposit transaction event
+				txEventPayload = testutils.TxEventToPayload(t, events[1], rootAddr)
+				txContent, err = hex.DecodeString(txEventPayload.Payload)
+				require.NoError(t, err)
+				tx, err = types.DirectCallFromEncoded(txContent)
+				require.NoError(t, err)
+				require.Equal(t, foa.Address(), tx.To)
+				require.Equal(t, types.BalanceToBigInt(balance), tx.Value)
+				txHashes = append(txHashes, tx.Hash())
+				totalGasUsed += txEventPayload.GasConsumed
+
+				// withdraw transaction event
+				txEventPayload = testutils.TxEventToPayload(t, events[2], rootAddr)
+				txContent, err = hex.DecodeString(txEventPayload.Payload)
+				require.NoError(t, err)
+				tx, err = types.DirectCallFromEncoded(txContent)
+				require.NoError(t, err)
+				require.Equal(t, foa.Address(), tx.From)
+				require.Equal(t, types.BalanceToBigInt(balance), tx.Value)
+				txHashes = append(txHashes, tx.Hash())
+				totalGasUsed += txEventPayload.GasConsumed
 
 				// block event
 				handler.CommitBlockProposal()
 				events = backend.Events()
 				require.Len(t, events, 4)
-				event = events[3]
-				assert.Equal(t, event.Type, types.EventTypeBlockExecuted)
+				blockEventPayload := testutils.BlockEventToPayload(t, events[3], rootAddr)
+				for i, txHash := range txHashes {
+					require.Equal(t, txHash.Hex(), string(blockEventPayload.TransactionHashes[i]))
+				}
+				require.Equal(t, totalGasUsed, blockEventPayload.TotalGasUsed)
 
 				// check gas usage
 				computationUsed, err := backend.ComputationUsed()
@@ -645,14 +640,7 @@ func TestHandler_COA(t *testing.T) {
 				require.Len(t, events, 3)
 				// last transaction executed event
 				event := events[2]
-				assert.Equal(t, event.Type, types.EventTypeTransactionExecuted)
-				ev, err := jsoncdc.Decode(nil, event.Payload)
-				require.NoError(t, err)
-				cadenceEvent, ok := ev.(cadence.Event)
-				require.True(t, ok)
-				txEventPayload, err := types.DecodeTransactionEventPayload(cadenceEvent)
-				require.NoError(t, err)
-
+				txEventPayload := testutils.TxEventToPayload(t, event, rootAddr)
 				values := txEventPayload.PrecompiledCalls.Values
 				aggregated := make([]byte, len(values))
 				for i, v := range values {
@@ -935,15 +923,8 @@ func TestHandler_TransactionRun(t *testing.T) {
 						if i == batchSize {
 							continue // don't check last block event
 						}
-						assert.Equal(t, event.Type, types.EventTypeTransactionExecuted)
-						ev, err := jsoncdc.Decode(nil, event.Payload)
-						require.NoError(t, err)
-						cadenceEvent, ok := ev.(cadence.Event)
-						require.True(t, ok)
-
-						// TODO: add an event decoder in types.event
-						cadenceLogs := cadence.SearchFieldByName(cadenceEvent, "logs")
-						encodedLogs, err := hex.DecodeString(strings.ReplaceAll(cadenceLogs.String(), "\"", ""))
+						txEventPayload := testutils.TxEventToPayload(t, event, rootAddr)
+						encodedLogs, err := hex.DecodeString(strings.ReplaceAll(txEventPayload.Logs, "\"", ""))
 						require.NoError(t, err)
 
 						var logs []*gethTypes.Log
