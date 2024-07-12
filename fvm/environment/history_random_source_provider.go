@@ -85,6 +85,10 @@ func NewRandomSourceHistoryProvider(
 	return NewForbiddenRandomSourceHistoryProvider()
 }
 
+// RandomSourceHistoryLength is the byte-size of the random source in the history
+// array.
+// It must be at least 16 (128 bits) to make sure it includes enough entropy
+// (assuming the randomness beacon also outputs more than 128 bits of entropy)
 const RandomSourceHistoryLength = 32
 
 func (b *historySourceProvider) RandomSourceHistory() ([]byte, error) {

@@ -19,6 +19,8 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 	cadenceErrors "github.com/onflow/cadence/runtime/errors"
 	"github.com/onflow/cadence/runtime/interpreter"
+	"github.com/onflow/cadence/runtime/sema"
+	"github.com/onflow/cadence/runtime/stdlib"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
@@ -291,6 +293,26 @@ func NewCadence1ValueMigration(
 	}
 }
 
+type capabilityControllerHandler struct {
+	idGenerator environment.AccountLocalIDGenerator
+}
+
+var _ stdlib.CapabilityControllerIssueHandler = capabilityControllerHandler{}
+var _ stdlib.CapabilityControllerHandler = capabilityControllerHandler{}
+
+func (c capabilityControllerHandler) GenerateAccountID(address common.Address) (uint64, error) {
+	return c.idGenerator.GenerateAccountID(address)
+}
+
+func (capabilityControllerHandler) EmitEvent(
+	_ *interpreter.Interpreter,
+	_ interpreter.LocationRange,
+	_ *sema.CompositeType,
+	_ []interpreter.Value,
+) {
+	// NO-OP
+}
+
 // NewCadence1LinkValueMigration creates a new CadenceBaseMigration
 // which migrates links to capability controllers.
 // It populates the given map with the IDs of the capability controller it issues.
@@ -318,16 +340,23 @@ func NewCadence1LinkValueMigration(
 			accounts environment.Accounts,
 			reporter *cadenceValueMigrationReporter,
 		) []migrations.ValueMigration {
+
 			idGenerator := environment.NewAccountLocalIDGenerator(
 				tracing.NewMockTracerSpan(),
 				util.NopMeter{},
 				accounts,
 			)
+
+			handler := capabilityControllerHandler{
+				idGenerator: idGenerator,
+			}
+
 			return []migrations.ValueMigration{
 				&capcons.LinkValueMigration{
-					CapabilityMapping:  capabilityMapping,
-					AccountIDGenerator: idGenerator,
-					Reporter:           reporter,
+					CapabilityMapping: capabilityMapping,
+					IssueHandler:      handler,
+					Handler:           handler,
+					Reporter:          reporter,
 				},
 			}
 		},

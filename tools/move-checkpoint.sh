@@ -44,6 +44,7 @@ mkdir -p "$destination_directory"
 # Define the expected files
 expected_files=(
     "$source_base"
+    "$source_base.000"
     "$source_base.001"
     "$source_base.002"
     "$source_base.003"
