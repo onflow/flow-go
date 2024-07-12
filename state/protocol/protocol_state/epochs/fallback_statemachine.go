@@ -58,7 +58,6 @@ func NewFallbackStateMachine(kvstore protocol.KVStoreReader, params protocol.Glo
 		err := sm.extendCurrentEpoch(flow.EpochExtension{
 			FirstView:     parentState.CurrentEpochFinalView() + 1,
 			FinalView:     parentState.CurrentEpochFinalView() + kvstore.GetEpochExtensionViewCount(),
-			TargetEndTime: 0, // TODO(EFM, #6020): calculate and set target end time
 		})
 		if err != nil {
 			return nil, err

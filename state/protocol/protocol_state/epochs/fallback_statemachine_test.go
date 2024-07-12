@@ -145,9 +145,8 @@ func (s *EpochFallbackStateMachineSuite) TestProcessInvalidEpochRecover() {
 		parentProtocolState := s.parentProtocolState.Copy()
 		parentProtocolState.CurrentEpoch.EpochExtensions = []flow.EpochExtension{
 			{
-				FirstView:     s.parentProtocolState.CurrentEpochSetup.FinalView + 2, // invalid view for extension
-				FinalView:     s.parentProtocolState.CurrentEpochSetup.FinalView + 1 + 10_000,
-				TargetEndTime: 0,
+				FirstView: s.parentProtocolState.CurrentEpochSetup.FinalView + 2, // invalid view for extension
+				FinalView: s.parentProtocolState.CurrentEpochSetup.FinalView + 1 + 10_000,
 			},
 		}
 
@@ -401,7 +400,6 @@ func (s *EpochFallbackStateMachineSuite) TestNewEpochFallbackStateMachine() {
 					{
 						FirstView:     parentProtocolState.CurrentEpochFinalView() + 1,
 						FinalView:     parentProtocolState.CurrentEpochFinalView() + extensionViewCount,
-						TargetEndTime: 0,
 					},
 				},
 			},
@@ -441,7 +439,6 @@ func (s *EpochFallbackStateMachineSuite) TestNewEpochFallbackStateMachine() {
 					{
 						FirstView:     parentProtocolState.CurrentEpochFinalView() + 1,
 						FinalView:     parentProtocolState.CurrentEpochFinalView() + extensionViewCount,
-						TargetEndTime: 0,
 					},
 				},
 			},
@@ -513,12 +510,10 @@ func (s *EpochFallbackStateMachineSuite) TestEpochFallbackStateMachineInjectsMul
 		firstExtension := flow.EpochExtension{
 			FirstView:     originalParentState.CurrentEpochSetup.FinalView + 1,
 			FinalView:     originalParentState.CurrentEpochSetup.FinalView + extensionViewCount,
-			TargetEndTime: 0,
 		}
 		secondExtension := flow.EpochExtension{
 			FirstView:     firstExtension.FinalView + 1,
 			FinalView:     firstExtension.FinalView + extensionViewCount,
-			TargetEndTime: 0,
 		}
 
 		parentProtocolState := originalParentState.Copy()
@@ -594,17 +589,14 @@ func (s *EpochFallbackStateMachineSuite) TestEpochFallbackStateMachineInjectsMul
 	firstExtension := flow.EpochExtension{
 		FirstView:     originalParentState.NextEpochSetup.FinalView + 1,
 		FinalView:     originalParentState.NextEpochSetup.FinalView + extensionViewCount,
-		TargetEndTime: 0,
 	}
 	secondExtension := flow.EpochExtension{
 		FirstView:     firstExtension.FinalView + 1,
 		FinalView:     firstExtension.FinalView + extensionViewCount,
-		TargetEndTime: 0,
 	}
 	thirdExtension := flow.EpochExtension{
 		FirstView:     secondExtension.FinalView + 1,
 		FinalView:     secondExtension.FinalView + extensionViewCount,
-		TargetEndTime: 0,
 	}
 
 	// In the previous test `TestNewEpochFallbackStateMachine`, we verified that the first extension is added correctly. Below we

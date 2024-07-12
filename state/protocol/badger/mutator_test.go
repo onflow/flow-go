@@ -2431,6 +2431,112 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 	})
 }
 
+// TestEpochTargetEndTime ensurers that the target end time of an epoch is correctly calculated depending on if the epoch is extended or not.
+// When we haven't added an extension yet, then the TargetEndTime is simply the value from the epoch setup event.
+// Otherwise, the TargetEndTime is calculated by adding the duration of the extension to the TargetEndTime of epoch setup.
+// We assume we keep the same view duration for all views in the epoch and all extensions.
+func TestEpochTargetEndTime(t *testing.T) {
+	rootSnapshot := unittest.RootSnapshotFixture(participants)
+	util.RunWithFullProtocolStateAndMutator(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState, mutableProtocolState realprotocol.MutableProtocolState) {
+		head, err := rootSnapshot.Head()
+		require.NoError(t, err)
+		rootResult, _, err := rootSnapshot.SealedResult()
+		require.NoError(t, err)
+
+		epoch1Setup := rootResult.ServiceEvents[0].Event.(*flow.EpochSetup)
+		rootTargetEndTime, err := rootSnapshot.Epochs().Current().TargetEndTime()
+		require.NoError(t, err)
+		require.Equal(t, epoch1Setup.TargetEndTime, rootTargetEndTime)
+
+		calculateExpectedStateId := calculateExpectedStateId(t, mutableProtocolState)
+
+		// add a block that will trigger EFM and add an epoch extension since the view of the epoch exceeds the safety threshold
+		block1 := unittest.BlockWithParentFixture(head)
+		block1.Header.View = epoch1Setup.FinalView
+		block1.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(calculateExpectedStateId(block1.Header, nil))))
+		unittest.InsertAndFinalize(t, state, block1)
+
+		assertEpochFallbackTriggered(t, state.Final(), true)
+		assertInPhase(t, state.Final(), flow.EpochPhaseFallback)
+
+		epochState, err := state.Final().EpochProtocolState()
+		require.NoError(t, err)
+		firstExtension := epochState.EpochExtensions()[0]
+		targetViewDuration := float64(epoch1Setup.TargetDuration) / float64(epoch1Setup.FinalView-epoch1Setup.FirstView+1)
+		expectedTargetEndTime := rootTargetEndTime + uint64(float64(firstExtension.FinalView-epoch1Setup.FinalView)*targetViewDuration)
+		afterFirstExtensionTargetEndTime, err := state.Final().Epochs().Current().TargetEndTime()
+		require.NoError(t, err)
+		require.Equal(t, expectedTargetEndTime, afterFirstExtensionTargetEndTime)
+
+		// add a second block that exceeds the safety threshold and triggers another epoch extension
+		block2 := unittest.BlockWithParentFixture(block1.Header)
+		block2.Header.View = firstExtension.FinalView
+		block2.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(calculateExpectedStateId(block2.Header, nil))))
+		unittest.InsertAndFinalize(t, state, block2)
+
+		epochState, err = state.Final().EpochProtocolState()
+		require.NoError(t, err)
+		secondExtension := epochState.EpochExtensions()[1]
+		expectedTargetEndTime = rootTargetEndTime + uint64(float64(secondExtension.FinalView-epoch1Setup.FinalView)*targetViewDuration)
+		afterSecondExtensionTargetEndTime, err := state.Final().Epochs().Current().TargetEndTime()
+		require.NoError(t, err)
+		require.Equal(t, expectedTargetEndTime, afterSecondExtensionTargetEndTime)
+	})
+}
+
+// TestEpochTargetDuration ensurers that the target duration of an epoch is correctly calculated depending on if the epoch is extended or not.
+// When we haven't added an extension yet, then the TargetDuration is simply the value from the epoch setup event.
+// Otherwise, the TargetDuration is calculated by adding the duration of the extension to the TargetDuration of epoch setup.
+// We assume we keep the same view duration for all views in the epoch and all extensions.
+func TestEpochTargetDuration(t *testing.T) {
+	rootSnapshot := unittest.RootSnapshotFixture(participants)
+	util.RunWithFullProtocolStateAndMutator(t, rootSnapshot, func(db *badger.DB, state *protocol.ParticipantState, mutableProtocolState realprotocol.MutableProtocolState) {
+		head, err := rootSnapshot.Head()
+		require.NoError(t, err)
+		rootResult, _, err := rootSnapshot.SealedResult()
+		require.NoError(t, err)
+
+		epoch1Setup := rootResult.ServiceEvents[0].Event.(*flow.EpochSetup)
+		rootTargetDuration, err := rootSnapshot.Epochs().Current().TargetDuration()
+		require.NoError(t, err)
+		require.Equal(t, epoch1Setup.TargetDuration, rootTargetDuration)
+
+		calculateExpectedStateId := calculateExpectedStateId(t, mutableProtocolState)
+
+		// add a block that will trigger EFM and add an epoch extension since the view of the epoch exceeds the safety threshold
+		block1 := unittest.BlockWithParentFixture(head)
+		block1.Header.View = epoch1Setup.FinalView
+		block1.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(calculateExpectedStateId(block1.Header, nil))))
+		unittest.InsertAndFinalize(t, state, block1)
+
+		assertEpochFallbackTriggered(t, state.Final(), true)
+		assertInPhase(t, state.Final(), flow.EpochPhaseFallback)
+
+		epochState, err := state.Final().EpochProtocolState()
+		require.NoError(t, err)
+		firstExtension := epochState.EpochExtensions()[0]
+		targetViewDuration := float64(epoch1Setup.TargetDuration) / float64(epoch1Setup.FinalView-epoch1Setup.FirstView+1)
+		afterFirstExtensionTargetDuration, err := state.Final().Epochs().Current().TargetDuration()
+		require.NoError(t, err)
+		expectedTargetDuration := rootTargetDuration + uint64(float64(firstExtension.FinalView-firstExtension.FirstView+1)*targetViewDuration)
+		require.Equal(t, expectedTargetDuration, afterFirstExtensionTargetDuration)
+
+		// add a second block that exceeds the safety threshold and triggers another epoch extension
+		block2 := unittest.BlockWithParentFixture(block1.Header)
+		block2.Header.View = firstExtension.FinalView
+		block2.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(calculateExpectedStateId(block2.Header, nil))))
+		unittest.InsertAndFinalize(t, state, block2)
+
+		epochState, err = state.Final().EpochProtocolState()
+		require.NoError(t, err)
+		secondExtension := epochState.EpochExtensions()[1]
+		afterSecondExtensionTargetDuration, err := state.Final().Epochs().Current().TargetDuration()
+		require.NoError(t, err)
+		expectedTargetDuration = rootTargetDuration + uint64(float64(secondExtension.FinalView-epoch1Setup.FinalView)*targetViewDuration)
+		require.Equal(t, expectedTargetDuration, afterSecondExtensionTargetDuration)
+	})
+}
+
 func TestExtendInvalidSealsInBlock(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		metrics := metrics.NewNoopCollector()
