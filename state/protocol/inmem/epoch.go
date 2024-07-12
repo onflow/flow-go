@@ -90,10 +90,9 @@ func (es *setupEpoch) TargetDuration() (uint64, error) {
 	if len(es.extensions) == 0 {
 		return es.setupEvent.TargetDuration, nil
 	} else {
+		viewDuration := float64(es.setupEvent.TargetDuration) / float64(es.setupEvent.FinalView-es.setupEvent.FirstView+1)
 		lastExtension := es.extensions[len(es.extensions)-1]
-		viewsPerEpoch := float64(es.setupEvent.FinalView - es.setupEvent.FirstView + 1)
-		extraViews := float64(lastExtension.FinalView - es.setupEvent.FinalView)
-		return es.setupEvent.TargetDuration + uint64(extraViews*float64(es.setupEvent.TargetDuration)/viewsPerEpoch), nil
+		return es.setupEvent.TargetDuration + uint64(float64(lastExtension.FinalView-es.setupEvent.FinalView)*viewDuration)
 	}
 }
 
