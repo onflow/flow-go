@@ -70,9 +70,8 @@ type EpochStateContainer struct {
 
 // EpochExtension represents a range of views, which contiguously extends this epoch.
 type EpochExtension struct {
-	FirstView     uint64
-	FinalView     uint64
-	TargetEndTime uint64
+	FirstView uint64
+	FinalView uint64
 }
 
 // ID returns an identifier for this EpochStateContainer by hashing internal fields.
