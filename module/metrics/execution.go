@@ -759,6 +759,7 @@ func (ec *ExecutionCollector) ExecutionBlockCachedPrograms(programs int) {
 func (ec *ExecutionCollector) ExecutionTransactionExecuted(
 	dur time.Duration,
 	stats module.TransactionExecutionResultStats,
+	info module.TransactionExecutionResultInfo,
 ) {
 	ec.totalExecutedTransactionsCounter.Inc()
 	ec.transactionExecutionTime.Observe(float64(dur.Milliseconds()))
