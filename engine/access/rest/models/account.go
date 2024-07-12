@@ -45,7 +45,7 @@ func (a *AccountPublicKey) Build(k flow.AccountPublicKey) {
 	sigAlgo := SigningAlgorithm(k.SignAlgo.String())
 	hashAlgo := HashingAlgorithm(k.HashAlgo.String())
 
-	a.Index = util.FromUint(uint64(k.Index))
+	a.Index = util.FromUint(k.Index)
 	a.PublicKey = k.PublicKey.String()
 	a.SigningAlgorithm = &sigAlgo
 	a.HashingAlgorithm = &hashAlgo

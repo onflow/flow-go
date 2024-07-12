@@ -23,7 +23,7 @@ import (
 // public key.
 func NewAccountPublicKey(publicKey *runtime.PublicKey,
 	hashAlgo sema.HashAlgorithm,
-	keyIndex int,
+	keyIndex uint32,
 	weight int,
 ) (
 	*flow.AccountPublicKey,
@@ -109,7 +109,7 @@ type AccountKeyUpdater interface {
 	// Note that the script variant will return OperationNotSupportedError.
 	RevokeAccountKey(
 		runtimeAddress common.Address,
-		keyIndex int,
+		keyIndex uint32,
 	) (
 		*runtime.AccountKey,
 		error,
@@ -152,7 +152,7 @@ func (updater ParseRestrictedAccountKeyUpdater) AddAccountKey(
 
 func (updater ParseRestrictedAccountKeyUpdater) RevokeAccountKey(
 	runtimeAddress common.Address,
-	keyIndex int,
+	keyIndex uint32,
 ) (
 	*runtime.AccountKey,
 	error,
@@ -181,7 +181,7 @@ func (NoAccountKeyUpdater) AddAccountKey(
 
 func (NoAccountKeyUpdater) RevokeAccountKey(
 	runtimeAddress common.Address,
-	keyIndex int,
+	keyIndex uint32,
 ) (
 	*runtime.AccountKey,
 	error,
@@ -245,7 +245,7 @@ func (updater *accountKeyUpdater) addAccountKey(
 	accountPublicKey, err := NewAccountPublicKey(
 		publicKey,
 		hashAlgo,
-		int(keyIndex),
+		keyIndex,
 		weight)
 	if err != nil {
 		return nil, fmt.Errorf("adding account key failed: %w", err)
@@ -276,7 +276,7 @@ func (updater *accountKeyUpdater) addAccountKey(
 // can be separated into another method
 func (updater *accountKeyUpdater) revokeAccountKey(
 	address flow.Address,
-	keyIndex int,
+	keyIndex uint32,
 ) (
 	*runtime.AccountKey,
 	error,
@@ -300,7 +300,7 @@ func (updater *accountKeyUpdater) revokeAccountKey(
 	var publicKey flow.AccountPublicKey
 	publicKey, err = updater.accounts.GetPublicKey(
 		address,
-		uint32(keyIndex))
+		keyIndex)
 	if err != nil {
 		// If a key is not found at a given index, then return a nil key with
 		// no errors.  This is to be inline with the Cadence runtime. Otherwise
@@ -317,7 +317,7 @@ func (updater *accountKeyUpdater) revokeAccountKey(
 
 	_, err = updater.accounts.SetPublicKey(
 		address,
-		uint32(keyIndex),
+		keyIndex,
 		publicKey)
 	if err != nil {
 		return nil, fmt.Errorf("revoking account key failed: %w", err)
@@ -386,7 +386,7 @@ func (updater *accountKeyUpdater) AddAccountKey(
 
 func (updater *accountKeyUpdater) RevokeAccountKey(
 	runtimeAddress common.Address,
-	keyIndex int,
+	keyIndex uint32,
 ) (
 	*runtime.AccountKey,
 	error,

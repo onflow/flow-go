@@ -4416,7 +4416,7 @@ func TestEVMValidateCOAOwnershipProof(t *testing.T) {
 		OnDecodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
 			return json.Decode(nil, b)
 		},
-		OnGetAccountKey: func(addr runtime.Address, index int) (*cadenceStdlib.AccountKey, error) {
+		OnGetAccountKey: func(addr runtime.Address, index uint32) (*cadenceStdlib.AccountKey, error) {
 			require.Equal(t, proof.Address[:], addr[:])
 			return &cadenceStdlib.AccountKey{
 				PublicKey: &cadenceStdlib.PublicKey{},

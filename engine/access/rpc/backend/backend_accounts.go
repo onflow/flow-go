@@ -329,7 +329,7 @@ func compareAccountsLogger(exec, local *flow.Account, lgCtx zerolog.Context) (ze
 		localKey := local.Keys[i]
 
 		if !execKey.PublicKey.Equals(localKey.PublicKey) {
-			mismatchKeys.Int(execKey.Index)
+			mismatchKeys.Uint32(execKey.Index)
 			different = true
 		}
 	}

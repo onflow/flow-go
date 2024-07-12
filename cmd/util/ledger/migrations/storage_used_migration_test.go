@@ -188,7 +188,7 @@ func TestAccountStatusMigration(t *testing.T) {
 				continue
 			}
 
-			accountStatus, err = environment.AccountStatusFromBytes(migrated[0].Value())
+			accountStatus, err = environment.AccountStatusFromBytes(payload.Value())
 			require.NoError(t, err)
 		}
 

@@ -132,7 +132,7 @@ func DecodeAccountPublicKey(b []byte, index uint32) (AccountPublicKey, error) {
 	}
 
 	return AccountPublicKey{
-		Index:     int(index),
+		Index:     index,
 		PublicKey: publicKey,
 		SignAlgo:  signAlgo,
 		HashAlgo:  hashAlgo,

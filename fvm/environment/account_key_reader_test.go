@@ -98,8 +98,8 @@ func TestAccountKeyReader_get_key_count(t *testing.T) {
 	t.Parallel()
 	address := bytesToAddress(1, 2, 3, 4)
 
-	identity := func(n uint32) (uint64, error) { return uint64(n), nil }
-	prop := func(n uint32) (uint64, error) {
+	identity := func(n uint32) (uint32, error) { return n, nil }
+	prop := func(n uint32) (uint32, error) {
 		return newDummyAccountKeyReader(t, n).AccountKeysCount(address)
 	}
 
