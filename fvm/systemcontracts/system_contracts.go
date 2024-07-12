@@ -24,22 +24,24 @@ import (
 const (
 	// Unqualified names of system smart contracts (not including address prefix)
 
-	ContractNameEpoch               = "FlowEpoch"
-	ContractNameIDTableStaking      = "FlowIDTableStaking"
-	ContractNameClusterQC           = "FlowClusterQC"
-	ContractNameDKG                 = "FlowDKG"
-	ContractNameServiceAccount      = "FlowServiceAccount"
-	ContractNameFlowFees            = "FlowFees"
-	ContractNameStorageFees         = "FlowStorageFees"
-	ContractNameNodeVersionBeacon   = "NodeVersionBeacon"
-	ContractNameRandomBeaconHistory = "RandomBeaconHistory"
-	ContractNameFungibleToken       = "FungibleToken"
-	ContractNameFlowToken           = "FlowToken"
-	ContractNameNonFungibleToken    = "NonFungibleToken"
-	ContractNameMetadataViews       = "MetadataViews"
-	ContractNameViewResolver        = "ViewResolver"
-	ContractNameEVM                 = "EVM"
-	ContractNameBurner              = "Burner"
+	ContractNameEpoch                      = "FlowEpoch"
+	ContractNameIDTableStaking             = "FlowIDTableStaking"
+	ContractNameClusterQC                  = "FlowClusterQC"
+	ContractNameDKG                        = "FlowDKG"
+	ContractNameServiceAccount             = "FlowServiceAccount"
+	ContractNameFlowFees                   = "FlowFees"
+	ContractNameStorageFees                = "FlowStorageFees"
+	ContractNameNodeVersionBeacon          = "NodeVersionBeacon"
+	ContractNameRandomBeaconHistory        = "RandomBeaconHistory"
+	ContractNameFungibleToken              = "FungibleToken"
+	ContractNameFlowToken                  = "FlowToken"
+	ContractNameFungibleTokenSwitchboard   = "FungibleTokenSwitchboard"
+	ContractNameFungibleTokenMetadataViews = "FungibleTokenMetadataViews"
+	ContractNameNonFungibleToken           = "NonFungibleToken"
+	ContractNameMetadataViews              = "MetadataViews"
+	ContractNameViewResolver               = "ViewResolver"
+	ContractNameEVM                        = "EVM"
+	ContractNameBurner                     = "Burner"
 
 	// AccountNameEVMStorage is not a contract, but a special account that is used to store EVM state
 	AccountNameEVMStorage = "EVMStorageAccount"
@@ -146,6 +148,7 @@ type SystemContracts struct {
 	FlowFees                   SystemContract
 	FlowToken                  SystemContract
 	FungibleToken              SystemContract
+	FungibleTokenSwitchboard   SystemContract
 	FungibleTokenMetadataViews SystemContract
 
 	// NFT related contracts
@@ -178,12 +181,12 @@ func (c SystemContracts) AsTemplateEnv() templates.Environment {
 		FlowFeesAddress:                   c.FlowFees.Address.Hex(),
 		FlowTokenAddress:                  c.FlowToken.Address.Hex(),
 		FungibleTokenAddress:              c.FungibleToken.Address.Hex(),
-		FungibleTokenMetadataViewsAddress: c.FungibleToken.Address.Hex(),
+		FungibleTokenSwitchboardAddress:   c.FungibleTokenSwitchboard.Address.Hex(),
+		FungibleTokenMetadataViewsAddress: c.FungibleTokenMetadataViews.Address.Hex(),
 
-		NonFungibleTokenAddress:         c.NonFungibleToken.Address.Hex(),
-		MetadataViewsAddress:            c.MetadataViews.Address.Hex(),
-		ViewResolverAddress:             c.ViewResolver.Address.Hex(),
-		FungibleTokenSwitchboardAddress: c.FungibleToken.Address.Hex(),
+		NonFungibleTokenAddress: c.NonFungibleToken.Address.Hex(),
+		MetadataViewsAddress:    c.MetadataViews.Address.Hex(),
+		ViewResolverAddress:     c.ViewResolver.Address.Hex(),
 
 		BurnerAddress: c.Burner.Address.Hex(),
 	}
@@ -205,6 +208,8 @@ func (c SystemContracts) All() []SystemContract {
 		c.FlowFees,
 		c.FlowToken,
 		c.FungibleToken,
+		c.FungibleTokenMetadataViews,
+		c.FungibleTokenSwitchboard,
 
 		c.NonFungibleToken,
 		c.MetadataViews,
@@ -326,9 +331,11 @@ func init() {
 		ContractNameServiceAccount:      serviceAddressFunc,
 		ContractNameStorageFees:         serviceAddressFunc,
 
-		ContractNameFlowFees:      nthAddressFunc(FlowFeesAccountIndex),
-		ContractNameFungibleToken: nthAddressFunc(FungibleTokenAccountIndex),
-		ContractNameFlowToken:     nthAddressFunc(FlowTokenAccountIndex),
+		ContractNameFlowFees:                   nthAddressFunc(FlowFeesAccountIndex),
+		ContractNameFungibleToken:              nthAddressFunc(FungibleTokenAccountIndex),
+		ContractNameFlowToken:                  nthAddressFunc(FlowTokenAccountIndex),
+		ContractNameFungibleTokenSwitchboard:   nthAddressFunc(FungibleTokenAccountIndex),
+		ContractNameFungibleTokenMetadataViews: nthAddressFunc(FungibleTokenAccountIndex),
 
 		ContractNameNonFungibleToken: nftTokenAddressFunc,
 		ContractNameMetadataViews:    nftTokenAddressFunc,
@@ -379,9 +386,11 @@ func init() {
 			RandomBeaconHistory: addressOfContract(ContractNameRandomBeaconHistory),
 			FlowStorageFees:     addressOfContract(ContractNameStorageFees),
 
-			FlowFees:      addressOfContract(ContractNameFlowFees),
-			FlowToken:     addressOfContract(ContractNameFlowToken),
-			FungibleToken: addressOfContract(ContractNameFungibleToken),
+			FlowFees:                   addressOfContract(ContractNameFlowFees),
+			FlowToken:                  addressOfContract(ContractNameFlowToken),
+			FungibleToken:              addressOfContract(ContractNameFungibleToken),
+			FungibleTokenMetadataViews: addressOfContract(ContractNameFungibleTokenMetadataViews),
+			FungibleTokenSwitchboard:   addressOfContract(ContractNameFungibleTokenSwitchboard),
 
 			NonFungibleToken: addressOfContract(ContractNameNonFungibleToken),
 			MetadataViews:    addressOfContract(ContractNameMetadataViews),
