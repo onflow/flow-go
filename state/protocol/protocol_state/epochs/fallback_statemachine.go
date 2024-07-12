@@ -53,15 +53,11 @@ func NewFallbackStateMachine(kvstore protocol.KVStoreReader, params protocol.Glo
 	}
 
 	if !nextEpochCommitted && view+params.EpochCommitSafetyThreshold() >= parentState.CurrentEpochFinalView() {
-		epochExtensionViewCount, err := kvstore.GetEpochExtensionViewCount()
-		if err != nil {
-			return nil, fmt.Errorf("could not query epoch extension view count: %w", err)
-		}
 		// we have reached safety threshold and we are still in the fallback mode
 		// prepare a new extension for the current epoch.
-		err = sm.extendCurrentEpoch(flow.EpochExtension{
+		err := sm.extendCurrentEpoch(flow.EpochExtension{
 			FirstView:     parentState.CurrentEpochFinalView() + 1,
-			FinalView:     parentState.CurrentEpochFinalView() + epochExtensionViewCount,
+			FinalView:     parentState.CurrentEpochFinalView() + kvstore.GetEpochExtensionViewCount(),
 			TargetEndTime: 0, // TODO(EFM, #6020): calculate and set target end time
 		})
 		if err != nil {

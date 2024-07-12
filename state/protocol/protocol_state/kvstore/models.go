@@ -56,7 +56,8 @@ func (model *UpgradableModel) GetVersionUpgrade() *protocol.ViewBasedActivator[u
 // with multiple supported KV model versions from the beginning.
 type Modelv0 struct {
 	UpgradableModel
-	EpochStateID flow.Identifier
+	EpochStateID            flow.Identifier
+	EpochExtensionViewCount uint64
 }
 
 var _ protocol_state.KVStoreAPI = (*Modelv0)(nil)
@@ -84,8 +85,7 @@ func (model *Modelv0) Replicate(protocolVersion uint64) (protocol_state.KVStoreM
 
 	// perform actual replication to the next version
 	v1 := &Modelv1{
-		Modelv0:                        clone.Clone(*model),
-		DefaultEpochExtensionViewCount: defaultEpochExtensionViewCount,
+		Modelv0: clone.Clone(*model),
 	}
 	return v1, nil
 }
@@ -118,8 +118,8 @@ func (model *Modelv0) SetEpochStateID(id flow.Identifier) {
 	model.EpochStateID = id
 }
 
-func (model *Modelv0) GetEpochExtensionViewCount() (uint64, error) {
-	return 0, ErrKeyNotSupported
+func (model *Modelv0) GetEpochExtensionViewCount() uint64 {
+	return model.EpochExtensionViewCount
 }
 
 // Modelv1 is v1 of the Protocol State key-value store.
@@ -127,8 +127,6 @@ func (model *Modelv0) GetEpochExtensionViewCount() (uint64, error) {
 // deployed software version.
 type Modelv1 struct {
 	Modelv0
-
-	DefaultEpochExtensionViewCount uint64
 }
 
 var _ protocol_state.KVStoreAPI = (*Modelv1)(nil)
@@ -171,10 +169,6 @@ func (model *Modelv1) GetProtocolStateVersion() uint64 {
 	return 1
 }
 
-func (model *Modelv1) GetEpochExtensionViewCount() (uint64, error) {
-	return model.DefaultEpochExtensionViewCount, nil
-}
-
 // NewDefaultKVStore constructs a default Key-Value Store of the *latest* protocol version for bootstrapping.
 // Currently, the KV store is largely empty.
 // TODO: Shortcut in bootstrapping; we will probably have to start with a non-empty KV store in the future;
@@ -182,10 +176,10 @@ func (model *Modelv1) GetEpochExtensionViewCount() (uint64, error) {
 func NewDefaultKVStore(epochStateID flow.Identifier) protocol_state.KVStoreAPI {
 	return &Modelv1{
 		Modelv0: Modelv0{
-			UpgradableModel: UpgradableModel{},
-			EpochStateID:    epochStateID,
+			UpgradableModel:         UpgradableModel{},
+			EpochStateID:            epochStateID,
+			EpochExtensionViewCount: defaultEpochExtensionViewCount,
 		},
-		DefaultEpochExtensionViewCount: defaultEpochExtensionViewCount,
 	}
 }
 

@@ -1,7 +1,6 @@
 package epochs
 
 import (
-	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/mock"
@@ -39,7 +38,7 @@ func (s *EpochFallbackStateMachineSuite) SetupTest() {
 	s.parentProtocolState.EpochFallbackTriggered = true
 
 	s.kvstore = mockstate.NewKVStoreReader(s.T())
-	s.kvstore.On("GetEpochExtensionViewCount").Return(extensionViewCount, nil).Maybe()
+	s.kvstore.On("GetEpochExtensionViewCount").Return(extensionViewCount).Maybe()
 
 	var err error
 	s.stateMachine, err = NewFallbackStateMachine(s.kvstore, s.params, s.consumer, s.candidate.View, s.parentProtocolState.Copy())
@@ -484,17 +483,6 @@ func (s *EpochFallbackStateMachineSuite) TestNewEpochFallbackStateMachine() {
 			EpochFallbackTriggered: true,
 		}
 		require.Equal(s.T(), expectedProtocolState, updatedState, "state should be equal to expected one")
-	})
-
-	// The view we enter EFM is in the epoch setup phase. This means that a SetupEvent for the next epoch is in the parent block's
-	// protocol state. We expect the logic for adding an epoch extension to be triggered but they KV store returns an exception.
-	s.Run("kv-store-exception", func() {
-		kvstore := mockstate.NewKVStoreReader(s.T())
-		exception := errors.New("kvstore-exception")
-		kvstore.On("GetEpochExtensionViewCount").Return(uint64(0), exception).Once()
-		stateMachine, err := NewFallbackStateMachine(kvstore, s.params, s.consumer, thresholdView, parentProtocolState.Copy())
-		require.ErrorIs(s.T(), err, exception)
-		require.Nil(s.T(), stateMachine)
 	})
 }
 
