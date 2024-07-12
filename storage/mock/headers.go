@@ -116,6 +116,32 @@ func (_m *Headers) ByParentID(parentID flow.Identifier) ([]*flow.Header, error) 
 	return r0, r1
 }
 
+// ByView provides a mock function with given fields: view
+func (_m *Headers) ByView(view uint64) (*flow.Header, error) {
+	ret := _m.Called(view)
+
+	var r0 *flow.Header
+	var r1 error
+	if rf, ok := ret.Get(0).(func(uint64) (*flow.Header, error)); ok {
+		return rf(view)
+	}
+	if rf, ok := ret.Get(0).(func(uint64) *flow.Header); ok {
+		r0 = rf(view)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*flow.Header)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(uint64) error); ok {
+		r1 = rf(view)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // Exists provides a mock function with given fields: blockID
 func (_m *Headers) Exists(blockID flow.Identifier) (bool, error) {
 	ret := _m.Called(blockID)

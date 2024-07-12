@@ -249,6 +249,21 @@ func (mr *MockHeadersMockRecorder) ByParentID(arg0 interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ByParentID", reflect.TypeOf((*MockHeaders)(nil).ByParentID), arg0)
 }
 
+// ByView mocks base method.
+func (m *MockHeaders) ByView(arg0 uint64) (*flow.Header, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ByView", arg0)
+	ret0, _ := ret[0].(*flow.Header)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ByView indicates an expected call of ByView.
+func (mr *MockHeadersMockRecorder) ByView(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ByView", reflect.TypeOf((*MockHeaders)(nil).ByView), arg0)
+}
+
 // Exists mocks base method.
 func (m *MockHeaders) Exists(arg0 flow.Identifier) (bool, error) {
 	m.ctrl.T.Helper()

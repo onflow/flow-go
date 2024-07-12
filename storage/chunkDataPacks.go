@@ -6,6 +6,7 @@ import (
 
 // ChunkDataPacks represents persistent storage for chunk data packs.
 type ChunkDataPacks interface {
+	Prunable
 
 	// Store stores multiple ChunkDataPacks cs keyed by their ChunkIDs in a batch.
 	// No errors are expected during normal operation, but it may return generic error

@@ -19,7 +19,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/executiondatasync/pruner"
+	edpruner "github.com/onflow/flow-go/module/executiondatasync/pruner"
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/module/mempool/queue"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
@@ -28,6 +28,7 @@ import (
 	"github.com/onflow/flow-go/network/channels"
 	psEvents "github.com/onflow/flow-go/state/protocol/events"
 	"github.com/onflow/flow-go/storage"
+	ppruner "github.com/onflow/flow-go/storage/pruner"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
@@ -50,7 +51,8 @@ type Engine struct {
 	maxCollectionHeight uint64
 	tracer              module.Tracer
 	extensiveLogging    bool
-	executionDataPruner *pruner.Pruner
+	executionDataPruner *edpruner.Pruner
+	protocolDBPruner    *ppruner.BlockProcessedProducer
 	uploader            *uploader.Manager
 	stopControl         *stop.StopControl
 	loader              BlockLoader
@@ -71,7 +73,8 @@ func New(
 	metrics module.ExecutionMetrics,
 	tracer module.Tracer,
 	extLog bool,
-	pruner *pruner.Pruner,
+	pruner *edpruner.Pruner,
+	protocolDBPruner *ppruner.Pruner,
 	uploader *uploader.Manager,
 	stopControl *stop.StopControl,
 	loader BlockLoader,
@@ -97,6 +100,7 @@ func New(
 		tracer:              tracer,
 		extensiveLogging:    extLog,
 		executionDataPruner: pruner,
+		protocolDBPruner:    protocolDBPruner.Register(),
 		uploader:            uploader,
 		stopControl:         stopControl,
 		loader:              loader,
@@ -505,6 +509,10 @@ func (e *Engine) executeBlock(
 
 	if e.executionDataPruner != nil {
 		e.executionDataPruner.NotifyFulfilledHeight(executableBlock.Height())
+	}
+
+	if e.protocolDBPruner != nil {
+		e.protocolDBPruner.OnBlockProcessed(executableBlock.Height())
 	}
 
 	e.stopControl.OnBlockExecuted(executableBlock.Block.Header)

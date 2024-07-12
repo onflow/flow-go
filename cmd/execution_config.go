@@ -68,6 +68,8 @@ type ExecutionConfig struct {
 	enableChecker            bool
 	enableNewIngestionEngine bool
 	publicAccessID           string
+
+	enableProtocolDBPruner bool
 }
 
 func (exeConf *ExecutionConfig) SetupFlags(flags *pflag.FlagSet) {
@@ -124,7 +126,7 @@ func (exeConf *ExecutionConfig) SetupFlags(flags *pflag.FlagSet) {
 	flags.BoolVar(&exeConf.enableChecker, "enable-checker", true, "enable checker to check the correctness of the execution result, default is true")
 	flags.BoolVar(&exeConf.enableNewIngestionEngine, "enable-new-ingestion-engine", false, "enable new ingestion engine, default is false")
 	flags.StringVar(&exeConf.publicAccessID, "public-access-id", "", "public access ID for the node")
-
+	flags.BoolVar(&exeConf.enableProtocolDBPruner, "protocol-db-pruner-enabled", false, "enable protocol db pruner")
 }
 
 func (exeConf *ExecutionConfig) ValidateFlags() error {

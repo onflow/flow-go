@@ -16,6 +16,7 @@ import (
 type ChunkDataPacks struct {
 	db             *pebble.DB
 	collections    storage.Collections
+	results        storage.ExecutionResults
 	byChunkIDCache *Cache[flow.Identifier, *storage.StoredChunkDataPack]
 }
 
@@ -141,5 +142,26 @@ func (ch *ChunkDataPacks) batchStore(c *flow.ChunkDataPack, batch *Batch) error 
 	if err != nil {
 		return fmt.Errorf("failed to store chunk data pack: %w", err)
 	}
+	return nil
+}
+
+// Prune removes chunk data packs by chunk ID, it removes them atomically.
+// Any errors are exceptions
+func (ch *ChunkDataPacks) Prune(blockID flow.Identifier, batch storage.BatchStorage) error {
+	w := operation.NewBatchWriter(batch.GetWriter())
+
+	result, err := ch.results.ByBlockID(blockID)
+	if err != nil {
+		return fmt.Errorf("could not retrieve execution result for block (id: %s): %w", blockID, err)
+	}
+
+	for _, chunk := range result.Chunks {
+		chunkID := chunk.ID()
+		err := ch.batchRemove(chunkID, w)
+		if err != nil {
+			return fmt.Errorf("could not remove chunk data pack (id: %s, blockID: %s): %w", chunkID, blockID, err)
+		}
+	}
+
 	return nil
 }

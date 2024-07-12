@@ -153,3 +153,7 @@ func (ch *ChunkDataPacks) retrieveCHDP(chunkID flow.Identifier) func(*badger.Txn
 		return val, nil
 	}
 }
+
+func (ch *ChunkDataPacks) Prune(_ flow.Identifier, _ storage.BatchStorage) error {
+	return fmt.Errorf("not implemented")
+}
