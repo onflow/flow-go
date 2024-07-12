@@ -433,7 +433,15 @@ func (ctl *BlockTimeController) measureViewDuration(tb TimedBlock) error {
 //   - update the curr epoch final view and target end time with the extension data.
 //
 // No errors are expected during normal operation.
-func (ctl *BlockTimeController) processEpochExtended(header *flow.Header, extension flow.EpochExtension) error {
+func (ctl *BlockTimeController) processEpochExtended(first *flow.Header) error {
+	finalView, err := ctl.state.AtHeight(header.Height).Epochs().Current().FinalView()
+	if err != nil {
+		return fmt.Errorf("failed to retrieve final view at block id %s", header.ID())
+	}
+	targetEndTime, err := ctl.state.AtHeight(header.Height).Epochs().Current().TargetEndTime()
+	if err != nil {
+		return fmt.Errorf("failed to retrieve target end time at block id %s", header.ID())
+	}
 	// sanity check: ensure the final view of the current epoch monotonically increases
 	if extension.FinalView < ctl.epochInfo.curEpochFinalView {
 		return fmt.Errorf("final view of epoch must be monotonically increases, but is decreasing from %d to %d", ctl.epochInfo.curEpochFinalView, extension.FinalView)
