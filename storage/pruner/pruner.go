@@ -45,7 +45,7 @@ type Pruner struct {
 	headers        storage.Headers
 	chunkDataPacks storage.ChunkDataPacks
 
-	targetKeepBlocks uint64 // number of blocks to keep below the highest block
+	targetKeepBlocks uint64 // number of blocks to keep below the highest executed and sealed block
 	pruneThreshold   uint64 // number of blocks to exceed the target before pruning
 	pruneMethod      PruneMethod
 
