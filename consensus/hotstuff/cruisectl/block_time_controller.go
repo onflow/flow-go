@@ -175,7 +175,7 @@ func (ctl *BlockTimeController) initEpochInfo() error {
 	if err != nil {
 		return fmt.Errorf("could not check snapshot phase: %w", err)
 	}
-	if phase > flow.EpochPhaseStaking {
+	if phase == flow.EpochPhaseCommitted {
 		nextEpochFinalView, err := finalSnapshot.Epochs().Next().FinalView()
 		if err != nil {
 			return fmt.Errorf("could not initialize next epoch final view: %w", err)
