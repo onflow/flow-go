@@ -235,15 +235,19 @@ func (db *StateDB) GetState(addr gethCommon.Address, key gethCommon.Hash) gethCo
 }
 
 // GetStorageRoot returns some sort of root for the given address.
+//
 // Warning! Since StateDB doesn't construct a Merkel tree under the hood,
 // the behavior of this endpoint is as follow:
 // - if an account doesn't exist it returns common.Hash{}
 // - if account is EOA it returns gethCommon.EmptyRootHash
 // - else it returns a unique hash value as the root but this returned
+//
 // This behavior is ok for this version of EVM as the only
 // use case in the EVM right now is here
 // https://github.com/onflow/go-ethereum/blob/37590b2c5579c36d846c788c70861685b0ea240e/core/vm/evm.go#L480
 // where the value that is returned is compared to empty values to make sure the storage is empty
+// This endpoint is added mostly to prevent the case that an smart contract is self-destructed
+// and a later transaction tries to deploy a contract to the same address.
 func (db *StateDB) GetStorageRoot(addr common.Address) common.Hash {
 	root, err := db.lastestView().GetStorageRoot(addr)
 	db.handleError(err)
