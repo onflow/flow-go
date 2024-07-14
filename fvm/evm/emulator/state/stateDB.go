@@ -498,13 +498,16 @@ func (s *StateDB) Error() error {
 }
 
 // PointCache is not supported and only needed
-// when EIP-4762 are in effect (e.g. after Verkle fork)
+// when EIP-4762 is enabled in the future versions
+// (currently planned for after Verkle fork).
 func (s *StateDB) PointCache() *utils.PointCache {
 	return nil
 }
 
 // Witness is not supported and only needed
-// when EIP-4762 are in effect. (e.g. after Verkle fork)
+// when if witness collection is enabled (EnableWitnessCollection flag).
+// By definition it should returns a set containing all trie nodes that have been accessed.
+// The returned map could be nil if the witness is empty.
 func (s *StateDB) Witness() *stateless.Witness {
 	return nil
 }
