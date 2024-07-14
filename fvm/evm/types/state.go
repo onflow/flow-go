@@ -62,12 +62,12 @@ type ReadOnlyView interface {
 	GetCodeSize(gethCommon.Address) (int, error)
 	// GetState returns values for an slot in the main storage
 	GetState(SlotAddress) (gethCommon.Hash, error)
-	// GetState returns the root for the address
-	// Warning! that the current behavior is
-	// for non-existing accounts it returns empty hash, for
-	// EOAs it returns the gethCommon.EmptyRootHash and
-	// for others it returns a unique hash but this root hash
-	// is not a commitment to the state.
+	// GetStorageRoot returns some sort of root for the given address.
+	// Warning! Since StateDB doesn't construct a Merkel tree under the hood,
+	// the behavior of this endpoint is as follow:
+	// - if an account doesn't exist it returns common.Hash{}
+	// - if account is EOA it returns gethCommon.EmptyRootHash
+	// - else it returns a unique hash value as the root but this returned
 	GetStorageRoot(gethCommon.Address) (gethCommon.Hash, error)
 	// GetTransientState returns values for an slot transient storage
 	GetTransientState(SlotAddress) gethCommon.Hash
