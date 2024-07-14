@@ -497,12 +497,14 @@ func (s *StateDB) Error() error {
 	return wrapError(s.cachedError)
 }
 
-// PointCache is not supported.
+// PointCache is not supported and only needed
+// when EIP-4762 are in effect (e.g. after Verkle fork)
 func (s *StateDB) PointCache() *utils.PointCache {
 	return nil
 }
 
-// Witness is not supported.
+// Witness is not supported and only needed
+// when EIP-4762 are in effect. (e.g. after Verkle fork)
 func (s *StateDB) Witness() *stateless.Witness {
 	return nil
 }
