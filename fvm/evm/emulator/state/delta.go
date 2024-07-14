@@ -175,8 +175,8 @@ func (d *DeltaView) CreateContract(addr gethCommon.Address) {
 	}
 }
 
-// IsNewContract returns true if address has been created in this tx
-// this is used to correctly handle EIP-6780 'delete-in-same-transaction' logic.
+// IsNewContract returns true if address has been created in this tx.
+// It's used to correctly handle EIP-6780 'delete-in-same-transaction' logic.
 func (d *DeltaView) IsNewContract(addr gethCommon.Address) bool {
 	_, found := d.newContract[addr]
 	if found {
@@ -402,11 +402,9 @@ func (d *DeltaView) SetState(sk types.SlotAddress, value gethCommon.Hash) error 
 // where the returned value is compared against empty hash and empty root hash
 // values to determine smart contracts that already has data.
 //
-// Since BaseView doesn't construct a Merkel tree
-// for each account hash of root slab as some sort of root hash.
-// if account doesn't exist we return empty hash
-// if account exist but not a smart contract we return EmptyRootHash
-// if is a contract we return the hash of the root slab content (some sort of commitment).
+// Here we return values for non-existing accounts, and redirect the call all
+// the way back to the base view. This means that the state root that is returned
+// ignores the updates to slots during the transaction.
 func (d *DeltaView) GetStorageRoot(addr gethCommon.Address) (gethCommon.Hash, error) {
 	exists, err := d.Exist(addr)
 	if err != nil {
@@ -417,7 +415,7 @@ func (d *DeltaView) GetStorageRoot(addr gethCommon.Address) (gethCommon.Hash, er
 	}
 
 	// otherwise go back to parents (until we reach the base view)
-	// note that if storage is updated in deltas but not
+	// Note that if storage is updated in deltas but not
 	// committed the expected behavior is to return the root in the base view.
 	return d.parent.GetStorageRoot(addr)
 }

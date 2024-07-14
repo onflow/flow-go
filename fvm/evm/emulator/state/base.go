@@ -166,11 +166,10 @@ func (v *BaseView) GetState(sk types.SlotAddress) (gethCommon.Hash, error) {
 }
 
 // GetStorageRoot returns some sort of storage root for the given address
-//
 // WARNING! the root that is returned is not a commitment to the state
 // Mostly is returned to satisfy the requirements of the EVM,
 // where the returned value is compared against empty hash and empty root hash
-// values to determine smart contracts that already has data.
+// to determine smart contracts that already has data.
 //
 // Since BaseView doesn't construct a Merkel tree
 // for each account hash of root slab as some sort of root hash.
@@ -194,7 +193,7 @@ func (v *BaseView) GetStorageRoot(addr common.Address) (common.Hash, error) {
 
 	// otherwise is smart contract account
 	// return the hash of collection ID
-	// not that this is not a proper root as it doesn't have
+	// This is not a proper root as it doesn't have
 	// any commitment to the content.
 	return gethCrypto.Keccak256Hash(account.CollectionID), nil
 }

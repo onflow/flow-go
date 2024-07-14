@@ -83,6 +83,11 @@ func (db *StateDB) CreateAccount(addr gethCommon.Address) {
 	db.handleError(err)
 }
 
+// IsCreated returns true if address is recently created (context of a transaction)
+func (db *StateDB) IsCreated(addr gethCommon.Address) bool {
+	return db.lastestView().IsCreated(addr)
+}
+
 // CreateContract is used whenever a contract is created. This may be preceded
 // by CreateAccount, but that is not required if it already existed in the
 // state due to funds sent beforehand.
@@ -90,11 +95,6 @@ func (db *StateDB) CreateAccount(addr gethCommon.Address) {
 // correctly handle EIP-6780 'delete-in-same-transaction' logic.
 func (db *StateDB) CreateContract(addr gethCommon.Address) {
 	db.lastestView().CreateContract(addr)
-}
-
-// IsCreated returns true if address is recently created (context of a transaction)
-func (db *StateDB) IsCreated(addr gethCommon.Address) bool {
-	return db.lastestView().IsCreated(addr)
 }
 
 // IsCreated returns true if address is a new contract
