@@ -8,8 +8,6 @@ import (
 	"testing"
 
 	"github.com/holiman/uint256"
-	"github.com/onflow/flow-go/utils/io"
-
 	"github.com/onflow/go-ethereum/common"
 	"github.com/onflow/go-ethereum/core/tracing"
 	"github.com/stretchr/testify/require"
@@ -18,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/fvm/evm/testutils"
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/utils/io"
 )
 
 const (
