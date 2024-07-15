@@ -9,8 +9,8 @@ import (
 // It is used to implement lazy initialization of the tracked identity list.
 // The structure relies on holding a reference to the list that is being modified.
 type trackedDynamicIdentityList struct {
-	dynamicIdentites flow.DynamicIdentityEntryList
-	identityLookup   map[flow.Identifier]*flow.DynamicIdentityEntry
+	dynamicIdentities flow.DynamicIdentityEntryList
+	identityLookup    map[flow.Identifier]*flow.DynamicIdentityEntry
 }
 
 // ejector is a dedicated structure for tracking ejected nodes in the state machine.
@@ -31,7 +31,7 @@ func (e *ejector) Eject(nodeID flow.Identifier) bool {
 	l := len(e.identityLists)
 	if len(e.ejected) == 0 { // if this is the first ejection sealed in this block, we have to populate the lookup first
 		for i := 0; i < l; i++ {
-			e.identityLists[i].identityLookup = e.identityLists[i].dynamicIdentites.Lookup()
+			e.identityLists[i].identityLookup = e.identityLists[i].dynamicIdentities.Lookup()
 		}
 	}
 
@@ -52,7 +52,7 @@ func (e *ejector) Eject(nodeID flow.Identifier) bool {
 // we ensure that the ejection status of previously ejected nodes is not reverted.
 // If a node was previously ejected and the new DynamicIdentityList readmits it, a protocol.InvalidServiceEventError is returned.
 func (e *ejector) TrackDynamicIdentityList(list flow.DynamicIdentityEntryList) error {
-	tracker := trackedDynamicIdentityList{dynamicIdentites: list}
+	tracker := trackedDynamicIdentityList{dynamicIdentities: list}
 	if len(e.ejected) > 0 {
 		// nodes were already ejected in this block, so their ejection should not be reverted in the new `list`
 		tracker.identityLookup = list.Lookup()

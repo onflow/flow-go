@@ -146,6 +146,7 @@ func (m *FallbackStateMachine) ProcessEpochCommit(setup *flow.EpochCommit) (bool
 // in terms of emitted events. Therefore, we aim to be resilient against invalid and/or inconsistent events:
 //  1. Any amount of setup and commit events being sealed in the same block as an epoch recover event:
 //     EpochSetup and EpochCommit are consistently ignored by the FallbackStateMachine, also after a successful recovery.
+//     For a detailed explanation why this is safe, see `ProcessEpochSetup` above.
 //  2. Multiple EpochRecover events sealed in the same block:
 //     - Invalid `EpochRecover` events are reported to telemetry and dropped.
 //     - The first valid `EpochRecover` event is accepted (if any is sealed in block)
