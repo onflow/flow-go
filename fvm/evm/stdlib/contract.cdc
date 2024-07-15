@@ -67,10 +67,10 @@ contract EVM {
         /// in case of revert, the smart contract custom error message
         /// is also returned here (see EIP-140 for more details).
         returnedData: [UInt8],
-        /// captures the input and output of the calls (rlp encoded) to the extra  
+        /// captures the input and output of the calls (rlp encoded) to the extra
         /// precompiled contracts (e.g. Cadence Arch) during the transaction execution.
         /// This data helps to replay the transactions without the need to
-        /// have access to the full cadence state data. 
+        /// have access to the full cadence state data.
         precompiledCalls: [UInt8]
     )
 
@@ -81,12 +81,12 @@ contract EVM {
     /// into the EVM environment. Note that this event is not emitted
     /// for transfer of flow tokens between two EVM addresses.
     /// Similar to the FungibleToken.Deposited event
-    /// this event includes a depositedUUID that captures the 
+    /// this event includes a depositedUUID that captures the
     /// uuid of the source vault.
     access(all)
     event FLOWTokensDeposited(
-        address: String, 
-        amount: UFix64, 
+        address: String,
+        amount: UFix64,
         depositedUUID: UInt64,
         balanceAfterInAttoFlow: UInt
     )
@@ -95,12 +95,12 @@ contract EVM {
     /// out of the EVM environment. Note that this event is not emitted
     /// for transfer of flow tokens between two EVM addresses.
     /// similar to the FungibleToken.Withdrawn events
-    /// this event includes a withdrawnUUID that captures the 
+    /// this event includes a withdrawnUUID that captures the
     /// uuid of the returning vault.
     access(all)
     event FLOWTokensWithdrawn(
-        address: String, 
-        amount: UFix64, 
+        address: String,
+        amount: UFix64,
         withdrawnUUID: UInt64,
         balanceAfterInAttoFlow: UInt
     )
@@ -177,8 +177,8 @@ contract EVM {
                 to: self.bytes
             )
             emit FLOWTokensDeposited(
-                address: self.toString(), 
-                amount: amount, 
+                address: self.toString(),
+                amount: amount,
                 depositedUUID: depositedUUID,
                 balanceAfterInAttoFlow: self.balance().attoflow
             )
@@ -411,7 +411,7 @@ contract EVM {
             emit FLOWTokensWithdrawn(
                 address: self.address().toString(),
                 amount: balance.inFLOW(),
-                withdrawnUUID: vault.uuid, 
+                withdrawnUUID: vault.uuid,
                 balanceAfterInAttoFlow: self.balance().attoflow
             )
             return <-vault
@@ -814,18 +814,18 @@ contract EVM {
             ?? panic("Could not borrow reference to the EVM bridge")
     }
 
-    /// The Heartbeat resource controls the block production 
+    /// The Heartbeat resource controls the block production
     access(all) resource Heartbeat {
 
-        /// heartbeat calls commit block proposals and forms new blocks including all the 
+        /// heartbeat calls commit block proposals and forms new blocks including all the
         /// recently executed transactions.
-        /// The Flow protocol makes sure to call this function once per block as a system call. 
+        /// The Flow protocol makes sure to call this function once per block as a system call.
         access(all) fun heartbeat() {
             InternalEVM.commitBlockProposal()
         }
     }
-    
-    init() { 
+
+    init() {
         self.account.storage.save(<-create Heartbeat(), to: /storage/EVMHeartbeat)
     }
 }
