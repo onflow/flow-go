@@ -75,8 +75,8 @@ func TestAccountStatus(t *testing.T) {
 			0, 0, 0, 0, 0, 0, 0, 3, // account id counter
 		}
 
-		// The new format has an extra 8 bytes for the account id counter
-		// so we need to increase the storage used by 8 bytes while migrating it
+		// for v2->v3 migration, we are shrinking the public key counts from uint64 to uint32
+		// so we need to decrease the storage used by 4 bytes
 		decreaseInSize := uint64(4)
 
 		migrated, err := environment.AccountStatusFromBytes(oldBytes)

@@ -24,7 +24,7 @@ func ToUint64(uint64Str string) (uint64, error) {
 func ToUint32(uint32Str string) (uint32, error) {
 	val, err := strconv.ParseUint(uint32Str, 10, 32)
 	if err != nil {
-		return 0, fmt.Errorf("value must be an unsigned 64 bit integer") // hide error from user
+		return 0, fmt.Errorf("value must be an unsigned 32 bit integer") // hide error from user
 	}
 	return uint32(val), nil
 }

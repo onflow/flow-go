@@ -107,6 +107,7 @@ func AccountStatusFromBytes(inp []byte) (*AccountStatus, error) {
 		// migrate v2 to v3
 
 		inp2 := make([]byte, accountStatusSizeV2)
+		// copy the old account status first, so that we don't slice the input
 		copy(inp2, inp)
 
 		// cut leading 4 bytes of old public key count.

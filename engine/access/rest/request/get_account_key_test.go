@@ -30,7 +30,7 @@ func Test_GetAccountKey_InvalidParse(t *testing.T) {
 			"0xf8d6e0586b0a20c7",
 			"-1.2",
 			"100",
-			"invalid key index: value must be an unsigned 64 bit integer",
+			"invalid key index: value must be an unsigned 32 bit integer",
 		},
 		{
 			"parse with invalid height",

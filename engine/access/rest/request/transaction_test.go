@@ -82,7 +82,7 @@ func TestTransaction_InvalidParse(t *testing.T) {
 		output     string
 	}{
 		{"address", "-1", "invalid address"},
-		{"key_index", "-1", `invalid key index: value must be an unsigned 64 bit integer`},
+		{"key_index", "-1", `invalid key index: value must be an unsigned 32 bit integer`},
 		{"sequence_number", "-1", "invalid sequence number: value must be an unsigned 64 bit integer"},
 	}
 
@@ -103,7 +103,7 @@ func TestTransaction_InvalidParse(t *testing.T) {
 		output     string
 	}{
 		{"address", "-1", "invalid address"},
-		{"key_index", "-1", `invalid key index: value must be an unsigned 64 bit integer`},
+		{"key_index", "-1", `invalid key index: value must be an unsigned 32 bit integer`},
 		{"signature", "-1", "invalid signature: invalid encoding"},
 	}
 

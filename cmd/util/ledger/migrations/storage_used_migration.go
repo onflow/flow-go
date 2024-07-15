@@ -104,7 +104,7 @@ func (m *AccountUsageMigration) MigrateAccount(
 			log.Error().
 				Str("account", address.HexWithPrefix()).
 				Msgf("account storage used would be negative")
-			return nil
+			return fmt.Errorf("account storage used would be negative")
 		}
 
 		actualUsed = actualUsed - uint64(-statusSizeDiff)
