@@ -40,21 +40,21 @@ func (e *ejector) Eject(nodeID flow.Identifier) bool {
 	}
 	e.ejected = append(e.ejected, nodeID)
 
-	var ejected bool
+	var nodeFound bool
 	for i := 0; i < l; i++ {
 		dynamicIdentity, found := e.identityLists[i].identityLookup[nodeID]
 		if found {
-			ejected = true
+			nodeFound = true
 			dynamicIdentity.Ejected = true
 		}
 	}
-	return ejected
+	return nodeFound
 }
 
 // TrackDynamicIdentityList tracks a new DynamicIdentityList in the state machine.
 // It is not allowed to readmit nodes that were ejected. Whenever a new DynamicIdentityList is tracked,
 // we ensure that the ejection status of previously ejected nodes is not reverted.
-// If a node was previously ejected and the new DynamicIdentityList contains the node with an `Ejected` 
+// If a node was previously ejected and the new DynamicIdentityList contains the node with an `Ejected`
 // status of `false`, a `protocol.InvalidServiceEventError` is returned and the ejector remains unchanged.
 func (e *ejector) TrackDynamicIdentityList(list flow.DynamicIdentityEntryList) error {
 	tracker := trackedDynamicIdentityList{dynamicIdentities: list}

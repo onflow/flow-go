@@ -91,10 +91,10 @@ func (u *baseStateMachine) EjectIdentity(nodeID flow.Identifier) error {
 // No errors are expected during normal operations.
 func (u *baseStateMachine) TransitionToNextEpoch() error {
 	nextEpoch := u.state.NextEpoch
-	if nextEpoch == nil { // nextEpoch ≠ nil if and only if next epoch was already set up (on the happy path)
+	if nextEpoch == nil { // nextEpoch ≠ nil if and only if next epoch was already set up
 		return fmt.Errorf("protocol state for next epoch has not yet been setup")
 	}
-	if nextEpoch.CommitID == flow.ZeroID { // nextEpoch.CommitID ≠ flow.ZeroID if and only if next epoch was already committed (on the happy path)
+	if nextEpoch.CommitID == flow.ZeroID { // nextEpoch.CommitID ≠ flow.ZeroID if and only if next epoch was already committed
 		return fmt.Errorf("protocol state for next epoch has not yet been committed")
 	}
 	// Check if we are at the next epoch, only then a transition is allowed
