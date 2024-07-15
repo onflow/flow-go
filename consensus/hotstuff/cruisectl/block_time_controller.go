@@ -434,15 +434,16 @@ func (ctl *BlockTimeController) measureViewDuration(tb TimedBlock) error {
 // of the extension.
 // No errors are expected during normal operation.
 func (ctl *BlockTimeController) processEpochExtended(first *flow.Header) error {
-	finalView, err := ctl.state.AtHeight(first.Height).Epochs().Current().FinalView()
+	currEpoch := ctl.state.AtHeight(first.Height).Epochs().Current()
+	finalView, err := currEpoch.FinalView()
 	if err != nil {
 		return fmt.Errorf("failed to retrieve final view at height id %d", first.Height)
 	}
-	targetEndTime, err := ctl.state.AtHeight(first.Height).Epochs().Current().TargetEndTime()
+	targetEndTime, err := currEpoch.TargetEndTime()
 	if err != nil {
 		return fmt.Errorf("failed to retrieve target end time at height id %d", first.Height)
 	}
-	targetDuration, err := ctl.state.AtBlockID(first.ID()).Epochs().Current().TargetDuration()
+	targetDuration, err := currEpoch.TargetDuration()
 	if err != nil {
 		return fmt.Errorf("failed to retrieve target duration at height id %d", first.Height)
 	}

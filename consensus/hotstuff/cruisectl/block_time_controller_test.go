@@ -17,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	mockmodule "github.com/onflow/flow-go/module/mock"
+	"github.com/onflow/flow-go/state/protocol/inmem"
 	mockprotocol "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/onflow/flow-go/utils/unittest/mocks"
@@ -220,18 +221,24 @@ func (bs *BlockTimeControllerSuite) TestOnEpochExtended() {
 	bs.CreateAndStartController()
 	defer bs.StopController()
 
-	header := unittest.BlockHeaderFixture()
-	extensionFirstView := bs.curEpochFinalView + 1
-	extensionFinalView := bs.curEpochFinalView * 2
-	extensionTargetTime, err := bs.snapshot.Epochs().Current().TargetEndTime()
-	require.NoError(bs.T(), err)
-	bs.state.On("AtBlockID", mock.Anything).Return(&bs.snapshot).Once()
+	// create setup epoch fixture with extensions and transition into it
+	setupFixture := unittest.EpochSetupFixture()
+	setupFixture.Counter = bs.epochCounter + 1
+	setupFixture.FirstView = bs.curEpochFinalView + 1
+	setupFixture.FinalView = bs.curEpochFinalView * 2
 
 	extension := flow.EpochExtension{
-		FirstView:     extensionFirstView,
-		FinalView:     extensionFinalView,
-		TargetEndTime: extensionTargetTime,
+		FirstView: setupFixture.FirstView,
+		FinalView: setupFixture.FinalView,
 	}
+
+	epoch := inmem.NewSetupEpoch(setupFixture, []flow.EpochExtension{extension})
+	bs.epochs.Add(epoch)
+	bs.epochs.Transition()
+
+	header := unittest.BlockHeaderFixture()
+	bs.state.On("AtHeight", header.Height).Return(&bs.snapshot).Once()
+
 	bs.ctl.EpochExtended(bs.epochCounter, header, extension)
 
 	// expect epoch fallback triggered to be set to true when first extension is encountered indicating we are in epoch fallback mode
@@ -239,7 +246,15 @@ func (bs *BlockTimeControllerSuite) TestOnEpochExtended() {
 		return len(bs.ctl.epochEvents) == 0
 	}, time.Second, time.Millisecond)
 
+	extensionTargetTime, err := bs.snapshot.Epochs().Current().TargetEndTime()
+	require.NoError(bs.T(), err)
+	extensionTargetDuration, err := bs.snapshot.Epochs().Current().TargetDuration()
+	require.NoError(bs.T(), err)
+	extensionFinalView, err := bs.snapshot.Epochs().Current().FinalView()
+	require.NoError(bs.T(), err)
+
 	assert.Equal(bs.T(), extensionTargetTime, bs.ctl.curEpochTargetEndTime)
+	assert.Equal(bs.T(), extensionTargetDuration, bs.ctl.curEpochTargetDuration)
 	assert.Equal(bs.T(), extensionFinalView, bs.ctl.curEpochFinalView)
 
 	// duplicate events should be no-ops
