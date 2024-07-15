@@ -3,7 +3,6 @@ package flow
 import (
 	"fmt"
 
-	clone "github.com/huandu/go-clone/generic"
 	"golang.org/x/exp/slices"
 )
 
@@ -98,11 +97,15 @@ func (c *EpochStateContainer) Copy() *EpochStateContainer {
 	if c == nil {
 		return nil
 	}
+	ext := make([]EpochExtension, len(c.EpochExtensions))
+	for i, e := range c.EpochExtensions {
+		ext[i] = e // value type
+	}
 	return &EpochStateContainer{
 		SetupID:          c.SetupID,
 		CommitID:         c.CommitID,
 		ActiveIdentities: c.ActiveIdentities.Copy(),
-		EpochExtensions:  clone.Clone(c.EpochExtensions),
+		EpochExtensions:  ext,
 	}
 }
 

@@ -213,11 +213,11 @@ func (m *FallbackStateMachine) ensureValidEpochRecover(epochRecover *flow.EpochR
 	}
 	err := protocol.IsValidExtendingEpochSetup(&epochRecover.EpochSetup, m.state)
 	if err != nil {
-		return fmt.Errorf("invalid epoch recovery event(setup): %w", err)
+		return fmt.Errorf("invalid setup portion in EpochRecover event: %w", err)
 	}
 	err = protocol.IsValidEpochCommit(&epochRecover.EpochCommit, &epochRecover.EpochSetup)
 	if err != nil {
-		return fmt.Errorf("invalid epoch recovery event(commit): %w", err)
+		return fmt.Errorf("invalid commit portion in EpochRecover event: %w", err)
 	}
 	return nil
 }
