@@ -33,11 +33,11 @@ func NewFallbackStateMachine(params protocol.GlobalParams, telemetry protocol_st
 	nextEpochCommitted := state.EpochPhase() == flow.EpochPhaseCommitted
 	// we are entering fallback mode, this logic needs to be executed only once
 	if !state.EpochFallbackTriggered {
-		// the next epoch has not been committed, but possibly setup, make sure it is cleared
+		// The next epoch has not been committed. Though setup event may be in the state, make sure it is cleared.
 		// CAUTION: this logic must be consistent with the `MinEpochStateEntry.EpochPhase()`, which
 		// determines the epoch phase based on the configuration of the fields we set here!
 		// Specifically, if and only if the next epoch is already committed as of the parent state,
-		// we go through with that committed epoch. Otherwise, we have a tentative values of an epoch
+		// we go through with that committed epoch. Otherwise, we have tentative values of an epoch
 		// not yet properly specified, which we have to clear out.
 		if !nextEpochCommitted {
 			state.NextEpoch = nil
@@ -170,7 +170,7 @@ func (m *FallbackStateMachine) ProcessEpochRecover(epochRecover *flow.EpochRecov
 		m.state.CurrentEpochSetup,
 		&epochRecover.EpochSetup)
 	if err != nil {
-		m.telemetry.OnInvalidServiceEvent(epochRecover.ServiceEvent(), err)
+		m.telemetry.OnInvalidServiceEvent(epochRecover.ServiceEvent(), fmt.Errorf("rejecting EpochRecover event: %w", err))
 		return false, nil
 	}
 
@@ -194,7 +194,7 @@ func (m *FallbackStateMachine) ProcessEpochRecover(epochRecover *flow.EpochRecov
 	}
 	err = m.ejector.TrackDynamicIdentityList(m.state.NextEpoch.ActiveIdentities)
 	if err != nil {
-		m.telemetry.OnInvalidServiceEvent(epochRecover.ServiceEvent(), err)
+		m.telemetry.OnInvalidServiceEvent(epochRecover.ServiceEvent(), fmt.Errorf("rejecting EpochRecover event: %w", err))
 		return false, nil
 	}
 	// if we have processed a valid EpochRecover event, we should exit EFM.
