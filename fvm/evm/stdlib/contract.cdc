@@ -29,7 +29,7 @@ contract EVM {
         // all gas used in the block by transactions included
         totalGasUsed: UInt64,
         // parent block hash
-        parentHash: String,
+        parentHash: [UInt8],
         // hash of all the transaction receipts
         receiptRoot: String,
         // all the transactions included in the block

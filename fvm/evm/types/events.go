@@ -141,7 +141,7 @@ var blockEventFields = []cadence.Field{
 	cadence.NewField("timestamp", cadence.UInt64Type),
 	cadence.NewField("totalSupply", cadence.IntType),
 	cadence.NewField("totalGasUsed", cadence.UInt64Type),
-	cadence.NewField("parentHash", cadence.StringType),
+	cadence.NewField("parentHash", cadence.NewVariableSizedArrayType(cadence.UInt8Type)),
 	cadence.NewField("receiptRoot", cadence.StringType),
 	cadence.NewField(
 		"transactionHashes",
@@ -173,7 +173,7 @@ func (p *blockEvent) ToCadence(location common.Location) (cadence.Event, error) 
 		cadence.NewUInt64(p.Timestamp),
 		cadence.NewIntFromBig(p.TotalSupply),
 		cadence.NewUInt64(p.TotalGasUsed),
-		cadence.String(p.ParentBlockHash.String()),
+		BytesToCadenceUInt8ArrayValue(p.ParentBlockHash.Bytes()),
 		cadence.String(p.ReceiptRoot.String()),
 		cadence.NewArray(hashes).
 			WithType(cadence.NewVariableSizedArrayType(cadence.StringType)),
@@ -186,7 +186,7 @@ type BlockExecutedEventPayload struct {
 	Timestamp         uint64           `cadence:"timestamp"`
 	TotalSupply       cadence.Int      `cadence:"totalSupply"`
 	TotalGasUsed      uint64           `cadence:"totalGasUsed"`
-	ParentBlockHash   string           `cadence:"parentHash"`
+	ParentBlockHash   cadence.Array    `cadence:"parentHash"`
 	ReceiptRoot       string           `cadence:"receiptRoot"`
 	TransactionHashes []cadence.String `cadence:"transactionHashes"`
 }
