@@ -249,6 +249,7 @@ func (d *downloader) trackBlobs(blockID flow.Identifier, cids []cid.Cid) error {
 		}
 
 		d.lastProducedHeight.Store(header.Height)
+		d.NotifyProducedHeight()
 
 		return nil
 	})
