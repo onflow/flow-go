@@ -15,15 +15,13 @@ type DynamicIdentityEntry struct {
 
 type DynamicIdentityEntryList []*DynamicIdentityEntry
 
-// MinEpochStateEntry represents a snapshot of the identity table (incl. the set of all notes authorized to
-// be part of the network) at some point in time. It allows to reconstruct the state of identity table using
-// epoch setup events and dynamic identities. It tracks attempts of invalid state transitions.
-// It also holds information about the next epoch, if it has been already committed.
-// This structure is used to persist protocol state in the database.
-//
-// Note that the current implementation does not store the identity table directly. Instead, we store
-// the original events that constituted the _initial_ identity table at the beginning of the epoch
-// plus some modifiers. We intend to restructure this code soon.
+// MinEpochStateEntry is the most compact snapshot of the epoch state and identity table (set of all notes authorized to
+// be part of the network) at some specific block. This struct is optimized for persisting the identity table
+// in the database, in that it only includes data that is variable during the course of an epoch to avoid
+// storage of redundant data. The Epoch Setup and Commit events, which carry the portion of the identity
+// table that is constant throughout an epoch, are only referenced by their hash commitment.
+// Note that a MinEpochStateEntry does not hold the entire data for the identity table directly. It
+// allows reconstructing the identity table with the referenced epoch setup events and dynamic identities.
 type MinEpochStateEntry struct {
 	PreviousEpoch *EpochStateContainer // minimal dynamic properties for previous epoch [optional, nil for first epoch after spork, genesis]
 	CurrentEpoch  EpochStateContainer  // minimal dynamic properties for current epoch
@@ -108,17 +106,20 @@ func (c *EpochStateContainer) Copy() *EpochStateContainer {
 	}
 }
 
-// EpochStateEntry is a MinEpochStateEntry which has additional fields that are cached
-// from storage layer for convenience.
-// Using this structure instead of MinEpochStateEntry allows us to avoid querying
-// the database for epoch setups and commits.
-// It holds several invariants, such as:
+// EpochStateEntry is a MinEpochStateEntry that has additional fields that are cached from the
+// storage layer for convenience. It holds all the information needed to construct a snapshot of
+// the identity table (set of all notes authorized to be part of the network) at some specific
+// block without any database queries. Specifically, `MinEpochStateEntry` is a snapshot of the
+// variable portion of the identity table. The portion of the identity table that is constant
+// throughout an epoch is contained in the Epoch Setup and Epoch Commit events.
+// Convention:
 //   - CurrentEpochSetup and CurrentEpochCommit are for the same epoch. Never nil.
 //   - PreviousEpochSetup and PreviousEpochCommit are for the same epoch. Can be nil.
 //   - NextEpochSetup and NextEpochCommit are for the same epoch. Can be nil.
 type EpochStateEntry struct {
 	*MinEpochStateEntry
 
+	// by convention, all epoch service events are immutable
 	PreviousEpochSetup  *EpochSetup
 	PreviousEpochCommit *EpochCommit
 	CurrentEpochSetup   *EpochSetup
