@@ -133,6 +133,20 @@ func NewBlockEvent(block *Block) *Event {
 	}
 }
 
+var blockEventFields = []cadence.Field{
+	cadence.NewField("height", cadence.UInt64Type),
+	cadence.NewField("hash", cadence.NewVariableSizedArrayType(cadence.UInt8Type)),
+	cadence.NewField("timestamp", cadence.UInt64Type),
+	cadence.NewField("totalSupply", cadence.IntType),
+	cadence.NewField("totalGasUsed", cadence.UInt64Type),
+	cadence.NewField("parentHash", cadence.StringType),
+	cadence.NewField("receiptRoot", cadence.StringType),
+	cadence.NewField(
+		"transactionHashes",
+		cadence.NewVariableSizedArrayType(cadence.StringType),
+	),
+}
+
 func (p *blockEvent) ToCadence(location common.Location) (cadence.Event, error) {
 	hashes := make([]cadence.Value, len(p.TransactionHashes))
 	for i, hash := range p.TransactionHashes {
@@ -147,37 +161,26 @@ func (p *blockEvent) ToCadence(location common.Location) (cadence.Event, error) 
 	eventType := cadence.NewEventType(
 		location,
 		string(EventTypeBlockExecuted),
-		[]cadence.Field{
-			cadence.NewField("height", cadence.UInt64Type),
-			cadence.NewField("hash", cadence.StringType),
-			cadence.NewField("timestamp", cadence.UInt64Type),
-			cadence.NewField("totalSupply", cadence.IntType),
-			cadence.NewField("totalGasUsed", cadence.UInt64Type),
-			cadence.NewField("parentHash", cadence.StringType),
-			cadence.NewField("receiptRoot", cadence.StringType),
-			cadence.NewField(
-				"transactionHashes",
-				cadence.NewVariableSizedArrayType(cadence.StringType),
-			),
-		},
+		blockEventFields,
 		nil,
 	)
 
 	return cadence.NewEvent([]cadence.Value{
 		cadence.NewUInt64(p.Height),
-		cadence.String(blockHash.String()),
+		BytesToCadenceUInt8ArrayValue(blockHash.Bytes()),
 		cadence.NewUInt64(p.Timestamp),
 		cadence.NewIntFromBig(p.TotalSupply),
 		cadence.NewUInt64(p.TotalGasUsed),
 		cadence.String(p.ParentBlockHash.String()),
 		cadence.String(p.ReceiptRoot.String()),
-		cadence.NewArray(hashes).WithType(cadence.NewVariableSizedArrayType(cadence.StringType)),
+		cadence.NewArray(hashes).
+			WithType(cadence.NewVariableSizedArrayType(cadence.StringType)),
 	}).WithType(eventType), nil
 }
 
-type BlockEventPayload struct {
+type BlockExecutedEventPayload struct {
 	Height            uint64           `cadence:"height"`
-	Hash              string           `cadence:"hash"`
+	Hash              cadence.Array    `cadence:"hash"`
 	Timestamp         uint64           `cadence:"timestamp"`
 	TotalSupply       cadence.Int      `cadence:"totalSupply"`
 	TotalGasUsed      uint64           `cadence:"totalGasUsed"`
@@ -186,9 +189,9 @@ type BlockEventPayload struct {
 	TransactionHashes []cadence.String `cadence:"transactionHashes"`
 }
 
-// DecodeBlockEventPayload decodes Cadence event into block event payload.
-func DecodeBlockEventPayload(event cadence.Event) (*BlockEventPayload, error) {
-	var block BlockEventPayload
+// DecodeBlockExecutedEventPayload decodes Cadence event into block event payload.
+func DecodeBlockExecutedEventPayload(event cadence.Event) (*BlockExecutedEventPayload, error) {
+	var block BlockExecutedEventPayload
 	err := cadence.DecodeFields(event, &block)
 	return &block, err
 }

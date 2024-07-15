@@ -21,7 +21,7 @@ contract EVM {
         // height or number of the block
         height: UInt64,
         // hash of the block
-        hash: String,
+        hash: [UInt8],
         // timestamp of the block creation
         timestamp: UInt64,
         // total Flow supply

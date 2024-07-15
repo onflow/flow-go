@@ -48,7 +48,7 @@ func TestEVMBlockExecutedEventCCFEncodingDecoding(t *testing.T) {
 	ev, err := event.Payload.ToCadence(evmLocation)
 	require.NoError(t, err)
 
-	bep, err := types.DecodeBlockEventPayload(ev)
+	bep, err := types.DecodeBlockExecutedEventPayload(ev)
 	require.NoError(t, err)
 
 	assert.Equal(t, bep.Height, block.Height)
@@ -76,10 +76,16 @@ func TestEVMBlockExecutedEventCCFEncodingDecoding(t *testing.T) {
 	evt, err := ccf.Decode(nil, v)
 	require.NoError(t, err)
 
-	assert.Equal(t, evt.Type().ID(), fmt.Sprintf(
-		"A.%s.EVM.BlockExecuted",
-		systemcontracts.SystemContractsForChain(flow.Emulator).EVMContract.Address,
-	))
+	sc := systemcontracts.SystemContractsForChain(flow.Emulator)
+
+	assert.Equal(t,
+		cdcCommon.NewAddressLocation(
+			nil,
+			cdcCommon.Address(sc.EVMContract.Address),
+			string(types.EventTypeBlockExecuted),
+		).ID(),
+		evt.Type().ID(),
+	)
 }
 
 func TestEVMTransactionExecutedEventCCFEncodingDecoding(t *testing.T) {
