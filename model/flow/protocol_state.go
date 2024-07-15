@@ -206,10 +206,11 @@ func NewEpochStateEntry(
 	return result, nil
 }
 
-// RichEpochStateEntry is a EpochStateEntry which has additional fields that are cached
-// from storage layer for convenience.
-// This structure extends EpochStateEntry by adding full identity table.
-// It holds several invariants, such as:
+// RichEpochStateEntry is a EpochStateEntry that additionally holds the canonical representation of the
+// identity table (set of all notes authorized to be part of the network) at some specific block.
+// This data structure is optimized for frequent reads of the same identity table, which is
+// the prevalent case during normal operations (node ejections and epoch fallback are rare).
+// Conventions:
 //   - Invariants inherited from EpochStateEntry.
 //   - CurrentEpochIdentityTable is the full (dynamic) identity table for the current epoch.
 //     Identities are sorted in canonical order. Without duplicates. Never nil.
@@ -241,9 +242,9 @@ func NewRichEpochStateEntry(
 	}
 	// If we are in staking phase (i.e. epochState.NextEpoch == nil):
 	//  (1) Full identity table contains active identities from current epoch.
-	//      If previous epoch exists, we add nodes from previous epoch that are leaving in the current epoch with `EpochParticipationStatusLeaving` status.
+	//      If previous epoch exists, we add nodes from previous epoch that are leaving in the current epoch with status `EpochParticipationStatusLeaving`.
 	// Otherwise, we are in epoch setup or epoch commit phase (i.e. epochState.NextEpoch ≠ nil):
-	//  (2a) Full identity table contains active identities from current epoch + nodes joining in next epoch with `EpochParticipationStatusJoining` status.
+	//  (2a) Full identity table contains active identities from current epoch + nodes joining in next epoch with status `EpochParticipationStatusJoining`.
 	//  (2b) Furthermore, we also build the full identity table for the next epoch's staking phase:
 	//       active identities from next epoch + nodes from current epoch that are leaving at the end of the current epoch with `flow.EpochParticipationStatusLeaving` status.
 	var err error
