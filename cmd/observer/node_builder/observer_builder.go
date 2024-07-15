@@ -1305,6 +1305,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				return nil, fmt.Errorf("failed to create execution data pruner: %w", err)
 			}
 
+			builder.ExecutionDataPruner.RegisterProducer(builder.ExecutionDataDownloader)
 			return builder.ExecutionDataPruner, nil
 		})
 	if builder.executionDataIndexingEnabled {
