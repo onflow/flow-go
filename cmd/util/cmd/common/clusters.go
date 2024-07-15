@@ -140,7 +140,7 @@ func ConvertClusterAssignmentsCdc(assignments flow.AssignmentList) cadence.Array
 //   - error: error if the cluster qcs and cluster lists don't match in size or
 //     signature indices decoding fails.
 func ConvertClusterQcsCdc(qcs []*flow.QuorumCertificate, clusterList flow.ClusterList, flowClusterQCAddress string) ([]cadence.Value, error) {
-	voteDataType := newFlowClusterQCVoteDataStructType(flowClusterQCAddress)
+	voteDataType := newClusterQCVoteDataCdcType(flowClusterQCAddress)
 	qcVoteData := make([]cadence.Value, len(qcs))
 	for i, qc := range qcs {
 		c, ok := clusterList.ByIndex(uint(i))
@@ -168,8 +168,8 @@ func ConvertClusterQcsCdc(qcs []*flow.QuorumCertificate, clusterList flow.Cluste
 	return qcVoteData, nil
 }
 
-// newFlowClusterQCVoteDataStructType returns the FlowClusterQC cadence struct type.
-func newFlowClusterQCVoteDataStructType(clusterQcAddress string) *cadence.StructType {
+// newClusterQCVoteDataCdcType returns the FlowClusterQC cadence struct type.
+func newClusterQCVoteDataCdcType(clusterQcAddress string) *cadence.StructType {
 
 	// FlowClusterQC.ClusterQCVoteData
 	address, _ := cdcCommon.HexToAddress(clusterQcAddress)
