@@ -114,8 +114,8 @@ func (b *BlockProposal) AppendTransaction(res *Result) {
 	b.TotalGasUsed = r.CumulativeGasUsed
 }
 
-// PopulateReceiptsHash populates receipt hash value
-func (b *BlockProposal) PopulateReceiptsHash() {
+// PopulateReceiptRoot populates receipt root hash value
+func (b *BlockProposal) PopulateReceiptRoot() {
 	if len(b.Receipts) == 0 {
 		b.ReceiptRoot = gethTypes.EmptyReceiptsHash
 		return
