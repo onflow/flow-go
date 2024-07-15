@@ -1,4 +1,4 @@
-package state
+package types
 
 import (
 	"bytes"
@@ -17,6 +17,10 @@ const (
 )
 
 // CollectionProvider provides access to collections
+//
+// Warning! using two collection providers using the
+// same root address concurrently can cause unexpected
+// behaviors.
 type CollectionProvider struct {
 	rootAddr atree.Address
 	storage  *atree.PersistentSlabStorage
@@ -91,7 +95,7 @@ func (cp *CollectionProvider) Commit() error {
 }
 
 // Collection provides a persistent and compact way of storing key/value pairs
-// each collection has a unique collectionID that can be used to fetch the collection
+// Each collection has a unique collectionID that can be used to fetch the collection
 //
 // TODO(ramtin): we might not need any extra hashing on the atree side
 // and optimize this to just use the key given the keys are hashed ?

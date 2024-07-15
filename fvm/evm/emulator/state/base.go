@@ -29,12 +29,12 @@ const (
 type BaseView struct {
 	rootAddress        flow.Address
 	ledger             atree.Ledger
-	collectionProvider *CollectionProvider
+	collectionProvider *types.CollectionProvider
 
 	// collections
-	accounts *Collection
-	codes    *Collection
-	slots    map[gethCommon.Address]*Collection
+	accounts *types.Collection
+	codes    *types.Collection
+	slots    map[gethCommon.Address]*types.Collection
 
 	// cached values
 	cachedAccounts map[gethCommon.Address]*Account
@@ -50,7 +50,7 @@ var _ types.BaseView = &BaseView{}
 
 // NewBaseView constructs a new base view
 func NewBaseView(ledger atree.Ledger, rootAddress flow.Address) (*BaseView, error) {
-	cp, err := NewCollectionProvider(atree.Address(rootAddress), ledger)
+	cp, err := types.NewCollectionProvider(atree.Address(rootAddress), ledger)
 	if err != nil {
 		return nil, err
 	}
@@ -60,7 +60,7 @@ func NewBaseView(ledger atree.Ledger, rootAddress flow.Address) (*BaseView, erro
 		rootAddress:        rootAddress,
 		collectionProvider: cp,
 
-		slots: make(map[gethCommon.Address]*Collection),
+		slots: make(map[gethCommon.Address]*types.Collection),
 
 		cachedAccounts: make(map[gethCommon.Address]*Account),
 		cachedCodes:    make(map[gethCommon.Address][]byte),
@@ -349,7 +349,7 @@ func (v *BaseView) NumberOfAccounts() uint64 {
 	return v.accounts.Size()
 }
 
-func (v *BaseView) fetchOrCreateCollection(path string) (collection *Collection, created bool, error error) {
+func (v *BaseView) fetchOrCreateCollection(path string) (collection *types.Collection, created bool, error error) {
 	collectionID, err := v.ledger.GetValue(v.rootAddress[:], []byte(path))
 	if err != nil {
 		return nil, false, err
@@ -561,7 +561,7 @@ func (v *BaseView) storeSlot(sk types.SlotAddress, data gethCommon.Hash) error {
 	return col.Set(sk.Key.Bytes(), data.Bytes())
 }
 
-func (v *BaseView) getSlotCollection(acc *Account) (*Collection, error) {
+func (v *BaseView) getSlotCollection(acc *Account) (*types.Collection, error) {
 	var err error
 
 	if len(acc.CollectionID) == 0 {

@@ -1,4 +1,4 @@
-package state_test
+package types_test
 
 import (
 	"testing"
@@ -6,8 +6,8 @@ import (
 	"github.com/onflow/atree"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/fvm/evm/emulator/state"
 	"github.com/onflow/flow-go/fvm/evm/testutils"
+	"github.com/onflow/flow-go/fvm/evm/types"
 )
 
 func TestCollection(t *testing.T) {
@@ -61,9 +61,9 @@ func TestCollection(t *testing.T) {
 	require.Error(t, err)
 }
 
-func setupTestCollection(t *testing.T) *state.CollectionProvider {
+func setupTestCollection(t *testing.T) *types.CollectionProvider {
 	ledger := testutils.GetSimpleValueStore()
-	cp, err := state.NewCollectionProvider(atree.Address{1, 2, 3, 4, 5, 6, 7, 8}, ledger)
+	cp, err := types.NewCollectionProvider(atree.Address{1, 2, 3, 4, 5, 6, 7, 8}, ledger)
 	require.NoError(t, err)
 	return cp
 }
