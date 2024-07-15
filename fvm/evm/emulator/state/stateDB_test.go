@@ -45,6 +45,22 @@ func TestStateDB(t *testing.T) {
 		require.False(t, db.Empty(addr1))
 	})
 
+	t.Run("test create contract method", func(t *testing.T) {
+		ledger := testutils.GetSimpleValueStore()
+		db, err := state.NewStateDB(ledger, rootAddr)
+		require.NoError(t, err)
+
+		addr1 := testutils.RandomCommonAddress(t)
+		require.False(t, db.IsNewContract(addr1))
+		require.NoError(t, db.Error())
+
+		db.CreateContract(addr1)
+		require.NoError(t, db.Error())
+
+		require.True(t, db.IsNewContract(addr1))
+		require.NoError(t, db.Error())
+	})
+
 	t.Run("test commit functionality", func(t *testing.T) {
 		ledger := testutils.GetSimpleValueStore()
 		db, err := state.NewStateDB(ledger, rootAddr)
@@ -288,4 +304,43 @@ func TestStateDB(t *testing.T) {
 		require.True(t, types.IsAFatalError(err))
 	})
 
+	t.Run("test storage root functionality", func(t *testing.T) {
+		ledger := testutils.GetSimpleValueStore()
+		db, err := state.NewStateDB(ledger, rootAddr)
+		require.NoError(t, err)
+
+		addr1 := testutils.RandomCommonAddress(t)
+
+		// non existing account
+		require.False(t, db.Exist(addr1))
+		require.NoError(t, db.Error())
+		root := db.GetStorageRoot(addr1)
+		require.NoError(t, db.Error())
+		require.Equal(t, gethCommon.Hash{}, root)
+
+		// accounts without slots
+		db.CreateAccount(addr1)
+		require.NoError(t, db.Error())
+		err = db.Commit(true)
+		require.NoError(t, err)
+
+		root = db.GetStorageRoot(addr1)
+		require.NoError(t, db.Error())
+		require.Equal(t, gethTypes.EmptyRootHash, root)
+
+		// add slots to the account
+		key := testutils.RandomCommonHash(t)
+		value := testutils.RandomCommonHash(t)
+		db.SetCode(addr1, []byte("somecode"))
+		require.NoError(t, db.Error())
+		db.SetState(addr1, key, value)
+		require.NoError(t, db.Error())
+		err = db.Commit(true)
+		require.NoError(t, err)
+
+		root = db.GetStorageRoot(addr1)
+		require.NoError(t, db.Error())
+		require.NotEqual(t, gethCommon.Hash{}, root)
+		require.NotEqual(t, gethTypes.EmptyRootHash, root)
+	})
 }
