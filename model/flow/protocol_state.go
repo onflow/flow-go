@@ -98,9 +98,7 @@ func (c *EpochStateContainer) Copy() *EpochStateContainer {
 		return nil
 	}
 	ext := make([]EpochExtension, len(c.EpochExtensions))
-	for i, e := range c.EpochExtensions {
-		ext[i] = e // value type
-	}
+	copy(ext, c.EpochExtensions)
 	return &EpochStateContainer{
 		SetupID:          c.SetupID,
 		CommitID:         c.CommitID,
