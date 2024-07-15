@@ -11,7 +11,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// TestEjectorRapid performs a rapid check on the ejector structure, ensuring that it correctly tracks and ejects nodes.
+// TestEjectorRapid fuzzy-tests the ejector, ensuring that it correctly tracks and ejects nodes.
 // This test covers only happy-path scenario.
 func TestEjectorRapid(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
@@ -68,7 +68,8 @@ func TestEjector_ReadmitEjectedIdentity(t *testing.T) {
 	require.True(t, protocol.IsInvalidServiceEventError(err))
 }
 
-// TestEjector_IdentityNotFound ensures that ejector returns false when the identity is not tracked.
+// TestEjector_IdentityNotFound ensures that ejector returns false when the identity is not
+// in any of the tracked lists. We test different scenarios where the identity is not tracked.
 // Tested different scenarios where the identity is not tracked.
 func TestEjector_IdentityNotFound(t *testing.T) {
 	t.Run("nothing-tracked", func(t *testing.T) {
