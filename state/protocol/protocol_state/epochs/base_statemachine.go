@@ -22,7 +22,7 @@ type baseStateMachine struct {
 // which keeps track of ejected identities.
 // A protocol.InvalidServiceEventError is returned if the ejector fails to track the identities.
 func newBaseStateMachine(telemetry protocol_state.StateMachineTelemetryConsumer, view uint64, parentState *flow.RichEpochStateEntry, state *flow.EpochStateEntry) (*baseStateMachine, error) {
-	ej := ejector{}
+	ej := newEjector()
 	if state.PreviousEpoch != nil {
 		err := ej.TrackDynamicIdentityList(state.PreviousEpoch.ActiveIdentities)
 		if err != nil {

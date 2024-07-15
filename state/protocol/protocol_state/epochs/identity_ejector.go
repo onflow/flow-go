@@ -25,6 +25,14 @@ type ejector struct {
 	ejected       []flow.Identifier
 }
 
+// newEjector implements a constructor for the ejector structure with a pre-allocated slice for identity lists.
+// We are always going to add at least one element, and most often two (previous and current epoch), but never more than three.
+func newEjector() ejector {
+	return ejector{
+		identityLists: make([]trackedDynamicIdentityList, 0, 3),
+	}
+}
+
 // Eject marks the node as ejected in all tracked identity lists. If it's the first ejection during lifetime of the state machine,
 // EjectIdentity updates the identity table by changing the node's participation status to 'ejected'. If
 // and only if the node is active in the previous or current or next epoch, the node's ejection status is set
