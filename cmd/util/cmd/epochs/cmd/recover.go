@@ -68,7 +68,7 @@ func init() {
 
 func addGenerateRecoverEpochTxArgsCmdFlags() error {
 	generateRecoverEpochTxArgsCmd.Flags().StringVar(&flagOut, "out", "", "file to write tx args output")
-	generateRecoverEpochTxArgsCmd.Flags().StringVar(&flagAnAddress, "access-address", "", "the address of the access node used for client connections")
+	generateRecoverEpochTxArgsCmd.Flags().StringVar(&flagAnAddress, "access-address", "", "the address of the access node used to retrieve the information")
 	generateRecoverEpochTxArgsCmd.Flags().StringVar(&flagRootChainID, "root-chain-id", "", "the root chain id")
 	generateRecoverEpochTxArgsCmd.Flags().StringVar(&flagAnPubkey, "access-network-key", "", "the network key of the access node used for client connections in hex string format")
 	generateRecoverEpochTxArgsCmd.Flags().BoolVar(&flagAnInsecure, "insecure", false, "set to true if the protocol snapshot should be retrieved from the insecure AN endpoint")
@@ -88,7 +88,7 @@ func addGenerateRecoverEpochTxArgsCmdFlags() error {
 	// This is needed only if a previous recoverEpoch transaction was submitted and a race condition occurred such that:
 	//   - the RecoveryEpoch in the admin transaction was accepted by the smart contract
 	//   - the RecoveryEpoch service event (after sealing latency) was rejected by the Protocol State
-	generateRecoverEpochTxArgsCmd.Flags().BoolVar(&flagInitNewEpoch, "unsafe-overwrite-epoch-data", false, "set to true if the resulting transaction is allowed to overwrite an existing epoch data entry in the smart contract. ")
+	generateRecoverEpochTxArgsCmd.Flags().BoolVar(&flagInitNewEpoch, "unsafe-overwrite-epoch-data", false, "set to true if the resulting transaction is allowed to overwrite an already specified epoch in the smart contract.")
 
 	err := generateRecoverEpochTxArgsCmd.MarkFlagRequired("access-address")
 	if err != nil {

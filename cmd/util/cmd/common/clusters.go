@@ -150,7 +150,7 @@ func ConvertClusterQcsCdc(qcs []*flow.QuorumCertificate, clusterList flow.Cluste
 		qcVoteData[i] = cadence.NewStruct([]cadence.Value{
 			// aggregatedSignature
 			cadence.String(fmt.Sprintf("%#x", qc.SigData)),
-			// voterIDs
+			// Node IDs of signers
 			cadence.NewArray(cdcVoterIds).WithType(cadence.NewVariableSizedArrayType(cadence.StringType)),
 		}).WithType(voteDataType)
 

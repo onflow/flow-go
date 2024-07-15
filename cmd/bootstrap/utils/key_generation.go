@@ -297,7 +297,8 @@ func WriteStakingNetworkingKeyFiles(nodeInfos []bootstrap.NodeInfo, write WriteJ
 	return nil
 }
 
-// WriteNodeInternalPubInfos writes the node-internal-infos.pub.json file.
+// WriteNodeInternalPubInfos writes the `node-internal-infos.pub.json` file.
+// In a nutshell, this file contains the Role, address and weight for all authorized nodes. 
 func WriteNodeInternalPubInfos(nodeInfos []bootstrap.NodeInfo, write WriteJSONFileFunc) error {
 	configs := make([]model.NodeConfig, len(nodeInfos))
 	for i, nodeInfo := range nodeInfos {
