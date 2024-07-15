@@ -724,23 +724,6 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				return &module.NoopReadyDoneAware{}, nil
 			}
 
-			execDataDistributor.AddOnExecutionDataReceivedConsumer(func(data *execution_data.BlockExecutionDataEntity) {
-				header, err := node.Storage.Headers.ByBlockID(data.BlockID)
-				if err != nil {
-					// if the execution data is available, the block must be locally finalized
-					node.Logger.Fatal().Err(err).Msg("failed to get header for execution data")
-				}
-
-				if builder.ExecutionDataPruner != nil {
-					err = builder.ExecutionDataTracker.SetFulfilledHeight(header.Height)
-					if err != nil {
-						node.Logger.Fatal().Err(err).Msg("failed to set fulfilled height")
-					}
-
-					builder.ExecutionDataPruner.NotifyFulfilledHeight(header.Height)
-				}
-			})
-
 			var prunerMetrics module.ExecutionDataPrunerMetrics = metrics.NewNoopCollector()
 			if node.MetricsEnabled {
 				prunerMetrics = metrics.NewExecutionDataPrunerCollector()
@@ -961,6 +944,8 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				if err != nil {
 					return nil, err
 				}
+
+				builder.ExecutionDataPruner.RegisterProducer(builder.ExecutionIndexer)
 
 				return builder.ExecutionIndexer, nil
 			}, builder.IndexerDependencies)

@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/ipfs/go-cid"
+	"go.uber.org/atomic"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -21,16 +22,20 @@ import (
 type Downloader interface {
 	module.ReadyDoneAware
 	ExecutionDataGetter
+	ExecutionDataProducer
 }
 
 var _ Downloader = (*downloader)(nil)
+var _ ExecutionDataProducer = (*downloader)(nil)
 
 type downloader struct {
-	blobService network.BlobService
-	maxBlobSize int
-	serializer  Serializer
-	storage     tracker.Storage
-	headers     storage.Headers
+	*ExecutionDataProducerManager
+	blobService        network.BlobService
+	maxBlobSize        int
+	serializer         Serializer
+	storage            tracker.Storage
+	headers            storage.Headers
+	lastProducedHeight *atomic.Uint64
 }
 
 type DownloaderOption func(*downloader)
@@ -53,9 +58,11 @@ func WithExecutionDataTracker(storage tracker.Storage, headers storage.Headers) 
 // NewDownloader creates a new Downloader instance
 func NewDownloader(blobService network.BlobService, opts ...DownloaderOption) *downloader {
 	d := &downloader{
-		blobService: blobService,
-		maxBlobSize: DefaultMaxBlobSize,
-		serializer:  DefaultSerializer,
+		blobService:                  blobService,
+		maxBlobSize:                  DefaultMaxBlobSize,
+		serializer:                   DefaultSerializer,
+		lastProducedHeight:           atomic.NewUint64(0),
+		ExecutionDataProducerManager: NewExecutionDataProducerManager(),
 	}
 
 	for _, opt := range opts {
@@ -241,6 +248,8 @@ func (d *downloader) trackBlobs(blockID flow.Identifier, cids []cid.Cid) error {
 			return err
 		}
 
+		d.lastProducedHeight.Store(header.Height)
+
 		return nil
 	})
 }
@@ -371,4 +380,8 @@ func (d *downloader) findBlob(
 	}
 
 	return nil, NewBlobNotFoundError(target)
+}
+
+func (d *downloader) LastProducedHeight() (uint64, error) {
+	return d.lastProducedHeight.Load(), nil
 }

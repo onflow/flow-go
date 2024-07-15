@@ -3,15 +3,17 @@ package pruner
 import (
 	"context"
 	"fmt"
+	"sort"
 	"time"
 
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/tracker"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/module/util"
 )
 
 const (
@@ -40,7 +42,7 @@ type Pruner struct {
 	pruneCallback func(ctx context.Context) error
 
 	// channels used to send new fulfilled heights and config changes to the worker thread
-	fulfilledHeights      chan uint64
+	fulfilledHeight       engine.Notifier
 	thresholdChan         chan uint64
 	heightRangeTargetChan chan uint64
 
@@ -62,6 +64,8 @@ type Pruner struct {
 
 	component.Component
 	cm *component.ComponentManager
+
+	registeredProducers []execution_data.ExecutionDataProducer
 }
 
 type PrunerOption func(*Pruner)
@@ -106,7 +110,7 @@ func NewPruner(logger zerolog.Logger, metrics module.ExecutionDataPrunerMetrics,
 		logger:                logger.With().Str("component", "execution_data_pruner").Logger(),
 		storage:               storage,
 		pruneCallback:         func(ctx context.Context) error { return nil },
-		fulfilledHeights:      fulfilledHeights,
+		fulfilledHeight:       engine.NewNotifier(),
 		thresholdChan:         make(chan uint64),
 		heightRangeTargetChan: make(chan uint64),
 		lastFulfilledHeight:   fulfilledHeight,
@@ -127,17 +131,12 @@ func NewPruner(logger zerolog.Logger, metrics module.ExecutionDataPrunerMetrics,
 	return p, nil
 }
 
-// NotifyFulfilledHeight notifies the Pruner of the latest fulfilled height.
-func (p *Pruner) NotifyFulfilledHeight(height uint64) {
-	if util.CheckClosed(p.cm.ShutdownSignal()) {
-		return
-	}
+func (p *Pruner) RegisterProducer(producer execution_data.ExecutionDataProducer) {
+	fmt.Println("RegisterProducer")
+	producer.Register(&p.fulfilledHeight)
+	fmt.Println("RegisterProducer end ")
 
-	select {
-	case p.fulfilledHeights <- height:
-	default:
-	}
-
+	p.registeredProducers = append(p.registeredProducers, producer)
 }
 
 // SetHeightRangeTarget updates the Pruner's height range target.
@@ -169,10 +168,17 @@ func (p *Pruner) loop(ctx irrecoverable.SignalerContext, ready component.ReadyFu
 		select {
 		case <-ctx.Done():
 			return
-		case height := <-p.fulfilledHeights:
-			if height > p.lastFulfilledHeight {
-				p.lastFulfilledHeight = height
+		case <-p.fulfilledHeight.Channel():
+			lowestHeight, err := p.lowestProducersHeight()
+			if err != nil {
+				ctx.Throw(fmt.Errorf("failed to get lowest fulfilled height: %w", err))
 			}
+
+			err = p.updateFulfilledHeight(lowestHeight)
+			if err != nil {
+				ctx.Throw(fmt.Errorf("failed to update lowest fulfilled height: %w", err))
+			}
+
 			p.checkPrune(ctx)
 		case heightRangeTarget := <-p.heightRangeTargetChan:
 			p.heightRangeTarget = heightRangeTarget
@@ -182,6 +188,27 @@ func (p *Pruner) loop(ctx irrecoverable.SignalerContext, ready component.ReadyFu
 			p.checkPrune(ctx)
 		}
 	}
+}
+
+func (p *Pruner) lowestProducersHeight() (uint64, error) {
+	var heights []uint64
+	for _, producer := range p.registeredProducers {
+		height, err := producer.LastProducedHeight()
+		if err != nil {
+			return 0, err
+		}
+		heights = append(heights, height)
+	}
+	sort.Slice(heights, func(i, j int) bool { return heights[i] < heights[j] })
+	return heights[0], nil
+}
+
+func (p *Pruner) updateFulfilledHeight(height uint64) error {
+	if height > p.lastFulfilledHeight {
+		p.lastFulfilledHeight = height
+		return p.storage.SetFulfilledHeight(height)
+	}
+	return nil
 }
 
 func (p *Pruner) checkPrune(ctx irrecoverable.SignalerContext) {

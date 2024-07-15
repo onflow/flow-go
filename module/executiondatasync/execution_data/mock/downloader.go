@@ -5,8 +5,10 @@ package mock
 import (
 	context "context"
 
-	flow "github.com/onflow/flow-go/model/flow"
+	engine "github.com/onflow/flow-go/engine"
 	execution_data "github.com/onflow/flow-go/module/executiondatasync/execution_data"
+
+	flow "github.com/onflow/flow-go/model/flow"
 
 	mock "github.com/stretchr/testify/mock"
 )
@@ -66,6 +68,39 @@ func (_m *Downloader) Get(ctx context.Context, rootID flow.Identifier) (*executi
 	return r0, r1
 }
 
+// LastProducedHeight provides a mock function with given fields:
+func (_m *Downloader) LastProducedHeight() (uint64, error) {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for LastProducedHeight")
+	}
+
+	var r0 uint64
+	var r1 error
+	if rf, ok := ret.Get(0).(func() (uint64, error)); ok {
+		return rf()
+	}
+	if rf, ok := ret.Get(0).(func() uint64); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(uint64)
+	}
+
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// NotifyProducedHeight provides a mock function with given fields:
+func (_m *Downloader) NotifyProducedHeight() {
+	_m.Called()
+}
+
 // Ready provides a mock function with given fields:
 func (_m *Downloader) Ready() <-chan struct{} {
 	ret := _m.Called()
@@ -84,6 +119,11 @@ func (_m *Downloader) Ready() <-chan struct{} {
 	}
 
 	return r0
+}
+
+// Register provides a mock function with given fields: _a0
+func (_m *Downloader) Register(_a0 *engine.Notifier) {
+	_m.Called(_a0)
 }
 
 // NewDownloader creates a new instance of Downloader. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.

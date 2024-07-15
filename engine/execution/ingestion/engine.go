@@ -9,6 +9,7 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/execution"
@@ -19,6 +20,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/pruner"
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/module/mempool/queue"
@@ -30,9 +32,12 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
+var _ execution_data.ExecutionDataProducer = (*Engine)(nil)
+
 // An Engine receives and saves incoming blocks.
 type Engine struct {
 	psEvents.Noop // satisfy protocol events consumer interface
+	*execution_data.ExecutionDataProducerManager
 
 	unit                *engine.Unit
 	log                 zerolog.Logger
@@ -51,6 +56,7 @@ type Engine struct {
 	uploader            *uploader.Manager
 	stopControl         *stop.StopControl
 	loader              BlockLoader
+	lastProducedHeight  *atomic.Uint64
 }
 
 func New(
@@ -77,23 +83,25 @@ func New(
 	mempool := newMempool()
 
 	eng := Engine{
-		unit:                unit,
-		log:                 log,
-		collectionFetcher:   collectionFetcher,
-		headers:             headers,
-		blocks:              blocks,
-		collections:         collections,
-		computationManager:  executionEngine,
-		providerEngine:      providerEngine,
-		mempool:             mempool,
-		execState:           execState,
-		metrics:             metrics,
-		tracer:              tracer,
-		extensiveLogging:    extLog,
-		executionDataPruner: pruner,
-		uploader:            uploader,
-		stopControl:         stopControl,
-		loader:              loader,
+		unit:                         unit,
+		log:                          log,
+		collectionFetcher:            collectionFetcher,
+		headers:                      headers,
+		blocks:                       blocks,
+		collections:                  collections,
+		computationManager:           executionEngine,
+		providerEngine:               providerEngine,
+		mempool:                      mempool,
+		execState:                    execState,
+		metrics:                      metrics,
+		tracer:                       tracer,
+		extensiveLogging:             extLog,
+		executionDataPruner:          pruner,
+		uploader:                     uploader,
+		stopControl:                  stopControl,
+		loader:                       loader,
+		lastProducedHeight:           atomic.NewUint64(0),
+		ExecutionDataProducerManager: execution_data.NewExecutionDataProducerManager(),
 	}
 
 	return &eng, nil
@@ -460,11 +468,16 @@ func (e *Engine) executeBlock(
 	}
 
 	if e.executionDataPruner != nil {
-		e.executionDataPruner.NotifyFulfilledHeight(executableBlock.Height())
+		e.lastProducedHeight.Store(executableBlock.Height())
+		e.NotifyProducedHeight()
 	}
 
 	e.unit.Ctx()
 
+}
+
+func (e *Engine) LastProducedHeight() (uint64, error) {
+	return e.lastProducedHeight.Load(), nil
 }
 
 func nonSystemTransactionCount(result flow.ExecutionResult) uint64 {

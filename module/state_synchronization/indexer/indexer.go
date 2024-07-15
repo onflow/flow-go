@@ -36,6 +36,7 @@ const (
 var ErrIndexNotInitialized = errors.New("index not initialized")
 
 var _ state_synchronization.IndexReporter = (*Indexer)(nil)
+var _ execution_data.ExecutionDataProducer = (*Indexer)(nil)
 
 // Indexer handles ingestion of new execution data available and uses the execution data indexer module
 // to index the data.
@@ -46,6 +47,8 @@ var _ state_synchronization.IndexReporter = (*Indexer)(nil)
 // notify new data is available and kick off indexing.
 type Indexer struct {
 	component.Component
+	*execution_data.ExecutionDataProducerManager
+
 	log             zerolog.Logger
 	exeDataReader   *jobs.ExecutionDataReader
 	exeDataNotifier engine.Notifier
@@ -65,10 +68,11 @@ func NewIndexer(
 	processedHeight storage.ConsumerProgress,
 ) (*Indexer, error) {
 	r := &Indexer{
-		log:             log.With().Str("module", "execution_indexer").Logger(),
-		exeDataNotifier: engine.NewNotifier(),
-		indexer:         indexer,
-		registers:       registers,
+		log:                          log.With().Str("module", "execution_indexer").Logger(),
+		exeDataNotifier:              engine.NewNotifier(),
+		indexer:                      indexer,
+		registers:                    registers,
+		ExecutionDataProducerManager: execution_data.NewExecutionDataProducerManager(),
 	}
 
 	r.exeDataReader = jobs.NewExecutionDataReader(executionCache, fetchTimeout, executionDataLatestHeight)
@@ -94,6 +98,10 @@ func NewIndexer(
 	r.Component = r.jobConsumer
 
 	return r, nil
+}
+
+func (i *Indexer) LastProducedHeight() (uint64, error) {
+	return i.HighestIndexedHeight()
 }
 
 // Start the worker jobqueue to consume the available data.
@@ -144,6 +152,8 @@ func (i *Indexer) processExecutionData(ctx irrecoverable.SignalerContext, job mo
 		i.log.Error().Err(err).Str("job_id", string(job.ID())).Msg("error during execution data index processing job")
 		ctx.Throw(err)
 	}
+
+	i.NotifyProducedHeight()
 
 	done()
 }
