@@ -256,7 +256,7 @@ func newRichEpochProtocolStateEntry(
 	if err != nil {
 		// observing an error here would be an indication of severe data corruption or bug in our code since
 		// all data should be available and correctly structured at this point.
-		return nil, irrecoverable.NewExceptionf("critical failure while instantiating RichEpochStateEntry: %w", err)
+		return nil, irrecoverable.NewExceptionf("critical failure while constructing RichEpochStateEntry from EpochStateEntry: %w", err)
 	}
 	return result, nil
 }
