@@ -31,7 +31,7 @@ contract EVM {
         // parent block hash
         parentHash: [UInt8],
         // hash of all the transaction receipts
-        receiptRoot: String,
+        receiptRoot: [UInt8],
         // all the transactions included in the block
         transactionHashes: [String]
     )
