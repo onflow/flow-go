@@ -26,7 +26,11 @@ type ejector struct {
 }
 
 // Eject marks the node as ejected in all tracked identity lists. If it's the first ejection during lifetime of the state machine,
-// the lookup tables are populated. The method returns true if the node was ejected in any of the tracked identity lists.
+// EjectIdentity updates the identity table by changing the node's participation status to 'ejected'. If
+// and only if the node is active in the previous or current or next epoch, the node's ejection status is set
+// to true for all occurrences, and we return true.  If `nodeID` is not found, we return false. This method
+// is idempotent and behaves identically for repeated calls with the same `nodeID` (and same internal state).
+// Repeated calls with the same input create minor performance overhead.
 func (e *ejector) Eject(nodeID flow.Identifier) bool {
 	l := len(e.identityLists)
 	if len(e.ejected) == 0 { // if this is the first ejection sealed in this block, we have to populate the lookup first
@@ -34,6 +38,7 @@ func (e *ejector) Eject(nodeID flow.Identifier) bool {
 			e.identityLists[i].identityLookup = e.identityLists[i].dynamicIdentities.Lookup()
 		}
 	}
+	e.ejected = append(e.ejected, nodeID)
 
 	var ejected bool
 	for i := 0; i < l; i++ {
@@ -41,7 +46,6 @@ func (e *ejector) Eject(nodeID flow.Identifier) bool {
 		if found {
 			ejected = true
 			dynamicIdentity.Ejected = true
-			e.ejected = append(e.ejected, nodeID)
 		}
 	}
 	return ejected
@@ -50,7 +54,8 @@ func (e *ejector) Eject(nodeID flow.Identifier) bool {
 // TrackDynamicIdentityList tracks a new DynamicIdentityList in the state machine.
 // It is not allowed to readmit nodes that were ejected. Whenever a new DynamicIdentityList is tracked,
 // we ensure that the ejection status of previously ejected nodes is not reverted.
-// If a node was previously ejected and the new DynamicIdentityList readmits it, a protocol.InvalidServiceEventError is returned.
+// If a node was previously ejected and the new DynamicIdentityList contains the node with an `Ejected` 
+// status of `false`, a `protocol.InvalidServiceEventError` is returned and the ejector remains unchanged.
 func (e *ejector) TrackDynamicIdentityList(list flow.DynamicIdentityEntryList) error {
 	tracker := trackedDynamicIdentityList{dynamicIdentities: list}
 	if len(e.ejected) > 0 {
@@ -59,7 +64,7 @@ func (e *ejector) TrackDynamicIdentityList(list flow.DynamicIdentityEntryList) e
 		for _, id := range e.ejected {
 			dynamicIdentity, found := tracker.identityLookup[id]
 			if found && !dynamicIdentity.Ejected {
-				return protocol.NewInvalidServiceEventErrorf("node %v was previously ejected but next DynamicIdentityList reverts their ejection status", id)
+				return protocol.NewInvalidServiceEventErrorf("node %v was previously ejected but next DynamicIdentityList reverts its ejection status", id)
 			}
 		}
 	}
