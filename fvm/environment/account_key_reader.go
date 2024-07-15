@@ -112,11 +112,6 @@ func (reader *accountKeyReader) GetAccountKey(
 		return formatErr(err)
 	}
 
-	// Don't return an error for invalid key indices
-	if keyIndex < 0 {
-		return nil, nil
-	}
-
 	address := flow.ConvertAddress(runtimeAddress)
 
 	// address verification is also done in this step

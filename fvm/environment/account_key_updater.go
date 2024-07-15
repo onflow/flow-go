@@ -292,11 +292,6 @@ func (updater *accountKeyUpdater) revokeAccountKey(
 			errors.NewAccountNotFoundError(address))
 	}
 
-	// Don't return an error for invalid key indices
-	if keyIndex < 0 {
-		return nil, nil
-	}
-
 	var publicKey flow.AccountPublicKey
 	publicKey, err = updater.accounts.GetPublicKey(
 		address,
