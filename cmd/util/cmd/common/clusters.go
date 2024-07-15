@@ -130,8 +130,17 @@ func ConvertClusterAssignmentsCdc(assignments flow.AssignmentList) cadence.Array
 }
 
 // ConvertClusterQcsCdc converts cluster QCs from `QuorumCertificate` type to `ClusterQCVoteData` type.
-func ConvertClusterQcsCdc(qcs []*flow.QuorumCertificate, clusterList flow.ClusterList, address string) ([]cadence.Value, error) {
-	voteDataType := newFlowClusterQCVoteDataStructType(address)
+// Args:
+//   - qcs: list of quorum certificates.
+//   - clusterList: the list of cluster lists each used to generate one of the quorum certificates in qcs.
+//   - flowClusterQCAddress: the FlowClusterQC contract address where the ClusterQCVoteData type is defined.
+//
+// Returns:
+//   - []cadence.Value: cadence representation of the list of cluster qcs.
+//   - error: error if the cluster qcs and cluster lists don't match in size or
+//     signature indices decoding fails.
+func ConvertClusterQcsCdc(qcs []*flow.QuorumCertificate, clusterList flow.ClusterList, flowClusterQCAddress string) ([]cadence.Value, error) {
+	voteDataType := newFlowClusterQCVoteDataStructType(flowClusterQCAddress)
 	qcVoteData := make([]cadence.Value, len(qcs))
 	for i, qc := range qcs {
 		c, ok := clusterList.ByIndex(uint(i))
