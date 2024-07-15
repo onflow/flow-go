@@ -58,7 +58,7 @@ func NewTransactionEvent(
 }
 
 var transactionEventFields = []cadence.Field{
-	cadence.NewField("hash", cadence.StringType),
+	cadence.NewField("hash", cadence.NewVariableSizedArrayType(cadence.UInt8Type)),
 	cadence.NewField("index", cadence.UInt16Type),
 	cadence.NewField("type", cadence.UInt8Type),
 	cadence.NewField("payload", cadence.NewVariableSizedArrayType(cadence.UInt8Type)),
@@ -107,7 +107,7 @@ func (p *transactionEvent) ToCadence(location common.Location) (cadence.Event, e
 	)
 
 	return cadence.NewEvent([]cadence.Value{
-		cadence.String(p.Result.TxHash.String()),
+		BytesToCadenceUInt8ArrayValue(p.Result.TxHash.Bytes()),
 		cadence.NewUInt16(p.Result.Index),
 		cadence.NewUInt8(p.Result.TxType),
 		BytesToCadenceUInt8ArrayValue(p.Payload),
@@ -199,7 +199,7 @@ func DecodeBlockExecutedEventPayload(event cadence.Event) (*BlockExecutedEventPa
 }
 
 type TransactionEventPayload struct {
-	Hash             string        `cadence:"hash"`
+	Hash             cadence.Array `cadence:"hash"`
 	Index            uint16        `cadence:"index"`
 	TransactionType  uint8         `cadence:"type"`
 	Payload          cadence.Array `cadence:"payload"`

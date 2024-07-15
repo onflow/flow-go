@@ -41,7 +41,7 @@ contract EVM {
     access(all)
     event TransactionExecuted(
         // hash of the transaction
-        hash: String,
+        hash: [UInt8],
         // index of the transaction in a block
         index: UInt16,
         // type of the transaction
