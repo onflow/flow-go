@@ -170,7 +170,7 @@ func (nc *NoopCollector) ExecutionCollectionExecuted(_ time.Duration, _ module.C
 }
 func (nc *NoopCollector) ExecutionBlockExecutionEffortVectorComponent(_ string, _ uint) {}
 func (nc *NoopCollector) ExecutionBlockCachedPrograms(programs int)                     {}
-func (nc *NoopCollector) ExecutionTransactionExecuted(_ time.Duration, stats module.TransactionExecutionResultStats) {
+func (nc *NoopCollector) ExecutionTransactionExecuted(_ time.Duration, _ module.TransactionExecutionResultStats, _ module.TransactionExecutionResultInfo) {
 }
 func (nc *NoopCollector) ExecutionChunkDataPackGenerated(_, _ int)                              {}
 func (nc *NoopCollector) ExecutionScriptExecuted(dur time.Duration, compUsed, _, _ uint64)      {}
