@@ -395,16 +395,14 @@ func TestEpochStateEntry_CurrentEpochFinalView(t *testing.T) {
 		extraViews := uint64(1000)
 		entry.CurrentEpoch.EpochExtensions = []flow.EpochExtension{
 			{
-				FirstView:     entry.CurrentEpochSetup.FinalView + 1,
-				FinalView:     entry.CurrentEpochSetup.FinalView + extraViews,
-				TargetEndTime: 0,
+				FirstView: entry.CurrentEpochSetup.FinalView + 1,
+				FinalView: entry.CurrentEpochSetup.FinalView + extraViews,
 			},
 		}
 		assert.Equal(t, entry.CurrentEpochSetup.FinalView+extraViews, entry.CurrentEpochFinalView())
 		entry.CurrentEpoch.EpochExtensions = append(entry.CurrentEpoch.EpochExtensions, flow.EpochExtension{
-			FirstView:     entry.CurrentEpoch.EpochExtensions[0].FinalView + 1,
-			FinalView:     entry.CurrentEpoch.EpochExtensions[0].FinalView + extraViews,
-			TargetEndTime: 0,
+			FirstView: entry.CurrentEpoch.EpochExtensions[0].FinalView + 1,
+			FinalView: entry.CurrentEpoch.EpochExtensions[0].FinalView + extraViews,
 		})
 		assert.Equal(t, entry.CurrentEpochSetup.FinalView+2*extraViews, entry.CurrentEpochFinalView())
 	})

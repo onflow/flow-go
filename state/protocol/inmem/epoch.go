@@ -84,15 +84,31 @@ func (es *setupEpoch) FinalView() (uint64, error) {
 // TargetDuration returns the desired real-world duration for this epoch, in seconds.
 // This target is specified by the FlowEpoch smart contract in the EpochSetup event
 // and used by the Cruise Control system to moderate the block rate.
+// In case the epoch has extensions, the target duration is calculated based on the last extension, by calculating how many
+// views were added by the extension and adding the proportional time to the target duration.
 func (es *setupEpoch) TargetDuration() (uint64, error) {
-	return es.setupEvent.TargetDuration, nil
+	if len(es.extensions) == 0 {
+		return es.setupEvent.TargetDuration, nil
+	} else {
+		viewDuration := float64(es.setupEvent.TargetDuration) / float64(es.setupEvent.FinalView-es.setupEvent.FirstView+1)
+		lastExtension := es.extensions[len(es.extensions)-1]
+		return es.setupEvent.TargetDuration + uint64(float64(lastExtension.FinalView-es.setupEvent.FinalView)*viewDuration), nil
+	}
 }
 
 // TargetEndTime returns the desired real-world end time for this epoch, represented as
 // Unix Time (in units of seconds). This target is specified by the FlowEpoch smart contract in
 // the EpochSetup event and used by the Cruise Control system to moderate the block rate.
+// In case the epoch has extensions, the target end time is calculated based on the last extension, by calculating how many
+// views were added by the extension and adding the proportional time to the target end time.
 func (es *setupEpoch) TargetEndTime() (uint64, error) {
-	return es.setupEvent.TargetEndTime, nil
+	if len(es.extensions) == 0 {
+		return es.setupEvent.TargetEndTime, nil
+	} else {
+		viewDuration := float64(es.setupEvent.TargetDuration) / float64(es.setupEvent.FinalView-es.setupEvent.FirstView+1)
+		lastExtension := es.extensions[len(es.extensions)-1]
+		return es.setupEvent.TargetEndTime + uint64(float64(lastExtension.FinalView-es.setupEvent.FinalView)*viewDuration), nil
+	}
 }
 
 func (es *setupEpoch) RandomSource() ([]byte, error) {
