@@ -66,7 +66,6 @@ func (s *Suite) executeEFMRecoverTXArgsCMD(collectionClusters int, numViewsInEpo
 		numViewsInStakingAuction,
 		numViewsInEpoch,
 		targetDuration,
-		targetEndTime,
 		false,
 		snapshot,
 	)

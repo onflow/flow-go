@@ -32,7 +32,10 @@ func (s *RecoverEpochSuite) TestRecoverEpoch() {
 	// 1. Manually trigger EFM
 	// wait until the epoch setup phase to force network into EFM
 	s.AwaitEpochPhase(s.Ctx, 0, flow.EpochPhaseSetup, 10*time.Second, 500*time.Millisecond)
-	// pausing collection node will force the network into EFM
+
+	// We set the DKG phase view len to 10 which is very short and should cause the network to go into EFM
+	// without pausing the collection node. This is not the case, we still need to pause the collection node.
+	//TODO(EFM, #6164): Why short DKG phase len of 10 views does not trigger EFM without pausing container ; see https://github.com/onflow/flow-go/issues/6164
 	ln := s.GetContainersByRole(flow.RoleCollection)[0]
 	require.NoError(s.T(), ln.Pause())
 	s.AwaitFinalizedView(s.Ctx, s.GetDKGEndView(), 2*time.Minute, 500*time.Millisecond)
