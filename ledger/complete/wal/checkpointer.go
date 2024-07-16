@@ -1083,3 +1083,35 @@ func CopyCheckpointFile(filename string, from string, to string) (
 
 	return newPaths, nil
 }
+
+// SoftlinkCheckpointFile creates soft links of the checkpoint file including the part files from the given `from` to
+// the `to` directory
+func SoftlinkCheckpointFile(filename string, from string, to string) ([]string, error) {
+
+	// It's possible that the trie dir does not yet exist. If not this will create the the required path
+	err := os.MkdirAll(to, 0700)
+	if err != nil {
+		return nil, err
+	}
+
+	// checkpoint V6 produces multiple checkpoint part files that need to be copied over
+	pattern := filePathPattern(from, filename)
+	matched, err := filepath.Glob(pattern)
+	if err != nil {
+		return nil, fmt.Errorf("could not glob checkpoint file with pattern %v: %w", pattern, err)
+	}
+
+	newPaths := make([]string, len(matched))
+	for i, match := range matched {
+		_, partfile := filepath.Split(match)
+		newPath := filepath.Join(to, partfile)
+		newPaths[i] = newPath
+
+		err := os.Symlink(match, newPath)
+		if err != nil {
+			return nil, fmt.Errorf("cannot link file from %v to %v: %w", match, newPath, err)
+		}
+	}
+
+	return newPaths, nil
+}
