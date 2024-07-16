@@ -978,6 +978,7 @@ func TestEVMAddressDeposit(t *testing.T) {
 
 			require.NotEmpty(t, blockEventPayload.Hash)
 			require.Equal(t, uint64(21000), blockEventPayload.TotalGasUsed)
+			require.Len(t, blockEventPayload.TransactionHashes, 1)
 		})
 }
 
