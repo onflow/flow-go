@@ -46,8 +46,8 @@ contract EVM {
         index: UInt16,
         // type of the transaction
         type: UInt8,
-        // RLP and hex encoded transaction payload
-        payload: String,
+        // RLP encoded transaction payload
+        payload: [UInt8],
         // code indicating a specific validation (201-300) or execution (301-400) error
         errorCode: UInt16,
         // a human-readable message about the error (if any)
@@ -56,8 +56,8 @@ contract EVM {
         gasConsumed: UInt64,
         // if transaction was a deployment contains a newly deployed contract address
         contractAddress: String,
-        // RLP and hex encoded logs
-        logs: String,
+        // RLP encoded logs
+        logs: [UInt8],
         // block height in which transaction was inclued
         blockHeight: UInt64,
         /// captures the hex encoded data that is returned from
@@ -66,7 +66,7 @@ contract EVM {
         /// the address provided in the contractAddress field.
         /// in case of revert, the smart contract custom error message
         /// is also returned here (see EIP-140 for more details).
-        returnedData: String,
+        returnedData: [UInt8],
         /// captures the input and output of the calls (rlp encoded) to the extra  
         /// precompiled contracts (e.g. Cadence Arch) during the transaction execution.
         /// This data helps to replay the transactions without the need to

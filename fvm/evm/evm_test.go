@@ -2,7 +2,6 @@ package evm_test
 
 import (
 	"encoding/binary"
-	"encoding/hex"
 	"fmt"
 	"math"
 	"math/big"
@@ -148,8 +147,12 @@ func TestEVMRun(t *testing.T) {
 
 				txEventPayload, err := types.DecodeTransactionEventPayload(cadenceEvent)
 				require.NoError(t, err)
+
+				txPayload, err := types.CadenceUInt8ArrayValueToBytes(txEventPayload.Payload)
+				require.NoError(t, err)
+
 				require.NotEmpty(t, txEventPayload.Hash)
-				require.Equal(t, hex.EncodeToString(innerTxBytes), txEventPayload.Payload)
+				require.Equal(t, innerTxBytes, txPayload)
 				require.Equal(t, uint16(types.ErrCodeNoError), txEventPayload.ErrorCode)
 				require.Equal(t, uint16(0), txEventPayload.Index)
 				require.Equal(t, blockEventPayload.Height, txEventPayload.BlockHeight)
@@ -394,7 +397,7 @@ func TestEVMRun(t *testing.T) {
 				require.NoError(t, err)
 				require.NotEmpty(t, event.Hash)
 
-				encodedLogs, err := hex.DecodeString(event.Logs)
+				encodedLogs, err := types.CadenceUInt8ArrayValueToBytes(event.Logs)
 				require.NoError(t, err)
 
 				var logs []*gethTypes.Log
@@ -502,7 +505,7 @@ func TestEVMBatchRun(t *testing.T) {
 					event, err := types.DecodeTransactionEventPayload(cadenceEvent)
 					require.NoError(t, err)
 
-					encodedLogs, err := hex.DecodeString(event.Logs)
+					encodedLogs, err := types.CadenceUInt8ArrayValueToBytes(event.Logs)
 					require.NoError(t, err)
 
 					var logs []*gethTypes.Log
