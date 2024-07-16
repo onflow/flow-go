@@ -325,15 +325,78 @@ func TestProtocolStateEntry_Copy(t *testing.T) {
 	cpy.EpochFallbackTriggered = !entry.EpochFallbackTriggered
 	assert.NotEqual(t, entry, cpy)
 
-	assert.Equal(t, entry.CurrentEpoch.ActiveIdentities[0], cpy.CurrentEpoch.ActiveIdentities[0])
-	cpy.CurrentEpoch.ActiveIdentities[0].Ejected = true
-	assert.NotEqual(t, entry.CurrentEpoch.ActiveIdentities[0], cpy.CurrentEpoch.ActiveIdentities[0])
+	assertEpochContainer := func(entry, cpy *flow.EpochStateContainer) {
+		assert.Equal(t, entry.ActiveIdentities[0], cpy.ActiveIdentities[0])
+		cpy.ActiveIdentities[0].Ejected = true
+		assert.NotEqual(t, entry.ActiveIdentities[0], cpy.ActiveIdentities[0])
 
-	cpy.CurrentEpoch.ActiveIdentities = append(cpy.CurrentEpoch.ActiveIdentities, &flow.DynamicIdentityEntry{
-		NodeID:  unittest.IdentifierFixture(),
-		Ejected: false,
+		cpy.ActiveIdentities = append(cpy.ActiveIdentities, &flow.DynamicIdentityEntry{
+			NodeID:  unittest.IdentifierFixture(),
+			Ejected: false,
+		})
+		assert.NotEqual(t, entry.ActiveIdentities, cpy.ActiveIdentities)
+
+		cpy.EpochExtensions = append(cpy.EpochExtensions, flow.EpochExtension{
+			FirstView: 13,
+		})
+		assert.NotEqual(t, entry.EpochExtensions, cpy.EpochExtensions)
+	}
+	assertEpochContainer(entry.PreviousEpoch, cpy.PreviousEpoch)
+	assertEpochContainer(&entry.CurrentEpoch, &cpy.CurrentEpoch)
+	assertEpochContainer(entry.NextEpoch, cpy.NextEpoch)
+}
+
+// TestEpochStateEntry_EpochCounter tests if the epoch counter is correctly computed for the entry.
+// The epoch counter should be equal to the counter of the current epoch setup and commit regardless of the previous or next epoch.
+func TestEpochStateEntry_EpochCounter(t *testing.T) {
+	t.Run("with-previous-epoch", func(t *testing.T) {
+		entry := unittest.EpochStateFixture()
+		assert.Equal(t, entry.EpochCounter(), entry.CurrentEpochSetup.Counter)
+		assert.Equal(t, entry.EpochCounter(), entry.CurrentEpochCommit.Counter)
 	})
-	assert.NotEqual(t, entry.CurrentEpoch.ActiveIdentities, cpy.CurrentEpoch.ActiveIdentities)
+	t.Run("root-epoch", func(t *testing.T) {
+		entry := unittest.EpochStateFixture(func(entry *flow.RichEpochStateEntry) {
+			entry.PreviousEpoch = nil
+			entry.PreviousEpochSetup = nil
+			entry.PreviousEpochCommit = nil
+		})
+		assert.Equal(t, entry.EpochCounter(), entry.CurrentEpochSetup.Counter)
+		assert.Equal(t, entry.EpochCounter(), entry.CurrentEpochCommit.Counter)
+	})
+	t.Run("with-next-epoch", func(t *testing.T) {
+		entry := unittest.EpochStateFixture(unittest.WithNextEpochProtocolState())
+		assert.Equal(t, entry.EpochCounter(), entry.CurrentEpochSetup.Counter)
+		assert.Equal(t, entry.EpochCounter(), entry.CurrentEpochCommit.Counter)
+	})
+}
+
+// TestEpochStateEntry_CurrentEpochFinalView tests if the final view of the current epoch is correctly computed,
+// it has to be equal:
+// - to the final view of the current epoch setup if there are no extensions
+// - to the final view of the last extension if there are multiple extensions
+func TestEpochStateEntry_CurrentEpochFinalView(t *testing.T) {
+	t.Run("no-extension", func(t *testing.T) {
+		entry := unittest.EpochStateFixture()
+		assert.Equal(t, entry.CurrentEpochSetup.FinalView, entry.CurrentEpochFinalView())
+	})
+	t.Run("multiple-extension", func(t *testing.T) {
+		entry := unittest.EpochStateFixture()
+		extraViews := uint64(1000)
+		entry.CurrentEpoch.EpochExtensions = []flow.EpochExtension{
+			{
+				FirstView:     entry.CurrentEpochSetup.FinalView + 1,
+				FinalView:     entry.CurrentEpochSetup.FinalView + extraViews,
+				TargetEndTime: 0,
+			},
+		}
+		assert.Equal(t, entry.CurrentEpochSetup.FinalView+extraViews, entry.CurrentEpochFinalView())
+		entry.CurrentEpoch.EpochExtensions = append(entry.CurrentEpoch.EpochExtensions, flow.EpochExtension{
+			FirstView:     entry.CurrentEpoch.EpochExtensions[0].FinalView + 1,
+			FinalView:     entry.CurrentEpoch.EpochExtensions[0].FinalView + extraViews,
+			TargetEndTime: 0,
+		})
+		assert.Equal(t, entry.CurrentEpochSetup.FinalView+2*extraViews, entry.CurrentEpochFinalView())
+	})
 }
 
 // TestBuildIdentityTable tests if BuildIdentityTable returns a correct identity, whenever we pass arguments with or without
