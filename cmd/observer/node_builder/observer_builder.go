@@ -1107,7 +1107,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 		}).
 		Module("execution data datastore and blobstore", func(node *cmd.NodeConfig) error {
 			datastoreDir := filepath.Join(builder.executionDataDir, "blobstore")
-			err := os.MkdirAll(datastoreDir, 0o700)
+			err := os.MkdirAll(datastoreDir, 0700)
 			if err != nil {
 				return err
 			}
@@ -1803,7 +1803,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 				builder.Logger,
 				node.Storage.VersionBeacons,
 				nodeVersion,
-				builder.FinalizedRootBlock.Header.Height,
+				builder.SealedRootBlock.Header.Height,
 				builder.LastFinalizedHeader.Height,
 			)
 			if err != nil {
