@@ -138,7 +138,7 @@ func TestHandler_TransactionRunOrPanic(t *testing.T) {
 					// make sure the transaction id included in the block transaction list is the same as tx submitted
 					assert.Equal(
 						t,
-						types.BytesToCadenceUInt8ArrayValue(evmTx.Hash().Bytes()).WithType(nil),
+						evmTx.Hash().Bytes(),
 						eventTxHash,
 					)
 				})
@@ -647,12 +647,7 @@ func TestHandler_COA(t *testing.T) {
 				txEventPayload, err := types.DecodeTransactionEventPayload(cadenceEvent)
 				require.NoError(t, err)
 
-				values := txEventPayload.PrecompiledCalls.Values
-				aggregated := make([]byte, len(values))
-				for i, v := range values {
-					aggregated[i] = uint8(v.(cadence.UInt8))
-				}
-				apc, err := types.AggregatedPrecompileCallsFromEncoded(aggregated)
+				apc, err := types.AggregatedPrecompileCallsFromEncoded(txEventPayload.PrecompiledCalls)
 				require.NoError(t, err)
 
 				require.False(t, apc.IsEmpty())

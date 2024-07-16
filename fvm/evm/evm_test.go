@@ -148,11 +148,8 @@ func TestEVMRun(t *testing.T) {
 				txEventPayload, err := types.DecodeTransactionEventPayload(cadenceEvent)
 				require.NoError(t, err)
 
-				txPayload, err := types.CadenceUInt8ArrayValueToBytes(txEventPayload.Payload)
-				require.NoError(t, err)
-
 				require.NotEmpty(t, txEventPayload.Hash)
-				require.Equal(t, innerTxBytes, txPayload)
+				require.Equal(t, innerTxBytes, txEventPayload.Payload)
 				require.Equal(t, uint16(types.ErrCodeNoError), txEventPayload.ErrorCode)
 				require.Equal(t, uint16(0), txEventPayload.Index)
 				require.Equal(t, blockExecutedEventPayload.Height, txEventPayload.BlockHeight)
@@ -397,11 +394,8 @@ func TestEVMRun(t *testing.T) {
 				require.NoError(t, err)
 				require.NotEmpty(t, event.Hash)
 
-				encodedLogs, err := types.CadenceUInt8ArrayValueToBytes(event.Logs)
-				require.NoError(t, err)
-
 				var logs []*gethTypes.Log
-				err = rlp.DecodeBytes(encodedLogs, &logs)
+				err = rlp.DecodeBytes(event.Logs, &logs)
 				require.NoError(t, err)
 				require.Len(t, logs, 1)
 				log := logs[0]
@@ -505,11 +499,8 @@ func TestEVMBatchRun(t *testing.T) {
 					event, err := types.DecodeTransactionEventPayload(cadenceEvent)
 					require.NoError(t, err)
 
-					encodedLogs, err := types.CadenceUInt8ArrayValueToBytes(event.Logs)
-					require.NoError(t, err)
-
 					var logs []*gethTypes.Log
-					err = rlp.DecodeBytes(encodedLogs, &logs)
+					err = rlp.DecodeBytes(event.Logs, &logs)
 					require.NoError(t, err)
 
 					require.Len(t, logs, 1)
