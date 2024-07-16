@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/onflow/cadence/encoding/ccf"
+	gethCommon "github.com/onflow/go-ethereum/common"
 	gethTypes "github.com/onflow/go-ethereum/core/types"
 	gethParams "github.com/onflow/go-ethereum/params"
 	"github.com/onflow/go-ethereum/rlp"
@@ -106,6 +107,8 @@ func TestEVMRun(t *testing.T) {
 				// assert event fields are correct
 				require.Len(t, output.Events, 1)
 				txEvent := output.Events[0]
+				txEventPayload := testutils.TxEventToPayload(t, txEvent, sc.EVMContract.Address)
+				require.NoError(t, err)
 
 				// commit block
 				blockEventPayload, snapshot := callEVMHeartBeat(t,
@@ -116,11 +119,13 @@ func TestEVMRun(t *testing.T) {
 				require.NotEmpty(t, blockEventPayload.Hash)
 				require.Equal(t, uint64(43785), blockEventPayload.TotalGasUsed)
 				require.NotEmpty(t, blockEventPayload.Hash)
-				require.Len(t, blockEventPayload.TransactionHashes, 1)
-				require.NotEmpty(t, blockEventPayload.ReceiptRoot)
 
-				txEventPayload := testutils.TxEventToPayload(t, txEvent, sc.EVMContract.Address)
-				require.NoError(t, err)
+				txHash := gethCommon.HexToHash(txEventPayload.Hash)
+				require.Equal(t,
+					types.ComputeTransactionRootHash([]gethCommon.Hash{txHash}).String(),
+					string(blockEventPayload.TransactionHashRoot),
+				)
+				require.NotEmpty(t, blockEventPayload.ReceiptRoot)
 
 				txPayload, err := types.CadenceUInt8ArrayValueToBytes(txEventPayload.Payload)
 				require.NoError(t, err)
@@ -464,6 +469,7 @@ func TestEVMBatchRun(t *testing.T) {
 				snapshot = snapshot.Append(state)
 
 				require.Len(t, output.Events, batchCount)
+				txHashes := make(types.TransactionHashes, 0)
 				for i, event := range output.Events {
 					if i == batchCount { // last one is block executed
 						continue
@@ -477,6 +483,7 @@ func TestEVMBatchRun(t *testing.T) {
 					event, err := types.DecodeTransactionEventPayload(cadenceEvent)
 					require.NoError(t, err)
 
+					txHashes = append(txHashes, gethCommon.HexToHash(event.Hash))
 					encodedLogs, err := types.CadenceUInt8ArrayValueToBytes(event.Logs)
 					require.NoError(t, err)
 
@@ -499,7 +506,10 @@ func TestEVMBatchRun(t *testing.T) {
 
 				require.NotEmpty(t, blockEventPayload.Hash)
 				require.Equal(t, uint64(155513), blockEventPayload.TotalGasUsed)
-				require.Len(t, blockEventPayload.TransactionHashes, 5)
+				require.Equal(t,
+					types.ComputeTransactionRootHash(txHashes).String(),
+					string(blockEventPayload.TransactionHashRoot),
+				)
 
 				// retrieve the values
 				retrieveCode := []byte(fmt.Sprintf(
@@ -982,8 +992,12 @@ func TestEVMAddressDeposit(t *testing.T) {
 
 			require.NotEmpty(t, blockEventPayload.Hash)
 			require.Equal(t, uint64(21000), blockEventPayload.TotalGasUsed)
-			require.Len(t, blockEventPayload.TransactionHashes, 1)
-			require.Equal(t, txEventPayload.Hash, string(blockEventPayload.TransactionHashes[0]))
+
+			txHash := gethCommon.HexToHash(txEventPayload.Hash)
+			require.Equal(t,
+				types.ComputeTransactionRootHash([]gethCommon.Hash{txHash}).String(),
+				string(blockEventPayload.TransactionHashRoot),
+			)
 		})
 }
 
