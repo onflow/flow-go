@@ -76,13 +76,15 @@ type BlockTimeController struct {
 	log     zerolog.Logger
 	metrics module.CruiseCtlMetrics
 
-	// epochInfo scheduled transition view for current/next epoch
+	// epochInfo holds the timing information for the current epoch (and next epoch if it is committed)
+	epochInfo
 	epochInfo
 
-	// incorporatedBlocks OnBlockIncorporated events, we desire these blocks to be processed in a timely manner and therefore use a small channel capacity
-	incorporatedBlocks chan TimedBlock
-	// epochEvents epoch related protocol events chan that stores event processing callbacks.
-	// Each epoch related event will be processed in the order it is received.
+	// incorporatedBlocks queues OnBlockIncorporated notifications for subsequent processing by an internal worker routine. 
+	// Channel capacity is small and if `incorporatedBlocks` is full we discard new blocks, because the timing targets
+	// from the controller only make sense, if the node is not overloaded and swiftly processing new blocks. 
+	// epochEvents queues functors for processing epoch-related protocol events.
+	// Events will be processed in the order they are received (fifo).
 	epochEvents     chan func() error
 	proportionalErr Ewma
 	integralErr     LeakyIntegrator
@@ -428,10 +430,11 @@ func (ctl *BlockTimeController) measureViewDuration(tb TimedBlock) error {
 	return nil
 }
 
-// processEpochExtended processes the EpochExtended protocol data.
-// When an EpochExtended event is processed we update the current epoch
-// final view, target end time, and target duration from the first block
-// of the extension.
+// processEpochCommittedPhaseStarted processes the EpochExtended notification, which the Protocol
+// State emits when we finalize the first block whose Protocol State further extends the current
+// epoch. The next epoch should not be committed so far, because epoch extension are only added
+// when there is no subsequent epoch that we could transition into but the current epoch is nearing
+// its end. Specifically, we memorize the updated timing information in the BlockTimeController.
 // No errors are expected during normal operation.
 func (ctl *BlockTimeController) processEpochExtended(first *flow.Header) error {
 	currEpoch := ctl.state.AtHeight(first.Height).Epochs().Current()
@@ -464,12 +467,9 @@ func (ctl *BlockTimeController) processEpochExtended(first *flow.Header) error {
 	return nil
 }
 
-// processEpochCommittedPhaseStarted processes the EpochCommittedPhaseStarted protocol data.
-// Whenever we enter the EpochSetup phase, we:
-//   - store the next epoch's final view
-//   - store the next epoch's target duration
-//   - store the next epoch's target end time
-//
+// processEpochCommittedPhaseStarted processes the EpochCommittedPhaseStarted notification, which
+// the consensus component emits when we finalize the first block of the Epoch Committed phase.
+// Specifically, we memorize the next epoch's timing information in the BlockTimeController.
 // No errors are expected during normal operation.
 func (ctl *BlockTimeController) processEpochCommittedPhaseStarted(first *flow.Header) error {
 	snapshot := ctl.state.AtHeight(first.Height)
@@ -504,14 +504,16 @@ func (ctl *BlockTimeController) OnBlockIncorporated(block *model.Block) {
 	}
 }
 
-// EpochExtended handles the EpochExtended protocol event.
+// EpochExtended listens to `EpochExtended` protocol notifications. The notification is queued
+// for async processing by the worker. We must process _all_ `EpochExtended` notifications.
 func (ctl *BlockTimeController) EpochExtended(_ uint64, first *flow.Header, _ flow.EpochExtension) {
 	ctl.epochEvents <- func() error {
 		return ctl.processEpochExtended(first)
 	}
 }
 
-// EpochCommittedPhaseStarted handles the EpochCommittedPhaseStarted protocol event.
+// EpochCommittedPhaseStarted ingests the respective protocol notifications. The notification is
+// queued for async processing by the worker. We must process _all_ `EpochExtended` notifications.
 func (ctl *BlockTimeController) EpochCommittedPhaseStarted(_ uint64, first *flow.Header) {
 	ctl.epochEvents <- func() error {
 		return ctl.processEpochCommittedPhaseStarted(first)
