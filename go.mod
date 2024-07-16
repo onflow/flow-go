@@ -50,8 +50,8 @@ require (
 	github.com/onflow/cadence v1.0.0-preview.36
 	github.com/onflow/crypto v0.25.1
 	github.com/onflow/flow v0.3.4
-	github.com/onflow/flow-core-contracts/lib/go/contracts v1.3.0
-	github.com/onflow/flow-core-contracts/lib/go/templates v1.3.0
+	github.com/onflow/flow-core-contracts/lib/go/contracts v1.3.1
+	github.com/onflow/flow-core-contracts/lib/go/templates v1.3.1
 	github.com/onflow/flow-go-sdk v1.0.0-preview.38
 	github.com/onflow/flow/protobuf/go/flow v0.4.4
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58
@@ -328,5 +328,3 @@ require (
 
 // Using custom fork until https://github.com/onflow/flow-go/issues/5338 is resolved
 replace github.com/ipfs/boxo => github.com/onflow/boxo v0.0.0-20240201202436-f2477b92f483
-
-replace github.com/onflow/flow-core-contracts/lib/go/templates => github.com/The-K-R-O-K/flow-core-contracts/lib/go/templates v0.15.2-0.20240624091211-1812579d3242
