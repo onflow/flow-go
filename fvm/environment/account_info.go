@@ -22,7 +22,7 @@ type AccountInfo interface {
 
 	GetAccount(address flow.Address) (*flow.Account, error)
 	GetAccountKeys(address flow.Address) ([]flow.AccountPublicKey, error)
-	GetAccountKeyByIndex(address flow.Address, index uint64) (*flow.AccountPublicKey, error)
+	GetAccountKeyByIndex(address flow.Address, index uint32) (*flow.AccountPublicKey, error)
 }
 
 type ParseRestrictedAccountInfo struct {
@@ -120,7 +120,7 @@ func (info ParseRestrictedAccountInfo) GetAccountKeys(
 
 func (info ParseRestrictedAccountInfo) GetAccountKeyByIndex(
 	address flow.Address,
-	index uint64,
+	index uint32,
 ) (
 	*flow.AccountPublicKey,
 	error,
@@ -305,7 +305,7 @@ func (info *accountInfo) GetAccountKeys(
 
 func (info *accountInfo) GetAccountKeyByIndex(
 	address flow.Address,
-	index uint64,
+	index uint32,
 ) (
 	*flow.AccountPublicKey,
 	error,

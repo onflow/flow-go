@@ -707,7 +707,7 @@ func TestAddAccountKey(t *testing.T) {
 
 					for i, expectedKey := range expectedKeys {
 						actualKey := after.Keys[i]
-						assert.Equal(t, i, actualKey.Index)
+						assert.Equal(t, uint32(i), actualKey.Index)
 						assert.Equal(t, expectedKey.PublicKey, actualKey.PublicKey)
 						assert.Equal(t, expectedKey.SignAlgo, actualKey.SignAlgo)
 						assert.Equal(t, expectedKey.HashAlgo, actualKey.HashAlgo)
@@ -937,7 +937,7 @@ func TestRemoveAccountKey(t *testing.T) {
 					require.NoError(t, err)
 					assert.Len(t, before.Keys, keyCount)
 
-					for _, keyIndex := range []int{-1, keyCount, keyCount + 1} {
+					for _, keyIndex := range []int{keyCount, keyCount + 1} {
 						keyIndexArg, err := jsoncdc.Encode(cadence.NewInt(keyIndex))
 						require.NoError(t, err)
 
@@ -1186,7 +1186,7 @@ func TestGetAccountKey(t *testing.T) {
 				require.NoError(t, err)
 				assert.Len(t, before.Keys, keyCount)
 
-				for _, keyIndex := range []int{-1, keyCount, keyCount + 1} {
+				for _, keyIndex := range []int{keyCount, keyCount + 1} {
 					keyIndexArg, err := jsoncdc.Encode(cadence.NewInt(keyIndex))
 					require.NoError(t, err)
 
@@ -1565,7 +1565,7 @@ func TestAccountBalanceFields(t *testing.T) {
 				_, output, err = vm.Run(ctx, script, snapshotTree)
 				assert.NoError(t, err)
 				assert.NoError(t, output.Err)
-				assert.Equal(t, cadence.UFix64(99_989_590), output.Value)
+				assert.Equal(t, cadence.UFix64(99_989_630), output.Value)
 			}),
 	)
 
