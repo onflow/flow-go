@@ -1131,7 +1131,7 @@ func TestHandler_TransactionRun(t *testing.T) {
 							tr.OnTxStart(nil, tx, from)
 							tr.OnEnter(0, byte(vm.ADD), from, *tx.To(), tx.Data(), 20, big.NewInt(2))
 							tr.OnExit(0, []byte{0x02}, 200, nil, false)
-							tr.OnTxEnd(result.Receipt(), nil)
+							tr.OnTxEnd(result.Receipt(0), nil)
 
 							traceResult, err = tr.GetResult()
 							require.NoError(t, err)

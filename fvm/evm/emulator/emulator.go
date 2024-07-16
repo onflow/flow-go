@@ -431,7 +431,7 @@ func (proc *procedure) deployAt(
 
 	if proc.evm.Config.Tracer != nil {
 		proc.captureTraceBegin(0, gethVM.CREATE2, caller.ToCommon(), to.ToCommon(), data, gasLimit, value)
-		defer proc.captureTraceEnd(0, gasLimit, res.ReturnedData, res.Receipt(), res.VMError)
+		defer proc.captureTraceEnd(0, gasLimit, res.ReturnedData, res.Receipt(0), res.VMError)
 	}
 
 	addr := to.ToCommon()
