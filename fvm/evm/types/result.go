@@ -134,6 +134,7 @@ func (res *Result) Receipt(cumulativeGasUsed uint64) *gethTypes.Receipt {
 	}
 
 	receipt := &gethTypes.Receipt{
+		GasUsed:           res.GasConsumed,
 		CumulativeGasUsed: cumulativeGasUsed + res.GasConsumed,
 		Logs:              res.Logs,
 	}
