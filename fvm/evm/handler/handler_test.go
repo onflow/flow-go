@@ -1,12 +1,10 @@
 package handler_test
 
 import (
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"math"
 	"math/big"
-	"strings"
 	"testing"
 	"time"
 
@@ -113,7 +111,7 @@ func TestHandler_TransactionRunOrPanic(t *testing.T) {
 					// TODO: add an event decoder in types.event
 					cadenceLogs := cadence.SearchFieldByName(cadenceEvent, "logs")
 
-					encodedLogs, err := hex.DecodeString(strings.ReplaceAll(cadenceLogs.String(), "\"", ""))
+					encodedLogs, err := types.CadenceUInt8ArrayValueToBytes(cadenceLogs)
 					require.NoError(t, err)
 
 					var logs []*gethTypes.Log
@@ -943,7 +941,7 @@ func TestHandler_TransactionRun(t *testing.T) {
 
 						// TODO: add an event decoder in types.event
 						cadenceLogs := cadence.SearchFieldByName(cadenceEvent, "logs")
-						encodedLogs, err := hex.DecodeString(strings.ReplaceAll(cadenceLogs.String(), "\"", ""))
+						encodedLogs, err := types.CadenceUInt8ArrayValueToBytes(cadenceLogs.(cadence.Array))
 						require.NoError(t, err)
 
 						var logs []*gethTypes.Log

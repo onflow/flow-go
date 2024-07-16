@@ -119,7 +119,7 @@ func TestEVMTransactionExecutedEventCCFEncodingDecoding(t *testing.T) {
 	}
 
 	t.Run("evm.TransactionExecuted with failed status", func(t *testing.T) {
-		event := types.NewTransactionEvent(txResult, txBytes, blockHeight, blockHash)
+		event := types.NewTransactionEvent(txResult, txBytes, blockHeight)
 		ev, err := event.Payload.ToCadence(evmLocation)
 		require.NoError(t, err)
 
@@ -127,14 +127,13 @@ func TestEVMTransactionExecutedEventCCFEncodingDecoding(t *testing.T) {
 		require.NoError(t, err)
 
 		assert.Equal(t, tep.BlockHeight, blockHeight)
-		assert.Equal(t, tep.BlockHash, blockHash.Hex())
 		assert.Equal(t, tep.Hash, txHash.Hex())
-		assert.Equal(t, tep.Payload, txEncoded)
+		assert.Equal(t, tep.Payload, types.BytesToCadenceUInt8ArrayValue(txBytes))
 		assert.Equal(t, types.ErrorCode(tep.ErrorCode), types.ExecutionErrCodeOutOfGas)
 		assert.Equal(t, tep.TransactionType, txResult.TxType)
 		assert.Equal(t, tep.GasConsumed, txResult.GasConsumed)
 		assert.Equal(t, tep.ErrorMessage, txResult.VMError.Error())
-		assert.Equal(t, tep.ReturnedData, hex.EncodeToString(txResult.ReturnedData))
+		assert.Equal(t, tep.ReturnedData, types.BytesToCadenceUInt8ArrayValue(txResult.ReturnedData))
 		assert.Equal(
 			t,
 			tep.ContractAddress,
@@ -143,7 +142,7 @@ func TestEVMTransactionExecutedEventCCFEncodingDecoding(t *testing.T) {
 
 		encodedLogs, err := rlp.EncodeToBytes(txResult.Logs)
 		require.NoError(t, err)
-		assert.Equal(t, tep.Logs, hex.EncodeToString(encodedLogs))
+		assert.Equal(t, tep.Logs, types.BytesToCadenceUInt8ArrayValue(encodedLogs))
 
 		v, err := ccf.Encode(ev)
 		require.NoError(t, err)
@@ -161,7 +160,7 @@ func TestEVMTransactionExecutedEventCCFEncodingDecoding(t *testing.T) {
 	t.Run("evm.TransactionExecuted with non-failed status", func(t *testing.T) {
 		txResult.VMError = nil
 
-		event := types.NewTransactionEvent(txResult, txBytes, blockHeight, blockHash)
+		event := types.NewTransactionEvent(txResult, txBytes, blockHeight)
 		ev, err := event.Payload.ToCadence(evmLocation)
 		require.NoError(t, err)
 
@@ -169,14 +168,13 @@ func TestEVMTransactionExecutedEventCCFEncodingDecoding(t *testing.T) {
 		require.NoError(t, err)
 
 		assert.Equal(t, tep.BlockHeight, blockHeight)
-		assert.Equal(t, tep.BlockHash, blockHash.Hex())
 		assert.Equal(t, tep.Hash, txHash.Hex())
-		assert.Equal(t, tep.Payload, txEncoded)
+		assert.Equal(t, tep.Payload, types.BytesToCadenceUInt8ArrayValue(txBytes))
 		assert.Equal(t, types.ErrCodeNoError, types.ErrorCode(tep.ErrorCode))
 		assert.Equal(t, tep.TransactionType, txResult.TxType)
 		assert.Equal(t, tep.GasConsumed, txResult.GasConsumed)
 		assert.Empty(t, tep.ErrorMessage)
-		assert.Equal(t, tep.ReturnedData, hex.EncodeToString(txResult.ReturnedData))
+		assert.Equal(t, tep.ReturnedData, types.BytesToCadenceUInt8ArrayValue(txResult.ReturnedData))
 		assert.NotNil(t, txResult.DeployedContractAddress)
 		assert.Equal(
 			t,
@@ -186,7 +184,7 @@ func TestEVMTransactionExecutedEventCCFEncodingDecoding(t *testing.T) {
 
 		encodedLogs, err := rlp.EncodeToBytes(txResult.Logs)
 		require.NoError(t, err)
-		assert.Equal(t, tep.Logs, hex.EncodeToString(encodedLogs))
+		assert.Equal(t, tep.Logs, types.BytesToCadenceUInt8ArrayValue(encodedLogs))
 
 		v, err := ccf.Encode(ev)
 		require.NoError(t, err)

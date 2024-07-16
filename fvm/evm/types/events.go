@@ -1,7 +1,6 @@
 package types
 
 import (
-	"encoding/hex"
 	"fmt"
 
 	"github.com/onflow/cadence/encoding/ccf"
@@ -47,13 +46,11 @@ func NewTransactionEvent(
 	result *Result,
 	payload []byte,
 	blockHeight uint64,
-	blockHash gethCommon.Hash,
 ) *Event {
 	return &Event{
 		Etype: EventTypeTransactionExecuted,
 		Payload: &transactionEvent{
 			BlockHeight: blockHeight,
-			BlockHash:   blockHash,
 			Payload:     payload,
 			Result:      result,
 		},
@@ -92,16 +89,16 @@ func (p *transactionEvent) ToCadence(location common.Location) (cadence.Event, e
 			cadence.NewField("hash", cadence.StringType),
 			cadence.NewField("index", cadence.UInt16Type),
 			cadence.NewField("type", cadence.UInt8Type),
-			cadence.NewField("payload", cadence.StringType),
+			cadence.NewField("payload", cadence.NewVariableSizedArrayType(cadence.UInt8Type)),
 			cadence.NewField("errorCode", cadence.UInt16Type),
 			cadence.NewField("errorMessage", cadence.StringType),
 			cadence.NewField("gasConsumed", cadence.UInt64Type),
 			cadence.NewField("contractAddress", cadence.StringType),
-			cadence.NewField("logs", cadence.StringType),
+			cadence.NewField("logs", cadence.NewVariableSizedArrayType(cadence.UInt8Type)),
 			cadence.NewField("blockHeight", cadence.UInt64Type),
 			// todo we can remove hash and just reference block by height (evm-gateway dependency)
 			cadence.NewField("blockHash", cadence.StringType),
-			cadence.NewField("returnedData", cadence.StringType),
+			cadence.NewField("returnedData", cadence.NewVariableSizedArrayType(cadence.UInt8Type)),
 			cadence.NewField("precompiledCalls", cadence.NewVariableSizedArrayType(cadence.UInt8Type)),
 		},
 		nil,
@@ -111,16 +108,16 @@ func (p *transactionEvent) ToCadence(location common.Location) (cadence.Event, e
 		cadence.String(p.Result.TxHash.String()),
 		cadence.NewUInt16(p.Result.Index),
 		cadence.NewUInt8(p.Result.TxType),
-		cadence.String(hex.EncodeToString(p.Payload)),
+		BytesToCadenceUInt8ArrayValue(p.Payload),
 		cadence.NewUInt16(uint16(p.Result.ResultSummary().ErrorCode)),
 		cadence.String(errorMsg),
 		cadence.NewUInt64(p.Result.GasConsumed),
 		deployedAddress,
-		cadence.String(hex.EncodeToString(encodedLogs)),
+		BytesToCadenceUInt8ArrayValue(encodedLogs),
 		cadence.NewUInt64(p.BlockHeight),
 		cadence.String(p.BlockHash.String()),
-		cadence.String(hex.EncodeToString(p.Result.ReturnedData)),
-		bytesToCadenceUInt8ArrayValue(p.Result.PrecompiledCalls),
+		BytesToCadenceUInt8ArrayValue(p.Result.ReturnedData),
+		BytesToCadenceUInt8ArrayValue(p.Result.PrecompiledCalls),
 	}).WithType(eventType), nil
 }
 
@@ -200,15 +197,14 @@ type TransactionEventPayload struct {
 	Hash             string        `cadence:"hash"`
 	Index            uint16        `cadence:"index"`
 	TransactionType  uint8         `cadence:"type"`
-	Payload          string        `cadence:"payload"`
+	Payload          cadence.Array `cadence:"payload"`
 	ErrorCode        uint16        `cadence:"errorCode"`
 	GasConsumed      uint64        `cadence:"gasConsumed"`
 	ContractAddress  string        `cadence:"contractAddress"`
-	Logs             string        `cadence:"logs"`
+	Logs             cadence.Array `cadence:"logs"`
 	BlockHeight      uint64        `cadence:"blockHeight"`
-	BlockHash        string        `cadence:"blockHash"`
 	ErrorMessage     string        `cadence:"errorMessage"`
-	ReturnedData     string        `cadence:"returnedData"`
+	ReturnedData     cadence.Array `cadence:"returnedData"`
 	PrecompiledCalls cadence.Array `cadence:"precompiledCalls"`
 }
 
@@ -217,16 +213,6 @@ func DecodeTransactionEventPayload(event cadence.Event) (*TransactionEventPayloa
 	var tx TransactionEventPayload
 	err := cadence.DecodeFields(event, &tx)
 	return &tx, err
-}
-
-func bytesToCadenceUInt8ArrayValue(b []byte) cadence.Array {
-	values := make([]cadence.Value, len(b))
-	for i, v := range b {
-		values[i] = cadence.NewUInt8(v)
-	}
-	return cadence.NewArray(values).WithType(
-		cadence.NewVariableSizedArrayType(cadence.UInt8Type),
-	)
 }
 
 // FLOWTokensEventPayload captures payloads for a FlowTokenDeposited event
