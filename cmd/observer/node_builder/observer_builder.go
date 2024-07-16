@@ -1092,6 +1092,8 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 	requesterDependable := module.NewProxiedReadyDoneAware()
 	builder.IndexerDependencies.Add(requesterDependable)
 
+	executionDataPrunerEnabled := builder.executionDataPrunerHeightRangeTarget != 0
+
 	builder.
 		AdminCommand("read-execution-data", func(config *cmd.NodeConfig) commands.AdminCommand {
 			return stateSyncCommands.NewReadExecutionDataCommand(builder.ExecutionDataStore)
@@ -1182,7 +1184,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 
 			var downloaderOpts []execution_data.DownloaderOption
 
-			if builder.executionDataPrunerHeightRangeTarget != 0 {
+			if executionDataPrunerEnabled {
 				sealed, err := node.State.Sealed().Head()
 				if err != nil {
 					return nil, fmt.Errorf("cannot get the sealed block: %w", err)
@@ -1281,7 +1283,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 			return builder.ExecutionDataRequester, nil
 		}).
 		Component("execution data pruner", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			if builder.executionDataPrunerHeightRangeTarget == 0 {
+			if !executionDataPrunerEnabled {
 				return &module.NoopReadyDoneAware{}, nil
 			}
 
@@ -1435,6 +1437,10 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				return nil, err
 			}
 
+			if executionDataPrunerEnabled {
+				builder.ExecutionDataPruner.RegisterProducer(builder.ExecutionIndexer)
+			}
+
 			// setup requester to notify indexer when new execution data is received
 			execDataDistributor.AddOnExecutionDataReceivedConsumer(builder.ExecutionIndexer.OnExecutionData)
 
@@ -1466,8 +1472,6 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 			if err != nil {
 				return nil, err
 			}
-
-			builder.ExecutionDataPruner.RegisterProducer(builder.ExecutionIndexer)
 
 			return builder.ExecutionIndexer, nil
 		}, builder.IndexerDependencies)
