@@ -31,23 +31,52 @@ type TimedBlock struct {
 	TimeObserved time.Time // timestamp when BlockTimeController received the block, per convention in UTC
 }
 
-// epochInfo stores data about the current and next epoch. It is updated when we enter
-// the first view of a new epoch, or the EpochSetup phase of the current epoch.
-type epochInfo struct {
-	curEpochFirstView       uint64
-	curEpochFinalView       uint64  // F[v] - the final view of the current epoch
-	curEpochTargetDuration  uint64  // desired total duration of current epoch in seconds
-	curEpochTargetEndTime   uint64  // T[v] - the target end time of the current epoch, represented as Unix Time [seconds]
-	nextEpochFinalView      *uint64 // the final view of the next epoch
-	nextEpochTargetDuration *uint64 // desired total duration of next epoch in seconds, or nil if epoch has not yet been set up
-	nextEpochTargetEndTime  *uint64 // the target end time of the next epoch, represented as Unix Time [seconds]
+// epochTiming encapsulates the timing information of one specific epoch:
+type epochTiming struct {
+	firstView      uint64 // first view of the epoch's view range
+	finalView      uint64 // last view of the epoch's view range
+	targetDuration uint64 // desired total duration of the epoch in seconds
+	targetEndTime  uint64 // target end time of the epoch, represented as Unix Time [seconds]
+}
+
+// newEpochTiming queries the timing information from the given `epoch` and returns it as a new `epochTiming` instance.
+func newEpochTiming(epoch protocol.Epoch) (*epochTiming, error) {
+	firstView, err := epoch.FirstView()
+	if err != nil {
+		return nil, fmt.Errorf("could not retrieve epoch's first view: %w", err)
+	}
+	finalView, err := epoch.FinalView()
+	if err != nil {
+		return nil, fmt.Errorf("could not retrieve epoch's final view: %w", err)
+	}
+	targetDuration, err := epoch.TargetDuration()
+	if err != nil {
+		return nil, fmt.Errorf("could not retrieve epoch's target duration: %w", err)
+	}
+	targetEndTime, err := epoch.TargetEndTime()
+	if err != nil {
+		return nil, fmt.Errorf("could not retrieve epoch's target end time: %w", err)
+	}
+
+	return &epochTiming{
+		firstView:      firstView,
+		finalView:      finalView,
+		targetDuration: targetDuration,
+		targetEndTime:  targetEndTime,
+	}, nil
 }
 
 // targetViewTime returns τ[v], the ideal, steady-state view time for the current epoch.
 // For numerical stability, we avoid repetitive conversions between seconds and time.Duration.
 // Instead, internally within the controller, we work with float64 in units of seconds.
-func (epoch *epochInfo) targetViewTime() float64 {
-	return float64(epoch.curEpochTargetDuration) / float64(epoch.curEpochFinalView-epoch.curEpochFirstView+1)
+func (epoch *epochTiming) targetViewTime() float64 {
+	return float64(epoch.targetDuration) / float64(epoch.finalView-epoch.firstView+1)
+}
+
+// isFollowedBy determines whether nextEpoch is indeed the direct successor of the receiver,
+// based on the view ranges of both epochs.
+func (et *epochTiming) isFollowedBy(nextEpoch *epochTiming) bool {
+	return et.finalView+1 == nextEpoch.firstView
 }
 
 // BlockTimeController dynamically adjusts the ProposalTiming of this node,
@@ -76,8 +105,10 @@ type BlockTimeController struct {
 	log     zerolog.Logger
 	metrics module.CruiseCtlMetrics
 
-	// epochInfo holds the timing information for the current epoch (and next epoch if it is committed)
-	epochInfo
+	// currentEpochTiming holds the timing information for the current epoch (and next epoch if it is committed)
+	currentEpochTiming epochTiming
+	// nextEpochTiming holds the timing information for the next epoch if it is committed
+	nextEpochTiming *epochTiming
 
 	// incorporatedBlocks queues OnBlockIncorporated notifications for subsequent processing by an internal worker routine.
 	incorporatedBlocks chan TimedBlock
@@ -127,7 +158,7 @@ func NewBlockTimeController(log zerolog.Logger, metrics module.CruiseCtlMetrics,
 		Build()
 
 	// initialize state
-	err = ctl.initEpochInfo()
+	err = ctl.initEpochTiming()
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize epoch info: %w", err)
 	}
@@ -143,65 +174,36 @@ func NewBlockTimeController(log zerolog.Logger, metrics module.CruiseCtlMetrics,
 	return ctl, nil
 }
 
-// initEpochInfo initializes the epochInfo state upon component startup.
+// initEpochTiming initializes the epochInfo state upon component startup.
 // No errors are expected during normal operation.
-func (ctl *BlockTimeController) initEpochInfo() error {
+func (ctl *BlockTimeController) initEpochTiming() error {
 	finalSnapshot := ctl.state.Final()
-	curEpoch := finalSnapshot.Epochs().Current()
 
-	curEpochFirstView, err := curEpoch.FirstView()
+	currentEpochTiming, err := newEpochTiming(finalSnapshot.Epochs().Current())
 	if err != nil {
-		return fmt.Errorf("could not initialize current epoch first view: %w", err)
+		return fmt.Errorf("failed to retrieve the current epoch's timing information: %w", err)
 	}
-	ctl.curEpochFirstView = curEpochFirstView
-
-	curEpochFinalView, err := curEpoch.FinalView()
-	if err != nil {
-		return fmt.Errorf("could not initialize current epoch final view: %w", err)
-	}
-	ctl.curEpochFinalView = curEpochFinalView
-
-	curEpochTargetDuration, err := curEpoch.TargetDuration()
-	if err != nil {
-		return fmt.Errorf("could not initialize current epoch target duration: %w", err)
-	}
-	ctl.curEpochTargetDuration = curEpochTargetDuration
-
-	curEpochTargetEndTime, err := curEpoch.TargetEndTime()
-	if err != nil {
-		return fmt.Errorf("could not initialize current epoch target end time: %w", err)
-	}
-	ctl.curEpochTargetEndTime = curEpochTargetEndTime
+	ctl.currentEpochTiming = *currentEpochTiming
 
 	phase, err := finalSnapshot.EpochPhase()
 	if err != nil {
 		return fmt.Errorf("could not check snapshot phase: %w", err)
 	}
 	if phase == flow.EpochPhaseCommitted {
-		nextEpochFinalView, err := finalSnapshot.Epochs().Next().FinalView()
+		ctl.nextEpochTiming, err = newEpochTiming(finalSnapshot.Epochs().Next())
 		if err != nil {
-			return fmt.Errorf("could not initialize next epoch final view: %w", err)
+			return fmt.Errorf("failed to retrieve the next epoch's timing information: %w", err)
 		}
-		ctl.epochInfo.nextEpochFinalView = &nextEpochFinalView
-
-		nextEpochTargetDuration, err := finalSnapshot.Epochs().Next().TargetDuration()
-		if err != nil {
-			return fmt.Errorf("could not initialize next epoch target duration: %w", err)
+		if !currentEpochTiming.isFollowedBy(ctl.nextEpochTiming) {
+			return fmt.Errorf("failed to retrieve the next epoch's timing information: %w", err)
 		}
-		ctl.nextEpochTargetDuration = &nextEpochTargetDuration
-
-		nextEpochTargetEndTime, err := finalSnapshot.Epochs().Next().TargetEndTime()
-		if err != nil {
-			return fmt.Errorf("could not initialize next epoch target end time: %w", err)
-		}
-		ctl.nextEpochTargetEndTime = &nextEpochTargetEndTime
 	}
 
 	return nil
 }
 
 // initProposalTiming initializes the ProposalTiming value upon startup.
-// CAUTION: Must be called after initEpochInfo.
+// CAUTION: Must be called after initEpochTiming.
 func (ctl *BlockTimeController) initProposalTiming(curView uint64) {
 	// When disabled, or in epoch fallback, use fallback timing (constant ProposalDuration)
 	if !ctl.config.Enabled.Load() {
@@ -330,32 +332,28 @@ func (ctl *BlockTimeController) processIncorporatedBlock(tb TimedBlock) error {
 // No errors are expected during normal operation.
 func (ctl *BlockTimeController) checkForEpochTransition(tb TimedBlock) error {
 	view := tb.Block.View
-	if view <= ctl.curEpochFinalView { // prevalent case: we are still within the current epoch
+	if view <= ctl.currentEpochTiming.finalView { // prevalent case: we are still within the current epoch
 		return nil
 	}
 
 	// sanity checks, since we are beyond the final view of the most recently processed epoch:
-	if ctl.nextEpochFinalView == nil { // final view of epoch we are entering should be known
-		return fmt.Errorf("cannot transition without nextEpochFinalView set")
+	if ctl.nextEpochTiming == nil { // next epoch timing not initialized
+		return fmt.Errorf("sanity check failed: cannot transition without next epoch timing initialized")
 	}
-	if ctl.nextEpochTargetEndTime == nil {
-		return fmt.Errorf("cannot transition without nextEpochTargetEndTime set")
+	if !ctl.currentEpochTiming.isFollowedBy(ctl.nextEpochTiming) { // non consecutive epochs
+		return fmt.Errorf("sanity check failed: invalid epoch transition current epoch (final view: %d) is not followed by next epoch (first view: %d)",
+			ctl.currentEpochTiming.finalView, ctl.nextEpochTiming.firstView)
 	}
-	if ctl.nextEpochTargetDuration == nil {
-		return fmt.Errorf("cannot transition without nextEpochTargetDuration set")
-	}
-	if view > *ctl.nextEpochFinalView { // the block's view should be within the upcoming epoch
+	if view > ctl.nextEpochTiming.finalView { // the block's view should be within the upcoming epoch
 		return fmt.Errorf("sanity check failed: curView %d is beyond both current epoch (final view %d) and next epoch (final view %d)",
-			view, ctl.curEpochFinalView, *ctl.nextEpochFinalView)
+			view, ctl.currentEpochTiming.finalView, ctl.nextEpochTiming.finalView)
 	}
 
-	ctl.curEpochFirstView = ctl.curEpochFinalView + 1
-	ctl.curEpochFinalView = *ctl.nextEpochFinalView
-	ctl.curEpochTargetDuration = *ctl.nextEpochTargetDuration
-	ctl.curEpochTargetEndTime = *ctl.nextEpochTargetEndTime
-	ctl.nextEpochFinalView = nil
-	ctl.nextEpochTargetDuration = nil
-	ctl.nextEpochTargetEndTime = nil
+	ctl.currentEpochTiming.firstView = ctl.nextEpochTiming.firstView
+	ctl.currentEpochTiming.finalView = ctl.nextEpochTiming.finalView
+	ctl.currentEpochTiming.targetDuration = ctl.nextEpochTiming.targetDuration
+	ctl.currentEpochTiming.targetEndTime = ctl.nextEpochTiming.targetEndTime
+	ctl.nextEpochTiming = nil
 
 	return nil
 }
@@ -389,9 +387,9 @@ func (ctl *BlockTimeController) measureViewDuration(tb TimedBlock) error {
 	// In accordance with this convention, observing the proposal for the last view of an epoch, marks the start of the last view.
 	// By observing the proposal, nodes enter the last view, verify the block, vote for it, the primary aggregates the votes,
 	// constructs the child (for first view of new epoch). The last view of the epoch ends, when the child proposal is published.
-	tau := ctl.targetViewTime()                                                    // τ: idealized target view time in units of seconds
-	viewDurationsRemaining := ctl.curEpochFinalView + 1 - view                     // k[v]: views remaining in current epoch
-	durationRemaining := unix2time(ctl.curEpochTargetEndTime).Sub(tb.TimeObserved) // Γ[v] = T[v] - t[v], with t[v] ≡ tb.TimeObserved the time when observing the block that triggered the view change
+	tau := ctl.currentEpochTiming.targetViewTime()                                            // τ: idealized target view time in units of seconds
+	viewDurationsRemaining := ctl.currentEpochTiming.finalView + 1 - view                     // k[v]: views remaining in current epoch
+	durationRemaining := unix2time(ctl.currentEpochTiming.targetEndTime).Sub(tb.TimeObserved) // Γ[v] = T[v] - t[v], with t[v] ≡ tb.TimeObserved the time when observing the block that triggered the view change
 
 	// Compute instantaneous error term: e[v] = k[v]·τ - T[v] i.e. the projected difference from target switchover
 	// and update PID controller's error terms. All UNITS in SECOND.
@@ -437,32 +435,23 @@ func (ctl *BlockTimeController) measureViewDuration(tb TimedBlock) error {
 // its end. Specifically, we memorize the updated timing information in the BlockTimeController.
 // No errors are expected during normal operation.
 func (ctl *BlockTimeController) processEpochExtended(first *flow.Header) error {
-	currEpoch := ctl.state.AtHeight(first.Height).Epochs().Current()
-	finalView, err := currEpoch.FinalView()
+	currEpochWithExtension, err := newEpochTiming(ctl.state.AtHeight(first.Height).Epochs().Current())
 	if err != nil {
-		return fmt.Errorf("failed to retrieve final view at height id %d", first.Height)
-	}
-	targetEndTime, err := currEpoch.TargetEndTime()
-	if err != nil {
-		return fmt.Errorf("failed to retrieve target end time at height id %d", first.Height)
-	}
-	targetDuration, err := currEpoch.TargetDuration()
-	if err != nil {
-		return fmt.Errorf("failed to retrieve target duration at height id %d", first.Height)
+		return fmt.Errorf("failed to get new epoch timing: %w", err)
 	}
 
 	// sanity check: ensure the final view of the current epoch monotonically increases
-	if finalView < ctl.epochInfo.curEpochFinalView {
-		return fmt.Errorf("final view of epoch must be monotonically increases, but is decreasing from %d to %d", ctl.epochInfo.curEpochFinalView, finalView)
+	if currEpochWithExtension.finalView < ctl.currentEpochTiming.finalView {
+		return fmt.Errorf("final view of epoch must be monotonically increases, but is decreasing from %d to %d", ctl.currentEpochTiming.finalView, currEpochWithExtension.finalView)
 	}
 
-	if finalView == ctl.epochInfo.curEpochFinalView {
+	if currEpochWithExtension.finalView == ctl.currentEpochTiming.finalView {
 		return nil
 	}
 
-	ctl.curEpochFinalView = finalView
-	ctl.curEpochTargetEndTime = targetEndTime
-	ctl.curEpochTargetDuration = targetDuration
+	ctl.currentEpochTiming.finalView = currEpochWithExtension.finalView
+	ctl.currentEpochTiming.targetEndTime = currEpochWithExtension.targetEndTime
+	ctl.currentEpochTiming.targetDuration = currEpochWithExtension.targetDuration
 
 	return nil
 }
@@ -472,24 +461,15 @@ func (ctl *BlockTimeController) processEpochExtended(first *flow.Header) error {
 // Specifically, we memorize the next epoch's timing information in the BlockTimeController.
 // No errors are expected during normal operation.
 func (ctl *BlockTimeController) processEpochCommittedPhaseStarted(first *flow.Header) error {
+	var err error
 	snapshot := ctl.state.AtHeight(first.Height)
-	nextEpoch := snapshot.Epochs().Next()
-	finalView, err := nextEpoch.FinalView()
+	ctl.nextEpochTiming, err = newEpochTiming(snapshot.Epochs().Next())
 	if err != nil {
-		return fmt.Errorf("could not get next epoch final view: %w", err)
+		return fmt.Errorf("failed to retrieve the next epoch's timing information: %w", err)
 	}
-	targetDuration, err := nextEpoch.TargetDuration()
-	if err != nil {
-		return fmt.Errorf("could not get next epoch target duration: %w", err)
+	if !ctl.currentEpochTiming.isFollowedBy(ctl.nextEpochTiming) {
+		return fmt.Errorf("failed to retrieve the next epoch's timing information: %w", err)
 	}
-	targetEndTime, err := nextEpoch.TargetEndTime()
-	if err != nil {
-		return fmt.Errorf("could not get next epoch target end time: %w", err)
-	}
-
-	ctl.epochInfo.nextEpochFinalView = &finalView
-	ctl.epochInfo.nextEpochTargetDuration = &targetDuration
-	ctl.epochInfo.nextEpochTargetEndTime = &targetEndTime
 	return nil
 }
 
