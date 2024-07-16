@@ -132,9 +132,7 @@ func NewPruner(logger zerolog.Logger, metrics module.ExecutionDataPrunerMetrics,
 }
 
 func (p *Pruner) RegisterProducer(producer execution_data.ExecutionDataProducer) {
-	fmt.Println("RegisterProducer")
 	producer.Register(&p.fulfilledHeight)
-	fmt.Println("RegisterProducer end ")
 
 	p.registeredProducers = append(p.registeredProducers, producer)
 }
