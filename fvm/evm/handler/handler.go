@@ -198,12 +198,6 @@ func (h *ContractHandler) batchRun(rlpEncodedTxs [][]byte, coinbase types.Addres
 		return nil, types.ErrUnexpectedEmptyResult
 	}
 
-	// Populate receipt root
-	bp.PopulateReceiptRoot(res)
-
-	// Populate total gas used
-	bp.CalculateGasUsage(res)
-
 	// meter all the transaction gas usage and append hashes to the block
 	for _, r := range res {
 		// meter gas anyway (even for invalid or failed states)
@@ -214,13 +208,8 @@ func (h *ContractHandler) batchRun(rlpEncodedTxs [][]byte, coinbase types.Addres
 
 		// include it in a block only if valid (not invalid)
 		if !r.Invalid() {
-			bp.AppendTxHash(r.TxHash)
+			bp.AppendTransaction(r)
 		}
-	}
-
-	blockHash, err := bp.Hash()
-	if err != nil {
-		return nil, err
 	}
 
 	// if there were no valid transactions skip emitting events
@@ -237,7 +226,6 @@ func (h *ContractHandler) batchRun(rlpEncodedTxs [][]byte, coinbase types.Addres
 			r,
 			rlpEncodedTxs[i],
 			bp.Height,
-			blockHash,
 		))
 		if err != nil {
 			return nil, err
@@ -246,17 +234,46 @@ func (h *ContractHandler) batchRun(rlpEncodedTxs [][]byte, coinbase types.Addres
 		h.tracer.Collect(r.TxHash)
 	}
 
-	err = h.emitEvent(types.NewBlockEvent(bp))
+	// update the block proposal
+	err = h.blockStore.UpdateBlockProposal(bp)
 	if err != nil {
 		return nil, err
 	}
 
-	err = h.blockStore.CommitBlockProposal()
+	// TODO: don't commit right away.
+	err = h.commitBlockProposal()
 	if err != nil {
 		return nil, err
 	}
 
 	return res, nil
+}
+
+// CommitBlockProposal commits the block proposal and add a new block to the EVM blockchain
+func (h *ContractHandler) CommitBlockProposal() {
+	panicOnError(h.commitBlockProposal())
+}
+
+func (h *ContractHandler) commitBlockProposal() error {
+	// load latest block proposal
+	bp, err := h.blockStore.BlockProposal()
+	if err != nil {
+		return err
+	}
+
+	// commit the proposal
+	err = h.blockStore.CommitBlockProposal(bp)
+	if err != nil {
+		return err
+	}
+
+	// emit block executed event
+	err = h.emitEvent(types.NewBlockEvent(&bp.Block))
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (h *ContractHandler) run(
@@ -312,32 +329,23 @@ func (h *ContractHandler) run(
 		return nil, err
 	}
 
-	bp.AppendTxHash(res.TxHash)
-
-	// Populate receipt root
-	bp.PopulateReceiptRoot([]*types.Result{res})
-
-	// Populate total gas used
-	bp.CalculateGasUsage([]*types.Result{res})
-
-	blockHash, err := bp.Hash()
-	if err != nil {
-		return nil, err
-	}
+	// append tx to the block proposal
+	bp.AppendTransaction(res)
 
 	// step 4 - emit events
-	err = h.emitEvent(types.NewTransactionEvent(res, rlpEncodedTx, bp.Height, blockHash))
+	err = h.emitEvent(types.NewTransactionEvent(res, rlpEncodedTx, bp.Height))
 	if err != nil {
 		return nil, err
 	}
 
-	err = h.emitEvent(types.NewBlockEvent(bp))
+	// update the block proposal
+	err = h.blockStore.UpdateBlockProposal(bp)
 	if err != nil {
 		return nil, err
 	}
 
-	// step 5 - commit block proposal
-	err = h.blockStore.CommitBlockProposal()
+	// TODO: don't commit right away.
+	err = h.commitBlockProposal()
 	if err != nil {
 		return nil, err
 	}
@@ -502,13 +510,8 @@ func (h *ContractHandler) executeAndHandleCall(
 		return nil, err
 	}
 
-	bp.AppendTxHash(res.TxHash)
-
-	// Populate receipt root
-	bp.PopulateReceiptRoot([]*types.Result{res})
-
-	// Populate total gas used
-	bp.CalculateGasUsage([]*types.Result{res})
+	// append transaction to the block proposal
+	bp.AppendTransaction(res)
 
 	if totalSupplyDiff != nil {
 		if deductSupplyDiff {
@@ -521,11 +524,6 @@ func (h *ContractHandler) executeAndHandleCall(
 		}
 	}
 
-	blockHash, err := bp.Hash()
-	if err != nil {
-		return nil, err
-	}
-
 	// emit events
 	encoded, err := call.Encode()
 	if err != nil {
@@ -533,19 +531,20 @@ func (h *ContractHandler) executeAndHandleCall(
 	}
 
 	err = h.emitEvent(
-		types.NewTransactionEvent(res, encoded, bp.Height, blockHash),
+		types.NewTransactionEvent(res, encoded, bp.Height),
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	err = h.emitEvent(types.NewBlockEvent(bp))
+	// update the block proposal
+	err = h.blockStore.UpdateBlockProposal(bp)
 	if err != nil {
 		return nil, err
 	}
 
-	// commit block proposal
-	err = h.blockStore.CommitBlockProposal()
+	// TODO: don't commit right away.
+	err = h.commitBlockProposal()
 	if err != nil {
 		return nil, err
 	}
