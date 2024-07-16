@@ -244,7 +244,7 @@ func TestGetAccountKeyByIndex(t *testing.T) {
 				"foo",
 				"100",
 			),
-			`{"code":400, "message":"invalid key index: value must be an unsigned 64 bit integer"}`,
+			`{"code":400, "message":"invalid key index: value must be an unsigned 32 bit integer"}`,
 		},
 		{
 			"get key with invalid height",

@@ -194,7 +194,7 @@ func (t *testTransactionSender) Send(tx *sdk.Transaction) (sdk.TransactionResult
 			SetComputeLimit(tx.GasLimit).
 			SetProposalKey(
 				flow.BytesToAddress(tx.ProposalKey.Address.Bytes()),
-				uint64(tx.ProposalKey.KeyIndex),
+				tx.ProposalKey.KeyIndex,
 				tx.ProposalKey.SequenceNumber,
 			).
 			SetPayer(flow.BytesToAddress(tx.Payer.Bytes()))
@@ -208,14 +208,14 @@ func (t *testTransactionSender) Send(tx *sdk.Transaction) (sdk.TransactionResult
 	for _, sig := range tx.PayloadSignatures {
 		txBody.AddPayloadSignature(
 			flow.BytesToAddress(sig.Address.Bytes()),
-			uint64(sig.KeyIndex),
+			sig.KeyIndex,
 			sig.Signature,
 		)
 	}
 	for _, sig := range tx.EnvelopeSignatures {
 		txBody.AddEnvelopeSignature(
 			flow.BytesToAddress(sig.Address.Bytes()),
-			uint64(sig.KeyIndex),
+			sig.KeyIndex,
 			sig.Signature,
 		)
 	}

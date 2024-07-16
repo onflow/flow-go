@@ -41,11 +41,11 @@ func (e *ExecutionResult) Build(
 
 func (c *Chunk) Build(chunk *flow.Chunk) {
 	c.BlockId = chunk.BlockID.String()
-	c.Index = util.FromUint64(chunk.Index)
-	c.CollectionIndex = util.FromUint64(uint64(chunk.CollectionIndex))
+	c.Index = util.FromUint(chunk.Index)
+	c.CollectionIndex = util.FromUint(uint64(chunk.CollectionIndex))
 	c.StartState = util.ToBase64(chunk.StartState[:])
 	c.EndState = util.ToBase64(chunk.EndState[:])
-	c.NumberOfTransactions = util.FromUint64(chunk.NumberOfTransactions)
+	c.NumberOfTransactions = util.FromUint(chunk.NumberOfTransactions)
 	c.EventCollection = chunk.EventCollection.String()
-	c.TotalComputationUsed = util.FromUint64(chunk.TotalComputationUsed)
+	c.TotalComputationUsed = util.FromUint(chunk.TotalComputationUsed)
 }
