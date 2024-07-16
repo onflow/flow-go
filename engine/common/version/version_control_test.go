@@ -340,12 +340,12 @@ func TestVersionBoundaryUpdated(t *testing.T) {
 		signalerContext:            signalCtx,
 	})
 
-	var assertUpdate func(height uint64, semver string)
+	var assertUpdate func(height uint64, version *semver.Version)
 	var assertCallbackCalled func()
 
 	// Add a consumer to verify version updates
-	vc.AddVersionUpdatesConsumer(func(height uint64, semver string) {
-		assertUpdate(height, semver)
+	vc.AddVersionUpdatesConsumer(func(height uint64, version *semver.Version) {
+		assertUpdate(height, version)
 	})
 	assert.Len(t, vc.consumers, 1)
 
@@ -355,7 +355,7 @@ func TestVersionBoundaryUpdated(t *testing.T) {
 	latestHeight++ // 11
 	contract.AddBoundary(latestHeight, flow.VersionBoundary{BlockHeight: boundaryHeight, Version: "0.0.2"})
 
-	assertUpdate, assertCallbackCalled = generateConsumerAssertions(t, boundaryHeight, "0.0.2")
+	assertUpdate, assertCallbackCalled = generateConsumerAssertions(t, boundaryHeight, semver.New("0.0.2"))
 	vc.blockFinalized(signalCtx, latestHeight)
 	assertCallbackCalled()
 
@@ -363,7 +363,7 @@ func TestVersionBoundaryUpdated(t *testing.T) {
 	latestHeight++ // 12
 	contract.UpdateBoundary(latestHeight, boundaryHeight, "0.0.3")
 
-	assertUpdate, assertCallbackCalled = generateConsumerAssertions(t, boundaryHeight, "0.0.3")
+	assertUpdate, assertCallbackCalled = generateConsumerAssertions(t, boundaryHeight, semver.New("0.0.3"))
 	vc.blockFinalized(signalCtx, latestHeight)
 	assertCallbackCalled()
 
@@ -403,12 +403,12 @@ func TestVersionBoundaryDeleted(t *testing.T) {
 		signalerContext:            signalCtx,
 	})
 
-	var assertUpdate func(height uint64, semver string)
+	var assertUpdate func(height uint64, version *semver.Version)
 	var assertCallbackCalled func()
 
 	// Add a consumer to verify version updates
-	vc.AddVersionUpdatesConsumer(func(height uint64, semver string) {
-		assertUpdate(height, semver)
+	vc.AddVersionUpdatesConsumer(func(height uint64, version *semver.Version) {
+		assertUpdate(height, version)
 	})
 	assert.Len(t, vc.consumers, 1)
 
@@ -416,7 +416,7 @@ func TestVersionBoundaryDeleted(t *testing.T) {
 	latestHeight++ // 11
 	contract.AddBoundary(latestHeight, flow.VersionBoundary{BlockHeight: boundaryHeight, Version: "0.0.2"})
 
-	assertUpdate, assertCallbackCalled = generateConsumerAssertions(t, boundaryHeight, "0.0.2")
+	assertUpdate, assertCallbackCalled = generateConsumerAssertions(t, boundaryHeight, semver.New("0.0.2"))
 	vc.blockFinalized(signalCtx, latestHeight)
 	assertCallbackCalled()
 
@@ -424,7 +424,7 @@ func TestVersionBoundaryDeleted(t *testing.T) {
 	latestHeight++ // 12
 	contract.DeleteBoundary(latestHeight, boundaryHeight)
 
-	assertUpdate, assertCallbackCalled = generateConsumerAssertions(t, boundaryHeight, "") // called with empty string signalling deleted
+	assertUpdate, assertCallbackCalled = generateConsumerAssertions(t, boundaryHeight, semver.New("0.0.0")) // called with empty string signalling deleted
 	vc.blockFinalized(signalCtx, latestHeight)
 	assertCallbackCalled()
 
@@ -466,8 +466,8 @@ func TestNotificationSkippedForCompatibleVersions(t *testing.T) {
 	})
 
 	// Add a consumer to verify notification is never sent
-	vc.AddVersionUpdatesConsumer(func(height uint64, semver string) {
-		t.Errorf("unexpected callback called at height %d with version %s", height, semver)
+	vc.AddVersionUpdatesConsumer(func(height uint64, version *semver.Version) {
+		t.Errorf("unexpected callback called at height %d with version %s", height, version)
 	})
 	assert.Len(t, vc.consumers, 1)
 
@@ -490,11 +490,11 @@ func TestNotificationSkippedForCompatibleVersions(t *testing.T) {
 func generateConsumerAssertions(
 	t *testing.T,
 	boundaryHeight uint64,
-	version string,
-) (func(height uint64, semver string), func()) {
+	version *semver.Version,
+) (func(height uint64, semver *semver.Version), func()) {
 	called := false
 
-	assertUpdate := func(height uint64, semver string) {
+	assertUpdate := func(height uint64, semver *semver.Version) {
 		assert.Equal(t, boundaryHeight, height)
 		assert.Equal(t, version, semver)
 		called = true
