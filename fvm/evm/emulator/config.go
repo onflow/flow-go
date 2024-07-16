@@ -72,6 +72,7 @@ var DefaultChainConfig = &gethParams.ChainConfig{
 	ShanghaiTime: &zero, // already on Shanghai
 	CancunTime:   &zero, // already on Cancun
 	PragueTime:   nil,   // not on Prague
+	VerkleTime:   nil,   // not on Verkle
 }
 
 // Default config supports the dynamic fee structure (EIP-1559)
@@ -213,9 +214,11 @@ func WithRandom(rand *gethCommon.Hash) Option {
 }
 
 // WithTransactionTracer sets a transaction tracer
-func WithTransactionTracer(tracer tracers.Tracer) Option {
+func WithTransactionTracer(tracer *tracers.Tracer) Option {
 	return func(c *Config) *Config {
-		c.EVMConfig.Tracer = tracer
+		if tracer != nil {
+			c.EVMConfig.Tracer = tracer.Hooks
+		}
 		return c
 	}
 }
