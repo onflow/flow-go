@@ -45,9 +45,9 @@ func (s *RecoverEpochSuite) TestRecoverEpoch() {
 
 	// wait for at least the first block of the next epoch to be sealed so that we can
 	// ensure that we are still in the same epoch after the final view of that epoch indicating we are in EFM
-	s.TimedLogf("waiting for epoch transition (finalized view %d) before pausing container", epoch1FinalView+1)
+	s.TimedLogf("waiting for epoch transition (finalized view %d)", epoch1FinalView+1)
 	s.AwaitFinalizedView(s.Ctx, epoch1FinalView+1, 2*time.Minute, 500*time.Millisecond)
-	s.TimedLogf("observed finalized view %d -> pausing container", epoch1FinalView+1)
+	s.TimedLogf("observed finalized view %d", epoch1FinalView+1)
 
 	// assert transition to second epoch did not happen
 	// if counter is still 0, epoch emergency fallback was triggered as expected
