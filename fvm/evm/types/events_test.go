@@ -55,13 +55,13 @@ func TestEVMBlockExecutedEventCCFEncodingDecoding(t *testing.T) {
 
 	blockHash, err := block.Hash()
 	require.NoError(t, err)
-	assert.Equal(t, bep.Hash, blockHash.Hex())
+	assert.Equal(t, bep.Hash, types.BytesToCadenceUInt8ArrayValue(blockHash.Bytes()))
 
 	assert.Equal(t, bep.TotalSupply.Value, block.TotalSupply)
 	assert.Equal(t, bep.Timestamp, block.Timestamp)
 	assert.Equal(t, bep.TotalGasUsed, block.TotalGasUsed)
-	assert.Equal(t, bep.ParentBlockHash, block.ParentBlockHash.Hex())
-	assert.Equal(t, bep.ReceiptRoot, block.ReceiptRoot.Hex())
+	assert.Equal(t, bep.ParentBlockHash, types.BytesToCadenceUInt8ArrayValue(block.ParentBlockHash.Bytes()))
+	assert.Equal(t, bep.ReceiptRoot, types.BytesToCadenceUInt8ArrayValue(block.ReceiptRoot.Bytes()))
 
 	hashes := make([]gethCommon.Hash, len(bep.TransactionHashes))
 	for i, h := range bep.TransactionHashes {
@@ -133,7 +133,7 @@ func TestEVMTransactionExecutedEventCCFEncodingDecoding(t *testing.T) {
 		require.NoError(t, err)
 
 		assert.Equal(t, tep.BlockHeight, blockHeight)
-		assert.Equal(t, tep.Hash, txHash.Hex())
+		assert.Equal(t, tep.Hash, types.BytesToCadenceUInt8ArrayValue(txHash.Bytes()))
 		assert.Equal(t, tep.Payload, types.BytesToCadenceUInt8ArrayValue(txBytes))
 		assert.Equal(t, types.ErrorCode(tep.ErrorCode), types.ExecutionErrCodeOutOfGas)
 		assert.Equal(t, tep.TransactionType, txResult.TxType)
@@ -174,7 +174,7 @@ func TestEVMTransactionExecutedEventCCFEncodingDecoding(t *testing.T) {
 		require.NoError(t, err)
 
 		assert.Equal(t, tep.BlockHeight, blockHeight)
-		assert.Equal(t, tep.Hash, txHash.Hex())
+		assert.Equal(t, tep.Hash, types.BytesToCadenceUInt8ArrayValue(txHash.Bytes()))
 		assert.Equal(t, tep.Payload, types.BytesToCadenceUInt8ArrayValue(txBytes))
 		assert.Equal(t, types.ErrCodeNoError, types.ErrorCode(tep.ErrorCode))
 		assert.Equal(t, tep.TransactionType, txResult.TxType)
