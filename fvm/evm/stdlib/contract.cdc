@@ -60,8 +60,6 @@ contract EVM {
         logs: [UInt8],
         // block height in which transaction was inclued
         blockHeight: UInt64,
-        // block hash in which transaction was included
-        blockHash: String,
         /// captures the hex encoded data that is returned from
         /// the evm. For contract deployments
         /// it returns the code deployed to
@@ -814,5 +812,20 @@ contract EVM {
         return self.account.storage.borrow<auth(Bridge) &{BridgeRouter}>(from: /storage/evmBridgeRouter)
             ?.borrowBridgeAccessor()
             ?? panic("Could not borrow reference to the EVM bridge")
+    }
+
+    /// The Heartbeat resource controls the block production 
+    access(all) resource Heartbeat {
+
+        /// heartbeat calls commit block proposals and forms new blocks including all the 
+        /// recently executed transactions.
+        /// The Flow protocol makes sure to call this function once per block as a system call. 
+        access(all) fun heartbeat() {
+            InternalEVM.commitBlockProposal()
+        }
+    }
+    
+    init() { 
+        self.account.storage.save(<-create Heartbeat(), to: /storage/EVMHeartbeat)
     }
 }

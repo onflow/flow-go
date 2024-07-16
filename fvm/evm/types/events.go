@@ -46,13 +46,11 @@ func NewTransactionEvent(
 	result *Result,
 	payload []byte,
 	blockHeight uint64,
-	blockHash gethCommon.Hash,
 ) *Event {
 	return &Event{
 		Etype: EventTypeTransactionExecuted,
 		Payload: &transactionEvent{
 			BlockHeight: blockHeight,
-			BlockHash:   blockHash,
 			Payload:     payload,
 			Result:      result,
 		},
@@ -205,7 +203,6 @@ type TransactionEventPayload struct {
 	ContractAddress  string        `cadence:"contractAddress"`
 	Logs             cadence.Array `cadence:"logs"`
 	BlockHeight      uint64        `cadence:"blockHeight"`
-	BlockHash        string        `cadence:"blockHash"`
 	ErrorMessage     string        `cadence:"errorMessage"`
 	ReturnedData     cadence.Array `cadence:"returnedData"`
 	PrecompiledCalls cadence.Array `cadence:"precompiledCalls"`

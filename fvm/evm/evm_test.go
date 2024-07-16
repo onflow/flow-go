@@ -155,7 +155,6 @@ func TestEVMRun(t *testing.T) {
 				require.Equal(t, innerTxBytes, txPayload)
 				require.Equal(t, uint16(types.ErrCodeNoError), txEventPayload.ErrorCode)
 				require.Equal(t, uint16(0), txEventPayload.Index)
-				require.Equal(t, blockEventPayload.Hash, txEventPayload.BlockHash)
 				require.Equal(t, blockEventPayload.Height, txEventPayload.BlockHeight)
 				require.Equal(t, blockEventPayload.TotalGasUsed, txEventPayload.GasConsumed)
 				require.Equal(t, uint64(43785), blockEventPayload.TotalGasUsed)
