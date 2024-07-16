@@ -106,16 +106,16 @@ func (b *BlockProposal) AppendTransaction(res *Result) {
 		return
 	}
 	b.TransactionHashes = append(b.TransactionHashes, res.TxHash)
-	r := res.LightReceipt()
+	r := res.LightReceipt(b.TotalGasUsed)
 	if r == nil {
 		return
 	}
 	b.Receipts = append(b.Receipts, *r)
-	b.TotalGasUsed += r.CumulativeGasUsed
+	b.TotalGasUsed = r.CumulativeGasUsed
 }
 
-// PopulateReceiptsHash populates receipt hash value
-func (b *BlockProposal) PopulateReceiptsHash() {
+// PopulateReceiptRoot populates receipt root hash value
+func (b *BlockProposal) PopulateReceiptRoot() {
 	if len(b.Receipts) == 0 {
 		b.ReceiptRoot = gethTypes.EmptyReceiptsHash
 		return

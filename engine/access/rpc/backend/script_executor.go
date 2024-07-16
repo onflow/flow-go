@@ -102,7 +102,7 @@ func (s *ScriptExecutor) GetAccountAtBlockHeight(ctx context.Context, address fl
 	return s.scriptExecutor.GetAccountAtBlockHeight(ctx, address, height)
 }
 
-// GetAccountBalance returns
+// GetAccountBalance returns a balance of Flow account by the provided address and block height.
 // Expected errors:
 // - Script execution related errors
 // - storage.ErrHeightNotIndexed if the data for the block height is not available
@@ -114,7 +114,19 @@ func (s *ScriptExecutor) GetAccountBalance(ctx context.Context, address flow.Add
 	return s.scriptExecutor.GetAccountBalance(ctx, address, height)
 }
 
-// GetAccountKeys returns
+// GetAccountAvailableBalance returns an available balance of Flow account by the provided address and block height.
+// Expected errors:
+// - Script execution related errors
+// - storage.ErrHeightNotIndexed if the data for the block height is not available
+func (s *ScriptExecutor) GetAccountAvailableBalance(ctx context.Context, address flow.Address, height uint64) (uint64, error) {
+	if err := s.checkDataAvailable(height); err != nil {
+		return 0, err
+	}
+
+	return s.scriptExecutor.GetAccountAvailableBalance(ctx, address, height)
+}
+
+// GetAccountKeys returns a public key of Flow account by the provided address, block height and index.
 // Expected errors:
 // - Script execution related errors
 // - storage.ErrHeightNotIndexed if the data for the block height is not available
@@ -124,6 +136,18 @@ func (s *ScriptExecutor) GetAccountKeys(ctx context.Context, address flow.Addres
 	}
 
 	return s.scriptExecutor.GetAccountKeys(ctx, address, height)
+}
+
+// GetAccountKey returns
+// Expected errors:
+// - Script execution related errors
+// - storage.ErrHeightNotIndexed if the data for the block height is not available
+func (s *ScriptExecutor) GetAccountKey(ctx context.Context, address flow.Address, keyIndex uint64, height uint64) (*flow.AccountPublicKey, error) {
+	if err := s.checkDataAvailable(height); err != nil {
+		return nil, err
+	}
+
+	return s.scriptExecutor.GetAccountKey(ctx, address, keyIndex, height)
 }
 
 func (s *ScriptExecutor) checkDataAvailable(height uint64) error {

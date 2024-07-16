@@ -128,13 +128,14 @@ func (res *Result) VMErrorString() string {
 // Type (txType), PostState or Status, CumulativeGasUsed, Logs and Logs Bloom
 // and for each log, Address, Topics, Data (consensus fields)
 // During execution we also do fill in BlockNumber, TxIndex, Index (event index)
-func (res *Result) Receipt() *gethTypes.Receipt {
+func (res *Result) Receipt(cumulativeGasUsed uint64) *gethTypes.Receipt {
 	if res.Invalid() {
 		return nil
 	}
 
 	receipt := &gethTypes.Receipt{
-		CumulativeGasUsed: res.GasConsumed,
+		GasUsed:           res.GasConsumed,
+		CumulativeGasUsed: cumulativeGasUsed + res.GasConsumed,
 		Logs:              res.Logs,
 	}
 
@@ -158,13 +159,13 @@ func (res *Result) Receipt() *gethTypes.Receipt {
 
 // LightReceipt constructs a light receipt from the result
 // that is used for storing in block proposal.
-func (res *Result) LightReceipt() *LightReceipt {
+func (res *Result) LightReceipt(gasUsedUntilNow uint64) *LightReceipt {
 	if res.Invalid() {
 		return nil
 	}
 
 	receipt := &LightReceipt{
-		CumulativeGasUsed: res.GasConsumed,
+		CumulativeGasUsed: res.GasConsumed + gasUsedUntilNow,
 	}
 
 	receipt.Logs = make([]LightLog, len(res.Logs))

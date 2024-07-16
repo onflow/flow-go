@@ -952,7 +952,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 
 			snapshotTree = snapshotTree.Append(executionSnapshot)
 
-			require.Len(t, output.Events, 16)
+			require.Len(t, output.Events, 20)
 			unittest.EnsureEventsIndexSeq(t, output.Events, chain.ChainID())
 
 			accountCreatedEvents := filterAccountCreatedEvents(output.Events)

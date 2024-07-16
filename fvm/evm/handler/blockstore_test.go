@@ -172,6 +172,9 @@ func TestBlockStore_AddedTimestamp(t *testing.T) {
 			err = backend.SetValue(root[:], []byte(handler.BlockStoreLatestBlockKey), blockBytes2)
 			require.NoError(t, err)
 
+			err = bs.ResetBlockProposal()
+			require.NoError(t, err)
+
 			block2, err := bs.LatestBlock()
 			require.NoError(t, err)
 
@@ -185,7 +188,10 @@ func TestBlockStore_AddedTimestamp(t *testing.T) {
 			bp, err := bs.BlockProposal()
 			require.NoError(t, err)
 
-			err = bs.CommitBlockProposal(bp)
+			blockBytes3, err := gethRLP.EncodeToBytes(bp.Block)
+			require.NoError(t, err)
+
+			err = backend.SetValue(root[:], []byte(handler.BlockStoreLatestBlockKey), blockBytes3)
 			require.NoError(t, err)
 
 			bb, err := bs.LatestBlock()

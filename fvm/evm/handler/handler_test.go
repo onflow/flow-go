@@ -1,12 +1,10 @@
 package handler_test
 
 import (
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"math"
 	"math/big"
-	"strings"
 	"testing"
 	"time"
 
@@ -94,8 +92,9 @@ func TestHandler_TransactionRunOrPanic(t *testing.T) {
 					txEventPayload := testutils.TxEventToPayload(t, events[0], rootAddr)
 
 					// check logs
-					encodedLogs, err := hex.DecodeString(strings.ReplaceAll(txEventPayload.Logs, "\"", ""))
+					encodedLogs, err := types.CadenceUInt8ArrayValueToBytes(txEventPayload.Logs)
 					require.NoError(t, err)
+
 					var logs []*gethTypes.Log
 					err = rlp.DecodeBytes(encodedLogs, &logs)
 					require.NoError(t, err)
@@ -346,7 +345,7 @@ func TestHandler_COA(t *testing.T) {
 
 				// deploy COA transaction event
 				txEventPayload := testutils.TxEventToPayload(t, events[0], rootAddr)
-				txContent, err := hex.DecodeString(txEventPayload.Payload)
+				txContent, err := types.CadenceUInt8ArrayValueToBytes(txEventPayload.Payload)
 				require.NoError(t, err)
 				tx, err := types.DirectCallFromEncoded(txContent)
 				require.NoError(t, err)
@@ -355,7 +354,7 @@ func TestHandler_COA(t *testing.T) {
 
 				// deposit transaction event
 				txEventPayload = testutils.TxEventToPayload(t, events[1], rootAddr)
-				txContent, err = hex.DecodeString(txEventPayload.Payload)
+				txContent, err = types.CadenceUInt8ArrayValueToBytes(txEventPayload.Payload)
 				require.NoError(t, err)
 				tx, err = types.DirectCallFromEncoded(txContent)
 				require.NoError(t, err)
@@ -366,7 +365,7 @@ func TestHandler_COA(t *testing.T) {
 
 				// withdraw transaction event
 				txEventPayload = testutils.TxEventToPayload(t, events[2], rootAddr)
-				txContent, err = hex.DecodeString(txEventPayload.Payload)
+				txContent, err = types.CadenceUInt8ArrayValueToBytes(txEventPayload.Payload)
 				require.NoError(t, err)
 				tx, err = types.DirectCallFromEncoded(txContent)
 				require.NoError(t, err)
@@ -924,7 +923,7 @@ func TestHandler_TransactionRun(t *testing.T) {
 							continue // don't check last block event
 						}
 						txEventPayload := testutils.TxEventToPayload(t, event, rootAddr)
-						encodedLogs, err := hex.DecodeString(strings.ReplaceAll(txEventPayload.Logs, "\"", ""))
+						encodedLogs, err := types.CadenceUInt8ArrayValueToBytes(txEventPayload.Logs)
 						require.NoError(t, err)
 
 						var logs []*gethTypes.Log
