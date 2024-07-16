@@ -113,8 +113,7 @@ func GenerateRecoverEpochTxArgs(log zerolog.Logger,
 		}
 		nodeIds = append(nodeIds, nodeIdCdc)
 	}
-
-	clusterQCAddress := systemcontracts.SystemContractsForChain(flow.ChainID(rootChainID)).ClusterQC.Address.String()
+	clusterQCAddress := systemcontracts.SystemContractsForChain(rootChainID).ClusterQC.Address.String()
 	qcVoteData, err := common.ConvertClusterQcsCdc(clusterQCs, clusters, clusterQCAddress)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to convert cluster qcs to cadence type")
