@@ -2,6 +2,7 @@ package evm_test
 
 import (
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 	"math"
 	"math/big"
@@ -28,7 +29,7 @@ import (
 	"github.com/onflow/flow-go/fvm/evm"
 	"github.com/onflow/flow-go/fvm/evm/emulator"
 	"github.com/onflow/flow-go/fvm/evm/stdlib"
-	"github.com/onflow/flow-go/fvm/evm/testutils"
+
 	. "github.com/onflow/flow-go/fvm/evm/testutils"
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
@@ -1266,7 +1267,7 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 				))
 
 				addr := cadence.NewArray(
-					ConvertToCadence(testutils.RandomAddress(t).Bytes()),
+					ConvertToCadence(RandomAddress(t).Bytes()),
 				).WithType(stdlib.EVMAddressBytesCadenceType)
 
 				script := fvm.Script(code).WithArguments(
@@ -1413,7 +1414,6 @@ func TestDryRun(t *testing.T) {
 		ctx fvm.Context,
 		vm fvm.VM,
 		snapshot snapshot.SnapshotTree,
-		testContract *TestContract,
 	) *types.ResultSummary {
 		code := []byte(fmt.Sprintf(`
 			import EVM from %s
@@ -1471,7 +1471,7 @@ func TestDryRun(t *testing.T) {
 					big.NewInt(0),
 					data,
 				)
-				result := dryRunTx(t, tx, ctx, vm, snapshot, testContract)
+				result := dryRunTx(t, tx, ctx, vm, snapshot)
 				require.Equal(t, types.ErrCodeNoError, result.ErrorCode)
 				require.Equal(t, types.StatusSuccessful, result.Status)
 				require.Greater(t, result.GasConsumed, uint64(0))
@@ -1487,7 +1487,7 @@ func TestDryRun(t *testing.T) {
 					big.NewInt(0),
 					data,
 				)
-				result = dryRunTx(t, tx, ctx, vm, snapshot, testContract)
+				result = dryRunTx(t, tx, ctx, vm, snapshot)
 				require.Equal(t, types.ExecutionErrCodeOutOfGas, result.ErrorCode)
 				require.Equal(t, types.StatusFailed, result.Status)
 				require.Equal(t, result.GasConsumed, limit) // burn it all!!!
@@ -1512,7 +1512,7 @@ func TestDryRun(t *testing.T) {
 					big.NewInt(0),
 					data,
 				)
-				dryRunResult := dryRunTx(t, tx, ctx, vm, snapshot, testContract)
+				dryRunResult := dryRunTx(t, tx, ctx, vm, snapshot)
 
 				require.Equal(t, types.ErrCodeNoError, dryRunResult.ErrorCode)
 				require.Equal(t, types.StatusSuccessful, dryRunResult.Status)
@@ -1643,7 +1643,7 @@ func TestDryRun(t *testing.T) {
 					big.NewInt(0),
 					data,
 				)
-				dryRunResult := dryRunTx(t, tx1, ctx, vm, snapshot, testContract)
+				dryRunResult := dryRunTx(t, tx1, ctx, vm, snapshot)
 
 				require.Equal(t, types.ErrCodeNoError, dryRunResult.ErrorCode)
 				require.Equal(t, types.StatusSuccessful, dryRunResult.Status)
@@ -1778,7 +1778,7 @@ func TestDryRun(t *testing.T) {
 					big.NewInt(0),
 					data,
 				)
-				dryRunResult := dryRunTx(t, tx1, ctx, vm, snapshot, testContract)
+				dryRunResult := dryRunTx(t, tx1, ctx, vm, snapshot)
 
 				require.Equal(t, types.ErrCodeNoError, dryRunResult.ErrorCode)
 				require.Equal(t, types.StatusSuccessful, dryRunResult.Status)
@@ -1862,7 +1862,7 @@ func TestDryRun(t *testing.T) {
 					data,
 				)
 
-				result := dryRunTx(t, tx, ctx, vm, snapshot, testContract)
+				result := dryRunTx(t, tx, ctx, vm, snapshot)
 				require.Equal(t, types.ErrCodeNoError, result.ErrorCode)
 				require.Equal(t, types.StatusSuccessful, result.Status)
 				require.Greater(t, result.GasConsumed, uint64(0))
@@ -1934,7 +1934,7 @@ func TestDryRun(t *testing.T) {
 					testContract.ByteCode,
 				)
 
-				result := dryRunTx(t, tx, ctx, vm, snapshot, testContract)
+				result := dryRunTx(t, tx, ctx, vm, snapshot)
 				require.Equal(t, types.ErrCodeNoError, result.ErrorCode)
 				require.Equal(t, types.StatusSuccessful, result.Status)
 				require.Greater(t, result.GasConsumed, uint64(0))
@@ -1961,7 +1961,7 @@ func TestDryRun(t *testing.T) {
 					nil,
 				)
 
-				result := dryRunTx(t, tx, ctx, vm, snapshot, testContract)
+				result := dryRunTx(t, tx, ctx, vm, snapshot)
 				assert.Equal(t, types.ValidationErrCodeInsufficientFunds, result.ErrorCode)
 				assert.Equal(t, types.StatusInvalid, result.Status)
 				assert.Equal(t, types.InvalidTransactionGasCost, int(result.GasConsumed))
