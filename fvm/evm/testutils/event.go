@@ -3,12 +3,12 @@ package testutils
 import (
 	"testing"
 
-	"github.com/stretchr/testify/require"
-	"gotest.tools/assert"
-
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/encoding/ccf"
 	"github.com/onflow/cadence/runtime/common"
+	"github.com/stretchr/testify/require"
+	"gotest.tools/assert"
+
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/model/flow"
 )
