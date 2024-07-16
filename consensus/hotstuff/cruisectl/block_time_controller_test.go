@@ -287,6 +287,7 @@ func (bs *BlockTimeControllerSuite) TestOnEpochCommittedPhaseStarted() {
 
 	assert.Equal(bs.T(), bs.curEpochFinalView*2, *bs.ctl.nextEpochFinalView)
 	assert.Equal(bs.T(), bs.curEpochTargetEndTime+bs.EpochDurationSeconds(), *bs.ctl.nextEpochTargetEndTime)
+	assert.Equal(bs.T(), bs.EpochDurationSeconds(), *bs.ctl.nextEpochTargetDuration)
 
 	// duplicate events should be no-ops
 	for i := 0; i <= cap(bs.ctl.epochEvents); i++ {
@@ -299,6 +300,7 @@ func (bs *BlockTimeControllerSuite) TestOnEpochCommittedPhaseStarted() {
 
 	assert.Equal(bs.T(), bs.curEpochFinalView*2, *bs.ctl.nextEpochFinalView)
 	assert.Equal(bs.T(), bs.curEpochTargetEndTime+bs.EpochDurationSeconds(), *bs.ctl.nextEpochTargetEndTime)
+	assert.Equal(bs.T(), bs.EpochDurationSeconds(), *bs.ctl.nextEpochTargetDuration)
 }
 
 // TestOnBlockIncorporated_UpdateProposalDelay tests that a new measurement is taken and

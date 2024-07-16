@@ -78,11 +78,11 @@ type BlockTimeController struct {
 
 	// epochInfo holds the timing information for the current epoch (and next epoch if it is committed)
 	epochInfo
-	epochInfo
 
-	// incorporatedBlocks queues OnBlockIncorporated notifications for subsequent processing by an internal worker routine. 
+	// incorporatedBlocks queues OnBlockIncorporated notifications for subsequent processing by an internal worker routine.
+	incorporatedBlocks chan TimedBlock
 	// Channel capacity is small and if `incorporatedBlocks` is full we discard new blocks, because the timing targets
-	// from the controller only make sense, if the node is not overloaded and swiftly processing new blocks. 
+	// from the controller only make sense, if the node is not overloaded and swiftly processing new blocks.
 	// epochEvents queues functors for processing epoch-related protocol events.
 	// Events will be processed in the order they are received (fifo).
 	epochEvents     chan func() error
