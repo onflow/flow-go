@@ -19,9 +19,9 @@ transaction {
             ?? panic("Couldn't borrow RandomBeaconHistory.Heartbeat Resource")
         randomBeaconHistoryHeartbeat.heartbeat(randomSourceHistory: randomSourceHistory())
 
-        let evmHeartbeat = serviceAccount.storage
-            .borrow<&EVM.Heartbeat>(from: /storage/EVMHeartbeat)
-            ?? panic("Couldn't borrow EVM.Heartbeat Resource")
-        evmHeartbeat.heartbeat()
+        let evmHeartbeat = serviceAccount.storage.borrow<&EVM.Heartbeat>(from: /storage/EVMHeartbeat)
+        if evmHeartbeat != nil { // skip if not available 
+            evmHeartbeat!.heartbeat()
+        }
     }
 }
