@@ -33,7 +33,7 @@ contract EVM {
         // hash of all the transaction receipts
         receiptRoot: [UInt8],
         // all the transactions included in the block
-        transactionHashes: [String]
+        transactionHashes: [[UInt8]]
     )
 
     /// Transaction executed event is emitted everytime a transaction

@@ -134,12 +134,12 @@ func TestHandler_TransactionRunOrPanic(t *testing.T) {
 					blockEvent, err := types.DecodeBlockExecutedEventPayload(cadenceEvent)
 					require.NoError(t, err)
 
-					eventTxID := blockEvent.TransactionHashes[0] // only one hash in block
-					// make sure the transaction id included in the block transaction list is the same as tx sumbmitted
+					eventTxHash := blockEvent.TransactionHashes[0] // only one hash in block
+					// make sure the transaction id included in the block transaction list is the same as tx submitted
 					assert.Equal(
 						t,
-						evmTx.Hash().String(),
-						string(eventTxID),
+						types.BytesToCadenceUInt8ArrayValue(evmTx.Hash().Bytes()).WithType(nil),
+						eventTxHash,
 					)
 				})
 			})

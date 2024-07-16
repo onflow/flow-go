@@ -6,6 +6,8 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/onflow/cadence"
+
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
 
@@ -63,11 +65,14 @@ func TestEVMBlockExecutedEventCCFEncodingDecoding(t *testing.T) {
 	assert.Equal(t, bep.ParentBlockHash, types.BytesToCadenceUInt8ArrayValue(block.ParentBlockHash.Bytes()))
 	assert.Equal(t, bep.ReceiptRoot, types.BytesToCadenceUInt8ArrayValue(block.ReceiptRoot.Bytes()))
 
-	hashes := make([]gethCommon.Hash, len(bep.TransactionHashes))
-	for i, h := range bep.TransactionHashes {
-		hashes[i] = gethCommon.HexToHash(string(h))
+	hashes := make([]cadence.Array, len(block.TransactionHashes))
+	for i, h := range block.TransactionHashes {
+		hashes[i] = types.BytesToCadenceUInt8ArrayValue(h.Bytes())
 	}
-	assert.Equal(t, hashes, block.TransactionHashes)
+	assert.Equal(t,
+		bep.TransactionHashes,
+		hashes,
+	)
 
 	v, err := ccf.Encode(ev)
 	require.NoError(t, err)
