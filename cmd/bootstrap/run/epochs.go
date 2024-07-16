@@ -26,7 +26,6 @@ func GenerateRecoverEpochTxArgs(log zerolog.Logger,
 	numViewsInStakingAuction uint64,
 	numViewsInEpoch uint64,
 	targetDuration uint64,
-	targetEndTime uint64,
 	initNewEpoch bool,
 	snapshot *inmem.Snapshot,
 ) ([]cadence.Value, error) {
@@ -129,6 +128,11 @@ func GenerateRecoverEpochTxArgs(log zerolog.Logger,
 		log.Fatal().Err(err).Msg("failed to get final view of current epoch")
 	}
 
+	currEpochTargetEndTime, err := epoch.TargetEndTime()
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to get target end time of current epoch")
+	}
+
 	args := []cadence.Value{
 		// epoch start view
 		cadence.NewUInt64(currEpochFinalView + 1),
@@ -139,7 +143,7 @@ func GenerateRecoverEpochTxArgs(log zerolog.Logger,
 		// target duration
 		cadence.NewUInt64(targetDuration),
 		// target end time
-		cadence.NewUInt64(targetEndTime),
+		cadence.NewUInt64(currEpochTargetEndTime),
 		// clusters,
 		common.ConvertClusterAssignmentsCdc(assignments),
 		// qcVoteData

@@ -49,7 +49,6 @@ This recovery process has some constraints:
 	flagNumViewsInStakingAuction uint64
 	flagEpochCounter             uint64
 	flagTargetDuration           uint64
-	flagTargetEndTime            uint64
 	flagInitNewEpoch             bool
 	flagRootChainID              string
 )
@@ -79,7 +78,6 @@ func addGenerateRecoverEpochTxArgsCmdFlags() error {
 	generateRecoverEpochTxArgsCmd.Flags().Uint64Var(&flagNumViewsInStakingAuction, "epoch-staking-phase-length", 0, "length of the epoch staking phase measured in views")
 	generateRecoverEpochTxArgsCmd.Flags().Uint64Var(&flagEpochCounter, "epoch-counter", 0, "the epoch counter used to generate the root cluster block")
 	generateRecoverEpochTxArgsCmd.Flags().Uint64Var(&flagTargetDuration, "epoch-timing-duration", 0, "the target duration of the epoch, in seconds")
-	generateRecoverEpochTxArgsCmd.Flags().Uint64Var(&flagTargetEndTime, "epoch-timing-end-time", 0, "the target end time for the epoch, specified in second-precision Unix time")
 	// The following option allows the RecoveryEpoch specified by this command to overwrite an epoch which already exists in the smart contract.
 	// This is needed only if a previous recoverEpoch transaction was submitted and a race condition occurred such that:
 	//   - the RecoveryEpoch in the admin transaction was accepted by the smart contract
@@ -108,12 +106,9 @@ func addGenerateRecoverEpochTxArgsCmdFlags() error {
 	}
 	err = generateRecoverEpochTxArgsCmd.MarkFlagRequired("epoch-timing-duration")
 	if err != nil {
-		return fmt.Errorf("failed to mark target-duration flag as required")
+		return fmt.Errorf("failed to mark epoch-timing-duration flag as required")
 	}
-	err = generateRecoverEpochTxArgsCmd.MarkFlagRequired("epoch-timing-end-time")
-	if err != nil {
-		return fmt.Errorf("failed to mark target-end-time flag as required")
-	}
+
 	err = generateRecoverEpochTxArgsCmd.MarkFlagRequired("root-chain-id")
 	if err != nil {
 		return fmt.Errorf("failed to mark root-chain-id flag as required")
@@ -155,7 +150,6 @@ func generateRecoverEpochTxArgs(getSnapshot func() *inmem.Snapshot) func(cmd *co
 			flagNumViewsInStakingAuction,
 			flagNumViewsInEpoch,
 			flagTargetDuration,
-			flagTargetEndTime,
 			flagInitNewEpoch,
 			getSnapshot(),
 		)
