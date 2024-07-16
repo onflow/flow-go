@@ -406,15 +406,7 @@ func (d *DeltaView) SetState(sk types.SlotAddress, value gethCommon.Hash) error 
 // the way back to the base view. This means that the state root that is returned
 // ignores the updates to slots during the transaction.
 func (d *DeltaView) GetStorageRoot(addr gethCommon.Address) (gethCommon.Hash, error) {
-	exists, err := d.Exist(addr)
-	if err != nil {
-		return gethCommon.Hash{}, err
-	}
-	if !exists {
-		return gethCommon.Hash{}, nil
-	}
-
-	// otherwise go back to parents (until we reach the base view)
+	// go back to parents (until we reach the base view)
 	// Note that if storage is updated in deltas but not
 	// committed the expected behavior is to return the root in the base view.
 	return d.parent.GetStorageRoot(addr)
