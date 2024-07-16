@@ -960,6 +960,11 @@ func TestEVMAddressDeposit(t *testing.T) {
 			bal := getEVMAccountBalance(t, ctx, vm, snapshot, addr)
 			require.Equal(t, expectedBalance, bal)
 
+			// tx executed event
+			txEvent := output.Events[2]
+			txEventPayload := testutils.TxEventToPayload(t, txEvent, sc.EVMContract.Address)
+			require.NoError(t, err)
+
 			// deposit event
 			depositEvent := output.Events[3]
 			depEv, err := types.FlowEventToCadenceEvent(depositEvent)
@@ -979,6 +984,7 @@ func TestEVMAddressDeposit(t *testing.T) {
 			require.NotEmpty(t, blockEventPayload.Hash)
 			require.Equal(t, uint64(21000), blockEventPayload.TotalGasUsed)
 			require.Len(t, blockEventPayload.TransactionHashes, 1)
+			require.Equal(t, txEventPayload.Hash, string(blockEventPayload.TransactionHashes[0]))
 		})
 }
 
