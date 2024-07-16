@@ -83,7 +83,6 @@ func setupMocks(bs *BlockTimeControllerSuite) {
 	bs.snapshot = *mockprotocol.NewSnapshot(bs.T())
 	bs.epochs = *mocks.NewEpochQuery(bs.T(), bs.epochCounter)
 	bs.curEpoch = *mockprotocol.NewEpoch(bs.T())
-
 	bs.state.On("Final").Return(&bs.snapshot)
 	bs.state.On("AtHeight", mock.Anything).Return(&bs.snapshot).Maybe()
 	bs.state.On("Params").Return(&bs.params)
@@ -141,8 +140,8 @@ func (bs *BlockTimeControllerSuite) AssertCorrectInitialization() {
 	assert.Equal(bs.T(), bs.curEpochTargetDuration, epoch.curEpochTargetDuration)
 	assert.Equal(bs.T(), bs.curEpochTargetEndTime, epoch.curEpochTargetEndTime)
 
-	// if next epoch is set up, final view should be set
-	if phase := bs.epochs.Phase(); phase > flow.EpochPhaseStaking {
+	// if next epoch is committed, final view should be set
+	if phase := bs.epochs.Phase(); phase == flow.EpochPhaseCommitted {
 		finalView, err := bs.epochs.Next().FinalView()
 		require.NoError(bs.T(), err)
 		assert.Equal(bs.T(), finalView, *epoch.nextEpochFinalView)
