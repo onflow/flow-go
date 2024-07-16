@@ -134,11 +134,6 @@ func NewBlockEvent(block *Block) *Event {
 }
 
 func (p *blockEvent) ToCadence(location common.Location) (cadence.Event, error) {
-	hashes := make([]cadence.Value, len(p.TransactionHashes))
-	for i, hash := range p.TransactionHashes {
-		hashes[i] = cadence.String(hash.String())
-	}
-
 	blockHash, err := p.Hash()
 	if err != nil {
 		return cadence.Event{}, err
@@ -155,10 +150,7 @@ func (p *blockEvent) ToCadence(location common.Location) (cadence.Event, error) 
 			cadence.NewField("totalGasUsed", cadence.UInt64Type),
 			cadence.NewField("parentHash", cadence.StringType),
 			cadence.NewField("receiptRoot", cadence.StringType),
-			cadence.NewField(
-				"transactionHashes",
-				cadence.NewVariableSizedArrayType(cadence.StringType),
-			),
+			cadence.NewField("transactionHashRoot", cadence.StringType),
 		},
 		nil,
 	)
@@ -171,19 +163,19 @@ func (p *blockEvent) ToCadence(location common.Location) (cadence.Event, error) 
 		cadence.NewUInt64(p.TotalGasUsed),
 		cadence.String(p.ParentBlockHash.String()),
 		cadence.String(p.ReceiptRoot.String()),
-		cadence.NewArray(hashes).WithType(cadence.NewVariableSizedArrayType(cadence.StringType)),
+		cadence.String(p.TransactionHashRoot.String()),
 	}).WithType(eventType), nil
 }
 
 type BlockEventPayload struct {
-	Height            uint64           `cadence:"height"`
-	Hash              string           `cadence:"hash"`
-	Timestamp         uint64           `cadence:"timestamp"`
-	TotalSupply       cadence.Int      `cadence:"totalSupply"`
-	TotalGasUsed      uint64           `cadence:"totalGasUsed"`
-	ParentBlockHash   string           `cadence:"parentHash"`
-	ReceiptRoot       string           `cadence:"receiptRoot"`
-	TransactionHashes []cadence.String `cadence:"transactionHashes"`
+	Height              uint64      `cadence:"height"`
+	Hash                string      `cadence:"hash"`
+	Timestamp           uint64      `cadence:"timestamp"`
+	TotalSupply         cadence.Int `cadence:"totalSupply"`
+	TotalGasUsed        uint64      `cadence:"totalGasUsed"`
+	ParentBlockHash     string      `cadence:"parentHash"`
+	ReceiptRoot         string      `cadence:"receiptRoot"`
+	TransactionHashRoot string      `cadence:"transactionHashRoot"`
 }
 
 // DecodeBlockEventPayload decodes Cadence event into block event payload.

@@ -30,10 +30,10 @@ contract EVM {
         totalGasUsed: UInt64,
         // parent block hash
         parentHash: String,
-        // hash of all the transaction receipts
+        // root hash of all the transaction receipts
         receiptRoot: String,
-        // all the transactions included in the block
-        transactionHashes: [String]
+        // root hash of all the transaction hashes
+        transactionHashRoot: String
     )
 
     /// Transaction executed event is emitted everytime a transaction

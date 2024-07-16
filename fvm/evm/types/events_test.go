@@ -33,15 +33,13 @@ func TestEVMBlockExecutedEventCCFEncodingDecoding(t *testing.T) {
 	t.Parallel()
 
 	block := &types.Block{
-		Height:          2,
-		Timestamp:       100,
-		TotalSupply:     big.NewInt(1500),
-		ParentBlockHash: gethCommon.HexToHash("0x2813452cff514c3054ac9f40cd7ce1b016cc78ab7f99f1c6d49708837f6e06d1"),
-		ReceiptRoot:     gethCommon.Hash{},
-		TotalGasUsed:    15,
-		TransactionHashes: []gethCommon.Hash{
-			gethCommon.HexToHash("0x70b67ce6710355acf8d69b2ea013d34e212bc4824926c5d26f189c1ca9667246"),
-		},
+		Height:              2,
+		Timestamp:           100,
+		TotalSupply:         big.NewInt(1500),
+		ParentBlockHash:     gethCommon.HexToHash("0x2813452cff514c3054ac9f40cd7ce1b016cc78ab7f99f1c6d49708837f6e06d1"),
+		ReceiptRoot:         gethCommon.Hash{},
+		TotalGasUsed:        15,
+		TransactionHashRoot: gethCommon.HexToHash("0x70b67ce6710355acf8d69b2ea013d34e212bc4824926c5d26f189c1ca9667246"),
 	}
 
 	event := types.NewBlockEvent(block)
@@ -62,12 +60,7 @@ func TestEVMBlockExecutedEventCCFEncodingDecoding(t *testing.T) {
 	assert.Equal(t, bep.TotalGasUsed, block.TotalGasUsed)
 	assert.Equal(t, bep.ParentBlockHash, block.ParentBlockHash.Hex())
 	assert.Equal(t, bep.ReceiptRoot, block.ReceiptRoot.Hex())
-
-	hashes := make([]gethCommon.Hash, len(bep.TransactionHashes))
-	for i, h := range bep.TransactionHashes {
-		hashes[i] = gethCommon.HexToHash(string(h))
-	}
-	assert.Equal(t, hashes, block.TransactionHashes)
+	assert.Equal(t, bep.TransactionHashRoot, block.TransactionHashRoot.Hex())
 
 	v, err := ccf.Encode(ev)
 	require.NoError(t, err)
