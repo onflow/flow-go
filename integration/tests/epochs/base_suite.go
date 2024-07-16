@@ -184,13 +184,13 @@ func (s *BaseSuite) GetLatestFinalizedHeader(ctx context.Context) *flow.Header {
 	return finalized
 }
 
-// AssertInEpoch requires actual epoch counter is equal to counter provided.
+// AssertInEpoch requires that the current epoch's counter (as of the latest finalized block) is equal to the counter value provided.
 func (s *BaseSuite) AssertInEpoch(ctx context.Context, expectedEpoch uint64) {
 	actualEpoch := s.CurrentEpoch(ctx)
 	require.Equalf(s.T(), expectedEpoch, actualEpoch, "expected to be in epoch %d got %d", expectedEpoch, actualEpoch)
 }
 
-// CurrentEpoch returns the current epoch counter.
+// CurrentEpoch returns the current epoch counter (as of the latest finalized block).
 func (s *BaseSuite) CurrentEpoch(ctx context.Context) uint64 {
 	snapshot := s.GetLatestProtocolSnapshot(ctx)
 	counter, err := snapshot.Epochs().Current().Counter()
@@ -198,7 +198,7 @@ func (s *BaseSuite) CurrentEpoch(ctx context.Context) uint64 {
 	return counter
 }
 
-// GetLatestProtocolSnapshot returns the latest protocol snapshot.
+// GetLatestProtocolSnapshot returns the protocol snapshot as of the latest finalized block.
 func (s *BaseSuite) GetLatestProtocolSnapshot(ctx context.Context) *inmem.Snapshot {
 	snapshot, err := s.Client.GetLatestProtocolSnapshot(ctx)
 	require.NoError(s.T(), err)

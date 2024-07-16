@@ -28,12 +28,17 @@ func GenerateRecoverEpochTxArgs(log zerolog.Logger,
 	targetDuration uint64,
 	targetEndTime uint64,
 	initNewEpoch bool,
-	snapshot *inmem.Snapshot) ([]cadence.Value, error) {
+	snapshot *inmem.Snapshot,
+) ([]cadence.Value, error) {
 	epoch := snapshot.Epochs().Current()
 
 	currentEpochIdentities, err := snapshot.Identities(filter.IsValidProtocolParticipant)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get  valid protocol participants from snapshot: %w", err)
+	}
+		// We need canonical ordering here; sanity check to enforce this:  
+	if !currentEpochIdentities.Sorted(flow.Canonical[flow.Identity]) {
+		return nil, fmt.Errorf("identies from snapshot not in canonical order")
 	}
 
 	// separate collector nodes by internal and partner nodes
@@ -156,12 +161,11 @@ func GenerateRecoverEpochTxArgs(log zerolog.Logger,
 // - log: the logger instance.
 // - clusterList: list of clusters
 // - nodeInfos: list of NodeInfos (must contain all internal nodes)
-// - clusterBlocks: list of root blocks for each cluster
+// - clusterBlocks: list of root blocks (one for each cluster)
 // Returns:
 // - flow.AssignmentList: the generated assignment list.
 // - flow.ClusterList: the generate collection cluster list.
 func ConstructRootQCsForClusters(log zerolog.Logger, clusterList flow.ClusterList, nodeInfos []bootstrap.NodeInfo, clusterBlocks []*cluster.Block) []*flow.QuorumCertificate {
-
 	if len(clusterBlocks) != len(clusterList) {
 		log.Fatal().Int("len(clusterBlocks)", len(clusterBlocks)).Int("len(clusterList)", len(clusterList)).
 			Msg("number of clusters needs to equal number of cluster blocks")
@@ -188,7 +192,7 @@ func filterClusterSigners(cluster flow.IdentitySkeletonList, nodeInfos []model.N
 	var filtered []model.NodeInfo
 	for _, node := range nodeInfos {
 		_, isInCluster := cluster.ByNodeID(node.NodeID)
-		isNotPartner := node.Type() == model.NodeInfoTypePrivate
+		isPrivateKeyAvailable := node.Type() == model.NodeInfoTypePrivate
 
 		if isInCluster && isNotPartner {
 			filtered = append(filtered, node)
