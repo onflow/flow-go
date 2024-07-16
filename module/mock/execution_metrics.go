@@ -106,9 +106,9 @@ func (_m *ExecutionMetrics) ExecutionSync(syncing bool) {
 	_m.Called(syncing)
 }
 
-// ExecutionTransactionExecuted provides a mock function with given fields: dur, stats
-func (_m *ExecutionMetrics) ExecutionTransactionExecuted(dur time.Duration, stats module.TransactionExecutionResultStats) {
-	_m.Called(dur, stats)
+// ExecutionTransactionExecuted provides a mock function with given fields: dur, stats, info
+func (_m *ExecutionMetrics) ExecutionTransactionExecuted(dur time.Duration, stats module.TransactionExecutionResultStats, info module.TransactionExecutionResultInfo) {
+	_m.Called(dur, stats, info)
 }
 
 // FinishBlockReceivedToExecuted provides a mock function with given fields: blockID
