@@ -33,21 +33,19 @@ func TestEjectorRapid(t *testing.T) {
 			require.NoError(t, err)
 		}
 
-		var ejectedIdentities []flow.Identifier
+		var ejectedIdentities flow.IdentifierList
 		for _, list := range trackedIdentities {
 			nodeID := rapid.SampledFrom(list).Draw(t, "ejected-identity").NodeID
 			require.True(t, ej.Eject(nodeID))
 			ejectedIdentities = append(ejectedIdentities, nodeID)
 		}
+		ejectedLookup := ejectedIdentities.Lookup()
 
-		for _, ejectedNodeID := range ejectedIdentities {
-			ejected := false
-			for _, list := range trackedIdentities {
-				if entry, found := list.ByNodeID(ejectedNodeID); found && entry.Ejected {
-					ejected = true
-				}
+		for _, list := range trackedIdentities {
+			for _, identity := range list {
+				_, expectedStatus := ejectedLookup[identity.NodeID]
+				require.Equal(t, expectedStatus, identity.Ejected, "incorrect ejection status")
 			}
-			require.True(t, ejected, "identity should be ejected in tracked list")
 		}
 	})
 }
