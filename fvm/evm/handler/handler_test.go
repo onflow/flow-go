@@ -91,7 +91,7 @@ func TestHandler_TransactionRunOrPanic(t *testing.T) {
 					events := backend.Events()
 					require.Len(t, events, 1)
 					txEventPayload := testutils.TxEventToPayload(t, events[0], rootAddr)
-
+					txHash := gethCommon.HexToHash(txEventPayload.Hash)
 					// check logs
 					encodedLogs, err := types.CadenceUInt8ArrayValueToBytes(txEventPayload.Logs)
 					require.NoError(t, err)
@@ -110,14 +110,11 @@ func TestHandler_TransactionRunOrPanic(t *testing.T) {
 					events = backend.Events()
 					require.Len(t, events, 2)
 					blockEventPayload := testutils.BlockEventToPayload(t, events[1], rootAddr)
-					// make sure block transaction list references the above transaction id
-					require.Len(t, blockEventPayload.TransactionHashes, 1)
-					eventTxID := blockEventPayload.TransactionHashes[0] // only one hash in block
 					// make sure the transaction id included in the block transaction list is the same as tx sumbmitted
 					assert.Equal(
 						t,
-						evmTx.Hash().String(),
-						string(eventTxID),
+						types.ComputeTransactionRootHash([]gethCommon.Hash{txHash}).String(),
+						string(blockEventPayload.TransactionHashRoot),
 					)
 				})
 			})
@@ -384,9 +381,12 @@ func TestHandler_COA(t *testing.T) {
 				events = backend.Events()
 				require.Len(t, events, 4)
 				blockEventPayload := testutils.BlockEventToPayload(t, events[3], rootAddr)
-				for i, txHash := range txHashes {
-					require.Equal(t, txHash.Hex(), string(blockEventPayload.TransactionHashes[i]))
-				}
+				assert.Equal(
+					t,
+					types.ComputeTransactionRootHash(txHashes).String(),
+					string(blockEventPayload.TransactionHashRoot),
+				)
+
 				require.Equal(t, totalGasUsed, blockEventPayload.TotalGasUsed)
 
 				// check gas usage
