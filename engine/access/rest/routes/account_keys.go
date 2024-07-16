@@ -27,20 +27,13 @@ func GetAccountKeyByIndex(r *request.Request, backend access.API, link models.Li
 		req.Height = header.Height
 	}
 
-	account, err := backend.GetAccountAtBlockHeight(r.Context(), req.Address, req.Height)
+	accountKey, err := backend.GetAccountKeyAtBlockHeight(r.Context(), req.Address, req.Index, req.Height)
 	if err != nil {
-		err := fmt.Errorf("account with address: %s does not exist", req.Address)
+		err = fmt.Errorf("failed to get account key with index: %d", req.Index)
 		return nil, models.NewNotFoundError(err.Error(), err)
 	}
 
 	var response models.AccountPublicKey
-	for _, key := range account.Keys {
-		if uint64(key.Index) == req.Index {
-			response.Build(key)
-			return response, nil
-		}
-	}
-
-	err = fmt.Errorf("account key with index: %d does not exist", req.Index)
-	return nil, models.NewNotFoundError(err.Error(), err)
+	response.Build(*accountKey)
+	return response, nil
 }
