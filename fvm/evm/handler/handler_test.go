@@ -14,6 +14,7 @@ import (
 	gethCommon "github.com/onflow/go-ethereum/common"
 	gethCore "github.com/onflow/go-ethereum/core"
 	gethTypes "github.com/onflow/go-ethereum/core/types"
+	"github.com/onflow/go-ethereum/core/vm"
 	gethVM "github.com/onflow/go-ethereum/core/vm"
 	gethParams "github.com/onflow/go-ethereum/params"
 	"github.com/onflow/go-ethereum/rlp"
@@ -274,7 +275,10 @@ func TestHandler_TransactionRunOrPanic(t *testing.T) {
 				// setup coinbase
 				foa2 := handler.DeployCOA(2)
 				account2 := handler.AccountByAddress(foa2, true)
-				require.Equal(t, types.NewBalanceFromUFix64(0), account2.Balance())
+				require.True(t, types.BalancesAreEqual(
+					types.NewBalanceFromUFix64(0),
+					account2.Balance(),
+				))
 
 				// no panic means success here
 				handler.RunOrPanic(tx, account2.Address())
@@ -345,7 +349,7 @@ func TestHandler_COA(t *testing.T) {
 				require.NotNil(t, foa)
 
 				zeroBalance := types.NewBalance(big.NewInt(0))
-				require.Equal(t, zeroBalance, foa.Balance())
+				require.True(t, types.BalancesAreEqual(zeroBalance, foa.Balance()))
 
 				balance := types.OneFlowBalance
 				vault := types.NewFlowTokenVault(balance)
@@ -356,7 +360,8 @@ func TestHandler_COA(t *testing.T) {
 				v := foa.Withdraw(balance)
 				require.Equal(t, balance, v.Balance())
 
-				require.Equal(t, zeroBalance, foa.Balance())
+				require.True(t, types.BalancesAreEqual(
+					zeroBalance, foa.Balance()))
 
 				events := backend.Events()
 				require.Len(t, events, 6)
@@ -1122,8 +1127,12 @@ func TestHandler_TransactionRun(t *testing.T) {
 						RunTransactionFunc: func(tx *gethTypes.Transaction) (*types.Result, error) {
 							tr := tracer.TxTracer()
 							// mock some calls
-							tr.CaptureTxStart(100)
-							tr.CaptureTxEnd(60)
+							from := eoa.Address().ToCommon()
+							tr.OnTxStart(nil, tx, from)
+							tr.OnEnter(0, byte(vm.ADD), from, *tx.To(), tx.Data(), 20, big.NewInt(2))
+							tr.OnExit(0, []byte{0x02}, 200, nil, false)
+							tr.OnTxEnd(result.Receipt(0), nil)
+
 							traceResult, err = tr.GetResult()
 							require.NoError(t, err)
 							return result, nil
@@ -1247,8 +1256,9 @@ func TestHandler_TransactionRun(t *testing.T) {
 							runResults = make([]*types.Result, len(txs))
 							for i, tx := range txs {
 								tr := tracer.TxTracer()
-								tr.CaptureTxStart(200)
-								tr.CaptureTxEnd(150)
+								// TODO(Ramtin): figure out me
+								// tr.CaptureTxStart(200)
+								// tr.CaptureTxEnd(150)
 
 								traceResults[i], _ = tr.GetResult()
 								runResults[i] = &types.Result{

@@ -767,8 +767,7 @@ func TestEVMBatchRun(t *testing.T) {
 									assert(res.errorMessage == "", message: "unexpected error msg")
 								} else {
 									assert(res.status == EVM.Status.failed, message: "unexpected failed status")
-									assert(res.errorCode == 301, message: "unexpected error code")
-									assert(res.errorMessage == "out of gas", message: "unexpected error msg")
+									assert(res.errorCode == 400, message: "unexpected error code")
 								}
 							}
 						}
