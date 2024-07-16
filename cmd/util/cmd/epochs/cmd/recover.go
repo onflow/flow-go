@@ -7,14 +7,10 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/onflow/cadence"
-
 	"github.com/onflow/flow-go/cmd/bootstrap/run"
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	epochcmdutil "github.com/onflow/flow-go/cmd/util/cmd/epochs/utils"
-	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module/grpcclient"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 )
@@ -187,129 +183,4 @@ func generateRecoverEpochTxArgs(getSnapshot func() *inmem.Snapshot) func(cmd *co
 			log.Info().Msgf("wrote transaction args to output file %s", flagOut)
 		}
 	}
-}
-
-// extractRecoverEpochArgs extracts the required transaction arguments for the `recoverEpoch` transaction.
-func extractRecoverEpochArgs(snapshot *inmem.Snapshot) []cadence.Value {
-	epoch := snapshot.Epochs().Current()
-
-	currentEpochIdentities, err := snapshot.Identities(filter.IsValidProtocolParticipant)
-	if err != nil {
-		log.Fatal().Err(err).Msg("failed to get  valid protocol participants from snapshot")
-	}
-
-	// separate collector nodes by internal and partner nodes
-	collectors := currentEpochIdentities.Filter(filter.HasRole[flow.Identity](flow.RoleCollection))
-	internalCollectors := make(flow.IdentityList, 0)
-	partnerCollectors := make(flow.IdentityList, 0)
-
-	log.Info().Msg("collecting internal node network and staking keys")
-	internalNodes, err := common.ReadFullInternalNodeInfos(log, flagInternalNodePrivInfoDir, flagNodeConfigJson)
-	if err != nil {
-		log.Fatal().Err(err).Msg("failed to read full internal node infos")
-	}
-
-	internalNodesMap := make(map[flow.Identifier]struct{})
-	for _, node := range internalNodes {
-		if !currentEpochIdentities.Exists(node.Identity()) {
-			log.Fatal().Msg(fmt.Sprintf("node ID found in internal node infos missing from protocol snapshot identities: %s", node.NodeID))
-		}
-		internalNodesMap[node.NodeID] = struct{}{}
-	}
-	log.Info().Msg("")
-
-	for _, collector := range collectors {
-		if _, ok := internalNodesMap[collector.NodeID]; ok {
-			internalCollectors = append(internalCollectors, collector)
-		} else {
-			partnerCollectors = append(partnerCollectors, collector)
-		}
-	}
-
-	currentEpochDKG, err := epoch.DKG()
-	if err != nil {
-		log.Fatal().Err(err).Msg("failed to get DKG for current epoch")
-	}
-
-	log.Info().Msg("computing collection node clusters")
-
-	assignments, clusters, err := common.ConstructClusterAssignment(log, partnerCollectors, internalCollectors, flagCollectionClusters)
-	if err != nil {
-		log.Fatal().Err(err).Msg("unable to generate cluster assignment")
-	}
-	log.Info().Msg("")
-
-	log.Info().Msg("constructing root blocks for collection node clusters")
-	clusterBlocks := run.GenerateRootClusterBlocks(flagEpochCounter, clusters)
-	log.Info().Msg("")
-
-	log.Info().Msg("constructing root QCs for collection node clusters")
-	clusterQCs := run.ConstructRootQCsForClusters(log, clusters, internalNodes, clusterBlocks)
-	log.Info().Msg("")
-
-	dkgPubKeys := make([]cadence.Value, 0)
-	nodeIds := make([]cadence.Value, 0)
-
-	// NOTE: The RecoveryEpoch will re-use the last successful DKG output. This means that the consensus
-	// committee in the RecoveryEpoch must be identical to the committee which participated in that DKG.
-	dkgGroupKeyCdc, cdcErr := cadence.NewString(currentEpochDKG.GroupKey().String())
-	if cdcErr != nil {
-		log.Fatal().Err(cdcErr).Msg("failed to get dkg group key cadence string")
-	}
-	dkgPubKeys = append(dkgPubKeys, dkgGroupKeyCdc)
-	for _, id := range currentEpochIdentities {
-		if id.GetRole() == flow.RoleConsensus {
-			dkgPubKey, keyShareErr := currentEpochDKG.KeyShare(id.GetNodeID())
-			if keyShareErr != nil {
-				log.Fatal().Err(keyShareErr).Msg(fmt.Sprintf("failed to get dkg pub key share for node: %s", id.GetNodeID()))
-			}
-			dkgPubKeyCdc, cdcErr := cadence.NewString(dkgPubKey.String())
-			if cdcErr != nil {
-				log.Fatal().Err(cdcErr).Msg(fmt.Sprintf("failed to get dkg pub key cadence string for node: %s", id.GetNodeID()))
-			}
-			dkgPubKeys = append(dkgPubKeys, dkgPubKeyCdc)
-		}
-		nodeIdCdc, err := cadence.NewString(id.GetNodeID().String())
-		if err != nil {
-			log.Fatal().Err(err).Msg(fmt.Sprintf("failed to convert node ID to cadence string: %s", id.GetNodeID()))
-		}
-		nodeIds = append(nodeIds, nodeIdCdc)
-	}
-
-	clusterQCAddress := systemcontracts.SystemContractsForChain(flow.ChainID(flagRootChainID)).ClusterQC.Address.String()
-	qcVoteData, err := common.ConvertClusterQcsCdc(clusterQCs, clusters, clusterQCAddress)
-	if err != nil {
-		log.Fatal().Err(err).Msg("failed to convert cluster qcs to cadence type")
-	}
-
-	currEpochFinalView, err := epoch.FinalView()
-	if err != nil {
-		log.Fatal().Err(err).Msg("failed to get final view of current epoch")
-	}
-
-	args := []cadence.Value{
-		// epoch start view
-		cadence.NewUInt64(currEpochFinalView + 1),
-		// staking phase end view
-		cadence.NewUInt64(currEpochFinalView + flagNumViewsInStakingAuction),
-		// epoch end view
-		cadence.NewUInt64(currEpochFinalView + flagNumViewsInEpoch),
-		// target duration
-		cadence.NewUInt64(flagTargetDuration),
-		// target end time
-		cadence.NewUInt64(flagTargetEndTime),
-		// clusters,
-		common.ConvertClusterAssignmentsCdc(assignments),
-		// qcVoteData
-		cadence.NewArray(qcVoteData),
-		// dkg pub keys
-		cadence.NewArray(dkgPubKeys),
-		// node ids
-		cadence.NewArray(nodeIds),
-		// recover the network by initializing a new recover epoch which will increment the smart contract epoch counter
-		// or overwrite the epoch metadata for the current epoch
-		cadence.NewBool(flagInitNewEpoch),
-	}
-
-	return args
 }

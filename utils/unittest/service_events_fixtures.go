@@ -1457,6 +1457,25 @@ func VerifyCdcArguments(t *testing.T, expected []cadence.Value, actual []interfa
 	}
 }
 
+// InterfafceToCdcValues decodes jsoncdc encoded values from interface -> cadence value.
+func InterfafceToCdcValues(t *testing.T, vals []interface{}) []cadence.Value {
+	decoded := make([]cadence.Value, len(vals))
+	for index, val := range vals {
+
+		// marshal to bytes
+		bz, err := json.Marshal(val)
+		require.NoError(t, err)
+
+		// parse cadence value
+		cdcVal, err := jsoncdc.Decode(nil, bz)
+		require.NoError(t, err)
+
+		decoded[index] = cdcVal
+	}
+
+	return decoded
+}
+
 func NewFlowClusterQCClusterStructType() *cadence.StructType {
 
 	// A.01cf0e2f2f715450.FlowClusterQC.Cluster

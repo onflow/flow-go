@@ -36,7 +36,7 @@ func GenerateRecoverEpochTxArgs(log zerolog.Logger,
 	if err != nil {
 		return nil, fmt.Errorf("failed to get  valid protocol participants from snapshot: %w", err)
 	}
-		// We need canonical ordering here; sanity check to enforce this:  
+	// We need canonical ordering here; sanity check to enforce this:
 	if !currentEpochIdentities.Sorted(flow.Canonical[flow.Identity]) {
 		return nil, fmt.Errorf("identies from snapshot not in canonical order")
 	}
@@ -194,7 +194,7 @@ func filterClusterSigners(cluster flow.IdentitySkeletonList, nodeInfos []model.N
 		_, isInCluster := cluster.ByNodeID(node.NodeID)
 		isPrivateKeyAvailable := node.Type() == model.NodeInfoTypePrivate
 
-		if isInCluster && isNotPartner {
+		if isInCluster && isPrivateKeyAvailable {
 			filtered = append(filtered, node)
 		}
 	}
