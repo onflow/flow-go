@@ -98,7 +98,7 @@ func (s *EpochFallbackStateMachineSuite) TestProcessEpochRecover() {
 			SetupID:          epochRecover.EpochSetup.ID(),
 			CommitID:         epochRecover.EpochCommit.ID(),
 			ActiveIdentities: flow.DynamicIdentityEntryListFromIdentities(nextEpochParticipants),
-			EpochExtensions:  nil,
+			EpochExtensions:  []flow.EpochExtension{},
 		},
 		EpochFallbackTriggered: false,
 	}
@@ -372,7 +372,7 @@ func (s *EpochFallbackStateMachineSuite) TestNewEpochFallbackStateMachine() {
 				SetupID:          parentProtocolState.CurrentEpoch.SetupID,
 				CommitID:         parentProtocolState.CurrentEpoch.CommitID,
 				ActiveIdentities: parentProtocolState.CurrentEpoch.ActiveIdentities,
-				EpochExtensions:  nil,
+				EpochExtensions:  []flow.EpochExtension{},
 			},
 			NextEpoch:              nil,
 			EpochFallbackTriggered: true,
@@ -479,7 +479,7 @@ func (s *EpochFallbackStateMachineSuite) TestNewEpochFallbackStateMachine() {
 				SetupID:          parentProtocolState.CurrentEpoch.SetupID,
 				CommitID:         parentProtocolState.CurrentEpoch.CommitID,
 				ActiveIdentities: parentProtocolState.CurrentEpoch.ActiveIdentities,
-				EpochExtensions:  nil,
+				EpochExtensions:  []flow.EpochExtension{},
 			},
 			NextEpoch:              parentProtocolState.NextEpoch,
 			EpochFallbackTriggered: true,
@@ -679,8 +679,8 @@ func (s *EpochFallbackStateMachineSuite) TestEpochRecoverAndEjectionInSameBlock(
 		setup.FirstView = s.parentProtocolState.CurrentEpochSetup.FinalView + 1
 		setup.FinalView = setup.FirstView + 10_000
 	})
-	err := s.stateMachine.EjectIdentity(ejectedIdentityID)
-	require.NoError(s.T(), err)
+	ejected := s.stateMachine.EjectIdentity(ejectedIdentityID)
+	require.True(s.T(), ejected)
 
 	s.consumer.On("OnServiceEventReceived", epochRecover.ServiceEvent()).Once()
 	s.consumer.On("OnInvalidServiceEvent", epochRecover.ServiceEvent(),
@@ -778,7 +778,7 @@ func (s *EpochFallbackStateMachineSuite) TestProcessingMultipleEventsAtTheSameBl
 			case *flow.EpochRecover:
 				_, err = s.stateMachine.ProcessEpochRecover(ev)
 			case flow.Identifier:
-				err = s.stateMachine.EjectIdentity(ev)
+				_ = s.stateMachine.EjectIdentity(ev)
 			}
 			require.NoError(s.T(), err)
 		}
