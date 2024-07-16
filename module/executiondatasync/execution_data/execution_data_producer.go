@@ -14,16 +14,14 @@ type ExecutionDataProducer interface {
 }
 
 type ExecutionDataProducerManager struct {
-	registered *atomic.Bool
-
+	registered       *atomic.Bool
 	producerNotifier *engine.Notifier
 }
 
 func NewExecutionDataProducerManager() *ExecutionDataProducerManager {
-	notifier := engine.NewNotifier()
 	return &ExecutionDataProducerManager{
 		registered:       atomic.NewBool(false),
-		producerNotifier: &notifier,
+		producerNotifier: nil,
 	}
 }
 
