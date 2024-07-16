@@ -26,8 +26,9 @@ func CadenceUInt8ArrayValueToBytes(a cadence.Value) ([]byte, error) {
 		return nil, fmt.Errorf("value is not an array")
 	}
 
+	arrayType := aa.Type()
 	// if array type is empty, continue
-	if aa.Type() != nil && !aa.Type().Equal(cadenceArrayTypeOfUInt8) {
+	if arrayType != nil && !arrayType.Equal(cadenceArrayTypeOfUInt8) {
 		return nil, fmt.Errorf("invalid array type")
 	}
 
