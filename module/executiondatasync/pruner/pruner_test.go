@@ -6,8 +6,11 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/engine"
+	exedatamock "github.com/onflow/flow-go/module/executiondatasync/execution_data/mock"
 	"github.com/onflow/flow-go/module/executiondatasync/pruner"
 	mocktracker "github.com/onflow/flow-go/module/executiondatasync/tracker/mock"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -30,18 +33,31 @@ func TestBasicPrune(t *testing.T) {
 	require.NoError(t, err)
 	trackerStorage.AssertExpectations(t)
 
+	downloader := new(exedatamock.Downloader)
+
+	var notifier *engine.Notifier
+	downloader.On("Register", mock.Anything).Return().Once().Run(func(args mock.Arguments) {
+		notifier = args.Get(0).(*engine.Notifier)
+	})
+	downloader.On("LastProducedHeight").
+		Return(uint64(16), nil).
+		Once()
+
+	pruner.RegisterProducer(downloader)
+
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx, errChan := irrecoverable.WithSignaler(ctx)
 
 	pruner.Start(signalerCtx)
+	notifier.Notify()
 
 	pruned := make(chan struct{})
 	trackerStorage.On("PruneUpToHeight", uint64(6)).Return(func(height uint64) error {
 		close(pruned)
 		return nil
 	}).Once()
+	trackerStorage.On("SetFulfilledHeight", uint64(16)).Return(nil).Maybe()
 
-	pruner.NotifyFulfilledHeight(16)
 	unittest.AssertClosesBefore(t, pruned, time.Second)
 	trackerStorage.AssertExpectations(t)
 

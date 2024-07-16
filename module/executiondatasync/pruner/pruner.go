@@ -103,9 +103,6 @@ func NewPruner(logger zerolog.Logger, metrics module.ExecutionDataPrunerMetrics,
 		return nil, fmt.Errorf("failed to get fulfilled height: %w", err)
 	}
 
-	fulfilledHeights := make(chan uint64, 32)
-	fulfilledHeights <- fulfilledHeight
-
 	p := &Pruner{
 		logger:                logger.With().Str("component", "execution_data_pruner").Logger(),
 		storage:               storage,
@@ -119,6 +116,7 @@ func NewPruner(logger zerolog.Logger, metrics module.ExecutionDataPrunerMetrics,
 		threshold:             defaultThreshold,
 		metrics:               metrics,
 	}
+	p.fulfilledHeight.Notify()
 	p.cm = component.NewComponentManagerBuilder().
 		AddWorker(p.loop).
 		Build()
@@ -167,16 +165,16 @@ func (p *Pruner) loop(ctx irrecoverable.SignalerContext, ready component.ReadyFu
 		case <-ctx.Done():
 			return
 		case <-p.fulfilledHeight.Channel():
-			lowestHeight, err := p.lowestProducersHeight()
-			if err != nil {
-				ctx.Throw(fmt.Errorf("failed to get lowest fulfilled height: %w", err))
+			if len(p.registeredProducers) > 0 {
+				lowestHeight, err := p.lowestProducersHeight()
+				if err != nil {
+					ctx.Throw(fmt.Errorf("failed to get lowest fulfilled height: %w", err))
+				}
+				err = p.updateFulfilledHeight(lowestHeight)
+				if err != nil {
+					ctx.Throw(fmt.Errorf("failed to update lowest fulfilled height: %w", err))
+				}
 			}
-
-			err = p.updateFulfilledHeight(lowestHeight)
-			if err != nil {
-				ctx.Throw(fmt.Errorf("failed to update lowest fulfilled height: %w", err))
-			}
-
 			p.checkPrune(ctx)
 		case heightRangeTarget := <-p.heightRangeTargetChan:
 			p.heightRangeTarget = heightRangeTarget
