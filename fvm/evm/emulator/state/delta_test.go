@@ -2,9 +2,9 @@ package state_test
 
 import (
 	"fmt"
-	"math/big"
 	"testing"
 
+	"github.com/holiman/uint256"
 	gethCommon "github.com/onflow/go-ethereum/common"
 	gethTypes "github.com/onflow/go-ethereum/core/types"
 	gethCrypto "github.com/onflow/go-ethereum/crypto"
@@ -44,11 +44,11 @@ func TestDeltaView(t *testing.T) {
 				IsCreatedFunc: func(a gethCommon.Address) bool {
 					return false
 				},
-				GetBalanceFunc: func(gethCommon.Address) (*big.Int, error) {
-					return new(big.Int), nil
+				GetBalanceFunc: func(gethCommon.Address) (*uint256.Int, error) {
+					return new(uint256.Int), nil
 				},
-				HasSelfDestructedFunc: func(gethCommon.Address) (bool, *big.Int) {
-					return false, new(big.Int)
+				HasSelfDestructedFunc: func(gethCommon.Address) (bool, *uint256.Int) {
+					return false, new(uint256.Int)
 				},
 			})
 
@@ -96,9 +96,9 @@ func TestDeltaView(t *testing.T) {
 
 	t.Run("test account balance functionality", func(t *testing.T) {
 		addr1 := testutils.RandomCommonAddress(t)
-		addr1InitBal := big.NewInt(10)
+		addr1InitBal := uint256.NewInt(10)
 		addr2 := testutils.RandomCommonAddress(t)
-		addr2InitBal := big.NewInt(5)
+		addr2InitBal := uint256.NewInt(5)
 		addr3 := testutils.RandomCommonAddress(t)
 
 		view := state.NewDeltaView(
@@ -113,13 +113,13 @@ func TestDeltaView(t *testing.T) {
 						return false, nil
 					}
 				},
-				HasSelfDestructedFunc: func(a gethCommon.Address) (bool, *big.Int) {
-					return false, new(big.Int)
+				HasSelfDestructedFunc: func(a gethCommon.Address) (bool, *uint256.Int) {
+					return false, new(uint256.Int)
 				},
 				IsCreatedFunc: func(a gethCommon.Address) bool {
 					return false
 				},
-				GetBalanceFunc: func(addr gethCommon.Address) (*big.Int, error) {
+				GetBalanceFunc: func(addr gethCommon.Address) (*uint256.Int, error) {
 					switch addr {
 					case addr1:
 						return addr1InitBal, nil
@@ -143,11 +143,11 @@ func TestDeltaView(t *testing.T) {
 		// now it should return balance of zero
 		bal, err = view.GetBalance(addr1)
 		require.NoError(t, err)
-		require.Equal(t, big.NewInt(0), bal)
+		require.Equal(t, uint256.NewInt(0), bal)
 
 		// add balance to addr2
-		amount := big.NewInt(7)
-		expected := new(big.Int).Add(addr2InitBal, amount)
+		amount := uint256.NewInt(7)
+		expected := new(uint256.Int).Add(addr2InitBal, amount)
 		err = view.AddBalance(addr2, amount)
 		require.NoError(t, err)
 		newBal, err := view.GetBalance(addr2)
@@ -155,8 +155,8 @@ func TestDeltaView(t *testing.T) {
 		require.Equal(t, expected, newBal)
 
 		// sub balance from addr2
-		amount = big.NewInt(9)
-		expected = new(big.Int).Sub(newBal, amount)
+		amount = uint256.NewInt(9)
+		expected = new(uint256.Int).Sub(newBal, amount)
 		err = view.SubBalance(addr2, amount)
 		require.NoError(t, err)
 		bal, err = view.GetBalance(addr2)
@@ -164,7 +164,7 @@ func TestDeltaView(t *testing.T) {
 		require.Equal(t, expected, bal)
 
 		// negative balance error
-		err = view.SubBalance(addr2, big.NewInt(100))
+		err = view.SubBalance(addr2, uint256.NewInt(100))
 		require.Error(t, err)
 
 		// handling error on the parent
@@ -189,14 +189,14 @@ func TestDeltaView(t *testing.T) {
 						return false, nil
 					}
 				},
-				HasSelfDestructedFunc: func(a gethCommon.Address) (bool, *big.Int) {
-					return false, new(big.Int)
+				HasSelfDestructedFunc: func(a gethCommon.Address) (bool, *uint256.Int) {
+					return false, new(uint256.Int)
 				},
 				IsCreatedFunc: func(a gethCommon.Address) bool {
 					return false
 				},
-				GetBalanceFunc: func(a gethCommon.Address) (*big.Int, error) {
-					return new(big.Int), nil
+				GetBalanceFunc: func(a gethCommon.Address) (*uint256.Int, error) {
+					return new(uint256.Int), nil
 				},
 				GetNonceFunc: func(addr gethCommon.Address) (uint64, error) {
 					switch addr {
@@ -253,14 +253,14 @@ func TestDeltaView(t *testing.T) {
 						return false, nil
 					}
 				},
-				HasSelfDestructedFunc: func(a gethCommon.Address) (bool, *big.Int) {
-					return false, new(big.Int)
+				HasSelfDestructedFunc: func(a gethCommon.Address) (bool, *uint256.Int) {
+					return false, new(uint256.Int)
 				},
 				IsCreatedFunc: func(a gethCommon.Address) bool {
 					return false
 				},
-				GetBalanceFunc: func(a gethCommon.Address) (*big.Int, error) {
-					return new(big.Int), nil
+				GetBalanceFunc: func(a gethCommon.Address) (*uint256.Int, error) {
+					return new(uint256.Int), nil
 				},
 				GetCodeFunc: func(addr gethCommon.Address) ([]byte, error) {
 					switch addr {
@@ -593,8 +593,8 @@ func TestDeltaView(t *testing.T) {
 				ExistFunc: func(addr gethCommon.Address) (bool, error) {
 					return true, nil
 				},
-				GetBalanceFunc: func(addr gethCommon.Address) (*big.Int, error) {
-					return big.NewInt(10), nil
+				GetBalanceFunc: func(addr gethCommon.Address) (*uint256.Int, error) {
+					return uint256.NewInt(10), nil
 				},
 				GetNonceFunc: func(addr gethCommon.Address) (uint64, error) {
 					return 0, nil
@@ -602,8 +602,8 @@ func TestDeltaView(t *testing.T) {
 				IsCreatedFunc: func(a gethCommon.Address) bool {
 					return false
 				},
-				HasSelfDestructedFunc: func(gethCommon.Address) (bool, *big.Int) {
-					return false, new(big.Int)
+				HasSelfDestructedFunc: func(gethCommon.Address) (bool, *uint256.Int) {
+					return false, new(uint256.Int)
 				},
 			})
 
@@ -620,11 +620,11 @@ func TestDeltaView(t *testing.T) {
 		require.NoError(t, err)
 
 		// add balance for address 3
-		err = view.AddBalance(addresses[2], big.NewInt(5))
+		err = view.AddBalance(addresses[2], uint256.NewInt(5))
 		require.NoError(t, err)
 
 		// sub balance for address 4
-		err = view.AddBalance(addresses[3], big.NewInt(5))
+		err = view.AddBalance(addresses[3], uint256.NewInt(5))
 		require.NoError(t, err)
 
 		// set nonce for address 5
@@ -654,14 +654,14 @@ func TestDeltaView(t *testing.T) {
 				ExistFunc: func(addr gethCommon.Address) (bool, error) {
 					return true, nil
 				},
-				HasSelfDestructedFunc: func(gethCommon.Address) (bool, *big.Int) {
-					return true, big.NewInt(2)
+				HasSelfDestructedFunc: func(gethCommon.Address) (bool, *uint256.Int) {
+					return true, uint256.NewInt(2)
 				},
 				IsCreatedFunc: func(a gethCommon.Address) bool {
 					return false
 				},
-				GetBalanceFunc: func(addr gethCommon.Address) (*big.Int, error) {
-					return new(big.Int), nil
+				GetBalanceFunc: func(addr gethCommon.Address) (*uint256.Int, error) {
+					return new(uint256.Int), nil
 				},
 				GetStateFunc: func(sa types.SlotAddress) (gethCommon.Hash, error) {
 					return gethCommon.Hash{}, nil
@@ -673,7 +673,7 @@ func TestDeltaView(t *testing.T) {
 		require.True(t, found)
 
 		// set balance
-		initBalance := big.NewInt(10)
+		initBalance := uint256.NewInt(10)
 		err = view.AddBalance(addr1, initBalance)
 		require.NoError(t, err)
 
@@ -707,7 +707,7 @@ func TestDeltaView(t *testing.T) {
 		// balance should be returned zero
 		bal, err = view.GetBalance(addr1)
 		require.NoError(t, err)
-		require.Equal(t, new(big.Int), bal)
+		require.Equal(t, new(uint256.Int), bal)
 
 		// get code should still work
 		ret, err = view.GetCode(addr1)
@@ -741,14 +741,16 @@ func TestDeltaView(t *testing.T) {
 
 type MockedReadOnlyView struct {
 	ExistFunc               func(gethCommon.Address) (bool, error)
-	HasSelfDestructedFunc   func(gethCommon.Address) (bool, *big.Int)
+	HasSelfDestructedFunc   func(gethCommon.Address) (bool, *uint256.Int)
 	IsCreatedFunc           func(gethCommon.Address) bool
-	GetBalanceFunc          func(gethCommon.Address) (*big.Int, error)
+	IsNewContractFunc       func(gethCommon.Address) bool
+	GetBalanceFunc          func(gethCommon.Address) (*uint256.Int, error)
 	GetNonceFunc            func(gethCommon.Address) (uint64, error)
 	GetCodeFunc             func(gethCommon.Address) ([]byte, error)
 	GetCodeHashFunc         func(gethCommon.Address) (gethCommon.Hash, error)
 	GetCodeSizeFunc         func(gethCommon.Address) (int, error)
 	GetStateFunc            func(types.SlotAddress) (gethCommon.Hash, error)
+	GetStorageRootFunc      func(gethCommon.Address) (gethCommon.Hash, error)
 	GetTransientStateFunc   func(types.SlotAddress) gethCommon.Hash
 	GetRefundFunc           func() uint64
 	AddressInAccessListFunc func(gethCommon.Address) bool
@@ -771,14 +773,21 @@ func (v *MockedReadOnlyView) IsCreated(addr gethCommon.Address) bool {
 	return v.IsCreatedFunc(addr)
 }
 
-func (v *MockedReadOnlyView) HasSelfDestructed(addr gethCommon.Address) (bool, *big.Int) {
+func (v *MockedReadOnlyView) IsNewContract(addr gethCommon.Address) bool {
+	if v.IsNewContractFunc == nil {
+		panic("IsNewContract is not set in this mocked view")
+	}
+	return v.IsNewContractFunc(addr)
+}
+
+func (v *MockedReadOnlyView) HasSelfDestructed(addr gethCommon.Address) (bool, *uint256.Int) {
 	if v.HasSelfDestructedFunc == nil {
 		panic("HasSelfDestructed is not set in this mocked view")
 	}
 	return v.HasSelfDestructedFunc(addr)
 }
 
-func (v *MockedReadOnlyView) GetBalance(addr gethCommon.Address) (*big.Int, error) {
+func (v *MockedReadOnlyView) GetBalance(addr gethCommon.Address) (*uint256.Int, error) {
 	if v.GetBalanceFunc == nil {
 		panic("GetBalance is not set in this mocked view")
 	}
@@ -818,6 +827,13 @@ func (v *MockedReadOnlyView) GetState(slot types.SlotAddress) (gethCommon.Hash, 
 		panic("GetState is not set in this mocked view")
 	}
 	return v.GetStateFunc(slot)
+}
+
+func (v *MockedReadOnlyView) GetStorageRoot(addr gethCommon.Address) (gethCommon.Hash, error) {
+	if v.GetStorageRootFunc == nil {
+		panic("GetStorageRoot is not set in this mocked view")
+	}
+	return v.GetStorageRootFunc(addr)
 }
 
 func (v *MockedReadOnlyView) GetTransientState(slot types.SlotAddress) gethCommon.Hash {

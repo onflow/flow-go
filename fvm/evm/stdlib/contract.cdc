@@ -815,16 +815,23 @@ contract EVM {
     }
 
     /// The Heartbeat resource controls the block production 
-    access(all) resource Heartbeat {
-
+    access(all) 
+    resource Heartbeat {
         /// heartbeat calls commit block proposals and forms new blocks including all the 
         /// recently executed transactions.
         /// The Flow protocol makes sure to call this function once per block as a system call. 
-        access(all) fun heartbeat() {
+        access(all) 
+        fun heartbeat() {
             InternalEVM.commitBlockProposal()
         }
     }
     
+    /// createHeartBeat creates a heartbeat resource
+    access(account) 
+    fun createHeartBeat(): @Heartbeat{
+        return <-create Heartbeat()
+    }
+
     init() { 
         self.account.storage.save(<-create Heartbeat(), to: /storage/EVMHeartbeat)
     }

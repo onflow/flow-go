@@ -3,20 +3,20 @@ package state_test
 import (
 	"encoding/binary"
 	"fmt"
-	"math/big"
 	"os"
 	"strings"
 	"testing"
 
-	"github.com/onflow/flow-go/utils/io"
-
+	"github.com/holiman/uint256"
 	"github.com/onflow/go-ethereum/common"
+	"github.com/onflow/go-ethereum/core/tracing"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm/evm/emulator/state"
 	"github.com/onflow/flow-go/fvm/evm/testutils"
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/utils/io"
 )
 
 const (
@@ -133,7 +133,7 @@ func Test_AccountCreations(t *testing.T) {
 	maxAccounts := 50_000
 	for i := 0; i < maxAccounts; i++ {
 		err = tester.run(func(state types.StateDB) {
-			state.AddBalance(tester.newAddress(), big.NewInt(100))
+			state.AddBalance(tester.newAddress(), uint256.NewInt(100), tracing.BalanceChangeUnspecified)
 		})
 		require.NoError(t, err)
 
@@ -172,11 +172,11 @@ func Test_AccountContractInteraction(t *testing.T) {
 		err = tester.run(func(state types.StateDB) {
 			// create a new account
 			accAddr := tester.newAddress()
-			state.AddBalance(accAddr, big.NewInt(100))
+			state.AddBalance(accAddr, uint256.NewInt(100), tracing.BalanceChangeUnspecified)
 
 			// create a contract
 			contractAddr := tester.newAddress()
-			state.AddBalance(contractAddr, big.NewInt(int64(i)))
+			state.AddBalance(contractAddr, uint256.NewInt(uint64(i)), tracing.BalanceChangeUnspecified)
 			state.SetCode(contractAddr, code)
 
 			for k, v := range contractState {
@@ -185,7 +185,7 @@ func Test_AccountContractInteraction(t *testing.T) {
 
 			// simulate interaction with contract state and account balance for fees
 			state.SetState(contractAddr, common.HexToHash("0x03"), common.HexToHash("0x40"))
-			state.AddBalance(accAddr, big.NewInt(1))
+			state.AddBalance(accAddr, uint256.NewInt(1), tracing.BalanceChangeUnspecified)
 		})
 		require.NoError(t, err)
 
