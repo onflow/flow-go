@@ -23,7 +23,7 @@ const ServiceAccountPrivateKeySignAlgo = crypto.ECDSAP256
 const ServiceAccountPrivateKeyHashAlgo = hash.SHA2_256
 
 // Pre-calculated state commitment with root account with the above private key
-const GenesisStateCommitmentHex = "19b050175a103ce5d9cd642ae2b91dcdf5c778b89f3a096e443383e16eabaf1b"
+const GenesisStateCommitmentHex = "9fcc5aba09e5432425082f0d847cdd9bcc007ecf8913a4858155911f4e37f532"
 
 var GenesisStateCommitment flow.StateCommitment
 
@@ -87,10 +87,10 @@ func genesisCommitHexByChainID(chainID flow.ChainID) string {
 		return GenesisStateCommitmentHex
 	}
 	if chainID == flow.Testnet {
-		return "759ddc47d454ad56f0c2d836456ca09d2b2044e0fe0020bf4c0b3c2b77e37b6b"
+		return "1bd8bb5766a37f0b9ee35946b44eca62f4c2e59184d7f961316014e78f86ad82"
 	}
 	if chainID == flow.Sandboxnet {
 		return "e1c08b17f9e5896f03fe28dd37ca396c19b26628161506924fbf785834646ea1"
 	}
-	return "35e2092d5de9fa8405000f84579dab9ee885fefb881b961276dfd8ee70b256a6"
+	return "0f93d29eb9b876b5a687e6c8acd0de0730fec5fdbf2f0cce5c55074356821c6f"
 }

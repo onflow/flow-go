@@ -6,6 +6,8 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/onflow/cadence"
+
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
 
@@ -55,19 +57,22 @@ func TestEVMBlockExecutedEventCCFEncodingDecoding(t *testing.T) {
 
 	blockHash, err := block.Hash()
 	require.NoError(t, err)
-	assert.Equal(t, bep.Hash, blockHash.Hex())
+	assert.Equal(t, bep.Hash, types.HashToCadenceArrayValue(blockHash))
 
 	assert.Equal(t, bep.TotalSupply.Value, block.TotalSupply)
 	assert.Equal(t, bep.Timestamp, block.Timestamp)
 	assert.Equal(t, bep.TotalGasUsed, block.TotalGasUsed)
-	assert.Equal(t, bep.ParentBlockHash, block.ParentBlockHash.Hex())
-	assert.Equal(t, bep.ReceiptRoot, block.ReceiptRoot.Hex())
+	assert.Equal(t, bep.ParentBlockHash, types.HashToCadenceArrayValue(block.ParentBlockHash))
+	assert.Equal(t, bep.ReceiptRoot, types.HashToCadenceArrayValue(block.ReceiptRoot))
 
-	hashes := make([]gethCommon.Hash, len(bep.TransactionHashes))
-	for i, h := range bep.TransactionHashes {
-		hashes[i] = gethCommon.HexToHash(string(h))
+	hashes := make([]cadence.Array, len(block.TransactionHashes))
+	for i, h := range block.TransactionHashes {
+		hashes[i] = types.HashToCadenceArrayValue(h)
 	}
-	assert.Equal(t, hashes, block.TransactionHashes)
+	assert.Equal(t,
+		bep.TransactionHashes,
+		hashes,
+	)
 
 	v, err := ccf.Encode(ev)
 	require.NoError(t, err)
@@ -76,10 +81,16 @@ func TestEVMBlockExecutedEventCCFEncodingDecoding(t *testing.T) {
 	evt, err := ccf.Decode(nil, v)
 	require.NoError(t, err)
 
-	assert.Equal(t, evt.Type().ID(), fmt.Sprintf(
-		"A.%s.EVM.BlockExecuted",
-		systemcontracts.SystemContractsForChain(flow.Emulator).EVMContract.Address,
-	))
+	sc := systemcontracts.SystemContractsForChain(flow.Emulator)
+
+	assert.Equal(t,
+		cdcCommon.NewAddressLocation(
+			nil,
+			cdcCommon.Address(sc.EVMContract.Address),
+			string(types.EventTypeBlockExecuted),
+		).ID(),
+		evt.Type().ID(),
+	)
 }
 
 func TestEVMTransactionExecutedEventCCFEncodingDecoding(t *testing.T) {
@@ -127,7 +138,7 @@ func TestEVMTransactionExecutedEventCCFEncodingDecoding(t *testing.T) {
 		require.NoError(t, err)
 
 		assert.Equal(t, tep.BlockHeight, blockHeight)
-		assert.Equal(t, tep.Hash, txHash.Hex())
+		assert.Equal(t, tep.Hash, types.HashToCadenceArrayValue(txHash))
 		assert.Equal(t, tep.Payload, types.BytesToCadenceUInt8ArrayValue(txBytes))
 		assert.Equal(t, types.ErrorCode(tep.ErrorCode), types.ExecutionErrCodeOutOfGas)
 		assert.Equal(t, tep.TransactionType, txResult.TxType)
@@ -168,7 +179,7 @@ func TestEVMTransactionExecutedEventCCFEncodingDecoding(t *testing.T) {
 		require.NoError(t, err)
 
 		assert.Equal(t, tep.BlockHeight, blockHeight)
-		assert.Equal(t, tep.Hash, txHash.Hex())
+		assert.Equal(t, tep.Hash, types.HashToCadenceArrayValue(txHash))
 		assert.Equal(t, tep.Payload, types.BytesToCadenceUInt8ArrayValue(txBytes))
 		assert.Equal(t, types.ErrCodeNoError, types.ErrorCode(tep.ErrorCode))
 		assert.Equal(t, tep.TransactionType, txResult.TxType)

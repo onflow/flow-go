@@ -116,8 +116,8 @@ func TestHandler_TransactionRunOrPanic(t *testing.T) {
 					// make sure the transaction id included in the block transaction list is the same as tx sumbmitted
 					assert.Equal(
 						t,
-						evmTx.Hash().String(),
-						string(eventTxID),
+						types.HashToCadenceArrayValue(evmTx.Hash()),
+						eventTxID,
 					)
 				})
 			})
@@ -385,7 +385,10 @@ func TestHandler_COA(t *testing.T) {
 				require.Len(t, events, 4)
 				blockEventPayload := testutils.BlockEventToPayload(t, events[3], rootAddr)
 				for i, txHash := range txHashes {
-					require.Equal(t, txHash.Hex(), string(blockEventPayload.TransactionHashes[i]))
+					require.Equal(t,
+						types.HashToCadenceArrayValue(txHash),
+						blockEventPayload.TransactionHashes[i],
+					)
 				}
 				require.Equal(t, totalGasUsed, blockEventPayload.TotalGasUsed)
 
