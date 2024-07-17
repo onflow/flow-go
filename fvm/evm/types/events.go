@@ -168,14 +168,14 @@ func (p *blockEvent) ToCadence(location common.Location) (cadence.Event, error) 
 }
 
 type BlockEventPayload struct {
-	Height              uint64        `cadence:"height"`
-	Hash                string        `cadence:"hash"`
-	Timestamp           uint64        `cadence:"timestamp"`
-	TotalSupply         cadence.Int   `cadence:"totalSupply"`
-	TotalGasUsed        uint64        `cadence:"totalGasUsed"`
-	ParentBlockHash     string        `cadence:"parentHash"`
-	ReceiptRoot         string        `cadence:"receiptRoot"`
-	TransactionHashRoot cadence.Array `cadence:"transactionHashRoot"`
+	Height              uint64      `cadence:"height"`
+	Hash                string      `cadence:"hash"`
+	Timestamp           uint64      `cadence:"timestamp"`
+	TotalSupply         cadence.Int `cadence:"totalSupply"`
+	TotalGasUsed        uint64      `cadence:"totalGasUsed"`
+	ParentBlockHash     string      `cadence:"parentHash"`
+	ReceiptRoot         string      `cadence:"receiptRoot"`
+	TransactionHashRoot string      `cadence:"transactionHashRoot"`
 }
 
 // DecodeBlockEventPayload decodes Cadence event into block event payload.
