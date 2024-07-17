@@ -13,24 +13,24 @@ type StateMachine struct {
 }
 
 // Build provides a mock function with given fields:
-func (_m *StateMachine) Build() (*flow.EpochProtocolStateEntry, flow.Identifier, bool) {
+func (_m *StateMachine) Build() (*flow.EpochStateEntry, flow.Identifier, bool) {
 	ret := _m.Called()
 
 	if len(ret) == 0 {
 		panic("no return value specified for Build")
 	}
 
-	var r0 *flow.EpochProtocolStateEntry
+	var r0 *flow.EpochStateEntry
 	var r1 flow.Identifier
 	var r2 bool
-	if rf, ok := ret.Get(0).(func() (*flow.EpochProtocolStateEntry, flow.Identifier, bool)); ok {
+	if rf, ok := ret.Get(0).(func() (*flow.EpochStateEntry, flow.Identifier, bool)); ok {
 		return rf()
 	}
-	if rf, ok := ret.Get(0).(func() *flow.EpochProtocolStateEntry); ok {
+	if rf, ok := ret.Get(0).(func() *flow.EpochStateEntry); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*flow.EpochProtocolStateEntry)
+			r0 = ret.Get(0).(*flow.EpochStateEntry)
 		}
 	}
 
@@ -52,37 +52,37 @@ func (_m *StateMachine) Build() (*flow.EpochProtocolStateEntry, flow.Identifier,
 }
 
 // EjectIdentity provides a mock function with given fields: nodeID
-func (_m *StateMachine) EjectIdentity(nodeID flow.Identifier) error {
+func (_m *StateMachine) EjectIdentity(nodeID flow.Identifier) bool {
 	ret := _m.Called(nodeID)
 
 	if len(ret) == 0 {
 		panic("no return value specified for EjectIdentity")
 	}
 
-	var r0 error
-	if rf, ok := ret.Get(0).(func(flow.Identifier) error); ok {
+	var r0 bool
+	if rf, ok := ret.Get(0).(func(flow.Identifier) bool); ok {
 		r0 = rf(nodeID)
 	} else {
-		r0 = ret.Error(0)
+		r0 = ret.Get(0).(bool)
 	}
 
 	return r0
 }
 
 // ParentState provides a mock function with given fields:
-func (_m *StateMachine) ParentState() *flow.RichEpochProtocolStateEntry {
+func (_m *StateMachine) ParentState() *flow.RichEpochStateEntry {
 	ret := _m.Called()
 
 	if len(ret) == 0 {
 		panic("no return value specified for ParentState")
 	}
 
-	var r0 *flow.RichEpochProtocolStateEntry
-	if rf, ok := ret.Get(0).(func() *flow.RichEpochProtocolStateEntry); ok {
+	var r0 *flow.RichEpochStateEntry
+	if rf, ok := ret.Get(0).(func() *flow.RichEpochStateEntry); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*flow.RichEpochProtocolStateEntry)
+			r0 = ret.Get(0).(*flow.RichEpochStateEntry)
 		}
 	}
 

@@ -295,8 +295,8 @@ func (s *DynamicEpochTransitionSuite) assertNodeApprovedAndProposed(ctx context.
 	require.Containsf(s.T(), proposedTable.(cadence.Array).Values, cadence.String(info.NodeID.String()), "expected new node to be in proposed table: %x", info.NodeID)
 }
 
-// newTestContainerOnNetwork configures a new container on the suites network
-func (s *DynamicEpochTransitionSuite) newTestContainerOnNetwork(role flow.Role, info *StakedNodeOperationInfo) *testnet.Container {
+// NewTestContainerOnNetwork configures a new container on the suites network
+func (s *DynamicEpochTransitionSuite) NewTestContainerOnNetwork(role flow.Role, info *StakedNodeOperationInfo) *testnet.Container {
 	containerConfigs := []func(config *testnet.NodeConfig){
 		testnet.WithLogLevel(zerolog.WarnLevel),
 		testnet.WithID(info.NodeID),
@@ -336,7 +336,7 @@ func (s *DynamicEpochTransitionSuite) StakeNewNode(ctx context.Context, env temp
 	s.assertNodeApprovedAndProposed(ctx, env, info)
 
 	// add a new container to the network with the info used to stake our node
-	testContainer := s.newTestContainerOnNetwork(role, info)
+	testContainer := s.NewTestContainerOnNetwork(role, info)
 
 	return info, testContainer
 }
