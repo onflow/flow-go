@@ -21,7 +21,7 @@ contract EVM {
         // height or number of the block
         height: UInt64,
         // hash of the block
-        hash: [UInt8],
+        hash: [UInt8; 32],
         // timestamp of the block creation
         timestamp: UInt64,
         // total Flow supply
@@ -29,11 +29,11 @@ contract EVM {
         // all gas used in the block by transactions included
         totalGasUsed: UInt64,
         // parent block hash
-        parentHash: [UInt8],
+        parentHash: [UInt8; 32],
         // hash of all the transaction receipts
-        receiptRoot: [UInt8],
+        receiptRoot: [UInt8; 32],
         // all the transactions included in the block
-        transactionHashes: [[UInt8]]
+        transactionHashes: [[UInt8; 32]]
     )
 
     /// Transaction executed event is emitted everytime a transaction
@@ -41,7 +41,7 @@ contract EVM {
     access(all)
     event TransactionExecuted(
         // hash of the transaction
-        hash: [UInt8],
+        hash: [UInt8; 32],
         // index of the transaction in a block
         index: UInt16,
         // type of the transaction
@@ -207,7 +207,7 @@ contract EVM {
         }
         // Strip the 0x prefix if it exists
         var withoutPrefix = (asHex[1] == "x" ? asHex.slice(from: 2, upTo: asHex.length) : asHex).toLower()
-        let bytes = withoutPrefix.decodeHex().toConstantSized<[UInt8;20]>()!
+        let bytes = withoutPrefix.decodeHex().toConstantSized<[UInt8; 20]>()!
         return EVMAddress(bytes: bytes)
     }
 
@@ -815,14 +815,21 @@ contract EVM {
     }
 
     /// The Heartbeat resource controls the block production
-    access(all) resource Heartbeat {
-
+    access(all)
+    resource Heartbeat {
         /// heartbeat calls commit block proposals and forms new blocks including all the
         /// recently executed transactions.
         /// The Flow protocol makes sure to call this function once per block as a system call.
-        access(all) fun heartbeat() {
+        access(all)
+        fun heartbeat() {
             InternalEVM.commitBlockProposal()
         }
+    }
+
+    /// createHeartBeat creates a heartbeat resource
+    access(account)
+    fun createHeartBeat(): @Heartbeat{
+        return <-create Heartbeat()
     }
 
     init() {
