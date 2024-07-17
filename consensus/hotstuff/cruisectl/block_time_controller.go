@@ -349,10 +349,7 @@ func (ctl *BlockTimeController) checkForEpochTransition(tb TimedBlock) error {
 			view, ctl.currentEpochTiming.finalView, ctl.nextEpochTiming.finalView)
 	}
 
-	ctl.currentEpochTiming.firstView = ctl.nextEpochTiming.firstView
-	ctl.currentEpochTiming.finalView = ctl.nextEpochTiming.finalView
-	ctl.currentEpochTiming.targetDuration = ctl.nextEpochTiming.targetDuration
-	ctl.currentEpochTiming.targetEndTime = ctl.nextEpochTiming.targetEndTime
+	ctl.currentEpochTiming = *ctl.nextEpochTiming
 	ctl.nextEpochTiming = nil
 
 	return nil
