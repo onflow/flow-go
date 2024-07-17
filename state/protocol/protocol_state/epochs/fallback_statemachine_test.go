@@ -98,7 +98,6 @@ func (s *EpochFallbackStateMachineSuite) TestProcessEpochRecover() {
 			SetupID:          epochRecover.EpochSetup.ID(),
 			CommitID:         epochRecover.EpochCommit.ID(),
 			ActiveIdentities: flow.DynamicIdentityEntryListFromIdentities(nextEpochParticipants),
-			EpochExtensions:  []flow.EpochExtension{},
 		},
 		EpochFallbackTriggered: false,
 	}
@@ -371,7 +370,6 @@ func (s *EpochFallbackStateMachineSuite) TestNewEpochFallbackStateMachine() {
 				SetupID:          parentProtocolState.CurrentEpoch.SetupID,
 				CommitID:         parentProtocolState.CurrentEpoch.CommitID,
 				ActiveIdentities: parentProtocolState.CurrentEpoch.ActiveIdentities,
-				EpochExtensions:  []flow.EpochExtension{},
 			},
 			NextEpoch:              nil,
 			EpochFallbackTriggered: true,
@@ -476,7 +474,6 @@ func (s *EpochFallbackStateMachineSuite) TestNewEpochFallbackStateMachine() {
 				SetupID:          parentProtocolState.CurrentEpoch.SetupID,
 				CommitID:         parentProtocolState.CurrentEpoch.CommitID,
 				ActiveIdentities: parentProtocolState.CurrentEpoch.ActiveIdentities,
-				EpochExtensions:  []flow.EpochExtension{},
 			},
 			NextEpoch:              parentProtocolState.NextEpoch,
 			EpochFallbackTriggered: true,

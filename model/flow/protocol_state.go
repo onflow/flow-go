@@ -96,8 +96,11 @@ func (c *EpochStateContainer) Copy() *EpochStateContainer {
 	if c == nil {
 		return nil
 	}
-	ext := make([]EpochExtension, len(c.EpochExtensions))
-	copy(ext, c.EpochExtensions)
+	var ext []EpochExtension
+	if c.EpochExtensions != nil {
+		ext = make([]EpochExtension, len(c.EpochExtensions))
+		copy(ext, c.EpochExtensions)
+	}
 	return &EpochStateContainer{
 		SetupID:          c.SetupID,
 		CommitID:         c.CommitID,

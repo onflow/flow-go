@@ -2772,13 +2772,11 @@ func EpochStateFixture(options ...func(*flow.RichEpochStateEntry)) *flow.RichEpo
 					SetupID:          currentEpochSetup.ID(),
 					CommitID:         currentEpochCommit.ID(),
 					ActiveIdentities: flow.DynamicIdentityEntryListFromIdentities(currentEpochIdentities),
-					EpochExtensions:  []flow.EpochExtension{},
 				},
 				PreviousEpoch: &flow.EpochStateContainer{
 					SetupID:          prevEpochSetup.ID(),
 					CommitID:         prevEpochCommit.ID(),
 					ActiveIdentities: flow.DynamicIdentityEntryListFromIdentities(prevEpochIdentities),
-					EpochExtensions:  []flow.EpochExtension{},
 				},
 				EpochFallbackTriggered: false,
 				NextEpoch:              nil,
@@ -2846,7 +2844,6 @@ func WithNextEpochProtocolState() func(entry *flow.RichEpochStateEntry) {
 			SetupID:          nextEpochSetup.ID(),
 			CommitID:         nextEpochCommit.ID(),
 			ActiveIdentities: flow.DynamicIdentityEntryListFromIdentities(nextEpochParticipants),
-			EpochExtensions:  []flow.EpochExtension{},
 		}
 		entry.NextEpochSetup = nextEpochSetup
 		entry.NextEpochCommit = nextEpochCommit
