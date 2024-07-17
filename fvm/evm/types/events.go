@@ -33,14 +33,12 @@ type transactionEvent struct {
 	Payload     []byte  // transaction RLP-encoded payload
 	Result      *Result // transaction execution result
 	BlockHeight uint64
-	BlockHash   gethCommon.Hash
 }
 
 // NewTransactionEvent creates a new transaction event with the given parameters
 // - result: the result of the transaction execution
 // - payload: the RLP-encoded payload of the transaction
 // - blockHeight: the height of the block where the transaction is included
-// - blockHash: the hash of the block where the transaction is included
 func NewTransactionEvent(
 	result *Result,
 	payload []byte,
@@ -67,8 +65,6 @@ var transactionEventFields = []cadence.Field{
 	cadence.NewField("contractAddress", cadence.StringType),
 	cadence.NewField("logs", cadenceArrayTypeOfUInt8),
 	cadence.NewField("blockHeight", cadence.UInt64Type),
-	// todo we can remove hash and just reference block by height (evm-gateway dependency)
-	cadence.NewField("blockHash", cadenceHashType),
 	cadence.NewField("returnedData", cadenceArrayTypeOfUInt8),
 	cadence.NewField("precompiledCalls", cadenceArrayTypeOfUInt8),
 }
@@ -116,7 +112,6 @@ func (p *transactionEvent) ToCadence(location common.Location) (cadence.Event, e
 		deployedAddress,
 		BytesToCadenceUInt8ArrayValue(encodedLogs),
 		cadence.NewUInt64(p.BlockHeight),
-		HashToCadenceArrayValue(p.BlockHash),
 		BytesToCadenceUInt8ArrayValue(p.Result.ReturnedData),
 		BytesToCadenceUInt8ArrayValue(p.Result.PrecompiledCalls),
 	}).WithType(eventType), nil

@@ -64,11 +64,12 @@ func NewBlock(
 	totalSupply *big.Int,
 ) *Block {
 	return &Block{
-		ParentBlockHash: parentBlockHash,
-		Height:          height,
-		Timestamp:       timestamp,
-		TotalSupply:     totalSupply,
-		ReceiptRoot:     gethTypes.EmptyReceiptsHash,
+		ParentBlockHash:     parentBlockHash,
+		Height:              height,
+		Timestamp:           timestamp,
+		TotalSupply:         totalSupply,
+		ReceiptRoot:         gethTypes.EmptyReceiptsHash,
+		TransactionHashRoot: gethTypes.EmptyRootHash,
 	}
 }
 
