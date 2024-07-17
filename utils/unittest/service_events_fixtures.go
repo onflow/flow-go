@@ -804,13 +804,9 @@ func createEpochRecoverEvent(randomSourceHex string) cadence.Event {
 	clusterQCVoteDataType := newFlowClusterQCClusterQCVoteDataStructType()
 
 	cluster1 := cadence.NewStruct([]cadence.Value{
-		// voteSignatures
-		cadence.NewArray([]cadence.Value{
-			cadence.String("a39cd1e1bf7e2fb0609b7388ce5215a6a4c01eef2aee86e1a007faa28a6b2a3dc876e11bb97cdb26c3846231d2d01e4d"),
-			cadence.String("91673ad9c717d396c9a0953617733c128049ac1a639653d4002ab245b121df1939430e313bcbfd06948f6a281f6bf853"),
-		}).WithType(cadence.NewVariableSizedArrayType(cadence.StringType)),
-
-		// voterIDs
+		// aggregatedSignature
+		cadence.String("b072ed22ed305acd44818a6c836e09b4e844eebde6a4fdbf5cec983e2872b86c8b0f6c34c0777bf52e385ab7c45dc55d"),
+		// Node IDs of signers
 		cadence.NewArray([]cadence.Value{
 			cadence.String("0000000000000000000000000000000000000000000000000000000000000001"),
 			cadence.String("0000000000000000000000000000000000000000000000000000000000000002"),
@@ -818,13 +814,9 @@ func createEpochRecoverEvent(randomSourceHex string) cadence.Event {
 	}).WithType(clusterQCVoteDataType)
 
 	cluster2 := cadence.NewStruct([]cadence.Value{
-		// voteSignatures
-		cadence.NewArray([]cadence.Value{
-			cadence.String("b2bff159971852ed63e72c37991e62c94822e52d4fdcd7bf29aaf9fb178b1c5b4ce20dd9594e029f3574cb29533b857a"),
-			cadence.String("9931562f0248c9195758da3de4fb92f24fa734cbc20c0cb80280163560e0e0348f843ac89ecbd3732e335940c1e8dccb"),
-		}).WithType(cadence.NewVariableSizedArrayType(cadence.StringType)),
-
-		// voterIDs
+		// aggregatedSignature
+		cadence.String("899e266a543e1b3a564f68b22f7be571f2e944ec30fadc4b39e2d5f526ba044c0f3cb2648f8334fc216fa3360a0418b2"),
+		// Node IDs of signers
 		cadence.NewArray([]cadence.Value{
 			cadence.String("0000000000000000000000000000000000000000000000000000000000000003"),
 			cadence.String("0000000000000000000000000000000000000000000000000000000000000004"),
@@ -878,7 +870,9 @@ func createEpochRecoverEvent(randomSourceHex string) cadence.Event {
 
 		// clusterQCs
 		cadence.NewArray([]cadence.Value{
+			// cluster 1
 			cluster1,
+			// cluster 2
 			cluster2,
 		}).WithType(cadence.NewVariableSizedArrayType(clusterQCVoteDataType)),
 
@@ -1241,7 +1235,7 @@ func newFlowClusterQCClusterQCVoteDataStructType() *cadence.StructType {
 		Fields: []cadence.Field{
 			{
 				Identifier: "aggregatedSignature",
-				Type:       cadence.NewVariableSizedArrayType(cadence.StringType),
+				Type:       cadence.StringType,
 			},
 			{
 				Identifier: "voterIDs",
