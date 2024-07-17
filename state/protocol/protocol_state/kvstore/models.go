@@ -118,7 +118,10 @@ func (model *Modelv0) SetEpochStateID(id flow.Identifier) {
 	model.EpochStateID = id
 }
 
-// GetEpochExtensionViewCount returns the length of the epoch extension in views.
+// GetEpochExtensionViewCount returns the number of views for a hypothetical epoch extension. Note
+// that this value can change at runtime (through a service event). When a new extension is added,
+// the view count is used right at this point in the protocol state's evolution. In other words,
+// different extensions can have different view counts.
 func (model *Modelv0) GetEpochExtensionViewCount() uint64 {
 	return model.EpochExtensionViewCount
 }
