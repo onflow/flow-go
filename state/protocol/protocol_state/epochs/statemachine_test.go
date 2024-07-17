@@ -411,6 +411,7 @@ func (s *EpochStateMachineSuite) TestEvolveState_InvalidEpochSetup() {
 			Return(false, protocol.NewInvalidServiceEventErrorf("")).Once()
 
 		fallbackStateMachine := mock.NewStateMachine(s.T())
+		fallbackStateMachine.On("ParentState").Return(s.parentEpochState)
 		fallbackStateMachine.On("ProcessEpochSetup", epochSetup).Return(false, nil).Once()
 		fallbackPathStateMachineFactory.On("Execute", s.candidate.View, s.parentEpochState).Return(fallbackStateMachine, nil).Once()
 
@@ -458,6 +459,7 @@ func (s *EpochStateMachineSuite) TestEvolveState_InvalidEpochCommit() {
 			Return(false, protocol.NewInvalidServiceEventErrorf("")).Once()
 
 		fallbackStateMachine := mock.NewStateMachine(s.T())
+		fallbackStateMachine.On("ParentState").Return(s.parentEpochState)
 		fallbackStateMachine.On("ProcessEpochCommit", epochCommit).Return(false, nil).Once()
 		fallbackPathStateMachineFactory.On("Execute", s.candidate.View, s.parentEpochState).Return(fallbackStateMachine, nil).Once()
 
@@ -500,7 +502,8 @@ func (s *EpochStateMachineSuite) TestEvolveStateTransitionToNextEpoch_Error() {
 	exception := errors.New("exception")
 	s.happyPathStateMachine.On("TransitionToNextEpoch").Return(exception).Once()
 	err := s.stateMachine.EvolveState(nil)
-	require.ErrorIs(s.T(), err, exception)
+	require.Error(s.T(), err, exception)
+	require.ErrorContains(s.T(), err, "[exception!]")
 	require.False(s.T(), protocol.IsInvalidServiceEventError(err))
 }
 
@@ -518,9 +521,6 @@ func (s *EpochStateMachineSuite) TestEvolveState_EventsAreFiltered() {
 // state that we have entered Epoch fallback mode (`flow.MinEpochStateEntry.EpochFallbackTriggered` is set to `true`).
 // This test ensures that we don't drop previously committed next epoch.
 func (s *EpochStateMachineSuite) TestEvolveStateTransitionToNextEpoch_WithInvalidStateTransition() {
-	unittest.SkipUnless(s.T(), unittest.TEST_TODO,
-		"This test is broken with current implementation but must pass when EFM recovery has been implemented."+
-			"See for details https://github.com/onflow/flow-go/issues/5631.")
 	s.parentEpochState = unittest.EpochStateFixture(unittest.WithNextEpochProtocolState())
 	s.candidate.View = s.parentEpochState.NextEpochSetup.FirstView
 	happyPathTelemetry := protocol_statemock.NewStateMachineTelemetryConsumer(s.T())
