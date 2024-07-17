@@ -2,6 +2,9 @@ package recover_epoch
 
 import (
 	"fmt"
+
+	"github.com/stretchr/testify/require"
+	
 	"github.com/onflow/cadence"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
 	sdk "github.com/onflow/flow-go-sdk"
@@ -10,7 +13,6 @@ import (
 	"github.com/onflow/flow-go/integration/utils"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/stretchr/testify/require"
 )
 
 // Suite encapsulates common functionality for epoch integration tests.
