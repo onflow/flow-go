@@ -11,6 +11,7 @@ import (
 
 	"cloud.google.com/go/storage"
 	gethCommon "github.com/onflow/go-ethereum/common"
+	gethTypes "github.com/onflow/go-ethereum/core/types"
 	"github.com/onflow/go-ethereum/core/vm"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
@@ -64,9 +65,18 @@ func Test_TracerUploaderIntegration(t *testing.T) {
 		tr := tracer.TxTracer()
 		require.NotNil(t, tr)
 
-		tr.CaptureTxStart(1000)
-		tr.CaptureEnter(vm.ADD, gethCommon.HexToAddress("0x01"), gethCommon.HexToAddress("0x02"), []byte{0x01}, 10, big.NewInt(2))
-		tr.CaptureTxEnd(500)
+		from := gethCommon.HexToAddress("0x01")
+		to := gethCommon.HexToAddress("0x02")
+		nonce := uint64(10)
+		gas := uint64(100)
+		gasPrice := big.NewInt(1)
+		value := big.NewInt(2)
+		input := []byte{0x01}
+		tx := gethTypes.NewTransaction(nonce, to, value, gas, gasPrice, input)
+
+		tr.OnTxStart(nil, tx, from)
+		tr.OnEnter(0, byte(vm.ADD), from, to, input, gas, value)
+		tr.OnTxEnd(&gethTypes.Receipt{}, nil)
 
 		traces, err := tr.GetResult()
 		require.NoError(t, err)

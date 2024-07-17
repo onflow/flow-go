@@ -22,7 +22,7 @@ const (
 
 type EVMTracer interface {
 	WithBlockID(identifier flow.Identifier)
-	TxTracer() tracers.Tracer
+	TxTracer() *tracers.Tracer
 	Collect(txID gethCommon.Hash)
 }
 
@@ -30,7 +30,7 @@ var _ EVMTracer = &CallTracer{}
 
 type CallTracer struct {
 	logger   zerolog.Logger
-	tracer   tracers.Tracer
+	tracer   *tracers.Tracer
 	uploader Uploader
 	blockID  flow.Identifier
 }
@@ -48,7 +48,7 @@ func NewEVMCallTracer(uploader Uploader, logger zerolog.Logger) (*CallTracer, er
 	}, nil
 }
 
-func (t *CallTracer) TxTracer() tracers.Tracer {
+func (t *CallTracer) TxTracer() *tracers.Tracer {
 	return t.tracer
 }
 
@@ -102,7 +102,7 @@ var _ EVMTracer = &nopTracer{}
 
 type nopTracer struct{}
 
-func (n nopTracer) TxTracer() tracers.Tracer {
+func (n nopTracer) TxTracer() *tracers.Tracer {
 	return nil
 }
 
