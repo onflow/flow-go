@@ -2,11 +2,13 @@ package state
 
 import (
 	"fmt"
-	"math/big"
 
+	"github.com/holiman/uint256"
 	"github.com/onflow/atree"
+	"github.com/onflow/go-ethereum/common"
 	gethCommon "github.com/onflow/go-ethereum/common"
 	gethTypes "github.com/onflow/go-ethereum/core/types"
+	gethCrypto "github.com/onflow/go-ethereum/crypto"
 
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/model/flow"
@@ -93,17 +95,22 @@ func (v *BaseView) IsCreated(gethCommon.Address) bool {
 	return false
 }
 
+// IsNewContract returns true if the address is a new contract
+func (v *BaseView) IsNewContract(gethCommon.Address) bool {
+	return false
+}
+
 // HasSelfDestructed returns true if an address is flagged for destruction at the end of transaction
-func (v *BaseView) HasSelfDestructed(gethCommon.Address) (bool, *big.Int) {
-	return false, new(big.Int)
+func (v *BaseView) HasSelfDestructed(gethCommon.Address) (bool, *uint256.Int) {
+	return false, new(uint256.Int)
 }
 
 // GetBalance returns the balance of an address
 //
 // for non-existent accounts it returns a balance of zero
-func (v *BaseView) GetBalance(addr gethCommon.Address) (*big.Int, error) {
+func (v *BaseView) GetBalance(addr gethCommon.Address) (*uint256.Int, error) {
 	acc, err := v.getAccount(addr)
-	bal := big.NewInt(0)
+	bal := uint256.NewInt(0)
 	if acc != nil {
 		bal = acc.Balance
 	}
@@ -158,6 +165,39 @@ func (v *BaseView) GetState(sk types.SlotAddress) (gethCommon.Hash, error) {
 	return v.getSlot(sk)
 }
 
+// GetStorageRoot returns some sort of storage root for the given address
+// WARNING! the root that is returned is not a commitment to the state
+// Mostly is returned to satisfy the requirements of the EVM,
+// where the returned value is compared against empty hash and empty root hash
+// to determine smart contracts that already has data.
+//
+// Since BaseView doesn't construct a Merkel tree
+// for each account hash of root slab as some sort of root hash.
+// if account doesn't exist we return empty hash
+// if account exist but not a smart contract we return EmptyRootHash
+// if is a contract we return the hash of the root slab content (some sort of commitment).
+func (v *BaseView) GetStorageRoot(addr common.Address) (common.Hash, error) {
+	account, err := v.getAccount(addr)
+	if err != nil {
+		return gethCommon.Hash{}, err
+	}
+	// account does not exist
+	if account == nil {
+		return gethCommon.Hash{}, nil
+	}
+
+	// account is EOA
+	if account.CollectionID == nil {
+		return gethTypes.EmptyRootHash, nil
+	}
+
+	// otherwise is smart contract account
+	// return the hash of collection ID
+	// This is not a proper root as it doesn't have
+	// any commitment to the content.
+	return gethCrypto.Keccak256Hash(account.CollectionID), nil
+}
+
 // UpdateSlot updates the value for a slot
 func (v *BaseView) UpdateSlot(sk types.SlotAddress, value gethCommon.Hash) error {
 	return v.storeSlot(sk, value)
@@ -197,7 +237,7 @@ func (v *BaseView) SlotInAccessList(types.SlotAddress) (addressOk bool, slotOk b
 // CreateAccount creates a new account
 func (v *BaseView) CreateAccount(
 	addr gethCommon.Address,
-	balance *big.Int,
+	balance *uint256.Int,
 	nonce uint64,
 	code []byte,
 	codeHash gethCommon.Hash,
@@ -221,7 +261,7 @@ func (v *BaseView) CreateAccount(
 // UpdateAccount updates an account's meta data
 func (v *BaseView) UpdateAccount(
 	addr gethCommon.Address,
-	balance *big.Int,
+	balance *uint256.Int,
 	nonce uint64,
 	code []byte,
 	codeHash gethCommon.Hash,
@@ -243,7 +283,7 @@ func (v *BaseView) UpdateAccount(
 		return err
 	}
 	// TODO: maybe purge the state in the future as well
-	// currently the behaviour of stateDB doesn't purge the data
+	// currently the behavior of stateDB doesn't purge the data
 	// We don't need to check if the code is empty and we purge the state
 	// this is not possible right now.
 
