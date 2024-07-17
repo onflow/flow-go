@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime/common"
 	gethCommon "github.com/onflow/go-ethereum/common"
 	gethCore "github.com/onflow/go-ethereum/core"
@@ -91,14 +90,10 @@ func TestHandler_TransactionRunOrPanic(t *testing.T) {
 					events := backend.Events()
 					require.Len(t, events, 1)
 					txEventPayload := testutils.TxEventToPayload(t, events[0], rootAddr)
-					txHash, err := types.CadenceArrayValueToHash(txEventPayload.Hash)
 					require.NoError(t, err)
 					// check logs
-					encodedLogs, err := types.CadenceUInt8ArrayValueToBytes(txEventPayload.Logs)
-					require.NoError(t, err)
-
 					var logs []*gethTypes.Log
-					err = rlp.DecodeBytes(encodedLogs, &logs)
+					err = rlp.DecodeBytes(txEventPayload.Logs, &logs)
 					require.NoError(t, err)
 					for i, l := range result.Logs {
 						assert.Equal(t, l, logs[i])
@@ -114,7 +109,7 @@ func TestHandler_TransactionRunOrPanic(t *testing.T) {
 					// make sure the transaction id included in the block transaction list is the same as tx sumbmitted
 					assert.Equal(
 						t,
-						types.HashToCadenceArrayValue(types.TransactionHashes{txHash}.RootHash()),
+						types.TransactionHashes{txEventPayload.Hash}.RootHash(),
 						blockEventPayload.TransactionHashRoot,
 					)
 				})
@@ -348,18 +343,14 @@ func TestHandler_COA(t *testing.T) {
 
 				// deploy COA transaction event
 				txEventPayload := testutils.TxEventToPayload(t, events[0], rootAddr)
-				txContent, err := types.CadenceUInt8ArrayValueToBytes(txEventPayload.Payload)
-				require.NoError(t, err)
-				tx, err := types.DirectCallFromEncoded(txContent)
+				tx, err := types.DirectCallFromEncoded(txEventPayload.Payload)
 				require.NoError(t, err)
 				txHashes = append(txHashes, tx.Hash())
 				totalGasUsed += txEventPayload.GasConsumed
 
 				// deposit transaction event
 				txEventPayload = testutils.TxEventToPayload(t, events[1], rootAddr)
-				txContent, err = types.CadenceUInt8ArrayValueToBytes(txEventPayload.Payload)
-				require.NoError(t, err)
-				tx, err = types.DirectCallFromEncoded(txContent)
+				tx, err = types.DirectCallFromEncoded(txEventPayload.Payload)
 				require.NoError(t, err)
 				require.Equal(t, foa.Address(), tx.To)
 				require.Equal(t, types.BalanceToBigInt(balance), tx.Value)
@@ -368,9 +359,7 @@ func TestHandler_COA(t *testing.T) {
 
 				// withdraw transaction event
 				txEventPayload = testutils.TxEventToPayload(t, events[2], rootAddr)
-				txContent, err = types.CadenceUInt8ArrayValueToBytes(txEventPayload.Payload)
-				require.NoError(t, err)
-				tx, err = types.DirectCallFromEncoded(txContent)
+				tx, err = types.DirectCallFromEncoded(txEventPayload.Payload)
 				require.NoError(t, err)
 				require.Equal(t, foa.Address(), tx.From)
 				require.Equal(t, types.BalanceToBigInt(balance), tx.Value)
@@ -384,7 +373,7 @@ func TestHandler_COA(t *testing.T) {
 				blockEventPayload := testutils.BlockEventToPayload(t, events[3], rootAddr)
 				assert.Equal(
 					t,
-					types.HashToCadenceArrayValue(txHashes.RootHash()),
+					txHashes.RootHash(),
 					blockEventPayload.TransactionHashRoot,
 				)
 
@@ -644,14 +633,11 @@ func TestHandler_COA(t *testing.T) {
 				events := backend.Events()
 				require.Len(t, events, 3)
 				// last transaction executed event
+
 				event := events[2]
 				txEventPayload := testutils.TxEventToPayload(t, event, rootAddr)
-				values := txEventPayload.PrecompiledCalls.Values
-				aggregated := make([]byte, len(values))
-				for i, v := range values {
-					aggregated[i] = uint8(v.(cadence.UInt8))
-				}
-				apc, err := types.AggregatedPrecompileCallsFromEncoded(aggregated)
+
+				apc, err := types.AggregatedPrecompileCallsFromEncoded(txEventPayload.PrecompiledCalls)
 				require.NoError(t, err)
 
 				require.False(t, apc.IsEmpty())
@@ -929,11 +915,9 @@ func TestHandler_TransactionRun(t *testing.T) {
 							continue // don't check last block event
 						}
 						txEventPayload := testutils.TxEventToPayload(t, event, rootAddr)
-						encodedLogs, err := types.CadenceUInt8ArrayValueToBytes(txEventPayload.Logs)
-						require.NoError(t, err)
 
 						var logs []*gethTypes.Log
-						err = rlp.DecodeBytes(encodedLogs, &logs)
+						err := rlp.DecodeBytes(txEventPayload.Logs, &logs)
 						require.NoError(t, err)
 
 						for k, l := range runResults[i].Logs {

@@ -119,20 +119,14 @@ func TestEVMRun(t *testing.T) {
 				require.Equal(t, uint64(43785), blockEventPayload.TotalGasUsed)
 				require.NotEmpty(t, blockEventPayload.Hash)
 
-				txHash, err := types.CadenceArrayValueToHash(txEventPayload.Hash)
-				require.NoError(t, err)
-				txHashes := types.TransactionHashes{txHash}
+				txHashes := types.TransactionHashes{txEventPayload.Hash}
 				require.Equal(t,
-					types.HashToCadenceArrayValue(txHashes.RootHash()),
+					txHashes.RootHash(),
 					blockEventPayload.TransactionHashRoot,
 				)
 				require.NotEmpty(t, blockEventPayload.ReceiptRoot)
 
-				txPayload, err := types.CadenceUInt8ArrayValueToBytes(txEventPayload.Payload)
-				require.NoError(t, err)
-
-				require.NotEmpty(t, txEventPayload.Hash)
-				require.Equal(t, innerTxBytes, txPayload)
+				require.Equal(t, innerTxBytes, txEventPayload.Payload)
 				require.Equal(t, uint16(types.ErrCodeNoError), txEventPayload.ErrorCode)
 				require.Equal(t, uint16(0), txEventPayload.Index)
 				require.Equal(t, blockEventPayload.Height, txEventPayload.BlockHeight)
@@ -372,11 +366,8 @@ func TestEVMRun(t *testing.T) {
 
 				require.NotEmpty(t, txEventPayload.Hash)
 
-				encodedLogs, err := types.CadenceUInt8ArrayValueToBytes(txEventPayload.Logs)
-				require.NoError(t, err)
-
 				var logs []*gethTypes.Log
-				err = rlp.DecodeBytes(encodedLogs, &logs)
+				err = rlp.DecodeBytes(txEventPayload.Logs, &logs)
 				require.NoError(t, err)
 				require.Len(t, logs, 1)
 				log := logs[0]
@@ -484,15 +475,9 @@ func TestEVMBatchRun(t *testing.T) {
 					event, err := types.DecodeTransactionEventPayload(cadenceEvent)
 					require.NoError(t, err)
 
-					txHash, err := types.CadenceArrayValueToHash(event.Hash)
-					require.NoError(t, err)
-
-					txHashes = append(txHashes, txHash)
-					encodedLogs, err := types.CadenceUInt8ArrayValueToBytes(event.Logs)
-					require.NoError(t, err)
-
+					txHashes = append(txHashes, event.Hash)
 					var logs []*gethTypes.Log
-					err = rlp.DecodeBytes(encodedLogs, &logs)
+					err = rlp.DecodeBytes(event.Logs, &logs)
 					require.NoError(t, err)
 
 					require.Len(t, logs, 1)
@@ -511,7 +496,7 @@ func TestEVMBatchRun(t *testing.T) {
 				require.NotEmpty(t, blockEventPayload.Hash)
 				require.Equal(t, uint64(155513), blockEventPayload.TotalGasUsed)
 				require.Equal(t,
-					types.HashToCadenceArrayValue(txHashes.RootHash()),
+					txHashes.RootHash(),
 					blockEventPayload.TransactionHashRoot,
 				)
 
@@ -976,7 +961,6 @@ func TestEVMAddressDeposit(t *testing.T) {
 			// tx executed event
 			txEvent := output.Events[2]
 			txEventPayload := testutils.TxEventToPayload(t, txEvent, sc.EVMContract.Address)
-			require.NoError(t, err)
 
 			// deposit event
 			depositEvent := output.Events[3]
@@ -997,11 +981,9 @@ func TestEVMAddressDeposit(t *testing.T) {
 			require.NotEmpty(t, blockEventPayload.Hash)
 			require.Equal(t, uint64(21000), blockEventPayload.TotalGasUsed)
 
-			txHash, err := types.CadenceArrayValueToHash(txEventPayload.Hash)
-			require.NoError(t, err)
-			txHashes := types.TransactionHashes{txHash}
+			txHashes := types.TransactionHashes{txEventPayload.Hash}
 			require.Equal(t,
-				types.HashToCadenceArrayValue(txHashes.RootHash()),
+				txHashes.RootHash(),
 				blockEventPayload.TransactionHashRoot,
 			)
 		})
