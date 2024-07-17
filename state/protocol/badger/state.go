@@ -181,10 +181,7 @@ func Bootstrap(
 			return fmt.Errorf("could not bootstrap version beacon: %w", err)
 		}
 
-		// set metric values, we pass `false` here since this node has empty storage and doesn't know anything about EFM.
-		// TODO for 'leaving Epoch Fallback via special service event', this needs to be updated to support bootstrapping
-		// while in EFM, currently initial state doesn't know how to bootstrap node when we have entered EFM.
-		err = updateEpochMetrics(metrics, root, false)
+		err = updateEpochMetrics(metrics, root)
 		if err != nil {
 			return fmt.Errorf("could not update epoch metrics: %w", err)
 		}
@@ -712,12 +709,7 @@ func OpenState(
 	}
 	metrics.SealedHeight(sealed.Height)
 
-	// initialize epoch-related metrics using the Protocol State from the latest finalized block
-	epochStateSnapshot, err := finalSnapshot.EpochProtocolState()
-	if err != nil {
-		return nil, fmt.Errorf("could not retrieve epoch protocol state: %w", err)
-	}
-	err = updateEpochMetrics(metrics, finalSnapshot, epochStateSnapshot.EpochFallbackTriggered())
+	err = updateEpochMetrics(metrics, finalSnapshot)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update epoch metrics: %w", err)
 	}
@@ -856,7 +848,7 @@ func IsBootstrapped(db *badger.DB) (bool, error) {
 
 // updateEpochMetrics update the `consensus_compliance_current_epoch_counter` and the
 // `consensus_compliance_current_epoch_phase` metric
-func updateEpochMetrics(metrics module.ComplianceMetrics, snap protocol.Snapshot, epochFallbackTriggered bool) error {
+func updateEpochMetrics(metrics module.ComplianceMetrics, snap protocol.Snapshot) error {
 
 	// update epoch counter
 	counter, err := snap.Epochs().Current().Counter()
@@ -885,8 +877,12 @@ func updateEpochMetrics(metrics module.ComplianceMetrics, snap protocol.Snapshot
 
 	metrics.CurrentDKGPhaseViews(dkgPhase1FinalView, dkgPhase2FinalView, dkgPhase3FinalView)
 
+	epochProtocolState, err := snap.EpochProtocolState()
+	if err != nil {
+		return fmt.Errorf("could not get epoch protocol state: %w", err)
+	}
 	// notify whether epoch fallback mode is active
-	if epochFallbackTriggered {
+	if epochProtocolState.EpochFallbackTriggered() {
 		metrics.EpochFallbackModeTriggered()
 	}
 

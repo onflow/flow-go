@@ -371,6 +371,63 @@ func TestBootstrapNonRoot(t *testing.T) {
 		})
 	})
 
+	// should be able to bootstrap from snapshot after entering EFM because of sealing invalid service event
+	// ROOT <- B1 <- B2(R1) <- B3(S1) <- CHILD
+	t.Run("in EFM", func(t *testing.T) {
+		after := snapshotAfter(t, rootSnapshot, func(state *bprotocol.FollowerState, mutableState protocol.MutableProtocolState) protocol.Snapshot {
+			block1 := unittest.BlockWithParentFixture(rootBlock)
+			block1.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
+			buildFinalizedBlock(t, state, block1)
+
+			invalidEpochSetup := unittest.EpochSetupFixture()
+			receipt1, seal1 := unittest.ReceiptAndSealForBlock(block1, invalidEpochSetup.ServiceEvent())
+			block2 := unittest.BlockWithParentFixture(block1.Header)
+			block2.SetPayload(unittest.PayloadFixture(
+				unittest.WithReceipts(receipt1),
+				unittest.WithProtocolStateID(rootProtocolStateID)))
+			buildFinalizedBlock(t, state, block2)
+
+			seals := []*flow.Seal{seal1}
+			block3 := unittest.BlockWithParentFixture(block2.Header)
+			block3.SetPayload(flow.Payload{
+				Seals:           seals,
+				ProtocolStateID: calculateExpectedStateId(t, mutableState)(block3.Header, seals),
+			})
+			buildFinalizedBlock(t, state, block3)
+
+			child := unittest.BlockWithParentProtocolState(block3)
+			buildBlock(t, state, child)
+
+			// ensure we have entered EFM
+			snapshot := state.AtBlockID(block3.ID())
+			epochState, err := snapshot.EpochProtocolState()
+			require.NoError(t, err)
+			require.Equal(t, flow.EpochPhaseFallback, epochState.EpochPhase())
+
+			return snapshot
+		})
+
+		bootstrap(t, after, func(state *bprotocol.State, err error) {
+			require.NoError(t, err)
+			unittest.AssertSnapshotsEqual(t, after, state.Final())
+			segment, err := state.Final().SealingSegment()
+			require.NoError(t, err)
+			for _, block := range segment.Blocks {
+				snapshot := state.AtBlockID(block.ID())
+				// should be able to read all QCs
+				_, err := snapshot.QuorumCertificate()
+				require.NoError(t, err)
+				_, err = snapshot.RandomSource()
+				require.NoError(t, err)
+			}
+
+			epochState, err := state.Final().EpochProtocolState()
+			require.NoError(t, err)
+			require.True(t, epochState.EpochFallbackTriggered())
+			require.Equal(t, flow.EpochPhaseFallback, epochState.EpochPhase())
+		})
+	})
+
 	t.Run("with setup next epoch", func(t *testing.T) {
 		after := snapshotAfter(t, rootSnapshot, func(state *bprotocol.FollowerState, mutableState protocol.MutableProtocolState) protocol.Snapshot {
 			unittest.NewEpochBuilder(t, mutableState, state).BuildEpoch()
