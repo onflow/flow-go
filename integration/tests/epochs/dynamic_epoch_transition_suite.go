@@ -136,7 +136,7 @@ func (s *DynamicEpochTransitionSuite) StakeNode(ctx context.Context, env templat
 		machineAccountAddr = accounts[1]
 	}
 
-	result = s.SubmitSetApprovedListTx(ctx, env, append(s.net.Identities().NodeIDs(), nodeID)...)
+	result = s.SubmitSetApprovedListTx(ctx, env, append(s.Net.Identities().NodeIDs(), nodeID)...)
 	require.NoError(s.T(), result.Error)
 
 	// ensure we are still in staking auction
@@ -272,7 +272,7 @@ func (s *DynamicEpochTransitionSuite) ExecuteReadApprovedNodesScript(ctx context
 
 // getTestContainerName returns a name for a test container in the form of ${role}_${nodeID}_test
 func (s *DynamicEpochTransitionSuite) getTestContainerName(role flow.Role) string {
-	i := len(s.net.ContainersByRole(role, false)) + 1
+	i := len(s.Net.ContainersByRole(role, false)) + 1
 	return fmt.Sprintf("%s_test_%d", role, i)
 }
 
@@ -295,8 +295,8 @@ func (s *DynamicEpochTransitionSuite) assertNodeApprovedAndProposed(ctx context.
 	require.Containsf(s.T(), proposedTable.(cadence.Array).Values, cadence.String(info.NodeID.String()), "expected new node to be in proposed table: %x", info.NodeID)
 }
 
-// newTestContainerOnNetwork configures a new container on the suites network
-func (s *DynamicEpochTransitionSuite) newTestContainerOnNetwork(role flow.Role, info *StakedNodeOperationInfo) *testnet.Container {
+// NewTestContainerOnNetwork configures a new container on the suites network
+func (s *DynamicEpochTransitionSuite) NewTestContainerOnNetwork(role flow.Role, info *StakedNodeOperationInfo) *testnet.Container {
 	containerConfigs := []func(config *testnet.NodeConfig){
 		testnet.WithLogLevel(zerolog.WarnLevel),
 		testnet.WithID(info.NodeID),
@@ -304,27 +304,27 @@ func (s *DynamicEpochTransitionSuite) newTestContainerOnNetwork(role flow.Role, 
 
 	nodeConfig := testnet.NewNodeConfig(role, containerConfigs...)
 	testContainerConfig := testnet.NewContainerConfig(info.ContainerName, nodeConfig, info.NetworkingKey, info.StakingKey)
-	err := testContainerConfig.WriteKeyFiles(s.net.BootstrapDir, info.MachineAccountAddress, encodable.MachineAccountPrivKey{PrivateKey: info.MachineAccountKey}, role)
+	err := testContainerConfig.WriteKeyFiles(s.Net.BootstrapDir, info.MachineAccountAddress, encodable.MachineAccountPrivKey{PrivateKey: info.MachineAccountKey}, role)
 	require.NoError(s.T(), err)
 
 	//add our container to the network
-	err = s.net.AddNode(s.T(), s.net.BootstrapDir, testContainerConfig)
+	err = s.Net.AddNode(s.T(), s.Net.BootstrapDir, testContainerConfig)
 	require.NoError(s.T(), err, "failed to add container to network")
 
 	// if node is of LN/SN role type add additional flags to node container for secure GRPC connection
 	if role == flow.RoleConsensus || role == flow.RoleCollection {
 		// ghost containers don't participate in the network skip any SN/LN ghost containers
-		nodeContainer := s.net.ContainerByID(testContainerConfig.NodeID)
+		nodeContainer := s.Net.ContainerByID(testContainerConfig.NodeID)
 		nodeContainer.AddFlag("insecure-access-api", "false")
 
 		accessNodeIDS := make([]string, 0)
-		for _, c := range s.net.ContainersByRole(flow.RoleAccess, false) {
+		for _, c := range s.Net.ContainersByRole(flow.RoleAccess, false) {
 			accessNodeIDS = append(accessNodeIDS, c.Config.NodeID.String())
 		}
 		nodeContainer.AddFlag("access-node-ids", strings.Join(accessNodeIDS, ","))
 	}
 
-	return s.net.ContainerByID(info.NodeID)
+	return s.Net.ContainerByID(info.NodeID)
 }
 
 // StakeNewNode will stake a new node, and create the corresponding docker container for that node
@@ -336,7 +336,7 @@ func (s *DynamicEpochTransitionSuite) StakeNewNode(ctx context.Context, env temp
 	s.assertNodeApprovedAndProposed(ctx, env, info)
 
 	// add a new container to the network with the info used to stake our node
-	testContainer := s.newTestContainerOnNetwork(role, info)
+	testContainer := s.NewTestContainerOnNetwork(role, info)
 
 	return info, testContainer
 }
@@ -453,7 +453,7 @@ func (s *DynamicEpochTransitionSuite) AssertNetworkHealthyAfterANChange(ctx cont
 
 	// get snapshot directly from new AN and compare head with head from the
 	// snapshot that was used to bootstrap the node
-	client, err := s.net.ContainerByName(info.ContainerName).TestnetClient()
+	client, err := s.Net.ContainerByName(info.ContainerName).TestnetClient()
 	require.NoError(s.T(), err)
 
 	// overwrite Client to point to the new AN (since we have stopped the initial AN at this point)
@@ -513,7 +513,7 @@ func (s *DynamicEpochTransitionSuite) RunTestEpochJoinAndLeave(role flow.Role, c
 
 	// replace access_2, avoid replacing access_1 the container used for Client connections
 	if role == flow.RoleAccess {
-		containerToReplace = s.net.ContainerByName("access_2")
+		containerToReplace = s.Net.ContainerByName("access_2")
 		require.NotNil(s.T(), containerToReplace)
 	} else {
 		// grab the first container of this node role type, this is the container we will replace

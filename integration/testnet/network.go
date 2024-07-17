@@ -640,7 +640,7 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig, chainID flow.Ch
 			observerConf.ContainerName = fmt.Sprintf("observer_%d", i+1)
 		}
 		t.Logf("add observer %v", observerConf.ContainerName)
-		flowNetwork.addObserver(t, observerConf)
+		flowNetwork.AddObserver(t, observerConf)
 	}
 
 	rootProtocolSnapshotPath := filepath.Join(bootstrapDir, bootstrap.PathRootProtocolStateSnapshot)
@@ -717,7 +717,7 @@ type ObserverConfig struct {
 	BootstrapAccessName string
 }
 
-func (net *FlowNetwork) addObserver(t *testing.T, conf ObserverConfig) {
+func (net *FlowNetwork) AddObserver(t *testing.T, conf ObserverConfig) *Container {
 	if conf.BootstrapAccessName == "" {
 		conf.BootstrapAccessName = PrimaryAN
 	}
@@ -769,6 +769,13 @@ func (net *FlowNetwork) addObserver(t *testing.T, conf ObserverConfig) {
 	}
 
 	nodeContainer := &Container{
+		Config: ContainerConfig{
+			NodeInfo: bootstrap.NodeInfo{
+				Role: flow.RoleAccess,
+			},
+			ContainerName: conf.ContainerName,
+			LogLevel:      conf.LogLevel,
+		},
 		Ports:   make(map[string]string),
 		datadir: tmpdir,
 		net:     net,
@@ -801,6 +808,7 @@ func (net *FlowNetwork) addObserver(t *testing.T, conf ObserverConfig) {
 
 	// start after the bootstrap access node
 	accessNode.After(suiteContainer)
+	return nodeContainer
 }
 
 // AddNode creates a node container with the given config and adds it to the
