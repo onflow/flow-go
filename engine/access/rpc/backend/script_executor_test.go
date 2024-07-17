@@ -161,11 +161,11 @@ func (s *ScriptExecutorSuite) TestExecuteAtBlockHeight() {
 	var expectedResult = []byte("{\"type\":\"Void\"}\n")
 
 	s.Run("test scrypt execution without version control", func() {
-		scriptExec := NewScriptExecutor(s.log, nil, uint64(0), math.MaxUint64)
-		s.reporter.On("LowestIndexedHeight").Return(s.height, nil).Twice()
+		scriptExec := NewScriptExecutor(s.log, uint64(0), math.MaxUint64)
+		s.reporter.On("LowestIndexedHeight").Return(s.height, nil)
 		s.reporter.On("HighestIndexedHeight").Return(s.height+1, nil).Once()
 
-		err := scriptExec.Initialize(s.indexReporter, s.scripts)
+		err := scriptExec.Initialize(s.indexReporter, s.scripts, nil)
 		s.Require().NoError(err)
 
 		res, err := scriptExec.ExecuteAtBlockHeight(ctx, script, scriptArgs, s.height)
@@ -209,10 +209,10 @@ func (s *ScriptExecutorSuite) TestExecuteAtBlockHeight() {
 		// Ensure the component is ready before proceeding.
 		unittest.RequireComponentsReadyBefore(s.T(), 2*time.Second, s.versionControl)
 
-		scriptExec := NewScriptExecutor(s.log, s.versionControl, uint64(0), math.MaxUint64)
+		scriptExec := NewScriptExecutor(s.log, uint64(0), math.MaxUint64)
 		s.reporter.On("HighestIndexedHeight").Return(s.height+1, nil)
 
-		err = scriptExec.Initialize(s.indexReporter, s.scripts)
+		err = scriptExec.Initialize(s.indexReporter, s.scripts, s.versionControl)
 		s.Require().NoError(err)
 
 		res, err := scriptExec.ExecuteAtBlockHeight(ctx, script, scriptArgs, s.height)
@@ -256,10 +256,10 @@ func (s *ScriptExecutorSuite) TestExecuteAtBlockHeight() {
 		// Ensure the component is ready before proceeding.
 		unittest.RequireComponentsReadyBefore(s.T(), 2*time.Second, s.versionControl)
 
-		scriptExec := NewScriptExecutor(s.log, s.versionControl, uint64(0), math.MaxUint64)
+		scriptExec := NewScriptExecutor(s.log, uint64(0), math.MaxUint64)
 		s.reporter.On("HighestIndexedHeight").Return(s.height+1, nil)
 
-		err = scriptExec.Initialize(s.indexReporter, s.scripts)
+		err = scriptExec.Initialize(s.indexReporter, s.scripts, s.versionControl)
 		s.Require().NoError(err)
 
 		res, err := scriptExec.ExecuteAtBlockHeight(ctx, script, scriptArgs, s.height)

@@ -952,7 +952,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					builder.programCacheSize > 0,
 				)
 
-				err = builder.ScriptExecutor.Initialize(builder.ExecutionIndexer, scripts)
+				err = builder.ScriptExecutor.Initialize(builder.ExecutionIndexer, scripts, builder.versionControl)
 				if err != nil {
 					return nil, err
 				}
@@ -1545,6 +1545,8 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 
 	ingestionDependable := module.NewProxiedReadyDoneAware()
 	builder.IndexerDependencies.Add(ingestionDependable)
+	versionControlDependable := module.NewProxiedReadyDoneAware()
+	builder.IndexerDependencies.Add(versionControlDependable)
 	var lastFullBlockHeight *counters.PersistentStrictMonotonicCounter
 
 	builder.
@@ -1701,7 +1703,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			return nil
 		}).
 		Module("backend script executor", func(node *cmd.NodeConfig) error {
-			builder.ScriptExecutor = backend.NewScriptExecutor(builder.Logger, builder.versionControl, builder.scriptExecMinBlock, builder.scriptExecMaxBlock)
+			builder.ScriptExecutor = backend.NewScriptExecutor(builder.Logger, builder.scriptExecMinBlock, builder.scriptExecMaxBlock)
 			return nil
 		}).
 		Module("async register store", func(node *cmd.NodeConfig) error {
@@ -1741,6 +1743,38 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			}
 
 			return nil
+		}).
+		Component("version control", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			if !builder.versionControlEnabled {
+				noop := &module.NoopReadyDoneAware{}
+				versionControlDependable.Init(noop)
+				return noop, nil
+			}
+
+			nodeVersion, err := build.Semver()
+			if err != nil {
+				return nil, fmt.Errorf("could not load node version for version control. "+
+					"version (%s) is not semver compliant: %w. Make sure a valid semantic version is provided in the VERSION environment variable", build.Version(), err)
+			}
+
+			versionControl, err := version.NewVersionControl(
+				builder.Logger,
+				node.Storage.VersionBeacons,
+				nodeVersion,
+				builder.SealedRootBlock.Header.Height,
+				builder.LastFinalizedHeader.Height,
+			)
+			if err != nil {
+				return nil, fmt.Errorf("could not create version control: %w", err)
+			}
+
+			// VersionControl needs to consume BlockFinalized events.
+			node.ProtocolEvents.AddConsumer(versionControl)
+
+			builder.versionControl = versionControl
+			versionControlDependable.Init(builder.versionControl)
+
+			return versionControl, nil
 		}).
 		Component("RPC engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			config := builder.rpcConf
@@ -1934,34 +1968,6 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			// be handled by the scaffold.
 			return builder.RequestEng, nil
 		})
-
-	if builder.versionControlEnabled {
-		builder.Component("version control", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			nodeVersion, err := build.Semver()
-			if err != nil {
-				return nil, fmt.Errorf("could not load node version for version control. "+
-					"version (%s) is not semver compliant: %w. Make sure a valid semantic version is provided in the VERSION environment variable", build.Version(), err)
-			}
-
-			versionControl, err := version.NewVersionControl(
-				builder.Logger,
-				node.Storage.VersionBeacons,
-				nodeVersion,
-				builder.SealedRootBlock.Header.Height,
-				builder.LastFinalizedHeader.Height,
-			)
-			if err != nil {
-				return nil, fmt.Errorf("could not create version control: %w", err)
-			}
-
-			// VersionControl needs to consume BlockFinalized events.
-			node.ProtocolEvents.AddConsumer(versionControl)
-
-			builder.versionControl = versionControl
-
-			return versionControl, nil
-		})
-	}
 
 	if builder.supportsObserver {
 		builder.Component("public sync request handler", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {

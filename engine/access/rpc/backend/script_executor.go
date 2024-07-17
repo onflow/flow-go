@@ -40,7 +40,7 @@ type ScriptExecutor struct {
 	maxCompatibleHeight *atomic.Uint64
 }
 
-func NewScriptExecutor(log zerolog.Logger, versionControl *version.VersionControl, minHeight, maxHeight uint64) *ScriptExecutor {
+func NewScriptExecutor(log zerolog.Logger, minHeight, maxHeight uint64) *ScriptExecutor {
 	logger := log.With().Str("component", "script-executor").Logger()
 	logger.Info().
 		Uint64("min_height", minHeight).
@@ -49,7 +49,6 @@ func NewScriptExecutor(log zerolog.Logger, versionControl *version.VersionContro
 
 	return &ScriptExecutor{
 		log:                 logger,
-		versionControl:      versionControl,
 		initialized:         atomic.NewBool(false),
 		minCompatibleHeight: atomic.NewUint64(minHeight),
 		maxCompatibleHeight: atomic.NewUint64(maxHeight),
@@ -73,11 +72,16 @@ func (s *ScriptExecutor) SetMaxCompatibleHeight(height uint64) {
 // Initialize initializes the indexReporter and script executor
 // This method can be called at any time after the ScriptExecutor object is created. Any requests
 // made to the other methods will return storage.ErrHeightNotIndexed until this method is called.
-func (s *ScriptExecutor) Initialize(indexReporter state_synchronization.IndexReporter, scriptExecutor *execution.Scripts) error {
+func (s *ScriptExecutor) Initialize(
+	indexReporter state_synchronization.IndexReporter,
+	scriptExecutor *execution.Scripts,
+	versionControl *version.VersionControl,
+) error {
 	if s.initialized.CompareAndSwap(false, true) {
 		s.log.Info().Msg("script executor initialized")
 		s.indexReporter = indexReporter
 		s.scriptExecutor = scriptExecutor
+		s.versionControl = versionControl
 		return nil
 	}
 	return fmt.Errorf("script executor already initialized")
