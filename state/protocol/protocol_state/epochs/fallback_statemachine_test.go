@@ -405,8 +405,8 @@ func (s *EpochFallbackStateMachineSuite) TestNewEpochFallbackStateMachine() {
 				ActiveIdentities: parentProtocolState.CurrentEpoch.ActiveIdentities,
 				EpochExtensions: []flow.EpochExtension{
 					{
-						FirstView:     parentProtocolState.CurrentEpochFinalView() + 1,
-						FinalView:     parentProtocolState.CurrentEpochFinalView() + extensionViewCount,
+						FirstView: parentProtocolState.CurrentEpochFinalView() + 1,
+						FinalView: parentProtocolState.CurrentEpochFinalView() + extensionViewCount,
 					},
 				},
 			},
@@ -444,8 +444,8 @@ func (s *EpochFallbackStateMachineSuite) TestNewEpochFallbackStateMachine() {
 				ActiveIdentities: parentProtocolState.CurrentEpoch.ActiveIdentities,
 				EpochExtensions: []flow.EpochExtension{
 					{
-						FirstView:     parentProtocolState.CurrentEpochFinalView() + 1,
-						FinalView:     parentProtocolState.CurrentEpochFinalView() + extensionViewCount,
+						FirstView: parentProtocolState.CurrentEpochFinalView() + 1,
+						FinalView: parentProtocolState.CurrentEpochFinalView() + extensionViewCount,
 					},
 				},
 			},
@@ -514,12 +514,12 @@ func (s *EpochFallbackStateMachineSuite) TestEpochFallbackStateMachineInjectsMul
 		// we expect 2 extensions to be added to the current epoch
 		// 1 after we reach the commit threshold of the epoch and another one after reaching the threshold of the extension themselves
 		firstExtension := flow.EpochExtension{
-			FirstView:     originalParentState.CurrentEpochSetup.FinalView + 1,
-			FinalView:     originalParentState.CurrentEpochSetup.FinalView + extensionViewCount,
+			FirstView: originalParentState.CurrentEpochSetup.FinalView + 1,
+			FinalView: originalParentState.CurrentEpochSetup.FinalView + extensionViewCount,
 		}
 		secondExtension := flow.EpochExtension{
-			FirstView:     firstExtension.FinalView + 1,
-			FinalView:     firstExtension.FinalView + extensionViewCount,
+			FirstView: firstExtension.FinalView + 1,
+			FinalView: firstExtension.FinalView + extensionViewCount,
 		}
 
 		parentProtocolState := originalParentState.Copy()
@@ -586,16 +586,16 @@ func (s *EpochFallbackStateMachineSuite) TestEpochFallbackStateMachineInjectsMul
 	// we expect 3 extensions to be added to the current epoch
 	// 1 after we reach the commit threshold of the epoch and two more after reaching the threshold of the extensions themselves
 	firstExtension := flow.EpochExtension{
-		FirstView:     originalParentState.NextEpochSetup.FinalView + 1,
-		FinalView:     originalParentState.NextEpochSetup.FinalView + extensionViewCount,
+		FirstView: originalParentState.NextEpochSetup.FinalView + 1,
+		FinalView: originalParentState.NextEpochSetup.FinalView + extensionViewCount,
 	}
 	secondExtension := flow.EpochExtension{
-		FirstView:     firstExtension.FinalView + 1,
-		FinalView:     firstExtension.FinalView + extensionViewCount,
+		FirstView: firstExtension.FinalView + 1,
+		FinalView: firstExtension.FinalView + extensionViewCount,
 	}
 	thirdExtension := flow.EpochExtension{
-		FirstView:     secondExtension.FinalView + 1,
-		FinalView:     secondExtension.FinalView + extensionViewCount,
+		FirstView: secondExtension.FinalView + 1,
+		FinalView: secondExtension.FinalView + extensionViewCount,
 	}
 
 	// In the previous test `TestNewEpochFallbackStateMachine`, we verified that the first extension is added correctly. Below we
