@@ -58,7 +58,7 @@ contract EVM {
         contractAddress: String,
         // RLP encoded logs
         logs: [UInt8],
-        // block height in which transaction was inclued
+        // block height in which transaction was included
         blockHeight: UInt64,
         /// captures the hex encoded data that is returned from
         /// the evm. For contract deployments

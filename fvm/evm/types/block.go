@@ -125,6 +125,23 @@ func (b *BlockProposal) AppendTransaction(res *Result) {
 
 // PopulateRoots populates receiptRoot and transactionHashRoot
 func (b *BlockProposal) PopulateRoots() {
+	// TODO: we can make this concurrent if needed in the future
+	// to improve the block production speed
+	b.PopulateTransactionHashRoot()
+	b.PopulateReceiptRoot()
+}
+
+// PopulateTransactionHashRoot sets the transactionHashRoot
+func (b *BlockProposal) PopulateTransactionHashRoot() {
+	if len(b.TransactionHashRoot) == 0 {
+		b.TransactionHashRoot = gethTypes.EmptyRootHash
+		return
+	}
+	b.TransactionHashRoot = b.TxHashes.RootHash()
+}
+
+// PopulateReceiptRoot sets the receiptRoot
+func (b *BlockProposal) PopulateReceiptRoot() {
 	if len(b.Receipts) == 0 {
 		b.ReceiptRoot = gethTypes.EmptyReceiptsHash
 		return
@@ -133,11 +150,7 @@ func (b *BlockProposal) PopulateRoots() {
 	for i, lr := range b.Receipts {
 		receipts[i] = lr.ToReceipt()
 	}
-
 	b.ReceiptRoot = gethTypes.DeriveSha(receipts, gethTrie.NewStackTrie(nil))
-
-	// TODO: we can make this concurrent if its
-	b.TransactionHashRoot = b.TxHashes.RootHash()
 }
 
 // ToBytes encodes the block proposal into bytes
