@@ -48,7 +48,7 @@ func TestEVMBlockExecutedEventCCFEncodingDecoding(t *testing.T) {
 	ev, err := event.Payload.ToCadence(evmLocation)
 	require.NoError(t, err)
 
-	bep, err := types.DecodeBlockExecutedEventPayload(ev)
+	bep, err := types.DecodeBlockEventPayload(ev)
 	require.NoError(t, err)
 
 	assert.Equal(t, bep.Height, block.Height)

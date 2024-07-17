@@ -131,7 +131,7 @@ func TestHandler_TransactionRunOrPanic(t *testing.T) {
 					// make sure block transaction list references the above transaction id
 					cadenceEvent, ok = ev.(cadence.Event)
 					require.True(t, ok)
-					blockEvent, err := types.DecodeBlockExecutedEventPayload(cadenceEvent)
+					blockEvent, err := types.DecodeBlockEventPayload(cadenceEvent)
 					require.NoError(t, err)
 
 					eventTxHash := blockEvent.TransactionHashes[0] // only one hash in block
