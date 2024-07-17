@@ -95,6 +95,10 @@ func NewIndexer(
 
 	r.jobConsumer = jobConsumer
 
+	r.jobConsumer.SetPostNotifier(func(module.JobID) {
+		r.NotifyProducedHeight()
+	})
+
 	r.Component = r.jobConsumer
 
 	return r, nil
@@ -152,8 +156,6 @@ func (i *Indexer) processExecutionData(ctx irrecoverable.SignalerContext, job mo
 		i.log.Error().Err(err).Str("job_id", string(job.ID())).Msg("error during execution data index processing job")
 		ctx.Throw(err)
 	}
-
-	i.NotifyProducedHeight()
 
 	done()
 }
