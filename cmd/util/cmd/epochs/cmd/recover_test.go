@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/cadence"
+
 	"github.com/onflow/flow-go/cmd/bootstrap/utils"
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/model/flow"

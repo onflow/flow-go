@@ -4,17 +4,17 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"fmt"
-	"github.com/onflow/crypto"
-	"golang.org/x/crypto/hkdf"
 	gohash "hash"
 	"io"
 
+	"golang.org/x/crypto/hkdf"
+
+	"github.com/onflow/crypto"
 	sdk "github.com/onflow/flow-go-sdk"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
-	model "github.com/onflow/flow-go/model/bootstrap"
-
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/bootstrap"
+	model "github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -298,7 +298,7 @@ func WriteStakingNetworkingKeyFiles(nodeInfos []bootstrap.NodeInfo, write WriteJ
 }
 
 // WriteNodeInternalPubInfos writes the `node-internal-infos.pub.json` file.
-// In a nutshell, this file contains the Role, address and weight for all authorized nodes. 
+// In a nutshell, this file contains the Role, address and weight for all authorized nodes.
 func WriteNodeInternalPubInfos(nodeInfos []bootstrap.NodeInfo, write WriteJSONFileFunc) error {
 	configs := make([]model.NodeConfig, len(nodeInfos))
 	for i, nodeInfo := range nodeInfos {
