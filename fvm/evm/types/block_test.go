@@ -42,7 +42,7 @@ func Test_BlockProposal(t *testing.T) {
 
 	bp.PopulateRoots()
 	require.Equal(t, gethTypes.EmptyReceiptsHash, bp.ReceiptRoot)
-	require.Equal(t, gethTypes.EmptyReceiptsHash, bp.TxHashes)
+	require.Equal(t, gethTypes.EmptyRootHash, bp.TransactionHashRoot)
 
 	res := &Result{
 		TxHash:      gethCommon.Hash{2},
