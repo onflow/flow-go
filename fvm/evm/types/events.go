@@ -179,14 +179,14 @@ func (p *blockEvent) ToCadence(location common.Location) (cadence.Event, error) 
 }
 
 type BlockEventPayload struct {
-	Height            uint64      `cadence:"height"`
-	Hash              []byte      `cadence:"hash"`
-	Timestamp         uint64      `cadence:"timestamp"`
-	TotalSupply       cadence.Int `cadence:"totalSupply"`
-	TotalGasUsed      uint64      `cadence:"totalGasUsed"`
-	ParentBlockHash   []byte      `cadence:"parentHash"`
-	ReceiptRoot       []byte      `cadence:"receiptRoot"`
-	TransactionHashes [][]byte    `cadence:"transactionHashes"`
+	Height            uint64            `cadence:"height"`
+	Hash              gethCommon.Hash   `cadence:"hash"`
+	Timestamp         uint64            `cadence:"timestamp"`
+	TotalSupply       cadence.Int       `cadence:"totalSupply"`
+	TotalGasUsed      uint64            `cadence:"totalGasUsed"`
+	ParentBlockHash   gethCommon.Hash   `cadence:"parentHash"`
+	ReceiptRoot       gethCommon.Hash   `cadence:"receiptRoot"`
+	TransactionHashes []gethCommon.Hash `cadence:"transactionHashes"`
 }
 
 // DecodeBlockEventPayload decodes Cadence event into block event payload.
@@ -197,18 +197,18 @@ func DecodeBlockEventPayload(event cadence.Event) (*BlockEventPayload, error) {
 }
 
 type TransactionEventPayload struct {
-	Hash             []byte `cadence:"hash"`
-	Index            uint16 `cadence:"index"`
-	TransactionType  uint8  `cadence:"type"`
-	Payload          []byte `cadence:"payload"`
-	ErrorCode        uint16 `cadence:"errorCode"`
-	GasConsumed      uint64 `cadence:"gasConsumed"`
-	ContractAddress  string `cadence:"contractAddress"`
-	Logs             []byte `cadence:"logs"`
-	BlockHeight      uint64 `cadence:"blockHeight"`
-	ErrorMessage     string `cadence:"errorMessage"`
-	ReturnedData     []byte `cadence:"returnedData"`
-	PrecompiledCalls []byte `cadence:"precompiledCalls"`
+	Hash             gethCommon.Hash `cadence:"hash"`
+	Index            uint16          `cadence:"index"`
+	TransactionType  uint8           `cadence:"type"`
+	Payload          []byte          `cadence:"payload"`
+	ErrorCode        uint16          `cadence:"errorCode"`
+	GasConsumed      uint64          `cadence:"gasConsumed"`
+	ContractAddress  string          `cadence:"contractAddress"`
+	Logs             []byte          `cadence:"logs"`
+	BlockHeight      uint64          `cadence:"blockHeight"`
+	ErrorMessage     string          `cadence:"errorMessage"`
+	ReturnedData     []byte          `cadence:"returnedData"`
+	PrecompiledCalls []byte          `cadence:"precompiledCalls"`
 }
 
 // DecodeTransactionEventPayload decodes Cadence event into transaction event payload.
