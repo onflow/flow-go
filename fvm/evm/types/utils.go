@@ -4,7 +4,11 @@ import (
 	"fmt"
 
 	"github.com/onflow/cadence"
+	gethCommon "github.com/onflow/go-ethereum/common"
 )
+
+// cadenceArrayTypeOfUInt8 is the Cadence type [UInt8]
+var cadenceArrayTypeOfUInt8 = cadence.NewVariableSizedArrayType(cadence.UInt8Type)
 
 // BytesToCadenceUInt8ArrayValue converts bytes into a Cadence array of type UInt8
 func BytesToCadenceUInt8ArrayValue(b []byte) cadence.Array {
@@ -12,14 +16,24 @@ func BytesToCadenceUInt8ArrayValue(b []byte) cadence.Array {
 	for i, v := range b {
 		values[i] = cadence.NewUInt8(v)
 	}
-	return cadence.NewArray(values).WithType(
-		cadence.NewVariableSizedArrayType(cadence.UInt8Type),
-	)
+	return cadence.NewArray(values).
+		WithType(cadenceArrayTypeOfUInt8)
 }
 
-var cadenceArrayTypeOfUInt8 = cadence.NewVariableSizedArrayType(cadence.UInt8Type)
+// cadenceHashType is the Cadence type [UInt8;32]
+var cadenceHashType = cadence.NewConstantSizedArrayType(gethCommon.HashLength, cadence.UInt8Type)
 
-// CadenceUInt8ArrayValueToBytes converts a Cadence array of type UInt8 into a byte slice
+// HashToCadenceArrayValue EVM hash ([32]byte) into a Cadence array of type [UInt8;32]
+func HashToCadenceArrayValue(hash gethCommon.Hash) cadence.Array {
+	values := make([]cadence.Value, len(hash))
+	for i, v := range hash {
+		values[i] = cadence.NewUInt8(v)
+	}
+	return cadence.NewArray(values).
+		WithType(cadenceHashType)
+}
+
+// CadenceUInt8ArrayValueToBytes converts a Cadence array of type [UInt8] into a byte slice ([]byte)
 func CadenceUInt8ArrayValueToBytes(a cadence.Value) ([]byte, error) {
 	aa, ok := a.(cadence.Array)
 	if !ok {
