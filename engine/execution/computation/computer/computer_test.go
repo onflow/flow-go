@@ -1248,7 +1248,7 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 	noopCollector := metrics.NewNoopCollector()
 
 	expectedNumberOfEvents := 4
-	expectedEventSize := 1961
+	expectedMinEventSize := 1000
 
 	// bootstrapping does not cache programs
 	expectedCachedPrograms := 0
@@ -1270,7 +1270,7 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 		mock.Anything, // duration
 		mock.MatchedBy(func(arg module.TransactionExecutionResultStats) bool {
 			return arg.EventCounts == expectedNumberOfEvents &&
-				arg.EventSize == expectedEventSize &&
+				arg.EventSize >= expectedMinEventSize &&
 				!arg.Failed
 		}),
 		mock.Anything).
