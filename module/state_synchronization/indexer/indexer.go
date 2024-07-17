@@ -95,17 +95,13 @@ func NewIndexer(
 
 	r.jobConsumer = jobConsumer
 
-	r.jobConsumer.SetPostNotifier(func(module.JobID) {
-		r.NotifyProducedHeight()
+	r.jobConsumer.SetPostNotifier(func(id module.JobID) {
+		r.SetLastProcessedHeight(r.jobConsumer.LastProcessedIndex())
 	})
 
 	r.Component = r.jobConsumer
 
 	return r, nil
-}
-
-func (i *Indexer) LastProducedHeight() (uint64, error) {
-	return i.HighestIndexedHeight()
 }
 
 // Start the worker jobqueue to consume the available data.

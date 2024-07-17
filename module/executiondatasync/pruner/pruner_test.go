@@ -39,8 +39,8 @@ func TestBasicPrune(t *testing.T) {
 	downloader.On("Register", mock.Anything).Return().Once().Run(func(args mock.Arguments) {
 		notifier = args.Get(0).(*engine.Notifier)
 	})
-	downloader.On("LastProducedHeight").
-		Return(uint64(16), nil).
+	downloader.On("LastProcessedHeight").
+		Return(uint64(16)).
 		Once()
 
 	pruner.RegisterProducer(downloader)

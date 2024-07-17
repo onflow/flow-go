@@ -68,37 +68,22 @@ func (_m *Downloader) Get(ctx context.Context, rootID flow.Identifier) (*executi
 	return r0, r1
 }
 
-// LastProducedHeight provides a mock function with given fields:
-func (_m *Downloader) LastProducedHeight() (uint64, error) {
+// LastProcessedHeight provides a mock function with given fields:
+func (_m *Downloader) LastProcessedHeight() uint64 {
 	ret := _m.Called()
 
 	if len(ret) == 0 {
-		panic("no return value specified for LastProducedHeight")
+		panic("no return value specified for LastProcessedHeight")
 	}
 
 	var r0 uint64
-	var r1 error
-	if rf, ok := ret.Get(0).(func() (uint64, error)); ok {
-		return rf()
-	}
 	if rf, ok := ret.Get(0).(func() uint64); ok {
 		r0 = rf()
 	} else {
 		r0 = ret.Get(0).(uint64)
 	}
 
-	if rf, ok := ret.Get(1).(func() error); ok {
-		r1 = rf()
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// NotifyProducedHeight provides a mock function with given fields:
-func (_m *Downloader) NotifyProducedHeight() {
-	_m.Called()
+	return r0
 }
 
 // Ready provides a mock function with given fields:
@@ -123,6 +108,11 @@ func (_m *Downloader) Ready() <-chan struct{} {
 
 // Register provides a mock function with given fields: _a0
 func (_m *Downloader) Register(_a0 *engine.Notifier) {
+	_m.Called(_a0)
+}
+
+// SetLastProcessedHeight provides a mock function with given fields: _a0
+func (_m *Downloader) SetLastProcessedHeight(_a0 uint64) {
 	_m.Called(_a0)
 }
 

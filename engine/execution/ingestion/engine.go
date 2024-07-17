@@ -9,7 +9,6 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/execution"
@@ -56,7 +55,6 @@ type Engine struct {
 	uploader            *uploader.Manager
 	stopControl         *stop.StopControl
 	loader              BlockLoader
-	lastProducedHeight  *atomic.Uint64
 }
 
 func New(
@@ -100,7 +98,6 @@ func New(
 		uploader:                     uploader,
 		stopControl:                  stopControl,
 		loader:                       loader,
-		lastProducedHeight:           atomic.NewUint64(0),
 		ExecutionDataProducerManager: execution_data.NewExecutionDataProducerManager(),
 	}
 
@@ -468,16 +465,11 @@ func (e *Engine) executeBlock(
 	}
 
 	if e.executionDataPruner != nil {
-		e.lastProducedHeight.Store(executableBlock.Height())
-		e.NotifyProducedHeight()
+		e.SetLastProcessedHeight(executableBlock.Height())
 	}
 
 	e.unit.Ctx()
 
-}
-
-func (e *Engine) LastProducedHeight() (uint64, error) {
-	return e.lastProducedHeight.Load(), nil
 }
 
 func nonSystemTransactionCount(result flow.ExecutionResult) uint64 {

@@ -7,7 +7,6 @@ import (
 	"fmt"
 
 	"github.com/ipfs/go-cid"
-	"go.uber.org/atomic"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -30,12 +29,11 @@ var _ ExecutionDataProducer = (*downloader)(nil)
 
 type downloader struct {
 	*ExecutionDataProducerManager
-	blobService        network.BlobService
-	maxBlobSize        int
-	serializer         Serializer
-	storage            tracker.Storage
-	headers            storage.Headers
-	lastProducedHeight *atomic.Uint64
+	blobService network.BlobService
+	maxBlobSize int
+	serializer  Serializer
+	storage     tracker.Storage
+	headers     storage.Headers
 }
 
 type DownloaderOption func(*downloader)
@@ -61,7 +59,6 @@ func NewDownloader(blobService network.BlobService, opts ...DownloaderOption) *d
 		blobService:                  blobService,
 		maxBlobSize:                  DefaultMaxBlobSize,
 		serializer:                   DefaultSerializer,
-		lastProducedHeight:           atomic.NewUint64(0),
 		ExecutionDataProducerManager: NewExecutionDataProducerManager(),
 	}
 
@@ -248,8 +245,7 @@ func (d *downloader) trackBlobs(blockID flow.Identifier, cids []cid.Cid) error {
 			return err
 		}
 
-		d.lastProducedHeight.Store(header.Height)
-		d.NotifyProducedHeight()
+		d.SetLastProcessedHeight(header.Height)
 
 		return nil
 	})
@@ -381,8 +377,4 @@ func (d *downloader) findBlob(
 	}
 
 	return nil, NewBlobNotFoundError(target)
-}
-
-func (d *downloader) LastProducedHeight() (uint64, error) {
-	return d.lastProducedHeight.Load(), nil
 }
