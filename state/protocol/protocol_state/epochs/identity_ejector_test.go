@@ -11,11 +11,11 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// TestEjectorRapid performs a rapid check on the ejector structure, ensuring that it correctly tracks and ejects nodes.
+// TestEjectorRapid fuzzy-tests the ejector, ensuring that it correctly tracks and ejects nodes.
 // This test covers only happy-path scenario.
 func TestEjectorRapid(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
-		ej := ejector{}
+		ej := newEjector()
 		baseIdentities := unittest.DynamicIdentityEntryListFixture(5)
 		// track 1-3 identity lists, each containing extra 0-7 identities
 		trackedIdentities := rapid.Map(rapid.SliceOfN(rapid.IntRange(0, 7), 1, 3), func(n []int) []flow.DynamicIdentityEntryList {
@@ -33,21 +33,19 @@ func TestEjectorRapid(t *testing.T) {
 			require.NoError(t, err)
 		}
 
-		var ejectedIdentities []flow.Identifier
+		var ejectedIdentities flow.IdentifierList
 		for _, list := range trackedIdentities {
 			nodeID := rapid.SampledFrom(list).Draw(t, "ejected-identity").NodeID
 			require.True(t, ej.Eject(nodeID))
 			ejectedIdentities = append(ejectedIdentities, nodeID)
 		}
+		ejectedLookup := ejectedIdentities.Lookup()
 
-		for _, ejectedNodeID := range ejectedIdentities {
-			ejected := false
-			for _, list := range trackedIdentities {
-				if entry, found := list.ByNodeID(ejectedNodeID); found && entry.Ejected {
-					ejected = true
-				}
+		for _, list := range trackedIdentities {
+			for _, identity := range list {
+				_, expectedStatus := ejectedLookup[identity.NodeID]
+				require.Equal(t, expectedStatus, identity.Ejected, "incorrect ejection status")
 			}
-			require.True(t, ejected, "identity should be ejected in tracked list")
 		}
 	})
 }
@@ -55,7 +53,7 @@ func TestEjectorRapid(t *testing.T) {
 // TestEjector_ReadmitEjectedIdentity ensures that a node that was ejected cannot be readmitted with subsequent track requests.
 func TestEjector_ReadmitEjectedIdentity(t *testing.T) {
 	list := unittest.DynamicIdentityEntryListFixture(3)
-	ej := ejector{}
+	ej := newEjector()
 	ejectedNodeID := list[0].NodeID
 	require.NoError(t, ej.TrackDynamicIdentityList(list))
 	require.True(t, ej.Eject(ejectedNodeID))
@@ -68,20 +66,21 @@ func TestEjector_ReadmitEjectedIdentity(t *testing.T) {
 	require.True(t, protocol.IsInvalidServiceEventError(err))
 }
 
-// TestEjector_IdentityNotFound ensures that ejector returns false when the identity is not tracked.
+// TestEjector_IdentityNotFound ensures that ejector returns false when the identity is not
+// in any of the tracked lists. We test different scenarios where the identity is not tracked.
 // Tested different scenarios where the identity is not tracked.
 func TestEjector_IdentityNotFound(t *testing.T) {
 	t.Run("nothing-tracked", func(t *testing.T) {
-		ej := ejector{}
+		ej := newEjector()
 		require.False(t, ej.Eject(unittest.IdentifierFixture()))
 	})
 	t.Run("list-tracked", func(t *testing.T) {
-		ej := ejector{}
+		ej := newEjector()
 		require.NoError(t, ej.TrackDynamicIdentityList(unittest.DynamicIdentityEntryListFixture(3)))
 		require.False(t, ej.Eject(unittest.IdentifierFixture()))
 	})
 	t.Run("after-ejection", func(t *testing.T) {
-		ej := ejector{}
+		ej := newEjector()
 		list := unittest.DynamicIdentityEntryListFixture(3)
 		require.NoError(t, ej.TrackDynamicIdentityList(list))
 		require.True(t, ej.Eject(list[0].NodeID))

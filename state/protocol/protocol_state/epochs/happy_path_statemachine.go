@@ -32,6 +32,7 @@ var _ StateMachine = (*HappyPathStateMachine)(nil)
 // NewHappyPathStateMachine creates a new HappyPathStateMachine.
 // An exception is returned in case the `EpochFallbackTriggered` flag is set in the `parentState`. This means that
 // the protocol state evolution has reached an undefined state from the perspective of the happy path state machine.
+// No errors are expected during normal operations.
 func NewHappyPathStateMachine(telemetry protocol_state.StateMachineTelemetryConsumer, view uint64, parentState *flow.RichEpochStateEntry) (*HappyPathStateMachine, error) {
 	if parentState.EpochFallbackTriggered {
 		return nil, irrecoverable.NewExceptionf("cannot create happy path protocol state machine at view (%d) for a parent state"+
@@ -117,7 +118,9 @@ func (u *HappyPathStateMachine) ProcessEpochSetup(epochSetup *flow.EpochSetup) (
 	// subsequent epoch commit event and update identities afterwards.
 	err = u.ejector.TrackDynamicIdentityList(u.state.NextEpoch.ActiveIdentities)
 	if err != nil {
-		u.telemetry.OnInvalidServiceEvent(epochSetup.ServiceEvent(), err)
+		if protocol.IsInvalidServiceEventError(err) {
+			u.telemetry.OnInvalidServiceEvent(epochSetup.ServiceEvent(), err)
+		}
 		return false, fmt.Errorf("failed to track dynamic identity list for next epoch: %w", err)
 
 	}

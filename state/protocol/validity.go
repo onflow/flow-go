@@ -151,7 +151,8 @@ func IsValidExtendingEpochCommit(extendingCommit *flow.EpochCommit, epochState *
 // IsValidEpochCommit checks whether an epoch commit service event is intrinsically valid.
 // Assumes the input flow.EpochSetup event has already been validated.
 // Expected errors during normal operations:
-// * protocol.InvalidServiceEventError if the EpochCommit is invalid
+// * protocol.InvalidServiceEventError if the EpochCommit is invalid.
+// This is a side-effect-free function. This function only returns protocol.InvalidServiceEventError as errors.
 func IsValidEpochCommit(commit *flow.EpochCommit, setup *flow.EpochSetup) error {
 	if len(setup.Assignments) != len(commit.ClusterQCs) {
 		return NewInvalidServiceEventErrorf("number of clusters (%d) does not number of QCs (%d)", len(setup.Assignments), len(commit.ClusterQCs))

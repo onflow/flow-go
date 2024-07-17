@@ -3,7 +3,6 @@ package flow
 import (
 	"fmt"
 
-	clone "github.com/huandu/go-clone/generic"
 	"golang.org/x/exp/slices"
 )
 
@@ -15,15 +14,13 @@ type DynamicIdentityEntry struct {
 
 type DynamicIdentityEntryList []*DynamicIdentityEntry
 
-// MinEpochStateEntry represents a snapshot of the identity table (incl. the set of all notes authorized to
-// be part of the network) at some point in time. It allows to reconstruct the state of identity table using
-// epoch setup events and dynamic identities. It tracks attempts of invalid state transitions.
-// It also holds information about the next epoch, if it has been already committed.
-// This structure is used to persist protocol state in the database.
-//
-// Note that the current implementation does not store the identity table directly. Instead, we store
-// the original events that constituted the _initial_ identity table at the beginning of the epoch
-// plus some modifiers. We intend to restructure this code soon.
+// MinEpochStateEntry is the most compact snapshot of the epoch state and identity table (set of all notes authorized to
+// be part of the network) at some specific block. This struct is optimized for persisting the identity table
+// in the database, in that it only includes data that is variable during the course of an epoch to avoid
+// storage of redundant data. The Epoch Setup and Commit events, which carry the portion of the identity
+// table that is constant throughout an epoch, are only referenced by their hash commitment.
+// Note that a MinEpochStateEntry does not hold the entire data for the identity table directly. It
+// allows reconstructing the identity table with the referenced epoch setup events and dynamic identities.
 type MinEpochStateEntry struct {
 	PreviousEpoch *EpochStateContainer // minimal dynamic properties for previous epoch [optional, nil for first epoch after spork, genesis]
 	CurrentEpoch  EpochStateContainer  // minimal dynamic properties for current epoch
@@ -70,9 +67,8 @@ type EpochStateContainer struct {
 
 // EpochExtension represents a range of views, which contiguously extends this epoch.
 type EpochExtension struct {
-	FirstView     uint64
-	FinalView     uint64
-	TargetEndTime uint64
+	FirstView uint64
+	FinalView uint64
 }
 
 // ID returns an identifier for this EpochStateContainer by hashing internal fields.
@@ -100,25 +96,33 @@ func (c *EpochStateContainer) Copy() *EpochStateContainer {
 	if c == nil {
 		return nil
 	}
+	var ext []EpochExtension
+	if c.EpochExtensions != nil {
+		ext = make([]EpochExtension, len(c.EpochExtensions))
+		copy(ext, c.EpochExtensions)
+	}
 	return &EpochStateContainer{
 		SetupID:          c.SetupID,
 		CommitID:         c.CommitID,
 		ActiveIdentities: c.ActiveIdentities.Copy(),
-		EpochExtensions:  clone.Clone(c.EpochExtensions),
+		EpochExtensions:  ext,
 	}
 }
 
-// EpochStateEntry is a MinEpochStateEntry which has additional fields that are cached
-// from storage layer for convenience.
-// Using this structure instead of MinEpochStateEntry allows us to avoid querying
-// the database for epoch setups and commits.
-// It holds several invariants, such as:
+// EpochStateEntry is a MinEpochStateEntry that has additional fields that are cached from the
+// storage layer for convenience. It holds all the information needed to construct a snapshot of
+// the identity table (set of all notes authorized to be part of the network) at some specific
+// block without any database queries. Specifically, `MinEpochStateEntry` is a snapshot of the
+// variable portion of the identity table. The portion of the identity table that is constant
+// throughout an epoch is contained in the Epoch Setup and Epoch Commit events.
+// Convention:
 //   - CurrentEpochSetup and CurrentEpochCommit are for the same epoch. Never nil.
 //   - PreviousEpochSetup and PreviousEpochCommit are for the same epoch. Can be nil.
 //   - NextEpochSetup and NextEpochCommit are for the same epoch. Can be nil.
 type EpochStateEntry struct {
 	*MinEpochStateEntry
 
+	// by convention, all epoch service events are immutable
 	PreviousEpochSetup  *EpochSetup
 	PreviousEpochCommit *EpochCommit
 	CurrentEpochSetup   *EpochSetup
@@ -206,10 +210,11 @@ func NewEpochStateEntry(
 	return result, nil
 }
 
-// RichEpochStateEntry is a EpochStateEntry which has additional fields that are cached
-// from storage layer for convenience.
-// This structure extends EpochStateEntry by adding full identity table.
-// It holds several invariants, such as:
+// RichEpochStateEntry is a EpochStateEntry that additionally holds the canonical representation of the
+// identity table (set of all notes authorized to be part of the network) at some specific block.
+// This data structure is optimized for frequent reads of the same identity table, which is
+// the prevalent case during normal operations (node ejections and epoch fallback are rare).
+// Conventions:
 //   - Invariants inherited from EpochStateEntry.
 //   - CurrentEpochIdentityTable is the full (dynamic) identity table for the current epoch.
 //     Identities are sorted in canonical order. Without duplicates. Never nil.
@@ -241,9 +246,9 @@ func NewRichEpochStateEntry(
 	}
 	// If we are in staking phase (i.e. epochState.NextEpoch == nil):
 	//  (1) Full identity table contains active identities from current epoch.
-	//      If previous epoch exists, we add nodes from previous epoch that are leaving in the current epoch with `EpochParticipationStatusLeaving` status.
+	//      If previous epoch exists, we add nodes from previous epoch that are leaving in the current epoch with status `EpochParticipationStatusLeaving`.
 	// Otherwise, we are in epoch setup or epoch commit phase (i.e. epochState.NextEpoch ≠ nil):
-	//  (2a) Full identity table contains active identities from current epoch + nodes joining in next epoch with `EpochParticipationStatusJoining` status.
+	//  (2a) Full identity table contains active identities from current epoch + nodes joining in next epoch with status `EpochParticipationStatusJoining`.
 	//  (2b) Furthermore, we also build the full identity table for the next epoch's staking phase:
 	//       active identities from next epoch + nodes from current epoch that are leaving at the end of the current epoch with `flow.EpochParticipationStatusLeaving` status.
 	var err error

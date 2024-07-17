@@ -67,11 +67,12 @@ type StateMachine interface {
 	//   - `protocol.InvalidServiceEventError` - if the service event is invalid or is not a valid state transition for the current protocol state.
 	ProcessEpochRecover(epochRecover *flow.EpochRecover) (bool, error)
 
-	// EjectIdentity updates identity table by changing the node's participation status to 'ejected'.
-	// Should pass identity which is already present in the table, otherwise an exception will be raised.
-	// Expected errors during normal operations:
-	// - `protocol.InvalidServiceEventError` if the updated identity is not found in current and adjacent epochs.
-	EjectIdentity(nodeID flow.Identifier) error
+	// EjectIdentity updates the identity table by changing the node's participation status to 'ejected'
+	// If and only if the node is active in the previous or current or next epoch, the node's ejection status
+	// is set to true for all occurrences, and we return true.  If `nodeID` is not found, we return false. This
+	// method is idempotent and behaves identically for repeated calls with the same `nodeID` (repeated calls
+	// with the same input create minor performance overhead though).
+	EjectIdentity(nodeID flow.Identifier) bool
 
 	// TransitionToNextEpoch transitions our reference frame of 'current epoch' to the pending but committed epoch.
 	// Epoch transition is only allowed when:

@@ -63,37 +63,6 @@ func FromParams(from protocol.GlobalParams) (*Params, error) {
 	return &Params{params}, nil
 }
 
-// FromCluster converts any protocol.Cluster to a memory-backed Cluster.
-// No errors are expected during normal operation.
-func FromCluster(from protocol.Cluster) (*Cluster, error) {
-	cluster := EncodableCluster{
-		Counter:   from.EpochCounter(),
-		Index:     from.Index(),
-		Members:   from.Members(),
-		RootBlock: from.RootBlock(),
-		RootQC:    from.RootQC(),
-	}
-	return &Cluster{cluster}, nil
-}
-
-// FromDKG converts any protocol.DKG to a memory-backed DKG.
-//
-// The given participant list must exactly match the DKG members.
-// All errors indicate inconsistent or invalid inputs.
-// No errors are expected during normal operation.
-func FromDKG(from protocol.DKG, participants flow.IdentitySkeletonList) (*DKG, error) {
-	var dkg EncodableDKG
-	dkg.GroupKey = encodable.RandomBeaconPubKey{PublicKey: from.GroupKey()}
-
-	lookup, err := protocol.ToDKGParticipantLookup(from, participants)
-	if err != nil {
-		return nil, fmt.Errorf("could not generate dkg participant lookup: %w", err)
-	}
-	dkg.Participants = lookup
-
-	return &DKG{dkg}, nil
-}
-
 // DKGFromEncodable returns a DKG backed by the given encodable representation.
 func DKGFromEncodable(enc EncodableDKG) (*DKG, error) {
 	return &DKG{enc}, nil
