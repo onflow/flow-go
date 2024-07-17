@@ -138,7 +138,7 @@ func TestHandler_TransactionRunOrPanic(t *testing.T) {
 					// make sure the transaction id included in the block transaction list is the same as tx submitted
 					assert.Equal(
 						t,
-						types.BytesToCadenceUInt8ArrayValue(evmTx.Hash().Bytes()).WithType(nil),
+						types.HashToCadenceArrayValue(evmTx.Hash()).WithType(nil),
 						eventTxHash,
 					)
 				})
