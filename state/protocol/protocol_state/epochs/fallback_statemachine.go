@@ -33,11 +33,11 @@ func NewFallbackStateMachine(params protocol.GlobalParams, telemetry protocol_st
 	nextEpochCommitted := state.EpochPhase() == flow.EpochPhaseCommitted
 	// we are entering fallback mode, this logic needs to be executed only once
 	if !state.EpochFallbackTriggered {
-		// the next epoch has not been committed, but possibly setup, make sure it is cleared
+		// The next epoch has not been committed. Though setup event may be in the state, make sure it is cleared.
 		// CAUTION: this logic must be consistent with the `MinEpochStateEntry.EpochPhase()`, which
 		// determines the epoch phase based on the configuration of the fields we set here!
 		// Specifically, if and only if the next epoch is already committed as of the parent state,
-		// we go through with that committed epoch. Otherwise, we have a tentative values of an epoch
+		// we go through with that committed epoch. Otherwise, we have tentative values of an epoch
 		// not yet properly specified, which we have to clear out.
 		if !nextEpochCommitted {
 			state.NextEpoch = nil
@@ -58,9 +58,8 @@ func NewFallbackStateMachine(params protocol.GlobalParams, telemetry protocol_st
 		// we have reached safety threshold and we are still in the fallback mode
 		// prepare a new extension for the current epoch.
 		err := sm.extendCurrentEpoch(flow.EpochExtension{
-			FirstView:     state.CurrentEpochFinalView() + 1,
-			FinalView:     state.CurrentEpochFinalView() + DefaultEpochExtensionViewCount, // TODO(EFM, #6020): replace with EpochExtensionLength
-			TargetEndTime: 0,                                                              // TODO(EFM, #6020): calculate and set target end time
+			FirstView: state.CurrentEpochFinalView() + 1,
+			FinalView: state.CurrentEpochFinalView() + DefaultEpochExtensionViewCount, // TODO(EFM, #6020): replace with EpochExtensionLength 			// TODO(EFM, #6020): calculate and set target end time
 		})
 		if err != nil {
 			return nil, err
@@ -146,6 +145,7 @@ func (m *FallbackStateMachine) ProcessEpochCommit(setup *flow.EpochCommit) (bool
 // in terms of emitted events. Therefore, we aim to be resilient against invalid and/or inconsistent events:
 //  1. Any amount of setup and commit events being sealed in the same block as an epoch recover event:
 //     EpochSetup and EpochCommit are consistently ignored by the FallbackStateMachine, also after a successful recovery.
+//     For a detailed explanation why this is safe, see `ProcessEpochSetup` above.
 //  2. Multiple EpochRecover events sealed in the same block:
 //     - Invalid `EpochRecover` events are reported to telemetry and dropped.
 //     - The first valid `EpochRecover` event is accepted (if any is sealed in block)
@@ -170,7 +170,7 @@ func (m *FallbackStateMachine) ProcessEpochRecover(epochRecover *flow.EpochRecov
 		m.state.CurrentEpochSetup,
 		&epochRecover.EpochSetup)
 	if err != nil {
-		m.telemetry.OnInvalidServiceEvent(epochRecover.ServiceEvent(), err)
+		m.telemetry.OnInvalidServiceEvent(epochRecover.ServiceEvent(), fmt.Errorf("rejecting EpochRecover event: %w", err))
 		return false, nil
 	}
 
@@ -194,8 +194,11 @@ func (m *FallbackStateMachine) ProcessEpochRecover(epochRecover *flow.EpochRecov
 	}
 	err = m.ejector.TrackDynamicIdentityList(m.state.NextEpoch.ActiveIdentities)
 	if err != nil {
-		m.telemetry.OnInvalidServiceEvent(epochRecover.ServiceEvent(), err)
-		return false, nil
+		if protocol.IsInvalidServiceEventError(err) {
+			m.telemetry.OnInvalidServiceEvent(epochRecover.ServiceEvent(), fmt.Errorf("rejecting EpochRecover event: %w", err))
+			return false, nil
+		}
+		return false, fmt.Errorf("unexpected errors tracking identity list: %w", err)
 	}
 	// if we have processed a valid EpochRecover event, we should exit EFM.
 	m.state.EpochFallbackTriggered = false
@@ -213,11 +216,11 @@ func (m *FallbackStateMachine) ensureValidEpochRecover(epochRecover *flow.EpochR
 	}
 	err := protocol.IsValidExtendingEpochSetup(&epochRecover.EpochSetup, m.state)
 	if err != nil {
-		return fmt.Errorf("invalid epoch recovery event(setup): %w", err)
+		return fmt.Errorf("invalid setup portion in EpochRecover event: %w", err)
 	}
 	err = protocol.IsValidEpochCommit(&epochRecover.EpochCommit, &epochRecover.EpochSetup)
 	if err != nil {
-		return fmt.Errorf("invalid epoch recovery event(commit): %w", err)
+		return fmt.Errorf("invalid commit portion in EpochRecover event: %w", err)
 	}
 	return nil
 }

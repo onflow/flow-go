@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/protocol_state"
 )
 
@@ -22,7 +21,7 @@ type baseStateMachine struct {
 // which keeps track of ejected identities.
 // A protocol.InvalidServiceEventError is returned if the ejector fails to track the identities.
 func newBaseStateMachine(telemetry protocol_state.StateMachineTelemetryConsumer, view uint64, parentState *flow.RichEpochStateEntry, state *flow.EpochStateEntry) (*baseStateMachine, error) {
-	ej := ejector{}
+	ej := newEjector()
 	if state.PreviousEpoch != nil {
 		err := ej.TrackDynamicIdentityList(state.PreviousEpoch.ActiveIdentities)
 		if err != nil {
@@ -71,16 +70,13 @@ func (u *baseStateMachine) ParentState() *flow.RichEpochStateEntry {
 	return u.parentState
 }
 
-// EjectIdentity updates identity table by changing the node's participation status to 'ejected'.
-// Should pass identity which is already present in the table, otherwise an exception will be raised.
-// Expected errors during normal operations:
-// - `protocol.InvalidServiceEventError` if the updated identity is not found in current and adjacent epochs or if the identity has already been ejected
-func (u *baseStateMachine) EjectIdentity(nodeID flow.Identifier) error {
-	ejected := u.ejector.Eject(nodeID)
-	if !ejected {
-		return protocol.NewInvalidServiceEventErrorf("node (%x) was not found or was already ejected", nodeID)
-	}
-	return nil
+// EjectIdentity updates the identity table by changing the node's participation status to 'ejected'
+// If and only if the node is active in the previous or current or next epoch, the node's ejection status
+// is set to true for all occurrences, and we return true.  If `nodeID` is not found, we return false. This
+// method is idempotent and behaves identically for repeated calls with the same `nodeID` (repeated calls
+// with the same input create minor performance overhead though).
+func (u *baseStateMachine) EjectIdentity(nodeID flow.Identifier) bool {
+	return u.ejector.Eject(nodeID)
 }
 
 // TransitionToNextEpoch updates the notion of 'current epoch', 'previous' and 'next epoch' in the protocol
@@ -91,10 +87,10 @@ func (u *baseStateMachine) EjectIdentity(nodeID flow.Identifier) error {
 // No errors are expected during normal operations.
 func (u *baseStateMachine) TransitionToNextEpoch() error {
 	nextEpoch := u.state.NextEpoch
-	if nextEpoch == nil { // nextEpoch ≠ nil if and only if next epoch was already set up (on the happy path)
+	if nextEpoch == nil { // nextEpoch ≠ nil if and only if next epoch was already set up
 		return fmt.Errorf("protocol state for next epoch has not yet been setup")
 	}
-	if nextEpoch.CommitID == flow.ZeroID { // nextEpoch.CommitID ≠ flow.ZeroID if and only if next epoch was already committed (on the happy path)
+	if nextEpoch.CommitID == flow.ZeroID { // nextEpoch.CommitID ≠ flow.ZeroID if and only if next epoch was already committed
 		return fmt.Errorf("protocol state for next epoch has not yet been committed")
 	}
 	// Check if we are at the next epoch, only then a transition is allowed

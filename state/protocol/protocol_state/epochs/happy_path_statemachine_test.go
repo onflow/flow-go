@@ -129,8 +129,8 @@ func (s *ProtocolStateMachineSuite) TestBuild() {
 	require.Equal(s.T(), s.parentProtocolState.ID(), s.stateMachine.ParentState().ID(), "should not modify parent protocol state")
 
 	updatedDynamicIdentity := s.parentProtocolState.CurrentEpochIdentityTable[0].NodeID
-	err := s.stateMachine.EjectIdentity(updatedDynamicIdentity)
-	require.NoError(s.T(), err)
+	ejected := s.stateMachine.EjectIdentity(updatedDynamicIdentity)
+	require.True(s.T(), ejected)
 	updatedState, stateID, hasChanges = s.stateMachine.Build()
 	require.True(s.T(), hasChanges, "should have changes")
 	require.NotEqual(s.T(), stateID, s.parentProtocolState.ID(), "protocol state was modified but still has same ID")
@@ -263,11 +263,11 @@ func (s *ProtocolStateMachineSuite) TestProcessEpochCommit() {
 	})
 }
 
-// TestUpdateIdentityUnknownIdentity tests if updating the identity of unknown node results in an error.
+// TestUpdateIdentityUnknownIdentity tests if updating the identity of unknown node results in a correct return value
+// and doesn't affect resulting state.
 func (s *ProtocolStateMachineSuite) TestUpdateIdentityUnknownIdentity() {
-	err := s.stateMachine.EjectIdentity(unittest.IdentifierFixture())
-	require.Error(s.T(), err, "should not be able to update data of unknown identity")
-	require.True(s.T(), protocol.IsInvalidServiceEventError(err))
+	ejected := s.stateMachine.EjectIdentity(unittest.IdentifierFixture())
+	require.False(s.T(), ejected, "should not be able to eject unknown identity")
 
 	updatedState, updatedStateID, hasChanges := s.stateMachine.Build()
 	require.False(s.T(), hasChanges, "should not have changes")
@@ -288,8 +288,8 @@ func (s *ProtocolStateMachineSuite) TestUpdateIdentityHappyPath() {
 	require.NoError(s.T(), err)
 
 	for _, update := range ejectedChanges {
-		err := s.stateMachine.EjectIdentity(update.NodeID)
-		require.NoError(s.T(), err)
+		ejected := s.stateMachine.EjectIdentity(update.NodeID)
+		require.True(s.T(), ejected)
 	}
 	updatedState, updatedStateID, hasChanges := s.stateMachine.Build()
 	require.True(s.T(), hasChanges, "should have changes")
@@ -474,8 +474,8 @@ func (s *ProtocolStateMachineSuite) TestEpochSetupAfterIdentityChange() {
 	ejectedChanges, err := participantsFromCurrentEpochSetup.Sample(2)
 	require.NoError(s.T(), err)
 	for _, update := range ejectedChanges {
-		err := s.stateMachine.EjectIdentity(update.NodeID)
-		require.NoError(s.T(), err)
+		ejected := s.stateMachine.EjectIdentity(update.NodeID)
+		require.True(s.T(), ejected)
 	}
 	updatedState, _, _ := s.stateMachine.Build()
 
@@ -545,8 +545,8 @@ func (s *ProtocolStateMachineSuite) TestEpochSetupAndEjectionInSameBlock() {
 		unittest.WithParticipants(setupParticipants),
 	)
 	// ejected identity before processing epoch setup
-	err := s.stateMachine.EjectIdentity(ejectedIdentityID)
-	require.NoError(s.T(), err)
+	ejected := s.stateMachine.EjectIdentity(ejectedIdentityID)
+	require.True(s.T(), ejected)
 
 	// epoch setup readmits the ejected identity, such events shouldn't be accepted.
 	s.consumer.On("OnServiceEventReceived", setup.ServiceEvent()).Once()
