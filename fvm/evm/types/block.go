@@ -108,16 +108,6 @@ type BlockProposal struct {
 	TxHashes TransactionHashes
 }
 
-type TransactionHashes []gethCommon.Hash
-
-func (th TransactionHashes) Len() int {
-	return len(th)
-}
-
-func (th TransactionHashes) EncodeIndex(index int, buffer *bytes.Buffer) {
-	buffer.Write(th[index].Bytes())
-}
-
 // AppendTransaction appends a transaction hash to the list of transaction hashes of the block
 // and also update the receipts
 func (b *BlockProposal) AppendTransaction(res *Result) {
@@ -147,7 +137,7 @@ func (b *BlockProposal) PopulateRoots() {
 	b.ReceiptRoot = gethTypes.DeriveSha(receipts, gethTrie.NewStackTrie(nil))
 
 	// TODO: we can make this concurrent if its
-	b.TransactionHashRoot = ComputeTransactionRootHash(b.TxHashes)
+	b.TransactionHashRoot = b.TxHashes.RootHash()
 }
 
 // ToBytes encodes the block proposal into bytes
@@ -178,6 +168,20 @@ func NewBlockProposal(
 		Receipts: make([]LightReceipt, 0),
 		TxHashes: make([]gethCommon.Hash, 0),
 	}
+}
+
+type TransactionHashes []gethCommon.Hash
+
+func (th TransactionHashes) Len() int {
+	return len(th)
+}
+
+func (th TransactionHashes) EncodeIndex(index int, buffer *bytes.Buffer) {
+	buffer.Write(th[index].Bytes())
+}
+
+func (txs TransactionHashes) RootHash() gethCommon.Hash {
+	return gethTypes.DeriveSha(txs, gethTrie.NewStackTrie(nil))
 }
 
 // todo remove this if confirmed we no longer need it on testnet, mainnet and previewnet.
@@ -340,8 +344,4 @@ func decodeBlockBreakingChanges(encoded []byte) *Block {
 	}
 
 	return nil
-}
-
-func ComputeTransactionRootHash(txs TransactionHashes) gethCommon.Hash {
-	return gethTypes.DeriveSha(txs, gethTrie.NewStackTrie(nil))
 }

@@ -120,9 +120,9 @@ func TestEVMRun(t *testing.T) {
 				require.Equal(t, uint64(43785), blockEventPayload.TotalGasUsed)
 				require.NotEmpty(t, blockEventPayload.Hash)
 
-				txHash := gethCommon.HexToHash(txEventPayload.Hash)
+				txHashes := types.TransactionHashes{gethCommon.HexToHash(txEventPayload.Hash)}
 				require.Equal(t,
-					types.ComputeTransactionRootHash([]gethCommon.Hash{txHash}).String(),
+					txHashes.RootHash().String(),
 					string(blockEventPayload.TransactionHashRoot),
 				)
 				require.NotEmpty(t, blockEventPayload.ReceiptRoot)
@@ -507,7 +507,7 @@ func TestEVMBatchRun(t *testing.T) {
 				require.NotEmpty(t, blockEventPayload.Hash)
 				require.Equal(t, uint64(155513), blockEventPayload.TotalGasUsed)
 				require.Equal(t,
-					types.ComputeTransactionRootHash(txHashes).String(),
+					txHashes.RootHash().String(),
 					string(blockEventPayload.TransactionHashRoot),
 				)
 
@@ -994,8 +994,9 @@ func TestEVMAddressDeposit(t *testing.T) {
 			require.Equal(t, uint64(21000), blockEventPayload.TotalGasUsed)
 
 			txHash := gethCommon.HexToHash(txEventPayload.Hash)
+			txHashes := types.TransactionHashes{txHash}
 			require.Equal(t,
-				types.ComputeTransactionRootHash([]gethCommon.Hash{txHash}).String(),
+				txHashes.RootHash().String(),
 				string(blockEventPayload.TransactionHashRoot),
 			)
 		})

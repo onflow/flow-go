@@ -113,7 +113,7 @@ func TestHandler_TransactionRunOrPanic(t *testing.T) {
 					// make sure the transaction id included in the block transaction list is the same as tx sumbmitted
 					assert.Equal(
 						t,
-						types.ComputeTransactionRootHash([]gethCommon.Hash{txHash}).String(),
+						types.TransactionHashes{txHash}.RootHash().String(),
 						string(blockEventPayload.TransactionHashRoot),
 					)
 				})
@@ -342,7 +342,7 @@ func TestHandler_COA(t *testing.T) {
 				require.Len(t, events, 3)
 
 				// Block level expected values
-				txHashes := make([]gethCommon.Hash, 0)
+				txHashes := make(types.TransactionHashes, 0)
 				totalGasUsed := uint64(0)
 
 				// deploy COA transaction event
@@ -383,7 +383,7 @@ func TestHandler_COA(t *testing.T) {
 				blockEventPayload := testutils.BlockEventToPayload(t, events[3], rootAddr)
 				assert.Equal(
 					t,
-					types.ComputeTransactionRootHash(txHashes).String(),
+					txHashes.RootHash().String(),
 					string(blockEventPayload.TransactionHashRoot),
 				)
 
