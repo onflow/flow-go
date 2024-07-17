@@ -45,22 +45,22 @@ type Environment struct {
 }
 
 // AccountKeysCount provides a mock function with given fields: address
-func (_m *Environment) AccountKeysCount(address common.Address) (uint64, error) {
+func (_m *Environment) AccountKeysCount(address common.Address) (uint32, error) {
 	ret := _m.Called(address)
 
 	if len(ret) == 0 {
 		panic("no return value specified for AccountKeysCount")
 	}
 
-	var r0 uint64
+	var r0 uint32
 	var r1 error
-	if rf, ok := ret.Get(0).(func(common.Address) (uint64, error)); ok {
+	if rf, ok := ret.Get(0).(func(common.Address) (uint32, error)); ok {
 		return rf(address)
 	}
-	if rf, ok := ret.Get(0).(func(common.Address) uint64); ok {
+	if rf, ok := ret.Get(0).(func(common.Address) uint32); ok {
 		r0 = rf(address)
 	} else {
-		r0 = ret.Get(0).(uint64)
+		r0 = ret.Get(0).(uint32)
 	}
 
 	if rf, ok := ret.Get(1).(func(common.Address) error); ok {
@@ -745,7 +745,7 @@ func (_m *Environment) GetAccountContractNames(address common.Address) ([]string
 }
 
 // GetAccountKey provides a mock function with given fields: address, index
-func (_m *Environment) GetAccountKey(address common.Address, index int) (*stdlib.AccountKey, error) {
+func (_m *Environment) GetAccountKey(address common.Address, index uint32) (*stdlib.AccountKey, error) {
 	ret := _m.Called(address, index)
 
 	if len(ret) == 0 {
@@ -754,10 +754,10 @@ func (_m *Environment) GetAccountKey(address common.Address, index int) (*stdlib
 
 	var r0 *stdlib.AccountKey
 	var r1 error
-	if rf, ok := ret.Get(0).(func(common.Address, int) (*stdlib.AccountKey, error)); ok {
+	if rf, ok := ret.Get(0).(func(common.Address, uint32) (*stdlib.AccountKey, error)); ok {
 		return rf(address, index)
 	}
-	if rf, ok := ret.Get(0).(func(common.Address, int) *stdlib.AccountKey); ok {
+	if rf, ok := ret.Get(0).(func(common.Address, uint32) *stdlib.AccountKey); ok {
 		r0 = rf(address, index)
 	} else {
 		if ret.Get(0) != nil {
@@ -765,7 +765,7 @@ func (_m *Environment) GetAccountKey(address common.Address, index int) (*stdlib
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(common.Address, int) error); ok {
+	if rf, ok := ret.Get(1).(func(common.Address, uint32) error); ok {
 		r1 = rf(address, index)
 	} else {
 		r1 = ret.Error(1)
@@ -1460,7 +1460,7 @@ func (_m *Environment) ReturnCadenceRuntime(_a0 *runtime.ReusableCadenceRuntime)
 }
 
 // RevokeAccountKey provides a mock function with given fields: address, index
-func (_m *Environment) RevokeAccountKey(address common.Address, index int) (*stdlib.AccountKey, error) {
+func (_m *Environment) RevokeAccountKey(address common.Address, index uint32) (*stdlib.AccountKey, error) {
 	ret := _m.Called(address, index)
 
 	if len(ret) == 0 {
@@ -1469,10 +1469,10 @@ func (_m *Environment) RevokeAccountKey(address common.Address, index int) (*std
 
 	var r0 *stdlib.AccountKey
 	var r1 error
-	if rf, ok := ret.Get(0).(func(common.Address, int) (*stdlib.AccountKey, error)); ok {
+	if rf, ok := ret.Get(0).(func(common.Address, uint32) (*stdlib.AccountKey, error)); ok {
 		return rf(address, index)
 	}
-	if rf, ok := ret.Get(0).(func(common.Address, int) *stdlib.AccountKey); ok {
+	if rf, ok := ret.Get(0).(func(common.Address, uint32) *stdlib.AccountKey); ok {
 		r0 = rf(address, index)
 	} else {
 		if ret.Get(0) != nil {
@@ -1480,7 +1480,7 @@ func (_m *Environment) RevokeAccountKey(address common.Address, index int) (*std
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(common.Address, int) error); ok {
+	if rf, ok := ret.Get(1).(func(common.Address, uint32) error); ok {
 		r1 = rf(address, index)
 	} else {
 		r1 = ret.Error(1)
