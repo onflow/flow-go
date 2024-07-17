@@ -73,7 +73,7 @@ func TestNativeTokenBridging(t *testing.T) {
 
 						retBalance, err = blk.BalanceOf(bridgeAccount)
 						require.NoError(t, err)
-						require.Equal(t, big.NewInt(0), retBalance)
+						require.Equal(t, big.NewInt(0).Uint64(), retBalance.Uint64())
 					})
 				})
 			})
@@ -105,7 +105,7 @@ func TestNativeTokenBridging(t *testing.T) {
 
 						retBalance, err = blk.BalanceOf(bridgeAccount)
 						require.NoError(t, err)
-						require.Equal(t, big.NewInt(0), retBalance)
+						require.Equal(t, big.NewInt(0).Uint64(), retBalance.Uint64())
 					})
 				})
 			})
@@ -660,7 +660,7 @@ func TestSelfdestruct(t *testing.T) {
 
 						bal, err = blk.BalanceOf(contractAddr)
 						require.NoError(t, err)
-						require.Equal(t, big.NewInt(0), bal)
+						require.Equal(t, big.NewInt(0).Uint64(), bal.Uint64())
 
 						nonce, err := blk.NonceOf(contractAddr)
 						require.NoError(t, err)
@@ -844,7 +844,7 @@ func TestTransactionTracing(t *testing.T) {
 							res, err := blk.DirectCall(call)
 							require.NoError(t, err)
 							require.NotNil(t, res.DeployedContractAddress)
-
+							testAccount.SetNonce(testAccount.Nonce() + 1)
 							testContract.DeployedAt = *res.DeployedContractAddress
 							f(testContract, testAccount, emu)
 						})
@@ -861,8 +861,9 @@ func TestTransactionTracing(t *testing.T) {
 		require.NoError(t, err)
 
 		// manually create block with provided tracer
-		defaultCtx.Tracer = tracer.TxTracer()
-		blk, err := emu.NewBlockView(defaultCtx)
+		ctx := types.NewDefaultBlockContext(1)
+		ctx.Tracer = tracer.TxTracer()
+		blk, err := emu.NewBlockView(ctx)
 		require.NoError(t, err)
 
 		return blk, uploader, tracer
@@ -905,6 +906,7 @@ func TestTransactionTracing(t *testing.T) {
 
 			tracer.Collect(txID)
 
+			testAccount.SetNonce(testAccount.Nonce() + 1)
 			require.Eventuallyf(t, func() bool {
 				<-uploaded
 				return true
@@ -942,6 +944,8 @@ func TestTransactionTracing(t *testing.T) {
 				),
 			)
 			require.NoError(t, err)
+			require.NoError(t, res.ValidationError)
+			require.NoError(t, res.VMError)
 			txID = res.TxHash
 			trace, err = tracer.TxTracer().GetResult()
 			require.NoError(t, err)
@@ -949,6 +953,7 @@ func TestTransactionTracing(t *testing.T) {
 
 			tracer.Collect(txID)
 
+			testAccount.SetNonce(testAccount.Nonce() + 1)
 			require.Eventuallyf(t, func() bool {
 				<-uploaded
 				return true
@@ -986,13 +991,15 @@ func TestTransactionTracing(t *testing.T) {
 			// interact and record trace
 			res, err := blk.RunTransaction(tx)
 			require.NoError(t, err)
+			require.NoError(t, res.ValidationError)
+			require.NoError(t, res.VMError)
 			txID = res.TxHash
 			trace, err = tracer.TxTracer().GetResult()
 			require.NoError(t, err)
 			tracer.WithBlockID(blockID)
 
 			tracer.Collect(txID)
-
+			testAccount.SetNonce(testAccount.Nonce() + 1)
 			require.Eventuallyf(t, func() bool {
 				<-uploaded
 				return true
