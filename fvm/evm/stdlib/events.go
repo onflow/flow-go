@@ -1,15 +1,15 @@
-package types
+package stdlib
 
 import (
 	"fmt"
 
 	"github.com/onflow/cadence/encoding/ccf"
-	"github.com/onflow/cadence/runtime/common"
 	gethCommon "github.com/onflow/go-ethereum/common"
 	"github.com/onflow/go-ethereum/rlp"
 
 	"github.com/onflow/cadence"
 
+	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -20,7 +20,7 @@ const (
 
 type EventPayload interface {
 	// ToCadence converts the event to Cadence event
-	ToCadence(location common.Location) (cadence.Event, error)
+	ToCadence(chainID flow.ChainID) (cadence.Event, error)
 }
 
 type Event struct {
@@ -31,8 +31,8 @@ type Event struct {
 // todo we might have to break this event into two (tx included /tx executed) if size becomes an issue
 
 type transactionEvent struct {
-	Payload     []byte  // transaction RLP-encoded payload
-	Result      *Result // transaction execution result
+	Payload     []byte        // transaction RLP-encoded payload
+	Result      *types.Result // transaction execution result
 	BlockHeight uint64
 	BlockHash   gethCommon.Hash
 }
@@ -43,7 +43,7 @@ type transactionEvent struct {
 // - blockHeight: the height of the block where the transaction is included
 // - blockHash: the hash of the block where the transaction is included
 func NewTransactionEvent(
-	result *Result,
+	result *types.Result,
 	payload []byte,
 	blockHeight uint64,
 ) *Event {
@@ -57,24 +57,7 @@ func NewTransactionEvent(
 	}
 }
 
-var transactionEventFields = []cadence.Field{
-	cadence.NewField("hash", cadenceHashType),
-	cadence.NewField("index", cadence.UInt16Type),
-	cadence.NewField("type", cadence.UInt8Type),
-	cadence.NewField("payload", cadenceArrayTypeOfUInt8),
-	cadence.NewField("errorCode", cadence.UInt16Type),
-	cadence.NewField("errorMessage", cadence.StringType),
-	cadence.NewField("gasConsumed", cadence.UInt64Type),
-	cadence.NewField("contractAddress", cadence.StringType),
-	cadence.NewField("logs", cadenceArrayTypeOfUInt8),
-	cadence.NewField("blockHeight", cadence.UInt64Type),
-	// todo we can remove hash and just reference block by height (evm-gateway dependency)
-	cadence.NewField("blockHash", cadenceHashType),
-	cadence.NewField("returnedData", cadenceArrayTypeOfUInt8),
-	cadence.NewField("precompiledCalls", cadenceArrayTypeOfUInt8),
-}
-
-func (p *transactionEvent) ToCadence(location common.Location) (cadence.Event, error) {
+func (p *transactionEvent) ToCadence(chainID flow.ChainID) (cadence.Event, error) {
 	var encodedLogs []byte
 	var err error
 	if len(p.Result.Logs) > 0 {
@@ -99,58 +82,41 @@ func (p *transactionEvent) ToCadence(location common.Location) (cadence.Event, e
 		errorMsg = p.Result.ValidationError.Error()
 	}
 
-	eventType := cadence.NewEventType(
-		location,
-		string(EventTypeTransactionExecuted),
-		transactionEventFields,
-		nil,
-	)
+	eventType := CadenceTypesForChain(chainID).TransactionExecuted
 
 	return cadence.NewEvent([]cadence.Value{
-		HashToCadenceArrayValue(p.Result.TxHash),
+		types.HashToCadenceArrayValue(p.Result.TxHash),
 		cadence.NewUInt16(p.Result.Index),
 		cadence.NewUInt8(p.Result.TxType),
-		BytesToCadenceUInt8ArrayValue(p.Payload),
+		types.BytesToCadenceUInt8ArrayValue(p.Payload),
 		cadence.NewUInt16(uint16(p.Result.ResultSummary().ErrorCode)),
 		cadence.String(errorMsg),
 		cadence.NewUInt64(p.Result.GasConsumed),
 		deployedAddress,
-		BytesToCadenceUInt8ArrayValue(encodedLogs),
+		types.BytesToCadenceUInt8ArrayValue(encodedLogs),
 		cadence.NewUInt64(p.BlockHeight),
-		HashToCadenceArrayValue(p.BlockHash),
-		BytesToCadenceUInt8ArrayValue(p.Result.ReturnedData),
-		BytesToCadenceUInt8ArrayValue(p.Result.PrecompiledCalls),
+		types.BytesToCadenceUInt8ArrayValue(p.Result.ReturnedData),
+		types.BytesToCadenceUInt8ArrayValue(p.Result.PrecompiledCalls),
 	}).WithType(eventType), nil
 }
 
 type blockEvent struct {
-	*Block
+	*types.Block
 }
 
 // NewBlockEvent creates a new block event with the given block as payload.
-func NewBlockEvent(block *Block) *Event {
+func NewBlockEvent(block *types.Block) *Event {
 	return &Event{
 		Etype:   EventTypeBlockExecuted,
 		Payload: &blockEvent{block},
 	}
 }
 
-var blockEventFields = []cadence.Field{
-	cadence.NewField("height", cadence.UInt64Type),
-	cadence.NewField("hash", cadenceHashType),
-	cadence.NewField("timestamp", cadence.UInt64Type),
-	cadence.NewField("totalSupply", cadence.IntType),
-	cadence.NewField("totalGasUsed", cadence.UInt64Type),
-	cadence.NewField("parentHash", cadenceHashType),
-	cadence.NewField("receiptRoot", cadenceHashType),
-	cadence.NewField("transactionHashes", cadence.NewVariableSizedArrayType(cadenceHashType)),
-}
-
-func (p *blockEvent) ToCadence(location common.Location) (cadence.Event, error) {
+func (p *blockEvent) ToCadence(chainID flow.ChainID) (cadence.Event, error) {
 
 	transactionHashes := make([]cadence.Value, len(p.TransactionHashes))
 	for i, hash := range p.TransactionHashes {
-		transactionHashes[i] = HashToCadenceArrayValue(hash)
+		transactionHashes[i] = types.HashToCadenceArrayValue(hash)
 	}
 
 	blockHash, err := p.Hash()
@@ -158,23 +124,18 @@ func (p *blockEvent) ToCadence(location common.Location) (cadence.Event, error) 
 		return cadence.Event{}, err
 	}
 
-	eventType := cadence.NewEventType(
-		location,
-		string(EventTypeBlockExecuted),
-		blockEventFields,
-		nil,
-	)
+	eventType := CadenceTypesForChain(chainID).BlockExecuted
 
 	return cadence.NewEvent([]cadence.Value{
 		cadence.NewUInt64(p.Height),
-		HashToCadenceArrayValue(blockHash),
+		types.HashToCadenceArrayValue(blockHash),
 		cadence.NewUInt64(p.Timestamp),
 		cadence.NewIntFromBig(p.TotalSupply),
 		cadence.NewUInt64(p.TotalGasUsed),
-		HashToCadenceArrayValue(p.ParentBlockHash),
-		HashToCadenceArrayValue(p.ReceiptRoot),
+		types.HashToCadenceArrayValue(p.ParentBlockHash),
+		types.HashToCadenceArrayValue(p.ReceiptRoot),
 		cadence.NewArray(transactionHashes).
-			WithType(cadence.NewVariableSizedArrayType(cadenceHashType)),
+			WithType(cadence.NewVariableSizedArrayType(types.CadenceHashType)),
 	}).WithType(eventType), nil
 }
 

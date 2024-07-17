@@ -3053,12 +3053,12 @@ func TestEVM(t *testing.T) {
 			txExecutedID := common.NewAddressLocation(
 				nil,
 				common.Address(sc.EVMContract.Address),
-				string(types.EventTypeTransactionExecuted),
+				string(stdlib.EventTypeTransactionExecuted),
 			).ID()
 			blockExecutedID := common.NewAddressLocation(
 				nil,
 				common.Address(sc.EVMContract.Address),
-				string(types.EventTypeBlockExecuted),
+				string(stdlib.EventTypeBlockExecuted),
 			).ID()
 			assert.Equal(t, txExecutedID, string(txExe.Type))
 			assert.Equal(t, blockExecutedID, string(blockExe.Type))

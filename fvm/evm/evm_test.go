@@ -468,7 +468,7 @@ func TestEVMBatchRun(t *testing.T) {
 					cadenceEvent, ok := ev.(cadence.Event)
 					require.True(t, ok)
 
-					event, err := types.DecodeTransactionEventPayload(cadenceEvent)
+					event, err := stdlib.DecodeTransactionEventPayload(cadenceEvent)
 					require.NoError(t, err)
 
 					var logs []*gethTypes.Log
@@ -956,10 +956,10 @@ func TestEVMAddressDeposit(t *testing.T) {
 
 			// deposit event
 			depositEvent := output.Events[3]
-			depEv, err := types.FlowEventToCadenceEvent(depositEvent)
+			depEv, err := stdlib.FlowEventToCadenceEvent(depositEvent)
 			require.NoError(t, err)
 
-			depEvPayload, err := types.DecodeFLOWTokensDepositedEventPayload(depEv)
+			depEvPayload, err := stdlib.DecodeFLOWTokensDepositedEventPayload(depEv)
 			require.NoError(t, err)
 
 			require.Equal(t, types.OneFlow, depEvPayload.BalanceAfterInAttoFlow.Value)
@@ -1141,10 +1141,10 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 
 				withdrawEvent := output.Events[7]
 
-				ev, err := types.FlowEventToCadenceEvent(withdrawEvent)
+				ev, err := stdlib.FlowEventToCadenceEvent(withdrawEvent)
 				require.NoError(t, err)
 
-				evPayload, err := types.DecodeFLOWTokensWithdrawnEventPayload(ev)
+				evPayload, err := stdlib.DecodeFLOWTokensWithdrawnEventPayload(ev)
 				require.NoError(t, err)
 
 				// 2.34 - 1.23 = 1.11
@@ -2510,7 +2510,7 @@ func callEVMHeartBeat(
 	ctx fvm.Context,
 	vm fvm.VM,
 	snap snapshot.SnapshotTree,
-) (*types.BlockEventPayload, snapshot.SnapshotTree) {
+) (*stdlib.BlockEventPayload, snapshot.SnapshotTree) {
 	sc := systemcontracts.SystemContractsForChain(ctx.Chain.ChainID())
 
 	heartBeatCode := []byte(fmt.Sprintf(
