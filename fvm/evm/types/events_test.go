@@ -57,17 +57,17 @@ func TestEVMBlockExecutedEventCCFEncodingDecoding(t *testing.T) {
 
 	blockHash, err := block.Hash()
 	require.NoError(t, err)
-	assert.Equal(t, bep.Hash, types.BytesToCadenceUInt8ArrayValue(blockHash.Bytes()))
+	assert.Equal(t, bep.Hash, types.HashToCadenceArrayValue(blockHash))
 
 	assert.Equal(t, bep.TotalSupply.Value, block.TotalSupply)
 	assert.Equal(t, bep.Timestamp, block.Timestamp)
 	assert.Equal(t, bep.TotalGasUsed, block.TotalGasUsed)
-	assert.Equal(t, bep.ParentBlockHash, types.BytesToCadenceUInt8ArrayValue(block.ParentBlockHash.Bytes()))
-	assert.Equal(t, bep.ReceiptRoot, types.BytesToCadenceUInt8ArrayValue(block.ReceiptRoot.Bytes()))
+	assert.Equal(t, bep.ParentBlockHash, types.HashToCadenceArrayValue(block.ParentBlockHash))
+	assert.Equal(t, bep.ReceiptRoot, types.HashToCadenceArrayValue(block.ReceiptRoot))
 
 	hashes := make([]cadence.Array, len(block.TransactionHashes))
 	for i, h := range block.TransactionHashes {
-		hashes[i] = types.BytesToCadenceUInt8ArrayValue(h.Bytes())
+		hashes[i] = types.HashToCadenceArrayValue(h)
 	}
 	assert.Equal(t,
 		bep.TransactionHashes,
@@ -138,7 +138,7 @@ func TestEVMTransactionExecutedEventCCFEncodingDecoding(t *testing.T) {
 		require.NoError(t, err)
 
 		assert.Equal(t, tep.BlockHeight, blockHeight)
-		assert.Equal(t, tep.Hash, types.BytesToCadenceUInt8ArrayValue(txHash.Bytes()))
+		assert.Equal(t, tep.Hash, types.HashToCadenceArrayValue(txHash))
 		assert.Equal(t, tep.Payload, types.BytesToCadenceUInt8ArrayValue(txBytes))
 		assert.Equal(t, types.ErrorCode(tep.ErrorCode), types.ExecutionErrCodeOutOfGas)
 		assert.Equal(t, tep.TransactionType, txResult.TxType)
@@ -179,7 +179,7 @@ func TestEVMTransactionExecutedEventCCFEncodingDecoding(t *testing.T) {
 		require.NoError(t, err)
 
 		assert.Equal(t, tep.BlockHeight, blockHeight)
-		assert.Equal(t, tep.Hash, types.BytesToCadenceUInt8ArrayValue(txHash.Bytes()))
+		assert.Equal(t, tep.Hash, types.HashToCadenceArrayValue(txHash))
 		assert.Equal(t, tep.Payload, types.BytesToCadenceUInt8ArrayValue(txBytes))
 		assert.Equal(t, types.ErrCodeNoError, types.ErrorCode(tep.ErrorCode))
 		assert.Equal(t, tep.TransactionType, txResult.TxType)

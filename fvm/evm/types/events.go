@@ -58,20 +58,20 @@ func NewTransactionEvent(
 }
 
 var transactionEventFields = []cadence.Field{
-	cadence.NewField("hash", cadence.NewVariableSizedArrayType(cadence.UInt8Type)),
+	cadence.NewField("hash", cadenceHashType),
 	cadence.NewField("index", cadence.UInt16Type),
 	cadence.NewField("type", cadence.UInt8Type),
-	cadence.NewField("payload", cadence.NewVariableSizedArrayType(cadence.UInt8Type)),
+	cadence.NewField("payload", cadenceArrayTypeOfUInt8),
 	cadence.NewField("errorCode", cadence.UInt16Type),
 	cadence.NewField("errorMessage", cadence.StringType),
 	cadence.NewField("gasConsumed", cadence.UInt64Type),
 	cadence.NewField("contractAddress", cadence.StringType),
-	cadence.NewField("logs", cadence.NewVariableSizedArrayType(cadence.UInt8Type)),
+	cadence.NewField("logs", cadenceArrayTypeOfUInt8),
 	cadence.NewField("blockHeight", cadence.UInt64Type),
 	// todo we can remove hash and just reference block by height (evm-gateway dependency)
-	cadence.NewField("blockHash", cadence.NewVariableSizedArrayType(cadence.UInt8Type)),
-	cadence.NewField("returnedData", cadence.NewVariableSizedArrayType(cadence.UInt8Type)),
-	cadence.NewField("precompiledCalls", cadence.NewVariableSizedArrayType(cadence.UInt8Type)),
+	cadence.NewField("blockHash", cadenceHashType),
+	cadence.NewField("returnedData", cadenceArrayTypeOfUInt8),
+	cadence.NewField("precompiledCalls", cadenceArrayTypeOfUInt8),
 }
 
 func (p *transactionEvent) ToCadence(location common.Location) (cadence.Event, error) {
@@ -107,7 +107,7 @@ func (p *transactionEvent) ToCadence(location common.Location) (cadence.Event, e
 	)
 
 	return cadence.NewEvent([]cadence.Value{
-		BytesToCadenceUInt8ArrayValue(p.Result.TxHash.Bytes()),
+		HashToCadenceArrayValue(p.Result.TxHash),
 		cadence.NewUInt16(p.Result.Index),
 		cadence.NewUInt8(p.Result.TxType),
 		BytesToCadenceUInt8ArrayValue(p.Payload),
@@ -117,7 +117,7 @@ func (p *transactionEvent) ToCadence(location common.Location) (cadence.Event, e
 		deployedAddress,
 		BytesToCadenceUInt8ArrayValue(encodedLogs),
 		cadence.NewUInt64(p.BlockHeight),
-		BytesToCadenceUInt8ArrayValue(p.BlockHash.Bytes()),
+		HashToCadenceArrayValue(p.BlockHash),
 		BytesToCadenceUInt8ArrayValue(p.Result.ReturnedData),
 		BytesToCadenceUInt8ArrayValue(p.Result.PrecompiledCalls),
 	}).WithType(eventType), nil
@@ -137,33 +137,20 @@ func NewBlockEvent(block *Block) *Event {
 
 var blockEventFields = []cadence.Field{
 	cadence.NewField("height", cadence.UInt64Type),
-	cadence.NewField("hash",
-		cadence.NewVariableSizedArrayType(cadence.UInt8Type),
-	),
+	cadence.NewField("hash", cadenceHashType),
 	cadence.NewField("timestamp", cadence.UInt64Type),
 	cadence.NewField("totalSupply", cadence.IntType),
 	cadence.NewField("totalGasUsed", cadence.UInt64Type),
-	cadence.NewField(
-		"parentHash",
-		cadence.NewVariableSizedArrayType(cadence.UInt8Type),
-	),
-	cadence.NewField(
-		"receiptRoot",
-		cadence.NewVariableSizedArrayType(cadence.UInt8Type),
-	),
-	cadence.NewField(
-		"transactionHashes",
-		cadence.NewVariableSizedArrayType(
-			cadence.NewVariableSizedArrayType(cadence.UInt8Type),
-		),
-	),
+	cadence.NewField("parentHash", cadenceHashType),
+	cadence.NewField("receiptRoot", cadenceHashType),
+	cadence.NewField("transactionHashes", cadence.NewVariableSizedArrayType(cadenceHashType)),
 }
 
 func (p *blockEvent) ToCadence(location common.Location) (cadence.Event, error) {
 
 	transactionHashes := make([]cadence.Value, len(p.TransactionHashes))
 	for i, hash := range p.TransactionHashes {
-		transactionHashes[i] = BytesToCadenceUInt8ArrayValue(hash.Bytes())
+		transactionHashes[i] = HashToCadenceArrayValue(hash)
 	}
 
 	blockHash, err := p.Hash()
@@ -180,18 +167,14 @@ func (p *blockEvent) ToCadence(location common.Location) (cadence.Event, error) 
 
 	return cadence.NewEvent([]cadence.Value{
 		cadence.NewUInt64(p.Height),
-		BytesToCadenceUInt8ArrayValue(blockHash.Bytes()),
+		HashToCadenceArrayValue(blockHash),
 		cadence.NewUInt64(p.Timestamp),
 		cadence.NewIntFromBig(p.TotalSupply),
 		cadence.NewUInt64(p.TotalGasUsed),
-		BytesToCadenceUInt8ArrayValue(p.ParentBlockHash.Bytes()),
-		BytesToCadenceUInt8ArrayValue(p.ReceiptRoot.Bytes()),
+		HashToCadenceArrayValue(p.ParentBlockHash),
+		HashToCadenceArrayValue(p.ReceiptRoot),
 		cadence.NewArray(transactionHashes).
-			WithType(
-				cadence.NewVariableSizedArrayType(
-					cadence.NewVariableSizedArrayType(cadence.UInt8Type),
-				),
-			),
+			WithType(cadence.NewVariableSizedArrayType(cadenceHashType)),
 	}).WithType(eventType), nil
 }
 
