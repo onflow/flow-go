@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/onflow/cadence/encoding/ccf"
-	gethCommon "github.com/onflow/go-ethereum/common"
 	gethTypes "github.com/onflow/go-ethereum/core/types"
 	gethParams "github.com/onflow/go-ethereum/params"
 	"github.com/onflow/go-ethereum/rlp"
@@ -120,10 +119,12 @@ func TestEVMRun(t *testing.T) {
 				require.Equal(t, uint64(43785), blockEventPayload.TotalGasUsed)
 				require.NotEmpty(t, blockEventPayload.Hash)
 
-				txHashes := types.TransactionHashes{gethCommon.HexToHash(txEventPayload.Hash)}
+				txHash, err := types.CadenceArrayValueToHash(txEventPayload.Hash)
+				require.NoError(t, err)
+				txHashes := types.TransactionHashes{txHash}
 				require.Equal(t,
-					txHashes.RootHash().String(),
-					string(blockEventPayload.TransactionHashRoot),
+					types.HashToCadenceArrayValue(txHashes.RootHash()),
+					blockEventPayload.TransactionHashRoot,
 				)
 				require.NotEmpty(t, blockEventPayload.ReceiptRoot)
 
@@ -483,7 +484,10 @@ func TestEVMBatchRun(t *testing.T) {
 					event, err := types.DecodeTransactionEventPayload(cadenceEvent)
 					require.NoError(t, err)
 
-					txHashes = append(txHashes, gethCommon.HexToHash(event.Hash))
+					txHash, err := types.CadenceArrayValueToHash(event.Hash)
+					require.NoError(t, err)
+
+					txHashes = append(txHashes, txHash)
 					encodedLogs, err := types.CadenceUInt8ArrayValueToBytes(event.Logs)
 					require.NoError(t, err)
 
@@ -507,8 +511,8 @@ func TestEVMBatchRun(t *testing.T) {
 				require.NotEmpty(t, blockEventPayload.Hash)
 				require.Equal(t, uint64(155513), blockEventPayload.TotalGasUsed)
 				require.Equal(t,
-					txHashes.RootHash().String(),
-					string(blockEventPayload.TransactionHashRoot),
+					types.HashToCadenceArrayValue(txHashes.RootHash()),
+					blockEventPayload.TransactionHashRoot,
 				)
 
 				// retrieve the values
@@ -993,11 +997,12 @@ func TestEVMAddressDeposit(t *testing.T) {
 			require.NotEmpty(t, blockEventPayload.Hash)
 			require.Equal(t, uint64(21000), blockEventPayload.TotalGasUsed)
 
-			txHash := gethCommon.HexToHash(txEventPayload.Hash)
+			txHash, err := types.CadenceArrayValueToHash(txEventPayload.Hash)
+			require.NoError(t, err)
 			txHashes := types.TransactionHashes{txHash}
 			require.Equal(t,
-				txHashes.RootHash().String(),
-				string(blockEventPayload.TransactionHashRoot),
+				types.HashToCadenceArrayValue(txHashes.RootHash()),
+				blockEventPayload.TransactionHashRoot,
 			)
 		})
 }
