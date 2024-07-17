@@ -12,7 +12,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/module/blobs"
-	storagedb "github.com/onflow/flow-go/module/executiondatasync/storage"
+	edstorage "github.com/onflow/flow-go/module/executiondatasync/storage"
 )
 
 // badger key prefixes
@@ -69,7 +69,7 @@ func makeUint64Value(v uint64) []byte {
 	return value
 }
 
-func getUint64Value(item storagedb.StorageItem) (uint64, error) {
+func getUint64Value(item edstorage.StorageItem) (uint64, error) {
 	value, err := item.ValueCopy(nil)
 	if err != nil {
 		return 0, err
@@ -80,7 +80,7 @@ func getUint64Value(item storagedb.StorageItem) (uint64, error) {
 
 // getBatchItemCountLimit returns the maximum number of items that can be included in a single batch
 // transaction based on the number / total size of updates per item.
-func getBatchItemCountLimit(db storagedb.StorageDB, writeCountPerItem int64, writeSizePerItem int64) int {
+func getBatchItemCountLimit(db edstorage.StorageDB, writeCountPerItem int64, writeSizePerItem int64) int {
 	totalSizePerItem := 2*writeCountPerItem + writeSizePerItem // 2 bytes per entry for user and internal meta
 	maxItemCountByWriteCount := db.MaxBatchCount() / writeCountPerItem
 	maxItemCountByWriteSize := db.MaxBatchSize() / totalSizePerItem
@@ -166,7 +166,7 @@ type storage struct {
 	// we acquire the write lock when we want to perform a prune WRITE
 	mu sync.RWMutex
 
-	db            storagedb.StorageDB
+	db            edstorage.StorageDB
 	pruneCallback PruneCallback
 	logger        zerolog.Logger
 }
@@ -179,7 +179,7 @@ func WithPruneCallback(callback PruneCallback) StorageOption {
 	}
 }
 
-func OpenStorage(db storagedb.StorageDB, startHeight uint64, logger zerolog.Logger, opts ...StorageOption) (*storage, error) {
+func OpenStorage(db edstorage.StorageDB, startHeight uint64, logger zerolog.Logger, opts ...StorageOption) (*storage, error) {
 	lg := logger.With().Str("module", "tracker_storage").Logger()
 
 	storage := &storage{

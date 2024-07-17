@@ -29,6 +29,10 @@ func (b *BadgerDBWrapper) Datastore() ds.Batching {
 	return b.ds
 }
 
+func (b *BadgerDBWrapper) DB() interface{} {
+	return b.ds.DB
+}
+
 func (b *BadgerDBWrapper) Keys(prefix []byte) ([][]byte, error) {
 	var keys [][]byte
 

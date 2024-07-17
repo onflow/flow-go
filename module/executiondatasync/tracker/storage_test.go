@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/module/blobs"
-	storagedb "github.com/onflow/flow-go/module/executiondatasync/storage"
+	edstorage "github.com/onflow/flow-go/module/executiondatasync/storage"
 )
 
 func randomCid() cid.Cid {
@@ -28,7 +28,7 @@ func TestPrune(t *testing.T) {
 	storageDir := t.TempDir()
 	options := badgerds.DefaultOptions
 	options.Options = badger.LSMOnlyOptions(storageDir)
-	storageDB, err := storagedb.NewBadgerDBWrapper(storageDir, &options)
+	storageDB, err := edstorage.NewBadgerDBWrapper(storageDir, &options)
 	require.NoError(t, err)
 	storage, err := OpenStorage(storageDB, 0, zerolog.Nop(), WithPruneCallback(func(c cid.Cid) error {
 		_, ok := expectedPrunedCIDs[c]
@@ -86,7 +86,7 @@ func TestPruneNonLatestHeight(t *testing.T) {
 	storageDir := t.TempDir()
 	options := badgerds.DefaultOptions
 	options.Options = badger.LSMOnlyOptions(storageDir)
-	storageDB, err := storagedb.NewBadgerDBWrapper(storageDir, &options)
+	storageDB, err := edstorage.NewBadgerDBWrapper(storageDir, &options)
 	require.NoError(t, err)
 	storage, err := OpenStorage(storageDB, 0, zerolog.Nop(), WithPruneCallback(func(c cid.Cid) error {
 		assert.Fail(t, "unexpected CID pruned: %s", c.String())
@@ -129,7 +129,7 @@ func TestAscendingOrderOfRecords(t *testing.T) {
 
 	options := badgerds.DefaultOptions
 	options.Options = badger.LSMOnlyOptions(storageDir)
-	storageDB, err := storagedb.NewBadgerDBWrapper(storageDir, &options)
+	storageDB, err := edstorage.NewBadgerDBWrapper(storageDir, &options)
 	require.NoError(t, err)
 	storage, err := OpenStorage(storageDB, 0, zerolog.Nop(), WithPruneCallback(func(c cid.Cid) error {
 		_, ok := expectedPrunedCIDs[c]

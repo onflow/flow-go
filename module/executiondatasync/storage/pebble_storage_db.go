@@ -15,19 +15,32 @@ var _ StorageDB = (*PebbleDBWrapper)(nil)
 // PebbleDBWrapper wraps the PebbleDB to implement the StorageDB interface.
 type PebbleDBWrapper struct {
 	ds *pebbleds.Datastore
+	db *pebble.DB
 }
 
-func NewPebbleDBWrapper(datastorePath string, options *pebble.Options) (*PebbleDBWrapper, error) {
-	db, err := pebbleds.NewDatastore(datastorePath, options)
+func NewPebbleDBWrapper(dbPath string, options *pebble.Options) (*PebbleDBWrapper, error) {
+	db, err := pebble.Open(dbPath, options)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open pebble database: %w", err)
+	}
+
+	ds, err := pebbleds.NewDatastore(dbPath, options)
 	if err != nil {
 		return nil, fmt.Errorf("could not open tracker ds: %w", err)
 	}
 
-	return &PebbleDBWrapper{db}, nil
+	return &PebbleDBWrapper{
+		ds: ds,
+		db: db,
+	}, nil
 }
 
 func (p *PebbleDBWrapper) Datastore() ds.Batching {
 	return p.ds
+}
+
+func (p *PebbleDBWrapper) DB() interface{} {
+	return p.db
 }
 
 func (p *PebbleDBWrapper) Keys(prefix []byte) ([][]byte, error) {

@@ -10,6 +10,7 @@ import (
 // StorageDB defines the interface for key-value store operations.
 type StorageDB interface {
 	Datastore() datastore.Batching
+	DB() interface{}
 
 	Get(key []byte) (StorageItem, error)
 	Set(key, val []byte) error
