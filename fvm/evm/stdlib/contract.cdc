@@ -6,7 +6,7 @@ import "FlowToken"
 access(all)
 contract EVM {
 
-    // Entitlements enabling finer-graned access control on a CadenceOwnedAccount
+    // Entitlements enabling finer-grained access control on a CadenceOwnedAccount
     access(all) entitlement Validate
     access(all) entitlement Withdraw
     access(all) entitlement Call
@@ -36,7 +36,7 @@ contract EVM {
         transactionHashRoot: [UInt8; 32],
     )
 
-    /// Transaction executed event is emitted everytime a transaction
+    /// Transaction executed event is emitted every time a transaction
     /// is executed by the EVM (even if failed).
     access(all)
     event TransactionExecuted(
