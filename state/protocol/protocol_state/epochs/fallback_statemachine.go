@@ -60,9 +60,8 @@ func NewFallbackStateMachine(params protocol.GlobalParams, telemetry protocol_st
 		// we have reached safety threshold and we are still in the fallback mode
 		// prepare a new extension for the current epoch.
 		err := sm.extendCurrentEpoch(flow.EpochExtension{
-			FirstView:     parentState.CurrentEpochFinalView() + 1,
-			FinalView:     parentState.CurrentEpochFinalView() + DefaultEpochExtensionViewCount, // TODO(EFM, #6020): replace with EpochExtensionLength
-			TargetEndTime: 0,                                                                    // TODO(EFM, #6020): calculate and set target end time
+			FirstView: parentState.CurrentEpochFinalView() + 1,
+			FinalView: parentState.CurrentEpochFinalView() + DefaultEpochExtensionViewCount, // TODO(EFM, #6020): replace with EpochExtensionLength
 		})
 		if err != nil {
 			return nil, err
