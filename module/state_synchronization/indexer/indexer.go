@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
+	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/module"
@@ -16,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/module/jobqueue"
 	"github.com/onflow/flow-go/module/state_synchronization"
 	"github.com/onflow/flow-go/module/state_synchronization/requester/jobs"
+	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/storage"
 )
 
@@ -49,12 +51,15 @@ type Indexer struct {
 	component.Component
 	*execution_data.ExecutionDataProducerManager
 
-	log             zerolog.Logger
-	exeDataReader   *jobs.ExecutionDataReader
-	exeDataNotifier engine.Notifier
-	indexer         *IndexerCore
-	jobConsumer     *jobqueue.ComponentConsumer
-	registers       storage.RegisterIndex
+	log                  zerolog.Logger
+	exeDataReader        *jobs.ExecutionDataReader
+	exeDataNotifier      engine.Notifier
+	blockIndexedNotifier engine.Notifier
+	// lastProcessedHeight the last handled block height
+	lastProcessedHeight *atomic.Uint64
+	indexer             *IndexerCore
+	jobConsumer         *jobqueue.ComponentConsumer
+	registers           storage.RegisterIndex
 }
 
 // NewIndexer creates a new execution worker.
@@ -70,6 +75,8 @@ func NewIndexer(
 	r := &Indexer{
 		log:                          log.With().Str("module", "execution_indexer").Logger(),
 		exeDataNotifier:              engine.NewNotifier(),
+		blockIndexedNotifier:         engine.NewNotifier(),
+		lastProcessedHeight:          atomic.NewUint64(0),
 		indexer:                      indexer,
 		registers:                    registers,
 		ExecutionDataProducerManager: execution_data.NewExecutionDataProducerManager(),
@@ -95,13 +102,75 @@ func NewIndexer(
 
 	r.jobConsumer = jobConsumer
 
-	r.jobConsumer.SetPostNotifier(func(id module.JobID) {
-		r.SetLastProcessedHeight(r.jobConsumer.LastProcessedIndex())
+	// SetPostNotifier will notify blockIndexedNotifier AFTER e.jobConsumer.LastProcessedIndex is updated.
+	r.jobConsumer.SetPostNotifier(func(module.JobID) {
+		r.blockIndexedNotifier.Notify()
 	})
 
-	r.Component = r.jobConsumer
+	cm := component.NewComponentManagerBuilder()
+	cm.AddWorker(r.runExecutionDataConsumer)
+	cm.AddWorker(r.processBlockIndexed)
+	r.Component = cm.Build()
 
 	return r, nil
+}
+
+// runExecutionDataConsumer runs the jobConsumer component
+//
+// No errors are expected during normal operations.
+func (i *Indexer) runExecutionDataConsumer(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+	i.log.Info().Msg("starting execution data jobqueue")
+	i.jobConsumer.Start(ctx)
+	err := util.WaitClosed(ctx, i.jobConsumer.Ready())
+	if err == nil {
+		ready()
+	}
+
+	<-i.jobConsumer.Done()
+}
+
+// processBlockIndexed is a worker that processes indexed blocks.
+//
+// No errors are expected during normal operations.
+func (i *Indexer) processBlockIndexed(
+	ctx irrecoverable.SignalerContext,
+	ready component.ReadyFunc,
+) {
+	ready()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-i.blockIndexedNotifier.Channel():
+			i.onBlockIndexed(ctx)
+		}
+	}
+}
+
+// onBlockIndexed notifies ExecutionDataProducerManager that new block is indexed.
+//
+// No errors are expected during normal operations.
+func (i *Indexer) onBlockIndexed(ctx irrecoverable.SignalerContext) {
+	lastProcessedHeight := i.lastProcessedHeight.Load()
+	highestIndexedHeight := i.jobConsumer.LastProcessedIndex()
+
+	if lastProcessedHeight >= highestIndexedHeight {
+		// already processed this
+		return
+	}
+
+	for height := lastProcessedHeight + 1; height <= highestIndexedHeight; height++ {
+		header, err := i.indexer.headers.ByHeight(height)
+		if err != nil {
+			// if the execution data is available, the block must be locally finalized
+			i.log.Error().Err(err).Msgf("could not get header for height %d:", height)
+			ctx.Throw(err)
+		}
+
+		i.SetLastProcessedHeight(header.Height)
+		i.lastProcessedHeight.Store(height)
+	}
 }
 
 // Start the worker jobqueue to consume the available data.

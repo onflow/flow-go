@@ -170,7 +170,9 @@ func (p *Pruner) loop(ctx irrecoverable.SignalerContext, ready component.ReadyFu
 
 				err := p.updateFulfilledHeight(lowestHeight)
 				if err != nil {
-					ctx.Throw(fmt.Errorf("failed to update lowest fulfilled height: %w", err))
+					p.logger.Fatal().Err(err).Msg("failed to set fulfilled height")
+					//TODO: check if Throw is needed here
+					//ctx.Throw(fmt.Errorf("failed to update lowest fulfilled height: %w", err))
 				}
 			}
 			p.checkPrune(ctx)
