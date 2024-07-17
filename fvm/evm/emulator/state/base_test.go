@@ -1,9 +1,9 @@
 package state_test
 
 import (
-	"math/big"
 	"testing"
 
+	"github.com/holiman/uint256"
 	gethCommon "github.com/onflow/go-ethereum/common"
 	gethTypes "github.com/onflow/go-ethereum/core/types"
 	gethCrypto "github.com/onflow/go-ethereum/crypto"
@@ -31,14 +31,14 @@ func TestBaseView(t *testing.T) {
 			view,
 			addr1,
 			false,
-			big.NewInt(0),
+			uint256.NewInt(0),
 			uint64(0),
 			nil,
 			gethCommon.Hash{},
 		)
 
 		// create an account with code
-		newBal := big.NewInt(10)
+		newBal := uint256.NewInt(10)
 		newNonce := uint64(5)
 		newCode := []byte("some code")
 		newCodeHash := gethCommon.Hash{1, 2}
@@ -76,7 +76,7 @@ func TestBaseView(t *testing.T) {
 
 		// test update account
 
-		newBal = big.NewInt(12)
+		newBal = uint256.NewInt(12)
 		newNonce = uint64(6)
 		newCode = []byte("some new code")
 		newCodeHash = gethCommon.Hash{2, 3}
@@ -121,7 +121,7 @@ func TestBaseView(t *testing.T) {
 			view,
 			addr1,
 			false,
-			big.NewInt(0),
+			uint256.NewInt(0),
 			uint64(0),
 			nil,
 			gethCommon.Hash{},
@@ -138,7 +138,7 @@ func TestBaseView(t *testing.T) {
 			view,
 			addr1,
 			false,
-			big.NewInt(0),
+			uint256.NewInt(0),
 			uint64(0),
 			nil,
 			gethCommon.Hash{},
@@ -171,7 +171,7 @@ func TestBaseView(t *testing.T) {
 		require.Error(t, err)
 
 		// account should have code to have slots
-		err = view.CreateAccount(addr1, big.NewInt(10), 0, []byte("ABC"), gethCommon.Hash{1, 2, 3})
+		err = view.CreateAccount(addr1, uint256.NewInt(10), 0, []byte("ABC"), gethCommon.Hash{1, 2, 3})
 		require.NoError(t, err)
 
 		err = view.UpdateSlot(slot1, newValue)
@@ -202,7 +202,7 @@ func TestBaseView(t *testing.T) {
 
 		dest, bal := view.HasSelfDestructed(gethCommon.Address{})
 		require.Equal(t, false, dest)
-		require.Equal(t, new(big.Int), bal)
+		require.Equal(t, new(uint256.Int), bal)
 		require.Equal(t, false, view.IsCreated(gethCommon.Address{}))
 		require.Equal(t, uint64(0), view.GetRefund())
 		require.Equal(t, gethCommon.Hash{}, view.GetTransientState(types.SlotAddress{}))
@@ -218,7 +218,7 @@ func TestBaseView(t *testing.T) {
 		view, err := state.NewBaseView(ledger, rootAddr)
 		require.NoError(t, err)
 
-		bal := new(big.Int)
+		bal := new(uint256.Int)
 		nonce := uint64(0)
 
 		addr1 := testutils.RandomCommonAddress(t)
@@ -308,7 +308,7 @@ func checkAccount(t *testing.T,
 	view *state.BaseView,
 	addr gethCommon.Address,
 	exists bool,
-	balance *big.Int,
+	balance *uint256.Int,
 	nonce uint64,
 	code []byte,
 	codeHash gethCommon.Hash,
