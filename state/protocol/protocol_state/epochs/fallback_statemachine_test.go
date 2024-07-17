@@ -9,6 +9,7 @@ import (
 	"pgregory.net/rapid"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/state/protocol"
 	mockstate "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -90,18 +91,17 @@ func (s *EpochFallbackStateMachineSuite) TestProcessEpochRecover() {
 	require.True(s.T(), hasChanges, "should have changes")
 	require.Equal(s.T(), updatedState.ID(), updatedStateID, "state ID should be equal to updated state ID")
 
-	expectedState := &flow.EpochProtocolStateEntry{
+	expectedState := &flow.MinEpochStateEntry{
 		PreviousEpoch: s.parentProtocolState.PreviousEpoch.Copy(),
 		CurrentEpoch:  s.parentProtocolState.CurrentEpoch,
 		NextEpoch: &flow.EpochStateContainer{
 			SetupID:          epochRecover.EpochSetup.ID(),
 			CommitID:         epochRecover.EpochCommit.ID(),
 			ActiveIdentities: flow.DynamicIdentityEntryListFromIdentities(nextEpochParticipants),
-			EpochExtensions:  nil,
 		},
 		EpochFallbackTriggered: false,
 	}
-	require.Equal(s.T(), expectedState, updatedState, "updatedState should be equal to expected one")
+	require.Equal(s.T(), expectedState, updatedState.MinEpochStateEntry, "updatedState should be equal to expected one")
 }
 
 // TestProcessInvalidEpochRecover tests that processing epoch recover event which is invalid or is not compatible with current
@@ -269,11 +269,19 @@ func (s *EpochFallbackStateMachineSuite) TestTransitionToNextEpoch() {
 	candidate := unittest.BlockHeaderFixture(
 		unittest.HeaderWithView(s.parentProtocolState.CurrentEpochSetup.FinalView + 1))
 
-	expectedState := &flow.EpochProtocolStateEntry{
-		PreviousEpoch:          s.parentProtocolState.CurrentEpoch.Copy(),
-		CurrentEpoch:           *s.parentProtocolState.NextEpoch.Copy(),
-		NextEpoch:              nil,
-		EpochFallbackTriggered: true,
+	expectedState := &flow.EpochStateEntry{
+		MinEpochStateEntry: &flow.MinEpochStateEntry{
+			PreviousEpoch:          s.parentProtocolState.CurrentEpoch.Copy(),
+			CurrentEpoch:           *s.parentProtocolState.NextEpoch.Copy(),
+			NextEpoch:              nil,
+			EpochFallbackTriggered: true,
+		},
+		PreviousEpochSetup:  s.parentProtocolState.CurrentEpochSetup,
+		PreviousEpochCommit: s.parentProtocolState.CurrentEpochCommit,
+		CurrentEpochSetup:   s.parentProtocolState.NextEpochSetup,
+		CurrentEpochCommit:  s.parentProtocolState.NextEpochCommit,
+		NextEpochSetup:      nil,
+		NextEpochCommit:     nil,
 	}
 
 	// Irrespective of whether the parent state is in EFM, the FallbackStateMachine should always set
@@ -292,7 +300,7 @@ func (s *EpochFallbackStateMachineSuite) TestTransitionToNextEpoch() {
 		require.True(s.T(), hasChanges)
 		require.NotEqual(s.T(), parentProtocolState.ID(), updatedState.ID())
 		require.Equal(s.T(), updatedState.ID(), stateID)
-		require.Equal(s.T(), updatedState, expectedState, "FallbackStateMachine produced unexpected Protocol State")
+		require.Equal(s.T(), expectedState, updatedState, "FallbackStateMachine produced unexpected Protocol State")
 	}
 }
 
@@ -308,7 +316,7 @@ func (s *EpochFallbackStateMachineSuite) TestTransitionToNextEpochNotAllowed() {
 		require.Error(s.T(), err, "should not allow transition to next epoch if there is no next epoch protocol state")
 	})
 	s.Run("next epoch not committed", func() {
-		protocolState := unittest.EpochStateFixture(unittest.WithNextEpochProtocolState(), func(entry *flow.RichEpochProtocolStateEntry) {
+		protocolState := unittest.EpochStateFixture(unittest.WithNextEpochProtocolState(), func(entry *flow.RichEpochStateEntry) {
 			entry.NextEpoch.CommitID = flow.ZeroID
 			entry.NextEpochCommit = nil
 			entry.NextEpochIdentityTable = nil
@@ -356,18 +364,17 @@ func (s *EpochFallbackStateMachineSuite) TestNewEpochFallbackStateMachine() {
 		require.Equal(s.T(), updatedState.ID(), stateID)
 		require.NotEqual(s.T(), parentProtocolState.ID(), stateID)
 
-		expectedProtocolState := &flow.EpochProtocolStateEntry{
+		expectedProtocolState := &flow.MinEpochStateEntry{
 			PreviousEpoch: parentProtocolState.PreviousEpoch,
 			CurrentEpoch: flow.EpochStateContainer{
 				SetupID:          parentProtocolState.CurrentEpoch.SetupID,
 				CommitID:         parentProtocolState.CurrentEpoch.CommitID,
 				ActiveIdentities: parentProtocolState.CurrentEpoch.ActiveIdentities,
-				EpochExtensions:  nil,
 			},
 			NextEpoch:              nil,
 			EpochFallbackTriggered: true,
 		}
-		require.Equal(s.T(), expectedProtocolState, updatedState, "state should be equal to expected one")
+		require.Equal(s.T(), expectedProtocolState, updatedState.MinEpochStateEntry, "state should be equal to expected one")
 	})
 
 	// The view we enter EFM is in the staking phase. The resulting epoch state should set `EpochFallbackTriggered` to true.
@@ -383,7 +390,7 @@ func (s *EpochFallbackStateMachineSuite) TestNewEpochFallbackStateMachine() {
 		require.Equal(s.T(), updatedState.ID(), stateID)
 		require.NotEqual(s.T(), parentProtocolState.ID(), stateID)
 
-		expectedProtocolState := &flow.EpochProtocolStateEntry{
+		expectedProtocolState := &flow.MinEpochStateEntry{
 			PreviousEpoch: parentProtocolState.PreviousEpoch,
 			CurrentEpoch: flow.EpochStateContainer{
 				SetupID:          parentProtocolState.CurrentEpoch.SetupID,
@@ -399,7 +406,7 @@ func (s *EpochFallbackStateMachineSuite) TestNewEpochFallbackStateMachine() {
 			NextEpoch:              nil,
 			EpochFallbackTriggered: true,
 		}
-		require.Equal(s.T(), expectedProtocolState, updatedState, "state should be equal to expected one")
+		require.Equal(s.T(), expectedProtocolState, updatedState.MinEpochStateEntry, "state should be equal to expected one")
 	})
 
 	// The view we enter EFM is in the epoch setup phase. This means that a SetupEvent for the next epoch is in the parent block's
@@ -422,7 +429,7 @@ func (s *EpochFallbackStateMachineSuite) TestNewEpochFallbackStateMachine() {
 		require.Equal(s.T(), updatedState.ID(), stateID)
 		require.NotEqual(s.T(), parentProtocolState.ID(), stateID)
 
-		expectedProtocolState := &flow.EpochProtocolStateEntry{
+		expectedProtocolState := &flow.MinEpochStateEntry{
 			PreviousEpoch: parentProtocolState.PreviousEpoch,
 			CurrentEpoch: flow.EpochStateContainer{
 				SetupID:          parentProtocolState.CurrentEpoch.SetupID,
@@ -438,7 +445,7 @@ func (s *EpochFallbackStateMachineSuite) TestNewEpochFallbackStateMachine() {
 			NextEpoch:              nil,
 			EpochFallbackTriggered: true,
 		}
-		require.Equal(s.T(), expectedProtocolState, updatedState, "state should be equal to expected one")
+		require.Equal(s.T(), expectedProtocolState, updatedState.MinEpochStateEntry, "state should be equal to expected one")
 	})
 
 	// If the next epoch has been committed, the extension shouldn't be added to the current epoch (verified below). Instead, the
@@ -461,18 +468,17 @@ func (s *EpochFallbackStateMachineSuite) TestNewEpochFallbackStateMachine() {
 		require.Equal(s.T(), updatedState.ID(), stateID)
 		require.NotEqual(s.T(), parentProtocolState.ID(), stateID)
 
-		expectedProtocolState := &flow.EpochProtocolStateEntry{
+		expectedProtocolState := &flow.MinEpochStateEntry{
 			PreviousEpoch: parentProtocolState.PreviousEpoch,
 			CurrentEpoch: flow.EpochStateContainer{
 				SetupID:          parentProtocolState.CurrentEpoch.SetupID,
 				CommitID:         parentProtocolState.CurrentEpoch.CommitID,
 				ActiveIdentities: parentProtocolState.CurrentEpoch.ActiveIdentities,
-				EpochExtensions:  nil,
 			},
 			NextEpoch:              parentProtocolState.NextEpoch,
 			EpochFallbackTriggered: true,
 		}
-		require.Equal(s.T(), expectedProtocolState, updatedState, "state should be equal to expected one")
+		require.Equal(s.T(), expectedProtocolState, updatedState.MinEpochStateEntry, "state should be equal to expected one")
 	})
 }
 
@@ -489,7 +495,7 @@ func (s *EpochFallbackStateMachineSuite) TestEpochFallbackStateMachineInjectsMul
 	parentStateInSetupPhase.NextEpoch.CommitID = flow.ZeroID
 	parentStateInSetupPhase.NextEpochCommit = nil
 
-	for _, originalParentState := range []*flow.RichEpochProtocolStateEntry{parentStateInStakingPhase, parentStateInSetupPhase} {
+	for _, originalParentState := range []*flow.RichEpochStateEntry{parentStateInStakingPhase, parentStateInSetupPhase} {
 		// In the previous test `TestNewEpochFallbackStateMachine`, we verified that the first extension is added correctly. Below we
 		// test proper addition of the subsequent extension. A new extension should be added when we reach `firstExtensionViewThreshold`.
 		// When reaching (equality) this threshold, the next extension should be added
@@ -519,14 +525,7 @@ func (s *EpochFallbackStateMachineSuite) TestEpochFallbackStateMachineInjectsMul
 				require.NoError(s.T(), err)
 				updatedState, _, _ := stateMachine.Build()
 
-				parentProtocolState, err = flow.NewRichEpochProtocolStateEntry(updatedState,
-					parentProtocolState.PreviousEpochSetup,
-					parentProtocolState.PreviousEpochCommit,
-					parentProtocolState.CurrentEpochSetup,
-					parentProtocolState.CurrentEpochCommit,
-					nil, // as the next epoch was not yet committed, when we entered EFM, the state machine removed the outdated setup event
-					nil)
-
+				parentProtocolState, err = flow.NewRichEpochStateEntry(updatedState)
 				require.NoError(s.T(), err)
 			}
 		}
@@ -548,7 +547,7 @@ func (s *EpochFallbackStateMachineSuite) TestEpochFallbackStateMachineInjectsMul
 		} {
 			evolveStateToView(data.TargetView)
 
-			expectedState := &flow.EpochProtocolStateEntry{
+			expectedState := &flow.MinEpochStateEntry{
 				PreviousEpoch: originalParentState.PreviousEpoch,
 				CurrentEpoch: flow.EpochStateContainer{
 					SetupID:          originalParentState.CurrentEpoch.SetupID,
@@ -559,7 +558,7 @@ func (s *EpochFallbackStateMachineSuite) TestEpochFallbackStateMachineInjectsMul
 				NextEpoch:              nil,
 				EpochFallbackTriggered: true,
 			}
-			require.Equal(s.T(), expectedState, parentProtocolState.EpochProtocolStateEntry)
+			require.Equal(s.T(), expectedState, parentProtocolState.MinEpochStateEntry)
 			require.Greater(s.T(), parentProtocolState.CurrentEpochFinalView(), candidateView,
 				"final view should be greater than final view of test")
 		}
@@ -608,27 +607,12 @@ func (s *EpochFallbackStateMachineSuite) TestEpochFallbackStateMachineInjectsMul
 			stateMachine, err := NewFallbackStateMachine(s.params, s.consumer, candidateView, parentProtocolState.Copy())
 			require.NoError(s.T(), err)
 
-			previousEpochSetup, previousEpochCommit := parentProtocolState.PreviousEpochSetup, parentProtocolState.PreviousEpochCommit
-			currentEpochSetup, currentEpochCommit := parentProtocolState.CurrentEpochSetup, parentProtocolState.CurrentEpochCommit
-			nextEpochSetup, nextEpochCommit := parentProtocolState.NextEpochSetup, parentProtocolState.NextEpochCommit
 			if candidateView > parentProtocolState.CurrentEpochFinalView() {
 				require.NoError(s.T(), stateMachine.TransitionToNextEpoch())
-
-				// after we have transitioned to the next epoch, we need to update the current epoch
-				// for the next iteration we can use parent protocol state again
-				previousEpochSetup, previousEpochCommit = currentEpochSetup, currentEpochCommit
-				currentEpochSetup, currentEpochCommit = parentProtocolState.NextEpochSetup, parentProtocolState.NextEpochCommit
-				nextEpochSetup, nextEpochCommit = nil, nil
 			}
 
 			updatedState, _, _ := stateMachine.Build()
-			parentProtocolState, err = flow.NewRichEpochProtocolStateEntry(updatedState,
-				previousEpochSetup,
-				previousEpochCommit,
-				currentEpochSetup,
-				currentEpochCommit,
-				nextEpochSetup,
-				nextEpochCommit)
+			parentProtocolState, err = flow.NewRichEpochStateEntry(updatedState)
 			require.NoError(s.T(), err)
 		}
 	}
@@ -654,7 +638,7 @@ func (s *EpochFallbackStateMachineSuite) TestEpochFallbackStateMachineInjectsMul
 	} {
 		evolveStateToView(data.TargetView)
 
-		expectedState := &flow.EpochProtocolStateEntry{
+		expectedState := &flow.MinEpochStateEntry{
 			PreviousEpoch: originalParentState.CurrentEpoch.Copy(),
 			CurrentEpoch: flow.EpochStateContainer{
 				SetupID:          originalParentState.NextEpoch.SetupID,
@@ -665,16 +649,42 @@ func (s *EpochFallbackStateMachineSuite) TestEpochFallbackStateMachineInjectsMul
 			NextEpoch:              nil,
 			EpochFallbackTriggered: true,
 		}
-		require.Equal(s.T(), expectedState, parentProtocolState.EpochProtocolStateEntry)
+		require.Equal(s.T(), expectedState, parentProtocolState.MinEpochStateEntry)
 		require.Greater(s.T(), parentProtocolState.CurrentEpochFinalView(), candidateView,
 			"final view should be greater than final view of test")
 	}
 }
 
-// TestProcessingMultipleEventsAtSameBlock tests that the state machine can process multiple events at the same block.
+// TestEpochRecoverAndEjectionInSameBlock tests that processing an epoch recover event which re-admits an ejected identity results in an error.
+// Such action should be considered illegal since smart contract emitted ejection before epoch recover and service events are delivered
+// in an order-preserving manner.
+func (s *EpochFallbackStateMachineSuite) TestEpochRecoverAndEjectionInSameBlock() {
+	nextEpochParticipants := s.parentProtocolState.CurrentEpochIdentityTable.Copy()
+	ejectedIdentityID := nextEpochParticipants.Filter(filter.HasRole[flow.Identity](flow.RoleAccess))[0].NodeID
+	epochRecover := unittest.EpochRecoverFixture(func(setup *flow.EpochSetup) {
+		setup.Participants = nextEpochParticipants.ToSkeleton()
+		setup.Assignments = unittest.ClusterAssignment(1, nextEpochParticipants.ToSkeleton())
+		setup.Counter = s.parentProtocolState.CurrentEpochSetup.Counter + 1
+		setup.FirstView = s.parentProtocolState.CurrentEpochSetup.FinalView + 1
+		setup.FinalView = setup.FirstView + 10_000
+	})
+	ejected := s.stateMachine.EjectIdentity(ejectedIdentityID)
+	require.True(s.T(), ejected)
+
+	s.consumer.On("OnServiceEventReceived", epochRecover.ServiceEvent()).Once()
+	s.consumer.On("OnInvalidServiceEvent", epochRecover.ServiceEvent(),
+		mock.MatchedBy(func(err error) bool { return protocol.IsInvalidServiceEventError(err) })).Once()
+	processed, err := s.stateMachine.ProcessEpochRecover(epochRecover)
+	require.NoError(s.T(), err)
+	require.False(s.T(), processed)
+}
+
+// TestProcessingMultipleEventsAtTheSameBlock tests that the state machine can process multiple events at the same block.
 // EpochFallbackStateMachineSuite has to be able to process any combination of events in any order at the same block.
 // This test generates a random amount of setup, commit and recover events and processes them in random order.
-func (s *EpochFallbackStateMachineSuite) TestProcesingMultipleEventsAtTheSameBlock() {
+// A special rule is used to inject an ejection event, depending on the random draw we will inject an ejection event before or after the recover event.
+// Depending on the ordering of events, the recovering event needs to be structured differently.
+func (s *EpochFallbackStateMachineSuite) TestProcessingMultipleEventsAtTheSameBlock() {
 	rapid.Check(s.T(), func(t *rapid.T) {
 		s.SetupTest() // start each time with clean state
 		var events []flow.ServiceEvent
@@ -702,11 +712,34 @@ func (s *EpochFallbackStateMachineSuite) TestProcesingMultipleEventsAtTheSameBlo
 				mock.MatchedBy(func(err error) bool { return protocol.IsInvalidServiceEventError(err) })).Once()
 			events = append(events, serviceEvent)
 		}
+
+		var ejectedNodes flow.IdentifierList
+		var ejectionEvents flow.ServiceEventList
+		includeEjection := rapid.Bool().Draw(t, "eject-node")
+		if includeEjection {
+			accessNodes := s.parentProtocolState.CurrentEpochSetup.Participants.Filter(filter.HasRole[flow.IdentitySkeleton](flow.RoleAccess))
+			identity := rapid.SampledFrom(accessNodes).Draw(t, "ejection-node")
+			// TODO(EFM, #6020): this needs to be updated when a proper ejection event is implemented
+			serviceEvent := flow.ServiceEvent{
+				Type:  "ejection",
+				Event: identity.NodeID,
+			}
+			ejectionEvents = append(ejectionEvents, serviceEvent)
+			ejectedNodes = append(ejectedNodes, identity.NodeID)
+		}
+
 		includeValidRecover := rapid.Bool().Draw(t, "include-valid-recover-event")
+		ejectionBeforeRecover := rapid.Bool().Draw(t, "ejection-before-recover")
 		if includeValidRecover {
 			serviceEvent := unittest.EpochRecoverFixture(func(setup *flow.EpochSetup) {
 				nextEpochParticipants := s.parentProtocolState.CurrentEpochIdentityTable.Copy()
-				setup.Participants = nextEpochParticipants.ToSkeleton()
+				if ejectionBeforeRecover {
+					// a valid recovery event cannot readmit a node ejected previously
+					setup.Participants = nextEpochParticipants.ToSkeleton().Filter(
+						filter.Not(filter.HasNodeID[flow.IdentitySkeleton](ejectedNodes...)))
+				} else {
+					setup.Participants = nextEpochParticipants.ToSkeleton()
+				}
 				setup.Assignments = unittest.ClusterAssignment(1, nextEpochParticipants.ToSkeleton())
 				setup.Counter = s.parentProtocolState.CurrentEpochSetup.Counter + 1
 				setup.FirstView = s.parentProtocolState.CurrentEpochSetup.FinalView + 1
@@ -716,20 +749,14 @@ func (s *EpochFallbackStateMachineSuite) TestProcesingMultipleEventsAtTheSameBlo
 			s.consumer.On("OnServiceEventProcessed", serviceEvent).Once()
 			events = append(events, serviceEvent)
 		}
-		includeEjection := rapid.Bool().Draw(t, "eject-node")
-		ejectionGen := rapid.SampledFrom(s.parentProtocolState.CurrentEpoch.ActiveIdentities)
-		var ejectedNodes flow.IdentifierList
-		if includeEjection {
-			identity := ejectionGen.Draw(t, "ejection-node")
-			// TODO(EFM, #6020): this needs to be updated when a proper ejection event is implemented
-			serviceEvent := flow.ServiceEvent{
-				Type:  "ejection",
-				Event: identity.NodeID,
-			}
-			events = append(events, serviceEvent)
-			ejectedNodes = append(ejectedNodes, identity.NodeID)
-		}
+
 		events = rapid.Permutation(events).Draw(t, "events-permutation")
+		if ejectionBeforeRecover {
+			events = append(ejectionEvents, events...)
+		} else {
+			events = append(events, ejectionEvents...)
+		}
+
 		for _, event := range events {
 			var err error
 			switch ev := event.Event.(type) {
@@ -740,7 +767,7 @@ func (s *EpochFallbackStateMachineSuite) TestProcesingMultipleEventsAtTheSameBlo
 			case *flow.EpochRecover:
 				_, err = s.stateMachine.ProcessEpochRecover(ev)
 			case flow.Identifier:
-				err = s.stateMachine.EjectIdentity(ev)
+				_ = s.stateMachine.EjectIdentity(ev)
 			}
 			require.NoError(s.T(), err)
 		}
@@ -751,22 +778,20 @@ func (s *EpochFallbackStateMachineSuite) TestProcesingMultipleEventsAtTheSameBlo
 			require.True(s.T(), ejectedIdentity.Ejected)
 		}
 
-		// TODO(EFM, #6019): next section needs to be updated when implementing related issue.
-		// Extra context: logic in this test is based on the assumption that recover event readmits the same identity table.
-		// This means if there is an ejection event in the same block and it precedes the recovery event then the recovery event needs to be rejected
-		// since it tries to readmit an ejected identity.
-		// Based on the setup of the test we will have changes to the state in next cases:
-		// 1. includeValidRecover == true, includeEjection == false, in this case epoch is recovered and NextEpoch != nil.
-		// 2. includeValidRecover == false, includeEjection == true, in this case we eject nodes and NextEpoch == nil.
-		// 3. includeValidRecover == true, includeEjection == true, recover precedes ejection event, in this case epoch is recovered and NextEpoch != nil
-		//    and nodes are ejected in both current and next epoch.
-		// In all other cases there shouldn't be changes to the resulting state.
-		require.Equal(t, includeValidRecover || includeEjection, hasChanges, "always should have changes since we eject nodes")
+		require.Equal(t, includeValidRecover || includeEjection, hasChanges,
+			"changes are expected if we include valid recovery or eject nodes")
 		if includeValidRecover {
-			if includeEjection {
-				//require.Nil(t, updatedState.NextEpoch, "recover event shouldn't be accepted since it readmits an ejected identity")
-			} else {
-				require.NotNil(t, updatedState.NextEpoch, "next epoch should be present")
+			require.NotNil(t, updatedState.NextEpoch, "next epoch should be present")
+			for _, nodeID := range ejectedNodes {
+				ejectedIdentity, found := updatedState.NextEpoch.ActiveIdentities.ByNodeID(nodeID)
+				if ejectionBeforeRecover {
+					// if ejection is before recover, the ejected node should not be present in the next epoch
+					require.False(s.T(), found)
+				} else {
+					// in-case of ejection after recover, the ejected node should be present in the next epoch, but it has to be 'ejected'.
+					require.True(s.T(), found)
+					require.True(s.T(), ejectedIdentity.Ejected)
+				}
 			}
 		}
 	})

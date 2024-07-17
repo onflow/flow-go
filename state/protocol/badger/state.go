@@ -40,7 +40,7 @@ type State struct {
 	}
 	params                      protocol.Params
 	protocolKVStoreSnapshotsDB  storage.ProtocolKVStore
-	epochProtocolStateEntriesDB storage.EpochProtocolStateEntries // TODO remove when EpochProtocolStateEntry is stored in KVStore
+	epochProtocolStateEntriesDB storage.EpochProtocolStateEntries // TODO remove when MinEpochStateEntry is stored in KVStore
 	protocolState               protocol.ProtocolState
 	versionBeacons              storage.VersionBeacons
 
@@ -562,7 +562,7 @@ func bootstrapEpochForProtocolStateEntry(
 		}
 
 		// insert epoch protocol state entry, which references above service events
-		err := operation.SkipDuplicatesTx(epochProtocolStateSnapshots.StoreTx(richEntry.ID(), richEntry.EpochProtocolStateEntry))(tx)
+		err := operation.SkipDuplicatesTx(epochProtocolStateSnapshots.StoreTx(richEntry.ID(), richEntry.MinEpochStateEntry))(tx)
 		if err != nil {
 			return fmt.Errorf("could not store epoch protocol state entry: %w", err)
 		}
