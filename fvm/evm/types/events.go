@@ -195,7 +195,7 @@ func (p *blockEvent) ToCadence(location common.Location) (cadence.Event, error) 
 	}).WithType(eventType), nil
 }
 
-type BlockExecutedEventPayload struct {
+type BlockEventPayload struct {
 	Height            uint64          `cadence:"height"`
 	Hash              cadence.Array   `cadence:"hash"`
 	Timestamp         uint64          `cadence:"timestamp"`
@@ -206,9 +206,9 @@ type BlockExecutedEventPayload struct {
 	TransactionHashes []cadence.Array `cadence:"transactionHashes"`
 }
 
-// DecodeBlockExecutedEventPayload decodes Cadence event into block event payload.
-func DecodeBlockExecutedEventPayload(event cadence.Event) (*BlockExecutedEventPayload, error) {
-	var block BlockExecutedEventPayload
+// DecodeBlockEventPayload decodes Cadence event into block event payload.
+func DecodeBlockEventPayload(event cadence.Event) (*BlockEventPayload, error) {
+	var block BlockEventPayload
 	err := cadence.DecodeFields(event, &block)
 	return &block, err
 }

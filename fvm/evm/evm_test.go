@@ -124,9 +124,9 @@ func TestEVMRun(t *testing.T) {
 				cadenceEvent, ok := ev.(cadence.Event)
 				require.True(t, ok)
 
-				blockExecutedEventPayload, err := types.DecodeBlockExecutedEventPayload(cadenceEvent)
+				blockEventPayload, err := types.DecodeBlockEventPayload(cadenceEvent)
 				require.NoError(t, err)
-				require.NotEmpty(t, blockExecutedEventPayload.Hash)
+				require.NotEmpty(t, blockEventPayload.Hash)
 
 				txEvent := output.Events[0]
 
@@ -155,9 +155,9 @@ func TestEVMRun(t *testing.T) {
 				require.Equal(t, innerTxBytes, txPayload)
 				require.Equal(t, uint16(types.ErrCodeNoError), txEventPayload.ErrorCode)
 				require.Equal(t, uint16(0), txEventPayload.Index)
-				require.Equal(t, blockExecutedEventPayload.Height, txEventPayload.BlockHeight)
-				require.Equal(t, blockExecutedEventPayload.TotalGasUsed, txEventPayload.GasConsumed)
-				require.Equal(t, uint64(43785), blockExecutedEventPayload.TotalGasUsed)
+				require.Equal(t, blockEventPayload.Height, txEventPayload.BlockHeight)
+				require.Equal(t, blockEventPayload.TotalGasUsed, txEventPayload.GasConsumed)
+				require.Equal(t, uint64(43785), blockEventPayload.TotalGasUsed)
 				require.Empty(t, txEventPayload.ContractAddress)
 
 				// append the state
@@ -537,7 +537,7 @@ func TestEVMBatchRun(t *testing.T) {
 				cadenceEvent, ok := ev.(cadence.Event)
 				require.True(t, ok)
 
-				blockEventPayload, err := types.DecodeBlockExecutedEventPayload(cadenceEvent)
+				blockEventPayload, err := types.DecodeBlockEventPayload(cadenceEvent)
 				require.NoError(t, err)
 				require.NotEmpty(t, blockEventPayload.Hash)
 				require.Equal(t, uint64(155513), blockEventPayload.TotalGasUsed)
@@ -1022,7 +1022,7 @@ func TestEVMAddressDeposit(t *testing.T) {
 			cadenceEvent, ok := ev.(cadence.Event)
 			require.True(t, ok)
 
-			blockEventPayload, err := types.DecodeBlockExecutedEventPayload(cadenceEvent)
+			blockEventPayload, err := types.DecodeBlockEventPayload(cadenceEvent)
 			require.NoError(t, err)
 			require.NotEmpty(t, blockEventPayload.Hash)
 			require.Equal(t, uint64(21000), blockEventPayload.TotalGasUsed)
