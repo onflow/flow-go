@@ -13,6 +13,7 @@ import (
 
 	gcemd "cloud.google.com/go/compute/metadata"
 	"github.com/dgraph-io/badger/v2"
+	"github.com/dgraph-io/badger/v2/options"
 	"github.com/hashicorp/go-multierror"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/libp2p/go-libp2p/core/host"
@@ -262,6 +263,24 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 		"observer-mode-bootstrap-node-addresses",
 		nil,
 		"the network addresses of the bootstrap access node if this is an observer e.g. access-001.mainnet.flow.org:9653,access-002.mainnet.flow.org:9653")
+
+	// Badger flags
+	fnb.flags.IntVar(&fnb.BadgerConfig.TableLoadingMode, "badger-table-loading-mode", defaultConfig.BadgerConfig.TableLoadingMode, "Table loading mode for BadgerDB")
+	fnb.flags.IntVar(&fnb.BadgerConfig.ValueLogLoadingMode, "badger-vlog-loading-mode", defaultConfig.BadgerConfig.ValueLogLoadingMode, "Value log loading mode for BadgerDB")
+	fnb.flags.Int64Var(&fnb.BadgerConfig.MaxTableSize, "badger-max-table-size", defaultConfig.BadgerConfig.MaxTableSize, "Maximum table size in BadgerDB")
+	fnb.flags.IntVar(&fnb.BadgerConfig.LevelSizeMultiplier, "badger-level-size-multiplier", defaultConfig.BadgerConfig.LevelSizeMultiplier, "Level size multiplier for BadgerDB")
+	fnb.flags.IntVar(&fnb.BadgerConfig.MaxLevels, "badger-max-levels", defaultConfig.BadgerConfig.MaxLevels, "Maximum number of levels in BadgerDB")
+	fnb.flags.IntVar(&fnb.BadgerConfig.ValueThreshold, "badger-value-threshold", defaultConfig.BadgerConfig.ValueThreshold, "Value threshold for BadgerDB")
+	fnb.flags.IntVar(&fnb.BadgerConfig.NumMemtables, "badger-num-memtables", defaultConfig.BadgerConfig.NumMemtables, "Number of memtables for BadgerDB")
+	fnb.flags.Float64Var(&fnb.BadgerConfig.BloomFalsePositive, "badger-bloom-false-positive", defaultConfig.BadgerConfig.BloomFalsePositive, "Bloom filter false positive rate for BadgerDB")
+	fnb.flags.BoolVar(&fnb.BadgerConfig.KeepL0InMemory, "badger-keep-l0-in-memory", defaultConfig.BadgerConfig.KeepL0InMemory, "Keep level 0 tables in memory for BadgerDB")
+	fnb.flags.Int64Var(&fnb.BadgerConfig.BlockCacheSize, "badger-block-cache-size", defaultConfig.BadgerConfig.BlockCacheSize, "Block cache size for BadgerDB")
+	fnb.flags.Int64Var(&fnb.BadgerConfig.IndexCacheSize, "badger-index-cache-size", defaultConfig.BadgerConfig.IndexCacheSize, "Index cache size for BadgerDB")
+	fnb.flags.IntVar(&fnb.BadgerConfig.NumLevelZeroTables, "badger-num-l0-tables", defaultConfig.BadgerConfig.NumLevelZeroTables, "Number of level 0 tables for BadgerDB")
+	fnb.flags.IntVar(&fnb.BadgerConfig.NumLevelZeroTablesStall, "badger-num-l0-tables-stall", defaultConfig.BadgerConfig.NumLevelZeroTablesStall, "Number of level 0 tables that trigger a stall in BadgerDB")
+	fnb.flags.Int64Var(&fnb.BadgerConfig.LevelOneSize, "badger-level-one-size", defaultConfig.BadgerConfig.LevelOneSize, "Size of level one in BadgerDB")
+	fnb.flags.Int64Var(&fnb.BadgerConfig.ValueLogFileSize, "badger-vlog-file-size", defaultConfig.BadgerConfig.ValueLogFileSize, "Value log file size for BadgerDB")
+	fnb.flags.Uint32Var(&fnb.BadgerConfig.ValueLogMaxEntries, "badger-vlog-max-entries", defaultConfig.BadgerConfig.ValueLogMaxEntries, "Maximum number of entries per value log file in BadgerDB")
 }
 
 func (fnb *FlowNodeBuilder) EnqueuePingService() {
@@ -1072,17 +1091,23 @@ func (fnb *FlowNodeBuilder) initDB() error {
 	// usage, but it improves overall performance and disk i/o
 	opts := badger.
 		DefaultOptions(fnb.BaseConfig.datadir).
-		WithKeepL0InMemory(true).
 		WithLogger(log).
-
-		// the ValueLogFileSize option specifies how big the value of a
-		// key-value pair is allowed to be saved into badger.
-		// exceeding this limit, will fail with an error like this:
-		// could not store data: Value with size <xxxx> exceeded 1073741824 limit
-		// Maximum value size is 10G, needed by execution node
-		// TODO: finding a better max value for each node type
-		WithValueLogFileSize(128 << 23).
-		WithValueLogMaxEntries(100000) // Default is 1000000
+		WithTableLoadingMode(options.FileLoadingMode(fnb.BadgerConfig.TableLoadingMode)).
+		WithValueLogLoadingMode(options.FileLoadingMode(fnb.BadgerConfig.ValueLogLoadingMode)).
+		WithMaxTableSize(fnb.BadgerConfig.MaxTableSize).
+		WithLevelSizeMultiplier(fnb.BadgerConfig.LevelSizeMultiplier).
+		WithMaxLevels(fnb.BadgerConfig.MaxLevels).
+		WithValueThreshold(fnb.BadgerConfig.ValueThreshold).
+		WithNumMemtables(fnb.BadgerConfig.NumMemtables).
+		WithBloomFalsePositive(fnb.BadgerConfig.BloomFalsePositive).
+		WithKeepL0InMemory(fnb.BadgerConfig.KeepL0InMemory).
+		WithBlockCacheSize(fnb.BadgerConfig.BlockCacheSize).
+		WithIndexCacheSize(fnb.BadgerConfig.IndexCacheSize).
+		WithNumLevelZeroTables(fnb.BadgerConfig.NumLevelZeroTables).
+		WithNumLevelZeroTablesStall(fnb.BadgerConfig.NumLevelZeroTablesStall).
+		WithLevelOneSize(fnb.BadgerConfig.LevelOneSize).
+		WithValueLogFileSize(fnb.BadgerConfig.ValueLogFileSize).
+		WithValueLogMaxEntries(fnb.BadgerConfig.ValueLogMaxEntries)
 
 	publicDB, err := bstorage.InitPublic(opts)
 	if err != nil {
