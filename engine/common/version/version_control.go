@@ -175,7 +175,7 @@ func (v *VersionControl) initBoundaries(
 			// this should never happen as we already validated the version beacon
 			// when indexing it
 			if err != nil || ver == nil {
-				if ver == nil {
+				if err == nil {
 					err = fmt.Errorf("boundary semantic version is nil")
 				}
 				ctx.Throw(
@@ -331,6 +331,9 @@ func (v *VersionControl) blockFinalized(
 		for _, boundary := range vb.VersionBoundaries {
 			ver, err := boundary.Semver()
 			if err != nil || ver == nil {
+				if err == nil {
+					err = fmt.Errorf("boundary semantic version is nil")
+				}
 				// this should never happen as we already validated the version beacon
 				// when indexing it
 				ctx.Throw(
