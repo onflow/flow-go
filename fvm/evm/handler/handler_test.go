@@ -90,7 +90,7 @@ func TestHandler_TransactionRunOrPanic(t *testing.T) {
 					events := backend.Events()
 					require.Len(t, events, 1)
 					txEventPayload := testutils.TxEventToPayload(t, events[0], rootAddr)
-
+					require.NoError(t, err)
 					// check logs
 					var logs []*gethTypes.Log
 					err = rlp.DecodeBytes(txEventPayload.Logs, &logs)
@@ -106,15 +106,11 @@ func TestHandler_TransactionRunOrPanic(t *testing.T) {
 					events = backend.Events()
 					require.Len(t, events, 2)
 					blockEventPayload := testutils.BlockEventToPayload(t, events[1], rootAddr)
-					// make sure block transaction list references the above transaction id
-
-					require.Len(t, blockEventPayload.TransactionHashes, 1)
-					eventTxID := blockEventPayload.TransactionHashes[0] // only one hash in block
 					// make sure the transaction id included in the block transaction list is the same as tx sumbmitted
 					assert.Equal(
 						t,
-						evmTx.Hash(),
-						eventTxID,
+						types.TransactionHashes{txEventPayload.Hash}.RootHash(),
+						blockEventPayload.TransactionHashRoot,
 					)
 				})
 			})
@@ -342,7 +338,7 @@ func TestHandler_COA(t *testing.T) {
 				require.Len(t, events, 3)
 
 				// Block level expected values
-				txHashes := make([]gethCommon.Hash, 0)
+				txHashes := make(types.TransactionHashes, 0)
 				totalGasUsed := uint64(0)
 
 				// deploy COA transaction event
@@ -375,12 +371,12 @@ func TestHandler_COA(t *testing.T) {
 				events = backend.Events()
 				require.Len(t, events, 4)
 				blockEventPayload := testutils.BlockEventToPayload(t, events[3], rootAddr)
-				for i, txHash := range txHashes {
-					require.Equal(t,
-						txHash,
-						blockEventPayload.TransactionHashes[i],
-					)
-				}
+				assert.Equal(
+					t,
+					txHashes.RootHash(),
+					blockEventPayload.TransactionHashRoot,
+				)
+
 				require.Equal(t, totalGasUsed, blockEventPayload.TotalGasUsed)
 
 				// check gas usage

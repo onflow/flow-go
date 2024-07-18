@@ -33,8 +33,22 @@ func HashToCadenceArrayValue(hash gethCommon.Hash) cadence.Array {
 		WithType(cadenceHashType)
 }
 
+// CadenceArrayValueToHash converts a Cadence array of type [UInt8;32] into EVM hash
+func CadenceArrayValueToHash(value cadence.Array) (gethCommon.Hash, error) {
+	bytes, err := cadenceUInt8ArrayToBytes(value, cadenceHashType)
+	if err != nil {
+		return gethCommon.Hash{}, err
+	}
+
+	return gethCommon.BytesToHash(bytes), nil
+}
+
 // CadenceUInt8ArrayValueToBytes converts a Cadence array of type [UInt8] into a byte slice ([]byte)
 func CadenceUInt8ArrayValueToBytes(a cadence.Value) ([]byte, error) {
+	return cadenceUInt8ArrayToBytes(a, cadenceArrayTypeOfUInt8)
+}
+
+func cadenceUInt8ArrayToBytes(a cadence.Value, expectedType cadence.Type) ([]byte, error) {
 	aa, ok := a.(cadence.Array)
 	if !ok {
 		return nil, fmt.Errorf("value is not an array")
@@ -42,7 +56,7 @@ func CadenceUInt8ArrayValueToBytes(a cadence.Value) ([]byte, error) {
 
 	arrayType := aa.Type()
 	// if array type is empty, continue
-	if arrayType != nil && !arrayType.Equal(cadenceArrayTypeOfUInt8) {
+	if arrayType != nil && !arrayType.Equal(expectedType) {
 		return nil, fmt.Errorf("invalid array type")
 	}
 

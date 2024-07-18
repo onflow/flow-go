@@ -104,8 +104,7 @@ func (bs *BlockStore) ResetBlockProposal() error {
 
 // CommitBlockProposal commits the block proposal to the chain
 func (bs *BlockStore) CommitBlockProposal(bp *types.BlockProposal) error {
-	// populate receipt root hash
-	bp.PopulateReceiptRoot()
+	bp.PopulateRoots()
 
 	blockBytes, err := bp.Block.ToBytes()
 	if err != nil {
