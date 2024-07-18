@@ -213,8 +213,8 @@ func (h *ContractHandler) batchRun(rlpEncodedTxs [][]byte, coinbase types.Addres
 	}
 
 	// if there were no valid transactions skip emitting events
-	// and committing a new block
-	if len(bp.TransactionHashes) == 0 {
+	// and update the block proposal
+	if len(bp.TxHashes) == 0 {
 		return res, nil
 	}
 

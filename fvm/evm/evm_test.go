@@ -106,6 +106,8 @@ func TestEVMRun(t *testing.T) {
 				// assert event fields are correct
 				require.Len(t, output.Events, 1)
 				txEvent := output.Events[0]
+				txEventPayload := testutils.TxEventToPayload(t, txEvent, sc.EVMContract.Address)
+				require.NoError(t, err)
 
 				// commit block
 				blockEventPayload, snapshot := callEVMHeartBeat(t,
@@ -116,13 +118,14 @@ func TestEVMRun(t *testing.T) {
 				require.NotEmpty(t, blockEventPayload.Hash)
 				require.Equal(t, uint64(43785), blockEventPayload.TotalGasUsed)
 				require.NotEmpty(t, blockEventPayload.Hash)
-				require.Len(t, blockEventPayload.TransactionHashes, 1)
+
+				txHashes := types.TransactionHashes{txEventPayload.Hash}
+				require.Equal(t,
+					txHashes.RootHash(),
+					blockEventPayload.TransactionHashRoot,
+				)
 				require.NotEmpty(t, blockEventPayload.ReceiptRoot)
 
-				txEventPayload := testutils.TxEventToPayload(t, txEvent, sc.EVMContract.Address)
-				require.NoError(t, err)
-
-				require.NotEmpty(t, txEventPayload.Hash)
 				require.Equal(t, innerTxBytes, txEventPayload.Payload)
 				require.Equal(t, uint16(types.ErrCodeNoError), txEventPayload.ErrorCode)
 				require.Equal(t, uint16(0), txEventPayload.Index)
@@ -458,6 +461,7 @@ func TestEVMBatchRun(t *testing.T) {
 				snapshot = snapshot.Append(state)
 
 				require.Len(t, output.Events, batchCount)
+				txHashes := make(types.TransactionHashes, 0)
 				for i, event := range output.Events {
 					if i == batchCount { // last one is block executed
 						continue
@@ -471,6 +475,7 @@ func TestEVMBatchRun(t *testing.T) {
 					event, err := types.DecodeTransactionEventPayload(cadenceEvent)
 					require.NoError(t, err)
 
+					txHashes = append(txHashes, event.Hash)
 					var logs []*gethTypes.Log
 					err = rlp.DecodeBytes(event.Logs, &logs)
 					require.NoError(t, err)
@@ -490,7 +495,10 @@ func TestEVMBatchRun(t *testing.T) {
 
 				require.NotEmpty(t, blockEventPayload.Hash)
 				require.Equal(t, uint64(155513), blockEventPayload.TotalGasUsed)
-				require.Len(t, blockEventPayload.TransactionHashes, 5)
+				require.Equal(t,
+					txHashes.RootHash(),
+					blockEventPayload.TransactionHashRoot,
+				)
 
 				// retrieve the values
 				retrieveCode := []byte(fmt.Sprintf(
@@ -972,10 +980,11 @@ func TestEVMAddressDeposit(t *testing.T) {
 
 			require.NotEmpty(t, blockEventPayload.Hash)
 			require.Equal(t, uint64(21000), blockEventPayload.TotalGasUsed)
-			require.Len(t, blockEventPayload.TransactionHashes, 1)
+
+			txHashes := types.TransactionHashes{txEventPayload.Hash}
 			require.Equal(t,
-				txEventPayload.Hash,
-				blockEventPayload.TransactionHashes[0],
+				txHashes.RootHash(),
+				blockEventPayload.TransactionHashRoot,
 			)
 		})
 }
