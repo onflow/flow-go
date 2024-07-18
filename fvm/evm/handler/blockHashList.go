@@ -25,12 +25,10 @@ const (
 	BlockHashListBucketKeyFormat = "BlockHashListBucket%d"
 )
 
-// TODO check legacy,
-// - check if the size of capacity doesn't match migrate
-
-// BlockHashList holds the last `capacity` number of block hashes in the list
+// BlockHashList stores the last `capacity` number of block hashes in the list
+// under the hood it stores block hashes in smaller buckets to minimize the
+// number of bytes read and written during operations.
 type BlockHashList struct {
-	// blocks      []gethCommon.Hash
 	backend     types.Backend
 	rootAddress flow.Address
 
@@ -41,8 +39,8 @@ type BlockHashList struct {
 	height   uint64 // keeps the height of last added block
 }
 
-// NewBlockHashList constructs a new block hash list
-// it tries to load the data from the backend
+// NewBlockHashList loads the block hash list
+// it tries to load the metadata from the backend
 // and if not exist it will create one
 func NewBlockHashList(
 	backend types.Backend,
@@ -63,7 +61,7 @@ func NewBlockHashList(
 	}
 	// check capacity
 	if bhl.capacity != capacity {
-		return nil, fmt.Errorf("capacity error expected: %d, got: %d", bhl.capacity, capacity)
+		return nil, fmt.Errorf("capacity doesn't match, expected: %d, got: %d", bhl.capacity, capacity)
 	}
 	return bhl, nil
 }
@@ -81,12 +79,13 @@ func (bhl *BlockHashList) Push(height uint64, bh gethCommon.Hash) error {
 	if err != nil {
 		return err
 	}
+	// update meta data
 	bhl.tail = (bhl.tail + 1) % bhl.capacity
 	bhl.height = height
 	if bhl.count != bhl.capacity {
 		bhl.count++
 	}
-	return bhl.updateMetaData()
+	return bhl.storeMetaData()
 }
 
 // IsEmpty returns true if the list is empty
@@ -193,7 +192,6 @@ func (bhl *BlockHashList) loadMetaData() error {
 		// don't do anything and return
 		return nil
 	}
-
 	if len(data) < metaEncodingSize {
 		return fmt.Errorf("encoded input too short: %d < %d", len(data), metaEncodingSize)
 	}
@@ -217,7 +215,7 @@ func (bhl *BlockHashList) loadMetaData() error {
 	return nil
 }
 
-func (bhl *BlockHashList) updateMetaData() error {
+func (bhl *BlockHashList) storeMetaData() error {
 	// encode meta data
 	buffer := make([]byte, metaEncodingSize)
 	pos := 0

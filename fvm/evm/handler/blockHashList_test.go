@@ -88,7 +88,6 @@ func TestBlockHashList(t *testing.T) {
 				require.True(t, found)
 				require.Equal(t, gethCommon.Hash{byte(i)}, h)
 			}
-			// TODO: check bytes read and storage
 		})
 	})
 }
