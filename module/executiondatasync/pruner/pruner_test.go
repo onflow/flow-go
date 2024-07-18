@@ -36,14 +36,15 @@ func TestBasicPrune(t *testing.T) {
 	downloader := new(exedatamock.Downloader)
 
 	var notifier *engine.Notifier
-	downloader.On("Register", mock.Anything).Return().Once().Run(func(args mock.Arguments) {
+	downloader.On("Register", mock.Anything).Return(nil).Once().Run(func(args mock.Arguments) {
 		notifier = args.Get(0).(*engine.Notifier)
 	})
 	downloader.On("LastProcessedHeight").
 		Return(uint64(16)).
 		Once()
 
-	pruner.RegisterProducer(downloader)
+	err = pruner.RegisterProducer(downloader)
+	require.NoError(t, err)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx, errChan := irrecoverable.WithSignaler(ctx)

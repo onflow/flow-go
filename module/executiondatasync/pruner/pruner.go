@@ -129,10 +129,14 @@ func NewPruner(logger zerolog.Logger, metrics module.ExecutionDataPrunerMetrics,
 	return p, nil
 }
 
-func (p *Pruner) RegisterProducer(producer execution_data.ExecutionDataProducer) {
-	producer.Register(&p.fulfilledHeight)
+func (p *Pruner) RegisterProducer(producer execution_data.ExecutionDataProducer) error {
+	err := producer.Register(&p.fulfilledHeight)
+	if err != nil {
+		return err
+	}
 
 	p.registeredProducers = append(p.registeredProducers, producer)
+	return nil
 }
 
 // SetHeightRangeTarget updates the Pruner's height range target.

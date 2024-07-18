@@ -107,8 +107,21 @@ func (_m *Downloader) Ready() <-chan struct{} {
 }
 
 // Register provides a mock function with given fields: _a0
-func (_m *Downloader) Register(_a0 *engine.Notifier) {
-	_m.Called(_a0)
+func (_m *Downloader) Register(_a0 *engine.Notifier) error {
+	ret := _m.Called(_a0)
+
+	if len(ret) == 0 {
+		panic("no return value specified for Register")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(*engine.Notifier) error); ok {
+		r0 = rf(_a0)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
 }
 
 // SetLastProcessedHeight provides a mock function with given fields: _a0

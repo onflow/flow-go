@@ -11,7 +11,7 @@ import (
 var ErrMultipleRegister = errors.New("producer may only be registered once")
 
 type ExecutionDataProducer interface {
-	Register(*engine.Notifier)
+	Register(*engine.Notifier) error
 	SetLastProcessedHeight(uint64)
 	LastProcessedHeight() uint64
 }
@@ -32,13 +32,15 @@ func NewExecutionDataProducerManager(initHeight uint64) *ExecutionDataProducerMa
 	}
 }
 
-func (e *ExecutionDataProducerManager) Register(notifier *engine.Notifier) {
+func (e *ExecutionDataProducerManager) Register(notifier *engine.Notifier) error {
 	// Make sure we only register once. atomically check if registered is false then set it to true.
 	// If it was not false, panic
 	if !e.registered.CompareAndSwap(false, true) {
-		panic(ErrMultipleRegister)
+		return ErrMultipleRegister
 	}
 	e.producerNotifier = notifier
+
+	return nil
 }
 
 func (e *ExecutionDataProducerManager) SetLastProcessedHeight(height uint64) {
