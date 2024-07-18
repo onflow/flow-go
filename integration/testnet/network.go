@@ -429,7 +429,7 @@ type NetworkConfig struct {
 	ViewsInStakingAuction      uint64
 	ViewsInEpoch               uint64
 	EpochCommitSafetyThreshold uint64
-	KVStoreFactory             func(epochStateID flow.Identifier) protocol_state.KVStoreAPI
+	KVStoreFactory             func(epochStateID flow.Identifier) (protocol_state.KVStoreAPI, error)
 }
 
 type NetworkConfigOpt func(*NetworkConfig)
@@ -443,7 +443,9 @@ func NewNetworkConfig(name string, nodes NodeConfigs, opts ...NetworkConfigOpt) 
 		ViewsInDKGPhase:            DefaultViewsInDKGPhase,
 		ViewsInEpoch:               DefaultViewsInEpoch,
 		EpochCommitSafetyThreshold: DefaultEpochCommitSafetyThreshold,
-		KVStoreFactory:             kvstore.NewDefaultKVStore,
+		KVStoreFactory: func(epochStateID flow.Identifier) (protocol_state.KVStoreAPI, error) {
+			return kvstore.NewDefaultKVStore(DefaultEpochCommitSafetyThreshold, epochStateID)
+		},
 	}
 
 	for _, apply := range opts {
@@ -491,7 +493,7 @@ func WithEpochCommitSafetyThreshold(threshold uint64) func(*NetworkConfig) {
 	}
 }
 
-func WithKVStoreFactory(factory func(flow.Identifier) protocol_state.KVStoreAPI) func(*NetworkConfig) {
+func WithKVStoreFactory(factory func(flow.Identifier) (protocol_state.KVStoreAPI, error)) func(*NetworkConfig) {
 	return func(config *NetworkConfig) {
 		config.KVStoreFactory = factory
 	}
@@ -1176,10 +1178,14 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 	root := &flow.Block{
 		Header: rootHeader,
 	}
+	rootProtocolState, err := networkConf.KVStoreFactory(
+		inmem.EpochProtocolStateFromServiceEvents(epochSetup, epochCommit).ID(),
+	)
+	if err != nil {
+		return nil, err
+	}
 	root.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(
-		networkConf.KVStoreFactory(
-			inmem.EpochProtocolStateFromServiceEvents(epochSetup, epochCommit).ID(),
-		).ID(),
+		rootProtocolState.ID(),
 	)))
 
 	cdcRandomSource, err := cadence.NewString(hex.EncodeToString(randomSource))
@@ -1244,7 +1250,14 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 		return nil, fmt.Errorf("has invalid votes: %v", invalidVotesErr)
 	}
 
-	snapshot, err := inmem.SnapshotFromBootstrapStateWithParams(root, result, seal, qc, flow.DefaultProtocolVersion, networkConf.EpochCommitSafetyThreshold, networkConf.KVStoreFactory)
+	snapshot, err := inmem.SnapshotFromBootstrapStateWithParams(
+		root,
+		result,
+		seal,
+		qc,
+		flow.DefaultProtocolVersion,
+		networkConf.KVStoreFactory,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("could not create bootstrap state snapshot: %w", err)
 	}

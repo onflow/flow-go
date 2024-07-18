@@ -183,23 +183,30 @@ func (model *Modelv1) GetProtocolStateVersion() uint64 {
 // TODO: Shortcut in bootstrapping; we will probably have to start with a non-empty KV store in the future;
 // Potentially we may need to carry over the KVStore during a spork (with possible migrations).
 func NewDefaultKVStore(finalizationSafetyThreshold uint64, epochStateID flow.Identifier) (protocol_state.KVStoreAPI, error) {
+	modelv0, err := newKVStoreV0(finalizationSafetyThreshold, epochStateID)
+	if err != nil {
+		return nil, fmt.Errorf("could not construct v0 kvstore: %w", err)
+	}
 	return &Modelv1{
-		Modelv0: Modelv0{
-			UpgradableModel:            UpgradableModel{},
-			EpochStateID:               epochStateID,
-			EpochExtensionViewCount:    defaultEpochExtensionViewCount,
-			EpochCommitSafetyThreshold: finalizationSafetyThreshold,
-		},
+		Modelv0: *modelv0,
 	}, nil
 }
 
 // NewKVStoreV0 constructs a KVStore using the v0 model. This is used to test
 // version upgrades, from v0 to v1.
-func NewKVStoreV0(epochStateID flow.Identifier) protocol_state.KVStoreAPI {
+func newKVStoreV0(finalizationSafetyThreshold uint64, epochStateID flow.Identifier) (*Modelv0, error) {
 	return &Modelv0{
-		UpgradableModel: UpgradableModel{},
-		EpochStateID:    epochStateID,
-	}
+		UpgradableModel:            UpgradableModel{},
+		EpochStateID:               epochStateID,
+		EpochCommitSafetyThreshold: finalizationSafetyThreshold,
+		EpochExtensionViewCount:    defaultEpochExtensionViewCount,
+	}, nil
+}
+
+// NewKVStoreV0 constructs a KVStore using the v0 model. This is used to test
+// version upgrades, from v0 to v1.
+func NewKVStoreV0(finalizationSafetyThreshold uint64, epochStateID flow.Identifier) (protocol_state.KVStoreAPI, error) {
+	return newKVStoreV0(finalizationSafetyThreshold, epochStateID)
 }
 
 // versionedModel generically represents a versioned protocol state model.
