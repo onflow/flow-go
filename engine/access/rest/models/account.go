@@ -10,7 +10,7 @@ const expandableContracts = "contracts"
 
 func (a *Account) Build(flowAccount *flow.Account, link LinkGenerator, expand map[string]bool) error {
 	a.Address = flowAccount.Address.String()
-	a.Balance = util.FromUint64(flowAccount.Balance)
+	a.Balance = util.FromUint(flowAccount.Balance)
 	a.Expandable = &AccountExpandable{}
 
 	if expand[expandableKeys] {
@@ -45,12 +45,12 @@ func (a *AccountPublicKey) Build(k flow.AccountPublicKey) {
 	sigAlgo := SigningAlgorithm(k.SignAlgo.String())
 	hashAlgo := HashingAlgorithm(k.HashAlgo.String())
 
-	a.Index = util.FromUint64(uint64(k.Index))
+	a.Index = util.FromUint(k.Index)
 	a.PublicKey = k.PublicKey.String()
 	a.SigningAlgorithm = &sigAlgo
 	a.HashingAlgorithm = &hashAlgo
-	a.SequenceNumber = util.FromUint64(k.SeqNumber)
-	a.Weight = util.FromUint64(uint64(k.Weight))
+	a.SequenceNumber = util.FromUint(k.SeqNumber)
+	a.Weight = util.FromUint(uint64(k.Weight))
 	a.Revoked = k.Revoked
 }
 

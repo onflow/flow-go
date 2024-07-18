@@ -122,11 +122,8 @@ func TestEVMRun(t *testing.T) {
 				txEventPayload := testutils.TxEventToPayload(t, txEvent, sc.EVMContract.Address)
 				require.NoError(t, err)
 
-				txPayload, err := types.CadenceUInt8ArrayValueToBytes(txEventPayload.Payload)
-				require.NoError(t, err)
-
 				require.NotEmpty(t, txEventPayload.Hash)
-				require.Equal(t, innerTxBytes, txPayload)
+				require.Equal(t, innerTxBytes, txEventPayload.Payload)
 				require.Equal(t, uint16(types.ErrCodeNoError), txEventPayload.ErrorCode)
 				require.Equal(t, uint16(0), txEventPayload.Index)
 				require.Equal(t, blockEventPayload.Height, txEventPayload.BlockHeight)
@@ -366,11 +363,8 @@ func TestEVMRun(t *testing.T) {
 
 				require.NotEmpty(t, txEventPayload.Hash)
 
-				encodedLogs, err := types.CadenceUInt8ArrayValueToBytes(txEventPayload.Logs)
-				require.NoError(t, err)
-
 				var logs []*gethTypes.Log
-				err = rlp.DecodeBytes(encodedLogs, &logs)
+				err = rlp.DecodeBytes(txEventPayload.Logs, &logs)
 				require.NoError(t, err)
 				require.Len(t, logs, 1)
 				log := logs[0]
@@ -477,11 +471,8 @@ func TestEVMBatchRun(t *testing.T) {
 					event, err := types.DecodeTransactionEventPayload(cadenceEvent)
 					require.NoError(t, err)
 
-					encodedLogs, err := types.CadenceUInt8ArrayValueToBytes(event.Logs)
-					require.NoError(t, err)
-
 					var logs []*gethTypes.Log
-					err = rlp.DecodeBytes(encodedLogs, &logs)
+					err = rlp.DecodeBytes(event.Logs, &logs)
 					require.NoError(t, err)
 
 					require.Len(t, logs, 1)
@@ -962,7 +953,6 @@ func TestEVMAddressDeposit(t *testing.T) {
 			// tx executed event
 			txEvent := output.Events[2]
 			txEventPayload := testutils.TxEventToPayload(t, txEvent, sc.EVMContract.Address)
-			require.NoError(t, err)
 
 			// deposit event
 			depositEvent := output.Events[3]
@@ -983,7 +973,10 @@ func TestEVMAddressDeposit(t *testing.T) {
 			require.NotEmpty(t, blockEventPayload.Hash)
 			require.Equal(t, uint64(21000), blockEventPayload.TotalGasUsed)
 			require.Len(t, blockEventPayload.TransactionHashes, 1)
-			require.Equal(t, txEventPayload.Hash, string(blockEventPayload.TransactionHashes[0]))
+			require.Equal(t,
+				txEventPayload.Hash,
+				blockEventPayload.TransactionHashes[0],
+			)
 		})
 }
 
