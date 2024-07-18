@@ -16,22 +16,22 @@ type AccountKeyReader struct {
 }
 
 // AccountKeysCount provides a mock function with given fields: runtimeAddress
-func (_m *AccountKeyReader) AccountKeysCount(runtimeAddress common.Address) (uint64, error) {
+func (_m *AccountKeyReader) AccountKeysCount(runtimeAddress common.Address) (uint32, error) {
 	ret := _m.Called(runtimeAddress)
 
 	if len(ret) == 0 {
 		panic("no return value specified for AccountKeysCount")
 	}
 
-	var r0 uint64
+	var r0 uint32
 	var r1 error
-	if rf, ok := ret.Get(0).(func(common.Address) (uint64, error)); ok {
+	if rf, ok := ret.Get(0).(func(common.Address) (uint32, error)); ok {
 		return rf(runtimeAddress)
 	}
-	if rf, ok := ret.Get(0).(func(common.Address) uint64); ok {
+	if rf, ok := ret.Get(0).(func(common.Address) uint32); ok {
 		r0 = rf(runtimeAddress)
 	} else {
-		r0 = ret.Get(0).(uint64)
+		r0 = ret.Get(0).(uint32)
 	}
 
 	if rf, ok := ret.Get(1).(func(common.Address) error); ok {
@@ -44,7 +44,7 @@ func (_m *AccountKeyReader) AccountKeysCount(runtimeAddress common.Address) (uin
 }
 
 // GetAccountKey provides a mock function with given fields: runtimeAddress, keyIndex
-func (_m *AccountKeyReader) GetAccountKey(runtimeAddress common.Address, keyIndex int) (*stdlib.AccountKey, error) {
+func (_m *AccountKeyReader) GetAccountKey(runtimeAddress common.Address, keyIndex uint32) (*stdlib.AccountKey, error) {
 	ret := _m.Called(runtimeAddress, keyIndex)
 
 	if len(ret) == 0 {
@@ -53,10 +53,10 @@ func (_m *AccountKeyReader) GetAccountKey(runtimeAddress common.Address, keyInde
 
 	var r0 *stdlib.AccountKey
 	var r1 error
-	if rf, ok := ret.Get(0).(func(common.Address, int) (*stdlib.AccountKey, error)); ok {
+	if rf, ok := ret.Get(0).(func(common.Address, uint32) (*stdlib.AccountKey, error)); ok {
 		return rf(runtimeAddress, keyIndex)
 	}
-	if rf, ok := ret.Get(0).(func(common.Address, int) *stdlib.AccountKey); ok {
+	if rf, ok := ret.Get(0).(func(common.Address, uint32) *stdlib.AccountKey); ok {
 		r0 = rf(runtimeAddress, keyIndex)
 	} else {
 		if ret.Get(0) != nil {
@@ -64,7 +64,7 @@ func (_m *AccountKeyReader) GetAccountKey(runtimeAddress common.Address, keyInde
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(common.Address, int) error); ok {
+	if rf, ok := ret.Get(1).(func(common.Address, uint32) error); ok {
 		r1 = rf(runtimeAddress, keyIndex)
 	} else {
 		r1 = ret.Error(1)

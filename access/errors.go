@@ -66,7 +66,7 @@ func (e InvalidAddressError) Error() string {
 // DuplicatedSignatureError indicates that two signatures havs been provided for a key (combination of account and key index)
 type DuplicatedSignatureError struct {
 	Address  flow.Address
-	KeyIndex uint64
+	KeyIndex uint32
 }
 
 func (e DuplicatedSignatureError) Error() string {

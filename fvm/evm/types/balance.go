@@ -31,6 +31,11 @@ var (
 // conversion errors and dealing with rounding errors.
 type Balance *big.Int
 
+// BalancesAreEqual returns true if balances are equal
+func BalancesAreEqual(bal1, bal2 Balance) bool {
+	return (*big.Int)(bal1).Cmp(bal2) == 0
+}
+
 // NewBalanceconstructs a new balance from an atto flow value
 func NewBalance(inp *big.Int) Balance {
 	return Balance(inp)

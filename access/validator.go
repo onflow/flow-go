@@ -343,7 +343,7 @@ func (v *TransactionValidator) checkAddresses(tx *flow.TransactionBody) error {
 func (v *TransactionValidator) checkSignatureDuplications(tx *flow.TransactionBody) error {
 	type uniqueKey struct {
 		address flow.Address
-		index   uint64
+		index   uint32
 	}
 	observedSigs := make(map[uniqueKey]bool)
 	for _, sig := range append(tx.PayloadSignatures, tx.EnvelopeSignatures...) {

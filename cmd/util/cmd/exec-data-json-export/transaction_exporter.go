@@ -28,7 +28,7 @@ type transactionInContext struct {
 	GasLimit               uint64   `json:"gas_limit"`
 	PayerAddressHex        string   `json:"payer_address_hex"`
 	ProposalKeyAddressHex  string   `json:"proposal_key_address_hex"`
-	ProposalKeyID          uint64   `json:"proposal_key_id"`
+	ProposalKeyID          uint32   `json:"proposal_key_id"`
 	ProposalSequenceNumber uint64   `json:"proposal_sequence_number"`
 	AuthorizersAddressHex  []string `json:"authorizers_address_hex"`
 	EnvelopeSize           int      `json:"envelope_size"`
