@@ -76,10 +76,10 @@ func NewIndexer(
 		log:                          log.With().Str("module", "execution_indexer").Logger(),
 		exeDataNotifier:              engine.NewNotifier(),
 		blockIndexedNotifier:         engine.NewNotifier(),
-		lastProcessedHeight:          atomic.NewUint64(0),
+		lastProcessedHeight:          atomic.NewUint64(initHeight),
 		indexer:                      indexer,
 		registers:                    registers,
-		ExecutionDataProducerManager: execution_data.NewExecutionDataProducerManager(),
+		ExecutionDataProducerManager: execution_data.NewExecutionDataProducerManager(initHeight),
 	}
 
 	r.exeDataReader = jobs.NewExecutionDataReader(executionCache, fetchTimeout, executionDataLatestHeight)
@@ -169,8 +169,8 @@ func (i *Indexer) onBlockIndexed(ctx irrecoverable.SignalerContext) {
 		}
 
 		i.SetLastProcessedHeight(header.Height)
-		i.lastProcessedHeight.Store(height)
 	}
+	i.lastProcessedHeight.Store(highestIndexedHeight)
 }
 
 // Start the worker jobqueue to consume the available data.

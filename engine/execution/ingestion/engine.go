@@ -98,7 +98,7 @@ func New(
 		uploader:                     uploader,
 		stopControl:                  stopControl,
 		loader:                       loader,
-		ExecutionDataProducerManager: execution_data.NewExecutionDataProducerManager(),
+		ExecutionDataProducerManager: execution_data.NewExecutionDataProducerManager(0),
 	}
 
 	return &eng, nil

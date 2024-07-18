@@ -59,7 +59,7 @@ func NewDownloader(blobService network.BlobService, opts ...DownloaderOption) *d
 		blobService:                  blobService,
 		maxBlobSize:                  DefaultMaxBlobSize,
 		serializer:                   DefaultSerializer,
-		ExecutionDataProducerManager: NewExecutionDataProducerManager(),
+		ExecutionDataProducerManager: NewExecutionDataProducerManager(0),
 	}
 
 	for _, opt := range opts {

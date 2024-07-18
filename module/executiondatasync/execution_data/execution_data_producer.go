@@ -24,10 +24,10 @@ type ExecutionDataProducerManager struct {
 	lastProcessedHeight *atomic.Uint64
 }
 
-func NewExecutionDataProducerManager() *ExecutionDataProducerManager {
+func NewExecutionDataProducerManager(initHeight uint64) *ExecutionDataProducerManager {
 	return &ExecutionDataProducerManager{
 		registered:          atomic.NewBool(false),
-		lastProcessedHeight: atomic.NewUint64(0),
+		lastProcessedHeight: atomic.NewUint64(initHeight),
 		producerNotifier:    nil,
 	}
 }
