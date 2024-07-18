@@ -97,6 +97,41 @@ func TestBlockStore(t *testing.T) {
 
 }
 
+// TODO: we can remove this when the previewnet is out
+func TestBlockStoreMigration(t *testing.T) {
+	testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
+		testutils.RunWithTestFlowEVMRootAddress(t, backend, func(root flow.Address) {
+			legacyCapacity := 16
+			maxHeightAdded := 32
+			bhl := types.NewBlockHashList(16)
+			for i := 0; i <= maxHeightAdded; i++ {
+				err := bhl.Push(uint64(i), gethCommon.Hash{byte(i)})
+				require.NoError(t, err)
+			}
+			err := backend.SetValue(
+				root[:],
+				[]byte(handler.BlockStoreBlockHashesKey),
+				bhl.Encode(),
+			)
+			require.NoError(t, err)
+			bs := handler.NewBlockStore(backend, root)
+
+			for i := 0; i <= maxHeightAdded-legacyCapacity; i++ {
+				h, err := bs.BlockHash(uint64(i))
+				require.NoError(t, err)
+				require.Equal(t, gethCommon.Hash{}, h)
+			}
+
+			for i := maxHeightAdded - legacyCapacity + 1; i <= maxHeightAdded; i++ {
+				h, err := bs.BlockHash(uint64(i))
+				require.NoError(t, err)
+				require.Equal(t, gethCommon.Hash{byte(i)}, h)
+			}
+		})
+	})
+
+}
+
 // This test reproduces a state before a breaking change on the Block type,
 // which added a timestamp and total gas used,
 // then it adds new blocks and makes sure the retrival
@@ -203,5 +238,3 @@ func TestBlockStore_AddedTimestamp(t *testing.T) {
 		})
 	})
 }
-
-// TODO: add test for migration
