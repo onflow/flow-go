@@ -10,6 +10,9 @@ import (
 	"github.com/onflow/flow-go/state/protocol/protocol_state"
 )
 
+// defaultEpochExtensionViewCount is a default length of epoch extension in views, approximately 1 day.
+const defaultEpochExtensionViewCount = 100_000
+
 // This file contains the concrete types that define the structure of the underlying key-value store
 // for a particular Protocol State version.
 // Essentially enumerating the set of keys and values that are supported.
@@ -53,7 +56,8 @@ func (model *UpgradableModel) GetVersionUpgrade() *protocol.ViewBasedActivator[u
 // with multiple supported KV model versions from the beginning.
 type Modelv0 struct {
 	UpgradableModel
-	EpochStateID flow.Identifier
+	EpochStateID            flow.Identifier
+	EpochExtensionViewCount uint64
 }
 
 var _ protocol_state.KVStoreAPI = (*Modelv0)(nil)
@@ -114,6 +118,14 @@ func (model *Modelv0) SetEpochStateID(id flow.Identifier) {
 	model.EpochStateID = id
 }
 
+// GetEpochExtensionViewCount returns the number of views for a hypothetical epoch extension. Note
+// that this value can change at runtime (through a service event). When a new extension is added,
+// the view count is used right at this point in the protocol state's evolution. In other words,
+// different extensions can have different view counts.
+func (model *Modelv0) GetEpochExtensionViewCount() uint64 {
+	return model.EpochExtensionViewCount
+}
+
 // Modelv1 is v1 of the Protocol State key-value store.
 // This represents the first model version which will be considered "latest" by any
 // deployed software version.
@@ -168,8 +180,9 @@ func (model *Modelv1) GetProtocolStateVersion() uint64 {
 func NewDefaultKVStore(epochStateID flow.Identifier) protocol_state.KVStoreAPI {
 	return &Modelv1{
 		Modelv0: Modelv0{
-			UpgradableModel: UpgradableModel{},
-			EpochStateID:    epochStateID,
+			UpgradableModel:         UpgradableModel{},
+			EpochStateID:            epochStateID,
+			EpochExtensionViewCount: defaultEpochExtensionViewCount,
 		},
 	}
 }
