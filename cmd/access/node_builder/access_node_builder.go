@@ -163,6 +163,7 @@ type AccessNodeConfig struct {
 	registerCacheType                    string
 	registerCacheSize                    uint
 	programCacheSize                     uint
+	checkPayerBalance                    bool
 }
 
 type PublicNetworkConfig struct {
@@ -262,6 +263,7 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 		registerCacheType:                    pStorage.CacheTypeTwoQueue.String(),
 		registerCacheSize:                    0,
 		programCacheSize:                     0,
+		checkPayerBalance:                    false,
 	}
 }
 
@@ -1358,6 +1360,10 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 			"program-cache-size",
 			defaultConfig.programCacheSize,
 			"[experimental] number of blocks to cache for cadence programs. use 0 to disable cache. default: 0. Note: this is an experimental feature and may cause nodes to become unstable under certain workloads. Use with caution.")
+		flags.BoolVar(&builder.checkPayerBalance,
+			"check-payer-balance",
+			defaultConfig.checkPayerBalance,
+			"checks that a transaction payer has sufficient balance to pay fees before submitting it to collection nodes")
 	}).ValidateFlags(func() error {
 		if builder.supportsObserver && (builder.PublicNetworkConfig.BindAddress == cmd.NotSet || builder.PublicNetworkConfig.BindAddress == "") {
 			return errors.New("public-network-address must be set if supports-observer is true")
@@ -1419,6 +1425,10 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		}
 		if builder.TxErrorMessagesCacheSize == 0 {
 			return errors.New("transaction-error-messages-cache-size must be greater than 0")
+		}
+
+		if builder.checkPayerBalance && !builder.executionDataIndexingEnabled {
+			return errors.New("execution-data-indexing-enabled must be set if check-payer-balance is enabled")
 		}
 
 		return nil
@@ -1822,6 +1832,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				TxErrorMessagesCacheSize:  builder.TxErrorMessagesCacheSize,
 				ScriptExecutor:            builder.ScriptExecutor,
 				ScriptExecutionMode:       scriptExecMode,
+				CheckPayerBalance:         builder.checkPayerBalance,
 				EventQueryMode:            eventQueryMode,
 				BlockTracker:              blockTracker,
 				SubscriptionHandler: subscription.NewSubscriptionHandler(

@@ -3,11 +3,10 @@ package stdlib
 import (
 	"fmt"
 
+	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/encoding/ccf"
 	gethCommon "github.com/onflow/go-ethereum/common"
 	"github.com/onflow/go-ethereum/rlp"
-
-	"github.com/onflow/cadence"
 
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/model/flow"
@@ -34,14 +33,12 @@ type transactionEvent struct {
 	Payload     []byte        // transaction RLP-encoded payload
 	Result      *types.Result // transaction execution result
 	BlockHeight uint64
-	BlockHash   gethCommon.Hash
 }
 
 // NewTransactionEvent creates a new transaction event with the given parameters
 // - result: the result of the transaction execution
 // - payload: the RLP-encoded payload of the transaction
 // - blockHeight: the height of the block where the transaction is included
-// - blockHash: the hash of the block where the transaction is included
 func NewTransactionEvent(
 	result *types.Result,
 	payload []byte,
@@ -113,12 +110,6 @@ func NewBlockEvent(block *types.Block) *Event {
 }
 
 func (p *blockEvent) ToCadence(chainID flow.ChainID) (cadence.Event, error) {
-
-	transactionHashes := make([]cadence.Value, len(p.TransactionHashes))
-	for i, hash := range p.TransactionHashes {
-		transactionHashes[i] = types.HashToCadenceArrayValue(hash)
-	}
-
 	blockHash, err := p.Hash()
 	if err != nil {
 		return cadence.Event{}, err
@@ -134,20 +125,19 @@ func (p *blockEvent) ToCadence(chainID flow.ChainID) (cadence.Event, error) {
 		cadence.NewUInt64(p.TotalGasUsed),
 		types.HashToCadenceArrayValue(p.ParentBlockHash),
 		types.HashToCadenceArrayValue(p.ReceiptRoot),
-		cadence.NewArray(transactionHashes).
-			WithType(cadence.NewVariableSizedArrayType(types.CadenceHashType)),
+		types.HashToCadenceArrayValue(p.TransactionHashRoot),
 	}).WithType(eventType), nil
 }
 
 type BlockEventPayload struct {
-	Height            uint64            `cadence:"height"`
-	Hash              gethCommon.Hash   `cadence:"hash"`
-	Timestamp         uint64            `cadence:"timestamp"`
-	TotalSupply       cadence.Int       `cadence:"totalSupply"`
-	TotalGasUsed      uint64            `cadence:"totalGasUsed"`
-	ParentBlockHash   gethCommon.Hash   `cadence:"parentHash"`
-	ReceiptRoot       gethCommon.Hash   `cadence:"receiptRoot"`
-	TransactionHashes []gethCommon.Hash `cadence:"transactionHashes"`
+	Height              uint64          `cadence:"height"`
+	Hash                gethCommon.Hash `cadence:"hash"`
+	Timestamp           uint64          `cadence:"timestamp"`
+	TotalSupply         cadence.Int     `cadence:"totalSupply"`
+	TotalGasUsed        uint64          `cadence:"totalGasUsed"`
+	ParentBlockHash     gethCommon.Hash `cadence:"parentHash"`
+	ReceiptRoot         gethCommon.Hash `cadence:"receiptRoot"`
+	TransactionHashRoot gethCommon.Hash `cadence:"transactionHashRoot"`
 }
 
 // DecodeBlockEventPayload decodes Cadence event into block event payload.
