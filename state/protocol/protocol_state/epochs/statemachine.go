@@ -322,7 +322,7 @@ func (e *EpochStateMachine) ParentState() protocol.KVStoreReader {
 //   - S was emitted during execution of some block A, s.t. A is an ancestor of B.
 //   - The seal for block A was included in some block C, s.t C is an ancestor of B.
 //
-// For further details see `params.EpochCommitSafetyThreshold()`.
+// For further details see `KVStoreReader.GetEpochCommitSafetyThreshold()`.
 func epochFallbackTriggeredByIncorporatingCandidate(candidateView uint64, parentState protocol.KVStoreReader, parentEpochState *flow.RichEpochStateEntry) bool {
 	if parentEpochState.EpochPhase() == flow.EpochPhaseCommitted { // Requirement 1
 		return false
