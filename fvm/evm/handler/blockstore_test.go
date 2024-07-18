@@ -20,7 +20,7 @@ func TestBlockStore(t *testing.T) {
 		testutils.RunWithTestFlowEVMRootAddress(t, backend, func(root flow.Address) {
 			bs := handler.NewBlockStore(backend, root)
 
-			// check gensis block
+			// check the Genesis block
 			b, err := bs.LatestBlock()
 			require.NoError(t, err)
 			require.Equal(t, types.GenesisBlock, b)
@@ -28,7 +28,7 @@ func TestBlockStore(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, types.GenesisBlockHash, h)
 
-			// test block proposal from genesis
+			// test block proposal construction from the Genesis block
 			bp, err := bs.BlockProposal()
 			require.NoError(t, err)
 			require.Equal(t, uint64(1), bp.Height)
@@ -36,18 +36,43 @@ func TestBlockStore(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, expectedParentHash, bp.ParentBlockHash)
 
-			// commit block proposal
+			// if no commit and again block proposal call should return the same
+			retbp, err := bs.BlockProposal()
+			require.NoError(t, err)
+			require.Equal(t, bp, retbp)
+
+			// update the block proposal
+			bp.TotalGasUsed += 100
+			err = bs.UpdateBlockProposal(bp)
+			require.NoError(t, err)
+
+			// reset the bs and check if it still return the block proposal
+			bs = handler.NewBlockStore(backend, root)
+			retbp, err = bs.BlockProposal()
+			require.NoError(t, err)
+			require.Equal(t, bp, retbp)
+
+			// update the block proposal again
 			supply := big.NewInt(100)
 			bp.TotalSupply = supply
-			err = bs.CommitBlockProposal()
+			err = bs.UpdateBlockProposal(bp)
 			require.NoError(t, err)
-			b, err = bs.LatestBlock()
+			// this should still return the gensis block
+			retb, err := bs.LatestBlock()
 			require.NoError(t, err)
-			require.Equal(t, supply, b.TotalSupply)
-			require.Equal(t, uint64(1), b.Height)
-			bp, err = bs.BlockProposal()
+			require.Equal(t, types.GenesisBlock, retb)
+
+			// commit the changes
+			err = bs.CommitBlockProposal(bp)
 			require.NoError(t, err)
-			require.Equal(t, uint64(2), bp.Height)
+			retb, err = bs.LatestBlock()
+			require.NoError(t, err)
+			require.Equal(t, supply, retb.TotalSupply)
+			require.Equal(t, uint64(1), retb.Height)
+
+			retbp, err = bs.BlockProposal()
+			require.NoError(t, err)
+			require.Equal(t, uint64(2), retbp.Height)
 
 			// check block hashes
 			// genesis
@@ -58,7 +83,7 @@ func TestBlockStore(t *testing.T) {
 			// block 1
 			h, err = bs.BlockHash(1)
 			require.NoError(t, err)
-			expected, err := b.Hash()
+			expected, err := bp.Hash()
 			require.NoError(t, err)
 			require.Equal(t, expected, h)
 
@@ -147,6 +172,9 @@ func TestBlockStore_AddedTimestamp(t *testing.T) {
 			err = backend.SetValue(root[:], []byte(handler.BlockStoreLatestBlockKey), blockBytes2)
 			require.NoError(t, err)
 
+			err = bs.ResetBlockProposal()
+			require.NoError(t, err)
+
 			block2, err := bs.LatestBlock()
 			require.NoError(t, err)
 
@@ -160,10 +188,10 @@ func TestBlockStore_AddedTimestamp(t *testing.T) {
 			bp, err := bs.BlockProposal()
 			require.NoError(t, err)
 
-			blockBytes, err = bp.ToBytes()
+			blockBytes3, err := gethRLP.EncodeToBytes(bp.Block)
 			require.NoError(t, err)
 
-			err = backend.SetValue(root[:], []byte(handler.BlockStoreLatestBlockKey), blockBytes)
+			err = backend.SetValue(root[:], []byte(handler.BlockStoreLatestBlockKey), blockBytes3)
 			require.NoError(t, err)
 
 			bb, err := bs.LatestBlock()

@@ -27,7 +27,7 @@ type BlockContext struct {
 	GasFeeCollector        Address
 	GetHashFunc            func(n uint64) gethCommon.Hash
 	Random                 gethCommon.Hash
-	Tracer                 tracers.Tracer
+	Tracer                 *tracers.Tracer
 
 	// a set of extra precompiled contracts to be injected
 	ExtraPrecompiledContracts []PrecompiledContract

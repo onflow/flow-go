@@ -21,7 +21,7 @@ func (s *TransactionSignature) Parse(
 		return err
 	}
 
-	keyIndex, err := util.ToUint64(rawKeyIndex)
+	keyIndex, err := util.ToUint32(rawKeyIndex)
 	if err != nil {
 		return fmt.Errorf("invalid key index: %w", err)
 	}
