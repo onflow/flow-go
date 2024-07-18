@@ -11,6 +11,7 @@ import (
 	stdlib2 "github.com/onflow/cadence/runtime/stdlib"
 
 	envMock "github.com/onflow/flow-go/fvm/environment/mock"
+	"github.com/onflow/flow-go/fvm/evm/events"
 
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/encoding/ccf"
@@ -3053,12 +3054,12 @@ func TestEVM(t *testing.T) {
 			txExecutedID := common.NewAddressLocation(
 				nil,
 				common.Address(sc.EVMContract.Address),
-				string(stdlib.EventTypeTransactionExecuted),
+				string(events.EventTypeTransactionExecuted),
 			).ID()
 			blockExecutedID := common.NewAddressLocation(
 				nil,
 				common.Address(sc.EVMContract.Address),
-				string(stdlib.EventTypeBlockExecuted),
+				string(events.EventTypeBlockExecuted),
 			).ID()
 			assert.Equal(t, txExecutedID, string(txExe.Type))
 			assert.Equal(t, blockExecutedID, string(blockExe.Type))

@@ -1,11 +1,11 @@
-package stdlib_test
+package events_test
 
 import (
 	"encoding/hex"
 	"math/big"
 	"testing"
 
-	"github.com/onflow/flow-go/fvm/evm/stdlib"
+	"github.com/onflow/flow-go/fvm/evm/events"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
 
@@ -36,11 +36,11 @@ func TestEVMBlockExecutedEventCCFEncodingDecoding(t *testing.T) {
 		TransactionHashRoot: gethCommon.HexToHash("0x70b67ce6710355acf8d69b2ea013d34e212bc4824926c5d26f189c1ca9667246"),
 	}
 
-	event := stdlib.NewBlockEvent(block)
+	event := events.NewBlockEvent(block)
 	ev, err := event.Payload.ToCadence(flow.Emulator)
 	require.NoError(t, err)
 
-	bep, err := stdlib.DecodeBlockEventPayload(ev)
+	bep, err := events.DecodeBlockEventPayload(ev)
 	require.NoError(t, err)
 
 	assert.Equal(t, bep.Height, block.Height)
@@ -69,7 +69,7 @@ func TestEVMBlockExecutedEventCCFEncodingDecoding(t *testing.T) {
 		cdcCommon.NewAddressLocation(
 			nil,
 			cdcCommon.Address(sc.EVMContract.Address),
-			string(stdlib.EventTypeBlockExecuted),
+			string(events.EventTypeBlockExecuted),
 		).ID(),
 		evt.Type().ID(),
 	)
@@ -112,11 +112,11 @@ func TestEVMTransactionExecutedEventCCFEncodingDecoding(t *testing.T) {
 	}
 
 	t.Run("evm.TransactionExecuted with failed status", func(t *testing.T) {
-		event := stdlib.NewTransactionEvent(txResult, txBytes, blockHeight)
+		event := events.NewTransactionEvent(txResult, txBytes, blockHeight)
 		ev, err := event.Payload.ToCadence(flow.Emulator)
 		require.NoError(t, err)
 
-		tep, err := stdlib.DecodeTransactionEventPayload(ev)
+		tep, err := events.DecodeTransactionEventPayload(ev)
 		require.NoError(t, err)
 
 		assert.Equal(t, tep.BlockHeight, blockHeight)
@@ -154,11 +154,11 @@ func TestEVMTransactionExecutedEventCCFEncodingDecoding(t *testing.T) {
 	t.Run("evm.TransactionExecuted with non-failed status", func(t *testing.T) {
 		txResult.VMError = nil
 
-		event := stdlib.NewTransactionEvent(txResult, txBytes, blockHeight)
+		event := events.NewTransactionEvent(txResult, txBytes, blockHeight)
 		ev, err := event.Payload.ToCadence(flow.Emulator)
 		require.NoError(t, err)
 
-		tep, err := stdlib.DecodeTransactionEventPayload(ev)
+		tep, err := events.DecodeTransactionEventPayload(ev)
 		require.NoError(t, err)
 
 		assert.Equal(t, tep.BlockHeight, blockHeight)

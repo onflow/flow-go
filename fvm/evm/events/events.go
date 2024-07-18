@@ -1,4 +1,4 @@
-package stdlib
+package events
 
 import (
 	"fmt"
@@ -8,6 +8,7 @@ import (
 	gethCommon "github.com/onflow/go-ethereum/common"
 	"github.com/onflow/go-ethereum/rlp"
 
+	"github.com/onflow/flow-go/fvm/evm/stdlib"
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -79,7 +80,7 @@ func (p *transactionEvent) ToCadence(chainID flow.ChainID) (cadence.Event, error
 		errorMsg = p.Result.ValidationError.Error()
 	}
 
-	eventType := CadenceTypesForChain(chainID).TransactionExecuted
+	eventType := stdlib.CadenceTypesForChain(chainID).TransactionExecuted
 
 	return cadence.NewEvent([]cadence.Value{
 		types.HashToCadenceArrayValue(p.Result.TxHash),
@@ -115,7 +116,7 @@ func (p *blockEvent) ToCadence(chainID flow.ChainID) (cadence.Event, error) {
 		return cadence.Event{}, err
 	}
 
-	eventType := CadenceTypesForChain(chainID).BlockExecuted
+	eventType := stdlib.CadenceTypesForChain(chainID).BlockExecuted
 
 	return cadence.NewEvent([]cadence.Value{
 		cadence.NewUInt64(p.Height),

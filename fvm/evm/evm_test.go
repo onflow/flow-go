@@ -24,6 +24,7 @@ import (
 	envMock "github.com/onflow/flow-go/fvm/environment/mock"
 	"github.com/onflow/flow-go/fvm/evm"
 	"github.com/onflow/flow-go/fvm/evm/emulator"
+	"github.com/onflow/flow-go/fvm/evm/events"
 	"github.com/onflow/flow-go/fvm/evm/stdlib"
 	"github.com/onflow/flow-go/fvm/evm/testutils"
 	. "github.com/onflow/flow-go/fvm/evm/testutils"
@@ -472,7 +473,7 @@ func TestEVMBatchRun(t *testing.T) {
 					cadenceEvent, ok := ev.(cadence.Event)
 					require.True(t, ok)
 
-					event, err := stdlib.DecodeTransactionEventPayload(cadenceEvent)
+					event, err := events.DecodeTransactionEventPayload(cadenceEvent)
 					require.NoError(t, err)
 
 					txHashes = append(txHashes, event.Hash)
@@ -964,10 +965,10 @@ func TestEVMAddressDeposit(t *testing.T) {
 
 			// deposit event
 			depositEvent := output.Events[3]
-			depEv, err := stdlib.FlowEventToCadenceEvent(depositEvent)
+			depEv, err := events.FlowEventToCadenceEvent(depositEvent)
 			require.NoError(t, err)
 
-			depEvPayload, err := stdlib.DecodeFLOWTokensDepositedEventPayload(depEv)
+			depEvPayload, err := events.DecodeFLOWTokensDepositedEventPayload(depEv)
 			require.NoError(t, err)
 
 			require.Equal(t, types.OneFlow, depEvPayload.BalanceAfterInAttoFlow.Value)
@@ -1150,10 +1151,10 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 
 				withdrawEvent := output.Events[7]
 
-				ev, err := stdlib.FlowEventToCadenceEvent(withdrawEvent)
+				ev, err := events.FlowEventToCadenceEvent(withdrawEvent)
 				require.NoError(t, err)
 
-				evPayload, err := stdlib.DecodeFLOWTokensWithdrawnEventPayload(ev)
+				evPayload, err := events.DecodeFLOWTokensWithdrawnEventPayload(ev)
 				require.NoError(t, err)
 
 				// 2.34 - 1.23 = 1.11
@@ -2519,7 +2520,7 @@ func callEVMHeartBeat(
 	ctx fvm.Context,
 	vm fvm.VM,
 	snap snapshot.SnapshotTree,
-) (*stdlib.BlockEventPayload, snapshot.SnapshotTree) {
+) (*events.BlockEventPayload, snapshot.SnapshotTree) {
 	sc := systemcontracts.SystemContractsForChain(ctx.Chain.ChainID())
 
 	heartBeatCode := []byte(fmt.Sprintf(
