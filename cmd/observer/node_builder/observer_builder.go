@@ -277,7 +277,7 @@ type ObserverServiceBuilder struct {
 	ExecutionDataStore      execution_data.ExecutionDataStore
 	ExecutionDataBlobstore  blobs.Blobstore
 	ExecutionDataPruner     *pruner.Pruner
-	ExecutionDataDatastore  edstorage.StorageDB
+	ExecutionDataStorage    edstorage.ExecutionDataStorage
 	ExecutionDataTracker    tracker.Storage
 
 	RegistersAsyncStore *execution.RegistersAsyncStore
@@ -1119,20 +1119,20 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 			}
 
 			if executionDataDBMode == execution_data.ExecutionDataDBModePebble {
-				builder.ExecutionDataDatastore, err = edstorage.NewPebbleDBWrapper(datastoreDir, nil)
+				builder.ExecutionDataStorage, err = edstorage.NewPebbleDBWrapper(datastoreDir, nil)
 				if err != nil {
 					return fmt.Errorf("could not create PebbleDBWrapper for execution data: %w", err)
 				}
 			} else {
-				builder.ExecutionDataDatastore, err = edstorage.NewBadgerDBWrapper(datastoreDir, &badgerds.DefaultOptions)
+				builder.ExecutionDataStorage, err = edstorage.NewBadgerDBWrapper(datastoreDir, &badgerds.DefaultOptions)
 				if err != nil {
 					return fmt.Errorf("could not create BadgerDBWrapper for execution data: %w", err)
 				}
 			}
-			ds = builder.ExecutionDataDatastore.Datastore()
+			ds = builder.ExecutionDataStorage.Datastore()
 
 			builder.ShutdownFunc(func() error {
-				if err := builder.ExecutionDataDatastore.Close(); err != nil {
+				if err := builder.ExecutionDataStorage.Close(); err != nil {
 					return fmt.Errorf("could not close execution data datastore: %w", err)
 				}
 				return nil
@@ -1335,7 +1335,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				prunerMetrics,
 				builder.ExecutionDataTracker,
 				pruner.WithPruneCallback(func(ctx context.Context) error {
-					return builder.ExecutionDataDatastore.CollectGarbage(ctx)
+					return builder.ExecutionDataStorage.CollectGarbage(ctx)
 				}),
 				pruner.WithHeightRangeTarget(builder.executionDataPrunerHeightRangeTarget),
 				pruner.WithThreshold(builder.executionDataPrunerThreshold),
