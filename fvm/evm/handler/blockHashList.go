@@ -107,7 +107,7 @@ func (bhl *BlockHashList) IsEmpty() bool {
 // LastAddedBlockHash returns the last block hash added to the list
 // for empty list it returns empty hash value
 func (bhl *BlockHashList) LastAddedBlockHash() (gethCommon.Hash, error) {
-	if bhl.count == 0 {
+	if bhl.IsEmpty() {
 		// return empty hash
 		return gethCommon.Hash{}, nil
 	}
@@ -133,9 +133,9 @@ func (bhl *BlockHashList) MaxAvailableHeight() uint64 {
 
 // BlockHashByIndex returns the block hash by block height
 func (bhl *BlockHashList) BlockHashByHeight(height uint64) (found bool, bh gethCommon.Hash, err error) {
-	if bhl.count == 0 || // if empty
-		height > bhl.MaxAvailableHeight() || // or height too high
-		height < bhl.MinAvailableHeight() { // or height too low
+	if bhl.IsEmpty() ||
+		height > bhl.MaxAvailableHeight() ||
+		height < bhl.MinAvailableHeight() {
 		return false, gethCommon.Hash{}, nil
 	}
 	// calculate the index to lookup
