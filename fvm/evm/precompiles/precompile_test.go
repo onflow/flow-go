@@ -34,10 +34,8 @@ func TestMutiFunctionContract(t *testing.T) {
 			},
 		}})
 
-	require.False(t, pc.IsCalled())
 	require.Equal(t, address, pc.Address())
 	require.Equal(t, gas, pc.RequiredGas(input))
-	require.True(t, pc.IsCalled())
 	ret, err := pc.Run(input)
 	require.NoError(t, err)
 	require.Equal(t, output, ret)
@@ -45,28 +43,6 @@ func TestMutiFunctionContract(t *testing.T) {
 	input2 := []byte("non existing signature and data")
 	_, err = pc.Run(input2)
 	require.Equal(t, precompiles.ErrInvalidMethodCall, err)
-
-	calls := pc.CapturedCalls()
-	require.Equal(t, address, calls.Address)
-	require.Len(t, calls.RequiredGasCalls, 1)
-	require.Equal(t, input, calls.RequiredGasCalls[0].Input)
-	require.Equal(t, gas, calls.RequiredGasCalls[0].Output)
-	require.Len(t, calls.RunCalls, 2)
-	require.Equal(t, input, calls.RunCalls[0].Input)
-	require.Equal(t, output, calls.RunCalls[0].Output)
-	require.Empty(t, calls.RunCalls[0].ErrorMsg)
-	require.Equal(t, input2, calls.RunCalls[1].Input)
-	require.Empty(t, calls.RunCalls[1].Output)
-	require.Equal(t, precompiles.ErrInvalidMethodCall.Error(), calls.RunCalls[1].ErrorMsg)
-
-	// test reset functionality
-	pc.Reset()
-	require.False(t, pc.IsCalled())
-
-	calls = pc.CapturedCalls()
-	require.Equal(t, address, calls.Address)
-	require.Len(t, calls.RequiredGasCalls, 0)
-	require.Len(t, calls.RunCalls, 0)
 }
 
 type mockedFunction struct {
