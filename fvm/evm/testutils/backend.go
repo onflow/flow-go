@@ -11,7 +11,7 @@ import (
 
 	"github.com/onflow/atree"
 	"github.com/onflow/cadence"
-	jsoncdc "github.com/onflow/cadence/encoding/json"
+	"github.com/onflow/cadence/encoding/ccf"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/stretchr/testify/require"
@@ -25,7 +25,7 @@ import (
 	"github.com/onflow/flow-go/module/trace"
 )
 
-var TestFlowEVMRootAddress = flow.BytesToAddress([]byte("FlowEVM"))
+var TestFlowEVMRootAddress = flow.Address{1, 2, 3, 4}
 var TestComputationLimit = uint(100_000_000)
 
 func RunWithTestFlowEVMRootAddress(t testing.TB, backend atree.Ledger, f func(flow.Address)) {
@@ -127,12 +127,15 @@ func getSimpleEventEmitter() *testEventEmitter {
 	events := make(flow.EventsList, 0)
 	return &testEventEmitter{
 		emitEvent: func(event cadence.Event) error {
-			payload, err := jsoncdc.Encode(event)
+			payload, err := ccf.Encode(event)
 			if err != nil {
 				return err
 			}
-
-			events = append(events, flow.Event{Type: flow.EventType(event.EventType.QualifiedIdentifier), Payload: payload})
+			eventType := flow.EventType(event.EventType.ID())
+			events = append(events, flow.Event{
+				Type:    eventType,
+				Payload: payload,
+			})
 			return nil
 		},
 		events: func() flow.EventsList {
