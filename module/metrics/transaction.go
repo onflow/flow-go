@@ -331,3 +331,13 @@ func (tc *TransactionCollector) TransactionExpired(txID flow.Identifier) {
 	tc.transactionSubmission.WithLabelValues("expired").Inc()
 	tc.transactionTimings.Remove(txID)
 }
+
+func (tc *TransactionCollector) TransactionValidated(txID flow.Identifier) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (tc *TransactionCollector) TransactionValidationFailed(txID flow.Identifier, reason string) {
+	//TODO implement me
+	panic("implement me")
+}

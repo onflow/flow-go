@@ -212,6 +212,8 @@ func (nc *NoopCollector) TransactionReceived(txID flow.Identifier, when time.Tim
 func (nc *NoopCollector) TransactionFinalized(txID flow.Identifier, when time.Time)             {}
 func (nc *NoopCollector) TransactionExecuted(txID flow.Identifier, when time.Time)              {}
 func (nc *NoopCollector) TransactionExpired(txID flow.Identifier)                               {}
+func (nc *NoopCollector) TransactionValidated(txID flow.Identifier)                             {}
+func (nc *NoopCollector) TransactionValidationFailed(txID flow.Identifier, reason string)       {}
 func (nc *NoopCollector) TransactionSubmissionFailed()                                          {}
 func (nc *NoopCollector) UpdateExecutionReceiptMaxHeight(height uint64)                         {}
 func (nc *NoopCollector) UpdateLastFullBlockHeight(height uint64)                               {}

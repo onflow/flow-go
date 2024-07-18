@@ -143,6 +143,16 @@ func (_m *AccessMetrics) TransactionSubmissionFailed() {
 	_m.Called()
 }
 
+// TransactionValidated provides a mock function with given fields: txID
+func (_m *AccessMetrics) TransactionValidated(txID flow.Identifier) {
+	_m.Called(txID)
+}
+
+// TransactionValidationFailed provides a mock function with given fields: txID, reason
+func (_m *AccessMetrics) TransactionValidationFailed(txID flow.Identifier, reason string) {
+	_m.Called(txID, reason)
+}
+
 // UpdateExecutionReceiptMaxHeight provides a mock function with given fields: height
 func (_m *AccessMetrics) UpdateExecutionReceiptMaxHeight(height uint64) {
 	_m.Called(height)

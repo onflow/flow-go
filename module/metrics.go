@@ -1055,6 +1055,12 @@ type TransactionMetrics interface {
 	// TransactionExpired tracks number of expired transactions
 	TransactionExpired(txID flow.Identifier)
 
+	// TransactionValidated tracks number of validated transactions
+	TransactionValidated(txID flow.Identifier)
+
+	// TransactionValidationFailed tracks number of validation failed transactions with reason
+	TransactionValidationFailed(txID flow.Identifier, reason string)
+
 	// TransactionSubmissionFailed should be called whenever we try to submit a transaction and it fails
 	TransactionSubmissionFailed()
 }
