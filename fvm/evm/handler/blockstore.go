@@ -165,14 +165,17 @@ func (bs *BlockStore) getBlockHashList() (*BlockHashList, error) {
 	// check legacy block hash list first
 	return bs.checkLegacyAndMigrate()
 	// TODO: when preview net is out, we can remove the call to legacy and uncomment below
-	// BlockStoreBlockHashesKey can also be removed
+	// BlockStoreBlockHashesKey constant also be removed
+	//
 	// bhl, err := NewBlockHashList(bs.backend, bs.rootAddress, BlockHashListCapacity)
 	// if err != nil {
-	//    return nil, err
+	// 	return nil, err
 	// }
-	// err = bhl.Push(types.GenesisBlock.Height, types.GenesisBlockHash)
-	// if err != nil {
-	//    return nil, err
+	// if bhl.IsEmpty() {
+	// 	err = bhl.Push(types.GenesisBlock.Height, types.GenesisBlockHash)
+	// 	if err != nil {
+	// 		return nil, err
+	// 	}
 	// }
 	// return bhl, nil
 }
