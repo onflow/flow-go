@@ -2,7 +2,6 @@ package storage
 
 import (
 	"context"
-	"errors"
 
 	"github.com/dgraph-io/badger/v2"
 	ds "github.com/ipfs/go-datastore"
@@ -27,10 +26,6 @@ func NewBadgerDBWrapper(datastorePath string, options *badgerds.Options) (*Badge
 
 func (b *BadgerDBWrapper) Datastore() ds.Batching {
 	return b.ds
-}
-
-func (b *BadgerDBWrapper) DB() interface{} {
-	return b.ds.DB
 }
 
 func (b *BadgerDBWrapper) Keys(prefix []byte) ([][]byte, error) {
@@ -85,26 +80,4 @@ func (b *BadgerDBWrapper) Delete(key []byte) error {
 
 func (b *BadgerDBWrapper) Close() error {
 	return b.ds.Close()
-}
-
-func (b *BadgerDBWrapper) RetryOnConflict(fn func() error) error {
-	for {
-		err := fn()
-		if errors.Is(err, badger.ErrConflict) {
-			continue
-		}
-		return err
-	}
-}
-
-func (b *BadgerDBWrapper) MaxBatchCount() int64 {
-	return b.ds.DB.MaxBatchCount()
-}
-
-func (b *BadgerDBWrapper) MaxBatchSize() int64 {
-	return b.ds.DB.MaxBatchSize()
-}
-
-func (b *BadgerDBWrapper) RunValueLogGC(discardRatio float64) error {
-	return b.ds.DB.RunValueLogGC(discardRatio)
 }

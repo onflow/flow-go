@@ -13,8 +13,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cockroachdb/pebble"
-	"github.com/dgraph-io/badger/v2"
 	"github.com/ipfs/boxo/bitswap"
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
@@ -1124,12 +1122,12 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 			if executionDataDBMode == execution_data.ExecutionDataDBModePebble {
 				builder.ExecutionDataDatastore, err = edstorage.NewPebbleDBWrapper(datastoreDir, nil)
 				if err != nil {
-					return err
+					return fmt.Errorf("could not create PebbleDBWrapper for execution data: %w", err)
 				}
 			} else {
 				builder.ExecutionDataDatastore, err = edstorage.NewBadgerDBWrapper(datastoreDir, &badgerds.DefaultOptions)
 				if err != nil {
-					return err
+					return fmt.Errorf("could not create BadgerDBWrapper for execution data: %w", err)
 				}
 			}
 			ds = storageDB.Datastore()
@@ -1146,21 +1144,13 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 		Module("processed block height consumer progress", func(node *cmd.NodeConfig) error {
 			// Note: progress is stored in the datastore's DB since that is where the jobqueue
 			// writes execution data to.
-			if executionDataDBMode == execution_data.ExecutionDataDBModePebble {
-				processedBlockHeight = pstorage.NewConsumerProgress(builder.ExecutionDataDatastore.DB().(*pebble.DB), module.ConsumeProgressExecutionDataRequesterBlockHeight)
-			} else {
-				processedBlockHeight = bstorage.NewConsumerProgress(builder.ExecutionDataDatastore.DB().(*badger.DB), module.ConsumeProgressExecutionDataRequesterBlockHeight)
-			}
+			processedBlockHeight = bstorage.NewConsumerProgress(builder.DB, module.ConsumeProgressExecutionDataRequesterBlockHeight)
 			return nil
 		}).
 		Module("processed notifications consumer progress", func(node *cmd.NodeConfig) error {
 			// Note: progress is stored in the datastore's DB since that is where the jobqueue
 			// writes execution data to.
-			if executionDataDBMode == execution_data.ExecutionDataDBModePebble {
-				processedNotifications = pstorage.NewConsumerProgress(builder.ExecutionDataDatastore.DB().(*pebble.DB), module.ConsumeProgressExecutionDataRequesterNotification)
-			} else {
-				processedNotifications = bstorage.NewConsumerProgress(builder.ExecutionDataDatastore.DB().(*badger.DB), module.ConsumeProgressExecutionDataRequesterNotification)
-			}
+			processedNotifications = bstorage.NewConsumerProgress(builder.DB, module.ConsumeProgressExecutionDataRequesterNotification)
 			return nil
 		}).
 		Module("blobservice peer manager dependencies", func(node *cmd.NodeConfig) error {

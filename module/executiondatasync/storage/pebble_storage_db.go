@@ -15,15 +15,9 @@ var _ StorageDB = (*PebbleDBWrapper)(nil)
 // PebbleDBWrapper wraps the PebbleDB to implement the StorageDB interface.
 type PebbleDBWrapper struct {
 	ds *pebbleds.Datastore
-	db *pebble.DB
 }
 
 func NewPebbleDBWrapper(dbPath string, options *pebble.Options) (*PebbleDBWrapper, error) {
-	db, err := pebble.Open(dbPath, options)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open pebble database: %w", err)
-	}
-
 	ds, err := pebbleds.NewDatastore(dbPath, options)
 	if err != nil {
 		return nil, fmt.Errorf("could not open tracker ds: %w", err)
@@ -31,16 +25,11 @@ func NewPebbleDBWrapper(dbPath string, options *pebble.Options) (*PebbleDBWrappe
 
 	return &PebbleDBWrapper{
 		ds: ds,
-		db: db,
 	}, nil
 }
 
 func (p *PebbleDBWrapper) Datastore() ds.Batching {
 	return p.ds
-}
-
-func (p *PebbleDBWrapper) DB() interface{} {
-	return p.db
 }
 
 func (p *PebbleDBWrapper) Keys(prefix []byte) ([][]byte, error) {
@@ -87,25 +76,6 @@ func (p *PebbleDBWrapper) Delete(key []byte) error {
 
 func (p *PebbleDBWrapper) Close() error {
 	return p.ds.Close()
-}
-
-func (p *PebbleDBWrapper) RetryOnConflict(_ func() error) error {
-	return nil
-}
-
-// TODO: implement
-func (p *PebbleDBWrapper) MaxBatchCount() int64 {
-	return 0
-}
-
-// TODO: implement
-func (p *PebbleDBWrapper) MaxBatchSize() int64 {
-	return 0
-}
-
-func (p *PebbleDBWrapper) RunValueLogGC(_ float64) error {
-	// PebbleDB (go-ds-pebble) does not have a direct equivalent to Badger's value log GC.
-	return nil
 }
 
 var _ StorageItem = (*PebbleItem)(nil)

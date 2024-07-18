@@ -82,6 +82,7 @@ func (s *ExecutionStateSyncSuite) buildNetworkConfig() {
 		testnet.WithAdditionalFlag(fmt.Sprintf("--execution-data-dir=%s", testnet.DefaultExecutionDataServiceDir)),
 		testnet.WithAdditionalFlag("--execution-data-retry-delay=1s"),
 		testnet.WithAdditionalFlagf("--public-network-execution-data-sync-enabled=true"),
+		testnet.WithAdditionalFlag(fmt.Sprintf("--execution-data-db=%s", execution_data.ExecutionDataDBModePebble.String())),
 	)
 
 	// add the ghost (access) node config
