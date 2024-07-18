@@ -66,7 +66,7 @@ func (mock *EpochQuery) Phase() flow.EpochPhase {
 	defer mock.mu.RUnlock()
 	_, exists := mock.byCounter[mock.counter+1]
 	if exists {
-		return flow.EpochPhaseSetup
+		return flow.EpochPhaseCommitted
 	}
 	return flow.EpochPhaseStaking
 }
