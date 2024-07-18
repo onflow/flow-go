@@ -83,18 +83,18 @@ func (p *transactionEvent) ToCadence(chainID flow.ChainID) (cadence.Event, error
 	eventType := stdlib.CadenceTypesForChain(chainID).TransactionExecuted
 
 	return cadence.NewEvent([]cadence.Value{
-		types.HashToCadenceArrayValue(p.Result.TxHash),
+		hashToCadenceArrayValue(p.Result.TxHash),
 		cadence.NewUInt16(p.Result.Index),
 		cadence.NewUInt8(p.Result.TxType),
-		types.BytesToCadenceUInt8ArrayValue(p.Payload),
+		bytesToCadenceUInt8ArrayValue(p.Payload),
 		cadence.NewUInt16(uint16(p.Result.ResultSummary().ErrorCode)),
 		cadence.String(errorMsg),
 		cadence.NewUInt64(p.Result.GasConsumed),
 		deployedAddress,
-		types.BytesToCadenceUInt8ArrayValue(encodedLogs),
+		bytesToCadenceUInt8ArrayValue(encodedLogs),
 		cadence.NewUInt64(p.BlockHeight),
-		types.BytesToCadenceUInt8ArrayValue(p.Result.ReturnedData),
-		types.BytesToCadenceUInt8ArrayValue(p.Result.PrecompiledCalls),
+		bytesToCadenceUInt8ArrayValue(p.Result.ReturnedData),
+		bytesToCadenceUInt8ArrayValue(p.Result.PrecompiledCalls),
 	}).WithType(eventType), nil
 }
 
@@ -120,13 +120,13 @@ func (p *blockEvent) ToCadence(chainID flow.ChainID) (cadence.Event, error) {
 
 	return cadence.NewEvent([]cadence.Value{
 		cadence.NewUInt64(p.Height),
-		types.HashToCadenceArrayValue(blockHash),
+		hashToCadenceArrayValue(blockHash),
 		cadence.NewUInt64(p.Timestamp),
 		cadence.NewIntFromBig(p.TotalSupply),
 		cadence.NewUInt64(p.TotalGasUsed),
-		types.HashToCadenceArrayValue(p.ParentBlockHash),
-		types.HashToCadenceArrayValue(p.ReceiptRoot),
-		types.HashToCadenceArrayValue(p.TransactionHashRoot),
+		hashToCadenceArrayValue(p.ParentBlockHash),
+		hashToCadenceArrayValue(p.ReceiptRoot),
+		hashToCadenceArrayValue(p.TransactionHashRoot),
 	}).WithType(eventType), nil
 }
 
