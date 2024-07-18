@@ -262,8 +262,14 @@ func withNextEpoch(
 	epochRichProtocolState, err := flow.NewRichEpochStateEntry(epochStateEntry)
 	require.NoError(t, err)
 
+	originalRootKVStore, err := snapshot.ProtocolState()
+	require.NoError(t, err)
+
 	// Store the modified epoch protocol state entry and corresponding KV store entry
-	rootKVStore := kvstore.NewDefaultKVStore(epochRichProtocolState.ID())
+	rootKVStore, err := kvstore.NewDefaultKVStore(
+		originalRootKVStore.GetEpochCommitSafetyThreshold(),
+		epochRichProtocolState.ID())
+	require.NoError(t, err)
 	protocolVersion, encodedKVStore, err := rootKVStore.VersionedEncode()
 	require.NoError(t, err)
 	encodableSnapshot.SealingSegment.ProtocolStateEntries = map[flow.Identifier]*flow.ProtocolStateEntryWrapper{

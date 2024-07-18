@@ -1698,11 +1698,10 @@ func TestEpochFallbackMode(t *testing.T) {
 			require.NoError(t, err)
 			result, _, err := rootSnapshot.SealedResult()
 			require.NoError(t, err)
-			safetyThreshold := rootSnapshot.Params().EpochCommitSafetyThreshold()
-			require.NoError(t, err)
 			rootProtocolState, err := rootSnapshot.ProtocolState()
 			require.NoError(t, err)
 			epochExtensionViewCount := rootProtocolState.GetEpochExtensionViewCount()
+			safetyThreshold := rootProtocolState.GetEpochCommitSafetyThreshold()
 
 			expectedStateIdCalculator := calculateExpectedStateId(t, mutableProtocolState)
 
@@ -1768,11 +1767,10 @@ func TestEpochFallbackMode(t *testing.T) {
 			require.NoError(t, err)
 			result, _, err := rootSnapshot.SealedResult()
 			require.NoError(t, err)
-			safetyThreshold := rootSnapshot.Params().EpochCommitSafetyThreshold()
-			require.NoError(t, err)
 			rootProtocolState, err := rootSnapshot.ProtocolState()
 			require.NoError(t, err)
 			epochExtensionViewCount := rootProtocolState.GetEpochExtensionViewCount()
+			safetyThreshold := rootProtocolState.GetEpochCommitSafetyThreshold()
 
 			// add a block for the first seal to reference
 			block1 := unittest.BlockWithParentFixture(head)
@@ -2218,11 +2216,10 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 			require.NoError(t, err)
 			rootResult, _, err := rootSnapshot.SealedResult()
 			require.NoError(t, err)
-			safetyThreshold := rootSnapshot.Params().EpochCommitSafetyThreshold()
-			require.NoError(t, err)
 			rootProtocolState, err := rootSnapshot.ProtocolState()
 			require.NoError(t, err)
 			epochExtensionViewCount := rootProtocolState.GetEpochExtensionViewCount()
+			safetyThreshold := rootProtocolState.GetEpochCommitSafetyThreshold()
 
 			expectedStateIdCalculator := calculateExpectedStateId(t, mutableProtocolState)
 

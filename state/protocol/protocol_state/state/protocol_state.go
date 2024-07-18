@@ -121,7 +121,7 @@ func NewMutableProtocolState(
 	// all factories are expected to be called in order defined here.
 	kvStateMachineFactories := []protocol_state.KeyValueStoreStateMachineFactory{
 		kvstore.NewPSVersionUpgradeStateMachineFactory(),
-		epochs.NewEpochStateMachineFactory(globalParams, setups, commits, epochProtocolStateDB,
+		epochs.NewEpochStateMachineFactory(setups, commits, epochProtocolStateDB,
 			epochhappyPathTelemetryFactory, epochfallbackTelemetryFactory),
 	}
 	return newMutableProtocolState(epochProtocolStateDB, kvstore.NewProtocolKVStore(kvStoreSnapshots), globalParams, headers, results, kvStateMachineFactories)

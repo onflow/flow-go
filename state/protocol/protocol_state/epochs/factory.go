@@ -20,7 +20,6 @@ type EpochStateMachineFactory struct {
 var _ protocol_state.KeyValueStoreStateMachineFactory = (*EpochStateMachineFactory)(nil)
 
 func NewEpochStateMachineFactory(
-	params protocol.GlobalParams,
 	setups storage.EpochSetups,
 	commits storage.EpochCommits,
 	epochProtocolStateDB storage.EpochProtocolStateEntries,
