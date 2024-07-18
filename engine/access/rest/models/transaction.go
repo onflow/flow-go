@@ -41,7 +41,7 @@ func (t *Transaction) Build(tx *flow.TransactionBody, txr *access.TransactionRes
 	t.Script = util.ToBase64(tx.Script)
 	t.Arguments = args
 	t.ReferenceBlockId = tx.ReferenceBlockID.String()
-	t.GasLimit = util.FromUint64(tx.GasLimit)
+	t.GasLimit = util.FromUint(tx.GasLimit)
 	t.Payer = tx.Payer.String()
 	t.ProposalKey = &proposalKey
 	t.Authorizers = auths
@@ -80,7 +80,7 @@ func (t *TransactionSignatures) Build(signatures []flow.TransactionSignature) {
 
 func (t *TransactionSignature) Build(sig flow.TransactionSignature) {
 	t.Address = sig.Address.String()
-	t.KeyIndex = util.FromUint64(sig.KeyIndex)
+	t.KeyIndex = util.FromUint(sig.KeyIndex)
 	t.Signature = util.ToBase64(sig.Signature)
 }
 
@@ -106,7 +106,7 @@ func (t *TransactionResult) Build(txr *access.TransactionResult, txID flow.Ident
 	t.Execution = &execution
 	t.StatusCode = int32(txr.StatusCode)
 	t.ErrorMessage = txr.ErrorMessage
-	t.ComputationUsed = util.FromUint64(0) // todo: define this
+	t.ComputationUsed = util.FromUint(uint64(0)) // todo: define this
 	t.Events = events
 
 	self, _ := SelfLink(txID, link.TransactionResultLink)
@@ -146,6 +146,6 @@ func (t *TransactionExecution) Build(result *access.TransactionResult) {
 
 func (p *ProposalKey) Build(key flow.ProposalKey) {
 	p.Address = key.Address.String()
-	p.KeyIndex = util.FromUint64(key.KeyIndex)
-	p.SequenceNumber = util.FromUint64(key.SequenceNumber)
+	p.KeyIndex = util.FromUint(key.KeyIndex)
+	p.SequenceNumber = util.FromUint(key.SequenceNumber)
 }

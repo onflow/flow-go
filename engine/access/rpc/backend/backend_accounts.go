@@ -124,7 +124,7 @@ func (b *backendAccounts) GetAccountBalanceAtBlockHeight(
 func (b *backendAccounts) GetAccountKeyAtLatestBlock(
 	ctx context.Context,
 	address flow.Address,
-	keyIndex uint64,
+	keyIndex uint32,
 ) (*flow.AccountPublicKey, error) {
 	sealed, err := b.state.Sealed().Head()
 	if err != nil {
@@ -171,7 +171,7 @@ func (b *backendAccounts) GetAccountKeysAtLatestBlock(
 func (b *backendAccounts) GetAccountKeyAtBlockHeight(
 	ctx context.Context,
 	address flow.Address,
-	keyIndex uint64,
+	keyIndex uint32,
 	height uint64,
 ) (*flow.AccountPublicKey, error) {
 	blockID, err := b.headers.BlockIDByHeight(height)
@@ -339,7 +339,7 @@ func (b *backendAccounts) getAccountKeysAtBlock(
 func (b *backendAccounts) getAccountKeyAtBlock(
 	ctx context.Context,
 	address flow.Address,
-	keyIndex uint64,
+	keyIndex uint32,
 	blockID flow.Identifier,
 	height uint64,
 ) (*flow.AccountPublicKey, error) {
@@ -352,7 +352,7 @@ func (b *backendAccounts) getAccountKeyAtBlock(
 		}
 
 		for _, key := range account.Keys {
-			if uint64(key.Index) == keyIndex {
+			if key.Index == keyIndex {
 				return &key, nil
 			}
 		}
@@ -379,7 +379,7 @@ func (b *backendAccounts) getAccountKeyAtBlock(
 		}
 
 		for _, key := range account.Keys {
-			if uint64(key.Index) == keyIndex {
+			if key.Index == keyIndex {
 				return &key, nil
 			}
 		}
@@ -594,7 +594,7 @@ func compareAccountsLogger(exec, local *flow.Account, lgCtx zerolog.Context) (ze
 		localKey := local.Keys[i]
 
 		if !execKey.PublicKey.Equals(localKey.PublicKey) {
-			mismatchKeys.Int(execKey.Index)
+			mismatchKeys.Uint32(execKey.Index)
 			different = true
 		}
 	}

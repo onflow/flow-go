@@ -84,7 +84,7 @@ type Executor interface {
 	GetAccountKey(
 		ctx context.Context,
 		addr flow.Address,
-		keyIndex uint64,
+		keyIndex uint32,
 		header *flow.Header,
 		snapshot snapshot.StorageSnapshot,
 	) (
@@ -260,7 +260,7 @@ func summarizeLog(log string, limit int) string {
 }
 
 func (e *QueryExecutor) GetAccount(
-	ctx context.Context,
+	_ context.Context,
 	address flow.Address,
 	blockHeader *flow.Header,
 	snapshot snapshot.StorageSnapshot,
@@ -291,7 +291,7 @@ func (e *QueryExecutor) GetAccount(
 }
 
 func (e *QueryExecutor) GetAccountBalance(
-	ctx context.Context,
+	_ context.Context,
 	address flow.Address,
 	blockHeader *flow.Header,
 	snapshot snapshot.StorageSnapshot,
@@ -321,7 +321,7 @@ func (e *QueryExecutor) GetAccountBalance(
 }
 
 func (e *QueryExecutor) GetAccountAvailableBalance(
-	ctx context.Context,
+	_ context.Context,
 	address flow.Address,
 	blockHeader *flow.Header,
 	snapshot snapshot.StorageSnapshot,
@@ -351,7 +351,7 @@ func (e *QueryExecutor) GetAccountAvailableBalance(
 }
 
 func (e *QueryExecutor) GetAccountKeys(
-	ctx context.Context,
+	_ context.Context,
 	address flow.Address,
 	blockHeader *flow.Header,
 	snapshot snapshot.StorageSnapshot,
@@ -378,9 +378,9 @@ func (e *QueryExecutor) GetAccountKeys(
 }
 
 func (e *QueryExecutor) GetAccountKey(
-	ctx context.Context,
+	_ context.Context,
 	address flow.Address,
-	keyIndex uint64,
+	keyIndex uint32,
 	blockHeader *flow.Header,
 	snapshot snapshot.StorageSnapshot,
 ) (*flow.AccountPublicKey, error) {
