@@ -103,15 +103,15 @@ func TestBlockStoreMigration(t *testing.T) {
 		testutils.RunWithTestFlowEVMRootAddress(t, backend, func(root flow.Address) {
 			legacyCapacity := 16
 			maxHeightAdded := 32
-			bhl := types.NewBlockHashList(16)
+			legacy := types.NewBlockHashList(16)
 			for i := 0; i <= maxHeightAdded; i++ {
-				err := bhl.Push(uint64(i), gethCommon.Hash{byte(i)})
+				err := legacy.Push(uint64(i), gethCommon.Hash{byte(i)})
 				require.NoError(t, err)
 			}
 			err := backend.SetValue(
 				root[:],
 				[]byte(handler.BlockStoreBlockHashesKey),
-				bhl.Encode(),
+				legacy.Encode(),
 			)
 			require.NoError(t, err)
 			bs := handler.NewBlockStore(backend, root)
