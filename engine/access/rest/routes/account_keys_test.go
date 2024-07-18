@@ -33,7 +33,7 @@ func TestGetAccountKeyByIndex(t *testing.T) {
 		account := accountFixture(t)
 		var height uint64 = 100
 		block := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(height))
-		var keyIndex uint64 = 0
+		var keyIndex uint32 = 0
 		keyByIndex := findAccountKeyByIndex(account.Keys, keyIndex)
 
 		req := getAccountKeyByIndexRequest(t, account, "0", sealedHeightQueryParam)
@@ -56,7 +56,7 @@ func TestGetAccountKeyByIndex(t *testing.T) {
 		account := accountFixture(t)
 		var height uint64 = 100
 		block := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(height))
-		var keyIndex uint64 = 0
+		var keyIndex uint32 = 0
 		keyByIndex := findAccountKeyByIndex(account.Keys, keyIndex)
 
 		req := getAccountKeyByIndexRequest(t, account, "0", finalHeightQueryParam)
@@ -87,7 +87,7 @@ func TestGetAccountKeyByIndex(t *testing.T) {
 			On("GetLatestBlockHeader", mocktestify.Anything, true).
 			Return(block, flow.BlockStatusSealed, nil)
 
-		var keyIndex uint64 = 2
+		var keyIndex uint32 = 2
 		err := fmt.Errorf("failed to get account key with index: %d", keyIndex)
 		backend.Mock.
 			On("GetAccountKeyAtBlockHeight", mocktestify.Anything, account.Address, keyIndex, height).
@@ -97,9 +97,9 @@ func TestGetAccountKeyByIndex(t *testing.T) {
 		expected := fmt.Sprintf(`
           {
             "code": %d,
-            "message": "failed to get account key with index: %s"
+            "message": "failed to get account key with index: %s, reason: failed to get account key with index: %s"
           }
-		`, statusCode, index)
+		`, statusCode, index, index)
 
 		assertResponse(t, req, statusCode, expected, backend)
 		mocktestify.AssertExpectationsForObjects(t, backend)
@@ -117,7 +117,7 @@ func TestGetAccountKeyByIndex(t *testing.T) {
 			On("GetLatestBlockHeader", mocktestify.Anything, false).
 			Return(block, flow.BlockStatusFinalized, nil)
 
-		var keyIndex uint64 = 2
+		var keyIndex uint32 = 2
 		err := fmt.Errorf("failed to get account key with index: %d", keyIndex)
 		backend.Mock.
 			On("GetAccountKeyAtBlockHeight", mocktestify.Anything, account.Address, keyIndex, height).
@@ -127,9 +127,9 @@ func TestGetAccountKeyByIndex(t *testing.T) {
 		expected := fmt.Sprintf(`
           {
             "code": %d,
-            "message": "failed to get account key with index: %s"
+            "message": "failed to get account key with index: %s, reason: failed to get account key with index: %s"
           }
-		`, statusCode, index)
+		`, statusCode, index, index)
 
 		assertResponse(t, req, statusCode, expected, backend)
 		mocktestify.AssertExpectationsForObjects(t, backend)
@@ -140,7 +140,7 @@ func TestGetAccountKeyByIndex(t *testing.T) {
 		account := accountFixture(t)
 		req := getAccountKeyByIndexRequest(t, account, "0", "1337")
 
-		var keyIndex uint64 = 0
+		var keyIndex uint32 = 0
 		keyByIndex := findAccountKeyByIndex(account.Keys, keyIndex)
 
 		backend.Mock.
@@ -265,9 +265,9 @@ func expectedAccountKeyResponse(account *flow.Account) string {
 	)
 }
 
-func findAccountKeyByIndex(keys []flow.AccountPublicKey, keyIndex uint64) *flow.AccountPublicKey {
+func findAccountKeyByIndex(keys []flow.AccountPublicKey, keyIndex uint32) *flow.AccountPublicKey {
 	for _, key := range keys {
-		if uint64(key.Index) == keyIndex {
+		if uint32(key.Index) == keyIndex {
 			return &key
 		}
 	}
