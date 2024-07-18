@@ -177,12 +177,12 @@ func DefaultBadgerConfig() BadgerConfig {
 		NumLevelZeroTables:      defaults.NumLevelZeroTables,
 		NumLevelZeroTablesStall: defaults.NumLevelZeroTablesStall,
 
-		LevelOneSize:     defaults.LevelOneSize,
-		ValueLogFileSize: defaults.ValueLogFileSize,
+		LevelOneSize: defaults.LevelOneSize,
 
 		// Flow-specific defaults
-		KeepL0InMemory:     true,    // default is false
-		ValueLogMaxEntries: 100_000, // default is 1,000,000
+		KeepL0InMemory:     true,      // default is false
+		ValueLogMaxEntries: 100_000,   // default is 1,000,000
+		ValueLogFileSize:   128 << 23, // default is 1<<30 - 1
 	}
 }
 
