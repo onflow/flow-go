@@ -57,7 +57,7 @@ func TestBlockStore(t *testing.T) {
 			bp.TotalSupply = supply
 			err = bs.UpdateBlockProposal(bp)
 			require.NoError(t, err)
-			// this should still return the gensis block
+			// this should still return the genesis block
 			retb, err := bs.LatestBlock()
 			require.NoError(t, err)
 			require.Equal(t, types.GenesisBlock, retb)
@@ -203,3 +203,5 @@ func TestBlockStore_AddedTimestamp(t *testing.T) {
 		})
 	})
 }
+
+// TODO: add test for migration
