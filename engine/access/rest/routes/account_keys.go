@@ -29,7 +29,6 @@ func GetAccountKeyByIndex(r *request.Request, backend access.API, link models.Li
 
 	accountKey, err := backend.GetAccountKeyAtBlockHeight(r.Context(), req.Address, req.Index, req.Height)
 	if err != nil {
-		//err = fmt.Errorf("failed to get account key with index: %d", req.Index)
 		err = fmt.Errorf("failed to get account key with index: %d, reason: %w", req.Index, err)
 		return nil, models.NewNotFoundError(err.Error(), err)
 	}
