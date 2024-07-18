@@ -12,7 +12,6 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/module/blobs"
-	edstorage "github.com/onflow/flow-go/module/executiondatasync/storage"
 )
 
 // badger key prefixes
@@ -28,6 +27,16 @@ const (
 )
 
 const cidsPerBatch = 16 // number of cids to track per batch
+
+func retryOnConflict(db *badger.DB, fn func(txn *badger.Txn) error) error {
+	for {
+		err := db.Update(fn)
+		if errors.Is(err, badger.ErrConflict) {
+			continue
+		}
+		return err
+	}
+}
 
 const globalStateKeyLength = 2
 
@@ -69,7 +78,7 @@ func makeUint64Value(v uint64) []byte {
 	return value
 }
 
-func getUint64Value(item edstorage.StorageItem) (uint64, error) {
+func getUint64Value(item *badger.Item) (uint64, error) {
 	value, err := item.ValueCopy(nil)
 	if err != nil {
 		return 0, err
@@ -80,7 +89,7 @@ func getUint64Value(item edstorage.StorageItem) (uint64, error) {
 
 // getBatchItemCountLimit returns the maximum number of items that can be included in a single batch
 // transaction based on the number / total size of updates per item.
-func getBatchItemCountLimit(db edstorage.StorageDB, writeCountPerItem int64, writeSizePerItem int64) int {
+func getBatchItemCountLimit(db *badger.DB, writeCountPerItem int64, writeSizePerItem int64) int {
 	totalSizePerItem := 2*writeCountPerItem + writeSizePerItem // 2 bytes per entry for user and internal meta
 	maxItemCountByWriteCount := db.MaxBatchCount() / writeCountPerItem
 	maxItemCountByWriteSize := db.MaxBatchSize() / totalSizePerItem
@@ -166,7 +175,7 @@ type storage struct {
 	// we acquire the write lock when we want to perform a prune WRITE
 	mu sync.RWMutex
 
-	db            edstorage.StorageDB
+	db            *badger.DB
 	pruneCallback PruneCallback
 	logger        zerolog.Logger
 }
@@ -179,8 +188,12 @@ func WithPruneCallback(callback PruneCallback) StorageOption {
 	}
 }
 
-func OpenStorage(db edstorage.StorageDB, startHeight uint64, logger zerolog.Logger, opts ...StorageOption) (*storage, error) {
+func OpenStorage(dbPath string, startHeight uint64, logger zerolog.Logger, opts ...StorageOption) (*storage, error) {
 	lg := logger.With().Str("module", "tracker_storage").Logger()
+	db, err := badger.Open(badger.LSMOnlyOptions(dbPath))
+	if err != nil {
+		return nil, fmt.Errorf("could not open tracker db: %w", err)
+	}
 
 	storage := &storage{
 		db:            db,
@@ -223,7 +236,7 @@ func (s *storage) init(startHeight uint64) error {
 		}
 		s.logger.Info().Msgf("finished pruning")
 	} else if errors.Is(fulfilledHeightErr, badger.ErrKeyNotFound) && errors.Is(prunedHeightErr, badger.ErrKeyNotFound) {
-		// ds is empty, we need to bootstrap it
+		// db is empty, we need to bootstrap it
 		if err := s.bootstrap(startHeight); err != nil {
 			return fmt.Errorf("failed to bootstrap storage: %w", err)
 		}
@@ -241,15 +254,17 @@ func (s *storage) bootstrap(startHeight uint64) error {
 	prunedHeightKey := makeGlobalStateKey(globalStatePrunedHeight)
 	prunedHeightValue := makeUint64Value(startHeight)
 
-	if err := s.db.Set(fulfilledHeightKey, fulfilledHeightValue); err != nil {
-		return fmt.Errorf("failed to set fulfilled height value: %w", err)
-	}
+	return s.db.Update(func(txn *badger.Txn) error {
+		if err := txn.Set(fulfilledHeightKey, fulfilledHeightValue); err != nil {
+			return fmt.Errorf("failed to set fulfilled height value: %w", err)
+		}
 
-	if err := s.db.Set(prunedHeightKey, prunedHeightValue); err != nil {
-		return fmt.Errorf("failed to set pruned height value: %w", err)
-	}
+		if err := txn.Set(prunedHeightKey, prunedHeightValue); err != nil {
+			return fmt.Errorf("failed to set pruned height value: %w", err)
+		}
 
-	return nil
+		return nil
+	})
 }
 
 func (s *storage) Update(f UpdateFn) error {
@@ -262,37 +277,45 @@ func (s *storage) SetFulfilledHeight(height uint64) error {
 	fulfilledHeightKey := makeGlobalStateKey(globalStateFulfilledHeight)
 	fulfilledHeightValue := makeUint64Value(height)
 
-	if err := s.db.Set(fulfilledHeightKey, fulfilledHeightValue); err != nil {
-		return fmt.Errorf("failed to set fulfilled height value: %w", err)
-	}
+	return s.db.Update(func(txn *badger.Txn) error {
+		if err := txn.Set(fulfilledHeightKey, fulfilledHeightValue); err != nil {
+			return fmt.Errorf("failed to set fulfilled height value: %w", err)
+		}
 
-	return nil
+		return nil
+	})
 }
 
 func (s *storage) GetFulfilledHeight() (uint64, error) {
 	fulfilledHeightKey := makeGlobalStateKey(globalStateFulfilledHeight)
 	var fulfilledHeight uint64
 
-	item, err := s.db.Get(fulfilledHeightKey)
-	if err != nil {
-		return 0, fmt.Errorf("failed to find fulfilled height entry: %w", err)
-	}
+	if err := s.db.View(func(txn *badger.Txn) error {
+		item, err := txn.Get(fulfilledHeightKey)
+		if err != nil {
+			return fmt.Errorf("failed to find fulfilled height entry: %w", err)
+		}
 
-	fulfilledHeight, err = getUint64Value(item)
-	if err != nil {
-		return 0, fmt.Errorf("failed to retrieve fulfilled height value: %w", err)
+		fulfilledHeight, err = getUint64Value(item)
+		if err != nil {
+			return fmt.Errorf("failed to retrieve fulfilled height value: %w", err)
+		}
+
+		return nil
+	}); err != nil {
+		return 0, err
 	}
 
 	return fulfilledHeight, nil
 }
 
-func (s *storage) trackBlob(blockHeight uint64, c cid.Cid) error {
-	if err := s.db.Set(makeBlobRecordKey(blockHeight, c), nil); err != nil {
+func (s *storage) trackBlob(txn *badger.Txn, blockHeight uint64, c cid.Cid) error {
+	if err := txn.Set(makeBlobRecordKey(blockHeight, c), nil); err != nil {
 		return fmt.Errorf("failed to add blob record: %w", err)
 	}
 
 	latestHeightKey := makeLatestHeightKey(c)
-	item, err := s.db.Get(latestHeightKey)
+	item, err := txn.Get(latestHeightKey)
 	if err != nil {
 		if !errors.Is(err, badger.ErrKeyNotFound) {
 			return fmt.Errorf("failed to get latest height: %w", err)
@@ -311,7 +334,7 @@ func (s *storage) trackBlob(blockHeight uint64, c cid.Cid) error {
 
 	latestHeightValue := makeUint64Value(blockHeight)
 
-	if err := s.db.Set(latestHeightKey, latestHeightValue); err != nil {
+	if err := txn.Set(latestHeightKey, latestHeightValue); err != nil {
 		return fmt.Errorf("failed to set latest height value: %w", err)
 	}
 
@@ -332,16 +355,15 @@ func (s *storage) trackBlobs(blockHeight uint64, cids ...cid.Cid) error {
 		}
 		batch := cids[:batchSize]
 
-		err := s.db.RetryOnConflict(func() error {
+		if err := retryOnConflict(s.db, func(txn *badger.Txn) error {
 			for _, c := range batch {
-				err := s.trackBlob(blockHeight, c)
-				if err != nil {
+				if err := s.trackBlob(txn, blockHeight, c); err != nil {
 					return fmt.Errorf("failed to track blob %s: %w", c.String(), err)
 				}
 			}
+
 			return nil
-		})
-		if err != nil {
+		}); err != nil {
 			return err
 		}
 
@@ -352,19 +374,21 @@ func (s *storage) trackBlobs(blockHeight uint64, cids ...cid.Cid) error {
 }
 
 func (s *storage) batchDelete(deleteInfos []*deleteInfo) error {
-	for _, dInfo := range deleteInfos {
-		if err := s.db.Delete(makeBlobRecordKey(dInfo.height, dInfo.cid)); err != nil {
-			return fmt.Errorf("failed to delete blob record for Cid %s: %w", dInfo.cid.String(), err)
-		}
+	return s.db.Update(func(txn *badger.Txn) error {
+		for _, dInfo := range deleteInfos {
+			if err := txn.Delete(makeBlobRecordKey(dInfo.height, dInfo.cid)); err != nil {
+				return fmt.Errorf("failed to delete blob record for Cid %s: %w", dInfo.cid.String(), err)
+			}
 
-		if dInfo.deleteLatestHeightRecord {
-			if err := s.db.Delete(makeLatestHeightKey(dInfo.cid)); err != nil {
-				return fmt.Errorf("failed to delete latest height record for Cid %s: %w", dInfo.cid.String(), err)
+			if dInfo.deleteLatestHeightRecord {
+				if err := txn.Delete(makeLatestHeightKey(dInfo.cid)); err != nil {
+					return fmt.Errorf("failed to delete latest height record for Cid %s: %w", dInfo.cid.String(), err)
+				}
 			}
 		}
-	}
 
-	return nil
+		return nil
+	})
 }
 
 func (s *storage) batchDeleteItemLimit() int {
@@ -388,72 +412,82 @@ func (s *storage) PruneUpToHeight(height uint64) error {
 		return err
 	}
 
-	keys, err := s.db.Keys(blobRecordPrefix)
-	if err != nil {
-		return err
-	}
+	if err := s.db.View(func(txn *badger.Txn) error {
+		it := txn.NewIterator(badger.IteratorOptions{
+			PrefetchValues: false,
+			Prefix:         blobRecordPrefix,
+		})
+		defer it.Close()
 
-	// iterate over blob records, calling pruneCallback for any CIDs that should be pruned
-	// and cleaning up the corresponding tracker records
-	for _, blobRecordKey := range keys {
-		blockHeight, blobCid, err := parseBlobRecordKey(blobRecordKey)
-		if err != nil {
-			return fmt.Errorf("malformed blob record key %v: %w", blobRecordKey, err)
-		}
+		// iterate over blob records, calling pruneCallback for any CIDs that should be pruned
+		// and cleaning up the corresponding tracker records
+		for it.Seek(blobRecordPrefix); it.ValidForPrefix(blobRecordPrefix); it.Next() {
+			blobRecordItem := it.Item()
+			blobRecordKey := blobRecordItem.Key()
 
-		// iteration occurs in key order, so block heights are guaranteed to be ascending
-		if blockHeight > height {
-			break
-		}
-
-		dInfo := &deleteInfo{
-			cid:    blobCid,
-			height: blockHeight,
-		}
-
-		latestHeightKey := makeLatestHeightKey(blobCid)
-		latestHeightItem, err := s.db.Get(latestHeightKey)
-		if err != nil {
-			return fmt.Errorf("failed to get latest height entry for Cid %s: %w", blobCid.String(), err)
-		}
-
-		latestHeight, err := getUint64Value(latestHeightItem)
-		if err != nil {
-			return fmt.Errorf("failed to retrieve latest height value for Cid %s: %w", blobCid.String(), err)
-		}
-
-		// a blob is only removable if it is not referenced by any blob tree at a higher height
-		if latestHeight < blockHeight {
-			// this should never happen
-			return fmt.Errorf(
-				"inconsistency detected: latest height recorded for Cid %s is %d, but blob record exists at height %d",
-				blobCid.String(), latestHeight, blockHeight,
-			)
-		}
-
-		// the current block height is the last to reference this CID, prune the CID and remove
-		// all tracker records
-		if latestHeight == blockHeight {
-			if err := s.pruneCallback(blobCid); err != nil {
-				return err
+			blockHeight, blobCid, err := parseBlobRecordKey(blobRecordKey)
+			if err != nil {
+				return fmt.Errorf("malformed blob record key %v: %w", blobRecordKey, err)
 			}
-			dInfo.deleteLatestHeightRecord = true
+
+			// iteration occurs in key order, so block heights are guaranteed to be ascending
+			if blockHeight > height {
+				break
+			}
+
+			dInfo := &deleteInfo{
+				cid:    blobCid,
+				height: blockHeight,
+			}
+
+			latestHeightKey := makeLatestHeightKey(blobCid)
+			latestHeightItem, err := txn.Get(latestHeightKey)
+			if err != nil {
+				return fmt.Errorf("failed to get latest height entry for Cid %s: %w", blobCid.String(), err)
+			}
+
+			latestHeight, err := getUint64Value(latestHeightItem)
+			if err != nil {
+				return fmt.Errorf("failed to retrieve latest height value for Cid %s: %w", blobCid.String(), err)
+			}
+
+			// a blob is only removable if it is not referenced by any blob tree at a higher height
+			if latestHeight < blockHeight {
+				// this should never happen
+				return fmt.Errorf(
+					"inconsistency detected: latest height recorded for Cid %s is %d, but blob record exists at height %d",
+					blobCid.String(), latestHeight, blockHeight,
+				)
+			}
+
+			// the current block height is the last to reference this CID, prune the CID and remove
+			// all tracker records
+			if latestHeight == blockHeight {
+				if err := s.pruneCallback(blobCid); err != nil {
+					return err
+				}
+				dInfo.deleteLatestHeightRecord = true
+			}
+
+			// remove tracker records for pruned heights
+			batch = append(batch, dInfo)
+			if len(batch) == itemsPerBatch {
+				if err := s.batchDelete(batch); err != nil {
+					return err
+				}
+				batch = nil
+			}
 		}
 
-		// remove tracker records for pruned heights
-		batch = append(batch, dInfo)
-		if len(batch) == itemsPerBatch {
+		if len(batch) > 0 {
 			if err := s.batchDelete(batch); err != nil {
 				return err
 			}
-			batch = nil
 		}
-	}
 
-	if len(batch) > 0 {
-		if err := s.batchDelete(batch); err != nil {
-			return err
-		}
+		return nil
+	}); err != nil {
+		return err
 	}
 
 	// this is a good time to do garbage collection
@@ -468,26 +502,33 @@ func (s *storage) setPrunedHeight(height uint64) error {
 	prunedHeightKey := makeGlobalStateKey(globalStatePrunedHeight)
 	prunedHeightValue := makeUint64Value(height)
 
-	if err := s.db.Set(prunedHeightKey, prunedHeightValue); err != nil {
-		return fmt.Errorf("failed to set pruned height value: %w", err)
-	}
+	return s.db.Update(func(txn *badger.Txn) error {
+		if err := txn.Set(prunedHeightKey, prunedHeightValue); err != nil {
+			return fmt.Errorf("failed to set pruned height value: %w", err)
+		}
 
-	return nil
-
+		return nil
+	})
 }
 
 func (s *storage) GetPrunedHeight() (uint64, error) {
 	prunedHeightKey := makeGlobalStateKey(globalStatePrunedHeight)
 	var prunedHeight uint64
 
-	item, err := s.db.Get(prunedHeightKey)
-	if err != nil {
-		return 0, fmt.Errorf("failed to find pruned height entry: %w", err)
-	}
+	if err := s.db.View(func(txn *badger.Txn) error {
+		item, err := txn.Get(prunedHeightKey)
+		if err != nil {
+			return fmt.Errorf("failed to find pruned height entry: %w", err)
+		}
 
-	prunedHeight, err = getUint64Value(item)
-	if err != nil {
-		return 0, fmt.Errorf("failed to retrieve pruned height value: %w", err)
+		prunedHeight, err = getUint64Value(item)
+		if err != nil {
+			return fmt.Errorf("failed to retrieve pruned height value: %w", err)
+		}
+
+		return nil
+	}); err != nil {
+		return 0, err
 	}
 
 	return prunedHeight, nil

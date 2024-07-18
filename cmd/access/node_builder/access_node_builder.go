@@ -659,17 +659,8 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				}
 
 				trackerDir := filepath.Join(builder.executionDataDir, "tracker")
-
-				// only badger db for tracker now, will change in new PRs
-				options := badgerds.DefaultOptions
-				options.Options = badger.LSMOnlyOptions(trackerDir)
-				storageDB, err := edstorage.NewBadgerDBWrapper(trackerDir, &options)
-				if err != nil {
-					return nil, fmt.Errorf("could not create tracker BadgerDBWrapper: %w", err)
-				}
-
 				builder.ExecutionDataTracker, err = tracker.OpenStorage(
-					storageDB,
+					trackerDir,
 					sealed.Height,
 					node.Logger,
 					tracker.WithPruneCallback(func(c cid.Cid) error {

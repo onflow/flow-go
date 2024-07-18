@@ -78,7 +78,6 @@ import (
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	exedataprovider "github.com/onflow/flow-go/module/executiondatasync/provider"
 	"github.com/onflow/flow-go/module/executiondatasync/pruner"
-	edstorage "github.com/onflow/flow-go/module/executiondatasync/storage"
 	"github.com/onflow/flow-go/module/executiondatasync/tracker"
 	"github.com/onflow/flow-go/module/finalizedreader"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
@@ -947,16 +946,8 @@ func (exeNode *ExecutionNode) LoadExecutionDataPruner(
 	}
 
 	trackerDir := filepath.Join(exeNode.exeConf.executionDataDir, "tracker")
-
-	options := badgerds.DefaultOptions
-	options.Options = badger.LSMOnlyOptions(trackerDir)
-	badgerDBWrapper, err := edstorage.NewBadgerDBWrapper(trackerDir, &options)
-	if err != nil {
-		return nil, fmt.Errorf("could not create BadgerDBWrapper: %w", err)
-	}
-
 	exeNode.executionDataTracker, err = tracker.OpenStorage(
-		badgerDBWrapper,
+		trackerDir,
 		sealed.Height,
 		node.Logger,
 		tracker.WithPruneCallback(func(c cid.Cid) error {
