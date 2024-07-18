@@ -44,6 +44,7 @@ import (
 	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/storage/badger/transaction"
 	"github.com/onflow/flow-go/storage/util"
 	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/onflow/flow-go/utils/unittest/mocks"
@@ -382,8 +383,8 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 		block2 := unittest.BlockFixture()
 		block2.Header.Height = 2
 
-		require.NoError(suite.T(), all.Blocks.Store(&block1))
-		require.NoError(suite.T(), all.Blocks.Store(&block2))
+		require.NoError(suite.T(), transaction.Update(db, all.Blocks.StoreTx(&block1)))
+		require.NoError(suite.T(), transaction.Update(db, all.Blocks.StoreTx(&block2)))
 
 		// the follower logic should update height index on the block storage when a block is finalized
 		err := db.Update(operation.IndexBlockHeight(block2.Header.Height, block2.ID()))
@@ -678,7 +679,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 		require.NoError(suite.T(), err)
 
 		// 1. Assume that follower engine updated the block storage and the protocol state. The block is reported as sealed
-		err = all.Blocks.Store(block)
+		err = transaction.Update(db, all.Blocks.StoreTx(block))
 		require.NoError(suite.T(), err)
 		suite.sealedBlock = block.Header
 
@@ -748,9 +749,9 @@ func (suite *Suite) TestGetTransactionResult() {
 		// specifically for this test we will consider that sealed block is far behind finalized, so we get EXECUTED status
 		suite.sealedSnapshot.On("Head").Return(sealedBlock, nil)
 
-		err := all.Blocks.Store(block)
+		err := transaction.Update(db, all.Blocks.StoreTx(block))
 		require.NoError(suite.T(), err)
-		err = all.Blocks.Store(blockNegative)
+		err = transaction.Update(db, all.Blocks.StoreTx(blockNegative))
 		require.NoError(suite.T(), err)
 
 		suite.state.On("AtBlockID", blockId).Return(suite.sealedSnapshot)
@@ -1051,7 +1052,7 @@ func (suite *Suite) TestExecuteScript() {
 
 		// create a block and a seal pointing to that block
 		lastBlock := unittest.BlockWithParentFixture(prevBlock.Header)
-		err = all.Blocks.Store(lastBlock)
+		err = transaction.Update(db, all.Blocks.StoreTx(lastBlock))
 		require.NoError(suite.T(), err)
 		err = db.Update(operation.IndexBlockHeight(lastBlock.Header.Height, lastBlock.ID()))
 		require.NoError(suite.T(), err)
@@ -1065,7 +1066,7 @@ func (suite *Suite) TestExecuteScript() {
 			require.NoError(suite.T(), err)
 		}
 
-		err = all.Blocks.Store(prevBlock)
+		err = transaction.Update(db, all.Blocks.StoreTx(prevBlock))
 		require.NoError(suite.T(), err)
 		err = db.Update(operation.IndexBlockHeight(prevBlock.Header.Height, prevBlock.ID()))
 		require.NoError(suite.T(), err)
@@ -1188,7 +1189,7 @@ func (suite *Suite) TestLastFinalizedBlockHeightResult() {
 		newFinalizedBlock := unittest.BlockWithParentFixture(block.Header)
 
 		// store new block
-		require.NoError(suite.T(), all.Blocks.Store(block))
+		require.NoError(suite.T(), transaction.Update(db, all.Blocks.StoreTx(block)))
 
 		assertFinalizedBlockHeader := func(resp *accessproto.BlockHeaderResponse, err error) {
 			require.NoError(suite.T(), err)

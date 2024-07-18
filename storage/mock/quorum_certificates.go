@@ -6,6 +6,8 @@ import (
 	flow "github.com/onflow/flow-go/model/flow"
 	mock "github.com/stretchr/testify/mock"
 
+	storage "github.com/onflow/flow-go/storage"
+
 	transaction "github.com/onflow/flow-go/storage/badger/transaction"
 )
 
@@ -38,6 +40,22 @@ func (_m *QuorumCertificates) ByBlockID(blockID flow.Identifier) (*flow.QuorumCe
 	}
 
 	return r0, r1
+}
+
+// StorePebble provides a mock function with given fields: qc
+func (_m *QuorumCertificates) StorePebble(qc *flow.QuorumCertificate) func(storage.PebbleReaderBatchWriter) error {
+	ret := _m.Called(qc)
+
+	var r0 func(storage.PebbleReaderBatchWriter) error
+	if rf, ok := ret.Get(0).(func(*flow.QuorumCertificate) func(storage.PebbleReaderBatchWriter) error); ok {
+		r0 = rf(qc)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(func(storage.PebbleReaderBatchWriter) error)
+		}
+	}
+
+	return r0
 }
 
 // StoreTx provides a mock function with given fields: qc

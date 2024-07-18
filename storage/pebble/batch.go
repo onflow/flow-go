@@ -4,25 +4,48 @@ import (
 	"sync"
 
 	"github.com/cockroachdb/pebble"
+
+	"github.com/onflow/flow-go/storage"
 )
 
 type Batch struct {
 	writer *pebble.Batch
 
+	db        *pebble.DB
 	lock      sync.RWMutex
 	callbacks []func()
 }
 
+var _ storage.BatchStorage = (*Batch)(nil)
+
 func NewBatch(db *pebble.DB) *Batch {
 	batch := db.NewBatch()
 	return &Batch{
+		db:        db,
 		writer:    batch,
 		callbacks: make([]func(), 0),
 	}
 }
 
-func (b *Batch) GetWriter() *pebble.Batch {
-	return b.writer
+func (b *Batch) GetWriter() storage.BatchWriter {
+	return &Transaction{b.writer}
+}
+
+type reader struct {
+	db *pebble.DB
+}
+
+func (r *reader) Get(key []byte) ([]byte, error) {
+	val, closer, err := r.db.Get(key)
+	if err != nil {
+		return nil, err
+	}
+	defer closer.Close()
+	return val, nil
+}
+
+func (b *Batch) GetReader() storage.Reader {
+	return &reader{db: b.db}
 }
 
 // OnSucceed adds a callback to execute after the batch has
@@ -55,4 +78,22 @@ func (b *Batch) Flush() error {
 
 func (b *Batch) Close() error {
 	return b.writer.Close()
+}
+
+type Transaction struct {
+	writer *pebble.Batch
+}
+
+var _ storage.BatchWriter = (*Transaction)(nil)
+
+func (t *Transaction) Set(key, value []byte) error {
+	return t.writer.Set(key, value, pebble.Sync)
+}
+
+func (t *Transaction) Delete(key []byte) error {
+	return t.writer.Delete(key, pebble.Sync)
+}
+
+func (t *Transaction) DeleteRange(start, end []byte) error {
+	return t.writer.DeleteRange(start, end, pebble.Sync)
 }
