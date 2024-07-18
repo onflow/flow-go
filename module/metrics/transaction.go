@@ -28,6 +28,8 @@ type TransactionCollector struct {
 	scriptExecutionComparison      *prometheus.CounterVec
 	scriptSize                     prometheus.Histogram
 	transactionResultDuration      *prometheus.HistogramVec
+	transactionValidated           *prometheus.CounterVec
+	transactionValidationFailed    *prometheus.CounterVec
 }
 
 // interface check
@@ -135,6 +137,18 @@ func NewTransactionCollector(
 			Subsystem: subsystemTransactionSubmission,
 			Help:      "histogram for the transaction size in kb of scripts used in GetTransactionResult",
 		}),
+		transactionValidated: promauto.NewCounterVec(prometheus.CounterOpts{
+			Name:      "transaction_validated_total",
+			Namespace: namespaceAccess,
+			Subsystem: subsystemTransactionValidation,
+			Help:      "counter for the validated transactions",
+		}, []string{"txID"}),
+		transactionValidationFailed: promauto.NewCounterVec(prometheus.CounterOpts{
+			Name:      "transaction_validation_failed",
+			Namespace: namespaceAccess,
+			Subsystem: subsystemTransactionValidation,
+			Help:      "counter for the failed transactions validation",
+		}, []string{"txID", "reason"}),
 	}
 
 	return tc
@@ -333,11 +347,9 @@ func (tc *TransactionCollector) TransactionExpired(txID flow.Identifier) {
 }
 
 func (tc *TransactionCollector) TransactionValidated(txID flow.Identifier) {
-	//TODO implement me
-	panic("implement me")
+	tc.transactionValidated.WithLabelValues(txID.String()).Inc()
 }
 
 func (tc *TransactionCollector) TransactionValidationFailed(txID flow.Identifier, reason string) {
-	//TODO implement me
-	panic("implement me")
+	tc.transactionValidationFailed.WithLabelValues(txID.String(), reason).Inc()
 }
