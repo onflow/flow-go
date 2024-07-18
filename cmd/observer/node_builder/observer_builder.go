@@ -1089,7 +1089,6 @@ func (builder *ObserverServiceBuilder) Build() (cmd.Node, error) {
 
 func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverServiceBuilder {
 	var ds datastore.Batching
-	var storageDB edstorage.StorageDB
 	var bs network.BlobService
 	var processedBlockHeight storage.ConsumerProgress
 	var processedNotifications storage.ConsumerProgress
@@ -1130,7 +1129,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 					return fmt.Errorf("could not create BadgerDBWrapper for execution data: %w", err)
 				}
 			}
-			ds = storageDB.Datastore()
+			ds = builder.ExecutionDataDatastore.Datastore()
 
 			builder.ShutdownFunc(func() error {
 				if err := builder.ExecutionDataDatastore.Close(); err != nil {
