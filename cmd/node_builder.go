@@ -170,15 +170,17 @@ func DefaultBadgerConfig() BadgerConfig {
 		NumMemtables:        defaults.NumMemtables,
 
 		BloomFalsePositive: defaults.BloomFalsePositive,
-		KeepL0InMemory:     defaults.KeepL0InMemory,
 		BlockCacheSize:     defaults.BlockCacheSize,
 		IndexCacheSize:     defaults.IndexCacheSize,
 
 		NumLevelZeroTables:      defaults.NumLevelZeroTables,
 		NumLevelZeroTablesStall: defaults.NumLevelZeroTablesStall,
 
-		LevelOneSize:       defaults.LevelOneSize,
-		ValueLogFileSize:   defaults.ValueLogFileSize,
+		LevelOneSize:     defaults.LevelOneSize,
+		ValueLogFileSize: defaults.ValueLogFileSize,
+
+		// Flow-specific defaults
+		KeepL0InMemory:     true,    // default is false
 		ValueLogMaxEntries: 100_000, // default is 1,000,000
 	}
 }
