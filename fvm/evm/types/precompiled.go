@@ -65,6 +65,8 @@ func (apc AggregatedPrecompiledCalls) IsEmpty() bool {
 // Encode encodes the aggregated precompile calls using rlp encoding
 // if there is no underlying call, we encode to empty bytes to save
 // space on transaction results (common case)
+// TODO: In the future versions of the encoding we might skip encoding the inputs
+// given it just takes space and not needed during execution time
 func (apc AggregatedPrecompiledCalls) Encode() ([]byte, error) {
 	if apc.IsEmpty() {
 		return []byte{}, nil
