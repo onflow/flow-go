@@ -242,7 +242,7 @@ func (bs *BlockTimeControllerSuite) TestOnEpochExtended() {
 
 	bs.ctl.EpochExtended(bs.epochCounter, header, extension)
 
-	// Check component state after the epochEvents channel is empty, indicating the event has been processed. 
+	// Check component state after the epochEvents channel is empty, indicating the event has been processed.
 	require.Eventually(bs.T(), func() bool {
 		return len(bs.ctl.epochEvents) == 0
 	}, time.Second, time.Millisecond)
