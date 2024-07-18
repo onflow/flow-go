@@ -130,6 +130,60 @@ type NodeBuilder interface {
 	ValidateRootSnapshot(f func(protocol.Snapshot) error) NodeBuilder
 }
 
+// BadgerConfig is a subset of badger.Options which are configurable via flags.
+// CAUTION: These are provided as-is and are passed directly to Badger without
+// any additional validation by flow-go; please make sure you understand what
+// you are doing when using these.
+type BadgerConfig struct {
+	TableLoadingMode    int
+	ValueLogLoadingMode int
+
+	MaxTableSize        int64
+	LevelSizeMultiplier int
+	MaxLevels           int
+	ValueThreshold      int
+	NumMemtables        int
+
+	BloomFalsePositive float64
+	KeepL0InMemory     bool
+	BlockCacheSize     int64
+	IndexCacheSize     int64
+
+	NumLevelZeroTables      int
+	NumLevelZeroTablesStall int
+
+	LevelOneSize       int64
+	ValueLogFileSize   int64
+	ValueLogMaxEntries uint32
+}
+
+// DefaultBadgerConfig returns BadgerConfig populated by badger.DefaultOptions and
+// any global Flow-specific config overrides.
+func DefaultBadgerConfig() BadgerConfig {
+	defaults := badger.DefaultOptions("")
+	return BadgerConfig{
+		TableLoadingMode:    int(defaults.TableLoadingMode),
+		ValueLogLoadingMode: int(defaults.ValueLogLoadingMode),
+		MaxTableSize:        defaults.MaxTableSize,
+		LevelSizeMultiplier: defaults.LevelSizeMultiplier,
+		MaxLevels:           defaults.MaxLevels,
+		ValueThreshold:      defaults.ValueThreshold,
+		NumMemtables:        defaults.NumMemtables,
+
+		BloomFalsePositive: defaults.BloomFalsePositive,
+		KeepL0InMemory:     defaults.KeepL0InMemory,
+		BlockCacheSize:     defaults.BlockCacheSize,
+		IndexCacheSize:     defaults.IndexCacheSize,
+
+		NumLevelZeroTables:      defaults.NumLevelZeroTables,
+		NumLevelZeroTablesStall: defaults.NumLevelZeroTablesStall,
+
+		LevelOneSize:       defaults.LevelOneSize,
+		ValueLogFileSize:   defaults.ValueLogFileSize,
+		ValueLogMaxEntries: 100_000, // default is 1,000,000
+	}
+}
+
 // BaseConfig is the general config for the NodeBuilder and the command line params
 // For a node running as a standalone process, the config fields will be populated from the command line params,
 // while for a node running as a library, the config fields are expected to be initialized by the caller.
@@ -170,6 +224,9 @@ type BaseConfig struct {
 	// ComplianceConfig configures either the compliance engine (consensus nodes)
 	// or the follower engine (all other node roles)
 	ComplianceConfig compliance.Config
+
+	// Configures Badger
+	BadgerConfig BadgerConfig
 
 	// FlowConfig Flow configuration.
 	FlowConfig config.FlowConfig
@@ -290,6 +347,7 @@ func DefaultBaseConfig() *BaseConfig {
 
 		HeroCacheMetricsEnable:  false,
 		SyncCoreConfig:          chainsync.DefaultConfig(),
+		BadgerConfig:            DefaultBadgerConfig(),
 		CodecFactory:            codecFactory,
 		ComplianceConfig:        compliance.DefaultConfig(),
 		DhtSystemEnabled:        true,
