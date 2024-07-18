@@ -14,7 +14,7 @@ import (
 func TestBlockHashList(t *testing.T) {
 	testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
 		testutils.RunWithTestFlowEVMRootAddress(t, backend, func(root flow.Address) {
-			capacity := 5
+			capacity := 256
 			bhl, err := handler.NewBlockHashList(backend, root, capacity)
 			require.NoError(t, err)
 			require.True(t, bhl.IsEmpty())
@@ -28,37 +28,40 @@ func TestBlockHashList(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, gethCommon.Hash{}, h)
 
-			// first full range
+			// first add blocks for the full range of capacity
 			for i := 0; i < capacity; i++ {
 				err := bhl.Push(uint64(i), gethCommon.Hash{byte(i)})
 				require.NoError(t, err)
 				require.Equal(t, uint64(0), bhl.MinAvailableHeight())
 				require.Equal(t, uint64(i), bhl.MaxAvailableHeight())
 			}
+
+			// check the value for all of them
 			for i := 0; i < capacity; i++ {
 				found, h, err := bhl.BlockHashByHeight(uint64(i))
 				require.NoError(t, err)
 				require.True(t, found)
 				require.Equal(t, gethCommon.Hash{byte(i)}, h)
 			}
-
 			h, err = bhl.LastAddedBlockHash()
 			require.NoError(t, err)
 			require.Equal(t, gethCommon.Hash{byte(capacity - 1)}, h)
 
-			// over border range
+			// over the border additions
 			for i := capacity; i < capacity+3; i++ {
 				err := bhl.Push(uint64(i), gethCommon.Hash{byte(i)})
 				require.NoError(t, err)
 				require.Equal(t, uint64(i-capacity+1), bhl.MinAvailableHeight())
 				require.Equal(t, uint64(i), bhl.MaxAvailableHeight())
 			}
-			for i := 0; i < capacity-2; i++ {
+			// check that old block has been replaced
+			for i := 0; i < 3; i++ {
 				found, _, err := bhl.BlockHashByHeight(uint64(i))
 				require.NoError(t, err)
 				require.False(t, found)
 			}
-			for i := capacity - 2; i < capacity+3; i++ {
+			// check the rest of blocks
+			for i := 3; i < capacity+3; i++ {
 				found, h, err := bhl.BlockHashByHeight(uint64(i))
 				require.NoError(t, err)
 				require.True(t, found)
@@ -77,12 +80,11 @@ func TestBlockHashList(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, h, h2)
 
-			for i := 0; i < capacity-2; i++ {
-				found, _, err := bhl.BlockHashByHeight(uint64(i))
-				require.NoError(t, err)
-				require.False(t, found)
-			}
-			for i := capacity - 2; i < capacity+3; i++ {
+			require.Equal(t, uint64(3), bhl.MinAvailableHeight())
+			require.Equal(t, uint64(capacity+2), bhl.MaxAvailableHeight())
+
+			// check all the stored blocks
+			for i := 3; i < capacity+3; i++ {
 				found, h, err := bhl.BlockHashByHeight(uint64(i))
 				require.NoError(t, err)
 				require.True(t, found)
