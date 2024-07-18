@@ -661,7 +661,7 @@ func (h *Handler) GetAccountKeyAtLatestBlock(
 		return nil, status.Errorf(codes.InvalidArgument, "invalid address: %v", err)
 	}
 
-	keyByIndex, err := h.api.GetAccountKeyAtLatestBlock(ctx, address, uint64(req.GetIndex()))
+	keyByIndex, err := h.api.GetAccountKeyAtLatestBlock(ctx, address, req.GetIndex())
 	if err != nil {
 		return nil, err
 	}
@@ -739,7 +739,7 @@ func (h *Handler) GetAccountKeyAtBlockHeight(
 		return nil, status.Errorf(codes.InvalidArgument, "invalid address: %v", err)
 	}
 
-	keyByIndex, err := h.api.GetAccountKeyAtBlockHeight(ctx, address, uint64(req.GetIndex()), req.GetBlockHeight())
+	keyByIndex, err := h.api.GetAccountKeyAtBlockHeight(ctx, address, req.GetIndex(), req.GetBlockHeight())
 	if err != nil {
 		return nil, err
 	}

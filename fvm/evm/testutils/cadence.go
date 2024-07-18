@@ -203,16 +203,16 @@ type TestRuntimeInterface struct {
 	OnGetInterpreterSharedState func() *interpreter.SharedState
 	OnCreateAccount             func(payer runtime.Address) (address runtime.Address, err error)
 	OnAddEncodedAccountKey      func(address runtime.Address, publicKey []byte) error
-	OnRemoveEncodedAccountKey   func(address runtime.Address, index int) (publicKey []byte, err error)
+	OnRemoveEncodedAccountKey   func(address runtime.Address, index uint32) (publicKey []byte, err error)
 	OnAddAccountKey             func(
 		address runtime.Address,
 		publicKey *cadenceStdlib.PublicKey,
 		hashAlgo runtime.HashAlgorithm,
 		weight int,
 	) (*cadenceStdlib.AccountKey, error)
-	OnGetAccountKey             func(address runtime.Address, index int) (*cadenceStdlib.AccountKey, error)
-	OnRemoveAccountKey          func(address runtime.Address, index int) (*cadenceStdlib.AccountKey, error)
-	OnAccountKeysCount          func(address runtime.Address) (uint64, error)
+	OnGetAccountKey             func(address runtime.Address, index uint32) (*cadenceStdlib.AccountKey, error)
+	OnRemoveAccountKey          func(address runtime.Address, index uint32) (*cadenceStdlib.AccountKey, error)
+	OnAccountKeysCount          func(address runtime.Address) (uint32, error)
 	OnUpdateAccountContractCode func(location common.AddressLocation, code []byte) error
 	OnGetAccountContractCode    func(location common.AddressLocation) (code []byte, err error)
 	OnRemoveAccountContractCode func(location common.AddressLocation) (err error)
@@ -376,7 +376,7 @@ func (i *TestRuntimeInterface) AddEncodedAccountKey(address runtime.Address, pub
 	return i.OnAddEncodedAccountKey(address, publicKey)
 }
 
-func (i *TestRuntimeInterface) RevokeEncodedAccountKey(address runtime.Address, index int) ([]byte, error) {
+func (i *TestRuntimeInterface) RevokeEncodedAccountKey(address runtime.Address, index uint32) ([]byte, error) {
 	if i.OnRemoveEncodedAccountKey == nil {
 		panic("must specify TestRuntimeInterface.OnRemoveEncodedAccountKey")
 	}
@@ -395,21 +395,21 @@ func (i *TestRuntimeInterface) AddAccountKey(
 	return i.OnAddAccountKey(address, publicKey, hashAlgo, weight)
 }
 
-func (i *TestRuntimeInterface) GetAccountKey(address runtime.Address, index int) (*cadenceStdlib.AccountKey, error) {
+func (i *TestRuntimeInterface) GetAccountKey(address runtime.Address, index uint32) (*cadenceStdlib.AccountKey, error) {
 	if i.OnGetAccountKey == nil {
 		panic("must specify TestRuntimeInterface.OnGetAccountKey")
 	}
 	return i.OnGetAccountKey(address, index)
 }
 
-func (i *TestRuntimeInterface) AccountKeysCount(address runtime.Address) (uint64, error) {
+func (i *TestRuntimeInterface) AccountKeysCount(address runtime.Address) (uint32, error) {
 	if i.OnAccountKeysCount == nil {
 		panic("must specify TestRuntimeInterface.OnAccountKeysCount")
 	}
 	return i.OnAccountKeysCount(address)
 }
 
-func (i *TestRuntimeInterface) RevokeAccountKey(address runtime.Address, index int) (*cadenceStdlib.AccountKey, error) {
+func (i *TestRuntimeInterface) RevokeAccountKey(address runtime.Address, index uint32) (*cadenceStdlib.AccountKey, error) {
 	if i.OnRemoveAccountKey == nil {
 		panic("must specify TestRuntimeInterface.OnRemoveAccountKey")
 	}

@@ -480,7 +480,7 @@ func newMigrations(
 				log,
 				opts.NWorker,
 				[]migrators.AccountBasedMigration{
-					&migrators.AccountUsageMigration{},
+					migrators.NewAccountUsageMigration(rwf),
 				},
 			),
 		},

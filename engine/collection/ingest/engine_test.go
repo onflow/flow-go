@@ -174,7 +174,7 @@ func (suite *Suite) TestInvalidTransaction() {
 
 	suite.Run("invalid signature format", func() {
 		signer := flow.Testnet.Chain().ServiceAddress()
-		keyIndex := uint64(0)
+		keyIndex := uint32(0)
 
 		sig1 := unittest.TransactionSignatureFixture()
 		sig1.KeyIndex = keyIndex

@@ -35,7 +35,7 @@ func GetAccountKeyByIndex(r *request.Request, backend access.API, link models.Li
 
 	var response models.AccountPublicKey
 	for _, key := range account.Keys {
-		if uint64(key.Index) == req.Index {
+		if key.Index == req.Index {
 			response.Build(key)
 			return response, nil
 		}
