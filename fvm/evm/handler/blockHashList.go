@@ -140,10 +140,17 @@ func (bhl *BlockHashList) updateBlockHashAt(idx int, bh gethCommon.Hash) error {
 	if err != nil {
 		return err
 	}
+	// update the block hash
 	start := (idx % hashCountPerBucket) * hashEncodingSize
 	end := start + hashEncodingSize
 	copy(bucket[start:end], bh.Bytes())
-	return bhl.storeBucket(bucketNumber, bucket)
+
+	// store bucket
+	return bhl.backend.SetValue(
+		bhl.rootAddress[:],
+		[]byte(fmt.Sprintf(BlockHashListBucketKeyFormat, bucketNumber)),
+		bucket,
+	)
 }
 
 func (bhl *BlockHashList) fetchBucket(num int) ([]byte, error) {
@@ -154,18 +161,11 @@ func (bhl *BlockHashList) fetchBucket(num int) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	// if not exist create and return an new empty buffer
 	if len(data) == 0 {
 		return make([]byte, hashCountPerBucket*hashEncodingSize), nil
 	}
 	return data, err
-}
-
-func (bhl *BlockHashList) storeBucket(num int, bucket []byte) error {
-	return bhl.backend.SetValue(
-		bhl.rootAddress[:],
-		[]byte(fmt.Sprintf(BlockHashListBucketKeyFormat, num)),
-		bucket,
-	)
 }
 
 func (bhl *BlockHashList) getBlockHashAt(idx int) (gethCommon.Hash, error) {
@@ -174,7 +174,7 @@ func (bhl *BlockHashList) getBlockHashAt(idx int) (gethCommon.Hash, error) {
 	if err != nil {
 		return gethCommon.Hash{}, err
 	}
-	// return the hash
+	// return the hash from the bucket
 	start := (idx % hashCountPerBucket) * hashEncodingSize
 	end := start + hashEncodingSize
 	return gethCommon.BytesToHash(bucket[start:end]), nil
@@ -188,10 +188,12 @@ func (bhl *BlockHashList) loadMetaData() error {
 	if err != nil {
 		return err
 	}
+	// if data doesn't exist
+	// return and keep the default values
 	if len(data) == 0 {
-		// don't do anything and return
 		return nil
 	}
+	// check the data size
 	if len(data) < metaEncodingSize {
 		return fmt.Errorf("encoded input too short: %d < %d", len(data), metaEncodingSize)
 	}
@@ -235,6 +237,7 @@ func (bhl *BlockHashList) storeMetaData() error {
 	// encode height
 	binary.BigEndian.PutUint64(buffer[pos:], uint64(bhl.height))
 
+	// store the encoded data into backend
 	return bhl.backend.SetValue(
 		bhl.rootAddress[:],
 		[]byte(BlockHashListMetaKey),
