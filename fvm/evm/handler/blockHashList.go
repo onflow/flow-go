@@ -11,7 +11,11 @@ import (
 )
 
 const (
+	blockHashListMetaKey         = "BlockHashListMeta"
+	blockHashListBucketKeyFormat = "BlockHashListBucket%d"
+
 	hashCountPerBucket   = 16
+	hashEncodingSize     = 32
 	capacityEncodingSize = 8
 	tailEncodingSize     = 8
 	countEncodingSize    = 8
@@ -20,15 +24,13 @@ const (
 		tailEncodingSize +
 		countEncodingSize +
 		heightEncodingSize
-	hashEncodingSize = 32
-
-	BlockHashListMetaKey         = "BlockHashListMeta"
-	BlockHashListBucketKeyFormat = "BlockHashListBucket%d"
 )
 
-// BlockHashList stores the last `capacity` number of block hashes in the list
-// under the hood it stores block hashes in smaller buckets to minimize the
-// number of bytes read and written during operations.
+// BlockHashList stores the last `capacity` number of block hashes
+//
+// Under the hood it breaks the list of hashes into
+// smaller fixed size buckets to minimize the
+// number of bytes read and written during set/get operations.
 type BlockHashList struct {
 	backend     types.Backend
 	rootAddress flow.Address
@@ -40,9 +42,9 @@ type BlockHashList struct {
 	height   uint64 // keeps the height of last added block
 }
 
-// NewBlockHashList loads the block hash list
-// it tries to load the metadata from the backend
-// and if not exist it will create one
+// NewBlockHashList creates a block hash list
+// It tries to load the metadata from the backend
+// and if not exist it creates one
 func NewBlockHashList(
 	backend types.Backend,
 	rootAddress flow.Address,
@@ -60,26 +62,34 @@ func NewBlockHashList(
 	if err != nil {
 		return nil, err
 	}
-	// check capacity
+	// check the loaded capacity against the one provided
 	if bhl.capacity != capacity {
-		return nil, fmt.Errorf("capacity doesn't match, expected: %d, got: %d", bhl.capacity, capacity)
+		return nil, fmt.Errorf(
+			"capacity doesn't match, expected: %d, got: %d",
+			bhl.capacity,
+			capacity,
+		)
 	}
 	return bhl, nil
 }
 
 // Push pushes a block hash for the next height to the list.
-// If the list is full, it overwrites the oldest element.
+// If the list has reached to the capacity, it overwrites the oldest element.
 func (bhl *BlockHashList) Push(height uint64, bh gethCommon.Hash) error {
+	// handle the very first block
 	if bhl.IsEmpty() && height != 0 {
 		return fmt.Errorf("out of the order block hash, expected: 0, got: %d", height)
 	}
+	// check the block heights before pushing
 	if !bhl.IsEmpty() && height != bhl.height+1 {
 		return fmt.Errorf("out of the order block hash, expected: %d, got: %d", bhl.height+1, height)
 	}
+	// updates the block hash stored at index
 	err := bhl.updateBlockHashAt(bhl.tail, bh)
 	if err != nil {
 		return err
 	}
+
 	// update meta data
 	bhl.tail = (bhl.tail + 1) % bhl.capacity
 	bhl.height = height
@@ -110,6 +120,9 @@ func (bhl *BlockHashList) LastAddedBlockHash() (gethCommon.Hash, error) {
 
 // MinAvailableHeight returns the min available height in the list
 func (bhl *BlockHashList) MinAvailableHeight() uint64 {
+	if bhl.IsEmpty() {
+		return 0
+	}
 	return bhl.height - (uint64(bhl.count) - 1)
 }
 
@@ -120,11 +133,12 @@ func (bhl *BlockHashList) MaxAvailableHeight() uint64 {
 
 // BlockHashByIndex returns the block hash by block height
 func (bhl *BlockHashList) BlockHashByHeight(height uint64) (found bool, bh gethCommon.Hash, err error) {
-	if bhl.count == 0 || // empty
-		height > bhl.height || // height too high
-		height < bhl.MinAvailableHeight() { // height too low
+	if bhl.count == 0 || // if empty
+		height > bhl.MaxAvailableHeight() || // or height too high
+		height < bhl.MinAvailableHeight() { // or height too low
 		return false, gethCommon.Hash{}, nil
 	}
+	// calculate the index to lookup
 	diff := bhl.height - height
 	index := bhl.tail - int(diff) - 1
 	if index < 0 {
@@ -134,6 +148,7 @@ func (bhl *BlockHashList) BlockHashByHeight(height uint64) (found bool, bh gethC
 	return true, bh, err
 }
 
+// updateBlockHashAt updates block hash at index
 func (bhl *BlockHashList) updateBlockHashAt(idx int, bh gethCommon.Hash) error {
 	// fetch the bucket
 	bucketNumber := idx / hashCountPerBucket
@@ -149,15 +164,16 @@ func (bhl *BlockHashList) updateBlockHashAt(idx int, bh gethCommon.Hash) error {
 	// store bucket
 	return bhl.backend.SetValue(
 		bhl.rootAddress[:],
-		[]byte(fmt.Sprintf(BlockHashListBucketKeyFormat, bucketNumber)),
+		[]byte(fmt.Sprintf(blockHashListBucketKeyFormat, bucketNumber)),
 		bucket,
 	)
 }
 
+// fetchBucket fetches the bucket
 func (bhl *BlockHashList) fetchBucket(num int) ([]byte, error) {
 	data, err := bhl.backend.GetValue(
 		bhl.rootAddress[:],
-		[]byte(fmt.Sprintf(BlockHashListBucketKeyFormat, num)),
+		[]byte(fmt.Sprintf(blockHashListBucketKeyFormat, num)),
 	)
 	if err != nil {
 		return nil, err
@@ -169,8 +185,9 @@ func (bhl *BlockHashList) fetchBucket(num int) ([]byte, error) {
 	return data, err
 }
 
+// returns the block hash at the given index
 func (bhl *BlockHashList) getBlockHashAt(idx int) (gethCommon.Hash, error) {
-	// fetch the bucket
+	// fetch the bucket first
 	bucket, err := bhl.fetchBucket(idx / hashCountPerBucket)
 	if err != nil {
 		return gethCommon.Hash{}, err
@@ -181,10 +198,11 @@ func (bhl *BlockHashList) getBlockHashAt(idx int) (gethCommon.Hash, error) {
 	return gethCommon.BytesToHash(bucket[start:end]), nil
 }
 
+// loadMetaData loads the meta data from the storage
 func (bhl *BlockHashList) loadMetaData() error {
 	data, err := bhl.backend.GetValue(
 		bhl.rootAddress[:],
-		[]byte(BlockHashListMetaKey),
+		[]byte(blockHashListMetaKey),
 	)
 	if err != nil {
 		return err
@@ -218,6 +236,7 @@ func (bhl *BlockHashList) loadMetaData() error {
 	return nil
 }
 
+// storeMetaData stores the meta data into storage
 func (bhl *BlockHashList) storeMetaData() error {
 	// encode meta data
 	buffer := make([]byte, metaEncodingSize)
@@ -241,7 +260,7 @@ func (bhl *BlockHashList) storeMetaData() error {
 	// store the encoded data into backend
 	return bhl.backend.SetValue(
 		bhl.rootAddress[:],
-		[]byte(BlockHashListMetaKey),
+		[]byte(blockHashListMetaKey),
 		buffer,
 	)
 }
