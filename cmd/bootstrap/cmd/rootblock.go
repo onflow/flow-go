@@ -4,6 +4,8 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"github.com/onflow/flow-go/state/protocol/inmem"
+	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
 	"time"
 
 	"github.com/onflow/cadence"
@@ -218,7 +220,14 @@ func rootBlock(cmd *cobra.Command, args []string) {
 	log.Info().Msg("")
 
 	log.Info().Msg("constructing root block")
-	block := constructRootBlock(header, epochSetup, epochCommit)
+	rootProtocolState, err := kvstore.NewDefaultKVStore(
+		flagEpochCommitSafetyThreshold,
+		inmem.EpochProtocolStateFromServiceEvents(epochSetup, epochCommit).ID(),
+	)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to construct root kvstore")
+	}
+	block := constructRootBlock(header, rootProtocolState.ID())
 	err = common.WriteJSON(model.PathRootBlockData, flagOutdir, block)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to write json")
