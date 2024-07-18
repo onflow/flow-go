@@ -2679,7 +2679,7 @@ func ChunkExecutionDataFixture(t *testing.T, minSize int, opts ...func(*executio
 // RootEpochProtocolStateFixture creates a fixture with correctly structured Epoch sub-state.
 // The epoch substate is part of the overall protocol state (KV store).
 // This can be useful for testing bootstrap when there is no previous epoch.
-func RootEpochProtocolStateFixture() *flow.RichEpochProtocolStateEntry {
+func RootEpochProtocolStateFixture() *flow.RichEpochStateEntry {
 	currentEpochSetup := EpochSetupFixture(func(setup *flow.EpochSetup) {
 		setup.Counter = 1
 	})
@@ -2696,23 +2696,25 @@ func RootEpochProtocolStateFixture() *flow.RichEpochProtocolStateEntry {
 			},
 		})
 	}
-	return &flow.RichEpochProtocolStateEntry{
-		EpochProtocolStateEntry: &flow.EpochProtocolStateEntry{
-			PreviousEpoch: nil,
-			CurrentEpoch: flow.EpochStateContainer{
-				SetupID:          currentEpochSetup.ID(),
-				CommitID:         currentEpochCommit.ID(),
-				ActiveIdentities: flow.DynamicIdentityEntryListFromIdentities(allIdentities),
+	return &flow.RichEpochStateEntry{
+		EpochStateEntry: &flow.EpochStateEntry{
+			MinEpochStateEntry: &flow.MinEpochStateEntry{
+				PreviousEpoch: nil,
+				CurrentEpoch: flow.EpochStateContainer{
+					SetupID:          currentEpochSetup.ID(),
+					CommitID:         currentEpochCommit.ID(),
+					ActiveIdentities: flow.DynamicIdentityEntryListFromIdentities(allIdentities),
+				},
+				EpochFallbackTriggered: false,
+				NextEpoch:              nil,
 			},
-			EpochFallbackTriggered: false,
-			NextEpoch:              nil,
+			PreviousEpochSetup:  nil,
+			PreviousEpochCommit: nil,
+			CurrentEpochSetup:   currentEpochSetup,
+			CurrentEpochCommit:  currentEpochCommit,
+			NextEpochSetup:      nil,
+			NextEpochCommit:     nil,
 		},
-		PreviousEpochSetup:        nil,
-		PreviousEpochCommit:       nil,
-		CurrentEpochSetup:         currentEpochSetup,
-		CurrentEpochCommit:        currentEpochCommit,
-		NextEpochSetup:            nil,
-		NextEpochCommit:           nil,
 		CurrentEpochIdentityTable: allIdentities,
 		NextEpochIdentityTable:    flow.IdentityList{},
 	}
@@ -2729,7 +2731,7 @@ func RootEpochProtocolStateFixture() *flow.RichEpochProtocolStateEntry {
 //   - Epoch setup and commit counters are set to match.
 //   - Identities are constructed from setup events.
 //   - Identities are sorted in canonical order.
-func EpochStateFixture(options ...func(*flow.RichEpochProtocolStateEntry)) *flow.RichEpochProtocolStateEntry {
+func EpochStateFixture(options ...func(*flow.RichEpochStateEntry)) *flow.RichEpochStateEntry {
 	prevEpochSetup := EpochSetupFixture()
 	prevEpochCommit := EpochCommitFixture(func(commit *flow.EpochCommit) {
 		commit.Counter = prevEpochSetup.Counter
@@ -2763,27 +2765,29 @@ func EpochStateFixture(options ...func(*flow.RichEpochProtocolStateEntry)) *flow
 	allIdentities := currentEpochIdentities.Union(
 		prevEpochIdentities.Map(mapfunc.WithEpochParticipationStatus(flow.EpochParticipationStatusLeaving)))
 
-	entry := &flow.RichEpochProtocolStateEntry{
-		EpochProtocolStateEntry: &flow.EpochProtocolStateEntry{
-			CurrentEpoch: flow.EpochStateContainer{
-				SetupID:          currentEpochSetup.ID(),
-				CommitID:         currentEpochCommit.ID(),
-				ActiveIdentities: flow.DynamicIdentityEntryListFromIdentities(currentEpochIdentities),
+	entry := &flow.RichEpochStateEntry{
+		EpochStateEntry: &flow.EpochStateEntry{
+			MinEpochStateEntry: &flow.MinEpochStateEntry{
+				CurrentEpoch: flow.EpochStateContainer{
+					SetupID:          currentEpochSetup.ID(),
+					CommitID:         currentEpochCommit.ID(),
+					ActiveIdentities: flow.DynamicIdentityEntryListFromIdentities(currentEpochIdentities),
+				},
+				PreviousEpoch: &flow.EpochStateContainer{
+					SetupID:          prevEpochSetup.ID(),
+					CommitID:         prevEpochCommit.ID(),
+					ActiveIdentities: flow.DynamicIdentityEntryListFromIdentities(prevEpochIdentities),
+				},
+				EpochFallbackTriggered: false,
+				NextEpoch:              nil,
 			},
-			PreviousEpoch: &flow.EpochStateContainer{
-				SetupID:          prevEpochSetup.ID(),
-				CommitID:         prevEpochCommit.ID(),
-				ActiveIdentities: flow.DynamicIdentityEntryListFromIdentities(prevEpochIdentities),
-			},
-			EpochFallbackTriggered: false,
-			NextEpoch:              nil,
+			PreviousEpochSetup:  prevEpochSetup,
+			PreviousEpochCommit: prevEpochCommit,
+			CurrentEpochSetup:   currentEpochSetup,
+			CurrentEpochCommit:  currentEpochCommit,
+			NextEpochSetup:      nil,
+			NextEpochCommit:     nil,
 		},
-		PreviousEpochSetup:        prevEpochSetup,
-		PreviousEpochCommit:       prevEpochCommit,
-		CurrentEpochSetup:         currentEpochSetup,
-		CurrentEpochCommit:        currentEpochCommit,
-		NextEpochSetup:            nil,
-		NextEpochCommit:           nil,
 		CurrentEpochIdentityTable: allIdentities,
 		NextEpochIdentityTable:    flow.IdentityList{},
 	}
@@ -2800,8 +2804,8 @@ func EpochStateFixture(options ...func(*flow.RichEpochProtocolStateEntry)) *flow
 //   - We are currently in Epoch N.
 //   - The previous epoch N-1 is known (specifically EpochSetup and EpochCommit events).
 //   - The network has completed the epoch setup phase, i.e. published the EpochSetup and EpochCommit events for epoch N+1.
-func WithNextEpochProtocolState() func(entry *flow.RichEpochProtocolStateEntry) {
-	return func(entry *flow.RichEpochProtocolStateEntry) {
+func WithNextEpochProtocolState() func(entry *flow.RichEpochStateEntry) {
+	return func(entry *flow.RichEpochStateEntry) {
 		nextEpochSetup := EpochSetupFixture(func(setup *flow.EpochSetup) {
 			setup.Counter = entry.CurrentEpochSetup.Counter + 1
 			setup.FirstView = entry.CurrentEpochSetup.FinalView + 1
@@ -2847,8 +2851,8 @@ func WithNextEpochProtocolState() func(entry *flow.RichEpochProtocolStateEntry) 
 }
 
 // WithValidDKG updated protocol state with correctly structured data for DKG.
-func WithValidDKG() func(*flow.RichEpochProtocolStateEntry) {
-	return func(entry *flow.RichEpochProtocolStateEntry) {
+func WithValidDKG() func(*flow.RichEpochStateEntry) {
+	return func(entry *flow.RichEpochStateEntry) {
 		commit := entry.CurrentEpochCommit
 		dkgParticipants := entry.CurrentEpochSetup.Participants.Filter(filter.IsValidDKGParticipant)
 		lookup := DKGParticipantLookup(dkgParticipants)
@@ -2859,13 +2863,13 @@ func WithValidDKG() func(*flow.RichEpochProtocolStateEntry) {
 	}
 }
 
-// EpochProtocolStateEntryFixture returns a flow.EpochProtocolStateEntry fixture.
+// EpochProtocolStateEntryFixture returns a flow.MinEpochStateEntry fixture.
 //   - PreviousEpoch is always nil
 //   - tentativePhase defines what service events should be defined for the NextEpoch
 //   - efmTriggered defines whether the EpochFallbackTriggered flag should be set.
-func EpochProtocolStateEntryFixture(tentativePhase flow.EpochPhase, efmTriggered bool) flow.EpochProtocolStateEntry {
+func EpochProtocolStateEntryFixture(tentativePhase flow.EpochPhase, efmTriggered bool) flow.MinEpochStateEntry {
 	identities := DynamicIdentityEntryListFixture(5)
-	entry := flow.EpochProtocolStateEntry{
+	entry := flow.MinEpochStateEntry{
 		EpochFallbackTriggered: efmTriggered,
 		PreviousEpoch:          nil,
 		CurrentEpoch: flow.EpochStateContainer{

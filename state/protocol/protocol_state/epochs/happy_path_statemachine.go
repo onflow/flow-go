@@ -23,7 +23,6 @@ import (
 // All updates are applied to a copy of parent protocol state, so parent protocol state is not modified. The stateMachine internally
 // tracks the current protocol state. A separate instance should be created for each block to process the updates therein.
 // See flow.EpochPhase for detailed documentation about EFM and epoch phase transitions.
-// TODO(EFM, #6019): this structure needs to be updated to stop using parent state.
 type HappyPathStateMachine struct {
 	baseStateMachine
 }
@@ -33,18 +32,18 @@ var _ StateMachine = (*HappyPathStateMachine)(nil)
 // NewHappyPathStateMachine creates a new HappyPathStateMachine.
 // An exception is returned in case the `EpochFallbackTriggered` flag is set in the `parentState`. This means that
 // the protocol state evolution has reached an undefined state from the perspective of the happy path state machine.
-func NewHappyPathStateMachine(telemetry protocol_state.StateMachineTelemetryConsumer, view uint64, parentState *flow.RichEpochProtocolStateEntry) (*HappyPathStateMachine, error) {
+// No errors are expected during normal operations.
+func NewHappyPathStateMachine(telemetry protocol_state.StateMachineTelemetryConsumer, view uint64, parentState *flow.RichEpochStateEntry) (*HappyPathStateMachine, error) {
 	if parentState.EpochFallbackTriggered {
 		return nil, irrecoverable.NewExceptionf("cannot create happy path protocol state machine at view (%d) for a parent state"+
 			"which is in Epoch Fallback Mode", view)
 	}
+	base, err := newBaseStateMachine(telemetry, view, parentState, parentState.EpochStateEntry.Copy())
+	if err != nil {
+		return nil, fmt.Errorf("could not create base state machine: %w", err)
+	}
 	return &HappyPathStateMachine{
-		baseStateMachine: baseStateMachine{
-			telemetry:   telemetry,
-			parentState: parentState,
-			state:       parentState.EpochProtocolStateEntry.Copy(),
-			view:        view,
-		},
+		baseStateMachine: *base,
 	}, nil
 }
 
@@ -62,7 +61,7 @@ func NewHappyPathStateMachine(telemetry protocol_state.StateMachineTelemetryCons
 //     after such error and discard the HappyPathStateMachine!
 func (u *HappyPathStateMachine) ProcessEpochSetup(epochSetup *flow.EpochSetup) (bool, error) {
 	u.telemetry.OnServiceEventReceived(epochSetup.ServiceEvent())
-	err := protocol.IsValidExtendingEpochSetup(epochSetup, u.parentState)
+	err := protocol.IsValidExtendingEpochSetup(epochSetup, u.state)
 	if err != nil {
 		u.telemetry.OnInvalidServiceEvent(epochSetup.ServiceEvent(), err)
 		return false, fmt.Errorf("invalid epoch setup event for epoch %d: %w", epochSetup.Counter, err)
@@ -73,7 +72,7 @@ func (u *HappyPathStateMachine) ProcessEpochSetup(epochSetup *flow.EpochSetup) (
 		return false, err
 	}
 
-	// When observing setup event for subsequent epoch, construct the EpochStateContainer for `EpochProtocolStateEntry.NextEpoch`.
+	// When observing setup event for subsequent epoch, construct the EpochStateContainer for `MinEpochStateEntry.NextEpoch`.
 	// Context:
 	// Note that the `EpochStateContainer.ActiveIdentities` only contains the nodes that are *active* in the next epoch. Active means
 	// that these nodes are authorized to contribute to extending the chain. Nodes are listed in `ActiveIdentities` if and only if
@@ -101,9 +100,8 @@ func (u *HappyPathStateMachine) ProcessEpochSetup(epochSetup *flow.EpochSetup) (
 
 	// For collector clusters, we rely on invariants (I) and (II) holding. See `committees.Cluster` for details, specifically function
 	// `constructInitialClusterIdentities(..)`. While the system smart contract must satisfy this invariant, we run a sanity check below.
-	// TODO(EFM, #6019): potential vulnerability because looking into parent state, some ejection events might be missing from the 'evolving state'.
-	activeIdentitiesLookup := u.parentState.CurrentEpoch.ActiveIdentities.Lookup() // lookup NodeID → DynamicIdentityEntry for nodes _active_ in the current epoch
-	nextEpochActiveIdentities, err := buildNextEpochActiveParticipants(activeIdentitiesLookup, u.parentState.CurrentEpochSetup, epochSetup)
+	activeIdentitiesLookup := u.state.CurrentEpoch.ActiveIdentities.Lookup() // lookup NodeID → DynamicIdentityEntry for nodes _active_ in the current epoch
+	nextEpochActiveIdentities, err := buildNextEpochActiveParticipants(activeIdentitiesLookup, u.state.CurrentEpochSetup, epochSetup)
 	if err != nil {
 		u.telemetry.OnInvalidServiceEvent(epochSetup.ServiceEvent(), err)
 		return false, fmt.Errorf("failed to construct next epoch active participants: %w", err)
@@ -115,9 +113,17 @@ func (u *HappyPathStateMachine) ProcessEpochSetup(epochSetup *flow.EpochSetup) (
 		CommitID:         flow.ZeroID,
 		ActiveIdentities: nextEpochActiveIdentities,
 	}
+	u.state.NextEpochSetup = epochSetup
 
 	// subsequent epoch commit event and update identities afterwards.
-	u.nextEpochIdentitiesLookup = u.state.NextEpoch.ActiveIdentities.Lookup()
+	err = u.ejector.TrackDynamicIdentityList(u.state.NextEpoch.ActiveIdentities)
+	if err != nil {
+		if protocol.IsInvalidServiceEventError(err) {
+			u.telemetry.OnInvalidServiceEvent(epochSetup.ServiceEvent(), err)
+		}
+		return false, fmt.Errorf("failed to track dynamic identity list for next epoch: %w", err)
+
+	}
 	u.telemetry.OnServiceEventProcessed(epochSetup.ServiceEvent())
 	return true, nil
 }
@@ -144,13 +150,14 @@ func (u *HappyPathStateMachine) ProcessEpochCommit(epochCommit *flow.EpochCommit
 		u.telemetry.OnInvalidServiceEvent(epochCommit.ServiceEvent(), err)
 		return false, err
 	}
-	err := protocol.IsValidExtendingEpochCommit(epochCommit, u.parentState.EpochProtocolStateEntry, u.parentState.NextEpochSetup)
+	err := protocol.IsValidExtendingEpochCommit(epochCommit, u.state.MinEpochStateEntry, u.state.NextEpochSetup)
 	if err != nil {
 		u.telemetry.OnInvalidServiceEvent(epochCommit.ServiceEvent(), err)
 		return false, fmt.Errorf("invalid epoch commit event for epoch %d: %w", epochCommit.Counter, err)
 	}
 
 	u.state.NextEpoch.CommitID = epochCommit.ID()
+	u.state.NextEpochCommit = epochCommit
 	u.telemetry.OnServiceEventProcessed(epochCommit.ServiceEvent())
 	return true, nil
 }

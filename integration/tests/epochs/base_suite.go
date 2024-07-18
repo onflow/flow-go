@@ -30,7 +30,7 @@ type BaseSuite struct {
 	lib.TestnetStateTracker
 	cancel  context.CancelFunc
 	log     zerolog.Logger
-	net     *testnet.FlowNetwork
+	Net     *testnet.FlowNetwork
 	ghostID flow.Identifier
 
 	Client *testnet.Client
@@ -65,6 +65,11 @@ func (s *BaseSuite) SetupTest() {
 		s.log.Info().Msg("================> Finish SetupTest")
 	}()
 
+	accessConfig := []func(*testnet.NodeConfig){
+		testnet.WithLogLevel(zerolog.WarnLevel),
+		testnet.WithAdditionalFlag("--supports-observer=true"),
+	}
+
 	collectionConfigs := []func(*testnet.NodeConfig){
 		testnet.WithAdditionalFlag("--hotstuff-proposal-duration=100ms"),
 		testnet.WithLogLevel(zerolog.WarnLevel)}
@@ -74,7 +79,7 @@ func (s *BaseSuite) SetupTest() {
 		testnet.WithAdditionalFlag("--cruise-ctl-enabled=false"), // disable cruise control for integration tests
 		testnet.WithAdditionalFlag(fmt.Sprintf("--required-verification-seal-approvals=%d", s.RequiredSealApprovals)),
 		testnet.WithAdditionalFlag(fmt.Sprintf("--required-construction-seal-approvals=%d", s.RequiredSealApprovals)),
-		testnet.WithLogLevel(zerolog.InfoLevel)}
+		testnet.WithLogLevel(zerolog.WarnLevel)}
 
 	// a ghost node masquerading as an access node
 	s.ghostID = unittest.IdentifierFixture()
@@ -85,7 +90,7 @@ func (s *BaseSuite) SetupTest() {
 		testnet.AsGhost())
 
 	confs := []testnet.NodeConfig{
-		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.WarnLevel)),
+		testnet.NewNodeConfig(flow.RoleAccess, accessConfig...),
 		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.WarnLevel)),
 		testnet.NewNodeConfig(flow.RoleCollection, collectionConfigs...),
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
@@ -99,16 +104,16 @@ func (s *BaseSuite) SetupTest() {
 	netConf := testnet.NewNetworkConfigWithEpochConfig("epochs-tests", confs, s.StakingAuctionLen, s.DKGPhaseLen, s.EpochLen, s.EpochCommitSafetyThreshold)
 
 	// initialize the network
-	s.net = testnet.PrepareFlowNetwork(s.T(), netConf, flow.Localnet)
+	s.Net = testnet.PrepareFlowNetwork(s.T(), netConf, flow.Localnet)
 
 	// start the network
-	s.net.Start(s.Ctx)
+	s.Net.Start(s.Ctx)
 
 	// start tracking blocks
 	s.Track(s.T(), s.Ctx, s.Ghost())
 
 	// use AN1 for test-related queries - the AN join/leave test will replace AN2
-	client, err := s.net.ContainerByName(testnet.PrimaryAN).TestnetClient()
+	client, err := s.Net.ContainerByName(testnet.PrimaryAN).TestnetClient()
 	require.NoError(s.T(), err)
 
 	s.Client = client
@@ -118,7 +123,7 @@ func (s *BaseSuite) SetupTest() {
 }
 
 func (s *BaseSuite) Ghost() *client.GhostClient {
-	client, err := s.net.ContainerByID(s.ghostID).GhostClient()
+	client, err := s.Net.ContainerByID(s.ghostID).GhostClient()
 	require.NoError(s.T(), err, "could not get ghost Client")
 	return client
 }
@@ -151,7 +156,7 @@ func (s *BaseSuite) AwaitEpochPhase(ctx context.Context, expectedEpoch uint64, e
 
 // GetContainersByRole returns all containers from the network for the specified role, making sure the containers are not ghost nodes.
 func (s *BaseSuite) GetContainersByRole(role flow.Role) []*testnet.Container {
-	nodes := s.net.ContainersByRole(role, false)
+	nodes := s.Net.ContainersByRole(role, false)
 	require.True(s.T(), len(nodes) > 0)
 	return nodes
 }
