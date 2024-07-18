@@ -121,7 +121,6 @@ var _ protocol_state.KeyValueStoreStateMachine = (*EpochStateMachine)(nil)
 func NewEpochStateMachine(
 	candidateView uint64,
 	parentBlockID flow.Identifier,
-	params protocol.GlobalParams,
 	setups storage.EpochSetups,
 	commits storage.EpochCommits,
 	epochProtocolStateDB storage.EpochProtocolStateEntries,
@@ -142,7 +141,7 @@ func NewEpochStateMachine(
 	}
 
 	var stateMachine StateMachine
-	candidateTriggersEpochFallback := epochFallbackTriggeredByIncorporatingCandidate(candidateView, params, parentEpochState)
+	candidateTriggersEpochFallback := epochFallbackTriggeredByIncorporatingCandidate(candidateView, parentState, parentEpochState)
 	if parentEpochState.EpochFallbackTriggered || candidateTriggersEpochFallback {
 		// Case 1: EpochFallbackTriggered is true, indicating that we have encountered an invalid
 		//         epoch service event or an invalid state transition previously in this fork.
@@ -324,9 +323,9 @@ func (e *EpochStateMachine) ParentState() protocol.KVStoreReader {
 //   - The seal for block A was included in some block C, s.t C is an ancestor of B.
 //
 // For further details see `params.EpochCommitSafetyThreshold()`.
-func epochFallbackTriggeredByIncorporatingCandidate(candidateView uint64, params protocol.GlobalParams, parentState *flow.RichEpochStateEntry) bool {
-	if parentState.EpochPhase() == flow.EpochPhaseCommitted { // Requirement 1
+func epochFallbackTriggeredByIncorporatingCandidate(candidateView uint64, parentState protocol.KVStoreReader, parentEpochState *flow.RichEpochStateEntry) bool {
+	if parentEpochState.EpochPhase() == flow.EpochPhaseCommitted { // Requirement 1
 		return false
 	}
-	return candidateView+params.EpochCommitSafetyThreshold() >= parentState.CurrentEpochSetup.FinalView // Requirement 2
+	return candidateView+parentState.GetEpochCommitSafetyThreshold() >= parentEpochState.CurrentEpochSetup.FinalView // Requirement 2
 }

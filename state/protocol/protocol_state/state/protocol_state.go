@@ -120,7 +120,7 @@ func NewMutableProtocolState(
 	// an ordered list of factories to create state machines for different sub-states of the Dynamic Protocol State.
 	// all factories are expected to be called in order defined here.
 	kvStateMachineFactories := []protocol_state.KeyValueStoreStateMachineFactory{
-		kvstore.NewPSVersionUpgradeStateMachineFactory(globalParams),
+		kvstore.NewPSVersionUpgradeStateMachineFactory(),
 		epochs.NewEpochStateMachineFactory(globalParams, setups, commits, epochProtocolStateDB,
 			epochhappyPathTelemetryFactory, epochfallbackTelemetryFactory),
 	}

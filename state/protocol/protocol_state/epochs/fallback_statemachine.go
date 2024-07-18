@@ -15,7 +15,7 @@ import (
 // Whenever invalid epoch state transition has been observed only epochFallbackStateMachines must be created for subsequent views.
 type FallbackStateMachine struct {
 	baseStateMachine
-	params protocol.GlobalParams
+	parentState protocol.KVStoreReader
 }
 
 var _ StateMachine = (*FallbackStateMachine)(nil)
@@ -25,13 +25,12 @@ var _ StateMachine = (*FallbackStateMachine)(nil)
 // See flow.EpochPhase for detailed documentation about EFM and epoch phase transitions.
 // No errors are expected during normal operations.
 func NewFallbackStateMachine(
-	kvstore protocol.KVStoreReader,
-	params protocol.GlobalParams,
+	parentState protocol.KVStoreReader,
 	telemetry protocol_state.StateMachineTelemetryConsumer,
 	view uint64,
-	parentState *flow.RichEpochStateEntry,
+	parentEpochState *flow.RichEpochStateEntry,
 ) (*FallbackStateMachine, error) {
-	state := parentState.EpochStateEntry.Copy()
+	state := parentEpochState.EpochStateEntry.Copy()
 	nextEpochCommitted := state.EpochPhase() == flow.EpochPhaseCommitted
 	// we are entering fallback mode, this logic needs to be executed only once
 	if !state.EpochFallbackTriggered {
@@ -47,21 +46,21 @@ func NewFallbackStateMachine(
 		state.EpochFallbackTriggered = true
 	}
 
-	base, err := newBaseStateMachine(telemetry, view, parentState, state)
+	base, err := newBaseStateMachine(telemetry, view, parentEpochState, state)
 	if err != nil {
 		return nil, fmt.Errorf("could not create base state machine: %w", err)
 	}
 	sm := &FallbackStateMachine{
 		baseStateMachine: *base,
-		params:           params,
+		parentState:      parentState,
 	}
 
-	if !nextEpochCommitted && view+params.EpochCommitSafetyThreshold() >= state.CurrentEpochFinalView() {
+	if !nextEpochCommitted && view+parentState.GetEpochCommitSafetyThreshold() >= state.CurrentEpochFinalView() {
 		// we have reached safety threshold and we are still in the fallback mode
 		// prepare a new extension for the current epoch.
 		err := sm.extendCurrentEpoch(flow.EpochExtension{
 			FirstView: state.CurrentEpochFinalView() + 1,
-			FinalView: state.CurrentEpochFinalView() + kvstore.GetEpochExtensionViewCount(),
+			FinalView: state.CurrentEpochFinalView() + parentState.GetEpochExtensionViewCount(),
 		})
 		if err != nil {
 			return nil, err
@@ -213,7 +212,7 @@ func (m *FallbackStateMachine) ProcessEpochRecover(epochRecover *flow.EpochRecov
 // * `protocol.InvalidServiceEventError` - if the service event is invalid or is not a valid state transition for the current protocol state.
 // This is a side-effect-free function. This function only returns protocol.InvalidServiceEventError as errors.
 func (m *FallbackStateMachine) ensureValidEpochRecover(epochRecover *flow.EpochRecover) error {
-	if m.view+m.params.EpochCommitSafetyThreshold() >= m.state.CurrentEpochFinalView() {
+	if m.view+m.parentState.GetEpochCommitSafetyThreshold() >= m.state.CurrentEpochFinalView() {
 		return protocol.NewInvalidServiceEventErrorf("could not process epoch recover, safety threshold reached")
 	}
 	err := protocol.IsValidExtendingEpochSetup(&epochRecover.EpochSetup, m.state)

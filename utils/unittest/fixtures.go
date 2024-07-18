@@ -2263,9 +2263,16 @@ func BootstrapFixtureWithChainID(
 		WithDKGFromParticipants(participants.ToSkeleton()),
 	)
 
+	threshold, err := protocol.DefaultEpochCommitSafetyThreshold(root.Header.ChainID)
+	if err != nil {
+		panic(err)
+	}
 	rootEpochState := inmem.EpochProtocolStateFromServiceEvents(setup, commit)
-	rootProtocolStateID := kvstore.NewDefaultKVStore(rootEpochState.ID()).ID()
-	root.SetPayload(flow.Payload{ProtocolStateID: rootProtocolStateID})
+	rootProtocolState, err := kvstore.NewDefaultKVStore(threshold, rootEpochState.ID())
+	if err != nil {
+		panic(err)
+	}
+	root.SetPayload(flow.Payload{ProtocolStateID: rootProtocolState.ID()})
 	stateCommit := GenesisStateCommitmentByChainID(chainID)
 
 	result := BootstrapExecutionResultFixture(root, stateCommit)

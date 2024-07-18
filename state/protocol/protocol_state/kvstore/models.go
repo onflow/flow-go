@@ -56,8 +56,9 @@ func (model *UpgradableModel) GetVersionUpgrade() *protocol.ViewBasedActivator[u
 // with multiple supported KV model versions from the beginning.
 type Modelv0 struct {
 	UpgradableModel
-	EpochStateID            flow.Identifier
-	EpochExtensionViewCount uint64
+	EpochStateID               flow.Identifier
+	EpochExtensionViewCount    uint64
+	EpochCommitSafetyThreshold uint64
 }
 
 var _ protocol_state.KVStoreAPI = (*Modelv0)(nil)
@@ -126,6 +127,10 @@ func (model *Modelv0) GetEpochExtensionViewCount() uint64 {
 	return model.EpochExtensionViewCount
 }
 
+func (model *Modelv0) GetEpochCommitSafetyThreshold() uint64 {
+	return model.EpochCommitSafetyThreshold
+}
+
 // Modelv1 is v1 of the Protocol State key-value store.
 // This represents the first model version which will be considered "latest" by any
 // deployed software version.
@@ -177,14 +182,15 @@ func (model *Modelv1) GetProtocolStateVersion() uint64 {
 // Currently, the KV store is largely empty.
 // TODO: Shortcut in bootstrapping; we will probably have to start with a non-empty KV store in the future;
 // Potentially we may need to carry over the KVStore during a spork (with possible migrations).
-func NewDefaultKVStore(epochStateID flow.Identifier) protocol_state.KVStoreAPI {
+func NewDefaultKVStore(finalizationSafetyThreshold uint64, epochStateID flow.Identifier) (protocol_state.KVStoreAPI, error) {
 	return &Modelv1{
 		Modelv0: Modelv0{
-			UpgradableModel:         UpgradableModel{},
-			EpochStateID:            epochStateID,
-			EpochExtensionViewCount: defaultEpochExtensionViewCount,
+			UpgradableModel:            UpgradableModel{},
+			EpochStateID:               epochStateID,
+			EpochExtensionViewCount:    defaultEpochExtensionViewCount,
+			EpochCommitSafetyThreshold: finalizationSafetyThreshold,
 		},
-	}
+	}, nil
 }
 
 // NewKVStoreV0 constructs a KVStore using the v0 model. This is used to test
