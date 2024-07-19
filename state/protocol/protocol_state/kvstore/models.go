@@ -119,6 +119,17 @@ func (model *Modelv0) SetEpochStateID(id flow.Identifier) {
 	model.EpochStateID = id
 }
 
+// SetEpochExtensionViewCount sets the number of views for a hypothetical epoch extension.
+// Expected errors during normal operations:
+//   - kvstore.ErrInvalidValue - if the view count is less than FinalizationSafetyThreshold*2.
+func (model *Modelv0) SetEpochExtensionViewCount(viewCount uint64) error {
+	if viewCount < model.EpochCommitSafetyThreshold*2 {
+		return fmt.Errorf("invalid view count %d, expect at least %d", viewCount, model.EpochCommitSafetyThreshold*2)
+	}
+	model.EpochExtensionViewCount = viewCount
+	return nil
+}
+
 // GetEpochExtensionViewCount returns the number of views for a hypothetical epoch extension. Note
 // that this value can change at runtime (through a service event). When a new extension is added,
 // the view count is used right at this point in the protocol state's evolution. In other words,
