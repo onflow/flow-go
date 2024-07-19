@@ -63,8 +63,16 @@ func BalanceToBigInt(bal Balance) *big.Int {
 // Warning! this method is only provided for logging and metric reporting
 // purposes, using float64 for any actual computation result in non-determinism.
 func UnsafeCastOfBalanceToFloat64(bal Balance) float64 {
-	converted := new(big.Int).Div(bal, new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(UFixedScale)), nil))
-	res, _ := new(big.Float).SetInt(converted).Float64()
+	res, _ := new(big.Float).Quo(
+		new(big.Float).SetInt(bal),
+		new(big.Float).SetInt(
+			new(big.Int).Exp(
+				big.NewInt(10),
+				big.NewInt(int64(AttoScale)),
+				nil,
+			),
+		),
+	).Float64()
 	return res
 }
 
