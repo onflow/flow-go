@@ -90,8 +90,8 @@ type ExecutionCollector struct {
 	numberOfDeployedCOAs                    prometheus.Gauge
 	evmBlockTotalSupply                     prometheus.Gauge
 	totalExecutedEVMTransactionsCounter     prometheus.Counter
+	totalFailedEVMTransactionsCounter       prometheus.Counter
 	totalExecutedEVMDirectCallsCounter      prometheus.Counter
-	evmTransactionExecutionTime             prometheus.Histogram
 	evmTransactionGasUsed                   prometheus.Histogram
 	evmBlockTxCount                         prometheus.Histogram
 	evmBlockGasUsed                         prometheus.Histogram
@@ -732,19 +732,18 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 			Help:      "the total number of executed evm transactions (including direct calls)",
 		}),
 
+		totalFailedEVMTransactionsCounter: promauto.NewCounter(prometheus.CounterOpts{
+			Namespace: namespaceExecution,
+			Subsystem: subsystemEVM,
+			Name:      "total_failed_evm_transaction_count",
+			Help:      "the total number of executed evm transactions with failed status (including direct calls)",
+		}),
+
 		totalExecutedEVMDirectCallsCounter: promauto.NewCounter(prometheus.CounterOpts{
 			Namespace: namespaceExecution,
 			Subsystem: subsystemEVM,
 			Name:      "total_executed_evm_direct_call_count",
 			Help:      "the total number of executed evm direct calls",
-		}),
-
-		evmTransactionExecutionTime: promauto.NewHistogram(prometheus.HistogramOpts{
-			Namespace: namespaceExecution,
-			Subsystem: subsystemRuntime,
-			Name:      "evm_transaction_execution_time_milliseconds",
-			Help:      "the total time spent on evm transaction execution in milliseconds",
-			Buckets:   prometheus.ExponentialBuckets(1, 2, 10),
 		}),
 
 		evmTransactionGasUsed: promauto.NewHistogram(prometheus.HistogramOpts{
@@ -1025,15 +1024,17 @@ func (ec *ExecutionCollector) SetNumberOfDeployedCOAs(count uint64) {
 }
 
 func (ec *ExecutionCollector) EVMTransactionExecuted(
-	duration time.Duration,
-	isDirectCall bool,
 	gasUsed uint64,
+	isDirectCall bool,
+	failed bool,
 ) {
 	ec.totalExecutedEVMTransactionsCounter.Inc()
 	if isDirectCall {
 		ec.totalExecutedEVMDirectCallsCounter.Inc()
 	}
-	ec.evmTransactionExecutionTime.Observe(float64(duration.Milliseconds()))
+	if failed {
+		ec.totalFailedEVMTransactionsCounter.Inc()
+	}
 	ec.evmTransactionGasUsed.Observe(float64(gasUsed))
 }
 

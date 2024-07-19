@@ -84,19 +84,21 @@ func (h *ContractHandler) deployCOA(uuid uint64) (*types.Result, error) {
 
 	factory := h.addressAllocator.COAFactoryAddress()
 	factoryAccount := h.AccountByAddress(factory, false)
+	factoryNonce := factoryAccount.Nonce()
 	call := types.NewDeployCallWithTargetAddress(
 		factory,
 		target,
 		coa.ContractBytes,
 		uint64(gaslimit),
 		new(big.Int),
-		factoryAccount.Nonce(),
+		factoryNonce,
 	)
 
 	ctx, err := h.getBlockContext()
 	if err != nil {
 		return nil, err
 	}
+	h.backend.SetNumberOfDeployedCOAs(factoryNonce)
 	return h.executeAndHandleCall(ctx, call, nil, false)
 }
 
@@ -193,7 +195,7 @@ func (h *ContractHandler) batchRun(rlpEncodedTxs [][]byte, coinbase types.Addres
 		return nil, err
 	}
 
-	// saftey check for result
+	// safety check for result
 	if len(res) == 0 {
 		return nil, types.ErrUnexpectedEmptyResult
 	}
@@ -230,6 +232,13 @@ func (h *ContractHandler) batchRun(rlpEncodedTxs [][]byte, coinbase types.Addres
 		if err != nil {
 			return nil, err
 		}
+
+		// step 4 - update metrics
+		h.backend.EVMTransactionExecuted(
+			r.GasConsumed,
+			false,
+			r.Failed(),
+		)
 
 		h.tracer.Collect(r.TxHash)
 	}
@@ -334,7 +343,14 @@ func (h *ContractHandler) run(
 		return nil, err
 	}
 
-	// step 5 - collect traces
+	// step 4 - update metrics
+	h.backend.EVMTransactionExecuted(
+		res.GasConsumed,
+		false,
+		res.Failed(),
+	)
+
+	// step 6 - collect traces
 	h.tracer.Collect(res.TxHash)
 	return res, nil
 }
@@ -526,6 +542,13 @@ func (h *ContractHandler) executeAndHandleCall(
 	if err != nil {
 		return nil, err
 	}
+
+	// metric
+	h.backend.EVMTransactionExecuted(
+		res.GasConsumed,
+		true,
+		res.Failed(),
+	)
 
 	// collect traces
 	h.tracer.Collect(res.TxHash)

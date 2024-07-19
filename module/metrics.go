@@ -826,9 +826,9 @@ type RuntimeMetrics interface {
 type EVMMetrics interface {
 	// SetNumberOfDeployedCOAs sets the total number of deployed COAs
 	SetNumberOfDeployedCOAs(count uint64)
-	// EVMTransactionExecuted reports the time spent and gas used when executing an evm transaction
-	EVMTransactionExecuted(duration time.Duration, isDirectCall bool, gasUsed uint64)
-	// EVMTransactionExecuted reports the block size, total gas used and total supply when executing an evm block
+	// EVMTransactionExecuted reports the gas used when executing an evm transaction
+	EVMTransactionExecuted(gasUsed uint64, isDirectCall bool, failed bool)
+	// EVMBlockExecuted reports the block size, total gas used and total supply when executing an evm block
 	EVMBlockExecuted(txCount int, totalGasUsed uint64, totalSupplyInFlow uint64)
 }
 

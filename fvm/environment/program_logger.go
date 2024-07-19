@@ -15,7 +15,7 @@ import (
 // MetricsReporter captures and reports EVM metrics to back to the execution
 type EVMMetricsReporter interface {
 	SetNumberOfDeployedCOAs(count uint64)
-	EVMTransactionExecuted(duration time.Duration, isDirectCall bool, gasUsed uint64)
+	EVMTransactionExecuted(gasUsed uint64, isDirectCall bool, failed bool)
 	EVMBlockExecuted(txCount int, totalGasUsed uint64, totalSupplyInFlow uint64)
 }
 
@@ -64,7 +64,7 @@ func (NoopMetricsReporter) RuntimeTransactionProgramsCacheHit() {}
 func (NoopMetricsReporter) SetNumberOfDeployedCOAs(_ uint64) {}
 
 // EVMTransactionExecuted is a noop
-func (NoopMetricsReporter) EVMTransactionExecuted(_ time.Duration, _ bool, _ uint64) {}
+func (NoopMetricsReporter) EVMTransactionExecuted(_ uint64, _ bool, _ bool) {}
 
 // EVMBlockExecuted is a noop
 func (NoopMetricsReporter) EVMBlockExecuted(_ int, _ uint64, _ uint64) {}

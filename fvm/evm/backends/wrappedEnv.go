@@ -1,8 +1,6 @@
 package backends
 
 import (
-	"time"
-
 	"github.com/onflow/atree"
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
@@ -161,11 +159,11 @@ func (we *WrappedEnvironment) SetNumberOfDeployedCOAs(count uint64) {
 }
 
 func (we *WrappedEnvironment) EVMTransactionExecuted(
-	duration time.Duration,
-	isDirectCall bool,
 	gasUsed uint64,
+	isDirectCall bool,
+	failed bool,
 ) {
-	we.env.EVMTransactionExecuted(duration, isDirectCall, gasUsed)
+	we.env.EVMTransactionExecuted(gasUsed, isDirectCall, failed)
 }
 
 func (we *WrappedEnvironment) EVMBlockExecuted(

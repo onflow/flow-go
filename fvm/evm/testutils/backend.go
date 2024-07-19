@@ -5,7 +5,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"testing"
-	"time"
 
 	"github.com/onflow/cadence/runtime/stdlib"
 	otelTrace "go.opentelemetry.io/otel/trace"
@@ -538,7 +537,7 @@ func (tt *TestTracer) ExpectedSpan(t *testing.T, expected trace.SpanName) {
 
 type TestMetricReporter struct {
 	SetNumberOfDeployedCOAsFunc func(uint64)
-	EVMTransactionExecutedFunc  func(time.Duration, bool, uint64)
+	EVMTransactionExecutedFunc  func(uint64, bool, bool)
 	EVMBlockExecutedFunc        func(int, uint64, uint64)
 }
 
@@ -550,10 +549,10 @@ func (tmr *TestMetricReporter) SetNumberOfDeployedCOAs(count uint64) {
 		tmr.SetNumberOfDeployedCOAsFunc(count)
 	}
 }
-func (tmr *TestMetricReporter) EVMTransactionExecuted(duration time.Duration, isDirectCall bool, gasUsed uint64) {
+func (tmr *TestMetricReporter) EVMTransactionExecuted(gasUsed uint64, isDirectCall bool, failed bool) {
 	// call the method if available otherwise skip
 	if tmr.EVMTransactionExecutedFunc != nil {
-		tmr.EVMTransactionExecutedFunc(duration, isDirectCall, gasUsed)
+		tmr.EVMTransactionExecutedFunc(gasUsed, isDirectCall, failed)
 	}
 }
 func (tmr *TestMetricReporter) EVMBlockExecuted(txCount int, totalGasUsed uint64, totalSupplyInFlow uint64) {
