@@ -111,10 +111,7 @@ func (bhl *BlockHashList) LastAddedBlockHash() (gethCommon.Hash, error) {
 		// return empty hash
 		return gethCommon.Hash{}, nil
 	}
-	index := bhl.tail - 1
-	if index < 0 {
-		index = bhl.capacity - 1
-	}
+	index := (bhl.tail + bhl.capacity - 1) % bhl.capacity
 	return bhl.getBlockHashAt(index)
 }
 
@@ -140,10 +137,7 @@ func (bhl *BlockHashList) BlockHashByHeight(height uint64) (found bool, bh gethC
 	}
 	// calculate the index to lookup
 	diff := bhl.height - height
-	index := bhl.tail - int(diff) - 1
-	if index < 0 {
-		index = bhl.capacity + index
-	}
+	index := (bhl.tail - int(diff) - 1 + bhl.capacity) % bhl.capacity
 	bh, err = bhl.getBlockHashAt(index)
 	return true, bh, err
 }
