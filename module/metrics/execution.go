@@ -92,6 +92,7 @@ type ExecutionCollector struct {
 	totalExecutedEVMTransactionsCounter     prometheus.Counter
 	totalFailedEVMTransactionsCounter       prometheus.Counter
 	totalExecutedEVMDirectCallsCounter      prometheus.Counter
+	totalFailedEVMDirectCallsCounter        prometheus.Counter
 	evmTransactionGasUsed                   prometheus.Histogram
 	evmBlockTxCount                         prometheus.Histogram
 	evmBlockGasUsed                         prometheus.Histogram
@@ -746,6 +747,13 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 			Help:      "the total number of executed evm direct calls",
 		}),
 
+		totalFailedEVMDirectCallsCounter: promauto.NewCounter(prometheus.CounterOpts{
+			Namespace: namespaceExecution,
+			Subsystem: subsystemEVM,
+			Name:      "total_failed_evm_direct_call_count",
+			Help:      "the total number of executed evm direct calls with failed status.",
+		}),
+
 		evmTransactionGasUsed: promauto.NewHistogram(prometheus.HistogramOpts{
 			Namespace: namespaceExecution,
 			Subsystem: subsystemEVM,
@@ -1031,6 +1039,9 @@ func (ec *ExecutionCollector) EVMTransactionExecuted(
 	ec.totalExecutedEVMTransactionsCounter.Inc()
 	if isDirectCall {
 		ec.totalExecutedEVMDirectCallsCounter.Inc()
+		if failed {
+			ec.totalFailedEVMDirectCallsCounter.Inc()
+		}
 	}
 	if failed {
 		ec.totalFailedEVMTransactionsCounter.Inc()
@@ -1043,7 +1054,7 @@ func (ec *ExecutionCollector) EVMBlockExecuted(
 	totalGasUsed uint64,
 	totalSupplyInFlow float64,
 ) {
-	ec.evmBlockTxCount.Observe(float64(totalGasUsed))
+	ec.evmBlockTxCount.Observe(float64(txCount))
 	ec.evmBlockGasUsed.Observe(float64(totalGasUsed))
 	ec.evmBlockTotalSupply.Set(totalSupplyInFlow)
 }
