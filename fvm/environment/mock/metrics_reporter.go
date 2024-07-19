@@ -13,6 +13,16 @@ type MetricsReporter struct {
 	mock.Mock
 }
 
+// EVMBlockExecuted provides a mock function with given fields: txCount, totalGasUsed, totalSupplyInFlow
+func (_m *MetricsReporter) EVMBlockExecuted(txCount int, totalGasUsed uint64, totalSupplyInFlow uint64) {
+	_m.Called(txCount, totalGasUsed, totalSupplyInFlow)
+}
+
+// EVMTransactionExecuted provides a mock function with given fields: duration, isDirectCall, gasUsed
+func (_m *MetricsReporter) EVMTransactionExecuted(duration time.Duration, isDirectCall bool, gasUsed uint64) {
+	_m.Called(duration, isDirectCall, gasUsed)
+}
+
 // RuntimeSetNumberOfAccounts provides a mock function with given fields: count
 func (_m *MetricsReporter) RuntimeSetNumberOfAccounts(count uint64) {
 	_m.Called(count)
@@ -41,6 +51,11 @@ func (_m *MetricsReporter) RuntimeTransactionProgramsCacheHit() {
 // RuntimeTransactionProgramsCacheMiss provides a mock function with given fields:
 func (_m *MetricsReporter) RuntimeTransactionProgramsCacheMiss() {
 	_m.Called()
+}
+
+// SetNumberOfDeployedCOAs provides a mock function with given fields: count
+func (_m *MetricsReporter) SetNumberOfDeployedCOAs(count uint64) {
+	_m.Called(count)
 }
 
 // NewMetricsReporter creates a new instance of MetricsReporter. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
