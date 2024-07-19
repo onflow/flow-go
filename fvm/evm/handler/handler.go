@@ -276,6 +276,13 @@ func (h *ContractHandler) commitBlockProposal() error {
 		return err
 	}
 
+	// report metrics
+	tb, _, err := types.ConvertBalanceToUFix64(bp.TotalSupply)
+	if err != nil {
+		return err
+	}
+	h.backend.EVMBlockExecuted(len(bp.TxHashes), bp.TotalGasUsed, uint64(tb))
+
 	return nil
 }
 

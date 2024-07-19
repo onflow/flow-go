@@ -44,7 +44,7 @@ func RunWithTestBackend(t testing.TB, f func(*TestBackend)) {
 		TestRandomGenerator:         getSimpleRandomGenerator(),
 		TestContractFunctionInvoker: &TestContractFunctionInvoker{},
 		TestTracer:                  &TestTracer{},
-		TestMetricReporter:          &TestMetricReporter{},
+		TestMetricsReporter:         &TestMetricsReporter{},
 	}
 	f(tb)
 }
@@ -194,7 +194,7 @@ type TestBackend struct {
 	*TestContractFunctionInvoker
 	*testUUIDGenerator
 	*TestTracer
-	*TestMetricReporter
+	*TestMetricsReporter
 }
 
 var _ types.Backend = &TestBackend{}
@@ -535,27 +535,27 @@ func (tt *TestTracer) ExpectedSpan(t *testing.T, expected trace.SpanName) {
 	}
 }
 
-type TestMetricReporter struct {
+type TestMetricsReporter struct {
 	SetNumberOfDeployedCOAsFunc func(uint64)
 	EVMTransactionExecutedFunc  func(uint64, bool, bool)
 	EVMBlockExecutedFunc        func(int, uint64, uint64)
 }
 
-var _ environment.EVMMetricsReporter = &TestMetricReporter{}
+var _ environment.EVMMetricsReporter = &TestMetricsReporter{}
 
-func (tmr *TestMetricReporter) SetNumberOfDeployedCOAs(count uint64) {
+func (tmr *TestMetricsReporter) SetNumberOfDeployedCOAs(count uint64) {
 	// call the method if available otherwise skip
 	if tmr.SetNumberOfDeployedCOAsFunc != nil {
 		tmr.SetNumberOfDeployedCOAsFunc(count)
 	}
 }
-func (tmr *TestMetricReporter) EVMTransactionExecuted(gasUsed uint64, isDirectCall bool, failed bool) {
+func (tmr *TestMetricsReporter) EVMTransactionExecuted(gasUsed uint64, isDirectCall bool, failed bool) {
 	// call the method if available otherwise skip
 	if tmr.EVMTransactionExecutedFunc != nil {
 		tmr.EVMTransactionExecutedFunc(gasUsed, isDirectCall, failed)
 	}
 }
-func (tmr *TestMetricReporter) EVMBlockExecuted(txCount int, totalGasUsed uint64, totalSupplyInFlow uint64) {
+func (tmr *TestMetricsReporter) EVMBlockExecuted(txCount int, totalGasUsed uint64, totalSupplyInFlow uint64) {
 	// call the method if available otherwise skip
 	if tmr.EVMBlockExecutedFunc != nil {
 		tmr.EVMBlockExecutedFunc(txCount, totalGasUsed, totalSupplyInFlow)
