@@ -12,9 +12,16 @@ import (
 	"github.com/onflow/flow-go/module/trace"
 )
 
-// MetricsReporter captures and reports metrics to back to the execution
+// MetricsReporter captures and reports EVM metrics to back to the execution
+type EVMMetricsReporter interface {
+	SetNumberOfDeployedCOAs(count uint64)
+	EVMTransactionExecuted(duration time.Duration, isDirectCall bool, gasUsed uint64)
+	EVMBlockExecuted(txCount int, totalGasUsed uint64, totalSupplyInFlow uint64)
+}
+
+// RuntimeMetricsReporter captures and reports runtime metrics to back to the execution
 // environment it is a setup passed to the context.
-type MetricsReporter interface {
+type RuntimeMetricsReporter interface {
 	RuntimeTransactionParsed(time.Duration)
 	RuntimeTransactionChecked(time.Duration)
 	RuntimeTransactionInterpreted(time.Duration)
@@ -23,8 +30,17 @@ type MetricsReporter interface {
 	RuntimeTransactionProgramsCacheHit()
 }
 
+// MetricsReporter captures and reports metrics to back to the execution
+// environment it is a setup passed to the context.
+type MetricsReporter interface {
+	EVMMetricsReporter
+	RuntimeMetricsReporter
+}
+
 // NoopMetricsReporter is a MetricReporter that does nothing.
 type NoopMetricsReporter struct{}
+
+var _ MetricsReporter = &NoopMetricsReporter{}
 
 // RuntimeTransactionParsed is a noop
 func (NoopMetricsReporter) RuntimeTransactionParsed(time.Duration) {}
@@ -43,6 +59,15 @@ func (NoopMetricsReporter) RuntimeTransactionProgramsCacheMiss() {}
 
 // RuntimeTransactionProgramsCacheHit is a noop
 func (NoopMetricsReporter) RuntimeTransactionProgramsCacheHit() {}
+
+// SetNumberOfDeployedCOAs is a noop
+func (NoopMetricsReporter) SetNumberOfDeployedCOAs(_ uint64) {}
+
+// EVMTransactionExecuted is a noop
+func (NoopMetricsReporter) EVMTransactionExecuted(_ time.Duration, _ bool, _ uint64) {}
+
+// EVMBlockExecuted is a noop
+func (NoopMetricsReporter) EVMBlockExecuted(_ int, _ uint64, _ uint64) {}
 
 type ProgramLoggerParams struct {
 	zerolog.Logger

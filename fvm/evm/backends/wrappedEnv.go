@@ -1,6 +1,8 @@
 package backends
 
 import (
+	"time"
+
 	"github.com/onflow/atree"
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
@@ -152,6 +154,26 @@ func (we *WrappedEnvironment) StartChildSpan(
 	options ...otelTrace.SpanStartOption,
 ) tracing.TracerSpan {
 	return we.env.StartChildSpan(name, options...)
+}
+
+func (we *WrappedEnvironment) SetNumberOfDeployedCOAs(count uint64) {
+	we.env.SetNumberOfDeployedCOAs(count)
+}
+
+func (we *WrappedEnvironment) EVMTransactionExecuted(
+	duration time.Duration,
+	isDirectCall bool,
+	gasUsed uint64,
+) {
+	we.env.EVMTransactionExecuted(duration, isDirectCall, gasUsed)
+}
+
+func (we *WrappedEnvironment) EVMBlockExecuted(
+	txCount int,
+	totalGasUsed uint64,
+	totalSupplyInFlow uint64,
+) {
+	we.env.EVMBlockExecuted(txCount, totalGasUsed, totalSupplyInFlow)
 }
 
 func handleEnvironmentError(err error) error {

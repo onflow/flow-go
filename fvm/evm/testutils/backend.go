@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/onflow/cadence/runtime/stdlib"
 	otelTrace "go.opentelemetry.io/otel/trace"
@@ -44,6 +45,7 @@ func RunWithTestBackend(t testing.TB, f func(*TestBackend)) {
 		TestRandomGenerator:         getSimpleRandomGenerator(),
 		TestContractFunctionInvoker: &TestContractFunctionInvoker{},
 		TestTracer:                  &TestTracer{},
+		TestMetricReporter:          &TestMetricReporter{},
 	}
 	f(tb)
 }
@@ -193,6 +195,7 @@ type TestBackend struct {
 	*TestContractFunctionInvoker
 	*testUUIDGenerator
 	*TestTracer
+	*TestMetricReporter
 }
 
 var _ types.Backend = &TestBackend{}
@@ -530,5 +533,32 @@ func (tt *TestTracer) ExpectedSpan(t *testing.T, expected trace.SpanName) {
 	) tracing.TracerSpan {
 		require.Equal(t, expected, sn)
 		return tracing.NewMockTracerSpan()
+	}
+}
+
+type TestMetricReporter struct {
+	SetNumberOfDeployedCOAsFunc func(uint64)
+	EVMTransactionExecutedFunc  func(time.Duration, bool, uint64)
+	EVMBlockExecutedFunc        func(int, uint64, uint64)
+}
+
+var _ environment.EVMMetricsReporter = &TestMetricReporter{}
+
+func (tmr *TestMetricReporter) SetNumberOfDeployedCOAs(count uint64) {
+	// call the method if available otherwise skip
+	if tmr.SetNumberOfDeployedCOAsFunc != nil {
+		tmr.SetNumberOfDeployedCOAsFunc(count)
+	}
+}
+func (tmr *TestMetricReporter) EVMTransactionExecuted(duration time.Duration, isDirectCall bool, gasUsed uint64) {
+	// call the method if available otherwise skip
+	if tmr.EVMTransactionExecutedFunc != nil {
+		tmr.EVMTransactionExecutedFunc(duration, isDirectCall, gasUsed)
+	}
+}
+func (tmr *TestMetricReporter) EVMBlockExecuted(txCount int, totalGasUsed uint64, totalSupplyInFlow uint64) {
+	// call the method if available otherwise skip
+	if tmr.EVMBlockExecutedFunc != nil {
+		tmr.EVMBlockExecutedFunc(txCount, totalGasUsed, totalSupplyInFlow)
 	}
 }
