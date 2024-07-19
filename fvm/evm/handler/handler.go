@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/fvm/environment"
 	fvmErrors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/evm/debug"
+	"github.com/onflow/flow-go/fvm/evm/events"
 	"github.com/onflow/flow-go/fvm/evm/handler/coa"
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/model/flow"
@@ -224,7 +225,7 @@ func (h *ContractHandler) batchRun(rlpEncodedTxs [][]byte, coinbase types.Addres
 		if r.Invalid() { // don't emit events for invalid tx
 			continue
 		}
-		err = h.emitEvent(types.NewTransactionEvent(
+		err = h.emitEvent(events.NewTransactionEvent(
 			r,
 			rlpEncodedTxs[i],
 			bp.Height,
@@ -271,7 +272,7 @@ func (h *ContractHandler) commitBlockProposal() error {
 	}
 
 	// emit block executed event
-	err = h.emitEvent(types.NewBlockEvent(&bp.Block))
+	err = h.emitEvent(events.NewBlockEvent(&bp.Block))
 	if err != nil {
 		return err
 	}
@@ -345,7 +346,7 @@ func (h *ContractHandler) run(
 	}
 
 	// step 4 - emit events
-	err = h.emitEvent(types.NewTransactionEvent(res, rlpEncodedTx, bp.Height))
+	err = h.emitEvent(events.NewTransactionEvent(res, rlpEncodedTx, bp.Height))
 	if err != nil {
 		return nil, err
 	}
@@ -441,9 +442,8 @@ func (h *ContractHandler) meterGasUsage(res *types.Result) error {
 	return h.backend.MeterComputation(environment.ComputationKindEVMGasUsage, uint(res.GasConsumed))
 }
 
-func (h *ContractHandler) emitEvent(event *types.Event) error {
-	location := common.NewAddressLocation(nil, common.Address(h.evmContractAddress), "EVM")
-	ev, err := event.Payload.ToCadence(location)
+func (h *ContractHandler) emitEvent(event *events.Event) error {
+	ev, err := event.Payload.ToCadence(h.flowChainID)
 	if err != nil {
 		return err
 	}
@@ -544,7 +544,7 @@ func (h *ContractHandler) executeAndHandleCall(
 	}
 
 	err = h.emitEvent(
-		types.NewTransactionEvent(res, encoded, bp.Height),
+		events.NewTransactionEvent(res, encoded, bp.Height),
 	)
 	if err != nil {
 		return nil, err
