@@ -277,11 +277,11 @@ func (h *ContractHandler) commitBlockProposal() error {
 	}
 
 	// report metrics
-	tb, _, err := types.ConvertBalanceToUFix64(bp.TotalSupply)
-	if err != nil {
-		return err
-	}
-	h.backend.EVMBlockExecuted(len(bp.TxHashes), bp.TotalGasUsed, uint64(tb))
+	h.backend.EVMBlockExecuted(
+		len(bp.TxHashes),
+		bp.TotalGasUsed,
+		types.UnsafeCastOfBalanceToFloat64(bp.TotalSupply),
+	)
 
 	return nil
 }

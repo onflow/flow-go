@@ -10,7 +10,7 @@ type EVMMetrics struct {
 }
 
 // EVMBlockExecuted provides a mock function with given fields: txCount, totalGasUsed, totalSupplyInFlow
-func (_m *EVMMetrics) EVMBlockExecuted(txCount int, totalGasUsed uint64, totalSupplyInFlow uint64) {
+func (_m *EVMMetrics) EVMBlockExecuted(txCount int, totalGasUsed uint64, totalSupplyInFlow float64) {
 	_m.Called(txCount, totalGasUsed, totalSupplyInFlow)
 }
 

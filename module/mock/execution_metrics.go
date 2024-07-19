@@ -22,7 +22,7 @@ func (_m *ExecutionMetrics) ChunkDataPackRequestProcessed() {
 }
 
 // EVMBlockExecuted provides a mock function with given fields: txCount, totalGasUsed, totalSupplyInFlow
-func (_m *ExecutionMetrics) EVMBlockExecuted(txCount int, totalGasUsed uint64, totalSupplyInFlow uint64) {
+func (_m *ExecutionMetrics) EVMBlockExecuted(txCount int, totalGasUsed uint64, totalSupplyInFlow float64) {
 	_m.Called(txCount, totalGasUsed, totalSupplyInFlow)
 }
 

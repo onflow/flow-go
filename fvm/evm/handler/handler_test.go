@@ -1412,7 +1412,7 @@ func TestHandler_Metrics(t *testing.T) {
 				require.Equal(t, 1, coaCounter)
 
 				// form block
-				backend.EVMBlockExecutedFunc = func(txCount int, gasUsed uint64, totalSupply uint64) {
+				backend.EVMBlockExecutedFunc = func(txCount int, gasUsed uint64, totalSupply float64) {
 					require.Equal(t, 4, txCount)
 					require.Equal(t, result.GasConsumed*4, gasUsed)
 					require.Equal(t, uint64(0), totalSupply)

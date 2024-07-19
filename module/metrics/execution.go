@@ -1041,11 +1041,11 @@ func (ec *ExecutionCollector) EVMTransactionExecuted(
 func (ec *ExecutionCollector) EVMBlockExecuted(
 	txCount int,
 	totalGasUsed uint64,
-	totalSupplyInFlow uint64,
+	totalSupplyInFlow float64,
 ) {
 	ec.evmBlockTxCount.Observe(float64(totalGasUsed))
 	ec.evmBlockGasUsed.Observe(float64(totalGasUsed))
-	ec.evmBlockTotalSupply.Set(float64(totalSupplyInFlow))
+	ec.evmBlockTotalSupply.Set(totalSupplyInFlow)
 }
 
 func (ec *ExecutionCollector) UpdateCollectionMaxHeight(height uint64) {

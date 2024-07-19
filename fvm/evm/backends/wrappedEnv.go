@@ -169,7 +169,7 @@ func (we *WrappedEnvironment) EVMTransactionExecuted(
 func (we *WrappedEnvironment) EVMBlockExecuted(
 	txCount int,
 	totalGasUsed uint64,
-	totalSupplyInFlow uint64,
+	totalSupplyInFlow float64,
 ) {
 	we.env.EVMBlockExecuted(txCount, totalGasUsed, totalSupplyInFlow)
 }

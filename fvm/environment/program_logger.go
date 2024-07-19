@@ -16,7 +16,7 @@ import (
 type EVMMetricsReporter interface {
 	SetNumberOfDeployedCOAs(count uint64)
 	EVMTransactionExecuted(gasUsed uint64, isDirectCall bool, failed bool)
-	EVMBlockExecuted(txCount int, totalGasUsed uint64, totalSupplyInFlow uint64)
+	EVMBlockExecuted(txCount int, totalGasUsed uint64, totalSupplyInFlow float64)
 }
 
 // RuntimeMetricsReporter captures and reports runtime metrics to back to the execution
@@ -67,7 +67,7 @@ func (NoopMetricsReporter) SetNumberOfDeployedCOAs(_ uint64) {}
 func (NoopMetricsReporter) EVMTransactionExecuted(_ uint64, _ bool, _ bool) {}
 
 // EVMBlockExecuted is a noop
-func (NoopMetricsReporter) EVMBlockExecuted(_ int, _ uint64, _ uint64) {}
+func (NoopMetricsReporter) EVMBlockExecuted(_ int, _ uint64, _ float64) {}
 
 type ProgramLoggerParams struct {
 	zerolog.Logger

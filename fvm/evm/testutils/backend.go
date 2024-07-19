@@ -538,7 +538,7 @@ func (tt *TestTracer) ExpectedSpan(t *testing.T, expected trace.SpanName) {
 type TestMetricsReporter struct {
 	SetNumberOfDeployedCOAsFunc func(uint64)
 	EVMTransactionExecutedFunc  func(uint64, bool, bool)
-	EVMBlockExecutedFunc        func(int, uint64, uint64)
+	EVMBlockExecutedFunc        func(int, uint64, float64)
 }
 
 var _ environment.EVMMetricsReporter = &TestMetricsReporter{}
@@ -555,7 +555,7 @@ func (tmr *TestMetricsReporter) EVMTransactionExecuted(gasUsed uint64, isDirectC
 		tmr.EVMTransactionExecutedFunc(gasUsed, isDirectCall, failed)
 	}
 }
-func (tmr *TestMetricsReporter) EVMBlockExecuted(txCount int, totalGasUsed uint64, totalSupplyInFlow uint64) {
+func (tmr *TestMetricsReporter) EVMBlockExecuted(txCount int, totalGasUsed uint64, totalSupplyInFlow float64) {
 	// call the method if available otherwise skip
 	if tmr.EVMBlockExecutedFunc != nil {
 		tmr.EVMBlockExecutedFunc(txCount, totalGasUsed, totalSupplyInFlow)

@@ -829,7 +829,7 @@ type EVMMetrics interface {
 	// EVMTransactionExecuted reports the gas used when executing an evm transaction
 	EVMTransactionExecuted(gasUsed uint64, isDirectCall bool, failed bool)
 	// EVMBlockExecuted reports the block size, total gas used and total supply when executing an evm block
-	EVMBlockExecuted(txCount int, totalGasUsed uint64, totalSupplyInFlow uint64)
+	EVMBlockExecuted(txCount int, totalGasUsed uint64, totalSupplyInFlow float64)
 }
 
 type ProviderMetrics interface {
