@@ -34,6 +34,9 @@ func TestBlockHashList(t *testing.T) {
 				require.NoError(t, err)
 				require.Equal(t, uint64(0), bhl.MinAvailableHeight())
 				require.Equal(t, uint64(i), bhl.MaxAvailableHeight())
+				h, err := bhl.LastAddedBlockHash()
+				require.NoError(t, err)
+				require.Equal(t, gethCommon.Hash{byte(i)}, h)
 			}
 
 			// check the value for all of them

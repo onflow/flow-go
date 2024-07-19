@@ -249,7 +249,7 @@ func (bhl *BlockHashList) storeMetaData() error {
 	pos += countEncodingSize
 
 	// encode height
-	binary.BigEndian.PutUint64(buffer[pos:], uint64(bhl.height))
+	binary.BigEndian.PutUint64(buffer[pos:], bhl.height)
 
 	// store the encoded data into backend
 	return bhl.backend.SetValue(
