@@ -1415,7 +1415,7 @@ func TestHandler_Metrics(t *testing.T) {
 				backend.EVMBlockExecutedFunc = func(txCount int, gasUsed uint64, totalSupply float64) {
 					require.Equal(t, 4, txCount)
 					require.Equal(t, result.GasConsumed*4, gasUsed)
-					require.Equal(t, uint64(0), totalSupply)
+					require.Equal(t, float64(0), totalSupply)
 					called += 1
 				}
 				handler.CommitBlockProposal()
