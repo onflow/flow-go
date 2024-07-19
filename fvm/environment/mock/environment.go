@@ -481,9 +481,9 @@ func (_m *Environment) EVMBlockExecuted(txCount int, totalGasUsed uint64, totalS
 	_m.Called(txCount, totalGasUsed, totalSupplyInFlow)
 }
 
-// EVMTransactionExecuted provides a mock function with given fields: duration, isDirectCall, gasUsed
-func (_m *Environment) EVMTransactionExecuted(duration time.Duration, isDirectCall bool, gasUsed uint64) {
-	_m.Called(duration, isDirectCall, gasUsed)
+// EVMTransactionExecuted provides a mock function with given fields: gasUsed, isDirectCall, failed
+func (_m *Environment) EVMTransactionExecuted(gasUsed uint64, isDirectCall bool, failed bool) {
+	_m.Called(gasUsed, isDirectCall, failed)
 }
 
 // EmitEvent provides a mock function with given fields: _a0
