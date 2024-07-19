@@ -67,6 +67,11 @@ func (s *BaseSuite) SetupTest() {
 		s.Log.Info().Msg("================> Finish SetupTest")
 	}()
 
+	accessConfig := []func(*testnet.NodeConfig){
+		testnet.WithLogLevel(zerolog.WarnLevel),
+		testnet.WithAdditionalFlag("--supports-observer=true"),
+	}
+
 	collectionConfigs := []func(*testnet.NodeConfig){
 		testnet.WithAdditionalFlag("--hotstuff-proposal-duration=100ms"),
 		testnet.WithLogLevel(zerolog.WarnLevel)}
@@ -76,7 +81,7 @@ func (s *BaseSuite) SetupTest() {
 		testnet.WithAdditionalFlag("--cruise-ctl-enabled=false"), // disable cruise control for integration tests
 		testnet.WithAdditionalFlag(fmt.Sprintf("--required-verification-seal-approvals=%d", s.RequiredSealApprovals)),
 		testnet.WithAdditionalFlag(fmt.Sprintf("--required-construction-seal-approvals=%d", s.RequiredSealApprovals)),
-		testnet.WithLogLevel(zerolog.ErrorLevel)}
+		testnet.WithLogLevel(zerolog.WarnLevel)}
 
 	// a ghost node masquerading as an access node
 	s.ghostID = unittest.IdentifierFixture()
@@ -87,14 +92,14 @@ func (s *BaseSuite) SetupTest() {
 		testnet.AsGhost())
 
 	confs := []testnet.NodeConfig{
-		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.ErrorLevel)),
-		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.ErrorLevel)),
+		testnet.NewNodeConfig(flow.RoleAccess, accessConfig...),
+		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.WarnLevel)),
 		testnet.NewNodeConfig(flow.RoleCollection, collectionConfigs...),
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
-		testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.ErrorLevel), testnet.WithAdditionalFlag("--extensive-logging=true")),
-		testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.ErrorLevel)),
-		testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.ErrorLevel)),
+		testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.WarnLevel), testnet.WithAdditionalFlag("--extensive-logging=true")),
+		testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.WarnLevel)),
+		testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.WarnLevel)),
 		ghostNode,
 	}
 
@@ -115,7 +120,7 @@ func (s *BaseSuite) SetupTest() {
 
 	s.Client = client
 
-	// Log network info periodically to aid in debugging future flaky tests
+	// log network info periodically to aid in debugging future flaky tests
 	go lib.LogStatusPeriodically(s.T(), s.Ctx, s.Log, s.Client, 5*time.Second)
 }
 
