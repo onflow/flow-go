@@ -87,6 +87,14 @@ type ExecutionCollector struct {
 	maxCollectionHeight                     prometheus.Gauge
 	computationResultUploadedCount          prometheus.Counter
 	computationResultUploadRetriedCount     prometheus.Counter
+	numberOfDeployedCOAs                    prometheus.Gauge
+	evmBlockTotalSupply                     prometheus.Gauge
+	totalExecutedEVMTransactionsCounter     prometheus.Counter
+	totalExecutedEVMDirectCallsCounter      prometheus.Counter
+	evmTransactionExecutionTime             prometheus.Histogram
+	evmTransactionGasUsed                   prometheus.Histogram
+	evmBlockTxCount                         prometheus.Histogram
+	evmBlockGasUsed                         prometheus.Histogram
 }
 
 func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
@@ -695,11 +703,64 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 		}),
 
 		maxCollectionHeightData: counters.NewMonotonousCounter(0),
+
 		maxCollectionHeight: prometheus.NewGauge(prometheus.GaugeOpts{
 			Name:      "max_collection_height",
 			Namespace: namespaceExecution,
 			Subsystem: subsystemIngestion,
 			Help:      "gauge to track the maximum block height of collections received",
+		}),
+
+		numberOfDeployedCOAs: promauto.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespaceExecution,
+			Subsystem: subsystemEVM,
+			Name:      "number_of_deployed_coas",
+			Help:      "the number of deployed coas",
+		}),
+
+		evmBlockTotalSupply: promauto.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespaceExecution,
+			Subsystem: subsystemEVM,
+			Name:      "evm_block_total_supply",
+			Help:      "the total amount of flow deposited to EVM (in FLOW)",
+		}),
+
+		totalExecutedEVMTransactionsCounter: promauto.NewCounter(prometheus.CounterOpts{
+			Namespace: namespaceExecution,
+			Subsystem: subsystemEVM,
+			Name:      "total_executed_evm_transaction_count",
+			Help:      "the total number of executed evm transactions (including direct calls)",
+		}),
+
+		totalExecutedEVMDirectCallsCounter: promauto.NewCounter(prometheus.CounterOpts{
+			Namespace: namespaceExecution,
+			Subsystem: subsystemEVM,
+			Name:      "total_executed_evm_direct_call_count",
+			Help:      "the total number of executed evm direct calls",
+		}),
+
+		evmTransactionExecutionTime: promauto.NewHistogram(prometheus.HistogramOpts{
+			Namespace: namespaceExecution,
+			Subsystem: subsystemRuntime,
+			Name:      "evm_transaction_execution_time_milliseconds",
+			Help:      "the total time spent on evm transaction execution in milliseconds",
+			Buckets:   prometheus.ExponentialBuckets(1, 2, 10),
+		}),
+
+		evmTransactionGasUsed: promauto.NewHistogram(prometheus.HistogramOpts{
+			Namespace: namespaceExecution,
+			Subsystem: subsystemEVM,
+			Name:      "evm_transaction_gas_used",
+			Help:      "the total amount of gas used by a transaction",
+			Buckets:   prometheus.ExponentialBuckets(20_000, 2, 8),
+		}),
+
+		evmBlockTxCount: promauto.NewHistogram(prometheus.HistogramOpts{
+			Namespace: namespaceExecution,
+			Subsystem: subsystemEVM,
+			Name:      "evm_block_transaction_counts",
+			Help:      "the total number of transactions per evm block",
+			Buckets:   prometheus.ExponentialBuckets(1, 2, 8),
 		}),
 	}
 
@@ -957,6 +1018,33 @@ func (ec *ExecutionCollector) RuntimeTransactionProgramsCacheMiss() {
 
 func (ec *ExecutionCollector) RuntimeTransactionProgramsCacheHit() {
 	ec.programsCacheHit.Inc()
+}
+
+func (ec *ExecutionCollector) SetNumberOfDeployedCOAs(count uint64) {
+	ec.numberOfDeployedCOAs.Set(float64(count))
+}
+
+func (ec *ExecutionCollector) EVMTransactionExecuted(
+	duration time.Duration,
+	isDirectCall bool,
+	gasUsed uint64,
+) {
+	ec.totalExecutedEVMTransactionsCounter.Inc()
+	if isDirectCall {
+		ec.totalExecutedEVMDirectCallsCounter.Inc()
+	}
+	ec.evmTransactionExecutionTime.Observe(float64(duration.Milliseconds()))
+	ec.evmTransactionGasUsed.Observe(float64(gasUsed))
+}
+
+func (ec *ExecutionCollector) EVMBlockExecuted(
+	txCount int,
+	totalGasUsed uint64,
+	totalSupplyInFlow uint64,
+) {
+	ec.evmBlockTxCount.Observe(float64(totalGasUsed))
+	ec.evmBlockGasUsed.Observe(float64(totalGasUsed))
+	ec.evmBlockTotalSupply.Set(float64(totalSupplyInFlow))
 }
 
 func (ec *ExecutionCollector) UpdateCollectionMaxHeight(height uint64) {

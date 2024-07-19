@@ -199,6 +199,9 @@ func (nc *NoopCollector) RuntimeTransactionInterpreted(dur time.Duration)       
 func (nc *NoopCollector) RuntimeSetNumberOfAccounts(count uint64)                               {}
 func (nc *NoopCollector) RuntimeTransactionProgramsCacheMiss()                                  {}
 func (nc *NoopCollector) RuntimeTransactionProgramsCacheHit()                                   {}
+func (nc *NoopCollector) SetNumberOfDeployedCOAs(_ uint64)                                      {}
+func (nc *NoopCollector) EVMTransactionExecuted(_ time.Duration, _ bool, _ uint64)              {}
+func (nc *NoopCollector) EVMBlockExecuted(_ int, _ uint64, _ uint64)                            {}
 func (nc *NoopCollector) ScriptExecuted(dur time.Duration, size int)                            {}
 func (nc *NoopCollector) ScriptExecutionErrorLocal()                                            {}
 func (nc *NoopCollector) ScriptExecutionErrorOnExecutionNode()                                  {}

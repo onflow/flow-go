@@ -823,6 +823,15 @@ type RuntimeMetrics interface {
 	RuntimeTransactionProgramsCacheHit()
 }
 
+type EVMMetrics interface {
+	// SetNumberOfDeployedCOAs sets the total number of deployed COAs
+	SetNumberOfDeployedCOAs(count uint64)
+	// EVMTransactionExecuted reports the time spent and gas used when executing an evm transaction
+	EVMTransactionExecuted(duration time.Duration, isDirectCall bool, gasUsed uint64)
+	// EVMTransactionExecuted reports the block size, total gas used and total supply when executing an evm block
+	EVMBlockExecuted(txCount int, totalGasUsed uint64, totalSupplyInFlow uint64)
+}
+
 type ProviderMetrics interface {
 	// ChunkDataPackRequestProcessed is executed every time a chunk data pack request is picked up for processing at execution node.
 	// It increases the request processed counter by one.
@@ -947,6 +956,7 @@ func (stats *BlockExecutionResultStats) Add(other CollectionExecutionResultStats
 type ExecutionMetrics interface {
 	LedgerMetrics
 	RuntimeMetrics
+	EVMMetrics
 	ProviderMetrics
 	WALMetrics
 
