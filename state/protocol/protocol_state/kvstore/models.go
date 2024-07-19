@@ -2,6 +2,7 @@ package kvstore
 
 import (
 	"fmt"
+	"github.com/onflow/flow-go/module/irrecoverable"
 
 	clone "github.com/huandu/go-clone/generic" //nolint:goimports
 
@@ -206,12 +207,17 @@ func NewDefaultKVStore(finalizationSafetyThreshold uint64, epochStateID flow.Ide
 // NewKVStoreV0 constructs a KVStore using the v0 model. This is used to test
 // version upgrades, from v0 to v1.
 func newKVStoreV0(finalizationSafetyThreshold uint64, epochStateID flow.Identifier) (*Modelv0, error) {
-	return &Modelv0{
+	model := &Modelv0{
 		UpgradableModel:            UpgradableModel{},
 		EpochStateID:               epochStateID,
 		EpochCommitSafetyThreshold: finalizationSafetyThreshold,
-		EpochExtensionViewCount:    defaultEpochExtensionViewCount,
-	}, nil
+	}
+	// use a setter to ensure the default value is valid and is not accidentally lower than the safety threshold.
+	err := model.SetEpochExtensionViewCount(defaultEpochExtensionViewCount)
+	if err != nil {
+		return nil, irrecoverable.NewExceptionf("could not set default epoch extension view count: %s", err.Error())
+	}
+	return model, nil
 }
 
 // NewKVStoreV0 constructs a KVStore using the v0 model. This is used to test
