@@ -60,5 +60,6 @@ func TestTracker(t *testing.T) {
 	expectedEncoded, err := apc.Encode()
 	require.NoError(t, err)
 	encoded, err := tracker.CapturedCalls()
+	require.NoError(t, err)
 	require.Equal(t, expectedEncoded, encoded)
 }

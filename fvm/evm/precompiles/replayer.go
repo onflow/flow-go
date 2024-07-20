@@ -14,8 +14,6 @@ var (
 	errInvalidPrecompiledContractCalls = fmt.Errorf("invalid list of precompiled contract calls")
 	// errUnexpectedCall is returned when a call to the precompile is not expected
 	errUnexpectedCall = fmt.Errorf("unexpected call")
-	// this error is returned where more calls were expected before CapturedCalls call
-	errMoreCallsWereExpected = fmt.Errorf("expecting more call")
 )
 
 // AggregatedPrecompiledCallsToPrecompiledContracts
