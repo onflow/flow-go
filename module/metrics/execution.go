@@ -719,13 +719,6 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 			Help:      "the number of deployed coas",
 		}),
 
-		evmBlockTotalSupply: promauto.NewGauge(prometheus.GaugeOpts{
-			Namespace: namespaceExecution,
-			Subsystem: subsystemEVM,
-			Name:      "evm_block_total_supply",
-			Help:      "the total amount of flow deposited to EVM (in FLOW)",
-		}),
-
 		totalExecutedEVMTransactionsCounter: promauto.NewCounter(prometheus.CounterOpts{
 			Namespace: namespaceExecution,
 			Subsystem: subsystemEVM,
@@ -768,6 +761,21 @@ func NewExecutionCollector(tracer module.Tracer) *ExecutionCollector {
 			Name:      "evm_block_transaction_counts",
 			Help:      "the total number of transactions per evm block",
 			Buckets:   prometheus.ExponentialBuckets(1, 2, 8),
+		}),
+
+		evmBlockGasUsed: promauto.NewHistogram(prometheus.HistogramOpts{
+			Namespace: namespaceExecution,
+			Subsystem: subsystemEVM,
+			Name:      "evm_block_gas_used",
+			Help:      "the total amount of gas used by a block",
+			Buckets:   prometheus.ExponentialBuckets(100_000, 2, 8),
+		}),
+
+		evmBlockTotalSupply: promauto.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespaceExecution,
+			Subsystem: subsystemEVM,
+			Name:      "evm_block_total_supply",
+			Help:      "the total amount of flow deposited to EVM (in FLOW)",
 		}),
 	}
 
