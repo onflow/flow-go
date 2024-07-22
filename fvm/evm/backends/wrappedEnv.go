@@ -185,6 +185,26 @@ func (we *WrappedEnvironment) StartChildSpan(
 	return we.env.StartChildSpan(name, options...)
 }
 
+func (we *WrappedEnvironment) SetNumberOfDeployedCOAs(count uint64) {
+	we.env.SetNumberOfDeployedCOAs(count)
+}
+
+func (we *WrappedEnvironment) EVMTransactionExecuted(
+	gasUsed uint64,
+	isDirectCall bool,
+	failed bool,
+) {
+	we.env.EVMTransactionExecuted(gasUsed, isDirectCall, failed)
+}
+
+func (we *WrappedEnvironment) EVMBlockExecuted(
+	txCount int,
+	totalGasUsed uint64,
+	totalSupplyInFlow float64,
+) {
+	we.env.EVMBlockExecuted(txCount, totalGasUsed, totalSupplyInFlow)
+}
+
 func handleEnvironmentError(err error) error {
 	if err == nil {
 		return nil

@@ -30,8 +30,8 @@ type Config struct {
 	TxContext *gethVM.TxContext
 	// base unit of gas for direct calls
 	DirectCallBaseGasUsage uint64
-	// list of precompiles
-	ExtraPrecompiles []types.PrecompiledContract
+	// captures extra precompiled calls
+	PCTracker *CallTracker
 }
 
 // ChainRules returns the chain rules
@@ -99,6 +99,7 @@ func defaultConfig() *Config {
 			},
 			GetPrecompile: gethCore.GetPrecompile,
 		},
+		PCTracker: NewCallTracker(),
 	}
 }
 
@@ -190,7 +191,9 @@ func WithExtraPrecompiledContracts(precompiledContracts []types.PrecompiledContr
 	return func(c *Config) *Config {
 		extraPreCompMap := make(map[gethCommon.Address]gethVM.PrecompiledContract)
 		for _, pc := range precompiledContracts {
-			extraPreCompMap[pc.Address().ToCommon()] = pc
+			// wrap pcs for tracking
+			wpc := c.PCTracker.RegisterPrecompiledContract(pc)
+			extraPreCompMap[pc.Address().ToCommon()] = wpc
 		}
 		c.BlockContext.GetPrecompile = func(rules gethParams.Rules, addr gethCommon.Address) (gethVM.PrecompiledContract, bool) {
 			prec, found := extraPreCompMap[addr]
@@ -199,7 +202,6 @@ func WithExtraPrecompiledContracts(precompiledContracts []types.PrecompiledContr
 			}
 			return gethCore.GetPrecompile(rules, addr)
 		}
-		c.ExtraPrecompiles = precompiledContracts
 		return c
 	}
 }

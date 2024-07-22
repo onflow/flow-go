@@ -20,6 +20,7 @@ const (
 )
 
 // BlockHashList holds the last `capacity` number of block hashes in the list
+// TODO: Clean up, BlockHashList would become deprecated when previewnet is out.
 type BlockHashList struct {
 	blocks   []gethCommon.Hash
 	capacity int
