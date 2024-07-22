@@ -268,7 +268,6 @@ func (bl *BlockView) DryRunTransaction(
 	}
 
 	// use the from as the signer
-	proc.evm.TxContext.Origin = from
 	msg.From = from
 	// we need to skip nonce check for dry run
 	msg.SkipAccountChecks = true
@@ -343,23 +342,26 @@ func (proc *procedure) mintTo(
 	call *types.DirectCall,
 	txHash gethCommon.Hash,
 ) (*types.Result, error) {
+	// convert value into uint256
 	value, overflow := uint256.FromBig(call.Value)
 	if overflow {
 		return nil, types.ErrInvalidBalance
 	}
 
-	bridge := call.From.ToCommon()
-
 	// create bridge account if not exist
+	bridge := call.From.ToCommon()
 	if !proc.state.Exist(bridge) {
 		proc.state.CreateAccount(bridge)
 	}
 
 	// add balance to the bridge account before transfer
 	proc.state.AddBalance(bridge, value, tracing.BalanceIncreaseWithdrawal)
+	// check state errors
+	if err := proc.state.Error(); err != nil {
+		return nil, err
+	}
 
 	msg := call.Message()
-	proc.evm.TxContext.Origin = msg.From
 	// withdraw the amount and move it to the bridge account
 	res, err := proc.run(msg, txHash, 0, types.DirectCallTxType)
 	if err != nil {
@@ -396,7 +398,6 @@ func (proc *procedure) withdrawFrom(
 
 	// withdraw the amount and move it to the bridge account
 	msg := call.Message()
-	proc.evm.TxContext.Origin = msg.From
 	res, err := proc.run(msg, txHash, 0, types.DirectCallTxType)
 	if err != nil {
 		return res, err
@@ -549,7 +550,6 @@ func (proc *procedure) runDirect(
 ) (*types.Result, error) {
 	// set the nonce for the message (needed for some operations like deployment)
 	msg.Nonce = proc.state.GetNonce(msg.From)
-	proc.evm.TxContext.Origin = msg.From
 	res, err := proc.run(msg, txHash, txIndex, types.DirectCallTxType)
 	if err != nil {
 		return nil, err
@@ -579,6 +579,9 @@ func (proc *procedure) run(
 	if msg.Value.Sign() < 0 {
 		return nil, types.ErrInvalidBalance
 	}
+
+	// set the origin
+	proc.evm.TxContext.Origin = msg.From
 
 	// reset precompile tracking in case
 	proc.config.PCTracker.Reset()
