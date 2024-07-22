@@ -100,6 +100,7 @@ func (bv *ReadOnlyBlockView) CodeHashOf(address types.Address) ([]byte, error) {
 }
 
 // BlockView allows mutation of the evm state as part of a block
+// current version only accepts only a single interaction per block view.
 type BlockView struct {
 	config   *Config
 	rootAddr flow.Address
@@ -137,11 +138,13 @@ func (bl *BlockView) DirectCall(call *types.DirectCall) (*types.Result, error) {
 func (bl *BlockView) RunTransaction(
 	tx *gethTypes.Transaction,
 ) (*types.Result, error) {
+	// create a new procedure
 	proc, err := bl.newProcedure()
 	if err != nil {
 		return nil, err
 	}
 
+	// constructs a core.message from the tx
 	msg, err := gethCore.TransactionToMessage(
 		tx,
 		GetSigner(bl.config),
@@ -150,11 +153,6 @@ func (bl *BlockView) RunTransaction(
 		// this is not a fatal error (e.g. due to bad signature)
 		// not a valid transaction
 		return types.NewInvalidResult(tx, err), nil
-	}
-
-	// negative amounts are not acceptable.
-	if msg.Value.Sign() < 0 {
-		return nil, types.ErrInvalidBalance
 	}
 
 	// update tx context origin
@@ -187,11 +185,6 @@ func (bl *BlockView) BatchRunTransactions(txs []*gethTypes.Transaction) ([]*type
 		if err != nil {
 			batchResults[i] = types.NewInvalidResult(tx, err)
 			continue
-		}
-
-		// negative amounts are not acceptable.
-		if msg.Value.Sign() < 0 {
-			return nil, types.ErrInvalidBalance
 		}
 
 		// update tx context origin
@@ -234,10 +227,6 @@ func (bl *BlockView) DryRunTransaction(
 		GetSigner(bl.config),
 		proc.config.BlockContext.BaseFee,
 	)
-	// negative amounts are not acceptable.
-	if msg.Value.Sign() < 0 {
-		return nil, types.ErrInvalidBalance
-	}
 
 	// we can ignore invalid signature errors since we don't expect signed transactions
 	if !errors.Is(err, gethTypes.ErrInvalidSig) {
@@ -320,11 +309,6 @@ func (proc *procedure) mintTo(
 	call *types.DirectCall,
 	txHash gethCommon.Hash,
 ) (*types.Result, error) {
-	// negative amounts are not acceptable.
-	if call.Value.Sign() < 0 {
-		return nil, types.ErrInvalidBalance
-	}
-
 	value, overflow := uint256.FromBig(call.Value)
 	if overflow {
 		return nil, types.ErrInvalidBalance
@@ -364,11 +348,6 @@ func (proc *procedure) withdrawFrom(
 	call *types.DirectCall,
 	txHash gethCommon.Hash,
 ) (*types.Result, error) {
-	// negative amounts are not acceptable.
-	if call.Value.Sign() < 0 {
-		return nil, types.ErrInvalidBalance
-	}
-
 	value, overflow := uint256.FromBig(call.Value)
 	if overflow {
 		return nil, types.ErrInvalidBalance
@@ -562,6 +541,11 @@ func (proc *procedure) run(
 		TxHash: txHash,
 	}
 
+	// negative amounts are not acceptable.
+	if msg.Value.Sign() < 0 {
+		return nil, types.ErrInvalidBalance
+	}
+
 	// reset precompile tracking in case
 	proc.config.PCTracker.Reset()
 	gasPool := (*gethCore.GasPool)(&proc.config.BlockContext.GasLimit)
@@ -582,7 +566,7 @@ func (proc *procedure) run(
 		return &res, nil
 	}
 
-	// if prechecks are passed, the exec result won't be nil
+	// if pre-checks are passed, the exec result won't be nil
 	if execResult != nil {
 		res.GasConsumed = execResult.UsedGas
 		res.GasRefund = proc.state.GetRefund()
@@ -591,6 +575,7 @@ func (proc *procedure) run(
 		if err != nil {
 			return nil, err
 		}
+
 		// we need to capture the returned value no matter the status
 		// if the tx is reverted the error message is returned as returned value
 		res.ReturnedData = execResult.ReturnData
