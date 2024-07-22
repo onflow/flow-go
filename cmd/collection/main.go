@@ -94,7 +94,6 @@ func main() {
 		followerCore          *hotstuff.FollowerLoop // follower hotstuff logic
 		followerEng           *followereng.ComplianceEngine
 		colMetrics            module.CollectionMetrics
-		txValidationMtrics    module.TransactionValidationMetrics
 		machineAccountMetrics module.MachineAccountMetrics
 		err                   error
 
@@ -271,10 +270,6 @@ func main() {
 			colMetrics = metrics.NewCollectionCollector(node.Tracer)
 			return nil
 		}).
-		Module("transaction validation metrics", func(node *cmd.NodeConfig) error {
-			txValidationMtrics = metrics.NewTransactionValidationCollector()
-			return nil
-		}).
 		Module("machine account metrics", func(node *cmd.NodeConfig) error {
 			machineAccountMetrics = metrics.NewMachineAccountCollector(node.MetricsRegisterer, machineAccountInfo.FlowAddress())
 			return nil
@@ -431,7 +426,6 @@ func main() {
 				node.Metrics.Engine,
 				node.Metrics.Mempool,
 				colMetrics,
-				txValidationMtrics,
 				node.Me,
 				node.RootChainID.Chain(),
 				pools,

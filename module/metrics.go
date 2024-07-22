@@ -591,6 +591,7 @@ type CruiseCtlMetrics interface {
 }
 
 type CollectionMetrics interface {
+	TransactionValidationMetrics
 	// TransactionIngested is called when a new transaction is ingested by the
 	// node. It increments the total count of ingested transactions and starts
 	// a tx->col span for the transaction.
