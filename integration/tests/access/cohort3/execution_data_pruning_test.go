@@ -8,12 +8,13 @@ import (
 	"time"
 
 	badgerds "github.com/ipfs/go-ds-badger2"
-	sdk "github.com/onflow/flow-go-sdk"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+
+	sdk "github.com/onflow/flow-go-sdk"
 
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/model/flow"
