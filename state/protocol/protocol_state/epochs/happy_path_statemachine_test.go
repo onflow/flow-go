@@ -55,8 +55,8 @@ func (s *ProtocolStateMachineSuite) SetupTest() {
 
 // TestNewStateMachine tests if the constructor correctly setups invariants for HappyPathStateMachine.
 func (s *ProtocolStateMachineSuite) TestNewStateMachine() {
-	require.NotSame(s.T(), s.stateMachine.parentState, s.stateMachine.state, "except to take deep copy of parent state")
-	require.Nil(s.T(), s.stateMachine.parentState.NextEpoch)
+	require.NotSame(s.T(), s.stateMachine.parentEpochState, s.stateMachine.state, "except to take deep copy of parent state")
+	require.Nil(s.T(), s.stateMachine.parentEpochState.NextEpoch)
 	require.Nil(s.T(), s.stateMachine.state.NextEpoch)
 	require.Equal(s.T(), s.candidate.View, s.stateMachine.View())
 	require.Equal(s.T(), s.parentProtocolState, s.stateMachine.ParentState())

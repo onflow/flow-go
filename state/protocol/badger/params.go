@@ -131,12 +131,6 @@ func ReadGlobalParams(db *badger.DB) (*inmem.Params, error) {
 		return nil, fmt.Errorf("could not get spork root block height: %w", err)
 	}
 
-	var threshold uint64
-	err = db.View(operation.RetrieveEpochCommitSafetyThreshold(&threshold))
-	if err != nil {
-		return nil, fmt.Errorf("could not get epoch commit safety threshold")
-	}
-
 	var version uint
 	err = db.View(operation.RetrieveProtocolVersion(&version))
 	if err != nil {
@@ -150,11 +144,10 @@ func ReadGlobalParams(db *badger.DB) (*inmem.Params, error) {
 
 	return inmem.NewParams(
 		inmem.EncodableParams{
-			ChainID:                    root.ChainID,
-			SporkID:                    sporkID,
-			SporkRootBlockHeight:       sporkRootBlockHeight,
-			ProtocolVersion:            version,
-			EpochCommitSafetyThreshold: threshold,
+			ChainID:              root.ChainID,
+			SporkID:              sporkID,
+			SporkRootBlockHeight: sporkRootBlockHeight,
+			ProtocolVersion:      version,
 		},
 	), nil
 }
