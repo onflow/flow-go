@@ -174,9 +174,7 @@ func (p *Pruner) loop(ctx irrecoverable.SignalerContext, ready component.ReadyFu
 
 				err := p.updateFulfilledHeight(lowestHeight)
 				if err != nil {
-					p.logger.Fatal().Err(err).Msg("failed to set fulfilled height")
-					//TODO: check if Throw is needed here
-					//ctx.Throw(fmt.Errorf("failed to update lowest fulfilled height: %w", err))
+					ctx.Throw(fmt.Errorf("failed to update lowest fulfilled height: %w", err))
 				}
 			}
 			p.checkPrune(ctx)
@@ -193,7 +191,7 @@ func (p *Pruner) loop(ctx irrecoverable.SignalerContext, ready component.ReadyFu
 func (p *Pruner) lowestProducersHeight() uint64 {
 	var heights []uint64
 	for _, producer := range p.registeredProducers {
-		height := producer.LastProcessedHeight()
+		height := producer.HighestCompleteHeight()
 		heights = append(heights, height)
 	}
 	sort.Slice(heights, func(i, j int) bool { return heights[i] < heights[j] })

@@ -465,7 +465,7 @@ func (e *Engine) executeBlock(
 	}
 
 	if e.executionDataPruner != nil {
-		e.SetLastProcessedHeight(executableBlock.Height())
+		e.OnBlockProcessed(executableBlock.Height())
 	}
 
 	e.unit.Ctx()

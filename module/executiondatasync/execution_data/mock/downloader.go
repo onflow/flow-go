@@ -68,12 +68,12 @@ func (_m *Downloader) Get(ctx context.Context, rootID flow.Identifier) (*executi
 	return r0, r1
 }
 
-// LastProcessedHeight provides a mock function with given fields:
-func (_m *Downloader) LastProcessedHeight() uint64 {
+// HighestCompleteHeight provides a mock function with given fields:
+func (_m *Downloader) HighestCompleteHeight() uint64 {
 	ret := _m.Called()
 
 	if len(ret) == 0 {
-		panic("no return value specified for LastProcessedHeight")
+		panic("no return value specified for HighestCompleteHeight")
 	}
 
 	var r0 uint64
@@ -84,6 +84,11 @@ func (_m *Downloader) LastProcessedHeight() uint64 {
 	}
 
 	return r0
+}
+
+// OnBlockProcessed provides a mock function with given fields: _a0
+func (_m *Downloader) OnBlockProcessed(_a0 uint64) {
+	_m.Called(_a0)
 }
 
 // Ready provides a mock function with given fields:
@@ -122,11 +127,6 @@ func (_m *Downloader) Register(_a0 *engine.Notifier) error {
 	}
 
 	return r0
-}
-
-// SetLastProcessedHeight provides a mock function with given fields: _a0
-func (_m *Downloader) SetLastProcessedHeight(_a0 uint64) {
-	_m.Called(_a0)
 }
 
 // NewDownloader creates a new instance of Downloader. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.

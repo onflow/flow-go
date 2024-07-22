@@ -168,7 +168,7 @@ func (i *Indexer) onBlockIndexed(ctx irrecoverable.SignalerContext) {
 			ctx.Throw(err)
 		}
 
-		i.SetLastProcessedHeight(header.Height)
+		i.OnBlockProcessed(header.Height)
 	}
 	i.lastProcessedHeight.Store(highestIndexedHeight)
 }

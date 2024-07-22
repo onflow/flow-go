@@ -245,7 +245,7 @@ func (d *downloader) trackBlobs(blockID flow.Identifier, cids []cid.Cid) error {
 			return err
 		}
 
-		d.SetLastProcessedHeight(header.Height)
+		d.OnBlockProcessed(header.Height)
 
 		return nil
 	})

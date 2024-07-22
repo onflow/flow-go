@@ -39,7 +39,7 @@ func TestBasicPrune(t *testing.T) {
 	downloader.On("Register", mock.Anything).Return(nil).Once().Run(func(args mock.Arguments) {
 		notifier = args.Get(0).(*engine.Notifier)
 	})
-	downloader.On("LastProcessedHeight").
+	downloader.On("HighestCompleteHeight").
 		Return(uint64(16)).
 		Once()
 

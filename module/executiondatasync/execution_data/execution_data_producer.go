@@ -12,8 +12,8 @@ var ErrMultipleRegister = errors.New("producer may only be registered once")
 
 type ExecutionDataProducer interface {
 	Register(*engine.Notifier) error
-	SetLastProcessedHeight(uint64)
-	LastProcessedHeight() uint64
+	OnBlockProcessed(uint64)
+	HighestCompleteHeight() uint64
 }
 
 var _ ExecutionDataProducer = (*ExecutionDataProducerManager)(nil)
@@ -43,13 +43,13 @@ func (e *ExecutionDataProducerManager) Register(notifier *engine.Notifier) error
 	return nil
 }
 
-func (e *ExecutionDataProducerManager) SetLastProcessedHeight(height uint64) {
+func (e *ExecutionDataProducerManager) OnBlockProcessed(height uint64) {
 	e.lastProcessedHeight.Store(height)
 	if e.registered.Load() {
 		e.producerNotifier.Notify()
 	}
 }
 
-func (e *ExecutionDataProducerManager) LastProcessedHeight() uint64 {
+func (e *ExecutionDataProducerManager) HighestCompleteHeight() uint64 {
 	return e.lastProcessedHeight.Load()
 }
