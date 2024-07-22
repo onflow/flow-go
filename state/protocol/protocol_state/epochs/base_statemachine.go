@@ -10,11 +10,11 @@ import (
 // baseStateMachine implements common logic for evolving protocol state both in happy path and epoch fallback
 // operation modes. It partially implements `StateMachine` and is used as building block for more complex implementations.
 type baseStateMachine struct {
-	telemetry   protocol_state.StateMachineTelemetryConsumer
-	parentState *flow.RichEpochStateEntry
-	state       *flow.EpochStateEntry
-	ejector     ejector
-	view        uint64
+	telemetry        protocol_state.StateMachineTelemetryConsumer
+	parentEpochState *flow.RichEpochStateEntry
+	state            *flow.EpochStateEntry
+	ejector          ejector
+	view             uint64
 }
 
 // newBaseStateMachine creates a new instance of baseStateMachine and performs initialization of the internal ejector
@@ -39,11 +39,11 @@ func newBaseStateMachine(telemetry protocol_state.StateMachineTelemetryConsumer,
 		}
 	}
 	return &baseStateMachine{
-		telemetry:   telemetry,
-		view:        view,
-		parentState: parentState,
-		state:       state,
-		ejector:     ej,
+		telemetry:        telemetry,
+		view:             view,
+		parentEpochState: parentState,
+		state:            state,
+		ejector:          ej,
 	}, nil
 }
 
@@ -55,7 +55,7 @@ func newBaseStateMachine(telemetry protocol_state.StateMachineTelemetryConsumer,
 func (u *baseStateMachine) Build() (updatedState *flow.EpochStateEntry, stateID flow.Identifier, hasChanges bool) {
 	updatedState = u.state.Copy()
 	stateID = updatedState.ID()
-	hasChanges = stateID != u.parentState.ID()
+	hasChanges = stateID != u.parentEpochState.ID()
 	return
 }
 
@@ -67,7 +67,7 @@ func (u *baseStateMachine) View() uint64 {
 
 // ParentState returns parent protocol state associated with this state machine.
 func (u *baseStateMachine) ParentState() *flow.RichEpochStateEntry {
-	return u.parentState
+	return u.parentEpochState
 }
 
 // EjectIdentity updates the identity table by changing the node's participation status to 'ejected'

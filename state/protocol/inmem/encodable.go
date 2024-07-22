@@ -109,9 +109,8 @@ type EncodableCluster struct {
 
 // EncodableParams is the encoding format for protocol.GlobalParams
 type EncodableParams struct {
-	ChainID                    flow.ChainID
-	SporkID                    flow.Identifier
-	SporkRootBlockHeight       uint64
-	ProtocolVersion            uint
-	EpochCommitSafetyThreshold uint64
+	ChainID              flow.ChainID
+	SporkID              flow.Identifier
+	SporkRootBlockHeight uint64
+	ProtocolVersion      uint
 }

@@ -235,9 +235,13 @@ func TestClusters(t *testing.T) {
 	clusterQCs := unittest.QuorumCertificatesFromAssignments(setup.Assignments)
 	commit.ClusterQCs = flow.ClusterQCVoteDatasFromQCs(clusterQCs)
 	seal.ResultID = result.ID()
-	root.Payload.ProtocolStateID = kvstore.NewDefaultKVStore(
-		inmem.EpochProtocolStateFromServiceEvents(setup, commit).ID()).ID()
-
+	finalizationThreshold, err := protocol.DefaultEpochCommitSafetyThreshold(root.Header.ChainID)
+	require.NoError(t, err)
+	rootProtocolState, err := kvstore.NewDefaultKVStore(
+		finalizationThreshold,
+		inmem.EpochProtocolStateFromServiceEvents(setup, commit).ID())
+	require.NoError(t, err)
+	root.Payload.ProtocolStateID = rootProtocolState.ID()
 	rootSnapshot, err := inmem.SnapshotFromBootstrapState(root, result, seal, qc)
 	require.NoError(t, err)
 

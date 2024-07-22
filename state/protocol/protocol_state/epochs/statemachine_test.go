@@ -49,9 +49,8 @@ func (s *EpochStateMachineSuite) SetupTest() {
 	s.epochStateDB = storagemock.NewEpochProtocolStateEntries(s.T())
 	s.setupsDB = storagemock.NewEpochSetups(s.T())
 	s.commitsDB = storagemock.NewEpochCommits(s.T())
-	s.globalParams = protocolmock.NewGlobalParams(s.T())
-	s.globalParams.On("EpochCommitSafetyThreshold").Return(uint64(1_000))
 	s.parentState = protocolmock.NewKVStoreReader(s.T())
+	s.parentState.On("GetEpochCommitSafetyThreshold").Return(uint64(1_000))
 	s.parentEpochState = unittest.EpochStateFixture()
 	s.mutator = protocol_statemock.NewKVStoreMutator(s.T())
 	s.candidate = unittest.BlockHeaderFixture(unittest.HeaderWithView(s.parentEpochState.CurrentEpochSetup.FirstView + 1))
@@ -77,7 +76,6 @@ func (s *EpochStateMachineSuite) SetupTest() {
 	s.stateMachine, err = epochs.NewEpochStateMachine(
 		s.candidate.View,
 		s.candidate.ParentID,
-		s.globalParams,
 		s.setupsDB,
 		s.commitsDB,
 		s.epochStateDB,
@@ -180,7 +178,6 @@ func (s *EpochStateMachineSuite) TestEpochStateMachine_Constructor() {
 			stateMachine, err := epochs.NewEpochStateMachine(
 				candidate.View,
 				candidate.ParentID,
-				s.globalParams,
 				s.setupsDB,
 				s.commitsDB,
 				s.epochStateDB,
@@ -206,7 +203,6 @@ func (s *EpochStateMachineSuite) TestEpochStateMachine_Constructor() {
 			stateMachine, err := epochs.NewEpochStateMachine(
 				candidate.View,
 				candidate.ParentID,
-				s.globalParams,
 				s.setupsDB,
 				s.commitsDB,
 				s.epochStateDB,
@@ -238,7 +234,6 @@ func (s *EpochStateMachineSuite) TestEpochStateMachine_Constructor() {
 			stateMachine, err := epochs.NewEpochStateMachine(
 				candidate.View,
 				candidate.ParentID,
-				s.globalParams,
 				s.setupsDB,
 				s.commitsDB,
 				s.epochStateDB,
@@ -264,7 +259,6 @@ func (s *EpochStateMachineSuite) TestEpochStateMachine_Constructor() {
 			stateMachine, err := epochs.NewEpochStateMachine(
 				candidate.View,
 				candidate.ParentID,
-				s.globalParams,
 				s.setupsDB,
 				s.commitsDB,
 				s.epochStateDB,
@@ -293,7 +287,6 @@ func (s *EpochStateMachineSuite) TestEpochStateMachine_Constructor() {
 			stateMachine, err := epochs.NewEpochStateMachine(
 				candidate.View,
 				candidate.ParentID,
-				s.globalParams,
 				s.setupsDB,
 				s.commitsDB,
 				s.epochStateDB,
@@ -319,7 +312,6 @@ func (s *EpochStateMachineSuite) TestEpochStateMachine_Constructor() {
 			stateMachine, err := epochs.NewEpochStateMachine(
 				candidate.View,
 				candidate.ParentID,
-				s.globalParams,
 				s.setupsDB,
 				s.commitsDB,
 				s.epochStateDB,
@@ -345,7 +337,6 @@ func (s *EpochStateMachineSuite) TestEpochStateMachine_Constructor() {
 			stateMachine, err := epochs.NewEpochStateMachine(
 				s.candidate.View,
 				s.candidate.ParentID,
-				s.globalParams,
 				s.setupsDB,
 				s.commitsDB,
 				s.epochStateDB,
@@ -367,7 +358,6 @@ func (s *EpochStateMachineSuite) TestEpochStateMachine_Constructor() {
 			stateMachine, err := epochs.NewEpochStateMachine(
 				s.candidate.View,
 				s.candidate.ParentID,
-				s.globalParams,
 				s.setupsDB,
 				s.commitsDB,
 				s.epochStateDB,
@@ -393,7 +383,6 @@ func (s *EpochStateMachineSuite) TestEvolveState_InvalidEpochSetup() {
 		stateMachine, err := epochs.NewEpochStateMachine(
 			s.candidate.View,
 			s.candidate.ParentID,
-			s.globalParams,
 			s.setupsDB,
 			s.commitsDB,
 			s.epochStateDB,
@@ -441,7 +430,6 @@ func (s *EpochStateMachineSuite) TestEvolveState_InvalidEpochCommit() {
 		stateMachine, err := epochs.NewEpochStateMachine(
 			s.candidate.View,
 			s.candidate.ParentID,
-			s.globalParams,
 			s.setupsDB,
 			s.commitsDB,
 			s.epochStateDB,
@@ -530,7 +518,6 @@ func (s *EpochStateMachineSuite) TestEvolveStateTransitionToNextEpoch_WithInvali
 	happyPathTelemetryFactory.On("Execute", s.candidate.View).Return(happyPathTelemetry).Once()
 	fallbackTelemetryFactory.On("Execute", s.candidate.View).Return(fallbackPathTelemetry).Once()
 	stateMachine, err := epochs.NewEpochStateMachineFactory(
-		s.globalParams,
 		s.setupsDB,
 		s.commitsDB,
 		s.epochStateDB,

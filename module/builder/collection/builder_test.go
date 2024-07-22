@@ -87,19 +87,26 @@ func (suite *BuilderSuite) SetupTest() {
 	// ensure we don't enter a new epoch for tests that build many blocks
 	result.ServiceEvents[0].Event.(*flow.EpochSetup).FinalView = root.Header.View + 100000
 	seal.ResultID = result.ID()
-	root.Payload.ProtocolStateID = kvstore.NewDefaultKVStore(inmem.EpochProtocolStateFromServiceEvents(
+	finalizationThreshold, err := protocol.DefaultEpochCommitSafetyThreshold(root.Header.ChainID)
+	require.NoError(suite.T(), err)
+	rootProtocolState, err := kvstore.NewDefaultKVStore(finalizationThreshold, inmem.EpochProtocolStateFromServiceEvents(
 		result.ServiceEvents[0].Event.(*flow.EpochSetup),
 		result.ServiceEvents[1].Event.(*flow.EpochCommit),
-	).ID()).ID()
+	).ID())
+	require.NoError(suite.T(), err)
+	root.Payload.ProtocolStateID = rootProtocolState.ID()
 	rootSnapshot, err := inmem.SnapshotFromBootstrapState(root, result, seal, unittest.QuorumCertificateFixture(unittest.QCWithRootBlockID(root.ID())))
 	require.NoError(suite.T(), err)
 	suite.epochCounter = rootSnapshot.Encodable().SealingSegment.LatestProtocolStateEntry().EpochEntry.EpochCounter()
 
+	require.NoError(suite.T(), err)
 	clusterQC := unittest.QuorumCertificateFixture(unittest.QCWithRootBlockID(suite.genesis.ID()))
-	root.Payload.ProtocolStateID = kvstore.NewDefaultKVStore(inmem.EpochProtocolStateFromServiceEvents(
+	rootProtocolState, err = kvstore.NewDefaultKVStore(finalizationThreshold, inmem.EpochProtocolStateFromServiceEvents(
 		result.ServiceEvents[0].Event.(*flow.EpochSetup),
 		result.ServiceEvents[1].Event.(*flow.EpochCommit),
-	).ID()).ID()
+	).ID())
+	require.NoError(suite.T(), err)
+	root.Payload.ProtocolStateID = rootProtocolState.ID()
 	clusterStateRoot, err := clusterkv.NewStateRoot(suite.genesis, clusterQC, suite.epochCounter)
 	suite.Require().NoError(err)
 	clusterState, err := clusterkv.Bootstrap(suite.db, clusterStateRoot)
