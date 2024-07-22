@@ -93,8 +93,8 @@ func (dc *DirectCall) Message() *gethCore.Message {
 		GasPrice:  big.NewInt(0), // price is set to zero fo direct calls
 		GasTipCap: big.NewInt(0), // also known as maxPriorityFeePerGas (in GWei)
 		GasFeeCap: big.NewInt(0), // also known as maxFeePerGas (in GWei)
-		// AccessList:        tx.AccessList(), // TODO revisit this value, the cost matter but performance might
-		SkipAccountChecks: true, // this would let us not set the nonce
+		// AccessList:        tx.AccessList(), // TODO revisit this value, the cost doesn't matter but performance might
+		SkipAccountChecks: true, // this enables skipping the nonce check
 	}
 }
 
@@ -233,8 +233,8 @@ func NewDeployCallWithTargetAddress(
 	}
 }
 
-// NewCall constructs a new call
-func NewCall(
+// NewContractCall constructs a new contract call
+func NewContractCall(
 	caller Address,
 	to Address,
 	data Data,
