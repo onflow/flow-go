@@ -239,7 +239,7 @@ func (bl *BlockView) BatchRunTransactions(txs []*gethTypes.Transaction) ([]*type
 
 		// this clears state for any subsequent transaction runs
 		proc.state.Reset()
-
+		// collect result
 		batchResults[i] = res
 	}
 
@@ -333,7 +333,7 @@ func (proc *procedure) commit(finalize bool) error {
 	err := proc.state.Commit(finalize)
 	if err != nil {
 		// if known types (state errors) don't do anything and return
-		if types.IsAFatalError(err) || types.IsAStateError(err) {
+		if types.IsAFatalError(err) || types.IsAStateError(err) || types.IsABackendError(err) {
 			return err
 		}
 
@@ -439,8 +439,26 @@ func (proc *procedure) deployAt(
 	}
 
 	if proc.evm.Config.Tracer != nil {
-		proc.captureTraceBegin(0, gethVM.CREATE2, call.From.ToCommon(), call.To.ToCommon(), call.Data, call.GasLimit, call.Value)
-		defer proc.captureTraceEnd(0, call.GasLimit, call.GasLimit-res.GasConsumed, res.ReturnedData, res.VMError)
+		tracer := proc.evm.Config.Tracer
+		if tracer.OnEnter != nil {
+			tracer.OnEnter(0, byte(gethVM.CREATE2), call.From.ToCommon(), call.To.ToCommon(), call.Data, call.GasLimit, call.Value)
+		}
+		if tracer.OnGasChange != nil {
+			tracer.OnGasChange(0, call.GasLimit, gethTracing.GasChangeCallInitialBalance)
+		}
+
+		defer func() {
+			if call.GasLimit != 0 && tracer.OnGasChange != nil {
+				tracer.OnGasChange(call.GasLimit, 0, gethTracing.GasChangeCallLeftOverReturned)
+			}
+			if tracer.OnExit != nil {
+				var reverted bool
+				if res.VMError != nil && !errors.Is(res.VMError, gethVM.ErrCodeStoreOutOfGas) {
+					reverted = true
+				}
+				tracer.OnExit(0, res.ReturnedData, call.GasLimit-res.GasConsumed, gethVM.VMErrorFromErr(res.VMError), reverted)
+			}
+		}()
 	}
 
 	addr := call.To.ToCommon()
@@ -571,17 +589,21 @@ func (proc *procedure) run(
 		TxHash: txHash,
 	}
 
-	// negative amounts are not acceptable.
+	// Negative values are not acceptable
+	// although we check this condition on direct calls
+	// its worth an extra check here given some calls are
+	// coming from batch run, etc.
 	if msg.Value.Sign() < 0 {
 		return nil, types.ErrInvalidBalance
 	}
 
-	// set the origin
+	// set the origin on the TxContext
 	proc.evm.TxContext.Origin = msg.From
 
 	// reset precompile tracking in case
 	proc.config.PCTracker.Reset()
-	// set gas pool based on block gas limit
+
+	// Set gas pool based on block gas limit
 	// if the block gas limit is set to anything than max
 	// we need to update this code.
 	gasPool := (*gethCore.GasPool)(&proc.config.BlockContext.GasLimit)
@@ -639,46 +661,6 @@ func (proc *procedure) run(
 		}
 	}
 	return &res, nil
-}
-
-func (proc *procedure) captureTraceBegin(
-	depth int,
-	typ gethVM.OpCode,
-	from gethCommon.Address,
-	to gethCommon.Address,
-	input []byte,
-	startGas uint64,
-	value *big.Int) {
-	tracer := proc.evm.Config.Tracer
-	if tracer.OnEnter != nil {
-		tracer.OnEnter(depth, byte(typ), from, to, input, startGas, value)
-	}
-	if tracer.OnGasChange != nil {
-		tracer.OnGasChange(0, startGas, gethTracing.GasChangeCallInitialBalance)
-	}
-}
-
-func (proc *procedure) captureTraceEnd(
-	depth int,
-	startGas uint64,
-	leftOverGas uint64,
-	ret []byte,
-	err error,
-) {
-	tracer := proc.evm.Config.Tracer
-	if leftOverGas != 0 && tracer.OnGasChange != nil {
-		tracer.OnGasChange(leftOverGas, 0, gethTracing.GasChangeCallLeftOverReturned)
-	}
-	var reverted bool
-	if err != nil {
-		reverted = true
-	}
-	if errors.Is(err, gethVM.ErrCodeStoreOutOfGas) {
-		reverted = false
-	}
-	if tracer.OnExit != nil {
-		tracer.OnExit(depth, ret, startGas-leftOverGas, gethVM.VMErrorFromErr(err), reverted)
-	}
 }
 
 func AddOne64th(n uint64) uint64 {
