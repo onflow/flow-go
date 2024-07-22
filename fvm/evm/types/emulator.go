@@ -41,6 +41,8 @@ type BlockContext struct {
 	BlockTimestamp         uint64
 	DirectCallBaseGasUsage uint64
 	DirectCallGasPrice     uint64
+	TxCountSoFar           uint
+	TotalGasUsedSoFar      uint64
 	GasFeeCollector        Address
 	GetHashFunc            func(n uint64) gethCommon.Hash
 	Random                 gethCommon.Hash

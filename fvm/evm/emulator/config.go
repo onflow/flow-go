@@ -32,6 +32,12 @@ type Config struct {
 	DirectCallBaseGasUsage uint64
 	// captures extra precompiled calls
 	PCTracker *CallTracker
+	// BlockTxCount captures the total number of
+	// transactions included in this block so far
+	BlockTxCountSoFar uint
+	// BlockTotalGasSoFar captures the total
+	// amount of gas used so far
+	BlockTotalGasUsedSoFar uint64
 }
 
 // ChainRules returns the chain rules
@@ -220,6 +226,24 @@ func WithTransactionTracer(tracer *tracers.Tracer) Option {
 		if tracer != nil {
 			c.EVMConfig.Tracer = tracer.Hooks
 		}
+		return c
+	}
+}
+
+// WithBlockTxCountSoFar sets the total number of transactions
+// included in the current block so far
+func WithBlockTxCountSoFar(txCount uint) Option {
+	return func(c *Config) *Config {
+		c.BlockTxCountSoFar = txCount
+		return c
+	}
+}
+
+// WithBlockTotalGasSoFar sets the total amount of gas used
+// for this block so far
+func WithBlockTotalGasUsedSoFar(gasUsed uint64) Option {
+	return func(c *Config) *Config {
+		c.BlockTotalGasUsedSoFar = gasUsed
 		return c
 	}
 }

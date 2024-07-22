@@ -51,6 +51,8 @@ func newConfig(ctx types.BlockContext) *Config {
 		WithGetBlockHashFunction(ctx.GetHashFunc),
 		WithRandom(&ctx.Random),
 		WithTransactionTracer(ctx.Tracer),
+		WithBlockTotalGasUsedSoFar(ctx.TotalGasUsedSoFar),
+		WithBlockTxCountSoFar(ctx.TxCountSoFar),
 	)
 }
 
@@ -124,13 +126,15 @@ func (bl *BlockView) DirectCall(call *types.DirectCall) (res *types.Result, err 
 		proc.evm.Config.Tracer.OnTxStart(proc.evm.GetVMContext(), call.Transaction(), call.From.ToCommon())
 		if proc.evm.Config.Tracer.OnTxEnd != nil {
 			defer func() {
-				// passing total gas used before of zero is okey since onTxEnd doesn't consume it
-				proc.evm.Config.Tracer.OnTxEnd(res.Receipt(0), err)
+				proc.evm.Config.Tracer.OnTxEnd(res.Receipt(bl.config.BlockTotalGasUsedSoFar), err)
 			}()
 		}
 	}
 
 	txHash := call.Hash()
+	// set the nonce for the call (needed for some operations like deployment)
+	call.Nonce = proc.state.GetNonce(call.From.ToCommon())
+
 	switch call.SubType {
 	case types.DepositCallSubType:
 		return proc.mintTo(call, txHash)
@@ -142,7 +146,7 @@ func (bl *BlockView) DirectCall(call *types.DirectCall) (res *types.Result, err 
 		}
 		fallthrough
 	default:
-		return proc.runDirect(call.Message(), txHash, 0)
+		return proc.runDirect(call.Message(), txHash, bl.config.BlockTxCountSoFar)
 	}
 }
 
@@ -172,15 +176,14 @@ func (bl *BlockView) RunTransaction(
 		proc.evm.Config.Tracer.OnTxStart(proc.evm.GetVMContext(), tx, msg.From)
 		if proc.evm.Config.Tracer.OnTxEnd != nil {
 			defer func() {
-				// passing total gas used before of zero is okey since onTxEnd doesn't consume it
-				proc.evm.Config.Tracer.OnTxEnd(result.Receipt(0), err)
+				proc.evm.Config.Tracer.OnTxEnd(result.Receipt(bl.config.BlockTotalGasUsedSoFar), err)
 			}()
 		}
 	}
 
 	// update tx context origin
 	proc.evm.TxContext.Origin = msg.From
-	res, err := proc.run(msg, tx.Hash(), 0, tx.Type())
+	res, err := proc.run(msg, tx.Hash(), bl.config.BlockTxCountSoFar, tx.Type())
 	if err != nil {
 		return nil, err
 	}
@@ -215,15 +218,17 @@ func (bl *BlockView) BatchRunTransactions(txs []*gethTypes.Transaction) ([]*type
 			proc.evm.Config.Tracer.OnTxStart(proc.evm.GetVMContext(), tx, msg.From)
 			if proc.evm.Config.Tracer.OnTxEnd != nil {
 				defer func() {
-					// passing total gas used before of zero is okey since onTxEnd doesn't consume it
-					proc.evm.Config.Tracer.OnTxEnd(batchResults[i].Receipt(0), err)
+					proc.evm.Config.Tracer.OnTxEnd(
+						batchResults[i].Receipt(bl.config.BlockTotalGasUsedSoFar),
+						err,
+					)
 				}()
 			}
 		}
 
 		// update tx context origin
 		proc.evm.TxContext.Origin = msg.From
-		res, err := proc.run(msg, tx.Hash(), uint(i), tx.Type())
+		res, err := proc.run(msg, tx.Hash(), bl.config.BlockTxCountSoFar+uint(i), tx.Type())
 		if err != nil {
 			return nil, err
 		}
@@ -273,7 +278,7 @@ func (bl *BlockView) DryRunTransaction(
 	msg.SkipAccountChecks = true
 
 	// return without committing the state
-	txResult, err = proc.run(msg, tx.Hash(), 0, tx.Type())
+	txResult, err = proc.run(msg, tx.Hash(), proc.config.BlockTxCountSoFar, tx.Type())
 	if txResult.Successful() {
 		// As mentioned in https://github.com/ethereum/EIPs/blob/master/EIPS/eip-150.md#specification
 		// Define "all but one 64th" of N as N - floor(N / 64).
@@ -362,7 +367,7 @@ func (proc *procedure) mintTo(
 	}
 
 	// withdraw the amount and move it to the bridge account
-	res, err := proc.run(call.Message(), txHash, 0, types.DirectCallTxType)
+	res, err := proc.run(call.Message(), txHash, proc.config.BlockTxCountSoFar, types.DirectCallTxType)
 	if err != nil {
 		return res, err
 	}
@@ -396,7 +401,7 @@ func (proc *procedure) withdrawFrom(
 	}
 
 	// withdraw the amount and move it to the bridge account
-	res, err := proc.run(call.Message(), txHash, 0, types.DirectCallTxType)
+	res, err := proc.run(call.Message(), txHash, proc.config.BlockTxCountSoFar, types.DirectCallTxType)
 	if err != nil {
 		return res, err
 	}
@@ -415,7 +420,7 @@ func (proc *procedure) withdrawFrom(
 
 // deployAt deploys a contract at the given target address
 // behavior should be similar to what evm.create internal method does with
-// a few differences, don't need to check for previous forks given this
+// a few differences, we don't need to check for previous forks given this
 // functionality was not available to anyone, we don't need to
 // follow snapshoting, given we do commit/revert style in this code base.
 // in the future we might optimize this method accepting deploy-ready byte codes
@@ -448,14 +453,14 @@ func (proc *procedure) deployAt(
 	}
 
 	addr := to.ToCommon()
-	// precheck 1 - check balance of the source
+	// pre check 1 - check balance of the source
 	if value.Sign() != 0 &&
 		!proc.evm.Context.CanTransfer(proc.state, caller.ToCommon(), castedValue) {
 		res.SetValidationError(gethCore.ErrInsufficientFundsForTransfer)
 		return res, nil
 	}
 
-	// precheck 2 - ensure there's no existing eoa or contract is deployed at the address
+	// pre check 2 - ensure there's no existing eoa or contract is deployed at the address
 	contractHash := proc.state.GetCodeHash(addr)
 	if proc.state.GetNonce(addr) != 0 ||
 		(contractHash != (gethCommon.Hash{}) && contractHash != gethTypes.EmptyCodeHash) {
@@ -546,8 +551,7 @@ func (proc *procedure) runDirect(
 	txHash gethCommon.Hash,
 	txIndex uint,
 ) (*types.Result, error) {
-	// set the nonce for the message (needed for some operations like deployment)
-	msg.Nonce = proc.state.GetNonce(msg.From)
+	// run the msg and commit
 	res, err := proc.run(msg, txHash, txIndex, types.DirectCallTxType)
 	if err != nil {
 		return nil, err
@@ -618,6 +622,10 @@ func (proc *procedure) run(
 		// we need to capture the returned value no matter the status
 		// if the tx is reverted the error message is returned as returned value
 		res.ReturnedData = execResult.ReturnData
+
+		// update proc (useful for batch runs)
+		proc.config.BlockTotalGasUsedSoFar += execResult.UsedGas
+		proc.config.BlockTxCountSoFar += 1
 
 		if !execResult.Failed() { // collect vm errors
 			// If the transaction created a contract, store the creation address in the receipt,
