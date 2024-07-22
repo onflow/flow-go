@@ -31,7 +31,6 @@ func constructRootBlock(rootHeader *flow.Header, protocolStateID flow.Identifier
 		Seals:      nil,
 		Receipts:   nil,
 		Results:    nil,
-		// TODO: shortcut in bootstrapping; we will probably have to start with a non-empty KV store in the future
 		ProtocolStateID: protocolStateID,
 	})
 	return block
