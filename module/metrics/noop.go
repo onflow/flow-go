@@ -37,6 +37,7 @@ func (nc *NoopCollector) BlockProposalDuration(duration time.Duration)          
 // interface check
 var _ module.BackendScriptsMetrics = (*NoopCollector)(nil)
 var _ module.TransactionMetrics = (*NoopCollector)(nil)
+var _ module.TransactionValidationMetrics = (*NoopCollector)(nil)
 var _ module.HotstuffMetrics = (*NoopCollector)(nil)
 var _ module.EngineMetrics = (*NoopCollector)(nil)
 var _ module.HeroCacheMetrics = (*NoopCollector)(nil)

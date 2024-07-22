@@ -51,6 +51,7 @@ func New(
 	engMetrics module.EngineMetrics,
 	mempoolMetrics module.MempoolMetrics,
 	colMetrics module.CollectionMetrics,
+	txValidationMetrics module.TransactionValidationMetrics,
 	me module.Local,
 	chain flow.Chain,
 	pools *epochs.TransactionPools,
@@ -71,6 +72,7 @@ func New(
 			MaxTransactionByteSize: config.MaxTransactionByteSize,
 			MaxCollectionByteSize:  config.MaxCollectionByteSize,
 		},
+		txValidationMetrics,
 		limiter,
 	)
 

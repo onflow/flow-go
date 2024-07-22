@@ -3,11 +3,9 @@ package access
 import (
 	"errors"
 	"fmt"
-	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/metrics"
-
 	"github.com/onflow/cadence/runtime/parser"
 	"github.com/onflow/crypto"
+	"github.com/onflow/flow-go/module"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state"
@@ -75,27 +73,27 @@ type TransactionValidationOptions struct {
 }
 
 type TransactionValidator struct {
-	blocks                Blocks     // for looking up blocks to check transaction expiry
-	chain                 flow.Chain // for checking validity of addresses
-	options               TransactionValidationOptions
-	serviceAccountAddress flow.Address
-	limiter               RateLimiter
-	transactionMetrics    module.TransactionMetrics
+	blocks                       Blocks     // for looking up blocks to check transaction expiry
+	chain                        flow.Chain // for checking validity of addresses
+	options                      TransactionValidationOptions
+	serviceAccountAddress        flow.Address
+	limiter                      RateLimiter
+	transactionValidationMetrics module.TransactionValidationMetrics
 }
 
 func NewTransactionValidator(
 	blocks Blocks,
 	chain flow.Chain,
-	transactionMetrics module.TransactionMetrics,
+	transactionValidationMetrics module.TransactionValidationMetrics,
 	options TransactionValidationOptions,
 ) *TransactionValidator {
 	return &TransactionValidator{
-		blocks:                blocks,
-		chain:                 chain,
-		options:               options,
-		serviceAccountAddress: chain.ServiceAddress(),
-		limiter:               NewNoopLimiter(),
-		transactionMetrics:    transactionMetrics,
+		blocks:                       blocks,
+		chain:                        chain,
+		options:                      options,
+		serviceAccountAddress:        chain.ServiceAddress(),
+		limiter:                      NewNoopLimiter(),
+		transactionValidationMetrics: transactionValidationMetrics,
 	}
 }
 
@@ -103,15 +101,16 @@ func NewTransactionValidatorWithLimiter(
 	blocks Blocks,
 	chain flow.Chain,
 	options TransactionValidationOptions,
+	transactionValidationMetrics module.TransactionValidationMetrics,
 	rateLimiter RateLimiter,
 ) *TransactionValidator {
 	return &TransactionValidator{
-		blocks:                blocks,
-		chain:                 chain,
-		options:               options,
-		serviceAccountAddress: chain.ServiceAddress(),
-		limiter:               rateLimiter,
-		transactionMetrics:    metrics.NewNoopCollector(), //TODO: Need to separate validation metrics
+		blocks:                       blocks,
+		chain:                        chain,
+		options:                      options,
+		serviceAccountAddress:        chain.ServiceAddress(),
+		limiter:                      rateLimiter,
+		transactionValidationMetrics: transactionValidationMetrics,
 	}
 }
 
@@ -122,61 +121,61 @@ func (v *TransactionValidator) Validate(tx *flow.TransactionBody) (err error) {
 	// checks will be skipped
 	err = v.checkRateLimitPayer(tx)
 	if err != nil {
-		v.transactionMetrics.TransactionValidationFailed(tx.ID(), "InvalidTxRateLimited")
+		v.transactionValidationMetrics.TransactionValidationFailed(tx.ID(), "InvalidTxRateLimited")
 		return err
 	}
 
 	err = v.checkTxSizeLimit(tx)
 	if err != nil {
-		v.transactionMetrics.TransactionValidationFailed(tx.ID(), "InvalidTxByteSizeError")
+		v.transactionValidationMetrics.TransactionValidationFailed(tx.ID(), "InvalidTxByteSizeError")
 		return err
 	}
 
 	err = v.checkMissingFields(tx)
 	if err != nil {
-		v.transactionMetrics.TransactionValidationFailed(tx.ID(), "IncompleteTransactionError")
+		v.transactionValidationMetrics.TransactionValidationFailed(tx.ID(), "IncompleteTransactionError")
 		return err
 	}
 
 	err = v.checkGasLimit(tx)
 	if err != nil {
-		v.transactionMetrics.TransactionValidationFailed(tx.ID(), "InvalidGasLimitError")
+		v.transactionValidationMetrics.TransactionValidationFailed(tx.ID(), "InvalidGasLimitError")
 		return err
 	}
 
 	err = v.checkExpiry(tx)
 	if err != nil {
-		v.transactionMetrics.TransactionValidationFailed(tx.ID(), "ExpiredTransactionError")
+		v.transactionValidationMetrics.TransactionValidationFailed(tx.ID(), "ExpiredTransactionError")
 		return err
 	}
 
 	err = v.checkCanBeParsed(tx)
 	if err != nil {
-		v.transactionMetrics.TransactionValidationFailed(tx.ID(), "InvalidScriptError")
+		v.transactionValidationMetrics.TransactionValidationFailed(tx.ID(), "InvalidScriptError")
 		return err
 	}
 
 	err = v.checkAddresses(tx)
 	if err != nil {
-		v.transactionMetrics.TransactionValidationFailed(tx.ID(), "InvalidAddressError")
+		v.transactionValidationMetrics.TransactionValidationFailed(tx.ID(), "InvalidAddressError")
 		return err
 	}
 
 	err = v.checkSignatureFormat(tx)
 	if err != nil {
-		v.transactionMetrics.TransactionValidationFailed(tx.ID(), "InvalidSignatureError")
+		v.transactionValidationMetrics.TransactionValidationFailed(tx.ID(), "InvalidSignatureError")
 		return err
 	}
 
 	err = v.checkSignatureDuplications(tx)
 	if err != nil {
-		v.transactionMetrics.TransactionValidationFailed(tx.ID(), "DuplicatedSignatureError")
+		v.transactionValidationMetrics.TransactionValidationFailed(tx.ID(), "DuplicatedSignatureError")
 		return err
 	}
 
 	// TODO replace checkSignatureFormat by verifying the account/payer signatures
 
-	v.transactionMetrics.TransactionValidated(tx.ID())
+	v.transactionValidationMetrics.TransactionValidated(tx.ID())
 
 	return nil
 }
