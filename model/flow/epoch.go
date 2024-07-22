@@ -247,12 +247,19 @@ type EpochCommit struct {
 	// CAUTION: This list may include keys for nodes which do not exist in the consensus committee
 	//          and may NOT include keys for all nodes in the consensus committee.
 	DKGParticipantKeys []crypto.PublicKey
+	// DKGIndexMap is always nil and is not used. This field exists to avoid data-model changes in a future version.
+	// Deprecated: This field is always nil and should not be used (it isn't really deprecated -- "pre-un-deprecated", maybe --
+	// but marking it as such makes Go tooling flag it in a way that is useful for this circumstance)
+	//
+	// TODO(EFM, #6214): Parse this field from service event and make use of it.
+	//                   Here is what the godoc should look like once we do that:
 	// DKGIndexMap is a mapping from node identifier to DKG index.
 	// It has the following invariants:
 	//   - len(DKGParticipantKeys) == len(DKGIndexMap)
 	//   - DKGIndexMap values form the set {0, 1, ..., n-1} where n=len(DKGParticipantKeys)
 	// CAUTION: This mapping may include identifiers for nodes which do not exist in the consensus committee
 	//          and may NOT include identifiers for all nodes in the consensus committee.
+	//
 	DKGIndexMap map[Identifier]int
 }
 
@@ -458,7 +465,7 @@ func (commit *EpochCommit) EqualTo(other *EpochCommit) bool {
 // ToDKGParticipantLookup constructs a DKG participant lookup from an identity
 // list and a key list. The identity list must be EXACTLY the same (order and
 // contents) as that used when initializing the corresponding DKG instance.
-// TODO can we get rid of this?
+// TODO(EFM, #6214): Once DKGIndexMap is populated we can remove this and use EpochCommit directly
 func ToDKGParticipantLookup(participants IdentitySkeletonList, keys []crypto.PublicKey) (map[Identifier]DKGParticipant, error) {
 	if len(participants) != len(keys) {
 		return nil, fmt.Errorf("participant list (len=%d) does not match key list (len=%d)", len(participants), len(keys))
