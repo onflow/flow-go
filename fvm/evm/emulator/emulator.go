@@ -115,12 +115,16 @@ func (bl *BlockView) DirectCall(call *types.DirectCall) (res *types.Result, err 
 		return nil, types.ErrInvalidBalance
 	}
 
+	// construct a new procedure
 	proc, err := bl.newProcedure()
 	if err != nil {
 		return nil, err
 	}
 
-	// call tracer
+	// Set the nonce for the call (needed for some operations like deployment)
+	call.Nonce = proc.state.GetNonce(call.From.ToCommon())
+
+	// Call tx tracer
 	if proc.evm.Config.Tracer != nil && proc.evm.Config.Tracer.OnTxStart != nil {
 		proc.evm.Config.Tracer.OnTxStart(proc.evm.GetVMContext(), call.Transaction(), call.From.ToCommon())
 		if proc.evm.Config.Tracer.OnTxEnd != nil {
@@ -130,22 +134,19 @@ func (bl *BlockView) DirectCall(call *types.DirectCall) (res *types.Result, err 
 		}
 	}
 
-	txHash := call.Hash()
-	// set the nonce for the call (needed for some operations like deployment)
-	call.Nonce = proc.state.GetNonce(call.From.ToCommon())
-
+	// re-route based on the sub type
 	switch call.SubType {
 	case types.DepositCallSubType:
-		return proc.mintTo(call, txHash)
+		return proc.mintTo(call)
 	case types.WithdrawCallSubType:
-		return proc.withdrawFrom(call, txHash)
+		return proc.withdrawFrom(call)
 	case types.DeployCallSubType:
 		if !call.EmptyToField() {
-			return proc.deployAt(call.From, call.To, call.Data, call.GasLimit, call.Value, txHash)
+			return proc.deployAt(call)
 		}
 		fallthrough
 	default:
-		return proc.runDirect(call.Message(), txHash, bl.config.BlockTxCountSoFar)
+		return proc.runDirect(call)
 	}
 }
 
@@ -344,7 +345,6 @@ func (proc *procedure) commit(finalize bool) error {
 
 func (proc *procedure) mintTo(
 	call *types.DirectCall,
-	txHash gethCommon.Hash,
 ) (*types.Result, error) {
 	// convert value into uint256
 	value, err := convertBigValueIntoUint256(call.Value)
@@ -366,7 +366,7 @@ func (proc *procedure) mintTo(
 	}
 
 	// withdraw the amount and move it to the bridge account
-	res, err := proc.run(call.Message(), txHash, proc.config.BlockTxCountSoFar, types.DirectCallTxType)
+	res, err := proc.run(call.Message(), call.Hash(), proc.config.BlockTxCountSoFar, types.DirectCallTxType)
 	if err != nil {
 		return res, err
 	}
@@ -374,18 +374,16 @@ func (proc *procedure) mintTo(
 	// if any error (invalid or vm) on the internal call, revert and don't commit any change
 	// this prevents having cases that we add balance to the bridge but the transfer
 	// fails due to gas, etc.
-	// TODO: in the future we might just return without error and handle everything on higher level
 	if res.Invalid() || res.Failed() {
 		return res, types.ErrInternalDirectCallFailed
 	}
 
-	// all commit errors (StateDB errors) has to be returned
+	// commit and finalize the state and return any stateDB error
 	return res, proc.commit(true)
 }
 
 func (proc *procedure) withdrawFrom(
 	call *types.DirectCall,
-	txHash gethCommon.Hash,
 ) (*types.Result, error) {
 	// convert value into uint256
 	value, err := convertBigValueIntoUint256(call.Value)
@@ -400,20 +398,22 @@ func (proc *procedure) withdrawFrom(
 	}
 
 	// withdraw the amount and move it to the bridge account
-	res, err := proc.run(call.Message(), txHash, proc.config.BlockTxCountSoFar, types.DirectCallTxType)
+	res, err := proc.run(call.Message(), call.Hash(), proc.config.BlockTxCountSoFar, types.DirectCallTxType)
 	if err != nil {
 		return res, err
 	}
 
 	// if any error (invalid or vm) on the internal call, revert and don't commit any change
-	// TODO: in the future we might just return without error and handle everything on higher level
+	// this prevents having cases that we deduct the balance from the account
+	// but doesn't return it as a vault.
 	if res.Invalid() || res.Failed() {
 		return res, types.ErrInternalDirectCallFailed
 	}
 
 	// now deduct the balance from the bridge
 	proc.state.SubBalance(bridge, value, gethTracing.BalanceIncreaseWithdrawal)
-	// all commit errors (StateDB errors) has to be returned
+
+	// commit and finalize the state and return any stateDB error
 	return res, proc.commit(true)
 }
 
@@ -425,36 +425,28 @@ func (proc *procedure) withdrawFrom(
 // in the future we might optimize this method accepting deploy-ready byte codes
 // and skip interpreter call, gas calculations and many checks.
 func (proc *procedure) deployAt(
-	caller types.Address,
-	to types.Address,
-	data types.Code,
-	gasLimit uint64,
-	value *big.Int,
-	txHash gethCommon.Hash,
+	call *types.DirectCall,
 ) (*types.Result, error) {
-	if value.Sign() < 0 {
-		return nil, types.ErrInvalidBalance
-	}
-
-	castedValue, overflow := uint256.FromBig(value)
+	castedValue, overflow := uint256.FromBig(call.Value)
 	if overflow {
 		return nil, types.ErrInvalidBalance
 	}
 
+	txHash := call.Hash()
 	res := &types.Result{
 		TxType: types.DirectCallTxType,
 		TxHash: txHash,
 	}
 
 	if proc.evm.Config.Tracer != nil {
-		proc.captureTraceBegin(0, gethVM.CREATE2, caller.ToCommon(), to.ToCommon(), data, gasLimit, value)
-		defer proc.captureTraceEnd(0, gasLimit, res.ReturnedData, res.Receipt(0), res.VMError)
+		proc.captureTraceBegin(0, gethVM.CREATE2, call.From.ToCommon(), call.To.ToCommon(), call.Data, call.GasLimit, call.Value)
+		defer proc.captureTraceEnd(0, call.GasLimit, res.ReturnedData, res.Receipt(0), res.VMError)
 	}
 
-	addr := to.ToCommon()
+	addr := call.To.ToCommon()
 	// pre check 1 - check balance of the source
-	if value.Sign() != 0 &&
-		!proc.evm.Context.CanTransfer(proc.state, caller.ToCommon(), castedValue) {
+	if call.Value.Sign() != 0 &&
+		!proc.evm.Context.CanTransfer(proc.state, call.From.ToCommon(), castedValue) {
 		res.SetValidationError(gethCore.ErrInsufficientFundsForTransfer)
 		return res, nil
 	}
@@ -467,7 +459,7 @@ func (proc *procedure) deployAt(
 		return res, nil
 	}
 
-	callerCommon := caller.ToCommon()
+	callerCommon := call.From.ToCommon()
 	// setup caller if doesn't exist
 	if !proc.state.Exist(callerCommon) {
 		proc.state.CreateAccount(callerCommon)
@@ -478,12 +470,12 @@ func (proc *procedure) deployAt(
 	// setup account
 	proc.state.CreateAccount(addr)
 	proc.state.SetNonce(addr, 1) // (EIP-158)
-	if value.Sign() > 0 {
+	if call.Value.Sign() > 0 {
 		proc.evm.Context.Transfer( // transfer value
 			proc.state,
-			caller.ToCommon(),
+			callerCommon,
 			addr,
-			uint256.MustFromBig(value),
+			uint256.MustFromBig(call.Value),
 		)
 	}
 
@@ -492,12 +484,12 @@ func (proc *procedure) deployAt(
 	var err error
 	inter := gethVM.NewEVMInterpreter(proc.evm)
 	contract := gethVM.NewContract(
-		gethVM.AccountRef(caller.ToCommon()),
+		gethVM.AccountRef(callerCommon),
 		gethVM.AccountRef(addr),
 		castedValue,
-		gasLimit)
+		call.GasLimit)
 
-	contract.SetCallCode(&addr, gethCrypto.Keccak256Hash(data), data)
+	contract.SetCallCode(&addr, gethCrypto.Keccak256Hash(call.Data), call.Data)
 	// update access list (Berlin)
 	proc.state.AddAddressToAccessList(addr)
 
@@ -509,16 +501,16 @@ func (proc *procedure) deployAt(
 	if err != nil {
 		// for all errors except this one consume all the remaining gas (Homestead)
 		if err != gethVM.ErrExecutionReverted {
-			res.GasConsumed = gasLimit
+			res.GasConsumed = call.GasLimit
 		}
 		res.VMError = err
 		return res, nil
 	}
 
 	// update gas usage
-	if gasCost > gasLimit {
+	if gasCost > call.GasLimit {
 		// consume all the remaining gas (Homestead)
-		res.GasConsumed = gasLimit
+		res.GasConsumed = call.GasLimit
 		res.VMError = gethVM.ErrCodeStoreOutOfGas
 		return res, nil
 	}
@@ -526,7 +518,7 @@ func (proc *procedure) deployAt(
 	// check max code size (EIP-158)
 	if len(ret) > gethParams.MaxCodeSize {
 		// consume all the remaining gas (Homestead)
-		res.GasConsumed = gasLimit
+		res.GasConsumed = call.GasLimit
 		res.VMError = gethVM.ErrMaxCodeSizeExceeded
 		return res, nil
 	}
@@ -534,28 +526,31 @@ func (proc *procedure) deployAt(
 	// reject code starting with 0xEF (EIP-3541)
 	if len(ret) >= 1 && ret[0] == 0xEF {
 		// consume all the remaining gas (Homestead)
-		res.GasConsumed = gasLimit
+		res.GasConsumed = call.GasLimit
 		res.VMError = gethVM.ErrInvalidCode
 		return res, nil
 	}
 
-	res.DeployedContractAddress = &to
+	res.DeployedContractAddress = &call.To
 
 	proc.state.SetCode(addr, ret)
 	return res, proc.commit(true)
 }
 
 func (proc *procedure) runDirect(
-	msg *gethCore.Message,
-	txHash gethCommon.Hash,
-	txIndex uint,
+	call *types.DirectCall,
 ) (*types.Result, error) {
-	// run the msg and commit
-	res, err := proc.run(msg, txHash, txIndex, types.DirectCallTxType)
+	// run the msg
+	res, err := proc.run(
+		call.Message(),
+		call.Hash(),
+		proc.config.BlockTxCountSoFar,
+		types.DirectCallTxType,
+	)
 	if err != nil {
 		return nil, err
 	}
-	// all commit errors (StateDB errors) has to be returned
+	// commit and finalize the state and return any stateDB error
 	return res, proc.commit(true)
 }
 
