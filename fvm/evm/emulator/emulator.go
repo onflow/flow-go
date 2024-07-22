@@ -108,7 +108,7 @@ type BlockView struct {
 }
 
 // DirectCall executes a direct call
-func (bl *BlockView) DirectCall(call *types.DirectCall) (*types.Result, error) {
+func (bl *BlockView) DirectCall(call *types.DirectCall) (res *types.Result, err error) {
 	// negative amounts are not acceptable.
 	if call.Value.Sign() < 0 {
 		return nil, types.ErrInvalidBalance
@@ -118,6 +118,18 @@ func (bl *BlockView) DirectCall(call *types.DirectCall) (*types.Result, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	// call tracer
+	if proc.evm.Config.Tracer != nil && proc.evm.Config.Tracer.OnTxStart != nil {
+		proc.evm.Config.Tracer.OnTxStart(proc.evm.GetVMContext(), call.Transaction(), call.From.ToCommon())
+		if proc.evm.Config.Tracer.OnTxEnd != nil {
+			defer func() {
+				// passing total gas used before of zero is okey since onTxEnd doesn't consume it
+				proc.evm.Config.Tracer.OnTxEnd(res.Receipt(0), err)
+			}()
+		}
+	}
+
 	txHash := call.Hash()
 	switch call.SubType {
 	case types.DepositCallSubType:
@@ -187,6 +199,17 @@ func (bl *BlockView) BatchRunTransactions(txs []*gethTypes.Transaction) ([]*type
 			continue
 		}
 
+		// call tracer
+		if proc.evm.Config.Tracer != nil && proc.evm.Config.Tracer.OnTxStart != nil {
+			proc.evm.Config.Tracer.OnTxStart(proc.evm.GetVMContext(), tx, msg.From)
+			if proc.evm.Config.Tracer.OnTxEnd != nil {
+				defer func() {
+					// passing total gas used before of zero is okey since onTxEnd doesn't consume it
+					proc.evm.Config.Tracer.OnTxEnd(batchResults[i].Receipt(0), err)
+				}()
+			}
+		}
+
 		// update tx context origin
 		proc.evm.TxContext.Origin = msg.From
 		res, err := proc.run(msg, tx.Hash(), uint(i), tx.Type())
@@ -217,16 +240,27 @@ func (bl *BlockView) DryRunTransaction(
 	tx *gethTypes.Transaction,
 	from gethCommon.Address,
 ) (*types.Result, error) {
+	var txResult *types.Result
 	proc, err := bl.newProcedure()
 	if err != nil {
 		return nil, err
 	}
-
 	msg, err := gethCore.TransactionToMessage(
 		tx,
 		GetSigner(bl.config),
 		proc.config.BlockContext.BaseFee,
 	)
+
+	// call tracer
+	if proc.evm.Config.Tracer != nil && proc.evm.Config.Tracer.OnTxStart != nil {
+		proc.evm.Config.Tracer.OnTxStart(proc.evm.GetVMContext(), tx, msg.From)
+		if proc.evm.Config.Tracer.OnTxEnd != nil {
+			defer func() {
+				// passing total gas used before of zero is okey since onTxEnd doesn't consume it
+				proc.evm.Config.Tracer.OnTxEnd(txResult.Receipt(0), err)
+			}()
+		}
+	}
 
 	// we can ignore invalid signature errors since we don't expect signed transactions
 	if !errors.Is(err, gethTypes.ErrInvalidSig) {
@@ -239,8 +273,8 @@ func (bl *BlockView) DryRunTransaction(
 	// we need to skip nonce check for dry run
 	msg.SkipAccountChecks = true
 
-	// return without commiting the state
-	txResult, err := proc.run(msg, tx.Hash(), 0, tx.Type())
+	// return without committing the state
+	txResult, err = proc.run(msg, tx.Hash(), 0, tx.Type())
 	if txResult.Successful() {
 		// As mentioned in https://github.com/ethereum/EIPs/blob/master/EIPS/eip-150.md#specification
 		// Define "all but one 64th" of N as N - floor(N / 64).
@@ -548,7 +582,11 @@ func (proc *procedure) run(
 
 	// reset precompile tracking in case
 	proc.config.PCTracker.Reset()
+	// set gas pool based on block gas limit
+	// if the block gas limit is set to anything than max
+	// we need to update this code.
 	gasPool := (*gethCore.GasPool)(&proc.config.BlockContext.GasLimit)
+	// transit the state
 	execResult, err := gethCore.NewStateTransition(
 		proc.evm,
 		msg,
