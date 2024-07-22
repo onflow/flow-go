@@ -5,9 +5,6 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/metrics"
-
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/stretchr/testify/assert"
@@ -20,7 +17,9 @@ import (
 	accessmock "github.com/onflow/flow-go/access/mock"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 	execmock "github.com/onflow/flow-go/module/execution/mock"
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 

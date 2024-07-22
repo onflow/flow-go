@@ -5,22 +5,19 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/onflow/flow-core-contracts/lib/go/templates"
-
-	"github.com/onflow/flow-go/fvm/systemcontracts"
+	"github.com/rs/zerolog/log"
 
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime/parser"
 	"github.com/onflow/crypto"
-
-	"github.com/rs/zerolog/log"
-
-	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-core-contracts/lib/go/templates"
 
 	cadenceutils "github.com/onflow/flow-go/access/utils"
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/execution"
 	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/protocol"
