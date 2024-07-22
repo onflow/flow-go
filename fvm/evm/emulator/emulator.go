@@ -4,9 +4,12 @@ import (
 	"errors"
 	"math/big"
 
+	"github.com/holiman/uint256"
 	"github.com/onflow/atree"
+	"github.com/onflow/go-ethereum/common"
 	gethCommon "github.com/onflow/go-ethereum/common"
 	gethCore "github.com/onflow/go-ethereum/core"
+	"github.com/onflow/go-ethereum/core/tracing"
 	gethTypes "github.com/onflow/go-ethereum/core/types"
 	gethVM "github.com/onflow/go-ethereum/core/vm"
 	gethCrypto "github.com/onflow/go-ethereum/crypto"
@@ -76,7 +79,8 @@ type ReadOnlyBlockView struct {
 
 // BalanceOf returns the balance of the given address
 func (bv *ReadOnlyBlockView) BalanceOf(address types.Address) (*big.Int, error) {
-	return bv.state.GetBalance(address.ToCommon()), nil
+	bal := bv.state.GetBalance(address.ToCommon())
+	return bal.ToBig(), nil
 }
 
 // NonceOf returns the nonce of the given address
@@ -124,8 +128,6 @@ func (bl *BlockView) DirectCall(call *types.DirectCall) (*types.Result, error) {
 		}
 		fallthrough
 	default:
-		// TODO: when we support mutiple calls per block, we need
-		// to update the value zero here for tx index
 		return proc.runDirect(call.Message(), txHash, 0)
 	}
 }
@@ -160,7 +162,7 @@ func (bl *BlockView) RunTransaction(
 	if err != nil {
 		return nil, err
 	}
-	// all commmit errors (StateDB errors) has to be returned
+	// all commit errors (StateDB errors) has to be returned
 	if err := proc.commit(true); err != nil {
 		return nil, err
 	}
@@ -197,7 +199,7 @@ func (bl *BlockView) BatchRunTransactions(txs []*gethTypes.Transaction) ([]*type
 		if err != nil {
 			return nil, err
 		}
-		// all commmit errors (StateDB errors) has to be returned
+		// all commit errors (StateDB errors) has to be returned
 		if err := proc.commit(false); err != nil {
 			return nil, err
 		}
@@ -322,6 +324,11 @@ func (proc *procedure) mintTo(
 		return nil, types.ErrInvalidBalance
 	}
 
+	value, overflow := uint256.FromBig(call.Value)
+	if overflow {
+		return nil, types.ErrInvalidBalance
+	}
+
 	bridge := call.From.ToCommon()
 
 	// create bridge account if not exist
@@ -330,7 +337,7 @@ func (proc *procedure) mintTo(
 	}
 
 	// add balance to the bridge account before transfer
-	proc.state.AddBalance(bridge, call.Value)
+	proc.state.AddBalance(bridge, value, tracing.BalanceIncreaseWithdrawal)
 
 	msg := call.Message()
 	proc.evm.TxContext.Origin = msg.From
@@ -361,6 +368,11 @@ func (proc *procedure) withdrawFrom(
 		return nil, types.ErrInvalidBalance
 	}
 
+	value, overflow := uint256.FromBig(call.Value)
+	if overflow {
+		return nil, types.ErrInvalidBalance
+	}
+
 	bridge := call.To.ToCommon()
 
 	// create bridge account if not exist
@@ -383,7 +395,7 @@ func (proc *procedure) withdrawFrom(
 	}
 
 	// now deduct the balance from the bridge
-	proc.state.SubBalance(bridge, call.Value)
+	proc.state.SubBalance(bridge, value, tracing.BalanceIncreaseWithdrawal)
 	// all commmit errors (StateDB errors) has to be returned
 	return res, proc.commit(true)
 }
@@ -407,16 +419,25 @@ func (proc *procedure) deployAt(
 		return nil, types.ErrInvalidBalance
 	}
 
+	castedValue, overflow := uint256.FromBig(value)
+	if overflow {
+		return nil, types.ErrInvalidBalance
+	}
+
 	res := &types.Result{
 		TxType: types.DirectCallTxType,
 		TxHash: txHash,
 	}
 
-	addr := to.ToCommon()
+	if proc.evm.Config.Tracer != nil {
+		proc.captureTraceBegin(0, gethVM.CREATE2, caller.ToCommon(), to.ToCommon(), data, gasLimit, value)
+		defer proc.captureTraceEnd(0, gasLimit, res.ReturnedData, res.Receipt(0), res.VMError)
+	}
 
+	addr := to.ToCommon()
 	// precheck 1 - check balance of the source
 	if value.Sign() != 0 &&
-		!proc.evm.Context.CanTransfer(proc.state, caller.ToCommon(), value) {
+		!proc.evm.Context.CanTransfer(proc.state, caller.ToCommon(), castedValue) {
 		res.SetValidationError(gethCore.ErrInsufficientFundsForTransfer)
 		return res, nil
 	}
@@ -445,16 +466,8 @@ func (proc *procedure) deployAt(
 			proc.state,
 			caller.ToCommon(),
 			addr,
-			value,
+			uint256.MustFromBig(value),
 		)
-	}
-
-	if tracer := proc.evm.Config.Tracer; tracer != nil {
-		tracer.CaptureStart(proc.evm, caller.ToCommon(), to.ToCommon(), true, data, gasLimit, value)
-
-		defer func() {
-			tracer.CaptureEnd(res.ReturnedData, res.GasConsumed, res.VMError)
-		}()
 	}
 
 	// run code through interpreter
@@ -464,7 +477,7 @@ func (proc *procedure) deployAt(
 	contract := gethVM.NewContract(
 		gethVM.AccountRef(caller.ToCommon()),
 		gethVM.AccountRef(addr),
-		value,
+		castedValue,
 		gasLimit)
 
 	contract.SetCallCode(&addr, gethCrypto.Keccak256Hash(data), data)
@@ -520,14 +533,14 @@ func (proc *procedure) runDirect(
 	txHash gethCommon.Hash,
 	txIndex uint,
 ) (*types.Result, error) {
-	// set the nonce for the message (needed for some opeartions like deployment)
+	// set the nonce for the message (needed for some operations like deployment)
 	msg.Nonce = proc.state.GetNonce(msg.From)
 	proc.evm.TxContext.Origin = msg.From
 	res, err := proc.run(msg, txHash, txIndex, types.DirectCallTxType)
 	if err != nil {
 		return nil, err
 	}
-	// all commmit errors (StateDB errors) has to be returned
+	// all commit errors (StateDB errors) has to be returned
 	return res, proc.commit(true)
 }
 
@@ -548,8 +561,8 @@ func (proc *procedure) run(
 		TxHash: txHash,
 	}
 
-	// reset precompile tracking
-	proc.resetPrecompileTracking()
+	// reset precompile tracking in case
+	proc.config.PCTracker.Reset()
 	gasPool := (*gethCore.GasPool)(&proc.config.BlockContext.GasLimit)
 	execResult, err := gethCore.NewStateTransition(
 		proc.evm,
@@ -573,12 +586,9 @@ func (proc *procedure) run(
 		res.GasConsumed = execResult.UsedGas
 		res.GasRefund = proc.state.GetRefund()
 		res.Index = uint16(txIndex)
-
-		if proc.extraPrecompiledIsCalled() {
-			res.PrecompiledCalls, err = proc.capturePrecompiledCalls()
-			if err != nil {
-				return nil, err
-			}
+		res.PrecompiledCalls, err = proc.config.PCTracker.CapturedCalls()
+		if err != nil {
+			return nil, err
 		}
 		// we need to capture the returned value no matter the status
 		// if the tx is reverted the error message is returned as returned value
@@ -604,29 +614,51 @@ func (proc *procedure) run(
 	return &res, nil
 }
 
-func (proc *procedure) resetPrecompileTracking() {
-	for _, pc := range proc.config.ExtraPrecompiles {
-		pc.Reset()
+func (proc *procedure) captureTraceBegin(
+	depth int,
+	typ gethVM.OpCode,
+	from common.Address,
+	to common.Address,
+	input []byte,
+	startGas uint64,
+	value *big.Int) {
+	tracer := proc.evm.Config.Tracer
+	if tracer.OnTxStart != nil {
+		tracer.OnTxStart(nil, gethTypes.NewTransaction(0, to, value, startGas, nil, input), from)
+	}
+	if tracer.OnEnter != nil {
+		tracer.OnEnter(depth, byte(typ), from, to, input, startGas, value)
+	}
+	if tracer.OnGasChange != nil {
+		tracer.OnGasChange(0, startGas, tracing.GasChangeCallInitialBalance)
 	}
 }
 
-func (proc *procedure) extraPrecompiledIsCalled() bool {
-	for _, pc := range proc.config.ExtraPrecompiles {
-		if pc.IsCalled() {
-			return true
-		}
+func (proc *procedure) captureTraceEnd(
+	depth int,
+	startGas uint64,
+	ret []byte,
+	receipt *gethTypes.Receipt,
+	err error,
+) {
+	tracer := proc.evm.Config.Tracer
+	leftOverGas := startGas - receipt.GasUsed
+	if leftOverGas != 0 && tracer.OnGasChange != nil {
+		tracer.OnGasChange(leftOverGas, 0, tracing.GasChangeCallLeftOverReturned)
 	}
-	return false
-}
-
-func (proc *procedure) capturePrecompiledCalls() ([]byte, error) {
-	apc := make(types.AggregatedPrecompiledCalls, 0)
-	for _, pc := range proc.config.ExtraPrecompiles {
-		if pc.IsCalled() {
-			apc = append(apc, *pc.CapturedCalls())
-		}
+	var reverted bool
+	if err != nil {
+		reverted = true
 	}
-	return apc.Encode()
+	if errors.Is(err, gethVM.ErrCodeStoreOutOfGas) {
+		reverted = false
+	}
+	if tracer.OnExit != nil {
+		tracer.OnExit(depth, ret, startGas-leftOverGas, gethVM.VMErrorFromErr(err), reverted)
+	}
+	if tracer.OnTxEnd != nil {
+		tracer.OnTxEnd(receipt, err)
+	}
 }
 
 func AddOne64th(n uint64) uint64 {

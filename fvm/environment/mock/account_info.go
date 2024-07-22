@@ -102,7 +102,7 @@ func (_m *AccountInfo) GetAccountBalance(runtimeAddress common.Address) (uint64,
 }
 
 // GetAccountKeyByIndex provides a mock function with given fields: address, index
-func (_m *AccountInfo) GetAccountKeyByIndex(address flow.Address, index uint64) (*flow.AccountPublicKey, error) {
+func (_m *AccountInfo) GetAccountKeyByIndex(address flow.Address, index uint32) (*flow.AccountPublicKey, error) {
 	ret := _m.Called(address, index)
 
 	if len(ret) == 0 {
@@ -111,10 +111,10 @@ func (_m *AccountInfo) GetAccountKeyByIndex(address flow.Address, index uint64) 
 
 	var r0 *flow.AccountPublicKey
 	var r1 error
-	if rf, ok := ret.Get(0).(func(flow.Address, uint64) (*flow.AccountPublicKey, error)); ok {
+	if rf, ok := ret.Get(0).(func(flow.Address, uint32) (*flow.AccountPublicKey, error)); ok {
 		return rf(address, index)
 	}
-	if rf, ok := ret.Get(0).(func(flow.Address, uint64) *flow.AccountPublicKey); ok {
+	if rf, ok := ret.Get(0).(func(flow.Address, uint32) *flow.AccountPublicKey); ok {
 		r0 = rf(address, index)
 	} else {
 		if ret.Get(0) != nil {
@@ -122,7 +122,7 @@ func (_m *AccountInfo) GetAccountKeyByIndex(address flow.Address, index uint64) 
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(flow.Address, uint64) error); ok {
+	if rf, ok := ret.Get(1).(func(flow.Address, uint32) error); ok {
 		r1 = rf(address, index)
 	} else {
 		r1 = ret.Error(1)

@@ -31,6 +31,11 @@ var (
 // conversion errors and dealing with rounding errors.
 type Balance *big.Int
 
+// BalancesAreEqual returns true if balances are equal
+func BalancesAreEqual(bal1, bal2 Balance) bool {
+	return (*big.Int)(bal1).Cmp(bal2) == 0
+}
+
 // NewBalanceconstructs a new balance from an atto flow value
 func NewBalance(inp *big.Int) Balance {
 	return Balance(inp)
@@ -53,10 +58,28 @@ func BalanceToBigInt(bal Balance) *big.Int {
 	return (*big.Int)(bal)
 }
 
+// UnsafeCastOfBalanceToFloat64 tries to cast the balance into a float64,
+//
+// Warning! this method is only provided for logging and metric reporting
+// purposes, using float64 for any actual computation result in non-determinism.
+func UnsafeCastOfBalanceToFloat64(bal Balance) float64 {
+	res, _ := new(big.Float).Quo(
+		new(big.Float).SetInt(bal),
+		new(big.Float).SetInt(
+			new(big.Int).Exp(
+				big.NewInt(10),
+				big.NewInt(int64(AttoScale)),
+				nil,
+			),
+		),
+	).Float64()
+	return res
+}
+
 // ConvertBalanceToUFix64 casts the balance into a UFix64,
 //
 // Warning! The smallest unit of Flow token that a FlowVault (Cadence) could store is 1e10^-8,
-// so transfering smaller values (or values with smalls fractions) could result in loss in
+// so transferring smaller values (or values with smalls fractions) could result in loss in
 // conversion. The rounded flag should be used to prevent loss of assets.
 func ConvertBalanceToUFix64(bal Balance) (value cadence.UFix64, roundedOff bool, err error) {
 	converted := new(big.Int).Div(bal, UFixToAttoConversionMultiplier)
@@ -65,7 +88,6 @@ func ConvertBalanceToUFix64(bal Balance) (value cadence.UFix64, roundedOff bool,
 		err = fmt.Errorf("balance can't be casted to a uint64")
 	}
 	return cadence.UFix64(converted.Uint64()), BalanceConvertionToUFix64ProneToRoundingError(bal), err
-
 }
 
 // BalanceConvertionToUFix64ProneToRoundingError returns true

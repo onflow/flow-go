@@ -18,6 +18,8 @@ type Environment interface {
 
 	Meter
 
+	MetricsReporter
+
 	// Runtime
 	BorrowCadenceRuntime() *reusableRuntime.ReusableCadenceRuntime
 	ReturnCadenceRuntime(*reusableRuntime.ReusableCadenceRuntime)

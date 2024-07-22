@@ -17,16 +17,16 @@ import (
 )
 
 const (
-	MaxPublicKeyCount = math.MaxUint64
+	MaxPublicKeyCount = math.MaxUint32
 )
 
 type Accounts interface {
 	Exists(address flow.Address) (bool, error)
 	Get(address flow.Address) (*flow.Account, error)
-	GetPublicKeyCount(address flow.Address) (uint64, error)
+	GetPublicKeyCount(address flow.Address) (uint32, error)
 	AppendPublicKey(address flow.Address, key flow.AccountPublicKey) error
-	GetPublicKey(address flow.Address, keyIndex uint64) (flow.AccountPublicKey, error)
-	SetPublicKey(address flow.Address, keyIndex uint64, publicKey flow.AccountPublicKey) ([]byte, error)
+	GetPublicKey(address flow.Address, keyIndex uint32) (flow.AccountPublicKey, error)
+	SetPublicKey(address flow.Address, keyIndex uint32, publicKey flow.AccountPublicKey) ([]byte, error)
 	GetPublicKeys(address flow.Address) ([]flow.AccountPublicKey, error)
 	GetContractNames(address flow.Address) ([]string, error)
 	GetContract(contractName string, address flow.Address) ([]byte, error)
@@ -66,7 +66,7 @@ func (a *StatefulAccounts) AllocateSlabIndex(
 	}
 
 	// get and increment the index
-	index := status.StorageIndex()
+	index := status.SlabIndex()
 	newIndexBytes := index.Next()
 
 	// store nil so that the setValue for new allocated slabs would be faster
@@ -186,7 +186,7 @@ func (a *StatefulAccounts) Create(
 
 func (a *StatefulAccounts) GetPublicKey(
 	address flow.Address,
-	keyIndex uint64,
+	keyIndex uint32,
 ) (
 	flow.AccountPublicKey,
 	error,
@@ -215,7 +215,7 @@ func (a *StatefulAccounts) GetPublicKey(
 func (a *StatefulAccounts) GetPublicKeyCount(
 	address flow.Address,
 ) (
-	uint64,
+	uint32,
 	error,
 ) {
 	status, err := a.getAccountStatus(address)
@@ -227,7 +227,7 @@ func (a *StatefulAccounts) GetPublicKeyCount(
 
 func (a *StatefulAccounts) setPublicKeyCount(
 	address flow.Address,
-	count uint64,
+	count uint32,
 ) error {
 	status, err := a.getAccountStatus(address)
 	if err != nil {
@@ -261,7 +261,7 @@ func (a *StatefulAccounts) GetPublicKeys(
 	}
 	publicKeys = make([]flow.AccountPublicKey, count)
 
-	for i := uint64(0); i < count; i++ {
+	for i := uint32(0); i < count; i++ {
 		publicKey, err := a.GetPublicKey(address, i)
 		if err != nil {
 			return nil, err
@@ -275,7 +275,7 @@ func (a *StatefulAccounts) GetPublicKeys(
 
 func (a *StatefulAccounts) SetPublicKey(
 	address flow.Address,
-	keyIndex uint64,
+	keyIndex uint32,
 	publicKey flow.AccountPublicKey,
 ) (encodedPublicKey []byte, err error) {
 	err = publicKey.Validate()
@@ -308,7 +308,7 @@ func (a *StatefulAccounts) SetAllPublicKeys(
 	publicKeys []flow.AccountPublicKey,
 ) error {
 
-	count := uint64(len(publicKeys))
+	count := uint32(len(publicKeys))
 
 	if count >= MaxPublicKeyCount {
 		return errors.NewAccountPublicKeyLimitError(
@@ -318,7 +318,7 @@ func (a *StatefulAccounts) SetAllPublicKeys(
 	}
 
 	for i, publicKey := range publicKeys {
-		_, err := a.SetPublicKey(address, uint64(i), publicKey)
+		_, err := a.SetPublicKey(address, uint32(i), publicKey)
 		if err != nil {
 			return err
 		}

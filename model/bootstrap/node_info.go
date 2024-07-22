@@ -26,9 +26,9 @@ const (
 )
 
 const (
-	DefaultMachineAccountSignAlgo      = sdkcrypto.ECDSA_P256
-	DefaultMachineAccountHashAlgo      = sdkcrypto.SHA3_256
-	DefaultMachineAccountKeyIndex uint = 0
+	DefaultMachineAccountSignAlgo        = sdkcrypto.ECDSA_P256
+	DefaultMachineAccountHashAlgo        = sdkcrypto.SHA3_256
+	DefaultMachineAccountKeyIndex uint32 = 0
 )
 
 // ErrMissingPrivateInfo is returned when a method is called on NodeInfo
@@ -56,7 +56,7 @@ type NodeMachineAccountInfo struct {
 	EncodedPrivateKey []byte
 
 	// KeyIndex is the index of the key in the associated machine account
-	KeyIndex uint
+	KeyIndex uint32
 
 	// SigningAlgorithm is the algorithm used by the machine account along with
 	// the above private key to create cryptographic signatures

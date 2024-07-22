@@ -73,7 +73,7 @@ func TestNativeTokenBridging(t *testing.T) {
 
 						retBalance, err = blk.BalanceOf(bridgeAccount)
 						require.NoError(t, err)
-						require.Equal(t, big.NewInt(0), retBalance)
+						require.Equal(t, big.NewInt(0).Uint64(), retBalance.Uint64())
 					})
 				})
 			})
@@ -105,7 +105,7 @@ func TestNativeTokenBridging(t *testing.T) {
 
 						retBalance, err = blk.BalanceOf(bridgeAccount)
 						require.NoError(t, err)
-						require.Equal(t, big.NewInt(0), retBalance)
+						require.Equal(t, big.NewInt(0).Uint64(), retBalance.Uint64())
 					})
 				})
 			})
@@ -660,7 +660,7 @@ func TestSelfdestruct(t *testing.T) {
 
 						bal, err = blk.BalanceOf(contractAddr)
 						require.NoError(t, err)
-						require.Equal(t, big.NewInt(0), bal)
+						require.Equal(t, big.NewInt(0).Uint64(), bal.Uint64())
 
 						nonce, err := blk.NonceOf(contractAddr)
 						require.NoError(t, err)
@@ -756,7 +756,6 @@ func TestCallingExtraPrecompiles(t *testing.T) {
 				input := []byte{1, 2}
 				output := []byte{3, 4}
 				addr := testutils.RandomAddress(t)
-				isCalled := false
 				capturedCall := &types.PrecompiledCalls{
 					Address: addr,
 					RequiredGasCalls: []types.RequiredGasCall{{
@@ -774,21 +773,11 @@ func TestCallingExtraPrecompiles(t *testing.T) {
 						return addr
 					},
 					RequiredGasFunc: func(input []byte) uint64 {
-						isCalled = true
 						return uint64(10)
 					},
 					RunFunc: func(inp []byte) ([]byte, error) {
-						isCalled = true
 						require.Equal(t, input, inp)
 						return output, nil
-					},
-					IsCalledFunc: func() bool {
-						return isCalled
-					},
-					CapturedCallsFunc: func() *types.PrecompiledCalls {
-						return capturedCall
-					},
-					ResetFunc: func() {
 					},
 				}
 
@@ -844,7 +833,7 @@ func TestTransactionTracing(t *testing.T) {
 							res, err := blk.DirectCall(call)
 							require.NoError(t, err)
 							require.NotNil(t, res.DeployedContractAddress)
-
+							testAccount.SetNonce(testAccount.Nonce() + 1)
 							testContract.DeployedAt = *res.DeployedContractAddress
 							f(testContract, testAccount, emu)
 						})
@@ -861,8 +850,9 @@ func TestTransactionTracing(t *testing.T) {
 		require.NoError(t, err)
 
 		// manually create block with provided tracer
-		defaultCtx.Tracer = tracer.TxTracer()
-		blk, err := emu.NewBlockView(defaultCtx)
+		ctx := types.NewDefaultBlockContext(1)
+		ctx.Tracer = tracer.TxTracer()
+		blk, err := emu.NewBlockView(ctx)
 		require.NoError(t, err)
 
 		return blk, uploader, tracer
@@ -905,6 +895,7 @@ func TestTransactionTracing(t *testing.T) {
 
 			tracer.Collect(txID)
 
+			testAccount.SetNonce(testAccount.Nonce() + 1)
 			require.Eventuallyf(t, func() bool {
 				<-uploaded
 				return true
@@ -942,6 +933,8 @@ func TestTransactionTracing(t *testing.T) {
 				),
 			)
 			require.NoError(t, err)
+			require.NoError(t, res.ValidationError)
+			require.NoError(t, res.VMError)
 			txID = res.TxHash
 			trace, err = tracer.TxTracer().GetResult()
 			require.NoError(t, err)
@@ -949,6 +942,7 @@ func TestTransactionTracing(t *testing.T) {
 
 			tracer.Collect(txID)
 
+			testAccount.SetNonce(testAccount.Nonce() + 1)
 			require.Eventuallyf(t, func() bool {
 				<-uploaded
 				return true
@@ -986,13 +980,15 @@ func TestTransactionTracing(t *testing.T) {
 			// interact and record trace
 			res, err := blk.RunTransaction(tx)
 			require.NoError(t, err)
+			require.NoError(t, res.ValidationError)
+			require.NoError(t, res.VMError)
 			txID = res.TxHash
 			trace, err = tracer.TxTracer().GetResult()
 			require.NoError(t, err)
 			tracer.WithBlockID(blockID)
 
 			tracer.Collect(txID)
-
+			testAccount.SetNonce(testAccount.Nonce() + 1)
 			require.Eventuallyf(t, func() bool {
 				<-uploaded
 				return true
@@ -1050,12 +1046,9 @@ func TestTransactionTracing(t *testing.T) {
 }
 
 type MockedPrecompiled struct {
-	AddressFunc       func() types.Address
-	RequiredGasFunc   func(input []byte) uint64
-	RunFunc           func(input []byte) ([]byte, error)
-	CapturedCallsFunc func() *types.PrecompiledCalls
-	ResetFunc         func()
-	IsCalledFunc      func() bool
+	AddressFunc     func() types.Address
+	RequiredGasFunc func(input []byte) uint64
+	RunFunc         func(input []byte) ([]byte, error)
 }
 
 var _ types.PrecompiledContract = &MockedPrecompiled{}
@@ -1074,30 +1067,9 @@ func (mp *MockedPrecompiled) RequiredGas(input []byte) uint64 {
 	return mp.RequiredGasFunc(input)
 }
 
-func (mp *MockedPrecompiled) IsCalled() bool {
-	if mp.IsCalledFunc == nil {
-		panic("IsCalled not set for the mocked precompiled contract")
-	}
-	return mp.IsCalledFunc()
-}
-
 func (mp *MockedPrecompiled) Run(input []byte) ([]byte, error) {
 	if mp.RunFunc == nil {
 		panic("Run not set for the mocked precompiled contract")
 	}
 	return mp.RunFunc(input)
-}
-
-func (mp *MockedPrecompiled) CapturedCalls() *types.PrecompiledCalls {
-	if mp.CapturedCallsFunc == nil {
-		panic("CapturedCalls not set for the mocked precompiled contract")
-	}
-	return mp.CapturedCallsFunc()
-}
-
-func (mp *MockedPrecompiled) Reset() {
-	if mp.ResetFunc == nil {
-		panic("Reset not set for the mocked precompiled contract")
-	}
-	mp.ResetFunc()
 }

@@ -204,11 +204,11 @@ func (m *MigrationRuntimeInterface) AddAccountKey(
 	panic("unexpected AddAccountKey call")
 }
 
-func (m *MigrationRuntimeInterface) GetAccountKey(_ runtime.Address, _ int) (*runtime.AccountKey, error) {
+func (m *MigrationRuntimeInterface) GetAccountKey(_ runtime.Address, _ uint32) (*runtime.AccountKey, error) {
 	panic("unexpected GetAccountKey call")
 }
 
-func (m *MigrationRuntimeInterface) RevokeAccountKey(_ runtime.Address, _ int) (*runtime.AccountKey, error) {
+func (m *MigrationRuntimeInterface) RevokeAccountKey(_ runtime.Address, _ uint32) (*runtime.AccountKey, error) {
 	panic("unexpected RevokeAccountKey call")
 }
 
@@ -331,7 +331,7 @@ func (m *MigrationRuntimeInterface) GetInterpreterSharedState() *interpreter.Sha
 	panic("unexpected GetInterpreterSharedState call")
 }
 
-func (m *MigrationRuntimeInterface) AccountKeysCount(_ runtime.Address) (uint64, error) {
+func (m *MigrationRuntimeInterface) AccountKeysCount(_ runtime.Address) (uint32, error) {
 	panic("unexpected AccountKeysCount call")
 }
 

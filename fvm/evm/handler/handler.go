@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/fvm/environment"
 	fvmErrors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/evm/debug"
+	"github.com/onflow/flow-go/fvm/evm/events"
 	"github.com/onflow/flow-go/fvm/evm/handler/coa"
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/model/flow"
@@ -84,19 +85,21 @@ func (h *ContractHandler) deployCOA(uuid uint64) (*types.Result, error) {
 
 	factory := h.addressAllocator.COAFactoryAddress()
 	factoryAccount := h.AccountByAddress(factory, false)
+	factoryNonce := factoryAccount.Nonce()
 	call := types.NewDeployCallWithTargetAddress(
 		factory,
 		target,
 		coa.ContractBytes,
 		uint64(gaslimit),
 		new(big.Int),
-		factoryAccount.Nonce(),
+		factoryNonce,
 	)
 
 	ctx, err := h.getBlockContext()
 	if err != nil {
 		return nil, err
 	}
+	h.backend.SetNumberOfDeployedCOAs(factoryNonce)
 	return h.executeAndHandleCall(ctx, call, nil, false)
 }
 
@@ -193,16 +196,10 @@ func (h *ContractHandler) batchRun(rlpEncodedTxs [][]byte, coinbase types.Addres
 		return nil, err
 	}
 
-	// saftey check for result
+	// safety check for result
 	if len(res) == 0 {
 		return nil, types.ErrUnexpectedEmptyResult
 	}
-
-	// Populate receipt root
-	bp.PopulateReceiptRoot(res)
-
-	// Populate total gas used
-	bp.CalculateGasUsage(res)
 
 	// meter all the transaction gas usage and append hashes to the block
 	for _, r := range res {
@@ -214,18 +211,13 @@ func (h *ContractHandler) batchRun(rlpEncodedTxs [][]byte, coinbase types.Addres
 
 		// include it in a block only if valid (not invalid)
 		if !r.Invalid() {
-			bp.AppendTxHash(r.TxHash)
+			bp.AppendTransaction(r)
 		}
 	}
 
-	blockHash, err := bp.Hash()
-	if err != nil {
-		return nil, err
-	}
-
 	// if there were no valid transactions skip emitting events
-	// and commiting a new block
-	if len(bp.TransactionHashes) == 0 {
+	// and update the block proposal
+	if len(bp.TxHashes) == 0 {
 		return res, nil
 	}
 
@@ -233,30 +225,66 @@ func (h *ContractHandler) batchRun(rlpEncodedTxs [][]byte, coinbase types.Addres
 		if r.Invalid() { // don't emit events for invalid tx
 			continue
 		}
-		err = h.emitEvent(types.NewTransactionEvent(
+		err = h.emitEvent(events.NewTransactionEvent(
 			r,
 			rlpEncodedTxs[i],
 			bp.Height,
-			blockHash,
 		))
 		if err != nil {
 			return nil, err
 		}
 
+		// step 4 - update metrics
+		h.backend.EVMTransactionExecuted(
+			r.GasConsumed,
+			false,
+			r.Failed(),
+		)
+
 		h.tracer.Collect(r.TxHash)
 	}
 
-	err = h.emitEvent(types.NewBlockEvent(bp))
-	if err != nil {
-		return nil, err
-	}
-
-	err = h.blockStore.CommitBlockProposal()
+	// update the block proposal
+	err = h.blockStore.UpdateBlockProposal(bp)
 	if err != nil {
 		return nil, err
 	}
 
 	return res, nil
+}
+
+// CommitBlockProposal commits the block proposal and add a new block to the EVM blockchain
+func (h *ContractHandler) CommitBlockProposal() {
+	panicOnError(h.commitBlockProposal())
+}
+
+func (h *ContractHandler) commitBlockProposal() error {
+	// load latest block proposal
+	bp, err := h.blockStore.BlockProposal()
+	if err != nil {
+		return err
+	}
+
+	// commit the proposal
+	err = h.blockStore.CommitBlockProposal(bp)
+	if err != nil {
+		return err
+	}
+
+	// emit block executed event
+	err = h.emitEvent(events.NewBlockEvent(&bp.Block))
+	if err != nil {
+		return err
+	}
+
+	// report metrics
+	h.backend.EVMBlockExecuted(
+		len(bp.TxHashes),
+		bp.TotalGasUsed,
+		types.UnsafeCastOfBalanceToFloat64(bp.TotalSupply),
+	)
+
+	return nil
 }
 
 func (h *ContractHandler) run(
@@ -290,7 +318,7 @@ func (h *ContractHandler) run(
 		return nil, err
 	}
 
-	// saftey check for result
+	// safety check for result
 	if res == nil {
 		return nil, types.ErrUnexpectedEmptyResult
 	}
@@ -306,44 +334,32 @@ func (h *ContractHandler) run(
 		return res, nil
 	}
 
-	// step 3 - update block proposal
+	// step 3 - update the block proposal
 	bp, err := h.blockStore.BlockProposal()
 	if err != nil {
 		return nil, err
 	}
-
-	bp.AppendTxHash(res.TxHash)
-
-	// Populate receipt root
-	bp.PopulateReceiptRoot([]*types.Result{res})
-
-	// Populate total gas used
-	bp.CalculateGasUsage([]*types.Result{res})
-
-	blockHash, err := bp.Hash()
+	bp.AppendTransaction(res)
+	err = h.blockStore.UpdateBlockProposal(bp)
 	if err != nil {
 		return nil, err
 	}
 
 	// step 4 - emit events
-	err = h.emitEvent(types.NewTransactionEvent(res, rlpEncodedTx, bp.Height, blockHash))
+	err = h.emitEvent(events.NewTransactionEvent(res, rlpEncodedTx, bp.Height))
 	if err != nil {
 		return nil, err
 	}
 
-	err = h.emitEvent(types.NewBlockEvent(bp))
-	if err != nil {
-		return nil, err
-	}
+	// step 4 - update metrics
+	h.backend.EVMTransactionExecuted(
+		res.GasConsumed,
+		false,
+		res.Failed(),
+	)
 
-	// step 5 - commit block proposal
-	err = h.blockStore.CommitBlockProposal()
-	if err != nil {
-		return nil, err
-	}
-
+	// step 6 - collect traces
 	h.tracer.Collect(res.TxHash)
-
 	return res, nil
 }
 
@@ -426,9 +442,8 @@ func (h *ContractHandler) meterGasUsage(res *types.Result) error {
 	return h.backend.MeterComputation(environment.ComputationKindEVMGasUsage, uint(res.GasConsumed))
 }
 
-func (h *ContractHandler) emitEvent(event *types.Event) error {
-	location := common.NewAddressLocation(nil, common.Address(h.evmContractAddress), "EVM")
-	ev, err := event.Payload.ToCadence(location)
+func (h *ContractHandler) emitEvent(event *events.Event) error {
+	ev, err := event.Payload.ToCadence(h.flowChainID)
 	if err != nil {
 		return err
 	}
@@ -480,7 +495,7 @@ func (h *ContractHandler) executeAndHandleCall(
 		return nil, err
 	}
 
-	// saftey check for result
+	// safety check for result
 	if res == nil {
 		return nil, types.ErrUnexpectedEmptyResult
 	}
@@ -502,13 +517,8 @@ func (h *ContractHandler) executeAndHandleCall(
 		return nil, err
 	}
 
-	bp.AppendTxHash(res.TxHash)
-
-	// Populate receipt root
-	bp.PopulateReceiptRoot([]*types.Result{res})
-
-	// Populate total gas used
-	bp.CalculateGasUsage([]*types.Result{res})
+	// append transaction to the block proposal
+	bp.AppendTransaction(res)
 
 	if totalSupplyDiff != nil {
 		if deductSupplyDiff {
@@ -521,7 +531,8 @@ func (h *ContractHandler) executeAndHandleCall(
 		}
 	}
 
-	blockHash, err := bp.Hash()
+	// update the block proposal
+	err = h.blockStore.UpdateBlockProposal(bp)
 	if err != nil {
 		return nil, err
 	}
@@ -533,25 +544,21 @@ func (h *ContractHandler) executeAndHandleCall(
 	}
 
 	err = h.emitEvent(
-		types.NewTransactionEvent(res, encoded, bp.Height, blockHash),
+		events.NewTransactionEvent(res, encoded, bp.Height),
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	err = h.emitEvent(types.NewBlockEvent(bp))
-	if err != nil {
-		return nil, err
-	}
+	// metric
+	h.backend.EVMTransactionExecuted(
+		res.GasConsumed,
+		true,
+		res.Failed(),
+	)
 
-	// commit block proposal
-	err = h.blockStore.CommitBlockProposal()
-	if err != nil {
-		return nil, err
-	}
-
+	// collect traces
 	h.tracer.Collect(res.TxHash)
-
 	return res, nil
 }
 
