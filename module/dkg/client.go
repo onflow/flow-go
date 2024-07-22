@@ -38,7 +38,7 @@ func NewClient(
 	signer sdkcrypto.Signer,
 	dkgContractAddress,
 	accountAddress string,
-	accountKeyIndex uint,
+	accountKeyIndex uint32,
 ) *Client {
 
 	log = log.With().
@@ -137,7 +137,7 @@ func (c *Client) Broadcast(msg model.BroadcastDKGMessage) error {
 		SetScript(templates.GenerateSendDKGWhiteboardMessageScript(c.env)).
 		SetComputeLimit(9999).
 		SetReferenceBlockID(latestBlock.ID).
-		SetProposalKey(account.Address, int(c.AccountKeyIndex), account.Keys[int(c.AccountKeyIndex)].SequenceNumber).
+		SetProposalKey(account.Address, c.AccountKeyIndex, account.Keys[int(c.AccountKeyIndex)].SequenceNumber).
 		SetPayer(account.Address).
 		AddAuthorizer(account.Address)
 
@@ -158,7 +158,7 @@ func (c *Client) Broadcast(msg model.BroadcastDKGMessage) error {
 	}
 
 	// sign envelope using account signer
-	err = tx.SignEnvelope(account.Address, int(c.AccountKeyIndex), c.Signer)
+	err = tx.SignEnvelope(account.Address, c.AccountKeyIndex, c.Signer)
 	if err != nil {
 		return fmt.Errorf("could not sign transaction: %w", err)
 	}
@@ -203,7 +203,7 @@ func (c *Client) SubmitResult(groupPublicKey crypto.PublicKey, publicKeys []cryp
 		SetScript(templates.GenerateSendDKGFinalSubmissionScript(c.env)).
 		SetComputeLimit(9999).
 		SetReferenceBlockID(latestBlock.ID).
-		SetProposalKey(account.Address, int(c.AccountKeyIndex), account.Keys[int(c.AccountKeyIndex)].SequenceNumber).
+		SetProposalKey(account.Address, c.AccountKeyIndex, account.Keys[int(c.AccountKeyIndex)].SequenceNumber).
 		SetPayer(account.Address).
 		AddAuthorizer(account.Address)
 
@@ -244,7 +244,7 @@ func (c *Client) SubmitResult(groupPublicKey crypto.PublicKey, publicKeys []cryp
 	}
 
 	// sign envelope using account signer
-	err = tx.SignEnvelope(account.Address, int(c.AccountKeyIndex), c.Signer)
+	err = tx.SignEnvelope(account.Address, c.AccountKeyIndex, c.Signer)
 	if err != nil {
 		return fmt.Errorf("could not sign transaction: %w", err)
 	}

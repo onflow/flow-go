@@ -73,6 +73,7 @@ const (
 	subsystemMTrie             = "mtrie"
 	subsystemIngestion         = "ingestion"
 	subsystemRuntime           = "runtime"
+	subsystemEVM               = "evm"
 	subsystemProvider          = "provider"
 	subsystemBlockDataUploader = "block_data_uploader"
 )

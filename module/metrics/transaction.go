@@ -32,6 +32,7 @@ type TransactionCollector struct {
 
 // interface check
 var _ module.BackendScriptsMetrics = (*TransactionCollector)(nil)
+var _ module.TransactionMetrics = (*TransactionCollector)(nil)
 
 func NewTransactionCollector(
 	log zerolog.Logger,

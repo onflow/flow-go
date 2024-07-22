@@ -12,9 +12,6 @@ import (
 var (
 	DefaultDirectCallBaseGasUsage = uint64(21_000)
 	DefaultDirectCallGasPrice     = uint64(0)
-
-	// anything block number above 0 works here
-	BlockNumberForEVMRules = big.NewInt(1)
 )
 
 // BlockContext holds the context needed for the emulator operations

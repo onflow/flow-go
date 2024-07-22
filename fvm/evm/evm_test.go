@@ -24,6 +24,7 @@ import (
 	envMock "github.com/onflow/flow-go/fvm/environment/mock"
 	"github.com/onflow/flow-go/fvm/evm"
 	"github.com/onflow/flow-go/fvm/evm/emulator"
+	"github.com/onflow/flow-go/fvm/evm/events"
 	"github.com/onflow/flow-go/fvm/evm/stdlib"
 	"github.com/onflow/flow-go/fvm/evm/testutils"
 	. "github.com/onflow/flow-go/fvm/evm/testutils"
@@ -106,6 +107,8 @@ func TestEVMRun(t *testing.T) {
 				// assert event fields are correct
 				require.Len(t, output.Events, 1)
 				txEvent := output.Events[0]
+				txEventPayload := testutils.TxEventToPayload(t, txEvent, sc.EVMContract.Address)
+				require.NoError(t, err)
 
 				// commit block
 				blockEventPayload, snapshot := callEVMHeartBeat(t,
@@ -116,17 +119,15 @@ func TestEVMRun(t *testing.T) {
 				require.NotEmpty(t, blockEventPayload.Hash)
 				require.Equal(t, uint64(43785), blockEventPayload.TotalGasUsed)
 				require.NotEmpty(t, blockEventPayload.Hash)
-				require.Len(t, blockEventPayload.TransactionHashes, 1)
+
+				txHashes := types.TransactionHashes{txEventPayload.Hash}
+				require.Equal(t,
+					txHashes.RootHash(),
+					blockEventPayload.TransactionHashRoot,
+				)
 				require.NotEmpty(t, blockEventPayload.ReceiptRoot)
 
-				txEventPayload := testutils.TxEventToPayload(t, txEvent, sc.EVMContract.Address)
-				require.NoError(t, err)
-
-				txPayload, err := types.CadenceUInt8ArrayValueToBytes(txEventPayload.Payload)
-				require.NoError(t, err)
-
-				require.NotEmpty(t, txEventPayload.Hash)
-				require.Equal(t, innerTxBytes, txPayload)
+				require.Equal(t, innerTxBytes, txEventPayload.Payload)
 				require.Equal(t, uint16(types.ErrCodeNoError), txEventPayload.ErrorCode)
 				require.Equal(t, uint16(0), txEventPayload.Index)
 				require.Equal(t, blockEventPayload.Height, txEventPayload.BlockHeight)
@@ -366,11 +367,8 @@ func TestEVMRun(t *testing.T) {
 
 				require.NotEmpty(t, txEventPayload.Hash)
 
-				encodedLogs, err := types.CadenceUInt8ArrayValueToBytes(txEventPayload.Logs)
-				require.NoError(t, err)
-
 				var logs []*gethTypes.Log
-				err = rlp.DecodeBytes(encodedLogs, &logs)
+				err = rlp.DecodeBytes(txEventPayload.Logs, &logs)
 				require.NoError(t, err)
 				require.Len(t, logs, 1)
 				log := logs[0]
@@ -464,6 +462,7 @@ func TestEVMBatchRun(t *testing.T) {
 				snapshot = snapshot.Append(state)
 
 				require.Len(t, output.Events, batchCount)
+				txHashes := make(types.TransactionHashes, 0)
 				for i, event := range output.Events {
 					if i == batchCount { // last one is block executed
 						continue
@@ -474,14 +473,12 @@ func TestEVMBatchRun(t *testing.T) {
 					cadenceEvent, ok := ev.(cadence.Event)
 					require.True(t, ok)
 
-					event, err := types.DecodeTransactionEventPayload(cadenceEvent)
+					event, err := events.DecodeTransactionEventPayload(cadenceEvent)
 					require.NoError(t, err)
 
-					encodedLogs, err := types.CadenceUInt8ArrayValueToBytes(event.Logs)
-					require.NoError(t, err)
-
+					txHashes = append(txHashes, event.Hash)
 					var logs []*gethTypes.Log
-					err = rlp.DecodeBytes(encodedLogs, &logs)
+					err = rlp.DecodeBytes(event.Logs, &logs)
 					require.NoError(t, err)
 
 					require.Len(t, logs, 1)
@@ -499,7 +496,10 @@ func TestEVMBatchRun(t *testing.T) {
 
 				require.NotEmpty(t, blockEventPayload.Hash)
 				require.Equal(t, uint64(155513), blockEventPayload.TotalGasUsed)
-				require.Len(t, blockEventPayload.TransactionHashes, 5)
+				require.Equal(t,
+					txHashes.RootHash(),
+					blockEventPayload.TransactionHashRoot,
+				)
 
 				// retrieve the values
 				retrieveCode := []byte(fmt.Sprintf(
@@ -962,14 +962,13 @@ func TestEVMAddressDeposit(t *testing.T) {
 			// tx executed event
 			txEvent := output.Events[2]
 			txEventPayload := testutils.TxEventToPayload(t, txEvent, sc.EVMContract.Address)
-			require.NoError(t, err)
 
 			// deposit event
 			depositEvent := output.Events[3]
-			depEv, err := types.FlowEventToCadenceEvent(depositEvent)
+			depEv, err := events.FlowEventToCadenceEvent(depositEvent)
 			require.NoError(t, err)
 
-			depEvPayload, err := types.DecodeFLOWTokensDepositedEventPayload(depEv)
+			depEvPayload, err := events.DecodeFLOWTokensDepositedEventPayload(depEv)
 			require.NoError(t, err)
 
 			require.Equal(t, types.OneFlow, depEvPayload.BalanceAfterInAttoFlow.Value)
@@ -982,8 +981,12 @@ func TestEVMAddressDeposit(t *testing.T) {
 
 			require.NotEmpty(t, blockEventPayload.Hash)
 			require.Equal(t, uint64(21000), blockEventPayload.TotalGasUsed)
-			require.Len(t, blockEventPayload.TransactionHashes, 1)
-			require.Equal(t, txEventPayload.Hash, string(blockEventPayload.TransactionHashes[0]))
+
+			txHashes := types.TransactionHashes{txEventPayload.Hash}
+			require.Equal(t,
+				txHashes.RootHash(),
+				blockEventPayload.TransactionHashRoot,
+			)
 		})
 }
 
@@ -1148,10 +1151,10 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 
 				withdrawEvent := output.Events[7]
 
-				ev, err := types.FlowEventToCadenceEvent(withdrawEvent)
+				ev, err := events.FlowEventToCadenceEvent(withdrawEvent)
 				require.NoError(t, err)
 
-				evPayload, err := types.DecodeFLOWTokensWithdrawnEventPayload(ev)
+				evPayload, err := events.DecodeFLOWTokensWithdrawnEventPayload(ev)
 				require.NoError(t, err)
 
 				// 2.34 - 1.23 = 1.11
@@ -2517,7 +2520,7 @@ func callEVMHeartBeat(
 	ctx fvm.Context,
 	vm fvm.VM,
 	snap snapshot.SnapshotTree,
-) (*types.BlockEventPayload, snapshot.SnapshotTree) {
+) (*events.BlockEventPayload, snapshot.SnapshotTree) {
 	sc := systemcontracts.SystemContractsForChain(ctx.Chain.ChainID())
 
 	heartBeatCode := []byte(fmt.Sprintf(

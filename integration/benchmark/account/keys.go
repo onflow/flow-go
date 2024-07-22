@@ -149,7 +149,7 @@ func AddKeysToAccount(
 	accountKeys := make([]flowsdk.AccountKey, numberOfKeysToAdd)
 	for i := 0; i < numberOfKeysToAdd; i++ {
 		accountKey := key.AccountKey
-		accountKey.Index = i + account.NumKeys()
+		accountKey.Index = uint32(i + account.NumKeys())
 		accountKey.SequenceNumber = 0
 		accountKeys[i] = accountKey
 	}

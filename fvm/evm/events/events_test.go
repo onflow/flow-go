@@ -1,11 +1,11 @@
-package types_test
+package events_test
 
 import (
 	"encoding/hex"
-	"fmt"
 	"math/big"
 	"testing"
 
+	"github.com/onflow/flow-go/fvm/evm/events"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
 
@@ -23,51 +23,38 @@ import (
 	"github.com/onflow/flow-go/fvm/evm/types"
 )
 
-var evmLocation = cdcCommon.NewAddressLocation(
-	nil,
-	cdcCommon.Address(systemcontracts.SystemContractsForChain(flow.Emulator).EVMContract.Address),
-	"EVM",
-)
-
 func TestEVMBlockExecutedEventCCFEncodingDecoding(t *testing.T) {
 	t.Parallel()
 
 	block := &types.Block{
-		Height:          2,
-		Timestamp:       100,
-		TotalSupply:     big.NewInt(1500),
-		ParentBlockHash: gethCommon.HexToHash("0x2813452cff514c3054ac9f40cd7ce1b016cc78ab7f99f1c6d49708837f6e06d1"),
-		ReceiptRoot:     gethCommon.Hash{},
-		TotalGasUsed:    15,
-		TransactionHashes: []gethCommon.Hash{
-			gethCommon.HexToHash("0x70b67ce6710355acf8d69b2ea013d34e212bc4824926c5d26f189c1ca9667246"),
-		},
+		Height:              2,
+		Timestamp:           100,
+		TotalSupply:         big.NewInt(1500),
+		ParentBlockHash:     gethCommon.HexToHash("0x2813452cff514c3054ac9f40cd7ce1b016cc78ab7f99f1c6d49708837f6e06d1"),
+		ReceiptRoot:         gethCommon.Hash{},
+		TotalGasUsed:        15,
+		TransactionHashRoot: gethCommon.HexToHash("0x70b67ce6710355acf8d69b2ea013d34e212bc4824926c5d26f189c1ca9667246"),
 	}
 
-	event := types.NewBlockEvent(block)
-	ev, err := event.Payload.ToCadence(evmLocation)
+	event := events.NewBlockEvent(block)
+	ev, err := event.Payload.ToCadence(flow.Emulator)
 	require.NoError(t, err)
 
-	bep, err := types.DecodeBlockEventPayload(ev)
+	bep, err := events.DecodeBlockEventPayload(ev)
 	require.NoError(t, err)
 
 	assert.Equal(t, bep.Height, block.Height)
 
 	blockHash, err := block.Hash()
 	require.NoError(t, err)
-	assert.Equal(t, bep.Hash, blockHash.Hex())
+	assert.Equal(t, bep.Hash, blockHash)
 
 	assert.Equal(t, bep.TotalSupply.Value, block.TotalSupply)
 	assert.Equal(t, bep.Timestamp, block.Timestamp)
 	assert.Equal(t, bep.TotalGasUsed, block.TotalGasUsed)
-	assert.Equal(t, bep.ParentBlockHash, block.ParentBlockHash.Hex())
-	assert.Equal(t, bep.ReceiptRoot, block.ReceiptRoot.Hex())
-
-	hashes := make([]gethCommon.Hash, len(bep.TransactionHashes))
-	for i, h := range bep.TransactionHashes {
-		hashes[i] = gethCommon.HexToHash(string(h))
-	}
-	assert.Equal(t, hashes, block.TransactionHashes)
+	assert.Equal(t, bep.ParentBlockHash, block.ParentBlockHash)
+	assert.Equal(t, bep.ReceiptRoot, block.ReceiptRoot)
+	assert.Equal(t, bep.TransactionHashRoot, block.TransactionHashRoot)
 
 	v, err := ccf.Encode(ev)
 	require.NoError(t, err)
@@ -76,10 +63,16 @@ func TestEVMBlockExecutedEventCCFEncodingDecoding(t *testing.T) {
 	evt, err := ccf.Decode(nil, v)
 	require.NoError(t, err)
 
-	assert.Equal(t, evt.Type().ID(), fmt.Sprintf(
-		"A.%s.EVM.BlockExecuted",
-		systemcontracts.SystemContractsForChain(flow.Emulator).EVMContract.Address,
-	))
+	sc := systemcontracts.SystemContractsForChain(flow.Emulator)
+
+	assert.Equal(t,
+		cdcCommon.NewAddressLocation(
+			nil,
+			cdcCommon.Address(sc.EVMContract.Address),
+			string(events.EventTypeBlockExecuted),
+		).ID(),
+		evt.Type().ID(),
+	)
 }
 
 func TestEVMTransactionExecutedEventCCFEncodingDecoding(t *testing.T) {
@@ -119,21 +112,21 @@ func TestEVMTransactionExecutedEventCCFEncodingDecoding(t *testing.T) {
 	}
 
 	t.Run("evm.TransactionExecuted with failed status", func(t *testing.T) {
-		event := types.NewTransactionEvent(txResult, txBytes, blockHeight)
-		ev, err := event.Payload.ToCadence(evmLocation)
+		event := events.NewTransactionEvent(txResult, txBytes, blockHeight)
+		ev, err := event.Payload.ToCadence(flow.Emulator)
 		require.NoError(t, err)
 
-		tep, err := types.DecodeTransactionEventPayload(ev)
+		tep, err := events.DecodeTransactionEventPayload(ev)
 		require.NoError(t, err)
 
 		assert.Equal(t, tep.BlockHeight, blockHeight)
-		assert.Equal(t, tep.Hash, txHash.Hex())
-		assert.Equal(t, tep.Payload, types.BytesToCadenceUInt8ArrayValue(txBytes))
+		assert.Equal(t, tep.Hash, txHash)
+		assert.Equal(t, tep.Payload, txBytes)
 		assert.Equal(t, types.ErrorCode(tep.ErrorCode), types.ExecutionErrCodeOutOfGas)
 		assert.Equal(t, tep.TransactionType, txResult.TxType)
 		assert.Equal(t, tep.GasConsumed, txResult.GasConsumed)
 		assert.Equal(t, tep.ErrorMessage, txResult.VMError.Error())
-		assert.Equal(t, tep.ReturnedData, types.BytesToCadenceUInt8ArrayValue(txResult.ReturnedData))
+		assert.Equal(t, tep.ReturnedData, txResult.ReturnedData)
 		assert.Equal(
 			t,
 			tep.ContractAddress,
@@ -142,7 +135,7 @@ func TestEVMTransactionExecutedEventCCFEncodingDecoding(t *testing.T) {
 
 		encodedLogs, err := rlp.EncodeToBytes(txResult.Logs)
 		require.NoError(t, err)
-		assert.Equal(t, tep.Logs, types.BytesToCadenceUInt8ArrayValue(encodedLogs))
+		assert.Equal(t, tep.Logs, encodedLogs)
 
 		v, err := ccf.Encode(ev)
 		require.NoError(t, err)
@@ -151,30 +144,31 @@ func TestEVMTransactionExecutedEventCCFEncodingDecoding(t *testing.T) {
 		evt, err := ccf.Decode(nil, v)
 		require.NoError(t, err)
 
-		assert.Equal(t, evt.Type().ID(), fmt.Sprintf(
-			"A.%s.EVM.TransactionExecuted",
-			systemcontracts.SystemContractsForChain(flow.Emulator).EVMContract.Address,
-		))
+		location := systemcontracts.SystemContractsForChain(flow.Emulator).EVMContract.Location()
+		assert.Equal(t,
+			string(location.TypeID(nil, "EVM.TransactionExecuted")),
+			evt.Type().ID(),
+		)
 	})
 
 	t.Run("evm.TransactionExecuted with non-failed status", func(t *testing.T) {
 		txResult.VMError = nil
 
-		event := types.NewTransactionEvent(txResult, txBytes, blockHeight)
-		ev, err := event.Payload.ToCadence(evmLocation)
+		event := events.NewTransactionEvent(txResult, txBytes, blockHeight)
+		ev, err := event.Payload.ToCadence(flow.Emulator)
 		require.NoError(t, err)
 
-		tep, err := types.DecodeTransactionEventPayload(ev)
+		tep, err := events.DecodeTransactionEventPayload(ev)
 		require.NoError(t, err)
 
 		assert.Equal(t, tep.BlockHeight, blockHeight)
-		assert.Equal(t, tep.Hash, txHash.Hex())
-		assert.Equal(t, tep.Payload, types.BytesToCadenceUInt8ArrayValue(txBytes))
+		assert.Equal(t, tep.Hash, txHash)
+		assert.Equal(t, tep.Payload, txBytes)
 		assert.Equal(t, types.ErrCodeNoError, types.ErrorCode(tep.ErrorCode))
 		assert.Equal(t, tep.TransactionType, txResult.TxType)
 		assert.Equal(t, tep.GasConsumed, txResult.GasConsumed)
 		assert.Empty(t, tep.ErrorMessage)
-		assert.Equal(t, tep.ReturnedData, types.BytesToCadenceUInt8ArrayValue(txResult.ReturnedData))
+		assert.Equal(t, tep.ReturnedData, txResult.ReturnedData)
 		assert.NotNil(t, txResult.DeployedContractAddress)
 		assert.Equal(
 			t,
@@ -184,7 +178,7 @@ func TestEVMTransactionExecutedEventCCFEncodingDecoding(t *testing.T) {
 
 		encodedLogs, err := rlp.EncodeToBytes(txResult.Logs)
 		require.NoError(t, err)
-		assert.Equal(t, tep.Logs, types.BytesToCadenceUInt8ArrayValue(encodedLogs))
+		assert.Equal(t, tep.Logs, encodedLogs)
 
 		v, err := ccf.Encode(ev)
 		require.NoError(t, err)
@@ -193,9 +187,10 @@ func TestEVMTransactionExecutedEventCCFEncodingDecoding(t *testing.T) {
 		evt, err := ccf.Decode(nil, v)
 		require.NoError(t, err)
 
-		assert.Equal(t, evt.Type().ID(), fmt.Sprintf(
-			"A.%s.EVM.TransactionExecuted",
-			systemcontracts.SystemContractsForChain(flow.Emulator).EVMContract.Address,
-		))
+		location := systemcontracts.SystemContractsForChain(flow.Emulator).EVMContract.Location()
+		assert.Equal(t,
+			string(location.TypeID(nil, "EVM.TransactionExecuted")),
+			evt.Type().ID(),
+		)
 	})
 }
