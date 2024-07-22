@@ -1344,6 +1344,99 @@ func TestHandler_TransactionRun(t *testing.T) {
 	})
 }
 
+func TestHandler_Metrics(t *testing.T) {
+	t.Parallel()
+
+	testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
+		testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
+			testutils.RunWithEOATestAccount(t, backend, rootAddr, func(eoa *testutils.EOATestAccount) {
+				result := &types.Result{
+					GasConsumed:             testutils.RandomGas(1000),
+					DeployedContractAddress: &types.EmptyAddress,
+				}
+				em := &testutils.TestEmulator{
+					RunTransactionFunc: func(tx *gethTypes.Transaction) (*types.Result, error) {
+						return result, nil
+					},
+					BatchRunTransactionFunc: func(txs []*gethTypes.Transaction) ([]*types.Result, error) {
+						return []*types.Result{result, result}, nil
+					},
+					DirectCallFunc: func(call *types.DirectCall) (*types.Result, error) {
+						return result, nil
+					},
+					NonceOfFunc: func(address types.Address) (uint64, error) {
+						return 1, nil
+					},
+				}
+				handler := handler.NewContractHandler(
+					flow.Emulator,
+					rootAddr,
+					flowTokenAddress,
+					rootAddr,
+					handler.NewBlockStore(backend, rootAddr),
+					handler.NewAddressAllocator(),
+					backend,
+					em,
+					debug.NopTracer)
+
+				tx := eoa.PrepareSignAndEncodeTx(
+					t,
+					gethCommon.Address{},
+					nil,
+					nil,
+					100_000,
+					big.NewInt(1),
+				)
+				// run tx
+				called := 0
+				backend.EVMTransactionExecutedFunc = func(gas uint64, isDirect, failed bool) {
+					require.Equal(t, result.GasConsumed, gas)
+					require.False(t, isDirect)
+					require.False(t, failed)
+					called += 1
+				}
+				handler.Run(tx, types.EmptyAddress)
+				require.Equal(t, 1, called)
+
+				// batch run
+				backend.EVMTransactionExecutedFunc = func(gas uint64, isDirect, failed bool) {
+					require.Equal(t, result.GasConsumed, gas)
+					require.False(t, isDirect)
+					require.False(t, failed)
+					called += 1
+				}
+				handler.BatchRun([][]byte{tx, tx}, types.EmptyAddress)
+				require.Equal(t, 3, called)
+
+				// Direct call
+				backend.EVMTransactionExecutedFunc = func(gas uint64, isDirect, failed bool) {
+					require.Equal(t, result.GasConsumed, gas)
+					require.True(t, isDirect)
+					require.False(t, failed)
+					called += 1
+				}
+				coaCounter := 0
+				backend.SetNumberOfDeployedCOAsFunc = func(count uint64) {
+					coaCounter = int(count)
+				}
+				handler.DeployCOA(0)
+				require.Equal(t, 4, called)
+				require.Equal(t, 1, coaCounter)
+
+				// form block
+				backend.EVMBlockExecutedFunc = func(txCount int, gasUsed uint64, totalSupply float64) {
+					require.Equal(t, 4, txCount)
+					require.Equal(t, result.GasConsumed*4, gasUsed)
+					require.Equal(t, float64(0), totalSupply)
+					called += 1
+				}
+				handler.CommitBlockProposal()
+				require.Equal(t, 5, called)
+			})
+		})
+	})
+}
+
 // returns true if error passes the checks
 type checkError func(error) bool
 
