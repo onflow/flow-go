@@ -440,7 +440,7 @@ func (proc *procedure) deployAt(
 
 	if proc.evm.Config.Tracer != nil {
 		proc.captureTraceBegin(0, gethVM.CREATE2, call.From.ToCommon(), call.To.ToCommon(), call.Data, call.GasLimit, call.Value)
-		defer proc.captureTraceEnd(0, call.GasLimit, res.ReturnedData, res.Receipt(0), res.VMError)
+		defer proc.captureTraceEnd(0, call.GasLimit, call.GasLimit-res.GasConsumed, res.ReturnedData, res.VMError)
 	}
 
 	addr := call.To.ToCommon()
@@ -661,12 +661,11 @@ func (proc *procedure) captureTraceBegin(
 func (proc *procedure) captureTraceEnd(
 	depth int,
 	startGas uint64,
+	leftOverGas uint64,
 	ret []byte,
-	receipt *gethTypes.Receipt,
 	err error,
 ) {
 	tracer := proc.evm.Config.Tracer
-	leftOverGas := startGas - receipt.GasUsed
 	if leftOverGas != 0 && tracer.OnGasChange != nil {
 		tracer.OnGasChange(leftOverGas, 0, gethTracing.GasChangeCallLeftOverReturned)
 	}
