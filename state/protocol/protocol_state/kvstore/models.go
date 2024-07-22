@@ -122,7 +122,7 @@ func (model *Modelv0) SetEpochStateID(id flow.Identifier) {
 //   - kvstore.ErrInvalidValue - if the view count is less than FinalizationSafetyThreshold*2.
 func (model *Modelv0) SetEpochExtensionViewCount(viewCount uint64) error {
 	if viewCount < model.EpochCommitSafetyThreshold*2 {
-		return fmt.Errorf("invalid view count %d, expect at least %d", viewCount, model.EpochCommitSafetyThreshold*2)
+		return fmt.Errorf("invalid view count %d, expect at least %d: %w", viewCount, model.EpochCommitSafetyThreshold*2, ErrInvalidValue)
 	}
 	model.EpochExtensionViewCount = viewCount
 	return nil
