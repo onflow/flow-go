@@ -51,17 +51,16 @@ func TestNativeTokenBridging(t *testing.T) {
 			originalBalance := big.NewInt(10000)
 			testAccount := types.NewAddressFromString("test")
 			bridgeAccount := types.NewAddressFromString("bridge")
-			nonce := uint64(0)
+			testAccountNonce := uint64(0)
 
 			t.Run("mint tokens to the first account", func(t *testing.T) {
 				RunWithNewEmulator(t, backend, rootAddr, func(env *emulator.Emulator) {
 					RunWithNewBlockView(t, env, func(blk types.BlockView) {
-						call := types.NewDepositCall(bridgeAccount, testAccount, originalBalance, nonce)
+						call := types.NewDepositCall(bridgeAccount, testAccount, originalBalance, 0)
 						res, err := blk.DirectCall(call)
 						require.NoError(t, err)
 						require.Equal(t, defaultCtx.DirectCallBaseGasUsage, res.GasConsumed)
 						require.Equal(t, call.Hash(), res.TxHash)
-						nonce += 1
 					})
 				})
 				RunWithNewEmulator(t, backend, rootAddr, func(env *emulator.Emulator) {
@@ -84,16 +83,19 @@ func TestNativeTokenBridging(t *testing.T) {
 						retBalance, err := blk.BalanceOf(testAccount)
 						require.NoError(t, err)
 						require.Equal(t, originalBalance, retBalance)
+						retNonce, err := blk.NonceOf(testAccount)
+						require.NoError(t, err)
+						require.Equal(t, testAccountNonce, retNonce)
 					})
 				})
 				RunWithNewEmulator(t, backend, rootAddr, func(env *emulator.Emulator) {
 					RunWithNewBlockView(t, env, func(blk types.BlockView) {
-						call := types.NewWithdrawCall(bridgeAccount, testAccount, amount, nonce)
+						call := types.NewWithdrawCall(bridgeAccount, testAccount, amount, testAccountNonce)
 						res, err := blk.DirectCall(call)
 						require.NoError(t, err)
 						require.Equal(t, defaultCtx.DirectCallBaseGasUsage, res.GasConsumed)
 						require.Equal(t, call.Hash(), res.TxHash)
-						nonce += 1
+						testAccountNonce += 1
 					})
 				})
 				RunWithNewEmulator(t, backend, rootAddr, func(env *emulator.Emulator) {
@@ -106,6 +108,10 @@ func TestNativeTokenBridging(t *testing.T) {
 						retBalance, err = blk.BalanceOf(bridgeAccount)
 						require.NoError(t, err)
 						require.Equal(t, big.NewInt(0).Uint64(), retBalance.Uint64())
+
+						retNonce, err := blk.NonceOf(testAccount)
+						require.NoError(t, err)
+						require.Equal(t, testAccountNonce, retNonce)
 					})
 				})
 			})
@@ -122,7 +128,7 @@ func TestContractInteraction(t *testing.T) {
 
 			testAccount := types.NewAddressFromString("test")
 			bridgeAccount := types.NewAddressFromString("bridge")
-			nonce := uint64(0)
+			testAccountNonce := uint64(0)
 
 			amount := big.NewInt(0).Mul(big.NewInt(1337), big.NewInt(gethParams.Ether))
 			amountToBeTransfered := big.NewInt(0).Mul(big.NewInt(100), big.NewInt(gethParams.Ether))
@@ -130,9 +136,8 @@ func TestContractInteraction(t *testing.T) {
 			// fund test account
 			RunWithNewEmulator(t, backend, rootAddr, func(env *emulator.Emulator) {
 				RunWithNewBlockView(t, env, func(blk types.BlockView) {
-					_, err := blk.DirectCall(types.NewDepositCall(bridgeAccount, testAccount, amount, nonce))
+					_, err := blk.DirectCall(types.NewDepositCall(bridgeAccount, testAccount, amount, 0))
 					require.NoError(t, err)
-					nonce += 1
 				})
 			})
 
@@ -146,13 +151,13 @@ func TestContractInteraction(t *testing.T) {
 							testContract.ByteCode,
 							math.MaxUint64,
 							amountToBeTransfered,
-							nonce)
+							testAccountNonce)
 						res, err := blk.DirectCall(call)
 						require.NoError(t, err)
 						require.NotNil(t, res.DeployedContractAddress)
 						contractAddr = *res.DeployedContractAddress
 						require.Equal(t, call.Hash(), res.TxHash)
-						nonce += 1
+						testAccountNonce += 1
 					})
 					RunWithNewReadOnlyBlockView(t, env, func(blk types.ReadOnlyBlockView) {
 						require.NotNil(t, contractAddr)
@@ -167,6 +172,10 @@ func TestContractInteraction(t *testing.T) {
 						retBalance, err = blk.BalanceOf(testAccount)
 						require.NoError(t, err)
 						require.Equal(t, amount.Sub(amount, amountToBeTransfered), retBalance)
+
+						retNonce, err := blk.NonceOf(testAccount)
+						require.NoError(t, err)
+						require.Equal(t, testAccountNonce, retNonce)
 					})
 				})
 			})
@@ -182,12 +191,12 @@ func TestContractInteraction(t *testing.T) {
 								testContract.MakeCallData(t, "store", num),
 								1_000_000,
 								big.NewInt(0), // this should be zero because the contract doesn't have receiver
-								nonce,
+								testAccountNonce,
 							),
 						)
 						require.NoError(t, err)
 						require.GreaterOrEqual(t, res.GasConsumed, uint64(40_000))
-						nonce += 1
+						testAccountNonce += 1
 						require.Empty(t, res.PrecompiledCalls)
 					})
 				})
@@ -201,11 +210,11 @@ func TestContractInteraction(t *testing.T) {
 								testContract.MakeCallData(t, "retrieve"),
 								1_000_000,
 								big.NewInt(0), // this should be zero because the contract doesn't have receiver
-								nonce,
+								testAccountNonce,
 							),
 						)
 						require.NoError(t, err)
-						nonce += 1
+						testAccountNonce += 1
 
 						ret := new(big.Int).SetBytes(res.ReturnedData)
 						require.Equal(t, num, ret)
@@ -222,14 +231,15 @@ func TestContractInteraction(t *testing.T) {
 								testContract.MakeCallData(t, "blockNumber"),
 								1_000_000,
 								big.NewInt(0), // this should be zero because the contract doesn't have receiver
-								nonce,
+								testAccountNonce,
 							),
 						)
 						require.NoError(t, err)
-						nonce += 1
+						testAccountNonce += 1
 
 						ret := new(big.Int).SetBytes(res.ReturnedData)
 						require.Equal(t, blockNumber, ret)
+
 					})
 				})
 
@@ -242,11 +252,11 @@ func TestContractInteraction(t *testing.T) {
 								testContract.MakeCallData(t, "assertError"),
 								1_000_000,
 								big.NewInt(0), // this should be zero because the contract doesn't have receiver
-								nonce,
+								testAccountNonce,
 							),
 						)
 						require.NoError(t, err)
-						nonce += 1
+						testAccountNonce += 1
 						require.Error(t, res.VMError)
 						strings.Contains(string(res.ReturnedData), "Assert Error Message")
 					})
@@ -261,11 +271,11 @@ func TestContractInteraction(t *testing.T) {
 								testContract.MakeCallData(t, "customError"),
 								1_000_000,
 								big.NewInt(0), // this should be zero because the contract doesn't have receiver
-								nonce,
+								testAccountNonce,
 							),
 						)
 						require.NoError(t, err)
-						nonce += 1
+						testAccountNonce += 1
 						require.Error(t, res.VMError)
 						strings.Contains(string(res.ReturnedData), "Value is too low")
 					})
@@ -282,11 +292,11 @@ func TestContractInteraction(t *testing.T) {
 							testContract.MakeCallData(t, "chainID"),
 							1_000_000,
 							big.NewInt(0), // this should be zero because the contract doesn't have receiver
-							nonce,
+							testAccountNonce,
 						),
 					)
 					require.NoError(t, err)
-					nonce += 1
+					testAccountNonce += 1
 
 					ret := new(big.Int).SetBytes(res.ReturnedData)
 					require.Equal(t, types.FlowEVMPreviewNetChainID, ret)
