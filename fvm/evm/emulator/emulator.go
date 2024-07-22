@@ -6,10 +6,9 @@ import (
 
 	"github.com/holiman/uint256"
 	"github.com/onflow/atree"
-	"github.com/onflow/go-ethereum/common"
 	gethCommon "github.com/onflow/go-ethereum/common"
 	gethCore "github.com/onflow/go-ethereum/core"
-	"github.com/onflow/go-ethereum/core/tracing"
+	gethTracing "github.com/onflow/go-ethereum/core/tracing"
 	gethTypes "github.com/onflow/go-ethereum/core/types"
 	gethVM "github.com/onflow/go-ethereum/core/vm"
 	gethCrypto "github.com/onflow/go-ethereum/crypto"
@@ -360,7 +359,7 @@ func (proc *procedure) mintTo(
 	}
 
 	// add balance to the bridge account before transfer
-	proc.state.AddBalance(bridge, value, tracing.BalanceIncreaseWithdrawal)
+	proc.state.AddBalance(bridge, value, gethTracing.BalanceIncreaseWithdrawal)
 	// check state errors
 	if err := proc.state.Error(); err != nil {
 		return nil, err
@@ -413,7 +412,7 @@ func (proc *procedure) withdrawFrom(
 	}
 
 	// now deduct the balance from the bridge
-	proc.state.SubBalance(bridge, value, tracing.BalanceIncreaseWithdrawal)
+	proc.state.SubBalance(bridge, value, gethTracing.BalanceIncreaseWithdrawal)
 	// all commit errors (StateDB errors) has to be returned
 	return res, proc.commit(true)
 }
@@ -650,8 +649,8 @@ func (proc *procedure) run(
 func (proc *procedure) captureTraceBegin(
 	depth int,
 	typ gethVM.OpCode,
-	from common.Address,
-	to common.Address,
+	from gethCommon.Address,
+	to gethCommon.Address,
 	input []byte,
 	startGas uint64,
 	value *big.Int) {
@@ -663,7 +662,7 @@ func (proc *procedure) captureTraceBegin(
 		tracer.OnEnter(depth, byte(typ), from, to, input, startGas, value)
 	}
 	if tracer.OnGasChange != nil {
-		tracer.OnGasChange(0, startGas, tracing.GasChangeCallInitialBalance)
+		tracer.OnGasChange(0, startGas, gethTracing.GasChangeCallInitialBalance)
 	}
 }
 
@@ -677,7 +676,7 @@ func (proc *procedure) captureTraceEnd(
 	tracer := proc.evm.Config.Tracer
 	leftOverGas := startGas - receipt.GasUsed
 	if leftOverGas != 0 && tracer.OnGasChange != nil {
-		tracer.OnGasChange(leftOverGas, 0, tracing.GasChangeCallLeftOverReturned)
+		tracer.OnGasChange(leftOverGas, 0, gethTracing.GasChangeCallLeftOverReturned)
 	}
 	var reverted bool
 	if err != nil {
