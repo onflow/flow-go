@@ -474,6 +474,8 @@ func (h *ContractHandler) getBlockContext() (types.BlockContext, error) {
 		ExtraPrecompiledContracts: h.precompiledContracts,
 		Random:                    rand,
 		Tracer:                    h.tracer.TxTracer(),
+		TxCountSoFar:              uint(len(bp.TxHashes)),
+		TotalGasUsedSoFar:         bp.TotalGasUsed,
 	}, nil
 }
 
