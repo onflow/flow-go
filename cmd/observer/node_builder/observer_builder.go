@@ -154,6 +154,7 @@ type ObserverServiceConfig struct {
 	executionDataIndexingEnabled         bool
 	executionDataPrunerHeightRangeTarget uint64
 	executionDataPrunerThreshold         uint64
+	executionDataPruningInterval         time.Duration
 	localServiceAPIEnabled               bool
 	executionDataDir                     string
 	executionDataStartHeight             uint64
@@ -225,7 +226,8 @@ func DefaultObserverServiceConfig() *ObserverServiceConfig {
 		executionDataSyncEnabled:             false,
 		executionDataIndexingEnabled:         false,
 		executionDataPrunerHeightRangeTarget: 0,
-		executionDataPrunerThreshold:         100_000,
+		executionDataPrunerThreshold:         pruner.DefaultThreshold,
+		executionDataPruningInterval:         pruner.DefaultPruningInterval,
 		localServiceAPIEnabled:               false,
 		executionDataDir:                     filepath.Join(homedir, ".flow", "execution_data"),
 		executionDataStartHeight:             0,
@@ -677,6 +679,10 @@ func (builder *ObserverServiceBuilder) extraFlags() {
 			"execution-data-height-range-threshold",
 			defaultConfig.executionDataPrunerThreshold,
 			"number of unpruned blocks of Execution Data beyond the height range target to allow before pruning")
+		flags.DurationVar(&builder.executionDataPruningInterval,
+			"execution-data-pruning-interval",
+			defaultConfig.executionDataPruningInterval,
+			"duration after which the pruner tries to prune execution data. The default value is 10 minutes")
 
 		// ExecutionDataRequester config
 		flags.BoolVar(&builder.executionDataSyncEnabled,
@@ -1302,6 +1308,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				}),
 				pruner.WithHeightRangeTarget(builder.executionDataPrunerHeightRangeTarget),
 				pruner.WithThreshold(builder.executionDataPrunerThreshold),
+				pruner.WithPruningInterval(builder.executionDataPruningInterval),
 			)
 			if err != nil {
 				return nil, fmt.Errorf("failed to create execution data pruner: %w", err)

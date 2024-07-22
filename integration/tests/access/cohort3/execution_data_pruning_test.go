@@ -8,13 +8,13 @@ import (
 	"time"
 
 	badgerds "github.com/ipfs/go-ds-badger2"
+	sdk "github.com/onflow/flow-go-sdk"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
-	sdk "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/blobs"
@@ -78,6 +78,7 @@ func (s *ExecutionDataPruningSuite) SetupTest() {
 		testnet.WithAdditionalFlagf("--event-query-mode=local-only"),
 		testnet.WithAdditionalFlagf("--execution-data-height-range-target=%d", 100),
 		testnet.WithAdditionalFlagf("--execution-data-height-range-threshold=%d", s.threshold),
+		testnet.WithAdditionalFlagf(fmt.Sprintf("--execution-data-pruning-interval=%s", "10s")),
 	)
 
 	consensusConfigs := []func(config *testnet.NodeConfig){
@@ -115,6 +116,7 @@ func (s *ExecutionDataPruningSuite) SetupTest() {
 			"--event-query-mode=local-only",
 			fmt.Sprintf("--execution-data-height-range-target=%d", 100),
 			fmt.Sprintf("--execution-data-height-range-threshold=%d", s.threshold),
+			fmt.Sprintf("--execution-data-pruning-interval=%s", "10s"),
 		},
 	}}
 

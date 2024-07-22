@@ -148,6 +148,7 @@ type AccessNodeConfig struct {
 	publicNetworkExecutionDataEnabled    bool
 	executionDataPrunerHeightRangeTarget uint64
 	executionDataPrunerThreshold         uint64
+	executionDataPruningInterval         time.Duration
 	executionDataDir                     string
 	executionDataStartHeight             uint64
 	executionDataConfig                  edrequester.ExecutionDataConfig
@@ -254,7 +255,8 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 		},
 		executionDataIndexingEnabled:         false,
 		executionDataPrunerHeightRangeTarget: 0,
-		executionDataPrunerThreshold:         100_000,
+		executionDataPrunerThreshold:         pruner.DefaultThreshold,
+		executionDataPruningInterval:         pruner.DefaultPruningInterval,
 		registersDBPath:                      filepath.Join(homedir, ".flow", "execution_state"),
 		checkpointFile:                       cmd.NotSet,
 		scriptExecutorConfig:                 query.NewDefaultConfig(),
@@ -743,6 +745,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				}),
 				pruner.WithHeightRangeTarget(builder.executionDataPrunerHeightRangeTarget),
 				pruner.WithThreshold(builder.executionDataPrunerThreshold),
+				pruner.WithPruningInterval(builder.executionDataPruningInterval),
 			)
 			if err != nil {
 				return nil, fmt.Errorf("failed to create execution data pruner: %w", err)
@@ -1265,6 +1268,10 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 			"execution-data-height-range-threshold",
 			defaultConfig.executionDataPrunerThreshold,
 			"number of unpruned blocks of Execution Data beyond the height range target to allow before pruning")
+		flags.DurationVar(&builder.executionDataPruningInterval,
+			"execution-data-pruning-interval",
+			defaultConfig.executionDataPruningInterval,
+			"duration after which the pruner tries to prune execution data. The default value is 10 minutes")
 
 		// Execution State Streaming API
 		flags.Uint32Var(&builder.stateStreamConf.ExecutionDataCacheSize, "execution-data-cache-size", defaultConfig.stateStreamConf.ExecutionDataCacheSize, "block execution data cache size")
