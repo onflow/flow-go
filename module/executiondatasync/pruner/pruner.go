@@ -39,10 +39,8 @@ const (
 // A height is considered fulfilled once it has both been executed,
 // tracked, and sealed.
 type Pruner struct {
-	storage tracker.Storage
-	// pruningInterval how frequently pruning can be performed
-	pruningInterval time.Duration
-	pruneCallback   func(ctx context.Context) error
+	storage       tracker.Storage
+	pruneCallback func(ctx context.Context) error
 
 	lastFulfilledHeight uint64
 	lastPrunedHeight    uint64
@@ -56,6 +54,9 @@ type Pruner struct {
 	// once the height range reaches `heightRangeTarget+threshold`, `threshold` many blocks
 	// are pruned
 	threshold *atomic.Uint64
+
+	// pruningInterval how frequently pruning can be performed
+	pruningInterval time.Duration
 
 	logger  zerolog.Logger
 	metrics module.ExecutionDataPrunerMetrics
@@ -83,12 +84,14 @@ func WithThreshold(threshold uint64) PrunerOption {
 	}
 }
 
+// WithPruneCallback sets a custom callback function to be called after pruning.
 func WithPruneCallback(callback func(context.Context) error) PrunerOption {
 	return func(p *Pruner) {
 		p.pruneCallback = callback
 	}
 }
 
+// WithPruningInterval is used to configure the pruner with a custom pruning interval.
 func WithPruningInterval(interval time.Duration) PrunerOption {
 	return func(p *Pruner) {
 		p.pruningInterval = interval
@@ -130,6 +133,13 @@ func NewPruner(logger zerolog.Logger, metrics module.ExecutionDataPrunerMetrics,
 	return p, nil
 }
 
+// RegisterProducer registers an execution data producer with the Pruner.
+//
+// Parameters:
+//   - producer: The execution data producer to register.
+//
+// Returns:
+//   - execution_data.ErrMultipleRegister: if producer is already registered.
 func (p *Pruner) RegisterProducer(producer execution_data.ExecutionDataProducer) error {
 	err := producer.Register()
 	if err != nil {
@@ -152,6 +162,9 @@ func (p *Pruner) SetThreshold(threshold uint64) {
 	p.threshold.Store(threshold)
 }
 
+// loop is the main worker for the Pruner, responsible for triggering
+// pruning operations at regular intervals. It monitors the heights
+// of registered producers and checks if pruning is necessary.
 func (p *Pruner) loop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
 	ticker := time.NewTicker(p.pruningInterval)
@@ -175,6 +188,10 @@ func (p *Pruner) loop(ctx irrecoverable.SignalerContext, ready component.ReadyFu
 	}
 }
 
+// lowestProducersHeight returns the lowest height among all registered producers.
+//
+// Returns:
+//   - uint64: The lowest height among all registered producers.
 func (p *Pruner) lowestProducersHeight() uint64 {
 	lowestHeight := uint64(math.MaxUint64)
 
@@ -187,6 +204,12 @@ func (p *Pruner) lowestProducersHeight() uint64 {
 	return lowestHeight
 }
 
+// updateFulfilledHeight updates the last fulfilled height and stores it in the storage.
+//
+// Parameters:
+//   - height: The new fulfilled height.
+//
+// No errors are expected during normal operations.
 func (p *Pruner) updateFulfilledHeight(height uint64) error {
 	if height > p.lastFulfilledHeight {
 		p.lastFulfilledHeight = height
@@ -195,6 +218,11 @@ func (p *Pruner) updateFulfilledHeight(height uint64) error {
 	return nil
 }
 
+// checkPrune checks if pruning should be performed based on the height range
+// and triggers the pruning operation if necessary.
+//
+// Parameters:
+//   - ctx: The context for managing the pruning operation.
 func (p *Pruner) checkPrune(ctx irrecoverable.SignalerContext) {
 	threshold := p.threshold.Load()
 	heightRangeTarget := p.heightRangeTarget.Load()
