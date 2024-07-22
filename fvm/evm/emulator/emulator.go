@@ -129,7 +129,7 @@ func (bl *BlockView) DirectCall(call *types.DirectCall) (res *types.Result, err 
 		proc.evm.Config.Tracer.OnTxStart(proc.evm.GetVMContext(), call.Transaction(), call.From.ToCommon())
 		if proc.evm.Config.Tracer.OnTxEnd != nil {
 			defer func() {
-				proc.evm.Config.Tracer.OnTxEnd(res.Receipt(bl.config.BlockTotalGasUsedSoFar), err)
+				proc.evm.Config.Tracer.OnTxEnd(res.Receipt(), err)
 			}()
 		}
 	}
@@ -176,14 +176,14 @@ func (bl *BlockView) RunTransaction(
 		proc.evm.Config.Tracer.OnTxStart(proc.evm.GetVMContext(), tx, msg.From)
 		if proc.evm.Config.Tracer.OnTxEnd != nil {
 			defer func() {
-				proc.evm.Config.Tracer.OnTxEnd(result.Receipt(bl.config.BlockTotalGasUsedSoFar), err)
+				proc.evm.Config.Tracer.OnTxEnd(result.Receipt(), err)
 			}()
 		}
 	}
 
 	// update tx context origin
 	proc.evm.TxContext.Origin = msg.From
-	res, err := proc.run(msg, tx.Hash(), bl.config.BlockTxCountSoFar, tx.Type())
+	res, err := proc.run(msg, tx.Hash(), tx.Type())
 	if err != nil {
 		return nil, err
 	}
@@ -219,7 +219,7 @@ func (bl *BlockView) BatchRunTransactions(txs []*gethTypes.Transaction) ([]*type
 			if proc.evm.Config.Tracer.OnTxEnd != nil {
 				defer func() {
 					proc.evm.Config.Tracer.OnTxEnd(
-						batchResults[i].Receipt(bl.config.BlockTotalGasUsedSoFar),
+						batchResults[i].Receipt(),
 						err,
 					)
 				}()
@@ -228,7 +228,7 @@ func (bl *BlockView) BatchRunTransactions(txs []*gethTypes.Transaction) ([]*type
 
 		// update tx context origin
 		proc.evm.TxContext.Origin = msg.From
-		res, err := proc.run(msg, tx.Hash(), bl.config.BlockTxCountSoFar+uint(i), tx.Type())
+		res, err := proc.run(msg, tx.Hash(), tx.Type())
 		if err != nil {
 			return nil, err
 		}
@@ -278,7 +278,7 @@ func (bl *BlockView) DryRunTransaction(
 	msg.SkipAccountChecks = true
 
 	// return without committing the state
-	txResult, err = proc.run(msg, tx.Hash(), proc.config.BlockTxCountSoFar, tx.Type())
+	txResult, err = proc.run(msg, tx.Hash(), tx.Type())
 	if txResult.Successful() {
 		// As mentioned in https://github.com/ethereum/EIPs/blob/master/EIPS/eip-150.md#specification
 		// Define "all but one 64th" of N as N - floor(N / 64).
@@ -366,7 +366,7 @@ func (proc *procedure) mintTo(
 	}
 
 	// withdraw the amount and move it to the bridge account
-	res, err := proc.run(call.Message(), call.Hash(), proc.config.BlockTxCountSoFar, types.DirectCallTxType)
+	res, err := proc.run(call.Message(), call.Hash(), types.DirectCallTxType)
 	if err != nil {
 		return res, err
 	}
@@ -398,7 +398,7 @@ func (proc *procedure) withdrawFrom(
 	}
 
 	// withdraw the amount and move it to the bridge account
-	res, err := proc.run(call.Message(), call.Hash(), proc.config.BlockTxCountSoFar, types.DirectCallTxType)
+	res, err := proc.run(call.Message(), call.Hash(), types.DirectCallTxType)
 	if err != nil {
 		return res, err
 	}
@@ -562,7 +562,6 @@ func (proc *procedure) runDirect(
 	res, err := proc.run(
 		call.Message(),
 		call.Hash(),
-		proc.config.BlockTxCountSoFar,
 		types.DirectCallTxType,
 	)
 	if err != nil {
@@ -580,7 +579,6 @@ func (proc *procedure) runDirect(
 func (proc *procedure) run(
 	msg *gethCore.Message,
 	txHash gethCommon.Hash,
-	txIndex uint,
 	txType uint8,
 ) (*types.Result, error) {
 	var err error
@@ -625,11 +623,14 @@ func (proc *procedure) run(
 		return &res, nil
 	}
 
+	txIndex := proc.config.BlockTxCountSoFar
 	// if pre-checks are passed, the exec result won't be nil
 	if execResult != nil {
+
 		res.GasConsumed = execResult.UsedGas
 		res.GasRefund = proc.state.GetRefund()
 		res.Index = uint16(txIndex)
+		res.CumulativeGasUsed = execResult.UsedGas + proc.config.BlockTotalGasUsedSoFar
 		res.PrecompiledCalls, err = proc.config.PCTracker.CapturedCalls()
 		if err != nil {
 			return nil, err
@@ -639,7 +640,7 @@ func (proc *procedure) run(
 		// if the tx is reverted the error message is returned as returned value
 		res.ReturnedData = execResult.ReturnData
 
-		// update proc (useful for batch runs)
+		// Update proc context
 		proc.config.BlockTotalGasUsedSoFar += execResult.UsedGas
 		proc.config.BlockTxCountSoFar += 1
 

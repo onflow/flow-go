@@ -73,6 +73,8 @@ type Result struct {
 	TxType uint8
 	// total gas consumed during execution
 	GasConsumed uint64
+	// total gas used by the block after this tx execution
+	CumulativeGasUsed uint64
 	// total gas refunds after transaction execution
 	GasRefund uint64
 	// the address where the contract is deployed (if any)
@@ -128,14 +130,14 @@ func (res *Result) VMErrorString() string {
 // Type (txType), PostState or Status, CumulativeGasUsed, Logs and Logs Bloom
 // and for each log, Address, Topics, Data (consensus fields)
 // During execution we also do fill in BlockNumber, TxIndex, Index (event index)
-func (res *Result) Receipt(cumulativeGasUsed uint64) *gethTypes.Receipt {
+func (res *Result) Receipt() *gethTypes.Receipt {
 	if res.Invalid() {
 		return nil
 	}
 
 	receipt := &gethTypes.Receipt{
 		GasUsed:           res.GasConsumed,
-		CumulativeGasUsed: cumulativeGasUsed + res.GasConsumed,
+		CumulativeGasUsed: res.CumulativeGasUsed,
 		Logs:              res.Logs,
 	}
 
@@ -159,13 +161,13 @@ func (res *Result) Receipt(cumulativeGasUsed uint64) *gethTypes.Receipt {
 
 // LightReceipt constructs a light receipt from the result
 // that is used for storing in block proposal.
-func (res *Result) LightReceipt(gasUsedUntilNow uint64) *LightReceipt {
+func (res *Result) LightReceipt() *LightReceipt {
 	if res.Invalid() {
 		return nil
 	}
 
 	receipt := &LightReceipt{
-		CumulativeGasUsed: res.GasConsumed + gasUsedUntilNow,
+		CumulativeGasUsed: res.CumulativeGasUsed,
 	}
 
 	receipt.Logs = make([]LightLog, len(res.Logs))

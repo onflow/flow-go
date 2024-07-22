@@ -116,7 +116,7 @@ func (b *BlockProposal) AppendTransaction(res *Result) {
 		return
 	}
 	b.TxHashes = append(b.TxHashes, res.TxHash)
-	r := res.LightReceipt(b.TotalGasUsed)
+	r := res.LightReceipt()
 	if r == nil {
 		return
 	}
