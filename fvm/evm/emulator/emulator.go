@@ -343,9 +343,9 @@ func (proc *procedure) mintTo(
 	txHash gethCommon.Hash,
 ) (*types.Result, error) {
 	// convert value into uint256
-	value, overflow := uint256.FromBig(call.Value)
-	if overflow {
-		return nil, types.ErrInvalidBalance
+	value, err := convertBigValueIntoUint256(call.Value)
+	if err != nil {
+		return nil, err
 	}
 
 	// create bridge account if not exist
@@ -361,9 +361,8 @@ func (proc *procedure) mintTo(
 		return nil, err
 	}
 
-	msg := call.Message()
 	// withdraw the amount and move it to the bridge account
-	res, err := proc.run(msg, txHash, 0, types.DirectCallTxType)
+	res, err := proc.run(call.Message(), txHash, 0, types.DirectCallTxType)
 	if err != nil {
 		return res, err
 	}
@@ -376,7 +375,7 @@ func (proc *procedure) mintTo(
 		return res, types.ErrInternalDirectCallFailed
 	}
 
-	// all commmit errors (StateDB errors) has to be returned
+	// all commit errors (StateDB errors) has to be returned
 	return res, proc.commit(true)
 }
 
@@ -384,21 +383,20 @@ func (proc *procedure) withdrawFrom(
 	call *types.DirectCall,
 	txHash gethCommon.Hash,
 ) (*types.Result, error) {
-	value, overflow := uint256.FromBig(call.Value)
-	if overflow {
-		return nil, types.ErrInvalidBalance
+	// convert value into uint256
+	value, err := convertBigValueIntoUint256(call.Value)
+	if err != nil {
+		return nil, err
 	}
 
-	bridge := call.To.ToCommon()
-
 	// create bridge account if not exist
+	bridge := call.To.ToCommon()
 	if !proc.state.Exist(bridge) {
 		proc.state.CreateAccount(bridge)
 	}
 
 	// withdraw the amount and move it to the bridge account
-	msg := call.Message()
-	res, err := proc.run(msg, txHash, 0, types.DirectCallTxType)
+	res, err := proc.run(call.Message(), txHash, 0, types.DirectCallTxType)
 	if err != nil {
 		return res, err
 	}
@@ -411,12 +409,12 @@ func (proc *procedure) withdrawFrom(
 
 	// now deduct the balance from the bridge
 	proc.state.SubBalance(bridge, value, tracing.BalanceIncreaseWithdrawal)
-	// all commmit errors (StateDB errors) has to be returned
+	// all commit errors (StateDB errors) has to be returned
 	return res, proc.commit(true)
 }
 
 // deployAt deploys a contract at the given target address
-// behaviour should be similar to what evm.create internal method does with
+// behavior should be similar to what evm.create internal method does with
 // a few differences, don't need to check for previous forks given this
 // functionality was not available to anyone, we don't need to
 // follow snapshoting, given we do commit/revert style in this code base.
@@ -691,4 +689,17 @@ func (proc *procedure) captureTraceEnd(
 func AddOne64th(n uint64) uint64 {
 	// NOTE: Go's integer division floors, but that is desirable here
 	return n + (n / 64)
+}
+
+func convertBigValueIntoUint256(inp *big.Int) (*uint256.Int, error) {
+	// negative amounts are not acceptable.
+	if inp.Sign() < 0 {
+		return nil, types.ErrInvalidBalance
+	}
+	// convert value into uint256
+	value, overflow := uint256.FromBig(inp)
+	if overflow {
+		return nil, types.ErrInvalidBalance
+	}
+	return value, nil
 }
