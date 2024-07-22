@@ -149,7 +149,7 @@ func (bl *BlockView) DirectCall(call *types.DirectCall) (res *types.Result, err 
 // RunTransaction runs an evm transaction
 func (bl *BlockView) RunTransaction(
 	tx *gethTypes.Transaction,
-) (*types.Result, error) {
+) (result *types.Result, err error) {
 	// create a new procedure
 	proc, err := bl.newProcedure()
 	if err != nil {
@@ -165,6 +165,17 @@ func (bl *BlockView) RunTransaction(
 		// this is not a fatal error (e.g. due to bad signature)
 		// not a valid transaction
 		return types.NewInvalidResult(tx, err), nil
+	}
+
+	// call tracer
+	if proc.evm.Config.Tracer != nil && proc.evm.Config.Tracer.OnTxStart != nil {
+		proc.evm.Config.Tracer.OnTxStart(proc.evm.GetVMContext(), tx, msg.From)
+		if proc.evm.Config.Tracer.OnTxEnd != nil {
+			defer func() {
+				// passing total gas used before of zero is okey since onTxEnd doesn't consume it
+				proc.evm.Config.Tracer.OnTxEnd(result.Receipt(0), err)
+			}()
+		}
 	}
 
 	// update tx context origin
@@ -250,17 +261,6 @@ func (bl *BlockView) DryRunTransaction(
 		GetSigner(bl.config),
 		proc.config.BlockContext.BaseFee,
 	)
-
-	// call tracer
-	if proc.evm.Config.Tracer != nil && proc.evm.Config.Tracer.OnTxStart != nil {
-		proc.evm.Config.Tracer.OnTxStart(proc.evm.GetVMContext(), tx, msg.From)
-		if proc.evm.Config.Tracer.OnTxEnd != nil {
-			defer func() {
-				// passing total gas used before of zero is okey since onTxEnd doesn't consume it
-				proc.evm.Config.Tracer.OnTxEnd(txResult.Receipt(0), err)
-			}()
-		}
-	}
 
 	// we can ignore invalid signature errors since we don't expect signed transactions
 	if !errors.Is(err, gethTypes.ErrInvalidSig) {
