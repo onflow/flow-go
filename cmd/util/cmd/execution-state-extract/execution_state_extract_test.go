@@ -15,6 +15,7 @@ import (
 	runtimeCommon "github.com/onflow/cadence/runtime/common"
 
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
+	"github.com/onflow/flow-go/cmd/util/ledger/migrations"
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
@@ -65,12 +66,27 @@ func TestExtractExecutionState(t *testing.T) {
 
 	t.Run("empty WAL doesn't find anything", func(t *testing.T) {
 		withDirs(t, func(datadir, execdir, outdir string) {
-			extractor := newExecutionStateExtractor(zerolog.Nop(), execdir, unittest.StateCommitmentFixture())
+			opts := migrations.Options{
+				NWorker:              10,
+				ChainID:              flow.Emulator,
+				EVMContractChange:    migrations.EVMContractChangeNone,
+				BurnerContractChange: migrations.BurnerContractChangeDeploy,
+				VerboseErrorOutput:   true,
+			}
 
-			partialState, payloads, err := extractor.extract()
+			err := extractExecutionState(
+				zerolog.Nop(),
+				execdir,
+				unittest.StateCommitmentFixture(),
+				outdir,
+				10,
+				false,
+				"",
+				nil,
+				false,
+				opts,
+			)
 			require.Error(t, err)
-			require.False(t, partialState)
-			require.Equal(t, 0, len(payloads))
 		})
 	})
 
