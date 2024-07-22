@@ -650,9 +650,6 @@ func (proc *procedure) captureTraceBegin(
 	startGas uint64,
 	value *big.Int) {
 	tracer := proc.evm.Config.Tracer
-	if tracer.OnTxStart != nil {
-		tracer.OnTxStart(nil, gethTypes.NewTransaction(0, to, value, startGas, nil, input), from)
-	}
 	if tracer.OnEnter != nil {
 		tracer.OnEnter(depth, byte(typ), from, to, input, startGas, value)
 	}
@@ -682,9 +679,6 @@ func (proc *procedure) captureTraceEnd(
 	}
 	if tracer.OnExit != nil {
 		tracer.OnExit(depth, ret, startGas-leftOverGas, gethVM.VMErrorFromErr(err), reverted)
-	}
-	if tracer.OnTxEnd != nil {
-		tracer.OnTxEnd(receipt, err)
 	}
 }
 
