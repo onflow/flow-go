@@ -1,6 +1,7 @@
 package kvstore_test
 
 import (
+	"github.com/onflow/flow-go/model/flow"
 	"reflect"
 	"testing"
 
@@ -178,4 +179,27 @@ func assertModelIsUpgradable(t *testing.T, api protocol_state.KVStoreMutator) {
 	// check if setting nil version upgrade works
 	api.SetVersionUpgrade(nil)
 	assert.Nil(t, api.GetVersionUpgrade(), "version upgrade should be nil")
+}
+
+// TestNewDefaultKVStore tests that the default KV store is created correctly.
+func TestNewDefaultKVStore(t *testing.T) {
+	t.Run("happy-path", func(t *testing.T) {
+		safetyParams, err := protocol.DefaultEpochSafetyParams(flow.Localnet)
+		require.NoError(t, err)
+		epochStateID := unittest.IdentifierFixture()
+		store, err := kvstore.NewDefaultKVStore(safetyParams.FinalizationSafetyThreshold, safetyParams.EpochExtensionViewCount, epochStateID)
+		require.NoError(t, err)
+		require.Equal(t, store.GetEpochStateID(), epochStateID)
+		require.Equal(t, store.GetEpochCommitSafetyThreshold(), safetyParams.FinalizationSafetyThreshold)
+		require.Equal(t, store.GetEpochExtensionViewCount(), safetyParams.EpochExtensionViewCount)
+	})
+	t.Run("invalid-epoch-extension-view-count", func(t *testing.T) {
+		safetyParams, err := protocol.DefaultEpochSafetyParams(flow.Localnet)
+		require.NoError(t, err)
+		epochStateID := unittest.IdentifierFixture()
+		// invalid epoch extension view count, it has to be at least 2*FinalizationSafetyThreshold
+		store, err := kvstore.NewDefaultKVStore(safetyParams.FinalizationSafetyThreshold, safetyParams.FinalizationSafetyThreshold, epochStateID)
+		require.Error(t, err)
+		require.Nil(t, store)
+	})
 }
