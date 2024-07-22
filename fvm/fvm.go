@@ -286,7 +286,7 @@ func GetAccountKeys(
 func GetAccountKey(
 	ctx Context,
 	address flow.Address,
-	keyIndex uint64,
+	keyIndex uint32,
 	storageSnapshot snapshot.StorageSnapshot,
 ) (
 	*flow.AccountPublicKey,

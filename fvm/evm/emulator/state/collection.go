@@ -45,7 +45,7 @@ func NewCollectionProvider(
 // Warning: this method should only used only once for each collection and
 // the returned pointer should be kept for the future.
 // calling twice for the same collection might result in odd-behaviours
-// currently collection provider doesn't do any internal caching to protect aginast these cases
+// currently collection provider doesn't do any internal caching to protect against these cases
 func (cp *CollectionProvider) CollectionByID(collectionID []byte) (*Collection, error) {
 	slabID, err := atree.NewSlabIDFromRawBytes(collectionID)
 	if err != nil {
