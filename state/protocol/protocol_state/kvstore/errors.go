@@ -36,4 +36,6 @@ var ErrInvalidActivationView = errors.New("invalid activation view for the new P
 // with the specified `protocolVersion` but such operation is not supported by the parent snapshot.
 var ErrIncompatibleVersionChange = errors.New("incompatible version change when replicating the Protocol State's kvstore")
 
+// ErrInvalidValue is a sentinel returned when a value is not considered valid for a given key.
+// This sentinel is applicable on a key-by-key basis: same value can be considered valid/invalid for different keys.
 var ErrInvalidValue = errors.New("invalid value for the requested key in Protocol State's kvstore")
