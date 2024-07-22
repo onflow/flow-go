@@ -73,7 +73,7 @@ func (em *Emulator) NewBlockView(ctx types.BlockContext) (types.BlockView, error
 }
 
 // ReadOnlyBlockView provides a read only view of a block
-// could be used multiple times for queries
+// could be used for multiple queries against a block
 type ReadOnlyBlockView struct {
 	state types.StateDB
 }
@@ -81,22 +81,22 @@ type ReadOnlyBlockView struct {
 // BalanceOf returns the balance of the given address
 func (bv *ReadOnlyBlockView) BalanceOf(address types.Address) (*big.Int, error) {
 	bal := bv.state.GetBalance(address.ToCommon())
-	return bal.ToBig(), nil
+	return bal.ToBig(), bv.state.Error()
 }
 
 // NonceOf returns the nonce of the given address
 func (bv *ReadOnlyBlockView) NonceOf(address types.Address) (uint64, error) {
-	return bv.state.GetNonce(address.ToCommon()), nil
+	return bv.state.GetNonce(address.ToCommon()), bv.state.Error()
 }
 
 // CodeOf returns the code of the given address
 func (bv *ReadOnlyBlockView) CodeOf(address types.Address) (types.Code, error) {
-	return bv.state.GetCode(address.ToCommon()), nil
+	return bv.state.GetCode(address.ToCommon()), bv.state.Error()
 }
 
 // CodeHashOf returns the code hash of the given address
 func (bv *ReadOnlyBlockView) CodeHashOf(address types.Address) ([]byte, error) {
-	return bv.state.GetCodeHash(address.ToCommon()).Bytes(), nil
+	return bv.state.GetCodeHash(address.ToCommon()).Bytes(), bv.state.Error()
 }
 
 // BlockView allows mutation of the evm state as part of a block
@@ -239,7 +239,7 @@ func (bl *BlockView) DryRunTransaction(
 		return nil, types.ErrInvalidBalance
 	}
 
-	// we can ignore invalid signature errors since we don't expect signed transctions
+	// we can ignore invalid signature errors since we don't expect signed transactions
 	if !errors.Is(err, gethTypes.ErrInvalidSig) {
 		return nil, err
 	}
