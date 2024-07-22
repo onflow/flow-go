@@ -1,13 +1,22 @@
 package access
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
+	"github.com/onflow/cadence"
+	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime/parser"
 	"github.com/onflow/crypto"
+	"github.com/onflow/flow-core-contracts/lib/go/templates"
+	"github.com/rs/zerolog/log"
 
+	cadenceutils "github.com/onflow/flow-go/access/utils"
+	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/execution"
 	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/protocol"
 )
@@ -15,6 +24,7 @@ import (
 type Blocks interface {
 	HeaderByID(id flow.Identifier) (*flow.Header, error)
 	FinalizedHeader() (*flow.Header, error)
+	SealedHeader() (*flow.Header, error)
 }
 
 type ProtocolStateBlocks struct {
@@ -40,6 +50,10 @@ func (b *ProtocolStateBlocks) HeaderByID(id flow.Identifier) (*flow.Header, erro
 
 func (b *ProtocolStateBlocks) FinalizedHeader() (*flow.Header, error) {
 	return b.state.Final().Head()
+}
+
+func (b *ProtocolStateBlocks) SealedHeader() (*flow.Header, error) {
+	return b.state.Sealed().Head()
 }
 
 // RateLimiter is an interface for checking if an address is rate limited.
@@ -70,28 +84,40 @@ type TransactionValidationOptions struct {
 	CheckScriptsParse            bool
 	MaxTransactionByteSize       uint64
 	MaxCollectionByteSize        uint64
+	CheckPayerBalance            bool
 }
 
 type TransactionValidator struct {
-	blocks                Blocks     // for looking up blocks to check transaction expiry
-	chain                 flow.Chain // for checking validity of addresses
-	options               TransactionValidationOptions
-	serviceAccountAddress flow.Address
-	limiter               RateLimiter
+	blocks                   Blocks     // for looking up blocks to check transaction expiry
+	chain                    flow.Chain // for checking validity of addresses
+	options                  TransactionValidationOptions
+	serviceAccountAddress    flow.Address
+	limiter                  RateLimiter
+	scriptExecutor           execution.ScriptExecutor
+	verifyPayerBalanceScript []byte
 }
 
 func NewTransactionValidator(
 	blocks Blocks,
 	chain flow.Chain,
 	options TransactionValidationOptions,
-) *TransactionValidator {
-	return &TransactionValidator{
-		blocks:                blocks,
-		chain:                 chain,
-		options:               options,
-		serviceAccountAddress: chain.ServiceAddress(),
-		limiter:               NewNoopLimiter(),
+	executor execution.ScriptExecutor,
+) (*TransactionValidator, error) {
+	if options.CheckPayerBalance && executor == nil {
+		return nil, errors.New("transaction validator cannot use checkPayerBalance with nil executor")
 	}
+
+	env := systemcontracts.SystemContractsForChain(chain.ChainID()).AsTemplateEnv()
+
+	return &TransactionValidator{
+		blocks:                   blocks,
+		chain:                    chain,
+		options:                  options,
+		serviceAccountAddress:    chain.ServiceAddress(),
+		limiter:                  NewNoopLimiter(),
+		scriptExecutor:           executor,
+		verifyPayerBalanceScript: templates.GenerateVerifyPayerBalanceForTxExecution(env),
+	}, nil
 }
 
 func NewTransactionValidatorWithLimiter(
@@ -109,7 +135,7 @@ func NewTransactionValidatorWithLimiter(
 	}
 }
 
-func (v *TransactionValidator) Validate(tx *flow.TransactionBody) (err error) {
+func (v *TransactionValidator) Validate(ctx context.Context, tx *flow.TransactionBody) (err error) {
 	// rate limit transactions for specific payers.
 	// a short term solution to prevent attacks that send too many failed transactions
 	// if a transaction is from a payer that should be rate limited, all the following
@@ -157,6 +183,20 @@ func (v *TransactionValidator) Validate(tx *flow.TransactionBody) (err error) {
 	err = v.checkSignatureDuplications(tx)
 	if err != nil {
 		return err
+	}
+
+	err = v.checkSufficientBalanceToPayForTransaction(ctx, tx)
+	if err != nil {
+		// we only return InsufficientBalanceError as it's a client-side issue
+		// that requires action from a user. Other errors (e.g. parsing errors)
+		// are 'internal' and related to script execution process. they shouldn't
+		// prevent the transaction from proceeding.
+		if IsInsufficientBalanceError(err) {
+			return err
+		}
+
+		// log and ignore all other errors
+		log.Info().Err(err).Msg("check payer validation skipped due to error")
 	}
 
 	// TODO replace checkSignatureFormat by verifying the account/payer signatures
@@ -344,6 +384,48 @@ func (v *TransactionValidator) checkSignatureFormat(tx *flow.TransactionBody) er
 	}
 
 	return nil
+}
+
+func (v *TransactionValidator) checkSufficientBalanceToPayForTransaction(ctx context.Context, tx *flow.TransactionBody) error {
+	if !v.options.CheckPayerBalance {
+		return nil
+	}
+
+	header, err := v.blocks.SealedHeader()
+	if err != nil {
+		return fmt.Errorf("could not fetch block header: %w", err)
+	}
+
+	payerAddress := cadence.NewAddress(tx.Payer)
+	inclusionEffort := cadence.UFix64(tx.InclusionEffort())
+	gasLimit := cadence.UFix64(tx.GasLimit)
+
+	args, err := cadenceutils.EncodeArgs([]cadence.Value{payerAddress, inclusionEffort, gasLimit})
+	if err != nil {
+		return fmt.Errorf("failed to encode cadence args for script executor: %w", err)
+	}
+
+	result, err := v.scriptExecutor.ExecuteAtBlockHeight(ctx, v.verifyPayerBalanceScript, args, header.Height)
+	if err != nil {
+		return fmt.Errorf("script finished with error: %w", err)
+	}
+
+	value, err := jsoncdc.Decode(nil, result)
+	if err != nil {
+		return fmt.Errorf("could not decode result value returned by script executor: %w", err)
+	}
+
+	canExecuteTransaction, requiredBalance, _, err := fvm.DecodeVerifyPayerBalanceResult(value)
+	if err != nil {
+		return fmt.Errorf("could not parse cadence value returned by script executor: %w", err)
+	}
+
+	// return no error if payer has sufficient balance
+	if bool(canExecuteTransaction) {
+		return nil
+	}
+
+	return InsufficientBalanceError{Payer: tx.Payer, RequiredBalance: requiredBalance}
 }
 
 func remove(s []string, r string) []string {
