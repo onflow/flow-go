@@ -40,10 +40,8 @@ func MultiFunctionPrecompiledContract(
 }
 
 type precompile struct {
-	address          types.Address
-	functions        map[FunctionSelector]Function
-	requiredGasCalls []types.RequiredGasCall
-	runCalls         []types.RunCall
+	address   types.Address
+	functions map[FunctionSelector]Function
 }
 
 func (p *precompile) Address() types.Address {
@@ -52,14 +50,6 @@ func (p *precompile) Address() types.Address {
 
 // RequiredGas calculates the contract gas use
 func (p *precompile) RequiredGas(input []byte) (output uint64) {
-	defer func() {
-		p.requiredGasCalls = append(
-			p.requiredGasCalls,
-			types.RequiredGasCall{
-				Input:  input,
-				Output: output,
-			})
-	}()
 	if len(input) < FunctionSelectorLength {
 		return InvalidMethodCallGasUsage
 	}
@@ -73,20 +63,6 @@ func (p *precompile) RequiredGas(input []byte) (output uint64) {
 
 // Run runs the precompiled contract
 func (p *precompile) Run(input []byte) (output []byte, err error) {
-	defer func() {
-		errMsg := ""
-		if err != nil {
-			errMsg = err.Error()
-		}
-		p.runCalls = append(
-			p.runCalls,
-			types.RunCall{
-				Input:    input,
-				Output:   output,
-				ErrorMsg: errMsg,
-			})
-	}()
-
 	if len(input) < FunctionSelectorLength {
 		return nil, ErrInvalidMethodCall
 	}
@@ -96,21 +72,4 @@ func (p *precompile) Run(input []byte) (output []byte, err error) {
 		return nil, ErrInvalidMethodCall
 	}
 	return callable.Run(data)
-}
-
-func (p *precompile) IsCalled() bool {
-	return len(p.requiredGasCalls) > 0 || len(p.runCalls) > 0
-}
-
-func (p *precompile) CapturedCalls() *types.PrecompiledCalls {
-	return &types.PrecompiledCalls{
-		Address:          p.address,
-		RequiredGasCalls: p.requiredGasCalls,
-		RunCalls:         p.runCalls,
-	}
-}
-
-func (p *precompile) Reset() {
-	p.requiredGasCalls = nil
-	p.runCalls = nil
 }

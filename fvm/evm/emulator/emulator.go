@@ -533,14 +533,14 @@ func (proc *procedure) runDirect(
 	txHash gethCommon.Hash,
 	txIndex uint,
 ) (*types.Result, error) {
-	// set the nonce for the message (needed for some opeartions like deployment)
+	// set the nonce for the message (needed for some operations like deployment)
 	msg.Nonce = proc.state.GetNonce(msg.From)
 	proc.evm.TxContext.Origin = msg.From
 	res, err := proc.run(msg, txHash, txIndex, types.DirectCallTxType)
 	if err != nil {
 		return nil, err
 	}
-	// all commmit errors (StateDB errors) has to be returned
+	// all commit errors (StateDB errors) has to be returned
 	return res, proc.commit(true)
 }
 
@@ -561,8 +561,8 @@ func (proc *procedure) run(
 		TxHash: txHash,
 	}
 
-	// reset precompile tracking
-	proc.resetPrecompileTracking()
+	// reset precompile tracking in case
+	proc.config.PCTracker.Reset()
 	gasPool := (*gethCore.GasPool)(&proc.config.BlockContext.GasLimit)
 	execResult, err := gethCore.NewStateTransition(
 		proc.evm,
@@ -586,12 +586,9 @@ func (proc *procedure) run(
 		res.GasConsumed = execResult.UsedGas
 		res.GasRefund = proc.state.GetRefund()
 		res.Index = uint16(txIndex)
-
-		if proc.extraPrecompiledIsCalled() {
-			res.PrecompiledCalls, err = proc.capturePrecompiledCalls()
-			if err != nil {
-				return nil, err
-			}
+		res.PrecompiledCalls, err = proc.config.PCTracker.CapturedCalls()
+		if err != nil {
+			return nil, err
 		}
 		// we need to capture the returned value no matter the status
 		// if the tx is reverted the error message is returned as returned value
@@ -615,31 +612,6 @@ func (proc *procedure) run(
 		}
 	}
 	return &res, nil
-}
-
-func (proc *procedure) resetPrecompileTracking() {
-	for _, pc := range proc.config.ExtraPrecompiles {
-		pc.Reset()
-	}
-}
-
-func (proc *procedure) extraPrecompiledIsCalled() bool {
-	for _, pc := range proc.config.ExtraPrecompiles {
-		if pc.IsCalled() {
-			return true
-		}
-	}
-	return false
-}
-
-func (proc *procedure) capturePrecompiledCalls() ([]byte, error) {
-	apc := make(types.AggregatedPrecompiledCalls, 0)
-	for _, pc := range proc.config.ExtraPrecompiles {
-		if pc.IsCalled() {
-			apc = append(apc, *pc.CapturedCalls())
-		}
-	}
-	return apc.Encode()
 }
 
 func (proc *procedure) captureTraceBegin(
