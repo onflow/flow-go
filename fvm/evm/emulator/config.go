@@ -1,7 +1,6 @@
 package emulator
 
 import (
-	"math"
 	"math/big"
 
 	gethCommon "github.com/onflow/go-ethereum/common"
@@ -14,13 +13,12 @@ import (
 )
 
 var (
-	DefaultBlockLevelGasLimit = uint64(math.MaxUint64)
-	DefaultBaseFee            = big.NewInt(0)
-	zero                      = uint64(0)
-	bigZero                   = big.NewInt(0)
+	zero    = uint64(0)
+	bigZero = big.NewInt(0)
 )
 
-// Config sets the required parameters
+// Config aggregates all the configuration (chain, evm, block, tx, ...)
+// needed during executing a transaction.
 type Config struct {
 	// Chain Config
 	ChainConfig *gethParams.ChainConfig
@@ -36,6 +34,7 @@ type Config struct {
 	ExtraPrecompiles []types.PrecompiledContract
 }
 
+// ChainRules returns the chain rules
 func (c *Config) ChainRules() gethParams.Rules {
 	return c.ChainConfig.Rules(
 		c.BlockContext.BlockNumber,
@@ -43,9 +42,9 @@ func (c *Config) ChainRules() gethParams.Rules {
 		c.BlockContext.Time)
 }
 
-// DefaultChainConfig is the default chain config which
-// considers majority of EVM upgrades (e.g. Shanghai update) already been applied
-// this has done through setting the height of these changes
+// DefaultChainConfig is the default chain config used by the emulator
+// considers majority of EVM upgrades (e.g. Cancun update) are already applied
+// This has been done through setting the height of these changes
 // to zero nad setting the time for some other changes to zero
 // For the future changes of EVM, we need to update the EVM go mod version
 // and set a proper height for the specific release based on the Flow EVM heights
@@ -83,7 +82,7 @@ func defaultConfig() *Config {
 	return &Config{
 		ChainConfig: DefaultChainConfig,
 		EVMConfig: gethVM.Config{
-			// setting this flag let us we force the base fee to zero (coinbase will collect)
+			// Forces the EIP-1559 baseFee to 0 (needed for 0 price calls)
 			NoBaseFee: true,
 		},
 		TxContext: &gethVM.TxContext{
@@ -93,8 +92,8 @@ func defaultConfig() *Config {
 		BlockContext: &gethVM.BlockContext{
 			CanTransfer: gethCore.CanTransfer,
 			Transfer:    gethCore.Transfer,
-			GasLimit:    DefaultBlockLevelGasLimit,
-			BaseFee:     DefaultBaseFee,
+			GasLimit:    types.DefaultBlockLevelGasLimit,
+			BaseFee:     types.DefaultBaseFee,
 			GetHash: func(n uint64) gethCommon.Hash {
 				return gethCommon.Hash{}
 			},
