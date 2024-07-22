@@ -3,7 +3,7 @@ package pruner
 import (
 	"context"
 	"fmt"
-	"sort"
+	"math"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -189,14 +189,15 @@ func (p *Pruner) loop(ctx irrecoverable.SignalerContext, ready component.ReadyFu
 }
 
 func (p *Pruner) lowestProducersHeight() uint64 {
-	var heights []uint64
+	lowestHeight := uint64(math.MaxUint64)
+
 	for _, producer := range p.registeredProducers {
 		height := producer.HighestCompleteHeight()
-		heights = append(heights, height)
+		if height < lowestHeight {
+			lowestHeight = height
+		}
 	}
-	sort.Slice(heights, func(i, j int) bool { return heights[i] < heights[j] })
-
-	return heights[0]
+	return lowestHeight
 }
 
 func (p *Pruner) updateFulfilledHeight(height uint64) error {
