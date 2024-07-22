@@ -93,8 +93,12 @@ func (dc *DirectCall) Message() *gethCore.Message {
 		GasPrice:  big.NewInt(0), // price is set to zero fo direct calls
 		GasTipCap: big.NewInt(0), // also known as maxPriorityFeePerGas (in GWei)
 		GasFeeCap: big.NewInt(0), // also known as maxFeePerGas (in GWei)
-		// AccessList:        tx.AccessList(), // TODO revisit this value, the cost doesn't matter but performance might
-		SkipAccountChecks: true, // this enables skipping the nonce check
+		// TODO: maybe revisit setting the access list
+		// AccessList:        tx.AccessList(),
+		// When SkipAccountChecks is true, the message nonce is not checked against the
+		// account nonce in state. It also disables checking that the sender is an EOA.
+		// Since we use the direct calls for COAs, we set the nonce and the COA is an smart contract.
+		SkipAccountChecks: true,
 	}
 }
 
