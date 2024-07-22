@@ -41,7 +41,9 @@ type ExecutionDataPruningSuite struct {
 	accessNodeName   string
 	observerNodeName string
 	// threshold defines the maximum height range and how frequently pruning is performed.
-	threshold uint64
+	threshold         uint64
+	heightRangeTarget uint64
+	pruningInterval   string
 
 	// root context for the current test
 	ctx    context.Context
@@ -64,6 +66,10 @@ func (s *ExecutionDataPruningSuite) SetupTest() {
 		s.log.Info().Msg("================> Finish SetupTest")
 	}()
 
+	s.threshold = 50
+	s.heightRangeTarget = 100
+	s.pruningInterval = "10s"
+
 	// access node
 	s.accessNodeName = testnet.PrimaryAN
 	accessNodeConfig := testnet.NewNodeConfig(
@@ -77,9 +83,9 @@ func (s *ExecutionDataPruningSuite) SetupTest() {
 		testnet.WithAdditionalFlagf("--execution-state-dir=%s", testnet.DefaultExecutionStateDir),
 		testnet.WithAdditionalFlagf("--public-network-execution-data-sync-enabled=true"),
 		testnet.WithAdditionalFlagf("--event-query-mode=local-only"),
-		testnet.WithAdditionalFlagf("--execution-data-height-range-target=%d", 100),
+		testnet.WithAdditionalFlagf("--execution-data-height-range-target=%d", s.heightRangeTarget),
 		testnet.WithAdditionalFlagf("--execution-data-height-range-threshold=%d", s.threshold),
-		testnet.WithAdditionalFlagf(fmt.Sprintf("--execution-data-pruning-interval=%s", "10s")),
+		testnet.WithAdditionalFlagf(fmt.Sprintf("--execution-data-pruning-interval=%s", s.pruningInterval)),
 	)
 
 	consensusConfigs := []func(config *testnet.NodeConfig){
@@ -103,7 +109,6 @@ func (s *ExecutionDataPruningSuite) SetupTest() {
 
 	// add the observer node config
 	s.observerNodeName = testnet.PrimaryON
-	s.threshold = 50
 
 	observers := []testnet.ObserverConfig{{
 		ContainerName: s.observerNodeName,
@@ -115,9 +120,9 @@ func (s *ExecutionDataPruningSuite) SetupTest() {
 			"--execution-data-indexing-enabled=true",
 			"--execution-data-retry-delay=1s",
 			"--event-query-mode=local-only",
-			fmt.Sprintf("--execution-data-height-range-target=%d", 100),
+			fmt.Sprintf("--execution-data-height-range-target=%d", s.heightRangeTarget),
 			fmt.Sprintf("--execution-data-height-range-threshold=%d", s.threshold),
-			fmt.Sprintf("--execution-data-pruning-interval=%s", "10s"),
+			fmt.Sprintf("--execution-data-pruning-interval=%s", s.pruningInterval),
 		},
 	}}
 
