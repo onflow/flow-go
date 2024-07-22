@@ -74,6 +74,11 @@ type TransactionValidationOptions struct {
 	MaxCollectionByteSize        uint64
 }
 
+type ValidationStep struct {
+	check      func(*flow.TransactionBody) error
+	failReason string
+}
+
 type TransactionValidator struct {
 	blocks                       Blocks     // for looking up blocks to check transaction expiry
 	chain                        flow.Chain // for checking validity of addresses
@@ -81,6 +86,8 @@ type TransactionValidator struct {
 	serviceAccountAddress        flow.Address
 	limiter                      RateLimiter
 	transactionValidationMetrics module.TransactionValidationMetrics
+
+	validationSteps []ValidationStep
 }
 
 func NewTransactionValidator(
@@ -89,7 +96,7 @@ func NewTransactionValidator(
 	transactionValidationMetrics module.TransactionValidationMetrics,
 	options TransactionValidationOptions,
 ) *TransactionValidator {
-	return &TransactionValidator{
+	txValidator := &TransactionValidator{
 		blocks:                       blocks,
 		chain:                        chain,
 		options:                      options,
@@ -97,6 +104,10 @@ func NewTransactionValidator(
 		limiter:                      NewNoopLimiter(),
 		transactionValidationMetrics: transactionValidationMetrics,
 	}
+
+	initValidationSteps(txValidator)
+
+	return txValidator
 }
 
 func NewTransactionValidatorWithLimiter(
@@ -106,7 +117,7 @@ func NewTransactionValidatorWithLimiter(
 	transactionValidationMetrics module.TransactionValidationMetrics,
 	rateLimiter RateLimiter,
 ) *TransactionValidator {
-	return &TransactionValidator{
+	txValidator := &TransactionValidator{
 		blocks:                       blocks,
 		chain:                        chain,
 		options:                      options,
@@ -114,65 +125,37 @@ func NewTransactionValidatorWithLimiter(
 		limiter:                      rateLimiter,
 		transactionValidationMetrics: transactionValidationMetrics,
 	}
+
+	initValidationSteps(txValidator)
+
+	return txValidator
+}
+
+func initValidationSteps(txValidator *TransactionValidator) {
+	txValidator.validationSteps = []ValidationStep{
+		// rate limit transactions for specific payers.
+		// a short term solution to prevent attacks that send too many failed transactions
+		// if a transaction is from a payer that should be rate limited, all the following
+		// checks will be skipped
+		{txValidator.checkRateLimitPayer, "invalid transaction rate limit"},
+		{txValidator.checkTxSizeLimit, "invalid transaction byte size"},
+		{txValidator.checkMissingFields, "incomplete transaction"},
+		{txValidator.checkGasLimit, "invalid gas limit"},
+		{txValidator.checkExpiry, "expired transaction"},
+		{txValidator.checkCanBeParsed, "invalid script"},
+		{txValidator.checkAddresses, "invalid address"},
+		{txValidator.checkSignatureFormat, "invalid signature"},
+		{txValidator.checkSignatureDuplications, "duplicated signature"},
+	}
 }
 
 func (v *TransactionValidator) Validate(tx *flow.TransactionBody) (err error) {
-	// rate limit transactions for specific payers.
-	// a short term solution to prevent attacks that send too many failed transactions
-	// if a transaction is from a payer that should be rate limited, all the following
-	// checks will be skipped
-	err = v.checkRateLimitPayer(tx)
-	if err != nil {
-		v.transactionValidationMetrics.TransactionValidationFailed(tx.ID(), "InvalidTxRateLimited")
-		return err
-	}
 
-	err = v.checkTxSizeLimit(tx)
-	if err != nil {
-		v.transactionValidationMetrics.TransactionValidationFailed(tx.ID(), "InvalidTxByteSizeError")
-		return err
-	}
-
-	err = v.checkMissingFields(tx)
-	if err != nil {
-		v.transactionValidationMetrics.TransactionValidationFailed(tx.ID(), "IncompleteTransactionError")
-		return err
-	}
-
-	err = v.checkGasLimit(tx)
-	if err != nil {
-		v.transactionValidationMetrics.TransactionValidationFailed(tx.ID(), "InvalidGasLimitError")
-		return err
-	}
-
-	err = v.checkExpiry(tx)
-	if err != nil {
-		v.transactionValidationMetrics.TransactionValidationFailed(tx.ID(), "ExpiredTransactionError")
-		return err
-	}
-
-	err = v.checkCanBeParsed(tx)
-	if err != nil {
-		v.transactionValidationMetrics.TransactionValidationFailed(tx.ID(), "InvalidScriptError")
-		return err
-	}
-
-	err = v.checkAddresses(tx)
-	if err != nil {
-		v.transactionValidationMetrics.TransactionValidationFailed(tx.ID(), "InvalidAddressError")
-		return err
-	}
-
-	err = v.checkSignatureFormat(tx)
-	if err != nil {
-		v.transactionValidationMetrics.TransactionValidationFailed(tx.ID(), "InvalidSignatureError")
-		return err
-	}
-
-	err = v.checkSignatureDuplications(tx)
-	if err != nil {
-		v.transactionValidationMetrics.TransactionValidationFailed(tx.ID(), "DuplicatedSignatureError")
-		return err
+	for _, step := range v.validationSteps {
+		if err = step.check(tx); err != nil {
+			v.transactionValidationMetrics.TransactionValidationFailed(tx.ID(), step.failReason)
+			return err
+		}
 	}
 
 	// TODO replace checkSignatureFormat by verifying the account/payer signatures
