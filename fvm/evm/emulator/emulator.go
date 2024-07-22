@@ -20,7 +20,8 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// Emulator handles operations against evm runtime
+// Emulator wraps an EVM runtime where evm transactions
+// and direct calls are accepted.
 type Emulator struct {
 	rootAddr flow.Address
 	ledger   atree.Ledger
@@ -53,7 +54,7 @@ func newConfig(ctx types.BlockContext) *Config {
 	)
 }
 
-// NewReadOnlyBlockView constructs a new readonly block view
+// NewReadOnlyBlockView constructs a new read-only block view
 func (em *Emulator) NewReadOnlyBlockView(ctx types.BlockContext) (types.ReadOnlyBlockView, error) {
 	execState, err := state.NewStateDB(em.ledger, em.rootAddr)
 	return &ReadOnlyBlockView{
