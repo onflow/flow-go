@@ -27,10 +27,10 @@ func constructRootBlock(rootHeader *flow.Header, protocolStateID flow.Identifier
 		Payload: nil,
 	}
 	block.SetPayload(flow.Payload{
-		Guarantees: nil,
-		Seals:      nil,
-		Receipts:   nil,
-		Results:    nil,
+		Guarantees:      nil,
+		Seals:           nil,
+		Receipts:        nil,
+		Results:         nil,
 		ProtocolStateID: protocolStateID,
 	})
 	return block
