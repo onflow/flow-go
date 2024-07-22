@@ -125,9 +125,19 @@ const EpochSetupRandomSourceLength = 16
 // EpochSetup is a service event emitted when the network is ready to set up
 // for the upcoming epoch. It contains the participants in the epoch, the
 // length, the cluster assignment, and the seed for leader selection.
+// EpochSetup is a service event emitted when the preparation process for the next epoch begins.
+// EpochSetup events must:
+//   - be emitted exactly once per epoch before the corresponding EpochCommit event
+//   - be emitted prior to the epoch commitment deadline (defined by EpochCommitSafetyThreshold)
+//
+// If either of the above constraints are not met, the service event will be rejected and Epoch Fallback Mode [EFM] will be triggered.
+//
+// When an EpochSetup event is accepted and incorporated into the Protocol State, this triggers the
+// Distributed Key Generation [DKG] and cluster QC voting process for the next epoch.
+// It also causes the current epoch to enter the EpochPhaseSetup phase.
 type EpochSetup struct {
-	Counter            uint64               // the number of the epoch
-	FirstView          uint64               // the first view of the epoch
+	Counter            uint64               // the number of the epoch bing setup (current+1)
+	FirstView          uint64               // the first view of the epoch being setup
 	DKGPhase1FinalView uint64               // the final view of DKG phase 1
 	DKGPhase2FinalView uint64               // the final view of DKG phase 2
 	DKGPhase3FinalView uint64               // the final view of DKG phase 3
@@ -215,14 +225,35 @@ func (er *EpochRecover) EqualTo(other *EpochRecover) bool {
 	return true
 }
 
-// EpochCommit is a service event emitted when epoch setup has been completed.
-// When an EpochCommit event is emitted, the network is ready to transition to
-// the epoch.
+// EpochCommit is a service event emitted when the preparation process for the next epoch is complete.
+// EpochCommit events must:
+//   - be emitted exactly once per epoch after the corresponding EpochSetup event
+//   - be emitted prior to the epoch commitment deadline (defined by EpochCommitSafetyThreshold)
+//
+// If either of the above constraints are not met, the service event will be rejected and Epoch Fallback Mode [EFM] will be triggered.
+//
+// When an EpochCommit event is accepted and incorporated into the Protocol State, this guarantees that
+// the network will proceed through that epoch's defined view range with its defined committee. It also
+// causes the current epoch to enter the EpochPhaseCommitted phase.
 type EpochCommit struct {
-	Counter            uint64              // the number of the epoch
-	ClusterQCs         []ClusterQCVoteData // quorum certificates for each cluster
-	DKGGroupKey        crypto.PublicKey    // group key from DKG
-	DKGParticipantKeys []crypto.PublicKey  // public keys for DKG participants
+	// Counter is the epoch counter of the epoch being committed
+	Counter uint64
+	// ClusterQCs is an ordered list of root quorum certificates, one per cluster.
+	// EpochCommit.ClustersQCs[i] is the QC for EpochSetup.Assignments[0]
+	ClusterQCs []ClusterQCVoteData
+	// DKGGroupKey is the group public key associated with the epoch's DKG.
+	DKGGroupKey crypto.PublicKey
+	// DKGParticipantKeys is a list of public keys, one per DKG participant, ordered by DKG index.
+	// CAUTION: This list may include keys for nodes which do not exist in the consensus committee
+	//          and may NOT include keys for all nodes in the consensus committee.
+	DKGParticipantKeys []crypto.PublicKey
+	// DKGIndexMap is a mapping from node identifier to DKG index.
+	// It has the following invariants:
+	//   - len(DKGParticipantKeys) == len(DKGIndexMap)
+	//   - DKGIndexMap values form the set {0, 1, ..., n-1} where n=len(DKGParticipantKeys)
+	// CAUTION: This mapping may include identifiers for nodes which do not exist in the consensus committee
+	//          and may NOT include identifiers for all nodes in the consensus committee.
+	DKGIndexMap map[Identifier]int
 }
 
 // ClusterQCVoteData represents the votes for a cluster quorum certificate, as
@@ -397,12 +428,26 @@ func (commit *EpochCommit) EqualTo(other *EpochCommit) bool {
 	if commit.DKGGroupKey != nil && other.DKGGroupKey != nil && !commit.DKGGroupKey.Equals(other.DKGGroupKey) {
 		return false
 	}
+
 	if len(commit.DKGParticipantKeys) != len(other.DKGParticipantKeys) {
 		return false
 	}
-
 	for i, key := range commit.DKGParticipantKeys {
 		if !key.Equals(other.DKGParticipantKeys[i]) {
+			return false
+		}
+	}
+
+	if len(commit.DKGIndexMap) != len(other.DKGIndexMap) {
+		return false
+	}
+	for id, index := range commit.DKGIndexMap {
+		// NOTE: must explicitly check existence in 2nd map, else eg. {a: 0} would be equal to {b: 1}
+		otherIndex, ok := other.DKGIndexMap[id]
+		if !ok {
+			return false
+		}
+		if index != otherIndex {
 			return false
 		}
 	}
@@ -413,6 +458,7 @@ func (commit *EpochCommit) EqualTo(other *EpochCommit) bool {
 // ToDKGParticipantLookup constructs a DKG participant lookup from an identity
 // list and a key list. The identity list must be EXACTLY the same (order and
 // contents) as that used when initializing the corresponding DKG instance.
+// TODO can we get rid of this?
 func ToDKGParticipantLookup(participants IdentitySkeletonList, keys []crypto.PublicKey) (map[Identifier]DKGParticipant, error) {
 	if len(participants) != len(keys) {
 		return nil, fmt.Errorf("participant list (len=%d) does not match key list (len=%d)", len(participants), len(keys))
