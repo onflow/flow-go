@@ -3,8 +3,10 @@ package access
 import (
 	"errors"
 	"fmt"
+
 	"github.com/onflow/cadence/runtime/parser"
 	"github.com/onflow/crypto"
+
 	"github.com/onflow/flow-go/module"
 
 	"github.com/onflow/flow-go/model/flow"

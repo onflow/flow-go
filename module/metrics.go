@@ -882,6 +882,7 @@ type AccessMetrics interface {
 	RestMetrics
 	GRPCConnectionPoolMetrics
 	TransactionMetrics
+	TransactionValidationMetrics
 	BackendScriptsMetrics
 
 	// UpdateExecutionReceiptMaxHeight is called whenever we store an execution receipt from a block from a newer height

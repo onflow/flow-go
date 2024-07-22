@@ -307,7 +307,7 @@ func identifierList(ids []string) (flow.IdentifierList, error) {
 func configureTransactionValidator(
 	state protocol.State,
 	chainID flow.ChainID,
-	transactionMetrics module.TransactionMetrics,
+	transactionMetrics module.TransactionValidationMetrics,
 ) *access.TransactionValidator {
 	return access.NewTransactionValidator(
 		access.NewProtocolStateBlocks(state),

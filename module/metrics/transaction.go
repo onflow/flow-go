@@ -13,7 +13,6 @@ import (
 )
 
 type TransactionCollector struct {
-	*TransactionValidationCollector
 	transactionTimings             mempool.TransactionTimings
 	log                            zerolog.Logger
 	logTimeToFinalized             bool
@@ -33,7 +32,6 @@ type TransactionCollector struct {
 
 // interface check
 var _ module.BackendScriptsMetrics = (*TransactionCollector)(nil)
-var _ module.TransactionMetrics = (*TransactionCollector)(nil)
 
 func NewTransactionCollector(
 	log zerolog.Logger,
@@ -136,7 +134,6 @@ func NewTransactionCollector(
 			Subsystem: subsystemTransactionSubmission,
 			Help:      "histogram for the transaction size in kb of scripts used in GetTransactionResult",
 		}),
-		TransactionValidationCollector: NewTransactionValidationCollector(),
 	}
 
 	return tc

@@ -44,16 +44,6 @@ func (_m *TransactionMetrics) TransactionSubmissionFailed() {
 	_m.Called()
 }
 
-// TransactionValidated provides a mock function with given fields: txID
-func (_m *TransactionMetrics) TransactionValidated(txID flow.Identifier) {
-	_m.Called(txID)
-}
-
-// TransactionValidationFailed provides a mock function with given fields: txID, reason
-func (_m *TransactionMetrics) TransactionValidationFailed(txID flow.Identifier, reason string) {
-	_m.Called(txID, reason)
-}
-
 // NewTransactionMetrics creates a new instance of TransactionMetrics. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
 // The first argument is typically a *testing.T value.
 func NewTransactionMetrics(t interface {
