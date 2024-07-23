@@ -97,9 +97,6 @@ var (
 	// ErrUnauthorizedMethodCall method call, usually emitted when calls are called on EOA accounts
 	ErrUnauthorizedMethodCall = errors.New("unauthorized method call")
 
-	// ErrInternalDirectCallFailed is returned when a withdraw or deposit internal call has failed.
-	ErrInternalDirectCallFailed = errors.New("internal direct call execution failed")
-
 	// ErrWithdrawBalanceRounding is returned when withdraw call has a balance that could
 	// result in rounding error, i.e. the balance contains fractions smaller than 10^8 Flow (smallest unit allowed to transfer).
 	ErrWithdrawBalanceRounding = errors.New("withdraw failed! the balance is susceptible to the rounding error")

@@ -370,15 +370,10 @@ func (proc *procedure) mintTo(
 	// if any error (invalid or vm) on the internal call, revert and don't commit any change
 	// this prevents having cases that we add balance to the bridge but the transfer
 	// fails due to gas, etc.
-	if res.Invalid() {
+	if res.Invalid() || res.Failed() {
+		// reset the state to revert the add balances
+		proc.state.Reset()
 		return res, nil
-	}
-	if res.Failed() {
-		return &types.Result{
-			TxType:          call.Type,
-			GasConsumed:     types.InvalidTransactionGasCost,
-			ValidationError: types.ErrInternalDirectCallFailed,
-		}, nil
 	}
 
 	// commit and finalize the state and return any stateDB error
@@ -411,15 +406,10 @@ func (proc *procedure) withdrawFrom(
 	// if any error (invalid or vm) on the internal call, revert and don't commit any change
 	// this prevents having cases that we deduct the balance from the account
 	// but doesn't return it as a vault.
-	if res.Invalid() {
+	if res.Invalid() || res.Failed() {
+		// reset the state to revert the add balances
+		proc.state.Reset()
 		return res, nil
-	}
-	if res.Failed() {
-		return &types.Result{
-			TxType:          call.Type,
-			GasConsumed:     types.InvalidTransactionGasCost,
-			ValidationError: types.ErrInternalDirectCallFailed,
-		}, nil
 	}
 
 	// now deduct the balance from the bridge
@@ -643,7 +633,6 @@ func (proc *procedure) run(
 	txIndex := proc.config.BlockTxCountSoFar
 	// if pre-checks are passed, the exec result won't be nil
 	if execResult != nil {
-
 		res.GasConsumed = execResult.UsedGas
 		res.GasRefund = proc.state.GetRefund()
 		res.Index = uint16(txIndex)
@@ -662,12 +651,13 @@ func (proc *procedure) run(
 		proc.config.BlockTxCountSoFar += 1
 
 		if !execResult.Failed() { // collect vm errors
-			// If the transaction created a contract, store the creation address in the receipt,
+			// If the transaction has created a contract,
+			// store the creation address in the receipt
 			if msg.To == nil {
 				deployedAddress := types.NewAddress(gethCrypto.CreateAddress(msg.From, msg.Nonce))
 				res.DeployedContractAddress = &deployedAddress
 			}
-			// replace tx index and tx hash
+			// collect logs
 			res.Logs = proc.state.Logs(
 				proc.config.BlockContext.BlockNumber.Uint64(),
 				txHash,
