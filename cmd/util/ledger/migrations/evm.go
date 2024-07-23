@@ -3,14 +3,13 @@ package migrations
 import (
 	"fmt"
 
+	"github.com/onflow/cadence/runtime"
+	"github.com/onflow/cadence/runtime/common"
+	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/cmd/util/ledger/util"
-	"github.com/onflow/flow-go/cmd/util/ledger/util/registers"
-	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/evm/stdlib"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
-	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -48,66 +47,65 @@ func NewEVMDeploymentMigration(
 	)
 }
 
+// NewEVMSetupMigration returns a migration that sets up the EVM contract account.
+// It performs the same operations as the EVM contract's initializer, calling the function EVM.setupHeartbeat,
+// which in turn creates an EVM.Heartbeat resource, and writes it to the account's storage.
 func NewEVMSetupMigration(
 	chainID flow.ChainID,
 	logger zerolog.Logger,
 ) RegistersMigration {
 
-	chain := chainID.Chain()
+	systemContracts := systemcontracts.SystemContractsForChain(chainID)
+	evmContract := systemContracts.EVMContract
+	evmContractAddress := common.Address(evmContract.Address)
 
-	return func(registersByAccount *registers.ByAccount) error {
+	return NewAccountStorageMigration(
+		evmContractAddress,
+		logger,
+		chainID,
+		func(storage *runtime.Storage, inter *interpreter.Interpreter) error {
 
-		tracerSpan := tracing.NewTracerSpan()
+			// Get the storage map for the EVM contract account
 
-		transactionInfoParams := environment.DefaultTransactionInfoParams()
-		transactionInfoParams.TxBody = &flow.TransactionBody{}
+			storageMap := storage.GetStorageMap(
+				evmContractAddress,
+				common.PathDomainStorage.Identifier(),
+				false,
+			)
+			if storageMap == nil {
+				return fmt.Errorf("failed to get storage map for EVM contract account")
+			}
 
-		environmentParams := environment.EnvironmentParams{
-			Chain:                 chain,
-			RuntimeParams:         environment.DefaultRuntimeParams(),
-			ProgramLoggerParams:   environment.DefaultProgramLoggerParams(),
-			TransactionInfoParams: transactionInfoParams,
-		}
+			// Check if the EVM.Heartbeat resource already exists
 
-		basicMigrationRuntime := NewBasicMigrationRuntime(registersByAccount)
+			key := interpreter.StringStorageMapKey("EVMHeartbeat")
 
-		transactionPreparer, err := util.NewTransactionPreparer(basicMigrationRuntime.TransactionState)
-		if err != nil {
-			return fmt.Errorf("failed to create transaction preparer: %w", err)
-		}
+			if storageMap.ValueExists(key) {
+				return nil
+			}
 
-		transactionEnvironment := environment.NewTransactionEnvironment(
-			tracerSpan,
-			environmentParams,
-			transactionPreparer,
-		)
+			// Create the EVM.Heartbeat resource and write it to storage
 
-		runtime := environment.NewRuntime(environmentParams.RuntimeParams)
-		runtime.SetEnvironment(transactionEnvironment)
+			heartbeatResource := interpreter.NewCompositeValue(
+				inter,
+				interpreter.EmptyLocationRange,
+				common.AddressLocation{
+					Address: evmContractAddress,
+					Name:    stdlib.ContractName,
+				},
+				"EVM.Heartbeat",
+				common.CompositeKindResource,
+				nil,
+				evmContractAddress,
+			)
 
-		programLogger := environment.NewProgramLogger(
-			tracerSpan,
-			environmentParams.ProgramLoggerParams,
-		)
-		systemContracts := environment.NewSystemContracts(
-			chain,
-			tracerSpan,
-			programLogger,
-			runtime,
-		)
+			storageMap.WriteValue(
+				inter,
+				key,
+				heartbeatResource,
+			)
 
-		_, err = systemContracts.Invoke(
-			environment.ContractFunctionSpec{
-				AddressFromChain: environment.ServiceAddress,
-				LocationName:     systemcontracts.ContractNameEVM,
-				FunctionName:     "setupHeartbeat",
-			},
-			nil,
-		)
-		if err != nil {
-			return fmt.Errorf("failed to setup EVM heartbeat: %w", err)
-		}
-
-		return nil
-	}
+			return nil
+		},
+	)
 }
