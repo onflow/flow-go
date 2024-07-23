@@ -202,7 +202,9 @@ func (suite *EpochLookupSuite) TestProtocolEvents_EpochExtended() {
 	suite.lookup.EpochExtended(suite.currEpoch.counter, header, extension)
 	suite.lookup.EpochExtended(suite.currEpoch.counter, header, extension)
 	suite.lookup.EpochExtended(suite.currEpoch.counter, header, extension)
-
+	require.Eventually(bs.T(), func() bool {
+		return len(bs.ctl.epochEvents) == 0
+	}, time.Second, time.Millisecond)
 	// validate queries are answered correctly
 	testEpochForViewWithFallback(suite.T(), suite.lookup, suite.state, epochs...)
 }
