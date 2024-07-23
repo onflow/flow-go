@@ -190,6 +190,7 @@ func (bl *BlockView) RunTransaction(
 	return res, nil
 }
 
+// BatchRunTransactions runs a batch of EVM transactions
 func (bl *BlockView) BatchRunTransactions(txs []*gethTypes.Transaction) ([]*types.Result, error) {
 	batchResults := make([]*types.Result, len(txs))
 
@@ -246,7 +247,7 @@ func (bl *BlockView) BatchRunTransactions(txs []*gethTypes.Transaction) ([]*type
 	return batchResults, nil
 }
 
-// DryRunTransaction run unsigned transaction without persisting the state
+// DryRunTransaction runs an unsigned transaction without persisting the state
 func (bl *BlockView) DryRunTransaction(
 	tx *gethTypes.Transaction,
 	from gethCommon.Address,
