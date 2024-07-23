@@ -547,6 +547,7 @@ func (exeNode *ExecutionNode) LoadProviderEngine(
 
 	vmCtx := fvm.NewContext(opts...)
 
+	// inject the transaction execution metrics
 	collector := exeNode.collector.WithTransactionCallback(
 		func(dur time.Duration, stats module.TransactionExecutionResultStats, info module.TransactionExecutionResultInfo) {
 			exeNode.metricsProvider.Collect(
@@ -562,7 +563,6 @@ func (exeNode *ExecutionNode) LoadProviderEngine(
 	ledgerViewCommitter := committer.NewLedgerViewCommitter(exeNode.ledgerStorage, node.Tracer)
 	manager, err := computation.New(
 		node.Logger,
-		// todo inject metrics for computation intensities
 		collector,
 		node.Tracer,
 		node.Me,
@@ -1151,13 +1151,19 @@ func (exeNode *ExecutionNode) LoadTransactionExecutionMetrics(
 		return nil, fmt.Errorf("could not get latest finalized block: %w", err)
 	}
 
+	// buffer size is the number of blocks that are kept in memory by the metrics provider
+	// If the size is to small the clients might not have the opportunity to get the metrics for all blocks
+	// If the size is too large the memory usage will increase
+	bufferSize := uint(200)
+
 	metricsProvider := txmetrics.NewTransactionExecutionMetricsProvider(
 		node.Logger,
 		exeNode.executionState,
 		node.Storage.Headers,
 		latestFinalizedBlock,
-		1000,
+		bufferSize,
 	)
+
 	node.ProtocolEvents.AddConsumer(metricsProvider)
 	exeNode.metricsProvider = metricsProvider
 	return metricsProvider, nil

@@ -825,7 +825,7 @@ func (h *handler) GetTransactionExecutionMetricsAfter(
 	for blockHeight, blockMetrics := range metrics {
 		blockResponse := &execution.GetTransactionExecutionMetricsAfterResponse_Result{
 			BlockHeight:  blockHeight,
-			Transactions: make([]*execution.GetTransactionExecutionMetricsAfterResponse_Transaction, 0, len(blockMetrics)),
+			Transactions: make([]*execution.GetTransactionExecutionMetricsAfterResponse_Transaction, len(blockMetrics)),
 		}
 
 		for i, transactionMetrics := range blockMetrics {
