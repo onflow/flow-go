@@ -116,16 +116,14 @@ func (cache *epochRangeCache) add(epoch epochRange) error {
 
 // EpochLookup implements the EpochLookup interface using protocol state to match views to epochs.
 // CAUTION: EpochLookup should only be used for querying the previous, current, or next epoch.
-// TODO(EFM, #5763): This implementation does not yet understand EFM recovery and needs to be updated.
 type EpochLookup struct {
 	state  protocol.State
 	mu     sync.RWMutex
 	epochs epochRangeCache
 	// epochEvents queues functors for processing epoch-related protocol events.
 	// Events will be processed in the order they are received (fifo).
-	epochEvents       chan func() error
-	committedEpochsCh chan *flow.Header // protocol events for newly committed epochs (the first block of the epoch is passed over the channel)
-	events.Noop                         // implements protocol.Consumer
+	epochEvents chan func() error
+	events.Noop // implements protocol.Consumer
 	component.Component
 }
 
@@ -135,9 +133,8 @@ var _ module.EpochLookup = (*EpochLookup)(nil)
 // NewEpochLookup instantiates a new EpochLookup
 func NewEpochLookup(state protocol.State) (*EpochLookup, error) {
 	lookup := &EpochLookup{
-		state:             state,
-		epochEvents:       make(chan func() error, 20),
-		committedEpochsCh: make(chan *flow.Header, 1),
+		state:       state,
+		epochEvents: make(chan func() error, 20),
 	}
 
 	lookup.Component = component.NewComponentManagerBuilder().
