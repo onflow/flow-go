@@ -162,9 +162,11 @@ func (suite *EpochLookupSuite) TestEpochForView_CurrNextPrev() {
 // in the protocol state.
 func (suite *EpochLookupSuite) TestProtocolEvents_EpochExtended() {
 	// previous and current epochs will be committed
-	suite.CommitEpochs(suite.prevEpoch)
-	epoch, extension := suite.epochFixtureWithExtension(suite.currEpoch.counter, suite.currEpoch.firstView, suite.currEpoch.finalView+1000)
-	suite.epochQuery.Add(epoch)
+	suite.CommitEpochs(suite.prevEpoch, suite.currEpoch)
+	extension := flow.EpochExtension{
+		FirstView: suite.currEpoch.FinalView+1,
+		FinalView: suite.currEpoch.FinalView+100,
+	}
 
 	epochs := []epochRange{
 		suite.prevEpoch,
