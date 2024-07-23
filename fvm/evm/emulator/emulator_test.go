@@ -1057,6 +1057,102 @@ func TestTransactionTracing(t *testing.T) {
 
 }
 
+func TestTxIndex(t *testing.T) {
+	testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
+		testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
+			RunWithNewEmulator(t, backend, rootAddr, func(em *emulator.Emulator) {
+				ctx := types.NewDefaultBlockContext(blockNumber.Uint64())
+				expectedTxIndex := uint16(1)
+				ctx.TxCountSoFar = 1
+				testAccount1 := types.NewAddressFromString("test")
+				testAccount2 := types.NewAddressFromString("test")
+
+				blk, err := em.NewBlockView(ctx)
+				require.NoError(t, err)
+
+				res, err := blk.DirectCall(
+					types.NewContractCall(
+						testAccount1,
+						testAccount2,
+						nil,
+						1_000_000,
+						big.NewInt(0),
+						0,
+					),
+				)
+
+				require.NoError(t, err)
+				require.Equal(t, expectedTxIndex, res.Index)
+				expectedTxIndex += 1
+				ctx.TxCountSoFar = 2
+
+				// create a test eoa account
+				account := testutils.GetTestEOAAccount(t, testutils.EOATestAccount1KeyHex)
+				fAddr := account.Address()
+
+				blk, err = em.NewBlockView(ctx)
+				require.NoError(t, err)
+				res, err = blk.DirectCall(
+					types.NewDepositCall(
+						types.EmptyAddress,
+						fAddr,
+						types.OneFlow,
+						account.Nonce(),
+					))
+				require.NoError(t, err)
+				require.NoError(t, res.VMError)
+				require.NoError(t, res.ValidationError)
+				require.Equal(t, expectedTxIndex, res.Index)
+				expectedTxIndex += 1
+				ctx.TxCountSoFar = 3
+
+				blk, err = em.NewBlockView(ctx)
+				require.NoError(t, err)
+
+				tx := account.PrepareAndSignTx(
+					t,
+					testAccount1.ToCommon(), // to
+					nil,                     // data
+					big.NewInt(1000),        // amount
+					gethParams.TxGas,        // gas limit
+					big.NewInt(0),
+				)
+
+				res, err = blk.RunTransaction(tx)
+				require.NoError(t, err)
+				require.NoError(t, res.VMError)
+				require.NoError(t, res.ValidationError)
+				require.Equal(t, expectedTxIndex, res.Index)
+				expectedTxIndex += 1
+				ctx.TxCountSoFar = 4
+
+				blk, err = em.NewBlockView(ctx)
+				require.NoError(t, err)
+
+				const batchSize = 3
+				txs := make([]*gethTypes.Transaction, batchSize)
+				for i := range txs {
+					txs[i] = account.PrepareAndSignTx(
+						t,
+						testAccount1.ToCommon(), // to
+						nil,                     // data
+						big.NewInt(1000),        // amount
+						gethParams.TxGas,        // gas limit
+						big.NewInt(0),
+					)
+				}
+				results, err := blk.BatchRunTransactions(txs)
+				require.NoError(t, err)
+				for i, res := range results {
+					require.NoError(t, res.VMError)
+					require.NoError(t, res.ValidationError)
+					require.Equal(t, expectedTxIndex+uint16(i), res.Index)
+				}
+			})
+		})
+	})
+}
+
 type MockedPrecompiled struct {
 	AddressFunc     func() types.Address
 	RequiredGasFunc func(input []byte) uint64
