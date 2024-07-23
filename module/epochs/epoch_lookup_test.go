@@ -186,7 +186,7 @@ func (suite *EpochLookupSuite) TestProtocolEvents_EpochExtended() {
 	suite.lookup.EpochExtended(suite.currEpoch.counter, nil, extension)
 
 	assert.Eventually(suite.T(), func() bool {
-		return len(suite.lookup.epochEvents) == 50
+		return len(suite.lookup.epochEvents) == 0
 	}, time.Second, time.Millisecond)
 
 	// validate queries are answered correctly
