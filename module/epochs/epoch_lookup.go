@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"sync"
 
-	"go.uber.org/atomic"
-
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -125,10 +123,9 @@ type EpochLookup struct {
 	epochs epochRangeCache
 	// epochEvents queues functors for processing epoch-related protocol events.
 	// Events will be processed in the order they are received (fifo).
-	epochEvents              chan func() error
-	committedEpochsCh        chan *flow.Header // protocol events for newly committed epochs (the first block of the epoch is passed over the channel)
-	epochFallbackIsTriggered *atomic.Bool      // true when epoch fallback is triggered
-	events.Noop                                // implements protocol.Consumer
+	epochEvents       chan func() error
+	committedEpochsCh chan *flow.Header // protocol events for newly committed epochs (the first block of the epoch is passed over the channel)
+	events.Noop                         // implements protocol.Consumer
 	component.Component
 }
 
@@ -138,10 +135,9 @@ var _ module.EpochLookup = (*EpochLookup)(nil)
 // NewEpochLookup instantiates a new EpochLookup
 func NewEpochLookup(state protocol.State) (*EpochLookup, error) {
 	lookup := &EpochLookup{
-		state:                    state,
-		epochEvents:              make(chan func() error, 20),
-		committedEpochsCh:        make(chan *flow.Header, 1),
-		epochFallbackIsTriggered: atomic.NewBool(false),
+		state:             state,
+		epochEvents:       make(chan func() error, 20),
+		committedEpochsCh: make(chan *flow.Header, 1),
 	}
 
 	lookup.Component = component.NewComponentManagerBuilder().
@@ -178,17 +174,6 @@ func NewEpochLookup(state protocol.State) (*EpochLookup, error) {
 		if err != nil {
 			return nil, fmt.Errorf("could not prepare previous epoch: %w", err)
 		}
-	}
-
-	epochStateSnapshot, err := final.EpochProtocolState()
-	if err != nil {
-		return nil, fmt.Errorf("could not retrieve epoch protocol state: %w", err)
-	}
-
-	// if epoch fallback was triggered, cache it here
-	// TODO(EFM, #6020): consider replacing with phase check when it's available
-	if epochStateSnapshot.EpochFallbackTriggered() {
-		lookup.epochFallbackIsTriggered.Store(true)
 	}
 
 	return lookup, nil
@@ -250,10 +235,6 @@ func (lookup *EpochLookup) EpochForViewWithFallback(view uint64) (uint64, error)
 	// view is after any known epochs
 	// -------[----|----|----]---*---
 	if view > finalView {
-		// if epoch fallback is triggered, we treat this view as part of the last committed epoch
-		if lookup.epochFallbackIsTriggered.Load() {
-			return lookup.epochs.latest().counter, nil
-		}
 		// otherwise, we are waiting for the epoch including this view to be committed
 		return 0, model.ErrViewForUnknownEpoch
 	}
@@ -342,9 +323,4 @@ func (lookup *EpochLookup) processEpochCommittedPhaseStarted(first *flow.Header)
 	}
 
 	return nil
-}
-
-// EpochFallbackModeTriggered passes the protocol event to the worker thread.
-func (lookup *EpochLookup) EpochFallbackModeTriggered(uint64, *flow.Header) {
-	lookup.epochFallbackIsTriggered.Store(true)
 }

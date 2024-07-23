@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
@@ -30,9 +29,8 @@ type EpochLookupSuite struct {
 	params     *mockprotocol.Params
 
 	// backend for mocked functions
-	mu                     sync.Mutex // protects access to epochFallbackTriggered and phase
-	epochFallbackTriggered bool
-	phase                  flow.EpochPhase
+	mu    sync.Mutex // protects access to phase and used to invoke funcs with a lock
+	phase flow.EpochPhase
 
 	// config for each epoch
 	currentEpochCounter uint64
@@ -67,10 +65,7 @@ func (suite *EpochLookupSuite) SetupTest() {
 		func() error { return nil })
 
 	epochProtocolState := mockprotocol.NewEpochProtocolState(suite.T())
-	epochProtocolState.On("EpochFallbackTriggered").Return(
-		suite.EpochFallbackTriggered,
-		func() error { return nil },
-	)
+
 	suite.snapshot.On("EpochProtocolState").Return(epochProtocolState, nil)
 
 	suite.state.On("Final").Return(suite.snapshot)
@@ -89,12 +84,6 @@ func (suite *EpochLookupSuite) WithLock(f func()) {
 	suite.mu.Lock()
 	f()
 	suite.mu.Unlock()
-}
-
-func (suite *EpochLookupSuite) EpochFallbackTriggered() bool {
-	suite.mu.Lock()
-	defer suite.mu.Unlock()
-	return suite.epochFallbackTriggered
 }
 
 func (suite *EpochLookupSuite) Phase() flow.EpochPhase {
@@ -171,44 +160,9 @@ func (suite *EpochLookupSuite) TestEpochForViewWithFallback_CurrNextPrev() {
 // EpochLookup with an initial state of epoch fallback triggered.
 func (suite *EpochLookupSuite) TestEpochForViewWithFallback_EpochFallbackTriggered() {
 	epochs := []epochRange{suite.prevEpoch, suite.currEpoch, suite.nextEpoch}
-	suite.WithLock(func() {
-		suite.epochFallbackTriggered = true
-	})
 	suite.CommitEpochs(epochs...)
 	suite.CreateAndStartEpochLookup()
 	testEpochForViewWithFallback(suite.T(), suite.lookup, suite.state, epochs...)
-}
-
-// TestProtocolEvents_EpochFallbackTriggered tests constructing and subsequently querying
-// EpochLookup, where there is no epoch fallback at construction time,
-// but an epoch fallback happens later via an epoch event.
-func (suite *EpochLookupSuite) TestProtocolEvents_EpochFallbackTriggered() {
-	// initially, only current epoch is committed
-	suite.CommitEpochs(suite.currEpoch)
-	suite.CreateAndStartEpochLookup()
-
-	// trigger epoch fallback
-	suite.WithLock(func() {
-		suite.epochFallbackTriggered = true
-	})
-	suite.lookup.EpochFallbackModeTriggered(0, nil)
-
-	// wait for the protocol event to be processed (async)
-	assert.Eventually(suite.T(), func() bool {
-		_, err := suite.lookup.EpochForViewWithFallback(suite.currEpoch.finalView + 1)
-		return err == nil
-	}, 5*time.Second, 50*time.Millisecond)
-
-	// validate queries are answered correctly
-	testEpochForViewWithFallback(suite.T(), suite.lookup, suite.state, suite.currEpoch)
-
-	// should handle multiple deliveries of the protocol event
-	suite.lookup.EpochFallbackModeTriggered(0, nil)
-	suite.lookup.EpochFallbackModeTriggered(0, nil)
-	suite.lookup.EpochFallbackModeTriggered(0, nil)
-
-	// validate queries are answered correctly
-	testEpochForViewWithFallback(suite.T(), suite.lookup, suite.state, suite.currEpoch)
 }
 
 // TestProtocolEvents_EpochExtended tests constructing and subsequently querying
@@ -300,14 +254,6 @@ func (suite *EpochLookupSuite) epochFixtureWithExtension(counter, firstView, ext
 // validates correctness by issuing various queries, using the input state and
 // epochs as source of truth.
 func testEpochForViewWithFallback(t *testing.T, lookup *EpochLookup, state protocol.State, epochs ...epochRange) {
-	epochProtocolState, err := state.Final().EpochProtocolState()
-	require.NoError(t, err)
-	epochFallbackTriggered := epochProtocolState.EpochFallbackTriggered()
-
-	t.Run("should have set epoch fallback triggered correctly", func(t *testing.T) {
-		assert.Equal(t, epochFallbackTriggered, lookup.epochFallbackIsTriggered.Load())
-	})
-
 	t.Run("should be able to query within any committed epoch", func(t *testing.T) {
 		for _, epoch := range epochs {
 			t.Run("first view", func(t *testing.T) {
@@ -343,21 +289,10 @@ func testEpochForViewWithFallback(t *testing.T, lookup *EpochLookup, state proto
 		})
 	})
 
-	// if epoch fallback is triggered, fallback to returning latest epoch counter
-	// otherwise return ErrViewForUnknownEpoch
-	if epochFallbackTriggered {
-		t.Run("should use fallback logic for queries above latest epoch when epoch fallback is triggered", func(t *testing.T) {
-			counter, err := lookup.EpochForViewWithFallback(epochs[len(epochs)-1].finalView + 1)
-			assert.NoError(t, err)
-			// should fallback to returning the counter for the latest epoch
-			assert.Equal(t, epochs[len(epochs)-1].counter, counter)
-		})
-	} else {
-		t.Run("should return ErrViewForUnknownEpoch for queries above latest epoch when epoch fallback is not triggered", func(t *testing.T) {
-			_, err := lookup.EpochForViewWithFallback(epochs[len(epochs)-1].finalView + 1)
-			assert.ErrorIs(t, err, model.ErrViewForUnknownEpoch)
-		})
-	}
+	t.Run("should return ErrViewForUnknownEpoch for queries above latest epoch final view", func(t *testing.T) {
+		_, err := lookup.EpochForViewWithFallback(epochs[len(epochs)-1].finalView + 1)
+		assert.ErrorIs(t, err, model.ErrViewForUnknownEpoch)
+	})
 }
 
 // newMockEpoch returns a mock epoch with the given fields set.
