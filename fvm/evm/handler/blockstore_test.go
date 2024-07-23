@@ -57,7 +57,7 @@ func TestBlockStore(t *testing.T) {
 			bp.TotalSupply = supply
 			err = bs.UpdateBlockProposal(bp)
 			require.NoError(t, err)
-			// this should still return the gensis block
+			// this should still return the genesis block
 			retb, err := bs.LatestBlock()
 			require.NoError(t, err)
 			require.Equal(t, types.GenesisBlock, retb)
@@ -93,6 +93,41 @@ func TestBlockStore(t *testing.T) {
 			require.Equal(t, gethCommon.Hash{}, h)
 		})
 
+	})
+
+}
+
+// TODO: we can remove this when the previewnet is out
+func TestBlockStoreMigration(t *testing.T) {
+	testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
+		testutils.RunWithTestFlowEVMRootAddress(t, backend, func(root flow.Address) {
+			legacyCapacity := 16
+			maxHeightAdded := 32
+			legacy := types.NewBlockHashList(16)
+			for i := 0; i <= maxHeightAdded; i++ {
+				err := legacy.Push(uint64(i), gethCommon.Hash{byte(i)})
+				require.NoError(t, err)
+			}
+			err := backend.SetValue(
+				root[:],
+				[]byte(handler.BlockStoreBlockHashesKey),
+				legacy.Encode(),
+			)
+			require.NoError(t, err)
+			bs := handler.NewBlockStore(backend, root)
+
+			for i := 0; i <= maxHeightAdded-legacyCapacity; i++ {
+				h, err := bs.BlockHash(uint64(i))
+				require.NoError(t, err)
+				require.Equal(t, gethCommon.Hash{}, h)
+			}
+
+			for i := maxHeightAdded - legacyCapacity + 1; i <= maxHeightAdded; i++ {
+				h, err := bs.BlockHash(uint64(i))
+				require.NoError(t, err)
+				require.Equal(t, gethCommon.Hash{byte(i)}, h)
+			}
+		})
 	})
 
 }
