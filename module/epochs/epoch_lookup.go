@@ -248,11 +248,10 @@ func (lookup *EpochLookup) EpochForView(view uint64) (uint64, error) {
 }
 
 // handleProtocolEvents processes queued Epoch events `EpochCommittedPhaseStarted`
-// and `EpochFallbackModeTriggered`. This function permanently utilizes a worker
+// and `EpochExtended`. This function permanently utilizes a worker
 // routine until the `Component` terminates.
 // When we observe a new epoch being committed, we compute
-// the leader selection and cache static info for the epoch. When we observe
-// epoch fallback mode being triggered, we inject a fallback epoch.
+// the leader selection and cache static info for the epoch.
 func (lookup *EpochLookup) handleProtocolEvents(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
 
