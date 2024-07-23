@@ -109,8 +109,8 @@ func (d *DeltaView) Exist(addr gethCommon.Address) (bool, error) {
 
 // CreateAccount creates a new account for the given address
 //
-// if address already extists (even if destructed), carry over the balance
-// and reset the data from the orginal account.
+// if address already exists (even if destructed), carry over the balance
+// and reset the data from the original account.
 func (d *DeltaView) CreateAccount(addr gethCommon.Address) error {
 	// if is already created return
 	if d.IsCreated(addr) {
@@ -137,7 +137,7 @@ func (d *DeltaView) CreateAccount(addr gethCommon.Address) error {
 		d.nonces[addr] = 0
 		d.codes[addr] = nil
 		d.codeHashes[addr] = gethTypes.EmptyCodeHash
-		// carrying over the balance. (legacy behaviour of the Geth stateDB)
+		// carrying over the balance. (legacy behavior of the Geth stateDB)
 		d.balances[addr] = balance
 
 		// flag addr as recreated, this flag helps with postponing deletion of slabs

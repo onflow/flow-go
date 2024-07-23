@@ -406,7 +406,7 @@ func (h *ContractHandler) dryRun(
 		return nil, err
 	}
 
-	// saftey check for result
+	// safety check for result
 	if res == nil {
 		return nil, types.ErrUnexpectedEmptyResult
 	}
