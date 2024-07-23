@@ -344,11 +344,9 @@ func (proc *procedure) mintTo(
 	// convert and check value
 	isValid, value := convertAndCheckValue(call.Value)
 	if !isValid {
-		return &types.Result{
-			TxType:          call.Type,
-			GasConsumed:     types.InvalidTransactionGasCost,
-			ValidationError: types.ErrInvalidBalance,
-		}, nil
+		return types.NewInvalidResult(
+			call.Transaction(),
+			types.ErrInvalidBalance), nil
 	}
 
 	// create bridge account if not exist
@@ -391,11 +389,9 @@ func (proc *procedure) withdrawFrom(
 	// convert and check value
 	isValid, value := convertAndCheckValue(call.Value)
 	if !isValid {
-		return &types.Result{
-			TxType:          call.Type,
-			GasConsumed:     types.InvalidTransactionGasCost,
-			ValidationError: types.ErrInvalidBalance,
-		}, nil
+		return types.NewInvalidResult(
+			call.Transaction(),
+			types.ErrInvalidBalance), nil
 	}
 
 	// create bridge account if not exist
