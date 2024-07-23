@@ -12,8 +12,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/state/protocol"
-	"github.com/onflow/flow-go/state/protocol/inmem"
 	mockprotocol "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/onflow/flow-go/utils/unittest/mocks"
@@ -126,7 +124,7 @@ func (suite *EpochLookupSuite) TestEpochForView_Curr() {
 	epochs := []epochRange{suite.currEpoch}
 	suite.CommitEpochs(epochs...)
 	suite.CreateAndStartEpochLookup()
-	testEpochForView(suite.T(), suite.lookup, suite.state, epochs...)
+	testEpochForView(suite.T(), suite.lookup, epochs...)
 }
 
 // TestEpochForView_PrevCurr tests constructing and subsequently querying
@@ -135,7 +133,7 @@ func (suite *EpochLookupSuite) TestEpochForView_PrevCurr() {
 	epochs := []epochRange{suite.prevEpoch, suite.currEpoch}
 	suite.CommitEpochs(epochs...)
 	suite.CreateAndStartEpochLookup()
-	testEpochForView(suite.T(), suite.lookup, suite.state, epochs...)
+	testEpochForView(suite.T(), suite.lookup, epochs...)
 }
 
 // TestEpochForView_CurrNext tests constructing and subsequently querying
@@ -144,7 +142,7 @@ func (suite *EpochLookupSuite) TestEpochForView_CurrNext() {
 	epochs := []epochRange{suite.currEpoch, suite.nextEpoch}
 	suite.CommitEpochs(epochs...)
 	suite.CreateAndStartEpochLookup()
-	testEpochForView(suite.T(), suite.lookup, suite.state, epochs...)
+	testEpochForView(suite.T(), suite.lookup, epochs...)
 }
 
 // TestEpochForView_CurrNextPrev tests constructing and subsequently querying
@@ -153,7 +151,7 @@ func (suite *EpochLookupSuite) TestEpochForView_CurrNextPrev() {
 	epochs := []epochRange{suite.prevEpoch, suite.currEpoch, suite.nextEpoch}
 	suite.CommitEpochs(epochs...)
 	suite.CreateAndStartEpochLookup()
-	testEpochForView(suite.T(), suite.lookup, suite.state, epochs...)
+	testEpochForView(suite.T(), suite.lookup, epochs...)
 }
 
 // TestProtocolEvents_EpochExtended tests constructing and subsequently querying
@@ -162,23 +160,16 @@ func (suite *EpochLookupSuite) TestEpochForView_CurrNextPrev() {
 // in the protocol state.
 func (suite *EpochLookupSuite) TestProtocolEvents_EpochExtended() {
 	// previous and current epochs will be committed
+	epochs := []epochRange{suite.prevEpoch, suite.currEpoch}
 	suite.CommitEpochs(suite.prevEpoch, suite.currEpoch)
-	extension := flow.EpochExtension{
-		FirstView: suite.currEpoch.FinalView+1,
-		FinalView: suite.currEpoch.FinalView+100,
-	}
-
-	epochs := []epochRange{
-		suite.prevEpoch,
-		{counter: suite.currEpoch.counter, firstView: suite.currEpoch.firstView, finalView: extension.FinalView},
-	}
-
-	header := unittest.BlockHeaderFixture()
-	suite.state.On("AtHeight", header.Height).Return(suite.snapshot).Times(4)
 
 	suite.CreateAndStartEpochLookup()
 
-	suite.lookup.EpochExtended(suite.currEpoch.counter, header, extension)
+	extension := flow.EpochExtension{
+		FirstView: suite.currEpoch.firstView + 1,
+		FinalView: suite.currEpoch.finalView + 100,
+	}
+	suite.lookup.EpochExtended(suite.currEpoch.counter, nil, extension)
 
 	// wait for the protocol event to be processed (async)
 	assert.Eventually(suite.T(), func() bool {
@@ -187,15 +178,15 @@ func (suite *EpochLookupSuite) TestProtocolEvents_EpochExtended() {
 	}, 5*time.Second, 50*time.Millisecond)
 
 	// validate queries are answered correctly
-	testEpochForView(suite.T(), suite.lookup, suite.state, epochs...)
+	testEpochForView(suite.T(), suite.lookup, epochs...)
 
 	// should handle multiple deliveries of the protocol event
-	suite.lookup.EpochExtended(suite.currEpoch.counter, header, extension)
-	suite.lookup.EpochExtended(suite.currEpoch.counter, header, extension)
-	suite.lookup.EpochExtended(suite.currEpoch.counter, header, extension)
+	suite.lookup.EpochExtended(suite.currEpoch.counter, nil, extension)
+	suite.lookup.EpochExtended(suite.currEpoch.counter, nil, extension)
+	suite.lookup.EpochExtended(suite.currEpoch.counter, nil, extension)
 
 	// validate queries are answered correctly
-	testEpochForView(suite.T(), suite.lookup, suite.state, epochs...)
+	testEpochForView(suite.T(), suite.lookup, epochs...)
 }
 
 // TestProtocolEvents_CommittedEpoch tests correct processing of an `EpochCommittedPhaseStarted` event
@@ -217,7 +208,7 @@ func (suite *EpochLookupSuite) TestProtocolEvents_CommittedEpoch() {
 	}, 5*time.Second, 50*time.Millisecond)
 
 	// validate queries are answered correctly
-	testEpochForView(suite.T(), suite.lookup, suite.state, suite.currEpoch, suite.nextEpoch)
+	testEpochForView(suite.T(), suite.lookup, suite.currEpoch, suite.nextEpoch)
 
 	// should handle multiple deliveries of the protocol event
 	suite.lookup.EpochCommittedPhaseStarted(suite.currentEpochCounter, firstBlockOfCommittedPhase)
@@ -225,28 +216,13 @@ func (suite *EpochLookupSuite) TestProtocolEvents_CommittedEpoch() {
 	suite.lookup.EpochCommittedPhaseStarted(suite.currentEpochCounter, firstBlockOfCommittedPhase)
 
 	// validate queries are answered correctly
-	testEpochForView(suite.T(), suite.lookup, suite.state, suite.currEpoch, suite.nextEpoch)
-}
-
-// epochFixtureWithExtension creates a setup epoch with an extension.
-func (suite *EpochLookupSuite) epochFixtureWithExtension(counter, firstView, extensionFinalView uint64) (protocol.Epoch, flow.EpochExtension) {
-	setupFixture := unittest.EpochSetupFixture()
-	setupFixture.Counter = counter
-	setupFixture.FirstView = firstView
-
-	extension := flow.EpochExtension{
-		FirstView: setupFixture.FirstView,
-		FinalView: extensionFinalView,
-	}
-
-	epoch := inmem.NewSetupEpoch(setupFixture, []flow.EpochExtension{extension})
-	return epoch, extension
+	testEpochForView(suite.T(), suite.lookup, suite.currEpoch, suite.nextEpoch)
 }
 
 // testEpochForView accepts a constructed EpochLookup and state, and
 // validates correctness by issuing various queries, using the input state and
 // epochs as source of truth.
-func testEpochForView(t *testing.T, lookup *EpochLookup, state protocol.State, epochs ...epochRange) {
+func testEpochForView(t *testing.T, lookup *EpochLookup, epochs ...epochRange) {
 	t.Run("should be able to query within any committed epoch", func(t *testing.T) {
 		for _, epoch := range epochs {
 			t.Run("first view", func(t *testing.T) {
@@ -283,7 +259,7 @@ func testEpochForView(t *testing.T, lookup *EpochLookup, state protocol.State, e
 	})
 
 	t.Run("should return ErrViewForUnknownEpoch for queries above latest epoch final view", func(t *testing.T) {
-		_, err := lookup.EpochForView(epochs[len(epochs)-1].finalView + 1)
+		_, err := lookup.EpochForView(lookup.epochs.latest().finalView + 1)
 		assert.ErrorIs(t, err, model.ErrViewForUnknownEpoch)
 	})
 }
