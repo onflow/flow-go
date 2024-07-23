@@ -176,8 +176,7 @@ func (bl *BlockView) RunTransaction(
 		}
 	}
 
-	// update tx context origin
-	proc.evm.TxContext.Origin = msg.From
+	// run msg
 	res, err := proc.run(msg, tx.Hash(), tx.Type())
 	if err != nil {
 		return nil, err
@@ -222,8 +221,7 @@ func (bl *BlockView) BatchRunTransactions(txs []*gethTypes.Transaction) ([]*type
 			}
 		}
 
-		// update tx context origin
-		proc.evm.TxContext.Origin = msg.From
+		// run msg
 		res, err := proc.run(msg, tx.Hash(), tx.Type())
 		if err != nil {
 			return nil, err
