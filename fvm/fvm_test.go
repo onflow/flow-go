@@ -11,6 +11,7 @@ import (
 	stdlib2 "github.com/onflow/cadence/runtime/stdlib"
 
 	envMock "github.com/onflow/flow-go/fvm/environment/mock"
+	"github.com/onflow/flow-go/fvm/evm/events"
 
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/encoding/ccf"
@@ -3015,10 +3016,17 @@ func TestEVM(t *testing.T) {
                                 .borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(from: /storage/flowTokenVault)
 							    ?? panic("Could not borrow reference to the owner's Vault!")
 
+							let evmHeartbeat = acc.storage
+								.borrow<&EVM.Heartbeat>(from: /storage/EVMHeartbeat)
+								?? panic("Couldn't borrow EVM.Heartbeat Resource")
+
 							let acc <- EVM.createCadenceOwnedAccount()
 							let amount <- vaultRef.withdraw(amount: 0.0000001) as! @FlowToken.Vault
 							acc.deposit(from: <- amount)
 							destroy acc
+
+							// commit blocks 
+							evmHeartbeat.heartbeat()
 						}
 					}`,
 					sc.FungibleToken.Address.HexWithPrefix(),
@@ -3040,18 +3048,18 @@ func TestEVM(t *testing.T) {
 
 			require.NoError(t, err)
 			require.NoError(t, output.Err)
-			require.Len(t, output.Events, 7)
+			require.Len(t, output.Events, 6)
 
-			txExe, blockExe := output.Events[4], output.Events[5]
+			txExe, blockExe := output.Events[3], output.Events[5]
 			txExecutedID := common.NewAddressLocation(
 				nil,
 				common.Address(sc.EVMContract.Address),
-				string(types.EventTypeTransactionExecuted),
+				string(events.EventTypeTransactionExecuted),
 			).ID()
 			blockExecutedID := common.NewAddressLocation(
 				nil,
 				common.Address(sc.EVMContract.Address),
-				string(types.EventTypeBlockExecuted),
+				string(events.EventTypeBlockExecuted),
 			).ID()
 			assert.Equal(t, txExecutedID, string(txExe.Type))
 			assert.Equal(t, blockExecutedID, string(blockExe.Type))
@@ -3067,12 +3075,11 @@ func TestEVM(t *testing.T) {
 				t,
 				[]common.TypeID{
 					common.TypeID(txExecutedID),
-					common.TypeID(blockExecutedID),
 					"A.f8d6e0586b0a20c7.EVM.CadenceOwnedAccountCreated",
 					"A.ee82856bf20e2aa6.FungibleToken.Withdrawn",
 					common.TypeID(txExecutedID),
-					common.TypeID(blockExecutedID),
 					"A.f8d6e0586b0a20c7.EVM.FLOWTokensDeposited",
+					common.TypeID(blockExecutedID),
 				},
 				eventTypeIDs,
 			)

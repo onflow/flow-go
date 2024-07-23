@@ -2,8 +2,8 @@ package state
 
 import (
 	"fmt"
-	"math/big"
 
+	"github.com/holiman/uint256"
 	gethCommon "github.com/onflow/go-ethereum/common"
 	gethTypes "github.com/onflow/go-ethereum/core/types"
 	gethCrypto "github.com/onflow/go-ethereum/crypto"
@@ -22,14 +22,20 @@ type DeltaView struct {
 	dirtyAddresses map[gethCommon.Address]struct{}
 	// created keeps a set of recently created addresses
 	created map[gethCommon.Address]struct{}
+	// This is an EIP-6780 flag indicating whether the object is eligible for
+	// self-destruct according to EIP-6780. The flag could be set either when
+	// the contract is just created within the current transaction, or when the
+	// object was previously existent and is being deployed as a contract within
+	// the current transaction.
+	newContract map[gethCommon.Address]struct{}
 	// toBeDestructed keeps a set of addresses flagged to be destructed at the
 	// end of transaction, it also keeps the balance of the addresses before destruction
-	toBeDestructed map[gethCommon.Address]*big.Int
+	toBeDestructed map[gethCommon.Address]*uint256.Int
 	// is a flag used to track accounts that has been flagged for
 	// destruction but recreated later
 	recreated map[gethCommon.Address]struct{}
 	// balances keeps the changes to the account balances
-	balances map[gethCommon.Address]*big.Int
+	balances map[gethCommon.Address]*uint256.Int
 	// nonces keeps the changes to the account nonces
 	nonces map[gethCommon.Address]uint64
 	// codes keeps the changes to the account codes
@@ -66,9 +72,10 @@ func NewDeltaView(parent types.ReadOnlyView) *DeltaView {
 
 		dirtyAddresses: make(map[gethCommon.Address]struct{}),
 		created:        make(map[gethCommon.Address]struct{}),
-		toBeDestructed: make(map[gethCommon.Address]*big.Int),
+		newContract:    make(map[gethCommon.Address]struct{}),
+		toBeDestructed: make(map[gethCommon.Address]*uint256.Int),
 		recreated:      make(map[gethCommon.Address]struct{}),
-		balances:       make(map[gethCommon.Address]*big.Int),
+		balances:       make(map[gethCommon.Address]*uint256.Int),
 		nonces:         make(map[gethCommon.Address]uint64),
 		codes:          make(map[gethCommon.Address][]byte),
 		codeHashes:     make(map[gethCommon.Address]gethCommon.Hash),
@@ -158,9 +165,29 @@ func (d *DeltaView) IsCreated(addr gethCommon.Address) bool {
 	return d.parent.IsCreated(addr)
 }
 
+// CreateContract is used whenever a contract is created. This may be preceded
+// by CreateAccount, but that is not required if it already existed in the
+// state due to funds sent beforehand.
+func (d *DeltaView) CreateContract(addr gethCommon.Address) {
+	_, found := d.newContract[addr]
+	if !found {
+		d.newContract[addr] = struct{}{}
+	}
+}
+
+// IsNewContract returns true if address has been created in this tx.
+// It's used to correctly handle EIP-6780 'delete-in-same-transaction' logic.
+func (d *DeltaView) IsNewContract(addr gethCommon.Address) bool {
+	_, found := d.newContract[addr]
+	if found {
+		return true
+	}
+	return d.parent.IsNewContract(addr)
+}
+
 // HasSelfDestructed returns true if address has been flagged for destruction
 // it also returns the balance of the address before the destruction call
-func (d *DeltaView) HasSelfDestructed(addr gethCommon.Address) (bool, *big.Int) {
+func (d *DeltaView) HasSelfDestructed(addr gethCommon.Address) (bool, *uint256.Int) {
 	bal, found := d.toBeDestructed[addr]
 	if found {
 		return true, bal
@@ -196,12 +223,12 @@ func (d *DeltaView) SelfDestruct(addr gethCommon.Address) error {
 	d.dirtyAddresses[addr] = struct{}{}
 
 	// set balance to zero
-	d.balances[addr] = new(big.Int)
+	d.balances[addr] = new(uint256.Int)
 	return nil
 }
 
 // GetBalance returns the balance of the given address
-func (d *DeltaView) GetBalance(addr gethCommon.Address) (*big.Int, error) {
+func (d *DeltaView) GetBalance(addr gethCommon.Address) (*uint256.Int, error) {
 	val, found := d.balances[addr]
 	if found {
 		return val, nil
@@ -209,13 +236,13 @@ func (d *DeltaView) GetBalance(addr gethCommon.Address) (*big.Int, error) {
 	// if newly created and no balance is set yet
 	_, newlyCreated := d.created[addr]
 	if newlyCreated {
-		return big.NewInt(0), nil
+		return uint256.NewInt(0), nil
 	}
 	return d.parent.GetBalance(addr)
 }
 
 // AddBalance adds the amount to the current balance of the given address
-func (d *DeltaView) AddBalance(addr gethCommon.Address, amount *big.Int) error {
+func (d *DeltaView) AddBalance(addr gethCommon.Address, amount *uint256.Int) error {
 	// if amount is 0 skip
 	if amount.Sign() == 0 {
 		return nil
@@ -226,7 +253,7 @@ func (d *DeltaView) AddBalance(addr gethCommon.Address, amount *big.Int) error {
 		return err
 	}
 	// update the balance
-	newBalance := new(big.Int).Add(orgBalance, amount)
+	newBalance := new(uint256.Int).Add(orgBalance, amount)
 	d.balances[addr] = newBalance
 
 	// flag the address as dirty
@@ -235,7 +262,7 @@ func (d *DeltaView) AddBalance(addr gethCommon.Address, amount *big.Int) error {
 }
 
 // SubBalance subtracts the amount from the current balance of the given address
-func (d *DeltaView) SubBalance(addr gethCommon.Address, amount *big.Int) error {
+func (d *DeltaView) SubBalance(addr gethCommon.Address, amount *uint256.Int) error {
 	// if amount is 0 skip
 	if amount.Sign() == 0 {
 		return nil
@@ -248,7 +275,7 @@ func (d *DeltaView) SubBalance(addr gethCommon.Address, amount *big.Int) error {
 	}
 
 	// update the new balance
-	newBalance := new(big.Int).Sub(orgBalance, amount)
+	newBalance := new(uint256.Int).Sub(orgBalance, amount)
 
 	// if new balance is negative error
 	if newBalance.Sign() < 0 {
@@ -366,6 +393,23 @@ func (d *DeltaView) SetState(sk types.SlotAddress, value gethCommon.Hash) error 
 	}
 	d.slots[sk] = value
 	return nil
+}
+
+// GetStorageRoot returns some sort of storage root for the given address
+//
+// WARNING! the root that is returned is not a commitment to the state
+// Mostly is returned to satisfy the requirements of the EVM,
+// where the returned value is compared against empty hash and empty root hash
+// values to determine smart contracts that already has data.
+//
+// Here we return values for non-existing accounts, and redirect the call all
+// the way back to the base view. This means that the state root that is returned
+// ignores the updates to slots during the transaction.
+func (d *DeltaView) GetStorageRoot(addr gethCommon.Address) (gethCommon.Hash, error) {
+	// go back to parents (until we reach the base view)
+	// Note that if storage is updated in deltas but not
+	// committed the expected behavior is to return the root in the base view.
+	return d.parent.GetStorageRoot(addr)
 }
 
 // GetTransientState returns the value of the slot of the transient state

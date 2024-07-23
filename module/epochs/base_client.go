@@ -37,7 +37,7 @@ type BaseClient struct {
 	FlowClient module.SDKClientWrapper // flow access node client
 
 	AccountAddress  sdk.Address      // account belonging to node interacting with the contract
-	AccountKeyIndex uint             // account key index
+	AccountKeyIndex uint32           // account key index
 	Signer          sdkcrypto.Signer // signer used to sign transactions
 }
 
@@ -46,7 +46,7 @@ func NewBaseClient(
 	log zerolog.Logger,
 	flowClient module.SDKClientWrapper,
 	accountAddress string,
-	accountKeyIndex uint,
+	accountKeyIndex uint32,
 	signer sdkcrypto.Signer,
 ) *BaseClient {
 

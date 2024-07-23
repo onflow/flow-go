@@ -155,7 +155,7 @@ func (s *ScriptExecutor) GetAccountKeys(ctx context.Context, address flow.Addres
 // Expected errors:
 // - Script execution related errors
 // - storage.ErrHeightNotIndexed if the data for the block height is not available
-func (s *ScriptExecutor) GetAccountKey(ctx context.Context, address flow.Address, keyIndex uint64, height uint64) (*flow.AccountPublicKey, error) {
+func (s *ScriptExecutor) GetAccountKey(ctx context.Context, address flow.Address, keyIndex uint32, height uint64) (*flow.AccountPublicKey, error) {
 	if err := s.checkHeight(height); err != nil {
 		return nil, err
 	}

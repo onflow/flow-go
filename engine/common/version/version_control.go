@@ -25,8 +25,8 @@ var ErrOutOfRange = errors.New("height is out of range")
 // VersionControlConsumer defines a function type that consumes version control updates.
 // It is called with the block height and the corresponding semantic version.
 // There are two possible notifications options:
-// - An updated version will have a new height and a semantic version at that height.
-// - A deleted version will have the previous height and an empty semantic version, indicating that the update was deleted.
+// - A new or updated version will have a height and a semantic version at that height.
+// - A deleted version will have the previous height and nil semantic version, indicating that the update was deleted.
 type VersionControlConsumer func(height uint64, version *semver.Version)
 
 // NoHeight represents the maximum possible height for blocks.
@@ -175,7 +175,7 @@ func (v *VersionControl) initBoundaries(
 			// this should never happen as we already validated the version beacon
 			// when indexing it
 			if err != nil || ver == nil {
-				if ver == nil {
+				if err == nil {
 					err = fmt.Errorf("boundary semantic version is nil")
 				}
 				ctx.Throw(
@@ -331,6 +331,9 @@ func (v *VersionControl) blockFinalized(
 		for _, boundary := range vb.VersionBoundaries {
 			ver, err := boundary.Semver()
 			if err != nil || ver == nil {
+				if err == nil {
+					err = fmt.Errorf("boundary semantic version is nil")
+				}
 				// this should never happen as we already validated the version beacon
 				// when indexing it
 				ctx.Throw(
@@ -357,7 +360,7 @@ func (v *VersionControl) blockFinalized(
 		if previousEndHeight != NoHeight && newEndHeight == NoHeight {
 			for _, consumer := range v.consumers {
 				// Note: notifying for the boundary height, which is end height + 1
-				consumer(previousEndHeight+1, semver.New("0.0.0"))
+				consumer(previousEndHeight+1, nil)
 			}
 		}
 	}
