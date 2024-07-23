@@ -424,7 +424,7 @@ func TestVersionBoundaryDeleted(t *testing.T) {
 	latestHeight++ // 12
 	contract.DeleteBoundary(latestHeight, boundaryHeight)
 
-	assertUpdate, assertCallbackCalled = generateConsumerAssertions(t, boundaryHeight, semver.New("0.0.0")) // called with empty string signalling deleted
+	assertUpdate, assertCallbackCalled = generateConsumerAssertions(t, boundaryHeight, nil) // called with empty string signalling deleted
 	vc.blockFinalized(signalCtx, latestHeight)
 	assertCallbackCalled()
 

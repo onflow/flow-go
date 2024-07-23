@@ -360,7 +360,7 @@ func (v *VersionControl) blockFinalized(
 		if previousEndHeight != NoHeight && newEndHeight == NoHeight {
 			for _, consumer := range v.consumers {
 				// Note: notifying for the boundary height, which is end height + 1
-				consumer(previousEndHeight+1, semver.New("0.0.0"))
+				consumer(previousEndHeight+1, nil)
 			}
 		}
 	}
