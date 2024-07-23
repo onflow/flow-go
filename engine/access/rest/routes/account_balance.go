@@ -29,20 +29,11 @@ func GetAccountBalance(r *request.Request, backend access.API, _ models.LinkGene
 
 	balance, err := backend.GetAccountBalanceAtBlockHeight(r.Context(), req.Address, req.Height)
 	if err != nil {
-		err := fmt.Errorf("account with address: %s does not exist", req.Address)
+		err = fmt.Errorf("failed to get account balance, reason: %w", err)
 		return nil, models.NewNotFoundError(err.Error(), err)
 	}
 
-	var accountBalance models.Block
-
-	//var response models.AccountPublicKey
-	//for _, key := range account.Keys {
-	//	if key.Index == req.Index {
-	//		response.Build(key)
-	//		return response, nil
-	//	}
-	//}
-	//
-	//err = fmt.Errorf("account key with index: %d does not exist", req.Index)
-	//return nil, models.NewNotFoundError(err.Error(), err)
+	var response models.AccountBalance
+	response.Build(balance)
+	return response, nil
 }
