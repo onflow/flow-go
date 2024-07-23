@@ -65,9 +65,8 @@ func (em *Emulator) NewReadOnlyBlockView(ctx types.BlockContext) (types.ReadOnly
 
 // NewBlockView constructs a new block view (mutable)
 func (em *Emulator) NewBlockView(ctx types.BlockContext) (types.BlockView, error) {
-	cfg := newConfig(ctx)
 	return &BlockView{
-		config:   cfg,
+		config:   newConfig(ctx),
 		rootAddr: em.rootAddr,
 		ledger:   em.ledger,
 	}, nil
@@ -181,6 +180,7 @@ func (bl *BlockView) RunTransaction(
 	if err != nil {
 		return nil, err
 	}
+
 	// all commit errors (StateDB errors) has to be returned
 	if err := proc.commit(true); err != nil {
 		return nil, err
@@ -370,7 +370,10 @@ func (proc *procedure) mintTo(
 	// if any error (invalid or vm) on the internal call, revert and don't commit any change
 	// this prevents having cases that we add balance to the bridge but the transfer
 	// fails due to gas, etc.
-	if res.Invalid() || res.Failed() {
+	if res.Invalid() {
+		return res, nil
+	}
+	if res.Failed() {
 		return &types.Result{
 			TxType:          call.Type,
 			GasConsumed:     types.InvalidTransactionGasCost,
@@ -408,7 +411,10 @@ func (proc *procedure) withdrawFrom(
 	// if any error (invalid or vm) on the internal call, revert and don't commit any change
 	// this prevents having cases that we deduct the balance from the account
 	// but doesn't return it as a vault.
-	if res.Invalid() || res.Failed() {
+	if res.Invalid() {
+		return res, nil
+	}
+	if res.Failed() {
 		return &types.Result{
 			TxType:          call.Type,
 			GasConsumed:     types.InvalidTransactionGasCost,
