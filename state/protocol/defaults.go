@@ -25,7 +25,7 @@ func DefaultEpochSafetyParams(chain flow.ChainID) (SafetyParams, error) {
 	case flow.Localnet, flow.Benchnet, flow.BftTestnet, flow.Emulator:
 		return SafetyParams{
 			FinalizationSafetyThreshold: 100,
-			EpochExtensionViewCount:     690, // approximately 10 minutes
+			EpochExtensionViewCount:     600, // approximately 10 minutes
 		}, nil
 	}
 	return SafetyParams{}, fmt.Errorf("unkown chain id %s", chain.String())
