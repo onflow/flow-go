@@ -434,9 +434,12 @@ func (proc *procedure) withdrawFrom(
 func (proc *procedure) deployAt(
 	call *types.DirectCall,
 ) (*types.Result, error) {
-	castedValue, overflow := uint256.FromBig(call.Value)
-	if overflow {
-		return nil, types.ErrInvalidBalance
+	// convert and check value
+	isValid, castedValue := convertAndCheckValue(call.Value)
+	if !isValid {
+		return types.NewInvalidResult(
+			call.Transaction(),
+			types.ErrInvalidBalance), nil
 	}
 
 	txHash := call.Hash()
@@ -557,6 +560,7 @@ func (proc *procedure) deployAt(
 	}
 
 	res.DeployedContractAddress = &call.To
+	res.CumulativeGasUsed = proc.config.BlockTotalGasUsedSoFar + res.GasConsumed
 
 	proc.state.SetCode(addr, ret)
 	return res, proc.commit(true)
@@ -649,7 +653,7 @@ func (proc *procedure) run(
 		res.ReturnedData = execResult.ReturnData
 
 		// Update proc context
-		proc.config.BlockTotalGasUsedSoFar += execResult.UsedGas
+		proc.config.BlockTotalGasUsedSoFar = res.CumulativeGasUsed
 		proc.config.BlockTxCountSoFar += 1
 
 		if !execResult.Failed() { // collect vm errors

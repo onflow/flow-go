@@ -314,6 +314,7 @@ func TestHandler_OpsWithoutEmulator(t *testing.T) {
 
 func TestHandler_COA(t *testing.T) {
 	t.Parallel()
+
 	t.Run("test deposit/withdraw (with integrated emulator)", func(t *testing.T) {
 		testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
 			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
@@ -1350,8 +1351,10 @@ func TestHandler_Metrics(t *testing.T) {
 	testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
 		testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
 			testutils.RunWithEOATestAccount(t, backend, rootAddr, func(eoa *testutils.EOATestAccount) {
+				gasUsed := testutils.RandomGas(1000)
 				result := &types.Result{
-					GasConsumed:             testutils.RandomGas(1000),
+					GasConsumed:             gasUsed,
+					CumulativeGasUsed:       gasUsed * 4,
 					DeployedContractAddress: &types.EmptyAddress,
 				}
 				em := &testutils.TestEmulator{

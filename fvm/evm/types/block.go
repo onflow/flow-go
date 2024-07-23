@@ -112,7 +112,8 @@ type BlockProposal struct {
 // AppendTransaction appends a transaction hash to the list of transaction hashes of the block
 // and also update the receipts
 func (b *BlockProposal) AppendTransaction(res *Result) {
-	if res == nil {
+	// we don't append invalid transactions to blocks
+	if res == nil || res.Invalid() {
 		return
 	}
 	b.TxHashes = append(b.TxHashes, res.TxHash)
