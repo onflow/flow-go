@@ -193,6 +193,7 @@ func (bl *BlockView) RunTransaction(
 func (bl *BlockView) BatchRunTransactions(txs []*gethTypes.Transaction) ([]*types.Result, error) {
 	batchResults := make([]*types.Result, len(txs))
 
+	// create a new procedure
 	proc, err := bl.newProcedure()
 	if err != nil {
 		return nil, err
@@ -226,6 +227,7 @@ func (bl *BlockView) BatchRunTransactions(txs []*gethTypes.Transaction) ([]*type
 		if err != nil {
 			return nil, err
 		}
+
 		// all commit errors (StateDB errors) has to be returned
 		if err := proc.commit(false); err != nil {
 			return nil, err
@@ -233,6 +235,7 @@ func (bl *BlockView) BatchRunTransactions(txs []*gethTypes.Transaction) ([]*type
 
 		// this clears state for any subsequent transaction runs
 		proc.state.Reset()
+
 		// collect result
 		batchResults[i] = res
 	}
@@ -251,10 +254,14 @@ func (bl *BlockView) DryRunTransaction(
 	from gethCommon.Address,
 ) (*types.Result, error) {
 	var txResult *types.Result
+
+	// create a new procedure
 	proc, err := bl.newProcedure()
 	if err != nil {
 		return nil, err
 	}
+
+	// convert tx into message
 	msg, err := gethCore.TransactionToMessage(
 		tx,
 		GetSigner(bl.config),
@@ -612,6 +619,7 @@ func (proc *procedure) run(
 	// if the block gas limit is set to anything than max
 	// we need to update this code.
 	gasPool := (*gethCore.GasPool)(&proc.config.BlockContext.GasLimit)
+
 	// transit the state
 	execResult, err := gethCore.NewStateTransition(
 		proc.evm,
