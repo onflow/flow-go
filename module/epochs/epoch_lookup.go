@@ -49,7 +49,11 @@ func (cache *epochRangeCache) extendLatestEpoch(extensionFinalView uint64) error
 	if cache[2].finalView > extensionFinalView {
 		return fmt.Errorf("sanity check failed: latest epoch final view %d greater than extension final view %d", cache[2].finalView, extensionFinalView)
 	}
-
+	// duplicate events are no-ops
+	if cache[2].finalView == extensionFinalView {
+		return nil
+	}	
+	
 	cache[2].finalView = extensionFinalView
 	return nil
 }
