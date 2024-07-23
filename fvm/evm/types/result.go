@@ -111,6 +111,9 @@ func (res *Result) Successful() bool {
 // and also sets the gas used to the fixed invalid gas usage
 func (res *Result) SetValidationError(err error) {
 	res.ValidationError = err
+	// for invalid transactions we only set the gasConsumed
+	// for metering reasons, yet we do not set the CumulativeGasUsed
+	// since we won't consider then for the block construction purposes
 	res.GasConsumed = InvalidTransactionGasCost
 }
 
