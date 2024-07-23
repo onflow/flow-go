@@ -7,7 +7,7 @@ import (
 	badgerds "github.com/ipfs/go-ds-badger2"
 )
 
-var _ StorageDB = (*BadgerDBWrapper)(nil)
+var _ ExecutionDataStorage = (*BadgerDBWrapper)(nil)
 
 // BadgerDBWrapper wraps the BadgerDB to implement the StorageDB interface.
 type BadgerDBWrapper struct {

@@ -11,7 +11,7 @@ import (
 	pstorage "github.com/onflow/flow-go/storage/pebble"
 )
 
-var _ StorageDB = (*PebbleDBWrapper)(nil)
+var _ ExecutionDataStorage = (*PebbleDBWrapper)(nil)
 
 // PebbleDBWrapper wraps the PebbleDB to implement the StorageDB interface.
 type PebbleDBWrapper struct {
