@@ -115,6 +115,8 @@ func TestNativeTokenBridging(t *testing.T) {
 					})
 				})
 			})
+			// TODO: add test for deploying to an empty contract (error on deposit call)
+			// and a test case for when not enough balance on account for withdraw
 		})
 	})
 }
@@ -602,7 +604,7 @@ func TestDeployAtFunctionality(t *testing.T) {
 // this function is called and we make sure the balance the contract had
 // is returned to the address provided, and the contract data stays according to the
 // EIP 6780 https://eips.ethereum.org/EIPS/eip-6780 in case where the selfdestruct
-// is not caleld in the same transaction as deployment.
+// is not called in the same transaction as deployment.
 func TestSelfdestruct(t *testing.T) {
 	testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
 		testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
