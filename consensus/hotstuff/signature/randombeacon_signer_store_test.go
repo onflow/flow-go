@@ -40,7 +40,7 @@ func (suite *BeaconKeyStore) TestHappyPath() {
 	view := rand.Uint64()
 	epoch := rand.Uint64()
 	expectedKey := unittest.KeyFixture(crypto.BLSBLS12381)
-	suite.epochLookup.On("EpochForViewWithFallback", view).Return(epoch, nil)
+	suite.epochLookup.On("EpochForView", view).Return(epoch, nil)
 	suite.beaconKeys.On("RetrieveMyBeaconPrivateKey", epoch).Return(expectedKey, true, nil)
 
 	key, err := suite.store.ByView(view)
@@ -52,7 +52,7 @@ func (suite *BeaconKeyStore) TestHappyPath() {
 // model.ErrViewForUnknownEpoch it is propagated to the caller of ByView.
 func (suite *BeaconKeyStore) Test_EpochLookup_ViewForUnknownEpoch() {
 	view := rand.Uint64()
-	suite.epochLookup.On("EpochForViewWithFallback", view).Return(uint64(0), model.ErrViewForUnknownEpoch)
+	suite.epochLookup.On("EpochForView", view).Return(uint64(0), model.ErrViewForUnknownEpoch)
 
 	key, err := suite.store.ByView(view)
 	require.ErrorIs(suite.T(), err, model.ErrViewForUnknownEpoch)
@@ -64,7 +64,7 @@ func (suite *BeaconKeyStore) Test_EpochLookup_ViewForUnknownEpoch() {
 func (suite *BeaconKeyStore) Test_EpochLookup_UnexpectedError() {
 	view := rand.Uint64()
 	exception := errors.New("unexpected error")
-	suite.epochLookup.On("EpochForViewWithFallback", view).Return(uint64(0), exception)
+	suite.epochLookup.On("EpochForView", view).Return(uint64(0), exception)
 
 	key, err := suite.store.ByView(view)
 	require.ErrorIs(suite.T(), err, exception)
@@ -76,7 +76,7 @@ func (suite *BeaconKeyStore) Test_EpochLookup_UnexpectedError() {
 func (suite *BeaconKeyStore) Test_BeaconKeys_Unsafe() {
 	view := rand.Uint64()
 	epoch := rand.Uint64()
-	suite.epochLookup.On("EpochForViewWithFallback", view).Return(epoch, nil)
+	suite.epochLookup.On("EpochForView", view).Return(epoch, nil)
 	suite.beaconKeys.On("RetrieveMyBeaconPrivateKey", epoch).Return(nil, false, nil)
 
 	key, err := suite.store.ByView(view)
@@ -89,7 +89,7 @@ func (suite *BeaconKeyStore) Test_BeaconKeys_Unsafe() {
 func (suite *BeaconKeyStore) Test_BeaconKeys_NotFound() {
 	view := rand.Uint64()
 	epoch := rand.Uint64()
-	suite.epochLookup.On("EpochForViewWithFallback", view).Return(epoch, nil)
+	suite.epochLookup.On("EpochForView", view).Return(epoch, nil)
 	suite.beaconKeys.On("RetrieveMyBeaconPrivateKey", epoch).Return(nil, false, storage.ErrNotFound)
 
 	key, err := suite.store.ByView(view)
@@ -104,7 +104,7 @@ func (suite *BeaconKeyStore) Test_BeaconKeys_NotFound() {
 func (suite *BeaconKeyStore) Test_BeaconKeys_NotFoundThenAvailable() {
 	view := rand.Uint64()
 	epoch := rand.Uint64()
-	suite.epochLookup.On("EpochForViewWithFallback", view).Return(epoch, nil)
+	suite.epochLookup.On("EpochForView", view).Return(epoch, nil)
 
 	var retKey crypto.PrivateKey
 	var retSafe bool
