@@ -39,6 +39,23 @@ func (cache *epochRangeCache) latest() epochRange {
 	return cache[2]
 }
 
+// extendLatestEpoch updates the final view of the latest epoch with the final view of the epoch extension.
+// No errors are expected during normal operation.
+func (cache *epochRangeCache) extendLatestEpoch(extensionFinalView uint64) error {
+	// sanity check: latest epoch should already be cached.
+	if !cache[2].exists() {
+		return fmt.Errorf("sanity check failed: latest epoch does not exist")
+	}
+
+	// sanity check: extensionFinalView should be greater than final view of latest epoch
+	if cache[2].finalView > extensionFinalView {
+		return fmt.Errorf("sanity check failed: latest epoch final view %d greater than extension final view %d", cache[2].finalView, extensionFinalView)
+	}
+
+	cache[2].finalView = extensionFinalView
+	return nil
+}
+
 // combinedRange returns the endpoints of the combined view range of all cached
 // epochs. In particular, we return the lowest firstView and the greatest finalView.
 // At least one epoch must already be cached, otherwise this function will panic.
@@ -103,9 +120,12 @@ func (cache *epochRangeCache) add(epoch epochRange) error {
 // CAUTION: EpochLookup should only be used for querying the previous, current, or next epoch.
 // TODO(EFM, #5763): This implementation does not yet understand EFM recovery and needs to be updated.
 type EpochLookup struct {
-	state                    protocol.State
-	mu                       sync.RWMutex
-	epochs                   epochRangeCache
+	state  protocol.State
+	mu     sync.RWMutex
+	epochs epochRangeCache
+	// epochEvents queues functors for processing epoch-related protocol events.
+	// Events will be processed in the order they are received (fifo).
+	epochEvents              chan func() error
 	committedEpochsCh        chan *flow.Header // protocol events for newly committed epochs (the first block of the epoch is passed over the channel)
 	epochFallbackIsTriggered *atomic.Bool      // true when epoch fallback is triggered
 	events.Noop                                // implements protocol.Consumer
@@ -119,6 +139,7 @@ var _ module.EpochLookup = (*EpochLookup)(nil)
 func NewEpochLookup(state protocol.State) (*EpochLookup, error) {
 	lookup := &EpochLookup{
 		state:                    state,
+		epochEvents:              make(chan func() error, 20),
 		committedEpochsCh:        make(chan *flow.Header, 1),
 		epochFallbackIsTriggered: atomic.NewBool(false),
 	}
@@ -264,9 +285,8 @@ func (lookup *EpochLookup) handleProtocolEvents(ctx irrecoverable.SignalerContex
 		select {
 		case <-ctx.Done():
 			return
-		case block := <-lookup.committedEpochsCh:
-			epoch := lookup.state.AtBlockID(block.ID()).Epochs().Next()
-			err := lookup.cacheEpoch(epoch)
+		case processEvtFn := <-lookup.epochEvents:
+			err := processEvtFn()
 			if err != nil {
 				ctx.Throw(err)
 			}
@@ -274,9 +294,54 @@ func (lookup *EpochLookup) handleProtocolEvents(ctx irrecoverable.SignalerContex
 	}
 }
 
-// EpochCommittedPhaseStarted informs the `committee.Consensus` that the block starting the Epoch Committed Phase has been finalized.
+// EpochExtended listens to `EpochExtended` protocol notifications. The notification is queued
+// for async processing by the worker. We must process _all_ `EpochExtended` notifications.
+func (lookup *EpochLookup) EpochExtended(_ uint64, first *flow.Header, _ flow.EpochExtension) {
+	lookup.epochEvents <- func() error {
+		return lookup.processEpochExtended(first)
+	}
+}
+
+// EpochCommittedPhaseStarted ingests the respective protocol notifications. The notification is
+// queued for async processing by the worker. We must process _all_ `EpochCommittedPhaseStarted` notifications.
 func (lookup *EpochLookup) EpochCommittedPhaseStarted(_ uint64, first *flow.Header) {
-	lookup.committedEpochsCh <- first
+	lookup.epochEvents <- func() error {
+		return lookup.processEpochCommittedPhaseStarted(first)
+	}
+}
+
+// processEpochExtended processes the EpochExtended notification, which the Protocol
+// State emits when we finalize the first block whose Protocol State further extends the current
+// epoch. The next epoch should not be committed so far, because epoch extension are only added
+// when there is no subsequent epoch that we could transition into but the current epoch is nearing
+// its end. Specifically, we update the final view of the latest epoch range with the final view of the
+// current epoch, which will now be updated because the epoch has extensions.
+func (lookup *EpochLookup) processEpochExtended(first *flow.Header) error {
+	finalView, err := lookup.state.AtHeight(first.Height).Epochs().Current().FinalView()
+	if err != nil {
+		return fmt.Errorf("failed to get final view of current epoch: %w", err)
+	}
+
+	err = lookup.epochs.extendLatestEpoch(finalView)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// processEpochCommittedPhaseStarted processes the EpochCommittedPhaseStarted notification, which
+// the consensus component emits when we finalize the first block of the Epoch Committed phase.
+// Specifically, we cache the next epoch in the EpochLookup.
+// No errors are expected during normal operation.
+func (lookup *EpochLookup) processEpochCommittedPhaseStarted(first *flow.Header) error {
+	epoch := lookup.state.AtBlockID(first.ID()).Epochs().Next()
+	err := lookup.cacheEpoch(epoch)
+	if err != nil {
+		return fmt.Errorf("failed to cache next epoch: %w", err)
+	}
+
+	return nil
 }
 
 // EpochFallbackModeTriggered passes the protocol event to the worker thread.

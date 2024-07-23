@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/state/protocol/inmem"
 	mockprotocol "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/onflow/flow-go/utils/unittest/mocks"
@@ -210,6 +211,46 @@ func (suite *EpochLookupSuite) TestProtocolEvents_EpochFallbackTriggered() {
 	testEpochForViewWithFallback(suite.T(), suite.lookup, suite.state, suite.currEpoch)
 }
 
+// TestProtocolEvents_EpochExtended tests constructing and subsequently querying
+// EpochLookup, where we process an EpochExtended event and expect the latest
+// epoch final view to be updated with the updated final view of the current epoch
+// in the protocol state.
+func (suite *EpochLookupSuite) TestProtocolEvents_EpochExtended() {
+	// previous and current epochs will be committed
+	suite.CommitEpochs(suite.prevEpoch)
+	epoch, extension := suite.epochFixtureWithExtension(suite.currEpoch.counter, suite.currEpoch.firstView, suite.currEpoch.finalView+1000)
+	suite.epochQuery.Add(epoch)
+
+	epochs := []epochRange{
+		suite.prevEpoch,
+		{counter: suite.currEpoch.counter, firstView: suite.currEpoch.firstView, finalView: extension.FinalView},
+	}
+
+	header := unittest.BlockHeaderFixture()
+	suite.state.On("AtHeight", header.Height).Return(suite.snapshot).Times(4)
+
+	suite.CreateAndStartEpochLookup()
+
+	suite.lookup.EpochExtended(suite.currEpoch.counter, header, extension)
+
+	// wait for the protocol event to be processed (async)
+	assert.Eventually(suite.T(), func() bool {
+		_, err := suite.lookup.EpochForViewWithFallback(extension.FinalView)
+		return err == nil
+	}, 5*time.Second, 50*time.Millisecond)
+
+	// validate queries are answered correctly
+	testEpochForViewWithFallback(suite.T(), suite.lookup, suite.state, epochs...)
+
+	// should handle multiple deliveries of the protocol event
+	suite.lookup.EpochExtended(suite.currEpoch.counter, header, extension)
+	suite.lookup.EpochExtended(suite.currEpoch.counter, header, extension)
+	suite.lookup.EpochExtended(suite.currEpoch.counter, header, extension)
+
+	// validate queries are answered correctly
+	testEpochForViewWithFallback(suite.T(), suite.lookup, suite.state, epochs...)
+}
+
 // TestProtocolEvents_CommittedEpoch tests correct processing of an `EpochCommittedPhaseStarted` event
 func (suite *EpochLookupSuite) TestProtocolEvents_CommittedEpoch() {
 	// initially, only current epoch is committed
@@ -238,6 +279,21 @@ func (suite *EpochLookupSuite) TestProtocolEvents_CommittedEpoch() {
 
 	// validate queries are answered correctly
 	testEpochForViewWithFallback(suite.T(), suite.lookup, suite.state, suite.currEpoch, suite.nextEpoch)
+}
+
+// epochFixtureWithExtension creates a setup epoch with an extension.
+func (suite *EpochLookupSuite) epochFixtureWithExtension(counter, firstView, extensionFinalView uint64) (protocol.Epoch, flow.EpochExtension) {
+	setupFixture := unittest.EpochSetupFixture()
+	setupFixture.Counter = counter
+	setupFixture.FirstView = firstView
+
+	extension := flow.EpochExtension{
+		FirstView: setupFixture.FirstView,
+		FinalView: extensionFinalView,
+	}
+
+	epoch := inmem.NewSetupEpoch(setupFixture, []flow.EpochExtension{extension})
+	return epoch, extension
 }
 
 // testEpochForViewWithFallback accepts a constructed EpochLookup and state, and
