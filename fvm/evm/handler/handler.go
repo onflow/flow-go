@@ -522,7 +522,7 @@ func (h *ContractHandler) executeAndHandleCall(
 	// append transaction to the block proposal
 	bp.AppendTransaction(res)
 
-	if totalSupplyDiff != nil {
+	if res.Successful() && totalSupplyDiff != nil {
 		if deductSupplyDiff {
 			bp.TotalSupply = new(big.Int).Sub(bp.TotalSupply, totalSupplyDiff)
 			if bp.TotalSupply.Sign() < 0 {

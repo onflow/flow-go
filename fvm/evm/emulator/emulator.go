@@ -374,9 +374,9 @@ func (proc *procedure) mintTo(
 	// fails due to gas, etc.
 	if res.Invalid() || res.Failed() {
 		return &types.Result{
-			TxType:      call.Type,
-			GasConsumed: types.InvalidTransactionGasCost,
-			VMError:     types.ErrInternalDirectCallFailed,
+			TxType:          call.Type,
+			GasConsumed:     types.InvalidTransactionGasCost,
+			ValidationError: types.ErrInternalDirectCallFailed,
 		}, nil
 	}
 
@@ -412,9 +412,9 @@ func (proc *procedure) withdrawFrom(
 	// but doesn't return it as a vault.
 	if res.Invalid() || res.Failed() {
 		return &types.Result{
-			TxType:      call.Type,
-			GasConsumed: types.InvalidTransactionGasCost,
-			VMError:     types.ErrInternalDirectCallFailed,
+			TxType:          call.Type,
+			GasConsumed:     types.InvalidTransactionGasCost,
+			ValidationError: types.ErrInternalDirectCallFailed,
 		}, nil
 	}
 

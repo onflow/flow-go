@@ -2914,10 +2914,10 @@ func TestEVM(t *testing.T) {
 				import EVM from %s
 				
 				access(all) fun main() {
-					let bal = EVM.Balance(attoflow: 1)
+					let bal = EVM.Balance(attoflow: 1000000000000000000)
 					let acc <- EVM.createCadenceOwnedAccount()
 
-					// withdraw with rounding error
+					// withdraw insufficient balance
 					destroy acc.withdraw(balance: bal)
 					destroy acc
 				}
