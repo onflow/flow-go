@@ -1364,6 +1364,7 @@ func (exeNode *ExecutionNode) LoadGrpcServer(
 		exeNode.results,
 		exeNode.txResults,
 		node.Storage.Commits,
+		exeNode.metricsProvider,
 		node.RootChainID,
 		signature.NewBlockSignerDecoder(exeNode.committee),
 		exeNode.exeConf.apiRatelimits,
