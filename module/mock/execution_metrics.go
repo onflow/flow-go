@@ -21,6 +21,16 @@ func (_m *ExecutionMetrics) ChunkDataPackRequestProcessed() {
 	_m.Called()
 }
 
+// EVMBlockExecuted provides a mock function with given fields: txCount, totalGasUsed, totalSupplyInFlow
+func (_m *ExecutionMetrics) EVMBlockExecuted(txCount int, totalGasUsed uint64, totalSupplyInFlow float64) {
+	_m.Called(txCount, totalGasUsed, totalSupplyInFlow)
+}
+
+// EVMTransactionExecuted provides a mock function with given fields: gasUsed, isDirectCall, failed
+func (_m *ExecutionMetrics) EVMTransactionExecuted(gasUsed uint64, isDirectCall bool, failed bool) {
+	_m.Called(gasUsed, isDirectCall, failed)
+}
+
 // ExecutionBlockCachedPrograms provides a mock function with given fields: programs
 func (_m *ExecutionMetrics) ExecutionBlockCachedPrograms(programs int) {
 	_m.Called(programs)
@@ -204,6 +214,11 @@ func (_m *ExecutionMetrics) RuntimeTransactionProgramsCacheHit() {
 // RuntimeTransactionProgramsCacheMiss provides a mock function with given fields:
 func (_m *ExecutionMetrics) RuntimeTransactionProgramsCacheMiss() {
 	_m.Called()
+}
+
+// SetNumberOfDeployedCOAs provides a mock function with given fields: count
+func (_m *ExecutionMetrics) SetNumberOfDeployedCOAs(count uint64) {
+	_m.Called(count)
 }
 
 // StartBlockReceivedToExecuted provides a mock function with given fields: blockID

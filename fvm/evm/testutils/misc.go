@@ -100,3 +100,26 @@ func RandomResultFixture(t testing.TB) *types.Result {
 		},
 	}
 }
+
+func AggregatedPrecompiledCallsFixture(t testing.TB) types.AggregatedPrecompiledCalls {
+	return types.AggregatedPrecompiledCalls{
+		types.PrecompiledCalls{
+			Address: RandomAddress(t),
+			RequiredGasCalls: []types.RequiredGasCall{{
+				Input:  RandomData(t),
+				Output: 2,
+			}},
+			RunCalls: []types.RunCall{
+				{
+					Input:  RandomData(t),
+					Output: RandomData(t),
+				},
+				{
+					Input:    RandomData(t),
+					Output:   []byte{},
+					ErrorMsg: "Some error msg",
+				},
+			},
+		},
+	}
+}

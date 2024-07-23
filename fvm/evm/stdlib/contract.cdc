@@ -6,7 +6,7 @@ import "FlowToken"
 access(all)
 contract EVM {
 
-    // Entitlements enabling finer-graned access control on a CadenceOwnedAccount
+    // Entitlements enabling finer-grained access control on a CadenceOwnedAccount
     access(all) entitlement Validate
     access(all) entitlement Withdraw
     access(all) entitlement Call
@@ -30,13 +30,13 @@ contract EVM {
         totalGasUsed: UInt64,
         // parent block hash
         parentHash: [UInt8; 32],
-        // hash of all the transaction receipts
+        // root hash of all the transaction receipts
         receiptRoot: [UInt8; 32],
-        // all the transactions included in the block
-        transactionHashes: [[UInt8; 32]]
+        // root hash of all the transaction hashes
+        transactionHashRoot: [UInt8; 32],
     )
 
-    /// Transaction executed event is emitted everytime a transaction
+    /// Transaction executed event is emitted every time a transaction
     /// is executed by the EVM (even if failed).
     access(all)
     event TransactionExecuted(
@@ -58,7 +58,7 @@ contract EVM {
         contractAddress: String,
         // RLP encoded logs
         logs: [UInt8],
-        // block height in which transaction was inclued
+        // block height in which transaction was included
         blockHeight: UInt64,
         /// captures the hex encoded data that is returned from
         /// the evm. For contract deployments

@@ -110,6 +110,7 @@ type Params struct {
 	TxErrorMessagesCacheSize  uint
 	ScriptExecutor            execution.ScriptExecutor
 	ScriptExecutionMode       IndexQueryMode
+	CheckPayerBalance         bool
 	EventQueryMode            IndexQueryMode
 	BlockTracker              subscription.BlockTracker
 	SubscriptionHandler       *subscription.SubscriptionHandler
@@ -245,6 +246,11 @@ func New(params Params) (*Backend, error) {
 		nodeInfo:          nodeInfo,
 	}
 
+	txValidator, err := configureTransactionValidator(params.State, params.ChainID, params.ScriptExecutor, params.CheckPayerBalance)
+	if err != nil {
+		return nil, fmt.Errorf("could not create transaction validator: %w", err)
+	}
+
 	b.backendTransactions = backendTransactions{
 		TransactionsLocalDataProvider: transactionsLocalDataProvider,
 		log:                           params.Log,
@@ -252,7 +258,7 @@ func New(params Params) (*Backend, error) {
 		chainID:                       params.ChainID,
 		transactions:                  params.Transactions,
 		executionReceipts:             params.ExecutionReceipts,
-		transactionValidator:          configureTransactionValidator(params.State, params.ChainID),
+		transactionValidator:          txValidator,
 		transactionMetrics:            params.AccessMetrics,
 		retry:                         retry,
 		connFactory:                   params.ConnFactory,
@@ -304,7 +310,7 @@ func identifierList(ids []string) (flow.IdentifierList, error) {
 	return idList, nil
 }
 
-func configureTransactionValidator(state protocol.State, chainID flow.ChainID) *access.TransactionValidator {
+func configureTransactionValidator(state protocol.State, chainID flow.ChainID, executor execution.ScriptExecutor, checkPayerBalance bool) (*access.TransactionValidator, error) {
 	return access.NewTransactionValidator(
 		access.NewProtocolStateBlocks(state),
 		chainID.Chain(),
@@ -317,7 +323,9 @@ func configureTransactionValidator(state protocol.State, chainID flow.ChainID) *
 			MaxGasLimit:                  flow.DefaultMaxTransactionGasLimit,
 			MaxTransactionByteSize:       flow.DefaultMaxTransactionByteSize,
 			MaxCollectionByteSize:        flow.DefaultMaxCollectionByteSize,
+			CheckPayerBalance:            checkPayerBalance,
 		},
+		executor,
 	)
 }
 

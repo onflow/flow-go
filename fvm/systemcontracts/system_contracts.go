@@ -16,6 +16,7 @@ package systemcontracts
 import (
 	"fmt"
 
+	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -103,6 +104,13 @@ var (
 type SystemContract struct {
 	Address flow.Address
 	Name    string
+}
+
+func (c SystemContract) Location() common.AddressLocation {
+	return common.AddressLocation{
+		Address: common.Address(c.Address),
+		Name:    c.Name,
+	}
 }
 
 // SystemAccount represents an address used by the system.
