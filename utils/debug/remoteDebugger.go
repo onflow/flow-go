@@ -16,9 +16,11 @@ type RemoteDebugger struct {
 
 // Warning : make sure you use the proper flow-go version, same version as the network you are collecting registers
 // from, otherwise the execution might differ from the way runs on the network
-func NewRemoteDebugger(grpcAddress string,
+func NewRemoteDebugger(
+	grpcAddress string,
 	chain flow.Chain,
-	logger zerolog.Logger) *RemoteDebugger {
+	logger zerolog.Logger,
+) *RemoteDebugger {
 	vm := fvm.NewVirtualMachine()
 
 	// no signature processor here
@@ -57,7 +59,7 @@ func (d *RemoteDebugger) RunTransaction(
 	return output.Err, nil
 }
 
-// RunTransaction runs the transaction and tries to collect the registers at
+// RunTransactionAtBlockID runs the transaction and tries to collect the registers at
 // the given blockID note that it would be very likely that block is far in the
 // past and you can't find the trie to read the registers from.
 // if regCachePath is empty, the register values won't be cached
