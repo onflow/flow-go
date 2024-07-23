@@ -39,18 +39,23 @@ func (cache *epochRangeCache) latest() epochRange {
 
 // extendLatestEpoch updates the final view of the latest epoch with the final view of the epoch extension.
 // No errors are expected during normal operation.
-func (cache *epochRangeCache) extendLatestEpoch(extensionFinalView uint64) error {
+func (cache *epochRangeCache) extendLatestEpoch(epochCounter uint64, extension flow.EpochExtension) error {
 	// sanity check: latest epoch should already be cached.
 	if !cache[2].exists() {
 		return fmt.Errorf("sanity check failed: latest epoch does not exist")
 	}
 
 	// sanity check: extensionFinalView should be greater than final view of latest epoch
-	if cache[2].finalView > extensionFinalView {
-		return fmt.Errorf("sanity check failed: latest epoch final view %d greater than extension final view %d", cache[2].finalView, extensionFinalView)
+	if cache[2].finalView > extension.FinalView {
+		return fmt.Errorf("sanity check failed: latest epoch final view %d greater than extension final view %d", cache[2].finalView, extension.FinalView)
 	}
 
-	cache[2].finalView = extensionFinalView
+	// sanity check: epoch extension should have the same epoch counter as the latest epoch
+	if cache[2].counter != epochCounter {
+		return fmt.Errorf("sanity check failed: latest epoch counter %d does not match extension epoch counter %d", cache[2].counter, epochCounter)
+	}
+
+	cache[2].finalView = extension.FinalView
 	return nil
 }
 
@@ -290,8 +295,8 @@ func (lookup *EpochLookup) EpochCommittedPhaseStarted(_ uint64, first *flow.Head
 // when there is no subsequent epoch that we could transition into but the current epoch is nearing
 // its end. Specifically, we update the final view of the latest epoch range with the final view of the
 // current epoch, which will now be updated because the epoch has extensions.
-func (lookup *EpochLookup) processEpochExtended(epochCounter uint64, extension *flow.EpochExtension) error {
-	err = lookup.epochs.extendLatestEpoch(epochCounter, extension)
+func (lookup *EpochLookup) processEpochExtended(epochCounter uint64, extension flow.EpochExtension) error {
+	err := lookup.epochs.extendLatestEpoch(epochCounter, extension)
 	if err != nil {
 		return err
 	}
