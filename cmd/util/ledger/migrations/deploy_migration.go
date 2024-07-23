@@ -63,18 +63,28 @@ func NewBurnerDeploymentMigration(
 func NewEVMDeploymentMigration(
 	chainID flow.ChainID,
 	logger zerolog.Logger,
+	full bool,
 ) RegistersMigration {
+
 	systemContracts := systemcontracts.SystemContractsForChain(chainID)
 	address := systemContracts.EVMContract.Address
+
+	var code []byte
+	if full {
+		code = evm.ContractCode(
+			systemContracts.NonFungibleToken.Address,
+			systemContracts.FungibleToken.Address,
+			systemContracts.FlowToken.Address,
+		)
+	} else {
+		code = []byte(evm.ContractMinimalCode)
+	}
+
 	return NewDeploymentMigration(
 		chainID,
 		Contract{
 			Name: systemContracts.EVMContract.Name,
-			Code: evm.ContractCode(
-				systemContracts.NonFungibleToken.Address,
-				systemContracts.FungibleToken.Address,
-				systemContracts.FlowToken.Address,
-			),
+			Code: code,
 		},
 		address,
 		map[flow.Address]struct{}{
