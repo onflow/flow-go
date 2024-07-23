@@ -22,24 +22,16 @@ func NewProgramsGetOrLoadProgramFunc(
 	accounts environment.Accounts,
 ) (GetOrLoadProgramFunc, error) {
 
-	derivedChainData, err := derived.NewDerivedChainData(derived.DefaultDerivedDataCacheSize)
+	transactionPreparer, err := NewTransactionPreparer(nestedTransactionPreparer)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create derived chain data: %w", err)
+		return nil, fmt.Errorf("failed to create transaction preparer: %w", err)
 	}
-
-	// The current block ID does not matter here, it is only for keeping a cross-block cache, which is not needed here.
-	derivedTransactionData := derivedChainData.
-		NewDerivedBlockDataForScript(flow.Identifier{}).
-		NewSnapshotReadDerivedTransactionData()
 
 	programs := environment.NewPrograms(
 		tracing.NewTracerSpan(),
 		NopMeter{},
 		environment.NoopMetricsReporter{},
-		migrationTransactionPreparer{
-			NestedTransactionPreparer:  nestedTransactionPreparer,
-			DerivedTransactionPreparer: derivedTransactionData,
-		},
+		transactionPreparer,
 		accounts,
 	)
 
@@ -72,5 +64,22 @@ func NewProgramsGetOrLoadProgramFunc(
 				return program, err
 			},
 		)
+	}, nil
+}
+
+func NewTransactionPreparer(nestedTransactionPreparer state.NestedTransactionPreparer) (storage.TransactionPreparer, error) {
+	derivedChainData, err := derived.NewDerivedChainData(derived.DefaultDerivedDataCacheSize)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create derived chain data: %w", err)
+	}
+
+	// The current block ID does not matter here, it is only for keeping a cross-block cache, which is not needed here.
+	derivedTransactionData := derivedChainData.
+		NewDerivedBlockDataForScript(flow.Identifier{}).
+		NewSnapshotReadDerivedTransactionData()
+
+	return migrationTransactionPreparer{
+		NestedTransactionPreparer:  nestedTransactionPreparer,
+		DerivedTransactionPreparer: derivedTransactionData,
 	}, nil
 }
