@@ -752,15 +752,17 @@ func (a *Account) Deposit(v *types.FLOWTokenVault) {
 }
 
 func (a *Account) deposit(v *types.FLOWTokenVault) (*types.Result, error) {
+	// prepare the call
 	bridge := a.fch.addressAllocator.NativeTokenBridgeAddress()
 	bridgeAccount := a.fch.AccountByAddress(bridge, false)
-
 	call := types.NewDepositCall(
 		bridge,
 		a.address,
 		v.Balance(),
 		bridgeAccount.Nonce(),
 	)
+
+	// pre-check the call
 	ctx, err := a.precheck(false, types.GasLimit(call.GasLimit))
 	if err != nil {
 		return nil, err
@@ -781,6 +783,13 @@ func (a *Account) Withdraw(b types.Balance) *types.FLOWTokenVault {
 }
 
 func (a *Account) withdraw(b types.Balance) (*types.Result, error) {
+	// Don't allow withdraw for balances that has rounding error
+	// TODO: maybe do this on lower levels instead
+	if types.BalanceConvertionToUFix64ProneToRoundingError(b) {
+		return nil, types.ErrWithdrawBalanceRounding
+	}
+
+	// prepare the call
 	call := types.NewWithdrawCall(
 		a.fch.addressAllocator.NativeTokenBridgeAddress(),
 		a.address,
@@ -788,14 +797,10 @@ func (a *Account) withdraw(b types.Balance) (*types.Result, error) {
 		a.Nonce(),
 	)
 
+	// pre-check the call
 	ctx, err := a.precheck(true, types.GasLimit(call.GasLimit))
 	if err != nil {
 		return nil, err
-	}
-
-	// Don't allow withdraw for balances that has rounding error
-	if types.BalanceConvertionToUFix64ProneToRoundingError(b) {
-		return nil, types.ErrWithdrawBalanceRounding
 	}
 
 	return a.fch.executeAndHandleCall(ctx, call, b, true)
@@ -808,12 +813,15 @@ func (a *Account) Transfer(to types.Address, balance types.Balance) {
 }
 
 func (a *Account) transfer(to types.Address, balance types.Balance) (*types.Result, error) {
+	// prepare the call
 	call := types.NewTransferCall(
 		a.address,
 		to,
 		balance,
 		a.Nonce(),
 	)
+
+	// pre-check the call
 	ctx, err := a.precheck(true, types.GasLimit(call.GasLimit))
 	if err != nil {
 		return nil, err
@@ -827,19 +835,17 @@ func (a *Account) transfer(to types.Address, balance types.Balance) (*types.Resu
 // contained in the result summary as data and
 // the contract data is not controlled by the caller accounts
 func (a *Account) Deploy(code types.Code, gaslimit types.GasLimit, balance types.Balance) *types.ResultSummary {
+	// capture open tracing span
 	defer a.fch.backend.StartChildSpan(trace.FVMEVMDeploy).End()
 
 	res, err := a.deploy(code, gaslimit, balance)
 	panicOnError(err)
+
 	return res.ResultSummary()
 }
 
 func (a *Account) deploy(code types.Code, gaslimit types.GasLimit, balance types.Balance) (*types.Result, error) {
-	ctx, err := a.precheck(true, gaslimit)
-	if err != nil {
-		return nil, err
-	}
-
+	// prepare the call
 	call := types.NewDeployCall(
 		a.address,
 		code,
@@ -847,6 +853,13 @@ func (a *Account) deploy(code types.Code, gaslimit types.GasLimit, balance types
 		balance,
 		a.Nonce(),
 	)
+
+	// pre-check and create block context
+	ctx, err := a.precheck(true, gaslimit)
+	if err != nil {
+		return nil, err
+	}
+
 	return a.fch.executeAndHandleCall(ctx, call, nil, false)
 }
 
@@ -855,18 +868,17 @@ func (a *Account) deploy(code types.Code, gaslimit types.GasLimit, balance types
 // given it doesn't goes beyond what Flow transaction allows.
 // the balance would be deducted from the OFA account and would be transferred to the target address
 func (a *Account) Call(to types.Address, data types.Data, gaslimit types.GasLimit, balance types.Balance) *types.ResultSummary {
+	// capture open tracing span
 	defer a.fch.backend.StartChildSpan(trace.FVMEVMCall).End()
 
 	res, err := a.call(to, data, gaslimit, balance)
 	panicOnError(err)
+
 	return res.ResultSummary()
 }
 
 func (a *Account) call(to types.Address, data types.Data, gaslimit types.GasLimit, balance types.Balance) (*types.Result, error) {
-	ctx, err := a.precheck(true, gaslimit)
-	if err != nil {
-		return nil, err
-	}
+	// prepare the call
 	call := types.NewContractCall(
 		a.address,
 		to,
@@ -875,6 +887,12 @@ func (a *Account) call(to types.Address, data types.Data, gaslimit types.GasLimi
 		balance,
 		a.Nonce(),
 	)
+
+	// pre-check and create block context
+	ctx, err := a.precheck(true, gaslimit)
+	if err != nil {
+		return nil, err
+	}
 
 	return a.fch.executeAndHandleCall(ctx, call, nil, false)
 }
