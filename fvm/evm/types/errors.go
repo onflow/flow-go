@@ -109,8 +109,8 @@ var (
 	ErrUnexpectedEmptyResult = errors.New("unexpected empty result has been returned")
 
 	// ErrInsufficientTotalSupply is returned when flow token
-	// is withdraw request is there but not enough balance is on EVM vault
-	// this should never happen but its a saftey measure to protect Flow against EVM issues.
+	// withdraw request is received but not enough balance is on EVM native token vault
+	// this should never happen but its a safety measure to protect Flow against EVM issues.
 	ErrInsufficientTotalSupply = NewFatalError(errors.New("insufficient total supply"))
 
 	// ErrNotImplemented is a fatal error when something is called that is not implemented
