@@ -270,9 +270,9 @@ func (lookup *EpochLookup) handleProtocolEvents(ctx irrecoverable.SignalerContex
 
 // EpochExtended listens to `EpochExtended` protocol notifications. The notification is queued
 // for async processing by the worker. We must process _all_ `EpochExtended` notifications.
-func (lookup *EpochLookup) EpochExtended(_ uint64, first *flow.Header, _ flow.EpochExtension) {
+func (lookup *EpochLookup) EpochExtended(epochCounter uint64, _ *flow.Header, extension flow.EpochExtension) {
 	lookup.epochEvents <- func() error {
-		return lookup.processEpochExtended(first)
+		return lookup.processEpochExtended(epochCounter, extension)
 	}
 }
 
@@ -290,13 +290,8 @@ func (lookup *EpochLookup) EpochCommittedPhaseStarted(_ uint64, first *flow.Head
 // when there is no subsequent epoch that we could transition into but the current epoch is nearing
 // its end. Specifically, we update the final view of the latest epoch range with the final view of the
 // current epoch, which will now be updated because the epoch has extensions.
-func (lookup *EpochLookup) processEpochExtended(first *flow.Header) error {
-	finalView, err := lookup.state.AtHeight(first.Height).Epochs().Current().FinalView()
-	if err != nil {
-		return fmt.Errorf("failed to get final view of current epoch: %w", err)
-	}
-
-	err = lookup.epochs.extendLatestEpoch(finalView)
+func (lookup *EpochLookup) processEpochExtended(epochCounter uint64, extension *flow.EpochExtension) error {
+	err = lookup.epochs.extendLatestEpoch(epochCounter, extension)
 	if err != nil {
 		return err
 	}
