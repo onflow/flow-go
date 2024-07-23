@@ -56,11 +56,6 @@ func TestScriptExecutorSuite(t *testing.T) {
 	suite.Run(t, new(ScriptExecutorSuite))
 }
 
-// runs after each test finishes
-func (s *ScriptExecutorSuite) TearDownTest() {
-	unittest.RequireComponentsDoneBefore(s.T(), 100*time.Millisecond, s.versionControl)
-}
-
 func newBlockHeadersStorage(blocks []*flow.Block) storage.Headers {
 	blocksByHeight := make(map[uint64]*flow.Block)
 	for _, b := range blocks {
@@ -155,6 +150,11 @@ func (s *ScriptExecutorSuite) SetupTest() {
 		true,
 	)
 	s.bootstrap()
+}
+
+// runs after each test finishes
+func (s *ScriptExecutorSuite) TearDownTest() {
+	unittest.RequireComponentsDoneBefore(s.T(), 100*time.Millisecond, s.versionControl)
 }
 
 func (s *ScriptExecutorSuite) TestExecuteAtBlockHeight() {
