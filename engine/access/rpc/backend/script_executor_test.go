@@ -56,6 +56,11 @@ func TestScriptExecutorSuite(t *testing.T) {
 	suite.Run(t, new(ScriptExecutorSuite))
 }
 
+// runs after each test finishes
+func (s *ScriptExecutorSuite) TearDownTest() {
+	unittest.RequireComponentsDoneBefore(s.T(), 100*time.Millisecond, s.versionControl)
+}
+
 func newBlockHeadersStorage(blocks []*flow.Block) storage.Headers {
 	blocksByHeight := make(map[uint64]*flow.Block)
 	for _, b := range blocks {
@@ -160,7 +165,7 @@ func (s *ScriptExecutorSuite) TestExecuteAtBlockHeight() {
 	var scriptArgs [][]byte
 	var expectedResult = []byte("{\"type\":\"Void\"}\n")
 
-	s.Run("test scrypt execution without version control", func() {
+	s.Run("test script execution without version control", func() {
 		scriptExec := NewScriptExecutor(s.log, uint64(0), math.MaxUint64)
 		s.reporter.On("LowestIndexedHeight").Return(s.height, nil)
 		s.reporter.On("HighestIndexedHeight").Return(s.height+1, nil).Once()
@@ -221,7 +226,7 @@ func (s *ScriptExecutorSuite) TestExecuteAtBlockHeight() {
 		s.Assert().Equal(expectedResult, res)
 	})
 
-	s.Run("test scrypt execution with version control with incompatible version", func() {
+	s.Run("test script execution with version control with incompatible version", func() {
 		// Set up a mock version beacons storage.
 		versionBeacons := storageMock.NewVersionBeacons(s.T())
 		versionEvents := map[uint64]*flow.SealedVersionBeacon{

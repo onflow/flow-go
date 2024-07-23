@@ -182,18 +182,18 @@ func (s *ScriptExecutor) checkHeight(height uint64) error {
 	}
 
 	if height < lowestHeight {
-		return ErrIncompatibleNodeVersion
+		return fmt.Errorf("%w: block is before lowest indexed height", storage.ErrHeightNotIndexed)
 	}
 
 	if height > s.maxCompatibleHeight.Load() || height < s.minCompatibleHeight.Load() {
-		return fmt.Errorf("%w: node software is not compatible with version required to executed block", storage.ErrHeightNotIndexed)
+		return ErrIncompatibleNodeVersion
 	}
 
 	// Version control feature could be disabled. In such a case, ignore related functionality.
 	if s.versionControl != nil {
 		compatible, err := s.versionControl.CompatibleAtBlock(height)
 		if err != nil {
-			return err
+			return fmt.Errorf("version is incompatible on block height %d, reason: %w", height, err)
 		}
 
 		if !compatible {
