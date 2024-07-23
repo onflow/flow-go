@@ -274,9 +274,9 @@ func (lookup *EpochLookup) handleProtocolEvents(ctx irrecoverable.SignalerContex
 
 // EpochExtended listens to `EpochExtended` protocol notifications. The notification is queued
 // for async processing by the worker. We must process _all_ `EpochExtended` notifications.
-func (lookup *EpochLookup) EpochExtended(_ uint64, first *flow.Header, _ flow.EpochExtension) {
+func (lookup *EpochLookup) EpochExtended(epochCounter uint64, _ *flow.Header, extension flow.EpochExtension) {
 	lookup.epochEvents <- func() error {
-		return lookup.processEpochExtended(first)
+		return lookup.processEpochExtended(epochCounter, extension)
 	}
 }
 
