@@ -110,11 +110,6 @@ type BlockView struct {
 
 // DirectCall executes a direct call
 func (bl *BlockView) DirectCall(call *types.DirectCall) (res *types.Result, err error) {
-	// negative amounts are not acceptable.
-	if call.Value.Sign() < 0 {
-		return nil, types.ErrInvalidBalance
-	}
-
 	// construct a new procedure
 	proc, err := bl.newProcedure()
 	if err != nil {
@@ -346,10 +341,14 @@ func (proc *procedure) commit(finalize bool) error {
 func (proc *procedure) mintTo(
 	call *types.DirectCall,
 ) (*types.Result, error) {
-	// convert value into uint256
-	value, err := convertBigValueIntoUint256(call.Value)
-	if err != nil {
-		return nil, err
+	// convert and check value
+	isValid, value := convertAndCheckValue(call.Value)
+	if !isValid {
+		return &types.Result{
+			TxType:          call.Type,
+			GasConsumed:     types.InvalidTransactionGasCost,
+			ValidationError: types.ErrInvalidBalance,
+		}, nil
 	}
 
 	// create bridge account if not exist
@@ -375,7 +374,11 @@ func (proc *procedure) mintTo(
 	// this prevents having cases that we add balance to the bridge but the transfer
 	// fails due to gas, etc.
 	if res.Invalid() || res.Failed() {
-		return res, types.ErrInternalDirectCallFailed
+		return &types.Result{
+			TxType:      call.Type,
+			GasConsumed: types.InvalidTransactionGasCost,
+			VMError:     types.ErrInternalDirectCallFailed,
+		}, nil
 	}
 
 	// commit and finalize the state and return any stateDB error
@@ -385,10 +388,14 @@ func (proc *procedure) mintTo(
 func (proc *procedure) withdrawFrom(
 	call *types.DirectCall,
 ) (*types.Result, error) {
-	// convert value into uint256
-	value, err := convertBigValueIntoUint256(call.Value)
-	if err != nil {
-		return nil, err
+	// convert and check value
+	isValid, value := convertAndCheckValue(call.Value)
+	if !isValid {
+		return &types.Result{
+			TxType:          call.Type,
+			GasConsumed:     types.InvalidTransactionGasCost,
+			ValidationError: types.ErrInvalidBalance,
+		}, nil
 	}
 
 	// create bridge account if not exist
@@ -407,7 +414,11 @@ func (proc *procedure) withdrawFrom(
 	// this prevents having cases that we deduct the balance from the account
 	// but doesn't return it as a vault.
 	if res.Invalid() || res.Failed() {
-		return res, types.ErrInternalDirectCallFailed
+		return &types.Result{
+			TxType:      call.Type,
+			GasConsumed: types.InvalidTransactionGasCost,
+			VMError:     types.ErrInternalDirectCallFailed,
+		}, nil
 	}
 
 	// now deduct the balance from the bridge
@@ -592,7 +603,8 @@ func (proc *procedure) run(
 	// its worth an extra check here given some calls are
 	// coming from batch run, etc.
 	if msg.Value.Sign() < 0 {
-		return nil, types.ErrInvalidBalance
+		res.SetValidationError(types.ErrInvalidBalance)
+		return &res, nil
 	}
 
 	// set the origin on the TxContext
@@ -669,15 +681,15 @@ func AddOne64th(n uint64) uint64 {
 	return n + (n / 64)
 }
 
-func convertBigValueIntoUint256(inp *big.Int) (*uint256.Int, error) {
-	// negative amounts are not acceptable.
-	if inp.Sign() < 0 {
-		return nil, types.ErrInvalidBalance
+func convertAndCheckValue(input *big.Int) (isValid bool, converted *uint256.Int) {
+	// check for negative input
+	if input.Sign() < 0 {
+		return false, nil
 	}
 	// convert value into uint256
-	value, overflow := uint256.FromBig(inp)
+	value, overflow := uint256.FromBig(input)
 	if overflow {
-		return nil, types.ErrInvalidBalance
+		return true, nil
 	}
-	return value, nil
+	return true, value
 }

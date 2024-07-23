@@ -456,7 +456,7 @@ func TestHandler_COA(t *testing.T) {
 					aa := handler.NewAddressAllocator()
 
 					// Withdraw calls are only possible within FOA accounts
-					assertPanic(t, types.IsAUnAuthroizedMethodCallError, func() {
+					assertPanic(t, types.IsAUnauthorizedMethodCallError, func() {
 						em := &testutils.TestEmulator{
 							NonceOfFunc: func(address types.Address) (uint64, error) {
 								return 0, nil
