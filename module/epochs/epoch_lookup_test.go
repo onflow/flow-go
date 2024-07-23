@@ -126,7 +126,7 @@ func (suite *EpochLookupSuite) TestEpochForView_Curr() {
 	epochs := []epochRange{suite.currEpoch}
 	suite.CommitEpochs(epochs...)
 	suite.CreateAndStartEpochLookup()
-	testEpochForViewWithFallback(suite.T(), suite.lookup, suite.state, epochs...)
+	testEpochForView(suite.T(), suite.lookup, suite.state, epochs...)
 }
 
 // TestEpochForView_PrevCurr tests constructing and subsequently querying
@@ -135,7 +135,7 @@ func (suite *EpochLookupSuite) TestEpochForView_PrevCurr() {
 	epochs := []epochRange{suite.prevEpoch, suite.currEpoch}
 	suite.CommitEpochs(epochs...)
 	suite.CreateAndStartEpochLookup()
-	testEpochForViewWithFallback(suite.T(), suite.lookup, suite.state, epochs...)
+	testEpochForView(suite.T(), suite.lookup, suite.state, epochs...)
 }
 
 // TestEpochForView_CurrNext tests constructing and subsequently querying
@@ -144,7 +144,7 @@ func (suite *EpochLookupSuite) TestEpochForView_CurrNext() {
 	epochs := []epochRange{suite.currEpoch, suite.nextEpoch}
 	suite.CommitEpochs(epochs...)
 	suite.CreateAndStartEpochLookup()
-	testEpochForViewWithFallback(suite.T(), suite.lookup, suite.state, epochs...)
+	testEpochForView(suite.T(), suite.lookup, suite.state, epochs...)
 }
 
 // TestEpochForView_CurrNextPrev tests constructing and subsequently querying
@@ -153,16 +153,7 @@ func (suite *EpochLookupSuite) TestEpochForView_CurrNextPrev() {
 	epochs := []epochRange{suite.prevEpoch, suite.currEpoch, suite.nextEpoch}
 	suite.CommitEpochs(epochs...)
 	suite.CreateAndStartEpochLookup()
-	testEpochForViewWithFallback(suite.T(), suite.lookup, suite.state, epochs...)
-}
-
-// TestEpochForView_EpochFallbackTriggered tests constructing and subsequently querying
-// EpochLookup with an initial state of epoch fallback triggered.
-func (suite *EpochLookupSuite) TestEpochForView_EpochFallbackTriggered() {
-	epochs := []epochRange{suite.prevEpoch, suite.currEpoch, suite.nextEpoch}
-	suite.CommitEpochs(epochs...)
-	suite.CreateAndStartEpochLookup()
-	testEpochForViewWithFallback(suite.T(), suite.lookup, suite.state, epochs...)
+	testEpochForView(suite.T(), suite.lookup, suite.state, epochs...)
 }
 
 // TestProtocolEvents_EpochExtended tests constructing and subsequently querying
@@ -194,7 +185,7 @@ func (suite *EpochLookupSuite) TestProtocolEvents_EpochExtended() {
 	}, 5*time.Second, 50*time.Millisecond)
 
 	// validate queries are answered correctly
-	testEpochForViewWithFallback(suite.T(), suite.lookup, suite.state, epochs...)
+	testEpochForView(suite.T(), suite.lookup, suite.state, epochs...)
 
 	// should handle multiple deliveries of the protocol event
 	suite.lookup.EpochExtended(suite.currEpoch.counter, header, extension)
@@ -202,7 +193,7 @@ func (suite *EpochLookupSuite) TestProtocolEvents_EpochExtended() {
 	suite.lookup.EpochExtended(suite.currEpoch.counter, header, extension)
 
 	// validate queries are answered correctly
-	testEpochForViewWithFallback(suite.T(), suite.lookup, suite.state, epochs...)
+	testEpochForView(suite.T(), suite.lookup, suite.state, epochs...)
 }
 
 // TestProtocolEvents_CommittedEpoch tests correct processing of an `EpochCommittedPhaseStarted` event
@@ -224,7 +215,7 @@ func (suite *EpochLookupSuite) TestProtocolEvents_CommittedEpoch() {
 	}, 5*time.Second, 50*time.Millisecond)
 
 	// validate queries are answered correctly
-	testEpochForViewWithFallback(suite.T(), suite.lookup, suite.state, suite.currEpoch, suite.nextEpoch)
+	testEpochForView(suite.T(), suite.lookup, suite.state, suite.currEpoch, suite.nextEpoch)
 
 	// should handle multiple deliveries of the protocol event
 	suite.lookup.EpochCommittedPhaseStarted(suite.currentEpochCounter, firstBlockOfCommittedPhase)
@@ -232,7 +223,7 @@ func (suite *EpochLookupSuite) TestProtocolEvents_CommittedEpoch() {
 	suite.lookup.EpochCommittedPhaseStarted(suite.currentEpochCounter, firstBlockOfCommittedPhase)
 
 	// validate queries are answered correctly
-	testEpochForViewWithFallback(suite.T(), suite.lookup, suite.state, suite.currEpoch, suite.nextEpoch)
+	testEpochForView(suite.T(), suite.lookup, suite.state, suite.currEpoch, suite.nextEpoch)
 }
 
 // epochFixtureWithExtension creates a setup epoch with an extension.
@@ -250,10 +241,10 @@ func (suite *EpochLookupSuite) epochFixtureWithExtension(counter, firstView, ext
 	return epoch, extension
 }
 
-// testEpochForViewWithFallback accepts a constructed EpochLookup and state, and
+// testEpochForView accepts a constructed EpochLookup and state, and
 // validates correctness by issuing various queries, using the input state and
 // epochs as source of truth.
-func testEpochForViewWithFallback(t *testing.T, lookup *EpochLookup, state protocol.State, epochs ...epochRange) {
+func testEpochForView(t *testing.T, lookup *EpochLookup, state protocol.State, epochs ...epochRange) {
 	t.Run("should be able to query within any committed epoch", func(t *testing.T) {
 		for _, epoch := range epochs {
 			t.Run("first view", func(t *testing.T) {
