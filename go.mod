@@ -331,3 +331,6 @@ require (
 
 // Using custom fork until https://github.com/onflow/flow-go/issues/5338 is resolved
 replace github.com/ipfs/boxo => github.com/onflow/boxo v0.0.0-20240201202436-f2477b92f483
+
+// TODO: remove it when https://github.com/ipfs/go-ds-pebble/pull/36 merged
+replace github.com/ipfs/go-ds-pebble v0.3.1 => github.com/The-K-R-O-K/go-ds-pebble v0.0.0-20240723100149-b11ba40ed8c6

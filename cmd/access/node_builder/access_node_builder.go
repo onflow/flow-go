@@ -11,6 +11,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cockroachdb/pebble"
+	"github.com/dgraph-io/badger/v2"
 	"github.com/ipfs/boxo/bitswap"
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
@@ -574,13 +576,21 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 		Module("processed block height consumer progress", func(node *cmd.NodeConfig) error {
 			// Note: progress is stored in the datastore's DB since that is where the jobqueue
 			// writes execution data to.
-			processedBlockHeight = bstorage.NewConsumerProgress(builder.DB, module.ConsumeProgressExecutionDataRequesterBlockHeight)
+			if executionDataDBMode == execution_data.ExecutionDataDBModeBadger {
+				processedBlockHeight = bstorage.NewConsumerProgress(builder.ExecutionDataStorage.DB().(*badger.DB), module.ConsumeProgressExecutionDataRequesterBlockHeight)
+			} else {
+				processedBlockHeight = pstorage.NewConsumerProgress(builder.ExecutionDataStorage.DB().(*pebble.DB), module.ConsumeProgressExecutionDataRequesterBlockHeight)
+			}
 			return nil
 		}).
 		Module("processed notifications consumer progress", func(node *cmd.NodeConfig) error {
 			// Note: progress is stored in the datastore's DB since that is where the jobqueue
 			// writes execution data to.
-			processedNotifications = bstorage.NewConsumerProgress(builder.DB, module.ConsumeProgressExecutionDataRequesterNotification)
+			if executionDataDBMode == execution_data.ExecutionDataDBModeBadger {
+				processedNotifications = bstorage.NewConsumerProgress(builder.ExecutionDataStorage.DB().(*badger.DB), module.ConsumeProgressExecutionDataRequesterNotification)
+			} else {
+				processedNotifications = pstorage.NewConsumerProgress(builder.ExecutionDataStorage.DB().(*pebble.DB), module.ConsumeProgressExecutionDataRequesterNotification)
+			}
 			return nil
 		}).
 		Module("blobservice peer manager dependencies", func(node *cmd.NodeConfig) error {

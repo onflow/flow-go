@@ -309,3 +309,6 @@ require (
 )
 
 replace github.com/onflow/flow-go => ../
+
+// TODO: remove it when https://github.com/ipfs/go-ds-pebble/pull/36 merged
+replace github.com/ipfs/go-ds-pebble v0.3.1 => github.com/The-K-R-O-K/go-ds-pebble v0.0.0-20240723100149-b11ba40ed8c6

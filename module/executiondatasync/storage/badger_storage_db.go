@@ -27,6 +27,10 @@ func (b *BadgerDBWrapper) Datastore() ds.Batching {
 	return b.ds
 }
 
+func (b *BadgerDBWrapper) DB() interface{} {
+	return b.ds.DB
+}
+
 func (b *BadgerDBWrapper) Close() error {
 	return b.ds.Close()
 }
