@@ -3,9 +3,6 @@ package migrations
 import (
 	"fmt"
 
-	"github.com/onflow/cadence/runtime"
-	"github.com/onflow/cadence/runtime/common"
-	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/fvm/evm/stdlib"
@@ -57,55 +54,31 @@ func NewEVMSetupMigration(
 
 	systemContracts := systemcontracts.SystemContractsForChain(chainID)
 	evmContract := systemContracts.EVMContract
-	evmContractAddress := common.Address(evmContract.Address)
 
-	return NewAccountStorageMigration(
-		evmContractAddress,
-		logger,
+	tx := flow.NewTransactionBody().
+		SetScript([]byte(fmt.Sprintf(
+			`
+              import EVM from %s
+
+              transaction {
+                  prepare() {
+                      EVM.setupHeartbeat()
+                  }
+              }
+            `,
+			evmContract.Address.HexWithPrefix(),
+		)))
+
+	return NewTransactionBasedMigration(
+		tx,
 		chainID,
-		func(storage *runtime.Storage, inter *interpreter.Interpreter) error {
-
-			// Get the storage map for the EVM contract account
-
-			storageMap := storage.GetStorageMap(
-				evmContractAddress,
-				common.PathDomainStorage.Identifier(),
-				false,
-			)
-			if storageMap == nil {
-				return fmt.Errorf("failed to get storage map for EVM contract account")
-			}
-
-			// Check if the EVM.Heartbeat resource already exists
-
-			key := interpreter.StringStorageMapKey("EVMHeartbeat")
-
-			if storageMap.ValueExists(key) {
-				return nil
-			}
-
-			// Create the EVM.Heartbeat resource and write it to storage
-
-			heartbeatResource := interpreter.NewCompositeValue(
-				inter,
-				interpreter.EmptyLocationRange,
-				common.AddressLocation{
-					Address: evmContractAddress,
-					Name:    stdlib.ContractName,
-				},
-				"EVM.Heartbeat",
-				common.CompositeKindResource,
-				nil,
-				evmContractAddress,
-			)
-
-			storageMap.WriteValue(
-				inter,
-				key,
-				heartbeatResource,
-			)
-
-			return nil
+		logger,
+		map[flow.Address]struct{}{
+			// The function call writes to the EVM contract account
+			evmContract.Address: {},
+			// The function call writes to the global account,
+			// as the function creates a resource, which gets initialized with a UUID
+			flow.Address{}: {},
 		},
 	)
 }
