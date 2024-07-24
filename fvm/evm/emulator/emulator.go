@@ -398,6 +398,13 @@ func (proc *procedure) withdrawFrom(
 			types.ErrInvalidBalance), nil
 	}
 
+	// check balance is not prone to rounding error
+	if types.BalanceConversionToUFix64ProneToRoundingError(call.Value) {
+		return types.NewInvalidResult(
+			call.Transaction(),
+			types.ErrWithdrawBalanceRounding), nil
+	}
+
 	// create bridge account if not exist
 	bridge := call.To.ToCommon()
 	if !proc.state.Exist(bridge) {

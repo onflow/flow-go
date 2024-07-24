@@ -772,12 +772,6 @@ func (a *Account) Deposit(v *types.FLOWTokenVault) {
 func (a *Account) Withdraw(b types.Balance) *types.FLOWTokenVault {
 	defer a.fch.backend.StartChildSpan(trace.FVMEVMWithdraw).End()
 
-	// Don't allow withdraw for balances that has rounding error
-	// TODO: maybe do this on lower levels instead
-	if types.BalanceConversionToUFix64ProneToRoundingError(b) {
-		panic(fvmErrors.NewEVMError(types.ErrWithdrawBalanceRounding))
-	}
-
 	res, err := a.executeAndHandleAuthorizedCall(
 		types.NewWithdrawCall(
 			a.fch.addressAllocator.NativeTokenBridgeAddress(),

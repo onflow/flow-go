@@ -48,7 +48,7 @@ func RunWithNewReadOnlyBlockView(t testing.TB, em *emulator.Emulator, f func(blk
 func TestNativeTokenBridging(t *testing.T) {
 	testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
 		testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
-			originalBalance := big.NewInt(10000)
+			originalBalance := types.OneFlow
 			testAccount := types.NewAddressFromString("test")
 			bridgeAccount := types.NewAddressFromString("bridge")
 			testAccountNonce := uint64(0)
@@ -77,7 +77,7 @@ func TestNativeTokenBridging(t *testing.T) {
 				})
 			})
 			t.Run("tokens withdraw", func(t *testing.T) {
-				amount := big.NewInt(1000)
+				amount := types.OneFlow
 				RunWithNewEmulator(t, backend, rootAddr, func(env *emulator.Emulator) {
 					RunWithNewReadOnlyBlockView(t, env, func(blk types.ReadOnlyBlockView) {
 						retBalance, err := blk.BalanceOf(testAccount)
@@ -112,6 +112,17 @@ func TestNativeTokenBridging(t *testing.T) {
 						retNonce, err := blk.NonceOf(testAccount)
 						require.NoError(t, err)
 						require.Equal(t, testAccountNonce, retNonce)
+					})
+				})
+			})
+			t.Run("tokens withdraw that results in rounding error", func(t *testing.T) {
+				RunWithNewEmulator(t, backend, rootAddr, func(env *emulator.Emulator) {
+					RunWithNewBlockView(t, env, func(blk types.BlockView) {
+						call := types.NewWithdrawCall(bridgeAccount, testAccount, big.NewInt(1000), testAccountNonce)
+						res, err := blk.DirectCall(call)
+						require.NoError(t, err)
+						require.Equal(t, res.ValidationError, types.ErrWithdrawBalanceRounding)
+						testAccountNonce += 1
 					})
 				})
 			})
