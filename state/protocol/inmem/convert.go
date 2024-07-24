@@ -54,11 +54,10 @@ func FromSnapshot(from protocol.Snapshot) (*Snapshot, error) {
 // TODO error docs
 func FromParams(from protocol.GlobalParams) (*Params, error) {
 	params := EncodableParams{
-		ChainID:                    from.ChainID(),
-		SporkID:                    from.SporkID(),
-		SporkRootBlockHeight:       from.SporkRootBlockHeight(),
-		ProtocolVersion:            from.ProtocolVersion(),
-		EpochCommitSafetyThreshold: from.EpochCommitSafetyThreshold(),
+		ChainID:              from.ChainID(),
+		SporkID:              from.SporkID(),
+		SporkRootBlockHeight: from.SporkRootBlockHeight(),
+		ProtocolVersion:      from.ProtocolVersion(),
 	}
 	return &Params{params}, nil
 }
@@ -100,7 +99,9 @@ func SnapshotFromBootstrapState(root *flow.Block, result *flow.ExecutionResult, 
 	if err != nil {
 		return nil, fmt.Errorf("could not get default epoch commit safety threshold: %w", err)
 	}
-	return SnapshotFromBootstrapStateWithParams(root, result, seal, qc, version, threshold, kvstore.NewDefaultKVStore)
+	return SnapshotFromBootstrapStateWithParams(root, result, seal, qc, version, func(epochStateID flow.Identifier) (protocol_state.KVStoreAPI, error) {
+		return kvstore.NewDefaultKVStore(threshold, epochStateID)
+	})
 }
 
 // SnapshotFromBootstrapStateWithParams is SnapshotFromBootstrapState
@@ -111,8 +112,7 @@ func SnapshotFromBootstrapStateWithParams(
 	seal *flow.Seal,
 	qc *flow.QuorumCertificate,
 	protocolVersion uint,
-	epochCommitSafetyThreshold uint64,
-	kvStoreFactory func(epochStateID flow.Identifier) protocol_state.KVStoreAPI,
+	kvStoreFactory func(epochStateID flow.Identifier) (protocol_state.KVStoreAPI, error),
 ) (*Snapshot, error) {
 	setup, ok := result.ServiceEvents[0].Event.(*flow.EpochSetup)
 	if !ok {
@@ -145,16 +145,18 @@ func SnapshotFromBootstrapStateWithParams(
 	}
 
 	params := EncodableParams{
-		ChainID:                    root.Header.ChainID,        // chain ID must match the root block
-		SporkID:                    root.ID(),                  // use root block ID as the unique spork identifier
-		SporkRootBlockHeight:       root.Header.Height,         // use root block height as the spork root block height
-		ProtocolVersion:            protocolVersion,            // major software version for this spork
-		EpochCommitSafetyThreshold: epochCommitSafetyThreshold, // see protocol.Params for details
+		ChainID:              root.Header.ChainID, // chain ID must match the root block
+		SporkID:              root.ID(),           // use root block ID as the unique spork identifier
+		SporkRootBlockHeight: root.Header.Height,  // use root block height as the spork root block height
+		ProtocolVersion:      protocolVersion,     // major software version for this spork
 	}
 
 	rootMinEpochState := EpochProtocolStateFromServiceEvents(setup, commit)
 	rootEpochStateID := rootMinEpochState.ID()
-	rootKvStore := kvStoreFactory(rootEpochStateID)
+	rootKvStore, err := kvStoreFactory(rootEpochStateID)
+	if err != nil {
+		return nil, fmt.Errorf("could not construct root kvstore: %w", err)
+	}
 	if rootKvStore.ID() != root.Payload.ProtocolStateID {
 		return nil, fmt.Errorf("incorrect protocol state ID in root block, expected (%x) but got (%x)",
 			root.Payload.ProtocolStateID, rootKvStore.ID())

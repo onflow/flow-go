@@ -592,12 +592,6 @@ func bootstrapSporkInfo(root protocol.Snapshot) func(*transaction.Tx) error {
 			return fmt.Errorf("could not insert protocol version: %w", err)
 		}
 
-		threshold := params.EpochCommitSafetyThreshold()
-		err = operation.InsertEpochCommitSafetyThreshold(threshold)(bdtx)
-		if err != nil {
-			return fmt.Errorf("could not insert epoch commit safety threshold: %w", err)
-		}
-
 		return nil
 	}
 }

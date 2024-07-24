@@ -24,6 +24,7 @@ import (
 	"github.com/onflow/flow-go/module/epochs"
 	"github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/inmem"
+	"github.com/onflow/flow-go/state/protocol/protocol_state"
 	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
 	"github.com/onflow/flow-go/utils/io"
 )
@@ -180,7 +181,16 @@ func finalize(cmd *cobra.Command, args []string) {
 
 	// construct serializable root protocol snapshot
 	log.Info().Msg("constructing root protocol snapshot")
-	snapshot, err := inmem.SnapshotFromBootstrapStateWithParams(block, result, seal, rootQC, intermediaryData.ProtocolVersion, intermediaryData.EpochCommitSafetyThreshold, kvstore.NewDefaultKVStore)
+	snapshot, err := inmem.SnapshotFromBootstrapStateWithParams(
+		block,
+		result,
+		seal,
+		rootQC,
+		intermediaryData.ProtocolVersion,
+		func(epochStateID flow.Identifier) (protocol_state.KVStoreAPI, error) {
+			return kvstore.NewDefaultKVStore(intermediaryData.EpochCommitSafetyThreshold, epochStateID)
+		},
+	)
 	if err != nil {
 		log.Fatal().Err(err).Msg("unable to generate root protocol snapshot")
 	}

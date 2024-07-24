@@ -25,7 +25,6 @@ func TestEpochFallbackStateMachine(t *testing.T) {
 // ProtocolStateMachineSuite is a dedicated test suite for testing happy path state machine.
 type EpochFallbackStateMachineSuite struct {
 	BaseStateMachineSuite
-	params  *mockstate.GlobalParams
 	kvstore *mockstate.KVStoreReader
 
 	stateMachine *FallbackStateMachine
@@ -33,16 +32,14 @@ type EpochFallbackStateMachineSuite struct {
 
 func (s *EpochFallbackStateMachineSuite) SetupTest() {
 	s.BaseStateMachineSuite.SetupTest()
-
-	s.params = mockstate.NewGlobalParams(s.T())
-	s.params.On("EpochCommitSafetyThreshold").Return(uint64(200))
 	s.parentProtocolState.EpochFallbackTriggered = true
 
 	s.kvstore = mockstate.NewKVStoreReader(s.T())
 	s.kvstore.On("GetEpochExtensionViewCount").Return(extensionViewCount).Maybe()
+	s.kvstore.On("GetEpochCommitSafetyThreshold").Return(uint64(200))
 
 	var err error
-	s.stateMachine, err = NewFallbackStateMachine(s.kvstore, s.params, s.consumer, s.candidate.View, s.parentProtocolState.Copy())
+	s.stateMachine, err = NewFallbackStateMachine(s.kvstore, s.consumer, s.candidate.View, s.parentProtocolState.Copy())
 	require.NoError(s.T(), err)
 }
 
@@ -150,8 +147,8 @@ func (s *EpochFallbackStateMachineSuite) TestProcessInvalidEpochRecover() {
 			},
 		}
 
-		candidateView := s.parentProtocolState.CurrentEpochSetup.FinalView - s.params.EpochCommitSafetyThreshold() + 1
-		stateMachine, err := NewFallbackStateMachine(s.kvstore, s.params, s.consumer, candidateView, parentProtocolState)
+		candidateView := s.parentProtocolState.CurrentEpochSetup.FinalView - s.kvstore.GetEpochCommitSafetyThreshold() + 1
+		stateMachine, err := NewFallbackStateMachine(s.kvstore, s.consumer, candidateView, parentProtocolState)
 		require.NoError(s.T(), err)
 
 		mockConsumer(epochRecover)
@@ -240,7 +237,7 @@ func (s *EpochFallbackStateMachineSuite) TestProcessInvalidEpochRecover() {
 		parentProtocolState := s.parentProtocolState.Copy()
 		unittest.WithNextEpochProtocolState()(parentProtocolState)
 
-		stateMachine, err := NewFallbackStateMachine(s.kvstore, s.params, s.consumer, s.candidate.View, parentProtocolState)
+		stateMachine, err := NewFallbackStateMachine(s.kvstore, s.consumer, s.candidate.View, parentProtocolState)
 		require.NoError(s.T(), err)
 
 		mockConsumer(epochRecover)
@@ -256,8 +253,8 @@ func (s *EpochFallbackStateMachineSuite) TestProcessInvalidEpochRecover() {
 			setup.FirstView = s.parentProtocolState.CurrentEpochSetup.FinalView + 1
 			setup.FinalView = setup.FirstView + 10_000
 		})
-		thresholdView := s.parentProtocolState.CurrentEpochSetup.FinalView - s.params.EpochCommitSafetyThreshold()
-		stateMachine, err := NewFallbackStateMachine(s.kvstore, s.params, s.consumer, thresholdView, s.parentProtocolState)
+		thresholdView := s.parentProtocolState.CurrentEpochSetup.FinalView - s.kvstore.GetEpochCommitSafetyThreshold()
+		stateMachine, err := NewFallbackStateMachine(s.kvstore, s.consumer, thresholdView, s.parentProtocolState)
 		require.NoError(s.T(), err)
 
 		mockConsumer(epochRecover)
@@ -299,7 +296,7 @@ func (s *EpochFallbackStateMachineSuite) TestTransitionToNextEpoch() {
 		parentProtocolState := s.parentProtocolState.Copy()
 		parentProtocolState.EpochFallbackTriggered = parentAlreadyInEFM
 
-		s.stateMachine, err = NewFallbackStateMachine(s.kvstore, s.params, s.consumer, candidate.View, parentProtocolState.Copy())
+		s.stateMachine, err = NewFallbackStateMachine(s.kvstore, s.consumer, candidate.View, parentProtocolState.Copy())
 		require.NoError(s.T(), err)
 		err = s.stateMachine.TransitionToNextEpoch()
 		require.NoError(s.T(), err)
@@ -317,7 +314,7 @@ func (s *EpochFallbackStateMachineSuite) TestTransitionToNextEpochNotAllowed() {
 		protocolState := unittest.EpochStateFixture()
 		candidate := unittest.BlockHeaderFixture(
 			unittest.HeaderWithView(protocolState.CurrentEpochSetup.FinalView + 1))
-		stateMachine, err := NewFallbackStateMachine(s.kvstore, s.params, s.consumer, candidate.View, protocolState)
+		stateMachine, err := NewFallbackStateMachine(s.kvstore, s.consumer, candidate.View, protocolState)
 		require.NoError(s.T(), err)
 		err = stateMachine.TransitionToNextEpoch()
 		require.Error(s.T(), err, "should not allow transition to next epoch if there is no next epoch protocol state")
@@ -330,7 +327,7 @@ func (s *EpochFallbackStateMachineSuite) TestTransitionToNextEpochNotAllowed() {
 		})
 		candidate := unittest.BlockHeaderFixture(
 			unittest.HeaderWithView(protocolState.CurrentEpochSetup.FinalView + 1))
-		stateMachine, err := NewFallbackStateMachine(s.kvstore, s.params, s.consumer, candidate.View, protocolState)
+		stateMachine, err := NewFallbackStateMachine(s.kvstore, s.consumer, candidate.View, protocolState)
 		require.NoError(s.T(), err)
 		err = stateMachine.TransitionToNextEpoch()
 		require.Error(s.T(), err, "should not allow transition to next epoch if it is not committed")
@@ -339,7 +336,7 @@ func (s *EpochFallbackStateMachineSuite) TestTransitionToNextEpochNotAllowed() {
 		protocolState := unittest.EpochStateFixture(unittest.WithNextEpochProtocolState())
 		candidate := unittest.BlockHeaderFixture(
 			unittest.HeaderWithView(protocolState.CurrentEpochSetup.FinalView))
-		stateMachine, err := NewFallbackStateMachine(s.kvstore, s.params, s.consumer, candidate.View, protocolState)
+		stateMachine, err := NewFallbackStateMachine(s.kvstore, s.consumer, candidate.View, protocolState)
 		require.NoError(s.T(), err)
 		err = stateMachine.TransitionToNextEpoch()
 		require.Error(s.T(), err, "should not allow transition to next epoch if next block is not first block from next epoch")
@@ -354,14 +351,14 @@ func (s *EpochFallbackStateMachineSuite) TestNewEpochFallbackStateMachine() {
 	parentProtocolState := s.parentProtocolState.Copy()
 	parentProtocolState.EpochFallbackTriggered = false
 
-	thresholdView := parentProtocolState.CurrentEpochSetup.FinalView - s.params.EpochCommitSafetyThreshold()
+	thresholdView := parentProtocolState.CurrentEpochSetup.FinalView - s.kvstore.GetEpochCommitSafetyThreshold()
 
 	// The view we enter EFM is in the staking phase. The resulting epoch state should be unchanged to the
 	// parent state _except_ that `EpochFallbackTriggered` is set to true.
 	// We expect no epoch extension to be added since we have not reached the threshold view.
 	s.Run("threshold-not-reached", func() {
 		candidateView := thresholdView - 1
-		stateMachine, err := NewFallbackStateMachine(s.kvstore, s.params, s.consumer, candidateView, parentProtocolState.Copy())
+		stateMachine, err := NewFallbackStateMachine(s.kvstore, s.consumer, candidateView, parentProtocolState.Copy())
 		require.NoError(s.T(), err)
 		require.Equal(s.T(), parentProtocolState.ID(), stateMachine.ParentState().ID())
 		require.Equal(s.T(), candidateView, stateMachine.View())
@@ -387,7 +384,7 @@ func (s *EpochFallbackStateMachineSuite) TestNewEpochFallbackStateMachine() {
 	// The view we enter EFM is in the staking phase. The resulting epoch state should set `EpochFallbackTriggered` to true.
 	// We expect an epoch extension to be added since we have reached the threshold view.
 	s.Run("staking-phase", func() {
-		stateMachine, err := NewFallbackStateMachine(s.kvstore, s.params, s.consumer, thresholdView, parentProtocolState.Copy())
+		stateMachine, err := NewFallbackStateMachine(s.kvstore, s.consumer, thresholdView, parentProtocolState.Copy())
 		require.NoError(s.T(), err)
 		require.Equal(s.T(), parentProtocolState.ID(), stateMachine.ParentState().ID())
 		require.Equal(s.T(), thresholdView, stateMachine.View())
@@ -425,7 +422,7 @@ func (s *EpochFallbackStateMachineSuite) TestNewEpochFallbackStateMachine() {
 		parentProtocolState.NextEpoch.CommitID = flow.ZeroID
 		parentProtocolState.NextEpochCommit = nil
 
-		stateMachine, err := NewFallbackStateMachine(s.kvstore, s.params, s.consumer, thresholdView, parentProtocolState)
+		stateMachine, err := NewFallbackStateMachine(s.kvstore, s.consumer, thresholdView, parentProtocolState)
 		require.NoError(s.T(), err)
 		require.Equal(s.T(), parentProtocolState.ID(), stateMachine.ParentState().ID())
 		require.Equal(s.T(), thresholdView, stateMachine.View())
@@ -465,7 +462,7 @@ func (s *EpochFallbackStateMachineSuite) TestNewEpochFallbackStateMachine() {
 		// if the next epoch has been committed, the extension shouldn't be added to the current epoch
 		// instead it will be added to the next epoch when **next** epoch reaches its safety threshold.
 
-		stateMachine, err := NewFallbackStateMachine(s.kvstore, s.params, s.consumer, thresholdView, parentProtocolState)
+		stateMachine, err := NewFallbackStateMachine(s.kvstore, s.consumer, thresholdView, parentProtocolState)
 		require.NoError(s.T(), err)
 		require.Equal(s.T(), parentProtocolState.ID(), stateMachine.ParentState().ID())
 		require.Equal(s.T(), thresholdView, stateMachine.View())
@@ -506,8 +503,8 @@ func (s *EpochFallbackStateMachineSuite) TestEpochFallbackStateMachineInjectsMul
 		// In the previous test `TestNewEpochFallbackStateMachine`, we verified that the first extension is added correctly. Below we
 		// test proper addition of the subsequent extension. A new extension should be added when we reach `firstExtensionViewThreshold`.
 		// When reaching (equality) this threshold, the next extension should be added
-		firstExtensionViewThreshold := originalParentState.CurrentEpochSetup.FinalView + extensionViewCount - s.params.EpochCommitSafetyThreshold()
-		secondExtensionViewThreshold := originalParentState.CurrentEpochSetup.FinalView + 2*extensionViewCount - s.params.EpochCommitSafetyThreshold()
+		firstExtensionViewThreshold := originalParentState.CurrentEpochSetup.FinalView + extensionViewCount - s.kvstore.GetEpochCommitSafetyThreshold()
+		secondExtensionViewThreshold := originalParentState.CurrentEpochSetup.FinalView + 2*extensionViewCount - s.kvstore.GetEpochCommitSafetyThreshold()
 		// We progress through views that are strictly smaller than threshold. Up to this point, only the initial extension should exist
 
 		// we will be asserting the validity of extensions after producing multiple extensions,
@@ -528,7 +525,7 @@ func (s *EpochFallbackStateMachineSuite) TestEpochFallbackStateMachineInjectsMul
 		// updates variables that are defined in outer context
 		evolveStateToView := func(targetView uint64) {
 			for ; candidateView < targetView; candidateView++ {
-				stateMachine, err := NewFallbackStateMachine(s.kvstore, s.params, s.consumer, candidateView, parentProtocolState.Copy())
+				stateMachine, err := NewFallbackStateMachine(s.kvstore, s.consumer, candidateView, parentProtocolState.Copy())
 				require.NoError(s.T(), err)
 				updatedState, _, _ := stateMachine.Build()
 
@@ -601,9 +598,9 @@ func (s *EpochFallbackStateMachineSuite) TestEpochFallbackStateMachineInjectsMul
 	// In the previous test `TestNewEpochFallbackStateMachine`, we verified that the first extension is added correctly. Below we
 	// test proper addition of the subsequent extension. A new extension should be added when we reach `firstExtensionViewThreshold`.
 	// When reaching (equality) this threshold, the next extension should be added
-	firstExtensionViewThreshold := originalParentState.NextEpochSetup.FinalView + extensionViewCount - s.params.EpochCommitSafetyThreshold()
-	secondExtensionViewThreshold := originalParentState.NextEpochSetup.FinalView + 2*extensionViewCount - s.params.EpochCommitSafetyThreshold()
-	thirdExtensionViewThreshold := originalParentState.NextEpochSetup.FinalView + 3*extensionViewCount - s.params.EpochCommitSafetyThreshold()
+	firstExtensionViewThreshold := originalParentState.NextEpochSetup.FinalView + extensionViewCount - s.kvstore.GetEpochCommitSafetyThreshold()
+	secondExtensionViewThreshold := originalParentState.NextEpochSetup.FinalView + 2*extensionViewCount - s.kvstore.GetEpochCommitSafetyThreshold()
+	thirdExtensionViewThreshold := originalParentState.NextEpochSetup.FinalView + 3*extensionViewCount - s.kvstore.GetEpochCommitSafetyThreshold()
 
 	parentProtocolState := originalParentState.Copy()
 	candidateView := originalParentState.CurrentEpochSetup.FirstView + 1
@@ -611,7 +608,7 @@ func (s *EpochFallbackStateMachineSuite) TestEpochFallbackStateMachineInjectsMul
 	// updates variables that are defined in outer context
 	evolveStateToView := func(targetView uint64) {
 		for ; candidateView < targetView; candidateView++ {
-			stateMachine, err := NewFallbackStateMachine(s.kvstore, s.params, s.consumer, candidateView, parentProtocolState.Copy())
+			stateMachine, err := NewFallbackStateMachine(s.kvstore, s.consumer, candidateView, parentProtocolState.Copy())
 			require.NoError(s.T(), err)
 
 			if candidateView > parentProtocolState.CurrentEpochFinalView() {
