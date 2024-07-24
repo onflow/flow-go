@@ -109,19 +109,13 @@ func (h *ContractHandler) deployCOA(uuid uint64) (*types.Result, error) {
 		factoryNonce,
 	)
 
-	// step 4 - prepare the block context
-	ctx, err := h.getBlockContext()
+	// step 4 - execute the call
+	res, err := h.executeAndHandleCall(call, nil, false)
 	if err != nil {
 		return nil, err
 	}
 
-	// step 5 - execute the call
-	res, err := h.executeAndHandleCall(ctx, call, nil, false)
-	if err != nil {
-		return nil, err
-	}
-
-	// step 6 - if successful COA metrics
+	// step 5 - if successful COA metrics
 	h.backend.SetNumberOfDeployedCOAs(factoryNonce)
 	return res, nil
 }
@@ -537,18 +531,28 @@ func (h *ContractHandler) getBlockContext() (types.BlockContext, error) {
 }
 
 func (h *ContractHandler) executeAndHandleCall(
-	ctx types.BlockContext,
 	call *types.DirectCall,
 	totalSupplyDiff *big.Int,
 	deductSupplyDiff bool,
 ) (*types.Result, error) {
-	// step 1 - create block view
+	// step 1 - check enough computation is available
+	if err := h.checkGasLimit(types.GasLimit(call.GasLimit)); err != nil {
+		return nil, err
+	}
+
+	// step 2 - prepare the block context
+	ctx, err := h.getBlockContext()
+	if err != nil {
+		return nil, err
+	}
+
+	// step 3 - create block view
 	blk, err := h.emulator.NewBlockView(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	// step 2 - run direct call
+	// step 4 - run direct call
 	res, err := blk.DirectCall(call)
 	// check backend errors first
 	if err != nil {
@@ -558,18 +562,18 @@ func (h *ContractHandler) executeAndHandleCall(
 		return nil, types.ErrUnexpectedEmptyResult
 	}
 
-	// step 3 - gas meter even invalid or failed status
+	// step 5 - gas meter even invalid or failed status
 	err = h.meterGasUsage(res)
 	if err != nil {
 		return nil, err
 	}
 
-	// step 4 - if is invalid skip the rest of states
+	// step 6 - if is invalid skip the rest of states
 	if res.Invalid() {
 		return res, nil
 	}
 
-	// step 5 - update block proposal
+	// step 7 - update block proposal
 	bp, err := h.blockStore.BlockProposal()
 	if err != nil {
 		return nil, err
@@ -596,7 +600,7 @@ func (h *ContractHandler) executeAndHandleCall(
 		return nil, err
 	}
 
-	// step 6 - emit transaction event
+	// step 8 - emit transaction event
 	encoded, err := call.Encode()
 	if err != nil {
 		return nil, err
@@ -608,14 +612,14 @@ func (h *ContractHandler) executeAndHandleCall(
 		return nil, err
 	}
 
-	// step 7 - report metrics
+	// step 9 - report metrics
 	h.backend.EVMTransactionExecuted(
 		res.GasConsumed,
 		true,
 		res.Failed(),
 	)
 
-	// step 8 - collect traces
+	// step 10 - collect traces
 	h.tracer.Collect(res.TxHash)
 
 	return res, nil
@@ -650,7 +654,7 @@ func (a *Account) Address() types.Address {
 // Nonce returns the nonce of this account
 //
 // Note: we don't meter any extra computation given reading data
-// from the storage already transalates into computation
+// from the storage already translates into computation
 func (a *Account) Nonce() uint64 {
 	nonce, err := a.nonce()
 	panicOnError(err)
@@ -674,7 +678,7 @@ func (a *Account) nonce() (uint64, error) {
 // Balance returns the balance of this account
 //
 // Note: we don't meter any extra computation given reading data
-// from the storage already transalates into computation
+// from the storage already translates into computation
 func (a *Account) Balance() types.Balance {
 	bal, err := a.balance()
 	panicOnError(err)
@@ -699,7 +703,7 @@ func (a *Account) balance() (types.Balance, error) {
 // Code returns the code of this account
 //
 // Note: we don't meter any extra computation given reading data
-// from the storage already transalates into computation
+// from the storage already translates into computation
 func (a *Account) Code() types.Code {
 	code, err := a.code()
 	panicOnError(err)
@@ -722,7 +726,7 @@ func (a *Account) code() (types.Code, error) {
 // CodeHash returns the code hash of this account
 //
 // Note: we don't meter any extra computation given reading data
-// from the storage already transalates into computation
+// from the storage already translates into computation
 func (a *Account) CodeHash() []byte {
 	codeHash, err := a.codeHash()
 	panicOnError(err)
@@ -747,28 +751,20 @@ func (a *Account) codeHash() ([]byte, error) {
 func (a *Account) Deposit(v *types.FLOWTokenVault) {
 	defer a.fch.backend.StartChildSpan(trace.FVMEVMDeposit).End()
 
-	res, err := a.deposit(v)
-	panicOnErrorOrInvalidOrFailedState(res, err)
-}
-
-func (a *Account) deposit(v *types.FLOWTokenVault) (*types.Result, error) {
-	// prepare the call
 	bridge := a.fch.addressAllocator.NativeTokenBridgeAddress()
 	bridgeAccount := a.fch.AccountByAddress(bridge, false)
-	call := types.NewDepositCall(
-		bridge,
-		a.address,
+	// it doesn't have to be authorized
+	res, err := a.fch.executeAndHandleCall(
+		types.NewDepositCall(
+			bridge,
+			a.address,
+			v.Balance(),
+			bridgeAccount.Nonce(),
+		),
 		v.Balance(),
-		bridgeAccount.Nonce(),
+		false,
 	)
-
-	// pre-check the call
-	ctx, err := a.precheck(false, types.GasLimit(call.GasLimit))
-	if err != nil {
-		return nil, err
-	}
-
-	return a.fch.executeAndHandleCall(ctx, call, v.Balance(), false)
+	panicOnErrorOrInvalidOrFailedState(res, err)
 }
 
 // Withdraw deducts the balance from the account and
@@ -776,58 +772,40 @@ func (a *Account) deposit(v *types.FLOWTokenVault) (*types.Result, error) {
 func (a *Account) Withdraw(b types.Balance) *types.FLOWTokenVault {
 	defer a.fch.backend.StartChildSpan(trace.FVMEVMWithdraw).End()
 
-	res, err := a.withdraw(b)
+	// Don't allow withdraw for balances that has rounding error
+	// TODO: maybe do this on lower levels instead
+	if types.BalanceConvertionToUFix64ProneToRoundingError(b) {
+		panic(fvmErrors.NewEVMError(types.ErrWithdrawBalanceRounding))
+	}
+
+	res, err := a.executeAndHandleAuthorizedCall(
+		types.NewWithdrawCall(
+			a.fch.addressAllocator.NativeTokenBridgeAddress(),
+			a.address,
+			b,
+			a.Nonce(),
+		),
+		b,
+		true,
+	)
 	panicOnErrorOrInvalidOrFailedState(res, err)
 
 	return types.NewFlowTokenVault(b)
 }
 
-func (a *Account) withdraw(b types.Balance) (*types.Result, error) {
-	// Don't allow withdraw for balances that has rounding error
-	// TODO: maybe do this on lower levels instead
-	if types.BalanceConvertionToUFix64ProneToRoundingError(b) {
-		return nil, types.ErrWithdrawBalanceRounding
-	}
-
-	// prepare the call
-	call := types.NewWithdrawCall(
-		a.fch.addressAllocator.NativeTokenBridgeAddress(),
-		a.address,
-		b,
-		a.Nonce(),
-	)
-
-	// pre-check the call
-	ctx, err := a.precheck(true, types.GasLimit(call.GasLimit))
-	if err != nil {
-		return nil, err
-	}
-
-	return a.fch.executeAndHandleCall(ctx, call, b, true)
-}
-
 // Transfer transfers tokens between accounts
 func (a *Account) Transfer(to types.Address, balance types.Balance) {
-	res, err := a.transfer(to, balance)
-	panicOnErrorOrInvalidOrFailedState(res, err)
-}
-
-func (a *Account) transfer(to types.Address, balance types.Balance) (*types.Result, error) {
-	// prepare the call
-	call := types.NewTransferCall(
-		a.address,
-		to,
-		balance,
-		a.Nonce(),
+	res, err := a.executeAndHandleAuthorizedCall(
+		types.NewTransferCall(
+			a.address,
+			to,
+			balance,
+			a.Nonce(),
+		),
+		nil,
+		false,
 	)
-
-	// pre-check the call
-	ctx, err := a.precheck(true, types.GasLimit(call.GasLimit))
-	if err != nil {
-		return nil, err
-	}
-
-	return a.fch.executeAndHandleCall(ctx, call, nil, false)
+	panicOnErrorOrInvalidOrFailedState(res, err)
 }
 
 // Deploy deploys a contract to the EVM environment
@@ -838,29 +816,20 @@ func (a *Account) Deploy(code types.Code, gaslimit types.GasLimit, balance types
 	// capture open tracing span
 	defer a.fch.backend.StartChildSpan(trace.FVMEVMDeploy).End()
 
-	res, err := a.deploy(code, gaslimit, balance)
+	res, err := a.executeAndHandleAuthorizedCall(
+		types.NewDeployCall(
+			a.address,
+			code,
+			uint64(gaslimit),
+			balance,
+			a.Nonce(),
+		),
+		nil,
+		false,
+	)
 	panicOnError(err)
 
 	return res.ResultSummary()
-}
-
-func (a *Account) deploy(code types.Code, gaslimit types.GasLimit, balance types.Balance) (*types.Result, error) {
-	// prepare the call
-	call := types.NewDeployCall(
-		a.address,
-		code,
-		uint64(gaslimit),
-		balance,
-		a.Nonce(),
-	)
-
-	// pre-check and create block context
-	ctx, err := a.precheck(true, gaslimit)
-	if err != nil {
-		return nil, err
-	}
-
-	return a.fch.executeAndHandleCall(ctx, call, nil, false)
 }
 
 // Call calls a smart contract function with the given data
@@ -871,43 +840,32 @@ func (a *Account) Call(to types.Address, data types.Data, gaslimit types.GasLimi
 	// capture open tracing span
 	defer a.fch.backend.StartChildSpan(trace.FVMEVMCall).End()
 
-	res, err := a.call(to, data, gaslimit, balance)
+	res, err := a.executeAndHandleAuthorizedCall(
+		types.NewContractCall(
+			a.address,
+			to,
+			data,
+			uint64(gaslimit),
+			balance,
+			a.Nonce(),
+		),
+		nil,
+		false,
+	)
 	panicOnError(err)
 
 	return res.ResultSummary()
 }
 
-func (a *Account) call(to types.Address, data types.Data, gaslimit types.GasLimit, balance types.Balance) (*types.Result, error) {
-	// prepare the call
-	call := types.NewContractCall(
-		a.address,
-		to,
-		data,
-		uint64(gaslimit),
-		balance,
-		a.Nonce(),
-	)
-
-	// pre-check and create block context
-	ctx, err := a.precheck(true, gaslimit)
-	if err != nil {
-		return nil, err
+func (a *Account) executeAndHandleAuthorizedCall(
+	call *types.DirectCall,
+	totalSupplyDiff *big.Int,
+	deductSupplyDiff bool,
+) (*types.Result, error) {
+	if !a.isAuthorized {
+		return nil, types.ErrUnauthorizedMethodCall
 	}
-
-	return a.fch.executeAndHandleCall(ctx, call, nil, false)
-}
-
-func (a *Account) precheck(authorized bool, gaslimit types.GasLimit) (types.BlockContext, error) {
-	// check if account is authorized (i.e. is a COA)
-	if authorized && !a.isAuthorized {
-		return types.BlockContext{}, types.ErrUnauthorizedMethodCall
-	}
-	err := a.fch.checkGasLimit(gaslimit)
-	if err != nil {
-		return types.BlockContext{}, err
-	}
-
-	return a.fch.getBlockContext()
+	return a.fch.executeAndHandleCall(call, totalSupplyDiff, deductSupplyDiff)
 }
 
 func panicOnErrorOrInvalidOrFailedState(res *types.Result, err error) {
