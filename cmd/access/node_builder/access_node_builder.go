@@ -31,6 +31,7 @@ import (
 	stateSyncCommands "github.com/onflow/flow-go/admin/commands/state_synchronization"
 	storageCommands "github.com/onflow/flow-go/admin/commands/storage"
 	"github.com/onflow/flow-go/cmd"
+	"github.com/onflow/flow-go/cmd/build"
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
@@ -55,6 +56,7 @@ import (
 	followereng "github.com/onflow/flow-go/engine/common/follower"
 	"github.com/onflow/flow-go/engine/common/requester"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
+	"github.com/onflow/flow-go/engine/common/version"
 	"github.com/onflow/flow-go/engine/execution/computation/query"
 	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/ledger"
@@ -169,6 +171,7 @@ type AccessNodeConfig struct {
 	registerCacheSize                    uint
 	programCacheSize                     uint
 	checkPayerBalance                    bool
+	versionControlEnabled                bool
 }
 
 type PublicNetworkConfig struct {
@@ -270,6 +273,7 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 		registerCacheSize:                    0,
 		programCacheSize:                     0,
 		checkPayerBalance:                    false,
+		versionControlEnabled:                true,
 	}
 }
 
@@ -317,6 +321,7 @@ type FlowAccessNodeBuilder struct {
 	ExecutionDataPruner        *pruner.Pruner
 	ExecutionDataStorage       edstorage.ExecutionDataStorage
 	ExecutionDataTracker       tracker.Storage
+	versionControl             *version.VersionControl
 
 	// The sync engine participants provider is the libp2p peer store for the access node
 	// which is not available until after the network has started.
@@ -1256,6 +1261,10 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 			"circuit-breaker-max-requests",
 			defaultConfig.rpcConf.BackendConfig.CircuitBreakerConfig.MaxRequests,
 			"maximum number of requests to check if connection restored after timeout. Default value is 1")
+		flags.BoolVar(&builder.versionControlEnabled,
+			"version-control-enabled",
+			defaultConfig.versionControlEnabled,
+			"whether to enable the version control feature. Default value is true")
 		// ExecutionDataRequester config
 		flags.BoolVar(&builder.executionDataSyncEnabled,
 			"execution-data-sync-enabled",
@@ -1970,6 +1979,34 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			// be handled by the scaffold.
 			return builder.RequestEng, nil
 		})
+
+	if builder.versionControlEnabled {
+		builder.Component("version control", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			nodeVersion, err := build.Semver()
+			if err != nil {
+				return nil, fmt.Errorf("could not load node version for version control. "+
+					"version (%s) is not semver compliant: %w. Make sure a valid semantic version is provided in the VERSION environment variable", build.Version(), err)
+			}
+
+			versionControl, err := version.NewVersionControl(
+				builder.Logger,
+				node.Storage.VersionBeacons,
+				nodeVersion,
+				builder.SealedRootBlock.Header.Height,
+				builder.LastFinalizedHeader.Height,
+			)
+			if err != nil {
+				return nil, fmt.Errorf("could not create version control: %w", err)
+			}
+
+			// VersionControl needs to consume BlockFinalized events.
+			node.ProtocolEvents.AddConsumer(versionControl)
+
+			builder.versionControl = versionControl
+
+			return versionControl, nil
+		})
+	}
 
 	if builder.supportsObserver {
 		builder.Component("public sync request handler", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {

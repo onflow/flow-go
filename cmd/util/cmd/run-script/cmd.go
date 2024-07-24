@@ -77,13 +77,17 @@ func run(*cobra.Command, []string) {
 	// Validate chain ID
 	_ = chainID.Chain()
 
+	code, err := io.ReadAll(os.Stdin)
+	if err != nil {
+		log.Fatal().Msgf("failed to read script: %s", err)
+	}
+
 	var payloads []*ledger.Payload
-	var err error
 
 	if flagPayloads != "" {
 		_, payloads, err = util.ReadPayloadFile(log.Logger, flagPayloads)
 	} else {
-		log.Info().Msg("Reading trie")
+		log.Info().Msg("reading trie")
 
 		stateCommitment := util.ParseStateCommitment(flagStateCommitment)
 		payloads, err = util.ReadTrie(flagState, stateCommitment)
@@ -92,12 +96,17 @@ func run(*cobra.Command, []string) {
 		log.Fatal().Err(err).Msg("failed to read payloads")
 	}
 
+	log.Info().Msgf("creating registers from payloads (%d)", len(payloads))
+
 	registersByAccount, err := registers.NewByAccountFromPayloads(payloads)
 	if err != nil {
 		log.Fatal().Err(err)
 	}
-
-	log.Info().Msgf("created registers (%d accounts)", registersByAccount.AccountCount())
+	log.Info().Msgf(
+		"created %d registers from payloads (%d accounts)",
+		registersByAccount.Count(),
+		registersByAccount.AccountCount(),
+	)
 
 	options := computation.DefaultFVMOptions(chainID, false, false)
 	options = append(
@@ -115,11 +124,6 @@ func run(*cobra.Command, []string) {
 	}
 
 	vm := fvm.NewVirtualMachine()
-
-	code, err := io.ReadAll(os.Stdin)
-	if err != nil {
-		log.Fatal().Msgf("failed to read script: %s", err)
-	}
 
 	_, res, err := vm.Run(
 		ctx,
