@@ -18,6 +18,7 @@ require (
 	github.com/ipfs/go-cid v0.4.1
 	github.com/ipfs/go-datastore v0.6.0
 	github.com/ipfs/go-ds-badger2 v0.1.3
+	github.com/ipfs/go-ds-pebble v0.3.1
 	github.com/libp2p/go-libp2p v0.32.2
 	github.com/onflow/cadence v1.0.0-preview.38
 	github.com/onflow/crypto v0.25.1
@@ -358,3 +359,6 @@ require (
 replace github.com/onflow/flow-go => ../
 
 replace github.com/onflow/flow-go/insecure => ../insecure
+
+// TODO: remove it when https://github.com/ipfs/go-ds-pebble/pull/36 merged
+replace github.com/ipfs/go-ds-pebble v0.3.1 => github.com/The-K-R-O-K/go-ds-pebble v0.0.0-20240723100149-b11ba40ed8c6
