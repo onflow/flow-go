@@ -378,10 +378,10 @@ func run(*cobra.Command, []string) {
 	switch chainID {
 	case flow.Emulator:
 		burnerContractChange = migrations.BurnerContractChangeDeploy
-		evmContractChange = migrations.EVMContractChangeDeploy
+		evmContractChange = migrations.EVMContractChangeDeployMinimalAndUpdateFull
 	case flow.Testnet, flow.Mainnet:
 		burnerContractChange = migrations.BurnerContractChangeUpdate
-		evmContractChange = migrations.EVMContractChangeUpdate
+		evmContractChange = migrations.EVMContractChangeUpdateFull
 	}
 
 	stagedContracts, err := migrations.StagedContractsFromCSV(flagStagedContractsFile)
