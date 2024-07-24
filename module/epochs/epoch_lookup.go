@@ -269,8 +269,8 @@ func (lookup *EpochLookup) handleProtocolEvents(ctx irrecoverable.SignalerContex
 		select {
 		case <-ctx.Done():
 			return
-		case processEvtFn := <-lookup.epochEvents:
-			err := processEvtFn()
+		case processEventFn := <-lookup.epochEvents:
+			err := processEventFn()
 			if err != nil {
 				ctx.Throw(err)
 			}
