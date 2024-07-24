@@ -130,8 +130,6 @@ func (i *Indexer) runExecutionDataConsumer(ctx irrecoverable.SignalerContext, re
 }
 
 // processBlockIndexed is a worker that processes indexed blocks.
-//
-// No errors are expected during normal operations.
 func (i *Indexer) processBlockIndexed(
 	ctx irrecoverable.SignalerContext,
 	ready component.ReadyFunc,

@@ -151,13 +151,11 @@ func (p *Pruner) RegisterProducer(producer execution_data.ExecutionDataProducer)
 }
 
 // SetHeightRangeTarget updates the Pruner's height range target.
-// This may block for the duration of a pruning operation.
 func (p *Pruner) SetHeightRangeTarget(heightRangeTarget uint64) {
 	p.heightRangeTarget.Store(heightRangeTarget)
 }
 
 // SetThreshold update's the Pruner's threshold.
-// This may block for the duration of a pruning operation.
 func (p *Pruner) SetThreshold(threshold uint64) {
 	p.threshold.Store(threshold)
 }
