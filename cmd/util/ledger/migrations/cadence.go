@@ -374,12 +374,23 @@ func NewCadence1ContractsMigrations(
 		)
 	}
 
-	if opts.EVMContractChange == EVMContractChangeDeploy {
+	switch opts.EVMContractChange {
+	case EVMContractChangeNone:
+		// NO-OP
+
+	case EVMContractChangeUpdateFull:
+		// handled in system contract updates (SystemContractChanges)
+
+	case EVMContractChangeDeployFull,
+		EVMContractChangeDeployMinimalAndUpdateFull:
+
+		full := opts.EVMContractChange == EVMContractChangeDeployFull
+
 		migs = append(
 			migs,
 			NamedMigration{
 				Name:    "evm-deployment-migration",
-				Migrate: NewEVMDeploymentMigration(opts.ChainID, log),
+				Migrate: NewEVMDeploymentMigration(opts.ChainID, log, full),
 			},
 		)
 	}

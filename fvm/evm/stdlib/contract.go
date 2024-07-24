@@ -27,6 +27,9 @@ import (
 //go:embed contract.cdc
 var contractCode string
 
+//go:embed contract_minimal.cdc
+var ContractMinimalCode string
+
 var nftImportPattern = regexp.MustCompile(`(?m)^import "NonFungibleToken"`)
 var fungibleTokenImportPattern = regexp.MustCompile(`(?m)^import "FungibleToken"`)
 var flowTokenImportPattern = regexp.MustCompile(`(?m)^import "FlowToken"`)

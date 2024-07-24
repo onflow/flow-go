@@ -45,13 +45,14 @@ func Test_BlockProposal(t *testing.T) {
 	require.Equal(t, gethTypes.EmptyRootHash, bp.TransactionHashRoot)
 
 	res := &Result{
-		TxHash:      gethCommon.Hash{2},
-		GasConsumed: 10,
+		TxHash:            gethCommon.Hash{2},
+		GasConsumed:       10,
+		CumulativeGasUsed: 20,
 	}
 	bp.AppendTransaction(res)
 	require.Equal(t, res.TxHash, bp.TxHashes[0])
-	require.Equal(t, res.GasConsumed, bp.TotalGasUsed)
-	require.Equal(t, *res.LightReceipt(0), bp.Receipts[0])
+	require.Equal(t, res.CumulativeGasUsed, bp.TotalGasUsed)
+	require.Equal(t, *res.LightReceipt(), bp.Receipts[0])
 
 	bp.PopulateRoots()
 	require.NotEqual(t, gethTypes.EmptyReceiptsHash, bp.ReceiptRoot)
