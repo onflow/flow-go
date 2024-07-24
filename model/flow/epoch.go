@@ -10,6 +10,8 @@ import (
 	"github.com/fxamacker/cbor/v2"
 	"github.com/onflow/crypto"
 	"github.com/vmihailenco/msgpack/v4"
+	"golang.org/x/exp/maps"
+	"golang.org/x/exp/slices"
 
 	"github.com/onflow/flow-go/model/encodable"
 )
@@ -420,14 +422,13 @@ func (commit *EpochCommit) EqualTo(other *EpochCommit) bool {
 	if commit.Counter != other.Counter {
 		return false
 	}
-	if len(commit.ClusterQCs) != len(other.ClusterQCs) {
+
+	if !slices.EqualFunc(commit.ClusterQCs, other.ClusterQCs, func(qc1 ClusterQCVoteData, qc2 ClusterQCVoteData) bool {
+		return qc1.EqualTo(&qc2)
+	}) {
 		return false
 	}
-	for i, qc := range commit.ClusterQCs {
-		if !qc.EqualTo(&other.ClusterQCs[i]) {
-			return false
-		}
-	}
+
 	if (commit.DKGGroupKey == nil && other.DKGGroupKey != nil) ||
 		(commit.DKGGroupKey != nil && other.DKGGroupKey == nil) {
 		return false
@@ -436,27 +437,14 @@ func (commit *EpochCommit) EqualTo(other *EpochCommit) bool {
 		return false
 	}
 
-	if len(commit.DKGParticipantKeys) != len(other.DKGParticipantKeys) {
+	if !slices.EqualFunc(commit.DKGParticipantKeys, other.DKGParticipantKeys, func(k1 crypto.PublicKey, k2 crypto.PublicKey) bool {
+		return k1.Equals(k2)
+	}) {
 		return false
-	}
-	for i, key := range commit.DKGParticipantKeys {
-		if !key.Equals(other.DKGParticipantKeys[i]) {
-			return false
-		}
 	}
 
-	if len(commit.DKGIndexMap) != len(other.DKGIndexMap) {
+	if !maps.Equal(commit.DKGIndexMap, other.DKGIndexMap) {
 		return false
-	}
-	for id, index := range commit.DKGIndexMap {
-		// NOTE: must explicitly check existence in 2nd map, else eg. {a: 0} would be equal to {b: 1}
-		otherIndex, ok := other.DKGIndexMap[id]
-		if !ok {
-			return false
-		}
-		if index != otherIndex {
-			return false
-		}
 	}
 
 	return true
