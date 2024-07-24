@@ -774,7 +774,7 @@ func (a *Account) Withdraw(b types.Balance) *types.FLOWTokenVault {
 
 	// Don't allow withdraw for balances that has rounding error
 	// TODO: maybe do this on lower levels instead
-	if types.BalanceConvertionToUFix64ProneToRoundingError(b) {
+	if types.BalanceConversionToUFix64ProneToRoundingError(b) {
 		panic(fvmErrors.NewEVMError(types.ErrWithdrawBalanceRounding))
 	}
 

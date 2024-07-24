@@ -87,12 +87,12 @@ func ConvertBalanceToUFix64(bal Balance) (value cadence.UFix64, roundedOff bool,
 		// this should never happen
 		err = fmt.Errorf("balance can't be casted to a uint64")
 	}
-	return cadence.UFix64(converted.Uint64()), BalanceConvertionToUFix64ProneToRoundingError(bal), err
+	return cadence.UFix64(converted.Uint64()), BalanceConversionToUFix64ProneToRoundingError(bal), err
 }
 
-// BalanceConvertionToUFix64ProneToRoundingError returns true
+// BalanceConversionToUFix64ProneToRoundingError returns true
 // if casting to UFix64 could result in rounding error
-func BalanceConvertionToUFix64ProneToRoundingError(bal Balance) bool {
+func BalanceConversionToUFix64ProneToRoundingError(bal Balance) bool {
 	return new(big.Int).Mod(bal, UFixToAttoConversionMultiplier).BitLen() != 0
 }
 
