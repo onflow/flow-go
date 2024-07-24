@@ -237,15 +237,23 @@ func (er *EpochRecover) EqualTo(other *EpochRecover) bool {
 // When an EpochCommit event is accepted and incorporated into the Protocol State, this guarantees that
 // the network will proceed through that epoch's defined view range with its defined committee. It also
 // causes the current epoch to enter the EpochPhaseCommitted phase.
+//
+// TERMINOLOGY NOTE: In the context of the Epoch Preparation Protocol and the EpochCommit event,
+// artifacts produced by the DKG are referred to with the "DKG" prefix (for example, DKGGroupKey).
+// These artifacts are *produced by* the DKG, but used for the Random Beacon. As such, other
+// components refer to these same artifacts with the "RandomBeacon" prefix.
 type EpochCommit struct {
 	// Counter is the epoch counter of the epoch being committed
 	Counter uint64
 	// ClusterQCs is an ordered list of root quorum certificates, one per cluster.
 	// EpochCommit.ClustersQCs[i] is the QC for EpochSetup.Assignments[i]
 	ClusterQCs []ClusterQCVoteData
-	// DKGGroupKey is the group public key associated with the epoch's DKG.
+	// DKGGroupKey is the group public key produced by the DKG associated with this epoch.
+	// It is used to verify Random Beacon signatures for the epoch with counter, Counter.
 	DKGGroupKey crypto.PublicKey
-	// DKGParticipantKeys is a list of public keys, one per DKG participant, ordered by DKG index.
+	// DKGParticipantKeys is a list of public keys, one per DKG participant, ordered by Random Beacon index.
+	// This list is the output of the DKG associated with this epoch.
+	// It is used to verify Random Beacon signatures for the epoch with counter, Counter.
 	// CAUTION: This list may include keys for nodes which do not exist in the consensus committee
 	//          and may NOT include keys for all nodes in the consensus committee.
 	DKGParticipantKeys []crypto.PublicKey
@@ -255,7 +263,7 @@ type EpochCommit struct {
 	//
 	// TODO(EFM, #6214): Parse this field from service event and make use of it.
 	//                   Here is what the godoc should look like once we do that:
-	// DKGIndexMap is a mapping from node identifier to DKG index.
+	// DKGIndexMap is a mapping from node identifier to Random Beacon index.
 	// It has the following invariants:
 	//   - len(DKGParticipantKeys) == len(DKGIndexMap)
 	//   - DKGIndexMap values form the set {0, 1, ..., n-1} where n=len(DKGParticipantKeys)
