@@ -2,9 +2,13 @@ package migrations
 
 import (
 	"fmt"
+	"time"
 
+	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
+	"github.com/rs/zerolog/log"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
@@ -72,6 +76,8 @@ type difference struct {
 	NewValueStaticType string `json:",omitempty"`
 }
 
+const minLargeAccountRegisterCount = 1_000_000
+
 type CadenceValueDiffReporter struct {
 	address        common.Address
 	chainID        flow.ChainID
@@ -96,62 +102,19 @@ func NewCadenceValueDiffReporter(
 	}
 }
 
-func (dr *CadenceValueDiffReporter) newStorageRuntime(
-	registers registers.Registers,
-) (
-	*InterpreterMigrationRuntime,
-	error,
-) {
-	// TODO: maybe make read-only again
-	runtimeInterface, err := NewInterpreterMigrationRuntime(
-		registers,
-		dr.chainID,
-		InterpreterMigrationRuntimeConfig{},
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	return runtimeInterface, nil
-}
-
 func (dr *CadenceValueDiffReporter) DiffStates(oldRegs, newRegs registers.Registers, domains []string) {
 
-	// Create all the runtime components we need for comparing Cadence values.
-	oldRuntime, err := dr.newStorageRuntime(oldRegs)
-	if err != nil {
-		dr.reportWriter.Write(
-			diffError{
-				Address: dr.address.Hex(),
-				Kind:    diffErrorKindString[abortErrorKind],
-				Msg:     fmt.Sprintf("failed to create runtime for old registers: %s", err),
-			})
-		return
-	}
+	oldStorage := newReadonlyStorage(oldRegs)
 
-	newRuntime, err := dr.newStorageRuntime(newRegs)
-	if err != nil {
-		dr.reportWriter.Write(
-			diffError{
-				Address: dr.address.Hex(),
-				Kind:    diffErrorKindString[abortErrorKind],
-				Msg:     fmt.Sprintf("failed to create runtime with new registers: %s", err),
-			})
-		return
-	}
+	newStorage := newReadonlyStorage(newRegs)
 
-	err = loadAtreeSlabsInStorage(oldRuntime.Storage, oldRegs, dr.nWorkers)
-	if err != nil {
-		dr.reportWriter.Write(
-			diffError{
-				Address: dr.address.Hex(),
-				Kind:    diffErrorKindString[abortErrorKind],
-				Msg:     fmt.Sprintf("failed to preload old atree registers: %s", err),
-			})
-		return
-	}
+	var loadAtreeStorageGroup errgroup.Group
 
-	err = loadAtreeSlabsInStorage(newRuntime.Storage, newRegs, dr.nWorkers)
+	loadAtreeStorageGroup.Go(func() (err error) {
+		return loadAtreeSlabsInStorage(oldStorage, oldRegs, dr.nWorkers)
+	})
+
+	err := loadAtreeSlabsInStorage(newStorage, newRegs, dr.nWorkers)
 	if err != nil {
 		dr.reportWriter.Write(
 			diffError{
@@ -162,15 +125,107 @@ func (dr *CadenceValueDiffReporter) DiffStates(oldRegs, newRegs registers.Regist
 		return
 	}
 
-	// Iterate through all domains and compare cadence values.
+	// Wait for old registers to be loaded in storage.
+	if err := loadAtreeStorageGroup.Wait(); err != nil {
+		dr.reportWriter.Write(
+			diffError{
+				Address: dr.address.Hex(),
+				Kind:    diffErrorKindString[abortErrorKind],
+				Msg:     fmt.Sprintf("failed to preload old atree registers: %s", err),
+			})
+		return
+	}
+
+	if oldRegs.Count() > minLargeAccountRegisterCount {
+		// Add concurrency to diff domains
+		var g errgroup.Group
+
+		// NOTE: preload storage map in the same goroutine
+		for _, domain := range domains {
+			_ = oldStorage.GetStorageMap(dr.address, domain, false)
+			_ = newStorage.GetStorageMap(dr.address, domain, false)
+		}
+
+		// Create goroutine to diff storage domain
+		g.Go(func() (err error) {
+			oldRuntime, err := newReadonlyStorageRuntimeWithStorage(oldStorage, oldRegs.Count())
+			if err != nil {
+				return fmt.Errorf("failed to create runtime for old registers: %s", err)
+			}
+
+			newRuntime, err := newReadonlyStorageRuntimeWithStorage(newStorage, newRegs.Count())
+			if err != nil {
+				return fmt.Errorf("failed to create runtime for new registers: %s", err)
+			}
+
+			dr.diffDomain(oldRuntime, newRuntime, common.PathDomainStorage.Identifier())
+			return nil
+		})
+
+		// Create goroutine to diff other domains
+		g.Go(func() (err error) {
+			oldRuntime, err := newReadonlyStorageRuntimeWithStorage(oldStorage, oldRegs.Count())
+			if err != nil {
+				return fmt.Errorf("failed to create runtime for old registers: %s", err)
+			}
+
+			newRuntime, err := newReadonlyStorageRuntimeWithStorage(newStorage, oldRegs.Count())
+			if err != nil {
+				return fmt.Errorf("failed to create runtime for new registers: %s", err)
+			}
+
+			for _, domain := range domains {
+				if domain != common.PathDomainStorage.Identifier() {
+					dr.diffDomain(oldRuntime, newRuntime, domain)
+				}
+			}
+			return nil
+		})
+
+		err = g.Wait()
+		if err != nil {
+			dr.reportWriter.Write(
+				diffError{
+					Address: dr.address.Hex(),
+					Kind:    diffErrorKindString[abortErrorKind],
+					Msg:     err.Error(),
+				})
+		}
+
+		return
+	}
+
+	// Skip goroutine overhead for smaller accounts
+	oldRuntime, err := newReadonlyStorageRuntimeWithStorage(oldStorage, oldRegs.Count())
+	if err != nil {
+		dr.reportWriter.Write(
+			diffError{
+				Address: dr.address.Hex(),
+				Kind:    diffErrorKindString[abortErrorKind],
+				Msg:     fmt.Sprintf("failed to create runtime for old registers: %s", err),
+			})
+		return
+	}
+
+	newRuntime, err := newReadonlyStorageRuntimeWithStorage(newStorage, newRegs.Count())
+	if err != nil {
+		dr.reportWriter.Write(
+			diffError{
+				Address: dr.address.Hex(),
+				Kind:    diffErrorKindString[abortErrorKind],
+				Msg:     fmt.Sprintf("failed to create runtime with new registers: %s", err),
+			})
+		return
+	}
+
 	for _, domain := range domains {
-		dr.diffStorageDomain(oldRuntime, newRuntime, domain)
+		dr.diffDomain(oldRuntime, newRuntime, domain)
 	}
 }
 
-func (dr *CadenceValueDiffReporter) diffStorageDomain(
-	oldRuntime *InterpreterMigrationRuntime,
-	newRuntime *InterpreterMigrationRuntime,
+func (dr *CadenceValueDiffReporter) diffDomain(
+	oldRuntime *readonlyStorageRuntime,
+	newRuntime *readonlyStorageRuntime,
 	domain string,
 ) {
 	defer func() {
@@ -264,8 +319,11 @@ func (dr *CadenceValueDiffReporter) diffStorageDomain(
 			})
 	}
 
-	// Compare elements present in both storage maps
-	for _, key := range sharedKeys {
+	if len(sharedKeys) == 0 {
+		return
+	}
+
+	getValues := func(key any) (interpreter.Value, interpreter.Value, *util.Trace, bool) {
 
 		trace := util.NewTrace(fmt.Sprintf("%s[%v]", domain, key))
 
@@ -297,17 +355,27 @@ func (dr *CadenceValueDiffReporter) diffStorageDomain(
 						key,
 					),
 				})
-			continue
+			return nil, nil, nil, false
 		}
 
 		oldValue := oldStorageMap.ReadValue(nil, mapKey)
 
 		newValue := newStorageMap.ReadValue(nil, mapKey)
 
+		return oldValue, newValue, trace, true
+	}
+
+	diffValues := func(
+		oldInterpreter *interpreter.Interpreter,
+		oldValue interpreter.Value,
+		newInterpreter *interpreter.Interpreter,
+		newValue interpreter.Value,
+		trace *util.Trace,
+	) {
 		hasDifference := dr.diffValues(
-			oldRuntime.Interpreter,
+			oldInterpreter,
 			oldValue,
-			newRuntime.Interpreter,
+			newInterpreter,
 			newValue,
 			domain,
 			trace,
@@ -324,13 +392,139 @@ func (dr *CadenceValueDiffReporter) diffStorageDomain(
 						Trace:              trace.String(),
 						OldValue:           oldValue.String(),
 						NewValue:           newValue.String(),
-						OldValueStaticType: oldValue.StaticType(oldRuntime.Interpreter).String(),
-						NewValueStaticType: newValue.StaticType(newRuntime.Interpreter).String(),
+						OldValueStaticType: oldValue.StaticType(oldInterpreter).String(),
+						NewValueStaticType: newValue.StaticType(newInterpreter).String(),
 					})
 			}
 		}
-
 	}
+
+	// Skip goroutine overhead for non-storage domain and small accounts.
+	if domain != common.PathDomainStorage.Identifier() ||
+		oldRuntime.PayloadCount < minLargeAccountRegisterCount ||
+		len(sharedKeys) == 1 {
+
+		for _, key := range sharedKeys {
+			oldValue, newValue, trace, canDiff := getValues(key)
+			if canDiff {
+				diffValues(
+					oldRuntime.Interpreter,
+					oldValue,
+					newRuntime.Interpreter,
+					newValue,
+					trace,
+				)
+			}
+		}
+		return
+	}
+
+	startTime := time.Now()
+
+	log.Info().Msgf(
+		"Diffing %x storage domain containing %d elements (%d payloads) ...",
+		dr.address[:],
+		len(sharedKeys),
+		oldRuntime.PayloadCount,
+	)
+
+	// Diffing storage domain in large account
+
+	type job struct {
+		oldValue interpreter.Value
+		newValue interpreter.Value
+		trace    *util.Trace
+	}
+
+	nWorkers := dr.nWorkers
+	if len(sharedKeys) < nWorkers {
+		nWorkers = len(sharedKeys)
+	}
+
+	jobs := make(chan job, nWorkers)
+
+	var g errgroup.Group
+
+	for i := 0; i < nWorkers; i++ {
+
+		g.Go(func() error {
+			oldInterpreter, err := interpreter.NewInterpreter(
+				nil,
+				nil,
+				&interpreter.Config{
+					Storage: oldRuntime.Storage,
+				},
+			)
+			if err != nil {
+				dr.reportWriter.Write(
+					diffError{
+						Address: dr.address.Hex(),
+						Kind:    diffErrorKindString[abortErrorKind],
+						Msg:     fmt.Sprintf("failed to create interpreter for old registers: %s", err),
+					})
+				return nil
+			}
+
+			newInterpreter, err := interpreter.NewInterpreter(
+				nil,
+				nil,
+				&interpreter.Config{
+					Storage: newRuntime.Storage,
+				},
+			)
+			if err != nil {
+				dr.reportWriter.Write(
+					diffError{
+						Address: dr.address.Hex(),
+						Kind:    diffErrorKindString[abortErrorKind],
+						Msg:     fmt.Sprintf("failed to create interpreter for new registers: %s", err),
+					})
+				return nil
+			}
+
+			for job := range jobs {
+				diffValues(oldInterpreter, job.oldValue, newInterpreter, job.newValue, job.trace)
+			}
+
+			return nil
+		})
+	}
+
+	// Launch goroutine to send account registers to jobs channel
+	go func() {
+		defer close(jobs)
+
+		for _, key := range sharedKeys {
+			oldValue, newValue, trace, canDiff := getValues(key)
+			if canDiff {
+				jobs <- job{
+					oldValue: oldValue,
+					newValue: newValue,
+					trace:    trace,
+				}
+			}
+		}
+	}()
+
+	// Wait for workers
+	err := g.Wait()
+	if err != nil {
+		dr.reportWriter.Write(
+			diffError{
+				Address: dr.address.Hex(),
+				Kind:    diffErrorKindString[abortErrorKind],
+				Msg:     fmt.Sprintf("failed to diff domain %s: %s", domain, err),
+			})
+	}
+
+	log.Info().
+		Msgf(
+			"Finished diffing %x storage domain containing %d elements (%d payloads) in %s",
+			dr.address[:],
+			len(sharedKeys),
+			oldRuntime.PayloadCount,
+			time.Since(startTime),
+		)
 }
 
 func (dr *CadenceValueDiffReporter) diffValues(
@@ -805,9 +999,36 @@ func (dr *CadenceValueDiffReporter) diffCadenceDictionaryValue(
 		return true
 	})
 
-	onlyOldKeys, onlyNewKeys, sharedKeys := diffCadenceValues(oldKeys, newKeys)
+	onlyOldKeys := make([]interpreter.Value, 0, len(oldKeys))
+
+	// Compare elements in both dict values
+
+	for _, key := range oldKeys {
+		valueTrace := trace.Append(fmt.Sprintf("[%v]", key))
+
+		oldValue, _ := v.Get(vInterpreter, interpreter.EmptyLocationRange, key)
+
+		newValue, found := otherDictionary.Get(otherInterpreter, interpreter.EmptyLocationRange, key)
+		if !found {
+			onlyOldKeys = append(onlyOldKeys, key)
+			continue
+		}
+
+		elementHasDifference := dr.diffValues(
+			vInterpreter,
+			oldValue,
+			otherInterpreter,
+			newValue,
+			domain,
+			valueTrace,
+		)
+		if elementHasDifference {
+			hasDifference = true
+		}
+	}
 
 	// Log keys only present in old dict value
+
 	if len(onlyOldKeys) > 0 {
 		hasDifference = true
 
@@ -825,42 +1046,34 @@ func (dr *CadenceValueDiffReporter) diffCadenceDictionaryValue(
 			})
 	}
 
-	// Log field names only present in new composite value
-	if len(onlyNewKeys) > 0 {
-		hasDifference = true
+	// Log keys only present in new dict value
 
-		dr.reportWriter.Write(
-			difference{
-				Address: dr.address.Hex(),
-				Domain:  domain,
-				Kind:    diffKindString[cadenceValueDiffKind],
-				Trace:   trace.String(),
-				Msg: fmt.Sprintf(
-					"new dict value has %d elements with keys %v, that are not present in old dict value",
-					len(onlyNewKeys),
-					onlyNewKeys,
-				),
-			})
-	}
+	if len(oldKeys) != len(newKeys) || len(onlyOldKeys) > 0 {
+		onlyNewKeys := make([]interpreter.Value, 0, len(newKeys))
 
-	// Compare elements in both dict values
-	for _, key := range sharedKeys {
-		valueTrace := trace.Append(fmt.Sprintf("[%v]", key))
+		// find keys only present in new dict
+		for _, key := range newKeys {
+			found := v.ContainsKey(vInterpreter, interpreter.EmptyLocationRange, key)
+			if !found {
+				onlyNewKeys = append(onlyNewKeys, key)
+			}
+		}
 
-		oldValue, _ := v.Get(vInterpreter, interpreter.EmptyLocationRange, key)
-
-		newValue, _ := otherDictionary.Get(otherInterpreter, interpreter.EmptyLocationRange, key)
-
-		elementHasDifference := dr.diffValues(
-			vInterpreter,
-			oldValue,
-			otherInterpreter,
-			newValue,
-			domain,
-			valueTrace,
-		)
-		if elementHasDifference {
+		if len(onlyNewKeys) > 0 {
 			hasDifference = true
+
+			dr.reportWriter.Write(
+				difference{
+					Address: dr.address.Hex(),
+					Domain:  domain,
+					Kind:    diffKindString[cadenceValueDiffKind],
+					Trace:   trace.String(),
+					Msg: fmt.Sprintf(
+						"new dict value has %d elements with keys %v, that are not present in old dict value",
+						len(onlyNewKeys),
+						onlyNewKeys,
+					),
+				})
 		}
 	}
 
@@ -915,54 +1128,39 @@ func diff[T comparable](old, new []T) (onlyOld, onlyNew, shared []T) {
 	return
 }
 
-func diffCadenceValues(old, new []interpreter.Value) (onlyOld, onlyNew, shared []interpreter.Value) {
-	onlyOld = make([]interpreter.Value, 0, len(old))
-	onlyNew = make([]interpreter.Value, 0, len(new))
-	shared = make([]interpreter.Value, 0, min(len(old), len(new)))
-
-	sharedNew := make([]bool, len(new))
-
-	for _, o := range old {
-		found := false
-
-		for i, n := range new {
-			foundShared := false
-
-			if ev, ok := o.(interpreter.EquatableValue); ok {
-				if ev.Equal(nil, interpreter.EmptyLocationRange, n) {
-					foundShared = true
-				}
-			} else {
-				if o == n {
-					foundShared = true
-				}
-			}
-
-			if foundShared {
-				shared = append(shared, o)
-				found = true
-				sharedNew[i] = true
-				break
-			}
-		}
-
-		if !found {
-			onlyOld = append(onlyOld, o)
-		}
-	}
-
-	for i, shared := range sharedNew {
-		if !shared {
-			onlyNew = append(onlyNew, new[i])
-		}
-	}
-
-	return
-}
-
 func min(a, b int) int {
 	if a <= b {
 		return a
 	}
 	return b
+}
+
+func newReadonlyStorage(regs registers.Registers) *runtime.Storage {
+	ledger := &registers.ReadOnlyLedger{Registers: regs}
+	return runtime.NewStorage(ledger, nil)
+}
+
+type readonlyStorageRuntime struct {
+	Interpreter  *interpreter.Interpreter
+	Storage      *runtime.Storage
+	PayloadCount int
+}
+
+func newReadonlyStorageRuntimeWithStorage(storage *runtime.Storage, payloadCount int) (*readonlyStorageRuntime, error) {
+	inter, err := interpreter.NewInterpreter(
+		nil,
+		nil,
+		&interpreter.Config{
+			Storage: storage,
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return &readonlyStorageRuntime{
+		Interpreter:  inter,
+		Storage:      storage,
+		PayloadCount: payloadCount,
+	}, nil
 }

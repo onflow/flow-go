@@ -6,27 +6,30 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 	gethCommon "github.com/onflow/go-ethereum/common"
 	gethTypes "github.com/onflow/go-ethereum/core/types"
+	"go.opentelemetry.io/otel/attribute"
 
 	"github.com/onflow/flow-go/fvm/environment"
 	fvmErrors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/evm/debug"
+	"github.com/onflow/flow-go/fvm/evm/events"
 	"github.com/onflow/flow-go/fvm/evm/handler/coa"
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/trace"
 )
 
 // ContractHandler is responsible for triggering calls to emulator, metering,
 // event emission and updating the block
 type ContractHandler struct {
-	flowChainID        flow.ChainID
-	evmContractAddress flow.Address
-	flowTokenAddress   common.Address
-	blockStore         types.BlockStore
-	addressAllocator   types.AddressAllocator
-	backend            types.Backend
-	emulator           types.Emulator
-	precompiles        []types.Precompile
-	tracer             debug.EVMTracer
+	flowChainID          flow.ChainID
+	evmContractAddress   flow.Address
+	flowTokenAddress     common.Address
+	blockStore           types.BlockStore
+	addressAllocator     types.AddressAllocator
+	backend              types.Backend
+	emulator             types.Emulator
+	precompiledContracts []types.PrecompiledContract
+	tracer               debug.EVMTracer
 }
 
 func (h *ContractHandler) FlowTokenAddress() common.Address {
@@ -51,20 +54,22 @@ func NewContractHandler(
 	tracer debug.EVMTracer,
 ) *ContractHandler {
 	return &ContractHandler{
-		flowChainID:        flowChainID,
-		evmContractAddress: evmContractAddress,
-		flowTokenAddress:   flowTokenAddress,
-		blockStore:         blockStore,
-		addressAllocator:   addressAllocator,
-		backend:            backend,
-		emulator:           emulator,
-		tracer:             tracer,
-		precompiles:        preparePrecompiles(evmContractAddress, randomBeaconAddress, addressAllocator, backend),
+		flowChainID:          flowChainID,
+		evmContractAddress:   evmContractAddress,
+		flowTokenAddress:     flowTokenAddress,
+		blockStore:           blockStore,
+		addressAllocator:     addressAllocator,
+		backend:              backend,
+		emulator:             emulator,
+		tracer:               tracer,
+		precompiledContracts: preparePrecompiledContracts(evmContractAddress, randomBeaconAddress, addressAllocator, backend),
 	}
 }
 
 // DeployCOA deploys a cadence-owned-account and returns the address
 func (h *ContractHandler) DeployCOA(uuid uint64) types.Address {
+	defer h.backend.StartChildSpan(trace.FVMEVMDeployCOA).End()
+
 	res, err := h.deployCOA(uuid)
 	panicOnErrorOrInvalidOrFailedState(res, err)
 	return *res.DeployedContractAddress
@@ -80,19 +85,21 @@ func (h *ContractHandler) deployCOA(uuid uint64) (*types.Result, error) {
 
 	factory := h.addressAllocator.COAFactoryAddress()
 	factoryAccount := h.AccountByAddress(factory, false)
+	factoryNonce := factoryAccount.Nonce()
 	call := types.NewDeployCallWithTargetAddress(
 		factory,
 		target,
 		coa.ContractBytes,
 		uint64(gaslimit),
 		new(big.Int),
-		factoryAccount.Nonce(),
+		factoryNonce,
 	)
 
 	ctx, err := h.getBlockContext()
 	if err != nil {
 		return nil, err
 	}
+	h.backend.SetNumberOfDeployedCOAs(factoryNonce)
 	return h.executeAndHandleCall(ctx, call, nil, false)
 }
 
@@ -119,6 +126,8 @@ func (h *ContractHandler) RunOrPanic(rlpEncodedTx []byte, coinbase types.Address
 // Run tries to run an rlpencoded evm transaction and
 // collects the gas fees and pay it to the coinbase address provided.
 func (h *ContractHandler) Run(rlpEncodedTx []byte, coinbase types.Address) *types.ResultSummary {
+	defer h.backend.StartChildSpan(trace.FVMEVMRun).End()
+
 	res, err := h.run(rlpEncodedTx, coinbase)
 	panicOnError(err)
 	return res.ResultSummary()
@@ -129,6 +138,10 @@ func (h *ContractHandler) Run(rlpEncodedTx []byte, coinbase types.Address) *type
 // All transactions provided in the batch are included in a single block,
 // except for invalid transactions
 func (h *ContractHandler) BatchRun(rlpEncodedTxs [][]byte, coinbase types.Address) []*types.ResultSummary {
+	span := h.backend.StartChildSpan(trace.FVMEVMBatchRun)
+	span.SetAttributes(attribute.Int("tx_counts", len(rlpEncodedTxs)))
+	defer span.End()
+
 	res, err := h.batchRun(rlpEncodedTxs, coinbase)
 	panicOnError(err)
 
@@ -183,16 +196,10 @@ func (h *ContractHandler) batchRun(rlpEncodedTxs [][]byte, coinbase types.Addres
 		return nil, err
 	}
 
-	// saftey check for result
+	// safety check for result
 	if len(res) == 0 {
 		return nil, types.ErrUnexpectedEmptyResult
 	}
-
-	// Populate receipt root
-	bp.PopulateReceiptRoot(res)
-
-	// Populate total gas used
-	bp.CalculateGasUsage(res)
 
 	// meter all the transaction gas usage and append hashes to the block
 	for _, r := range res {
@@ -204,18 +211,13 @@ func (h *ContractHandler) batchRun(rlpEncodedTxs [][]byte, coinbase types.Addres
 
 		// include it in a block only if valid (not invalid)
 		if !r.Invalid() {
-			bp.AppendTxHash(r.TxHash)
+			bp.AppendTransaction(r)
 		}
 	}
 
-	blockHash, err := bp.Hash()
-	if err != nil {
-		return nil, err
-	}
-
 	// if there were no valid transactions skip emitting events
-	// and commiting a new block
-	if len(bp.TransactionHashes) == 0 {
+	// and update the block proposal
+	if len(bp.TxHashes) == 0 {
 		return res, nil
 	}
 
@@ -223,30 +225,66 @@ func (h *ContractHandler) batchRun(rlpEncodedTxs [][]byte, coinbase types.Addres
 		if r.Invalid() { // don't emit events for invalid tx
 			continue
 		}
-		err = h.emitEvent(types.NewTransactionEvent(
+		err = h.emitEvent(events.NewTransactionEvent(
 			r,
 			rlpEncodedTxs[i],
 			bp.Height,
-			blockHash,
 		))
 		if err != nil {
 			return nil, err
 		}
 
+		// step 4 - update metrics
+		h.backend.EVMTransactionExecuted(
+			r.GasConsumed,
+			false,
+			r.Failed(),
+		)
+
 		h.tracer.Collect(r.TxHash)
 	}
 
-	err = h.emitEvent(types.NewBlockEvent(bp))
-	if err != nil {
-		return nil, err
-	}
-
-	err = h.blockStore.CommitBlockProposal()
+	// update the block proposal
+	err = h.blockStore.UpdateBlockProposal(bp)
 	if err != nil {
 		return nil, err
 	}
 
 	return res, nil
+}
+
+// CommitBlockProposal commits the block proposal and add a new block to the EVM blockchain
+func (h *ContractHandler) CommitBlockProposal() {
+	panicOnError(h.commitBlockProposal())
+}
+
+func (h *ContractHandler) commitBlockProposal() error {
+	// load latest block proposal
+	bp, err := h.blockStore.BlockProposal()
+	if err != nil {
+		return err
+	}
+
+	// commit the proposal
+	err = h.blockStore.CommitBlockProposal(bp)
+	if err != nil {
+		return err
+	}
+
+	// emit block executed event
+	err = h.emitEvent(events.NewBlockEvent(&bp.Block))
+	if err != nil {
+		return err
+	}
+
+	// report metrics
+	h.backend.EVMBlockExecuted(
+		len(bp.TxHashes),
+		bp.TotalGasUsed,
+		types.UnsafeCastOfBalanceToFloat64(bp.TotalSupply),
+	)
+
+	return nil
 }
 
 func (h *ContractHandler) run(
@@ -280,7 +318,7 @@ func (h *ContractHandler) run(
 		return nil, err
 	}
 
-	// saftey check for result
+	// safety check for result
 	if res == nil {
 		return nil, types.ErrUnexpectedEmptyResult
 	}
@@ -296,44 +334,32 @@ func (h *ContractHandler) run(
 		return res, nil
 	}
 
-	// step 3 - update block proposal
+	// step 3 - update the block proposal
 	bp, err := h.blockStore.BlockProposal()
 	if err != nil {
 		return nil, err
 	}
-
-	bp.AppendTxHash(res.TxHash)
-
-	// Populate receipt root
-	bp.PopulateReceiptRoot([]*types.Result{res})
-
-	// Populate total gas used
-	bp.CalculateGasUsage([]*types.Result{res})
-
-	blockHash, err := bp.Hash()
+	bp.AppendTransaction(res)
+	err = h.blockStore.UpdateBlockProposal(bp)
 	if err != nil {
 		return nil, err
 	}
 
 	// step 4 - emit events
-	err = h.emitEvent(types.NewTransactionEvent(res, rlpEncodedTx, bp.Height, blockHash))
+	err = h.emitEvent(events.NewTransactionEvent(res, rlpEncodedTx, bp.Height))
 	if err != nil {
 		return nil, err
 	}
 
-	err = h.emitEvent(types.NewBlockEvent(bp))
-	if err != nil {
-		return nil, err
-	}
+	// step 4 - update metrics
+	h.backend.EVMTransactionExecuted(
+		res.GasConsumed,
+		false,
+		res.Failed(),
+	)
 
-	// step 5 - commit block proposal
-	err = h.blockStore.CommitBlockProposal()
-	if err != nil {
-		return nil, err
-	}
-
+	// step 6 - collect traces
 	h.tracer.Collect(res.TxHash)
-
 	return res, nil
 }
 
@@ -341,6 +367,8 @@ func (h *ContractHandler) DryRun(
 	rlpEncodedTx []byte,
 	from types.Address,
 ) *types.ResultSummary {
+	defer h.backend.StartChildSpan(trace.FVMEVMDryRun).End()
+
 	res, err := h.dryRun(rlpEncodedTx, from)
 	panicOnError(err)
 	return res.ResultSummary()
@@ -414,9 +442,8 @@ func (h *ContractHandler) meterGasUsage(res *types.Result) error {
 	return h.backend.MeterComputation(environment.ComputationKindEVMGasUsage, uint(res.GasConsumed))
 }
 
-func (h *ContractHandler) emitEvent(event *types.Event) error {
-	location := common.NewAddressLocation(nil, common.Address(h.evmContractAddress), "EVM")
-	ev, err := event.Payload.ToCadence(location)
+func (h *ContractHandler) emitEvent(event *events.Event) error {
+	ev, err := event.Payload.ToCadence(h.flowChainID)
 	if err != nil {
 		return err
 	}
@@ -444,9 +471,11 @@ func (h *ContractHandler) getBlockContext() (types.BlockContext, error) {
 			panicOnError(err) // we have to handle it here given we can't continue with it even in try case
 			return hash
 		},
-		ExtraPrecompiles: h.precompiles,
-		Random:           rand,
-		Tracer:           h.tracer.TxTracer(),
+		ExtraPrecompiledContracts: h.precompiledContracts,
+		Random:                    rand,
+		Tracer:                    h.tracer.TxTracer(),
+		TxCountSoFar:              uint(len(bp.TxHashes)),
+		TotalGasUsedSoFar:         bp.TotalGasUsed,
 	}, nil
 }
 
@@ -468,7 +497,7 @@ func (h *ContractHandler) executeAndHandleCall(
 		return nil, err
 	}
 
-	// saftey check for result
+	// safety check for result
 	if res == nil {
 		return nil, types.ErrUnexpectedEmptyResult
 	}
@@ -490,15 +519,10 @@ func (h *ContractHandler) executeAndHandleCall(
 		return nil, err
 	}
 
-	bp.AppendTxHash(res.TxHash)
+	// append transaction to the block proposal
+	bp.AppendTransaction(res)
 
-	// Populate receipt root
-	bp.PopulateReceiptRoot([]*types.Result{res})
-
-	// Populate total gas used
-	bp.CalculateGasUsage([]*types.Result{res})
-
-	if totalSupplyDiff != nil {
+	if res.Successful() && totalSupplyDiff != nil {
 		if deductSupplyDiff {
 			bp.TotalSupply = new(big.Int).Sub(bp.TotalSupply, totalSupplyDiff)
 			if bp.TotalSupply.Sign() < 0 {
@@ -509,7 +533,8 @@ func (h *ContractHandler) executeAndHandleCall(
 		}
 	}
 
-	blockHash, err := bp.Hash()
+	// update the block proposal
+	err = h.blockStore.UpdateBlockProposal(bp)
 	if err != nil {
 		return nil, err
 	}
@@ -521,25 +546,21 @@ func (h *ContractHandler) executeAndHandleCall(
 	}
 
 	err = h.emitEvent(
-		types.NewTransactionEvent(res, encoded, bp.Height, blockHash),
+		events.NewTransactionEvent(res, encoded, bp.Height),
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	err = h.emitEvent(types.NewBlockEvent(bp))
-	if err != nil {
-		return nil, err
-	}
+	// metric
+	h.backend.EVMTransactionExecuted(
+		res.GasConsumed,
+		true,
+		res.Failed(),
+	)
 
-	// commit block proposal
-	err = h.blockStore.CommitBlockProposal()
-	if err != nil {
-		return nil, err
-	}
-
+	// collect traces
 	h.tracer.Collect(res.TxHash)
-
 	return res, nil
 }
 
@@ -667,6 +688,8 @@ func (a *Account) codeHash() ([]byte, error) {
 // Deposit deposits the token from the given vault into the flow evm main vault
 // and update the account balance with the new amount
 func (a *Account) Deposit(v *types.FLOWTokenVault) {
+	defer a.fch.backend.StartChildSpan(trace.FVMEVMDeposit).End()
+
 	res, err := a.deposit(v)
 	panicOnErrorOrInvalidOrFailedState(res, err)
 }
@@ -692,6 +715,8 @@ func (a *Account) deposit(v *types.FLOWTokenVault) (*types.Result, error) {
 // Withdraw deducts the balance from the account and
 // withdraw and return flow token from the Flex main vault.
 func (a *Account) Withdraw(b types.Balance) *types.FLOWTokenVault {
+	defer a.fch.backend.StartChildSpan(trace.FVMEVMWithdraw).End()
+
 	res, err := a.withdraw(b)
 	panicOnErrorOrInvalidOrFailedState(res, err)
 
@@ -745,6 +770,8 @@ func (a *Account) transfer(to types.Address, balance types.Balance) (*types.Resu
 // contained in the result summary as data and
 // the contract data is not controlled by the caller accounts
 func (a *Account) Deploy(code types.Code, gaslimit types.GasLimit, balance types.Balance) *types.ResultSummary {
+	defer a.fch.backend.StartChildSpan(trace.FVMEVMDeploy).End()
+
 	res, err := a.deploy(code, gaslimit, balance)
 	panicOnError(err)
 	return res.ResultSummary()
@@ -771,6 +798,8 @@ func (a *Account) deploy(code types.Code, gaslimit types.GasLimit, balance types
 // given it doesn't goes beyond what Flow transaction allows.
 // the balance would be deducted from the OFA account and would be transferred to the target address
 func (a *Account) Call(to types.Address, data types.Data, gaslimit types.GasLimit, balance types.Balance) *types.ResultSummary {
+	defer a.fch.backend.StartChildSpan(trace.FVMEVMCall).End()
+
 	res, err := a.call(to, data, gaslimit, balance)
 	panicOnError(err)
 	return res.ResultSummary()
@@ -793,10 +822,10 @@ func (a *Account) call(to types.Address, data types.Data, gaslimit types.GasLimi
 	return a.fch.executeAndHandleCall(ctx, call, nil, false)
 }
 
-func (a *Account) precheck(authroized bool, gaslimit types.GasLimit) (types.BlockContext, error) {
+func (a *Account) precheck(authorized bool, gaslimit types.GasLimit) (types.BlockContext, error) {
 	// check if account is authorized (i.e. is a COA)
-	if authroized && !a.isAuthorized {
-		return types.BlockContext{}, types.ErrUnAuthroizedMethodCall
+	if authorized && !a.isAuthorized {
+		return types.BlockContext{}, types.ErrUnauthorizedMethodCall
 	}
 	err := a.fch.checkGasLimit(gaslimit)
 	if err != nil {

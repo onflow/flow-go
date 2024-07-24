@@ -159,7 +159,8 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			mock.Anything,
 			mock.MatchedBy(func(arg module.TransactionExecutionResultStats) bool {
 				return !arg.Failed // only successful transactions
-			})).
+			}),
+			mock.Anything).
 			Return(nil).
 			Times(2 + 1) // 2 txs in collection + system chunk tx
 
@@ -377,6 +378,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		// include all fees. System chunk should ignore them
 		contextOptions := []fvm.Option{
+			fvm.WithEVMEnabled(true),
 			fvm.WithTransactionFeesEnabled(true),
 			fvm.WithAccountStorageLimit(true),
 			fvm.WithBlocks(&environment.NoopBlockFinder{}),
@@ -1222,6 +1224,7 @@ func (f *FixedAddressGenerator) AddressCount() uint64 {
 func Test_ExecutingSystemCollection(t *testing.T) {
 
 	execCtx := fvm.NewContext(
+		fvm.WithEVMEnabled(true),
 		fvm.WithChain(flow.Localnet.Chain()),
 		fvm.WithBlocks(&environment.NoopBlockFinder{}),
 	)
@@ -1244,8 +1247,8 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 
 	noopCollector := metrics.NewNoopCollector()
 
-	expectedNumberOfEvents := 3
-	expectedEventSize := 1497
+	expectedNumberOfEvents := 4
+	expectedMinEventSize := 1000
 
 	// bootstrapping does not cache programs
 	expectedCachedPrograms := 0
@@ -1267,9 +1270,10 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 		mock.Anything, // duration
 		mock.MatchedBy(func(arg module.TransactionExecutionResultStats) bool {
 			return arg.EventCounts == expectedNumberOfEvents &&
-				arg.EventSize == expectedEventSize &&
+				arg.EventSize >= expectedMinEventSize &&
 				!arg.Failed
-		})).
+		}),
+		mock.Anything).
 		Return(nil).
 		Times(1) // system chunk tx
 

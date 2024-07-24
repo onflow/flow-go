@@ -45,22 +45,22 @@ type Environment struct {
 }
 
 // AccountKeysCount provides a mock function with given fields: address
-func (_m *Environment) AccountKeysCount(address common.Address) (uint64, error) {
+func (_m *Environment) AccountKeysCount(address common.Address) (uint32, error) {
 	ret := _m.Called(address)
 
 	if len(ret) == 0 {
 		panic("no return value specified for AccountKeysCount")
 	}
 
-	var r0 uint64
+	var r0 uint32
 	var r1 error
-	if rf, ok := ret.Get(0).(func(common.Address) (uint64, error)); ok {
+	if rf, ok := ret.Get(0).(func(common.Address) (uint32, error)); ok {
 		return rf(address)
 	}
-	if rf, ok := ret.Get(0).(func(common.Address) uint64); ok {
+	if rf, ok := ret.Get(0).(func(common.Address) uint32); ok {
 		r0 = rf(address)
 	} else {
-		r0 = ret.Get(0).(uint64)
+		r0 = ret.Get(0).(uint32)
 	}
 
 	if rf, ok := ret.Get(1).(func(common.Address) error); ok {
@@ -476,6 +476,16 @@ func (_m *Environment) DeductTransactionFees(payer flow.Address, inclusionEffort
 	return r0, r1
 }
 
+// EVMBlockExecuted provides a mock function with given fields: txCount, totalGasUsed, totalSupplyInFlow
+func (_m *Environment) EVMBlockExecuted(txCount int, totalGasUsed uint64, totalSupplyInFlow float64) {
+	_m.Called(txCount, totalGasUsed, totalSupplyInFlow)
+}
+
+// EVMTransactionExecuted provides a mock function with given fields: gasUsed, isDirectCall, failed
+func (_m *Environment) EVMTransactionExecuted(gasUsed uint64, isDirectCall bool, failed bool) {
+	_m.Called(gasUsed, isDirectCall, failed)
+}
+
 // EmitEvent provides a mock function with given fields: _a0
 func (_m *Environment) EmitEvent(_a0 cadence.Event) error {
 	ret := _m.Called(_a0)
@@ -745,7 +755,7 @@ func (_m *Environment) GetAccountContractNames(address common.Address) ([]string
 }
 
 // GetAccountKey provides a mock function with given fields: address, index
-func (_m *Environment) GetAccountKey(address common.Address, index int) (*stdlib.AccountKey, error) {
+func (_m *Environment) GetAccountKey(address common.Address, index uint32) (*stdlib.AccountKey, error) {
 	ret := _m.Called(address, index)
 
 	if len(ret) == 0 {
@@ -754,10 +764,10 @@ func (_m *Environment) GetAccountKey(address common.Address, index int) (*stdlib
 
 	var r0 *stdlib.AccountKey
 	var r1 error
-	if rf, ok := ret.Get(0).(func(common.Address, int) (*stdlib.AccountKey, error)); ok {
+	if rf, ok := ret.Get(0).(func(common.Address, uint32) (*stdlib.AccountKey, error)); ok {
 		return rf(address, index)
 	}
-	if rf, ok := ret.Get(0).(func(common.Address, int) *stdlib.AccountKey); ok {
+	if rf, ok := ret.Get(0).(func(common.Address, uint32) *stdlib.AccountKey); ok {
 		r0 = rf(address, index)
 	} else {
 		if ret.Get(0) != nil {
@@ -765,8 +775,38 @@ func (_m *Environment) GetAccountKey(address common.Address, index int) (*stdlib
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(common.Address, int) error); ok {
+	if rf, ok := ret.Get(1).(func(common.Address, uint32) error); ok {
 		r1 = rf(address, index)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetAccountKeys provides a mock function with given fields: address
+func (_m *Environment) GetAccountKeys(address flow.Address) ([]flow.AccountPublicKey, error) {
+	ret := _m.Called(address)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetAccountKeys")
+	}
+
+	var r0 []flow.AccountPublicKey
+	var r1 error
+	if rf, ok := ret.Get(0).(func(flow.Address) ([]flow.AccountPublicKey, error)); ok {
+		return rf(address)
+	}
+	if rf, ok := ret.Get(0).(func(flow.Address) []flow.AccountPublicKey); ok {
+		r0 = rf(address)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]flow.AccountPublicKey)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(flow.Address) error); ok {
+		r1 = rf(address)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -1430,7 +1470,7 @@ func (_m *Environment) ReturnCadenceRuntime(_a0 *runtime.ReusableCadenceRuntime)
 }
 
 // RevokeAccountKey provides a mock function with given fields: address, index
-func (_m *Environment) RevokeAccountKey(address common.Address, index int) (*stdlib.AccountKey, error) {
+func (_m *Environment) RevokeAccountKey(address common.Address, index uint32) (*stdlib.AccountKey, error) {
 	ret := _m.Called(address, index)
 
 	if len(ret) == 0 {
@@ -1439,10 +1479,10 @@ func (_m *Environment) RevokeAccountKey(address common.Address, index int) (*std
 
 	var r0 *stdlib.AccountKey
 	var r1 error
-	if rf, ok := ret.Get(0).(func(common.Address, int) (*stdlib.AccountKey, error)); ok {
+	if rf, ok := ret.Get(0).(func(common.Address, uint32) (*stdlib.AccountKey, error)); ok {
 		return rf(address, index)
 	}
-	if rf, ok := ret.Get(0).(func(common.Address, int) *stdlib.AccountKey); ok {
+	if rf, ok := ret.Get(0).(func(common.Address, uint32) *stdlib.AccountKey); ok {
 		r0 = rf(address, index)
 	} else {
 		if ret.Get(0) != nil {
@@ -1450,13 +1490,43 @@ func (_m *Environment) RevokeAccountKey(address common.Address, index int) (*std
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(common.Address, int) error); ok {
+	if rf, ok := ret.Get(1).(func(common.Address, uint32) error); ok {
 		r1 = rf(address, index)
 	} else {
 		r1 = ret.Error(1)
 	}
 
 	return r0, r1
+}
+
+// RuntimeSetNumberOfAccounts provides a mock function with given fields: count
+func (_m *Environment) RuntimeSetNumberOfAccounts(count uint64) {
+	_m.Called(count)
+}
+
+// RuntimeTransactionChecked provides a mock function with given fields: _a0
+func (_m *Environment) RuntimeTransactionChecked(_a0 time.Duration) {
+	_m.Called(_a0)
+}
+
+// RuntimeTransactionInterpreted provides a mock function with given fields: _a0
+func (_m *Environment) RuntimeTransactionInterpreted(_a0 time.Duration) {
+	_m.Called(_a0)
+}
+
+// RuntimeTransactionParsed provides a mock function with given fields: _a0
+func (_m *Environment) RuntimeTransactionParsed(_a0 time.Duration) {
+	_m.Called(_a0)
+}
+
+// RuntimeTransactionProgramsCacheHit provides a mock function with given fields:
+func (_m *Environment) RuntimeTransactionProgramsCacheHit() {
+	_m.Called()
+}
+
+// RuntimeTransactionProgramsCacheMiss provides a mock function with given fields:
+func (_m *Environment) RuntimeTransactionProgramsCacheMiss() {
+	_m.Called()
 }
 
 // ServiceEvents provides a mock function with given fields:
@@ -1482,6 +1552,11 @@ func (_m *Environment) ServiceEvents() flow.EventsList {
 // SetInterpreterSharedState provides a mock function with given fields: state
 func (_m *Environment) SetInterpreterSharedState(state *interpreter.SharedState) {
 	_m.Called(state)
+}
+
+// SetNumberOfDeployedCOAs provides a mock function with given fields: count
+func (_m *Environment) SetNumberOfDeployedCOAs(count uint64) {
+	_m.Called(count)
 }
 
 // SetValue provides a mock function with given fields: owner, key, value

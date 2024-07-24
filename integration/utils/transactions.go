@@ -162,7 +162,7 @@ func MakeCreateAndSetupNodeTx(
 func MakeAdminRemoveNodeTx(
 	env templates.Environment,
 	adminAccount *sdk.Account,
-	adminAccountKeyID int,
+	adminAccountKeyID uint32,
 	latestBlockID sdk.Identifier,
 	nodeID flow.Identifier,
 ) (*sdk.Transaction, error) {
@@ -189,7 +189,7 @@ func MakeAdminRemoveNodeTx(
 func MakeSetProtocolStateVersionTx(
 	env templates.Environment,
 	adminAccount *sdk.Account,
-	adminAccountKeyID int,
+	adminAccountKeyID uint32,
 	latestBlockID sdk.Identifier,
 	newProtocolVersion uint64,
 	activeViewDiff uint64,

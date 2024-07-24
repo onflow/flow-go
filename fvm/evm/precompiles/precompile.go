@@ -24,11 +24,11 @@ type Function interface {
 	Run(input []byte) ([]byte, error)
 }
 
-// MultiFunctionPrecompileContract constructs a multi-function precompile smart contract
-func MultiFunctionPrecompileContract(
+// MultiFunctionPrecompiledContract constructs a multi-function precompile smart contract
+func MultiFunctionPrecompiledContract(
 	address types.Address,
 	functions []Function,
-) types.Precompile {
+) types.PrecompiledContract {
 	pc := &precompile{
 		functions: make(map[FunctionSelector]Function),
 		address:   address,
@@ -49,7 +49,7 @@ func (p *precompile) Address() types.Address {
 }
 
 // RequiredGas calculates the contract gas use
-func (p *precompile) RequiredGas(input []byte) uint64 {
+func (p *precompile) RequiredGas(input []byte) (output uint64) {
 	if len(input) < FunctionSelectorLength {
 		return InvalidMethodCallGasUsage
 	}
@@ -62,7 +62,7 @@ func (p *precompile) RequiredGas(input []byte) uint64 {
 }
 
 // Run runs the precompiled contract
-func (p *precompile) Run(input []byte) ([]byte, error) {
+func (p *precompile) Run(input []byte) (output []byte, err error) {
 	if len(input) < FunctionSelectorLength {
 		return nil, ErrInvalidMethodCall
 	}

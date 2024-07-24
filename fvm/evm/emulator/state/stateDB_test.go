@@ -2,11 +2,12 @@ package state_test
 
 import (
 	"fmt"
-	"math/big"
 	"testing"
 
+	"github.com/holiman/uint256"
 	"github.com/onflow/atree"
 	gethCommon "github.com/onflow/go-ethereum/common"
+	"github.com/onflow/go-ethereum/core/tracing"
 	gethTypes "github.com/onflow/go-ethereum/core/types"
 	gethParams "github.com/onflow/go-ethereum/params"
 	"github.com/stretchr/testify/require"
@@ -38,10 +39,26 @@ func TestStateDB(t *testing.T) {
 		require.True(t, db.Empty(addr1))
 		require.NoError(t, db.Error())
 
-		db.AddBalance(addr1, big.NewInt(10))
+		db.AddBalance(addr1, uint256.NewInt(10), tracing.BalanceChangeUnspecified)
 		require.NoError(t, db.Error())
 
 		require.False(t, db.Empty(addr1))
+	})
+
+	t.Run("test create contract method", func(t *testing.T) {
+		ledger := testutils.GetSimpleValueStore()
+		db, err := state.NewStateDB(ledger, rootAddr)
+		require.NoError(t, err)
+
+		addr1 := testutils.RandomCommonAddress(t)
+		require.False(t, db.IsNewContract(addr1))
+		require.NoError(t, db.Error())
+
+		db.CreateContract(addr1)
+		require.NoError(t, db.Error())
+
+		require.True(t, db.IsNewContract(addr1))
+		require.NoError(t, db.Error())
 	})
 
 	t.Run("test commit functionality", func(t *testing.T) {
@@ -56,7 +73,7 @@ func TestStateDB(t *testing.T) {
 		db.CreateAccount(addr1)
 		require.NoError(t, db.Error())
 
-		db.AddBalance(addr1, big.NewInt(5))
+		db.AddBalance(addr1, uint256.NewInt(5), tracing.BalanceChangeUnspecified)
 		require.NoError(t, db.Error())
 
 		// should have code to be able to set state
@@ -83,7 +100,7 @@ func TestStateDB(t *testing.T) {
 
 		bal := db.GetBalance(addr1)
 		require.NoError(t, db.Error())
-		require.Equal(t, big.NewInt(5), bal)
+		require.Equal(t, uint256.NewInt(5), bal)
 
 		val := db.GetState(addr1, key1)
 		require.NoError(t, db.Error())
@@ -108,22 +125,22 @@ func TestStateDB(t *testing.T) {
 		require.True(t, db.Exist(addr1))
 		require.NoError(t, db.Error())
 
-		db.AddBalance(addr1, big.NewInt(5))
+		db.AddBalance(addr1, uint256.NewInt(5), tracing.BalanceChangeUnspecified)
 		require.NoError(t, db.Error())
 
 		bal := db.GetBalance(addr1)
 		require.NoError(t, db.Error())
-		require.Equal(t, big.NewInt(5), bal)
+		require.Equal(t, uint256.NewInt(5), bal)
 
 		snapshot2 := db.Snapshot()
 		require.Equal(t, 2, snapshot2)
 
-		db.AddBalance(addr1, big.NewInt(5))
+		db.AddBalance(addr1, uint256.NewInt(5), tracing.BalanceChangeUnspecified)
 		require.NoError(t, db.Error())
 
 		bal = db.GetBalance(addr1)
 		require.NoError(t, db.Error())
-		require.Equal(t, big.NewInt(10), bal)
+		require.Equal(t, uint256.NewInt(10), bal)
 
 		// revert to snapshot 2
 		db.RevertToSnapshot(snapshot2)
@@ -131,7 +148,7 @@ func TestStateDB(t *testing.T) {
 
 		bal = db.GetBalance(addr1)
 		require.NoError(t, db.Error())
-		require.Equal(t, big.NewInt(5), bal)
+		require.Equal(t, uint256.NewInt(5), bal)
 
 		// revert to snapshot 1
 		db.RevertToSnapshot(snapshot1)
@@ -139,7 +156,7 @@ func TestStateDB(t *testing.T) {
 
 		bal = db.GetBalance(addr1)
 		require.NoError(t, db.Error())
-		require.Equal(t, big.NewInt(0), bal)
+		require.Equal(t, uint256.NewInt(0), bal)
 
 		// revert to an invalid snapshot
 		db.RevertToSnapshot(10)
@@ -287,4 +304,43 @@ func TestStateDB(t *testing.T) {
 		require.True(t, types.IsAFatalError(err))
 	})
 
+	t.Run("test storage root functionality", func(t *testing.T) {
+		ledger := testutils.GetSimpleValueStore()
+		db, err := state.NewStateDB(ledger, rootAddr)
+		require.NoError(t, err)
+
+		addr1 := testutils.RandomCommonAddress(t)
+
+		// non existing account
+		require.False(t, db.Exist(addr1))
+		require.NoError(t, db.Error())
+		root := db.GetStorageRoot(addr1)
+		require.NoError(t, db.Error())
+		require.Equal(t, gethCommon.Hash{}, root)
+
+		// accounts without slots
+		db.CreateAccount(addr1)
+		require.NoError(t, db.Error())
+		err = db.Commit(true)
+		require.NoError(t, err)
+
+		root = db.GetStorageRoot(addr1)
+		require.NoError(t, db.Error())
+		require.Equal(t, gethTypes.EmptyRootHash, root)
+
+		// add slots to the account
+		key := testutils.RandomCommonHash(t)
+		value := testutils.RandomCommonHash(t)
+		db.SetCode(addr1, []byte("somecode"))
+		require.NoError(t, db.Error())
+		db.SetState(addr1, key, value)
+		require.NoError(t, db.Error())
+		err = db.Commit(true)
+		require.NoError(t, err)
+
+		root = db.GetStorageRoot(addr1)
+		require.NoError(t, db.Error())
+		require.NotEqual(t, gethCommon.Hash{}, root)
+		require.NotEqual(t, gethTypes.EmptyRootHash, root)
+	})
 }

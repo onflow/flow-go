@@ -274,7 +274,7 @@ func (_m *Accounts) GetContractNames(address flow.Address) ([]string, error) {
 }
 
 // GetPublicKey provides a mock function with given fields: address, keyIndex
-func (_m *Accounts) GetPublicKey(address flow.Address, keyIndex uint64) (flow.AccountPublicKey, error) {
+func (_m *Accounts) GetPublicKey(address flow.Address, keyIndex uint32) (flow.AccountPublicKey, error) {
 	ret := _m.Called(address, keyIndex)
 
 	if len(ret) == 0 {
@@ -283,16 +283,16 @@ func (_m *Accounts) GetPublicKey(address flow.Address, keyIndex uint64) (flow.Ac
 
 	var r0 flow.AccountPublicKey
 	var r1 error
-	if rf, ok := ret.Get(0).(func(flow.Address, uint64) (flow.AccountPublicKey, error)); ok {
+	if rf, ok := ret.Get(0).(func(flow.Address, uint32) (flow.AccountPublicKey, error)); ok {
 		return rf(address, keyIndex)
 	}
-	if rf, ok := ret.Get(0).(func(flow.Address, uint64) flow.AccountPublicKey); ok {
+	if rf, ok := ret.Get(0).(func(flow.Address, uint32) flow.AccountPublicKey); ok {
 		r0 = rf(address, keyIndex)
 	} else {
 		r0 = ret.Get(0).(flow.AccountPublicKey)
 	}
 
-	if rf, ok := ret.Get(1).(func(flow.Address, uint64) error); ok {
+	if rf, ok := ret.Get(1).(func(flow.Address, uint32) error); ok {
 		r1 = rf(address, keyIndex)
 	} else {
 		r1 = ret.Error(1)
@@ -302,22 +302,52 @@ func (_m *Accounts) GetPublicKey(address flow.Address, keyIndex uint64) (flow.Ac
 }
 
 // GetPublicKeyCount provides a mock function with given fields: address
-func (_m *Accounts) GetPublicKeyCount(address flow.Address) (uint64, error) {
+func (_m *Accounts) GetPublicKeyCount(address flow.Address) (uint32, error) {
 	ret := _m.Called(address)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetPublicKeyCount")
 	}
 
-	var r0 uint64
+	var r0 uint32
 	var r1 error
-	if rf, ok := ret.Get(0).(func(flow.Address) (uint64, error)); ok {
+	if rf, ok := ret.Get(0).(func(flow.Address) (uint32, error)); ok {
 		return rf(address)
 	}
-	if rf, ok := ret.Get(0).(func(flow.Address) uint64); ok {
+	if rf, ok := ret.Get(0).(func(flow.Address) uint32); ok {
 		r0 = rf(address)
 	} else {
-		r0 = ret.Get(0).(uint64)
+		r0 = ret.Get(0).(uint32)
+	}
+
+	if rf, ok := ret.Get(1).(func(flow.Address) error); ok {
+		r1 = rf(address)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetPublicKeys provides a mock function with given fields: address
+func (_m *Accounts) GetPublicKeys(address flow.Address) ([]flow.AccountPublicKey, error) {
+	ret := _m.Called(address)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetPublicKeys")
+	}
+
+	var r0 []flow.AccountPublicKey
+	var r1 error
+	if rf, ok := ret.Get(0).(func(flow.Address) ([]flow.AccountPublicKey, error)); ok {
+		return rf(address)
+	}
+	if rf, ok := ret.Get(0).(func(flow.Address) []flow.AccountPublicKey); ok {
+		r0 = rf(address)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]flow.AccountPublicKey)
+		}
 	}
 
 	if rf, ok := ret.Get(1).(func(flow.Address) error); ok {
@@ -406,7 +436,7 @@ func (_m *Accounts) SetContract(contractName string, address flow.Address, contr
 }
 
 // SetPublicKey provides a mock function with given fields: address, keyIndex, publicKey
-func (_m *Accounts) SetPublicKey(address flow.Address, keyIndex uint64, publicKey flow.AccountPublicKey) ([]byte, error) {
+func (_m *Accounts) SetPublicKey(address flow.Address, keyIndex uint32, publicKey flow.AccountPublicKey) ([]byte, error) {
 	ret := _m.Called(address, keyIndex, publicKey)
 
 	if len(ret) == 0 {
@@ -415,10 +445,10 @@ func (_m *Accounts) SetPublicKey(address flow.Address, keyIndex uint64, publicKe
 
 	var r0 []byte
 	var r1 error
-	if rf, ok := ret.Get(0).(func(flow.Address, uint64, flow.AccountPublicKey) ([]byte, error)); ok {
+	if rf, ok := ret.Get(0).(func(flow.Address, uint32, flow.AccountPublicKey) ([]byte, error)); ok {
 		return rf(address, keyIndex, publicKey)
 	}
-	if rf, ok := ret.Get(0).(func(flow.Address, uint64, flow.AccountPublicKey) []byte); ok {
+	if rf, ok := ret.Get(0).(func(flow.Address, uint32, flow.AccountPublicKey) []byte); ok {
 		r0 = rf(address, keyIndex, publicKey)
 	} else {
 		if ret.Get(0) != nil {
@@ -426,7 +456,7 @@ func (_m *Accounts) SetPublicKey(address flow.Address, keyIndex uint64, publicKe
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(flow.Address, uint64, flow.AccountPublicKey) error); ok {
+	if rf, ok := ret.Get(1).(func(flow.Address, uint32, flow.AccountPublicKey) error); ok {
 		r1 = rf(address, keyIndex, publicKey)
 	} else {
 		r1 = ret.Error(1)

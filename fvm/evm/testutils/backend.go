@@ -7,10 +7,11 @@ import (
 	"testing"
 
 	"github.com/onflow/cadence/runtime/stdlib"
+	otelTrace "go.opentelemetry.io/otel/trace"
 
 	"github.com/onflow/atree"
 	"github.com/onflow/cadence"
-	jsoncdc "github.com/onflow/cadence/encoding/json"
+	"github.com/onflow/cadence/encoding/ccf"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/stretchr/testify/require"
@@ -19,10 +20,12 @@ import (
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/fvm/meter"
+	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/trace"
 )
 
-var TestFlowEVMRootAddress = flow.BytesToAddress([]byte("FlowEVM"))
+var TestFlowEVMRootAddress = flow.Address{1, 2, 3, 4}
 var TestComputationLimit = uint(100_000_000)
 
 func RunWithTestFlowEVMRootAddress(t testing.TB, backend atree.Ledger, f func(flow.Address)) {
@@ -40,6 +43,8 @@ func RunWithTestBackend(t testing.TB, f func(*TestBackend)) {
 		TestBlockInfo:               getSimpleBlockStore(),
 		TestRandomGenerator:         getSimpleRandomGenerator(),
 		TestContractFunctionInvoker: &TestContractFunctionInvoker{},
+		TestTracer:                  &TestTracer{},
+		TestMetricsReporter:         &TestMetricsReporter{},
 	}
 	f(tb)
 }
@@ -123,12 +128,15 @@ func getSimpleEventEmitter() *testEventEmitter {
 	events := make(flow.EventsList, 0)
 	return &testEventEmitter{
 		emitEvent: func(event cadence.Event) error {
-			payload, err := jsoncdc.Encode(event)
+			payload, err := ccf.Encode(event)
 			if err != nil {
 				return err
 			}
-
-			events = append(events, flow.Event{Type: flow.EventType(event.EventType.QualifiedIdentifier), Payload: payload})
+			eventType := flow.EventType(event.EventType.ID())
+			events = append(events, flow.Event{
+				Type:    eventType,
+				Payload: payload,
+			})
 			return nil
 		},
 		events: func() flow.EventsList {
@@ -185,6 +193,8 @@ type TestBackend struct {
 	*TestRandomGenerator
 	*TestContractFunctionInvoker
 	*testUUIDGenerator
+	*TestTracer
+	*TestMetricsReporter
 }
 
 var _ types.Backend = &TestBackend{}
@@ -496,4 +506,58 @@ func (t *testUUIDGenerator) GenerateUUID() (uint64, error) {
 		panic("generateUUID method is not set")
 	}
 	return t.generateUUID()
+}
+
+type TestTracer struct {
+	StartChildSpanFunc func(trace.SpanName, ...otelTrace.SpanStartOption) tracing.TracerSpan
+}
+
+var _ environment.Tracer = &TestTracer{}
+
+func (tt *TestTracer) StartChildSpan(
+	name trace.SpanName,
+	options ...otelTrace.SpanStartOption,
+) tracing.TracerSpan {
+	// if not set we use noop tracer
+	if tt.StartChildSpanFunc == nil {
+		return tracing.NewMockTracerSpan()
+	}
+	return tt.StartChildSpanFunc(name, options...)
+}
+
+func (tt *TestTracer) ExpectedSpan(t *testing.T, expected trace.SpanName) {
+	tt.StartChildSpanFunc = func(
+		sn trace.SpanName,
+		sso ...otelTrace.SpanStartOption,
+	) tracing.TracerSpan {
+		require.Equal(t, expected, sn)
+		return tracing.NewMockTracerSpan()
+	}
+}
+
+type TestMetricsReporter struct {
+	SetNumberOfDeployedCOAsFunc func(uint64)
+	EVMTransactionExecutedFunc  func(uint64, bool, bool)
+	EVMBlockExecutedFunc        func(int, uint64, float64)
+}
+
+var _ environment.EVMMetricsReporter = &TestMetricsReporter{}
+
+func (tmr *TestMetricsReporter) SetNumberOfDeployedCOAs(count uint64) {
+	// call the method if available otherwise skip
+	if tmr.SetNumberOfDeployedCOAsFunc != nil {
+		tmr.SetNumberOfDeployedCOAsFunc(count)
+	}
+}
+func (tmr *TestMetricsReporter) EVMTransactionExecuted(gasUsed uint64, isDirectCall bool, failed bool) {
+	// call the method if available otherwise skip
+	if tmr.EVMTransactionExecutedFunc != nil {
+		tmr.EVMTransactionExecutedFunc(gasUsed, isDirectCall, failed)
+	}
+}
+func (tmr *TestMetricsReporter) EVMBlockExecuted(txCount int, totalGasUsed uint64, totalSupplyInFlow float64) {
+	// call the method if available otherwise skip
+	if tmr.EVMBlockExecutedFunc != nil {
+		tmr.EVMBlockExecutedFunc(txCount, totalGasUsed, totalSupplyInFlow)
+	}
 }

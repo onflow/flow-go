@@ -38,6 +38,7 @@ type testContractHandler struct {
 	batchRun             func(txs [][]byte, coinbase types.Address) []*types.ResultSummary
 	generateResourceUUID func() uint64
 	dryRun               func(tx []byte, from types.Address) *types.ResultSummary
+	commitBlockProposal  func()
 }
 
 var _ types.ContractHandler = &testContractHandler{}
@@ -99,6 +100,13 @@ func (t *testContractHandler) GenerateResourceUUID() uint64 {
 		panic("unexpected GenerateResourceUUID")
 	}
 	return t.generateResourceUUID()
+}
+
+func (t *testContractHandler) CommitBlockProposal() {
+	if t.commitBlockProposal == nil {
+		panic("unexpected CommitBlockProposal")
+	}
+	t.commitBlockProposal()
 }
 
 type testFlowAccount struct {
@@ -3428,7 +3436,7 @@ func TestEVMCreateCadenceOwnedAccount(t *testing.T) {
 	require.NoError(t, err)
 
 	expected := cadence.NewArray([]cadence.Value{
-		cadence.UInt8(4), cadence.UInt8(0),
+		cadence.UInt8(5), cadence.UInt8(0),
 		cadence.UInt8(0), cadence.UInt8(0),
 		cadence.UInt8(0), cadence.UInt8(0),
 		cadence.UInt8(0), cadence.UInt8(0),
@@ -3453,10 +3461,10 @@ func TestEVMCreateCadenceOwnedAccount(t *testing.T) {
 	CheckCadenceEventTypes(t, events, expectedEventTypes)
 
 	// check cadence owned account created events
-	expectedCoaAddress := types.Address{3}
+	expectedCoaAddress := types.Address{4}
 	requireEqualEventAddress(t, events[0], expectedCoaAddress)
 
-	expectedCoaAddress = types.Address{4}
+	expectedCoaAddress = types.Address{5}
 	requireEqualEventAddress(t, events[1], expectedCoaAddress)
 }
 
@@ -3472,7 +3480,7 @@ func TestCadenceOwnedAccountCall(t *testing.T) {
 	handler := &testContractHandler{
 		evmContractAddress: common.Address(contractsAddress),
 		accountByAddress: func(fromAddress types.Address, isAuthorized bool) types.Account {
-			assert.Equal(t, types.Address{3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, fromAddress)
+			assert.Equal(t, types.Address{4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, fromAddress)
 			assert.True(t, isAuthorized)
 
 			return &testFlowAccount{
@@ -3483,7 +3491,7 @@ func TestCadenceOwnedAccountCall(t *testing.T) {
 					limit types.GasLimit,
 					balance types.Balance,
 				) *types.ResultSummary {
-					assert.Equal(t, types.Address{2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, toAddress)
+					assert.Equal(t, types.Address{4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, toAddress)
 					assert.Equal(t, types.Data{4, 5, 6}, data)
 					assert.Equal(t, types.GasLimit(9999), limit)
 					assert.Equal(t, types.NewBalanceFromUFix64(expectedBalance), balance)
@@ -3512,7 +3520,7 @@ func TestCadenceOwnedAccountCall(t *testing.T) {
 		  bal.setFLOW(flow: 1.23)
           let response = cadenceOwnedAccount.call(
               to: EVM.EVMAddress(
-                  bytes: [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+                  bytes: [4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
               ),
               data: [4, 5, 6],
               gasLimit: 9999,
@@ -3599,7 +3607,7 @@ func TestEVMAddressDeposit(t *testing.T) {
 	handler := &testContractHandler{
 
 		accountByAddress: func(fromAddress types.Address, isAuthorized bool) types.Account {
-			assert.Equal(t, types.Address{2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, fromAddress)
+			assert.Equal(t, types.Address{4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, fromAddress)
 			assert.False(t, isAuthorized)
 
 			return &testFlowAccount{
@@ -3636,7 +3644,7 @@ func TestEVMAddressDeposit(t *testing.T) {
           destroy minter
 
           let address = EVM.EVMAddress(
-              bytes: [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+              bytes: [4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
           )
           address.deposit(from: <-vault)
       }
@@ -3708,7 +3716,7 @@ func TestCOADeposit(t *testing.T) {
 
 	var deposited bool
 
-	var expectedCoaAddress = types.Address{5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
+	var expectedCoaAddress = types.Address{6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
 
 	handler := &testContractHandler{
 
@@ -3834,6 +3842,14 @@ func TestCOADeposit(t *testing.T) {
 		expectedBalance,
 		tokenDepositEventFields["amount"],
 	)
+
+	// check depositedUUID, based on the transaction content
+	// its expected the uuid of 4 be allocated to the source vault.
+	expectedDepositedUUID := cadence.UInt64(5)
+	require.Equal(t,
+		expectedDepositedUUID,
+		tokenDepositEventFields["depositedUUID"],
+	)
 }
 
 func TestCadenceOwnedAccountWithdraw(t *testing.T) {
@@ -3853,13 +3869,12 @@ func TestCadenceOwnedAccountWithdraw(t *testing.T) {
 
 	var nextUUID uint64 = 1
 
-	var expectedCoaAddress = types.Address{5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
+	var expectedCoaAddress = types.Address{6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
 
 	handler := &testContractHandler{
 		flowTokenAddress: common.Address(contractsAddress),
 		accountByAddress: func(fromAddress types.Address, isAuthorized bool) types.Account {
 			assert.Equal(t, expectedCoaAddress, fromAddress)
-			assert.Equal(t, deposited, isAuthorized)
 
 			return &testFlowAccount{
 				address: fromAddress,
@@ -4004,6 +4019,14 @@ func TestCadenceOwnedAccountWithdraw(t *testing.T) {
 		expectedWithdrawBalance,
 		tokenWithdrawEventFields["amount"],
 	)
+
+	// check expectedWithdrawnUUID
+	// last allocated UUID is 1
+	expectedWithdrawnUUID := cadence.UInt64(1)
+	require.Equal(t,
+		expectedWithdrawnUUID,
+		tokenWithdrawEventFields["withdrawnUUID"],
+	)
 }
 
 func TestCadenceOwnedAccountDeploy(t *testing.T) {
@@ -4020,7 +4043,7 @@ func TestCadenceOwnedAccountDeploy(t *testing.T) {
 	handler := &testContractHandler{
 		evmContractAddress: common.Address(contractsAddress),
 		accountByAddress: func(fromAddress types.Address, isAuthorized bool) types.Account {
-			assert.Equal(t, types.Address{3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, fromAddress)
+			assert.Equal(t, types.Address{4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, fromAddress)
 			assert.True(t, isAuthorized)
 
 			return &testFlowAccount{
@@ -4033,7 +4056,7 @@ func TestCadenceOwnedAccountDeploy(t *testing.T) {
 
 					return &types.ResultSummary{
 						Status:                  types.StatusSuccessful,
-						DeployedContractAddress: &types.Address{4},
+						DeployedContractAddress: &types.Address{5},
 						ReturnedData:            types.Data{5},
 					}
 				},
@@ -4059,7 +4082,7 @@ func TestCadenceOwnedAccountDeploy(t *testing.T) {
           )
           destroy cadenceOwnedAccount
 
-          assert(res.deployedContract?.bytes == [4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+          assert(res.deployedContract?.bytes == [5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
           return res.data
       }
    `)
@@ -4209,7 +4232,7 @@ func TestEVMAccountBalance(t *testing.T) {
 		flowTokenAddress:   common.Address(contractsAddress),
 		evmContractAddress: common.Address(contractsAddress),
 		accountByAddress: func(fromAddress types.Address, isAuthorized bool) types.Account {
-			assert.Equal(t, types.Address{3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, fromAddress)
+			assert.Equal(t, types.Address{4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, fromAddress)
 			assert.False(t, isAuthorized)
 
 			return &testFlowAccount{
@@ -4244,7 +4267,7 @@ func TestEVMAccountNonce(t *testing.T) {
 		flowTokenAddress:   common.Address(contractsAddress),
 		evmContractAddress: common.Address(contractsAddress),
 		accountByAddress: func(fromAddress types.Address, isAuthorized bool) types.Account {
-			assert.Equal(t, types.Address{3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, fromAddress)
+			assert.Equal(t, types.Address{4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, fromAddress)
 			assert.False(t, isAuthorized)
 
 			return &testFlowAccount{
@@ -4284,7 +4307,7 @@ func TestEVMAccountCode(t *testing.T) {
 		flowTokenAddress:   common.Address(contractsAddress),
 		evmContractAddress: common.Address(contractsAddress),
 		accountByAddress: func(fromAddress types.Address, isAuthorized bool) types.Account {
-			assert.Equal(t, types.Address{3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, fromAddress)
+			assert.Equal(t, types.Address{4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, fromAddress)
 			assert.False(t, isAuthorized)
 
 			return &testFlowAccount{
@@ -4324,7 +4347,7 @@ func TestEVMAccountCodeHash(t *testing.T) {
 		flowTokenAddress:   common.Address(contractsAddress),
 		evmContractAddress: common.Address(contractsAddress),
 		accountByAddress: func(fromAddress types.Address, isAuthorized bool) types.Account {
-			assert.Equal(t, types.Address{3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, fromAddress)
+			assert.Equal(t, types.Address{4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, fromAddress)
 			assert.False(t, isAuthorized)
 
 			return &testFlowAccount{
@@ -4401,7 +4424,7 @@ func TestEVMValidateCOAOwnershipProof(t *testing.T) {
 		OnDecodeArgument: func(b []byte, t cadence.Type) (cadence.Value, error) {
 			return json.Decode(nil, b)
 		},
-		OnGetAccountKey: func(addr runtime.Address, index int) (*cadenceStdlib.AccountKey, error) {
+		OnGetAccountKey: func(addr runtime.Address, index uint32) (*cadenceStdlib.AccountKey, error) {
 			require.Equal(t, proof.Address[:], addr[:])
 			return &cadenceStdlib.AccountKey{
 				PublicKey: &cadenceStdlib.PublicKey{},

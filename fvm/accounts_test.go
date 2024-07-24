@@ -391,7 +391,7 @@ func TestCreateAccount(t *testing.T) {
 					).(cadence.Address),
 				)
 
-				account, err := vm.GetAccount(ctx, address, snapshotTree)
+				account, err := fvm.GetAccount(ctx, address, snapshotTree)
 				require.NoError(t, err)
 				require.NotNil(t, account)
 			}),
@@ -440,7 +440,7 @@ func TestCreateAccount(t *testing.T) {
 							stdlib.AccountEventAddressParameter.Identifier,
 						).(cadence.Address),
 					)
-					account, err := vm.GetAccount(ctx, address, snapshotTree)
+					account, err := fvm.GetAccount(ctx, address, snapshotTree)
 					require.NoError(t, err)
 					require.NotNil(t, account)
 				}
@@ -616,7 +616,7 @@ func TestAddAccountKey(t *testing.T) {
 						ctx,
 						snapshotTree)
 
-					before, err := vm.GetAccount(ctx, address, snapshotTree)
+					before, err := fvm.GetAccount(ctx, address, snapshotTree)
 					require.NoError(t, err)
 					assert.Empty(t, before.Keys)
 
@@ -640,7 +640,7 @@ func TestAddAccountKey(t *testing.T) {
 
 					snapshotTree = snapshotTree.Append(executionSnapshot)
 
-					after, err := vm.GetAccount(ctx, address, snapshotTree)
+					after, err := fvm.GetAccount(ctx, address, snapshotTree)
 					require.NoError(t, err)
 
 					require.Len(t, after.Keys, 1)
@@ -672,7 +672,7 @@ func TestAddAccountKey(t *testing.T) {
 						address,
 						accountKeyAPIVersionV2)
 
-					before, err := vm.GetAccount(ctx, address, snapshotTree)
+					before, err := fvm.GetAccount(ctx, address, snapshotTree)
 					require.NoError(t, err)
 					assert.Len(t, before.Keys, 1)
 
@@ -695,7 +695,7 @@ func TestAddAccountKey(t *testing.T) {
 
 					snapshotTree = snapshotTree.Append(executionSnapshot)
 
-					after, err := vm.GetAccount(ctx, address, snapshotTree)
+					after, err := fvm.GetAccount(ctx, address, snapshotTree)
 					require.NoError(t, err)
 
 					expectedKeys := []flow.AccountPublicKey{
@@ -707,7 +707,7 @@ func TestAddAccountKey(t *testing.T) {
 
 					for i, expectedKey := range expectedKeys {
 						actualKey := after.Keys[i]
-						assert.Equal(t, i, actualKey.Index)
+						assert.Equal(t, uint32(i), actualKey.Index)
 						assert.Equal(t, expectedKey.PublicKey, actualKey.PublicKey)
 						assert.Equal(t, expectedKey.SignAlgo, actualKey.SignAlgo)
 						assert.Equal(t, expectedKey.HashAlgo, actualKey.HashAlgo)
@@ -744,7 +744,7 @@ func TestAddAccountKey(t *testing.T) {
 
 					snapshotTree = snapshotTree.Append(executionSnapshot)
 
-					after, err := vm.GetAccount(ctx, address, snapshotTree)
+					after, err := fvm.GetAccount(ctx, address, snapshotTree)
 					require.NoError(t, err)
 
 					assert.Empty(t, after.Keys)
@@ -772,7 +772,7 @@ func TestAddAccountKey(t *testing.T) {
 						ctx,
 						snapshotTree)
 
-					before, err := vm.GetAccount(ctx, address, snapshotTree)
+					before, err := fvm.GetAccount(ctx, address, snapshotTree)
 					require.NoError(t, err)
 					assert.Empty(t, before.Keys)
 
@@ -800,7 +800,7 @@ func TestAddAccountKey(t *testing.T) {
 
 					snapshotTree = snapshotTree.Append(executionSnapshot)
 
-					after, err := vm.GetAccount(ctx, address, snapshotTree)
+					after, err := fvm.GetAccount(ctx, address, snapshotTree)
 					require.NoError(t, err)
 
 					expectedKeys := []flow.AccountPublicKey{
@@ -876,7 +876,7 @@ func TestAddAccountKey(t *testing.T) {
 
 						snapshotTree = snapshotTree.Append(executionSnapshot)
 
-						after, err := vm.GetAccount(ctx, address, snapshotTree)
+						after, err := fvm.GetAccount(ctx, address, snapshotTree)
 						require.NoError(t, err)
 
 						assert.Empty(t, after.Keys)
@@ -933,11 +933,11 @@ func TestRemoveAccountKey(t *testing.T) {
 							accountKeyAPIVersionV2)
 					}
 
-					before, err := vm.GetAccount(ctx, address, snapshotTree)
+					before, err := fvm.GetAccount(ctx, address, snapshotTree)
 					require.NoError(t, err)
 					assert.Len(t, before.Keys, keyCount)
 
-					for _, keyIndex := range []int{-1, keyCount, keyCount + 1} {
+					for _, keyIndex := range []int{keyCount, keyCount + 1} {
 						keyIndexArg, err := jsoncdc.Encode(cadence.NewInt(keyIndex))
 						require.NoError(t, err)
 
@@ -961,7 +961,7 @@ func TestRemoveAccountKey(t *testing.T) {
 						snapshotTree = snapshotTree.Append(executionSnapshot)
 					}
 
-					after, err := vm.GetAccount(ctx, address, snapshotTree)
+					after, err := fvm.GetAccount(ctx, address, snapshotTree)
 					require.NoError(t, err)
 					assert.Len(t, after.Keys, keyCount)
 
@@ -994,7 +994,7 @@ func TestRemoveAccountKey(t *testing.T) {
 							accountKeyAPIVersionV2)
 					}
 
-					before, err := vm.GetAccount(ctx, address, snapshotTree)
+					before, err := fvm.GetAccount(ctx, address, snapshotTree)
 					require.NoError(t, err)
 					assert.Len(t, before.Keys, keyCount)
 
@@ -1015,7 +1015,7 @@ func TestRemoveAccountKey(t *testing.T) {
 
 					snapshotTree = snapshotTree.Append(executionSnapshot)
 
-					after, err := vm.GetAccount(ctx, address, snapshotTree)
+					after, err := fvm.GetAccount(ctx, address, snapshotTree)
 					require.NoError(t, err)
 					assert.Len(t, after.Keys, keyCount)
 
@@ -1050,7 +1050,7 @@ func TestRemoveAccountKey(t *testing.T) {
 							accountKeyAPIVersionV2)
 					}
 
-					before, err := vm.GetAccount(ctx, address, snapshotTree)
+					before, err := fvm.GetAccount(ctx, address, snapshotTree)
 					require.NoError(t, err)
 					assert.Len(t, before.Keys, keyCount)
 
@@ -1071,7 +1071,7 @@ func TestRemoveAccountKey(t *testing.T) {
 
 					snapshotTree = snapshotTree.Append(executionSnapshot)
 
-					after, err := vm.GetAccount(ctx, address, snapshotTree)
+					after, err := fvm.GetAccount(ctx, address, snapshotTree)
 					require.NoError(t, err)
 					assert.Len(t, after.Keys, keyCount)
 
@@ -1116,7 +1116,7 @@ func TestRemoveAccountKey(t *testing.T) {
 							accountKeyAPIVersionV2)
 					}
 
-					before, err := vm.GetAccount(ctx, address, snapshotTree)
+					before, err := fvm.GetAccount(ctx, address, snapshotTree)
 					require.NoError(t, err)
 					assert.Len(t, before.Keys, keyCount)
 
@@ -1140,7 +1140,7 @@ func TestRemoveAccountKey(t *testing.T) {
 
 					snapshotTree = snapshotTree.Append(executionSnapshot)
 
-					after, err := vm.GetAccount(ctx, address, snapshotTree)
+					after, err := fvm.GetAccount(ctx, address, snapshotTree)
 					require.NoError(t, err)
 					assert.Len(t, after.Keys, keyCount)
 
@@ -1182,11 +1182,11 @@ func TestGetAccountKey(t *testing.T) {
 						accountKeyAPIVersionV2)
 				}
 
-				before, err := vm.GetAccount(ctx, address, snapshotTree)
+				before, err := fvm.GetAccount(ctx, address, snapshotTree)
 				require.NoError(t, err)
 				assert.Len(t, before.Keys, keyCount)
 
-				for _, keyIndex := range []int{-1, keyCount, keyCount + 1} {
+				for _, keyIndex := range []int{keyCount, keyCount + 1} {
 					keyIndexArg, err := jsoncdc.Encode(cadence.NewInt(keyIndex))
 					require.NoError(t, err)
 
@@ -1234,7 +1234,7 @@ func TestGetAccountKey(t *testing.T) {
 						accountKeyAPIVersionV2)
 				}
 
-				before, err := vm.GetAccount(ctx, address, snapshotTree)
+				before, err := fvm.GetAccount(ctx, address, snapshotTree)
 				require.NoError(t, err)
 				assert.Len(t, before.Keys, keyCount)
 
@@ -1298,7 +1298,7 @@ func TestGetAccountKey(t *testing.T) {
 						accountKeyAPIVersionV2)
 				}
 
-				before, err := vm.GetAccount(ctx, address, snapshotTree)
+				before, err := fvm.GetAccount(ctx, address, snapshotTree)
 				require.NoError(t, err)
 				assert.Len(t, before.Keys, keyCount)
 
@@ -1360,7 +1360,7 @@ func TestGetAccountKey(t *testing.T) {
 						accountKeyAPIVersionV2)
 				}
 
-				before, err := vm.GetAccount(ctx, address, snapshotTree)
+				before, err := fvm.GetAccount(ctx, address, snapshotTree)
 				require.NoError(t, err)
 				assert.Len(t, before.Keys, keyCount)
 
@@ -1565,7 +1565,7 @@ func TestAccountBalanceFields(t *testing.T) {
 				_, output, err = vm.Run(ctx, script, snapshotTree)
 				assert.NoError(t, err)
 				assert.NoError(t, output.Err)
-				assert.Equal(t, cadence.UFix64(99_989_590), output.Value)
+				assert.Equal(t, cadence.UFix64(99_989_630), output.Value)
 			}),
 	)
 
