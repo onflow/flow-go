@@ -427,7 +427,7 @@ func TestContractInteraction(t *testing.T) {
 				})
 			})
 
-			t.Run("test runing transactions with dynamic fees (happy case)", func(t *testing.T) {
+			t.Run("test running transactions with dynamic fees (happy case)", func(t *testing.T) {
 				account := testutils.GetTestEOAAccount(t, testutils.EOATestAccount1KeyHex)
 				fAddr := account.Address()
 				RunWithNewEmulator(t, backend, rootAddr, func(env *emulator.Emulator) {
@@ -1075,8 +1075,8 @@ func TestTxIndex(t *testing.T) {
 				ctx := types.NewDefaultBlockContext(blockNumber.Uint64())
 				expectedTxIndex := uint16(1)
 				ctx.TxCountSoFar = 1
-				testAccount1 := types.NewAddressFromString("test")
-				testAccount2 := types.NewAddressFromString("test")
+				testAccount1 := testutils.RandomAddress(t)
+				testAccount2 := testutils.RandomAddress(t)
 
 				blk, err := em.NewBlockView(ctx)
 				require.NoError(t, err)
@@ -1124,7 +1124,7 @@ func TestTxIndex(t *testing.T) {
 					t,
 					testAccount1.ToCommon(), // to
 					nil,                     // data
-					big.NewInt(1000),        // amount
+					big.NewInt(0),           // amount
 					gethParams.TxGas,        // gas limit
 					big.NewInt(0),
 				)
@@ -1147,7 +1147,7 @@ func TestTxIndex(t *testing.T) {
 						t,
 						testAccount1.ToCommon(), // to
 						nil,                     // data
-						big.NewInt(1000),        // amount
+						big.NewInt(0),           // amount
 						gethParams.TxGas,        // gas limit
 						big.NewInt(0),
 					)
