@@ -10,7 +10,7 @@ access:
       limits:
         cpu: "800m"
         memory: "10Gi"
-    storage: 1G
+    storage: 100G
   nodes:
 {{- range $val := .}}{{if eq ($val.role) ("access")}}
     {{$val.name}}:
@@ -38,7 +38,7 @@ collection:
       limits:
         cpu: "800m"
         memory: "10Gi"
-    storage: 1G
+    storage: 50G
   nodes:
 {{- range $val := .}}{{if eq ($val.role) ("collection")}}
     {{$val.name}}:
@@ -61,7 +61,7 @@ consensus:
       limits:
         cpu: "800m"
         memory: "10Gi"
-    storage: 1G
+    storage: 50G
   nodes:
 {{- range $val := .}}{{if eq ($val.role) ("consensus")}}
     {{$val.name}}:
@@ -85,7 +85,7 @@ execution:
       limits:
         cpu: "800m"
         memory: "10Gi"
-    storage: 10G
+    storage: 500G
   nodes:
 {{- range $val := .}}{{if eq ($val.role) ("execution")}}
     {{$val.name}}:
@@ -108,7 +108,7 @@ verification:
       limits:
         cpu: "800m"
         memory: "10Gi"
-    storage: 1G
+    storage: 50G
   nodes:
 {{- range $val := .}}{{if eq ($val.role) ("verification")}}
     {{$val.name}}:
