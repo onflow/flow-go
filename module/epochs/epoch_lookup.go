@@ -40,27 +40,34 @@ func (cache *epochRangeCache) latest() epochRange {
 // extendLatestEpoch updates the final view of the latest epoch with the final view of the epoch extension.
 // No errors are expected during normal operation.
 func (cache *epochRangeCache) extendLatestEpoch(epochCounter uint64, extension flow.EpochExtension) error {
+	latestEpoch := cache[2]
 	// sanity check: latest epoch should already be cached.
-	if !cache[2].exists() {
+	if !latestEpoch.exists() {
 		return fmt.Errorf("sanity check failed: latest epoch does not exist")
 	}
 
 	// duplicate events are no-ops
-	if cache[2].finalView == extension.FinalView {
+	if latestEpoch.finalView == extension.FinalView {
 		return nil
 	}
 
 	// sanity check: extensionFinalView should be greater than final view of latest epoch
-	if cache[2].finalView > extension.FinalView {
-		return fmt.Errorf("sanity check failed: latest epoch final view %d greater than extension final view %d", cache[2].finalView, extension.FinalView)
+	if latestEpoch.finalView > extension.FinalView {
+		return fmt.Errorf("sanity check failed: latest epoch final view %d greater than extension final view %d", latestEpoch.finalView, extension.FinalView)
 	}
 
 	// sanity check: epoch extension should have the same epoch counter as the latest epoch
-	if cache[2].counter != epochCounter {
-		return fmt.Errorf("sanity check failed: latest epoch counter %d does not match extension epoch counter %d", cache[2].counter, epochCounter)
+	if latestEpoch.counter != epochCounter {
+		return fmt.Errorf("sanity check failed: latest epoch counter %d does not match extension epoch counter %d", latestEpoch.counter, epochCounter)
 	}
 
-	cache[2].finalView = extension.FinalView
+	// sanity check: first view of the epoch extension should immediately start after the final view of the latest epoch.
+	if latestEpoch.finalView+1 != extension.FirstView {
+		return fmt.Errorf("sanity check: first view of the epoch extension %d should immediately start after the final view of the latest epoch %d", extension.FirstView, latestEpoch.finalView)
+	}
+
+	latestEpoch.finalView = extension.FinalView
+	cache[2] = latestEpoch
 	return nil
 }
 
