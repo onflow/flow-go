@@ -45,7 +45,7 @@ func (cache *epochRangeCache) extendLatestEpoch(epochCounter uint64, extension f
 		return fmt.Errorf("sanity check failed: latest epoch does not exist")
 	}
 
-	// sanity check: extensionFinalView should be greater than final view of latest epoch
+	// sanity check: `extension.FinalView` should be greater than final view of latest epoch
 	if cache[2].finalView > extension.FinalView {
 		return fmt.Errorf("sanity check failed: latest epoch final view %d greater than extension final view %d", cache[2].finalView, extension.FinalView)
 	}
