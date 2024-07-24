@@ -165,9 +165,10 @@ func (s *ScriptExecutorSuite) TestExecuteAtBlockHeight() {
 	var scriptArgs [][]byte
 	var expectedResult = []byte("{\"type\":\"Void\"}\n")
 
+	s.reporter.On("LowestIndexedHeight").Return(s.height, nil)
+
 	s.Run("test script execution without version control", func() {
 		scriptExec := NewScriptExecutor(s.log, uint64(0), math.MaxUint64)
-		s.reporter.On("LowestIndexedHeight").Return(s.height, nil)
 		s.reporter.On("HighestIndexedHeight").Return(s.height+1, nil).Once()
 
 		err := scriptExec.Initialize(s.indexReporter, s.scripts, nil)
@@ -268,7 +269,7 @@ func (s *ScriptExecutorSuite) TestExecuteAtBlockHeight() {
 		s.Require().NoError(err)
 
 		res, err := scriptExec.ExecuteAtBlockHeight(ctx, script, scriptArgs, s.height)
-		s.Assert().Error(err)
+		s.Assert().ErrorIs(ErrIncompatibleNodeVersion, err)
 		s.Assert().Nil(res)
 	})
 }
