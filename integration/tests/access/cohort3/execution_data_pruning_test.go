@@ -21,7 +21,7 @@ import (
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/metrics"
-	storage "github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/utils/unittest"
 
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
@@ -147,6 +147,18 @@ func (s *ExecutionDataPruningSuite) getGRPCClient(address string) (accessproto.A
 	return client, nil
 }
 
+// TestHappyPath tests the execution data pruning process in a happy path scenario.
+// The test follows these steps:
+//
+// 1. Define a target block height (waitingBlockHeight) for which execution data will be indexed.
+// 2. Wait until the execution data for the specified block height is indexed by the observer node.
+//   - Set up a gRPC client to communicate with the observer node.
+//   - Ensure the observer node has indexed the execution data up to the target block height by
+//     subscribing to execution data events and monitoring the event stream.
+//
+// 3. Stop all Flow network containers to simulate a network shutdown and ensure the indexing process is complete.
+// 4. Verify the results of execution data pruning:
+//   - Check that the Access and Observer Nodes execution data up to the pruning threshold height has been correctly pruned.
 func (s *ExecutionDataPruningSuite) TestHappyPath() {
 	accessNode := s.net.ContainerByName(s.accessNodeName)
 	observerNode := s.net.ContainerByName(s.observerNodeName)
@@ -164,8 +176,8 @@ func (s *ExecutionDataPruningSuite) TestHappyPath() {
 	anDB, err := accessNode.DB()
 	require.NoError(s.T(), err, "could not open db")
 
-	anHeaders := storage.NewHeaders(metrics, anDB)
-	anResults := storage.NewExecutionResults(metrics, anDB)
+	anHeaders := badger.NewHeaders(metrics, anDB)
+	anResults := badger.NewExecutionResults(metrics, anDB)
 
 	// start an execution data service using the Observer Node's execution data db
 
@@ -174,12 +186,13 @@ func (s *ExecutionDataPruningSuite) TestHappyPath() {
 	onDB, err := observerNode.DB()
 	require.NoError(s.T(), err, "could not open db")
 
-	onResults := storage.NewExecutionResults(metrics, onDB)
+	onResults := badger.NewExecutionResults(metrics, onDB)
 
 	s.checkResults(anHeaders, anResults, onResults, anEds, onEds)
 }
 
 // waitUntilExecutionDataForBlockIndexed waits until the execution data for the specified block height is indexed.
+// It subscribes to events from the start height and waits until the execution data for the specified block height is indexed.
 func (s *ExecutionDataPruningSuite) waitUntilExecutionDataForBlockIndexed(waitingBlockHeight uint64) {
 	observerNode := s.net.ContainerByName(s.observerNodeName)
 
@@ -190,12 +203,13 @@ func (s *ExecutionDataPruningSuite) waitUntilExecutionDataForBlockIndexed(waitin
 	client, err := getClient(fmt.Sprintf("localhost:%s", observerNode.Port(testnet.ExecutionStatePort)))
 	s.Require().NoError(err)
 
-	// pause until the observer node start indexing blocks
+	// pause until the observer node start indexing blocks,
+	// getting events from 2-nd block to make sure that 1-st block already indexed, and we can start subscribing
 	s.Require().Eventually(func() bool {
 		_, err := grpcClient.GetEventsForHeightRange(s.ctx, &accessproto.GetEventsForHeightRangeRequest{
 			Type:                 sdk.EventAccountCreated,
-			StartHeight:          1,
-			EndHeight:            1,
+			StartHeight:          2,
+			EndHeight:            2,
 			EventEncodingVersion: entities.EventEncodingVersion_CCF_V0,
 		})
 
@@ -215,6 +229,10 @@ func (s *ExecutionDataPruningSuite) waitUntilExecutionDataForBlockIndexed(waitin
 	eventsChan, errChan, err := SubscribeHandler(s.ctx, stream.Recv, eventsResponseHandler)
 	s.Require().NoError(err)
 
+	duration := 3 * time.Minute
+	timer := time.NewTimer(duration)
+	defer timer.Stop()
+
 	for {
 		select {
 		case err := <-errChan:
@@ -223,15 +241,17 @@ func (s *ExecutionDataPruningSuite) waitUntilExecutionDataForBlockIndexed(waitin
 			if event.Height > waitingBlockHeight {
 				return
 			}
+		case <-timer.C:
+			s.T().Fatalf("failed to index to %d block within %s", waitingBlockHeight, duration.String())
 		}
 	}
 }
 
 // checkResults checks the results of execution data pruning to ensure correctness.
 func (s *ExecutionDataPruningSuite) checkResults(
-	headers *storage.Headers,
-	anResults *storage.ExecutionResults,
-	onResults *storage.ExecutionResults,
+	headers *badger.Headers,
+	anResults *badger.ExecutionResults,
+	onResults *badger.ExecutionResults,
 	anEds execution_data.ExecutionDataStore,
 	onEds execution_data.ExecutionDataStore,
 ) {
@@ -247,10 +267,12 @@ func (s *ExecutionDataPruningSuite) checkResults(
 		result, err := anResults.ByBlockID(header.ID())
 		require.NoError(s.T(), err, "%s: could not get sealed result", s.accessNodeName)
 
+		var blobNotFoundError *execution_data.BlobNotFoundError
+
 		// verify AN execution data
 		_, err = anEds.Get(s.ctx, result.ExecutionDataID)
 		require.Error(s.T(), err, "%s: could not prune execution data for height %v", s.accessNodeName, i)
-		require.ErrorContains(s.T(), err, "not found")
+		require.ErrorAs(s.T(), err, &blobNotFoundError)
 
 		result, err = onResults.ByID(result.ID())
 		require.NoError(s.T(), err, "%s: could not get sealed result from ON`s storage", s.observerNodeName)
@@ -258,7 +280,7 @@ func (s *ExecutionDataPruningSuite) checkResults(
 		// verify ON execution data
 		_, err = onEds.Get(s.ctx, result.ExecutionDataID)
 		require.Error(s.T(), err, "%s: could not prune execution data for height %v", s.observerNodeName, i)
-		require.ErrorContains(s.T(), err, "not found")
+		require.ErrorAs(s.T(), err, &blobNotFoundError)
 	}
 }
 
