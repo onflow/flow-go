@@ -33,13 +33,11 @@ func TestBasicPrune(t *testing.T) {
 	trackerStorage.AssertExpectations(t)
 
 	downloader := new(exedatamock.Downloader)
-	downloader.On("Register").Return(nil).Once()
 	downloader.On("HighestCompleteHeight").
 		Return(uint64(16)).
 		Once()
 
-	err = pruner.RegisterProducer(downloader)
-	require.NoError(t, err)
+	pruner.RegisterHeightRecorder(downloader)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx, errChan := irrecoverable.WithSignaler(ctx)

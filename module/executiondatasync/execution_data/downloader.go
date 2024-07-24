@@ -21,14 +21,14 @@ import (
 type Downloader interface {
 	module.ReadyDoneAware
 	ExecutionDataGetter
-	ExecutionDataProducer
+	ProcessedHeightRecorder
 }
 
 var _ Downloader = (*downloader)(nil)
-var _ ExecutionDataProducer = (*downloader)(nil)
+var _ ProcessedHeightRecorder = (*downloader)(nil)
 
 type downloader struct {
-	*ExecutionDataProducerManager
+	ProcessedHeightRecorder
 	blobService network.BlobService
 	maxBlobSize int
 	serializer  Serializer
@@ -56,10 +56,10 @@ func WithExecutionDataTracker(storage tracker.Storage, headers storage.Headers) 
 // NewDownloader creates a new Downloader instance
 func NewDownloader(blobService network.BlobService, opts ...DownloaderOption) *downloader {
 	d := &downloader{
-		blobService:                  blobService,
-		maxBlobSize:                  DefaultMaxBlobSize,
-		serializer:                   DefaultSerializer,
-		ExecutionDataProducerManager: NewExecutionDataProducerManager(0),
+		blobService:             blobService,
+		maxBlobSize:             DefaultMaxBlobSize,
+		serializer:              DefaultSerializer,
+		ProcessedHeightRecorder: NewProcessedHeightRecorderManager(0),
 	}
 
 	for _, opt := range opts {

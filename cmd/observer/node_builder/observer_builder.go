@@ -1314,10 +1314,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				return nil, fmt.Errorf("failed to create execution data pruner: %w", err)
 			}
 
-			err = builder.ExecutionDataPruner.RegisterProducer(builder.ExecutionDataDownloader)
-			if err != nil {
-				return nil, fmt.Errorf("failed to register the execution data downloader as a producer: %w", err)
-			}
+			builder.ExecutionDataPruner.RegisterHeightRecorder(builder.ExecutionDataDownloader)
 
 			return builder.ExecutionDataPruner, nil
 		})
@@ -1449,10 +1446,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 			}
 
 			if executionDataPrunerEnabled {
-				err = builder.ExecutionDataPruner.RegisterProducer(builder.ExecutionIndexer)
-				if err != nil {
-					return nil, fmt.Errorf("failed to register the execution indexer as a producer: %w", err)
-				}
+				builder.ExecutionDataPruner.RegisterHeightRecorder(builder.ExecutionIndexer)
 			}
 
 			// setup requester to notify indexer when new execution data is received

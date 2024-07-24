@@ -31,12 +31,12 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
-var _ execution_data.ExecutionDataProducer = (*Engine)(nil)
+var _ execution_data.ProcessedHeightRecorder = (*Engine)(nil)
 
 // An Engine receives and saves incoming blocks.
 type Engine struct {
 	psEvents.Noop // satisfy protocol events consumer interface
-	*execution_data.ExecutionDataProducerManager
+	execution_data.ProcessedHeightRecorder
 
 	unit                *engine.Unit
 	log                 zerolog.Logger
@@ -81,24 +81,24 @@ func New(
 	mempool := newMempool()
 
 	eng := Engine{
-		unit:                         unit,
-		log:                          log,
-		collectionFetcher:            collectionFetcher,
-		headers:                      headers,
-		blocks:                       blocks,
-		collections:                  collections,
-		computationManager:           executionEngine,
-		providerEngine:               providerEngine,
-		mempool:                      mempool,
-		execState:                    execState,
-		metrics:                      metrics,
-		tracer:                       tracer,
-		extensiveLogging:             extLog,
-		executionDataPruner:          pruner,
-		uploader:                     uploader,
-		stopControl:                  stopControl,
-		loader:                       loader,
-		ExecutionDataProducerManager: execution_data.NewExecutionDataProducerManager(0),
+		unit:                    unit,
+		log:                     log,
+		collectionFetcher:       collectionFetcher,
+		headers:                 headers,
+		blocks:                  blocks,
+		collections:             collections,
+		computationManager:      executionEngine,
+		providerEngine:          providerEngine,
+		mempool:                 mempool,
+		execState:               execState,
+		metrics:                 metrics,
+		tracer:                  tracer,
+		extensiveLogging:        extLog,
+		executionDataPruner:     pruner,
+		uploader:                uploader,
+		stopControl:             stopControl,
+		loader:                  loader,
+		ProcessedHeightRecorder: execution_data.NewProcessedHeightRecorderManager(0),
 	}
 
 	return &eng, nil

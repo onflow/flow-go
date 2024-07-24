@@ -64,7 +64,7 @@ type Pruner struct {
 	component.Component
 	cm *component.ComponentManager
 
-	registeredProducers []execution_data.ExecutionDataProducer
+	registeredHeightRecorders []execution_data.ProcessedHeightRecorder
 }
 
 type PrunerOption func(*Pruner)
@@ -133,21 +133,12 @@ func NewPruner(logger zerolog.Logger, metrics module.ExecutionDataPrunerMetrics,
 	return p, nil
 }
 
-// RegisterProducer registers an execution data producer with the Pruner.
+// RegisterHeightRecorder registers an execution data height recorder with the Pruner.
 //
 // Parameters:
-//   - producer: The execution data producer to register.
-//
-// Returns:
-//   - execution_data.ErrMultipleRegister: if producer is already registered.
-func (p *Pruner) RegisterProducer(producer execution_data.ExecutionDataProducer) error {
-	err := producer.Register()
-	if err != nil {
-		return err
-	}
-
-	p.registeredProducers = append(p.registeredProducers, producer)
-	return nil
+//   - recorder: The execution data height recorder to register.
+func (p *Pruner) RegisterHeightRecorder(recorder execution_data.ProcessedHeightRecorder) {
+	p.registeredHeightRecorders = append(p.registeredHeightRecorders, recorder)
 }
 
 // SetHeightRangeTarget updates the Pruner's height range target.
@@ -162,7 +153,7 @@ func (p *Pruner) SetThreshold(threshold uint64) {
 
 // loop is the main worker for the Pruner, responsible for triggering
 // pruning operations at regular intervals. It monitors the heights
-// of registered producers and checks if pruning is necessary.
+// of registered height recorders and checks if pruning is necessary.
 func (p *Pruner) loop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
 	ticker := time.NewTicker(p.pruningInterval)
@@ -173,8 +164,8 @@ func (p *Pruner) loop(ctx irrecoverable.SignalerContext, ready component.ReadyFu
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			if len(p.registeredProducers) > 0 {
-				lowestHeight := p.lowestProducersHeight()
+			if len(p.registeredHeightRecorders) > 0 {
+				lowestHeight := p.lowestRecordersHeight()
 
 				err := p.updateFulfilledHeight(lowestHeight)
 				if err != nil {
@@ -186,15 +177,15 @@ func (p *Pruner) loop(ctx irrecoverable.SignalerContext, ready component.ReadyFu
 	}
 }
 
-// lowestProducersHeight returns the lowest height among all registered producers.
+// lowestRecordersHeight returns the lowest height among all height recorders.
 //
 // Returns:
-//   - uint64: The lowest height among all registered producers.
-func (p *Pruner) lowestProducersHeight() uint64 {
+//   - uint64: The lowest height among all registered height recorders.
+func (p *Pruner) lowestRecordersHeight() uint64 {
 	lowestHeight := uint64(math.MaxUint64)
 
-	for _, producer := range p.registeredProducers {
-		height := producer.HighestCompleteHeight()
+	for _, recorder := range p.registeredHeightRecorders {
+		height := recorder.HighestCompleteHeight()
 		if height < lowestHeight {
 			lowestHeight = height
 		}

@@ -38,7 +38,7 @@ const (
 var ErrIndexNotInitialized = errors.New("index not initialized")
 
 var _ state_synchronization.IndexReporter = (*Indexer)(nil)
-var _ execution_data.ExecutionDataProducer = (*Indexer)(nil)
+var _ execution_data.ProcessedHeightRecorder = (*Indexer)(nil)
 
 // Indexer handles ingestion of new execution data available and uses the execution data indexer module
 // to index the data.
@@ -49,7 +49,7 @@ var _ execution_data.ExecutionDataProducer = (*Indexer)(nil)
 // notify new data is available and kick off indexing.
 type Indexer struct {
 	component.Component
-	*execution_data.ExecutionDataProducerManager
+	execution_data.ProcessedHeightRecorder
 
 	log                  zerolog.Logger
 	exeDataReader        *jobs.ExecutionDataReader
@@ -73,13 +73,13 @@ func NewIndexer(
 	processedHeight storage.ConsumerProgress,
 ) (*Indexer, error) {
 	r := &Indexer{
-		log:                          log.With().Str("module", "execution_indexer").Logger(),
-		exeDataNotifier:              engine.NewNotifier(),
-		blockIndexedNotifier:         engine.NewNotifier(),
-		lastProcessedHeight:          atomic.NewUint64(initHeight),
-		indexer:                      indexer,
-		registers:                    registers,
-		ExecutionDataProducerManager: execution_data.NewExecutionDataProducerManager(initHeight),
+		log:                     log.With().Str("module", "execution_indexer").Logger(),
+		exeDataNotifier:         engine.NewNotifier(),
+		blockIndexedNotifier:    engine.NewNotifier(),
+		lastProcessedHeight:     atomic.NewUint64(initHeight),
+		indexer:                 indexer,
+		registers:               registers,
+		ProcessedHeightRecorder: execution_data.NewProcessedHeightRecorderManager(initHeight),
 	}
 
 	r.exeDataReader = jobs.NewExecutionDataReader(executionCache, fetchTimeout, executionDataLatestHeight)
@@ -146,7 +146,7 @@ func (i *Indexer) processBlockIndexed(
 	}
 }
 
-// onBlockIndexed notifies ExecutionDataProducerManager that new block is indexed.
+// onBlockIndexed notifies ProcessedHeightRecorderManager that new block is indexed.
 //
 // No errors are expected during normal operations.
 func (i *Indexer) onBlockIndexed(ctx irrecoverable.SignalerContext) {
