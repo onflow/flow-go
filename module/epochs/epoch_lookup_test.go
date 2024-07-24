@@ -178,6 +178,7 @@ func (suite *EpochLookupSuite) TestProtocolEvents_EpochExtended() {
 	}, 5*time.Second, 50*time.Millisecond)
 
 	// validate queries are answered correctly
+	suite.currEpoch.finalView = extension.FinalView // expect final view to have been updated from extension
 	testEpochForView(suite.T(), suite.lookup, epochs...)
 
 	// should handle multiple deliveries of the protocol event
