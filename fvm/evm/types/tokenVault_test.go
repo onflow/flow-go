@@ -9,7 +9,6 @@ import (
 )
 
 func TestVault(t *testing.T) {
-
 	vault1 := types.NewFlowTokenVault(types.MakeABalanceInFlow(3))
 
 	vault2, err := vault1.Withdraw(types.OneFlowBalance)

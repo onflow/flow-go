@@ -420,6 +420,7 @@ func (h *ContractHandler) DryRun(
 
 	res, err := h.dryRun(rlpEncodedTx, from)
 	panicOnError(err)
+
 	return res.ResultSummary()
 }
 
@@ -454,9 +455,7 @@ func (h *ContractHandler) dryRun(
 	if err != nil {
 		return nil, err
 	}
-
-	// saftey check for result
-	if res == nil {
+	if res == nil { // safety check for result
 		return nil, types.ErrUnexpectedEmptyResult
 	}
 
@@ -753,7 +752,7 @@ func (a *Account) Deposit(v *types.FLOWTokenVault) {
 
 	bridge := a.fch.addressAllocator.NativeTokenBridgeAddress()
 	bridgeAccount := a.fch.AccountByAddress(bridge, false)
-	// it doesn't have to be authorized
+	// Note: its not an authorized call
 	res, err := a.fch.executeAndHandleCall(
 		types.NewDepositCall(
 			bridge,
