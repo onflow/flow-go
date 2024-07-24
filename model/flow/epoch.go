@@ -136,7 +136,7 @@ const EpochSetupRandomSourceLength = 16
 // Distributed Key Generation [DKG] and cluster QC voting process for the next epoch.
 // It also causes the current epoch to enter the EpochPhaseSetup phase.
 type EpochSetup struct {
-	Counter            uint64               // the number of the epoch bing setup (current+1)
+	Counter            uint64               // the number of the epoch being setup (current+1)
 	FirstView          uint64               // the first view of the epoch being setup
 	DKGPhase1FinalView uint64               // the final view of DKG phase 1
 	DKGPhase2FinalView uint64               // the final view of DKG phase 2
@@ -239,7 +239,7 @@ type EpochCommit struct {
 	// Counter is the epoch counter of the epoch being committed
 	Counter uint64
 	// ClusterQCs is an ordered list of root quorum certificates, one per cluster.
-	// EpochCommit.ClustersQCs[i] is the QC for EpochSetup.Assignments[0]
+	// EpochCommit.ClustersQCs[i] is the QC for EpochSetup.Assignments[i]
 	ClusterQCs []ClusterQCVoteData
 	// DKGGroupKey is the group public key associated with the epoch's DKG.
 	DKGGroupKey crypto.PublicKey
