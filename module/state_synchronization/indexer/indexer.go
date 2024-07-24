@@ -141,36 +141,39 @@ func (i *Indexer) processBlockIndexed(
 		case <-ctx.Done():
 			return
 		case <-i.blockIndexedNotifier.Channel():
-			i.onBlockIndexed(ctx)
+			err := i.onBlockIndexed()
+			if err != nil {
+				ctx.Throw(err)
+			}
 		}
 	}
 }
 
 // onBlockIndexed notifies ProcessedHeightRecorderManager that new block is indexed.
 //
-// No errors are expected during normal operations.
-func (i *Indexer) onBlockIndexed(ctx irrecoverable.SignalerContext) {
+// Expected errors during normal operation:
+//   - storage.ErrNotFound:  if no finalized block header is known at given height
+func (i *Indexer) onBlockIndexed() error {
 	lastProcessedHeight := i.lastProcessedHeight.Load()
 	highestIndexedHeight := i.jobConsumer.LastProcessedIndex()
 
-	if lastProcessedHeight >= highestIndexedHeight {
-		// already processed this
-		return
-	}
+	if lastProcessedHeight < highestIndexedHeight {
+		// we need loop here because it's possible for a height to be missed here,
+		// we should guarantee all heights are processed
+		for height := lastProcessedHeight + 1; height <= highestIndexedHeight; height++ {
+			header, err := i.indexer.headers.ByHeight(height)
+			if err != nil {
+				// if the execution data is available, the block must be locally finalized
+				i.log.Error().Err(err).Msgf("could not get header for height %d:", height)
+				return fmt.Errorf("could not get header for height %d: %w", height, err)
+			}
 
-	// we need loop here because it's possible for a height to be missed here,
-	// we should guarantee all heights are processed
-	for height := lastProcessedHeight + 1; height <= highestIndexedHeight; height++ {
-		header, err := i.indexer.headers.ByHeight(height)
-		if err != nil {
-			// if the execution data is available, the block must be locally finalized
-			i.log.Error().Err(err).Msgf("could not get header for height %d:", height)
-			ctx.Throw(err)
+			i.OnBlockProcessed(header.Height)
 		}
-
-		i.OnBlockProcessed(header.Height)
+		i.lastProcessedHeight.Store(highestIndexedHeight)
 	}
-	i.lastProcessedHeight.Store(highestIndexedHeight)
+
+	return nil
 }
 
 // Start the worker jobqueue to consume the available data.
