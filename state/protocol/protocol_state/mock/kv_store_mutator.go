@@ -128,6 +128,24 @@ func (_m *KVStoreMutator) ID() flow.Identifier {
 	return r0
 }
 
+// SetEpochExtensionViewCount provides a mock function with given fields: viewCount
+func (_m *KVStoreMutator) SetEpochExtensionViewCount(viewCount uint64) error {
+	ret := _m.Called(viewCount)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SetEpochExtensionViewCount")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(uint64) error); ok {
+		r0 = rf(viewCount)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // SetEpochStateID provides a mock function with given fields: stateID
 func (_m *KVStoreMutator) SetEpochStateID(stateID flow.Identifier) {
 	_m.Called(stateID)
