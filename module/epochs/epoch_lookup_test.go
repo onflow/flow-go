@@ -166,7 +166,7 @@ func (suite *EpochLookupSuite) TestProtocolEvents_EpochExtended() {
 	suite.CreateAndStartEpochLookup()
 
 	extension := flow.EpochExtension{
-		FirstView: suite.currEpoch.firstView + 1,
+		FirstView: suite.currEpoch.finalView + 1,
 		FinalView: suite.currEpoch.finalView + 100,
 	}
 	suite.lookup.EpochExtended(suite.currEpoch.counter, nil, extension)
