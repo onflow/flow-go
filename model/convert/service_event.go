@@ -271,6 +271,8 @@ func convertServiceEventEpochCommit(event flow.Event) (*flow.ServiceEvent, error
 	}
 	commit.DKGGroupKey = dkgGroupKey
 	commit.DKGParticipantKeys = dkgParticipantKeys
+	// TODO(EFM, #6214): parse index map from service event
+	commit.DKGIndexMap = nil
 
 	// create the service event
 	serviceEvent := &flow.ServiceEvent{
