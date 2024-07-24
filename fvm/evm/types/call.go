@@ -23,7 +23,7 @@ const (
 	ContractCallSubType = byte(5)
 
 	// Note that these gas values might need to change if we
-	// change the transaction (e.g. add accesslist),
+	// change the transaction (e.g. add access list),
 	// then it has to be updated to use Intrinsic function
 	// to calculate the minimum gas needed to run the transaction.
 	IntrinsicFeeForTokenTransfer = gethParams.TxGas
@@ -40,7 +40,7 @@ const (
 // DirectCall captures all the data related to a direct call to evm
 // direct calls are similar to transactions but they don't have
 // signatures and don't need sequence number checks
-// Note that eventhough we don't check the nonce, it impacts
+// Note that while we don't check the nonce, it impacts
 // hash calculation and also impacts the address of resulting contract
 // when deployed through direct calls.
 // Users don't have the worry about the nonce, handler sets
@@ -93,8 +93,12 @@ func (dc *DirectCall) Message() *gethCore.Message {
 		GasPrice:  big.NewInt(0), // price is set to zero fo direct calls
 		GasTipCap: big.NewInt(0), // also known as maxPriorityFeePerGas (in GWei)
 		GasFeeCap: big.NewInt(0), // also known as maxFeePerGas (in GWei)
-		// AccessList:        tx.AccessList(), // TODO revisit this value, the cost matter but performance might
-		SkipAccountChecks: true, // this would let us not set the nonce
+		// TODO: maybe revisit setting the access list
+		// AccessList:        tx.AccessList(),
+		// When SkipAccountChecks is true, the message nonce is not checked against the
+		// account nonce in state. It also disables checking that the sender is an EOA.
+		// Since we use the direct calls for COAs, we set the nonce and the COA is an smart contract.
+		SkipAccountChecks: true,
 	}
 }
 
@@ -131,6 +135,7 @@ func (dc *DirectCall) to() *gethCommon.Address {
 	return nil
 }
 
+// NewDepositCall constructs a new deposit direct call
 func NewDepositCall(
 	bridge Address,
 	address Address,
@@ -149,6 +154,7 @@ func NewDepositCall(
 	}
 }
 
+// NewDepositCall constructs a new withdraw direct call
 func NewWithdrawCall(
 	bridge Address,
 	address Address,
@@ -185,6 +191,7 @@ func NewTransferCall(
 	}
 }
 
+// NewDeployCall constructs a new deploy direct call
 func NewDeployCall(
 	caller Address,
 	code Code,
@@ -204,7 +211,10 @@ func NewDeployCall(
 	}
 }
 
-// this subtype should only be used internally for
+// NewDeployCallWithTargetAddress constructs a new deployment call
+// for the given target address
+//
+// Warning! This subtype should only be used internally for
 // deploying contracts at given addresses (e.g. COA account init setup)
 // should not be used for other means.
 func NewDeployCallWithTargetAddress(
@@ -227,6 +237,7 @@ func NewDeployCallWithTargetAddress(
 	}
 }
 
+// NewContractCall constructs a new contract call
 func NewContractCall(
 	caller Address,
 	to Address,
@@ -247,10 +258,13 @@ func NewContractCall(
 	}
 }
 
+// GasLimit sets the limit for the total gas used by a transaction
 type GasLimit uint64
 
+// Code holds an smart contract code
 type Code []byte
 
+// Data holds the data passed as part of a call
 type Data []byte
 
 // AsBigInt process the data and return it as a big integer
