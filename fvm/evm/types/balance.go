@@ -22,11 +22,11 @@ var (
 )
 
 // Balance represents the balance of an address
-// in the evm environment (Flow EVM), balances are kept in attoflow (1e-18 flow);
+// in the evm environment (Flow EVM), balances are kept in atto-flow (1e-18 flow);
 // the smallest denomination of FLOW token (similar to how Wei is used to store Eth)
 // But A Cadence FLOW Vault uses a Cadence.UFix64 to store values in Flow, which means
 // 1e-8 is the smallest value that can be stored on the vault.
-// The balance here considers the highest precision (attoflow) but utility
+// The balance here considers the highest precision (atto-flow) but utility
 // function has been provided for conversion from/to UFix64 to prevent accidental
 // conversion errors and dealing with rounding errors.
 type Balance *big.Int
@@ -36,7 +36,7 @@ func BalancesAreEqual(bal1, bal2 Balance) bool {
 	return (*big.Int)(bal1).Cmp(bal2) == 0
 }
 
-// NewBalanceconstructs a new balance from an atto flow value
+// NewBalance constructs a new balance from an atto-flow value
 func NewBalance(inp *big.Int) Balance {
 	return Balance(inp)
 }
