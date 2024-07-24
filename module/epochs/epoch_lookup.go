@@ -51,14 +51,14 @@ func (cache *epochRangeCache) extendLatestEpoch(epochCounter uint64, extension f
 		return nil
 	}
 
-	// sanity check: extensionFinalView should be greater than final view of latest epoch
-	if latestEpoch.finalView > extension.FinalView {
-		return fmt.Errorf("sanity check failed: latest epoch final view %d greater than extension final view %d", latestEpoch.finalView, extension.FinalView)
+	// sanity check: `extension.FinalView` should be greater than final view of latest epoch
+	if cache[2].finalView > extension.FinalView {
+		return fmt.Errorf("sanity check failed: latest epoch final view %d greater than extension final view %d", cache[2].finalView, extension.FinalView)
 	}
 
 	// sanity check: epoch extension should have the same epoch counter as the latest epoch
-	if latestEpoch.counter != epochCounter {
-		return fmt.Errorf("sanity check failed: latest epoch counter %d does not match extension epoch counter %d", latestEpoch.counter, epochCounter)
+	if cache[2].counter != epochCounter {
+		return fmt.Errorf("sanity check failed: latest epoch counter %d does not match extension epoch counter %d", cache[2].counter, epochCounter)
 	}
 
 	// sanity check: first view of the epoch extension should immediately start after the final view of the latest epoch.
@@ -276,8 +276,8 @@ func (lookup *EpochLookup) handleProtocolEvents(ctx irrecoverable.SignalerContex
 		select {
 		case <-ctx.Done():
 			return
-		case processEvtFn := <-lookup.epochEvents:
-			err := processEvtFn()
+		case processEventFn := <-lookup.epochEvents:
+			err := processEventFn()
 			if err != nil {
 				ctx.Throw(err)
 			}
