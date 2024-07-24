@@ -314,6 +314,7 @@ func TestHandler_OpsWithoutEmulator(t *testing.T) {
 
 func TestHandler_COA(t *testing.T) {
 	t.Parallel()
+
 	t.Run("test deposit/withdraw (with integrated emulator)", func(t *testing.T) {
 		testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
 			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
@@ -456,7 +457,7 @@ func TestHandler_COA(t *testing.T) {
 					aa := handler.NewAddressAllocator()
 
 					// Withdraw calls are only possible within FOA accounts
-					assertPanic(t, types.IsAUnAuthroizedMethodCallError, func() {
+					assertPanic(t, types.IsAUnauthorizedMethodCallError, func() {
 						em := &testutils.TestEmulator{
 							NonceOfFunc: func(address types.Address) (uint64, error) {
 								return 0, nil
@@ -1115,7 +1116,7 @@ func TestHandler_TransactionRun(t *testing.T) {
 							tr.OnTxStart(nil, tx, from)
 							tr.OnEnter(0, byte(vm.ADD), from, *tx.To(), tx.Data(), 20, big.NewInt(2))
 							tr.OnExit(0, []byte{0x02}, 200, nil, false)
-							tr.OnTxEnd(result.Receipt(0), nil)
+							tr.OnTxEnd(result.Receipt(), nil)
 
 							traceResult, err = tr.GetResult()
 							require.NoError(t, err)
@@ -1350,8 +1351,10 @@ func TestHandler_Metrics(t *testing.T) {
 	testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
 		testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
 			testutils.RunWithEOATestAccount(t, backend, rootAddr, func(eoa *testutils.EOATestAccount) {
+				gasUsed := testutils.RandomGas(1000)
 				result := &types.Result{
-					GasConsumed:             testutils.RandomGas(1000),
+					GasConsumed:             gasUsed,
+					CumulativeGasUsed:       gasUsed * 4,
 					DeployedContractAddress: &types.EmptyAddress,
 				}
 				em := &testutils.TestEmulator{

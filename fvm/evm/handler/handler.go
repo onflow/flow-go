@@ -474,6 +474,8 @@ func (h *ContractHandler) getBlockContext() (types.BlockContext, error) {
 		ExtraPrecompiledContracts: h.precompiledContracts,
 		Random:                    rand,
 		Tracer:                    h.tracer.TxTracer(),
+		TxCountSoFar:              uint(len(bp.TxHashes)),
+		TotalGasUsedSoFar:         bp.TotalGasUsed,
 	}, nil
 }
 
@@ -520,7 +522,7 @@ func (h *ContractHandler) executeAndHandleCall(
 	// append transaction to the block proposal
 	bp.AppendTransaction(res)
 
-	if totalSupplyDiff != nil {
+	if res.Successful() && totalSupplyDiff != nil {
 		if deductSupplyDiff {
 			bp.TotalSupply = new(big.Int).Sub(bp.TotalSupply, totalSupplyDiff)
 			if bp.TotalSupply.Sign() < 0 {
@@ -820,10 +822,10 @@ func (a *Account) call(to types.Address, data types.Data, gaslimit types.GasLimi
 	return a.fch.executeAndHandleCall(ctx, call, nil, false)
 }
 
-func (a *Account) precheck(authroized bool, gaslimit types.GasLimit) (types.BlockContext, error) {
+func (a *Account) precheck(authorized bool, gaslimit types.GasLimit) (types.BlockContext, error) {
 	// check if account is authorized (i.e. is a COA)
-	if authroized && !a.isAuthorized {
-		return types.BlockContext{}, types.ErrUnAuthroizedMethodCall
+	if authorized && !a.isAuthorized {
+		return types.BlockContext{}, types.ErrUnauthorizedMethodCall
 	}
 	err := a.fch.checkGasLimit(gaslimit)
 	if err != nil {

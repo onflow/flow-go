@@ -36,6 +36,9 @@ type StateDB interface {
 	// preimages, access lists, ...
 	// The method is often called between execution of different transactions
 	Reset()
+
+	// Error returns any error that has been cached so far by the state.
+	Error() error
 }
 
 // ReadOnlyView provides a readonly view of the state
