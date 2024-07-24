@@ -274,13 +274,13 @@ type ObserverServiceBuilder struct {
 	TxResultsIndex       *index.TransactionResultsIndex
 	IndexerDependencies  *cmd.DependencyList
 
-	ExecutionDataDownloader execution_data.Downloader
-	ExecutionDataRequester  state_synchronization.ExecutionDataRequester
-	ExecutionDataStore      execution_data.ExecutionDataStore
-	ExecutionDataBlobstore  blobs.Blobstore
-	ExecutionDataPruner     *pruner.Pruner
-	ExecutionDataStorage    edstorage.ExecutionDataStorage
-	ExecutionDataTracker    tracker.Storage
+	ExecutionDataDownloader   execution_data.Downloader
+	ExecutionDataRequester    state_synchronization.ExecutionDataRequester
+	ExecutionDataStore        execution_data.ExecutionDataStore
+	ExecutionDataBlobstore    blobs.Blobstore
+	ExecutionDataPruner       *pruner.Pruner
+	ExecutionDatastoreManager edstorage.DatastoreManager
+	ExecutionDataTracker      tracker.Storage
 
 	RegistersAsyncStore *execution.RegistersAsyncStore
 	Reporter            *index.Reporter
@@ -1121,20 +1121,20 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 			}
 
 			if executionDataDBMode == execution_data.ExecutionDataDBModePebble {
-				builder.ExecutionDataStorage, err = edstorage.NewPebbleDBWrapper(datastoreDir, nil)
+				builder.ExecutionDatastoreManager, err = edstorage.NewPebbleDatastoreManager(datastoreDir, nil)
 				if err != nil {
-					return fmt.Errorf("could not create PebbleDBWrapper for execution data: %w", err)
+					return fmt.Errorf("could not create PebbleDatastoreManager for execution data: %w", err)
 				}
 			} else {
-				builder.ExecutionDataStorage, err = edstorage.NewBadgerDBWrapper(datastoreDir, &badgerds.DefaultOptions)
+				builder.ExecutionDatastoreManager, err = edstorage.NewBadgerDatastoreManager(datastoreDir, &badgerds.DefaultOptions)
 				if err != nil {
-					return fmt.Errorf("could not create BadgerDBWrapper for execution data: %w", err)
+					return fmt.Errorf("could not create BadgerDatastoreManager for execution data: %w", err)
 				}
 			}
-			ds = builder.ExecutionDataStorage.Datastore()
+			ds = builder.ExecutionDatastoreManager.Datastore()
 
 			builder.ShutdownFunc(func() error {
-				if err := builder.ExecutionDataStorage.Close(); err != nil {
+				if err := builder.ExecutionDatastoreManager.Close(); err != nil {
 					return fmt.Errorf("could not close execution data datastore: %w", err)
 				}
 				return nil
@@ -1146,9 +1146,9 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 			// Note: progress is stored in the datastore's DB since that is where the jobqueue
 			// writes execution data to.
 			if executionDataDBMode == execution_data.ExecutionDataDBModeBadger {
-				processedBlockHeight = bstorage.NewConsumerProgress(builder.ExecutionDataStorage.DB().(*badger.DB), module.ConsumeProgressExecutionDataRequesterBlockHeight)
+				processedBlockHeight = bstorage.NewConsumerProgress(builder.ExecutionDatastoreManager.DB().(*badger.DB), module.ConsumeProgressExecutionDataRequesterBlockHeight)
 			} else {
-				processedBlockHeight = pstorage.NewConsumerProgress(builder.ExecutionDataStorage.DB().(*pebble.DB), module.ConsumeProgressExecutionDataRequesterBlockHeight)
+				processedBlockHeight = pstorage.NewConsumerProgress(builder.ExecutionDatastoreManager.DB().(*pebble.DB), module.ConsumeProgressExecutionDataRequesterBlockHeight)
 			}
 			return nil
 		}).
@@ -1156,9 +1156,9 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 			// Note: progress is stored in the datastore's DB since that is where the jobqueue
 			// writes execution data to.
 			if executionDataDBMode == execution_data.ExecutionDataDBModeBadger {
-				processedNotifications = bstorage.NewConsumerProgress(builder.ExecutionDataStorage.DB().(*badger.DB), module.ConsumeProgressExecutionDataRequesterNotification)
+				processedNotifications = bstorage.NewConsumerProgress(builder.ExecutionDatastoreManager.DB().(*badger.DB), module.ConsumeProgressExecutionDataRequesterNotification)
 			} else {
-				processedNotifications = pstorage.NewConsumerProgress(builder.ExecutionDataStorage.DB().(*pebble.DB), module.ConsumeProgressExecutionDataRequesterNotification)
+				processedNotifications = pstorage.NewConsumerProgress(builder.ExecutionDatastoreManager.DB().(*pebble.DB), module.ConsumeProgressExecutionDataRequesterNotification)
 			}
 			return nil
 		}).
@@ -1345,7 +1345,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				prunerMetrics,
 				builder.ExecutionDataTracker,
 				pruner.WithPruneCallback(func(ctx context.Context) error {
-					return builder.ExecutionDataStorage.CollectGarbage(ctx)
+					return builder.ExecutionDatastoreManager.CollectGarbage(ctx)
 				}),
 				pruner.WithHeightRangeTarget(builder.executionDataPrunerHeightRangeTarget),
 				pruner.WithThreshold(builder.executionDataPrunerThreshold),
