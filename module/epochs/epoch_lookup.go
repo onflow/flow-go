@@ -285,47 +285,39 @@ func (lookup *EpochLookup) handleProtocolEvents(ctx irrecoverable.SignalerContex
 	}
 }
 
-// EpochExtended listens to `EpochExtended` protocol notifications. The notification is queued
-// for async processing by the worker. We must process _all_ `EpochExtended` notifications.
-func (lookup *EpochLookup) EpochExtended(epochCounter uint64, _ *flow.Header, extension flow.EpochExtension) {
-	lookup.epochEvents <- func() error {
-		return lookup.processEpochExtended(epochCounter, extension)
-	}
-}
-
-// EpochCommittedPhaseStarted ingests the respective protocol notifications. The notification is
-// queued for async processing by the worker. We must process _all_ `EpochCommittedPhaseStarted` notifications.
-func (lookup *EpochLookup) EpochCommittedPhaseStarted(_ uint64, first *flow.Header) {
-	lookup.epochEvents <- func() error {
-		return lookup.processEpochCommittedPhaseStarted(first)
-	}
-}
-
-// processEpochExtended processes the EpochExtended notification, which the Protocol
+// EpochExtended listens to `EpochExtended` protocol notifications which the Protocol
 // State emits when we finalize the first block whose Protocol State further extends the current
 // epoch. The next epoch should not be committed so far, because epoch extension are only added
 // when there is no subsequent epoch that we could transition into but the current epoch is nearing
-// its end. Specifically, we update the final view of the latest epoch range with the final view of the
+// its end. The notification is queued for async processing by the worker.
+// Specifically, we update the final view of the latest epoch range with the final view of the
 // current epoch, which will now be updated because the epoch has extensions.
-func (lookup *EpochLookup) processEpochExtended(epochCounter uint64, extension flow.EpochExtension) error {
-	err := lookup.epochs.extendLatestEpoch(epochCounter, extension)
-	if err != nil {
-		return err
-	}
+// We must process _all_ `EpochExtended` notifications.
+// No errors are expected to be returned by the process callback during normal operation.
+func (lookup *EpochLookup) EpochExtended(epochCounter uint64, _ *flow.Header, extension flow.EpochExtension) {
+	lookup.epochEvents <- func() error {
+		err := lookup.epochs.extendLatestEpoch(epochCounter, extension)
+		if err != nil {
+			return err
+		}
 
-	return nil
+		return nil
+	}
 }
 
-// processEpochCommittedPhaseStarted processes the EpochCommittedPhaseStarted notification, which
-// the consensus component emits when we finalize the first block of the Epoch Committed phase.
-// Specifically, we cache the next epoch in the EpochLookup.
-// No errors are expected during normal operation.
-func (lookup *EpochLookup) processEpochCommittedPhaseStarted(first *flow.Header) error {
-	epoch := lookup.state.AtBlockID(first.ID()).Epochs().Next()
-	err := lookup.cacheEpoch(epoch)
-	if err != nil {
-		return fmt.Errorf("failed to cache next epoch: %w", err)
-	}
+// EpochCommittedPhaseStarted ingests the respective protocol notifications
+// which the Protocol State emits when we finalize the first block whose Protocol State further extends the current
+// epoch. The notification is queued for async processing by the worker. Specifically, we cache the next epoch in the EpochLookup.
+// We must process _all_ `EpochCommittedPhaseStarted` notifications.
+// No errors are expected to be returned by the process callback during normal operation.
+func (lookup *EpochLookup) EpochCommittedPhaseStarted(_ uint64, first *flow.Header) {
+	lookup.epochEvents <- func() error {
+		epoch := lookup.state.AtBlockID(first.ID()).Epochs().Next()
+		err := lookup.cacheEpoch(epoch)
+		if err != nil {
+			return fmt.Errorf("failed to cache next epoch: %w", err)
+		}
 
-	return nil
+		return nil
+	}
 }
