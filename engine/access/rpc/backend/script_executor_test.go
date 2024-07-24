@@ -180,6 +180,8 @@ func (s *ScriptExecutorSuite) TestExecuteAtBlockHeight() {
 
 	s.reporter.On("LowestIndexedHeight").Return(s.height, nil)
 
+	// This test simulates the behavior when the version beacon is not set in the script executor,
+	// but it should still work by omitting the version control checks.
 	s.Run("test script execution without version control", func() {
 		scriptExec := NewScriptExecutor(s.log, uint64(0), math.MaxUint64)
 		s.reporter.On("HighestIndexedHeight").Return(s.height+1, nil).Once()
@@ -195,6 +197,8 @@ func (s *ScriptExecutorSuite) TestExecuteAtBlockHeight() {
 		s.Assert().Equal(expectedResult, res)
 	})
 
+	// This test simulates the behavior when the version beacon is set in the script executor,
+	// and the script is running on a block with a compatible version that matches the current node version.
 	s.Run("test script execution with version control with compatible version", func() {
 		// Set up a mock version beacons events storage
 		versionBeacons := storageMock.NewVersionBeacons(s.T())
@@ -245,7 +249,8 @@ func (s *ScriptExecutorSuite) TestExecuteAtBlockHeight() {
 		s.Assert().Equal(expectedResult, res)
 	})
 
-	// Test case for script execution with version control and incompatible version
+	// This test simulates the behavior when the version beacon is set in the script executor,
+	// and the script is running on a block with incompatible version that mismatch the current node version.
 	s.Run("test script execution with version control with incompatible version", func() {
 		// Set up a mock version beacons events storage
 		versionBeacons := storageMock.NewVersionBeacons(s.T())
