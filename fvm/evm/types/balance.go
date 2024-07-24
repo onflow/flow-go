@@ -16,8 +16,6 @@ var (
 	UFixToAttoConversionMultiplier = new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(UFixedToAttoConversionScale)), nil)
 
 	OneFlowInUFix64 = cadence.UFix64(uint64(math.Pow(10, float64(UFixedScale))))
-	OneFlow         = new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(AttoScale)), nil)
-	OneFlowBalance  = Balance(OneFlow)
 	EmptyBalance    = Balance(new(big.Int))
 )
 
@@ -111,5 +109,20 @@ func AddBalance(bal1 Balance, bal2 Balance) (Balance, error) {
 
 // MakeABalanceInFlow makes a balance object that has `amount` Flow Token in it
 func MakeABalanceInFlow(amount uint64) Balance {
-	return NewBalance(new(big.Int).Mul(OneFlowBalance, new(big.Int).SetUint64(amount)))
+	return NewBalance(MakeBigIntInFlow(amount))
+}
+
+// MakeBigIntInFlow makes big int containing `amount` of Flow
+func MakeBigIntInFlow(amount uint64) *big.Int {
+	return new(big.Int).Mul(OneFlowBalance(), new(big.Int).SetUint64(amount))
+}
+
+// OneFlow creates a big int including one flow
+func OneFlow() *big.Int {
+	return new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(AttoScale)), nil)
+}
+
+// OneFlowBalance creates a new balance including one flow
+func OneFlowBalance() Balance {
+	return Balance(OneFlow())
 }

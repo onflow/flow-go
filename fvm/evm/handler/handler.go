@@ -186,6 +186,8 @@ func (h *ContractHandler) batchRun(
 	coinbase types.Address,
 ) ([]*types.Result, error) {
 	// step 1 - transaction decoding and compute total gas needed
+	// This is safe to be done before checking the gas
+	// as it has its own metering
 	var totalGasLimit types.GasLimit
 	batchLen := len(rlpEncodedTxs)
 	txs := make([]*gethTypes.Transaction, batchLen)

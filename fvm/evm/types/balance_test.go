@@ -13,7 +13,7 @@ import (
 
 func TestBalance(t *testing.T) {
 	// test attoflow to flow
-	bal := types.OneFlowBalance
+	bal := types.OneFlowBalance()
 	require.Equal(t, bal, types.NewBalanceFromUFix64(types.OneFlowInUFix64))
 
 	// 100.0002 Flow

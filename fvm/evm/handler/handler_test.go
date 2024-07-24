@@ -283,7 +283,7 @@ func TestHandler_OpsWithoutEmulator(t *testing.T) {
 				// do some changes
 				address := testutils.RandomAddress(t)
 				account := handler.AccountByAddress(address, true)
-				bal := types.OneFlowBalance
+				bal := types.OneFlowBalance()
 				account.Deposit(types.NewFlowTokenVault(bal))
 
 				handler.CommitBlockProposal()
@@ -327,7 +327,7 @@ func TestHandler_COA(t *testing.T) {
 				zeroBalance := types.NewBalance(big.NewInt(0))
 				require.True(t, types.BalancesAreEqual(zeroBalance, foa.Balance()))
 
-				balance := types.OneFlowBalance
+				balance := types.OneFlowBalance()
 				vault := types.NewFlowTokenVault(balance)
 
 				foa.Deposit(vault)
