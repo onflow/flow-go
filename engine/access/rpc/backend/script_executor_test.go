@@ -34,6 +34,8 @@ import (
 	"github.com/onflow/flow-go/utils/unittest/mocks"
 )
 
+// ScriptExecutorSuite is a test suite for testing the ScriptExecutor.
+// It sets up the necessary components and dependencies for executing scripts.
 type ScriptExecutorSuite struct {
 	suite.Suite
 
@@ -52,10 +54,12 @@ type ScriptExecutorSuite struct {
 	snapshot       snapshot.SnapshotTree
 }
 
+// TestScriptExecutorSuite runs the ScriptExecutorSuite test suite.
 func TestScriptExecutorSuite(t *testing.T) {
 	suite.Run(t, new(ScriptExecutorSuite))
 }
 
+// newBlockHeadersStorage creates a mock block header storage for the given blocks.
 func newBlockHeadersStorage(blocks []*flow.Block) storage.Headers {
 	blocksByHeight := make(map[uint64]*flow.Block)
 	for _, b := range blocks {
@@ -65,6 +69,8 @@ func newBlockHeadersStorage(blocks []*flow.Block) storage.Headers {
 	return synctest.MockBlockHeaderStorage(synctest.WithByHeight(blocksByHeight))
 }
 
+// bootstrap initializes the virtual machine and updates the register index and snapshot.
+// This method sets up the initial state for the virtual machine.
 func (s *ScriptExecutorSuite) bootstrap() {
 	bootstrapOpts := []fvm.BootstrapProcedureOption{
 		fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply),
@@ -75,16 +81,21 @@ func (s *ScriptExecutorSuite) bootstrap() {
 		fvm.Bootstrap(unittest.ServiceAccountPublicKey, bootstrapOpts...),
 		s.snapshot)
 
+	// Ensure no errors occurred during the bootstrap process
 	s.Require().NoError(err)
 	s.Require().NoError(out.Err)
 
+	// Update the block height and store the updated registers
 	s.height++
 	err = s.registerIndex.Store(executionSnapshot.UpdatedRegisters(), s.height)
 	s.Require().NoError(err)
 
+	// Append the execution snapshot to the snapshot tree
 	s.snapshot = s.snapshot.Append(executionSnapshot)
 }
 
+// SetupTest sets up the test environment for each test in the suite.
+// This includes initializing various components and mock objects needed for the tests.
 func (s *ScriptExecutorSuite) SetupTest() {
 	s.log = unittest.Logger()
 	s.chain = flow.Emulator.Chain()
@@ -152,11 +163,13 @@ func (s *ScriptExecutorSuite) SetupTest() {
 	s.bootstrap()
 }
 
-// runs after each test finishes
+// TearDownTest runs after each test finishes and ensures components are done before continuing.
 func (s *ScriptExecutorSuite) TearDownTest() {
 	unittest.RequireComponentsDoneBefore(s.T(), 100*time.Millisecond, s.versionControl)
 }
 
+// TestExecuteAtBlockHeight tests script execution at a specific block height.
+// It verifies the behavior of script execution with and without version control.
 func (s *ScriptExecutorSuite) TestExecuteAtBlockHeight() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -171,9 +184,11 @@ func (s *ScriptExecutorSuite) TestExecuteAtBlockHeight() {
 		scriptExec := NewScriptExecutor(s.log, uint64(0), math.MaxUint64)
 		s.reporter.On("HighestIndexedHeight").Return(s.height+1, nil).Once()
 
+		// Initialize the script executor without version control
 		err := scriptExec.Initialize(s.indexReporter, s.scripts, nil)
 		s.Require().NoError(err)
 
+		// Execute the script at the specified block height
 		res, err := scriptExec.ExecuteAtBlockHeight(ctx, script, scriptArgs, s.height)
 		s.Assert().NoError(err)
 		s.Assert().NotNil(res)
@@ -181,7 +196,7 @@ func (s *ScriptExecutorSuite) TestExecuteAtBlockHeight() {
 	})
 
 	s.Run("test script execution with version control with compatible version", func() {
-		// Set up a mock version beacons storage.
+		// Set up a mock version beacons events storage
 		versionBeacons := storageMock.NewVersionBeacons(s.T())
 		versionEvents := map[uint64]*flow.SealedVersionBeacon{
 			s.height: versionBeaconEvent(
@@ -191,12 +206,13 @@ func (s *ScriptExecutorSuite) TestExecuteAtBlockHeight() {
 				[]string{"0.0.1"},
 			),
 		}
-		// Mock the Highest method to return a version beacon with a specific version.
+		// Mock the Highest method to return a version beacon with a specific version
 		versionBeacons.
 			On("Highest", testifyMock.AnythingOfType("uint64")).
 			Return(mocks.StorageMapGetter(versionEvents))
 
 		var err error
+		// Initialize version control with the mock version beacons
 		s.versionControl, err = version.NewVersionControl(
 			s.log,
 			versionBeacons,
@@ -206,29 +222,32 @@ func (s *ScriptExecutorSuite) TestExecuteAtBlockHeight() {
 		)
 		require.NoError(s.T(), err)
 
-		// Create a mock signaler context for testing.
+		// Create a mock signaler context for testing
 		ictx := irrecoverable.NewMockSignalerContext(s.T(), ctx)
 
-		// Start the VersionControl component.
+		// Start the VersionControl component
 		s.versionControl.Start(ictx)
 
-		// Ensure the component is ready before proceeding.
+		// Ensure the component is ready before proceeding
 		unittest.RequireComponentsReadyBefore(s.T(), 2*time.Second, s.versionControl)
 
+		// Initialize the script executor with version control
 		scriptExec := NewScriptExecutor(s.log, uint64(0), math.MaxUint64)
 		s.reporter.On("HighestIndexedHeight").Return(s.height+1, nil)
 
 		err = scriptExec.Initialize(s.indexReporter, s.scripts, s.versionControl)
 		s.Require().NoError(err)
 
+		// Execute the script at the specified block height
 		res, err := scriptExec.ExecuteAtBlockHeight(ctx, script, scriptArgs, s.height)
 		s.Assert().NoError(err)
 		s.Assert().NotNil(res)
 		s.Assert().Equal(expectedResult, res)
 	})
 
+	// Test case for script execution with version control and incompatible version
 	s.Run("test script execution with version control with incompatible version", func() {
-		// Set up a mock version beacons storage.
+		// Set up a mock version beacons events storage
 		versionBeacons := storageMock.NewVersionBeacons(s.T())
 		versionEvents := map[uint64]*flow.SealedVersionBeacon{
 			s.height: versionBeaconEvent(
@@ -238,12 +257,13 @@ func (s *ScriptExecutorSuite) TestExecuteAtBlockHeight() {
 				[]string{"0.0.2"},
 			),
 		}
-		// Mock the Highest method to return a version beacon with a specific version.
+		// Mock the Highest method to return a version beacon with a specific version
 		versionBeacons.
 			On("Highest", testifyMock.AnythingOfType("uint64")).
 			Return(mocks.StorageMapGetter(versionEvents))
 
 		var err error
+		// Initialize version control with the mock version beacons
 		s.versionControl, err = version.NewVersionControl(
 			s.log,
 			versionBeacons,
@@ -253,21 +273,23 @@ func (s *ScriptExecutorSuite) TestExecuteAtBlockHeight() {
 		)
 		require.NoError(s.T(), err)
 
-		// Create a mock signaler context for testing.
+		// Create a mock signaler context for testing
 		ictx := irrecoverable.NewMockSignalerContext(s.T(), ctx)
 
-		// Start the VersionControl component.
+		// Start the VersionControl component
 		s.versionControl.Start(ictx)
 
-		// Ensure the component is ready before proceeding.
+		// Ensure the component is ready before proceeding
 		unittest.RequireComponentsReadyBefore(s.T(), 2*time.Second, s.versionControl)
 
+		// Initialize the script executor with version control
 		scriptExec := NewScriptExecutor(s.log, uint64(0), math.MaxUint64)
 		s.reporter.On("HighestIndexedHeight").Return(s.height+1, nil)
 
 		err = scriptExec.Initialize(s.indexReporter, s.scripts, s.versionControl)
 		s.Require().NoError(err)
 
+		// Execute the script at the specified block height
 		res, err := scriptExec.ExecuteAtBlockHeight(ctx, script, scriptArgs, s.height)
 		s.Assert().ErrorIs(ErrIncompatibleNodeVersion, err)
 		s.Assert().Nil(res)
@@ -275,7 +297,13 @@ func (s *ScriptExecutorSuite) TestExecuteAtBlockHeight() {
 }
 
 // versionBeaconEvent creates a SealedVersionBeacon for the given heights and versions.
-func versionBeaconEvent(t *testing.T, sealHeight uint64, heights []uint64, versions []string) *flow.SealedVersionBeacon {
+// This is used to simulate version events in the tests.
+func versionBeaconEvent(
+	t *testing.T,
+	sealHeight uint64,
+	heights []uint64,
+	versions []string,
+) *flow.SealedVersionBeacon {
 	require.Equal(t, len(heights), len(versions), "the heights array should be the same length as the versions array")
 	var vb []flow.VersionBoundary
 	for i := 0; i < len(heights); i++ {
