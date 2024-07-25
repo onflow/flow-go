@@ -54,7 +54,7 @@ func (a *AccountPublicKey) Build(k flow.AccountPublicKey) {
 	a.Revoked = k.Revoked
 }
 
-type AccountPublicKeys []AccountPublicKey
+type AccountKeys []AccountPublicKey
 
 func (a *AccountPublicKeys) Build(accountKeys []flow.AccountPublicKey) {
 	keys := make([]AccountPublicKey, len(accountKeys))
