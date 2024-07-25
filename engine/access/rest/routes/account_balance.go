@@ -17,8 +17,9 @@ func GetAccountBalance(r *request.Request, backend access.API, _ models.LinkGene
 
 	// In case we receive special height values 'final' and 'sealed',
 	// fetch that height and overwrite request with it.
-	if req.Height == request.FinalHeight || req.Height == request.SealedHeight {
-		isSealed := req.Height == request.SealedHeight
+	isSealed := req.Height == request.SealedHeight
+	isFinal:= req.Height == request.FinalHeight
+	if isFinal || isSealed {		
 		header, _, err := backend.GetLatestBlockHeader(r.Context(), isSealed)
 		if err != nil {
 			err := fmt.Errorf("block with height: %d does not exist", req.Height)
