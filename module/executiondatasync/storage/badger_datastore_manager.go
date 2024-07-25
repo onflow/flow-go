@@ -46,9 +46,8 @@ func (b *BadgerDatastoreManager) DB() interface{} {
 }
 
 // Close terminates the connection to the datastore and releases
-// any resources associated with it. This method should be called
-// when you are finished using the datastore to ensure resources
-// are properly cleaned up.
+// any associated resources. This method should be called
+// when finished using the datastore to ensure proper resource cleanup.
 func (b *BadgerDatastoreManager) Close() error {
 	return b.ds.Close()
 }
