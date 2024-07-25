@@ -13,6 +13,12 @@ import (
 	"github.com/onflow/flow-go/state/protocol/events"
 )
 
+const (
+	invalidExtensionFinalView = "sanity check failed: latest epoch final view %d greater than extension final view %d"
+	mismatchEpochCounter      = "sanity check failed: latest epoch counter %d does not match extension epoch counter %d"
+	invalidEpochViewSequence  = "sanity check: first view of the epoch extension %d should immediately start after the final view of the latest epoch %d"
+)
+
 // epochRange captures the counter and view range of an epoch (inclusive on both ends)
 type epochRange struct {
 	counter   uint64
@@ -53,17 +59,17 @@ func (cache *epochRangeCache) extendLatestEpoch(epochCounter uint64, extension f
 
 	// sanity check: `extension.FinalView` should be greater than final view of latest epoch
 	if cache[2].finalView > extension.FinalView {
-		return fmt.Errorf("sanity check failed: latest epoch final view %d greater than extension final view %d", cache[2].finalView, extension.FinalView)
+		return fmt.Errorf(invalidExtensionFinalView, cache[2].finalView, extension.FinalView)
 	}
 
 	// sanity check: epoch extension should have the same epoch counter as the latest epoch
 	if cache[2].counter != epochCounter {
-		return fmt.Errorf("sanity check failed: latest epoch counter %d does not match extension epoch counter %d", cache[2].counter, epochCounter)
+		return fmt.Errorf(mismatchEpochCounter, cache[2].counter, epochCounter)
 	}
 
 	// sanity check: first view of the epoch extension should immediately start after the final view of the latest epoch.
 	if latestEpoch.finalView+1 != extension.FirstView {
-		return fmt.Errorf("sanity check: first view of the epoch extension %d should immediately start after the final view of the latest epoch %d", extension.FirstView, latestEpoch.finalView)
+		return fmt.Errorf(invalidEpochViewSequence, extension.FirstView, latestEpoch.finalView)
 	}
 
 	latestEpoch.finalView = extension.FinalView

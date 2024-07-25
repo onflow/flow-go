@@ -2,11 +2,13 @@ package epochs
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
@@ -192,6 +194,93 @@ func (suite *EpochLookupSuite) TestProtocolEvents_EpochExtended() {
 
 	// validate queries are answered correctly
 	testEpochForView(suite.T(), suite.lookup, epochs...)
+}
+
+// TestProtocolEvents_EpochExtended_SanityChecks ensures all expected sanity checks are checked when processing
+// EpochExtended events.
+func (suite *EpochLookupSuite) TestProtocolEvents_EpochExtended_SanityChecks() {
+	initAndStartLookup := func() *irrecoverable.MockSignalerContext {
+		lookup, err := NewEpochLookup(suite.state)
+		suite.Require().NoError(err)
+		ctx, cancel := irrecoverable.NewMockSignalerContextWithCancel(suite.T(), context.Background())
+		lookup.Start(ctx)
+
+		suite.lookup = lookup
+		suite.cancel = cancel
+
+		return ctx
+	}
+
+	suite.T().Run("sanity check: `extension.FinalView` should be greater than final view of latest epoch", func(t *testing.T) {
+		// initially, only current epoch is committed
+		suite.CommitEpochs(suite.prevEpoch, suite.currEpoch)
+		ctx := initAndStartLookup()
+
+		// create invalid extension with final view in the past
+		extension := flow.EpochExtension{
+			FirstView: suite.currEpoch.finalView + 1,
+			FinalView: suite.currEpoch.finalView - 100,
+		}
+
+		ctx.On("Throw", mock.AnythingOfType("*errors.errorString")).Run(func(args mock.Arguments) {
+			err, ok := args.Get(0).(error)
+			assert.True(suite.T(), ok)
+			assert.Contains(suite.T(), err.Error(), fmt.Sprintf(invalidExtensionFinalView, suite.currEpoch.finalView, extension.FinalView))
+		})
+
+		suite.lookup.EpochExtended(suite.currEpoch.counter, nil, extension)
+
+		// wait for the protocol event to be processed (async)
+		assert.Eventually(suite.T(), func() bool {
+			return len(suite.lookup.epochEvents) == 0
+		}, 2*time.Second, 50*time.Millisecond)
+	})
+	suite.T().Run("sanity check: epoch extension should have the same epoch counter as the latest epoch", func(t *testing.T) {
+		// initially, only current epoch is committed
+		suite.CommitEpochs(suite.prevEpoch, suite.currEpoch)
+		ctx := initAndStartLookup()
+
+		unknownCounter := uint64(100)
+		ctx.On("Throw", mock.AnythingOfType("*errors.errorString")).Run(func(args mock.Arguments) {
+			err, ok := args.Get(0).(error)
+			assert.True(suite.T(), ok)
+			assert.Contains(suite.T(), err.Error(), fmt.Sprintf(mismatchEpochCounter, suite.currEpoch.counter, unknownCounter))
+		})
+
+		suite.lookup.EpochExtended(unknownCounter, nil, flow.EpochExtension{
+			FirstView: suite.currEpoch.finalView + 1,
+			FinalView: suite.currEpoch.finalView + 100,
+		})
+
+		// wait for the protocol event to be processed (async)
+		assert.Eventually(suite.T(), func() bool {
+			return len(suite.lookup.epochEvents) == 0
+		}, 2*time.Second, 50*time.Millisecond)
+	})
+	suite.T().Run("sanity check: first view of the epoch extension should immediately start after the final view of the latest epoch", func(t *testing.T) {
+		// initially, only current epoch is committed
+		suite.CommitEpochs(suite.prevEpoch, suite.currEpoch)
+		ctx := initAndStartLookup()
+
+		// create invalid extension with final view in the past
+		extension := flow.EpochExtension{
+			FirstView: suite.currEpoch.finalView - 100,
+			FinalView: suite.currEpoch.finalView + 100,
+		}
+
+		ctx.On("Throw", mock.AnythingOfType("*errors.errorString")).Run(func(args mock.Arguments) {
+			err, ok := args.Get(0).(error)
+			assert.True(suite.T(), ok)
+			assert.Contains(suite.T(), err.Error(), fmt.Sprintf(invalidEpochViewSequence, extension.FirstView, suite.currEpoch.finalView))
+		})
+
+		suite.lookup.EpochExtended(suite.currEpoch.counter, nil, extension)
+
+		// wait for the protocol event to be processed (async)
+		assert.Eventually(suite.T(), func() bool {
+			return len(suite.lookup.epochEvents) == 0
+		}, 2*time.Second, 50*time.Millisecond)
+	})
 }
 
 // TestProtocolEvents_CommittedEpoch tests correct processing of an `EpochCommittedPhaseStarted` event
