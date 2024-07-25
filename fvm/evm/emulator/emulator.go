@@ -123,7 +123,7 @@ func (bl *BlockView) DirectCall(call *types.DirectCall) (res *types.Result, err 
 		proc.evm.Config.Tracer.OnTxStart(proc.evm.GetVMContext(), call.Transaction(), call.From.ToCommon())
 		defer func() {
 			if proc.evm.Config.Tracer.OnTxEnd != nil {
-				var receipt *gethTypes.Receipt
+				receipt := &gethTypes.Receipt{}
 				if res != nil {
 					receipt = res.Receipt()
 				}
@@ -175,7 +175,7 @@ func (bl *BlockView) RunTransaction(
 		proc.evm.Config.Tracer.OnTxStart(proc.evm.GetVMContext(), tx, msg.From)
 		defer func() {
 			if proc.evm.Config.Tracer.OnTxEnd != nil {
-				var receipt *gethTypes.Receipt
+				receipt := &gethTypes.Receipt{}
 				if result != nil {
 					receipt = result.Receipt()
 				}
@@ -223,7 +223,7 @@ func (bl *BlockView) BatchRunTransactions(txs []*gethTypes.Transaction) ([]*type
 			proc.evm.Config.Tracer.OnTxStart(proc.evm.GetVMContext(), tx, msg.From)
 			defer func() {
 				if proc.evm.Config.Tracer.OnTxEnd != nil {
-					var receipt *gethTypes.Receipt
+					receipt := &gethTypes.Receipt{}
 					if batchResults[i] != nil {
 						receipt = batchResults[i].Receipt()
 					}
