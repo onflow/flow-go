@@ -72,8 +72,7 @@ func (cache *epochRangeCache) extendLatestEpoch(epochCounter uint64, extension f
 		return fmt.Errorf(invalidEpochViewSequence, extension.FirstView, latestEpoch.finalView)
 	}
 
-	latestEpoch.finalView = extension.FinalView
-	cache[2] = latestEpoch
+	cache[2].finalView = extension.FinalView
 	return nil
 }
 
