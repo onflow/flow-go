@@ -119,6 +119,7 @@ const (
 	DefaultViewsInDKGPhase            uint64 = 50
 	DefaultViewsInEpoch               uint64 = 200
 	DefaultEpochCommitSafetyThreshold uint64 = 20
+	DefaultEpochExtensionViewCount    uint64 = 50
 
 	// DefaultMinimumNumOfAccessNodeIDS at-least 1 AN ID must be configured for LN & SN
 	DefaultMinimumNumOfAccessNodeIDS = 1
@@ -444,7 +445,7 @@ func NewNetworkConfig(name string, nodes NodeConfigs, opts ...NetworkConfigOpt) 
 		ViewsInEpoch:               DefaultViewsInEpoch,
 		EpochCommitSafetyThreshold: DefaultEpochCommitSafetyThreshold,
 		KVStoreFactory: func(epochStateID flow.Identifier) (protocol_state.KVStoreAPI, error) {
-			return kvstore.NewDefaultKVStore(DefaultEpochCommitSafetyThreshold, epochStateID)
+			return kvstore.NewDefaultKVStore(DefaultEpochCommitSafetyThreshold, DefaultEpochExtensionViewCount, epochStateID)
 		},
 	}
 

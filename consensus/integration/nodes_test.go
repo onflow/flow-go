@@ -282,9 +282,9 @@ func createRootBlockData(t *testing.T, participantData *run.ParticipantData) (*f
 	)
 
 	epochProtocolStateID := inmem.EpochProtocolStateFromServiceEvents(setup, commit).ID()
-	finalizationThreshold, err := protocol.DefaultEpochCommitSafetyThreshold(root.Header.ChainID)
+	safetyParams, err := protocol.DefaultEpochSafetyParams(root.Header.ChainID)
 	require.NoError(t, err)
-	rootProtocolState, err := kvstore.NewDefaultKVStore(finalizationThreshold, epochProtocolStateID)
+	rootProtocolState, err := kvstore.NewDefaultKVStore(safetyParams.FinalizationSafetyThreshold, safetyParams.EpochExtensionViewCount, epochProtocolStateID)
 	require.NoError(t, err)
 	root.SetPayload(flow.Payload{ProtocolStateID: rootProtocolState.ID()})
 	result := unittest.BootstrapExecutionResultFixture(root, unittest.GenesisStateCommitment)

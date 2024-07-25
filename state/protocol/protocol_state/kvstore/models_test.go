@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/protocol_state"
 	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
@@ -178,4 +179,64 @@ func assertModelIsUpgradable(t *testing.T, api protocol_state.KVStoreMutator) {
 	// check if setting nil version upgrade works
 	api.SetVersionUpgrade(nil)
 	assert.Nil(t, api.GetVersionUpgrade(), "version upgrade should be nil")
+}
+
+// TestNewDefaultKVStore tests that the default KV store is created correctly.
+func TestNewDefaultKVStore(t *testing.T) {
+	t.Run("happy-path", func(t *testing.T) {
+		safetyParams, err := protocol.DefaultEpochSafetyParams(flow.Localnet)
+		require.NoError(t, err)
+		epochStateID := unittest.IdentifierFixture()
+		store, err := kvstore.NewDefaultKVStore(safetyParams.FinalizationSafetyThreshold, safetyParams.EpochExtensionViewCount, epochStateID)
+		require.NoError(t, err)
+		require.Equal(t, store.GetEpochStateID(), epochStateID)
+		require.Equal(t, store.GetEpochCommitSafetyThreshold(), safetyParams.FinalizationSafetyThreshold)
+		require.Equal(t, store.GetEpochExtensionViewCount(), safetyParams.EpochExtensionViewCount)
+		require.GreaterOrEqual(t, store.GetEpochExtensionViewCount(), 2*safetyParams.FinalizationSafetyThreshold,
+			"extension view count should be at least 2*FinalizationSafetyThreshold")
+	})
+	t.Run("invalid-epoch-extension-view-count", func(t *testing.T) {
+		safetyParams, err := protocol.DefaultEpochSafetyParams(flow.Localnet)
+		require.NoError(t, err)
+		epochStateID := unittest.IdentifierFixture()
+		// invalid epoch extension view count, it has to be at least 2*FinalizationSafetyThreshold
+		store, err := kvstore.NewDefaultKVStore(safetyParams.FinalizationSafetyThreshold, safetyParams.FinalizationSafetyThreshold, epochStateID)
+		require.Error(t, err)
+		require.Nil(t, store)
+	})
+}
+
+// TestKVStoreMutator_SetEpochExtensionViewCount tests that setter performs an input validation and doesn't allow setting
+// a value which is lower than 2*FinalizationSafetyThreshold.
+func TestKVStoreMutator_SetEpochExtensionViewCount(t *testing.T) {
+	safetyParams, err := protocol.DefaultEpochSafetyParams(flow.Localnet)
+	require.NoError(t, err)
+	epochStateID := unittest.IdentifierFixture()
+
+	t.Run("happy-path", func(t *testing.T) {
+		store, err := kvstore.NewDefaultKVStore(safetyParams.FinalizationSafetyThreshold, safetyParams.EpochExtensionViewCount, epochStateID)
+		require.NoError(t, err)
+		mutator, err := store.Replicate(store.GetProtocolStateVersion())
+		require.NoError(t, err)
+
+		newValue := safetyParams.FinalizationSafetyThreshold*2 + 1
+		require.NotEqual(t, mutator.GetEpochExtensionViewCount(), newValue)
+		err = mutator.SetEpochExtensionViewCount(newValue)
+		require.NoError(t, err)
+		require.Equal(t, mutator.GetEpochExtensionViewCount(), newValue)
+	})
+	t.Run("invalid-value", func(t *testing.T) {
+		store, err := kvstore.NewDefaultKVStore(safetyParams.FinalizationSafetyThreshold, safetyParams.EpochExtensionViewCount, epochStateID)
+		require.NoError(t, err)
+		mutator, err := store.Replicate(store.GetProtocolStateVersion())
+		require.NoError(t, err)
+
+		oldValue := mutator.GetEpochExtensionViewCount()
+		newValue := safetyParams.FinalizationSafetyThreshold*2 - 1
+		require.NotEqual(t, oldValue, newValue)
+		err = mutator.SetEpochExtensionViewCount(newValue)
+		require.ErrorIs(t, err, kvstore.ErrInvalidValue)
+		require.Equal(t, mutator.GetEpochExtensionViewCount(), oldValue, "value should be unchanged")
+	})
+
 }
