@@ -814,7 +814,8 @@ contract EVM {
             ?? panic("Could not borrow reference to the EVM bridge")
     }
 
-    /// The Heartbeat resource controls the block production
+    /// The Heartbeat resource controls the block production.
+    /// It is stored in the storage and used in the Flow protocol to call the heartbeat function once per block.
     access(all)
     resource Heartbeat {
         /// heartbeat calls commit block proposals and forms new blocks including all the
@@ -826,13 +827,23 @@ contract EVM {
         }
     }
 
-    /// createHeartBeat creates a heartbeat resource
-    access(account)
-    fun createHeartBeat(): @Heartbeat{
-        return <-create Heartbeat()
+    /// setupHeartbeat creates a heartbeat resource and saves it to storage.
+    /// The function is called once during the contract initialization.
+    ///
+    /// The heartbeat resource is used to control the block production,
+    /// and used in the Flow protocol to call the heartbeat function once per block.
+    ///
+    /// The function can be called by anyone, but only once:
+    /// the function will fail if the resource already exists.
+    ///
+    /// The resulting resource is stored in the account storage,
+    /// and is only accessible by the account, not the caller of the function.
+    access(all)
+    fun setupHeartbeat() {
+        self.account.storage.save(<-create Heartbeat(), to: /storage/EVMHeartbeat)
     }
 
     init() {
-        self.account.storage.save(<-create Heartbeat(), to: /storage/EVMHeartbeat)
+        self.setupHeartbeat()
     }
 }
