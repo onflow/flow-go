@@ -170,7 +170,11 @@ func (bl *BlockView) RunTransaction(
 		proc.evm.Config.Tracer.OnTxStart(proc.evm.GetVMContext(), tx, msg.From)
 		if proc.evm.Config.Tracer.OnTxEnd != nil {
 			defer func() {
-				proc.evm.Config.Tracer.OnTxEnd(result.Receipt(), err)
+				var receipt *gethTypes.Receipt
+				if result != nil {
+					receipt = result.Receipt()
+				}
+				proc.evm.Config.Tracer.OnTxEnd(receipt, err)
 			}()
 		}
 	}
