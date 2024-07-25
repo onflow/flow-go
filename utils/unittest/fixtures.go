@@ -2263,12 +2263,12 @@ func BootstrapFixtureWithChainID(
 		WithDKGFromParticipants(participants.ToSkeleton()),
 	)
 
-	threshold, err := protocol.DefaultEpochCommitSafetyThreshold(root.Header.ChainID)
+	safetyParams, err := protocol.DefaultEpochSafetyParams(root.Header.ChainID)
 	if err != nil {
 		panic(err)
 	}
 	rootEpochState := inmem.EpochProtocolStateFromServiceEvents(setup, commit)
-	rootProtocolState, err := kvstore.NewDefaultKVStore(threshold, rootEpochState.ID())
+	rootProtocolState, err := kvstore.NewDefaultKVStore(safetyParams.FinalizationSafetyThreshold, safetyParams.EpochExtensionViewCount, rootEpochState.ID())
 	if err != nil {
 		panic(err)
 	}

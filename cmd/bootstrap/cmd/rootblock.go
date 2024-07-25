@@ -29,6 +29,7 @@ var (
 	flagRootTimestamp              string
 	flagProtocolVersion            uint
 	flagEpochCommitSafetyThreshold uint64
+	flagEpochExtensionViewCount    uint64
 	flagCollectionClusters         uint
 	flagEpochCounter               uint64
 	flagNumViewsInEpoch            uint64
@@ -93,12 +94,14 @@ func addRootBlockCmdFlags() {
 	rootBlockCmd.Flags().StringVar(&flagRootTimestamp, "root-timestamp", time.Now().UTC().Format(time.RFC3339), "timestamp of the root block (RFC3339)")
 	rootBlockCmd.Flags().UintVar(&flagProtocolVersion, "protocol-version", flow.DefaultProtocolVersion, "major software version used for the duration of this spork")
 	rootBlockCmd.Flags().Uint64Var(&flagEpochCommitSafetyThreshold, "epoch-commit-safety-threshold", 500, "defines epoch commitment deadline")
+	rootBlockCmd.Flags().Uint64Var(&flagEpochExtensionViewCount, "epoch-extension-view-count", 100_000, "length of epoch extension in views, default is 100_000 which is approximately 1 day")
 
 	cmd.MarkFlagRequired(rootBlockCmd, "root-chain")
 	cmd.MarkFlagRequired(rootBlockCmd, "root-parent")
 	cmd.MarkFlagRequired(rootBlockCmd, "root-height")
 	cmd.MarkFlagRequired(rootBlockCmd, "protocol-version")
 	cmd.MarkFlagRequired(rootBlockCmd, "epoch-commit-safety-threshold")
+	cmd.MarkFlagRequired(rootBlockCmd, "epoch-extension-view-count")
 
 	// Epoch timing config - these values must be set identically to `EpochTimingConfig` in the FlowEpoch smart contract.
 	// See https://github.com/onflow/flow-core-contracts/blob/240579784e9bb8d97d91d0e3213614e25562c078/contracts/epochs/FlowEpoch.cdc#L259-L266
@@ -206,6 +209,7 @@ func rootBlock(cmd *cobra.Command, args []string) {
 	}
 	intermediaryParamsData := IntermediaryParamsData{
 		EpochCommitSafetyThreshold: flagEpochCommitSafetyThreshold,
+		EpochExtensionViewCount:    flagEpochExtensionViewCount,
 		ProtocolVersion:            flagProtocolVersion,
 	}
 	intermediaryData := IntermediaryBootstrappingData{
@@ -222,6 +226,7 @@ func rootBlock(cmd *cobra.Command, args []string) {
 	log.Info().Msg("constructing root block")
 	rootProtocolState, err := kvstore.NewDefaultKVStore(
 		flagEpochCommitSafetyThreshold,
+		flagEpochExtensionViewCount,
 		inmem.EpochProtocolStateFromServiceEvents(epochSetup, epochCommit).ID(),
 	)
 	if err != nil {
@@ -251,23 +256,26 @@ func validateEpochConfig() error {
 	dkgFinalView := flagNumViewsInStakingAuction + flagNumViewsInDKGPhase*3 // 3 DKG phases
 	epochCommitDeadline := flagNumViewsInEpoch - flagEpochCommitSafetyThreshold
 
-	defaultSafetyThreshold, err := protocol.DefaultEpochCommitSafetyThreshold(chainID)
+	defaultEpochSafetyParams, err := protocol.DefaultEpochSafetyParams(chainID)
 	if err != nil {
 		return fmt.Errorf("could not get default epoch commit safety threshold: %w", err)
 	}
 
 	// sanity check: the safety threshold is >= the default for the chain
-	if flagEpochCommitSafetyThreshold < defaultSafetyThreshold {
-		return fmt.Errorf("potentially unsafe epoch config: epoch commit safety threshold smaller than expected (%d < %d)", flagEpochCommitSafetyThreshold, defaultSafetyThreshold)
+	if flagEpochCommitSafetyThreshold < defaultEpochSafetyParams.FinalizationSafetyThreshold {
+		return fmt.Errorf("potentially unsafe epoch config: epoch commit safety threshold smaller than expected (%d < %d)", flagEpochCommitSafetyThreshold, defaultEpochSafetyParams.FinalizationSafetyThreshold)
+	}
+	if flagEpochExtensionViewCount < defaultEpochSafetyParams.EpochExtensionViewCount {
+		return fmt.Errorf("potentially unsafe epoch config: epoch extension view count smaller than expected (%d < %d)", flagEpochExtensionViewCount, defaultEpochSafetyParams.EpochExtensionViewCount)
 	}
 	// sanity check: epoch commitment deadline cannot be before the DKG end
 	if epochCommitDeadline <= dkgFinalView {
 		return fmt.Errorf("invalid epoch config: the epoch commitment deadline (%d) is before the DKG final view (%d)", epochCommitDeadline, dkgFinalView)
 	}
 	// sanity check: the difference between DKG end and safety threshold is also >= the default safety threshold
-	if epochCommitDeadline-dkgFinalView < defaultSafetyThreshold {
+	if epochCommitDeadline-dkgFinalView < defaultEpochSafetyParams.FinalizationSafetyThreshold {
 		return fmt.Errorf("potentially unsafe epoch config: time between DKG end and epoch commitment deadline is smaller than expected (%d-%d < %d)",
-			epochCommitDeadline, dkgFinalView, defaultSafetyThreshold)
+			epochCommitDeadline, dkgFinalView, defaultEpochSafetyParams.FinalizationSafetyThreshold)
 	}
 	return nil
 }

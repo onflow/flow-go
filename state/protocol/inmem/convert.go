@@ -95,12 +95,12 @@ func ClusterFromEncodable(enc EncodableCluster) (*Cluster, error) {
 // genesis or post-spork states.
 func SnapshotFromBootstrapState(root *flow.Block, result *flow.ExecutionResult, seal *flow.Seal, qc *flow.QuorumCertificate) (*Snapshot, error) {
 	version := flow.DefaultProtocolVersion
-	threshold, err := protocol.DefaultEpochCommitSafetyThreshold(root.Header.ChainID)
+	safetyParams, err := protocol.DefaultEpochSafetyParams(root.Header.ChainID)
 	if err != nil {
 		return nil, fmt.Errorf("could not get default epoch commit safety threshold: %w", err)
 	}
 	return SnapshotFromBootstrapStateWithParams(root, result, seal, qc, version, func(epochStateID flow.Identifier) (protocol_state.KVStoreAPI, error) {
-		return kvstore.NewDefaultKVStore(threshold, epochStateID)
+		return kvstore.NewDefaultKVStore(safetyParams.FinalizationSafetyThreshold, safetyParams.EpochExtensionViewCount, epochStateID)
 	})
 }
 

@@ -99,10 +99,11 @@ func NewClusterSwitchoverTestCase(t *testing.T, conf ClusterSwitchoverTestConf) 
 	commit.ClusterQCs = rootClusterQCs
 
 	seal.ResultID = result.ID()
-	finalizationThreshold, err := protocol.DefaultEpochCommitSafetyThreshold(root.Header.ChainID)
+	safetyParams, err := protocol.DefaultEpochSafetyParams(root.Header.ChainID)
 	require.NoError(t, err)
 	rootProtocolState, err := kvstore.NewDefaultKVStore(
-		finalizationThreshold,
+		safetyParams.FinalizationSafetyThreshold,
+		safetyParams.EpochExtensionViewCount,
 		inmem.EpochProtocolStateFromServiceEvents(setup, commit).ID())
 	require.NoError(t, err)
 	root.Payload.ProtocolStateID = rootProtocolState.ID()

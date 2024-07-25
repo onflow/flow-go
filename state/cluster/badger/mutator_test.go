@@ -75,10 +75,11 @@ func (suite *MutatorSuite) SetupTest() {
 
 	seal.ResultID = result.ID()
 	qc := unittest.QuorumCertificateFixture(unittest.QCWithRootBlockID(genesis.ID()))
-	finalizationThreshold, err := protocol.DefaultEpochCommitSafetyThreshold(genesis.Header.ChainID)
+	safetyParams, err := protocol.DefaultEpochSafetyParams(genesis.Header.ChainID)
 	require.NoError(suite.T(), err)
 	rootProtocolState, err := kvstore.NewDefaultKVStore(
-		finalizationThreshold,
+		safetyParams.FinalizationSafetyThreshold,
+		safetyParams.EpochExtensionViewCount,
 		inmem.EpochProtocolStateFromServiceEvents(
 			result.ServiceEvents[0].Event.(*flow.EpochSetup),
 			result.ServiceEvents[1].Event.(*flow.EpochCommit),
