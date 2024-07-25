@@ -23,7 +23,7 @@ var _ module.CollectionMetrics = (*CollectionCollector)(nil)
 func NewCollectionCollector(tracer module.Tracer) *CollectionCollector {
 
 	cc := &CollectionCollector{
-		TransactionValidationMetrics: NewTransactionValidationCollector(),
+		TransactionValidationMetrics: NewTransactionValidationCollector(CollectionNamespace),
 		tracer:                       tracer,
 		transactionsIngested: promauto.NewCounter(prometheus.CounterOpts{
 			Namespace: namespaceCollection,

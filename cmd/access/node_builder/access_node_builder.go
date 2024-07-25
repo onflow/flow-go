@@ -1624,7 +1624,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			return nil
 		}).
 		Module("transaction validation metrics", func(node *cmd.NodeConfig) error {
-			builder.TransactionValidationMetrics = metrics.NewTransactionValidationCollector()
+			builder.TransactionValidationMetrics = metrics.NewTransactionValidationCollector(metrics.AccessNamespace)
 			return nil
 		}).
 		Module("rest metrics", func(node *cmd.NodeConfig) error {

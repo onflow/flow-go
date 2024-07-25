@@ -1072,7 +1072,7 @@ type TransactionMetrics interface {
 }
 
 type TransactionValidationMetrics interface {
-	// TransactionValidated tracks number of validated transactions
+	// TransactionValidated tracks number of successfully validated transactions
 	TransactionValidated()
 	// TransactionValidationFailed tracks number of validation failed transactions with reason
 	TransactionValidationFailed(reason string)
