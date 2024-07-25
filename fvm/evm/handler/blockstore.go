@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	BlockHashListCapacity            = 16
+	BlockHashListCapacity            = 256
 	BlockStoreLatestBlockKey         = "LatestBlock"
 	BlockStoreLatestBlockProposalKey = "LatestBlockProposal"
 	BlockStoreBlockHashesKey         = "LatestBlockHashes"
@@ -37,7 +37,7 @@ func (bs *BlockStore) BlockProposal() (*types.BlockProposal, error) {
 	// first fetch it from the storage
 	data, err := bs.backend.GetValue(bs.rootAddress[:], []byte(BlockStoreLatestBlockProposalKey))
 	if err != nil {
-		return nil, types.NewFatalError(err)
+		return nil, err
 	}
 	if len(data) != 0 {
 		return types.NewBlockProposalFromBytes(data)
@@ -104,8 +104,7 @@ func (bs *BlockStore) ResetBlockProposal() error {
 
 // CommitBlockProposal commits the block proposal to the chain
 func (bs *BlockStore) CommitBlockProposal(bp *types.BlockProposal) error {
-	// populate receipt root hash
-	bp.PopulateReceiptRoot()
+	bp.PopulateRoots()
 
 	blockBytes, err := bp.Block.ToBytes()
 	if err != nil {
@@ -122,7 +121,11 @@ func (bs *BlockStore) CommitBlockProposal(bp *types.BlockProposal) error {
 		return err
 	}
 
-	err = bs.updateBlockHashList(bp.Block.Height, hash)
+	bhl, err := bs.getBlockHashList()
+	if err != nil {
+		return err
+	}
+	err = bhl.Push(bp.Block.Height, hash)
 	if err != nil {
 		return err
 	}
@@ -138,11 +141,11 @@ func (bs *BlockStore) CommitBlockProposal(bp *types.BlockProposal) error {
 // LatestBlock returns the latest executed block
 func (bs *BlockStore) LatestBlock() (*types.Block, error) {
 	data, err := bs.backend.GetValue(bs.rootAddress[:], []byte(BlockStoreLatestBlockKey))
-	if len(data) == 0 {
-		return types.GenesisBlock, err
-	}
 	if err != nil {
-		return nil, types.NewFatalError(err)
+		return nil, err
+	}
+	if len(data) == 0 {
+		return types.GenesisBlock, nil
 	}
 	return types.NewBlockFromBytes(data)
 }
@@ -153,38 +156,74 @@ func (bs *BlockStore) BlockHash(height uint64) (gethCommon.Hash, error) {
 	if err != nil {
 		return gethCommon.Hash{}, err
 	}
-	_, hash := bhl.BlockHashByHeight(height)
-	return hash, nil
+	_, hash, err := bhl.BlockHashByHeight(height)
+	return hash, err
 }
 
-func (bs *BlockStore) getBlockHashList() (*types.BlockHashList, error) {
+func (bs *BlockStore) getBlockHashList() (*BlockHashList, error) {
+	// check legacy block hash list first
+	return bs.checkLegacyAndMigrate()
+	// TODO: when preview net is out, we can remove the call to legacy and uncomment below
+	// BlockStoreBlockHashesKey constant also be removed
+	//
+	// bhl, err := NewBlockHashList(bs.backend, bs.rootAddress, BlockHashListCapacity)
+	// if err != nil {
+	// 	return nil, err
+	// }
+	// if bhl.IsEmpty() {
+	// 	err = bhl.Push(types.GenesisBlock.Height, types.GenesisBlockHash)
+	// 	if err != nil {
+	// 		return nil, err
+	// 	}
+	// }
+	// return bhl, nil
+}
+
+func (bs *BlockStore) checkLegacyAndMigrate() (*BlockHashList, error) {
 	data, err := bs.backend.GetValue(bs.rootAddress[:], []byte(BlockStoreBlockHashesKey))
 	if err != nil {
 		return nil, err
 	}
-	if len(data) == 0 {
-		bhl := types.NewBlockHashList(BlockHashListCapacity)
-		err = bhl.Push(types.GenesisBlock.Height, types.GenesisBlockHash)
-		return bhl, err
-	}
-	return types.NewBlockHashListFromEncoded(data)
-}
 
-func (bs *BlockStore) updateBlockHashList(height uint64, hash gethCommon.Hash) error {
-	bhl, err := bs.getBlockHashList()
-	if err != nil {
-		return err
+	// no legacy found
+	if len(data) == 0 {
+		bhl, err := NewBlockHashList(bs.backend, bs.rootAddress, BlockHashListCapacity)
+		if err != nil {
+			return nil, err
+		}
+		if bhl.IsEmpty() {
+			err = bhl.Push(types.GenesisBlock.Height, types.GenesisBlockHash)
+			if err != nil {
+				return nil, err
+			}
+		}
+		return bhl, nil
 	}
-	err = bhl.Push(height, hash)
+
+	legacy, err := types.NewBlockHashListFromEncoded(data)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	err = bs.backend.SetValue(
-		bs.rootAddress[:],
-		[]byte(BlockStoreBlockHashesKey),
-		bhl.Encode())
+
+	// migrate the data
+	bhl, err := NewBlockHashList(bs.backend, bs.rootAddress, BlockHashListCapacity)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	return nil
+	for i := uint64(0); i <= legacy.MaxAvailableHeight(); i++ {
+		// for the non-existing ones we insert empty hash
+		_, bh := legacy.BlockHashByHeight(i)
+		err = bhl.Push(i, bh)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	// reset the old key
+	err = bs.backend.SetValue(bs.rootAddress[:], []byte(BlockStoreBlockHashesKey), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return bhl, nil
 }

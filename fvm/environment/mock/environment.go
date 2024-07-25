@@ -476,6 +476,16 @@ func (_m *Environment) DeductTransactionFees(payer flow.Address, inclusionEffort
 	return r0, r1
 }
 
+// EVMBlockExecuted provides a mock function with given fields: txCount, totalGasUsed, totalSupplyInFlow
+func (_m *Environment) EVMBlockExecuted(txCount int, totalGasUsed uint64, totalSupplyInFlow float64) {
+	_m.Called(txCount, totalGasUsed, totalSupplyInFlow)
+}
+
+// EVMTransactionExecuted provides a mock function with given fields: gasUsed, isDirectCall, failed
+func (_m *Environment) EVMTransactionExecuted(gasUsed uint64, isDirectCall bool, failed bool) {
+	_m.Called(gasUsed, isDirectCall, failed)
+}
+
 // EmitEvent provides a mock function with given fields: _a0
 func (_m *Environment) EmitEvent(_a0 cadence.Event) error {
 	ret := _m.Called(_a0)
@@ -1489,6 +1499,36 @@ func (_m *Environment) RevokeAccountKey(address common.Address, index uint32) (*
 	return r0, r1
 }
 
+// RuntimeSetNumberOfAccounts provides a mock function with given fields: count
+func (_m *Environment) RuntimeSetNumberOfAccounts(count uint64) {
+	_m.Called(count)
+}
+
+// RuntimeTransactionChecked provides a mock function with given fields: _a0
+func (_m *Environment) RuntimeTransactionChecked(_a0 time.Duration) {
+	_m.Called(_a0)
+}
+
+// RuntimeTransactionInterpreted provides a mock function with given fields: _a0
+func (_m *Environment) RuntimeTransactionInterpreted(_a0 time.Duration) {
+	_m.Called(_a0)
+}
+
+// RuntimeTransactionParsed provides a mock function with given fields: _a0
+func (_m *Environment) RuntimeTransactionParsed(_a0 time.Duration) {
+	_m.Called(_a0)
+}
+
+// RuntimeTransactionProgramsCacheHit provides a mock function with given fields:
+func (_m *Environment) RuntimeTransactionProgramsCacheHit() {
+	_m.Called()
+}
+
+// RuntimeTransactionProgramsCacheMiss provides a mock function with given fields:
+func (_m *Environment) RuntimeTransactionProgramsCacheMiss() {
+	_m.Called()
+}
+
 // ServiceEvents provides a mock function with given fields:
 func (_m *Environment) ServiceEvents() flow.EventsList {
 	ret := _m.Called()
@@ -1512,6 +1552,11 @@ func (_m *Environment) ServiceEvents() flow.EventsList {
 // SetInterpreterSharedState provides a mock function with given fields: state
 func (_m *Environment) SetInterpreterSharedState(state *interpreter.SharedState) {
 	_m.Called(state)
+}
+
+// SetNumberOfDeployedCOAs provides a mock function with given fields: count
+func (_m *Environment) SetNumberOfDeployedCOAs(count uint64) {
+	_m.Called(count)
 }
 
 // SetValue provides a mock function with given fields: owner, key, value

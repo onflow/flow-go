@@ -10,7 +10,6 @@ import (
 )
 
 func TestPrecompiledCallsEncoding(t *testing.T) {
-
 	// empty precompiled calls
 	empty := types.AggregatedPrecompiledCalls{
 		types.PrecompiledCalls{

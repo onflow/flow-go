@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/fvm/environment"
 	fvmErrors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/evm/debug"
+	"github.com/onflow/flow-go/fvm/evm/events"
 	"github.com/onflow/flow-go/fvm/evm/handler/coa"
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/model/flow"
@@ -84,19 +85,21 @@ func (h *ContractHandler) deployCOA(uuid uint64) (*types.Result, error) {
 
 	factory := h.addressAllocator.COAFactoryAddress()
 	factoryAccount := h.AccountByAddress(factory, false)
+	factoryNonce := factoryAccount.Nonce()
 	call := types.NewDeployCallWithTargetAddress(
 		factory,
 		target,
 		coa.ContractBytes,
 		uint64(gaslimit),
 		new(big.Int),
-		factoryAccount.Nonce(),
+		factoryNonce,
 	)
 
 	ctx, err := h.getBlockContext()
 	if err != nil {
 		return nil, err
 	}
+	h.backend.SetNumberOfDeployedCOAs(factoryNonce)
 	return h.executeAndHandleCall(ctx, call, nil, false)
 }
 
@@ -193,7 +196,7 @@ func (h *ContractHandler) batchRun(rlpEncodedTxs [][]byte, coinbase types.Addres
 		return nil, err
 	}
 
-	// saftey check for result
+	// safety check for result
 	if len(res) == 0 {
 		return nil, types.ErrUnexpectedEmptyResult
 	}
@@ -213,8 +216,8 @@ func (h *ContractHandler) batchRun(rlpEncodedTxs [][]byte, coinbase types.Addres
 	}
 
 	// if there were no valid transactions skip emitting events
-	// and committing a new block
-	if len(bp.TransactionHashes) == 0 {
+	// and update the block proposal
+	if len(bp.TxHashes) == 0 {
 		return res, nil
 	}
 
@@ -222,7 +225,7 @@ func (h *ContractHandler) batchRun(rlpEncodedTxs [][]byte, coinbase types.Addres
 		if r.Invalid() { // don't emit events for invalid tx
 			continue
 		}
-		err = h.emitEvent(types.NewTransactionEvent(
+		err = h.emitEvent(events.NewTransactionEvent(
 			r,
 			rlpEncodedTxs[i],
 			bp.Height,
@@ -230,6 +233,13 @@ func (h *ContractHandler) batchRun(rlpEncodedTxs [][]byte, coinbase types.Addres
 		if err != nil {
 			return nil, err
 		}
+
+		// step 4 - update metrics
+		h.backend.EVMTransactionExecuted(
+			r.GasConsumed,
+			false,
+			r.Failed(),
+		)
 
 		h.tracer.Collect(r.TxHash)
 	}
@@ -262,10 +272,17 @@ func (h *ContractHandler) commitBlockProposal() error {
 	}
 
 	// emit block executed event
-	err = h.emitEvent(types.NewBlockEvent(&bp.Block))
+	err = h.emitEvent(events.NewBlockEvent(&bp.Block))
 	if err != nil {
 		return err
 	}
+
+	// report metrics
+	h.backend.EVMBlockExecuted(
+		len(bp.TxHashes),
+		bp.TotalGasUsed,
+		types.UnsafeCastOfBalanceToFloat64(bp.TotalSupply),
+	)
 
 	return nil
 }
@@ -329,12 +346,19 @@ func (h *ContractHandler) run(
 	}
 
 	// step 4 - emit events
-	err = h.emitEvent(types.NewTransactionEvent(res, rlpEncodedTx, bp.Height))
+	err = h.emitEvent(events.NewTransactionEvent(res, rlpEncodedTx, bp.Height))
 	if err != nil {
 		return nil, err
 	}
 
-	// step 5 - collect traces
+	// step 4 - update metrics
+	h.backend.EVMTransactionExecuted(
+		res.GasConsumed,
+		false,
+		res.Failed(),
+	)
+
+	// step 6 - collect traces
 	h.tracer.Collect(res.TxHash)
 	return res, nil
 }
@@ -418,9 +442,8 @@ func (h *ContractHandler) meterGasUsage(res *types.Result) error {
 	return h.backend.MeterComputation(environment.ComputationKindEVMGasUsage, uint(res.GasConsumed))
 }
 
-func (h *ContractHandler) emitEvent(event *types.Event) error {
-	location := common.NewAddressLocation(nil, common.Address(h.evmContractAddress), "EVM")
-	ev, err := event.Payload.ToCadence(location)
+func (h *ContractHandler) emitEvent(event *events.Event) error {
+	ev, err := event.Payload.ToCadence(h.flowChainID)
 	if err != nil {
 		return err
 	}
@@ -451,6 +474,8 @@ func (h *ContractHandler) getBlockContext() (types.BlockContext, error) {
 		ExtraPrecompiledContracts: h.precompiledContracts,
 		Random:                    rand,
 		Tracer:                    h.tracer.TxTracer(),
+		TxCountSoFar:              uint(len(bp.TxHashes)),
+		TotalGasUsedSoFar:         bp.TotalGasUsed,
 	}, nil
 }
 
@@ -497,7 +522,7 @@ func (h *ContractHandler) executeAndHandleCall(
 	// append transaction to the block proposal
 	bp.AppendTransaction(res)
 
-	if totalSupplyDiff != nil {
+	if res.Successful() && totalSupplyDiff != nil {
 		if deductSupplyDiff {
 			bp.TotalSupply = new(big.Int).Sub(bp.TotalSupply, totalSupplyDiff)
 			if bp.TotalSupply.Sign() < 0 {
@@ -521,11 +546,18 @@ func (h *ContractHandler) executeAndHandleCall(
 	}
 
 	err = h.emitEvent(
-		types.NewTransactionEvent(res, encoded, bp.Height),
+		events.NewTransactionEvent(res, encoded, bp.Height),
 	)
 	if err != nil {
 		return nil, err
 	}
+
+	// metric
+	h.backend.EVMTransactionExecuted(
+		res.GasConsumed,
+		true,
+		res.Failed(),
+	)
 
 	// collect traces
 	h.tracer.Collect(res.TxHash)
@@ -790,10 +822,10 @@ func (a *Account) call(to types.Address, data types.Data, gaslimit types.GasLimi
 	return a.fch.executeAndHandleCall(ctx, call, nil, false)
 }
 
-func (a *Account) precheck(authroized bool, gaslimit types.GasLimit) (types.BlockContext, error) {
+func (a *Account) precheck(authorized bool, gaslimit types.GasLimit) (types.BlockContext, error) {
 	// check if account is authorized (i.e. is a COA)
-	if authroized && !a.isAuthorized {
-		return types.BlockContext{}, types.ErrUnAuthroizedMethodCall
+	if authorized && !a.isAuthorized {
+		return types.BlockContext{}, types.ErrUnauthorizedMethodCall
 	}
 	err := a.fch.checkGasLimit(gaslimit)
 	if err != nil {

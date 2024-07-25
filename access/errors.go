@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/onflow/cadence"
+
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -97,4 +99,19 @@ type InvalidTxRateLimitedError struct {
 
 func (e InvalidTxRateLimitedError) Error() string {
 	return fmt.Sprintf("transaction rate limited for payer (%s)", e.Payer)
+}
+
+type InsufficientBalanceError struct {
+	Payer           flow.Address
+	RequiredBalance cadence.UFix64
+}
+
+func (e InsufficientBalanceError) Error() string {
+	return fmt.Sprintf("transaction payer (%s) has insufficient balance to pay transaction fee. "+
+		"Required balance: (%s). ", e.Payer, e.RequiredBalance.String())
+}
+
+func IsInsufficientBalanceError(err error) bool {
+	var balanceError InsufficientBalanceError
+	return errors.As(err, &balanceError)
 }
