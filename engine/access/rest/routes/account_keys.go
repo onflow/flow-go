@@ -40,7 +40,7 @@ func GetAccountKeyByIndex(r *request.Request, backend access.API, _ models.LinkG
 
 // GetAccountKeys handler retrieves an account keys by address and returns the response
 func GetAccountKeys(r *request.Request, backend access.API, _ models.LinkGenerator) (interface{}, error) {
-	req, err := r.GetAccountKeyRequest()
+	req, err := r.GetAccountKeysRequest()
 	if err != nil {
 		return nil, models.NewBadRequestError(err)
 	}
@@ -65,6 +65,6 @@ func GetAccountKeys(r *request.Request, backend access.API, _ models.LinkGenerat
 	}
 
 	var response models.AccountPublicKeys
-	response.Build(*accountKey)
+	response.Build(accountKeys)
 	return response, nil
 }

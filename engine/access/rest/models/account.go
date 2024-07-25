@@ -14,7 +14,7 @@ func (a *Account) Build(flowAccount *flow.Account, link LinkGenerator, expand ma
 	a.Expandable = &AccountExpandable{}
 
 	if expand[expandableKeys] {
-		var keys AccountPublicKeys
+		var keys AccountKeys
 		keys.Build(flowAccount.Keys)
 		a.Keys = keys
 	} else {
@@ -56,7 +56,7 @@ func (a *AccountPublicKey) Build(k flow.AccountPublicKey) {
 
 type AccountKeys []AccountPublicKey
 
-func (a *AccountPublicKeys) Build(accountKeys []flow.AccountPublicKey) {
+func (a *AccountKeys) Build(accountKeys []flow.AccountPublicKey) {
 	keys := make([]AccountPublicKey, len(accountKeys))
 	for i, k := range accountKeys {
 		var key AccountPublicKey
@@ -65,4 +65,15 @@ func (a *AccountPublicKeys) Build(accountKeys []flow.AccountPublicKey) {
 	}
 
 	*a = keys
+}
+
+func (a *AccountPublicKeys) Build(accountKeys []flow.AccountPublicKey) {
+	keys := make([]AccountPublicKey, len(accountKeys))
+	for i, k := range accountKeys {
+		var key AccountPublicKey
+		key.Build(k)
+		keys[i] = key
+	}
+
+	a.Keys = keys
 }
