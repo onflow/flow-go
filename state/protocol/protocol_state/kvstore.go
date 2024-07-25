@@ -63,6 +63,11 @@ type KVStoreMutator interface {
 	// SetEpochStateID sets the state ID of the epoch state.
 	// This method is used to commit the epoch state to the KV store when the state of the epoch is updated.
 	SetEpochStateID(stateID flow.Identifier)
+
+	// SetEpochExtensionViewCount sets the number of views for a hypothetical epoch extension.
+	// Expected errors during normal operations:
+	//  - kvstore.ErrInvalidValue - if the view count is less than FinalizationSafetyThreshold*2.
+	SetEpochExtensionViewCount(viewCount uint64) error
 }
 
 // OrthogonalStoreStateMachine represents a state machine that exclusively evolves its state P.

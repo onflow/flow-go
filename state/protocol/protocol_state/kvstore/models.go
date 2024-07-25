@@ -6,12 +6,10 @@ import (
 	clone "github.com/huandu/go-clone/generic" //nolint:goimports
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/protocol_state"
 )
-
-// defaultEpochExtensionViewCount is a default length of epoch extension in views, approximately 1 day.
-const defaultEpochExtensionViewCount = 100_000
 
 // This file contains the concrete types that define the structure of the underlying key-value store
 // for a particular Protocol State version.
@@ -119,6 +117,20 @@ func (model *Modelv0) SetEpochStateID(id flow.Identifier) {
 	model.EpochStateID = id
 }
 
+// SetEpochExtensionViewCount sets the number of views for a hypothetical epoch extension.
+// Expected errors during normal operations:
+//   - kvstore.ErrInvalidValue - if the view count is less than FinalizationSafetyThreshold*2.
+func (model *Modelv0) SetEpochExtensionViewCount(viewCount uint64) error {
+	// Strictly speaking it should be perfectly fine to use a value viewCount >= model.EpochCommitSafetyThreshold.
+	// By using a sligtly higher value(factor of 2) we ensure that extension is big enough in practice to give operators a bigger
+	// window in which a valid epoch recover event could be submitted.
+	if viewCount < model.EpochCommitSafetyThreshold*2 {
+		return fmt.Errorf("invalid view count %d, expect at least %d: %w", viewCount, model.EpochCommitSafetyThreshold*2, ErrInvalidValue)
+	}
+	model.EpochExtensionViewCount = viewCount
+	return nil
+}
+
 // GetEpochExtensionViewCount returns the number of views for a hypothetical epoch extension. Note
 // that this value can change at runtime (through a service event). When a new extension is added,
 // the view count is used right at this point in the protocol state's evolution. In other words,
@@ -182,8 +194,8 @@ func (model *Modelv1) GetProtocolStateVersion() uint64 {
 // Currently, the KV store is largely empty.
 // TODO: Shortcut in bootstrapping; we will probably have to start with a non-empty KV store in the future;
 // Potentially we may need to carry over the KVStore during a spork (with possible migrations).
-func NewDefaultKVStore(finalizationSafetyThreshold uint64, epochStateID flow.Identifier) (protocol_state.KVStoreAPI, error) {
-	modelv0, err := newKVStoreV0(finalizationSafetyThreshold, epochStateID)
+func NewDefaultKVStore(finalizationSafetyThreshold, epochExtensionViewCount uint64, epochStateID flow.Identifier) (protocol_state.KVStoreAPI, error) {
+	modelv0, err := newKVStoreV0(finalizationSafetyThreshold, epochExtensionViewCount, epochStateID)
 	if err != nil {
 		return nil, fmt.Errorf("could not construct v0 kvstore: %w", err)
 	}
@@ -194,19 +206,24 @@ func NewDefaultKVStore(finalizationSafetyThreshold uint64, epochStateID flow.Ide
 
 // NewKVStoreV0 constructs a KVStore using the v0 model. This is used to test
 // version upgrades, from v0 to v1.
-func newKVStoreV0(finalizationSafetyThreshold uint64, epochStateID flow.Identifier) (*Modelv0, error) {
-	return &Modelv0{
+func newKVStoreV0(finalizationSafetyThreshold, epochExtensionViewCount uint64, epochStateID flow.Identifier) (*Modelv0, error) {
+	model := &Modelv0{
 		UpgradableModel:            UpgradableModel{},
 		EpochStateID:               epochStateID,
 		EpochCommitSafetyThreshold: finalizationSafetyThreshold,
-		EpochExtensionViewCount:    defaultEpochExtensionViewCount,
-	}, nil
+	}
+	// use a setter to ensure the default value is valid and is not accidentally lower than the safety threshold.
+	err := model.SetEpochExtensionViewCount(epochExtensionViewCount)
+	if err != nil {
+		return nil, irrecoverable.NewExceptionf("could not set default epoch extension view count: %s", err.Error())
+	}
+	return model, nil
 }
 
 // NewKVStoreV0 constructs a KVStore using the v0 model. This is used to test
 // version upgrades, from v0 to v1.
-func NewKVStoreV0(finalizationSafetyThreshold uint64, epochStateID flow.Identifier) (protocol_state.KVStoreAPI, error) {
-	return newKVStoreV0(finalizationSafetyThreshold, epochStateID)
+func NewKVStoreV0(finalizationSafetyThreshold, epochExtensionViewCount uint64, epochStateID flow.Identifier) (protocol_state.KVStoreAPI, error) {
+	return newKVStoreV0(finalizationSafetyThreshold, epochExtensionViewCount, epochStateID)
 }
 
 // versionedModel generically represents a versioned protocol state model.
