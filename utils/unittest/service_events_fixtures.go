@@ -1136,10 +1136,10 @@ func newFlowEpochEpochRecoverEventType() *cadence.EventType {
 	address, _ := common.HexToAddress("01cf0e2f2f715450")
 	location := common.NewAddressLocation(nil, address, "FlowEpoch")
 
-	return &cadence.EventType{
-		Location:            location,
-		QualifiedIdentifier: "FlowEpoch.EpochRecover",
-		Fields: []cadence.Field{
+	return cadence.NewEventType(
+		location,
+		"FlowEpoch.EpochRecover",
+		[]cadence.Field{
 			{
 				Identifier: "counter",
 				Type:       cadence.UInt64Type,
@@ -1193,7 +1193,8 @@ func newFlowEpochEpochRecoverEventType() *cadence.EventType {
 				Type:       cadence.NewVariableSizedArrayType(cadence.StringType),
 			},
 		},
-	}
+		nil,
+	)
 }
 
 func newFlowClusterQCClusterQCStructType() *cadence.StructType {
@@ -1235,10 +1236,10 @@ func newFlowClusterQCClusterQCVoteDataStructType() *cadence.StructType {
 	address, _ := common.HexToAddress("01cf0e2f2f715450")
 	location := common.NewAddressLocation(nil, address, "ClusterQCVoteData")
 
-	return &cadence.StructType{
-		Location:            location,
-		QualifiedIdentifier: "FlowClusterQC.ClusterQCVoteData",
-		Fields: []cadence.Field{
+	return cadence.NewStructType(
+		location,
+		"FlowClusterQC.ClusterQCVoteData",
+		[]cadence.Field{
 			{
 				Identifier: "aggregatedSignature",
 				Type:       cadence.StringType,
@@ -1248,7 +1249,8 @@ func newFlowClusterQCClusterQCVoteDataStructType() *cadence.StructType {
 				Type:       cadence.NewVariableSizedArrayType(cadence.StringType),
 			},
 		},
-	}
+		nil,
+	)
 }
 
 func NewNodeVersionBeaconVersionBeaconEventType() *cadence.EventType {
