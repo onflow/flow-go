@@ -29,14 +29,14 @@ func (_m *CollectionMetrics) TransactionIngested(txID flow.Identifier) {
 	_m.Called(txID)
 }
 
-// TransactionValidated provides a mock function with given fields: txID
-func (_m *CollectionMetrics) TransactionValidated(txID flow.Identifier) {
-	_m.Called(txID)
+// TransactionValidated provides a mock function with given fields:
+func (_m *CollectionMetrics) TransactionValidated() {
+	_m.Called()
 }
 
-// TransactionValidationFailed provides a mock function with given fields: txID, reason
-func (_m *CollectionMetrics) TransactionValidationFailed(txID flow.Identifier, reason string) {
-	_m.Called(txID, reason)
+// TransactionValidationFailed provides a mock function with given fields: reason
+func (_m *CollectionMetrics) TransactionValidationFailed(reason string) {
+	_m.Called(reason)
 }
 
 // NewCollectionMetrics creates a new instance of CollectionMetrics. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.

@@ -4,13 +4,12 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 
-	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 )
 
 // TransactionValidationCollector TODO
 type TransactionValidationCollector struct {
-	transactionValidated        *prometheus.CounterVec
+	transactionValidated        prometheus.Counter
 	transactionValidationFailed *prometheus.CounterVec
 }
 
@@ -19,27 +18,27 @@ var _ module.TransactionValidationMetrics = (*TransactionValidationCollector)(ni
 
 func NewTransactionValidationCollector() *TransactionValidationCollector {
 	return &TransactionValidationCollector{
-		transactionValidated: promauto.NewCounterVec(prometheus.CounterOpts{
-			Name:      "transaction_validated_total",
+		transactionValidated: promauto.NewCounter(prometheus.CounterOpts{
+			Name:      "transaction_validation_succeeded",
 			Namespace: namespaceAccess,
 			Subsystem: subsystemTransactionValidation,
 			Help:      "counter for the validated transactions",
-		}, []string{"txID"}),
+		}),
 		transactionValidationFailed: promauto.NewCounterVec(prometheus.CounterOpts{
 			Name:      "transaction_validation_failed",
 			Namespace: namespaceAccess,
 			Subsystem: subsystemTransactionValidation,
 			Help:      "counter for the failed transactions validation",
-		}, []string{"txID", "reason"}),
+		}, []string{"reason"}),
 	}
 }
 
 // TransactionValidated TODO
-func (tc *TransactionValidationCollector) TransactionValidated(txID flow.Identifier) {
-	tc.transactionValidated.WithLabelValues(txID.String()).Inc()
+func (tc *TransactionValidationCollector) TransactionValidated() {
+	tc.transactionValidated.Inc()
 }
 
 // TransactionValidationFailed TODO
-func (tc *TransactionValidationCollector) TransactionValidationFailed(txID flow.Identifier, reason string) {
-	tc.transactionValidationFailed.WithLabelValues(txID.String(), reason).Inc()
+func (tc *TransactionValidationCollector) TransactionValidationFailed(reason string) {
+	tc.transactionValidationFailed.WithLabelValues(reason).Inc()
 }

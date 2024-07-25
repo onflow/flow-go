@@ -23,6 +23,19 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 )
 
+const (
+	InvalidTransactionRateLimit = "invalid transaction rate limit"
+	InvalidTransactionByteSize  = "invalid transaction byte size"
+	IncompleteTransaction       = "incomplete transaction"
+	InvalidGasLimit             = "invalid gas limit"
+	ExpiredTransaction          = "expired transaction"
+	InvalidScript               = "invalid script"
+	InvalidAddresses            = "invalid address"
+	InvalidSignature            = "invalid signature"
+	DuplicatedSignature         = "duplicated signature"
+	InsufficientBalance         = "insufficient balance"
+)
+
 type Blocks interface {
 	HeaderByID(id flow.Identifier) (*flow.Header, error)
 	FinalizedHeader() (*flow.Header, error)
@@ -131,7 +144,7 @@ func NewTransactionValidator(
 		transactionValidationMetrics: transactionValidationMetrics,
 	}
 
-	initValidationSteps(txValidator)
+	txValidator.initValidationSteps()
 
 	return txValidator, nil
 }
@@ -152,26 +165,26 @@ func NewTransactionValidatorWithLimiter(
 		transactionValidationMetrics: transactionValidationMetrics,
 	}
 
-	initValidationSteps(txValidator)
+	txValidator.initValidationSteps()
 
 	return txValidator
 }
 
-func initValidationSteps(txValidator *TransactionValidator) {
-	txValidator.validationSteps = []ValidationStep{
+func (v *TransactionValidator) initValidationSteps() {
+	v.validationSteps = []ValidationStep{
 		// rate limit transactions for specific payers.
 		// a short term solution to prevent attacks that send too many failed transactions
 		// if a transaction is from a payer that should be rate limited, all the following
 		// checks will be skipped
-		{txValidator.checkRateLimitPayer, "invalid transaction rate limit"},
-		{txValidator.checkTxSizeLimit, "invalid transaction byte size"},
-		{txValidator.checkMissingFields, "incomplete transaction"},
-		{txValidator.checkGasLimit, "invalid gas limit"},
-		{txValidator.checkExpiry, "expired transaction"},
-		{txValidator.checkCanBeParsed, "invalid script"},
-		{txValidator.checkAddresses, "invalid address"},
-		{txValidator.checkSignatureFormat, "invalid signature"},
-		{txValidator.checkSignatureDuplications, "duplicated signature"},
+		{v.checkRateLimitPayer, InvalidTransactionRateLimit},
+		{v.checkTxSizeLimit, InvalidTransactionByteSize},
+		{v.checkMissingFields, IncompleteTransaction},
+		{v.checkGasLimit, InvalidGasLimit},
+		{v.checkExpiry, ExpiredTransaction},
+		{v.checkCanBeParsed, InvalidScript},
+		{v.checkAddresses, InvalidAddresses},
+		{v.checkSignatureFormat, InvalidSignature},
+		{v.checkSignatureDuplications, DuplicatedSignature},
 	}
 }
 
@@ -179,7 +192,7 @@ func (v *TransactionValidator) Validate(ctx context.Context, tx *flow.Transactio
 
 	for _, step := range v.validationSteps {
 		if err = step.check(tx); err != nil {
-			v.transactionValidationMetrics.TransactionValidationFailed(tx.ID(), step.failReason)
+			v.transactionValidationMetrics.TransactionValidationFailed(step.failReason)
 			return err
 		}
 	}
@@ -191,7 +204,7 @@ func (v *TransactionValidator) Validate(ctx context.Context, tx *flow.Transactio
 		// are 'internal' and related to script execution process. they shouldn't
 		// prevent the transaction from proceeding.
 		if IsInsufficientBalanceError(err) {
-			v.transactionValidationMetrics.TransactionValidationFailed(tx.ID(), "insufficient balance")
+			v.transactionValidationMetrics.TransactionValidationFailed(InsufficientBalance)
 			return err
 		}
 
@@ -201,7 +214,7 @@ func (v *TransactionValidator) Validate(ctx context.Context, tx *flow.Transactio
 
 	// TODO replace checkSignatureFormat by verifying the account/payer signatures
 
-	v.transactionValidationMetrics.TransactionValidated(tx.ID())
+	v.transactionValidationMetrics.TransactionValidated()
 
 	return nil
 }
@@ -421,7 +434,7 @@ func (v *TransactionValidator) checkSufficientBalanceToPayForTransaction(ctx con
 	}
 
 	// return no error if payer has sufficient balance
-	if canExecuteTransaction {
+	if bool(canExecuteTransaction) {
 		return nil
 	}
 

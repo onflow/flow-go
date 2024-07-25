@@ -1073,9 +1073,9 @@ type TransactionMetrics interface {
 
 type TransactionValidationMetrics interface {
 	// TransactionValidated tracks number of validated transactions
-	TransactionValidated(txID flow.Identifier)
+	TransactionValidated()
 	// TransactionValidationFailed tracks number of validation failed transactions with reason
-	TransactionValidationFailed(txID flow.Identifier, reason string)
+	TransactionValidationFailed(reason string)
 }
 
 type PingMetrics interface {
