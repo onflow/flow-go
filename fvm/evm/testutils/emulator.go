@@ -24,12 +24,12 @@ type TestEmulator struct {
 var _ types.Emulator = &TestEmulator{}
 
 // NewBlock returns a new block
-func (em *TestEmulator) NewBlockView(_ types.BlockContext) (types.BlockView, error) {
+func (em *TestEmulator) NewBlockView(_ *types.Config) (types.BlockView, error) {
 	return em, nil
 }
 
 // NewBlock returns a new block view
-func (em *TestEmulator) NewReadOnlyBlockView(_ types.BlockContext) (types.ReadOnlyBlockView, error) {
+func (em *TestEmulator) NewReadOnlyBlockView(_ *types.Config) (types.ReadOnlyBlockView, error) {
 	return em, nil
 }
 

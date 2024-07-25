@@ -61,7 +61,7 @@ func DeployContract(t testing.TB, caller types.Address, tc *TestContract, led at
 	// deploy contract
 	e := emulator.NewEmulator(led, flowEVMRootAddress)
 
-	ctx := types.NewDefaultBlockContext(2)
+	ctx := types.NewConfig(types.WithBlockNumber(big.NewInt(3)))
 
 	bl, err := e.NewReadOnlyBlockView(ctx)
 	require.NoError(t, err)
@@ -82,7 +82,11 @@ func DeployContract(t testing.TB, caller types.Address, tc *TestContract, led at
 	)
 	require.NoError(t, err)
 
-	blk2, err := e.NewBlockView(types.NewDefaultBlockContext(3))
+	blk2, err := e.NewBlockView(
+		types.NewConfig(
+			types.WithBlockNumber(big.NewInt(3)),
+		),
+	)
 	require.NoError(t, err)
 
 	res, err := blk2.DirectCall(

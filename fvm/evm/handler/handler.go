@@ -211,14 +211,14 @@ func (h *ContractHandler) batchRun(
 	}
 
 	// step 3 - prepare block context
-	ctx, err := h.getBlockContext()
+	cfg, err := h.getBlockConfig()
 	if err != nil {
 		return nil, err
 	}
-	ctx.GasFeeCollector = coinbase
+	cfg.BlockContext.Coinbase = coinbase.ToCommon()
 
 	// step 4 - create a block view
-	blk, err := h.emulator.NewBlockView(ctx)
+	blk, err := h.emulator.NewBlockView(cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -351,14 +351,14 @@ func (h *ContractHandler) run(
 	}
 
 	// step 3 - prepare block context
-	ctx, err := h.getBlockContext()
+	cfg, err := h.getBlockConfig()
 	if err != nil {
 		return nil, err
 	}
-	ctx.GasFeeCollector = coinbase
+	cfg.BlockContext.Coinbase = coinbase.ToCommon()
 
 	// step 4 - create a block view
-	blk, err := h.emulator.NewBlockView(ctx)
+	blk, err := h.emulator.NewBlockView(cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -443,12 +443,12 @@ func (h *ContractHandler) dryRun(
 		return nil, err
 	}
 
-	ctx, err := h.getBlockContext()
+	cfg, err := h.getBlockConfig()
 	if err != nil {
 		return nil, err
 	}
 
-	blk, err := h.emulator.NewBlockView(ctx)
+	blk, err := h.emulator.NewBlockView(cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -502,33 +502,31 @@ func (h *ContractHandler) emitEvent(event *events.Event) error {
 	return h.backend.EmitEvent(ev)
 }
 
-func (h *ContractHandler) getBlockContext() (types.BlockContext, error) {
+func (h *ContractHandler) getBlockConfig() (*types.Config, error) {
 	bp, err := h.blockStore.BlockProposal()
 	if err != nil {
-		return types.BlockContext{}, err
+		return nil, err
 	}
-	rand := gethCommon.Hash{}
+	rand := &gethCommon.Hash{}
 	err = h.backend.ReadRandom(rand[:])
 	if err != nil {
-		return types.BlockContext{}, err
+		return nil, err
 	}
-
-	return types.BlockContext{
-		ChainID:                types.EVMChainIDFromFlowChainID(h.flowChainID),
-		BlockNumber:            bp.Height,
-		BlockTimestamp:         bp.Timestamp,
-		DirectCallBaseGasUsage: types.DefaultDirectCallBaseGasUsage,
-		GetHashFunc: func(n uint64) gethCommon.Hash {
+	return types.NewConfig(
+		types.WithChainID(types.EVMChainIDFromFlowChainID(h.flowChainID)),
+		types.WithBlockNumber(new(big.Int).SetUint64(bp.Height)),
+		types.WithBlockTime(bp.Timestamp),
+		types.WithExtraPrecompiledContracts(h.precompiledContracts),
+		types.WithRandom(rand),
+		types.WithTransactionTracer(h.tracer.TxTracer()),
+		types.WithBlockTxCountSoFar(uint(len(bp.TxHashes))),
+		types.WithBlockTotalGasUsedSoFar(bp.TotalGasUsed),
+		types.WithGetBlockHashFunction(func(n uint64) gethCommon.Hash {
 			hash, err := h.blockStore.BlockHash(n)
 			panicOnError(err) // we have to handle it here given we can't continue with it even in try case
 			return hash
-		},
-		ExtraPrecompiledContracts: h.precompiledContracts,
-		Random:                    rand,
-		Tracer:                    h.tracer.TxTracer(),
-		TxCountSoFar:              uint(len(bp.TxHashes)),
-		TotalGasUsedSoFar:         bp.TotalGasUsed,
-	}, nil
+		}),
+	), nil
 }
 
 func (h *ContractHandler) executeAndHandleCall(
@@ -542,13 +540,13 @@ func (h *ContractHandler) executeAndHandleCall(
 	}
 
 	// step 2 - prepare the block context
-	ctx, err := h.getBlockContext()
+	cfg, err := h.getBlockConfig()
 	if err != nil {
 		return nil, err
 	}
 
 	// step 3 - create block view
-	blk, err := h.emulator.NewBlockView(ctx)
+	blk, err := h.emulator.NewBlockView(cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -663,12 +661,12 @@ func (a *Account) Nonce() uint64 {
 }
 
 func (a *Account) nonce() (uint64, error) {
-	ctx, err := a.fch.getBlockContext()
+	cfg, err := a.fch.getBlockConfig()
 	if err != nil {
 		return 0, err
 	}
 
-	blk, err := a.fch.emulator.NewReadOnlyBlockView(ctx)
+	blk, err := a.fch.emulator.NewReadOnlyBlockView(cfg)
 	if err != nil {
 		return 0, err
 	}
@@ -687,12 +685,12 @@ func (a *Account) Balance() types.Balance {
 }
 
 func (a *Account) balance() (types.Balance, error) {
-	ctx, err := a.fch.getBlockContext()
+	cfg, err := a.fch.getBlockConfig()
 	if err != nil {
 		return nil, err
 	}
 
-	blk, err := a.fch.emulator.NewReadOnlyBlockView(ctx)
+	blk, err := a.fch.emulator.NewReadOnlyBlockView(cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -712,12 +710,12 @@ func (a *Account) Code() types.Code {
 }
 
 func (a *Account) code() (types.Code, error) {
-	ctx, err := a.fch.getBlockContext()
+	cfg, err := a.fch.getBlockConfig()
 	if err != nil {
 		return nil, err
 	}
 
-	blk, err := a.fch.emulator.NewReadOnlyBlockView(ctx)
+	blk, err := a.fch.emulator.NewReadOnlyBlockView(cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -735,12 +733,12 @@ func (a *Account) CodeHash() []byte {
 }
 
 func (a *Account) codeHash() ([]byte, error) {
-	ctx, err := a.fch.getBlockContext()
+	cfg, err := a.fch.getBlockConfig()
 	if err != nil {
 		return nil, err
 	}
 
-	blk, err := a.fch.emulator.NewReadOnlyBlockView(ctx)
+	blk, err := a.fch.emulator.NewReadOnlyBlockView(cfg)
 	if err != nil {
 		return nil, err
 	}

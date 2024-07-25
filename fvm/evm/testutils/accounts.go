@@ -131,7 +131,8 @@ func FundAndGetEOATestAccount(t testing.TB, led atree.Ledger, flowEVMRootAddress
 	// fund account
 	e := emulator.NewEmulator(led, flowEVMRootAddress)
 
-	blk, err := e.NewBlockView(types.NewDefaultBlockContext(2))
+	blk, err := e.NewBlockView(
+		types.NewConfig(types.WithBlockNumber(big.NewInt(3))))
 	require.NoError(t, err)
 
 	_, err = blk.DirectCall(
@@ -144,7 +145,8 @@ func FundAndGetEOATestAccount(t testing.TB, led atree.Ledger, flowEVMRootAddress
 	)
 	require.NoError(t, err)
 
-	blk2, err := e.NewReadOnlyBlockView(types.NewDefaultBlockContext(2))
+	blk2, err := e.NewReadOnlyBlockView(
+		types.NewConfig(types.WithBlockNumber(big.NewInt(3))))
 	require.NoError(t, err)
 
 	bal, err := blk2.BalanceOf(account.Address())

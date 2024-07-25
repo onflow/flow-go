@@ -1,16 +1,16 @@
 package emulator
 
 import (
-	"math/big"
+	gethTypes "github.com/onflow/go-ethereum/core/types"
 
-	"github.com/onflow/go-ethereum/core/types"
+	"github.com/onflow/flow-go/fvm/evm/types"
 )
 
-var defaultBlockNumberForEVMRules = big.NewInt(1) // anything bigger than 0
-
 // GetDefaultSigner returns a signer which is compatible with the default config
-func GetDefaultSigner() types.Signer {
-	cfg := NewConfig(WithBlockNumber(defaultBlockNumberForEVMRules))
+func GetDefaultSigner() gethTypes.Signer {
+	cfg := types.NewConfig(
+		types.WithBlockNumber(types.BlockNumberForEVMRules),
+		types.WithBlockTime(types.BlockTimeForEVMRules))
 	return GetSigner(cfg)
 }
 
@@ -19,8 +19,8 @@ func GetDefaultSigner() types.Signer {
 // Despite its misleading name, signer encapsulates transaction signature validation functionality and
 // does not provide actual signing functionality.
 // we kept the same name to be consistent with EVM naming.
-func GetSigner(cfg *Config) types.Signer {
-	return types.MakeSigner(
+func GetSigner(cfg *types.Config) gethTypes.Signer {
+	return gethTypes.MakeSigner(
 		cfg.ChainConfig,
 		cfg.BlockContext.BlockNumber,
 		cfg.BlockContext.Time,

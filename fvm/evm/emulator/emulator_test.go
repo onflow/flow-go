@@ -26,8 +26,18 @@ import (
 	_ "github.com/onflow/go-ethereum/eth/tracers/native" // imported so callTracers is registered in init
 )
 
-var blockNumber = big.NewInt(10)
-var defaultCtx = types.NewDefaultBlockContext(blockNumber.Uint64())
+var (
+	defaultBlockNumber = big.NewInt(10)
+	defaultBlockTime   = uint64(100)
+)
+
+func defaultTestConfig() *types.Config {
+	return types.NewConfig(
+		types.WithRandom(&gethCommon.Hash{1}),
+		types.WithBlockNumber(defaultBlockNumber),
+		types.WithBlockTime(defaultBlockTime),
+	)
+}
 
 func RunWithNewEmulator(t testing.TB, backend *testutils.TestBackend, rootAddr flow.Address, f func(*emulator.Emulator)) {
 	env := emulator.NewEmulator(backend, rootAddr)
@@ -35,13 +45,13 @@ func RunWithNewEmulator(t testing.TB, backend *testutils.TestBackend, rootAddr f
 }
 
 func RunWithNewBlockView(t testing.TB, em *emulator.Emulator, f func(blk types.BlockView)) {
-	blk, err := em.NewBlockView(defaultCtx)
+	blk, err := em.NewBlockView(defaultTestConfig())
 	require.NoError(t, err)
 	f(blk)
 }
 
 func RunWithNewReadOnlyBlockView(t testing.TB, em *emulator.Emulator, f func(blk types.ReadOnlyBlockView)) {
-	blk, err := em.NewReadOnlyBlockView(defaultCtx)
+	blk, err := em.NewReadOnlyBlockView(defaultTestConfig())
 	require.NoError(t, err)
 	f(blk)
 }
@@ -66,7 +76,7 @@ func TestNativeTokenBridging(t *testing.T) {
 						call := types.NewDepositCall(bridgeAccount, testAccount, originalBalance, 0)
 						res, err := blk.DirectCall(call)
 						requireSuccessfulExecution(t, err, res)
-						require.Equal(t, defaultCtx.DirectCallBaseGasUsage, res.GasConsumed)
+						require.Equal(t, types.DefaultDirectCallBaseGasUsage, res.GasConsumed)
 						require.Equal(t, call.Hash(), res.TxHash)
 					})
 				})
@@ -130,7 +140,7 @@ func TestNativeTokenBridging(t *testing.T) {
 						call := types.NewWithdrawCall(bridgeAccount, testAccount, amount, testAccountNonce)
 						res, err := blk.DirectCall(call)
 						requireSuccessfulExecution(t, err, res)
-						require.Equal(t, defaultCtx.DirectCallBaseGasUsage, res.GasConsumed)
+						require.Equal(t, types.DefaultDirectCallBaseGasUsage, res.GasConsumed)
 						require.Equal(t, call.Hash(), res.TxHash)
 						testAccountNonce += 1
 					})
@@ -302,7 +312,7 @@ func TestContractInteraction(t *testing.T) {
 						testAccountNonce += 1
 
 						ret := new(big.Int).SetBytes(res.ReturnedData)
-						require.Equal(t, blockNumber, ret)
+						require.Equal(t, defaultBlockNumber, ret)
 
 					})
 				})
@@ -347,7 +357,7 @@ func TestContractInteraction(t *testing.T) {
 				})
 
 				RunWithNewEmulator(t, backend, rootAddr, func(em *emulator.Emulator) {
-					ctx := types.NewDefaultBlockContext(blockNumber.Uint64())
+					ctx := types.NewConfig(types.WithBlockNumber(defaultBlockNumber))
 					blk, err := em.NewBlockView(ctx)
 					require.NoError(t, err)
 					res, err := blk.DirectCall(
@@ -379,12 +389,21 @@ func TestContractInteraction(t *testing.T) {
 				})
 
 				RunWithNewEmulator(t, backend, rootAddr, func(env *emulator.Emulator) {
-					ctx := types.NewDefaultBlockContext(blockNumber.Uint64())
-					ctx.GasFeeCollector = types.NewAddressFromString("coinbase")
+					coinbase := types.NewAddressFromString("coinbase")
+					ctx := types.NewConfig(
+						types.WithBlockNumber(defaultBlockNumber),
+						types.WithCoinbase(coinbase.ToCommon()),
+					)
 					coinbaseOrgBalance := gethCommon.Big1
 					// small amount of money to create account
 					RunWithNewBlockView(t, env, func(blk types.BlockView) {
-						_, err := blk.DirectCall(types.NewDepositCall(bridgeAccount, ctx.GasFeeCollector, coinbaseOrgBalance, 0))
+						_, err := blk.DirectCall(
+							types.NewDepositCall(
+								bridgeAccount,
+								coinbase,
+								coinbaseOrgBalance,
+								0),
+						)
 						require.NoError(t, err)
 					})
 
@@ -405,7 +424,7 @@ func TestContractInteraction(t *testing.T) {
 
 					// check the balance of coinbase
 					RunWithNewReadOnlyBlockView(t, env, func(blk2 types.ReadOnlyBlockView) {
-						bal, err := blk2.BalanceOf(ctx.GasFeeCollector)
+						bal, err := blk2.BalanceOf(coinbase)
 						require.NoError(t, err)
 						expected := gethParams.TxGas*gethCommon.Big1.Uint64() + gethCommon.Big1.Uint64()
 						require.Equal(t, expected, bal.Uint64())
@@ -429,16 +448,24 @@ func TestContractInteraction(t *testing.T) {
 				})
 
 				RunWithNewEmulator(t, backend, rootAddr, func(env *emulator.Emulator) {
-					ctx := types.NewDefaultBlockContext(blockNumber.Uint64())
-					ctx.GasFeeCollector = types.NewAddressFromString("coinbase-collector")
+					coinbase := types.NewAddressFromString("coinbase-collector")
+					cfg := types.NewConfig(
+						types.WithBlockNumber(defaultBlockNumber),
+						types.WithCoinbase(coinbase.ToCommon()),
+					)
 					coinbaseOrgBalance := gethCommon.Big1
 					// small amount of money to create account
 					RunWithNewBlockView(t, env, func(blk types.BlockView) {
-						_, err := blk.DirectCall(types.NewDepositCall(bridgeAccount, ctx.GasFeeCollector, coinbaseOrgBalance, 0))
+						_, err := blk.DirectCall(types.NewDepositCall(
+							bridgeAccount,
+							types.Address(cfg.BlockContext.Coinbase),
+							coinbaseOrgBalance,
+							0),
+						)
 						require.NoError(t, err)
 					})
 
-					blk, err := env.NewBlockView(ctx)
+					blk, err := env.NewBlockView(cfg)
 					require.NoError(t, err)
 
 					const batchSize = 3
@@ -464,7 +491,7 @@ func TestContractInteraction(t *testing.T) {
 
 					// check the balance of coinbase
 					RunWithNewReadOnlyBlockView(t, env, func(blk2 types.ReadOnlyBlockView) {
-						bal, err := blk2.BalanceOf(ctx.GasFeeCollector)
+						bal, err := blk2.BalanceOf(types.Address(cfg.BlockContext.Coinbase))
 						require.NoError(t, err)
 						expected := gethParams.TxGas*batchSize + gethCommon.Big1.Uint64()
 						require.Equal(t, expected, bal.Uint64())
@@ -488,16 +515,18 @@ func TestContractInteraction(t *testing.T) {
 				account.SetNonce(account.Nonce() + 4)
 
 				RunWithNewEmulator(t, backend, rootAddr, func(env *emulator.Emulator) {
-					ctx := types.NewDefaultBlockContext(blockNumber.Uint64())
-					ctx.GasFeeCollector = types.NewAddressFromString("coinbase")
+					coinbase := types.NewAddressFromString("coinbase")
+					cfg := types.NewConfig(
+						types.WithBlockNumber(defaultBlockNumber),
+						types.WithCoinbase(coinbase.ToCommon()))
 					coinbaseOrgBalance := gethCommon.Big1
 					// small amount of money to create account
 					RunWithNewBlockView(t, env, func(blk types.BlockView) {
-						_, err := blk.DirectCall(types.NewDepositCall(bridgeAccount, ctx.GasFeeCollector, coinbaseOrgBalance, 1))
+						_, err := blk.DirectCall(types.NewDepositCall(bridgeAccount, coinbase, coinbaseOrgBalance, 1))
 						require.NoError(t, err)
 					})
 
-					blk, err := env.NewBlockView(ctx)
+					blk, err := env.NewBlockView(cfg)
 					require.NoError(t, err)
 					tx := account.SignTx(
 						t,
@@ -530,8 +559,9 @@ func TestContractInteraction(t *testing.T) {
 				})
 
 				RunWithNewEmulator(t, backend, rootAddr, func(env *emulator.Emulator) {
-					ctx := types.NewDefaultBlockContext(blockNumber.Uint64())
-					blk, err := env.NewBlockView(ctx)
+					cfg := types.NewConfig(
+						types.WithBlockNumber(defaultBlockNumber))
+					blk, err := env.NewBlockView(cfg)
 					require.NoError(t, err)
 					tx := account.SignTx(t,
 						gethTypes.NewTransaction(
@@ -551,8 +581,8 @@ func TestContractInteraction(t *testing.T) {
 
 			t.Run("test sending transactions (bad signature)", func(t *testing.T) {
 				RunWithNewEmulator(t, backend, rootAddr, func(env *emulator.Emulator) {
-					ctx := types.NewDefaultBlockContext(blockNumber.Uint64())
-					blk, err := env.NewBlockView(ctx)
+					cfg := types.NewConfig(types.WithBlockNumber(defaultBlockNumber))
+					blk, err := env.NewBlockView(cfg)
 					require.NoError(t, err)
 					tx := gethTypes.NewTx(&gethTypes.LegacyTx{
 						Nonce:    0,
@@ -851,10 +881,10 @@ func TestCallingExtraPrecompiles(t *testing.T) {
 					},
 				}
 
-				ctx := types.NewDefaultBlockContext(blockNumber.Uint64())
-				ctx.ExtraPrecompiledContracts = []types.PrecompiledContract{pc}
-
-				blk, err := em.NewBlockView(ctx)
+				cfg := types.NewConfig(
+					types.WithBlockNumber(defaultBlockNumber),
+					types.WithExtraPrecompiledContracts([]types.PrecompiledContract{pc}))
+				blk, err := em.NewBlockView(cfg)
 				require.NoError(t, err)
 
 				res, err := blk.DirectCall(
@@ -920,9 +950,8 @@ func TestTransactionTracing(t *testing.T) {
 		require.NoError(t, err)
 
 		// manually create block with provided tracer
-		ctx := types.NewDefaultBlockContext(1)
-		ctx.Tracer = tracer.TxTracer()
-		blk, err := emu.NewBlockView(ctx)
+		cfg := types.NewConfig(types.WithTransactionTracer(tracer.TxTracer()))
+		blk, err := emu.NewBlockView(cfg)
 		require.NoError(t, err)
 
 		return blk, uploader, tracer
@@ -1115,13 +1144,13 @@ func TestTxIndex(t *testing.T) {
 	testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
 		testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
 			RunWithNewEmulator(t, backend, rootAddr, func(em *emulator.Emulator) {
-				ctx := types.NewDefaultBlockContext(blockNumber.Uint64())
+				cfg := types.NewConfig(types.WithBlockNumber(defaultBlockNumber),
+					types.WithBlockTxCountSoFar(1))
 				expectedTxIndex := uint16(1)
-				ctx.TxCountSoFar = 1
 				testAccount1 := testutils.RandomAddress(t)
 				testAccount2 := testutils.RandomAddress(t)
 
-				blk, err := em.NewBlockView(ctx)
+				blk, err := em.NewBlockView(cfg)
 				require.NoError(t, err)
 
 				res, err := blk.DirectCall(
@@ -1138,13 +1167,13 @@ func TestTxIndex(t *testing.T) {
 				require.NoError(t, err)
 				require.Equal(t, expectedTxIndex, res.Index)
 				expectedTxIndex += 1
-				ctx.TxCountSoFar = 2
+				cfg.BlockTxCountSoFar = 2
 
 				// create a test eoa account
 				account := testutils.GetTestEOAAccount(t, testutils.EOATestAccount1KeyHex)
 				fAddr := account.Address()
 
-				blk, err = em.NewBlockView(ctx)
+				blk, err = em.NewBlockView(cfg)
 				require.NoError(t, err)
 				res, err = blk.DirectCall(
 					types.NewDepositCall(
@@ -1156,9 +1185,9 @@ func TestTxIndex(t *testing.T) {
 				requireSuccessfulExecution(t, err, res)
 				require.Equal(t, expectedTxIndex, res.Index)
 				expectedTxIndex += 1
-				ctx.TxCountSoFar = 3
+				cfg.BlockTxCountSoFar = 3
 
-				blk, err = em.NewBlockView(ctx)
+				blk, err = em.NewBlockView(cfg)
 				require.NoError(t, err)
 
 				tx := account.PrepareAndSignTx(
@@ -1174,9 +1203,9 @@ func TestTxIndex(t *testing.T) {
 				requireSuccessfulExecution(t, err, res)
 				require.Equal(t, expectedTxIndex, res.Index)
 				expectedTxIndex += 1
-				ctx.TxCountSoFar = 4
+				cfg.BlockTxCountSoFar = 4
 
-				blk, err = em.NewBlockView(ctx)
+				blk, err = em.NewBlockView(cfg)
 				require.NoError(t, err)
 
 				const batchSize = 3

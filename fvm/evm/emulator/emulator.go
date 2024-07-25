@@ -39,24 +39,8 @@ func NewEmulator(
 	}
 }
 
-func newConfig(ctx types.BlockContext) *Config {
-	return NewConfig(
-		WithChainID(ctx.ChainID),
-		WithBlockNumber(new(big.Int).SetUint64(ctx.BlockNumber)),
-		WithBlockTime(ctx.BlockTimestamp),
-		WithCoinbase(ctx.GasFeeCollector.ToCommon()),
-		WithDirectCallBaseGasUsage(ctx.DirectCallBaseGasUsage),
-		WithExtraPrecompiledContracts(ctx.ExtraPrecompiledContracts),
-		WithGetBlockHashFunction(ctx.GetHashFunc),
-		WithRandom(&ctx.Random),
-		WithTransactionTracer(ctx.Tracer),
-		WithBlockTotalGasUsedSoFar(ctx.TotalGasUsedSoFar),
-		WithBlockTxCountSoFar(ctx.TxCountSoFar),
-	)
-}
-
 // NewReadOnlyBlockView constructs a new read-only block view
-func (em *Emulator) NewReadOnlyBlockView(ctx types.BlockContext) (types.ReadOnlyBlockView, error) {
+func (em *Emulator) NewReadOnlyBlockView(cfg *types.Config) (types.ReadOnlyBlockView, error) {
 	execState, err := state.NewStateDB(em.ledger, em.rootAddr)
 	return &ReadOnlyBlockView{
 		state: execState,
@@ -64,9 +48,9 @@ func (em *Emulator) NewReadOnlyBlockView(ctx types.BlockContext) (types.ReadOnly
 }
 
 // NewBlockView constructs a new block view (mutable)
-func (em *Emulator) NewBlockView(ctx types.BlockContext) (types.BlockView, error) {
+func (em *Emulator) NewBlockView(cfg *types.Config) (types.BlockView, error) {
 	return &BlockView{
-		config:   newConfig(ctx),
+		config:   cfg,
 		rootAddr: em.rootAddr,
 		ledger:   em.ledger,
 	}, nil
@@ -102,7 +86,7 @@ func (bv *ReadOnlyBlockView) CodeHashOf(address types.Address) ([]byte, error) {
 // BlockView allows mutation of the evm state as part of a block
 // current version only accepts only a single interaction per block view.
 type BlockView struct {
-	config   *Config
+	config   *types.Config
 	rootAddr flow.Address
 	ledger   atree.Ledger
 }
@@ -310,8 +294,24 @@ func (bl *BlockView) newProcedure() (*procedure, error) {
 		return nil, err
 	}
 	cfg := bl.config
+	// setup precompile tracker
+	pcTracker := NewCallTracker()
+	extraPreCompMap := make(map[gethCommon.Address]gethVM.PrecompiledContract)
+	for _, pc := range cfg.ExtraPrecompiledContracts {
+		// wrap pcs for tracking
+		wpc := pcTracker.RegisterPrecompiledContract(pc)
+		extraPreCompMap[pc.Address().ToCommon()] = wpc
+	}
+	cfg.BlockContext.GetPrecompile = func(rules gethParams.Rules, addr gethCommon.Address) (gethVM.PrecompiledContract, bool) {
+		prec, found := extraPreCompMap[addr]
+		if found {
+			return prec, true
+		}
+		return gethCore.GetPrecompile(rules, addr)
+	}
 	return &procedure{
-		config: cfg,
+		pcTracker: pcTracker,
+		config:    cfg,
 		evm: gethVM.NewEVM(
 			*cfg.BlockContext,
 			*cfg.TxContext,
@@ -324,9 +324,10 @@ func (bl *BlockView) newProcedure() (*procedure, error) {
 }
 
 type procedure struct {
-	config *Config
-	evm    *gethVM.EVM
-	state  types.StateDB
+	config    *types.Config
+	pcTracker *CallTracker
+	evm       *gethVM.EVM
+	state     types.StateDB
 }
 
 // commit commits the changes to the state (with optional finalization)
@@ -620,7 +621,7 @@ func (proc *procedure) run(
 	proc.evm.TxContext.Origin = msg.From
 
 	// reset precompile tracking in case
-	proc.config.PCTracker.Reset()
+	proc.pcTracker.Reset()
 
 	// Set gas pool based on block gas limit
 	// if the block gas limit is set to anything than max
@@ -652,7 +653,7 @@ func (proc *procedure) run(
 		res.GasRefund = proc.state.GetRefund()
 		res.Index = uint16(txIndex)
 		res.CumulativeGasUsed = execResult.UsedGas + proc.config.BlockTotalGasUsedSoFar
-		res.PrecompiledCalls, err = proc.config.PCTracker.CapturedCalls()
+		res.PrecompiledCalls, err = proc.pcTracker.CapturedCalls()
 		if err != nil {
 			return nil, err
 		}
