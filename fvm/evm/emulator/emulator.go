@@ -123,7 +123,11 @@ func (bl *BlockView) DirectCall(call *types.DirectCall) (res *types.Result, err 
 		proc.evm.Config.Tracer.OnTxStart(proc.evm.GetVMContext(), call.Transaction(), call.From.ToCommon())
 		if proc.evm.Config.Tracer.OnTxEnd != nil {
 			defer func() {
-				proc.evm.Config.Tracer.OnTxEnd(res.Receipt(), err)
+				var receipt *gethTypes.Receipt
+				if res != nil {
+					receipt = res.Receipt()
+				}
+				proc.evm.Config.Tracer.OnTxEnd(receipt, err)
 			}()
 		}
 	}
@@ -217,8 +221,12 @@ func (bl *BlockView) BatchRunTransactions(txs []*gethTypes.Transaction) ([]*type
 			proc.evm.Config.Tracer.OnTxStart(proc.evm.GetVMContext(), tx, msg.From)
 			if proc.evm.Config.Tracer.OnTxEnd != nil {
 				defer func() {
+					var receipt *gethTypes.Receipt
+					if batchResults[i] != nil {
+						receipt = batchResults[i].Receipt()
+					}
 					proc.evm.Config.Tracer.OnTxEnd(
-						batchResults[i].Receipt(),
+						receipt,
 						err,
 					)
 				}()
