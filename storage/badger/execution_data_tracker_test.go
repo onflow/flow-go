@@ -1,4 +1,4 @@
-package tracker
+package badger
 
 import (
 	"crypto/rand"
@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/module/blobs"
+	"github.com/onflow/flow-go/module/executiondatasync/tracker"
 )
 
 func randomCid() cid.Cid {
@@ -24,7 +25,7 @@ func randomCid() cid.Cid {
 func TestPrune(t *testing.T) {
 	expectedPrunedCIDs := make(map[cid.Cid]struct{})
 	storageDir := t.TempDir()
-	storage, err := OpenStorage(storageDir, 0, zerolog.Nop(), WithPruneCallback(func(c cid.Cid) error {
+	storage, err := NewStorageTracker(storageDir, 0, zerolog.Nop(), WithPruneCallback(func(c cid.Cid) error {
 		_, ok := expectedPrunedCIDs[c]
 		assert.True(t, ok, "unexpected CID pruned: %s", c.String())
 		delete(expectedPrunedCIDs, c)
@@ -41,7 +42,7 @@ func TestPrune(t *testing.T) {
 	c3 := randomCid()
 	c4 := randomCid()
 
-	require.NoError(t, storage.Update(func(tbf TrackBlobsFn) error {
+	require.NoError(t, storage.Update(func(tbf tracker.TrackBlobsFn) error {
 		require.NoError(t, tbf(1, c1, c2))
 		require.NoError(t, tbf(2, c3, c4))
 
@@ -56,22 +57,22 @@ func TestPrune(t *testing.T) {
 	assert.Len(t, expectedPrunedCIDs, 0)
 
 	err = storage.db.View(func(txn *badger.Txn) error {
-		_, err := txn.Get(makeBlobRecordKey(1, c1))
+		_, err := txn.Get(tracker.MakeBlobRecordKey(1, c1))
 		assert.ErrorIs(t, err, badger.ErrKeyNotFound)
-		_, err = txn.Get(makeLatestHeightKey(c1))
+		_, err = txn.Get(tracker.MakeLatestHeightKey(c1))
 		assert.ErrorIs(t, err, badger.ErrKeyNotFound)
-		_, err = txn.Get(makeBlobRecordKey(1, c2))
+		_, err = txn.Get(tracker.MakeBlobRecordKey(1, c2))
 		assert.ErrorIs(t, err, badger.ErrKeyNotFound)
-		_, err = txn.Get(makeLatestHeightKey(c2))
+		_, err = txn.Get(tracker.MakeLatestHeightKey(c2))
 		assert.ErrorIs(t, err, badger.ErrKeyNotFound)
 
-		_, err = txn.Get(makeBlobRecordKey(2, c3))
+		_, err = txn.Get(tracker.MakeBlobRecordKey(2, c3))
 		assert.NoError(t, err)
-		_, err = txn.Get(makeLatestHeightKey(c3))
+		_, err = txn.Get(tracker.MakeLatestHeightKey(c3))
 		assert.NoError(t, err)
-		_, err = txn.Get(makeBlobRecordKey(2, c4))
+		_, err = txn.Get(tracker.MakeBlobRecordKey(2, c4))
 		assert.NoError(t, err)
-		_, err = txn.Get(makeLatestHeightKey(c4))
+		_, err = txn.Get(tracker.MakeLatestHeightKey(c4))
 		assert.NoError(t, err)
 
 		return nil
@@ -83,7 +84,7 @@ func TestPrune(t *testing.T) {
 // if that CID also exists at another height above the pruned height, the CID should not be pruned.
 func TestPruneNonLatestHeight(t *testing.T) {
 	storageDir := t.TempDir()
-	storage, err := OpenStorage(storageDir, 0, zerolog.Nop(), WithPruneCallback(func(c cid.Cid) error {
+	storage, err := NewStorageTracker(storageDir, 0, zerolog.Nop(), WithPruneCallback(func(c cid.Cid) error {
 		assert.Fail(t, "unexpected CID pruned: %s", c.String())
 		return nil
 	}))
@@ -94,7 +95,7 @@ func TestPruneNonLatestHeight(t *testing.T) {
 	c1 := randomCid()
 	c2 := randomCid()
 
-	require.NoError(t, storage.Update(func(tbf TrackBlobsFn) error {
+	require.NoError(t, storage.Update(func(tbf tracker.TrackBlobsFn) error {
 		require.NoError(t, tbf(1, c1, c2))
 		require.NoError(t, tbf(2, c1, c2))
 
@@ -107,13 +108,13 @@ func TestPruneNonLatestHeight(t *testing.T) {
 	assert.Equal(t, uint64(1), prunedHeight)
 
 	err = storage.db.View(func(txn *badger.Txn) error {
-		_, err = txn.Get(makeBlobRecordKey(2, c1))
+		_, err = txn.Get(tracker.MakeBlobRecordKey(2, c1))
 		assert.NoError(t, err)
-		_, err = txn.Get(makeLatestHeightKey(c1))
+		_, err = txn.Get(tracker.MakeLatestHeightKey(c1))
 		assert.NoError(t, err)
-		_, err = txn.Get(makeBlobRecordKey(2, c2))
+		_, err = txn.Get(tracker.MakeBlobRecordKey(2, c2))
 		assert.NoError(t, err)
-		_, err = txn.Get(makeLatestHeightKey(c2))
+		_, err = txn.Get(tracker.MakeLatestHeightKey(c2))
 		assert.NoError(t, err)
 
 		return nil
@@ -126,7 +127,7 @@ func TestPruneNonLatestHeight(t *testing.T) {
 func TestAscendingOrderOfRecords(t *testing.T) {
 	expectedPrunedCIDs := make(map[cid.Cid]struct{})
 	storageDir := t.TempDir()
-	storage, err := OpenStorage(storageDir, 0, zerolog.Nop(), WithPruneCallback(func(c cid.Cid) error {
+	storage, err := NewStorageTracker(storageDir, 0, zerolog.Nop(), WithPruneCallback(func(c cid.Cid) error {
 		_, ok := expectedPrunedCIDs[c]
 		assert.True(t, ok, "unexpected CID pruned: %s", c.String())
 		delete(expectedPrunedCIDs, c)
@@ -143,7 +144,7 @@ func TestAscendingOrderOfRecords(t *testing.T) {
 	c2 := randomCid()
 	c3 := randomCid()
 
-	require.NoError(t, storage.Update(func(tbf TrackBlobsFn) error {
+	require.NoError(t, storage.Update(func(tbf tracker.TrackBlobsFn) error {
 		require.NoError(t, tbf(1, c1))
 		require.NoError(t, tbf(2, c2))
 		// It is important to check if the record with height 256 does not precede
@@ -162,21 +163,21 @@ func TestAscendingOrderOfRecords(t *testing.T) {
 
 	err = storage.db.View(func(txn *badger.Txn) error {
 		// expected that blob record with height 1 was removed
-		_, err := txn.Get(makeBlobRecordKey(1, c1))
+		_, err := txn.Get(tracker.MakeBlobRecordKey(1, c1))
 		assert.ErrorIs(t, err, badger.ErrKeyNotFound)
-		_, err = txn.Get(makeLatestHeightKey(c1))
+		_, err = txn.Get(tracker.MakeLatestHeightKey(c1))
 		assert.ErrorIs(t, err, badger.ErrKeyNotFound)
 
 		// expected that blob record with height 2 exists
-		_, err = txn.Get(makeBlobRecordKey(2, c2))
+		_, err = txn.Get(tracker.MakeBlobRecordKey(2, c2))
 		assert.NoError(t, err)
-		_, err = txn.Get(makeLatestHeightKey(c2))
+		_, err = txn.Get(tracker.MakeLatestHeightKey(c2))
 		assert.NoError(t, err)
 
 		// expected that blob record with height 256 exists
-		_, err = txn.Get(makeBlobRecordKey(256, c3))
+		_, err = txn.Get(tracker.MakeBlobRecordKey(256, c3))
 		assert.NoError(t, err)
-		_, err = txn.Get(makeLatestHeightKey(c3))
+		_, err = txn.Get(tracker.MakeLatestHeightKey(c3))
 		assert.NoError(t, err)
 
 		return nil

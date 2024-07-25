@@ -946,11 +946,11 @@ func (exeNode *ExecutionNode) LoadExecutionDataPruner(
 	}
 
 	trackerDir := filepath.Join(exeNode.exeConf.executionDataDir, "tracker")
-	exeNode.executionDataTracker, err = tracker.OpenStorage(
+	exeNode.executionDataTracker, err = storage.NewStorageTracker(
 		trackerDir,
 		sealed.Height,
 		node.Logger,
-		tracker.WithPruneCallback(func(c cid.Cid) error {
+		storage.WithPruneCallback(func(c cid.Cid) error {
 			// TODO: use a proper context here
 			return exeNode.executionDataBlobstore.DeleteBlob(context.TODO(), c)
 		}),
