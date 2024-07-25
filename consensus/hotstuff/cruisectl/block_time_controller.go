@@ -111,9 +111,10 @@ type BlockTimeController struct {
 	nextEpochTiming *epochTiming
 
 	// incorporatedBlocks queues OnBlockIncorporated notifications for subsequent processing by an internal worker routine.
-	incorporatedBlocks chan TimedBlock
 	// Channel capacity is small and if `incorporatedBlocks` is full we discard new blocks, because the timing targets
 	// from the controller only make sense, if the node is not overloaded and swiftly processing new blocks.
+	incorporatedBlocks chan TimedBlock
+
 	// epochEvents queues functors for processing epoch-related protocol events.
 	// Events will be processed in the order they are received (fifo).
 	epochEvents     chan func() error
@@ -432,23 +433,21 @@ func (ctl *BlockTimeController) measureViewDuration(tb TimedBlock) error {
 // its end. Specifically, we memorize the updated timing information in the BlockTimeController.
 // No errors are expected during normal operation.
 func (ctl *BlockTimeController) processEpochExtended(first *flow.Header) error {
-	currEpochWithExtension, err := newEpochTiming(ctl.state.AtHeight(first.Height).Epochs().Current())
+	currEpochTimingWithExtension, err := newEpochTiming(ctl.state.AtHeight(first.Height).Epochs().Current())
 	if err != nil {
 		return fmt.Errorf("failed to get new epoch timing: %w", err)
 	}
 
 	// sanity check: ensure the final view of the current epoch monotonically increases
-	if currEpochWithExtension.finalView < ctl.currentEpochTiming.finalView {
-		return fmt.Errorf("final view of epoch must be monotonically increases, but is decreasing from %d to %d", ctl.currentEpochTiming.finalView, currEpochWithExtension.finalView)
+	if currEpochTimingWithExtension.finalView < ctl.currentEpochTiming.finalView {
+		return fmt.Errorf("final view of epoch must be monotonically increases, but is decreasing from %d to %d", ctl.currentEpochTiming.finalView, currEpochTimingWithExtension.finalView)
 	}
 
-	if currEpochWithExtension.finalView == ctl.currentEpochTiming.finalView {
+	if currEpochTimingWithExtension.finalView == ctl.currentEpochTiming.finalView {
 		return nil
 	}
 
-	ctl.currentEpochTiming.finalView = currEpochWithExtension.finalView
-	ctl.currentEpochTiming.targetEndTime = currEpochWithExtension.targetEndTime
-	ctl.currentEpochTiming.targetDuration = currEpochWithExtension.targetDuration
+	ctl.currentEpochTiming = *currEpochTimingWithExtension
 
 	return nil
 }
@@ -490,7 +489,7 @@ func (ctl *BlockTimeController) EpochExtended(_ uint64, first *flow.Header, _ fl
 }
 
 // EpochCommittedPhaseStarted ingests the respective protocol notifications. The notification is
-// queued for async processing by the worker. We must process _all_ `EpochExtended` notifications.
+// queued for async processing by the worker. We must process _all_ `EpochCommittedPhaseStarted` notifications.
 func (ctl *BlockTimeController) EpochCommittedPhaseStarted(_ uint64, first *flow.Header) {
 	ctl.epochEvents <- func() error {
 		return ctl.processEpochCommittedPhaseStarted(first)

@@ -196,7 +196,7 @@ func createNodes(t *testing.T, participants *ConsensusParticipants, rootSnapshot
 		rootSnapshot.Epochs().Next())
 
 	epochLookup := &mockmodule.EpochLookup{}
-	epochLookup.On("EpochForViewWithFallback", mock.Anything).Return(
+	epochLookup.On("EpochForView", mock.Anything).Return(
 		func(view uint64) uint64 {
 			for _, info := range epochViewLookup {
 				if view <= info.finalView {
