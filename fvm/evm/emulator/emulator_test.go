@@ -1011,21 +1011,8 @@ func TestTransactionTracing(t *testing.T) {
 
 	t.Run("contract interaction run failed transaction", func(t *testing.T) {
 		runWithDeployedContract(t, func(testContract *testutils.TestContract, testAccount *testutils.EOATestAccount, emu *emulator.Emulator) {
-			blk, uploader, tracer := blockWithTracer(t, emu)
-
+			blk, _, tracer := blockWithTracer(t, emu)
 			var txID gethCommon.Hash
-			var trace json.RawMessage
-
-			blockID := flow.Identifier{0x02}
-			uploaded := make(chan struct{})
-
-			uploader.UploadFunc = func(id string, message json.RawMessage) error {
-				uploaded <- struct{}{}
-				require.Equal(t, debug.TraceID(txID, blockID), id)
-				require.Equal(t, trace, message)
-				require.Greater(t, len(message), 0)
-				return nil
-			}
 
 			tx := testAccount.PrepareAndSignTx(
 				t,
@@ -1039,40 +1026,17 @@ func TestTransactionTracing(t *testing.T) {
 			// interact and record trace
 			res, err := blk.RunTransaction(tx)
 			require.NoError(t, err)
-			require.NoError(t, res.ValidationError)
-			require.NoError(t, res.VMError)
-			txID = res.TxHash
-			trace, err = tracer.TxTracer().GetResult()
-			require.NoError(t, err)
-			tracer.WithBlockID(blockID)
+			require.EqualError(t, res.VMError, "method 'store1' not found")
 
 			tracer.Collect(txID)
-			testAccount.SetNonce(testAccount.Nonce() + 1)
-			require.Eventuallyf(t, func() bool {
-				<-uploaded
-				return true
-			}, time.Second, time.Millisecond*100, "upload did not execute")
 		})
 
 	})
 
 	t.Run("contract interaction run invalid transaction", func(t *testing.T) {
 		runWithDeployedContract(t, func(testContract *testutils.TestContract, testAccount *testutils.EOATestAccount, emu *emulator.Emulator) {
-			blk, uploader, tracer := blockWithTracer(t, emu)
-
+			blk, _, tracer := blockWithTracer(t, emu)
 			var txID gethCommon.Hash
-			var trace json.RawMessage
-
-			blockID := flow.Identifier{0x02}
-			uploaded := make(chan struct{})
-
-			uploader.UploadFunc = func(id string, message json.RawMessage) error {
-				uploaded <- struct{}{}
-				require.Equal(t, debug.TraceID(txID, blockID), id)
-				require.Equal(t, trace, message)
-				require.Greater(t, len(message), 0)
-				return nil
-			}
 
 			tx := testAccount.PrepareAndSignTx(
 				t,
@@ -1086,19 +1050,9 @@ func TestTransactionTracing(t *testing.T) {
 			// interact and record trace
 			res, err := blk.RunTransaction(tx)
 			require.NoError(t, err)
-			require.NoError(t, res.ValidationError)
-			require.NoError(t, res.VMError)
-			txID = res.TxHash
-			trace, err = tracer.TxTracer().GetResult()
-			require.NoError(t, err)
-			tracer.WithBlockID(blockID)
+			require.EqualError(t, res.ValidationError, "max fee per gas less than block base fee: address 0x658Bdf435d810C91414eC09147DAA6DB62406379, maxFeePerGas: -1, baseFee: 0")
 
 			tracer.Collect(txID)
-			testAccount.SetNonce(testAccount.Nonce() + 1)
-			require.Eventuallyf(t, func() bool {
-				<-uploaded
-				return true
-			}, time.Second, time.Millisecond*100, "upload did not execute")
 		})
 
 	})
