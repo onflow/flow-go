@@ -52,7 +52,7 @@ func NewEVMCallTracer(uploader Uploader, logger zerolog.Logger) (*CallTracer, er
 }
 
 func (t *CallTracer) TxTracer() *tracers.Tracer {
-	return NewSafeTxTracer(t.tracer)
+	return NewSafeTxTracer(t)
 }
 
 func (t *CallTracer) WithBlockID(id flow.Identifier) {
@@ -117,10 +117,15 @@ func TraceID(txID gethCommon.Hash, blockID flow.Identifier) string {
 	return fmt.Sprintf("%s-%s", blockID.String(), txID.String())
 }
 
-func NewSafeTxTracer(tc *tracers.Tracer) *tracers.Tracer {
+func NewSafeTxTracer(ct *CallTracer) *tracers.Tracer {
 	wrapped := &tracers.Tracer{
 		Hooks: &tracing.Hooks{},
 	}
+
+	l := ct.logger.With().
+		Str("block-id", ct.blockID.String()).
+		Logger()
+
 	wrapped.OnTxStart = func(
 		vm *tracing.VMContext,
 		tx *types.Transaction,
@@ -128,21 +133,31 @@ func NewSafeTxTracer(tc *tracers.Tracer) *tracers.Tracer {
 	) {
 		defer func() {
 			if r := recover(); r != nil {
-				_ = r
-				// TODO log
+				err, ok := r.(error)
+				if !ok {
+					err = fmt.Errorf("panic: %v", r)
+				}
+				l.Err(err).
+					Stack().
+					Msg("OnTxStart trace collection failed")
 			}
 		}()
-		tc.OnTxStart(vm, tx, from)
+		ct.tracer.OnTxStart(vm, tx, from)
 	}
 
 	wrapped.OnTxEnd = func(receipt *types.Receipt, err error) {
 		defer func() {
 			if r := recover(); r != nil {
-				_ = r
-				// TODO log
+				err, ok := r.(error)
+				if !ok {
+					err = fmt.Errorf("panic: %v", r)
+				}
+				l.Err(err).
+					Stack().
+					Msg("OnTxEnd trace collection failed")
 			}
 		}()
-		tc.OnTxEnd(receipt, err)
+		ct.tracer.OnTxEnd(receipt, err)
 	}
 
 	wrapped.OnEnter = func(
@@ -155,21 +170,31 @@ func NewSafeTxTracer(tc *tracers.Tracer) *tracers.Tracer {
 	) {
 		defer func() {
 			if r := recover(); r != nil {
-				_ = r
-				// TODO log
+				err, ok := r.(error)
+				if !ok {
+					err = fmt.Errorf("panic: %v", r)
+				}
+				l.Err(err).
+					Stack().
+					Msg("OnEnter trace collection failed")
 			}
 		}()
-		tc.OnEnter(depth, typ, from, to, input, gas, value)
+		ct.tracer.OnEnter(depth, typ, from, to, input, gas, value)
 	}
 
 	wrapped.OnExit = func(depth int, output []byte, gasUsed uint64, err error, reverted bool) {
 		defer func() {
 			if r := recover(); r != nil {
-				_ = r
-				// TODO log
+				err, ok := r.(error)
+				if !ok {
+					err = fmt.Errorf("panic: %v", r)
+				}
+				l.Err(err).
+					Stack().
+					Msg("OnExit trace collection failed")
 			}
 		}()
-		tc.OnExit(depth, output, gasUsed, err, reverted)
+		ct.tracer.OnExit(depth, output, gasUsed, err, reverted)
 	}
 
 	wrapped.OnOpcode = func(
@@ -183,11 +208,16 @@ func NewSafeTxTracer(tc *tracers.Tracer) *tracers.Tracer {
 	) {
 		defer func() {
 			if r := recover(); r != nil {
-				_ = r
-				// TODO log
+				err, ok := r.(error)
+				if !ok {
+					err = fmt.Errorf("panic: %v", r)
+				}
+				l.Err(err).
+					Stack().
+					Msg("OnOpcode trace collection failed")
 			}
 		}()
-		tc.OnOpcode(pc, op, gas, cost, scope, rData, depth, err)
+		ct.tracer.OnOpcode(pc, op, gas, cost, scope, rData, depth, err)
 	}
 
 	wrapped.OnFault = func(
@@ -199,24 +229,34 @@ func NewSafeTxTracer(tc *tracers.Tracer) *tracers.Tracer {
 		err error) {
 		defer func() {
 			if r := recover(); r != nil {
-				_ = r
-				// TODO log
+				err, ok := r.(error)
+				if !ok {
+					err = fmt.Errorf("panic: %v", r)
+				}
+				l.Err(err).
+					Stack().
+					Msg("OnFault trace collection failed")
 			}
 		}()
-		tc.OnFault(pc, op, gas, cost, scope, depth, err)
+		ct.tracer.OnFault(pc, op, gas, cost, scope, depth, err)
 	}
 
 	wrapped.OnGasChange = func(old, new uint64, reason tracing.GasChangeReason) {
 		defer func() {
 			if r := recover(); r != nil {
-				_ = r
-				// TODO log
+				err, ok := r.(error)
+				if !ok {
+					err = fmt.Errorf("panic: %v", r)
+				}
+				l.Err(err).
+					Stack().
+					Msg("OnGasChange trace collection failed")
 			}
 		}()
-		tc.OnGasChange(old, new, reason)
+		ct.tracer.OnGasChange(old, new, reason)
 	}
 
-	wrapped.GetResult = tc.GetResult
-	wrapped.Stop = tc.Stop
+	wrapped.GetResult = ct.tracer.GetResult
+	wrapped.Stop = ct.tracer.Stop
 	return wrapped
 }
