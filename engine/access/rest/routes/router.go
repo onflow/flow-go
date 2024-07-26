@@ -237,8 +237,7 @@ func normalizeURL(url string) (string, error) {
 		parts = append(parts, "{address}")
 		if matches[0][5] == "balance" {
 			parts = append(parts, "balance")
-		}
-		if matches[0][5] == "keys" {
+		} else if matches[0][5] == "keys" {
 			parts = append(parts, "keys", "{index}")
 		}
 	default:
