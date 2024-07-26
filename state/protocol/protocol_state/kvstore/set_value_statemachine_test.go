@@ -1,6 +1,7 @@
 package kvstore_test
 
 import (
+	"errors"
 	"github.com/onflow/flow-go/state/protocol"
 	"testing"
 
@@ -87,7 +88,16 @@ func (s *SetKeyValueStoreValueStateMachineSuite) TestEvolveState_ProtocolStateVe
 		require.NoError(s.T(), err, "sentinel error has to be handled internally")
 	})
 	s.Run("exception", func() {
+		s.mutator = mock.NewKVStoreMutator(s.T())
+		s.stateMachine = kvstore.NewSetValueStateMachine(s.telemetry, s.view, s.parentState, s.mutator)
+		invalid := &flow.SetEpochExtensionViewCount{
+			Value: 50,
+		}
 
+		exception := errors.New("kvstore-exception")
+		s.mutator.On("SetEpochExtensionViewCount", invalid.Value).Return(exception).Once()
+		err := s.stateMachine.EvolveState([]flow.ServiceEvent{invalid.ServiceEvent(), invalid.ServiceEvent()})
+		require.ErrorIs(s.T(), err, exception, "exception has to be propagated")
 	})
 }
 
