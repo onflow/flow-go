@@ -97,19 +97,19 @@ func (c *collector) collect(
 
 // Pop returns the metrics for the given block at the given height
 // and clears all data up to the given height.
-func (c *collector) Pop(height uint64, block flow.Identifier) []TransactionExecutionMetrics {
+func (c *collector) Pop(height uint64, blockID flow.Identifier) []TransactionExecutionMetrics {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	if height <= c.latestHeight && c.latestHeight != 0 {
 		c.log.Warn().
 			Uint64("height", height).
-			Stringer("block", block).
-			Msg("requested metrics for a block that is older or equal than the most recent block")
+			Stringer("blockID", blockID).
+			Msg("requested metrics for a blockID that is older or equal than the most recent blockID")
 		return nil
 	}
 
-	metrics := c.metrics[block]
+	metrics := c.metrics[blockID]
 
 	c.advanceTo(height)
 

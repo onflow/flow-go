@@ -547,18 +547,22 @@ func (exeNode *ExecutionNode) LoadProviderEngine(
 
 	vmCtx := fvm.NewContext(opts...)
 
-	// inject the transaction execution metrics
-	collector := exeNode.collector.WithTransactionCallback(
-		func(dur time.Duration, stats module.TransactionExecutionResultStats, info module.TransactionExecutionResultInfo) {
-			exeNode.metricsProvider.Collect(
-				info.BlockID,
-				info.BlockHeight,
-				txmetrics.TransactionExecutionMetrics{
-					TransactionID:          info.TransactionID,
-					ExecutionTime:          dur,
-					ExecutionEffortWeights: stats.ComputationIntensities,
-				})
-		})
+	var collector module.ExecutionMetrics
+	collector = exeNode.collector
+	if exeNode.exeConf.transactionExecutionMetricsEnabled {
+		// inject the transaction execution metrics
+		collector = exeNode.collector.WithTransactionCallback(
+			func(dur time.Duration, stats module.TransactionExecutionResultStats, info module.TransactionExecutionResultInfo) {
+				exeNode.metricsProvider.Collect(
+					info.BlockID,
+					info.BlockHeight,
+					txmetrics.TransactionExecutionMetrics{
+						TransactionID:          info.TransactionID,
+						ExecutionTime:          dur,
+						ExecutionEffortWeights: stats.ComputationIntensities,
+					})
+			})
+	}
 
 	ledgerViewCommitter := committer.NewLedgerViewCommitter(exeNode.ledgerStorage, node.Tracer)
 	manager, err := computation.New(

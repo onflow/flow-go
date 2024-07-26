@@ -3,6 +3,8 @@ package metrics
 import (
 	"time"
 
+	"github.com/onflow/flow-go/engine"
+
 	cadenceCommon "github.com/onflow/cadence/runtime/common"
 	"github.com/rs/zerolog"
 
@@ -71,9 +73,9 @@ type transactionExecutionMetricsProvider struct {
 
 	log zerolog.Logger
 
-	executionState state.FinalizedExecutionState
-	headers        storage.Headers
-	blockFinalized chan struct{}
+	executionState         state.FinalizedExecutionState
+	headers                storage.Headers
+	blockFinalizedNotifier engine.Notifier
 
 	latestFinalizedAndExecuted *flow.Header
 }
@@ -98,7 +100,7 @@ func NewTransactionExecutionMetricsProvider(
 		log:                        log,
 		executionState:             executionState,
 		headers:                    headers,
-		blockFinalized:             make(chan struct{}),
+		blockFinalizedNotifier:     engine.NewNotifier(),
 		latestFinalizedAndExecuted: latestFinalizedBlock,
 	}
 
@@ -112,11 +114,7 @@ func NewTransactionExecutionMetricsProvider(
 }
 
 func (p *transactionExecutionMetricsProvider) BlockFinalized(*flow.Header) {
-	// only handle a single finalized event at a time
-	select {
-	case p.blockFinalized <- struct{}{}:
-	default:
-	}
+	p.blockFinalizedNotifier.Notify()
 }
 
 // move data from the collector to the provider
@@ -135,7 +133,7 @@ func (p *transactionExecutionMetricsProvider) blockFinalizedWorker(
 		select {
 		case <-ctx.Done():
 			return
-		case <-p.blockFinalized:
+		case <-p.blockFinalizedNotifier.Channel():
 			p.onExecutedAndFinalized()
 		}
 	}

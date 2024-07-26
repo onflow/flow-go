@@ -1,7 +1,6 @@
 package metrics
 
 import (
-	"fmt"
 	"sync"
 
 	"github.com/rs/zerolog"
@@ -12,7 +11,7 @@ import (
 type provider struct {
 	log zerolog.Logger
 
-	mu *sync.RWMutex
+	mu sync.RWMutex
 
 	bufferSize               uint
 	bufferIndex              uint
@@ -31,7 +30,6 @@ func newProvider(
 	}
 
 	return &provider{
-		mu:                       &sync.RWMutex{},
 		log:                      log,
 		bufferSize:               bufferSize,
 		blockHeightAtBufferIndex: blockHeightAtBufferIndex,
@@ -86,10 +84,9 @@ func (p *provider) GetTransactionExecutionMetricsAfter(height uint64) (GetTransa
 	}
 
 	// start index is the lowest block height that is in the buffer
+	// missing heights are handled below
 	startIndex := uint64(0)
-	if p.blockHeightAtBufferIndex < uint64(p.bufferSize) {
-		startIndex = 0
-	} else {
+	if p.blockHeightAtBufferIndex > uint64(p.bufferSize) {
 		startIndex = p.blockHeightAtBufferIndex - uint64(p.bufferSize)
 	}
 
@@ -100,12 +97,17 @@ func (p *provider) GetTransactionExecutionMetricsAfter(height uint64) (GetTransa
 	}
 
 	for i := startIndex; i <= p.blockHeightAtBufferIndex; i++ {
-		// 0 <= diff
+		// 0 <= diff; because of the bufferSize check above
 		diff := uint(p.blockHeightAtBufferIndex - i)
 
-		//  0 <= diff < bufferSize
-		// we add bufferSize to avoid negative values
-		index := (p.bufferIndex + (p.bufferSize - diff)) % p.bufferSize
+		// 0 <= diff < bufferSize; because of the bufferSize check above
+		// we are about to do a modulo operation with p.bufferSize on p.bufferIndex - diff, but diff could
+		// be larger than p.bufferIndex, which would result in a negative intermediate value.
+		// To avoid this, we add p.bufferSize to diff, which will guarantee that (p.bufferSize + p.bufferIndex - diff)
+		// is always positive, but the modulo operation will still return the same index.
+		intermediateIndex := p.bufferIndex + p.bufferSize - diff
+		index := intermediateIndex % p.bufferSize
+
 		d := p.buffer[index]
 		if len(d) == 0 {
 			continue
@@ -116,5 +118,3 @@ func (p *provider) GetTransactionExecutionMetricsAfter(height uint64) (GetTransa
 
 	return data, nil
 }
-
-var NoTransactionExecutionMetricsError = fmt.Errorf("no transaction execution metrics available")
