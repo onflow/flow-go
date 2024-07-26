@@ -2,6 +2,7 @@ package epochs
 
 import (
 	"fmt"
+	"github.com/onflow/flow-go/state/protocol/protocol_state/helper"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -100,9 +101,8 @@ type StateMachineFactoryMethod func(candidateView uint64, parentState *flow.Rich
 // which is either a HappyPathStateMachine or a FallbackStateMachine depending on the operation mode of the protocol.
 // It relies on Key-Value Store to read the parent state and to persist the snapshot of the updated Epoch state.
 type EpochStateMachine struct {
+	helper.BaseKeyValueStoreStateMachine
 	activeStateMachine               StateMachine
-	parentState                      protocol.KVStoreReader
-	mutator                          protocol_state.KVStoreMutator
 	epochFallbackStateMachineFactory func() (StateMachine, error)
 
 	setups               storage.EpochSetups
@@ -160,9 +160,8 @@ func NewEpochStateMachine(
 	}
 
 	return &EpochStateMachine{
-		activeStateMachine: stateMachine,
-		parentState:        parentState,
-		mutator:            mutator,
+		BaseKeyValueStoreStateMachine: helper.NewBaseKeyValueStoreStateMachine(candidateView, parentState, mutator),
+		activeStateMachine:            stateMachine,
 		epochFallbackStateMachineFactory: func() (StateMachine, error) {
 			return epochFallbackStateMachineFactory(candidateView, parentEpochState)
 		},
@@ -189,7 +188,7 @@ func (e *EpochStateMachine) Build() (*transaction.DeferredBlockPersist, error) {
 		e.pendingDbUpdates.AddDbOp(operation.SkipDuplicatesTx(
 			e.epochProtocolStateDB.StoreTx(updatedStateID, updatedEpochState.MinEpochStateEntry)))
 	}
-	e.mutator.SetEpochStateID(updatedStateID)
+	e.Mutator.SetEpochStateID(updatedStateID)
 
 	return e.pendingDbUpdates, nil
 }
@@ -297,17 +296,6 @@ func (e *EpochStateMachine) evolveActiveStateMachine(sealedServiceEvents []flow.
 		}
 	}
 	return dbUpdates, nil
-}
-
-// View returns the view associated with this state machine.
-// The view of the state machine equals the view of the block carrying the respective updates.
-func (e *EpochStateMachine) View() uint64 {
-	return e.activeStateMachine.View()
-}
-
-// ParentState returns parent state associated with this state machine.
-func (e *EpochStateMachine) ParentState() protocol.KVStoreReader {
-	return e.parentState
 }
 
 // epochFallbackTriggeredByIncorporatingCandidate checks whether incorporating the input block B

@@ -2,11 +2,11 @@ package kvstore
 
 import (
 	"fmt"
+	"github.com/onflow/flow-go/state/protocol/protocol_state/helper"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/protocol_state"
-	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
 // PSVersionUpgradeStateMachine encapsulates the logic for evolving the version of the Protocol State.
@@ -16,9 +16,7 @@ import (
 // All updates are applied to a copy of parent KV store, so parent KV store is not modified.
 // A separate instance should be created for each block to process the updates therein.
 type PSVersionUpgradeStateMachine struct {
-	candidateView uint64
-	parentState   protocol.KVStoreReader
-	mutator       protocol_state.KVStoreMutator
+	helper.BaseKeyValueStoreStateMachine
 }
 
 var _ protocol_state.KeyValueStoreStateMachine = (*PSVersionUpgradeStateMachine)(nil)
@@ -32,17 +30,8 @@ func NewPSVersionUpgradeStateMachine(
 	mutator protocol_state.KVStoreMutator,
 ) *PSVersionUpgradeStateMachine {
 	return &PSVersionUpgradeStateMachine{
-		candidateView: candidateView,
-		parentState:   parentState,
-		mutator:       mutator,
+		BaseKeyValueStoreStateMachine: helper.NewBaseKeyValueStoreStateMachine(candidateView, parentState, mutator),
 	}
-}
-
-// Build is a no-op, because scheduled version upgrades are stored in the KVStore only, which the
-// caller `protocol.MutableProtocolState` persist. (There is no secondary database operations to
-// index or persist version upgrade data separately)
-func (m *PSVersionUpgradeStateMachine) Build() (*transaction.DeferredBlockPersist, error) {
-	return transaction.NewDeferredBlockPersist(), nil
 }
 
 // EvolveState applies the state change(s) on sub-state P for the candidate block (under construction).
@@ -81,24 +70,24 @@ func (m *PSVersionUpgradeStateMachine) EvolveState(orderedUpdates []flow.Service
 //
 // All other errors should be treated as exceptions.
 func (m *PSVersionUpgradeStateMachine) processSingleEvent(versionUpgrade *flow.ProtocolStateVersionUpgrade) error {
-	// To switch the protocol version, replica needs to process a block with a candidateView >= activation view.
+	// To switch the protocol version, replica needs to process a block with a CandidateView >= activation view.
 	// But we cannot activate a new version till the block containing the seal is finalized, because when
 	// switching between forks with different highest views, we do not want to switch forth and back between versions.
 	// The problem is that finality is local to each node due to the nature of the consensus algorithm itself.
 	// We would like to guarantee that all nodes switch the protocol version at exactly the same block.
 	// To guarantee that all nodes switch the protocol version at exactly the same block, we require that the
-	// activation view is higher than the candidateView + Δ when accepting the event. Δ represents the finalization lag
+	// activation view is higher than the CandidateView + Δ when accepting the event. Δ represents the finalization lag
 	// to give time for replicas to finalize the block containing the seal for the version upgrade event.
 	// When replica reaches (or exceeds) the activation view *and* the latest finalized protocol state knows
 	// about the version upgrade, only then it's safe to switch the protocol version.
-	if m.candidateView+m.parentState.GetEpochCommitSafetyThreshold() >= versionUpgrade.ActiveView {
+	if m.View()+m.ParentState().GetEpochCommitSafetyThreshold() >= versionUpgrade.ActiveView {
 		return protocol.NewInvalidServiceEventErrorf("view %d triggering version upgrade must be at least %d views in the future of current view %d: %w",
-			versionUpgrade.ActiveView, m.parentState.GetEpochCommitSafetyThreshold(), m.candidateView, ErrInvalidActivationView)
+			versionUpgrade.ActiveView, m.ParentState().GetEpochCommitSafetyThreshold(), m.View(), ErrInvalidActivationView)
 	}
 
-	if m.parentState.GetProtocolStateVersion()+1 != versionUpgrade.NewProtocolStateVersion {
+	if m.ParentState().GetProtocolStateVersion()+1 != versionUpgrade.NewProtocolStateVersion {
 		return protocol.NewInvalidServiceEventErrorf("invalid protocol state version upgrade %d -> %d: %w",
-			m.parentState.GetProtocolStateVersion(), versionUpgrade.NewProtocolStateVersion, ErrInvalidUpgradeVersion)
+			m.ParentState().GetProtocolStateVersion(), versionUpgrade.NewProtocolStateVersion, ErrInvalidUpgradeVersion)
 	}
 
 	// checkPendingUpgrade checks if there is a pending upgrade in the state and validates if we can accept the upgrade request.
@@ -108,7 +97,7 @@ func (m *PSVersionUpgradeStateMachine) processSingleEvent(versionUpgrade *flow.P
 	// Condition (ii) is checked in this function.
 	checkPendingUpgrade := func(store protocol.KVStoreReader) error {
 		if pendingUpgrade := store.GetVersionUpgrade(); pendingUpgrade != nil {
-			if pendingUpgrade.ActivationView < m.candidateView {
+			if pendingUpgrade.ActivationView < m.View() {
 				// pending upgrade has been activated, we can ignore it.
 				return nil
 			}
@@ -124,11 +113,11 @@ func (m *PSVersionUpgradeStateMachine) processSingleEvent(versionUpgrade *flow.P
 	}
 
 	// There can be multiple `versionUpgrade` Service Events sealed in one block. In case we have _not_
-	// encountered any, `m.mutator` contains the latest `versionUpgrade` as of the parent block, because
+	// encountered any, `m.Mutator` contains the latest `versionUpgrade` as of the parent block, because
 	// we cloned it from the parent state. If we encountered some version upgrades, we already enforced that
 	// they are all upgrades to the same version. So we only need to check that the next `versionUpgrade`
 	// also has the same version.
-	err := checkPendingUpgrade(m.mutator)
+	err := checkPendingUpgrade(m.Mutator)
 	if err != nil {
 		return fmt.Errorf("version upgrade invalid with respect to the current state: %w", err)
 	}
@@ -137,17 +126,6 @@ func (m *PSVersionUpgradeStateMachine) processSingleEvent(versionUpgrade *flow.P
 		Data:           versionUpgrade.NewProtocolStateVersion,
 		ActivationView: versionUpgrade.ActiveView,
 	}
-	m.mutator.SetVersionUpgrade(activator)
+	m.Mutator.SetVersionUpgrade(activator)
 	return nil
-}
-
-// View returns the view associated with this state machine.
-// The view of the state machine equals the view of the block carrying the respective updates.
-func (m *PSVersionUpgradeStateMachine) View() uint64 {
-	return m.candidateView
-}
-
-// ParentState returns parent state associated with this state machine.
-func (m *PSVersionUpgradeStateMachine) ParentState() protocol.KVStoreReader {
-	return m.parentState
 }

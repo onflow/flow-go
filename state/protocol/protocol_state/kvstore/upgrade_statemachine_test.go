@@ -41,7 +41,7 @@ func (s *StateMachineSuite) SetupTest() {
 }
 
 // TestInitialInvariants ensures that initial state machine invariants are met.
-// It checks that state machine has correct candidateView and parent state.
+// It checks that state machine has correct CandidateView and parent state.
 func (s *StateMachineSuite) TestInitialInvariants() {
 	require.Equal(s.T(), s.view, s.stateMachine.View())
 	require.Equal(s.T(), s.parentState, s.stateMachine.ParentState())
