@@ -1026,7 +1026,6 @@ func TestTransactionTracing(t *testing.T) {
 			// interact and record trace
 			res, err := blk.RunTransaction(tx)
 			require.NoError(t, err)
-			fmt.Println(res)
 			require.EqualError(t, res.VMError, "out of gas")
 
 			tracer.Collect(txID)
