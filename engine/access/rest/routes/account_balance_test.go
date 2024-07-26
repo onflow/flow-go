@@ -23,7 +23,7 @@ import (
 // 3. Get account balance by address at height.
 // 4. Get invalid account balance.
 func TestGetAccountBalance(t *testing.T) {
-	backend := &mock.API{}
+	backend := mock.NewAPI(t)
 
 	t.Run("get balance by address at latest sealed block", func(t *testing.T) {
 		account := accountFixture(t)

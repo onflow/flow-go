@@ -235,6 +235,9 @@ func normalizeURL(url string) (string, error) {
 	case 16:
 		// address based resource. e.g. /v1/accounts/1234567890abcdef
 		parts = append(parts, "{address}")
+		if matches[0][5] == "balance" {
+			parts = append(parts, "balance")
+		}
 		if matches[0][5] == "keys" {
 			parts = append(parts, "keys", "{index}")
 		}

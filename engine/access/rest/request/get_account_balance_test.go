@@ -42,4 +42,12 @@ func Test_GetAccountBalance_ValidParse(t *testing.T) {
 	err = getAccountBalance.Parse(addr, "100", chain)
 	assert.NoError(t, err)
 	assert.Equal(t, getAccountBalance.Height, uint64(100))
+
+	err = getAccountBalance.Parse(addr, sealed, chain)
+	assert.NoError(t, err)
+	assert.Equal(t, getAccountBalance.Height, SealedHeight)
+
+	err = getAccountBalance.Parse(addr, final, chain)
+	assert.NoError(t, err)
+	assert.Equal(t, getAccountBalance.Height, FinalHeight)
 }
