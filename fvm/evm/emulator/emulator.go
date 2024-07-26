@@ -179,7 +179,7 @@ func (bl *BlockView) RunTransaction(
 				if result != nil {
 					receipt = result.Receipt()
 				}
-				proc.evm.Config.Tracer.OnTxEnd(receipt, err)
+				proc.evm.Config.Tracer.OnTxEnd(receipt, result.ValidationError)
 			}
 		}()
 
