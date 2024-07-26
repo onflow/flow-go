@@ -224,7 +224,7 @@ func TestAccounts_SetContracts(t *testing.T) {
 }
 
 func TestAccount_StorageUsed(t *testing.T) {
-	emptyAccountSize := uint64(48)
+	emptyAccountSize := uint64(44)
 
 	t.Run("Storage used on account creation is deterministic", func(t *testing.T) {
 		txnState := testutils.NewSimpleTransaction(nil)
