@@ -3,8 +3,11 @@ package debug
 import (
 	"encoding/json"
 	"fmt"
+	"math/big"
 
 	gethCommon "github.com/onflow/go-ethereum/common"
+	"github.com/onflow/go-ethereum/core/tracing"
+	"github.com/onflow/go-ethereum/core/types"
 	"github.com/onflow/go-ethereum/eth/tracers"
 	"github.com/rs/zerolog"
 
@@ -49,7 +52,7 @@ func NewEVMCallTracer(uploader Uploader, logger zerolog.Logger) (*CallTracer, er
 }
 
 func (t *CallTracer) TxTracer() *tracers.Tracer {
-	return t.tracer
+	return NewSafeTxTracer(t.tracer)
 }
 
 func (t *CallTracer) WithBlockID(id flow.Identifier) {
@@ -112,4 +115,108 @@ func (n nopTracer) Collect(_ gethCommon.Hash) {}
 
 func TraceID(txID gethCommon.Hash, blockID flow.Identifier) string {
 	return fmt.Sprintf("%s-%s", blockID.String(), txID.String())
+}
+
+func NewSafeTxTracer(tc *tracers.Tracer) *tracers.Tracer {
+	wrapped := &tracers.Tracer{
+		Hooks: &tracing.Hooks{},
+	}
+	wrapped.OnTxStart = func(
+		vm *tracing.VMContext,
+		tx *types.Transaction,
+		from gethCommon.Address,
+	) {
+		defer func() {
+			if r := recover(); r != nil {
+				_ = r
+				// TODO log
+			}
+		}()
+		tc.OnTxStart(vm, tx, from)
+	}
+
+	wrapped.OnTxEnd = func(receipt *types.Receipt, err error) {
+		defer func() {
+			if r := recover(); r != nil {
+				_ = r
+				// TODO log
+			}
+		}()
+		tc.OnTxEnd(receipt, err)
+	}
+
+	wrapped.OnEnter = func(
+		depth int,
+		typ byte,
+		from, to gethCommon.Address,
+		input []byte,
+		gas uint64,
+		value *big.Int,
+	) {
+		defer func() {
+			if r := recover(); r != nil {
+				_ = r
+				// TODO log
+			}
+		}()
+		tc.OnEnter(depth, typ, from, to, input, gas, value)
+	}
+
+	wrapped.OnExit = func(depth int, output []byte, gasUsed uint64, err error, reverted bool) {
+		defer func() {
+			if r := recover(); r != nil {
+				_ = r
+				// TODO log
+			}
+		}()
+		tc.OnExit(depth, output, gasUsed, err, reverted)
+	}
+
+	wrapped.OnOpcode = func(
+		pc uint64,
+		op byte,
+		gas, cost uint64,
+		scope tracing.OpContext,
+		rData []byte,
+		depth int,
+		err error,
+	) {
+		defer func() {
+			if r := recover(); r != nil {
+				_ = r
+				// TODO log
+			}
+		}()
+		tc.OnOpcode(pc, op, gas, cost, scope, rData, depth, err)
+	}
+
+	wrapped.OnFault = func(
+		pc uint64,
+		op byte,
+		gas, cost uint64,
+		scope tracing.OpContext,
+		depth int,
+		err error) {
+		defer func() {
+			if r := recover(); r != nil {
+				_ = r
+				// TODO log
+			}
+		}()
+		tc.OnFault(pc, op, gas, cost, scope, depth, err)
+	}
+
+	wrapped.OnGasChange = func(old, new uint64, reason tracing.GasChangeReason) {
+		defer func() {
+			if r := recover(); r != nil {
+				_ = r
+				// TODO log
+			}
+		}()
+		tc.OnGasChange(old, new, reason)
+	}
+
+	wrapped.GetResult = tc.GetResult
+	wrapped.Stop = tc.Stop
+	return wrapped
 }
