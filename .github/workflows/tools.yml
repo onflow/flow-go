@@ -53,6 +53,11 @@ jobs:
         make tool-util
         tar -czf util.tar util
         gsutil cp util.tar gs://flow-genesis-bootstrap/tools/${{ inputs.tag }}/util.tar
+    - name: Build and upload remove-execution-fork
+      run: |
+        make tool-remove-execution-fork
+        tar -czf remove-execution-fork.tar remove-execution-fork
+        gsutil cp remove-execution-fork.tar gs://flow-genesis-bootstrap/tools/${{ inputs.tag }}/remove-execution-fork.tar
     - name: Promote boot-tools
       run: |
         if [[ "${{ inputs.promote }}" = true ]]; then
