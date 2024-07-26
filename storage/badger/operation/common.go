@@ -255,6 +255,9 @@ func retrieve(key []byte, entity interface{}) func(*badger.Txn) error {
 
 		// get the value from the item
 		err = item.Value(func(val []byte) error {
+			if entity == nil {
+				return nil
+			}
 			err := msgpack.Unmarshal(val, entity)
 			return err
 		})

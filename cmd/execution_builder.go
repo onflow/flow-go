@@ -946,7 +946,7 @@ func (exeNode *ExecutionNode) LoadExecutionDataPruner(
 	}
 
 	trackerDir := filepath.Join(exeNode.exeConf.executionDataDir, "tracker")
-	exeNode.executionDataTracker, err = storage.NewStorageTracker(
+	exeNode.executionDataTracker, err = storage.NewExecutionDataTracker(
 		trackerDir,
 		sealed.Height,
 		node.Logger,

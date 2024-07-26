@@ -8,7 +8,7 @@ import (
 	"github.com/onflow/flow-go/module/blobs"
 )
 
-// badger key prefixes
+// key prefixes
 const (
 	PrefixGlobalState  byte = iota + 1 // global state variables
 	PrefixLatestHeight                 // tracks, for each blob, the latest height at which there exists a block whose execution data contains the blob
@@ -21,45 +21,13 @@ const (
 )
 
 const CidsPerBatch = 16 // number of cids to track per batch
-
-const GlobalStateKeyLength = 2
-
-func MakeGlobalStateKey(state byte) []byte {
-	globalStateKey := make([]byte, GlobalStateKeyLength)
-	globalStateKey[0] = PrefixGlobalState
-	globalStateKey[1] = state
-	return globalStateKey
-}
-
 const BlobRecordKeyLength = 1 + 8 + blobs.CidLength
-
-func MakeBlobRecordKey(blockHeight uint64, c cid.Cid) []byte {
-	blobRecordKey := make([]byte, BlobRecordKeyLength)
-	blobRecordKey[0] = PrefixBlobRecord
-	binary.BigEndian.PutUint64(blobRecordKey[1:], blockHeight)
-	copy(blobRecordKey[1+8:], c.Bytes())
-	return blobRecordKey
-}
+const LatestHeightKeyLength = 1 + blobs.CidLength
 
 func ParseBlobRecordKey(key []byte) (uint64, cid.Cid, error) {
 	blockHeight := binary.BigEndian.Uint64(key[1:])
 	c, err := cid.Cast(key[1+8:])
 	return blockHeight, c, err
-}
-
-const LatestHeightKeyLength = 1 + blobs.CidLength
-
-func MakeLatestHeightKey(c cid.Cid) []byte {
-	latestHeightKey := make([]byte, LatestHeightKeyLength)
-	latestHeightKey[0] = PrefixLatestHeight
-	copy(latestHeightKey[1:], c.Bytes())
-	return latestHeightKey
-}
-
-func MakeUint64Value(v uint64) []byte {
-	value := make([]byte, 8)
-	binary.BigEndian.PutUint64(value, v)
-	return value
 }
 
 // TrackBlobsFn is passed to the UpdateFn provided to Storage.Update,

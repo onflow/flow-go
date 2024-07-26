@@ -1231,7 +1231,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				}
 
 				trackerDir := filepath.Join(builder.executionDataDir, "tracker")
-				builder.ExecutionDataTracker, err = bstorage.NewStorageTracker(
+				builder.ExecutionDataTracker, err = bstorage.NewExecutionDataTracker(
 					trackerDir,
 					sealed.Height,
 					node.Logger,

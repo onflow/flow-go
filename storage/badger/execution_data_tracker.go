@@ -1,7 +1,6 @@
 package badger
 
 import (
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"sync"
@@ -12,16 +11,9 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/module/executiondatasync/tracker"
+	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/badger/operation"
 )
-
-func getUint64Value(item *badger.Item) (uint64, error) {
-	value, err := item.ValueCopy(nil)
-	if err != nil {
-		return 0, err
-	}
-
-	return binary.BigEndian.Uint64(value), nil
-}
 
 // getBatchItemCountLimit returns the maximum number of items that can be included in a single batch
 // transaction based on the number / total size of updates per item.
@@ -37,21 +29,11 @@ func getBatchItemCountLimit(db *badger.DB, writeCountPerItem int64, writeSizePer
 	}
 }
 
-func retryOnConflict(db *badger.DB, fn func(txn *badger.Txn) error) error {
-	for {
-		err := db.Update(fn)
-		if errors.Is(err, badger.ErrConflict) {
-			continue
-		}
-		return err
-	}
-}
+type StorageOption func(*ExecutionDataTracker)
 
-type StorageOption func(*Storage)
+var _ tracker.Storage = (*ExecutionDataTracker)(nil)
 
-var _ tracker.Storage = (*Storage)(nil)
-
-// The Storage component tracks the following information:
+// The ExecutionDataTracker component tracks the following information:
 //   - the latest pruned height
 //   - the latest fulfilled height
 //   - the set of CIDs of the execution data blobs we know about at each height, so that
@@ -62,7 +44,7 @@ var _ tracker.Storage = (*Storage)(nil)
 // The storage component calls the given prune callback for a CID when the last height
 // at which that CID appears is pruned. The prune callback can be used to delete the
 // corresponding blob data from the blob store.
-type Storage struct {
+type ExecutionDataTracker struct {
 	// ensures that pruning operations are not run concurrently with any other db writes
 	// we acquire the read lock when we want to perform a non-prune WRITE
 	// we acquire the write lock when we want to perform a prune WRITE
@@ -74,19 +56,19 @@ type Storage struct {
 }
 
 func WithPruneCallback(callback tracker.PruneCallback) StorageOption {
-	return func(s *Storage) {
+	return func(s *ExecutionDataTracker) {
 		s.pruneCallback = callback
 	}
 }
 
-func NewStorageTracker(dbPath string, startHeight uint64, logger zerolog.Logger, opts ...StorageOption) (*Storage, error) {
+func NewExecutionDataTracker(dbPath string, startHeight uint64, logger zerolog.Logger, opts ...StorageOption) (*ExecutionDataTracker, error) {
 	lg := logger.With().Str("module", "tracker_storage").Logger()
 	db, err := badger.Open(badger.LSMOnlyOptions(dbPath))
 	if err != nil {
 		return nil, fmt.Errorf("could not open tracker db: %w", err)
 	}
 
-	storage := &Storage{
+	storage := &ExecutionDataTracker{
 		db:            db,
 		pruneCallback: func(c cid.Cid) error { return nil },
 		logger:        lg,
@@ -107,7 +89,7 @@ func NewStorageTracker(dbPath string, startHeight uint64, logger zerolog.Logger,
 	return storage, nil
 }
 
-func (s *Storage) init(startHeight uint64) error {
+func (s *ExecutionDataTracker) init(startHeight uint64) error {
 	fulfilledHeight, fulfilledHeightErr := s.GetFulfilledHeight()
 	prunedHeight, prunedHeightErr := s.GetPrunedHeight()
 
@@ -126,7 +108,7 @@ func (s *Storage) init(startHeight uint64) error {
 			return fmt.Errorf("failed to replay pruning: %w", err)
 		}
 		s.logger.Info().Msgf("finished pruning")
-	} else if errors.Is(fulfilledHeightErr, badger.ErrKeyNotFound) && errors.Is(prunedHeightErr, badger.ErrKeyNotFound) {
+	} else if errors.Is(fulfilledHeightErr, storage.ErrNotFound) && errors.Is(prunedHeightErr, storage.ErrNotFound) {
 		// db is empty, we need to bootstrap it
 		if err := s.bootstrap(startHeight); err != nil {
 			return fmt.Errorf("failed to bootstrap storage: %w", err)
@@ -138,101 +120,74 @@ func (s *Storage) init(startHeight uint64) error {
 	return nil
 }
 
-func (s *Storage) bootstrap(startHeight uint64) error {
-	fulfilledHeightKey := tracker.MakeGlobalStateKey(tracker.GlobalStateFulfilledHeight)
-	fulfilledHeightValue := tracker.MakeUint64Value(startHeight)
+func (s *ExecutionDataTracker) bootstrap(startHeight uint64) error {
+	err := s.db.Update(operation.InsertTrackerFulfilledHeight(startHeight))
+	if err != nil {
+		return fmt.Errorf("failed to set fulfilled height value: %w", err)
+	}
 
-	prunedHeightKey := tracker.MakeGlobalStateKey(tracker.GlobalStatePrunedHeight)
-	prunedHeightValue := tracker.MakeUint64Value(startHeight)
+	err = s.db.Update(operation.InsertTrackerPrunedHeight(startHeight))
+	if err != nil {
+		return fmt.Errorf("failed to set pruned height value: %w", err)
+	}
 
-	return s.db.Update(func(txn *badger.Txn) error {
-		if err := txn.Set(fulfilledHeightKey, fulfilledHeightValue); err != nil {
-			return fmt.Errorf("failed to set fulfilled height value: %w", err)
-		}
-
-		if err := txn.Set(prunedHeightKey, prunedHeightValue); err != nil {
-			return fmt.Errorf("failed to set pruned height value: %w", err)
-		}
-
-		return nil
-	})
+	return nil
 }
 
-func (s *Storage) Update(f tracker.UpdateFn) error {
+func (s *ExecutionDataTracker) Update(f tracker.UpdateFn) error {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return f(s.trackBlobs)
 }
 
-func (s *Storage) SetFulfilledHeight(height uint64) error {
-	fulfilledHeightKey := tracker.MakeGlobalStateKey(tracker.GlobalStateFulfilledHeight)
-	fulfilledHeightValue := tracker.MakeUint64Value(height)
+func (s *ExecutionDataTracker) SetFulfilledHeight(height uint64) error {
+	err := s.db.Update(operation.UpdateTrackerFulfilledHeight(height))
+	if err != nil {
+		return fmt.Errorf("failed to set fulfilled height value: %w", err)
+	}
 
-	return s.db.Update(func(txn *badger.Txn) error {
-		if err := txn.Set(fulfilledHeightKey, fulfilledHeightValue); err != nil {
-			return fmt.Errorf("failed to set fulfilled height value: %w", err)
-		}
-
-		return nil
-	})
+	return nil
 }
 
-func (s *Storage) GetFulfilledHeight() (uint64, error) {
-	fulfilledHeightKey := tracker.MakeGlobalStateKey(tracker.GlobalStateFulfilledHeight)
+func (s *ExecutionDataTracker) GetFulfilledHeight() (uint64, error) {
 	var fulfilledHeight uint64
 
-	if err := s.db.View(func(txn *badger.Txn) error {
-		item, err := txn.Get(fulfilledHeightKey)
-		if err != nil {
-			return fmt.Errorf("failed to find fulfilled height entry: %w", err)
-		}
-
-		fulfilledHeight, err = getUint64Value(item)
-		if err != nil {
-			return fmt.Errorf("failed to retrieve fulfilled height value: %w", err)
-		}
-
-		return nil
-	}); err != nil {
+	err := s.db.View(operation.RetrieveTrackerFulfilledHeight(&fulfilledHeight))
+	if err != nil {
 		return 0, err
 	}
 
 	return fulfilledHeight, nil
 }
 
-func (s *Storage) trackBlob(txn *badger.Txn, blockHeight uint64, c cid.Cid) error {
-	if err := txn.Set(tracker.MakeBlobRecordKey(blockHeight, c), nil); err != nil {
+func (s *ExecutionDataTracker) trackBlob(tx *badger.Txn, blockHeight uint64, c cid.Cid) error {
+	err := operation.InsertBlob(blockHeight, c)(tx)
+	if err != nil {
 		return fmt.Errorf("failed to add blob record: %w", err)
 	}
 
-	latestHeightKey := tracker.MakeLatestHeightKey(c)
-	item, err := txn.Get(latestHeightKey)
+	var latestHeight uint64
+	err = operation.RetrieveTrackerLatestHeight(c, &latestHeight)(tx)
 	if err != nil {
-		if !errors.Is(err, badger.ErrKeyNotFound) {
+		if !errors.Is(err, storage.ErrNotFound) {
 			return fmt.Errorf("failed to get latest height: %w", err)
 		}
 	} else {
-		latestHeight, err := getUint64Value(item)
-		if err != nil {
-			return fmt.Errorf("failed to retrieve latest height value: %w", err)
-		}
-
 		// don't update the latest height if there is already a higher block height containing this blob
 		if latestHeight >= blockHeight {
 			return nil
 		}
 	}
 
-	latestHeightValue := tracker.MakeUint64Value(blockHeight)
-
-	if err := txn.Set(latestHeightKey, latestHeightValue); err != nil {
+	err = operation.UpsertTrackerLatestHeight(c, blockHeight)(tx)
+	if err != nil {
 		return fmt.Errorf("failed to set latest height value: %w", err)
 	}
 
 	return nil
 }
 
-func (s *Storage) trackBlobs(blockHeight uint64, cids ...cid.Cid) error {
+func (s *ExecutionDataTracker) trackBlobs(blockHeight uint64, cids ...cid.Cid) error {
 	cidsPerBatch := tracker.CidsPerBatch
 	maxCidsPerBatch := getBatchItemCountLimit(s.db, 2, tracker.BlobRecordKeyLength+tracker.LatestHeightKeyLength+8)
 	if maxCidsPerBatch < cidsPerBatch {
@@ -246,7 +201,7 @@ func (s *Storage) trackBlobs(blockHeight uint64, cids ...cid.Cid) error {
 		}
 		batch := cids[:batchSize]
 
-		if err := retryOnConflict(s.db, func(txn *badger.Txn) error {
+		if err := operation.RetryOnConflict(s.db.Update, func(txn *badger.Txn) error {
 			for _, c := range batch {
 				if err := s.trackBlob(txn, blockHeight, c); err != nil {
 					return fmt.Errorf("failed to track blob %s: %w", c.String(), err)
@@ -264,25 +219,25 @@ func (s *Storage) trackBlobs(blockHeight uint64, cids ...cid.Cid) error {
 	return nil
 }
 
-func (s *Storage) batchDelete(deleteInfos []*deleteInfo) error {
-	return s.db.Update(func(txn *badger.Txn) error {
-		for _, dInfo := range deleteInfos {
-			if err := txn.Delete(tracker.MakeBlobRecordKey(dInfo.height, dInfo.cid)); err != nil {
-				return fmt.Errorf("failed to delete blob record for Cid %s: %w", dInfo.cid.String(), err)
-			}
-
-			if dInfo.deleteLatestHeightRecord {
-				if err := txn.Delete(tracker.MakeLatestHeightKey(dInfo.cid)); err != nil {
-					return fmt.Errorf("failed to delete latest height record for Cid %s: %w", dInfo.cid.String(), err)
-				}
-			}
+func (s *ExecutionDataTracker) batchDelete(deleteInfos []*deleteInfo) error {
+	for _, dInfo := range deleteInfos {
+		err := s.db.Update(operation.RemoveBlob(dInfo.height, dInfo.cid))
+		if err != nil {
+			return fmt.Errorf("failed to delete blob record for Cid %s: %w", dInfo.cid.String(), err)
 		}
 
-		return nil
-	})
+		if dInfo.deleteLatestHeightRecord {
+			err = s.db.Update(operation.RemoveTrackerLatestHeight(dInfo.cid))
+			if err != nil {
+				return fmt.Errorf("failed to delete latest height record for Cid %s: %w", dInfo.cid.String(), err)
+			}
+		}
+	}
+
+	return nil
 }
 
-func (s *Storage) batchDeleteItemLimit() int {
+func (s *ExecutionDataTracker) batchDeleteItemLimit() int {
 	itemsPerBatch := 256
 	maxItemsPerBatch := getBatchItemCountLimit(s.db, 2, tracker.BlobRecordKeyLength+tracker.LatestHeightKeyLength)
 	if maxItemsPerBatch < itemsPerBatch {
@@ -291,7 +246,7 @@ func (s *Storage) batchDeleteItemLimit() int {
 	return itemsPerBatch
 }
 
-func (s *Storage) PruneUpToHeight(height uint64) error {
+func (s *ExecutionDataTracker) PruneUpToHeight(height uint64) error {
 	blobRecordPrefix := []byte{tracker.PrefixBlobRecord}
 	itemsPerBatch := s.batchDeleteItemLimit()
 	var batch []*deleteInfo
@@ -331,15 +286,10 @@ func (s *Storage) PruneUpToHeight(height uint64) error {
 				height: blockHeight,
 			}
 
-			latestHeightKey := tracker.MakeLatestHeightKey(blobCid)
-			latestHeightItem, err := txn.Get(latestHeightKey)
+			var latestHeight uint64
+			err = operation.RetrieveTrackerLatestHeight(blobCid, &latestHeight)(txn)
 			if err != nil {
 				return fmt.Errorf("failed to get latest height entry for Cid %s: %w", blobCid.String(), err)
-			}
-
-			latestHeight, err := getUint64Value(latestHeightItem)
-			if err != nil {
-				return fmt.Errorf("failed to retrieve latest height value for Cid %s: %w", blobCid.String(), err)
 			}
 
 			// a blob is only removable if it is not referenced by any blob tree at a higher height
@@ -389,36 +339,20 @@ func (s *Storage) PruneUpToHeight(height uint64) error {
 	return nil
 }
 
-func (s *Storage) setPrunedHeight(height uint64) error {
-	prunedHeightKey := tracker.MakeGlobalStateKey(tracker.GlobalStatePrunedHeight)
-	prunedHeightValue := tracker.MakeUint64Value(height)
+func (s *ExecutionDataTracker) setPrunedHeight(height uint64) error {
+	err := s.db.Update(operation.UpdateTrackerPrunedHeight(height))
+	if err != nil {
+		return fmt.Errorf("failed to set pruned height value: %w", err)
+	}
 
-	return s.db.Update(func(txn *badger.Txn) error {
-		if err := txn.Set(prunedHeightKey, prunedHeightValue); err != nil {
-			return fmt.Errorf("failed to set pruned height value: %w", err)
-		}
-
-		return nil
-	})
+	return nil
 }
 
-func (s *Storage) GetPrunedHeight() (uint64, error) {
-	prunedHeightKey := tracker.MakeGlobalStateKey(tracker.GlobalStatePrunedHeight)
+func (s *ExecutionDataTracker) GetPrunedHeight() (uint64, error) {
 	var prunedHeight uint64
 
-	if err := s.db.View(func(txn *badger.Txn) error {
-		item, err := txn.Get(prunedHeightKey)
-		if err != nil {
-			return fmt.Errorf("failed to find pruned height entry: %w", err)
-		}
-
-		prunedHeight, err = getUint64Value(item)
-		if err != nil {
-			return fmt.Errorf("failed to retrieve pruned height value: %w", err)
-		}
-
-		return nil
-	}); err != nil {
+	err := s.db.View(operation.RetrieveTrackerPrunedHeight(&prunedHeight))
+	if err != nil {
 		return 0, err
 	}
 
