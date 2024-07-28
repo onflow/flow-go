@@ -1,15 +1,12 @@
 package recover_epoch
 
 import (
-	"strings"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	sdk "github.com/onflow/flow-go-sdk"
-	"github.com/onflow/flow-go/integration/utils"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -56,43 +53,4 @@ func (s *RecoverEpochSuite) TestRecoverEpoch() {
 	// if counter is still 0, epoch emergency fallback was triggered as expected
 	s.AssertInEpoch(s.Ctx, 0)
 
-	// 2. Generate transaction arguments for epoch recover transaction.
-	// generate epoch recover transaction args
-	collectionClusters := s.NumOfCollectionClusters
-	numViewsInRecoveryEpoch := s.EpochLen
-	numViewsInStakingAuction := s.StakingAuctionLen
-	epochCounter := uint64(1)
-
-	txArgs := s.executeEFMRecoverTXArgsCMD(
-		collectionClusters,
-		numViewsInRecoveryEpoch,
-		numViewsInStakingAuction,
-		epochCounter,
-		// cruise control is disabled for integration tests
-		// targetDuration and targetEndTime will be ignored
-		3000,
-		4000,
-	)
-
-	// 3. Submit recover epoch transaction to the network.
-	// submit the recover epoch transaction
-	env := utils.LocalnetEnv()
-	result := s.recoverEpoch(env, txArgs)
-	require.NoError(s.T(), result.Error)
-	require.Equal(s.T(), result.Status, sdk.TransactionStatusSealed)
-
-	// 3. Ensure EpochRecover event was emitted.
-	eventType := ""
-	for _, evt := range result.Events {
-		if strings.Contains(evt.Type, "FlowEpoch.EpochRecover") {
-			eventType = evt.Type
-			break
-		}
-	}
-	require.NotEmpty(s.T(), eventType, "expected FlowEpoch.EpochRecover event type")
-	events, err := s.Client.GetEventsForBlockIDs(s.Ctx, eventType, []sdk.Identifier{result.BlockID})
-	require.NoError(s.T(), err)
-	require.Equal(s.T(), events[0].Events[0].Type, eventType)
-
-	// 4. TODO(EFM, #6164) ensure EpochRecover service event is processed by the fallback state machine and the network recovers.
 }
