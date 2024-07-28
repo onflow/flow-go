@@ -241,7 +241,7 @@ func CreateFlowAccount(ctx context.Context, client *testnet.Client) (sdk.Address
 func MakeRecoverEpochTx(
 	env templates.Environment,
 	adminAccount *sdk.Account,
-	adminAccountKeyID int,
+	adminAccountKeyID uint32,
 	latestBlockID sdk.Identifier,
 	args []cadence.Value,
 ) (*sdk.Transaction, error) {
