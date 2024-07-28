@@ -4,10 +4,15 @@ import (
 	"fmt"
 
 	"github.com/onflow/cadence"
+	"github.com/onflow/flow-core-contracts/lib/go/templates"
+
+	sdk "github.com/onflow/flow-go-sdk"
+
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/cmd/bootstrap/run"
 	"github.com/onflow/flow-go/integration/tests/epochs"
+	"github.com/onflow/flow-go/integration/utils"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -70,4 +75,28 @@ func (s *Suite) executeEFMRecoverTXArgsCMD(collectionClusters int, numViewsInEpo
 	)
 	require.NoError(s.T(), err)
 	return txArgs
+}
+
+// recoverEpoch submits the recover epoch transaction to the network.
+func (s *Suite) recoverEpoch(env templates.Environment, args []cadence.Value) *sdk.TransactionResult {
+	latestBlockID, err := s.Client.GetLatestBlockID(s.Ctx)
+	require.NoError(s.T(), err)
+
+	tx, err := utils.MakeRecoverEpochTx(
+		env,
+		s.Client.Account(),
+		0,
+		sdk.Identifier(latestBlockID),
+		args,
+	)
+	require.NoError(s.T(), err)
+
+	err = s.Client.SignAndSendTransaction(s.Ctx, tx)
+	require.NoError(s.T(), err)
+	result, err := s.Client.WaitForSealed(s.Ctx, tx.ID())
+	require.NoError(s.T(), err)
+	s.Client.Account().Keys[0].SequenceNumber++
+	require.NoError(s.T(), result.Error)
+
+	return result
 }

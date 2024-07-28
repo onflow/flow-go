@@ -236,3 +236,30 @@ func CreateFlowAccount(ctx context.Context, client *testnet.Client) (sdk.Address
 
 	return addr, nil
 }
+
+// MakeRecoverEpochTx makes an admin transaction to recover the network when it is in EFM mode.
+func MakeRecoverEpochTx(
+	env templates.Environment,
+	adminAccount *sdk.Account,
+	adminAccountKeyID uint32,
+	latestBlockID sdk.Identifier,
+	args []cadence.Value,
+) (*sdk.Transaction, error) {
+	accountKey := adminAccount.Keys[adminAccountKeyID]
+	tx := sdk.NewTransaction().
+		SetScript([]byte(templates.GenerateRecoverEpochScript(env))).
+		SetComputeLimit(9999).
+		SetReferenceBlockID(latestBlockID).
+		SetProposalKey(adminAccount.Address, adminAccountKeyID, accountKey.SequenceNumber).
+		SetPayer(adminAccount.Address).
+		AddAuthorizer(adminAccount.Address)
+
+	for _, arg := range args {
+		err := tx.AddArgument(arg)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return tx, nil
+}
