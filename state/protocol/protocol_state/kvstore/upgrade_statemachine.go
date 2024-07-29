@@ -70,13 +70,13 @@ func (m *PSVersionUpgradeStateMachine) EvolveState(orderedUpdates []flow.Service
 //
 // All other errors should be treated as exceptions.
 func (m *PSVersionUpgradeStateMachine) processSingleEvent(versionUpgrade *flow.ProtocolStateVersionUpgrade) error {
-	// To switch the protocol version, replica needs to process a block with a CandidateView >= activation view.
+	// To switch the protocol version, replica needs to process a block with a view >= activation view.
 	// But we cannot activate a new version till the block containing the seal is finalized, because when
 	// switching between forks with different highest views, we do not want to switch forth and back between versions.
 	// The problem is that finality is local to each node due to the nature of the consensus algorithm itself.
 	// We would like to guarantee that all nodes switch the protocol version at exactly the same block.
 	// To guarantee that all nodes switch the protocol version at exactly the same block, we require that the
-	// activation view is higher than the CandidateView + Δ when accepting the event. Δ represents the finalization lag
+	// activation view is higher than the view + Δ when accepting the event. Δ represents the finalization lag
 	// to give time for replicas to finalize the block containing the seal for the version upgrade event.
 	// When replica reaches (or exceeds) the activation view *and* the latest finalized protocol state knows
 	// about the version upgrade, only then it's safe to switch the protocol version.
