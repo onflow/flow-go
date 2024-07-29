@@ -2,6 +2,7 @@ package pruner
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"time"
@@ -15,6 +16,11 @@ import (
 	"github.com/onflow/flow-go/module/executiondatasync/tracker"
 	"github.com/onflow/flow-go/module/irrecoverable"
 )
+
+// ErrNoRegisteredHeightRecorders represents an error indicating that pruner did not register any execution data height recorders.
+// This error occurs when the pruner attempts to perform operations that require
+// at least one registered height recorder, but none are found.
+var ErrNoRegisteredHeightRecorders = errors.New("no registered height recorders")
 
 const (
 	DefaultHeightRangeTarget = uint64(2_000_000)
@@ -164,9 +170,8 @@ func (p *Pruner) loop(ctx irrecoverable.SignalerContext, ready component.ReadyFu
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			if len(p.registeredHeightRecorders) > 0 {
-				lowestHeight := p.lowestRecordersHeight()
-
+			lowestHeight, err := p.lowestRecordersHeight()
+			if err == nil || !errors.Is(err, ErrNoRegisteredHeightRecorders) {
 				err := p.updateFulfilledHeight(lowestHeight)
 				if err != nil {
 					ctx.Throw(fmt.Errorf("failed to update lowest fulfilled height: %w", err))
@@ -177,20 +182,28 @@ func (p *Pruner) loop(ctx irrecoverable.SignalerContext, ready component.ReadyFu
 	}
 }
 
-// lowestRecordersHeight returns the lowest height among all height recorders.
+// lowestRecordersHeight returns the lowest height among all registered
+// height recorders.
 //
-// Returns:
-//   - uint64: The lowest height among all registered height recorders.
-func (p *Pruner) lowestRecordersHeight() uint64 {
-	lowestHeight := uint64(math.MaxUint64)
+// This function iterates over all registered height recorders to determine
+// the smallest of complete height recorded. If no height recorders are registered, it
+// returns an error.
+//
+// Expected errors during normal operation:
+// - ErrNoRegisteredHeightRecorders: if no height recorders are registered.
+func (p *Pruner) lowestRecordersHeight() (uint64, error) {
+	if len(p.registeredHeightRecorders) == 0 {
+		return 0, ErrNoRegisteredHeightRecorders
+	}
 
+	lowestHeight := uint64(math.MaxUint64)
 	for _, recorder := range p.registeredHeightRecorders {
 		height := recorder.HighestCompleteHeight()
 		if height < lowestHeight {
 			lowestHeight = height
 		}
 	}
-	return lowestHeight
+	return lowestHeight, nil
 }
 
 // updateFulfilledHeight updates the last fulfilled height and stores it in the storage.
