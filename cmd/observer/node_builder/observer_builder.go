@@ -1231,15 +1231,27 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				}
 
 				trackerDir := filepath.Join(builder.executionDataDir, "tracker")
-				builder.ExecutionDataTracker, err = bstorage.NewExecutionDataTracker(
-					trackerDir,
-					sealed.Height,
-					node.Logger,
-					bstorage.WithPruneCallback(func(c cid.Cid) error {
-						// TODO: use a proper context here
-						return builder.ExecutionDataBlobstore.DeleteBlob(context.TODO(), c)
-					}),
-				)
+				if executionDataDBMode == execution_data.ExecutionDataDBModeBadger {
+					builder.ExecutionDataTracker, err = bstorage.NewExecutionDataTracker(
+						trackerDir,
+						sealed.Height,
+						node.Logger,
+						bstorage.WithPruneCallback(func(c cid.Cid) error {
+							// TODO: use a proper context here
+							return builder.ExecutionDataBlobstore.DeleteBlob(context.TODO(), c)
+						}),
+					)
+				} else {
+					builder.ExecutionDataTracker, err = pstorage.NewExecutionDataTracker(
+						trackerDir,
+						sealed.Height,
+						node.Logger,
+						pstorage.WithPruneCallback(func(c cid.Cid) error {
+							// TODO: use a proper context here
+							return builder.ExecutionDataBlobstore.DeleteBlob(context.TODO(), c)
+						}),
+					)
+				}
 				if err != nil {
 					return nil, fmt.Errorf("failed to create execution data tracker: %w", err)
 				}
