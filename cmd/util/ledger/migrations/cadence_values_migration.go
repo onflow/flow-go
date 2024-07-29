@@ -532,7 +532,10 @@ func (t *cadenceValueMigrationReporter) MigratedLink(
 }
 
 func (t *cadenceValueMigrationReporter) CyclicLink(err capcons.CyclicLinkError) {
-	t.reportWriter.Write(err)
+	t.reportWriter.Write(linkCyclicEntry{
+		Address: err.Address,
+		Paths:   err.Paths,
+	})
 }
 
 func (t *cadenceValueMigrationReporter) MissingTarget(accountAddressPath interpreter.AddressPath) {
@@ -731,6 +734,39 @@ func (e linkMissingTargetEntry) MarshalJSON() ([]byte, error) {
 		Kind:           "link-missing-target",
 		AccountAddress: e.AddressPath.Address.HexWithPrefix(),
 		Path:           e.AddressPath.Path.String(),
+	})
+}
+
+// linkCyclicEntry
+
+type linkCyclicEntry struct {
+	Address common.Address
+	Paths   []interpreter.PathValue
+}
+
+var _ valueMigrationReportEntry = linkCyclicEntry{}
+
+func (e linkCyclicEntry) accountAddress() common.Address {
+	return e.Address
+}
+
+var _ json.Marshaler = linkCyclicEntry{}
+
+func (e linkCyclicEntry) MarshalJSON() ([]byte, error) {
+
+	pathStrings := make([]string, 0, len(e.Paths))
+	for _, path := range e.Paths {
+		pathStrings = append(pathStrings, path.String())
+	}
+
+	return json.Marshal(struct {
+		Kind           string   `json:"kind"`
+		AccountAddress string   `json:"account_address"`
+		Paths          []string `json:"paths"`
+	}{
+		Kind:           "link-cyclic",
+		AccountAddress: e.Address.HexWithPrefix(),
+		Paths:          pathStrings,
 	})
 }
 
