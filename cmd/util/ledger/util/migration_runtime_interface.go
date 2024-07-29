@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/onflow/cadence/runtime/ast"
 	"go.opentelemetry.io/otel/attribute"
 
 	"github.com/onflow/atree"
@@ -58,6 +59,8 @@ func NewMigrationRuntimeInterface(
 		GetOrLoadProgramListenerFunc: getOrLoadProgramListenerFunc,
 	}
 }
+
+var _ runtime.Interface = &MigrationRuntimeInterface{}
 
 func (m *MigrationRuntimeInterface) ResolveLocation(
 	identifiers []runtime.Identifier,
@@ -173,6 +176,10 @@ func (m *MigrationRuntimeInterface) MeterMemory(_ common.MemoryUsage) error {
 
 func (m *MigrationRuntimeInterface) MeterComputation(_ common.ComputationKind, _ uint) error {
 	return nil
+}
+
+func (m *MigrationRuntimeInterface) RecoverProgram(_ *ast.Program, _ common.Location) (*ast.Program, error) {
+	return nil, nil
 }
 
 func (m *MigrationRuntimeInterface) GetValue(_, _ []byte) (value []byte, err error) {
