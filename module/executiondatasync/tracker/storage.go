@@ -86,3 +86,9 @@ type Storage interface {
 	// called with a value higher than the fulfilled height.
 	PruneUpToHeight(height uint64) error
 }
+
+type DeleteInfo struct {
+	Cid                      cid.Cid
+	Height                   uint64
+	DeleteLatestHeightRecord bool
+}

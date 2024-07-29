@@ -219,17 +219,17 @@ func (s *ExecutionDataTracker) trackBlobs(blockHeight uint64, cids ...cid.Cid) e
 	return nil
 }
 
-func (s *ExecutionDataTracker) batchDelete(deleteInfos []*deleteInfo) error {
+func (s *ExecutionDataTracker) batchDelete(deleteInfos []*tracker.DeleteInfo) error {
 	for _, dInfo := range deleteInfos {
-		err := s.db.Update(operation.RemoveBlob(dInfo.height, dInfo.cid))
+		err := s.db.Update(operation.RemoveBlob(dInfo.Height, dInfo.Cid))
 		if err != nil {
-			return fmt.Errorf("failed to delete blob record for Cid %s: %w", dInfo.cid.String(), err)
+			return fmt.Errorf("failed to delete blob record for Cid %s: %w", dInfo.Cid.String(), err)
 		}
 
-		if dInfo.deleteLatestHeightRecord {
-			err = s.db.Update(operation.RemoveTrackerLatestHeight(dInfo.cid))
+		if dInfo.DeleteLatestHeightRecord {
+			err = s.db.Update(operation.RemoveTrackerLatestHeight(dInfo.Cid))
 			if err != nil {
-				return fmt.Errorf("failed to delete latest height record for Cid %s: %w", dInfo.cid.String(), err)
+				return fmt.Errorf("failed to delete latest height record for Cid %s: %w", dInfo.Cid.String(), err)
 			}
 		}
 	}
@@ -249,7 +249,7 @@ func (s *ExecutionDataTracker) batchDeleteItemLimit() int {
 func (s *ExecutionDataTracker) PruneUpToHeight(height uint64) error {
 	blobRecordPrefix := []byte{tracker.PrefixBlobRecord}
 	itemsPerBatch := s.batchDeleteItemLimit()
-	var batch []*deleteInfo
+	var batch []*tracker.DeleteInfo
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -258,6 +258,7 @@ func (s *ExecutionDataTracker) PruneUpToHeight(height uint64) error {
 		return err
 	}
 
+	// TODO: move to separate 'iterate' function
 	if err := s.db.View(func(txn *badger.Txn) error {
 		it := txn.NewIterator(badger.IteratorOptions{
 			PrefetchValues: false,
@@ -281,9 +282,9 @@ func (s *ExecutionDataTracker) PruneUpToHeight(height uint64) error {
 				break
 			}
 
-			dInfo := &deleteInfo{
-				cid:    blobCid,
-				height: blockHeight,
+			dInfo := &tracker.DeleteInfo{
+				Cid:    blobCid,
+				Height: blockHeight,
 			}
 
 			var latestHeight uint64
@@ -307,7 +308,7 @@ func (s *ExecutionDataTracker) PruneUpToHeight(height uint64) error {
 				if err := s.pruneCallback(blobCid); err != nil {
 					return err
 				}
-				dInfo.deleteLatestHeightRecord = true
+				dInfo.DeleteLatestHeightRecord = true
 			}
 
 			// remove tracker records for pruned heights
@@ -357,10 +358,4 @@ func (s *ExecutionDataTracker) GetPrunedHeight() (uint64, error) {
 	}
 
 	return prunedHeight, nil
-}
-
-type deleteInfo struct {
-	cid                      cid.Cid
-	height                   uint64
-	deleteLatestHeightRecord bool
 }
