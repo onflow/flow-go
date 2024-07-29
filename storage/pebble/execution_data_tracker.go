@@ -76,6 +76,7 @@ func NewExecutionDataTracker(path string, startHeight uint64, logger zerolog.Log
 	return storage, nil
 }
 
+// TODO: move common logic into separate function to avoid duplication of code
 func (s *ExecutionDataTracker) init(startHeight uint64) error {
 	fulfilledHeight, fulfilledHeightErr := s.GetFulfilledHeight()
 	prunedHeight, prunedHeightErr := s.GetPrunedHeight()
