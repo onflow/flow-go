@@ -230,18 +230,15 @@ func (s *ExecutionDataPruningSuite) waitUntilExecutionDataForBlockIndexed(waitin
 	s.Require().NoError(err)
 
 	duration := 3 * time.Minute
-	timer := time.NewTimer(duration)
-	defer timer.Stop()
-
 	for {
 		select {
 		case err := <-errChan:
 			s.Require().NoErrorf(err, "unexpected %s error", s.observerNodeName)
 		case event := <-eventsChan:
-			if event.Height > waitingBlockHeight {
+			if event.Height >= waitingBlockHeight {
 				return
 			}
-		case <-timer.C:
+		case <-time.After(duration):
 			s.T().Fatalf("failed to index to %d block within %s", waitingBlockHeight, duration.String())
 		}
 	}
