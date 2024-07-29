@@ -120,6 +120,7 @@ func (s *ExecutionDataPruningSuite) SetupTest() {
 			"--execution-data-indexing-enabled=true",
 			"--execution-data-retry-delay=1s",
 			"--event-query-mode=local-only",
+			"--local-service-api-enabled=true",
 			fmt.Sprintf("--execution-data-height-range-target=%d", s.heightRangeTarget),
 			fmt.Sprintf("--execution-data-height-range-threshold=%d", s.threshold),
 			fmt.Sprintf("--execution-data-pruning-interval=%s", s.pruningInterval),
@@ -204,12 +205,12 @@ func (s *ExecutionDataPruningSuite) waitUntilExecutionDataForBlockIndexed(waitin
 	s.Require().NoError(err)
 
 	// pause until the observer node start indexing blocks,
-	// getting events from 2-nd block to make sure that 1-st block already indexed, and we can start subscribing
+	// getting events from 1-nd block to make sure that 1-st block already indexed, and we can start subscribing
 	s.Require().Eventually(func() bool {
 		_, err := grpcClient.GetEventsForHeightRange(s.ctx, &accessproto.GetEventsForHeightRangeRequest{
 			Type:                 sdk.EventAccountCreated,
-			StartHeight:          2,
-			EndHeight:            2,
+			StartHeight:          1,
+			EndHeight:            1,
 			EventEncodingVersion: entities.EventEncodingVersion_CCF_V0,
 		})
 
