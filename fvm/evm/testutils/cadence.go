@@ -718,6 +718,11 @@ func (i *TestRuntimeInterface) InteractionUsed() (uint64, error) {
 	return i.OnInteractionUsed()
 }
 
+func (i *TestRuntimeInterface) RecoverProgram(_ *ast.Program, _ common.Location) (*ast.Program, error) {
+	// NO-OP
+	return nil, nil
+}
+
 func CheckCadenceEventTypes(t testing.TB, events []cadence.Event, expectedTypes []string) {
 	require.Equal(t, len(events), len(expectedTypes))
 	for i, ev := range events {

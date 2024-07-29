@@ -7,6 +7,7 @@ import (
 	"github.com/onflow/atree"
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
+	"github.com/onflow/cadence/runtime/ast"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
 	"go.opentelemetry.io/otel/attribute"
@@ -99,6 +100,11 @@ func (r *checkingInterface) GetAccountContractCode(location common.AddressLocati
 func (*checkingInterface) MeterMemory(_ common.MemoryUsage) error {
 	// NO-OP
 	return nil
+}
+
+func (*checkingInterface) RecoverProgram(_ *ast.Program, _ runtime.Location) (*ast.Program, error) {
+	// NO-OP
+	return nil, nil
 }
 
 func (*checkingInterface) MeterComputation(_ common.ComputationKind, _ uint) error {
