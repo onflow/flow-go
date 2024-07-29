@@ -562,5 +562,19 @@ func NewCadence1Migrations(
 		)...,
 	)
 
+	switch opts.EVMContractChange {
+	case EVMContractChangeNone,
+		EVMContractChangeDeployFull:
+		// NO-OP
+	case EVMContractChangeUpdateFull, EVMContractChangeDeployMinimalAndUpdateFull:
+		migs = append(
+			migs,
+			NamedMigration{
+				Name:    "evm-setup-migration",
+				Migrate: NewEVMSetupMigration(opts.ChainID, log),
+			},
+		)
+	}
+
 	return migs
 }
