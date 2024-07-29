@@ -68,11 +68,17 @@ func (d *ContractCleanupMigration) MigrateAccount(
 		contractNameSet[contractName] = struct{}{}
 	}
 
+	contractNamesSorted := make([]string, 0, len(contractNameSet))
+	for contractName := range contractNameSet {
+		contractNamesSorted = append(contractNamesSorted, contractName)
+	}
+	sort.Strings(contractNamesSorted)
+
 	// Cleanup the code for each contract in the account.
 	// If the contract code is empty, the contract code register will be removed,
 	// and the contract name will be removed from the account's contract names.
 
-	for contractName := range contractNameSet {
+	for _, contractName := range contractNamesSorted {
 		removed, err := d.cleanupContractCode(
 			address,
 			accountRegisters,
