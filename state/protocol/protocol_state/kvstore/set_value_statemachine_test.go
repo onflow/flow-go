@@ -2,17 +2,17 @@ package kvstore_test
 
 import (
 	"errors"
-	"github.com/onflow/flow-go/state/protocol"
 	"testing"
 
+	mocks "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/state/protocol"
 	mockprotocol "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
 	"github.com/onflow/flow-go/state/protocol/protocol_state/mock"
-	mocks "github.com/stretchr/testify/mock"
 )
 
 func TestSetKeyValueStoreValueStateMachine(t *testing.T) {
