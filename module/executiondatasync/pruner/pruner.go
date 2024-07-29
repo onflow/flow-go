@@ -17,7 +17,7 @@ import (
 )
 
 const (
-	defaultHeightRangeTarget = uint64(400_000)
+	DefaultHeightRangeTarget = uint64(2_000_000)
 	DefaultThreshold         = uint64(100_000)
 	DefaultPruningInterval   = 10 * time.Minute
 )
@@ -116,7 +116,7 @@ func NewPruner(logger zerolog.Logger, metrics module.ExecutionDataPrunerMetrics,
 		pruneCallback:       func(ctx context.Context) error { return nil },
 		lastFulfilledHeight: fulfilledHeight,
 		lastPrunedHeight:    lastPrunedHeight,
-		heightRangeTarget:   atomic.NewUint64(defaultHeightRangeTarget),
+		heightRangeTarget:   atomic.NewUint64(DefaultHeightRangeTarget),
 		threshold:           atomic.NewUint64(DefaultThreshold),
 		metrics:             metrics,
 		pruningInterval:     DefaultPruningInterval,
