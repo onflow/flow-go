@@ -243,5 +243,5 @@ func (p *PayloadsLedger) AllocateSlabIndex(owner []byte) (atree.SlabIndex, error
 		return p.AllocateSlabIndexFunc(owner)
 	}
 
-	panic("AllocateStorageIndex not expected to be called")
+	panic("AllocateSlabIndex not expected to be called")
 }

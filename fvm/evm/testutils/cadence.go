@@ -75,7 +75,6 @@ func EncodeArgs(argValues []cadence.Value) [][]byte {
 	return args
 }
 
-
 func CheckCadenceEventTypes(t testing.TB, events []cadence.Event, expectedTypes []string) {
 	require.Equal(t, len(events), len(expectedTypes))
 	for i, ev := range events {
