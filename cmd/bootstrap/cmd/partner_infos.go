@@ -28,6 +28,7 @@ const (
 	networkingAddressField = "networkingAddress"
 	networkingKeyField     = "networkingKey"
 	stakingKeyField        = "stakingKey"
+	stakingKePOPyField     = "stakingKeyPoP"
 )
 
 const (
@@ -173,6 +174,11 @@ func parseNodeInfo(info cadence.Value) (*bootstrap.NodeInfoPub, error) {
 		return nil, fmt.Errorf("failed to decode staking public key: %w", err)
 	}
 
+	stakingPOP, err := hex.DecodeString(string(fields[stakingKePOPyField].(cadence.String)))
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode staking private key PoP hex (%s): %w", string(fields[stakingKePOPyField].(cadence.String)), err)
+	}
+
 	return &bootstrap.NodeInfoPub{
 		Role:          flow.Role(fields[roleField].(cadence.UInt8)),
 		Address:       string(fields[networkingAddressField].(cadence.String)),
@@ -180,6 +186,7 @@ func parseNodeInfo(info cadence.Value) (*bootstrap.NodeInfoPub, error) {
 		Weight:        flow.DefaultInitialWeight,
 		NetworkPubKey: encodable.NetworkPubKey{PublicKey: networkPubKey},
 		StakingPubKey: encodable.StakingPubKey{PublicKey: stakingPubKey},
+		StakingPoP:    stakingPOP,
 	}, nil
 }
 
