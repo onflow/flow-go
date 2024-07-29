@@ -1063,6 +1063,54 @@ func TestTransactionTracing(t *testing.T) {
 
 	})
 
+	t.Run("contract interaction run failed transaction", func(t *testing.T) {
+		runWithDeployedContract(t, func(testContract *testutils.TestContract, testAccount *testutils.EOATestAccount, emu *emulator.Emulator) {
+			blk, _, tracer := blockWithTracer(t, emu)
+			var txID gethCommon.Hash
+
+			tx := testAccount.PrepareAndSignTx(
+				t,
+				testContract.DeployedAt.ToCommon(),
+				testContract.MakeCallData(t, "store", big.NewInt(2)),
+				big.NewInt(0),
+				21210,
+				big.NewInt(100),
+			)
+
+			// interact and record trace
+			res, err := blk.RunTransaction(tx)
+			require.NoError(t, err)
+			require.EqualError(t, res.VMError, "out of gas")
+
+			tracer.Collect(txID)
+		})
+
+	})
+
+	t.Run("contract interaction run invalid transaction", func(t *testing.T) {
+		runWithDeployedContract(t, func(testContract *testutils.TestContract, testAccount *testutils.EOATestAccount, emu *emulator.Emulator) {
+			blk, _, tracer := blockWithTracer(t, emu)
+			var txID gethCommon.Hash
+
+			tx := testAccount.PrepareAndSignTx(
+				t,
+				testContract.DeployedAt.ToCommon(),
+				testContract.MakeCallData(t, "store", big.NewInt(2)),
+				big.NewInt(0),
+				1_000_000,
+				big.NewInt(-1),
+			)
+
+			// interact and record trace
+			res, err := blk.RunTransaction(tx)
+			require.NoError(t, err)
+			require.EqualError(t, res.ValidationError, "max fee per gas less than block base fee: address 0x658Bdf435d810C91414eC09147DAA6DB62406379, maxFeePerGas: -1, baseFee: 0")
+
+			tracer.Collect(txID)
+		})
+
+	})
+
 	t.Run("contract interaction using run batch transaction", func(t *testing.T) {
 		runWithDeployedContract(t, func(testContract *testutils.TestContract, testAccount *testutils.EOATestAccount, emu *emulator.Emulator) {
 			blk, uploader, tracer := blockWithTracer(t, emu)
