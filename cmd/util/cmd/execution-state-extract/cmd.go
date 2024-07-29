@@ -378,10 +378,10 @@ func run(*cobra.Command, []string) {
 	switch chainID {
 	case flow.Emulator:
 		burnerContractChange = migrations.BurnerContractChangeDeploy
-		evmContractChange = migrations.EVMContractChangeDeploy
+		evmContractChange = migrations.EVMContractChangeDeployMinimalAndUpdateFull
 	case flow.Testnet, flow.Mainnet:
 		burnerContractChange = migrations.BurnerContractChangeUpdate
-		evmContractChange = migrations.EVMContractChangeUpdate
+		evmContractChange = migrations.EVMContractChangeUpdateFull
 	}
 
 	stagedContracts, err := migrations.StagedContractsFromCSV(flagStagedContractsFile)
@@ -431,7 +431,7 @@ func run(*cobra.Command, []string) {
 
 		migration := newMigration(log.Logger, migrations, flagNWorker)
 
-		payloads, err := migration(payloads)
+		payloads, err = migration(payloads)
 		if err != nil {
 			log.Fatal().Err(err).Msgf("error migrating payloads: %s", err.Error())
 		}

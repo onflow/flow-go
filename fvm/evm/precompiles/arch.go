@@ -8,7 +8,7 @@ import (
 
 var (
 	FlowBlockHeightFuncSig = ComputeFunctionSelector("flowBlockHeight", nil)
-	// TODO: fix me
+
 	ProofVerifierFuncSig = ComputeFunctionSelector(
 		"verifyCOAOwnershipProof",
 		[]string{"address", "bytes32", "bytes"},

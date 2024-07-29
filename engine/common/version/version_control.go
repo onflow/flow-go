@@ -3,7 +3,6 @@ package version
 import (
 	"errors"
 	"fmt"
-	"math"
 	"sync"
 
 	"github.com/coreos/go-semver/semver"
@@ -25,10 +24,13 @@ var ErrOutOfRange = errors.New("height is out of range")
 
 // VersionControlConsumer defines a function type that consumes version control updates.
 // It is called with the block height and the corresponding semantic version.
-type VersionControlConsumer func(height uint64, semver string)
+// There are two possible notifications options:
+// - A new or updated version will have a height and a semantic version at that height.
+// - A deleted version will have the previous height and nil semantic version, indicating that the update was deleted.
+type VersionControlConsumer func(height uint64, version *semver.Version)
 
 // NoHeight represents the maximum possible height for blocks.
-var NoHeight = uint64(math.MaxUint64)
+var NoHeight = uint64(0)
 
 // VersionControl manages the version control system for the node.
 // It consumes BlockFinalized events and updates the node's version control based on the latest version beacon.
@@ -101,7 +103,7 @@ func NewVersionControl(
 		return nil, fmt.Errorf("version control node version is empty")
 	}
 
-	log.Info().
+	vc.log.Info().
 		Stringer("node_version", vc.nodeVersion).
 		Msg("system initialized")
 
@@ -173,7 +175,7 @@ func (v *VersionControl) initBoundaries(
 			// this should never happen as we already validated the version beacon
 			// when indexing it
 			if err != nil || ver == nil {
-				if ver == nil {
+				if err == nil {
 					err = fmt.Errorf("boundary semantic version is nil")
 				}
 				ctx.Throw(
@@ -319,7 +321,7 @@ func (v *VersionControl) blockFinalized(
 
 		previousEndHeight := v.endHeight.Load()
 
-		if height > previousEndHeight {
+		if previousEndHeight != NoHeight && height > previousEndHeight {
 			// Stop here since it's outside our compatible range
 			return
 		}
@@ -329,6 +331,9 @@ func (v *VersionControl) blockFinalized(
 		for _, boundary := range vb.VersionBoundaries {
 			ver, err := boundary.Semver()
 			if err != nil || ver == nil {
+				if err == nil {
+					err = fmt.Errorf("boundary semantic version is nil")
+				}
 				// this should never happen as we already validated the version beacon
 				// when indexing it
 				ctx.Throw(
@@ -342,7 +347,7 @@ func (v *VersionControl) blockFinalized(
 				newEndHeight = boundary.BlockHeight - 1
 
 				for _, consumer := range v.consumers {
-					consumer(boundary.BlockHeight, ver.String())
+					consumer(boundary.BlockHeight, ver)
 				}
 
 				break
@@ -355,7 +360,7 @@ func (v *VersionControl) blockFinalized(
 		if previousEndHeight != NoHeight && newEndHeight == NoHeight {
 			for _, consumer := range v.consumers {
 				// Note: notifying for the boundary height, which is end height + 1
-				consumer(previousEndHeight+1, "")
+				consumer(previousEndHeight+1, nil)
 			}
 		}
 	}

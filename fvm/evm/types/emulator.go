@@ -1,6 +1,7 @@
 package types
 
 import (
+	"math"
 	"math/big"
 
 	gethCommon "github.com/onflow/go-ethereum/common"
@@ -10,8 +11,24 @@ import (
 )
 
 var (
+	// DefaultBlockLevelGasLimit is the default value for the block gas limit
+	// currently set to maximum and we don't consider any limit
+	// given number of included EVM transactions are naturally
+	// limited by the Flow block production limits.
+	DefaultBlockLevelGasLimit = uint64(math.MaxUint64)
+	// DefaultBaseFee is the default base fee value for the block
+	// is set to zero but can be updated by the config
+	DefaultBaseFee = big.NewInt(0)
+
+	// DefaultDirectCallBaseGasUsage holds the minimum gas
+	// charge for direct calls
 	DefaultDirectCallBaseGasUsage = uint64(21_000)
-	DefaultDirectCallGasPrice     = uint64(0)
+	// DefaultDirectCallGasPrice captures the default
+	// gas price for the direct call.
+	// its set to zero currently given that we charge
+	// computation but we don't need to refund to any
+	// coinbase account.
+	DefaultDirectCallGasPrice = uint64(0)
 
 	// anything block number above 0 works here
 	BlockNumberForEVMRules = big.NewInt(1)
@@ -24,10 +41,12 @@ type BlockContext struct {
 	BlockTimestamp         uint64
 	DirectCallBaseGasUsage uint64
 	DirectCallGasPrice     uint64
+	TxCountSoFar           uint
+	TotalGasUsedSoFar      uint64
 	GasFeeCollector        Address
 	GetHashFunc            func(n uint64) gethCommon.Hash
 	Random                 gethCommon.Hash
-	Tracer                 tracers.Tracer
+	Tracer                 *tracers.Tracer
 
 	// a set of extra precompiled contracts to be injected
 	ExtraPrecompiledContracts []PrecompiledContract
