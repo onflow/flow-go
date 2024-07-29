@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/onflow/cadence/runtime"
+	"github.com/onflow/cadence/runtime/ast"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
 
@@ -56,6 +57,8 @@ func NewMigrationRuntimeInterface(
 		GetOrLoadProgramListenerFunc: getOrLoadProgramListenerFunc,
 	}
 }
+
+var _ runtime.Interface = &MigrationRuntimeInterface{}
 
 func (m *MigrationRuntimeInterface) ResolveLocation(
 	identifiers []runtime.Identifier,
@@ -163,6 +166,10 @@ func (m *MigrationRuntimeInterface) GetOrLoadProgram(
 	}
 
 	return getOrLoadProgram(location, load)
+}
+
+func (m *MigrationRuntimeInterface) RecoverProgram(_ *ast.Program, _ common.Location) (*ast.Program, error) {
+	return nil, nil
 }
 
 type migrationTransactionPreparer struct {
