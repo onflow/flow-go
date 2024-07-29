@@ -3,7 +3,6 @@ package environment
 import (
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
-	"github.com/rs/zerolog"
 
 	reusableRuntime "github.com/onflow/flow-go/fvm/runtime"
 	"github.com/onflow/flow-go/model/flow"
@@ -27,7 +26,7 @@ type Environment interface {
 	TransactionInfo
 
 	// ProgramLogger
-	Logger() zerolog.Logger
+	LoggerProvider
 	Logs() []string
 
 	// EventEmitter
