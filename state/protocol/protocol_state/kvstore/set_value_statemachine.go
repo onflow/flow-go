@@ -47,6 +47,7 @@ func (m *SetValueStateMachine) EvolveState(orderedUpdates []flow.ServiceEvent) e
 				return fmt.Errorf("internal invalid type for SetEpochExtensionViewCount: %T", update.Event)
 			}
 
+			m.telemetry.OnServiceEventReceived(update)
 			err := m.Mutator.SetEpochExtensionViewCount(setEpochExtensionViewCount.Value)
 			if err != nil {
 				if errors.Is(err, ErrInvalidValue) {
@@ -57,6 +58,7 @@ func (m *SetValueStateMachine) EvolveState(orderedUpdates []flow.ServiceEvent) e
 				}
 				return fmt.Errorf("unexpected error when processing SetEpochExtensionViewCount: %w", err)
 			}
+			m.telemetry.OnServiceEventProcessed(update)
 
 		// Service events not explicitly expected are ignored
 		default:

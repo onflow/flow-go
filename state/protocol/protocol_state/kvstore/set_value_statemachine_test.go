@@ -61,6 +61,8 @@ func (s *SetKeyValueStoreValueStateMachineSuite) TestEvolveState_ProtocolStateVe
 			Value: 1000,
 		}
 
+		s.telemetry.On("OnServiceEventReceived", ev.ServiceEvent()).Return().Once()
+		s.telemetry.On("OnServiceEventProcessed", ev.ServiceEvent()).Return().Once()
 		s.mutator.On("SetEpochExtensionViewCount", ev.Value).Return(nil)
 		err := s.stateMachine.EvolveState([]flow.ServiceEvent{ev.ServiceEvent()})
 		require.NoError(s.T(), err)
@@ -81,6 +83,9 @@ func (s *SetKeyValueStoreValueStateMachineSuite) TestEvolveState_ProtocolStateVe
 
 		s.mutator.On("SetEpochExtensionViewCount", valid.Value).Return(nil).Once()
 		s.mutator.On("SetEpochExtensionViewCount", invalid.Value).Return(kvstore.ErrInvalidValue).Once()
+		s.telemetry.On("OnServiceEventReceived", valid.ServiceEvent()).Return().Once()
+		s.telemetry.On("OnServiceEventProcessed", valid.ServiceEvent()).Return().Once()
+		s.telemetry.On("OnServiceEventReceived", invalid.ServiceEvent()).Return().Once()
 		s.telemetry.On("OnInvalidServiceEvent", invalid.ServiceEvent(),
 			mocks.MatchedBy(protocol.IsInvalidServiceEventError)).Return().Once()
 
@@ -96,6 +101,7 @@ func (s *SetKeyValueStoreValueStateMachineSuite) TestEvolveState_ProtocolStateVe
 
 		exception := errors.New("kvstore-exception")
 		s.mutator.On("SetEpochExtensionViewCount", invalid.Value).Return(exception).Once()
+		s.telemetry.On("OnServiceEventReceived", invalid.ServiceEvent()).Return().Once()
 		err := s.stateMachine.EvolveState([]flow.ServiceEvent{invalid.ServiceEvent(), invalid.ServiceEvent()})
 		require.ErrorIs(s.T(), err, exception, "exception has to be propagated")
 	})
