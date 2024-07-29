@@ -172,7 +172,7 @@ func (m *AddKeyMigration) MigrateAccount(
 
 type keyAddedReport struct {
 	Address string `json:"address"`
-	Index   uint64 `json:"index"`
+	Index   uint32 `json:"index"`
 	Key     string `json:"key"`
 }
 
