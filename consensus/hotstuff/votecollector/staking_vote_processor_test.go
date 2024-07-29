@@ -251,7 +251,7 @@ func TestStakingVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 	epochCounter := uint64(3)
 	epochLookup := &modulemock.EpochLookup{}
 	view := uint64(20)
-	epochLookup.On("EpochForViewWithFallback", view).Return(epochCounter, nil)
+	epochLookup.On("EpochForView", view).Return(epochCounter, nil)
 
 	// signers hold objects that are created with private key and can sign votes and proposals
 	signers := make(map[flow.Identifier]*verification.StakingSigner)

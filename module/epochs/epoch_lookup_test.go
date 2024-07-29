@@ -2,18 +2,18 @@ package epochs
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/state/protocol"
 	mockprotocol "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/onflow/flow-go/utils/unittest/mocks"
@@ -28,10 +28,9 @@ type EpochLookupSuite struct {
 	snapshot   *mockprotocol.Snapshot
 	params     *mockprotocol.Params
 
-	// backend for mocked functions
-	mu                     sync.Mutex // protects access to epochFallbackTriggered and phase
-	epochFallbackTriggered bool
-	phase                  flow.EpochPhase
+	// protects access to phase and used to invoke funcs with a lock
+	mu    sync.Mutex
+	phase flow.EpochPhase
 
 	// config for each epoch
 	currentEpochCounter uint64
@@ -66,10 +65,7 @@ func (suite *EpochLookupSuite) SetupTest() {
 		func() error { return nil })
 
 	epochProtocolState := mockprotocol.NewEpochProtocolState(suite.T())
-	epochProtocolState.On("EpochFallbackTriggered").Return(
-		suite.EpochFallbackTriggered,
-		func() error { return nil },
-	)
+
 	suite.snapshot.On("EpochProtocolState").Return(epochProtocolState, nil)
 
 	suite.state.On("Final").Return(suite.snapshot)
@@ -88,12 +84,6 @@ func (suite *EpochLookupSuite) WithLock(f func()) {
 	suite.mu.Lock()
 	f()
 	suite.mu.Unlock()
-}
-
-func (suite *EpochLookupSuite) EpochFallbackTriggered() bool {
-	suite.mu.Lock()
-	defer suite.mu.Unlock()
-	return suite.epochFallbackTriggered
 }
 
 func (suite *EpochLookupSuite) Phase() flow.EpochPhase {
@@ -130,84 +120,167 @@ func (suite *EpochLookupSuite) CreateAndStartEpochLookup() {
 	suite.cancel = cancel
 }
 
-// TestEpochForViewWithFallback_Curr tests constructing and subsequently querying
+// TestEpochForView_Curr tests constructing and subsequently querying
 // EpochLookup with an initial state of a current epoch.
-func (suite *EpochLookupSuite) TestEpochForViewWithFallback_Curr() {
+func (suite *EpochLookupSuite) TestEpochForView_Curr() {
 	epochs := []epochRange{suite.currEpoch}
 	suite.CommitEpochs(epochs...)
 	suite.CreateAndStartEpochLookup()
-	testEpochForViewWithFallback(suite.T(), suite.lookup, suite.state, epochs...)
+	testEpochForView(suite.T(), suite.lookup, epochs...)
 }
 
-// TestEpochForViewWithFallback_PrevCurr tests constructing and subsequently querying
+// TestEpochForView_PrevCurr tests constructing and subsequently querying
 // EpochLookup with an initial state of a previous and current epoch.
-func (suite *EpochLookupSuite) TestEpochForViewWithFallback_PrevCurr() {
+func (suite *EpochLookupSuite) TestEpochForView_PrevCurr() {
 	epochs := []epochRange{suite.prevEpoch, suite.currEpoch}
 	suite.CommitEpochs(epochs...)
 	suite.CreateAndStartEpochLookup()
-	testEpochForViewWithFallback(suite.T(), suite.lookup, suite.state, epochs...)
+	testEpochForView(suite.T(), suite.lookup, epochs...)
 }
 
-// TestEpochForViewWithFallback_CurrNext tests constructing and subsequently querying
+// TestEpochForView_CurrNext tests constructing and subsequently querying
 // EpochLookup with an initial state of a current and next epoch.
-func (suite *EpochLookupSuite) TestEpochForViewWithFallback_CurrNext() {
+func (suite *EpochLookupSuite) TestEpochForView_CurrNext() {
 	epochs := []epochRange{suite.currEpoch, suite.nextEpoch}
 	suite.CommitEpochs(epochs...)
 	suite.CreateAndStartEpochLookup()
-	testEpochForViewWithFallback(suite.T(), suite.lookup, suite.state, epochs...)
+	testEpochForView(suite.T(), suite.lookup, epochs...)
 }
 
-// TestEpochForViewWithFallback_CurrNextPrev tests constructing and subsequently querying
+// TestEpochForView_CurrNextPrev tests constructing and subsequently querying
 // EpochLookup with an initial state of a previous, current, and next epoch.
-func (suite *EpochLookupSuite) TestEpochForViewWithFallback_CurrNextPrev() {
+func (suite *EpochLookupSuite) TestEpochForView_CurrNextPrev() {
 	epochs := []epochRange{suite.prevEpoch, suite.currEpoch, suite.nextEpoch}
 	suite.CommitEpochs(epochs...)
 	suite.CreateAndStartEpochLookup()
-	testEpochForViewWithFallback(suite.T(), suite.lookup, suite.state, epochs...)
+	testEpochForView(suite.T(), suite.lookup, epochs...)
 }
 
-// TestEpochForViewWithFallback_EpochFallbackTriggered tests constructing and subsequently querying
-// EpochLookup with an initial state of epoch fallback triggered.
-func (suite *EpochLookupSuite) TestEpochForViewWithFallback_EpochFallbackTriggered() {
-	epochs := []epochRange{suite.prevEpoch, suite.currEpoch, suite.nextEpoch}
-	suite.WithLock(func() {
-		suite.epochFallbackTriggered = true
-	})
-	suite.CommitEpochs(epochs...)
-	suite.CreateAndStartEpochLookup()
-	testEpochForViewWithFallback(suite.T(), suite.lookup, suite.state, epochs...)
-}
+// TestProtocolEvents_EpochExtended tests constructing and subsequently querying
+// EpochLookup, where we process an EpochExtended event and expect the latest
+// epoch final view to be updated with the updated final view of the current epoch
+// in the protocol state.
+func (suite *EpochLookupSuite) TestProtocolEvents_EpochExtended() {
+	// previous and current epochs will be committed
+	epochs := []epochRange{suite.prevEpoch, suite.currEpoch}
+	suite.CommitEpochs(suite.prevEpoch, suite.currEpoch)
 
-// TestProtocolEvents_EpochFallbackTriggered tests constructing and subsequently querying
-// EpochLookup, where there is no epoch fallback at construction time,
-// but an epoch fallback happens later via an epoch event.
-func (suite *EpochLookupSuite) TestProtocolEvents_EpochFallbackTriggered() {
-	// initially, only current epoch is committed
-	suite.CommitEpochs(suite.currEpoch)
 	suite.CreateAndStartEpochLookup()
 
-	// trigger epoch fallback
-	suite.WithLock(func() {
-		suite.epochFallbackTriggered = true
-	})
-	suite.lookup.EpochFallbackModeTriggered(0, nil)
+	extension := flow.EpochExtension{
+		FirstView: suite.currEpoch.finalView + 1,
+		FinalView: suite.currEpoch.finalView + 100,
+	}
+	suite.lookup.EpochExtended(suite.currEpoch.counter, nil, extension)
 
 	// wait for the protocol event to be processed (async)
 	assert.Eventually(suite.T(), func() bool {
-		_, err := suite.lookup.EpochForViewWithFallback(suite.currEpoch.finalView + 1)
+		_, err := suite.lookup.EpochForView(extension.FinalView)
 		return err == nil
 	}, 5*time.Second, 50*time.Millisecond)
 
 	// validate queries are answered correctly
-	testEpochForViewWithFallback(suite.T(), suite.lookup, suite.state, suite.currEpoch)
+	suite.currEpoch.finalView = extension.FinalView // expect final view to have been updated from extension
+	testEpochForView(suite.T(), suite.lookup, epochs...)
 
 	// should handle multiple deliveries of the protocol event
-	suite.lookup.EpochFallbackModeTriggered(0, nil)
-	suite.lookup.EpochFallbackModeTriggered(0, nil)
-	suite.lookup.EpochFallbackModeTriggered(0, nil)
+	suite.lookup.EpochExtended(suite.currEpoch.counter, nil, extension)
+	suite.lookup.EpochExtended(suite.currEpoch.counter, nil, extension)
+	suite.lookup.EpochExtended(suite.currEpoch.counter, nil, extension)
+
+	assert.Eventually(suite.T(), func() bool {
+		return len(suite.lookup.epochEvents) == 0
+	}, time.Second, time.Millisecond)
 
 	// validate queries are answered correctly
-	testEpochForViewWithFallback(suite.T(), suite.lookup, suite.state, suite.currEpoch)
+	testEpochForView(suite.T(), suite.lookup, epochs...)
+}
+
+// TestProtocolEvents_EpochExtended_SanityChecks ensures all expected sanity checks are checked when processing
+// EpochExtended events.
+func (suite *EpochLookupSuite) TestProtocolEvents_EpochExtended_SanityChecks() {
+	initAndStartLookup := func() *irrecoverable.MockSignalerContext {
+		lookup, err := NewEpochLookup(suite.state)
+		suite.Require().NoError(err)
+		ctx, cancel := irrecoverable.NewMockSignalerContextWithCancel(suite.T(), context.Background())
+		lookup.Start(ctx)
+
+		suite.lookup = lookup
+		suite.cancel = cancel
+
+		return ctx
+	}
+
+	suite.T().Run("sanity check: `extension.FinalView` should be greater than final view of latest epoch", func(t *testing.T) {
+		// initially, only current epoch is committed
+		suite.CommitEpochs(suite.prevEpoch, suite.currEpoch)
+		ctx := initAndStartLookup()
+
+		// create invalid extension with final view in the past
+		extension := flow.EpochExtension{
+			FirstView: suite.currEpoch.finalView + 1,
+			FinalView: suite.currEpoch.finalView - 100,
+		}
+
+		ctx.On("Throw", mock.AnythingOfType("*errors.errorString")).Run(func(args mock.Arguments) {
+			err, ok := args.Get(0).(error)
+			assert.True(suite.T(), ok)
+			assert.Contains(suite.T(), err.Error(), fmt.Sprintf(invalidExtensionFinalView, suite.currEpoch.finalView, extension.FinalView))
+		})
+
+		suite.lookup.EpochExtended(suite.currEpoch.counter, nil, extension)
+
+		// wait for the protocol event to be processed (async)
+		assert.Eventually(suite.T(), func() bool {
+			return len(suite.lookup.epochEvents) == 0
+		}, 2*time.Second, 50*time.Millisecond)
+	})
+	suite.T().Run("sanity check: epoch extension should have the same epoch counter as the latest epoch", func(t *testing.T) {
+		// initially, only current epoch is committed
+		suite.CommitEpochs(suite.prevEpoch, suite.currEpoch)
+		ctx := initAndStartLookup()
+
+		unknownCounter := uint64(100)
+		ctx.On("Throw", mock.AnythingOfType("*errors.errorString")).Run(func(args mock.Arguments) {
+			err, ok := args.Get(0).(error)
+			assert.True(suite.T(), ok)
+			assert.Contains(suite.T(), err.Error(), fmt.Sprintf(mismatchEpochCounter, suite.currEpoch.counter, unknownCounter))
+		})
+
+		suite.lookup.EpochExtended(unknownCounter, nil, flow.EpochExtension{
+			FirstView: suite.currEpoch.finalView + 1,
+			FinalView: suite.currEpoch.finalView + 100,
+		})
+
+		// wait for the protocol event to be processed (async)
+		assert.Eventually(suite.T(), func() bool {
+			return len(suite.lookup.epochEvents) == 0
+		}, 2*time.Second, 50*time.Millisecond)
+	})
+	suite.T().Run("sanity check: first view of the epoch extension should immediately start after the final view of the latest epoch", func(t *testing.T) {
+		// initially, only current epoch is committed
+		suite.CommitEpochs(suite.prevEpoch, suite.currEpoch)
+		ctx := initAndStartLookup()
+
+		// create invalid extension with final view in the past
+		extension := flow.EpochExtension{
+			FirstView: suite.currEpoch.finalView - 100,
+			FinalView: suite.currEpoch.finalView + 100,
+		}
+
+		ctx.On("Throw", mock.AnythingOfType("*errors.errorString")).Run(func(args mock.Arguments) {
+			err, ok := args.Get(0).(error)
+			assert.True(suite.T(), ok)
+			assert.Contains(suite.T(), err.Error(), fmt.Sprintf(invalidEpochViewSequence, extension.FirstView, suite.currEpoch.finalView))
+		})
+
+		suite.lookup.EpochExtended(suite.currEpoch.counter, nil, extension)
+
+		// wait for the protocol event to be processed (async)
+		assert.Eventually(suite.T(), func() bool {
+			return len(suite.lookup.epochEvents) == 0
+		}, 2*time.Second, 50*time.Millisecond)
+	})
 }
 
 // TestProtocolEvents_CommittedEpoch tests correct processing of an `EpochCommittedPhaseStarted` event
@@ -224,12 +297,12 @@ func (suite *EpochLookupSuite) TestProtocolEvents_CommittedEpoch() {
 
 	// wait for the protocol event to be processed (async)
 	assert.Eventually(suite.T(), func() bool {
-		_, err := suite.lookup.EpochForViewWithFallback(suite.currEpoch.finalView + 1)
+		_, err := suite.lookup.EpochForView(suite.currEpoch.finalView + 1)
 		return err == nil
 	}, 5*time.Second, 50*time.Millisecond)
 
 	// validate queries are answered correctly
-	testEpochForViewWithFallback(suite.T(), suite.lookup, suite.state, suite.currEpoch, suite.nextEpoch)
+	testEpochForView(suite.T(), suite.lookup, suite.currEpoch, suite.nextEpoch)
 
 	// should handle multiple deliveries of the protocol event
 	suite.lookup.EpochCommittedPhaseStarted(suite.currentEpochCounter, firstBlockOfCommittedPhase)
@@ -237,35 +310,27 @@ func (suite *EpochLookupSuite) TestProtocolEvents_CommittedEpoch() {
 	suite.lookup.EpochCommittedPhaseStarted(suite.currentEpochCounter, firstBlockOfCommittedPhase)
 
 	// validate queries are answered correctly
-	testEpochForViewWithFallback(suite.T(), suite.lookup, suite.state, suite.currEpoch, suite.nextEpoch)
+	testEpochForView(suite.T(), suite.lookup, suite.currEpoch, suite.nextEpoch)
 }
 
-// testEpochForViewWithFallback accepts a constructed EpochLookup and state, and
+// testEpochForView accepts a constructed EpochLookup and state, and
 // validates correctness by issuing various queries, using the input state and
 // epochs as source of truth.
-func testEpochForViewWithFallback(t *testing.T, lookup *EpochLookup, state protocol.State, epochs ...epochRange) {
-	epochProtocolState, err := state.Final().EpochProtocolState()
-	require.NoError(t, err)
-	epochFallbackTriggered := epochProtocolState.EpochFallbackTriggered()
-
-	t.Run("should have set epoch fallback triggered correctly", func(t *testing.T) {
-		assert.Equal(t, epochFallbackTriggered, lookup.epochFallbackIsTriggered.Load())
-	})
-
+func testEpochForView(t *testing.T, lookup *EpochLookup, epochs ...epochRange) {
 	t.Run("should be able to query within any committed epoch", func(t *testing.T) {
 		for _, epoch := range epochs {
 			t.Run("first view", func(t *testing.T) {
-				counter, err := lookup.EpochForViewWithFallback(epoch.firstView)
+				counter, err := lookup.EpochForView(epoch.firstView)
 				assert.NoError(t, err)
 				assert.Equal(t, epoch.counter, counter)
 			})
 			t.Run("final view", func(t *testing.T) {
-				counter, err := lookup.EpochForViewWithFallback(epoch.finalView)
+				counter, err := lookup.EpochForView(epoch.finalView)
 				assert.NoError(t, err)
 				assert.Equal(t, epoch.counter, counter)
 			})
 			t.Run("random view in range", func(t *testing.T) {
-				counter, err := lookup.EpochForViewWithFallback(unittest.Uint64InRange(epoch.firstView, epoch.finalView))
+				counter, err := lookup.EpochForView(unittest.Uint64InRange(epoch.firstView, epoch.finalView))
 				assert.NoError(t, err)
 				assert.Equal(t, epoch.counter, counter)
 			})
@@ -274,34 +339,23 @@ func testEpochForViewWithFallback(t *testing.T, lookup *EpochLookup, state proto
 
 	t.Run("should return ErrViewForUnknownEpoch below earliest epoch", func(t *testing.T) {
 		t.Run("view 0", func(t *testing.T) {
-			_, err := lookup.EpochForViewWithFallback(0)
+			_, err := lookup.EpochForView(0)
 			assert.ErrorIs(t, err, model.ErrViewForUnknownEpoch)
 		})
 		t.Run("boundary of earliest epoch", func(t *testing.T) {
-			_, err := lookup.EpochForViewWithFallback(epochs[0].firstView - 1)
+			_, err := lookup.EpochForView(epochs[0].firstView - 1)
 			assert.ErrorIs(t, err, model.ErrViewForUnknownEpoch)
 		})
 		t.Run("random view below earliest epoch", func(t *testing.T) {
-			_, err := lookup.EpochForViewWithFallback(unittest.Uint64InRange(0, epochs[0].firstView-1))
+			_, err := lookup.EpochForView(unittest.Uint64InRange(0, epochs[0].firstView-1))
 			assert.ErrorIs(t, err, model.ErrViewForUnknownEpoch)
 		})
 	})
 
-	// if epoch fallback is triggered, fallback to returning latest epoch counter
-	// otherwise return ErrViewForUnknownEpoch
-	if epochFallbackTriggered {
-		t.Run("should use fallback logic for queries above latest epoch when epoch fallback is triggered", func(t *testing.T) {
-			counter, err := lookup.EpochForViewWithFallback(epochs[len(epochs)-1].finalView + 1)
-			assert.NoError(t, err)
-			// should fallback to returning the counter for the latest epoch
-			assert.Equal(t, epochs[len(epochs)-1].counter, counter)
-		})
-	} else {
-		t.Run("should return ErrViewForUnknownEpoch for queries above latest epoch when epoch fallback is not triggered", func(t *testing.T) {
-			_, err := lookup.EpochForViewWithFallback(epochs[len(epochs)-1].finalView + 1)
-			assert.ErrorIs(t, err, model.ErrViewForUnknownEpoch)
-		})
-	}
+	t.Run("should return ErrViewForUnknownEpoch for queries above latest epoch final view", func(t *testing.T) {
+		_, err := lookup.EpochForView(lookup.epochs.latest().finalView + 1)
+		assert.ErrorIs(t, err, model.ErrViewForUnknownEpoch)
+	})
 }
 
 // newMockEpoch returns a mock epoch with the given fields set.
