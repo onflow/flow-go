@@ -98,6 +98,7 @@ func NewMutableProtocolState(
 	setups storage.EpochSetups,
 	commits storage.EpochCommits,
 ) *MutableProtocolState {
+	log = log.With().Str("module", "dynamic_protocol_state").Logger()
 	epochhappyPathTelemetryFactory := func(candidateView uint64) protocol_state.StateMachineTelemetryConsumer {
 		return pubsub.NewLogConsumer(
 			log.With().
@@ -116,6 +117,7 @@ func NewMutableProtocolState(
 	}
 
 	// TODO(EFM, #6020): inject consumers into other state machine factories.
+	setKVStoreValueTelemetry := pubsub.NewLogConsumer(log.With().Str("state_machine", "set_kvstore_value").Logger())
 
 	// an ordered list of factories to create state machines for different sub-states of the Dynamic Protocol State.
 	// all factories are expected to be called in order defined here.
@@ -123,6 +125,7 @@ func NewMutableProtocolState(
 		kvstore.NewPSVersionUpgradeStateMachineFactory(),
 		epochs.NewEpochStateMachineFactory(setups, commits, epochProtocolStateDB,
 			epochhappyPathTelemetryFactory, epochfallbackTelemetryFactory),
+		kvstore.NewSetValueKVStoreStateMachineFactory(setKVStoreValueTelemetry),
 	}
 	return newMutableProtocolState(epochProtocolStateDB, kvstore.NewProtocolKVStore(kvStoreSnapshots), globalParams, headers, results, kvStateMachineFactories)
 }
