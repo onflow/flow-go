@@ -3,6 +3,7 @@ package types
 import (
 	"bytes"
 	"math/big"
+	"time"
 
 	gethCommon "github.com/onflow/go-ethereum/common"
 	gethTypes "github.com/onflow/go-ethereum/core/types"
@@ -87,12 +88,17 @@ func NewBlockFromBytes(encoded []byte) (*Block, error) {
 	return res, nil
 }
 
+var GenesisTime = time.Date(2024, time.August, 1, 0, 0, 0, 0, time.UTC)
+
 // GenesisBlock is the genesis block in the EVM environment
 var GenesisBlock = &Block{
-	ParentBlockHash: gethCommon.Hash{},
-	Height:          uint64(0),
-	TotalSupply:     new(big.Int),
-	ReceiptRoot:     gethTypes.EmptyRootHash,
+	ParentBlockHash:     gethCommon.Hash{},
+	Height:              uint64(0),
+	Timestamp:           uint64(GenesisTime.Unix()),
+	TotalSupply:         new(big.Int),
+	ReceiptRoot:         gethTypes.EmptyRootHash,
+	TransactionHashRoot: gethTypes.EmptyRootHash,
+	TotalGasUsed:        0,
 }
 
 var GenesisBlockHash, _ = GenesisBlock.Hash()
