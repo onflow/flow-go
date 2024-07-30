@@ -687,7 +687,7 @@ func (builder *ObserverServiceBuilder) extraFlags() {
 		flags.StringVar(&builder.executionDataDBMode,
 			"execution-data-db",
 			defaultConfig.executionDataDBMode,
-			"[experimental] the DB name for execution data name. One of [badger, pebble]")
+			"[experimental] the DB type for execution datastore. One of [badger, pebble]")
 
 		// Execution data pruner
 		flags.Uint64Var(&builder.executionDataPrunerHeightRangeTarget,

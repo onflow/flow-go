@@ -1296,7 +1296,7 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		flags.StringVar(&builder.executionDataDBMode,
 			"execution-data-db",
 			defaultConfig.executionDataDBMode,
-			"[experimental] the DB name for execution data name. One of [badger, pebble]")
+			"[experimental] the DB type for execution datastore. One of [badger, pebble]")
 		flags.Uint64Var(&builder.executionDataPrunerHeightRangeTarget,
 			"execution-data-height-range-target",
 			defaultConfig.executionDataPrunerHeightRangeTarget,
