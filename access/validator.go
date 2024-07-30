@@ -24,16 +24,16 @@ import (
 )
 
 const (
-	InvalidTransactionRateLimit = "payer_exceeded_ratelimit"
-	InvalidTransactionByteSize  = "transaction_exceeded_size_limit"
-	IncompleteTransaction       = "missing_fields"
-	InvalidGasLimit             = "invalid_gas_limit"
-	ExpiredTransaction          = "transaction_expired"
-	InvalidScript               = "invalid_script"
-	InvalidAddresses            = "invalid_address"
-	InvalidSignature            = "invalid_signature"
-	DuplicatedSignature         = "duplicate_signature"
-	InsufficientBalance         = "payer_insufficient_balance"
+	invalidTransactionRateLimit = "payer_exceeded_ratelimit"
+	invalidTransactionByteSize  = "transaction_exceeded_size_limit"
+	incompleteTransaction       = "missing_fields"
+	invalidGasLimit             = "invalid_gas_limit"
+	expiredTransaction          = "transaction_expired"
+	invalidScript               = "invalid_script"
+	invalidAddresses            = "invalid_address"
+	invalidSignature            = "invalid_signature"
+	duplicatedSignature         = "duplicate_signature"
+	insufficientBalance         = "payer_insufficient_balance"
 )
 
 type Blocks interface {
@@ -176,15 +176,15 @@ func (v *TransactionValidator) initValidationSteps() {
 		// a short term solution to prevent attacks that send too many failed transactions
 		// if a transaction is from a payer that should be rate limited, all the following
 		// checks will be skipped
-		{v.checkRateLimitPayer, InvalidTransactionRateLimit},
-		{v.checkTxSizeLimit, InvalidTransactionByteSize},
-		{v.checkMissingFields, IncompleteTransaction},
-		{v.checkGasLimit, InvalidGasLimit},
-		{v.checkExpiry, ExpiredTransaction},
-		{v.checkCanBeParsed, InvalidScript},
-		{v.checkAddresses, InvalidAddresses},
-		{v.checkSignatureFormat, InvalidSignature},
-		{v.checkSignatureDuplications, DuplicatedSignature},
+		{v.checkRateLimitPayer, invalidTransactionRateLimit},
+		{v.checkTxSizeLimit, invalidTransactionByteSize},
+		{v.checkMissingFields, incompleteTransaction},
+		{v.checkGasLimit, invalidGasLimit},
+		{v.checkExpiry, expiredTransaction},
+		{v.checkCanBeParsed, invalidScript},
+		{v.checkAddresses, invalidAddresses},
+		{v.checkSignatureFormat, invalidSignature},
+		{v.checkSignatureDuplications, duplicatedSignature},
 	}
 }
 
@@ -204,7 +204,7 @@ func (v *TransactionValidator) Validate(ctx context.Context, tx *flow.Transactio
 		// are 'internal' and related to script execution process. they shouldn't
 		// prevent the transaction from proceeding.
 		if IsInsufficientBalanceError(err) {
-			v.transactionValidationMetrics.TransactionValidationFailed(InsufficientBalance)
+			v.transactionValidationMetrics.TransactionValidationFailed(insufficientBalance)
 			return err
 		}
 
