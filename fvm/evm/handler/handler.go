@@ -2,6 +2,7 @@ package handler
 
 import (
 	"math/big"
+	"time"
 
 	"github.com/onflow/cadence/runtime/common"
 	gethCommon "github.com/onflow/go-ethereum/common"
@@ -461,10 +462,14 @@ func (h *ContractHandler) getBlockContext() (types.BlockContext, error) {
 		return types.BlockContext{}, err
 	}
 
+	//  block timestamp is unix nanoseconds but evm blocks
+	// expect timestamps in unix seconds so we convert here
+	timestamp := bp.Timestamp / uint64(time.Second)
+
 	return types.BlockContext{
 		ChainID:                types.EVMChainIDFromFlowChainID(h.flowChainID),
 		BlockNumber:            bp.Height,
-		BlockTimestamp:         bp.Timestamp,
+		BlockTimestamp:         timestamp,
 		DirectCallBaseGasUsage: types.DefaultDirectCallBaseGasUsage,
 		GetHashFunc: func(n uint64) gethCommon.Hash {
 			hash, err := h.blockStore.BlockHash(n)
@@ -474,7 +479,7 @@ func (h *ContractHandler) getBlockContext() (types.BlockContext, error) {
 		ExtraPrecompiledContracts: h.precompiledContracts,
 		Random:                    rand,
 		Tracer:                    h.tracer.TxTracer(),
-		TxCountSoFar:              uint(len(bp.TxHashes)),
+		TxCountSoFar:              uint(bp.TransactionCount),
 		TotalGasUsedSoFar:         bp.TotalGasUsed,
 	}, nil
 }

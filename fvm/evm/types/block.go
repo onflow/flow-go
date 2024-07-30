@@ -21,7 +21,7 @@ type Block struct {
 	// Height returns the height of this block
 	Height uint64
 
-	// Timestamp is a Unix timestamp in seconds at which the block was created
+	// Timestamp is a Unix timestamp in nanoseconds at which the block was created
 	// Note that this value must be provided from the FVM Block
 	Timestamp uint64
 
@@ -42,8 +42,11 @@ type Block struct {
 	// values as node values. Proofs are still compatible but might require an extra hashing step.
 	TransactionHashRoot gethCommon.Hash
 
-	// stores gas used by all transactions included in the block.
+	// TotalGasUsed stores the sum of gas used by all transactions included in the block
 	TotalGasUsed uint64
+
+	// TransactionCount stores the total num of transactions
+	TransactionCount uint32
 }
 
 // ToBytes encodes the block into bytes
@@ -98,6 +101,7 @@ var GenesisBlock = &Block{
 	TotalSupply:         new(big.Int),
 	ReceiptRoot:         gethTypes.EmptyRootHash,
 	TransactionHashRoot: gethTypes.EmptyRootHash,
+	TransactionCount:    0,
 	TotalGasUsed:        0,
 }
 
@@ -129,6 +133,7 @@ func (b *BlockProposal) AppendTransaction(res *Result) {
 	}
 	b.Receipts = append(b.Receipts, *r)
 	b.TotalGasUsed = r.CumulativeGasUsed
+	b.TransactionCount += 1
 }
 
 // PopulateRoots populates receiptRoot and transactionHashRoot
@@ -288,6 +293,23 @@ type blockV6 struct {
 	TotalGasUsed      uint64
 }
 
+// removes TransactionHashes
+// and adds TransactionHashRoot
+
+type blockV7 struct {
+	ParentBlockHash     gethCommon.Hash
+	Height              uint64
+	Timestamp           uint64
+	TotalSupply         *big.Int
+	ReceiptRoot         gethCommon.Hash
+	TransactionHashRoot gethCommon.Hash
+	TotalGasUsed        uint64
+}
+
+func secondsToNanoSeconds(t uint64) uint64 {
+	return t * uint64(time.Second)
+}
+
 // decodeBlockBreakingChanges will try to decode the bytes into all
 // previous versions of block type, if it succeeds it will return the
 // migrated block, otherwise it will return nil.
@@ -347,7 +369,7 @@ func decodeBlockBreakingChanges(encoded []byte) *Block {
 		return &Block{
 			ParentBlockHash: b5.ParentBlockHash,
 			Height:          b5.Height,
-			Timestamp:       b5.Timestamp,
+			Timestamp:       secondsToNanoSeconds(b5.Timestamp),
 			TotalSupply:     b5.TotalSupply,
 			ReceiptRoot:     b5.ReceiptRoot,
 		}
@@ -356,11 +378,25 @@ func decodeBlockBreakingChanges(encoded []byte) *Block {
 	b6 := &blockV6{}
 	if err := gethRLP.DecodeBytes(encoded, b6); err == nil {
 		return &Block{
-			ParentBlockHash: b5.ParentBlockHash,
-			Height:          b5.Height,
-			Timestamp:       b5.Timestamp,
-			TotalSupply:     b5.TotalSupply,
-			ReceiptRoot:     b5.ReceiptRoot,
+			ParentBlockHash: b6.ParentBlockHash,
+			Height:          b6.Height,
+			Timestamp:       secondsToNanoSeconds(b6.Timestamp),
+			TotalSupply:     b6.TotalSupply,
+			ReceiptRoot:     b6.ReceiptRoot,
+			TotalGasUsed:    b6.TotalGasUsed,
+		}
+	}
+
+	b7 := &blockV7{}
+	if err := gethRLP.DecodeBytes(encoded, b7); err == nil {
+		return &Block{
+			ParentBlockHash:     b7.ParentBlockHash,
+			Height:              b7.Height,
+			Timestamp:           secondsToNanoSeconds(b7.Timestamp),
+			TotalSupply:         b7.TotalSupply,
+			ReceiptRoot:         b7.ReceiptRoot,
+			TotalGasUsed:        b7.TotalGasUsed,
+			TransactionHashRoot: b7.TransactionHashRoot,
 		}
 	}
 
