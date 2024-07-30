@@ -35,6 +35,7 @@ import (
 	run_script "github.com/onflow/flow-go/cmd/util/cmd/run-script"
 	"github.com/onflow/flow-go/cmd/util/cmd/snapshot"
 	truncate_database "github.com/onflow/flow-go/cmd/util/cmd/truncate-database"
+	validate_c1_migration "github.com/onflow/flow-go/cmd/util/cmd/validate-c1-migration"
 	"github.com/onflow/flow-go/cmd/util/cmd/version"
 	"github.com/onflow/flow-go/module/profiler"
 )
@@ -114,6 +115,7 @@ func addCommands() {
 	rootCmd.AddCommand(atree_inlined_status.Cmd)
 	rootCmd.AddCommand(find_trie_root.Cmd)
 	rootCmd.AddCommand(run_script.Cmd)
+	rootCmd.AddCommand(validate_c1_migration.Cmd)
 }
 
 func initConfig() {

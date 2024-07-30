@@ -1297,7 +1297,7 @@ func TestProgramParsingError(t *testing.T) {
 	var messages []string
 
 	for _, entry := range reporter.entries {
-		if errorEntry, isErrorEntry := entry.(contractCheckingFailure); isErrorEntry {
+		if errorEntry, isErrorEntry := entry.(ContractCheckingFailure); isErrorEntry {
 			messages = append(messages, errorEntry.Error)
 			break
 		}

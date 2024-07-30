@@ -308,3 +308,23 @@ func NewSystemContractsMigration(
 
 	return migration, locations
 }
+
+func SystemContractChangesForChainID(chainID flow.ChainID) (
+	burnerContractChange BurnerContractChange,
+	evmContractChange EVMContractChange,
+) {
+	burnerContractChange = BurnerContractChangeNone
+	evmContractChange = EVMContractChangeNone
+
+	switch chainID {
+	case flow.Emulator:
+		burnerContractChange = BurnerContractChangeDeploy
+		evmContractChange = EVMContractChangeDeployMinimalAndUpdateFull
+
+	case flow.Testnet, flow.Mainnet:
+		burnerContractChange = BurnerContractChangeUpdate
+		evmContractChange = EVMContractChangeUpdateFull
+	}
+
+	return
+}
