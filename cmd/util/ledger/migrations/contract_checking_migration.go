@@ -28,11 +28,13 @@ type AddressContract struct {
 
 // NewContractCheckingMigration returns a migration that checks all contracts.
 // It parses and checks all contract code and stores the programs in the provided map.
+// Important locations is a set of locations that should always succeed to check.
 func NewContractCheckingMigration(
 	log zerolog.Logger,
 	rwf reporters.ReportWriterFactory,
 	chainID flow.ChainID,
 	verboseErrorOutput bool,
+	importantLocations map[common.AddressLocation]struct{},
 	programs map[common.Location]*interpreter.Program,
 ) RegistersMigration {
 	return func(registersByAccount *registers.ByAccount) error {
@@ -124,6 +126,7 @@ func NewContractCheckingMigration(
 				contractsForPrettyPrinting,
 				verboseErrorOutput,
 				reporter,
+				importantLocations,
 				programs,
 			)
 		}
@@ -139,6 +142,7 @@ func checkContract(
 	contractsForPrettyPrinting map[common.Location][]byte,
 	verboseErrorOutput bool,
 	reporter reporters.ReportWriter,
+	importantLocations map[common.AddressLocation]struct{},
 	programs map[common.Location]*interpreter.Program,
 ) {
 	location := contract.location
@@ -164,7 +168,13 @@ func checkContract(
 			errorDetails = err.Error()
 		}
 
-		if verboseErrorOutput {
+		if _, ok := importantLocations[location]; ok {
+			log.Error().Msgf(
+				"error checking important contract %s: %s",
+				location,
+				errorDetails,
+			)
+		} else if verboseErrorOutput {
 			log.Error().Msgf(
 				"error checking contract %s: %s",
 				location,

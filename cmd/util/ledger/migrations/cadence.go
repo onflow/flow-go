@@ -217,6 +217,7 @@ type NamedMigration struct {
 func NewCadence1ValueMigrations(
 	log zerolog.Logger,
 	rwf reporters.ReportWriterFactory,
+	importantLocations map[common.AddressLocation]struct{},
 	opts Options,
 ) (migs []NamedMigration) {
 
@@ -253,6 +254,7 @@ func NewCadence1ValueMigrations(
 				rwf,
 				opts.ChainID,
 				opts.VerboseErrorOutput,
+				importantLocations,
 				programs,
 			),
 		},
@@ -336,7 +338,10 @@ func NewCadence1ContractsMigrations(
 	log zerolog.Logger,
 	rwf reporters.ReportWriterFactory,
 	opts Options,
-) (migs []NamedMigration) {
+) (
+	migs []NamedMigration,
+	importantLocations map[common.AddressLocation]struct{},
+) {
 
 	stagedContractsMigrationOptions := StagedContractsMigrationOptions{
 		ChainID:            opts.ChainID,
@@ -349,7 +354,8 @@ func NewCadence1ContractsMigrations(
 		Burner:                          opts.BurnerContractChange,
 	}
 
-	systemContractsMigration := NewSystemContractsMigration(
+	var systemContractsMigration *StagedContractsMigration
+	systemContractsMigration, importantLocations = NewSystemContractsMigration(
 		log,
 		rwf,
 		systemContractsMigrationOptions,
@@ -417,7 +423,7 @@ func NewCadence1ContractsMigrations(
 		},
 	)
 
-	return migs
+	return migs, importantLocations
 }
 
 var testnetAccountsWithBrokenSlabReferences = func() map[common.Address]struct{} {
@@ -544,13 +550,15 @@ func NewCadence1Migrations(
 		}
 	}
 
+	cadence1ContractsMigrations, importantLocations := NewCadence1ContractsMigrations(
+		log,
+		rwf,
+		opts,
+	)
+
 	migs = append(
 		migs,
-		NewCadence1ContractsMigrations(
-			log,
-			rwf,
-			opts,
-		)...,
+		cadence1ContractsMigrations...,
 	)
 
 	migs = append(
@@ -558,6 +566,7 @@ func NewCadence1Migrations(
 		NewCadence1ValueMigrations(
 			log,
 			rwf,
+			importantLocations,
 			opts,
 		)...,
 	)

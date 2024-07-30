@@ -287,16 +287,24 @@ func NewSystemContractsMigration(
 	log zerolog.Logger,
 	rwf reporters.ReportWriterFactory,
 	options SystemContractsMigrationOptions,
-) *StagedContractsMigration {
-	migration := NewStagedContractsMigration(
+) (
+	migration *StagedContractsMigration,
+	locations map[common.AddressLocation]struct{},
+) {
+	migration = NewStagedContractsMigration(
 		"SystemContractsMigration",
 		"system-contracts-migration",
 		log,
 		rwf,
 		options.StagedContractsMigrationOptions,
 	)
+
+	locations = make(map[common.AddressLocation]struct{})
+
 	for _, change := range SystemContractChanges(options.ChainID, options) {
 		migration.registerContractChange(change)
+		locations[change.AddressLocation()] = struct{}{}
 	}
-	return migration
+
+	return migration, locations
 }
