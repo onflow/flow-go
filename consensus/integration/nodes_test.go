@@ -196,7 +196,7 @@ func createNodes(t *testing.T, participants *ConsensusParticipants, rootSnapshot
 		rootSnapshot.Epochs().Next())
 
 	epochLookup := &mockmodule.EpochLookup{}
-	epochLookup.On("EpochForViewWithFallback", mock.Anything).Return(
+	epochLookup.On("EpochForView", mock.Anything).Return(
 		func(view uint64) uint64 {
 			for _, info := range epochViewLookup {
 				if view <= info.finalView {
@@ -252,7 +252,7 @@ func createRootQC(t *testing.T, root *flow.Block, participantData *run.Participa
 
 // createRootBlockData creates genesis block with first epoch and real data node identities.
 // This function requires all participants to pass DKG process.
-func createRootBlockData(participantData *run.ParticipantData) (*flow.Block, *flow.ExecutionResult, *flow.Seal) {
+func createRootBlockData(t *testing.T, participantData *run.ParticipantData) (*flow.Block, *flow.ExecutionResult, *flow.Seal) {
 	root := unittest.GenesisFixture()
 	consensusParticipants := participantData.Identities()
 
@@ -282,7 +282,11 @@ func createRootBlockData(participantData *run.ParticipantData) (*flow.Block, *fl
 	)
 
 	epochProtocolStateID := inmem.EpochProtocolStateFromServiceEvents(setup, commit).ID()
-	root.SetPayload(flow.Payload{ProtocolStateID: kvstore.NewDefaultKVStore(epochProtocolStateID).ID()})
+	safetyParams, err := protocol.DefaultEpochSafetyParams(root.Header.ChainID)
+	require.NoError(t, err)
+	rootProtocolState, err := kvstore.NewDefaultKVStore(safetyParams.FinalizationSafetyThreshold, safetyParams.EpochExtensionViewCount, epochProtocolStateID)
+	require.NoError(t, err)
+	root.SetPayload(flow.Payload{ProtocolStateID: rootProtocolState.ID()})
 	result := unittest.BootstrapExecutionResultFixture(root, unittest.GenesisStateCommitment)
 	result.ServiceEvents = []flow.ServiceEvent{setup.ServiceEvent(), commit.ServiceEvent()}
 
@@ -344,7 +348,7 @@ func completeConsensusIdentities(t *testing.T, nodeInfos []bootstrap.NodeInfo) *
 // createRootSnapshot creates root block, generates root QC and builds a root snapshot for
 // bootstrapping a node
 func createRootSnapshot(t *testing.T, participantData *run.ParticipantData) *inmem.Snapshot {
-	root, result, seal := createRootBlockData(participantData)
+	root, result, seal := createRootBlockData(t, participantData)
 	rootQC := createRootQC(t, root, participantData)
 
 	rootSnapshot, err := inmem.SnapshotFromBootstrapState(root, result, seal, rootQC)
@@ -466,6 +470,7 @@ func createNode(
 	seals := stdmap.NewIncorporatedResultSeals(sealLimit)
 
 	mutableProtocolState := protocol_state.NewMutableProtocolState(
+		log,
 		protocolStateDB,
 		protocokKVStoreDB,
 		state.Params(),

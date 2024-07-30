@@ -238,7 +238,7 @@ func LogStatus(t *testing.T, ctx context.Context, log zerolog.Logger, client *te
 	sealed := sealingSegment.Sealed()
 	finalized := sealingSegment.Finalized()
 
-	phase, err := snapshot.Phase()
+	phase, err := snapshot.EpochPhase()
 	require.NoError(t, err)
 	epoch := snapshot.Epochs().Current()
 	counter, err := epoch.Counter()

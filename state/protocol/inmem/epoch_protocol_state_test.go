@@ -15,7 +15,7 @@ import (
 )
 
 // TestEpochProtocolStateAdapter tests if the EpochProtocolStateAdapter returns expected values when created
-// using constructor passing a RichEpochProtocolStateEntry.
+// using constructor passing a RichEpochStateEntry.
 func TestEpochProtocolStateAdapter(t *testing.T) {
 	// construct a valid protocol state entry that has semantically correct DKGParticipantKeys
 	entry := unittest.EpochStateFixture(unittest.WithValidDKG())
@@ -72,7 +72,7 @@ func TestEpochProtocolStateAdapter(t *testing.T) {
 		adapter := inmem.NewEpochProtocolStateAdapter(entry, globalParams)
 		assert.Equal(t, flow.EpochPhaseStaking, adapter.EpochPhase())
 		assert.True(t, adapter.PreviousEpochExists())
-		assert.False(t, adapter.InvalidEpochTransitionAttempted())
+		assert.False(t, adapter.EpochFallbackTriggered())
 	})
 	t.Run("epoch-phase-setup", func(t *testing.T) {
 		entry := unittest.EpochStateFixture(unittest.WithNextEpochProtocolState())
@@ -82,24 +82,35 @@ func TestEpochProtocolStateAdapter(t *testing.T) {
 		adapter := inmem.NewEpochProtocolStateAdapter(entry, globalParams)
 		assert.Equal(t, flow.EpochPhaseSetup, adapter.EpochPhase())
 		assert.True(t, adapter.PreviousEpochExists())
-		assert.False(t, adapter.InvalidEpochTransitionAttempted())
+		assert.False(t, adapter.EpochFallbackTriggered())
 	})
 	t.Run("epoch-phase-commit", func(t *testing.T) {
 		entry := unittest.EpochStateFixture(unittest.WithNextEpochProtocolState())
 		adapter := inmem.NewEpochProtocolStateAdapter(entry, globalParams)
 		assert.Equal(t, flow.EpochPhaseCommitted, adapter.EpochPhase())
 		assert.True(t, adapter.PreviousEpochExists())
-		assert.False(t, adapter.InvalidEpochTransitionAttempted())
+		assert.False(t, adapter.EpochFallbackTriggered())
 	})
-	t.Run("invalid-state-transition-attempted", func(t *testing.T) {
-		entry := unittest.EpochStateFixture(func(entry *flow.RichEpochProtocolStateEntry) {
-			entry.InvalidEpochTransitionAttempted = true
+	t.Run("epoch-fallback-triggered", func(t *testing.T) {
+		t.Run("tentatively staking phase", func(t *testing.T) {
+			entry := unittest.EpochStateFixture(func(entry *flow.RichEpochStateEntry) {
+				entry.EpochFallbackTriggered = true
+			})
+			adapter := inmem.NewEpochProtocolStateAdapter(entry, globalParams)
+			assert.True(t, adapter.EpochFallbackTriggered())
+			assert.Equal(t, flow.EpochPhaseFallback, entry.EpochPhase())
 		})
-		adapter := inmem.NewEpochProtocolStateAdapter(entry, globalParams)
-		assert.True(t, adapter.InvalidEpochTransitionAttempted())
+		t.Run("tentatively committed phase", func(t *testing.T) {
+			entry := unittest.EpochStateFixture(unittest.WithNextEpochProtocolState(), func(entry *flow.RichEpochStateEntry) {
+				entry.EpochFallbackTriggered = true
+			})
+			adapter := inmem.NewEpochProtocolStateAdapter(entry, globalParams)
+			assert.True(t, adapter.EpochFallbackTriggered())
+			assert.Equal(t, flow.EpochPhaseCommitted, entry.EpochPhase())
+		})
 	})
 	t.Run("no-previous-epoch", func(t *testing.T) {
-		entry := unittest.EpochStateFixture(func(entry *flow.RichEpochProtocolStateEntry) {
+		entry := unittest.EpochStateFixture(func(entry *flow.RichEpochStateEntry) {
 			entry.PreviousEpoch = nil
 			entry.PreviousEpochSetup = nil
 			entry.PreviousEpochCommit = nil

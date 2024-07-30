@@ -328,6 +328,7 @@ func RunWithFullProtocolStateAndMetricsAndConsumer(t testing.TB, rootSnapshot pr
 		)
 		require.NoError(t, err)
 		mutableProtocolState := protocol_state.NewMutableProtocolState(
+			log,
 			all.EpochProtocolStateEntries,
 			all.ProtocolKVStore,
 			state.Params(),
@@ -417,6 +418,7 @@ func RunWithFullProtocolStateAndMutator(t testing.TB, rootSnapshot protocol.Snap
 		)
 		require.NoError(t, err)
 		mutableProtocolState := protocol_state.NewMutableProtocolState(
+			log,
 			all.EpochProtocolStateEntries,
 			all.ProtocolKVStore,
 			state.Params(),
