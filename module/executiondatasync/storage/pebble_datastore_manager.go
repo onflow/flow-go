@@ -74,5 +74,6 @@ func (p *PebbleDatastoreManager) Close() error {
 // CollectGarbage initiates garbage collection on the datastore
 // to reclaim unused space and optimize performance.
 func (p *PebbleDatastoreManager) CollectGarbage(_ context.Context) error {
+	// In PebbleDB, there's no direct equivalent to manual value log garbage collection
 	return nil
 }
