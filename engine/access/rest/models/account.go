@@ -67,6 +67,7 @@ func (a *AccountKeys) Build(accountKeys []flow.AccountPublicKey) {
 	*a = keys
 }
 
+// Build function use model AccountPublicKeys type for GetAccountKeys call
 func (a *AccountPublicKeys) Build(accountKeys []flow.AccountPublicKey) {
 	keys := make([]AccountPublicKey, len(accountKeys))
 	for i, k := range accountKeys {
