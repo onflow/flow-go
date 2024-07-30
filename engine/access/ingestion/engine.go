@@ -247,11 +247,6 @@ func (e *Engine) processFinalizedBlockJob(ctx irrecoverable.SignalerContext, job
 		ctx.Throw(fmt.Errorf("failed to convert job to block: %w", err))
 	}
 
-	// In case, stop control feature is enabled, the block should be checked before further processing for version compatibility
-	if e.stopControl != nil {
-		e.stopControl.OnProcessedBlock(ctx, block.Header.Height)
-	}
-
 	err = e.processFinalizedBlock(block)
 	if err == nil {
 		done()

@@ -3,6 +3,7 @@ package stop
 import (
 	"fmt"
 
+	"github.com/coreos/go-semver/semver"
 	"github.com/rs/zerolog"
 	"go.uber.org/atomic"
 
@@ -46,29 +47,30 @@ func NewStopControl(
 	return sc
 }
 
+// updateVersionData sets new version data
+func (sc *StopControl) updateVersionData(height uint64, semver string) {
+	sc.incompatibleBlockHeight.Store(height)
+	sc.updatedVersion.Store(semver)
+}
+
 // OnVersionUpdate is called when a version update occurs.
 //
 // It updates the incompatible block height and the expected node version
 // based on the provided height and semver.
-func (sc *StopControl) OnVersionUpdate(height uint64, semver string) {
-	sc.log.Info().
-		Uint64("height", height).
-		Str("semver", semver).
-		Msg("Received version update")
-
-	updateVersionData := func(height uint64, semver string) {
-		sc.incompatibleBlockHeight.Store(height)
-		sc.updatedVersion.Store(semver)
-	}
-
+func (sc *StopControl) OnVersionUpdate(height uint64, version *semver.Version) {
 	// If the version was updated, store new version information
-	if len(semver) > 0 {
-		updateVersionData(height, semver)
+	if version != nil {
+		sc.log.Info().
+			Uint64("height", height).
+			Str("semver", version.String()).
+			Msg("Received version update")
+
+		sc.updateVersionData(height, version.String())
 		return
 	}
 
 	// If semver is 0, but notification was received, this means that the version update was deleted.
-	updateVersionData(0, "")
+	sc.updateVersionData(0, "")
 }
 
 // OnProcessedBlock is called when need to check processed block for compatibility with current node.

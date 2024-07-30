@@ -270,7 +270,7 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 		programCacheSize:                     0,
 		checkPayerBalance:                    false,
 		versionControlEnabled:                true,
-		stopControlEnabled:                   true,
+		stopControlEnabled:                   false,
 	}
 }
 
