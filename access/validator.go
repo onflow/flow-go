@@ -24,7 +24,7 @@ import (
 )
 
 const (
-	invalidTransactionRateLimit = "payer_exceeded_ratelimit"
+	invalidTransactionRateLimit = "payer_exceeded_rate_limit"
 	invalidTransactionByteSize  = "transaction_exceeded_size_limit"
 	incompleteTransaction       = "missing_fields"
 	invalidGasLimit             = "invalid_gas_limit"
