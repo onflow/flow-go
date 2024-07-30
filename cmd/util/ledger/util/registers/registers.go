@@ -348,8 +348,8 @@ func (l ReadOnlyLedger) SetValue(_, _, _ []byte) error {
 	panic("unexpected call of SetValue")
 }
 
-func (l ReadOnlyLedger) AllocateStorageIndex(_ []byte) (atree.StorageIndex, error) {
-	panic("unexpected call of AllocateStorageIndex")
+func (l ReadOnlyLedger) AllocateSlabIndex(_ []byte) (atree.SlabIndex, error) {
+	panic("unexpected call of AllocateSlabIndex")
 }
 
 // ApplyChanges applies the given changes to the given registers,
