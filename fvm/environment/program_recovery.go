@@ -34,7 +34,15 @@ func RecoverProgram(
 		return nil, nil
 	}
 
-	code := fmt.Sprintf(
+	contractName := addressLocation.Name
+
+	code := RecoveredFungibleTokenCode(fungibleTokenAddress, contractName)
+
+	return parser.ParseProgram(memoryGauge, []byte(code), parser.Config{})
+}
+
+func RecoveredFungibleTokenCode(fungibleTokenAddress common.Address, contractName string) string {
+	return fmt.Sprintf(
 		//language=Cadence
 		`
           import FungibleToken from %s
@@ -47,6 +55,16 @@ func RecoverProgram(
 
               init() {
                   self.totalSupply = 0.0
+              }
+
+              access(all)
+              view fun getContractViews(resourceType: Type?): [Type] {
+                  panic("getContractViews is not implemented")
+              }
+
+              access(all)
+              fun resolveContractView(resourceType: Type?, viewType: Type): AnyStruct? {
+                  panic("resolveContractView is not implemented")
               }
 
               access(all)
@@ -78,6 +96,16 @@ func RecoverProgram(
                   fun createEmptyVault(): @{FungibleToken.Vault} {
                       panic("createEmptyVault is not implemented")
                   }
+
+                  access(all)
+                  view fun getViews(): [Type] {
+                      panic("getViews is not implemented")
+                  }
+
+                  access(all)
+                  fun resolveView(_ view: Type): AnyStruct? {
+                      panic("resolveView is not implemented")
+                  }
               }
 
               access(all)
@@ -87,10 +115,8 @@ func RecoverProgram(
           }
         `,
 		fungibleTokenAddress.HexWithPrefix(),
-		addressLocation.Name,
+		contractName,
 	)
-
-	return parser.ParseProgram(memoryGauge, []byte(code), parser.Config{})
 }
 
 func importsAddressLocation(program *ast.Program, address common.Address, name string) bool {
