@@ -78,7 +78,6 @@ import (
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	exedataprovider "github.com/onflow/flow-go/module/executiondatasync/provider"
 	"github.com/onflow/flow-go/module/executiondatasync/pruner"
-	"github.com/onflow/flow-go/module/executiondatasync/tracker"
 	"github.com/onflow/flow-go/module/finalizedreader"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
 	"github.com/onflow/flow-go/module/mempool/queue"
@@ -90,8 +89,8 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
-	storageerr "github.com/onflow/flow-go/storage"
-	storage "github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/storage"
+	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/badger/procedure"
 	storagepebble "github.com/onflow/flow-go/storage/pebble"
 	sutil "github.com/onflow/flow-go/storage/util"
@@ -133,11 +132,11 @@ type ExecutionNode struct {
 	committee              hotstuff.DynamicCommittee
 	ledgerStorage          *ledger.Ledger
 	registerStore          *storehouse.RegisterStore
-	events                 *storage.Events
-	serviceEvents          *storage.ServiceEvents
-	txResults              *storage.TransactionResults
-	results                *storage.ExecutionResults
-	myReceipts             *storage.MyExecutionReceipts
+	events                 *bstorage.Events
+	serviceEvents          *bstorage.ServiceEvents
+	txResults              *bstorage.TransactionResults
+	results                *bstorage.ExecutionResults
+	myReceipts             *bstorage.MyExecutionReceipts
 	providerEngine         exeprovider.ProviderEngine
 	checkerEng             *checker.Engine
 	syncCore               *chainsync.Core
@@ -157,7 +156,7 @@ type ExecutionNode struct {
 	executionDataDatastore *badgerds.Datastore
 	executionDataPruner    *pruner.Pruner
 	executionDataBlobstore blobs.Blobstore
-	executionDataTracker   tracker.Storage
+	executionDataTracker   storage.ExecutionDataTracker
 	blobService            network.BlobService
 	blobserviceDependable  *module.ProxiedReadyDoneAware
 }
@@ -281,7 +280,7 @@ func (exeNode *ExecutionNode) LoadExecutionMetrics(node *NodeConfig) error {
 	err := node.DB.View(procedure.GetHighestExecutedBlock(&height, &blockID))
 	if err != nil {
 		// database has not been bootstrapped yet
-		if errors.Is(err, storageerr.ErrNotFound) {
+		if errors.Is(err, storage.ErrNotFound) {
 			return nil
 		}
 		return fmt.Errorf("could not get highest executed block: %w", err)
@@ -300,8 +299,8 @@ func (exeNode *ExecutionNode) LoadSyncCore(node *NodeConfig) error {
 func (exeNode *ExecutionNode) LoadExecutionReceiptsStorage(
 	node *NodeConfig,
 ) error {
-	exeNode.results = storage.NewExecutionResults(node.Metrics.Cache, node.DB)
-	exeNode.myReceipts = storage.NewMyExecutionReceipts(node.Metrics.Cache, node.DB, node.Storage.Receipts.(*storage.ExecutionReceipts))
+	exeNode.results = bstorage.NewExecutionResults(node.Metrics.Cache, node.DB)
+	exeNode.myReceipts = bstorage.NewMyExecutionReceipts(node.Metrics.Cache, node.DB, node.Storage.Receipts.(*bstorage.ExecutionReceipts))
 	return nil
 }
 
@@ -440,7 +439,7 @@ func (exeNode *ExecutionNode) LoadGCPBlockDataUploader(
 		exeNode.events,
 		exeNode.results,
 		exeNode.txResults,
-		storage.NewComputationResultUploadStatus(node.DB),
+		bstorage.NewComputationResultUploadStatus(node.DB),
 		execution_data.NewDownloader(exeNode.blobService),
 		exeNode.collector)
 	if retryableUploader == nil {
@@ -739,9 +738,9 @@ func (exeNode *ExecutionNode) LoadExecutionState(
 		chunkDataPackDB, node.Storage.Collections, exeNode.exeConf.chunkDataPackCacheSize)
 
 	// Needed for gRPC server, make sure to assign to main scoped vars
-	exeNode.events = storage.NewEvents(node.Metrics.Cache, node.DB)
-	exeNode.serviceEvents = storage.NewServiceEvents(node.Metrics.Cache, node.DB)
-	exeNode.txResults = storage.NewTransactionResults(node.Metrics.Cache, node.DB, exeNode.exeConf.transactionResultsCacheSize)
+	exeNode.events = bstorage.NewEvents(node.Metrics.Cache, node.DB)
+	exeNode.serviceEvents = bstorage.NewServiceEvents(node.Metrics.Cache, node.DB)
+	exeNode.txResults = bstorage.NewTransactionResults(node.Metrics.Cache, node.DB, exeNode.exeConf.transactionResultsCacheSize)
 
 	exeNode.executionState = state.NewExecutionState(
 		exeNode.ledgerStorage,
@@ -946,11 +945,11 @@ func (exeNode *ExecutionNode) LoadExecutionDataPruner(
 	}
 
 	trackerDir := filepath.Join(exeNode.exeConf.executionDataDir, "tracker")
-	exeNode.executionDataTracker, err = storage.NewExecutionDataTracker(
+	exeNode.executionDataTracker, err = bstorage.NewExecutionDataTracker(
 		trackerDir,
 		sealed.Height,
 		node.Logger,
-		storage.WithPruneCallback(func(c cid.Cid) error {
+		bstorage.WithPruneCallback(func(c cid.Cid) error {
 			// TODO: use a proper context here
 			return exeNode.executionDataBlobstore.DeleteBlob(context.TODO(), c)
 		}),

@@ -11,7 +11,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/module/blobs"
-	"github.com/onflow/flow-go/module/executiondatasync/tracker"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
 )
@@ -44,7 +43,7 @@ func TestPrune(t *testing.T) {
 	c3 := randomCid()
 	c4 := randomCid()
 
-	require.NoError(t, executionDataTracker.Update(func(tbf tracker.TrackBlobsFn) error {
+	require.NoError(t, executionDataTracker.Update(func(tbf storage.TrackBlobsFn) error {
 		require.NoError(t, tbf(1, c1, c2))
 		require.NoError(t, tbf(2, c3, c4))
 
@@ -98,7 +97,7 @@ func TestPruneNonLatestHeight(t *testing.T) {
 	c1 := randomCid()
 	c2 := randomCid()
 
-	require.NoError(t, executionDataTracker.Update(func(tbf tracker.TrackBlobsFn) error {
+	require.NoError(t, executionDataTracker.Update(func(tbf storage.TrackBlobsFn) error {
 		require.NoError(t, tbf(1, c1, c2))
 		require.NoError(t, tbf(2, c1, c2))
 
@@ -148,7 +147,7 @@ func TestAscendingOrderOfRecords(t *testing.T) {
 	c2 := randomCid()
 	c3 := randomCid()
 
-	require.NoError(t, executionDataTracker.Update(func(tbf tracker.TrackBlobsFn) error {
+	require.NoError(t, executionDataTracker.Update(func(tbf storage.TrackBlobsFn) error {
 		require.NoError(t, tbf(1, c1))
 		require.NoError(t, tbf(2, c2))
 		// It is important to check if the record with height 256 does not precede

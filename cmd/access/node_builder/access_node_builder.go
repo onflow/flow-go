@@ -73,7 +73,6 @@ import (
 	execdatacache "github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
 	"github.com/onflow/flow-go/module/executiondatasync/pruner"
 	edstorage "github.com/onflow/flow-go/module/executiondatasync/storage"
-	"github.com/onflow/flow-go/module/executiondatasync/tracker"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
 	"github.com/onflow/flow-go/module/grpcserver"
 	"github.com/onflow/flow-go/module/id"
@@ -322,7 +321,7 @@ type FlowAccessNodeBuilder struct {
 	collectionExecutedMetric   module.CollectionExecutedMetric
 	ExecutionDataPruner        *pruner.Pruner
 	ExecutionDatastoreManager  edstorage.DatastoreManager
-	ExecutionDataTracker       tracker.Storage
+	ExecutionDataTracker       storage.ExecutionDataTracker
 	versionControl             *version.VersionControl
 
 	// The sync engine participants provider is the libp2p peer store for the access node

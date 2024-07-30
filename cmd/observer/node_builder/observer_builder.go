@@ -72,7 +72,6 @@ import (
 	execdatacache "github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
 	"github.com/onflow/flow-go/module/executiondatasync/pruner"
 	edstorage "github.com/onflow/flow-go/module/executiondatasync/storage"
-	"github.com/onflow/flow-go/module/executiondatasync/tracker"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
 	"github.com/onflow/flow-go/module/grpcserver"
 	"github.com/onflow/flow-go/module/id"
@@ -287,7 +286,7 @@ type ObserverServiceBuilder struct {
 	ExecutionDataBlobstore    blobs.Blobstore
 	ExecutionDataPruner       *pruner.Pruner
 	ExecutionDatastoreManager edstorage.DatastoreManager
-	ExecutionDataTracker      tracker.Storage
+	ExecutionDataTracker      storage.ExecutionDataTracker
 
 	RegistersAsyncStore *execution.RegistersAsyncStore
 	Reporter            *index.Reporter

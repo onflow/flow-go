@@ -15,8 +15,9 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
-	"github.com/onflow/flow-go/module/executiondatasync/tracker"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/util"
 )
 
 type ProviderOption func(*ExecutionDataProvider)
@@ -37,7 +38,7 @@ type ExecutionDataProvider struct {
 	metrics      module.ExecutionDataProviderMetrics
 	maxBlobSize  int
 	blobService  network.BlobService
-	storage      tracker.Storage
+	storage      storage.ExecutionDataTracker
 	cidsProvider *ExecutionDataCIDProvider
 }
 
@@ -48,11 +49,11 @@ func NewProvider(
 	metrics module.ExecutionDataProviderMetrics,
 	serializer execution_data.Serializer,
 	blobService network.BlobService,
-	storage tracker.Storage,
+	storage storage.ExecutionDataTracker,
 	opts ...ProviderOption,
 ) *ExecutionDataProvider {
 	if storage == nil {
-		storage = &tracker.NoopStorage{}
+		storage = &util.NoopStorage{}
 	}
 
 	p := &ExecutionDataProvider{
@@ -95,7 +96,7 @@ func (p *ExecutionDataProvider) storeBlobs(parent context.Context, blockHeight u
 			p.logger.Debug().Array("cids", cidArr).Uint64("height", blockHeight).Msg("storing blobs")
 		}
 
-		err := p.storage.Update(func(trackBlobs tracker.TrackBlobsFn) error {
+		err := p.storage.Update(func(trackBlobs storage.TrackBlobsFn) error {
 			ctx, cancel := context.WithCancel(parent)
 			defer cancel()
 

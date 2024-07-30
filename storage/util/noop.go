@@ -1,12 +1,16 @@
-package tracker
+package util
 
-import "github.com/ipfs/go-cid"
+import (
+	"github.com/ipfs/go-cid"
+
+	"github.com/onflow/flow-go/storage"
+)
 
 type NoopStorage struct{}
 
-var _ Storage = (*NoopStorage)(nil)
+var _ storage.ExecutionDataTracker = (*NoopStorage)(nil)
 
-func (s *NoopStorage) Update(update UpdateFn) error {
+func (s *NoopStorage) Update(update storage.UpdateFn) error {
 	return update(func(blockHeight uint64, cids ...cid.Cid) error {
 		return nil
 	})

@@ -11,14 +11,13 @@ import (
 	"github.com/ipfs/go-cid"
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/module/executiondatasync/tracker"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/pebble/operation"
 )
 
 type StorageOption func(*ExecutionDataTracker)
 
-var _ tracker.Storage = (*ExecutionDataTracker)(nil)
+var _ storage.ExecutionDataTracker = (*ExecutionDataTracker)(nil)
 
 // The ExecutionDataTracker component tracks the following information:
 //   - the latest pruned height
@@ -38,11 +37,11 @@ type ExecutionDataTracker struct {
 	mu sync.RWMutex
 
 	db            *pebble.DB
-	pruneCallback tracker.PruneCallback
+	pruneCallback storage.PruneCallback
 	logger        zerolog.Logger
 }
 
-func WithPruneCallback(callback tracker.PruneCallback) StorageOption {
+func WithPruneCallback(callback storage.PruneCallback) StorageOption {
 	return func(s *ExecutionDataTracker) {
 		s.pruneCallback = callback
 	}
@@ -122,7 +121,7 @@ func (s *ExecutionDataTracker) bootstrap(startHeight uint64) error {
 	return nil
 }
 
-func (s *ExecutionDataTracker) Update(f tracker.UpdateFn) error {
+func (s *ExecutionDataTracker) Update(f storage.UpdateFn) error {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return f(s.trackBlobs)
@@ -176,7 +175,7 @@ func (s *ExecutionDataTracker) trackBlob(blockHeight uint64, c cid.Cid) error {
 }
 
 func (s *ExecutionDataTracker) trackBlobs(blockHeight uint64, cids ...cid.Cid) error {
-	cidsPerBatch := tracker.CidsPerBatch
+	cidsPerBatch := storage.CidsPerBatch
 
 	for len(cids) > 0 {
 		batchSize := cidsPerBatch
@@ -197,7 +196,7 @@ func (s *ExecutionDataTracker) trackBlobs(blockHeight uint64, cids ...cid.Cid) e
 	return nil
 }
 
-func (s *ExecutionDataTracker) batchDelete(deleteInfos []*tracker.DeleteInfo) error {
+func (s *ExecutionDataTracker) batchDelete(deleteInfos []*storage.DeleteInfo) error {
 	for _, dInfo := range deleteInfos {
 		err := operation.RemoveBlob(dInfo.Height, dInfo.Cid)(s.db)
 		if err != nil {
@@ -218,9 +217,9 @@ func (s *ExecutionDataTracker) batchDelete(deleteInfos []*tracker.DeleteInfo) er
 var ffBytes = bytes.Repeat([]byte{0xFF}, 32)
 
 func (s *ExecutionDataTracker) PruneUpToHeight(height uint64) error {
-	blobRecordPrefix := []byte{tracker.PrefixBlobRecord}
+	blobRecordPrefix := []byte{storage.PrefixBlobRecord}
 	itemsPerBatch := 256
-	var batch []*tracker.DeleteInfo
+	var batch []*storage.DeleteInfo
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -247,7 +246,7 @@ func (s *ExecutionDataTracker) PruneUpToHeight(height uint64) error {
 		for it.SeekGE(blobRecordPrefix); it.Valid(); it.Next() {
 			blobRecordKey := it.Key()
 
-			blockHeight, blobCid, err := tracker.ParseBlobRecordKey(blobRecordKey)
+			blockHeight, blobCid, err := storage.ParseBlobRecordKey(blobRecordKey)
 			if err != nil {
 				return fmt.Errorf("malformed blob record key %v: %w", blobRecordKey, err)
 			}
@@ -257,7 +256,7 @@ func (s *ExecutionDataTracker) PruneUpToHeight(height uint64) error {
 				break
 			}
 
-			dInfo := &tracker.DeleteInfo{
+			dInfo := &storage.DeleteInfo{
 				Cid:    blobCid,
 				Height: blockHeight,
 			}

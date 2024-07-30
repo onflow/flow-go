@@ -1,4 +1,4 @@
-package tracker
+package storage
 
 import (
 	"encoding/binary"
@@ -30,28 +30,28 @@ func ParseBlobRecordKey(key []byte) (uint64, cid.Cid, error) {
 	return blockHeight, c, err
 }
 
-// TrackBlobsFn is passed to the UpdateFn provided to Storage.Update,
+// TrackBlobsFn is passed to the UpdateFn provided to ExecutionDataTracker.Update,
 // and can be called to track a list of cids at a given block height.
 // It returns an error if the update failed.
 type TrackBlobsFn func(blockHeight uint64, cids ...cid.Cid) error
 
-// UpdateFn is implemented by the user and passed to Storage.Update,
+// UpdateFn is implemented by the user and passed to ExecutionDataTracker.Update,
 // which ensures that it will never be run concurrently with any call
-// to Storage.Prune.
-// Any returned error will be returned from the surrounding call to Storage.Update.
-// The function must never make any calls to the Storage interface itself,
+// to ExecutionDataTracker.Prune.
+// Any returned error will be returned from the surrounding call to ExecutionDataTracker.Update.
+// The function must never make any calls to the ExecutionDataTracker interface itself,
 // and should instead only modify the storage via the provided TrackBlobsFn.
 type UpdateFn func(TrackBlobsFn) error
 
 // PruneCallback is a function which can be provided by the user which
 // is called for each CID when the last height at which that CID appears
 // is pruned.
-// Any returned error will be returned from the surrounding call to Storage.Prune.
+// Any returned error will be returned from the surrounding call to ExecutionDataTracker.Prune.
 // The prune callback can be used to delete the corresponding
 // blob data from the blob store.
 type PruneCallback func(cid.Cid) error
 
-type Storage interface {
+type ExecutionDataTracker interface {
 	// Update is used to track new blob CIDs.
 	// It can be used to track blobs for both sealed and unsealed
 	// heights, and the same blob may be added multiple times for
@@ -80,7 +80,7 @@ type Storage interface {
 	// PruneUpToHeight removes all data from storage corresponding
 	// to block heights up to and including the given height,
 	// and updates the latest pruned height value.
-	// It locks the Storage and ensures that no other writes
+	// It locks the ExecutionDataTracker and ensures that no other writes
 	// can occur during the pruning.
 	// It is up to the caller to ensure that this is never
 	// called with a value higher than the fulfilled height.
