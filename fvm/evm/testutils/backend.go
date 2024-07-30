@@ -85,7 +85,7 @@ func GetSimpleValueStore() *TestValueStore {
 			bytesRead += len(fk) + len(value)
 			return len(value) > 0, nil
 		},
-		AllocateStorageIndexFunc: func(owner []byte) (atree.StorageIndex, error) {
+		AllocateSlabIndexFunc: func(owner []byte) (atree.SlabIndex, error) {
 			index := allocator[string(owner)]
 			// TODO: figure out why it result in a collision
 			if index == 0 {
@@ -96,7 +96,7 @@ func GetSimpleValueStore() *TestValueStore {
 			binary.BigEndian.PutUint64(data[:], index)
 			bytesRead += len(owner) + 8
 			bytesWritten += len(owner) + 8
-			return atree.StorageIndex(data), nil
+			return atree.SlabIndex(data), nil
 		},
 		TotalStorageSizeFunc: func() int {
 			size := 0
@@ -218,15 +218,15 @@ func (tb *TestBackend) Get(id flow.RegisterID) (flow.RegisterValue, error) {
 }
 
 type TestValueStore struct {
-	GetValueFunc             func(owner, key []byte) ([]byte, error)
-	SetValueFunc             func(owner, key, value []byte) error
-	ValueExistsFunc          func(owner, key []byte) (bool, error)
-	AllocateStorageIndexFunc func(owner []byte) (atree.StorageIndex, error)
-	TotalStorageSizeFunc     func() int
-	TotalBytesReadFunc       func() int
-	TotalBytesWrittenFunc    func() int
-	TotalStorageItemsFunc    func() int
-	ResetStatsFunc           func()
+	GetValueFunc          func(owner, key []byte) ([]byte, error)
+	SetValueFunc          func(owner, key, value []byte) error
+	ValueExistsFunc       func(owner, key []byte) (bool, error)
+	AllocateSlabIndexFunc func(owner []byte) (atree.SlabIndex, error)
+	TotalStorageSizeFunc  func() int
+	TotalBytesReadFunc    func() int
+	TotalBytesWrittenFunc func() int
+	TotalStorageItemsFunc func() int
+	ResetStatsFunc        func()
 }
 
 var _ environment.ValueStore = &TestValueStore{}
@@ -252,11 +252,11 @@ func (vs *TestValueStore) ValueExists(owner, key []byte) (bool, error) {
 	return vs.ValueExistsFunc(owner, key)
 }
 
-func (vs *TestValueStore) AllocateStorageIndex(owner []byte) (atree.StorageIndex, error) {
-	if vs.AllocateStorageIndexFunc == nil {
+func (vs *TestValueStore) AllocateSlabIndex(owner []byte) (atree.SlabIndex, error) {
+	if vs.AllocateSlabIndexFunc == nil {
 		panic("method not set")
 	}
-	return vs.AllocateStorageIndexFunc(owner)
+	return vs.AllocateSlabIndexFunc(owner)
 }
 
 func (vs *TestValueStore) TotalBytesRead() int {

@@ -112,14 +112,14 @@ func TestFixSlabsWithBrokenReferences(t *testing.T) {
 
 	fixedSlabWithBrokenReferences := ledger.NewPayload(
 		ledger.NewKey([]ledger.KeyPart{ownerKey, {Type: 2, Value: slabIndexWithBrokenReferences}}),
-		mustDecodeHex("008883d8d982d8d582d8c0824848602d8056ff9d937046616e546f705065726d697373696f6e7546616e546f705065726d697373696f6e2e526f6c65d8ddf6001b535c9de83a38cab0008883005b00000000000000009b0000000000000000"),
+		ledger.Value(mustDecodeHex("108883d8d982d8d582d8c0824848602d8056ff9d937046616e546f705065726d697373696f6e7546616e546f705065726d697373696f6e2e526f6c65d8ddf6001b535c9de83a38cab08300590000990000")),
 	)
 
 	// Account status register is updated to include address ID counter and new storage used.
 	accountStatusRegisterID := mustDecodeHex("612e73")
 	updatedAccountStatusRegister := ledger.NewPayload(
 		ledger.NewKey([]ledger.KeyPart{ownerKey, {Type: 2, Value: accountStatusRegisterID}}),
-		[]byte{0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x7, 0xc8, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x9, 0x0, 0x0, 0x0, 0x1, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+		[]byte{0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x7, 0xba, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x9, 0x0, 0x0, 0x0, 0x1, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
 	)
 
 	expectedNewPayloads := make([]*ledger.Payload, len(oldPayloads))
