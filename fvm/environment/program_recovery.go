@@ -138,15 +138,15 @@ func isNominalType(ty ast.Type, name string) bool {
 		nominalType.Identifier.Identifier == name
 }
 
+const fungibleTokenTypeIdentifier = "FungibleToken"
 const fungibleTokenTypeTotalSupplyFieldName = "totalSupply"
-const fungibleTokenVaultTypeBalanceFieldName = "balance"
 const fungibleTokenVaultTypeIdentifier = "Vault"
+const fungibleTokenVaultTypeBalanceFieldName = "balance"
 
 func isFungibleTokenContract(program *ast.Program, fungibleTokenAddress common.Address) bool {
-	const contractName = "FungibleToken"
 
 	// Check if the contract imports the FungibleToken contract
-	if !importsAddressLocation(program, fungibleTokenAddress, contractName) {
+	if !importsAddressLocation(program, fungibleTokenAddress, fungibleTokenTypeIdentifier) {
 		return false
 	}
 
@@ -156,7 +156,7 @@ func isFungibleTokenContract(program *ast.Program, fungibleTokenAddress common.A
 	}
 
 	// Check if the contract implements the FungibleToken interface
-	if !declaresConformanceTo(contractDeclaration, contractName) {
+	if !declaresConformanceTo(contractDeclaration, fungibleTokenTypeIdentifier) {
 		return false
 	}
 
