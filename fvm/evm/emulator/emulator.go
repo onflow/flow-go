@@ -638,7 +638,7 @@ func (proc *procedure) run(
 	)
 	var transitionError error
 	var execResult *gethCore.ExecutionResult
-	panicErr := handlePanic(func() {
+	panicErr := handleEVMPanic(func() {
 		execResult, transitionError = st.TransitionDb()
 	}, proc.logger)
 
@@ -720,7 +720,7 @@ func convertAndCheckValue(input *big.Int) (isValid bool, converted *uint256.Int)
 	return true, value
 }
 
-func handlePanic(f func(), logger zerolog.Logger) error {
+func handleEVMPanic(f func(), logger zerolog.Logger) error {
 	var panicErr error
 	defer func() {
 		if r := recover(); r != nil {
