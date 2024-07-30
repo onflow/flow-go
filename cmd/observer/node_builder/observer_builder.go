@@ -161,6 +161,7 @@ type ObserverServiceConfig struct {
 	executionDataDBMode                  string
 	executionDataPrunerHeightRangeTarget uint64
 	executionDataPrunerThreshold         uint64
+	executionDataPruningInterval         time.Duration
 	localServiceAPIEnabled               bool
 	versionControlEnabled                bool
 	executionDataDir                     string
@@ -234,7 +235,8 @@ func DefaultObserverServiceConfig() *ObserverServiceConfig {
 		executionDataIndexingEnabled:         false,
 		executionDataDBMode:                  execution_data.ExecutionDataDBModeBadger.String(),
 		executionDataPrunerHeightRangeTarget: 0,
-		executionDataPrunerThreshold:         100_000,
+		executionDataPrunerThreshold:         pruner.DefaultThreshold,
+		executionDataPruningInterval:         pruner.DefaultPruningInterval,
 		localServiceAPIEnabled:               false,
 		versionControlEnabled:                true,
 		executionDataDir:                     filepath.Join(homedir, ".flow", "execution_data"),
@@ -696,6 +698,10 @@ func (builder *ObserverServiceBuilder) extraFlags() {
 			"execution-data-height-range-threshold",
 			defaultConfig.executionDataPrunerThreshold,
 			"number of unpruned blocks of Execution Data beyond the height range target to allow before pruning")
+		flags.DurationVar(&builder.executionDataPruningInterval,
+			"execution-data-pruning-interval",
+			defaultConfig.executionDataPruningInterval,
+			"duration after which the pruner tries to prune execution data. The default value is 10 minutes")
 
 		// ExecutionDataRequester config
 		flags.BoolVar(&builder.executionDataSyncEnabled,
@@ -1113,6 +1119,8 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 	requesterDependable := module.NewProxiedReadyDoneAware()
 	builder.IndexerDependencies.Add(requesterDependable)
 
+	executionDataPrunerEnabled := builder.executionDataPrunerHeightRangeTarget != 0
+
 	builder.
 		AdminCommand("read-execution-data", func(config *cmd.NodeConfig) commands.AdminCommand {
 			return stateSyncCommands.NewReadExecutionDataCommand(builder.ExecutionDataStore)
@@ -1224,7 +1232,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 
 			var downloaderOpts []execution_data.DownloaderOption
 
-			if builder.executionDataPrunerHeightRangeTarget != 0 {
+			if executionDataPrunerEnabled {
 				sealed, err := node.State.Sealed().Head()
 				if err != nil {
 					return nil, fmt.Errorf("cannot get the sealed block: %w", err)
@@ -1335,25 +1343,9 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 			return builder.ExecutionDataRequester, nil
 		}).
 		Component("execution data pruner", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			if builder.executionDataPrunerHeightRangeTarget == 0 {
+			if !executionDataPrunerEnabled {
 				return &module.NoopReadyDoneAware{}, nil
 			}
-
-			execDataDistributor.AddOnExecutionDataReceivedConsumer(func(data *execution_data.BlockExecutionDataEntity) {
-				header, err := node.Storage.Headers.ByBlockID(data.BlockID)
-				if err != nil {
-					node.Logger.Fatal().Err(err).Msg("failed to get header for execution data")
-				}
-
-				if builder.ExecutionDataPruner != nil {
-					err = builder.ExecutionDataTracker.SetFulfilledHeight(header.Height)
-					if err != nil {
-						node.Logger.Fatal().Err(err).Msg("failed to set fulfilled height")
-					}
-
-					builder.ExecutionDataPruner.NotifyFulfilledHeight(header.Height)
-				}
-			})
 
 			var prunerMetrics module.ExecutionDataPrunerMetrics = metrics.NewNoopCollector()
 			if node.MetricsEnabled {
@@ -1370,10 +1362,13 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				}),
 				pruner.WithHeightRangeTarget(builder.executionDataPrunerHeightRangeTarget),
 				pruner.WithThreshold(builder.executionDataPrunerThreshold),
+				pruner.WithPruningInterval(builder.executionDataPruningInterval),
 			)
 			if err != nil {
 				return nil, fmt.Errorf("failed to create execution data pruner: %w", err)
 			}
+
+			builder.ExecutionDataPruner.RegisterHeightRecorder(builder.ExecutionDataDownloader)
 
 			return builder.ExecutionDataPruner, nil
 		})
@@ -1502,6 +1497,10 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 			)
 			if err != nil {
 				return nil, err
+			}
+
+			if executionDataPrunerEnabled {
+				builder.ExecutionDataPruner.RegisterHeightRecorder(builder.ExecutionIndexer)
 			}
 
 			// setup requester to notify indexer when new execution data is received

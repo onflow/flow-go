@@ -132,24 +132,24 @@ func (_m *Environment) AddAccountKey(address common.Address, publicKey *stdlib.P
 	return r0, r1
 }
 
-// AllocateStorageIndex provides a mock function with given fields: owner
-func (_m *Environment) AllocateStorageIndex(owner []byte) (atree.StorageIndex, error) {
+// AllocateSlabIndex provides a mock function with given fields: owner
+func (_m *Environment) AllocateSlabIndex(owner []byte) (atree.SlabIndex, error) {
 	ret := _m.Called(owner)
 
 	if len(ret) == 0 {
-		panic("no return value specified for AllocateStorageIndex")
+		panic("no return value specified for AllocateSlabIndex")
 	}
 
-	var r0 atree.StorageIndex
+	var r0 atree.SlabIndex
 	var r1 error
-	if rf, ok := ret.Get(0).(func([]byte) (atree.StorageIndex, error)); ok {
+	if rf, ok := ret.Get(0).(func([]byte) (atree.SlabIndex, error)); ok {
 		return rf(owner)
 	}
-	if rf, ok := ret.Get(0).(func([]byte) atree.StorageIndex); ok {
+	if rf, ok := ret.Get(0).(func([]byte) atree.SlabIndex); ok {
 		r0 = rf(owner)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(atree.StorageIndex)
+			r0 = ret.Get(0).(atree.SlabIndex)
 		}
 	}
 
@@ -1404,6 +1404,36 @@ func (_m *Environment) ReadRandom(_a0 []byte) error {
 // RecordTrace provides a mock function with given fields: operation, location, duration, attrs
 func (_m *Environment) RecordTrace(operation string, location common.Location, duration time.Duration, attrs []attribute.KeyValue) {
 	_m.Called(operation, location, duration, attrs)
+}
+
+// RecoverProgram provides a mock function with given fields: program, location
+func (_m *Environment) RecoverProgram(program *ast.Program, location common.Location) (*ast.Program, error) {
+	ret := _m.Called(program, location)
+
+	if len(ret) == 0 {
+		panic("no return value specified for RecoverProgram")
+	}
+
+	var r0 *ast.Program
+	var r1 error
+	if rf, ok := ret.Get(0).(func(*ast.Program, common.Location) (*ast.Program, error)); ok {
+		return rf(program, location)
+	}
+	if rf, ok := ret.Get(0).(func(*ast.Program, common.Location) *ast.Program); ok {
+		r0 = rf(program, location)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*ast.Program)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(*ast.Program, common.Location) error); ok {
+		r1 = rf(program, location)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
 
 // RemoveAccountContractCode provides a mock function with given fields: location

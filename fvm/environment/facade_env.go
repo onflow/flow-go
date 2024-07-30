@@ -3,6 +3,7 @@ package environment
 import (
 	"context"
 
+	"github.com/onflow/cadence/runtime/ast"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
 
@@ -315,19 +316,27 @@ func (env *facadeEnvironment) Reset() {
 	env.Programs.Reset()
 }
 
-// Miscellaneous cadence runtime.Interface API.
-func (facadeEnvironment) ResourceOwnerChanged(
+// Miscellaneous Cadence runtime.Interface API
+
+func (*facadeEnvironment) ResourceOwnerChanged(
 	*interpreter.Interpreter,
 	*interpreter.CompositeValue,
 	common.Address,
 	common.Address,
 ) {
-}
-
-func (env *facadeEnvironment) SetInterpreterSharedState(state *interpreter.SharedState) {
 	// NO-OP
 }
 
-func (env *facadeEnvironment) GetInterpreterSharedState() *interpreter.SharedState {
+func (*facadeEnvironment) SetInterpreterSharedState(_ *interpreter.SharedState) {
+	// NO-OP
+}
+
+func (*facadeEnvironment) GetInterpreterSharedState() *interpreter.SharedState {
+	// NO-OP
 	return nil
+}
+
+func (env *facadeEnvironment) RecoverProgram(_ *ast.Program, _ common.Location) (*ast.Program, error) {
+	// NO-OP
+	return nil, nil
 }
