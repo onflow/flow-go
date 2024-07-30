@@ -193,7 +193,7 @@ func (s *ScriptExecutor) checkHeight(height uint64) error {
 	if s.versionControl != nil {
 		compatible, err := s.versionControl.CompatibleAtBlock(height)
 		if err != nil {
-			return fmt.Errorf("version is incompatible on block height %d, reason: %w", height, err)
+			return fmt.Errorf("failed to check compatibility with block height %d: %w", height, err)
 		}
 
 		if !compatible {
