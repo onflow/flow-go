@@ -66,6 +66,29 @@ func (_m *Downloader) Get(ctx context.Context, rootID flow.Identifier) (*executi
 	return r0, r1
 }
 
+// HighestCompleteHeight provides a mock function with given fields:
+func (_m *Downloader) HighestCompleteHeight() uint64 {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for HighestCompleteHeight")
+	}
+
+	var r0 uint64
+	if rf, ok := ret.Get(0).(func() uint64); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(uint64)
+	}
+
+	return r0
+}
+
+// OnBlockProcessed provides a mock function with given fields: _a0
+func (_m *Downloader) OnBlockProcessed(_a0 uint64) {
+	_m.Called(_a0)
+}
+
 // Ready provides a mock function with given fields:
 func (_m *Downloader) Ready() <-chan struct{} {
 	ret := _m.Called()
