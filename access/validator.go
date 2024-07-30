@@ -24,16 +24,16 @@ import (
 )
 
 const (
-	InvalidTransactionRateLimit = "invalid transaction rate limit"
-	InvalidTransactionByteSize  = "invalid transaction byte size"
-	IncompleteTransaction       = "incomplete transaction"
-	InvalidGasLimit             = "invalid gas limit"
-	ExpiredTransaction          = "expired transaction"
-	InvalidScript               = "invalid script"
-	InvalidAddresses            = "invalid address"
-	InvalidSignature            = "invalid signature"
-	DuplicatedSignature         = "duplicated signature"
-	InsufficientBalance         = "insufficient balance"
+	InvalidTransactionRateLimit = "payer_exceeded_ratelimit"
+	InvalidTransactionByteSize  = "transaction_exceeded_size_limit"
+	IncompleteTransaction       = "missing_fields"
+	InvalidGasLimit             = "invalid_gas_limit"
+	ExpiredTransaction          = "transaction_expired"
+	InvalidScript               = "invalid_script"
+	InvalidAddresses            = "invalid_address"
+	InvalidSignature            = "invalid_signature"
+	DuplicatedSignature         = "duplicate_signature"
+	InsufficientBalance         = "payer_insufficient_balance"
 )
 
 type Blocks interface {
