@@ -1,16 +1,11 @@
 package handler
 
 import (
-	"fmt"
 	"math/big"
-	goRuntime "runtime"
-	runtimeDebug "runtime/debug"
 
 	"github.com/onflow/cadence/runtime/common"
-	cadenceErrors "github.com/onflow/cadence/runtime/errors"
 	gethCommon "github.com/onflow/go-ethereum/common"
 	gethTypes "github.com/onflow/go-ethereum/core/types"
-	"github.com/rs/zerolog"
 	"go.opentelemetry.io/otel/attribute"
 
 	"github.com/onflow/flow-go/fvm/environment"
@@ -875,28 +870,4 @@ func panicOnError(err error) {
 
 	// any other returned errors are non-fatal errors
 	panic(fvmErrors.NewEVMError(err))
-}
-
-func wrapExternalPanic(f func(), logger zerolog.Logger) {
-	defer func() {
-		if r := recover(); r != nil {
-			// capture and log stack traces
-			switch r := r.(type) {
-			case goRuntime.Error:
-				msg := fmt.Sprintf("panic during evm operation: %v", runtimeDebug.Stack())
-				logger.Err(r).Msg(msg)
-				// wrap it with Cadence external error
-				// this stops the execution node ?
-				panic(cadenceErrors.NewExternalError(r))
-			case error:
-				msg := fmt.Sprintf("panic during evm operation: %v", runtimeDebug.Stack())
-				logger.Err(r).Msg(msg)
-				panic(r)
-			default:
-				panic(r)
-			}
-		}
-
-	}()
-	f()
 }

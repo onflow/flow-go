@@ -8,6 +8,7 @@ import (
 
 	"github.com/onflow/atree"
 	gethABI "github.com/onflow/go-ethereum/accounts/abi"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm/evm/emulator"
@@ -59,7 +60,7 @@ func RunWithDeployedContract(t testing.TB, tc *TestContract, led atree.Ledger, f
 
 func DeployContract(t testing.TB, caller types.Address, tc *TestContract, led atree.Ledger, flowEVMRootAddress flow.Address) {
 	// deploy contract
-	e := emulator.NewEmulator(led, flowEVMRootAddress)
+	e := emulator.NewEmulator(zerolog.Nop(), led, flowEVMRootAddress)
 
 	ctx := types.NewDefaultBlockContext(2)
 

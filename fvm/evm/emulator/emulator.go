@@ -2,7 +2,10 @@ package emulator
 
 import (
 	"errors"
+	"fmt"
 	"math/big"
+	goRuntime "runtime"
+	goRuntimeDebug "runtime/debug"
 
 	"github.com/holiman/uint256"
 	"github.com/onflow/atree"
@@ -13,6 +16,7 @@ import (
 	gethVM "github.com/onflow/go-ethereum/core/vm"
 	gethCrypto "github.com/onflow/go-ethereum/crypto"
 	gethParams "github.com/onflow/go-ethereum/params"
+	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/fvm/evm/emulator/state"
 	"github.com/onflow/flow-go/fvm/evm/types"
@@ -22,6 +26,7 @@ import (
 // Emulator wraps an EVM runtime where evm transactions
 // and direct calls are accepted.
 type Emulator struct {
+	logger   zerolog.Logger
 	rootAddr flow.Address
 	ledger   atree.Ledger
 }
@@ -30,10 +35,12 @@ var _ types.Emulator = &Emulator{}
 
 // NewEmulator constructs a new EVM Emulator
 func NewEmulator(
+	logger zerolog.Logger,
 	ledger atree.Ledger,
 	rootAddr flow.Address,
 ) *Emulator {
 	return &Emulator{
+		logger:   logger,
 		rootAddr: rootAddr,
 		ledger:   ledger,
 	}
@@ -69,6 +76,7 @@ func (em *Emulator) NewBlockView(ctx types.BlockContext) (types.BlockView, error
 		config:   newConfig(ctx),
 		rootAddr: em.rootAddr,
 		ledger:   em.ledger,
+		logger:   em.logger,
 	}, nil
 }
 
@@ -105,6 +113,7 @@ type BlockView struct {
 	config   *Config
 	rootAddr flow.Address
 	ledger   atree.Ledger
+	logger   zerolog.Logger
 }
 
 // DirectCall executes a direct call
@@ -319,7 +328,8 @@ func (bl *BlockView) newProcedure() (*procedure, error) {
 			cfg.ChainConfig,
 			cfg.EVMConfig,
 		),
-		state: execState,
+		state:  execState,
+		logger: bl.logger,
 	}, nil
 }
 
@@ -327,6 +337,7 @@ type procedure struct {
 	config *Config
 	evm    *gethVM.EVM
 	state  types.StateDB
+	logger zerolog.Logger
 }
 
 // commit commits the changes to the state (with optional finalization)
@@ -620,20 +631,33 @@ func (proc *procedure) run(
 	// we need to update this code.
 	gasPool := (*gethCore.GasPool)(&proc.config.BlockContext.GasLimit)
 	// transit the state
-	execResult, err := gethCore.NewStateTransition(
+	st := gethCore.NewStateTransition(
 		proc.evm,
 		msg,
 		gasPool,
-	).TransitionDb()
-	if err != nil {
+	)
+	var transitionError error
+	var execResult *gethCore.ExecutionResult
+	panicErr := handlePanic(func() {
+		execResult, transitionError = st.TransitionDb()
+	}, proc.logger)
+
+	if panicErr != nil {
+		res.SetValidationError(types.ErrUnsuccessfulStateTransition)
+		return &res, nil
+	}
+
+	if transitionError != nil {
 		// if the error is a fatal error or a non-fatal state error or a backend err return it
 		// this condition should never happen given all StateDB errors are withheld for the commit time.
-		if types.IsAFatalError(err) || types.IsAStateError(err) || types.IsABackendError(err) {
-			return nil, err
+		if types.IsAFatalError(transitionError) ||
+			types.IsAStateError(transitionError) ||
+			types.IsABackendError(transitionError) {
+			return nil, transitionError
 		}
 		// otherwise is a validation error (pre-check failure)
 		// no state change, wrap the error and return
-		res.SetValidationError(err)
+		res.SetValidationError(transitionError)
 		return &res, nil
 	}
 
@@ -694,4 +718,23 @@ func convertAndCheckValue(input *big.Int) (isValid bool, converted *uint256.Int)
 		return true, nil
 	}
 	return true, value
+}
+
+func handlePanic(f func(), logger zerolog.Logger) error {
+	var panicErr error
+	defer func() {
+		if r := recover(); r != nil {
+			switch r := r.(type) {
+			case goRuntime.Error, error:
+				// capture and log stack traces
+				msg := fmt.Sprintf("panic during evm operation: %v", goRuntimeDebug.Stack())
+				panicErr = r.(error)
+				logger.Err(panicErr).Msg(msg)
+			default:
+				panic(r)
+			}
+		}
+	}()
+	f()
+	return panicErr
 }

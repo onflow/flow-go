@@ -11,6 +11,7 @@ import (
 	gethCommon "github.com/onflow/go-ethereum/common"
 	gethTypes "github.com/onflow/go-ethereum/core/types"
 	gethCrypto "github.com/onflow/go-ethereum/crypto"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/atree"
@@ -129,7 +130,7 @@ func FundAndGetEOATestAccount(t testing.TB, led atree.Ledger, flowEVMRootAddress
 	account := GetTestEOAAccount(t, EOATestAccount1KeyHex)
 
 	// fund account
-	e := emulator.NewEmulator(led, flowEVMRootAddress)
+	e := emulator.NewEmulator(zerolog.Nop(), led, flowEVMRootAddress)
 
 	blk, err := e.NewBlockView(types.NewDefaultBlockContext(2))
 	require.NoError(t, err)

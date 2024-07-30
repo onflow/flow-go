@@ -29,7 +29,7 @@ var blockNumber = big.NewInt(10)
 var defaultCtx = types.NewDefaultBlockContext(blockNumber.Uint64())
 
 func RunWithNewEmulator(t testing.TB, backend *testutils.TestBackend, rootAddr flow.Address, f func(*emulator.Emulator)) {
-	env := emulator.NewEmulator(backend, rootAddr)
+	env := emulator.NewEmulator(zerolog.Nop(), backend, rootAddr)
 	f(env)
 }
 
@@ -732,7 +732,7 @@ func TestStorageNoSideEffect(t *testing.T) {
 	testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
 		testutils.RunWithTestFlowEVMRootAddress(t, backend, func(flowEVMRoot flow.Address) {
 			var err error
-			em := emulator.NewEmulator(backend, flowEVMRoot)
+			em := emulator.NewEmulator(zerolog.Nop(), backend, flowEVMRoot)
 			testAccount := types.NewAddressFromString("test")
 			bridgeAccount := types.NewAddressFromString("bridge")
 
