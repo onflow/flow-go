@@ -36,7 +36,7 @@ import (
 // fails to be committed by the `EpochCommitSafetyThreshold`, then we enter Epoch Fallback Mode [EFM].
 // Depending on whether the subsequent epoch has already been committed, the EFM progress differs slightly.
 // In a nutshell, we always enter the _latest_ epoch already committed on the happy path (if there is any)
-// and the follow the fallback protocol.
+// and then follow the fallback protocol.
 //
 // SCENARIO A: the future Epoch N is already committed, when we enter EFM
 //
