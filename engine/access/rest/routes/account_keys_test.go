@@ -2,6 +2,8 @@ package routes
 
 import (
 	"fmt"
+	"github.com/onflow/crypto"
+	"github.com/onflow/crypto/hash"
 	"math"
 	"net/http"
 	"net/url"
@@ -230,7 +232,7 @@ func TestGetAccountKeys(t *testing.T) {
 	backend := mock.NewAPI(t)
 
 	t.Run("get keys by address at latest sealed block", func(t *testing.T) {
-		account := accountFixture(t)
+		account := accountWithKeysFixture(t)
 		var height uint64 = 100
 		block := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(height))
 
@@ -251,7 +253,7 @@ func TestGetAccountKeys(t *testing.T) {
 	})
 
 	t.Run("get keys by address at latest finalized block", func(t *testing.T) {
-		account := accountFixture(t)
+		account := accountWithKeysFixture(t)
 		var height uint64 = 100
 		block := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(height))
 
@@ -273,7 +275,7 @@ func TestGetAccountKeys(t *testing.T) {
 
 	t.Run("get keys by address at height", func(t *testing.T) {
 		var height uint64 = 1337
-		account := accountFixture(t)
+		account := accountWithKeysFixture(t)
 		req := getAccountKeysRequest(t, account, "1337")
 
 		backend.Mock.
@@ -288,7 +290,7 @@ func TestGetAccountKeys(t *testing.T) {
 
 	t.Run("get keys by address at missing block", func(t *testing.T) {
 		backend := mock.NewAPI(t)
-		account := accountFixture(t)
+		account := accountWithKeysFixture(t)
 		const finalHeight uint64 = math.MaxUint64 - 2
 
 		req := getAccountKeysRequest(t, account, finalHeightQueryParam)
@@ -429,10 +431,20 @@ func expectedAccountKeysResponse(account *flow.Account) string {
 					 "sequence_number":"0",
 					 "weight":"1000",
 					 "revoked":false
+				  },
+				  {
+					 "index":"0",
+					 "public_key":"%s",
+					 "signing_algorithm":"ECDSA_P256",
+					 "hashing_algorithm":"SHA3_256",
+					 "sequence_number":"0",
+					 "weight":"500",
+					 "revoked":false
 				  }
 			  ]
         }`,
 		account.Keys[0].PublicKey.String(),
+		account.Keys[1].PublicKey.String(),
 	)
 }
 
@@ -443,4 +455,16 @@ func findAccountKeyByIndex(keys []flow.AccountPublicKey, keyIndex uint32) *flow.
 		}
 	}
 	return &flow.AccountPublicKey{}
+}
+
+func accountWithKeysFixture(t *testing.T) *flow.Account {
+	account, err := unittest.AccountFixture()
+
+	key2, err := unittest.AccountKeyFixture(128, crypto.ECDSAP256, hash.SHA3_256)
+	require.NoError(t, err)
+
+	account.Keys = append(account.Keys, key2.PublicKey(500))
+
+	require.NoError(t, err)
+	return account
 }
