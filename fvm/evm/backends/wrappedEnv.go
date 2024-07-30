@@ -48,9 +48,9 @@ func (we *WrappedEnvironment) ValueExists(owner, key []byte) (bool, error) {
 	return b, handleEnvironmentError(err)
 }
 
-// AllocateStorageIndex allocates an storage index under the given account.
-func (we *WrappedEnvironment) AllocateStorageIndex(owner []byte) (atree.StorageIndex, error) {
-	index, err := we.env.AllocateStorageIndex(owner)
+// AllocateSlabIndex allocates a slab index under the given account.
+func (we *WrappedEnvironment) AllocateSlabIndex(owner []byte) (atree.SlabIndex, error) {
+	index, err := we.env.AllocateSlabIndex(owner)
 	return index, handleEnvironmentError(err)
 }
 
