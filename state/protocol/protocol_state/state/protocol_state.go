@@ -99,7 +99,7 @@ func NewMutableProtocolState(
 	commits storage.EpochCommits,
 ) *MutableProtocolState {
 	log = log.With().Str("module", "dynamic_protocol_state").Logger()
-	epochhappyPathTelemetryFactory := func(candidateView uint64) protocol_state.StateMachineTelemetryConsumer {
+	epochHappyPathTelemetryFactory := func(candidateView uint64) protocol_state.StateMachineTelemetryConsumer {
 		return pubsub.NewLogConsumer(
 			log.With().
 				Str("state_machine", "epoch_happy_path").
@@ -107,7 +107,7 @@ func NewMutableProtocolState(
 				Logger(),
 		)
 	}
-	epochfallbackTelemetryFactory := func(candidateView uint64) protocol_state.StateMachineTelemetryConsumer {
+	epochFallbackTelemetryFactory := func(candidateView uint64) protocol_state.StateMachineTelemetryConsumer {
 		return pubsub.NewLogConsumer(
 			log.With().
 				Str("state_machine", "epoch_fallback_path").
@@ -116,15 +116,15 @@ func NewMutableProtocolState(
 		)
 	}
 
-	// TODO(EFM, #6020): inject consumers into other state machine factories.
+	psVersionUpgradeStateMachineTelemetry := pubsub.NewLogConsumer(log.With().Str("state_machine", "version_upgrade").Logger())
 	setKVStoreValueTelemetry := pubsub.NewLogConsumer(log.With().Str("state_machine", "set_kvstore_value").Logger())
 
 	// an ordered list of factories to create state machines for different sub-states of the Dynamic Protocol State.
 	// all factories are expected to be called in order defined here.
 	kvStateMachineFactories := []protocol_state.KeyValueStoreStateMachineFactory{
-		kvstore.NewPSVersionUpgradeStateMachineFactory(),
+		kvstore.NewPSVersionUpgradeStateMachineFactory(psVersionUpgradeStateMachineTelemetry),
 		epochs.NewEpochStateMachineFactory(setups, commits, epochProtocolStateDB,
-			epochhappyPathTelemetryFactory, epochfallbackTelemetryFactory),
+			epochHappyPathTelemetryFactory, epochFallbackTelemetryFactory),
 		kvstore.NewSetValueKVStoreStateMachineFactory(setKVStoreValueTelemetry),
 	}
 	return newMutableProtocolState(epochProtocolStateDB, kvstore.NewProtocolKVStore(kvStoreSnapshots), globalParams, headers, results, kvStateMachineFactories)

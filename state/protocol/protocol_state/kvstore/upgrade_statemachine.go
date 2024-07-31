@@ -17,6 +17,7 @@ import (
 // A separate instance should be created for each block to process the updates therein.
 type PSVersionUpgradeStateMachine struct {
 	helper.BaseKeyValueStoreStateMachine
+	telemetry protocol_state.StateMachineTelemetryConsumer
 }
 
 var _ protocol_state.KeyValueStoreStateMachine = (*PSVersionUpgradeStateMachine)(nil)
@@ -25,12 +26,14 @@ var _ protocol_state.KeyValueStoreStateMachine = (*PSVersionUpgradeStateMachine)
 // It schedules protocol state version upgrades upon receiving a `ProtocolStateVersionUpgrade` event.
 // The actual model upgrade is handled in the upper layer (`ProtocolStateMachine`).
 func NewPSVersionUpgradeStateMachine(
+	telemetry protocol_state.StateMachineTelemetryConsumer,
 	candidateView uint64,
 	parentState protocol.KVStoreReader,
 	mutator protocol_state.KVStoreMutator,
 ) *PSVersionUpgradeStateMachine {
 	return &PSVersionUpgradeStateMachine{
 		BaseKeyValueStoreStateMachine: helper.NewBaseKeyValueStoreStateMachine(candidateView, parentState, mutator),
+		telemetry:                     telemetry,
 	}
 }
 
@@ -46,14 +49,16 @@ func (m *PSVersionUpgradeStateMachine) EvolveState(orderedUpdates []flow.Service
 				return fmt.Errorf("internal invalid type for ProtocolStateVersionUpgrade: %T", update.Event)
 			}
 
+			m.telemetry.OnServiceEventReceived(update)
 			err := m.processSingleEvent(versionUpgrade)
 			if err != nil {
 				if protocol.IsInvalidServiceEventError(err) {
-					// TODO: log, report invalid service event
+					m.telemetry.OnInvalidServiceEvent(update, err)
 					continue
 				}
 				return fmt.Errorf("unexpected error when processing version upgrade event: %w", err)
 			}
+			m.telemetry.OnServiceEventProcessed(update)
 
 		// Service events not explicitly expected are ignored
 		default:

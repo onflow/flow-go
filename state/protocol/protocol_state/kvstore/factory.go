@@ -8,19 +8,22 @@ import (
 
 // PSVersionUpgradeStateMachineFactory is a factory for creating PSVersionUpgradeStateMachine instances.
 type PSVersionUpgradeStateMachineFactory struct {
+	telemetry protocol_state.StateMachineTelemetryConsumer
 }
 
 var _ protocol_state.KeyValueStoreStateMachineFactory = (*PSVersionUpgradeStateMachineFactory)(nil)
 
-func NewPSVersionUpgradeStateMachineFactory() *PSVersionUpgradeStateMachineFactory {
-	return &PSVersionUpgradeStateMachineFactory{}
+func NewPSVersionUpgradeStateMachineFactory(telemetry protocol_state.StateMachineTelemetryConsumer) *PSVersionUpgradeStateMachineFactory {
+	return &PSVersionUpgradeStateMachineFactory{
+		telemetry: telemetry,
+	}
 }
 
 // Create instantiates a new PSVersionUpgradeStateMachine, which processes ProtocolStateVersionUpgrade ServiceEvent
 // that are sealed by the candidate block (possibly still under construction) with the given view.
 // No errors are expected during normal operations.
 func (f *PSVersionUpgradeStateMachineFactory) Create(candidateView uint64, _ flow.Identifier, parentState protocol.KVStoreReader, mutator protocol_state.KVStoreMutator) (protocol_state.KeyValueStoreStateMachine, error) {
-	return NewPSVersionUpgradeStateMachine(candidateView, parentState, mutator), nil
+	return NewPSVersionUpgradeStateMachine(f.telemetry, candidateView, parentState, mutator), nil
 }
 
 // SetValueKVStoreStateMachineFactory is a factory for creating SetValueKVStoreStateMachineFactory instances.
