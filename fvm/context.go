@@ -392,3 +392,11 @@ func WithEVMTracer(tracer debug.EVMTracer) Option {
 		return ctx
 	}
 }
+
+// WithProgramRecovery enables program recovery functionality
+func WithProgramRecovery(enabled bool) Option {
+	return func(ctx Context) Context {
+		ctx.ProgramsParams.AllowRecoverProgramCalls = enabled
+		return ctx
+	}
+}
