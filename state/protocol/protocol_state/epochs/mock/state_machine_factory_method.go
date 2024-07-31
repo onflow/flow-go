@@ -15,7 +15,7 @@ type StateMachineFactoryMethod struct {
 }
 
 // Execute provides a mock function with given fields: candidateView, parentState
-func (_m *StateMachineFactoryMethod) Execute(candidateView uint64, parentState *flow.RichEpochProtocolStateEntry) (epochs.StateMachine, error) {
+func (_m *StateMachineFactoryMethod) Execute(candidateView uint64, parentState *flow.RichEpochStateEntry) (epochs.StateMachine, error) {
 	ret := _m.Called(candidateView, parentState)
 
 	if len(ret) == 0 {
@@ -24,10 +24,10 @@ func (_m *StateMachineFactoryMethod) Execute(candidateView uint64, parentState *
 
 	var r0 epochs.StateMachine
 	var r1 error
-	if rf, ok := ret.Get(0).(func(uint64, *flow.RichEpochProtocolStateEntry) (epochs.StateMachine, error)); ok {
+	if rf, ok := ret.Get(0).(func(uint64, *flow.RichEpochStateEntry) (epochs.StateMachine, error)); ok {
 		return rf(candidateView, parentState)
 	}
-	if rf, ok := ret.Get(0).(func(uint64, *flow.RichEpochProtocolStateEntry) epochs.StateMachine); ok {
+	if rf, ok := ret.Get(0).(func(uint64, *flow.RichEpochStateEntry) epochs.StateMachine); ok {
 		r0 = rf(candidateView, parentState)
 	} else {
 		if ret.Get(0) != nil {
@@ -35,7 +35,7 @@ func (_m *StateMachineFactoryMethod) Execute(candidateView uint64, parentState *
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(uint64, *flow.RichEpochProtocolStateEntry) error); ok {
+	if rf, ok := ret.Get(1).(func(uint64, *flow.RichEpochStateEntry) error); ok {
 		r1 = rf(candidateView, parentState)
 	} else {
 		r1 = ret.Error(1)

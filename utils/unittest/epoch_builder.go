@@ -173,7 +173,7 @@ func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 	require.NoError(builder.t, err)
 
 	// check that block A satisfies initial condition
-	phase, err := state.Final().Phase()
+	phase, err := state.Final().EpochPhase()
 	require.NoError(builder.t, err)
 	require.Equal(builder.t, flow.EpochPhaseStaking, phase)
 
@@ -317,7 +317,7 @@ func (builder *EpochBuilder) CompleteEpoch() *EpochBuilder {
 
 	state := builder.states[0]
 
-	phase, err := state.Final().Phase()
+	phase, err := state.Final().EpochPhase()
 	require.Nil(builder.t, err)
 	require.Equal(builder.t, flow.EpochPhaseCommitted, phase)
 	finalView, err := state.Final().Epochs().Current().FinalView()
