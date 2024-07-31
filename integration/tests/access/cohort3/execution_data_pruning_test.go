@@ -123,6 +123,7 @@ func (s *ExecutionDataPruningSuite) setup(executionDataDBMode execution_data.Exe
 			"--execution-data-retry-delay=1s",
 			"--event-query-mode=local-only",
 			"--local-service-api-enabled=true",
+			fmt.Sprintf("--execution-data-db=%s", s.executionDataDBMode.String()),
 			fmt.Sprintf("--execution-data-height-range-target=%d", s.heightRangeTarget),
 			fmt.Sprintf("--execution-data-height-range-threshold=%d", s.threshold),
 			fmt.Sprintf("--execution-data-pruning-interval=%s", s.pruningInterval),
