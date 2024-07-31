@@ -9,6 +9,7 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
 
+	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/model/flow"
@@ -36,6 +37,7 @@ type GerOrLoadProgramListenerFunc func(
 // It only allows parsing and checking of contracts.
 type MigrationRuntimeInterface struct {
 	runtime.EmptyRuntimeInterface
+	chainID                      flow.ChainID
 	GetContractCodeFunc          GetContractCodeFunc
 	GetContractNamesFunc         GetContractNamesFunc
 	GetOrLoadProgramFunc         GetOrLoadProgramFunc
@@ -45,12 +47,14 @@ type MigrationRuntimeInterface struct {
 var _ runtime.Interface = &MigrationRuntimeInterface{}
 
 func NewMigrationRuntimeInterface(
+	chainID flow.ChainID,
 	getCodeFunc GetContractCodeFunc,
 	getContractNamesFunc GetContractNamesFunc,
 	getOrLoadProgramFunc GetOrLoadProgramFunc,
 	getOrLoadProgramListenerFunc GerOrLoadProgramListenerFunc,
 ) *MigrationRuntimeInterface {
 	return &MigrationRuntimeInterface{
+		chainID:                      chainID,
 		GetContractCodeFunc:          getCodeFunc,
 		GetContractNamesFunc:         getContractNamesFunc,
 		GetOrLoadProgramFunc:         getOrLoadProgramFunc,
@@ -168,8 +172,11 @@ func (m *MigrationRuntimeInterface) GetOrLoadProgram(
 	return getOrLoadProgram(location, load)
 }
 
-func (m *MigrationRuntimeInterface) RecoverProgram(_ *ast.Program, _ common.Location) (*ast.Program, error) {
-	return nil, nil
+func (m *MigrationRuntimeInterface) RecoverProgram(
+	program *ast.Program,
+	location common.Location,
+) (*ast.Program, error) {
+	return environment.RecoverProgram(nil, m.chainID, program, location)
 }
 
 type migrationTransactionPreparer struct {

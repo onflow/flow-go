@@ -160,7 +160,7 @@ func (suite *Suite) SetupTest() {
 	suite.snap.On("Head").Return(
 		func() *flow.Header { return suite.header },
 		func() error { return nil })
-	suite.snap.On("Phase").Return(
+	suite.snap.On("EpochPhase").Return(
 		func() flow.EpochPhase { return suite.phase },
 		func() error { return nil })
 
@@ -531,4 +531,36 @@ func (suite *Suite) TestRespondToEpochTransition() {
 
 	// the expired epoch should have been stopped
 	suite.AssertEpochStopped(suite.counter - 1)
+}
+
+// TestStopQcVoting tests that, if we encounter an EpochEmergencyFallbackTriggered event
+// the engine will stop in progress QC voting. The engine keeps track of the current in progress
+// qc vote by keeping a pointer to the cancel func for the context of that process.
+// When the EFM event is encountered and voting is in progress the cancel func will be invoked
+// and the voting process will be stopped.
+func (suite *Suite) TestStopQcVoting() {
+	// we expect 1 ActiveClustersChanged events when the engine first starts and the first set of epoch components are started
+	suite.engineEventsDistributor.On("ActiveClustersChanged", mock.AnythingOfType("flow.ChainIDList")).Once()
+
+	receivedCancelSignal := make(chan struct{})
+	suite.voter.On("Vote", mock.Anything, suite.epochQuery.Next()).
+		Return(nil).
+		Run(func(args mock.Arguments) {
+			ctx := args.Get(0).(context.Context)
+			<-ctx.Done()
+			close(receivedCancelSignal)
+		}).Once()
+
+	// we are in setup phase, forces engine to start voting on startup
+	suite.phase = flow.EpochPhaseSetup
+
+	// start up the engine
+	suite.StartEngine()
+
+	require.NotNil(suite.T(), suite.engine.inProgressQCVote.Load(), "expected qc vote to be in progress")
+
+	// simulate processing efm triggered event, this should cancel all in progress voting
+	suite.engine.EpochEmergencyFallbackTriggered()
+
+	unittest.AssertClosesBefore(suite.T(), receivedCancelSignal, time.Second)
 }

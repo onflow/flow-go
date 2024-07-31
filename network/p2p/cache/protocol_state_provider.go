@@ -66,7 +66,7 @@ func NewProtocolStateIDCache(
 // of an Epoch transition that just occurred. Upon such notification, the internally-cached
 // Identity table of authorized network participants is updated.
 //
-// TODO: per API contract, implementations of `EpochTransition` should be non-blocking
+// TODO(EFM, #6123): per API contract, implementations of `EpochTransition` should be non-blocking
 // and virtually latency free. However, we run data base queries and acquire locks here,
 // which is undesired.
 func (p *ProtocolStateIDCache) EpochTransition(newEpochCounter uint64, header *flow.Header) {
@@ -77,7 +77,7 @@ func (p *ProtocolStateIDCache) EpochTransition(newEpochCounter uint64, header *f
 // that the EpochSetup Phase has just stared. Upon such notification, the internally-cached
 // Identity table of authorized network participants is updated.
 //
-// TODO: per API contract, implementations of `EpochSetupPhaseStarted` should be non-blocking
+// TODO(EFM, #6123): per API contract, implementations of `EpochSetupPhaseStarted` should be non-blocking
 // and virtually latency free. However, we run data base queries and acquire locks here,
 // which is undesired.
 func (p *ProtocolStateIDCache) EpochSetupPhaseStarted(currentEpochCounter uint64, header *flow.Header) {
@@ -88,7 +88,7 @@ func (p *ProtocolStateIDCache) EpochSetupPhaseStarted(currentEpochCounter uint64
 // that the EpochCommitted Phase has just stared. Upon such notification, the internally-cached
 // Identity table of authorized network participants is updated.
 //
-// TODO: per API contract, implementations of `EpochCommittedPhaseStarted` should be non-blocking
+// TODO(EFM, #6123): per API contract, implementations of `EpochCommittedPhaseStarted` should be non-blocking
 // and virtually latency free. However, we run data base queries and acquire locks here,
 // which is undesired.
 func (p *ProtocolStateIDCache) EpochCommittedPhaseStarted(currentEpochCounter uint64, header *flow.Header) {

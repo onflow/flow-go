@@ -20,6 +20,7 @@ type IntermediaryBootstrappingData struct {
 type IntermediaryParamsData struct {
 	ProtocolVersion            uint
 	EpochCommitSafetyThreshold uint64
+	EpochExtensionViewCount    uint64
 }
 
 // IntermediaryEpochData stores the root epoch and the epoch config for the execution state
