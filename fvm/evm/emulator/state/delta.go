@@ -109,8 +109,8 @@ func (d *DeltaView) Exist(addr gethCommon.Address) (bool, error) {
 
 // CreateAccount creates a new account for the given address
 //
-// if address already extists (even if destructed), carry over the balance
-// and reset the data from the orginal account.
+// if address already exists (even if destructed), carry over the balance
+// and reset the data from the original account.
 func (d *DeltaView) CreateAccount(addr gethCommon.Address) error {
 	// if is already created return
 	if d.IsCreated(addr) {
@@ -137,7 +137,7 @@ func (d *DeltaView) CreateAccount(addr gethCommon.Address) error {
 		d.nonces[addr] = 0
 		d.codes[addr] = nil
 		d.codeHashes[addr] = gethTypes.EmptyCodeHash
-		// carrying over the balance. (legacy behaviour of the Geth stateDB)
+		// carrying over the balance. (legacy behavior of the Geth stateDB)
 		d.balances[addr] = balance
 
 		// flag addr as recreated, this flag helps with postponing deletion of slabs
@@ -199,17 +199,18 @@ func (d *DeltaView) HasSelfDestructed(addr gethCommon.Address) (bool, *uint256.I
 //
 // if an account has been created in this transaction, it would return an error
 func (d *DeltaView) SelfDestruct(addr gethCommon.Address) error {
-	// if it has been recently created, calling self destruct is not a valid operation
-	if d.IsCreated(addr) {
-		return fmt.Errorf("invalid operation, can't selfdestruct an account that is just created")
-	}
-
-	// if it doesn't exist, return false
+	// if it doesn't exist, return
 	exists, err := d.Exist(addr)
 	if err != nil {
 		return err
 	}
 	if !exists {
+		return nil
+	}
+
+	// if already set to be self destructed, return
+	_, found := d.toBeDestructed[addr]
+	if found {
 		return nil
 	}
 
