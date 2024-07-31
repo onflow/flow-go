@@ -105,6 +105,8 @@ type EnvironmentParams struct {
 	EntropyProvider
 
 	ContractUpdaterParams
+
+	ProgramsParams
 }
 
 func DefaultEnvironmentParams() EnvironmentParams {
@@ -118,6 +120,7 @@ func DefaultEnvironmentParams() EnvironmentParams {
 		BlockInfoParams:       DefaultBlockInfoParams(),
 		TransactionInfoParams: DefaultTransactionInfoParams(),
 		ContractUpdaterParams: DefaultContractUpdaterParams(),
+		ProgramsParams:        DefaultProgramsParams(),
 	}
 }
 

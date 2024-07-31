@@ -8,6 +8,7 @@ import (
 
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
+	"github.com/onflow/cadence/runtime/ast"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
 
@@ -16,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/fvm/storage/derived"
 	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/fvm/tracing"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
 )
 
@@ -35,6 +37,17 @@ func (p ProgramLoadingError) Error() string {
 	return fmt.Sprintf("error getting program %v: %s", p.Location, p.Err)
 }
 
+type ProgramsParams struct {
+	AllowRecoverProgramCalls bool
+}
+
+func DefaultProgramsParams() ProgramsParams {
+	return ProgramsParams{
+		// Default is off until https://github.com/onflow/flips/pull/283 got approved.
+		AllowRecoverProgramCalls: false,
+	}
+}
+
 // Programs manages operations around cadence program parsing.
 //
 // Note that cadence guarantees that Get/Set methods are called in a LIFO
@@ -45,6 +58,7 @@ type Programs struct {
 	tracer  tracing.TracerSpan
 	meter   Meter
 	metrics MetricsReporter
+	chain   flow.Chain
 
 	txnState storage.TransactionPreparer
 	accounts Accounts
@@ -55,6 +69,8 @@ type Programs struct {
 
 	// dependencyStack tracks programs currently being loaded and their dependencies.
 	dependencyStack *dependencyStack
+
+	ProgramsParams
 }
 
 // NewPrograms constructs a new ProgramHandler
@@ -62,17 +78,21 @@ func NewPrograms(
 	tracer tracing.TracerSpan,
 	meter Meter,
 	metrics MetricsReporter,
+	chain flow.Chain,
+	params ProgramsParams,
 	txnState storage.TransactionPreparer,
 	accounts Accounts,
 ) *Programs {
 	return &Programs{
 		tracer:             tracer,
 		meter:              meter,
+		chain:              chain,
 		metrics:            metrics,
 		txnState:           txnState,
 		accounts:           accounts,
 		nonAddressPrograms: make(map[common.Location]*interpreter.Program),
 		dependencyStack:    newDependencyStack(),
+		ProgramsParams:     params,
 	}
 }
 
@@ -182,6 +202,19 @@ func (programs *Programs) getOrLoadNonAddressProgram(
 
 	programs.nonAddressPrograms[location] = program
 	return program, nil
+}
+
+func (programs *Programs) RecoverProgram(program *ast.Program, location common.Location) (*ast.Program, error) {
+	if !programs.AllowRecoverProgramCalls {
+		return nil, nil
+	}
+
+	return RecoverProgram(
+		programs.meter,
+		programs.chain.ChainID(),
+		program,
+		location,
+	)
 }
 
 func (programs *Programs) DecodeArgument(
