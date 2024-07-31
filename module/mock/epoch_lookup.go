@@ -9,12 +9,12 @@ type EpochLookup struct {
 	mock.Mock
 }
 
-// EpochForViewWithFallback provides a mock function with given fields: view
-func (_m *EpochLookup) EpochForViewWithFallback(view uint64) (uint64, error) {
+// EpochForView provides a mock function with given fields: view
+func (_m *EpochLookup) EpochForView(view uint64) (uint64, error) {
 	ret := _m.Called(view)
 
 	if len(ret) == 0 {
-		panic("no return value specified for EpochForViewWithFallback")
+		panic("no return value specified for EpochForView")
 	}
 
 	var r0 uint64

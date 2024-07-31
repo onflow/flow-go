@@ -75,19 +75,19 @@ func (_m *EpochProtocolState) DKG() (protocol.DKG, error) {
 }
 
 // Entry provides a mock function with given fields:
-func (_m *EpochProtocolState) Entry() *flow.RichEpochProtocolStateEntry {
+func (_m *EpochProtocolState) Entry() *flow.RichEpochStateEntry {
 	ret := _m.Called()
 
 	if len(ret) == 0 {
 		panic("no return value specified for Entry")
 	}
 
-	var r0 *flow.RichEpochProtocolStateEntry
-	if rf, ok := ret.Get(0).(func() *flow.RichEpochProtocolStateEntry); ok {
+	var r0 *flow.RichEpochStateEntry
+	if rf, ok := ret.Get(0).(func() *flow.RichEpochStateEntry); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*flow.RichEpochProtocolStateEntry)
+			r0 = ret.Get(0).(*flow.RichEpochStateEntry)
 		}
 	}
 
@@ -127,6 +127,44 @@ func (_m *EpochProtocolState) EpochCommit() *flow.EpochCommit {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*flow.EpochCommit)
 		}
+	}
+
+	return r0
+}
+
+// EpochExtensions provides a mock function with given fields:
+func (_m *EpochProtocolState) EpochExtensions() []flow.EpochExtension {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for EpochExtensions")
+	}
+
+	var r0 []flow.EpochExtension
+	if rf, ok := ret.Get(0).(func() []flow.EpochExtension); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]flow.EpochExtension)
+		}
+	}
+
+	return r0
+}
+
+// EpochFallbackTriggered provides a mock function with given fields:
+func (_m *EpochProtocolState) EpochFallbackTriggered() bool {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for EpochFallbackTriggered")
+	}
+
+	var r0 bool
+	if rf, ok := ret.Get(0).(func() bool); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(bool)
 	}
 
 	return r0
@@ -205,24 +243,6 @@ func (_m *EpochProtocolState) Identities() flow.GenericIdentityList[flow.Identit
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(flow.GenericIdentityList[flow.Identity])
 		}
-	}
-
-	return r0
-}
-
-// InvalidEpochTransitionAttempted provides a mock function with given fields:
-func (_m *EpochProtocolState) InvalidEpochTransitionAttempted() bool {
-	ret := _m.Called()
-
-	if len(ret) == 0 {
-		panic("no return value specified for InvalidEpochTransitionAttempted")
-	}
-
-	var r0 bool
-	if rf, ok := ret.Get(0).(func() bool); ok {
-		r0 = rf()
-	} else {
-		r0 = ret.Get(0).(bool)
 	}
 
 	return r0

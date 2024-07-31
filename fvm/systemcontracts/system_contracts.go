@@ -51,6 +51,7 @@ const (
 
 	EventNameEpochSetup                  = "EpochSetup"
 	EventNameEpochCommit                 = "EpochCommit"
+	EventNameEpochRecover                = "EpochRecover"
 	EventNameVersionBeacon               = "VersionBeacon"               // VersionBeacon only controls version of ENs, describing software compatability via semantic versioning
 	EventNameProtocolStateVersionUpgrade = "ProtocolStateVersionUpgrade" // Protocol State version applies to all nodes and uses an _integer version_ of the _protocol state_
 
@@ -234,6 +235,7 @@ func (c SystemContracts) All() []SystemContract {
 type ServiceEvents struct {
 	EpochSetup                  ServiceEvent
 	EpochCommit                 ServiceEvent
+	EpochRecover                ServiceEvent
 	VersionBeacon               ServiceEvent
 	ProtocolStateVersionUpgrade ServiceEvent
 }
@@ -243,6 +245,7 @@ func (se ServiceEvents) All() []ServiceEvent {
 	return []ServiceEvent{
 		se.EpochSetup,
 		se.EpochCommit,
+		se.EpochRecover,
 		se.VersionBeacon,
 		se.ProtocolStateVersionUpgrade,
 	}
@@ -432,6 +435,7 @@ func init() {
 		events := &ServiceEvents{
 			EpochSetup:                  event(ContractNameEpoch, EventNameEpochSetup),
 			EpochCommit:                 event(ContractNameEpoch, EventNameEpochCommit),
+			EpochRecover:                event(ContractNameEpoch, EventNameEpochRecover),
 			VersionBeacon:               event(ContractNameNodeVersionBeacon, EventNameVersionBeacon),
 			ProtocolStateVersionUpgrade: event(ContractNameNodeVersionBeacon, EventNameProtocolStateVersionUpgrade),
 		}

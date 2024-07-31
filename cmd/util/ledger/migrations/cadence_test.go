@@ -52,7 +52,7 @@ func TestMigrateCadence1EmptyContract(t *testing.T) {
 	// Run contract checking migration
 
 	log := zerolog.Nop()
-	checkingMigration := NewContractCheckingMigration(log, rwf, chainID, false, programs)
+	checkingMigration := NewContractCheckingMigration(log, rwf, chainID, false, nil, programs)
 
 	err = checkingMigration(registersByAccount)
 	require.NoError(t, err)

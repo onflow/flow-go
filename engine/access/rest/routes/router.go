@@ -153,6 +153,11 @@ var Routes = []route{{
 	Handler: GetAccount,
 }, {
 	Method:  http.MethodGet,
+	Pattern: "/accounts/{address}/balance",
+	Name:    "getAccountBalance",
+	Handler: GetAccountBalance,
+}, {
+	Method:  http.MethodGet,
 	Pattern: "/accounts/{address}/keys/{index}",
 	Name:    "getAccountKeyByIndex",
 	Handler: GetAccountKeyByIndex,

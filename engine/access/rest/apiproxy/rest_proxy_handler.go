@@ -203,6 +203,30 @@ func (r *RestProxyHandler) GetAccountAtBlockHeight(ctx context.Context, address 
 	return convert.MessageToAccount(accountResponse.Account)
 }
 
+// GetAccountBalanceAtBlockHeight returns account balance by account address and block height.
+func (r *RestProxyHandler) GetAccountBalanceAtBlockHeight(ctx context.Context, address flow.Address, height uint64) (uint64, error) {
+	upstream, closer, err := r.FaultTolerantClient()
+	if err != nil {
+		return 0, err
+	}
+	defer closer.Close()
+
+	getAccountBalanceAtBlockHeightRequest := &accessproto.GetAccountBalanceAtBlockHeightRequest{
+		Address:     address.Bytes(),
+		BlockHeight: height,
+	}
+
+	accountBalanceResponse, err := upstream.GetAccountBalanceAtBlockHeight(ctx, getAccountBalanceAtBlockHeightRequest)
+	r.log("upstream", "GetAccountBalanceAtBlockHeight", err)
+
+	if err != nil {
+		return 0, err
+	}
+
+	return accountBalanceResponse.GetBalance(), nil
+
+}
+
 // GetAccountKeys returns account keys by account address and block height.
 func (r *RestProxyHandler) GetAccountKeys(ctx context.Context, address flow.Address, height uint64) ([]flow.AccountPublicKey, error) {
 	upstream, closer, err := r.FaultTolerantClient()

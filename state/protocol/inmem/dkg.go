@@ -7,6 +7,8 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 )
 
+// TODO(EFM, #6214): Once EpochCommit.DKGIndexMap is populated, we can remove much of the logic here.
+//   - a thin wrapper around EpochCommit can satisfy the protocol.DKG interface
 type DKG struct {
 	enc EncodableDKG
 }

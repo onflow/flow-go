@@ -7,14 +7,15 @@ import (
 	gohash "hash"
 	"io"
 
-	"github.com/onflow/crypto"
 	"golang.org/x/crypto/hkdf"
+
+	"github.com/onflow/crypto"
 
 	sdk "github.com/onflow/flow-go-sdk"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
-
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/bootstrap"
+	model "github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -294,5 +295,23 @@ func WriteStakingNetworkingKeyFiles(nodeInfos []bootstrap.NodeInfo, write WriteJ
 		}
 	}
 
+	return nil
+}
+
+// WriteNodeInternalPubInfos writes the `node-internal-infos.pub.json` file.
+// In a nutshell, this file contains the Role, address and weight for all authorized nodes.
+func WriteNodeInternalPubInfos(nodeInfos []bootstrap.NodeInfo, write WriteJSONFileFunc) error {
+	configs := make([]model.NodeConfig, len(nodeInfos))
+	for i, nodeInfo := range nodeInfos {
+		configs[i] = model.NodeConfig{
+			Role:    nodeInfo.Role,
+			Address: nodeInfo.Address,
+			Weight:  nodeInfo.Weight,
+		}
+	}
+	err := write(bootstrap.PathNodeInfosPub, configs)
+	if err != nil {
+		return err
+	}
 	return nil
 }

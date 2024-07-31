@@ -79,3 +79,7 @@ func (a *AccountPublicKeys) Build(accountKeys []flow.AccountPublicKey) {
 
 	a.Keys = keys
 }
+
+func (b *AccountBalance) Build(balance uint64) {
+	b.Balance = util.FromUint(balance)
+}
