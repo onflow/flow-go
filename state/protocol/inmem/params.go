@@ -32,7 +32,3 @@ func (p Params) SporkRootBlockHeight() uint64 {
 func (p Params) ProtocolVersion() uint {
 	return p.enc.ProtocolVersion
 }
-
-func (p Params) EpochCommitSafetyThreshold() uint64 {
-	return p.enc.EpochCommitSafetyThreshold
-}

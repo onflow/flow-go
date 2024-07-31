@@ -39,18 +39,22 @@ type EpochProtocolState interface {
 	// No errors are expected during normal operations.
 	DKG() (DKG, error)
 
-	// InvalidEpochTransitionAttempted denotes whether an invalid epoch state transition was attempted
-	// on the fork ending this block. Once the first block where this flag is true is finalized, epoch
-	// fallback mode is triggered.
-	// TODO for 'leaving Epoch Fallback via special service event': at the moment, this is a one-way transition and requires a spork to recover - need to revisit for sporkless EFM recovery
-	InvalidEpochTransitionAttempted() bool
+	// EpochFallbackTriggered denotes whether an invalid epoch state transition was attempted
+	// on the fork ending in this block. Once the first block where this flag is true is finalized, epoch
+	// fallback mode is triggered. This flag is reset to false when finalizing a block that seals
+	// a valid EpochRecover service event.
+	EpochFallbackTriggered() bool
 
 	// PreviousEpochExists returns true if a previous epoch exists. This is true for all epoch
 	// except those immediately following a spork.
 	PreviousEpochExists() bool
 
 	// EpochPhase returns the epoch phase for the current epoch.
+	// See flow.EpochPhase for detailed documentation.
 	EpochPhase() flow.EpochPhase
+
+	// EpochExtensions returns the epoch extensions associated with the current epoch, if any.
+	EpochExtensions() []flow.EpochExtension
 
 	// Identities returns identities (in canonical ordering) that can participate in the current or
 	// previous or next epochs. Let P be the set of identities in the previous epoch, C be the set
@@ -71,7 +75,7 @@ type EpochProtocolState interface {
 	// Entry returns low-level protocol state entry that was used to initialize this object.
 	// It shouldn't be used by high-level logic, it is useful for some cases such as bootstrapping.
 	// Prefer using other methods to access protocol state.
-	Entry() *flow.RichEpochProtocolStateEntry
+	Entry() *flow.RichEpochStateEntry
 }
 
 // ProtocolState is the read-only interface for protocol state. It allows querying the

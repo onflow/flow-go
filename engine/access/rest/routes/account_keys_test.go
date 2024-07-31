@@ -13,7 +13,6 @@ import (
 
 	"github.com/onflow/flow-go/access/mock"
 	"github.com/onflow/flow-go/model/flow"
-
 	"github.com/onflow/flow-go/utils/unittest"
 )
 

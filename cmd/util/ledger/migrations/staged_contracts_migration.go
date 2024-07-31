@@ -49,6 +49,13 @@ type StagedContract struct {
 	Address common.Address
 }
 
+func (s StagedContract) AddressLocation() common.AddressLocation {
+	return common.AddressLocation{
+		Name:    s.Name,
+		Address: s.Address,
+	}
+}
+
 type Contract struct {
 	Name string
 	Code []byte

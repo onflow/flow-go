@@ -119,6 +119,7 @@ const (
 	DefaultViewsInDKGPhase            uint64 = 50
 	DefaultViewsInEpoch               uint64 = 200
 	DefaultEpochCommitSafetyThreshold uint64 = 20
+	DefaultEpochExtensionViewCount    uint64 = 50
 
 	// DefaultMinimumNumOfAccessNodeIDS at-least 1 AN ID must be configured for LN & SN
 	DefaultMinimumNumOfAccessNodeIDS = 1
@@ -429,7 +430,7 @@ type NetworkConfig struct {
 	ViewsInStakingAuction      uint64
 	ViewsInEpoch               uint64
 	EpochCommitSafetyThreshold uint64
-	KVStoreFactory             func(epochStateID flow.Identifier) protocol_state.KVStoreAPI
+	KVStoreFactory             func(epochStateID flow.Identifier) (protocol_state.KVStoreAPI, error)
 }
 
 type NetworkConfigOpt func(*NetworkConfig)
@@ -443,7 +444,9 @@ func NewNetworkConfig(name string, nodes NodeConfigs, opts ...NetworkConfigOpt) 
 		ViewsInDKGPhase:            DefaultViewsInDKGPhase,
 		ViewsInEpoch:               DefaultViewsInEpoch,
 		EpochCommitSafetyThreshold: DefaultEpochCommitSafetyThreshold,
-		KVStoreFactory:             kvstore.NewDefaultKVStore,
+		KVStoreFactory: func(epochStateID flow.Identifier) (protocol_state.KVStoreAPI, error) {
+			return kvstore.NewDefaultKVStore(DefaultEpochCommitSafetyThreshold, DefaultEpochExtensionViewCount, epochStateID)
+		},
 	}
 
 	for _, apply := range opts {
@@ -491,7 +494,7 @@ func WithEpochCommitSafetyThreshold(threshold uint64) func(*NetworkConfig) {
 	}
 }
 
-func WithKVStoreFactory(factory func(flow.Identifier) protocol_state.KVStoreAPI) func(*NetworkConfig) {
+func WithKVStoreFactory(factory func(flow.Identifier) (protocol_state.KVStoreAPI, error)) func(*NetworkConfig) {
 	return func(config *NetworkConfig) {
 		config.KVStoreFactory = factory
 	}
@@ -568,7 +571,7 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig, chainID flow.Ch
 	t.Logf("BootstrapDir: %s \n", bootstrapDir)
 
 	bootstrapData, err := BootstrapNetwork(networkConf, bootstrapDir, chainID)
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	root := bootstrapData.Root
 	result := bootstrapData.Result
@@ -640,7 +643,7 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig, chainID flow.Ch
 			observerConf.ContainerName = fmt.Sprintf("observer_%d", i+1)
 		}
 		t.Logf("add observer %v", observerConf.ContainerName)
-		flowNetwork.addObserver(t, observerConf)
+		flowNetwork.AddObserver(t, observerConf)
 	}
 
 	rootProtocolSnapshotPath := filepath.Join(bootstrapDir, bootstrap.PathRootProtocolStateSnapshot)
@@ -717,7 +720,7 @@ type ObserverConfig struct {
 	BootstrapAccessName string
 }
 
-func (net *FlowNetwork) addObserver(t *testing.T, conf ObserverConfig) {
+func (net *FlowNetwork) AddObserver(t *testing.T, conf ObserverConfig) *Container {
 	if conf.BootstrapAccessName == "" {
 		conf.BootstrapAccessName = PrimaryAN
 	}
@@ -769,6 +772,13 @@ func (net *FlowNetwork) addObserver(t *testing.T, conf ObserverConfig) {
 	}
 
 	nodeContainer := &Container{
+		Config: ContainerConfig{
+			NodeInfo: bootstrap.NodeInfo{
+				Role: flow.RoleAccess,
+			},
+			ContainerName: conf.ContainerName,
+			LogLevel:      conf.LogLevel,
+		},
 		Ports:   make(map[string]string),
 		datadir: tmpdir,
 		net:     net,
@@ -801,6 +811,7 @@ func (net *FlowNetwork) addObserver(t *testing.T, conf ObserverConfig) {
 
 	// start after the bootstrap access node
 	accessNode.After(suiteContainer)
+	return nodeContainer
 }
 
 // AddNode creates a node container with the given config and adds it to the
@@ -1104,6 +1115,11 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 		return nil, fmt.Errorf("failed to write machine account files: %w", err)
 	}
 
+	err = utils.WriteNodeInternalPubInfos(allNodeInfos, writeJSONFile)
+	if err != nil {
+		return nil, fmt.Errorf("failed to node pub info file: %w", err)
+	}
+
 	// define root block parameters
 	parentID := flow.ZeroID
 	height := uint64(0)
@@ -1168,10 +1184,14 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 	root := &flow.Block{
 		Header: rootHeader,
 	}
+	rootProtocolState, err := networkConf.KVStoreFactory(
+		inmem.EpochProtocolStateFromServiceEvents(epochSetup, epochCommit).ID(),
+	)
+	if err != nil {
+		return nil, err
+	}
 	root.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(
-		networkConf.KVStoreFactory(
-			inmem.EpochProtocolStateFromServiceEvents(epochSetup, epochCommit).ID(),
-		).ID(),
+		rootProtocolState.ID(),
 	)))
 
 	cdcRandomSource, err := cadence.NewString(hex.EncodeToString(randomSource))
@@ -1236,7 +1256,14 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 		return nil, fmt.Errorf("has invalid votes: %v", invalidVotesErr)
 	}
 
-	snapshot, err := inmem.SnapshotFromBootstrapStateWithParams(root, result, seal, qc, flow.DefaultProtocolVersion, networkConf.EpochCommitSafetyThreshold, networkConf.KVStoreFactory)
+	snapshot, err := inmem.SnapshotFromBootstrapStateWithParams(
+		root,
+		result,
+		seal,
+		qc,
+		flow.DefaultProtocolVersion,
+		networkConf.KVStoreFactory,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("could not create bootstrap state snapshot: %w", err)
 	}
