@@ -503,11 +503,13 @@ func (t *cadenceValueMigrationReporter) MigratedPathCapability(
 	accountAddress common.Address,
 	addressPath interpreter.AddressPath,
 	borrowType *interpreter.ReferenceStaticType,
+	capabilityID interpreter.UInt64Value,
 ) {
 	t.reportWriter.Write(capabilityMigrationEntry{
 		AccountAddress: accountAddress,
 		AddressPath:    addressPath,
 		BorrowType:     borrowType,
+		CapabilityID:   capabilityID,
 	})
 }
 
@@ -656,6 +658,7 @@ type capabilityMigrationEntry struct {
 	AccountAddress common.Address
 	AddressPath    interpreter.AddressPath
 	BorrowType     *interpreter.ReferenceStaticType
+	CapabilityID   interpreter.UInt64Value
 }
 
 var _ valueMigrationReportEntry = capabilityMigrationEntry{}
@@ -673,12 +676,14 @@ func (e capabilityMigrationEntry) MarshalJSON() ([]byte, error) {
 		Address        string `json:"address"`
 		Path           string `json:"path"`
 		BorrowType     string `json:"borrow_type"`
+		CapabilityID   string `json:"capability_id"`
 	}{
 		Kind:           "capability-migration-success",
 		AccountAddress: e.AccountAddress.HexWithPrefix(),
 		Address:        e.AddressPath.Address.HexWithPrefix(),
 		Path:           e.AddressPath.Path.String(),
 		BorrowType:     string(e.BorrowType.ID()),
+		CapabilityID:   e.CapabilityID.String(),
 	})
 }
 
