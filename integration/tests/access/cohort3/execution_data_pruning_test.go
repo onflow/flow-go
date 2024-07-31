@@ -3,22 +3,17 @@ package cohort3
 import (
 	"context"
 	"fmt"
-	"path/filepath"
 	"testing"
 	"time"
 
-	badgerds "github.com/ipfs/go-ds-badger2"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 
 	sdk "github.com/onflow/flow-go-sdk"
 
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage/badger"
@@ -41,9 +36,10 @@ type ExecutionDataPruningSuite struct {
 	accessNodeName   string
 	observerNodeName string
 	// threshold defines the maximum height range and how frequently pruning is performed.
-	threshold         uint64
-	heightRangeTarget uint64
-	pruningInterval   string
+	threshold           uint64
+	heightRangeTarget   uint64
+	pruningInterval     string
+	executionDataDBMode execution_data.ExecutionDataDBMode
 
 	// root context for the current test
 	ctx    context.Context
@@ -60,6 +56,10 @@ func (s *ExecutionDataPruningSuite) TearDownTest() {
 }
 
 func (s *ExecutionDataPruningSuite) SetupTest() {
+	s.setup(execution_data.ExecutionDataDBModeBadger)
+}
+
+func (s *ExecutionDataPruningSuite) setup(executionDataDBMode execution_data.ExecutionDataDBMode) {
 	s.log = unittest.LoggerForTest(s.Suite.T(), zerolog.InfoLevel)
 	s.log.Info().Msg("================> SetupTest")
 	defer func() {
@@ -69,6 +69,7 @@ func (s *ExecutionDataPruningSuite) SetupTest() {
 	s.threshold = 50
 	s.heightRangeTarget = 100
 	s.pruningInterval = "10s"
+	s.executionDataDBMode = executionDataDBMode
 
 	// access node
 	s.accessNodeName = testnet.PrimaryAN
@@ -83,6 +84,7 @@ func (s *ExecutionDataPruningSuite) SetupTest() {
 		testnet.WithAdditionalFlagf("--execution-state-dir=%s", testnet.DefaultExecutionStateDir),
 		testnet.WithAdditionalFlagf("--public-network-execution-data-sync-enabled=true"),
 		testnet.WithAdditionalFlagf("--event-query-mode=local-only"),
+		testnet.WithAdditionalFlagf("--execution-data-db=%s", s.executionDataDBMode.String()),
 		testnet.WithAdditionalFlagf("--execution-data-height-range-target=%d", s.heightRangeTarget),
 		testnet.WithAdditionalFlagf("--execution-data-height-range-threshold=%d", s.threshold),
 		testnet.WithAdditionalFlagf(fmt.Sprintf("--execution-data-pruning-interval=%s", s.pruningInterval)),
@@ -137,18 +139,13 @@ func (s *ExecutionDataPruningSuite) SetupTest() {
 	s.net.Start(s.ctx)
 }
 
-// getGRPCClient is the helper func to create an access api client
-func (s *ExecutionDataPruningSuite) getGRPCClient(address string) (accessproto.AccessAPIClient, error) {
-	conn, err := grpc.Dial(address, grpc.WithTransportCredentials(insecure.NewCredentials()))
-	if err != nil {
-		return nil, err
-	}
-
-	client := accessproto.NewAccessAPIClient(conn)
-	return client, nil
+// TestHappyPath tests the execution data pruning process using badger DB in a happy path scenario.
+func (s *ExecutionDataPruningSuite) TestHappyPath() {
+	s.executionDataPruningTest()
 }
 
-// TestHappyPath tests the execution data pruning process in a happy path scenario.
+// executionDataPruningTest tests the execution data pruning process in a happy path scenario.
+
 // The test follows these steps:
 //
 // 1. Define a target block height (waitingBlockHeight) for which execution data will be indexed.
@@ -160,7 +157,7 @@ func (s *ExecutionDataPruningSuite) getGRPCClient(address string) (accessproto.A
 // 3. Stop all Flow network containers to simulate a network shutdown and ensure the indexing process is complete.
 // 4. Verify the results of execution data pruning:
 //   - Check that the Access and Observer Nodes execution data up to the pruning threshold height has been correctly pruned.
-func (s *ExecutionDataPruningSuite) TestHappyPath() {
+func (s *ExecutionDataPruningSuite) executionDataPruningTest() {
 	accessNode := s.net.ContainerByName(s.accessNodeName)
 	observerNode := s.net.ContainerByName(s.observerNodeName)
 
@@ -171,7 +168,7 @@ func (s *ExecutionDataPruningSuite) TestHappyPath() {
 	metrics := metrics.NewNoopCollector()
 
 	// start an execution data service using the Access Node's execution data db
-	anEds := s.nodeExecutionDataStore(accessNode)
+	anEds := nodeExecutionDataStore(s.T(), accessNode, s.executionDataDBMode)
 
 	// setup storage objects needed to get the execution data id
 	anDB, err := accessNode.DB()
@@ -182,7 +179,7 @@ func (s *ExecutionDataPruningSuite) TestHappyPath() {
 
 	// start an execution data service using the Observer Node's execution data db
 
-	onEds := s.nodeExecutionDataStore(observerNode)
+	onEds := nodeExecutionDataStore(s.T(), observerNode, s.executionDataDBMode)
 	// setup storage objects needed to get the execution data id
 	onDB, err := observerNode.DB()
 	require.NoError(s.T(), err, "could not open db")
@@ -197,7 +194,7 @@ func (s *ExecutionDataPruningSuite) TestHappyPath() {
 func (s *ExecutionDataPruningSuite) waitUntilExecutionDataForBlockIndexed(waitingBlockHeight uint64) {
 	observerNode := s.net.ContainerByName(s.observerNodeName)
 
-	grpcClient, err := s.getGRPCClient(observerNode.Addr(testnet.GRPCPort))
+	grpcClient, err := getAccessAPIClient(observerNode.Addr(testnet.GRPCPort))
 	s.Require().NoError(err)
 
 	// creating execution data api client
@@ -280,11 +277,4 @@ func (s *ExecutionDataPruningSuite) checkResults(
 		require.Error(s.T(), err, "%s: could not prune execution data for height %v", s.observerNodeName, i)
 		require.ErrorAs(s.T(), err, &blobNotFoundError)
 	}
-}
-
-func (s *ExecutionDataPruningSuite) nodeExecutionDataStore(node *testnet.Container) execution_data.ExecutionDataStore {
-	ds, err := badgerds.NewDatastore(filepath.Join(node.ExecutionDataDBPath(), "blobstore"), &badgerds.DefaultOptions)
-	require.NoError(s.T(), err, "could not get execution datastore")
-
-	return execution_data.NewExecutionDataStore(blobs.NewBlobstore(ds), execution_data.DefaultSerializer)
 }
