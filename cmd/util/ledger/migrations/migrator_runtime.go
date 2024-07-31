@@ -45,6 +45,7 @@ type InterpreterMigrationRuntimeConfig struct {
 }
 
 func (c InterpreterMigrationRuntimeConfig) NewRuntimeInterface(
+	chainID flow.ChainID,
 	transactionState state.NestedTransactionPreparer,
 	accounts environment.Accounts,
 ) (
@@ -90,6 +91,7 @@ func (c InterpreterMigrationRuntimeConfig) NewRuntimeInterface(
 	}
 
 	return util.NewMigrationRuntimeInterface(
+		chainID,
 		getCodeFunc,
 		getContractNames,
 		getOrLoadProgram,
@@ -141,6 +143,7 @@ func NewInterpreterMigrationRuntime(
 	})
 
 	runtimeInterface, err := config.NewRuntimeInterface(
+		chainID,
 		basicMigrationRuntime.TransactionState,
 		basicMigrationRuntime.Accounts,
 	)
