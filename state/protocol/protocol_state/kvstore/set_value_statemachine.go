@@ -11,7 +11,7 @@ import (
 )
 
 // SetValueStateMachine encapsulates the logic for evolving sub-state of KV store by setting particular values.
-// Specifically, it consumes ProtocolStateVersionUpgrade ServiceEvent that are sealed by the candidate block
+// Specifically, it consumes service events that are sealed by the candidate block
 // (possibly still under construction) with the given view.
 // Each relevant event is validated before it is applied to the KV store.
 // All updates are applied to a copy of parent KV store, so parent KV store is not modified.
