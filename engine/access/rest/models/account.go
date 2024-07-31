@@ -68,6 +68,7 @@ func (a *AccountKeys) Build(accountKeys []flow.AccountPublicKey) {
 }
 
 // Build function use model AccountPublicKeys type for GetAccountKeys call
+// AccountPublicKeys is an auto-generated type from the openapi spec
 func (a *AccountPublicKeys) Build(accountKeys []flow.AccountPublicKey) {
 	keys := make([]AccountPublicKey, len(accountKeys))
 	for i, k := range accountKeys {
