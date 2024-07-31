@@ -50,11 +50,11 @@ func (s *SetKeyValueStoreValueStateMachineSuite) TestInitialInvariants() {
 	require.Equal(s.T(), s.parentState, s.stateMachine.ParentState())
 }
 
-// TestEvolveState_ SetEpochExtensionViewCount ensures that state machine can process protocol state version upgrade event.
+// TestEvolveState_SetEpochExtensionViewCount ensures that state machine can process protocol state version upgrade event.
 // It checks several cases including
 //   - happy path - valid extension length value
 //   - invalid extension length value
-func (s *SetKeyValueStoreValueStateMachineSuite) TestEvolveState_ SetEpochExtensionViewCount() {
+func (s *SetKeyValueStoreValueStateMachineSuite) TestEvolveState_SetEpochExtensionViewCount() {
 	s.Run("happy-path", func() {
 		ev := &flow.SetEpochExtensionViewCount{
 			Value: 1000,
