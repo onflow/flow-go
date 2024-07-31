@@ -15,7 +15,6 @@ const (
 	ExecutionDataDBModeBadger ExecutionDataDBMode = iota + 1
 
 	// ExecutionDataDBModePebble uses pebble db
-	// execution nodes
 	ExecutionDataDBModePebble
 )
 
