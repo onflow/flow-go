@@ -2,8 +2,6 @@ package routes
 
 import (
 	"fmt"
-	"github.com/onflow/crypto"
-	"github.com/onflow/crypto/hash"
 	"math"
 	"net/http"
 	"net/url"
@@ -13,9 +11,11 @@ import (
 	mocktestify "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/crypto"
+	"github.com/onflow/crypto/hash"
+
 	"github.com/onflow/flow-go/access/mock"
 	"github.com/onflow/flow-go/model/flow"
-
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -433,7 +433,7 @@ func expectedAccountKeysResponse(account *flow.Account) string {
 					 "revoked":false
 				  },
 				  {
-					 "index":"0",
+					 "index":"1",
 					 "public_key":"%s",
 					 "signing_algorithm":"ECDSA_P256",
 					 "hashing_algorithm":"SHA3_256",
@@ -459,12 +459,13 @@ func findAccountKeyByIndex(keys []flow.AccountPublicKey, keyIndex uint32) *flow.
 
 func accountWithKeysFixture(t *testing.T) *flow.Account {
 	account, err := unittest.AccountFixture()
+	require.NoError(t, err)
 
 	key2, err := unittest.AccountKeyFixture(128, crypto.ECDSAP256, hash.SHA3_256)
 	require.NoError(t, err)
 
 	account.Keys = append(account.Keys, key2.PublicKey(500))
+	account.Keys[1].Index = 1
 
-	require.NoError(t, err)
 	return account
 }
