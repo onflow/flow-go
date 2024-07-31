@@ -237,7 +237,7 @@ func (s *ExecutionDataTracker) batchDelete(deleteInfos []*storage.DeleteInfo) er
 }
 
 func (s *ExecutionDataTracker) batchDeleteItemLimit() int {
-	itemsPerBatch := 256
+	itemsPerBatch := storage.DeleteItemsPerBatch
 	maxItemsPerBatch := getBatchItemCountLimit(s.db, 2, storage.BlobRecordKeyLength+storage.LatestHeightKeyLength)
 	if maxItemsPerBatch < itemsPerBatch {
 		itemsPerBatch = maxItemsPerBatch

@@ -175,22 +175,12 @@ func (s *ExecutionDataTracker) trackBlob(blockHeight uint64, c cid.Cid) error {
 }
 
 func (s *ExecutionDataTracker) trackBlobs(blockHeight uint64, cids ...cid.Cid) error {
-	cidsPerBatch := storage.CidsPerBatch
-
 	for len(cids) > 0 {
-		batchSize := cidsPerBatch
-		if len(cids) < batchSize {
-			batchSize = len(cids)
-		}
-		batch := cids[:batchSize]
-
-		for _, c := range batch {
+		for _, c := range cids {
 			if err := s.trackBlob(blockHeight, c); err != nil {
 				return fmt.Errorf("failed to track blob %s: %w", c.String(), err)
 			}
 		}
-
-		cids = cids[batchSize:]
 	}
 
 	return nil
@@ -214,11 +204,11 @@ func (s *ExecutionDataTracker) batchDelete(deleteInfos []*storage.DeleteInfo) er
 	return nil
 }
 
-var ffBytes = bytes.Repeat([]byte{0xFF}, 32)
+var ffBytes = bytes.Repeat([]byte{0xFF}, storage.BlobRecordKeyLength)
 
 func (s *ExecutionDataTracker) PruneUpToHeight(height uint64) error {
 	blobRecordPrefix := []byte{storage.PrefixBlobRecord}
-	itemsPerBatch := 256
+	itemsPerBatch := storage.DeleteItemsPerBatch
 	var batch []*storage.DeleteInfo
 
 	s.mu.Lock()

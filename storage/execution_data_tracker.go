@@ -23,6 +23,7 @@ const (
 const CidsPerBatch = 16 // number of cids to track per batch
 const BlobRecordKeyLength = 1 + 8 + blobs.CidLength
 const LatestHeightKeyLength = 1 + blobs.CidLength
+const DeleteItemsPerBatch = 256
 
 func ParseBlobRecordKey(key []byte) (uint64, cid.Cid, error) {
 	blockHeight := binary.BigEndian.Uint64(key[1:])
