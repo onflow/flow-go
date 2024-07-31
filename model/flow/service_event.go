@@ -314,14 +314,14 @@ func (se *ServiceEvent) EqualTo(other *ServiceEvent) (bool, error) {
 		}
 		return version.EqualTo(otherVersion), nil
 	case ServiceEventSetEpochExtensionViewCount:
-		version, ok := se.Event.(*SetEpochExtensionViewCount)
+		typedEvent, ok := se.Event.(*SetEpochExtensionViewCount)
 		if !ok {
 			return false, fmt.Errorf(
 				"internal invalid type for SetEpochExtensionViewCount: %T",
 				se.Event,
 			)
 		}
-		otherVersion, ok := other.Event.(*SetEpochExtensionViewCount)
+		otherTypedEvent, ok := other.Event.(*SetEpochExtensionViewCount)
 		if !ok {
 			return false,
 				fmt.Errorf(
@@ -329,7 +329,7 @@ func (se *ServiceEvent) EqualTo(other *ServiceEvent) (bool, error) {
 					other.Event,
 				)
 		}
-		return version.EqualTo(otherVersion), nil
+		return typedEvent.EqualTo(otherTypedEvent), nil
 
 	default:
 		return false, fmt.Errorf("unknown serice event type: %s", se.Type)
