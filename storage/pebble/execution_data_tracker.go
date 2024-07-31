@@ -175,7 +175,7 @@ func (s *ExecutionDataTracker) trackBlob(blockHeight uint64, c cid.Cid) error {
 }
 
 func (s *ExecutionDataTracker) trackBlobs(blockHeight uint64, cids ...cid.Cid) error {
-	for len(cids) > 0 {
+	if len(cids) > 0 {
 		for _, c := range cids {
 			if err := s.trackBlob(blockHeight, c); err != nil {
 				return fmt.Errorf("failed to track blob %s: %w", c.String(), err)
@@ -204,6 +204,9 @@ func (s *ExecutionDataTracker) batchDelete(deleteInfos []*storage.DeleteInfo) er
 	return nil
 }
 
+// for forward iteration, add the 0xff-bytes suffix to the end
+// prefix, to ensure we include all keys with that prefix before
+// finishing.
 var ffBytes = bytes.Repeat([]byte{0xFF}, storage.BlobRecordKeyLength)
 
 func (s *ExecutionDataTracker) PruneUpToHeight(height uint64) error {
