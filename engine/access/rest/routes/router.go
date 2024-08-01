@@ -163,6 +163,11 @@ var Routes = []route{{
 	Handler: GetAccountKeyByIndex,
 }, {
 	Method:  http.MethodGet,
+	Pattern: "/accounts/{address}/keys",
+	Name:    "getAccountKeys",
+	Handler: GetAccountKeys,
+}, {
+	Method:  http.MethodGet,
 	Pattern: "/events",
 	Name:    "getEvents",
 	Handler: GetEvents,
@@ -186,7 +191,7 @@ var WSRoutes = []wsroute{{
 }}
 
 var routeUrlMap = map[string]string{}
-var routeRE = regexp.MustCompile(`(?i)/v1/(\w+)(/(\w+)(/(\w+))?)?`)
+var routeRE = regexp.MustCompile(`(?i)/v1/(\w+)(/(\w+))?(/(\w+))?(/(\w+))?`)
 
 func init() {
 	for _, r := range Routes {
@@ -212,7 +217,7 @@ func URLToRoute(url string) (string, error) {
 
 func normalizeURL(url string) (string, error) {
 	matches := routeRE.FindAllStringSubmatch(url, -1)
-	if len(matches) != 1 || len(matches[0]) != 6 {
+	if len(matches) != 1 || len(matches[0]) != 8 {
 		return "", fmt.Errorf("invalid url")
 	}
 
@@ -235,10 +240,10 @@ func normalizeURL(url string) (string, error) {
 	case 16:
 		// address based resource. e.g. /v1/accounts/1234567890abcdef
 		parts = append(parts, "{address}")
-		if matches[0][5] == "balance" {
-			parts = append(parts, "balance")
-		} else if matches[0][5] == "keys" {
+		if matches[0][5] == "keys" && matches[0][7] != "" {
 			parts = append(parts, "keys", "{index}")
+		} else if matches[0][5] != "" {
+			parts = append(parts, matches[0][5])
 		}
 	default:
 		// named resource. e.g. /v1/network/parameters
