@@ -52,6 +52,10 @@ func (s *TransactionValidatorSuite) SetupTest() {
 		On("SealedHeader").
 		Return(s.header, nil)
 
+	s.blocks.
+		On("IndexedHeight").
+		Return(s.blocks, nil)
+
 	s.chain = flow.Testnet.Chain()
 	s.validatorOptions = access.TransactionValidationOptions{
 		CheckPayerBalance:      true,
@@ -161,4 +165,8 @@ func (s *TransactionValidatorSuite) TestTransactionValidator_InsufficientBalance
 	actualErr := validator.Validate(context.Background(), &txBody)
 
 	assert.ErrorIs(s.T(), actualErr, expectedError)
+}
+
+func (s *TransactionValidatorSuite) TestTransactionValidator_SealedIndexedHeightThresholdLimit() {
+
 }

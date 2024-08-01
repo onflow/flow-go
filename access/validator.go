@@ -419,8 +419,8 @@ func (v *TransactionValidator) checkSufficientBalanceToPayForTransaction(ctx con
 		return fmt.Errorf("could not get indexed height: %w", err)
 	}
 
-	if header.Height-indexedHeight <= DefaultSealedIndexedHeightThresholdNumber {
-		return fmt.Errorf("could not get indexed height: %w", SealedIndexedHeightThresholdLimit)
+	if header.Height-indexedHeight >= DefaultSealedIndexedHeightThresholdNumber {
+		return fmt.Errorf("the gap between sealed and indexed height is larger than threshold: %w", SealedIndexedHeightThresholdLimit)
 	}
 
 	payerAddress := cadence.NewAddress(tx.Payer)
