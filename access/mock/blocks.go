@@ -72,6 +72,34 @@ func (_m *Blocks) HeaderByID(id flow.Identifier) (*flow.Header, error) {
 	return r0, r1
 }
 
+// IndexedHeight provides a mock function with given fields:
+func (_m *Blocks) IndexedHeight() (uint64, error) {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for IndexedHeight")
+	}
+
+	var r0 uint64
+	var r1 error
+	if rf, ok := ret.Get(0).(func() (uint64, error)); ok {
+		return rf()
+	}
+	if rf, ok := ret.Get(0).(func() uint64); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(uint64)
+	}
+
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // SealedHeader provides a mock function with given fields:
 func (_m *Blocks) SealedHeader() (*flow.Header, error) {
 	ret := _m.Called()

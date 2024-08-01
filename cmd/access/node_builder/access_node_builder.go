@@ -1815,6 +1815,12 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				return nil, fmt.Errorf("transaction result query mode 'compare' is not supported")
 			}
 
+			// If execution data syncing and indexing is disabled, pass nil indexReporter
+			var indexReporter state_synchronization.IndexReporter
+			if builder.executionDataSyncEnabled && builder.executionDataIndexingEnabled {
+				indexReporter = builder.Reporter
+			}
+
 			nodeBackend, err := backend.New(backend.Params{
 				State:                     node.State,
 				CollectionRPC:             builder.CollectionRPC,
@@ -1853,15 +1859,10 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				TxResultQueryMode:   txResultQueryMode,
 				TxResultsIndex:      builder.TxResultsIndex,
 				LastFullBlockHeight: lastFullBlockHeight,
+				IndexReporter:       indexReporter,
 			})
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize backend: %w", err)
-			}
-
-			// If execution data syncing and indexing is disabled, pass nil indexReporter
-			var indexReporter state_synchronization.IndexReporter
-			if builder.executionDataSyncEnabled && builder.executionDataIndexingEnabled {
-				indexReporter = builder.Reporter
 			}
 
 			engineBuilder, err := rpc.NewBuilder(

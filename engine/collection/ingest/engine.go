@@ -61,7 +61,7 @@ func New(
 	logger := log.With().Str("engine", "ingest").Logger()
 
 	transactionValidator := access.NewTransactionValidatorWithLimiter(
-		access.NewProtocolStateBlocks(state),
+		access.NewProtocolStateBlocks(state, nil),
 		chain,
 		access.TransactionValidationOptions{
 			Expiry:                 flow.DefaultTransactionExpiry,

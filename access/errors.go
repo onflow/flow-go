@@ -12,6 +12,13 @@ import (
 // ErrUnknownReferenceBlock indicates that a transaction references an unknown block.
 var ErrUnknownReferenceBlock = errors.New("unknown reference block")
 
+// IndexReporterNotInitialized is returned when indexReporter is nil because
+// execution data syncing and indexing is disabled
+var IndexReporterNotInitialized = errors.New("index reported not initialized")
+
+// SealedIndexedHeightThresholdLimit is returned when gap between sealed and indexed height is larger than allowed
+var SealedIndexedHeightThresholdLimit = errors.New("gap between sealed and indexed height is larger than allowed")
+
 // IncompleteTransactionError indicates that a transaction is missing one or more required fields.
 type IncompleteTransactionError struct {
 	MissingFields []string
