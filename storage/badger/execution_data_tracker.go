@@ -67,25 +67,25 @@ func NewExecutionDataTracker(dbPath string, startHeight uint64, logger zerolog.L
 		return nil, fmt.Errorf("could not open tracker db: %w", err)
 	}
 
-	storage := &ExecutionDataTracker{
+	tracker := &ExecutionDataTracker{
 		db:            db,
 		pruneCallback: func(c cid.Cid) error { return nil },
 		logger:        lg,
 	}
 
 	for _, opt := range opts {
-		opt(storage)
+		opt(tracker)
 	}
 
-	lg.Info().Msgf("initialize storage with start height: %d", startHeight)
+	lg.Info().Msgf("initialize tracker with start height: %d", startHeight)
 
-	if err := storage.init(startHeight); err != nil {
-		return nil, fmt.Errorf("failed to initialize storage: %w", err)
+	if err := tracker.init(startHeight); err != nil {
+		return nil, fmt.Errorf("failed to initialize tracker: %w", err)
 	}
 
-	lg.Info().Msgf("storage initialized")
+	lg.Info().Msgf("tracker initialized")
 
-	return storage, nil
+	return tracker, nil
 }
 
 func (s *ExecutionDataTracker) init(startHeight uint64) error {
@@ -257,7 +257,6 @@ func (s *ExecutionDataTracker) PruneUpToHeight(height uint64) error {
 		return err
 	}
 
-	// TODO: move to separate 'iterate' function
 	if err := s.db.View(func(txn *badger.Txn) error {
 		it := txn.NewIterator(badger.IteratorOptions{
 			PrefetchValues: false,
