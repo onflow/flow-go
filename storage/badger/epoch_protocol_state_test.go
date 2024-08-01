@@ -43,7 +43,7 @@ func TestProtocolStateStorage(t *testing.T) {
 			err = commits.StoreTx(expected.NextEpochCommit)(tx)
 			require.NoError(t, err)
 
-			err = store.StoreTx(protocolStateID, expected.EpochProtocolStateEntry)(tx)
+			err = store.StoreTx(protocolStateID, expected.MinEpochStateEntry)(tx)
 			require.NoError(t, err)
 			return store.Index(blockID, protocolStateID)(tx)
 		})
@@ -73,14 +73,14 @@ func TestProtocolStateStoreInvalidProtocolState(t *testing.T) {
 		setups := NewEpochSetups(metrics, db)
 		commits := NewEpochCommits(metrics, db)
 		store := NewEpochProtocolStateEntries(metrics, setups, commits, db, DefaultEpochProtocolStateCacheSize, DefaultProtocolStateIndexCacheSize)
-		invalid := unittest.EpochStateFixture().EpochProtocolStateEntry
+		invalid := unittest.EpochStateFixture().MinEpochStateEntry
 		// swap first and second elements to break canonical order
 		invalid.CurrentEpoch.ActiveIdentities[0], invalid.CurrentEpoch.ActiveIdentities[1] = invalid.CurrentEpoch.ActiveIdentities[1], invalid.CurrentEpoch.ActiveIdentities[0]
 
 		err := transaction.Update(db, store.StoreTx(invalid.ID(), invalid))
 		require.Error(t, err)
 
-		invalid = unittest.EpochStateFixture(unittest.WithNextEpochProtocolState()).EpochProtocolStateEntry
+		invalid = unittest.EpochStateFixture(unittest.WithNextEpochProtocolState()).MinEpochStateEntry
 		// swap first and second elements to break canonical order
 		invalid.NextEpoch.ActiveIdentities[0], invalid.NextEpoch.ActiveIdentities[1] = invalid.NextEpoch.ActiveIdentities[1], invalid.NextEpoch.ActiveIdentities[0]
 
@@ -123,7 +123,7 @@ func TestProtocolStateMergeParticipants(t *testing.T) {
 			err = commits.StoreTx(stateEntry.CurrentEpochCommit)(tx)
 			require.NoError(t, err)
 
-			return store.StoreTx(protocolStateID, stateEntry.EpochProtocolStateEntry)(tx)
+			return store.StoreTx(protocolStateID, stateEntry.MinEpochStateEntry)(tx)
 		})
 		require.NoError(t, err)
 
@@ -161,7 +161,7 @@ func TestProtocolStateRootSnapshot(t *testing.T) {
 			err = commits.StoreTx(expected.CurrentEpochCommit)(tx)
 			require.NoError(t, err)
 
-			err = store.StoreTx(protocolStateID, expected.EpochProtocolStateEntry)(tx)
+			err = store.StoreTx(protocolStateID, expected.MinEpochStateEntry)(tx)
 			require.NoError(t, err)
 			return store.Index(blockID, protocolStateID)(tx)
 		})
@@ -184,13 +184,13 @@ func TestProtocolStateRootSnapshot(t *testing.T) {
 }
 
 // assertRichProtocolStateValidity checks if RichProtocolState holds its invariant and is correctly populated by storage layer.
-func assertRichProtocolStateValidity(t *testing.T, state *flow.RichEpochProtocolStateEntry) {
+func assertRichProtocolStateValidity(t *testing.T, state *flow.RichEpochStateEntry) {
 	// invariants:
 	//  - CurrentEpochSetup and CurrentEpochCommit are for the same epoch. Never nil.
-	//  - CurrentEpochSetup and CurrentEpochCommit IDs match respective commitments in the `EpochProtocolStateEntry`.
+	//  - CurrentEpochSetup and CurrentEpochCommit IDs match respective commitments in the `MinEpochStateEntry`.
 	assert.Equal(t, state.CurrentEpochSetup.Counter, state.CurrentEpochCommit.Counter, "current epoch setup and commit should be for the same epoch")
-	assert.Equal(t, state.CurrentEpochSetup.ID(), state.EpochProtocolStateEntry.CurrentEpoch.SetupID, "epoch setup should be for correct event ID")
-	assert.Equal(t, state.CurrentEpochCommit.ID(), state.EpochProtocolStateEntry.CurrentEpoch.CommitID, "epoch commit should be for correct event ID")
+	assert.Equal(t, state.CurrentEpochSetup.ID(), state.MinEpochStateEntry.CurrentEpoch.SetupID, "epoch setup should be for correct event ID")
+	assert.Equal(t, state.CurrentEpochCommit.ID(), state.MinEpochStateEntry.CurrentEpoch.CommitID, "epoch commit should be for correct event ID")
 
 	var (
 		previousEpochParticipants flow.IdentityList
@@ -203,8 +203,8 @@ func assertRichProtocolStateValidity(t *testing.T, state *flow.RichEpochProtocol
 		assert.Equal(t, state.PreviousEpochSetup.Counter, state.PreviousEpochCommit.Counter, "previous epoch setup and commit should be for the same epoch")
 
 		// invariant: PreviousEpochSetup and PreviousEpochCommit IDs are the equal to the ID of the protocol state entry. Never nil.
-		assert.Equal(t, state.PreviousEpochSetup.ID(), state.EpochProtocolStateEntry.PreviousEpoch.SetupID, "epoch setup should be for correct event ID")
-		assert.Equal(t, state.PreviousEpochCommit.ID(), state.EpochProtocolStateEntry.PreviousEpoch.CommitID, "epoch commit should be for correct event ID")
+		assert.Equal(t, state.PreviousEpochSetup.ID(), state.MinEpochStateEntry.PreviousEpoch.SetupID, "epoch setup should be for correct event ID")
+		assert.Equal(t, state.PreviousEpochCommit.ID(), state.MinEpochStateEntry.PreviousEpoch.CommitID, "epoch commit should be for correct event ID")
 
 		// invariant: ComposeFullIdentities ensures that we can build full identities of previous epoch's active participants. This step also confirms that the
 		// previous epoch's `Participants` [IdentitySkeletons] and `ActiveIdentities` [DynamicIdentity properties] list the same nodes in canonical ordering.
@@ -260,7 +260,7 @@ func assertRichProtocolStateValidity(t *testing.T, state *flow.RichEpochProtocol
 
 	// invariants:
 	//  - NextEpochSetup and NextEpochCommit are for the same epoch. Never nil.
-	//  - NextEpochSetup and NextEpochCommit IDs match respective commitments in the `EpochProtocolStateEntry`.
+	//  - NextEpochSetup and NextEpochCommit IDs match respective commitments in the `MinEpochStateEntry`.
 	assert.Equal(t, state.CurrentEpochSetup.Counter+1, state.NextEpochSetup.Counter, "next epoch (%d) should be following right after current epoch (%d)", state.NextEpochSetup.Counter, state.CurrentEpochSetup.Counter)
 	assert.Equal(t, state.NextEpochSetup.Counter, state.NextEpochCommit.Counter, "next epoch setup and commit should be for the same epoch")
 	assert.Equal(t, state.NextEpochSetup.ID(), state.NextEpoch.SetupID, "epoch setup should be for correct event ID")

@@ -304,7 +304,7 @@ func TestLeaderSelectionAreWeighted(t *testing.T) {
 
 func BenchmarkLeaderSelection(b *testing.B) {
 
-	const N_VIEWS = 15000000
+	const N_VIEWS = EstimatedSixMonthOfViews
 	const N_NODES = 20
 
 	identities := make(flow.IdentityList, 0, N_NODES)

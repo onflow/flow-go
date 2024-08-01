@@ -458,66 +458,42 @@ func checkMigratedState(
 				value:         "StorageCapabilityController(borrowType: Type<&A.0ae53cb6e3f42a79.FlowToken.Vault>(), capabilityID: 3, target: /storage/flowTokenVault)",
 			},
 			{
-				storageKey: interpreter.StorageKey{
-					Key:     "path_cap",
-					Address: address,
-				},
+				storageKey:    interpreter.StorageKey{Key: "path_cap", Address: address},
 				storageMapKey: interpreter.StringStorageMapKey("flowTokenVault"),
 				value:         "3",
 			},
 			{
-				storageKey: interpreter.StorageKey{
-					Key:     "path_cap",
-					Address: address,
-				},
+				storageKey:    interpreter.StorageKey{Key: "path_cap", Address: address},
 				storageMapKey: interpreter.StringStorageMapKey("flowTokenVault"),
 				value:         "1",
 			},
 			{
-				storageKey: interpreter.StorageKey{
-					Key:     "path_cap",
-					Address: address,
-				},
+				storageKey:    interpreter.StorageKey{Key: "path_cap", Address: address},
 				storageMapKey: interpreter.StringStorageMapKey("flowTokenVault"),
 				value:         "nil",
 			},
 			{
-				storageKey: interpreter.StorageKey{
-					Key:     "path_cap",
-					Address: address,
-				},
+				storageKey:    interpreter.StorageKey{Key: "path_cap", Address: address},
 				storageMapKey: interpreter.StringStorageMapKey("flowTokenVault"),
 				value:         "nil",
 			},
 			{
-				storageKey: interpreter.StorageKey{
-					Key:     "path_cap",
-					Address: address,
-				},
+				storageKey:    interpreter.StorageKey{Key: "path_cap", Address: address},
 				storageMapKey: interpreter.StringStorageMapKey("flowTokenVault"),
 				value:         "{3: nil, 1: nil}",
 			},
 			{
-				storageKey: interpreter.StorageKey{
-					Key:     "path_cap",
-					Address: address,
-				},
+				storageKey:    interpreter.StorageKey{Key: "path_cap", Address: address},
 				storageMapKey: interpreter.StringStorageMapKey("r"),
 				value:         "2",
 			},
 			{
-				storageKey: interpreter.StorageKey{
-					Key:     "path_cap",
-					Address: address,
-				},
+				storageKey:    interpreter.StorageKey{Key: "path_cap", Address: address},
 				storageMapKey: interpreter.StringStorageMapKey("r"),
 				value:         "nil",
 			},
 			{
-				storageKey: interpreter.StorageKey{
-					Key:     "path_cap",
-					Address: address,
-				},
+				storageKey:    interpreter.StorageKey{Key: "path_cap", Address: address},
 				storageMapKey: interpreter.StringStorageMapKey("r"),
 				value:         "{2: nil}",
 			},
@@ -860,13 +836,17 @@ func checkReporters(
 				AccountAddress: address,
 				AddressPath: interpreter.AddressPath{
 					Address: address,
-					Path:    interpreter.PathValue{Identifier: "linkR", Domain: 0x3},
+					Path: interpreter.PathValue{
+						Identifier: "linkR",
+						Domain:     common.PathDomainPublic,
+					},
 				},
 				BorrowType: interpreter.NewReferenceStaticType(
 					nil,
 					entitlementAuthorization(),
 					rResourceType,
 				),
+				CapabilityID: 2,
 			},
 			cadenceValueMigrationEntry{
 				StorageKey:    interpreter.StorageKey{Key: "storage", Address: address},
@@ -876,13 +856,17 @@ func checkReporters(
 			capabilityMigrationEntry{
 				AccountAddress: address,
 				AddressPath: interpreter.AddressPath{
-					Address: address, Path: interpreter.PathValue{Identifier: "linkR", Domain: 0x3},
+					Address: address, Path: interpreter.PathValue{
+						Identifier: "linkR",
+						Domain:     common.PathDomainPublic,
+					},
 				},
 				BorrowType: interpreter.NewReferenceStaticType(
 					nil,
 					entitlementAuthorization(),
 					rResourceType,
 				),
+				CapabilityID: 2,
 			},
 			cadenceValueMigrationEntry{
 				StorageKey:    interpreter.StorageKey{Key: "storage", Address: address},
@@ -892,9 +876,12 @@ func checkReporters(
 			linkMigrationEntry{
 				AccountAddressPath: interpreter.AddressPath{
 					Address: address,
-					Path:    interpreter.PathValue{Identifier: "flowTokenReceiver", Domain: 0x3},
+					Path: interpreter.PathValue{
+						Identifier: "flowTokenReceiver",
+						Domain:     common.PathDomainPublic,
+					},
 				},
-				CapabilityID: 0x1,
+				CapabilityID: 1,
 			},
 			cadenceValueMigrationEntry{
 				StorageKey:    interpreter.StorageKey{Key: "public", Address: address},
@@ -904,9 +891,12 @@ func checkReporters(
 			linkMigrationEntry{
 				AccountAddressPath: interpreter.AddressPath{
 					Address: address,
-					Path:    interpreter.PathValue{Identifier: "linkR", Domain: 0x3},
+					Path: interpreter.PathValue{
+						Identifier: "linkR",
+						Domain:     common.PathDomainPublic,
+					},
 				},
-				CapabilityID: 0x2,
+				CapabilityID: 2,
 			},
 			cadenceValueMigrationEntry{
 				StorageKey:    interpreter.StorageKey{Key: "public", Address: address},
@@ -916,9 +906,12 @@ func checkReporters(
 			linkMigrationEntry{
 				AccountAddressPath: interpreter.AddressPath{
 					Address: address,
-					Path:    interpreter.PathValue{Identifier: "flowTokenBalance", Domain: 0x3},
+					Path: interpreter.PathValue{
+						Identifier: "flowTokenBalance",
+						Domain:     common.PathDomainPublic,
+					},
 				},
-				CapabilityID: 0x3,
+				CapabilityID: 3,
 			},
 			cadenceValueMigrationEntry{
 				StorageKey:    interpreter.StorageKey{Key: "public", Address: address},
@@ -2044,7 +2037,8 @@ func TestCapabilityMigrationEntry_MarshalJSON(t *testing.T) {
           "account_address": "0x0000000000000002",
           "address": "0x0000000000000001",
           "path": "/public/test",
-          "borrow_type": "&Int"
+          "borrow_type": "&Int",
+          "capability_id": "0"
         }`,
 		string(actual),
 	)

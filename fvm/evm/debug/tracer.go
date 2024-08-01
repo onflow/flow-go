@@ -3,8 +3,11 @@ package debug
 import (
 	"encoding/json"
 	"fmt"
+	"math/big"
 
 	gethCommon "github.com/onflow/go-ethereum/common"
+	"github.com/onflow/go-ethereum/core/tracing"
+	"github.com/onflow/go-ethereum/core/types"
 	"github.com/onflow/go-ethereum/eth/tracers"
 	"github.com/rs/zerolog"
 
@@ -49,7 +52,7 @@ func NewEVMCallTracer(uploader Uploader, logger zerolog.Logger) (*CallTracer, er
 }
 
 func (t *CallTracer) TxTracer() *tracers.Tracer {
-	return t.tracer
+	return NewSafeTxTracer(t)
 }
 
 func (t *CallTracer) WithBlockID(id flow.Identifier) {
@@ -112,4 +115,148 @@ func (n nopTracer) Collect(_ gethCommon.Hash) {}
 
 func TraceID(txID gethCommon.Hash, blockID flow.Identifier) string {
 	return fmt.Sprintf("%s-%s", blockID.String(), txID.String())
+}
+
+func NewSafeTxTracer(ct *CallTracer) *tracers.Tracer {
+	wrapped := &tracers.Tracer{
+		Hooks: &tracing.Hooks{},
+	}
+
+	l := ct.logger.With().
+		Str("block-id", ct.blockID.String()).
+		Logger()
+
+	wrapped.OnTxStart = func(
+		vm *tracing.VMContext,
+		tx *types.Transaction,
+		from gethCommon.Address,
+	) {
+		defer func() {
+			if r := recover(); r != nil {
+				err, ok := r.(error)
+				if !ok {
+					err = fmt.Errorf("panic: %v", r)
+				}
+				l.Err(err).
+					Stack().
+					Msg("OnTxStart trace collection failed")
+			}
+		}()
+		ct.tracer.OnTxStart(vm, tx, from)
+	}
+
+	wrapped.OnTxEnd = func(receipt *types.Receipt, err error) {
+		defer func() {
+			if r := recover(); r != nil {
+				err, ok := r.(error)
+				if !ok {
+					err = fmt.Errorf("panic: %v", r)
+				}
+				l.Err(err).
+					Stack().
+					Msg("OnTxEnd trace collection failed")
+			}
+		}()
+		ct.tracer.OnTxEnd(receipt, err)
+	}
+
+	wrapped.OnEnter = func(
+		depth int,
+		typ byte,
+		from, to gethCommon.Address,
+		input []byte,
+		gas uint64,
+		value *big.Int,
+	) {
+		defer func() {
+			if r := recover(); r != nil {
+				err, ok := r.(error)
+				if !ok {
+					err = fmt.Errorf("panic: %v", r)
+				}
+				l.Err(err).
+					Stack().
+					Msg("OnEnter trace collection failed")
+			}
+		}()
+		ct.tracer.OnEnter(depth, typ, from, to, input, gas, value)
+	}
+
+	wrapped.OnExit = func(depth int, output []byte, gasUsed uint64, err error, reverted bool) {
+		defer func() {
+			if r := recover(); r != nil {
+				err, ok := r.(error)
+				if !ok {
+					err = fmt.Errorf("panic: %v", r)
+				}
+				l.Err(err).
+					Stack().
+					Msg("OnExit trace collection failed")
+			}
+		}()
+		ct.tracer.OnExit(depth, output, gasUsed, err, reverted)
+	}
+
+	wrapped.OnOpcode = func(
+		pc uint64,
+		op byte,
+		gas, cost uint64,
+		scope tracing.OpContext,
+		rData []byte,
+		depth int,
+		err error,
+	) {
+		defer func() {
+			if r := recover(); r != nil {
+				err, ok := r.(error)
+				if !ok {
+					err = fmt.Errorf("panic: %v", r)
+				}
+				l.Err(err).
+					Stack().
+					Msg("OnOpcode trace collection failed")
+			}
+		}()
+		ct.tracer.OnOpcode(pc, op, gas, cost, scope, rData, depth, err)
+	}
+
+	wrapped.OnFault = func(
+		pc uint64,
+		op byte,
+		gas, cost uint64,
+		scope tracing.OpContext,
+		depth int,
+		err error) {
+		defer func() {
+			if r := recover(); r != nil {
+				err, ok := r.(error)
+				if !ok {
+					err = fmt.Errorf("panic: %v", r)
+				}
+				l.Err(err).
+					Stack().
+					Msg("OnFault trace collection failed")
+			}
+		}()
+		ct.tracer.OnFault(pc, op, gas, cost, scope, depth, err)
+	}
+
+	wrapped.OnGasChange = func(old, new uint64, reason tracing.GasChangeReason) {
+		defer func() {
+			if r := recover(); r != nil {
+				err, ok := r.(error)
+				if !ok {
+					err = fmt.Errorf("panic: %v", r)
+				}
+				l.Err(err).
+					Stack().
+					Msg("OnGasChange trace collection failed")
+			}
+		}()
+		ct.tracer.OnGasChange(old, new, reason)
+	}
+
+	wrapped.GetResult = ct.tracer.GetResult
+	wrapped.Stop = ct.tracer.Stop
+	return wrapped
 }

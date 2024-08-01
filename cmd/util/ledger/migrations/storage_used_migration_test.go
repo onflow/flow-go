@@ -94,7 +94,7 @@ func TestAccountStatusMigration(t *testing.T) {
 		require.NoError(t, err)
 
 		require.Equal(t, sizeOfTheStatusPayload, accountStatus.StorageUsed())
-		require.Equal(t, atree.StorageIndex{0, 0, 0, 0, 0, 0, 0, 6}, accountStatus.StorageIndex())
+		require.Equal(t, atree.SlabIndex{0, 0, 0, 0, 0, 0, 0, 6}, accountStatus.SlabIndex())
 		require.Equal(t, uint32(5), accountStatus.PublicKeyCount())
 		require.Equal(t, uint64(0), accountStatus.AccountIdCounter())
 	})
@@ -122,7 +122,7 @@ func TestAccountStatusMigration(t *testing.T) {
 		require.NoError(t, err)
 
 		require.Equal(t, sizeOfTheStatusPayload, accountStatus.StorageUsed())
-		require.Equal(t, atree.StorageIndex{0, 0, 0, 0, 0, 0, 0, 6}, accountStatus.StorageIndex())
+		require.Equal(t, atree.SlabIndex{0, 0, 0, 0, 0, 0, 0, 6}, accountStatus.SlabIndex())
 		require.Equal(t, uint32(5), accountStatus.PublicKeyCount())
 		require.Equal(t, uint64(3), accountStatus.AccountIdCounter())
 	})
@@ -151,7 +151,7 @@ func TestAccountStatusMigration(t *testing.T) {
 		require.NoError(t, err)
 
 		require.Equal(t, sizeOfTheStatusPayload, accountStatus.StorageUsed())
-		require.Equal(t, atree.StorageIndex{0, 0, 0, 0, 0, 0, 0, 6}, accountStatus.StorageIndex())
+		require.Equal(t, atree.SlabIndex{0, 0, 0, 0, 0, 0, 0, 6}, accountStatus.SlabIndex())
 		require.Equal(t, uint32(5), accountStatus.PublicKeyCount())
 		require.Equal(t, uint64(3), accountStatus.AccountIdCounter())
 	})
@@ -201,7 +201,7 @@ func TestAccountStatusMigration(t *testing.T) {
 		))
 
 		require.Equal(t, sizeOfTheStatusPayload+dataRegisterSize, accountStatus.StorageUsed())
-		require.Equal(t, atree.StorageIndex{0, 0, 0, 0, 0, 0, 0, 6}, accountStatus.StorageIndex())
+		require.Equal(t, atree.SlabIndex{0, 0, 0, 0, 0, 0, 0, 6}, accountStatus.SlabIndex())
 		require.Equal(t, uint32(5), accountStatus.PublicKeyCount())
 		require.Equal(t, uint64(3), accountStatus.AccountIdCounter())
 	})

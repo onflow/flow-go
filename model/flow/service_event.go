@@ -21,6 +21,7 @@ func (set ServiceEventType) String() string {
 const (
 	ServiceEventSetup                       ServiceEventType = "setup"
 	ServiceEventCommit                      ServiceEventType = "commit"
+	ServiceEventRecover                     ServiceEventType = "recover"
 	ServiceEventVersionBeacon               ServiceEventType = "version-beacon"                 // VersionBeacon only controls version of ENs, describing software compatability via semantic versioning
 	ServiceEventProtocolStateVersionUpgrade ServiceEventType = "protocol-state-version-upgrade" // Protocol State version applies to all nodes and uses an _integer version_ of the _protocol_
 )
@@ -117,6 +118,8 @@ func (marshaller marshallerImpl) UnmarshalWrapped(b []byte) (ServiceEvent, error
 		event, err = unmarshalWrapped[EpochSetup](b, marshaller)
 	case ServiceEventCommit:
 		event, err = unmarshalWrapped[EpochCommit](b, marshaller)
+	case ServiceEventRecover:
+		event, err = unmarshalWrapped[EpochRecover](b, marshaller)
 	case ServiceEventVersionBeacon:
 		event, err = unmarshalWrapped[VersionBeacon](b, marshaller)
 	case ServiceEventProtocolStateVersionUpgrade:
@@ -159,6 +162,8 @@ func (marshaller marshallerImpl) UnmarshalWithType(b []byte, eventType ServiceEv
 		event = new(EpochSetup)
 	case ServiceEventCommit:
 		event = new(EpochCommit)
+	case ServiceEventRecover:
+		event = new(EpochRecover)
 	case ServiceEventVersionBeacon:
 		event = new(VersionBeacon)
 	case ServiceEventProtocolStateVersionUpgrade:
@@ -251,6 +256,23 @@ func (se *ServiceEvent) EqualTo(other *ServiceEvent) (bool, error) {
 			)
 		}
 		return commit.EqualTo(otherCommit), nil
+
+	case ServiceEventRecover:
+		ev, ok := se.Event.(*EpochRecover)
+		if !ok {
+			return false, fmt.Errorf(
+				"internal invalid type for ServiceEventRecover: %T",
+				se.Event,
+			)
+		}
+		otherEv, ok := other.Event.(*EpochRecover)
+		if !ok {
+			return false, fmt.Errorf(
+				"internal invalid type for ServiceEventRecover: %T",
+				other.Event,
+			)
+		}
+		return ev.EqualTo(otherEv), nil
 
 	case ServiceEventVersionBeacon:
 		version, ok := se.Event.(*VersionBeacon)

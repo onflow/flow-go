@@ -42,7 +42,7 @@ func TestBootstrapAndOpen(t *testing.T) {
 		require.NoError(t, err)
 		counter, err := epoch.Counter()
 		require.NoError(t, err)
-		phase, err := rootSnapshot.Phase()
+		phase, err := rootSnapshot.EpochPhase()
 		require.NoError(t, err)
 
 		complianceMetrics := new(mock.ComplianceMetrics)
@@ -54,9 +54,7 @@ func TestBootstrapAndOpen(t *testing.T) {
 
 		dkgPhase1FinalView, dkgPhase2FinalView, dkgPhase3FinalView, err := protocol.DKGPhaseViews(epoch)
 		require.NoError(t, err)
-		complianceMetrics.On("CurrentDKGPhase1FinalView", dkgPhase1FinalView).Once()
-		complianceMetrics.On("CurrentDKGPhase2FinalView", dkgPhase2FinalView).Once()
-		complianceMetrics.On("CurrentDKGPhase3FinalView", dkgPhase3FinalView).Once()
+		complianceMetrics.On("CurrentDKGPhaseViews", dkgPhase1FinalView, dkgPhase2FinalView, dkgPhase3FinalView).Once()
 
 		noopMetrics := new(metrics.NoopCollector)
 		all := storagebadger.InitAll(noopMetrics, db)
@@ -91,9 +89,6 @@ func TestBootstrapAndOpen(t *testing.T) {
 // root snapshot from EpochCommitted phase  we should be able to open it and
 // got the same state.
 func TestBootstrapAndOpen_EpochCommitted(t *testing.T) {
-	unittest.SkipUnless(t, unittest.TEST_TODO, "such behavior is not supported yet since SealingSegment should"+
-		"contain blocks with the same protocol state ID. For this test it means that blocks needs to be selected"+
-		"from the same epoch phase and cannot cross epoch boundaries")
 	// create a state root and bootstrap the protocol state with it
 	participants := unittest.CompleteIdentitySet()
 	rootSnapshot := unittest.RootSnapshotFixture(participants, func(block *flow.Block) {
@@ -108,7 +103,7 @@ func TestBootstrapAndOpen_EpochCommitted(t *testing.T) {
 
 		// find the point where we transition to the epoch committed phase
 		for height := rootBlock.Height + 1; ; height++ {
-			phase, err := state.AtHeight(height).Phase()
+			phase, err := state.AtHeight(height).EpochPhase()
 			require.NoError(t, err)
 			if phase == flow.EpochPhaseCommitted {
 				return state.AtHeight(height)
@@ -126,7 +121,7 @@ func TestBootstrapAndOpen_EpochCommitted(t *testing.T) {
 		complianceMetrics.On("CurrentEpochCounter", counter).Once()
 
 		// expect epoch phase to be set to current phase
-		phase, err := committedPhaseSnapshot.Phase()
+		phase, err := committedPhaseSnapshot.EpochPhase()
 		require.NoError(t, err)
 		complianceMetrics.On("CurrentEpochPhase", phase).Once()
 
@@ -136,9 +131,7 @@ func TestBootstrapAndOpen_EpochCommitted(t *testing.T) {
 
 		dkgPhase1FinalView, dkgPhase2FinalView, dkgPhase3FinalView, err := protocol.DKGPhaseViews(committedPhaseSnapshot.Epochs().Current())
 		require.NoError(t, err)
-		complianceMetrics.On("CurrentDKGPhase1FinalView", dkgPhase1FinalView).Once()
-		complianceMetrics.On("CurrentDKGPhase2FinalView", dkgPhase2FinalView).Once()
-		complianceMetrics.On("CurrentDKGPhase3FinalView", dkgPhase3FinalView).Once()
+		complianceMetrics.On("CurrentDKGPhaseViews", dkgPhase1FinalView, dkgPhase2FinalView, dkgPhase3FinalView).Once()
 		complianceMetrics.On("FinalizedHeight", testmock.Anything).Once()
 		complianceMetrics.On("SealedHeight", testmock.Anything).Once()
 
@@ -378,13 +371,70 @@ func TestBootstrapNonRoot(t *testing.T) {
 		})
 	})
 
+	// should be able to bootstrap from snapshot after entering EFM because of sealing invalid service event
+	// ROOT <- B1 <- B2(R1) <- B3(S1) <- CHILD
+	t.Run("in EFM", func(t *testing.T) {
+		after := snapshotAfter(t, rootSnapshot, func(state *bprotocol.FollowerState, mutableState protocol.MutableProtocolState) protocol.Snapshot {
+			block1 := unittest.BlockWithParentFixture(rootBlock)
+			block1.SetPayload(unittest.PayloadFixture(unittest.WithProtocolStateID(rootProtocolStateID)))
+			buildFinalizedBlock(t, state, block1)
+
+			invalidEpochSetup := unittest.EpochSetupFixture()
+			receipt1, seal1 := unittest.ReceiptAndSealForBlock(block1, invalidEpochSetup.ServiceEvent())
+			block2 := unittest.BlockWithParentFixture(block1.Header)
+			block2.SetPayload(unittest.PayloadFixture(
+				unittest.WithReceipts(receipt1),
+				unittest.WithProtocolStateID(rootProtocolStateID)))
+			buildFinalizedBlock(t, state, block2)
+
+			seals := []*flow.Seal{seal1}
+			block3 := unittest.BlockWithParentFixture(block2.Header)
+			block3.SetPayload(flow.Payload{
+				Seals:           seals,
+				ProtocolStateID: calculateExpectedStateId(t, mutableState)(block3.Header, seals),
+			})
+			buildFinalizedBlock(t, state, block3)
+
+			child := unittest.BlockWithParentProtocolState(block3)
+			buildBlock(t, state, child)
+
+			// ensure we have entered EFM
+			snapshot := state.AtBlockID(block3.ID())
+			epochState, err := snapshot.EpochProtocolState()
+			require.NoError(t, err)
+			require.Equal(t, flow.EpochPhaseFallback, epochState.EpochPhase())
+
+			return snapshot
+		})
+
+		bootstrap(t, after, func(state *bprotocol.State, err error) {
+			require.NoError(t, err)
+			unittest.AssertSnapshotsEqual(t, after, state.Final())
+			segment, err := state.Final().SealingSegment()
+			require.NoError(t, err)
+			for _, block := range segment.Blocks {
+				snapshot := state.AtBlockID(block.ID())
+				// should be able to read all QCs
+				_, err := snapshot.QuorumCertificate()
+				require.NoError(t, err)
+				_, err = snapshot.RandomSource()
+				require.NoError(t, err)
+			}
+
+			epochState, err := state.Final().EpochProtocolState()
+			require.NoError(t, err)
+			require.True(t, epochState.EpochFallbackTriggered())
+			require.Equal(t, flow.EpochPhaseFallback, epochState.EpochPhase())
+		})
+	})
+
 	t.Run("with setup next epoch", func(t *testing.T) {
 		after := snapshotAfter(t, rootSnapshot, func(state *bprotocol.FollowerState, mutableState protocol.MutableProtocolState) protocol.Snapshot {
 			unittest.NewEpochBuilder(t, mutableState, state).BuildEpoch()
 
 			// find the point where we transition to the epoch setup phase
 			for height := rootBlock.Height + 1; ; height++ {
-				phase, err := state.AtHeight(height).Phase()
+				phase, err := state.AtHeight(height).EpochPhase()
 				require.NoError(t, err)
 				if phase == flow.EpochPhaseSetup {
 					return state.AtHeight(height)
@@ -415,7 +465,7 @@ func TestBootstrapNonRoot(t *testing.T) {
 
 			// find the point where we transition to the epoch committed phase
 			for height := rootBlock.Height + 1; ; height++ {
-				phase, err := state.AtHeight(height).Phase()
+				phase, err := state.AtHeight(height).EpochPhase()
 				require.NoError(t, err)
 				if phase == flow.EpochPhaseCommitted {
 					return state.AtHeight(height)
@@ -453,7 +503,7 @@ func TestBootstrapNonRoot(t *testing.T) {
 				snap := state.AtHeight(height)
 				counter, err := snap.Epochs().Current().Counter()
 				require.NoError(t, err)
-				phase, err := snap.Phase()
+				phase, err := snap.EpochPhase()
 				require.NoError(t, err)
 				if phase == flow.EpochPhaseSetup && counter == epoch1Counter+1 {
 					return snap
