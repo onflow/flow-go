@@ -74,6 +74,34 @@ func (_m *Snapshot) Descendants() ([]flow.Identifier, error) {
 	return r0, r1
 }
 
+// EpochPhase provides a mock function with given fields:
+func (_m *Snapshot) EpochPhase() (flow.EpochPhase, error) {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for EpochPhase")
+	}
+
+	var r0 flow.EpochPhase
+	var r1 error
+	if rf, ok := ret.Get(0).(func() (flow.EpochPhase, error)); ok {
+		return rf()
+	}
+	if rf, ok := ret.Get(0).(func() flow.EpochPhase); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(flow.EpochPhase)
+	}
+
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // EpochProtocolState provides a mock function with given fields:
 func (_m *Snapshot) EpochProtocolState() (protocol.EpochProtocolState, error) {
 	ret := _m.Called()
@@ -232,34 +260,6 @@ func (_m *Snapshot) Params() protocol.GlobalParams {
 	}
 
 	return r0
-}
-
-// Phase provides a mock function with given fields:
-func (_m *Snapshot) Phase() (flow.EpochPhase, error) {
-	ret := _m.Called()
-
-	if len(ret) == 0 {
-		panic("no return value specified for Phase")
-	}
-
-	var r0 flow.EpochPhase
-	var r1 error
-	if rf, ok := ret.Get(0).(func() (flow.EpochPhase, error)); ok {
-		return rf()
-	}
-	if rf, ok := ret.Get(0).(func() flow.EpochPhase); ok {
-		r0 = rf()
-	} else {
-		r0 = ret.Get(0).(flow.EpochPhase)
-	}
-
-	if rf, ok := ret.Get(1).(func() error); ok {
-		r1 = rf()
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
 }
 
 // ProtocolState provides a mock function with given fields:

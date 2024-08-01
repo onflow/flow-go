@@ -69,11 +69,13 @@ func ComputationResultForBlockFixture(
 
 	_, serviceEventEpochCommitProtocol := unittest.EpochCommitFixtureByChainID(flow.Localnet)
 	_, serviceEventEpochSetupProtocol := unittest.EpochSetupFixtureByChainID(flow.Localnet)
+	_, serviceEventEpochRecoverProtocol := unittest.EpochRecoverFixtureByChainID(flow.Localnet)
 	_, serviceEventVersionBeaconProtocol := unittest.VersionBeaconFixtureByChainID(flow.Localnet)
 
 	convertedServiceEvents := flow.ServiceEventList{
 		serviceEventEpochCommitProtocol.ServiceEvent(),
 		serviceEventEpochSetupProtocol.ServiceEvent(),
+		serviceEventEpochRecoverProtocol.ServiceEvent(),
 		serviceEventVersionBeaconProtocol.ServiceEvent(),
 	}
 

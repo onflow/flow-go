@@ -121,11 +121,14 @@ func (bl *BlockView) DirectCall(call *types.DirectCall) (res *types.Result, err 
 	// Call tx tracer
 	if proc.evm.Config.Tracer != nil && proc.evm.Config.Tracer.OnTxStart != nil {
 		proc.evm.Config.Tracer.OnTxStart(proc.evm.GetVMContext(), call.Transaction(), call.From.ToCommon())
-		if proc.evm.Config.Tracer.OnTxEnd != nil {
-			defer func() {
-				proc.evm.Config.Tracer.OnTxEnd(res.Receipt(), err)
-			}()
-		}
+		defer func() {
+			if proc.evm.Config.Tracer.OnTxEnd != nil {
+				if err == nil && res != nil {
+					proc.evm.Config.Tracer.OnTxEnd(res.Receipt(), res.ValidationError)
+				}
+			}
+		}()
+
 	}
 
 	// re-route based on the sub type
@@ -168,11 +171,13 @@ func (bl *BlockView) RunTransaction(
 	// call tracer
 	if proc.evm.Config.Tracer != nil && proc.evm.Config.Tracer.OnTxStart != nil {
 		proc.evm.Config.Tracer.OnTxStart(proc.evm.GetVMContext(), tx, msg.From)
-		if proc.evm.Config.Tracer.OnTxEnd != nil {
-			defer func() {
-				proc.evm.Config.Tracer.OnTxEnd(result.Receipt(), err)
-			}()
-		}
+		defer func() {
+			if proc.evm.Config.Tracer.OnTxEnd != nil {
+				if err == nil && result != nil {
+					proc.evm.Config.Tracer.OnTxEnd(result.Receipt(), result.ValidationError)
+				}
+			}
+		}()
 	}
 
 	// run msg
@@ -211,14 +216,16 @@ func (bl *BlockView) BatchRunTransactions(txs []*gethTypes.Transaction) ([]*type
 		// call tracer
 		if proc.evm.Config.Tracer != nil && proc.evm.Config.Tracer.OnTxStart != nil {
 			proc.evm.Config.Tracer.OnTxStart(proc.evm.GetVMContext(), tx, msg.From)
-			if proc.evm.Config.Tracer.OnTxEnd != nil {
-				defer func() {
-					proc.evm.Config.Tracer.OnTxEnd(
-						batchResults[i].Receipt(),
-						err,
-					)
-				}()
-			}
+			defer func() {
+				if proc.evm.Config.Tracer.OnTxEnd != nil {
+					j := i
+					res := batchResults[j]
+					if err == nil && res != nil {
+						proc.evm.Config.Tracer.OnTxEnd(res.Receipt(), res.ValidationError)
+					}
+				}
+			}()
+
 		}
 
 		// run msg
