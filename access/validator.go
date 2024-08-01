@@ -19,21 +19,9 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/execution"
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/protocol"
-)
-
-const (
-	invalidTransactionRateLimit = "payer_exceeded_rate_limit"
-	invalidTransactionByteSize  = "transaction_exceeded_size_limit"
-	incompleteTransaction       = "missing_fields"
-	invalidGasLimit             = "invalid_gas_limit"
-	expiredTransaction          = "transaction_expired"
-	invalidScript               = "invalid_script"
-	invalidAddresses            = "invalid_address"
-	invalidSignature            = "invalid_signature"
-	duplicatedSignature         = "duplicate_signature"
-	insufficientBalance         = "payer_insufficient_balance"
 )
 
 type Blocks interface {
@@ -176,15 +164,15 @@ func (v *TransactionValidator) initValidationSteps() {
 		// a short term solution to prevent attacks that send too many failed transactions
 		// if a transaction is from a payer that should be rate limited, all the following
 		// checks will be skipped
-		{v.checkRateLimitPayer, invalidTransactionRateLimit},
-		{v.checkTxSizeLimit, invalidTransactionByteSize},
-		{v.checkMissingFields, incompleteTransaction},
-		{v.checkGasLimit, invalidGasLimit},
-		{v.checkExpiry, expiredTransaction},
-		{v.checkCanBeParsed, invalidScript},
-		{v.checkAddresses, invalidAddresses},
-		{v.checkSignatureFormat, invalidSignature},
-		{v.checkSignatureDuplications, duplicatedSignature},
+		{v.checkRateLimitPayer, metrics.InvalidTransactionRateLimit},
+		{v.checkTxSizeLimit, metrics.InvalidTransactionByteSize},
+		{v.checkMissingFields, metrics.IncompleteTransaction},
+		{v.checkGasLimit, metrics.InvalidGasLimit},
+		{v.checkExpiry, metrics.ExpiredTransaction},
+		{v.checkCanBeParsed, metrics.InvalidScript},
+		{v.checkAddresses, metrics.InvalidAddresses},
+		{v.checkSignatureFormat, metrics.InvalidSignature},
+		{v.checkSignatureDuplications, metrics.DuplicatedSignature},
 	}
 }
 
@@ -204,7 +192,7 @@ func (v *TransactionValidator) Validate(ctx context.Context, tx *flow.Transactio
 		// are 'internal' and related to script execution process. they shouldn't
 		// prevent the transaction from proceeding.
 		if IsInsufficientBalanceError(err) {
-			v.transactionValidationMetrics.TransactionValidationFailed(insufficientBalance)
+			v.transactionValidationMetrics.TransactionValidationFailed(metrics.InsufficientBalance)
 			return err
 		}
 

@@ -9,11 +9,6 @@ import (
 
 type NamespaceType string
 
-const (
-	AccessNamespace     NamespaceType = namespaceAccess
-	CollectionNamespace NamespaceType = namespaceCollection
-)
-
 // TransactionValidationCollector the metrics for transaction validation functionality
 type TransactionValidationCollector struct {
 	transactionValidated        prometheus.Counter
@@ -24,17 +19,17 @@ type TransactionValidationCollector struct {
 var _ module.TransactionValidationMetrics = (*TransactionValidationCollector)(nil)
 
 // NewTransactionValidationCollector creates new instance of TransactionValidationCollector
-func NewTransactionValidationCollector(namespace NamespaceType) *TransactionValidationCollector {
+func NewTransactionValidationCollector() *TransactionValidationCollector {
 	return &TransactionValidationCollector{
 		transactionValidated: promauto.NewCounter(prometheus.CounterOpts{
-			Name:      "transaction_validation_succeeded",
-			Namespace: string(namespace),
+			Name:      "transaction_validation_successes_total",
+			Namespace: namespaceAccess,
 			Subsystem: subsystemTransactionValidation,
 			Help:      "counter for the validated transactions",
 		}),
 		transactionValidationFailed: promauto.NewCounterVec(prometheus.CounterOpts{
 			Name:      "transaction_validation_failed",
-			Namespace: string(namespace),
+			Namespace: namespaceAccess,
 			Subsystem: subsystemTransactionValidation,
 			Help:      "counter for the failed transactions validation",
 		}, []string{"reason"}),
