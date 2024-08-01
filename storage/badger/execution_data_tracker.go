@@ -120,12 +120,12 @@ func (s *ExecutionDataTracker) init(startHeight uint64) error {
 }
 
 func (s *ExecutionDataTracker) bootstrap(startHeight uint64) error {
-	err := s.db.Update(operation.InsertTrackerFulfilledHeight(startHeight))
+	err := s.db.Update(operation.InitTrackerFulfilledHeight(startHeight))
 	if err != nil {
 		return fmt.Errorf("failed to set fulfilled height value: %w", err)
 	}
 
-	err = s.db.Update(operation.InsertTrackerPrunedHeight(startHeight))
+	err = s.db.Update(operation.InitTrackerPrunedHeight(startHeight))
 	if err != nil {
 		return fmt.Errorf("failed to set pruned height value: %w", err)
 	}

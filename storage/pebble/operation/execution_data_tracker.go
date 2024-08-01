@@ -11,7 +11,7 @@ func UpdateTrackerFulfilledHeight(height uint64) func(w pebble.Writer) error {
 	return insert(makePrefix(storage.PrefixGlobalState, storage.GlobalStateFulfilledHeight), height)
 }
 
-func InsertTrackerFulfilledHeight(height uint64) func(w pebble.Writer) error {
+func InitTrackerFulfilledHeight(height uint64) func(w pebble.Writer) error {
 	return insert(makePrefix(storage.PrefixGlobalState, storage.GlobalStateFulfilledHeight), height)
 }
 
@@ -23,7 +23,7 @@ func UpdateTrackerPrunedHeight(height uint64) func(w pebble.Writer) error {
 	return insert(makePrefix(storage.PrefixGlobalState, storage.GlobalStatePrunedHeight), height)
 }
 
-func InsertTrackerPrunedHeight(height uint64) func(w pebble.Writer) error {
+func InitTrackerPrunedHeight(height uint64) func(w pebble.Writer) error {
 	return insert(makePrefix(storage.PrefixGlobalState, storage.GlobalStatePrunedHeight), height)
 }
 

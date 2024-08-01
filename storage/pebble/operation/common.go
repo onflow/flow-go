@@ -34,9 +34,11 @@ func retrieve(key []byte, sc interface{}) func(r pebble.Reader) error {
 		}
 		defer closer.Close()
 
+		// in case the value is not needed
 		if sc == nil {
 			return nil
 		}
+
 		err = msgpack.Unmarshal(val, sc)
 		if err != nil {
 			return irrecoverable.NewExceptionf("failed to decode value: %w", err)
