@@ -16,6 +16,28 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+var verifyPayerBalanceResultType = cadence.NewStructType(
+	// TODO: location
+	nil,
+	// TODO: qualified identifier
+	"",
+	[]cadence.Field{
+		{
+			Identifier: fvm.VerifyPayerBalanceResultTypeCanExecuteTransactionFieldName,
+			Type:       cadence.BoolType,
+		},
+		{
+			Identifier: fvm.VerifyPayerBalanceResultTypeRequiredBalanceFieldName,
+			Type:       cadence.UFix64Type,
+		},
+		{
+			Identifier: fvm.VerifyPayerBalanceResultTypeMaximumTransactionFeesFieldName,
+			Type:       cadence.UFix64Type,
+		},
+	},
+	nil,
+)
+
 func TestTransactionPayerBalanceChecker(t *testing.T) {
 	payer := flow.HexToAddress("1")
 	t.Run("TransactionFeesEnabled == false disables the balance check", func(t *testing.T) {
@@ -90,7 +112,7 @@ func TestTransactionPayerBalanceChecker(t *testing.T) {
 				cadence.NewBool(true),
 				cadence.UFix64(100),
 				cadence.UFix64(100),
-			}).WithType(fvm.VerifyPayerBalanceResultType),
+			}).WithType(verifyPayerBalanceResultType),
 			nil,
 		)
 
@@ -119,7 +141,7 @@ func TestTransactionPayerBalanceChecker(t *testing.T) {
 				cadence.NewBool(false),
 				cadence.UFix64(100),
 				cadence.UFix64(101),
-			}).WithType(fvm.VerifyPayerBalanceResultType),
+			}).WithType(verifyPayerBalanceResultType),
 			nil,
 		)
 

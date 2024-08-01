@@ -135,7 +135,7 @@ func (tb *TransactionBody) SetComputeLimit(limit uint64) *TransactionBody {
 //
 // The first two arguments specify the account key to be used, and the last argument is the sequence
 // number being declared.
-func (tb *TransactionBody) SetProposalKey(address Address, keyID uint64, sequenceNum uint64) *TransactionBody {
+func (tb *TransactionBody) SetProposalKey(address Address, keyID uint32, sequenceNum uint64) *TransactionBody {
 	proposalKey := ProposalKey{
 		Address:        address,
 		KeyIndex:       keyID,
@@ -244,7 +244,7 @@ func (tb *TransactionBody) signerMap() map[Address]int {
 // This function returns an error if the signature cannot be generated.
 func (tb *TransactionBody) SignPayload(
 	address Address,
-	keyID uint64,
+	keyID uint32,
 	privateKey crypto.PrivateKey,
 	hasher hash.Hasher,
 ) error {
@@ -267,7 +267,7 @@ func (tb *TransactionBody) SignPayload(
 // This function returns an error if the signature cannot be generated.
 func (tb *TransactionBody) SignEnvelope(
 	address Address,
-	keyID uint64,
+	keyID uint32,
 	privateKey crypto.PrivateKey,
 	hasher hash.Hasher,
 ) error {
@@ -303,7 +303,7 @@ func (tb *TransactionBody) Sign(
 }
 
 // AddPayloadSignature adds a payload signature to the transaction for the given address and key ID.
-func (tb *TransactionBody) AddPayloadSignature(address Address, keyID uint64, sig []byte) *TransactionBody {
+func (tb *TransactionBody) AddPayloadSignature(address Address, keyID uint32, sig []byte) *TransactionBody {
 	s := tb.createSignature(address, keyID, sig)
 
 	tb.PayloadSignatures = append(tb.PayloadSignatures, s)
@@ -313,7 +313,7 @@ func (tb *TransactionBody) AddPayloadSignature(address Address, keyID uint64, si
 }
 
 // AddEnvelopeSignature adds an envelope signature to the transaction for the given address and key ID.
-func (tb *TransactionBody) AddEnvelopeSignature(address Address, keyID uint64, sig []byte) *TransactionBody {
+func (tb *TransactionBody) AddEnvelopeSignature(address Address, keyID uint32, sig []byte) *TransactionBody {
 	s := tb.createSignature(address, keyID, sig)
 
 	tb.EnvelopeSignatures = append(tb.EnvelopeSignatures, s)
@@ -322,7 +322,7 @@ func (tb *TransactionBody) AddEnvelopeSignature(address Address, keyID uint64, s
 	return tb
 }
 
-func (tb *TransactionBody) createSignature(address Address, keyID uint64, sig []byte) TransactionSignature {
+func (tb *TransactionBody) createSignature(address Address, keyID uint32, sig []byte) TransactionSignature {
 	signerIndex, signerExists := tb.signerMap()[address]
 	if !signerExists {
 		signerIndex = -1
@@ -352,7 +352,7 @@ func (tb *TransactionBody) payloadCanonicalForm() interface{} {
 		ReferenceBlockID          []byte
 		GasLimit                  uint64
 		ProposalKeyAddress        []byte
-		ProposalKeyID             uint64
+		ProposalKeyID             uint32
 		ProposalKeySequenceNumber uint64
 		Payer                     []byte
 		Authorizers               [][]byte
@@ -441,7 +441,7 @@ func (f TransactionField) String() string {
 // A ProposalKey is the key that specifies the proposal key and sequence number for a transaction.
 type ProposalKey struct {
 	Address        Address
-	KeyIndex       uint64
+	KeyIndex       uint32
 	SequenceNumber uint64
 }
 
@@ -456,7 +456,7 @@ func (p ProposalKey) ByteSize() int {
 type TransactionSignature struct {
 	Address     Address
 	SignerIndex int
-	KeyIndex    uint64
+	KeyIndex    uint32
 	Signature   []byte
 }
 

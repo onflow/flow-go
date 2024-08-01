@@ -33,8 +33,9 @@ const (
 )
 
 type collectionInfo struct {
-	blockId    flow.Identifier
-	blockIdStr string
+	blockId     flow.Identifier
+	blockIdStr  string
+	blockHeight uint64
 
 	collectionIndex int
 	*entity.CompleteCollection
@@ -238,6 +239,7 @@ func (e *blockComputer) queueTransactionRequests(
 		collectionInfo := collectionInfo{
 			blockId:             blockId,
 			blockIdStr:          blockIdStr,
+			blockHeight:         blockHeader.Height,
 			collectionIndex:     idx,
 			CompleteCollection:  collection,
 			isSystemTransaction: false,
@@ -278,6 +280,7 @@ func (e *blockComputer) queueTransactionRequests(
 	systemCollectionInfo := collectionInfo{
 		blockId:         blockId,
 		blockIdStr:      blockIdStr,
+		blockHeight:     blockHeader.Height,
 		collectionIndex: len(rawCollections),
 		CompleteCollection: &entity.CompleteCollection{
 			Transactions: []*flow.TransactionBody{systemTxnBody},

@@ -2485,7 +2485,7 @@ func MachineAccountFixture(t *testing.T) (
 		Balance: uint64(bal),
 		Keys: []*sdk.AccountKey{
 			{
-				Index:     int(info.KeyIndex),
+				Index:     info.KeyIndex,
 				PublicKey: info.MustPrivateKey().PublicKey(),
 				SigAlgo:   info.SigningAlgorithm,
 				HashAlgo:  info.HashAlgorithm,

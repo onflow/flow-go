@@ -5,15 +5,19 @@ import (
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
+	otelTrace "go.opentelemetry.io/otel/trace"
 
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/fvm/meter"
+	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/trace"
 )
 
-// WrappedEnvironment wraps an FVM environment
+// WrappedEnvironment wraps a FVM environment,
+// handles external errors and provides backend to the EVM.
 type WrappedEnvironment struct {
 	env environment.Environment
 }
@@ -25,95 +29,121 @@ func NewWrappedEnvironment(env environment.Environment) types.Backend {
 
 var _ types.Backend = &WrappedEnvironment{}
 
+// GetValue gets a value from the storage for the given owner and key pair,
+// if value not found empty slice and no error is returned.
 func (we *WrappedEnvironment) GetValue(owner, key []byte) ([]byte, error) {
 	val, err := we.env.GetValue(owner, key)
 	return val, handleEnvironmentError(err)
 }
 
+// SetValue sets a value into the storage for the given owner and key pair.
 func (we *WrappedEnvironment) SetValue(owner, key, value []byte) error {
 	err := we.env.SetValue(owner, key, value)
 	return handleEnvironmentError(err)
 }
 
+// ValueExists checks if a value exist for the given owner and key pair.
 func (we *WrappedEnvironment) ValueExists(owner, key []byte) (bool, error) {
 	b, err := we.env.ValueExists(owner, key)
 	return b, handleEnvironmentError(err)
 }
 
-func (we *WrappedEnvironment) AllocateStorageIndex(owner []byte) (atree.StorageIndex, error) {
-	index, err := we.env.AllocateStorageIndex(owner)
+// AllocateSlabIndex allocates a slab index under the given account.
+func (we *WrappedEnvironment) AllocateSlabIndex(owner []byte) (atree.SlabIndex, error) {
+	index, err := we.env.AllocateSlabIndex(owner)
 	return index, handleEnvironmentError(err)
 }
 
+// MeterComputation updates the total computation used based on the kind and intensity of the operation.
 func (we *WrappedEnvironment) MeterComputation(kind common.ComputationKind, intensity uint) error {
 	err := we.env.MeterComputation(kind, intensity)
 	return handleEnvironmentError(err)
 }
 
+// ComputationUsed returns the computation used so far
 func (we *WrappedEnvironment) ComputationUsed() (uint64, error) {
 	val, err := we.env.ComputationUsed()
 	return val, handleEnvironmentError(err)
 }
 
+// ComputationIntensities returns a the list of computation intensities
 func (we *WrappedEnvironment) ComputationIntensities() meter.MeteredComputationIntensities {
 	return we.env.ComputationIntensities()
 }
 
-func (we *WrappedEnvironment) ComputationAvailable(kind common.ComputationKind, intensity uint) bool {
+// ComputationAvailable returns true if there is computation room
+// for the given kind and intensity operation.
+func (we *WrappedEnvironment) ComputationAvailable(
+	kind common.ComputationKind,
+	intensity uint,
+) bool {
 	return we.env.ComputationAvailable(kind, intensity)
 }
 
+// MeterMemory meters the memory usage of a new operation.
 func (we *WrappedEnvironment) MeterMemory(usage common.MemoryUsage) error {
 	err := we.env.MeterMemory(usage)
 	return handleEnvironmentError(err)
 }
 
+// MemoryUsed returns the total memory used so far.
 func (we *WrappedEnvironment) MemoryUsed() (uint64, error) {
 	val, err := we.env.MemoryUsed()
 	return val, handleEnvironmentError(err)
 }
 
+// MeterEmittedEvent meters a newly emitted event.
 func (we *WrappedEnvironment) MeterEmittedEvent(byteSize uint64) error {
 	err := we.env.MeterEmittedEvent(byteSize)
 	return handleEnvironmentError(err)
 }
 
+// TotalEmittedEventBytes returns the total byte size of events emitted so far.
 func (we *WrappedEnvironment) TotalEmittedEventBytes() uint64 {
 	return we.env.TotalEmittedEventBytes()
 }
 
+// InteractionUsed returns the total storage interaction used.
 func (we *WrappedEnvironment) InteractionUsed() (uint64, error) {
 	val, err := we.env.InteractionUsed()
 	return val, handleEnvironmentError(err)
 }
 
+// EmitEvent emits an event.
 func (we *WrappedEnvironment) EmitEvent(event cadence.Event) error {
 	err := we.env.EmitEvent(event)
 	return handleEnvironmentError(err)
 }
 
+// Events returns the list of emitted events.
 func (we *WrappedEnvironment) Events() flow.EventsList {
 	return we.env.Events()
 
 }
 
+// ServiceEvents returns the list of emitted service events
 func (we *WrappedEnvironment) ServiceEvents() flow.EventsList {
 	return we.env.ServiceEvents()
 }
 
+// ConvertedServiceEvents returns the converted list of emitted service events.
 func (we *WrappedEnvironment) ConvertedServiceEvents() flow.ServiceEventList {
 	return we.env.ConvertedServiceEvents()
 }
 
+// Reset resets and discards all the changes to the
+// all stateful environment modules (events, storage, ...)
 func (we *WrappedEnvironment) Reset() {
 	we.env.Reset()
 }
 
+// GetCurrentBlockHeight returns the current Flow block height
 func (we *WrappedEnvironment) GetCurrentBlockHeight() (uint64, error) {
 	val, err := we.env.GetCurrentBlockHeight()
 	return val, handleEnvironmentError(err)
 }
 
+// GetBlockAtHeight returns the block at the given height
 func (we *WrappedEnvironment) GetBlockAtHeight(height uint64) (
 	runtime.Block,
 	bool,
@@ -123,11 +153,13 @@ func (we *WrappedEnvironment) GetBlockAtHeight(height uint64) (
 	return val, found, handleEnvironmentError(err)
 }
 
+// ReadRandom sets a random number into the buffer
 func (we *WrappedEnvironment) ReadRandom(buffer []byte) error {
 	err := we.env.ReadRandom(buffer)
 	return handleEnvironmentError(err)
 }
 
+// Invoke invokes call inside the fvm env.
 func (we *WrappedEnvironment) Invoke(
 	spec environment.ContractFunctionSpec,
 	arguments []cadence.Value,
@@ -139,9 +171,38 @@ func (we *WrappedEnvironment) Invoke(
 	return val, handleEnvironmentError(err)
 }
 
+// GenerateUUID generates a uuid
 func (we *WrappedEnvironment) GenerateUUID() (uint64, error) {
 	uuid, err := we.env.GenerateUUID()
 	return uuid, handleEnvironmentError(err)
+}
+
+// StartChildSpan starts a new child open tracing span.
+func (we *WrappedEnvironment) StartChildSpan(
+	name trace.SpanName,
+	options ...otelTrace.SpanStartOption,
+) tracing.TracerSpan {
+	return we.env.StartChildSpan(name, options...)
+}
+
+func (we *WrappedEnvironment) SetNumberOfDeployedCOAs(count uint64) {
+	we.env.SetNumberOfDeployedCOAs(count)
+}
+
+func (we *WrappedEnvironment) EVMTransactionExecuted(
+	gasUsed uint64,
+	isDirectCall bool,
+	failed bool,
+) {
+	we.env.EVMTransactionExecuted(gasUsed, isDirectCall, failed)
+}
+
+func (we *WrappedEnvironment) EVMBlockExecuted(
+	txCount int,
+	totalGasUsed uint64,
+	totalSupplyInFlow float64,
+) {
+	we.env.EVMBlockExecuted(txCount, totalGasUsed, totalSupplyInFlow)
 }
 
 func handleEnvironmentError(err error) error {

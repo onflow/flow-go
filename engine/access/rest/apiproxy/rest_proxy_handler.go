@@ -203,6 +203,30 @@ func (r *RestProxyHandler) GetAccountAtBlockHeight(ctx context.Context, address 
 	return convert.MessageToAccount(accountResponse.Account)
 }
 
+// GetAccountKeyByIndex returns account key by account address, key index and block height.
+func (r *RestProxyHandler) GetAccountKeyByIndex(ctx context.Context, address flow.Address, keyIndex uint32, height uint64) (*flow.AccountPublicKey, error) {
+	upstream, closer, err := r.FaultTolerantClient()
+	if err != nil {
+		return nil, err
+	}
+	defer closer.Close()
+
+	getAccountKeyAtBlockHeightRequest := &accessproto.GetAccountKeyAtBlockHeightRequest{
+		Address:     address.Bytes(),
+		Index:       keyIndex,
+		BlockHeight: height,
+	}
+
+	accountKeyResponse, err := upstream.GetAccountKeyAtBlockHeight(ctx, getAccountKeyAtBlockHeightRequest)
+	r.log("upstream", "GetAccountKeyAtBlockHeight", err)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return convert.MessageToAccountKey(accountKeyResponse.AccountKey)
+}
+
 // ExecuteScriptAtLatestBlock executes script at latest block.
 func (r *RestProxyHandler) ExecuteScriptAtLatestBlock(ctx context.Context, script []byte, arguments [][]byte) ([]byte, error) {
 	upstream, closer, err := r.FaultTolerantClient()

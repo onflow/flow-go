@@ -48,7 +48,7 @@ func TestTransactionSignature_ValidParse(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, addr, txSignature.Address.String())
 	assert.Equal(t, 0, txSignature.SignerIndex)
-	assert.Equal(t, uint64(0), txSignature.KeyIndex)
+	assert.Equal(t, uint32(0), txSignature.KeyIndex)
 	assert.Equal(t, sig, fmt.Sprintf("%x", txSignature.Signature))
 }
 
@@ -80,7 +80,7 @@ func TestTransactionSignatures_ValidParse(t *testing.T) {
 		for i, sig := range sigs {
 			assert.Equal(t, sig.Address, txSigantures[i].Address.String())
 			assert.Equal(t, 0, txSigantures[i].SignerIndex)
-			assert.Equal(t, uint64(0), txSigantures[i].KeyIndex)
+			assert.Equal(t, uint32(0), txSigantures[i].KeyIndex)
 			assert.Equal(t, test.inSigs[i], fmt.Sprintf("%x", txSigantures[i].Signature))
 		}
 	}

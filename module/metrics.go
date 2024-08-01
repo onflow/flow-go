@@ -839,6 +839,15 @@ type RuntimeMetrics interface {
 	RuntimeTransactionProgramsCacheHit()
 }
 
+type EVMMetrics interface {
+	// SetNumberOfDeployedCOAs sets the total number of deployed COAs
+	SetNumberOfDeployedCOAs(count uint64)
+	// EVMTransactionExecuted reports the gas used when executing an evm transaction
+	EVMTransactionExecuted(gasUsed uint64, isDirectCall bool, failed bool)
+	// EVMBlockExecuted reports the block size, total gas used and total supply when executing an evm block
+	EVMBlockExecuted(txCount int, totalGasUsed uint64, totalSupplyInFlow float64)
+}
+
 type ProviderMetrics interface {
 	// ChunkDataPackRequestProcessed is executed every time a chunk data pack request is picked up for processing at execution node.
 	// It increases the request processed counter by one.
@@ -934,6 +943,12 @@ type TransactionExecutionResultStats struct {
 	ComputationIntensities     meter.MeteredComputationIntensities
 }
 
+type TransactionExecutionResultInfo struct {
+	TransactionID flow.Identifier
+	BlockID       flow.Identifier
+	BlockHeight   uint64
+}
+
 func (stats *ExecutionResultStats) Merge(other ExecutionResultStats) {
 	stats.ComputationUsed += other.ComputationUsed
 	stats.MemoryUsed += other.MemoryUsed
@@ -957,6 +972,7 @@ func (stats *BlockExecutionResultStats) Add(other CollectionExecutionResultStats
 type ExecutionMetrics interface {
 	LedgerMetrics
 	RuntimeMetrics
+	EVMMetrics
 	ProviderMetrics
 	WALMetrics
 
@@ -990,7 +1006,7 @@ type ExecutionMetrics interface {
 	ExecutionCollectionExecuted(dur time.Duration, stats CollectionExecutionResultStats)
 
 	// ExecutionTransactionExecuted reports stats on executing a single transaction
-	ExecutionTransactionExecuted(dur time.Duration, stats TransactionExecutionResultStats)
+	ExecutionTransactionExecuted(dur time.Duration, stats TransactionExecutionResultStats, info TransactionExecutionResultInfo)
 
 	// ExecutionChunkDataPackGenerated reports stats on chunk data pack generation
 	ExecutionChunkDataPackGenerated(proofSize, numberOfTransactions int)

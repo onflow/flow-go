@@ -170,7 +170,7 @@ func (nc *NoopCollector) ExecutionCollectionExecuted(_ time.Duration, _ module.C
 }
 func (nc *NoopCollector) ExecutionBlockExecutionEffortVectorComponent(_ string, _ uint) {}
 func (nc *NoopCollector) ExecutionBlockCachedPrograms(programs int)                     {}
-func (nc *NoopCollector) ExecutionTransactionExecuted(_ time.Duration, stats module.TransactionExecutionResultStats) {
+func (nc *NoopCollector) ExecutionTransactionExecuted(_ time.Duration, _ module.TransactionExecutionResultStats, _ module.TransactionExecutionResultInfo) {
 }
 func (nc *NoopCollector) ExecutionChunkDataPackGenerated(_, _ int)                              {}
 func (nc *NoopCollector) ExecutionScriptExecuted(dur time.Duration, compUsed, _, _ uint64)      {}
@@ -199,6 +199,9 @@ func (nc *NoopCollector) RuntimeTransactionInterpreted(dur time.Duration)       
 func (nc *NoopCollector) RuntimeSetNumberOfAccounts(count uint64)                               {}
 func (nc *NoopCollector) RuntimeTransactionProgramsCacheMiss()                                  {}
 func (nc *NoopCollector) RuntimeTransactionProgramsCacheHit()                                   {}
+func (nc *NoopCollector) SetNumberOfDeployedCOAs(_ uint64)                                      {}
+func (nc *NoopCollector) EVMTransactionExecuted(_ uint64, _ bool, _ bool)                       {}
+func (nc *NoopCollector) EVMBlockExecuted(_ int, _ uint64, _ float64)                           {}
 func (nc *NoopCollector) ScriptExecuted(dur time.Duration, size int)                            {}
 func (nc *NoopCollector) ScriptExecutionErrorLocal()                                            {}
 func (nc *NoopCollector) ScriptExecutionErrorOnExecutionNode()                                  {}
