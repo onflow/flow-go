@@ -20,11 +20,13 @@ const (
 	GlobalStatePrunedHeight                    // latest pruned block height
 )
 
-const CidsPerBatch = 16 // number of cids to track per batch
 const BlobRecordKeyLength = 1 + 8 + blobs.CidLength
 const LatestHeightKeyLength = 1 + blobs.CidLength
-const DeleteItemsPerBatch = 256
 
+const CidsPerBatch = 16         // number of cids to track per batch
+const DeleteItemsPerBatch = 256 // number of items to delete per batch
+
+// ParseBlobRecordKey parses a blob record key and returns the block height and CID.
 func ParseBlobRecordKey(key []byte) (uint64, cid.Cid, error) {
 	blockHeight := binary.BigEndian.Uint64(key[1:])
 	c, err := cid.Cast(key[1+8:])
@@ -62,19 +64,22 @@ type ExecutionDataTracker interface {
 	Update(UpdateFn) error
 
 	// GetFulfilledHeight returns the current fulfilled height.
+	//
 	// No errors are expected during normal operation.
 	GetFulfilledHeight() (uint64, error)
 
 	// SetFulfilledHeight updates the fulfilled height value,
-	// which is the highest block height `h` such that all
+	// which is the lowest from the highest block heights `h` such that all
 	// heights <= `h` are sealed and the sealed execution data
-	// has been downloaded.
+	// has been downloaded or indexed.
 	// It is up to the caller to ensure that this is never
 	// called with a value lower than the pruned height.
+	//
 	// No errors are expected during normal operation
 	SetFulfilledHeight(height uint64) error
 
 	// GetPrunedHeight returns the current pruned height.
+	//
 	// No errors are expected during normal operation.
 	GetPrunedHeight() (uint64, error)
 
@@ -88,6 +93,7 @@ type ExecutionDataTracker interface {
 	PruneUpToHeight(height uint64) error
 }
 
+// DeleteInfo contains information for a deletion operation.
 type DeleteInfo struct {
 	Cid                      cid.Cid
 	Height                   uint64
