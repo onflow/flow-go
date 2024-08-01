@@ -203,7 +203,7 @@ func (s *ScriptExecutorSuite) TestExecuteAtBlockHeight() {
 		// Set up a mock version beacons events storage
 		versionBeacons := storageMock.NewVersionBeacons(s.T())
 		versionEvents := map[uint64]*flow.SealedVersionBeacon{
-			s.height: versionBeaconEvent(
+			s.height: versionBeaconEventFixture(
 				s.T(),
 				s.height,
 				[]uint64{s.height},
@@ -255,7 +255,7 @@ func (s *ScriptExecutorSuite) TestExecuteAtBlockHeight() {
 		// Set up a mock version beacons events storage
 		versionBeacons := storageMock.NewVersionBeacons(s.T())
 		versionEvents := map[uint64]*flow.SealedVersionBeacon{
-			s.height: versionBeaconEvent(
+			s.height: versionBeaconEventFixture(
 				s.T(),
 				s.height,
 				[]uint64{s.height},
@@ -301,9 +301,9 @@ func (s *ScriptExecutorSuite) TestExecuteAtBlockHeight() {
 	})
 }
 
-// versionBeaconEvent creates a SealedVersionBeacon for the given heights and versions.
+// versionBeaconEventFixture creates a SealedVersionBeacon for the given heights and versions.
 // This is used to simulate version events in the tests.
-func versionBeaconEvent(
+func versionBeaconEventFixture(
 	t *testing.T,
 	sealHeight uint64,
 	heights []uint64,
