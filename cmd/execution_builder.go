@@ -946,9 +946,9 @@ func (exeNode *ExecutionNode) LoadExecutionDataPruner(
 
 	trackerDir := filepath.Join(exeNode.exeConf.executionDataDir, "tracker")
 	exeNode.executionDataTracker, err = bstorage.NewExecutionDataTracker(
+		node.Logger,
 		trackerDir,
 		sealed.Height,
-		node.Logger,
 		bstorage.WithPruneCallback(func(c cid.Cid) error {
 			// TODO: use a proper context here
 			return exeNode.executionDataBlobstore.DeleteBlob(context.TODO(), c)

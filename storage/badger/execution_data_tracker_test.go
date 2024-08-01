@@ -26,12 +26,16 @@ func randomCid() cid.Cid {
 func TestPrune(t *testing.T) {
 	expectedPrunedCIDs := make(map[cid.Cid]struct{})
 	storageDir := t.TempDir()
-	executionDataTracker, err := NewExecutionDataTracker(storageDir, 0, zerolog.Nop(), WithPruneCallback(func(c cid.Cid) error {
-		_, ok := expectedPrunedCIDs[c]
-		assert.True(t, ok, "unexpected CID pruned: %s", c.String())
-		delete(expectedPrunedCIDs, c)
-		return nil
-	}))
+	executionDataTracker, err := NewExecutionDataTracker(
+		zerolog.Nop(),
+		storageDir,
+		0,
+		WithPruneCallback(func(c cid.Cid) error {
+			_, ok := expectedPrunedCIDs[c]
+			assert.True(t, ok, "unexpected CID pruned: %s", c.String())
+			delete(expectedPrunedCIDs, c)
+			return nil
+		}))
 	require.NoError(t, err)
 
 	// c1 and c2 are for height 1, and c3 and c4 are for height 2
@@ -86,10 +90,14 @@ func TestPrune(t *testing.T) {
 // if that CID also exists at another height above the pruned height, the CID should not be pruned.
 func TestPruneNonLatestHeight(t *testing.T) {
 	storageDir := t.TempDir()
-	executionDataTracker, err := NewExecutionDataTracker(storageDir, 0, zerolog.Nop(), WithPruneCallback(func(c cid.Cid) error {
-		assert.Fail(t, "unexpected CID pruned: %s", c.String())
-		return nil
-	}))
+	executionDataTracker, err := NewExecutionDataTracker(
+		zerolog.Nop(),
+		storageDir,
+		0,
+		WithPruneCallback(func(c cid.Cid) error {
+			assert.Fail(t, "unexpected CID pruned: %s", c.String())
+			return nil
+		}))
 	require.NoError(t, err)
 
 	// c1 and c2 appear both at height 1 and 2
@@ -130,12 +138,16 @@ func TestPruneNonLatestHeight(t *testing.T) {
 func TestAscendingOrderOfRecords(t *testing.T) {
 	expectedPrunedCIDs := make(map[cid.Cid]struct{})
 	storageDir := t.TempDir()
-	executionDataTracker, err := NewExecutionDataTracker(storageDir, 0, zerolog.Nop(), WithPruneCallback(func(c cid.Cid) error {
-		_, ok := expectedPrunedCIDs[c]
-		assert.True(t, ok, "unexpected CID pruned: %s", c.String())
-		delete(expectedPrunedCIDs, c)
-		return nil
-	}))
+	executionDataTracker, err := NewExecutionDataTracker(
+		zerolog.Nop(),
+		storageDir,
+		0,
+		WithPruneCallback(func(c cid.Cid) error {
+			_, ok := expectedPrunedCIDs[c]
+			assert.True(t, ok, "unexpected CID pruned: %s", c.String())
+			delete(expectedPrunedCIDs, c)
+			return nil
+		}))
 	require.NoError(t, err)
 
 	// c1 is for height 1,

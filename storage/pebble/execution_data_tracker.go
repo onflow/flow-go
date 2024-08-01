@@ -55,16 +55,16 @@ func WithPruneCallback(callback storage.PruneCallback) StorageOption {
 // NewExecutionDataTracker initializes a new ExecutionDataTracker.
 //
 // Parameters:
+// - logger: The logger for logging tracker operations.
 // - path: The file path for the underlying Pebble database.
 // - startHeight: The initial fulfilled height to be set if no previous fulfilled height is found.
-// - logger: The logger for logging tracker operations.
 // - opts: Additional configuration options such as custom prune callbacks.
 //
 // No errors are expected during normal operation.
 func NewExecutionDataTracker(
+	logger zerolog.Logger,
 	path string,
 	startHeight uint64,
-	logger zerolog.Logger,
 	opts ...StorageOption,
 ) (*ExecutionDataTracker, error) {
 	lg := logger.With().Str("module", "tracker_storage").Logger()
