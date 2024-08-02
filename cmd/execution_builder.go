@@ -13,10 +13,10 @@ import (
 
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
-	badgerDB "github.com/dgraph-io/badger/v2"
+	"github.com/dgraph-io/badger/v2"
 	"github.com/ipfs/boxo/bitswap"
 	"github.com/ipfs/go-cid"
-	badger "github.com/ipfs/go-ds-badger2"
+	badgerds "github.com/ipfs/go-ds-badger2"
 	"github.com/onflow/cadence"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
 	"github.com/rs/zerolog"
@@ -154,7 +154,7 @@ type ExecutionNode struct {
 	executionDataStore     execution_data.ExecutionDataStore
 	toTriggerCheckpoint    *atomic.Bool      // create the checkpoint trigger to be controlled by admin tool, and listened by the compactor
 	stopControl            *stop.StopControl // stop the node at given block height
-	executionDataDatastore *badger.Datastore
+	executionDataDatastore *badgerds.Datastore
 	executionDataPruner    *pruner.Pruner
 	executionDataBlobstore blobs.Blobstore
 	executionDataTracker   tracker.Storage
@@ -669,8 +669,8 @@ func (exeNode *ExecutionNode) LoadExecutionDataDatastore(
 	if err != nil {
 		return err
 	}
-	dsOpts := &badger.DefaultOptions
-	ds, err := badger.NewDatastore(datastoreDir, dsOpts)
+	dsOpts := &badgerds.DefaultOptions
+	ds, err := badgerds.NewDatastore(datastoreDir, dsOpts)
 	if err != nil {
 		return err
 	}
@@ -691,10 +691,10 @@ func (exeNode *ExecutionNode) LoadExecutionDataGetter(node *NodeConfig) error {
 	return nil
 }
 
-func OpenChunkDataPackDB(dbPath string, logger zerolog.Logger) (*badgerDB.DB, error) {
+func OpenChunkDataPackDB(dbPath string, logger zerolog.Logger) (*badger.DB, error) {
 	log := sutil.NewLogger(logger)
 
-	opts := badgerDB.
+	opts := badger.
 		DefaultOptions(dbPath).
 		WithKeepL0InMemory(true).
 		WithLogger(log).
@@ -708,7 +708,7 @@ func OpenChunkDataPackDB(dbPath string, logger zerolog.Logger) (*badgerDB.DB, er
 		WithValueLogFileSize(256 << 23).
 		WithValueLogMaxEntries(100000) // Default is 1000000
 
-	db, err := badgerDB.Open(opts)
+	db, err := badger.Open(opts)
 	if err != nil {
 		return nil, fmt.Errorf("could not open chunk data pack badger db at path %v: %w", dbPath, err)
 	}
