@@ -383,7 +383,7 @@ func (l *EVMTransferLoad) transferTransaction(
 			gasPrice := big.NewInt(0)
 
 			oneFlow := cadence.UFix64(100_000_000)
-			amount := new(big.Int).Div(evmTypes.OneFlowBalance, big.NewInt(int64(oneFlow)))
+			amount := new(big.Int).Div(evmTypes.OneFlowBalance(), big.NewInt(int64(oneFlow)))
 			evmTx := types.NewTx(&types.LegacyTx{Nonce: nonce, To: &to, Value: amount, Gas: params.TxGas, GasPrice: gasPrice, Data: nil})
 
 			signed, err := types.SignTx(evmTx, emulator.GetDefaultSigner(), eoa.pk)
