@@ -237,6 +237,16 @@ func NewCadence1ValueMigrations(
 
 	migs = []NamedMigration{
 		{
+			Name: "cleanup-contracts",
+			Migrate: NewAccountBasedMigration(
+				log,
+				opts.NWorker,
+				[]AccountBasedMigration{
+					NewContractCleanupMigration(rwf),
+				},
+			),
+		},
+		{
 			Name: "check-contracts",
 			Migrate: NewContractCheckingMigration(
 				log,
@@ -364,12 +374,23 @@ func NewCadence1ContractsMigrations(
 		)
 	}
 
-	if opts.EVMContractChange == EVMContractChangeDeploy {
+	switch opts.EVMContractChange {
+	case EVMContractChangeNone:
+		// NO-OP
+
+	case EVMContractChangeUpdateFull:
+		// handled in system contract updates (SystemContractChanges)
+
+	case EVMContractChangeDeployFull,
+		EVMContractChangeDeployMinimalAndUpdateFull:
+
+		full := opts.EVMContractChange == EVMContractChangeDeployFull
+
 		migs = append(
 			migs,
 			NamedMigration{
 				Name:    "evm-deployment-migration",
-				Migrate: NewEVMDeploymentMigration(opts.ChainID, log),
+				Migrate: NewEVMDeploymentMigration(opts.ChainID, log, full),
 			},
 		)
 	}
@@ -540,6 +561,20 @@ func NewCadence1Migrations(
 			opts,
 		)...,
 	)
+
+	switch opts.EVMContractChange {
+	case EVMContractChangeNone,
+		EVMContractChangeDeployFull:
+		// NO-OP
+	case EVMContractChangeUpdateFull, EVMContractChangeDeployMinimalAndUpdateFull:
+		migs = append(
+			migs,
+			NamedMigration{
+				Name:    "evm-setup-migration",
+				Migrate: NewEVMSetupMigration(opts.ChainID, log),
+			},
+		)
+	}
 
 	return migs
 }

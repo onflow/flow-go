@@ -53,9 +53,10 @@ gen-bootstrap: clone-flow
 		--epoch-length 5000 \
 		--epoch-staking-phase-length 500 \
 		--epoch-dkg-phase-length 1000 \
+		--epoch-extension-view-count=600 \
 		--collection-clusters 1 \
 		--protocol-version=0 \
-		--epoch-commit-safety-threshold=500 \
+		--epoch-commit-safety-threshold=100 \
 		--use-default-epoch-timing \
 		--config ../../../bootstrap/conf/node-config.json \
 		-o ../../../bootstrap/ \

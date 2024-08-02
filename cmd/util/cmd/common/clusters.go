@@ -175,10 +175,10 @@ func newClusterQCVoteDataCdcType(clusterQcAddress string) *cadence.StructType {
 	address, _ := cdcCommon.HexToAddress(clusterQcAddress)
 	location := cdcCommon.NewAddressLocation(nil, address, "FlowClusterQC")
 
-	return &cadence.StructType{
-		Location:            location,
-		QualifiedIdentifier: "FlowClusterQC.ClusterQCVoteData",
-		Fields: []cadence.Field{
+	return cadence.NewStructType(
+		location,
+		"FlowClusterQC.ClusterQCVoteData",
+		[]cadence.Field{
 			{
 				Identifier: "aggregatedSignature",
 				Type:       cadence.StringType,
@@ -188,5 +188,6 @@ func newClusterQCVoteDataCdcType(clusterQcAddress string) *cadence.StructType {
 				Type:       cadence.NewVariableSizedArrayType(cadence.StringType),
 			},
 		},
-	}
+		nil,
+	)
 }

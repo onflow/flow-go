@@ -67,7 +67,7 @@ func (m *MetricsCollectingMigration) InitMigration(
 
 	// If the program is available, that means the associated contracts is compatible with Cadence 1.0.
 	// i.e: the contract is either migrated to be compatible with 1.0 or existing contract already compatible.
-	for _, program := range m.programs {
+	for location, program := range m.programs {
 		var nestedDecls *ast.Members
 
 		contract := program.Program.SoleContractDeclaration()
@@ -80,7 +80,16 @@ func (m *MetricsCollectingMigration) InitMigration(
 		} else {
 			contractInterface := program.Program.SoleContractInterfaceDeclaration()
 			if contractInterface == nil {
-				panic(errors.NewUnreachableError())
+				declarations := program.Program.Declarations()
+				declarationKinds := make([]common.DeclarationKind, 0, len(declarations))
+				for _, declaration := range declarations {
+					declarationKinds = append(declarationKinds, declaration.DeclarationKind())
+				}
+				panic(errors.NewUnexpectedError(
+					"invalid program %s: expected a sole contract or contract interface, got %s",
+					location,
+					declarationKinds,
+				))
 			}
 			nestedDecls = contractInterface.Members
 

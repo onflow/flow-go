@@ -55,6 +55,9 @@ type ContractHandler interface {
 
 	// GenerateResourceUUID generates a new UUID for a resource
 	GenerateResourceUUID() uint64
+
+	// Constructs and commits a new block from the block proposal
+	CommitBlockProposal()
 }
 
 // AddressAllocator allocates addresses, used by the handler
@@ -81,12 +84,12 @@ type BlockStore interface {
 	// BlockHash returns the hash of the block at the given height
 	BlockHash(height uint64) (gethCommon.Hash, error)
 
-	// BlockProposal returns the block proposal
-	BlockProposal() (*Block, error)
+	// BlockProposal returns the active block proposal
+	BlockProposal() (*BlockProposal, error)
+
+	// UpdateBlockProposal replaces the current block proposal with the ones passed
+	UpdateBlockProposal(*BlockProposal) error
 
 	// CommitBlockProposal commits the block proposal and update the chain of blocks
-	CommitBlockProposal() error
-
-	// ResetBlockProposal resets the block proposal
-	ResetBlockProposal() error
+	CommitBlockProposal(*BlockProposal) error
 }
