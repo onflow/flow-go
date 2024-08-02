@@ -176,4 +176,24 @@ func Test_DecodeBlocks(t *testing.T) {
 	require.Equal(t, b.Height, bv5.Height)
 	require.Equal(t, b.ParentBlockHash, bv5.ParentBlockHash)
 	require.Empty(t, b.TotalGasUsed)
+
+	bv6 := blockV6{
+		ParentBlockHash:   GenesisBlockHash,
+		Height:            1,
+		TotalSupply:       big.NewInt(2),
+		ReceiptRoot:       gethCommon.Hash{0x02},
+		TransactionHashes: []gethCommon.Hash{{0x04}},
+		Timestamp:         100,
+	}
+
+	b6, err := gethRLP.EncodeToBytes(bv6)
+	require.NoError(t, err)
+
+	b = decodeBlockBreakingChanges(b6)
+
+	require.Equal(t, b.Timestamp, bv6.Timestamp)
+	require.Equal(t, b.TotalSupply, bv6.TotalSupply)
+	require.Equal(t, b.Height, bv6.Height)
+	require.Equal(t, b.ParentBlockHash, bv6.ParentBlockHash)
+	require.Empty(t, b.TotalGasUsed)
 }
