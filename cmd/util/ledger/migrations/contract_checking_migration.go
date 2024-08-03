@@ -182,7 +182,7 @@ func checkContract(
 			)
 		}
 
-		reporter.Write(contractCheckingFailure{
+		reporter.Write(ContractCheckingFailure{
 			AccountAddress: location.Address,
 			ContractName:   location.Name,
 			Code:           string(code),
@@ -195,7 +195,7 @@ func checkContract(
 	// Record the checked program for future use
 	programs[location] = program
 
-	reporter.Write(contractCheckingSuccess{
+	reporter.Write(ContractCheckingSuccess{
 		AccountAddress: location.Address,
 		ContractName:   location.Name,
 		Code:           string(code),
@@ -204,24 +204,29 @@ func checkContract(
 	log.Info().Msgf("finished checking contract %s", location)
 }
 
-type contractCheckingFailure struct {
+type ContractCheckingFailure struct {
 	AccountAddress common.Address
 	ContractName   string
 	Code           string
 	Error          string
 }
 
-var _ json.Marshaler = contractCheckingFailure{}
+var _ json.Marshaler = ContractCheckingFailure{}
+var _ json.Unmarshaler = &ContractCheckingFailure{}
 
-func (e contractCheckingFailure) MarshalJSON() ([]byte, error) {
-	return json.Marshal(struct {
-		Kind           string `json:"kind"`
-		AccountAddress string `json:"address"`
-		ContractName   string `json:"name"`
-		Code           string `json:"code"`
-		Error          string `json:"error"`
-	}{
-		Kind:           "checking-failure",
+type contractCheckingFailureJSON struct {
+	Kind           string `json:"kind"`
+	AccountAddress string `json:"address"`
+	ContractName   string `json:"name"`
+	Code           string `json:"code"`
+	Error          string `json:"error"`
+}
+
+const contractCheckingKindFailure = "checking-failure"
+
+func (e ContractCheckingFailure) MarshalJSON() ([]byte, error) {
+	return json.Marshal(contractCheckingFailureJSON{
+		Kind:           contractCheckingKindFailure,
 		AccountAddress: e.AccountAddress.HexWithPrefix(),
 		ContractName:   e.ContractName,
 		Code:           e.Code,
@@ -229,24 +234,95 @@ func (e contractCheckingFailure) MarshalJSON() ([]byte, error) {
 	})
 }
 
-type contractCheckingSuccess struct {
+func (e *ContractCheckingFailure) UnmarshalJSON(data []byte) error {
+	var raw contractCheckingFailureJSON
+	err := json.Unmarshal(data, &raw)
+	if err != nil {
+		return err
+	}
+
+	e.AccountAddress, err = common.HexToAddress(raw.AccountAddress)
+	if err != nil {
+		return fmt.Errorf("failed to parse account address: %w", err)
+	}
+
+	e.ContractName = raw.ContractName
+	e.Code = raw.Code
+	e.Error = raw.Error
+
+	return nil
+}
+
+type ContractCheckingSuccess struct {
 	AccountAddress common.Address
 	ContractName   string
 	Code           string
 }
 
-var _ json.Marshaler = contractCheckingSuccess{}
+var _ json.Marshaler = ContractCheckingSuccess{}
+var _ json.Unmarshaler = &ContractCheckingSuccess{}
 
-func (e contractCheckingSuccess) MarshalJSON() ([]byte, error) {
-	return json.Marshal(struct {
-		Kind           string `json:"kind"`
-		AccountAddress string `json:"address"`
-		ContractName   string `json:"name"`
-		Code           string `json:"code"`
-	}{
-		Kind:           "checking-success",
+type contractCheckingSuccessJSON struct {
+	Kind           string `json:"kind"`
+	AccountAddress string `json:"address"`
+	ContractName   string `json:"name"`
+	Code           string `json:"code"`
+}
+
+const contractCheckingKindSuccess = "checking-success"
+
+func (e ContractCheckingSuccess) MarshalJSON() ([]byte, error) {
+	return json.Marshal(contractCheckingSuccessJSON{
+		Kind:           contractCheckingKindSuccess,
 		AccountAddress: e.AccountAddress.HexWithPrefix(),
 		ContractName:   e.ContractName,
 		Code:           e.Code,
 	})
+}
+
+func (e *ContractCheckingSuccess) UnmarshalJSON(data []byte) error {
+	var raw contractCheckingSuccessJSON
+	err := json.Unmarshal(data, &raw)
+	if err != nil {
+		return err
+	}
+
+	e.AccountAddress, err = common.HexToAddress(raw.AccountAddress)
+	if err != nil {
+		return fmt.Errorf("failed to parse account address: %w", err)
+	}
+
+	e.ContractName = raw.ContractName
+	e.Code = raw.Code
+
+	return nil
+}
+
+type kindSwitch struct {
+	Kind string `json:"kind"`
+}
+
+type ContractCheckingResultJSON struct {
+	kindSwitch
+	*ContractCheckingSuccess
+	*ContractCheckingFailure
+}
+
+func (t *ContractCheckingResultJSON) UnmarshalJSON(data []byte) error {
+	if err := json.Unmarshal(data, &t.kindSwitch); err != nil {
+		return err
+	}
+
+	switch t.kindSwitch.Kind {
+	case contractCheckingKindSuccess:
+		t.ContractCheckingSuccess = &ContractCheckingSuccess{}
+		return json.Unmarshal(data, t.ContractCheckingSuccess)
+
+	case contractCheckingKindFailure:
+		t.ContractCheckingFailure = &ContractCheckingFailure{}
+		return json.Unmarshal(data, t.ContractCheckingFailure)
+
+	default:
+		return fmt.Errorf("unrecognized kind %q", t.kindSwitch.Kind)
+	}
 }

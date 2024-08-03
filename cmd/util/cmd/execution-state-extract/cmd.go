@@ -373,16 +373,7 @@ func run(*cobra.Command, []string) {
 
 	chainID := chain.ChainID()
 
-	burnerContractChange := migrations.BurnerContractChangeNone
-	evmContractChange := migrations.EVMContractChangeNone
-	switch chainID {
-	case flow.Emulator:
-		burnerContractChange = migrations.BurnerContractChangeDeploy
-		evmContractChange = migrations.EVMContractChangeDeployMinimalAndUpdateFull
-	case flow.Testnet, flow.Mainnet:
-		burnerContractChange = migrations.BurnerContractChangeUpdate
-		evmContractChange = migrations.EVMContractChangeUpdateFull
-	}
+	burnerContractChange, evmContractChange := migrations.SystemContractChangesForChainID(chainID)
 
 	stagedContracts, err := migrations.StagedContractsFromCSV(flagStagedContractsFile)
 	if err != nil {
