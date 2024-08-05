@@ -25,6 +25,7 @@ const (
 	ServiceEventVersionBeacon               ServiceEventType = "version-beacon"                 // VersionBeacon only controls version of ENs, describing software compatability via semantic versioning
 	ServiceEventProtocolStateVersionUpgrade ServiceEventType = "protocol-state-version-upgrade" // Protocol State version applies to all nodes and uses an _integer version_ of the _protocol_
 	ServiceEventSetEpochExtensionViewCount  ServiceEventType = "set-epoch-extension-view-count" // Applies new value for the epoch extension view count to the KV store.
+	ServiceEventEjectIdentity               ServiceEventType = "eject-identity"                 // Ejects an identity from the protocol state.
 )
 
 // ServiceEvent represents a service event, which is a special event that when
@@ -127,6 +128,8 @@ func (marshaller marshallerImpl) UnmarshalWrapped(b []byte) (ServiceEvent, error
 		event, err = unmarshalWrapped[ProtocolStateVersionUpgrade](b, marshaller)
 	case ServiceEventSetEpochExtensionViewCount:
 		event, err = unmarshalWrapped[SetEpochExtensionViewCount](b, marshaller)
+	case ServiceEventEjectIdentity:
+		event, err = unmarshalWrapped[EjectIdentity](b, marshaller)
 	default:
 		return ServiceEvent{}, fmt.Errorf("invalid type: %s", eventType)
 	}
@@ -173,6 +176,8 @@ func (marshaller marshallerImpl) UnmarshalWithType(b []byte, eventType ServiceEv
 		event = new(ProtocolStateVersionUpgrade)
 	case ServiceEventSetEpochExtensionViewCount:
 		event = new(SetEpochExtensionViewCount)
+	case ServiceEventEjectIdentity:
+		event = new(EjectIdentity)
 	default:
 		return ServiceEvent{}, fmt.Errorf("invalid type: %s", eventType)
 	}
@@ -326,6 +331,23 @@ func (se *ServiceEvent) EqualTo(other *ServiceEvent) (bool, error) {
 			return false,
 				fmt.Errorf(
 					"internal invalid type for SetEpochExtensionViewCount: %T",
+					other.Event,
+				)
+		}
+		return typedEvent.EqualTo(otherTypedEvent), nil
+	case ServiceEventEjectIdentity:
+		typedEvent, ok := se.Event.(*EjectIdentity)
+		if !ok {
+			return false, fmt.Errorf(
+				"internal invalid type for EjectIdentity: %T",
+				se.Event,
+			)
+		}
+		otherTypedEvent, ok := other.Event.(*EjectIdentity)
+		if !ok {
+			return false,
+				fmt.Errorf(
+					"internal invalid type for EjectIdentity: %T",
 					other.Event,
 				)
 		}
