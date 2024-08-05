@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/onflow/flow-go/engine/common/stop"
-
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
@@ -98,8 +96,6 @@ type Engine struct {
 	maxReceiptHeight  uint64
 	executionResults  storage.ExecutionResults
 
-	stopControl *stop.StopControl
-
 	lastFullBlockHeight *counters.PersistentStrictMonotonicCounter
 	// metrics
 	collectionExecutedMetric module.CollectionExecutedMetric
@@ -125,7 +121,6 @@ func New(
 	collectionExecutedMetric module.CollectionExecutedMetric,
 	processedHeight storage.ConsumerProgress,
 	lastFullBlockHeight *counters.PersistentStrictMonotonicCounter,
-	stopControl *stop.StopControl,
 ) (*Engine, error) {
 	executionReceiptsRawQueue, err := fifoqueue.NewFifoQueue(defaultQueueCapacity)
 	if err != nil {
@@ -169,7 +164,6 @@ func New(
 		executionReceiptsNotifier: engine.NewNotifier(),
 		executionReceiptsQueue:    executionReceiptsQueue,
 		messageHandler:            messageHandler,
-		stopControl:               stopControl,
 	}
 
 	// jobqueue Jobs object that tracks finalized blocks by height. This is used by the finalizedBlockConsumer

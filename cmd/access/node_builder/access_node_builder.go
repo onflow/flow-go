@@ -1826,6 +1826,23 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 
 			return versionControl, nil
 		}).
+		Component("stop control", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			if !builder.stopControlEnabled {
+				return &module.NoopReadyDoneAware{}, nil
+			}
+
+			stopControl := stop.NewStopControl(
+				builder.Logger,
+				builder.versionControl,
+			)
+
+			stopControl.RegisterHeightRecorder(builder.ExecutionDataDownloader)
+			stopControl.RegisterHeightRecorder(builder.ExecutionIndexer)
+
+			builder.stopControl = stopControl
+
+			return stopControl, nil
+		}).
 		Component("RPC engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			config := builder.rpcConf
 			backendConfig := config.BackendConfig
@@ -1988,10 +2005,6 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				return nil, fmt.Errorf("could not create requester engine: %w", err)
 			}
 
-			if builder.stopControlEnabled {
-				builder.stopControl = stop.NewStopControl(builder.Logger, builder.versionControl)
-			}
-
 			builder.IngestEng, err = ingestion.New(
 				node.Logger,
 				node.EngineRegistry,
@@ -2007,7 +2020,6 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				builder.collectionExecutedMetric,
 				processedBlockHeight,
 				lastFullBlockHeight,
-				builder.stopControl,
 			)
 			if err != nil {
 				return nil, err
