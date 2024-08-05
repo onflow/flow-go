@@ -73,7 +73,7 @@ type StateMachine interface {
 	// is set to true for all occurrences, and we return true.  If `nodeID` is not found, we return false. This
 	// method is idempotent and behaves identically for repeated calls with the same `nodeID` (repeated calls
 	// with the same input create minor performance overhead though).
-	EjectIdentity(nodeID flow.Identifier) bool
+	EjectIdentity(ejectIdentity *flow.EjectIdentity) bool
 
 	// TransitionToNextEpoch transitions our reference frame of 'current epoch' to the pending but committed epoch.
 	// Epoch transition is only allowed when:
@@ -291,6 +291,8 @@ func (e *EpochStateMachine) evolveActiveStateMachine(sealedServiceEvents []flow.
 			if processed {
 				dbUpdates.AddDbOps(e.setups.StoreTx(&ev.EpochSetup), e.commits.StoreTx(&ev.EpochCommit)) // we'll insert the setup & commit events when we insert the block
 			}
+		case *flow.EjectIdentity:
+			_ = e.activeStateMachine.EjectIdentity(ev)
 		default:
 			continue
 		}

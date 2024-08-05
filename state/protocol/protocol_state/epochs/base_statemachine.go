@@ -2,6 +2,7 @@ package epochs
 
 import (
 	"fmt"
+	"github.com/onflow/flow-go/state/protocol"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol/protocol_state"
@@ -75,8 +76,16 @@ func (u *baseStateMachine) ParentState() *flow.RichEpochStateEntry {
 // is set to true for all occurrences, and we return true.  If `nodeID` is not found, we return false. This
 // method is idempotent and behaves identically for repeated calls with the same `nodeID` (repeated calls
 // with the same input create minor performance overhead though).
-func (u *baseStateMachine) EjectIdentity(nodeID flow.Identifier) bool {
-	return u.ejector.Eject(nodeID)
+func (u *baseStateMachine) EjectIdentity(ejectIdentity *flow.EjectIdentity) bool {
+	u.telemetry.OnServiceEventReceived(ejectIdentity.ServiceEvent())
+	ejected := u.ejector.Eject(ejectIdentity.NodeID)
+	if ejected {
+		u.telemetry.OnServiceEventProcessed(ejectIdentity.ServiceEvent())
+	} else {
+		u.telemetry.OnInvalidServiceEvent(ejectIdentity.ServiceEvent(),
+			protocol.NewInvalidServiceEventErrorf("could not eject identity (%v)", ejectIdentity.NodeID))
+	}
+	return ejected
 }
 
 // TransitionToNextEpoch updates the notion of 'current epoch', 'previous' and 'next epoch' in the protocol
