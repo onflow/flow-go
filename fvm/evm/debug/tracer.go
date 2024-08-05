@@ -142,7 +142,10 @@ func NewSafeTxTracer(ct *CallTracer) *tracers.Tracer {
 					Msg("OnTxStart trace collection failed")
 			}
 		}()
-		ct.tracer.OnTxStart(vm, tx, from)
+
+		if ct.tracer.OnTxStart != nil {
+			ct.tracer.OnTxStart(vm, tx, from)
+		}
 	}
 
 	wrapped.OnTxEnd = func(receipt *types.Receipt, err error) {
@@ -157,7 +160,10 @@ func NewSafeTxTracer(ct *CallTracer) *tracers.Tracer {
 					Msg("OnTxEnd trace collection failed")
 			}
 		}()
-		ct.tracer.OnTxEnd(receipt, err)
+
+		if ct.tracer.OnTxEnd != nil {
+			ct.tracer.OnTxEnd(receipt, err)
+		}
 	}
 
 	wrapped.OnEnter = func(
@@ -179,7 +185,10 @@ func NewSafeTxTracer(ct *CallTracer) *tracers.Tracer {
 					Msg("OnEnter trace collection failed")
 			}
 		}()
-		ct.tracer.OnEnter(depth, typ, from, to, input, gas, value)
+
+		if ct.tracer.OnEnter != nil {
+			ct.tracer.OnEnter(depth, typ, from, to, input, gas, value)
+		}
 	}
 
 	wrapped.OnExit = func(depth int, output []byte, gasUsed uint64, err error, reverted bool) {
@@ -194,7 +203,10 @@ func NewSafeTxTracer(ct *CallTracer) *tracers.Tracer {
 					Msg("OnExit trace collection failed")
 			}
 		}()
-		ct.tracer.OnExit(depth, output, gasUsed, err, reverted)
+
+		if ct.tracer.OnExit != nil {
+			ct.tracer.OnExit(depth, output, gasUsed, err, reverted)
+		}
 	}
 
 	wrapped.OnOpcode = func(
@@ -217,7 +229,10 @@ func NewSafeTxTracer(ct *CallTracer) *tracers.Tracer {
 					Msg("OnOpcode trace collection failed")
 			}
 		}()
-		ct.tracer.OnOpcode(pc, op, gas, cost, scope, rData, depth, err)
+
+		if ct.tracer.OnOpcode != nil {
+			ct.tracer.OnOpcode(pc, op, gas, cost, scope, rData, depth, err)
+		}
 	}
 
 	wrapped.OnFault = func(
@@ -238,7 +253,10 @@ func NewSafeTxTracer(ct *CallTracer) *tracers.Tracer {
 					Msg("OnFault trace collection failed")
 			}
 		}()
-		ct.tracer.OnFault(pc, op, gas, cost, scope, depth, err)
+
+		if ct.tracer.OnFault != nil {
+			ct.tracer.OnFault(pc, op, gas, cost, scope, depth, err)
+		}
 	}
 
 	wrapped.OnGasChange = func(old, new uint64, reason tracing.GasChangeReason) {
@@ -253,7 +271,10 @@ func NewSafeTxTracer(ct *CallTracer) *tracers.Tracer {
 					Msg("OnGasChange trace collection failed")
 			}
 		}()
-		ct.tracer.OnGasChange(old, new, reason)
+
+		if ct.tracer.OnGasChange != nil {
+			ct.tracer.OnGasChange(old, new, reason)
+		}
 	}
 
 	wrapped.GetResult = ct.tracer.GetResult
