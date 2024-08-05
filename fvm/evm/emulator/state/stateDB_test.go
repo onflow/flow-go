@@ -352,4 +352,102 @@ func TestStateDB(t *testing.T) {
 		require.NotEqual(t, gethCommon.Hash{}, root)
 		require.NotEqual(t, gethTypes.EmptyRootHash, root)
 	})
+
+	t.Run("test Selfdestruct6780 functionality", func(t *testing.T) {
+		ledger := testutils.GetSimpleValueStore()
+		db, err := state.NewStateDB(ledger, rootAddr)
+		require.NoError(t, err)
+
+		// test 1 - an already existing contract
+		// fail for selfdestruction
+		addr1 := testutils.RandomCommonAddress(t)
+		balance1 := uint256.NewInt(100)
+		code1 := []byte("some code")
+		db.CreateAccount(addr1)
+		db.SetCode(addr1, code1)
+		db.AddBalance(addr1, balance1, tracing.BalanceChangeTransfer)
+		require.NoError(t, db.Error())
+		err = db.Commit(true)
+		require.NoError(t, err)
+		// renew db
+		db, err = state.NewStateDB(ledger, rootAddr)
+		require.NoError(t, err)
+		// call self destruct
+		db.Selfdestruct6780(addr1)
+		require.NoError(t, db.Error())
+		// noop is expected
+		require.Equal(t, balance1, db.GetBalance(addr1))
+		require.Equal(t, code1, db.GetCode(addr1))
+		require.NoError(t, db.Error())
+
+		// test 2 - account exist before with some balance
+		// but not a contract - selfdestruct should work
+		addr2 := testutils.RandomCommonAddress(t)
+		balance2 := uint256.NewInt(200)
+		db.CreateAccount(addr2)
+		db.AddBalance(addr2, balance2, tracing.BalanceChangeTransfer)
+		require.NoError(t, db.Error())
+		// commit and renew db
+		err = db.Commit(true)
+		require.NoError(t, err)
+		db, err = state.NewStateDB(ledger, rootAddr)
+		require.NoError(t, err)
+		// call self destruct should not work
+		db.Selfdestruct6780(addr2)
+		require.NoError(t, db.Error())
+		// still no impact
+		require.Equal(t, balance2, db.GetBalance(addr2))
+		require.Empty(t, db.GetCode(addr2))
+		require.NoError(t, db.Error())
+		// commit and renew db
+		err = db.Commit(true)
+		require.NoError(t, err)
+		db, err = state.NewStateDB(ledger, rootAddr)
+		require.NoError(t, err)
+		// set code and call contract creation
+		db.SetCode(addr2, code1)
+		db.CreateContract(addr2)
+		require.Equal(t, code1, db.GetCode(addr2))
+		// now calling selfdestruct should do the job
+		db.Selfdestruct6780(addr2)
+		require.NoError(t, db.Error())
+		err = db.Commit(true)
+		require.NoError(t, err)
+		db, err = state.NewStateDB(ledger, rootAddr)
+		require.NoError(t, err)
+		// now query
+		require.Equal(t, uint256.NewInt(0), db.GetBalance(addr2))
+		require.Empty(t, db.GetCode(addr2))
+		require.NoError(t, db.Error())
+
+		// test 3 - create account and call self destruct in a single operation
+		// selfdestruct should work
+		db, err = state.NewStateDB(ledger, rootAddr)
+		require.NoError(t, err)
+		addr3 := testutils.RandomCommonAddress(t)
+		balance3 := uint256.NewInt(300)
+		key := testutils.RandomCommonHash(t)
+		value := testutils.RandomCommonHash(t)
+		db.CreateAccount(addr3)
+		db.CreateContract(addr3)
+		db.SetCode(addr3, code1)
+		db.SetState(addr3, key, value)
+		db.AddBalance(addr3, balance3, tracing.BalanceChangeTransfer)
+		require.NoError(t, db.Error())
+		// call self destruct
+		db.Selfdestruct6780(addr3)
+		require.NoError(t, db.Error())
+		// commit changes
+		err = db.Commit(true)
+		require.NoError(t, err)
+		// renew db
+		db, err = state.NewStateDB(ledger, rootAddr)
+		require.NoError(t, err)
+		// account should not exist
+		require.False(t, db.Exist(addr3))
+		require.Equal(t, uint256.NewInt(0), db.GetBalance(addr3))
+		require.Empty(t, db.GetCode(addr3))
+		require.Equal(t, gethCommon.Hash{}, db.GetState(addr3, key))
+		require.NoError(t, db.Error())
+	})
 }

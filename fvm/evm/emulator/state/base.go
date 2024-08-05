@@ -300,8 +300,8 @@ func (v *BaseView) DeleteAccount(addr gethCommon.Address) error {
 	if err != nil {
 		return err
 	}
-	if acc == nil {
-		return fmt.Errorf("account doesn't exist to be deleted")
+	if acc == nil { // if account doesn't exist return
+		return nil
 	}
 
 	// 2. remove the code
