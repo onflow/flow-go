@@ -328,6 +328,15 @@ func TestStateDB(t *testing.T) {
 		require.NoError(t, db.Error())
 		require.Equal(t, gethTypes.EmptyRootHash, root)
 
+		db.AddBalance(addr1, uint256.NewInt(100), tracing.BalanceChangeTouchAccount)
+		require.NoError(t, db.Error())
+		err = db.Commit(true)
+		require.NoError(t, err)
+
+		root = db.GetStorageRoot(addr1)
+		require.NoError(t, db.Error())
+		require.Equal(t, gethTypes.EmptyRootHash, root)
+
 		// add slots to the account
 		key := testutils.RandomCommonHash(t)
 		value := testutils.RandomCommonHash(t)

@@ -187,7 +187,7 @@ func (v *BaseView) GetStorageRoot(addr common.Address) (common.Hash, error) {
 	}
 
 	// account is EOA
-	if account.CollectionID == nil {
+	if len(account.CollectionID) == 0 {
 		return gethTypes.EmptyRootHash, nil
 	}
 
