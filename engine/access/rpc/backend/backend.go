@@ -16,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/engine/common/rpc"
+	"github.com/onflow/flow-go/engine/common/version"
 	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -119,6 +120,7 @@ type Params struct {
 	TxResultQueryMode   IndexQueryMode
 	TxResultsIndex      *index.TransactionResultsIndex
 	LastFullBlockHeight *counters.PersistentStrictMonotonicCounter
+	VersionControl      *version.VersionControl
 }
 
 var _ TransactionErrorMessage = (*Backend)(nil)
@@ -163,7 +165,7 @@ func New(params Params) (*Backend, error) {
 	systemTxID := systemTx.ID()
 
 	// initialize node version info
-	nodeInfo := getNodeVersionInfo(params.State.Params())
+	nodeInfo := getNodeVersionInfo(params.State.Params(), params.VersionControl)
 
 	transactionsLocalDataProvider := &TransactionsLocalDataProvider{
 		state:               params.State,
@@ -349,12 +351,26 @@ func (b *Backend) GetNodeVersionInfo(_ context.Context) (*access.NodeVersionInfo
 
 // getNodeVersionInfo returns the NodeVersionInfo for the node.
 // Since these values are static while the node is running, it is safe to cache.
-func getNodeVersionInfo(stateParams protocol.Params) *access.NodeVersionInfo {
+func getNodeVersionInfo(stateParams protocol.Params, versionControl *version.VersionControl) *access.NodeVersionInfo {
 	sporkID := stateParams.SporkID()
 	protocolVersion := stateParams.ProtocolVersion()
 	sporkRootBlockHeight := stateParams.SporkRootBlockHeight()
 
 	nodeRootBlockHeader := stateParams.SealedRoot()
+
+	var startHeight uint64
+	var endHeight uint64
+
+	// Version control feature could be disabled
+	if versionControl != nil {
+		startHeight = versionControl.StartHeight()
+		endHeight = versionControl.EndHeight()
+	}
+
+	// startHeight is the root block if there is no start boundary in the current spork
+	if startHeight == version.NoHeight {
+		startHeight = nodeRootBlockHeader.Height
+	}
 
 	nodeInfo := &access.NodeVersionInfo{
 		Semver:               build.Version(),
@@ -363,6 +379,8 @@ func getNodeVersionInfo(stateParams protocol.Params) *access.NodeVersionInfo {
 		ProtocolVersion:      uint64(protocolVersion),
 		SporkRootBlockHeight: sporkRootBlockHeight,
 		NodeRootBlockHeight:  nodeRootBlockHeader.Height,
+		StartHeight:          startHeight,
+		EndHeight:            endHeight,
 	}
 
 	return nodeInfo

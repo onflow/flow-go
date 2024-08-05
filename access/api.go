@@ -272,4 +272,6 @@ type NodeVersionInfo struct {
 	ProtocolVersion      uint64
 	SporkRootBlockHeight uint64
 	NodeRootBlockHeight  uint64
+	StartHeight          uint64
+	EndHeight            uint64
 }

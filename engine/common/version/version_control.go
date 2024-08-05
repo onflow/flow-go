@@ -365,3 +365,13 @@ func (v *VersionControl) blockFinalized(
 		}
 	}
 }
+
+// StartHeight return the first block that the version supports
+func (v *VersionControl) StartHeight() uint64 {
+	return v.startHeight.Load()
+}
+
+// EndHeight return the last block that the version supports
+func (v *VersionControl) EndHeight() uint64 {
+	return v.endHeight.Load()
+}

@@ -1596,6 +1596,8 @@ func (suite *Suite) TestGetNodeVersionInfo() {
 			ProtocolVersion:      uint64(protocolVersion),
 			SporkRootBlockHeight: sporkRootBlock.Height,
 			NodeRootBlockHeight:  nodeRootBlock.Height,
+			StartHeight:          nodeRootBlock.Height,
+			EndHeight:            uint64(0),
 		}
 
 		params := suite.defaultBackendParams()
