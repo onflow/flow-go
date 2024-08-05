@@ -20,20 +20,3 @@ func (s *SetEpochExtensionViewCount) ServiceEvent() ServiceEvent {
 		Event: s,
 	}
 }
-
-type EjectIdentity struct {
-	NodeID Identifier
-}
-
-// EqualTo returns true if the two events are equivalent.
-func (e *EjectIdentity) EqualTo(other *EjectIdentity) bool {
-	return e.NodeID == other.NodeID
-}
-
-// ServiceEvent returns the event as a generic ServiceEvent type.
-func (e *EjectIdentity) ServiceEvent() ServiceEvent {
-	return ServiceEvent{
-		Type:  ServiceEventEjectIdentity,
-		Event: e,
-	}
-}

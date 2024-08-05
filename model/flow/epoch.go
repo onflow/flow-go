@@ -458,6 +458,23 @@ func (commit *EpochCommit) EqualTo(other *EpochCommit) bool {
 	return true
 }
 
+type EjectIdentity struct {
+	NodeID Identifier
+}
+
+// EqualTo returns true if the two events are equivalent.
+func (e *EjectIdentity) EqualTo(other *EjectIdentity) bool {
+	return e.NodeID == other.NodeID
+}
+
+// ServiceEvent returns the event as a generic ServiceEvent type.
+func (e *EjectIdentity) ServiceEvent() ServiceEvent {
+	return ServiceEvent{
+		Type:  ServiceEventEjectIdentity,
+		Event: e,
+	}
+}
+
 // ToDKGParticipantLookup constructs a DKG participant lookup from an identity
 // list and a key list. The identity list must be EXACTLY the same (order and
 // contents) as that used when initializing the corresponding DKG instance.
