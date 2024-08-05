@@ -16,17 +16,15 @@ var (
 	UFixToAttoConversionMultiplier = new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(UFixedToAttoConversionScale)), nil)
 
 	OneFlowInUFix64 = cadence.UFix64(uint64(math.Pow(10, float64(UFixedScale))))
-	OneFlow         = new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(AttoScale)), nil)
-	OneFlowBalance  = Balance(OneFlow)
 	EmptyBalance    = Balance(new(big.Int))
 )
 
 // Balance represents the balance of an address
-// in the evm environment (Flow EVM), balances are kept in attoflow (1e-18 flow);
+// in the evm environment (Flow EVM), balances are kept in atto-flow (1e-18 flow);
 // the smallest denomination of FLOW token (similar to how Wei is used to store Eth)
 // But A Cadence FLOW Vault uses a Cadence.UFix64 to store values in Flow, which means
 // 1e-8 is the smallest value that can be stored on the vault.
-// The balance here considers the highest precision (attoflow) but utility
+// The balance here considers the highest precision (atto-flow) but utility
 // function has been provided for conversion from/to UFix64 to prevent accidental
 // conversion errors and dealing with rounding errors.
 type Balance *big.Int
@@ -36,7 +34,7 @@ func BalancesAreEqual(bal1, bal2 Balance) bool {
 	return (*big.Int)(bal1).Cmp(bal2) == 0
 }
 
-// NewBalanceconstructs a new balance from an atto flow value
+// NewBalance constructs a new balance from an atto-flow value
 func NewBalance(inp *big.Int) Balance {
 	return Balance(inp)
 }
@@ -87,12 +85,12 @@ func ConvertBalanceToUFix64(bal Balance) (value cadence.UFix64, roundedOff bool,
 		// this should never happen
 		err = fmt.Errorf("balance can't be casted to a uint64")
 	}
-	return cadence.UFix64(converted.Uint64()), BalanceConvertionToUFix64ProneToRoundingError(bal), err
+	return cadence.UFix64(converted.Uint64()), BalanceConversionToUFix64ProneToRoundingError(bal), err
 }
 
-// BalanceConvertionToUFix64ProneToRoundingError returns true
+// BalanceConversionToUFix64ProneToRoundingError returns true
 // if casting to UFix64 could result in rounding error
-func BalanceConvertionToUFix64ProneToRoundingError(bal Balance) bool {
+func BalanceConversionToUFix64ProneToRoundingError(bal Balance) bool {
 	return new(big.Int).Mod(bal, UFixToAttoConversionMultiplier).BitLen() != 0
 }
 
@@ -111,5 +109,20 @@ func AddBalance(bal1 Balance, bal2 Balance) (Balance, error) {
 
 // MakeABalanceInFlow makes a balance object that has `amount` Flow Token in it
 func MakeABalanceInFlow(amount uint64) Balance {
-	return NewBalance(new(big.Int).Mul(OneFlowBalance, new(big.Int).SetUint64(amount)))
+	return NewBalance(MakeBigIntInFlow(amount))
+}
+
+// MakeBigIntInFlow makes big int containing `amount` of Flow
+func MakeBigIntInFlow(amount uint64) *big.Int {
+	return new(big.Int).Mul(OneFlowBalance(), new(big.Int).SetUint64(amount))
+}
+
+// OneFlow creates a big int including one flow
+func OneFlow() *big.Int {
+	return new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(AttoScale)), nil)
+}
+
+// OneFlowBalance creates a new balance including one flow
+func OneFlowBalance() Balance {
+	return Balance(OneFlow())
 }

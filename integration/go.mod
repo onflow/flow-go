@@ -18,14 +18,15 @@ require (
 	github.com/ipfs/go-cid v0.4.1
 	github.com/ipfs/go-datastore v0.6.0
 	github.com/ipfs/go-ds-badger2 v0.1.3
+	github.com/ipfs/go-ds-pebble v0.3.1
 	github.com/libp2p/go-libp2p v0.32.2
-	github.com/onflow/cadence v1.0.0-preview.41
+	github.com/onflow/cadence v1.0.0-preview.42
 	github.com/onflow/crypto v0.25.1
 	github.com/onflow/flow-core-contracts/lib/go/contracts v1.3.1
 	github.com/onflow/flow-core-contracts/lib/go/templates v1.3.1
 	github.com/onflow/flow-emulator v1.0.0-preview.36.0.20240729195722-d4eb1c30eb9f
 	github.com/onflow/flow-go v0.36.8-0.20240729205403-18c8533fa521
-	github.com/onflow/flow-go-sdk v1.0.0-preview.44
+	github.com/onflow/flow-go-sdk v1.0.0-preview.45
 	github.com/onflow/flow-go/insecure v0.0.0-00010101000000-000000000000
 	github.com/onflow/flow/protobuf/go/flow v0.4.5
 	github.com/onflow/go-ethereum v1.14.7
@@ -358,6 +359,9 @@ require (
 replace github.com/onflow/flow-go => ../
 
 replace github.com/onflow/flow-go/insecure => ../insecure
+
+// TODO: remove it when https://github.com/ipfs/go-ds-pebble/pull/36 merged
+replace github.com/ipfs/go-ds-pebble v0.3.1 => github.com/onflow/go-ds-pebble v0.0.0-20240731130313-f186539f382c
 
 //TODO: Should be rmoved, when emulator part will be merged
 replace github.com/onflow/flow-emulator v1.0.0-preview.36.0.20240729195722-d4eb1c30eb9f => github.com/The-K-R-O-K/flow-emulator v1.0.0-preview.12.0.20240730123659-82e94c205df3

@@ -15,6 +15,7 @@ import (
 
 	"github.com/onflow/flow-go/integration/utils"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/state/protocol/protocol_state"
 	"github.com/onflow/flow-go/state/protocol/protocol_state/kvstore"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -33,7 +34,13 @@ func TestProtocolVersionUpgrade(t *testing.T) {
 func (suite *ProtocolVersionUpgradeSuite) SetupTest() {
 	// Begin the test with a v0 kvstore, rather than the default v1.
 	// This lets us test upgrading v0->v1
-	suite.KVStoreFactory = kvstore.NewKVStoreV0
+	protocolState, err := suite.net.BootstrapSnapshot.ProtocolState()
+	require.NoError(suite.T(), err)
+	finalizationThreshold := protocolState.GetEpochCommitSafetyThreshold()
+	epochExtensionViewCount := protocolState.GetEpochExtensionViewCount()
+	suite.KVStoreFactory = func(epochStateID flow.Identifier) (protocol_state.KVStoreAPI, error) {
+		return kvstore.NewKVStoreV0(finalizationThreshold, epochExtensionViewCount, epochStateID)
+	}
 	suite.Suite.SetupTest()
 }
 

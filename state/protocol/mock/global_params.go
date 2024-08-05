@@ -30,24 +30,6 @@ func (_m *GlobalParams) ChainID() flow.ChainID {
 	return r0
 }
 
-// EpochCommitSafetyThreshold provides a mock function with given fields:
-func (_m *GlobalParams) EpochCommitSafetyThreshold() uint64 {
-	ret := _m.Called()
-
-	if len(ret) == 0 {
-		panic("no return value specified for EpochCommitSafetyThreshold")
-	}
-
-	var r0 uint64
-	if rf, ok := ret.Get(0).(func() uint64); ok {
-		r0 = rf()
-	} else {
-		r0 = ret.Get(0).(uint64)
-	}
-
-	return r0
-}
-
 // ProtocolVersion provides a mock function with given fields:
 func (_m *GlobalParams) ProtocolVersion() uint {
 	ret := _m.Called()

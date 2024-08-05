@@ -49,13 +49,10 @@ type QCContractClient interface {
 // CAUTION: EpochLookup should only be used for querying the previous, current, or next epoch.
 type EpochLookup interface {
 
-	// EpochForViewWithFallback returns the counter of the epoch that the input view belongs to.
-	// If epoch fallback has been triggered, returns the last committed epoch counter
-	// in perpetuity for any inputs beyond the last committed epoch view range.
-	// For example, if we trigger epoch fallback during epoch 10, and reach the final
-	// view of epoch 10 before epoch 11 has finished being setup, this function will
-	// return 10 even for input views beyond the final view of epoch 10.
+	// EpochForView returns the counter of the epoch that the input view belongs to.
+	// Note: The EpochLookup component processes EpochExtended notifications which will
+	// extend the view range for the latest epoch.
 	//
 	// Returns model.ErrViewForUnknownEpoch if the input does not fall within the range of a known epoch.
-	EpochForViewWithFallback(view uint64) (epochCounter uint64, err error)
+	EpochForView(view uint64) (epochCounter uint64, err error)
 }

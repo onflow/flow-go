@@ -47,6 +47,7 @@ func Test_MutableProtocolState(t *testing.T) {
 	commitsDB := storagemock.NewEpochCommits(t)
 
 	mutableProtocolState := NewMutableProtocolState(
+		unittest.Logger(),
 		epochProtocolStateDB,
 		protocolKVStoreDB,
 		globalParams,

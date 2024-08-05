@@ -503,11 +503,13 @@ func (t *cadenceValueMigrationReporter) MigratedPathCapability(
 	accountAddress common.Address,
 	addressPath interpreter.AddressPath,
 	borrowType *interpreter.ReferenceStaticType,
+	capabilityID interpreter.UInt64Value,
 ) {
 	t.reportWriter.Write(capabilityMigrationEntry{
 		AccountAddress: accountAddress,
 		AddressPath:    addressPath,
 		BorrowType:     borrowType,
+		CapabilityID:   capabilityID,
 	})
 }
 
@@ -532,7 +534,10 @@ func (t *cadenceValueMigrationReporter) MigratedLink(
 }
 
 func (t *cadenceValueMigrationReporter) CyclicLink(err capcons.CyclicLinkError) {
-	t.reportWriter.Write(err)
+	t.reportWriter.Write(linkCyclicEntry{
+		Address: err.Address,
+		Paths:   err.Paths,
+	})
 }
 
 func (t *cadenceValueMigrationReporter) MissingTarget(accountAddressPath interpreter.AddressPath) {
@@ -653,6 +658,7 @@ type capabilityMigrationEntry struct {
 	AccountAddress common.Address
 	AddressPath    interpreter.AddressPath
 	BorrowType     *interpreter.ReferenceStaticType
+	CapabilityID   interpreter.UInt64Value
 }
 
 var _ valueMigrationReportEntry = capabilityMigrationEntry{}
@@ -670,12 +676,14 @@ func (e capabilityMigrationEntry) MarshalJSON() ([]byte, error) {
 		Address        string `json:"address"`
 		Path           string `json:"path"`
 		BorrowType     string `json:"borrow_type"`
+		CapabilityID   string `json:"capability_id"`
 	}{
 		Kind:           "capability-migration-success",
 		AccountAddress: e.AccountAddress.HexWithPrefix(),
 		Address:        e.AddressPath.Address.HexWithPrefix(),
 		Path:           e.AddressPath.Path.String(),
 		BorrowType:     string(e.BorrowType.ID()),
+		CapabilityID:   e.CapabilityID.String(),
 	})
 }
 
@@ -731,6 +739,39 @@ func (e linkMissingTargetEntry) MarshalJSON() ([]byte, error) {
 		Kind:           "link-missing-target",
 		AccountAddress: e.AddressPath.Address.HexWithPrefix(),
 		Path:           e.AddressPath.Path.String(),
+	})
+}
+
+// linkCyclicEntry
+
+type linkCyclicEntry struct {
+	Address common.Address
+	Paths   []interpreter.PathValue
+}
+
+var _ valueMigrationReportEntry = linkCyclicEntry{}
+
+func (e linkCyclicEntry) accountAddress() common.Address {
+	return e.Address
+}
+
+var _ json.Marshaler = linkCyclicEntry{}
+
+func (e linkCyclicEntry) MarshalJSON() ([]byte, error) {
+
+	pathStrings := make([]string, 0, len(e.Paths))
+	for _, path := range e.Paths {
+		pathStrings = append(pathStrings, path.String())
+	}
+
+	return json.Marshal(struct {
+		Kind           string   `json:"kind"`
+		AccountAddress string   `json:"account_address"`
+		Paths          []string `json:"paths"`
+	}{
+		Kind:           "link-cyclic",
+		AccountAddress: e.Address.HexWithPrefix(),
+		Paths:          pathStrings,
 	})
 }
 
