@@ -801,6 +801,21 @@ func TestFactory(t *testing.T) {
 							types.NewContractCall(
 								factoryDeployer,
 								factoryAddress,
+								factoryContract.MakeCallData(t, "deployAndDestroy", salt),
+								200_000,
+								big.NewInt(0),
+								0,
+							),
+						)
+						requireSuccessfulExecution(t, err, res)
+					})
+
+					RunWithNewBlockView(t, env, func(blk types.BlockView) {
+						salt := [32]byte{3}
+						res, err := blk.DirectCall(
+							types.NewContractCall(
+								factoryDeployer,
+								factoryAddress,
 								factoryContract.MakeCallData(t, "depositAndDeploy", salt, big.NewInt(100)),
 								250_000,
 								big.NewInt(0),
@@ -811,7 +826,7 @@ func TestFactory(t *testing.T) {
 					})
 
 					RunWithNewBlockView(t, env, func(blk types.BlockView) {
-						salt := [32]byte{3}
+						salt := [32]byte{4}
 						res, err := blk.DirectCall(
 							types.NewContractCall(
 								factoryDeployer,
