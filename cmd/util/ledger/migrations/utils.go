@@ -31,8 +31,8 @@ func init() {
 	}
 }
 
-func getSlabIDsFromRegisters(registers registers.Registers) ([]atree.StorageID, error) {
-	storageIDs := make([]atree.StorageID, 0, registers.Count())
+func getSlabIDsFromRegisters(registers registers.Registers) ([]atree.SlabID, error) {
+	storageIDs := make([]atree.SlabID, 0, registers.Count())
 
 	err := registers.ForEach(func(owner string, key string, value []byte) error {
 
@@ -40,12 +40,12 @@ func getSlabIDsFromRegisters(registers registers.Registers) ([]atree.StorageID, 
 			return nil
 		}
 
-		storageID := atree.NewStorageID(
+		slabID := atree.NewSlabID(
 			atree.Address([]byte(owner)),
-			atree.StorageIndex([]byte(key[1:])),
+			atree.SlabIndex([]byte(key[1:])),
 		)
 
-		storageIDs = append(storageIDs, storageID)
+		storageIDs = append(storageIDs, slabID)
 
 		return nil
 	})

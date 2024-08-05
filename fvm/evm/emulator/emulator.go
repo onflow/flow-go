@@ -123,11 +123,9 @@ func (bl *BlockView) DirectCall(call *types.DirectCall) (res *types.Result, err 
 		proc.evm.Config.Tracer.OnTxStart(proc.evm.GetVMContext(), call.Transaction(), call.From.ToCommon())
 		defer func() {
 			if proc.evm.Config.Tracer.OnTxEnd != nil {
-				receipt := &gethTypes.Receipt{}
-				if res != nil {
-					receipt = res.Receipt()
+				if err == nil && res != nil {
+					proc.evm.Config.Tracer.OnTxEnd(res.Receipt(), res.ValidationError)
 				}
-				proc.evm.Config.Tracer.OnTxEnd(receipt, err)
 			}
 		}()
 
@@ -175,14 +173,11 @@ func (bl *BlockView) RunTransaction(
 		proc.evm.Config.Tracer.OnTxStart(proc.evm.GetVMContext(), tx, msg.From)
 		defer func() {
 			if proc.evm.Config.Tracer.OnTxEnd != nil {
-				receipt := &gethTypes.Receipt{}
-				if result != nil {
-					receipt = result.Receipt()
+				if err == nil && result != nil {
+					proc.evm.Config.Tracer.OnTxEnd(result.Receipt(), result.ValidationError)
 				}
-				proc.evm.Config.Tracer.OnTxEnd(receipt, err)
 			}
 		}()
-
 	}
 
 	// run msg
@@ -203,6 +198,7 @@ func (bl *BlockView) RunTransaction(
 func (bl *BlockView) BatchRunTransactions(txs []*gethTypes.Transaction) ([]*types.Result, error) {
 	batchResults := make([]*types.Result, len(txs))
 
+	// create a new procedure
 	proc, err := bl.newProcedure()
 	if err != nil {
 		return nil, err
@@ -223,14 +219,11 @@ func (bl *BlockView) BatchRunTransactions(txs []*gethTypes.Transaction) ([]*type
 			proc.evm.Config.Tracer.OnTxStart(proc.evm.GetVMContext(), tx, msg.From)
 			defer func() {
 				if proc.evm.Config.Tracer.OnTxEnd != nil {
-					receipt := &gethTypes.Receipt{}
-					if batchResults[i] != nil {
-						receipt = batchResults[i].Receipt()
+					j := i
+					res := batchResults[j]
+					if err == nil && res != nil {
+						proc.evm.Config.Tracer.OnTxEnd(res.Receipt(), res.ValidationError)
 					}
-					proc.evm.Config.Tracer.OnTxEnd(
-						receipt,
-						err,
-					)
 				}
 			}()
 
@@ -241,6 +234,7 @@ func (bl *BlockView) BatchRunTransactions(txs []*gethTypes.Transaction) ([]*type
 		if err != nil {
 			return nil, err
 		}
+
 		// all commit errors (StateDB errors) has to be returned
 		if err := proc.commit(false); err != nil {
 			return nil, err
@@ -248,6 +242,7 @@ func (bl *BlockView) BatchRunTransactions(txs []*gethTypes.Transaction) ([]*type
 
 		// this clears state for any subsequent transaction runs
 		proc.state.Reset()
+
 		// collect result
 		batchResults[i] = res
 	}
@@ -266,10 +261,14 @@ func (bl *BlockView) DryRunTransaction(
 	from gethCommon.Address,
 ) (*types.Result, error) {
 	var txResult *types.Result
+
+	// create a new procedure
 	proc, err := bl.newProcedure()
 	if err != nil {
 		return nil, err
 	}
+
+	// convert tx into message
 	msg, err := gethCore.TransactionToMessage(
 		tx,
 		GetSigner(bl.config),
@@ -404,6 +403,13 @@ func (proc *procedure) withdrawFrom(
 		return types.NewInvalidResult(
 			call.Transaction(),
 			types.ErrInvalidBalance), nil
+	}
+
+	// check balance is not prone to rounding error
+	if types.BalanceConversionToUFix64ProneToRoundingError(call.Value) {
+		return types.NewInvalidResult(
+			call.Transaction(),
+			types.ErrWithdrawBalanceRounding), nil
 	}
 
 	// create bridge account if not exist
@@ -627,6 +633,7 @@ func (proc *procedure) run(
 	// if the block gas limit is set to anything than max
 	// we need to update this code.
 	gasPool := (*gethCore.GasPool)(&proc.config.BlockContext.GasLimit)
+
 	// transit the state
 	execResult, err := gethCore.NewStateTransition(
 		proc.evm,

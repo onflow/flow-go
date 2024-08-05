@@ -235,9 +235,14 @@ func TestClusters(t *testing.T) {
 	clusterQCs := unittest.QuorumCertificatesFromAssignments(setup.Assignments)
 	commit.ClusterQCs = flow.ClusterQCVoteDatasFromQCs(clusterQCs)
 	seal.ResultID = result.ID()
-	root.Payload.ProtocolStateID = kvstore.NewDefaultKVStore(
-		inmem.EpochProtocolStateFromServiceEvents(setup, commit).ID()).ID()
-
+	safetyParams, err := protocol.DefaultEpochSafetyParams(root.Header.ChainID)
+	require.NoError(t, err)
+	rootProtocolState, err := kvstore.NewDefaultKVStore(
+		safetyParams.FinalizationSafetyThreshold,
+		safetyParams.EpochExtensionViewCount,
+		inmem.EpochProtocolStateFromServiceEvents(setup, commit).ID())
+	require.NoError(t, err)
+	root.Payload.ProtocolStateID = rootProtocolState.ID()
 	rootSnapshot, err := inmem.SnapshotFromBootstrapState(root, result, seal, qc)
 	require.NoError(t, err)
 
@@ -1473,7 +1478,7 @@ func TestSnapshot_CrossEpochIdentities(t *testing.T) {
 			snapshots := []protocol.Snapshot{state.AtHeight(epoch1.Setup), state.AtHeight(epoch1.Committed)}
 
 			for _, snapshot := range snapshots {
-				phase, err := snapshot.Phase()
+				phase, err := snapshot.EpochPhase()
 				require.NoError(t, err)
 
 				t.Run("phase: "+phase.String(), func(t *testing.T) {
@@ -1521,7 +1526,7 @@ func TestSnapshot_CrossEpochIdentities(t *testing.T) {
 			snapshots := []protocol.Snapshot{state.AtHeight(epoch2.Setup), state.AtHeight(epoch2.Committed)}
 
 			for _, snapshot := range snapshots {
-				phase, err := snapshot.Phase()
+				phase, err := snapshot.EpochPhase()
 				require.NoError(t, err)
 
 				t.Run("phase: "+phase.String(), func(t *testing.T) {

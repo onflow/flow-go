@@ -156,7 +156,7 @@ const (
 	FVMEnvValueExists                 SpanName = "fvm.env.valueExists"
 	FVMEnvGetValue                    SpanName = "fvm.env.getValue"
 	FVMEnvSetValue                    SpanName = "fvm.env.setValue"
-	FVMEnvAllocateStorageIndex        SpanName = "fvm.env.allocateStorageIndex"
+	FVMEnvAllocateSlabIndex           SpanName = "fvm.env.allocateSlabIndex"
 	FVMEnvGetAccount                  SpanName = "fvm.env.getAccount"
 	FVMEnvGetStorageUsed              SpanName = "fvm.env.getStorageUsed"
 	FVMEnvGetStorageCapacity          SpanName = "fvm.env.getStorageCapacity"

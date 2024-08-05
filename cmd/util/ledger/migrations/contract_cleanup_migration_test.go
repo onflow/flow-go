@@ -248,15 +248,16 @@ func TestContractCleanupMigration2(t *testing.T) {
 	reporter := rwf.reportWriters[contractCleanupReporterName]
 	require.NotNil(t, reporter)
 
+	// Order is alphabetical
 	assert.Equal(t,
 		[]any{
 			emptyContractRemoved{
 				AccountAddress: address,
-				ContractName:   contractNameEmpty1,
+				ContractName:   contractNameEmpty2,
 			},
 			emptyContractRemoved{
 				AccountAddress: address,
-				ContractName:   contractNameEmpty2,
+				ContractName:   contractNameEmpty1,
 			},
 			contractNamesChanged{
 				AccountAddress: address,
