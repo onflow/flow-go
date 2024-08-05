@@ -665,6 +665,13 @@ func (s *EpochFallbackStateMachineSuite) TestEpochFallbackStateMachineInjectsMul
 func (s *EpochFallbackStateMachineSuite) TestEpochRecoverAndEjectionInSameBlock() {
 	nextEpochParticipants := s.parentProtocolState.CurrentEpochIdentityTable.Copy()
 	ejectedIdentityID := nextEpochParticipants.Filter(filter.HasRole[flow.Identity](flow.RoleAccess))[0].NodeID
+	ejectIdentity := &flow.EjectIdentity{NodeID: ejectedIdentityID}
+
+	s.consumer.On("OnServiceEventReceived", ejectIdentity.ServiceEvent()).Once()
+	s.consumer.On("OnServiceEventProcessed", ejectIdentity.ServiceEvent()).Once()
+	ejected := s.stateMachine.EjectIdentity(ejectIdentity)
+	require.True(s.T(), ejected)
+
 	epochRecover := unittest.EpochRecoverFixture(func(setup *flow.EpochSetup) {
 		setup.Participants = nextEpochParticipants.ToSkeleton()
 		setup.Assignments = unittest.ClusterAssignment(1, nextEpochParticipants.ToSkeleton())
@@ -672,9 +679,6 @@ func (s *EpochFallbackStateMachineSuite) TestEpochRecoverAndEjectionInSameBlock(
 		setup.FirstView = s.parentProtocolState.CurrentEpochSetup.FinalView + 1
 		setup.FinalView = setup.FirstView + 10_000
 	})
-	ejected := s.stateMachine.EjectIdentity(ejectedIdentityID)
-	require.True(s.T(), ejected)
-
 	s.consumer.On("OnServiceEventReceived", epochRecover.ServiceEvent()).Once()
 	s.consumer.On("OnInvalidServiceEvent", epochRecover.ServiceEvent(),
 		mock.MatchedBy(func(err error) bool { return protocol.IsInvalidServiceEventError(err) })).Once()
@@ -723,11 +727,9 @@ func (s *EpochFallbackStateMachineSuite) TestProcessingMultipleEventsAtTheSameBl
 		if includeEjection {
 			accessNodes := s.parentProtocolState.CurrentEpochSetup.Participants.Filter(filter.HasRole[flow.IdentitySkeleton](flow.RoleAccess))
 			identity := rapid.SampledFrom(accessNodes).Draw(t, "ejection-node")
-			// TODO(EFM, #6020): this needs to be updated when a proper ejection event is implemented
-			serviceEvent := flow.ServiceEvent{
-				Type:  "ejection",
-				Event: identity.NodeID,
-			}
+			serviceEvent := (&flow.EjectIdentity{NodeID: identity.NodeID}).ServiceEvent()
+			s.consumer.On("OnServiceEventReceived", serviceEvent).Once()
+			s.consumer.On("OnServiceEventProcessed", serviceEvent).Once()
 			ejectionEvents = append(ejectionEvents, serviceEvent)
 			ejectedNodes = append(ejectedNodes, identity.NodeID)
 		}
@@ -770,7 +772,7 @@ func (s *EpochFallbackStateMachineSuite) TestProcessingMultipleEventsAtTheSameBl
 				_, err = s.stateMachine.ProcessEpochCommit(ev)
 			case *flow.EpochRecover:
 				_, err = s.stateMachine.ProcessEpochRecover(ev)
-			case flow.Identifier:
+			case *flow.EjectIdentity:
 				_ = s.stateMachine.EjectIdentity(ev)
 			}
 			require.NoError(s.T(), err)
