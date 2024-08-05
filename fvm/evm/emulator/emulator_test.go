@@ -746,6 +746,91 @@ func TestSelfdestruct(t *testing.T) {
 	})
 }
 
+// test factory pattern
+func TestFactory(t *testing.T) {
+	testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
+		testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
+			testutils.RunWithEOATestAccount(t, backend, rootAddr, func(testAccount *testutils.EOATestAccount) {
+
+				var factoryAddress types.Address
+				factoryContract := testutils.GetFactoryTestContract(t)
+				factoryDeployer := types.NewAddressFromString("factoryDeployer")
+				factoryDeployerBalance := big.NewInt(0).Mul(big.NewInt(1000), big.NewInt(gethParams.Ether))
+				factoryBalance := big.NewInt(0).Mul(big.NewInt(100), big.NewInt(gethParams.Ether))
+
+				// setup the test with funded account and deploying a factory contract.
+				RunWithNewEmulator(t, backend, rootAddr, func(env *emulator.Emulator) {
+					RunWithNewBlockView(t, env, func(blk types.BlockView) {
+						res, err := blk.DirectCall(types.NewDepositCall(types.EmptyAddress, factoryDeployer, factoryDeployerBalance, 0))
+						require.NoError(t, err)
+						requireSuccessfulExecution(t, err, res)
+					})
+
+					RunWithNewBlockView(t, env, func(blk types.BlockView) {
+						res, err := blk.DirectCall(
+							types.NewDeployCall(
+								factoryDeployer,
+								factoryContract.ByteCode,
+								math.MaxUint64,
+								factoryBalance,
+								0),
+						)
+						requireSuccessfulExecution(t, err, res)
+						require.NotNil(t, res.DeployedContractAddress)
+						factoryAddress = *res.DeployedContractAddress
+					})
+
+					RunWithNewBlockView(t, env, func(blk types.BlockView) {
+						salt := [32]byte{1}
+						res, err := blk.DirectCall(
+							types.NewContractCall(
+								factoryDeployer,
+								factoryAddress,
+								factoryContract.MakeCallData(t, "deploy", salt),
+								200_000,
+								big.NewInt(0),
+								0,
+							),
+						)
+						requireSuccessfulExecution(t, err, res)
+					})
+
+					RunWithNewBlockView(t, env, func(blk types.BlockView) {
+						salt := [32]byte{2}
+						res, err := blk.DirectCall(
+							types.NewContractCall(
+								factoryDeployer,
+								factoryAddress,
+								factoryContract.MakeCallData(t, "depositAndDeploy", salt, big.NewInt(100)),
+								250_000,
+								big.NewInt(0),
+								1,
+							),
+						)
+						requireSuccessfulExecution(t, err, res)
+					})
+
+					RunWithNewBlockView(t, env, func(blk types.BlockView) {
+						salt := [32]byte{3}
+						res, err := blk.DirectCall(
+							types.NewContractCall(
+								factoryDeployer,
+								factoryAddress,
+								factoryContract.MakeCallData(t, "depositDeployAndDestroy", salt, big.NewInt(100)),
+								250_000,
+								big.NewInt(0),
+								1,
+							),
+						)
+						requireSuccessfulExecution(t, err, res)
+					})
+
+				})
+			})
+		})
+	})
+}
+
 func TestTransfers(t *testing.T) {
 	testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
 		testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {

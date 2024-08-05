@@ -20,3 +20,11 @@ var DummyKittyContractBytes, _ = hex.DecodeString(dummyKittyContractBytesInHex)
 
 //go:embed dummy_kitty_abi.json
 var DummyKittyContractABIJSON string
+
+//go:embed factory_bytes.hex
+var factoryContractBytesInHex string
+
+var FactoryContractBytes, _ = hex.DecodeString(factoryContractBytesInHex)
+
+//go:embed factory_abi.json
+var FactoryContractABIJSON string
