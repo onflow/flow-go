@@ -3,14 +3,12 @@ package epochs
 import (
 	"testing"
 
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"pgregory.net/rapid"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
-	"github.com/onflow/flow-go/state/protocol"
 	mockstate "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -48,7 +46,7 @@ func (s *EpochFallbackStateMachineSuite) TestProcessEpochSetupIsNoop() {
 	setup := unittest.EpochSetupFixture()
 	s.consumer.On("OnServiceEventReceived", setup.ServiceEvent()).Once()
 	s.consumer.On("OnInvalidServiceEvent", setup.ServiceEvent(),
-		mock.MatchedBy(func(err error) bool { return protocol.IsInvalidServiceEventError(err) })).Once()
+		unittest.MatchInvalidServiceEventError).Once()
 	applied, err := s.stateMachine.ProcessEpochSetup(setup)
 	require.NoError(s.T(), err)
 	require.False(s.T(), applied)
@@ -64,7 +62,7 @@ func (s *EpochFallbackStateMachineSuite) TestProcessEpochCommitIsNoop() {
 	commit := unittest.EpochCommitFixture()
 	s.consumer.On("OnServiceEventReceived", commit.ServiceEvent()).Once()
 	s.consumer.On("OnInvalidServiceEvent", commit.ServiceEvent(),
-		mock.MatchedBy(func(err error) bool { return protocol.IsInvalidServiceEventError(err) })).Once()
+		unittest.MatchInvalidServiceEventError).Once()
 	applied, err := s.stateMachine.ProcessEpochCommit(commit)
 	require.NoError(s.T(), err)
 	require.False(s.T(), applied)
@@ -115,7 +113,7 @@ func (s *EpochFallbackStateMachineSuite) TestProcessInvalidEpochRecover() {
 	mockConsumer := func(epochRecover *flow.EpochRecover) {
 		s.consumer.On("OnServiceEventReceived", epochRecover.ServiceEvent()).Once()
 		s.consumer.On("OnInvalidServiceEvent", epochRecover.ServiceEvent(),
-			mock.MatchedBy(func(err error) bool { return protocol.IsInvalidServiceEventError(err) })).Once()
+			unittest.MatchInvalidServiceEventError).Once()
 	}
 	s.Run("invalid-first-view", func() {
 		epochRecover := unittest.EpochRecoverFixture(func(setup *flow.EpochSetup) {
@@ -681,7 +679,7 @@ func (s *EpochFallbackStateMachineSuite) TestEpochRecoverAndEjectionInSameBlock(
 	})
 	s.consumer.On("OnServiceEventReceived", epochRecover.ServiceEvent()).Once()
 	s.consumer.On("OnInvalidServiceEvent", epochRecover.ServiceEvent(),
-		mock.MatchedBy(func(err error) bool { return protocol.IsInvalidServiceEventError(err) })).Once()
+		unittest.MatchInvalidServiceEventError).Once()
 	processed, err := s.stateMachine.ProcessEpochRecover(epochRecover)
 	require.NoError(s.T(), err)
 	require.False(s.T(), processed)
@@ -701,7 +699,7 @@ func (s *EpochFallbackStateMachineSuite) TestProcessingMultipleEventsAtTheSameBl
 			serviceEvent := unittest.EpochSetupFixture().ServiceEvent()
 			s.consumer.On("OnServiceEventReceived", serviceEvent).Once()
 			s.consumer.On("OnInvalidServiceEvent", serviceEvent,
-				mock.MatchedBy(func(err error) bool { return protocol.IsInvalidServiceEventError(err) })).Once()
+				unittest.MatchInvalidServiceEventError).Once()
 			events = append(events, serviceEvent)
 		}
 		commitEvents := rapid.IntRange(0, 5).Draw(t, "number-of-commit-events")
@@ -709,7 +707,7 @@ func (s *EpochFallbackStateMachineSuite) TestProcessingMultipleEventsAtTheSameBl
 			serviceEvent := unittest.EpochCommitFixture().ServiceEvent()
 			s.consumer.On("OnServiceEventReceived", serviceEvent).Once()
 			s.consumer.On("OnInvalidServiceEvent", serviceEvent,
-				mock.MatchedBy(func(err error) bool { return protocol.IsInvalidServiceEventError(err) })).Once()
+				unittest.MatchInvalidServiceEventError).Once()
 			events = append(events, serviceEvent)
 		}
 		recoverEvents := rapid.IntRange(0, 5).Draw(t, "number-of-recover-events")
@@ -717,7 +715,7 @@ func (s *EpochFallbackStateMachineSuite) TestProcessingMultipleEventsAtTheSameBl
 			serviceEvent := unittest.EpochRecoverFixture().ServiceEvent()
 			s.consumer.On("OnServiceEventReceived", serviceEvent).Once()
 			s.consumer.On("OnInvalidServiceEvent", serviceEvent,
-				mock.MatchedBy(func(err error) bool { return protocol.IsInvalidServiceEventError(err) })).Once()
+				unittest.MatchInvalidServiceEventError).Once()
 			events = append(events, serviceEvent)
 		}
 

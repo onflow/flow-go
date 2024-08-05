@@ -3,7 +3,6 @@ package epochs
 import (
 	"testing"
 
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
@@ -157,7 +156,7 @@ func (s *ProtocolStateMachineSuite) TestProcessEpochCommit() {
 	mockConsumer := func(commit *flow.EpochCommit) {
 		s.consumer.On("OnServiceEventReceived", commit.ServiceEvent()).Once()
 		s.consumer.On("OnInvalidServiceEvent", commit.ServiceEvent(),
-			mock.MatchedBy(func(err error) bool { return protocol.IsInvalidServiceEventError(err) })).Once()
+			unittest.MatchInvalidServiceEventError).Once()
 	}
 	var err error
 	s.Run("invalid counter", func() {
@@ -272,7 +271,7 @@ func (s *ProtocolStateMachineSuite) TestUpdateIdentityUnknownIdentity() {
 	serviceEvent := &flow.EjectIdentity{NodeID: unittest.IdentifierFixture()}
 	s.consumer.On("OnServiceEventReceived", serviceEvent.ServiceEvent()).Once()
 	s.consumer.On("OnInvalidServiceEvent", serviceEvent.ServiceEvent(),
-		mock.MatchedBy(func(err error) bool { return protocol.IsInvalidServiceEventError(err) })).Once()
+		unittest.MatchInvalidServiceEventError).Once()
 	ejected := s.stateMachine.EjectIdentity(serviceEvent)
 	require.False(s.T(), ejected, "should not be able to eject unknown identity")
 
@@ -333,7 +332,7 @@ func (s *ProtocolStateMachineSuite) TestProcessEpochSetupInvariants() {
 	mockConsumer := func(setup *flow.EpochSetup) {
 		s.consumer.On("OnServiceEventReceived", setup.ServiceEvent()).Once()
 		s.consumer.On("OnInvalidServiceEvent", setup.ServiceEvent(),
-			mock.MatchedBy(func(err error) bool { return protocol.IsInvalidServiceEventError(err) })).Once()
+			unittest.MatchInvalidServiceEventError).Once()
 	}
 	s.Run("invalid counter", func() {
 		setup := unittest.EpochSetupFixture(func(setup *flow.EpochSetup) {
@@ -568,7 +567,7 @@ func (s *ProtocolStateMachineSuite) TestEpochSetupAndEjectionInSameBlock() {
 	// epoch setup readmits the ejected identity, such events shouldn't be accepted.
 	s.consumer.On("OnServiceEventReceived", setup.ServiceEvent()).Once()
 	s.consumer.On("OnInvalidServiceEvent", setup.ServiceEvent(),
-		mock.MatchedBy(func(err error) bool { return protocol.IsInvalidServiceEventError(err) })).Once()
+		unittest.MatchInvalidServiceEventError).Once()
 	processed, err := s.stateMachine.ProcessEpochSetup(setup)
 	require.Error(s.T(), err)
 	require.True(s.T(), protocol.IsInvalidServiceEventError(err))
@@ -587,7 +586,7 @@ func (s *ProtocolStateMachineSuite) TestProcessEpochRecover() {
 	})
 	s.consumer.On("OnServiceEventReceived", epochRecover.ServiceEvent()).Once()
 	s.consumer.On("OnInvalidServiceEvent", epochRecover.ServiceEvent(),
-		mock.MatchedBy(func(err error) bool { return protocol.IsInvalidServiceEventError(err) })).Once()
+		unittest.MatchInvalidServiceEventError).Once()
 	processed, err := s.stateMachine.ProcessEpochRecover(epochRecover)
 	require.Error(s.T(), err)
 	require.True(s.T(), protocol.IsInvalidServiceEventError(err))
