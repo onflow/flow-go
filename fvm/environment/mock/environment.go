@@ -1406,6 +1406,36 @@ func (_m *Environment) RecordTrace(operation string, location common.Location, d
 	_m.Called(operation, location, duration, attrs)
 }
 
+// RecoverProgram provides a mock function with given fields: program, location
+func (_m *Environment) RecoverProgram(program *ast.Program, location common.Location) (*ast.Program, error) {
+	ret := _m.Called(program, location)
+
+	if len(ret) == 0 {
+		panic("no return value specified for RecoverProgram")
+	}
+
+	var r0 *ast.Program
+	var r1 error
+	if rf, ok := ret.Get(0).(func(*ast.Program, common.Location) (*ast.Program, error)); ok {
+		return rf(program, location)
+	}
+	if rf, ok := ret.Get(0).(func(*ast.Program, common.Location) *ast.Program); ok {
+		r0 = rf(program, location)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*ast.Program)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(*ast.Program, common.Location) error); ok {
+		r1 = rf(program, location)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // RemoveAccountContractCode provides a mock function with given fields: location
 func (_m *Environment) RemoveAccountContractCode(location common.AddressLocation) error {
 	ret := _m.Called(location)

@@ -35,7 +35,7 @@ type EpochStateMachineSuite struct {
 	commitsDB                       *storagemock.EpochCommits
 	globalParams                    *protocolmock.GlobalParams
 	parentState                     *protocolmock.KVStoreReader
-	parentEpochState                *flow.RichEpochProtocolStateEntry
+	parentEpochState                *flow.RichEpochStateEntry
 	mutator                         *protocol_statemock.KVStoreMutator
 	happyPathStateMachine           *mock.StateMachine
 	happyPathStateMachineFactory    *mock.StateMachineFactoryMethod
@@ -49,9 +49,8 @@ func (s *EpochStateMachineSuite) SetupTest() {
 	s.epochStateDB = storagemock.NewEpochProtocolStateEntries(s.T())
 	s.setupsDB = storagemock.NewEpochSetups(s.T())
 	s.commitsDB = storagemock.NewEpochCommits(s.T())
-	s.globalParams = protocolmock.NewGlobalParams(s.T())
-	s.globalParams.On("EpochCommitSafetyThreshold").Return(uint64(1_000))
 	s.parentState = protocolmock.NewKVStoreReader(s.T())
+	s.parentState.On("GetEpochCommitSafetyThreshold").Return(uint64(1_000))
 	s.parentEpochState = unittest.EpochStateFixture()
 	s.mutator = protocol_statemock.NewKVStoreMutator(s.T())
 	s.candidate = unittest.BlockHeaderFixture(unittest.HeaderWithView(s.parentEpochState.CurrentEpochSetup.FirstView + 1))
@@ -59,7 +58,7 @@ func (s *EpochStateMachineSuite) SetupTest() {
 	s.happyPathStateMachineFactory = mock.NewStateMachineFactoryMethod(s.T())
 	s.fallbackPathStateMachineFactory = mock.NewStateMachineFactoryMethod(s.T())
 
-	s.epochStateDB.On("ByBlockID", mocks.Anything).Return(func(_ flow.Identifier) *flow.RichEpochProtocolStateEntry {
+	s.epochStateDB.On("ByBlockID", mocks.Anything).Return(func(_ flow.Identifier) *flow.RichEpochStateEntry {
 		return s.parentEpochState
 	}, func(_ flow.Identifier) error {
 		return nil
@@ -77,7 +76,6 @@ func (s *EpochStateMachineSuite) SetupTest() {
 	s.stateMachine, err = epochs.NewEpochStateMachine(
 		s.candidate.View,
 		s.candidate.ParentID,
-		s.globalParams,
 		s.setupsDB,
 		s.commitsDB,
 		s.epochStateDB,
@@ -93,7 +91,7 @@ func (s *EpochStateMachineSuite) SetupTest() {
 // epoch state ID in the KV store even when there were no events to process.
 func (s *EpochStateMachineSuite) TestBuild_NoChanges() {
 	s.happyPathStateMachine.On("ParentState").Return(s.parentEpochState)
-	s.happyPathStateMachine.On("Build").Return(s.parentEpochState.EpochProtocolStateEntry, s.parentEpochState.ID(), false).Once()
+	s.happyPathStateMachine.On("Build").Return(s.parentEpochState.EpochStateEntry, s.parentEpochState.ID(), false).Once()
 
 	err := s.stateMachine.EvolveState(nil)
 	require.NoError(s.T(), err)
@@ -117,7 +115,7 @@ func (s *EpochStateMachineSuite) TestBuild_NoChanges() {
 // This test also ensures that updated state ID is committed in the KV store.
 func (s *EpochStateMachineSuite) TestBuild_HappyPath() {
 	s.happyPathStateMachine.On("ParentState").Return(s.parentEpochState)
-	updatedState := unittest.EpochStateFixture().EpochProtocolStateEntry
+	updatedState := unittest.EpochStateFixture().EpochStateEntry
 	updatedStateID := updatedState.ID()
 	s.happyPathStateMachine.On("Build").Return(updatedState, updatedStateID, true).Once()
 
@@ -148,7 +146,7 @@ func (s *EpochStateMachineSuite) TestBuild_HappyPath() {
 	storeTxDeferredUpdate.On("Execute", mocks.Anything).Return(nil).Once()
 
 	s.epochStateDB.On("Index", s.candidate.ID(), updatedStateID).Return(indexTxDeferredUpdate.Execute, nil).Once()
-	s.epochStateDB.On("StoreTx", updatedStateID, updatedState).Return(storeTxDeferredUpdate.Execute, nil).Once()
+	s.epochStateDB.On("StoreTx", updatedStateID, updatedState.MinEpochStateEntry).Return(storeTxDeferredUpdate.Execute, nil).Once()
 	s.mutator.On("SetEpochStateID", updatedStateID).Return(nil).Once()
 
 	dbUpdates, err := s.stateMachine.Build()
@@ -180,7 +178,6 @@ func (s *EpochStateMachineSuite) TestEpochStateMachine_Constructor() {
 			stateMachine, err := epochs.NewEpochStateMachine(
 				candidate.View,
 				candidate.ParentID,
-				s.globalParams,
 				s.setupsDB,
 				s.commitsDB,
 				s.epochStateDB,
@@ -206,7 +203,6 @@ func (s *EpochStateMachineSuite) TestEpochStateMachine_Constructor() {
 			stateMachine, err := epochs.NewEpochStateMachine(
 				candidate.View,
 				candidate.ParentID,
-				s.globalParams,
 				s.setupsDB,
 				s.commitsDB,
 				s.epochStateDB,
@@ -238,7 +234,6 @@ func (s *EpochStateMachineSuite) TestEpochStateMachine_Constructor() {
 			stateMachine, err := epochs.NewEpochStateMachine(
 				candidate.View,
 				candidate.ParentID,
-				s.globalParams,
 				s.setupsDB,
 				s.commitsDB,
 				s.epochStateDB,
@@ -264,7 +259,6 @@ func (s *EpochStateMachineSuite) TestEpochStateMachine_Constructor() {
 			stateMachine, err := epochs.NewEpochStateMachine(
 				candidate.View,
 				candidate.ParentID,
-				s.globalParams,
 				s.setupsDB,
 				s.commitsDB,
 				s.epochStateDB,
@@ -293,7 +287,6 @@ func (s *EpochStateMachineSuite) TestEpochStateMachine_Constructor() {
 			stateMachine, err := epochs.NewEpochStateMachine(
 				candidate.View,
 				candidate.ParentID,
-				s.globalParams,
 				s.setupsDB,
 				s.commitsDB,
 				s.epochStateDB,
@@ -319,7 +312,6 @@ func (s *EpochStateMachineSuite) TestEpochStateMachine_Constructor() {
 			stateMachine, err := epochs.NewEpochStateMachine(
 				candidate.View,
 				candidate.ParentID,
-				s.globalParams,
 				s.setupsDB,
 				s.commitsDB,
 				s.epochStateDB,
@@ -345,7 +337,6 @@ func (s *EpochStateMachineSuite) TestEpochStateMachine_Constructor() {
 			stateMachine, err := epochs.NewEpochStateMachine(
 				s.candidate.View,
 				s.candidate.ParentID,
-				s.globalParams,
 				s.setupsDB,
 				s.commitsDB,
 				s.epochStateDB,
@@ -358,7 +349,7 @@ func (s *EpochStateMachineSuite) TestEpochStateMachine_Constructor() {
 			assert.Nil(s.T(), stateMachine)
 		})
 		s.Run("epoch-fallback", func() {
-			s.parentEpochState.InvalidEpochTransitionAttempted = true // ensure we use epoch-fallback state machine
+			s.parentEpochState.EpochFallbackTriggered = true // ensure we use epoch-fallback state machine
 			exception := irrecoverable.NewExceptionf("exception")
 			happyPathStateMachineFactory := mock.NewStateMachineFactoryMethod(s.T())
 			fallbackPathStateMachineFactory := mock.NewStateMachineFactoryMethod(s.T())
@@ -367,7 +358,6 @@ func (s *EpochStateMachineSuite) TestEpochStateMachine_Constructor() {
 			stateMachine, err := epochs.NewEpochStateMachine(
 				s.candidate.View,
 				s.candidate.ParentID,
-				s.globalParams,
 				s.setupsDB,
 				s.commitsDB,
 				s.epochStateDB,
@@ -393,7 +383,6 @@ func (s *EpochStateMachineSuite) TestEvolveState_InvalidEpochSetup() {
 		stateMachine, err := epochs.NewEpochStateMachine(
 			s.candidate.View,
 			s.candidate.ParentID,
-			s.globalParams,
 			s.setupsDB,
 			s.commitsDB,
 			s.epochStateDB,
@@ -411,6 +400,7 @@ func (s *EpochStateMachineSuite) TestEvolveState_InvalidEpochSetup() {
 			Return(false, protocol.NewInvalidServiceEventErrorf("")).Once()
 
 		fallbackStateMachine := mock.NewStateMachine(s.T())
+		fallbackStateMachine.On("ParentState").Return(s.parentEpochState)
 		fallbackStateMachine.On("ProcessEpochSetup", epochSetup).Return(false, nil).Once()
 		fallbackPathStateMachineFactory.On("Execute", s.candidate.View, s.parentEpochState).Return(fallbackStateMachine, nil).Once()
 
@@ -440,7 +430,6 @@ func (s *EpochStateMachineSuite) TestEvolveState_InvalidEpochCommit() {
 		stateMachine, err := epochs.NewEpochStateMachine(
 			s.candidate.View,
 			s.candidate.ParentID,
-			s.globalParams,
 			s.setupsDB,
 			s.commitsDB,
 			s.epochStateDB,
@@ -458,6 +447,7 @@ func (s *EpochStateMachineSuite) TestEvolveState_InvalidEpochCommit() {
 			Return(false, protocol.NewInvalidServiceEventErrorf("")).Once()
 
 		fallbackStateMachine := mock.NewStateMachine(s.T())
+		fallbackStateMachine.On("ParentState").Return(s.parentEpochState)
 		fallbackStateMachine.On("ProcessEpochCommit", epochCommit).Return(false, nil).Once()
 		fallbackPathStateMachineFactory.On("Execute", s.candidate.View, s.parentEpochState).Return(fallbackStateMachine, nil).Once()
 
@@ -500,7 +490,8 @@ func (s *EpochStateMachineSuite) TestEvolveStateTransitionToNextEpoch_Error() {
 	exception := errors.New("exception")
 	s.happyPathStateMachine.On("TransitionToNextEpoch").Return(exception).Once()
 	err := s.stateMachine.EvolveState(nil)
-	require.ErrorIs(s.T(), err, exception)
+	require.Error(s.T(), err, exception)
+	require.ErrorContains(s.T(), err, "[exception!]")
 	require.False(s.T(), protocol.IsInvalidServiceEventError(err))
 }
 
@@ -515,23 +506,31 @@ func (s *EpochStateMachineSuite) TestEvolveState_EventsAreFiltered() {
 // TestEvolveStateTransitionToNextEpoch_WithInvalidStateTransition tests that EpochStateMachine transitions to the next epoch
 // if an invalid state transition has been detected in a block which triggers transitioning to the next epoch.
 // In such situation, we still need to enter the next epoch (because it has already been committed), but persist in the
-// state that we have entered Epoch fallback mode (`flow.EpochProtocolStateEntry.InvalidEpochTransitionAttempted` is set to `true`).
+// state that we have entered Epoch fallback mode (`flow.MinEpochStateEntry.EpochFallbackTriggered` is set to `true`).
 // This test ensures that we don't drop previously committed next epoch.
 func (s *EpochStateMachineSuite) TestEvolveStateTransitionToNextEpoch_WithInvalidStateTransition() {
-	unittest.SkipUnless(s.T(), unittest.TEST_TODO,
-		"This test is broken with current implementation but must pass when EFM recovery has been implemented."+
-			"See for details https://github.com/onflow/flow-go/issues/5631.")
 	s.parentEpochState = unittest.EpochStateFixture(unittest.WithNextEpochProtocolState())
 	s.candidate.View = s.parentEpochState.NextEpochSetup.FirstView
+	happyPathTelemetry := protocol_statemock.NewStateMachineTelemetryConsumer(s.T())
+	fallbackPathTelemetry := protocol_statemock.NewStateMachineTelemetryConsumer(s.T())
+	happyPathTelemetryFactory := protocol_statemock.NewStateMachineEventsTelemetryFactory(s.T())
+	fallbackTelemetryFactory := protocol_statemock.NewStateMachineEventsTelemetryFactory(s.T())
+	happyPathTelemetryFactory.On("Execute", s.candidate.View).Return(happyPathTelemetry).Once()
+	fallbackTelemetryFactory.On("Execute", s.candidate.View).Return(fallbackPathTelemetry).Once()
 	stateMachine, err := epochs.NewEpochStateMachineFactory(
-		s.globalParams,
 		s.setupsDB,
 		s.commitsDB,
 		s.epochStateDB,
+		happyPathTelemetryFactory.Execute,
+		fallbackTelemetryFactory.Execute,
 	).Create(s.candidate.View, s.candidate.ParentID, s.parentState, s.mutator)
 	require.NoError(s.T(), err)
 
 	invalidServiceEvent := unittest.EpochSetupFixture()
+	happyPathTelemetry.On("OnServiceEventReceived", invalidServiceEvent.ServiceEvent()).Return().Once()
+	happyPathTelemetry.On("OnInvalidServiceEvent", invalidServiceEvent.ServiceEvent(), mocks.Anything).Return().Once()
+	fallbackPathTelemetry.On("OnServiceEventReceived", invalidServiceEvent.ServiceEvent()).Return().Once()
+	fallbackPathTelemetry.On("OnInvalidServiceEvent", invalidServiceEvent.ServiceEvent(), mocks.Anything).Return().Once()
 	err = stateMachine.EvolveState([]flow.ServiceEvent{invalidServiceEvent.ServiceEvent()})
 	require.NoError(s.T(), err)
 
@@ -539,11 +538,11 @@ func (s *EpochStateMachineSuite) TestEvolveStateTransitionToNextEpoch_WithInvali
 	indexTxDeferredUpdate.On("Execute", mocks.Anything).Return(nil).Once()
 	s.epochStateDB.On("Index", s.candidate.ID(), mocks.Anything).Return(indexTxDeferredUpdate.Execute, nil).Once()
 
-	expectedEpochState := &flow.EpochProtocolStateEntry{
-		PreviousEpoch:                   s.parentEpochState.CurrentEpoch.Copy(),
-		CurrentEpoch:                    *s.parentEpochState.NextEpoch.Copy(),
-		NextEpoch:                       nil,
-		InvalidEpochTransitionAttempted: true,
+	expectedEpochState := &flow.MinEpochStateEntry{
+		PreviousEpoch:          s.parentEpochState.CurrentEpoch.Copy(),
+		CurrentEpoch:           *s.parentEpochState.NextEpoch.Copy(),
+		NextEpoch:              nil,
+		EpochFallbackTriggered: true,
 	}
 
 	storeTxDeferredUpdate := storagemock.NewDeferredDBUpdate(s.T())

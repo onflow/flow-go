@@ -121,11 +121,14 @@ func (bl *BlockView) DirectCall(call *types.DirectCall) (res *types.Result, err 
 	// Call tx tracer
 	if proc.evm.Config.Tracer != nil && proc.evm.Config.Tracer.OnTxStart != nil {
 		proc.evm.Config.Tracer.OnTxStart(proc.evm.GetVMContext(), call.Transaction(), call.From.ToCommon())
-		if proc.evm.Config.Tracer.OnTxEnd != nil {
-			defer func() {
-				proc.evm.Config.Tracer.OnTxEnd(res.Receipt(), err)
-			}()
-		}
+		defer func() {
+			if proc.evm.Config.Tracer.OnTxEnd != nil {
+				if err == nil && res != nil {
+					proc.evm.Config.Tracer.OnTxEnd(res.Receipt(), res.ValidationError)
+				}
+			}
+		}()
+
 	}
 
 	// re-route based on the sub type
@@ -168,11 +171,13 @@ func (bl *BlockView) RunTransaction(
 	// call tracer
 	if proc.evm.Config.Tracer != nil && proc.evm.Config.Tracer.OnTxStart != nil {
 		proc.evm.Config.Tracer.OnTxStart(proc.evm.GetVMContext(), tx, msg.From)
-		if proc.evm.Config.Tracer.OnTxEnd != nil {
-			defer func() {
-				proc.evm.Config.Tracer.OnTxEnd(result.Receipt(), err)
-			}()
-		}
+		defer func() {
+			if proc.evm.Config.Tracer.OnTxEnd != nil {
+				if err == nil && result != nil {
+					proc.evm.Config.Tracer.OnTxEnd(result.Receipt(), result.ValidationError)
+				}
+			}
+		}()
 	}
 
 	// run msg
@@ -193,6 +198,7 @@ func (bl *BlockView) RunTransaction(
 func (bl *BlockView) BatchRunTransactions(txs []*gethTypes.Transaction) ([]*types.Result, error) {
 	batchResults := make([]*types.Result, len(txs))
 
+	// create a new procedure
 	proc, err := bl.newProcedure()
 	if err != nil {
 		return nil, err
@@ -211,14 +217,16 @@ func (bl *BlockView) BatchRunTransactions(txs []*gethTypes.Transaction) ([]*type
 		// call tracer
 		if proc.evm.Config.Tracer != nil && proc.evm.Config.Tracer.OnTxStart != nil {
 			proc.evm.Config.Tracer.OnTxStart(proc.evm.GetVMContext(), tx, msg.From)
-			if proc.evm.Config.Tracer.OnTxEnd != nil {
-				defer func() {
-					proc.evm.Config.Tracer.OnTxEnd(
-						batchResults[i].Receipt(),
-						err,
-					)
-				}()
-			}
+			defer func() {
+				if proc.evm.Config.Tracer.OnTxEnd != nil {
+					j := i
+					res := batchResults[j]
+					if err == nil && res != nil {
+						proc.evm.Config.Tracer.OnTxEnd(res.Receipt(), res.ValidationError)
+					}
+				}
+			}()
+
 		}
 
 		// run msg
@@ -226,6 +234,7 @@ func (bl *BlockView) BatchRunTransactions(txs []*gethTypes.Transaction) ([]*type
 		if err != nil {
 			return nil, err
 		}
+
 		// all commit errors (StateDB errors) has to be returned
 		if err := proc.commit(false); err != nil {
 			return nil, err
@@ -233,6 +242,7 @@ func (bl *BlockView) BatchRunTransactions(txs []*gethTypes.Transaction) ([]*type
 
 		// this clears state for any subsequent transaction runs
 		proc.state.Reset()
+
 		// collect result
 		batchResults[i] = res
 	}
@@ -251,10 +261,14 @@ func (bl *BlockView) DryRunTransaction(
 	from gethCommon.Address,
 ) (*types.Result, error) {
 	var txResult *types.Result
+
+	// create a new procedure
 	proc, err := bl.newProcedure()
 	if err != nil {
 		return nil, err
 	}
+
+	// convert tx into message
 	msg, err := gethCore.TransactionToMessage(
 		tx,
 		GetSigner(bl.config),
@@ -389,6 +403,13 @@ func (proc *procedure) withdrawFrom(
 		return types.NewInvalidResult(
 			call.Transaction(),
 			types.ErrInvalidBalance), nil
+	}
+
+	// check balance is not prone to rounding error
+	if types.BalanceConversionToUFix64ProneToRoundingError(call.Value) {
+		return types.NewInvalidResult(
+			call.Transaction(),
+			types.ErrWithdrawBalanceRounding), nil
 	}
 
 	// create bridge account if not exist
@@ -612,6 +633,7 @@ func (proc *procedure) run(
 	// if the block gas limit is set to anything than max
 	// we need to update this code.
 	gasPool := (*gethCore.GasPool)(&proc.config.BlockContext.GasLimit)
+
 	// transit the state
 	execResult, err := gethCore.NewStateTransition(
 		proc.evm,

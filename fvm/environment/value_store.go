@@ -90,7 +90,7 @@ func (store ParseRestrictedValueStore) AllocateSlabIndex(
 ) {
 	return parseRestrict1Arg1Ret(
 		store.txnState,
-		trace.FVMEnvAllocateStorageIndex,
+		trace.FVMEnvAllocateSlabIndex,
 		store.impl.AllocateSlabIndex,
 		owner)
 }
@@ -197,9 +197,9 @@ func (store *valueStore) AllocateSlabIndex(
 	atree.SlabIndex,
 	error,
 ) {
-	defer store.tracer.StartChildSpan(trace.FVMEnvAllocateStorageIndex).End()
+	defer store.tracer.StartChildSpan(trace.FVMEnvAllocateSlabIndex).End()
 
-	err := store.meter.MeterComputation(ComputationKindAllocateStorageIndex, 1)
+	err := store.meter.MeterComputation(ComputationKindAllocateSlabIndex, 1)
 	if err != nil {
 		return atree.SlabIndex{}, fmt.Errorf(
 			"allocate storage index failed: %w",

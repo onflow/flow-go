@@ -264,7 +264,7 @@ func TestStateDB(t *testing.T) {
 			SetValueFunc: func(owner, key, value []byte) error {
 				return atree.NewUserError(fmt.Errorf("key not found"))
 			},
-			AllocateStorageIndexFunc: func(owner []byte) (atree.SlabIndex, error) {
+			AllocateSlabIndexFunc: func(owner []byte) (atree.SlabIndex, error) {
 				return atree.SlabIndex{}, nil
 			},
 		}
@@ -288,7 +288,7 @@ func TestStateDB(t *testing.T) {
 			SetValueFunc: func(owner, key, value []byte) error {
 				return atree.NewFatalError(fmt.Errorf("key not found"))
 			},
-			AllocateStorageIndexFunc: func(owner []byte) (atree.SlabIndex, error) {
+			AllocateSlabIndexFunc: func(owner []byte) (atree.SlabIndex, error) {
 				return atree.SlabIndex{}, nil
 			},
 		}

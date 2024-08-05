@@ -413,7 +413,7 @@ func createByteArray(size int) []byte {
 	return bytes
 }
 
-func TestAccounts_AllocateStorageIndex(t *testing.T) {
+func TestAccounts_AllocateSlabIndex(t *testing.T) {
 	txnState := testutils.NewSimpleTransaction(nil)
 	accounts := environment.NewAccounts(txnState)
 	address := flow.HexToAddress("01")

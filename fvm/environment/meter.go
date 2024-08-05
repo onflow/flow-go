@@ -16,7 +16,7 @@ const (
 	ComputationKindVerifySignature
 	ComputationKindAddAccountKey
 	ComputationKindAddEncodedAccountKey
-	ComputationKindAllocateStorageIndex
+	ComputationKindAllocateSlabIndex
 	ComputationKindCreateAccount
 	ComputationKindEmitEvent
 	ComputationKindGenerateUUID
