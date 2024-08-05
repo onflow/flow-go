@@ -82,9 +82,9 @@ type Backend struct {
 	executionReceipts storage.ExecutionReceipts
 	connFactory       connection.ConnectionFactory
 
-	// cache the response to GetNodeVersionInfo since it doesn't change
-	nodeInfo     *access.NodeVersionInfo
-	BlockTracker subscription.BlockTracker
+	BlockTracker   subscription.BlockTracker
+	stateParams    protocol.Params
+	versionControl *version.VersionControl
 }
 
 type Params struct {
@@ -164,9 +164,6 @@ func New(params Params) (*Backend, error) {
 	}
 	systemTxID := systemTx.ID()
 
-	// initialize node version info
-	nodeInfo := getNodeVersionInfo(params.State.Params(), params.VersionControl)
-
 	transactionsLocalDataProvider := &TransactionsLocalDataProvider{
 		state:               params.State,
 		collections:         params.Collections,
@@ -245,7 +242,8 @@ func New(params Params) (*Backend, error) {
 		executionReceipts: params.ExecutionReceipts,
 		connFactory:       params.ConnFactory,
 		chainID:           params.ChainID,
-		nodeInfo:          nodeInfo,
+		stateParams:       params.State.Params(),
+		versionControl:    params.VersionControl,
 	}
 
 	txValidator, err := configureTransactionValidator(params.State, params.ChainID, params.ScriptExecutor, params.CheckPayerBalance)
@@ -346,25 +344,24 @@ func (b *Backend) Ping(ctx context.Context) error {
 
 // GetNodeVersionInfo returns node version information such as semver, commit, sporkID, protocolVersion, etc
 func (b *Backend) GetNodeVersionInfo(_ context.Context) (*access.NodeVersionInfo, error) {
-	return b.nodeInfo, nil
+	return b.getNodeVersionInfo(), nil
 }
 
 // getNodeVersionInfo returns the NodeVersionInfo for the node.
-// Since these values are static while the node is running, it is safe to cache.
-func getNodeVersionInfo(stateParams protocol.Params, versionControl *version.VersionControl) *access.NodeVersionInfo {
-	sporkID := stateParams.SporkID()
-	protocolVersion := stateParams.ProtocolVersion()
-	sporkRootBlockHeight := stateParams.SporkRootBlockHeight()
+func (b *Backend) getNodeVersionInfo() *access.NodeVersionInfo {
+	sporkID := b.stateParams.SporkID()
+	protocolVersion := b.stateParams.ProtocolVersion()
+	sporkRootBlockHeight := b.stateParams.SporkRootBlockHeight()
 
-	nodeRootBlockHeader := stateParams.SealedRoot()
+	nodeRootBlockHeader := b.stateParams.SealedRoot()
 
 	var startHeight uint64
 	var endHeight uint64
 
 	// Version control feature could be disabled
-	if versionControl != nil {
-		startHeight = versionControl.StartHeight()
-		endHeight = versionControl.EndHeight()
+	if b.versionControl != nil {
+		startHeight = b.versionControl.StartHeight()
+		endHeight = b.versionControl.EndHeight()
 	}
 
 	// startHeight is the root block if there is no start boundary in the current spork

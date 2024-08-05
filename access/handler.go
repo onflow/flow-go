@@ -100,6 +100,8 @@ func (h *Handler) GetNodeVersionInfo(
 			ProtocolVersion:      nodeVersionInfo.ProtocolVersion,
 			SporkRootBlockHeight: nodeVersionInfo.SporkRootBlockHeight,
 			NodeRootBlockHeight:  nodeVersionInfo.NodeRootBlockHeight,
+			StartHeight:          nodeVersionInfo.StartHeight,
+			EndHeight:            nodeVersionInfo.EndHeight,
 		},
 	}, nil
 }
