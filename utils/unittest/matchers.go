@@ -1,10 +1,10 @@
 package unittest
 
 import (
-	"github.com/onflow/flow-go/state/protocol"
 	"github.com/stretchr/testify/mock"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/state/protocol"
 )
 
 // MatchEpochExtension matches an epoch extension argument passed to a mocked component.
