@@ -694,7 +694,17 @@ func (s *EpochFallbackStateMachineSuite) TestProcessingMultipleEventsAtTheSameBl
 	rapid.Check(s.T(), func(t *rapid.T) {
 		s.SetupTest() // start each time with clean state
 		var events []flow.ServiceEvent
+		// ATTENTION: explicitly grouped draw events because drawing an int range can raise a panic.
+		// It's not an issue on its own, but we are using telemetry to check correct invocations of state machine
+		// and when a panic occurs, it will still try to assert expectations on the consumer leading to a test failure.
+		// Specifically, for that reason, we are drawing the values before setting up the expectations on mocked objects.
 		setupEvents := rapid.IntRange(0, 5).Draw(t, "number-of-setup-events")
+		commitEvents := rapid.IntRange(0, 5).Draw(t, "number-of-commit-events")
+		recoverEvents := rapid.IntRange(0, 5).Draw(t, "number-of-recover-events")
+		includeEjection := rapid.Bool().Draw(t, "eject-node")
+		includeValidRecover := rapid.Bool().Draw(t, "include-valid-recover-event")
+		ejectionBeforeRecover := rapid.Bool().Draw(t, "ejection-before-recover")
+
 		for i := 0; i < setupEvents; i++ {
 			serviceEvent := unittest.EpochSetupFixture().ServiceEvent()
 			s.consumer.On("OnServiceEventReceived", serviceEvent).Once()
@@ -702,7 +712,7 @@ func (s *EpochFallbackStateMachineSuite) TestProcessingMultipleEventsAtTheSameBl
 				unittest.MatchInvalidServiceEventError).Once()
 			events = append(events, serviceEvent)
 		}
-		commitEvents := rapid.IntRange(0, 5).Draw(t, "number-of-commit-events")
+
 		for i := 0; i < commitEvents; i++ {
 			serviceEvent := unittest.EpochCommitFixture().ServiceEvent()
 			s.consumer.On("OnServiceEventReceived", serviceEvent).Once()
@@ -710,7 +720,7 @@ func (s *EpochFallbackStateMachineSuite) TestProcessingMultipleEventsAtTheSameBl
 				unittest.MatchInvalidServiceEventError).Once()
 			events = append(events, serviceEvent)
 		}
-		recoverEvents := rapid.IntRange(0, 5).Draw(t, "number-of-recover-events")
+
 		for i := 0; i < recoverEvents; i++ {
 			serviceEvent := unittest.EpochRecoverFixture().ServiceEvent()
 			s.consumer.On("OnServiceEventReceived", serviceEvent).Once()
@@ -721,7 +731,7 @@ func (s *EpochFallbackStateMachineSuite) TestProcessingMultipleEventsAtTheSameBl
 
 		var ejectedNodes flow.IdentifierList
 		var ejectionEvents flow.ServiceEventList
-		includeEjection := rapid.Bool().Draw(t, "eject-node")
+
 		if includeEjection {
 			accessNodes := s.parentProtocolState.CurrentEpochSetup.Participants.Filter(filter.HasRole[flow.IdentitySkeleton](flow.RoleAccess))
 			identity := rapid.SampledFrom(accessNodes).Draw(t, "ejection-node")
@@ -732,8 +742,6 @@ func (s *EpochFallbackStateMachineSuite) TestProcessingMultipleEventsAtTheSameBl
 			ejectedNodes = append(ejectedNodes, identity.NodeID)
 		}
 
-		includeValidRecover := rapid.Bool().Draw(t, "include-valid-recover-event")
-		ejectionBeforeRecover := rapid.Bool().Draw(t, "ejection-before-recover")
 		if includeValidRecover {
 			serviceEvent := unittest.EpochRecoverFixture(func(setup *flow.EpochSetup) {
 				nextEpochParticipants := s.parentProtocolState.CurrentEpochIdentityTable.Copy()
