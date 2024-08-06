@@ -266,12 +266,12 @@ type NetworkParameters struct {
 
 // NodeVersionInfo contains information about node, such as semver, commit, sporkID, protocolVersion, etc
 type NodeVersionInfo struct {
-	Semver               string
-	Commit               string
-	SporkId              flow.Identifier
-	ProtocolVersion      uint64
-	SporkRootBlockHeight uint64
-	NodeRootBlockHeight  uint64
-	StartHeight          uint64
-	EndHeight            uint64
+	Semver                     string
+	Commit                     string
+	SporkId                    flow.Identifier
+	ProtocolVersion            uint64
+	SporkRootBlockHeight       uint64
+	NodeRootBlockHeight        uint64
+	ProtocolVersionStartHeight uint64
+	ProtocolVersionEndHeight   uint64
 }

@@ -355,29 +355,29 @@ func (b *Backend) getNodeVersionInfo() *access.NodeVersionInfo {
 
 	nodeRootBlockHeader := b.stateParams.SealedRoot()
 
-	var startHeight uint64
-	var endHeight uint64
+	var protocolVersionStartHeight uint64
+	var protocolVersionEndHeight uint64
 
 	// Version control feature could be disabled
 	if b.versionControl != nil {
-		startHeight = b.versionControl.StartHeight()
-		endHeight = b.versionControl.EndHeight()
+		protocolVersionStartHeight = b.versionControl.ProtocolVersionStartHeight()
+		protocolVersionEndHeight = b.versionControl.ProtocolVersionEndHeight()
 	}
 
-	// startHeight is the root block if there is no start boundary in the current spork
-	if startHeight == version.NoHeight {
-		startHeight = nodeRootBlockHeader.Height
+	// protocolVersionStartHeight is the root block if there is no start boundary in the current spork
+	if protocolVersionStartHeight == version.NoHeight {
+		protocolVersionStartHeight = nodeRootBlockHeader.Height
 	}
 
 	nodeInfo := &access.NodeVersionInfo{
-		Semver:               build.Version(),
-		Commit:               build.Commit(),
-		SporkId:              sporkID,
-		ProtocolVersion:      uint64(protocolVersion),
-		SporkRootBlockHeight: sporkRootBlockHeight,
-		NodeRootBlockHeight:  nodeRootBlockHeader.Height,
-		StartHeight:          startHeight,
-		EndHeight:            endHeight,
+		Semver:                     build.Version(),
+		Commit:                     build.Commit(),
+		SporkId:                    sporkID,
+		ProtocolVersion:            uint64(protocolVersion),
+		SporkRootBlockHeight:       sporkRootBlockHeight,
+		NodeRootBlockHeight:        nodeRootBlockHeader.Height,
+		ProtocolVersionStartHeight: protocolVersionStartHeight,
+		ProtocolVersionEndHeight:   protocolVersionEndHeight,
 	}
 
 	return nodeInfo

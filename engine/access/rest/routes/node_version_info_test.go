@@ -31,14 +31,14 @@ func TestGetNodeVersionInfo(t *testing.T) {
 		nodeRootBlockHeight := unittest.Uint64InRange(10_000, 100_000)
 
 		params := &access.NodeVersionInfo{
-			Semver:               build.Version(),
-			Commit:               build.Commit(),
-			SporkId:              unittest.IdentifierFixture(),
-			ProtocolVersion:      unittest.Uint64InRange(10, 30),
-			SporkRootBlockHeight: unittest.Uint64InRange(1000, 10_000),
-			NodeRootBlockHeight:  nodeRootBlockHeight,
-			StartHeight:          nodeRootBlockHeight,
-			EndHeight:            uint64(0),
+			Semver:                     build.Version(),
+			Commit:                     build.Commit(),
+			SporkId:                    unittest.IdentifierFixture(),
+			ProtocolVersion:            unittest.Uint64InRange(10, 30),
+			SporkRootBlockHeight:       unittest.Uint64InRange(1000, 10_000),
+			NodeRootBlockHeight:        nodeRootBlockHeight,
+			ProtocolVersionStartHeight: nodeRootBlockHeight,
+			ProtocolVersionEndHeight:   uint64(0),
 		}
 
 		backend.Mock.
@@ -60,8 +60,8 @@ func nodeVersionInfoExpectedStr(nodeVersionInfo *access.NodeVersionInfo) string 
             "protocol_version": "%d",
             "spork_root_block_height": "%d",
             "node_root_block_height": "%d",
-            "start_height": "%d",
-            "end_height": "%d"
+            "protocol_version_start_height": "%d",
+            "protocol_version_end_height": "%d"
 		}`,
 		nodeVersionInfo.Semver,
 		nodeVersionInfo.Commit,
@@ -69,8 +69,8 @@ func nodeVersionInfoExpectedStr(nodeVersionInfo *access.NodeVersionInfo) string 
 		nodeVersionInfo.ProtocolVersion,
 		nodeVersionInfo.SporkRootBlockHeight,
 		nodeVersionInfo.NodeRootBlockHeight,
-		nodeVersionInfo.StartHeight,
-		nodeVersionInfo.EndHeight,
+		nodeVersionInfo.ProtocolVersionStartHeight,
+		nodeVersionInfo.ProtocolVersionEndHeight,
 	)
 }
 

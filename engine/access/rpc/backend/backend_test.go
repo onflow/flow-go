@@ -1595,14 +1595,14 @@ func (suite *Suite) TestGetNodeVersionInfo() {
 		state.On("Params").Return(stateParams, nil).Maybe()
 
 		expected := &accessflow.NodeVersionInfo{
-			Semver:               build.Version(),
-			Commit:               build.Commit(),
-			SporkId:              sporkID,
-			ProtocolVersion:      uint64(protocolVersion),
-			SporkRootBlockHeight: sporkRootBlock.Height,
-			NodeRootBlockHeight:  nodeRootBlock.Height,
-			StartHeight:          nodeRootBlock.Height,
-			EndHeight:            uint64(0),
+			Semver:                     build.Version(),
+			Commit:                     build.Commit(),
+			SporkId:                    sporkID,
+			ProtocolVersion:            uint64(protocolVersion),
+			SporkRootBlockHeight:       sporkRootBlock.Height,
+			NodeRootBlockHeight:        nodeRootBlock.Height,
+			ProtocolVersionStartHeight: nodeRootBlock.Height,
+			ProtocolVersionEndHeight:   uint64(0),
 		}
 
 		params := suite.defaultBackendParams()
@@ -1691,14 +1691,14 @@ func (suite *Suite) TestGetNodeVersionInfo() {
 		state.On("Params").Return(stateParams, nil).Maybe()
 
 		expected := &accessflow.NodeVersionInfo{
-			Semver:               build.Version(),
-			Commit:               build.Commit(),
-			SporkId:              sporkID,
-			ProtocolVersion:      uint64(protocolVersion),
-			SporkRootBlockHeight: sporkRootBlock.Height,
-			NodeRootBlockHeight:  nodeRootBlock.Height,
-			StartHeight:          nodeRootBlock.Height + 12,
-			EndHeight:            latestBlockHeight - 9,
+			Semver:                     build.Version(),
+			Commit:                     build.Commit(),
+			SporkId:                    sporkID,
+			ProtocolVersion:            uint64(protocolVersion),
+			SporkRootBlockHeight:       sporkRootBlock.Height,
+			NodeRootBlockHeight:        nodeRootBlock.Height,
+			ProtocolVersionStartHeight: nodeRootBlock.Height + 12,
+			ProtocolVersionEndHeight:   latestBlockHeight - 9,
 		}
 
 		params := suite.defaultBackendParams()

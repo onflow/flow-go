@@ -12,6 +12,6 @@ func (t *NodeVersionInfo) Build(params *access.NodeVersionInfo) {
 	t.ProtocolVersion = util.FromUint(params.ProtocolVersion)
 	t.SporkRootBlockHeight = util.FromUint(params.SporkRootBlockHeight)
 	t.NodeRootBlockHeight = util.FromUint(params.NodeRootBlockHeight)
-	t.StartHeight = util.FromUint(params.StartHeight)
-	t.EndHeight = util.FromUint(params.EndHeight)
+	t.ProtocolVersionStartHeight = util.FromUint(params.ProtocolVersionStartHeight)
+	t.ProtocolVersionEndHeight = util.FromUint(params.ProtocolVersionEndHeight)
 }
