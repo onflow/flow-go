@@ -28,3 +28,6 @@ var FactoryContractBytes, _ = hex.DecodeString(factoryContractBytesInHex)
 
 //go:embed factory_abi.json
 var FactoryContractABIJSON string
+
+//go:embed factory_deployable_abi.json
+var FactoryDeployableContractABIJSON string

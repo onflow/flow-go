@@ -10,22 +10,13 @@ contract Factory {
         return _getCreate2Address(salt, keccak256(abi.encodePacked(type(Deployable).creationCode)));
     }
 
-    function deployAndDestroy(bytes32 salt) public {
+    function deployAndDestroy(bytes32 salt, uint256 value) public {
         Deployable dep = new Deployable{salt: salt}();
+        dep.set(value);
         dep.destroy(address(this));
     }
 
-    function depositAndDeploy(bytes32 salt, uint256 amount) public {
-        address addr = _getCreate2Address(salt, keccak256(abi.encodePacked(type(Deployable).creationCode)));
-        bool success;
-        assembly {
-            success := call(gas(), addr, amount, 0, 0, 0, 0)
-        }
-        require(success);
-        new Deployable{salt: salt}();
-    }
-
-    function depositDeployAndDestroy(bytes32 salt, uint256 amount) public {
+    function depositAndDeploy(bytes32 salt, uint256 amount, uint256 stored) public returns (address) {
         address addr = _getCreate2Address(salt, keccak256(abi.encodePacked(type(Deployable).creationCode)));
         bool success;
         assembly {
@@ -33,6 +24,19 @@ contract Factory {
         }
         require(success);
         Deployable dep = new Deployable{salt: salt}();
+        dep.set(stored);
+        return _getCreate2Address(salt, keccak256(abi.encodePacked(type(Deployable).creationCode)));
+    }
+
+    function depositDeployAndDestroy(bytes32 salt, uint256 amount, uint256 stored) public {
+        address addr = _getCreate2Address(salt, keccak256(abi.encodePacked(type(Deployable).creationCode)));
+        bool success;
+        assembly {
+            success := call(gas(), addr, amount, 0, 0, 0, 0)
+        }
+        require(success);
+        Deployable dep = new Deployable{salt: salt}();
+        dep.set(stored);
         dep.destroy(address(this));
     }
 
@@ -52,5 +56,8 @@ contract Deployable {
     }
     function destroy(address etherDestination) external {
         selfdestruct(payable(etherDestination));
+    }
+
+    receive() external payable  {
     }
 }
