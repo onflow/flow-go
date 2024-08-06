@@ -6,7 +6,9 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 
+	"github.com/dustin/go-humanize/english"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
@@ -29,7 +31,7 @@ var (
 	flagState2           string
 	flagStateCommitment1 string
 	flagStateCommitment2 string
-	flagRaw              bool
+	flagMode             string
 	flagAlwaysDiffValues bool
 	flagNWorker          int
 	flagChain            string
@@ -107,11 +109,11 @@ func init() {
 	)
 	_ = Cmd.MarkFlagRequired("output-directory")
 
-	Cmd.Flags().BoolVar(
-		&flagRaw,
-		"raw",
-		true,
-		"Raw or value",
+	Cmd.Flags().StringVar(
+		&flagMode,
+		"mode",
+		"values",
+		"one of 'values', 'accounts', or 'raw'; to diff values, accounts, or raw bytes. default is 'values'",
 	)
 
 	Cmd.Flags().BoolVar(
@@ -137,6 +139,20 @@ func init() {
 	_ = Cmd.MarkFlagRequired("chain")
 }
 
+type mode uint8
+
+const (
+	modeValues mode = iota
+	modeAccounts
+	modeRaw
+)
+
+var modeByName = map[string]mode{
+	"values":   modeValues,
+	"accounts": modeAccounts,
+	"raw":      modeRaw,
+}
+
 func run(*cobra.Command, []string) {
 
 	chainID := flow.ChainID(flagChain)
@@ -159,6 +175,18 @@ func run(*cobra.Command, []string) {
 	}
 	if flagState2 != "" && flagStateCommitment2 == "" {
 		log.Fatal().Msg("--state-commitment-2 must be provided when --state-2 is provided")
+	}
+
+	mode, ok := modeByName[flagMode]
+	if !ok {
+		modeNames := make([]string, 0, len(modeByName))
+		for name := range modeByName {
+			modeNames = append(modeNames, fmt.Sprintf("%q", name))
+		}
+		log.Fatal().Msgf(
+			"--mode must be one of %s",
+			english.OxfordWordSeries(modeNames, "or"),
+		)
 	}
 
 	rw := reporters.NewReportFileWriterFactoryWithFormat(flagOutputDirectory, log.Logger, reporters.ReportFormatJSONL).
@@ -194,7 +222,7 @@ func run(*cobra.Command, []string) {
 		}
 	}
 
-	err := diff(registers1, registers2, chainID, rw, flagNWorker)
+	err := diff(registers1, registers2, chainID, rw, flagNWorker, mode)
 	if err != nil {
 		log.Warn().Err(err).Msgf("failed to diff registers")
 	}
@@ -292,6 +320,7 @@ func diffAccount(
 	accountRegisters2 *registers.AccountRegisters,
 	chainID flow.ChainID,
 	rw reporters.ReportWriter,
+	mode mode,
 ) (err error) {
 
 	if accountRegisters1.Count() != accountRegisters2.Count() {
@@ -313,7 +342,7 @@ func diffAccount(
 
 		if !bytes.Equal(value1, value2) {
 
-			if flagRaw {
+			if mode == modeRaw {
 				rw.Write(rawDiff{
 					Owner:  owner,
 					Key:    key,
@@ -329,11 +358,21 @@ func diffAccount(
 		return nil
 	})
 	if err != nil {
-		if flagRaw || !errors.Is(err, accountsDiffer) {
+		accountsDiffer := errors.Is(err, accountsDiffer)
+		if !accountsDiffer {
 			return err
 		}
 
-		diffValues = true
+		switch mode {
+		case modeRaw:
+			// NO-OP
+		case modeAccounts:
+			rw.Write(accountDiff{
+				Owner: owner,
+			})
+		case modeValues:
+			diffValues = true
+		}
 	}
 
 	if diffValues {
@@ -364,6 +403,7 @@ func diff(
 	chainID flow.ChainID,
 	rw reporters.ReportWriter,
 	nWorkers int,
+	mode mode,
 ) error {
 	log.Info().Msgf("Diffing %d accounts", registers1.AccountCount())
 
@@ -404,6 +444,7 @@ func diff(
 				accountRegisters2,
 				chainID,
 				rw,
+				mode,
 			)
 			if err != nil {
 				log.Warn().Err(err).Msgf("failed to diff account %x", []byte(owner))
@@ -457,6 +498,7 @@ func diff(
 					job.accountRegisters2,
 					chainID,
 					rw,
+					mode,
 				)
 
 				select {
@@ -558,6 +600,22 @@ func (e rawDiff) MarshalJSON() ([]byte, error) {
 		Key:    hex.EncodeToString([]byte(e.Key)),
 		Value1: hex.EncodeToString(e.Value1),
 		Value2: hex.EncodeToString(e.Value2),
+	})
+}
+
+type accountDiff struct {
+	Owner string
+}
+
+var _ json.Marshaler = accountDiff{}
+
+func (e accountDiff) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		Kind  string `json:"kind"`
+		Owner string `json:"owner"`
+	}{
+		Kind:  "account-diff",
+		Owner: hex.EncodeToString([]byte(e.Owner)),
 	})
 }
 

@@ -1524,7 +1524,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				builder.programCacheSize > 0,
 			)
 
-			err = builder.ScriptExecutor.Initialize(builder.ExecutionIndexer, scripts)
+			err = builder.ScriptExecutor.Initialize(builder.ExecutionIndexer, scripts, builder.versionControl)
 			if err != nil {
 				return nil, err
 			}
@@ -1834,33 +1834,42 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		builder.ScriptExecutor = backend.NewScriptExecutor(builder.Logger, builder.scriptExecMinBlock, builder.scriptExecMaxBlock)
 		return nil
 	})
-	if builder.versionControlEnabled {
-		builder.Component("version control", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			nodeVersion, err := build.Semver()
-			if err != nil {
-				return nil, fmt.Errorf("could not load node version for version control. "+
-					"version (%s) is not semver compliant: %w. Make sure a valid semantic version is provided in the VERSION environment variable", build.Version(), err)
-			}
 
-			versionControl, err := version.NewVersionControl(
-				builder.Logger,
-				node.Storage.VersionBeacons,
-				nodeVersion,
-				builder.SealedRootBlock.Header.Height,
-				builder.LastFinalizedHeader.Height,
-			)
-			if err != nil {
-				return nil, fmt.Errorf("could not create version control: %w", err)
-			}
+	versionControlDependable := module.NewProxiedReadyDoneAware()
+	builder.IndexerDependencies.Add(versionControlDependable)
 
-			// VersionControl needs to consume BlockFinalized events.
-			node.ProtocolEvents.AddConsumer(versionControl)
+	builder.Component("version control", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		if !builder.versionControlEnabled {
+			noop := &module.NoopReadyDoneAware{}
+			versionControlDependable.Init(noop)
+			return noop, nil
+		}
 
-			builder.versionControl = versionControl
+		nodeVersion, err := build.Semver()
+		if err != nil {
+			return nil, fmt.Errorf("could not load node version for version control. "+
+				"version (%s) is not semver compliant: %w. Make sure a valid semantic version is provided in the VERSION environment variable", build.Version(), err)
+		}
 
-			return versionControl, nil
-		})
-	}
+		versionControl, err := version.NewVersionControl(
+			builder.Logger,
+			node.Storage.VersionBeacons,
+			nodeVersion,
+			builder.SealedRootBlock.Header.Height,
+			builder.LastFinalizedHeader.Height,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("could not create version control: %w", err)
+		}
+
+		// VersionControl needs to consume BlockFinalized events.
+		node.ProtocolEvents.AddConsumer(versionControl)
+
+		builder.versionControl = versionControl
+		versionControlDependable.Init(builder.versionControl)
+
+		return versionControl, nil
+	})
 	builder.Component("RPC engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		accessMetrics := builder.AccessMetrics
 		config := builder.rpcConf
