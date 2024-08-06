@@ -98,7 +98,7 @@ var GenesisBlock = &Block{
 var GenesisBlockHash, _ = GenesisBlock.Hash()
 
 // BlockProposal is a EVM block proposal
-// holding all the iterim data of block before commitment
+// holding all the interim data of block before commitment
 type BlockProposal struct {
 	Block
 
