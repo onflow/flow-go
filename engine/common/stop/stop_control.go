@@ -17,10 +17,14 @@ import (
 	"github.com/onflow/flow-go/engine/common/version"
 )
 
-// ErrNoRegisteredHeightRecorders represents an error indicating that pruner did not register any execution data height recorders.
-// This error occurs when the pruner attempts to perform operations that require
+// ErrNoRegisteredHeightRecorders represents an error indicating that StopControl did not register any execution data height recorders.
+// This error occurs when the StopControl attempts to perform operations that require
 // at least one registered height recorder, but none are found.
 var ErrNoRegisteredHeightRecorders = errors.New("no registered height recorders")
+
+const (
+	DefaultCheckHeightInterval = 30 * time.Second
+)
 
 // StopControl is responsible for managing the stopping behavior of the node
 // when an incompatible block height is encountered.
@@ -112,8 +116,7 @@ func (sc *StopControl) RegisterHeightRecorder(recorder execution_data.ProcessedH
 
 func (sc *StopControl) loop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
-	//TODO: Check defaults
-	ticker := time.NewTicker(30 * time.Second)
+	ticker := time.NewTicker(DefaultCheckHeightInterval)
 	defer ticker.Stop()
 
 	for {
@@ -125,7 +128,6 @@ func (sc *StopControl) loop(ctx irrecoverable.SignalerContext, ready component.R
 			if err == nil || !errors.Is(err, ErrNoRegisteredHeightRecorders) {
 				sc.OnProcessedBlock(ctx, lowestHeight)
 			}
-
 		}
 	}
 }

@@ -1836,8 +1836,13 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				builder.versionControl,
 			)
 
-			stopControl.RegisterHeightRecorder(builder.ExecutionDataDownloader)
-			stopControl.RegisterHeightRecorder(builder.ExecutionIndexer)
+			if builder.executionDataSyncEnabled {
+				stopControl.RegisterHeightRecorder(builder.ExecutionDataDownloader)
+
+				if builder.executionDataIndexingEnabled {
+					stopControl.RegisterHeightRecorder(builder.ExecutionIndexer)
+				}
+			}
 
 			builder.stopControl = stopControl
 
