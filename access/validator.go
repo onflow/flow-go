@@ -222,11 +222,10 @@ func (v *TransactionValidator) Validate(ctx context.Context, tx *flow.Transactio
 		// are 'internal' and related to script execution process. they shouldn't
 		// prevent the transaction from proceeding.
 		if IsInsufficientBalanceError(err) {
-			switch v.options.CheckPayerBalanceMode {
-			case WarnCheck:
-				log.Info().Err(err).Msg("payer has insufficient balance")
-			case EnforceCheck:
-				log.Info().Err(err).Msg("payer has insufficient balance")
+			log.Info().Err(err).Msg("payer has insufficient balance")
+			//TODO: Metrics should go here from https://github.com/onflow/flow-go/pull/6239
+
+			if v.options.CheckPayerBalanceMode == EnforceCheck {
 				return err
 			}
 		}
