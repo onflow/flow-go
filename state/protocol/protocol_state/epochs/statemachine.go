@@ -7,7 +7,7 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/protocol_state"
-	"github.com/onflow/flow-go/state/protocol/protocol_state/helper"
+	"github.com/onflow/flow-go/state/protocol/protocol_state/common"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/storage/badger/transaction"
@@ -101,7 +101,7 @@ type StateMachineFactoryMethod func(candidateView uint64, parentState *flow.Rich
 // which is either a HappyPathStateMachine or a FallbackStateMachine depending on the operation mode of the protocol.
 // It relies on Key-Value Store to read the parent state and to persist the snapshot of the updated Epoch state.
 type EpochStateMachine struct {
-	helper.BaseKeyValueStoreStateMachine
+	common.BaseKeyValueStoreStateMachine
 	activeStateMachine               StateMachine
 	epochFallbackStateMachineFactory func() (StateMachine, error)
 
@@ -125,7 +125,7 @@ func NewEpochStateMachine(
 	commits storage.EpochCommits,
 	epochProtocolStateDB storage.EpochProtocolStateEntries,
 	parentState protocol.KVStoreReader,
-	mutator protocol_state.KVStoreMutator,
+	evolvingState protocol_state.KVStoreMutator,
 	happyPathStateMachineFactory StateMachineFactoryMethod,
 	epochFallbackStateMachineFactory StateMachineFactoryMethod,
 ) (*EpochStateMachine, error) {
@@ -160,7 +160,7 @@ func NewEpochStateMachine(
 	}
 
 	return &EpochStateMachine{
-		BaseKeyValueStoreStateMachine: helper.NewBaseKeyValueStoreStateMachine(candidateView, parentState, mutator),
+		BaseKeyValueStoreStateMachine: common.NewBaseKeyValueStoreStateMachine(candidateView, parentState, evolvingState),
 		activeStateMachine:            stateMachine,
 		epochFallbackStateMachineFactory: func() (StateMachine, error) {
 			return epochFallbackStateMachineFactory(candidateView, parentEpochState)
@@ -188,7 +188,7 @@ func (e *EpochStateMachine) Build() (*transaction.DeferredBlockPersist, error) {
 		e.pendingDbUpdates.AddDbOp(operation.SkipDuplicatesTx(
 			e.epochProtocolStateDB.StoreTx(updatedStateID, updatedEpochState.MinEpochStateEntry)))
 	}
-	e.Mutator.SetEpochStateID(updatedStateID)
+	e.EvolvingState.SetEpochStateID(updatedStateID)
 
 	return e.pendingDbUpdates, nil
 }

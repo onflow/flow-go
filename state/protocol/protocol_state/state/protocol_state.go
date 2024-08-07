@@ -99,7 +99,15 @@ func NewMutableProtocolState(
 	commits storage.EpochCommits,
 ) *MutableProtocolState {
 	log = log.With().Str("module", "dynamic_protocol_state").Logger()
-	epochhappyPathTelemetryFactory := func(candidateView uint64) protocol_state.StateMachineTelemetryConsumer {
+	// TODO [future generalization]: ideally, the telemetry consumers would be injected into the constructor
+	// mirroring telemetry collection in HotStuff. Thereby it would become possible to add more advanced supervision
+	// logic or to expose the telemetry as structured data by implementing custom telemetry consumers. At the moment,
+	// we only desire to log events picked up by the state machines, so the implementation below suffices. In case
+	// of two proposals for the same view, our current `StateMachineTelemetryConsumer` by itself does not collect
+	// sufficient context to differentiate events from the two blocks, as it only observes the view number. From the
+	// surrounding logs, we can infer the proposals' IDs. However, for more advanced analytics on the state machines,
+	// we might want to extend the current Telemetry implementation in the future.
+	epochHappyPathTelemetryFactory := func(candidateView uint64) protocol_state.StateMachineTelemetryConsumer {
 		return pubsub.NewLogConsumer(
 			log.With().
 				Str("state_machine", "epoch_happy_path").
@@ -107,7 +115,7 @@ func NewMutableProtocolState(
 				Logger(),
 		)
 	}
-	epochfallbackTelemetryFactory := func(candidateView uint64) protocol_state.StateMachineTelemetryConsumer {
+	epochFallbackTelemetryFactory := func(candidateView uint64) protocol_state.StateMachineTelemetryConsumer {
 		return pubsub.NewLogConsumer(
 			log.With().
 				Str("state_machine", "epoch_fallback_path").
@@ -115,17 +123,15 @@ func NewMutableProtocolState(
 				Logger(),
 		)
 	}
-
-	// TODO(EFM, #6020): inject consumers into other state machine factories.
+	psVersionUpgradeStateMachineTelemetry := pubsub.NewLogConsumer(log.With().Str("state_machine", "version_upgrade").Logger())
 	setKVStoreValueTelemetry := pubsub.NewLogConsumer(log.With().Str("state_machine", "set_kvstore_value").Logger())
 
 	// an ordered list of factories to create state machines for different sub-states of the Dynamic Protocol State.
 	// all factories are expected to be called in order defined here.
 	kvStateMachineFactories := []protocol_state.KeyValueStoreStateMachineFactory{
-		kvstore.NewPSVersionUpgradeStateMachineFactory(),
-		epochs.NewEpochStateMachineFactory(setups, commits, epochProtocolStateDB,
-			epochhappyPathTelemetryFactory, epochfallbackTelemetryFactory),
-		kvstore.NewSetValueKVStoreStateMachineFactory(setKVStoreValueTelemetry),
+		kvstore.NewPSVersionUpgradeStateMachineFactory(psVersionUpgradeStateMachineTelemetry),
+		epochs.NewEpochStateMachineFactory(setups, commits, epochProtocolStateDB, epochHappyPathTelemetryFactory, epochFallbackTelemetryFactory),
+		kvstore.NewSetValueStateMachineFactory(setKVStoreValueTelemetry),
 	}
 	return newMutableProtocolState(epochProtocolStateDB, kvstore.NewProtocolKVStore(kvStoreSnapshots), globalParams, headers, results, kvStateMachineFactories)
 }
@@ -309,7 +315,7 @@ func (s *MutableProtocolState) build(
 	parentStateID flow.Identifier,
 	stateMachines []protocol_state.KeyValueStoreStateMachine,
 	serviceEvents []flow.ServiceEvent,
-	evolvingState protocol_state.KVStoreMutator,
+	evolvingState protocol.KVStoreReader,
 ) (flow.Identifier, *transaction.DeferredBlockPersist, error) {
 	for _, stateMachine := range stateMachines {
 		err := stateMachine.EvolveState(serviceEvents) // state machine should only bubble up exceptions
