@@ -199,17 +199,18 @@ func (d *DeltaView) HasSelfDestructed(addr gethCommon.Address) (bool, *uint256.I
 //
 // if an account has been created in this transaction, it would return an error
 func (d *DeltaView) SelfDestruct(addr gethCommon.Address) error {
-	// if it has been recently created, calling self destruct is not a valid operation
-	if d.IsCreated(addr) {
-		return fmt.Errorf("invalid operation, can't selfdestruct an account that is just created")
-	}
-
-	// if it doesn't exist, return false
+	// if it doesn't exist, return
 	exists, err := d.Exist(addr)
 	if err != nil {
 		return err
 	}
 	if !exists {
+		return nil
+	}
+
+	// if already set to be self destructed, return
+	_, found := d.toBeDestructed[addr]
+	if found {
 		return nil
 	}
 

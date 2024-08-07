@@ -106,15 +106,15 @@ func (db *StateDB) IsNewContract(addr gethCommon.Address) bool {
 // while this address exists for the rest of transaction,
 // the balance of this account is return zero after the SelfDestruct call.
 func (db *StateDB) SelfDestruct(addr gethCommon.Address) {
-	err := db.latestView().SelfDestruct(addr)
-	db.handleError(err)
+	db.handleError(fmt.Errorf("legacy self destruct is not supported"))
 }
 
 // Selfdestruct6780 would only follow the self destruct steps if account is a new contract
 // either just created, or address had balance before but got a contract deployed to it (in this tx).
 func (db *StateDB) Selfdestruct6780(addr gethCommon.Address) {
 	if db.IsNewContract(addr) {
-		db.SelfDestruct(addr)
+		err := db.latestView().SelfDestruct(addr)
+		db.handleError(err)
 	}
 }
 
@@ -389,8 +389,10 @@ func (db *StateDB) Commit(finalize bool) error {
 			}
 			deleted = true
 		}
-		// then create new ones
-		// an account might be in a single transaction be deleted and recreated
+		if deleted {
+			continue
+		}
+		// create new accounts
 		if db.IsCreated(addr) {
 			err = db.baseView.CreateAccount(
 				addr,
@@ -402,9 +404,6 @@ func (db *StateDB) Commit(finalize bool) error {
 			if err != nil {
 				return wrapError(err)
 			}
-			continue
-		}
-		if deleted {
 			continue
 		}
 		err = db.baseView.UpdateAccount(
@@ -434,6 +433,10 @@ func (db *StateDB) Commit(finalize bool) error {
 
 	// update slots
 	for _, sk := range sortedSlots {
+		// don't update slots if self destructed
+		if db.HasSelfDestructed(sk.Address) {
+			continue
+		}
 		err = db.baseView.UpdateSlot(
 			sk,
 			db.GetState(sk.Address, sk.Key),
@@ -484,7 +487,7 @@ func (db *StateDB) Prepare(rules gethParams.Rules, sender, coinbase gethCommon.A
 }
 
 // Reset resets uncommitted changes and transient artifacts such as error, logs,
-// preimages, access lists, ...
+// pre-images, access lists, ...
 // The method is often called between execution of different transactions
 func (db *StateDB) Reset() {
 	db.views = []*DeltaView{NewDeltaView(db.baseView)}
