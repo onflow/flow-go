@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"sort"
 	"strings"
 	"unicode/utf8"
 
@@ -849,6 +850,11 @@ func (h *handler) GetTransactionExecutionMetricsAfter(
 		}
 		response.Results = append(response.Results, blockResponse)
 	}
+
+	// sort the response by block height in descending order
+	sort.Slice(response.Results, func(i, j int) bool {
+		return response.Results[i].BlockHeight > response.Results[j].BlockHeight
+	})
 
 	return response, nil
 }
