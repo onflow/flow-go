@@ -32,7 +32,7 @@ func NewPSVersionUpgradeStateMachine(
 	evolvingState protocol_state.KVStoreMutator,
 ) *PSVersionUpgradeStateMachine {
 	return &PSVersionUpgradeStateMachine{
-		BaseKeyValueStoreStateMachine: common.NewBaseKeyValueStoreStateMachine(candidateView, parentState, mutator),
+		BaseKeyValueStoreStateMachine: common.NewBaseKeyValueStoreStateMachine(candidateView, parentState, evolvingState),
 		telemetry:                     telemetry,
 	}
 }
