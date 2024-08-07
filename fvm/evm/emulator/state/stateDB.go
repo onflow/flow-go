@@ -113,7 +113,7 @@ func (db *StateDB) SelfDestruct(addr gethCommon.Address) {
 // either just created, or address had balance before but got a contract deployed to it (in this tx).
 func (db *StateDB) Selfdestruct6780(addr gethCommon.Address) {
 	if db.IsNewContract(addr) {
-		err := db.lastestView().SelfDestruct(addr)
+		err := db.latestView().SelfDestruct(addr)
 		db.handleError(err)
 	}
 }
