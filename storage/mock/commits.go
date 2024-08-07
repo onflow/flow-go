@@ -68,20 +68,6 @@ func (_m *Commits) ByBlockID(blockID flow.Identifier) (flow.StateCommitment, err
 	return r0, r1
 }
 
-// Store provides a mock function with given fields: blockID, commit
-func (_m *Commits) Store(blockID flow.Identifier, commit flow.StateCommitment) error {
-	ret := _m.Called(blockID, commit)
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(flow.Identifier, flow.StateCommitment) error); ok {
-		r0 = rf(blockID, commit)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
 type mockConstructorTestingTNewCommits interface {
 	mock.TestingT
 	Cleanup(func())

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
@@ -25,7 +25,7 @@ import (
 
 func prepareTest(f func(t *testing.T, es state.ExecutionState, l *ledger.Ledger, headers *storage.Headers, commits *storage.Commits)) func(*testing.T) {
 	return func(t *testing.T) {
-		unittest.RunWithBadgerDB(t, func(badgerDB *badger.DB) {
+		unittest.RunWithPebbleDB(t, func(pebbleDB *pebble.DB) {
 			metricsCollector := &metrics.NoopCollector{}
 			diskWal := &fixtures.NoopWAL{}
 			ls, err := ledger.NewLedger(diskWal, 100, metricsCollector, zerolog.Nop(), ledger.DefaultPathFinderVersion)
@@ -49,7 +49,7 @@ func prepareTest(f func(t *testing.T, es state.ExecutionState, l *ledger.Ledger,
 			myReceipts := storage.NewMyExecutionReceipts(t)
 
 			es := state.NewExecutionState(
-				ls, stateCommitments, blocks, headers, collections, chunkDataPacks, results, myReceipts, events, serviceEvents, txResults, badgerDB, trace.NewNoopTracer(),
+				ls, stateCommitments, blocks, headers, collections, chunkDataPacks, results, myReceipts, events, serviceEvents, txResults, pebbleDB, trace.NewNoopTracer(),
 				nil,
 				false,
 			)

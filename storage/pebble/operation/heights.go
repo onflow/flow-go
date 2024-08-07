@@ -1,48 +1,46 @@
-// (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
-
 package operation
 
 import (
-	"github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble"
 )
 
-func InsertRootHeight(height uint64) func(*badger.Txn) error {
+func InsertRootHeight(height uint64) func(pebble.Writer) error {
 	return insert(makePrefix(codeFinalizedRootHeight), height)
 }
 
-func RetrieveRootHeight(height *uint64) func(*badger.Txn) error {
+func RetrieveRootHeight(height *uint64) func(pebble.Reader) error {
 	return retrieve(makePrefix(codeFinalizedRootHeight), height)
 }
 
-func InsertSealedRootHeight(height uint64) func(*badger.Txn) error {
+func InsertSealedRootHeight(height uint64) func(pebble.Writer) error {
 	return insert(makePrefix(codeSealedRootHeight), height)
 }
 
-func RetrieveSealedRootHeight(height *uint64) func(*badger.Txn) error {
+func RetrieveSealedRootHeight(height *uint64) func(pebble.Reader) error {
 	return retrieve(makePrefix(codeSealedRootHeight), height)
 }
 
-func InsertFinalizedHeight(height uint64) func(*badger.Txn) error {
+func InsertFinalizedHeight(height uint64) func(pebble.Writer) error {
 	return insert(makePrefix(codeFinalizedHeight), height)
 }
 
-func UpdateFinalizedHeight(height uint64) func(*badger.Txn) error {
-	return update(makePrefix(codeFinalizedHeight), height)
+func UpdateFinalizedHeight(height uint64) func(pebble.Writer) error {
+	return insert(makePrefix(codeFinalizedHeight), height)
 }
 
-func RetrieveFinalizedHeight(height *uint64) func(*badger.Txn) error {
+func RetrieveFinalizedHeight(height *uint64) func(pebble.Reader) error {
 	return retrieve(makePrefix(codeFinalizedHeight), height)
 }
 
-func InsertSealedHeight(height uint64) func(*badger.Txn) error {
+func InsertSealedHeight(height uint64) func(pebble.Writer) error {
 	return insert(makePrefix(codeSealedHeight), height)
 }
 
-func UpdateSealedHeight(height uint64) func(*badger.Txn) error {
-	return update(makePrefix(codeSealedHeight), height)
+func UpdateSealedHeight(height uint64) func(pebble.Writer) error {
+	return insert(makePrefix(codeSealedHeight), height)
 }
 
-func RetrieveSealedHeight(height *uint64) func(*badger.Txn) error {
+func RetrieveSealedHeight(height *uint64) func(pebble.Reader) error {
 	return retrieve(makePrefix(codeSealedHeight), height)
 }
 
@@ -50,22 +48,22 @@ func RetrieveSealedHeight(height *uint64) func(*badger.Txn) error {
 // The first block of an epoch E is the finalized block with view >= E.FirstView.
 // Although we don't store the final height of an epoch, it can be inferred from this index.
 // Returns storage.ErrAlreadyExists if the height has already been indexed.
-func InsertEpochFirstHeight(epoch, height uint64) func(*badger.Txn) error {
+func InsertEpochFirstHeight(epoch, height uint64) func(pebble.Writer) error {
 	return insert(makePrefix(codeEpochFirstHeight, epoch), height)
 }
 
 // RetrieveEpochFirstHeight retrieves the height of the first block in the given epoch.
 // Returns storage.ErrNotFound if the first block of the epoch has not yet been finalized.
-func RetrieveEpochFirstHeight(epoch uint64, height *uint64) func(*badger.Txn) error {
+func RetrieveEpochFirstHeight(epoch uint64, height *uint64) func(pebble.Reader) error {
 	return retrieve(makePrefix(codeEpochFirstHeight, epoch), height)
 }
 
 // RetrieveEpochLastHeight retrieves the height of the last block in the given epoch.
 // It's a more readable, but equivalent query to RetrieveEpochFirstHeight when interested in the last height of an epoch.
 // Returns storage.ErrNotFound if the first block of the epoch has not yet been finalized.
-func RetrieveEpochLastHeight(epoch uint64, height *uint64) func(*badger.Txn) error {
+func RetrieveEpochLastHeight(epoch uint64, height *uint64) func(pebble.Reader) error {
 	var nextEpochFirstHeight uint64
-	return func(tx *badger.Txn) error {
+	return func(tx pebble.Reader) error {
 		if err := retrieve(makePrefix(codeEpochFirstHeight, epoch+1), &nextEpochFirstHeight)(tx); err != nil {
 			return err
 		}
@@ -76,18 +74,18 @@ func RetrieveEpochLastHeight(epoch uint64, height *uint64) func(*badger.Txn) err
 
 // InsertLastCompleteBlockHeightIfNotExists inserts the last full block height if it is not already set.
 // Calling this function multiple times is a no-op and returns no expected errors.
-func InsertLastCompleteBlockHeightIfNotExists(height uint64) func(*badger.Txn) error {
-	return SkipDuplicates(InsertLastCompleteBlockHeight(height))
+func InsertLastCompleteBlockHeightIfNotExists(height uint64) func(pebble.Writer) error {
+	return InsertLastCompleteBlockHeight(height)
 }
 
-func InsertLastCompleteBlockHeight(height uint64) func(*badger.Txn) error {
+func InsertLastCompleteBlockHeight(height uint64) func(pebble.Writer) error {
 	return insert(makePrefix(codeLastCompleteBlockHeight), height)
 }
 
-func UpdateLastCompleteBlockHeight(height uint64) func(*badger.Txn) error {
-	return update(makePrefix(codeLastCompleteBlockHeight), height)
+func UpdateLastCompleteBlockHeight(height uint64) func(pebble.Writer) error {
+	return insert(makePrefix(codeLastCompleteBlockHeight), height)
 }
 
-func RetrieveLastCompleteBlockHeight(height *uint64) func(*badger.Txn) error {
+func RetrieveLastCompleteBlockHeight(height *uint64) func(pebble.Reader) error {
 	return retrieve(makePrefix(codeLastCompleteBlockHeight), height)
 }

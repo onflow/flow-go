@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/cmd"
@@ -36,8 +36,8 @@ type Config struct {
 	networkPrivKey   crypto.PrivateKey   // the network private key of this node
 	bootstrapNodes   []BootstrapNodeInfo // the bootstrap nodes to use
 	bindAddr         string              // address to bind on
-	db               *badger.DB          // the badger DB storage to use for the protocol state
-	dataDir          string              // directory to store the protocol state (if the badger storage is not provided)
+	db               *pebble.DB          // the pebble DB storage to use for the protocol state
+	dataDir          string              // directory to store the protocol state (if the pebble storage is not provided)
 	bootstrapDir     string              // path to the bootstrap directory
 	logLevel         string              // log level
 	exposeMetrics    bool                // whether to expose metrics
@@ -71,7 +71,7 @@ func WithLogLevel(level string) Option {
 
 // WithDB sets the underlying database that will be used to store the chain state
 // WithDB takes precedence over WithDataDir and datadir will be set to empty if DB is set using this option
-func WithDB(db *badger.DB) Option {
+func WithDB(db *pebble.DB) Option {
 	return func(cf *Config) {
 		cf.db = db
 		cf.dataDir = ""

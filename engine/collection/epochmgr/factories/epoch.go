@@ -9,7 +9,7 @@ import (
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/mempool/epochs"
 	"github.com/onflow/flow-go/state/cluster"
-	"github.com/onflow/flow-go/state/cluster/badger"
+	"github.com/onflow/flow-go/state/cluster/pebble"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
@@ -109,12 +109,12 @@ func (factory *EpochComponentsFactory) Create(
 		blocks   storage.ClusterBlocks
 	)
 
-	stateRoot, err := badger.NewStateRoot(cluster.RootBlock(), cluster.RootQC(), cluster.EpochCounter())
+	stateRoot, err := pebble.NewStateRoot(cluster.RootBlock(), cluster.RootQC(), cluster.EpochCounter())
 	if err != nil {
 		err = fmt.Errorf("could not create valid state root: %w", err)
 		return
 	}
-	var mutableState *badger.MutableState
+	var mutableState *pebble.MutableState
 	mutableState, headers, payloads, blocks, err = factory.state.Create(stateRoot)
 	state = mutableState
 	if err != nil {

@@ -1,17 +1,17 @@
-package badger
+package pebble
 
 import (
-	"github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/storage/pebble/operation"
 )
 
 type ComputationResultUploadStatus struct {
-	db *badger.DB
+	db *pebble.DB
 }
 
-func NewComputationResultUploadStatus(db *badger.DB) *ComputationResultUploadStatus {
+func NewComputationResultUploadStatus(db *pebble.DB) *ComputationResultUploadStatus {
 	return &ComputationResultUploadStatus{
 		db: db,
 	}
@@ -19,22 +19,18 @@ func NewComputationResultUploadStatus(db *badger.DB) *ComputationResultUploadSta
 
 func (c *ComputationResultUploadStatus) Upsert(blockID flow.Identifier,
 	wasUploadCompleted bool) error {
-	return operation.RetryOnConflict(c.db.Update, func(btx *badger.Txn) error {
-		return operation.UpsertComputationResultUploadStatus(blockID, wasUploadCompleted)(btx)
-	})
+	return operation.UpsertComputationResultUploadStatus(blockID, wasUploadCompleted)(c.db)
 }
 
 func (c *ComputationResultUploadStatus) GetIDsByUploadStatus(targetUploadStatus bool) ([]flow.Identifier, error) {
 	ids := make([]flow.Identifier, 0)
-	err := c.db.View(operation.GetBlockIDsByStatus(&ids, targetUploadStatus))
+	err := operation.GetBlockIDsByStatus(&ids, targetUploadStatus)(c.db)
 	return ids, err
 }
 
 func (c *ComputationResultUploadStatus) ByID(computationResultID flow.Identifier) (bool, error) {
 	var ret bool
-	err := c.db.View(func(btx *badger.Txn) error {
-		return operation.GetComputationResultUploadStatus(computationResultID, &ret)(btx)
-	})
+	err := operation.GetComputationResultUploadStatus(computationResultID, &ret)(c.db)
 	if err != nil {
 		return false, err
 	}
@@ -43,7 +39,5 @@ func (c *ComputationResultUploadStatus) ByID(computationResultID flow.Identifier
 }
 
 func (c *ComputationResultUploadStatus) Remove(computationResultID flow.Identifier) error {
-	return operation.RetryOnConflict(c.db.Update, func(btx *badger.Txn) error {
-		return operation.RemoveComputationResultUploadStatus(computationResultID)(btx)
-	})
+	return operation.RemoveComputationResultUploadStatus(computationResultID)(c.db)
 }

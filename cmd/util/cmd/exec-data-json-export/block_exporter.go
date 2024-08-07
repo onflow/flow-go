@@ -12,7 +12,7 @@ import (
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/storage/pebble"
 )
 
 type blockSummary struct {
@@ -34,19 +34,22 @@ type blockSummary struct {
 func ExportBlocks(blockID flow.Identifier, dbPath string, outputPath string) (flow.StateCommitment, error) {
 
 	// traverse backward from the given block (parent block) and fetch by blockHash
-	db := common.InitStorage(dbPath)
+	db, err := common.InitStoragePebble(dbPath)
+	if err != nil {
+		return flow.DummyStateCommitment, fmt.Errorf("could not open db: %w", err)
+	}
 	defer db.Close()
 
 	cacheMetrics := &metrics.NoopCollector{}
-	headers := badger.NewHeaders(cacheMetrics, db)
-	index := badger.NewIndex(cacheMetrics, db)
-	guarantees := badger.NewGuarantees(cacheMetrics, db, badger.DefaultCacheSize)
-	seals := badger.NewSeals(cacheMetrics, db)
-	results := badger.NewExecutionResults(cacheMetrics, db)
-	receipts := badger.NewExecutionReceipts(cacheMetrics, db, results, badger.DefaultCacheSize)
-	payloads := badger.NewPayloads(db, index, guarantees, seals, receipts, results)
-	blocks := badger.NewBlocks(db, headers, payloads)
-	commits := badger.NewCommits(&metrics.NoopCollector{}, db)
+	headers := pebble.NewHeaders(cacheMetrics, db)
+	index := pebble.NewIndex(cacheMetrics, db)
+	guarantees := pebble.NewGuarantees(cacheMetrics, db, pebble.DefaultCacheSize)
+	seals := pebble.NewSeals(cacheMetrics, db)
+	results := pebble.NewExecutionResults(cacheMetrics, db)
+	receipts := pebble.NewExecutionReceipts(cacheMetrics, db, results, pebble.DefaultCacheSize)
+	payloads := pebble.NewPayloads(db, index, guarantees, seals, receipts, results)
+	blocks := pebble.NewBlocks(db, headers, payloads)
+	commits := pebble.NewCommits(&metrics.NoopCollector{}, db)
 
 	activeBlockID := blockID
 	outputFile := filepath.Join(outputPath, "blocks.jsonl")

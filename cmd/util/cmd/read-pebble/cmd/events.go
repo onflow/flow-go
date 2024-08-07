@@ -23,7 +23,7 @@ func init() {
 
 var eventsCmd = &cobra.Command{
 	Use:   "events",
-	Short: "Read events from badger",
+	Short: "Read events from pebble",
 	Run: func(cmd *cobra.Command, args []string) {
 		storages, db := InitStorages()
 		defer db.Close()

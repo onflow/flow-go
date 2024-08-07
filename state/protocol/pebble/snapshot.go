@@ -1,12 +1,8 @@
-// (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
-
-package badger
+package pebble
 
 import (
 	"errors"
 	"fmt"
-
-	"github.com/dgraph-io/badger/v2"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
@@ -17,8 +13,8 @@ import (
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/state/protocol/invalid"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/badger/operation"
-	"github.com/onflow/flow-go/storage/badger/procedure"
+	"github.com/onflow/flow-go/storage/pebble/operation"
+	"github.com/onflow/flow-go/storage/pebble/procedure"
 )
 
 // Snapshot implements the protocol.Snapshot interface.
@@ -353,7 +349,7 @@ func (s *Snapshot) Descendants() ([]flow.Identifier, error) {
 
 func (s *Snapshot) lookupChildren(blockID flow.Identifier) ([]flow.Identifier, error) {
 	var children flow.IdentifierList
-	err := s.state.db.View(procedure.LookupBlockChildren(blockID, &children))
+	err := procedure.LookupBlockChildren(blockID, &children)(s.state.db)
 	if err != nil {
 		return nil, fmt.Errorf("could not get children of block %v: %w", blockID, err)
 	}
@@ -544,35 +540,32 @@ func (q *EpochQuery) Previous() protocol.Epoch {
 //
 // No errors are expected during normal operation.
 func (q *EpochQuery) retrieveEpochHeightBounds(epoch uint64) (firstHeight, finalHeight uint64, isFirstBlockFinalized, isLastBlockFinalized bool, err error) {
-	err = q.snap.state.db.View(func(tx *badger.Txn) error {
-		// Retrieve the epoch's first height
-		err = operation.RetrieveEpochFirstHeight(epoch, &firstHeight)(tx)
-		if err != nil {
-			if errors.Is(err, storage.ErrNotFound) {
-				isFirstBlockFinalized = false
-				isLastBlockFinalized = false
-				return nil
-			}
-			return err // unexpected error
-		}
-		isFirstBlockFinalized = true
-
-		var subsequentEpochFirstHeight uint64
-		err = operation.RetrieveEpochFirstHeight(epoch+1, &subsequentEpochFirstHeight)(tx)
-		if err != nil {
-			if errors.Is(err, storage.ErrNotFound) {
-				isLastBlockFinalized = false
-				return nil
-			}
-			return err // unexpected error
-		}
-		finalHeight = subsequentEpochFirstHeight - 1
-		isLastBlockFinalized = true
-
-		return nil
-	})
+	// Retrieve the epoch's first height
+	db := q.snap.state.db
+	err = operation.RetrieveEpochFirstHeight(epoch, &firstHeight)(db)
 	if err != nil {
-		return 0, 0, false, false, err
+		if errors.Is(err, storage.ErrNotFound) {
+			isFirstBlockFinalized = false
+			isLastBlockFinalized = false
+			err = nil
+			return
+		}
+		return // unexpected error
 	}
+	isFirstBlockFinalized = true
+
+	var subsequentEpochFirstHeight uint64
+	err = operation.RetrieveEpochFirstHeight(epoch+1, &subsequentEpochFirstHeight)(db)
+	if err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			isLastBlockFinalized = false
+			err = nil
+			return
+		}
+		return // unexpected error
+	}
+	finalHeight = subsequentEpochFirstHeight - 1
+	isLastBlockFinalized = true
+
 	return firstHeight, finalHeight, isFirstBlockFinalized, isLastBlockFinalized, nil
 }

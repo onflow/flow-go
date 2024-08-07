@@ -1,95 +1,34 @@
-package badger
+package pebble
 
 import (
-	"encoding/binary"
-	"encoding/hex"
 	"fmt"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/storage/pebble/operation"
 )
 
 var _ storage.TransactionResults = (*TransactionResults)(nil)
 
 type TransactionResults struct {
-	db         *badger.DB
+	db         *pebble.DB
 	cache      *Cache[string, flow.TransactionResult]
 	indexCache *Cache[string, flow.TransactionResult]
 	blockCache *Cache[string, []flow.TransactionResult]
 }
 
-func KeyFromBlockIDTransactionID(blockID flow.Identifier, txID flow.Identifier) string {
-	return fmt.Sprintf("%x%x", blockID, txID)
-}
+var _ storage.TransactionResults = (*TransactionResults)(nil)
 
-func KeyFromBlockIDIndex(blockID flow.Identifier, txIndex uint32) string {
-	idData := make([]byte, 4) //uint32 fits into 4 bytes
-	binary.BigEndian.PutUint32(idData, txIndex)
-	return fmt.Sprintf("%x%x", blockID, idData)
-}
-
-func KeyFromBlockID(blockID flow.Identifier) string {
-	return blockID.String()
-}
-
-func KeyToBlockIDTransactionID(key string) (flow.Identifier, flow.Identifier, error) {
-	blockIDStr := key[:64]
-	txIDStr := key[64:]
-	blockID, err := flow.HexStringToIdentifier(blockIDStr)
-	if err != nil {
-		return flow.ZeroID, flow.ZeroID, fmt.Errorf("could not get block ID: %w", err)
-	}
-
-	txID, err := flow.HexStringToIdentifier(txIDStr)
-	if err != nil {
-		return flow.ZeroID, flow.ZeroID, fmt.Errorf("could not get transaction id: %w", err)
-	}
-
-	return blockID, txID, nil
-}
-
-func KeyToBlockIDIndex(key string) (flow.Identifier, uint32, error) {
-	blockIDStr := key[:64]
-	indexStr := key[64:]
-	blockID, err := flow.HexStringToIdentifier(blockIDStr)
-	if err != nil {
-		return flow.ZeroID, 0, fmt.Errorf("could not get block ID: %w", err)
-	}
-
-	txIndexBytes, err := hex.DecodeString(indexStr)
-	if err != nil {
-		return flow.ZeroID, 0, fmt.Errorf("could not get transaction index: %w", err)
-	}
-	if len(txIndexBytes) != 4 {
-		return flow.ZeroID, 0, fmt.Errorf("could not get transaction index - invalid length: %d", len(txIndexBytes))
-	}
-
-	txIndex := binary.BigEndian.Uint32(txIndexBytes)
-
-	return blockID, txIndex, nil
-}
-
-func KeyToBlockID(key string) (flow.Identifier, error) {
-
-	blockID, err := flow.HexStringToIdentifier(key)
-	if err != nil {
-		return flow.ZeroID, fmt.Errorf("could not get block ID: %w", err)
-	}
-
-	return blockID, err
-}
-
-func NewTransactionResults(collector module.CacheMetrics, db *badger.DB, transactionResultsCacheSize uint) *TransactionResults {
-	retrieve := func(key string) func(tx *badger.Txn) (flow.TransactionResult, error) {
+func NewTransactionResults(collector module.CacheMetrics, db *pebble.DB, transactionResultsCacheSize uint) *TransactionResults {
+	retrieve := func(key string) func(tx pebble.Reader) (flow.TransactionResult, error) {
 		var txResult flow.TransactionResult
-		return func(tx *badger.Txn) (flow.TransactionResult, error) {
+		return func(tx pebble.Reader) (flow.TransactionResult, error) {
 
-			blockID, txID, err := KeyToBlockIDTransactionID(key)
+			blockID, txID, err := storage.KeyToBlockIDTransactionID(key)
 			if err != nil {
 				return flow.TransactionResult{}, fmt.Errorf("could not convert key: %w", err)
 			}
@@ -101,11 +40,11 @@ func NewTransactionResults(collector module.CacheMetrics, db *badger.DB, transac
 			return txResult, nil
 		}
 	}
-	retrieveIndex := func(key string) func(tx *badger.Txn) (flow.TransactionResult, error) {
+	retrieveIndex := func(key string) func(tx pebble.Reader) (flow.TransactionResult, error) {
 		var txResult flow.TransactionResult
-		return func(tx *badger.Txn) (flow.TransactionResult, error) {
+		return func(tx pebble.Reader) (flow.TransactionResult, error) {
 
-			blockID, txIndex, err := KeyToBlockIDIndex(key)
+			blockID, txIndex, err := storage.KeyToBlockIDIndex(key)
 			if err != nil {
 				return flow.TransactionResult{}, fmt.Errorf("could not convert index key: %w", err)
 			}
@@ -117,11 +56,11 @@ func NewTransactionResults(collector module.CacheMetrics, db *badger.DB, transac
 			return txResult, nil
 		}
 	}
-	retrieveForBlock := func(key string) func(tx *badger.Txn) ([]flow.TransactionResult, error) {
+	retrieveForBlock := func(key string) func(tx pebble.Reader) ([]flow.TransactionResult, error) {
 		var txResults []flow.TransactionResult
-		return func(tx *badger.Txn) ([]flow.TransactionResult, error) {
+		return func(tx pebble.Reader) ([]flow.TransactionResult, error) {
 
-			blockID, err := KeyToBlockID(key)
+			blockID, err := storage.KeyToBlockID(key)
 			if err != nil {
 				return nil, fmt.Errorf("could not convert index key: %w", err)
 			}
@@ -157,8 +96,9 @@ func NewTransactionResults(collector module.CacheMetrics, db *badger.DB, transac
 func (tr *TransactionResults) BatchStore(blockID flow.Identifier, transactionResults []flow.TransactionResult, batch storage.BatchStorage) error {
 	writeBatch := batch.GetWriter()
 
+	writer := operation.NewBatchWriter(writeBatch)
 	for i, result := range transactionResults {
-		err := operation.BatchInsertTransactionResult(blockID, &result)(writeBatch)
+		err := operation.InsertTransactionResult(blockID, &result)(writer)
 		if err != nil {
 			return fmt.Errorf("cannot batch insert tx result: %w", err)
 		}
@@ -171,17 +111,17 @@ func (tr *TransactionResults) BatchStore(blockID flow.Identifier, transactionRes
 
 	batch.OnSucceed(func() {
 		for i, result := range transactionResults {
-			key := KeyFromBlockIDTransactionID(blockID, result.TransactionID)
+			key := storage.KeyFromBlockIDTransactionID(blockID, result.TransactionID)
 			// cache for each transaction, so that it's faster to retrieve
 			tr.cache.Insert(key, result)
 
 			index := uint32(i)
 
-			keyIndex := KeyFromBlockIDIndex(blockID, index)
+			keyIndex := storage.KeyFromBlockIDIndex(blockID, index)
 			tr.indexCache.Insert(keyIndex, result)
 		}
 
-		key := KeyFromBlockID(blockID)
+		key := storage.KeyFromBlockID(blockID)
 		tr.blockCache.Insert(key, transactionResults)
 	})
 	return nil
@@ -189,10 +129,8 @@ func (tr *TransactionResults) BatchStore(blockID flow.Identifier, transactionRes
 
 // ByBlockIDTransactionID returns the runtime transaction result for the given block ID and transaction ID
 func (tr *TransactionResults) ByBlockIDTransactionID(blockID flow.Identifier, txID flow.Identifier) (*flow.TransactionResult, error) {
-	tx := tr.db.NewTransaction(false)
-	defer tx.Discard()
-	key := KeyFromBlockIDTransactionID(blockID, txID)
-	transactionResult, err := tr.cache.Get(key)(tx)
+	key := storage.KeyFromBlockIDTransactionID(blockID, txID)
+	transactionResult, err := tr.cache.Get(key)(tr.db)
 	if err != nil {
 		return nil, err
 	}
@@ -201,10 +139,8 @@ func (tr *TransactionResults) ByBlockIDTransactionID(blockID flow.Identifier, tx
 
 // ByBlockIDTransactionIndex returns the runtime transaction result for the given block ID and transaction index
 func (tr *TransactionResults) ByBlockIDTransactionIndex(blockID flow.Identifier, txIndex uint32) (*flow.TransactionResult, error) {
-	tx := tr.db.NewTransaction(false)
-	defer tx.Discard()
-	key := KeyFromBlockIDIndex(blockID, txIndex)
-	transactionResult, err := tr.indexCache.Get(key)(tx)
+	key := storage.KeyFromBlockIDIndex(blockID, txIndex)
+	transactionResult, err := tr.indexCache.Get(key)(tr.db)
 	if err != nil {
 		return nil, err
 	}
@@ -213,10 +149,8 @@ func (tr *TransactionResults) ByBlockIDTransactionIndex(blockID flow.Identifier,
 
 // ByBlockID gets all transaction results for a block, ordered by transaction index
 func (tr *TransactionResults) ByBlockID(blockID flow.Identifier) ([]flow.TransactionResult, error) {
-	tx := tr.db.NewTransaction(false)
-	defer tx.Discard()
-	key := KeyFromBlockID(blockID)
-	transactionResults, err := tr.blockCache.Get(key)(tx)
+	key := storage.KeyFromBlockID(blockID)
+	transactionResults, err := tr.blockCache.Get(key)(tr.db)
 	if err != nil {
 		return nil, err
 	}
@@ -225,11 +159,10 @@ func (tr *TransactionResults) ByBlockID(blockID flow.Identifier) ([]flow.Transac
 
 // RemoveByBlockID removes transaction results by block ID
 func (tr *TransactionResults) RemoveByBlockID(blockID flow.Identifier) error {
-	return tr.db.Update(operation.RemoveTransactionResultsByBlockID(blockID))
+	return operation.RemoveTransactionResultsByBlockID(blockID)(tr.db)
 }
 
 // BatchRemoveByBlockID batch removes transaction results by block ID
 func (tr *TransactionResults) BatchRemoveByBlockID(blockID flow.Identifier, batch storage.BatchStorage) error {
-	writeBatch := batch.GetWriter()
-	return tr.db.View(operation.BatchRemoveTransactionResultsByBlockID(blockID, writeBatch))
+	return operation.BatchRemoveTransactionResultsByBlockID(blockID)(operation.NewBatchWriter(batch.GetWriter()))
 }

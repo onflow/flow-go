@@ -1,26 +1,26 @@
-package badger
+package pebble
 
 import (
 	"fmt"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/storage/pebble/operation"
 )
 
 type Events struct {
-	db    *badger.DB
+	db    *pebble.DB
 	cache *Cache[flow.Identifier, []flow.Event]
 }
 
-func NewEvents(collector module.CacheMetrics, db *badger.DB) *Events {
-	retrieve := func(blockID flow.Identifier) func(tx *badger.Txn) ([]flow.Event, error) {
+func NewEvents(collector module.CacheMetrics, db *pebble.DB) *Events {
+	retrieve := func(blockID flow.Identifier) func(tx pebble.Reader) ([]flow.Event, error) {
 		var events []flow.Event
-		return func(tx *badger.Txn) ([]flow.Event, error) {
+		return func(tx pebble.Reader) ([]flow.Event, error) {
 			err := operation.LookupEventsByBlockID(blockID, &events)(tx)
 			return events, handleError(err, flow.Event{})
 		}
@@ -36,9 +36,10 @@ func NewEvents(collector module.CacheMetrics, db *badger.DB) *Events {
 
 // BatchStore stores events keyed by a blockID in provided batch
 // No errors are expected during normal operation, but it may return generic error
-// if badger fails to process request
+// if pebble fails to process request
 func (e *Events) BatchStore(blockID flow.Identifier, blockEvents []flow.EventsList, batch storage.BatchStorage) error {
 	writeBatch := batch.GetWriter()
+	writer := operation.NewBatchWriter(writeBatch)
 
 	// pre-allocating and indexing slice is faster than appending
 	sliceSize := 0
@@ -52,7 +53,7 @@ func (e *Events) BatchStore(blockID flow.Identifier, blockEvents []flow.EventsLi
 
 	for _, events := range blockEvents {
 		for _, event := range events {
-			err := operation.BatchInsertEvent(blockID, event)(writeBatch)
+			err := operation.InsertEvent(blockID, event)(writer)
 			if err != nil {
 				return fmt.Errorf("cannot batch insert event: %w", err)
 			}
@@ -88,9 +89,7 @@ func (e *Events) Store(blockID flow.Identifier, blockEvents []flow.EventsList) e
 // ByBlockID returns the events for the given block ID
 // Note: This method will return an empty slice and no error if no entries for the blockID are found
 func (e *Events) ByBlockID(blockID flow.Identifier) ([]flow.Event, error) {
-	tx := e.db.NewTransaction(false)
-	defer tx.Discard()
-	val, err := e.cache.Get(blockID)(tx)
+	val, err := e.cache.Get(blockID)(e.db)
 	if err != nil {
 		return nil, err
 	}
@@ -150,26 +149,26 @@ func (e *Events) ByBlockIDEventType(blockID flow.Identifier, eventType flow.Even
 
 // RemoveByBlockID removes events by block ID
 func (e *Events) RemoveByBlockID(blockID flow.Identifier) error {
-	return e.db.Update(operation.RemoveEventsByBlockID(blockID))
+	return operation.RemoveEventsByBlockID(blockID)(e.db)
 }
 
 // BatchRemoveByBlockID removes events keyed by a blockID in provided batch
 // No errors are expected during normal operation, even if no entries are matched.
-// If Badger unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
+// If pebble unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
 func (e *Events) BatchRemoveByBlockID(blockID flow.Identifier, batch storage.BatchStorage) error {
 	writeBatch := batch.GetWriter()
-	return e.db.View(operation.BatchRemoveEventsByBlockID(blockID, writeBatch))
+	return operation.RemoveEventsByBlockID(blockID)(operation.NewBatchWriter(writeBatch))
 }
 
 type ServiceEvents struct {
-	db    *badger.DB
+	db    *pebble.DB
 	cache *Cache[flow.Identifier, []flow.Event]
 }
 
-func NewServiceEvents(collector module.CacheMetrics, db *badger.DB) *ServiceEvents {
-	retrieve := func(blockID flow.Identifier) func(tx *badger.Txn) ([]flow.Event, error) {
+func NewServiceEvents(collector module.CacheMetrics, db *pebble.DB) *ServiceEvents {
+	retrieve := func(blockID flow.Identifier) func(tx pebble.Reader) ([]flow.Event, error) {
 		var events []flow.Event
-		return func(tx *badger.Txn) ([]flow.Event, error) {
+		return func(tx pebble.Reader) ([]flow.Event, error) {
 			err := operation.LookupServiceEventsByBlockID(blockID, &events)(tx)
 			return events, handleError(err, flow.Event{})
 		}
@@ -185,11 +184,12 @@ func NewServiceEvents(collector module.CacheMetrics, db *badger.DB) *ServiceEven
 
 // BatchStore stores service events keyed by a blockID in provided batch
 // No errors are expected during normal operation, even if no entries are matched.
-// If Badger unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
+// If pebble unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
 func (e *ServiceEvents) BatchStore(blockID flow.Identifier, events []flow.Event, batch storage.BatchStorage) error {
 	writeBatch := batch.GetWriter()
+	writer := operation.NewBatchWriter(writeBatch)
 	for _, event := range events {
-		err := operation.BatchInsertServiceEvent(blockID, event)(writeBatch)
+		err := operation.InsertServiceEvent(blockID, event)(writer)
 		if err != nil {
 			return fmt.Errorf("cannot batch insert service event: %w", err)
 		}
@@ -204,9 +204,7 @@ func (e *ServiceEvents) BatchStore(blockID flow.Identifier, events []flow.Event,
 
 // ByBlockID returns the events for the given block ID
 func (e *ServiceEvents) ByBlockID(blockID flow.Identifier) ([]flow.Event, error) {
-	tx := e.db.NewTransaction(false)
-	defer tx.Discard()
-	val, err := e.cache.Get(blockID)(tx)
+	val, err := e.cache.Get(blockID)(e.db)
 	if err != nil {
 		return nil, err
 	}
@@ -215,13 +213,13 @@ func (e *ServiceEvents) ByBlockID(blockID flow.Identifier) ([]flow.Event, error)
 
 // RemoveByBlockID removes service events by block ID
 func (e *ServiceEvents) RemoveByBlockID(blockID flow.Identifier) error {
-	return e.db.Update(operation.RemoveServiceEventsByBlockID(blockID))
+	return operation.RemoveServiceEventsByBlockID(blockID)(e.db)
 }
 
 // BatchRemoveByBlockID removes service events keyed by a blockID in provided batch
 // No errors are expected during normal operation, even if no entries are matched.
-// If Badger unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
+// If pebble unexpectedly fails to process the request, the error is wrapped in a generic error and returned.
 func (e *ServiceEvents) BatchRemoveByBlockID(blockID flow.Identifier, batch storage.BatchStorage) error {
 	writeBatch := batch.GetWriter()
-	return e.db.View(operation.BatchRemoveServiceEventsByBlockID(blockID, writeBatch))
+	return operation.RemoveServiceEventsByBlockID(blockID)(operation.NewBatchWriter(writeBatch))
 }

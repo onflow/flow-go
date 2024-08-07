@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/cluster"
@@ -19,19 +19,19 @@ import (
 	"github.com/onflow/flow-go/state/fork"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/badger/operation"
-	"github.com/onflow/flow-go/storage/badger/procedure"
+	"github.com/onflow/flow-go/storage/pebble/operation"
+	"github.com/onflow/flow-go/storage/pebble/procedure"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
-// Builder is the builder for collection block payloads. Upon providing a
+// BuilderPebble is the builder for collection block payloads. Upon providing a
 // payload hash, it also memorizes the payload contents.
 //
-// NOTE: Builder is NOT safe for use with multiple goroutines. Since the
+// NOTE: BuilderPebble is NOT safe for use with multiple goroutines. Since the
 // HotStuff event loop is the only consumer of this interface and is single
 // threaded, this is OK.
-type Builder struct {
-	db             *badger.DB
+type BuilderPebble struct {
+	db             *pebble.DB
 	mainHeaders    storage.Headers
 	clusterHeaders storage.Headers
 	protoState     protocol.State
@@ -48,8 +48,8 @@ type Builder struct {
 	epochFinalID        *flow.Identifier // ID of last block in this cluster's operating epoch (nil if epoch not ended)
 }
 
-func NewBuilder(
-	db *badger.DB,
+func NewBuilderPebble(
+	db *pebble.DB,
 	tracer module.Tracer,
 	protoState protocol.State,
 	clusterState clusterstate.State,
@@ -60,8 +60,8 @@ func NewBuilder(
 	log zerolog.Logger,
 	epochCounter uint64,
 	opts ...Opt,
-) (*Builder, error) {
-	b := Builder{
+) (*BuilderPebble, error) {
+	b := BuilderPebble{
 		db:             db,
 		tracer:         tracer,
 		protoState:     protoState,
@@ -75,7 +75,7 @@ func NewBuilder(
 		clusterEpoch:   epochCounter,
 	}
 
-	err := db.View(operation.RetrieveEpochFirstHeight(epochCounter, &b.refEpochFirstHeight))
+	err := operation.RetrieveEpochFirstHeight(epochCounter, &b.refEpochFirstHeight)(db)
 	if err != nil {
 		return nil, fmt.Errorf("could not get epoch first height: %w", err)
 	}
@@ -94,7 +94,7 @@ func NewBuilder(
 
 // BuildOn creates a new block built on the given parent. It produces a payload
 // that is valid with respect to the un-finalized chain it extends.
-func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) error) (*flow.Header, error) {
+func (b *BuilderPebble) BuildOn(parentID flow.Identifier, setter func(*flow.Header) error) (*flow.Header, error) {
 	parentSpan, ctx := b.tracer.StartSpanFromContext(context.Background(), trace.COLBuildOn)
 	defer parentSpan.End()
 
@@ -193,7 +193,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 
 	// STEP 4: insert the cluster block to the database.
 	span, _ = b.tracer.StartSpanFromContext(ctx, trace.COLBuildOnDBInsert)
-	err = operation.RetryOnConflict(b.db.Update, procedure.InsertClusterBlock(&proposal))
+	err = operation.WithReaderBatchWriter(b.db, procedure.InsertClusterBlock(&proposal))
 	span.End()
 	if err != nil {
 		return nil, fmt.Errorf("could not insert built block: %w", err)
@@ -205,7 +205,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 // getBlockBuildContext retrieves the required contextual information from the database
 // required to build a new block proposal.
 // No errors are expected during normal operation.
-func (b *Builder) getBlockBuildContext(parentID flow.Identifier) (*blockBuildContext, error) {
+func (b *BuilderPebble) getBlockBuildContext(parentID flow.Identifier) (*blockBuildContext, error) {
 	ctx := new(blockBuildContext)
 	ctx.config = b.config
 	ctx.parentID = parentID
@@ -241,7 +241,7 @@ func (b *Builder) getBlockBuildContext(parentID flow.Identifier) (*blockBuildCon
 	}
 
 	// otherwise, attempt to read them from storage
-	err = b.db.View(func(btx *badger.Txn) error {
+	err = (func(btx pebble.Reader) error {
 		var refEpochFinalHeight uint64
 		var refEpochFinalID flow.Identifier
 
@@ -267,7 +267,7 @@ func (b *Builder) getBlockBuildContext(parentID flow.Identifier) (*blockBuildCon
 		ctx.refEpochFinalHeight = b.epochFinalHeight
 
 		return nil
-	})
+	})(b.db)
 	if err != nil {
 		return nil, fmt.Errorf("could not get block build context: %w", err)
 	}
@@ -280,7 +280,7 @@ func (b *Builder) getBlockBuildContext(parentID flow.Identifier) (*blockBuildCon
 //
 // The traversal begins with the block specified by parentID (the block we are
 // building on top of) and ends with the oldest unfinalized block in the ancestry.
-func (b *Builder) populateUnfinalizedAncestryLookup(ctx *blockBuildContext) error {
+func (b *BuilderPebble) populateUnfinalizedAncestryLookup(ctx *blockBuildContext) error {
 	err := fork.TraverseBackward(b.clusterHeaders, ctx.parentID, func(ancestor *flow.Header) error {
 		payload, err := b.payloads.ByBlockID(ancestor.ID())
 		if err != nil {
@@ -303,7 +303,7 @@ func (b *Builder) populateUnfinalizedAncestryLookup(ctx *blockBuildContext) erro
 // The traversal is structured so that we check every collection whose reference
 // block height translates to a possible constituent transaction which could also
 // appear in the collection we are building.
-func (b *Builder) populateFinalizedAncestryLookup(ctx *blockBuildContext) error {
+func (b *BuilderPebble) populateFinalizedAncestryLookup(ctx *blockBuildContext) error {
 	minRefHeight := ctx.lowestPossibleReferenceBlockHeight()
 	maxRefHeight := ctx.highestPossibleReferenceBlockHeight()
 	lookup := ctx.lookup
@@ -331,7 +331,7 @@ func (b *Builder) populateFinalizedAncestryLookup(ctx *blockBuildContext) error 
 	// the finalized cluster blocks which could possibly contain any conflicting transactions
 	var clusterBlockIDs []flow.Identifier
 	start, end := findRefHeightSearchRangeForConflictingClusterBlocks(minRefHeight, maxRefHeight)
-	err := b.db.View(operation.LookupClusterBlocksByReferenceHeightRange(start, end, &clusterBlockIDs))
+	err := operation.LookupClusterBlocksByReferenceHeightRange(start, end, &clusterBlockIDs)(b.db)
 	if err != nil {
 		return fmt.Errorf("could not lookup finalized cluster blocks by reference height range [%d,%d]: %w", start, end, err)
 	}
@@ -357,7 +357,7 @@ func (b *Builder) populateFinalizedAncestryLookup(ctx *blockBuildContext) error 
 // buildPayload constructs a valid payload based on transactions available in the mempool.
 // If the mempool is empty, an empty payload will be returned.
 // No errors are expected during normal operation.
-func (b *Builder) buildPayload(buildCtx *blockBuildContext) (*cluster.Payload, error) {
+func (b *BuilderPebble) buildPayload(buildCtx *blockBuildContext) (*cluster.Payload, error) {
 	lookup := buildCtx.lookup
 	limiter := buildCtx.limiter
 	maxRefHeight := buildCtx.highestPossibleReferenceBlockHeight()
@@ -487,7 +487,7 @@ func (b *Builder) buildPayload(buildCtx *blockBuildContext) (*cluster.Payload, e
 // buildHeader constructs the header for the cluster block being built.
 // It invokes the HotStuff setter to set fields related to HotStuff (QC, etc.).
 // No errors are expected during normal operation.
-func (b *Builder) buildHeader(ctx *blockBuildContext, payload *cluster.Payload, setter func(header *flow.Header) error) (*flow.Header, error) {
+func (b *BuilderPebble) buildHeader(ctx *blockBuildContext, payload *cluster.Payload, setter func(header *flow.Header) error) (*flow.Header, error) {
 
 	header := &flow.Header{
 		ChainID:     ctx.parent.ChainID,
@@ -506,21 +506,4 @@ func (b *Builder) buildHeader(ctx *blockBuildContext, payload *cluster.Payload, 
 		return nil, fmt.Errorf("could not set fields to header: %w", err)
 	}
 	return header, nil
-}
-
-// findRefHeightSearchRangeForConflictingClusterBlocks computes the range of reference
-// block heights of ancestor blocks which could possibly contain transactions
-// duplicating those in our collection under construction, based on the range of
-// reference heights of transactions in the collection under construction.
-//
-// Input range is the (inclusive) range of reference heights of transactions included
-// in the collection under construction. Output range is the (inclusive) range of
-// reference heights which need to be searched.
-func findRefHeightSearchRangeForConflictingClusterBlocks(minRefHeight, maxRefHeight uint64) (start, end uint64) {
-	start = minRefHeight - flow.DefaultTransactionExpiry + 1
-	if start > minRefHeight {
-		start = 0 // overflow check
-	}
-	end = maxRefHeight
-	return start, end
 }

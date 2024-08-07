@@ -7,11 +7,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble"
 	otelTrace "go.opentelemetry.io/otel/trace"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/flow/filter/id"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/trace"
@@ -19,15 +18,15 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/storage/pebble/operation"
 )
 
-// Builder is the builder for consensus block payloads. Upon providing a payload
+// BuilderPebble is the builder for consensus block payloads. Upon providing a payload
 // hash, it also memorizes which entities were included into the payload.
-type Builder struct {
+type BuilderPebble struct {
 	metrics    module.MempoolMetrics
 	tracer     module.Tracer
-	db         *badger.DB
+	db         *pebble.DB
 	state      protocol.ParticipantState
 	seals      storage.Seals
 	headers    storage.Headers
@@ -41,10 +40,10 @@ type Builder struct {
 	cfg        Config
 }
 
-// NewBuilder creates a new block builder.
-func NewBuilder(
+// NewBuilderPebble creates a new block builder.
+func NewBuilderPebble(
 	metrics module.MempoolMetrics,
-	db *badger.DB,
+	db *pebble.DB,
 	state protocol.ParticipantState,
 	headers storage.Headers,
 	seals storage.Seals,
@@ -57,7 +56,7 @@ func NewBuilder(
 	recPool mempool.ExecutionTree,
 	tracer module.Tracer,
 	options ...func(*Config),
-) (*Builder, error) {
+) (*BuilderPebble, error) {
 
 	blockTimer, err := blocktimer.NewBlockTimer(500*time.Millisecond, 10*time.Second)
 	if err != nil {
@@ -78,7 +77,7 @@ func NewBuilder(
 		option(&cfg)
 	}
 
-	b := &Builder{
+	b := &BuilderPebble{
 		metrics:    metrics,
 		db:         db,
 		tracer:     tracer,
@@ -106,7 +105,7 @@ func NewBuilder(
 // BuildOn creates a new block header on top of the provided parent, using the
 // given view and applying the custom setter function to allow the caller to
 // make changes to the header before storing it.
-func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) error) (*flow.Header, error) {
+func (b *BuilderPebble) BuildOn(parentID flow.Identifier, setter func(*flow.Header) error) (*flow.Header, error) {
 
 	// since we don't know the blockID when building the block we track the
 	// time indirectly and insert the span directly at the end
@@ -157,7 +156,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 // 1) traverse backwards all finalized blocks starting from last finalized block till we reach last sealed block. [lastSealedHeight, lastFinalizedHeight]
 // 2) traverse forward all unfinalized(pending) blocks starting from last finalized block.
 // For each block that is being traversed we will collect execution results and add them to execution tree.
-func (b *Builder) repopulateExecutionTree() error {
+func (b *BuilderPebble) repopulateExecutionTree() error {
 	finalizedSnapshot := b.state.Final()
 	finalized, err := finalizedSnapshot.Head()
 	if err != nil {
@@ -252,7 +251,7 @@ func (b *Builder) repopulateExecutionTree() error {
 // 3) If the referenced block has an expired height, skip.
 //
 // 4) Otherwise, this guarantee can be included in the payload.
-func (b *Builder) getInsertableGuarantees(parentID flow.Identifier) ([]*flow.CollectionGuarantee, error) {
+func (b *BuilderPebble) getInsertableGuarantees(parentID flow.Identifier) ([]*flow.CollectionGuarantee, error) {
 
 	// we look back only as far as the expiry limit for the current height we
 	// are building for; any guarantee with a reference block before that can
@@ -270,7 +269,7 @@ func (b *Builder) getInsertableGuarantees(parentID flow.Identifier) ([]*flow.Col
 	// look up the root height so we don't look too far back
 	// initially this is the genesis block height (aka 0).
 	var rootHeight uint64
-	err = b.db.View(operation.RetrieveRootHeight(&rootHeight))
+	err = operation.RetrieveRootHeight(&rootHeight)(b.db)
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve root block height: %w", err)
 	}
@@ -354,7 +353,7 @@ func (b *Builder) getInsertableGuarantees(parentID flow.Identifier) ([]*flow.Col
 //     block or by a seal included earlier in the block that we are constructing).
 //
 // To limit block size, we cap the number of seals to maxSealCount.
-func (b *Builder) getInsertableSeals(parentID flow.Identifier) ([]*flow.Seal, error) {
+func (b *BuilderPebble) getInsertableSeals(parentID flow.Identifier) ([]*flow.Seal, error) {
 	// get the latest seal in the fork, which we are extending and
 	// the corresponding block, whose result is sealed
 	// Note: the last seal might not be included in a finalized block yet
@@ -471,22 +470,6 @@ func (b *Builder) getInsertableSeals(parentID flow.Identifier) ([]*flow.Seal, er
 	return seals, nil
 }
 
-// connectingSeal looks through `sealsForNextBlock`. It checks whether the
-// sealed result directly descends from the lastSealed result.
-func connectingSeal(sealsForNextBlock []*flow.IncorporatedResultSeal, lastSealed *flow.Seal) (*flow.Seal, bool) {
-	for _, candidateSeal := range sealsForNextBlock {
-		if candidateSeal.IncorporatedResult.Result.PreviousResultID == lastSealed.ResultID {
-			return candidateSeal.Seal, true
-		}
-	}
-	return nil, false
-}
-
-type InsertableReceipts struct {
-	receipts []*flow.ExecutionReceiptMeta
-	results  []*flow.ExecutionResult
-}
-
 // getInsertableReceipts constructs:
 //   - (i)  the meta information of the ExecutionReceipts (i.e. ExecutionReceiptMeta)
 //     that should be inserted in the next payload
@@ -502,7 +485,7 @@ type InsertableReceipts struct {
 // 3) Otherwise, this receipt can be included in the payload.
 //
 // Receipts have to be ordered by block height.
-func (b *Builder) getInsertableReceipts(parentID flow.Identifier) (*InsertableReceipts, error) {
+func (b *BuilderPebble) getInsertableReceipts(parentID flow.Identifier) (*InsertableReceipts, error) {
 
 	// Get the latest sealed block on this fork, ie the highest block for which
 	// there is a seal in this fork. This block is not necessarily finalized.
@@ -568,41 +551,9 @@ func (b *Builder) getInsertableReceipts(parentID flow.Identifier) (*InsertableRe
 	return insertables, nil
 }
 
-// toInsertables separates the provided receipts into ExecutionReceiptMeta and
-// ExecutionResult. Results that are in includedResults are skipped.
-// We also limit the number of receipts to maxReceiptCount.
-func toInsertables(receipts []*flow.ExecutionReceipt, includedResults map[flow.Identifier]struct{}, maxReceiptCount uint) *InsertableReceipts {
-	results := make([]*flow.ExecutionResult, 0)
-
-	count := uint(len(receipts))
-	// don't collect more than maxReceiptCount receipts
-	if count > maxReceiptCount {
-		count = maxReceiptCount
-	}
-
-	filteredReceipts := make([]*flow.ExecutionReceiptMeta, 0, count)
-
-	for i := uint(0); i < count; i++ {
-		receipt := receipts[i]
-		meta := receipt.Meta()
-		resultID := meta.ResultID
-		if _, inserted := includedResults[resultID]; !inserted {
-			results = append(results, &receipt.ExecutionResult)
-			includedResults[resultID] = struct{}{}
-		}
-
-		filteredReceipts = append(filteredReceipts, meta)
-	}
-
-	return &InsertableReceipts{
-		receipts: filteredReceipts,
-		results:  results,
-	}
-}
-
 // createProposal assembles a block with the provided header and payload
 // information
-func (b *Builder) createProposal(parentID flow.Identifier,
+func (b *BuilderPebble) createProposal(parentID flow.Identifier,
 	guarantees []*flow.CollectionGuarantee,
 	seals []*flow.Seal,
 	insertableReceipts *InsertableReceipts,
@@ -644,27 +595,4 @@ func (b *Builder) createProposal(parentID flow.Identifier,
 	}
 
 	return proposal, nil
-}
-
-// isResultForBlock constructs a mempool.BlockFilter that accepts only blocks whose ID is part of the given set.
-func isResultForBlock(blockIDs map[flow.Identifier]struct{}) mempool.BlockFilter {
-	blockIdFilter := id.InSet(blockIDs)
-	return func(h *flow.Header) bool {
-		return blockIdFilter(h.ID())
-	}
-}
-
-// isNoDupAndNotSealed constructs a mempool.ReceiptFilter for discarding receipts that
-// * are duplicates
-// * or are for the sealed block
-func isNoDupAndNotSealed(includedReceipts map[flow.Identifier]struct{}, sealedBlockID flow.Identifier) mempool.ReceiptFilter {
-	return func(receipt *flow.ExecutionReceipt) bool {
-		if _, duplicate := includedReceipts[receipt.ID()]; duplicate {
-			return false
-		}
-		if receipt.ExecutionResult.BlockID == sealedBlockID {
-			return false
-		}
-		return true
-	}
 }

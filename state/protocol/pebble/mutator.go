@@ -1,13 +1,10 @@
-// (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
-
-package badger
+package pebble
 
 import (
 	"context"
 	"errors"
 	"fmt"
 
-	"github.com/dgraph-io/badger/v2"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine"
@@ -19,9 +16,8 @@ import (
 	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/badger/operation"
-	"github.com/onflow/flow-go/storage/badger/procedure"
-	"github.com/onflow/flow-go/storage/badger/transaction"
+	"github.com/onflow/flow-go/storage/pebble/operation"
+	"github.com/onflow/flow-go/storage/pebble/procedure"
 )
 
 // FollowerState implements a lighter version of a mutable protocol state.
@@ -296,12 +292,12 @@ func (m *FollowerState) checkBlockAlreadyProcessed(blockID flow.Identifier) (boo
 //   - state.OutdatedExtensionError if the candidate block is outdated (e.g. orphaned)
 func (m *ParticipantState) checkOutdatedExtension(header *flow.Header) error {
 	var finalizedHeight uint64
-	err := m.db.View(operation.RetrieveFinalizedHeight(&finalizedHeight))
+	err := operation.RetrieveFinalizedHeight(&finalizedHeight)(m.db)
 	if err != nil {
 		return fmt.Errorf("could not retrieve finalized height: %w", err)
 	}
 	var finalID flow.Identifier
-	err = m.db.View(operation.LookupBlockHeight(finalizedHeight, &finalID))
+	err = operation.LookupBlockHeight(finalizedHeight, &finalID)(m.db)
 	if err != nil {
 		return fmt.Errorf("could not lookup finalized block: %w", err)
 	}
@@ -523,14 +519,14 @@ func (m *FollowerState) insert(ctx context.Context, candidate *flow.Block, certi
 	// Both the header itself and its payload are in compliance with the protocol state.
 	// We can now store the candidate block, as well as adding its final seal
 	// to the seal index and initializing its children index.
-	err = operation.RetryOnConflictTx(m.db, transaction.Update, func(tx *transaction.Tx) error {
+	err = operation.WithReaderBatchWriter(m.db, func(tx storage.PebbleReaderBatchWriter) error {
 		// insert the block into the database AND cache
-		err := m.blocks.StoreTx(candidate)(tx)
+		err := m.blocks.StorePebble(candidate)(tx)
 		if err != nil {
 			return fmt.Errorf("could not store candidate block: %w", err)
 		}
 
-		err = m.qcs.StoreTx(qc)(tx)
+		err = m.qcs.StorePebble(qc)(tx)
 		if err != nil {
 			if !errors.Is(err, storage.ErrAlreadyExists) {
 				return fmt.Errorf("could not store incorporated qc: %w", err)
@@ -545,7 +541,7 @@ func (m *FollowerState) insert(ctx context.Context, candidate *flow.Block, certi
 		}
 
 		if certifyingQC != nil {
-			err = m.qcs.StoreTx(certifyingQC)(tx)
+			err = m.qcs.StorePebble(certifyingQC)(tx)
 			if err != nil {
 				return fmt.Errorf("could not store certifying qc: %w", err)
 			}
@@ -556,14 +552,15 @@ func (m *FollowerState) insert(ctx context.Context, candidate *flow.Block, certi
 			})
 		}
 
+		_, writer := tx.ReaderWriter()
 		// index the latest sealed block in this fork
-		err = transaction.WithTx(operation.IndexLatestSealAtBlock(blockID, latestSealID))(tx)
+		err = operation.IndexLatestSealAtBlock(blockID, latestSealID)(writer)
 		if err != nil {
 			return fmt.Errorf("could not index candidate seal: %w", err)
 		}
 
 		// index the child block for recovery
-		err = transaction.WithTx(procedure.IndexNewBlock(blockID, candidate.Header.ParentID))(tx)
+		err = procedure.IndexNewBlock(blockID, candidate.Header.ParentID)(tx)
 		if err != nil {
 			return fmt.Errorf("could not index new block: %w", err)
 		}
@@ -615,12 +612,12 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 	// this must be the case, as the `Finalize` method only finalizes one block
 	// at a time and hence the parent of `blockID` must already be finalized.
 	var finalized uint64
-	err = m.db.View(operation.RetrieveFinalizedHeight(&finalized))
+	err = operation.RetrieveFinalizedHeight(&finalized)(m.db)
 	if err != nil {
 		return fmt.Errorf("could not retrieve finalized height: %w", err)
 	}
 	var finalID flow.Identifier
-	err = m.db.View(operation.LookupBlockHeight(finalized, &finalID))
+	err = operation.LookupBlockHeight(finalized, &finalID)(m.db)
 	if err != nil {
 		return fmt.Errorf("could not retrieve final header: %w", err)
 	}
@@ -707,7 +704,8 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 	//   This value could actually stay the same if it has no seals in
 	//   its payload, in which case the parent's seal is the same.
 	// * set the epoch fallback flag, if it is triggered
-	err = operation.RetryOnConflict(m.db.Update, func(tx *badger.Txn) error {
+	err = operation.WithReaderBatchWriter(m.db, func(rw storage.PebbleReaderBatchWriter) error {
+		_, tx := rw.ReaderWriter()
 		err = operation.IndexBlockHeight(header.Height, blockID)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert number mapping: %w", err)
@@ -1094,7 +1092,7 @@ func (m *FollowerState) versionBeaconOnBlockFinalized(
 //     operations to insert service events for blocks that include them.
 //
 // No errors are expected during normal operation.
-func (m *FollowerState) handleEpochServiceEvents(candidate *flow.Block) (dbUpdates []func(*transaction.Tx) error, err error) {
+func (m *FollowerState) handleEpochServiceEvents(candidate *flow.Block) (dbUpdates []func(storage.PebbleReaderBatchWriter) error, err error) {
 	epochFallbackTriggered, err := m.isEpochEmergencyFallbackTriggered()
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve epoch fallback status: %w", err)
@@ -1112,7 +1110,7 @@ func (m *FollowerState) handleEpochServiceEvents(candidate *flow.Block) (dbUpdat
 	// note: We are scheduling the operation to store the Epoch status using the _pointer_ variable `epochStatus`.
 	// The struct `epochStatus` points to will still be modified below.
 	blockID := candidate.ID()
-	dbUpdates = append(dbUpdates, m.epoch.statuses.StoreTx(blockID, epochStatus))
+	dbUpdates = append(dbUpdates, m.epoch.statuses.StorePebble(blockID, epochStatus))
 
 	// never process service events after epoch fallback is triggered
 	if epochStatus.InvalidServiceEventIncorporated || epochFallbackTriggered {
@@ -1160,7 +1158,7 @@ func (m *FollowerState) handleEpochServiceEvents(candidate *flow.Block) (dbUpdat
 				epochStatus.NextEpoch.SetupID = ev.ID()
 
 				// we'll insert the setup event when we insert the block
-				dbUpdates = append(dbUpdates, m.epoch.setups.StoreTx(ev))
+				dbUpdates = append(dbUpdates, m.epoch.setups.StorePebble(ev))
 
 			case *flow.EpochCommit:
 				// if we receive an EpochCommit event, we must have already observed an EpochSetup event
@@ -1196,7 +1194,7 @@ func (m *FollowerState) handleEpochServiceEvents(candidate *flow.Block) (dbUpdat
 				epochStatus.NextEpoch.CommitID = ev.ID()
 
 				// we'll insert the commit event when we insert the block
-				dbUpdates = append(dbUpdates, m.epoch.commits.StoreTx(ev))
+				dbUpdates = append(dbUpdates, m.epoch.commits.StorePebble(ev))
 			case *flow.VersionBeacon:
 				// do nothing for now
 			default:

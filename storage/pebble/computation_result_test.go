@@ -1,22 +1,21 @@
-package badger_test
+package pebble_test
 
 import (
 	"reflect"
 	"testing"
 
+	"github.com/cockroachdb/pebble"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dgraph-io/badger/v2"
-
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/testutil"
-	bstorage "github.com/onflow/flow-go/storage/badger"
+	bstorage "github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestUpsertAndRetrieveComputationResult(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
 		expected := testutil.ComputationResultFixture(t)
 		crStorage := bstorage.NewComputationResultUploadStatus(db)
 		crId := expected.ExecutableBlock.ID()
@@ -44,7 +43,7 @@ func TestUpsertAndRetrieveComputationResult(t *testing.T) {
 }
 
 func TestRemoveComputationResults(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
 		t.Run("Remove ComputationResult", func(t *testing.T) {
 			expected := testutil.ComputationResultFixture(t)
 			crId := expected.ExecutableBlock.ID()
@@ -67,7 +66,7 @@ func TestRemoveComputationResults(t *testing.T) {
 }
 
 func TestListComputationResults(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
 		t.Run("List all ComputationResult with given status", func(t *testing.T) {
 			expected := [...]*execution.ComputationResult{
 				testutil.ComputationResultFixture(t),

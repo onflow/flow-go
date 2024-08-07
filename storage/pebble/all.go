@@ -1,13 +1,13 @@
-package badger
+package pebble
 
 import (
-	"github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble"
 
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/storage"
 )
 
-func InitAll(metrics module.CacheMetrics, db *badger.DB) *storage.All {
+func InitAll(metrics module.CacheMetrics, db *pebble.DB) *storage.All {
 	headers := NewHeaders(metrics, db)
 	guarantees := NewGuarantees(metrics, db, DefaultCacheSize)
 	seals := NewSeals(metrics, db)

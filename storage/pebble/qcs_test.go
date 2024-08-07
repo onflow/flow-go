@@ -1,28 +1,27 @@
-package badger_test
+package pebble_test
 
 import (
 	"testing"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
-	bstorage "github.com/onflow/flow-go/storage/badger"
-	"github.com/onflow/flow-go/storage/badger/operation"
-	"github.com/onflow/flow-go/storage/badger/transaction"
+	bstorage "github.com/onflow/flow-go/storage/pebble"
+	"github.com/onflow/flow-go/storage/pebble/operation"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
 // TestQuorumCertificates_StoreTx tests storing and retrieving of QC.
 func TestQuorumCertificates_StoreTx(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
 		metrics := metrics.NewNoopCollector()
 		store := bstorage.NewQuorumCertificates(metrics, db, 10)
 		qc := unittest.QuorumCertificateFixture()
 
-		err := operation.RetryOnConflictTx(db, transaction.Update, store.StoreTx(qc))
+		err := operation.WithReaderBatchWriter(db, store.StorePebble(qc))
 		require.NoError(t, err)
 
 		actual, err := store.ByBlockID(qc.BlockID)
@@ -34,8 +33,9 @@ func TestQuorumCertificates_StoreTx(t *testing.T) {
 
 // TestQuorumCertificates_StoreTx_OtherQC checks if storing other QC for same blockID results in
 // expected storage error and already stored value is not overwritten.
+
 func TestQuorumCertificates_StoreTx_OtherQC(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
 		metrics := metrics.NewNoopCollector()
 		store := bstorage.NewQuorumCertificates(metrics, db, 10)
 		qc := unittest.QuorumCertificateFixture()
@@ -44,10 +44,10 @@ func TestQuorumCertificates_StoreTx_OtherQC(t *testing.T) {
 			otherQC.BlockID = qc.BlockID
 		})
 
-		err := operation.RetryOnConflictTx(db, transaction.Update, store.StoreTx(qc))
+		err := operation.WithReaderBatchWriter(db, store.StorePebble(qc))
 		require.NoError(t, err)
 
-		err = operation.RetryOnConflictTx(db, transaction.Update, store.StoreTx(otherQC))
+		err = operation.WithReaderBatchWriter(db, store.StorePebble(otherQC))
 		require.ErrorIs(t, err, storage.ErrAlreadyExists)
 
 		actual, err := store.ByBlockID(otherQC.BlockID)
@@ -59,7 +59,7 @@ func TestQuorumCertificates_StoreTx_OtherQC(t *testing.T) {
 
 // TestQuorumCertificates_ByBlockID that ByBlockID returns correct sentinel error if no QC for given block ID has been found
 func TestQuorumCertificates_ByBlockID(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
 		metrics := metrics.NewNoopCollector()
 		store := bstorage.NewQuorumCertificates(metrics, db, 10)
 

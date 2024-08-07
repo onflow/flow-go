@@ -1,17 +1,17 @@
-package badger
+package pebble
 
 import (
 	"errors"
 	"fmt"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble"
 
 	"github.com/onflow/flow-go/storage"
 )
 
 func handleError(err error, t interface{}) error {
 	if err != nil {
-		if errors.Is(err, badger.ErrKeyNotFound) {
+		if errors.Is(err, pebble.ErrNotFound) {
 			return storage.ErrNotFound
 		}
 

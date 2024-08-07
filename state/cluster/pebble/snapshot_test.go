@@ -1,11 +1,11 @@
-package badger
+package pebble
 
 import (
 	"math"
 	"os"
 	"testing"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 
@@ -15,17 +15,17 @@ import (
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/state/cluster"
 	"github.com/onflow/flow-go/state/protocol"
-	pbadger "github.com/onflow/flow-go/state/protocol/badger"
-	storage "github.com/onflow/flow-go/storage/badger"
-	"github.com/onflow/flow-go/storage/badger/operation"
-	"github.com/onflow/flow-go/storage/badger/procedure"
-	"github.com/onflow/flow-go/storage/util"
+	ppebble "github.com/onflow/flow-go/state/protocol/pebble"
+	storage "github.com/onflow/flow-go/storage/pebble"
+	"github.com/onflow/flow-go/storage/pebble/operation"
+	"github.com/onflow/flow-go/storage/pebble/procedure"
+	"github.com/onflow/flow-go/storage/testingutils"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
 type SnapshotSuite struct {
 	suite.Suite
-	db    *badger.DB
+	db    *pebble.DB
 	dbdir string
 
 	genesis      *model.Block
@@ -45,18 +45,18 @@ func (suite *SnapshotSuite) SetupTest() {
 	suite.chainID = suite.genesis.Header.ChainID
 
 	suite.dbdir = unittest.TempDir(suite.T())
-	suite.db = unittest.BadgerDB(suite.T(), suite.dbdir)
+	suite.db = unittest.PebbleDB(suite.T(), suite.dbdir)
 
 	metrics := metrics.NewNoopCollector()
 	tracer := trace.NewNoopTracer()
 
-	all := util.StorageLayer(suite.T(), suite.db)
+	all := testingutils.PebbleStorageLayer(suite.T(), suite.db)
 	colPayloads := storage.NewClusterPayloads(metrics, suite.db)
 
 	root := unittest.RootSnapshotFixture(unittest.IdentityListFixture(5, unittest.WithAllRoles()))
 	suite.epochCounter = root.Encodable().Epochs.Current.Counter
 
-	suite.protoState, err = pbadger.Bootstrap(
+	suite.protoState, err = ppebble.Bootstrap(
 		metrics,
 		suite.db,
 		all.Headers,
@@ -123,7 +123,7 @@ func (suite *SnapshotSuite) Block() model.Block {
 }
 
 func (suite *SnapshotSuite) InsertBlock(block model.Block) {
-	err := suite.db.Update(procedure.InsertClusterBlock(&block))
+	err := operation.WithReaderBatchWriter(suite.db, procedure.InsertClusterBlock(&block))
 	suite.Assert().Nil(err)
 }
 
@@ -210,7 +210,7 @@ func (suite *SnapshotSuite) TestFinalizedBlock() {
 	assert.Nil(t, err)
 
 	// finalize the block
-	err = suite.db.Update(procedure.FinalizeClusterBlock(finalizedBlock1.ID()))
+	err = operation.WithReaderBatchWriter(suite.db, procedure.FinalizeClusterBlock(finalizedBlock1.ID()))
 	assert.Nil(t, err)
 
 	// get the final snapshot, should map to finalizedBlock1
@@ -277,7 +277,7 @@ func (suite *SnapshotSuite) TestPending_Grandchildren() {
 
 	for _, blockID := range pending {
 		var header flow.Header
-		err := suite.db.View(operation.RetrieveHeader(blockID, &header))
+		err := operation.RetrieveHeader(blockID, &header)(suite.db)
 		suite.Require().Nil(err)
 
 		// we must have already seen the parent

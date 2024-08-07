@@ -6,6 +6,8 @@ import (
 	flow "github.com/onflow/flow-go/model/flow"
 	mock "github.com/stretchr/testify/mock"
 
+	storage "github.com/onflow/flow-go/storage"
+
 	transaction "github.com/onflow/flow-go/storage/badger/transaction"
 )
 
@@ -38,6 +40,22 @@ func (_m *EpochStatuses) ByBlockID(_a0 flow.Identifier) (*flow.EpochStatus, erro
 	}
 
 	return r0, r1
+}
+
+// StorePebble provides a mock function with given fields: blockID, state
+func (_m *EpochStatuses) StorePebble(blockID flow.Identifier, state *flow.EpochStatus) func(storage.PebbleReaderBatchWriter) error {
+	ret := _m.Called(blockID, state)
+
+	var r0 func(storage.PebbleReaderBatchWriter) error
+	if rf, ok := ret.Get(0).(func(flow.Identifier, *flow.EpochStatus) func(storage.PebbleReaderBatchWriter) error); ok {
+		r0 = rf(blockID, state)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(func(storage.PebbleReaderBatchWriter) error)
+		}
+	}
+
+	return r0
 }
 
 // StoreTx provides a mock function with given fields: blockID, state

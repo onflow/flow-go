@@ -1,4 +1,4 @@
-package badger
+package pebble
 
 import (
 	"github.com/onflow/flow-go/model/flow"

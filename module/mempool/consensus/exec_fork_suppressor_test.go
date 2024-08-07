@@ -4,7 +4,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -246,8 +246,7 @@ func Test_ConflictingResults(t *testing.T) {
 // persisted in the data base
 func Test_ForkDetectionPersisted(t *testing.T) {
 	unittest.RunWithTempDir(t, func(dir string) {
-		db := unittest.BadgerDB(t, dir)
-		defer db.Close()
+		db := unittest.PebbleDB(t, dir)
 
 		// initialize ExecForkSuppressor
 		wrappedMempool := &poolmock.IncorporatedResultSeals{}
@@ -280,7 +279,7 @@ func Test_ForkDetectionPersisted(t *testing.T) {
 
 		// crash => re-initialization
 		db.Close()
-		db2 := unittest.BadgerDB(t, dir)
+		db2 := unittest.PebbleDB(t, dir)
 		wrappedMempool2 := &poolmock.IncorporatedResultSeals{}
 		execForkActor2 := &actormock.ExecForkActorMock{}
 		execForkActor2.On("OnExecFork", mock.Anything).
@@ -312,7 +311,7 @@ func Test_AddRemove_SmokeTest(t *testing.T) {
 	onExecFork := func([]*flow.IncorporatedResultSeal) {
 		require.Fail(t, "no call to onExecFork expected ")
 	}
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
 		wrappedMempool := stdmap.NewIncorporatedResultSeals(100)
 		wrapper, err := NewExecStateForkSuppressor(wrappedMempool, onExecFork, db, zerolog.New(os.Stderr))
 		require.NoError(t, err)
@@ -349,7 +348,7 @@ func Test_AddRemove_SmokeTest(t *testing.T) {
 // ExecForkSuppressor. We wrap stdmap.IncorporatedResultSeals with consensus.IncorporatedResultSeals which is wrapped with ExecForkSuppressor.
 // Test adding conflicting seals with different number of matching receipts.
 func Test_ConflictingSeal_SmokeTest(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
 		executingForkDetected := atomic.NewBool(false)
 		onExecFork := func([]*flow.IncorporatedResultSeal) {
 			executingForkDetected.Store(true)
@@ -420,7 +419,7 @@ func Test_ConflictingSeal_SmokeTest(t *testing.T) {
 //  3. ensures that initializing the wrapper did not error
 //  4. executes the `testLogic`
 func WithExecStateForkSuppressor(t testing.TB, testLogic func(wrapper *ExecForkSuppressor, wrappedMempool *poolmock.IncorporatedResultSeals, execForkActor *actormock.ExecForkActorMock)) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
 		wrappedMempool := &poolmock.IncorporatedResultSeals{}
 		execForkActor := &actormock.ExecForkActorMock{}
 		wrapper, err := NewExecStateForkSuppressor(wrappedMempool, execForkActor.OnExecFork, db, zerolog.New(os.Stderr))

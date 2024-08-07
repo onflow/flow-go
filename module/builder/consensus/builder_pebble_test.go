@@ -5,7 +5,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -20,16 +20,16 @@ import (
 	realproto "github.com/onflow/flow-go/state/protocol"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	storerr "github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/badger/operation"
 	storage "github.com/onflow/flow-go/storage/mock"
+	"github.com/onflow/flow-go/storage/pebble/operation"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func TestConsensusBuilder(t *testing.T) {
-	suite.Run(t, new(BuilderSuite))
+func TestConsensusBuilderPebble(t *testing.T) {
+	suite.Run(t, new(BuilderSuitePebble))
 }
 
-type BuilderSuite struct {
+type BuilderSuitePebble struct {
 	suite.Suite
 
 	// test helpers
@@ -63,7 +63,7 @@ type BuilderSuite struct {
 
 	// real dependencies
 	dir      string
-	db       *badger.DB
+	db       *pebble.DB
 	sentinel uint64
 	setter   func(*flow.Header) error
 
@@ -84,10 +84,10 @@ type BuilderSuite struct {
 	assembled *flow.Payload // built payload
 
 	// component under test
-	build *Builder
+	build *BuilderPebble
 }
 
-func (bs *BuilderSuite) storeBlock(block *flow.Block) {
+func (bs *BuilderSuitePebble) storeBlock(block *flow.Block) {
 	bs.headers[block.ID()] = block.Header
 	bs.blocks[block.ID()] = block
 	bs.index[block.ID()] = block.Payload.Index()
@@ -102,7 +102,7 @@ func (bs *BuilderSuite) storeBlock(block *flow.Block) {
 // block, which is also used to create a seal for the previous block. The seal
 // and the result are combined in an IncorporatedResultSeal which is a candidate
 // for the seals mempool.
-func (bs *BuilderSuite) createAndRecordBlock(parentBlock *flow.Block, candidateSealForParent bool) *flow.Block {
+func (bs *BuilderSuitePebble) createAndRecordBlock(parentBlock *flow.Block, candidateSealForParent bool) *flow.Block {
 	block := unittest.BlockWithParentFixture(parentBlock.Header)
 
 	// Create a receipt for a result of the parentBlock block,
@@ -146,7 +146,7 @@ func (bs *BuilderSuite) createAndRecordBlock(parentBlock *flow.Block, candidateS
 // Create a seal for the result's block. The corresponding
 // IncorporatedResultSeal, which ties the seal to the incorporated result it
 // seals, is also recorded for future access.
-func (bs *BuilderSuite) chainSeal(incorporatedResult *flow.IncorporatedResult) {
+func (bs *BuilderSuitePebble) chainSeal(incorporatedResult *flow.IncorporatedResult) {
 	incorporatedResultSeal := unittest.IncorporatedResultSeal.Fixture(
 		unittest.IncorporatedResultSeal.WithResult(incorporatedResult.Result),
 		unittest.IncorporatedResultSeal.WithIncorporatedBlockID(incorporatedResult.IncorporatedBlockID),
@@ -172,7 +172,7 @@ func (bs *BuilderSuite) chainSeal(incorporatedResult *flow.IncorporatedResult) {
 // Note: In the happy path, the blocks [A3] and [parent] will not have candidate seal for the following reason:
 // For the verifiers to start checking a result R, they need a source of randomness for the block _incorporating_
 // result R. The result for block [A3] is incorporated in [parent], which does _not_ have a child yet.
-func (bs *BuilderSuite) SetupTest() {
+func (bs *BuilderSuitePebble) SetupTest() {
 
 	// set up no-op dependencies
 	noopMetrics := metrics.NewNoopCollector()
@@ -244,19 +244,19 @@ func (bs *BuilderSuite) SetupTest() {
 	bs.parentID = parent.ID()
 
 	// set up temporary database for tests
-	bs.db, bs.dir = unittest.TempBadgerDB(bs.T())
+	bs.db, bs.dir = unittest.TempPebbleDBWithOpts(bs.T(), &pebble.Options{})
 
-	err := bs.db.Update(operation.InsertFinalizedHeight(final.Header.Height))
+	err := operation.InsertFinalizedHeight(final.Header.Height)(bs.db)
 	bs.Require().NoError(err)
-	err = bs.db.Update(operation.IndexBlockHeight(final.Header.Height, bs.finalID))
-	bs.Require().NoError(err)
-
-	err = bs.db.Update(operation.InsertRootHeight(13))
+	err = operation.IndexBlockHeight(final.Header.Height, bs.finalID)(bs.db)
 	bs.Require().NoError(err)
 
-	err = bs.db.Update(operation.InsertSealedHeight(first.Header.Height))
+	err = operation.InsertRootHeight(13)(bs.db)
 	bs.Require().NoError(err)
-	err = bs.db.Update(operation.IndexBlockHeight(first.Header.Height, first.ID()))
+
+	err = operation.InsertSealedHeight(first.Header.Height)(bs.db)
+	bs.Require().NoError(err)
+	err = operation.IndexBlockHeight(first.Header.Height, first.ID())(bs.db)
 	bs.Require().NoError(err)
 
 	bs.sentinel = 1337
@@ -410,7 +410,7 @@ func (bs *BuilderSuite) SetupTest() {
 	)
 
 	// initialize the builder
-	bs.build, err = NewBuilder(
+	bs.build, err = NewBuilderPebble(
 		noopMetrics,
 		bs.db,
 		bs.state,
@@ -430,14 +430,14 @@ func (bs *BuilderSuite) SetupTest() {
 	bs.build.cfg.expiry = 11
 }
 
-func (bs *BuilderSuite) TearDownTest() {
+func (bs *BuilderSuitePebble) TearDownTest() {
 	err := bs.db.Close()
 	bs.Assert().NoError(err)
 	err = os.RemoveAll(bs.dir)
 	bs.Assert().NoError(err)
 }
 
-func (bs *BuilderSuite) TestPayloadEmptyValid() {
+func (bs *BuilderSuitePebble) TestPayloadEmptyValid() {
 
 	// we should build an empty block with default setup
 	_, err := bs.build.BuildOn(bs.parentID, bs.setter)
@@ -446,7 +446,7 @@ func (bs *BuilderSuite) TestPayloadEmptyValid() {
 	bs.Assert().Empty(bs.assembled.Seals, "should have no seals in payload with empty mempool")
 }
 
-func (bs *BuilderSuite) TestPayloadGuaranteeValid() {
+func (bs *BuilderSuitePebble) TestPayloadGuaranteeValid() {
 
 	// add sixteen guarantees to the pool
 	bs.pendingGuarantees = unittest.CollectionGuaranteesFixture(16, unittest.WithCollRef(bs.finalID))
@@ -455,7 +455,7 @@ func (bs *BuilderSuite) TestPayloadGuaranteeValid() {
 	bs.Assert().ElementsMatch(bs.pendingGuarantees, bs.assembled.Guarantees, "should have guarantees from mempool in payload")
 }
 
-func (bs *BuilderSuite) TestPayloadGuaranteeDuplicate() {
+func (bs *BuilderSuitePebble) TestPayloadGuaranteeDuplicate() {
 
 	// create some valid guarantees
 	valid := unittest.CollectionGuaranteesFixture(4, unittest.WithCollRef(bs.finalID))
@@ -478,7 +478,7 @@ func (bs *BuilderSuite) TestPayloadGuaranteeDuplicate() {
 	bs.Assert().ElementsMatch(valid, bs.assembled.Guarantees, "should have valid guarantees from mempool in payload")
 }
 
-func (bs *BuilderSuite) TestPayloadGuaranteeReferenceUnknown() {
+func (bs *BuilderSuitePebble) TestPayloadGuaranteeReferenceUnknown() {
 
 	// create 12 valid guarantees
 	valid := unittest.CollectionGuaranteesFixture(12, unittest.WithCollRef(bs.finalID))
@@ -493,7 +493,7 @@ func (bs *BuilderSuite) TestPayloadGuaranteeReferenceUnknown() {
 	bs.Assert().ElementsMatch(valid, bs.assembled.Guarantees, "should have valid from mempool in payload")
 }
 
-func (bs *BuilderSuite) TestPayloadGuaranteeReferenceExpired() {
+func (bs *BuilderSuitePebble) TestPayloadGuaranteeReferenceExpired() {
 
 	// create 12 valid guarantees
 	valid := unittest.CollectionGuaranteesFixture(12, unittest.WithCollRef(bs.finalID))
@@ -528,7 +528,7 @@ func (bs *BuilderSuite) TestPayloadGuaranteeReferenceExpired() {
 //     their work, they need a child block of A4, because the child contains the source of randomness for
 //     A4. But we are just constructing this child right now. Hence, the verifiers couldn't have checked
 //     the result for A3.
-func (bs *BuilderSuite) TestPayloadSeals_AllValid() {
+func (bs *BuilderSuitePebble) TestPayloadSeals_AllValid() {
 	//	Populate seals mempool with valid chain of seals for blocks [F0], ..., [A2]
 	bs.pendingSeals = bs.irsMap
 
@@ -539,7 +539,7 @@ func (bs *BuilderSuite) TestPayloadSeals_AllValid() {
 }
 
 // TestPayloadSeals_Limit verifies that builder does not exceed  maxSealLimit
-func (bs *BuilderSuite) TestPayloadSeals_Limit() {
+func (bs *BuilderSuitePebble) TestPayloadSeals_Limit() {
 	// use valid chain of seals in mempool
 	bs.pendingSeals = bs.irsMap
 
@@ -555,7 +555,7 @@ func (bs *BuilderSuite) TestPayloadSeals_Limit() {
 
 // TestPayloadSeals_OnlyFork checks that the builder only includes seals corresponding
 // to blocks on the current fork (and _not_ seals for sealable blocks on other forks)
-func (bs *BuilderSuite) TestPayloadSeals_OnlyFork() {
+func (bs *BuilderSuitePebble) TestPayloadSeals_OnlyFork() {
 	// in the test setup, we already created a single fork
 	//    [first] <- [F0] <- [F1] <- [F2] <- [F3] <- [final] <- [A0] <- [A1] <- [A2] ..
 	// For this test, we add fork:                        ^
@@ -618,7 +618,7 @@ func (bs *BuilderSuite) TestPayloadSeals_OnlyFork() {
 //
 //	 (i) Builder does _not_ include seal for B1 when constructing block B5
 //	(ii) Builder _includes_ seal for B1 when constructing block B6
-func (bs *BuilderSuite) TestPayloadSeals_EnforceGap() {
+func (bs *BuilderSuitePebble) TestPayloadSeals_EnforceGap() {
 	// we use bs.parentID as block B0
 	b0result := bs.resultForBlock[bs.parentID]
 	b0seal := unittest.Seal.Fixture(unittest.Seal.WithResult(b0result))
@@ -683,7 +683,7 @@ func (bs *BuilderSuite) TestPayloadSeals_EnforceGap() {
 //
 // Expected behaviour:
 //   - builder should only include seals [A0], ..., [A3]
-func (bs *BuilderSuite) TestPayloadSeals_Duplicate() {
+func (bs *BuilderSuitePebble) TestPayloadSeals_Duplicate() {
 	//	Pretend that the first n blocks are already sealed
 	n := 4
 	lastSeal := bs.chain[n-1]
@@ -711,7 +711,7 @@ func (bs *BuilderSuite) TestPayloadSeals_Duplicate() {
 //
 // Expected behaviour:
 //   - builder should not include any seals as the immediately next seal is not in mempool
-func (bs *BuilderSuite) TestPayloadSeals_MissingNextSeal() {
+func (bs *BuilderSuitePebble) TestPayloadSeals_MissingNextSeal() {
 	// remove the seal for block [F0]
 	firstSeal := bs.irsList[0]
 	delete(bs.irsMap, firstSeal.ID())
@@ -735,7 +735,7 @@ func (bs *BuilderSuite) TestPayloadSeals_MissingNextSeal() {
 //
 // Expected behaviour:
 //   - builder should only include candidate seals for [F0], [F1], [F2]
-func (bs *BuilderSuite) TestPayloadSeals_MissingInterimSeal() {
+func (bs *BuilderSuitePebble) TestPayloadSeals_MissingInterimSeal() {
 	// remove a seal for block [F4]
 	seal := bs.irsList[3]
 	delete(bs.irsMap, seal.ID())
@@ -774,7 +774,7 @@ func (bs *BuilderSuite) TestPayloadSeals_MissingInterimSeal() {
 //
 // (i) verify that execution fork conflicting with sealed result is not sealed
 // (ii) verify that multiple execution forks are properly handled
-func (bs *BuilderSuite) TestValidatePayloadSeals_ExecutionForks() {
+func (bs *BuilderSuitePebble) TestValidatePayloadSeals_ExecutionForks() {
 	bs.build.cfg.expiry = 4 // reduce expiry so collection dedup algorithm doesn't walk past  [lastSeal]
 
 	blockF := bs.blocks[bs.finalID]
@@ -842,9 +842,9 @@ func (bs *BuilderSuite) TestValidatePayloadSeals_ExecutionForks() {
 //	 [lastSeal] <- [F0] <- [F1] <- [F2] <- [F3] <- [F4] <- [A0] <- [A1{seals ..F2}] <- [A2] <- [A3]
 //
 // Where
-// * blocks [lastSeal], [F1], ... [F4], [A0], ... [A4], are created by BuilderSuite
+// * blocks [lastSeal], [F1], ... [F4], [A0], ... [A4], are created by BuilderSuitePebble
 // * latest sealed block for a specific fork is provided by test-local seals storage mock
-func (bs *BuilderSuite) TestPayloadReceipts_TraverseExecutionTreeFromLastSealedResult() {
+func (bs *BuilderSuitePebble) TestPayloadReceipts_TraverseExecutionTreeFromLastSealedResult() {
 	bs.build.cfg.expiry = 4 // reduce expiry so collection dedup algorithm doesn't walk past  [lastSeal]
 	x0 := bs.createAndRecordBlock(bs.blocks[bs.finalID], true)
 	x1 := bs.createAndRecordBlock(x0, true)
@@ -900,7 +900,7 @@ func (bs *BuilderSuite) TestPayloadReceipts_TraverseExecutionTreeFromLastSealedR
 // Context:
 // While the receipt selection itself is performed by the ExecutionTree, the Builder
 // controls the selection by providing suitable BlockFilter and ReceiptFilter.
-func (bs *BuilderSuite) TestPayloadReceipts_IncludeOnlyReceiptsForCurrentFork() {
+func (bs *BuilderSuitePebble) TestPayloadReceipts_IncludeOnlyReceiptsForCurrentFork() {
 	b1 := bs.createAndRecordBlock(bs.blocks[bs.finalID], true)
 	b2 := bs.createAndRecordBlock(b1, true)
 	b3 := bs.createAndRecordBlock(b2, true)
@@ -947,7 +947,7 @@ func (bs *BuilderSuite) TestPayloadReceipts_IncludeOnlyReceiptsForCurrentFork() 
 // Comment:
 // While the receipt selection itself is performed by the ExecutionTree, the Builder
 // controls the selection by providing suitable BlockFilter and ReceiptFilter.
-func (bs *BuilderSuite) TestPayloadReceipts_SkipDuplicatedReceipts() {
+func (bs *BuilderSuitePebble) TestPayloadReceipts_SkipDuplicatedReceipts() {
 	// setup mock to test the ReceiptFilter provided by Builder
 	bs.recPool = &mempool.ExecutionTree{}
 	bs.recPool.On("Size").Return(uint(0)).Maybe()
@@ -985,7 +985,7 @@ func (bs *BuilderSuite) TestPayloadReceipts_SkipDuplicatedReceipts() {
 // Comment:
 // While the receipt selection itself is performed by the ExecutionTree, the Builder
 // controls the selection by providing suitable BlockFilter and ReceiptFilter.
-func (bs *BuilderSuite) TestPayloadReceipts_SkipReceiptsForSealedBlock() {
+func (bs *BuilderSuitePebble) TestPayloadReceipts_SkipReceiptsForSealedBlock() {
 	// setup mock to test the ReceiptFilter provided by Builder
 	bs.recPool = &mempool.ExecutionTree{}
 	bs.recPool.On("Size").Return(uint(0)).Maybe()
@@ -1010,7 +1010,7 @@ func (bs *BuilderSuite) TestPayloadReceipts_SkipReceiptsForSealedBlock() {
 
 // TestPayloadReceipts_BlockLimit tests that the builder does not include more
 // receipts than the configured maxReceiptCount.
-func (bs *BuilderSuite) TestPayloadReceipts_BlockLimit() {
+func (bs *BuilderSuitePebble) TestPayloadReceipts_BlockLimit() {
 
 	// Populate the mempool with 5 valid receipts
 	receipts := []*flow.ExecutionReceipt{}
@@ -1039,7 +1039,7 @@ func (bs *BuilderSuite) TestPayloadReceipts_BlockLimit() {
 
 // TestPayloadReceipts_AsProvidedByReceiptForest tests the receipt selection.
 // Expectation: Builder should embed the Receipts as provided by the ExecutionTree
-func (bs *BuilderSuite) TestPayloadReceipts_AsProvidedByReceiptForest() {
+func (bs *BuilderSuitePebble) TestPayloadReceipts_AsProvidedByReceiptForest() {
 	var expectedReceipts []*flow.ExecutionReceipt
 	var expectedMetas []*flow.ExecutionReceiptMeta
 	var expectedResults []*flow.ExecutionResult
@@ -1076,7 +1076,7 @@ func (bs *BuilderSuite) TestPayloadReceipts_AsProvidedByReceiptForest() {
 // the parent result (block B's result).
 //
 // ... <- S[ER{parent}] <- A[ER{S}] <- B <- C <- X (candidate)
-func (bs *BuilderSuite) TestIntegration_PayloadReceiptNoParentResult() {
+func (bs *BuilderSuitePebble) TestIntegration_PayloadReceiptNoParentResult() {
 	// make blocks S, A, B, C
 	parentReceipt := unittest.ExecutionReceiptFixture(unittest.WithResult(bs.resultForBlock[bs.parentID]))
 	blockSABC := unittest.ChainFixtureFrom(4, bs.blocks[bs.parentID].Header)
@@ -1124,7 +1124,7 @@ func (bs *BuilderSuite) TestIntegration_PayloadReceiptNoParentResult() {
 //
 //	                                      candidate
 //	P <- A[ER{P}] <- B[ER{A}, ER{A}'] <- X[ER{B}, ER{B}']
-func (bs *BuilderSuite) TestIntegration_ExtendDifferentExecutionPathsOnSameFork() {
+func (bs *BuilderSuitePebble) TestIntegration_ExtendDifferentExecutionPathsOnSameFork() {
 
 	// A is a block containing a valid receipt for block P
 	recP := unittest.ExecutionReceiptFixture(unittest.WithResult(bs.resultForBlock[bs.parentID]))
@@ -1201,7 +1201,7 @@ func (bs *BuilderSuite) TestIntegration_ExtendDifferentExecutionPathsOnSameFork(
 //	ER{P} <- ER{A}  <- ER{B}
 //	       |
 //	       < ER{A}' <- ER{B}'
-func (bs *BuilderSuite) TestIntegration_ExtendDifferentExecutionPathsOnDifferentForks() {
+func (bs *BuilderSuitePebble) TestIntegration_ExtendDifferentExecutionPathsOnDifferentForks() {
 	// A is a block containing a valid receipt for block P
 	recP := unittest.ExecutionReceiptFixture(unittest.WithResult(bs.resultForBlock[bs.parentID]))
 	A := unittest.BlockWithParentFixture(bs.headers[bs.parentID])
@@ -1269,7 +1269,7 @@ func (bs *BuilderSuite) TestIntegration_ExtendDifferentExecutionPathsOnDifferent
 // receipts that are already incorporated in blocks on the fork.
 //
 //	P <- A(r_P) <- B(r_A) <- X (candidate)
-func (bs *BuilderSuite) TestIntegration_DuplicateReceipts() {
+func (bs *BuilderSuitePebble) TestIntegration_DuplicateReceipts() {
 	// A is a block containing a valid receipt for block P
 	recP := unittest.ExecutionReceiptFixture(unittest.WithResult(bs.resultForBlock[bs.parentID]))
 	A := unittest.BlockWithParentFixture(bs.headers[bs.parentID])
@@ -1314,7 +1314,7 @@ func (bs *BuilderSuite) TestIntegration_DuplicateReceipts() {
 // receipts for results that were already incorporated in blocks on the fork.
 //
 //	P <- A(ER[P]) <- X (candidate)
-func (bs *BuilderSuite) TestIntegration_ResultAlreadyIncorporated() {
+func (bs *BuilderSuitePebble) TestIntegration_ResultAlreadyIncorporated() {
 	// A is a block containing a valid receipt for block P
 	recP := unittest.ExecutionReceiptFixture(unittest.WithResult(bs.resultForBlock[bs.parentID]))
 	A := unittest.BlockWithParentFixture(bs.headers[bs.parentID])
@@ -1350,15 +1350,6 @@ func (bs *BuilderSuite) TestIntegration_ResultAlreadyIncorporated() {
 	bs.Assert().ElementsMatch(expectedResults, bs.assembled.Results, "builder should not include results that were already incorporated")
 }
 
-func storeSealForIncorporatedResult(result *flow.ExecutionResult, incorporatingBlockID flow.Identifier, pendingSeals map[flow.Identifier]*flow.IncorporatedResultSeal) *flow.IncorporatedResultSeal {
-	incorporatedResultSeal := unittest.IncorporatedResultSeal.Fixture(
-		unittest.IncorporatedResultSeal.WithResult(result),
-		unittest.IncorporatedResultSeal.WithIncorporatedBlockID(incorporatingBlockID),
-	)
-	pendingSeals[incorporatedResultSeal.ID()] = incorporatedResultSeal
-	return incorporatedResultSeal
-}
-
 // TestIntegration_RepopulateExecutionTreeAtStartup tests that the
 // builder includes receipts for candidate block after fresh start, meaning
 // it will repopulate execution tree in constructor
@@ -1366,7 +1357,7 @@ func storeSealForIncorporatedResult(result *flow.ExecutionResult, incorporatingB
 //	P <- A[ER{P}] <- B[ER{A}, ER{A}'] <- C <- X[ER{B}, ER{B}', ER{C} ]
 //	       |
 //	   finalized
-func (bs *BuilderSuite) TestIntegration_RepopulateExecutionTreeAtStartup() {
+func (bs *BuilderSuitePebble) TestIntegration_RepopulateExecutionTreeAtStartup() {
 	// setup initial state
 	// A is a block containing a valid receipt for block P
 	recP := unittest.ExecutionReceiptFixture(unittest.WithResult(bs.resultForBlock[bs.parentID]))
@@ -1421,7 +1412,7 @@ func (bs *BuilderSuite) TestIntegration_RepopulateExecutionTreeAtStartup() {
 
 	// create builder which has to repopulate execution tree
 	var err error
-	bs.build, err = NewBuilder(
+	bs.build, err = NewBuilderPebble(
 		noopMetrics,
 		bs.db,
 		bs.state,

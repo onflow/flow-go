@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble"
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 	entitiesproto "github.com/onflow/flow/protobuf/go/flow/entities"
@@ -32,9 +32,9 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	realstate "github.com/onflow/flow-go/state"
-	bprotocol "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/invalid"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
+	bprotocol "github.com/onflow/flow-go/state/protocol/pebble"
 	"github.com/onflow/flow-go/state/protocol/snapshots"
 	"github.com/onflow/flow-go/state/protocol/util"
 	"github.com/onflow/flow-go/storage"
@@ -165,7 +165,7 @@ func (suite *Suite) TestGetLatestFinalizedBlockHeader() {
 func (suite *Suite) TestGetLatestProtocolStateSnapshot_NoTransitionSpan() {
 	identities := unittest.CompleteIdentitySet()
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
-	util.RunWithFullProtocolState(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
+	util.RunWithPebbleFullProtocolState(suite.T(), rootSnapshot, func(db *pebble.DB, state *bprotocol.ParticipantState) {
 		epochBuilder := unittest.NewEpochBuilder(suite.T(), state)
 		// build epoch 1
 		// Blocks in current State
@@ -212,7 +212,7 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_NoTransitionSpan() {
 func (suite *Suite) TestGetLatestProtocolStateSnapshot_TransitionSpans() {
 	identities := unittest.CompleteIdentitySet()
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
-	util.RunWithFullProtocolState(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
+	util.RunWithPebbleFullProtocolState(suite.T(), rootSnapshot, func(db *pebble.DB, state *bprotocol.ParticipantState) {
 		epochBuilder := unittest.NewEpochBuilder(suite.T(), state)
 
 		// building 2 epochs allows us to take a snapshot at a point in time where
@@ -268,7 +268,7 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_TransitionSpans() {
 func (suite *Suite) TestGetLatestProtocolStateSnapshot_PhaseTransitionSpan() {
 	identities := unittest.CompleteIdentitySet()
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
-	util.RunWithFullProtocolState(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
+	util.RunWithPebbleFullProtocolState(suite.T(), rootSnapshot, func(db *pebble.DB, state *bprotocol.ParticipantState) {
 		epochBuilder := unittest.NewEpochBuilder(suite.T(), state)
 		// build epoch 1
 		// Blocks in current State
@@ -316,7 +316,7 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_PhaseTransitionSpan() {
 func (suite *Suite) TestGetLatestProtocolStateSnapshot_EpochTransitionSpan() {
 	identities := unittest.CompleteIdentitySet()
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
-	util.RunWithFullProtocolState(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
+	util.RunWithPebbleFullProtocolState(suite.T(), rootSnapshot, func(db *pebble.DB, state *bprotocol.ParticipantState) {
 		epochBuilder := unittest.NewEpochBuilder(suite.T(), state)
 		// build epoch 1
 		// Blocks in current State
@@ -376,7 +376,7 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_EpochTransitionSpan() {
 func (suite *Suite) TestGetLatestProtocolStateSnapshot_HistoryLimit() {
 	identities := unittest.CompleteIdentitySet()
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
-	util.RunWithFullProtocolState(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
+	util.RunWithPebbleFullProtocolState(suite.T(), rootSnapshot, func(db *pebble.DB, state *bprotocol.ParticipantState) {
 		epochBuilder := unittest.NewEpochBuilder(suite.T(), state).BuildEpoch().CompleteEpoch()
 
 		// get heights of each phase in built epochs
@@ -412,7 +412,7 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot_HistoryLimit() {
 func (suite *Suite) TestGetProtocolStateSnapshotByBlockID() {
 	identities := unittest.CompleteIdentitySet()
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
-	util.RunWithFullProtocolState(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
+	util.RunWithPebbleFullProtocolState(suite.T(), rootSnapshot, func(db *pebble.DB, state *bprotocol.ParticipantState) {
 		epochBuilder := unittest.NewEpochBuilder(suite.T(), state)
 		// build epoch 1
 		// Blocks in current State
@@ -463,7 +463,7 @@ func (suite *Suite) TestGetProtocolStateSnapshotByBlockID() {
 func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_UnknownQueryBlock() {
 	identities := unittest.CompleteIdentitySet()
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
-	util.RunWithFullProtocolState(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
+	util.RunWithPebbleFullProtocolState(suite.T(), rootSnapshot, func(db *pebble.DB, state *bprotocol.ParticipantState) {
 		rootBlock, err := rootSnapshot.Head()
 		suite.Require().NoError(err)
 
@@ -495,7 +495,7 @@ func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_UnknownQueryBlock() {
 func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_AtBlockIDInternalError() {
 	identities := unittest.CompleteIdentitySet()
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
-	util.RunWithFullProtocolState(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
+	util.RunWithPebbleFullProtocolState(suite.T(), rootSnapshot, func(db *pebble.DB, state *bprotocol.ParticipantState) {
 		params := suite.defaultBackendParams()
 		params.MaxHeightRange = TEST_MAX_HEIGHT
 
@@ -523,7 +523,7 @@ func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_AtBlockIDInternalError
 func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_BlockNotFinalizedAtHeight() {
 	identities := unittest.CompleteIdentitySet()
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
-	util.RunWithFullProtocolState(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
+	util.RunWithPebbleFullProtocolState(suite.T(), rootSnapshot, func(db *pebble.DB, state *bprotocol.ParticipantState) {
 		rootBlock, err := rootSnapshot.Head()
 		suite.Require().NoError(err)
 
@@ -558,7 +558,7 @@ func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_BlockNotFinalizedAtHei
 func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_DifferentBlockFinalizedAtHeight() {
 	identities := unittest.CompleteIdentitySet()
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
-	util.RunWithFullProtocolState(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
+	util.RunWithPebbleFullProtocolState(suite.T(), rootSnapshot, func(db *pebble.DB, state *bprotocol.ParticipantState) {
 		rootBlock, err := rootSnapshot.Head()
 		suite.Require().NoError(err)
 
@@ -604,7 +604,7 @@ func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_DifferentBlockFinalize
 func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_UnexpectedErrorBlockIDByHeight() {
 	identities := unittest.CompleteIdentitySet()
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
-	util.RunWithFullProtocolState(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
+	util.RunWithPebbleFullProtocolState(suite.T(), rootSnapshot, func(db *pebble.DB, state *bprotocol.ParticipantState) {
 		rootBlock, err := rootSnapshot.Head()
 		suite.Require().NoError(err)
 
@@ -641,7 +641,7 @@ func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_UnexpectedErrorBlockID
 func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_InvalidSegment() {
 	identities := unittest.CompleteIdentitySet()
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
-	util.RunWithFullProtocolState(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
+	util.RunWithPebbleFullProtocolState(suite.T(), rootSnapshot, func(db *pebble.DB, state *bprotocol.ParticipantState) {
 		epochBuilder := unittest.NewEpochBuilder(suite.T(), state)
 		// build epoch 1
 		// Blocks in current State
@@ -710,7 +710,7 @@ func (suite *Suite) TestGetProtocolStateSnapshotByBlockID_InvalidSegment() {
 func (suite *Suite) TestGetProtocolStateSnapshotByHeight() {
 	identities := unittest.CompleteIdentitySet()
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
-	util.RunWithFullProtocolState(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
+	util.RunWithPebbleFullProtocolState(suite.T(), rootSnapshot, func(db *pebble.DB, state *bprotocol.ParticipantState) {
 		epochBuilder := unittest.NewEpochBuilder(suite.T(), state)
 		// build epoch 1
 		// Blocks in current State
@@ -753,7 +753,7 @@ func (suite *Suite) TestGetProtocolStateSnapshotByHeight() {
 func (suite *Suite) TestGetProtocolStateSnapshotByHeight_NonFinalizedBlocks() {
 	identities := unittest.CompleteIdentitySet()
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
-	util.RunWithFullProtocolState(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
+	util.RunWithPebbleFullProtocolState(suite.T(), rootSnapshot, func(db *pebble.DB, state *bprotocol.ParticipantState) {
 		rootBlock, err := rootSnapshot.Head()
 		suite.Require().NoError(err)
 		// create a new block with root block as parent
@@ -788,7 +788,7 @@ func (suite *Suite) TestGetProtocolStateSnapshotByHeight_NonFinalizedBlocks() {
 func (suite *Suite) TestGetProtocolStateSnapshotByHeight_InvalidSegment() {
 	identities := unittest.CompleteIdentitySet()
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
-	util.RunWithFullProtocolState(suite.T(), rootSnapshot, func(db *badger.DB, state *bprotocol.ParticipantState) {
+	util.RunWithPebbleFullProtocolState(suite.T(), rootSnapshot, func(db *pebble.DB, state *bprotocol.ParticipantState) {
 		epochBuilder := unittest.NewEpochBuilder(suite.T(), state)
 		// build epoch 1
 		// Blocks in current State

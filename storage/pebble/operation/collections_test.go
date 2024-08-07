@@ -1,11 +1,9 @@
-// (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
-
 package operation
 
 import (
 	"testing"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -14,32 +12,32 @@ import (
 )
 
 func TestCollections(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
 		expected := unittest.CollectionFixture(2).Light()
 
 		t.Run("Retrieve nonexistant", func(t *testing.T) {
 			var actual flow.LightCollection
-			err := db.View(RetrieveCollection(expected.ID(), &actual))
+			err := RetrieveCollection(expected.ID(), &actual)(db)
 			assert.Error(t, err)
 		})
 
 		t.Run("Save", func(t *testing.T) {
-			err := db.Update(InsertCollection(&expected))
+			err := InsertCollection(&expected)(db)
 			require.NoError(t, err)
 
 			var actual flow.LightCollection
-			err = db.View(RetrieveCollection(expected.ID(), &actual))
+			err = RetrieveCollection(expected.ID(), &actual)(db)
 			assert.NoError(t, err)
 
 			assert.Equal(t, expected, actual)
 		})
 
 		t.Run("Remove", func(t *testing.T) {
-			err := db.Update(RemoveCollection(expected.ID()))
+			err := RemoveCollection(expected.ID())(db)
 			require.NoError(t, err)
 
 			var actual flow.LightCollection
-			err = db.View(RetrieveCollection(expected.ID(), &actual))
+			err = RetrieveCollection(expected.ID(), &actual)(db)
 			assert.Error(t, err)
 		})
 
@@ -47,7 +45,7 @@ func TestCollections(t *testing.T) {
 			expected := unittest.CollectionFixture(1).Light()
 			blockID := unittest.IdentifierFixture()
 
-			_ = db.Update(func(tx *badger.Txn) error {
+			_ = BatchUpdate(db, func(tx pebble.Writer) error {
 				err := InsertCollection(&expected)(tx)
 				assert.Nil(t, err)
 				err = IndexCollectionPayload(blockID, expected.Transactions)(tx)
@@ -56,7 +54,7 @@ func TestCollections(t *testing.T) {
 			})
 
 			var actual flow.LightCollection
-			err := db.View(LookupCollectionPayload(blockID, &actual.Transactions))
+			err := LookupCollectionPayload(blockID, &actual.Transactions)(db)
 			assert.Nil(t, err)
 
 			assert.Equal(t, expected, actual)
@@ -67,13 +65,10 @@ func TestCollections(t *testing.T) {
 			transactionID := unittest.IdentifierFixture()
 			actual := flow.Identifier{}
 
-			_ = db.Update(func(tx *badger.Txn) error {
-				err := IndexCollectionByTransaction(transactionID, expected)(tx)
-				assert.Nil(t, err)
-				err = RetrieveCollectionID(transactionID, &actual)(tx)
-				assert.Nil(t, err)
-				return nil
-			})
+			err := IndexCollectionByTransaction(transactionID, expected)(db)
+			assert.Nil(t, err)
+			err = RetrieveCollectionID(transactionID, &actual)(db)
+			assert.Nil(t, err)
 			assert.Equal(t, expected, actual)
 		})
 	})

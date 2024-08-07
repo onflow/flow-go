@@ -1,10 +1,10 @@
-package badger_test
+package pebble_test
 
 import (
 	"errors"
 	"testing"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -12,13 +12,13 @@ import (
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/unittest"
 
-	badgerstorage "github.com/onflow/flow-go/storage/badger"
+	pebblestorage "github.com/onflow/flow-go/storage/pebble"
 )
 
 func TestTransactionStoreRetrieve(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
 		metrics := metrics.NewNoopCollector()
-		store := badgerstorage.NewTransactions(metrics, db)
+		store := pebblestorage.NewTransactions(metrics, db)
 
 		// store a transaction in db
 		expected := unittest.TransactionFixture()
@@ -37,9 +37,9 @@ func TestTransactionStoreRetrieve(t *testing.T) {
 }
 
 func TestTransactionRetrieveWithoutStore(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
 		metrics := metrics.NewNoopCollector()
-		store := badgerstorage.NewTransactions(metrics, db)
+		store := pebblestorage.NewTransactions(metrics, db)
 
 		// attempt to get a invalid transaction
 		_, err := store.ByID(unittest.IdentifierFixture())

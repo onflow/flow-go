@@ -3,7 +3,7 @@ package procedure
 import (
 	"testing"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -11,15 +11,15 @@ import (
 )
 
 func TestInsertRetrieveIndex(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
 		blockID := unittest.IdentifierFixture()
 		index := unittest.IndexFixture()
 
-		err := db.Update(InsertIndex(blockID, index))
+		err := InsertIndex(blockID, index)(db)
 		require.NoError(t, err)
 
 		var retrieved flow.Index
-		err = db.View(RetrieveIndex(blockID, &retrieved))
+		err = RetrieveIndex(blockID, &retrieved)(db)
 		require.NoError(t, err)
 
 		require.Equal(t, index, &retrieved)
