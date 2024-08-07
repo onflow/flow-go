@@ -32,31 +32,37 @@ type EVMTracer interface {
 var _ EVMTracer = &CallTracer{}
 
 type CallTracer struct {
-	logger   zerolog.Logger
-	tracer   *tracers.Tracer
-	uploader Uploader
-	blockID  flow.Identifier
-	txTracer *tracers.Tracer
+	logger       zerolog.Logger
+	tracer       *tracers.Tracer
+	tracerConfig []byte
+	uploader     Uploader
+	blockID      flow.Identifier
 }
 
 func NewEVMCallTracer(uploader Uploader, logger zerolog.Logger) (*CallTracer, error) {
-	tracer, err := tracers.DefaultDirectory.New(tracerName, &tracers.Context{}, json.RawMessage(tracerConfig))
+	tracerConfig := json.RawMessage(tracerConfig)
+
+	tracer, err := tracers.DefaultDirectory.New(tracerName, &tracers.Context{}, tracerConfig)
 	if err != nil {
 		return nil, err
 	}
 
 	return &CallTracer{
-		logger:   logger.With().Str("module", "evm-tracer").Logger(),
-		tracer:   tracer,
-		uploader: uploader,
+		logger:       logger.With().Str("module", "evm-tracer").Logger(),
+		tracer:       tracer,
+		tracerConfig: tracerConfig,
+		uploader:     uploader,
 	}, nil
 }
 
 func (t *CallTracer) TxTracer() *tracers.Tracer {
-	if t.txTracer == nil {
-		t.txTracer = NewSafeTxTracer(t)
-	}
-	return t.txTracer
+	return NewSafeTxTracer(t)
+}
+
+func (t *CallTracer) ResetTracer() error {
+	var err error
+	t.tracer, err = tracers.DefaultDirectory.New(tracerName, &tracers.Context{}, json.RawMessage(tracerConfig))
+	return err
 }
 
 func (t *CallTracer) WithBlockID(id flow.Identifier) {
@@ -98,9 +104,17 @@ func (t *CallTracer) Collect(txID gethCommon.Hash) {
 				Msg("failed to upload trace results, no more retries")
 			return
 		}
+		// reset tracing to have fresh state
+		if err := t.ResetTracer(); err != nil {
+			l.Error().Err(err).
+				Str("traces", string(res)).
+				Msg("failed to reset trace")
+			return
+		}
 
 		l.Debug().Msg("evm traces uploaded successfully")
 	}()
+
 }
 
 var NopTracer = &nopTracer{}
