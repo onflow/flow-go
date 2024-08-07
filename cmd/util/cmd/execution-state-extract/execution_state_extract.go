@@ -4,15 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"math"
 	"os"
-	"runtime/pprof"
 	syncAtomic "sync/atomic"
 	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	"go.uber.org/atomic"
 	"golang.org/x/sync/errgroup"
 
 	migrators "github.com/onflow/flow-go/cmd/util/ledger/migrations"
@@ -27,151 +24,194 @@ import (
 	"github.com/onflow/flow-go/ledger/complete/wal"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/metrics"
 )
 
-func extractExecutionState(
-	log zerolog.Logger,
-	dir string,
-	targetHash flow.StateCommitment,
-	outputDir string,
-	nWorker int, // number of concurrent worker to migration payloads
-	runMigrations bool,
-	outputPayloadFile string,
-	exportPayloadsForOwners map[string]struct{},
+type extractor interface {
+	extract() (partialState bool, payloads []*ledger.Payload, err error)
+}
+
+type payloadFileExtractor struct {
+	logger   zerolog.Logger
+	fileName string
+}
+
+func newPayloadFileExtractor(
+	logger zerolog.Logger,
+	fileName string,
+) *payloadFileExtractor {
+	return &payloadFileExtractor{
+		logger:   logger,
+		fileName: fileName,
+	}
+}
+
+func (e *payloadFileExtractor) extract() (bool, []*ledger.Payload, error) {
+	return util.ReadPayloadFile(e.logger, e.fileName)
+}
+
+type executionStateExtractor struct {
+	logger          zerolog.Logger
+	dir             string
+	stateCommitment flow.StateCommitment
+}
+
+func newExecutionStateExtractor(
+	logger zerolog.Logger,
+	executionStateDir string,
+	stateCommitment flow.StateCommitment,
+) *executionStateExtractor {
+	return &executionStateExtractor{
+		logger:          logger,
+		dir:             executionStateDir,
+		stateCommitment: stateCommitment,
+	}
+}
+
+func (e *executionStateExtractor) extract() (bool, []*ledger.Payload, error) {
+	payloads, err := util.ReadTrie(e.dir, e.stateCommitment)
+	if err != nil {
+		return false, nil, err
+	}
+
+	return false, payloads, nil
+}
+
+type exporter interface {
+	export(partialState bool, payloads []*ledger.Payload) (ledger.State, error)
+}
+
+type payloadFileExporter struct {
+	logger         zerolog.Logger
+	nWorker        int
+	fileName       string
+	addressFilters map[string]struct{}
+	sortPayloads   bool
+}
+
+func newPayloadFileExporter(
+	logger zerolog.Logger,
+	nWorker int,
+	fileName string,
+	addressFilters map[string]struct{},
 	sortPayloads bool,
-	opts migrators.Options,
+) *payloadFileExporter {
+	return &payloadFileExporter{
+		logger:         logger,
+		nWorker:        nWorker,
+		fileName:       fileName,
+		addressFilters: addressFilters,
+		sortPayloads:   sortPayloads,
+	}
+}
+
+func (e *payloadFileExporter) export(
+	partialState bool,
+	payloads []*ledger.Payload,
+) (ledger.State, error) {
+
+	var group errgroup.Group
+
+	var migratedState ledger.State
+
+	// Need to use a copy of payloads when creating new trie in goroutine
+	// because payloads are sorted in createPayloadFile().
+	copiedPayloads := make([]*ledger.Payload, len(payloads))
+	copy(copiedPayloads, payloads)
+
+	// Launch goroutine to get root hash of trie from exported payloads
+	group.Go(func() error {
+		newTrie, err := createTrieFromPayloads(log.Logger, copiedPayloads)
+		if err != nil {
+			return err
+		}
+
+		migratedState = ledger.State(newTrie.RootHash())
+		return nil
+	})
+
+	// Export payloads to payload file
+	err := e.createPayloadFile(partialState, payloads)
+	if err != nil {
+		return ledger.DummyState, err
+	}
+
+	err = group.Wait()
+	if err != nil {
+		return ledger.DummyState, err
+	}
+
+	return migratedState, nil
+}
+
+func (e *payloadFileExporter) createPayloadFile(
+	partialState bool,
+	payloads []*ledger.Payload,
 ) error {
+	if e.sortPayloads {
+		e.logger.Info().Msgf("sorting %d payloads", len(payloads))
 
-	log.Info().Msg("init WAL")
+		// Sort payloads to produce deterministic payload file with
+		// same sequence of payloads inside.
+		payloads = util.SortPayloadsByAddress(payloads, e.nWorker)
 
-	diskWal, err := wal.NewDiskWAL(
-		log,
-		nil,
-		metrics.NewNoopCollector(),
-		dir,
-		complete.DefaultCacheSize,
-		pathfinder.PathByteSize,
-		wal.SegmentSize,
+		log.Info().Msgf("sorted %d payloads", len(payloads))
+	}
+
+	log.Info().Msgf("creating payloads file %s", e.fileName)
+
+	exportedPayloadCount, err := util.CreatePayloadFile(
+		e.logger,
+		e.fileName,
+		payloads,
+		e.addressFilters,
+		partialState,
 	)
 	if err != nil {
-		return fmt.Errorf("cannot create disk WAL: %w", err)
+		return fmt.Errorf("cannot generate payloads file: %w", err)
 	}
 
-	log.Info().Msg("init ledger")
-
-	led, err := complete.NewLedger(
-		diskWal,
-		complete.DefaultCacheSize,
-		&metrics.NoopCollector{},
-		log,
-		complete.DefaultPathFinderVersion)
-	if err != nil {
-		return fmt.Errorf("cannot create ledger from write-a-head logs and checkpoints: %w", err)
-	}
-
-	const (
-		checkpointDistance = math.MaxInt // A large number to prevent checkpoint creation.
-		checkpointsToKeep  = 1
-	)
-
-	log.Info().Msg("init compactor")
-
-	compactor, err := complete.NewCompactor(
-		led,
-		diskWal,
-		log,
-		complete.DefaultCacheSize,
-		checkpointDistance,
-		checkpointsToKeep,
-		atomic.NewBool(false),
-		&metrics.NoopCollector{},
-	)
-	if err != nil {
-		return fmt.Errorf("cannot create compactor: %w", err)
-	}
-
-	log.Info().Msgf("waiting for compactor to load checkpoint and WAL")
-
-	<-compactor.Ready()
-
-	defer func() {
-		<-led.Done()
-		<-compactor.Done()
-	}()
-
-	migrations := newMigrations(
-		log,
-		dir,
-		runMigrations,
-		opts,
-	)
-
-	migration := newMigration(log, migrations, nWorker)
-
-	newState := ledger.State(targetHash)
-
-	// migrate the trie if there are migrations
-	newTrie, err := led.MigrateAt(
-		newState,
-		migration,
-		complete.DefaultPathFinderVersion,
-	)
-
-	if err != nil {
-		return err
-	}
-
-	// create reporter
-	reporter := reporters.NewExportReporter(
-		log,
-		func() flow.StateCommitment {
-			return targetHash
-		},
-	)
-
-	newMigratedState := ledger.State(newTrie.RootHash())
-	err = reporter.Report(nil, newMigratedState)
-	if err != nil {
-		log.Err(err).Msgf("can not generate report for migrated state: %v", newMigratedState)
-	}
-
-	if len(outputPayloadFile) > 0 {
-		payloads := newTrie.AllPayloads()
-
-		return exportPayloads(
-			log,
-			payloads,
-			nWorker,
-			outputPayloadFile,
-			exportPayloadsForOwners,
-			false, // payloads represents entire state.
-			sortPayloads,
-		)
-	}
-
-	migratedState, err := createCheckpoint(
-		newTrie,
-		log,
-		outputDir,
-		bootstrap.FilenameWALRootCheckpoint,
-	)
-	if err != nil {
-		return fmt.Errorf("cannot generate the output checkpoint: %w", err)
-	}
-
-	log.Info().Msgf(
-		"New state commitment for the exported state is: %s (base64: %s)",
-		migratedState.String(),
-		migratedState.Base64(),
-	)
+	e.logger.Info().Msgf("exported %d payloads out of %d payloads", exportedPayloadCount, len(payloads))
 
 	return nil
 }
 
+type checkpointFileExporter struct {
+	logger    zerolog.Logger
+	outputDir string
+}
+
+func newCheckpointFileExporter(
+	logger zerolog.Logger,
+	outputDir string,
+) *checkpointFileExporter {
+	return &checkpointFileExporter{
+		logger:    logger,
+		outputDir: outputDir,
+	}
+}
+
+func (e *checkpointFileExporter) export(
+	_ bool,
+	payloads []*ledger.Payload,
+) (ledger.State, error) {
+	// Create trie
+	newTrie, err := createTrieFromPayloads(e.logger, payloads)
+	if err != nil {
+		return ledger.DummyState, err
+	}
+
+	// Create checkpoint files
+	return createCheckpoint(
+		log.Logger,
+		newTrie,
+		e.outputDir,
+		bootstrap.FilenameWALRootCheckpoint,
+	)
+}
+
 func createCheckpoint(
-	newTrie *trie.MTrie,
 	log zerolog.Logger,
+	newTrie *trie.MTrie,
 	outputDir,
 	outputFile string,
 ) (ledger.State, error) {
@@ -208,136 +248,12 @@ func writeStatusFile(fileName string, e error) error {
 	return err
 }
 
-func extractExecutionStateFromPayloads(
-	log zerolog.Logger,
-	dir string,
-	outputDir string,
-	nWorker int, // number of concurrent worker to migration payloads
-	runMigrations bool,
-	inputPayloadFile string,
-	outputPayloadFile string,
-	exportPayloadsForOwners map[string]struct{},
-	sortPayloads bool,
-	opts migrators.Options,
-) error {
-
-	inputPayloadsFromPartialState, payloads, err := util.ReadPayloadFile(log, inputPayloadFile)
-	if err != nil {
-		return err
-	}
-
-	log.Info().Msgf("read %d payloads", len(payloads))
-
-	migrations := newMigrations(
-		log,
-		dir,
-		runMigrations,
-		opts,
-	)
-
-	migration := newMigration(
-		log,
-		migrations,
-		nWorker,
-	)
-
-	payloads, err = migration(payloads)
-	if err != nil {
-		return err
-	}
-
-	if len(outputPayloadFile) > 0 {
-		return exportPayloads(
-			log,
-			payloads,
-			nWorker,
-			outputPayloadFile,
-			exportPayloadsForOwners,
-			inputPayloadsFromPartialState,
-			sortPayloads,
-		)
-	}
-
-	newTrie, err := createTrieFromPayloads(log, payloads)
-	if err != nil {
-		return err
-	}
-
-	migratedState, err := createCheckpoint(
-		newTrie,
-		log,
-		outputDir,
-		bootstrap.FilenameWALRootCheckpoint,
-	)
-	if err != nil {
-		return fmt.Errorf("cannot generate the output checkpoint: %w", err)
-	}
-
-	log.Info().Msgf(
-		"New state commitment for the exported state is: %s (base64: %s)",
-		migratedState.String(),
-		migratedState.Base64(),
-	)
-
-	return nil
-}
-
-func exportPayloads(
-	log zerolog.Logger,
-	payloads []*ledger.Payload,
-	nWorker int,
-	outputPayloadFile string,
-	exportPayloadsForOwners map[string]struct{},
-	inputPayloadsFromPartialState bool,
-	sortPayloads bool,
-) error {
-	if sortPayloads {
-		log.Info().Msgf("sorting %d payloads", len(payloads))
-
-		// Sort payloads to produce deterministic payload file with
-		// same sequence of payloads inside.
-		payloads = util.SortPayloadsByAddress(payloads, nWorker)
-
-		log.Info().Msgf("sorted %d payloads", len(payloads))
-	}
-
-	log.Info().Msgf("creating payloads file %s", outputPayloadFile)
-
-	exportedPayloadCount, err := util.CreatePayloadFile(
-		log,
-		outputPayloadFile,
-		payloads,
-		exportPayloadsForOwners,
-		inputPayloadsFromPartialState,
-	)
-	if err != nil {
-		return fmt.Errorf("cannot generate payloads file: %w", err)
-	}
-
-	log.Info().Msgf("exported %d payloads out of %d payloads", exportedPayloadCount, len(payloads))
-
-	return nil
-}
-
 func newMigration(
 	logger zerolog.Logger,
 	migrations []migrators.NamedMigration,
 	nWorker int,
 ) ledger.Migration {
 	return func(payloads []*ledger.Payload) ([]*ledger.Payload, error) {
-		if flagCPUProfile != "" {
-			f, err := os.Create(flagCPUProfile)
-			if err != nil {
-				logger.Fatal().Err(err).Msg("could not create CPU profile")
-			}
-
-			err = pprof.StartCPUProfile(f)
-			if err != nil {
-				logger.Fatal().Err(err).Msg("could not start CPU profile")
-			}
-
-			defer pprof.StopCPUProfile()
-		}
 
 		if len(migrations) == 0 {
 			return payloads, nil
@@ -541,12 +457,8 @@ func createTrieFromPayloads(logger zerolog.Logger, payloads []*ledger.Payload) (
 func newMigrations(
 	log zerolog.Logger,
 	outputDir string,
-	runMigrations bool,
 	opts migrators.Options,
 ) []migrators.NamedMigration {
-	if !runMigrations {
-		return nil
-	}
 
 	log.Info().Msg("initializing migrations")
 
@@ -568,7 +480,7 @@ func newMigrations(
 				log,
 				opts.NWorker,
 				[]migrators.AccountBasedMigration{
-					&migrators.AccountUsageMigration{},
+					migrators.NewAccountUsageMigration(rwf),
 				},
 			),
 		},

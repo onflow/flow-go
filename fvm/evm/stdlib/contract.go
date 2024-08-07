@@ -27,6 +27,9 @@ import (
 //go:embed contract.cdc
 var contractCode string
 
+//go:embed contract_minimal.cdc
+var ContractMinimalCode string
+
 var nftImportPattern = regexp.MustCompile(`(?m)^import "NonFungibleToken"`)
 var fungibleTokenImportPattern = regexp.MustCompile(`(?m)^import "FungibleToken"`)
 var flowTokenImportPattern = regexp.MustCompile(`(?m)^import "FlowToken"`)
@@ -1528,7 +1531,7 @@ func newInternalEVMTypeDepositFunction(
 ) *interpreter.HostFunctionValue {
 	return interpreter.NewStaticHostFunctionValue(
 		gauge,
-		internalEVMTypeCallFunctionType,
+		internalEVMTypeDepositFunctionType,
 		func(invocation interpreter.Invocation) interpreter.Value {
 			inter := invocation.Interpreter
 			locationRange := invocation.LocationRange
@@ -1599,7 +1602,7 @@ func newInternalEVMTypeBalanceFunction(
 ) *interpreter.HostFunctionValue {
 	return interpreter.NewStaticHostFunctionValue(
 		gauge,
-		internalEVMTypeCallFunctionType,
+		internalEVMTypeBalanceFunctionType,
 		func(invocation interpreter.Invocation) interpreter.Value {
 			inter := invocation.Interpreter
 			locationRange := invocation.LocationRange
@@ -1641,7 +1644,7 @@ func newInternalEVMTypeNonceFunction(
 ) *interpreter.HostFunctionValue {
 	return interpreter.NewStaticHostFunctionValue(
 		gauge,
-		internalEVMTypeCallFunctionType,
+		internalEVMTypeNonceFunctionType,
 		func(invocation interpreter.Invocation) interpreter.Value {
 			inter := invocation.Interpreter
 			locationRange := invocation.LocationRange
@@ -1683,7 +1686,7 @@ func newInternalEVMTypeCodeFunction(
 ) *interpreter.HostFunctionValue {
 	return interpreter.NewStaticHostFunctionValue(
 		gauge,
-		internalEVMTypeCallFunctionType,
+		internalEVMTypeCodeFunctionType,
 		func(invocation interpreter.Invocation) interpreter.Value {
 			inter := invocation.Interpreter
 			locationRange := invocation.LocationRange
@@ -1725,7 +1728,7 @@ func newInternalEVMTypeCodeHashFunction(
 ) *interpreter.HostFunctionValue {
 	return interpreter.NewStaticHostFunctionValue(
 		gauge,
-		internalEVMTypeCallFunctionType,
+		internalEVMTypeCodeHashFunctionType,
 		func(invocation interpreter.Invocation) interpreter.Value {
 			inter := invocation.Interpreter
 			locationRange := invocation.LocationRange
@@ -1770,7 +1773,7 @@ func newInternalEVMTypeWithdrawFunction(
 ) *interpreter.HostFunctionValue {
 	return interpreter.NewStaticHostFunctionValue(
 		gauge,
-		internalEVMTypeCallFunctionType,
+		internalEVMTypeWithdrawFunctionType,
 		func(invocation interpreter.Invocation) interpreter.Value {
 			inter := invocation.Interpreter
 			locationRange := invocation.LocationRange
@@ -1868,7 +1871,7 @@ func newInternalEVMTypeDeployFunction(
 ) *interpreter.HostFunctionValue {
 	return interpreter.NewStaticHostFunctionValue(
 		gauge,
-		internalEVMTypeCallFunctionType,
+		internalEVMTypeDeployFunctionType,
 		func(invocation interpreter.Invocation) interpreter.Value {
 			inter := invocation.Interpreter
 			locationRange := invocation.LocationRange
@@ -1945,7 +1948,7 @@ func newInternalEVMTypeCastToAttoFLOWFunction(
 ) *interpreter.HostFunctionValue {
 	return interpreter.NewStaticHostFunctionValue(
 		gauge,
-		internalEVMTypeCallFunctionType,
+		internalEVMTypeCastToAttoFLOWFunctionType,
 		func(invocation interpreter.Invocation) interpreter.Value {
 			balanceValue, ok := invocation.Arguments[0].(interpreter.UFix64Value)
 			if !ok {
@@ -1975,7 +1978,7 @@ func newInternalEVMTypeCastToFLOWFunction(
 ) *interpreter.HostFunctionValue {
 	return interpreter.NewStaticHostFunctionValue(
 		gauge,
-		internalEVMTypeCallFunctionType,
+		internalEVMTypeCastToFLOWFunctionType,
 		func(invocation interpreter.Invocation) interpreter.Value {
 			balanceValue, ok := invocation.Arguments[0].(interpreter.UIntValue)
 			if !ok {
@@ -1988,6 +1991,27 @@ func newInternalEVMTypeCastToFLOWFunction(
 				panic(err)
 			}
 			return interpreter.UFix64Value(v)
+		},
+	)
+}
+
+const internalEVMTypeCommitBlockProposalFunctionName = "commitBlockProposal"
+
+var internalEVMTypeCommitBlockProposalFunctionType = &sema.FunctionType{
+	Parameters:           []sema.Parameter{},
+	ReturnTypeAnnotation: sema.NewTypeAnnotation(sema.VoidType),
+}
+
+func newInternalEVMTypeCommitBlockProposalFunction(
+	gauge common.MemoryGauge,
+	handler types.ContractHandler,
+) *interpreter.HostFunctionValue {
+	return interpreter.NewStaticHostFunctionValue(
+		gauge,
+		internalEVMTypeCommitBlockProposalFunctionType,
+		func(invocation interpreter.Invocation) interpreter.Value {
+			handler.CommitBlockProposal()
+			return interpreter.Void
 		},
 	)
 }
@@ -2006,7 +2030,7 @@ func newInternalEVMTypeGetLatestBlockFunction(
 ) *interpreter.HostFunctionValue {
 	return interpreter.NewStaticHostFunctionValue(
 		gauge,
-		internalEVMTypeCallFunctionType,
+		internalEVMTypeGetLatestBlockFunctionType,
 		func(invocation interpreter.Invocation) interpreter.Value {
 			inter := invocation.Interpreter
 			locationRange := invocation.LocationRange
@@ -2098,6 +2122,7 @@ func NewInternalEVMContractValue(
 			internalEVMTypeCastToFLOWFunctionName:                newInternalEVMTypeCastToFLOWFunction(gauge),
 			internalEVMTypeGetLatestBlockFunctionName:            newInternalEVMTypeGetLatestBlockFunction(gauge, handler),
 			internalEVMTypeDryRunFunctionName:                    newInternalEVMTypeDryRunFunction(gauge, handler),
+			internalEVMTypeCommitBlockProposalFunctionName:       newInternalEVMTypeCommitBlockProposalFunction(gauge, handler),
 		},
 		nil,
 		nil,
@@ -2214,6 +2239,12 @@ var InternalEVMContractType = func() *sema.CompositeType {
 			ty,
 			internalEVMTypeGetLatestBlockFunctionName,
 			internalEVMTypeGetLatestBlockFunctionType,
+			"",
+		),
+		sema.NewUnmeteredPublicFunctionMember(
+			ty,
+			internalEVMTypeCommitBlockProposalFunctionName,
+			internalEVMTypeCommitBlockProposalFunctionType,
 			"",
 		),
 	})

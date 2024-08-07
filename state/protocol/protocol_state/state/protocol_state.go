@@ -309,7 +309,7 @@ func (s *MutableProtocolState) build(
 	parentStateID flow.Identifier,
 	stateMachines []protocol_state.KeyValueStoreStateMachine,
 	serviceEvents []flow.ServiceEvent,
-	evolvingState protocol_state.KVStoreMutator,
+	evolvingState protocol.KVStoreReader,
 ) (flow.Identifier, *transaction.DeferredBlockPersist, error) {
 	for _, stateMachine := range stateMachines {
 		err := stateMachine.EvolveState(serviceEvents) // state machine should only bubble up exceptions

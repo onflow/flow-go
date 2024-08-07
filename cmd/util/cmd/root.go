@@ -25,12 +25,14 @@ import (
 	export_json_transactions "github.com/onflow/flow-go/cmd/util/cmd/export-json-transactions"
 	extractpayloads "github.com/onflow/flow-go/cmd/util/cmd/extract-payloads-by-address"
 	find_inconsistent_result "github.com/onflow/flow-go/cmd/util/cmd/find-inconsistent-result"
+	find_trie_root "github.com/onflow/flow-go/cmd/util/cmd/find-trie-root"
 	read_badger "github.com/onflow/flow-go/cmd/util/cmd/read-badger/cmd"
 	read_execution_state "github.com/onflow/flow-go/cmd/util/cmd/read-execution-state"
 	read_hotstuff "github.com/onflow/flow-go/cmd/util/cmd/read-hotstuff/cmd"
 	read_protocol_state "github.com/onflow/flow-go/cmd/util/cmd/read-protocol-state/cmd"
 	index_er "github.com/onflow/flow-go/cmd/util/cmd/reindex/cmd"
 	rollback_executed_height "github.com/onflow/flow-go/cmd/util/cmd/rollback-executed-height/cmd"
+	run_script "github.com/onflow/flow-go/cmd/util/cmd/run-script"
 	"github.com/onflow/flow-go/cmd/util/cmd/snapshot"
 	truncate_database "github.com/onflow/flow-go/cmd/util/cmd/truncate-database"
 	"github.com/onflow/flow-go/cmd/util/cmd/version"
@@ -110,6 +112,8 @@ func addCommands() {
 	rootCmd.AddCommand(find_inconsistent_result.Cmd)
 	rootCmd.AddCommand(diff_states.Cmd)
 	rootCmd.AddCommand(atree_inlined_status.Cmd)
+	rootCmd.AddCommand(find_trie_root.Cmd)
+	rootCmd.AddCommand(run_script.Cmd)
 }
 
 func initConfig() {

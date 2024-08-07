@@ -37,4 +37,12 @@ func TestBalance(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, cadence.UFix64(0), bret)
 	require.True(t, roundedOff)
+
+	// test unsafe conversion to float64
+	u, err = cadence.NewUFix64("100.0002")
+	require.NoError(t, err)
+	bal = types.NewBalanceFromUFix64(u)
+	require.NoError(t, err)
+	ret := types.UnsafeCastOfBalanceToFloat64(bal)
+	require.Equal(t, 100.0002, ret)
 }

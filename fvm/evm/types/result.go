@@ -1,6 +1,7 @@
 package types
 
 import (
+	"github.com/onflow/go-ethereum/common"
 	gethCommon "github.com/onflow/go-ethereum/common"
 	gethTypes "github.com/onflow/go-ethereum/core/types"
 )
@@ -33,7 +34,7 @@ var (
 	StatusSuccessful Status = 3
 )
 
-// ResultSummary summerizes the outcome of a EVM call or tx run
+// ResultSummary summarizes the outcome of a EVM call or tx run
 type ResultSummary struct {
 	Status                  Status
 	ErrorCode               ErrorCode
@@ -60,7 +61,7 @@ func NewInvalidResult(tx *gethTypes.Transaction, err error) *Result {
 // evm transaction.
 // Its more comprehensive than typical evm receipt, usually
 // the receipt generation requires some extra calculation (e.g. Deployed contract address)
-// but we take a different apporach here and include more data so that
+// but we take a different approach here and include more data so that
 // it requires less work for anyone who tracks and consume results.
 type Result struct {
 	// captures error returned during validation step (pre-checks)
@@ -70,20 +71,25 @@ type Result struct {
 	// type of transaction defined by the evm package
 	// see DirectCallTxType as extra type we added type for direct calls.
 	TxType uint8
-	// total gas consumed during an opeartion
+	// total gas consumed during execution
 	GasConsumed uint64
+	// total gas used by the block after this tx execution
+	CumulativeGasUsed uint64
 	// total gas refunds after transaction execution
 	GasRefund uint64
 	// the address where the contract is deployed (if any)
 	DeployedContractAddress *Address
 	// returned data from a function call
 	ReturnedData []byte
-	// EVM logs (events that are emited by evm)
+	// EVM logs (events that are emitted by evm)
 	Logs []*gethTypes.Log
-	// TX hash holdes the cached value of tx hash
+	// TX hash holds the cached value of tx hash
 	TxHash gethCommon.Hash
 	// transaction block inclusion index
 	Index uint16
+	// PrecompiledCalls captures an encoded list of calls to the precompile
+	// during the execution of transaction
+	PrecompiledCalls []byte
 }
 
 // Invalid returns true if transaction has been rejected
@@ -105,6 +111,9 @@ func (res *Result) Successful() bool {
 // and also sets the gas used to the fixed invalid gas usage
 func (res *Result) SetValidationError(err error) {
 	res.ValidationError = err
+	// for invalid transactions we only set the gasConsumed
+	// for metering reasons, yet we do not set the CumulativeGasUsed
+	// since we won't consider then for the block construction purposes
 	res.GasConsumed = InvalidTransactionGasCost
 }
 
@@ -120,7 +129,7 @@ func (res *Result) VMErrorString() string {
 // can be used by json-rpc and other integration to be returned.
 //
 // This is method is also used to construct block receipt root hash
-// which requires the return receipt satisfy RLP encoding and cover these feilds
+// which requires the return receipt satisfy RLP encoding and cover these fields
 // Type (txType), PostState or Status, CumulativeGasUsed, Logs and Logs Bloom
 // and for each log, Address, Topics, Data (consensus fields)
 // During execution we also do fill in BlockNumber, TxIndex, Index (event index)
@@ -128,11 +137,18 @@ func (res *Result) Receipt() *gethTypes.Receipt {
 	if res.Invalid() {
 		return nil
 	}
+
 	receipt := &gethTypes.Receipt{
-		Type:              res.TxType,
-		CumulativeGasUsed: res.GasConsumed, // TODO: update to capture cumulative
+		GasUsed:           res.GasConsumed,
+		CumulativeGasUsed: res.CumulativeGasUsed,
 		Logs:              res.Logs,
 	}
+
+	// only add tx type if not direct call
+	if res.TxType != DirectCallTxType {
+		receipt.Type = res.TxType
+	}
+
 	if res.DeployedContractAddress != nil {
 		receipt.ContractAddress = res.DeployedContractAddress.ToCommon()
 	}
@@ -143,6 +159,41 @@ func (res *Result) Receipt() *gethTypes.Receipt {
 	}
 
 	receipt.Bloom = gethTypes.CreateBloom(gethTypes.Receipts{receipt})
+	return receipt
+}
+
+// LightReceipt constructs a light receipt from the result
+// that is used for storing in block proposal.
+func (res *Result) LightReceipt() *LightReceipt {
+	if res.Invalid() {
+		return nil
+	}
+
+	receipt := &LightReceipt{
+		CumulativeGasUsed: res.CumulativeGasUsed,
+	}
+
+	receipt.Logs = make([]LightLog, len(res.Logs))
+	for i, l := range res.Logs {
+		receipt.Logs[i] = LightLog{
+			Address: l.Address,
+			Topics:  l.Topics,
+			Data:    l.Data,
+		}
+	}
+
+	// only add tx type if not direct call
+	if res.TxType != DirectCallTxType {
+		receipt.Type = res.TxType
+	}
+
+	// add status
+	if res.Failed() {
+		receipt.Status = uint8(gethTypes.ReceiptStatusFailed)
+	} else {
+		receipt.Status = uint8(gethTypes.ReceiptStatusSuccessful)
+	}
+
 	return receipt
 }
 
@@ -171,4 +222,55 @@ func (res *Result) ResultSummary() *ResultSummary {
 	}
 
 	return rs
+}
+
+// LightLog captures only consensus fields of an EVM log
+// used by the LightReceipt
+type LightLog struct {
+	// address of the contract that generated the event
+	Address common.Address
+	// list of topics provided by the contract.
+	Topics []common.Hash
+	// supplied by the contract, usually ABI-encoded
+	Data []byte
+}
+
+// LightReceipt captures only the consensus fields of
+// a receipt, making storage of receipts for the purpose
+// of trie building more storage efficient.
+//
+// Note that we don't store Bloom as we can reconstruct it
+// later. We don't have PostState and we use a uint8 for
+// status as there is currently only acts as boolean.
+// Data shows that using the light receipt results in 60% storage reduction
+// for block proposals and the extra overheads are manageable.
+type LightReceipt struct {
+	Type              uint8
+	Status            uint8
+	CumulativeGasUsed uint64
+	Logs              []LightLog
+}
+
+// ToReceipt constructs a Receipt from the LightReceipt
+// Warning, this only populates the consensus fields
+// and if you want the full data, use the receipt
+// from the result.
+func (lr *LightReceipt) ToReceipt() *gethTypes.Receipt {
+	receipt := &gethTypes.Receipt{
+		Type:              lr.Type,
+		Status:            uint64(lr.Status),
+		CumulativeGasUsed: lr.CumulativeGasUsed,
+	}
+
+	receipt.Logs = make([]*gethTypes.Log, len(lr.Logs))
+	for i, l := range lr.Logs {
+		receipt.Logs[i] = &gethTypes.Log{
+			Address: l.Address,
+			Topics:  l.Topics,
+			Data:    l.Data,
+		}
+	}
+
+	receipt.Bloom = gethTypes.CreateBloom(gethTypes.Receipts{receipt})
+	return receipt
 }

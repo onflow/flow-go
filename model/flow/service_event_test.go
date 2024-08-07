@@ -147,7 +147,7 @@ type ServiceEventCapable interface {
 	ServiceEvent() flow.ServiceEvent
 }
 
-// assertJsonConvert asserts that a value can be marshaled and unmarshaled to/from JSON.
+// assertJsonConvert asserts that value `v` can be marshaled and unmarshaled to/from JSON.
 func assertJsonConvert[T any](t *testing.T, v *T, opts ...gocmp.Option) {
 	b, err := json.Marshal(v)
 	require.NoError(t, err)
@@ -158,7 +158,7 @@ func assertJsonConvert[T any](t *testing.T, v *T, opts ...gocmp.Option) {
 	assert.DeepEqual(t, v, got, opts...)
 }
 
-// assertJsonGenericConvert asserts that a value can be marshaled and unmarshaled to/from JSON as a generic ServiceEvent.
+// assertJsonGenericConvert asserts that value `v` can be marshaled and unmarshaled to/from JSON as a generic ServiceEvent.
 func assertJsonGenericConvert[T ServiceEventCapable](t *testing.T, v T, opts ...gocmp.Option) {
 	b, err := json.Marshal(v.ServiceEvent())
 	require.NoError(t, err)
@@ -171,7 +171,7 @@ func assertJsonGenericConvert[T ServiceEventCapable](t *testing.T, v T, opts ...
 	assert.DeepEqual(t, v, got, opts...)
 }
 
-// assertMsgPackConvert asserts that a value can be marshaled and unmarshaled to/from MessagePack.
+// assertMsgPackConvert asserts that value `v` can be marshaled and unmarshaled to/from MessagePack.
 func assertMsgPackConvert[T any](t *testing.T, v *T, opts ...gocmp.Option) {
 	b, err := msgpack.Marshal(v)
 	require.NoError(t, err)
@@ -182,7 +182,7 @@ func assertMsgPackConvert[T any](t *testing.T, v *T, opts ...gocmp.Option) {
 	assert.DeepEqual(t, v, got, opts...)
 }
 
-// assertMsgPackGenericConvert asserts that a value can be marshaled and unmarshaled to/from MessagePack as a generic ServiceEvent.
+// assertMsgPackGenericConvert asserts that value `v` can be marshaled and unmarshaled to/from MessagePack as a generic ServiceEvent.
 func assertMsgPackGenericConvert[T ServiceEventCapable](t *testing.T, v T, opts ...gocmp.Option) {
 	b, err := msgpack.Marshal(v.ServiceEvent())
 	require.NoError(t, err)
@@ -195,7 +195,7 @@ func assertMsgPackGenericConvert[T ServiceEventCapable](t *testing.T, v T, opts 
 	assert.DeepEqual(t, v, got, opts...)
 }
 
-// assertCborConvert asserts that a value can be marshaled and unmarshaled to/from CBOR.
+// assertCborConvert asserts that value `v` can be marshaled and unmarshaled to/from CBOR.
 func assertCborConvert[T any](t *testing.T, v *T, opts ...gocmp.Option) {
 	b, err := cbor.Marshal(v)
 	require.NoError(t, err)
@@ -206,7 +206,7 @@ func assertCborConvert[T any](t *testing.T, v *T, opts ...gocmp.Option) {
 	assert.DeepEqual(t, v, got, opts...)
 }
 
-// assertCborGenericConvert asserts that a value can be marshaled and unmarshaled to/from CBOR as a generic ServiceEvent.
+// assertCborGenericConvert asserts that value `v` can be marshaled and unmarshaled to/from CBOR as a generic ServiceEvent.
 func assertCborGenericConvert[T ServiceEventCapable](t *testing.T, v T, opts ...gocmp.Option) {
 	b, err := cbor.Marshal(v.ServiceEvent())
 	require.NoError(t, err)

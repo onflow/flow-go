@@ -627,7 +627,7 @@ func (m *FollowerState) lastSealed(candidate *flow.Block, deferredDbOps *transac
 }
 
 // evolveProtocolState
-//   - instantiates a Protocol State Mutator from the parent block's state
+//   - instantiates a Protocol State EvolvingState from the parent block's state
 //   - applies any state-changing service events sealed by this block
 //   - verifies that the resulting protocol state is consistent with the commitment in the block
 //

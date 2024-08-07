@@ -19,7 +19,7 @@ func NewPSVersionUpgradeStateMachineFactory(telemetry protocol_state.StateMachin
 	}
 }
 
-// Create instantiates a new PSVersionUpgradeStateMachine, which processes ProtocolStateVersionUpgrade ServiceEvent
+// Create instantiates a new PSVersionUpgradeStateMachine, which processes ProtocolStateVersionUpgrade ServiceEvents
 // that are sealed by the candidate block (possibly still under construction) with the given view.
 // No errors are expected during normal operations.
 func (f *PSVersionUpgradeStateMachineFactory) Create(candidateView uint64, _ flow.Identifier, parentState protocol.KVStoreReader, mutator protocol_state.KVStoreMutator) (protocol_state.KeyValueStoreStateMachine, error) {

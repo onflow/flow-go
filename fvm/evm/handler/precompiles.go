@@ -13,12 +13,12 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-func preparePrecompiles(
+func preparePrecompiledContracts(
 	evmContractAddress flow.Address,
 	randomBeaconAddress flow.Address,
 	addressAllocator types.AddressAllocator,
 	backend types.Backend,
-) []types.Precompile {
+) []types.PrecompiledContract {
 	archAddress := addressAllocator.AllocatePrecompileAddress(1)
 	archContract := precompiles.ArchContract(
 		archAddress,
@@ -27,7 +27,7 @@ func preparePrecompiles(
 		randomSourceProvider(randomBeaconAddress, backend),
 		revertibleRandomGenerator(backend),
 	)
-	return []types.Precompile{archContract}
+	return []types.PrecompiledContract{archContract}
 }
 
 func blockHeightProvider(backend types.Backend) func() (uint64, error) {
@@ -42,8 +42,8 @@ func blockHeightProvider(backend types.Backend) func() (uint64, error) {
 
 const RandomSourceTypeValueFieldName = "value"
 
-func randomSourceProvider(contractAddress flow.Address, backend types.Backend) func(uint64) (uint64, error) {
-	return func(blockHeight uint64) (uint64, error) {
+func randomSourceProvider(contractAddress flow.Address, backend types.Backend) func(uint64) ([]byte, error) {
+	return func(blockHeight uint64) ([]byte, error) {
 		value, err := backend.Invoke(
 			environment.ContractFunctionSpec{
 				AddressFromChain: func(_ flow.Chain) flow.Address {
@@ -63,21 +63,21 @@ func randomSourceProvider(contractAddress flow.Address, backend types.Backend) f
 			if types.IsAFatalError(err) || types.IsABackendError(err) {
 				panic(err)
 			}
-			return 0, err
+			return nil, err
 		}
 
 		data, ok := value.(cadence.Struct)
 		if !ok {
-			return 0, fmt.Errorf("invalid output data received from getRandomSource")
+			return nil, fmt.Errorf("invalid output data received from getRandomSource")
 		}
 
 		cadenceArray := cadence.SearchFieldByName(data, RandomSourceTypeValueFieldName).(cadence.Array)
-		source := make([]byte, 8)
+		source := make([]byte, environment.RandomSourceHistoryLength)
 		for i := range source {
 			source[i] = byte(cadenceArray.Values[i].(cadence.UInt8))
 		}
 
-		return binary.BigEndian.Uint64(source), nil
+		return source, nil
 	}
 }
 

@@ -24,7 +24,7 @@ const (
 	ServiceEventRecover                     ServiceEventType = "recover"
 	ServiceEventVersionBeacon               ServiceEventType = "version-beacon"                 // VersionBeacon only controls version of ENs, describing software compatability via semantic versioning
 	ServiceEventProtocolStateVersionUpgrade ServiceEventType = "protocol-state-version-upgrade" // Protocol State version applies to all nodes and uses an _integer version_ of the _protocol_
-	ServiceEventSetEpochExtensionViewCount  ServiceEventType = "set-epoch-extension-view-count" // Applies new value for the epoch extension view count to the KV store.
+	ServiceEventSetEpochExtensionViewCount  ServiceEventType = "set-epoch-extension-view-count" // Sets value for parameter `EpochExtensionViewCount` in the protocol state's KV store.
 )
 
 // ServiceEvent represents a service event, which is a special event that when
