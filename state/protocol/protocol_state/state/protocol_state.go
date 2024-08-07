@@ -123,7 +123,6 @@ func NewMutableProtocolState(
 				Logger(),
 		)
 	}
-
 	psVersionUpgradeStateMachineTelemetry := pubsub.NewLogConsumer(log.With().Str("state_machine", "version_upgrade").Logger())
 	setKVStoreValueTelemetry := pubsub.NewLogConsumer(log.With().Str("state_machine", "set_kvstore_value").Logger())
 
@@ -132,7 +131,7 @@ func NewMutableProtocolState(
 	kvStateMachineFactories := []protocol_state.KeyValueStoreStateMachineFactory{
 		kvstore.NewPSVersionUpgradeStateMachineFactory(psVersionUpgradeStateMachineTelemetry),
 		epochs.NewEpochStateMachineFactory(setups, commits, epochProtocolStateDB, epochHappyPathTelemetryFactory, epochFallbackTelemetryFactory),
-		kvstore.NewSetValueKVStoreStateMachineFactory(setKVStoreValueTelemetry),
+		kvstore.NewSetValueStateMachineFactory(setKVStoreValueTelemetry),
 	}
 	return newMutableProtocolState(epochProtocolStateDB, kvstore.NewProtocolKVStore(kvStoreSnapshots), globalParams, headers, results, kvStateMachineFactories)
 }

@@ -28,19 +28,21 @@ func (f *PSVersionUpgradeStateMachineFactory) Create(candidateView uint64, _ flo
 	return NewPSVersionUpgradeStateMachine(f.telemetry, candidateView, parentState, mutator), nil
 }
 
-// SetValueKVStoreStateMachineFactory is a factory for creating SetValueKVStoreStateMachineFactory instances.
-type SetValueKVStoreStateMachineFactory struct {
+// SetValueStateMachineFactory is a factory for creating SetValueStateMachine instances.
+type SetValueStateMachineFactory struct {
 	telemetry protocol_state.StateMachineTelemetryConsumer
 }
 
-var _ protocol_state.KeyValueStoreStateMachineFactory = (*SetValueKVStoreStateMachineFactory)(nil)
+var _ protocol_state.KeyValueStoreStateMachineFactory = (*SetValueStateMachineFactory)(nil)
 
-func NewSetValueKVStoreStateMachineFactory(telemetry protocol_state.StateMachineTelemetryConsumer) *SetValueKVStoreStateMachineFactory {
-	return &SetValueKVStoreStateMachineFactory{telemetry: telemetry}
+// NewSetValueStateMachineFactory returns a factory for instantiating SetValueStateMachines.
+// The created state machines report their operations to the provided telemetry consumer.
+func NewSetValueStateMachineFactory(telemetry protocol_state.StateMachineTelemetryConsumer) *SetValueStateMachineFactory {
+	return &SetValueStateMachineFactory{telemetry: telemetry}
 }
 
-// Create creates a new instance of SetValueKVStoreStateMachineFactory.
+// Create creates a new instance of SetValueStateMachine.
 // No errors are expected during normal operations.
-func (f *SetValueKVStoreStateMachineFactory) Create(candidateView uint64, _ flow.Identifier, parentState protocol.KVStoreReader, mutator protocol_state.KVStoreMutator) (protocol_state.KeyValueStoreStateMachine, error) {
+func (f *SetValueStateMachineFactory) Create(candidateView uint64, _ flow.Identifier, parentState protocol.KVStoreReader, mutator protocol_state.KVStoreMutator) (protocol_state.KeyValueStoreStateMachine, error) {
 	return NewSetValueStateMachine(f.telemetry, candidateView, parentState, mutator), nil
 }
