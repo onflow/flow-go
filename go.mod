@@ -34,6 +34,7 @@ require (
 	github.com/ipfs/go-cid v0.4.1
 	github.com/ipfs/go-datastore v0.6.0
 	github.com/ipfs/go-ds-badger2 v0.1.3
+	github.com/ipfs/go-ds-pebble v0.3.1
 	github.com/ipfs/go-ipld-format v0.6.0
 	github.com/ipfs/go-log v1.0.5
 	github.com/ipfs/go-log/v2 v2.5.1
@@ -47,12 +48,12 @@ require (
 	github.com/multiformats/go-multiaddr-dns v0.3.1
 	github.com/multiformats/go-multihash v0.2.3
 	github.com/onflow/atree v0.8.0-rc.5
-	github.com/onflow/cadence v1.0.0-preview.41
+	github.com/onflow/cadence v1.0.0-preview.42
 	github.com/onflow/crypto v0.25.1
 	github.com/onflow/flow v0.3.4
 	github.com/onflow/flow-core-contracts/lib/go/contracts v1.3.1
 	github.com/onflow/flow-core-contracts/lib/go/templates v1.3.1
-	github.com/onflow/flow-go-sdk v1.0.0-preview.44
+	github.com/onflow/flow-go-sdk v1.0.0-preview.45
 	github.com/onflow/flow/protobuf/go/flow v0.4.5
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58
 	github.com/pierrec/lz4 v2.6.1+incompatible
@@ -96,6 +97,7 @@ require (
 	github.com/cockroachdb/pebble v1.1.1
 	github.com/coreos/go-semver v0.3.0
 	github.com/docker/go-units v0.5.0
+	github.com/dustin/go-humanize v1.0.1
 	github.com/glebarez/go-sqlite v1.22.0
 	github.com/go-playground/validator/v10 v10.14.1
 	github.com/golang/snappy v0.0.5-0.20220116011046-fa5810519dcb
@@ -164,7 +166,6 @@ require (
 	github.com/desertbit/timer v0.0.0-20180107155436-c41aec40b27f // indirect
 	github.com/dgraph-io/ristretto v0.1.0 // indirect
 	github.com/dgryski/go-farm v0.0.0-20190423205320-6a90982ecee2 // indirect
-	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/elastic/gosigar v0.14.2 // indirect
 	github.com/ethereum/c-kzg-4844 v1.0.0 // indirect
 	github.com/ethereum/go-verkle v0.1.1-0.20240306133620-7d920df305f0 // indirect
@@ -330,3 +331,6 @@ require (
 
 // Using custom fork until https://github.com/onflow/flow-go/issues/5338 is resolved
 replace github.com/ipfs/boxo => github.com/onflow/boxo v0.0.0-20240201202436-f2477b92f483
+
+// TODO: remove it when https://github.com/ipfs/go-ds-pebble/pull/36 merged
+replace github.com/ipfs/go-ds-pebble v0.3.1 => github.com/onflow/go-ds-pebble v0.0.0-20240731130313-f186539f382c
