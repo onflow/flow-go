@@ -16,9 +16,6 @@ var ErrUnknownReferenceBlock = errors.New("unknown reference block")
 // execution data syncing and indexing is disabled
 var IndexReporterNotInitialized = errors.New("index reported not initialized")
 
-// SealedIndexedHeightThresholdLimit is returned when gap between sealed and indexed height is larger than allowed
-var SealedIndexedHeightThresholdLimit = errors.New("gap between sealed and indexed height is larger than allowed")
-
 // IncompleteTransactionError indicates that a transaction is missing one or more required fields.
 type IncompleteTransactionError struct {
 	MissingFields []string
@@ -121,4 +118,19 @@ func (e InsufficientBalanceError) Error() string {
 func IsInsufficientBalanceError(err error) bool {
 	var balanceError InsufficientBalanceError
 	return errors.As(err, &balanceError)
+}
+
+type IndexedHeightTooBehindError struct {
+	SealedHeight  uint64
+	IndexedHeight uint64
+}
+
+func (e IndexedHeightTooBehindError) Error() string {
+	return fmt.Sprintf("the difference between the latest sealed height (%d) and indexed height (%d) exceeds the maximum gap allowed",
+		e.SealedHeight, e.IndexedHeight)
+}
+
+func IsIndexedHeightTooBehindError(err error) bool {
+	var indexedError IndexedHeightTooBehindError
+	return errors.As(err, &indexedError)
 }

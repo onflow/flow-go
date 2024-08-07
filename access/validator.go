@@ -205,6 +205,10 @@ func (v *TransactionValidator) Validate(ctx context.Context, tx *flow.Transactio
 
 	err = v.checkSufficientBalanceToPayForTransaction(ctx, tx)
 	if err != nil {
+		if IsIndexedHeightTooBehindError(err) {
+			return err
+		}
+
 		// we only return InsufficientBalanceError as it's a client-side issue
 		// that requires action from a user. Other errors (e.g. parsing errors)
 		// are 'internal' and related to script execution process. they shouldn't
@@ -419,8 +423,9 @@ func (v *TransactionValidator) checkSufficientBalanceToPayForTransaction(ctx con
 		return fmt.Errorf("could not get indexed height: %w", err)
 	}
 
-	if header.Height-indexedHeight >= DefaultSealedIndexedHeightThresholdNumber {
-		return fmt.Errorf("the gap between sealed and indexed height is larger than threshold: %w", SealedIndexedHeightThresholdLimit)
+	sealedHeight := header.Height
+	if sealedHeight-DefaultSealedIndexedHeightThresholdNumber > indexedHeight {
+		return IndexedHeightTooBehindError{SealedHeight: sealedHeight, IndexedHeight: indexedHeight}
 	}
 
 	payerAddress := cadence.NewAddress(tx.Payer)

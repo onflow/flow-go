@@ -52,10 +52,6 @@ func (s *TransactionValidatorSuite) SetupTest() {
 		On("SealedHeader").
 		Return(s.header, nil)
 
-	s.blocks.
-		On("IndexedHeight").
-		Return(s.blocks, nil)
-
 	s.chain = flow.Testnet.Chain()
 	s.validatorOptions = access.TransactionValidationOptions{
 		CheckPayerBalance:      true,
@@ -88,6 +84,10 @@ func (s *TransactionValidatorSuite) TestTransactionValidator_ScriptExecutorInter
 	scriptExecutor := execmock.NewScriptExecutor(s.T())
 	assert.NotNil(s.T(), scriptExecutor)
 
+	s.blocks.
+		On("IndexedHeight").
+		Return(s.header.Height, nil)
+
 	scriptExecutor.
 		On("ExecuteAtBlockHeight", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(nil, errors.New("script executor internal error")).
@@ -114,6 +114,10 @@ func (s *TransactionValidatorSuite) TestTransactionValidator_SufficientBalance()
 	actualResponseValue := cadence.NewStruct(fields).WithType(verifyPayerBalanceResultType)
 	actualResponse, err := jsoncdc.Encode(actualResponseValue)
 	assert.NoError(s.T(), err)
+
+	s.blocks.
+		On("IndexedHeight").
+		Return(s.header.Height, nil)
 
 	scriptExecutor.
 		On("ExecuteAtBlockHeight", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
@@ -142,6 +146,10 @@ func (s *TransactionValidatorSuite) TestTransactionValidator_InsufficientBalance
 	actualResponse, err := jsoncdc.Encode(actualResponseValue)
 	assert.NoError(s.T(), err)
 
+	s.blocks.
+		On("IndexedHeight").
+		Return(s.header.Height, nil)
+
 	scriptExecutor.
 		On("ExecuteAtBlockHeight", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(actualResponse, nil).
@@ -168,5 +176,27 @@ func (s *TransactionValidatorSuite) TestTransactionValidator_InsufficientBalance
 }
 
 func (s *TransactionValidatorSuite) TestTransactionValidator_SealedIndexedHeightThresholdLimit() {
+	scriptExecutor := execmock.NewScriptExecutor(s.T())
 
+	// setting indexed height to be behind of sealed by bigger number than allowed(30)
+	indexedHeight := s.header.Height - 40
+
+	s.blocks.
+		On("IndexedHeight").
+		Return(indexedHeight, nil)
+
+	validator, err := access.NewTransactionValidator(s.blocks, s.chain, s.validatorOptions, scriptExecutor)
+	assert.NoError(s.T(), err)
+	assert.NotNil(s.T(), validator)
+
+	txBody := unittest.TransactionBodyFixture()
+
+	expectedError := access.IndexedHeightTooBehindError{
+		SealedHeight:  s.header.Height,
+		IndexedHeight: indexedHeight,
+	}
+
+	actualErr := validator.Validate(context.Background(), &txBody)
+
+	assert.ErrorIs(s.T(), actualErr, expectedError)
 }
