@@ -13,6 +13,8 @@ type PSVersionUpgradeStateMachineFactory struct {
 
 var _ protocol_state.KeyValueStoreStateMachineFactory = (*PSVersionUpgradeStateMachineFactory)(nil)
 
+// NewPSVersionUpgradeStateMachineFactory returns a factory for instantiating PSVersionUpgradeStateMachines.
+// The created state machines report their operations to the provided telemetry consumer.
 func NewPSVersionUpgradeStateMachineFactory(telemetry protocol_state.StateMachineTelemetryConsumer) *PSVersionUpgradeStateMachineFactory {
 	return &PSVersionUpgradeStateMachineFactory{
 		telemetry: telemetry,

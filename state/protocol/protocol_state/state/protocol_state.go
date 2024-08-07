@@ -99,6 +99,14 @@ func NewMutableProtocolState(
 	commits storage.EpochCommits,
 ) *MutableProtocolState {
 	log = log.With().Str("module", "dynamic_protocol_state").Logger()
+	// TODO [future generalization]: ideally, the telemetry consumers would be injected into the constructor
+	// mirroring telemetry collection in HotStuff. Thereby it would become possible to add more advanced supervision
+	// logic or to expose the telemetry as structured data by implementing custom telemetry consumers. At the moment,
+	// we only desire to log events picked up by the state machines, so the implementation below suffices. In case
+	// of two proposals for the same view, our current `StateMachineTelemetryConsumer` by itself does not collect
+	// sufficient context to differentiate events from the two blocks, as it only observes the view number. From the
+	// surrounding logs, we can infer the proposals' IDs. However, for more advanced analytics on the state machines,
+	// we might want to extend the current Telemetry implementation in the future.
 	epochHappyPathTelemetryFactory := func(candidateView uint64) protocol_state.StateMachineTelemetryConsumer {
 		return pubsub.NewLogConsumer(
 			log.With().
@@ -123,8 +131,7 @@ func NewMutableProtocolState(
 	// all factories are expected to be called in order defined here.
 	kvStateMachineFactories := []protocol_state.KeyValueStoreStateMachineFactory{
 		kvstore.NewPSVersionUpgradeStateMachineFactory(psVersionUpgradeStateMachineTelemetry),
-		epochs.NewEpochStateMachineFactory(setups, commits, epochProtocolStateDB,
-			epochHappyPathTelemetryFactory, epochFallbackTelemetryFactory),
+		epochs.NewEpochStateMachineFactory(setups, commits, epochProtocolStateDB, epochHappyPathTelemetryFactory, epochFallbackTelemetryFactory),
 		kvstore.NewSetValueKVStoreStateMachineFactory(setKVStoreValueTelemetry),
 	}
 	return newMutableProtocolState(epochProtocolStateDB, kvstore.NewProtocolKVStore(kvStoreSnapshots), globalParams, headers, results, kvStateMachineFactories)
