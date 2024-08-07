@@ -98,17 +98,18 @@ func (t *CallTracer) Collect(txID gethCommon.Hash) {
 			l.Error().Err(err).Msg("failed to produce trace results")
 		}
 
-		if err = t.uploader.Upload(TraceID(txID, t.blockID), res); err != nil {
-			l.Error().Err(err).
-				Str("traces", string(res)).
-				Msg("failed to upload trace results, no more retries")
-			return
-		}
 		// reset tracing to have fresh state
 		if err := t.ResetTracer(); err != nil {
 			l.Error().Err(err).
 				Str("traces", string(res)).
 				Msg("failed to reset trace")
+			return
+		}
+
+		if err = t.uploader.Upload(TraceID(txID, t.blockID), res); err != nil {
+			l.Error().Err(err).
+				Str("traces", string(res)).
+				Msg("failed to upload trace results, no more retries")
 			return
 		}
 
