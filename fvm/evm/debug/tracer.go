@@ -36,6 +36,7 @@ type CallTracer struct {
 	tracer   *tracers.Tracer
 	uploader Uploader
 	blockID  flow.Identifier
+	txTracer *tracers.Tracer
 }
 
 func NewEVMCallTracer(uploader Uploader, logger zerolog.Logger) (*CallTracer, error) {
@@ -52,7 +53,10 @@ func NewEVMCallTracer(uploader Uploader, logger zerolog.Logger) (*CallTracer, er
 }
 
 func (t *CallTracer) TxTracer() *tracers.Tracer {
-	return NewSafeTxTracer(t)
+	if t.txTracer == nil {
+		t.txTracer = NewSafeTxTracer(t)
+	}
+	return t.txTracer
 }
 
 func (t *CallTracer) WithBlockID(id flow.Identifier) {
@@ -126,134 +130,148 @@ func NewSafeTxTracer(ct *CallTracer) *tracers.Tracer {
 		Str("block-id", ct.blockID.String()).
 		Logger()
 
-	wrapped.OnTxStart = func(
-		vm *tracing.VMContext,
-		tx *types.Transaction,
-		from gethCommon.Address,
-	) {
-		defer func() {
-			if r := recover(); r != nil {
-				err, ok := r.(error)
-				if !ok {
-					err = fmt.Errorf("panic: %v", r)
+	if ct.tracer.OnTxStart != nil {
+		wrapped.OnTxStart = func(
+			vm *tracing.VMContext,
+			tx *types.Transaction,
+			from gethCommon.Address,
+		) {
+			defer func() {
+				if r := recover(); r != nil {
+					err, ok := r.(error)
+					if !ok {
+						err = fmt.Errorf("panic: %v", r)
+					}
+					l.Err(err).
+						Stack().
+						Msg("OnTxStart trace collection failed")
 				}
-				l.Err(err).
-					Stack().
-					Msg("OnTxStart trace collection failed")
-			}
-		}()
-		ct.tracer.OnTxStart(vm, tx, from)
+			}()
+			ct.tracer.OnTxStart(vm, tx, from)
+		}
 	}
 
-	wrapped.OnTxEnd = func(receipt *types.Receipt, err error) {
-		defer func() {
-			if r := recover(); r != nil {
-				err, ok := r.(error)
-				if !ok {
-					err = fmt.Errorf("panic: %v", r)
+	if ct.tracer.OnTxEnd != nil {
+		wrapped.OnTxEnd = func(receipt *types.Receipt, err error) {
+			defer func() {
+				if r := recover(); r != nil {
+					err, ok := r.(error)
+					if !ok {
+						err = fmt.Errorf("panic: %v", r)
+					}
+					l.Err(err).
+						Stack().
+						Msg("OnTxEnd trace collection failed")
 				}
-				l.Err(err).
-					Stack().
-					Msg("OnTxEnd trace collection failed")
-			}
-		}()
-		ct.tracer.OnTxEnd(receipt, err)
+			}()
+			ct.tracer.OnTxEnd(receipt, err)
+		}
 	}
 
-	wrapped.OnEnter = func(
-		depth int,
-		typ byte,
-		from, to gethCommon.Address,
-		input []byte,
-		gas uint64,
-		value *big.Int,
-	) {
-		defer func() {
-			if r := recover(); r != nil {
-				err, ok := r.(error)
-				if !ok {
-					err = fmt.Errorf("panic: %v", r)
+	if ct.tracer.OnEnter != nil {
+		wrapped.OnEnter = func(
+			depth int,
+			typ byte,
+			from, to gethCommon.Address,
+			input []byte,
+			gas uint64,
+			value *big.Int,
+		) {
+			defer func() {
+				if r := recover(); r != nil {
+					err, ok := r.(error)
+					if !ok {
+						err = fmt.Errorf("panic: %v", r)
+					}
+					l.Err(err).
+						Stack().
+						Msg("OnEnter trace collection failed")
 				}
-				l.Err(err).
-					Stack().
-					Msg("OnEnter trace collection failed")
-			}
-		}()
-		ct.tracer.OnEnter(depth, typ, from, to, input, gas, value)
+			}()
+			ct.tracer.OnEnter(depth, typ, from, to, input, gas, value)
+		}
 	}
 
-	wrapped.OnExit = func(depth int, output []byte, gasUsed uint64, err error, reverted bool) {
-		defer func() {
-			if r := recover(); r != nil {
-				err, ok := r.(error)
-				if !ok {
-					err = fmt.Errorf("panic: %v", r)
+	if ct.tracer.OnExit != nil {
+		wrapped.OnExit = func(depth int, output []byte, gasUsed uint64, err error, reverted bool) {
+			defer func() {
+				if r := recover(); r != nil {
+					err, ok := r.(error)
+					if !ok {
+						err = fmt.Errorf("panic: %v", r)
+					}
+					l.Err(err).
+						Stack().
+						Msg("OnExit trace collection failed")
 				}
-				l.Err(err).
-					Stack().
-					Msg("OnExit trace collection failed")
-			}
-		}()
-		ct.tracer.OnExit(depth, output, gasUsed, err, reverted)
+			}()
+			ct.tracer.OnExit(depth, output, gasUsed, err, reverted)
+		}
 	}
 
-	wrapped.OnOpcode = func(
-		pc uint64,
-		op byte,
-		gas, cost uint64,
-		scope tracing.OpContext,
-		rData []byte,
-		depth int,
-		err error,
-	) {
-		defer func() {
-			if r := recover(); r != nil {
-				err, ok := r.(error)
-				if !ok {
-					err = fmt.Errorf("panic: %v", r)
+	if ct.tracer.OnOpcode != nil {
+		wrapped.OnOpcode = func(
+			pc uint64,
+			op byte,
+			gas, cost uint64,
+			scope tracing.OpContext,
+			rData []byte,
+			depth int,
+			err error,
+		) {
+			defer func() {
+				if r := recover(); r != nil {
+					err, ok := r.(error)
+					if !ok {
+						err = fmt.Errorf("panic: %v", r)
+					}
+					l.Err(err).
+						Stack().
+						Msg("OnOpcode trace collection failed")
 				}
-				l.Err(err).
-					Stack().
-					Msg("OnOpcode trace collection failed")
-			}
-		}()
-		ct.tracer.OnOpcode(pc, op, gas, cost, scope, rData, depth, err)
+			}()
+			ct.tracer.OnOpcode(pc, op, gas, cost, scope, rData, depth, err)
+		}
 	}
 
-	wrapped.OnFault = func(
-		pc uint64,
-		op byte,
-		gas, cost uint64,
-		scope tracing.OpContext,
-		depth int,
-		err error) {
-		defer func() {
-			if r := recover(); r != nil {
-				err, ok := r.(error)
-				if !ok {
-					err = fmt.Errorf("panic: %v", r)
+	if ct.tracer.OnFault != nil {
+		wrapped.OnFault = func(
+			pc uint64,
+			op byte,
+			gas, cost uint64,
+			scope tracing.OpContext,
+			depth int,
+			err error) {
+			defer func() {
+				if r := recover(); r != nil {
+					err, ok := r.(error)
+					if !ok {
+						err = fmt.Errorf("panic: %v", r)
+					}
+					l.Err(err).
+						Stack().
+						Msg("OnFault trace collection failed")
 				}
-				l.Err(err).
-					Stack().
-					Msg("OnFault trace collection failed")
-			}
-		}()
-		ct.tracer.OnFault(pc, op, gas, cost, scope, depth, err)
+			}()
+			ct.tracer.OnFault(pc, op, gas, cost, scope, depth, err)
+		}
 	}
 
-	wrapped.OnGasChange = func(old, new uint64, reason tracing.GasChangeReason) {
-		defer func() {
-			if r := recover(); r != nil {
-				err, ok := r.(error)
-				if !ok {
-					err = fmt.Errorf("panic: %v", r)
+	if ct.tracer.OnGasChange != nil {
+		wrapped.OnGasChange = func(old, new uint64, reason tracing.GasChangeReason) {
+			defer func() {
+				if r := recover(); r != nil {
+					err, ok := r.(error)
+					if !ok {
+						err = fmt.Errorf("panic: %v", r)
+					}
+					l.Err(err).
+						Stack().
+						Msg("OnGasChange trace collection failed")
 				}
-				l.Err(err).
-					Stack().
-					Msg("OnGasChange trace collection failed")
-			}
-		}()
-		ct.tracer.OnGasChange(old, new, reason)
+			}()
+			ct.tracer.OnGasChange(old, new, reason)
+		}
 	}
 
 	wrapped.GetResult = ct.tracer.GetResult
