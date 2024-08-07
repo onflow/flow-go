@@ -662,7 +662,7 @@ func TestExtendInvalidChainID(t *testing.T) {
 
 // TestExtendReceiptsNotSorted tests the case where receipts are included in a block payload
 // not sorted by height. Previously, this constraint was required (unordered receipts resulted
-// in an error). Now, any ordering of receipts should be accepted by the Mutator.
+// in an error). Now, any ordering of receipts should be accepted by the EvolvingState.
 func TestExtendReceiptsNotSorted(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
 	rootProtocolStateID := getRootProtocolStateID(t, rootSnapshot)

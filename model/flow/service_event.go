@@ -24,6 +24,7 @@ const (
 	ServiceEventRecover                     ServiceEventType = "recover"
 	ServiceEventVersionBeacon               ServiceEventType = "version-beacon"                 // VersionBeacon only controls version of ENs, describing software compatability via semantic versioning
 	ServiceEventProtocolStateVersionUpgrade ServiceEventType = "protocol-state-version-upgrade" // Protocol State version applies to all nodes and uses an _integer version_ of the _protocol_
+	ServiceEventSetEpochExtensionViewCount  ServiceEventType = "set-epoch-extension-view-count" // Sets value for parameter `EpochExtensionViewCount` in the protocol state's KV store.
 )
 
 // ServiceEvent represents a service event, which is a special event that when
@@ -124,6 +125,8 @@ func (marshaller marshallerImpl) UnmarshalWrapped(b []byte) (ServiceEvent, error
 		event, err = unmarshalWrapped[VersionBeacon](b, marshaller)
 	case ServiceEventProtocolStateVersionUpgrade:
 		event, err = unmarshalWrapped[ProtocolStateVersionUpgrade](b, marshaller)
+	case ServiceEventSetEpochExtensionViewCount:
+		event, err = unmarshalWrapped[SetEpochExtensionViewCount](b, marshaller)
 	default:
 		return ServiceEvent{}, fmt.Errorf("invalid type: %s", eventType)
 	}
@@ -168,6 +171,8 @@ func (marshaller marshallerImpl) UnmarshalWithType(b []byte, eventType ServiceEv
 		event = new(VersionBeacon)
 	case ServiceEventProtocolStateVersionUpgrade:
 		event = new(ProtocolStateVersionUpgrade)
+	case ServiceEventSetEpochExtensionViewCount:
+		event = new(SetEpochExtensionViewCount)
 	default:
 		return ServiceEvent{}, fmt.Errorf("invalid type: %s", eventType)
 	}
@@ -308,6 +313,23 @@ func (se *ServiceEvent) EqualTo(other *ServiceEvent) (bool, error) {
 				)
 		}
 		return version.EqualTo(otherVersion), nil
+	case ServiceEventSetEpochExtensionViewCount:
+		typedEvent, ok := se.Event.(*SetEpochExtensionViewCount)
+		if !ok {
+			return false, fmt.Errorf(
+				"internal invalid type for SetEpochExtensionViewCount: %T",
+				se.Event,
+			)
+		}
+		otherTypedEvent, ok := other.Event.(*SetEpochExtensionViewCount)
+		if !ok {
+			return false,
+				fmt.Errorf(
+					"internal invalid type for SetEpochExtensionViewCount: %T",
+					other.Event,
+				)
+		}
+		return typedEvent.EqualTo(otherTypedEvent), nil
 
 	default:
 		return false, fmt.Errorf("unknown serice event type: %s", se.Type)

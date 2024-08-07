@@ -2,26 +2,27 @@ package flow_test
 
 import (
 	"encoding/json"
+	"math/rand"
 	"testing"
 
 	"github.com/fxamacker/cbor/v2"
 	"github.com/google/go-cmp/cmp"
+	gocmp "github.com/google/go-cmp/cmp"
 	"github.com/onflow/crypto"
 	"github.com/stretchr/testify/require"
 	"github.com/vmihailenco/msgpack"
 	"gotest.tools/assert"
 
-	cborcodec "github.com/onflow/flow-go/model/encoding/cbor"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestEncodeDecode(t *testing.T) {
-
 	setup := unittest.EpochSetupFixture()
 	commit := unittest.EpochCommitFixture()
 	versionBeacon := unittest.VersionBeaconFixture()
 	protocolVersionUpgrade := unittest.ProtocolStateVersionUpgradeFixture()
+	setEpochExtensionViewCount := &flow.SetEpochExtensionViewCount{Value: uint64(rand.Uint32())}
 
 	comparePubKey := cmp.FilterValues(func(a, b crypto.PublicKey) bool {
 		return true
@@ -35,273 +36,185 @@ func TestEncodeDecode(t *testing.T) {
 	t.Run("json", func(t *testing.T) {
 		t.Run("specific event types", func(t *testing.T) {
 			// EpochSetup
-			b, err := json.Marshal(setup)
-			require.NoError(t, err)
-
-			gotSetup := new(flow.EpochSetup)
-			err = json.Unmarshal(b, gotSetup)
-			require.NoError(t, err)
-			assert.DeepEqual(t, setup, gotSetup, comparePubKey)
+			assertJsonConvert(t, setup, comparePubKey)
 
 			// EpochCommit
-			b, err = json.Marshal(commit)
-			require.NoError(t, err)
-
-			gotCommit := new(flow.EpochCommit)
-			err = json.Unmarshal(b, gotCommit)
-			require.NoError(t, err)
-			assert.DeepEqual(t, commit, gotCommit, comparePubKey)
+			assertJsonConvert(t, commit, comparePubKey)
 
 			// VersionBeacon
-			b, err = json.Marshal(versionBeacon)
-			require.NoError(t, err)
-
-			gotVersionBeacon := new(flow.VersionBeacon)
-			err = json.Unmarshal(b, gotVersionBeacon)
-			require.NoError(t, err)
-			assert.DeepEqual(t, versionBeacon, gotVersionBeacon)
+			assertJsonConvert(t, versionBeacon)
 
 			// ProtocolStateVersionUpgrade
-			b, err = json.Marshal(protocolVersionUpgrade)
-			require.NoError(t, err)
+			assertJsonConvert(t, protocolVersionUpgrade)
 
-			gotProtocolVersionUpgrade := new(flow.ProtocolStateVersionUpgrade)
-			err = json.Unmarshal(b, gotProtocolVersionUpgrade)
-			require.NoError(t, err)
-			assert.DeepEqual(t, protocolVersionUpgrade, gotProtocolVersionUpgrade)
+			// SetEpochExtensionViewCount
+			assertJsonConvert(t, setEpochExtensionViewCount)
 		})
 
 		t.Run("generic type", func(t *testing.T) {
 			// EpochSetup
-			b, err := json.Marshal(setup.ServiceEvent())
-			require.NoError(t, err)
-
-			outer := new(flow.ServiceEvent)
-			err = json.Unmarshal(b, outer)
-			require.NoError(t, err)
-			gotSetup, ok := outer.Event.(*flow.EpochSetup)
-			require.True(t, ok)
-			assert.DeepEqual(t, setup, gotSetup, comparePubKey)
+			assertJsonGenericConvert(t, setup, comparePubKey)
 
 			// EpochCommit
-			t.Logf("- debug: setup.ServiceEvent()=%+v\n", setup.ServiceEvent())
-			b, err = json.Marshal(commit.ServiceEvent())
-			require.NoError(t, err)
-
-			outer = new(flow.ServiceEvent)
-			t.Logf("- debug: outer=%+v <-- before .UnmarshalWrapped()\n", outer)
-			err = json.Unmarshal(b, outer)
-			t.Logf("- debug: outer=%+v <-- after .UnmarshalWrapped()\n", outer)
-			require.NoError(t, err)
-			gotCommit, ok := outer.Event.(*flow.EpochCommit)
-			require.True(t, ok)
-			assert.DeepEqual(t, commit, gotCommit, comparePubKey)
+			assertJsonGenericConvert(t, commit, comparePubKey)
 
 			// VersionBeacon
-			t.Logf("- debug: versionBeacon.ServiceEvent()=%+v\n", versionBeacon.ServiceEvent())
-			b, err = json.Marshal(versionBeacon.ServiceEvent())
-			require.NoError(t, err)
-
-			outer = new(flow.ServiceEvent)
-			t.Logf("- debug: outer=%+v <-- before .UnmarshalWrapped()\n", outer)
-			err = json.Unmarshal(b, outer)
-			t.Logf("- debug: outer=%+v <-- after .UnmarshalWrapped()\n", outer)
-			require.NoError(t, err)
-			gotVersionTable, ok := outer.Event.(*flow.VersionBeacon)
-			require.True(t, ok)
-			assert.DeepEqual(t, versionBeacon, gotVersionTable)
+			assertJsonGenericConvert(t, versionBeacon)
 
 			// ProtocolStateVersionUpgrade
-			b, err = json.Marshal(protocolVersionUpgrade.ServiceEvent())
-			require.NoError(t, err)
+			assertJsonGenericConvert(t, protocolVersionUpgrade)
 
-			outer = new(flow.ServiceEvent)
-			err = json.Unmarshal(b, outer)
-			require.NoError(t, err)
-			gotProtocolVersionUpgrade, ok := outer.Event.(*flow.ProtocolStateVersionUpgrade)
-			require.True(t, ok)
-			assert.DeepEqual(t, protocolVersionUpgrade, gotProtocolVersionUpgrade)
+			// SetEpochExtensionViewCount
+			assertJsonGenericConvert(t, setEpochExtensionViewCount)
 		})
 	})
 
 	t.Run("msgpack", func(t *testing.T) {
 		t.Run("specific event types", func(t *testing.T) {
 			// EpochSetup
-			b, err := msgpack.Marshal(setup)
-			require.NoError(t, err)
-
-			gotSetup := new(flow.EpochSetup)
-			err = msgpack.Unmarshal(b, gotSetup)
-			require.NoError(t, err)
-			assert.DeepEqual(t, setup, gotSetup, comparePubKey)
+			assertMsgPackConvert(t, setup, comparePubKey)
 
 			// EpochCommit
-			b, err = msgpack.Marshal(commit)
-			require.NoError(t, err)
-
-			gotCommit := new(flow.EpochCommit)
-			err = msgpack.Unmarshal(b, gotCommit)
-			require.NoError(t, err)
-			assert.DeepEqual(t, commit, gotCommit, comparePubKey)
+			assertMsgPackConvert(t, commit, comparePubKey)
 
 			// VersionBeacon
-			b, err = msgpack.Marshal(versionBeacon)
-			require.NoError(t, err)
-
-			gotVersionTable := new(flow.VersionBeacon)
-			err = msgpack.Unmarshal(b, gotVersionTable)
-			require.NoError(t, err)
-			assert.DeepEqual(t, versionBeacon, gotVersionTable)
+			assertMsgPackConvert(t, versionBeacon)
 
 			// ProtocolStateVersionUpgrade
-			b, err = msgpack.Marshal(protocolVersionUpgrade)
-			require.NoError(t, err)
+			assertMsgPackConvert(t, protocolVersionUpgrade)
 
-			gotProtocolVersionUpgrade := new(flow.ProtocolStateVersionUpgrade)
-			err = msgpack.Unmarshal(b, gotProtocolVersionUpgrade)
-			require.NoError(t, err)
-			assert.DeepEqual(t, protocolVersionUpgrade, gotProtocolVersionUpgrade)
+			// SetEpochExtensionViewCount
+			assertMsgPackConvert(t, setEpochExtensionViewCount)
 		})
 
 		t.Run("generic type", func(t *testing.T) {
-			b, err := msgpack.Marshal(setup.ServiceEvent())
-			require.NoError(t, err)
-
-			outer := new(flow.ServiceEvent)
-			err = msgpack.Unmarshal(b, outer)
-			require.NoError(t, err)
-			gotSetup, ok := outer.Event.(*flow.EpochSetup)
-			require.True(t, ok)
-			assert.DeepEqual(t, setup, gotSetup, comparePubKey)
+			// EpochSetup
+			assertMsgPackGenericConvert(t, setup, comparePubKey)
 
 			// EpochCommit
-			t.Logf("- debug: setup.ServiceEvent()=%+v\n", setup.ServiceEvent())
-			b, err = msgpack.Marshal(commit.ServiceEvent())
-			require.NoError(t, err)
-
-			outer = new(flow.ServiceEvent)
-			t.Logf("- debug: outer=%+v <-- before .UnmarshalWrapped()\n", outer)
-			err = msgpack.Unmarshal(b, outer)
-			t.Logf("- debug: outer=%+v <-- after .UnmarshalWrapped()\n", outer)
-			require.NoError(t, err)
-			gotCommit, ok := outer.Event.(*flow.EpochCommit)
-			require.True(t, ok)
-			assert.DeepEqual(t, commit, gotCommit, comparePubKey)
+			assertMsgPackGenericConvert(t, commit, comparePubKey)
 
 			// VersionBeacon
-			t.Logf("- debug: versionTable.ServiceEvent()=%+v\n", versionBeacon.ServiceEvent())
-			b, err = msgpack.Marshal(versionBeacon.ServiceEvent())
-			require.NoError(t, err)
-
-			outer = new(flow.ServiceEvent)
-			t.Logf("- debug: outer=%+v <-- before .UnmarshalWrapped()\n", outer)
-			err = msgpack.Unmarshal(b, outer)
-			t.Logf("- debug: outer=%+v <-- after .UnmarshalWrapped()\n", outer)
-			require.NoError(t, err)
-			gotVersionTable, ok := outer.Event.(*flow.VersionBeacon)
-			require.True(t, ok)
-			assert.DeepEqual(t, versionBeacon, gotVersionTable, comparePubKey)
+			assertMsgPackGenericConvert(t, versionBeacon, comparePubKey)
 
 			// ProtocolStateVersionUpgrade
-			b, err = msgpack.Marshal(protocolVersionUpgrade.ServiceEvent())
-			require.NoError(t, err)
+			assertMsgPackGenericConvert(t, protocolVersionUpgrade)
 
-			outer = new(flow.ServiceEvent)
-			err = msgpack.Unmarshal(b, outer)
-			require.NoError(t, err)
-			gotProtocolVersionUpgrade, ok := outer.Event.(*flow.ProtocolStateVersionUpgrade)
-			require.True(t, ok)
-			assert.DeepEqual(t, protocolVersionUpgrade, gotProtocolVersionUpgrade)
+			// SetEpochExtensionViewCount
+			assertMsgPackGenericConvert(t, setEpochExtensionViewCount)
 		})
 	})
 
 	t.Run("cbor", func(t *testing.T) {
 		t.Run("specific event types", func(t *testing.T) {
 			// EpochSetup
-			b, err := cborcodec.EncMode.Marshal(setup)
-			require.NoError(t, err)
-
-			gotSetup := new(flow.EpochSetup)
-			err = cbor.Unmarshal(b, gotSetup)
-			require.NoError(t, err)
-			assert.DeepEqual(t, setup, gotSetup, comparePubKey)
+			assertCborConvert(t, setup, comparePubKey)
 
 			// EpochCommit
-			b, err = cborcodec.EncMode.Marshal(commit)
-			require.NoError(t, err)
-
-			gotCommit := new(flow.EpochCommit)
-			err = cbor.Unmarshal(b, gotCommit)
-			require.NoError(t, err)
-			assert.DeepEqual(t, commit, gotCommit, comparePubKey)
+			assertCborConvert(t, commit, comparePubKey)
 
 			// VersionBeacon
-			b, err = cborcodec.EncMode.Marshal(versionBeacon)
-			require.NoError(t, err)
-
-			gotVersionTable := new(flow.VersionBeacon)
-			err = cbor.Unmarshal(b, gotVersionTable)
-			require.NoError(t, err)
-			assert.DeepEqual(t, versionBeacon, gotVersionTable)
+			assertCborConvert(t, versionBeacon)
 
 			// ProtocolStateVersionUpgrade
-			b, err = cborcodec.EncMode.Marshal(protocolVersionUpgrade)
-			require.NoError(t, err)
+			assertCborConvert(t, protocolVersionUpgrade)
 
-			gotProtocolVersionUpgrade := new(flow.ProtocolStateVersionUpgrade)
-			err = cbor.Unmarshal(b, gotProtocolVersionUpgrade)
-			require.NoError(t, err)
-			assert.DeepEqual(t, protocolVersionUpgrade, gotProtocolVersionUpgrade)
+			// SetEpochExtensionViewCount
+			assertCborConvert(t, setEpochExtensionViewCount)
 		})
 
 		t.Run("generic type", func(t *testing.T) {
 			// EpochSetup
-			t.Logf("- debug: setup.ServiceEvent()=%+v\n", setup.ServiceEvent())
-			b, err := cborcodec.EncMode.Marshal(setup.ServiceEvent())
-			require.NoError(t, err)
-
-			outer := new(flow.ServiceEvent)
-			t.Logf("- debug: outer=%+v <-- before .UnmarshalWrapped()\n", outer)
-			err = cbor.Unmarshal(b, outer)
-			t.Logf("- debug: outer=%+v <-- after .UnmarshalWrapped()\n", outer)
-			require.NoError(t, err)
-			gotSetup, ok := outer.Event.(*flow.EpochSetup)
-			require.True(t, ok)
-			assert.DeepEqual(t, setup, gotSetup, comparePubKey)
+			assertCborGenericConvert(t, setup, comparePubKey)
 
 			// EpochCommit
-			b, err = cborcodec.EncMode.Marshal(commit.ServiceEvent())
-			require.NoError(t, err)
-
-			outer = new(flow.ServiceEvent)
-			err = cbor.Unmarshal(b, outer)
-			require.NoError(t, err)
-			gotCommit, ok := outer.Event.(*flow.EpochCommit)
-			require.True(t, ok)
-			assert.DeepEqual(t, commit, gotCommit, comparePubKey)
+			assertCborGenericConvert(t, commit, comparePubKey)
 
 			// VersionBeacon
-			t.Logf("- debug: setup.ServiceEvent()=%+v\n", versionBeacon.ServiceEvent())
-			b, err = cborcodec.EncMode.Marshal(versionBeacon.ServiceEvent())
-			require.NoError(t, err)
-
-			outer = new(flow.ServiceEvent)
-			err = cbor.Unmarshal(b, outer)
-			require.NoError(t, err)
-			gotVersionTable, ok := outer.Event.(*flow.VersionBeacon)
-			require.True(t, ok)
-			assert.DeepEqual(t, versionBeacon, gotVersionTable)
+			assertCborGenericConvert(t, versionBeacon)
 
 			// ProtocolStateVersionUpgrade
-			b, err = cborcodec.EncMode.Marshal(protocolVersionUpgrade.ServiceEvent())
-			require.NoError(t, err)
+			assertCborGenericConvert(t, protocolVersionUpgrade)
 
-			outer = new(flow.ServiceEvent)
-			err = cbor.Unmarshal(b, outer)
-			require.NoError(t, err)
-			gotProtocolVersionUpgrade, ok := outer.Event.(*flow.ProtocolStateVersionUpgrade)
-			require.True(t, ok)
-			assert.DeepEqual(t, protocolVersionUpgrade, gotProtocolVersionUpgrade)
+			// SetEpochExtensionViewCount
+			assertCborGenericConvert(t, setEpochExtensionViewCount)
 		})
 	})
+}
+
+// ServiceEventCapable is an interface to convert a specific event type to a generic ServiceEvent type.
+type ServiceEventCapable interface {
+	ServiceEvent() flow.ServiceEvent
+}
+
+// assertJsonConvert asserts that value `v` can be marshaled and unmarshaled to/from JSON.
+func assertJsonConvert[T any](t *testing.T, v *T, opts ...gocmp.Option) {
+	b, err := json.Marshal(v)
+	require.NoError(t, err)
+
+	got := new(T)
+	err = json.Unmarshal(b, got)
+	require.NoError(t, err)
+	assert.DeepEqual(t, v, got, opts...)
+}
+
+// assertJsonGenericConvert asserts that value `v` can be marshaled and unmarshaled to/from JSON as a generic ServiceEvent.
+func assertJsonGenericConvert[T ServiceEventCapable](t *testing.T, v T, opts ...gocmp.Option) {
+	b, err := json.Marshal(v.ServiceEvent())
+	require.NoError(t, err)
+
+	outer := new(flow.ServiceEvent)
+	err = json.Unmarshal(b, outer)
+	require.NoError(t, err)
+	got, ok := outer.Event.(T)
+	require.True(t, ok)
+	assert.DeepEqual(t, v, got, opts...)
+}
+
+// assertMsgPackConvert asserts that value `v` can be marshaled and unmarshaled to/from MessagePack.
+func assertMsgPackConvert[T any](t *testing.T, v *T, opts ...gocmp.Option) {
+	b, err := msgpack.Marshal(v)
+	require.NoError(t, err)
+
+	got := new(T)
+	err = msgpack.Unmarshal(b, got)
+	require.NoError(t, err)
+	assert.DeepEqual(t, v, got, opts...)
+}
+
+// assertMsgPackGenericConvert asserts that value `v` can be marshaled and unmarshaled to/from MessagePack as a generic ServiceEvent.
+func assertMsgPackGenericConvert[T ServiceEventCapable](t *testing.T, v T, opts ...gocmp.Option) {
+	b, err := msgpack.Marshal(v.ServiceEvent())
+	require.NoError(t, err)
+
+	outer := new(flow.ServiceEvent)
+	err = msgpack.Unmarshal(b, outer)
+	require.NoError(t, err)
+	got, ok := outer.Event.(T)
+	require.True(t, ok)
+	assert.DeepEqual(t, v, got, opts...)
+}
+
+// assertCborConvert asserts that value `v` can be marshaled and unmarshaled to/from CBOR.
+func assertCborConvert[T any](t *testing.T, v *T, opts ...gocmp.Option) {
+	b, err := cbor.Marshal(v)
+	require.NoError(t, err)
+
+	got := new(T)
+	err = cbor.Unmarshal(b, got)
+	require.NoError(t, err)
+	assert.DeepEqual(t, v, got, opts...)
+}
+
+// assertCborGenericConvert asserts that value `v` can be marshaled and unmarshaled to/from CBOR as a generic ServiceEvent.
+func assertCborGenericConvert[T ServiceEventCapable](t *testing.T, v T, opts ...gocmp.Option) {
+	b, err := cbor.Marshal(v.ServiceEvent())
+	require.NoError(t, err)
+
+	outer := new(flow.ServiceEvent)
+	err = cbor.Unmarshal(b, outer)
+	require.NoError(t, err)
+	got, ok := outer.Event.(T)
+	require.True(t, ok)
+	assert.DeepEqual(t, v, got, opts...)
 }
