@@ -75,10 +75,17 @@ func (suite *MutatorSuite) SetupTest() {
 
 	seal.ResultID = result.ID()
 	qc := unittest.QuorumCertificateFixture(unittest.QCWithRootBlockID(genesis.ID()))
-	genesis.Payload.ProtocolStateID = kvstore.NewDefaultKVStore(inmem.EpochProtocolStateFromServiceEvents(
-		result.ServiceEvents[0].Event.(*flow.EpochSetup),
-		result.ServiceEvents[1].Event.(*flow.EpochCommit),
-	).ID()).ID()
+	safetyParams, err := protocol.DefaultEpochSafetyParams(genesis.Header.ChainID)
+	require.NoError(suite.T(), err)
+	rootProtocolState, err := kvstore.NewDefaultKVStore(
+		safetyParams.FinalizationSafetyThreshold,
+		safetyParams.EpochExtensionViewCount,
+		inmem.EpochProtocolStateFromServiceEvents(
+			result.ServiceEvents[0].Event.(*flow.EpochSetup),
+			result.ServiceEvents[1].Event.(*flow.EpochCommit),
+		).ID())
+	require.NoError(suite.T(), err)
+	genesis.Payload.ProtocolStateID = rootProtocolState.ID()
 	rootSnapshot, err := inmem.SnapshotFromBootstrapState(genesis, result, seal, qc)
 	require.NoError(suite.T(), err)
 	suite.epochCounter = rootSnapshot.Encodable().SealingSegment.LatestProtocolStateEntry().EpochEntry.EpochCounter()
@@ -104,6 +111,7 @@ func (suite *MutatorSuite) SetupTest() {
 	require.NoError(suite.T(), err)
 
 	suite.mutableProtocolState = protocol_state.NewMutableProtocolState(
+		log,
 		all.EpochProtocolStateEntries,
 		all.ProtocolKVStore,
 		state.Params(),

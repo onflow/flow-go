@@ -37,7 +37,7 @@ func (bs *BlockStore) BlockProposal() (*types.BlockProposal, error) {
 	// first fetch it from the storage
 	data, err := bs.backend.GetValue(bs.rootAddress[:], []byte(BlockStoreLatestBlockProposalKey))
 	if err != nil {
-		return nil, types.NewFatalError(err)
+		return nil, err
 	}
 	if len(data) != 0 {
 		return types.NewBlockProposalFromBytes(data)
@@ -141,11 +141,11 @@ func (bs *BlockStore) CommitBlockProposal(bp *types.BlockProposal) error {
 // LatestBlock returns the latest executed block
 func (bs *BlockStore) LatestBlock() (*types.Block, error) {
 	data, err := bs.backend.GetValue(bs.rootAddress[:], []byte(BlockStoreLatestBlockKey))
-	if len(data) == 0 {
-		return types.GenesisBlock, err
-	}
 	if err != nil {
-		return nil, types.NewFatalError(err)
+		return nil, err
+	}
+	if len(data) == 0 {
+		return types.GenesisBlock, nil
 	}
 	return types.NewBlockFromBytes(data)
 }

@@ -1,6 +1,7 @@
 package emulator_test
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"math"
@@ -45,23 +46,28 @@ func RunWithNewReadOnlyBlockView(t testing.TB, em *emulator.Emulator, f func(blk
 	f(blk)
 }
 
+func requireSuccessfulExecution(t testing.TB, err error, res *types.Result) {
+	require.NoError(t, err)
+	require.NoError(t, res.VMError)
+	require.NoError(t, res.ValidationError)
+}
+
 func TestNativeTokenBridging(t *testing.T) {
 	testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
 		testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
-			originalBalance := big.NewInt(10000)
+			originalBalance := types.MakeBigIntInFlow(3)
 			testAccount := types.NewAddressFromString("test")
 			bridgeAccount := types.NewAddressFromString("bridge")
-			nonce := uint64(0)
+			testAccountNonce := uint64(0)
 
 			t.Run("mint tokens to the first account", func(t *testing.T) {
 				RunWithNewEmulator(t, backend, rootAddr, func(env *emulator.Emulator) {
 					RunWithNewBlockView(t, env, func(blk types.BlockView) {
-						call := types.NewDepositCall(bridgeAccount, testAccount, originalBalance, nonce)
+						call := types.NewDepositCall(bridgeAccount, testAccount, originalBalance, 0)
 						res, err := blk.DirectCall(call)
-						require.NoError(t, err)
+						requireSuccessfulExecution(t, err, res)
 						require.Equal(t, defaultCtx.DirectCallBaseGasUsage, res.GasConsumed)
 						require.Equal(t, call.Hash(), res.TxHash)
-						nonce += 1
 					})
 				})
 				RunWithNewEmulator(t, backend, rootAddr, func(env *emulator.Emulator) {
@@ -69,31 +75,64 @@ func TestNativeTokenBridging(t *testing.T) {
 						retBalance, err := blk.BalanceOf(testAccount)
 						require.NoError(t, err)
 						require.Equal(t, originalBalance, retBalance)
-						// check balance of bridgeAccount to be zero
 
+						// check balance of bridgeAccount to be zero
 						retBalance, err = blk.BalanceOf(bridgeAccount)
 						require.NoError(t, err)
 						require.Equal(t, big.NewInt(0).Uint64(), retBalance.Uint64())
 					})
 				})
 			})
+			t.Run("tokens deposit to an smart contract that doesn't accept native token", func(t *testing.T) {
+				var testContract types.Address
+				// deploy contract
+				RunWithNewEmulator(t, backend, rootAddr, func(env *emulator.Emulator) {
+					RunWithNewBlockView(t, env, func(blk types.BlockView) {
+						emptyContractByteCode, err := hex.DecodeString("6080604052348015600e575f80fd5b50603e80601a5f395ff3fe60806040525f80fdfea2646970667358221220093c3754c634ed147652afc2e8c4a2336be5c37cbc733839668aa5a11e713e6e64736f6c634300081a0033")
+						require.NoError(t, err)
+						call := types.NewDeployCall(
+							bridgeAccount,
+							emptyContractByteCode,
+							100_000,
+							big.NewInt(0),
+							1)
+						res, err := blk.DirectCall(call)
+						requireSuccessfulExecution(t, err, res)
+						testContract = *res.DeployedContractAddress
+					})
+				})
+
+				RunWithNewEmulator(t, backend, rootAddr, func(env *emulator.Emulator) {
+					RunWithNewBlockView(t, env, func(blk types.BlockView) {
+						call := types.NewDepositCall(bridgeAccount, testContract, types.MakeBigIntInFlow(1), 0)
+						res, err := blk.DirectCall(call)
+						require.NoError(t, err)
+						require.NoError(t, res.ValidationError)
+						require.Equal(t, res.VMError, gethVM.ErrExecutionReverted)
+					})
+				})
+			})
+
 			t.Run("tokens withdraw", func(t *testing.T) {
-				amount := big.NewInt(1000)
+				amount := types.OneFlow()
 				RunWithNewEmulator(t, backend, rootAddr, func(env *emulator.Emulator) {
 					RunWithNewReadOnlyBlockView(t, env, func(blk types.ReadOnlyBlockView) {
 						retBalance, err := blk.BalanceOf(testAccount)
 						require.NoError(t, err)
 						require.Equal(t, originalBalance, retBalance)
+						retNonce, err := blk.NonceOf(testAccount)
+						require.NoError(t, err)
+						require.Equal(t, testAccountNonce, retNonce)
 					})
 				})
 				RunWithNewEmulator(t, backend, rootAddr, func(env *emulator.Emulator) {
 					RunWithNewBlockView(t, env, func(blk types.BlockView) {
-						call := types.NewWithdrawCall(bridgeAccount, testAccount, amount, nonce)
+						call := types.NewWithdrawCall(bridgeAccount, testAccount, amount, testAccountNonce)
 						res, err := blk.DirectCall(call)
-						require.NoError(t, err)
+						requireSuccessfulExecution(t, err, res)
 						require.Equal(t, defaultCtx.DirectCallBaseGasUsage, res.GasConsumed)
 						require.Equal(t, call.Hash(), res.TxHash)
-						nonce += 1
+						testAccountNonce += 1
 					})
 				})
 				RunWithNewEmulator(t, backend, rootAddr, func(env *emulator.Emulator) {
@@ -106,6 +145,37 @@ func TestNativeTokenBridging(t *testing.T) {
 						retBalance, err = blk.BalanceOf(bridgeAccount)
 						require.NoError(t, err)
 						require.Equal(t, big.NewInt(0).Uint64(), retBalance.Uint64())
+
+						retNonce, err := blk.NonceOf(testAccount)
+						require.NoError(t, err)
+						require.Equal(t, testAccountNonce, retNonce)
+					})
+				})
+			})
+			t.Run("tokens withdraw that results in rounding error", func(t *testing.T) {
+				RunWithNewEmulator(t, backend, rootAddr, func(env *emulator.Emulator) {
+					RunWithNewBlockView(t, env, func(blk types.BlockView) {
+						call := types.NewWithdrawCall(bridgeAccount, testAccount, big.NewInt(1000), testAccountNonce)
+						res, err := blk.DirectCall(call)
+						require.NoError(t, err)
+						require.Equal(t, res.ValidationError, types.ErrWithdrawBalanceRounding)
+						testAccountNonce += 1
+					})
+				})
+			})
+
+			t.Run("tokens withdraw not having enough balance", func(t *testing.T) {
+				RunWithNewEmulator(t, backend, rootAddr, func(env *emulator.Emulator) {
+					RunWithNewBlockView(t, env, func(blk types.BlockView) {
+						call := types.NewWithdrawCall(bridgeAccount, testAccount, types.MakeBigIntInFlow(3), testAccountNonce)
+						res, err := blk.DirectCall(call)
+						require.NoError(t, err)
+						require.True(t,
+							strings.Contains(
+								res.ValidationError.Error(),
+								"insufficient funds",
+							),
+						)
 					})
 				})
 			})
@@ -122,7 +192,7 @@ func TestContractInteraction(t *testing.T) {
 
 			testAccount := types.NewAddressFromString("test")
 			bridgeAccount := types.NewAddressFromString("bridge")
-			nonce := uint64(0)
+			testAccountNonce := uint64(0)
 
 			amount := big.NewInt(0).Mul(big.NewInt(1337), big.NewInt(gethParams.Ether))
 			amountToBeTransfered := big.NewInt(0).Mul(big.NewInt(100), big.NewInt(gethParams.Ether))
@@ -130,9 +200,8 @@ func TestContractInteraction(t *testing.T) {
 			// fund test account
 			RunWithNewEmulator(t, backend, rootAddr, func(env *emulator.Emulator) {
 				RunWithNewBlockView(t, env, func(blk types.BlockView) {
-					_, err := blk.DirectCall(types.NewDepositCall(bridgeAccount, testAccount, amount, nonce))
+					_, err := blk.DirectCall(types.NewDepositCall(bridgeAccount, testAccount, amount, 0))
 					require.NoError(t, err)
-					nonce += 1
 				})
 			})
 
@@ -146,13 +215,13 @@ func TestContractInteraction(t *testing.T) {
 							testContract.ByteCode,
 							math.MaxUint64,
 							amountToBeTransfered,
-							nonce)
+							testAccountNonce)
 						res, err := blk.DirectCall(call)
-						require.NoError(t, err)
+						requireSuccessfulExecution(t, err, res)
 						require.NotNil(t, res.DeployedContractAddress)
 						contractAddr = *res.DeployedContractAddress
 						require.Equal(t, call.Hash(), res.TxHash)
-						nonce += 1
+						testAccountNonce += 1
 					})
 					RunWithNewReadOnlyBlockView(t, env, func(blk types.ReadOnlyBlockView) {
 						require.NotNil(t, contractAddr)
@@ -167,6 +236,10 @@ func TestContractInteraction(t *testing.T) {
 						retBalance, err = blk.BalanceOf(testAccount)
 						require.NoError(t, err)
 						require.Equal(t, amount.Sub(amount, amountToBeTransfered), retBalance)
+
+						retNonce, err := blk.NonceOf(testAccount)
+						require.NoError(t, err)
+						require.Equal(t, testAccountNonce, retNonce)
 					})
 				})
 			})
@@ -182,12 +255,12 @@ func TestContractInteraction(t *testing.T) {
 								testContract.MakeCallData(t, "store", num),
 								1_000_000,
 								big.NewInt(0), // this should be zero because the contract doesn't have receiver
-								nonce,
+								testAccountNonce,
 							),
 						)
-						require.NoError(t, err)
+						requireSuccessfulExecution(t, err, res)
 						require.GreaterOrEqual(t, res.GasConsumed, uint64(40_000))
-						nonce += 1
+						testAccountNonce += 1
 						require.Empty(t, res.PrecompiledCalls)
 					})
 				})
@@ -201,11 +274,11 @@ func TestContractInteraction(t *testing.T) {
 								testContract.MakeCallData(t, "retrieve"),
 								1_000_000,
 								big.NewInt(0), // this should be zero because the contract doesn't have receiver
-								nonce,
+								testAccountNonce,
 							),
 						)
-						require.NoError(t, err)
-						nonce += 1
+						requireSuccessfulExecution(t, err, res)
+						testAccountNonce += 1
 
 						ret := new(big.Int).SetBytes(res.ReturnedData)
 						require.Equal(t, num, ret)
@@ -222,14 +295,15 @@ func TestContractInteraction(t *testing.T) {
 								testContract.MakeCallData(t, "blockNumber"),
 								1_000_000,
 								big.NewInt(0), // this should be zero because the contract doesn't have receiver
-								nonce,
+								testAccountNonce,
 							),
 						)
-						require.NoError(t, err)
-						nonce += 1
+						requireSuccessfulExecution(t, err, res)
+						testAccountNonce += 1
 
 						ret := new(big.Int).SetBytes(res.ReturnedData)
 						require.Equal(t, blockNumber, ret)
+
 					})
 				})
 
@@ -242,11 +316,11 @@ func TestContractInteraction(t *testing.T) {
 								testContract.MakeCallData(t, "assertError"),
 								1_000_000,
 								big.NewInt(0), // this should be zero because the contract doesn't have receiver
-								nonce,
+								testAccountNonce,
 							),
 						)
 						require.NoError(t, err)
-						nonce += 1
+						testAccountNonce += 1
 						require.Error(t, res.VMError)
 						strings.Contains(string(res.ReturnedData), "Assert Error Message")
 					})
@@ -261,11 +335,12 @@ func TestContractInteraction(t *testing.T) {
 								testContract.MakeCallData(t, "customError"),
 								1_000_000,
 								big.NewInt(0), // this should be zero because the contract doesn't have receiver
-								nonce,
+								testAccountNonce,
 							),
 						)
 						require.NoError(t, err)
-						nonce += 1
+						require.NoError(t, res.ValidationError)
+						testAccountNonce += 1
 						require.Error(t, res.VMError)
 						strings.Contains(string(res.ReturnedData), "Value is too low")
 					})
@@ -282,11 +357,11 @@ func TestContractInteraction(t *testing.T) {
 							testContract.MakeCallData(t, "chainID"),
 							1_000_000,
 							big.NewInt(0), // this should be zero because the contract doesn't have receiver
-							nonce,
+							testAccountNonce,
 						),
 					)
-					require.NoError(t, err)
-					nonce += 1
+					requireSuccessfulExecution(t, err, res)
+					testAccountNonce += 1
 
 					ret := new(big.Int).SetBytes(res.ReturnedData)
 					require.Equal(t, types.FlowEVMPreviewNetChainID, ret)
@@ -325,9 +400,7 @@ func TestContractInteraction(t *testing.T) {
 
 					)
 					res, err := blk.RunTransaction(tx)
-					require.NoError(t, err)
-					require.NoError(t, res.VMError)
-					require.NoError(t, res.ValidationError)
+					requireSuccessfulExecution(t, err, res)
 					require.Greater(t, res.GasConsumed, uint64(0))
 
 					// check the balance of coinbase
@@ -385,8 +458,7 @@ func TestContractInteraction(t *testing.T) {
 					results, err := blk.BatchRunTransactions(txs)
 					require.NoError(t, err)
 					for _, res := range results {
-						require.NoError(t, res.VMError)
-						require.NoError(t, res.ValidationError)
+						requireSuccessfulExecution(t, nil, res)
 						require.Greater(t, res.GasConsumed, uint64(0))
 					}
 
@@ -404,7 +476,7 @@ func TestContractInteraction(t *testing.T) {
 				})
 			})
 
-			t.Run("test runing transactions with dynamic fees (happy case)", func(t *testing.T) {
+			t.Run("test running transactions with dynamic fees (happy case)", func(t *testing.T) {
 				account := testutils.GetTestEOAAccount(t, testutils.EOATestAccount1KeyHex)
 				fAddr := account.Address()
 				RunWithNewEmulator(t, backend, rootAddr, func(env *emulator.Emulator) {
@@ -442,9 +514,7 @@ func TestContractInteraction(t *testing.T) {
 					account.SetNonce(account.Nonce() + 1)
 
 					res, err := blk.RunTransaction(tx)
-					require.NoError(t, err)
-					require.NoError(t, res.VMError)
-					require.NoError(t, res.ValidationError)
+					requireSuccessfulExecution(t, err, res)
 					require.Greater(t, res.GasConsumed, uint64(0))
 				})
 			})
@@ -592,7 +662,7 @@ func TestDeployAtFunctionality(t *testing.T) {
 // this function is called and we make sure the balance the contract had
 // is returned to the address provided, and the contract data stays according to the
 // EIP 6780 https://eips.ethereum.org/EIPS/eip-6780 in case where the selfdestruct
-// is not caleld in the same transaction as deployment.
+// is not called in the same transaction as deployment.
 func TestSelfdestruct(t *testing.T) {
 	testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
 		testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
@@ -609,8 +679,9 @@ func TestSelfdestruct(t *testing.T) {
 				// setup the test with funded account and deploying a selfdestruct contract.
 				RunWithNewEmulator(t, backend, rootAddr, func(env *emulator.Emulator) {
 					RunWithNewBlockView(t, env, func(blk types.BlockView) {
-						_, err := blk.DirectCall(types.NewDepositCall(bridgeAccount, testAddress, startBalance, 0))
+						res, err := blk.DirectCall(types.NewDepositCall(bridgeAccount, testAddress, startBalance, 0))
 						require.NoError(t, err)
+						requireSuccessfulExecution(t, err, res)
 					})
 
 					RunWithNewBlockView(t, env, func(blk types.BlockView) {
@@ -622,7 +693,7 @@ func TestSelfdestruct(t *testing.T) {
 								deployBalance,
 								0),
 						)
-						require.NoError(t, err)
+						requireSuccessfulExecution(t, err, res)
 						require.NotNil(t, res.DeployedContractAddress)
 						contractAddr = *res.DeployedContractAddress
 					})
@@ -647,8 +718,7 @@ func TestSelfdestruct(t *testing.T) {
 							Value:    big.NewInt(0),
 							GasLimit: 100_000,
 						})
-						require.NoError(t, err)
-						require.False(t, res.Failed())
+						requireSuccessfulExecution(t, err, res)
 					})
 
 					// after calling selfdestruct the balance should be returned to the caller and
@@ -932,9 +1002,7 @@ func TestTransactionTracing(t *testing.T) {
 					testAccount.Nonce(),
 				),
 			)
-			require.NoError(t, err)
-			require.NoError(t, res.ValidationError)
-			require.NoError(t, res.VMError)
+			requireSuccessfulExecution(t, err, res)
 			txID = res.TxHash
 			trace, err = tracer.TxTracer().GetResult()
 			require.NoError(t, err)
@@ -979,9 +1047,7 @@ func TestTransactionTracing(t *testing.T) {
 
 			// interact and record trace
 			res, err := blk.RunTransaction(tx)
-			require.NoError(t, err)
-			require.NoError(t, res.ValidationError)
-			require.NoError(t, res.VMError)
+			requireSuccessfulExecution(t, err, res)
 			txID = res.TxHash
 			trace, err = tracer.TxTracer().GetResult()
 			require.NoError(t, err)
@@ -993,6 +1059,54 @@ func TestTransactionTracing(t *testing.T) {
 				<-uploaded
 				return true
 			}, time.Second, time.Millisecond*100, "upload did not execute")
+		})
+
+	})
+
+	t.Run("contract interaction run failed transaction", func(t *testing.T) {
+		runWithDeployedContract(t, func(testContract *testutils.TestContract, testAccount *testutils.EOATestAccount, emu *emulator.Emulator) {
+			blk, _, tracer := blockWithTracer(t, emu)
+			var txID gethCommon.Hash
+
+			tx := testAccount.PrepareAndSignTx(
+				t,
+				testContract.DeployedAt.ToCommon(),
+				testContract.MakeCallData(t, "store", big.NewInt(2)),
+				big.NewInt(0),
+				21210,
+				big.NewInt(100),
+			)
+
+			// interact and record trace
+			res, err := blk.RunTransaction(tx)
+			require.NoError(t, err)
+			require.EqualError(t, res.VMError, "out of gas")
+
+			tracer.Collect(txID)
+		})
+
+	})
+
+	t.Run("contract interaction run invalid transaction", func(t *testing.T) {
+		runWithDeployedContract(t, func(testContract *testutils.TestContract, testAccount *testutils.EOATestAccount, emu *emulator.Emulator) {
+			blk, _, tracer := blockWithTracer(t, emu)
+			var txID gethCommon.Hash
+
+			tx := testAccount.PrepareAndSignTx(
+				t,
+				testContract.DeployedAt.ToCommon(),
+				testContract.MakeCallData(t, "store", big.NewInt(2)),
+				big.NewInt(0),
+				1_000_000,
+				big.NewInt(-1),
+			)
+
+			// interact and record trace
+			res, err := blk.RunTransaction(tx)
+			require.NoError(t, err)
+			require.EqualError(t, res.ValidationError, "max fee per gas less than block base fee: address 0x658Bdf435d810C91414eC09147DAA6DB62406379, maxFeePerGas: -1, baseFee: 0")
+
+			tracer.Collect(txID)
 		})
 
 	})
@@ -1043,6 +1157,97 @@ func TestTransactionTracing(t *testing.T) {
 
 	})
 
+}
+
+func TestTxIndex(t *testing.T) {
+	testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
+		testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
+			RunWithNewEmulator(t, backend, rootAddr, func(em *emulator.Emulator) {
+				ctx := types.NewDefaultBlockContext(blockNumber.Uint64())
+				expectedTxIndex := uint16(1)
+				ctx.TxCountSoFar = 1
+				testAccount1 := testutils.RandomAddress(t)
+				testAccount2 := testutils.RandomAddress(t)
+
+				blk, err := em.NewBlockView(ctx)
+				require.NoError(t, err)
+
+				res, err := blk.DirectCall(
+					types.NewContractCall(
+						testAccount1,
+						testAccount2,
+						nil,
+						1_000_000,
+						big.NewInt(0),
+						0,
+					),
+				)
+
+				require.NoError(t, err)
+				require.Equal(t, expectedTxIndex, res.Index)
+				expectedTxIndex += 1
+				ctx.TxCountSoFar = 2
+
+				// create a test eoa account
+				account := testutils.GetTestEOAAccount(t, testutils.EOATestAccount1KeyHex)
+				fAddr := account.Address()
+
+				blk, err = em.NewBlockView(ctx)
+				require.NoError(t, err)
+				res, err = blk.DirectCall(
+					types.NewDepositCall(
+						types.EmptyAddress,
+						fAddr,
+						types.OneFlow(),
+						account.Nonce(),
+					))
+				requireSuccessfulExecution(t, err, res)
+				require.Equal(t, expectedTxIndex, res.Index)
+				expectedTxIndex += 1
+				ctx.TxCountSoFar = 3
+
+				blk, err = em.NewBlockView(ctx)
+				require.NoError(t, err)
+
+				tx := account.PrepareAndSignTx(
+					t,
+					testAccount1.ToCommon(), // to
+					nil,                     // data
+					big.NewInt(0),           // amount
+					gethParams.TxGas,        // gas limit
+					big.NewInt(0),
+				)
+
+				res, err = blk.RunTransaction(tx)
+				requireSuccessfulExecution(t, err, res)
+				require.Equal(t, expectedTxIndex, res.Index)
+				expectedTxIndex += 1
+				ctx.TxCountSoFar = 4
+
+				blk, err = em.NewBlockView(ctx)
+				require.NoError(t, err)
+
+				const batchSize = 3
+				txs := make([]*gethTypes.Transaction, batchSize)
+				for i := range txs {
+					txs[i] = account.PrepareAndSignTx(
+						t,
+						testAccount1.ToCommon(), // to
+						nil,                     // data
+						big.NewInt(0),           // amount
+						gethParams.TxGas,        // gas limit
+						big.NewInt(0),
+					)
+				}
+				results, err := blk.BatchRunTransactions(txs)
+				require.NoError(t, err)
+				for i, res := range results {
+					requireSuccessfulExecution(t, err, res)
+					require.Equal(t, expectedTxIndex+uint16(i), res.Index)
+				}
+			})
+		})
+	})
 }
 
 type MockedPrecompiled struct {

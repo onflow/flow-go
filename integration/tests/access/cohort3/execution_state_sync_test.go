@@ -6,7 +6,9 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/ipfs/go-datastore"
 	badgerds "github.com/ipfs/go-ds-badger2"
+	pebbleds "github.com/ipfs/go-ds-pebble"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -41,14 +43,20 @@ type ExecutionStateSyncSuite struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 
-	net *testnet.FlowNetwork
+	net                 *testnet.FlowNetwork
+	executionDataDBMode execution_data.ExecutionDataDBMode
 }
 
 func (s *ExecutionStateSyncSuite) SetupTest() {
+	s.setup(execution_data.ExecutionDataDBModeBadger)
+}
+
+func (s *ExecutionStateSyncSuite) setup(executionDataDBMode execution_data.ExecutionDataDBMode) {
 	s.log = unittest.LoggerForTest(s.Suite.T(), zerolog.InfoLevel)
 	s.log.Info().Msg("================> SetupTest")
 	s.ctx, s.cancel = context.WithCancel(context.Background())
 
+	s.executionDataDBMode = executionDataDBMode
 	s.buildNetworkConfig()
 
 	// start the network
@@ -82,6 +90,7 @@ func (s *ExecutionStateSyncSuite) buildNetworkConfig() {
 		testnet.WithAdditionalFlag(fmt.Sprintf("--execution-data-dir=%s", testnet.DefaultExecutionDataServiceDir)),
 		testnet.WithAdditionalFlag("--execution-data-retry-delay=1s"),
 		testnet.WithAdditionalFlagf("--public-network-execution-data-sync-enabled=true"),
+		testnet.WithAdditionalFlag(fmt.Sprintf("--execution-data-db=%s", s.executionDataDBMode.String())),
 	)
 
 	// add the ghost (access) node config
@@ -121,6 +130,7 @@ func (s *ExecutionStateSyncSuite) buildNetworkConfig() {
 			fmt.Sprintf("--execution-data-dir=%s", testnet.DefaultExecutionDataServiceDir),
 			"--execution-data-sync-enabled=true",
 			"--event-query-mode=execution-nodes-only",
+			fmt.Sprintf("--execution-data-db=%s", s.executionDataDBMode.String()),
 		},
 	}}
 
@@ -128,9 +138,13 @@ func (s *ExecutionStateSyncSuite) buildNetworkConfig() {
 	s.net = testnet.PrepareFlowNetwork(s.T(), conf, flow.Localnet)
 }
 
-// TestHappyPath tests that Execution Nodes generate execution data, and Access Nodes are able to
-// successfully sync the data
-func (s *ExecutionStateSyncSuite) TestHappyPath() {
+// TestBadgerDBHappyPath tests that Execution Nodes generate execution data, and Access Nodes are able to
+// successfully sync the data to badger DB
+func (s *ExecutionStateSyncSuite) TestBadgerDBHappyPath() {
+	s.executionStateSyncTest()
+}
+
+func (s *ExecutionStateSyncSuite) executionStateSyncTest() {
 	// Let the network run for this many blocks
 	runBlocks := uint64(60)
 
@@ -203,7 +217,15 @@ func (s *ExecutionStateSyncSuite) TestHappyPath() {
 }
 
 func (s *ExecutionStateSyncSuite) nodeExecutionDataStore(node *testnet.Container) execution_data.ExecutionDataStore {
-	ds, err := badgerds.NewDatastore(filepath.Join(node.ExecutionDataDBPath(), "blobstore"), &badgerds.DefaultOptions)
+	var ds datastore.Batching
+	var err error
+	dsPath := filepath.Join(node.ExecutionDataDBPath(), "blobstore")
+
+	if s.executionDataDBMode == execution_data.ExecutionDataDBModePebble {
+		ds, err = pebbleds.NewDatastore(dsPath, nil)
+	} else {
+		ds, err = badgerds.NewDatastore(dsPath, &badgerds.DefaultOptions)
+	}
 	require.NoError(s.T(), err, "could not get execution datastore")
 
 	return execution_data.NewExecutionDataStore(blobs.NewBlobstore(ds), execution_data.DefaultSerializer)

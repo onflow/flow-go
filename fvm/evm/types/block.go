@@ -98,7 +98,7 @@ var GenesisBlock = &Block{
 var GenesisBlockHash, _ = GenesisBlock.Hash()
 
 // BlockProposal is a EVM block proposal
-// holding all the iterim data of block before commitment
+// holding all the interim data of block before commitment
 type BlockProposal struct {
 	Block
 
@@ -112,11 +112,12 @@ type BlockProposal struct {
 // AppendTransaction appends a transaction hash to the list of transaction hashes of the block
 // and also update the receipts
 func (b *BlockProposal) AppendTransaction(res *Result) {
-	if res == nil {
+	// we don't append invalid transactions to blocks
+	if res == nil || res.Invalid() {
 		return
 	}
 	b.TxHashes = append(b.TxHashes, res.TxHash)
-	r := res.LightReceipt(b.TotalGasUsed)
+	r := res.LightReceipt()
 	if r == nil {
 		return
 	}

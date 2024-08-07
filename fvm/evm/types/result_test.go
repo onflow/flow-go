@@ -17,8 +17,8 @@ func TestLightReceipts(t *testing.T) {
 	var totalGas uint64
 	for i := 0; i < resCount; i++ {
 		res := testutils.RandomResultFixture(t)
-		receipts[i] = res.Receipt(totalGas)
-		reconstructedReceipts[i] = res.LightReceipt(totalGas).ToReceipt()
+		receipts[i] = res.Receipt()
+		reconstructedReceipts[i] = res.LightReceipt().ToReceipt()
 		totalGas += res.GasConsumed
 	}
 	// the root hash for reconstructed receipts should match the receipts

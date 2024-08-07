@@ -58,10 +58,6 @@ func (p *Params) ProtocolVersion() uint {
 	return 0
 }
 
-func (p *Params) EpochCommitSafetyThreshold() uint64 {
-	return 0
-}
-
 func (p *Params) EpochFallbackTriggered() (bool, error) {
 	return false, fmt.Errorf("not implemented")
 }
