@@ -52,6 +52,13 @@ func GetDummyKittyTestContract(t testing.TB) *TestContract {
 	}
 }
 
+func GetProxyContract(t testing.TB) *TestContract {
+	return &TestContract{
+		ABI:      contracts.ProxyContractABIJSON,
+		ByteCode: contracts.ProxyContractBytes,
+	}
+}
+
 func RunWithDeployedContract(t testing.TB, tc *TestContract, led atree.Ledger, flowEVMRootAddress flow.Address, f func(*TestContract)) {
 	DeployContract(t, RandomAddress(t), tc, led, flowEVMRootAddress)
 	f(tc)
