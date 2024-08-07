@@ -6,7 +6,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/protocol_state"
-	"github.com/onflow/flow-go/state/protocol/protocol_state/helper"
+	"github.com/onflow/flow-go/state/protocol/protocol_state/common"
 )
 
 // PSVersionUpgradeStateMachine encapsulates the logic for evolving the version of the Protocol State.
@@ -16,7 +16,7 @@ import (
 // All updates are applied to a copy of parent KV store, so parent KV store is not modified.
 // A separate instance should be created for each block to process the updates therein.
 type PSVersionUpgradeStateMachine struct {
-	helper.BaseKeyValueStoreStateMachine
+	common.BaseKeyValueStoreStateMachine
 }
 
 var _ protocol_state.KeyValueStoreStateMachine = (*PSVersionUpgradeStateMachine)(nil)
@@ -27,10 +27,10 @@ var _ protocol_state.KeyValueStoreStateMachine = (*PSVersionUpgradeStateMachine)
 func NewPSVersionUpgradeStateMachine(
 	candidateView uint64,
 	parentState protocol.KVStoreReader,
-	mutator protocol_state.KVStoreMutator,
+	evolvingState protocol_state.KVStoreMutator,
 ) *PSVersionUpgradeStateMachine {
 	return &PSVersionUpgradeStateMachine{
-		BaseKeyValueStoreStateMachine: helper.NewBaseKeyValueStoreStateMachine(candidateView, parentState, mutator),
+		BaseKeyValueStoreStateMachine: common.NewBaseKeyValueStoreStateMachine(candidateView, parentState, evolvingState),
 	}
 }
 
@@ -113,11 +113,11 @@ func (m *PSVersionUpgradeStateMachine) processSingleEvent(versionUpgrade *flow.P
 	}
 
 	// There can be multiple `versionUpgrade` Service Events sealed in one block. In case we have _not_
-	// encountered any, `m.Mutator` contains the latest `versionUpgrade` as of the parent block, because
+	// encountered any, `m.EvolvingState` contains the latest `versionUpgrade` as of the parent block, because
 	// we cloned it from the parent state. If we encountered some version upgrades, we already enforced that
 	// they are all upgrades to the same version. So we only need to check that the next `versionUpgrade`
 	// also has the same version.
-	err := checkPendingUpgrade(m.Mutator)
+	err := checkPendingUpgrade(m.EvolvingState)
 	if err != nil {
 		return fmt.Errorf("version upgrade invalid with respect to the current state: %w", err)
 	}
@@ -126,6 +126,6 @@ func (m *PSVersionUpgradeStateMachine) processSingleEvent(versionUpgrade *flow.P
 		Data:           versionUpgrade.NewProtocolStateVersion,
 		ActivationView: versionUpgrade.ActiveView,
 	}
-	m.Mutator.SetVersionUpgrade(activator)
+	m.EvolvingState.SetVersionUpgrade(activator)
 	return nil
 }

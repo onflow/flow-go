@@ -1,4 +1,4 @@
-package helper
+package common
 
 import (
 	"github.com/onflow/flow-go/state/protocol"
@@ -12,19 +12,19 @@ import (
 type BaseKeyValueStoreStateMachine struct {
 	candidateView uint64
 	parentState   protocol.KVStoreReader
-	Mutator       protocol_state.KVStoreMutator
+	EvolvingState protocol_state.KVStoreMutator
 }
 
 // NewBaseKeyValueStoreStateMachine creates a new instance of BaseKeyValueStoreStateMachine.
 func NewBaseKeyValueStoreStateMachine(
 	candidateView uint64,
 	parentState protocol.KVStoreReader,
-	mutator protocol_state.KVStoreMutator,
+	evolvingState protocol_state.KVStoreMutator,
 ) BaseKeyValueStoreStateMachine {
 	return BaseKeyValueStoreStateMachine{
 		candidateView: candidateView,
 		parentState:   parentState,
-		Mutator:       mutator,
+		EvolvingState: evolvingState,
 	}
 }
 

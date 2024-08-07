@@ -7,7 +7,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/protocol_state"
-	"github.com/onflow/flow-go/state/protocol/protocol_state/helper"
+	"github.com/onflow/flow-go/state/protocol/protocol_state/common"
 )
 
 // SetValueStateMachine encapsulates the logic for evolving sub-state of KV store by setting particular values.
@@ -17,7 +17,7 @@ import (
 // All updates are applied to a copy of parent KV store, so parent KV store is not modified.
 // A separate instance should be created for each block to process the updates therein.
 type SetValueStateMachine struct {
-	helper.BaseKeyValueStoreStateMachine
+	common.BaseKeyValueStoreStateMachine
 	telemetry protocol_state.StateMachineTelemetryConsumer
 }
 
@@ -28,10 +28,10 @@ func NewSetValueStateMachine(
 	telemetry protocol_state.StateMachineTelemetryConsumer,
 	candidateView uint64,
 	parentState protocol.KVStoreReader,
-	mutator protocol_state.KVStoreMutator,
+	evolvingState protocol_state.KVStoreMutator,
 ) *SetValueStateMachine {
 	return &SetValueStateMachine{
-		BaseKeyValueStoreStateMachine: helper.NewBaseKeyValueStoreStateMachine(candidateView, parentState, mutator),
+		BaseKeyValueStoreStateMachine: common.NewBaseKeyValueStoreStateMachine(candidateView, parentState, evolvingState),
 		telemetry:                     telemetry,
 	}
 }
@@ -49,7 +49,7 @@ func (m *SetValueStateMachine) EvolveState(orderedUpdates []flow.ServiceEvent) e
 			}
 
 			m.telemetry.OnServiceEventReceived(update)
-			err := m.Mutator.SetEpochExtensionViewCount(setEpochExtensionViewCount.Value)
+			err := m.EvolvingState.SetEpochExtensionViewCount(setEpochExtensionViewCount.Value)
 			if err != nil {
 				if errors.Is(err, ErrInvalidValue) {
 					m.telemetry.OnInvalidServiceEvent(update,
