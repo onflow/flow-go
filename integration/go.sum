@@ -2164,8 +2164,8 @@ github.com/onflow/flow-nft/lib/go/contracts v1.2.1/go.mod h1:2gpbza+uzs1k7x31hkp
 github.com/onflow/flow-nft/lib/go/templates v1.2.0 h1:JSQyh9rg0RC+D1930BiRXN8lrtMs+ubVMK6aQPon6Yc=
 github.com/onflow/flow-nft/lib/go/templates v1.2.0/go.mod h1:p+2hRvtjLUR3MW1NsoJe5Gqgr2eeH49QB6+s6ze00w0=
 github.com/onflow/flow/protobuf/go/flow v0.3.2-0.20231121210617-52ee94b830c2/go.mod h1:NA2pX2nw8zuaxfKphhKsk00kWLwfd+tv8mS23YXO4Sk=
-github.com/onflow/flow/protobuf/go/flow v0.4.5 h1:6o+pgYGqwXdEhqSJxu2BdnDXkOQVOkfGAb6IiXB+NPM=
-github.com/onflow/flow/protobuf/go/flow v0.4.5/go.mod h1:NA2pX2nw8zuaxfKphhKsk00kWLwfd+tv8mS23YXO4Sk=
+github.com/onflow/flow/protobuf/go/flow v0.4.6-0.20240807181630-cbebf11253ae h1:pUq9wUoVF8jSkIiLLPoTnaU+VBOypc+22QKfeoFkK00=
+github.com/onflow/flow/protobuf/go/flow v0.4.6-0.20240807181630-cbebf11253ae/go.mod h1:NA2pX2nw8zuaxfKphhKsk00kWLwfd+tv8mS23YXO4Sk=
 github.com/onflow/go-ds-pebble v0.0.0-20240731130313-f186539f382c h1:T0jDCm7k7uqDo26JiiujQ5oryl30itPnlmZQywTu9ng=
 github.com/onflow/go-ds-pebble v0.0.0-20240731130313-f186539f382c/go.mod h1:XYnWtulwJvHVOr2B0WVA/UC3dvRgFevjp8Pn9a3E1xo=
 github.com/onflow/go-ethereum v1.14.7 h1:gg3awYqI02e3AypRdpJKEvNTJ6kz/OhAqRti0h54Wlc=
