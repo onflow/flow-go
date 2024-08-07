@@ -1,7 +1,7 @@
 package flow
 
-// SetEpochExtensionViewCount is a service event emitted by the FlowServiceAccount to update `EpochExtensionViewCount`
-// protocol parameter in the protocol state key-value store.
+// SetEpochExtensionViewCount is a service event emitted by the FlowServiceAccount for updating
+// the `EpochExtensionViewCount` parameter in the protocol state's key-value store.
 // NOTE: A SetEpochExtensionViewCount event `E` is accepted while processing block `B`
 // which seals `E` if and only if E.Value > 2*FinalizationSafetyThreshold.
 type SetEpochExtensionViewCount struct {

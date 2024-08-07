@@ -53,7 +53,7 @@ func (m *SetValueStateMachine) EvolveState(orderedUpdates []flow.ServiceEvent) e
 			if err != nil {
 				if errors.Is(err, ErrInvalidValue) {
 					m.telemetry.OnInvalidServiceEvent(update,
-						protocol.NewInvalidServiceEventErrorf("invalid value %v for SetEpochExtensionViewCount: %s",
+						protocol.NewInvalidServiceEventErrorf("ignoring invalid value %v in SetEpochExtensionViewCount event: %s",
 							setEpochExtensionViewCount.Value, err.Error()))
 					continue
 				}
