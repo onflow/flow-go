@@ -2133,3 +2133,136 @@ func TestCadenceValueMigrationEntry_MarshalJSON(t *testing.T) {
 		string(actual),
 	)
 }
+
+func TestCapabilityMigration(t *testing.T) {
+	t.Parallel()
+
+	rwf := &testReportWriterFactory{}
+
+	logWriter := &writer{}
+	logger := zerolog.New(logWriter).Level(zerolog.ErrorLevel)
+
+	const nWorker = 2
+
+	const chainID = flow.Emulator
+	chain := chainID.Chain()
+
+	testAddress := common.Address(chain.ServiceAddress())
+
+	payloads, err := newBootstrapPayloads(chainID)
+	require.NoError(t, err)
+
+	registersByAccount, err := registers.NewByAccountFromPayloads(payloads)
+	require.NoError(t, err)
+
+	runtime, err := NewInterpreterMigrationRuntime(
+		registersByAccount,
+		chainID,
+		InterpreterMigrationRuntimeConfig{},
+	)
+	require.NoError(t, err)
+
+	storage := runtime.Storage
+	storageMapKey := interpreter.StringStorageMapKey("test")
+	storageDomain := common.PathDomainStorage.Identifier()
+
+	storageMap := storage.GetStorageMap(
+		testAddress,
+		storageDomain,
+		true,
+	)
+
+	borrowType := interpreter.NewReferenceStaticType(
+		nil,
+		interpreter.UnauthorizedAccess,
+		interpreter.PrimitiveStaticTypeAnyStruct,
+	)
+
+	capabilityValue := &interpreter.PathCapabilityValue{
+		BorrowType: borrowType,
+		Path:       interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "foo"),
+		Address:    interpreter.AddressValue(testAddress),
+	}
+
+	storageMap.WriteValue(
+		runtime.Interpreter,
+		storageMapKey,
+		capabilityValue,
+	)
+
+	err = storage.NondeterministicCommit(runtime.Interpreter, false)
+	require.NoError(t, err)
+
+	// finalize the transaction
+	result, err := runtime.TransactionState.FinalizeMainTransaction()
+	require.NoError(t, err)
+
+	// Merge the changes into the registers
+
+	expectedAddresses := map[flow.Address]struct{}{
+		flow.Address(testAddress): {},
+	}
+
+	err = registers.ApplyChanges(
+		registersByAccount,
+		result.WriteSet,
+		expectedAddresses,
+		logger,
+	)
+	require.NoError(t, err)
+
+	// Migrate
+
+	// TODO: EVM contract is not deployed in snapshot yet, so can't update it
+	const evmContractChange = EVMContractChangeNone
+
+	const burnerContractChange = BurnerContractChangeUpdate
+
+	migrations := NewCadence1Migrations(
+		logger,
+		t.TempDir(),
+		rwf,
+		Options{
+			NWorker:              nWorker,
+			ChainID:              chainID,
+			EVMContractChange:    evmContractChange,
+			BurnerContractChange: burnerContractChange,
+			VerboseErrorOutput:   true,
+		},
+	)
+
+	for _, migration := range migrations {
+		err = migration.Migrate(registersByAccount)
+		require.NoError(
+			t,
+			err,
+			"migration `%s` failed, logs: %v",
+			migration.Name,
+			logWriter.logs,
+		)
+	}
+
+	reporter := rwf.reportWriters[capabilityValueMigrationReporterName]
+	require.NotNil(t, reporter)
+	require.Len(t, reporter.entries, 2)
+
+	require.Equal(t, reporter.entries, []any{
+		capabilityMigrationEntry{
+			AccountAddress: testAddress,
+			AddressPath: interpreter.AddressPath{
+				Address: testAddress,
+				Path:    interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "foo"),
+			},
+			BorrowType:   borrowType,
+			CapabilityID: 6,
+		},
+		cadenceValueMigrationEntry{
+			StorageKey: interpreter.StorageKey{
+				Key:     storageDomain,
+				Address: testAddress,
+			},
+			StorageMapKey: storageMapKey,
+			Migration:     "CapabilityValueMigration",
+		},
+	})
+}
