@@ -8,13 +8,12 @@ import (
 
 	"github.com/holiman/uint256"
 	"github.com/onflow/atree"
-	"github.com/onflow/go-ethereum/common"
 	gethCommon "github.com/onflow/go-ethereum/common"
-	"github.com/onflow/go-ethereum/core/stateless"
-	"github.com/onflow/go-ethereum/core/tracing"
+	gethStateless "github.com/onflow/go-ethereum/core/stateless"
+	gethTracing "github.com/onflow/go-ethereum/core/tracing"
 	gethTypes "github.com/onflow/go-ethereum/core/types"
 	gethParams "github.com/onflow/go-ethereum/params"
-	"github.com/onflow/go-ethereum/trie/utils"
+	gethUtils "github.com/onflow/go-ethereum/trie/utils"
 
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/model/flow"
@@ -59,7 +58,7 @@ func NewStateDB(ledger atree.Ledger, root flow.Address) (*StateDB, error) {
 //
 // this should also return true for self destructed accounts during the transaction execution.
 func (db *StateDB) Exist(addr gethCommon.Address) bool {
-	exist, err := db.lastestView().Exist(addr)
+	exist, err := db.latestView().Exist(addr)
 	db.handleError(err)
 	return exist
 }
@@ -79,13 +78,13 @@ func (db *StateDB) Empty(addr gethCommon.Address) bool {
 // CreateAccount creates a new account for the given address
 // it sets the nonce to zero
 func (db *StateDB) CreateAccount(addr gethCommon.Address) {
-	err := db.lastestView().CreateAccount(addr)
+	err := db.latestView().CreateAccount(addr)
 	db.handleError(err)
 }
 
 // IsCreated returns true if address is recently created (context of a transaction)
 func (db *StateDB) IsCreated(addr gethCommon.Address) bool {
-	return db.lastestView().IsCreated(addr)
+	return db.latestView().IsCreated(addr)
 }
 
 // CreateContract is used whenever a contract is created. This may be preceded
@@ -94,12 +93,12 @@ func (db *StateDB) IsCreated(addr gethCommon.Address) bool {
 // This operation sets the 'newContract'-flag, which is required in order to
 // correctly handle EIP-6780 'delete-in-same-transaction' logic.
 func (db *StateDB) CreateContract(addr gethCommon.Address) {
-	db.lastestView().CreateContract(addr)
+	db.latestView().CreateContract(addr)
 }
 
 // IsCreated returns true if address is a new contract
 func (db *StateDB) IsNewContract(addr gethCommon.Address) bool {
-	return db.lastestView().IsNewContract(addr)
+	return db.latestView().IsNewContract(addr)
 }
 
 // SelfDestruct flags the address for deletion.
@@ -119,9 +118,9 @@ func (db *StateDB) Selfdestruct6780(addr gethCommon.Address) {
 	}
 }
 
-// HasSelfDestructed returns true if address is flaged with self destruct.
+// HasSelfDestructed returns true if address is flagged with self destruct.
 func (db *StateDB) HasSelfDestructed(addr gethCommon.Address) bool {
-	destructed, _ := db.lastestView().HasSelfDestructed(addr)
+	destructed, _ := db.latestView().HasSelfDestructed(addr)
 	return destructed
 }
 
@@ -129,14 +128,14 @@ func (db *StateDB) HasSelfDestructed(addr gethCommon.Address) bool {
 func (db *StateDB) SubBalance(
 	addr gethCommon.Address,
 	amount *uint256.Int,
-	reason tracing.BalanceChangeReason,
+	reason gethTracing.BalanceChangeReason,
 ) {
 	// negative amounts are not accepted.
 	if amount.Sign() < 0 {
 		db.handleError(types.ErrInvalidBalance)
 		return
 	}
-	err := db.lastestView().SubBalance(addr, amount)
+	err := db.latestView().SubBalance(addr, amount)
 	db.handleError(err)
 }
 
@@ -144,82 +143,82 @@ func (db *StateDB) SubBalance(
 func (db *StateDB) AddBalance(
 	addr gethCommon.Address,
 	amount *uint256.Int,
-	reason tracing.BalanceChangeReason,
+	reason gethTracing.BalanceChangeReason,
 ) {
 	// negative amounts are not accepted.
 	if amount.Sign() < 0 {
 		db.handleError(types.ErrInvalidBalance)
 		return
 	}
-	err := db.lastestView().AddBalance(addr, amount)
+	err := db.latestView().AddBalance(addr, amount)
 	db.handleError(err)
 }
 
 // GetBalance returns the balance of the given address
 func (db *StateDB) GetBalance(addr gethCommon.Address) *uint256.Int {
-	bal, err := db.lastestView().GetBalance(addr)
+	bal, err := db.latestView().GetBalance(addr)
 	db.handleError(err)
 	return bal
 }
 
 // GetNonce returns the nonce of the given address
 func (db *StateDB) GetNonce(addr gethCommon.Address) uint64 {
-	nonce, err := db.lastestView().GetNonce(addr)
+	nonce, err := db.latestView().GetNonce(addr)
 	db.handleError(err)
 	return nonce
 }
 
 // SetNonce sets the nonce value for the given address
 func (db *StateDB) SetNonce(addr gethCommon.Address, nonce uint64) {
-	err := db.lastestView().SetNonce(addr, nonce)
+	err := db.latestView().SetNonce(addr, nonce)
 	db.handleError(err)
 }
 
 // GetCodeHash returns the code hash of the given address
 func (db *StateDB) GetCodeHash(addr gethCommon.Address) gethCommon.Hash {
-	hash, err := db.lastestView().GetCodeHash(addr)
+	hash, err := db.latestView().GetCodeHash(addr)
 	db.handleError(err)
 	return hash
 }
 
 // GetCode returns the code for the given address
 func (db *StateDB) GetCode(addr gethCommon.Address) []byte {
-	code, err := db.lastestView().GetCode(addr)
+	code, err := db.latestView().GetCode(addr)
 	db.handleError(err)
 	return code
 }
 
 // GetCodeSize returns the size of the code for the given address
 func (db *StateDB) GetCodeSize(addr gethCommon.Address) int {
-	codeSize, err := db.lastestView().GetCodeSize(addr)
+	codeSize, err := db.latestView().GetCodeSize(addr)
 	db.handleError(err)
 	return codeSize
 }
 
 // SetCode sets the code for the given address
 func (db *StateDB) SetCode(addr gethCommon.Address, code []byte) {
-	err := db.lastestView().SetCode(addr, code)
+	err := db.latestView().SetCode(addr, code)
 	db.handleError(err)
 }
 
 // AddRefund adds the amount to the total (gas) refund
 func (db *StateDB) AddRefund(amount uint64) {
-	err := db.lastestView().AddRefund(amount)
+	err := db.latestView().AddRefund(amount)
 	db.handleError(err)
 }
 
 // SubRefund subtracts the amount from the total (gas) refund
 func (db *StateDB) SubRefund(amount uint64) {
-	err := db.lastestView().SubRefund(amount)
+	err := db.latestView().SubRefund(amount)
 	db.handleError(err)
 }
 
 // GetRefund returns the total (gas) refund
 func (db *StateDB) GetRefund() uint64 {
-	return db.lastestView().GetRefund()
+	return db.latestView().GetRefund()
 }
 
-// GetCommittedState returns the value for the given storage slot considering only the commited state and not
+// GetCommittedState returns the value for the given storage slot considering only the committed state and not
 // changes in the scope of current transaction.
 func (db *StateDB) GetCommittedState(addr gethCommon.Address, key gethCommon.Hash) gethCommon.Hash {
 	value, err := db.baseView.GetState(types.SlotAddress{Address: addr, Key: key})
@@ -229,14 +228,14 @@ func (db *StateDB) GetCommittedState(addr gethCommon.Address, key gethCommon.Has
 
 // GetState returns the value for the given storage slot
 func (db *StateDB) GetState(addr gethCommon.Address, key gethCommon.Hash) gethCommon.Hash {
-	state, err := db.lastestView().GetState(types.SlotAddress{Address: addr, Key: key})
+	state, err := db.latestView().GetState(types.SlotAddress{Address: addr, Key: key})
 	db.handleError(err)
 	return state
 }
 
 // GetStorageRoot returns some sort of root for the given address.
 //
-// Warning! Since StateDB doesn't construct a Merkel tree under the hood,
+// Warning! Since StateDB doesn't construct a Merkle tree under the hood,
 // the behavior of this endpoint is as follow:
 // - if an account doesn't exist it returns common.Hash{}
 // - if account is EOA it returns gethCommon.EmptyRootHash
@@ -248,59 +247,59 @@ func (db *StateDB) GetState(addr gethCommon.Address, key gethCommon.Hash) gethCo
 // where the value that is returned is compared to empty values to make sure the storage is empty
 // This endpoint is added mostly to prevent the case that an smart contract is self-destructed
 // and a later transaction tries to deploy a contract to the same address.
-func (db *StateDB) GetStorageRoot(addr common.Address) common.Hash {
-	root, err := db.lastestView().GetStorageRoot(addr)
+func (db *StateDB) GetStorageRoot(addr gethCommon.Address) gethCommon.Hash {
+	root, err := db.latestView().GetStorageRoot(addr)
 	db.handleError(err)
 	return root
 }
 
 // SetState sets a value for the given storage slot
 func (db *StateDB) SetState(addr gethCommon.Address, key gethCommon.Hash, value gethCommon.Hash) {
-	err := db.lastestView().SetState(types.SlotAddress{Address: addr, Key: key}, value)
+	err := db.latestView().SetState(types.SlotAddress{Address: addr, Key: key}, value)
 	db.handleError(err)
 }
 
 // GetTransientState returns the value for the given key of the transient storage
 func (db *StateDB) GetTransientState(addr gethCommon.Address, key gethCommon.Hash) gethCommon.Hash {
-	return db.lastestView().GetTransientState(types.SlotAddress{Address: addr, Key: key})
+	return db.latestView().GetTransientState(types.SlotAddress{Address: addr, Key: key})
 }
 
 // SetTransientState sets a value for the given key of the transient storage
 func (db *StateDB) SetTransientState(addr gethCommon.Address, key, value gethCommon.Hash) {
-	db.lastestView().SetTransientState(types.SlotAddress{Address: addr, Key: key}, value)
+	db.latestView().SetTransientState(types.SlotAddress{Address: addr, Key: key}, value)
 }
 
 // AddressInAccessList checks if an address is in the access list
 func (db *StateDB) AddressInAccessList(addr gethCommon.Address) bool {
-	return db.lastestView().AddressInAccessList(addr)
+	return db.latestView().AddressInAccessList(addr)
 }
 
 // SlotInAccessList checks if the given (address,slot) is in the access list
 func (db *StateDB) SlotInAccessList(addr gethCommon.Address, key gethCommon.Hash) (addressOk bool, slotOk bool) {
-	return db.lastestView().SlotInAccessList(types.SlotAddress{Address: addr, Key: key})
+	return db.latestView().SlotInAccessList(types.SlotAddress{Address: addr, Key: key})
 }
 
 // AddAddressToAccessList adds the given address to the access list.
 func (db *StateDB) AddAddressToAccessList(addr gethCommon.Address) {
-	db.lastestView().AddAddressToAccessList(addr)
+	db.latestView().AddAddressToAccessList(addr)
 }
 
 // AddSlotToAccessList adds the given (address,slot) to the access list.
 func (db *StateDB) AddSlotToAccessList(addr gethCommon.Address, key gethCommon.Hash) {
-	db.lastestView().AddSlotToAccessList(types.SlotAddress{Address: addr, Key: key})
+	db.latestView().AddSlotToAccessList(types.SlotAddress{Address: addr, Key: key})
 }
 
 // AddLog appends a lot to the collection of logs
 func (db *StateDB) AddLog(log *gethTypes.Log) {
-	db.lastestView().AddLog(log)
+	db.latestView().AddLog(log)
 }
 
-// AddPreimage adds a preimage to the collection of preimages
+// AddPreimage adds a pre-image to the collection of pre-images
 func (db *StateDB) AddPreimage(hash gethCommon.Hash, data []byte) {
-	db.lastestView().AddPreimage(hash, data)
+	db.latestView().AddPreimage(hash, data)
 }
 
-// RevertToSnapshot reverts the changes until we reach the given snaptshot
+// RevertToSnapshot reverts the changes until we reach the given snapshot
 func (db *StateDB) RevertToSnapshot(index int) {
 	if index > len(db.views) {
 		db.cachedError = fmt.Errorf("invalid revert")
@@ -312,7 +311,7 @@ func (db *StateDB) RevertToSnapshot(index int) {
 // Snapshot takes an snapshot of the state and returns an int
 // that can be used later for revert calls.
 func (db *StateDB) Snapshot() int {
-	newView := db.lastestView().NewChildView()
+	newView := db.latestView().NewChildView()
 	db.views = append(db.views, newView)
 	return len(db.views) - 1
 }
@@ -336,7 +335,7 @@ func (db *StateDB) Logs(
 	return allLogs
 }
 
-// Preimages returns a set of preimages
+// Preimages returns a set of pre-images
 func (db *StateDB) Preimages() map[gethCommon.Hash][]byte {
 	preImages := make(map[gethCommon.Hash][]byte, 0)
 	for _, view := range db.views {
@@ -463,7 +462,7 @@ func (db *StateDB) Finalize() error {
 
 // Prepare is a high level logic that sadly is considered to be part of the
 // stateDB interface and not on the layers above.
-// based on parameters that are passed it updates access-lists
+// based on parameters that are passed it updates access lists
 func (db *StateDB) Prepare(rules gethParams.Rules, sender, coinbase gethCommon.Address, dest *gethCommon.Address, precompiles []gethCommon.Address, txAccesses gethTypes.AccessList) {
 	if rules.IsBerlin {
 		db.AddAddressToAccessList(sender)
@@ -503,7 +502,7 @@ func (s *StateDB) Error() error {
 // PointCache is not supported and only needed
 // when EIP-4762 is enabled in the future versions
 // (currently planned for after Verkle fork).
-func (s *StateDB) PointCache() *utils.PointCache {
+func (s *StateDB) PointCache() *gethUtils.PointCache {
 	return nil
 }
 
@@ -511,11 +510,11 @@ func (s *StateDB) PointCache() *utils.PointCache {
 // when if witness collection is enabled (EnableWitnessCollection flag).
 // By definition it should returns a set containing all trie nodes that have been accessed.
 // The returned map could be nil if the witness is empty.
-func (s *StateDB) Witness() *stateless.Witness {
+func (s *StateDB) Witness() *gethStateless.Witness {
 	return nil
 }
 
-func (db *StateDB) lastestView() *DeltaView {
+func (db *StateDB) latestView() *DeltaView {
 	return db.views[len(db.views)-1]
 }
 
