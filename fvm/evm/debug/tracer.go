@@ -148,6 +148,7 @@ func NewSafeTxTracer(ct *CallTracer) *tracers.Tracer {
 				}
 			}()
 			ct.tracer.OnTxStart(vm, tx, from)
+			l.Debug().Msg("tracing OnTxStart is called")
 		}
 	}
 
@@ -165,6 +166,7 @@ func NewSafeTxTracer(ct *CallTracer) *tracers.Tracer {
 				}
 			}()
 			ct.tracer.OnTxEnd(receipt, err)
+			l.Debug().Msg("tracing OnTxEnd is called")
 		}
 	}
 
@@ -189,6 +191,7 @@ func NewSafeTxTracer(ct *CallTracer) *tracers.Tracer {
 				}
 			}()
 			ct.tracer.OnEnter(depth, typ, from, to, input, gas, value)
+			l.Debug().Int("depth", depth).Msg("tracing OnEnter is called")
 		}
 	}
 
@@ -206,6 +209,7 @@ func NewSafeTxTracer(ct *CallTracer) *tracers.Tracer {
 				}
 			}()
 			ct.tracer.OnExit(depth, output, gasUsed, err, reverted)
+			l.Debug().Int("depth", depth).Msg("tracing OnExit is called")
 		}
 	}
 
@@ -231,6 +235,7 @@ func NewSafeTxTracer(ct *CallTracer) *tracers.Tracer {
 				}
 			}()
 			ct.tracer.OnOpcode(pc, op, gas, cost, scope, rData, depth, err)
+			l.Debug().Msg("tracing OnOpcode is called")
 		}
 	}
 
@@ -254,6 +259,7 @@ func NewSafeTxTracer(ct *CallTracer) *tracers.Tracer {
 				}
 			}()
 			ct.tracer.OnFault(pc, op, gas, cost, scope, depth, err)
+			l.Debug().Msg("tracing OnFault is called")
 		}
 	}
 
@@ -271,6 +277,7 @@ func NewSafeTxTracer(ct *CallTracer) *tracers.Tracer {
 				}
 			}()
 			ct.tracer.OnGasChange(old, new, reason)
+			l.Debug().Msg("tracing OnGasChange is called")
 		}
 	}
 
