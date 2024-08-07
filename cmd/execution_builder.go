@@ -87,12 +87,12 @@ import (
 	"github.com/onflow/flow-go/network/p2p/blob"
 	"github.com/onflow/flow-go/network/underlay"
 	"github.com/onflow/flow-go/state/protocol"
-	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
+	pebbleState "github.com/onflow/flow-go/state/protocol/pebble"
 	storageerr "github.com/onflow/flow-go/storage"
 	storage "github.com/onflow/flow-go/storage/badger"
-	"github.com/onflow/flow-go/storage/badger/procedure"
 	storagepebble "github.com/onflow/flow-go/storage/pebble"
+	"github.com/onflow/flow-go/storage/pebble/procedure"
 	sutil "github.com/onflow/flow-go/storage/util"
 )
 
@@ -132,11 +132,11 @@ type ExecutionNode struct {
 	committee              hotstuff.DynamicCommittee
 	ledgerStorage          *ledger.Ledger
 	registerStore          *storehouse.RegisterStore
-	events                 *storage.Events
-	serviceEvents          *storage.ServiceEvents
-	txResults              *storage.TransactionResults
-	results                *storage.ExecutionResults
-	myReceipts             *storage.MyExecutionReceipts
+	events                 *storagepebble.Events
+	serviceEvents          *storagepebble.ServiceEvents
+	txResults              *storagepebble.TransactionResults
+	results                *storagepebble.ExecutionResults
+	myReceipts             *storagepebble.MyExecutionReceipts
 	providerEngine         exeprovider.ProviderEngine
 	checkerEng             *checker.Engine
 	syncCore               *chainsync.Core
@@ -243,12 +243,12 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 func (exeNode *ExecutionNode) LoadMutableFollowerState(node *NodeConfig) error {
 	// For now, we only support state implementations from package badger.
 	// If we ever support different implementations, the following can be replaced by a type-aware factory
-	bState, ok := node.State.(*badgerState.State)
+	bState, ok := node.State.(*pebbleState.State)
 	if !ok {
 		return fmt.Errorf("only implementations of type badger.State are currently supported but read-only state has type %T", node.State)
 	}
 	var err error
-	exeNode.followerState, err = badgerState.NewFollowerState(
+	exeNode.followerState, err = pebbleState.NewFollowerState(
 		node.Logger,
 		node.Tracer,
 		node.ProtocolEvents,
@@ -277,7 +277,7 @@ func (exeNode *ExecutionNode) LoadExecutionMetrics(node *NodeConfig) error {
 	// the root block as executed block
 	var height uint64
 	var blockID flow.Identifier
-	err := node.DB.View(procedure.GetHighestExecutedBlock(&height, &blockID))
+	err := procedure.GetHighestExecutedBlock(&height, &blockID)(node.DB)
 	if err != nil {
 		// database has not been bootstrapped yet
 		if errors.Is(err, storageerr.ErrNotFound) {
@@ -299,8 +299,8 @@ func (exeNode *ExecutionNode) LoadSyncCore(node *NodeConfig) error {
 func (exeNode *ExecutionNode) LoadExecutionReceiptsStorage(
 	node *NodeConfig,
 ) error {
-	exeNode.results = storage.NewExecutionResults(node.Metrics.Cache, node.DB)
-	exeNode.myReceipts = storage.NewMyExecutionReceipts(node.Metrics.Cache, node.DB, node.Storage.Receipts.(*storage.ExecutionReceipts))
+	exeNode.results = storagepebble.NewExecutionResults(node.Metrics.Cache, node.DB)
+	exeNode.myReceipts = storagepebble.NewMyExecutionReceipts(node.Metrics.Cache, node.DB, node.Storage.Receipts.(*storagepebble.ExecutionReceipts))
 	return nil
 }
 
@@ -436,7 +436,7 @@ func (exeNode *ExecutionNode) LoadGCPBlockDataUploader(
 		exeNode.events,
 		exeNode.results,
 		exeNode.txResults,
-		storage.NewComputationResultUploadStatus(node.DB),
+		storagepebble.NewComputationResultUploadStatus(node.DB),
 		execution_data.NewDownloader(exeNode.blobService),
 		exeNode.collector)
 	if retryableUploader == nil {
@@ -776,9 +776,9 @@ func (exeNode *ExecutionNode) LoadExecutionState(
 		return nil
 	})
 	// Needed for gRPC server, make sure to assign to main scoped vars
-	exeNode.events = storage.NewEvents(node.Metrics.Cache, node.DB)
-	exeNode.serviceEvents = storage.NewServiceEvents(node.Metrics.Cache, node.DB)
-	exeNode.txResults = storage.NewTransactionResults(node.Metrics.Cache, node.DB, exeNode.exeConf.transactionResultsCacheSize)
+	exeNode.events = storagepebble.NewEvents(node.Metrics.Cache, node.DB)
+	exeNode.serviceEvents = storagepebble.NewServiceEvents(node.Metrics.Cache, node.DB)
+	exeNode.txResults = storagepebble.NewTransactionResults(node.Metrics.Cache, node.DB, exeNode.exeConf.transactionResultsCacheSize)
 
 	exeNode.executionState = state.NewExecutionState(
 		exeNode.ledgerStorage,
@@ -1198,7 +1198,7 @@ func (exeNode *ExecutionNode) LoadFollowerCore(
 ) {
 	// create a finalizer that handles updating the protocol
 	// state when the follower detects newly finalized blocks
-	final := finalizer.NewFinalizer(node.DB, node.Storage.Headers, exeNode.followerState, node.Tracer)
+	final := finalizer.NewFinalizerPebble(node.DB, node.Storage.Headers, exeNode.followerState, node.Tracer)
 
 	finalized, pending, err := recovery.FindLatest(node.State, node.Storage.Headers)
 	if err != nil {

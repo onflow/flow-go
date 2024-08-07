@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/atomic"
@@ -25,11 +25,11 @@ import (
 	"github.com/onflow/flow-go/module/trace"
 	moduleutil "github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/network/mocknetwork"
-	pbadger "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/events"
+	ppebble "github.com/onflow/flow-go/state/protocol/pebble"
 	"github.com/onflow/flow-go/state/protocol/util"
-	"github.com/onflow/flow-go/storage/badger/operation"
-	storageutil "github.com/onflow/flow-go/storage/util"
+	"github.com/onflow/flow-go/storage/pebble/operation"
+	"github.com/onflow/flow-go/storage/testingutils"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -45,15 +45,15 @@ import (
 func TestFollowerHappyPath(t *testing.T) {
 	allIdentities := unittest.CompleteIdentitySet()
 	rootSnapshot := unittest.RootSnapshotFixture(allIdentities)
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
 		metrics := metrics.NewNoopCollector()
 		tracer := trace.NewNoopTracer()
 		log := unittest.Logger()
 		consumer := events.NewNoop()
-		all := storageutil.StorageLayer(t, db)
+		all := testingutils.PebbleStorageLayer(t, db)
 
 		// bootstrap root snapshot
-		state, err := pbadger.Bootstrap(
+		state, err := ppebble.Bootstrap(
 			metrics,
 			db,
 			all.Headers,
@@ -71,7 +71,7 @@ func TestFollowerHappyPath(t *testing.T) {
 		mockTimer := util.MockBlockTimer()
 
 		// create follower state
-		followerState, err := pbadger.NewFollowerState(
+		followerState, err := ppebble.NewFollowerState(
 			log,
 			tracer,
 			consumer,
@@ -81,7 +81,7 @@ func TestFollowerHappyPath(t *testing.T) {
 			mockTimer,
 		)
 		require.NoError(t, err)
-		finalizer := moduleconsensus.NewFinalizer(db, all.Headers, followerState, tracer)
+		finalizer := moduleconsensus.NewFinalizerPebble(db, all.Headers, followerState, tracer)
 		rootHeader, err := rootSnapshot.Head()
 		require.NoError(t, err)
 		rootQC, err := rootSnapshot.QuorumCertificate()
@@ -90,10 +90,7 @@ func TestFollowerHappyPath(t *testing.T) {
 		// Hack EECC.
 		// Since root snapshot is created with 1000 views for first epoch, we will forcefully enter EECC to avoid errors
 		// related to epoch transitions.
-		db.NewTransaction(true)
-		err = db.Update(func(txn *badger.Txn) error {
-			return operation.SetEpochEmergencyFallbackTriggered(rootHeader.ID())(txn)
-		})
+		err = operation.SetEpochEmergencyFallbackTriggered(rootHeader.ID())(db)
 		require.NoError(t, err)
 
 		consensusConsumer := pubsub.NewFollowerDistributor()

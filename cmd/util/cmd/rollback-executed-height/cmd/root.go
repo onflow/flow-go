@@ -27,7 +27,7 @@ func Execute() {
 }
 
 func init() {
-	rootCmd.PersistentFlags().StringVarP(&flagDatadir, "datadir", "d", "/var/flow/data/protocol", "directory to the badger dababase")
+	rootCmd.PersistentFlags().StringVarP(&flagDatadir, "datadir", "d", "/var/flow/data/protocol", "directory to the protocol state dababase")
 	_ = rootCmd.MarkPersistentFlagRequired("datadir")
 
 	cobra.OnInitialize(initConfig)

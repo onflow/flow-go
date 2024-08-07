@@ -18,11 +18,14 @@ func init() {
 }
 
 func runGetSafetyData(*cobra.Command, []string) {
-	db := common.InitStorage(flagDatadir)
+	db, err := common.InitStoragePebble(flagDatadir)
+	if err != nil {
+		log.Fatal().Err(err).Msg("could not open db")
+	}
 	defer db.Close()
 
-	storages := common.InitStorages(db)
-	state, err := common.InitProtocolState(db, storages)
+	storages := common.InitStoragesPebble(db)
+	state, err := common.InitProtocolStatePebble(db, storages)
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not init protocol state")
 	}

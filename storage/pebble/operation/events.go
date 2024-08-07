@@ -1,0 +1,86 @@
+package operation
+
+import (
+	"github.com/cockroachdb/pebble"
+
+	"github.com/onflow/flow-go/model/flow"
+)
+
+func eventPrefix(prefix byte, blockID flow.Identifier, event flow.Event) []byte {
+	return makePrefix(prefix, blockID, event.TransactionID, event.TransactionIndex, event.EventIndex)
+}
+
+func InsertEvent(blockID flow.Identifier, event flow.Event) func(pebble.Writer) error {
+	return insert(eventPrefix(codeEvent, blockID, event), event)
+}
+
+func InsertServiceEvent(blockID flow.Identifier, event flow.Event) func(pebble.Writer) error {
+	return insert(eventPrefix(codeServiceEvent, blockID, event), event)
+}
+
+func RetrieveEvents(blockID flow.Identifier, transactionID flow.Identifier, events *[]flow.Event) func(pebble.Reader) error {
+	iterationFunc := eventIterationFunc(events)
+	return traverse(makePrefix(codeEvent, blockID, transactionID), iterationFunc)
+}
+
+func LookupEventsByBlockID(blockID flow.Identifier, events *[]flow.Event) func(pebble.Reader) error {
+	iterationFunc := eventIterationFunc(events)
+	return traverse(makePrefix(codeEvent, blockID), iterationFunc)
+}
+
+func LookupServiceEventsByBlockID(blockID flow.Identifier, events *[]flow.Event) func(pebble.Reader) error {
+	iterationFunc := eventIterationFunc(events)
+	return traverse(makePrefix(codeServiceEvent, blockID), iterationFunc)
+}
+
+func LookupEventsByBlockIDEventType(blockID flow.Identifier, eventType flow.EventType, events *[]flow.Event) func(pebble.Reader) error {
+	iterationFunc := eventFilterIterationFunc(events, eventType)
+	return traverse(makePrefix(codeEvent, blockID), iterationFunc)
+}
+
+func RemoveServiceEventsByBlockID(blockID flow.Identifier) func(pebble.Writer) error {
+	return removeByPrefix(makePrefix(codeServiceEvent, blockID))
+}
+
+func RemoveEventsByBlockID(blockID flow.Identifier) func(pebble.Writer) error {
+	return removeByPrefix(makePrefix(codeEvent, blockID))
+}
+
+// eventIterationFunc returns an in iteration function which returns all events found during traversal or iteration
+func eventIterationFunc(events *[]flow.Event) func() (checkFunc, createFunc, handleFunc) {
+	return func() (checkFunc, createFunc, handleFunc) {
+		check := func(key []byte) bool {
+			return true
+		}
+		var val flow.Event
+		create := func() interface{} {
+			return &val
+		}
+		handle := func() error {
+			*events = append(*events, val)
+			return nil
+		}
+		return check, create, handle
+	}
+}
+
+// eventFilterIterationFunc returns an iteration function which filters the result by the given event type in the handleFunc
+func eventFilterIterationFunc(events *[]flow.Event, eventType flow.EventType) func() (checkFunc, createFunc, handleFunc) {
+	return func() (checkFunc, createFunc, handleFunc) {
+		check := func(key []byte) bool {
+			return true
+		}
+		var val flow.Event
+		create := func() interface{} {
+			return &val
+		}
+		handle := func() error {
+			// filter out all events not of type eventType
+			if val.Type == eventType {
+				*events = append(*events, val)
+			}
+			return nil
+		}
+		return check, create, handle
+	}
+}

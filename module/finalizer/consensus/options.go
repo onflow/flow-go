@@ -5,3 +5,9 @@ func WithCleanup(cleanup CleanupFunc) func(*Finalizer) {
 		f.cleanup = cleanup
 	}
 }
+
+func WithCleanupPebble(cleanup CleanupFunc) func(*FinalizerPebble) {
+	return func(f *FinalizerPebble) {
+		f.cleanup = cleanup
+	}
+}

@@ -216,7 +216,6 @@ func Bootstrap(
 // protocol state root snapshot to disk.
 func (state *State) bootstrapSealingSegment(segment *flow.SealingSegment, head *flow.Block, rootSeal *flow.Seal) func(tx *transaction.Tx) error {
 	return func(tx *transaction.Tx) error {
-
 		for _, result := range segment.ExecutionResults {
 			err := transaction.WithTx(operation.SkipDuplicates(operation.InsertExecutionResult(result)))(tx)
 			if err != nil {

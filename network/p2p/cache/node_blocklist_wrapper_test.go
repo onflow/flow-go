@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -23,7 +23,7 @@ import (
 
 type NodeDisallowListWrapperTestSuite struct {
 	suite.Suite
-	DB       *badger.DB
+	DB       *pebble.DB
 	provider *mocks.IdentityProvider
 
 	wrapper        *cache.NodeDisallowListingWrapper
@@ -31,7 +31,7 @@ type NodeDisallowListWrapperTestSuite struct {
 }
 
 func (s *NodeDisallowListWrapperTestSuite) SetupTest() {
-	s.DB, _ = unittest.TempBadgerDB(s.T())
+	s.DB, _ = unittest.TempPebbleDB(s.T())
 	s.provider = new(mocks.IdentityProvider)
 
 	var err error

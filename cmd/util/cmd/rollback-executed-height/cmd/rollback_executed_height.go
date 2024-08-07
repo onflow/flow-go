@@ -12,7 +12,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/storage/pebble"
 )
 
 var (
@@ -50,25 +50,29 @@ func run(*cobra.Command, []string) {
 		log.Fatal().Msg("height must be above 0")
 	}
 
-	db := common.InitStorage(flagDataDir)
-	storages := common.InitStorages(db)
-	state, err := common.InitProtocolState(db, storages)
+	db, err := common.InitStoragePebble(flagDataDir)
+	if err != nil {
+		log.Fatal().Err(err).Msg("could not init storage")
+	}
+	defer db.Close()
+	storages := common.InitStoragesPebble(db)
+	state, err := common.InitProtocolStatePebble(db, storages)
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not init protocol states")
 	}
 
 	metrics := &metrics.NoopCollector{}
-	transactionResults := badger.NewTransactionResults(metrics, db, badger.DefaultCacheSize)
-	commits := badger.NewCommits(metrics, db)
-	chunkDataPacks := badger.NewChunkDataPacks(metrics, db, badger.NewCollections(db, badger.NewTransactions(metrics, db)), badger.DefaultCacheSize)
-	results := badger.NewExecutionResults(metrics, db)
-	receipts := badger.NewExecutionReceipts(metrics, db, results, badger.DefaultCacheSize)
-	myReceipts := badger.NewMyExecutionReceipts(metrics, db, receipts)
-	headers := badger.NewHeaders(metrics, db)
-	events := badger.NewEvents(metrics, db)
-	serviceEvents := badger.NewServiceEvents(metrics, db)
+	transactionResults := pebble.NewTransactionResults(metrics, db, pebble.DefaultCacheSize)
+	commits := pebble.NewCommits(metrics, db)
+	chunkDataPacks := pebble.NewChunkDataPacks(metrics, db, pebble.NewCollections(db, pebble.NewTransactions(metrics, db)), pebble.DefaultCacheSize)
+	results := pebble.NewExecutionResults(metrics, db)
+	receipts := pebble.NewExecutionReceipts(metrics, db, results, pebble.DefaultCacheSize)
+	myReceipts := pebble.NewMyExecutionReceipts(metrics, db, receipts)
+	headers := pebble.NewHeaders(metrics, db)
+	events := pebble.NewEvents(metrics, db)
+	serviceEvents := pebble.NewServiceEvents(metrics, db)
 
-	writeBatch := badger.NewBatch(db)
+	writeBatch := pebble.NewBatch(db)
 
 	err = removeExecutionResultsFromHeight(
 		writeBatch,
@@ -105,19 +109,19 @@ func run(*cobra.Command, []string) {
 
 }
 
-// use badger instances directly instead of stroage interfaces so that the interface don't
+// use pebble instances directly instead of stroage interfaces so that the interface don't
 // need to include the Remove methods
 func removeExecutionResultsFromHeight(
-	writeBatch *badger.Batch,
+	writeBatch *pebble.Batch,
 	protoState protocol.State,
-	headers *badger.Headers,
-	transactionResults *badger.TransactionResults,
-	commits *badger.Commits,
-	chunkDataPacks *badger.ChunkDataPacks,
-	results *badger.ExecutionResults,
-	myReceipts *badger.MyExecutionReceipts,
-	events *badger.Events,
-	serviceEvents *badger.ServiceEvents,
+	headers *pebble.Headers,
+	transactionResults *pebble.TransactionResults,
+	commits *pebble.Commits,
+	chunkDataPacks *pebble.ChunkDataPacks,
+	results *pebble.ExecutionResults,
+	myReceipts *pebble.MyExecutionReceipts,
+	events *pebble.Events,
+	serviceEvents *pebble.ServiceEvents,
 	fromHeight uint64) error {
 	log.Info().Msgf("removing results for blocks from height: %v", fromHeight)
 
@@ -190,15 +194,15 @@ func removeExecutionResultsFromHeight(
 // All data to be removed will be removed in a batch write.
 // It bubbles up any error encountered
 func removeForBlockID(
-	writeBatch *badger.Batch,
-	headers *badger.Headers,
-	commits *badger.Commits,
-	transactionResults *badger.TransactionResults,
-	results *badger.ExecutionResults,
-	chunks *badger.ChunkDataPacks,
-	myReceipts *badger.MyExecutionReceipts,
-	events *badger.Events,
-	serviceEvents *badger.ServiceEvents,
+	writeBatch *pebble.Batch,
+	headers *pebble.Headers,
+	commits *pebble.Commits,
+	transactionResults *pebble.TransactionResults,
+	results *pebble.ExecutionResults,
+	chunks *pebble.ChunkDataPacks,
+	myReceipts *pebble.MyExecutionReceipts,
+	events *pebble.Events,
+	serviceEvents *pebble.ServiceEvents,
 	blockID flow.Identifier,
 ) error {
 	result, err := results.ByBlockID(blockID)
