@@ -8,16 +8,17 @@ import (
 	"github.com/onflow/flow-go/module/blobs"
 )
 
-// key prefixes
+// These key prefixes used exclusively in the execution data tracker database.
+// They help categorize and manage different types of execution data.
 const (
-	PrefixGlobalState  byte = iota + 1 // global state variables
-	PrefixLatestHeight                 // tracks, for each blob, the latest height at which there exists a block whose execution data contains the blob
-	PrefixBlobRecord                   // tracks the set of blobs at each height
+	PrefixGlobalState  byte = 1 // global state variables
+	PrefixLatestHeight byte = 2 // tracks, for each blob, the latest height at which there exists a block whose execution data contains the blob
+	PrefixBlobRecord   byte = 3 // tracks the set of blobs at each height
 )
 
 const (
-	GlobalStateFulfilledHeight byte = iota + 1 // latest fulfilled block height
-	GlobalStatePrunedHeight                    // latest pruned block height
+	GlobalStateFulfilledHeight byte = 1 // latest fulfilled block height
+	GlobalStatePrunedHeight    byte = 2 // latest pruned block height
 )
 
 const BlobRecordKeyLength = 1 + 8 + blobs.CidLength
