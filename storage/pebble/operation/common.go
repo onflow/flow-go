@@ -17,7 +17,7 @@ func insert(key []byte, val interface{}) func(pebble.Writer) error {
 			return irrecoverable.NewExceptionf("failed to encode value: %w", err)
 		}
 
-		err = w.Set(key, value, pebble.Sync)
+		err = w.Set(key, value, nil)
 		if err != nil {
 			return irrecoverable.NewExceptionf("failed to store data: %w", err)
 		}
