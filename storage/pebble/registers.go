@@ -15,9 +15,10 @@ import (
 // Registers library that implements pebble storage for registers
 // given a pebble instance with root block and root height populated
 type Registers struct {
-	db           *pebble.DB
-	firstHeight  uint64
-	latestHeight *atomic.Uint64
+	db             *pebble.DB
+	firstHeight    uint64
+	latestHeight   *atomic.Uint64
+	pruneThreshold uint64
 }
 
 var _ storage.RegisterIndex = (*Registers)(nil)
@@ -25,7 +26,7 @@ var _ storage.RegisterIndex = (*Registers)(nil)
 // NewRegisters takes a populated pebble instance with LatestHeight and FirstHeight set.
 // return storage.ErrNotBootstrapped if they those two keys are unavailable as it implies a uninitialized state
 // return other error if database is in a corrupted state
-func NewRegisters(db *pebble.DB) (*Registers, error) {
+func NewRegisters(db *pebble.DB, pruneThreshold uint64) (*Registers, error) {
 	// check height keys and populate cache. These two variables will have been set
 	firstHeight, latestHeight, err := ReadHeightsFromBootstrappedDB(db)
 	if err != nil {
@@ -35,9 +36,10 @@ func NewRegisters(db *pebble.DB) (*Registers, error) {
 
 	// All registers between firstHeight and lastHeight have been indexed
 	return &Registers{
-		db:           db,
-		firstHeight:  firstHeight,
-		latestHeight: atomic.NewUint64(latestHeight),
+		db:             db,
+		firstHeight:    firstHeight,
+		latestHeight:   atomic.NewUint64(latestHeight),
+		pruneThreshold: pruneThreshold,
 	}, nil
 }
 
@@ -54,10 +56,12 @@ func (s *Registers) Get(
 	height uint64,
 ) (flow.RegisterValue, error) {
 	latestHeight := s.latestHeight.Load()
-	if height > latestHeight || height < s.firstHeight {
+	pruneHeight := latestHeight - s.pruneThreshold
+
+	if height > latestHeight || height < s.firstHeight || height < pruneHeight {
 		return nil, errors.Wrap(
 			storage.ErrHeightNotIndexed,
-			fmt.Sprintf("height %d not indexed, indexed range is [%d-%d]", height, s.firstHeight, latestHeight),
+			fmt.Sprintf("height %d not indexed, indexed range is [%d-%d], or below prune height %d", height, s.firstHeight, latestHeight, pruneHeight),
 		)
 	}
 	key := newLookupKey(height, reg)
