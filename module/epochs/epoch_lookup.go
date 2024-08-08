@@ -21,7 +21,7 @@ const (
 
 // viewRange captures the counter and view range of an epoch (inclusive on both ends)
 // The zero value (epochCounter = firstView = finalView = 0) can conceptually not occur:
-// even the genesis epoch '0' is required to have some view to prepare the subsequent epoch.
+// even the genesis epoch '0' is required to have some views to prepare the subsequent epoch.
 // Therefore, we use the zero value to represent 'undefined'.
 type viewRange struct {
 	epochCounter uint64
