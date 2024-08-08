@@ -51,17 +51,17 @@ func (_m *StateMachine) Build() (*flow.EpochStateEntry, flow.Identifier, bool) {
 	return r0, r1, r2
 }
 
-// EjectIdentity provides a mock function with given fields: nodeID
-func (_m *StateMachine) EjectIdentity(nodeID flow.Identifier) bool {
-	ret := _m.Called(nodeID)
+// EjectIdentity provides a mock function with given fields: ejectIdentity
+func (_m *StateMachine) EjectIdentity(ejectIdentity *flow.EjectIdentity) bool {
+	ret := _m.Called(ejectIdentity)
 
 	if len(ret) == 0 {
 		panic("no return value specified for EjectIdentity")
 	}
 
 	var r0 bool
-	if rf, ok := ret.Get(0).(func(flow.Identifier) bool); ok {
-		r0 = rf(nodeID)
+	if rf, ok := ret.Get(0).(func(*flow.EjectIdentity) bool); ok {
+		r0 = rf(ejectIdentity)
 	} else {
 		r0 = ret.Get(0).(bool)
 	}
