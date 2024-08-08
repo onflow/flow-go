@@ -19,27 +19,27 @@ const (
 	invalidEpochViewSequence  = "sanity check: first view of the epoch extension %d should immediately start after the final view of the latest epoch %d"
 )
 
-// epochRange captures the counter and view range of an epoch (inclusive on both ends)
-type epochRange struct {
-	counter   uint64
-	firstView uint64
-	finalView uint64
+// viewRange captures the counter and view range of an epoch (inclusive on both ends)
+type viewRange struct {
+	epochCounter uint64
+	firstView    uint64
+	finalView    uint64
 }
 
-// exists returns true when the epochRange is initialized (anything besides the zero value for the struct).
+// exists returns true when the viewRange is initialized (anything besides the zero value for the struct).
 // It is useful for checking existence while iterating the epochRangeCache.
-func (er epochRange) exists() bool {
-	return er != epochRange{}
+func (er viewRange) exists() bool {
+	return er != viewRange{}
 }
 
 // epochRangeCache stores at most the 3 latest epoch ranges.
 // Ranges are ordered by counter (ascending) and right-aligned.
 // For example, if we only have one epoch cached, `epochRangeCache[0]` and `epochRangeCache[1]` are `nil`.
 // Not safe for concurrent use.
-type epochRangeCache [3]epochRange
+type epochRangeCache [3]viewRange
 
 // latest returns the latest cached epoch range, or nil if no epochs are cached.
-func (cache *epochRangeCache) latest() epochRange {
+func (cache *epochRangeCache) latest() viewRange {
 	return cache[2]
 }
 
@@ -63,8 +63,8 @@ func (cache *epochRangeCache) extendLatestEpoch(epochCounter uint64, extension f
 	}
 
 	// sanity check: epoch extension should have the same epoch counter as the latest epoch
-	if latestEpoch.counter != epochCounter {
-		return fmt.Errorf(mismatchEpochCounter, cache[2].counter, epochCounter)
+	if latestEpoch.epochCounter != epochCounter {
+		return fmt.Errorf(mismatchEpochCounter, cache[2].epochCounter, epochCounter)
 	}
 
 	// sanity check: first view of the epoch extension should immediately start after the final view of the latest epoch.
@@ -98,7 +98,7 @@ func (cache *epochRangeCache) combinedRange() (firstView uint64, finalView uint6
 // Adding the same epoch multiple times is a no-op.
 // Guarantees ordering and alignment properties of epochRangeCache are preserved.
 // No errors are expected during normal operation.
-func (cache *epochRangeCache) add(epoch epochRange) error {
+func (cache *epochRangeCache) add(epoch viewRange) error {
 
 	// sanity check: ensure the epoch we are adding is considered a non-zero value
 	// this helps ensure internal consistency in this component, but if we ever trip this check, something is seriously wrong elsewhere
@@ -119,8 +119,8 @@ func (cache *epochRangeCache) add(epoch epochRange) error {
 	}
 
 	// sanity check: ensure counters/views are sequential
-	if epoch.counter != latestCachedEpoch.counter+1 {
-		return fmt.Errorf("non-sequential epoch counters: adding epoch %d when latest cached epoch is %d", epoch.counter, latestCachedEpoch.counter)
+	if epoch.epochCounter != latestCachedEpoch.epochCounter+1 {
+		return fmt.Errorf("non-sequential epoch counters: adding epoch %d when latest cached epoch is %d", epoch.epochCounter, latestCachedEpoch.epochCounter)
 	}
 	if epoch.firstView != latestCachedEpoch.finalView+1 {
 		return fmt.Errorf("non-sequential epoch view ranges: adding range [%d,%d] when latest cached range is [%d,%d]",
@@ -214,10 +214,10 @@ func (lookup *EpochLookup) cacheEpoch(epoch protocol.Epoch) error {
 		return err
 	}
 
-	cachedEpoch := epochRange{
-		counter:   counter,
-		firstView: firstView,
-		finalView: finalView,
+	cachedEpoch := viewRange{
+		epochCounter: counter,
+		firstView:    firstView,
+		finalView:    finalView,
 	}
 
 	lookup.mu.Lock()
@@ -261,7 +261,7 @@ func (lookup *EpochLookup) EpochForView(view uint64) (uint64, error) {
 			continue
 		}
 		if epoch.firstView <= view && view <= epoch.finalView {
-			return epoch.counter, nil
+			return epoch.epochCounter, nil
 		}
 	}
 
