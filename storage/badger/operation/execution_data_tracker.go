@@ -64,9 +64,9 @@ func InsertBlob(blockHeight uint64, cid cid.Cid) func(*badger.Txn) error {
 	return insert(makePrefix(storage.PrefixBlobRecord, blockHeight, cid), nil)
 }
 
-// RetrieveBlob retrieves a blob record for the given block height and CID from the execution data tracker storage.
-func RetrieveBlob(blockHeight uint64, cid cid.Cid) func(*badger.Txn) error {
-	return retrieve(makePrefix(storage.PrefixBlobRecord, blockHeight, cid), nil)
+// BlobExist checks whether a blob record exists in the execution data tracker storage.
+func BlobExist(blockHeight uint64, cid cid.Cid, blobExists *bool) func(*badger.Txn) error {
+	return exists(makePrefix(storage.PrefixBlobRecord, blockHeight, cid), blobExists)
 }
 
 // RemoveBlob removes a blob record for the given block height and CID from the execution data tracker storage.

@@ -253,11 +253,6 @@ func retrieve(key []byte, entity interface{}) func(*badger.Txn) error {
 			return irrecoverable.NewExceptionf("could not load data: %w", err)
 		}
 
-		// in case the value is not needed
-		if entity == nil {
-			return nil
-		}
-
 		// get the value from the item
 		err = item.Value(func(val []byte) error {
 			err := msgpack.Unmarshal(val, entity)
