@@ -265,9 +265,9 @@ func (s *ProtocolStateMachineSuite) TestProcessEpochCommit() {
 	})
 }
 
-// TestUpdateIdentityUnknownIdentity tests if updating the identity of unknown node results in a correct return value
-// and doesn't affect resulting state.
-func (s *ProtocolStateMachineSuite) TestUpdateIdentityUnknownIdentity() {
+// TestNodeEjectionOfUnknownID verifies that an `EjectNode` service event referencing an unknown
+// node leaves the state invariant.
+func (s *ProtocolStateMachineSuite) TestNodeEjectionOfUnknownID() {
 	serviceEvent := &flow.EjectNode{NodeID: unittest.IdentifierFixture()}
 	s.consumer.On("OnServiceEventReceived", serviceEvent.ServiceEvent()).Once()
 	s.consumer.On("OnInvalidServiceEvent", serviceEvent.ServiceEvent(),
@@ -281,8 +281,9 @@ func (s *ProtocolStateMachineSuite) TestUpdateIdentityUnknownIdentity() {
 	require.Equal(s.T(), updatedState.ID(), updatedStateID)
 }
 
-// TestUpdateIdentityHappyPath tests if identity updates are correctly processed and reflected in the resulting protocol state.
-func (s *ProtocolStateMachineSuite) TestUpdateIdentityHappyPath() {
+// TestNodeEjectionHappyPath verifies that `EjectNode` service events are correctly processed
+// and reflected in the resulting protocol state.
+func (s *ProtocolStateMachineSuite) TestNodeEjectionHappyPath() {
 	// update protocol state to have next epoch protocol state
 	unittest.WithNextEpochProtocolState()(s.parentProtocolState)
 	var err error
