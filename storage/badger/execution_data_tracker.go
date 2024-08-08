@@ -14,6 +14,8 @@ import (
 	"github.com/onflow/flow-go/storage/badger/operation"
 )
 
+const defaultDiscardRatio = 0.25
+
 // getBatchItemCountLimit returns the maximum number of items that can be included in a single batch
 // transaction based on the number / total size of updates per item.
 func getBatchItemCountLimit(db *badger.DB, writeCountPerItem int64, writeSizePerItem int64) int {
@@ -438,7 +440,7 @@ func (s *ExecutionDataTracker) PruneUpToHeight(height uint64) error {
 	}
 
 	// this is a good time to do garbage collection
-	if err := s.db.RunValueLogGC(0.5); err != nil {
+	if err := s.db.RunValueLogGC(defaultDiscardRatio); err != nil {
 		s.logger.Err(err).Msg("failed to run value log garbage collection")
 	}
 
