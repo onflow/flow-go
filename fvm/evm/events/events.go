@@ -16,6 +16,7 @@ import (
 const (
 	EventTypeBlockExecuted       flow.EventType = "EVM.BlockExecuted"
 	EventTypeTransactionExecuted flow.EventType = "EVM.TransactionExecuted"
+	EventTypeFlowFeesDeducted    flow.EventType = "FlowFees.FeesDeducted"
 )
 
 type EventPayload interface {
@@ -213,4 +214,16 @@ func FlowEventToCadenceEvent(event flow.Event) (cadence.Event, error) {
 		return cadence.Event{}, fmt.Errorf("event can not be casted to a cadence event")
 	}
 	return cadenceEvent, nil
+}
+
+type FlowFeesDeductedEventPayload struct {
+	Amount          cadence.UFix64 `cadence:"amount"`
+	InclusionEffort cadence.UFix64 `cadence:"inclusionEffort"`
+	ExecutionEffort cadence.UFix64 `cadence:"executionEffort"`
+}
+
+func DecodeFlowFeesDeductedEventPayload(event cadence.Event) (*FlowFeesDeductedEventPayload, error) {
+	var payload FlowFeesDeductedEventPayload
+	err := cadence.DecodeFields(event, &payload)
+	return &payload, err
 }
