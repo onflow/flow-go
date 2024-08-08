@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"sort"
 	"strings"
 	"unicode/utf8"
 
@@ -26,6 +27,7 @@ import (
 	"github.com/onflow/flow-go/engine/common/rpc"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	exeEng "github.com/onflow/flow-go/engine/execution"
+	"github.com/onflow/flow-go/engine/execution/computation/metrics"
 	"github.com/onflow/flow-go/engine/execution/state"
 	fvmerrors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/model/flow"
@@ -62,6 +64,7 @@ func New(
 	exeResults storage.ExecutionResults,
 	txResults storage.TransactionResults,
 	commits storage.Commits,
+	transactionMetrics metrics.TransactionExecutionMetricsProvider,
 	chainID flow.ChainID,
 	signerIndicesDecoder hotstuff.BlockSignerDecoder,
 	apiRatelimits map[string]int, // the api rate limit (max calls per second) for each of the gRPC API e.g. Ping->100, ExecuteScriptAtBlockID->300
@@ -105,6 +108,7 @@ func New(
 			exeResults:           exeResults,
 			transactionResults:   txResults,
 			commits:              commits,
+			transactionMetrics:   transactionMetrics,
 			log:                  log,
 			maxBlockRange:        DefaultMaxBlockRange,
 		},
@@ -166,6 +170,7 @@ type handler struct {
 	transactionResults   storage.TransactionResults
 	log                  zerolog.Logger
 	commits              storage.Commits
+	transactionMetrics   metrics.TransactionExecutionMetricsProvider
 	maxBlockRange        int
 }
 
@@ -800,6 +805,58 @@ func (h *handler) blockHeaderResponse(header *flow.Header) (*execution.BlockHead
 	return &execution.BlockHeaderResponse{
 		Block: msg,
 	}, nil
+}
+
+// GetTransactionExecutionMetricsAfter gets the execution metrics for a transaction after a given block.
+func (h *handler) GetTransactionExecutionMetricsAfter(
+	_ context.Context,
+	req *execution.GetTransactionExecutionMetricsAfterRequest,
+) (*execution.GetTransactionExecutionMetricsAfterResponse, error) {
+	height := req.GetBlockHeight()
+
+	metrics, err := h.transactionMetrics.GetTransactionExecutionMetricsAfter(height)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to get metrics after block height %v: %v", height, err)
+	}
+
+	response := &execution.GetTransactionExecutionMetricsAfterResponse{
+		Results: make([]*execution.GetTransactionExecutionMetricsAfterResponse_Result, 0, len(metrics)),
+	}
+
+	for blockHeight, blockMetrics := range metrics {
+		blockResponse := &execution.GetTransactionExecutionMetricsAfterResponse_Result{
+			BlockHeight:  blockHeight,
+			Transactions: make([]*execution.GetTransactionExecutionMetricsAfterResponse_Transaction, len(blockMetrics)),
+		}
+
+		for i, transactionMetrics := range blockMetrics {
+			transactionMetricsResponse := &execution.GetTransactionExecutionMetricsAfterResponse_Transaction{
+				TransactionId:          transactionMetrics.TransactionID[:],
+				ExecutionTime:          uint64(transactionMetrics.ExecutionTime.Nanoseconds()),
+				ExecutionEffortWeights: make([]*execution.GetTransactionExecutionMetricsAfterResponse_ExecutionEffortWeight, 0, len(transactionMetrics.ExecutionEffortWeights)),
+			}
+
+			for kind, weight := range transactionMetrics.ExecutionEffortWeights {
+				transactionMetricsResponse.ExecutionEffortWeights = append(
+					transactionMetricsResponse.ExecutionEffortWeights,
+					&execution.GetTransactionExecutionMetricsAfterResponse_ExecutionEffortWeight{
+						Kind:   uint64(kind),
+						Weight: uint64(weight),
+					},
+				)
+			}
+
+			blockResponse.Transactions[i] = transactionMetricsResponse
+		}
+		response.Results = append(response.Results, blockResponse)
+	}
+
+	// sort the response by block height in descending order
+	sort.Slice(response.Results, func(i, j int) bool {
+		return response.Results[i].BlockHeight > response.Results[j].BlockHeight
+	})
+
+	return response, nil
 }
 
 // additional check that when there is no event in the block, double check if the execution
