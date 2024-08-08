@@ -76,16 +76,16 @@ func (u *baseStateMachine) ParentState() *flow.RichEpochStateEntry {
 // is set to true for all occurrences, and we return true.  If `nodeID` is not found, we return false. This
 // method is idempotent and behaves identically for repeated calls with the same `nodeID` (repeated calls
 // with the same input create minor performance overhead though).
-func (u *baseStateMachine) EjectIdentity(ejectIdentity *flow.EjectIdentity) bool {
-	u.telemetry.OnServiceEventReceived(ejectIdentity.ServiceEvent())
-	ejected := u.ejector.Eject(ejectIdentity.NodeID)
-	if ejected {
-		u.telemetry.OnServiceEventProcessed(ejectIdentity.ServiceEvent())
+func (u *baseStateMachine) EjectIdentity(ejectionEvent *flow.EjectNode) bool {
+	u.telemetry.OnServiceEventReceived(ejectionEvent.ServiceEvent())
+	wasEjected := u.ejector.Eject(ejectionEvent.NodeID)
+	if wasEjected {
+		u.telemetry.OnServiceEventProcessed(ejectionEvent.ServiceEvent())
 	} else {
-		u.telemetry.OnInvalidServiceEvent(ejectIdentity.ServiceEvent(),
-			protocol.NewInvalidServiceEventErrorf("could not eject identity (%v)", ejectIdentity.NodeID))
+		u.telemetry.OnInvalidServiceEvent(ejectionEvent.ServiceEvent(),
+			protocol.NewInvalidServiceEventErrorf("could not eject node with unknown NodeID %v", ejectionEvent.NodeID))
 	}
-	return ejected
+	return wasEjected
 }
 
 // TransitionToNextEpoch updates the notion of 'current epoch', 'previous' and 'next epoch' in the protocol

@@ -458,22 +458,22 @@ func (commit *EpochCommit) EqualTo(other *EpochCommit) bool {
 	return true
 }
 
-// EjectIdentity is a service event emitted when a node has to be ejected from the network.
-// Dynamic Protocol State listens to this event and updates the identity table accordingly.
+// EjectNode is a service event emitted when a node has to be ejected from the network.
+// The Dynamic Protocol State observes these events and updates the identity table accordingly.
 // It contains a single field which is the identifier of the node being ejected.
-type EjectIdentity struct {
+type EjectNode struct {
 	NodeID Identifier
 }
 
 // EqualTo returns true if the two events are equivalent.
-func (e *EjectIdentity) EqualTo(other *EjectIdentity) bool {
+func (e *EjectNode) EqualTo(other *EjectNode) bool {
 	return e.NodeID == other.NodeID
 }
 
 // ServiceEvent returns the event as a generic ServiceEvent type.
-func (e *EjectIdentity) ServiceEvent() ServiceEvent {
+func (e *EjectNode) ServiceEvent() ServiceEvent {
 	return ServiceEvent{
-		Type:  ServiceEventEjectIdentity,
+		Type:  ServiceEventEjectNode,
 		Event: e,
 	}
 }
