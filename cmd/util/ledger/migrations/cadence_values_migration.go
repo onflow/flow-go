@@ -244,6 +244,7 @@ func NewCadence1ValueMigration(
 	programs map[runtime.Location]*interpreter.Program,
 	compositeTypeConverter statictypes.CompositeTypeConverterFunc,
 	interfaceTypeConverter statictypes.InterfaceTypeConverterFunc,
+	storageDomainCapabilities *capcons.AccountsCapabilities,
 	opts Options,
 ) *CadenceBaseMigration {
 
@@ -285,6 +286,9 @@ func NewCadence1ValueMigration(
 				// and the mutating iterator of the inlined version of atree
 				type_keys.NewTypeKeyMigration(),
 				string_normalization.NewStringNormalizingMigration(),
+				&capcons.StorageCapMigration{
+					StorageDomainCapabilities: storageDomainCapabilities,
+				},
 			}
 		},
 		errorMessageHandler: errorMessageHandler,
@@ -396,22 +400,10 @@ func NewCadence1CapabilityValueMigration(
 			accounts environment.Accounts,
 			reporter *cadenceValueMigrationReporter,
 		) []migrations.ValueMigration {
-
-			idGenerator := environment.NewAccountLocalIDGenerator(
-				tracing.NewMockTracerSpan(),
-				util.NopMeter{},
-				accounts,
-			)
-
-			handler := capabilityControllerHandler{
-				idGenerator: idGenerator,
-			}
-
 			return []migrations.ValueMigration{
 				&capcons.CapabilityValueMigration{
 					CapabilityMapping: capabilityMapping,
 					Reporter:          reporter,
-					IssueHandler:      handler,
 				},
 			}
 		},

@@ -1,17 +1,23 @@
 package migrations
 
 import (
+	"context"
 	_ "embed"
 	"fmt"
 
 	"github.com/onflow/cadence/migrations/capcons"
 	"github.com/onflow/cadence/migrations/statictypes"
+	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
+	"github.com/onflow/flow-go/cmd/util/ledger/util"
+	"github.com/onflow/flow-go/cmd/util/ledger/util/registers"
+	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
+	"github.com/onflow/flow-go/fvm/tracing"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -214,6 +220,91 @@ type NamedMigration struct {
 	Migrate RegistersMigration
 }
 
+type IssueStorageCapConMigration struct {
+	chainID                           flow.ChainID
+	accountsCapabilities              *capcons.AccountsCapabilities
+	interpreterMigrationRuntimeConfig InterpreterMigrationRuntimeConfig
+	programs                          map[runtime.Location]*interpreter.Program
+	mapping                           *capcons.CapabilityMapping
+}
+
+func (m *IssueStorageCapConMigration) InitMigration(
+	_ zerolog.Logger,
+	_ *registers.ByAccount,
+	_ int,
+) error {
+	// During the migration, we only provide already checked programs,
+	// no parsing/checking of contracts is expected.
+
+	m.interpreterMigrationRuntimeConfig = InterpreterMigrationRuntimeConfig{
+		GetOrLoadProgram: func(
+			location runtime.Location,
+			_ func() (*interpreter.Program, error),
+		) (*interpreter.Program, error) {
+			program, ok := m.programs[location]
+			if !ok {
+				return nil, fmt.Errorf("program not found: %s", location)
+			}
+			return program, nil
+		},
+		GetCode: func(_ common.AddressLocation) ([]byte, error) {
+			return nil, fmt.Errorf("unexpected call to GetCode")
+		},
+		GetContractNames: func(address flow.Address) ([]string, error) {
+			return nil, fmt.Errorf("unexpected call to GetContractNames")
+		},
+	}
+
+	return nil
+}
+
+func (m *IssueStorageCapConMigration) MigrateAccount(
+	_ context.Context,
+	address common.Address,
+	accountRegisters *registers.AccountRegisters,
+) error {
+	accountCapabilities := m.accountsCapabilities.Get(address)
+	if accountCapabilities == nil {
+		return nil
+	}
+
+	// Create all the runtime components we need for the migration
+	migrationRuntime, err := NewInterpreterMigrationRuntime(
+		accountRegisters,
+		m.chainID,
+		m.interpreterMigrationRuntimeConfig,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create interpreter migration runtime: %w", err)
+	}
+
+	idGenerator := environment.NewAccountLocalIDGenerator(
+		tracing.NewMockTracerSpan(),
+		util.NopMeter{},
+		migrationRuntime.Accounts,
+	)
+
+	handler := capabilityControllerHandler{
+		idGenerator: idGenerator,
+	}
+
+	capcons.IssueAccountCapabilities(
+		migrationRuntime.Interpreter,
+		address,
+		accountCapabilities,
+		handler,
+		m.mapping,
+	)
+
+	return nil
+}
+
+func (*IssueStorageCapConMigration) Close() error {
+	return nil
+}
+
+var _ AccountBasedMigration = &IssueStorageCapConMigration{}
+
 func NewCadence1ValueMigrations(
 	log zerolog.Logger,
 	rwf reporters.ReportWriterFactory,
@@ -224,6 +315,10 @@ func NewCadence1ValueMigrations(
 	// Populated by CadenceLinkValueMigration,
 	// used by CadenceCapabilityValueMigration
 	capabilityMapping := &capcons.CapabilityMapping{}
+
+	// Populated by StorageCapMigration,
+	// used by IssueStorageCapConMigration
+	storageDomainCapabilities := &capcons.AccountsCapabilities{}
 
 	errorMessageHandler := &errorMessageHandler{}
 
@@ -260,46 +355,59 @@ func NewCadence1ValueMigrations(
 		},
 	}
 
-	for index, migrationConstructor := range []func(opts Options) *CadenceBaseMigration{
-		func(opts Options) *CadenceBaseMigration {
-			return NewCadence1ValueMigration(
+	for index, migrationConstructor := range []func(opts Options) (string, AccountBasedMigration){
+		func(opts Options) (string, AccountBasedMigration) {
+			migration := NewCadence1ValueMigration(
 				rwf,
 				errorMessageHandler,
 				programs,
 				NewCadence1CompositeStaticTypeConverter(opts.ChainID),
 				NewCadence1InterfaceStaticTypeConverter(opts.ChainID),
+				storageDomainCapabilities,
 				opts,
 			)
+			return migration.name, migration
 		},
-		func(opts Options) *CadenceBaseMigration {
-			return NewCadence1LinkValueMigration(
+		func(opts Options) (string, AccountBasedMigration) {
+			return "cadence_storage_cap_con_issue_migration",
+				&IssueStorageCapConMigration{
+					chainID:              opts.ChainID,
+					accountsCapabilities: storageDomainCapabilities,
+					programs:             programs,
+					mapping:              capabilityMapping,
+				}
+		},
+		func(opts Options) (string, AccountBasedMigration) {
+			migration := NewCadence1LinkValueMigration(
 				rwf,
 				errorMessageHandler,
 				programs,
 				capabilityMapping,
 				opts,
 			)
+			return migration.name, migration
 		},
-		func(opts Options) *CadenceBaseMigration {
-			return NewCadence1CapabilityValueMigration(
+		func(opts Options) (string, AccountBasedMigration) {
+			migration := NewCadence1CapabilityValueMigration(
 				rwf,
 				errorMessageHandler,
 				programs,
 				capabilityMapping,
 				opts,
 			)
+			return migration.name, migration
 		},
 	} {
 		opts := opts
 		// Only check storage health before the first migration
 		opts.CheckStorageHealthBeforeMigration = opts.CheckStorageHealthBeforeMigration && index == 0
 
-		accountBasedMigration := migrationConstructor(opts)
+		name, accountBasedMigration := migrationConstructor(opts)
 
 		migs = append(
 			migs,
 			NamedMigration{
-				Name: accountBasedMigration.name,
+				Name: name,
 				Migrate: NewAccountBasedMigration(
 					log,
 					opts.NWorker,
