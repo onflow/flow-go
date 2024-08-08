@@ -221,11 +221,32 @@ type NamedMigration struct {
 }
 
 type IssueStorageCapConMigration struct {
+	name                              string
 	chainID                           flow.ChainID
 	accountsCapabilities              *capcons.AccountsCapabilities
 	interpreterMigrationRuntimeConfig InterpreterMigrationRuntimeConfig
 	programs                          map[runtime.Location]*interpreter.Program
 	mapping                           *capcons.CapabilityMapping
+	reporter                          reporters.ReportWriter
+}
+
+const issueStorageCapConMigrationReporterName = "cadence-storage-capcon-issue-migration"
+
+func NewIssueStorageCapConMigration(
+	rwf reporters.ReportWriterFactory,
+	chainID flow.ChainID,
+	storageDomainCapabilities *capcons.AccountsCapabilities,
+	programs map[runtime.Location]*interpreter.Program,
+	capabilityMapping *capcons.CapabilityMapping,
+) *IssueStorageCapConMigration {
+	return &IssueStorageCapConMigration{
+		name:                 "cadence_storage_cap_con_issue_migration",
+		reporter:             rwf.ReportWriter(issueStorageCapConMigrationReporterName),
+		chainID:              chainID,
+		accountsCapabilities: storageDomainCapabilities,
+		programs:             programs,
+		mapping:              capabilityMapping,
+	}
 }
 
 func (m *IssueStorageCapConMigration) InitMigration(
@@ -296,10 +317,27 @@ func (m *IssueStorageCapConMigration) MigrateAccount(
 		m.mapping,
 	)
 
+	// It would be ideal to do the reporting inside `IssueAccountCapabilities` function above.
+	// However, that doesn't have the access to the reporter. So doing it here.
+	for _, capability := range accountCapabilities.Capabilities {
+		id, _, _ := m.mapping.Get(interpreter.AddressPath{
+			Address: address,
+			Path:    capability.Path,
+		})
+
+		m.reporter.Write(storageCapconIssuedEntry{
+			AccountAddress: address,
+			Path:           capability.Path,
+			BorrowType:     capability.BorrowType,
+			CapabilityID:   id,
+		})
+	}
+
 	return nil
 }
 
-func (*IssueStorageCapConMigration) Close() error {
+func (m *IssueStorageCapConMigration) Close() error {
+	m.reporter.Close()
 	return nil
 }
 
@@ -369,13 +407,15 @@ func NewCadence1ValueMigrations(
 			return migration.name, migration
 		},
 		func(opts Options) (string, AccountBasedMigration) {
-			return "cadence_storage_cap_con_issue_migration",
-				&IssueStorageCapConMigration{
-					chainID:              opts.ChainID,
-					accountsCapabilities: storageDomainCapabilities,
-					programs:             programs,
-					mapping:              capabilityMapping,
-				}
+			migration := NewIssueStorageCapConMigration(
+				rwf,
+				opts.ChainID,
+				storageDomainCapabilities,
+				programs,
+				capabilityMapping,
+			)
+			return migration.name, migration
+
 		},
 		func(opts Options) (string, AccountBasedMigration) {
 			migration := NewCadence1LinkValueMigration(

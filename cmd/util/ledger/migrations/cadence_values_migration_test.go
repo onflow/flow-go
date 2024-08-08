@@ -2276,4 +2276,31 @@ func TestCapabilityMigration(t *testing.T) {
 		},
 		reporter.entries,
 	)
+
+	issueStorageCapConReporter := rwf.reportWriters[issueStorageCapConMigrationReporterName]
+	require.NotNil(t, issueStorageCapConReporter)
+	require.Len(t, issueStorageCapConReporter.entries, 1)
+
+	entry := issueStorageCapConReporter.entries[0]
+
+	require.IsType(t, storageCapconIssuedEntry{}, entry)
+	storageCapconIssued := entry.(storageCapconIssuedEntry)
+
+	actual, err := storageCapconIssued.MarshalJSON()
+	require.NoError(t, err)
+
+	require.JSONEq(t,
+		//language=JSON
+		fmt.Sprintf(
+			`{
+                "kind": "storage-capcon-issued",
+                "account_address": "%s",
+                "path": "/storage/foo",
+                "borrow_type": "&AnyStruct",
+                "capability_id": "3"
+            }`,
+			addressB.HexWithPrefix(),
+		),
+		string(actual),
+	)
 }
