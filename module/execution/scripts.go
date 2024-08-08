@@ -42,15 +42,25 @@ type ScriptExecutor interface {
 	// - storage.ErrHeightNotIndexed if the data for the block height is not available
 	GetAccountAtBlockHeight(ctx context.Context, address flow.Address, height uint64) (*flow.Account, error)
 
-	// GetAccountBalance returns
+	// GetAccountBalance returns a Flow account balance by the provided address and block height.
 	// Expected errors:
 	// - storage.ErrHeightNotIndexed if the data for the block height is not available
 	GetAccountBalance(ctx context.Context, address flow.Address, height uint64) (uint64, error)
 
-	// GetAccountKeys returns
+	// GetAccountAvailableBalance returns a Flow account available balance by the provided address and block height.
+	// Expected errors:
+	// - storage.ErrHeightNotIndexed if the data for the block height is not available
+	GetAccountAvailableBalance(ctx context.Context, address flow.Address, height uint64) (uint64, error)
+
+	// GetAccountKeys returns a Flow account public keys by the provided address and block height.
 	// Expected errors:
 	// - storage.ErrHeightNotIndexed if the data for the block height is not available
 	GetAccountKeys(ctx context.Context, address flow.Address, height uint64) ([]flow.AccountPublicKey, error)
+
+	// GetAccountKey returns a Flow account public key by the provided address, block height and index.
+	// Expected errors:
+	// - storage.ErrHeightNotIndexed if the data for the block height is not available
+	GetAccountKey(ctx context.Context, address flow.Address, keyIndex uint32, height uint64) (*flow.AccountPublicKey, error)
 }
 
 var _ ScriptExecutor = (*Scripts)(nil)
@@ -148,6 +158,19 @@ func (s *Scripts) GetAccountBalance(ctx context.Context, address flow.Address, h
 	return s.executor.GetAccountBalance(ctx, address, header, snap)
 }
 
+// GetAccountAvailableBalance returns an available balance of Flow account by the provided address and block height.
+// Expected errors:
+// - Script execution related errors
+// - storage.ErrHeightNotIndexed if the data for the block height is not available
+func (s *Scripts) GetAccountAvailableBalance(ctx context.Context, address flow.Address, height uint64) (uint64, error) {
+	snap, header, err := s.snapshotWithBlock(height)
+	if err != nil {
+		return 0, err
+	}
+
+	return s.executor.GetAccountAvailableBalance(ctx, address, header, snap)
+}
+
 // GetAccountKeys returns a public keys of Flow account by the provided address and block height.
 // Expected errors:
 // - Script execution related errors
@@ -159,6 +182,19 @@ func (s *Scripts) GetAccountKeys(ctx context.Context, address flow.Address, heig
 	}
 
 	return s.executor.GetAccountKeys(ctx, address, header, snap)
+}
+
+// GetAccountKey returns a public key of Flow account by the provided address, block height and index.
+// Expected errors:
+// - Script execution related errors
+// - storage.ErrHeightNotIndexed if the data for the block height is not available
+func (s *Scripts) GetAccountKey(ctx context.Context, address flow.Address, keyIndex uint32, height uint64) (*flow.AccountPublicKey, error) {
+	snap, header, err := s.snapshotWithBlock(height)
+	if err != nil {
+		return nil, err
+	}
+
+	return s.executor.GetAccountKey(ctx, address, keyIndex, header, snap)
 }
 
 // snapshotWithBlock is a common function for executing scripts and get account functionality.

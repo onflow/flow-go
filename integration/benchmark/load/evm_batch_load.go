@@ -376,7 +376,7 @@ func (l *EVMBatchTransferLoad) transferTransaction(
 			gasPrice := big.NewInt(0)
 
 			oneFlow := cadence.UFix64(100_000_000)
-			amount := new(big.Int).Div(EVMBatchTypes.OneFlowBalance, big.NewInt(int64(oneFlow)))
+			amount := new(big.Int).Div(EVMBatchTypes.OneFlowBalance(), big.NewInt(int64(oneFlow)))
 
 			batchCount := int(l.TransfersPerTransaction)
 

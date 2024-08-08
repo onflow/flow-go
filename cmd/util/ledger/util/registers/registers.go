@@ -349,7 +349,7 @@ func (l ReadOnlyLedger) SetValue(_, _, _ []byte) error {
 }
 
 func (l ReadOnlyLedger) AllocateSlabIndex(_ []byte) (atree.SlabIndex, error) {
-	panic("unexpected call of AllocateStorageIndex")
+	panic("unexpected call of AllocateSlabIndex")
 }
 
 // ApplyChanges applies the given changes to the given registers,
@@ -367,11 +367,18 @@ func ApplyChanges(
 			ownerAddress := flow.BytesToAddress([]byte(registerID.Owner))
 
 			if _, ok := expectedChangeAddresses[ownerAddress]; !ok {
+
+				expectedChangeAddressesArray := zerolog.Arr()
+				for expectedChangeAddress := range expectedChangeAddresses {
+					expectedChangeAddressesArray =
+						expectedChangeAddressesArray.Str(expectedChangeAddress.Hex())
+				}
+
 				// something was changed that does not belong to this account. Log it.
 				logger.Error().
 					Str("key", registerID.String()).
 					Str("actual_address", ownerAddress.Hex()).
-					Interface("expected_addresses", expectedChangeAddresses).
+					Array("expected_addresses", expectedChangeAddressesArray).
 					Hex("value", newValue).
 					Msg("key is part of the change set, but is for a different account")
 			}

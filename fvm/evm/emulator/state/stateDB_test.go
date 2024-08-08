@@ -2,11 +2,12 @@ package state_test
 
 import (
 	"fmt"
-	"math/big"
 	"testing"
 
+	"github.com/holiman/uint256"
 	"github.com/onflow/atree"
 	gethCommon "github.com/onflow/go-ethereum/common"
+	"github.com/onflow/go-ethereum/core/tracing"
 	gethTypes "github.com/onflow/go-ethereum/core/types"
 	gethParams "github.com/onflow/go-ethereum/params"
 	"github.com/stretchr/testify/require"
@@ -38,10 +39,26 @@ func TestStateDB(t *testing.T) {
 		require.True(t, db.Empty(addr1))
 		require.NoError(t, db.Error())
 
-		db.AddBalance(addr1, big.NewInt(10))
+		db.AddBalance(addr1, uint256.NewInt(10), tracing.BalanceChangeUnspecified)
 		require.NoError(t, db.Error())
 
 		require.False(t, db.Empty(addr1))
+	})
+
+	t.Run("test create contract method", func(t *testing.T) {
+		ledger := testutils.GetSimpleValueStore()
+		db, err := state.NewStateDB(ledger, rootAddr)
+		require.NoError(t, err)
+
+		addr1 := testutils.RandomCommonAddress(t)
+		require.False(t, db.IsNewContract(addr1))
+		require.NoError(t, db.Error())
+
+		db.CreateContract(addr1)
+		require.NoError(t, db.Error())
+
+		require.True(t, db.IsNewContract(addr1))
+		require.NoError(t, db.Error())
 	})
 
 	t.Run("test commit functionality", func(t *testing.T) {
@@ -56,7 +73,7 @@ func TestStateDB(t *testing.T) {
 		db.CreateAccount(addr1)
 		require.NoError(t, db.Error())
 
-		db.AddBalance(addr1, big.NewInt(5))
+		db.AddBalance(addr1, uint256.NewInt(5), tracing.BalanceChangeUnspecified)
 		require.NoError(t, db.Error())
 
 		// should have code to be able to set state
@@ -83,7 +100,7 @@ func TestStateDB(t *testing.T) {
 
 		bal := db.GetBalance(addr1)
 		require.NoError(t, db.Error())
-		require.Equal(t, big.NewInt(5), bal)
+		require.Equal(t, uint256.NewInt(5), bal)
 
 		val := db.GetState(addr1, key1)
 		require.NoError(t, db.Error())
@@ -108,22 +125,22 @@ func TestStateDB(t *testing.T) {
 		require.True(t, db.Exist(addr1))
 		require.NoError(t, db.Error())
 
-		db.AddBalance(addr1, big.NewInt(5))
+		db.AddBalance(addr1, uint256.NewInt(5), tracing.BalanceChangeUnspecified)
 		require.NoError(t, db.Error())
 
 		bal := db.GetBalance(addr1)
 		require.NoError(t, db.Error())
-		require.Equal(t, big.NewInt(5), bal)
+		require.Equal(t, uint256.NewInt(5), bal)
 
 		snapshot2 := db.Snapshot()
 		require.Equal(t, 2, snapshot2)
 
-		db.AddBalance(addr1, big.NewInt(5))
+		db.AddBalance(addr1, uint256.NewInt(5), tracing.BalanceChangeUnspecified)
 		require.NoError(t, db.Error())
 
 		bal = db.GetBalance(addr1)
 		require.NoError(t, db.Error())
-		require.Equal(t, big.NewInt(10), bal)
+		require.Equal(t, uint256.NewInt(10), bal)
 
 		// revert to snapshot 2
 		db.RevertToSnapshot(snapshot2)
@@ -131,7 +148,7 @@ func TestStateDB(t *testing.T) {
 
 		bal = db.GetBalance(addr1)
 		require.NoError(t, db.Error())
-		require.Equal(t, big.NewInt(5), bal)
+		require.Equal(t, uint256.NewInt(5), bal)
 
 		// revert to snapshot 1
 		db.RevertToSnapshot(snapshot1)
@@ -139,7 +156,7 @@ func TestStateDB(t *testing.T) {
 
 		bal = db.GetBalance(addr1)
 		require.NoError(t, db.Error())
-		require.Equal(t, big.NewInt(0), bal)
+		require.Equal(t, uint256.NewInt(0), bal)
 
 		// revert to an invalid snapshot
 		db.RevertToSnapshot(10)
@@ -247,7 +264,7 @@ func TestStateDB(t *testing.T) {
 			SetValueFunc: func(owner, key, value []byte) error {
 				return atree.NewUserError(fmt.Errorf("key not found"))
 			},
-			AllocateStorageIndexFunc: func(owner []byte) (atree.SlabIndex, error) {
+			AllocateSlabIndexFunc: func(owner []byte) (atree.SlabIndex, error) {
 				return atree.SlabIndex{}, nil
 			},
 		}
@@ -271,7 +288,7 @@ func TestStateDB(t *testing.T) {
 			SetValueFunc: func(owner, key, value []byte) error {
 				return atree.NewFatalError(fmt.Errorf("key not found"))
 			},
-			AllocateStorageIndexFunc: func(owner []byte) (atree.SlabIndex, error) {
+			AllocateSlabIndexFunc: func(owner []byte) (atree.SlabIndex, error) {
 				return atree.SlabIndex{}, nil
 			},
 		}
@@ -287,4 +304,150 @@ func TestStateDB(t *testing.T) {
 		require.True(t, types.IsAFatalError(err))
 	})
 
+	t.Run("test storage root functionality", func(t *testing.T) {
+		ledger := testutils.GetSimpleValueStore()
+		db, err := state.NewStateDB(ledger, rootAddr)
+		require.NoError(t, err)
+
+		addr1 := testutils.RandomCommonAddress(t)
+
+		// non existing account
+		require.False(t, db.Exist(addr1))
+		require.NoError(t, db.Error())
+		root := db.GetStorageRoot(addr1)
+		require.NoError(t, db.Error())
+		require.Equal(t, gethCommon.Hash{}, root)
+
+		// accounts without slots
+		db.CreateAccount(addr1)
+		require.NoError(t, db.Error())
+		err = db.Commit(true)
+		require.NoError(t, err)
+
+		root = db.GetStorageRoot(addr1)
+		require.NoError(t, db.Error())
+		require.Equal(t, gethTypes.EmptyRootHash, root)
+
+		db.AddBalance(addr1, uint256.NewInt(100), tracing.BalanceChangeTouchAccount)
+		require.NoError(t, db.Error())
+		err = db.Commit(true)
+		require.NoError(t, err)
+
+		root = db.GetStorageRoot(addr1)
+		require.NoError(t, db.Error())
+		require.Equal(t, gethTypes.EmptyRootHash, root)
+
+		// add slots to the account
+		key := testutils.RandomCommonHash(t)
+		value := testutils.RandomCommonHash(t)
+		db.SetCode(addr1, []byte("somecode"))
+		require.NoError(t, db.Error())
+		db.SetState(addr1, key, value)
+		require.NoError(t, db.Error())
+		err = db.Commit(true)
+		require.NoError(t, err)
+
+		root = db.GetStorageRoot(addr1)
+		require.NoError(t, db.Error())
+		require.NotEqual(t, gethCommon.Hash{}, root)
+		require.NotEqual(t, gethTypes.EmptyRootHash, root)
+	})
+
+	t.Run("test Selfdestruct6780 functionality", func(t *testing.T) {
+		ledger := testutils.GetSimpleValueStore()
+		db, err := state.NewStateDB(ledger, rootAddr)
+		require.NoError(t, err)
+
+		// test 1 - an already existing contract
+		// fail for selfdestruction
+		addr1 := testutils.RandomCommonAddress(t)
+		balance1 := uint256.NewInt(100)
+		code1 := []byte("some code")
+		db.CreateAccount(addr1)
+		db.SetCode(addr1, code1)
+		db.AddBalance(addr1, balance1, tracing.BalanceChangeTransfer)
+		require.NoError(t, db.Error())
+		err = db.Commit(true)
+		require.NoError(t, err)
+		// renew db
+		db, err = state.NewStateDB(ledger, rootAddr)
+		require.NoError(t, err)
+		// call self destruct
+		db.Selfdestruct6780(addr1)
+		require.NoError(t, db.Error())
+		// noop is expected
+		require.Equal(t, balance1, db.GetBalance(addr1))
+		require.Equal(t, code1, db.GetCode(addr1))
+		require.NoError(t, db.Error())
+
+		// test 2 - account exist before with some balance
+		// but not a contract - selfdestruct should work
+		addr2 := testutils.RandomCommonAddress(t)
+		balance2 := uint256.NewInt(200)
+		db.CreateAccount(addr2)
+		db.AddBalance(addr2, balance2, tracing.BalanceChangeTransfer)
+		require.NoError(t, db.Error())
+		// commit and renew db
+		err = db.Commit(true)
+		require.NoError(t, err)
+		db, err = state.NewStateDB(ledger, rootAddr)
+		require.NoError(t, err)
+		// call self destruct should not work
+		db.Selfdestruct6780(addr2)
+		require.NoError(t, db.Error())
+		// still no impact
+		require.Equal(t, balance2, db.GetBalance(addr2))
+		require.Empty(t, db.GetCode(addr2))
+		require.NoError(t, db.Error())
+		// commit and renew db
+		err = db.Commit(true)
+		require.NoError(t, err)
+		db, err = state.NewStateDB(ledger, rootAddr)
+		require.NoError(t, err)
+		// set code and call contract creation
+		db.SetCode(addr2, code1)
+		db.CreateContract(addr2)
+		require.Equal(t, code1, db.GetCode(addr2))
+		// now calling selfdestruct should do the job
+		db.Selfdestruct6780(addr2)
+		require.NoError(t, db.Error())
+		err = db.Commit(true)
+		require.NoError(t, err)
+		db, err = state.NewStateDB(ledger, rootAddr)
+		require.NoError(t, err)
+		// now query
+		require.Equal(t, uint256.NewInt(0), db.GetBalance(addr2))
+		require.Empty(t, db.GetCode(addr2))
+		require.NoError(t, db.Error())
+
+		// test 3 - create account and call self destruct in a single operation
+		// selfdestruct should work
+		db, err = state.NewStateDB(ledger, rootAddr)
+		require.NoError(t, err)
+		addr3 := testutils.RandomCommonAddress(t)
+		balance3 := uint256.NewInt(300)
+		key := testutils.RandomCommonHash(t)
+		value := testutils.RandomCommonHash(t)
+		db.CreateAccount(addr3)
+		db.CreateContract(addr3)
+		db.SetCode(addr3, code1)
+		db.SetState(addr3, key, value)
+		db.AddBalance(addr3, balance3, tracing.BalanceChangeTransfer)
+		require.NoError(t, db.Error())
+		// call self destruct
+		db.Selfdestruct6780(addr3)
+		require.NoError(t, db.Error())
+		// commit changes
+		err = db.Commit(true)
+		require.NoError(t, err)
+		// renew db
+		db, err = state.NewStateDB(ledger, rootAddr)
+		require.NoError(t, err)
+		// account should not exist
+		require.False(t, db.Exist(addr3))
+		require.Equal(t, uint256.NewInt(0), db.GetBalance(addr3))
+		require.Empty(t, db.GetCode(addr3))
+		require.Equal(t, gethCommon.Hash{}, db.GetState(addr3, key))
+		require.NoError(t, db.Error())
+	})
 }

@@ -16,4 +16,5 @@ type Backend interface {
 	environment.ContractFunctionInvoker
 	environment.UUIDGenerator
 	environment.Tracer
+	environment.EVMMetricsReporter
 }

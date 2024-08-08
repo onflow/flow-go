@@ -19,6 +19,8 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 	cadenceErrors "github.com/onflow/cadence/runtime/errors"
 	"github.com/onflow/cadence/runtime/interpreter"
+	"github.com/onflow/cadence/runtime/sema"
+	"github.com/onflow/cadence/runtime/stdlib"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
@@ -291,6 +293,26 @@ func NewCadence1ValueMigration(
 	}
 }
 
+type capabilityControllerHandler struct {
+	idGenerator environment.AccountLocalIDGenerator
+}
+
+var _ stdlib.CapabilityControllerIssueHandler = capabilityControllerHandler{}
+var _ stdlib.CapabilityControllerHandler = capabilityControllerHandler{}
+
+func (c capabilityControllerHandler) GenerateAccountID(address common.Address) (uint64, error) {
+	return c.idGenerator.GenerateAccountID(address)
+}
+
+func (capabilityControllerHandler) EmitEvent(
+	_ *interpreter.Interpreter,
+	_ interpreter.LocationRange,
+	_ *sema.CompositeType,
+	_ []interpreter.Value,
+) {
+	// NO-OP
+}
+
 // NewCadence1LinkValueMigration creates a new CadenceBaseMigration
 // which migrates links to capability controllers.
 // It populates the given map with the IDs of the capability controller it issues.
@@ -318,16 +340,23 @@ func NewCadence1LinkValueMigration(
 			accounts environment.Accounts,
 			reporter *cadenceValueMigrationReporter,
 		) []migrations.ValueMigration {
+
 			idGenerator := environment.NewAccountLocalIDGenerator(
 				tracing.NewMockTracerSpan(),
 				util.NopMeter{},
 				accounts,
 			)
+
+			handler := capabilityControllerHandler{
+				idGenerator: idGenerator,
+			}
+
 			return []migrations.ValueMigration{
 				&capcons.LinkValueMigration{
-					CapabilityMapping:  capabilityMapping,
-					AccountIDGenerator: idGenerator,
-					Reporter:           reporter,
+					CapabilityMapping: capabilityMapping,
+					IssueHandler:      handler,
+					Handler:           handler,
+					Reporter:          reporter,
 				},
 			}
 		},
@@ -336,6 +365,8 @@ func NewCadence1LinkValueMigration(
 		chainID:             opts.ChainID,
 	}
 }
+
+const capabilityValueMigrationReporterName = "cadence-capability-value-migration"
 
 // NewCadence1CapabilityValueMigration creates a new CadenceBaseMigration
 // which migrates path capability values to ID capability values.
@@ -355,20 +386,32 @@ func NewCadence1CapabilityValueMigration(
 
 	return &CadenceBaseMigration{
 		name:                              "cadence_capability_value_migration",
-		reporter:                          rwf.ReportWriter("cadence-capability-value-migration"),
+		reporter:                          rwf.ReportWriter(capabilityValueMigrationReporterName),
 		diffReporter:                      diffReporter,
 		logVerboseDiff:                    opts.LogVerboseDiff,
 		verboseErrorOutput:                opts.VerboseErrorOutput,
 		checkStorageHealthBeforeMigration: opts.CheckStorageHealthBeforeMigration,
 		valueMigrations: func(
 			_ *interpreter.Interpreter,
-			_ environment.Accounts,
+			accounts environment.Accounts,
 			reporter *cadenceValueMigrationReporter,
 		) []migrations.ValueMigration {
+
+			idGenerator := environment.NewAccountLocalIDGenerator(
+				tracing.NewMockTracerSpan(),
+				util.NopMeter{},
+				accounts,
+			)
+
+			handler := capabilityControllerHandler{
+				idGenerator: idGenerator,
+			}
+
 			return []migrations.ValueMigration{
 				&capcons.CapabilityValueMigration{
 					CapabilityMapping: capabilityMapping,
 					Reporter:          reporter,
+					IssueHandler:      handler,
 				},
 			}
 		},
@@ -474,11 +517,13 @@ func (t *cadenceValueMigrationReporter) MigratedPathCapability(
 	accountAddress common.Address,
 	addressPath interpreter.AddressPath,
 	borrowType *interpreter.ReferenceStaticType,
+	capabilityID interpreter.UInt64Value,
 ) {
 	t.reportWriter.Write(capabilityMigrationEntry{
 		AccountAddress: accountAddress,
 		AddressPath:    addressPath,
 		BorrowType:     borrowType,
+		CapabilityID:   capabilityID,
 	})
 }
 
@@ -503,7 +548,10 @@ func (t *cadenceValueMigrationReporter) MigratedLink(
 }
 
 func (t *cadenceValueMigrationReporter) CyclicLink(err capcons.CyclicLinkError) {
-	t.reportWriter.Write(err)
+	t.reportWriter.Write(linkCyclicEntry{
+		Address: err.Address,
+		Paths:   err.Paths,
+	})
 }
 
 func (t *cadenceValueMigrationReporter) MissingTarget(accountAddressPath interpreter.AddressPath) {
@@ -624,6 +672,7 @@ type capabilityMigrationEntry struct {
 	AccountAddress common.Address
 	AddressPath    interpreter.AddressPath
 	BorrowType     *interpreter.ReferenceStaticType
+	CapabilityID   interpreter.UInt64Value
 }
 
 var _ valueMigrationReportEntry = capabilityMigrationEntry{}
@@ -641,12 +690,14 @@ func (e capabilityMigrationEntry) MarshalJSON() ([]byte, error) {
 		Address        string `json:"address"`
 		Path           string `json:"path"`
 		BorrowType     string `json:"borrow_type"`
+		CapabilityID   string `json:"capability_id"`
 	}{
 		Kind:           "capability-migration-success",
 		AccountAddress: e.AccountAddress.HexWithPrefix(),
 		Address:        e.AddressPath.Address.HexWithPrefix(),
 		Path:           e.AddressPath.Path.String(),
 		BorrowType:     string(e.BorrowType.ID()),
+		CapabilityID:   e.CapabilityID.String(),
 	})
 }
 
@@ -702,6 +753,39 @@ func (e linkMissingTargetEntry) MarshalJSON() ([]byte, error) {
 		Kind:           "link-missing-target",
 		AccountAddress: e.AddressPath.Address.HexWithPrefix(),
 		Path:           e.AddressPath.Path.String(),
+	})
+}
+
+// linkCyclicEntry
+
+type linkCyclicEntry struct {
+	Address common.Address
+	Paths   []interpreter.PathValue
+}
+
+var _ valueMigrationReportEntry = linkCyclicEntry{}
+
+func (e linkCyclicEntry) accountAddress() common.Address {
+	return e.Address
+}
+
+var _ json.Marshaler = linkCyclicEntry{}
+
+func (e linkCyclicEntry) MarshalJSON() ([]byte, error) {
+
+	pathStrings := make([]string, 0, len(e.Paths))
+	for _, path := range e.Paths {
+		pathStrings = append(pathStrings, path.String())
+	}
+
+	return json.Marshal(struct {
+		Kind           string   `json:"kind"`
+		AccountAddress string   `json:"account_address"`
+		Paths          []string `json:"paths"`
+	}{
+		Kind:           "link-cyclic",
+		AccountAddress: e.Address.HexWithPrefix(),
+		Paths:          pathStrings,
 	})
 }
 

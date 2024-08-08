@@ -550,6 +550,7 @@ func (h *Handler) GetAccountAtLatestBlock(
 	}, nil
 }
 
+// GetAccountAtBlockHeight returns an account by address at the given block height.
 func (h *Handler) GetAccountAtBlockHeight(
 	ctx context.Context,
 	req *access.GetAccountAtBlockHeightRequest,
@@ -577,6 +578,222 @@ func (h *Handler) GetAccountAtBlockHeight(
 	return &access.AccountResponse{
 		Account:  accountMsg,
 		Metadata: metadata,
+	}, nil
+}
+
+// GetAccountBalanceAtLatestBlock returns an account balance by address at the latest sealed block.
+//
+// Expected errors during normal operation:
+// - codes.InvalidArgument - if invalid account address provided.
+// - codes.Internal - if failed to get account from the execution node or failed to convert account message.
+func (h *Handler) GetAccountBalanceAtLatestBlock(
+	ctx context.Context,
+	req *access.GetAccountBalanceAtLatestBlockRequest,
+) (*access.AccountBalanceResponse, error) {
+	metadata, err := h.buildMetadataResponse()
+	if err != nil {
+		return nil, err
+	}
+
+	address, err := convert.Address(req.GetAddress(), h.chain)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid address: %v", err)
+	}
+
+	accountBalance, err := h.api.GetAccountBalanceAtLatestBlock(ctx, address)
+	if err != nil {
+		return nil, err
+	}
+
+	return &access.AccountBalanceResponse{
+		Balance:  accountBalance,
+		Metadata: metadata,
+	}, nil
+}
+
+// GetAccountBalanceAtBlockHeight returns an account balance by address at the given block height.
+//
+// Expected errors during normal operation:
+// - codes.InvalidArgument - if invalid account address provided.
+// - codes.Internal - if failed to get account from the execution node or failed to convert account message.
+
+func (h *Handler) GetAccountBalanceAtBlockHeight(
+	ctx context.Context,
+	req *access.GetAccountBalanceAtBlockHeightRequest,
+) (*access.AccountBalanceResponse, error) {
+	metadata, err := h.buildMetadataResponse()
+	if err != nil {
+		return nil, err
+	}
+
+	address, err := convert.Address(req.GetAddress(), h.chain)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid address: %v", err)
+	}
+
+	accountBalance, err := h.api.GetAccountBalanceAtBlockHeight(ctx, address, req.GetBlockHeight())
+	if err != nil {
+		return nil, err
+	}
+
+	return &access.AccountBalanceResponse{
+		Balance:  accountBalance,
+		Metadata: metadata,
+	}, nil
+}
+
+// GetAccountKeyAtLatestBlock returns an account public key by address and key index at the latest sealed block.
+//
+// Expected errors during normal operation:
+// - codes.InvalidArgument - if invalid account address provided.
+// - codes.Internal - if failed to get account from the execution node, ailed to convert account message or failed to encode account key.
+func (h *Handler) GetAccountKeyAtLatestBlock(
+	ctx context.Context,
+	req *access.GetAccountKeyAtLatestBlockRequest,
+) (*access.AccountKeyResponse, error) {
+	metadata, err := h.buildMetadataResponse()
+	if err != nil {
+		return nil, err
+	}
+
+	address, err := convert.Address(req.GetAddress(), h.chain)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid address: %v", err)
+	}
+
+	keyByIndex, err := h.api.GetAccountKeyAtLatestBlock(ctx, address, req.GetIndex())
+	if err != nil {
+		return nil, err
+	}
+
+	accountKey, err := convert.AccountKeyToMessage(*keyByIndex)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to encode account key: %v", err)
+	}
+
+	return &access.AccountKeyResponse{
+		AccountKey: accountKey,
+		Metadata:   metadata,
+	}, nil
+}
+
+// GetAccountKeysAtLatestBlock returns an account public keys by address at the latest sealed block.
+// GetAccountKeyAtLatestBlock returns an account public key by address and key index at the latest sealed block.
+//
+// Expected errors during normal operation:
+// - codes.InvalidArgument - if invalid account address provided.
+// - codes.Internal - if failed to get account from the execution node, ailed to convert account message or failed to encode account key.
+func (h *Handler) GetAccountKeysAtLatestBlock(
+	ctx context.Context,
+	req *access.GetAccountKeysAtLatestBlockRequest,
+) (*access.AccountKeysResponse, error) {
+	metadata, err := h.buildMetadataResponse()
+	if err != nil {
+		return nil, err
+	}
+
+	address, err := convert.Address(req.GetAddress(), h.chain)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid address: %v", err)
+	}
+
+	accountKeys, err := h.api.GetAccountKeysAtLatestBlock(ctx, address)
+	if err != nil {
+		return nil, err
+	}
+
+	var publicKeys []*entities.AccountKey
+
+	for i, key := range accountKeys {
+		accountKey, err := convert.AccountKeyToMessage(key)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to encode account key %d: %v", i, err)
+		}
+
+		publicKeys = append(publicKeys, accountKey)
+	}
+
+	return &access.AccountKeysResponse{
+		AccountKeys: publicKeys,
+		Metadata:    metadata,
+	}, nil
+}
+
+// GetAccountKeyAtBlockHeight returns an account public keys by address and key index at the given block height.
+// GetAccountKeyAtLatestBlock returns an account public key by address and key index at the latest sealed block.
+//
+// Expected errors during normal operation:
+// - codes.InvalidArgument - if invalid account address provided.
+// - codes.Internal - if failed to get account from the execution node, ailed to convert account message or failed to encode account key.
+func (h *Handler) GetAccountKeyAtBlockHeight(
+	ctx context.Context,
+	req *access.GetAccountKeyAtBlockHeightRequest,
+) (*access.AccountKeyResponse, error) {
+	metadata, err := h.buildMetadataResponse()
+	if err != nil {
+		return nil, err
+	}
+
+	address, err := convert.Address(req.GetAddress(), h.chain)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid address: %v", err)
+	}
+
+	keyByIndex, err := h.api.GetAccountKeyAtBlockHeight(ctx, address, req.GetIndex(), req.GetBlockHeight())
+	if err != nil {
+		return nil, err
+	}
+
+	accountKey, err := convert.AccountKeyToMessage(*keyByIndex)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to encode account key: %v", err)
+	}
+
+	return &access.AccountKeyResponse{
+		AccountKey: accountKey,
+		Metadata:   metadata,
+	}, nil
+}
+
+// GetAccountKeysAtBlockHeight returns an account public keys by address at the given block height.
+// GetAccountKeyAtLatestBlock returns an account public key by address and key index at the latest sealed block.
+//
+// Expected errors during normal operation:
+// - codes.InvalidArgument - if invalid account address provided.
+// - codes.Internal - if failed to get account from the execution node, ailed to convert account message or failed to encode account key.
+func (h *Handler) GetAccountKeysAtBlockHeight(
+	ctx context.Context,
+	req *access.GetAccountKeysAtBlockHeightRequest,
+) (*access.AccountKeysResponse, error) {
+	metadata, err := h.buildMetadataResponse()
+	if err != nil {
+		return nil, err
+	}
+
+	address, err := convert.Address(req.GetAddress(), h.chain)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid address: %v", err)
+	}
+
+	accountKeys, err := h.api.GetAccountKeysAtBlockHeight(ctx, address, req.GetBlockHeight())
+	if err != nil {
+		return nil, err
+	}
+
+	var publicKeys []*entities.AccountKey
+
+	for i, key := range accountKeys {
+		accountKey, err := convert.AccountKeyToMessage(key)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to encode account key %d: %v", i, err)
+		}
+
+		publicKeys = append(publicKeys, accountKey)
+	}
+
+	return &access.AccountKeysResponse{
+		AccountKeys: publicKeys,
+		Metadata:    metadata,
 	}, nil
 }
 

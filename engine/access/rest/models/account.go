@@ -10,11 +10,11 @@ const expandableContracts = "contracts"
 
 func (a *Account) Build(flowAccount *flow.Account, link LinkGenerator, expand map[string]bool) error {
 	a.Address = flowAccount.Address.String()
-	a.Balance = util.FromUint64(flowAccount.Balance)
+	a.Balance = util.FromUint(flowAccount.Balance)
 	a.Expandable = &AccountExpandable{}
 
 	if expand[expandableKeys] {
-		var keys AccountPublicKeys
+		var keys AccountKeys
 		keys.Build(flowAccount.Keys)
 		a.Keys = keys
 	} else {
@@ -45,18 +45,18 @@ func (a *AccountPublicKey) Build(k flow.AccountPublicKey) {
 	sigAlgo := SigningAlgorithm(k.SignAlgo.String())
 	hashAlgo := HashingAlgorithm(k.HashAlgo.String())
 
-	a.Index = util.FromUint64(uint64(k.Index))
+	a.Index = util.FromUint(k.Index)
 	a.PublicKey = k.PublicKey.String()
 	a.SigningAlgorithm = &sigAlgo
 	a.HashingAlgorithm = &hashAlgo
-	a.SequenceNumber = util.FromUint64(k.SeqNumber)
-	a.Weight = util.FromUint64(uint64(k.Weight))
+	a.SequenceNumber = util.FromUint(k.SeqNumber)
+	a.Weight = util.FromUint(uint64(k.Weight))
 	a.Revoked = k.Revoked
 }
 
-type AccountPublicKeys []AccountPublicKey
+type AccountKeys []AccountPublicKey
 
-func (a *AccountPublicKeys) Build(accountKeys []flow.AccountPublicKey) {
+func (a *AccountKeys) Build(accountKeys []flow.AccountPublicKey) {
 	keys := make([]AccountPublicKey, len(accountKeys))
 	for i, k := range accountKeys {
 		var key AccountPublicKey
@@ -65,4 +65,21 @@ func (a *AccountPublicKeys) Build(accountKeys []flow.AccountPublicKey) {
 	}
 
 	*a = keys
+}
+
+// Build function use model AccountPublicKeys type for GetAccountKeys call
+// AccountPublicKeys is an auto-generated type from the openapi spec
+func (a *AccountPublicKeys) Build(accountKeys []flow.AccountPublicKey) {
+	keys := make([]AccountPublicKey, len(accountKeys))
+	for i, k := range accountKeys {
+		var key AccountPublicKey
+		key.Build(k)
+		keys[i] = key
+	}
+
+	a.Keys = keys
+}
+
+func (b *AccountBalance) Build(balance uint64) {
+	b.Balance = util.FromUint(balance)
 }

@@ -11,7 +11,7 @@ import (
 
 	"github.com/onflow/atree"
 	"github.com/onflow/cadence"
-	jsoncdc "github.com/onflow/cadence/encoding/json"
+	"github.com/onflow/cadence/encoding/ccf"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/stretchr/testify/require"
@@ -25,7 +25,7 @@ import (
 	"github.com/onflow/flow-go/module/trace"
 )
 
-var TestFlowEVMRootAddress = flow.BytesToAddress([]byte("FlowEVM"))
+var TestFlowEVMRootAddress = flow.Address{1, 2, 3, 4}
 var TestComputationLimit = uint(100_000_000)
 
 func RunWithTestFlowEVMRootAddress(t testing.TB, backend atree.Ledger, f func(flow.Address)) {
@@ -44,6 +44,7 @@ func RunWithTestBackend(t testing.TB, f func(*TestBackend)) {
 		TestRandomGenerator:         getSimpleRandomGenerator(),
 		TestContractFunctionInvoker: &TestContractFunctionInvoker{},
 		TestTracer:                  &TestTracer{},
+		TestMetricsReporter:         &TestMetricsReporter{},
 	}
 	f(tb)
 }
@@ -84,7 +85,7 @@ func GetSimpleValueStore() *TestValueStore {
 			bytesRead += len(fk) + len(value)
 			return len(value) > 0, nil
 		},
-		AllocateStorageIndexFunc: func(owner []byte) (atree.SlabIndex, error) {
+		AllocateSlabIndexFunc: func(owner []byte) (atree.SlabIndex, error) {
 			index := allocator[string(owner)]
 			// TODO: figure out why it result in a collision
 			if index == 0 {
@@ -127,12 +128,15 @@ func getSimpleEventEmitter() *testEventEmitter {
 	events := make(flow.EventsList, 0)
 	return &testEventEmitter{
 		emitEvent: func(event cadence.Event) error {
-			payload, err := jsoncdc.Encode(event)
+			payload, err := ccf.Encode(event)
 			if err != nil {
 				return err
 			}
-
-			events = append(events, flow.Event{Type: flow.EventType(event.EventType.QualifiedIdentifier), Payload: payload})
+			eventType := flow.EventType(event.EventType.ID())
+			events = append(events, flow.Event{
+				Type:    eventType,
+				Payload: payload,
+			})
 			return nil
 		},
 		events: func() flow.EventsList {
@@ -190,6 +194,7 @@ type TestBackend struct {
 	*TestContractFunctionInvoker
 	*testUUIDGenerator
 	*TestTracer
+	*TestMetricsReporter
 }
 
 var _ types.Backend = &TestBackend{}
@@ -213,15 +218,15 @@ func (tb *TestBackend) Get(id flow.RegisterID) (flow.RegisterValue, error) {
 }
 
 type TestValueStore struct {
-	GetValueFunc             func(owner, key []byte) ([]byte, error)
-	SetValueFunc             func(owner, key, value []byte) error
-	ValueExistsFunc          func(owner, key []byte) (bool, error)
-	AllocateStorageIndexFunc func(owner []byte) (atree.SlabIndex, error)
-	TotalStorageSizeFunc     func() int
-	TotalBytesReadFunc       func() int
-	TotalBytesWrittenFunc    func() int
-	TotalStorageItemsFunc    func() int
-	ResetStatsFunc           func()
+	GetValueFunc          func(owner, key []byte) ([]byte, error)
+	SetValueFunc          func(owner, key, value []byte) error
+	ValueExistsFunc       func(owner, key []byte) (bool, error)
+	AllocateSlabIndexFunc func(owner []byte) (atree.SlabIndex, error)
+	TotalStorageSizeFunc  func() int
+	TotalBytesReadFunc    func() int
+	TotalBytesWrittenFunc func() int
+	TotalStorageItemsFunc func() int
+	ResetStatsFunc        func()
 }
 
 var _ environment.ValueStore = &TestValueStore{}
@@ -248,10 +253,10 @@ func (vs *TestValueStore) ValueExists(owner, key []byte) (bool, error) {
 }
 
 func (vs *TestValueStore) AllocateSlabIndex(owner []byte) (atree.SlabIndex, error) {
-	if vs.AllocateStorageIndexFunc == nil {
+	if vs.AllocateSlabIndexFunc == nil {
 		panic("method not set")
 	}
-	return vs.AllocateStorageIndexFunc(owner)
+	return vs.AllocateSlabIndexFunc(owner)
 }
 
 func (vs *TestValueStore) TotalBytesRead() int {
@@ -527,5 +532,32 @@ func (tt *TestTracer) ExpectedSpan(t *testing.T, expected trace.SpanName) {
 	) tracing.TracerSpan {
 		require.Equal(t, expected, sn)
 		return tracing.NewMockTracerSpan()
+	}
+}
+
+type TestMetricsReporter struct {
+	SetNumberOfDeployedCOAsFunc func(uint64)
+	EVMTransactionExecutedFunc  func(uint64, bool, bool)
+	EVMBlockExecutedFunc        func(int, uint64, float64)
+}
+
+var _ environment.EVMMetricsReporter = &TestMetricsReporter{}
+
+func (tmr *TestMetricsReporter) SetNumberOfDeployedCOAs(count uint64) {
+	// call the method if available otherwise skip
+	if tmr.SetNumberOfDeployedCOAsFunc != nil {
+		tmr.SetNumberOfDeployedCOAsFunc(count)
+	}
+}
+func (tmr *TestMetricsReporter) EVMTransactionExecuted(gasUsed uint64, isDirectCall bool, failed bool) {
+	// call the method if available otherwise skip
+	if tmr.EVMTransactionExecutedFunc != nil {
+		tmr.EVMTransactionExecutedFunc(gasUsed, isDirectCall, failed)
+	}
+}
+func (tmr *TestMetricsReporter) EVMBlockExecuted(txCount int, totalGasUsed uint64, totalSupplyInFlow float64) {
+	// call the method if available otherwise skip
+	if tmr.EVMBlockExecutedFunc != nil {
+		tmr.EVMBlockExecutedFunc(txCount, totalGasUsed, totalSupplyInFlow)
 	}
 }

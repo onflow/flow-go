@@ -28,7 +28,7 @@ type Suite struct {
 	exe1ID  flow.Identifier
 
 	// Determines which kvstore version is used for root state
-	KVStoreFactory func(flow.Identifier) protocol_state.KVStoreAPI
+	KVStoreFactory func(flow.Identifier) (protocol_state.KVStoreAPI, error)
 }
 
 func (s *Suite) Ghost() *client.GhostClient {

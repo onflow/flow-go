@@ -19,7 +19,6 @@ type PSVersionUpgradeStateMachine struct {
 	candidateView uint64
 	parentState   protocol.KVStoreReader
 	mutator       protocol_state.KVStoreMutator
-	params        protocol.GlobalParams
 }
 
 var _ protocol_state.KeyValueStoreStateMachine = (*PSVersionUpgradeStateMachine)(nil)
@@ -29,7 +28,6 @@ var _ protocol_state.KeyValueStoreStateMachine = (*PSVersionUpgradeStateMachine)
 // The actual model upgrade is handled in the upper layer (`ProtocolStateMachine`).
 func NewPSVersionUpgradeStateMachine(
 	candidateView uint64,
-	params protocol.GlobalParams,
 	parentState protocol.KVStoreReader,
 	mutator protocol_state.KVStoreMutator,
 ) *PSVersionUpgradeStateMachine {
@@ -37,7 +35,6 @@ func NewPSVersionUpgradeStateMachine(
 		candidateView: candidateView,
 		parentState:   parentState,
 		mutator:       mutator,
-		params:        params,
 	}
 }
 
@@ -94,9 +91,9 @@ func (m *PSVersionUpgradeStateMachine) processSingleEvent(versionUpgrade *flow.P
 	// to give time for replicas to finalize the block containing the seal for the version upgrade event.
 	// When replica reaches (or exceeds) the activation view *and* the latest finalized protocol state knows
 	// about the version upgrade, only then it's safe to switch the protocol version.
-	if m.candidateView+m.params.EpochCommitSafetyThreshold() >= versionUpgrade.ActiveView {
+	if m.candidateView+m.parentState.GetEpochCommitSafetyThreshold() >= versionUpgrade.ActiveView {
 		return protocol.NewInvalidServiceEventErrorf("view %d triggering version upgrade must be at least %d views in the future of current view %d: %w",
-			versionUpgrade.ActiveView, m.params.EpochCommitSafetyThreshold(), m.candidateView, ErrInvalidActivationView)
+			versionUpgrade.ActiveView, m.parentState.GetEpochCommitSafetyThreshold(), m.candidateView, ErrInvalidActivationView)
 	}
 
 	if m.parentState.GetProtocolStateVersion()+1 != versionUpgrade.NewProtocolStateVersion {

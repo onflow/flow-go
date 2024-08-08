@@ -103,7 +103,7 @@ func TestAccounts_GetPublicKeyCount(t *testing.T) {
 
 			count, err := accounts.GetPublicKeyCount(address)
 			require.NoError(t, err)
-			require.Equal(t, uint64(0), count)
+			require.Equal(t, uint32(0), count)
 		}
 	})
 }
@@ -224,7 +224,7 @@ func TestAccounts_SetContracts(t *testing.T) {
 }
 
 func TestAccount_StorageUsed(t *testing.T) {
-	emptyAccountSize := uint64(48)
+	emptyAccountSize := uint64(44)
 
 	t.Run("Storage used on account creation is deterministic", func(t *testing.T) {
 		txnState := testutils.NewSimpleTransaction(nil)
@@ -413,7 +413,7 @@ func createByteArray(size int) []byte {
 	return bytes
 }
 
-func TestAccounts_AllocateStorageIndex(t *testing.T) {
+func TestAccounts_AllocateSlabIndex(t *testing.T) {
 	txnState := testutils.NewSimpleTransaction(nil)
 	accounts := environment.NewAccounts(txnState)
 	address := flow.HexToAddress("01")

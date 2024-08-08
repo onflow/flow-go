@@ -3,6 +3,7 @@ package environment
 import (
 	"context"
 
+	"github.com/onflow/cadence/runtime/ast"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
 
@@ -10,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/fvm/tracing"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 var _ Environment = &facadeEnvironment{}
@@ -315,19 +317,37 @@ func (env *facadeEnvironment) Reset() {
 	env.Programs.Reset()
 }
 
-// Miscellaneous cadence runtime.Interface API.
-func (facadeEnvironment) ResourceOwnerChanged(
+// Miscellaneous Cadence runtime.Interface API
+
+func (*facadeEnvironment) ResourceOwnerChanged(
 	*interpreter.Interpreter,
 	*interpreter.CompositeValue,
 	common.Address,
 	common.Address,
 ) {
-}
-
-func (env *facadeEnvironment) SetInterpreterSharedState(state *interpreter.SharedState) {
 	// NO-OP
 }
 
-func (env *facadeEnvironment) GetInterpreterSharedState() *interpreter.SharedState {
+func (*facadeEnvironment) SetInterpreterSharedState(_ *interpreter.SharedState) {
+	// NO-OP
+}
+
+func (*facadeEnvironment) GetInterpreterSharedState() *interpreter.SharedState {
+	// NO-OP
 	return nil
+}
+
+func (env *facadeEnvironment) RecoverProgram(program *ast.Program, location common.Location) (*ast.Program, error) {
+	// Enabled on all networks but Mainnet,
+	// until https://github.com/onflow/flips/pull/283 got approved.
+	if env.chain.ChainID() == flow.Mainnet {
+		return nil, nil
+	}
+
+	return RecoverProgram(
+		env,
+		env.chain.ChainID(),
+		program,
+		location,
+	)
 }

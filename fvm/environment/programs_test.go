@@ -893,6 +893,12 @@ func (m *metricsReporter) RuntimeTransactionInterpreted(duration time.Duration) 
 
 func (m *metricsReporter) RuntimeSetNumberOfAccounts(count uint64) {}
 
+func (m *metricsReporter) SetNumberOfDeployedCOAs(count uint64) {}
+
+func (m *metricsReporter) EVMTransactionExecuted(_ uint64, _ bool, _ bool) {}
+
+func (m *metricsReporter) EVMBlockExecuted(_ int, _ uint64, _ float64) {}
+
 func (m *metricsReporter) RuntimeTransactionProgramsCacheMiss() {
 	m.CacheMisses++
 }

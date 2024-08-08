@@ -87,19 +87,31 @@ func (suite *BuilderSuite) SetupTest() {
 	// ensure we don't enter a new epoch for tests that build many blocks
 	result.ServiceEvents[0].Event.(*flow.EpochSetup).FinalView = root.Header.View + 100000
 	seal.ResultID = result.ID()
-	root.Payload.ProtocolStateID = kvstore.NewDefaultKVStore(inmem.EpochProtocolStateFromServiceEvents(
-		result.ServiceEvents[0].Event.(*flow.EpochSetup),
-		result.ServiceEvents[1].Event.(*flow.EpochCommit),
-	).ID()).ID()
+	safetyParams, err := protocol.DefaultEpochSafetyParams(root.Header.ChainID)
+	require.NoError(suite.T(), err)
+	rootProtocolState, err := kvstore.NewDefaultKVStore(
+		safetyParams.FinalizationSafetyThreshold,
+		safetyParams.EpochExtensionViewCount,
+		inmem.EpochProtocolStateFromServiceEvents(
+			result.ServiceEvents[0].Event.(*flow.EpochSetup),
+			result.ServiceEvents[1].Event.(*flow.EpochCommit),
+		).ID())
+	require.NoError(suite.T(), err)
+	root.Payload.ProtocolStateID = rootProtocolState.ID()
 	rootSnapshot, err := inmem.SnapshotFromBootstrapState(root, result, seal, unittest.QuorumCertificateFixture(unittest.QCWithRootBlockID(root.ID())))
 	require.NoError(suite.T(), err)
 	suite.epochCounter = rootSnapshot.Encodable().SealingSegment.LatestProtocolStateEntry().EpochEntry.EpochCounter()
 
+	require.NoError(suite.T(), err)
 	clusterQC := unittest.QuorumCertificateFixture(unittest.QCWithRootBlockID(suite.genesis.ID()))
-	root.Payload.ProtocolStateID = kvstore.NewDefaultKVStore(inmem.EpochProtocolStateFromServiceEvents(
-		result.ServiceEvents[0].Event.(*flow.EpochSetup),
-		result.ServiceEvents[1].Event.(*flow.EpochCommit),
-	).ID()).ID()
+	rootProtocolState, err = kvstore.NewDefaultKVStore(
+		safetyParams.FinalizationSafetyThreshold, safetyParams.EpochExtensionViewCount,
+		inmem.EpochProtocolStateFromServiceEvents(
+			result.ServiceEvents[0].Event.(*flow.EpochSetup),
+			result.ServiceEvents[1].Event.(*flow.EpochCommit),
+		).ID())
+	require.NoError(suite.T(), err)
+	root.Payload.ProtocolStateID = rootProtocolState.ID()
 	clusterStateRoot, err := clusterkv.NewStateRoot(suite.genesis, clusterQC, suite.epochCounter)
 	suite.Require().NoError(err)
 	clusterState, err := clusterkv.Bootstrap(suite.db, clusterStateRoot)
@@ -784,7 +796,7 @@ func (suite *BuilderSuite) TestBuildOn_RateLimitNonPayer() {
 		tx.Payer = unittest.RandomAddressFixture()
 		tx.ProposalKey = flow.ProposalKey{
 			Address:        proposer,
-			KeyIndex:       rand.Uint64(),
+			KeyIndex:       rand.Uint32(),
 			SequenceNumber: rand.Uint64(),
 		}
 		return &tx

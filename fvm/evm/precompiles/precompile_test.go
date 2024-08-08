@@ -19,7 +19,7 @@ func TestMutiFunctionContract(t *testing.T) {
 	gas := uint64(20)
 	output := []byte("output")
 
-	pc := precompiles.MultiFunctionPrecompileContract(address, []precompiles.Function{
+	pc := precompiles.MultiFunctionPrecompiledContract(address, []precompiles.Function{
 		&mockedFunction{
 			FunctionSelectorFunc: func() precompiles.FunctionSelector {
 				return sig
