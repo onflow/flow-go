@@ -34,15 +34,28 @@ func retrieve(key []byte, sc interface{}) func(r pebble.Reader) error {
 		}
 		defer closer.Close()
 
-		// in case the value is not needed
-		if sc == nil {
-			return nil
-		}
-
 		err = msgpack.Unmarshal(val, sc)
 		if err != nil {
 			return irrecoverable.NewExceptionf("failed to decode value: %w", err)
 		}
+		return nil
+	}
+}
+
+func exists(key []byte, keyExists *bool) func(r pebble.Reader) error {
+	return func(r pebble.Reader) error {
+		_, closer, err := r.Get(key)
+		if err != nil {
+			if errors.Is(err, pebble.ErrNotFound) {
+				*keyExists = false
+				return nil
+			}
+
+			// exception while checking for the key
+			return irrecoverable.NewExceptionf("could not load data: %w", err)
+		}
+		*keyExists = true
+		defer closer.Close()
 		return nil
 	}
 }
