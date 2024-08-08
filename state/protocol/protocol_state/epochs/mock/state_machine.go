@@ -56,7 +56,7 @@ func (_m *StateMachine) EjectIdentity(ejectionEvent *flow.EjectNode) bool {
 	ret := _m.Called(ejectionEvent)
 
 	if len(ret) == 0 {
-		panic("no return value specified for EjectNode")
+		panic("no return value specified for EjectIdentity")
 	}
 
 	var r0 bool
