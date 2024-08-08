@@ -78,14 +78,14 @@ func (u *baseStateMachine) ParentState() *flow.RichEpochStateEntry {
 // with the same input create minor performance overhead though).
 func (u *baseStateMachine) EjectIdentity(ejectionEvent *flow.EjectNode) bool {
 	u.telemetry.OnServiceEventReceived(ejectionEvent.ServiceEvent())
-	ejected := u.ejector.Eject(ejectionEvent.NodeID)
-	if ejected {
+	wasEjected := u.ejector.Eject(ejectionEvent.NodeID)
+	if wasEjected {
 		u.telemetry.OnServiceEventProcessed(ejectionEvent.ServiceEvent())
 	} else {
 		u.telemetry.OnInvalidServiceEvent(ejectionEvent.ServiceEvent(),
-			protocol.NewInvalidServiceEventErrorf("could not eject identity (%v)", ejectionEvent.NodeID))
+			protocol.NewInvalidServiceEventErrorf("could not eject node with unknown NodeID %v", ejectionEvent.NodeID))
 	}
-	return ejected
+	return wasEjected
 }
 
 // TransitionToNextEpoch updates the notion of 'current epoch', 'previous' and 'next epoch' in the protocol
