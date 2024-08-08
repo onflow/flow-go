@@ -663,12 +663,12 @@ func (s *EpochFallbackStateMachineSuite) TestEpochFallbackStateMachineInjectsMul
 func (s *EpochFallbackStateMachineSuite) TestEpochRecoverAndEjectionInSameBlock() {
 	nextEpochParticipants := s.parentProtocolState.CurrentEpochIdentityTable.Copy()
 	ejectedIdentityID := nextEpochParticipants.Filter(filter.HasRole[flow.Identity](flow.RoleAccess))[0].NodeID
-	ejectIdentity := &flow.EjectIdentity{NodeID: ejectedIdentityID}
+	ejectionEvent := &flow.EjectNode{NodeID: ejectedIdentityID}
 
-	s.consumer.On("OnServiceEventReceived", ejectIdentity.ServiceEvent()).Once()
-	s.consumer.On("OnServiceEventProcessed", ejectIdentity.ServiceEvent()).Once()
-	ejected := s.stateMachine.EjectIdentity(ejectIdentity)
-	require.True(s.T(), ejected)
+	s.consumer.On("OnServiceEventReceived", ejectionEvent.ServiceEvent()).Once()
+	s.consumer.On("OnServiceEventProcessed", ejectionEvent.ServiceEvent()).Once()
+	wasEjected := s.stateMachine.EjectIdentity(ejectionEvent)
+	require.True(s.T(), wasEjected)
 
 	epochRecover := unittest.EpochRecoverFixture(func(setup *flow.EpochSetup) {
 		setup.Participants = nextEpochParticipants.ToSkeleton()
@@ -735,7 +735,7 @@ func (s *EpochFallbackStateMachineSuite) TestProcessingMultipleEventsAtTheSameBl
 		if includeEjection {
 			accessNodes := s.parentProtocolState.CurrentEpochSetup.Participants.Filter(filter.HasRole[flow.IdentitySkeleton](flow.RoleAccess))
 			identity := rapid.SampledFrom(accessNodes).Draw(t, "ejection-node")
-			serviceEvent := (&flow.EjectIdentity{NodeID: identity.NodeID}).ServiceEvent()
+			serviceEvent := (&flow.EjectNode{NodeID: identity.NodeID}).ServiceEvent()
 			s.consumer.On("OnServiceEventReceived", serviceEvent).Once()
 			s.consumer.On("OnServiceEventProcessed", serviceEvent).Once()
 			ejectionEvents = append(ejectionEvents, serviceEvent)
@@ -778,7 +778,7 @@ func (s *EpochFallbackStateMachineSuite) TestProcessingMultipleEventsAtTheSameBl
 				_, err = s.stateMachine.ProcessEpochCommit(ev)
 			case *flow.EpochRecover:
 				_, err = s.stateMachine.ProcessEpochRecover(ev)
-			case *flow.EjectIdentity:
+			case *flow.EjectNode:
 				_ = s.stateMachine.EjectIdentity(ev)
 			}
 			require.NoError(s.T(), err)

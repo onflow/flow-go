@@ -127,12 +127,12 @@ func (s *ProtocolStateMachineSuite) TestBuild() {
 	require.Equal(s.T(), updatedState.ID(), stateID, "should return correct ID")
 	require.Equal(s.T(), s.parentProtocolState.ID(), s.stateMachine.ParentState().ID(), "should not modify parent protocol state")
 
-	updatedDynamicIdentity := s.parentProtocolState.CurrentEpochIdentityTable[0].NodeID
-	serviceEvent := &flow.EjectIdentity{NodeID: updatedDynamicIdentity}
+	nodeIDforEjection := s.parentProtocolState.CurrentEpochIdentityTable[0].NodeID
+	serviceEvent := &flow.EjectNode{NodeID: nodeIDforEjection}
 	s.consumer.On("OnServiceEventReceived", serviceEvent.ServiceEvent()).Once()
 	s.consumer.On("OnServiceEventProcessed", serviceEvent.ServiceEvent()).Once()
-	ejected := s.stateMachine.EjectIdentity(serviceEvent)
-	require.True(s.T(), ejected)
+	wasEjected := s.stateMachine.EjectIdentity(serviceEvent)
+	require.True(s.T(), wasEjected)
 	updatedState, stateID, hasChanges = s.stateMachine.Build()
 	require.True(s.T(), hasChanges, "should have changes")
 	require.NotEqual(s.T(), stateID, s.parentProtocolState.ID(), "protocol state was modified but still has same ID")
@@ -268,12 +268,12 @@ func (s *ProtocolStateMachineSuite) TestProcessEpochCommit() {
 // TestUpdateIdentityUnknownIdentity tests if updating the identity of unknown node results in a correct return value
 // and doesn't affect resulting state.
 func (s *ProtocolStateMachineSuite) TestUpdateIdentityUnknownIdentity() {
-	serviceEvent := &flow.EjectIdentity{NodeID: unittest.IdentifierFixture()}
+	serviceEvent := &flow.EjectNode{NodeID: unittest.IdentifierFixture()}
 	s.consumer.On("OnServiceEventReceived", serviceEvent.ServiceEvent()).Once()
 	s.consumer.On("OnInvalidServiceEvent", serviceEvent.ServiceEvent(),
 		unittest.MatchInvalidServiceEventError).Once()
-	ejected := s.stateMachine.EjectIdentity(serviceEvent)
-	require.False(s.T(), ejected, "should not be able to eject unknown identity")
+	wasEjected := s.stateMachine.EjectIdentity(serviceEvent)
+	require.False(s.T(), wasEjected, "should not be able to eject unknown identity")
 
 	updatedState, updatedStateID, hasChanges := s.stateMachine.Build()
 	require.False(s.T(), hasChanges, "should not have changes")
@@ -294,11 +294,11 @@ func (s *ProtocolStateMachineSuite) TestUpdateIdentityHappyPath() {
 	require.NoError(s.T(), err)
 
 	for _, update := range ejectedChanges {
-		serviceEvent := &flow.EjectIdentity{NodeID: update.NodeID}
+		serviceEvent := &flow.EjectNode{NodeID: update.NodeID}
 		s.consumer.On("OnServiceEventReceived", serviceEvent.ServiceEvent()).Once()
 		s.consumer.On("OnServiceEventProcessed", serviceEvent.ServiceEvent()).Once()
-		ejected := s.stateMachine.EjectIdentity(serviceEvent)
-		require.True(s.T(), ejected)
+		wasEjected := s.stateMachine.EjectIdentity(serviceEvent)
+		require.True(s.T(), wasEjected)
 	}
 	updatedState, updatedStateID, hasChanges := s.stateMachine.Build()
 	require.True(s.T(), hasChanges, "should have changes")
@@ -483,11 +483,11 @@ func (s *ProtocolStateMachineSuite) TestEpochSetupAfterIdentityChange() {
 	ejectedChanges, err := participantsFromCurrentEpochSetup.Sample(2)
 	require.NoError(s.T(), err)
 	for _, update := range ejectedChanges {
-		serviceEvent := &flow.EjectIdentity{NodeID: update.NodeID}
+		serviceEvent := &flow.EjectNode{NodeID: update.NodeID}
 		s.consumer.On("OnServiceEventReceived", serviceEvent.ServiceEvent()).Once()
 		s.consumer.On("OnServiceEventProcessed", serviceEvent.ServiceEvent()).Once()
-		ejected := s.stateMachine.EjectIdentity(serviceEvent)
-		require.True(s.T(), ejected)
+		wasEjected := s.stateMachine.EjectIdentity(serviceEvent)
+		require.True(s.T(), wasEjected)
 	}
 	updatedState, _, _ := s.stateMachine.Build()
 
@@ -551,12 +551,12 @@ func (s *ProtocolStateMachineSuite) TestEpochSetupAndEjectionInSameBlock() {
 	setupParticipants := s.parentProtocolState.CurrentEpochSetup.Participants.Copy() // use same participants as in current epoch setup
 	ejectedIdentityID := setupParticipants[0].NodeID
 
-	serviceEvent := &flow.EjectIdentity{NodeID: ejectedIdentityID}
+	serviceEvent := &flow.EjectNode{NodeID: ejectedIdentityID}
 	s.consumer.On("OnServiceEventReceived", serviceEvent.ServiceEvent()).Once()
 	s.consumer.On("OnServiceEventProcessed", serviceEvent.ServiceEvent()).Once()
 	// ejected identity before processing epoch setup
-	ejected := s.stateMachine.EjectIdentity(serviceEvent)
-	require.True(s.T(), ejected)
+	wasEjected := s.stateMachine.EjectIdentity(serviceEvent)
+	require.True(s.T(), wasEjected)
 
 	setup := unittest.EpochSetupFixture(
 		unittest.SetupWithCounter(s.parentProtocolState.CurrentEpochSetup.Counter+1),
