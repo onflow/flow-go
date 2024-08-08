@@ -16,6 +16,11 @@ type Downloader struct {
 	mock.Mock
 }
 
+// AddHeightUpdatesConsumer provides a mock function with given fields: _a0
+func (_m *Downloader) AddHeightUpdatesConsumer(_a0 execution_data.HeightUpdatesConsumer) {
+	_m.Called(_a0)
+}
+
 // Done provides a mock function with given fields:
 func (_m *Downloader) Done() <-chan struct{} {
 	ret := _m.Called()

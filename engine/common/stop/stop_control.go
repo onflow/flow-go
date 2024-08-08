@@ -1,29 +1,19 @@
 package stop
 
 import (
-	"errors"
 	"fmt"
-	"math"
-	"time"
 
 	"github.com/coreos/go-semver/semver"
 	"github.com/rs/zerolog"
 	"go.uber.org/atomic"
 
+	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/counters"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/irrecoverable"
 
 	"github.com/onflow/flow-go/engine/common/version"
-)
-
-// ErrNoRegisteredHeightRecorders represents an error indicating that StopControl did not register any execution data height recorders.
-// This error occurs when the StopControl attempts to perform operations that require
-// at least one registered height recorder, but none are found.
-var ErrNoRegisteredHeightRecorders = errors.New("no registered height recorders")
-
-const (
-	DefaultCheckHeightInterval = 30 * time.Second
 )
 
 // StopControl is responsible for managing the stopping behavior of the node
@@ -40,9 +30,22 @@ type StopControl struct {
 	updatedVersion *atomic.String
 
 	registeredHeightRecorders []execution_data.ProcessedHeightRecorder
+
+	// Notifier for new processed block height
+	processedHeightNotifier engine.Notifier
+
+	// Stores latest highest processed block height
+	lastProcessedHeight counters.StrictMonotonousCounter
 }
 
 // NewStopControl creates a new StopControl instance.
+//
+// Parameters:
+//   - log: The logger used for logging.
+//   - versionControl: The version control used to track node version updates.
+//
+// Returns:
+//   - A pointer to the newly created StopControl instance.
 func NewStopControl(
 	log zerolog.Logger,
 	versionControl *version.VersionControl,
@@ -53,10 +56,12 @@ func NewStopControl(
 			Logger(),
 		incompatibleBlockHeight: atomic.NewUint64(0),
 		updatedVersion:          atomic.NewString(""),
+		lastProcessedHeight:     counters.NewMonotonousCounter(0),
+		processedHeightNotifier: engine.NewNotifier(),
 	}
 
 	sc.cm = component.NewComponentManagerBuilder().
-		AddWorker(sc.loop).
+		AddWorker(sc.processEvents).
 		Build()
 	sc.Component = sc.cm
 
@@ -71,7 +76,11 @@ func NewStopControl(
 	return sc
 }
 
-// updateVersionData sets new version data
+// updateVersionData sets new version data.
+//
+// Parameters:
+//   - height: The block height that is incompatible with the current node version.
+//   - semver: The new semantic version string that is expected for compatibility.
 func (sc *StopControl) updateVersionData(height uint64, semver string) {
 	sc.incompatibleBlockHeight.Store(height)
 	sc.updatedVersion.Store(semver)
@@ -81,6 +90,10 @@ func (sc *StopControl) updateVersionData(height uint64, semver string) {
 //
 // It updates the incompatible block height and the expected node version
 // based on the provided height and semver.
+//
+// Parameters:
+//   - height: The block height that is incompatible with the current node version.
+//   - version: The new semantic version object that is expected for compatibility.
 func (sc *StopControl) OnVersionUpdate(height uint64, version *semver.Version) {
 	// If the version was updated, store new version information
 	if version != nil {
@@ -98,11 +111,25 @@ func (sc *StopControl) OnVersionUpdate(height uint64, version *semver.Version) {
 }
 
 // OnProcessedBlock is called when need to check processed block for compatibility with current node.
-func (sc *StopControl) OnProcessedBlock(ctx irrecoverable.SignalerContext, height uint64) {
+//
+// Parameters:
+//   - ctx: The context used to signal an irrecoverable error if the processed block is incompatible.
+func (sc *StopControl) OnProcessedBlock(ctx irrecoverable.SignalerContext) {
 	incompatibleBlockHeight := sc.incompatibleBlockHeight.Load()
-	if height >= incompatibleBlockHeight {
+	newHeight := sc.lastProcessedHeight.Value()
+	if newHeight >= incompatibleBlockHeight {
 		ctx.Throw(fmt.Errorf("processed block at height %d is incompatible with the current node version, please upgrade to version %s starting from block height %d",
-			height, sc.updatedVersion.Load(), incompatibleBlockHeight))
+			newHeight, sc.updatedVersion.Load(), incompatibleBlockHeight))
+	}
+}
+
+// updateProcessedHeight updates the last processed height and triggers notifications.
+//
+// Parameters:
+//   - height: The height of the latest processed block.
+func (sc *StopControl) updateProcessedHeight(height uint64) {
+	if sc.lastProcessedHeight.Set(height) {
+		sc.processedHeightNotifier.Notify()
 	}
 }
 
@@ -111,47 +138,26 @@ func (sc *StopControl) OnProcessedBlock(ctx irrecoverable.SignalerContext, heigh
 // Parameters:
 //   - recorder: The execution data height recorder to register.
 func (sc *StopControl) RegisterHeightRecorder(recorder execution_data.ProcessedHeightRecorder) {
-	sc.registeredHeightRecorders = append(sc.registeredHeightRecorders, recorder)
+	if recorder != nil {
+		recorder.AddHeightUpdatesConsumer(sc.updateProcessedHeight)
+		sc.registeredHeightRecorders = append(sc.registeredHeightRecorders, recorder)
+	}
 }
 
-func (sc *StopControl) loop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+// processEvents processes incoming events related to block heights and version updates.
+//
+// Parameters:
+//   - ctx: The context used to handle irrecoverable errors.
+//   - ready: A function to signal that the component is ready to start processing events.
+func (sc *StopControl) processEvents(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
-	ticker := time.NewTicker(DefaultCheckHeightInterval)
-	defer ticker.Stop()
 
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case <-ticker.C:
-			lowestHeight, err := sc.lowestRecordersHeight()
-			if err == nil || !errors.Is(err, ErrNoRegisteredHeightRecorders) {
-				sc.OnProcessedBlock(ctx, lowestHeight)
-			}
+		case <-sc.processedHeightNotifier.Channel():
+			sc.OnProcessedBlock(ctx)
 		}
 	}
-}
-
-// lowestRecordersHeight returns the lowest height among all registered
-// height recorders.
-//
-// This function iterates over all registered height recorders to determine
-// the smallest of complete height recorded. If no height recorders are registered, it
-// returns an error.
-//
-// Expected errors during normal operation:
-// - ErrNoRegisteredHeightRecorders: if no height recorders are registered.
-func (sc *StopControl) lowestRecordersHeight() (uint64, error) {
-	if len(sc.registeredHeightRecorders) == 0 {
-		return 0, ErrNoRegisteredHeightRecorders
-	}
-
-	lowestHeight := uint64(math.MaxUint64)
-	for _, recorder := range sc.registeredHeightRecorders {
-		height := recorder.HighestCompleteHeight()
-		if height < lowestHeight {
-			lowestHeight = height
-		}
-	}
-	return lowestHeight, nil
 }
