@@ -353,7 +353,9 @@ func testEpochForView(t *testing.T, lookup *EpochLookup, epochs ...viewRange) {
 	})
 
 	t.Run("should return ErrViewForUnknownEpoch for queries above latest epoch final view", func(t *testing.T) {
-		_, err := lookup.EpochForView(lookup.epochs.latest().finalView + 1)
+		latest, exists := lookup.epochs.latest()
+		assert.True(t, exists)
+		_, err := lookup.EpochForView(latest.finalView + 1)
 		assert.ErrorIs(t, err, model.ErrViewForUnknownEpoch)
 	})
 }

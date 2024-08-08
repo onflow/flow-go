@@ -20,6 +20,9 @@ const (
 )
 
 // viewRange captures the counter and view range of an epoch (inclusive on both ends)
+// The zero value (epochCounter = firstView = finalView = 0) can conceptually not occur:
+// even the genesis epoch '0' is required to have some view to prepare the subsequent epoch.
+// Therefore, we use the zero value to represent 'undefined'.
 type viewRange struct {
 	epochCounter uint64
 	firstView    uint64
@@ -28,19 +31,27 @@ type viewRange struct {
 
 // exists returns true when the viewRange is initialized (anything besides the zero value for the struct).
 // It is useful for checking existence while iterating the epochRangeCache.
-func (er viewRange) exists() bool {
-	return er != viewRange{}
+func (er viewRange) undefined() bool {
+	return er.epochCounter == 0 && er.firstView == 0 && er.finalView == 0
 }
 
-// epochRangeCache stores at most the 3 latest epoch ranges.
-// Ranges are ordered by counter (ascending) and right-aligned.
-// For example, if we only have one epoch cached, `epochRangeCache[0]` and `epochRangeCache[1]` are `nil`.
-// Not safe for concurrent use.
+// epochRangeCache stores at most the 3 latest epoch `viewRange`s.
+// viewRange are ordered by counter (ascending) and right-aligned. For example, if we only have one epoch
+// cached, `epochRangeCache[0]` and `epochRangeCache[1]` are `undefined`. epochRangeCache enforces the
+// following conventions:
+//  1. For two adjacent epochs, their view ranges must form a continuous sequence without gaps or overlap.
+//     Formally: epochRangeCache[i].finalView + 1 = epochRangeCache[i+1].firstView must hold for _all_ cached epochs.
+//  2. For any two adjacent epochs, their the view counters must satisfy:
+//     epochRangeCache[i].epochCounter + 1 = epochRangeCache[i+1].epochCounter
+//
+// NOT safe for CONCURRENT use.
 type epochRangeCache [3]viewRange
 
-// latest returns the latest cached epoch range, or nil if no epochs are cached.
-func (cache *epochRangeCache) latest() viewRange {
-	return cache[2]
+// latest returns the latest cached epoch range, or nil if no epochs are cached. Follows map semantics
+// to indicate whether latest is known. If the boolean return value is false, the returned view range
+// is the zero value, i.e. undefined.
+func (cache *epochRangeCache) latest() (viewRange, bool) {
+	return cache[2], !cache[2].undefined()
 }
 
 // extendLatestEpoch updates the final view of the latest epoch with the final view of the epoch extension.
@@ -48,7 +59,7 @@ func (cache *epochRangeCache) latest() viewRange {
 func (cache *epochRangeCache) extendLatestEpoch(epochCounter uint64, extension flow.EpochExtension) error {
 	latestEpoch := cache[2]
 	// sanity check: latest epoch should already be cached.
-	if !latestEpoch.exists() {
+	if latestEpoch.undefined() {
 		return fmt.Errorf("sanity check failed: latest epoch does not exist")
 	}
 
@@ -76,21 +87,22 @@ func (cache *epochRangeCache) extendLatestEpoch(epochCounter uint64, extension f
 	return nil
 }
 
-// combinedRange returns the endpoints of the combined view range of all cached
-// epochs. In particular, we return the lowest firstView and the greatest finalView.
-// At least one epoch must already be cached, otherwise this function will panic.
-func (cache *epochRangeCache) combinedRange() (firstView uint64, finalView uint64) {
-
-	// low end of the range is the first view of the first cached epoch
-	for _, epoch := range cache {
-		if epoch.exists() {
-			firstView = epoch.firstView
-			break
+// cachedEpochs returns a slice of the cached epochs in order. The return slice is guaranteed to satisfy:
+//  1. For two adjacent epochs, their view ranges form a continuous sequence without gaps or overlap.
+//     Formally: epochRangeCache[i].finalView + 1 = epochRangeCache[i+1].firstView
+//  2. For any two adjacent epochs, their the view counters increments by one
+//     epochRangeCache[i].epochCounter + 1 = epochRangeCache[i+1].epochCounter
+//  3. All slice elements are different from the zero value (i.e. not undefined).
+//
+// If no elements are cached, the return slice is empty/nil. It may also contain only a single epoch.
+func (cache *epochRangeCache) cachedEpochs() []viewRange {
+	for i, epoch := range cache {
+		if epoch.undefined() {
+			continue
 		}
+		return cache[i:3]
 	}
-	// high end of the range is the final view of the latest cached epoch
-	finalView = cache.latest().finalView
-	return
+	return nil
 }
 
 // add inserts an epoch range to the cache.
@@ -99,16 +111,14 @@ func (cache *epochRangeCache) combinedRange() (firstView uint64, finalView uint6
 // Guarantees ordering and alignment properties of epochRangeCache are preserved.
 // No errors are expected during normal operation.
 func (cache *epochRangeCache) add(epoch viewRange) error {
-
-	// sanity check: ensure the epoch we are adding is considered a non-zero value
-	// this helps ensure internal consistency in this component, but if we ever trip this check, something is seriously wrong elsewhere
-	if !epoch.exists() {
+	// sanity check: ensure the epoch we are adding is non-zero value. This helps ensure internal consistency
+	// in this component, but if we ever trip this check, something is seriously wrong elsewhere!
+	if epoch.undefined() {
 		return fmt.Errorf("sanity check failed: caller attempted to cache invalid zero epoch")
 	}
 
-	latestCachedEpoch := cache.latest()
-	// initial case - no epoch ranges are stored yet
-	if !latestCachedEpoch.exists() {
+	latestCachedEpoch, exists := cache.latest()
+	if !exists { // initial case - no epoch ranges are stored yet
 		cache[2] = epoch
 		return nil
 	}
@@ -137,6 +147,7 @@ func (cache *epochRangeCache) add(epoch viewRange) error {
 }
 
 // EpochLookup implements the EpochLookup interface using protocol state to match views to epochs.
+// Only Epochs that are fully committed can be retrieved.
 // CAUTION: EpochLookup should only be used for querying the previous, current, or next epoch.
 type EpochLookup struct {
 	state  protocol.State
@@ -237,36 +248,39 @@ func (lookup *EpochLookup) cacheEpoch(epoch protocol.Epoch) error {
 func (lookup *EpochLookup) EpochForView(view uint64) (uint64, error) {
 	lookup.mu.RLock()
 	defer lookup.mu.RUnlock()
-	firstView, finalView := lookup.epochs.combinedRange()
 
+	cachedEpochs := lookup.epochs.cachedEpochs()
+	l := len(cachedEpochs)
+	if l == 0 {
+		return 0, model.ErrViewForUnknownEpoch
+	}
+
+	// by convention, `epochRangeCache` guarantees that epochs are successive, without gaps or overlaps
+	// in their epoch counters and view ranges. Therefore, we can just chronologically walk through the
+	// epochs. This is an internal lookup, so we optimize for the happy path and proceed reverse chronologically
 	// LEGEND:
 	// *      -> view argument
 	// [----| -> epoch view range
 
+	// view is after the known epochs
+	// -------[----|----|----]---*---
+	if view > cachedEpochs[l-1].finalView {
+		// The epoch including this view may be close to being committed. However, until an epoch
+		// is committed, views cannot be conclusively assigned to it.
+		return 0, model.ErrViewForUnknownEpoch
+	}
+	// view is within a known epoch
+	// -------[----|-*--|----]-------
+	for i := l - 1; i >= 0; i-- {
+		if cachedEpochs[i].firstView <= view {
+			// we know: view ≤ cachedEpochs[i].finalView, because otherwise we would have returned via a prior
+			// value check triggering; or epochRangeCache has a bug, which we avoid with thorough testing.
+			return cachedEpochs[i].epochCounter, nil
+		}
+	}
 	// view is before any known epochs
 	// ---*---[----|----|----]-------
-	if view < firstView {
-		return 0, model.ErrViewForUnknownEpoch
-	}
-	// view is after any known epochs
-	// -------[----|----|----]---*---
-	if view > finalView {
-		// otherwise, we are waiting for the epoch including this view to be committed
-		return 0, model.ErrViewForUnknownEpoch
-	}
-
-	// view is within a known epoch
-	for _, epoch := range lookup.epochs {
-		if !epoch.exists() {
-			continue
-		}
-		if epoch.firstView <= view && view <= epoch.finalView {
-			return epoch.epochCounter, nil
-		}
-	}
-
-	// reaching this point indicates a corrupted state or internal bug
-	return 0, fmt.Errorf("sanity check failed: cached epochs (%v) does not contain input view %d", lookup.epochs, view)
+	return 0, model.ErrViewForUnknownEpoch
 }
 
 // handleProtocolEvents processes queued Epoch events `EpochCommittedPhaseStarted`
