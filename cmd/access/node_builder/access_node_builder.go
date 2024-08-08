@@ -55,6 +55,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/subscription"
 	followereng "github.com/onflow/flow-go/engine/common/follower"
 	"github.com/onflow/flow-go/engine/common/requester"
+	"github.com/onflow/flow-go/engine/common/stop"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/engine/common/version"
 	"github.com/onflow/flow-go/engine/execution/computation/query"
@@ -173,6 +174,7 @@ type AccessNodeConfig struct {
 	programCacheSize                     uint
 	checkPayerBalance                    bool
 	versionControlEnabled                bool
+	stopControlEnabled                   bool
 }
 
 type PublicNetworkConfig struct {
@@ -276,6 +278,7 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 		programCacheSize:                     0,
 		checkPayerBalance:                    false,
 		versionControlEnabled:                true,
+		stopControlEnabled:                   false,
 	}
 }
 
@@ -324,6 +327,7 @@ type FlowAccessNodeBuilder struct {
 	ExecutionDatastoreManager  edstorage.DatastoreManager
 	ExecutionDataTracker       tracker.Storage
 	versionControl             *version.VersionControl
+	stopControl                *stop.StopControl
 
 	// The sync engine participants provider is the libp2p peer store for the access node
 	// which is not available until after the network has started.
@@ -1259,6 +1263,10 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 			"version-control-enabled",
 			defaultConfig.versionControlEnabled,
 			"whether to enable the version control feature. Default value is true")
+		flags.BoolVar(&builder.stopControlEnabled,
+			"stop-control-enabled",
+			defaultConfig.stopControlEnabled,
+			"whether to enable the stop control feature. Default value is true")
 		// ExecutionDataRequester config
 		flags.BoolVar(&builder.executionDataSyncEnabled,
 			"execution-data-sync-enabled",
@@ -1817,6 +1825,28 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			versionControlDependable.Init(builder.versionControl)
 
 			return versionControl, nil
+		}).
+		Component("stop control", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			if !builder.stopControlEnabled {
+				return &module.NoopReadyDoneAware{}, nil
+			}
+
+			stopControl := stop.NewStopControl(
+				builder.Logger,
+				builder.versionControl,
+			)
+
+			if builder.executionDataSyncEnabled {
+				stopControl.RegisterHeightRecorder(builder.ExecutionDataDownloader)
+
+				if builder.executionDataIndexingEnabled {
+					stopControl.RegisterHeightRecorder(builder.ExecutionIndexer)
+				}
+			}
+
+			builder.stopControl = stopControl
+
+			return stopControl, nil
 		}).
 		Component("RPC engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			config := builder.rpcConf
