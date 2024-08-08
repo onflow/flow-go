@@ -28,3 +28,14 @@ var ProxyContractBytes, _ = hex.DecodeString(proxyContractBytesInHex)
 
 //go:embed proxy_abi.json
 var ProxyContractABIJSON string
+
+//go:embed factory_bytes.hex
+var factoryContractBytesInHex string
+
+var FactoryContractBytes, _ = hex.DecodeString(factoryContractBytesInHex)
+
+//go:embed factory_abi.json
+var FactoryContractABIJSON string
+
+//go:embed factory_deployable_abi.json
+var FactoryDeployableContractABIJSON string

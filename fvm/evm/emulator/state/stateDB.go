@@ -462,7 +462,7 @@ func (db *StateDB) Finalize() error {
 
 // Prepare is a high level logic that sadly is considered to be part of the
 // stateDB interface and not on the layers above.
-// based on parameters that are passed it updates access lists
+// based on parameters that are passed it updates access-lists
 func (db *StateDB) Prepare(rules gethParams.Rules, sender, coinbase gethCommon.Address, dest *gethCommon.Address, precompiles []gethCommon.Address, txAccesses gethTypes.AccessList) {
 	if rules.IsBerlin {
 		db.AddAddressToAccessList(sender)
