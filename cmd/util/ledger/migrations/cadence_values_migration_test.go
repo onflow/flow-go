@@ -2145,14 +2145,18 @@ func TestCapabilityMigration(t *testing.T) {
 	const nWorker = 2
 
 	const chainID = flow.Emulator
-	chain := chainID.Chain()
-
-	testAddress := common.Address(chain.ServiceAddress())
 
 	payloads, err := newBootstrapPayloads(chainID)
 	require.NoError(t, err)
 
 	registersByAccount, err := registers.NewByAccountFromPayloads(payloads)
+	require.NoError(t, err)
+
+	addressA := common.Address(chainID.Chain().ServiceAddress())
+
+	// TODO: is there a way to read this address from bootstrapped payloads
+	// rather than hard-coding it here?
+	addressB, err := common.HexToAddress("0xe5a8b7f23e8b548f")
 	require.NoError(t, err)
 
 	runtime, err := NewInterpreterMigrationRuntime(
@@ -2167,7 +2171,7 @@ func TestCapabilityMigration(t *testing.T) {
 	storageDomain := common.PathDomainStorage.Identifier()
 
 	storageMap := storage.GetStorageMap(
-		testAddress,
+		addressA,
 		storageDomain,
 		true,
 	)
@@ -2181,7 +2185,10 @@ func TestCapabilityMigration(t *testing.T) {
 	capabilityValue := &interpreter.PathCapabilityValue{
 		BorrowType: borrowType,
 		Path:       interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "foo"),
-		Address:    interpreter.AddressValue(testAddress),
+
+		// Important: Capability must be for a different address,
+		// compared to where the capability is stored.
+		Address: interpreter.AddressValue(addressB),
 	}
 
 	storageMap.WriteValue(
@@ -2200,7 +2207,7 @@ func TestCapabilityMigration(t *testing.T) {
 	// Merge the changes into the registers
 
 	expectedAddresses := map[flow.Address]struct{}{
-		flow.Address(testAddress): {},
+		flow.Address(addressA): {},
 	}
 
 	err = registers.ApplyChanges(
@@ -2248,9 +2255,9 @@ func TestCapabilityMigration(t *testing.T) {
 
 	require.Equal(t, reporter.entries, []any{
 		capabilityMigrationEntry{
-			AccountAddress: testAddress,
+			AccountAddress: addressA,
 			AddressPath: interpreter.AddressPath{
-				Address: testAddress,
+				Address: addressA,
 				Path:    interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "foo"),
 			},
 			BorrowType:   borrowType,
@@ -2259,7 +2266,7 @@ func TestCapabilityMigration(t *testing.T) {
 		cadenceValueMigrationEntry{
 			StorageKey: interpreter.StorageKey{
 				Key:     storageDomain,
-				Address: testAddress,
+				Address: addressA,
 			},
 			StorageMapKey: storageMapKey,
 			Migration:     "CapabilityValueMigration",
