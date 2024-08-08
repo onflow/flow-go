@@ -187,7 +187,7 @@ func (v *BaseView) GetStorageRoot(addr common.Address) (common.Hash, error) {
 	}
 
 	// account is EOA
-	if account.CollectionID == nil {
+	if len(account.CollectionID) == 0 {
 		return gethTypes.EmptyRootHash, nil
 	}
 
@@ -300,8 +300,8 @@ func (v *BaseView) DeleteAccount(addr gethCommon.Address) error {
 	if err != nil {
 		return err
 	}
-	if acc == nil {
-		return fmt.Errorf("account doesn't exist to be deleted")
+	if acc == nil { // if account doesn't exist return
+		return nil
 	}
 
 	// 2. remove the code
