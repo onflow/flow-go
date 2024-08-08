@@ -83,7 +83,7 @@ func (u *baseStateMachine) EjectIdentity(ejectIdentity *flow.EjectIdentity) bool
 		u.telemetry.OnServiceEventProcessed(ejectIdentity.ServiceEvent())
 	} else {
 		u.telemetry.OnInvalidServiceEvent(ejectIdentity.ServiceEvent(),
-			protocol.NewInvalidServiceEventErrorf("could not eject identity (%v)", ejectIdentity.NodeID))
+			protocol.NewInvalidServiceEventErrorf("could not eject node with unknown NodeID %v", ejectIdentity.NodeID))
 	}
 	return ejected
 }
