@@ -366,6 +366,8 @@ func NewCadence1LinkValueMigration(
 	}
 }
 
+const capabilityValueMigrationReporterName = "cadence-capability-value-migration"
+
 // NewCadence1CapabilityValueMigration creates a new CadenceBaseMigration
 // which migrates path capability values to ID capability values.
 // It requires a map the IDs of the capability controllers,
@@ -384,20 +386,32 @@ func NewCadence1CapabilityValueMigration(
 
 	return &CadenceBaseMigration{
 		name:                              "cadence_capability_value_migration",
-		reporter:                          rwf.ReportWriter("cadence-capability-value-migration"),
+		reporter:                          rwf.ReportWriter(capabilityValueMigrationReporterName),
 		diffReporter:                      diffReporter,
 		logVerboseDiff:                    opts.LogVerboseDiff,
 		verboseErrorOutput:                opts.VerboseErrorOutput,
 		checkStorageHealthBeforeMigration: opts.CheckStorageHealthBeforeMigration,
 		valueMigrations: func(
 			_ *interpreter.Interpreter,
-			_ environment.Accounts,
+			accounts environment.Accounts,
 			reporter *cadenceValueMigrationReporter,
 		) []migrations.ValueMigration {
+
+			idGenerator := environment.NewAccountLocalIDGenerator(
+				tracing.NewMockTracerSpan(),
+				util.NopMeter{},
+				accounts,
+			)
+
+			handler := capabilityControllerHandler{
+				idGenerator: idGenerator,
+			}
+
 			return []migrations.ValueMigration{
 				&capcons.CapabilityValueMigration{
 					CapabilityMapping: capabilityMapping,
 					Reporter:          reporter,
+					IssueHandler:      handler,
 				},
 			}
 		},
