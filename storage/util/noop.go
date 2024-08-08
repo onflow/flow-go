@@ -6,28 +6,28 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-type NoopStorage struct{}
+type NoopExecutionDataTracker struct{}
 
-var _ storage.ExecutionDataTracker = (*NoopStorage)(nil)
+var _ storage.ExecutionDataTracker = (*NoopExecutionDataTracker)(nil)
 
-func (s *NoopStorage) Update(update storage.UpdateFn) error {
+func (s *NoopExecutionDataTracker) Update(update storage.UpdateFn) error {
 	return update(func(blockHeight uint64, cids ...cid.Cid) error {
 		return nil
 	})
 }
 
-func (s *NoopStorage) GetFulfilledHeight() (uint64, error) {
+func (s *NoopExecutionDataTracker) GetFulfilledHeight() (uint64, error) {
 	return 0, nil
 }
 
-func (s *NoopStorage) SetFulfilledHeight(uint64) error {
+func (s *NoopExecutionDataTracker) SetFulfilledHeight(uint64) error {
 	return nil
 }
 
-func (s *NoopStorage) GetPrunedHeight() (uint64, error) {
+func (s *NoopExecutionDataTracker) GetPrunedHeight() (uint64, error) {
 	return 0, nil
 }
 
-func (s *NoopStorage) PruneUpToHeight(height uint64) error {
+func (s *NoopExecutionDataTracker) PruneUpToHeight(height uint64) error {
 	return nil
 }

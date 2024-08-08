@@ -53,7 +53,7 @@ func NewProvider(
 	opts ...ProviderOption,
 ) *ExecutionDataProvider {
 	if storage == nil {
-		storage = &util.NoopStorage{}
+		storage = &util.NoopExecutionDataTracker{}
 	}
 
 	p := &ExecutionDataProvider{
