@@ -17,22 +17,31 @@ import (
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/execution"
+	"github.com/onflow/flow-go/module/state_synchronization"
 	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/protocol"
 )
+
+// DefaultSealedIndexedHeightThresholdNumber is the default number of blocks between sealed and indexed height
+const DefaultSealedIndexedHeightThresholdNumber = 30
 
 type Blocks interface {
 	HeaderByID(id flow.Identifier) (*flow.Header, error)
 	FinalizedHeader() (*flow.Header, error)
 	SealedHeader() (*flow.Header, error)
+	IndexedHeight() (uint64, error)
 }
 
 type ProtocolStateBlocks struct {
-	state protocol.State
+	state         protocol.State
+	indexReporter state_synchronization.IndexReporter
 }
 
-func NewProtocolStateBlocks(state protocol.State) *ProtocolStateBlocks {
-	return &ProtocolStateBlocks{state: state}
+func NewProtocolStateBlocks(state protocol.State, indexReporter state_synchronization.IndexReporter) *ProtocolStateBlocks {
+	return &ProtocolStateBlocks{
+		state:         state,
+		indexReporter: indexReporter,
+	}
 }
 
 func (b *ProtocolStateBlocks) HeaderByID(id flow.Identifier) (*flow.Header, error) {
@@ -53,7 +62,16 @@ func (b *ProtocolStateBlocks) FinalizedHeader() (*flow.Header, error) {
 }
 
 func (b *ProtocolStateBlocks) SealedHeader() (*flow.Header, error) {
+
 	return b.state.Sealed().Head()
+
+}
+
+func (b *ProtocolStateBlocks) IndexedHeight() (uint64, error) {
+	if b.indexReporter != nil {
+		return b.indexReporter.HighestIndexedHeight()
+	}
+	return 0, IndexReporterNotInitialized
 }
 
 // RateLimiter is an interface for checking if an address is rate limited.
@@ -187,6 +205,10 @@ func (v *TransactionValidator) Validate(ctx context.Context, tx *flow.Transactio
 
 	err = v.checkSufficientBalanceToPayForTransaction(ctx, tx)
 	if err != nil {
+		if IsIndexedHeightTooBehindError(err) {
+			return err
+		}
+
 		// we only return InsufficientBalanceError as it's a client-side issue
 		// that requires action from a user. Other errors (e.g. parsing errors)
 		// are 'internal' and related to script execution process. they shouldn't
@@ -396,6 +418,16 @@ func (v *TransactionValidator) checkSufficientBalanceToPayForTransaction(ctx con
 		return fmt.Errorf("could not fetch block header: %w", err)
 	}
 
+	indexedHeight, err := v.blocks.IndexedHeight()
+	if err != nil {
+		return fmt.Errorf("could not get indexed height: %w", err)
+	}
+
+	sealedHeight := header.Height
+	if sealedHeight-DefaultSealedIndexedHeightThresholdNumber > indexedHeight {
+		return IndexedHeightTooBehindError{SealedHeight: sealedHeight, IndexedHeight: indexedHeight}
+	}
+
 	payerAddress := cadence.NewAddress(tx.Payer)
 	inclusionEffort := cadence.UFix64(tx.InclusionEffort())
 	gasLimit := cadence.UFix64(tx.GasLimit)
@@ -405,7 +437,7 @@ func (v *TransactionValidator) checkSufficientBalanceToPayForTransaction(ctx con
 		return fmt.Errorf("failed to encode cadence args for script executor: %w", err)
 	}
 
-	result, err := v.scriptExecutor.ExecuteAtBlockHeight(ctx, v.verifyPayerBalanceScript, args, header.Height)
+	result, err := v.scriptExecutor.ExecuteAtBlockHeight(ctx, v.verifyPayerBalanceScript, args, indexedHeight)
 	if err != nil {
 		return fmt.Errorf("script finished with error: %w", err)
 	}
@@ -421,7 +453,7 @@ func (v *TransactionValidator) checkSufficientBalanceToPayForTransaction(ctx con
 	}
 
 	// return no error if payer has sufficient balance
-	if bool(canExecuteTransaction) {
+	if canExecuteTransaction {
 		return nil
 	}
 
