@@ -689,6 +689,10 @@ func (s *EpochFallbackStateMachineSuite) TestEpochRecoverAndEjectionInSameBlock(
 		processed, err := s.stateMachine.ProcessEpochRecover(epochRecover)
 		require.NoError(s.T(), err)
 		require.True(s.T(), processed)
+
+		updatedState, _, _ := s.stateMachine.Build()
+		require.False(s.T(), updatedState.EpochFallbackTriggered, "should exit EFM")
+		require.NotNil(s.T(), updatedState.NextEpoch, "should setup & commit next epoch")
 	})
 	s.Run("invalid epoch recover event", func() {
 		s.kvstore = mockstate.NewKVStoreReader(s.T())
@@ -717,6 +721,10 @@ func (s *EpochFallbackStateMachineSuite) TestEpochRecoverAndEjectionInSameBlock(
 		processed, err := s.stateMachine.ProcessEpochRecover(epochRecover)
 		require.NoError(s.T(), err)
 		require.False(s.T(), processed)
+
+		updatedState, _, _ := s.stateMachine.Build()
+		require.True(s.T(), updatedState.EpochFallbackTriggered, "should remain in EFM")
+		require.Nil(s.T(), updatedState.NextEpoch, "next epoch should be nil as recover event is invalid")
 	})
 }
 
