@@ -75,6 +75,35 @@ func (l *NoopLimiter) IsRateLimited(address flow.Address) bool {
 	return false
 }
 
+type PayerBalanceMode int
+
+const (
+	WarnCheck PayerBalanceMode = iota + 1
+	EnforceCheck
+)
+
+func ParsePayerBalanceMode(s string) (PayerBalanceMode, error) {
+	switch s {
+	case WarnCheck.String():
+		return WarnCheck, nil
+	case EnforceCheck.String():
+		return EnforceCheck, nil
+	default:
+		return 0, errors.New("invalid payer balance mode")
+	}
+}
+
+func (m PayerBalanceMode) String() string {
+	switch m {
+	case WarnCheck:
+		return "warn"
+	case EnforceCheck:
+		return "enforce"
+	default:
+		return ""
+	}
+}
+
 type TransactionValidationOptions struct {
 	Expiry                       uint
 	ExpiryBuffer                 uint
@@ -85,6 +114,7 @@ type TransactionValidationOptions struct {
 	MaxTransactionByteSize       uint64
 	MaxCollectionByteSize        uint64
 	CheckPayerBalance            bool
+	CheckPayerBalanceMode        PayerBalanceMode
 }
 
 type TransactionValidator struct {
@@ -192,7 +222,12 @@ func (v *TransactionValidator) Validate(ctx context.Context, tx *flow.Transactio
 		// are 'internal' and related to script execution process. they shouldn't
 		// prevent the transaction from proceeding.
 		if IsInsufficientBalanceError(err) {
-			return err
+			log.Info().Err(err).Msg("payer has insufficient balance")
+			//TODO: Metrics should go here from https://github.com/onflow/flow-go/pull/6239
+
+			if v.options.CheckPayerBalanceMode == EnforceCheck {
+				return err
+			}
 		}
 
 		// log and ignore all other errors
