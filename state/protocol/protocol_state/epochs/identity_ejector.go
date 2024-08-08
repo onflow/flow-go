@@ -34,7 +34,7 @@ func newEjector() ejector {
 }
 
 // Eject marks the node as ejected in all tracked identity lists. If it's the first ejection during lifetime of the state machine,
-// EjectIdentity updates the identity table by changing the node's participation status to 'ejected'. If
+// EjectNode updates the identity table by changing the node's participation status to 'ejected'. If
 // and only if the node is active in the previous or current or next epoch, the node's ejection status is set
 // to true for all occurrences, and we return true.  If `nodeID` is not found, we return false. This method
 // is idempotent and behaves identically for repeated calls with the same `nodeID` (and same internal state).
