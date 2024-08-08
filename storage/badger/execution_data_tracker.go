@@ -131,31 +131,11 @@ func (s *ExecutionDataTracker) init(startHeight uint64) error {
 		s.logger.Info().Msgf("finished pruning")
 	} else if errors.Is(fulfilledHeightErr, storage.ErrNotFound) && errors.Is(prunedHeightErr, storage.ErrNotFound) {
 		// db is empty, we need to bootstrap it
-		if err := s.bootstrap(startHeight); err != nil {
+		if err := s.db.Update(operation.InitTrackerHeights(startHeight)); err != nil {
 			return fmt.Errorf("failed to bootstrap storage: %w", err)
 		}
 	} else {
 		return multierror.Append(fulfilledHeightErr, prunedHeightErr).ErrorOrNil()
-	}
-
-	return nil
-}
-
-// bootstrap sets the initial fulfilled and pruned heights to startHeight in an empty database.
-//
-// Parameters:
-// - startHeight: The initial height to set for both fulfilled and pruned heights.
-//
-// No errors are expected during normal operation.
-func (s *ExecutionDataTracker) bootstrap(startHeight uint64) error {
-	err := s.db.Update(operation.InitTrackerFulfilledHeight(startHeight))
-	if err != nil {
-		return fmt.Errorf("failed to set fulfilled height value: %w", err)
-	}
-
-	err = s.db.Update(operation.InitTrackerPrunedHeight(startHeight))
-	if err != nil {
-		return fmt.Errorf("failed to set pruned height value: %w", err)
 	}
 
 	return nil

@@ -1,20 +1,32 @@
 package operation
 
 import (
+	"fmt"
+
 	"github.com/dgraph-io/badger/v2"
 	"github.com/ipfs/go-cid"
 
 	"github.com/onflow/flow-go/storage"
 )
 
+// InitTrackerHeights initializes the fulfilled and the pruned heights for the execution data tracker storage.
+//
+// No errors are expected during normal operations.
+func InitTrackerHeights(height uint64) func(*badger.Txn) error {
+	return func(tx *badger.Txn) error {
+		if err := insert(makePrefix(storage.PrefixGlobalState, storage.GlobalStateFulfilledHeight), height)(tx); err != nil {
+			return fmt.Errorf("failed to set fulfilled height value: %w", err)
+		}
+		if err := insert(makePrefix(storage.PrefixGlobalState, storage.GlobalStatePrunedHeight), height)(tx); err != nil {
+			return fmt.Errorf("failed to set pruned height value: %w", err)
+		}
+		return nil
+	}
+}
+
 // UpdateTrackerFulfilledHeight updates the fulfilled height in the execution data tracker storage.
 func UpdateTrackerFulfilledHeight(height uint64) func(*badger.Txn) error {
 	return update(makePrefix(storage.PrefixGlobalState, storage.GlobalStateFulfilledHeight), height)
-}
-
-// InitTrackerFulfilledHeight initializes the fulfilled height for the execution data tracker storage.
-func InitTrackerFulfilledHeight(height uint64) func(*badger.Txn) error {
-	return insert(makePrefix(storage.PrefixGlobalState, storage.GlobalStateFulfilledHeight), height)
 }
 
 // RetrieveTrackerFulfilledHeight retrieves the fulfilled height from the execution data tracker storage.
@@ -25,11 +37,6 @@ func RetrieveTrackerFulfilledHeight(height *uint64) func(*badger.Txn) error {
 // UpdateTrackerPrunedHeight updates the pruned height in the execution data tracker storage.
 func UpdateTrackerPrunedHeight(height uint64) func(*badger.Txn) error {
 	return update(makePrefix(storage.PrefixGlobalState, storage.GlobalStatePrunedHeight), height)
-}
-
-// InitTrackerPrunedHeight initializes the pruned height for the execution data tracker storage.
-func InitTrackerPrunedHeight(height uint64) func(*badger.Txn) error {
-	return insert(makePrefix(storage.PrefixGlobalState, storage.GlobalStatePrunedHeight), height)
 }
 
 // RetrieveTrackerPrunedHeight retrieves the pruned height from the execution data tracker storage.
