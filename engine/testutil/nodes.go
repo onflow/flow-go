@@ -670,7 +670,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ide
 	committer := committer.NewLedgerViewCommitter(ls, node.Tracer)
 
 	bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
-	trackerStorage := mocktracker.NewMockStorage()
+	trackerStorage := mocktracker.NewMockExecutionDataTracker()
 
 	prov := exedataprovider.NewProvider(
 		zerolog.Nop(),

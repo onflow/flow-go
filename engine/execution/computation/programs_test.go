@@ -118,7 +118,7 @@ func TestPrograms_TestContractUpdates(t *testing.T) {
 		Return(nil, nil)
 
 	bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
-	trackerStorage := mocktracker.NewMockStorage()
+	trackerStorage := mocktracker.NewMockExecutionDataTracker()
 
 	prov := provider.NewProvider(
 		zerolog.Nop(),
@@ -231,7 +231,7 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 		Return(nil, nil)
 
 	bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
-	trackerStorage := mocktracker.NewMockStorage()
+	trackerStorage := mocktracker.NewMockExecutionDataTracker()
 
 	prov := provider.NewProvider(
 		zerolog.Nop(),

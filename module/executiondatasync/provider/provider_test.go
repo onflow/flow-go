@@ -41,7 +41,7 @@ func getBlobservice(t *testing.T, ds datastore.Batching) network.BlobService {
 }
 
 func getProvider(blobService network.BlobService) provider.Provider {
-	trackerStorage := mocktracker.NewMockStorage()
+	trackerStorage := mocktracker.NewMockExecutionDataTracker()
 
 	return provider.NewProvider(
 		unittest.Logger(),

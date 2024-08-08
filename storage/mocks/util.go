@@ -8,7 +8,7 @@ import (
 	storagemock "github.com/onflow/flow-go/storage/mock"
 )
 
-func NewMockStorage() *storagemock.ExecutionDataTracker {
+func NewMockExecutionDataTracker() *storagemock.ExecutionDataTracker {
 	trackerStorage := new(storagemock.ExecutionDataTracker)
 	trackerStorage.On("Update", mock.Anything).Return(func(fn storage.UpdateFn) error {
 		return fn(func(uint64, ...cid.Cid) error { return nil })

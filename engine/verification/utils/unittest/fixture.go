@@ -274,7 +274,7 @@ func ExecutionResultFixture(t *testing.T,
 		committer := committer.NewLedgerViewCommitter(led, trace.NewNoopTracer())
 
 		bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
-		trackerStorage := mocktracker.NewMockStorage()
+		trackerStorage := mocktracker.NewMockExecutionDataTracker()
 
 		prov := provider.NewProvider(
 			zerolog.Nop(),

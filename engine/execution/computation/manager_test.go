@@ -124,7 +124,7 @@ func TestComputeBlockWithStorage(t *testing.T) {
 		Return(nil, nil)
 
 	bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
-	trackerStorage := mocktracker.NewMockStorage()
+	trackerStorage := mocktracker.NewMockExecutionDataTracker()
 
 	prov := provider.NewProvider(
 		zerolog.Nop(),
@@ -253,7 +253,7 @@ func TestExecuteScript(t *testing.T) {
 	))
 
 	bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
-	trackerStorage := mocktracker.NewMockStorage()
+	trackerStorage := mocktracker.NewMockExecutionDataTracker()
 
 	prov := provider.NewProvider(
 		zerolog.Nop(),
@@ -320,7 +320,7 @@ func TestExecuteScript_BalanceScriptFailsIfViewIsEmpty(t *testing.T) {
 	))
 
 	bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
-	trackerStorage := mocktracker.NewMockStorage()
+	trackerStorage := mocktracker.NewMockExecutionDataTracker()
 
 	prov := provider.NewProvider(
 		zerolog.Nop(),
@@ -366,7 +366,7 @@ func TestExecuteScripPanicsAreHandled(t *testing.T) {
 	header := unittest.BlockHeaderFixture()
 
 	bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
-	trackerStorage := mocktracker.NewMockStorage()
+	trackerStorage := mocktracker.NewMockExecutionDataTracker()
 
 	prov := provider.NewProvider(
 		zerolog.Nop(),
@@ -416,7 +416,7 @@ func TestExecuteScript_LongScriptsAreLogged(t *testing.T) {
 	header := unittest.BlockHeaderFixture()
 
 	bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
-	trackerStorage := mocktracker.NewMockStorage()
+	trackerStorage := mocktracker.NewMockExecutionDataTracker()
 
 	prov := provider.NewProvider(
 		zerolog.Nop(),
@@ -469,7 +469,7 @@ func TestExecuteScript_ShortScriptsAreNotLogged(t *testing.T) {
 	header := unittest.BlockHeaderFixture()
 
 	bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
-	trackerStorage := mocktracker.NewMockStorage()
+	trackerStorage := mocktracker.NewMockExecutionDataTracker()
 
 	prov := provider.NewProvider(
 		zerolog.Nop(),
@@ -819,7 +819,7 @@ func Test_EventEncodingFailsOnlyTxAndCarriesOn(t *testing.T) {
 		Return(nil, nil)
 
 	bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
-	trackerStorage := mocktracker.NewMockStorage()
+	trackerStorage := mocktracker.NewMockExecutionDataTracker()
 
 	prov := provider.NewProvider(
 		zerolog.Nop(),
