@@ -27,7 +27,7 @@ func InitAll(metrics module.CacheMetrics, db *pebble.DB) *storage.All {
 	transactionResults := NewTransactionResults(metrics, db, 10000)
 	collections := NewCollections(db, transactions)
 	events := NewEvents(metrics, db)
-	chunkDataPacks := NewChunkDataPacks(metrics, db, collections, 1000)
+	chunkDataPacks := NewChunkDataPacks(metrics, db, collections, results, 1000)
 
 	return &storage.All{
 		Headers:            headers,

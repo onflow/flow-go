@@ -22,7 +22,7 @@ type ChunkDataPacks struct {
 
 var _ storage.ChunkDataPacks = (*ChunkDataPacks)(nil)
 
-func NewChunkDataPacks(collector module.CacheMetrics, db *pebble.DB, collections storage.Collections, byChunkIDCacheSize uint) *ChunkDataPacks {
+func NewChunkDataPacks(collector module.CacheMetrics, db *pebble.DB, collections storage.Collections, results storage.ExecutionResults, byChunkIDCacheSize uint) *ChunkDataPacks {
 
 	retrieve := func(key flow.Identifier) func(pebble.Reader) (*storage.StoredChunkDataPack, error) {
 		return func(r pebble.Reader) (*storage.StoredChunkDataPack, error) {
@@ -40,6 +40,7 @@ func NewChunkDataPacks(collector module.CacheMetrics, db *pebble.DB, collections
 	return &ChunkDataPacks{
 		db:             db,
 		collections:    collections,
+		results:        results,
 		byChunkIDCache: cache,
 	}
 }

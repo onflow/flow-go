@@ -176,10 +176,8 @@ func (p *Pruner) loop(ctx irrecoverable.SignalerContext, ready component.ReadyFu
 			p.checkPrune(ctx)
 		case heightRangeTarget := <-p.heightRangeTargetChan:
 			p.heightRangeTarget = heightRangeTarget
-			p.checkPrune(ctx)
 		case threshold := <-p.thresholdChan:
 			p.threshold = threshold
-			p.checkPrune(ctx)
 		}
 	}
 }
