@@ -72,7 +72,6 @@ import (
 	execdatacache "github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
 	"github.com/onflow/flow-go/module/executiondatasync/pruner"
 	edstorage "github.com/onflow/flow-go/module/executiondatasync/storage"
-	"github.com/onflow/flow-go/module/executiondatasync/tracker"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
 	"github.com/onflow/flow-go/module/grpcserver"
 	"github.com/onflow/flow-go/module/id"
@@ -287,7 +286,7 @@ type ObserverServiceBuilder struct {
 	ExecutionDataBlobstore    blobs.Blobstore
 	ExecutionDataPruner       *pruner.Pruner
 	ExecutionDatastoreManager edstorage.DatastoreManager
-	ExecutionDataTracker      tracker.Storage
+	ExecutionDataTracker      storage.ExecutionDataTracker
 
 	RegistersAsyncStore *execution.RegistersAsyncStore
 	Reporter            *index.Reporter
@@ -1239,15 +1238,27 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				}
 
 				trackerDir := filepath.Join(builder.executionDataDir, "tracker")
-				builder.ExecutionDataTracker, err = tracker.OpenStorage(
-					trackerDir,
-					sealed.Height,
-					node.Logger,
-					tracker.WithPruneCallback(func(c cid.Cid) error {
-						// TODO: use a proper context here
-						return builder.ExecutionDataBlobstore.DeleteBlob(context.TODO(), c)
-					}),
-				)
+				if executionDataDBMode == execution_data.ExecutionDataDBModeBadger {
+					builder.ExecutionDataTracker, err = bstorage.NewExecutionDataTracker(
+						node.Logger,
+						trackerDir,
+						sealed.Height,
+						bstorage.WithPruneCallback(func(c cid.Cid) error {
+							// TODO: use a proper context here
+							return builder.ExecutionDataBlobstore.DeleteBlob(context.TODO(), c)
+						}),
+					)
+				} else {
+					builder.ExecutionDataTracker, err = pstorage.NewExecutionDataTracker(
+						node.Logger,
+						trackerDir,
+						sealed.Height,
+						pstorage.WithPruneCallback(func(c cid.Cid) error {
+							// TODO: use a proper context here
+							return builder.ExecutionDataBlobstore.DeleteBlob(context.TODO(), c)
+						}),
+					)
+				}
 				if err != nil {
 					return nil, fmt.Errorf("failed to create execution data tracker: %w", err)
 				}

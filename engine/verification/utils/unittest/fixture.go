@@ -25,12 +25,12 @@ import (
 	"github.com/onflow/flow-go/module/epochs"
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/state/cluster"
+	mocktracker "github.com/onflow/flow-go/storage/mocks"
 
 	envMock "github.com/onflow/flow-go/fvm/environment/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/provider"
-	mocktracker "github.com/onflow/flow-go/module/executiondatasync/tracker/mock"
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/module/metrics"
 	moduleMock "github.com/onflow/flow-go/module/mock"
@@ -274,7 +274,7 @@ func ExecutionResultFixture(t *testing.T,
 		committer := committer.NewLedgerViewCommitter(led, trace.NewNoopTracer())
 
 		bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
-		trackerStorage := mocktracker.NewMockStorage()
+		trackerStorage := mocktracker.NewMockExecutionDataTracker()
 
 		prov := provider.NewProvider(
 			zerolog.Nop(),

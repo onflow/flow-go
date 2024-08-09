@@ -4,6 +4,8 @@ import (
 	"encoding/binary"
 	"fmt"
 
+	"github.com/ipfs/go-cid"
+
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -45,6 +47,8 @@ func b(v interface{}) []byte {
 		return i[:]
 	case flow.ChainID:
 		return []byte(i)
+	case cid.Cid:
+		return i.Bytes()
 	default:
 		panic(fmt.Sprintf("unsupported type to convert (%T)", v))
 	}

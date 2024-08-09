@@ -49,12 +49,12 @@ import (
 	"github.com/onflow/flow-go/module/epochs"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/executiondatasync/provider"
-	mocktracker "github.com/onflow/flow-go/module/executiondatasync/tracker/mock"
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/module/metrics"
 	modulemock "github.com/onflow/flow-go/module/mock"
 	requesterunit "github.com/onflow/flow-go/module/state_synchronization/requester/unittest"
 	"github.com/onflow/flow-go/module/trace"
+	mocktracker "github.com/onflow/flow-go/storage/mocks"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -179,7 +179,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			Times(1) // 1 block
 
 		bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
-		trackerStorage := mocktracker.NewMockStorage()
+		trackerStorage := mocktracker.NewMockExecutionDataTracker()
 
 		prov := provider.NewProvider(
 			zerolog.Nop(),
@@ -317,7 +317,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		committer := new(computermock.ViewCommitter)
 
 		bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
-		trackerStorage := mocktracker.NewMockStorage()
+		trackerStorage := mocktracker.NewMockExecutionDataTracker()
 
 		prov := provider.NewProvider(
 			zerolog.Nop(),
@@ -421,7 +421,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		comm := new(computermock.ViewCommitter)
 
 		bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
-		trackerStorage := mocktracker.NewMockStorage()
+		trackerStorage := mocktracker.NewMockExecutionDataTracker()
 
 		prov := provider.NewProvider(
 			zerolog.Nop(),
@@ -477,7 +477,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		committer := new(computermock.ViewCommitter)
 
 		bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
-		trackerStorage := mocktracker.NewMockStorage()
+		trackerStorage := mocktracker.NewMockExecutionDataTracker()
 
 		prov := provider.NewProvider(
 			zerolog.Nop(),
@@ -710,7 +710,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			vm := fvm.NewVirtualMachine()
 
 			bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
-			trackerStorage := mocktracker.NewMockStorage()
+			trackerStorage := mocktracker.NewMockExecutionDataTracker()
 
 			prov := provider.NewProvider(
 				zerolog.Nop(),
@@ -821,7 +821,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		vm := fvm.NewVirtualMachine()
 
 		bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
-		trackerStorage := mocktracker.NewMockStorage()
+		trackerStorage := mocktracker.NewMockExecutionDataTracker()
 
 		prov := provider.NewProvider(
 			zerolog.Nop(),
@@ -934,7 +934,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		vm := fvm.NewVirtualMachine()
 
 		bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
-		trackerStorage := mocktracker.NewMockStorage()
+		trackerStorage := mocktracker.NewMockExecutionDataTracker()
 
 		prov := provider.NewProvider(
 			zerolog.Nop(),
@@ -980,7 +980,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		bservice := requesterunit.MockBlobService(
 			blockstore.NewBlockstore(
 				dssync.MutexWrap(datastore.NewMapDatastore())))
-		trackerStorage := mocktracker.NewMockStorage()
+		trackerStorage := mocktracker.NewMockExecutionDataTracker()
 
 		prov := provider.NewProvider(
 			zerolog.Nop(),
@@ -1297,7 +1297,7 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 		Return(nil)
 
 	bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
-	trackerStorage := mocktracker.NewMockStorage()
+	trackerStorage := mocktracker.NewMockExecutionDataTracker()
 
 	prov := provider.NewProvider(
 		zerolog.Nop(),

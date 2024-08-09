@@ -10,14 +10,14 @@ import (
 
 	exedatamock "github.com/onflow/flow-go/module/executiondatasync/execution_data/mock"
 	"github.com/onflow/flow-go/module/executiondatasync/pruner"
-	mocktracker "github.com/onflow/flow-go/module/executiondatasync/tracker/mock"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
+	mockstorage "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestBasicPrune(t *testing.T) {
-	trackerStorage := new(mocktracker.Storage)
+	trackerStorage := new(mockstorage.ExecutionDataTracker)
 	trackerStorage.On("GetFulfilledHeight").Return(uint64(0), nil).Once()
 	trackerStorage.On("GetPrunedHeight").Return(uint64(0), nil).Once()
 
@@ -65,7 +65,7 @@ func TestBasicPrune(t *testing.T) {
 }
 
 func TestUpdateThreshold(t *testing.T) {
-	trackerStorage := new(mocktracker.Storage)
+	trackerStorage := new(mockstorage.ExecutionDataTracker)
 	trackerStorage.On("GetFulfilledHeight").Return(uint64(15), nil).Once()
 	trackerStorage.On("GetPrunedHeight").Return(uint64(0), nil).Once()
 
@@ -106,7 +106,7 @@ func TestUpdateThreshold(t *testing.T) {
 }
 
 func TestUpdateHeightRangeTarget(t *testing.T) {
-	trackerStorage := new(mocktracker.Storage)
+	trackerStorage := new(mockstorage.ExecutionDataTracker)
 	trackerStorage.On("GetFulfilledHeight").Return(uint64(10), nil).Once()
 	trackerStorage.On("GetPrunedHeight").Return(uint64(0), nil).Once()
 

@@ -13,8 +13,8 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
-	"github.com/onflow/flow-go/module/executiondatasync/tracker"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/storage"
 )
 
 // ErrNoRegisteredHeightRecorders represents an error indicating that pruner did not register any execution data height recorders.
@@ -45,7 +45,7 @@ const (
 // A height is considered fulfilled once it has both been executed,
 // tracked, and sealed.
 type Pruner struct {
-	storage       tracker.Storage
+	storage       storage.ExecutionDataTracker
 	pruneCallback func(ctx context.Context) error
 
 	lastFulfilledHeight uint64
@@ -105,7 +105,7 @@ func WithPruningInterval(interval time.Duration) PrunerOption {
 }
 
 // NewPruner creates a new Pruner.
-func NewPruner(logger zerolog.Logger, metrics module.ExecutionDataPrunerMetrics, storage tracker.Storage, opts ...PrunerOption) (*Pruner, error) {
+func NewPruner(logger zerolog.Logger, metrics module.ExecutionDataPrunerMetrics, storage storage.ExecutionDataTracker, opts ...PrunerOption) (*Pruner, error) {
 	lastPrunedHeight, err := storage.GetPrunedHeight()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get pruned height: %w", err)

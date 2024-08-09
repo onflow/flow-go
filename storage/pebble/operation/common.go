@@ -34,9 +34,41 @@ func retrieve(key []byte, sc interface{}) func(r pebble.Reader) error {
 		}
 		defer closer.Close()
 
-		err = msgpack.Unmarshal(val, &sc)
+		err = msgpack.Unmarshal(val, sc)
 		if err != nil {
 			return irrecoverable.NewExceptionf("failed to decode value: %w", err)
+		}
+		return nil
+	}
+}
+
+func exists(key []byte, keyExists *bool) func(r pebble.Reader) error {
+	return func(r pebble.Reader) error {
+		_, closer, err := r.Get(key)
+		if err != nil {
+			if errors.Is(err, pebble.ErrNotFound) {
+				*keyExists = false
+				return nil
+			}
+
+			// exception while checking for the key
+			return irrecoverable.NewExceptionf("could not load data: %w", err)
+		}
+		*keyExists = true
+		defer closer.Close()
+		return nil
+	}
+}
+
+// remove removes the entity with the given key, if it exists. If it doesn't
+// exist, this is a no-op.
+// Error returns:
+// * generic error in case of unexpected database error
+func remove(key []byte) func(pebble.Writer) error {
+	return func(w pebble.Writer) error {
+		err := w.Delete(key, nil)
+		if err != nil {
+			return irrecoverable.NewExceptionf("could not delete item: %w", err)
 		}
 		return nil
 	}

@@ -166,7 +166,7 @@ func (s *ExecutionStateSyncSuite) executionStateSyncTest() {
 
 	// start an execution data service using the Access Node's execution data db
 	an := s.net.ContainerByID(s.bridgeID)
-	anEds := s.nodeExecutionDataStore(an)
+	anEds := nodeExecutionDataStore(s.T(), an, s.executionDataDBMode)
 
 	// setup storage objects needed to get the execution data id
 	anDB, err := an.DB()
@@ -177,7 +177,7 @@ func (s *ExecutionStateSyncSuite) executionStateSyncTest() {
 
 	// start an execution data service using the Observer Node's execution data db
 	on := s.net.ContainerByName(s.observerName)
-	onEds := s.nodeExecutionDataStore(on)
+	onEds := nodeExecutionDataStore(s.T(), on, s.executionDataDBMode)
 
 	// setup storage objects needed to get the execution data id
 	onDB, err := on.DB()
@@ -216,17 +216,21 @@ func (s *ExecutionStateSyncSuite) executionStateSyncTest() {
 	}
 }
 
-func (s *ExecutionStateSyncSuite) nodeExecutionDataStore(node *testnet.Container) execution_data.ExecutionDataStore {
+func nodeExecutionDataStore(
+	t *testing.T,
+	node *testnet.Container,
+	executionDataDBMode execution_data.ExecutionDataDBMode,
+) execution_data.ExecutionDataStore {
 	var ds datastore.Batching
 	var err error
 	dsPath := filepath.Join(node.ExecutionDataDBPath(), "blobstore")
 
-	if s.executionDataDBMode == execution_data.ExecutionDataDBModePebble {
+	if executionDataDBMode == execution_data.ExecutionDataDBModePebble {
 		ds, err = pebbleds.NewDatastore(dsPath, nil)
 	} else {
 		ds, err = badgerds.NewDatastore(dsPath, &badgerds.DefaultOptions)
 	}
-	require.NoError(s.T(), err, "could not get execution datastore")
+	require.NoError(t, err, "could not get execution datastore")
 
 	return execution_data.NewExecutionDataStore(blobs.NewBlobstore(ds), execution_data.DefaultSerializer)
 }
