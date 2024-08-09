@@ -80,6 +80,7 @@ import (
 	"github.com/onflow/flow-go/module/executiondatasync/tracker"
 	"github.com/onflow/flow-go/module/finalizedreader"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
+	"github.com/onflow/flow-go/module/heightrecorder"
 	"github.com/onflow/flow-go/module/mempool/queue"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
@@ -161,6 +162,7 @@ type ExecutionNode struct {
 	executionDataTracker   tracker.Storage
 	blobService            network.BlobService
 	blobserviceDependable  *module.ProxiedReadyDoneAware
+	prunerHeightRecorder   *heightrecorder.Manager
 }
 
 func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
@@ -209,6 +211,7 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 		Module("blobservice peer manager dependencies", exeNode.LoadBlobservicePeerManagerDependencies).
 		Module("bootstrap", exeNode.LoadBootstrapper).
 		Module("register store", exeNode.LoadRegisterStore).
+		Module("pruner height recorder", exeNode.LoadPrunerHeightRecorder).
 		Component("execution state ledger", exeNode.LoadExecutionStateLedger).
 
 		// TODO: Modules should be able to depends on components
@@ -769,8 +772,9 @@ func (exeNode *ExecutionNode) LoadExecutionState(
 		}
 		closer = chunkDataPackDB
 		chunkDataPacks = storagepebble.NewChunkDataPacks(node.Metrics.Cache, chunkDataPackDB,
-			node.Storage.Collections, exeNode.exeConf.chunkDataPackCacheSize)
+			node.Storage.Collections, node.Storage.Results, exeNode.exeConf.chunkDataPackCacheSize)
 	}
+	node.Storage.ChunkDataPacks = chunkDataPacks
 
 	exeNode.builder.ShutdownFunc(func() error {
 		if err := closer.Close(); err != nil {
@@ -939,6 +943,13 @@ func (exeNode *ExecutionNode) LoadRegisterStore(
 	}
 
 	exeNode.registerStore = registerStore
+	return nil
+}
+
+func (exeNode *ExecutionNode) LoadPrunerHeightRecorder(
+	node *NodeConfig,
+) error {
+	exeNode.prunerHeightRecorder = heightrecorder.NewManager()
 	return nil
 }
 
@@ -1132,6 +1143,9 @@ func (exeNode *ExecutionNode) LoadIngestionEngine(
 		blockLoader = loader.NewUnexecutedLoader(node.Logger, node.State, node.Storage.Headers, exeNode.executionState)
 	}
 
+	executedBlockRecorder := heightrecorder.NewProcessedHeightRecorder()
+	exeNode.prunerHeightRecorder.RegisterHeightRecorder(executedBlockRecorder)
+
 	ingestionEng, err := ingestion.New(
 		exeNode.ingestionUnit,
 		node.Logger,
@@ -1148,7 +1162,7 @@ func (exeNode *ExecutionNode) LoadIngestionEngine(
 		node.Tracer,
 		exeNode.exeConf.extensiveLog,
 		exeNode.executionDataPruner,
-		exeNode.protocolDBPruner,
+		executedBlockRecorder,
 		exeNode.blockDataUploader,
 		exeNode.stopControl,
 		blockLoader,
@@ -1396,22 +1410,32 @@ func (exeNode *ExecutionNode) LoadProtocolDBPruner(
 
 	progress := storagepebble.NewConsumerProgress(node.DB, module.ConsumeProgressProtocolDBPrunerByHeight)
 
-	exeNode.protocolDBPruner = ppruner.New(
-		node.Logger,
+	core := ppruner.NewPruneByHeightCore(
+		node.Logger.With().Str("component", "protocoldb_core_pruner").Logger(),
 		node.DB,
 		node.Storage.Headers,
 		node.Storage.ChunkDataPacks,
-		node.SealedRootBlock.Header,
 		progress,
-		// TODO: make these configurable with higher defaults
+		node.SealedRootBlock.Header.Height,
 		100,
-		10,
 	)
 
-	// configure default producer, which notifies about sealed blocks.
+	exeNode.protocolDBPruner = ppruner.New(
+		node.Logger,
+		core,
+		exeNode.prunerHeightRecorder,
+		node.Storage.Headers,
+		progress,
+		node.SealedRootBlock.Header,
+	)
+
+	// configure default recorder, which notifies about sealed blocks.
 	// Note: we must use sealed blocks instead of finalized to ensure unsealed finalized blocks are
 	// never pruned even in the event of a prolonged sealing halt.
-	sealedBlocksProducer := ppruner.NewSealedBlocksProducer(node.State, exeNode.protocolDBPruner.Register())
+	sealedBlocksRecorder := heightrecorder.NewProcessedHeightRecorder()
+	exeNode.prunerHeightRecorder.RegisterHeightRecorder(sealedBlocksRecorder)
+
+	sealedBlocksProducer := ppruner.NewSealedBlocksRecorder(node.State, sealedBlocksRecorder)
 	node.ProtocolEvents.AddConsumer(sealedBlocksProducer)
 
 	return exeNode.protocolDBPruner, nil
