@@ -1270,6 +1270,84 @@ func TestTransactionTracing(t *testing.T) {
 
 	})
 
+	t.Run("contract interaction using run transaction with proxy", func(t *testing.T) {
+		runWithDeployedContract(t, func(testContract *testutils.TestContract, testAccount *testutils.EOATestAccount, emu *emulator.Emulator) {
+
+			// deploy proxy
+			proxyContract := testutils.GetProxyContract(t)
+			RunWithNewBlockView(t, emu, func(blk types.BlockView) {
+				call := types.NewDeployCall(
+					testAccount.Address(),
+					proxyContract.ByteCode,
+					math.MaxUint64,
+					big.NewInt(0),
+					testAccount.Nonce())
+
+				res, err := blk.DirectCall(call)
+				require.NoError(t, err)
+				require.NotNil(t, res.DeployedContractAddress)
+				testAccount.SetNonce(testAccount.Nonce() + 1)
+				proxyContract.DeployedAt = *res.DeployedContractAddress
+			})
+
+			RunWithNewBlockView(t, emu, func(blk types.BlockView) {
+				// set proxy contract reference the test contract
+				tx := testAccount.PrepareAndSignTx(
+					t,
+					proxyContract.DeployedAt.ToCommon(),
+					proxyContract.MakeCallData(t, "setImplementation", testContract.DeployedAt.ToCommon()),
+					big.NewInt(0),
+					1_000_000,
+					big.NewInt(0),
+				)
+				res, err := blk.RunTransaction(tx)
+				requireSuccessfulExecution(t, err, res)
+			})
+
+			blk, uploader, tracer := blockWithTracer(t, emu)
+
+			var txID gethCommon.Hash
+			var trace json.RawMessage
+
+			blockID := flow.Identifier{0x02}
+			uploaded := make(chan struct{})
+
+			uploader.UploadFunc = func(id string, message json.RawMessage) error {
+				uploaded <- struct{}{}
+				require.Equal(t, debug.TraceID(txID, blockID), id)
+				require.Equal(t, trace, message)
+				require.Greater(t, len(message), 0)
+				return nil
+			}
+
+			// make call to the proxy
+			tx := testAccount.PrepareAndSignTx(
+				t,
+				proxyContract.DeployedAt.ToCommon(),
+				testContract.MakeCallData(t, "store", big.NewInt(2)),
+				big.NewInt(0),
+				1_000_000,
+				big.NewInt(0),
+			)
+
+			// interact and record trace
+			res, err := blk.RunTransaction(tx)
+			requireSuccessfulExecution(t, err, res)
+			txID = res.TxHash
+			trace, err = tracer.TxTracer().GetResult()
+			require.NoError(t, err)
+			require.NotEmpty(t, trace)
+			tracer.WithBlockID(blockID)
+
+			tracer.Collect(txID)
+			testAccount.SetNonce(testAccount.Nonce() + 1)
+			require.Eventuallyf(t, func() bool {
+				<-uploaded
+				return true
+			}, time.Second, time.Millisecond*100, "upload did not execute")
+		})
+
+	})
 	t.Run("contract interaction run failed transaction", func(t *testing.T) {
 		runWithDeployedContract(t, func(testContract *testutils.TestContract, testAccount *testutils.EOATestAccount, emu *emulator.Emulator) {
 			blk, _, tracer := blockWithTracer(t, emu)
