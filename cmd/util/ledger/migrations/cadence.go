@@ -4,6 +4,7 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
+
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/cadence/migrations/capcons"
@@ -370,13 +371,13 @@ func (m *IssueStorageCapConMigration) issueAccountCapabilities(
 		}
 
 		borrowStaticType := capability.BorrowType
-		path := capability.Path.Identifier
 
 		if borrowStaticType == nil {
 			reporter.MissingBorrowType(address, addressPath)
 
 			// If the borrow type is missing, treat it as `AnyStruct` or `AnyResource`.
 			// To determine whether it is a resource, read the target path.
+			path := capability.Path.Identifier
 			value := storageMap.ReadValue(nil, interpreter.StringStorageMapKey(path))
 
 			assumedBorrowType := interpreter.PrimitiveStaticTypeAnyStruct
