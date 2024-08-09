@@ -244,6 +244,7 @@ func NewCadence1ValueMigration(
 	programs map[runtime.Location]*interpreter.Program,
 	compositeTypeConverter statictypes.CompositeTypeConverterFunc,
 	interfaceTypeConverter statictypes.InterfaceTypeConverterFunc,
+	storageDomainCapabilities *capcons.AccountsCapabilities,
 	opts Options,
 ) *CadenceBaseMigration {
 
@@ -285,6 +286,9 @@ func NewCadence1ValueMigration(
 				// and the mutating iterator of the inlined version of atree
 				type_keys.NewTypeKeyMigration(),
 				string_normalization.NewStringNormalizingMigration(),
+				&capcons.StorageCapMigration{
+					StorageDomainCapabilities: storageDomainCapabilities,
+				},
 			}
 		},
 		errorMessageHandler: errorMessageHandler,
@@ -396,22 +400,10 @@ func NewCadence1CapabilityValueMigration(
 			accounts environment.Accounts,
 			reporter *cadenceValueMigrationReporter,
 		) []migrations.ValueMigration {
-
-			idGenerator := environment.NewAccountLocalIDGenerator(
-				tracing.NewMockTracerSpan(),
-				util.NopMeter{},
-				accounts,
-			)
-
-			handler := capabilityControllerHandler{
-				idGenerator: idGenerator,
-			}
-
 			return []migrations.ValueMigration{
 				&capcons.CapabilityValueMigration{
 					CapabilityMapping: capabilityMapping,
 					Reporter:          reporter,
-					IssueHandler:      handler,
 				},
 			}
 		},
@@ -806,5 +798,38 @@ func (e dictionaryKeyConflictEntry) MarshalJSON() ([]byte, error) {
 		Kind:           "dictionary-key-conflict",
 		AccountAddress: e.AddressPath.Address.HexWithPrefix(),
 		Path:           e.AddressPath.Path.String(),
+	})
+}
+
+// storageCapconIssuedEntry
+
+type storageCapconIssuedEntry struct {
+	AccountAddress common.Address
+	Path           interpreter.PathValue
+	BorrowType     interpreter.StaticType
+	CapabilityID   interpreter.UInt64Value
+}
+
+var _ valueMigrationReportEntry = storageCapconIssuedEntry{}
+
+func (e storageCapconIssuedEntry) accountAddress() common.Address {
+	return e.AccountAddress
+}
+
+var _ json.Marshaler = storageCapconIssuedEntry{}
+
+func (e storageCapconIssuedEntry) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		Kind           string `json:"kind"`
+		AccountAddress string `json:"account_address"`
+		Path           string `json:"path"`
+		BorrowType     string `json:"borrow_type"`
+		CapabilityID   string `json:"capability_id"`
+	}{
+		Kind:           "storage-capcon-issued",
+		AccountAddress: e.AccountAddress.HexWithPrefix(),
+		Path:           e.Path.String(),
+		BorrowType:     string(e.BorrowType.ID()),
+		CapabilityID:   e.CapabilityID.String(),
 	})
 }
