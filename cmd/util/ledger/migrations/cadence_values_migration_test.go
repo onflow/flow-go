@@ -2169,7 +2169,20 @@ func TestCapabilityMigration(t *testing.T) {
 	storage := runtime.Storage
 	storageDomain := common.PathDomainStorage.Identifier()
 
-	storageMap := storage.GetStorageMap(
+	storageMapForAddressB := storage.GetStorageMap(
+		addressB,
+		storageDomain,
+		true,
+	)
+
+	// First store the target value.
+	storageMapForAddressB.WriteValue(
+		runtime.Interpreter,
+		interpreter.StringStorageMapKey("bar"),
+		interpreter.NewUnmeteredStringValue("This is the bar value"),
+	)
+
+	storageMapForAddressA := storage.GetStorageMap(
 		addressA,
 		storageDomain,
 		true,
@@ -2194,7 +2207,7 @@ func TestCapabilityMigration(t *testing.T) {
 		Address: interpreter.AddressValue(addressB),
 	}
 
-	storageMap.WriteValue(
+	storageMapForAddressA.WriteValue(
 		runtime.Interpreter,
 		fooCapStorageMapKey,
 		capabilityFoo,
@@ -2212,7 +2225,8 @@ func TestCapabilityMigration(t *testing.T) {
 		Address: interpreter.AddressValue(addressB),
 	}
 
-	storageMap.WriteValue(
+	// Then store the capability value.
+	storageMapForAddressA.WriteValue(
 		runtime.Interpreter,
 		barCapStorageMapKey,
 		capabilityBar,
@@ -2272,17 +2286,27 @@ func TestCapabilityMigration(t *testing.T) {
 
 	reporter := rwf.reportWriters[capabilityValueMigrationReporterName]
 	require.NotNil(t, reporter)
-	require.Len(t, reporter.entries, 3)
+	require.Len(t, reporter.entries, 4)
 
 	require.Equal(
 		t,
 		[]any{
-			capabilityMissingCapabilityIDEntry{
+			capabilityMigrationEntry{
 				AccountAddress: addressA,
 				AddressPath: interpreter.AddressPath{
 					Address: addressB,
 					Path:    interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "bar"),
 				},
+				BorrowType:   borrowType,
+				CapabilityID: 3,
+			},
+			cadenceValueMigrationEntry{
+				StorageKey: interpreter.StorageKey{
+					Key:     storageDomain,
+					Address: addressA,
+				},
+				StorageMapKey: barCapStorageMapKey,
+				Migration:     "CapabilityValueMigration",
 			},
 			capabilityMigrationEntry{
 				AccountAddress: addressA,
@@ -2291,7 +2315,7 @@ func TestCapabilityMigration(t *testing.T) {
 					Path:    interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "foo"),
 				},
 				BorrowType:   borrowType,
-				CapabilityID: 3,
+				CapabilityID: 4,
 			},
 			cadenceValueMigrationEntry{
 				StorageKey: interpreter.StorageKey{
@@ -2307,7 +2331,7 @@ func TestCapabilityMigration(t *testing.T) {
 
 	issueStorageCapConReporter := rwf.reportWriters[issueStorageCapConMigrationReporterName]
 	require.NotNil(t, issueStorageCapConReporter)
-	require.Len(t, issueStorageCapConReporter.entries, 2)
+	require.Len(t, issueStorageCapConReporter.entries, 3)
 	require.Equal(
 		t,
 		[]any{
@@ -2322,10 +2346,23 @@ func TestCapabilityMigration(t *testing.T) {
 				AccountAddress: addressB,
 				AddressPath: interpreter.AddressPath{
 					Address: addressB,
+					Path:    interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "bar"),
+				},
+				BorrowType: interpreter.NewReferenceStaticType(
+					nil,
+					interpreter.UnauthorizedAccess,
+					interpreter.PrimitiveStaticTypeAnyStruct,
+				),
+				CapabilityID: 3,
+			},
+			storageCapConIssuedEntry{
+				AccountAddress: addressB,
+				AddressPath: interpreter.AddressPath{
+					Address: addressB,
 					Path:    interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "foo"),
 				},
 				BorrowType:   borrowType,
-				CapabilityID: 3,
+				CapabilityID: 4,
 			},
 		},
 		issueStorageCapConReporter.entries,

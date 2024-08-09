@@ -4,7 +4,6 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
-
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/cadence/migrations/capcons"
@@ -12,6 +11,8 @@ import (
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
+	"github.com/onflow/cadence/runtime/sema"
+	"github.com/onflow/cadence/runtime/stdlib"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
@@ -235,6 +236,8 @@ type IssueStorageCapConMigration struct {
 	log                               zerolog.Logger
 }
 
+var _ AccountBasedMigration = &IssueStorageCapConMigration{}
+
 const issueStorageCapConMigrationReporterName = "cadence-storage-capcon-issue-migration"
 
 func NewIssueStorageCapConMigration(
@@ -328,13 +331,12 @@ func (m *IssueStorageCapConMigration) MigrateAccount(
 		m.verboseErrorOutput,
 	)
 
-	capcons.IssueAccountCapabilities(
-		migrationRuntime.Interpreter,
+	m.issueAccountCapabilities(
+		migrationRuntime,
 		reporter,
 		address,
 		accountCapabilities,
 		handler,
-		m.mapping,
 	)
 
 	return nil
@@ -345,7 +347,71 @@ func (m *IssueStorageCapConMigration) Close() error {
 	return nil
 }
 
-var _ AccountBasedMigration = &IssueStorageCapConMigration{}
+func (m *IssueStorageCapConMigration) issueAccountCapabilities(
+	migrationRuntime *InterpreterMigrationRuntime,
+	reporter capcons.StorageCapabilityMigrationReporter,
+	address common.Address,
+	capabilities *capcons.AccountCapabilities,
+	handler stdlib.CapabilityControllerIssueHandler,
+) {
+
+	storageMap := migrationRuntime.Storage.GetStorageMap(
+		address,
+		common.PathDomainStorage.Identifier(),
+		false,
+	)
+
+	inter := migrationRuntime.Interpreter
+
+	for _, capability := range capabilities.Capabilities {
+		addressPath := interpreter.AddressPath{
+			Address: address,
+			Path:    capability.Path,
+		}
+
+		borrowStaticType := capability.BorrowType
+		path := capability.Path.Identifier
+
+		if borrowStaticType == nil {
+			reporter.MissingBorrowType(address, addressPath)
+
+			// If the borrow type is missing, treat it as `AnyStruct` or `AnyResource`.
+			// To determine whether it is a resource, read the target path.
+			value := storageMap.ReadValue(nil, interpreter.StringStorageMapKey(path))
+
+			assumedBorrowType := interpreter.PrimitiveStaticTypeAnyStruct
+			if value.IsResourceKinded(inter) {
+				assumedBorrowType = interpreter.PrimitiveStaticTypeAnyResource
+			}
+
+			borrowStaticType = interpreter.NewReferenceStaticType(
+				nil,
+				interpreter.UnauthorizedAccess,
+				assumedBorrowType,
+			)
+		}
+
+		borrowType := inter.MustConvertStaticToSemaType(borrowStaticType).(*sema.ReferenceType)
+
+		capabilityID, _ := stdlib.IssueStorageCapabilityController(
+			inter,
+			interpreter.EmptyLocationRange,
+			handler,
+			address,
+			borrowType,
+			capability.Path,
+		)
+
+		m.mapping.Record(addressPath, capabilityID, borrowType)
+
+		reporter.IssuedStorageCapabilityController(
+			address,
+			addressPath,
+			borrowStaticType.(*interpreter.ReferenceStaticType),
+			capabilityID,
+		)
+	}
+}
 
 func NewCadence1ValueMigrations(
 	log zerolog.Logger,
