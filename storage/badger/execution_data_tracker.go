@@ -296,20 +296,28 @@ func (s *ExecutionDataTracker) trackBlobs(blockHeight uint64, cids ...cid.Cid) e
 //
 // Ensures that all specified blobs are deleted from the storage.
 //
-// Returns an error if the batch deletion fails.
+// No errors are expected during normal operation.
 func (s *ExecutionDataTracker) batchDelete(deleteInfos []*storage.DeleteInfo) error {
+	batch := NewBatch(s.db)
+
 	for _, dInfo := range deleteInfos {
-		err := s.db.Update(operation.RemoveBlob(dInfo.Height, dInfo.Cid))
+		writeBatch := batch.GetWriter()
+		err := operation.BatchRemoveBlob(dInfo.Height, dInfo.Cid)(writeBatch)
 		if err != nil {
-			return fmt.Errorf("failed to delete blob record for Cid %s: %w", dInfo.Cid.String(), err)
+			return fmt.Errorf("cannot batch remove blob: %w", err)
 		}
 
 		if dInfo.DeleteLatestHeightRecord {
-			err = s.db.Update(operation.RemoveTrackerLatestHeight(dInfo.Cid))
+			err = operation.BatchRemoveTrackerLatestHeight(dInfo.Cid)(writeBatch)
 			if err != nil {
-				return fmt.Errorf("failed to delete latest height record for Cid %s: %w", dInfo.Cid.String(), err)
+				return fmt.Errorf("cannot batch remove latest height record: %w", err)
 			}
 		}
+	}
+
+	err := batch.Flush()
+	if err != nil {
+		return fmt.Errorf("cannot flush batch to remove execution data: %w", err)
 	}
 
 	return nil

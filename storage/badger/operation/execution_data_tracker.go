@@ -54,9 +54,10 @@ func RetrieveTrackerLatestHeight(cid cid.Cid, height *uint64) func(*badger.Txn) 
 	return retrieve(makePrefix(storage.PrefixLatestHeight, cid), height)
 }
 
-// RemoveTrackerLatestHeight removes the latest height for the given CID from the execution data tracker storage.
-func RemoveTrackerLatestHeight(cid cid.Cid) func(*badger.Txn) error {
-	return remove(makePrefix(storage.PrefixLatestHeight, cid))
+// BatchRemoveTrackerLatestHeight removes the latest height for the given CID in provided batch from the execution data
+// tracker storage.
+func BatchRemoveTrackerLatestHeight(cid cid.Cid) func(batch *badger.WriteBatch) error {
+	return batchRemove(makePrefix(storage.PrefixLatestHeight, cid))
 }
 
 // InsertBlob inserts a blob record for the given block height and CID into the execution data tracker storage.
@@ -69,7 +70,8 @@ func BlobExist(blockHeight uint64, cid cid.Cid, blobExists *bool) func(*badger.T
 	return exists(makePrefix(storage.PrefixBlobRecord, blockHeight, cid), blobExists)
 }
 
-// RemoveBlob removes a blob record for the given block height and CID from the execution data tracker storage.
-func RemoveBlob(blockHeight uint64, cid cid.Cid) func(*badger.Txn) error {
-	return remove(makePrefix(storage.PrefixBlobRecord, blockHeight, cid))
+// BatchRemoveBlob removes a blob record for the given block height and CID in provided batch from the execution data
+// tracker storage.
+func BatchRemoveBlob(blockHeight uint64, cid cid.Cid) func(batch *badger.WriteBatch) error {
+	return batchRemove(makePrefix(storage.PrefixBlobRecord, blockHeight, cid))
 }
