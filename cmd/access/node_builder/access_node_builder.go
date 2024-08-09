@@ -323,7 +323,7 @@ type FlowAccessNodeBuilder struct {
 	ExecutionDataPruner        *pruner.Pruner
 	ExecutionDatastoreManager  edstorage.DatastoreManager
 	ExecutionDataTracker       tracker.Storage
-	versionControl             *version.VersionControl
+	VersionControl             *version.VersionControl
 
 	// The sync engine participants provider is the libp2p peer store for the access node
 	// which is not available until after the network has started.
@@ -978,7 +978,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					builder.programCacheSize > 0,
 				)
 
-				err = builder.ScriptExecutor.Initialize(builder.ExecutionIndexer, scripts, builder.versionControl)
+				err = builder.ScriptExecutor.Initialize(builder.ExecutionIndexer, scripts, builder.VersionControl)
 				if err != nil {
 					return nil, err
 				}
@@ -1813,8 +1813,8 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			// VersionControl needs to consume BlockFinalized events.
 			node.ProtocolEvents.AddConsumer(versionControl)
 
-			builder.versionControl = versionControl
-			versionControlDependable.Init(builder.versionControl)
+			builder.VersionControl = versionControl
+			versionControlDependable.Init(builder.VersionControl)
 
 			return versionControl, nil
 		}).
@@ -1921,6 +1921,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				TxResultQueryMode:   txResultQueryMode,
 				TxResultsIndex:      builder.TxResultsIndex,
 				LastFullBlockHeight: lastFullBlockHeight,
+				VersionControl:      builder.VersionControl,
 			})
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize backend: %w", err)

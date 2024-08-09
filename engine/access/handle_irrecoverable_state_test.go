@@ -75,12 +75,7 @@ func (suite *IrrecoverableStateTestSuite) SetupTest() {
 	suite.state = protocol.NewState(suite.T())
 	suite.snapshot = protocol.NewSnapshot(suite.T())
 
-	rootHeader := unittest.BlockHeaderFixture()
 	params := protocol.NewParams(suite.T())
-	params.On("SporkID").Return(unittest.IdentifierFixture(), nil)
-	params.On("ProtocolVersion").Return(uint(unittest.Uint64InRange(10, 30)), nil)
-	params.On("SporkRootBlockHeight").Return(rootHeader.Height, nil)
-	params.On("SealedRoot").Return(rootHeader, nil)
 
 	suite.epochQuery = protocol.NewEpochQuery(suite.T())
 	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()

@@ -16,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	"github.com/onflow/flow-go/engine/access/subscription"
 	"github.com/onflow/flow-go/engine/common/rpc"
+	"github.com/onflow/flow-go/engine/common/version"
 	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -81,9 +82,9 @@ type Backend struct {
 	executionReceipts storage.ExecutionReceipts
 	connFactory       connection.ConnectionFactory
 
-	// cache the response to GetNodeVersionInfo since it doesn't change
-	nodeInfo     *access.NodeVersionInfo
-	BlockTracker subscription.BlockTracker
+	BlockTracker   subscription.BlockTracker
+	stateParams    protocol.Params
+	versionControl *version.VersionControl
 }
 
 type Params struct {
@@ -119,6 +120,7 @@ type Params struct {
 	TxResultQueryMode   IndexQueryMode
 	TxResultsIndex      *index.TransactionResultsIndex
 	LastFullBlockHeight *counters.PersistentStrictMonotonicCounter
+	VersionControl      *version.VersionControl
 }
 
 var _ TransactionErrorMessage = (*Backend)(nil)
@@ -161,9 +163,6 @@ func New(params Params) (*Backend, error) {
 		return nil, fmt.Errorf("failed to create system chunk transaction: %w", err)
 	}
 	systemTxID := systemTx.ID()
-
-	// initialize node version info
-	nodeInfo := getNodeVersionInfo(params.State.Params())
 
 	transactionsLocalDataProvider := &TransactionsLocalDataProvider{
 		state:               params.State,
@@ -243,7 +242,8 @@ func New(params Params) (*Backend, error) {
 		executionReceipts: params.ExecutionReceipts,
 		connFactory:       params.ConnFactory,
 		chainID:           params.ChainID,
-		nodeInfo:          nodeInfo,
+		stateParams:       params.State.Params(),
+		versionControl:    params.VersionControl,
 	}
 
 	txValidator, err := configureTransactionValidator(params.State, params.ChainID, params.ScriptExecutor, params.CheckPayerBalance)
@@ -344,25 +344,40 @@ func (b *Backend) Ping(ctx context.Context) error {
 
 // GetNodeVersionInfo returns node version information such as semver, commit, sporkID, protocolVersion, etc
 func (b *Backend) GetNodeVersionInfo(_ context.Context) (*access.NodeVersionInfo, error) {
-	return b.nodeInfo, nil
+	return b.getNodeVersionInfo(), nil
 }
 
 // getNodeVersionInfo returns the NodeVersionInfo for the node.
-// Since these values are static while the node is running, it is safe to cache.
-func getNodeVersionInfo(stateParams protocol.Params) *access.NodeVersionInfo {
-	sporkID := stateParams.SporkID()
-	protocolVersion := stateParams.ProtocolVersion()
-	sporkRootBlockHeight := stateParams.SporkRootBlockHeight()
+func (b *Backend) getNodeVersionInfo() *access.NodeVersionInfo {
+	sporkID := b.stateParams.SporkID()
+	protocolVersion := b.stateParams.ProtocolVersion()
+	sporkRootBlockHeight := b.stateParams.SporkRootBlockHeight()
 
-	nodeRootBlockHeader := stateParams.SealedRoot()
+	nodeRootBlockHeader := b.stateParams.SealedRoot()
+
+	var protocolVersionStartHeight uint64
+	var protocolVersionEndHeight uint64
+
+	// Version control feature could be disabled
+	if b.versionControl != nil {
+		protocolVersionStartHeight = b.versionControl.ProtocolVersionStartHeight()
+		protocolVersionEndHeight = b.versionControl.ProtocolVersionEndHeight()
+	}
+
+	// protocolVersionStartHeight is the root block if there is no start boundary in the current spork
+	if protocolVersionStartHeight == version.NoHeight {
+		protocolVersionStartHeight = nodeRootBlockHeader.Height
+	}
 
 	nodeInfo := &access.NodeVersionInfo{
-		Semver:               build.Version(),
-		Commit:               build.Commit(),
-		SporkId:              sporkID,
-		ProtocolVersion:      uint64(protocolVersion),
-		SporkRootBlockHeight: sporkRootBlockHeight,
-		NodeRootBlockHeight:  nodeRootBlockHeader.Height,
+		Semver:                     build.Version(),
+		Commit:                     build.Commit(),
+		SporkId:                    sporkID,
+		ProtocolVersion:            uint64(protocolVersion),
+		SporkRootBlockHeight:       sporkRootBlockHeight,
+		NodeRootBlockHeight:        nodeRootBlockHeader.Height,
+		ProtocolVersionStartHeight: protocolVersionStartHeight,
+		ProtocolVersionEndHeight:   protocolVersionEndHeight,
 	}
 
 	return nodeInfo
