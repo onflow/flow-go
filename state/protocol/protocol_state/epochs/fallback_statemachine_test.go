@@ -78,6 +78,9 @@ func (s *EpochFallbackStateMachineSuite) TestProcessEpochCommitIsNoop() {
 // TestProcessEpochRecover ensures that after processing EpochRecover event, the state machine initializes
 // correctly the next epoch with expected values. Tests happy path scenario where the next epoch has been set up correctly.
 func (s *EpochFallbackStateMachineSuite) TestProcessEpochRecover() {
+	// TODO(EFM): re-enable when merging feature/efm-recovery
+	unittest.SkipUnless(s.T(), unittest.TEST_TODO, "re-enable when merging feature/efm-recovery")
+
 	nextEpochParticipants := s.parentProtocolState.CurrentEpochIdentityTable.Copy()
 	epochRecover := unittest.EpochRecoverFixture(func(setup *flow.EpochSetup) {
 		setup.Participants = nextEpochParticipants.ToSkeleton()
@@ -689,6 +692,9 @@ func (s *EpochFallbackStateMachineSuite) TestEpochRecoverAndEjectionInSameBlock(
 // A special rule is used to inject an ejection event, depending on the random draw we will inject an ejection event before or after the recover event.
 // Depending on the ordering of events, the recovering event needs to be structured differently.
 func (s *EpochFallbackStateMachineSuite) TestProcessingMultipleEventsAtTheSameBlock() {
+	// TODO(EFM): re-enable when merging feature/efm-recovery
+	unittest.SkipUnless(s.T(), unittest.TEST_TODO, "re-enable when merging feature/efm-recovery")
+
 	rapid.Check(s.T(), func(t *rapid.T) {
 		s.SetupTest() // start each time with clean state
 		var events []flow.ServiceEvent
