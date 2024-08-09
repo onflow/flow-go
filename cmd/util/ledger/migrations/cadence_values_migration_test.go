@@ -2167,7 +2167,6 @@ func TestCapabilityMigration(t *testing.T) {
 	require.NoError(t, err)
 
 	storage := runtime.Storage
-	storageMapKey := interpreter.StringStorageMapKey("test")
 	storageDomain := common.PathDomainStorage.Identifier()
 
 	storageMap := storage.GetStorageMap(
@@ -2184,6 +2183,8 @@ func TestCapabilityMigration(t *testing.T) {
 
 	// Store a capability with storage path
 
+	fooCapStorageMapKey := interpreter.StringStorageMapKey("fooCap")
+
 	capabilityFoo := &interpreter.PathCapabilityValue{
 		BorrowType: borrowType,
 		Path:       interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "foo"),
@@ -2195,11 +2196,13 @@ func TestCapabilityMigration(t *testing.T) {
 
 	storageMap.WriteValue(
 		runtime.Interpreter,
-		storageMapKey,
+		fooCapStorageMapKey,
 		capabilityFoo,
 	)
 
 	// Store another capability with storage path, but without a borrow type.
+
+	barCapStorageMapKey := interpreter.StringStorageMapKey("barCap")
 
 	capabilityBar := &interpreter.PathCapabilityValue{
 		Path: interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "bar"),
@@ -2211,7 +2214,7 @@ func TestCapabilityMigration(t *testing.T) {
 
 	storageMap.WriteValue(
 		runtime.Interpreter,
-		storageMapKey,
+		barCapStorageMapKey,
 		capabilityBar,
 	)
 
@@ -2269,11 +2272,18 @@ func TestCapabilityMigration(t *testing.T) {
 
 	reporter := rwf.reportWriters[capabilityValueMigrationReporterName]
 	require.NotNil(t, reporter)
-	require.Len(t, reporter.entries, 2)
+	require.Len(t, reporter.entries, 3)
 
 	require.Equal(
 		t,
 		[]any{
+			capabilityMissingCapabilityIDEntry{
+				AccountAddress: addressA,
+				AddressPath: interpreter.AddressPath{
+					Address: addressB,
+					Path:    interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "bar"),
+				},
+			},
 			capabilityMigrationEntry{
 				AccountAddress: addressA,
 				AddressPath: interpreter.AddressPath{
@@ -2288,7 +2298,7 @@ func TestCapabilityMigration(t *testing.T) {
 					Key:     storageDomain,
 					Address: addressA,
 				},
-				StorageMapKey: storageMapKey,
+				StorageMapKey: fooCapStorageMapKey,
 				Migration:     "CapabilityValueMigration",
 			},
 		},
@@ -2297,28 +2307,95 @@ func TestCapabilityMigration(t *testing.T) {
 
 	issueStorageCapConReporter := rwf.reportWriters[issueStorageCapConMigrationReporterName]
 	require.NotNil(t, issueStorageCapConReporter)
-	require.Len(t, issueStorageCapConReporter.entries, 1)
+	require.Len(t, issueStorageCapConReporter.entries, 2)
+	require.Equal(
+		t,
+		[]any{
+			storageCapConsMissingBorrowTypeEntry{
+				AccountAddress: addressB,
+				AddressPath: interpreter.AddressPath{
+					Address: addressB,
+					Path:    interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "bar"),
+				},
+			},
+			storageCapConIssuedEntry{
+				AccountAddress: addressB,
+				AddressPath: interpreter.AddressPath{
+					Address: addressB,
+					Path:    interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "foo"),
+				},
+				BorrowType:   borrowType,
+				CapabilityID: 3,
+			},
+		},
+		issueStorageCapConReporter.entries,
+	)
+}
 
-	entry := issueStorageCapConReporter.entries[0]
+func TestStorageCapConIssuedEntry_MarshalJSON(t *testing.T) {
 
-	require.IsType(t, storageCapconIssuedEntry{}, entry)
-	storageCapconIssued := entry.(storageCapconIssuedEntry)
+	t.Parallel()
 
-	actual, err := storageCapconIssued.MarshalJSON()
+	e := storageCapConIssuedEntry{
+		AccountAddress: common.MustBytesToAddress([]byte{0x2}),
+		AddressPath: interpreter.AddressPath{
+			Address: common.MustBytesToAddress([]byte{0x1}),
+			Path: interpreter.PathValue{
+				Domain:     common.PathDomainStorage,
+				Identifier: "test",
+			},
+		},
+		BorrowType: interpreter.NewReferenceStaticType(
+			nil,
+			interpreter.UnauthorizedAccess,
+			interpreter.PrimitiveStaticTypeInt,
+		),
+		CapabilityID: 3,
+	}
+
+	actual, err := e.MarshalJSON()
 	require.NoError(t, err)
 
 	require.JSONEq(t,
 		//language=JSON
-		fmt.Sprintf(
-			`{
-                "kind": "storage-capcon-issued",
-                "account_address": "%s",
-                "path": "/storage/foo",
-                "borrow_type": "&AnyStruct",
-                "capability_id": "3"
-            }`,
-			addressB.HexWithPrefix(),
-		),
+		`{
+          "kind": "storage-capcon-issued",
+          "account_address": "0x0000000000000002",
+          "address": "0x0000000000000001",
+          "path": "/storage/test",
+          "borrow_type": "&Int",
+          "capability_id": "3"
+        }`,
+		string(actual),
+	)
+}
+
+func TestStorageCapConsMissingBorrowTypeEntry_MarshalJSON(t *testing.T) {
+
+	t.Parallel()
+
+	e := storageCapConsMissingBorrowTypeEntry{
+		AccountAddress: common.MustBytesToAddress([]byte{0x2}),
+		AddressPath: interpreter.AddressPath{
+			Address: common.MustBytesToAddress([]byte{0x1}),
+			Path: interpreter.PathValue{
+				Domain:     common.PathDomainStorage,
+				Identifier: "test",
+			},
+		},
+	}
+
+	actual, err := e.MarshalJSON()
+	require.NoError(t, err)
+
+	require.JSONEq(t,
+		//language=JSON
+		`{
+          "kind": "storage-capcon-missing-borrow-type",
+          "account_address": "0x0000000000000002",
+          "address": "0x0000000000000001",
+          "path": "/storage/test"
+        }`,
 		string(actual),
 	)
 }
