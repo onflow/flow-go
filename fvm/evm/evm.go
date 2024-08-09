@@ -35,7 +35,7 @@ func SetupEnvironment(
 	flowTokenAddress := sc.FlowToken.Address
 
 	backend := backends.NewWrappedEnvironment(fvmEnv)
-	emulator := evm.NewEmulator(backend, StorageAccountAddress(chainID))
+	emulator := evm.NewEmulator(backend.Logger(), backend, StorageAccountAddress(chainID))
 	blockStore := handler.NewBlockStore(backend, StorageAccountAddress(chainID))
 	addressAllocator := handler.NewAddressAllocator()
 

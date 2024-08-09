@@ -105,6 +105,9 @@ var (
 	// but nil has been returned. This should never happen and is a safety error.
 	ErrUnexpectedEmptyResult = errors.New("unexpected empty result has been returned")
 
+	// ErrUnsuccessfulStateTransition is returned when evm panics during state transition.
+	ErrUnsuccessfulStateTransition = errors.New("evm state transition was unsuccessful")
+
 	// ErrInsufficientTotalSupply is returned when flow token
 	// withdraw request is received but not enough balance is on EVM native token vault
 	// this should never happen but its a safety measure to protect Flow against EVM issues.

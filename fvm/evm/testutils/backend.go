@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/onflow/cadence/runtime/stdlib"
+	"github.com/rs/zerolog"
 	otelTrace "go.opentelemetry.io/otel/trace"
 
 	"github.com/onflow/atree"
@@ -195,6 +196,7 @@ type TestBackend struct {
 	*testUUIDGenerator
 	*TestTracer
 	*TestMetricsReporter
+	*TestLoggerProvider
 }
 
 var _ types.Backend = &TestBackend{}
@@ -549,15 +551,29 @@ func (tmr *TestMetricsReporter) SetNumberOfDeployedCOAs(count uint64) {
 		tmr.SetNumberOfDeployedCOAsFunc(count)
 	}
 }
+
 func (tmr *TestMetricsReporter) EVMTransactionExecuted(gasUsed uint64, isDirectCall bool, failed bool) {
 	// call the method if available otherwise skip
 	if tmr.EVMTransactionExecutedFunc != nil {
 		tmr.EVMTransactionExecutedFunc(gasUsed, isDirectCall, failed)
 	}
 }
+
 func (tmr *TestMetricsReporter) EVMBlockExecuted(txCount int, totalGasUsed uint64, totalSupplyInFlow float64) {
 	// call the method if available otherwise skip
 	if tmr.EVMBlockExecutedFunc != nil {
 		tmr.EVMBlockExecutedFunc(txCount, totalGasUsed, totalSupplyInFlow)
 	}
+}
+
+type TestLoggerProvider struct {
+	LoggerFunc func() zerolog.Logger
+}
+
+func (tlp *TestLoggerProvider) Logger() zerolog.Logger {
+	// call the method if not available return noop logger
+	if tlp.LoggerFunc != nil {
+		return tlp.LoggerFunc()
+	}
+	return zerolog.Nop()
 }
