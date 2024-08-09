@@ -52,6 +52,13 @@ func GetDummyKittyTestContract(t testing.TB) *TestContract {
 	}
 }
 
+func GetProxyContract(t testing.TB) *TestContract {
+	return &TestContract{
+		ABI:      contracts.ProxyContractABIJSON,
+		ByteCode: contracts.ProxyContractBytes,
+	}
+}
+
 func GetFactoryTestContract(t testing.TB) *TestContract {
 	return &TestContract{
 		ABI:      contracts.FactoryContractABIJSON,
