@@ -159,52 +159,14 @@ func (m *FallbackStateMachine) ProcessEpochCommit(setup *flow.EpochCommit) (bool
 //   - During normal operations, this method internally handle erroneous inputs. Error returns are
 //     symptoms of internal state corruption or critical bugs, making continuation impossible.
 func (m *FallbackStateMachine) ProcessEpochRecover(epochRecover *flow.EpochRecover) (bool, error) {
+	// TODO(EFM): The following logs and discards any EpochRecover event.
+	//            When updating FlowEpoch to support EpochRecover service events and merging the feature/efm-recovery branch,
+	//            this implementation should be removed and replaced with the implementation from feature/efm-recovery.
+	//            See https://github.com/onflow/flow-go/pull/6296#discussion_r1709167877
 	m.telemetry.OnServiceEventReceived(epochRecover.ServiceEvent())
-	err := m.ensureValidEpochRecover(epochRecover)
-	if err != nil {
-		m.telemetry.OnInvalidServiceEvent(epochRecover.ServiceEvent(), err)
-		return false, nil
-	}
-
-	nextEpochParticipants, err := buildNextEpochActiveParticipants(
-		m.state.CurrentEpoch.ActiveIdentities.Lookup(),
-		m.state.CurrentEpochSetup,
-		&epochRecover.EpochSetup)
-	if err != nil {
-		m.telemetry.OnInvalidServiceEvent(epochRecover.ServiceEvent(), fmt.Errorf("rejecting EpochRecover event: %w", err))
-		return false, nil
-	}
-
-	nextEpoch := m.state.NextEpoch
-	if nextEpoch == nil {
-		// setup next epoch if there is none
-		m.state.NextEpoch = &flow.EpochStateContainer{
-			SetupID:          epochRecover.EpochSetup.ID(),
-			CommitID:         epochRecover.EpochCommit.ID(),
-			ActiveIdentities: nextEpochParticipants,
-			EpochExtensions:  nil,
-		}
-	} else {
-		// accept iff the EpochRecover is the same as the one we have already recovered.
-		if nextEpoch.SetupID != epochRecover.EpochSetup.ID() ||
-			nextEpoch.CommitID != epochRecover.EpochCommit.ID() {
-			m.telemetry.OnInvalidServiceEvent(epochRecover.ServiceEvent(),
-				protocol.NewInvalidServiceEventErrorf("multiple inconsistent EpochRecover events sealed in the same block"))
-			return false, nil
-		}
-	}
-	err = m.ejector.TrackDynamicIdentityList(m.state.NextEpoch.ActiveIdentities)
-	if err != nil {
-		if protocol.IsInvalidServiceEventError(err) {
-			m.telemetry.OnInvalidServiceEvent(epochRecover.ServiceEvent(), fmt.Errorf("rejecting EpochRecover event: %w", err))
-			return false, nil
-		}
-		return false, fmt.Errorf("unexpected errors tracking identity list: %w", err)
-	}
-	// if we have processed a valid EpochRecover event, we should exit EFM.
-	m.state.EpochFallbackTriggered = false
-	m.telemetry.OnServiceEventProcessed(epochRecover.ServiceEvent())
-	return true, nil
+	m.telemetry.OnInvalidServiceEvent(epochRecover.ServiceEvent(),
+		protocol.NewInvalidServiceEventErrorf("ignoring all EpochRecover events, as FallbackStateMachine requires further revisions to safely process them"))
+	return false, nil
 }
 
 // ensureValidEpochRecover performs validity checks on the epoch recover event.
