@@ -19,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/fvm/evm/debug"
 	"github.com/onflow/flow-go/fvm/evm/emulator"
 	"github.com/onflow/flow-go/fvm/evm/testutils"
+	"github.com/onflow/flow-go/fvm/evm/testutils/contracts"
 	"github.com/onflow/flow-go/fvm/evm/types"
 	"github.com/onflow/flow-go/model/flow"
 
@@ -43,6 +44,12 @@ func RunWithNewReadOnlyBlockView(t testing.TB, em *emulator.Emulator, f func(blk
 	blk, err := em.NewReadOnlyBlockView(defaultCtx)
 	require.NoError(t, err)
 	f(blk)
+}
+
+func requireSuccessfulExecution(t testing.TB, err error, res *types.Result) {
+	require.NoError(t, err)
+	require.NoError(t, res.VMError)
+	require.NoError(t, res.ValidationError)
 }
 
 func TestNativeTokenBridging(t *testing.T) {
@@ -688,6 +695,266 @@ func TestSelfdestruct(t *testing.T) {
 	})
 }
 
+// test factory patterns
+func TestFactoryPatterns(t *testing.T) {
+	testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
+		testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
+
+			var factoryAddress types.Address
+			factoryContract := testutils.GetFactoryTestContract(t)
+			factoryDeployer := types.NewAddressFromString("factoryDeployer")
+			factoryDeployerBalance := big.NewInt(0).Mul(big.NewInt(1000), big.NewInt(gethParams.Ether))
+			factoryBalance := big.NewInt(0).Mul(big.NewInt(100), big.NewInt(gethParams.Ether))
+
+			// setup the test with funded account and deploying a factory contract.
+			RunWithNewEmulator(t, backend, rootAddr, func(env *emulator.Emulator) {
+				t.Run("test deploying factory", func(t *testing.T) {
+					RunWithNewBlockView(t, env, func(blk types.BlockView) {
+						res, err := blk.DirectCall(types.NewDepositCall(types.EmptyAddress, factoryDeployer, factoryDeployerBalance, 0))
+						require.NoError(t, err)
+						requireSuccessfulExecution(t, err, res)
+					})
+					RunWithNewBlockView(t, env, func(blk types.BlockView) {
+						res, err := blk.DirectCall(
+							types.NewDeployCall(
+								factoryDeployer,
+								factoryContract.ByteCode,
+								math.MaxUint64,
+								factoryBalance,
+								0),
+						)
+						requireSuccessfulExecution(t, err, res)
+						require.NotNil(t, res.DeployedContractAddress)
+						factoryAddress = *res.DeployedContractAddress
+					})
+				})
+
+				t.Run("test self-destruct to a contract that is already deployed",
+					func(t *testing.T) {
+						// first test call deploy and try self destruct later
+						var deployed types.Address
+						RunWithNewBlockView(t, env, func(blk types.BlockView) {
+							salt := [32]byte{1}
+							res, err := blk.DirectCall(
+								types.NewContractCall(
+									factoryDeployer,
+									factoryAddress,
+									factoryContract.MakeCallData(t, "deploy", salt),
+									250_000,
+									big.NewInt(0),
+									0,
+								),
+							)
+							requireSuccessfulExecution(t, err, res)
+
+							// decode address, data is left padded
+							deployed = types.Address(gethCommon.BytesToAddress(res.ReturnedData[12:]))
+						})
+
+						// deposit money into the contract
+						depositedBalance := big.NewInt(200)
+						RunWithNewBlockView(t, env, func(blk types.BlockView) {
+							res, err := blk.DirectCall(types.NewDepositCall(
+								types.EmptyAddress,
+								deployed,
+								depositedBalance, 1))
+							require.NoError(t, err)
+							requireSuccessfulExecution(t, err, res)
+						})
+						// check balance of contract
+						RunWithNewReadOnlyBlockView(t, env, func(blk types.ReadOnlyBlockView) {
+							bal, err := blk.BalanceOf(deployed)
+							require.NoError(t, err)
+							require.Equal(t, depositedBalance, bal)
+						})
+
+						// set storage on deployed contract
+						storedValue := big.NewInt(12)
+						RunWithNewBlockView(t, env, func(blk types.BlockView) {
+							res, err := blk.DirectCall(
+								types.NewContractCall(
+									factoryDeployer,
+									types.Address(deployed),
+									testutils.MakeCallData(t,
+										contracts.FactoryDeployableContractABIJSON,
+										"set",
+										storedValue),
+									120_000,
+									big.NewInt(0),
+									0,
+								),
+							)
+							requireSuccessfulExecution(t, err, res)
+						})
+
+						// call self-destruct on the deployed
+						refundAddress := testutils.RandomAddress(t)
+						RunWithNewBlockView(t, env, func(blk types.BlockView) {
+							res, err := blk.DirectCall(
+								types.NewContractCall(
+									factoryDeployer,
+									types.Address(deployed),
+									testutils.MakeCallData(t,
+										contracts.FactoryDeployableContractABIJSON,
+										"destroy",
+										refundAddress),
+									120_000,
+									big.NewInt(0),
+									0,
+								),
+							)
+							requireSuccessfulExecution(t, err, res)
+						})
+
+						// check balance of the refund address and the contract
+						// balance should be transferred to the refund address
+						RunWithNewReadOnlyBlockView(t, env, func(blk types.ReadOnlyBlockView) {
+							bal, err := blk.BalanceOf(refundAddress)
+							require.NoError(t, err)
+							require.Equal(t, depositedBalance, bal)
+
+							bal, err = blk.BalanceOf(deployed)
+							require.NoError(t, err)
+							require.True(t, types.BalancesAreEqual(big.NewInt(0), bal))
+						})
+
+						// data should still be there
+						RunWithNewBlockView(t, env, func(blk types.BlockView) {
+							res, err := blk.DirectCall(
+								types.NewContractCall(
+									factoryDeployer,
+									types.Address(deployed),
+									testutils.MakeCallData(t,
+										contracts.FactoryDeployableContractABIJSON,
+										"get"),
+									120_000,
+									big.NewInt(0),
+									0,
+								),
+							)
+							requireSuccessfulExecution(t, err, res)
+							require.Equal(t, storedValue, new(big.Int).SetBytes(res.ReturnedData))
+						})
+					})
+
+				t.Run("test deploy and destroy in a single call",
+					func(t *testing.T) {
+						var originalFactoryBalance types.Balance
+						var err error
+						RunWithNewReadOnlyBlockView(t, env, func(blk types.ReadOnlyBlockView) {
+							originalFactoryBalance, err = blk.BalanceOf(factoryAddress)
+							require.NoError(t, err)
+						})
+
+						storedValue := big.NewInt(100)
+						RunWithNewBlockView(t, env, func(blk types.BlockView) {
+							salt := [32]byte{2}
+							res, err := blk.DirectCall(
+								types.NewContractCall(
+									factoryDeployer,
+									factoryAddress,
+									factoryContract.MakeCallData(t,
+										"deployAndDestroy",
+										salt,
+										storedValue),
+									400_000,
+									big.NewInt(0),
+									0,
+								),
+							)
+							requireSuccessfulExecution(t, err, res)
+						})
+
+						// no balance change on the caller
+						RunWithNewReadOnlyBlockView(t, env, func(blk types.ReadOnlyBlockView) {
+							ret, err := blk.BalanceOf(factoryAddress)
+							require.NoError(t, err)
+							require.True(t, types.BalancesAreEqual(originalFactoryBalance, ret))
+						})
+					})
+				t.Run("test deposit first to an address and then deploy in a single call",
+					func(t *testing.T) {
+						storedValue := big.NewInt(120)
+						balance := big.NewInt(80)
+						var deployed types.Address
+						RunWithNewBlockView(t, env, func(blk types.BlockView) {
+							salt := [32]byte{3}
+							res, err := blk.DirectCall(
+								types.NewContractCall(
+									factoryDeployer,
+									factoryAddress,
+									factoryContract.MakeCallData(t, "depositAndDeploy", salt, balance, storedValue),
+									250_000,
+									big.NewInt(0),
+									1,
+								),
+							)
+							requireSuccessfulExecution(t, err, res)
+							// decode address, data is left padded
+							deployed = types.Address(gethCommon.BytesToAddress(res.ReturnedData[12:]))
+						})
+
+						// no balance change on the caller
+						RunWithNewReadOnlyBlockView(t, env, func(blk types.ReadOnlyBlockView) {
+							ret, err := blk.BalanceOf(deployed)
+							require.NoError(t, err)
+							require.True(t, types.BalancesAreEqual(balance, ret))
+						})
+
+						// check stored data
+						RunWithNewBlockView(t, env, func(blk types.BlockView) {
+							res, err := blk.DirectCall(
+								types.NewContractCall(
+									factoryDeployer,
+									types.Address(deployed),
+									testutils.MakeCallData(t,
+										contracts.FactoryDeployableContractABIJSON,
+										"get"),
+									120_000,
+									big.NewInt(0),
+									0,
+								),
+							)
+							requireSuccessfulExecution(t, err, res)
+							require.Equal(t, storedValue, new(big.Int).SetBytes(res.ReturnedData))
+						})
+					})
+
+				t.Run("test deposit, deploy, destroy in a single call",
+					func(t *testing.T) {
+						var originalFactoryBalance types.Balance
+						var err error
+						RunWithNewReadOnlyBlockView(t, env, func(blk types.ReadOnlyBlockView) {
+							originalFactoryBalance, err = blk.BalanceOf(factoryAddress)
+							require.NoError(t, err)
+						})
+
+						RunWithNewBlockView(t, env, func(blk types.BlockView) {
+							salt := [32]byte{4}
+							res, err := blk.DirectCall(
+								types.NewContractCall(
+									factoryDeployer,
+									factoryAddress,
+									factoryContract.MakeCallData(t, "depositDeployAndDestroy", salt, big.NewInt(100), big.NewInt(10)),
+									250_000,
+									big.NewInt(0),
+									1,
+								),
+							)
+							requireSuccessfulExecution(t, err, res)
+						})
+						// no balance change on the caller
+						RunWithNewReadOnlyBlockView(t, env, func(blk types.ReadOnlyBlockView) {
+							ret, err := blk.BalanceOf(factoryAddress)
+							require.NoError(t, err)
+							require.True(t, types.BalancesAreEqual(originalFactoryBalance, ret))
+						})
+					})
+			})
+		})
+	})
+}
+
 func TestTransfers(t *testing.T) {
 	testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
 		testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
@@ -1009,6 +1276,84 @@ func TestTransactionTracing(t *testing.T) {
 
 	})
 
+	t.Run("contract interaction using run transaction with proxy", func(t *testing.T) {
+		runWithDeployedContract(t, func(testContract *testutils.TestContract, testAccount *testutils.EOATestAccount, emu *emulator.Emulator) {
+
+			// deploy proxy
+			proxyContract := testutils.GetProxyContract(t)
+			RunWithNewBlockView(t, emu, func(blk types.BlockView) {
+				call := types.NewDeployCall(
+					testAccount.Address(),
+					proxyContract.ByteCode,
+					math.MaxUint64,
+					big.NewInt(0),
+					testAccount.Nonce())
+
+				res, err := blk.DirectCall(call)
+				require.NoError(t, err)
+				require.NotNil(t, res.DeployedContractAddress)
+				testAccount.SetNonce(testAccount.Nonce() + 1)
+				proxyContract.DeployedAt = *res.DeployedContractAddress
+			})
+
+			RunWithNewBlockView(t, emu, func(blk types.BlockView) {
+				// set proxy contract reference the test contract
+				tx := testAccount.PrepareAndSignTx(
+					t,
+					proxyContract.DeployedAt.ToCommon(),
+					proxyContract.MakeCallData(t, "setImplementation", testContract.DeployedAt.ToCommon()),
+					big.NewInt(0),
+					1_000_000,
+					big.NewInt(0),
+				)
+				res, err := blk.RunTransaction(tx)
+				requireSuccessfulExecution(t, err, res)
+			})
+
+			blk, uploader, tracer := blockWithTracer(t, emu)
+
+			var txID gethCommon.Hash
+			var trace json.RawMessage
+
+			blockID := flow.Identifier{0x02}
+			uploaded := make(chan struct{})
+
+			uploader.UploadFunc = func(id string, message json.RawMessage) error {
+				uploaded <- struct{}{}
+				require.Equal(t, debug.TraceID(txID, blockID), id)
+				require.Equal(t, trace, message)
+				require.Greater(t, len(message), 0)
+				return nil
+			}
+
+			// make call to the proxy
+			tx := testAccount.PrepareAndSignTx(
+				t,
+				proxyContract.DeployedAt.ToCommon(),
+				testContract.MakeCallData(t, "store", big.NewInt(2)),
+				big.NewInt(0),
+				1_000_000,
+				big.NewInt(0),
+			)
+
+			// interact and record trace
+			res, err := blk.RunTransaction(tx)
+			requireSuccessfulExecution(t, err, res)
+			txID = res.TxHash
+			trace, err = tracer.TxTracer().GetResult()
+			require.NoError(t, err)
+			require.NotEmpty(t, trace)
+			tracer.WithBlockID(blockID)
+
+			tracer.Collect(txID)
+			testAccount.SetNonce(testAccount.Nonce() + 1)
+			require.Eventuallyf(t, func() bool {
+				<-uploaded
+				return true
+			}, time.Second, time.Millisecond*100, "upload did not execute")
+		})
+
+	})
 	t.Run("contract interaction run failed transaction", func(t *testing.T) {
 		runWithDeployedContract(t, func(testContract *testutils.TestContract, testAccount *testutils.EOATestAccount, emu *emulator.Emulator) {
 			blk, _, tracer := blockWithTracer(t, emu)
