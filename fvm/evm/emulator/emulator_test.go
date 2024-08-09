@@ -46,6 +46,12 @@ func RunWithNewReadOnlyBlockView(t testing.TB, em *emulator.Emulator, f func(blk
 	f(blk)
 }
 
+func requireSuccessfulExecution(t testing.TB, err error, res *types.Result) {
+	require.NoError(t, err)
+	require.NoError(t, res.VMError)
+	require.NoError(t, res.ValidationError)
+}
+
 func TestNativeTokenBridging(t *testing.T) {
 	testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
 		testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
