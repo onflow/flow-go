@@ -2182,7 +2182,9 @@ func TestCapabilityMigration(t *testing.T) {
 		interpreter.PrimitiveStaticTypeAnyStruct,
 	)
 
-	capabilityValue := &interpreter.PathCapabilityValue{
+	// Store a capability with storage path
+
+	capabilityFoo := &interpreter.PathCapabilityValue{
 		BorrowType: borrowType,
 		Path:       interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "foo"),
 
@@ -2194,7 +2196,23 @@ func TestCapabilityMigration(t *testing.T) {
 	storageMap.WriteValue(
 		runtime.Interpreter,
 		storageMapKey,
-		capabilityValue,
+		capabilityFoo,
+	)
+
+	// Store another capability with storage path, but without a borrow type.
+
+	capabilityBar := &interpreter.PathCapabilityValue{
+		Path: interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "bar"),
+
+		// Important: Capability must be for a different address,
+		// compared to where the capability is stored.
+		Address: interpreter.AddressValue(addressB),
+	}
+
+	storageMap.WriteValue(
+		runtime.Interpreter,
+		storageMapKey,
+		capabilityBar,
 	)
 
 	err = storage.NondeterministicCommit(runtime.Interpreter, false)
