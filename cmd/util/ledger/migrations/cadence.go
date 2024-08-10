@@ -328,14 +328,21 @@ func (m *IssueStorageCapConMigration) MigrateAccount(
 		m.verboseErrorOutput,
 	)
 
+	inter := migrationRuntime.Interpreter
+
 	capcons.IssueAccountCapabilities(
-		migrationRuntime.Interpreter,
+		inter,
 		reporter,
 		address,
 		accountCapabilities,
 		handler,
 		m.mapping,
 	)
+
+	err = migrationRuntime.Storage.NondeterministicCommit(inter, false)
+	if err != nil {
+		return fmt.Errorf("failed to commit changes: %w", err)
+	}
 
 	// finalize the transaction
 	result, err := migrationRuntime.TransactionState.FinalizeMainTransaction()
