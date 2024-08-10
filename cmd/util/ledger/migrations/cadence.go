@@ -328,14 +328,42 @@ func (m *IssueStorageCapConMigration) MigrateAccount(
 		m.verboseErrorOutput,
 	)
 
+	inter := migrationRuntime.Interpreter
+
 	capcons.IssueAccountCapabilities(
-		migrationRuntime.Interpreter,
+		inter,
 		reporter,
 		address,
 		accountCapabilities,
 		handler,
 		m.mapping,
 	)
+
+	err = migrationRuntime.Storage.NondeterministicCommit(inter, false)
+	if err != nil {
+		return fmt.Errorf("failed to commit changes: %w", err)
+	}
+
+	// finalize the transaction
+	result, err := migrationRuntime.TransactionState.FinalizeMainTransaction()
+	if err != nil {
+		return fmt.Errorf("failed to finalize main transaction: %w", err)
+	}
+
+	// Merge the changes into the registers
+	expectedAddresses := map[flow.Address]struct{}{
+		flow.Address(address): {},
+	}
+
+	err = registers.ApplyChanges(
+		accountRegisters,
+		result.WriteSet,
+		expectedAddresses,
+		m.log,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to apply changes: %w", err)
+	}
 
 	return nil
 }
