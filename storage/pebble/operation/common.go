@@ -157,6 +157,31 @@ func remove(key []byte) func(pebble.Writer) error {
 	}
 }
 
+func increment(end []byte) []byte {
+	if len(end) == 0 {
+		return nil
+	}
+
+	// Create a new slice with the same length as the original
+	newEnd := make([]byte, len(end))
+	copy(newEnd, end)
+
+	// Perform the increment operation
+	for i := len(newEnd) - 1; i >= 0; i-- {
+		newEnd[i]++
+		if newEnd[i] != 0 {
+			break
+		}
+	}
+
+	isOverflow := newEnd[0] == 0
+	if isOverflow {
+		return nil
+	}
+
+	return newEnd
+}
+
 // iterate iterates over a range of keys defined by a start and end key. The
 // start key may be higher than the end key, in which case we iterate in
 // reverse order.
@@ -175,17 +200,30 @@ func remove(key []byte) func(pebble.Writer) error {
 // provided handleFunc will be propagated back to the caller of iterate.
 func iterate(start []byte, end []byte, iteration iterationFunc, prefetchValues bool) func(pebble.Reader) error {
 	return func(tx pebble.Reader) error {
+
+		if len(start) == 0 {
+			return fmt.Errorf("start prefix is empty")
+		}
+
+		if len(end) == 0 {
+			return fmt.Errorf("end prefix is empty")
+		}
+
 		// Reverse iteration is not supported by pebble
 		if bytes.Compare(start, end) > 0 {
 			return fmt.Errorf("start key must be less than or equal to end key")
 		}
 
 		// initialize the default options and comparison modifier for iteration
-		maxEndWithPrefix := append(end, ffBytes...)
-
 		options := pebble.IterOptions{
 			LowerBound: start,
-			UpperBound: maxEndWithPrefix,
+			// LowerBound specifies the smallest key to iterate and it's inclusive.
+			// UpperBound specifies the largest key to iterate and it's exclusive (not inclusive)
+			// in order to match all keys prefixed with the `end` bytes, we increment the bytes of end by 1,
+			// for instance, to iterate keys between "hello" and "world",
+			// we use "hello" as LowerBound, "worle" as UpperBound, so that "world", "world1", "worldffff...ffff"
+			// will all be included.
+			UpperBound: increment(end),
 		}
 
 		// In order to satisfy this function's prefix-wise inclusion semantics,
@@ -260,8 +298,6 @@ func iterate(start []byte, end []byte, iteration iterationFunc, prefetchValues b
 	}
 }
 
-var ffBytes = bytes.Repeat([]byte{0xFF}, 32)
-
 // traverse iterates over a range of keys defined by a prefix.
 //
 // The prefix must be shared by all keys in the iteration.
@@ -276,7 +312,13 @@ func traverse(prefix []byte, iteration iterationFunc) func(pebble.Reader) error 
 
 		it, err := r.NewIter(&pebble.IterOptions{
 			LowerBound: prefix,
-			UpperBound: append(prefix, ffBytes...),
+			// LowerBound specifies the smallest key to iterate and it's inclusive.
+			// UpperBound specifies the largest key to iterate and it's exclusive (not inclusive)
+			// in order to match all keys prefixed with the `end` bytes, we increment the bytes of end by 1,
+			// for instance, to iterate keys between "hello" and "world",
+			// we use "hello" as LowerBound, "worle" as UpperBound, so that "world", "world1", "worldffff...ffff"
+			// will all be included.
+			UpperBound: increment(prefix),
 		})
 
 		if err != nil {
@@ -373,9 +415,17 @@ func findHighestAtOrBelow(
 			return fmt.Errorf("prefix must not be empty")
 		}
 
-		key := append(prefix, b(height)...)
+		// why height+1? because:
+		// UpperBound specifies the largest key to iterate and it's exclusive (not inclusive)
+		// in order to match all keys indexed by height that is equal to or below the given height,
+		// we could increment the height by 1,
+		// for instance, to find highest key equal to or below 10, we first use 11 as the UpperBound, so that
+		// if there are 4 keys: [prefix-7, prefix-9, prefix-10, prefix-11], then all keys except
+		// prefix-11 will be included. And iterating them in the increasing order will find prefix-10
+		// as the highest key.
+		key := append(prefix, b(height+1)...)
 		it, err := r.NewIter(&pebble.IterOptions{
-			UpperBound: append(key, ffBytes...),
+			UpperBound: key,
 		})
 		if err != nil {
 			return fmt.Errorf("can not create iterator: %w", err)
