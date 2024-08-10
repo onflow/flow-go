@@ -175,7 +175,6 @@ func remove(key []byte) func(pebble.Writer) error {
 // provided handleFunc will be propagated back to the caller of iterate.
 func iterate(start []byte, end []byte, iteration iterationFunc, prefetchValues bool) func(pebble.Reader) error {
 	return func(tx pebble.Reader) error {
-
 		// Reverse iteration is not supported by pebble
 		if bytes.Compare(start, end) > 0 {
 			return fmt.Errorf("start key must be less than or equal to end key")
@@ -196,9 +195,6 @@ func iterate(start []byte, end []byte, iteration iterationFunc, prefetchValues b
 		// the starting key. It also enables us to detect boundary conditions by
 		// simple lexicographic comparison (ie. bytes.Compare) rather than
 		// explicitly comparing prefixes.
-		//
-		// See https://github.com/onflow/flow-go/pull/3310#issuecomment-618127494
-		// for discussion and more detail on this.
 
 		// If start is bigger than end, we have a backwards iteration:
 		// 1) We set the reverse option on the iterator, so we step through all
