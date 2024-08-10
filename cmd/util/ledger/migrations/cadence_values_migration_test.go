@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	_ "github.com/glebarez/go-sqlite"
+	"github.com/onflow/cadence"
 	migrations2 "github.com/onflow/cadence/migrations"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -21,6 +22,8 @@ import (
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
 	"github.com/onflow/flow-go/cmd/util/ledger/util/registers"
+	"github.com/onflow/flow-go/engine/execution/computation"
+	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
@@ -2134,7 +2137,7 @@ func TestCadenceValueMigrationEntry_MarshalJSON(t *testing.T) {
 	)
 }
 
-func TestCapabilityMigration(t *testing.T) {
+func TestStoragePathCapabilityMigration(t *testing.T) {
 	t.Parallel()
 
 	rwf := &testReportWriterFactory{}
@@ -2330,6 +2333,50 @@ func TestCapabilityMigration(t *testing.T) {
 		},
 		issueStorageCapConReporter.entries,
 	)
+
+	// Check account A
+
+	_, err = runScript(
+		chainID,
+		registersByAccount,
+		fmt.Sprintf(
+			//language=Cadence
+			`
+              access(all)
+              fun main() {
+                  let storage = getAuthAccount<auth(Storage) &Account>(%s).storage
+                  let fooCap = storage.copy<Capability>(from: /storage/fooCap)!
+                  let barCap = storage.copy<Capability>(from: /storage/barCap)!
+                  assert(fooCap.id == 3)
+                  assert(barCap.id == 0)
+              }
+            `,
+			addressA.HexWithPrefix(),
+		),
+	)
+	require.NoError(t, err)
+
+	// Check account B
+
+	_, err = runScript(
+		chainID,
+		registersByAccount,
+		fmt.Sprintf(
+			//language=Cadence
+			`
+              access(all)
+              fun main() {
+                  let capabilities = getAuthAccount<auth(Capabilities) &Account>(%s).capabilities.storage
+                  let fooCapCons = capabilities.getControllers(forPath: /storage/foo)
+                  assert(fooCapCons.length == 1)
+                  assert(fooCapCons[0].capabilityID == 3)
+              }
+            `,
+			addressB.HexWithPrefix(),
+		),
+	)
+	require.NoError(t, err)
+
 }
 
 func TestStorageCapConIssuedEntry_MarshalJSON(t *testing.T) {
@@ -2398,4 +2445,36 @@ func TestStorageCapConsMissingBorrowTypeEntry_MarshalJSON(t *testing.T) {
         }`,
 		string(actual),
 	)
+}
+
+func runScript(chainID flow.ChainID, registersByAccount *registers.ByAccount, script string) (cadence.Value, error) {
+	options := computation.DefaultFVMOptions(chainID, false, false)
+	options = append(options,
+		fvm.WithContractDeploymentRestricted(false),
+		fvm.WithContractRemovalRestricted(false),
+		fvm.WithAuthorizationChecksEnabled(false),
+		fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
+		fvm.WithTransactionFeesEnabled(false))
+	ctx := fvm.NewContext(options...)
+
+	storageSnapshot := registers.StorageSnapshot{
+		Registers: registersByAccount,
+	}
+
+	vm := fvm.NewVirtualMachine()
+
+	_, res, err := vm.Run(
+		ctx,
+		fvm.Script([]byte(script)),
+		storageSnapshot,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to run transaction: %w", err)
+	}
+
+	if res.Err != nil {
+		return nil, fmt.Errorf("transaction failed: %w", res.Err)
+	}
+
+	return res.Value, nil
 }
