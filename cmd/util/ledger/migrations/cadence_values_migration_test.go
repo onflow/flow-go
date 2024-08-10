@@ -2175,18 +2175,18 @@ func TestCapabilityMigration(t *testing.T) {
 		true,
 	)
 
-	borrowType := interpreter.NewReferenceStaticType(
-		nil,
-		interpreter.UnauthorizedAccess,
-		interpreter.PrimitiveStaticTypeAnyStruct,
-	)
-
 	// Store a capability with storage path
 
-	fooCapStorageMapKey := interpreter.StringStorageMapKey("fooCap")
+	borrowType1 := interpreter.NewReferenceStaticType(
+		nil,
+		interpreter.UnauthorizedAccess,
+		interpreter.PrimitiveStaticTypeString,
+	)
 
-	capabilityFoo := &interpreter.PathCapabilityValue{
-		BorrowType: borrowType,
+	fooCapStorageMapKey1 := interpreter.StringStorageMapKey("fooCap1")
+
+	fooCap1 := &interpreter.PathCapabilityValue{
+		BorrowType: borrowType1,
 		Path:       interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "foo"),
 
 		// Important: Capability must be for a different address,
@@ -2196,8 +2196,33 @@ func TestCapabilityMigration(t *testing.T) {
 
 	storageMap.WriteValue(
 		runtime.Interpreter,
-		fooCapStorageMapKey,
-		capabilityFoo,
+		fooCapStorageMapKey1,
+		fooCap1,
+	)
+
+	// Store a second capability with for the same storage path, with a different borrow type.
+
+	borrowType2 := interpreter.NewReferenceStaticType(
+		nil,
+		interpreter.UnauthorizedAccess,
+		interpreter.PrimitiveStaticTypeInt,
+	)
+
+	fooCapStorageMapKey2 := interpreter.StringStorageMapKey("fooCap2")
+
+	fooCap2 := &interpreter.PathCapabilityValue{
+		BorrowType: borrowType2,
+		Path:       interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "foo"),
+
+		// Important: Capability must be for a different address,
+		// compared to where the capability is stored.
+		Address: interpreter.AddressValue(addressB),
+	}
+
+	storageMap.WriteValue(
+		runtime.Interpreter,
+		fooCapStorageMapKey2,
+		fooCap2,
 	)
 
 	// Store another capability with storage path, but without a borrow type.
@@ -2272,7 +2297,7 @@ func TestCapabilityMigration(t *testing.T) {
 
 	reporter := rwf.reportWriters[capabilityValueMigrationReporterName]
 	require.NotNil(t, reporter)
-	require.Len(t, reporter.entries, 3)
+	require.Len(t, reporter.entries, 5)
 
 	require.Equal(
 		t,
@@ -2290,15 +2315,32 @@ func TestCapabilityMigration(t *testing.T) {
 					Address: addressB,
 					Path:    interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "foo"),
 				},
-				BorrowType:   borrowType,
-				CapabilityID: 3,
+				BorrowType:   borrowType2,
+				CapabilityID: 4,
 			},
 			cadenceValueMigrationEntry{
 				StorageKey: interpreter.StorageKey{
 					Key:     storageDomain,
 					Address: addressA,
 				},
-				StorageMapKey: fooCapStorageMapKey,
+				StorageMapKey: fooCapStorageMapKey2,
+				Migration:     "CapabilityValueMigration",
+			},
+			capabilityMigrationEntry{
+				AccountAddress: addressA,
+				AddressPath: interpreter.AddressPath{
+					Address: addressB,
+					Path:    interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "foo"),
+				},
+				BorrowType:   borrowType1,
+				CapabilityID: 4,
+			},
+			cadenceValueMigrationEntry{
+				StorageKey: interpreter.StorageKey{
+					Key:     storageDomain,
+					Address: addressA,
+				},
+				StorageMapKey: fooCapStorageMapKey1,
 				Migration:     "CapabilityValueMigration",
 			},
 		},
@@ -2307,7 +2349,7 @@ func TestCapabilityMigration(t *testing.T) {
 
 	issueStorageCapConReporter := rwf.reportWriters[issueStorageCapConMigrationReporterName]
 	require.NotNil(t, issueStorageCapConReporter)
-	require.Len(t, issueStorageCapConReporter.entries, 2)
+	require.Len(t, issueStorageCapConReporter.entries, 3)
 	require.Equal(
 		t,
 		[]any{
@@ -2324,8 +2366,17 @@ func TestCapabilityMigration(t *testing.T) {
 					Address: addressB,
 					Path:    interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "foo"),
 				},
-				BorrowType:   borrowType,
+				BorrowType:   borrowType2,
 				CapabilityID: 3,
+			},
+			storageCapConIssuedEntry{
+				AccountAddress: addressB,
+				AddressPath: interpreter.AddressPath{
+					Address: addressB,
+					Path:    interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "foo"),
+				},
+				BorrowType:   borrowType1,
+				CapabilityID: 4,
 			},
 		},
 		issueStorageCapConReporter.entries,
