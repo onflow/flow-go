@@ -5,6 +5,7 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/onflow/flow-go/model/flow"
 	gethCommon "github.com/onflow/go-ethereum/common"
 	gethTypes "github.com/onflow/go-ethereum/core/types"
 	gethCrypto "github.com/onflow/go-ethereum/crypto"
@@ -88,20 +89,37 @@ func NewBlockFromBytes(encoded []byte) (*Block, error) {
 	return res, nil
 }
 
-var GenesisTimeStamp = uint64(time.Date(2024, time.August, 1, 0, 0, 0, 0, time.UTC).Unix())
-
-// GenesisBlock is the genesis block in the EVM environment
-var GenesisBlock = &Block{
-	ParentBlockHash:     gethCommon.Hash{},
-	Height:              uint64(0),
-	Timestamp:           GenesisTimeStamp,
-	TotalSupply:         new(big.Int),
-	ReceiptRoot:         gethTypes.EmptyRootHash,
-	TransactionHashRoot: gethTypes.EmptyRootHash,
-	TotalGasUsed:        0,
+// GenesisTimeStamp returns the block time stamp for EVM genesis block
+func GenesisTimeStamp(flowChainID flow.ChainID) uint64 {
+	// default evm chain ID is previewNet
+	switch flowChainID {
+	case flow.Mainnet:
+		return uint64(time.Date(2024, time.August, 1, 0, 0, 0, 0, time.UTC).Unix())
+	case flow.Testnet:
+		return uint64(time.Date(2024, time.September, 1, 0, 0, 0, 0, time.UTC).Unix())
+	default:
+		return 0
+	}
 }
 
-var GenesisBlockHash, _ = GenesisBlock.Hash()
+// GenesisBlock returns the genesis block in the EVM environment
+func GenesisBlock(chainID flow.ChainID) *Block {
+	return &Block{
+		ParentBlockHash:     gethCommon.Hash{},
+		Height:              uint64(0),
+		Timestamp:           GenesisTimeStamp(chainID),
+		TotalSupply:         new(big.Int),
+		ReceiptRoot:         gethTypes.EmptyRootHash,
+		TransactionHashRoot: gethTypes.EmptyRootHash,
+		TotalGasUsed:        0,
+	}
+}
+
+// GenesisBlockHash returns the genesis block hash in the EVM environment
+func GenesisBlockHash(chainID flow.ChainID) gethCommon.Hash {
+	h, _ := GenesisBlock(chainID).Hash()
+	return h
+}
 
 // BlockProposal is a EVM block proposal
 // holding all the interim data of block before commitment

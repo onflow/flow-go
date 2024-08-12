@@ -4,6 +4,7 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/onflow/flow-go/model/flow"
 	gethCommon "github.com/onflow/go-ethereum/common"
 	gethTypes "github.com/onflow/go-ethereum/core/types"
 	gethRLP "github.com/onflow/go-ethereum/rlp"
@@ -60,7 +61,7 @@ func Test_BlockProposal(t *testing.T) {
 
 func Test_DecodeBlocks(t *testing.T) {
 	bv0 := blockV0{
-		ParentBlockHash: GenesisBlockHash,
+		ParentBlockHash: GenesisBlockHash(flow.Previewnet.Chain().ChainID()),
 		Height:          1,
 		UUIDIndex:       2,
 		TotalSupply:     3,
@@ -79,7 +80,7 @@ func Test_DecodeBlocks(t *testing.T) {
 	require.Empty(t, b.TotalGasUsed)
 
 	bv1 := blockV1{
-		ParentBlockHash:   GenesisBlockHash,
+		ParentBlockHash:   GenesisBlockHash(flow.Previewnet.Chain().ChainID()),
 		Height:            1,
 		UUIDIndex:         2,
 		TotalSupply:       3,
@@ -100,7 +101,7 @@ func Test_DecodeBlocks(t *testing.T) {
 	require.Empty(t, b.TotalGasUsed)
 
 	bv2 := blockV2{
-		ParentBlockHash:   GenesisBlockHash,
+		ParentBlockHash:   GenesisBlockHash(flow.Previewnet.Chain().ChainID()),
 		Height:            1,
 		TotalSupply:       2,
 		StateRoot:         gethCommon.Hash{0x01},
@@ -120,7 +121,7 @@ func Test_DecodeBlocks(t *testing.T) {
 	require.Empty(t, b.TotalGasUsed)
 
 	bv3 := blockV3{
-		ParentBlockHash:   GenesisBlockHash,
+		ParentBlockHash:   GenesisBlockHash(flow.Previewnet.Chain().ChainID()),
 		Height:            1,
 		TotalSupply:       2,
 		ReceiptRoot:       gethCommon.Hash{0x02},
@@ -139,7 +140,7 @@ func Test_DecodeBlocks(t *testing.T) {
 	require.Empty(t, b.TotalGasUsed)
 
 	bv4 := blockV4{
-		ParentBlockHash:   GenesisBlockHash,
+		ParentBlockHash:   GenesisBlockHash(flow.Previewnet.Chain().ChainID()),
 		Height:            1,
 		TotalSupply:       big.NewInt(4),
 		ReceiptRoot:       gethCommon.Hash{0x02},
@@ -158,7 +159,7 @@ func Test_DecodeBlocks(t *testing.T) {
 	require.Empty(t, b.TotalGasUsed)
 
 	bv5 := blockV5{
-		ParentBlockHash:   GenesisBlockHash,
+		ParentBlockHash:   GenesisBlockHash(flow.Previewnet.Chain().ChainID()),
 		Height:            1,
 		TotalSupply:       big.NewInt(2),
 		ReceiptRoot:       gethCommon.Hash{0x02},
