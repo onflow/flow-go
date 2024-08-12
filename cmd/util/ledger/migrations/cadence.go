@@ -385,6 +385,8 @@ func NewCadence1ValueMigrations(
 	// Populated by CadenceLinkValueMigration,
 	// used by CadenceCapabilityValueMigration
 	privatePublicCapabilityMapping := &capcons.PathCapabilityMapping{}
+	// Populated by IssueStorageCapConMigration
+	// used by CadenceCapabilityValueMigration
 	storageCapabilityMapping := &capcons.PathTypeCapabilityMapping{}
 
 	// Populated by StorageCapMigration,
