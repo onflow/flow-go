@@ -54,9 +54,9 @@ func (model *UpgradableModel) GetVersionUpgrade() *protocol.ViewBasedActivator[u
 // with multiple supported KV model versions from the beginning.
 type Modelv0 struct {
 	UpgradableModel
-	EpochStateID               flow.Identifier
-	EpochExtensionViewCount    uint64
-	EpochCommitSafetyThreshold uint64
+	EpochStateID                flow.Identifier
+	EpochExtensionViewCount     uint64
+	FinalizationSafetyThreshold uint64
 }
 
 var _ protocol_state.KVStoreAPI = (*Modelv0)(nil)
@@ -121,11 +121,11 @@ func (model *Modelv0) SetEpochStateID(id flow.Identifier) {
 // Expected errors during normal operations:
 //   - kvstore.ErrInvalidValue - if the view count is less than FinalizationSafetyThreshold*2.
 func (model *Modelv0) SetEpochExtensionViewCount(viewCount uint64) error {
-	// Strictly speaking it should be perfectly fine to use a value viewCount >= model.EpochCommitSafetyThreshold.
+	// Strictly speaking it should be perfectly fine to use a value viewCount >= model.FinalizationSafetyThreshold.
 	// By using a sligtly higher value(factor of 2) we ensure that extension is big enough in practice to give operators a bigger
 	// window in which a valid epoch recover event could be submitted.
-	if viewCount < model.EpochCommitSafetyThreshold*2 {
-		return fmt.Errorf("invalid view count %d, expect at least %d: %w", viewCount, model.EpochCommitSafetyThreshold*2, ErrInvalidValue)
+	if viewCount < model.FinalizationSafetyThreshold*2 {
+		return fmt.Errorf("invalid view count %d, expect at least %d: %w", viewCount, model.FinalizationSafetyThreshold*2, ErrInvalidValue)
 	}
 	model.EpochExtensionViewCount = viewCount
 	return nil
@@ -140,7 +140,7 @@ func (model *Modelv0) GetEpochExtensionViewCount() uint64 {
 }
 
 func (model *Modelv0) GetEpochCommitSafetyThreshold() uint64 {
-	return model.EpochCommitSafetyThreshold
+	return model.FinalizationSafetyThreshold
 }
 
 // Modelv1 is v1 of the Protocol State key-value store.
@@ -208,9 +208,9 @@ func NewDefaultKVStore(finalizationSafetyThreshold, epochExtensionViewCount uint
 // version upgrades, from v0 to v1.
 func newKVStoreV0(finalizationSafetyThreshold, epochExtensionViewCount uint64, epochStateID flow.Identifier) (*Modelv0, error) {
 	model := &Modelv0{
-		UpgradableModel:            UpgradableModel{},
-		EpochStateID:               epochStateID,
-		EpochCommitSafetyThreshold: finalizationSafetyThreshold,
+		UpgradableModel:             UpgradableModel{},
+		EpochStateID:                epochStateID,
+		FinalizationSafetyThreshold: finalizationSafetyThreshold,
 	}
 	// use a setter to ensure the default value is valid and is not accidentally lower than the safety threshold.
 	err := model.SetEpochExtensionViewCount(epochExtensionViewCount)
