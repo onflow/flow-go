@@ -54,7 +54,6 @@ func (s *TransactionValidatorSuite) SetupTest() {
 
 	s.chain = flow.Testnet.Chain()
 	s.validatorOptions = access.TransactionValidationOptions{
-		CheckPayerBalance:      true,
 		CheckPayerBalanceMode:  access.EnforceCheck,
 		MaxTransactionByteSize: flow.DefaultMaxTransactionByteSize,
 		MaxCollectionByteSize:  flow.DefaultMaxCollectionByteSize,

@@ -110,7 +110,6 @@ type Params struct {
 	TxErrorMessagesCacheSize  uint
 	ScriptExecutor            execution.ScriptExecutor
 	ScriptExecutionMode       IndexQueryMode
-	CheckPayerBalance         bool
 	CheckPayerBalanceMode     access.PayerBalanceMode
 	EventQueryMode            IndexQueryMode
 	BlockTracker              subscription.BlockTracker
@@ -251,7 +250,6 @@ func New(params Params) (*Backend, error) {
 		params.State,
 		params.ChainID,
 		params.ScriptExecutor,
-		params.CheckPayerBalance,
 		params.CheckPayerBalanceMode,
 	)
 	if err != nil {
@@ -321,7 +319,6 @@ func configureTransactionValidator(
 	state protocol.State,
 	chainID flow.ChainID,
 	executor execution.ScriptExecutor,
-	checkPayerBalance bool,
 	checkPayerBalanceMode access.PayerBalanceMode,
 ) (*access.TransactionValidator, error) {
 	return access.NewTransactionValidator(
@@ -336,7 +333,6 @@ func configureTransactionValidator(
 			MaxGasLimit:                  flow.DefaultMaxTransactionGasLimit,
 			MaxTransactionByteSize:       flow.DefaultMaxTransactionByteSize,
 			MaxCollectionByteSize:        flow.DefaultMaxCollectionByteSize,
-			CheckPayerBalance:            checkPayerBalance,
 			CheckPayerBalanceMode:        checkPayerBalanceMode,
 		},
 		executor,

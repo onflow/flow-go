@@ -78,12 +78,15 @@ func (l *NoopLimiter) IsRateLimited(address flow.Address) bool {
 type PayerBalanceMode int
 
 const (
-	WarnCheck PayerBalanceMode = iota + 1
+	Disabled PayerBalanceMode = iota
+	WarnCheck
 	EnforceCheck
 )
 
 func ParsePayerBalanceMode(s string) (PayerBalanceMode, error) {
 	switch s {
+	case Disabled.String():
+		return Disabled, nil
 	case WarnCheck.String():
 		return WarnCheck, nil
 	case EnforceCheck.String():
@@ -95,6 +98,8 @@ func ParsePayerBalanceMode(s string) (PayerBalanceMode, error) {
 
 func (m PayerBalanceMode) String() string {
 	switch m {
+	case Disabled:
+		return "disabled"
 	case WarnCheck:
 		return "warn"
 	case EnforceCheck:
@@ -113,7 +118,6 @@ type TransactionValidationOptions struct {
 	CheckScriptsParse            bool
 	MaxTransactionByteSize       uint64
 	MaxCollectionByteSize        uint64
-	CheckPayerBalance            bool
 	CheckPayerBalanceMode        PayerBalanceMode
 }
 
@@ -133,7 +137,7 @@ func NewTransactionValidator(
 	options TransactionValidationOptions,
 	executor execution.ScriptExecutor,
 ) (*TransactionValidator, error) {
-	if options.CheckPayerBalance && executor == nil {
+	if options.CheckPayerBalanceMode != Disabled && executor == nil {
 		return nil, errors.New("transaction validator cannot use checkPayerBalance with nil executor")
 	}
 
@@ -422,7 +426,7 @@ func (v *TransactionValidator) checkSignatureFormat(tx *flow.TransactionBody) er
 }
 
 func (v *TransactionValidator) checkSufficientBalanceToPayForTransaction(ctx context.Context, tx *flow.TransactionBody) error {
-	if !v.options.CheckPayerBalance {
+	if v.options.CheckPayerBalanceMode == Disabled {
 		return nil
 	}
 
