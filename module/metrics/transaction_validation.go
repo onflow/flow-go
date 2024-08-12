@@ -11,8 +11,9 @@ type NamespaceType string
 
 // TransactionValidationCollector the metrics for transaction validation functionality
 type TransactionValidationCollector struct {
-	transactionValidated        prometheus.Counter
-	transactionValidationFailed *prometheus.CounterVec
+	transactionValidated         prometheus.Counter
+	transactionValidationSkipped prometheus.Counter
+	transactionValidationFailed  *prometheus.CounterVec
 }
 
 // interface check
@@ -26,6 +27,12 @@ func NewTransactionValidationCollector() *TransactionValidationCollector {
 			Namespace: namespaceAccess,
 			Subsystem: subsystemTransactionValidation,
 			Help:      "counter for the validated transactions",
+		}),
+		transactionValidationSkipped: promauto.NewCounter(prometheus.CounterOpts{
+			Name:      "transaction_validation_skipped",
+			Namespace: namespaceAccess,
+			Subsystem: subsystemTransactionValidation,
+			Help:      "counter for the skipped transaction validations",
 		}),
 		transactionValidationFailed: promauto.NewCounterVec(prometheus.CounterOpts{
 			Name:      "transaction_validation_failed",
@@ -44,4 +51,9 @@ func (tc *TransactionValidationCollector) TransactionValidated() {
 // TransactionValidationFailed tracks number of validation failed transactions with reason
 func (tc *TransactionValidationCollector) TransactionValidationFailed(reason string) {
 	tc.transactionValidationFailed.WithLabelValues(reason).Inc()
+}
+
+// TransactionValidationSkipped tracks number of skipped transaction validations
+func (tc *TransactionValidationCollector) TransactionValidationSkipped() {
+	tc.transactionValidationSkipped.Inc()
 }

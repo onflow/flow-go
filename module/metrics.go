@@ -1092,6 +1092,8 @@ type TransactionValidationMetrics interface {
 	TransactionValidated()
 	// TransactionValidationFailed tracks number of validation failed transactions with reason
 	TransactionValidationFailed(reason string)
+	// TransactionValidationSkipped tracks number of skipped transaction validations
+	TransactionValidationSkipped()
 }
 
 type PingMetrics interface {

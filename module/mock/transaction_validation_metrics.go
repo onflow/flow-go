@@ -19,6 +19,11 @@ func (_m *TransactionValidationMetrics) TransactionValidationFailed(reason strin
 	_m.Called(reason)
 }
 
+// TransactionValidationSkipped provides a mock function with given fields:
+func (_m *TransactionValidationMetrics) TransactionValidationSkipped() {
+	_m.Called()
+}
+
 // NewTransactionValidationMetrics creates a new instance of TransactionValidationMetrics. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
 // The first argument is typically a *testing.T value.
 func NewTransactionValidationMetrics(t interface {
