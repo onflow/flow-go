@@ -1099,16 +1099,6 @@ func (ec *ExecutionCollector) WithTransactionCallback(
 		module.TransactionExecutionResultInfo,
 	),
 ) *ExecutionCollectorWithTransactionCallback {
-	// if callback is nil, use a no-op callback
-	if callback == nil {
-		callback = func(
-			time.Duration,
-			module.TransactionExecutionResultStats,
-			module.TransactionExecutionResultInfo,
-		) {
-		}
-	}
-
 	return &ExecutionCollectorWithTransactionCallback{
 		ExecutionCollector:  ec,
 		TransactionCallback: callback,

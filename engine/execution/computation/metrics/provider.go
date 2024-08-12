@@ -48,14 +48,14 @@ func (p *provider) Push(
 	if height <= p.blockHeightAtBufferIndex {
 		p.log.Warn().
 			Uint64("height", height).
-			Uint64("latestHeight", p.blockHeightAtBufferIndex).
+			Uint64("lowestAvailableHeight", p.blockHeightAtBufferIndex).
 			Msg("received metrics for a block that is older or equal than the most recent block")
 		return
 	}
 	if height > p.blockHeightAtBufferIndex+1 {
 		p.log.Warn().
 			Uint64("height", height).
-			Uint64("latestHeight", p.blockHeightAtBufferIndex).
+			Uint64("lowestAvailableHeight", p.blockHeightAtBufferIndex).
 			Msg("received metrics for a block that is not the next block")
 
 		// Fill in the gap with nil

@@ -1150,22 +1150,14 @@ func (exeNode *ExecutionNode) LoadScriptsEngine(node *NodeConfig) (module.ReadyD
 func (exeNode *ExecutionNode) LoadTransactionExecutionMetrics(
 	node *NodeConfig,
 ) (module.ReadyDoneAware, error) {
-	latestFinalizedBlock, err := node.State.Final().Head()
-	if err != nil {
-		return nil, fmt.Errorf("could not get latest finalized block: %w", err)
-	}
-
-	// buffer size is the number of blocks that are kept in memory by the metrics provider
-	// If the size is to small the clients might not have the opportunity to get the metrics for all blocks
-	// If the size is too large the memory usage will increase
-	bufferSize := uint(200)
+	lastFinalizedHeader := node.LastFinalizedHeader
 
 	metricsProvider := txmetrics.NewTransactionExecutionMetricsProvider(
 		node.Logger,
 		exeNode.executionState,
 		node.Storage.Headers,
-		latestFinalizedBlock,
-		bufferSize,
+		lastFinalizedHeader,
+		exeNode.exeConf.transactionExecutionMetricsBufferSize,
 	)
 
 	node.ProtocolEvents.AddConsumer(metricsProvider)

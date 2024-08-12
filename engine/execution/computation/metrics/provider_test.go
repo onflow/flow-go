@@ -104,5 +104,6 @@ func Test_ProviderPushOutOfSequence(t *testing.T) {
 
 	require.Len(t, res, int(bufferSize))
 
+	require.Nil(t, res[newHeight+1])
 	require.Equal(t, time.Duration(newHeight+2), res[newHeight+2][0].ExecutionTime)
 }
