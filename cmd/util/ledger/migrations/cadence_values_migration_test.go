@@ -2133,3 +2133,174 @@ func TestCadenceValueMigrationEntry_MarshalJSON(t *testing.T) {
 		string(actual),
 	)
 }
+
+func TestCapabilityMigration(t *testing.T) {
+	t.Parallel()
+
+	rwf := &testReportWriterFactory{}
+
+	logWriter := &writer{}
+	logger := zerolog.New(logWriter).Level(zerolog.ErrorLevel)
+
+	const nWorker = 2
+
+	const chainID = flow.Emulator
+
+	payloads, err := newBootstrapPayloads(chainID)
+	require.NoError(t, err)
+
+	registersByAccount, err := registers.NewByAccountFromPayloads(payloads)
+	require.NoError(t, err)
+
+	addressA := common.Address(chainID.Chain().ServiceAddress())
+
+	// TODO: is there a way to read this address from bootstrapped payloads
+	// rather than hard-coding it here?
+	addressB, err := common.HexToAddress("0xe5a8b7f23e8b548f")
+	require.NoError(t, err)
+
+	runtime, err := NewInterpreterMigrationRuntime(
+		registersByAccount,
+		chainID,
+		InterpreterMigrationRuntimeConfig{},
+	)
+	require.NoError(t, err)
+
+	storage := runtime.Storage
+	storageMapKey := interpreter.StringStorageMapKey("test")
+	storageDomain := common.PathDomainStorage.Identifier()
+
+	storageMap := storage.GetStorageMap(
+		addressA,
+		storageDomain,
+		true,
+	)
+
+	borrowType := interpreter.NewReferenceStaticType(
+		nil,
+		interpreter.UnauthorizedAccess,
+		interpreter.PrimitiveStaticTypeAnyStruct,
+	)
+
+	capabilityValue := &interpreter.PathCapabilityValue{
+		BorrowType: borrowType,
+		Path:       interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "foo"),
+
+		// Important: Capability must be for a different address,
+		// compared to where the capability is stored.
+		Address: interpreter.AddressValue(addressB),
+	}
+
+	storageMap.WriteValue(
+		runtime.Interpreter,
+		storageMapKey,
+		capabilityValue,
+	)
+
+	err = storage.NondeterministicCommit(runtime.Interpreter, false)
+	require.NoError(t, err)
+
+	// finalize the transaction
+	result, err := runtime.TransactionState.FinalizeMainTransaction()
+	require.NoError(t, err)
+
+	// Merge the changes into the registers
+
+	expectedAddresses := map[flow.Address]struct{}{
+		flow.Address(addressA): {},
+	}
+
+	err = registers.ApplyChanges(
+		registersByAccount,
+		result.WriteSet,
+		expectedAddresses,
+		logger,
+	)
+	require.NoError(t, err)
+
+	// Migrate
+
+	// TODO: EVM contract is not deployed in snapshot yet, so can't update it
+	const evmContractChange = EVMContractChangeNone
+
+	const burnerContractChange = BurnerContractChangeUpdate
+
+	migrations := NewCadence1Migrations(
+		logger,
+		t.TempDir(),
+		rwf,
+		Options{
+			NWorker:              nWorker,
+			ChainID:              chainID,
+			EVMContractChange:    evmContractChange,
+			BurnerContractChange: burnerContractChange,
+			VerboseErrorOutput:   true,
+		},
+	)
+
+	for _, migration := range migrations {
+		err = migration.Migrate(registersByAccount)
+		require.NoError(
+			t,
+			err,
+			"migration `%s` failed, logs: %v",
+			migration.Name,
+			logWriter.logs,
+		)
+	}
+
+	reporter := rwf.reportWriters[capabilityValueMigrationReporterName]
+	require.NotNil(t, reporter)
+	require.Len(t, reporter.entries, 2)
+
+	require.Equal(
+		t,
+		[]any{
+			capabilityMigrationEntry{
+				AccountAddress: addressA,
+				AddressPath: interpreter.AddressPath{
+					Address: addressB,
+					Path:    interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "foo"),
+				},
+				BorrowType:   borrowType,
+				CapabilityID: 3,
+			},
+			cadenceValueMigrationEntry{
+				StorageKey: interpreter.StorageKey{
+					Key:     storageDomain,
+					Address: addressA,
+				},
+				StorageMapKey: storageMapKey,
+				Migration:     "CapabilityValueMigration",
+			},
+		},
+		reporter.entries,
+	)
+
+	issueStorageCapConReporter := rwf.reportWriters[issueStorageCapConMigrationReporterName]
+	require.NotNil(t, issueStorageCapConReporter)
+	require.Len(t, issueStorageCapConReporter.entries, 1)
+
+	entry := issueStorageCapConReporter.entries[0]
+
+	require.IsType(t, storageCapconIssuedEntry{}, entry)
+	storageCapconIssued := entry.(storageCapconIssuedEntry)
+
+	actual, err := storageCapconIssued.MarshalJSON()
+	require.NoError(t, err)
+
+	require.JSONEq(t,
+		//language=JSON
+		fmt.Sprintf(
+			`{
+                "kind": "storage-capcon-issued",
+                "account_address": "%s",
+                "path": "/storage/foo",
+                "borrow_type": "&AnyStruct",
+                "capability_id": "3"
+            }`,
+			addressB.HexWithPrefix(),
+		),
+		string(actual),
+	)
+}
