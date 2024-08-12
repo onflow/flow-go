@@ -94,14 +94,13 @@ func (h *Handler) GetNodeVersionInfo(
 
 	return &access.GetNodeVersionInfoResponse{
 		Info: &entities.NodeVersionInfo{
-			Semver:                     nodeVersionInfo.Semver,
-			Commit:                     nodeVersionInfo.Commit,
-			SporkId:                    nodeVersionInfo.SporkId[:],
-			ProtocolVersion:            nodeVersionInfo.ProtocolVersion,
-			SporkRootBlockHeight:       nodeVersionInfo.SporkRootBlockHeight,
-			NodeRootBlockHeight:        nodeVersionInfo.NodeRootBlockHeight,
-			ProtocolVersionStartHeight: nodeVersionInfo.ProtocolVersionStartHeight,
-			ProtocolVersionEndHeight:   nodeVersionInfo.ProtocolVersionEndHeight,
+			Semver:               nodeVersionInfo.Semver,
+			Commit:               nodeVersionInfo.Commit,
+			SporkId:              nodeVersionInfo.SporkId[:],
+			ProtocolVersion:      nodeVersionInfo.ProtocolVersion,
+			SporkRootBlockHeight: nodeVersionInfo.SporkRootBlockHeight,
+			NodeRootBlockHeight:  nodeVersionInfo.NodeRootBlockHeight,
+			CompatibleRange:      convert.CompatibleRangeToMessage(nodeVersionInfo.CompatibleRange),
 		},
 	}, nil
 }

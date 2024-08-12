@@ -51,12 +51,12 @@ func (b *backendNetwork) GetNetworkParameters(_ context.Context) access.NetworkP
 	}
 }
 
-func (b *backendNetwork) GetNodeVersionInfo(_ context.Context) (*access.NodeVersionInfo, error) {
+func (b *backendNetwork) GetNodeVersionInfo(_ context.Context) (*flow.NodeVersionInfo, error) {
 	stateParams := b.state.Params()
 	sporkId := stateParams.SporkID()
 	protocolVersion := stateParams.ProtocolVersion()
 
-	return &access.NodeVersionInfo{
+	return &flow.NodeVersionInfo{
 		Semver:          build.Version(),
 		Commit:          build.Commit(),
 		SporkId:         sporkId,

@@ -9,9 +9,9 @@ import (
 	mocktestify "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/access/mock"
 	"github.com/onflow/flow-go/cmd/build"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -30,15 +30,17 @@ func TestGetNodeVersionInfo(t *testing.T) {
 
 		nodeRootBlockHeight := unittest.Uint64InRange(10_000, 100_000)
 
-		params := &access.NodeVersionInfo{
-			Semver:                     build.Version(),
-			Commit:                     build.Commit(),
-			SporkId:                    unittest.IdentifierFixture(),
-			ProtocolVersion:            unittest.Uint64InRange(10, 30),
-			SporkRootBlockHeight:       unittest.Uint64InRange(1000, 10_000),
-			NodeRootBlockHeight:        nodeRootBlockHeight,
-			ProtocolVersionStartHeight: nodeRootBlockHeight,
-			ProtocolVersionEndHeight:   uint64(0),
+		params := &flow.NodeVersionInfo{
+			Semver:               build.Version(),
+			Commit:               build.Commit(),
+			SporkId:              unittest.IdentifierFixture(),
+			ProtocolVersion:      unittest.Uint64InRange(10, 30),
+			SporkRootBlockHeight: unittest.Uint64InRange(1000, 10_000),
+			NodeRootBlockHeight:  nodeRootBlockHeight,
+			CompatibleRange: &flow.CompatibleRange{
+				StartHeight: nodeRootBlockHeight,
+				EndHeight:   uint64(0),
+			},
 		}
 
 		backend.Mock.
@@ -52,7 +54,15 @@ func TestGetNodeVersionInfo(t *testing.T) {
 	})
 }
 
-func nodeVersionInfoExpectedStr(nodeVersionInfo *access.NodeVersionInfo) string {
+func nodeVersionInfoExpectedStr(nodeVersionInfo *flow.NodeVersionInfo) string {
+	compatibleRange := fmt.Sprintf(`"compatible_range": {
+		"start_height": "%d",
+		"end_height": "%d"
+	}`,
+		nodeVersionInfo.CompatibleRange.StartHeight,
+		nodeVersionInfo.CompatibleRange.EndHeight,
+	)
+
 	return fmt.Sprintf(`{
 			"semver": "%s",
 			"commit": "%s",
@@ -60,8 +70,7 @@ func nodeVersionInfoExpectedStr(nodeVersionInfo *access.NodeVersionInfo) string 
             "protocol_version": "%d",
             "spork_root_block_height": "%d",
             "node_root_block_height": "%d",
-            "protocol_version_start_height": "%d",
-            "protocol_version_end_height": "%d"
+            %s
 		}`,
 		nodeVersionInfo.Semver,
 		nodeVersionInfo.Commit,
@@ -69,8 +78,7 @@ func nodeVersionInfoExpectedStr(nodeVersionInfo *access.NodeVersionInfo) string 
 		nodeVersionInfo.ProtocolVersion,
 		nodeVersionInfo.SporkRootBlockHeight,
 		nodeVersionInfo.NodeRootBlockHeight,
-		nodeVersionInfo.ProtocolVersionStartHeight,
-		nodeVersionInfo.ProtocolVersionEndHeight,
+		compatibleRange,
 	)
 }
 

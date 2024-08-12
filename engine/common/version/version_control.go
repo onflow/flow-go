@@ -366,12 +366,12 @@ func (v *VersionControl) blockFinalized(
 	}
 }
 
-// ProtocolVersionStartHeight return the first block that the version supports
-func (v *VersionControl) ProtocolVersionStartHeight() uint64 {
+// StartHeight return the first block that the version supports
+func (v *VersionControl) StartHeight() uint64 {
 	return v.startHeight.Load()
 }
 
-// ProtocolVersionEndHeight return the last block that the version supports
-func (v *VersionControl) ProtocolVersionEndHeight() uint64 {
+// EndHeight return the last block that the version supports
+func (v *VersionControl) EndHeight() uint64 {
 	return v.endHeight.Load()
 }

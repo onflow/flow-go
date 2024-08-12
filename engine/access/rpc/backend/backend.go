@@ -343,41 +343,41 @@ func (b *Backend) Ping(ctx context.Context) error {
 }
 
 // GetNodeVersionInfo returns node version information such as semver, commit, sporkID, protocolVersion, etc
-func (b *Backend) GetNodeVersionInfo(_ context.Context) (*access.NodeVersionInfo, error) {
+func (b *Backend) GetNodeVersionInfo(_ context.Context) (*flow.NodeVersionInfo, error) {
 	return b.getNodeVersionInfo(), nil
 }
 
 // getNodeVersionInfo returns the NodeVersionInfo for the node.
-func (b *Backend) getNodeVersionInfo() *access.NodeVersionInfo {
+func (b *Backend) getNodeVersionInfo() *flow.NodeVersionInfo {
 	sporkID := b.stateParams.SporkID()
 	protocolVersion := b.stateParams.ProtocolVersion()
 	sporkRootBlockHeight := b.stateParams.SporkRootBlockHeight()
 
 	nodeRootBlockHeader := b.stateParams.SealedRoot()
 
-	var protocolVersionStartHeight uint64
-	var protocolVersionEndHeight uint64
+	var compatibleRange *flow.CompatibleRange
 
 	// Version control feature could be disabled
 	if b.versionControl != nil {
-		protocolVersionStartHeight = b.versionControl.ProtocolVersionStartHeight()
-		protocolVersionEndHeight = b.versionControl.ProtocolVersionEndHeight()
+		compatibleRange = &flow.CompatibleRange{
+			StartHeight: b.versionControl.StartHeight(),
+			EndHeight:   b.versionControl.EndHeight(),
+		}
+
+		// StartHeight is the root block if there is no start boundary in the current spork
+		if compatibleRange.StartHeight == version.NoHeight {
+			compatibleRange.StartHeight = nodeRootBlockHeader.Height
+		}
 	}
 
-	// protocolVersionStartHeight is the root block if there is no start boundary in the current spork
-	if protocolVersionStartHeight == version.NoHeight {
-		protocolVersionStartHeight = nodeRootBlockHeader.Height
-	}
-
-	nodeInfo := &access.NodeVersionInfo{
-		Semver:                     build.Version(),
-		Commit:                     build.Commit(),
-		SporkId:                    sporkID,
-		ProtocolVersion:            uint64(protocolVersion),
-		SporkRootBlockHeight:       sporkRootBlockHeight,
-		NodeRootBlockHeight:        nodeRootBlockHeader.Height,
-		ProtocolVersionStartHeight: protocolVersionStartHeight,
-		ProtocolVersionEndHeight:   protocolVersionEndHeight,
+	nodeInfo := &flow.NodeVersionInfo{
+		Semver:               build.Version(),
+		Commit:               build.Commit(),
+		SporkId:              sporkID,
+		ProtocolVersion:      uint64(protocolVersion),
+		SporkRootBlockHeight: sporkRootBlockHeight,
+		NodeRootBlockHeight:  nodeRootBlockHeader.Height,
+		CompatibleRange:      compatibleRange,
 	}
 
 	return nodeInfo

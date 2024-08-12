@@ -15,7 +15,7 @@ import (
 type API interface {
 	Ping(ctx context.Context) error
 	GetNetworkParameters(ctx context.Context) NetworkParameters
-	GetNodeVersionInfo(ctx context.Context) (*NodeVersionInfo, error)
+	GetNodeVersionInfo(ctx context.Context) (*flow.NodeVersionInfo, error)
 
 	GetLatestBlockHeader(ctx context.Context, isSealed bool) (*flow.Header, flow.BlockStatus, error)
 	GetBlockHeaderByHeight(ctx context.Context, height uint64) (*flow.Header, flow.BlockStatus, error)
@@ -262,16 +262,4 @@ func MessageToTransactionResult(message *access.TransactionResultResponse) *Tran
 // NetworkParameters contains the network-wide parameters for the Flow blockchain.
 type NetworkParameters struct {
 	ChainID flow.ChainID
-}
-
-// NodeVersionInfo contains information about node, such as semver, commit, sporkID, protocolVersion, etc
-type NodeVersionInfo struct {
-	Semver                     string
-	Commit                     string
-	SporkId                    flow.Identifier
-	ProtocolVersion            uint64
-	SporkRootBlockHeight       uint64
-	NodeRootBlockHeight        uint64
-	ProtocolVersionStartHeight uint64
-	ProtocolVersionEndHeight   uint64
 }

@@ -24,7 +24,6 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	accessflow "github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/cmd/build"
 	access "github.com/onflow/flow-go/engine/access/mock"
 	backendmock "github.com/onflow/flow-go/engine/access/rpc/backend/mock"
@@ -1594,15 +1593,14 @@ func (suite *Suite) TestGetNodeVersionInfo() {
 		state := protocol.NewState(suite.T())
 		state.On("Params").Return(stateParams, nil).Maybe()
 
-		expected := &accessflow.NodeVersionInfo{
-			Semver:                     build.Version(),
-			Commit:                     build.Commit(),
-			SporkId:                    sporkID,
-			ProtocolVersion:            uint64(protocolVersion),
-			SporkRootBlockHeight:       sporkRootBlock.Height,
-			NodeRootBlockHeight:        nodeRootBlock.Height,
-			ProtocolVersionStartHeight: nodeRootBlock.Height,
-			ProtocolVersionEndHeight:   uint64(0),
+		expected := &flow.NodeVersionInfo{
+			Semver:               build.Version(),
+			Commit:               build.Commit(),
+			SporkId:              sporkID,
+			ProtocolVersion:      uint64(protocolVersion),
+			SporkRootBlockHeight: sporkRootBlock.Height,
+			NodeRootBlockHeight:  nodeRootBlock.Height,
+			CompatibleRange:      nil,
 		}
 
 		params := suite.defaultBackendParams()
@@ -1690,15 +1688,17 @@ func (suite *Suite) TestGetNodeVersionInfo() {
 		state := protocol.NewState(suite.T())
 		state.On("Params").Return(stateParams, nil).Maybe()
 
-		expected := &accessflow.NodeVersionInfo{
-			Semver:                     build.Version(),
-			Commit:                     build.Commit(),
-			SporkId:                    sporkID,
-			ProtocolVersion:            uint64(protocolVersion),
-			SporkRootBlockHeight:       sporkRootBlock.Height,
-			NodeRootBlockHeight:        nodeRootBlock.Height,
-			ProtocolVersionStartHeight: nodeRootBlock.Height + 12,
-			ProtocolVersionEndHeight:   latestBlockHeight - 9,
+		expected := &flow.NodeVersionInfo{
+			Semver:               build.Version(),
+			Commit:               build.Commit(),
+			SporkId:              sporkID,
+			ProtocolVersion:      uint64(protocolVersion),
+			SporkRootBlockHeight: sporkRootBlock.Height,
+			NodeRootBlockHeight:  nodeRootBlock.Height,
+			CompatibleRange: &flow.CompatibleRange{
+				StartHeight: nodeRootBlock.Height + 12,
+				EndHeight:   latestBlockHeight - 9,
+			},
 		}
 
 		params := suite.defaultBackendParams()
