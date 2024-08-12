@@ -227,7 +227,7 @@ type IssueStorageCapConMigration struct {
 	accountsCapabilities              *capcons.AccountsCapabilities
 	interpreterMigrationRuntimeConfig InterpreterMigrationRuntimeConfig
 	programs                          map[runtime.Location]*interpreter.Program
-	mapping                           *capcons.CapabilityMapping
+	mapping                           *capcons.PathTypeCapabilityMapping
 	reporter                          reporters.ReportWriter
 	logVerboseDiff                    bool
 	verboseErrorOutput                bool
@@ -243,7 +243,7 @@ func NewIssueStorageCapConMigration(
 	chainID flow.ChainID,
 	storageDomainCapabilities *capcons.AccountsCapabilities,
 	programs map[runtime.Location]*interpreter.Program,
-	capabilityMapping *capcons.CapabilityMapping,
+	storageCapabilityMapping *capcons.PathTypeCapabilityMapping,
 	opts Options,
 ) *IssueStorageCapConMigration {
 	return &IssueStorageCapConMigration{
@@ -252,7 +252,7 @@ func NewIssueStorageCapConMigration(
 		chainID:              chainID,
 		accountsCapabilities: storageDomainCapabilities,
 		programs:             programs,
-		mapping:              capabilityMapping,
+		mapping:              storageCapabilityMapping,
 		logVerboseDiff:       opts.LogVerboseDiff,
 		verboseErrorOutput:   opts.VerboseErrorOutput,
 		errorMessageHandler:  errorMessageHandler,
@@ -384,7 +384,8 @@ func NewCadence1ValueMigrations(
 
 	// Populated by CadenceLinkValueMigration,
 	// used by CadenceCapabilityValueMigration
-	capabilityMapping := &capcons.CapabilityMapping{}
+	privatePublicCapabilityMapping := &capcons.PathCapabilityMapping{}
+	storageCapabilityMapping := &capcons.PathTypeCapabilityMapping{}
 
 	// Populated by StorageCapMigration,
 	// used by IssueStorageCapConMigration
@@ -445,7 +446,7 @@ func NewCadence1ValueMigrations(
 				opts.ChainID,
 				storageDomainCapabilities,
 				programs,
-				capabilityMapping,
+				storageCapabilityMapping,
 				opts,
 			)
 			return migration.name, migration
@@ -456,7 +457,7 @@ func NewCadence1ValueMigrations(
 				rwf,
 				errorMessageHandler,
 				programs,
-				capabilityMapping,
+				privatePublicCapabilityMapping,
 				opts,
 			)
 			return migration.name, migration
@@ -466,7 +467,8 @@ func NewCadence1ValueMigrations(
 				rwf,
 				errorMessageHandler,
 				programs,
-				capabilityMapping,
+				privatePublicCapabilityMapping,
+				storageCapabilityMapping,
 				opts,
 			)
 			return migration.name, migration

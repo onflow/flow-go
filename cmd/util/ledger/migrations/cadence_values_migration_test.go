@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/onflow/cadence/runtime/sema"
@@ -2162,15 +2163,46 @@ func TestStoragePathCapabilityMigration(t *testing.T) {
 	addressB, err := common.HexToAddress("0xe5a8b7f23e8b548f")
 	require.NoError(t, err)
 
-	runtime, err := NewInterpreterMigrationRuntime(
+	addressC, err := common.HexToAddress("0x1")
+	require.NoError(t, err)
+
+	// Store a contract in `addressC`.
+
+	const contractName = "Test"
+	contractAddress := addressC
+
+	err = registersByAccount.Set(
+		string(contractAddress[:]),
+		flow.ContractKey(contractName),
+		[]byte(`
+            pub contract Test {
+                access(all) resource R {}
+            }
+        `),
+	)
+	require.NoError(t, err)
+
+	encodedContractNames, err := environment.EncodeContractNames([]string{contractName})
+	require.NoError(t, err)
+
+	err = registersByAccount.Set(
+		string(contractAddress[:]),
+		flow.ContractNamesKey,
+		encodedContractNames,
+	)
+	require.NoError(t, err)
+
+	migrationRuntime, err := NewInterpreterMigrationRuntime(
 		registersByAccount,
 		chainID,
 		InterpreterMigrationRuntimeConfig{},
 	)
 	require.NoError(t, err)
 
-	storage := runtime.Storage
+	storage := migrationRuntime.Storage
 	storageDomain := common.PathDomainStorage.Identifier()
+
+	// Store a capability with storage path
 
 	storageMap := storage.GetStorageMap(
 		addressA,
@@ -2184,8 +2216,6 @@ func TestStoragePathCapabilityMigration(t *testing.T) {
 		interpreter.PrimitiveStaticTypeAnyStruct,
 	)
 
-	// Store a capability with storage path
-
 	fooCapStorageMapKey := interpreter.StringStorageMapKey("fooCap")
 
 	capabilityFoo := &interpreter.PathCapabilityValue{
@@ -2198,7 +2228,7 @@ func TestStoragePathCapabilityMigration(t *testing.T) {
 	}
 
 	storageMap.WriteValue(
-		runtime.Interpreter,
+		migrationRuntime.Interpreter,
 		fooCapStorageMapKey,
 		capabilityFoo,
 	)
@@ -2216,16 +2246,47 @@ func TestStoragePathCapabilityMigration(t *testing.T) {
 	}
 
 	storageMap.WriteValue(
-		runtime.Interpreter,
+		migrationRuntime.Interpreter,
 		barCapStorageMapKey,
 		capabilityBar,
 	)
 
-	err = storage.NondeterministicCommit(runtime.Interpreter, false)
+	// Store a third capability with storage path, and with a broken type
+
+	bazBorrowType := interpreter.NewReferenceStaticType(
+		nil,
+		interpreter.UnauthorizedAccess,
+		interpreter.NewCompositeStaticTypeComputeTypeID(
+			nil,
+			common.NewAddressLocation(nil, contractAddress, "Test"),
+			"Test.R",
+		),
+	)
+
+	bazCapStorageMapKey := interpreter.StringStorageMapKey("bazCap")
+
+	bazCapability := &interpreter.PathCapabilityValue{
+		BorrowType: bazBorrowType,
+		Path:       interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "baz"),
+
+		// Important: Capability must be for a different address,
+		// compared to where the capability is stored.
+		Address: interpreter.AddressValue(addressB),
+	}
+
+	storageMap.WriteValue(
+		migrationRuntime.Interpreter,
+		bazCapStorageMapKey,
+		bazCapability,
+	)
+
+	// Commit
+
+	err = storage.NondeterministicCommit(migrationRuntime.Interpreter, false)
 	require.NoError(t, err)
 
 	// finalize the transaction
-	result, err := runtime.TransactionState.FinalizeMainTransaction()
+	result, err := migrationRuntime.TransactionState.FinalizeMainTransaction()
 	require.NoError(t, err)
 
 	// Merge the changes into the registers
@@ -2275,12 +2336,12 @@ func TestStoragePathCapabilityMigration(t *testing.T) {
 
 	reporter := rwf.reportWriters[capabilityValueMigrationReporterName]
 	require.NotNil(t, reporter)
-	require.Len(t, reporter.entries, 3)
+	require.Len(t, reporter.entries, 5)
 
 	require.Equal(
 		t,
 		[]any{
-			capabilityMissingCapabilityIDEntry{
+			storageCapConsMissingBorrowTypeEntry{
 				AccountAddress: addressA,
 				AddressPath: interpreter.AddressPath{
 					Address: addressB,
@@ -2291,10 +2352,27 @@ func TestStoragePathCapabilityMigration(t *testing.T) {
 				AccountAddress: addressA,
 				AddressPath: interpreter.AddressPath{
 					Address: addressB,
+					Path:    interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "baz"),
+				},
+				BorrowType:   bazBorrowType,
+				CapabilityID: 3,
+			},
+			cadenceValueMigrationEntry{
+				StorageKey: interpreter.StorageKey{
+					Key:     storageDomain,
+					Address: addressA,
+				},
+				StorageMapKey: bazCapStorageMapKey,
+				Migration:     "CapabilityValueMigration",
+			},
+			capabilityMigrationEntry{
+				AccountAddress: addressA,
+				AddressPath: interpreter.AddressPath{
+					Address: addressB,
 					Path:    interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "foo"),
 				},
 				BorrowType:   borrowType,
-				CapabilityID: 3,
+				CapabilityID: 4,
 			},
 			cadenceValueMigrationEntry{
 				StorageKey: interpreter.StorageKey{
@@ -2310,7 +2388,7 @@ func TestStoragePathCapabilityMigration(t *testing.T) {
 
 	issueStorageCapConReporter := rwf.reportWriters[issueStorageCapConMigrationReporterName]
 	require.NotNil(t, issueStorageCapConReporter)
-	require.Len(t, issueStorageCapConReporter.entries, 2)
+	require.Len(t, issueStorageCapConReporter.entries, 3)
 	require.Equal(
 		t,
 		[]any{
@@ -2325,10 +2403,19 @@ func TestStoragePathCapabilityMigration(t *testing.T) {
 				AccountAddress: addressB,
 				AddressPath: interpreter.AddressPath{
 					Address: addressB,
+					Path:    interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "baz"),
+				},
+				BorrowType:   bazBorrowType,
+				CapabilityID: 3,
+			},
+			storageCapConIssuedEntry{
+				AccountAddress: addressB,
+				AddressPath: interpreter.AddressPath{
+					Address: addressB,
 					Path:    interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "foo"),
 				},
 				BorrowType:   borrowType,
-				CapabilityID: 3,
+				CapabilityID: 4,
 			},
 		},
 		issueStorageCapConReporter.entries,
@@ -2347,7 +2434,7 @@ func TestStoragePathCapabilityMigration(t *testing.T) {
                   let storage = getAuthAccount<auth(Storage) &Account>(%s).storage
                   let fooCap = storage.copy<Capability>(from: /storage/fooCap)!
                   let barCap = storage.copy<Capability>(from: /storage/barCap)!
-                  assert(fooCap.id == 3)
+                  assert(fooCap.id == 4)
                   assert(barCap.id == 0)
               }
             `,
@@ -2355,6 +2442,26 @@ func TestStoragePathCapabilityMigration(t *testing.T) {
 		),
 	)
 	require.NoError(t, err)
+
+	// check the cap with the broken type
+
+	_, err = runScript(
+		chainID,
+		registersByAccount,
+		fmt.Sprintf(
+			//language=Cadence
+			`
+              access(all)
+              fun main() {
+                  let storage = getAuthAccount<auth(Storage) &Account>(%s).storage
+                  let bazCap = storage.copy<Capability>(from: /storage/bazCap)!
+              }
+            `,
+			addressA.HexWithPrefix(),
+		),
+	)
+	require.Error(t, err)
+	require.ErrorAs(t, &runtime.ParsingCheckingError{}, &err)
 
 	// Check account B
 
@@ -2369,7 +2476,7 @@ func TestStoragePathCapabilityMigration(t *testing.T) {
                   let capabilities = getAuthAccount<auth(Capabilities) &Account>(%s).capabilities.storage
                   let fooCapCons = capabilities.getControllers(forPath: /storage/foo)
                   assert(fooCapCons.length == 1)
-                  assert(fooCapCons[0].capabilityID == 3)
+                  assert(fooCapCons[0].capabilityID == 4)
               }
             `,
 			addressB.HexWithPrefix(),

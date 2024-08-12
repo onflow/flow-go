@@ -324,7 +324,7 @@ func NewCadence1LinkValueMigration(
 	rwf reporters.ReportWriterFactory,
 	errorMessageHandler *errorMessageHandler,
 	programs map[runtime.Location]*interpreter.Program,
-	capabilityMapping *capcons.CapabilityMapping,
+	capabilityMapping *capcons.PathCapabilityMapping,
 	opts Options,
 ) *CadenceBaseMigration {
 	var diffReporter reporters.ReportWriter
@@ -380,7 +380,8 @@ func NewCadence1CapabilityValueMigration(
 	rwf reporters.ReportWriterFactory,
 	errorMessageHandler *errorMessageHandler,
 	programs map[runtime.Location]*interpreter.Program,
-	capabilityMapping *capcons.CapabilityMapping,
+	privatePublicCapabilityMapping *capcons.PathCapabilityMapping,
+	storageCapabilityMapping *capcons.PathTypeCapabilityMapping,
 	opts Options,
 ) *CadenceBaseMigration {
 	var diffReporter reporters.ReportWriter
@@ -402,8 +403,9 @@ func NewCadence1CapabilityValueMigration(
 		) []migrations.ValueMigration {
 			return []migrations.ValueMigration{
 				&capcons.CapabilityValueMigration{
-					CapabilityMapping: capabilityMapping,
-					Reporter:          reporter,
+					PrivatePublicCapabilityMapping: privatePublicCapabilityMapping,
+					StorageCapabilityMapping:       storageCapabilityMapping,
+					Reporter:                       reporter,
 				},
 			}
 		},
