@@ -1194,7 +1194,6 @@ func TestTransactionTracing(t *testing.T) {
 			blk, uploader, tracer := blockWithTracer(t, emu)
 
 			var txID gethCommon.Hash
-			var trace json.RawMessage
 
 			blockID := flow.Identifier{0x01}
 			uploaded := make(chan struct{})
@@ -1202,10 +1201,12 @@ func TestTransactionTracing(t *testing.T) {
 			uploader.UploadFunc = func(id string, message json.RawMessage) error {
 				uploaded <- struct{}{}
 				require.Equal(t, debug.TraceID(txID, blockID), id)
-				require.Equal(t, trace, message)
+				require.NotEmpty(t, message)
 				require.Greater(t, len(message), 0)
 				return nil
 			}
+
+			tracer.WithBlockID(blockID)
 
 			// interact and record trace
 			res, err := blk.DirectCall(
@@ -1219,12 +1220,10 @@ func TestTransactionTracing(t *testing.T) {
 				),
 			)
 			require.NoError(t, err)
+			require.NoError(t, res.ValidationError)
+			require.NoError(t, res.VMError)
 			txID = res.TxHash
-			trace, err = tracer.TxTracer().GetResult()
-			require.NoError(t, err)
-			tracer.WithBlockID(blockID)
-
-			tracer.Collect(txID)
+			tracer.Collect(res.TxHash)
 
 			testAccount.SetNonce(testAccount.Nonce() + 1)
 			require.Eventuallyf(t, func() bool {

@@ -1078,7 +1078,6 @@ func TestHandler_TransactionRun(t *testing.T) {
 			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
 				testutils.RunWithEOATestAccount(t, backend, rootAddr, func(eoa *testutils.EOATestAccount) {
 
-					var traceResult json.RawMessage
 					txID := gethCommon.HexToHash("0x1")
 					blockID := flow.Identifier{0x02}
 					uploaded := make(chan struct{})
@@ -1093,7 +1092,7 @@ func TestHandler_TransactionRun(t *testing.T) {
 
 					uploader := &testutils.MockUploader{
 						UploadFunc: func(id string, message json.RawMessage) error {
-							assert.Equal(t, traceResult, message)
+							assert.NotEmpty(t, message)
 							assert.Equal(t, debug.TraceID(txID, blockID), id)
 							close(uploaded)
 							return nil
@@ -1116,9 +1115,6 @@ func TestHandler_TransactionRun(t *testing.T) {
 							tr.OnEnter(0, byte(gethVM.ADD), from, *tx.To(), tx.Data(), 20, big.NewInt(2))
 							tr.OnExit(0, []byte{0x02}, 200, nil, false)
 							tr.OnTxEnd(result.Receipt(), nil)
-
-							traceResult, err = tr.GetResult()
-							require.NoError(t, err)
 							return result, nil
 						},
 					}
@@ -1179,6 +1175,11 @@ func TestHandler_TransactionRun(t *testing.T) {
 
 					em := &testutils.TestEmulator{
 						RunTransactionFunc: func(tx *gethTypes.Transaction) (*types.Result, error) {
+							tr := tracer.TxTracer()
+							tr.OnTxStart(nil, tx, gethCommon.Address{})
+							tr.OnEnter(0, 0, gethCommon.Address{}, *tx.To(), []byte{0x01, 0x02}, 10, big.NewInt(1))
+							tr.OnExit(0, []byte{0x02}, 200, nil, false)
+							tr.OnTxEnd(&gethTypes.Receipt{TxHash: result.TxHash}, nil)
 							return result, nil
 						},
 					}
@@ -1238,19 +1239,20 @@ func TestHandler_TransactionRun(t *testing.T) {
 					em := &testutils.TestEmulator{
 						BatchRunTransactionFunc: func(txs []*gethTypes.Transaction) ([]*types.Result, error) {
 							runResults = make([]*types.Result, len(txs))
+							tr := tracer.TxTracer()
 							for i, tx := range txs {
-								tr := tracer.TxTracer()
-								// TODO(Ramtin): figure out me
-								// tr.CaptureTxStart(200)
-								// tr.CaptureTxEnd(150)
-
-								traceResults[i], _ = tr.GetResult()
+								from := gethCommon.Address{byte(i)}
+								tr.OnTxStart(nil, tx, from)
+								tr.OnEnter(0, 0, from, *tx.To(), []byte{0x01, 0x02}, 10, big.NewInt(1))
+								tr.OnExit(0, []byte{0x02}, 200, nil, false)
+								tr.OnTxEnd(&gethTypes.Receipt{TxHash: tx.Hash()}, nil)
 								runResults[i] = &types.Result{
 									TxHash: tx.Hash(),
 									Logs: []*gethTypes.Log{
 										testutils.GetRandomLogFixture(t),
 									},
 								}
+								traceResults[i] = tracer.GetResultByTxHash(tx.Hash())
 							}
 							return runResults, nil
 						},

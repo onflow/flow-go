@@ -42,19 +42,15 @@ func Test_CallTracer(t *testing.T) {
 		tr := tracer.TxTracer()
 		require.NotNil(t, tr)
 
-		tr.OnEnter(0, 0, from, to, []byte{0x01, 0x02}, 10, big.NewInt(1))
 		tx := gethTypes.NewTransaction(nonce, to, amount, 100, big.NewInt(10), data)
 		tr.OnTxStart(nil, tx, from)
+		tr.OnEnter(0, 0, from, to, []byte{0x01, 0x02}, 10, big.NewInt(1))
 		tr.OnEnter(1, byte(vm.ADD), from, to, data, 20, big.NewInt(2))
 		tr.OnExit(1, nil, 10, nil, false)
-		tr.OnTxEnd(&gethTypes.Receipt{}, nil)
 		tr.OnExit(0, []byte{0x02}, 200, nil, false)
+		tr.OnTxEnd(&gethTypes.Receipt{TxHash: tx.Hash()}, nil)
 
-		res, err = tr.GetResult()
-		require.NoError(t, err)
-		require.NotNil(t, res)
-
-		tracer.Collect(txID)
+		tracer.Collect(tx.Hash())
 	})
 
 	t.Run("collector panic recovery", func(t *testing.T) {
