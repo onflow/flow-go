@@ -52,7 +52,7 @@ type KVStoreReader interface {
 	// different extensions can have different view counts.
 	GetEpochExtensionViewCount() uint64
 
-	// GetEpochCommitSafetyThreshold [t] defines a deadline for sealing the EpochCommit
+	// GetFinalizationSafetyThreshold [t] defines a deadline for sealing the EpochCommit
 	// service event near the end of each epoch - the "epoch commitment deadline".
 	// Given a safety threshold t, the deadline for an epoch with final view f is:
 	//   Epoch Commitment Deadline: d=f-t
@@ -108,7 +108,7 @@ type KVStoreReader interface {
 	//    enough that the network is overwhelming likely to finalize at least one
 	//    block with a view in this range
 	//
-	GetEpochCommitSafetyThreshold() uint64
+	GetFinalizationSafetyThreshold() uint64
 }
 
 // VersionedEncodable defines the interface for a versioned key-value store independent

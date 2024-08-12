@@ -55,7 +55,7 @@ func NewFallbackStateMachine(
 		parentState:      parentState,
 	}
 
-	if !nextEpochCommitted && view+parentState.GetEpochCommitSafetyThreshold() >= state.CurrentEpochFinalView() {
+	if !nextEpochCommitted && view+parentState.GetFinalizationSafetyThreshold() >= state.CurrentEpochFinalView() {
 		// we have reached safety threshold and we are still in the fallback mode
 		// prepare a new extension for the current epoch.
 		err := sm.extendCurrentEpoch(flow.EpochExtension{
@@ -104,9 +104,9 @@ func (m *FallbackStateMachine) ProcessEpochSetup(setup *flow.EpochSetup) (bool, 
 	//
 	// CAUTION: This leaves an edge case where, a valid `EpochRecover` event followed by an `EpochSetup` is sealed in the
 	// same block. Conceptually, this is a clear indication that the Epoch Smart contract is doing something unexpect. The
-	// reason is that the block with the `EpochRecover` event is at least `EpochCommitSafetyThreshold` views before the
+	// reason is that the block with the `EpochRecover` event is at least `FinalizationSafetyThreshold` views before the
 	// switchover to the recovery epoch. Otherwise, the FallbackStateMachine constructor would have added an extension to
-	// the current epoch. Axiomatically, the `EpochCommitSafetyThreshold` is large enough that we guarantee finalization of
+	// the current epoch. Axiomatically, the `FinalizationSafetyThreshold` is large enough that we guarantee finalization of
 	// the epoch configuration (in this case the configuration of the recovery epoch provided by the `EpochRecover` event)
 	// _before_ the recovery epoch starts. For finalization, the block sealing the `EpochRecover` event must have descendants
 	// in the same epoch, i.e. an EpochSetup cannot occur in the same block as the `EpochRecover` event.
@@ -212,7 +212,7 @@ func (m *FallbackStateMachine) ProcessEpochRecover(epochRecover *flow.EpochRecov
 // * `protocol.InvalidServiceEventError` - if the service event is invalid or is not a valid state transition for the current protocol state.
 // This is a side-effect-free function. This function only returns protocol.InvalidServiceEventError as errors.
 func (m *FallbackStateMachine) ensureValidEpochRecover(epochRecover *flow.EpochRecover) error {
-	if m.view+m.parentState.GetEpochCommitSafetyThreshold() >= m.state.CurrentEpochFinalView() {
+	if m.view+m.parentState.GetFinalizationSafetyThreshold() >= m.state.CurrentEpochFinalView() {
 		return protocol.NewInvalidServiceEventErrorf("could not process epoch recover, safety threshold reached")
 	}
 	err := protocol.IsValidExtendingEpochSetup(&epochRecover.EpochSetup, m.state)

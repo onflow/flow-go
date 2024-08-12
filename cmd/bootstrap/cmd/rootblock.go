@@ -23,18 +23,18 @@ import (
 )
 
 var (
-	flagRootChain                  string
-	flagRootParent                 string
-	flagRootHeight                 uint64
-	flagRootTimestamp              string
-	flagProtocolVersion            uint
-	flagEpochCommitSafetyThreshold uint64
-	flagEpochExtensionViewCount    uint64
-	flagCollectionClusters         uint
-	flagEpochCounter               uint64
-	flagNumViewsInEpoch            uint64
-	flagNumViewsInStakingAuction   uint64
-	flagNumViewsInDKGPhase         uint64
+	flagRootChain                   string
+	flagRootParent                  string
+	flagRootHeight                  uint64
+	flagRootTimestamp               string
+	flagProtocolVersion             uint
+	flagFinalizationSafetyThreshold uint64
+	flagEpochExtensionViewCount     uint64
+	flagCollectionClusters          uint
+	flagEpochCounter                uint64
+	flagNumViewsInEpoch             uint64
+	flagNumViewsInStakingAuction    uint64
+	flagNumViewsInDKGPhase          uint64
 	// Epoch target end time config
 	flagUseDefaultEpochTargetEndTime bool
 	flagEpochTimingRefCounter        uint64
@@ -93,14 +93,14 @@ func addRootBlockCmdFlags() {
 	rootBlockCmd.Flags().Uint64Var(&flagRootHeight, "root-height", 0, "height of the root block")
 	rootBlockCmd.Flags().StringVar(&flagRootTimestamp, "root-timestamp", time.Now().UTC().Format(time.RFC3339), "timestamp of the root block (RFC3339)")
 	rootBlockCmd.Flags().UintVar(&flagProtocolVersion, "protocol-version", flow.DefaultProtocolVersion, "major software version used for the duration of this spork")
-	rootBlockCmd.Flags().Uint64Var(&flagEpochCommitSafetyThreshold, "epoch-commit-safety-threshold", 500, "defines epoch commitment deadline")
+	rootBlockCmd.Flags().Uint64Var(&flagFinalizationSafetyThreshold, "finalization-safety-threshold", 500, "defines finalization safety threshold")
 	rootBlockCmd.Flags().Uint64Var(&flagEpochExtensionViewCount, "epoch-extension-view-count", 100_000, "length of epoch extension in views, default is 100_000 which is approximately 1 day")
 
 	cmd.MarkFlagRequired(rootBlockCmd, "root-chain")
 	cmd.MarkFlagRequired(rootBlockCmd, "root-parent")
 	cmd.MarkFlagRequired(rootBlockCmd, "root-height")
 	cmd.MarkFlagRequired(rootBlockCmd, "protocol-version")
-	cmd.MarkFlagRequired(rootBlockCmd, "epoch-commit-safety-threshold")
+	cmd.MarkFlagRequired(rootBlockCmd, "finalization-safety-threshold")
 	cmd.MarkFlagRequired(rootBlockCmd, "epoch-extension-view-count")
 
 	// Epoch timing config - these values must be set identically to `EpochTimingConfig` in the FlowEpoch smart contract.
@@ -138,7 +138,7 @@ func rootBlock(cmd *cobra.Command, args []string) {
 	// validate epoch configs
 	err := validateEpochConfig()
 	if err != nil {
-		log.Fatal().Err(err).Msg("invalid or unsafe epoch commit threshold config")
+		log.Fatal().Err(err).Msg("invalid or unsafe finalization safety threshold config")
 	}
 	err = validateOrPopulateEpochTimingConfig()
 	if err != nil {
@@ -208,9 +208,9 @@ func rootBlock(cmd *cobra.Command, args []string) {
 		ExecutionStateConfig: epochConfig,
 	}
 	intermediaryParamsData := IntermediaryParamsData{
-		EpochCommitSafetyThreshold: flagEpochCommitSafetyThreshold,
-		EpochExtensionViewCount:    flagEpochExtensionViewCount,
-		ProtocolVersion:            flagProtocolVersion,
+		FinalizationSafetyThreshold: flagFinalizationSafetyThreshold,
+		EpochExtensionViewCount:     flagEpochExtensionViewCount,
+		ProtocolVersion:             flagProtocolVersion,
 	}
 	intermediaryData := IntermediaryBootstrappingData{
 		IntermediaryEpochData:  intermediaryEpochData,
@@ -225,7 +225,7 @@ func rootBlock(cmd *cobra.Command, args []string) {
 
 	log.Info().Msg("constructing root block")
 	rootProtocolState, err := kvstore.NewDefaultKVStore(
-		flagEpochCommitSafetyThreshold,
+		flagFinalizationSafetyThreshold,
 		flagEpochExtensionViewCount,
 		inmem.EpochProtocolStateFromServiceEvents(epochSetup, epochCommit).ID(),
 	)
@@ -254,7 +254,7 @@ func rootBlock(cmd *cobra.Command, args []string) {
 func validateEpochConfig() error {
 	chainID := parseChainID(flagRootChain)
 	dkgFinalView := flagNumViewsInStakingAuction + flagNumViewsInDKGPhase*3 // 3 DKG phases
-	epochCommitDeadline := flagNumViewsInEpoch - flagEpochCommitSafetyThreshold
+	epochCommitDeadline := flagNumViewsInEpoch - flagFinalizationSafetyThreshold
 
 	defaultEpochSafetyParams, err := protocol.DefaultEpochSafetyParams(chainID)
 	if err != nil {
@@ -262,8 +262,8 @@ func validateEpochConfig() error {
 	}
 
 	// sanity check: the safety threshold is >= the default for the chain
-	if flagEpochCommitSafetyThreshold < defaultEpochSafetyParams.FinalizationSafetyThreshold {
-		return fmt.Errorf("potentially unsafe epoch config: epoch commit safety threshold smaller than expected (%d < %d)", flagEpochCommitSafetyThreshold, defaultEpochSafetyParams.FinalizationSafetyThreshold)
+	if flagFinalizationSafetyThreshold < defaultEpochSafetyParams.FinalizationSafetyThreshold {
+		return fmt.Errorf("potentially unsafe epoch config: epoch commit safety threshold smaller than expected (%d < %d)", flagFinalizationSafetyThreshold, defaultEpochSafetyParams.FinalizationSafetyThreshold)
 	}
 	if flagEpochExtensionViewCount < defaultEpochSafetyParams.EpochExtensionViewCount {
 		return fmt.Errorf("potentially unsafe epoch config: epoch extension view count smaller than expected (%d < %d)", flagEpochExtensionViewCount, defaultEpochSafetyParams.EpochExtensionViewCount)

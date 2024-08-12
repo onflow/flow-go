@@ -310,10 +310,10 @@ func (e *EpochStateMachine) evolveActiveStateMachine(sealedServiceEvents []flow.
 //   - S was emitted during execution of some block A, s.t. A is an ancestor of B.
 //   - The seal for block A was included in some block C, s.t C is an ancestor of B.
 //
-// For further details see `KVStoreReader.GetEpochCommitSafetyThreshold()`.
+// For further details see `KVStoreReader.GetFinalizationSafetyThreshold()`.
 func epochFallbackTriggeredByIncorporatingCandidate(candidateView uint64, parentState protocol.KVStoreReader, parentEpochState *flow.RichEpochStateEntry) bool {
 	if parentEpochState.EpochPhase() == flow.EpochPhaseCommitted { // Requirement 1
 		return false
 	}
-	return candidateView+parentState.GetEpochCommitSafetyThreshold() >= parentEpochState.CurrentEpochSetup.FinalView // Requirement 2
+	return candidateView+parentState.GetFinalizationSafetyThreshold() >= parentEpochState.CurrentEpochSetup.FinalView // Requirement 2
 }

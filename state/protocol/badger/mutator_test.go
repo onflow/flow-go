@@ -1701,7 +1701,7 @@ func TestEpochFallbackMode(t *testing.T) {
 			rootProtocolState, err := rootSnapshot.ProtocolState()
 			require.NoError(t, err)
 			epochExtensionViewCount := rootProtocolState.GetEpochExtensionViewCount()
-			safetyThreshold := rootProtocolState.GetEpochCommitSafetyThreshold()
+			safetyThreshold := rootProtocolState.GetFinalizationSafetyThreshold()
 			require.GreaterOrEqual(t, epochExtensionViewCount, safetyThreshold, "epoch extension view count must be at least as large as safety threshold")
 
 			expectedStateIdCalculator := calculateExpectedStateId(t, mutableProtocolState)
@@ -1771,7 +1771,7 @@ func TestEpochFallbackMode(t *testing.T) {
 			rootProtocolState, err := rootSnapshot.ProtocolState()
 			require.NoError(t, err)
 			epochExtensionViewCount := rootProtocolState.GetEpochExtensionViewCount()
-			safetyThreshold := rootProtocolState.GetEpochCommitSafetyThreshold()
+			safetyThreshold := rootProtocolState.GetFinalizationSafetyThreshold()
 			require.GreaterOrEqual(t, epochExtensionViewCount, safetyThreshold, "epoch extension view count must be at least as large as safety threshold")
 
 			// add a block for the first seal to reference
@@ -2221,7 +2221,7 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 			rootProtocolState, err := rootSnapshot.ProtocolState()
 			require.NoError(t, err)
 			epochExtensionViewCount := rootProtocolState.GetEpochExtensionViewCount()
-			safetyThreshold := rootProtocolState.GetEpochCommitSafetyThreshold()
+			safetyThreshold := rootProtocolState.GetFinalizationSafetyThreshold()
 			require.GreaterOrEqual(t, epochExtensionViewCount, safetyThreshold, "epoch extension view count must be at least as large as safety threshold")
 
 			expectedStateIdCalculator := calculateExpectedStateId(t, mutableProtocolState)

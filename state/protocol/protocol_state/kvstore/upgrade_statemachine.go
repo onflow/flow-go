@@ -85,9 +85,9 @@ func (m *PSVersionUpgradeStateMachine) processSingleEvent(versionUpgrade *flow.P
 	// to give time for replicas to finalize the block containing the seal for the version upgrade event.
 	// When replica reaches (or exceeds) the activation view *and* the latest finalized protocol state knows
 	// about the version upgrade, only then it's safe to switch the protocol version.
-	if m.View()+m.ParentState().GetEpochCommitSafetyThreshold() >= versionUpgrade.ActiveView {
+	if m.View()+m.ParentState().GetFinalizationSafetyThreshold() >= versionUpgrade.ActiveView {
 		return protocol.NewInvalidServiceEventErrorf("view %d triggering version upgrade must be at least %d views in the future of current view %d: %w",
-			versionUpgrade.ActiveView, m.ParentState().GetEpochCommitSafetyThreshold(), m.View(), ErrInvalidActivationView)
+			versionUpgrade.ActiveView, m.ParentState().GetFinalizationSafetyThreshold(), m.View(), ErrInvalidActivationView)
 	}
 
 	if m.ParentState().GetProtocolStateVersion()+1 != versionUpgrade.NewProtocolStateVersion {

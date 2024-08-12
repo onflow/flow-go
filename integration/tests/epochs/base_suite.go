@@ -38,11 +38,11 @@ type BaseSuite struct {
 	Ctx    context.Context
 
 	// Epoch config (lengths in views)
-	StakingAuctionLen          uint64
-	DKGPhaseLen                uint64
-	EpochLen                   uint64
-	EpochCommitSafetyThreshold uint64
-	NumOfCollectionClusters    int
+	StakingAuctionLen           uint64
+	DKGPhaseLen                 uint64
+	EpochLen                    uint64
+	FinalizationSafetyThreshold uint64
+	NumOfCollectionClusters     int
 	// Whether approvals are required for sealing (we only enable for VN tests because
 	// requiring approvals requires a longer DKG period to avoid flakiness)
 	RequiredSealApprovals uint // defaults to 0 (no approvals required)
@@ -58,7 +58,7 @@ func (s *BaseSuite) SetupTest() {
 
 	minEpochLength := s.StakingAuctionLen + s.DKGPhaseLen*3 + 20
 	// ensure epoch lengths are set correctly
-	require.Greater(s.T(), s.EpochLen, minEpochLength+s.EpochCommitSafetyThreshold, "epoch too short")
+	require.Greater(s.T(), s.EpochLen, minEpochLength+s.FinalizationSafetyThreshold, "epoch too short")
 
 	s.Ctx, s.cancel = context.WithCancel(context.Background())
 	s.Log = unittest.LoggerForTest(s.Suite.T(), zerolog.InfoLevel)
@@ -103,7 +103,7 @@ func (s *BaseSuite) SetupTest() {
 		ghostNode,
 	}
 
-	netConf := testnet.NewNetworkConfigWithEpochConfig("epochs-tests", confs, s.StakingAuctionLen, s.DKGPhaseLen, s.EpochLen, s.EpochCommitSafetyThreshold)
+	netConf := testnet.NewNetworkConfigWithEpochConfig("epochs-tests", confs, s.StakingAuctionLen, s.DKGPhaseLen, s.EpochLen, s.FinalizationSafetyThreshold)
 
 	// initialize the network
 	s.Net = testnet.PrepareFlowNetwork(s.T(), netConf, flow.Localnet)
