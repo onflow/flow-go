@@ -244,6 +244,7 @@ func NewCadence1ValueMigration(
 	programs map[runtime.Location]*interpreter.Program,
 	compositeTypeConverter statictypes.CompositeTypeConverterFunc,
 	interfaceTypeConverter statictypes.InterfaceTypeConverterFunc,
+	storageDomainCapabilities *capcons.AccountsCapabilities,
 	opts Options,
 ) *CadenceBaseMigration {
 
@@ -285,6 +286,9 @@ func NewCadence1ValueMigration(
 				// and the mutating iterator of the inlined version of atree
 				type_keys.NewTypeKeyMigration(),
 				string_normalization.NewStringNormalizingMigration(),
+				&capcons.StorageCapMigration{
+					StorageDomainCapabilities: storageDomainCapabilities,
+				},
 			}
 		},
 		errorMessageHandler: errorMessageHandler,
@@ -396,22 +400,10 @@ func NewCadence1CapabilityValueMigration(
 			accounts environment.Accounts,
 			reporter *cadenceValueMigrationReporter,
 		) []migrations.ValueMigration {
-
-			idGenerator := environment.NewAccountLocalIDGenerator(
-				tracing.NewMockTracerSpan(),
-				util.NopMeter{},
-				accounts,
-			)
-
-			handler := capabilityControllerHandler{
-				idGenerator: idGenerator,
-			}
-
 			return []migrations.ValueMigration{
 				&capcons.CapabilityValueMigration{
 					CapabilityMapping: capabilityMapping,
 					Reporter:          reporter,
-					IssueHandler:      handler,
 				},
 			}
 		},
@@ -457,6 +449,7 @@ type cadenceValueMigrationReporter struct {
 
 var _ capcons.LinkMigrationReporter = &cadenceValueMigrationReporter{}
 var _ capcons.CapabilityMigrationReporter = &cadenceValueMigrationReporter{}
+var _ capcons.StorageCapabilityMigrationReporter = &cadenceValueMigrationReporter{}
 var _ migrations.Reporter = &cadenceValueMigrationReporter{}
 
 func newValueMigrationReporter(
@@ -534,6 +527,30 @@ func (t *cadenceValueMigrationReporter) MissingCapabilityID(
 	t.reportWriter.Write(capabilityMissingCapabilityIDEntry{
 		AccountAddress: accountAddress,
 		AddressPath:    addressPath,
+	})
+}
+
+func (t *cadenceValueMigrationReporter) MissingBorrowType(
+	accountAddress common.Address,
+	addressPath interpreter.AddressPath,
+) {
+	t.reportWriter.Write(storageCapConsMissingBorrowTypeEntry{
+		AccountAddress: accountAddress,
+		AddressPath:    addressPath,
+	})
+}
+
+func (t *cadenceValueMigrationReporter) IssuedStorageCapabilityController(
+	accountAddress common.Address,
+	addressPath interpreter.AddressPath,
+	borrowType *interpreter.ReferenceStaticType,
+	capabilityID interpreter.UInt64Value,
+) {
+	t.reportWriter.Write(storageCapConIssuedEntry{
+		AccountAddress: accountAddress,
+		AddressPath:    addressPath,
+		BorrowType:     borrowType,
+		CapabilityID:   capabilityID,
 	})
 }
 
@@ -805,6 +822,70 @@ func (e dictionaryKeyConflictEntry) MarshalJSON() ([]byte, error) {
 	}{
 		Kind:           "dictionary-key-conflict",
 		AccountAddress: e.AddressPath.Address.HexWithPrefix(),
+		Path:           e.AddressPath.Path.String(),
+	})
+}
+
+// storageCapConIssuedEntry
+
+type storageCapConIssuedEntry struct {
+	AccountAddress common.Address
+	AddressPath    interpreter.AddressPath
+	BorrowType     interpreter.StaticType
+	CapabilityID   interpreter.UInt64Value
+}
+
+var _ valueMigrationReportEntry = storageCapConIssuedEntry{}
+
+func (e storageCapConIssuedEntry) accountAddress() common.Address {
+	return e.AccountAddress
+}
+
+var _ json.Marshaler = storageCapConIssuedEntry{}
+
+func (e storageCapConIssuedEntry) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		Kind           string `json:"kind"`
+		AccountAddress string `json:"account_address"`
+		Address        string `json:"address"`
+		Path           string `json:"path"`
+		BorrowType     string `json:"borrow_type"`
+		CapabilityID   string `json:"capability_id"`
+	}{
+		Kind:           "storage-capcon-issued",
+		AccountAddress: e.AccountAddress.HexWithPrefix(),
+		Address:        e.AddressPath.Address.HexWithPrefix(),
+		Path:           e.AddressPath.Path.String(),
+		BorrowType:     string(e.BorrowType.ID()),
+		CapabilityID:   e.CapabilityID.String(),
+	})
+}
+
+// StorageCapConMissingBorrowType
+
+type storageCapConsMissingBorrowTypeEntry struct {
+	AccountAddress common.Address
+	AddressPath    interpreter.AddressPath
+}
+
+var _ valueMigrationReportEntry = storageCapConsMissingBorrowTypeEntry{}
+
+func (e storageCapConsMissingBorrowTypeEntry) accountAddress() common.Address {
+	return e.AccountAddress
+}
+
+var _ json.Marshaler = storageCapConsMissingBorrowTypeEntry{}
+
+func (e storageCapConsMissingBorrowTypeEntry) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		Kind           string `json:"kind"`
+		AccountAddress string `json:"account_address"`
+		Address        string `json:"address"`
+		Path           string `json:"path"`
+	}{
+		Kind:           "storage-capcon-missing-borrow-type",
+		AccountAddress: e.AccountAddress.HexWithPrefix(),
+		Address:        e.AddressPath.Address.HexWithPrefix(),
 		Path:           e.AddressPath.Path.String(),
 	})
 }

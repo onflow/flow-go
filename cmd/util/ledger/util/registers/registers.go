@@ -196,14 +196,14 @@ var _ Registers = &AccountRegisters{}
 
 func (a *AccountRegisters) Get(owner string, key string) ([]byte, error) {
 	if owner != a.owner {
-		return nil, fmt.Errorf("owner mismatch: expected %s, got %s", a.owner, owner)
+		return nil, fmt.Errorf("owner mismatch: expected %x, got %x", a.owner, owner)
 	}
 	return a.registers[key], nil
 }
 
 func (a *AccountRegisters) Set(owner string, key string, value []byte) error {
 	if owner != a.owner {
-		return fmt.Errorf("owner mismatch: expected %s, got %s", a.owner, owner)
+		return fmt.Errorf("owner mismatch: expected %x, got %x", a.owner, owner)
 	}
 	a.uncheckedSet(key, value)
 	return nil
