@@ -66,14 +66,13 @@ func runSystemContractsChecking(_ *cobra.Command, args []string) {
 		systemContractLocations[change.AddressLocation()] = struct{}{}
 	}
 
-	var reader io.Reader
-	var err error
-
-	reader, err = os.Open(report)
+	f, err := os.Open(report)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to open report")
 	}
+	defer f.Close()
 
+	var reader io.Reader = f
 	if flagGzip {
 		reader, err = gzip.NewReader(reader)
 		if err != nil {
