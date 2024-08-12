@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	_ "github.com/glebarez/go-sqlite"
+	"github.com/onflow/cadence"
 	migrations2 "github.com/onflow/cadence/migrations"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -21,6 +22,8 @@ import (
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
 	"github.com/onflow/flow-go/cmd/util/ledger/util/registers"
+	"github.com/onflow/flow-go/engine/execution/computation"
+	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
@@ -2132,4 +2135,346 @@ func TestCadenceValueMigrationEntry_MarshalJSON(t *testing.T) {
         }`,
 		string(actual),
 	)
+}
+
+func TestStoragePathCapabilityMigration(t *testing.T) {
+	t.Parallel()
+
+	rwf := &testReportWriterFactory{}
+
+	logWriter := &writer{}
+	logger := zerolog.New(logWriter).Level(zerolog.ErrorLevel)
+
+	const nWorker = 2
+
+	const chainID = flow.Emulator
+
+	payloads, err := newBootstrapPayloads(chainID)
+	require.NoError(t, err)
+
+	registersByAccount, err := registers.NewByAccountFromPayloads(payloads)
+	require.NoError(t, err)
+
+	addressA := common.Address(chainID.Chain().ServiceAddress())
+
+	// TODO: is there a way to read this address from bootstrapped payloads
+	// rather than hard-coding it here?
+	addressB, err := common.HexToAddress("0xe5a8b7f23e8b548f")
+	require.NoError(t, err)
+
+	runtime, err := NewInterpreterMigrationRuntime(
+		registersByAccount,
+		chainID,
+		InterpreterMigrationRuntimeConfig{},
+	)
+	require.NoError(t, err)
+
+	storage := runtime.Storage
+	storageDomain := common.PathDomainStorage.Identifier()
+
+	storageMap := storage.GetStorageMap(
+		addressA,
+		storageDomain,
+		true,
+	)
+
+	borrowType := interpreter.NewReferenceStaticType(
+		nil,
+		interpreter.UnauthorizedAccess,
+		interpreter.PrimitiveStaticTypeAnyStruct,
+	)
+
+	// Store a capability with storage path
+
+	fooCapStorageMapKey := interpreter.StringStorageMapKey("fooCap")
+
+	capabilityFoo := &interpreter.PathCapabilityValue{
+		BorrowType: borrowType,
+		Path:       interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "foo"),
+
+		// Important: Capability must be for a different address,
+		// compared to where the capability is stored.
+		Address: interpreter.AddressValue(addressB),
+	}
+
+	storageMap.WriteValue(
+		runtime.Interpreter,
+		fooCapStorageMapKey,
+		capabilityFoo,
+	)
+
+	// Store another capability with storage path, but without a borrow type.
+
+	barCapStorageMapKey := interpreter.StringStorageMapKey("barCap")
+
+	capabilityBar := &interpreter.PathCapabilityValue{
+		Path: interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "bar"),
+
+		// Important: Capability must be for a different address,
+		// compared to where the capability is stored.
+		Address: interpreter.AddressValue(addressB),
+	}
+
+	storageMap.WriteValue(
+		runtime.Interpreter,
+		barCapStorageMapKey,
+		capabilityBar,
+	)
+
+	err = storage.NondeterministicCommit(runtime.Interpreter, false)
+	require.NoError(t, err)
+
+	// finalize the transaction
+	result, err := runtime.TransactionState.FinalizeMainTransaction()
+	require.NoError(t, err)
+
+	// Merge the changes into the registers
+
+	expectedAddresses := map[flow.Address]struct{}{
+		flow.Address(addressA): {},
+	}
+
+	err = registers.ApplyChanges(
+		registersByAccount,
+		result.WriteSet,
+		expectedAddresses,
+		logger,
+	)
+	require.NoError(t, err)
+
+	// Migrate
+
+	// TODO: EVM contract is not deployed in snapshot yet, so can't update it
+	const evmContractChange = EVMContractChangeNone
+
+	const burnerContractChange = BurnerContractChangeUpdate
+
+	migrations := NewCadence1Migrations(
+		logger,
+		t.TempDir(),
+		rwf,
+		Options{
+			NWorker:              nWorker,
+			ChainID:              chainID,
+			EVMContractChange:    evmContractChange,
+			BurnerContractChange: burnerContractChange,
+			VerboseErrorOutput:   true,
+		},
+	)
+
+	for _, migration := range migrations {
+		err = migration.Migrate(registersByAccount)
+		require.NoError(
+			t,
+			err,
+			"migration `%s` failed, logs: %v",
+			migration.Name,
+			logWriter.logs,
+		)
+	}
+
+	reporter := rwf.reportWriters[capabilityValueMigrationReporterName]
+	require.NotNil(t, reporter)
+	require.Len(t, reporter.entries, 3)
+
+	require.Equal(
+		t,
+		[]any{
+			capabilityMissingCapabilityIDEntry{
+				AccountAddress: addressA,
+				AddressPath: interpreter.AddressPath{
+					Address: addressB,
+					Path:    interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "bar"),
+				},
+			},
+			capabilityMigrationEntry{
+				AccountAddress: addressA,
+				AddressPath: interpreter.AddressPath{
+					Address: addressB,
+					Path:    interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "foo"),
+				},
+				BorrowType:   borrowType,
+				CapabilityID: 3,
+			},
+			cadenceValueMigrationEntry{
+				StorageKey: interpreter.StorageKey{
+					Key:     storageDomain,
+					Address: addressA,
+				},
+				StorageMapKey: fooCapStorageMapKey,
+				Migration:     "CapabilityValueMigration",
+			},
+		},
+		reporter.entries,
+	)
+
+	issueStorageCapConReporter := rwf.reportWriters[issueStorageCapConMigrationReporterName]
+	require.NotNil(t, issueStorageCapConReporter)
+	require.Len(t, issueStorageCapConReporter.entries, 2)
+	require.Equal(
+		t,
+		[]any{
+			storageCapConsMissingBorrowTypeEntry{
+				AccountAddress: addressB,
+				AddressPath: interpreter.AddressPath{
+					Address: addressB,
+					Path:    interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "bar"),
+				},
+			},
+			storageCapConIssuedEntry{
+				AccountAddress: addressB,
+				AddressPath: interpreter.AddressPath{
+					Address: addressB,
+					Path:    interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "foo"),
+				},
+				BorrowType:   borrowType,
+				CapabilityID: 3,
+			},
+		},
+		issueStorageCapConReporter.entries,
+	)
+
+	// Check account A
+
+	_, err = runScript(
+		chainID,
+		registersByAccount,
+		fmt.Sprintf(
+			//language=Cadence
+			`
+              access(all)
+              fun main() {
+                  let storage = getAuthAccount<auth(Storage) &Account>(%s).storage
+                  let fooCap = storage.copy<Capability>(from: /storage/fooCap)!
+                  let barCap = storage.copy<Capability>(from: /storage/barCap)!
+                  assert(fooCap.id == 3)
+                  assert(barCap.id == 0)
+              }
+            `,
+			addressA.HexWithPrefix(),
+		),
+	)
+	require.NoError(t, err)
+
+	// Check account B
+
+	_, err = runScript(
+		chainID,
+		registersByAccount,
+		fmt.Sprintf(
+			//language=Cadence
+			`
+              access(all)
+              fun main() {
+                  let capabilities = getAuthAccount<auth(Capabilities) &Account>(%s).capabilities.storage
+                  let fooCapCons = capabilities.getControllers(forPath: /storage/foo)
+                  assert(fooCapCons.length == 1)
+                  assert(fooCapCons[0].capabilityID == 3)
+              }
+            `,
+			addressB.HexWithPrefix(),
+		),
+	)
+	require.NoError(t, err)
+
+}
+
+func TestStorageCapConIssuedEntry_MarshalJSON(t *testing.T) {
+
+	t.Parallel()
+
+	e := storageCapConIssuedEntry{
+		AccountAddress: common.MustBytesToAddress([]byte{0x2}),
+		AddressPath: interpreter.AddressPath{
+			Address: common.MustBytesToAddress([]byte{0x1}),
+			Path: interpreter.PathValue{
+				Domain:     common.PathDomainStorage,
+				Identifier: "test",
+			},
+		},
+		BorrowType: interpreter.NewReferenceStaticType(
+			nil,
+			interpreter.UnauthorizedAccess,
+			interpreter.PrimitiveStaticTypeInt,
+		),
+		CapabilityID: 3,
+	}
+
+	actual, err := e.MarshalJSON()
+	require.NoError(t, err)
+
+	require.JSONEq(t,
+		//language=JSON
+		`{
+          "kind": "storage-capcon-issued",
+          "account_address": "0x0000000000000002",
+          "address": "0x0000000000000001",
+          "path": "/storage/test",
+          "borrow_type": "&Int",
+          "capability_id": "3"
+        }`,
+		string(actual),
+	)
+}
+
+func TestStorageCapConsMissingBorrowTypeEntry_MarshalJSON(t *testing.T) {
+
+	t.Parallel()
+
+	e := storageCapConsMissingBorrowTypeEntry{
+		AccountAddress: common.MustBytesToAddress([]byte{0x2}),
+		AddressPath: interpreter.AddressPath{
+			Address: common.MustBytesToAddress([]byte{0x1}),
+			Path: interpreter.PathValue{
+				Domain:     common.PathDomainStorage,
+				Identifier: "test",
+			},
+		},
+	}
+
+	actual, err := e.MarshalJSON()
+	require.NoError(t, err)
+
+	require.JSONEq(t,
+		//language=JSON
+		`{
+          "kind": "storage-capcon-missing-borrow-type",
+          "account_address": "0x0000000000000002",
+          "address": "0x0000000000000001",
+          "path": "/storage/test"
+        }`,
+		string(actual),
+	)
+}
+
+func runScript(chainID flow.ChainID, registersByAccount *registers.ByAccount, script string) (cadence.Value, error) {
+	options := computation.DefaultFVMOptions(chainID, false, false)
+	options = append(options,
+		fvm.WithContractDeploymentRestricted(false),
+		fvm.WithContractRemovalRestricted(false),
+		fvm.WithAuthorizationChecksEnabled(false),
+		fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
+		fvm.WithTransactionFeesEnabled(false))
+	ctx := fvm.NewContext(options...)
+
+	storageSnapshot := registers.StorageSnapshot{
+		Registers: registersByAccount,
+	}
+
+	vm := fvm.NewVirtualMachine()
+
+	_, res, err := vm.Run(
+		ctx,
+		fvm.Script([]byte(script)),
+		storageSnapshot,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to run transaction: %w", err)
+	}
+
+	if res.Err != nil {
+		return nil, fmt.Errorf("transaction failed: %w", res.Err)
+	}
+
+	return res.Value, nil
 }
