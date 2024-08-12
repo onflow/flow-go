@@ -77,6 +77,7 @@ import (
 	"github.com/onflow/flow-go/module/compliance"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	exedataprovider "github.com/onflow/flow-go/module/executiondatasync/provider"
+	"github.com/onflow/flow-go/module/executiondatasync/pruner"
 	mocktracker "github.com/onflow/flow-go/module/executiondatasync/tracker/mock"
 	"github.com/onflow/flow-go/module/finalizedreader"
 	confinalizer "github.com/onflow/flow-go/module/finalizer/consensus"
@@ -616,7 +617,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ide
 	checkpointHeight := uint64(0)
 	require.NoError(t, esbootstrap.ImportRegistersFromCheckpoint(node.Log, checkpointFile, checkpointHeight, matchTrie.RootHash(), pebbledb, 2))
 
-	diskStore, err := storagepebble.NewRegisters(pebbledb)
+	diskStore, err := storagepebble.NewRegisters(pebbledb, pruner.DefaultThreshold)
 	require.NoError(t, err)
 
 	reader := finalizedreader.NewFinalizedReader(headersStorage, checkpointHeight)

@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/module/executiondatasync/pruner"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -66,7 +67,7 @@ func TestNewBootstrappedRegistersWithPath(t *testing.T) {
 		firstHeight := uint64(10)
 		require.NoError(t, initHeights(db2, firstHeight))
 
-		registers, err := NewRegisters(db2)
+		registers, err := NewRegisters(db2, pruner.DefaultThreshold)
 		require.NoError(t, err)
 		require.Equal(t, firstHeight, registers.FirstHeight())
 		require.Equal(t, firstHeight, registers.LatestHeight())

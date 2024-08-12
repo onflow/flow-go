@@ -899,7 +899,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					}
 				}
 
-				registers, err := pstorage.NewRegisters(pdb)
+				registers, err := pstorage.NewRegisters(pdb, builder.executionDataPrunerThreshold)
 				if err != nil {
 					return nil, fmt.Errorf("could not create registers storage: %w", err)
 				}

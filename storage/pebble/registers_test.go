@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/executiondatasync/pruner"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/pebble/registers"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -25,7 +26,7 @@ func TestRegisters_Initialize(t *testing.T) {
 	t.Parallel()
 	p, dir := unittest.TempPebbleDBWithOpts(t, nil)
 	// fail on blank database without FirstHeight and LastHeight set
-	_, err := NewRegisters(p)
+	_, err := NewRegisters(p, pruner.DefaultThreshold)
 	require.Error(t, err)
 	// verify the error type
 	require.True(t, errors.Is(err, storage.ErrNotBootstrapped))
@@ -296,7 +297,7 @@ func Benchmark_PayloadStorage(b *testing.B) {
 	dbpath := path.Join(b.TempDir(), "benchmark1.db")
 	db, err := pebble.Open(dbpath, opts)
 	require.NoError(b, err)
-	s, err := NewRegisters(db)
+	s, err := NewRegisters(db, pruner.DefaultThreshold)
 	require.NoError(b, err)
 	require.NotNil(b, s)
 

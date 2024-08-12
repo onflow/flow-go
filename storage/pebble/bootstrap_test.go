@@ -19,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 	"github.com/onflow/flow-go/ledger/complete/wal"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/executiondatasync/pruner"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -59,7 +60,7 @@ func TestRegisterBootstrap_IndexCheckpointFile_Happy(t *testing.T) {
 		require.NoError(t, err)
 
 		// create registers instance and check values
-		reg, err := NewRegisters(pb)
+		reg, err := NewRegisters(pb, pruner.DefaultThreshold)
 		require.NoError(t, err)
 
 		require.Equal(t, reg.LatestHeight(), rootHeight)
@@ -94,7 +95,7 @@ func TestRegisterBootstrap_IndexCheckpointFile_Empty(t *testing.T) {
 		require.NoError(t, err)
 
 		// create registers instance and check values
-		reg, err := NewRegisters(pb)
+		reg, err := NewRegisters(pb, pruner.DefaultThreshold)
 		require.NoError(t, err)
 
 		require.Equal(t, reg.LatestHeight(), rootHeight)
@@ -176,7 +177,7 @@ func TestRegisterBootstrap_IndexCheckpointFile_MultipleBatch(t *testing.T) {
 		require.NoError(t, err)
 
 		// create registers instance and check values
-		reg, err := NewRegisters(pb)
+		reg, err := NewRegisters(pb, pruner.DefaultThreshold)
 		require.NoError(t, err)
 
 		require.Equal(t, reg.LatestHeight(), rootHeight)
