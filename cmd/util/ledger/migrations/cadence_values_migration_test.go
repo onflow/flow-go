@@ -2202,9 +2202,9 @@ func TestStoragePathCapabilityMigration(t *testing.T) {
 	storage := migrationRuntime.Storage
 	storageDomain := common.PathDomainStorage.Identifier()
 
-	// Store a capability with storage path
+	// Store a typed-capability with storage path
 
-	storageMap := storage.GetStorageMap(
+	storageMapForAddressA := storage.GetStorageMap(
 		addressA,
 		storageDomain,
 		true,
@@ -2216,44 +2216,76 @@ func TestStoragePathCapabilityMigration(t *testing.T) {
 		interpreter.PrimitiveStaticTypeAnyStruct,
 	)
 
-	fooCapStorageMapKey := interpreter.StringStorageMapKey("fooCap")
+	aCapStorageMapKey := interpreter.StringStorageMapKey("aCap")
 
-	capabilityFoo := &interpreter.PathCapabilityValue{
+	aCapability := &interpreter.PathCapabilityValue{
 		BorrowType: borrowType,
-		Path:       interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "foo"),
+		Path:       interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "a"),
 
 		// Important: Capability must be for a different address,
 		// compared to where the capability is stored.
 		Address: interpreter.AddressValue(addressB),
 	}
 
-	storageMap.WriteValue(
+	storageMapForAddressA.WriteValue(
 		migrationRuntime.Interpreter,
-		fooCapStorageMapKey,
-		capabilityFoo,
+		aCapStorageMapKey,
+		aCapability,
 	)
 
 	// Store another capability with storage path, but without a borrow type.
+	// But the target path does not contain a value.
 
-	barCapStorageMapKey := interpreter.StringStorageMapKey("barCap")
+	bCapStorageMapKey := interpreter.StringStorageMapKey("bCap")
 
-	capabilityBar := &interpreter.PathCapabilityValue{
-		Path: interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "bar"),
+	bCapability := &interpreter.PathCapabilityValue{
+		Path: interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "b"),
 
 		// Important: Capability must be for a different address,
 		// compared to where the capability is stored.
 		Address: interpreter.AddressValue(addressB),
 	}
 
-	storageMap.WriteValue(
+	storageMapForAddressA.WriteValue(
 		migrationRuntime.Interpreter,
-		barCapStorageMapKey,
-		capabilityBar,
+		bCapStorageMapKey,
+		bCapability,
 	)
 
-	// Store a third capability with storage path, and with a broken type
+	// Store a third capability with storage path, without a borrow type.
+	// But the target path contains a value.
 
-	bazBorrowType := interpreter.NewReferenceStaticType(
+	storageMapForAddressB := storage.GetStorageMap(
+		addressB,
+		storageDomain,
+		true,
+	)
+
+	storageMapForAddressB.WriteValue(
+		migrationRuntime.Interpreter,
+		interpreter.StringStorageMapKey("c"),
+		interpreter.NewUnmeteredStringValue("This is the bar value"),
+	)
+
+	cCapStorageMapKey := interpreter.StringStorageMapKey("cCap")
+
+	cCapability := &interpreter.PathCapabilityValue{
+		Path: interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "c"),
+
+		// Important: Capability must be for a different address,
+		// compared to where the capability is stored.
+		Address: interpreter.AddressValue(addressB),
+	}
+
+	storageMapForAddressA.WriteValue(
+		migrationRuntime.Interpreter,
+		cCapStorageMapKey,
+		cCapability,
+	)
+
+	// Store a fourth capability with storage path, and with a broken type
+
+	dBorrowType := interpreter.NewReferenceStaticType(
 		nil,
 		interpreter.UnauthorizedAccess,
 		interpreter.NewCompositeStaticTypeComputeTypeID(
@@ -2263,21 +2295,21 @@ func TestStoragePathCapabilityMigration(t *testing.T) {
 		),
 	)
 
-	bazCapStorageMapKey := interpreter.StringStorageMapKey("bazCap")
+	dCapStorageMapKey := interpreter.StringStorageMapKey("dCap")
 
-	bazCapability := &interpreter.PathCapabilityValue{
-		BorrowType: bazBorrowType,
-		Path:       interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "baz"),
+	dCapability := &interpreter.PathCapabilityValue{
+		BorrowType: dBorrowType,
+		Path:       interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "d"),
 
 		// Important: Capability must be for a different address,
 		// compared to where the capability is stored.
 		Address: interpreter.AddressValue(addressB),
 	}
 
-	storageMap.WriteValue(
+	storageMapForAddressA.WriteValue(
 		migrationRuntime.Interpreter,
-		bazCapStorageMapKey,
-		bazCapability,
+		dCapStorageMapKey,
+		dCapability,
 	)
 
 	// Commit
@@ -2336,25 +2368,28 @@ func TestStoragePathCapabilityMigration(t *testing.T) {
 
 	reporter := rwf.reportWriters[capabilityValueMigrationReporterName]
 	require.NotNil(t, reporter)
-	require.Len(t, reporter.entries, 5)
+	require.Len(t, reporter.entries, 7)
+
+	inferredBorrowType := interpreter.NewReferenceStaticType(
+		nil,
+		interpreter.UnauthorizedAccess,
+		interpreter.PrimitiveStaticTypeString,
+	)
 
 	require.Equal(
 		t,
 		[]any{
-			storageCapConsMissingBorrowTypeEntry{
-				AccountAddress: addressA,
-				AddressPath: interpreter.AddressPath{
-					Address: addressB,
-					Path:    interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "bar"),
-				},
-			},
 			capabilityMigrationEntry{
 				AccountAddress: addressA,
 				AddressPath: interpreter.AddressPath{
 					Address: addressB,
-					Path:    interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "baz"),
+					Path:    interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "c"),
 				},
-				BorrowType:   bazBorrowType,
+				BorrowType: interpreter.NewReferenceStaticType(
+					nil,
+					interpreter.UnauthorizedAccess,
+					interpreter.PrimitiveStaticTypeString,
+				),
 				CapabilityID: 3,
 			},
 			cadenceValueMigrationEntry{
@@ -2362,16 +2397,16 @@ func TestStoragePathCapabilityMigration(t *testing.T) {
 					Key:     storageDomain,
 					Address: addressA,
 				},
-				StorageMapKey: bazCapStorageMapKey,
+				StorageMapKey: cCapStorageMapKey,
 				Migration:     "CapabilityValueMigration",
 			},
 			capabilityMigrationEntry{
 				AccountAddress: addressA,
 				AddressPath: interpreter.AddressPath{
 					Address: addressB,
-					Path:    interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "foo"),
+					Path:    interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "d"),
 				},
-				BorrowType:   borrowType,
+				BorrowType:   dBorrowType,
 				CapabilityID: 4,
 			},
 			cadenceValueMigrationEntry{
@@ -2379,8 +2414,32 @@ func TestStoragePathCapabilityMigration(t *testing.T) {
 					Key:     storageDomain,
 					Address: addressA,
 				},
-				StorageMapKey: fooCapStorageMapKey,
+				StorageMapKey: dCapStorageMapKey,
 				Migration:     "CapabilityValueMigration",
+			},
+			capabilityMigrationEntry{
+				AccountAddress: addressA,
+				AddressPath: interpreter.AddressPath{
+					Address: addressB,
+					Path:    interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "a"),
+				},
+				BorrowType:   borrowType,
+				CapabilityID: 5,
+			},
+			cadenceValueMigrationEntry{
+				StorageKey: interpreter.StorageKey{
+					Key:     storageDomain,
+					Address: addressA,
+				},
+				StorageMapKey: aCapStorageMapKey,
+				Migration:     "CapabilityValueMigration",
+			},
+			capabilityMissingCapabilityIDEntry{
+				AccountAddress: addressA,
+				AddressPath: interpreter.AddressPath{
+					Address: addressB,
+					Path:    interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "b"),
+				},
 			},
 		},
 		reporter.entries,
@@ -2388,34 +2447,51 @@ func TestStoragePathCapabilityMigration(t *testing.T) {
 
 	issueStorageCapConReporter := rwf.reportWriters[issueStorageCapConMigrationReporterName]
 	require.NotNil(t, issueStorageCapConReporter)
-	require.Len(t, issueStorageCapConReporter.entries, 3)
+	require.Len(t, issueStorageCapConReporter.entries, 5)
 	require.Equal(
 		t,
 		[]any{
-			storageCapConsMissingBorrowTypeEntry{
+			storageCapConsInferredBorrowTypeEntry{
 				AccountAddress: addressB,
 				AddressPath: interpreter.AddressPath{
 					Address: addressB,
-					Path:    interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "bar"),
+					Path:    interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "c"),
 				},
+				BorrowType: inferredBorrowType,
 			},
 			storageCapConIssuedEntry{
 				AccountAddress: addressB,
 				AddressPath: interpreter.AddressPath{
 					Address: addressB,
-					Path:    interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "baz"),
+					Path:    interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "c"),
 				},
-				BorrowType:   bazBorrowType,
+				BorrowType:   inferredBorrowType,
 				CapabilityID: 3,
 			},
 			storageCapConIssuedEntry{
 				AccountAddress: addressB,
 				AddressPath: interpreter.AddressPath{
 					Address: addressB,
-					Path:    interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "foo"),
+					Path:    interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "d"),
+				},
+				BorrowType:   dBorrowType,
+				CapabilityID: 4,
+			},
+			storageCapConIssuedEntry{
+				AccountAddress: addressB,
+				AddressPath: interpreter.AddressPath{
+					Address: addressB,
+					Path:    interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "a"),
 				},
 				BorrowType:   borrowType,
-				CapabilityID: 4,
+				CapabilityID: 5,
+			},
+			storageCapConsMissingBorrowTypeEntry{
+				AccountAddress: addressB,
+				AddressPath: interpreter.AddressPath{
+					Address: addressB,
+					Path:    interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "b"),
+				},
 			},
 		},
 		issueStorageCapConReporter.entries,
@@ -2432,10 +2508,12 @@ func TestStoragePathCapabilityMigration(t *testing.T) {
               access(all)
               fun main() {
                   let storage = getAuthAccount<auth(Storage) &Account>(%s).storage
-                  let fooCap = storage.copy<Capability>(from: /storage/fooCap)!
-                  let barCap = storage.copy<Capability>(from: /storage/barCap)!
-                  assert(fooCap.id == 4)
-                  assert(barCap.id == 0)
+                  let aCap = storage.copy<Capability>(from: /storage/aCap)!
+                  let bCap = storage.copy<Capability>(from: /storage/bCap)!
+                  let cCap = storage.copy<Capability>(from: /storage/cCap)!
+                  assert(aCap.id == 5)
+                  assert(bCap.id == 0)
+                  assert(cCap.id == 3)
               }
             `,
 			addressA.HexWithPrefix(),
@@ -2454,7 +2532,7 @@ func TestStoragePathCapabilityMigration(t *testing.T) {
               access(all)
               fun main() {
                   let storage = getAuthAccount<auth(Storage) &Account>(%s).storage
-                  let bazCap = storage.copy<Capability>(from: /storage/bazCap)!
+                  let dCap = storage.copy<Capability>(from: /storage/dCap)!
               }
             `,
 			addressA.HexWithPrefix(),
@@ -2474,9 +2552,9 @@ func TestStoragePathCapabilityMigration(t *testing.T) {
               access(all)
               fun main() {
                   let capabilities = getAuthAccount<auth(Capabilities) &Account>(%s).capabilities.storage
-                  let fooCapCons = capabilities.getControllers(forPath: /storage/foo)
-                  assert(fooCapCons.length == 1)
-                  assert(fooCapCons[0].capabilityID == 4)
+                  let aCapCons = capabilities.getControllers(forPath: /storage/a)
+                  assert(aCapCons.length == 1)
+                  assert(aCapCons[0].capabilityID == 5)
               }
             `,
 			addressB.HexWithPrefix(),
