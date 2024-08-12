@@ -1266,7 +1266,7 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		flags.BoolVar(&builder.stopControlEnabled,
 			"stop-control-enabled",
 			defaultConfig.stopControlEnabled,
-			"whether to enable the stop control feature. Default value is true")
+			"whether to enable the stop control feature. Default value is false")
 		// ExecutionDataRequester config
 		flags.BoolVar(&builder.executionDataSyncEnabled,
 			"execution-data-sync-enabled",
@@ -1833,15 +1833,12 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 
 			stopControl := stop.NewStopControl(
 				builder.Logger,
-				builder.versionControl,
 			)
 
-			if builder.executionDataSyncEnabled {
-				stopControl.RegisterHeightRecorder(builder.ExecutionDataDownloader)
+			builder.versionControl.AddVersionUpdatesConsumer(stopControl.OnVersionUpdate)
 
-				if builder.executionDataIndexingEnabled {
-					stopControl.RegisterHeightRecorder(builder.ExecutionIndexer)
-				}
+			if builder.executionDataIndexingEnabled {
+				stopControl.RegisterHeightRecorder(builder.ExecutionIndexer)
 			}
 
 			builder.stopControl = stopControl

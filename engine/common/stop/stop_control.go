@@ -12,9 +12,14 @@ import (
 	"github.com/onflow/flow-go/module/counters"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	"github.com/onflow/flow-go/module/irrecoverable"
-
-	"github.com/onflow/flow-go/engine/common/version"
 )
+
+type VersionMetadata struct {
+	// incompatibleBlockHeight is the height of the block that is incompatible with the current node version.
+	incompatibleBlockHeight uint64
+	// updatedVersion is the expected node version to continue working with new blocks.
+	updatedVersion string
+}
 
 // StopControl is responsible for managing the stopping behavior of the node
 // when an incompatible block height is encountered.
@@ -24,10 +29,7 @@ type StopControl struct {
 
 	log zerolog.Logger
 
-	// incompatibleBlockHeight is the height of the block that is incompatible with the current node version.
-	incompatibleBlockHeight *atomic.Uint64
-	// updatedVersion is the expected node version to continue working with new blocks.
-	updatedVersion *atomic.String
+	versionData *atomic.Pointer[VersionMetadata]
 
 	registeredHeightRecorders []execution_data.ProcessedHeightRecorder
 
@@ -48,15 +50,16 @@ type StopControl struct {
 //   - A pointer to the newly created StopControl instance.
 func NewStopControl(
 	log zerolog.Logger,
-	versionControl *version.VersionControl,
 ) *StopControl {
 	sc := &StopControl{
 		log: log.With().
 			Str("component", "stop_control").
 			Logger(),
-		incompatibleBlockHeight: atomic.NewUint64(0),
-		updatedVersion:          atomic.NewString(""),
-		lastProcessedHeight:     counters.NewMonotonousCounter(0),
+		lastProcessedHeight: counters.NewMonotonousCounter(0),
+		versionData: atomic.NewPointer[VersionMetadata](&VersionMetadata{
+			incompatibleBlockHeight: 0,
+			updatedVersion:          "",
+		}),
 		processedHeightNotifier: engine.NewNotifier(),
 	}
 
@@ -64,14 +67,6 @@ func NewStopControl(
 		AddWorker(sc.processEvents).
 		Build()
 	sc.Component = sc.cm
-
-	if versionControl != nil {
-		// Subscribe for version updates
-		versionControl.AddVersionUpdatesConsumer(sc.OnVersionUpdate)
-	} else {
-		sc.log.Info().
-			Msg("version control is uninitialized")
-	}
 
 	return sc
 }
@@ -82,8 +77,10 @@ func NewStopControl(
 //   - height: The block height that is incompatible with the current node version.
 //   - semver: The new semantic version string that is expected for compatibility.
 func (sc *StopControl) updateVersionData(height uint64, semver string) {
-	sc.incompatibleBlockHeight.Store(height)
-	sc.updatedVersion.Store(semver)
+	sc.versionData.Store(&VersionMetadata{
+		incompatibleBlockHeight: height,
+		updatedVersion:          semver,
+	})
 }
 
 // OnVersionUpdate is called when a version update occurs.
@@ -110,16 +107,16 @@ func (sc *StopControl) OnVersionUpdate(height uint64, version *semver.Version) {
 	sc.updateVersionData(0, "")
 }
 
-// OnProcessedBlock is called when need to check processed block for compatibility with current node.
+// onProcessedBlock is called when need to check processed block for compatibility with current node.
 //
 // Parameters:
 //   - ctx: The context used to signal an irrecoverable error if the processed block is incompatible.
-func (sc *StopControl) OnProcessedBlock(ctx irrecoverable.SignalerContext) {
-	incompatibleBlockHeight := sc.incompatibleBlockHeight.Load()
+func (sc *StopControl) onProcessedBlock(ctx irrecoverable.SignalerContext) {
+	versionData := sc.versionData.Load()
 	newHeight := sc.lastProcessedHeight.Value()
-	if newHeight >= incompatibleBlockHeight {
+	if newHeight >= versionData.incompatibleBlockHeight-1 {
 		ctx.Throw(fmt.Errorf("processed block at height %d is incompatible with the current node version, please upgrade to version %s starting from block height %d",
-			newHeight, sc.updatedVersion.Load(), incompatibleBlockHeight))
+			newHeight, versionData.updatedVersion, versionData.incompatibleBlockHeight))
 	}
 }
 
@@ -157,7 +154,7 @@ func (sc *StopControl) processEvents(ctx irrecoverable.SignalerContext, ready co
 		case <-ctx.Done():
 			return
 		case <-sc.processedHeightNotifier.Channel():
-			sc.OnProcessedBlock(ctx)
+			sc.onProcessedBlock(ctx)
 		}
 	}
 }
