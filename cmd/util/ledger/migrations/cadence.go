@@ -5,12 +5,13 @@ import (
 	_ "embed"
 	"fmt"
 
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/cadence/migrations/capcons"
 	"github.com/onflow/cadence/migrations/statictypes"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
-	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
@@ -228,16 +229,22 @@ type IssueStorageCapConMigration struct {
 	programs                          map[runtime.Location]*interpreter.Program
 	mapping                           *capcons.CapabilityMapping
 	reporter                          reporters.ReportWriter
+	logVerboseDiff                    bool
+	verboseErrorOutput                bool
+	errorMessageHandler               *errorMessageHandler
+	log                               zerolog.Logger
 }
 
 const issueStorageCapConMigrationReporterName = "cadence-storage-capcon-issue-migration"
 
 func NewIssueStorageCapConMigration(
 	rwf reporters.ReportWriterFactory,
+	errorMessageHandler *errorMessageHandler,
 	chainID flow.ChainID,
 	storageDomainCapabilities *capcons.AccountsCapabilities,
 	programs map[runtime.Location]*interpreter.Program,
 	capabilityMapping *capcons.CapabilityMapping,
+	opts Options,
 ) *IssueStorageCapConMigration {
 	return &IssueStorageCapConMigration{
 		name:                 "cadence_storage_cap_con_issue_migration",
@@ -246,14 +253,19 @@ func NewIssueStorageCapConMigration(
 		accountsCapabilities: storageDomainCapabilities,
 		programs:             programs,
 		mapping:              capabilityMapping,
+		logVerboseDiff:       opts.LogVerboseDiff,
+		verboseErrorOutput:   opts.VerboseErrorOutput,
+		errorMessageHandler:  errorMessageHandler,
 	}
 }
 
 func (m *IssueStorageCapConMigration) InitMigration(
-	_ zerolog.Logger,
+	log zerolog.Logger,
 	_ *registers.ByAccount,
 	_ int,
 ) error {
+	m.log = log.With().Str("migration", m.name).Logger()
+
 	// During the migration, we only provide already checked programs,
 	// no parsing/checking of contracts is expected.
 
@@ -309,28 +321,48 @@ func (m *IssueStorageCapConMigration) MigrateAccount(
 		idGenerator: idGenerator,
 	}
 
+	reporter := newValueMigrationReporter(
+		m.reporter,
+		m.log,
+		m.errorMessageHandler,
+		m.verboseErrorOutput,
+	)
+
+	inter := migrationRuntime.Interpreter
+
 	capcons.IssueAccountCapabilities(
-		migrationRuntime.Interpreter,
+		inter,
+		reporter,
 		address,
 		accountCapabilities,
 		handler,
 		m.mapping,
 	)
 
-	// It would be ideal to do the reporting inside `IssueAccountCapabilities` function above.
-	// However, that doesn't have the access to the reporter. So doing it here.
-	for _, capability := range accountCapabilities.Capabilities {
-		id, _, _ := m.mapping.Get(interpreter.AddressPath{
-			Address: address,
-			Path:    capability.Path,
-		})
+	err = migrationRuntime.Storage.NondeterministicCommit(inter, false)
+	if err != nil {
+		return fmt.Errorf("failed to commit changes: %w", err)
+	}
 
-		m.reporter.Write(storageCapconIssuedEntry{
-			AccountAddress: address,
-			Path:           capability.Path,
-			BorrowType:     capability.BorrowType,
-			CapabilityID:   id,
-		})
+	// finalize the transaction
+	result, err := migrationRuntime.TransactionState.FinalizeMainTransaction()
+	if err != nil {
+		return fmt.Errorf("failed to finalize main transaction: %w", err)
+	}
+
+	// Merge the changes into the registers
+	expectedAddresses := map[flow.Address]struct{}{
+		flow.Address(address): {},
+	}
+
+	err = registers.ApplyChanges(
+		accountRegisters,
+		result.WriteSet,
+		expectedAddresses,
+		m.log,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to apply changes: %w", err)
 	}
 
 	return nil
@@ -409,10 +441,12 @@ func NewCadence1ValueMigrations(
 		func(opts Options) (string, AccountBasedMigration) {
 			migration := NewIssueStorageCapConMigration(
 				rwf,
+				errorMessageHandler,
 				opts.ChainID,
 				storageDomainCapabilities,
 				programs,
 				capabilityMapping,
+				opts,
 			)
 			return migration.name, migration
 
