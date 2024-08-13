@@ -2239,6 +2239,7 @@ func TestStoragePathCapabilityMigration(t *testing.T) {
 	bCapStorageMapKey := interpreter.StringStorageMapKey("bCap")
 
 	bCapability := &interpreter.PathCapabilityValue{
+		// NOTE: no borrow type
 		Path: interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "b"),
 
 		// Important: Capability must be for a different address,
@@ -2270,6 +2271,7 @@ func TestStoragePathCapabilityMigration(t *testing.T) {
 	cCapStorageMapKey := interpreter.StringStorageMapKey("cCap")
 
 	cCapability := &interpreter.PathCapabilityValue{
+		// NOTE: no borrow type
 		Path: interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "c"),
 
 		// Important: Capability must be for a different address,
@@ -2310,6 +2312,41 @@ func TestStoragePathCapabilityMigration(t *testing.T) {
 		migrationRuntime.Interpreter,
 		dCapStorageMapKey,
 		dCapability,
+	)
+
+	// Store a fifth capability with storage path targeting a FlowToken.Vault, but no borrow type
+
+	flowVaultCapStorageMapKey := interpreter.StringStorageMapKey("flowVaultCap")
+
+	flowVaultCapability := &interpreter.PathCapabilityValue{
+		// NOTE: no borrow type
+		Path: interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "flowVault"),
+
+		// Important: Capability must be for a different address,
+		// compared to where the capability is stored.
+		Address: interpreter.AddressValue(addressB),
+	}
+
+	storageMapForAddressA.WriteValue(
+		migrationRuntime.Interpreter,
+		flowVaultCapStorageMapKey,
+		flowVaultCapability,
+	)
+
+	// Store a FlowToken.Vault
+
+	storageMapForAddressB.WriteValue(
+		migrationRuntime.Interpreter,
+		interpreter.StringStorageMapKey("flowVault"),
+		interpreter.NewCompositeValue(
+			migrationRuntime.Interpreter,
+			interpreter.EmptyLocationRange,
+			systemcontracts.SystemContractsForChain(chainID).FlowToken.Location(),
+			"FlowToken.Vault",
+			common.CompositeKindResource,
+			[]interpreter.CompositeField{},
+			addressB,
+		),
 	)
 
 	// Commit
@@ -2368,12 +2405,29 @@ func TestStoragePathCapabilityMigration(t *testing.T) {
 
 	reporter := rwf.reportWriters[capabilityValueMigrationReporterName]
 	require.NotNil(t, reporter)
-	require.Len(t, reporter.entries, 7)
 
 	inferredBorrowType := interpreter.NewReferenceStaticType(
 		nil,
 		interpreter.UnauthorizedAccess,
 		interpreter.PrimitiveStaticTypeString,
+	)
+
+	flowTokenVaultBorrowType := interpreter.NewReferenceStaticType(
+		nil,
+		interpreter.NewEntitlementSetAuthorization(nil,
+			func() []common.TypeID {
+				return []common.TypeID{
+					"A.ee82856bf20e2aa6.FungibleToken.Withdraw",
+				}
+			},
+			1,
+			sema.Conjunction,
+		),
+		interpreter.NewCompositeStaticTypeComputeTypeID(
+			nil,
+			common.NewAddressLocation(nil, flowTokenAddress, "FlowToken"),
+			"FlowToken.Vault",
+		),
 	)
 
 	require.Equal(
@@ -2434,6 +2488,23 @@ func TestStoragePathCapabilityMigration(t *testing.T) {
 				StorageMapKey: aCapStorageMapKey,
 				Migration:     "CapabilityValueMigration",
 			},
+			capabilityMigrationEntry{
+				AccountAddress: addressA,
+				AddressPath: interpreter.AddressPath{
+					Address: addressB,
+					Path:    interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "flowVault"),
+				},
+				BorrowType:   flowTokenVaultBorrowType,
+				CapabilityID: 6,
+			},
+			cadenceValueMigrationEntry{
+				StorageKey: interpreter.StorageKey{
+					Key:     storageDomain,
+					Address: addressA,
+				},
+				StorageMapKey: interpreter.StringStorageMapKey("flowVaultCap"),
+				Migration:     "CapabilityValueMigration",
+			},
 			capabilityMissingCapabilityIDEntry{
 				AccountAddress: addressA,
 				AddressPath: interpreter.AddressPath{
@@ -2447,7 +2518,6 @@ func TestStoragePathCapabilityMigration(t *testing.T) {
 
 	issueStorageCapConReporter := rwf.reportWriters[issueStorageCapConMigrationReporterName]
 	require.NotNil(t, issueStorageCapConReporter)
-	require.Len(t, issueStorageCapConReporter.entries, 5)
 	require.Equal(
 		t,
 		[]any{
@@ -2485,6 +2555,23 @@ func TestStoragePathCapabilityMigration(t *testing.T) {
 				},
 				BorrowType:   borrowType,
 				CapabilityID: 5,
+			},
+			storageCapConsInferredBorrowTypeEntry{
+				AccountAddress: addressB,
+				AddressPath: interpreter.AddressPath{
+					Address: addressB,
+					Path:    interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "flowVault"),
+				},
+				BorrowType: flowTokenVaultBorrowType,
+			},
+			storageCapConIssuedEntry{
+				AccountAddress: addressB,
+				AddressPath: interpreter.AddressPath{
+					Address: addressB,
+					Path:    interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "flowVault"),
+				},
+				BorrowType:   flowTokenVaultBorrowType,
+				CapabilityID: 6,
 			},
 			storageCapConsMissingBorrowTypeEntry{
 				AccountAddress: addressB,
