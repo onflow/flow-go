@@ -527,14 +527,12 @@ func (exeNode *ExecutionNode) LoadProviderEngine(
 
 	if exeNode.exeConf.evmTracingEnabled {
 		var err error
-		var evmTraceUploader debug.Uploader
+		evmTraceUploader := debug.NewNoopUploader()
 		if len(exeNode.exeConf.evmTracesGCPBucket) > 0 {
 			evmTraceUploader, err = debug.NewGCPUploader(exeNode.exeConf.evmTracesGCPBucket)
 			if err != nil {
 				return nil, fmt.Errorf("could not create evm trace uploader: %w", err)
 			}
-		} else {
-			evmTraceUploader = &debug.NoopUploader{}
 		}
 		evmTracer, err := debug.NewEVMCallTracer(evmTraceUploader, node.Logger)
 		if err != nil {
