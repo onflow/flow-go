@@ -58,3 +58,9 @@ func (g *GCPUploader) Upload(id string, data json.RawMessage) error {
 
 	return nil
 }
+
+type NoopUploader struct{}
+
+func (np *NoopUploader) Upload(id string, data json.RawMessage) error {
+	return nil
+}
