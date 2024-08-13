@@ -5,6 +5,7 @@ import (
 	_ "embed"
 	"fmt"
 
+	"github.com/onflow/cadence/runtime/sema"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/cadence/migrations/capcons"
@@ -333,6 +334,12 @@ func (m *IssueStorageCapConMigration) MigrateAccount(
 
 	inter := migrationRuntime.Interpreter
 
+	// Create the chain-specific fungible token vault type
+	// and the fungible token vault authorization once and reuse it
+	systemContracts := systemcontracts.SystemContractsForChain(m.chainID)
+	fungibleTokenVaultType := m.fungibleTokenVaultType(systemContracts)
+	fungibleTokenVaultAuthorization := m.fungibleTokenVaultAuthorization(systemContracts)
+
 	capcons.IssueAccountCapabilities(
 		inter,
 		migrationRuntime.Storage,
@@ -343,7 +350,10 @@ func (m *IssueStorageCapConMigration) MigrateAccount(
 		m.typedCapabilityMapping,
 		m.untypedCapabilityMapping,
 		func(valueType interpreter.StaticType) interpreter.Authorization {
-			// TODO:
+			// TODO: potentially extend with additional heuristics if needed
+			if valueType.Equal(fungibleTokenVaultType) {
+				return fungibleTokenVaultAuthorization
+			}
 			return interpreter.UnauthorizedAccess
 		},
 	)
@@ -375,6 +385,49 @@ func (m *IssueStorageCapConMigration) MigrateAccount(
 	}
 
 	return nil
+}
+
+func (m *IssueStorageCapConMigration) fungibleTokenVaultType(
+	systemContracts *systemcontracts.SystemContracts,
+) *interpreter.CompositeStaticType {
+
+	flowTokenLocation := common.AddressLocation{
+		Address: common.Address(systemContracts.FlowToken.Address),
+		Name:    "FlowToken",
+	}
+
+	return interpreter.NewCompositeStaticTypeComputeTypeID(
+		nil,
+		flowTokenLocation,
+		"FlowToken.Vault",
+	)
+}
+
+func (m *IssueStorageCapConMigration) fungibleTokenVaultAuthorization(
+	systemContracts *systemcontracts.SystemContracts,
+) interpreter.Authorization {
+
+	// Not metered, so safe to allocate outside constructor function
+
+	fungibleTokenLocation := common.AddressLocation{
+		Address: common.Address(systemContracts.FungibleToken.Address),
+		Name:    "FungibleToken",
+	}
+
+	withdrawEntitlement := fungibleTokenLocation.TypeID(nil, "FungibleToken.Withdraw")
+
+	entitlements := []common.TypeID{
+		withdrawEntitlement,
+	}
+
+	return interpreter.NewEntitlementSetAuthorization(
+		nil,
+		func() []common.TypeID {
+			return entitlements
+		},
+		len(entitlements),
+		sema.Conjunction,
+	)
 }
 
 func (m *IssueStorageCapConMigration) Close() error {
