@@ -2447,10 +2447,20 @@ func TestStoragePathCapabilityMigration(t *testing.T) {
 
 	issueStorageCapConReporter := rwf.reportWriters[issueStorageCapConMigrationReporterName]
 	require.NotNil(t, issueStorageCapConReporter)
-	require.Len(t, issueStorageCapConReporter.entries, 5)
+	require.Len(t, issueStorageCapConReporter.entries, 6)
 	require.Equal(
 		t,
 		[]any{
+			storageCapConsMissingBorrowTypeEntry{
+				TargetPath: interpreter.AddressPath{
+					Address: addressB,
+					Path:    interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "c"),
+				},
+				StoredPath: interpreter.AddressPath{
+					Address: addressB,
+					Path:    interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "cCap"),
+				},
+			},
 			storageCapConsInferredBorrowTypeEntry{
 				TargetPath: interpreter.AddressPath{
 					Address: addressB,
