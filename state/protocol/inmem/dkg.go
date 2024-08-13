@@ -7,37 +7,35 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 )
 
-// TODO(EFM, #6214): Once EpochCommit.DKGIndexMap is populated, we can remove much of the logic here.
-//   - a thin wrapper around EpochCommit can satisfy the protocol.DKG interface
 type DKG struct {
-	enc EncodableDKG
+	commit *flow.EpochCommit
 }
 
 var _ protocol.DKG = (*DKG)(nil)
 
-func NewDKG(enc EncodableDKG) *DKG {
-	return &DKG{enc: enc}
+func NewDKG(commit *flow.EpochCommit) *DKG {
+	return &DKG{commit: commit}
 }
 
-func (d DKG) Size() uint                 { return uint(len(d.enc.Participants)) }
-func (d DKG) GroupKey() crypto.PublicKey { return d.enc.GroupKey.PublicKey }
+func (d DKG) Size() uint                 { return uint(len(d.commit.DKGParticipantKeys)) }
+func (d DKG) GroupKey() crypto.PublicKey { return d.commit.DKGGroupKey }
 
 // Index returns the index for the given node. Error Returns:
 // protocol.IdentityNotFoundError if nodeID is not a valid DKG participant.
 func (d DKG) Index(nodeID flow.Identifier) (uint, error) {
-	part, exists := d.enc.Participants[nodeID]
+	index, exists := d.commit.DKGIndexMap[nodeID]
 	if !exists {
 		return 0, protocol.IdentityNotFoundError{NodeID: nodeID}
 	}
-	return part.Index, nil
+	return uint(index), nil
 }
 
 // KeyShare returns the public key share for the given node. Error Returns:
 // protocol.IdentityNotFoundError if nodeID is not a valid DKG participant.
 func (d DKG) KeyShare(nodeID flow.Identifier) (crypto.PublicKey, error) {
-	part, exists := d.enc.Participants[nodeID]
+	index, exists := d.commit.DKGIndexMap[nodeID]
 	if !exists {
 		return nil, protocol.IdentityNotFoundError{NodeID: nodeID}
 	}
-	return part.KeyShare, nil
+	return d.commit.DKGParticipantKeys[index], nil
 }

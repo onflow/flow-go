@@ -3,7 +3,6 @@ package flow
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"io"
 
 	"github.com/ethereum/go-ethereum/rlp"
@@ -476,27 +475,6 @@ func (e *EjectNode) ServiceEvent() ServiceEvent {
 		Type:  ServiceEventEjectNode,
 		Event: e,
 	}
-}
-
-// ToDKGParticipantLookup constructs a DKG participant lookup from an identity
-// list and a key list. The identity list must be EXACTLY the same (order and
-// contents) as that used when initializing the corresponding DKG instance.
-// TODO(EFM, #6214): Once DKGIndexMap is populated we can remove this and use EpochCommit directly
-func ToDKGParticipantLookup(participants IdentitySkeletonList, keys []crypto.PublicKey) (map[Identifier]DKGParticipant, error) {
-	if len(participants) != len(keys) {
-		return nil, fmt.Errorf("participant list (len=%d) does not match key list (len=%d)", len(participants), len(keys))
-	}
-
-	lookup := make(map[Identifier]DKGParticipant, len(participants))
-	for i := 0; i < len(participants); i++ {
-		part := participants[i]
-		key := keys[i]
-		lookup[part.NodeID] = DKGParticipant{
-			Index:    uint(i),
-			KeyShare: key,
-		}
-	}
-	return lookup, nil
 }
 
 type DKGParticipant struct {
