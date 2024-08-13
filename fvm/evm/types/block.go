@@ -93,9 +93,9 @@ func NewBlockFromBytes(encoded []byte) (*Block, error) {
 func GenesisTimeStamp(flowChainID flow.ChainID) uint64 {
 	// default evm chain ID is previewNet
 	switch flowChainID {
-	case flow.Mainnet:
-		return uint64(time.Date(2024, time.August, 1, 0, 0, 0, 0, time.UTC).Unix())
 	case flow.Testnet:
+		return uint64(time.Date(2024, time.August, 1, 0, 0, 0, 0, time.UTC).Unix())
+	case flow.Mainnet:
 		return uint64(time.Date(2024, time.September, 1, 0, 0, 0, 0, time.UTC).Unix())
 	default:
 		return 0
