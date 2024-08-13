@@ -215,14 +215,14 @@ func (s *ExecutionDataTracker) GetPrunedHeight() (uint64, error) {
 // No errors are expected during normal operation.
 func (s *ExecutionDataTracker) trackBlob(blockHeight uint64, c cid.Cid) func(tx storage.PebbleReaderBatchWriter) error {
 	return func(tx storage.PebbleReaderBatchWriter) error {
-		r, w := tx.ReaderWriter()
+		_, w := tx.ReaderWriter()
 		err := operation.InsertBlob(blockHeight, c)(w)
 		if err != nil {
 			return fmt.Errorf("failed to add blob record: %w", err)
 		}
 
 		var latestHeight uint64
-		err = operation.RetrieveTrackerLatestHeight(c, &latestHeight)(r)
+		err = operation.RetrieveTrackerLatestHeight(c, &latestHeight)(s.db)
 		if err != nil {
 			if !errors.Is(err, storage.ErrNotFound) {
 				return fmt.Errorf("failed to get latest height: %w", err)
