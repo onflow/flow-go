@@ -121,32 +121,12 @@ func (s *ExecutionDataTracker) init(startHeight uint64) error {
 		}
 		s.logger.Info().Msgf("finished pruning")
 	} else if errors.Is(fulfilledHeightErr, storage.ErrNotFound) && errors.Is(prunedHeightErr, storage.ErrNotFound) {
-		// db is empty, need to bootstrap it
-		if err := s.bootstrap(startHeight); err != nil {
+		// db is empty, need to initialize it
+		if err := operation.WithReaderBatchWriter(s.db, operation.InitTrackerHeights(startHeight)); err != nil {
 			return fmt.Errorf("failed to bootstrap storage: %w", err)
 		}
 	} else {
 		return multierror.Append(fulfilledHeightErr, prunedHeightErr).ErrorOrNil()
-	}
-
-	return nil
-}
-
-// bootstrap sets the initial fulfilled and pruned heights to startHeight in an empty database.
-//
-// Parameters:
-// - startHeight: The initial height to set for both fulfilled and pruned heights.
-//
-// No errors are expected during normal operation.
-func (s *ExecutionDataTracker) bootstrap(startHeight uint64) error {
-	err := operation.InitTrackerFulfilledHeight(startHeight)(s.db)
-	if err != nil {
-		return fmt.Errorf("failed to set fulfilled height value: %w", err)
-	}
-
-	err = operation.InitTrackerPrunedHeight(startHeight)(s.db)
-	if err != nil {
-		return fmt.Errorf("failed to set pruned height value: %w", err)
 	}
 
 	return nil
@@ -233,31 +213,34 @@ func (s *ExecutionDataTracker) GetPrunedHeight() (uint64, error) {
 // - c: The CID of the blob to be tracked.
 //
 // No errors are expected during normal operation.
-func (s *ExecutionDataTracker) trackBlob(blockHeight uint64, c cid.Cid) error {
-	err := operation.InsertBlob(blockHeight, c)(s.db)
-	if err != nil {
-		return fmt.Errorf("failed to add blob record: %w", err)
-	}
-
-	var latestHeight uint64
-	err = operation.RetrieveTrackerLatestHeight(c, &latestHeight)(s.db)
-	if err != nil {
-		if !errors.Is(err, storage.ErrNotFound) {
-			return fmt.Errorf("failed to get latest height: %w", err)
+func (s *ExecutionDataTracker) trackBlob(blockHeight uint64, c cid.Cid) func(tx storage.PebbleReaderBatchWriter) error {
+	return func(tx storage.PebbleReaderBatchWriter) error {
+		r, w := tx.ReaderWriter()
+		err := operation.InsertBlob(blockHeight, c)(w)
+		if err != nil {
+			return fmt.Errorf("failed to add blob record: %w", err)
 		}
-	} else {
-		// don't update the latest height if there is already a higher block height containing this blob
-		if latestHeight >= blockHeight {
-			return nil
+
+		var latestHeight uint64
+		err = operation.RetrieveTrackerLatestHeight(c, &latestHeight)(r)
+		if err != nil {
+			if !errors.Is(err, storage.ErrNotFound) {
+				return fmt.Errorf("failed to get latest height: %w", err)
+			}
+		} else {
+			// don't update the latest height if there is already a higher block height containing this blob
+			if latestHeight >= blockHeight {
+				return nil
+			}
 		}
-	}
 
-	err = operation.UpsertTrackerLatestHeight(c, blockHeight)(s.db)
-	if err != nil {
-		return fmt.Errorf("failed to set latest height value: %w", err)
-	}
+		err = operation.UpsertTrackerLatestHeight(c, blockHeight)(w)
+		if err != nil {
+			return fmt.Errorf("failed to set latest height value: %w", err)
+		}
 
-	return nil
+		return nil
+	}
 }
 
 // trackBlobs tracks multiple blob CIDs at the specified block height.
@@ -269,11 +252,15 @@ func (s *ExecutionDataTracker) trackBlob(blockHeight uint64, c cid.Cid) error {
 // No errors are expected during normal operation.
 func (s *ExecutionDataTracker) trackBlobs(blockHeight uint64, cids ...cid.Cid) error {
 	if len(cids) > 0 {
-		for _, c := range cids {
-			if err := s.trackBlob(blockHeight, c); err != nil {
-				return fmt.Errorf("failed to track blob %s: %w", c.String(), err)
+		return operation.WithReaderBatchWriter(s.db, func(tx storage.PebbleReaderBatchWriter) error {
+			for _, c := range cids {
+				if err := s.trackBlob(blockHeight, c)(tx); err != nil {
+					return fmt.Errorf("failed to track blob %s: %w", c.String(), err)
+				}
 			}
-		}
+
+			return nil
+		})
 	}
 
 	return nil
@@ -286,22 +273,26 @@ func (s *ExecutionDataTracker) trackBlobs(blockHeight uint64, cids ...cid.Cid) e
 // whether to delete the latest height record.
 //
 // No errors are expected during normal operation.
-func (s *ExecutionDataTracker) batchDelete(deleteInfos []*storage.DeleteInfo) error {
-	for _, dInfo := range deleteInfos {
-		err := operation.RemoveBlob(dInfo.Height, dInfo.Cid)(s.db)
-		if err != nil {
-			return fmt.Errorf("failed to delete blob record for Cid %s: %w", dInfo.Cid.String(), err)
-		}
+func (s *ExecutionDataTracker) batchDelete(deleteInfos []*storage.DeleteInfo) func(storage.PebbleReaderBatchWriter) error {
+	return func(tx storage.PebbleReaderBatchWriter) error {
+		_, w := tx.ReaderWriter()
 
-		if dInfo.DeleteLatestHeightRecord {
-			err = operation.RemoveTrackerLatestHeight(dInfo.Cid)(s.db)
+		for _, dInfo := range deleteInfos {
+			err := operation.RemoveBlob(dInfo.Height, dInfo.Cid)(w)
 			if err != nil {
-				return fmt.Errorf("failed to delete latest height record for Cid %s: %w", dInfo.Cid.String(), err)
+				return fmt.Errorf("failed to delete blob record for Cid %s: %w", dInfo.Cid.String(), err)
+			}
+
+			if dInfo.DeleteLatestHeightRecord {
+				err = operation.RemoveTrackerLatestHeight(dInfo.Cid)(w)
+				if err != nil {
+					return fmt.Errorf("failed to delete latest height record for Cid %s: %w", dInfo.Cid.String(), err)
+				}
 			}
 		}
-	}
 
-	return nil
+		return nil
+	}
 }
 
 // PruneUpToHeight removes all data from storage corresponding
@@ -384,7 +375,7 @@ func (s *ExecutionDataTracker) PruneUpToHeight(height uint64) error {
 			// remove tracker records for pruned heights
 			batch = append(batch, dInfo)
 			if len(batch) == itemsPerBatch {
-				if err := s.batchDelete(batch); err != nil {
+				if err := operation.WithReaderBatchWriter(s.db, s.batchDelete(batch)); err != nil {
 					return err
 				}
 				batch = nil
@@ -392,7 +383,7 @@ func (s *ExecutionDataTracker) PruneUpToHeight(height uint64) error {
 		}
 
 		if len(batch) > 0 {
-			if err := s.batchDelete(batch); err != nil {
+			if err := operation.WithReaderBatchWriter(s.db, s.batchDelete(batch)); err != nil {
 				return err
 			}
 		}

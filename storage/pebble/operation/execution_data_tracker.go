@@ -1,6 +1,8 @@
 package operation
 
 import (
+	"fmt"
+
 	"github.com/cockroachdb/pebble"
 	"github.com/ipfs/go-cid"
 
@@ -12,9 +14,23 @@ func UpdateTrackerFulfilledHeight(height uint64) func(w pebble.Writer) error {
 	return insert(makePrefix(storage.PrefixGlobalState, storage.GlobalStateFulfilledHeight), height)
 }
 
-// InitTrackerFulfilledHeight initializes the fulfilled height for the execution data tracker storage.
-func InitTrackerFulfilledHeight(height uint64) func(w pebble.Writer) error {
-	return insert(makePrefix(storage.PrefixGlobalState, storage.GlobalStateFulfilledHeight), height)
+// InitTrackerHeights initializes the fulfilled and pruned heights for the execution data tracker storage.
+func InitTrackerHeights(height uint64) func(storage.PebbleReaderBatchWriter) error {
+	return func(tx storage.PebbleReaderBatchWriter) error {
+		_, w := tx.ReaderWriter()
+
+		err := insert(makePrefix(storage.PrefixGlobalState, storage.GlobalStateFulfilledHeight), height)(w)
+		if err != nil {
+			return fmt.Errorf("failed to set fulfilled height value: %w", err)
+		}
+
+		err = insert(makePrefix(storage.PrefixGlobalState, storage.GlobalStatePrunedHeight), height)(w)
+		if err != nil {
+			return fmt.Errorf("failed to set pruned height value: %w", err)
+		}
+
+		return nil
+	}
 }
 
 // RetrieveTrackerFulfilledHeight retrieves the fulfilled height from the execution data tracker storage.
@@ -24,11 +40,6 @@ func RetrieveTrackerFulfilledHeight(height *uint64) func(r pebble.Reader) error 
 
 // UpdateTrackerPrunedHeight updates the pruned height in the execution data tracker storage.
 func UpdateTrackerPrunedHeight(height uint64) func(w pebble.Writer) error {
-	return insert(makePrefix(storage.PrefixGlobalState, storage.GlobalStatePrunedHeight), height)
-}
-
-// InitTrackerPrunedHeight initializes the pruned height for the execution data tracker storage.
-func InitTrackerPrunedHeight(height uint64) func(w pebble.Writer) error {
 	return insert(makePrefix(storage.PrefixGlobalState, storage.GlobalStatePrunedHeight), height)
 }
 
