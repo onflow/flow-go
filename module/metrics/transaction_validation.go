@@ -29,13 +29,13 @@ func NewTransactionValidationCollector() *TransactionValidationCollector {
 			Help:      "counter for the validated transactions",
 		}),
 		transactionValidationSkipped: promauto.NewCounter(prometheus.CounterOpts{
-			Name:      "transaction_validation_skipped",
+			Name:      "transaction_validation_skipped_total",
 			Namespace: namespaceAccess,
 			Subsystem: subsystemTransactionValidation,
 			Help:      "counter for the skipped transaction validations",
 		}),
 		transactionValidationFailed: promauto.NewCounterVec(prometheus.CounterOpts{
-			Name:      "transaction_validation_failed",
+			Name:      "transaction_validation_failed_total",
 			Namespace: namespaceAccess,
 			Subsystem: subsystemTransactionValidation,
 			Help:      "counter for the failed transactions validation",
