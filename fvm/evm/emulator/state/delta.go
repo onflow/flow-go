@@ -104,13 +104,18 @@ func (d *DeltaView) Exist(addr gethCommon.Address) (bool, error) {
 	if found {
 		return true, nil
 	}
+	// if is address is dirty it exists
+	_, found = d.dirtyAddresses[addr]
+	if found {
+		return true, nil
+	}
 	return d.parent.Exist(addr)
 }
 
 // CreateAccount creates a new account for the given address
 //
-// if address already extists (even if destructed), carry over the balance
-// and reset the data from the orginal account.
+// if address already exists (even if destructed), carry over the balance
+// and reset the data from the original account.
 func (d *DeltaView) CreateAccount(addr gethCommon.Address) error {
 	// if is already created return
 	if d.IsCreated(addr) {
@@ -137,7 +142,7 @@ func (d *DeltaView) CreateAccount(addr gethCommon.Address) error {
 		d.nonces[addr] = 0
 		d.codes[addr] = nil
 		d.codeHashes[addr] = gethTypes.EmptyCodeHash
-		// carrying over the balance. (legacy behaviour of the Geth stateDB)
+		// carrying over the balance. (legacy behavior of the Geth stateDB)
 		d.balances[addr] = balance
 
 		// flag addr as recreated, this flag helps with postponing deletion of slabs
@@ -199,17 +204,18 @@ func (d *DeltaView) HasSelfDestructed(addr gethCommon.Address) (bool, *uint256.I
 //
 // if an account has been created in this transaction, it would return an error
 func (d *DeltaView) SelfDestruct(addr gethCommon.Address) error {
-	// if it has been recently created, calling self destruct is not a valid operation
-	if d.IsCreated(addr) {
-		return fmt.Errorf("invalid operation, can't selfdestruct an account that is just created")
-	}
-
-	// if it doesn't exist, return false
+	// if it doesn't exist, return
 	exists, err := d.Exist(addr)
 	if err != nil {
 		return err
 	}
 	if !exists {
+		return nil
+	}
+
+	// if already set to be self destructed, return
+	_, found := d.toBeDestructed[addr]
+	if found {
 		return nil
 	}
 
@@ -406,6 +412,20 @@ func (d *DeltaView) SetState(sk types.SlotAddress, value gethCommon.Hash) error 
 // the way back to the base view. This means that the state root that is returned
 // ignores the updates to slots during the transaction.
 func (d *DeltaView) GetStorageRoot(addr gethCommon.Address) (gethCommon.Hash, error) {
+	exist, err := d.Exist(addr)
+	if err != nil {
+		return gethCommon.Hash{}, err
+	}
+	if exist {
+		code, err := d.GetCode(addr)
+		if err != nil {
+			return gethCommon.Hash{}, err
+		}
+		if len(code) == 0 {
+			return gethTypes.EmptyRootHash, nil
+		}
+		// else go back to the parent
+	}
 	// go back to parents (until we reach the base view)
 	// Note that if storage is updated in deltas but not
 	// committed the expected behavior is to return the root in the base view.

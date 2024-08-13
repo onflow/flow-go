@@ -955,7 +955,7 @@ func TestEVMAddressDeposit(t *testing.T) {
 
 			snapshot = snapshot.Append(execSnap)
 
-			expectedBalance := types.OneFlowBalance
+			expectedBalance := types.OneFlowBalance()
 			bal := getEVMAccountBalance(t, ctx, vm, snapshot, addr)
 			require.Equal(t, expectedBalance, bal)
 
@@ -971,7 +971,7 @@ func TestEVMAddressDeposit(t *testing.T) {
 			depEvPayload, err := events.DecodeFLOWTokensDepositedEventPayload(depEv)
 			require.NoError(t, err)
 
-			require.Equal(t, types.OneFlow, depEvPayload.BalanceAfterInAttoFlow.Value)
+			require.Equal(t, types.OneFlow(), depEvPayload.BalanceAfterInAttoFlow.Value)
 
 			// commit block
 			blockEventPayload, _ := callEVMHeartBeat(t,

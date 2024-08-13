@@ -35,7 +35,7 @@ func TestCommonQueryParamMiddlewares(t *testing.T) {
 			query.Add(ExpandQueryParam, strings.Join(expandList, ","))
 		}
 		if len(selectList) > 0 {
-			query.Add(selectQueryParam, strings.Join(selectList, ","))
+			query.Add(SelectQueryParam, strings.Join(selectList, ","))
 		}
 		req.URL.RawQuery = query.Encode()
 
