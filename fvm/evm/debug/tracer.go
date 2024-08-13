@@ -111,7 +111,8 @@ func (t *CallTracer) Collect(txID gethCommon.Hash) {
 				Msg("failed to upload trace results, no more retries")
 			return
 		}
-
+		// remove the result
+		delete(t.resultsByTxID, txID)
 		l.Debug().Msg("evm traces uploaded successfully")
 	}()
 
