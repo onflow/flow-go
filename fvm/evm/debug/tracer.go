@@ -101,8 +101,7 @@ func (t *CallTracer) Collect(txID gethCommon.Hash) {
 
 		res, found := t.resultsByTxID[txID]
 		if !found {
-			l.Error().Str("txID", txID.Hex()).
-				Msg("trace result not found")
+			l.Error().Msg("trace result not found")
 			return
 		}
 		if err := t.uploader.Upload(TraceID(txID, t.blockID), res); err != nil {
