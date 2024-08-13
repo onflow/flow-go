@@ -4,12 +4,13 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/onflow/flow-go/model/flow"
 	gethCommon "github.com/onflow/go-ethereum/common"
 	gethTypes "github.com/onflow/go-ethereum/core/types"
 	gethRLP "github.com/onflow/go-ethereum/rlp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/onflow/flow-go/model/flow"
 )
 
 func Test_GenesisBlock(t *testing.T) {
