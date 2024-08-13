@@ -168,8 +168,21 @@ func IsValidEpochCommit(commit *flow.EpochCommit, setup *flow.EpochSetup) error 
 	}
 
 	participants := setup.Participants.Filter(filter.IsValidDKGParticipant)
-	if len(participants) != len(commit.DKGParticipantKeys) {
-		return NewInvalidServiceEventErrorf("participant list (len=%d) does not match dkg key list (len=%d)", len(participants), len(commit.DKGParticipantKeys))
+	// at max DKG participant count is equal to the number of participants,
+	// but it can be less if some participants took part in the DKG but are not part of the committee anymore(eg. ejected)
+	if len(participants) > len(commit.DKGParticipantKeys) {
+		return NewInvalidServiceEventErrorf("participant list (len=%d) is bigger than dkg key list (len=%d)", len(participants), len(commit.DKGParticipantKeys))
+	}
+	// we always expect same number of keys as the number of entries in the index map.
+	if len(commit.DKGParticipantKeys) != len(commit.DKGIndexMap) {
+		return NewInvalidServiceEventErrorf("dkg key list (len=%d) does not match index map (len=%d)", len(commit.DKGParticipantKeys), len(commit.DKGIndexMap))
+	}
+	// make sure that all participants have a DKG index
+	for _, nodeID := range participants.NodeIDs() {
+		_, ok := commit.DKGIndexMap[nodeID]
+		if !ok {
+			return NewInvalidServiceEventErrorf("missing DKG index for participant %x", nodeID)
+		}
 	}
 	return nil
 }

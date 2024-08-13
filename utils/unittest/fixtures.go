@@ -2145,9 +2145,14 @@ func IndexFixture() *flow.Index {
 }
 
 func WithDKGFromParticipants(participants flow.IdentitySkeletonList) func(*flow.EpochCommit) {
-	count := len(participants.Filter(filter.IsValidDKGParticipant))
+	dkgParticipants := participants.Filter(filter.IsValidDKGParticipant).Sort(flow.Canonical[flow.IdentitySkeleton])
 	return func(commit *flow.EpochCommit) {
-		commit.DKGParticipantKeys = PublicKeysFixture(count, crypto.BLSBLS12381)
+		commit.DKGParticipantKeys = nil
+		commit.DKGIndexMap = make(map[flow.Identifier]int)
+		for index, nodeID := range dkgParticipants.NodeIDs() {
+			commit.DKGParticipantKeys = append(commit.DKGParticipantKeys, KeyFixture(crypto.BLSBLS12381).PublicKey())
+			commit.DKGIndexMap[nodeID] = index
+		}
 	}
 }
 

@@ -125,8 +125,39 @@ func TestBootstrapInvalidEpochCommit(t *testing.T) {
 		_, result, _ := unittest.BootstrapFixture(participants)
 		setup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
 		commit := result.ServiceEvents[1].Event.(*flow.EpochCommit)
-		// add an extra DKG participant key
+		// remove a DKG participant key, this will lead to a case where we have more DKG participants than resulting keys.
+		commit.DKGParticipantKeys = commit.DKGParticipantKeys[1:]
+		for nodeID, index := range commit.DKGIndexMap {
+			if index == 0 {
+				delete(commit.DKGIndexMap, nodeID)
+				break
+			}
+		}
+
+		err := protocol.IsValidEpochCommit(commit, setup)
+		require.Error(t, err)
+	})
+
+	t.Run("inconsistent DKG index map", func(t *testing.T) {
+		_, result, _ := unittest.BootstrapFixture(participants)
+		setup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
+		commit := result.ServiceEvents[1].Event.(*flow.EpochCommit)
+		// add an extra DKG participant key, this will lead to a case where size of index map is different from the number of keys.
 		commit.DKGParticipantKeys = append(commit.DKGParticipantKeys, unittest.KeyFixture(crypto.BLSBLS12381).PublicKey())
+
+		err := protocol.IsValidEpochCommit(commit, setup)
+		require.Error(t, err)
+	})
+
+	t.Run("missing DKG index", func(t *testing.T) {
+		_, result, _ := unittest.BootstrapFixture(participants)
+		setup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
+		commit := result.ServiceEvents[1].Event.(*flow.EpochCommit)
+		// replace entity in the index map so the size matches but with invalid identifier ID.
+		nodeID := setup.Participants.Filter(filter.IsValidDKGParticipant)[0].NodeID
+		index := commit.DKGIndexMap[nodeID]
+		delete(commit.DKGIndexMap, nodeID)
+		commit.DKGIndexMap[unittest.IdentifierFixture()] = index
 
 		err := protocol.IsValidEpochCommit(commit, setup)
 		require.Error(t, err)
