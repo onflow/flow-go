@@ -2160,8 +2160,6 @@ github.com/onflow/cadence v1.0.0-M3/go.mod h1:odXGZZ/wGNA5mwT8bC9v8u8EXACHllB2AB
 github.com/onflow/cadence v1.0.0-preview.48 h1:WkgU0z6H/oRe44kLL6OO+wkGeKULWChoCT8i7sgiWdg=
 github.com/onflow/cadence v1.0.0-preview.48/go.mod h1:BCoenp1TYp+SmG7FGWStjehvvzcvNQ3xvpK5rkthq3Y=
 github.com/onflow/crypto v0.25.0/go.mod h1:C8FbaX0x8y+FxWjbkHy0Q4EASCDR9bSPWZqlpCLYyVI=
-github.com/onflow/crypto v0.25.1 h1:0txy2PKPMM873JbpxQNbJmuOJtD56bfs48RQfm0ts5A=
-github.com/onflow/crypto v0.25.1/go.mod h1:C8FbaX0x8y+FxWjbkHy0Q4EASCDR9bSPWZqlpCLYyVI=
 github.com/onflow/crypto v0.25.2-0.20240813163121-a1d4a1128629 h1:EUAb4cxdvwegBc2VIAwRHzoPuTKvVPYEeMeh3WGh6pU=
 github.com/onflow/crypto v0.25.2-0.20240813163121-a1d4a1128629/go.mod h1:AFO9qjQTLSkh3S3r+hNPPYENrZYx2vcfFawsBmtyd48=
 github.com/onflow/flow-core-contracts/lib/go/contracts v1.3.1 h1:q9tXLIALwQ76bO4bmSrhtTkyc2cZF4/gH11ix9E3F5k=
