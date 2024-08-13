@@ -458,6 +458,26 @@ func (commit *EpochCommit) EqualTo(other *EpochCommit) bool {
 	return true
 }
 
+// EjectNode is a service event emitted when a node has to be ejected from the network.
+// The Dynamic Protocol State observes these events and updates the identity table accordingly.
+// It contains a single field which is the identifier of the node being ejected.
+type EjectNode struct {
+	NodeID Identifier
+}
+
+// EqualTo returns true if the two events are equivalent.
+func (e *EjectNode) EqualTo(other *EjectNode) bool {
+	return e.NodeID == other.NodeID
+}
+
+// ServiceEvent returns the event as a generic ServiceEvent type.
+func (e *EjectNode) ServiceEvent() ServiceEvent {
+	return ServiceEvent{
+		Type:  ServiceEventEjectNode,
+		Event: e,
+	}
+}
+
 // ToDKGParticipantLookup constructs a DKG participant lookup from an identity
 // list and a key list. The identity list must be EXACTLY the same (order and
 // contents) as that used when initializing the corresponding DKG instance.
