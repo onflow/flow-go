@@ -256,11 +256,7 @@ func (s *ExecutionDataTracker) trackBlob(tx *badger.Txn, blockHeight uint64, c c
 //
 // No errors are expected during normal operation.
 func (s *ExecutionDataTracker) trackBlobs(blockHeight uint64, cids ...cid.Cid) error {
-	cidsPerBatch := storage.CidsPerBatch
-	maxCidsPerBatch := getBatchItemCountLimit(s.db, 2, storage.BlobRecordKeyLength+storage.LatestHeightKeyLength+8)
-	if maxCidsPerBatch < cidsPerBatch {
-		cidsPerBatch = maxCidsPerBatch
-	}
+	cidsPerBatch := s.batchItemLimit(storage.CidsPerBatch, 2, storage.BlobRecordKeyLength+storage.LatestHeightKeyLength+8)
 
 	for len(cids) > 0 {
 		batchSize := cidsPerBatch
@@ -321,10 +317,19 @@ func (s *ExecutionDataTracker) batchDelete(deleteInfos []*storage.DeleteInfo) er
 	return nil
 }
 
-// batchDeleteItemLimit determines the maximum number of items that can be deleted in a batch operation.
-func (s *ExecutionDataTracker) batchDeleteItemLimit() int {
-	itemsPerBatch := storage.DeleteItemsPerBatch
-	maxItemsPerBatch := getBatchItemCountLimit(s.db, 2, storage.BlobRecordKeyLength+storage.LatestHeightKeyLength)
+// batchItemLimit returns the maximum number of items that can
+// be processed in a single batch operation based on the limits.
+//
+// Parameters:
+// - itemsPerBatch: The initial number of items to process in a single batch.
+// - writeCountPerItem: The number of write operations required per item.
+// - writeSizePerItem: The size in bytes of each item to be written.
+func (s *ExecutionDataTracker) batchItemLimit(
+	itemsPerBatch int,
+	writeCountPerItem int64,
+	writeSizePerItem int64,
+) int {
+	maxItemsPerBatch := getBatchItemCountLimit(s.db, writeCountPerItem, writeSizePerItem)
 	if maxItemsPerBatch < itemsPerBatch {
 		itemsPerBatch = maxItemsPerBatch
 	}
@@ -342,7 +347,7 @@ func (s *ExecutionDataTracker) batchDeleteItemLimit() int {
 // No errors are expected during normal operation.
 func (s *ExecutionDataTracker) PruneUpToHeight(height uint64) error {
 	blobRecordPrefix := []byte{storage.PrefixBlobRecord}
-	itemsPerBatch := s.batchDeleteItemLimit()
+	itemsPerBatch := s.batchItemLimit(storage.DeleteItemsPerBatch, 2, storage.BlobRecordKeyLength+storage.LatestHeightKeyLength)
 	var batch []*storage.DeleteInfo
 
 	s.mu.Lock()
