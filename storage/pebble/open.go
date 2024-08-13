@@ -7,7 +7,6 @@ import (
 	"github.com/cockroachdb/pebble"
 	"github.com/hashicorp/go-multierror"
 
-	"github.com/onflow/flow-go/module/executiondatasync/pruner"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/pebble/registers"
 )
@@ -21,7 +20,7 @@ func NewBootstrappedRegistersWithPath(dir string) (*Registers, *pebble.DB, error
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to initialize pebble db: %w", err)
 	}
-	registers, err := NewRegisters(db, pruner.DefaultThreshold)
+	registers, err := NewRegisters(db, 0)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotBootstrapped) {
 			// closing the db if not bootstrapped

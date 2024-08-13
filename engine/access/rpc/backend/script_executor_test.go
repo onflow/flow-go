@@ -22,7 +22,6 @@ import (
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/execution"
-	"github.com/onflow/flow-go/module/executiondatasync/pruner"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/state_synchronization/indexer"
@@ -127,7 +126,7 @@ func (s *ScriptExecutorSuite) SetupTest() {
 
 	s.dbDir = unittest.TempDir(s.T())
 	db := pebbleStorage.NewBootstrappedRegistersWithPathForTest(s.T(), s.dbDir, s.height, s.height)
-	pebbleRegisters, err := pebbleStorage.NewRegisters(db, pruner.DefaultThreshold)
+	pebbleRegisters, err := pebbleStorage.NewRegisters(db, 0)
 	s.Require().NoError(err)
 	s.registerIndex = pebbleRegisters
 

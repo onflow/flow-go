@@ -56,9 +56,14 @@ func (s *Registers) Get(
 	height uint64,
 ) (flow.RegisterValue, error) {
 	latestHeight := s.latestHeight.Load()
-	pruneHeight := latestHeight - s.pruneThreshold
 
-	if height > latestHeight || height < s.firstHeight || height < pruneHeight {
+	// TODO: clarify, if we do not set any prune threshold, the check should be valid, also what should be done in case of prune threshold bigger than height
+	var pruneHeight uint64
+	if s.pruneThreshold != 0 {
+		pruneHeight = latestHeight - s.pruneThreshold
+	}
+
+	if height < s.firstHeight || height < pruneHeight || height > latestHeight {
 		return nil, errors.Wrap(
 			storage.ErrHeightNotIndexed,
 			fmt.Sprintf("height %d not indexed, indexed range is [%d-%d], or below prune height %d", height, s.firstHeight, latestHeight, pruneHeight),

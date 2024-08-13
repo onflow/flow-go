@@ -15,7 +15,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/executiondatasync/pruner"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/pebble/registers"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -26,7 +25,7 @@ func TestRegisters_Initialize(t *testing.T) {
 	t.Parallel()
 	p, dir := unittest.TempPebbleDBWithOpts(t, nil)
 	// fail on blank database without FirstHeight and LastHeight set
-	_, err := NewRegisters(p, pruner.DefaultThreshold)
+	_, err := NewRegisters(p, 0)
 	require.Error(t, err)
 	// verify the error type
 	require.True(t, errors.Is(err, storage.ErrNotBootstrapped))
@@ -133,7 +132,7 @@ func TestRegisters_Heights(t *testing.T) {
 func TestRegisters_Store_RoundTrip(t *testing.T) {
 	t.Parallel()
 	minHeight := uint64(2)
-	RunWithRegistersStorageAtInitialHeights(t, minHeight, minHeight, func(r *Registers) {
+	RunWithRegistersStorageAtInitialHeights(t, minHeight, minHeight, 0, func(r *Registers) {
 		key1 := flow.RegisterID{Owner: "owner", Key: "key1"}
 		expectedValue1 := []byte("value1")
 		entries := flow.RegisterEntries{
@@ -222,7 +221,7 @@ func TestRegisters_GetAndStoreEmptyOwner(t *testing.T) {
 	otherValue := []byte("other value")
 
 	t.Run("empty owner", func(t *testing.T) {
-		RunWithRegistersStorageAtInitialHeights(t, 1, 1, func(r *Registers) {
+		RunWithRegistersStorageAtInitialHeights(t, 1, 1, 0, func(r *Registers) {
 			// First, only set the empty Owner key, and make sure the empty value is available,
 			// and the zero value returns an errors
 			entries := flow.RegisterEntries{
@@ -255,7 +254,7 @@ func TestRegisters_GetAndStoreEmptyOwner(t *testing.T) {
 	})
 
 	t.Run("zero owner", func(t *testing.T) {
-		RunWithRegistersStorageAtInitialHeights(t, 1, 1, func(r *Registers) {
+		RunWithRegistersStorageAtInitialHeights(t, 1, 1, 0, func(r *Registers) {
 			// First, only set the zero Owner key, and make sure the zero value is available,
 			// and the empty value returns an errors
 			entries := flow.RegisterEntries{
@@ -297,7 +296,7 @@ func Benchmark_PayloadStorage(b *testing.B) {
 	dbpath := path.Join(b.TempDir(), "benchmark1.db")
 	db, err := pebble.Open(dbpath, opts)
 	require.NoError(b, err)
-	s, err := NewRegisters(db, pruner.DefaultThreshold)
+	s, err := NewRegisters(db, 0)
 	require.NoError(b, err)
 	require.NotNil(b, s)
 
@@ -377,5 +376,5 @@ func Benchmark_PayloadStorage(b *testing.B) {
 
 func RunWithRegistersStorageAtHeight1(tb testing.TB, f func(r *Registers)) {
 	defaultHeight := uint64(1)
-	RunWithRegistersStorageAtInitialHeights(tb, defaultHeight, defaultHeight, f)
+	RunWithRegistersStorageAtInitialHeights(tb, defaultHeight, defaultHeight, 0, f)
 }

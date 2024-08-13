@@ -33,7 +33,7 @@ func withRegisterStore(t *testing.T, fn func(
 	headers map[uint64]*flow.Header,
 	n *notifier,
 )) {
-	pebble.RunWithRegistersStorageAtInitialHeights(t, 10, 10, func(diskStore *pebble.Registers) {
+	pebble.RunWithRegistersStorageAtInitialHeights(t, 10, 10, 0, func(diskStore *pebble.Registers) {
 		log := unittest.Logger()
 		var wal execution.ExecutedFinalizedWAL
 		finalized, headerByHeight, highest := testutil.NewMockFinalizedReader(10, 100)
