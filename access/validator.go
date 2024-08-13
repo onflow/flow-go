@@ -197,6 +197,7 @@ func (v *TransactionValidator) Validate(ctx context.Context, tx *flow.Transactio
 		}
 
 		// log and ignore all other errors
+		v.transactionValidationMetrics.TransactionValidationSkipped()
 		log.Info().Err(err).Msg("check payer validation skipped due to error")
 	}
 
