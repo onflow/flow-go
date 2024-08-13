@@ -2,8 +2,12 @@ package storage
 
 import (
 	"encoding/binary"
+	"errors"
+	"fmt"
 
+	"github.com/hashicorp/go-multierror"
 	"github.com/ipfs/go-cid"
+	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/module/blobs"
 )
@@ -99,4 +103,51 @@ type DeleteInfo struct {
 	Cid                      cid.Cid
 	Height                   uint64
 	DeleteLatestHeightRecord bool
+}
+
+// InitTracker initializes an ExecutionDataTracker.
+//
+// This function is shared by multiple tracker implementations (e.g., Badger-based and Pebble-based) to avoid code duplication.
+//
+// Parameters:
+// - tracker: The ExecutionDataTracker implementation being initialized.
+// - logger: The logger for logging tracker operations.
+// - startHeight: The initial height to be set if no previous tracker heights are found.
+// - updateHeightsFn: A function that initializes the tracker heights in the database if they are not found.
+//
+// Returns an error if any inconsistency is detected or if there is a failure in the initialization process.
+func InitTracker(
+	tracker ExecutionDataTracker,
+	logger zerolog.Logger,
+	startHeight uint64,
+	initHeightsFn func(startHeight uint64) error,
+) error {
+	fulfilledHeight, fulfilledHeightErr := tracker.GetFulfilledHeight()
+	prunedHeight, prunedHeightErr := tracker.GetPrunedHeight()
+
+	if fulfilledHeightErr == nil && prunedHeightErr == nil {
+		if prunedHeight > fulfilledHeight {
+			return fmt.Errorf(
+				"inconsistency detected: pruned height (%d) is greater than fulfilled height (%d)",
+				prunedHeight,
+				fulfilledHeight,
+			)
+		}
+
+		logger.Info().Msgf("prune from height %v up to height %d", fulfilledHeight, prunedHeight)
+		// replay pruning in case it was interrupted during previous shutdown
+		if err := tracker.PruneUpToHeight(prunedHeight); err != nil {
+			return fmt.Errorf("failed to replay pruning: %w", err)
+		}
+		logger.Info().Msgf("finished pruning")
+	} else if errors.Is(fulfilledHeightErr, ErrNotFound) && errors.Is(prunedHeightErr, ErrNotFound) {
+		// db is empty, need to initialize it
+		if err := initHeightsFn(startHeight); err != nil {
+			return fmt.Errorf("failed to bootstrap storage: %w", err)
+		}
+	} else {
+		return multierror.Append(fulfilledHeightErr, prunedHeightErr).ErrorOrNil()
+	}
+
+	return nil
 }

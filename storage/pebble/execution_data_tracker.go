@@ -7,7 +7,6 @@ import (
 	"sync"
 
 	"github.com/cockroachdb/pebble"
-	"github.com/hashicorp/go-multierror"
 	"github.com/ipfs/go-cid"
 	"github.com/rs/zerolog"
 
@@ -85,51 +84,21 @@ func NewExecutionDataTracker(
 
 	lg.Info().Msgf("initialize tracker with start height: %d", startHeight)
 
-	if err := tracker.init(startHeight); err != nil {
+	err = storage.InitTracker(
+		tracker,
+		lg,
+		startHeight,
+		func(startHeight uint64) error {
+			return operation.WithReaderBatchWriter(db, operation.InitTrackerHeights(startHeight))
+		},
+	)
+	if err != nil {
 		return nil, fmt.Errorf("failed to initialize tracker: %w", err)
 	}
 
 	lg.Info().Msgf("tracker initialized")
 
 	return tracker, nil
-}
-
-// TODO: move common logic into separate function to avoid duplication of code
-// init initializes the ExecutionDataTracker by setting the fulfilled and pruned heights.
-//
-// Parameters:
-// - startHeight: The initial fulfilled height to be set if no previous fulfilled height is found.
-//
-// No errors are expected during normal operation.
-func (s *ExecutionDataTracker) init(startHeight uint64) error {
-	fulfilledHeight, fulfilledHeightErr := s.GetFulfilledHeight()
-	prunedHeight, prunedHeightErr := s.GetPrunedHeight()
-
-	if fulfilledHeightErr == nil && prunedHeightErr == nil {
-		if prunedHeight > fulfilledHeight {
-			return fmt.Errorf(
-				"inconsistency detected: pruned height (%d) is greater than fulfilled height (%d)",
-				prunedHeight,
-				fulfilledHeight,
-			)
-		}
-
-		s.logger.Info().Msgf("prune from height %v up to height %d", fulfilledHeight, prunedHeight)
-		// replay pruning in case it was interrupted during previous shutdown
-		if err := s.PruneUpToHeight(prunedHeight); err != nil {
-			return fmt.Errorf("failed to replay pruning: %w", err)
-		}
-		s.logger.Info().Msgf("finished pruning")
-	} else if errors.Is(fulfilledHeightErr, storage.ErrNotFound) && errors.Is(prunedHeightErr, storage.ErrNotFound) {
-		// db is empty, need to initialize it
-		if err := operation.WithReaderBatchWriter(s.db, operation.InitTrackerHeights(startHeight)); err != nil {
-			return fmt.Errorf("failed to bootstrap storage: %w", err)
-		}
-	} else {
-		return multierror.Append(fulfilledHeightErr, prunedHeightErr).ErrorOrNil()
-	}
-
-	return nil
 }
 
 // Update is used to track new blob CIDs.
