@@ -17,7 +17,7 @@ import (
 
 func Test_CallTracer(t *testing.T) {
 	t.Run("collect traces and upload them", func(t *testing.T) {
-		txID := gethCommon.Hash{0x05}
+		var txID gethCommon.Hash
 		blockID := flow.Identifier{0x01}
 		var res json.RawMessage
 
@@ -42,7 +42,9 @@ func Test_CallTracer(t *testing.T) {
 		// first transaction
 		tr := tracer.TxTracer()
 		require.NotNil(t, tr)
+
 		tx := gethTypes.NewTransaction(nonce, to, amount, 100, big.NewInt(10), data)
+		txID = tx.Hash()
 		tr.OnTxStart(nil, tx, from)
 		tr.OnEnter(0, 0, from, to, []byte{0x01, 0x02}, 10, big.NewInt(1))
 		tr.OnEnter(1, byte(vm.ADD), from, to, data, 20, big.NewInt(2))
@@ -53,8 +55,8 @@ func Test_CallTracer(t *testing.T) {
 	})
 
 	t.Run("collect traces and upload them (after a failed transaction)", func(t *testing.T) {
-		txID := gethCommon.Hash{0x05}
 		blockID := flow.Identifier{0x01}
+		var txID gethCommon.Hash
 		var res json.RawMessage
 
 		mockUpload := &testutils.MockUploader{
@@ -75,7 +77,6 @@ func Test_CallTracer(t *testing.T) {
 		data := []byte{0x02, 0x04}
 		amount := big.NewInt(1)
 
-		// first transaction
 		tr := tracer.TxTracer()
 		require.NotNil(t, tr)
 
@@ -85,8 +86,9 @@ func Test_CallTracer(t *testing.T) {
 		tr.OnEnter(0, 0, from, to, []byte{0x01, 0x02}, 10, big.NewInt(1))
 		tr.OnEnter(1, byte(vm.ADD), from, to, data, 20, big.NewInt(2))
 
-		// 4th transaction
+		// success
 		tx = gethTypes.NewTransaction(nonce, to, amount, 400, big.NewInt(40), data)
+		txID = tx.Hash()
 		tr.OnTxStart(nil, tx, from)
 		tr.OnEnter(0, 0, from, to, []byte{0x01, 0x02}, 10, big.NewInt(1))
 		tr.OnExit(0, []byte{0x02}, 200, nil, false)
