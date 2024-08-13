@@ -381,7 +381,8 @@ func NewCadence1CapabilityValueMigration(
 	errorMessageHandler *errorMessageHandler,
 	programs map[runtime.Location]*interpreter.Program,
 	privatePublicCapabilityMapping *capcons.PathCapabilityMapping,
-	storageCapabilityMapping *capcons.PathTypeCapabilityMapping,
+	typedStorageCapabilityMapping *capcons.PathTypeCapabilityMapping,
+	untypedStorageCapabilityMapping *capcons.PathCapabilityMapping,
 	opts Options,
 ) *CadenceBaseMigration {
 	var diffReporter reporters.ReportWriter
@@ -403,9 +404,10 @@ func NewCadence1CapabilityValueMigration(
 		) []migrations.ValueMigration {
 			return []migrations.ValueMigration{
 				&capcons.CapabilityValueMigration{
-					PrivatePublicCapabilityMapping: privatePublicCapabilityMapping,
-					StorageCapabilityMapping:       storageCapabilityMapping,
-					Reporter:                       reporter,
+					PrivatePublicCapabilityMapping:  privatePublicCapabilityMapping,
+					TypedStorageCapabilityMapping:   typedStorageCapabilityMapping,
+					UntypedStorageCapabilityMapping: untypedStorageCapabilityMapping,
+					Reporter:                        reporter,
 				},
 			}
 		},
@@ -539,6 +541,18 @@ func (t *cadenceValueMigrationReporter) MissingBorrowType(
 	t.reportWriter.Write(storageCapConsMissingBorrowTypeEntry{
 		AccountAddress: accountAddress,
 		AddressPath:    addressPath,
+	})
+}
+
+func (t *cadenceValueMigrationReporter) InferredMissingBorrowType(
+	accountAddress common.Address,
+	addressPath interpreter.AddressPath,
+	borrowType *interpreter.ReferenceStaticType,
+) {
+	t.reportWriter.Write(storageCapConsInferredBorrowTypeEntry{
+		AccountAddress: accountAddress,
+		AddressPath:    addressPath,
+		BorrowType:     borrowType,
 	})
 }
 
@@ -889,5 +903,36 @@ func (e storageCapConsMissingBorrowTypeEntry) MarshalJSON() ([]byte, error) {
 		AccountAddress: e.AccountAddress.HexWithPrefix(),
 		Address:        e.AddressPath.Address.HexWithPrefix(),
 		Path:           e.AddressPath.Path.String(),
+	})
+}
+
+// StorageCapConMissingBorrowType
+
+type storageCapConsInferredBorrowTypeEntry struct {
+	AccountAddress common.Address
+	AddressPath    interpreter.AddressPath
+	BorrowType     *interpreter.ReferenceStaticType
+}
+
+var _ valueMigrationReportEntry = storageCapConsInferredBorrowTypeEntry{}
+var _ json.Marshaler = storageCapConsInferredBorrowTypeEntry{}
+
+func (e storageCapConsInferredBorrowTypeEntry) accountAddress() common.Address {
+	return e.AccountAddress
+}
+
+func (e storageCapConsInferredBorrowTypeEntry) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		Kind           string `json:"kind"`
+		AccountAddress string `json:"account_address"`
+		Address        string `json:"address"`
+		Path           string `json:"path"`
+		BorrowType     string `json:"borrow_type"`
+	}{
+		Kind:           "storage-capcon-inferred-borrow-type",
+		AccountAddress: e.AccountAddress.HexWithPrefix(),
+		Address:        e.AddressPath.Address.HexWithPrefix(),
+		Path:           e.AddressPath.Path.String(),
+		BorrowType:     string(e.BorrowType.ID()),
 	})
 }
