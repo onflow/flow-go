@@ -235,11 +235,9 @@ func (s *ExecutionDataTracker) trackBlob(tx *badger.Txn, blockHeight uint64, c c
 		if !errors.Is(err, storage.ErrNotFound) {
 			return fmt.Errorf("failed to get latest height: %w", err)
 		}
-	} else {
+	} else if latestHeight >= blockHeight {
 		// don't update the latest height if there is already a higher block height containing this blob
-		if latestHeight >= blockHeight {
-			return nil
-		}
+		return nil
 	}
 
 	err = operation.UpsertTrackerLatestHeight(c, blockHeight)(tx)
