@@ -118,7 +118,10 @@ func GenesisBlock(chainID flow.ChainID) *Block {
 
 // GenesisBlockHash returns the genesis block hash in the EVM environment
 func GenesisBlockHash(chainID flow.ChainID) gethCommon.Hash {
-	h, _ := GenesisBlock(chainID).Hash()
+	h, err := GenesisBlock(chainID).Hash()
+	if err != nil { // this never happens
+		panic(err)
+	}
 	return h
 }
 
