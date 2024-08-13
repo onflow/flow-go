@@ -6,7 +6,6 @@ import (
 	"github.com/onflow/crypto"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module/signature"
 )
 
@@ -107,15 +106,11 @@ func ToEpochCommit(epoch Epoch) (*flow.EpochCommit, error) {
 		})
 	}
 
-	participants, err := epoch.InitialIdentities()
-	if err != nil {
-		return nil, fmt.Errorf("could not get epoch participants: %w", err)
-	}
 	dkg, err := epoch.DKG()
 	if err != nil {
 		return nil, fmt.Errorf("could not get epoch dkg: %w", err)
 	}
-	dkgParticipantKeys, err := GetDKGParticipantKeys(dkg, participants.Filter(filter.IsValidDKGParticipant))
+	dkgParticipantKeys, dkgIndexMap, err := GetDKGParticipantKeys(dkg)
 	if err != nil {
 		return nil, fmt.Errorf("could not get dkg participant keys: %w", err)
 	}
@@ -125,35 +120,32 @@ func ToEpochCommit(epoch Epoch) (*flow.EpochCommit, error) {
 		ClusterQCs:         flow.ClusterQCVoteDatasFromQCs(qcs),
 		DKGGroupKey:        dkg.GroupKey(),
 		DKGParticipantKeys: dkgParticipantKeys,
+		DKGIndexMap:        dkgIndexMap,
 	}
 	return commit, nil
 }
 
-// GetDKGParticipantKeys retrieves the canonically ordered list of DKG
-// participant keys from the DKG.
+// GetDKGParticipantKeys retrieves the list of public keys and index map for a DKG participants.
 // All errors indicate inconsistent or invalid inputs.
 // No errors are expected during normal operation.
-func GetDKGParticipantKeys(dkg DKG, participants flow.IdentitySkeletonList) ([]crypto.PublicKey, error) {
-
-	keys := make([]crypto.PublicKey, 0, len(participants))
-	for i, identity := range participants {
-
-		index, err := dkg.Index(identity.NodeID)
+func GetDKGParticipantKeys(dkg DKG) ([]crypto.PublicKey, map[flow.Identifier]int, error) {
+	dkgSize := dkg.Size()
+	keys := make([]crypto.PublicKey, 0, dkgSize)
+	indexMap := make(map[flow.Identifier]int, dkgSize)
+	for i := uint(0); i < dkgSize; i++ {
+		nodeID, err := dkg.NodeID(i)
 		if err != nil {
-			return nil, fmt.Errorf("could not get index (node=%x): %w", identity.NodeID, err)
+			return nil, nil, fmt.Errorf("could not get node ID (index=%d): %w", i, err)
 		}
-		key, err := dkg.KeyShare(identity.NodeID)
+		key, err := dkg.KeyShare(nodeID)
 		if err != nil {
-			return nil, fmt.Errorf("could not get key share (node=%x): %w", identity.NodeID, err)
+			return nil, nil, fmt.Errorf("could not get key share (node=%x): %w", nodeID, err)
 		}
-		if uint(i) != index {
-			return nil, fmt.Errorf("participant list index (%d) does not match dkg index (%d)", i, index)
-		}
-
 		keys = append(keys, key)
+		indexMap[nodeID] = int(i)
 	}
 
-	return keys, nil
+	return keys, indexMap, nil
 }
 
 // DKGPhaseViews returns the DKG final phase views for an epoch.

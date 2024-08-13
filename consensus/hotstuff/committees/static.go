@@ -147,3 +147,14 @@ func (s staticDKG) KeyShare(nodeID flow.Identifier) (crypto.PublicKey, error) {
 	}
 	return participant.KeyShare, nil
 }
+
+// NodeID returns the node identifier for the given index.
+// An exception is returned if the index is >= Size().
+func (s staticDKG) NodeID(index uint) (flow.Identifier, error) {
+	for nodeID, participant := range s.dkgParticipants {
+		if participant.Index == index {
+			return nodeID, nil
+		}
+	}
+	return flow.ZeroID, fmt.Errorf("index %d not found in DKG", index)
+}

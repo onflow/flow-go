@@ -25,4 +25,8 @@ type DKG interface {
 	// Error Returns:
 	// * protocol.IdentityNotFoundError if nodeID is not a valid DKG participant.
 	KeyShare(nodeID flow.Identifier) (crypto.PublicKey, error)
+
+	// NodeID returns the node identifier for the given index.
+	// An exception is returned if the index is >= Size().
+	NodeID(index uint) (flow.Identifier, error)
 }

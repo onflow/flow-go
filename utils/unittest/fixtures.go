@@ -2168,17 +2168,6 @@ func WithClusterQCsFromAssignments(assignments flow.AssignmentList) func(*flow.E
 	}
 }
 
-func DKGParticipantLookup(participants flow.IdentitySkeletonList) map[flow.Identifier]flow.DKGParticipant {
-	lookup := make(map[flow.Identifier]flow.DKGParticipant)
-	for i, node := range participants.Filter(filter.HasRole[flow.IdentitySkeleton](flow.RoleConsensus)) {
-		lookup[node.NodeID] = flow.DKGParticipant{
-			Index:    uint(i),
-			KeyShare: KeyFixture(crypto.BLSBLS12381).PublicKey(),
-		}
-	}
-	return lookup
-}
-
 func CommitWithCounter(counter uint64) func(*flow.EpochCommit) {
 	return func(commit *flow.EpochCommit) {
 		commit.Counter = counter
@@ -2866,11 +2855,12 @@ func WithNextEpochProtocolState() func(entry *flow.RichEpochStateEntry) {
 func WithValidDKG() func(*flow.RichEpochStateEntry) {
 	return func(entry *flow.RichEpochStateEntry) {
 		commit := entry.CurrentEpochCommit
-		dkgParticipants := entry.CurrentEpochSetup.Participants.Filter(filter.IsValidDKGParticipant)
-		lookup := DKGParticipantLookup(dkgParticipants)
-		commit.DKGParticipantKeys = make([]crypto.PublicKey, len(lookup))
-		for _, participant := range lookup {
-			commit.DKGParticipantKeys[participant.Index] = participant.KeyShare
+		dkgParticipants := entry.CurrentEpochSetup.Participants.Filter(filter.IsValidDKGParticipant).Sort(flow.Canonical[flow.IdentitySkeleton])
+		commit.DKGParticipantKeys = nil
+		commit.DKGIndexMap = make(map[flow.Identifier]int)
+		for index, nodeID := range dkgParticipants.NodeIDs() {
+			commit.DKGParticipantKeys = append(commit.DKGParticipantKeys, KeyFixture(crypto.BLSBLS12381).PublicKey())
+			commit.DKGIndexMap[nodeID] = index
 		}
 	}
 }

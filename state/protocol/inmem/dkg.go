@@ -1,6 +1,7 @@
 package inmem
 
 import (
+	"fmt"
 	"github.com/onflow/crypto"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -38,4 +39,15 @@ func (d DKG) KeyShare(nodeID flow.Identifier) (crypto.PublicKey, error) {
 		return nil, protocol.IdentityNotFoundError{NodeID: nodeID}
 	}
 	return d.commit.DKGParticipantKeys[index], nil
+}
+
+// NodeID returns the node identifier for the given index.
+// An exception is returned if the index is >= Size().
+func (d DKG) NodeID(index uint) (flow.Identifier, error) {
+	for nodeID, dkgIndex := range d.commit.DKGIndexMap {
+		if dkgIndex == int(index) {
+			return nodeID, nil
+		}
+	}
+	return flow.ZeroID, fmt.Errorf("index %d not found in DKG", index)
 }
