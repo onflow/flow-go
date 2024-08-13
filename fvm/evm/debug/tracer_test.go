@@ -39,9 +39,9 @@ func Test_CallTracer(t *testing.T) {
 		data := []byte{0x02, 0x04}
 		amount := big.NewInt(1)
 
+		// first transaction
 		tr := tracer.TxTracer()
 		require.NotNil(t, tr)
-
 		tx := gethTypes.NewTransaction(nonce, to, amount, 100, big.NewInt(10), data)
 		tr.OnTxStart(nil, tx, from)
 		tr.OnEnter(0, 0, from, to, []byte{0x01, 0x02}, 10, big.NewInt(1))
@@ -49,7 +49,28 @@ func Test_CallTracer(t *testing.T) {
 		tr.OnExit(1, nil, 10, nil, false)
 		tr.OnExit(0, []byte{0x02}, 200, nil, false)
 		tr.OnTxEnd(&gethTypes.Receipt{TxHash: tx.Hash()}, nil)
+		tracer.Collect(tx.Hash())
 
+		// second transaction
+		tx = gethTypes.NewTransaction(nonce, to, amount, 200, big.NewInt(20), data)
+		tr.OnTxStart(nil, tx, from)
+		tr.OnEnter(0, 0, from, to, []byte{0x01, 0x02}, 10, big.NewInt(1))
+		tr.OnExit(0, []byte{0x02}, 200, nil, false)
+		tr.OnTxEnd(&gethTypes.Receipt{TxHash: tx.Hash()}, nil)
+		tracer.Collect(tx.Hash())
+
+		// failed transaction (no exit and collect call)
+		tx = gethTypes.NewTransaction(nonce, to, amount, 300, big.NewInt(30), data)
+		tr.OnTxStart(nil, tx, from)
+		tr.OnEnter(0, 0, from, to, []byte{0x01, 0x02}, 10, big.NewInt(1))
+		tr.OnEnter(1, byte(vm.ADD), from, to, data, 20, big.NewInt(2))
+
+		// 4th transaction
+		tx = gethTypes.NewTransaction(nonce, to, amount, 400, big.NewInt(40), data)
+		tr.OnTxStart(nil, tx, from)
+		tr.OnEnter(0, 0, from, to, []byte{0x01, 0x02}, 10, big.NewInt(1))
+		tr.OnExit(0, []byte{0x02}, 200, nil, false)
+		tr.OnTxEnd(&gethTypes.Receipt{TxHash: tx.Hash()}, nil)
 		tracer.Collect(tx.Hash())
 	})
 

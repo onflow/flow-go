@@ -182,8 +182,10 @@ func (bl *BlockView) RunTransaction(
 		return nil, err
 	}
 
-	// call tracer
-	if proc.evm.Config.Tracer != nil && proc.evm.Config.Tracer.OnTxEnd != nil {
+	// call tracer on tx end
+	if proc.evm.Config.Tracer != nil &&
+		proc.evm.Config.Tracer.OnTxEnd != nil &&
+		res != nil {
 		proc.evm.Config.Tracer.OnTxEnd(res.Receipt(), res.ValidationError)
 	}
 
@@ -210,7 +212,7 @@ func (bl *BlockView) BatchRunTransactions(txs []*gethTypes.Transaction) ([]*type
 			continue
 		}
 
-		// call tracer
+		// call tracer on tx start
 		if proc.evm.Config.Tracer != nil && proc.evm.Config.Tracer.OnTxStart != nil {
 			proc.evm.Config.Tracer.OnTxStart(proc.evm.GetVMContext(), tx, msg.From)
 		}
@@ -232,7 +234,10 @@ func (bl *BlockView) BatchRunTransactions(txs []*gethTypes.Transaction) ([]*type
 		// collect result
 		batchResults[i] = res
 
-		if proc.evm.Config.Tracer != nil && proc.evm.Config.Tracer.OnTxEnd != nil {
+		// call tracer on tx end
+		if proc.evm.Config.Tracer != nil &&
+			proc.evm.Config.Tracer.OnTxEnd != nil &&
+			res != nil {
 			proc.evm.Config.Tracer.OnTxEnd(res.Receipt(), res.ValidationError)
 		}
 	}
