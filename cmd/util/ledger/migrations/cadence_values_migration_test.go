@@ -2452,12 +2452,15 @@ func TestStoragePathCapabilityMigration(t *testing.T) {
 		t,
 		[]any{
 			storageCapConsInferredBorrowTypeEntry{
-				AccountAddress: addressB,
-				AddressPath: interpreter.AddressPath{
+				TargetPath: interpreter.AddressPath{
 					Address: addressB,
 					Path:    interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "c"),
 				},
 				BorrowType: inferredBorrowType,
+				StoredPath: interpreter.AddressPath{
+					Address: addressB,
+					Path:    interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "cCap"),
+				},
 			},
 			storageCapConIssuedEntry{
 				AccountAddress: addressB,
@@ -2487,10 +2490,13 @@ func TestStoragePathCapabilityMigration(t *testing.T) {
 				CapabilityID: 5,
 			},
 			storageCapConsMissingBorrowTypeEntry{
-				AccountAddress: addressB,
-				AddressPath: interpreter.AddressPath{
+				TargetPath: interpreter.AddressPath{
 					Address: addressB,
 					Path:    interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "b"),
+				},
+				StoredPath: interpreter.AddressPath{
+					Address: addressB,
+					Path:    interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "bCap"),
 				},
 			},
 		},
@@ -2607,13 +2613,16 @@ func TestStorageCapConsMissingBorrowTypeEntry_MarshalJSON(t *testing.T) {
 	t.Parallel()
 
 	e := storageCapConsMissingBorrowTypeEntry{
-		AccountAddress: common.MustBytesToAddress([]byte{0x2}),
-		AddressPath: interpreter.AddressPath{
+		TargetPath: interpreter.AddressPath{
 			Address: common.MustBytesToAddress([]byte{0x1}),
 			Path: interpreter.PathValue{
 				Domain:     common.PathDomainStorage,
 				Identifier: "test",
 			},
+		},
+		StoredPath: interpreter.AddressPath{
+			Address: common.MustBytesToAddress([]byte{0x2}),
+			Path:    interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "storedCap"),
 		},
 	}
 
@@ -2626,7 +2635,48 @@ func TestStorageCapConsMissingBorrowTypeEntry_MarshalJSON(t *testing.T) {
           "kind": "storage-capcon-missing-borrow-type",
           "account_address": "0x0000000000000002",
           "address": "0x0000000000000001",
-          "path": "/storage/test"
+          "target_path": "/storage/test",
+          "stored_path": "/storage/storedCap"
+        }`,
+		string(actual),
+	)
+}
+
+func TestStorageCapConsInferredBorrowTypeEntry_MarshalJSON(t *testing.T) {
+
+	t.Parallel()
+
+	e := storageCapConsInferredBorrowTypeEntry{
+		TargetPath: interpreter.AddressPath{
+			Address: common.MustBytesToAddress([]byte{0x1}),
+			Path: interpreter.PathValue{
+				Domain:     common.PathDomainStorage,
+				Identifier: "test",
+			},
+		},
+		StoredPath: interpreter.AddressPath{
+			Address: common.MustBytesToAddress([]byte{0x2}),
+			Path:    interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "storedCap"),
+		},
+		BorrowType: interpreter.NewReferenceStaticType(
+			nil,
+			interpreter.UnauthorizedAccess,
+			interpreter.PrimitiveStaticTypeInt,
+		),
+	}
+
+	actual, err := e.MarshalJSON()
+	require.NoError(t, err)
+
+	require.JSONEq(t,
+		//language=JSON
+		`{
+          "kind": "storage-capcon-inferred-borrow-type",
+          "account_address": "0x0000000000000002",
+          "address": "0x0000000000000001",
+          "borrow_type":"&Int",
+          "target_path": "/storage/test",
+          "stored_path": "/storage/storedCap"
         }`,
 		string(actual),
 	)
