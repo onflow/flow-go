@@ -66,7 +66,7 @@ func WithPruneCallback(callback storage.PruneCallback) StorageOption {
 //
 // Parameters:
 // - logger: The logger for logging tracker operations.
-// - path: The file path for the underlying Pebble database.
+// - path: The file path for the underlying Badger database.
 // - startHeight: The initial fulfilled height to be set if no previous fulfilled height is found.
 // - opts: Additional configuration options such as custom prune callbacks.
 //
@@ -77,7 +77,7 @@ func NewExecutionDataTracker(
 	startHeight uint64,
 	opts ...StorageOption,
 ) (*ExecutionDataTracker, error) {
-	lg := logger.With().Str("module", "tracker_storage").Logger()
+	lg := logger.With().Str("module", "badger_storage_tracker").Logger()
 	db, err := badger.Open(badger.LSMOnlyOptions(path))
 	if err != nil {
 		return nil, fmt.Errorf("could not open tracker db: %w", err)

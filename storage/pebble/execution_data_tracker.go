@@ -67,7 +67,7 @@ func NewExecutionDataTracker(
 	startHeight uint64,
 	opts ...StorageOption,
 ) (*ExecutionDataTracker, error) {
-	lg := logger.With().Str("module", "tracker_storage").Logger()
+	lg := logger.With().Str("module", "pebble_storage_tracker").Logger()
 	db, err := pebble.Open(path, nil)
 	if err != nil {
 		return nil, fmt.Errorf("could not open db: %w", err)
