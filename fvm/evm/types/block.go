@@ -90,8 +90,8 @@ func NewBlockFromBytes(encoded []byte) (*Block, error) {
 	return res, nil
 }
 
-// GenesisTimeStamp returns the block time stamp for EVM genesis block
-func GenesisTimeStamp(flowChainID flow.ChainID) uint64 {
+// GenesisTimestamp returns the block time stamp for EVM genesis block
+func GenesisTimestamp(flowChainID flow.ChainID) uint64 {
 	// default evm chain ID is previewNet
 	switch flowChainID {
 	case flow.Testnet:
@@ -108,7 +108,7 @@ func GenesisBlock(chainID flow.ChainID) *Block {
 	return &Block{
 		ParentBlockHash:     gethCommon.Hash{},
 		Height:              uint64(0),
-		Timestamp:           GenesisTimeStamp(chainID),
+		Timestamp:           GenesisTimestamp(chainID),
 		TotalSupply:         new(big.Int),
 		ReceiptRoot:         gethTypes.EmptyRootHash,
 		TransactionHashRoot: gethTypes.EmptyRootHash,
