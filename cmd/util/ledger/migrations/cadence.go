@@ -227,7 +227,8 @@ type IssueStorageCapConMigration struct {
 	accountsCapabilities              *capcons.AccountsCapabilities
 	interpreterMigrationRuntimeConfig InterpreterMigrationRuntimeConfig
 	programs                          map[runtime.Location]*interpreter.Program
-	mapping                           *capcons.PathTypeCapabilityMapping
+	typedCapabilityMapping            *capcons.PathTypeCapabilityMapping
+	untypedCapabilityMapping          *capcons.PathCapabilityMapping
 	reporter                          reporters.ReportWriter
 	logVerboseDiff                    bool
 	verboseErrorOutput                bool
@@ -243,19 +244,21 @@ func NewIssueStorageCapConMigration(
 	chainID flow.ChainID,
 	storageDomainCapabilities *capcons.AccountsCapabilities,
 	programs map[runtime.Location]*interpreter.Program,
-	storageCapabilityMapping *capcons.PathTypeCapabilityMapping,
+	typedStorageCapabilityMapping *capcons.PathTypeCapabilityMapping,
+	untypedStorageCapabilityMapping *capcons.PathCapabilityMapping,
 	opts Options,
 ) *IssueStorageCapConMigration {
 	return &IssueStorageCapConMigration{
-		name:                 "cadence_storage_cap_con_issue_migration",
-		reporter:             rwf.ReportWriter(issueStorageCapConMigrationReporterName),
-		chainID:              chainID,
-		accountsCapabilities: storageDomainCapabilities,
-		programs:             programs,
-		mapping:              storageCapabilityMapping,
-		logVerboseDiff:       opts.LogVerboseDiff,
-		verboseErrorOutput:   opts.VerboseErrorOutput,
-		errorMessageHandler:  errorMessageHandler,
+		name:                     "cadence_storage_cap_con_issue_migration",
+		reporter:                 rwf.ReportWriter(issueStorageCapConMigrationReporterName),
+		chainID:                  chainID,
+		accountsCapabilities:     storageDomainCapabilities,
+		programs:                 programs,
+		typedCapabilityMapping:   typedStorageCapabilityMapping,
+		untypedCapabilityMapping: untypedStorageCapabilityMapping,
+		logVerboseDiff:           opts.LogVerboseDiff,
+		verboseErrorOutput:       opts.VerboseErrorOutput,
+		errorMessageHandler:      errorMessageHandler,
 	}
 }
 
@@ -332,11 +335,17 @@ func (m *IssueStorageCapConMigration) MigrateAccount(
 
 	capcons.IssueAccountCapabilities(
 		inter,
+		migrationRuntime.Storage,
 		reporter,
 		address,
 		accountCapabilities,
 		handler,
-		m.mapping,
+		m.typedCapabilityMapping,
+		m.untypedCapabilityMapping,
+		func(valueType interpreter.StaticType) interpreter.Authorization {
+			// TODO:
+			return interpreter.UnauthorizedAccess
+		},
 	)
 
 	err = migrationRuntime.Storage.NondeterministicCommit(inter, false)
@@ -387,7 +396,8 @@ func NewCadence1ValueMigrations(
 	privatePublicCapabilityMapping := &capcons.PathCapabilityMapping{}
 	// Populated by IssueStorageCapConMigration
 	// used by CadenceCapabilityValueMigration
-	storageCapabilityMapping := &capcons.PathTypeCapabilityMapping{}
+	typedStorageCapabilityMapping := &capcons.PathTypeCapabilityMapping{}
+	untypedStorageCapabilityMapping := &capcons.PathCapabilityMapping{}
 
 	// Populated by StorageCapMigration,
 	// used by IssueStorageCapConMigration
@@ -448,7 +458,8 @@ func NewCadence1ValueMigrations(
 				opts.ChainID,
 				storageDomainCapabilities,
 				programs,
-				storageCapabilityMapping,
+				typedStorageCapabilityMapping,
+				untypedStorageCapabilityMapping,
 				opts,
 			)
 			return migration.name, migration
@@ -470,7 +481,8 @@ func NewCadence1ValueMigrations(
 				errorMessageHandler,
 				programs,
 				privatePublicCapabilityMapping,
-				storageCapabilityMapping,
+				typedStorageCapabilityMapping,
+				untypedStorageCapabilityMapping,
 				opts,
 			)
 			return migration.name, migration
