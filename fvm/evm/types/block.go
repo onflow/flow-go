@@ -5,12 +5,13 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/onflow/flow-go/model/flow"
 	gethCommon "github.com/onflow/go-ethereum/common"
 	gethTypes "github.com/onflow/go-ethereum/core/types"
 	gethCrypto "github.com/onflow/go-ethereum/crypto"
 	gethRLP "github.com/onflow/go-ethereum/rlp"
 	gethTrie "github.com/onflow/go-ethereum/trie"
+
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // Block represents a evm block.
