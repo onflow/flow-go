@@ -314,13 +314,13 @@ func (s *ExecutionDataTracker) PruneUpToHeight(height uint64) error {
 		return err
 	}
 
-	err := func(tx pebble.Reader) error {
+	err := func(r pebble.Reader) error {
 		options := pebble.IterOptions{
 			LowerBound: blobRecordPrefix,
 			UpperBound: append(blobRecordPrefix, ffBytes...),
 		}
 
-		it, err := tx.NewIter(&options)
+		it, err := r.NewIter(&options)
 		if err != nil {
 			return fmt.Errorf("can not create iterator: %w", err)
 		}
@@ -347,7 +347,7 @@ func (s *ExecutionDataTracker) PruneUpToHeight(height uint64) error {
 			}
 
 			var latestHeight uint64
-			err = operation.RetrieveTrackerLatestHeight(blobCid, &latestHeight)(s.db)
+			err = operation.RetrieveTrackerLatestHeight(blobCid, &latestHeight)(r)
 			if err != nil {
 				return fmt.Errorf("failed to get latest height entry for Cid %s: %w", blobCid.String(), err)
 			}
