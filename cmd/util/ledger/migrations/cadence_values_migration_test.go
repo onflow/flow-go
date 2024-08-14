@@ -2692,6 +2692,156 @@ func TestStorageCapConsInferredBorrowTypeEntry_MarshalJSON(t *testing.T) {
 	)
 }
 
+func TestTypeRequirementRemovalMigration(t *testing.T) {
+	t.Parallel()
+
+	rwf := &testReportWriterFactory{}
+
+	logWriter := &writer{}
+	logger := zerolog.New(logWriter).Level(zerolog.ErrorLevel)
+
+	const nWorker = 2
+
+	const chainID = flow.Emulator
+
+	payloads, err := newBootstrapPayloads(chainID)
+	require.NoError(t, err)
+
+	registersByAccount, err := registers.NewByAccountFromPayloads(payloads)
+	require.NoError(t, err)
+
+	storedAddress := common.Address(chainID.Chain().ServiceAddress())
+	tiblesAddress := mustHexToAddress("e93c412c964bdf40")
+
+	// Store a contract in `addressC`.
+
+	migrationRuntime, err := NewInterpreterMigrationRuntime(
+		registersByAccount,
+		chainID,
+		InterpreterMigrationRuntimeConfig{},
+	)
+	require.NoError(t, err)
+
+	storage := migrationRuntime.Storage
+	storageDomain := common.PathDomainStorage.Identifier()
+
+	storageMap := storage.GetStorageMap(
+		storedAddress,
+		storageDomain,
+		true,
+	)
+
+	// Store a value with the actual `TiblesProducer.Minter` type
+	storageMap.WriteValue(
+		migrationRuntime.Interpreter,
+		interpreter.StringStorageMapKey("a"),
+		interpreter.NewTypeValue(
+			nil,
+			interpreter.NewCompositeStaticTypeComputeTypeID(
+				nil,
+				common.AddressLocation{
+					Name:    "TiblesProducer",
+					Address: tiblesAddress,
+				},
+				"TiblesProducer.Minter",
+			),
+		),
+	)
+
+	// Store a value with a random `TiblesProducer.Minter` type (different address)
+	storageMap.WriteValue(
+		migrationRuntime.Interpreter,
+		interpreter.StringStorageMapKey("b"),
+		interpreter.NewTypeValue(
+			nil,
+			interpreter.NewCompositeStaticTypeComputeTypeID(
+				nil,
+				common.AddressLocation{
+					Name:    "TiblesProducer",
+					Address: storedAddress,
+				},
+				"TiblesProducer.Minter",
+			),
+		),
+	)
+
+	// Commit
+
+	err = storage.NondeterministicCommit(migrationRuntime.Interpreter, false)
+	require.NoError(t, err)
+
+	// finalize the transaction
+	result, err := migrationRuntime.TransactionState.FinalizeMainTransaction()
+	require.NoError(t, err)
+
+	// Merge the changes into the registers
+
+	expectedAddresses := map[flow.Address]struct{}{
+		flow.Address(storedAddress): {},
+	}
+
+	err = registers.ApplyChanges(
+		registersByAccount,
+		result.WriteSet,
+		expectedAddresses,
+		logger,
+	)
+	require.NoError(t, err)
+
+	// Migrate
+
+	// TODO: EVM contract is not deployed in snapshot yet, so can't update it
+	const evmContractChange = EVMContractChangeNone
+
+	const burnerContractChange = BurnerContractChangeUpdate
+
+	migrations := NewCadence1Migrations(
+		logger,
+		t.TempDir(),
+		rwf,
+		Options{
+			NWorker:              nWorker,
+			ChainID:              chainID,
+			EVMContractChange:    evmContractChange,
+			BurnerContractChange: burnerContractChange,
+			VerboseErrorOutput:   true,
+		},
+	)
+
+	for _, migration := range migrations {
+		err = migration.Migrate(registersByAccount)
+		require.NoError(
+			t,
+			err,
+			"migration `%s` failed, logs: %v",
+			migration.Name,
+			logWriter.logs,
+		)
+	}
+
+	// Check account
+
+	_, err = runScript(
+		chainID,
+		registersByAccount,
+		fmt.Sprintf(
+			//language=Cadence
+			`
+              access(all)
+              fun main() {
+                  let storage = getAuthAccount<auth(Storage) &Account>(%s).storage
+                  assert(storage.copy<Type>(from: /storage/a)!.identifier == "{A.%s.TiblesProducer.Minter}")
+                  assert(storage.copy<Type>(from: /storage/b)!.identifier == "A.%s.TiblesProducer.Minter")
+              }
+            `,
+			storedAddress.HexWithPrefix(),
+			tiblesAddress.Hex(),
+			storedAddress.Hex(),
+		),
+	)
+	require.NoError(t, err)
+}
+
 func runScript(chainID flow.ChainID, registersByAccount *registers.ByAccount, script string) (cadence.Value, error) {
 	options := computation.DefaultFVMOptions(chainID, false, false)
 	options = append(options,
