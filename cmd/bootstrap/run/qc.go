@@ -49,6 +49,14 @@ func (pd *ParticipantData) Identities() flow.IdentityList {
 	return bootstrap.ToIdentityList(nodes)
 }
 
+func (pd *ParticipantData) DKGIndexMap() map[flow.Identifier]int {
+	result := make(map[flow.Identifier]int)
+	for nodeID, participant := range pd.Lookup {
+		result[nodeID] = int(participant.Index)
+	}
+	return result
+}
+
 // GenerateRootQC generates QC for root block, caller needs to provide votes for root QC and
 // participantData to build the QC.
 // NOTE: at the moment, we require private keys for one node because we we re-using the full business logic,

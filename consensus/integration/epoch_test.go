@@ -231,6 +231,7 @@ func withNextEpoch(
 		ClusterQCs:         currEpochCommit.ClusterQCs,
 		DKGParticipantKeys: nextEpochParticipantData.PublicBeaconKeys(),
 		DKGGroupKey:        nextEpochParticipantData.GroupKey,
+		DKGIndexMap:        nextEpochParticipantData.DKGIndexMap(),
 	}
 
 	// Construct the new min epoch state entry

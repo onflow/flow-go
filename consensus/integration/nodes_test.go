@@ -257,12 +257,13 @@ func createRootBlockData(t *testing.T, participantData *run.ParticipantData) (*f
 	consensusParticipants := participantData.Identities()
 
 	// add other roles to create a complete identity list
-	participants := unittest.CompleteIdentitySet(consensusParticipants...)
-	participants.Sort(flow.Canonical[flow.Identity])
-
+	participants := unittest.CompleteIdentitySet(consensusParticipants...).Sort(flow.Canonical[flow.Identity])
+	dkgParticipants := participants.ToSkeleton().Filter(filter.IsValidDKGParticipant)
 	dkgParticipantsKeys := make([]crypto.PublicKey, 0, len(consensusParticipants))
-	for _, participant := range participants.Filter(filter.HasRole[flow.Identity](flow.RoleConsensus)) {
+	dkgIndexMap := make(map[flow.Identifier]int)
+	for index, participant := range dkgParticipants {
 		dkgParticipantsKeys = append(dkgParticipantsKeys, participantData.Lookup[participant.NodeID].KeyShare)
+		dkgIndexMap[participant.NodeID] = index
 	}
 
 	counter := uint64(1)
@@ -278,6 +279,7 @@ func createRootBlockData(t *testing.T, participantData *run.ParticipantData) (*f
 		func(commit *flow.EpochCommit) {
 			commit.DKGGroupKey = participantData.GroupKey
 			commit.DKGParticipantKeys = dkgParticipantsKeys
+			commit.DKGIndexMap = dkgIndexMap
 		},
 	)
 
