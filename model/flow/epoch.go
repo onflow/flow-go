@@ -325,6 +325,7 @@ type encodableCommit struct {
 	ClusterQCs         []ClusterQCVoteData
 	DKGGroupKey        encodable.RandomBeaconPubKey
 	DKGParticipantKeys []encodable.RandomBeaconPubKey
+	DKGIndexMap        map[Identifier]int
 }
 
 func encodableFromCommit(commit *EpochCommit) encodableCommit {
@@ -337,6 +338,7 @@ func encodableFromCommit(commit *EpochCommit) encodableCommit {
 		ClusterQCs:         commit.ClusterQCs,
 		DKGGroupKey:        encodable.RandomBeaconPubKey{PublicKey: commit.DKGGroupKey},
 		DKGParticipantKeys: encKeys,
+		DKGIndexMap:        commit.DKGIndexMap,
 	}
 }
 
@@ -350,6 +352,7 @@ func commitFromEncodable(enc encodableCommit) EpochCommit {
 		ClusterQCs:         enc.ClusterQCs,
 		DKGGroupKey:        enc.DKGGroupKey.PublicKey,
 		DKGParticipantKeys: dkgKeys,
+		DKGIndexMap:        enc.DKGIndexMap,
 	}
 }
 
