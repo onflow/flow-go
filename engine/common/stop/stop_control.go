@@ -7,7 +7,6 @@ import (
 	"github.com/rs/zerolog"
 	"go.uber.org/atomic"
 
-	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/counters"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
@@ -34,7 +33,7 @@ type StopControl struct {
 	registeredHeightRecorders []execution_data.ProcessedHeightRecorder
 
 	// Notifier for new processed block height
-	processedHeightNotifier engine.Notifier
+	processedHeightChannel chan uint64
 
 	// Stores latest highest processed block height
 	lastProcessedHeight counters.StrictMonotonousCounter
@@ -55,12 +54,9 @@ func NewStopControl(
 		log: log.With().
 			Str("component", "stop_control").
 			Logger(),
-		lastProcessedHeight: counters.NewMonotonousCounter(0),
-		versionData: atomic.NewPointer[VersionMetadata](&VersionMetadata{
-			incompatibleBlockHeight: 0,
-			updatedVersion:          "",
-		}),
-		processedHeightNotifier: engine.NewNotifier(),
+		lastProcessedHeight:    counters.NewMonotonousCounter(0),
+		versionData:            atomic.NewPointer[VersionMetadata](nil),
+		processedHeightChannel: make(chan uint64),
 	}
 
 	sc.cm = component.NewComponentManagerBuilder().
@@ -69,18 +65,6 @@ func NewStopControl(
 	sc.Component = sc.cm
 
 	return sc
-}
-
-// updateVersionData sets new version data.
-//
-// Parameters:
-//   - height: The block height that is incompatible with the current node version.
-//   - semver: The new semantic version string that is expected for compatibility.
-func (sc *StopControl) updateVersionData(height uint64, semver string) {
-	sc.versionData.Store(&VersionMetadata{
-		incompatibleBlockHeight: height,
-		updatedVersion:          semver,
-	})
 }
 
 // OnVersionUpdate is called when a version update occurs.
@@ -99,24 +83,32 @@ func (sc *StopControl) OnVersionUpdate(height uint64, version *semver.Version) {
 			Str("semver", version.String()).
 			Msg("Received version update")
 
-		sc.updateVersionData(height, version.String())
+		sc.versionData.Store(&VersionMetadata{
+			incompatibleBlockHeight: height,
+			updatedVersion:          version.String(),
+		})
 		return
 	}
 
 	// If semver is 0, but notification was received, this means that the version update was deleted.
-	sc.updateVersionData(0, "")
+	sc.versionData.Store(nil)
 }
 
-// onProcessedBlock is called when need to check processed block for compatibility with current node.
+// onProcessedBlock is called when a new block is processed block.
+// when the last compatible block is processed, the StopControl will cause the node to crash
 //
 // Parameters:
-//   - ctx: The context used to signal an irrecoverable error if the processed block is incompatible.
+//   - ctx: The context used to signal an irrecoverable error.
 func (sc *StopControl) onProcessedBlock(ctx irrecoverable.SignalerContext) {
 	versionData := sc.versionData.Load()
+	if versionData == nil {
+		return
+	}
+
 	newHeight := sc.lastProcessedHeight.Value()
 	if newHeight >= versionData.incompatibleBlockHeight-1 {
 		ctx.Throw(fmt.Errorf("processed block at height %d is incompatible with the current node version, please upgrade to version %s starting from block height %d",
-			newHeight, versionData.updatedVersion, versionData.incompatibleBlockHeight))
+			newHeight, versionData.updatedVersion, versionData.incompatibleBlockHeight-1))
 	}
 }
 
@@ -125,9 +117,7 @@ func (sc *StopControl) onProcessedBlock(ctx irrecoverable.SignalerContext) {
 // Parameters:
 //   - height: The height of the latest processed block.
 func (sc *StopControl) updateProcessedHeight(height uint64) {
-	if sc.lastProcessedHeight.Set(height) {
-		sc.processedHeightNotifier.Notify()
-	}
+	sc.processedHeightChannel <- height
 }
 
 // RegisterHeightRecorder registers an execution data height recorder with the StopControl.
@@ -135,10 +125,8 @@ func (sc *StopControl) updateProcessedHeight(height uint64) {
 // Parameters:
 //   - recorder: The execution data height recorder to register.
 func (sc *StopControl) RegisterHeightRecorder(recorder execution_data.ProcessedHeightRecorder) {
-	if recorder != nil {
-		recorder.AddHeightUpdatesConsumer(sc.updateProcessedHeight)
-		sc.registeredHeightRecorders = append(sc.registeredHeightRecorders, recorder)
-	}
+	recorder.AddHeightUpdatesConsumer(sc.updateProcessedHeight)
+	sc.registeredHeightRecorders = append(sc.registeredHeightRecorders, recorder)
 }
 
 // processEvents processes incoming events related to block heights and version updates.
@@ -153,8 +141,10 @@ func (sc *StopControl) processEvents(ctx irrecoverable.SignalerContext, ready co
 		select {
 		case <-ctx.Done():
 			return
-		case <-sc.processedHeightNotifier.Channel():
-			sc.onProcessedBlock(ctx)
+		case height, ok := <-sc.processedHeightChannel:
+			if ok && sc.lastProcessedHeight.Set(height) {
+				sc.onProcessedBlock(ctx)
+			}
 		}
 	}
 }

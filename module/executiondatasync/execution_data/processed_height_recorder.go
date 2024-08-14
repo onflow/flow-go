@@ -1,6 +1,8 @@
 package execution_data
 
 import (
+	"sync"
+
 	"go.uber.org/atomic"
 )
 
@@ -14,7 +16,8 @@ type ProcessedHeightRecorder interface {
 	// HighestCompleteHeight returns the highest complete processed block height.
 	HighestCompleteHeight() uint64
 
-	// AddHeightUpdatesConsumer subscribe consumers for processed height updates.
+	// AddHeightUpdatesConsumer subscribe consumer for processed height updates.
+	// Callback are called synchronously and must be non-blocking
 	AddHeightUpdatesConsumer(HeightUpdatesConsumer)
 }
 
@@ -23,8 +26,9 @@ var _ ProcessedHeightRecorder = (*ProcessedHeightRecorderManager)(nil)
 // ProcessedHeightRecorderManager manages an execution data height recorder
 // and tracks the highest processed block height.
 type ProcessedHeightRecorderManager struct {
+	sync.Mutex
 	highestCompleteHeight *atomic.Uint64
-	consumers             []HeightUpdatesConsumer
+	consumer              HeightUpdatesConsumer
 }
 
 // NewProcessedHeightRecorderManager creates a new ProcessedHeightRecorderManager with the given initial height.
@@ -39,8 +43,8 @@ func (e *ProcessedHeightRecorderManager) OnBlockProcessed(height uint64) {
 	if height > e.highestCompleteHeight.Load() {
 		e.highestCompleteHeight.Store(height)
 
-		for _, consumer := range e.consumers {
-			consumer(height)
+		if e.consumer != nil {
+			e.consumer(height)
 		}
 	}
 }
@@ -52,5 +56,8 @@ func (e *ProcessedHeightRecorderManager) HighestCompleteHeight() uint64 {
 
 // AddHeightUpdatesConsumer subscribe consumers for processed height updates.
 func (e *ProcessedHeightRecorderManager) AddHeightUpdatesConsumer(consumer HeightUpdatesConsumer) {
-	e.consumers = append(e.consumers, consumer)
+	e.Lock()
+	defer e.Unlock()
+
+	e.consumer = consumer
 }
