@@ -58,10 +58,9 @@ func (s *Registers) Get(
 	latestHeight := s.latestHeight.Load()
 
 	// TODO: clarify, if we do not set any prune threshold, the check should be valid, also what should be done in case of prune threshold bigger than height
-	var pruneHeight uint64
-	if s.pruneThreshold != 0 {
-		pruneHeight = latestHeight - s.pruneThreshold
-	}
+	// If pruneThreshold valid, but bigger than latestHeight 1 10 - 20
+
+	pruneHeight := latestHeight - s.pruneThreshold
 
 	if height < s.firstHeight || height < pruneHeight || height > latestHeight {
 		return nil, errors.Wrap(
