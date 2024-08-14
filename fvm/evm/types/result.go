@@ -139,6 +139,7 @@ func (res *Result) Receipt() *gethTypes.Receipt {
 	}
 
 	receipt := &gethTypes.Receipt{
+		TxHash:            res.TxHash,
 		GasUsed:           res.GasConsumed,
 		CumulativeGasUsed: res.CumulativeGasUsed,
 		Logs:              res.Logs,
