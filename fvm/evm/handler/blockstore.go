@@ -18,6 +18,7 @@ const (
 )
 
 type BlockStore struct {
+	chainID     flow.ChainID
 	backend     types.Backend
 	rootAddress flow.Address
 }
@@ -25,8 +26,13 @@ type BlockStore struct {
 var _ types.BlockStore = &BlockStore{}
 
 // NewBlockStore constructs a new block store
-func NewBlockStore(backend types.Backend, rootAddress flow.Address) *BlockStore {
+func NewBlockStore(
+	chainID flow.ChainID,
+	backend types.Backend,
+	rootAddress flow.Address,
+) *BlockStore {
 	return &BlockStore{
+		chainID:     chainID,
 		backend:     backend,
 		rootAddress: rootAddress,
 	}
@@ -145,7 +151,7 @@ func (bs *BlockStore) LatestBlock() (*types.Block, error) {
 		return nil, err
 	}
 	if len(data) == 0 {
-		return types.GenesisBlock, nil
+		return types.GenesisBlock(bs.chainID), nil
 	}
 	return types.NewBlockFromBytes(data)
 }
@@ -171,10 +177,13 @@ func (bs *BlockStore) getBlockHashList() (*BlockHashList, error) {
 	// 	return nil, err
 	// }
 	// if bhl.IsEmpty() {
-	// 	err = bhl.Push(types.GenesisBlock.Height, types.GenesisBlockHash)
-	// 	if err != nil {
-	// 		return nil, err
-	// 	}
+	// err = bhl.Push(
+	// 	types.GenesisBlock(bs.chainID).Height,
+	// 	types.GenesisBlockHash(bs.chainID),
+	// )
+	// if err != nil {
+	// 	return nil, err
+	// }
 	// }
 	// return bhl, nil
 }
@@ -192,7 +201,10 @@ func (bs *BlockStore) checkLegacyAndMigrate() (*BlockHashList, error) {
 			return nil, err
 		}
 		if bhl.IsEmpty() {
-			err = bhl.Push(types.GenesisBlock.Height, types.GenesisBlockHash)
+			err = bhl.Push(
+				types.GenesisBlock(bs.chainID).Height,
+				types.GenesisBlockHash(bs.chainID),
+			)
 			if err != nil {
 				return nil, err
 			}
