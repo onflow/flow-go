@@ -41,6 +41,28 @@ func NewInterfaceTypeConversionRules(chainID flow.ChainID) StaticTypeMigrationRu
 	}
 }
 
+var typeRequirementRemovals = []struct {
+	address      string
+	contractName string
+	typeName     string
+}{
+	{
+		address:      "e93c412c964bdf40",
+		contractName: "TiblesProducer",
+		typeName:     "Producer",
+	},
+	{
+		address:      "e93c412c964bdf40",
+		contractName: "TiblesProducer",
+		typeName:     "Minter",
+	},
+	{
+		address:      "e93c412c964bdf40",
+		contractName: "TiblesProducer",
+		typeName:     "ContentLocation",
+	},
+}
+
 func NewCompositeTypeConversionRules(chainID flow.ChainID) StaticTypeMigrationRules {
 	systemContracts := systemcontracts.SystemContractsForChain(chainID)
 
@@ -51,11 +73,23 @@ func NewCompositeTypeConversionRules(chainID flow.ChainID) StaticTypeMigrationRu
 	oldNonFungibleTokenCollectionCompositeType, newNonFungibleTokenCollectionType :=
 		nonFungibleTokenCompositeToInterfaceRule(systemContracts, "Collection")
 
-	return StaticTypeMigrationRules{
+	rules := StaticTypeMigrationRules{
 		oldFungibleTokenVaultCompositeType.ID():         newFungibleTokenVaultType,
 		oldNonFungibleTokenNFTCompositeType.ID():        newNonFungibleTokenNFTType,
 		oldNonFungibleTokenCollectionCompositeType.ID(): newNonFungibleTokenCollectionType,
 	}
+
+	for _, typeRemoval := range typeRequirementRemovals {
+		oldType, newType := compositeToInterfaceRule(
+			mustHexToAddress(typeRemoval.address),
+			typeRemoval.contractName,
+			typeRemoval.typeName,
+		)
+
+		rules[oldType.ID()] = newType
+	}
+
+	return rules
 }
 
 func NewCadence1InterfaceStaticTypeConverter(chainID flow.ChainID) statictypes.InterfaceTypeConverterFunc {
@@ -77,11 +111,26 @@ func nonFungibleTokenCompositeToInterfaceRule(
 ) {
 	contract := systemContracts.NonFungibleToken
 
-	qualifiedIdentifier := fmt.Sprintf("%s.%s", contract.Name, identifier)
+	return compositeToInterfaceRule(
+		common.Address(contract.Address),
+		contract.Name,
+		identifier,
+	)
+}
+
+func compositeToInterfaceRule(
+	address common.Address,
+	contractName string,
+	typeName string,
+) (
+	*interpreter.CompositeStaticType,
+	*interpreter.IntersectionStaticType,
+) {
+	qualifiedIdentifier := fmt.Sprintf("%s.%s", contractName, typeName)
 
 	location := common.AddressLocation{
-		Address: common.Address(contract.Address),
-		Name:    contract.Name,
+		Address: address,
+		Name:    contractName,
 	}
 
 	nftTypeID := location.TypeID(nil, qualifiedIdentifier)

@@ -2407,3 +2407,278 @@ func TestContractUpdateFailureEntry_MarshalJSON(t *testing.T) {
 		string(actual),
 	)
 }
+
+func TestTypeRequirementRemoval(t *testing.T) {
+	t.Parallel()
+
+	const chainID = flow.Testnet
+
+	t.Run("TiblesProducer", func(t *testing.T) {
+		t.Parallel()
+
+		tiblesAddress := mustHexToAddress("e93c412c964bdf40")
+
+		oldCode := `
+            pub contract interface TiblesProducer {
+
+                pub struct ContentLocation {}
+                pub struct interface IContentLocation {}
+
+                pub resource interface IContent {
+                    access(contract) let contentIdsToPaths: {String: TiblesProducer.ContentLocation}
+                    pub fun getMetadata(contentId: String): {String: AnyStruct}?
+                }
+
+                pub resource interface IProducer {
+                    access(contract) let minters: @{String: Minter}
+                }
+
+                pub resource Producer: IContent, IProducer {
+                    access(contract) let minters: @{String: Minter}
+                }
+
+                pub resource interface IMinter {
+                    pub let id: String
+                    pub var lastMintNumber: UInt32
+                    pub let contentCapability: Capability
+                    pub fun mintNext()
+                }
+
+                pub resource Minter: IMinter {
+                    pub let id: String
+                    pub var lastMintNumber: UInt32
+                    pub let contentCapability: Capability
+                    pub fun mintNext()
+                }
+            }
+        `
+
+		newCode := `
+            access(all) contract interface TiblesProducer {
+
+                access(all) struct interface ContentLocation {}
+                access(all) struct interface IContentLocation {}
+
+                access(all) resource interface IContent {
+                    access(contract) let contentIdsToPaths: {String: {TiblesProducer.ContentLocation}}
+                    access(all) fun getMetadata(contentId: String): {String: AnyStruct}?
+                }
+
+                access(all) resource interface IProducer {
+                    access(contract) let minters: @{String: {Minter}}
+                }
+
+                access(all) resource interface Producer: IContent, IProducer {
+                    access(contract) let minters: @{String: {Minter}}
+                }
+
+                access(all) resource interface IMinter {
+                    access(all) let id: String
+                    access(all) var lastMintNumber: UInt32
+                    access(all) let contentCapability: Capability
+                    access(all) fun mintNext()
+                }
+
+                access(all) resource interface Minter: IMinter {
+                    access(all) let id: String
+                    access(all) var lastMintNumber: UInt32
+                    access(all) let contentCapability: Capability
+                    access(all) fun mintNext()
+                }
+            }
+        `
+
+		stagedContracts := []StagedContract{
+			{
+				Address: tiblesAddress,
+				Contract: Contract{
+					Name: "TiblesProducer",
+					Code: []byte(newCode),
+				},
+			},
+		}
+
+		logWriter := &logWriter{}
+		log := zerolog.New(logWriter)
+
+		rwf := &testReportWriterFactory{}
+
+		options := StagedContractsMigrationOptions{
+			ChainID:            chainID,
+			VerboseErrorOutput: true,
+		}
+
+		migration := NewStagedContractsMigration("test", "test", log, rwf, options).
+			WithStagedContractUpdates(stagedContracts).
+			WithContractUpdateValidation()
+
+		registersByAccount, err := registersForStagedContracts(
+			StagedContract{
+				Address: tiblesAddress,
+				Contract: Contract{
+					Name: "TiblesProducer",
+					Code: []byte(oldCode),
+				},
+			},
+		)
+		require.NoError(t, err)
+
+		err = migration.InitMigration(log, registersByAccount, 1)
+		require.NoError(t, err)
+
+		owner := string(tiblesAddress[:])
+		accountRegisters := registersByAccount.AccountRegisters(owner)
+
+		err = migration.MigrateAccount(
+			context.Background(),
+			tiblesAddress,
+			accountRegisters,
+		)
+		require.NoError(t, err)
+
+		err = migration.Close()
+		require.NoError(t, err)
+
+		require.Empty(t, logWriter.logs)
+
+		require.Equal(t, 1, accountRegisters.Count())
+		assert.Equal(t, newCode, contractCode(t, registersByAccount, owner, "TiblesProducer"))
+	})
+
+	t.Run("different address", func(t *testing.T) {
+		t.Parallel()
+
+		addressGenerator := chainID.Chain().NewAddressGenerator()
+		randomAddress, err := addressGenerator.NextAddress()
+		require.NoError(t, err)
+
+		oldCode := `
+            pub contract interface TiblesProducer {
+
+                pub struct ContentLocation {}
+                pub struct interface IContentLocation {}
+
+                pub resource interface IContent {
+                    access(contract) let contentIdsToPaths: {String: TiblesProducer.ContentLocation}
+                    pub fun getMetadata(contentId: String): {String: AnyStruct}?
+                }
+
+                pub resource interface IProducer {
+                    access(contract) let minters: @{String: Minter}
+                }
+
+                pub resource Producer: IContent, IProducer {
+                    access(contract) let minters: @{String: Minter}
+                }
+
+                pub resource interface IMinter {
+                    pub let id: String
+                    pub var lastMintNumber: UInt32
+                    pub let contentCapability: Capability
+                    pub fun mintNext()
+                }
+
+                pub resource Minter: IMinter {
+                    pub let id: String
+                    pub var lastMintNumber: UInt32
+                    pub let contentCapability: Capability
+                    pub fun mintNext()
+                }
+            }
+        `
+
+		newCode := `
+            access(all) contract interface TiblesProducer {
+
+                access(all) struct interface ContentLocation {}
+                access(all) struct interface IContentLocation {}
+
+                access(all) resource interface IContent {
+                    access(contract) let contentIdsToPaths: {String: {TiblesProducer.ContentLocation}}
+                    access(all) fun getMetadata(contentId: String): {String: AnyStruct}?
+                }
+
+                access(all) resource interface IProducer {
+                    access(contract) let minters: @{String: {Minter}}
+                }
+
+                access(all) resource interface Producer: IContent, IProducer {
+                    access(contract) let minters: @{String: {Minter}}
+                }
+
+                access(all) resource interface IMinter {
+                    access(all) let id: String
+                    access(all) var lastMintNumber: UInt32
+                    access(all) let contentCapability: Capability
+                    access(all) fun mintNext()
+                }
+
+                access(all) resource interface Minter: IMinter {
+                    access(all) let id: String
+                    access(all) var lastMintNumber: UInt32
+                    access(all) let contentCapability: Capability
+                    access(all) fun mintNext()
+                }
+            }
+        `
+
+		stagedContracts := []StagedContract{
+			{
+				Address: common.Address(randomAddress),
+				Contract: Contract{
+					Name: "TiblesProducer",
+					Code: []byte(newCode),
+				},
+			},
+		}
+
+		logWriter := &logWriter{}
+		log := zerolog.New(logWriter)
+
+		rwf := &testReportWriterFactory{}
+
+		options := StagedContractsMigrationOptions{
+			ChainID:            chainID,
+			VerboseErrorOutput: true,
+		}
+
+		migration := NewStagedContractsMigration("test", "test", log, rwf, options).
+			WithStagedContractUpdates(stagedContracts).
+			WithContractUpdateValidation()
+
+		registersByAccount, err := registersForStagedContracts(
+			StagedContract{
+				Address: common.Address(randomAddress),
+				Contract: Contract{
+					Name: "TiblesProducer",
+					Code: []byte(oldCode),
+				},
+			},
+		)
+		require.NoError(t, err)
+
+		err = migration.InitMigration(log, registersByAccount, 1)
+		require.NoError(t, err)
+
+		owner := string(randomAddress[:])
+		accountRegisters := registersByAccount.AccountRegisters(owner)
+
+		err = migration.MigrateAccount(
+			context.Background(),
+			common.Address(randomAddress),
+			accountRegisters,
+		)
+		require.NoError(t, err)
+
+		err = migration.Close()
+		require.NoError(t, err)
+
+		require.Len(t, logWriter.logs, 1)
+		errorLog := logWriter.logs[0]
+		require.Contains(t, errorLog, "incompatible type annotations. expected `Minter`, found `{Minter}")
+		require.Contains(t, errorLog, "incompatible type annotations. expected `TiblesProducer.ContentLocation`, found `{TiblesProducer.ContentLocation}")
+
+		require.Equal(t, 1, accountRegisters.Count())
+		assert.Equal(t, oldCode, contractCode(t, registersByAccount, owner, "TiblesProducer"))
+	})
+}
