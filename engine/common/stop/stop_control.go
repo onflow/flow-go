@@ -30,8 +30,6 @@ type StopControl struct {
 
 	versionData *atomic.Pointer[VersionMetadata]
 
-	registeredHeightRecorders []execution_data.ProcessedHeightRecorder
-
 	// Notifier for new processed block height
 	processedHeightChannel chan uint64
 
@@ -126,7 +124,6 @@ func (sc *StopControl) updateProcessedHeight(height uint64) {
 //   - recorder: The execution data height recorder to register.
 func (sc *StopControl) RegisterHeightRecorder(recorder execution_data.ProcessedHeightRecorder) {
 	recorder.AddHeightUpdatesConsumer(sc.updateProcessedHeight)
-	sc.registeredHeightRecorders = append(sc.registeredHeightRecorders, recorder)
 }
 
 // processEvents processes incoming events related to block heights and version updates.
