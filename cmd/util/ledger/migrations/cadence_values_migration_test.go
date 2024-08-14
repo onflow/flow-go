@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/onflow/cadence/runtime/sema"
@@ -2162,17 +2163,48 @@ func TestStoragePathCapabilityMigration(t *testing.T) {
 	addressB, err := common.HexToAddress("0xe5a8b7f23e8b548f")
 	require.NoError(t, err)
 
-	runtime, err := NewInterpreterMigrationRuntime(
+	addressC, err := common.HexToAddress("0x1")
+	require.NoError(t, err)
+
+	// Store a contract in `addressC`.
+
+	const contractName = "Test"
+	contractAddress := addressC
+
+	err = registersByAccount.Set(
+		string(contractAddress[:]),
+		flow.ContractKey(contractName),
+		[]byte(`
+            pub contract Test {
+                access(all) resource R {}
+            }
+        `),
+	)
+	require.NoError(t, err)
+
+	encodedContractNames, err := environment.EncodeContractNames([]string{contractName})
+	require.NoError(t, err)
+
+	err = registersByAccount.Set(
+		string(contractAddress[:]),
+		flow.ContractNamesKey,
+		encodedContractNames,
+	)
+	require.NoError(t, err)
+
+	migrationRuntime, err := NewInterpreterMigrationRuntime(
 		registersByAccount,
 		chainID,
 		InterpreterMigrationRuntimeConfig{},
 	)
 	require.NoError(t, err)
 
-	storage := runtime.Storage
+	storage := migrationRuntime.Storage
 	storageDomain := common.PathDomainStorage.Identifier()
 
-	storageMap := storage.GetStorageMap(
+	// Store a typed-capability with storage path
+
+	storageMapForAddressA := storage.GetStorageMap(
 		addressA,
 		storageDomain,
 		true,
@@ -2184,48 +2216,109 @@ func TestStoragePathCapabilityMigration(t *testing.T) {
 		interpreter.PrimitiveStaticTypeAnyStruct,
 	)
 
-	// Store a capability with storage path
+	aCapStorageMapKey := interpreter.StringStorageMapKey("aCap")
 
-	fooCapStorageMapKey := interpreter.StringStorageMapKey("fooCap")
-
-	capabilityFoo := &interpreter.PathCapabilityValue{
+	aCapability := &interpreter.PathCapabilityValue{
 		BorrowType: borrowType,
-		Path:       interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "foo"),
+		Path:       interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "a"),
 
 		// Important: Capability must be for a different address,
 		// compared to where the capability is stored.
 		Address: interpreter.AddressValue(addressB),
 	}
 
-	storageMap.WriteValue(
-		runtime.Interpreter,
-		fooCapStorageMapKey,
-		capabilityFoo,
+	storageMapForAddressA.WriteValue(
+		migrationRuntime.Interpreter,
+		aCapStorageMapKey,
+		aCapability,
 	)
 
 	// Store another capability with storage path, but without a borrow type.
+	// But the target path does not contain a value.
 
-	barCapStorageMapKey := interpreter.StringStorageMapKey("barCap")
+	bCapStorageMapKey := interpreter.StringStorageMapKey("bCap")
 
-	capabilityBar := &interpreter.PathCapabilityValue{
-		Path: interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "bar"),
+	bCapability := &interpreter.PathCapabilityValue{
+		Path: interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "b"),
 
 		// Important: Capability must be for a different address,
 		// compared to where the capability is stored.
 		Address: interpreter.AddressValue(addressB),
 	}
 
-	storageMap.WriteValue(
-		runtime.Interpreter,
-		barCapStorageMapKey,
-		capabilityBar,
+	storageMapForAddressA.WriteValue(
+		migrationRuntime.Interpreter,
+		bCapStorageMapKey,
+		bCapability,
 	)
 
-	err = storage.NondeterministicCommit(runtime.Interpreter, false)
+	// Store a third capability with storage path, without a borrow type.
+	// But the target path contains a value.
+
+	storageMapForAddressB := storage.GetStorageMap(
+		addressB,
+		storageDomain,
+		true,
+	)
+
+	storageMapForAddressB.WriteValue(
+		migrationRuntime.Interpreter,
+		interpreter.StringStorageMapKey("c"),
+		interpreter.NewUnmeteredStringValue("This is the bar value"),
+	)
+
+	cCapStorageMapKey := interpreter.StringStorageMapKey("cCap")
+
+	cCapability := &interpreter.PathCapabilityValue{
+		Path: interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "c"),
+
+		// Important: Capability must be for a different address,
+		// compared to where the capability is stored.
+		Address: interpreter.AddressValue(addressB),
+	}
+
+	storageMapForAddressA.WriteValue(
+		migrationRuntime.Interpreter,
+		cCapStorageMapKey,
+		cCapability,
+	)
+
+	// Store a fourth capability with storage path, and with a broken type
+
+	dBorrowType := interpreter.NewReferenceStaticType(
+		nil,
+		interpreter.UnauthorizedAccess,
+		interpreter.NewCompositeStaticTypeComputeTypeID(
+			nil,
+			common.NewAddressLocation(nil, contractAddress, "Test"),
+			"Test.R",
+		),
+	)
+
+	dCapStorageMapKey := interpreter.StringStorageMapKey("dCap")
+
+	dCapability := &interpreter.PathCapabilityValue{
+		BorrowType: dBorrowType,
+		Path:       interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "d"),
+
+		// Important: Capability must be for a different address,
+		// compared to where the capability is stored.
+		Address: interpreter.AddressValue(addressB),
+	}
+
+	storageMapForAddressA.WriteValue(
+		migrationRuntime.Interpreter,
+		dCapStorageMapKey,
+		dCapability,
+	)
+
+	// Commit
+
+	err = storage.NondeterministicCommit(migrationRuntime.Interpreter, false)
 	require.NoError(t, err)
 
 	// finalize the transaction
-	result, err := runtime.TransactionState.FinalizeMainTransaction()
+	result, err := migrationRuntime.TransactionState.FinalizeMainTransaction()
 	require.NoError(t, err)
 
 	// Merge the changes into the registers
@@ -2275,25 +2368,28 @@ func TestStoragePathCapabilityMigration(t *testing.T) {
 
 	reporter := rwf.reportWriters[capabilityValueMigrationReporterName]
 	require.NotNil(t, reporter)
-	require.Len(t, reporter.entries, 3)
+	require.Len(t, reporter.entries, 7)
+
+	inferredBorrowType := interpreter.NewReferenceStaticType(
+		nil,
+		interpreter.UnauthorizedAccess,
+		interpreter.PrimitiveStaticTypeString,
+	)
 
 	require.Equal(
 		t,
 		[]any{
-			capabilityMissingCapabilityIDEntry{
-				AccountAddress: addressA,
-				AddressPath: interpreter.AddressPath{
-					Address: addressB,
-					Path:    interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "bar"),
-				},
-			},
 			capabilityMigrationEntry{
 				AccountAddress: addressA,
 				AddressPath: interpreter.AddressPath{
 					Address: addressB,
-					Path:    interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "foo"),
+					Path:    interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "c"),
 				},
-				BorrowType:   borrowType,
+				BorrowType: interpreter.NewReferenceStaticType(
+					nil,
+					interpreter.UnauthorizedAccess,
+					interpreter.PrimitiveStaticTypeString,
+				),
 				CapabilityID: 3,
 			},
 			cadenceValueMigrationEntry{
@@ -2301,8 +2397,49 @@ func TestStoragePathCapabilityMigration(t *testing.T) {
 					Key:     storageDomain,
 					Address: addressA,
 				},
-				StorageMapKey: fooCapStorageMapKey,
+				StorageMapKey: cCapStorageMapKey,
 				Migration:     "CapabilityValueMigration",
+			},
+			capabilityMigrationEntry{
+				AccountAddress: addressA,
+				AddressPath: interpreter.AddressPath{
+					Address: addressB,
+					Path:    interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "d"),
+				},
+				BorrowType:   dBorrowType,
+				CapabilityID: 4,
+			},
+			cadenceValueMigrationEntry{
+				StorageKey: interpreter.StorageKey{
+					Key:     storageDomain,
+					Address: addressA,
+				},
+				StorageMapKey: dCapStorageMapKey,
+				Migration:     "CapabilityValueMigration",
+			},
+			capabilityMigrationEntry{
+				AccountAddress: addressA,
+				AddressPath: interpreter.AddressPath{
+					Address: addressB,
+					Path:    interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "a"),
+				},
+				BorrowType:   borrowType,
+				CapabilityID: 5,
+			},
+			cadenceValueMigrationEntry{
+				StorageKey: interpreter.StorageKey{
+					Key:     storageDomain,
+					Address: addressA,
+				},
+				StorageMapKey: aCapStorageMapKey,
+				Migration:     "CapabilityValueMigration",
+			},
+			capabilityMissingCapabilityIDEntry{
+				AccountAddress: addressA,
+				AddressPath: interpreter.AddressPath{
+					Address: addressB,
+					Path:    interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "b"),
+				},
 			},
 		},
 		reporter.entries,
@@ -2310,25 +2447,67 @@ func TestStoragePathCapabilityMigration(t *testing.T) {
 
 	issueStorageCapConReporter := rwf.reportWriters[issueStorageCapConMigrationReporterName]
 	require.NotNil(t, issueStorageCapConReporter)
-	require.Len(t, issueStorageCapConReporter.entries, 2)
+	require.Len(t, issueStorageCapConReporter.entries, 6)
 	require.Equal(
 		t,
 		[]any{
 			storageCapConsMissingBorrowTypeEntry{
-				AccountAddress: addressB,
-				AddressPath: interpreter.AddressPath{
+				TargetPath: interpreter.AddressPath{
 					Address: addressB,
-					Path:    interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "bar"),
+					Path:    interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "c"),
+				},
+				StoredPath: interpreter.AddressPath{
+					Address: addressB,
+					Path:    interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "cCap"),
+				},
+			},
+			storageCapConsInferredBorrowTypeEntry{
+				TargetPath: interpreter.AddressPath{
+					Address: addressB,
+					Path:    interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "c"),
+				},
+				BorrowType: inferredBorrowType,
+				StoredPath: interpreter.AddressPath{
+					Address: addressB,
+					Path:    interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "cCap"),
 				},
 			},
 			storageCapConIssuedEntry{
 				AccountAddress: addressB,
 				AddressPath: interpreter.AddressPath{
 					Address: addressB,
-					Path:    interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "foo"),
+					Path:    interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "c"),
+				},
+				BorrowType:   inferredBorrowType,
+				CapabilityID: 3,
+			},
+			storageCapConIssuedEntry{
+				AccountAddress: addressB,
+				AddressPath: interpreter.AddressPath{
+					Address: addressB,
+					Path:    interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "d"),
+				},
+				BorrowType:   dBorrowType,
+				CapabilityID: 4,
+			},
+			storageCapConIssuedEntry{
+				AccountAddress: addressB,
+				AddressPath: interpreter.AddressPath{
+					Address: addressB,
+					Path:    interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "a"),
 				},
 				BorrowType:   borrowType,
-				CapabilityID: 3,
+				CapabilityID: 5,
+			},
+			storageCapConsMissingBorrowTypeEntry{
+				TargetPath: interpreter.AddressPath{
+					Address: addressB,
+					Path:    interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "b"),
+				},
+				StoredPath: interpreter.AddressPath{
+					Address: addressB,
+					Path:    interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "bCap"),
+				},
 			},
 		},
 		issueStorageCapConReporter.entries,
@@ -2345,16 +2524,38 @@ func TestStoragePathCapabilityMigration(t *testing.T) {
               access(all)
               fun main() {
                   let storage = getAuthAccount<auth(Storage) &Account>(%s).storage
-                  let fooCap = storage.copy<Capability>(from: /storage/fooCap)!
-                  let barCap = storage.copy<Capability>(from: /storage/barCap)!
-                  assert(fooCap.id == 3)
-                  assert(barCap.id == 0)
+                  let aCap = storage.copy<Capability>(from: /storage/aCap)!
+                  let bCap = storage.copy<Capability>(from: /storage/bCap)!
+                  let cCap = storage.copy<Capability>(from: /storage/cCap)!
+                  assert(aCap.id == 5)
+                  assert(bCap.id == 0)
+                  assert(cCap.id == 3)
               }
             `,
 			addressA.HexWithPrefix(),
 		),
 	)
 	require.NoError(t, err)
+
+	// check the cap with the broken type
+
+	_, err = runScript(
+		chainID,
+		registersByAccount,
+		fmt.Sprintf(
+			//language=Cadence
+			`
+              access(all)
+              fun main() {
+                  let storage = getAuthAccount<auth(Storage) &Account>(%s).storage
+                  let dCap = storage.copy<Capability>(from: /storage/dCap)!
+              }
+            `,
+			addressA.HexWithPrefix(),
+		),
+	)
+	require.Error(t, err)
+	require.ErrorAs(t, &runtime.ParsingCheckingError{}, &err)
 
 	// Check account B
 
@@ -2367,9 +2568,9 @@ func TestStoragePathCapabilityMigration(t *testing.T) {
               access(all)
               fun main() {
                   let capabilities = getAuthAccount<auth(Capabilities) &Account>(%s).capabilities.storage
-                  let fooCapCons = capabilities.getControllers(forPath: /storage/foo)
-                  assert(fooCapCons.length == 1)
-                  assert(fooCapCons[0].capabilityID == 3)
+                  let aCapCons = capabilities.getControllers(forPath: /storage/a)
+                  assert(aCapCons.length == 1)
+                  assert(aCapCons[0].capabilityID == 5)
               }
             `,
 			addressB.HexWithPrefix(),
@@ -2422,13 +2623,16 @@ func TestStorageCapConsMissingBorrowTypeEntry_MarshalJSON(t *testing.T) {
 	t.Parallel()
 
 	e := storageCapConsMissingBorrowTypeEntry{
-		AccountAddress: common.MustBytesToAddress([]byte{0x2}),
-		AddressPath: interpreter.AddressPath{
+		TargetPath: interpreter.AddressPath{
 			Address: common.MustBytesToAddress([]byte{0x1}),
 			Path: interpreter.PathValue{
 				Domain:     common.PathDomainStorage,
 				Identifier: "test",
 			},
+		},
+		StoredPath: interpreter.AddressPath{
+			Address: common.MustBytesToAddress([]byte{0x2}),
+			Path:    interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "storedCap"),
 		},
 	}
 
@@ -2441,7 +2645,48 @@ func TestStorageCapConsMissingBorrowTypeEntry_MarshalJSON(t *testing.T) {
           "kind": "storage-capcon-missing-borrow-type",
           "account_address": "0x0000000000000002",
           "address": "0x0000000000000001",
-          "path": "/storage/test"
+          "target_path": "/storage/test",
+          "stored_path": "/storage/storedCap"
+        }`,
+		string(actual),
+	)
+}
+
+func TestStorageCapConsInferredBorrowTypeEntry_MarshalJSON(t *testing.T) {
+
+	t.Parallel()
+
+	e := storageCapConsInferredBorrowTypeEntry{
+		TargetPath: interpreter.AddressPath{
+			Address: common.MustBytesToAddress([]byte{0x1}),
+			Path: interpreter.PathValue{
+				Domain:     common.PathDomainStorage,
+				Identifier: "test",
+			},
+		},
+		StoredPath: interpreter.AddressPath{
+			Address: common.MustBytesToAddress([]byte{0x2}),
+			Path:    interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "storedCap"),
+		},
+		BorrowType: interpreter.NewReferenceStaticType(
+			nil,
+			interpreter.UnauthorizedAccess,
+			interpreter.PrimitiveStaticTypeInt,
+		),
+	}
+
+	actual, err := e.MarshalJSON()
+	require.NoError(t, err)
+
+	require.JSONEq(t,
+		//language=JSON
+		`{
+          "kind": "storage-capcon-inferred-borrow-type",
+          "account_address": "0x0000000000000002",
+          "address": "0x0000000000000001",
+          "borrow_type":"&Int",
+          "target_path": "/storage/test",
+          "stored_path": "/storage/storedCap"
         }`,
 		string(actual),
 	)
