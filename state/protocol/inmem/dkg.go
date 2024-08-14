@@ -2,6 +2,7 @@ package inmem
 
 import (
 	"fmt"
+
 	"github.com/onflow/crypto"
 
 	"github.com/onflow/flow-go/model/flow"

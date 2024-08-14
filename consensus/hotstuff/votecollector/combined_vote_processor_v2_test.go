@@ -2,7 +2,6 @@ package votecollector
 
 import (
 	"errors"
-	"golang.org/x/exp/slices"
 	"math/rand"
 	"sync"
 	"testing"
@@ -12,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/atomic"
+	"golang.org/x/exp/slices"
 	"pgregory.net/rapid"
 
 	bootstrapDKG "github.com/onflow/flow-go/cmd/bootstrap/dkg"
