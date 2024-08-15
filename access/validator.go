@@ -22,8 +22,9 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 )
 
-// DefaultSealedIndexedHeightThresholdNumber is the default number of blocks between sealed and indexed height
-const DefaultSealedIndexedHeightThresholdNumber = 30
+// DefaultSealedIndexedHeightThreshold is the default number of blocks between sealed and indexed height
+// this sets a limit on how far into the past the payer validator will allow for checking the payer's balance.
+const DefaultSealedIndexedHeightThreshold = 30
 
 type Blocks interface {
 	HeaderByID(id flow.Identifier) (*flow.Header, error)
@@ -205,10 +206,6 @@ func (v *TransactionValidator) Validate(ctx context.Context, tx *flow.Transactio
 
 	err = v.checkSufficientBalanceToPayForTransaction(ctx, tx)
 	if err != nil {
-		if IsIndexedHeightTooBehindError(err) {
-			return err
-		}
-
 		// we only return InsufficientBalanceError as it's a client-side issue
 		// that requires action from a user. Other errors (e.g. parsing errors)
 		// are 'internal' and related to script execution process. they shouldn't
@@ -424,8 +421,8 @@ func (v *TransactionValidator) checkSufficientBalanceToPayForTransaction(ctx con
 	}
 
 	sealedHeight := header.Height
-	if sealedHeight-DefaultSealedIndexedHeightThresholdNumber > indexedHeight {
-		return IndexedHeightTooBehindError{SealedHeight: sealedHeight, IndexedHeight: indexedHeight}
+	if indexedHeight < sealedHeight-DefaultSealedIndexedHeightThreshold {
+		return IndexedHeightFarBehindError{SealedHeight: sealedHeight, IndexedHeight: indexedHeight}
 	}
 
 	payerAddress := cadence.NewAddress(tx.Payer)

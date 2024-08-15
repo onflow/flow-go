@@ -120,17 +120,13 @@ func IsInsufficientBalanceError(err error) bool {
 	return errors.As(err, &balanceError)
 }
 
-type IndexedHeightTooBehindError struct {
+// IndexedHeightFarBehindError indicates that a node is far behind on indexing.
+type IndexedHeightFarBehindError struct {
 	SealedHeight  uint64
 	IndexedHeight uint64
 }
 
-func (e IndexedHeightTooBehindError) Error() string {
+func (e IndexedHeightFarBehindError) Error() string {
 	return fmt.Sprintf("the difference between the latest sealed height (%d) and indexed height (%d) exceeds the maximum gap allowed",
 		e.SealedHeight, e.IndexedHeight)
-}
-
-func IsIndexedHeightTooBehindError(err error) bool {
-	var indexedError IndexedHeightTooBehindError
-	return errors.As(err, &indexedError)
 }

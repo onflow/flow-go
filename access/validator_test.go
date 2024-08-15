@@ -178,7 +178,7 @@ func (s *TransactionValidatorSuite) TestTransactionValidator_InsufficientBalance
 func (s *TransactionValidatorSuite) TestTransactionValidator_SealedIndexedHeightThresholdLimit() {
 	scriptExecutor := execmock.NewScriptExecutor(s.T())
 
-	// setting indexed height to be behind of sealed by bigger number than allowed(30)
+	// setting indexed height to be behind of sealed by bigger number than allowed(DefaultSealedIndexedHeightThreshold)
 	indexedHeight := s.header.Height - 40
 
 	s.blocks.
@@ -191,12 +191,7 @@ func (s *TransactionValidatorSuite) TestTransactionValidator_SealedIndexedHeight
 
 	txBody := unittest.TransactionBodyFixture()
 
-	expectedError := access.IndexedHeightTooBehindError{
-		SealedHeight:  s.header.Height,
-		IndexedHeight: indexedHeight,
-	}
+	err = validator.Validate(context.Background(), &txBody)
+	assert.NoError(s.T(), err)
 
-	actualErr := validator.Validate(context.Background(), &txBody)
-
-	assert.ErrorIs(s.T(), actualErr, expectedError)
 }
