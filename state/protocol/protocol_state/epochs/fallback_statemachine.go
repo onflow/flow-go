@@ -165,26 +165,8 @@ func (m *FallbackStateMachine) ProcessEpochRecover(epochRecover *flow.EpochRecov
 		m.telemetry.OnInvalidServiceEvent(epochRecover.ServiceEvent(), err)
 		return false, nil
 	}
-
-	nextEpochParticipants, err := buildNextEpochActiveParticipants(
-		m.state.CurrentEpoch.ActiveIdentities.Lookup(),
-		m.state.CurrentEpochSetup,
-		&epochRecover.EpochSetup)
-	if err != nil {
-		m.telemetry.OnInvalidServiceEvent(epochRecover.ServiceEvent(), fmt.Errorf("rejecting EpochRecover event: %w", err))
-		return false, nil
-	}
-
 	nextEpoch := m.state.NextEpoch
-	if nextEpoch == nil {
-		// setup next epoch if there is none
-		nextEpoch = &flow.EpochStateContainer{
-			SetupID:          epochRecover.EpochSetup.ID(),
-			CommitID:         epochRecover.EpochCommit.ID(),
-			ActiveIdentities: nextEpochParticipants,
-			EpochExtensions:  nil,
-		}
-	} else {
+	if nextEpoch != nil {
 		// accept iff the EpochRecover is the same as the one we have already recovered.
 		if nextEpoch.SetupID != epochRecover.EpochSetup.ID() ||
 			nextEpoch.CommitID != epochRecover.EpochCommit.ID() {
@@ -193,6 +175,24 @@ func (m *FallbackStateMachine) ProcessEpochRecover(epochRecover *flow.EpochRecov
 			return false, nil
 		}
 	}
+	// m.state.NextEpoch is either nil, or its EpochSetup and EpochCommit are identical to the given `epochRecover`
+
+	// assemble EpochStateContainer for next epoch:
+	nextEpochParticipants, err := buildNextEpochActiveParticipants(
+		m.state.CurrentEpoch.ActiveIdentities.Lookup(),
+		m.state.CurrentEpochSetup,
+		&epochRecover.EpochSetup)
+	if err != nil {
+		m.telemetry.OnInvalidServiceEvent(epochRecover.ServiceEvent(), fmt.Errorf("rejecting EpochRecover event: %w", err))
+		return false, nil
+	}
+	nextEpoch = &flow.EpochStateContainer{
+		SetupID:          epochRecover.EpochSetup.ID(),
+		CommitID:         epochRecover.EpochCommit.ID(),
+		ActiveIdentities: nextEpochParticipants,
+		EpochExtensions:  nil,
+	}
+
 	err = m.ejector.TrackDynamicIdentityList(nextEpoch.ActiveIdentities)
 	if err != nil {
 		if protocol.IsInvalidServiceEventError(err) {
