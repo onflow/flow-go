@@ -16,23 +16,24 @@ import (
 
 func TestBlockStore(t *testing.T) {
 
+	var chainID = flow.Testnet
 	testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
 		testutils.RunWithTestFlowEVMRootAddress(t, backend, func(root flow.Address) {
-			bs := handler.NewBlockStore(backend, root)
+			bs := handler.NewBlockStore(chainID, backend, root)
 
 			// check the Genesis block
 			b, err := bs.LatestBlock()
 			require.NoError(t, err)
-			require.Equal(t, types.GenesisBlock, b)
+			require.Equal(t, types.GenesisBlock(chainID), b)
 			h, err := bs.BlockHash(0)
 			require.NoError(t, err)
-			require.Equal(t, types.GenesisBlockHash, h)
+			require.Equal(t, types.GenesisBlockHash(chainID), h)
 
 			// test block proposal construction from the Genesis block
 			bp, err := bs.BlockProposal()
 			require.NoError(t, err)
 			require.Equal(t, uint64(1), bp.Height)
-			expectedParentHash, err := types.GenesisBlock.Hash()
+			expectedParentHash, err := types.GenesisBlock(chainID).Hash()
 			require.NoError(t, err)
 			require.Equal(t, expectedParentHash, bp.ParentBlockHash)
 
@@ -47,7 +48,7 @@ func TestBlockStore(t *testing.T) {
 			require.NoError(t, err)
 
 			// reset the bs and check if it still return the block proposal
-			bs = handler.NewBlockStore(backend, root)
+			bs = handler.NewBlockStore(chainID, backend, root)
 			retbp, err = bs.BlockProposal()
 			require.NoError(t, err)
 			require.Equal(t, bp, retbp)
@@ -60,7 +61,7 @@ func TestBlockStore(t *testing.T) {
 			// this should still return the genesis block
 			retb, err := bs.LatestBlock()
 			require.NoError(t, err)
-			require.Equal(t, types.GenesisBlock, retb)
+			require.Equal(t, types.GenesisBlock(chainID), retb)
 
 			// commit the changes
 			err = bs.CommitBlockProposal(bp)
@@ -78,7 +79,7 @@ func TestBlockStore(t *testing.T) {
 			// genesis
 			h, err = bs.BlockHash(0)
 			require.NoError(t, err)
-			require.Equal(t, types.GenesisBlockHash, h)
+			require.Equal(t, types.GenesisBlockHash(chainID), h)
 
 			// block 1
 			h, err = bs.BlockHash(1)
@@ -99,6 +100,7 @@ func TestBlockStore(t *testing.T) {
 
 // TODO: we can remove this when the previewnet is out
 func TestBlockStoreMigration(t *testing.T) {
+	var chainID = flow.Testnet
 	testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
 		testutils.RunWithTestFlowEVMRootAddress(t, backend, func(root flow.Address) {
 			legacyCapacity := 16
@@ -114,7 +116,7 @@ func TestBlockStoreMigration(t *testing.T) {
 				legacy.Encode(),
 			)
 			require.NoError(t, err)
-			bs := handler.NewBlockStore(backend, root)
+			bs := handler.NewBlockStore(chainID, backend, root)
 
 			for i := 0; i <= maxHeightAdded-legacyCapacity; i++ {
 				h, err := bs.BlockHash(uint64(i))
@@ -138,10 +140,11 @@ func TestBlockStoreMigration(t *testing.T) {
 // and storage of blocks works as it should, the breaking change was introduced
 // in this PR https://github.com/onflow/flow-go/pull/5660
 func TestBlockStore_AddedTimestamp(t *testing.T) {
+	var chainID = flow.Testnet
 	testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
 		testutils.RunWithTestFlowEVMRootAddress(t, backend, func(root flow.Address) {
 
-			bs := handler.NewBlockStore(backend, root)
+			bs := handler.NewBlockStore(chainID, backend, root)
 
 			// block type before breaking change (no timestamp and total gas used)
 			type oldBlockV1 struct {
@@ -154,7 +157,7 @@ func TestBlockStore_AddedTimestamp(t *testing.T) {
 				TransactionHashes []gethCommon.Hash
 			}
 
-			g := types.GenesisBlock
+			g := types.GenesisBlock(chainID)
 			h, err := g.Hash()
 			require.NoError(t, err)
 

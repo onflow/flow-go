@@ -659,28 +659,70 @@ func (s *EpochFallbackStateMachineSuite) TestEpochFallbackStateMachineInjectsMul
 	}
 }
 
-// TestEpochRecoverAndEjectionInSameBlock tests that processing an epoch recover event which re-admits an ejected identity results in an error.
-// Such action should be considered illegal since smart contract emitted ejection before epoch recover and service events are delivered
-// in an order-preserving manner.
+// TestEpochRecoverAndEjectionInSameBlock tests that state machine correctly handles ejection events and a subsequent
+// epoch recover in the same block. Specifically we test two cases:
+//  1. Happy Path: The Epoch Recover event excludes the previously ejected node.
+//  2. Invalid Epoch Recover: an epoch recover event which re-admits an ejected identity is ignored. Such action should
+//     be considered illegal since smart contract emitted ejection before epoch recover and service events are delivered
+//     in an order-preserving manner. However, since the FallbackStateMachine is intended to keep the protocol alive even
+//     in the presence of (largely) arbitrary Epoch Smart Contract bugs, it should also handle this case gracefully.
+//     In this case, the EpochRecover service event should be discarded and the internal state should remain unchanged.
 func (s *EpochFallbackStateMachineSuite) TestEpochRecoverAndEjectionInSameBlock() {
 	nextEpochParticipants := s.parentProtocolState.CurrentEpochIdentityTable.Copy()
 	ejectedIdentityID := nextEpochParticipants.Filter(filter.HasRole[flow.Identity](flow.RoleAccess))[0].NodeID
-	epochRecover := unittest.EpochRecoverFixture(func(setup *flow.EpochSetup) {
-		setup.Participants = nextEpochParticipants.ToSkeleton()
-		setup.Assignments = unittest.ClusterAssignment(1, nextEpochParticipants.ToSkeleton())
-		setup.Counter = s.parentProtocolState.CurrentEpochSetup.Counter + 1
-		setup.FirstView = s.parentProtocolState.CurrentEpochSetup.FinalView + 1
-		setup.FinalView = setup.FirstView + 10_000
-	})
-	ejected := s.stateMachine.EjectIdentity(ejectedIdentityID)
-	require.True(s.T(), ejected)
 
-	s.consumer.On("OnServiceEventReceived", epochRecover.ServiceEvent()).Once()
-	s.consumer.On("OnInvalidServiceEvent", epochRecover.ServiceEvent(),
-		mock.MatchedBy(func(err error) bool { return protocol.IsInvalidServiceEventError(err) })).Once()
-	processed, err := s.stateMachine.ProcessEpochRecover(epochRecover)
-	require.NoError(s.T(), err)
-	require.False(s.T(), processed)
+	s.Run("happy path", func() {
+		wasEjected := s.stateMachine.EjectIdentity(ejectedIdentityID)
+		require.True(s.T(), wasEjected)
+
+		epochRecover := unittest.EpochRecoverFixture(func(setup *flow.EpochSetup) {
+			setup.Participants = nextEpochParticipants.ToSkeleton().Filter(
+				filter.Not(filter.HasNodeID[flow.IdentitySkeleton](ejectedIdentityID)))
+			setup.Assignments = unittest.ClusterAssignment(1, setup.Participants.ToSkeleton())
+			setup.Counter = s.parentProtocolState.CurrentEpochSetup.Counter + 1
+			setup.FirstView = s.parentProtocolState.CurrentEpochSetup.FinalView + 1
+			setup.FinalView = setup.FirstView + 10_000
+		})
+		s.consumer.On("OnServiceEventReceived", epochRecover.ServiceEvent()).Once()
+		s.consumer.On("OnServiceEventProcessed", epochRecover.ServiceEvent()).Once()
+		processed, err := s.stateMachine.ProcessEpochRecover(epochRecover)
+		require.NoError(s.T(), err)
+		require.True(s.T(), processed)
+
+		updatedState, _, _ := s.stateMachine.Build()
+		require.False(s.T(), updatedState.EpochFallbackTriggered, "should exit EFM")
+		require.NotNil(s.T(), updatedState.NextEpoch, "should setup & commit next epoch")
+	})
+	s.Run("invalid epoch recover event", func() {
+		s.kvstore = mockstate.NewKVStoreReader(s.T())
+		s.kvstore.On("GetEpochExtensionViewCount").Return(extensionViewCount).Maybe()
+		s.kvstore.On("GetEpochCommitSafetyThreshold").Return(uint64(200))
+
+		var err error
+		s.stateMachine, err = NewFallbackStateMachine(s.kvstore, s.consumer, s.candidate.View, s.parentProtocolState.Copy())
+		require.NoError(s.T(), err)
+
+		wasEjected := s.stateMachine.EjectIdentity(ejectedIdentityID)
+		require.True(s.T(), wasEjected)
+
+		epochRecover := unittest.EpochRecoverFixture(func(setup *flow.EpochSetup) {
+			setup.Participants = nextEpochParticipants.ToSkeleton()
+			setup.Assignments = unittest.ClusterAssignment(1, nextEpochParticipants.ToSkeleton())
+			setup.Counter = s.parentProtocolState.CurrentEpochSetup.Counter + 1
+			setup.FirstView = s.parentProtocolState.CurrentEpochSetup.FinalView + 1
+			setup.FinalView = setup.FirstView + 10_000
+		})
+		s.consumer.On("OnServiceEventReceived", epochRecover.ServiceEvent()).Once()
+		s.consumer.On("OnInvalidServiceEvent", epochRecover.ServiceEvent(),
+			mock.MatchedBy(func(err error) bool { return protocol.IsInvalidServiceEventError(err) })).Once()
+		processed, err := s.stateMachine.ProcessEpochRecover(epochRecover)
+		require.NoError(s.T(), err)
+		require.False(s.T(), processed)
+
+		updatedState, _, _ := s.stateMachine.Build()
+		require.True(s.T(), updatedState.EpochFallbackTriggered, "should remain in EFM")
+		require.Nil(s.T(), updatedState.NextEpoch, "next epoch should be nil as recover event is invalid")
+	})
 }
 
 // TestProcessingMultipleEventsAtTheSameBlock tests that the state machine can process multiple events at the same block.
