@@ -111,6 +111,18 @@ func TestValidateEvent(t *testing.T) {
 				Name:         "EventA",
 			},
 		},
+		{
+			name:      "resource destroyed event",
+			eventType: "A.0000000000000001.Contract1.ResourceA.ResourceB.ResourceC.ResourceDestroyed",
+			expected: events.ParsedEvent{
+				Type:         events.AccountEventType,
+				EventType:    "A.0000000000000001.Contract1.ResourceA.ResourceB.ResourceC.ResourceDestroyed",
+				Address:      "0000000000000001",
+				Contract:     "A.0000000000000001.Contract1",
+				ContractName: "Contract1",
+				Name:         "ResourceDestroyed",
+			},
+		},
 	}
 
 	for _, test := range tests {
