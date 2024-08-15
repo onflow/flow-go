@@ -49,6 +49,7 @@ func (pd *ParticipantData) Identities() flow.IdentityList {
 	return bootstrap.ToIdentityList(nodes)
 }
 
+// DKGIndexMap returns a map from node ID to DKG index. Can be used to reconstruct EpochCommit.
 func (pd *ParticipantData) DKGIndexMap() map[flow.Identifier]int {
 	result := make(map[flow.Identifier]int)
 	for nodeID, participant := range pd.Lookup {

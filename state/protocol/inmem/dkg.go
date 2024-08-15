@@ -9,6 +9,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 )
 
+// DKG is an adapter structure which wraps a flow.EpochCommit and implements the protocol.DKG interface.
 type DKG struct {
 	commit *flow.EpochCommit
 }
