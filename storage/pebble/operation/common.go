@@ -187,7 +187,7 @@ func keyUpperBound(b []byte) []byte {
 // TODO: this function is unbounded – pass context.Context to this or calling functions to allow timing functions out.
 // No errors are expected during normal operation. Any errors returned by the
 // provided handleFunc will be propagated back to the caller of iterate.
-func iterate(start []byte, end []byte, iteration iterationFunc, prefetchValues bool) func(pebble.Reader) error {
+func iterate(start []byte, end []byte, iteration iterationFunc) func(pebble.Reader) error {
 	return func(tx pebble.Reader) error {
 
 		if len(start) == 0 {
@@ -253,11 +253,6 @@ func iterate(start []byte, end []byte, iteration iterationFunc, prefetchValues b
 			// check if we should process the item at all
 			ok := check(key)
 			if !ok {
-				continue
-			}
-
-			// when prefetchValues is false, we skip loading the value
-			if !prefetchValues {
 				continue
 			}
 
@@ -414,6 +409,7 @@ func findHighestAtOrBelow(
 		// as the highest key.
 		key := append(prefix, b(height+1)...)
 		it, err := r.NewIter(&pebble.IterOptions{
+			LowerBound: prefix,
 			UpperBound: key,
 		})
 		if err != nil {

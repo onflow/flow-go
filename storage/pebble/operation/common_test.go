@@ -311,7 +311,7 @@ func TestIterate(t *testing.T) {
 			return check, create, handle
 		}
 
-		err := iterate(keys[0], keys[2], iterationFunc, true)(db)
+		err := iterate(keys[0], keys[2], iterationFunc)(db)
 		require.Nil(t, err)
 
 		assert.Equal(t, expected, actual)
@@ -551,7 +551,7 @@ func TestIterateBoundaries(t *testing.T) {
 		}
 
 		// iterate forward and check boundaries are included correctly
-		err := iterate(start, end, iteration, false)(db)
+		err := iterate(start, end, iteration)(db)
 		for i, f := range found {
 			t.Logf("forward %d: %x", i, f)
 		}
@@ -647,7 +647,7 @@ func TestIterateBoundariesOverflow(t *testing.T) {
 		}
 
 		// iterate forward and check boundaries are included correctly
-		err := iterate(start, end, iteration, false)(db)
+		err := iterate(start, end, iteration)(db)
 		for i, f := range found {
 			t.Logf("forward %d: %x", i, f)
 		}
