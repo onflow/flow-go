@@ -29,7 +29,7 @@ type viewRange struct {
 	finalView    uint64
 }
 
-// exists returns true when the viewRange is initialized (anything besides the zero value for the struct).
+// undefined returns true when the viewRange is not initialized (equal to the zero value for the struct).
 // It is useful for checking existence while iterating the epochRangeCache.
 func (er viewRange) undefined() bool {
 	return er.epochCounter == 0 && er.firstView == 0 && er.finalView == 0
@@ -47,7 +47,7 @@ func (er viewRange) undefined() bool {
 // NOT safe for CONCURRENT use.
 type epochRangeCache [3]viewRange
 
-// latest returns the latest cached epoch range, or nil if no epochs are cached. Follows map semantics
+// latest returns the latest cached epoch range. Follows map semantics
 // to indicate whether latest is known. If the boolean return value is false, the returned view range
 // is the zero value, i.e. undefined.
 func (cache *epochRangeCache) latest() (viewRange, bool) {
@@ -90,7 +90,7 @@ func (cache *epochRangeCache) extendLatestEpoch(epochCounter uint64, extension f
 // cachedEpochs returns a slice of the cached epochs in order. The return slice is guaranteed to satisfy:
 //  1. For two adjacent epochs, their view ranges form a continuous sequence without gaps or overlap.
 //     Formally: epochRangeCache[i].finalView + 1 = epochRangeCache[i+1].firstView
-//  2. For any two adjacent epochs, their the view counters increments by one
+//  2. For any two adjacent epochs, their epoch counters increment by one
 //     epochRangeCache[i].epochCounter + 1 = epochRangeCache[i+1].epochCounter
 //  3. All slice elements are different from the zero value (i.e. not undefined).
 //
@@ -272,9 +272,7 @@ func (lookup *EpochLookup) EpochForView(view uint64) (uint64, error) {
 	// view is within a known epoch
 	// -------[----|-*--|----]-------
 	for i := l - 1; i >= 0; i-- {
-		if cachedEpochs[i].firstView <= view {
-			// we know: view ≤ cachedEpochs[i].finalView, because otherwise we would have returned via a prior
-			// value check triggering; or epochRangeCache has a bug, which we avoid with thorough testing.
+		if cachedEpochs[i].firstView <= view && view <= cachedEpochs[i].finalView {
 			return cachedEpochs[i].epochCounter, nil
 		}
 	}
