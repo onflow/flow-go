@@ -741,7 +741,7 @@ func (s *EpochFallbackStateMachineSuite) TestProcessingMultipleEventsInTheSameBl
 		// It's not an issue on its own, but we are using telemetry to check correct invocations of state machine
 		// and when a panic occurs, it will still try to assert expectations on the consumer leading to a test failure.
 		// Specifically, for that reason, we are using a lower-level telemetry mock which allows manual assertion(in the end).
-		s.consumer = &protocol_statemock.StateMachineTelemetryConsumer{}
+		s.consumer = protocol_statemock.NewStateMachineTelemetryConsumer(s.T())
 		var err error
 		s.stateMachine, err = NewFallbackStateMachine(s.kvstore, s.consumer, s.candidate.View, s.parentProtocolState.Copy())
 		require.NoError(s.T(), err)
