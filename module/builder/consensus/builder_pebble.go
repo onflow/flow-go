@@ -49,6 +49,7 @@ func NewBuilderPebble(
 	seals storage.Seals,
 	index storage.Index,
 	blocks storage.Blocks,
+	blockIndex storage.BlockIndexer,
 	resultsDB storage.ExecutionResults,
 	receiptsDB storage.ExecutionReceipts,
 	guarPool mempool.Guarantees,

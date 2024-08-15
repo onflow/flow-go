@@ -17,7 +17,6 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/pebble/operation"
-	"github.com/onflow/flow-go/storage/pebble/procedure"
 )
 
 // FollowerState implements a lighter version of a mutable protocol state.
@@ -33,12 +32,13 @@ import (
 type FollowerState struct {
 	*State
 
-	index      storage.Index
-	payloads   storage.Payloads
-	tracer     module.Tracer
-	logger     zerolog.Logger
-	consumer   protocol.Consumer
-	blockTimer protocol.BlockTimer
+	index        storage.Index
+	payloads     storage.Payloads
+	blockIndexer storage.BlockIndexer
+	tracer       module.Tracer
+	logger       zerolog.Logger
+	consumer     protocol.Consumer
+	blockTimer   protocol.BlockTimer
 }
 
 var _ protocol.FollowerState = (*FollowerState)(nil)
@@ -62,16 +62,18 @@ func NewFollowerState(
 	state *State,
 	index storage.Index,
 	payloads storage.Payloads,
+	blockIndexer storage.BlockIndexer,
 	blockTimer protocol.BlockTimer,
 ) (*FollowerState, error) {
 	followerState := &FollowerState{
-		State:      state,
-		index:      index,
-		payloads:   payloads,
-		tracer:     tracer,
-		logger:     logger,
-		consumer:   consumer,
-		blockTimer: blockTimer,
+		State:        state,
+		index:        index,
+		payloads:     payloads,
+		blockIndexer: blockIndexer,
+		tracer:       tracer,
+		logger:       logger,
+		consumer:     consumer,
+		blockTimer:   blockTimer,
 	}
 	return followerState, nil
 }
@@ -87,6 +89,7 @@ func NewFullConsensusState(
 	state *State,
 	index storage.Index,
 	payloads storage.Payloads,
+	blockIndexer storage.BlockIndexer,
 	blockTimer protocol.BlockTimer,
 	receiptValidator module.ReceiptValidator,
 	sealValidator module.SealValidator,
@@ -98,6 +101,7 @@ func NewFullConsensusState(
 		state,
 		index,
 		payloads,
+		blockIndexer,
 		blockTimer,
 	)
 	if err != nil {
@@ -560,7 +564,7 @@ func (m *FollowerState) insert(ctx context.Context, candidate *flow.Block, certi
 		}
 
 		// index the child block for recovery
-		err = procedure.IndexNewBlock(blockID, candidate.Header.ParentID)(tx)
+		err = m.blockIndexer.IndexNewBlock(blockID, candidate.Header.ParentID)(tx)
 		if err != nil {
 			return fmt.Errorf("could not index new block: %w", err)
 		}

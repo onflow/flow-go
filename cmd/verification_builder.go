@@ -37,6 +37,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
 	pebbleState "github.com/onflow/flow-go/state/protocol/pebble"
 	"github.com/onflow/flow-go/storage/pebble"
+	"github.com/onflow/flow-go/storage/pebble/procedure"
 )
 
 type VerificationConfig struct {
@@ -125,6 +126,7 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 				state,
 				node.Storage.Index,
 				node.Storage.Payloads,
+				procedure.NewBlockIndexer(),
 				blocktimer.DefaultBlockTimer,
 			)
 			return err

@@ -24,9 +24,10 @@ func TestClusterBlocksByHeight(t *testing.T) {
 		err = operation.InsertClusterFinalizedHeight(parent.Header.ChainID, parent.Header.Height)(db)
 		require.NoError(t, err)
 
+		blockIndexer := procedure.NewClusterBlockIndexer()
 		// store a chain of blocks
 		for _, block := range blocks {
-			err := operation.WithReaderBatchWriter(db, procedure.InsertClusterBlock(&block))
+			err := operation.WithReaderBatchWriter(db, blockIndexer.InsertClusterBlock(&block))
 			require.NoError(t, err)
 
 			err = operation.WithReaderBatchWriter(db, procedure.FinalizeClusterBlock(block.Header.ID()))

@@ -58,6 +58,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol/util"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	storage "github.com/onflow/flow-go/storage/pebble"
+	"github.com/onflow/flow-go/storage/pebble/procedure"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -403,6 +404,7 @@ func createNode(
 
 	blockTimer, err := blocktimer.NewBlockTimer(1*time.Millisecond, 90*time.Second)
 	require.NoError(t, err)
+	blockIndexer := procedure.NewBlockIndexer()
 
 	fullState, err := bprotocol.NewFullConsensusState(
 		log,
@@ -411,6 +413,7 @@ func createNode(
 		state,
 		indexDB,
 		payloadsDB,
+		blockIndexer,
 		blockTimer,
 		util.MockReceiptValidator(),
 		util.MockSealValidator(sealsDB),
@@ -458,7 +461,7 @@ func createNode(
 	seals := stdmap.NewIncorporatedResultSeals(sealLimit)
 
 	// initialize the block builder
-	build, err := builder.NewBuilderPebble(metricsCollector, db, fullState, headersDB, sealsDB, indexDB, blocksDB, resultsDB, receiptsDB,
+	build, err := builder.NewBuilderPebble(metricsCollector, db, fullState, headersDB, sealsDB, indexDB, blocksDB, blockIndexer, resultsDB, receiptsDB,
 		guarantees, consensusMempools.NewIncorporatedResultSeals(seals, receiptsDB), receipts, tracer)
 	require.NoError(t, err)
 

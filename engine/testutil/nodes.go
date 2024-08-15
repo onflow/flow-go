@@ -107,6 +107,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol/util"
 	storage "github.com/onflow/flow-go/storage/pebble"
 	storagepebble "github.com/onflow/flow-go/storage/pebble"
+	"github.com/onflow/flow-go/storage/pebble/procedure"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -271,6 +272,7 @@ func CompleteStateFixture(
 		state,
 		s.Index,
 		s.Payloads,
+		procedure.NewBlockIndexer(),
 		util.MockBlockTimer(),
 		util.MockReceiptValidator(),
 		util.MockSealValidator(s.Seals),
@@ -586,6 +588,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		protoState.State,
 		node.Index,
 		node.Payloads,
+		procedure.NewBlockIndexer(),
 		blocktimer.DefaultBlockTimer,
 	)
 	require.NoError(t, err)

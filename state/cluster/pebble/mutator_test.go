@@ -91,14 +91,14 @@ func (suite *MutatorSuite) SetupTest() {
 		rootSnapshot,
 	)
 	require.NoError(suite.T(), err)
-	suite.protoState, err = ppebble.NewFollowerState(log, tracer, events.NewNoop(), state, all.Index, all.Payloads, protocolutil.MockBlockTimer())
+	suite.protoState, err = ppebble.NewFollowerState(log, tracer, events.NewNoop(), state, all.Index, all.Payloads, procedure.NewBlockIndexer(), protocolutil.MockBlockTimer())
 	require.NoError(suite.T(), err)
 
 	clusterStateRoot, err := NewStateRoot(suite.genesis, unittest.QuorumCertificateFixture(), suite.epochCounter)
 	suite.NoError(err)
 	clusterState, err := Bootstrap(suite.db, clusterStateRoot)
 	suite.Assert().Nil(err)
-	suite.state, err = NewMutableState(clusterState, tracer, all.Headers, colPayloads)
+	suite.state, err = NewMutableState(clusterState, tracer, all.Headers, colPayloads, procedure.NewClusterBlockIndexer())
 	suite.Assert().Nil(err)
 }
 

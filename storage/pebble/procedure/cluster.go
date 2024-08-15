@@ -2,6 +2,7 @@ package procedure
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/cockroachdb/pebble"
 
@@ -13,9 +14,21 @@ import (
 
 // This file implements storage functions for blocks in cluster consensus.
 
+type ClusterBlockIndexer struct {
+	indexing *sync.Mutex
+}
+
+var _ storage.ClusterBlockIndexer = (*ClusterBlockIndexer)(nil)
+
+func NewClusterBlockIndexer() *ClusterBlockIndexer {
+	return &ClusterBlockIndexer{
+		indexing: new(sync.Mutex),
+	}
+}
+
 // InsertClusterBlock inserts a cluster consensus block, updating all
 // associated indexes.
-func InsertClusterBlock(block *cluster.Block) func(storage.PebbleReaderBatchWriter) error {
+func (i *ClusterBlockIndexer) InsertClusterBlock(block *cluster.Block) func(storage.PebbleReaderBatchWriter) error {
 	return func(tx storage.PebbleReaderBatchWriter) error {
 		_, w := tx.ReaderWriter()
 
@@ -38,7 +51,7 @@ func InsertClusterBlock(block *cluster.Block) func(storage.PebbleReaderBatchWrit
 		}
 
 		// index the child block for recovery
-		err = IndexNewBlock(blockID, block.Header.ParentID)(tx)
+		err = IndexNewBlock(i.indexing, blockID, block.Header.ParentID)(tx)
 		if err != nil {
 			return fmt.Errorf("could not index new block: %w", err)
 		}

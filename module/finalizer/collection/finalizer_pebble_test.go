@@ -55,9 +55,11 @@ func TestFinalizerPebble(t *testing.T) {
 			require.NoError(t, err)
 		}
 
+		blockIndexer := procedure.NewClusterBlockIndexer()
+
 		// a helper function to insert a block
 		insert := func(block model.Block) {
-			err := operation.WithReaderBatchWriter(db, procedure.InsertClusterBlock(&block))
+			err := operation.WithReaderBatchWriter(db, blockIndexer.InsertClusterBlock(&block))
 			assert.Nil(t, err)
 		}
 

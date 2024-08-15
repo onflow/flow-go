@@ -43,9 +43,10 @@ type BuilderPebbleSuite struct {
 	chainID      flow.ChainID
 	epochCounter uint64
 
-	headers  storage.Headers
-	payloads storage.ClusterPayloads
-	blocks   storage.Blocks
+	headers      storage.Headers
+	payloads     storage.ClusterPayloads
+	blocks       storage.Blocks
+	blockIndexer storage.ClusterBlockIndexer
 
 	state cluster.MutableState
 
@@ -77,6 +78,7 @@ func (suite *BuilderPebbleSuite) SetupTest() {
 	suite.headers = all.Headers
 	suite.blocks = all.Blocks
 	suite.payloads = bstorage.NewClusterPayloads(metrics, suite.db)
+	suite.blockIndexer = procedure.NewClusterBlockIndexer()
 
 	// just bootstrap with a genesis block, we'll use this as reference
 	root, result, seal := unittest.BootstrapFixture(unittest.IdentityListFixture(5, unittest.WithAllRoles()))
@@ -93,7 +95,7 @@ func (suite *BuilderPebbleSuite) SetupTest() {
 	clusterState, err := clusterkv.Bootstrap(suite.db, clusterStateRoot)
 	suite.Require().NoError(err)
 
-	suite.state, err = clusterkv.NewMutableState(clusterState, tracer, suite.headers, suite.payloads)
+	suite.state, err = clusterkv.NewMutableState(clusterState, tracer, suite.headers, suite.payloads, suite.blockIndexer)
 	suite.Require().NoError(err)
 
 	state, err := ppebble.Bootstrap(
@@ -119,6 +121,7 @@ func (suite *BuilderPebbleSuite) SetupTest() {
 		state,
 		all.Index,
 		all.Payloads,
+		procedure.NewBlockIndexer(),
 		util.MockBlockTimer(),
 	)
 	require.NoError(suite.T(), err)
@@ -134,7 +137,7 @@ func (suite *BuilderPebbleSuite) SetupTest() {
 		suite.Assert().True(added)
 	}
 
-	suite.builder, _ = builder.NewBuilderPebble(suite.db, tracer, suite.protoState, suite.state, suite.headers, suite.headers, suite.payloads, suite.pool, unittest.Logger(), suite.epochCounter)
+	suite.builder, _ = builder.NewBuilderPebble(suite.db, tracer, suite.protoState, suite.state, suite.headers, suite.headers, suite.payloads, suite.blockIndexer, suite.pool, unittest.Logger(), suite.epochCounter)
 }
 
 // runs after each test finishes
@@ -146,7 +149,7 @@ func (suite *BuilderPebbleSuite) TearDownTest() {
 }
 
 func (suite *BuilderPebbleSuite) InsertBlock(block model.Block) {
-	err := operation.WithReaderBatchWriter(suite.db, procedure.InsertClusterBlock(&block))
+	err := operation.WithReaderBatchWriter(suite.db, suite.blockIndexer.InsertClusterBlock(&block))
 	suite.Assert().NoError(err)
 }
 
@@ -489,7 +492,7 @@ func (suite *BuilderPebbleSuite) TestBuildOn_LargeHistory() {
 
 	// use a mempool with 2000 transactions, one per block
 	suite.pool = herocache.NewTransactions(2000, unittest.Logger(), metrics.NewNoopCollector())
-	suite.builder, _ = builder.NewBuilderPebble(suite.db, trace.NewNoopTracer(), suite.protoState, suite.state, suite.headers, suite.headers, suite.payloads, suite.pool, unittest.Logger(), suite.epochCounter, builder.WithMaxCollectionSize(10000))
+	suite.builder, _ = builder.NewBuilderPebble(suite.db, trace.NewNoopTracer(), suite.protoState, suite.state, suite.headers, suite.headers, suite.payloads, suite.blockIndexer, suite.pool, unittest.Logger(), suite.epochCounter, builder.WithMaxCollectionSize(10000))
 
 	// get a valid reference block ID
 	final, err := suite.protoState.Final().Head()
@@ -569,7 +572,7 @@ func (suite *BuilderPebbleSuite) TestBuildOn_LargeHistory() {
 
 func (suite *BuilderPebbleSuite) TestBuildOn_MaxCollectionSize() {
 	// set the max collection size to 1
-	suite.builder, _ = builder.NewBuilderPebble(suite.db, trace.NewNoopTracer(), suite.protoState, suite.state, suite.headers, suite.headers, suite.payloads, suite.pool, unittest.Logger(), suite.epochCounter, builder.WithMaxCollectionSize(1))
+	suite.builder, _ = builder.NewBuilderPebble(suite.db, trace.NewNoopTracer(), suite.protoState, suite.state, suite.headers, suite.headers, suite.payloads, suite.blockIndexer, suite.pool, unittest.Logger(), suite.epochCounter, builder.WithMaxCollectionSize(1))
 
 	// build a block
 	header, err := suite.builder.BuildOn(suite.genesis.ID(), noopSetter)
@@ -587,7 +590,7 @@ func (suite *BuilderPebbleSuite) TestBuildOn_MaxCollectionSize() {
 
 func (suite *BuilderPebbleSuite) TestBuildOn_MaxCollectionByteSize() {
 	// set the max collection byte size to 400 (each tx is about 150 bytes)
-	suite.builder, _ = builder.NewBuilderPebble(suite.db, trace.NewNoopTracer(), suite.protoState, suite.state, suite.headers, suite.headers, suite.payloads, suite.pool, unittest.Logger(), suite.epochCounter, builder.WithMaxCollectionByteSize(400))
+	suite.builder, _ = builder.NewBuilderPebble(suite.db, trace.NewNoopTracer(), suite.protoState, suite.state, suite.headers, suite.headers, suite.payloads, suite.blockIndexer, suite.pool, unittest.Logger(), suite.epochCounter, builder.WithMaxCollectionByteSize(400))
 
 	// build a block
 	header, err := suite.builder.BuildOn(suite.genesis.ID(), noopSetter)
@@ -605,7 +608,7 @@ func (suite *BuilderPebbleSuite) TestBuildOn_MaxCollectionByteSize() {
 
 func (suite *BuilderPebbleSuite) TestBuildOn_MaxCollectionTotalGas() {
 	// set the max gas to 20,000
-	suite.builder, _ = builder.NewBuilderPebble(suite.db, trace.NewNoopTracer(), suite.protoState, suite.state, suite.headers, suite.headers, suite.payloads, suite.pool, unittest.Logger(), suite.epochCounter, builder.WithMaxCollectionTotalGas(20000))
+	suite.builder, _ = builder.NewBuilderPebble(suite.db, trace.NewNoopTracer(), suite.protoState, suite.state, suite.headers, suite.headers, suite.payloads, suite.blockIndexer, suite.pool, unittest.Logger(), suite.epochCounter, builder.WithMaxCollectionTotalGas(20000))
 
 	// build a block
 	header, err := suite.builder.BuildOn(suite.genesis.ID(), noopSetter)
@@ -642,7 +645,7 @@ func (suite *BuilderPebbleSuite) TestBuildOn_ExpiredTransaction() {
 
 	// reset the pool and builder
 	suite.pool = herocache.NewTransactions(10, unittest.Logger(), metrics.NewNoopCollector())
-	suite.builder, _ = builder.NewBuilderPebble(suite.db, trace.NewNoopTracer(), suite.protoState, suite.state, suite.headers, suite.headers, suite.payloads, suite.pool, unittest.Logger(), suite.epochCounter)
+	suite.builder, _ = builder.NewBuilderPebble(suite.db, trace.NewNoopTracer(), suite.protoState, suite.state, suite.headers, suite.headers, suite.payloads, suite.blockIndexer, suite.pool, unittest.Logger(), suite.epochCounter)
 
 	// insert a transaction referring genesis (now expired)
 	tx1 := unittest.TransactionBodyFixture(func(tx *flow.TransactionBody) {
@@ -684,7 +687,7 @@ func (suite *BuilderPebbleSuite) TestBuildOn_EmptyMempool() {
 
 	// start with an empty mempool
 	suite.pool = herocache.NewTransactions(1000, unittest.Logger(), metrics.NewNoopCollector())
-	suite.builder, _ = builder.NewBuilderPebble(suite.db, trace.NewNoopTracer(), suite.protoState, suite.state, suite.headers, suite.headers, suite.payloads, suite.pool, unittest.Logger(), suite.epochCounter)
+	suite.builder, _ = builder.NewBuilderPebble(suite.db, trace.NewNoopTracer(), suite.protoState, suite.state, suite.headers, suite.headers, suite.payloads, suite.blockIndexer, suite.pool, unittest.Logger(), suite.epochCounter)
 
 	header, err := suite.builder.BuildOn(suite.genesis.ID(), noopSetter)
 	suite.Require().NoError(err)
@@ -711,7 +714,7 @@ func (suite *BuilderPebbleSuite) TestBuildOn_NoRateLimiting() {
 	suite.ClearPool()
 
 	// create builder with no rate limit and max 10 tx/collection
-	suite.builder, _ = builder.NewBuilderPebble(suite.db, trace.NewNoopTracer(), suite.protoState, suite.state, suite.headers, suite.headers, suite.payloads, suite.pool, unittest.Logger(), suite.epochCounter,
+	suite.builder, _ = builder.NewBuilderPebble(suite.db, trace.NewNoopTracer(), suite.protoState, suite.state, suite.headers, suite.headers, suite.payloads, suite.blockIndexer, suite.pool, unittest.Logger(), suite.epochCounter,
 		builder.WithMaxCollectionSize(10),
 		builder.WithMaxPayerTransactionRate(0),
 	)
@@ -752,7 +755,7 @@ func (suite *BuilderPebbleSuite) TestBuildOn_RateLimitNonPayer() {
 	suite.ClearPool()
 
 	// create builder with 5 tx/payer and max 10 tx/collection
-	suite.builder, _ = builder.NewBuilderPebble(suite.db, trace.NewNoopTracer(), suite.protoState, suite.state, suite.headers, suite.headers, suite.payloads, suite.pool, unittest.Logger(), suite.epochCounter,
+	suite.builder, _ = builder.NewBuilderPebble(suite.db, trace.NewNoopTracer(), suite.protoState, suite.state, suite.headers, suite.headers, suite.payloads, suite.blockIndexer, suite.pool, unittest.Logger(), suite.epochCounter,
 		builder.WithMaxCollectionSize(10),
 		builder.WithMaxPayerTransactionRate(5),
 	)
@@ -796,7 +799,7 @@ func (suite *BuilderPebbleSuite) TestBuildOn_HighRateLimit() {
 	suite.ClearPool()
 
 	// create builder with 5 tx/payer and max 10 tx/collection
-	suite.builder, _ = builder.NewBuilderPebble(suite.db, trace.NewNoopTracer(), suite.protoState, suite.state, suite.headers, suite.headers, suite.payloads, suite.pool, unittest.Logger(), suite.epochCounter,
+	suite.builder, _ = builder.NewBuilderPebble(suite.db, trace.NewNoopTracer(), suite.protoState, suite.state, suite.headers, suite.headers, suite.payloads, suite.blockIndexer, suite.pool, unittest.Logger(), suite.epochCounter,
 		builder.WithMaxCollectionSize(10),
 		builder.WithMaxPayerTransactionRate(5),
 	)
@@ -834,7 +837,7 @@ func (suite *BuilderPebbleSuite) TestBuildOn_LowRateLimit() {
 	suite.ClearPool()
 
 	// create builder with .5 tx/payer and max 10 tx/collection
-	suite.builder, _ = builder.NewBuilderPebble(suite.db, trace.NewNoopTracer(), suite.protoState, suite.state, suite.headers, suite.headers, suite.payloads, suite.pool, unittest.Logger(), suite.epochCounter,
+	suite.builder, _ = builder.NewBuilderPebble(suite.db, trace.NewNoopTracer(), suite.protoState, suite.state, suite.headers, suite.headers, suite.payloads, suite.blockIndexer, suite.pool, unittest.Logger(), suite.epochCounter,
 		builder.WithMaxCollectionSize(10),
 		builder.WithMaxPayerTransactionRate(.5),
 	)
@@ -876,7 +879,7 @@ func (suite *BuilderPebbleSuite) TestBuildOn_UnlimitedPayer() {
 	// create builder with 5 tx/payer and max 10 tx/collection
 	// configure an unlimited payer
 	payer := unittest.RandomAddressFixture()
-	suite.builder, _ = builder.NewBuilderPebble(suite.db, trace.NewNoopTracer(), suite.protoState, suite.state, suite.headers, suite.headers, suite.payloads, suite.pool, unittest.Logger(), suite.epochCounter,
+	suite.builder, _ = builder.NewBuilderPebble(suite.db, trace.NewNoopTracer(), suite.protoState, suite.state, suite.headers, suite.headers, suite.payloads, suite.blockIndexer, suite.pool, unittest.Logger(), suite.epochCounter,
 		builder.WithMaxCollectionSize(10),
 		builder.WithMaxPayerTransactionRate(5),
 		builder.WithUnlimitedPayers(payer),
@@ -917,7 +920,7 @@ func (suite *BuilderPebbleSuite) TestBuildOn_RateLimitDryRun() {
 	// create builder with 5 tx/payer and max 10 tx/collection
 	// configure an unlimited payer
 	payer := unittest.RandomAddressFixture()
-	suite.builder, _ = builder.NewBuilderPebble(suite.db, trace.NewNoopTracer(), suite.protoState, suite.state, suite.headers, suite.headers, suite.payloads, suite.pool, unittest.Logger(), suite.epochCounter,
+	suite.builder, _ = builder.NewBuilderPebble(suite.db, trace.NewNoopTracer(), suite.protoState, suite.state, suite.headers, suite.headers, suite.payloads, suite.blockIndexer, suite.pool, unittest.Logger(), suite.epochCounter,
 		builder.WithMaxCollectionSize(10),
 		builder.WithMaxPayerTransactionRate(5),
 		builder.WithRateLimitDryRun(true),
@@ -993,7 +996,7 @@ func benchmarkBuildOnPebble(b *testing.B, size int) {
 		state, err := clusterkv.Bootstrap(suite.db, stateRoot)
 		assert.NoError(b, err)
 
-		suite.state, err = clusterkv.NewMutableState(state, tracer, suite.headers, suite.payloads)
+		suite.state, err = clusterkv.NewMutableState(state, tracer, suite.headers, suite.payloads, suite.blockIndexer)
 		assert.NoError(b, err)
 
 		// add some transactions to transaction pool
@@ -1004,14 +1007,14 @@ func benchmarkBuildOnPebble(b *testing.B, size int) {
 		}
 
 		// create the builder
-		suite.builder, _ = builder.NewBuilderPebble(suite.db, tracer, suite.protoState, suite.state, suite.headers, suite.headers, suite.payloads, suite.pool, unittest.Logger(), suite.epochCounter)
+		suite.builder, _ = builder.NewBuilderPebble(suite.db, tracer, suite.protoState, suite.state, suite.headers, suite.headers, suite.payloads, suite.blockIndexer, suite.pool, unittest.Logger(), suite.epochCounter)
 	}
 
 	// create a block history to test performance against
 	final := suite.genesis
 	for i := 0; i < size; i++ {
 		block := unittest.ClusterBlockWithParent(final)
-		err := operation.WithReaderBatchWriter(suite.db, procedure.InsertClusterBlock(&block))
+		err := operation.WithReaderBatchWriter(suite.db, suite.blockIndexer.InsertClusterBlock(&block))
 		require.NoError(b, err)
 
 		// finalize the block 80% of the time, resulting in a fork-rate of 20%

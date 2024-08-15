@@ -16,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/state/cluster"
 	"github.com/onflow/flow-go/state/protocol"
 	ppebble "github.com/onflow/flow-go/state/protocol/pebble"
+	protcolstorage "github.com/onflow/flow-go/storage"
 	storage "github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/storage/pebble/operation"
 	"github.com/onflow/flow-go/storage/pebble/procedure"
@@ -32,7 +33,8 @@ type SnapshotSuite struct {
 	chainID      flow.ChainID
 	epochCounter uint64
 
-	protoState protocol.State
+	protoState   protocol.State
+	blockIndexer protcolstorage.ClusterBlockIndexer
 
 	state cluster.MutableState
 }
@@ -46,6 +48,7 @@ func (suite *SnapshotSuite) SetupTest() {
 
 	suite.dbdir = unittest.TempDir(suite.T())
 	suite.db = unittest.PebbleDB(suite.T(), suite.dbdir)
+	suite.blockIndexer = procedure.NewClusterBlockIndexer()
 
 	metrics := metrics.NewNoopCollector()
 	tracer := trace.NewNoopTracer()
@@ -76,7 +79,7 @@ func (suite *SnapshotSuite) SetupTest() {
 	suite.Require().NoError(err)
 	clusterState, err := Bootstrap(suite.db, clusterStateRoot)
 	suite.Require().NoError(err)
-	suite.state, err = NewMutableState(clusterState, tracer, all.Headers, colPayloads)
+	suite.state, err = NewMutableState(clusterState, tracer, all.Headers, colPayloads, suite.blockIndexer)
 	suite.Require().NoError(err)
 }
 
@@ -123,7 +126,7 @@ func (suite *SnapshotSuite) Block() model.Block {
 }
 
 func (suite *SnapshotSuite) InsertBlock(block model.Block) {
-	err := operation.WithReaderBatchWriter(suite.db, procedure.InsertClusterBlock(&block))
+	err := operation.WithReaderBatchWriter(suite.db, suite.blockIndexer.InsertClusterBlock(&block))
 	suite.Assert().Nil(err)
 }
 

@@ -17,12 +17,13 @@ import (
 // after indexing a block by its parent, it should be able to retrieve the child block by the parentID
 func TestIndexAndLookupChild(t *testing.T) {
 	unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
+		indexer := procedure.NewBlockIndexer()
 
 		parentID := unittest.IdentifierFixture()
 		childID := unittest.IdentifierFixture()
 
 		rw := operation.NewPebbleReaderBatchWriter(db)
-		err := procedure.IndexNewBlock(childID, parentID)(rw)
+		err := indexer.IndexNewBlock(childID, parentID)(rw)
 		require.NoError(t, err)
 		require.NoError(t, rw.Commit())
 
@@ -41,6 +42,7 @@ func TestIndexAndLookupChild(t *testing.T) {
 // was indexed.
 func TestIndexTwiceAndRetrieve(t *testing.T) {
 	unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
+		indexer := procedure.NewBlockIndexer()
 
 		parentID := unittest.IdentifierFixture()
 		child1ID := unittest.IdentifierFixture()
@@ -48,13 +50,13 @@ func TestIndexTwiceAndRetrieve(t *testing.T) {
 
 		rw := operation.NewPebbleReaderBatchWriter(db)
 		// index the first child
-		err := procedure.IndexNewBlock(child1ID, parentID)(rw)
+		err := indexer.IndexNewBlock(child1ID, parentID)(rw)
 		require.NoError(t, err)
 		require.NoError(t, rw.Commit())
 
 		// index the second child
 		rw = operation.NewPebbleReaderBatchWriter(db)
-		err = procedure.IndexNewBlock(child2ID, parentID)(rw)
+		err = indexer.IndexNewBlock(child2ID, parentID)(rw)
 		require.NoError(t, err)
 		require.NoError(t, rw.Commit())
 
@@ -70,10 +72,12 @@ func TestIndexTwiceAndRetrieve(t *testing.T) {
 func TestIndexZeroParent(t *testing.T) {
 	unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
 
+		indexer := procedure.NewBlockIndexer()
+
 		childID := unittest.IdentifierFixture()
 
 		rw := operation.NewPebbleReaderBatchWriter(db)
-		err := procedure.IndexNewBlock(childID, flow.ZeroID)(rw)
+		err := indexer.IndexNewBlock(childID, flow.ZeroID)(rw)
 		require.NoError(t, err)
 		require.NoError(t, rw.Commit())
 
@@ -87,6 +91,7 @@ func TestIndexZeroParent(t *testing.T) {
 // lookup block children will only return direct childrens
 func TestDirectChildren(t *testing.T) {
 	unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
+		indexer := procedure.NewBlockIndexer()
 
 		b1 := unittest.IdentifierFixture()
 		b2 := unittest.IdentifierFixture()
@@ -94,17 +99,17 @@ func TestDirectChildren(t *testing.T) {
 		b4 := unittest.IdentifierFixture()
 
 		rw := operation.NewPebbleReaderBatchWriter(db)
-		err := procedure.IndexNewBlock(b2, b1)(rw)
+		err := indexer.IndexNewBlock(b2, b1)(rw)
 		require.NoError(t, err)
 		require.NoError(t, rw.Commit())
 
 		rw = operation.NewPebbleReaderBatchWriter(db)
-		err = procedure.IndexNewBlock(b3, b2)(rw)
+		err = indexer.IndexNewBlock(b3, b2)(rw)
 		require.NoError(t, err)
 		require.NoError(t, rw.Commit())
 
 		rw = operation.NewPebbleReaderBatchWriter(db)
-		err = procedure.IndexNewBlock(b4, b3)(rw)
+		err = indexer.IndexNewBlock(b4, b3)(rw)
 		require.NoError(t, err)
 		require.NoError(t, rw.Commit())
 

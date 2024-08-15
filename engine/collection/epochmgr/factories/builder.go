@@ -55,6 +55,7 @@ func (f *BuilderFactory) Create(
 	clusterState clusterstate.State,
 	clusterHeaders storage.Headers,
 	clusterPayloads storage.ClusterPayloads,
+	blockIndexer storage.ClusterBlockIndexer,
 	pool mempool.Transactions,
 	epoch uint64,
 ) (module.Builder, *finalizer.FinalizerPebble, error) {
@@ -67,6 +68,7 @@ func (f *BuilderFactory) Create(
 		f.mainChainHeaders,
 		clusterHeaders,
 		clusterPayloads,
+		blockIndexer,
 		pool,
 		f.log,
 		epoch,
