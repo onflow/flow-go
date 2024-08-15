@@ -122,14 +122,14 @@ func TestStopControl_OnProcessedBlock(t *testing.T) {
 		wg.Add(1)
 
 		// Expected error message when the incompatible block height is processed.
-		expectedError := fmt.Errorf("processed block at height %d is incompatible with the current node version, please upgrade to version %s starting from block height %d", height, version.String(), incompatibleHeight-1)
+		expectedError := fmt.Errorf("processed block at height %d is incompatible with the current node version, please upgrade to version %s starting from block height %d", height, version.String(), incompatibleHeight)
 
 		// Set expectation that the Throw method will be called with the expected error.
 		ctx.On("Throw", expectedError).Run(func(args mock.Arguments) { wg.Done() }).Return().Once()
 
 		// Update the processed height to the incompatible height and wait for Throw to be called.
 		sc.updateProcessedHeight(height)
-		wg.Wait()
+		unittest.RequireReturnsBefore(t, wg.Wait, 100*time.Millisecond, "expect for ctx.Throw before timeout")
 
 		// Verify that the processed height and the Throw method call are correct.
 		assert.Equal(t, height, sc.lastProcessedHeight.Value())
