@@ -32,22 +32,28 @@ type EVMTracer interface {
 var _ EVMTracer = &CallTracer{}
 
 type CallTracer struct {
-	logger   zerolog.Logger
-	tracer   *tracers.Tracer
-	uploader Uploader
-	blockID  flow.Identifier
+	logger        zerolog.Logger
+	tracer        *tracers.Tracer
+	resultsByTxID map[gethCommon.Hash]json.RawMessage
+	tracerConfig  []byte
+	uploader      Uploader
+	blockID       flow.Identifier
 }
 
 func NewEVMCallTracer(uploader Uploader, logger zerolog.Logger) (*CallTracer, error) {
-	tracer, err := tracers.DefaultDirectory.New(tracerName, &tracers.Context{}, json.RawMessage(tracerConfig))
+	tracerConfig := json.RawMessage(tracerConfig)
+
+	tracer, err := tracers.DefaultDirectory.New(tracerName, &tracers.Context{}, tracerConfig)
 	if err != nil {
 		return nil, err
 	}
 
 	return &CallTracer{
-		logger:   logger.With().Str("module", "evm-tracer").Logger(),
-		tracer:   tracer,
-		uploader: uploader,
+		logger:        logger.With().Str("module", "evm-tracer").Logger(),
+		tracer:        tracer,
+		resultsByTxID: make(map[gethCommon.Hash]json.RawMessage),
+		tracerConfig:  tracerConfig,
+		uploader:      uploader,
 	}, nil
 }
 
@@ -55,8 +61,18 @@ func (t *CallTracer) TxTracer() *tracers.Tracer {
 	return NewSafeTxTracer(t)
 }
 
+func (t *CallTracer) ResetTracer() error {
+	var err error
+	t.tracer, err = tracers.DefaultDirectory.New(tracerName, &tracers.Context{}, json.RawMessage(tracerConfig))
+	return err
+}
+
 func (t *CallTracer) WithBlockID(id flow.Identifier) {
 	t.blockID = id
+}
+
+func (t *CallTracer) GetResultByTxHash(txID gethCommon.Hash) json.RawMessage {
+	return t.resultsByTxID[txID]
 }
 
 func (t *CallTracer) Collect(txID gethCommon.Hash) {
@@ -83,20 +99,22 @@ func (t *CallTracer) Collect(txID gethCommon.Hash) {
 			}
 		}()
 
-		res, err := t.tracer.GetResult()
-		if err != nil {
-			l.Error().Err(err).Msg("failed to produce trace results")
+		res, found := t.resultsByTxID[txID]
+		if !found {
+			l.Error().Msg("trace result not found")
+			return
 		}
-
-		if err = t.uploader.Upload(TraceID(txID, t.blockID), res); err != nil {
+		if err := t.uploader.Upload(TraceID(txID, t.blockID), res); err != nil {
 			l.Error().Err(err).
 				Str("traces", string(res)).
 				Msg("failed to upload trace results, no more retries")
 			return
 		}
-
+		// remove the result
+		delete(t.resultsByTxID, txID)
 		l.Debug().Msg("evm traces uploaded successfully")
 	}()
+
 }
 
 var NopTracer = &nopTracer{}
@@ -142,7 +160,16 @@ func NewSafeTxTracer(ct *CallTracer) *tracers.Tracer {
 					Msg("OnTxStart trace collection failed")
 			}
 		}()
-		ct.tracer.OnTxStart(vm, tx, from)
+		l.Debug().Msg("tracing OnTxStart is called")
+		if ct.tracer.OnTxStart != nil {
+			ct.tracer.OnTxStart(vm, tx, from)
+		}
+		// reset tracing to have fresh state
+		if err := ct.ResetTracer(); err != nil {
+			l.Error().Err(err).
+				Msg("failed to reset tracer")
+			return
+		}
 	}
 
 	wrapped.OnTxEnd = func(receipt *types.Receipt, err error) {
@@ -157,7 +184,18 @@ func NewSafeTxTracer(ct *CallTracer) *tracers.Tracer {
 					Msg("OnTxEnd trace collection failed")
 			}
 		}()
-		ct.tracer.OnTxEnd(receipt, err)
+		l.Debug().Msg("tracing OnTxEnd is called")
+		if ct.tracer.OnTxEnd != nil {
+			ct.tracer.OnTxEnd(receipt, err)
+		}
+
+		// collect results for the tracer
+		res, err := ct.tracer.GetResult()
+		if err != nil {
+			l.Error().Err(err).Msg("failed to produce trace results")
+			return
+		}
+		ct.resultsByTxID[receipt.TxHash] = res
 	}
 
 	wrapped.OnEnter = func(
@@ -179,7 +217,10 @@ func NewSafeTxTracer(ct *CallTracer) *tracers.Tracer {
 					Msg("OnEnter trace collection failed")
 			}
 		}()
-		ct.tracer.OnEnter(depth, typ, from, to, input, gas, value)
+		l.Debug().Int("depth", depth).Msg("tracing OnEnter is called")
+		if ct.tracer.OnEnter != nil {
+			ct.tracer.OnEnter(depth, typ, from, to, input, gas, value)
+		}
 	}
 
 	wrapped.OnExit = func(depth int, output []byte, gasUsed uint64, err error, reverted bool) {
@@ -194,7 +235,10 @@ func NewSafeTxTracer(ct *CallTracer) *tracers.Tracer {
 					Msg("OnExit trace collection failed")
 			}
 		}()
-		ct.tracer.OnExit(depth, output, gasUsed, err, reverted)
+		l.Debug().Int("depth", depth).Msg("tracing OnExit is called")
+		if ct.tracer.OnExit != nil {
+			ct.tracer.OnExit(depth, output, gasUsed, err, reverted)
+		}
 	}
 
 	wrapped.OnOpcode = func(
@@ -217,9 +261,11 @@ func NewSafeTxTracer(ct *CallTracer) *tracers.Tracer {
 					Msg("OnOpcode trace collection failed")
 			}
 		}()
-		ct.tracer.OnOpcode(pc, op, gas, cost, scope, rData, depth, err)
+		l.Debug().Msg("tracing OnOpcode is called")
+		if ct.tracer.OnOpcode != nil {
+			ct.tracer.OnOpcode(pc, op, gas, cost, scope, rData, depth, err)
+		}
 	}
-
 	wrapped.OnFault = func(
 		pc uint64,
 		op byte,
@@ -238,7 +284,10 @@ func NewSafeTxTracer(ct *CallTracer) *tracers.Tracer {
 					Msg("OnFault trace collection failed")
 			}
 		}()
-		ct.tracer.OnFault(pc, op, gas, cost, scope, depth, err)
+		l.Debug().Msg("tracing OnFault is called")
+		if ct.tracer.OnFault != nil {
+			ct.tracer.OnFault(pc, op, gas, cost, scope, depth, err)
+		}
 	}
 
 	wrapped.OnGasChange = func(old, new uint64, reason tracing.GasChangeReason) {
@@ -253,7 +302,10 @@ func NewSafeTxTracer(ct *CallTracer) *tracers.Tracer {
 					Msg("OnGasChange trace collection failed")
 			}
 		}()
-		ct.tracer.OnGasChange(old, new, reason)
+		l.Debug().Msg("tracing OnGasChange is called")
+		if ct.tracer.OnGasChange != nil {
+			ct.tracer.OnGasChange(old, new, reason)
+		}
 	}
 
 	wrapped.GetResult = ct.tracer.GetResult
