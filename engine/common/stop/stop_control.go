@@ -33,7 +33,7 @@ type StopControl struct {
 	// Notifier for new processed block height
 	processedHeightChannel chan uint64
 
-	// Stores latest highest processed block height
+	// Stores latest processed block height
 	lastProcessedHeight counters.StrictMonotonousCounter
 }
 
@@ -106,7 +106,7 @@ func (sc *StopControl) onProcessedBlock(ctx irrecoverable.SignalerContext) {
 	newHeight := sc.lastProcessedHeight.Value()
 	if newHeight >= versionData.incompatibleBlockHeight-1 {
 		ctx.Throw(fmt.Errorf("processed block at height %d is incompatible with the current node version, please upgrade to version %s starting from block height %d",
-			newHeight, versionData.updatedVersion, versionData.incompatibleBlockHeight-1))
+			newHeight, versionData.updatedVersion, versionData.incompatibleBlockHeight))
 	}
 }
 
