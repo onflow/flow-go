@@ -336,30 +336,8 @@ func traverse(prefix []byte, iteration iterationFunc) func(pebble.Reader) error 
 // No errors are expected during normal operation.
 func removeByPrefix(prefix []byte) func(pebble.Writer) error {
 	return func(tx pebble.Writer) error {
-		start, end := getStartEndKeys(prefix)
-		return tx.DeleteRange(start, end, nil)
+		return tx.DeleteRange(prefix, prefixUpperBound(prefix), nil)
 	}
-}
-
-// getStartEndKeys calculates the start and end keys for a given prefix.
-// note: DeleteRange takes [start, end) (inclusion on start, exclusive on end),
-func getStartEndKeys(prefix []byte) (start, end []byte) {
-	start = prefix
-
-	// End key is the prefix with the last byte incremented by 1
-	end = append([]byte{}, prefix...)
-	for i := len(end) - 1; i >= 0; i-- {
-		if end[i] < 0xff {
-			end[i]++
-			break
-		}
-		end[i] = 0
-		if i == 0 {
-			end = append(end, 0)
-		}
-	}
-
-	return start, end
 }
 
 func convertNotFoundError(err error) error {
