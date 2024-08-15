@@ -278,7 +278,12 @@ func (lookup *EpochLookup) EpochForView(view uint64) (uint64, error) {
 	}
 	// view is before any known epochs
 	// ---*---[----|----|----]-------
-	return 0, model.ErrViewForUnknownEpoch
+	if view < cachedEpochs[0].firstView {
+		return 0, model.ErrViewForUnknownEpoch
+	}
+
+	// reaching this point indicates a corrupted state or internal bug
+	return 0, fmt.Errorf("sanity check failed: input view %d falls within the view range [%d, %d] of the cached epochs epochs, but none contains it", view, cachedEpochs[0].firstView, cachedEpochs[l-1].finalView)
 }
 
 // handleProtocolEvents processes queued Epoch events `EpochCommittedPhaseStarted`
