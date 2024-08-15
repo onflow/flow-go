@@ -71,7 +71,7 @@ import (
 	"github.com/onflow/flow-go/module/execution"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	execdatacache "github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
-	"github.com/onflow/flow-go/module/executiondatasync/pruner"
+	edpruner "github.com/onflow/flow-go/module/executiondatasync/pruner"
 	edstorage "github.com/onflow/flow-go/module/executiondatasync/storage"
 	"github.com/onflow/flow-go/module/executiondatasync/tracker"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
@@ -173,6 +173,9 @@ type AccessNodeConfig struct {
 	programCacheSize                     uint
 	checkPayerBalance                    bool
 	versionControlEnabled                bool
+	registerDBPruningEnabled             bool
+	registerDBPruneInterval              uint64
+	registerDBPruneThrottleDelay         time.Duration
 }
 
 type PublicNetworkConfig struct {
@@ -264,8 +267,8 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 		executionDataIndexingEnabled:         false,
 		executionDataDBMode:                  execution_data.ExecutionDataDBModeBadger.String(),
 		executionDataPrunerHeightRangeTarget: 0,
-		executionDataPrunerThreshold:         pruner.DefaultThreshold,
-		executionDataPruningInterval:         pruner.DefaultPruningInterval,
+		executionDataPrunerThreshold:         edpruner.DefaultThreshold,
+		executionDataPruningInterval:         edpruner.DefaultPruningInterval,
 		registersDBPath:                      filepath.Join(homedir, ".flow", "execution_state"),
 		checkpointFile:                       cmd.NotSet,
 		scriptExecutorConfig:                 query.NewDefaultConfig(),
@@ -276,6 +279,9 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 		programCacheSize:                     0,
 		checkPayerBalance:                    false,
 		versionControlEnabled:                true,
+		registerDBPruningEnabled:             false,
+		registerDBPruneInterval:              pstorage.DefaultPruneInterval,
+		registerDBPruneThrottleDelay:         pstorage.DefaultPruneThrottleDelay,
 	}
 }
 
@@ -320,7 +326,7 @@ type FlowAccessNodeBuilder struct {
 	TxResultsIndex             *index.TransactionResultsIndex
 	IndexerDependencies        *cmd.DependencyList
 	collectionExecutedMetric   module.CollectionExecutedMetric
-	ExecutionDataPruner        *pruner.Pruner
+	ExecutionDataPruner        *edpruner.Pruner
 	ExecutionDatastoreManager  edstorage.DatastoreManager
 	ExecutionDataTracker       tracker.Storage
 	versionControl             *version.VersionControl
@@ -771,16 +777,16 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			}
 
 			var err error
-			builder.ExecutionDataPruner, err = pruner.NewPruner(
+			builder.ExecutionDataPruner, err = edpruner.NewPruner(
 				node.Logger,
 				prunerMetrics,
 				builder.ExecutionDataTracker,
-				pruner.WithPruneCallback(func(ctx context.Context) error {
+				edpruner.WithPruneCallback(func(ctx context.Context) error {
 					return builder.ExecutionDatastoreManager.CollectGarbage(ctx)
 				}),
-				pruner.WithHeightRangeTarget(builder.executionDataPrunerHeightRangeTarget),
-				pruner.WithThreshold(builder.executionDataPrunerThreshold),
-				pruner.WithPruningInterval(builder.executionDataPruningInterval),
+				edpruner.WithHeightRangeTarget(builder.executionDataPrunerHeightRangeTarget),
+				edpruner.WithThreshold(builder.executionDataPrunerThreshold),
+				edpruner.WithPruningInterval(builder.executionDataPruningInterval),
 			)
 			if err != nil {
 				return nil, fmt.Errorf("failed to create execution data pruner: %w", err)
@@ -1297,6 +1303,8 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 			"execution-data-db",
 			defaultConfig.executionDataDBMode,
 			"[experimental] the DB type for execution datastore. One of [badger, pebble]")
+
+		// Execution data pruner
 		flags.Uint64Var(&builder.executionDataPrunerHeightRangeTarget,
 			"execution-data-height-range-target",
 			defaultConfig.executionDataPrunerHeightRangeTarget,
@@ -1309,6 +1317,20 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 			"execution-data-pruning-interval",
 			defaultConfig.executionDataPruningInterval,
 			"duration after which the pruner tries to prune execution data. The default value is 10 minutes")
+
+		// RegisterDB pruning
+		flags.BoolVar(&builder.registerDBPruningEnabled,
+			"registerdb-pruning-enabled",
+			defaultConfig.registerDBPruningEnabled,
+			"whether to enable the pruning for register db")
+		flags.Uint64Var(&builder.registerDBPruneInterval,
+			"registerdb-prune-interval",
+			defaultConfig.registerDBPruneInterval,
+			"a number of pruned blocks in the db, above which pruning should be triggered")
+		flags.DurationVar(&builder.registerDBPruneThrottleDelay,
+			"registerdb-prune-throttle-delay",
+			defaultConfig.executionDataPruningInterval,
+			"duration after which the pruner tries to prune data. The default value is 10 minutes")
 
 		// Execution State Streaming API
 		flags.Uint32Var(&builder.stateStreamConf.ExecutionDataCacheSize, "execution-data-cache-size", defaultConfig.stateStreamConf.ExecutionDataCacheSize, "block execution data cache size")

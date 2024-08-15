@@ -70,7 +70,7 @@ import (
 	"github.com/onflow/flow-go/module/execution"
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data"
 	execdatacache "github.com/onflow/flow-go/module/executiondatasync/execution_data/cache"
-	"github.com/onflow/flow-go/module/executiondatasync/pruner"
+	edpruner "github.com/onflow/flow-go/module/executiondatasync/pruner"
 	edstorage "github.com/onflow/flow-go/module/executiondatasync/storage"
 	"github.com/onflow/flow-go/module/executiondatasync/tracker"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
@@ -172,6 +172,9 @@ type ObserverServiceConfig struct {
 	registerCacheType                    string
 	registerCacheSize                    uint
 	programCacheSize                     uint
+	registerDBPruningEnabled             bool
+	registerDBPruneInterval              uint64
+	registerDBPruneThrottleDelay         time.Duration
 }
 
 // DefaultObserverServiceConfig defines all the default values for the ObserverServiceConfig
@@ -235,8 +238,8 @@ func DefaultObserverServiceConfig() *ObserverServiceConfig {
 		executionDataIndexingEnabled:         false,
 		executionDataDBMode:                  execution_data.ExecutionDataDBModeBadger.String(),
 		executionDataPrunerHeightRangeTarget: 0,
-		executionDataPrunerThreshold:         pruner.DefaultThreshold,
-		executionDataPruningInterval:         pruner.DefaultPruningInterval,
+		executionDataPrunerThreshold:         edpruner.DefaultThreshold,
+		executionDataPruningInterval:         edpruner.DefaultPruningInterval,
 		localServiceAPIEnabled:               false,
 		versionControlEnabled:                true,
 		executionDataDir:                     filepath.Join(homedir, ".flow", "execution_data"),
@@ -285,7 +288,7 @@ type ObserverServiceBuilder struct {
 	ExecutionDataRequester    state_synchronization.ExecutionDataRequester
 	ExecutionDataStore        execution_data.ExecutionDataStore
 	ExecutionDataBlobstore    blobs.Blobstore
-	ExecutionDataPruner       *pruner.Pruner
+	ExecutionDataPruner       *edpruner.Pruner
 	ExecutionDatastoreManager edstorage.DatastoreManager
 	ExecutionDataTracker      tracker.Storage
 
@@ -702,6 +705,20 @@ func (builder *ObserverServiceBuilder) extraFlags() {
 			"execution-data-pruning-interval",
 			defaultConfig.executionDataPruningInterval,
 			"duration after which the pruner tries to prune execution data. The default value is 10 minutes")
+
+		// RegisterDB pruning
+		flags.BoolVar(&builder.registerDBPruningEnabled,
+			"registerdb-pruning-enabled",
+			defaultConfig.registerDBPruningEnabled,
+			"whether to enable the pruning for register db")
+		flags.Uint64Var(&builder.registerDBPruneInterval,
+			"registerdb-prune-interval",
+			defaultConfig.registerDBPruneInterval,
+			"a number of pruned blocks in the db, above which pruning should be triggered")
+		flags.DurationVar(&builder.registerDBPruneThrottleDelay,
+			"registerdb-prune-throttle-delay",
+			defaultConfig.executionDataPruningInterval,
+			"duration after which the pruner tries to prune data. The default value is 10 minutes")
 
 		// ExecutionDataRequester config
 		flags.BoolVar(&builder.executionDataSyncEnabled,
@@ -1341,16 +1358,16 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 			}
 
 			var err error
-			builder.ExecutionDataPruner, err = pruner.NewPruner(
+			builder.ExecutionDataPruner, err = edpruner.NewPruner(
 				node.Logger,
 				prunerMetrics,
 				builder.ExecutionDataTracker,
-				pruner.WithPruneCallback(func(ctx context.Context) error {
+				edpruner.WithPruneCallback(func(ctx context.Context) error {
 					return builder.ExecutionDatastoreManager.CollectGarbage(ctx)
 				}),
-				pruner.WithHeightRangeTarget(builder.executionDataPrunerHeightRangeTarget),
-				pruner.WithThreshold(builder.executionDataPrunerThreshold),
-				pruner.WithPruningInterval(builder.executionDataPruningInterval),
+				edpruner.WithHeightRangeTarget(builder.executionDataPrunerHeightRangeTarget),
+				edpruner.WithThreshold(builder.executionDataPrunerThreshold),
+				edpruner.WithPruningInterval(builder.executionDataPruningInterval),
 			)
 			if err != nil {
 				return nil, fmt.Errorf("failed to create execution data pruner: %w", err)
