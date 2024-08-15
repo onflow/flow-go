@@ -540,6 +540,15 @@ docker-native-build-access-corrupt:
 		-t "$(CONTAINER_REGISTRY)/access-corrupted:$(IMAGE_TAG)" .
 	./insecure/cmd/mods_restore.sh
 
+# build a binary to run on bare metal without using docker.
+# binary is written to file ./bin/app
+.PHONY: docker-native-build-access-binary
+docker-native-build-access-binary:
+	docker build -f cmd/Dockerfile  --build-arg TARGET=./cmd/access --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --build-arg CGO_FLAG=$(CRYPTO_FLAG) --target production \
+		--label "git_commit=${COMMIT}" --label "git_tag=${IMAGE_TAG}" \
+		--secret id=cadence_deploy_key,env=CADENCE_DEPLOY_KEY --build-arg GOPRIVATE=$(GOPRIVATE) \
+		--output=. .
+
 .PHONY: docker-native-build-observer
 docker-native-build-observer:
 	docker build -f cmd/Dockerfile --build-arg TARGET=./cmd/observer --build-arg COMMIT=$(COMMIT) --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --build-arg CGO_FLAG=$(CRYPTO_FLAG) --target production \
