@@ -25,7 +25,7 @@ require (
 	github.com/onflow/flow-core-contracts/lib/go/contracts v1.3.1
 	github.com/onflow/flow-core-contracts/lib/go/templates v1.3.1
 	github.com/onflow/flow-emulator v1.0.0-preview.36.0.20240729195722-d4eb1c30eb9f
-	github.com/onflow/flow-go v0.36.8-0.20240729205403-18c8533fa521
+	github.com/onflow/flow-go v0.37.1
 	github.com/onflow/flow-go-sdk v1.0.0-preview.50
 	github.com/onflow/flow-go/insecure v0.0.0-00010101000000-000000000000
 	github.com/onflow/flow/protobuf/go/flow v0.4.5
@@ -361,7 +361,7 @@ replace github.com/onflow/flow-go => ../
 replace github.com/onflow/flow-go/insecure => ../insecure
 
 // TODO: remove it when https://github.com/onflow/flow-emulator/pull/724 merged
-replace github.com/onflow/flow-emulator v1.0.0-preview.36.0.20240729195722-d4eb1c30eb9f => github.com/AndriiDiachuk/flow-emulator v0.0.0-20240807122054-7dd4e4e81bbd
+replace github.com/onflow/flow-emulator v1.0.0-preview.36.0.20240729195722-d4eb1c30eb9f => github.com/AndriiDiachuk/flow-emulator v0.0.0-20240815104502-fab42f5691e1
 
 // TODO: remove it when https://github.com/ipfs/go-ds-pebble/pull/36 merged
 replace github.com/ipfs/go-ds-pebble v0.3.1 => github.com/onflow/go-ds-pebble v0.0.0-20240731130313-f186539f382c
