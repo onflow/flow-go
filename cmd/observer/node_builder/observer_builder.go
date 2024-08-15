@@ -172,6 +172,7 @@ type ObserverServiceConfig struct {
 	registerCacheType                    string
 	registerCacheSize                    uint
 	programCacheSize                     uint
+	registerDBPruneThreshold             uint64
 }
 
 // DefaultObserverServiceConfig defines all the default values for the ObserverServiceConfig
@@ -249,11 +250,12 @@ func DefaultObserverServiceConfig() *ObserverServiceConfig {
 			RetryDelay:         edrequester.DefaultRetryDelay,
 			MaxRetryDelay:      edrequester.DefaultMaxRetryDelay,
 		},
-		scriptExecMinBlock: 0,
-		scriptExecMaxBlock: math.MaxUint64,
-		registerCacheType:  pstorage.CacheTypeTwoQueue.String(),
-		registerCacheSize:  0,
-		programCacheSize:   0,
+		scriptExecMinBlock:       0,
+		scriptExecMaxBlock:       math.MaxUint64,
+		registerCacheType:        pstorage.CacheTypeTwoQueue.String(),
+		registerCacheSize:        0,
+		programCacheSize:         0,
+		registerDBPruneThreshold: pruner.DefaultThreshold,
 	}
 }
 
@@ -802,6 +804,12 @@ func (builder *ObserverServiceBuilder) extraFlags() {
 			"program-cache-size",
 			defaultConfig.programCacheSize,
 			"[experimental] number of blocks to cache for cadence programs. use 0 to disable cache. default: 0. Note: this is an experimental feature and may cause nodes to become unstable under certain workloads. Use with caution.")
+
+		// Register DB Pruning
+		flags.Uint64Var(&builder.registerDBPruneThreshold,
+			"registerdb-pruning-enabled",
+			defaultConfig.registerDBPruneThreshold,
+			fmt.Sprintf("specifies the number of blocks below the latest stored block height to keep in register db. default: %d", defaultConfig.registerDBPruneThreshold))
 	}).ValidateFlags(func() error {
 		if builder.executionDataSyncEnabled {
 			if builder.executionDataConfig.FetchTimeout <= 0 {
@@ -1428,7 +1436,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				}
 			}
 
-			registers, err := pstorage.NewRegisters(pdb, builder.executionDataPrunerThreshold)
+			registers, err := pstorage.NewRegisters(pdb, builder.registerDBPruneThreshold)
 			if err != nil {
 				return nil, fmt.Errorf("could not create registers storage: %w", err)
 			}

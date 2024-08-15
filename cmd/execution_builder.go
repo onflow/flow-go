@@ -869,7 +869,9 @@ func (exeNode *ExecutionNode) LoadRegisterStore(
 			return fmt.Errorf("could not import registers from checkpoint: %w", err)
 		}
 	}
-	diskStore, err := storagepebble.NewRegisters(pebbledb, exeNode.exeConf.executionDataPrunerThreshold)
+	//TODO: if the pruning for register DB will be enabled on execution node, the CLI flag should be added to change
+	//      pruning threshold parameter.
+	diskStore, err := storagepebble.NewRegisters(pebbledb, pruner.DefaultThreshold)
 	if err != nil {
 		return fmt.Errorf("could not create registers storage: %w", err)
 	}

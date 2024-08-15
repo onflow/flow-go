@@ -173,6 +173,7 @@ type AccessNodeConfig struct {
 	programCacheSize                     uint
 	checkPayerBalance                    bool
 	versionControlEnabled                bool
+	registerDBPruneThreshold             uint64
 }
 
 type PublicNetworkConfig struct {
@@ -276,6 +277,7 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 		programCacheSize:                     0,
 		checkPayerBalance:                    false,
 		versionControlEnabled:                true,
+		registerDBPruneThreshold:             pruner.DefaultThreshold,
 	}
 }
 
@@ -899,7 +901,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					}
 				}
 
-				registers, err := pstorage.NewRegisters(pdb, builder.executionDataPrunerThreshold)
+				registers, err := pstorage.NewRegisters(pdb, builder.registerDBPruneThreshold)
 				if err != nil {
 					return nil, fmt.Errorf("could not create registers storage: %w", err)
 				}
@@ -1405,6 +1407,12 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 			"check-payer-balance",
 			defaultConfig.checkPayerBalance,
 			"checks that a transaction payer has sufficient balance to pay fees before submitting it to collection nodes")
+
+		// Register DB Pruning
+		flags.Uint64Var(&builder.registerDBPruneThreshold,
+			"registerdb-pruning-enabled",
+			defaultConfig.registerDBPruneThreshold,
+			fmt.Sprintf("specifies the number of blocks below the latest stored block height to keep in register db. default: %d", defaultConfig.registerDBPruneThreshold))
 	}).ValidateFlags(func() error {
 		if builder.supportsObserver && (builder.PublicNetworkConfig.BindAddress == cmd.NotSet || builder.PublicNetworkConfig.BindAddress == "") {
 			return errors.New("public-network-address must be set if supports-observer is true")

@@ -61,8 +61,9 @@ func (s *Registers) Get(
 	// If pruneThreshold valid, but bigger than latestHeight 1 10 - 20
 
 	pruneHeight := latestHeight - s.pruneThreshold
+	firstHeight := s.FirstHeight()
 
-	if height < s.firstHeight || height < pruneHeight || height > latestHeight {
+	if height < firstHeight || height < pruneHeight || height > latestHeight {
 		return nil, errors.Wrap(
 			storage.ErrHeightNotIndexed,
 			fmt.Sprintf("height %d not indexed, indexed range is [%d-%d], or below prune height %d", height, s.firstHeight, latestHeight, pruneHeight),
