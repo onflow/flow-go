@@ -36,7 +36,7 @@ func SetupEnvironment(
 
 	backend := backends.NewWrappedEnvironment(fvmEnv)
 	emulator := evm.NewEmulator(backend, StorageAccountAddress(chainID))
-	blockStore := handler.NewBlockStore(backend, StorageAccountAddress(chainID))
+	blockStore := handler.NewBlockStore(chainID, backend, StorageAccountAddress(chainID))
 	addressAllocator := handler.NewAddressAllocator()
 
 	if tracer != debug.NopTracer {
