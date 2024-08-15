@@ -157,14 +157,14 @@ func remove(key []byte) func(pebble.Writer) error {
 	}
 }
 
-// prefixUpperBound returns a key K such that all possible keys beginning with the input prefix 
+// prefixUpperBound returns a key K such that all possible keys beginning with the input prefix
 // sort lower than K according to the byte-wise lexicographic key ordering used by Pebble.
 // This is used to define an upper bound for iteration, when we want to iterate over
-// all keys beginning with a given prefix. 
+// all keys beginning with a given prefix.
 // referred to https://pkg.go.dev/github.com/cockroachdb/pebble#example-Iterator-PrefixIteration
 func prefixUpperBound(prefix []byte) []byte {
-	end := make([]byte, len(b))
-	copy(end, b)
+	end := make([]byte, len(prefix))
+	copy(end, prefix)
 	for i := len(end) - 1; i >= 0; i-- {
 		// increment the bytes by 1
 		end[i] = end[i] + 1
@@ -175,7 +175,7 @@ func prefixUpperBound(prefix []byte) []byte {
 	return nil // no upper-bound
 }
 
-// iterate iterates over a range of keys defined by a start and end key. 
+// iterate iterates over a range of keys defined by a start and end key.
 // The start key must be less than or equal to the end key by lexicographic ordering.
 // Both start and end keys must have non-zero length.
 //
@@ -216,32 +216,9 @@ func iterate(start []byte, end []byte, iteration iterationFunc) func(pebble.Read
 			// for instance, to iterate keys between "hello" and "world",
 			// we use "hello" as LowerBound, "worle" as UpperBound, so that "world", "world1", "worldffff...ffff"
 			// will all be included.
-			UpperBound: keyUpperBound(end),
+			UpperBound: prefixUpperBound(end),
 		}
 
-		// In order to satisfy this function's prefix-wise inclusion semantics,
-		// we append 0xff bytes to the largest of start and end.
-		// This ensures Badger will seek to the largest key with that prefix
-		// for reverse iteration, thus including all keys with a prefix matching
-		// the starting key. It also enables us to detect boundary conditions by
-		// simple lexicographic comparison (ie. bytes.Compare) rather than
-		// explicitly comparing prefixes.
-
-		// If start is bigger than end, we have a backwards iteration:
-		// 1) We set the reverse option on the iterator, so we step through all
-		//    the keys backwards. This modifies the behaviour of Seek to go to
-		//    the first key that is less than or equal to the start key (as
-		//    opposed to greater than or equal in a regular iteration).
-		// 2) In order to satisfy this function's prefix-wise inclusion semantics,
-		//    we append a 0xff-byte suffix to the start key so the seek will go
-		// to the right place.
-		// 3) For a regular iteration, we break the loop upon hitting the first
-		//    item that has a key higher than the end prefix. In order to reverse
-		//    this, we use a modifier for the comparison that reverses the check
-		//    and makes it stop upon the first item lower than the end prefix.
-		// for forward iteration, add the 0xff-bytes suffix to the end
-		// prefix, to ensure we include all keys with that prefix before
-		// finishing.
 		it, err := tx.NewIter(&options)
 		if err != nil {
 			return fmt.Errorf("can not create iterator: %w", err)
@@ -306,7 +283,7 @@ func traverse(prefix []byte, iteration iterationFunc) func(pebble.Reader) error 
 			// for instance, to iterate keys between "hello" and "world",
 			// we use "hello" as LowerBound, "worle" as UpperBound, so that "world", "world1", "worldffff...ffff"
 			// will all be included.
-			UpperBound: keyUpperBound(prefix),
+			UpperBound: prefixUpperBound(prefix),
 		})
 
 		if err != nil {
