@@ -198,7 +198,7 @@ func (b *backendScripts) executeScriptLocally(
 			logEvent.Msg("script failed to execute locally")
 
 		default:
-			lg.Error().Err(err).Msg("script execution failed")
+			lg.Debug().Err(err).Msg("script execution failed")
 			b.metrics.ScriptExecutionErrorLocal()
 		}
 
