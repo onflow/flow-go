@@ -1970,15 +1970,8 @@ func TestRecoveryFromEpochFallbackMode(t *testing.T) {
 		epochState, err := state.Final().EpochProtocolState()
 		require.NoError(t, err)
 		epochPhase := epochState.EpochPhase()
-
-		nextEpochQuery := state.Final().Epochs().Next()
-		nextEpochSetup, err := realprotocol.ToEpochSetup(nextEpochQuery)
-		require.NoError(t, err)
-		nextEpochCommit, err := realprotocol.ToEpochCommit(nextEpochQuery)
-		require.NoError(t, err)
-
-		require.Equal(t, &epochRecover.EpochSetup, nextEpochSetup, "next epoch has to be setup according to EpochRecover")
-		require.Equal(t, &epochRecover.EpochCommit, nextEpochCommit, "next epoch has to be committed according to EpochRecover")
+		require.Equal(t, &epochRecover.EpochSetup, epochState.Entry().NextEpochSetup, "next epoch has to be setup according to EpochRecover")
+		require.Equal(t, &epochRecover.EpochCommit, epochState.Entry().NextEpochCommit, "next epoch has to be committed according to EpochRecover")
 		require.Equal(t, flow.EpochPhaseCommitted, epochPhase, "next epoch has to be committed")
 	}
 
