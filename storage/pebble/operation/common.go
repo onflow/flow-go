@@ -157,29 +157,18 @@ func remove(key []byte) func(pebble.Writer) error {
 	}
 }
 
-func increment(end []byte) []byte {
-	if len(end) == 0 {
-		return nil
-	}
-
-	// Create a new slice with the same length as the original
-	newEnd := make([]byte, len(end))
-	copy(newEnd, end)
-
-	// Perform the increment operation
-	for i := len(newEnd) - 1; i >= 0; i-- {
-		newEnd[i]++
-		if newEnd[i] != 0 {
-			break
+// referred to https://pkg.go.dev/github.com/cockroachdb/pebble#example-Iterator-PrefixIteration
+func keyUpperBound(b []byte) []byte {
+	end := make([]byte, len(b))
+	copy(end, b)
+	for i := len(end) - 1; i >= 0; i-- {
+		// increment the bytes by 1
+		end[i] = end[i] + 1
+		if end[i] != 0 {
+			return end[:i+1]
 		}
 	}
-
-	isOverflow := newEnd[0] == 0
-	if isOverflow {
-		return nil
-	}
-
-	return newEnd
+	return nil // no upper-bound
 }
 
 // iterate iterates over a range of keys defined by a start and end key. The
@@ -223,7 +212,7 @@ func iterate(start []byte, end []byte, iteration iterationFunc, prefetchValues b
 			// for instance, to iterate keys between "hello" and "world",
 			// we use "hello" as LowerBound, "worle" as UpperBound, so that "world", "world1", "worldffff...ffff"
 			// will all be included.
-			UpperBound: increment(end),
+			UpperBound: keyUpperBound(end),
 		}
 
 		// In order to satisfy this function's prefix-wise inclusion semantics,
@@ -318,7 +307,7 @@ func traverse(prefix []byte, iteration iterationFunc) func(pebble.Reader) error 
 			// for instance, to iterate keys between "hello" and "world",
 			// we use "hello" as LowerBound, "worle" as UpperBound, so that "world", "world1", "worldffff...ffff"
 			// will all be included.
-			UpperBound: increment(prefix),
+			UpperBound: keyUpperBound(prefix),
 		})
 
 		if err != nil {
