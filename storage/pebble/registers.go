@@ -16,7 +16,7 @@ import (
 // given a pebble instance with root block and root height populated
 type Registers struct {
 	db             *pebble.DB
-	firstHeight    uint64
+	firstHeight    *atomic.Uint64
 	latestHeight   *atomic.Uint64
 	pruneThreshold uint64
 }
@@ -37,7 +37,7 @@ func NewRegisters(db *pebble.DB, pruneThreshold uint64) (*Registers, error) {
 	// All registers between firstHeight and lastHeight have been indexed
 	return &Registers{
 		db:             db,
-		firstHeight:    firstHeight,
+		firstHeight:    atomic.NewUint64(firstHeight),
 		latestHeight:   atomic.NewUint64(latestHeight),
 		pruneThreshold: pruneThreshold,
 	}, nil
@@ -55,18 +55,12 @@ func (s *Registers) Get(
 	reg flow.RegisterID,
 	height uint64,
 ) (flow.RegisterValue, error) {
-	latestHeight := s.latestHeight.Load()
-
-	// TODO: clarify, if we do not set any prune threshold, the check should be valid, also what should be done in case of prune threshold bigger than height
-	// If pruneThreshold valid, but bigger than latestHeight 1 10 - 20
-
-	pruneHeight := latestHeight - s.pruneThreshold
+	latestHeight := s.LatestHeight()
 	firstHeight := s.FirstHeight()
-
-	if height < firstHeight || height < pruneHeight || height > latestHeight {
+	if height > latestHeight || height < firstHeight {
 		return nil, errors.Wrap(
 			storage.ErrHeightNotIndexed,
-			fmt.Sprintf("height %d not indexed, indexed range is [%d-%d], or below prune height %d", height, s.firstHeight, latestHeight, pruneHeight),
+			fmt.Sprintf("height %d not indexed, indexed range is [%d-%d]", height, firstHeight, latestHeight),
 		)
 	}
 	key := newLookupKey(height, reg)
@@ -143,6 +137,12 @@ func (s *Registers) Store(
 	}
 	s.latestHeight.Store(height)
 
+	// TODO: This is temporary solution, as I think, this should be changed when register DB pruner will be implemented.
+	//       The pruner responsibility is to change first height of the node, base on pruning result. Issue https://github.com/onflow/flow-go/issues/6068
+	if height-s.FirstHeight() > s.pruneThreshold {
+		s.firstHeight.Store(height - s.pruneThreshold)
+	}
+
 	return nil
 }
 
@@ -153,7 +153,7 @@ func (s *Registers) LatestHeight() uint64 {
 
 // FirstHeight first indexed height found in the store, typically root block for the spork
 func (s *Registers) FirstHeight() uint64 {
-	return s.firstHeight
+	return s.firstHeight.Load()
 }
 
 func firstStoredHeight(db *pebble.DB) (uint64, error) {
