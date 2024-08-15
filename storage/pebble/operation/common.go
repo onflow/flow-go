@@ -157,8 +157,12 @@ func remove(key []byte) func(pebble.Writer) error {
 	}
 }
 
+// prefixUpperBound returns a key K such that all possible keys beginning with the input prefix 
+// sort lower than K according to the byte-wise lexicographic key ordering used by Pebble.
+// This is used to define an upper bound for iteration, when we want to iterate over
+// all keys beginning with a given prefix. 
 // referred to https://pkg.go.dev/github.com/cockroachdb/pebble#example-Iterator-PrefixIteration
-func keyUpperBound(b []byte) []byte {
+func prefixUpperBound(prefix []byte) []byte {
 	end := make([]byte, len(b))
 	copy(end, b)
 	for i := len(end) - 1; i >= 0; i-- {
@@ -171,9 +175,9 @@ func keyUpperBound(b []byte) []byte {
 	return nil // no upper-bound
 }
 
-// iterate iterates over a range of keys defined by a start and end key. The
-// start key may be higher than the end key, in which case we iterate in
-// reverse order.
+// iterate iterates over a range of keys defined by a start and end key. 
+// The start key must be less than or equal to the end key by lexicographic ordering.
+// Both start and end keys must have non-zero length.
 //
 // The iteration range uses prefix-wise semantics. Specifically, all keys that
 // meet ANY of the following conditions are included in the iteration:
