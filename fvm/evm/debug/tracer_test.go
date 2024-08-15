@@ -39,7 +39,6 @@ func Test_CallTracer(t *testing.T) {
 		data := []byte{0x02, 0x04}
 		amount := big.NewInt(1)
 
-		// first transaction
 		tr := tracer.TxTracer()
 		require.NotNil(t, tr)
 
@@ -50,8 +49,9 @@ func Test_CallTracer(t *testing.T) {
 		tr.OnEnter(1, byte(vm.ADD), from, to, data, 20, big.NewInt(2))
 		tr.OnExit(1, nil, 10, nil, false)
 		tr.OnExit(0, []byte{0x02}, 200, nil, false)
-		tr.OnTxEnd(&gethTypes.Receipt{TxHash: tx.Hash()}, nil)
-		tracer.Collect(tx.Hash())
+		tr.OnTxEnd(&gethTypes.Receipt{TxHash: txID}, nil)
+		res = tracer.GetResultByTxHash(txID)
+		tracer.Collect(txID)
 	})
 
 	t.Run("collect traces and upload them (after a failed transaction)", func(t *testing.T) {
@@ -92,8 +92,9 @@ func Test_CallTracer(t *testing.T) {
 		tr.OnTxStart(nil, tx, from)
 		tr.OnEnter(0, 0, from, to, []byte{0x01, 0x02}, 10, big.NewInt(1))
 		tr.OnExit(0, []byte{0x02}, 200, nil, false)
-		tr.OnTxEnd(&gethTypes.Receipt{TxHash: tx.Hash()}, nil)
-		tracer.Collect(tx.Hash())
+		tr.OnTxEnd(&gethTypes.Receipt{TxHash: txID}, nil)
+		res = tracer.GetResultByTxHash(txID)
+		tracer.Collect(txID)
 	})
 
 	t.Run("collector panic recovery", func(t *testing.T) {
