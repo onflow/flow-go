@@ -3,7 +3,6 @@ package epochs
 import (
 	"testing"
 
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
@@ -128,9 +127,12 @@ func (s *ProtocolStateMachineSuite) TestBuild() {
 	require.Equal(s.T(), updatedState.ID(), stateID, "should return correct ID")
 	require.Equal(s.T(), s.parentProtocolState.ID(), s.stateMachine.ParentState().ID(), "should not modify parent protocol state")
 
-	updatedDynamicIdentity := s.parentProtocolState.CurrentEpochIdentityTable[0].NodeID
-	ejected := s.stateMachine.EjectIdentity(updatedDynamicIdentity)
-	require.True(s.T(), ejected)
+	nodeIDforEjection := s.parentProtocolState.CurrentEpochIdentityTable[0].NodeID
+	serviceEvent := &flow.EjectNode{NodeID: nodeIDforEjection}
+	s.consumer.On("OnServiceEventReceived", serviceEvent.ServiceEvent()).Once()
+	s.consumer.On("OnServiceEventProcessed", serviceEvent.ServiceEvent()).Once()
+	wasEjected := s.stateMachine.EjectIdentity(serviceEvent)
+	require.True(s.T(), wasEjected)
 	updatedState, stateID, hasChanges = s.stateMachine.Build()
 	require.True(s.T(), hasChanges, "should have changes")
 	require.NotEqual(s.T(), stateID, s.parentProtocolState.ID(), "protocol state was modified but still has same ID")
@@ -154,7 +156,7 @@ func (s *ProtocolStateMachineSuite) TestProcessEpochCommit() {
 	mockConsumer := func(commit *flow.EpochCommit) {
 		s.consumer.On("OnServiceEventReceived", commit.ServiceEvent()).Once()
 		s.consumer.On("OnInvalidServiceEvent", commit.ServiceEvent(),
-			mock.MatchedBy(func(err error) bool { return protocol.IsInvalidServiceEventError(err) })).Once()
+			unittest.MatchInvalidServiceEventError).Once()
 	}
 	var err error
 	s.Run("invalid counter", func() {
@@ -263,11 +265,15 @@ func (s *ProtocolStateMachineSuite) TestProcessEpochCommit() {
 	})
 }
 
-// TestUpdateIdentityUnknownIdentity tests if updating the identity of unknown node results in a correct return value
-// and doesn't affect resulting state.
-func (s *ProtocolStateMachineSuite) TestUpdateIdentityUnknownIdentity() {
-	ejected := s.stateMachine.EjectIdentity(unittest.IdentifierFixture())
-	require.False(s.T(), ejected, "should not be able to eject unknown identity")
+// TestNodeEjectionOfUnknownID verifies that an `EjectNode` service event referencing an unknown
+// node leaves the state invariant.
+func (s *ProtocolStateMachineSuite) TestNodeEjectionOfUnknownID() {
+	serviceEvent := &flow.EjectNode{NodeID: unittest.IdentifierFixture()}
+	s.consumer.On("OnServiceEventReceived", serviceEvent.ServiceEvent()).Once()
+	s.consumer.On("OnInvalidServiceEvent", serviceEvent.ServiceEvent(),
+		unittest.MatchInvalidServiceEventError).Once()
+	wasEjected := s.stateMachine.EjectIdentity(serviceEvent)
+	require.False(s.T(), wasEjected, "should not be able to eject unknown identity")
 
 	updatedState, updatedStateID, hasChanges := s.stateMachine.Build()
 	require.False(s.T(), hasChanges, "should not have changes")
@@ -275,8 +281,9 @@ func (s *ProtocolStateMachineSuite) TestUpdateIdentityUnknownIdentity() {
 	require.Equal(s.T(), updatedState.ID(), updatedStateID)
 }
 
-// TestUpdateIdentityHappyPath tests if identity updates are correctly processed and reflected in the resulting protocol state.
-func (s *ProtocolStateMachineSuite) TestUpdateIdentityHappyPath() {
+// TestNodeEjectionHappyPath verifies that `EjectNode` service events are correctly processed
+// and reflected in the resulting protocol state.
+func (s *ProtocolStateMachineSuite) TestNodeEjectionHappyPath() {
 	// update protocol state to have next epoch protocol state
 	unittest.WithNextEpochProtocolState()(s.parentProtocolState)
 	var err error
@@ -288,8 +295,11 @@ func (s *ProtocolStateMachineSuite) TestUpdateIdentityHappyPath() {
 	require.NoError(s.T(), err)
 
 	for _, update := range ejectedChanges {
-		ejected := s.stateMachine.EjectIdentity(update.NodeID)
-		require.True(s.T(), ejected)
+		serviceEvent := &flow.EjectNode{NodeID: update.NodeID}
+		s.consumer.On("OnServiceEventReceived", serviceEvent.ServiceEvent()).Once()
+		s.consumer.On("OnServiceEventProcessed", serviceEvent.ServiceEvent()).Once()
+		wasEjected := s.stateMachine.EjectIdentity(serviceEvent)
+		require.True(s.T(), wasEjected)
 	}
 	updatedState, updatedStateID, hasChanges := s.stateMachine.Build()
 	require.True(s.T(), hasChanges, "should have changes")
@@ -323,7 +333,7 @@ func (s *ProtocolStateMachineSuite) TestProcessEpochSetupInvariants() {
 	mockConsumer := func(setup *flow.EpochSetup) {
 		s.consumer.On("OnServiceEventReceived", setup.ServiceEvent()).Once()
 		s.consumer.On("OnInvalidServiceEvent", setup.ServiceEvent(),
-			mock.MatchedBy(func(err error) bool { return protocol.IsInvalidServiceEventError(err) })).Once()
+			unittest.MatchInvalidServiceEventError).Once()
 	}
 	s.Run("invalid counter", func() {
 		setup := unittest.EpochSetupFixture(func(setup *flow.EpochSetup) {
@@ -474,8 +484,11 @@ func (s *ProtocolStateMachineSuite) TestEpochSetupAfterIdentityChange() {
 	ejectedChanges, err := participantsFromCurrentEpochSetup.Sample(2)
 	require.NoError(s.T(), err)
 	for _, update := range ejectedChanges {
-		ejected := s.stateMachine.EjectIdentity(update.NodeID)
-		require.True(s.T(), ejected)
+		serviceEvent := &flow.EjectNode{NodeID: update.NodeID}
+		s.consumer.On("OnServiceEventReceived", serviceEvent.ServiceEvent()).Once()
+		s.consumer.On("OnServiceEventProcessed", serviceEvent.ServiceEvent()).Once()
+		wasEjected := s.stateMachine.EjectIdentity(serviceEvent)
+		require.True(s.T(), wasEjected)
 	}
 	updatedState, _, _ := s.stateMachine.Build()
 
@@ -538,20 +551,24 @@ func (s *ProtocolStateMachineSuite) TestEpochSetupAfterIdentityChange() {
 func (s *ProtocolStateMachineSuite) TestEpochSetupAndEjectionInSameBlock() {
 	setupParticipants := s.parentProtocolState.CurrentEpochSetup.Participants.Copy() // use same participants as in current epoch setup
 	ejectedIdentityID := setupParticipants[0].NodeID
+
+	serviceEvent := &flow.EjectNode{NodeID: ejectedIdentityID}
+	s.consumer.On("OnServiceEventReceived", serviceEvent.ServiceEvent()).Once()
+	s.consumer.On("OnServiceEventProcessed", serviceEvent.ServiceEvent()).Once()
+	// ejected identity before processing epoch setup
+	wasEjected := s.stateMachine.EjectIdentity(serviceEvent)
+	require.True(s.T(), wasEjected)
+
 	setup := unittest.EpochSetupFixture(
 		unittest.SetupWithCounter(s.parentProtocolState.CurrentEpochSetup.Counter+1),
 		unittest.WithFirstView(s.parentProtocolState.CurrentEpochSetup.FinalView+1),
 		unittest.WithFinalView(s.parentProtocolState.CurrentEpochSetup.FinalView+1000),
 		unittest.WithParticipants(setupParticipants),
 	)
-	// ejected identity before processing epoch setup
-	ejected := s.stateMachine.EjectIdentity(ejectedIdentityID)
-	require.True(s.T(), ejected)
-
 	// epoch setup readmits the ejected identity, such events shouldn't be accepted.
 	s.consumer.On("OnServiceEventReceived", setup.ServiceEvent()).Once()
 	s.consumer.On("OnInvalidServiceEvent", setup.ServiceEvent(),
-		mock.MatchedBy(func(err error) bool { return protocol.IsInvalidServiceEventError(err) })).Once()
+		unittest.MatchInvalidServiceEventError).Once()
 	processed, err := s.stateMachine.ProcessEpochSetup(setup)
 	require.Error(s.T(), err)
 	require.True(s.T(), protocol.IsInvalidServiceEventError(err))
@@ -570,7 +587,7 @@ func (s *ProtocolStateMachineSuite) TestProcessEpochRecover() {
 	})
 	s.consumer.On("OnServiceEventReceived", epochRecover.ServiceEvent()).Once()
 	s.consumer.On("OnInvalidServiceEvent", epochRecover.ServiceEvent(),
-		mock.MatchedBy(func(err error) bool { return protocol.IsInvalidServiceEventError(err) })).Once()
+		unittest.MatchInvalidServiceEventError).Once()
 	processed, err := s.stateMachine.ProcessEpochRecover(epochRecover)
 	require.Error(s.T(), err)
 	require.True(s.T(), protocol.IsInvalidServiceEventError(err))

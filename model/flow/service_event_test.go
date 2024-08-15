@@ -23,6 +23,7 @@ func TestEncodeDecode(t *testing.T) {
 	versionBeacon := unittest.VersionBeaconFixture()
 	protocolVersionUpgrade := unittest.ProtocolStateVersionUpgradeFixture()
 	setEpochExtensionViewCount := &flow.SetEpochExtensionViewCount{Value: uint64(rand.Uint32())}
+	ejectionEvent := &flow.EjectNode{NodeID: unittest.IdentifierFixture()}
 
 	comparePubKey := cmp.FilterValues(func(a, b crypto.PublicKey) bool {
 		return true
@@ -49,6 +50,9 @@ func TestEncodeDecode(t *testing.T) {
 
 			// SetEpochExtensionViewCount
 			assertJsonConvert(t, setEpochExtensionViewCount)
+
+			// EjectNode
+			assertJsonConvert(t, ejectionEvent)
 		})
 
 		t.Run("generic type", func(t *testing.T) {
@@ -66,6 +70,9 @@ func TestEncodeDecode(t *testing.T) {
 
 			// SetEpochExtensionViewCount
 			assertJsonGenericConvert(t, setEpochExtensionViewCount)
+
+			// EjectNode
+			assertJsonGenericConvert(t, ejectionEvent)
 		})
 	})
 
@@ -85,6 +92,9 @@ func TestEncodeDecode(t *testing.T) {
 
 			// SetEpochExtensionViewCount
 			assertMsgPackConvert(t, setEpochExtensionViewCount)
+
+			// EjectNode
+			assertMsgPackConvert(t, ejectionEvent)
 		})
 
 		t.Run("generic type", func(t *testing.T) {
@@ -102,6 +112,9 @@ func TestEncodeDecode(t *testing.T) {
 
 			// SetEpochExtensionViewCount
 			assertMsgPackGenericConvert(t, setEpochExtensionViewCount)
+
+			// EjectNode
+			assertMsgPackGenericConvert(t, ejectionEvent)
 		})
 	})
 
@@ -121,6 +134,9 @@ func TestEncodeDecode(t *testing.T) {
 
 			// SetEpochExtensionViewCount
 			assertCborConvert(t, setEpochExtensionViewCount)
+
+			// EjectNode
+			assertCborConvert(t, ejectionEvent)
 		})
 
 		t.Run("generic type", func(t *testing.T) {
@@ -138,6 +154,9 @@ func TestEncodeDecode(t *testing.T) {
 
 			// SetEpochExtensionViewCount
 			assertCborGenericConvert(t, setEpochExtensionViewCount)
+
+			// EjectNode
+			assertCborGenericConvert(t, ejectionEvent)
 		})
 	})
 }
