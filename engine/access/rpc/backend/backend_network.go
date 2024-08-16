@@ -48,7 +48,10 @@ func NewNetworkAPI(
 
 func (b *backendNetwork) GetNetworkParameters(_ context.Context) access.NetworkParameters {
 	return access.NetworkParameters{
-		ChainID: b.chainID,
+		// Hardcoded for the internal migration testnet chain, used exclusively for
+		// testing pre-Crescendo.
+		// DO NOT backport!
+		ChainID: "flow-migrationnet",
 	}
 }
 
