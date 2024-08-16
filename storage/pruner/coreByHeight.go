@@ -44,7 +44,7 @@ func NewPruneByHeightCore(
 ) *PruneByHeightCore {
 	return &PruneByHeightCore{
 		coreBase:         newCoreBase(chunkDataPacks, DefaultThrottleDelay),
-		log:              log,
+		log:              log.With().Str("component", "protocoldb_core_pruner").Logger(),
 		db:               db,
 		headers:          headers,
 		progress:         progress,

@@ -158,20 +158,21 @@ type ExecutionNode struct {
 	executionDataDatastore *badger.Datastore
 	executionDataPruner    *edpruner.Pruner
 	protocolDBPruner       *ppruner.Pruner
+	prunerHeightRecorder   *heightrecorder.Manager
 	executionDataBlobstore blobs.Blobstore
 	executionDataTracker   tracker.Storage
 	blobService            network.BlobService
 	blobserviceDependable  *module.ProxiedReadyDoneAware
-	prunerHeightRecorder   *heightrecorder.Manager
 }
 
 func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 
 	exeNode := &ExecutionNode{
-		builder:             builder.FlowNodeBuilder,
-		exeConf:             builder.exeConf,
-		toTriggerCheckpoint: atomic.NewBool(false),
-		ingestionUnit:       engine.NewUnit(),
+		builder:              builder.FlowNodeBuilder,
+		exeConf:              builder.exeConf,
+		toTriggerCheckpoint:  atomic.NewBool(false),
+		ingestionUnit:        engine.NewUnit(),
+		prunerHeightRecorder: heightrecorder.NewManager(),
 	}
 
 	builder.FlowNodeBuilder.
@@ -211,7 +212,6 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 		Module("blobservice peer manager dependencies", exeNode.LoadBlobservicePeerManagerDependencies).
 		Module("bootstrap", exeNode.LoadBootstrapper).
 		Module("register store", exeNode.LoadRegisterStore).
-		Module("pruner height recorder", exeNode.LoadPrunerHeightRecorder).
 		Component("execution state ledger", exeNode.LoadExecutionStateLedger).
 
 		// TODO: Modules should be able to depends on components
@@ -946,13 +946,6 @@ func (exeNode *ExecutionNode) LoadRegisterStore(
 	return nil
 }
 
-func (exeNode *ExecutionNode) LoadPrunerHeightRecorder(
-	node *NodeConfig,
-) error {
-	exeNode.prunerHeightRecorder = heightrecorder.NewManager()
-	return nil
-}
-
 func (exeNode *ExecutionNode) LoadExecutionStateLedger(
 	node *NodeConfig,
 ) (
@@ -1411,7 +1404,7 @@ func (exeNode *ExecutionNode) LoadProtocolDBPruner(
 	progress := storagepebble.NewConsumerProgress(node.DB, module.ConsumeProgressProtocolDBPrunerByHeight)
 
 	core := ppruner.NewPruneByHeightCore(
-		node.Logger.With().Str("component", "protocoldb_core_pruner").Logger(),
+		node.Logger,
 		node.DB,
 		node.Storage.Headers,
 		node.Storage.ChunkDataPacks,
@@ -1426,7 +1419,7 @@ func (exeNode *ExecutionNode) LoadProtocolDBPruner(
 		exeNode.prunerHeightRecorder,
 		node.Storage.Headers,
 		progress,
-		node.SealedRootBlock.Header,
+		node.SealedRootBlock.Header.Height,
 	)
 
 	// configure default recorder, which notifies about sealed blocks.

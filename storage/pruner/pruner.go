@@ -34,8 +34,7 @@ type Pruner struct {
 	log     zerolog.Logger
 	headers storage.Headers
 
-	lowestHeader     *flow.Header
-	rootSealedHeader *flow.Header
+	rootSealedHeight uint64
 	progress         storage.ConsumerProgress
 
 	core           Core
@@ -50,7 +49,7 @@ func New(
 	heightRecorder *heightrecorder.Manager,
 	headers storage.Headers,
 	progress storage.ConsumerProgress,
-	rootSealedHeader *flow.Header,
+	rootSealedHeight uint64,
 ) *Pruner {
 	p := &Pruner{
 		log: log.With().Str("component", "protocoldb_pruner").Logger(),
@@ -59,7 +58,7 @@ func New(
 		headers:          headers,
 		progress:         progress,
 		heightRecorder:   heightRecorder,
-		rootSealedHeader: rootSealedHeader,
+		rootSealedHeight: rootSealedHeight,
 	}
 
 	p.Component = component.NewComponentManagerBuilder().
@@ -82,7 +81,7 @@ func (p *Pruner) initProgress() (uint64, error) {
 		return 0, fmt.Errorf("could not get processed index: %w", err)
 	}
 
-	err = p.progress.InitProcessedIndex(p.rootSealedHeader.Height)
+	err = p.progress.InitProcessedIndex(p.rootSealedHeight)
 	if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
 		return 0, fmt.Errorf("could not init processed index: %w", err)
 	}
@@ -101,16 +100,10 @@ func (p *Pruner) loop(ctx irrecoverable.SignalerContext, ready component.ReadyFu
 		return
 	}
 
-	p.lowestHeader, err = p.headers.ByHeight(lowestHeight)
-	if err != nil {
-		ctx.Throw(fmt.Errorf("could not get header for lowest height (%d): %w", lowestHeight, err))
-		return
-	}
-
 	ready()
 
 	p.log.Info().
-		Uint64("lowestHeight", p.lowestHeader.Height).
+		Uint64("lowestHeight", lowestHeight).
 		Msg("starting pruner")
 
 	ticker := time.NewTicker(DefaultPruneInterval)
