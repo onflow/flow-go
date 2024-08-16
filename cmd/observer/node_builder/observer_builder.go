@@ -173,7 +173,7 @@ type ObserverServiceConfig struct {
 	registerCacheSize                    uint
 	programCacheSize                     uint
 	registerDBPruningEnabled             bool
-	registerDBPruneInterval              uint64
+	registerDBPruneTickerInterval        time.Duration
 	registerDBPruneThrottleDelay         time.Duration
 }
 
@@ -252,11 +252,14 @@ func DefaultObserverServiceConfig() *ObserverServiceConfig {
 			RetryDelay:         edrequester.DefaultRetryDelay,
 			MaxRetryDelay:      edrequester.DefaultMaxRetryDelay,
 		},
-		scriptExecMinBlock: 0,
-		scriptExecMaxBlock: math.MaxUint64,
-		registerCacheType:  pstorage.CacheTypeTwoQueue.String(),
-		registerCacheSize:  0,
-		programCacheSize:   0,
+		scriptExecMinBlock:            0,
+		scriptExecMaxBlock:            math.MaxUint64,
+		registerCacheType:             pstorage.CacheTypeTwoQueue.String(),
+		registerCacheSize:             0,
+		programCacheSize:              0,
+		registerDBPruningEnabled:      false,
+		registerDBPruneTickerInterval: pstorage.DefaultPruneTickerInterval,
+		registerDBPruneThrottleDelay:  pstorage.DefaultPruneThrottleDelay,
 	}
 }
 
@@ -711,13 +714,13 @@ func (builder *ObserverServiceBuilder) extraFlags() {
 			"registerdb-pruning-enabled",
 			defaultConfig.registerDBPruningEnabled,
 			"whether to enable the pruning for register db")
-		flags.Uint64Var(&builder.registerDBPruneInterval,
-			"registerdb-prune-interval",
-			defaultConfig.registerDBPruneInterval,
-			"a number of pruned blocks in the db, above which pruning should be triggered")
 		flags.DurationVar(&builder.registerDBPruneThrottleDelay,
 			"registerdb-prune-throttle-delay",
-			defaultConfig.executionDataPruningInterval,
+			defaultConfig.registerDBPruneThrottleDelay,
+			"delay for controlling a pause between batches of registers inspected and pruned")
+		flags.DurationVar(&builder.registerDBPruneTickerInterval,
+			"registerdb-prune-ticker-interval",
+			defaultConfig.registerDBPruneTickerInterval,
 			"duration after which the pruner tries to prune data. The default value is 10 minutes")
 
 		// ExecutionDataRequester config

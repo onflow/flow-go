@@ -174,7 +174,7 @@ type AccessNodeConfig struct {
 	checkPayerBalance                    bool
 	versionControlEnabled                bool
 	registerDBPruningEnabled             bool
-	registerDBPruneInterval              uint64
+	registerDBPruneTickerInterval        time.Duration
 	registerDBPruneThrottleDelay         time.Duration
 }
 
@@ -280,7 +280,7 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 		checkPayerBalance:                    false,
 		versionControlEnabled:                true,
 		registerDBPruningEnabled:             false,
-		registerDBPruneInterval:              pstorage.DefaultPruneInterval,
+		registerDBPruneTickerInterval:        pstorage.DefaultPruneTickerInterval,
 		registerDBPruneThrottleDelay:         pstorage.DefaultPruneThrottleDelay,
 	}
 }
@@ -1323,13 +1323,13 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 			"registerdb-pruning-enabled",
 			defaultConfig.registerDBPruningEnabled,
 			"whether to enable the pruning for register db")
-		flags.Uint64Var(&builder.registerDBPruneInterval,
-			"registerdb-prune-interval",
-			defaultConfig.registerDBPruneInterval,
-			"a number of pruned blocks in the db, above which pruning should be triggered")
 		flags.DurationVar(&builder.registerDBPruneThrottleDelay,
 			"registerdb-prune-throttle-delay",
-			defaultConfig.executionDataPruningInterval,
+			defaultConfig.registerDBPruneThrottleDelay,
+			"delay for controlling a pause between batches of registers inspected and pruned")
+		flags.DurationVar(&builder.registerDBPruneTickerInterval,
+			"registerdb-prune-ticker-interval",
+			defaultConfig.registerDBPruneTickerInterval,
 			"duration after which the pruner tries to prune data. The default value is 10 minutes")
 
 		// Execution State Streaming API
