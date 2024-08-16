@@ -361,6 +361,9 @@ func TestFinalizerPebble(t *testing.T) {
 			})
 		})
 	})
+
+	t.Run("concurrency safety", func(t *testing.T) {
+	})
 }
 
 // assertClusterBlocksIndexedByReferenceHeightPebble checks the given cluster blocks have
