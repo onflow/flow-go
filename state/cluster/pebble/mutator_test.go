@@ -91,7 +91,7 @@ func (suite *MutatorSuite) SetupTest() {
 		rootSnapshot,
 	)
 	require.NoError(suite.T(), err)
-	suite.protoState, err = ppebble.NewFollowerState(log, tracer, events.NewNoop(), state, all.Index, all.Payloads, procedure.NewBlockIndexer(), protocolutil.MockBlockTimer())
+	suite.protoState, err = ppebble.NewFollowerState(log, tracer, events.NewNoop(), state, all.Index, all.Payloads, protocolutil.MockBlockTimer())
 	require.NoError(suite.T(), err)
 
 	clusterStateRoot, err := NewStateRoot(suite.genesis, unittest.QuorumCertificateFixture(), suite.epochCounter)

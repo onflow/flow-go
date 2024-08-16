@@ -255,7 +255,6 @@ func (exeNode *ExecutionNode) LoadMutableFollowerState(node *NodeConfig) error {
 		bState,
 		node.Storage.Index,
 		node.Storage.Payloads,
-		procedure.NewBlockIndexer(),
 		blocktimer.DefaultBlockTimer,
 	)
 	return err

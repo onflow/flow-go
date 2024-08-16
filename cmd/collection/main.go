@@ -52,7 +52,6 @@ import (
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
 	pebbleState "github.com/onflow/flow-go/state/protocol/pebble"
 	"github.com/onflow/flow-go/storage/pebble"
-	"github.com/onflow/flow-go/storage/pebble/procedure"
 	"github.com/onflow/flow-go/utils/grpcutils"
 )
 
@@ -209,7 +208,6 @@ func main() {
 				state,
 				node.Storage.Index,
 				node.Storage.Payloads,
-				procedure.NewBlockIndexer(),
 				blocktimer.DefaultBlockTimer,
 			)
 			return err

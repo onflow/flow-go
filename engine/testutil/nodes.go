@@ -588,7 +588,6 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		protoState.State,
 		node.Index,
 		node.Payloads,
-		procedure.NewBlockIndexer(),
 		blocktimer.DefaultBlockTimer,
 	)
 	require.NoError(t, err)

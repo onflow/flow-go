@@ -121,7 +121,6 @@ func (suite *BuilderPebbleSuite) SetupTest() {
 		state,
 		all.Index,
 		all.Payloads,
-		procedure.NewBlockIndexer(),
 		util.MockBlockTimer(),
 	)
 	require.NoError(suite.T(), err)

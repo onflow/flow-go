@@ -17,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/pebble/operation"
+	"github.com/onflow/flow-go/storage/pebble/procedure"
 )
 
 // FollowerState implements a lighter version of a mutable protocol state.
@@ -62,14 +63,13 @@ func NewFollowerState(
 	state *State,
 	index storage.Index,
 	payloads storage.Payloads,
-	blockIndexer storage.BlockIndexer,
 	blockTimer protocol.BlockTimer,
 ) (*FollowerState, error) {
 	followerState := &FollowerState{
 		State:        state,
 		index:        index,
 		payloads:     payloads,
-		blockIndexer: blockIndexer,
+		blockIndexer: procedure.NewBlockIndexer(),
 		tracer:       tracer,
 		logger:       logger,
 		consumer:     consumer,
@@ -94,18 +94,15 @@ func NewFullConsensusState(
 	receiptValidator module.ReceiptValidator,
 	sealValidator module.SealValidator,
 ) (*ParticipantState, error) {
-	followerState, err := NewFollowerState(
-		logger,
-		tracer,
-		consumer,
-		state,
-		index,
-		payloads,
-		blockIndexer,
-		blockTimer,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("initialization of Mutable Follower State failed: %w", err)
+	followerState := &FollowerState{
+		logger:       logger,
+		tracer:       tracer,
+		consumer:     consumer,
+		State:        state,
+		index:        index,
+		payloads:     payloads,
+		blockIndexer: blockIndexer,
+		blockTimer:   blockTimer,
 	}
 	return &ParticipantState{
 		FollowerState:    followerState,

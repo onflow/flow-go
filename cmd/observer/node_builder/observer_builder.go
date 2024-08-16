@@ -102,7 +102,6 @@ import (
 	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
 	pstorage "github.com/onflow/flow-go/storage/pebble"
-	"github.com/onflow/flow-go/storage/pebble/procedure"
 	"github.com/onflow/flow-go/utils/grpcutils"
 	"github.com/onflow/flow-go/utils/io"
 )
@@ -353,7 +352,6 @@ func (builder *ObserverServiceBuilder) buildFollowerState() *ObserverServiceBuil
 			state,
 			node.Storage.Index,
 			node.Storage.Payloads,
-			procedure.NewBlockIndexer(),
 			blocktimer.DefaultBlockTimer,
 		)
 		builder.FollowerState = followerState
