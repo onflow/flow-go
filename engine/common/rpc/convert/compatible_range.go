@@ -11,7 +11,7 @@ func CompatibleRangeToMessage(c *flow.CompatibleRange) *entities.CompatibleRange
 	if c != nil {
 		return &entities.CompatibleRange{
 			StartHeight: c.StartHeight,
-			EndHeight:   c.StartHeight,
+			EndHeight:   c.EndHeight,
 		}
 	}
 
