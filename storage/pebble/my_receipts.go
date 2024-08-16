@@ -55,7 +55,10 @@ func NewMyExecutionReceipts(collector module.CacheMetrics, db *pebble.DB, receip
 
 			// acquiring the lock is necessary to avoid dirty reads when calling LookupOwnExecutionReceipt
 			mr.indexingOwnReceipts.Lock()
-			defer mr.indexingOwnReceipts.Unlock()
+			rw.AddCallback(func() {
+				// not release the lock until the batch is committed.
+				mr.indexingOwnReceipts.Unlock()
+			})
 
 			var myOwnReceiptExecutedBefore flow.Identifier
 			err = operation.LookupOwnExecutionReceipt(blockID, &myOwnReceiptExecutedBefore)(r)
