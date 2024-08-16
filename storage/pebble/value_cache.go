@@ -140,8 +140,10 @@ func (c *Cache[K, V]) PutPebble(key K, resource V) func(storage.PebbleReaderBatc
 	storeOps := c.store(key, resource) // assemble DB operations to store resource (no execution)
 
 	return func(rw storage.PebbleReaderBatchWriter) error {
-		rw.AddCallback(func() {
-			c.Insert(key, resource)
+		rw.AddCallback(func(err error) {
+			if err != nil {
+				c.Insert(key, resource)
+			}
 		})
 
 		err := storeOps(rw)

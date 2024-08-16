@@ -64,7 +64,11 @@ func IndexNewBlock(indexing *sync.Mutex, blockID flow.Identifier, parentID flow.
 
 		// acquiring a lock to avoid dirty reads when calling RetrieveBlockChildren
 		indexing.Lock()
-		defer indexing.Unlock()
+		rw.AddCallback(func(error) {
+			// the lock is not released until the batch update is committed.
+			// the lock will be released regardless the commit is successful or not.
+			indexing.Unlock()
+		})
 
 		// if the parent block is not zero, depending on whether the parent block has
 		// children or not, we will either update the index or insert the index:

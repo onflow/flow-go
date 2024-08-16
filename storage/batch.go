@@ -32,7 +32,7 @@ type BatchStorage interface {
 type PebbleReaderBatchWriter interface {
 	ReaderWriter() (pebble.Reader, pebble.Writer)
 	IndexedBatch() *pebble.Batch
-	AddCallback(func())
+	AddCallback(func(error))
 }
 
 func OnlyWriter(fn func(pebble.Writer) error) func(PebbleReaderBatchWriter) error {

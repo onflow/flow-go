@@ -2,6 +2,7 @@ package procedure_test
 
 import (
 	"errors"
+	"sync"
 	"testing"
 
 	"github.com/cockroachdb/pebble"
@@ -131,5 +132,46 @@ func TestDirectChildren(t *testing.T) {
 		err = procedure.LookupBlockChildren(b4, &retrievedIDs)(db)
 		require.NoError(t, err)
 		require.Nil(t, retrievedIDs)
+	})
+}
+
+func TestIndexConcurrent(t *testing.T) {
+	unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
+		indexer := procedure.NewBlockIndexer()
+
+		parentID := unittest.IdentifierFixture()
+		child1ID := unittest.IdentifierFixture()
+		child2ID := unittest.IdentifierFixture()
+
+		var wg sync.WaitGroup
+		wg.Add(2)
+
+		// index the first child concurrently
+		go func() {
+			defer wg.Done()
+			rw := operation.NewPebbleReaderBatchWriter(db)
+			err := indexer.IndexNewBlock(child1ID, parentID)(rw)
+			require.NoError(t, err)
+			require.NoError(t, rw.Commit())
+		}()
+
+		// index the second child concurrently
+		go func() {
+			defer wg.Done()
+			rw := operation.NewPebbleReaderBatchWriter(db)
+			err := indexer.IndexNewBlock(child2ID, parentID)(rw)
+			require.NoError(t, err)
+			require.NoError(t, rw.Commit())
+		}()
+
+		// Wait for both indexing operations to complete
+		wg.Wait()
+
+		// Verify that both children were correctly indexed
+		var retrievedIDs flow.IdentifierList
+		err := procedure.LookupBlockChildren(parentID, &retrievedIDs)(db)
+		require.NoError(t, err)
+
+		require.ElementsMatch(t, flow.IdentifierList{child1ID, child2ID}, retrievedIDs)
 	})
 }
