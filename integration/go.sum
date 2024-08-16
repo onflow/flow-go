@@ -999,8 +999,8 @@ github.com/Shopify/goreferrer v0.0.0-20181106222321-ec9c9a553398/go.mod h1:a1uqR
 github.com/StackExchange/wmi v0.0.0-20180116203802-5d049714c4a6/go.mod h1:3eOhrUMpNV+6aFIbp5/iudMxNCF27Vw2OZgy4xEx0Fg=
 github.com/StackExchange/wmi v1.2.1 h1:VIkavFPXSjcnS+O8yTq7NI32k0R5Aj+v39y29VYDOSA=
 github.com/StackExchange/wmi v1.2.1/go.mod h1:rcmrprowKIVzvc+NUiLncP2uuArMWLCbu9SBzvHz7e8=
-github.com/The-K-R-O-K/flow-emulator v0.0.0-20240812141422-9597eccc6cd6 h1:YzH4OjCtUMaxKlDyO3GQn2t8uJ4kSnInMGDm5h30Q8M=
-github.com/The-K-R-O-K/flow-emulator v0.0.0-20240812141422-9597eccc6cd6/go.mod h1:Qj+2esS/jxypx9iRiHnUq+L2HHefi/lnaP872j+d0RQ=
+github.com/The-K-R-O-K/flow-emulator v0.0.0-20240816104201-ccd7c1451926 h1:TQp6qKpBHMZxUlGn3wPjNoHhnoRMjh/qxCQ6Mz9Kn+g=
+github.com/The-K-R-O-K/flow-emulator v0.0.0-20240816104201-ccd7c1451926/go.mod h1:P/mNTUBwgUuInatn0RRVR6JkA834Yn0X4QLBb7LlaCY=
 github.com/VictoriaMetrics/fastcache v1.6.0/go.mod h1:0qHz5QP0GMX4pfmMA/zt5RgfNuXJrTP0zS7DqpHGGTw=
 github.com/VictoriaMetrics/fastcache v1.12.1/go.mod h1:tX04vaqcNoQeGLD+ra5pU5sWkuxnzWhEzLwhP9w653o=
 github.com/VictoriaMetrics/fastcache v1.12.2 h1:N0y9ASrJ0F6h0QaC3o6uJb3NIZ9VKLjCM7NQbSmF7WI=
