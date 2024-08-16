@@ -210,7 +210,7 @@ require (
 	github.com/onflow/flow-go-sdk v1.0.0-preview.50 // indirect
 	github.com/onflow/flow-nft/lib/go/contracts v1.2.1 // indirect
 	github.com/onflow/flow-nft/lib/go/templates v1.2.0 // indirect
-	github.com/onflow/flow/protobuf/go/flow v0.4.5 // indirect
+	github.com/onflow/flow/protobuf/go/flow v0.4.6 // indirect
 	github.com/onflow/go-ethereum v1.14.7 // indirect
 	github.com/onflow/sdks v0.6.0-preview.1 // indirect
 	github.com/onflow/wal v1.0.2 // indirect
@@ -312,6 +312,3 @@ replace github.com/onflow/flow-go => ../
 
 // TODO: remove it when https://github.com/ipfs/go-ds-pebble/pull/36 merged
 replace github.com/ipfs/go-ds-pebble v0.3.1 => github.com/onflow/go-ds-pebble v0.0.0-20240731130313-f186539f382c
-
-// TODO: remove it when merged
-replace github.com/onflow/flow/protobuf/go/flow v0.4.5 => github.com/The-K-R-O-K/flow/protobuf/go/flow v0.0.0-20240812105951-72fdc9e2dcff

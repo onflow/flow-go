@@ -28,7 +28,7 @@ require (
 	github.com/onflow/flow-go v0.37.0-crescendo-RC3.0.20240808013212-1dd0921e5306
 	github.com/onflow/flow-go-sdk v1.0.0-preview.50
 	github.com/onflow/flow-go/insecure v0.0.0-00010101000000-000000000000
-	github.com/onflow/flow/protobuf/go/flow v0.4.5
+	github.com/onflow/flow/protobuf/go/flow v0.4.6
 	github.com/onflow/go-ethereum v1.14.7
 	github.com/prometheus/client_golang v1.18.0
 	github.com/prometheus/client_model v0.5.0
@@ -362,9 +362,6 @@ replace github.com/onflow/flow-go/insecure => ../insecure
 
 // TODO: remove it when https://github.com/ipfs/go-ds-pebble/pull/36 merged
 replace github.com/ipfs/go-ds-pebble v0.3.1 => github.com/onflow/go-ds-pebble v0.0.0-20240731130313-f186539f382c
-
-// TODO: remove it when merged
-replace github.com/onflow/flow/protobuf/go/flow v0.4.5 => github.com/The-K-R-O-K/flow/protobuf/go/flow v0.0.0-20240812105951-72fdc9e2dcff
 
 // TODO: remove it when merged
 replace github.com/onflow/flow-emulator v1.0.0-preview.36.0.20240729195722-d4eb1c30eb9f => github.com/The-K-R-O-K/flow-emulator v0.0.0-20240812141422-9597eccc6cd6
