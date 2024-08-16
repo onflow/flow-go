@@ -2,6 +2,7 @@ package collection
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/cockroachdb/pebble"
 
@@ -25,6 +26,7 @@ type FinalizerPebble struct {
 	transactions mempool.Transactions
 	prov         network.Engine
 	metrics      module.CollectionMetrics
+	finalizing   *sync.Mutex
 }
 
 // NewFinalizerPebble creates a new finalizer for collection nodes.
@@ -39,6 +41,7 @@ func NewFinalizerPebble(
 		transactions: transactions,
 		prov:         prov,
 		metrics:      metrics,
+		finalizing:   new(sync.Mutex),
 	}
 	return f
 }
@@ -61,6 +64,10 @@ func (f *FinalizerPebble) MakeFinal(blockID flow.Identifier) error {
 	if err != nil {
 		return fmt.Errorf("could not retrieve header: %w", err)
 	}
+
+	// we need to ensure that only one block is finalized at a time
+	f.finalizing.Lock()
+	defer f.finalizing.Unlock()
 
 	// retrieve the current finalized cluster state boundary
 	var boundary uint64

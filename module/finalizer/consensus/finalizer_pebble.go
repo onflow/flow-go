@@ -3,6 +3,7 @@ package consensus
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	"github.com/cockroachdb/pebble"
 
@@ -22,6 +23,8 @@ type FinalizerPebble struct {
 	state   protocol.FollowerState
 	cleanup CleanupFunc
 	tracer  module.Tracer
+
+	finalizing *sync.Mutex
 }
 
 // NewFinalizerPebble creates a new finalizer for the temporary state.
@@ -31,11 +34,12 @@ func NewFinalizerPebble(db *pebble.DB,
 	tracer module.Tracer,
 	options ...func(*FinalizerPebble)) *FinalizerPebble {
 	f := &FinalizerPebble{
-		db:      db,
-		state:   state,
-		headers: headers,
-		cleanup: CleanupNothing(),
-		tracer:  tracer,
+		db:         db,
+		state:      state,
+		headers:    headers,
+		cleanup:    CleanupNothing(),
+		tracer:     tracer,
+		finalizing: new(sync.Mutex),
 	}
 	for _, option := range options {
 		option(f)
@@ -55,6 +59,10 @@ func (f *FinalizerPebble) MakeFinal(blockID flow.Identifier) error {
 
 	span, ctx := f.tracer.StartBlockSpan(context.Background(), blockID, trace.CONFinalizerFinalizeBlock)
 	defer span.End()
+
+	// We want to ensure that only one block is being finalized at a time.
+	f.finalizing.Lock()
+	defer f.finalizing.Unlock()
 
 	// STEP ONE: This is an idempotent operation. In case we are trying to
 	// finalize a block that is already below finalized height, we want to do
