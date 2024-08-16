@@ -19,7 +19,9 @@ func TestRetrieveEventByBlockIDTxID(t *testing.T) {
 
 		// create block ids, transaction ids and event types slices
 		blockIDs := []flow.Identifier{flow.HashToID([]byte{0x01}), flow.HashToID([]byte{0x02})}
-		txIDs := []flow.Identifier{flow.HashToID([]byte{0x11}), flow.HashToID([]byte{0x12})}
+		txIDs := []flow.Identifier{flow.HashToID([]byte{0x11}), flow.HashToID([]byte{0x12}),
+			[32]byte{0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF},
+		}
 		eTypes := []flow.EventType{flow.EventAccountCreated, flow.EventAccountUpdated}
 
 		// create map of block id to event, tx id to event and event type to event
