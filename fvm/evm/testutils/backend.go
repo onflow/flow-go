@@ -46,6 +46,7 @@ func RunWithTestBackend(t testing.TB, f func(*TestBackend)) {
 		TestContractFunctionInvoker: &TestContractFunctionInvoker{},
 		TestTracer:                  &TestTracer{},
 		TestMetricsReporter:         &TestMetricsReporter{},
+		TestLoggerProvider:          &TestLoggerProvider{},
 	}
 	f(tb)
 }
