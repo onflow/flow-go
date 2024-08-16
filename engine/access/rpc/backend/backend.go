@@ -373,12 +373,6 @@ func (b *Backend) GetFullCollectionByID(_ context.Context, colID flow.Identifier
 	return col, nil
 }
 
-func (b *Backend) GetNetworkParameters(_ context.Context) access.NetworkParameters {
-	return access.NetworkParameters{
-		ChainID: b.chainID,
-	}
-}
-
 // executionNodesForBlockID returns upto maxNodesCnt number of randomly chosen execution node identities
 // which have executed the given block ID.
 // If no such execution node is found, an InsufficientExecutionReceipts error is returned.
