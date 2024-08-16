@@ -22,7 +22,18 @@ type Headers struct {
 func NewHeaders(collector module.CacheMetrics, db *pebble.DB) *Headers {
 
 	store := func(blockID flow.Identifier, header *flow.Header) func(storage.PebbleReaderBatchWriter) error {
-		return storage.OnlyWriter(operation.InsertHeader(blockID, header))
+		return storage.OnlyWriter(func(writer pebble.Writer) error {
+			err := operation.InsertHeader(blockID, header)(writer)
+			if err != nil {
+				return fmt.Errorf("could not insert header (id: %s): %w", blockID, err)
+			}
+
+			err = operation.IndexViewBlock(header.View, blockID)(writer)
+			if err != nil {
+				return fmt.Errorf("could not index block by view (id: %s, view: %d): %w", blockID, header.View, err)
+			}
+			return nil
+		})
 	}
 
 	// CAUTION: should only be used to index FINALIZED blocks by their
