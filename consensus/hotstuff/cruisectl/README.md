@@ -61,7 +61,7 @@ The desired idealized system behaviour would a constant view duration $\tau_0$ t
 
 However, in the real-world system we have disturbances (varying message relay times, slow or offline nodes, etc) and measurement uncertainty (node can only observe its local view times, but not the committee’s collective swarm behaviour).
 
-<img src='https://github.com/onflow/flow-go/blob/master/docs/CruiseControl_BlockTimeController/PID_controller_for_block-rate-delay.png' width='600'>
+<img src='https://github.com/onflow/flow-go/blob/master/docs/CruiseControl_BlockTimeController/PID_controller_for_block-rate-delay.png' width='680'>
 
 
 After a disturbance, we want the controller to drive the system back to a state, where it can closely follow the ideal behaviour from there on. 
@@ -309,3 +309,96 @@ Through, the optimal solution would be a consistent view time throughout normal 
 ## Testing
 
 [Cruise Control: Benchnet Testing Notes](https://www.notion.so/Cruise-Control-Benchnet-Testing-Notes-ea08f49ba9d24ce2a158fca9358966df?pvs=21)
+
+# Implementation Aspects
+
+## Delaying Broadcast to match Controller-generated view duration: implementation subtleties
+
+### [Challenge] Discrepancy between expected and observed timing behaviour 
+
+The following figure captures Cruise Control's output and the corresponding behaviour:
+* Flow TestNet (`devnet51`) August 14-18, 2024
+  with 7 consensus nodes.
+* Cruise control was configured to stabilize view progression of the consensus committee to 2 views per second, i.e. the target view time is 500ms  
+* On August 14 at 11:30 am testnet was started, which was a bit earlier than anticipated for the number of specified views in the epoch,
+  to precisely assign with the specified epoch transition at 2 views per second given. In other words, there were fewer views to cover the remaining
+  time duration until the targeted epoch switchover time, so views had to be longer than 500ms. 
+* The controller responds as expected: 
+  * it elongates the view time between until Aug 15, 00:50am
+  * At that point, the timing has aligned with the setpoint to progress with 500ms view time from there on.   
+* On testnet, we assume that consensus participants are responsive and not overloaded. In this case, the number of orphaned blocks or timed-out views
+  should be entirely negligible (assumption). Hence, we can assume that the protocol proceeds entirely on the happy path with negligible error. 
+
+TODO insert figure
+
+* Under the hood, the controller outputs the unconstrained view time $\widehat{\tau}[v]= \tau_0 - u[v]$ (of type [`time.Duration`](https://pkg.go.dev/time)),
+  which is wrapped into a [`happyPathBlockTime`](https://github.com/onflow/flow-go/blob/d9f7522d6c502d7e148dab69c926279202677cf8/consensus/hotstuff/cruisectl/proposal_timing.go#L59-L74)
+  (👉 [code](https://github.com/onflow/flow-go/blob/d9f7522d6c502d7e148dab69c926279202677cf8/consensus/hotstuff/cruisectl/block_time_controller.go#L402-L404)).
+  The [`happyPathBlockTime`](https://github.com/onflow/flow-go/blob/d9f7522d6c502d7e148dab69c926279202677cf8/consensus/hotstuff/cruisectl/proposal_timing.go#L59-L74)
+  [applies the limits of authority](https://github.com/onflow/flow-go/blob/d9f7522d6c502d7e148dab69c926279202677cf8/consensus/hotstuff/cruisectl/proposal_timing.go#L94),
+  and the resulting `ConstrainedBlockTime` we capture by the metric `Target View Time` (see figure above).
+* From taking a look at the [`hotatuff.EventHandler`](https://github.com/onflow/flow-go/blob/d9f7522d6c502d7e148dab69c926279202677cf8/consensus/hotstuff/eventhandler/event_handler.go#L157-L171),
+  we can confirm that the `BlockTimeController` and the metric `Observed View Time` use practically the same reference time to determine view progression:
+  ```golang
+  func (e *EventHandler) OnReceiveProposal(proposal *model.Proposal) error {
+    ⋮
+    
+    // store the block.
+    err := e.forks.AddValidatedBlock(block)
+    if err != nil {
+      return fmt.Errorf("cannot add proposal to forks (%x): %w", block.BlockID, err)
+    }
+
+    _, err = e.paceMaker.ProcessQC(proposal.Block.QC)
+    if err != nil {
+      return fmt.Errorf("could not process QC for block %x: %w", block.BlockID, err)
+    }
+
+    _, err = e.paceMaker.ProcessTC(proposal.LastViewTC)
+    if err != nil {
+      return fmt.Errorf("could not process TC for block %x: %w", block.BlockID, err)
+    }
+
+    ⋮
+  ```
+  - The call to `forks.AddValidatedBlock` emits the `OnBlockIncorporated` notification for `block` with view $v$, which the `BlockTimeController` uses as [its starting point for the view](https://github.com/onflow/flow-go/blob/d9f7522d6c502d7e148dab69c926279202677cf8/consensus/hotstuff/cruisectl/block_time_controller.go#L476-L481):
+    ```golang
+    TimedBlock{Block: block, TimeObserved: time.Now().UTC()}
+    ```
+    So for the `BlockTimeController`, the start of view `v` is the `TimeObserved` for proposal with view `v`.   
+  - Right after, the PaceMaker ingests the QC for view `v-1`, which is included in the proposal for view `v`.
+    The call to `paceMaker.ProcessQC` updates the metric `consensus_hotstuff_cur_view`, based on which we calculate `Observed Average (10m) View Time [s]` (depicted in figure above).
+* As the `TargetPublicationTime` for block `v+1`, the `BlockTimeController` [calculates](https://github.com/onflow/flow-go/blob/d9f7522d6c502d7e148dab69c926279202677cf8/consensus/hotstuff/cruisectl/proposal_timing.go#L102-L112):
+  ```golang
+  targetPublicationTime := TimeObserved.Add(ConstrainedBlockTime)
+  ``` 
+* The [`EventHandler` triggers](https://github.com/onflow/flow-go/blob/d9f7522d6c502d7e148dab69c926279202677cf8/consensus/hotstuff/eventhandler/event_handler.go#L390-L417) the
+  [computation](https://github.com/onflow/flow-go/blob/d9f7522d6c502d7e148dab69c926279202677cf8/consensus/hotstuff/cruisectl/block_time_controller.go#L249-L262) of the
+ `Block Publication Delay` metric right when it hands its proposal for view `v+1` to the [`MessageHub`](https://github.com/onflow/flow-go/blob/d9f7522d6c502d7e148dab69c926279202677cf8/engine/consensus/message_hub/message_hub.go#L428-L434)
+  ```golang
+  publicationDelay := time.Until(targetPublicationTime)
+  if publicationDelay < 0 {
+    publicationDelay = 0 // Controller can only delay publication of proposal. Hence, the delay is lower-bounded by zero.
+  }
+  metrics.ProposalPublicationDelay(publicationDelay)
+  ```
+* The [`MessageHub` repeats exactly that computation of `publicationDelay`](https://github.com/onflow/flow-go/blob/d9f7522d6c502d7e148dab69c926279202677cf8/engine/consensus/message_hub/message_hub.go#L433-L437)
+  to determine how long it should sleep before broadcasting the proposal:
+  ```golang
+  select {
+    case <-time.After(time.Until(targetPublicationTime.Round(0))):
+    case <-h.ShutdownSignal():
+         return
+  }
+  ```
+
+**Discrepancy**
+- As we can see from the figure above, the `Observed Average View Time` (blue solid curve) is just marginally larger than the `Block Publication Delay` (purple dashed curve).
+- `Observed Average View Time` and `Block Publication Delay` use nearly identical temporal reference points (discrepancy is probably on the order of 10s of nanoseconds).  
+- There are some additional computation steps that happen in practise, which we have not accounted for in our description here. However, computation can only _increase_ the `Observed Average View Time`
+  compared to `Block Publication Delay`. The EventHandler is very fast and in practise we have seen execution times of single-digit milliseconds.   
+- Hence, empirical evidence is supporting the following hypothesis: 
+  - The `MessageHub` accuratley delays the publication of the proposal by `Block Publication Delay` (type `time.Duration`).
+  - **However, the translation introduces some errors: `publicationDelay := time.Until(targetPublicationTime) = time.Until(parentProposal.TimeObserved + ConstrainedBlockTime)`
+  
+
