@@ -507,11 +507,6 @@ func (h *ContractHandler) getBlockContext() (types.BlockContext, error) {
 	if err != nil {
 		return types.BlockContext{}, err
 	}
-	rand := gethCommon.Hash{}
-	err = h.backend.ReadRandom(rand[:])
-	if err != nil {
-		return types.BlockContext{}, err
-	}
 
 	return types.BlockContext{
 		ChainID:                types.EVMChainIDFromFlowChainID(h.flowChainID),
@@ -524,7 +519,7 @@ func (h *ContractHandler) getBlockContext() (types.BlockContext, error) {
 			return hash
 		},
 		ExtraPrecompiledContracts: h.precompiledContracts,
-		Random:                    rand,
+		Random:                    bp.Random,
 		Tracer:                    h.tracer.TxTracer(),
 		TxCountSoFar:              uint(len(bp.TxHashes)),
 		TotalGasUsedSoFar:         bp.TotalGasUsed,
