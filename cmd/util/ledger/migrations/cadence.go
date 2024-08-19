@@ -41,29 +41,10 @@ func NewInterfaceTypeConversionRules(chainID flow.ChainID) StaticTypeMigrationRu
 	}
 }
 
-var typeRequirementRemovals = []struct {
-	address      string
-	contractName string
-	typeName     string
-}{
-	{
-		address:      "e93c412c964bdf40",
-		contractName: "TiblesProducer",
-		typeName:     "Producer",
-	},
-	{
-		address:      "e93c412c964bdf40",
-		contractName: "TiblesProducer",
-		typeName:     "Minter",
-	},
-	{
-		address:      "e93c412c964bdf40",
-		contractName: "TiblesProducer",
-		typeName:     "ContentLocation",
-	},
-}
-
-func NewCompositeTypeConversionRules(chainID flow.ChainID) StaticTypeMigrationRules {
+func NewCompositeTypeConversionRules(
+	chainID flow.ChainID,
+	legacyTypeRequirements *LegacyTypeRequirements,
+) StaticTypeMigrationRules {
 	systemContracts := systemcontracts.SystemContractsForChain(chainID)
 
 	oldFungibleTokenVaultCompositeType, newFungibleTokenVaultType :=
@@ -79,11 +60,11 @@ func NewCompositeTypeConversionRules(chainID flow.ChainID) StaticTypeMigrationRu
 		oldNonFungibleTokenCollectionCompositeType.ID(): newNonFungibleTokenCollectionType,
 	}
 
-	for _, typeRemoval := range typeRequirementRemovals {
+	for _, typeRequirement := range legacyTypeRequirements.typeRequirements {
 		oldType, newType := compositeToInterfaceRule(
-			mustHexToAddress(typeRemoval.address),
-			typeRemoval.contractName,
-			typeRemoval.typeName,
+			typeRequirement.Address,
+			typeRequirement.ContractName,
+			typeRequirement.TypeName,
 		)
 
 		rules[oldType.ID()] = newType
@@ -93,13 +74,22 @@ func NewCompositeTypeConversionRules(chainID flow.ChainID) StaticTypeMigrationRu
 }
 
 func NewCadence1InterfaceStaticTypeConverter(chainID flow.ChainID) statictypes.InterfaceTypeConverterFunc {
-	rules := NewInterfaceTypeConversionRules(chainID)
-	return NewStaticTypeMigration[*interpreter.InterfaceStaticType](rules)
+	return NewStaticTypeMigration[*interpreter.InterfaceStaticType](
+		func() StaticTypeMigrationRules {
+			return NewInterfaceTypeConversionRules(chainID)
+		},
+	)
 }
 
-func NewCadence1CompositeStaticTypeConverter(chainID flow.ChainID) statictypes.CompositeTypeConverterFunc {
-	rules := NewCompositeTypeConversionRules(chainID)
-	return NewStaticTypeMigration[*interpreter.CompositeStaticType](rules)
+func NewCadence1CompositeStaticTypeConverter(
+	chainID flow.ChainID,
+	legacyTypeRequirements *LegacyTypeRequirements,
+) statictypes.CompositeTypeConverterFunc {
+	return NewStaticTypeMigration[*interpreter.CompositeStaticType](
+		func() StaticTypeMigrationRules {
+			return NewCompositeTypeConversionRules(chainID, legacyTypeRequirements)
+		},
+	)
 }
 
 func nonFungibleTokenCompositeToInterfaceRule(
@@ -437,6 +427,7 @@ func NewCadence1ValueMigrations(
 	log zerolog.Logger,
 	rwf reporters.ReportWriterFactory,
 	importantLocations map[common.AddressLocation]struct{},
+	legacyTypeRequirements *LegacyTypeRequirements,
 	opts Options,
 ) (migs []NamedMigration) {
 
@@ -493,7 +484,7 @@ func NewCadence1ValueMigrations(
 				rwf,
 				errorMessageHandler,
 				programs,
-				NewCadence1CompositeStaticTypeConverter(opts.ChainID),
+				NewCadence1CompositeStaticTypeConverter(opts.ChainID, legacyTypeRequirements),
 				NewCadence1InterfaceStaticTypeConverter(opts.ChainID),
 				storageDomainCapabilities,
 				opts,
@@ -584,10 +575,11 @@ const stagedContractUpdateMigrationName = "staged-contracts-update-migration"
 func NewCadence1ContractsMigrations(
 	log zerolog.Logger,
 	rwf reporters.ReportWriterFactory,
+	importantLocations map[common.AddressLocation]struct{},
+	legacyTypeRequirements *LegacyTypeRequirements,
 	opts Options,
 ) (
 	migs []NamedMigration,
-	importantLocations map[common.AddressLocation]struct{},
 ) {
 
 	stagedContractsMigrationOptions := StagedContractsMigrationOptions{
@@ -602,9 +594,10 @@ func NewCadence1ContractsMigrations(
 	}
 
 	var systemContractsMigration *StagedContractsMigration
-	systemContractsMigration, importantLocations = NewSystemContractsMigration(
+	systemContractsMigration = NewSystemContractsMigration(
 		log,
 		rwf,
+		importantLocations,
 		systemContractsMigrationOptions,
 	)
 
@@ -613,6 +606,7 @@ func NewCadence1ContractsMigrations(
 		"staged-contracts-migration",
 		log,
 		rwf,
+		legacyTypeRequirements,
 		stagedContractsMigrationOptions,
 	).WithContractUpdateValidation().
 		WithStagedContractUpdates(opts.StagedContracts)
@@ -670,7 +664,7 @@ func NewCadence1ContractsMigrations(
 		},
 	)
 
-	return migs, importantLocations
+	return migs
 }
 
 var testnetAccountsWithBrokenSlabReferences = func() map[common.Address]struct{} {
@@ -797,9 +791,29 @@ func NewCadence1Migrations(
 		}
 	}
 
-	cadence1ContractsMigrations, importantLocations := NewCadence1ContractsMigrations(
+	importantLocations := make(map[common.AddressLocation]struct{})
+	legacyTypeRequirements := &LegacyTypeRequirements{}
+
+	cadenceTypeRequirementsExtractor := NewTypeRequirementsExtractingMigration(
 		log,
 		rwf,
+		importantLocations,
+		legacyTypeRequirements,
+	)
+
+	migs = append(
+		migs,
+		NamedMigration{
+			Name:    "extract-type-requirements",
+			Migrate: cadenceTypeRequirementsExtractor,
+		},
+	)
+
+	cadence1ContractsMigrations := NewCadence1ContractsMigrations(
+		log,
+		rwf,
+		importantLocations,
+		legacyTypeRequirements,
 		opts,
 	)
 
@@ -814,6 +828,7 @@ func NewCadence1Migrations(
 			log,
 			rwf,
 			importantLocations,
+			legacyTypeRequirements,
 			opts,
 		)...,
 	)

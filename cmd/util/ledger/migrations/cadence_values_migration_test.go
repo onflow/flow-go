@@ -2702,7 +2702,7 @@ func TestTypeRequirementRemovalMigration(t *testing.T) {
 
 	const nWorker = 2
 
-	const chainID = flow.Emulator
+	const chainID = flow.Testnet
 
 	payloads, err := newBootstrapPayloads(chainID)
 	require.NoError(t, err)
@@ -2731,6 +2731,8 @@ func TestTypeRequirementRemovalMigration(t *testing.T) {
 		true,
 	)
 
+	contractName := "TiblesProducer"
+
 	// Store a value with the actual `TiblesProducer.Minter` type
 	storageMap.WriteValue(
 		migrationRuntime.Interpreter,
@@ -2740,7 +2742,7 @@ func TestTypeRequirementRemovalMigration(t *testing.T) {
 			interpreter.NewCompositeStaticTypeComputeTypeID(
 				nil,
 				common.AddressLocation{
-					Name:    "TiblesProducer",
+					Name:    contractName,
 					Address: tiblesAddress,
 				},
 				"TiblesProducer.Minter",
@@ -2757,7 +2759,7 @@ func TestTypeRequirementRemovalMigration(t *testing.T) {
 			interpreter.NewCompositeStaticTypeComputeTypeID(
 				nil,
 				common.AddressLocation{
-					Name:    "TiblesProducer",
+					Name:    contractName,
 					Address: storedAddress,
 				},
 				"TiblesProducer.Minter",
@@ -2785,6 +2787,60 @@ func TestTypeRequirementRemovalMigration(t *testing.T) {
 		result.WriteSet,
 		expectedAddresses,
 		logger,
+	)
+	require.NoError(t, err)
+
+	// Set contract code
+
+	oldCode := `
+        pub contract interface TiblesProducer {
+
+            pub struct ContentLocation {}
+            pub struct interface IContentLocation {}
+
+            pub resource interface IContent {
+                access(contract) let contentIdsToPaths: {String: TiblesProducer.ContentLocation}
+                pub fun getMetadata(contentId: String): {String: AnyStruct}?
+            }
+
+            pub resource interface IProducer {
+                access(contract) let minters: @{String: Minter}
+            }
+
+            pub resource Producer: IContent, IProducer {
+                access(contract) let minters: @{String: Minter}
+            }
+
+            pub resource interface IMinter {
+                pub let id: String
+                pub var lastMintNumber: UInt32
+                pub let contentCapability: Capability
+                pub fun mintNext()
+            }
+
+            pub resource Minter: IMinter {
+                pub let id: String
+                pub var lastMintNumber: UInt32
+                pub let contentCapability: Capability
+                pub fun mintNext()
+            }
+        }
+    `
+
+	err = registersByAccount.Set(
+		string(tiblesAddress[:]),
+		flow.ContractKey(contractName),
+		[]byte(oldCode),
+	)
+	require.NoError(t, err)
+
+	encodedContractNames, err := environment.EncodeContractNames([]string{contractName})
+	require.NoError(t, err)
+
+	err = registersByAccount.Set(
+		string(tiblesAddress[:]),
+		flow.ContractNamesKey,
+		encodedContractNames,
 	)
 	require.NoError(t, err)
 

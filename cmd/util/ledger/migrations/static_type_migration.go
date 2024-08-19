@@ -8,18 +8,22 @@ import (
 type StaticTypeMigrationRules map[common.TypeID]interpreter.StaticType
 
 func NewStaticTypeMigration[T interpreter.StaticType](
-	rules StaticTypeMigrationRules,
+	rulesGetter func() StaticTypeMigrationRules,
 ) func(staticType T) interpreter.StaticType {
 
-	// Returning `nil` form the callback indicates the type wasn't converted.
-
-	if rules == nil {
-		return func(original T) interpreter.StaticType {
-			return nil
-		}
-	}
+	var rules StaticTypeMigrationRules
 
 	return func(original T) interpreter.StaticType {
+		// Initialize only once
+		if rules == nil {
+			rules = rulesGetter()
+		}
+
+		// Returning `nil` form the callback indicates the type wasn't converted.
+		if rules == nil {
+			return nil
+		}
+
 		if replacement, ok := rules[original.ID()]; ok {
 			return replacement
 		}
