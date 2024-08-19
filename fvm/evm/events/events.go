@@ -127,6 +127,7 @@ func (p *blockEvent) ToCadence(chainID flow.ChainID) (cadence.Event, error) {
 		hashToCadenceArrayValue(p.ParentBlockHash),
 		hashToCadenceArrayValue(p.ReceiptRoot),
 		hashToCadenceArrayValue(p.TransactionHashRoot),
+		hashToCadenceArrayValue(p.Random),
 	}).WithType(eventType), nil
 }
 
@@ -139,6 +140,7 @@ type BlockEventPayload struct {
 	ParentBlockHash     gethCommon.Hash `cadence:"parentHash"`
 	ReceiptRoot         gethCommon.Hash `cadence:"receiptRoot"`
 	TransactionHashRoot gethCommon.Hash `cadence:"transactionHashRoot"`
+	Random              gethCommon.Hash `cadence:"random"`
 }
 
 // DecodeBlockEventPayload decodes Cadence event into block event payload.
