@@ -360,10 +360,12 @@ func (v *VersionControl) blockFinalized(
 	}
 }
 
-// StartHeight return the first block that the version supports
+// StartHeight return the first block that the version supports.
+// Start height is the sealed root block if there is no start boundary in the current spork.
 func (v *VersionControl) StartHeight() uint64 {
-	var startHeight = v.startHeight.Load()
-	// start height is the sealed root block if there is no start boundary in the current spork
+	startHeight := v.startHeight.Load()
+
+	// in case no start boundary in the current spork
 	if startHeight == NoHeight {
 		startHeight = v.sealedRootBlockHeight.Load()
 	}
@@ -371,7 +373,15 @@ func (v *VersionControl) StartHeight() uint64 {
 	return startHeight
 }
 
-// EndHeight return the last block that the version supports
+// EndHeight return the last block that the version supports.
+// End height is the last processed height if there is no end boundary in the current spork.
 func (v *VersionControl) EndHeight() uint64 {
-	return v.endHeight.Load()
+	endHeight := v.endHeight.Load()
+
+	// in case no end boundary in the current spork
+	if endHeight == NoHeight {
+		endHeight = v.lastProcessedHeight.Load()
+	}
+
+	return endHeight
 }
