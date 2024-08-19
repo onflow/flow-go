@@ -10,7 +10,6 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/access"
-	"github.com/onflow/flow-go/cmd/build"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
@@ -49,19 +48,6 @@ func (b *backendNetwork) GetNetworkParameters(_ context.Context) access.NetworkP
 	return access.NetworkParameters{
 		ChainID: b.chainID,
 	}
-}
-
-func (b *backendNetwork) GetNodeVersionInfo(_ context.Context) (*flow.NodeVersionInfo, error) {
-	stateParams := b.state.Params()
-	sporkId := stateParams.SporkID()
-	protocolVersion := stateParams.ProtocolVersion()
-
-	return &flow.NodeVersionInfo{
-		Semver:          build.Version(),
-		Commit:          build.Commit(),
-		SporkId:         sporkId,
-		ProtocolVersion: uint64(protocolVersion),
-	}, nil
 }
 
 // GetLatestProtocolStateSnapshot returns the latest finalized snapshot.
