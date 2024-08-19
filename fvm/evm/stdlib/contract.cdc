@@ -34,6 +34,8 @@ contract EVM {
         receiptRoot: [UInt8; 32],
         // root hash of all the transaction hashes
         transactionHashRoot: [UInt8; 32],
+        // random value used for PREVRANDO
+        random: [UInt8; 32]
     )
 
     /// Transaction executed event is emitted every time a transaction
