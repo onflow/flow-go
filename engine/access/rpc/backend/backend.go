@@ -363,11 +363,6 @@ func (b *Backend) getNodeVersionInfo() *flow.NodeVersionInfo {
 			StartHeight: b.versionControl.StartHeight(),
 			EndHeight:   b.versionControl.EndHeight(),
 		}
-
-		// StartHeight is the root block if there is no start boundary in the current spork
-		if compatibleRange.StartHeight == version.NoHeight {
-			compatibleRange.StartHeight = nodeRootBlockHeader.Height
-		}
 	}
 
 	nodeInfo := &flow.NodeVersionInfo{

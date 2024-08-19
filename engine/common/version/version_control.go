@@ -362,7 +362,13 @@ func (v *VersionControl) blockFinalized(
 
 // StartHeight return the first block that the version supports
 func (v *VersionControl) StartHeight() uint64 {
-	return v.startHeight.Load()
+	var startHeight = v.startHeight.Load()
+	// start height is the sealed root block if there is no start boundary in the current spork
+	if startHeight == NoHeight {
+		startHeight = v.sealedRootBlockHeight.Load()
+	}
+
+	return startHeight
 }
 
 // EndHeight return the last block that the version supports
