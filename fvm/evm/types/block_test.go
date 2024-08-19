@@ -39,6 +39,7 @@ func Test_BlockHash(t *testing.T) {
 		ReceiptRoot:         gethCommon.Hash{0x2, 0x3, 0x4},
 		TotalGasUsed:        135,
 		TransactionHashRoot: gethCommon.Hash{0x5, 0x6, 0x7},
+		Random:              gethCommon.Hash{0x2, 0x3, 0x4},
 	}
 
 	h1, err := b.Hash()
@@ -54,7 +55,7 @@ func Test_BlockHash(t *testing.T) {
 }
 
 func Test_BlockProposal(t *testing.T) {
-	bp := NewBlockProposal(gethCommon.Hash{1}, 1, 0, nil)
+	bp := NewBlockProposal(gethCommon.Hash{1}, 1, 0, nil, gethCommon.Hash{0x1})
 
 	bp.AppendTransaction(nil)
 	require.Empty(t, bp.TxHashes)
