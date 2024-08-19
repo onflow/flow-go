@@ -116,6 +116,7 @@ func GenesisBlock(chainID flow.ChainID) *Block {
 		ReceiptRoot:         gethTypes.EmptyRootHash,
 		TransactionHashRoot: gethTypes.EmptyRootHash,
 		TotalGasUsed:        0,
+		Random:              gethTypes.EmptyRootHash,
 	}
 }
 
