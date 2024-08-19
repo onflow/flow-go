@@ -8,7 +8,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
+	"github.com/onflow/cadence/runtime/stdlib"
 	gethCommon "github.com/onflow/go-ethereum/common"
 	gethCore "github.com/onflow/go-ethereum/core"
 	gethTypes "github.com/onflow/go-ethereum/core/types"
@@ -678,13 +680,15 @@ func TestHandler_COA(t *testing.T) {
 		t.Parallel()
 
 		testutils.RunWithTestBackend(t, func(backend *testutils.TestBackend) {
-			random := testutils.RandomCommonHash(t)
-			backend.ReadRandomFunc = func(buffer []byte) error {
-				copy(buffer, random.Bytes())
-				return nil
-			}
 			testutils.RunWithTestFlowEVMRootAddress(t, backend, func(rootAddr flow.Address) {
 				handler := SetupHandler(t, backend, rootAddr)
+
+				rand := gethCommon.Hash{0x2}
+				backend.GetBlockAtHeightFunc = func(height uint64) (runtime.Block, bool, error) {
+					return runtime.Block{
+						Hash: stdlib.BlockHash(rand),
+					}, true, nil
+				}
 
 				foa := handler.AccountByAddress(handler.DeployCOA(1), true)
 				require.NotNil(t, foa)
@@ -705,7 +709,7 @@ func TestHandler_COA(t *testing.T) {
 					math.MaxUint64,
 					types.EmptyBalance)
 
-				require.Equal(t, random.Bytes(), []byte(ret.ReturnedData))
+				require.Equal(t, rand.Bytes(), []byte(ret.ReturnedData))
 			})
 		})
 	})
