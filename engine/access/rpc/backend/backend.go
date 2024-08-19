@@ -344,11 +344,6 @@ func (b *Backend) Ping(ctx context.Context) error {
 
 // GetNodeVersionInfo returns node version information such as semver, commit, sporkID, protocolVersion, etc
 func (b *Backend) GetNodeVersionInfo(_ context.Context) (*flow.NodeVersionInfo, error) {
-	return b.getNodeVersionInfo(), nil
-}
-
-// getNodeVersionInfo returns the NodeVersionInfo for the node.
-func (b *Backend) getNodeVersionInfo() *flow.NodeVersionInfo {
 	sporkID := b.stateParams.SporkID()
 	protocolVersion := b.stateParams.ProtocolVersion()
 	sporkRootBlockHeight := b.stateParams.SporkRootBlockHeight()
@@ -375,7 +370,7 @@ func (b *Backend) getNodeVersionInfo() *flow.NodeVersionInfo {
 		CompatibleRange:      compatibleRange,
 	}
 
-	return nodeInfo
+	return nodeInfo, nil
 }
 
 func (b *Backend) GetCollectionByID(_ context.Context, colID flow.Identifier) (*flow.LightCollection, error) {
