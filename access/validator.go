@@ -68,6 +68,9 @@ func (b *ProtocolStateBlocks) SealedHeader() (*flow.Header, error) {
 
 }
 
+// IndexedHeight returns the highest indexed height by calling corresponding function of indexReporter.
+// Expected errors during normal operation:
+// - access.IndexReporterNotInitialized - indexed reporter was not initialized.
 func (b *ProtocolStateBlocks) IndexedHeight() (uint64, error) {
 	if b.indexReporter != nil {
 		return b.indexReporter.HighestIndexedHeight()
@@ -420,6 +423,9 @@ func (v *TransactionValidator) checkSufficientBalanceToPayForTransaction(ctx con
 		return fmt.Errorf("could not get indexed height: %w", err)
 	}
 
+	// instead of using latest sealed block we are using latest indexed block, so we can do a check
+	// to ensure that the difference between the latest sealed and indexed is within some tolerance
+	// to handle cases where a node is behind on indexing.
 	sealedHeight := header.Height
 	if indexedHeight < sealedHeight-DefaultSealedIndexedHeightThreshold {
 		return IndexedHeightFarBehindError{SealedHeight: sealedHeight, IndexedHeight: indexedHeight}
