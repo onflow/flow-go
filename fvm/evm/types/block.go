@@ -79,15 +79,7 @@ func NewBlock(
 // NewBlockFromBytes constructs a new block from encoded data
 func NewBlockFromBytes(encoded []byte) (*Block, error) {
 	res := &Block{}
-
-	err := gethRLP.DecodeBytes(encoded, res)
-	if err != nil {
-		res = decodeBlockBreakingChanges(encoded)
-		if res == nil {
-			return nil, err
-		}
-	}
-	return res, nil
+	return res, gethRLP.DecodeBytes(encoded, res)
 }
 
 // GenesisTimestamp returns the block time stamp for EVM genesis block
