@@ -74,10 +74,6 @@ func (r *ResultApprovals) byChunk(resultID flow.Identifier, chunkIndex uint64) f
 
 func (r *ResultApprovals) index(resultID flow.Identifier, chunkIndex uint64, approvalID flow.Identifier) func(storage.PebbleReaderBatchWriter) error {
 	return func(tx storage.PebbleReaderBatchWriter) error {
-		// acquring the lock to prevent dirty reads of check conflicted approvals
-		r.indexing.Lock()
-		defer r.indexing.Unlock()
-
 		r, w := tx.ReaderWriter()
 
 		var storedApprovalID flow.Identifier
@@ -118,6 +114,14 @@ func (r *ResultApprovals) Store(approval *flow.ResultApproval) error {
 // just calling the method once; still the method succeeds on each call).
 // this method is concurrent-safe
 func (r *ResultApprovals) Index(resultID flow.Identifier, chunkIndex uint64, approvalID flow.Identifier) error {
+	// acquring the lock to prevent dirty reads when checking conflicted approvals
+	// how it works:
+	// the lock can only be acquired after the index operation is committed to the database,
+	// since the index operation is the only operation that would affect the reads operation,
+	// no writes can go through util the lock is released, so locking here could prevent dirty reads.
+	r.indexing.Lock()
+	defer r.indexing.Unlock()
+
 	err := operation.WithReaderBatchWriter(r.db, r.index(resultID, chunkIndex, approvalID))
 	if err != nil {
 		return fmt.Errorf("could not index result approval: %w", err)
