@@ -84,7 +84,6 @@ func NewBlockFromBytes(encoded []byte) (*Block, error) {
 
 // GenesisTimestamp returns the block time stamp for EVM genesis block
 func GenesisTimestamp(flowChainID flow.ChainID) uint64 {
-	// default evm chain ID is previewNet
 	switch flowChainID {
 	case flow.Testnet:
 		return uint64(time.Date(2024, time.August, 1, 0, 0, 0, 0, time.UTC).Unix())
