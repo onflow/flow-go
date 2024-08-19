@@ -46,6 +46,9 @@ type Block struct {
 
 	// stores gas used by all transactions included in the block.
 	TotalGasUsed uint64
+
+	// Random stores a pseud-random value that is used in PREVRANDO.
+	Random gethCommon.Hash
 }
 
 // ToBytes encodes the block into bytes
@@ -199,6 +202,7 @@ func NewBlockProposal(
 	height uint64,
 	timestamp uint64,
 	totalSupply *big.Int,
+	random gethCommon.Hash,
 ) *BlockProposal {
 	return &BlockProposal{
 		Block: Block{
@@ -207,6 +211,7 @@ func NewBlockProposal(
 			Timestamp:       timestamp,
 			TotalSupply:     totalSupply,
 			ReceiptRoot:     gethTypes.EmptyRootHash,
+			Random:          random,
 		},
 		Receipts: make([]LightReceipt, 0),
 		TxHashes: make([]gethCommon.Hash, 0),
