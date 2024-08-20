@@ -44,8 +44,11 @@ type Block struct {
 	// values as node values. Proofs are still compatible but might require an extra hashing step.
 	TransactionHashRoot gethCommon.Hash
 
-	// stores gas used by all transactions included in the block.
+	// TotalGasUsed stores gas used by all transactions included in the block.
 	TotalGasUsed uint64
+
+	// Prevrandao is the value returned for Prevrandao
+	Prevrandao gethCommon.Hash
 }
 
 // ToBytes encodes the block into bytes
@@ -65,6 +68,7 @@ func NewBlock(
 	height uint64,
 	timestamp uint64,
 	totalSupply *big.Int,
+	prevrandao gethCommon.Hash,
 ) *Block {
 	return &Block{
 		ParentBlockHash:     parentBlockHash,
@@ -73,13 +77,21 @@ func NewBlock(
 		TotalSupply:         totalSupply,
 		ReceiptRoot:         gethTypes.EmptyReceiptsHash,
 		TransactionHashRoot: gethTypes.EmptyRootHash,
+		Prevrandao:          prevrandao,
 	}
 }
 
 // NewBlockFromBytes constructs a new block from encoded data
 func NewBlockFromBytes(encoded []byte) (*Block, error) {
 	res := &Block{}
-	return res, gethRLP.DecodeBytes(encoded, res)
+	err := gethRLP.DecodeBytes(encoded, res)
+	if err != nil {
+		res = decodeBlockBreakingChanges(encoded)
+		if res == nil {
+			return nil, err
+		}
+	}
+	return res, nil
 }
 
 // GenesisTimestamp returns the block time stamp for EVM genesis block
@@ -104,6 +116,7 @@ func GenesisBlock(chainID flow.ChainID) *Block {
 		ReceiptRoot:         gethTypes.EmptyRootHash,
 		TransactionHashRoot: gethTypes.EmptyRootHash,
 		TotalGasUsed:        0,
+		Prevrandao:          gethCommon.Hash{},
 	}
 }
 
@@ -182,7 +195,14 @@ func (b *BlockProposal) ToBytes() ([]byte, error) {
 // NewBlockProposalFromBytes constructs a new block proposal from encoded data
 func NewBlockProposalFromBytes(encoded []byte) (*BlockProposal, error) {
 	res := &BlockProposal{}
-	return res, gethRLP.DecodeBytes(encoded, res)
+	err := gethRLP.DecodeBytes(encoded, res)
+	if err != nil {
+		res = decodeBlockProposalBreakingChanges(encoded)
+		if res == nil {
+			return nil, err
+		}
+	}
+	return res, nil
 }
 
 func NewBlockProposal(
@@ -190,6 +210,7 @@ func NewBlockProposal(
 	height uint64,
 	timestamp uint64,
 	totalSupply *big.Int,
+	prevrandao gethCommon.Hash,
 ) *BlockProposal {
 	return &BlockProposal{
 		Block: Block{
@@ -198,6 +219,7 @@ func NewBlockProposal(
 			Timestamp:       timestamp,
 			TotalSupply:     totalSupply,
 			ReceiptRoot:     gethTypes.EmptyRootHash,
+			Prevrandao:      prevrandao,
 		},
 		Receipts: make([]LightReceipt, 0),
 		TxHashes: make([]gethCommon.Hash, 0),
@@ -216,4 +238,71 @@ func (t TransactionHashes) EncodeIndex(index int, buffer *bytes.Buffer) {
 
 func (t TransactionHashes) RootHash() gethCommon.Hash {
 	return gethTypes.DeriveSha(t, gethTrie.NewStackTrie(nil))
+}
+
+// Below block type section, defines earlier block types,
+// this is being used to decode blocks that were stored
+// before block type changes. It allows us to still decode
+// a block that would otherwise be invalid if decoded into
+// latest version of the above Block type.
+
+// before adding Prevrandao to block
+type BlockV0 struct {
+	ParentBlockHash     gethCommon.Hash
+	Height              uint64
+	Timestamp           uint64
+	TotalSupply         *big.Int
+	ReceiptRoot         gethCommon.Hash
+	TransactionHashRoot gethCommon.Hash
+	TotalGasUsed        uint64
+}
+
+type BlockProposalV0 struct {
+	BlockV0
+	Receipts []LightReceipt
+	TxHashes TransactionHashes
+}
+
+// decodeBlockBreakingChanges will try to decode the bytes into all
+// previous versions of block type, if it succeeds it will return the
+// migrated block, otherwise it will return nil.
+func decodeBlockBreakingChanges(encoded []byte) *Block {
+	b0 := &BlockV0{}
+	if err := gethRLP.DecodeBytes(encoded, b0); err == nil {
+		return &Block{
+			ParentBlockHash:     b0.ParentBlockHash,
+			Height:              b0.Height,
+			Timestamp:           b0.Timestamp,
+			TotalSupply:         b0.TotalSupply,
+			ReceiptRoot:         b0.ReceiptRoot,
+			TransactionHashRoot: b0.TransactionHashRoot,
+			TotalGasUsed:        b0.TotalGasUsed,
+			Prevrandao:          gethCommon.Hash{},
+		}
+	}
+	return nil
+}
+
+// decodeBlockProposalBreakingChanges will try to decode the bytes into all
+// previous versions of block proposal type, if it succeeds it will return the
+// migrated block, otherwise it will return nil.
+func decodeBlockProposalBreakingChanges(encoded []byte) *BlockProposal {
+	bp0 := &BlockProposalV0{}
+	if err := gethRLP.DecodeBytes(encoded, bp0); err == nil {
+		return &BlockProposal{
+			Block: Block{
+				ParentBlockHash:     bp0.ParentBlockHash,
+				Height:              bp0.Height,
+				Timestamp:           bp0.Timestamp,
+				TotalSupply:         bp0.TotalSupply,
+				ReceiptRoot:         bp0.ReceiptRoot,
+				TransactionHashRoot: bp0.TransactionHashRoot,
+				TotalGasUsed:        bp0.TotalGasUsed,
+				Prevrandao:          gethCommon.Hash{},
+			},
+			Receipts: bp0.Receipts,
+			TxHashes: bp0.TxHashes,
+		}
+	}
+	return nil
 }

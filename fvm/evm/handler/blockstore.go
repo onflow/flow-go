@@ -76,11 +76,19 @@ func (bs *BlockStore) BlockProposal() (*types.BlockProposal, error) {
 	// expect timestamps in unix seconds so we convert here
 	timestamp := uint64(cadenceBlock.Timestamp / int64(time.Second))
 
+	// read a random value for block proposal
+	rand := gethCommon.Hash{}
+	err = bs.backend.ReadRandom(rand[:])
+	if err != nil {
+		return nil, err
+	}
+
 	blockProposal := types.NewBlockProposal(
 		parentHash,
 		lastExecutedBlock.Height+1,
 		timestamp,
 		lastExecutedBlock.TotalSupply,
+		rand,
 	)
 	return blockProposal, nil
 }
