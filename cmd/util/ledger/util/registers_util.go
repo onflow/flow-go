@@ -92,6 +92,10 @@ func NewByAccountRegistersFromPayloadAccountGrouping(
 		for accountRegisters := range results {
 			oldAccountRegisters := registersByAccount.SetAccountRegisters(accountRegisters)
 			if oldAccountRegisters != nil {
+				// TODO: check full migration logs to see if this edge case of multiple groups
+				// for an account still exists.  If it still exists, create an issue to fix it.
+				// Otherwise, we can treat this as error and panic (instead of merging groups).
+
 				// Account grouping should never create multiple groups for an account.
 				// In case it does anyway, merge the groups together,
 				// by merging the existing registers into the new ones.
