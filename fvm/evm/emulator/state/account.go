@@ -1,8 +1,6 @@
 package state
 
 import (
-	"math/big"
-
 	"github.com/holiman/uint256"
 	gethCommon "github.com/onflow/go-ethereum/common"
 	gethTypes "github.com/onflow/go-ethereum/core/types"
@@ -59,47 +57,5 @@ func DecodeAccount(inp []byte) (*Account, error) {
 		return nil, nil
 	}
 	a := &Account{}
-	// try decoding
-	err := rlp.DecodeBytes(inp, a)
-	if err != nil {
-		// try legacy decoding (fall back)
-		a = decodeLegacy(inp)
-		// if no success return the initial error
-		if a == nil {
-			return nil, err
-		}
-	}
-	return a, nil
-
-}
-
-// TODO: remove it when the Preview is shut down
-// Legacy account type - used big.Int for balances
-type accountV0 struct {
-	// address
-	Address gethCommon.Address
-	// balance of the address
-	Balance *big.Int
-	// nonce of the address
-	Nonce uint64
-	// hash of the code
-	// if no code the gethTypes.EmptyCodeHash is stored
-	CodeHash gethCommon.Hash
-	// the id of the collection holds storage slots for this account
-	// this value is nil for EOA accounts
-	CollectionID []byte
-}
-
-func decodeLegacy(encoded []byte) *Account {
-	a0 := &accountV0{}
-	if err := rlp.DecodeBytes(encoded, a0); err == nil {
-		return &Account{
-			Address:      a0.Address,
-			Balance:      uint256.MustFromBig(a0.Balance),
-			Nonce:        a0.Nonce,
-			CodeHash:     a0.CodeHash,
-			CollectionID: a0.CollectionID,
-		}
-	}
-	return nil
+	return a, rlp.DecodeBytes(inp, a)
 }
