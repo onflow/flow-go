@@ -295,6 +295,9 @@ type ObserverServiceBuilder struct {
 	ExecutionDatastoreManager edstorage.DatastoreManager
 	ExecutionDataTracker      tracker.Storage
 
+	RegisterDB                   *pebble.DB
+	RegisterDBPrunerDependencies *cmd.DependencyList
+
 	RegistersAsyncStore *execution.RegistersAsyncStore
 	Reporter            *index.Reporter
 	EventsIndex         *index.EventsIndex
@@ -583,10 +586,11 @@ func NewFlowObserverServiceBuilder(opts ...Option) *ObserverServiceBuilder {
 		opt(config)
 	}
 	anb := &ObserverServiceBuilder{
-		ObserverServiceConfig: config,
-		FlowNodeBuilder:       cmd.FlowNode("observer"),
-		FollowerDistributor:   pubsub.NewFollowerDistributor(),
-		IndexerDependencies:   cmd.NewDependencyList(),
+		ObserverServiceConfig:        config,
+		FlowNodeBuilder:              cmd.FlowNode("observer"),
+		FollowerDistributor:          pubsub.NewFollowerDistributor(),
+		IndexerDependencies:          cmd.NewDependencyList(),
+		RegisterDBPrunerDependencies: cmd.NewDependencyList(),
 	}
 	anb.FollowerDistributor.AddProposalViolationConsumer(notifications.NewSlashingViolationsConsumer(anb.Logger))
 	// the observer gets a version of the root snapshot file that does not contain any node addresses
@@ -1139,6 +1143,10 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 	requesterDependable := module.NewProxiedReadyDoneAware()
 	builder.IndexerDependencies.Add(requesterDependable)
 
+	// setup dependency chain to ensure register db pruner starts after the indexer
+	indexerDependable := module.NewProxiedReadyDoneAware()
+	builder.RegisterDBPrunerDependencies.Add(indexerDependable)
+
 	executionDataPrunerEnabled := builder.executionDataPrunerHeightRangeTarget != 0
 
 	builder.
@@ -1394,16 +1402,16 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 			// Note: using a DependableComponent here to ensure that the indexer does not block
 			// other components from starting while bootstrapping the register db since it may
 			// take hours to complete.
-
-			pdb, err := pstorage.OpenRegisterPebbleDB(builder.registersDBPath)
+			var err error
+			builder.RegisterDB, err = pstorage.OpenRegisterPebbleDB(builder.registersDBPath)
 			if err != nil {
 				return nil, fmt.Errorf("could not open registers db: %w", err)
 			}
 			builder.ShutdownFunc(func() error {
-				return pdb.Close()
+				return builder.RegisterDB.Close()
 			})
 
-			bootstrapped, err := pstorage.IsBootstrapped(pdb)
+			bootstrapped, err := pstorage.IsBootstrapped(builder.RegisterDB)
 			if err != nil {
 				return nil, fmt.Errorf("could not check if registers db is bootstrapped: %w", err)
 			}
@@ -1435,7 +1443,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				}
 
 				rootHash := ledger.RootHash(builder.RootSeal.FinalState)
-				bootstrap, err := pstorage.NewRegisterBootstrap(pdb, checkpointFile, checkpointHeight, rootHash, builder.Logger)
+				bootstrap, err := pstorage.NewRegisterBootstrap(builder.RegisterDB, checkpointFile, checkpointHeight, rootHash, builder.Logger)
 				if err != nil {
 					return nil, fmt.Errorf("could not create registers bootstrap: %w", err)
 				}
@@ -1448,7 +1456,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				}
 			}
 
-			registers, err := pstorage.NewRegisters(pdb)
+			registers, err := pstorage.NewRegisters(builder.RegisterDB)
 			if err != nil {
 				return nil, fmt.Errorf("could not create registers storage: %w", err)
 			}
@@ -1543,8 +1551,30 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				return nil, err
 			}
 
+			// add indexer into ReadyDoneAware dependency passed to pruner. This allows the register db pruner
+			// to wait for the indexer to be ready before starting.
+			indexerDependable.Init(builder.ExecutionIndexer)
+
 			return builder.ExecutionIndexer, nil
-		}, builder.IndexerDependencies)
+		}, builder.IndexerDependencies).
+			DependableComponent("register db pruner", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+				if !builder.registerDBPruningEnabled {
+					return &module.NoopReadyDoneAware{}, nil
+				}
+
+				registerDBPruner, err := pstorage.NewRegisterPruner(
+					node.Logger,
+					builder.RegisterDB,
+					//pstorage.WithPruneThreshold(builder.registerDBPruneThreshold),
+					pstorage.WithPruneThrottleDelay(builder.registerDBPruneThrottleDelay),
+					pstorage.WithPruneTickerInterval(builder.registerDBPruneTickerInterval),
+				)
+				if err != nil {
+					return nil, fmt.Errorf("failed to create register db pruner: %w", err)
+				}
+
+				return registerDBPruner, nil
+			}, builder.RegisterDBPrunerDependencies)
 	}
 
 	if builder.stateStreamConf.ListenAddr != "" {

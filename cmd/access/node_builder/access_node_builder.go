@@ -293,43 +293,45 @@ type FlowAccessNodeBuilder struct {
 	*AccessNodeConfig
 
 	// components
-	FollowerState              protocol.FollowerState
-	SyncCore                   *chainsync.Core
-	RpcEng                     *rpc.Engine
-	FollowerDistributor        *consensuspubsub.FollowerDistributor
-	CollectionRPC              access.AccessAPIClient
-	TransactionTimings         *stdmap.TransactionTimings
-	CollectionsToMarkFinalized *stdmap.Times
-	CollectionsToMarkExecuted  *stdmap.Times
-	BlocksToMarkExecuted       *stdmap.Times
-	TransactionMetrics         *metrics.TransactionCollector
-	RestMetrics                *metrics.RestCollector
-	AccessMetrics              module.AccessMetrics
-	PingMetrics                module.PingMetrics
-	Committee                  hotstuff.DynamicCommittee
-	Finalized                  *flow.Header // latest finalized block that the node knows of at startup time
-	Pending                    []*flow.Header
-	FollowerCore               module.HotStuffFollower
-	Validator                  hotstuff.Validator
-	ExecutionDataDownloader    execution_data.Downloader
-	PublicBlobService          network.BlobService
-	ExecutionDataRequester     state_synchronization.ExecutionDataRequester
-	ExecutionDataStore         execution_data.ExecutionDataStore
-	ExecutionDataBlobstore     blobs.Blobstore
-	ExecutionDataCache         *execdatacache.ExecutionDataCache
-	ExecutionIndexer           *indexer.Indexer
-	ExecutionIndexerCore       *indexer.IndexerCore
-	ScriptExecutor             *backend.ScriptExecutor
-	RegistersAsyncStore        *execution.RegistersAsyncStore
-	Reporter                   *index.Reporter
-	EventsIndex                *index.EventsIndex
-	TxResultsIndex             *index.TransactionResultsIndex
-	IndexerDependencies        *cmd.DependencyList
-	collectionExecutedMetric   module.CollectionExecutedMetric
-	ExecutionDataPruner        *edpruner.Pruner
-	ExecutionDatastoreManager  edstorage.DatastoreManager
-	ExecutionDataTracker       tracker.Storage
-	versionControl             *version.VersionControl
+	FollowerState                protocol.FollowerState
+	SyncCore                     *chainsync.Core
+	RpcEng                       *rpc.Engine
+	FollowerDistributor          *consensuspubsub.FollowerDistributor
+	CollectionRPC                access.AccessAPIClient
+	TransactionTimings           *stdmap.TransactionTimings
+	CollectionsToMarkFinalized   *stdmap.Times
+	CollectionsToMarkExecuted    *stdmap.Times
+	BlocksToMarkExecuted         *stdmap.Times
+	TransactionMetrics           *metrics.TransactionCollector
+	RestMetrics                  *metrics.RestCollector
+	AccessMetrics                module.AccessMetrics
+	PingMetrics                  module.PingMetrics
+	Committee                    hotstuff.DynamicCommittee
+	Finalized                    *flow.Header // latest finalized block that the node knows of at startup time
+	Pending                      []*flow.Header
+	FollowerCore                 module.HotStuffFollower
+	Validator                    hotstuff.Validator
+	ExecutionDataDownloader      execution_data.Downloader
+	PublicBlobService            network.BlobService
+	ExecutionDataRequester       state_synchronization.ExecutionDataRequester
+	ExecutionDataStore           execution_data.ExecutionDataStore
+	ExecutionDataBlobstore       blobs.Blobstore
+	ExecutionDataCache           *execdatacache.ExecutionDataCache
+	ExecutionIndexer             *indexer.Indexer
+	ExecutionIndexerCore         *indexer.IndexerCore
+	ScriptExecutor               *backend.ScriptExecutor
+	RegistersAsyncStore          *execution.RegistersAsyncStore
+	Reporter                     *index.Reporter
+	EventsIndex                  *index.EventsIndex
+	TxResultsIndex               *index.TransactionResultsIndex
+	IndexerDependencies          *cmd.DependencyList
+	collectionExecutedMetric     module.CollectionExecutedMetric
+	ExecutionDataPruner          *edpruner.Pruner
+	ExecutionDatastoreManager    edstorage.DatastoreManager
+	ExecutionDataTracker         tracker.Storage
+	versionControl               *version.VersionControl
+	RegisterDB                   *pebble.DB
+	RegisterDBPrunerDependencies *cmd.DependencyList
 
 	// The sync engine participants provider is the libp2p peer store for the access node
 	// which is not available until after the network has started.
@@ -547,6 +549,10 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 	// setup dependency chain to ensure indexer starts after the requester
 	requesterDependable := module.NewProxiedReadyDoneAware()
 	builder.IndexerDependencies.Add(requesterDependable)
+
+	// setup dependency chain to ensure register db pruner starts after the indexer
+	indexerDependable := module.NewProxiedReadyDoneAware()
+	builder.RegisterDBPrunerDependencies.Add(indexerDependable)
 
 	executionDataPrunerEnabled := builder.executionDataPrunerHeightRangeTarget != 0
 
@@ -851,16 +857,16 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				// Note: using a DependableComponent here to ensure that the indexer does not block
 				// other components from starting while bootstrapping the register db since it may
 				// take hours to complete.
-
-				pdb, err := pstorage.OpenRegisterPebbleDB(builder.registersDBPath)
+				var err error
+				builder.RegisterDB, err = pstorage.OpenRegisterPebbleDB(builder.registersDBPath)
 				if err != nil {
 					return nil, fmt.Errorf("could not open registers db: %w", err)
 				}
 				builder.ShutdownFunc(func() error {
-					return pdb.Close()
+					return builder.RegisterDB.Close()
 				})
 
-				bootstrapped, err := pstorage.IsBootstrapped(pdb)
+				bootstrapped, err := pstorage.IsBootstrapped(builder.RegisterDB)
 				if err != nil {
 					return nil, fmt.Errorf("could not check if registers db is bootstrapped: %w", err)
 				}
@@ -892,7 +898,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					}
 
 					rootHash := ledger.RootHash(builder.RootSeal.FinalState)
-					bootstrap, err := pstorage.NewRegisterBootstrap(pdb, checkpointFile, checkpointHeight, rootHash, builder.Logger)
+					bootstrap, err := pstorage.NewRegisterBootstrap(builder.RegisterDB, checkpointFile, checkpointHeight, rootHash, builder.Logger)
 					if err != nil {
 						return nil, fmt.Errorf("could not create registers bootstrap: %w", err)
 					}
@@ -905,7 +911,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					}
 				}
 
-				registers, err := pstorage.NewRegisters(pdb)
+				registers, err := pstorage.NewRegisters(builder.RegisterDB)
 				if err != nil {
 					return nil, fmt.Errorf("could not create registers storage: %w", err)
 				}
@@ -999,8 +1005,30 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					return nil, err
 				}
 
+				// add indexer into ReadyDoneAware dependency passed to pruner. This allows the register db pruner
+				// to wait for the indexer to be ready before starting.
+				indexerDependable.Init(builder.ExecutionIndexer)
+
 				return builder.ExecutionIndexer, nil
-			}, builder.IndexerDependencies)
+			}, builder.IndexerDependencies).
+			DependableComponent("register db pruner", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+				if !builder.registerDBPruningEnabled {
+					return &module.NoopReadyDoneAware{}, nil
+				}
+
+				registerDBPruner, err := pstorage.NewRegisterPruner(
+					node.Logger,
+					builder.RegisterDB,
+					//pstorage.WithPruneThreshold(builder.registerDBPruneThreshold),
+					pstorage.WithPruneThrottleDelay(builder.registerDBPruneThrottleDelay),
+					pstorage.WithPruneTickerInterval(builder.registerDBPruneTickerInterval),
+				)
+				if err != nil {
+					return nil, fmt.Errorf("failed to create register db pruner: %w", err)
+				}
+
+				return registerDBPruner, nil
+			}, builder.RegisterDBPrunerDependencies)
 	}
 
 	if builder.stateStreamConf.ListenAddr != "" {
@@ -1127,10 +1155,11 @@ func FlowAccessNode(nodeBuilder *cmd.FlowNodeBuilder) *FlowAccessNodeBuilder {
 	dist := consensuspubsub.NewFollowerDistributor()
 	dist.AddProposalViolationConsumer(notifications.NewSlashingViolationsConsumer(nodeBuilder.Logger))
 	return &FlowAccessNodeBuilder{
-		AccessNodeConfig:    DefaultAccessNodeConfig(),
-		FlowNodeBuilder:     nodeBuilder,
-		FollowerDistributor: dist,
-		IndexerDependencies: cmd.NewDependencyList(),
+		AccessNodeConfig:             DefaultAccessNodeConfig(),
+		FlowNodeBuilder:              nodeBuilder,
+		FollowerDistributor:          dist,
+		IndexerDependencies:          cmd.NewDependencyList(),
+		RegisterDBPrunerDependencies: cmd.NewDependencyList(),
 	}
 }
 

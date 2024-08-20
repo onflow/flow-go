@@ -9,7 +9,6 @@ import (
 
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/storage"
 )
 
 const (
@@ -30,9 +29,8 @@ type RegisterPruner struct {
 	component.Component
 	componentManager *component.ComponentManager
 
-	logger   zerolog.Logger
-	db       *pebble.DB
-	register storage.RegisterIndex
+	logger zerolog.Logger
+	db     *pebble.DB
 
 	// pruningInterval is a number of pruned blocks in the db, above which pruning should be triggered
 	pruneInterval uint64
@@ -73,13 +71,11 @@ func WithPruneTickerInterval(interval time.Duration) PrunerOption {
 func NewRegisterPruner(
 	logger zerolog.Logger,
 	db *pebble.DB,
-	register storage.RegisterIndex,
 	opts ...PrunerOption,
 ) (*RegisterPruner, error) {
 	pruner := &RegisterPruner{
 		logger:              logger.With().Str("component", "register_pruner").Logger(),
 		db:                  db,
-		register:            register,
 		pruneInterval:       pruneInterval(DefaultPruneThreshold),
 		pruneThreshold:      DefaultPruneThreshold,
 		pruneThrottleDelay:  DefaultPruneThrottleDelay,
