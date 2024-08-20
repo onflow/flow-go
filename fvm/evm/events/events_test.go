@@ -83,7 +83,6 @@ func TestEVMTransactionExecutedEventCCFEncodingDecoding(t *testing.T) {
 	require.NoError(t, err)
 	txHash := testutils.RandomCommonHash(t)
 	blockHash := testutils.RandomCommonHash(t)
-	random := testutils.RandomCommonHash(t)
 	coinbase := testutils.RandomAddress(t)
 	data := "000000000000000000000000000000000000000000000000000000000000002a"
 	dataBytes, err := hex.DecodeString(data)
@@ -114,7 +113,7 @@ func TestEVMTransactionExecutedEventCCFEncodingDecoding(t *testing.T) {
 	}
 
 	t.Run("evm.TransactionExecuted with failed status", func(t *testing.T) {
-		event := events.NewTransactionEvent(txResult, txBytes, blockHeight, random, coinbase)
+		event := events.NewTransactionEvent(txResult, txBytes, blockHeight, coinbase)
 		ev, err := event.Payload.ToCadence(flow.Emulator)
 		require.NoError(t, err)
 
@@ -122,7 +121,6 @@ func TestEVMTransactionExecutedEventCCFEncodingDecoding(t *testing.T) {
 		require.NoError(t, err)
 
 		assert.Equal(t, tep.BlockHeight, blockHeight)
-		assert.Equal(t, tep.Random, random)
 		assert.Equal(t, tep.Coinbase, coinbase.String())
 		assert.Equal(t, tep.Hash, txHash)
 		assert.Equal(t, tep.Payload, txBytes)
@@ -161,7 +159,6 @@ func TestEVMTransactionExecutedEventCCFEncodingDecoding(t *testing.T) {
 		event := events.NewTransactionEvent(txResult,
 			txBytes,
 			blockHeight,
-			random,
 			coinbase)
 		ev, err := event.Payload.ToCadence(flow.Emulator)
 		require.NoError(t, err)
@@ -170,7 +167,6 @@ func TestEVMTransactionExecutedEventCCFEncodingDecoding(t *testing.T) {
 		require.NoError(t, err)
 
 		assert.Equal(t, tep.BlockHeight, blockHeight)
-		assert.Equal(t, tep.Random, random)
 		assert.Equal(t, tep.Coinbase, coinbase.String())
 		assert.Equal(t, tep.Hash, txHash)
 		assert.Equal(t, tep.Payload, txBytes)

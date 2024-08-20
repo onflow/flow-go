@@ -34,7 +34,6 @@ type transactionEvent struct {
 	Payload     []byte        // transaction RLP-encoded payload
 	Result      *types.Result // transaction execution result
 	BlockHeight uint64
-	Random      gethCommon.Hash
 	Coinbase    *types.Address
 }
 
@@ -46,7 +45,6 @@ func NewTransactionEvent(
 	result *types.Result,
 	payload []byte,
 	blockHeight uint64,
-	random gethCommon.Hash,
 	coinbase types.Address,
 ) *Event {
 	var cb *types.Address
@@ -59,7 +57,6 @@ func NewTransactionEvent(
 			BlockHeight: blockHeight,
 			Payload:     payload,
 			Result:      result,
-			Random:      random,
 			Coinbase:    cb,
 		},
 	}
@@ -110,7 +107,6 @@ func (p *transactionEvent) ToCadence(chainID flow.ChainID) (cadence.Event, error
 		cadence.NewUInt64(p.BlockHeight),
 		bytesToCadenceUInt8ArrayValue(p.Result.ReturnedData),
 		bytesToCadenceUInt8ArrayValue(p.Result.PrecompiledCalls),
-		hashToCadenceArrayValue(p.Random),
 		coinbaseAddress,
 	}).WithType(eventType), nil
 }
@@ -178,7 +174,6 @@ type TransactionEventPayload struct {
 	ErrorMessage     string          `cadence:"errorMessage"`
 	ReturnedData     []byte          `cadence:"returnedData"`
 	PrecompiledCalls []byte          `cadence:"precompiledCalls"`
-	Random           gethCommon.Hash `cadence:"random"`
 	Coinbase         string          `cadence:"coinbase"`
 }
 

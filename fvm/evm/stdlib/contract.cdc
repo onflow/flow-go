@@ -72,8 +72,6 @@ contract EVM {
         /// This data helps to replay the transactions without the need to
         /// have access to the full cadence state data.
         precompiledCalls: [UInt8],
-        /// random value used for PREVRANDO opcode
-        random: [UInt8; 32],
         /// coinbase value used for COINBASE opcode (if empty no coinbase is set)
         coinbase: String
     )

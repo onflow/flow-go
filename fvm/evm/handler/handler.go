@@ -274,7 +274,6 @@ func (h *ContractHandler) batchRun(
 			r,
 			rlpEncodedTxs[i],
 			bp.Height,
-			ctx.Random,
 			ctx.GasFeeCollector,
 		))
 		if err != nil {
@@ -402,7 +401,6 @@ func (h *ContractHandler) run(
 			res,
 			rlpEncodedTx,
 			bp.Height,
-			ctx.Random,
 			ctx.GasFeeCollector,
 		))
 
@@ -621,7 +619,6 @@ func (h *ContractHandler) executeAndHandleCall(
 			res,
 			encoded,
 			bp.Height,
-			ctx.Random,
 			ctx.GasFeeCollector,
 		),
 	)
