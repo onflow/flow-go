@@ -469,19 +469,35 @@ type EngineMetrics interface {
 	OutboundMessageDropped(engine string, messages string)
 }
 
+// ComplianceMetrics reports metrics about the compliance layer, which processes, finalizes,
+// and seals blocks and tracks data in the Protocol State.
 type ComplianceMetrics interface {
+	// FinalizedHeight reports the latest finalized height known to this node.
 	FinalizedHeight(height uint64)
+	// EpochTransitionHeight reports the height of the most recently finalized epoch transition.
 	EpochTransitionHeight(height uint64)
+	// SealedHeight reports the latest block that has a finalized seal known to this node.
 	SealedHeight(height uint64)
+	// BlockFinalized reports information about data contained within finalized blocks.
 	BlockFinalized(*flow.Block)
+	// BlockSealed reports information about data contained within blocks with a finalized seal.
+	// When a new block is finalized, this method is called for every seal in the finalized block,
+	// in the order the seals are listed.
+	// CAUTION: within a block, seals can be included in any permutation (not necessarily in order
+	// of increasing height).
 	BlockSealed(*flow.Block)
+	// CurrentEpochCounter reports the current epoch counter.
 	CurrentEpochCounter(counter uint64)
+	// CurrentEpochPhase reports the current epoch phase.
 	CurrentEpochPhase(phase flow.EpochPhase)
+	// CurrentEpochFinalView reports the final view of the current epoch, including epoch extensions.
 	CurrentEpochFinalView(view uint64)
-	CurrentDKGPhase1FinalView(view uint64)
-	CurrentDKGPhase2FinalView(view uint64)
-	CurrentDKGPhase3FinalView(view uint64)
-	EpochEmergencyFallbackTriggered()
+	// CurrentDKGPhaseViews reports the final view of each DKG phase for the current epoch.
+	CurrentDKGPhaseViews(phase1FinalView, phase2FinalView, phase3FinalView uint64)
+	// EpochFallbackModeTriggered reports that EFM is triggered.
+	EpochFallbackModeTriggered()
+	// EpochFallbackModeExited reports that EFM is no longer triggered.
+	EpochFallbackModeExited()
 }
 
 type CleanerMetrics interface {
@@ -823,6 +839,15 @@ type RuntimeMetrics interface {
 	RuntimeTransactionProgramsCacheHit()
 }
 
+type EVMMetrics interface {
+	// SetNumberOfDeployedCOAs sets the total number of deployed COAs
+	SetNumberOfDeployedCOAs(count uint64)
+	// EVMTransactionExecuted reports the gas used when executing an evm transaction
+	EVMTransactionExecuted(gasUsed uint64, isDirectCall bool, failed bool)
+	// EVMBlockExecuted reports the block size, total gas used and total supply when executing an evm block
+	EVMBlockExecuted(txCount int, totalGasUsed uint64, totalSupplyInFlow float64)
+}
+
 type ProviderMetrics interface {
 	// ChunkDataPackRequestProcessed is executed every time a chunk data pack request is picked up for processing at execution node.
 	// It increases the request processed counter by one.
@@ -918,6 +943,12 @@ type TransactionExecutionResultStats struct {
 	ComputationIntensities     meter.MeteredComputationIntensities
 }
 
+type TransactionExecutionResultInfo struct {
+	TransactionID flow.Identifier
+	BlockID       flow.Identifier
+	BlockHeight   uint64
+}
+
 func (stats *ExecutionResultStats) Merge(other ExecutionResultStats) {
 	stats.ComputationUsed += other.ComputationUsed
 	stats.MemoryUsed += other.MemoryUsed
@@ -941,6 +972,7 @@ func (stats *BlockExecutionResultStats) Add(other CollectionExecutionResultStats
 type ExecutionMetrics interface {
 	LedgerMetrics
 	RuntimeMetrics
+	EVMMetrics
 	ProviderMetrics
 	WALMetrics
 
@@ -974,7 +1006,7 @@ type ExecutionMetrics interface {
 	ExecutionCollectionExecuted(dur time.Duration, stats CollectionExecutionResultStats)
 
 	// ExecutionTransactionExecuted reports stats on executing a single transaction
-	ExecutionTransactionExecuted(dur time.Duration, stats TransactionExecutionResultStats)
+	ExecutionTransactionExecuted(dur time.Duration, stats TransactionExecutionResultStats, info TransactionExecutionResultInfo)
 
 	// ExecutionChunkDataPackGenerated reports stats on chunk data pack generation
 	ExecutionChunkDataPackGenerated(proofSize, numberOfTransactions int)

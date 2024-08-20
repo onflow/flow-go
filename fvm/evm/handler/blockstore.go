@@ -11,33 +11,44 @@ import (
 )
 
 const (
-	BlockHashListCapacity    = 16
-	BlockStoreLatestBlockKey = "LatestBlock"
-	BlockStoreBlockHashesKey = "LatestBlockHashes"
+	BlockHashListCapacity            = 256
+	BlockStoreLatestBlockKey         = "LatestBlock"
+	BlockStoreLatestBlockProposalKey = "LatestBlockProposal"
 )
 
 type BlockStore struct {
-	backend       types.Backend
-	rootAddress   flow.Address
-	blockProposal *types.Block
+	chainID     flow.ChainID
+	backend     types.Backend
+	rootAddress flow.Address
 }
 
 var _ types.BlockStore = &BlockStore{}
 
 // NewBlockStore constructs a new block store
-func NewBlockStore(backend types.Backend, rootAddress flow.Address) *BlockStore {
+func NewBlockStore(
+	chainID flow.ChainID,
+	backend types.Backend,
+	rootAddress flow.Address,
+) *BlockStore {
 	return &BlockStore{
+		chainID:     chainID,
 		backend:     backend,
 		rootAddress: rootAddress,
 	}
 }
 
 // BlockProposal returns the block proposal to be updated by the handler
-func (bs *BlockStore) BlockProposal() (*types.Block, error) {
-	if bs.blockProposal != nil {
-		return bs.blockProposal, nil
+func (bs *BlockStore) BlockProposal() (*types.BlockProposal, error) {
+	// first fetch it from the storage
+	data, err := bs.backend.GetValue(bs.rootAddress[:], []byte(BlockStoreLatestBlockProposalKey))
+	if err != nil {
+		return nil, err
+	}
+	if len(data) != 0 {
+		return types.NewBlockProposalFromBytes(data)
 	}
 
+	// if available construct a new one
 	cadenceHeight, err := bs.backend.GetCurrentBlockHeight()
 	if err != nil {
 		return nil, err
@@ -65,25 +76,42 @@ func (bs *BlockStore) BlockProposal() (*types.Block, error) {
 	// expect timestamps in unix seconds so we convert here
 	timestamp := uint64(cadenceBlock.Timestamp / int64(time.Second))
 
-	bs.blockProposal = types.NewBlock(
+	blockProposal := types.NewBlockProposal(
 		parentHash,
 		lastExecutedBlock.Height+1,
 		timestamp,
 		lastExecutedBlock.TotalSupply,
-		gethCommon.Hash{},
-		make([]gethCommon.Hash, 0),
 	)
-	return bs.blockProposal, nil
+	return blockProposal, nil
+}
+
+// UpdateBlockProposal updates the block proposal
+func (bs *BlockStore) UpdateBlockProposal(bp *types.BlockProposal) error {
+	blockProposalBytes, err := bp.ToBytes()
+	if err != nil {
+		return types.NewFatalError(err)
+	}
+
+	return bs.backend.SetValue(
+		bs.rootAddress[:],
+		[]byte(BlockStoreLatestBlockProposalKey),
+		blockProposalBytes,
+	)
+}
+
+func (bs *BlockStore) ResetBlockProposal() error {
+	return bs.backend.SetValue(
+		bs.rootAddress[:],
+		[]byte(BlockStoreLatestBlockProposalKey),
+		nil,
+	)
 }
 
 // CommitBlockProposal commits the block proposal to the chain
-func (bs *BlockStore) CommitBlockProposal() error {
-	bp, err := bs.BlockProposal()
-	if err != nil {
-		return err
-	}
+func (bs *BlockStore) CommitBlockProposal(bp *types.BlockProposal) error {
+	bp.PopulateRoots()
 
-	blockBytes, err := bp.ToBytes()
+	blockBytes, err := bp.Block.ToBytes()
 	if err != nil {
 		return types.NewFatalError(err)
 	}
@@ -93,29 +121,36 @@ func (bs *BlockStore) CommitBlockProposal() error {
 		return err
 	}
 
-	err = bs.updateBlockHashList(bs.blockProposal)
+	hash, err := bp.Block.Hash()
 	if err != nil {
 		return err
 	}
 
-	bs.blockProposal = nil
-	return nil
-}
+	bhl, err := bs.getBlockHashList()
+	if err != nil {
+		return err
+	}
+	err = bhl.Push(bp.Block.Height, hash)
+	if err != nil {
+		return err
+	}
 
-// ResetBlockProposal resets the block proposal
-func (bs *BlockStore) ResetBlockProposal() error {
-	bs.blockProposal = nil
+	err = bs.ResetBlockProposal()
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
 // LatestBlock returns the latest executed block
 func (bs *BlockStore) LatestBlock() (*types.Block, error) {
 	data, err := bs.backend.GetValue(bs.rootAddress[:], []byte(BlockStoreLatestBlockKey))
-	if len(data) == 0 {
-		return types.GenesisBlock, err
-	}
 	if err != nil {
-		return nil, types.NewFatalError(err)
+		return nil, err
+	}
+	if len(data) == 0 {
+		return types.GenesisBlock(bs.chainID), nil
 	}
 	return types.NewBlockFromBytes(data)
 }
@@ -126,42 +161,25 @@ func (bs *BlockStore) BlockHash(height uint64) (gethCommon.Hash, error) {
 	if err != nil {
 		return gethCommon.Hash{}, err
 	}
-	_, hash := bhl.BlockHashByHeight(height)
-	return hash, nil
+	_, hash, err := bhl.BlockHashByHeight(height)
+	return hash, err
 }
 
-func (bs *BlockStore) getBlockHashList() (*types.BlockHashList, error) {
-	data, err := bs.backend.GetValue(bs.rootAddress[:], []byte(BlockStoreBlockHashesKey))
+func (bs *BlockStore) getBlockHashList() (*BlockHashList, error) {
+	bhl, err := NewBlockHashList(bs.backend, bs.rootAddress, BlockHashListCapacity)
 	if err != nil {
 		return nil, err
 	}
-	if len(data) == 0 {
-		bhl := types.NewBlockHashList(BlockHashListCapacity)
-		err = bhl.Push(types.GenesisBlock.Height, types.GenesisBlockHash)
-		return bhl, err
-	}
-	return types.NewBlockHashListFromEncoded(data)
-}
 
-func (bs *BlockStore) updateBlockHashList(block *types.Block) error {
-	bhl, err := bs.getBlockHashList()
-	if err != nil {
-		return err
+	if bhl.IsEmpty() {
+		err = bhl.Push(
+			types.GenesisBlock(bs.chainID).Height,
+			types.GenesisBlockHash(bs.chainID),
+		)
+		if err != nil {
+			return nil, err
+		}
 	}
-	hash, err := block.Hash()
-	if err != nil {
-		return err
-	}
-	err = bhl.Push(block.Height, hash)
-	if err != nil {
-		return err
-	}
-	err = bs.backend.SetValue(
-		bs.rootAddress[:],
-		[]byte(BlockStoreBlockHashesKey),
-		bhl.Encode())
-	if err != nil {
-		return err
-	}
-	return nil
+
+	return bhl, nil
 }

@@ -13,10 +13,10 @@ import (
 
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
-	badgerDB "github.com/dgraph-io/badger/v2"
+	"github.com/dgraph-io/badger/v2"
 	"github.com/ipfs/boxo/bitswap"
 	"github.com/ipfs/go-cid"
-	badger "github.com/ipfs/go-ds-badger2"
+	badgerds "github.com/ipfs/go-ds-badger2"
 	"github.com/onflow/cadence"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
 	"github.com/rs/zerolog"
@@ -154,7 +154,7 @@ type ExecutionNode struct {
 	executionDataStore     execution_data.ExecutionDataStore
 	toTriggerCheckpoint    *atomic.Bool      // create the checkpoint trigger to be controlled by admin tool, and listened by the compactor
 	stopControl            *stop.StopControl // stop the node at given block height
-	executionDataDatastore *badger.Datastore
+	executionDataDatastore *badgerds.Datastore
 	executionDataPruner    *pruner.Pruner
 	executionDataBlobstore blobs.Blobstore
 	executionDataTracker   tracker.Storage
@@ -526,13 +526,13 @@ func (exeNode *ExecutionNode) LoadProviderEngine(
 	)
 
 	if exeNode.exeConf.evmTracingEnabled {
-		if exeNode.exeConf.evmTracesGCPBucket == "" {
-			return nil, fmt.Errorf("must provide GCP bucket name when EVM tracing is enabled")
-		}
-
-		evmTraceUploader, err := debug.NewGCPUploader(exeNode.exeConf.evmTracesGCPBucket)
-		if err != nil {
-			return nil, fmt.Errorf("could not create evm trace uploader: %w", err)
+		var err error
+		evmTraceUploader := debug.NewNoopUploader()
+		if len(exeNode.exeConf.evmTracesGCPBucket) > 0 {
+			evmTraceUploader, err = debug.NewGCPUploader(exeNode.exeConf.evmTracesGCPBucket)
+			if err != nil {
+				return nil, fmt.Errorf("could not create evm trace uploader: %w", err)
+			}
 		}
 		evmTracer, err := debug.NewEVMCallTracer(evmTraceUploader, node.Logger)
 		if err != nil {
@@ -669,8 +669,8 @@ func (exeNode *ExecutionNode) LoadExecutionDataDatastore(
 	if err != nil {
 		return err
 	}
-	dsOpts := &badger.DefaultOptions
-	ds, err := badger.NewDatastore(datastoreDir, dsOpts)
+	dsOpts := &badgerds.DefaultOptions
+	ds, err := badgerds.NewDatastore(datastoreDir, dsOpts)
 	if err != nil {
 		return err
 	}
@@ -691,10 +691,10 @@ func (exeNode *ExecutionNode) LoadExecutionDataGetter(node *NodeConfig) error {
 	return nil
 }
 
-func OpenChunkDataPackDB(dbPath string, logger zerolog.Logger) (*badgerDB.DB, error) {
+func OpenChunkDataPackDB(dbPath string, logger zerolog.Logger) (*badger.DB, error) {
 	log := sutil.NewLogger(logger)
 
-	opts := badgerDB.
+	opts := badger.
 		DefaultOptions(dbPath).
 		WithKeepL0InMemory(true).
 		WithLogger(log).
@@ -708,7 +708,7 @@ func OpenChunkDataPackDB(dbPath string, logger zerolog.Logger) (*badgerDB.DB, er
 		WithValueLogFileSize(256 << 23).
 		WithValueLogMaxEntries(100000) // Default is 1000000
 
-	db, err := badgerDB.Open(opts)
+	db, err := badger.Open(opts)
 	if err != nil {
 		return nil, fmt.Errorf("could not open chunk data pack badger db at path %v: %w", dbPath, err)
 	}
@@ -1347,6 +1347,7 @@ func (exeNode *ExecutionNode) LoadBootstrapper(node *NodeConfig) error {
 
 	// if the execution database does not exist, then we need to bootstrap the execution database.
 	if !bootstrapped {
+
 		err := wal.CheckpointHasRootHash(
 			node.Logger,
 			path.Join(node.BootstrapDir, bootstrapFilenames.DirnameExecutionState),
@@ -1454,16 +1455,16 @@ func copyBootstrapState(dir, trie string) error {
 	from, to := path.Join(dir, bootstrapFilenames.DirnameExecutionState), trie
 
 	log.Info().Str("dir", dir).Str("trie", trie).
-		Msgf("copying checkpoint file %v from directory: %v, to: %v", filename, from, to)
+		Msgf("linking checkpoint file %v from directory: %v, to: %v", filename, from, to)
 
-	copiedFiles, err := wal.CopyCheckpointFile(filename, from, to)
+	copiedFiles, err := wal.SoftlinkCheckpointFile(filename, from, to)
 	if err != nil {
-		return fmt.Errorf("can not copy checkpoint file %s, from %s to %s",
-			filename, from, to)
+		return fmt.Errorf("can not link checkpoint file %s, from %s to %s, %w",
+			filename, from, to, err)
 	}
 
 	for _, newPath := range copiedFiles {
-		fmt.Printf("copied root checkpoint file from directory: %v, to: %v\n", from, newPath)
+		fmt.Printf("linked root checkpoint file from directory: %v, to: %v\n", from, newPath)
 	}
 
 	return nil

@@ -94,14 +94,11 @@ var (
 	// left in the context of flow transaction to execute the evm operation.
 	ErrInsufficientComputation = errors.New("insufficient computation")
 
-	// ErrUnAuthroizedMethodCall method call, usually emited when calls are called on EOA accounts
-	ErrUnAuthroizedMethodCall = errors.New("unauthroized method call")
-
-	// ErrInternalDirecCallFailed is returned when a withdraw or deposit internal call has failed.
-	ErrInternalDirectCallFailed = errors.New("internal direct call execution failed")
+	// ErrUnauthorizedMethodCall method call, usually emitted when calls are called on EOA accounts
+	ErrUnauthorizedMethodCall = errors.New("unauthorized method call")
 
 	// ErrWithdrawBalanceRounding is returned when withdraw call has a balance that could
-	// yeild to rounding error, i.e. the balance contains fractions smaller than 10^8 Flow (smallest unit allowed to transfer).
+	// result in rounding error, i.e. the balance contains fractions smaller than 10^8 Flow (smallest unit allowed to transfer).
 	ErrWithdrawBalanceRounding = errors.New("withdraw failed! the balance is susceptible to the rounding error")
 
 	// ErrUnexpectedEmptyResult is returned when a result is expected to be returned by the emulator
@@ -109,8 +106,8 @@ var (
 	ErrUnexpectedEmptyResult = errors.New("unexpected empty result has been returned")
 
 	// ErrInsufficientTotalSupply is returned when flow token
-	// is withdraw request is there but not enough balance is on EVM vault
-	// this should never happen but its a saftey measure to protect Flow against EVM issues.
+	// withdraw request is received but not enough balance is on EVM native token vault
+	// this should never happen but its a safety measure to protect Flow against EVM issues.
 	ErrInsufficientTotalSupply = NewFatalError(errors.New("insufficient total supply"))
 
 	// ErrNotImplemented is a fatal error when something is called that is not implemented
@@ -146,7 +143,7 @@ func IsAStateError(err error) bool {
 }
 
 // FatalError is used for any error that is not user related and something
-// unusual has happend. Usually we stop the node when this happens
+// unusual has happened. Usually we stop the node when this happens
 // given it might have a non-deterministic root.
 type FatalError struct {
 	err error
@@ -186,10 +183,10 @@ func IsWithdrawBalanceRoundingError(err error) bool {
 	return errors.Is(err, ErrWithdrawBalanceRounding)
 }
 
-// IsAUnAuthroizedMethodCallError returns true if the error type is
-// UnAuthroizedMethodCallError
-func IsAUnAuthroizedMethodCallError(err error) bool {
-	return errors.Is(err, ErrUnAuthroizedMethodCall)
+// IsAUnauthorizedMethodCallError returns true if the error type is
+// UnauthorizedMethodCallError
+func IsAUnauthorizedMethodCallError(err error) bool {
+	return errors.Is(err, ErrUnauthorizedMethodCall)
 }
 
 // BackendError is a non-fatal error wraps errors returned from the backend

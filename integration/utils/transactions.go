@@ -29,6 +29,7 @@ var setProtocolStateVersionScript string
 
 func LocalnetEnv() templates.Environment {
 	return templates.Environment{
+		EpochAddress:             "f8d6e0586b0a20c7",
 		IDTableAddress:           "f8d6e0586b0a20c7",
 		FungibleTokenAddress:     "ee82856bf20e2aa6",
 		FlowTokenAddress:         "0ae53cb6e3f42a79",
@@ -161,7 +162,7 @@ func MakeCreateAndSetupNodeTx(
 func MakeAdminRemoveNodeTx(
 	env templates.Environment,
 	adminAccount *sdk.Account,
-	adminAccountKeyID int,
+	adminAccountKeyID uint32,
 	latestBlockID sdk.Identifier,
 	nodeID flow.Identifier,
 ) (*sdk.Transaction, error) {
@@ -188,7 +189,7 @@ func MakeAdminRemoveNodeTx(
 func MakeSetProtocolStateVersionTx(
 	env templates.Environment,
 	adminAccount *sdk.Account,
-	adminAccountKeyID int,
+	adminAccountKeyID uint32,
 	latestBlockID sdk.Identifier,
 	newProtocolVersion uint64,
 	activeViewDiff uint64,
@@ -214,7 +215,7 @@ func MakeSetProtocolStateVersionTx(
 	return tx, nil
 }
 
-// submitSmokeTestTransaction will submit a create account transaction to smoke test network
+// CreateFlowAccount will submit a create account transaction to smoke test network
 // This ensures a single transaction can be sealed by the network.
 func CreateFlowAccount(ctx context.Context, client *testnet.Client) (sdk.Address, error) {
 	fullAccountKey := sdk.NewAccountKey().

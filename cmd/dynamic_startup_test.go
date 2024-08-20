@@ -28,7 +28,7 @@ func getMockSnapshot(t *testing.T, epochCounter uint64, phase flow.EpochPhase) *
 
 	snapshot := new(protocolmock.Snapshot)
 	snapshot.On("Epochs").Return(epochQuery)
-	snapshot.On("Phase").Return(phase, nil)
+	snapshot.On("EpochPhase").Return(phase, nil)
 	snapshot.On("Head").Return(unittest.BlockHeaderFixture(), nil)
 
 	return snapshot

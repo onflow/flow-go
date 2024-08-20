@@ -22,6 +22,7 @@ type AccountInfo interface {
 
 	GetAccount(address flow.Address) (*flow.Account, error)
 	GetAccountKeys(address flow.Address) ([]flow.AccountPublicKey, error)
+	GetAccountKeyByIndex(address flow.Address, index uint32) (*flow.AccountPublicKey, error)
 }
 
 type ParseRestrictedAccountInfo struct {
@@ -115,6 +116,22 @@ func (info ParseRestrictedAccountInfo) GetAccountKeys(
 		trace.FVMEnvGetAccountKeys,
 		info.impl.GetAccountKeys,
 		address)
+}
+
+func (info ParseRestrictedAccountInfo) GetAccountKeyByIndex(
+	address flow.Address,
+	index uint32,
+) (
+	*flow.AccountPublicKey,
+	error,
+) {
+	return parseRestrict2Arg1Ret(
+		info.txnState,
+		trace.FVMEnvGetAccountKey,
+		info.impl.GetAccountKeyByIndex,
+		address,
+		index,
+	)
 }
 
 type accountInfo struct {
@@ -284,4 +301,22 @@ func (info *accountInfo) GetAccountKeys(
 	}
 
 	return accountKeys, nil
+}
+
+func (info *accountInfo) GetAccountKeyByIndex(
+	address flow.Address,
+	index uint32,
+) (
+	*flow.AccountPublicKey,
+	error,
+) {
+	defer info.tracer.StartChildSpan(trace.FVMEnvGetAccountKey).End()
+
+	accountKey, err := info.accounts.GetPublicKey(address, index)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &accountKey, nil
 }

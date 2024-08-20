@@ -31,8 +31,13 @@ type EVMContractChange uint8
 
 const (
 	EVMContractChangeNone EVMContractChange = iota
-	EVMContractChangeDeploy
-	EVMContractChangeUpdate
+	// EVMContractChangeDeployFull deploys the full EVM contract
+	EVMContractChangeDeployFull
+	// EVMContractChangeUpdateFull updates the existing EVM contract to the latest, full EVM contract
+	EVMContractChangeUpdateFull
+	// EVMContractChangeDeployMinimalAndUpdateFull deploys the minimal EVM contract
+	// and updates it to the latest, full EVM contract
+	EVMContractChangeDeployMinimalAndUpdateFull
 )
 
 type BurnerContractChange uint8
@@ -216,7 +221,16 @@ func SystemContractChanges(chainID flow.ChainID, options SystemContractsMigratio
 	}
 
 	// EVM contract
-	if options.EVM == EVMContractChangeUpdate {
+	switch options.EVM {
+	case EVMContractChangeNone:
+		// NO-OP
+
+	case EVMContractChangeDeployFull:
+		// handled in migration pipeline (NewCadence1ContractsMigrations)
+
+	case EVMContractChangeUpdateFull,
+		EVMContractChangeDeployMinimalAndUpdateFull:
+
 		contractChanges = append(
 			contractChanges,
 			NewSystemContractChange(
@@ -273,16 +287,24 @@ func NewSystemContractsMigration(
 	log zerolog.Logger,
 	rwf reporters.ReportWriterFactory,
 	options SystemContractsMigrationOptions,
-) *StagedContractsMigration {
-	migration := NewStagedContractsMigration(
+) (
+	migration *StagedContractsMigration,
+	locations map[common.AddressLocation]struct{},
+) {
+	migration = NewStagedContractsMigration(
 		"SystemContractsMigration",
 		"system-contracts-migration",
 		log,
 		rwf,
 		options.StagedContractsMigrationOptions,
 	)
+
+	locations = make(map[common.AddressLocation]struct{})
+
 	for _, change := range SystemContractChanges(options.ChainID, options) {
 		migration.registerContractChange(change)
+		locations[change.AddressLocation()] = struct{}{}
 	}
-	return migration
+
+	return migration, locations
 }

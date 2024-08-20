@@ -33,8 +33,9 @@ const (
 )
 
 type collectionInfo struct {
-	blockId    flow.Identifier
-	blockIdStr string
+	blockId     flow.Identifier
+	blockIdStr  string
+	blockHeight uint64
 
 	collectionIndex int
 	*entity.CompleteCollection
@@ -118,7 +119,7 @@ type blockComputer struct {
 	maxConcurrency        int
 }
 
-func SystemChunkContext(vmCtx fvm.Context) fvm.Context {
+func SystemChunkContext(vmCtx fvm.Context, metrics module.ExecutionMetrics) fvm.Context {
 	return fvm.NewContextFromParent(
 		vmCtx,
 		fvm.WithContractDeploymentRestricted(false),
@@ -130,6 +131,7 @@ func SystemChunkContext(vmCtx fvm.Context) fvm.Context {
 		fvm.WithMemoryAndInteractionLimitsDisabled(),
 		// only the system transaction is allowed to call the block entropy provider
 		fvm.WithRandomSourceHistoryCallAllowed(true),
+		fvm.WithMetricsReporter(metrics),
 	)
 }
 
@@ -157,7 +159,7 @@ func NewBlockComputer(
 		return nil, fmt.Errorf("program cache writes are not allowed in scripts on Execution nodes")
 	}
 
-	systemChunkCtx := SystemChunkContext(vmCtx)
+	systemChunkCtx := SystemChunkContext(vmCtx, metrics)
 	vmCtx = fvm.NewContextFromParent(
 		vmCtx,
 		fvm.WithMetricsReporter(metrics),
@@ -238,6 +240,7 @@ func (e *blockComputer) queueTransactionRequests(
 		collectionInfo := collectionInfo{
 			blockId:             blockId,
 			blockIdStr:          blockIdStr,
+			blockHeight:         blockHeader.Height,
 			collectionIndex:     idx,
 			CompleteCollection:  collection,
 			isSystemTransaction: false,
@@ -278,6 +281,7 @@ func (e *blockComputer) queueTransactionRequests(
 	systemCollectionInfo := collectionInfo{
 		blockId:         blockId,
 		blockIdStr:      blockIdStr,
+		blockHeight:     blockHeader.Height,
 		collectionIndex: len(rawCollections),
 		CompleteCollection: &entity.CompleteCollection{
 			Transactions: []*flow.TransactionBody{systemTxnBody},

@@ -9,7 +9,8 @@ import (
 // subscribe to callbacks any time an identity table change (or possible change)
 // is finalized.
 //
-// TODO add slashing/ejection events here once implemented
+// TODO(EFM, #6123) add slashing/ejection events here once implemented
+// TODO(EFM, #6123): Consider consolidating this with ProtocolStateIDCache
 type IdentityDeltas struct {
 	events.Noop
 	callback func()

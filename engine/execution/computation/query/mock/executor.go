@@ -83,6 +83,34 @@ func (_m *Executor) GetAccount(ctx context.Context, addr flow.Address, header *f
 	return r0, r1
 }
 
+// GetAccountAvailableBalance provides a mock function with given fields: ctx, addr, header, _a3
+func (_m *Executor) GetAccountAvailableBalance(ctx context.Context, addr flow.Address, header *flow.Header, _a3 snapshot.StorageSnapshot) (uint64, error) {
+	ret := _m.Called(ctx, addr, header, _a3)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetAccountAvailableBalance")
+	}
+
+	var r0 uint64
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Address, *flow.Header, snapshot.StorageSnapshot) (uint64, error)); ok {
+		return rf(ctx, addr, header, _a3)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Address, *flow.Header, snapshot.StorageSnapshot) uint64); ok {
+		r0 = rf(ctx, addr, header, _a3)
+	} else {
+		r0 = ret.Get(0).(uint64)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, flow.Address, *flow.Header, snapshot.StorageSnapshot) error); ok {
+		r1 = rf(ctx, addr, header, _a3)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetAccountBalance provides a mock function with given fields: ctx, addr, header, _a3
 func (_m *Executor) GetAccountBalance(ctx context.Context, addr flow.Address, header *flow.Header, _a3 snapshot.StorageSnapshot) (uint64, error) {
 	ret := _m.Called(ctx, addr, header, _a3)
@@ -104,6 +132,36 @@ func (_m *Executor) GetAccountBalance(ctx context.Context, addr flow.Address, he
 
 	if rf, ok := ret.Get(1).(func(context.Context, flow.Address, *flow.Header, snapshot.StorageSnapshot) error); ok {
 		r1 = rf(ctx, addr, header, _a3)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetAccountKey provides a mock function with given fields: ctx, addr, keyIndex, header, _a4
+func (_m *Executor) GetAccountKey(ctx context.Context, addr flow.Address, keyIndex uint32, header *flow.Header, _a4 snapshot.StorageSnapshot) (*flow.AccountPublicKey, error) {
+	ret := _m.Called(ctx, addr, keyIndex, header, _a4)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetAccountKey")
+	}
+
+	var r0 *flow.AccountPublicKey
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Address, uint32, *flow.Header, snapshot.StorageSnapshot) (*flow.AccountPublicKey, error)); ok {
+		return rf(ctx, addr, keyIndex, header, _a4)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Address, uint32, *flow.Header, snapshot.StorageSnapshot) *flow.AccountPublicKey); ok {
+		r0 = rf(ctx, addr, keyIndex, header, _a4)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*flow.AccountPublicKey)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, flow.Address, uint32, *flow.Header, snapshot.StorageSnapshot) error); ok {
+		r1 = rf(ctx, addr, keyIndex, header, _a4)
 	} else {
 		r1 = ret.Error(1)
 	}

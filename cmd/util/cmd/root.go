@@ -32,7 +32,9 @@ import (
 	read_protocol_state "github.com/onflow/flow-go/cmd/util/cmd/read-protocol-state/cmd"
 	index_er "github.com/onflow/flow-go/cmd/util/cmd/reindex/cmd"
 	rollback_executed_height "github.com/onflow/flow-go/cmd/util/cmd/rollback-executed-height/cmd"
+	run_script "github.com/onflow/flow-go/cmd/util/cmd/run-script"
 	"github.com/onflow/flow-go/cmd/util/cmd/snapshot"
+	system_addresses "github.com/onflow/flow-go/cmd/util/cmd/system-addresses"
 	truncate_database "github.com/onflow/flow-go/cmd/util/cmd/truncate-database"
 	"github.com/onflow/flow-go/cmd/util/cmd/version"
 	"github.com/onflow/flow-go/module/profiler"
@@ -112,6 +114,8 @@ func addCommands() {
 	rootCmd.AddCommand(diff_states.Cmd)
 	rootCmd.AddCommand(atree_inlined_status.Cmd)
 	rootCmd.AddCommand(find_trie_root.Cmd)
+	rootCmd.AddCommand(run_script.Cmd)
+	rootCmd.AddCommand(system_addresses.Cmd)
 }
 
 func initConfig() {

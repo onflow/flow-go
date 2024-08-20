@@ -211,13 +211,11 @@ func withNextEpoch(
 	require.Len(t, encodableSnapshot.SealingSegment.Blocks, 1, "function `withNextEpoch` only works for spork-root/genesis snapshots")
 
 	rootProtocolState := encodableSnapshot.SealingSegment.LatestProtocolStateEntry()
-	epochProtocolState := rootProtocolState.EpochEntry
-	currEpochSetup := epochProtocolState.CurrentEpochSetup
-	currEpochCommit := epochProtocolState.CurrentEpochCommit
+	currEpochSetup := rootProtocolState.EpochEntry.CurrentEpochSetup
+	currEpochCommit := rootProtocolState.EpochEntry.CurrentEpochCommit
 
 	// Set current epoch length
 	currEpochSetup.FinalView = currEpochSetup.FirstView + curEpochViews - 1
-	epochProtocolState.CurrentEpoch.SetupID = currEpochSetup.ID()
 
 	// Construct events for next epoch
 	nextEpochSetup := &flow.EpochSetup{
@@ -234,21 +232,45 @@ func withNextEpoch(
 		DKGParticipantKeys: nextEpochParticipantData.PublicBeaconKeys(),
 		DKGGroupKey:        nextEpochParticipantData.GroupKey,
 	}
-	epochProtocolState.NextEpoch = &flow.EpochStateContainer{
-		SetupID:          nextEpochSetup.ID(),
-		CommitID:         nextEpochCommit.ID(),
-		ActiveIdentities: flow.DynamicIdentityEntryListFromIdentities(nextEpochIdentities),
+
+	// Construct the new min epoch state entry
+	minEpochStateEntry := &flow.MinEpochStateEntry{
+		PreviousEpoch: rootProtocolState.EpochEntry.PreviousEpoch,
+		CurrentEpoch: flow.EpochStateContainer{
+			SetupID:          currEpochSetup.ID(),
+			CommitID:         currEpochCommit.ID(),
+			ActiveIdentities: rootProtocolState.EpochEntry.CurrentEpoch.ActiveIdentities,
+			EpochExtensions:  rootProtocolState.EpochEntry.CurrentEpoch.EpochExtensions,
+		},
+		NextEpoch: &flow.EpochStateContainer{
+			SetupID:          nextEpochSetup.ID(),
+			CommitID:         nextEpochCommit.ID(),
+			ActiveIdentities: flow.DynamicIdentityEntryListFromIdentities(nextEpochIdentities),
+		},
+		EpochFallbackTriggered: false,
 	}
-	// Re-construct epoch protocol state with modified events (constructs ActiveIdentity fields)
-	epochProtocolState, err = flow.NewRichEpochProtocolStateEntry(
-		epochProtocolState.EpochProtocolStateEntry,
-		epochProtocolState.PreviousEpochSetup, epochProtocolState.PreviousEpochCommit,
+
+	// Construct the new epoch protocol state entry
+	epochStateEntry, err := flow.NewEpochStateEntry(
+		minEpochStateEntry,
+		rootProtocolState.EpochEntry.PreviousEpochSetup,
+		rootProtocolState.EpochEntry.PreviousEpochCommit,
 		currEpochSetup, currEpochCommit,
 		nextEpochSetup, nextEpochCommit)
 	require.NoError(t, err)
+	// Re-construct epoch protocol state with modified events (constructs ActiveIdentity fields)
+	epochRichProtocolState, err := flow.NewRichEpochStateEntry(epochStateEntry)
+	require.NoError(t, err)
+
+	originalRootKVStore, err := snapshot.ProtocolState()
+	require.NoError(t, err)
 
 	// Store the modified epoch protocol state entry and corresponding KV store entry
-	rootKVStore := kvstore.NewDefaultKVStore(epochProtocolState.ID())
+	rootKVStore, err := kvstore.NewDefaultKVStore(
+		originalRootKVStore.GetEpochCommitSafetyThreshold(),
+		originalRootKVStore.GetEpochExtensionViewCount(),
+		epochRichProtocolState.ID())
+	require.NoError(t, err)
 	protocolVersion, encodedKVStore, err := rootKVStore.VersionedEncode()
 	require.NoError(t, err)
 	encodableSnapshot.SealingSegment.ProtocolStateEntries = map[flow.Identifier]*flow.ProtocolStateEntryWrapper{
@@ -257,7 +279,7 @@ func withNextEpoch(
 				Version: protocolVersion,
 				Data:    encodedKVStore,
 			},
-			EpochEntry: epochProtocolState,
+			EpochEntry: epochRichProtocolState,
 		},
 	}
 
