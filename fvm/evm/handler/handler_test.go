@@ -69,8 +69,6 @@ func TestHandler_TransactionRunOrPanic(t *testing.T) {
 					}
 					handler := handler.NewContractHandler(flow.Emulator, rootAddr, flowTokenAddress, rootAddr, bs, aa, backend, em, debug.NopTracer)
 
-					coinbase := types.NewAddress(gethCommon.Address{})
-
 					tx := eoa.PrepareSignAndEncodeTx(
 						t,
 						gethCommon.Address{},
@@ -87,7 +85,7 @@ func TestHandler_TransactionRunOrPanic(t *testing.T) {
 					result.TxHash = evmTx.Hash()
 
 					// successfully run (no-panic)
-					handler.RunOrPanic(tx, coinbase)
+					handler.RunOrPanic(tx)
 
 					// check event
 					events := backend.Events()
@@ -138,13 +136,11 @@ func TestHandler_TransactionRunOrPanic(t *testing.T) {
 					}
 					handler := handler.NewContractHandler(flow.Testnet, rootAddr, flowTokenAddress, rootAddr, bs, aa, backend, em, debug.NopTracer)
 
-					coinbase := types.NewAddress(gethCommon.Address{})
-
 					// test RLP decoding (non fatal)
 					assertPanic(t, isNotFatal, func() {
 						// invalid RLP encoding
 						invalidTx := "badencoding"
-						handler.RunOrPanic([]byte(invalidTx), coinbase)
+						handler.RunOrPanic([]byte(invalidTx))
 					})
 
 					// test gas limit (non fatal)
@@ -159,7 +155,7 @@ func TestHandler_TransactionRunOrPanic(t *testing.T) {
 							big.NewInt(1),
 						)
 
-						handler.RunOrPanic([]byte(tx), coinbase)
+						handler.RunOrPanic([]byte(tx))
 					})
 
 					// tx validation error
@@ -174,7 +170,7 @@ func TestHandler_TransactionRunOrPanic(t *testing.T) {
 							big.NewInt(1),
 						)
 
-						handler.RunOrPanic([]byte(tx), coinbase)
+						handler.RunOrPanic([]byte(tx))
 					})
 				})
 			})
@@ -203,7 +199,7 @@ func TestHandler_TransactionRunOrPanic(t *testing.T) {
 								100_000,
 								big.NewInt(1),
 							)
-							handler.RunOrPanic([]byte(tx), types.NewAddress(gethCommon.Address{}))
+							handler.RunOrPanic([]byte(tx))
 						})
 					})
 				})
@@ -247,22 +243,21 @@ func TestHandler_TransactionRunOrPanic(t *testing.T) {
 				)
 
 				// setup coinbase
-				foa2 := handler.DeployCOA(2)
-				account2 := handler.AccountByAddress(foa2, true)
+				coinbase := handler.AccountByAddress(types.CoinbaseAddress, true)
 				require.True(t, types.BalancesAreEqual(
 					types.NewBalanceFromUFix64(0),
-					account2.Balance(),
+					coinbase.Balance(),
 				))
 
 				// no panic means success here
-				handler.RunOrPanic(tx, account2.Address())
+				handler.RunOrPanic(tx)
 				expected, err = types.SubBalance(orgBalance, deduction)
 				require.NoError(t, err)
 				expected, err = types.AddBalance(expected, addition)
 				require.NoError(t, err)
 				require.Equal(t, expected, foa.Balance())
 
-				require.NotEqual(t, types.NewBalanceFromUFix64(0), account2.Balance())
+				require.NotEqual(t, types.NewBalanceFromUFix64(0), coinbase.Balance())
 			})
 		})
 	})
@@ -752,7 +747,7 @@ func TestHandler_TransactionRun(t *testing.T) {
 						big.NewInt(1),
 					)
 
-					rs := handler.Run(tx, types.NewAddress(gethCommon.Address{}))
+					rs := handler.Run(tx)
 					require.Equal(t, types.StatusSuccessful, rs.Status)
 					require.Equal(t, result.GasConsumed, rs.GasConsumed)
 					require.Equal(t, types.ErrCodeNoError, rs.ErrorCode)
@@ -798,7 +793,7 @@ func TestHandler_TransactionRun(t *testing.T) {
 						big.NewInt(1),
 					)
 
-					rs := handler.Run(tx, types.NewAddress(gethCommon.Address{}))
+					rs := handler.Run(tx)
 					require.Equal(t, types.StatusFailed, rs.Status)
 					require.Equal(t, result.GasConsumed, rs.GasConsumed)
 					require.Equal(t, types.ExecutionErrCodeOutOfGas, rs.ErrorCode)
@@ -824,8 +819,6 @@ func TestHandler_TransactionRun(t *testing.T) {
 					}
 					handler := handler.NewContractHandler(chainID, rootAddr, flowTokenAddress, rootAddr, bs, aa, backend, em, debug.NopTracer)
 
-					coinbase := types.NewAddress(gethCommon.Address{})
-
 					gasLimit := uint64(testutils.TestComputationLimit + 1)
 					tx := eoa.PrepareSignAndEncodeTx(
 						t,
@@ -837,7 +830,7 @@ func TestHandler_TransactionRun(t *testing.T) {
 					)
 
 					assertPanic(t, isNotFatal, func() {
-						rs := handler.Run([]byte(tx), coinbase)
+						rs := handler.Run([]byte(tx))
 						require.Equal(t, types.StatusInvalid, rs.Status)
 					})
 
@@ -850,7 +843,7 @@ func TestHandler_TransactionRun(t *testing.T) {
 						big.NewInt(1),
 					)
 
-					rs := handler.Run([]byte(tx), coinbase)
+					rs := handler.Run([]byte(tx))
 					require.Equal(t, types.StatusInvalid, rs.Status)
 					require.Equal(t, types.ValidationErrCodeNonceTooLow, rs.ErrorCode)
 				})
@@ -895,8 +888,6 @@ func TestHandler_TransactionRun(t *testing.T) {
 						},
 					}
 					handler := handler.NewContractHandler(chainID, rootAddr, flowTokenAddress, randomBeaconAddress, bs, aa, backend, em, debug.NopTracer)
-
-					coinbase := types.NewAddress(gethCommon.Address{})
 					gasLimit := uint64(100_000)
 
 					// run multiple successful transactions
@@ -913,7 +904,7 @@ func TestHandler_TransactionRun(t *testing.T) {
 						)
 					}
 
-					results := handler.BatchRun(txs, coinbase)
+					results := handler.BatchRun(txs)
 					for _, rs := range results {
 						require.Equal(t, types.StatusSuccessful, rs.Status)
 						require.Equal(t, gasConsumed, rs.GasConsumed)
@@ -952,7 +943,7 @@ func TestHandler_TransactionRun(t *testing.T) {
 						)
 					}
 
-					results = handler.BatchRun(txs, coinbase)
+					results = handler.BatchRun(txs)
 					for _, rs := range results {
 						require.Equal(t, types.StatusSuccessful, rs.Status)
 					}
@@ -994,12 +985,11 @@ func TestHandler_TransactionRun(t *testing.T) {
 						},
 					}
 					handler := handler.NewContractHandler(chainID, rootAddr, flowTokenAddress, randomBeaconAddress, bs, aa, backend, em, debug.NopTracer)
-					coinbase := types.NewAddress(gethCommon.Address{})
 
 					// batch run empty transactions
 					txs := make([][]byte, 1)
 					assertPanic(t, isNotFatal, func() {
-						handler.BatchRun(txs, coinbase)
+						handler.BatchRun(txs)
 					})
 
 				})
@@ -1132,7 +1122,7 @@ func TestHandler_TransactionRun(t *testing.T) {
 						big.NewInt(1),
 					)
 
-					_ = handler.Run(tx, types.NewAddress(gethCommon.Address{}))
+					_ = handler.Run(tx)
 
 					assert.Eventuallyf(t, func() bool {
 						<-uploaded
@@ -1197,7 +1187,7 @@ func TestHandler_TransactionRun(t *testing.T) {
 						big.NewInt(1),
 					)
 
-					res := handler.Run(tx, types.NewAddress(gethCommon.Address{}))
+					res := handler.Run(tx)
 
 					assert.Eventuallyf(t, func() bool {
 						<-uploaded
@@ -1262,8 +1252,6 @@ func TestHandler_TransactionRun(t *testing.T) {
 
 					handler := handler.NewContractHandler(chainID, rootAddr, flowTokenAddress, randomBeaconAddress, bs, aa, backend, em, tracer)
 
-					coinbase := types.NewAddress(gethCommon.Address{})
-
 					txs := make([][]byte, batchSize)
 					for i := range txs {
 						txs[i] = eoa.PrepareSignAndEncodeTx(
@@ -1276,7 +1264,7 @@ func TestHandler_TransactionRun(t *testing.T) {
 						)
 					}
 
-					_ = handler.BatchRun(txs, coinbase)
+					_ = handler.BatchRun(txs)
 
 					for i := 0; i < batchSize; i++ {
 						assert.Eventuallyf(t, func() bool {
@@ -1321,10 +1309,10 @@ func TestHandler_TransactionRun(t *testing.T) {
 					handler.DryRun(rlpTx, types.EmptyAddress)
 
 					backend.ExpectedSpan(t, trace.FVMEVMRun)
-					handler.Run(rlpTx, types.EmptyAddress)
+					handler.Run(rlpTx)
 
 					backend.ExpectedSpan(t, trace.FVMEVMBatchRun)
-					handler.BatchRun([][]byte{rlpTx}, types.EmptyAddress)
+					handler.BatchRun([][]byte{rlpTx})
 
 					backend.ExpectedSpan(t, trace.FVMEVMDeployCOA)
 					coa := handler.DeployCOA(1)
@@ -1401,7 +1389,7 @@ func TestHandler_Metrics(t *testing.T) {
 					require.False(t, failed)
 					called += 1
 				}
-				handler.Run(tx, types.EmptyAddress)
+				handler.Run(tx)
 				require.Equal(t, 1, called)
 
 				// batch run
@@ -1411,7 +1399,7 @@ func TestHandler_Metrics(t *testing.T) {
 					require.False(t, failed)
 					called += 1
 				}
-				handler.BatchRun([][]byte{tx, tx}, types.EmptyAddress)
+				handler.BatchRun([][]byte{tx, tx})
 				require.Equal(t, 3, called)
 
 				// Direct call

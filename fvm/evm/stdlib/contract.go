@@ -1029,22 +1029,30 @@ func newInternalEVMTypeRunFunction(
 				panic(err)
 			}
 
-			// Get coinbase argument
+			// Get gas fee collector argument
 
-			coinbaseValue, ok := invocation.Arguments[1].(*interpreter.ArrayValue)
+			gasFeeCollectorValue, ok := invocation.Arguments[1].(*interpreter.ArrayValue)
 			if !ok {
 				panic(errors.NewUnreachableError())
 			}
 
-			coinbase, err := interpreter.ByteArrayValueToByteSlice(inter, coinbaseValue, locationRange)
+			gasFeeCollector, err := interpreter.ByteArrayValueToByteSlice(inter, gasFeeCollectorValue, locationRange)
 			if err != nil {
 				panic(err)
 			}
 
-			// Run
+			// track balance of coinbase
+			cb := handler.AccountByAddress(types.CoinbaseAddress, true)
+			initCoinbaseBalance := cb.Balance()
+			// run transaction
+			result := handler.Run(transaction)
 
-			cb := types.NewAddressFromBytes(coinbase)
-			result := handler.Run(transaction, cb)
+			// transfer the gas fees collected to the coinbase
+			afterBalance := cb.Balance()
+			diff := new(big.Int).Sub(afterBalance, initCoinbaseBalance)
+			if diff.Sign() > 0 {
+				cb.Transfer(types.NewAddressFromBytes(gasFeeCollector), diff)
+			}
 
 			return NewResultValue(handler, gauge, inter, locationRange, result)
 		},
@@ -1142,7 +1150,6 @@ func newInternalEVMTypeBatchRunFunction(
 			locationRange := invocation.LocationRange
 
 			// Get transactions batch argument
-
 			transactionsBatchValue, ok := invocation.Arguments[0].(*interpreter.ArrayValue)
 			if !ok {
 				panic(errors.NewUnreachableError())
@@ -1164,22 +1171,30 @@ func newInternalEVMTypeBatchRunFunction(
 				}, false, locationRange)
 			}
 
-			// Get coinbase argument
-
-			coinbaseValue, ok := invocation.Arguments[1].(*interpreter.ArrayValue)
+			// Get gas fee collector argument
+			gasFeeCollectorValue, ok := invocation.Arguments[1].(*interpreter.ArrayValue)
 			if !ok {
 				panic(errors.NewUnreachableError())
 			}
 
-			coinbase, err := interpreter.ByteArrayValueToByteSlice(inter, coinbaseValue, locationRange)
+			gasFeeCollector, err := interpreter.ByteArrayValueToByteSlice(inter, gasFeeCollectorValue, locationRange)
 			if err != nil {
 				panic(err)
 			}
 
-			// Batch run
+			// track balance of coinbase
+			cb := handler.AccountByAddress(types.CoinbaseAddress, true)
+			initCoinbaseBalance := cb.Balance()
 
-			cb := types.NewAddressFromBytes(coinbase)
-			batchResults := handler.BatchRun(transactionBatch, cb)
+			// Batch run
+			batchResults := handler.BatchRun(transactionBatch)
+
+			// transfer the gas fees collected to the coinbase
+			afterBalance := cb.Balance()
+			diff := new(big.Int).Sub(afterBalance, initCoinbaseBalance)
+			if diff.Sign() > 0 {
+				cb.Transfer(types.NewAddressFromBytes(gasFeeCollector), diff)
+			}
 
 			values := newResultValues(handler, gauge, inter, locationRange, batchResults)
 

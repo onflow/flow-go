@@ -134,43 +134,37 @@ func (h *ContractHandler) LastExecutedBlock() *types.Block {
 }
 
 // RunOrPanic runs an rlp-encoded evm transaction and
-// collects the gas fees and pay it to the coinbase address provided.
-func (h *ContractHandler) RunOrPanic(rlpEncodedTx []byte, coinbase types.Address) {
+func (h *ContractHandler) RunOrPanic(rlpEncodedTx []byte) {
 	// capture open tracing span
 	defer h.backend.StartChildSpan(trace.FVMEVMRun).End()
 
-	res, err := h.run(rlpEncodedTx, coinbase)
+	res, err := h.run(rlpEncodedTx)
 	panicOnErrorOrInvalidOrFailedState(res, err)
 }
 
-// Run tries to run an rlp-encoded evm transaction and
-// collects the gas fees and pay it to the coinbase address provided.
-func (h *ContractHandler) Run(rlpEncodedTx []byte, coinbase types.Address) *types.ResultSummary {
+// Run tries to run an rlp-encoded evm transaction
+func (h *ContractHandler) Run(rlpEncodedTx []byte) *types.ResultSummary {
 	// capture open tracing span
 	defer h.backend.StartChildSpan(trace.FVMEVMRun).End()
 
-	res, err := h.run(rlpEncodedTx, coinbase)
+	res, err := h.run(rlpEncodedTx)
 	panicOnError(err)
 
 	// return the result summary
 	return res.ResultSummary()
 }
 
-// BatchRun tries to run batch of rlp-encoded transactions and
-// collects the gas fees and pay it to the coinbase address provided.
+// BatchRun tries to run batch of rlp-encoded transactions
 // All transactions provided in the batch are included in a single block,
 // except for invalid transactions
-func (h *ContractHandler) BatchRun(
-	rlpEncodedTxs [][]byte,
-	coinbase types.Address,
-) []*types.ResultSummary {
+func (h *ContractHandler) BatchRun(rlpEncodedTxs [][]byte) []*types.ResultSummary {
 	// capture open tracing
 	span := h.backend.StartChildSpan(trace.FVMEVMBatchRun)
 	span.SetAttributes(attribute.Int("tx_counts", len(rlpEncodedTxs)))
 	defer span.End()
 
 	// batch run transactions and panic if any error
-	res, err := h.batchRun(rlpEncodedTxs, coinbase)
+	res, err := h.batchRun(rlpEncodedTxs)
 	panicOnError(err)
 
 	// convert results into result summaries
@@ -181,10 +175,7 @@ func (h *ContractHandler) BatchRun(
 	return resSummaries
 }
 
-func (h *ContractHandler) batchRun(
-	rlpEncodedTxs [][]byte,
-	coinbase types.Address,
-) ([]*types.Result, error) {
+func (h *ContractHandler) batchRun(rlpEncodedTxs [][]byte) ([]*types.Result, error) {
 	// step 1 - transaction decoding and compute total gas needed
 	// This is safe to be done before checking the gas
 	// as it has its own metering
@@ -215,7 +206,6 @@ func (h *ContractHandler) batchRun(
 	if err != nil {
 		return nil, err
 	}
-	ctx.GasFeeCollector = coinbase
 
 	// step 4 - create a block view
 	blk, err := h.emulator.NewBlockView(ctx)
@@ -343,10 +333,7 @@ func (h *ContractHandler) commitBlockProposal() error {
 	return nil
 }
 
-func (h *ContractHandler) run(
-	rlpEncodedTx []byte,
-	coinbase types.Address,
-) (*types.Result, error) {
+func (h *ContractHandler) run(rlpEncodedTx []byte) (*types.Result, error) {
 	// step 1 - transaction decoding
 	tx, err := h.decodeTransaction(rlpEncodedTx)
 	if err != nil {
@@ -364,7 +351,6 @@ func (h *ContractHandler) run(
 	if err != nil {
 		return nil, err
 	}
-	ctx.GasFeeCollector = coinbase
 
 	// step 4 - create a block view
 	blk, err := h.emulator.NewBlockView(ctx)
@@ -537,6 +523,7 @@ func (h *ContractHandler) getBlockContext() (types.BlockContext, error) {
 		Tracer:                    h.tracer.TxTracer(),
 		TxCountSoFar:              uint(len(bp.TxHashes)),
 		TotalGasUsedSoFar:         bp.TotalGasUsed,
+		GasFeeCollector:           types.CoinbaseAddress,
 	}, nil
 }
 

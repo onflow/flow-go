@@ -35,8 +35,8 @@ type testContractHandler struct {
 	deployCOA            func(uint64) types.Address
 	accountByAddress     func(types.Address, bool) types.Account
 	lastExecutedBlock    func() *types.Block
-	run                  func(tx []byte, coinbase types.Address) *types.ResultSummary
-	batchRun             func(txs [][]byte, coinbase types.Address) []*types.ResultSummary
+	run                  func(tx []byte) *types.ResultSummary
+	batchRun             func(txs [][]byte) []*types.ResultSummary
 	generateResourceUUID func() uint64
 	dryRun               func(tx []byte, from types.Address) *types.ResultSummary
 	commitBlockProposal  func()
@@ -75,11 +75,11 @@ func (t *testContractHandler) LastExecutedBlock() *types.Block {
 	return t.lastExecutedBlock()
 }
 
-func (t *testContractHandler) Run(tx []byte, coinbase types.Address) *types.ResultSummary {
+func (t *testContractHandler) Run(tx []byte) *types.ResultSummary {
 	if t.run == nil {
 		panic("unexpected Run")
 	}
-	return t.run(tx, coinbase)
+	return t.run(tx)
 }
 
 func (t *testContractHandler) DryRun(tx []byte, from types.Address) *types.ResultSummary {
@@ -89,11 +89,11 @@ func (t *testContractHandler) DryRun(tx []byte, from types.Address) *types.Resul
 	return t.dryRun(tx, from)
 }
 
-func (t *testContractHandler) BatchRun(txs [][]byte, coinbase types.Address) []*types.ResultSummary {
+func (t *testContractHandler) BatchRun(txs [][]byte) []*types.ResultSummary {
 	if t.batchRun == nil {
 		panic("unexpected BatchRun")
 	}
-	return t.batchRun(txs, coinbase)
+	return t.batchRun(txs)
 }
 
 func (t *testContractHandler) GenerateResourceUUID() uint64 {
@@ -2969,7 +2969,7 @@ func TestEVMRun(t *testing.T) {
 		cadence.UInt8(3),
 	}).WithType(stdlib.EVMTransactionBytesCadenceType)
 
-	coinbase := cadence.NewArray([]cadence.Value{
+	gasFeeCollector := cadence.NewArray([]cadence.Value{
 		cadence.UInt8(1), cadence.UInt8(1),
 		cadence.UInt8(2), cadence.UInt8(2),
 		cadence.UInt8(3), cadence.UInt8(3),
@@ -2985,18 +2985,41 @@ func TestEVMRun(t *testing.T) {
 	runCalled := false
 
 	contractsAddress := flow.BytesToAddress([]byte{0x1})
+	firstBalanceCall := true
+	coinbaseInitBalance := big.NewInt(1)
+	coinbaseAfterBalance := big.NewInt(3)
+	coinbaseDiffBalance := big.NewInt(2)
 	handler := &testContractHandler{
 		evmContractAddress: common.Address(contractsAddress),
-		run: func(tx []byte, coinbase types.Address) *types.ResultSummary {
-			runCalled = true
-
-			assert.Equal(t, []byte{1, 2, 3}, tx)
-			assert.Equal(t,
-				types.Address{
-					1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 10,
+		accountByAddress: func(addr types.Address, isAuthorized bool) types.Account {
+			assert.Equal(t, types.CoinbaseAddress, addr)
+			assert.True(t, isAuthorized)
+			return &testFlowAccount{
+				address: addr,
+				balance: func() types.Balance {
+					if firstBalanceCall {
+						firstBalanceCall = false
+						return coinbaseInitBalance
+					}
+					return coinbaseAfterBalance
 				},
-				coinbase,
-			)
+				transfer: func(address types.Address, balance types.Balance) {
+					assert.Equal(t,
+						types.Address{
+							1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 10,
+						},
+						address,
+					)
+					assert.True(t, types.BalancesAreEqual(coinbaseDiffBalance, balance))
+				},
+				codeHash: func() []byte {
+					return nil
+				},
+			}
+		},
+		run: func(tx []byte) *types.ResultSummary {
+			runCalled = true
+			assert.Equal(t, []byte{1, 2, 3}, tx)
 			return &types.ResultSummary{
 				Status: types.StatusSuccessful,
 			}
@@ -3065,7 +3088,7 @@ func TestEVMRun(t *testing.T) {
 	val, err := rt.ExecuteScript(
 		runtime.Script{
 			Source:    script,
-			Arguments: EncodeArgs([]cadence.Value{evmTx, coinbase}),
+			Arguments: EncodeArgs([]cadence.Value{evmTx, gasFeeCollector}),
 		},
 		runtime.Context{
 			Interface:   runtimeInterface,
@@ -3093,7 +3116,7 @@ func TestEVMRun(t *testing.T) {
 	val, err = rt.ExecuteScript(
 		runtime.Script{
 			Source:    script,
-			Arguments: EncodeArgs([]cadence.Value{evmTx, coinbase}),
+			Arguments: EncodeArgs([]cadence.Value{evmTx, gasFeeCollector}),
 		},
 		runtime.Context{
 			Interface:   runtimeInterface,
@@ -3235,21 +3258,43 @@ func TestEVMBatchRun(t *testing.T) {
 	runCalled := false
 
 	contractsAddress := flow.BytesToAddress([]byte{0x1})
+	firstBalanceCall := true
+	coinbaseInitBalance := big.NewInt(1)
+	coinbaseAfterBalance := big.NewInt(3)
+	coinbaseDiffBalance := big.NewInt(2)
 	handler := &testContractHandler{
 		evmContractAddress: common.Address(contractsAddress),
-		batchRun: func(txs [][]byte, coinbase types.Address) []*types.ResultSummary {
+		accountByAddress: func(addr types.Address, isAuthorized bool) types.Account {
+			assert.Equal(t, types.CoinbaseAddress, addr)
+			assert.True(t, isAuthorized)
+			return &testFlowAccount{
+				address: addr,
+				balance: func() types.Balance {
+					if firstBalanceCall {
+						firstBalanceCall = false
+						return coinbaseInitBalance
+					}
+					return coinbaseAfterBalance
+				},
+				transfer: func(address types.Address, balance types.Balance) {
+					assert.Equal(t,
+						types.Address{
+							1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 10,
+						},
+						address,
+					)
+					assert.True(t, types.BalancesAreEqual(coinbaseDiffBalance, balance))
+				},
+				codeHash: func() []byte {
+					return nil
+				},
+			}
+		},
+		batchRun: func(txs [][]byte) []*types.ResultSummary {
 			runCalled = true
-
 			assert.EqualValues(t, [][]byte{
 				{1, 2, 3}, {4, 5, 6}, {7, 8, 9},
 			}, txs)
-			assert.Equal(t,
-				types.Address{
-					1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 10,
-				},
-				coinbase,
-			)
-
 			results := make([]*types.ResultSummary, 3)
 			for i := range results {
 				results[i] = &types.ResultSummary{
