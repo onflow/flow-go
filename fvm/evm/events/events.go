@@ -34,7 +34,6 @@ type transactionEvent struct {
 	Payload     []byte        // transaction RLP-encoded payload
 	Result      *types.Result // transaction execution result
 	BlockHeight uint64
-	Random      gethCommon.Hash
 	Coinbase    *types.Address
 }
 
