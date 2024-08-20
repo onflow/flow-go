@@ -122,9 +122,15 @@ func (p *RegisterPruner) loop(ctx irrecoverable.SignalerContext, ready component
 // Parameters:
 //   - ctx: The context for managing the pruning operation.
 func (p *RegisterPruner) checkPrune(ctx irrecoverable.SignalerContext) {
-	// TODO: get firstHeight and latestHeight from db
-	var firstHeight uint64
-	var latestHeight uint64
+	firstHeight, err := firstStoredHeight(p.db)
+	if err != nil {
+		ctx.Throw(fmt.Errorf("failed to get first height from register storage: %w", err))
+	}
+
+	latestHeight, err := latestStoredHeight(p.db)
+	if err != nil {
+		ctx.Throw(fmt.Errorf("failed to get latest height from register storage: %w", err))
+	}
 
 	pruneHeight := latestHeight - p.pruneThreshold
 
@@ -136,7 +142,11 @@ func (p *RegisterPruner) checkPrune(ctx irrecoverable.SignalerContext) {
 			ctx.Throw(fmt.Errorf("failed to prune: %w", err))
 		}
 
-		// TODO: update first height in db
+		// update first indexed height
+		err = updateFirstStoredHeight(p.db, pruneHeight)
+		if err != nil {
+			ctx.Throw(fmt.Errorf("failed to update first height for register storage: %w", err))
+		}
 	}
 }
 
