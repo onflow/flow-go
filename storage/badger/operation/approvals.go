@@ -1,19 +1,21 @@
 package operation
 
 import (
-	"github.com/dgraph-io/badger/v2"
-
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/storage"
 )
 
 // InsertResultApproval inserts a ResultApproval by ID.
-func InsertResultApproval(approval *flow.ResultApproval) func(*badger.Txn) error {
-	return insert(makePrefix(codeResultApproval, approval.ID()), approval)
+// The same key (`approval.ID()`) necessitates that the value (full `approval`) is
+// also identical (otherwise, we would have a successful pre-image attack on our
+// cryptographic hash function). Therefore, concurrent calls to this function are safe.
+func InsertResultApproval(approval *flow.ResultApproval) func(storage.Writer) error {
+	return insertW(makePrefix(codeResultApproval, approval.ID()), approval)
 }
 
 // RetrieveResultApproval retrieves an approval by ID.
-func RetrieveResultApproval(approvalID flow.Identifier, approval *flow.ResultApproval) func(*badger.Txn) error {
-	return retrieve(makePrefix(codeResultApproval, approvalID), approval)
+func RetrieveResultApproval(approvalID flow.Identifier, approval *flow.ResultApproval) func(storage.Reader) error {
+	return retrieveR(makePrefix(codeResultApproval, approvalID), approval)
 }
 
 // IndexResultApproval inserts a ResultApproval ID keyed by ExecutionResult ID
@@ -21,11 +23,11 @@ func RetrieveResultApproval(approvalID flow.Identifier, approval *flow.ResultApp
 // error is returned. This operation is only used by the ResultApprovals store,
 // which is only used within a Verification node, where it is assumed that there
 // is only one approval per chunk.
-func IndexResultApproval(resultID flow.Identifier, chunkIndex uint64, approvalID flow.Identifier) func(*badger.Txn) error {
-	return insert(makePrefix(codeIndexResultApprovalByChunk, resultID, chunkIndex), approvalID)
+func IndexResultApproval(resultID flow.Identifier, chunkIndex uint64, approvalID flow.Identifier) func(storage.Writer) error {
+	return insertW(makePrefix(codeIndexResultApprovalByChunk, resultID, chunkIndex), approvalID)
 }
 
 // LookupResultApproval finds a ResultApproval by result ID and chunk index.
-func LookupResultApproval(resultID flow.Identifier, chunkIndex uint64, approvalID *flow.Identifier) func(*badger.Txn) error {
-	return retrieve(makePrefix(codeIndexResultApprovalByChunk, resultID, chunkIndex), approvalID)
+func LookupResultApproval(resultID flow.Identifier, chunkIndex uint64, approvalID *flow.Identifier) func(storage.Reader) error {
+	return retrieveR(makePrefix(codeIndexResultApprovalByChunk, resultID, chunkIndex), approvalID)
 }
