@@ -320,12 +320,12 @@ The following figure captures Cruise Control's output and the corresponding beha
 * Flow TestNet (`devnet51`) August 14-18, 2024
   with 7 consensus nodes.
 * Cruise control was configured to stabilize view progression of the consensus committee to 2 views per second, i.e. the target view time is 500ms  
-* On August 14 at 11:30 am testnet was started, which was a bit earlier than anticipated for the number of specified views in the epoch,
-  to precisely assign with the specified epoch transition at 2 views per second given. In other words, there were fewer views to cover the remaining
+* On August 14 at 18:30 UTC testnet was started, which was a bit earlier than anticipated for the number of specified views in the epoch,
+  to precisely assign with the specified epoch transition at 2 views per second. In other words, there were fewer views to cover the remaining
   time duration until the targeted epoch switchover time, so views had to be longer than 500ms. 
-* The controller responds as expected: 
-  * it elongates the view time between until Aug 15, 00:50am
-  * At that point, the timing has aligned with the setpoint to progress with 500ms view time from there on.   
+* The controller responded as expected (see figure below): 
+  * it elongated the view time until Aug 15, 00:50 UTC
+  * At that point, the timing had aligned with the setpoint to progress with 500ms view time from there on.   
 * On testnet, we assume that consensus participants are responsive and not overloaded. In this case, the number of orphaned blocks or timed-out views
   should be entirely negligible (assumption). Hence, we can assume that the protocol proceeds entirely on the happy path with negligible error. 
 
@@ -386,7 +386,7 @@ TODO insert figure
   to determine how long it should sleep before broadcasting the proposal:
   ```golang
   select {
-    case <-time.After(time.Until(targetPublicationTime.Round(0))):
+    case <-time.After(time.Until(targetPublicationTime)):
     case <-h.ShutdownSignal():
          return
   }
@@ -394,11 +394,16 @@ TODO insert figure
 
 **Discrepancy**
 - As we can see from the figure above, the `Observed Average View Time` (blue solid curve) is just marginally larger than the `Block Publication Delay` (purple dashed curve).
-- `Observed Average View Time` and `Block Publication Delay` use nearly identical temporal reference points (discrepancy is probably on the order of 10s of nanoseconds).  
+- `Observed Average View Time` and `Block Publication Delay` use nearly identical temporal reference points (discrepancy is smaller than 1ms based on prior benchmarks of the `EventHandler`).  
 - There are some additional computation steps that happen in practise, which we have not accounted for in our description here. However, computation can only _increase_ the `Observed Average View Time`
   compared to `Block Publication Delay`. The EventHandler is very fast and in practise we have seen execution times of single-digit milliseconds.   
 - Hence, empirical evidence is supporting the following hypothesis: 
-  - The `MessageHub` accuratley delays the publication of the proposal by `Block Publication Delay` (type `time.Duration`).
-  - **However, the translation introduces some errors: `publicationDelay := time.Until(targetPublicationTime) = time.Until(parentProposal.TimeObserved + ConstrainedBlockTime)`
-  
+  - The `MessageHub` accurately delays the publication of the proposal by `Block Publication Delay` (type `time.Duration`).
+  - However, the **delay computation is inaccurate**: `publicationDelay := time.Until(targetPublicationTime) = time.Until(parentProposal.TimeObserved + ConstrainedBlockTime)`
 
+**Possible Source**
+* Golang's `time` package provides the following [documentation](https://pkg.go.dev/time):
+  > Operating systems provide both a “wall clock,” which is subject to changes for clock synchronization, and a “monotonic clock,” which is not. The general rule is that the wall clock is for telling time and the monotonic clock is for measuring time. Rather than split the API, in this package the Time returned by `time.Now` contains both a wall clock reading and a monotonic clock reading
+  > [..]
+  > On some systems the monotonic clock will stop if the computer [CPU] goes to sleep. On such a system, [..] [some functions] not accurately reflect the actual time that passed [..] such as `After`, `Add` [..] In some cases, you may need to strip the monotonic clock to get accurate results.
+  > The canonical way to strip a monotonic clock reading is to use `t = t.Round(0)`.

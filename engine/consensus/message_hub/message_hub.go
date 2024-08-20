@@ -430,10 +430,16 @@ func (h *MessageHub) OnOwnTimeout(timeout *model.TimeoutObject) {
 // The proposal will only be placed in the queue, after the specified delay (or dropped on shutdown signal).
 func (h *MessageHub) OnOwnProposal(proposal *flow.Header, targetPublicationTime time.Time) {
 	go func() {
-		select {
-		case <-time.After(time.Until(targetPublicationTime)):
-		case <-h.ShutdownSignal():
-			return
+		// `Time.Round(0)` strips the monotonic clock reading for more precise time measurement; see documentation of `time` package for details
+		targetPublicationTime = targetPublicationTime.Round(0)
+		publicationDelay := time.Until(targetPublicationTime)
+		for publicationDelay > 10*time.Millisecond {
+			select {
+			case <-time.After(publicationDelay):
+			case <-h.ShutdownSignal():
+				return
+			}
+			publicationDelay = time.Until(targetPublicationTime)
 		}
 
 		hotstuffProposal := model.ProposalFromFlow(proposal)

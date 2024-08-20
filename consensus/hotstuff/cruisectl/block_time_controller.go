@@ -474,8 +474,14 @@ func (ctl *BlockTimeController) processEpochCommittedPhaseStarted(first *flow.He
 // the event is discarded - since we are taking an average it doesn't matter if we
 // occasionally miss a sample.
 func (ctl *BlockTimeController) OnBlockIncorporated(block *model.Block) {
+	// Documentation of golang's `time` package: `time.Now` contains time stamps from the 'wall clock' and
+	// a 'monotonic clock' (based on counting CPU-cycles). The doc emphasizes that we may need to strip the
+	// monotonic clock to get accurate results. The canonical way to strip a monotonic clock reading from
+	// a `Time` instance `t` is: `t = t.Round(0)`. See cruisectl/README.md for further details.
+	blockObservationTime := time.Now().UTC()
+	blockObservationTime = blockObservationTime.Round(0) // strip a monotonic clock reading
 	select {
-	case ctl.incorporatedBlocks <- TimedBlock{Block: block, TimeObserved: time.Now().UTC()}:
+	case ctl.incorporatedBlocks <- TimedBlock{Block: block, TimeObserved: blockObservationTime}:
 	default:
 	}
 }
@@ -504,7 +510,11 @@ func time2unix(t time.Time) uint64 {
 
 // unix2time converts a UNIX timestamp represented as a uint64 to a time.Time.
 func unix2time(unix uint64) time.Time {
-	return time.Unix(int64(unix), 0)
+	// Documentation of golang's `time` package: `time.Now` contains time stamps from the 'wall clock' and
+	// a 'monotonic clock' (based on counting CPU-cycles). The doc emphasizes that we may need to strip the
+	// monotonic clock to get accurate results. The canonical way to strip a monotonic clock reading from
+	// a `Time` instance `t` is: `t = t.Round(0)`. See cruisectl/README.md for further details.
+	return time.Unix(int64(unix), 0).UTC().Round(0)
 }
 
 // sec2dur converts a floating-point number of seconds to a time.Duration.
