@@ -19,6 +19,17 @@ func NewByAccountRegistersFromPayloadAccountGrouping(
 	*registers.ByAccount,
 	error,
 ) {
+	accountCount := payloadAccountGrouping.Len()
+
+	if accountCount == 0 {
+		return registers.NewByAccount(), nil
+	}
+
+	// Set nWorker to be the lesser of nWorker and accountCount
+	// but greater than 0.
+	nWorker = min(nWorker, accountCount)
+	nWorker = max(nWorker, 1)
+
 	g, ctx := errgroup.WithContext(context.Background())
 
 	jobs := make(chan *PayloadAccountGroup, nWorker)
