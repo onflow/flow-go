@@ -125,7 +125,7 @@ func (m *CadenceBaseMigration) MigrateAccount(
 	var storageHealthErrorBefore error
 	if m.checkStorageHealthBeforeMigration {
 
-		storageHealthErrorBefore = checkStorageHealth(address, storage, accountRegisters, m.nWorkers)
+		storageHealthErrorBefore = util.CheckStorageHealth(address, storage, accountRegisters, AllStorageMapDomains, m.nWorkers)
 		if storageHealthErrorBefore != nil {
 			m.log.Warn().
 				Err(storageHealthErrorBefore).
