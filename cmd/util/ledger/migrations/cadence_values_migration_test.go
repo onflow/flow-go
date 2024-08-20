@@ -2723,3 +2723,180 @@ func runScript(chainID flow.ChainID, registersByAccount *registers.ByAccount, sc
 
 	return res.Value, nil
 }
+
+func TestStorageCapsMigrationDeterminism(t *testing.T) {
+	t.Parallel()
+
+	const nWorker = 4
+
+	const chainID = flow.Emulator
+
+	addressA := common.Address(chainID.Chain().ServiceAddress())
+
+	addressB, err := common.HexToAddress("0xe5a8b7f23e8b548f")
+	require.NoError(t, err)
+
+	rwf := &testReportWriterFactory{}
+
+	logWriter := &writer{}
+	logger := zerolog.New(logWriter).Level(zerolog.ErrorLevel)
+
+	// Store values.
+
+	payloads, err := newBootstrapPayloads(chainID)
+	require.NoError(t, err)
+
+	registersByAccount, err := registers.NewByAccountFromPayloads(payloads)
+	require.NoError(t, err)
+
+	migrationRuntime, err := NewInterpreterMigrationRuntime(
+		registersByAccount,
+		chainID,
+		InterpreterMigrationRuntimeConfig{},
+	)
+	require.NoError(t, err)
+
+	storage := migrationRuntime.Storage
+	storageDomain := common.PathDomainStorage.Identifier()
+
+	// First, create a capability with storage path, issued for account A,
+	// and store it in account A.
+
+	borrowType := interpreter.NewReferenceStaticType(
+		nil,
+		interpreter.UnauthorizedAccess,
+		interpreter.PrimitiveStaticTypeAnyStruct,
+	)
+
+	aCapability := &interpreter.PathCapabilityValue{
+		BorrowType: borrowType,
+		Path:       interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "a"),
+		// Important: Capability must be for address A.
+		Address: interpreter.AddressValue(addressA),
+	}
+
+	storageMapForAddressA := storage.GetStorageMap(
+		addressA,
+		storageDomain,
+		true,
+	)
+
+	aCapStorageMapKey := interpreter.StringStorageMapKey("aCap")
+
+	storageMapForAddressA.WriteValue(
+		migrationRuntime.Interpreter,
+		aCapStorageMapKey,
+		aCapability,
+	)
+
+	// Then, create a capability with storage path, issued for account A,
+	// and store it in account B.
+
+	bCapability := &interpreter.PathCapabilityValue{
+		BorrowType: borrowType,
+		Path:       interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "b"),
+		// Important: Capability must be for address A.
+		Address: interpreter.AddressValue(addressA),
+	}
+
+	storageMapForAddressB := storage.GetStorageMap(
+		addressB,
+		storageDomain,
+		true,
+	)
+
+	bCapStorageMapKey := interpreter.StringStorageMapKey("bCap")
+
+	storageMapForAddressB.WriteValue(
+		migrationRuntime.Interpreter,
+		bCapStorageMapKey,
+		bCapability,
+	)
+
+	// Commit
+
+	err = storage.NondeterministicCommit(migrationRuntime.Interpreter, false)
+	require.NoError(t, err)
+
+	// finalize the transaction
+	result, err := migrationRuntime.TransactionState.FinalizeMainTransaction()
+	require.NoError(t, err)
+
+	// Merge the changes into the registers
+
+	expectedAddresses := map[flow.Address]struct{}{
+		flow.Address(addressA): {},
+		flow.Address(addressB): {},
+	}
+
+	err = registers.ApplyChanges(
+		registersByAccount,
+		result.WriteSet,
+		expectedAddresses,
+		logger,
+	)
+	require.NoError(t, err)
+
+	// Migrate
+
+	// TODO: EVM contract is not deployed in snapshot yet, so can't update it
+	const evmContractChange = EVMContractChangeNone
+
+	const burnerContractChange = BurnerContractChangeUpdate
+
+	migrations := NewCadence1Migrations(
+		logger,
+		t.TempDir(),
+		rwf,
+		Options{
+			NWorker:              nWorker,
+			ChainID:              chainID,
+			EVMContractChange:    evmContractChange,
+			BurnerContractChange: burnerContractChange,
+			VerboseErrorOutput:   true,
+		},
+	)
+
+	for _, migration := range migrations {
+		err = migration.Migrate(registersByAccount)
+		require.NoError(
+			t,
+			err,
+			"migration `%s` failed, logs: %v",
+			migration.Name,
+			logWriter.logs,
+		)
+	}
+
+	reporter := rwf.reportWriters[capabilityValueMigrationReporterName]
+	require.NotNil(t, reporter)
+	require.Len(t, reporter.entries, 4)
+
+	issueStorageCapConReporter := rwf.reportWriters[issueStorageCapConMigrationReporterName]
+	require.NotNil(t, issueStorageCapConReporter)
+	require.Len(t, issueStorageCapConReporter.entries, 2)
+	require.Equal(
+		t,
+		[]any{
+			storageCapConIssuedEntry{
+				AccountAddress: addressA,
+				AddressPath: interpreter.AddressPath{
+					Address: addressA,
+					Path:    interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "a"),
+				},
+				BorrowType:   borrowType,
+				CapabilityID: 6,
+			},
+			storageCapConIssuedEntry{
+				AccountAddress: addressA,
+				AddressPath: interpreter.AddressPath{
+					Address: addressA,
+					Path:    interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "b"),
+				},
+				BorrowType:   borrowType,
+				CapabilityID: 7,
+			},
+		},
+		issueStorageCapConReporter.entries,
+	)
+}
