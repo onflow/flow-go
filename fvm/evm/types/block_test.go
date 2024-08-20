@@ -80,13 +80,13 @@ func Test_BlockProposal(t *testing.T) {
 
 func Test_DecodeHistoricBlocks(t *testing.T) {
 	bv0 := BlockV0{
-		ParentBlockHash:     GenesisBlockHash(flow.Previewnet.Chain().ChainID()),
+		ParentBlockHash:     gethCommon.HexToHash("0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"),
 		Height:              1,
 		Timestamp:           2,
 		TotalSupply:         big.NewInt(3),
 		ReceiptRoot:         gethCommon.Hash{0x04},
 		TransactionHashRoot: gethCommon.Hash{0x05},
-		TotalGasUsed:        6,
+		TotalGasUsed:        0,
 	}
 	b0, err := gethRLP.EncodeToBytes(bv0)
 	require.NoError(t, err)
@@ -113,7 +113,8 @@ func Test_DecodeHistoricBlocks(t *testing.T) {
 	bp0, err := gethRLP.EncodeToBytes(bpv0)
 	require.NoError(t, err)
 
-	bp := decodeBlockProposalBreakingChanges(bp0)
+	bp, err := NewBlockProposalFromBytes(bp0)
+	require.NoError(t, err)
 	require.Equal(t, bp.ParentBlockHash, bpv0.ParentBlockHash)
 	require.Equal(t, bp.Height, bpv0.Height)
 	require.Equal(t, bp.Timestamp, bpv0.Timestamp)
@@ -124,5 +125,4 @@ func Test_DecodeHistoricBlocks(t *testing.T) {
 	require.Empty(t, bp.Prevrandao)
 	require.Len(t, bp.Receipts, 2)
 	require.Len(t, bp.TxHashes, 3)
-
 }

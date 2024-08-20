@@ -34,6 +34,8 @@ contract EVM {
         receiptRoot: [UInt8; 32],
         // root hash of all the transaction hashes
         transactionHashRoot: [UInt8; 32],
+        /// value returned for PREVRANDAO opcode
+        prevrandao: [UInt8; 32],
     )
 
     /// Transaction executed event is emitted every time a transaction
@@ -72,8 +74,6 @@ contract EVM {
         /// This data helps to replay the transactions without the need to
         /// have access to the full cadence state data.
         precompiledCalls: [UInt8],
-        /// random value used for PREVRANDO opcode
-        random: [UInt8; 32],
         /// coinbase value used for COINBASE opcode (if empty no coinbase is set)
         coinbase: String
     )

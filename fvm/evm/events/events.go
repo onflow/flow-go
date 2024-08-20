@@ -42,11 +42,11 @@ type transactionEvent struct {
 // - result: the result of the transaction execution
 // - payload: the RLP-encoded payload of the transaction
 // - blockHeight: the height of the block where the transaction is included
+// - coinbase: address of the coinbase, where the fees are collected
 func NewTransactionEvent(
 	result *types.Result,
 	payload []byte,
 	blockHeight uint64,
-	random gethCommon.Hash,
 	coinbase types.Address,
 ) *Event {
 	var cb *types.Address
@@ -59,7 +59,6 @@ func NewTransactionEvent(
 			BlockHeight: blockHeight,
 			Payload:     payload,
 			Result:      result,
-			Random:      random,
 			Coinbase:    cb,
 		},
 	}
@@ -110,7 +109,6 @@ func (p *transactionEvent) ToCadence(chainID flow.ChainID) (cadence.Event, error
 		cadence.NewUInt64(p.BlockHeight),
 		bytesToCadenceUInt8ArrayValue(p.Result.ReturnedData),
 		bytesToCadenceUInt8ArrayValue(p.Result.PrecompiledCalls),
-		hashToCadenceArrayValue(p.Random),
 		coinbaseAddress,
 	}).WithType(eventType), nil
 }
@@ -144,6 +142,7 @@ func (p *blockEvent) ToCadence(chainID flow.ChainID) (cadence.Event, error) {
 		hashToCadenceArrayValue(p.ParentBlockHash),
 		hashToCadenceArrayValue(p.ReceiptRoot),
 		hashToCadenceArrayValue(p.TransactionHashRoot),
+		hashToCadenceArrayValue(p.Prevrandao),
 	}).WithType(eventType), nil
 }
 
@@ -156,6 +155,7 @@ type BlockEventPayload struct {
 	ParentBlockHash     gethCommon.Hash `cadence:"parentHash"`
 	ReceiptRoot         gethCommon.Hash `cadence:"receiptRoot"`
 	TransactionHashRoot gethCommon.Hash `cadence:"transactionHashRoot"`
+	Prevrandao          gethCommon.Hash `cadence:"prevrandao"`
 }
 
 // DecodeBlockEventPayload decodes Cadence event into block event payload.
@@ -178,7 +178,6 @@ type TransactionEventPayload struct {
 	ErrorMessage     string          `cadence:"errorMessage"`
 	ReturnedData     []byte          `cadence:"returnedData"`
 	PrecompiledCalls []byte          `cadence:"precompiledCalls"`
-	Random           gethCommon.Hash `cadence:"random"`
 	Coinbase         string          `cadence:"coinbase"`
 }
 
