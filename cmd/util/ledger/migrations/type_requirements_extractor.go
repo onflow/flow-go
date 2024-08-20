@@ -2,11 +2,14 @@ package migrations
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
+	"sort"
+
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/old_parser"
-	"github.com/rs/zerolog"
-	"sort"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/cmd/util/ledger/util/registers"
@@ -146,13 +149,50 @@ func extractTypeRequirements(
 	}
 
 	for _, composites := range contractInterface.DeclarationMembers().Composites() {
-		legacyTypeRequirements.typeRequirements = append(
-			legacyTypeRequirements.typeRequirements,
-			TypeRequirement{
-				Address:      contract.location.Address,
-				ContractName: contractInterface.Identifier.Identifier,
-				TypeName:     composites.Identifier.Identifier,
-			},
-		)
+		typeRequirement := TypeRequirement{
+			Address:      contract.location.Address,
+			ContractName: contractInterface.Identifier.Identifier,
+			TypeName:     composites.Identifier.Identifier,
+		}
+
+		legacyTypeRequirements.typeRequirements = append(legacyTypeRequirements.typeRequirements, typeRequirement)
+
+		reporter.Write(typeRequirementRemovalEntry{
+			Address:      typeRequirement.Address,
+			ContractName: typeRequirement.ContractName,
+			TypeName:     typeRequirement.TypeName,
+		})
 	}
+
+	log.Info().Msgf("Collected %d type-requirements", len(legacyTypeRequirements.typeRequirements))
+}
+
+// cadenceValueMigrationFailureEntry
+
+type typeRequirementRemovalEntry struct {
+	Address      common.Address
+	ContractName string
+	TypeName     string
+}
+
+var _ valueMigrationReportEntry = typeRequirementRemovalEntry{}
+
+func (e typeRequirementRemovalEntry) accountAddress() common.Address {
+	return e.Address
+}
+
+var _ json.Marshaler = typeRequirementRemovalEntry{}
+
+func (e typeRequirementRemovalEntry) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		Kind           string `json:"kind"`
+		AccountAddress string `json:"account_address"`
+		ContractName   string `json:"contract_name"`
+		TypeName       string `json:"type_name"`
+	}{
+		Kind:           "cadence-type-requirement-remove",
+		AccountAddress: e.Address.HexWithPrefix(),
+		ContractName:   e.ContractName,
+		TypeName:       e.TypeName,
+	})
 }

@@ -2875,6 +2875,34 @@ func TestTypeRequirementRemovalMigration(t *testing.T) {
 		)
 	}
 
+	// Check reporters
+
+	reporter := rwf.reportWriters[typeRequirementExtractingReporterName]
+	require.NotNil(t, reporter)
+	require.Len(t, reporter.entries, 3)
+
+	assert.Equal(
+		t,
+		[]any{
+			typeRequirementRemovalEntry{
+				Address:      tiblesAddress,
+				ContractName: contractName,
+				TypeName:     "ContentLocation",
+			},
+			typeRequirementRemovalEntry{
+				Address:      tiblesAddress,
+				ContractName: contractName,
+				TypeName:     "Producer",
+			},
+			typeRequirementRemovalEntry{
+				Address:      tiblesAddress,
+				ContractName: contractName,
+				TypeName:     "Minter",
+			},
+		},
+		reporter.entries,
+	)
+
 	// Check account
 
 	_, err = runScript(

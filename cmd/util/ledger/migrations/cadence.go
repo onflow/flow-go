@@ -593,8 +593,7 @@ func NewCadence1ContractsMigrations(
 		Burner:                          opts.BurnerContractChange,
 	}
 
-	var systemContractsMigration *StagedContractsMigration
-	systemContractsMigration = NewSystemContractsMigration(
+	systemContractsMigration := NewSystemContractsMigration(
 		log,
 		rwf,
 		importantLocations,
