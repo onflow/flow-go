@@ -329,7 +329,7 @@ The following figure captures Cruise Control's output and the corresponding beha
 * On testnet, we assume that consensus participants are responsive and not overloaded. In this case, the number of orphaned blocks or timed-out views
   should be entirely negligible (assumption). Hence, we can assume that the protocol proceeds entirely on the happy path with negligible error. 
 
-TODO insert figure
+<img src='https://github.com/user-attachments/assets/3820497b-e134-4c50-8f8d-d710997ff646' width='900'>
 
 * Under the hood, the controller outputs the unconstrained view time $\widehat{\tau}[v]= \tau_0 - u[v]$ (of type [`time.Duration`](https://pkg.go.dev/time)),
   which is wrapped into a [`happyPathBlockTime`](https://github.com/onflow/flow-go/blob/d9f7522d6c502d7e148dab69c926279202677cf8/consensus/hotstuff/cruisectl/proposal_timing.go#L59-L74)
