@@ -17,10 +17,9 @@ const (
 )
 
 type BlockStore struct {
-	chainID             flow.ChainID
-	backend             types.Backend
-	rootAddress         flow.Address
-	cachedBlockProposal *types.BlockProposal
+	chainID     flow.ChainID
+	backend     types.Backend
+	rootAddress flow.Address
 }
 
 var _ types.BlockStore = &BlockStore{}
@@ -77,8 +76,12 @@ func (bs *BlockStore) BlockProposal() (*types.BlockProposal, error) {
 	// expect timestamps in unix seconds so we convert here
 	timestamp := uint64(cadenceBlock.Timestamp / int64(time.Second))
 
-	// Use flow block hash as input for prevrandao
-	prevrandao := gethCommon.BytesToHash(cadenceBlock.Hash[:])
+	// read a random value for block proposal
+	prevrandao := gethCommon.Hash{}
+	err = bs.backend.ReadRandom(prevrandao[:])
+	if err != nil {
+		return nil, err
+	}
 
 	blockProposal := types.NewBlockProposal(
 		parentHash,
@@ -87,6 +90,13 @@ func (bs *BlockStore) BlockProposal() (*types.BlockProposal, error) {
 		lastExecutedBlock.TotalSupply,
 		prevrandao,
 	)
+
+	// store it
+	err = bs.UpdateBlockProposal(blockProposal)
+	if err != nil {
+		return nil, err
+	}
+
 	return blockProposal, nil
 }
 
