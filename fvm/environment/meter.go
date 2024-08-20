@@ -58,14 +58,15 @@ const (
 )
 
 // MainnetExecutionEffortWeights are the execution effort weights as they are
-// on mainnet from 18.8.2022
+// on mainnet from crescendo spork
 var MainnetExecutionEffortWeights = meter.ExecutionEffortWeights{
-	common.ComputationKindStatement:          1569,
-	common.ComputationKindLoop:               1569,
-	common.ComputationKindFunctionInvocation: 1569,
-	ComputationKindGetValue:                  808,
-	ComputationKindCreateAccount:             2837670,
-	ComputationKindSetValue:                  765,
+	common.ComputationKindStatement:          314,
+	common.ComputationKindLoop:               314,
+	common.ComputationKindFunctionInvocation: 314,
+	ComputationKindGetValue:                  162,
+	ComputationKindCreateAccount:             567534,
+	ComputationKindSetValue:                  153,
+	ComputationKindEVMGasUsage:               13,
 }
 
 type Meter interface {
