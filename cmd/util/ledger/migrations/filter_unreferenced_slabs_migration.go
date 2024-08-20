@@ -2,6 +2,7 @@ package migrations
 
 import (
 	"context"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"path"
@@ -23,12 +24,17 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-func registerFromStorageID(storageID atree.StorageID) (owner, key string) {
-	owner = string(storageID.Address[:])
+func registerFromSlabID(slabID atree.SlabID) (owner, key string) {
+	var address [8]byte
+	binary.BigEndian.PutUint64(address[:], slabID.AddressAsUint64())
+
+	index := slabID.Index()
+
+	owner = string(address[:])
 
 	var sb strings.Builder
 	sb.WriteByte(flow.SlabIndexPrefix)
-	sb.Write(storageID.Index[:])
+	sb.Write(index[:])
 	key = sb.String()
 
 	return owner, key
@@ -87,7 +93,7 @@ func (m *FilterUnreferencedSlabsMigration) MigrateAccount(
 		nil,
 	)
 
-	err := checkStorageHealth(address, storage, accountRegisters, m.nWorkers)
+	err := util.CheckStorageHealth(address, storage, accountRegisters, AllStorageMapDomains, m.nWorkers)
 	if err == nil {
 		return nil
 	}
@@ -103,7 +109,7 @@ func (m *FilterUnreferencedSlabsMigration) MigrateAccount(
 
 	// Create a set of unreferenced slabs: root slabs, and all slabs they reference.
 
-	unreferencedSlabIDs := map[atree.StorageID]struct{}{}
+	unreferencedSlabIDs := map[atree.SlabID]struct{}{}
 	for _, rootSlabID := range unreferencedRootSlabsErr.UnreferencedRootSlabIDs {
 		unreferencedSlabIDs[rootSlabID] = struct{}{}
 
@@ -129,28 +135,28 @@ func (m *FilterUnreferencedSlabsMigration) MigrateAccount(
 		Str("account", address.HexWithPrefix()).
 		Msgf("filtering %d unreferenced slabs", len(unreferencedSlabIDs))
 
-	var storageIDs []atree.StorageID
+	var slabIDs []atree.SlabID
 	for storageID := range unreferencedSlabIDs {
-		storageIDs = append(storageIDs, storageID)
+		slabIDs = append(slabIDs, storageID)
 	}
 	sort.Slice(
-		storageIDs,
+		slabIDs,
 		func(i, j int) bool {
-			a := storageIDs[i]
-			b := storageIDs[j]
+			a := slabIDs[i]
+			b := slabIDs[j]
 			return a.Compare(b) < 0
 		},
 	)
 
-	for _, storageID := range storageIDs {
-		owner, key := registerFromStorageID(storageID)
+	for _, slabID := range slabIDs {
+		owner, key := registerFromSlabID(slabID)
 
 		value, err := accountRegisters.Get(owner, key)
 		if err != nil {
 			return fmt.Errorf(
 				"failed to get register for slab %x/%x: %w",
 				owner,
-				storageID.Index,
+				slabID.Index(),
 				err,
 			)
 		}
@@ -160,7 +166,7 @@ func (m *FilterUnreferencedSlabsMigration) MigrateAccount(
 			return fmt.Errorf(
 				"failed to set register for slab %x/%x: %w",
 				owner,
-				storageID.Index,
+				slabID.Index(),
 				err,
 			)
 		}

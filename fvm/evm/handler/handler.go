@@ -32,16 +32,9 @@ type ContractHandler struct {
 	tracer               debug.EVMTracer
 }
 
-func (h *ContractHandler) FlowTokenAddress() common.Address {
-	return h.flowTokenAddress
-}
-
-func (h *ContractHandler) EVMContractAddress() common.Address {
-	return common.Address(h.evmContractAddress)
-}
-
 var _ types.ContractHandler = &ContractHandler{}
 
+// NewContractHandler constructs a new ContractHandler
 func NewContractHandler(
 	flowChainID flow.ChainID,
 	evmContractAddress flow.Address,
@@ -54,35 +47,56 @@ func NewContractHandler(
 	tracer debug.EVMTracer,
 ) *ContractHandler {
 	return &ContractHandler{
-		flowChainID:          flowChainID,
-		evmContractAddress:   evmContractAddress,
-		flowTokenAddress:     flowTokenAddress,
-		blockStore:           blockStore,
-		addressAllocator:     addressAllocator,
-		backend:              backend,
-		emulator:             emulator,
-		tracer:               tracer,
-		precompiledContracts: preparePrecompiledContracts(evmContractAddress, randomBeaconAddress, addressAllocator, backend),
+		flowChainID:        flowChainID,
+		evmContractAddress: evmContractAddress,
+		flowTokenAddress:   flowTokenAddress,
+		blockStore:         blockStore,
+		addressAllocator:   addressAllocator,
+		backend:            backend,
+		emulator:           emulator,
+		tracer:             tracer,
+		precompiledContracts: preparePrecompiledContracts(
+			evmContractAddress,
+			randomBeaconAddress,
+			addressAllocator,
+			backend,
+		),
 	}
+}
+
+// FlowTokenAddress returns the address where the FlowToken contract is deployed
+func (h *ContractHandler) FlowTokenAddress() common.Address {
+	return h.flowTokenAddress
+}
+
+// EVMContractAddress returns the address where EVM contract is deployed
+func (h *ContractHandler) EVMContractAddress() common.Address {
+	return common.Address(h.evmContractAddress)
 }
 
 // DeployCOA deploys a cadence-owned-account and returns the address
 func (h *ContractHandler) DeployCOA(uuid uint64) types.Address {
+	// capture open tracing traces
 	defer h.backend.StartChildSpan(trace.FVMEVMDeployCOA).End()
 
 	res, err := h.deployCOA(uuid)
 	panicOnErrorOrInvalidOrFailedState(res, err)
+
 	return *res.DeployedContractAddress
 }
 
 func (h *ContractHandler) deployCOA(uuid uint64) (*types.Result, error) {
-	target := h.addressAllocator.AllocateCOAAddress(uuid)
+	// step 1 - check enough computation is available
 	gaslimit := types.GasLimit(coa.ContractDeploymentRequiredGas)
 	err := h.checkGasLimit(gaslimit)
 	if err != nil {
 		return nil, err
 	}
 
+	// step 2 - allocate a new address for the COA
+	target := h.addressAllocator.AllocateCOAAddress(uuid)
+
+	// step 3 - create a COA deployment call
 	factory := h.addressAllocator.COAFactoryAddress()
 	factoryAccount := h.AccountByAddress(factory, false)
 	factoryNonce := factoryAccount.Nonce()
@@ -95,12 +109,15 @@ func (h *ContractHandler) deployCOA(uuid uint64) (*types.Result, error) {
 		factoryNonce,
 	)
 
-	ctx, err := h.getBlockContext()
+	// step 4 - execute the call
+	res, err := h.executeAndHandleCall(call, nil, false)
 	if err != nil {
 		return nil, err
 	}
+
+	// step 5 - if successful COA metrics
 	h.backend.SetNumberOfDeployedCOAs(factoryNonce)
-	return h.executeAndHandleCall(ctx, call, nil, false)
+	return res, nil
 }
 
 // AccountByAddress returns the account for the given address,
@@ -116,20 +133,26 @@ func (h *ContractHandler) LastExecutedBlock() *types.Block {
 	return block
 }
 
-// RunOrPanic runs an rlpencoded evm transaction and
+// RunOrPanic runs an rlp-encoded evm transaction and
 // collects the gas fees and pay it to the coinbase address provided.
 func (h *ContractHandler) RunOrPanic(rlpEncodedTx []byte, coinbase types.Address) {
+	// capture open tracing span
+	defer h.backend.StartChildSpan(trace.FVMEVMRun).End()
+
 	res, err := h.run(rlpEncodedTx, coinbase)
 	panicOnErrorOrInvalidOrFailedState(res, err)
 }
 
-// Run tries to run an rlpencoded evm transaction and
+// Run tries to run an rlp-encoded evm transaction and
 // collects the gas fees and pay it to the coinbase address provided.
 func (h *ContractHandler) Run(rlpEncodedTx []byte, coinbase types.Address) *types.ResultSummary {
+	// capture open tracing span
 	defer h.backend.StartChildSpan(trace.FVMEVMRun).End()
 
 	res, err := h.run(rlpEncodedTx, coinbase)
 	panicOnError(err)
+
+	// return the result summary
 	return res.ResultSummary()
 }
 
@@ -137,46 +160,41 @@ func (h *ContractHandler) Run(rlpEncodedTx []byte, coinbase types.Address) *type
 // collects the gas fees and pay it to the coinbase address provided.
 // All transactions provided in the batch are included in a single block,
 // except for invalid transactions
-func (h *ContractHandler) BatchRun(rlpEncodedTxs [][]byte, coinbase types.Address) []*types.ResultSummary {
+func (h *ContractHandler) BatchRun(
+	rlpEncodedTxs [][]byte,
+	coinbase types.Address,
+) []*types.ResultSummary {
+	// capture open tracing
 	span := h.backend.StartChildSpan(trace.FVMEVMBatchRun)
 	span.SetAttributes(attribute.Int("tx_counts", len(rlpEncodedTxs)))
 	defer span.End()
 
+	// batch run transactions and panic if any error
 	res, err := h.batchRun(rlpEncodedTxs, coinbase)
 	panicOnError(err)
 
-	resSummary := make([]*types.ResultSummary, len(res))
+	// convert results into result summaries
+	resSummaries := make([]*types.ResultSummary, len(res))
 	for i, r := range res {
-		resSummary[i] = r.ResultSummary()
+		resSummaries[i] = r.ResultSummary()
 	}
-	return resSummary
+	return resSummaries
 }
 
-func (h *ContractHandler) batchRun(rlpEncodedTxs [][]byte, coinbase types.Address) ([]*types.Result, error) {
-	// prepare block view used to run the batch
-	ctx, err := h.getBlockContext()
-	if err != nil {
-		return nil, err
-	}
-
-	ctx.GasFeeCollector = coinbase
-	blk, err := h.emulator.NewBlockView(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	bp, err := h.blockStore.BlockProposal()
-	if err != nil {
-		return nil, err
-	}
-
-	// decode all transactions and calculate total gas limit
+func (h *ContractHandler) batchRun(
+	rlpEncodedTxs [][]byte,
+	coinbase types.Address,
+) ([]*types.Result, error) {
+	// step 1 - transaction decoding and compute total gas needed
+	// This is safe to be done before checking the gas
+	// as it has its own metering
 	var totalGasLimit types.GasLimit
 	batchLen := len(rlpEncodedTxs)
 	txs := make([]*gethTypes.Transaction, batchLen)
 
 	for i, rlpEncodedTx := range rlpEncodedTxs {
 		tx, err := h.decodeTransaction(rlpEncodedTx)
+		// if any tx fails decoding revert the batch
 		if err != nil {
 			return nil, err
 		}
@@ -185,23 +203,38 @@ func (h *ContractHandler) batchRun(rlpEncodedTxs [][]byte, coinbase types.Addres
 		totalGasLimit += types.GasLimit(tx.Gas())
 	}
 
-	// check if all transactions in the batch are below gas limit
-	err = h.checkGasLimit(totalGasLimit)
+	// step 2 - check if enough computation is available
+	// for the whole batch
+	err := h.checkGasLimit(totalGasLimit)
 	if err != nil {
 		return nil, err
 	}
 
+	// step 3 - prepare block context
+	ctx, err := h.getBlockContext()
+	if err != nil {
+		return nil, err
+	}
+	ctx.GasFeeCollector = coinbase
+
+	// step 4 - create a block view
+	blk, err := h.emulator.NewBlockView(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// step 5 - batch run transactions
 	res, err := blk.BatchRunTransactions(txs)
 	if err != nil {
 		return nil, err
 	}
-
-	// safety check for result
-	if len(res) == 0 {
+	if len(res) == 0 { // safety check for result
 		return nil, types.ErrUnexpectedEmptyResult
 	}
 
-	// meter all the transaction gas usage and append hashes to the block
+	var hasAtLeastOneValid bool
+	// step 6 - meter all the transaction gas usage
+	// and append hashes to the block
 	for _, r := range res {
 		// meter gas anyway (even for invalid or failed states)
 		err = h.meterGasUsage(r)
@@ -211,20 +244,32 @@ func (h *ContractHandler) batchRun(rlpEncodedTxs [][]byte, coinbase types.Addres
 
 		// include it in a block only if valid (not invalid)
 		if !r.Invalid() {
-			bp.AppendTransaction(r)
+			hasAtLeastOneValid = true
 		}
 	}
 
-	// if there were no valid transactions skip emitting events
-	// and update the block proposal
-	if len(bp.TxHashes) == 0 {
+	// step 7 - if there were no valid transactions
+	// skip the rest of steps
+	if !hasAtLeastOneValid {
 		return res, nil
 	}
 
+	// load block proposal
+	bp, err := h.blockStore.BlockProposal()
+	if err != nil {
+		return nil, err
+	}
+
+	// for valid transactions
 	for i, r := range res {
 		if r.Invalid() { // don't emit events for invalid tx
 			continue
 		}
+
+		// step 8 - update block proposal
+		bp.AppendTransaction(r)
+
+		// step 9 - emit transaction event
 		err = h.emitEvent(events.NewTransactionEvent(
 			r,
 			rlpEncodedTxs[i],
@@ -234,13 +279,14 @@ func (h *ContractHandler) batchRun(rlpEncodedTxs [][]byte, coinbase types.Addres
 			return nil, err
 		}
 
-		// step 4 - update metrics
+		// step 10 - report metrics
 		h.backend.EVMTransactionExecuted(
 			r.GasConsumed,
 			false,
 			r.Failed(),
 		)
 
+		// step 11 - collect traces
 		h.tracer.Collect(r.TxHash)
 	}
 
@@ -253,7 +299,8 @@ func (h *ContractHandler) batchRun(rlpEncodedTxs [][]byte, coinbase types.Addres
 	return res, nil
 }
 
-// CommitBlockProposal commits the block proposal and add a new block to the EVM blockchain
+// CommitBlockProposal commits the block proposal
+// and add a new block to the EVM blockchain
 func (h *ContractHandler) CommitBlockProposal() {
 	panicOnError(h.commitBlockProposal())
 }
@@ -284,6 +331,15 @@ func (h *ContractHandler) commitBlockProposal() error {
 		types.UnsafeCastOfBalanceToFloat64(bp.TotalSupply),
 	)
 
+	// log evm block commitment
+	logger := h.backend.Logger()
+	logger.Info().
+		Uint64("height", bp.Height).
+		Int("tx_count", len(bp.TxHashes)).
+		Uint64("total_gas_used", bp.TotalGasUsed).
+		Uint64("total_supply", bp.TotalSupply.Uint64()).
+		Msg("EVM Block Committed")
+
 	return nil
 }
 
@@ -297,44 +353,46 @@ func (h *ContractHandler) run(
 		return nil, err
 	}
 
-	// step 2 - run transaction
+	// step 2 - check if enough computation is available
 	err = h.checkGasLimit(types.GasLimit(tx.Gas()))
 	if err != nil {
 		return nil, err
 	}
 
+	// step 3 - prepare block context
 	ctx, err := h.getBlockContext()
 	if err != nil {
 		return nil, err
 	}
 	ctx.GasFeeCollector = coinbase
+
+	// step 4 - create a block view
 	blk, err := h.emulator.NewBlockView(ctx)
 	if err != nil {
 		return nil, err
 	}
 
+	// step 5 - run transaction
 	res, err := blk.RunTransaction(tx)
 	if err != nil {
 		return nil, err
 	}
-
-	// safety check for result
-	if res == nil {
+	if res == nil { // safety check for result
 		return nil, types.ErrUnexpectedEmptyResult
 	}
 
-	// meter gas anyway (even for invalid or failed states)
+	// step 6 - meter gas anyway (even for invalid or failed states)
 	err = h.meterGasUsage(res)
 	if err != nil {
 		return nil, err
 	}
 
-	// if is invalid tx skip the next steps (forming block, ...)
+	// step 7 - skip the rest if is invalid tx
 	if res.Invalid() {
 		return res, nil
 	}
 
-	// step 3 - update the block proposal
+	// step 8 - update the block proposal
 	bp, err := h.blockStore.BlockProposal()
 	if err != nil {
 		return nil, err
@@ -345,24 +403,26 @@ func (h *ContractHandler) run(
 		return nil, err
 	}
 
-	// step 4 - emit events
+	// step 9 - emit transaction event
 	err = h.emitEvent(events.NewTransactionEvent(res, rlpEncodedTx, bp.Height))
 	if err != nil {
 		return nil, err
 	}
 
-	// step 4 - update metrics
+	// step 10 - report metrics
 	h.backend.EVMTransactionExecuted(
 		res.GasConsumed,
 		false,
 		res.Failed(),
 	)
 
-	// step 6 - collect traces
+	// step 11 - collect traces
 	h.tracer.Collect(res.TxHash)
+
 	return res, nil
 }
 
+// DryRun simulates execution of the provided RLP-encoded and unsigned transaction.
 func (h *ContractHandler) DryRun(
 	rlpEncodedTx []byte,
 	from types.Address,
@@ -371,6 +431,7 @@ func (h *ContractHandler) DryRun(
 
 	res, err := h.dryRun(rlpEncodedTx, from)
 	panicOnError(err)
+
 	return res.ResultSummary()
 }
 
@@ -405,15 +466,15 @@ func (h *ContractHandler) dryRun(
 	if err != nil {
 		return nil, err
 	}
-
-	// saftey check for result
-	if res == nil {
+	if res == nil { // safety check for result
 		return nil, types.ErrUnexpectedEmptyResult
 	}
 
 	return res, nil
 }
 
+// checkGasLimit checks if enough computation is left in the environment
+// before attempting executing a evm operation
 func (h *ContractHandler) checkGasLimit(limit types.GasLimit) error {
 	// check gas limit against what has been left on the transaction side
 	if !h.backend.ComputationAvailable(environment.ComputationKindEVMGasUsage, uint(limit)) {
@@ -480,40 +541,49 @@ func (h *ContractHandler) getBlockContext() (types.BlockContext, error) {
 }
 
 func (h *ContractHandler) executeAndHandleCall(
-	ctx types.BlockContext,
 	call *types.DirectCall,
 	totalSupplyDiff *big.Int,
 	deductSupplyDiff bool,
 ) (*types.Result, error) {
-	// execute the call
+	// step 1 - check enough computation is available
+	if err := h.checkGasLimit(types.GasLimit(call.GasLimit)); err != nil {
+		return nil, err
+	}
+
+	// step 2 - prepare the block context
+	ctx, err := h.getBlockContext()
+	if err != nil {
+		return nil, err
+	}
+
+	// step 3 - create block view
 	blk, err := h.emulator.NewBlockView(ctx)
 	if err != nil {
 		return nil, err
 	}
 
+	// step 4 - run direct call
 	res, err := blk.DirectCall(call)
 	// check backend errors first
 	if err != nil {
 		return nil, err
 	}
-
-	// safety check for result
-	if res == nil {
+	if res == nil { // safety check for result
 		return nil, types.ErrUnexpectedEmptyResult
 	}
 
-	// gas meter even invalid or failed status
+	// step 5 - gas meter even invalid or failed status
 	err = h.meterGasUsage(res)
 	if err != nil {
 		return nil, err
 	}
 
-	// if is invalid skip the rest of states
+	// step 6 - if is invalid skip the rest of states
 	if res.Invalid() {
 		return res, nil
 	}
 
-	// update block proposal
+	// step 7 - update block proposal
 	bp, err := h.blockStore.BlockProposal()
 	if err != nil {
 		return nil, err
@@ -522,6 +592,7 @@ func (h *ContractHandler) executeAndHandleCall(
 	// append transaction to the block proposal
 	bp.AppendTransaction(res)
 
+	// update total supply if applicable
 	if res.Successful() && totalSupplyDiff != nil {
 		if deductSupplyDiff {
 			bp.TotalSupply = new(big.Int).Sub(bp.TotalSupply, totalSupplyDiff)
@@ -539,12 +610,11 @@ func (h *ContractHandler) executeAndHandleCall(
 		return nil, err
 	}
 
-	// emit events
+	// step 8 - emit transaction event
 	encoded, err := call.Encode()
 	if err != nil {
 		return nil, err
 	}
-
 	err = h.emitEvent(
 		events.NewTransactionEvent(res, encoded, bp.Height),
 	)
@@ -552,15 +622,16 @@ func (h *ContractHandler) executeAndHandleCall(
 		return nil, err
 	}
 
-	// metric
+	// step 9 - report metrics
 	h.backend.EVMTransactionExecuted(
 		res.GasConsumed,
 		true,
 		res.Failed(),
 	)
 
-	// collect traces
+	// step 10 - collect traces
 	h.tracer.Collect(res.TxHash)
+
 	return res, nil
 }
 
@@ -593,7 +664,7 @@ func (a *Account) Address() types.Address {
 // Nonce returns the nonce of this account
 //
 // Note: we don't meter any extra computation given reading data
-// from the storage already transalates into computation
+// from the storage already translates into computation
 func (a *Account) Nonce() uint64 {
 	nonce, err := a.nonce()
 	panicOnError(err)
@@ -617,7 +688,7 @@ func (a *Account) nonce() (uint64, error) {
 // Balance returns the balance of this account
 //
 // Note: we don't meter any extra computation given reading data
-// from the storage already transalates into computation
+// from the storage already translates into computation
 func (a *Account) Balance() types.Balance {
 	bal, err := a.balance()
 	panicOnError(err)
@@ -642,7 +713,7 @@ func (a *Account) balance() (types.Balance, error) {
 // Code returns the code of this account
 //
 // Note: we don't meter any extra computation given reading data
-// from the storage already transalates into computation
+// from the storage already translates into computation
 func (a *Account) Code() types.Code {
 	code, err := a.code()
 	panicOnError(err)
@@ -665,7 +736,7 @@ func (a *Account) code() (types.Code, error) {
 // CodeHash returns the code hash of this account
 //
 // Note: we don't meter any extra computation given reading data
-// from the storage already transalates into computation
+// from the storage already translates into computation
 func (a *Account) CodeHash() []byte {
 	codeHash, err := a.codeHash()
 	panicOnError(err)
@@ -690,26 +761,20 @@ func (a *Account) codeHash() ([]byte, error) {
 func (a *Account) Deposit(v *types.FLOWTokenVault) {
 	defer a.fch.backend.StartChildSpan(trace.FVMEVMDeposit).End()
 
-	res, err := a.deposit(v)
-	panicOnErrorOrInvalidOrFailedState(res, err)
-}
-
-func (a *Account) deposit(v *types.FLOWTokenVault) (*types.Result, error) {
 	bridge := a.fch.addressAllocator.NativeTokenBridgeAddress()
 	bridgeAccount := a.fch.AccountByAddress(bridge, false)
-
-	call := types.NewDepositCall(
-		bridge,
-		a.address,
+	// Note: its not an authorized call
+	res, err := a.fch.executeAndHandleCall(
+		types.NewDepositCall(
+			bridge,
+			a.address,
+			v.Balance(),
+			bridgeAccount.Nonce(),
+		),
 		v.Balance(),
-		bridgeAccount.Nonce(),
+		false,
 	)
-	ctx, err := a.precheck(false, types.GasLimit(call.GasLimit))
-	if err != nil {
-		return nil, err
-	}
-
-	return a.fch.executeAndHandleCall(ctx, call, v.Balance(), false)
+	panicOnErrorOrInvalidOrFailedState(res, err)
 }
 
 // Withdraw deducts the balance from the account and
@@ -717,52 +782,34 @@ func (a *Account) deposit(v *types.FLOWTokenVault) (*types.Result, error) {
 func (a *Account) Withdraw(b types.Balance) *types.FLOWTokenVault {
 	defer a.fch.backend.StartChildSpan(trace.FVMEVMWithdraw).End()
 
-	res, err := a.withdraw(b)
+	res, err := a.executeAndHandleAuthorizedCall(
+		types.NewWithdrawCall(
+			a.fch.addressAllocator.NativeTokenBridgeAddress(),
+			a.address,
+			b,
+			a.Nonce(),
+		),
+		b,
+		true,
+	)
 	panicOnErrorOrInvalidOrFailedState(res, err)
 
 	return types.NewFlowTokenVault(b)
 }
 
-func (a *Account) withdraw(b types.Balance) (*types.Result, error) {
-	call := types.NewWithdrawCall(
-		a.fch.addressAllocator.NativeTokenBridgeAddress(),
-		a.address,
-		b,
-		a.Nonce(),
-	)
-
-	ctx, err := a.precheck(true, types.GasLimit(call.GasLimit))
-	if err != nil {
-		return nil, err
-	}
-
-	// Don't allow withdraw for balances that has rounding error
-	if types.BalanceConvertionToUFix64ProneToRoundingError(b) {
-		return nil, types.ErrWithdrawBalanceRounding
-	}
-
-	return a.fch.executeAndHandleCall(ctx, call, b, true)
-}
-
 // Transfer transfers tokens between accounts
 func (a *Account) Transfer(to types.Address, balance types.Balance) {
-	res, err := a.transfer(to, balance)
-	panicOnErrorOrInvalidOrFailedState(res, err)
-}
-
-func (a *Account) transfer(to types.Address, balance types.Balance) (*types.Result, error) {
-	call := types.NewTransferCall(
-		a.address,
-		to,
-		balance,
-		a.Nonce(),
+	res, err := a.executeAndHandleAuthorizedCall(
+		types.NewTransferCall(
+			a.address,
+			to,
+			balance,
+			a.Nonce(),
+		),
+		nil,
+		false,
 	)
-	ctx, err := a.precheck(true, types.GasLimit(call.GasLimit))
-	if err != nil {
-		return nil, err
-	}
-
-	return a.fch.executeAndHandleCall(ctx, call, nil, false)
+	panicOnErrorOrInvalidOrFailedState(res, err)
 }
 
 // Deploy deploys a contract to the EVM environment
@@ -770,27 +817,23 @@ func (a *Account) transfer(to types.Address, balance types.Balance) (*types.Resu
 // contained in the result summary as data and
 // the contract data is not controlled by the caller accounts
 func (a *Account) Deploy(code types.Code, gaslimit types.GasLimit, balance types.Balance) *types.ResultSummary {
+	// capture open tracing span
 	defer a.fch.backend.StartChildSpan(trace.FVMEVMDeploy).End()
 
-	res, err := a.deploy(code, gaslimit, balance)
-	panicOnError(err)
-	return res.ResultSummary()
-}
-
-func (a *Account) deploy(code types.Code, gaslimit types.GasLimit, balance types.Balance) (*types.Result, error) {
-	ctx, err := a.precheck(true, gaslimit)
-	if err != nil {
-		return nil, err
-	}
-
-	call := types.NewDeployCall(
-		a.address,
-		code,
-		uint64(gaslimit),
-		balance,
-		a.Nonce(),
+	res, err := a.executeAndHandleAuthorizedCall(
+		types.NewDeployCall(
+			a.address,
+			code,
+			uint64(gaslimit),
+			balance,
+			a.Nonce(),
+		),
+		nil,
+		false,
 	)
-	return a.fch.executeAndHandleCall(ctx, call, nil, false)
+	panicOnError(err)
+
+	return res.ResultSummary()
 }
 
 // Call calls a smart contract function with the given data
@@ -798,41 +841,35 @@ func (a *Account) deploy(code types.Code, gaslimit types.GasLimit, balance types
 // given it doesn't goes beyond what Flow transaction allows.
 // the balance would be deducted from the OFA account and would be transferred to the target address
 func (a *Account) Call(to types.Address, data types.Data, gaslimit types.GasLimit, balance types.Balance) *types.ResultSummary {
+	// capture open tracing span
 	defer a.fch.backend.StartChildSpan(trace.FVMEVMCall).End()
 
-	res, err := a.call(to, data, gaslimit, balance)
+	res, err := a.executeAndHandleAuthorizedCall(
+		types.NewContractCall(
+			a.address,
+			to,
+			data,
+			uint64(gaslimit),
+			balance,
+			a.Nonce(),
+		),
+		nil,
+		false,
+	)
 	panicOnError(err)
+
 	return res.ResultSummary()
 }
 
-func (a *Account) call(to types.Address, data types.Data, gaslimit types.GasLimit, balance types.Balance) (*types.Result, error) {
-	ctx, err := a.precheck(true, gaslimit)
-	if err != nil {
-		return nil, err
+func (a *Account) executeAndHandleAuthorizedCall(
+	call *types.DirectCall,
+	totalSupplyDiff *big.Int,
+	deductSupplyDiff bool,
+) (*types.Result, error) {
+	if !a.isAuthorized {
+		return nil, types.ErrUnauthorizedMethodCall
 	}
-	call := types.NewContractCall(
-		a.address,
-		to,
-		data,
-		uint64(gaslimit),
-		balance,
-		a.Nonce(),
-	)
-
-	return a.fch.executeAndHandleCall(ctx, call, nil, false)
-}
-
-func (a *Account) precheck(authorized bool, gaslimit types.GasLimit) (types.BlockContext, error) {
-	// check if account is authorized (i.e. is a COA)
-	if authorized && !a.isAuthorized {
-		return types.BlockContext{}, types.ErrUnauthorizedMethodCall
-	}
-	err := a.fch.checkGasLimit(gaslimit)
-	if err != nil {
-		return types.BlockContext{}, err
-	}
-
-	return a.fch.getBlockContext()
+	return a.fch.executeAndHandleCall(call, totalSupplyDiff, deductSupplyDiff)
 }
 
 func panicOnErrorOrInvalidOrFailedState(res *types.Result, err error) {

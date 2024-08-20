@@ -111,10 +111,10 @@ func (dr *CadenceValueDiffReporter) DiffStates(oldRegs, newRegs registers.Regist
 	var loadAtreeStorageGroup errgroup.Group
 
 	loadAtreeStorageGroup.Go(func() (err error) {
-		return loadAtreeSlabsInStorage(oldStorage, oldRegs, dr.nWorkers)
+		return util.LoadAtreeSlabsInStorage(oldStorage, oldRegs, dr.nWorkers)
 	})
 
-	err := loadAtreeSlabsInStorage(newStorage, newRegs, dr.nWorkers)
+	err := util.LoadAtreeSlabsInStorage(newStorage, newRegs, dr.nWorkers)
 	if err != nil {
 		dr.reportWriter.Write(
 			diffError{
@@ -988,13 +988,13 @@ func (dr *CadenceValueDiffReporter) diffCadenceDictionaryValue(
 	}
 
 	oldKeys := make([]interpreter.Value, 0, v.Count())
-	v.IterateKeys(vInterpreter, func(key interpreter.Value) (resume bool) {
+	v.IterateKeys(vInterpreter, interpreter.EmptyLocationRange, func(key interpreter.Value) (resume bool) {
 		oldKeys = append(oldKeys, key)
 		return true
 	})
 
 	newKeys := make([]interpreter.Value, 0, otherDictionary.Count())
-	otherDictionary.IterateKeys(otherInterpreter, func(key interpreter.Value) (resume bool) {
+	otherDictionary.IterateKeys(otherInterpreter, interpreter.EmptyLocationRange, func(key interpreter.Value) (resume bool) {
 		newKeys = append(newKeys, key)
 		return true
 	})

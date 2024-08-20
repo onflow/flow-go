@@ -40,8 +40,8 @@ type State struct {
 	}
 	params                      protocol.Params
 	protocolKVStoreSnapshotsDB  storage.ProtocolKVStore
-	epochProtocolStateEntriesDB storage.EpochProtocolStateEntries // TODO remove when EpochProtocolStateEntry is stored in KVStore
-	protocolState               protocol.MutableProtocolState
+	epochProtocolStateEntriesDB storage.EpochProtocolStateEntries // TODO remove when MinEpochStateEntry is stored in KVStore
+	protocolState               protocol.ProtocolState
 	versionBeacons              storage.VersionBeacons
 
 	// finalizedRootHeight marks the cutoff of the history this node knows about. We cache it in the state
@@ -181,10 +181,7 @@ func Bootstrap(
 			return fmt.Errorf("could not bootstrap version beacon: %w", err)
 		}
 
-		// set metric values, we pass `false` here since this node has empty storage and doesn't know anything about EFM.
-		// TODO for 'leaving Epoch Fallback via special service event', this needs to be updated to support bootstrapping
-		// while in EFM, currently initial state doesn't know how to bootstrap node when we have entered EFM.
-		err = updateEpochMetrics(metrics, root, false)
+		err = updateEpochMetrics(metrics, root)
 		if err != nil {
 			return fmt.Errorf("could not update epoch metrics: %w", err)
 		}
@@ -562,7 +559,7 @@ func bootstrapEpochForProtocolStateEntry(
 		}
 
 		// insert epoch protocol state entry, which references above service events
-		err := operation.SkipDuplicatesTx(epochProtocolStateSnapshots.StoreTx(richEntry.ID(), richEntry.EpochProtocolStateEntry))(tx)
+		err := operation.SkipDuplicatesTx(epochProtocolStateSnapshots.StoreTx(richEntry.ID(), richEntry.MinEpochStateEntry))(tx)
 		if err != nil {
 			return fmt.Errorf("could not store epoch protocol state entry: %w", err)
 		}
@@ -593,12 +590,6 @@ func bootstrapSporkInfo(root protocol.Snapshot) func(*transaction.Tx) error {
 		err = operation.InsertProtocolVersion(version)(bdtx)
 		if err != nil {
 			return fmt.Errorf("could not insert protocol version: %w", err)
-		}
-
-		threshold := params.EpochCommitSafetyThreshold()
-		err = operation.InsertEpochCommitSafetyThreshold(threshold)(bdtx)
-		if err != nil {
-			return fmt.Errorf("could not insert epoch commit safety threshold: %w", err)
 		}
 
 		return nil
@@ -712,13 +703,7 @@ func OpenState(
 	}
 	metrics.SealedHeight(sealed.Height)
 
-	epochFallbackTriggered, err := state.isEpochEmergencyFallbackTriggered()
-	if err != nil {
-		return nil, fmt.Errorf("could not check epoch emergency fallback flag: %w", err)
-	}
-
-	// update all epoch related metrics
-	err = updateEpochMetrics(metrics, finalSnapshot, epochFallbackTriggered)
+	err = updateEpochMetrics(metrics, finalSnapshot)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update epoch metrics: %w", err)
 	}
@@ -757,9 +742,7 @@ func (state *State) Final() protocol.Snapshot {
 //     -> if the given height is below the root height
 //   - exception for critical unexpected storage errors
 func (state *State) AtHeight(height uint64) protocol.Snapshot {
-	// retrieve the block ID for the finalized height
-	var blockID flow.Identifier
-	err := state.db.View(operation.LookupBlockHeight(height, &blockID))
+	blockID, err := state.headers.BlockIDByHeight(height)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
 			return invalid.NewSnapshotf("unknown finalized height %d: %w", height, statepkg.ErrUnknownSnapshotReference)
@@ -825,14 +808,10 @@ func newState(
 		protocolKVStoreSnapshotsDB:  protocolKVStoreSnapshots,
 		epochProtocolStateEntriesDB: epochProtocolStateSnapshots,
 		protocolState: protocol_state.
-			NewMutableProtocolState(
+			NewProtocolState(
 				epochProtocolStateSnapshots,
 				protocolKVStoreSnapshots,
 				params,
-				headers,
-				results,
-				setups,
-				commits,
 			),
 		versionBeacons:     versionBeacons,
 		cachedLatestFinal:  new(atomic.Pointer[cachedHeader]),
@@ -863,7 +842,7 @@ func IsBootstrapped(db *badger.DB) (bool, error) {
 
 // updateEpochMetrics update the `consensus_compliance_current_epoch_counter` and the
 // `consensus_compliance_current_epoch_phase` metric
-func updateEpochMetrics(metrics module.ComplianceMetrics, snap protocol.Snapshot, epochFallbackTriggered bool) error {
+func updateEpochMetrics(metrics module.ComplianceMetrics, snap protocol.Snapshot) error {
 
 	// update epoch counter
 	counter, err := snap.Epochs().Current().Counter()
@@ -873,7 +852,7 @@ func updateEpochMetrics(metrics module.ComplianceMetrics, snap protocol.Snapshot
 	metrics.CurrentEpochCounter(counter)
 
 	// update epoch phase
-	phase, err := snap.Phase()
+	phase, err := snap.EpochPhase()
 	if err != nil {
 		return fmt.Errorf("could not get current epoch counter: %w", err)
 	}
@@ -890,14 +869,15 @@ func updateEpochMetrics(metrics module.ComplianceMetrics, snap protocol.Snapshot
 		return fmt.Errorf("could not get dkg phase final view: %w", err)
 	}
 
-	metrics.CurrentDKGPhase1FinalView(dkgPhase1FinalView)
-	metrics.CurrentDKGPhase2FinalView(dkgPhase2FinalView)
-	metrics.CurrentDKGPhase3FinalView(dkgPhase3FinalView)
+	metrics.CurrentDKGPhaseViews(dkgPhase1FinalView, dkgPhase2FinalView, dkgPhase3FinalView)
 
-	// EFM - check whether the epoch emergency fallback flag has been set
-	// in the database. If so, skip updating any epoch-related metrics.
-	if epochFallbackTriggered {
-		metrics.EpochEmergencyFallbackTriggered()
+	epochProtocolState, err := snap.EpochProtocolState()
+	if err != nil {
+		return fmt.Errorf("could not get epoch protocol state: %w", err)
+	}
+	// notify whether epoch fallback mode is active
+	if epochProtocolState.EpochFallbackTriggered() {
+		metrics.EpochFallbackModeTriggered()
 	}
 
 	return nil
@@ -968,17 +948,4 @@ func (state *State) populateCache() error {
 	}
 
 	return nil
-}
-
-// isEpochEmergencyFallbackTriggered checks whether epoch fallback has been globally triggered.
-// TODO(efm-recovery): Stop storing a global EFM flag, use parentState.EFMTriggered instead
-//
-// Returns:
-// * (true, nil) if epoch fallback is triggered
-// * (false, nil) if epoch fallback is not triggered (including if the flag is not set)
-// * (false, err) if an unexpected error occurs
-func (state *State) isEpochEmergencyFallbackTriggered() (bool, error) {
-	var triggered bool
-	err := state.db.View(operation.CheckEpochEmergencyFallbackTriggered(&triggered))
-	return triggered, err
 }

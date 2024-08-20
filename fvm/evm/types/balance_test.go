@@ -13,7 +13,7 @@ import (
 
 func TestBalance(t *testing.T) {
 	// test attoflow to flow
-	bal := types.OneFlowBalance
+	bal := types.OneFlowBalance()
 	require.Equal(t, bal, types.NewBalanceFromUFix64(types.OneFlowInUFix64))
 
 	// 100.0002 Flow
@@ -23,7 +23,7 @@ func TestBalance(t *testing.T) {
 
 	bb := types.NewBalanceFromUFix64(u)
 	require.Equal(t, "100000200000000000000", types.BalanceToBigInt(bb).String())
-	require.False(t, types.BalanceConvertionToUFix64ProneToRoundingError(bb))
+	require.False(t, types.BalanceConversionToUFix64ProneToRoundingError(bb))
 	bret, roundedOff, err := types.ConvertBalanceToUFix64(bb)
 	require.NoError(t, err)
 	require.Equal(t, u, bret)
@@ -32,7 +32,7 @@ func TestBalance(t *testing.T) {
 	// rounded off flag
 	bal = types.NewBalance(big.NewInt(1))
 	require.NoError(t, err)
-	require.True(t, types.BalanceConvertionToUFix64ProneToRoundingError(bal))
+	require.True(t, types.BalanceConversionToUFix64ProneToRoundingError(bal))
 	bret, roundedOff, err = types.ConvertBalanceToUFix64(bal)
 	require.NoError(t, err)
 	require.Equal(t, cadence.UFix64(0), bret)
@@ -45,4 +45,5 @@ func TestBalance(t *testing.T) {
 	require.NoError(t, err)
 	ret := types.UnsafeCastOfBalanceToFloat64(bal)
 	require.Equal(t, 100.0002, ret)
+
 }

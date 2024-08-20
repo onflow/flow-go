@@ -181,13 +181,13 @@ func (a *AccountStatus) StorageUsed() uint64 {
 }
 
 // SetStorageIndex updates the storage index of the account
-func (a *AccountStatus) SetStorageIndex(index atree.StorageIndex) {
+func (a *AccountStatus) SetStorageIndex(index atree.SlabIndex) {
 	copy(a[storageIndexStartIndex:storageIndexStartIndex+storageIndexSize], index[:storageIndexSize])
 }
 
-// StorageIndex returns the storage index of the account
-func (a *AccountStatus) StorageIndex() atree.StorageIndex {
-	var index atree.StorageIndex
+// SlabIndex returns the storage index of the account
+func (a *AccountStatus) SlabIndex() atree.SlabIndex {
+	var index atree.SlabIndex
 	copy(index[:], a[storageIndexStartIndex:storageIndexStartIndex+storageIndexSize])
 	return index
 }

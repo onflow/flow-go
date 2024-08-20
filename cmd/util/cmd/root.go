@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/cmd/util/cmd/addresses"
 	"github.com/onflow/flow-go/cmd/util/cmd/atree_inlined_status"
 	bootstrap_execution_state_payloads "github.com/onflow/flow-go/cmd/util/cmd/bootstrap-execution-state-payloads"
+	check_storage "github.com/onflow/flow-go/cmd/util/cmd/check-storage"
 	checkpoint_collect_stats "github.com/onflow/flow-go/cmd/util/cmd/checkpoint-collect-stats"
 	checkpoint_list_tries "github.com/onflow/flow-go/cmd/util/cmd/checkpoint-list-tries"
 	checkpoint_trie_stats "github.com/onflow/flow-go/cmd/util/cmd/checkpoint-trie-stats"
@@ -34,6 +35,7 @@ import (
 	rollback_executed_height "github.com/onflow/flow-go/cmd/util/cmd/rollback-executed-height/cmd"
 	run_script "github.com/onflow/flow-go/cmd/util/cmd/run-script"
 	"github.com/onflow/flow-go/cmd/util/cmd/snapshot"
+	system_addresses "github.com/onflow/flow-go/cmd/util/cmd/system-addresses"
 	truncate_database "github.com/onflow/flow-go/cmd/util/cmd/truncate-database"
 	"github.com/onflow/flow-go/cmd/util/cmd/version"
 	"github.com/onflow/flow-go/module/profiler"
@@ -114,6 +116,8 @@ func addCommands() {
 	rootCmd.AddCommand(atree_inlined_status.Cmd)
 	rootCmd.AddCommand(find_trie_root.Cmd)
 	rootCmd.AddCommand(run_script.Cmd)
+	rootCmd.AddCommand(system_addresses.Cmd)
+	rootCmd.AddCommand(check_storage.Cmd)
 }
 
 func initConfig() {

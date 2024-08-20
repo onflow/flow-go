@@ -196,14 +196,14 @@ var _ Registers = &AccountRegisters{}
 
 func (a *AccountRegisters) Get(owner string, key string) ([]byte, error) {
 	if owner != a.owner {
-		return nil, fmt.Errorf("owner mismatch: expected %s, got %s", a.owner, owner)
+		return nil, fmt.Errorf("owner mismatch: expected %x, got %x", a.owner, owner)
 	}
 	return a.registers[key], nil
 }
 
 func (a *AccountRegisters) Set(owner string, key string, value []byte) error {
 	if owner != a.owner {
-		return fmt.Errorf("owner mismatch: expected %s, got %s", a.owner, owner)
+		return fmt.Errorf("owner mismatch: expected %x, got %x", a.owner, owner)
 	}
 	a.uncheckedSet(key, value)
 	return nil
@@ -332,8 +332,9 @@ type ReadOnlyLedger struct {
 
 var _ atree.Ledger = ReadOnlyLedger{}
 
-func (l ReadOnlyLedger) GetValue(owner, key []byte) (value []byte, err error) {
-	return l.Registers.Get(string(owner), string(key))
+func (l ReadOnlyLedger) GetValue(address, key []byte) (value []byte, err error) {
+	owner := flow.AddressToRegisterOwner(flow.BytesToAddress(address))
+	return l.Registers.Get(owner, string(key))
 }
 
 func (l ReadOnlyLedger) ValueExists(owner, key []byte) (exists bool, err error) {
@@ -348,8 +349,8 @@ func (l ReadOnlyLedger) SetValue(_, _, _ []byte) error {
 	panic("unexpected call of SetValue")
 }
 
-func (l ReadOnlyLedger) AllocateStorageIndex(_ []byte) (atree.StorageIndex, error) {
-	panic("unexpected call of AllocateStorageIndex")
+func (l ReadOnlyLedger) AllocateSlabIndex(_ []byte) (atree.SlabIndex, error) {
+	panic("unexpected call of AllocateSlabIndex")
 }
 
 // ApplyChanges applies the given changes to the given registers,
