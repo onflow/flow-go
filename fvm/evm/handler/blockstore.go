@@ -47,7 +47,16 @@ func (bs *BlockStore) BlockProposal() (*types.BlockProposal, error) {
 	if len(data) != 0 {
 		return types.NewBlockProposalFromBytes(data)
 	}
-	return bs.constructBlockProposal()
+	bp, err := bs.constructBlockProposal()
+	if err != nil {
+		return nil, err
+	}
+	// store block proposal
+	err = bs.UpdateBlockProposal(bp)
+	if err != nil {
+		return nil, err
+	}
+	return bp, nil
 }
 
 func (bs *BlockStore) constructBlockProposal() (*types.BlockProposal, error) {
