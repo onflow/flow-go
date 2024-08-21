@@ -1,5 +1,6 @@
 package utils
 
+// #nosec
 import (
 	"crypto/md5"
 	"io"
