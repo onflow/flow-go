@@ -138,7 +138,7 @@ func rootBlock(cmd *cobra.Command, args []string) {
 	// validate epoch configs
 	err := validateEpochConfig()
 	if err != nil {
-		log.Fatal().Err(err).Msg("invalid or unsafe finalization safety threshold config")
+		log.Fatal().Err(err).Msg("invalid or unsafe config for finalization safety threshold")
 	}
 	err = validateOrPopulateEpochTimingConfig()
 	if err != nil {
