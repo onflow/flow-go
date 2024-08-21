@@ -274,7 +274,6 @@ func (h *ContractHandler) batchRun(
 			r,
 			rlpEncodedTxs[i],
 			bp.Height,
-			ctx.GasFeeCollector,
 		))
 		if err != nil {
 			return nil, err
@@ -401,7 +400,6 @@ func (h *ContractHandler) run(
 			res,
 			rlpEncodedTx,
 			bp.Height,
-			ctx.GasFeeCollector,
 		))
 
 	if err != nil {
@@ -614,7 +612,6 @@ func (h *ContractHandler) executeAndHandleCall(
 			res,
 			encoded,
 			bp.Height,
-			ctx.GasFeeCollector,
 		),
 	)
 	if err != nil {
