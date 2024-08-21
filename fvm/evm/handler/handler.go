@@ -134,38 +134,74 @@ func (h *ContractHandler) LastExecutedBlock() *types.Block {
 }
 
 // RunOrPanic runs an rlp-encoded evm transaction and
-func (h *ContractHandler) RunOrPanic(rlpEncodedTx []byte) {
+func (h *ContractHandler) RunOrPanic(rlpEncodedTx []byte, gasFeeCollector types.Address) {
 	// capture open tracing span
 	defer h.backend.StartChildSpan(trace.FVMEVMRun).End()
+
+	// capture coinbase init balance
+	cb := h.AccountByAddress(types.CoinbaseAddress, true)
+	initCoinbaseBalance := cb.Balance()
 
 	res, err := h.run(rlpEncodedTx)
 	panicOnErrorOrInvalidOrFailedState(res, err)
+
+	// transfer the gas fees collected to the gas fee collector address
+	afterBalance := cb.Balance()
+	diff := new(big.Int).Sub(afterBalance, initCoinbaseBalance)
+	if diff.Sign() > 0 {
+		cb.Transfer(gasFeeCollector, diff)
+	}
 }
 
 // Run tries to run an rlp-encoded evm transaction
-func (h *ContractHandler) Run(rlpEncodedTx []byte) *types.ResultSummary {
+// collects the gas fees and pay it to the gasFeeCollector address provided.
+func (h *ContractHandler) Run(rlpEncodedTx []byte, gasFeeCollector types.Address) *types.ResultSummary {
 	// capture open tracing span
 	defer h.backend.StartChildSpan(trace.FVMEVMRun).End()
 
+	// capture coinbase init balance
+	cb := h.AccountByAddress(types.CoinbaseAddress, true)
+	initCoinbaseBalance := cb.Balance()
+
+	// run transaction
 	res, err := h.run(rlpEncodedTx)
 	panicOnError(err)
+
+	// transfer the gas fees collected to the gas fee collector address
+	afterBalance := cb.Balance()
+	diff := new(big.Int).Sub(afterBalance, initCoinbaseBalance)
+	if diff.Sign() > 0 {
+		cb.Transfer(gasFeeCollector, diff)
+	}
 
 	// return the result summary
 	return res.ResultSummary()
 }
 
 // BatchRun tries to run batch of rlp-encoded transactions
+// collects the gas fees and pay it to the coinbase address provided.
 // All transactions provided in the batch are included in a single block,
 // except for invalid transactions
-func (h *ContractHandler) BatchRun(rlpEncodedTxs [][]byte) []*types.ResultSummary {
+func (h *ContractHandler) BatchRun(rlpEncodedTxs [][]byte, gasFeeCollector types.Address) []*types.ResultSummary {
 	// capture open tracing
 	span := h.backend.StartChildSpan(trace.FVMEVMBatchRun)
 	span.SetAttributes(attribute.Int("tx_counts", len(rlpEncodedTxs)))
 	defer span.End()
 
+	// capture coinbase init balance
+	cb := h.AccountByAddress(types.CoinbaseAddress, true)
+	initCoinbaseBalance := cb.Balance()
+
 	// batch run transactions and panic if any error
 	res, err := h.batchRun(rlpEncodedTxs)
 	panicOnError(err)
+
+	// transfer the gas fees collected to the gas fee collector address
+	afterBalance := cb.Balance()
+	diff := new(big.Int).Sub(afterBalance, initCoinbaseBalance)
+	if diff.Sign() > 0 {
+		cb.Transfer(gasFeeCollector, diff)
+	}
 
 	// convert results into result summaries
 	resSummaries := make([]*types.ResultSummary, len(res))

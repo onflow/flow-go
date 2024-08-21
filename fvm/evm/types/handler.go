@@ -34,8 +34,8 @@ type ContractHandler interface {
 	LastExecutedBlock() *Block
 
 	// Run runs a transaction in the evm environment,
-	// collects the gas fees, and transfers it to the coinbase account
-	Run(tx []byte) *ResultSummary
+	// collects the gas fees, and transfers it to the gasFeeCollector account
+	Run(tx []byte, gasFeeCollector Address) *ResultSummary
 
 	// DryRun simulates execution of the provided RLP-encoded and unsigned transaction.
 	// Because the transaction is unsigned the from address is required, since
@@ -44,8 +44,8 @@ type ContractHandler interface {
 	DryRun(tx []byte, from Address) *ResultSummary
 
 	// BatchRun runs transaction batch in the evm environment,
-	// collect all the gas fees and transfers the gas fees to the coinbase account.
-	BatchRun(txs [][]byte) []*ResultSummary
+	// collect all the gas fees and transfers the gas fees to the gasFeeCollector account.
+	BatchRun(txs [][]byte, gasFeeCollector Address) []*ResultSummary
 
 	// FlowTokenAddress returns the address where FLOW token is deployed
 	FlowTokenAddress() common.Address

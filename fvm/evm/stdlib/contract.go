@@ -1041,18 +1041,8 @@ func newInternalEVMTypeRunFunction(
 				panic(err)
 			}
 
-			// track balance of coinbase
-			cb := handler.AccountByAddress(types.CoinbaseAddress, true)
-			initCoinbaseBalance := cb.Balance()
 			// run transaction
-			result := handler.Run(transaction)
-
-			// transfer the gas fees collected to the coinbase
-			afterBalance := cb.Balance()
-			diff := new(big.Int).Sub(afterBalance, initCoinbaseBalance)
-			if diff.Sign() > 0 {
-				cb.Transfer(types.NewAddressFromBytes(gasFeeCollector), diff)
-			}
+			result := handler.Run(transaction, types.NewAddressFromBytes(gasFeeCollector))
 
 			return NewResultValue(handler, gauge, inter, locationRange, result)
 		},
@@ -1182,19 +1172,8 @@ func newInternalEVMTypeBatchRunFunction(
 				panic(err)
 			}
 
-			// track balance of coinbase
-			cb := handler.AccountByAddress(types.CoinbaseAddress, true)
-			initCoinbaseBalance := cb.Balance()
-
 			// Batch run
-			batchResults := handler.BatchRun(transactionBatch)
-
-			// transfer the gas fees collected to the coinbase
-			afterBalance := cb.Balance()
-			diff := new(big.Int).Sub(afterBalance, initCoinbaseBalance)
-			if diff.Sign() > 0 {
-				cb.Transfer(types.NewAddressFromBytes(gasFeeCollector), diff)
-			}
+			batchResults := handler.BatchRun(transactionBatch, types.NewAddressFromBytes(gasFeeCollector))
 
 			values := newResultValues(handler, gauge, inter, locationRange, batchResults)
 
