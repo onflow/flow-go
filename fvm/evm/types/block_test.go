@@ -54,7 +54,7 @@ func Test_BlockHash(t *testing.T) {
 }
 
 func Test_BlockProposal(t *testing.T) {
-	bp := NewBlockProposal(gethCommon.Hash{1}, 1, 0, nil)
+	bp := NewBlockProposal(gethCommon.Hash{1}, 1, 0, nil, gethCommon.Hash{1, 2, 3})
 
 	bp.AppendTransaction(nil)
 	require.Empty(t, bp.TxHashes)
@@ -78,122 +78,51 @@ func Test_BlockProposal(t *testing.T) {
 	require.NotEqual(t, gethTypes.EmptyReceiptsHash, bp.ReceiptRoot)
 }
 
-func Test_DecodeBlocks(t *testing.T) {
-	bv0 := blockV0{
-		ParentBlockHash: GenesisBlockHash(flow.Previewnet.Chain().ChainID()),
-		Height:          1,
-		UUIDIndex:       2,
-		TotalSupply:     3,
-		StateRoot:       gethCommon.Hash{0x01},
-		ReceiptRoot:     gethCommon.Hash{0x02},
+func Test_DecodeHistoricBlocks(t *testing.T) {
+	bv0 := BlockV0{
+		ParentBlockHash:     gethCommon.HexToHash("0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"),
+		Height:              1,
+		Timestamp:           2,
+		TotalSupply:         big.NewInt(3),
+		ReceiptRoot:         gethCommon.Hash{0x04},
+		TransactionHashRoot: gethCommon.Hash{0x05},
+		TotalGasUsed:        0,
 	}
 	b0, err := gethRLP.EncodeToBytes(bv0)
 	require.NoError(t, err)
 
 	b := decodeBlockBreakingChanges(b0)
-
-	require.Equal(t, b.TotalSupply.Uint64(), bv0.TotalSupply)
-	require.Equal(t, b.Height, bv0.Height)
 	require.Equal(t, b.ParentBlockHash, bv0.ParentBlockHash)
-	require.Empty(t, b.Timestamp)
-	require.Empty(t, b.TotalGasUsed)
+	require.Equal(t, b.Height, bv0.Height)
+	require.Equal(t, b.Timestamp, bv0.Timestamp)
+	require.Equal(t, b.TotalSupply.Uint64(), bv0.TotalSupply.Uint64())
+	require.Equal(t, b.ReceiptRoot, bv0.ReceiptRoot)
+	require.Equal(t, b.TransactionHashRoot, bv0.TransactionHashRoot)
+	require.Equal(t, b.TotalGasUsed, bv0.TotalGasUsed)
+	require.Empty(t, b.PrevRandao)
 
-	bv1 := blockV1{
-		ParentBlockHash:   GenesisBlockHash(flow.Previewnet.Chain().ChainID()),
-		Height:            1,
-		UUIDIndex:         2,
-		TotalSupply:       3,
-		StateRoot:         gethCommon.Hash{0x01},
-		ReceiptRoot:       gethCommon.Hash{0x02},
-		TransactionHashes: []gethCommon.Hash{{0x04}},
+	bpv0 := BlockProposalV0{
+		BlockV0: bv0,
+		Receipts: []LightReceipt{
+			{CumulativeGasUsed: 10},
+			{CumulativeGasUsed: 2},
+		},
+		TxHashes: []gethCommon.Hash{{1, 2}, {3, 4}, {5, 6}},
 	}
 
-	b1, err := gethRLP.EncodeToBytes(bv1)
+	bp0, err := gethRLP.EncodeToBytes(bpv0)
 	require.NoError(t, err)
 
-	b = decodeBlockBreakingChanges(b1)
-
-	require.Equal(t, b.TotalSupply.Uint64(), bv1.TotalSupply)
-	require.Equal(t, b.Height, bv1.Height)
-	require.Equal(t, b.ParentBlockHash, bv1.ParentBlockHash)
-	require.Empty(t, b.Timestamp)
-	require.Empty(t, b.TotalGasUsed)
-
-	bv2 := blockV2{
-		ParentBlockHash:   GenesisBlockHash(flow.Previewnet.Chain().ChainID()),
-		Height:            1,
-		TotalSupply:       2,
-		StateRoot:         gethCommon.Hash{0x01},
-		ReceiptRoot:       gethCommon.Hash{0x02},
-		TransactionHashes: []gethCommon.Hash{{0x04}},
-	}
-
-	b2, err := gethRLP.EncodeToBytes(bv2)
+	bp, err := NewBlockProposalFromBytes(bp0)
 	require.NoError(t, err)
-
-	b = decodeBlockBreakingChanges(b2)
-
-	require.Equal(t, b.TotalSupply.Uint64(), bv2.TotalSupply)
-	require.Equal(t, b.Height, bv2.Height)
-	require.Equal(t, b.ParentBlockHash, bv2.ParentBlockHash)
-	require.Empty(t, b.Timestamp)
-	require.Empty(t, b.TotalGasUsed)
-
-	bv3 := blockV3{
-		ParentBlockHash:   GenesisBlockHash(flow.Previewnet.Chain().ChainID()),
-		Height:            1,
-		TotalSupply:       2,
-		ReceiptRoot:       gethCommon.Hash{0x02},
-		TransactionHashes: []gethCommon.Hash{{0x04}},
-	}
-
-	b3, err := gethRLP.EncodeToBytes(bv3)
-	require.NoError(t, err)
-
-	b = decodeBlockBreakingChanges(b3)
-
-	require.Equal(t, b.TotalSupply.Uint64(), bv3.TotalSupply)
-	require.Equal(t, b.Height, bv3.Height)
-	require.Equal(t, b.ParentBlockHash, bv3.ParentBlockHash)
-	require.Empty(t, b.Timestamp)
-	require.Empty(t, b.TotalGasUsed)
-
-	bv4 := blockV4{
-		ParentBlockHash:   GenesisBlockHash(flow.Previewnet.Chain().ChainID()),
-		Height:            1,
-		TotalSupply:       big.NewInt(4),
-		ReceiptRoot:       gethCommon.Hash{0x02},
-		TransactionHashes: []gethCommon.Hash{{0x04}},
-	}
-
-	b4, err := gethRLP.EncodeToBytes(bv4)
-	require.NoError(t, err)
-
-	b = decodeBlockBreakingChanges(b4)
-
-	require.Equal(t, b.TotalSupply, bv4.TotalSupply)
-	require.Equal(t, b.Height, bv4.Height)
-	require.Equal(t, b.ParentBlockHash, bv4.ParentBlockHash)
-	require.Empty(t, b.Timestamp)
-	require.Empty(t, b.TotalGasUsed)
-
-	bv5 := blockV5{
-		ParentBlockHash:   GenesisBlockHash(flow.Previewnet.Chain().ChainID()),
-		Height:            1,
-		TotalSupply:       big.NewInt(2),
-		ReceiptRoot:       gethCommon.Hash{0x02},
-		TransactionHashes: []gethCommon.Hash{{0x04}},
-		Timestamp:         100,
-	}
-
-	b5, err := gethRLP.EncodeToBytes(bv5)
-	require.NoError(t, err)
-
-	b = decodeBlockBreakingChanges(b5)
-
-	require.Equal(t, b.Timestamp, bv5.Timestamp)
-	require.Equal(t, b.TotalSupply, bv5.TotalSupply)
-	require.Equal(t, b.Height, bv5.Height)
-	require.Equal(t, b.ParentBlockHash, bv5.ParentBlockHash)
-	require.Empty(t, b.TotalGasUsed)
+	require.Equal(t, bp.ParentBlockHash, bpv0.ParentBlockHash)
+	require.Equal(t, bp.Height, bpv0.Height)
+	require.Equal(t, bp.Timestamp, bpv0.Timestamp)
+	require.Equal(t, bp.TotalSupply.Uint64(), bpv0.TotalSupply.Uint64())
+	require.Equal(t, bp.ReceiptRoot, bpv0.ReceiptRoot)
+	require.Equal(t, bp.TransactionHashRoot, bpv0.TransactionHashRoot)
+	require.Equal(t, bp.TotalGasUsed, bpv0.TotalGasUsed)
+	require.Empty(t, bp.PrevRandao)
+	require.Len(t, bp.Receipts, 2)
+	require.Len(t, bp.TxHashes, 3)
 }
