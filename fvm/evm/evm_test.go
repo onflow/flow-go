@@ -70,6 +70,10 @@ func TestEVMRun(t *testing.T) {
 					sc.EVMContract.Address.HexWithPrefix(),
 				))
 
+				coinbaseAddr := types.Address{1, 2, 3}
+				coinbaseBalance := getEVMAccountBalance(t, ctx, vm, snapshot, coinbaseAddr)
+				require.Zero(t, types.BalanceToBigInt(coinbaseBalance).Uint64())
+
 				num := int64(12)
 				innerTxBytes := testAccount.PrepareSignAndEncodeTx(t,
 					testContract.DeployedAt.ToCommon(),
@@ -84,7 +88,7 @@ func TestEVMRun(t *testing.T) {
 				).WithType(stdlib.EVMTransactionBytesCadenceType)
 
 				coinbase := cadence.NewArray(
-					ConvertToCadence(testAccount.Address().Bytes()),
+					ConvertToCadence(coinbaseAddr.Bytes()),
 				).WithType(stdlib.EVMAddressBytesCadenceType)
 
 				tx := fvm.Transaction(
@@ -144,6 +148,10 @@ func TestEVMRun(t *testing.T) {
 
 				// append the state
 				snapshot = snapshot.Append(state)
+
+				// check coinbase balance
+				coinbaseBalance = getEVMAccountBalance(t, ctx, vm, snapshot, coinbaseAddr)
+				require.Equal(t, types.BalanceToBigInt(coinbaseBalance).Uint64(), txEventPayload.GasConsumed)
 
 				// query the value
 				code = []byte(fmt.Sprintf(
@@ -422,6 +430,10 @@ func TestEVMBatchRun(t *testing.T) {
 					sc.EVMContract.Address.HexWithPrefix(),
 				))
 
+				coinbaseAddr := types.Address{1, 2, 3}
+				coinbaseBalance := getEVMAccountBalance(t, ctx, vm, snapshot, coinbaseAddr)
+				require.Zero(t, types.BalanceToBigInt(coinbaseBalance).Uint64())
+
 				batchCount := 5
 				var storedValues []int64
 				txBytes := make([]cadence.Value, batchCount)
@@ -444,7 +456,7 @@ func TestEVMBatchRun(t *testing.T) {
 				}
 
 				coinbase := cadence.NewArray(
-					ConvertToCadence(testAccount.Address().Bytes()),
+					ConvertToCadence(coinbaseAddr.Bytes()),
 				).WithType(stdlib.EVMAddressBytesCadenceType)
 
 				txs := cadence.NewArray(txBytes).
@@ -470,6 +482,7 @@ func TestEVMBatchRun(t *testing.T) {
 
 				require.Len(t, output.Events, batchCount+1)
 				txHashes := make(types.TransactionHashes, 0)
+				totalGasUsed := uint64(0)
 				for i, event := range output.Events {
 					if i == batchCount { // skip last one
 						continue
@@ -493,6 +506,7 @@ func TestEVMBatchRun(t *testing.T) {
 					log := logs[0]
 					last := log.Topics[len(log.Topics)-1] // last topic is the value set in the store method
 					assert.Equal(t, storedValues[i], last.Big().Int64())
+					totalGasUsed += event.GasConsumed
 				}
 
 				// last event is fee transfer event
@@ -503,6 +517,10 @@ func TestEVMBatchRun(t *testing.T) {
 				require.Equal(t, uint16(batchCount), feeTranferEventPayload.Index)
 				require.Equal(t, uint64(21000), feeTranferEventPayload.GasConsumed)
 				txHashes = append(txHashes, feeTranferEventPayload.Hash)
+
+				// check coinbase balance (note the gas price is 1)
+				coinbaseBalance = getEVMAccountBalance(t, ctx, vm, snapshot, coinbaseAddr)
+				require.Equal(t, types.BalanceToBigInt(coinbaseBalance).Uint64(), totalGasUsed)
 
 				// commit block
 				blockEventPayload, snapshot := callEVMHeartBeat(t,
