@@ -2139,11 +2139,11 @@ github.com/oklog/ulid v1.3.1/go.mod h1:CirwcVhetQ6Lv90oh/F+FBtV6XMibvdAFo93nm5qn
 github.com/olekukonko/tablewriter v0.0.5 h1:P2Ga83D34wi1o9J6Wh1mRuqd4mF/x/lgBS7N7AbDhec=
 github.com/olekukonko/tablewriter v0.0.5/go.mod h1:hPp6KlRPjbx+hW8ykQs1w3UBbZlj6HuIJcUGPhkA7kY=
 github.com/onflow/atree v0.6.1-0.20230711151834-86040b30171f/go.mod h1:xvP61FoOs95K7IYdIYRnNcYQGf4nbF/uuJ0tHf4DRuM=
-github.com/onflow/atree v0.8.0-rc.5 h1:1sU+c6UfDzq/EjM8nTw4EI8GvEMarcxkWkJKy6piFSY=
-github.com/onflow/atree v0.8.0-rc.5/go.mod h1:yccR+LR7xc1Jdic0mrjocbHvUD7lnVvg8/Ct1AA5zBo=
+github.com/onflow/atree v0.8.0-rc.6 h1:GWgaylK24b5ta2Hq+TvyOF7X5tZLiLzMMn7lEt59fsA=
+github.com/onflow/atree v0.8.0-rc.6/go.mod h1:yccR+LR7xc1Jdic0mrjocbHvUD7lnVvg8/Ct1AA5zBo=
 github.com/onflow/cadence v1.0.0-M3/go.mod h1:odXGZZ/wGNA5mwT8bC9v8u8EXACHllB2ABSZK65TGL8=
-github.com/onflow/cadence v1.0.0-preview.48 h1:WkgU0z6H/oRe44kLL6OO+wkGeKULWChoCT8i7sgiWdg=
-github.com/onflow/cadence v1.0.0-preview.48/go.mod h1:BCoenp1TYp+SmG7FGWStjehvvzcvNQ3xvpK5rkthq3Y=
+github.com/onflow/cadence v1.0.0-preview.49 h1:MXy6qAtFyRSnqSVKpDkh2J1sb2JEryJoYy/5qsaixlw=
+github.com/onflow/cadence v1.0.0-preview.49/go.mod h1:7wvvecnAZtYOspLOS3Lh+FuAmMeSrXhAWiycC3kQ1UU=
 github.com/onflow/crypto v0.25.0/go.mod h1:C8FbaX0x8y+FxWjbkHy0Q4EASCDR9bSPWZqlpCLYyVI=
 github.com/onflow/crypto v0.25.2 h1:GjHunqVt+vPcdqhxxhAXiMIF3YiLX7gTuTR5O+VG2ns=
 github.com/onflow/crypto v0.25.2/go.mod h1:fY7eLqUdMKV8EGOw301unP8h7PvLVy8/6gVR++/g0BY=
