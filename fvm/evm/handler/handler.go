@@ -396,11 +396,8 @@ func (h *ContractHandler) run(
 
 	// step 9 - emit transaction event
 	err = h.emitEvent(
-		events.NewTransactionEvent(
-			res,
-			rlpEncodedTx,
-			bp.Height,
-		))
+		events.NewTransactionEvent(res, rlpEncodedTx, bp.Height),
+	)
 
 	if err != nil {
 		return nil, err
@@ -608,11 +605,7 @@ func (h *ContractHandler) executeAndHandleCall(
 		return nil, err
 	}
 	err = h.emitEvent(
-		events.NewTransactionEvent(
-			res,
-			encoded,
-			bp.Height,
-		),
+		events.NewTransactionEvent(res, encoded, bp.Height),
 	)
 	if err != nil {
 		return nil, err
