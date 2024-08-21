@@ -158,9 +158,7 @@ func extractTypeRequirements(
 		legacyTypeRequirements.typeRequirements = append(legacyTypeRequirements.typeRequirements, typeRequirement)
 
 		reporter.Write(typeRequirementRemovalEntry{
-			Address:      typeRequirement.Address,
-			ContractName: typeRequirement.ContractName,
-			TypeName:     typeRequirement.TypeName,
+			TypeRequirement: typeRequirement,
 		})
 	}
 
@@ -170,9 +168,7 @@ func extractTypeRequirements(
 // cadenceValueMigrationFailureEntry
 
 type typeRequirementRemovalEntry struct {
-	Address      common.Address
-	ContractName string
-	TypeName     string
+	TypeRequirement
 }
 
 var _ valueMigrationReportEntry = typeRequirementRemovalEntry{}
