@@ -33,12 +33,14 @@ func newEjector() ejector {
 	}
 }
 
-// Eject marks the node as ejected in all tracked identity lists. If it's the first ejection during lifetime of the state machine,
-// EjectNode updates the identity table by changing the node's participation status to 'ejected'. If
-// and only if the node is active in the previous or current or next epoch, the node's ejection status is set
-// to true for all occurrences, and we return true.  If `nodeID` is not found, we return false. This method
-// is idempotent and behaves identically for repeated calls with the same `nodeID` (and same internal state).
-// Repeated calls with the same input create minor performance overhead.
+// Eject marks the node as ejected in all tracked identity lists. If and only if the node is active in the previous
+// or current or next epoch, the node's ejection status is set to true for all occurrences, and we return true. If
+// `nodeID` is not found, we return false. This method is idempotent and behaves identically for repeated calls with
+// the same `nodeID`. Repeated calls with the same input create minor performance overhead.
+//
+// If it's the first ejection during the `ejector`s lifetime (i.e. this `ejector` has no previous ejection events
+// memorized), it populates an internal lookup for each `DynamicIdentityList` is tracks. This lazy initialization
+// benefits the vastly common happy path (no ejection events during the ejector's lifetime).
 func (e *ejector) Eject(nodeID flow.Identifier) bool {
 	l := len(e.identityLists)
 	if len(e.ejected) == 0 { // if this is the first ejection sealed in this block, we have to populate the lookup first
