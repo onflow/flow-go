@@ -52,6 +52,18 @@ func TestSelectFilter(t *testing.T) {
 			keys:        []string{"b.c"},
 			description: "single object with arrays as values",
 		},
+		{
+			input:       `{ "a": 1, "b": {"c":2, "d":3}}`,
+			output:      `{ "b": {"c":2, "d":3}}`,
+			keys:        []string{"b"},
+			description: "full single object with nested fields",
+		},
+		{
+			input:       `{ "a": 1, "b": {"c":2, "d":3}}`,
+			output:      `{}`,
+			keys:        []string{"e"},
+			description: "unknown object",
+		},
 	}
 
 	for _, tv := range testVectors {
