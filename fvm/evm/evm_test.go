@@ -76,7 +76,7 @@ func TestEVMRun(t *testing.T) {
 					testContract.MakeCallData(t, "store", big.NewInt(num)),
 					big.NewInt(0),
 					uint64(100_000),
-					big.NewInt(0),
+					big.NewInt(1),
 				)
 
 				innerTx := cadence.NewArray(
@@ -105,10 +105,18 @@ func TestEVMRun(t *testing.T) {
 				snapshot = snapshot.Append(state)
 
 				// assert event fields are correct
-				require.Len(t, output.Events, 1)
+				require.Len(t, output.Events, 2)
 				txEvent := output.Events[0]
 				txEventPayload := testutils.TxEventToPayload(t, txEvent, sc.EVMContract.Address)
 				require.NoError(t, err)
+
+				// fee transfer event
+				feeTransferEvent := output.Events[1]
+				feeTranferEventPayload := testutils.TxEventToPayload(t, feeTransferEvent, sc.EVMContract.Address)
+				require.NoError(t, err)
+				require.Equal(t, uint16(types.ErrCodeNoError), feeTranferEventPayload.ErrorCode)
+				require.Equal(t, uint16(1), feeTranferEventPayload.Index)
+				require.Equal(t, uint64(21000), feeTranferEventPayload.GasConsumed)
 
 				// commit block
 				blockEventPayload, snapshot := callEVMHeartBeat(t,
@@ -117,10 +125,10 @@ func TestEVMRun(t *testing.T) {
 					snapshot)
 
 				require.NotEmpty(t, blockEventPayload.Hash)
-				require.Equal(t, uint64(43785), blockEventPayload.TotalGasUsed)
+				require.Equal(t, uint64(64785), blockEventPayload.TotalGasUsed)
 				require.NotEmpty(t, blockEventPayload.Hash)
 
-				txHashes := types.TransactionHashes{txEventPayload.Hash}
+				txHashes := types.TransactionHashes{txEventPayload.Hash, feeTranferEventPayload.Hash}
 				require.Equal(t,
 					txHashes.RootHash(),
 					blockEventPayload.TransactionHashRoot,
@@ -131,8 +139,7 @@ func TestEVMRun(t *testing.T) {
 				require.Equal(t, uint16(types.ErrCodeNoError), txEventPayload.ErrorCode)
 				require.Equal(t, uint16(0), txEventPayload.Index)
 				require.Equal(t, blockEventPayload.Height, txEventPayload.BlockHeight)
-				require.Equal(t, blockEventPayload.TotalGasUsed, txEventPayload.GasConsumed)
-				require.Equal(t, uint64(43785), blockEventPayload.TotalGasUsed)
+				require.Equal(t, blockEventPayload.TotalGasUsed-feeTranferEventPayload.GasConsumed, txEventPayload.GasConsumed)
 				require.Empty(t, txEventPayload.ContractAddress)
 
 				// append the state
@@ -427,7 +434,7 @@ func TestEVMBatchRun(t *testing.T) {
 						testContract.MakeCallData(t, "storeWithLog", big.NewInt(num)),
 						big.NewInt(0),
 						uint64(100_000),
-						big.NewInt(0),
+						big.NewInt(1),
 					)
 
 					// build txs argument
@@ -461,10 +468,10 @@ func TestEVMBatchRun(t *testing.T) {
 				// append the state
 				snapshot = snapshot.Append(state)
 
-				require.Len(t, output.Events, batchCount)
+				require.Len(t, output.Events, batchCount+1)
 				txHashes := make(types.TransactionHashes, 0)
 				for i, event := range output.Events {
-					if i == batchCount { // last one is block executed
+					if i == batchCount { // skip last one
 						continue
 					}
 
@@ -488,6 +495,15 @@ func TestEVMBatchRun(t *testing.T) {
 					assert.Equal(t, storedValues[i], last.Big().Int64())
 				}
 
+				// last event is fee transfer event
+				feeTransferEvent := output.Events[batchCount]
+				feeTranferEventPayload := testutils.TxEventToPayload(t, feeTransferEvent, sc.EVMContract.Address)
+				require.NoError(t, err)
+				require.Equal(t, uint16(types.ErrCodeNoError), feeTranferEventPayload.ErrorCode)
+				require.Equal(t, uint16(batchCount), feeTranferEventPayload.Index)
+				require.Equal(t, uint64(21000), feeTranferEventPayload.GasConsumed)
+				txHashes = append(txHashes, feeTranferEventPayload.Hash)
+
 				// commit block
 				blockEventPayload, snapshot := callEVMHeartBeat(t,
 					ctx,
@@ -495,7 +511,7 @@ func TestEVMBatchRun(t *testing.T) {
 					snapshot)
 
 				require.NotEmpty(t, blockEventPayload.Hash)
-				require.Equal(t, uint64(155513), blockEventPayload.TotalGasUsed)
+				require.Equal(t, uint64(176_513), blockEventPayload.TotalGasUsed)
 				require.Equal(t,
 					txHashes.RootHash(),
 					blockEventPayload.TransactionHashRoot,
