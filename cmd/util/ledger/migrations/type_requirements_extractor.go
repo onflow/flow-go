@@ -1,10 +1,7 @@
 package migrations
 
 import (
-	"bytes"
 	"encoding/json"
-	"fmt"
-	"sort"
 
 	"github.com/rs/zerolog"
 
@@ -13,8 +10,6 @@ import (
 
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/cmd/util/ledger/util/registers"
-	"github.com/onflow/flow-go/fvm/environment"
-	"github.com/onflow/flow-go/model/flow"
 )
 
 const typeRequirementExtractingReporterName = "type-requirements-extracting"
@@ -42,74 +37,20 @@ func NewTypeRequirementsExtractingMigration(
 
 		// Gather all contracts
 
-		log.Info().Msg("Gathering contracts ...")
-
-		contracts := make([]AddressContract, 0, contractCountEstimate)
-
-		err := registersByAccount.ForEachAccount(func(accountRegisters *registers.AccountRegisters) error {
-			owner := accountRegisters.Owner()
-
-			encodedContractNames, err := accountRegisters.Get(owner, flow.ContractNamesKey)
-			if err != nil {
-				return err
-			}
-
-			contractNames, err := environment.DecodeContractNames(encodedContractNames)
-			if err != nil {
-				return err
-			}
-
-			for _, contractName := range contractNames {
-
-				contractKey := flow.ContractKey(contractName)
-
-				code, err := accountRegisters.Get(owner, contractKey)
-				if err != nil {
-					return err
-				}
-
-				if len(bytes.TrimSpace(code)) == 0 {
-					continue
-				}
-
-				address := common.Address([]byte(owner))
-				location := common.AddressLocation{
-					Address: address,
-					Name:    contractName,
-				}
-
-				if _, isSystemContract := importantLocations[location]; isSystemContract {
-					// System contracts have their own type-changing rules.
-					// So do not add them here.
-					continue
-				}
-
-				contracts = append(
-					contracts,
-					AddressContract{
-						location: location,
-						code:     code,
-					},
-				)
-			}
-
-			return nil
-		})
+		contracts, err := gatherContractsFromRegisters(registersByAccount, log)
 		if err != nil {
-			return fmt.Errorf("failed to get contracts of accounts: %w", err)
+			return err
 		}
 
-		sort.Slice(contracts, func(i, j int) bool {
-			a := contracts[i]
-			b := contracts[j]
-			return a.location.ID() < b.location.ID()
-		})
-
-		log.Info().Msgf("Gathered all contracts (%d)", len(contracts))
-
-		// Check all contracts
+		// Extract type requirements from all contracts
 
 		for _, contract := range contracts {
+			if _, isSystemContract := importantLocations[contract.location]; isSystemContract {
+				// System contracts have their own type-changing rules.
+				// So do not add them here.
+				continue
+			}
+
 			extractTypeRequirements(
 				contract,
 				log,

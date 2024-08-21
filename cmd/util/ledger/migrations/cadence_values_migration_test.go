@@ -2885,19 +2885,25 @@ func TestTypeRequirementRemovalMigration(t *testing.T) {
 		t,
 		[]any{
 			typeRequirementRemovalEntry{
-				Address:      tiblesAddress,
-				ContractName: contractName,
-				TypeName:     "ContentLocation",
+				TypeRequirement{
+					Address:      tiblesAddress,
+					ContractName: contractName,
+					TypeName:     "ContentLocation",
+				},
 			},
 			typeRequirementRemovalEntry{
-				Address:      tiblesAddress,
-				ContractName: contractName,
-				TypeName:     "Producer",
+				TypeRequirement{
+					Address:      tiblesAddress,
+					ContractName: contractName,
+					TypeName:     "Producer",
+				},
 			},
 			typeRequirementRemovalEntry{
-				Address:      tiblesAddress,
-				ContractName: contractName,
-				TypeName:     "Minter",
+				TypeRequirement{
+					Address:      tiblesAddress,
+					ContractName: contractName,
+					TypeName:     "Minter",
+				},
 			},
 		},
 		reporter.entries,
