@@ -56,7 +56,7 @@ func TestEVMBlockExecutedEventCCFEncodingDecoding(t *testing.T) {
 	assert.Equal(t, bep.ParentBlockHash, block.ParentBlockHash)
 	assert.Equal(t, bep.ReceiptRoot, block.ReceiptRoot)
 	assert.Equal(t, bep.TransactionHashRoot, block.TransactionHashRoot)
-	assert.Equal(t, bep.Prevrandao, block.PrevRandao)
+	assert.Equal(t, bep.PrevRandao, block.PrevRandao)
 
 	v, err := ccf.Encode(ev)
 	require.NoError(t, err)

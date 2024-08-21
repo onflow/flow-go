@@ -154,7 +154,7 @@ type BlockEventPayload struct {
 	ParentBlockHash     gethCommon.Hash `cadence:"parentHash"`
 	ReceiptRoot         gethCommon.Hash `cadence:"receiptRoot"`
 	TransactionHashRoot gethCommon.Hash `cadence:"transactionHashRoot"`
-	Prevrandao          gethCommon.Hash `cadence:"prevrandao"`
+	PrevRandao          gethCommon.Hash `cadence:"prevRandao"`
 }
 
 // DecodeBlockEventPayload decodes Cadence event into block event payload.

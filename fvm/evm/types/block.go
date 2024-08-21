@@ -47,7 +47,7 @@ type Block struct {
 	// TotalGasUsed stores gas used by all transactions included in the block.
 	TotalGasUsed uint64
 
-	// PrevRandao is the value returned for Prevrandao opcode
+	// PrevRandao is the value returned for block.prevrandao opcode
 	PrevRandao gethCommon.Hash
 }
 
@@ -246,7 +246,7 @@ func (t TransactionHashes) RootHash() gethCommon.Hash {
 // a block that would otherwise be invalid if decoded into
 // latest version of the above Block type.
 
-// before adding Prevrandao to block
+// before adding PrevRandao to the block
 type BlockV0 struct {
 	ParentBlockHash     gethCommon.Hash
 	Height              uint64
