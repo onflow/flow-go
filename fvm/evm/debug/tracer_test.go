@@ -46,6 +46,7 @@ func Test_CallTracer(t *testing.T) {
 		tx := gethTypes.NewTransaction(nonce, to, amount, 100, big.NewInt(10), data)
 		tr.OnTxStart(nil, tx, from)
 		tr.OnEnter(1, byte(vm.ADD), from, to, data, 20, big.NewInt(2))
+		tr.OnExit(1, nil, 10, nil, false)
 		tr.OnTxEnd(&gethTypes.Receipt{}, nil)
 		tr.OnExit(0, []byte{0x02}, 200, nil, false)
 
