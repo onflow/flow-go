@@ -66,7 +66,7 @@ func TestHandler_TransactionRunOrPanic(t *testing.T) {
 						RunTransactionFunc: func(tx *gethTypes.Transaction) (*types.Result, error) {
 							return result, nil
 						},
-						// this disables fee collection
+						// this disables the fee collection step
 						BalanceOfFunc: func(address types.Address) (*big.Int, error) {
 							return new(big.Int), nil
 						},
@@ -139,7 +139,7 @@ func TestHandler_TransactionRunOrPanic(t *testing.T) {
 								ValidationError: fmt.Errorf("some sort of validation error"),
 							}, nil
 						},
-						// this disables fee collection
+						// this disables the fee collection step
 						BalanceOfFunc: func(address types.Address) (*big.Int, error) {
 							return new(big.Int), nil
 						},
@@ -200,7 +200,7 @@ func TestHandler_TransactionRunOrPanic(t *testing.T) {
 							RunTransactionFunc: func(tx *gethTypes.Transaction) (*types.Result, error) {
 								return &types.Result{}, types.NewFatalError(fmt.Errorf("Fatal error"))
 							},
-							// this disables fee collection
+							// this disables the fee collection step
 							BalanceOfFunc: func(address types.Address) (*big.Int, error) {
 								return new(big.Int), nil
 							},
@@ -1062,7 +1062,7 @@ func TestHandler_TransactionRun(t *testing.T) {
 							}
 							return res, nil
 						},
-						// this disables fee collection
+						// this disables the fee collection step
 						BalanceOfFunc: func(address types.Address) (*big.Int, error) {
 							return new(big.Int), nil
 						},
