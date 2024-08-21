@@ -7,6 +7,7 @@ import (
 	"github.com/cockroachdb/pebble"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 )
@@ -18,7 +19,10 @@ const (
 )
 
 // pruneIntervalRatio represents an additional percentage of pruneThreshold which is used to calculate pruneInterval
-const pruneIntervalRatio = 0.1
+const (
+	pruneIntervalRatio  = 0.1
+	deleteItemsPerBatch = 256
+)
 
 // pruneInterval is a helper function which calculates interval for pruner
 func pruneInterval(threshold uint64) uint64 {
@@ -146,6 +150,108 @@ func (p *RegisterPruner) checkPrune(ctx irrecoverable.SignalerContext) {
 	}
 }
 
-func (p *RegisterPruner) pruneUpToHeight(height uint64) error {
+// pruneUpToHeight prunes all entries in the database with heights less than or equal
+// to the specified pruneHeight. For each register prefix, it keeps the earliest entry
+// that has a height less than or equal to pruneHeight, and deletes all other entries
+// with lower heights.
+//
+// This function iterates over the database keys, identifies keys to delete in batches,
+// and uses the batchDelete function to remove them efficiently.
+//
+// Parameters:
+//   - pruneHeight: The maximum height of entries to prune.
+//
+// No errors are expected during normal operations.
+func (p *RegisterPruner) pruneUpToHeight(pruneHeight uint64) error {
+	prefix := []byte{codeRegister}
+	itemsPerBatch := deleteItemsPerBatch
+	var batchKeysToRemove [][]byte
+
+	err := func(r pebble.Reader) error {
+		options := pebble.IterOptions{
+			LowerBound: prefix,
+		}
+
+		it, err := r.NewIter(&options)
+		if err != nil {
+			return fmt.Errorf("can not create iterator: %w", err)
+		}
+		defer it.Close()
+
+		var lastRegisterID flow.RegisterID
+		var keepKeyFound bool
+
+		for it.SeekGE(prefix); it.Valid(); it.Next() {
+			key := it.Key()
+
+			keyHeight, registerID, err := lookupKeyToRegisterID(key)
+			if err != nil {
+				return fmt.Errorf("malformed lookup key %v: %w", key, err)
+			}
+
+			// New register prefix, reset the state
+			if !keepKeyFound || lastRegisterID != registerID {
+				keepKeyFound = false
+				lastRegisterID = registerID
+			}
+
+			if keyHeight <= pruneHeight {
+				if !keepKeyFound {
+					// Keep the first entry found for this registerID that is <= pruneHeight
+					keepKeyFound = true
+					continue
+				}
+
+				// Otherwise, mark this key for removal
+				batchKeysToRemove = append(batchKeysToRemove, key)
+
+				if len(batchKeysToRemove) == itemsPerBatch {
+					// Perform batch delete
+					if err := p.batchDelete(batchKeysToRemove); err != nil {
+						return err
+					}
+					batchKeysToRemove = nil
+				}
+			}
+		}
+
+		if len(batchKeysToRemove) > 0 {
+			// Perform the final batch delete if there are any remaining keys
+			if err := p.batchDelete(batchKeysToRemove); err != nil {
+				return err
+			}
+		}
+
+		return nil
+	}(p.db)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// batchDelete deletes the provided keys from the database in a single batch operation.
+// It creates a new batch, deletes each key from the batch, and commits the batch to ensure
+// that the deletions are applied atomically.
+//
+// Parameters:
+//   - lookupKeys: A slice of keys to be deleted from the database.
+//
+// No errors are expected during normal operations.
+func (p *RegisterPruner) batchDelete(lookupKeys [][]byte) error {
+	batch := p.db.NewBatch()
+	defer batch.Close()
+
+	for _, key := range lookupKeys {
+		if err := batch.Delete(key, nil); err != nil {
+			return fmt.Errorf("failed to delete lookupKey: %w", err)
+		}
+	}
+
+	if err := batch.Commit(pebble.Sync); err != nil {
+		return fmt.Errorf("failed to commit batch: %w", err)
+	}
+
 	return nil
 }
