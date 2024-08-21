@@ -697,7 +697,7 @@ func (s *EpochFallbackStateMachineSuite) TestEpochRecoverAndEjectionInSameBlock(
 	s.Run("invalid epoch recover event", func() {
 		s.kvstore = mockstate.NewKVStoreReader(s.T())
 		s.kvstore.On("GetEpochExtensionViewCount").Return(extensionViewCount).Maybe()
-		s.kvstore.On("GetEpochCommitSafetyThreshold").Return(uint64(200))
+		s.kvstore.On("GetFinalizationSafetyThreshold").Return(uint64(200))
 
 		var err error
 		s.stateMachine, err = NewFallbackStateMachine(s.kvstore, s.consumer, s.candidate.View, s.parentProtocolState.Copy())
