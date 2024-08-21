@@ -2390,7 +2390,7 @@ func TestStoragePathCapabilityMigration(t *testing.T) {
 					interpreter.UnauthorizedAccess,
 					interpreter.PrimitiveStaticTypeString,
 				),
-				CapabilityID: 3,
+				CapabilityID: 4,
 			},
 			cadenceValueMigrationEntry{
 				StorageKey: interpreter.StorageKey{
@@ -2407,7 +2407,7 @@ func TestStoragePathCapabilityMigration(t *testing.T) {
 					Path:    interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "d"),
 				},
 				BorrowType:   dBorrowType,
-				CapabilityID: 4,
+				CapabilityID: 5,
 			},
 			cadenceValueMigrationEntry{
 				StorageKey: interpreter.StorageKey{
@@ -2424,7 +2424,7 @@ func TestStoragePathCapabilityMigration(t *testing.T) {
 					Path:    interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "a"),
 				},
 				BorrowType:   borrowType,
-				CapabilityID: 5,
+				CapabilityID: 3,
 			},
 			cadenceValueMigrationEntry{
 				StorageKey: interpreter.StorageKey{
@@ -2451,6 +2451,25 @@ func TestStoragePathCapabilityMigration(t *testing.T) {
 	require.Equal(
 		t,
 		[]any{
+			storageCapConIssuedEntry{
+				AccountAddress: addressB,
+				AddressPath: interpreter.AddressPath{
+					Address: addressB,
+					Path:    interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "a"),
+				},
+				BorrowType:   borrowType,
+				CapabilityID: 3,
+			},
+			storageCapConsMissingBorrowTypeEntry{
+				TargetPath: interpreter.AddressPath{
+					Address: addressB,
+					Path:    interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "b"),
+				},
+				StoredPath: interpreter.AddressPath{
+					Address: addressB,
+					Path:    interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "bCap"),
+				},
+			},
 			storageCapConsMissingBorrowTypeEntry{
 				TargetPath: interpreter.AddressPath{
 					Address: addressB,
@@ -2479,7 +2498,7 @@ func TestStoragePathCapabilityMigration(t *testing.T) {
 					Path:    interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "c"),
 				},
 				BorrowType:   inferredBorrowType,
-				CapabilityID: 3,
+				CapabilityID: 4,
 			},
 			storageCapConIssuedEntry{
 				AccountAddress: addressB,
@@ -2488,26 +2507,7 @@ func TestStoragePathCapabilityMigration(t *testing.T) {
 					Path:    interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "d"),
 				},
 				BorrowType:   dBorrowType,
-				CapabilityID: 4,
-			},
-			storageCapConIssuedEntry{
-				AccountAddress: addressB,
-				AddressPath: interpreter.AddressPath{
-					Address: addressB,
-					Path:    interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "a"),
-				},
-				BorrowType:   borrowType,
 				CapabilityID: 5,
-			},
-			storageCapConsMissingBorrowTypeEntry{
-				TargetPath: interpreter.AddressPath{
-					Address: addressB,
-					Path:    interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "b"),
-				},
-				StoredPath: interpreter.AddressPath{
-					Address: addressB,
-					Path:    interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "bCap"),
-				},
 			},
 		},
 		issueStorageCapConReporter.entries,
@@ -2527,9 +2527,9 @@ func TestStoragePathCapabilityMigration(t *testing.T) {
                   let aCap = storage.copy<Capability>(from: /storage/aCap)!
                   let bCap = storage.copy<Capability>(from: /storage/bCap)!
                   let cCap = storage.copy<Capability>(from: /storage/cCap)!
-                  assert(aCap.id == 5)
+                  assert(aCap.id == 3)
                   assert(bCap.id == 0)
-                  assert(cCap.id == 3)
+                  assert(cCap.id == 4)
               }
             `,
 			addressA.HexWithPrefix(),
@@ -2570,7 +2570,7 @@ func TestStoragePathCapabilityMigration(t *testing.T) {
                   let capabilities = getAuthAccount<auth(Capabilities) &Account>(%s).capabilities.storage
                   let aCapCons = capabilities.getControllers(forPath: /storage/a)
                   assert(aCapCons.length == 1)
-                  assert(aCapCons[0].capabilityID == 5)
+                  assert(aCapCons[0].capabilityID == 3)
               }
             `,
 			addressB.HexWithPrefix(),
