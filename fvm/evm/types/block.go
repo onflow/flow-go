@@ -47,8 +47,8 @@ type Block struct {
 	// TotalGasUsed stores gas used by all transactions included in the block.
 	TotalGasUsed uint64
 
-	// Prevrandao is the value returned for Prevrandao
-	Prevrandao gethCommon.Hash
+	// PrevRandao is the value returned for Prevrandao opcode
+	PrevRandao gethCommon.Hash
 }
 
 // ToBytes encodes the block into bytes
@@ -68,7 +68,7 @@ func NewBlock(
 	height uint64,
 	timestamp uint64,
 	totalSupply *big.Int,
-	prevrandao gethCommon.Hash,
+	prevRandao gethCommon.Hash,
 ) *Block {
 	return &Block{
 		ParentBlockHash:     parentBlockHash,
@@ -77,7 +77,7 @@ func NewBlock(
 		TotalSupply:         totalSupply,
 		ReceiptRoot:         gethTypes.EmptyReceiptsHash,
 		TransactionHashRoot: gethTypes.EmptyRootHash,
-		Prevrandao:          prevrandao,
+		PrevRandao:          prevRandao,
 	}
 }
 
@@ -116,7 +116,7 @@ func GenesisBlock(chainID flow.ChainID) *Block {
 		ReceiptRoot:         gethTypes.EmptyRootHash,
 		TransactionHashRoot: gethTypes.EmptyRootHash,
 		TotalGasUsed:        0,
-		Prevrandao:          gethCommon.Hash{},
+		PrevRandao:          gethCommon.Hash{},
 	}
 }
 
@@ -210,7 +210,7 @@ func NewBlockProposal(
 	height uint64,
 	timestamp uint64,
 	totalSupply *big.Int,
-	prevrandao gethCommon.Hash,
+	prevRandao gethCommon.Hash,
 ) *BlockProposal {
 	return &BlockProposal{
 		Block: Block{
@@ -219,7 +219,7 @@ func NewBlockProposal(
 			Timestamp:       timestamp,
 			TotalSupply:     totalSupply,
 			ReceiptRoot:     gethTypes.EmptyRootHash,
-			Prevrandao:      prevrandao,
+			PrevRandao:      prevRandao,
 		},
 		Receipts: make([]LightReceipt, 0),
 		TxHashes: make([]gethCommon.Hash, 0),
@@ -277,7 +277,7 @@ func decodeBlockBreakingChanges(encoded []byte) *Block {
 			ReceiptRoot:         b0.ReceiptRoot,
 			TransactionHashRoot: b0.TransactionHashRoot,
 			TotalGasUsed:        b0.TotalGasUsed,
-			Prevrandao:          gethCommon.Hash{},
+			PrevRandao:          gethCommon.Hash{},
 		}
 	}
 	return nil
@@ -298,7 +298,7 @@ func decodeBlockProposalBreakingChanges(encoded []byte) *BlockProposal {
 				ReceiptRoot:         bp0.ReceiptRoot,
 				TransactionHashRoot: bp0.TransactionHashRoot,
 				TotalGasUsed:        bp0.TotalGasUsed,
-				Prevrandao:          gethCommon.Hash{},
+				PrevRandao:          gethCommon.Hash{},
 			},
 			Receipts: bp0.Receipts,
 			TxHashes: bp0.TxHashes,

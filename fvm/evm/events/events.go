@@ -141,7 +141,7 @@ func (p *blockEvent) ToCadence(chainID flow.ChainID) (cadence.Event, error) {
 		hashToCadenceArrayValue(p.ParentBlockHash),
 		hashToCadenceArrayValue(p.ReceiptRoot),
 		hashToCadenceArrayValue(p.TransactionHashRoot),
-		hashToCadenceArrayValue(p.Prevrandao),
+		hashToCadenceArrayValue(p.PrevRandao),
 	}).WithType(eventType), nil
 }
 

@@ -527,7 +527,7 @@ func (h *ContractHandler) getBlockContext() (types.BlockContext, error) {
 			return hash
 		},
 		ExtraPrecompiledContracts: h.precompiledContracts,
-		Random:                    bp.Prevrandao,
+		Random:                    bp.PrevRandao,
 		Tracer:                    h.tracer.TxTracer(),
 		TxCountSoFar:              uint(len(bp.TxHashes)),
 		TotalGasUsedSoFar:         bp.TotalGasUsed,

@@ -34,7 +34,7 @@ func TestEVMBlockExecutedEventCCFEncodingDecoding(t *testing.T) {
 		ReceiptRoot:         gethCommon.Hash{},
 		TotalGasUsed:        15,
 		TransactionHashRoot: gethCommon.HexToHash("0x70b67ce6710355acf8d69b2ea013d34e212bc4824926c5d26f189c1ca9667246"),
-		Prevrandao:          testutils.RandomCommonHash(t),
+		PrevRandao:          testutils.RandomCommonHash(t),
 	}
 
 	event := events.NewBlockEvent(block)
@@ -56,7 +56,7 @@ func TestEVMBlockExecutedEventCCFEncodingDecoding(t *testing.T) {
 	assert.Equal(t, bep.ParentBlockHash, block.ParentBlockHash)
 	assert.Equal(t, bep.ReceiptRoot, block.ReceiptRoot)
 	assert.Equal(t, bep.TransactionHashRoot, block.TransactionHashRoot)
-	assert.Equal(t, bep.Prevrandao, block.Prevrandao)
+	assert.Equal(t, bep.Prevrandao, block.PrevRandao)
 
 	v, err := ccf.Encode(ev)
 	require.NoError(t, err)

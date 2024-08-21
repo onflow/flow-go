@@ -99,7 +99,7 @@ func Test_DecodeHistoricBlocks(t *testing.T) {
 	require.Equal(t, b.ReceiptRoot, bv0.ReceiptRoot)
 	require.Equal(t, b.TransactionHashRoot, bv0.TransactionHashRoot)
 	require.Equal(t, b.TotalGasUsed, bv0.TotalGasUsed)
-	require.Empty(t, b.Prevrandao)
+	require.Empty(t, b.PrevRandao)
 
 	bpv0 := BlockProposalV0{
 		BlockV0: bv0,
@@ -122,7 +122,7 @@ func Test_DecodeHistoricBlocks(t *testing.T) {
 	require.Equal(t, bp.ReceiptRoot, bpv0.ReceiptRoot)
 	require.Equal(t, bp.TransactionHashRoot, bpv0.TransactionHashRoot)
 	require.Equal(t, bp.TotalGasUsed, bpv0.TotalGasUsed)
-	require.Empty(t, bp.Prevrandao)
+	require.Empty(t, bp.PrevRandao)
 	require.Len(t, bp.Receipts, 2)
 	require.Len(t, bp.TxHashes, 3)
 }
