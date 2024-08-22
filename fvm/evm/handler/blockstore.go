@@ -47,7 +47,19 @@ func (bs *BlockStore) BlockProposal() (*types.BlockProposal, error) {
 	if len(data) != 0 {
 		return types.NewBlockProposalFromBytes(data)
 	}
+	bp, err := bs.constructBlockProposal()
+	if err != nil {
+		return nil, err
+	}
+	// store block proposal
+	err = bs.UpdateBlockProposal(bp)
+	if err != nil {
+		return nil, err
+	}
+	return bp, nil
+}
 
+func (bs *BlockStore) constructBlockProposal() (*types.BlockProposal, error) {
 	// if available construct a new one
 	cadenceHeight, err := bs.backend.GetCurrentBlockHeight()
 	if err != nil {
@@ -76,12 +88,21 @@ func (bs *BlockStore) BlockProposal() (*types.BlockProposal, error) {
 	// expect timestamps in unix seconds so we convert here
 	timestamp := uint64(cadenceBlock.Timestamp / int64(time.Second))
 
+	// read a random value for block proposal
+	prevrandao := gethCommon.Hash{}
+	err = bs.backend.ReadRandom(prevrandao[:])
+	if err != nil {
+		return nil, err
+	}
+
 	blockProposal := types.NewBlockProposal(
 		parentHash,
 		lastExecutedBlock.Height+1,
 		timestamp,
 		lastExecutedBlock.TotalSupply,
+		prevrandao,
 	)
+
 	return blockProposal, nil
 }
 
@@ -96,14 +117,6 @@ func (bs *BlockStore) UpdateBlockProposal(bp *types.BlockProposal) error {
 		bs.rootAddress[:],
 		[]byte(BlockStoreLatestBlockProposalKey),
 		blockProposalBytes,
-	)
-}
-
-func (bs *BlockStore) ResetBlockProposal() error {
-	return bs.backend.SetValue(
-		bs.rootAddress[:],
-		[]byte(BlockStoreLatestBlockProposalKey),
-		nil,
 	)
 }
 
@@ -135,7 +148,12 @@ func (bs *BlockStore) CommitBlockProposal(bp *types.BlockProposal) error {
 		return err
 	}
 
-	err = bs.ResetBlockProposal()
+	// construct a new block proposal and store
+	newBP, err := bs.constructBlockProposal()
+	if err != nil {
+		return err
+	}
+	err = bs.UpdateBlockProposal(newBP)
 	if err != nil {
 		return err
 	}
