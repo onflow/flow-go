@@ -5,6 +5,7 @@ import (
 	"sort"
 	"testing"
 
+	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
 	coreContracts "github.com/onflow/flow-core-contracts/lib/go/contracts"
@@ -14,8 +15,11 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/util/registers"
+	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/environment"
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
+	"github.com/onflow/flow-go/ledger/common/convert"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -111,6 +115,7 @@ func TestContractCheckingMigrationProgramRecovery(t *testing.T) {
 	// Set up contracts
 
 	const chainID = flow.Testnet
+	chain := chainID.Chain()
 
 	systemContracts := systemcontracts.SystemContractsForChain(chainID)
 
@@ -153,13 +158,16 @@ func TestContractCheckingMigrationProgramRecovery(t *testing.T) {
 		coreContracts.NonFungibleToken(env),
 	)
 
+	const exampleFungibleTokenContractName = "ExampleFungibleToken"
+	const exampleNonFungibleTokenContractName = "ExampleNonFungibleToken"
+
 	// Use an old version of the ExampleFungibleToken contract,
 	// and "deploy" it at some arbitrary, high (i.e. non-system) address
-	exampleAddress, err := chainID.Chain().AddressAtIndex(1000)
+	exampleAddress, err := chain.AddressAtIndex(1000)
 	require.NoError(t, err)
 	addContract(
 		exampleAddress,
-		"ExampleFungibleToken",
+		exampleFungibleTokenContractName,
 		[]byte(oldExampleFungibleTokenCode(systemContracts.FungibleToken.Address)),
 	)
 	// Use an old version of the ExampleNonFungibleToken contract,
@@ -167,7 +175,7 @@ func TestContractCheckingMigrationProgramRecovery(t *testing.T) {
 	require.NoError(t, err)
 	addContract(
 		exampleAddress,
-		"ExampleNonFungibleToken",
+		exampleNonFungibleTokenContractName,
 		[]byte(oldExampleNonFungibleTokenCode(systemContracts.NonFungibleToken.Address)),
 	)
 
@@ -245,15 +253,203 @@ func TestContractCheckingMigrationProgramRecovery(t *testing.T) {
 			},
 			contractCheckingSuccess{
 				AccountAddress: common.Address(exampleAddress),
-				ContractName:   "ExampleFungibleToken",
+				ContractName:   exampleFungibleTokenContractName,
 				Code:           oldExampleFungibleTokenCode(systemContracts.FungibleToken.Address),
 			},
 			contractCheckingSuccess{
 				AccountAddress: common.Address(exampleAddress),
-				ContractName:   "ExampleNonFungibleToken",
+				ContractName:   exampleNonFungibleTokenContractName,
 				Code:           oldExampleNonFungibleTokenCode(systemContracts.NonFungibleToken.Address),
 			},
 		},
 		reporter.entries,
 	)
+
+	// Check that the programs are recovered correctly after the migration.
+
+	mr, err := NewInterpreterMigrationRuntime(registersByAccount, chainID, InterpreterMigrationRuntimeConfig{})
+	require.NoError(t, err)
+
+	// First, we need to create the example account
+
+	err = mr.Accounts.Create(nil, exampleAddress)
+	require.NoError(t, err)
+
+	expectedAddresses := map[flow.Address]struct{}{
+		exampleAddress: {},
+	}
+
+	err = mr.Commit(expectedAddresses, log)
+	require.NoError(t, err)
+
+	// Next, we need to manually store contract values in the example account,
+	// simulating the effect of the deploying the original contracts.
+	//
+	// We need to do so with a new runtime,
+	// because the previous runtime's transaction state is finalized.
+
+	mr, err = NewInterpreterMigrationRuntime(registersByAccount, chainID, InterpreterMigrationRuntimeConfig{})
+	require.NoError(t, err)
+
+	contractsStorageMap := mr.Storage.GetStorageMap(
+		common.Address(exampleAddress),
+		runtime.StorageDomainContract,
+		true,
+	)
+
+	inter := mr.Interpreter
+
+	exampleFungibleTokenContractValue := interpreter.NewCompositeValue(
+		inter,
+		interpreter.EmptyLocationRange,
+		common.NewAddressLocation(
+			nil,
+			common.Address(exampleAddress),
+			exampleFungibleTokenContractName,
+		),
+		exampleFungibleTokenContractName,
+		common.CompositeKindContract,
+		[]interpreter.CompositeField{
+			{
+				Name:  "totalSupply",
+				Value: interpreter.NewUnmeteredUFix64ValueWithInteger(42, interpreter.EmptyLocationRange),
+			},
+		},
+		common.Address(exampleAddress),
+	)
+
+	contractsStorageMap.SetValue(
+		inter,
+		interpreter.StringStorageMapKey(exampleFungibleTokenContractName),
+		exampleFungibleTokenContractValue,
+	)
+
+	exampleNonFungibleTokenContractValue := interpreter.NewCompositeValue(
+		inter,
+		interpreter.EmptyLocationRange,
+		common.NewAddressLocation(
+			nil,
+			common.Address(exampleAddress),
+			exampleNonFungibleTokenContractName,
+		),
+		exampleNonFungibleTokenContractName,
+		common.CompositeKindContract,
+		[]interpreter.CompositeField{
+			{
+				Name:  "totalSupply",
+				Value: interpreter.NewUnmeteredUInt64Value(42),
+			},
+		},
+		common.Address(exampleAddress),
+	)
+
+	contractsStorageMap.SetValue(
+		inter,
+		interpreter.StringStorageMapKey(exampleNonFungibleTokenContractName),
+		exampleNonFungibleTokenContractValue,
+	)
+
+	err = mr.Storage.NondeterministicCommit(inter, false)
+	require.NoError(t, err)
+
+	err = mr.Commit(expectedAddresses, log)
+	require.NoError(t, err)
+
+	// Setup complete, now we can run the test transactions
+
+	type testCase struct {
+		name  string
+		code  string
+		check func(t *testing.T, err error)
+	}
+
+	testCases := []testCase{
+		{
+			name: exampleFungibleTokenContractName,
+			code: fmt.Sprintf(
+				`
+                  import ExampleFungibleToken from %s
+
+                  transaction {
+                      execute {
+                          assert(ExampleFungibleToken.totalSupply == 42.0)
+                          destroy ExampleFungibleToken.createEmptyVault(
+                              vaultType: Type<@ExampleFungibleToken.Vault>()
+                          )
+                      }
+                  }
+                `,
+				exampleAddress.HexWithPrefix(),
+			),
+			check: func(t *testing.T, err error) {
+				require.Error(t, err)
+				require.ErrorContains(t, err, "Contract ExampleFungibleToken is no longer functional")
+				require.ErrorContains(t, err, "createEmptyVault is not available in recovered program.")
+			},
+		},
+		{
+			name: exampleNonFungibleTokenContractName,
+			code: fmt.Sprintf(
+				`
+                  import ExampleNonFungibleToken from %s
+
+                  transaction {
+                      execute {
+                          destroy ExampleNonFungibleToken.createEmptyCollection(
+                              nftType: Type<@ExampleNonFungibleToken.NFT>()
+                          )
+                      }
+                  }
+                `,
+				exampleAddress.HexWithPrefix(),
+			),
+			check: func(t *testing.T, err error) {
+				require.Error(t, err)
+				require.ErrorContains(t, err, "Contract ExampleNonFungibleToken is no longer functional")
+				require.ErrorContains(t, err, "createEmptyCollection is not available in recovered program.")
+			},
+		},
+	}
+
+	storageSnapshot := snapshot.MapStorageSnapshot{}
+
+	newPayloads := registersByAccount.DestructIntoPayloads(1)
+
+	for _, newPayload := range newPayloads {
+		registerID, registerValue, err := convert.PayloadToRegister(newPayload)
+		require.NoError(t, err)
+
+		storageSnapshot[registerID] = registerValue
+	}
+
+	test := func(testCase testCase) {
+
+		t.Run(testCase.name, func(t *testing.T) {
+
+			txBody := flow.NewTransactionBody().
+				SetScript([]byte(testCase.code))
+
+			vm := fvm.NewVirtualMachine()
+
+			ctx := fvm.NewContext(
+				fvm.WithChain(chain),
+				fvm.WithAuthorizationChecksEnabled(false),
+				fvm.WithSequenceNumberCheckAndIncrementEnabled(false),
+				fvm.WithCadenceLogging(true),
+			)
+
+			_, output, err := vm.Run(
+				ctx,
+				fvm.Transaction(txBody, 0),
+				storageSnapshot,
+			)
+
+			require.NoError(t, err)
+			testCase.check(t, output.Err)
+		})
+	}
+
+	for _, testCase := range testCases {
+		test(testCase)
+	}
 }

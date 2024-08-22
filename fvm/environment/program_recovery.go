@@ -5,7 +5,6 @@ import (
 
 	"github.com/onflow/cadence/runtime/ast"
 	"github.com/onflow/cadence/runtime/common"
-	"github.com/onflow/cadence/runtime/parser"
 	"github.com/onflow/cadence/runtime/sema"
 
 	"github.com/onflow/flow-go/fvm/systemcontracts"
@@ -13,12 +12,11 @@ import (
 )
 
 func RecoverProgram(
-	memoryGauge common.MemoryGauge,
 	chainID flow.ChainID,
 	program *ast.Program,
 	location common.Location,
 ) (
-	*ast.Program,
+	[]byte,
 	error,
 ) {
 	addressLocation, ok := location.(common.AddressLocation)
@@ -31,31 +29,32 @@ func RecoverProgram(
 	fungibleTokenAddress := common.Address(sc.FungibleToken.Address)
 	nonFungibleTokenAddress := common.Address(sc.NonFungibleToken.Address)
 
-	var code string
-
 	switch {
 	case isFungibleTokenContract(program, fungibleTokenAddress):
-		code = RecoveredFungibleTokenCode(fungibleTokenAddress, addressLocation.Name)
+		return RecoveredFungibleTokenCode(fungibleTokenAddress, addressLocation.Name), nil
 
 	case isNonFungibleTokenContract(program, nonFungibleTokenAddress):
-		code = RecoveredNonFungibleTokenCode(nonFungibleTokenAddress, addressLocation.Name)
-	default:
-		return nil, nil
+		return RecoveredNonFungibleTokenCode(nonFungibleTokenAddress, addressLocation.Name), nil
 	}
-
-	return parser.ParseProgram(memoryGauge, []byte(code), parser.Config{})
 
 	return nil, nil
 }
 
-func RecoveredFungibleTokenCode(fungibleTokenAddress common.Address, contractName string) string {
-	return fmt.Sprintf(
+func RecoveredFungibleTokenCode(fungibleTokenAddress common.Address, contractName string) []byte {
+	return []byte(fmt.Sprintf(
 		//language=Cadence
 		`
-          import FungibleToken from %s
+          import FungibleToken from %[1]s
 
           access(all)
-          contract %s: FungibleToken {
+          contract %[2]s: FungibleToken {
+
+              access(self)
+              view fun recoveryPanic(_ functionName: String): Never {
+                  return panic(
+                      "%[3]s ".concat(functionName).concat(" is not available in recovered program.")
+                  )
+              }
 
               access(all)
               var totalSupply: UFix64
@@ -66,12 +65,17 @@ func RecoveredFungibleTokenCode(fungibleTokenAddress common.Address, contractNam
 
               access(all)
               view fun getContractViews(resourceType: Type?): [Type] {
-                  panic("getContractViews is not available in recovered program")
+                  %[2]s.recoveryPanic("getContractViews")
               }
 
               access(all)
               fun resolveContractView(resourceType: Type?, viewType: Type): AnyStruct? {
-                  panic("resolveContractView is not available in recovered program")
+                  %[2]s.recoveryPanic("resolveContractView")
+              }
+
+              access(all)
+              fun createEmptyVault(vaultType: Type): @{FungibleToken.Vault} {
+                  %[2]s.recoveryPanic("createEmptyVault")
               }
 
               access(all)
@@ -86,54 +90,75 @@ func RecoveredFungibleTokenCode(fungibleTokenAddress common.Address, contractNam
 
                   access(FungibleToken.Withdraw)
                   fun withdraw(amount: UFix64): @{FungibleToken.Vault} {
-                      panic("withdraw is not available in recovered program")
+                      %[2]s.recoveryPanic("Vault.withdraw")
                   }
 
                   access(all)
                   view fun isAvailableToWithdraw(amount: UFix64): Bool {
-                      panic("isAvailableToWithdraw is not available in recovered program")
+                      %[2]s.recoveryPanic("Vault.isAvailableToWithdraw")
                   }
 
                   access(all)
                   fun deposit(from: @{FungibleToken.Vault}) {
-                      panic("deposit is not available in recovered program")
+                      %[2]s.recoveryPanic("Vault.deposit")
                   }
 
                   access(all)
                   fun createEmptyVault(): @{FungibleToken.Vault} {
-                      panic("createEmptyVault is not available in recovered program")
+                      %[2]s.recoveryPanic("Vault.createEmptyVault")
                   }
 
                   access(all)
                   view fun getViews(): [Type] {
-                      panic("getViews is not available in recovered program")
+                      %[2]s.recoveryPanic("Vault.getViews")
                   }
 
                   access(all)
                   fun resolveView(_ view: Type): AnyStruct? {
-                      panic("resolveView is not available in recovered program")
+                      %[2]s.recoveryPanic("Vault.resolveView")
                   }
-              }
-
-              access(all)
-              fun createEmptyVault(vaultType: Type): @{FungibleToken.Vault} {
-                  panic("createEmptyVault is not available in recovered program")
               }
           }
         `,
 		fungibleTokenAddress.HexWithPrefix(),
 		contractName,
-	)
+		fmt.Sprintf("Contract %s is no longer functional. "+
+			"A version of the contract has been recovered to allow access to the fields declared in the FT standard.",
+			contractName,
+		),
+	))
 }
 
-func RecoveredNonFungibleTokenCode(nonFungibleTokenAddress common.Address, contractName string) string {
-	return fmt.Sprintf(
+func RecoveredNonFungibleTokenCode(nonFungibleTokenAddress common.Address, contractName string) []byte {
+	return []byte(fmt.Sprintf(
 		//language=Cadence
 		`
-          import NonFungibleToken from %s
+          import NonFungibleToken from %[1]s
 
           access(all)
-          contract %s: NonFungibleToken {
+          contract %[2]s: NonFungibleToken {
+
+              access(self)
+              view fun recoveryPanic(_ functionName: String): Never {
+                  return panic(
+                      "%[3]s ".concat(functionName).concat(" is not available in recovered program.")
+                  )
+              }
+
+              access(all)
+              view fun getContractViews(resourceType: Type?): [Type] {
+                  %[2]s.recoveryPanic("getContractViews")
+              }
+
+              access(all)
+              fun resolveContractView(resourceType: Type?, viewType: Type): AnyStruct? {
+                  %[2]s.recoveryPanic("resolveContractView")
+              }
+
+              access(all)
+              fun createEmptyCollection(nftType: Type): @{NonFungibleToken.Collection} {
+                  %[2]s.recoveryPanic("createEmptyCollection")
+              }
 
               access(all)
               resource NFT: NonFungibleToken.NFT {
@@ -147,39 +172,28 @@ func RecoveredNonFungibleTokenCode(nonFungibleTokenAddress common.Address, contr
 
                   access(all)
                   view fun getViews(): [Type] {
-                      panic("getViews is not available in recovered program")
+                      %[2]s.recoveryPanic("NFT.getViews")
                   }
 
                   access(all)
                   fun resolveView(_ view: Type): AnyStruct? {
-                      panic("resolveView is not available in recovered program")
+                      %[2]s.recoveryPanic("NFT.resolveView")
                   }
 
                   access(all)
                   fun createEmptyCollection(): @{NonFungibleToken.Collection} {
-                      panic("createEmptyCollection is not available in recovered program")
+                      %[2]s.recoveryPanic("NFT.createEmptyCollection")
                   }
-              }
-
-              access(all)
-              view fun getContractViews(resourceType: Type?): [Type] {
-                  panic("getContractViews is not available in recovered program")
-              }
-
-              access(all)
-              fun resolveContractView(resourceType: Type?, viewType: Type): AnyStruct? {
-                  panic("resolveContractView is not available in recovered program")
-              }
-
-              access(all)
-              fun createEmptyCollection(nftType: Type): @{NonFungibleToken.Collection} {
-                  panic("createEmptyCollection is not available in recovered program")
               }
           }
         `,
 		nonFungibleTokenAddress.HexWithPrefix(),
 		contractName,
-	)
+		fmt.Sprintf("Contract %s is no longer functional. "+
+			"A version of the contract has been recovered to allow access to the fields declared in the NFT standard.",
+			contractName,
+		),
+	))
 }
 
 func importsAddressLocation(program *ast.Program, address common.Address, name string) bool {
