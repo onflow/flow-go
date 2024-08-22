@@ -19,12 +19,12 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-func oldExampleTokenCode(fungibleTokenAddress flow.Address) string {
+func oldExampleFungibleTokenCode(fungibleTokenAddress flow.Address) string {
 	return fmt.Sprintf(
 		`
           import FungibleToken from 0x%s
 
-          pub contract ExampleToken: FungibleToken {
+          pub contract ExampleFungibleToken: FungibleToken {
              pub var totalSupply: UFix64
 
              pub resource Vault: FungibleToken.Provider, FungibleToken.Receiver, FungibleToken.Balance {
@@ -62,6 +62,40 @@ func oldExampleTokenCode(fungibleTokenAddress flow.Address) string {
              init() {
                  self.totalSupply = 0.0
              }
+          }
+        `,
+		fungibleTokenAddress.Hex(),
+	)
+}
+
+func oldExampleNonFungibleTokenCode(fungibleTokenAddress flow.Address) string {
+	return fmt.Sprintf(
+		`
+          import NonFungibleToken from 0x%s
+
+          pub contract ExampleNFT: NonFungibleToken {
+          
+              /// Total supply of ExampleNFTs in existence
+              pub var totalSupply: UInt64
+
+              /// The core resource that represents a Non Fungible Token.
+              /// New instances will be created using the NFTMinter resource
+              /// and stored in the Collection resource
+              ///
+              pub resource NFT: NonFungibleToken.INFT {
+          
+                  /// The unique ID that each NFT has
+                  pub let id: UInt64
+
+                  init(id: UInt64) {
+                      self.id = id
+                  }
+              }
+
+              init() {
+                  // Initialize the total supply
+                  self.totalSupply = 0
+              }
           }
         `,
 		fungibleTokenAddress.Hex(),
@@ -114,15 +148,27 @@ func TestContractCheckingMigrationProgramRecovery(t *testing.T) {
 		systemContracts.FungibleToken,
 		coreContracts.FungibleToken(env),
 	)
+	addSystemContract(
+		systemContracts.NonFungibleToken,
+		coreContracts.NonFungibleToken(env),
+	)
 
-	// Use an old version of the ExampleToken contract,
+	// Use an old version of the ExampleFungibleToken contract,
 	// and "deploy" it at some arbitrary, high (i.e. non-system) address
-	exampleTokenAddress, err := chainID.Chain().AddressAtIndex(1000)
+	exampleAddress, err := chainID.Chain().AddressAtIndex(1000)
 	require.NoError(t, err)
 	addContract(
-		exampleTokenAddress,
-		"ExampleToken",
-		[]byte(oldExampleTokenCode(systemContracts.FungibleToken.Address)),
+		exampleAddress,
+		"ExampleFungibleToken",
+		[]byte(oldExampleFungibleTokenCode(systemContracts.FungibleToken.Address)),
+	)
+	// Use an old version of the ExampleNonFungibleToken contract,
+	// and "deploy" it at some arbitrary, high (i.e. non-system) address
+	require.NoError(t, err)
+	addContract(
+		exampleAddress,
+		"ExampleNonFungibleToken",
+		[]byte(oldExampleNonFungibleTokenCode(systemContracts.NonFungibleToken.Address)),
 	)
 
 	for address, addressContracts := range contracts {
@@ -178,6 +224,11 @@ func TestContractCheckingMigrationProgramRecovery(t *testing.T) {
 	assert.Equal(t,
 		[]any{
 			contractCheckingSuccess{
+				AccountAddress: common.Address(systemContracts.NonFungibleToken.Address),
+				ContractName:   systemcontracts.ContractNameNonFungibleToken,
+				Code:           string(coreContracts.NonFungibleToken(env)),
+			},
+			contractCheckingSuccess{
 				AccountAddress: common.Address(systemContracts.ViewResolver.Address),
 				ContractName:   systemcontracts.ContractNameViewResolver,
 				Code:           string(coreContracts.ViewResolver()),
@@ -193,9 +244,14 @@ func TestContractCheckingMigrationProgramRecovery(t *testing.T) {
 				Code:           string(coreContracts.FungibleToken(env)),
 			},
 			contractCheckingSuccess{
-				AccountAddress: common.Address(exampleTokenAddress),
-				ContractName:   "ExampleToken",
-				Code:           oldExampleTokenCode(systemContracts.FungibleToken.Address),
+				AccountAddress: common.Address(exampleAddress),
+				ContractName:   "ExampleFungibleToken",
+				Code:           oldExampleFungibleTokenCode(systemContracts.FungibleToken.Address),
+			},
+			contractCheckingSuccess{
+				AccountAddress: common.Address(exampleAddress),
+				ContractName:   "ExampleNonFungibleToken",
+				Code:           oldExampleNonFungibleTokenCode(systemContracts.NonFungibleToken.Address),
 			},
 		},
 		reporter.entries,
