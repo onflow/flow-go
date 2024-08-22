@@ -62,7 +62,7 @@ import (
 //	║                         Epoch N
 //	║ ···────────────────────────┴───────────────────────────────────────────────────────────────╮
 //	║              invalid service event or                         EpochRecover
-//	║         FinalizationSafetyThreshold reached                    service event
+//	║         FinalizationSafetyThreshold reached                   service event
 //	║                           ⇣                      ┊            ⇣
 //	║  ┌────────────────────┐   ┌──────────────────────┊──────┐     ┌───────────────────────────┐
 //	║  │ EpochPhaseStaking  │   │     EpochPhaseFallback      │     │   EpochPhaseCommitted     │
