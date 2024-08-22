@@ -21,6 +21,65 @@ import (
 // evolves the state, based on the relevant information in the child block (specifically Service Events
 // sealed in the child block and the child block's view). A separate instance must be created for each
 // block that is being processed. Calling `Build()` constructs a snapshot of the resulting Epoch state.
+//
+// IMPORTANCE of the FinalizationSafetyThreshold:
+// The FinalizationSafetyThreshold's value `t` acts as a deadline for sealing the EpochCommit service
+// event near the end of each epoch. Specifically, if the current epoch N's final view is `f`, the
+// EpochCommit event for configuring epoch N+1 must be received latest by the
+//
+//	Epoch Commitment Deadline: d=f-t
+//
+//	                  Epoch Commitment Deadline
+//	EPOCH N           ↓                            EPOCH N+1
+//	...---------------|--------------------------| |-----...
+//	                  ↑                          ↑ ↑
+//	view:             d············t············>⋮ f+1
+//
+// This deadline is used to determine when to trigger Epoch Fallback Mode [EFM]:
+// if no valid configuration for epoch N+1 has been determined by view `d`, the
+// protocol enters EFM for the following reason:
+//   - By the time a node surpasses the last view `f` of epoch N, it must know the leaders
+//     for every view of epoch N+1.
+//   - The leader selection for epoch N+1 is only unambiguously determined, if the configuration
+//     for epoch N+1 has been finalized. (Otherwise, different forks could contain different
+//     consensus committees for epoch N+1, which would lead to different leaders. Only finalization
+//     resolves this ambiguity by finalizing one and orphaning epoch configurations possibly
+//     contained in competing forks).
+//   - The latest point where we could still finalize a configuration for Epoch N+1 is the last view
+//     `f` of epoch N. As finalization is permitted to take up to `t` views, a valid configuration
+//     for epoch N+1 must be available at latest by view d=f-t.
+//
+// Example: A service event is emitted during the computation of block A. The execution result
+// for block A, denoted as `RA`, is incorporated into block B. The seal `SA` for this result
+// is included in block C:
+//
+//	A ← B(RA) ← C(SA) ← ... ← R
+//
+// A service event σ is considered sealed w.r.t. a reference block R if:
+//   - σ was emitted during execution of some block A, s.t. A is an ancestor of R
+//   - The seal for block A was included in some block C, s.t C is an ancestor of R
+//
+// When we finalize the first block B with B.View >= d:
+//   - HAPPY PATH: If an EpochCommit service event has been sealed w.r.t. B, no action is taken.
+//   - FALLBACK PATH: If no EpochCommit service event has been sealed w.r.t. B,
+//     Epoch Fallback Mode [EFM] is triggered.
+//
+// CONTEXT:
+// The Epoch Commitment Deadline exists to ensure that all nodes agree on whether EFM is triggered
+// for a particular epoch, before the epoch actually ends. In particular, all nodes will agree about
+// EFM being triggered (or not) if at least one block with view in [d, f] is finalized - in other words,
+// we require at least one block being finalized after the epoch commitment deadline, and before the next
+// epoch begins.
+//
+// It should be noted that we are employing a heuristic here, which succeeds with overwhelming probability
+// of nearly 1. However, theoretically it is possible that no blocks are finalized within t views. In this
+// edge case, the nodes would have not detected the epoch commit phase failing and the protocol would just
+// halt at the end of the epoch. However, we emphasize that this is extremely unlikely, because the
+// probability of randomly selecting t faulty leaders in sequence decays to zero exponentially with
+// increasing t. Furthermore, failing to finalize blocks for a noticeable period entails halting block sealing,
+// which would trigger human intervention on much smaller time scales than t views. Therefore, t should be
+// chosen such that it takes more than 30mins to pass t views under happy path operation. Significant larger
+// values are ok, but t views equalling 30 mins should be seen as a lower bound.
 type StateMachine interface {
 	// Build returns updated protocol state entry, state ID and a flag indicating if there were any changes.
 	// CAUTION:
@@ -42,10 +101,9 @@ type StateMachine interface {
 	//     after such error and discard the StateMachine!
 	ProcessEpochSetup(epochSetup *flow.EpochSetup) (bool, error)
 
-	// ProcessEpochCommit updates the internally-maintained interim Epoch state with data from epoch commit event.
-	// Observing an epoch setup commit, transitions protocol state from setup to commit phase.
-	// At this point, we have finished construction of the next epoch.
-	// As a result of this operation protocol state for next epoch will be committed.
+	// ProcessEpochCommit updates the internally-maintained interim Epoch state with data from EpochCommit event.
+	// On the happy path, observing an epoch EpochCommit transitions the protocol state from setup to commit phase.
+	// At this point, we have fully determined the next epoch's configuration.
 	// Returned boolean indicates if event triggered a transition in the state machine or not.
 	// Implementors must never return (true, error).
 	// Expected errors indicating that we are leaving the happy-path of the epoch transitions
