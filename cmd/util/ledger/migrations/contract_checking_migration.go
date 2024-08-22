@@ -51,70 +51,15 @@ func NewContractCheckingMigration(
 			return fmt.Errorf("failed to create interpreter migration runtime: %w", err)
 		}
 
-		// Gather all contracts
-
-		log.Info().Msg("Gathering contracts ...")
-
-		contractsForPrettyPrinting := make(map[common.Location][]byte, contractCountEstimate)
-
-		contracts := make([]AddressContract, 0, contractCountEstimate)
-
-		err = registersByAccount.ForEachAccount(func(accountRegisters *registers.AccountRegisters) error {
-			owner := accountRegisters.Owner()
-
-			encodedContractNames, err := accountRegisters.Get(owner, flow.ContractNamesKey)
-			if err != nil {
-				return err
-			}
-
-			contractNames, err := environment.DecodeContractNames(encodedContractNames)
-			if err != nil {
-				return err
-			}
-
-			for _, contractName := range contractNames {
-
-				contractKey := flow.ContractKey(contractName)
-
-				code, err := accountRegisters.Get(owner, contractKey)
-				if err != nil {
-					return err
-				}
-
-				if len(bytes.TrimSpace(code)) == 0 {
-					continue
-				}
-
-				address := common.Address([]byte(owner))
-				location := common.AddressLocation{
-					Address: address,
-					Name:    contractName,
-				}
-
-				contracts = append(
-					contracts,
-					AddressContract{
-						location: location,
-						code:     code,
-					},
-				)
-
-				contractsForPrettyPrinting[location] = code
-			}
-
-			return nil
-		})
+		contracts, err := gatherContractsFromRegisters(registersByAccount, log)
 		if err != nil {
-			return fmt.Errorf("failed to get contracts of accounts: %w", err)
+			return err
 		}
 
-		sort.Slice(contracts, func(i, j int) bool {
-			a := contracts[i]
-			b := contracts[j]
-			return a.location.ID() < b.location.ID()
-		})
-
-		log.Info().Msgf("Gathered all contracts (%d)", len(contracts))
+		contractsForPrettyPrinting := make(map[common.Location][]byte, len(contracts))
+		for _, contract := range contracts {
+			contractsForPrettyPrinting[contract.location] = contract.code
+		}
 
 		// Check all contracts
 
@@ -133,6 +78,68 @@ func NewContractCheckingMigration(
 
 		return nil
 	}
+}
+
+func gatherContractsFromRegisters(registersByAccount *registers.ByAccount, log zerolog.Logger) ([]AddressContract, error) {
+	log.Info().Msg("Gathering contracts ...")
+
+	contracts := make([]AddressContract, 0, contractCountEstimate)
+
+	err := registersByAccount.ForEachAccount(func(accountRegisters *registers.AccountRegisters) error {
+		owner := accountRegisters.Owner()
+
+		encodedContractNames, err := accountRegisters.Get(owner, flow.ContractNamesKey)
+		if err != nil {
+			return err
+		}
+
+		contractNames, err := environment.DecodeContractNames(encodedContractNames)
+		if err != nil {
+			return err
+		}
+
+		for _, contractName := range contractNames {
+
+			contractKey := flow.ContractKey(contractName)
+
+			code, err := accountRegisters.Get(owner, contractKey)
+			if err != nil {
+				return err
+			}
+
+			if len(bytes.TrimSpace(code)) == 0 {
+				continue
+			}
+
+			address := common.Address([]byte(owner))
+			location := common.AddressLocation{
+				Address: address,
+				Name:    contractName,
+			}
+
+			contracts = append(
+				contracts,
+				AddressContract{
+					location: location,
+					code:     code,
+				},
+			)
+		}
+
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get contracts of accounts: %w", err)
+	}
+
+	sort.Slice(contracts, func(i, j int) bool {
+		a := contracts[i]
+		b := contracts[j]
+		return a.location.ID() < b.location.ID()
+	})
+
+	log.Info().Msgf("Gathered all contracts (%d)", len(contracts))
+	return contracts, nil
 }
 
 func checkContract(
