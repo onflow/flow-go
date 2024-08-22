@@ -1474,7 +1474,7 @@ func SetupHandler(t testing.TB, backend types.Backend, rootAddr flow.Address) *h
 		handler.NewBlockStore(defaultChainID, backend, rootAddr),
 		handler.NewAddressAllocator(),
 		backend,
-		emulator.NewEmulator(backend, rootAddr),
+		emulator.NewEmulator(zerolog.Nop(), backend, rootAddr),
 		debug.NopTracer,
 	)
 }

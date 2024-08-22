@@ -1042,10 +1042,11 @@ func newInternalEVMTypeRunFunction(
 			}
 
 			// Run
-
-			cb := types.NewAddressFromBytes(coinbase)
-			result := handler.Run(transaction, cb)
-
+			var result *types.ResultSummary
+			errors.WrapPanic(func() {
+				cb := types.NewAddressFromBytes(coinbase)
+				result = handler.Run(transaction, cb)
+			})
 			return NewResultValue(handler, gauge, inter, locationRange, result)
 		},
 	)
@@ -1106,8 +1107,10 @@ func newInternalEVMTypeDryRunFunction(
 			}
 
 			// call estimate
-
-			res := handler.DryRun(transaction, types.NewAddressFromBytes(from))
+			var res *types.ResultSummary
+			errors.WrapPanic(func() {
+				res = handler.DryRun(transaction, types.NewAddressFromBytes(from))
+			})
 			return NewResultValue(handler, gauge, inter, locationRange, res)
 		},
 	)
@@ -1177,9 +1180,11 @@ func newInternalEVMTypeBatchRunFunction(
 			}
 
 			// Batch run
-
-			cb := types.NewAddressFromBytes(coinbase)
-			batchResults := handler.BatchRun(transactionBatch, cb)
+			var batchResults []*types.ResultSummary
+			errors.WrapPanic(func() {
+				cb := types.NewAddressFromBytes(coinbase)
+				batchResults = handler.BatchRun(transactionBatch, cb)
+			})
 
 			values := newResultValues(handler, gauge, inter, locationRange, batchResults)
 
@@ -1466,10 +1471,12 @@ func newInternalEVMTypeCallFunction(
 
 			balance := types.NewBalance(balanceValue.BigInt)
 			// Call
-
-			const isAuthorized = true
-			account := handler.AccountByAddress(fromAddress, isAuthorized)
-			result := account.Call(toAddress, data, gasLimit, balance)
+			var result *types.ResultSummary
+			errors.WrapPanic(func() {
+				const isAuthorized = true
+				account := handler.AccountByAddress(fromAddress, isAuthorized)
+				result = account.Call(toAddress, data, gasLimit, balance)
+			})
 
 			return NewResultValue(handler, gauge, inter, locationRange, result)
 		},
@@ -1501,8 +1508,11 @@ func newInternalEVMTypeCreateCadenceOwnedAccountFunction(
 			if !ok {
 				panic(errors.NewUnreachableError())
 			}
-			address := handler.DeployCOA(uint64(uuid))
-			return EVMAddressToAddressBytesArrayValue(inter, address)
+			var addr types.Address
+			errors.WrapPanic(func() {
+				addr = handler.DeployCOA(uint64(uuid))
+			})
+			return EVMAddressToAddressBytesArrayValue(inter, addr)
 		},
 	)
 }
@@ -1572,10 +1582,11 @@ func newInternalEVMTypeDepositFunction(
 			// and a withdrawal would then have to perform an actual mint of new tokens.
 
 			// Deposit
-
-			const isAuthorized = false
-			account := handler.AccountByAddress(toAddress, isAuthorized)
-			account.Deposit(types.NewFlowTokenVault(amount))
+			errors.WrapPanic(func() {
+				const isAuthorized = false
+				account := handler.AccountByAddress(toAddress, isAuthorized)
+				account.Deposit(types.NewFlowTokenVault(amount))
+			})
 
 			return interpreter.Void
 		},
@@ -1617,8 +1628,11 @@ func newInternalEVMTypeBalanceFunction(
 				panic(err)
 			}
 
-			const isAuthorized = false
-			account := handler.AccountByAddress(address, isAuthorized)
+			var account types.Account
+			errors.WrapPanic(func() {
+				const isAuthorized = false
+				account = handler.AccountByAddress(address, isAuthorized)
+			})
 
 			return interpreter.UIntValue{BigInt: account.Balance()}
 		},
@@ -1658,9 +1672,11 @@ func newInternalEVMTypeNonceFunction(
 			if err != nil {
 				panic(err)
 			}
-
-			const isAuthorized = false
-			account := handler.AccountByAddress(address, isAuthorized)
+			var account types.Account
+			errors.WrapPanic(func() {
+				const isAuthorized = false
+				account = handler.AccountByAddress(address, isAuthorized)
+			})
 
 			return interpreter.UInt64Value(account.Nonce())
 		},
@@ -1700,9 +1716,11 @@ func newInternalEVMTypeCodeFunction(
 			if err != nil {
 				panic(err)
 			}
-
-			const isAuthorized = false
-			account := handler.AccountByAddress(address, isAuthorized)
+			var account types.Account
+			errors.WrapPanic(func() {
+				const isAuthorized = false
+				account = handler.AccountByAddress(address, isAuthorized)
+			})
 
 			return interpreter.ByteSliceToByteArrayValue(inter, account.Code())
 		},
@@ -1742,9 +1760,11 @@ func newInternalEVMTypeCodeHashFunction(
 			if err != nil {
 				panic(err)
 			}
-
-			const isAuthorized = false
-			account := handler.AccountByAddress(address, isAuthorized)
+			var account types.Account
+			errors.WrapPanic(func() {
+				const isAuthorized = false
+				account = handler.AccountByAddress(address, isAuthorized)
+			})
 
 			return interpreter.ByteSliceToByteArrayValue(inter, account.CodeHash())
 		},
@@ -1801,9 +1821,12 @@ func newInternalEVMTypeWithdrawFunction(
 
 			// Withdraw
 
-			const isAuthorized = true
-			account := handler.AccountByAddress(fromAddress, isAuthorized)
-			vault := account.Withdraw(amount)
+			var vault *types.FLOWTokenVault
+			errors.WrapPanic(func() {
+				const isAuthorized = true
+				account := handler.AccountByAddress(fromAddress, isAuthorized)
+				vault = account.Withdraw(amount)
+			})
 
 			ufix, roundedOff, err := types.ConvertBalanceToUFix64(vault.Balance())
 			if err != nil {
@@ -1813,11 +1836,20 @@ func newInternalEVMTypeWithdrawFunction(
 				panic(types.ErrWithdrawBalanceRounding)
 			}
 
+			var uuid uint64
+			errors.WrapPanic(func() {
+				uuid = handler.GenerateResourceUUID()
+			})
+
+			var ftAddress common.Address
+			errors.WrapPanic(func() {
+				ftAddress = handler.FlowTokenAddress()
+			})
 			// TODO: improve: maybe call actual constructor
 			return interpreter.NewCompositeValue(
 				inter,
 				locationRange,
-				common.NewAddressLocation(gauge, handler.FlowTokenAddress(), "FlowToken"),
+				common.NewAddressLocation(gauge, ftAddress, "FlowToken"),
 				"FlowToken.Vault",
 				common.CompositeKindResource,
 				[]interpreter.CompositeField{
@@ -1830,7 +1862,7 @@ func newInternalEVMTypeWithdrawFunction(
 					{
 						Name: sema.ResourceUUIDFieldName,
 						Value: interpreter.NewUInt64Value(gauge, func() uint64 {
-							return handler.GenerateResourceUUID()
+							return uuid
 						}),
 					},
 				},
@@ -1915,15 +1947,15 @@ func newInternalEVMTypeDeployFunction(
 			if !ok {
 				panic(errors.NewUnreachableError())
 			}
-
 			amount := types.NewBalance(amountValue.BigInt)
 
 			// Deploy
-
-			const isAuthorized = true
-			account := handler.AccountByAddress(fromAddress, isAuthorized)
-			result := account.Deploy(code, gasLimit, amount)
-
+			var result *types.ResultSummary
+			errors.WrapPanic(func() {
+				const isAuthorized = true
+				account := handler.AccountByAddress(fromAddress, isAuthorized)
+				result = account.Deploy(code, gasLimit, amount)
+			})
 			res := NewResultValue(handler, gauge, inter, locationRange, result)
 			return res
 		},
@@ -2010,7 +2042,9 @@ func newInternalEVMTypeCommitBlockProposalFunction(
 		gauge,
 		internalEVMTypeCommitBlockProposalFunctionType,
 		func(invocation interpreter.Invocation) interpreter.Value {
-			handler.CommitBlockProposal()
+			errors.WrapPanic(func() {
+				handler.CommitBlockProposal()
+			})
 			return interpreter.Void
 		},
 	)
@@ -2034,8 +2068,10 @@ func newInternalEVMTypeGetLatestBlockFunction(
 		func(invocation interpreter.Invocation) interpreter.Value {
 			inter := invocation.Interpreter
 			locationRange := invocation.LocationRange
-
-			latestBlock := handler.LastExecutedBlock()
+			var latestBlock *types.Block
+			errors.WrapPanic(func() {
+				latestBlock = handler.LastExecutedBlock()
+			})
 			return NewEVMBlockValue(handler, gauge, inter, locationRange, latestBlock)
 		},
 	)
