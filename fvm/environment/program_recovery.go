@@ -39,11 +39,11 @@ func RecoverProgram(
 
 	case isNonFungibleTokenContract(program, nonFungibleTokenAddress):
 		code = RecoveredNonFungibleTokenCode(nonFungibleTokenAddress, addressLocation.Name)
+	default:
+		return nil, nil
 	}
 
-	if code != "" {
-		return parser.ParseProgram(memoryGauge, []byte(code), parser.Config{})
-	}
+	return parser.ParseProgram(memoryGauge, []byte(code), parser.Config{})
 
 	return nil, nil
 }
