@@ -3,9 +3,10 @@ package debug_tx
 import (
 	"context"
 
-	sdk "github.com/onflow/flow-go-sdk"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
+
+	sdk "github.com/onflow/flow-go-sdk"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/grpcclient"
