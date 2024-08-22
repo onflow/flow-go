@@ -105,7 +105,7 @@ func (r *ResultApprovals) index(resultID flow.Identifier, chunkIndex uint64, app
 
 // Store stores a ResultApproval
 func (r *ResultApprovals) Store(approval *flow.ResultApproval) error {
-	return operation.WithBadgerReaderBatchWriter(r.db, r.store(approval))
+	return operation.WithReaderBatchWriter(r.db, r.store(approval))
 }
 
 // Index indexes a ResultApproval by chunk (ResultID + chunk index).
@@ -120,7 +120,7 @@ func (r *ResultApprovals) Index(resultID flow.Identifier, chunkIndex uint64, app
 	r.indexing.Lock()
 	defer r.indexing.Unlock()
 
-	err := operation.WithBadgerReaderBatchWriter(r.db, r.index(resultID, chunkIndex, approvalID))
+	err := operation.WithReaderBatchWriter(r.db, r.index(resultID, chunkIndex, approvalID))
 	if err != nil {
 		return fmt.Errorf("could not index result approval: %w", err)
 	}
