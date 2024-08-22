@@ -44,8 +44,11 @@ type Block struct {
 	// values as node values. Proofs are still compatible but might require an extra hashing step.
 	TransactionHashRoot gethCommon.Hash
 
-	// stores gas used by all transactions included in the block.
+	// TotalGasUsed stores gas used by all transactions included in the block.
 	TotalGasUsed uint64
+
+	// PrevRandao is the value returned for block.prevrandao opcode
+	PrevRandao gethCommon.Hash
 }
 
 // ToBytes encodes the block into bytes
@@ -65,6 +68,7 @@ func NewBlock(
 	height uint64,
 	timestamp uint64,
 	totalSupply *big.Int,
+	prevRandao gethCommon.Hash,
 ) *Block {
 	return &Block{
 		ParentBlockHash:     parentBlockHash,
@@ -73,13 +77,13 @@ func NewBlock(
 		TotalSupply:         totalSupply,
 		ReceiptRoot:         gethTypes.EmptyReceiptsHash,
 		TransactionHashRoot: gethTypes.EmptyRootHash,
+		PrevRandao:          prevRandao,
 	}
 }
 
 // NewBlockFromBytes constructs a new block from encoded data
 func NewBlockFromBytes(encoded []byte) (*Block, error) {
 	res := &Block{}
-
 	err := gethRLP.DecodeBytes(encoded, res)
 	if err != nil {
 		res = decodeBlockBreakingChanges(encoded)
@@ -92,7 +96,6 @@ func NewBlockFromBytes(encoded []byte) (*Block, error) {
 
 // GenesisTimestamp returns the block time stamp for EVM genesis block
 func GenesisTimestamp(flowChainID flow.ChainID) uint64 {
-	// default evm chain ID is previewNet
 	switch flowChainID {
 	case flow.Testnet:
 		return uint64(time.Date(2024, time.August, 1, 0, 0, 0, 0, time.UTC).Unix())
@@ -113,6 +116,7 @@ func GenesisBlock(chainID flow.ChainID) *Block {
 		ReceiptRoot:         gethTypes.EmptyRootHash,
 		TransactionHashRoot: gethTypes.EmptyRootHash,
 		TotalGasUsed:        0,
+		PrevRandao:          gethCommon.Hash{},
 	}
 }
 
@@ -191,7 +195,14 @@ func (b *BlockProposal) ToBytes() ([]byte, error) {
 // NewBlockProposalFromBytes constructs a new block proposal from encoded data
 func NewBlockProposalFromBytes(encoded []byte) (*BlockProposal, error) {
 	res := &BlockProposal{}
-	return res, gethRLP.DecodeBytes(encoded, res)
+	err := gethRLP.DecodeBytes(encoded, res)
+	if err != nil {
+		res = decodeBlockProposalBreakingChanges(encoded)
+		if res == nil {
+			return nil, err
+		}
+	}
+	return res, nil
 }
 
 func NewBlockProposal(
@@ -199,6 +210,7 @@ func NewBlockProposal(
 	height uint64,
 	timestamp uint64,
 	totalSupply *big.Int,
+	prevRandao gethCommon.Hash,
 ) *BlockProposal {
 	return &BlockProposal{
 		Block: Block{
@@ -207,6 +219,7 @@ func NewBlockProposal(
 			Timestamp:       timestamp,
 			TotalSupply:     totalSupply,
 			ReceiptRoot:     gethTypes.EmptyRootHash,
+			PrevRandao:      prevRandao,
 		},
 		Receipts: make([]LightReceipt, 0),
 		TxHashes: make([]gethCommon.Hash, 0),
@@ -215,19 +228,17 @@ func NewBlockProposal(
 
 type TransactionHashes []gethCommon.Hash
 
-func (th TransactionHashes) Len() int {
-	return len(th)
+func (t TransactionHashes) Len() int {
+	return len(t)
 }
 
-func (th TransactionHashes) EncodeIndex(index int, buffer *bytes.Buffer) {
-	buffer.Write(th[index].Bytes())
+func (t TransactionHashes) EncodeIndex(index int, buffer *bytes.Buffer) {
+	buffer.Write(t[index].Bytes())
 }
 
-func (txs TransactionHashes) RootHash() gethCommon.Hash {
-	return gethTypes.DeriveSha(txs, gethTrie.NewStackTrie(nil))
+func (t TransactionHashes) RootHash() gethCommon.Hash {
+	return gethTypes.DeriveSha(t, gethTrie.NewStackTrie(nil))
 }
-
-// todo remove this if confirmed we no longer need it on testnet, mainnet and previewnet.
 
 // Below block type section, defines earlier block types,
 // this is being used to decode blocks that were stored
@@ -235,156 +246,63 @@ func (txs TransactionHashes) RootHash() gethCommon.Hash {
 // a block that would otherwise be invalid if decoded into
 // latest version of the above Block type.
 
-type blockV0 struct {
-	ParentBlockHash gethCommon.Hash
-	Height          uint64
-	UUIDIndex       uint64
-	TotalSupply     uint64
-	StateRoot       gethCommon.Hash
-	ReceiptRoot     gethCommon.Hash
+// before adding PrevRandao to the block
+type BlockV0 struct {
+	ParentBlockHash     gethCommon.Hash
+	Height              uint64
+	Timestamp           uint64
+	TotalSupply         *big.Int
+	ReceiptRoot         gethCommon.Hash
+	TransactionHashRoot gethCommon.Hash
+	TotalGasUsed        uint64
 }
 
-// adds TransactionHashes
-
-type blockV1 struct {
-	ParentBlockHash   gethCommon.Hash
-	Height            uint64
-	UUIDIndex         uint64
-	TotalSupply       uint64
-	StateRoot         gethCommon.Hash
-	ReceiptRoot       gethCommon.Hash
-	TransactionHashes []gethCommon.Hash
-}
-
-// removes UUIDIndex
-
-type blockV2 struct {
-	ParentBlockHash   gethCommon.Hash
-	Height            uint64
-	TotalSupply       uint64
-	StateRoot         gethCommon.Hash
-	ReceiptRoot       gethCommon.Hash
-	TransactionHashes []gethCommon.Hash
-}
-
-// removes state root
-
-type blockV3 struct {
-	ParentBlockHash   gethCommon.Hash
-	Height            uint64
-	TotalSupply       uint64
-	ReceiptRoot       gethCommon.Hash
-	TransactionHashes []gethCommon.Hash
-}
-
-// change total supply type
-
-type blockV4 struct {
-	ParentBlockHash   gethCommon.Hash
-	Height            uint64
-	TotalSupply       *big.Int
-	ReceiptRoot       gethCommon.Hash
-	TransactionHashes []gethCommon.Hash
-}
-
-// adds timestamp
-
-type blockV5 struct {
-	ParentBlockHash   gethCommon.Hash
-	Height            uint64
-	Timestamp         uint64
-	TotalSupply       *big.Int
-	ReceiptRoot       gethCommon.Hash
-	TransactionHashes []gethCommon.Hash
-}
-
-// adds total gas used
-
-type blockV6 struct {
-	ParentBlockHash   gethCommon.Hash
-	Height            uint64
-	Timestamp         uint64
-	TotalSupply       *big.Int
-	ReceiptRoot       gethCommon.Hash
-	TransactionHashes []gethCommon.Hash
-	TotalGasUsed      uint64
+type BlockProposalV0 struct {
+	BlockV0
+	Receipts []LightReceipt
+	TxHashes TransactionHashes
 }
 
 // decodeBlockBreakingChanges will try to decode the bytes into all
 // previous versions of block type, if it succeeds it will return the
 // migrated block, otherwise it will return nil.
 func decodeBlockBreakingChanges(encoded []byte) *Block {
-	b0 := &blockV0{}
+	b0 := &BlockV0{}
 	if err := gethRLP.DecodeBytes(encoded, b0); err == nil {
 		return &Block{
-			ParentBlockHash: b0.ParentBlockHash,
-			Height:          b0.Height,
-			ReceiptRoot:     b0.ReceiptRoot,
-			TotalSupply:     big.NewInt(int64(b0.TotalSupply)),
+			ParentBlockHash:     b0.ParentBlockHash,
+			Height:              b0.Height,
+			Timestamp:           b0.Timestamp,
+			TotalSupply:         b0.TotalSupply,
+			ReceiptRoot:         b0.ReceiptRoot,
+			TransactionHashRoot: b0.TransactionHashRoot,
+			TotalGasUsed:        b0.TotalGasUsed,
+			PrevRandao:          gethCommon.Hash{},
 		}
 	}
+	return nil
+}
 
-	b1 := &blockV1{}
-	if err := gethRLP.DecodeBytes(encoded, b1); err == nil {
-		return &Block{
-			ParentBlockHash: b1.ParentBlockHash,
-			Height:          b1.Height,
-			TotalSupply:     big.NewInt(int64(b1.TotalSupply)),
-			ReceiptRoot:     b1.ReceiptRoot,
+// decodeBlockProposalBreakingChanges will try to decode the bytes into all
+// previous versions of block proposal type, if it succeeds it will return the
+// migrated block, otherwise it will return nil.
+func decodeBlockProposalBreakingChanges(encoded []byte) *BlockProposal {
+	bp0 := &BlockProposalV0{}
+	if err := gethRLP.DecodeBytes(encoded, bp0); err == nil {
+		return &BlockProposal{
+			Block: Block{
+				ParentBlockHash:     bp0.ParentBlockHash,
+				Height:              bp0.Height,
+				Timestamp:           bp0.Timestamp,
+				TotalSupply:         bp0.TotalSupply,
+				ReceiptRoot:         bp0.ReceiptRoot,
+				TransactionHashRoot: bp0.TransactionHashRoot,
+				TotalGasUsed:        bp0.TotalGasUsed,
+				PrevRandao:          gethCommon.Hash{},
+			},
+			Receipts: bp0.Receipts,
+			TxHashes: bp0.TxHashes,
 		}
 	}
-
-	b2 := &blockV2{}
-	if err := gethRLP.DecodeBytes(encoded, b2); err == nil {
-		return &Block{
-			ParentBlockHash: b2.ParentBlockHash,
-			Height:          b2.Height,
-			TotalSupply:     big.NewInt(int64(b2.TotalSupply)),
-			ReceiptRoot:     b2.ReceiptRoot,
-		}
-	}
-
-	b3 := &blockV3{}
-	if err := gethRLP.DecodeBytes(encoded, b3); err == nil {
-		return &Block{
-			ParentBlockHash: b3.ParentBlockHash,
-			Height:          b3.Height,
-			TotalSupply:     big.NewInt(int64(b3.TotalSupply)),
-			ReceiptRoot:     b3.ReceiptRoot,
-		}
-	}
-
-	b4 := &blockV4{}
-	if err := gethRLP.DecodeBytes(encoded, b4); err == nil {
-		return &Block{
-			ParentBlockHash: b4.ParentBlockHash,
-			Height:          b4.Height,
-			TotalSupply:     b4.TotalSupply,
-			ReceiptRoot:     b4.ReceiptRoot,
-		}
-	}
-
-	b5 := &blockV5{}
-	if err := gethRLP.DecodeBytes(encoded, b5); err == nil {
-		return &Block{
-			ParentBlockHash: b5.ParentBlockHash,
-			Height:          b5.Height,
-			Timestamp:       b5.Timestamp,
-			TotalSupply:     b5.TotalSupply,
-			ReceiptRoot:     b5.ReceiptRoot,
-		}
-	}
-
-	b6 := &blockV6{}
-	if err := gethRLP.DecodeBytes(encoded, b6); err == nil {
-		return &Block{
-			ParentBlockHash: b5.ParentBlockHash,
-			Height:          b5.Height,
-			Timestamp:       b5.Timestamp,
-			TotalSupply:     b5.TotalSupply,
-			ReceiptRoot:     b5.ReceiptRoot,
-		}
-	}
-
 	return nil
 }
