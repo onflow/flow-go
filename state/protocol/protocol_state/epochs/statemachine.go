@@ -25,7 +25,7 @@ import (
 // IMPORTANCE of the FinalizationSafetyThreshold:
 // The FinalizationSafetyThreshold's value `t` acts as a deadline for sealing the EpochCommit service
 // event near the end of each epoch. Specifically, if the current epoch N's final view is `f`, the
-// EpochCommit event for configuring epoch N+1 must be received latest by the
+// EpochCommit event for configuring epoch N+1 must be received at latest by the:
 //
 //	Epoch Commitment Deadline: d=f-t
 //
