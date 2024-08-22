@@ -15,6 +15,7 @@ func CalcMd5(outpath string) []byte {
 	}
 	defer f.Close()
 
+	// #nosec
 	h := md5.New()
 	if _, err := io.Copy(h, f); err != nil {
 		return nil
