@@ -422,7 +422,10 @@ func (h *ContractHandler) run(rlpEncodedTx []byte) (*types.Result, error) {
 	}
 
 	// step 9 - emit transaction event
-	err = h.emitEvent(events.NewTransactionEvent(res, rlpEncodedTx, bp.Height))
+	err = h.emitEvent(
+		events.NewTransactionEvent(res, rlpEncodedTx, bp.Height),
+	)
+
 	if err != nil {
 		return nil, err
 	}
@@ -534,11 +537,6 @@ func (h *ContractHandler) getBlockContext() (types.BlockContext, error) {
 	if err != nil {
 		return types.BlockContext{}, err
 	}
-	rand := gethCommon.Hash{}
-	err = h.backend.ReadRandom(rand[:])
-	if err != nil {
-		return types.BlockContext{}, err
-	}
 
 	return types.BlockContext{
 		ChainID:                types.EVMChainIDFromFlowChainID(h.flowChainID),
@@ -551,7 +549,7 @@ func (h *ContractHandler) getBlockContext() (types.BlockContext, error) {
 			return hash
 		},
 		ExtraPrecompiledContracts: h.precompiledContracts,
-		Random:                    rand,
+		Random:                    bp.PrevRandao,
 		Tracer:                    h.tracer.TxTracer(),
 		TxCountSoFar:              uint(len(bp.TxHashes)),
 		TotalGasUsedSoFar:         bp.TotalGasUsed,
