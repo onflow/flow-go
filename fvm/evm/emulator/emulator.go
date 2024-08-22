@@ -651,7 +651,7 @@ func (proc *procedure) run(
 	// if pre-checks are passed, the exec result won't be nil
 	if execResult != nil {
 		res.GasConsumed = execResult.UsedGas
-		res.GasRefund = proc.state.GetRefund()
+		res.GasRefund = execResult.RefundedGas
 		res.Index = uint16(txIndex)
 		res.CumulativeGasUsed = execResult.UsedGas + proc.config.BlockTotalGasUsedSoFar
 		res.PrecompiledCalls, err = proc.config.PCTracker.CapturedCalls()
