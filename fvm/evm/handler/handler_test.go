@@ -66,6 +66,10 @@ func TestHandler_TransactionRunOrPanic(t *testing.T) {
 						RunTransactionFunc: func(tx *gethTypes.Transaction) (*types.Result, error) {
 							return result, nil
 						},
+						// this disables the fee collection step
+						BalanceOfFunc: func(address types.Address) (*big.Int, error) {
+							return new(big.Int), nil
+						},
 					}
 					handler := handler.NewContractHandler(flow.Emulator, rootAddr, flowTokenAddress, rootAddr, bs, aa, backend, em, debug.NopTracer)
 
@@ -135,6 +139,10 @@ func TestHandler_TransactionRunOrPanic(t *testing.T) {
 								ValidationError: fmt.Errorf("some sort of validation error"),
 							}, nil
 						},
+						// this disables the fee collection step
+						BalanceOfFunc: func(address types.Address) (*big.Int, error) {
+							return new(big.Int), nil
+						},
 					}
 					handler := handler.NewContractHandler(flow.Testnet, rootAddr, flowTokenAddress, rootAddr, bs, aa, backend, em, debug.NopTracer)
 
@@ -191,6 +199,10 @@ func TestHandler_TransactionRunOrPanic(t *testing.T) {
 						em := &testutils.TestEmulator{
 							RunTransactionFunc: func(tx *gethTypes.Transaction) (*types.Result, error) {
 								return &types.Result{}, types.NewFatalError(fmt.Errorf("Fatal error"))
+							},
+							// this disables the fee collection step
+							BalanceOfFunc: func(address types.Address) (*big.Int, error) {
+								return new(big.Int), nil
 							},
 						}
 						handler := handler.NewContractHandler(flow.Testnet, rootAddr, flowTokenAddress, rootAddr, bs, aa, backend, em, debug.NopTracer)
@@ -737,9 +749,34 @@ func TestHandler_TransactionRun(t *testing.T) {
 						},
 					}
 
+					gasFeeCollector := types.NewAddress(gethCommon.Address{1, 2, 3})
+					firstBalanceCall := true
+					feeCollected := false
+					coinbaseInitBalance := big.NewInt(1)
+					coinbaseAfterBalance := big.NewInt(3)
+					coinbaseDiffBalance := big.NewInt(2)
 					em := &testutils.TestEmulator{
 						RunTransactionFunc: func(tx *gethTypes.Transaction) (*types.Result, error) {
 							return result, nil
+						},
+						BalanceOfFunc: func(address types.Address) (*big.Int, error) {
+							if firstBalanceCall {
+								firstBalanceCall = false
+								return coinbaseInitBalance, nil
+							}
+							return coinbaseAfterBalance, nil
+						},
+						NonceOfFunc: func(address types.Address) (uint64, error) {
+							return 0, nil
+						},
+						DirectCallFunc: func(call *types.DirectCall) (*types.Result, error) {
+							feeCollected = true
+							require.Equal(t, types.CoinbaseAddress, call.From)
+							require.Equal(t, gasFeeCollector, call.To)
+							require.True(t, types.BalancesAreEqual(call.Value, coinbaseDiffBalance))
+							return &types.Result{
+								GasConsumed: 21_000,
+							}, nil
 						},
 					}
 					handler := handler.NewContractHandler(chainID, rootAddr, flowTokenAddress, rootAddr, bs, aa, backend, em, debug.NopTracer)
@@ -752,10 +789,11 @@ func TestHandler_TransactionRun(t *testing.T) {
 						big.NewInt(1),
 					)
 
-					rs := handler.Run(tx, types.NewAddress(gethCommon.Address{}))
+					rs := handler.Run(tx, gasFeeCollector)
 					require.Equal(t, types.StatusSuccessful, rs.Status)
 					require.Equal(t, result.GasConsumed, rs.GasConsumed)
 					require.Equal(t, types.ErrCodeNoError, rs.ErrorCode)
+					require.True(t, feeCollected)
 
 				})
 			})
@@ -785,6 +823,9 @@ func TestHandler_TransactionRun(t *testing.T) {
 					em := &testutils.TestEmulator{
 						RunTransactionFunc: func(tx *gethTypes.Transaction) (*types.Result, error) {
 							return result, nil
+						},
+						BalanceOfFunc: func(address types.Address) (*big.Int, error) {
+							return new(big.Int), nil
 						},
 					}
 					handler := handler.NewContractHandler(chainID, rootAddr, flowTokenAddress, rootAddr, bs, aa, backend, em, debug.NopTracer)
@@ -820,6 +861,9 @@ func TestHandler_TransactionRun(t *testing.T) {
 					em := &testutils.TestEmulator{
 						RunTransactionFunc: func(tx *gethTypes.Transaction) (*types.Result, error) {
 							return &types.Result{ValidationError: evmErr}, nil
+						},
+						BalanceOfFunc: func(address types.Address) (*big.Int, error) {
+							return new(big.Int), nil
 						},
 					}
 					handler := handler.NewContractHandler(chainID, rootAddr, flowTokenAddress, rootAddr, bs, aa, backend, em, debug.NopTracer)
@@ -884,6 +928,12 @@ func TestHandler_TransactionRun(t *testing.T) {
 						}
 					}
 
+					gasFeeCollector := types.NewAddress(gethCommon.Address{1, 2, 3})
+					firstBalanceCall := true
+					feeCollected := false
+					coinbaseInitBalance := big.NewInt(1)
+					coinbaseAfterBalance := big.NewInt(3)
+					coinbaseDiffBalance := big.NewInt(2)
 					var runResults []*types.Result
 					em := &testutils.TestEmulator{
 						BatchRunTransactionFunc: func(txs []*gethTypes.Transaction) ([]*types.Result, error) {
@@ -893,10 +943,28 @@ func TestHandler_TransactionRun(t *testing.T) {
 							}
 							return runResults, nil
 						},
+						BalanceOfFunc: func(address types.Address) (*big.Int, error) {
+							if firstBalanceCall {
+								firstBalanceCall = false
+								return coinbaseInitBalance, nil
+							}
+							return coinbaseAfterBalance, nil
+						},
+						NonceOfFunc: func(address types.Address) (uint64, error) {
+							return 0, nil
+						},
+						DirectCallFunc: func(call *types.DirectCall) (*types.Result, error) {
+							feeCollected = true
+							require.Equal(t, types.CoinbaseAddress, call.From)
+							require.Equal(t, gasFeeCollector, call.To)
+							require.True(t, types.BalancesAreEqual(call.Value, coinbaseDiffBalance))
+							return &types.Result{
+								GasConsumed: 21_000,
+							}, nil
+						},
 					}
 					handler := handler.NewContractHandler(chainID, rootAddr, flowTokenAddress, randomBeaconAddress, bs, aa, backend, em, debug.NopTracer)
 
-					coinbase := types.NewAddress(gethCommon.Address{})
 					gasLimit := uint64(100_000)
 
 					// run multiple successful transactions
@@ -913,20 +981,22 @@ func TestHandler_TransactionRun(t *testing.T) {
 						)
 					}
 
-					results := handler.BatchRun(txs, coinbase)
+					results := handler.BatchRun(txs, gasFeeCollector)
 					for _, rs := range results {
 						require.Equal(t, types.StatusSuccessful, rs.Status)
 						require.Equal(t, gasConsumed, rs.GasConsumed)
 						require.Equal(t, types.ErrCodeNoError, rs.ErrorCode)
 					}
+					require.True(t, feeCollected)
 
 					handler.CommitBlockProposal()
 					events := backend.Events()
-					require.Len(t, events, batchSize+1) // +1 block event
+					// +1 for fee collection +1 block event
+					require.Len(t, events, batchSize+1+1)
 
 					for i, event := range events {
 						if i == batchSize {
-							continue // don't check last block event
+							break // don't check last block event
 						}
 						txEventPayload := testutils.TxEventToPayload(t, event, sc.EVMContract.Address)
 
@@ -952,7 +1022,7 @@ func TestHandler_TransactionRun(t *testing.T) {
 						)
 					}
 
-					results = handler.BatchRun(txs, coinbase)
+					results = handler.BatchRun(txs, gasFeeCollector)
 					for _, rs := range results {
 						require.Equal(t, types.StatusSuccessful, rs.Status)
 					}
@@ -991,6 +1061,10 @@ func TestHandler_TransactionRun(t *testing.T) {
 								res[i] = result()
 							}
 							return res, nil
+						},
+						// this disables the fee collection step
+						BalanceOfFunc: func(address types.Address) (*big.Int, error) {
+							return new(big.Int), nil
 						},
 					}
 					handler := handler.NewContractHandler(chainID, rootAddr, flowTokenAddress, randomBeaconAddress, bs, aa, backend, em, debug.NopTracer)
@@ -1119,6 +1193,9 @@ func TestHandler_TransactionRun(t *testing.T) {
 							tr.OnTxEnd(result.Receipt(), nil)
 							return result, nil
 						},
+						BalanceOfFunc: func(address types.Address) (*big.Int, error) {
+							return big.NewInt(0), nil
+						},
 					}
 
 					handler := handler.NewContractHandler(chainID, rootAddr, flowTokenAddress, rootAddr, bs, aa, backend, em, tracer)
@@ -1183,6 +1260,9 @@ func TestHandler_TransactionRun(t *testing.T) {
 							tr.OnExit(0, []byte{0x02}, 200, nil, false)
 							tr.OnTxEnd(&gethTypes.Receipt{TxHash: result.TxHash}, nil)
 							return result, nil
+						},
+						BalanceOfFunc: func(address types.Address) (*big.Int, error) {
+							return big.NewInt(0), nil
 						},
 					}
 
@@ -1257,6 +1337,9 @@ func TestHandler_TransactionRun(t *testing.T) {
 								traceResults[i] = tracer.GetResultByTxHash(tx.Hash())
 							}
 							return runResults, nil
+						},
+						BalanceOfFunc: func(address types.Address) (*big.Int, error) {
+							return big.NewInt(0), nil
 						},
 					}
 
@@ -1372,6 +1455,9 @@ func TestHandler_Metrics(t *testing.T) {
 					},
 					NonceOfFunc: func(address types.Address) (uint64, error) {
 						return 1, nil
+					},
+					BalanceOfFunc: func(address types.Address) (*big.Int, error) {
+						return big.NewInt(0), nil
 					},
 				}
 				handler := handler.NewContractHandler(

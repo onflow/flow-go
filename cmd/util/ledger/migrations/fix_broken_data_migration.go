@@ -79,7 +79,7 @@ func (m *FixSlabsWithBrokenReferencesMigration) MigrateAccount(
 	storage := migrationRuntime.Storage
 
 	// Load all atree registers in storage
-	err := loadAtreeSlabsInStorage(storage, accountRegisters, m.nWorkers)
+	err := util.LoadAtreeSlabsInStorage(storage, accountRegisters, m.nWorkers)
 	if err != nil {
 		return err
 	}
