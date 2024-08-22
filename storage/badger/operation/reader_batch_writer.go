@@ -55,8 +55,8 @@ func (b *ReaderBatchWriter) notifyCallbacks(err error) {
 	}
 }
 
-func WithBadgerReaderBatchWriter(db *badger.DB, fn func(storage.BadgerReaderBatchWriter) error) error {
-	batch := NewBadgerReaderBatchWriter(db)
+func WithReaderBatchWriter(db *badger.DB, fn func(storage.BadgerReaderBatchWriter) error) error {
+	batch := NewReaderBatchWriter(db)
 
 	err := fn(batch)
 	if err != nil {
@@ -72,7 +72,7 @@ func WithBadgerReaderBatchWriter(db *badger.DB, fn func(storage.BadgerReaderBatc
 	return batch.Commit()
 }
 
-func NewBadgerReaderBatchWriter(db *badger.DB) *ReaderBatchWriter {
+func NewReaderBatchWriter(db *badger.DB) *ReaderBatchWriter {
 	return &ReaderBatchWriter{
 		db:    db,
 		batch: db.NewWriteBatch(),
@@ -80,7 +80,7 @@ func NewBadgerReaderBatchWriter(db *badger.DB) *ReaderBatchWriter {
 }
 
 // ToReader is a helper function to convert a BadgerReaderBatchWriter to a Reader
-var ToReader = NewBadgerReaderBatchWriter
+var ToReader = NewReaderBatchWriter
 
 var _ storage.Reader = (*ReaderBatchWriter)(nil)
 
