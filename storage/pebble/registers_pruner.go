@@ -143,7 +143,7 @@ func (p *RegisterPruner) checkPrune(ctx irrecoverable.SignalerContext) {
 		}
 
 		// update first indexed height
-		err = updateFirstStoredHeight(p.db, pruneHeight)
+		err = p.updateFirstStoredHeight(pruneHeight)
 		if err != nil {
 			ctx.Throw(fmt.Errorf("failed to update first height for register storage: %w", err))
 		}
@@ -170,6 +170,7 @@ func (p *RegisterPruner) pruneUpToHeight(pruneHeight uint64) error {
 	err := func(r pebble.Reader) error {
 		options := pebble.IterOptions{
 			LowerBound: prefix,
+			UpperBound: []byte{codeFirstBlockHeight},
 		}
 
 		it, err := r.NewIter(&options)
@@ -254,4 +255,15 @@ func (p *RegisterPruner) batchDelete(lookupKeys [][]byte) error {
 	}
 
 	return nil
+}
+
+// updateFirstStoredHeight updates the first stored height in the database to the specified height.
+// The height is stored using the `firstHeightKey` key.
+//
+// Parameters:
+//   - height: The height value to store as the first stored height.
+//
+// No errors are expected during normal operations.
+func (p *RegisterPruner) updateFirstStoredHeight(height uint64) error {
+	return p.db.Set(firstHeightKey, encodedUint64(height), nil)
 }

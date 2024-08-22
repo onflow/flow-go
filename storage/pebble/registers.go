@@ -148,13 +148,9 @@ func (s *Registers) FirstHeight() uint64 {
 }
 
 func firstStoredHeight(db *pebble.DB) (uint64, error) {
-	return operation.RetrieveHeight(db, firstHeightKey)
+	return operation.RetrieveRegisterHeight(db, firstHeightKey)
 }
 
 func latestStoredHeight(db *pebble.DB) (uint64, error) {
-	return operation.RetrieveHeight(db, latestHeightKey)
-}
-
-func updateFirstStoredHeight(db *pebble.DB, height uint64) error {
-	return db.Set(firstHeightKey, encodedUint64(height), nil)
+	return operation.RetrieveRegisterHeight(db, latestHeightKey)
 }
