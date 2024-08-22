@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"fmt"
 	"math/big"
 
 	"github.com/onflow/cadence/runtime/common"
@@ -138,19 +139,10 @@ func (h *ContractHandler) RunOrPanic(rlpEncodedTx []byte, gasFeeCollector types.
 	// capture open tracing span
 	defer h.backend.StartChildSpan(trace.FVMEVMRun).End()
 
-	// capture coinbase init balance
-	cb := h.AccountByAddress(types.CoinbaseAddress, true)
-	initCoinbaseBalance := cb.Balance()
-
-	res, err := h.run(rlpEncodedTx)
-	panicOnErrorOrInvalidOrFailedState(res, err)
-
-	// transfer the gas fees collected to the gas fee collector address
-	afterBalance := cb.Balance()
-	diff := new(big.Int).Sub(afterBalance, initCoinbaseBalance)
-	if diff.Sign() > 0 {
-		cb.Transfer(gasFeeCollector, diff)
-	}
+	h.runWithGasFeeRefund(gasFeeCollector, func() {
+		res, err := h.run(rlpEncodedTx)
+		panicOnErrorOrInvalidOrFailedState(res, err)
+	})
 }
 
 // Run tries to run an rlp-encoded evm transaction
@@ -159,23 +151,34 @@ func (h *ContractHandler) Run(rlpEncodedTx []byte, gasFeeCollector types.Address
 	// capture open tracing span
 	defer h.backend.StartChildSpan(trace.FVMEVMRun).End()
 
+	var res *types.Result
+	var err error
+	h.runWithGasFeeRefund(gasFeeCollector, func() {
+		// run transaction
+		res, err = h.run(rlpEncodedTx)
+		panicOnError(err)
+
+	})
+	// return the result summary
+	return res.ResultSummary()
+}
+
+// runWithGasFeeRefund runs a method and transfers the balance changes of the
+// coinbase address to the provided gas fee collector
+func (h *ContractHandler) runWithGasFeeRefund(gasFeeCollector types.Address, f func()) {
 	// capture coinbase init balance
 	cb := h.AccountByAddress(types.CoinbaseAddress, true)
 	initCoinbaseBalance := cb.Balance()
-
-	// run transaction
-	res, err := h.run(rlpEncodedTx)
-	panicOnError(err)
-
+	f()
 	// transfer the gas fees collected to the gas fee collector address
 	afterBalance := cb.Balance()
 	diff := new(big.Int).Sub(afterBalance, initCoinbaseBalance)
 	if diff.Sign() > 0 {
 		cb.Transfer(gasFeeCollector, diff)
 	}
-
-	// return the result summary
-	return res.ResultSummary()
+	if diff.Sign() < 0 { // this should never happen but in case
+		panic(fvmErrors.NewEVMError(fmt.Errorf("negative balance change on coinbase")))
+	}
 }
 
 // BatchRun tries to run batch of rlp-encoded transactions
@@ -188,24 +191,17 @@ func (h *ContractHandler) BatchRun(rlpEncodedTxs [][]byte, gasFeeCollector types
 	span.SetAttributes(attribute.Int("tx_counts", len(rlpEncodedTxs)))
 	defer span.End()
 
-	// capture coinbase init balance
-	cb := h.AccountByAddress(types.CoinbaseAddress, true)
-	initCoinbaseBalance := cb.Balance()
-
-	// batch run transactions and panic if any error
-	res, err := h.batchRun(rlpEncodedTxs)
-	panicOnError(err)
-
-	// transfer the gas fees collected to the gas fee collector address
-	afterBalance := cb.Balance()
-	diff := new(big.Int).Sub(afterBalance, initCoinbaseBalance)
-	if diff.Sign() > 0 {
-		cb.Transfer(gasFeeCollector, diff)
-	}
+	var results []*types.Result
+	var err error
+	h.runWithGasFeeRefund(gasFeeCollector, func() {
+		// batch run transactions and panic if any error
+		results, err = h.batchRun(rlpEncodedTxs)
+		panicOnError(err)
+	})
 
 	// convert results into result summaries
-	resSummaries := make([]*types.ResultSummary, len(res))
-	for i, r := range res {
+	resSummaries := make([]*types.ResultSummary, len(results))
+	for i, r := range results {
 		resSummaries[i] = r.ResultSummary()
 	}
 	return resSummaries
