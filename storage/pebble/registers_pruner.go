@@ -204,7 +204,10 @@ func (p *RegisterPruner) pruneUpToHeight(pruneHeight uint64) error {
 				}
 
 				// Otherwise, mark this key for removal
-				batchKeysToRemove = append(batchKeysToRemove, key)
+				// Create a copy of the key to avoid memory issues
+				keyCopy := make([]byte, len(key))
+				copy(keyCopy, key)
+				batchKeysToRemove = append(batchKeysToRemove, keyCopy)
 
 				if len(batchKeysToRemove) == itemsPerBatch {
 					// Perform batch delete
@@ -245,8 +248,9 @@ func (p *RegisterPruner) batchDelete(lookupKeys [][]byte) error {
 	defer batch.Close()
 
 	for _, key := range lookupKeys {
+		keyHeight, registerID, _ := lookupKeyToRegisterID(key)
 		if err := batch.Delete(key, nil); err != nil {
-			return fmt.Errorf("failed to delete lookupKey: %w", err)
+			return fmt.Errorf("failed to delete lookupKey: %w %d %v", err, keyHeight, registerID)
 		}
 	}
 
