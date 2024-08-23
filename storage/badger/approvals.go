@@ -72,6 +72,7 @@ func (r *ResultApprovals) byChunk(resultID flow.Identifier, chunkIndex uint64) f
 	}
 }
 
+// CAUTION: Caller must acquire `indexing` lock.
 func (r *ResultApprovals) index(resultID flow.Identifier, chunkIndex uint64, approvalID flow.Identifier) func(storage.BadgerReaderBatchWriter) error {
 	return func(tx storage.BadgerReaderBatchWriter) error {
 		r, w := tx.ReaderWriter()

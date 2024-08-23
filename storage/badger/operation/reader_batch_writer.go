@@ -79,7 +79,7 @@ func NewReaderBatchWriter(db *badger.DB) *ReaderBatchWriter {
 	}
 }
 
-// ToReader is a helper function to convert a BadgerReaderBatchWriter to a Reader
+// ToReader is a helper function to convert a *badger.DB to a Reader
 var ToReader = NewReaderBatchWriter
 
 var _ storage.Reader = (*ReaderBatchWriter)(nil)
@@ -111,7 +111,7 @@ func (b *ReaderBatchWriter) Get(key []byte) ([]byte, io.Closer, error) {
 		return nil, nil, irrecoverable.NewExceptionf("could not load value: %w", err)
 	}
 
-	return value, new(noopCloser), nil
+	return value, noopCloser{}, nil
 }
 
 var _ storage.Writer = (*ReaderBatchWriter)(nil)
