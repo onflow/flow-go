@@ -16,15 +16,30 @@ type ReaderBatchWriter struct {
 	batch *badger.WriteBatch
 
 	addingCallback sync.Mutex // protect callbacks
-	callbacks      []func(error)
+
+	// callbacks are executed regardless of the success of the batch commit.
+	// if any function that is adding writes to the batch fails, the callbacks
+	// are also called with the error, in this case the callbacks are executed
+	// before the batch is submitted. This is useful for the locks in those functions
+	// to be released.
+	// callbacks must be non-blocking
+	callbacks []func(error)
 }
 
 var _ storage.BadgerReaderBatchWriter = (*ReaderBatchWriter)(nil)
 
+// GlobalReader returns a database-backed reader which reads the latest committed global database state ("read-committed isolation").
+// This reader will not read writes written to ReaderBatchWriter.Writer until the write batch is committed.
+// This reader may observe different values for the same key on subsequent reads.
 func (b *ReaderBatchWriter) GlobalReader() storage.Reader {
 	return b
 }
 
+// Writer returns a writer associated with a batch of writes. The batch is pending until it is committed.
+// When we `Write` into the batch, that write operation is added to the pending batch, but not committed.
+// The commit operation is atomic w.r.t. the batch; either all writes are applied to the database, or no writes are.
+// Note:
+// - The writer cannot be used concurrently for writing.
 func (b *ReaderBatchWriter) Writer() storage.Writer {
 	return b
 }

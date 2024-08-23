@@ -84,7 +84,7 @@ func (r *ResultApprovals) index(resultID flow.Identifier, chunkIndex uint64, app
 
 			// no approval found, index the approval
 
-			return operation.IndexResultApproval(resultID, chunkIndex, approvalID)(rw.Writer())
+			return operation.UnsafeIndexResultApproval(resultID, chunkIndex, approvalID)(rw.Writer())
 		}
 
 		// an approval is already indexed, double check if it is the same

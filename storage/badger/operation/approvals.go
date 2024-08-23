@@ -18,12 +18,14 @@ func RetrieveResultApproval(approvalID flow.Identifier, approval *flow.ResultApp
 	return retrieveR(makePrefix(codeResultApproval, approvalID), approval)
 }
 
-// IndexResultApproval inserts a ResultApproval ID keyed by ExecutionResult ID
+// UnsafeIndexResultApproval inserts a ResultApproval ID keyed by ExecutionResult ID
 // and chunk index. If a value for this key exists, a storage.ErrAlreadyExists
 // error is returned. This operation is only used by the ResultApprovals store,
 // which is only used within a Verification node, where it is assumed that there
 // is only one approval per chunk.
-func IndexResultApproval(resultID flow.Identifier, chunkIndex uint64, approvalID flow.Identifier) func(storage.Writer) error {
+// CAUTION: In order to prevent overwriting, use of this function must be
+// synchronized with check (RetrieveResultApproval) for existance of the key.
+func UnsafeIndexResultApproval(resultID flow.Identifier, chunkIndex uint64, approvalID flow.Identifier) func(storage.Writer) error {
 	return insertW(makePrefix(codeIndexResultApprovalByChunk, resultID, chunkIndex), approvalID)
 }
 
