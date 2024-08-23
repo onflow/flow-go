@@ -13,6 +13,9 @@ import (
 	"github.com/onflow/flow-go/utils/debug"
 )
 
+// use the following command to forward port 9000 from the EN to localhost:9001
+// `gcloud compute ssh '--ssh-flag=-A' --no-user-output-enabled --tunnel-through-iap migrationmainnet1-execution-001 --project flow-multi-region -- -NL 9001:localhost:9000`
+
 var (
 	flagAccessAddress    string
 	flagExecutionAddress string
