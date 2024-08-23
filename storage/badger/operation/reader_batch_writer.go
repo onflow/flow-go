@@ -2,7 +2,6 @@ package operation
 
 import (
 	"errors"
-	"fmt"
 	"io"
 	"sync"
 
@@ -122,9 +121,4 @@ func (b *ReaderBatchWriter) Set(key, value []byte) error {
 
 func (b *ReaderBatchWriter) Delete(key []byte) error {
 	return b.batch.Delete(key)
-}
-
-func (b *ReaderBatchWriter) DeleteRange(start, end []byte) error {
-	// TODO: implement
-	return fmt.Errorf("not implemented")
 }
