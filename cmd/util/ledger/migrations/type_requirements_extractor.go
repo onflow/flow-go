@@ -45,7 +45,7 @@ func NewTypeRequirementsExtractingMigration(
 		// Extract type requirements from all contracts
 
 		for _, contract := range contracts {
-			if _, isSystemContract := importantLocations[contract.location]; isSystemContract {
+			if _, isSystemContract := importantLocations[contract.Location]; isSystemContract {
 				// System contracts have their own type-changing rules.
 				// So do not add them here.
 				continue
@@ -73,7 +73,7 @@ func ExtractTypeRequirements(
 	// must be parsed with the old parser.
 	program, err := old_parser.ParseProgram(
 		nil,
-		contract.code,
+		contract.Code,
 		old_parser.Config{},
 	)
 
@@ -91,7 +91,7 @@ func ExtractTypeRequirements(
 
 	for _, composites := range contractInterface.DeclarationMembers().Composites() {
 		typeRequirement := TypeRequirement{
-			Address:      contract.location.Address,
+			Address:      contract.Location.Address,
 			ContractName: contractInterface.Identifier.Identifier,
 			TypeName:     composites.Identifier.Identifier,
 		}
