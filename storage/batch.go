@@ -53,14 +53,6 @@ type Writer interface {
 	//
 	// It is safe to modify the contents of the arguments after Delete returns.
 	Delete(key []byte) error
-
-	// DeleteRange deletes all of the point keys (and values) in the range
-	// [start,end) (inclusive on start, exclusive on end). DeleteRange does NOT
-	// delete overlapping range keys (eg, keys set via RangeKeySet).
-	//
-	// It is safe to modify the contents of the arguments after DeleteRange
-	// returns.
-	DeleteRange(start, end []byte) error
 }
 
 // BadgerReaderBatchWriter is an interface for badger-specific reader and writer.
