@@ -87,7 +87,7 @@ func (c *CacheB[K, V]) IsCached(key K) bool {
 // injected. During normal operations, the following error returns are expected:
 //   - `storage.ErrNotFound` if key is unknown.
 func (c *CacheB[K, V]) Get(key K) func(storage.Reader) (V, error) {
-	return func(tx storage.Reader) (V, error) {
+	return func(r storage.Reader) (V, error) {
 
 		// check if we have it in the cache
 		resource, cached := c.cache.Get(key)
@@ -97,7 +97,7 @@ func (c *CacheB[K, V]) Get(key K) func(storage.Reader) (V, error) {
 		}
 
 		// get it from the database
-		resource, err := c.retrieve(key)(tx)
+		resource, err := c.retrieve(key)(r)
 		if err != nil {
 			if errors.Is(err, storage.ErrNotFound) {
 				c.metrics.CacheNotFound(c.resource)
