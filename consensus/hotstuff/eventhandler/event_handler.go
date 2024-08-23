@@ -71,6 +71,7 @@ type EventHandler struct {
 	// The node's own proposal will be added to Forks _after_ the broadcast the same way as proposals from other nodes.
 	// On the unhappy path, the node's own proposals will be added to Forks along with unfinalized proposals from other nodes.
 	// TODO: use safety rules also for block signing, which produces the same guarantees of not double-proposing without this extra logic
+	//       For further details, see issue https://github.com/onflow/flow-go/issues/6389
 	myLastProposedView uint64
 }
 
