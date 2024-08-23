@@ -342,6 +342,10 @@ func (e *EventHandler) broadcastTimeoutObjectIfAuthorized() error {
 //   - after receiving a proposal (but not changing view), if that proposal is referenced by our highest known QC,
 //     and the proposal was previously unknown, then we can propose a block in the current view
 //
+// Enforced INVARIANTS:
+//   - There will at most be `OnOwnProposal` notification emitted for views where this node is the leader, and none
+//     if another node is the leader. This holds irrespective of restarts. Formally, this prevents proposal equivocation.
+//
 // It reads the current view, and generates a proposal if we are the leader.
 // No errors are expected during normal operation.
 func (e *EventHandler) proposeForNewViewIfPrimary() error {
