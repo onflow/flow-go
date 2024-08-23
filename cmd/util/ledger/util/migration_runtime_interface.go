@@ -175,8 +175,8 @@ func (m *MigrationRuntimeInterface) GetOrLoadProgram(
 func (m *MigrationRuntimeInterface) RecoverProgram(
 	program *ast.Program,
 	location common.Location,
-) (*ast.Program, error) {
-	return environment.RecoverProgram(nil, m.chainID, program, location)
+) ([]byte, error) {
+	return environment.RecoverProgram(m.chainID, program, location)
 }
 
 type migrationTransactionPreparer struct {

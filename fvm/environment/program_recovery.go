@@ -5,7 +5,6 @@ import (
 
 	"github.com/onflow/cadence/runtime/ast"
 	"github.com/onflow/cadence/runtime/common"
-	"github.com/onflow/cadence/runtime/parser"
 	"github.com/onflow/cadence/runtime/sema"
 
 	"github.com/onflow/flow-go/fvm/systemcontracts"
@@ -13,12 +12,11 @@ import (
 )
 
 func RecoverProgram(
-	memoryGauge common.MemoryGauge,
 	chainID flow.ChainID,
 	program *ast.Program,
 	location common.Location,
 ) (
-	*ast.Program,
+	[]byte,
 	error,
 ) {
 	addressLocation, ok := location.(common.AddressLocation)
@@ -36,9 +34,7 @@ func RecoverProgram(
 
 	contractName := addressLocation.Name
 
-	code := RecoveredFungibleTokenCode(fungibleTokenAddress, contractName)
-
-	return parser.ParseProgram(memoryGauge, []byte(code), parser.Config{})
+	return []byte(RecoveredFungibleTokenCode(fungibleTokenAddress, contractName)), nil
 }
 
 func RecoveredFungibleTokenCode(fungibleTokenAddress common.Address, contractName string) string {
