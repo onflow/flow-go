@@ -94,3 +94,12 @@ func OnlyBadgerWriter(fn func(Writer) error) func(BadgerReaderBatchWriter) error
 		return fn(w)
 	}
 }
+
+// OnCommitSucceed adds a callback to execute after the batch has been successfully committed.
+func OnCommitSucceed(b BadgerReaderBatchWriter, onSuccessFn func()) {
+	b.AddCallback(func(err error) {
+		if err == nil {
+			onSuccessFn()
+		}
+	})
+}

@@ -135,14 +135,12 @@ func (c *CacheB[K, V]) Insert(key K, resource V) {
 func (c *CacheB[K, V]) PutTx(key K, resource V) func(storage.BadgerReaderBatchWriter) error {
 	storeOps := c.store(key, resource) // assemble DB operations to store resource (no execution)
 
-	return func(tx storage.BadgerReaderBatchWriter) error {
-		tx.AddCallback(func(err error) {
-			if err != nil {
-				c.Insert(key, resource)
-			}
+	return func(rw storage.BadgerReaderBatchWriter) error {
+		storage.OnCommitSucceed(rw, func() {
+			c.Insert(key, resource)
 		})
 
-		err := storeOps(tx) // execute operations to store resource
+		err := storeOps(rw) // execute operations to store resource
 		if err != nil {
 			return fmt.Errorf("could not store resource: %w", err)
 		}
