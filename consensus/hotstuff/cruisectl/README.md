@@ -310,7 +310,8 @@ Through, the optimal solution would be a consistent view time throughout normal 
 
 ## Timing Reference Points
 
-// TODO: example Figure
+<img src='https://github.com/user-attachments/assets/8c28d4d1-0b6c-4b6f-8413-c0753e7400f9' width='900'>
+
 
 * Under the hood, the controller outputs the unconstrained view time $\widehat{\tau}[v]= \tau_0 - u[v]$ (of type [`time.Duration`](https://pkg.go.dev/time)),
   which is wrapped into a [`happyPathBlockTime`](https://github.com/onflow/flow-go/blob/d9f7522d6c502d7e148dab69c926279202677cf8/consensus/hotstuff/cruisectl/proposal_timing.go#L59-L74)
