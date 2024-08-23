@@ -51,7 +51,7 @@ func NewTypeRequirementsExtractingMigration(
 				continue
 			}
 
-			extractTypeRequirements(
+			ExtractTypeRequirements(
 				contract,
 				log,
 				reporter,
@@ -63,7 +63,7 @@ func NewTypeRequirementsExtractingMigration(
 	}
 }
 
-func extractTypeRequirements(
+func ExtractTypeRequirements(
 	contract AddressContract,
 	log zerolog.Logger,
 	reporter reporters.ReportWriter,
