@@ -153,7 +153,7 @@ func (p *RegisterPruner) checkPrune(ctx irrecoverable.SignalerContext) {
 		}
 
 		// update first indexed height
-		err = updateFirstStoredHeight(p.db, pruneHeight)
+		err = p.updateFirstStoredHeight(pruneHeight)
 		if err != nil {
 			ctx.Throw(fmt.Errorf("failed to update first height for register storage: %w", err))
 		}
@@ -182,6 +182,7 @@ func (p *RegisterPruner) pruneUpToHeight(pruneHeight uint64) error {
 	err := func(r pebble.Reader) error {
 		options := pebble.IterOptions{
 			LowerBound: prefix,
+			UpperBound: []byte{codeFirstBlockHeight},
 		}
 
 		it, err := r.NewIter(&options)
@@ -215,7 +216,10 @@ func (p *RegisterPruner) pruneUpToHeight(pruneHeight uint64) error {
 				}
 
 				// Otherwise, mark this key for removal
-				batchKeysToRemove = append(batchKeysToRemove, key)
+				// Create a copy of the key to avoid memory issues
+				keyCopy := make([]byte, len(key))
+				copy(keyCopy, key)
+				batchKeysToRemove = append(batchKeysToRemove, keyCopy)
 
 				if len(batchKeysToRemove) == itemsPerBatch {
 					// Perform batch delete
@@ -263,8 +267,9 @@ func (p *RegisterPruner) batchDelete(lookupKeys [][]byte) error {
 	defer batch.Close()
 
 	for _, key := range lookupKeys {
+		keyHeight, registerID, _ := lookupKeyToRegisterID(key)
 		if err := batch.Delete(key, nil); err != nil {
-			return fmt.Errorf("failed to delete lookupKey: %w", err)
+			return fmt.Errorf("failed to delete lookupKey: %w %d %v", err, keyHeight, registerID)
 		}
 	}
 
@@ -273,4 +278,15 @@ func (p *RegisterPruner) batchDelete(lookupKeys [][]byte) error {
 	}
 
 	return nil
+}
+
+// updateFirstStoredHeight updates the first stored height in the database to the specified height.
+// The height is stored using the `firstHeightKey` key.
+//
+// Parameters:
+//   - height: The height value to store as the first stored height.
+//
+// No errors are expected during normal operations.
+func (p *RegisterPruner) updateFirstStoredHeight(height uint64) error {
+	return p.db.Set(firstHeightKey, encodedUint64(height), nil)
 }
