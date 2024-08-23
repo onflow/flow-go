@@ -62,8 +62,6 @@ func NewMigrationRuntimeInterface(
 	}
 }
 
-var _ runtime.Interface = &MigrationRuntimeInterface{}
-
 func (m *MigrationRuntimeInterface) ResolveLocation(
 	identifiers []runtime.Identifier,
 	location runtime.Location,
