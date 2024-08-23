@@ -18,17 +18,17 @@ require (
 	github.com/ipfs/go-cid v0.4.1
 	github.com/ipfs/go-datastore v0.6.0
 	github.com/ipfs/go-ds-badger2 v0.1.3
-	github.com/ipfs/go-ds-pebble v0.3.1
+	github.com/ipfs/go-ds-pebble v0.3.1-0.20240828032824-d745b9d3200b
 	github.com/libp2p/go-libp2p v0.32.2
-	github.com/onflow/cadence v1.0.0-preview.49
+	github.com/onflow/cadence v1.0.0-preview.52
 	github.com/onflow/crypto v0.25.2
 	github.com/onflow/flow-core-contracts/lib/go/contracts v1.3.1
 	github.com/onflow/flow-core-contracts/lib/go/templates v1.3.1
-	github.com/onflow/flow-emulator v1.0.0-preview.36.0.20240729195722-d4eb1c30eb9f
-	github.com/onflow/flow-go v0.36.8-0.20240729193633-433a32eeb0cd
-	github.com/onflow/flow-go-sdk v1.0.0-preview.50
+	github.com/onflow/flow-emulator v1.0.0-preview.41.0.20240829134601-0be55d6970b5
+	github.com/onflow/flow-go v0.37.7-0.20240826193109-e211841b59f5
+	github.com/onflow/flow-go-sdk v1.0.0-preview.55
 	github.com/onflow/flow-go/insecure v0.0.0-00010101000000-000000000000
-	github.com/onflow/flow/protobuf/go/flow v0.4.5
+	github.com/onflow/flow/protobuf/go/flow v0.4.6
 	github.com/onflow/go-ethereum v1.14.7
 	github.com/prometheus/client_golang v1.18.0
 	github.com/prometheus/client_model v0.5.0
@@ -359,6 +359,3 @@ require (
 replace github.com/onflow/flow-go => ../
 
 replace github.com/onflow/flow-go/insecure => ../insecure
-
-// TODO: remove it when https://github.com/ipfs/go-ds-pebble/pull/36 merged
-replace github.com/ipfs/go-ds-pebble v0.3.1 => github.com/onflow/go-ds-pebble v0.0.0-20240731130313-f186539f382c
