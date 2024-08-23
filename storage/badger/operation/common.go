@@ -44,6 +44,12 @@ func batchWrite(key []byte, entity interface{}) func(writeBatch *badger.WriteBat
 	}
 }
 
+// insertW will encode the given entity using msgpack and will insert the resulting
+// binary data in the badger DB under the provided key. It will error if the
+// key already exists.
+// Error returns:
+//   - generic error in case of unexpected failure from the database layer or
+//     encoding failure.
 func insertW(key []byte, val interface{}) func(storage.Writer) error {
 	return func(w storage.Writer) error {
 		value, err := msgpack.Marshal(val)
@@ -60,6 +66,7 @@ func insertW(key []byte, val interface{}) func(storage.Writer) error {
 	}
 }
 
+// deprecated - use insertW instead
 // insert will encode the given entity using msgpack and will insert the resulting
 // binary data in the badger DB under the provided key. It will error if the
 // key already exists.
