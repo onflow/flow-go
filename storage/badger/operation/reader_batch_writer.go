@@ -21,9 +21,12 @@ type ReaderBatchWriter struct {
 
 var _ storage.BadgerReaderBatchWriter = (*ReaderBatchWriter)(nil)
 
-func (b *ReaderBatchWriter) ReaderWriter() (storage.Reader, storage.Writer) {
-	// reusing the same underlying object, but expose with different interfaces
-	return b, b
+func (b *ReaderBatchWriter) GlobalReader() storage.Reader {
+	return b
+}
+
+func (b *ReaderBatchWriter) Writer() storage.Writer {
+	return b
 }
 
 func (b *ReaderBatchWriter) BadgerWriteBatch() *badger.WriteBatch {

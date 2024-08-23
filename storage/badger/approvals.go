@@ -74,11 +74,9 @@ func (r *ResultApprovals) byChunk(resultID flow.Identifier, chunkIndex uint64) f
 
 // CAUTION: Caller must acquire `indexing` lock.
 func (r *ResultApprovals) index(resultID flow.Identifier, chunkIndex uint64, approvalID flow.Identifier) func(storage.BadgerReaderBatchWriter) error {
-	return func(tx storage.BadgerReaderBatchWriter) error {
-		r, w := tx.ReaderWriter()
-
+	return func(rw storage.BadgerReaderBatchWriter) error {
 		var storedApprovalID flow.Identifier
-		err := operation.LookupResultApproval(resultID, chunkIndex, &storedApprovalID)(r)
+		err := operation.LookupResultApproval(resultID, chunkIndex, &storedApprovalID)(rw.GlobalReader())
 		if err != nil {
 			if !errors.Is(err, storage.ErrNotFound) {
 				return fmt.Errorf("could not lookup result approval ID: %w", err)
@@ -86,7 +84,7 @@ func (r *ResultApprovals) index(resultID flow.Identifier, chunkIndex uint64, app
 
 			// no approval found, index the approval
 
-			return operation.IndexResultApproval(resultID, chunkIndex, approvalID)(w)
+			return operation.IndexResultApproval(resultID, chunkIndex, approvalID)(rw.Writer())
 		}
 
 		// an approval is already indexed, double check if it is the same
