@@ -306,10 +306,6 @@ When the network is in EFM, epoch timing is anyway disrupted. The main thing we 
 This is largely guaranteed, due to the limits of authority. Beyond that, pretty much any block timing on the happy path is acceptable.
 Through, the optimal solution would be a consistent view time throughout normal Epochs as well as EFM.
 
-## Testing
-
-[Cruise Control: Benchnet Testing Notes](https://www.notion.so/Cruise-Control-Benchnet-Testing-Notes-ea08f49ba9d24ce2a158fca9358966df?pvs=21)
-
 # Implementation Aspects
 
 ## Timing Reference Points
@@ -402,3 +398,7 @@ This discrepancy between what the controller was setting vs the networks real-wo
 * For larger consensus committee sizes, this systematic observation bias persists, but the probability of is much lower: The probability for a leader to be selected
   as leader decreases with $\frac{1}{n}$ for $n$ the committee size. As the bias only affects the second of the two consecutive views, the overall impact of this 
   bias declines with increasing consensus committee size.  
+
+## Initial Testing
+
+see [Cruise Control: Benchnet Testing Notes](https://www.notion.so/Cruise-Control-Benchnet-Testing-Notes-ea08f49ba9d24ce2a158fca9358966df?pvs=21)
