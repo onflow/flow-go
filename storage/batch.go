@@ -57,16 +57,17 @@ type Writer interface {
 
 // BadgerReaderBatchWriter is an interface for badger-specific reader and writer.
 type BadgerReaderBatchWriter interface {
-	// ReaderWriter returns the reader and writer for the storage backend.
-	// The reader is used to read data from the storage backend, and
-	// the writer is used to write data to the storage backend with an atomic batch
-	// update.
+	// GlobalReader returns a database-backed reader which reads the latest committed global database state ("read-committed isolation").
+	// This reader will not read writes written to ReaderBatchWriter.Writer until the write batch is committed.
+	// This reader may observe different values for the same key on subsequent reads.
+	GlobalReader() Reader
+
+	// Writer returns a writer associated with a batch of writes. The batch is pending until it is committed.
+	// When we `Write` into the batch, that write operation is added to the pending batch, but not committed.
+	// The commit operation is atomic w.r.t. the batch; either all writes are applied to the database, or no writes are.
 	// Note:
-	// - There is no guarantee on the consistency of the data read,
-	// 	 the data read may not reflect the latest data written.
-	//   it is the responsibility of the caller to ensure the consistency.
 	// - The writer cannot be used concurrently for writing.
-	ReaderWriter() (Reader, Writer)
+	Writer() Writer
 
 	// BadgerBatch returns the underlying batch object
 	// Useful for implementing badger-specific operations
@@ -82,8 +83,7 @@ type BadgerReaderBatchWriter interface {
 // to a function that takes a BadgerReaderBatchWriter.
 func OnlyBadgerWriter(fn func(Writer) error) func(BadgerReaderBatchWriter) error {
 	return func(rw BadgerReaderBatchWriter) error {
-		_, w := rw.ReaderWriter()
-		return fn(w)
+		return fn(rw.Writer())
 	}
 }
 
