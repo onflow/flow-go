@@ -1,6 +1,8 @@
 package metrics
 
 import (
+	"time"
+
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 
@@ -28,10 +30,17 @@ func WithRestMetrics(m module.RestMetrics) AccessCollectorOpts {
 	}
 }
 
+func WithRegisterDBPrunerMetrics(m module.RegisterDBPrunerMetrics) AccessCollectorOpts {
+	return func(ac *AccessCollector) {
+		ac.RegisterDBPrunerMetrics = m
+	}
+}
+
 type AccessCollector struct {
 	module.RestMetrics
 	module.TransactionMetrics
 	module.BackendScriptsMetrics
+	module.RegisterDBPrunerMetrics
 
 	connectionReused      prometheus.Counter
 	connectionsInPool     *prometheus.GaugeVec
@@ -152,4 +161,9 @@ func (ac *AccessCollector) UpdateExecutionReceiptMaxHeight(height uint64) {
 	if ac.maxReceiptHeightValue.Set(height) {
 		ac.maxReceiptHeight.Set(float64(height))
 	}
+}
+
+// Pruned records the duration of a pruning operation and updates the latest pruned height.
+func (ac *AccessCollector) Pruned(height uint64, duration time.Duration) {
+	ac.RegisterDBPrunerMetrics.Pruned(height, duration)
 }

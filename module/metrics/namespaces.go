@@ -46,6 +46,7 @@ const (
 	subsystemTransactionSubmission = "transaction_submission"
 	subsystemConnectionPool        = "connection_pool"
 	subsystemHTTP                  = "http"
+	subsystemRegisterDBPruner      = "register_db_pruner"
 )
 
 // Observer subsystem

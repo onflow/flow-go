@@ -41,6 +41,7 @@ var _ module.HotstuffMetrics = (*NoopCollector)(nil)
 var _ module.EngineMetrics = (*NoopCollector)(nil)
 var _ module.HeroCacheMetrics = (*NoopCollector)(nil)
 var _ module.NetworkMetrics = (*NoopCollector)(nil)
+var _ module.RegisterDBPrunerMetrics = (*NoopCollector)(nil)
 
 func (nc *NoopCollector) Peers(prefix string, n int)                                             {}
 func (nc *NoopCollector) Wantlist(prefix string, n int)                                          {}

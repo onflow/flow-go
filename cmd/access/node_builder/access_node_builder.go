@@ -304,6 +304,7 @@ type FlowAccessNodeBuilder struct {
 	BlocksToMarkExecuted         *stdmap.Times
 	TransactionMetrics           *metrics.TransactionCollector
 	RestMetrics                  *metrics.RestCollector
+	RegisterDBPrunerMetrics      *metrics.RegisterDBPrunerCollector
 	AccessMetrics                module.AccessMetrics
 	PingMetrics                  module.PingMetrics
 	Committee                    hotstuff.DynamicCommittee
@@ -1019,6 +1020,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				registerDBPruner, err := pstorage.NewRegisterPruner(
 					node.Logger,
 					builder.RegisterDB,
+					pstorage.WithPrunerMetrics(builder.RegisterDBPrunerMetrics),
 					//pstorage.WithPruneThreshold(builder.registerDBPruneThreshold),
 					pstorage.WithPruneThrottleDelay(builder.registerDBPruneThrottleDelay),
 					pstorage.WithPruneTickerInterval(builder.registerDBPruneTickerInterval),
@@ -1724,11 +1726,16 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			builder.RestMetrics = m
 			return nil
 		}).
+		Module("register db metrics", func(node *cmd.NodeConfig) error {
+			builder.RegisterDBPrunerMetrics = metrics.NewRegisterDBPrunerCollector()
+			return nil
+		}).
 		Module("access metrics", func(node *cmd.NodeConfig) error {
 			builder.AccessMetrics = metrics.NewAccessCollector(
 				metrics.WithTransactionMetrics(builder.TransactionMetrics),
 				metrics.WithBackendScriptsMetrics(builder.TransactionMetrics),
 				metrics.WithRestMetrics(builder.RestMetrics),
+				metrics.WithRegisterDBPrunerMetrics(builder.RegisterDBPrunerMetrics),
 			)
 			return nil
 		}).

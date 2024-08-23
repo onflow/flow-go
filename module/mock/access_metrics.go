@@ -68,6 +68,11 @@ func (_m *AccessMetrics) ObserveHTTPResponseSize(ctx context.Context, props metr
 	_m.Called(ctx, props, sizeBytes)
 }
 
+// Pruned provides a mock function with given fields: height, duration
+func (_m *AccessMetrics) Pruned(height uint64, duration time.Duration) {
+	_m.Called(height, duration)
+}
+
 // ScriptExecuted provides a mock function with given fields: dur, size
 func (_m *AccessMetrics) ScriptExecuted(dur time.Duration, size int) {
 	_m.Called(dur, size)

@@ -8,6 +8,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 )
@@ -35,6 +36,8 @@ type RegisterPruner struct {
 
 	logger zerolog.Logger
 	db     *pebble.DB
+
+	metrics module.RegisterDBPrunerMetrics
 
 	// pruningInterval is a number of pruned blocks in the db, above which pruning should be triggered
 	pruneInterval uint64
@@ -69,6 +72,13 @@ func WithPruneThrottleDelay(throttleDelay time.Duration) PrunerOption {
 func WithPruneTickerInterval(interval time.Duration) PrunerOption {
 	return func(p *RegisterPruner) {
 		p.pruneTickerInterval = interval
+	}
+}
+
+// WithPrunerMetrics is used to sets the metrics for a RegisterPruner instance.
+func WithPrunerMetrics(metrics module.RegisterDBPrunerMetrics) PrunerOption {
+	return func(p *RegisterPruner) {
+		p.metrics = metrics
 	}
 }
 
@@ -167,6 +177,8 @@ func (p *RegisterPruner) pruneUpToHeight(pruneHeight uint64) error {
 	itemsPerBatch := deleteItemsPerBatch
 	var batchKeysToRemove [][]byte
 
+	start := time.Now()
+
 	err := func(r pebble.Reader) error {
 		options := pebble.IterOptions{
 			LowerBound: prefix,
@@ -224,8 +236,15 @@ func (p *RegisterPruner) pruneUpToHeight(pruneHeight uint64) error {
 
 		return nil
 	}(p.db)
+
+	duration := time.Since(start)
+
 	if err != nil {
 		return err
+	}
+
+	if p.metrics != nil {
+		p.metrics.Pruned(pruneHeight, duration)
 	}
 
 	return nil
