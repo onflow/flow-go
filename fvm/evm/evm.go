@@ -74,7 +74,7 @@ func SetupEnvironment(
 	internalEVMContractValue := impl.NewInternalEVMContractValue(
 		nil,
 		contractHandler,
-		common.Address(evmContractAddress),
+		evmContractAddress,
 	)
 
 	stdlib.SetupEnvironment(

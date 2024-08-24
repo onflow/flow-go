@@ -12,6 +12,7 @@ import (
 
 	"github.com/onflow/flow-go/fvm/evm/stdlib"
 	"github.com/onflow/flow-go/fvm/evm/types"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 var internalEVMContractStaticType = interpreter.ConvertSemaCompositeTypeToStaticCompositeType(
@@ -22,7 +23,7 @@ var internalEVMContractStaticType = interpreter.ConvertSemaCompositeTypeToStatic
 func NewInternalEVMContractValue(
 	gauge common.MemoryGauge,
 	handler types.ContractHandler,
-	contractAddress common.Address,
+	contractAddress flow.Address,
 ) *interpreter.SimpleCompositeValue {
 	location := common.NewAddressLocation(nil, common.Address(contractAddress), stdlib.ContractName)
 

@@ -312,7 +312,7 @@ func newEVMTransactionEnvironment(handler types.ContractHandler, contractAddress
 	internalEVMValue := impl.NewInternalEVMContractValue(
 		nil,
 		handler,
-		common.Address(contractAddress),
+		contractAddress,
 	)
 
 	stdlib.SetupEnvironment(
@@ -330,7 +330,7 @@ func newEVMScriptEnvironment(handler types.ContractHandler, contractAddress flow
 	internalEVMValue := impl.NewInternalEVMContractValue(
 		nil,
 		handler,
-		common.Address(contractAddress),
+		contractAddress,
 	)
 
 	stdlib.SetupEnvironment(
