@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/fvm/evm/debug"
 	evm "github.com/onflow/flow-go/fvm/evm/emulator"
 	"github.com/onflow/flow-go/fvm/evm/handler"
+	"github.com/onflow/flow-go/fvm/evm/impl"
 	"github.com/onflow/flow-go/fvm/evm/stdlib"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
@@ -56,9 +57,11 @@ func SetupEnvironment(
 		tracer.WithBlockID(flow.Identifier(block.Hash))
 	}
 
+	evmContractAddress := ContractAccountAddress(chainID)
+
 	contractHandler := handler.NewContractHandler(
 		chainID,
-		ContractAccountAddress(chainID),
+		evmContractAddress,
 		common.Address(flowTokenAddress),
 		randomBeaconAddress,
 		blockStore,
@@ -68,10 +71,16 @@ func SetupEnvironment(
 		tracer,
 	)
 
+	internalEVMContractValue := impl.NewInternalEVMContractValue(
+		nil,
+		contractHandler,
+		common.Address(evmContractAddress),
+	)
+
 	stdlib.SetupEnvironment(
 		runtimeEnv,
-		contractHandler,
-		ContractAccountAddress(chainID),
+		internalEVMContractValue,
+		evmContractAddress,
 	)
 
 	return nil
