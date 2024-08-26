@@ -48,19 +48,19 @@ func NewRegisterDBPrunerCollector() *RegisterDBPrunerCollector {
 			Help:      "The latest block height that has been pruned.",
 		}),
 		numberOfBlocksPruned: promauto.NewGauge(prometheus.GaugeOpts{
-			Name:      "number_of_blocks_pruned",
+			Name:      "number_of_blocks_pruned_total",
 			Namespace: namespaceAccess,
 			Subsystem: subsystemRegisterDBPruner,
 			Help:      "The number of blocks that have been pruned.",
 		}),
 		numberOfRowsPruned: promauto.NewGauge(prometheus.GaugeOpts{
-			Name:      "number_of_rows_pruned",
+			Name:      "number_of_rows_pruned_total",
 			Namespace: namespaceAccess,
 			Subsystem: subsystemRegisterDBPruner,
 			Help:      "The number of rows that have been pruned.",
 		}),
 		numberOfElementsVisited: promauto.NewGauge(prometheus.GaugeOpts{
-			Name:      "number_of_elements_visited",
+			Name:      "number_of_elements_visited_total",
 			Namespace: namespaceAccess,
 			Subsystem: subsystemRegisterDBPruner,
 			Help:      "The number of elements that have been visited.",
@@ -83,15 +83,12 @@ func (c *RegisterDBPrunerCollector) Pruned(height uint64, duration time.Duration
 // Parameters:
 // - rows: The number of rows that were pruned.
 func (c *RegisterDBPrunerCollector) NumberOfRowsPruned(rows uint64) {
-	c.numberOfRowsPruned.Set(float64(rows))
+	c.numberOfRowsPruned.Add(float64(rows))
 }
 
-// NumberOfElementsVisited records the number of elements that were visited during the pruning operation.
-//
-// Parameters:
-// - elements: The number of elements that were visited.
-func (c *RegisterDBPrunerCollector) NumberOfElementsVisited(elements uint64) {
-	c.numberOfElementsVisited.Set(float64(elements))
+// ElementVisited records the element that were visited during the pruning operation.
+func (c *RegisterDBPrunerCollector) ElementVisited() {
+	c.numberOfElementsVisited.Inc()
 }
 
 // NumberOfBlocksPruned tracks the number of blocks that were pruned during the operation.
@@ -99,5 +96,5 @@ func (c *RegisterDBPrunerCollector) NumberOfElementsVisited(elements uint64) {
 // Parameters:
 // - blocks: The number of blocks that were pruned.
 func (c *RegisterDBPrunerCollector) NumberOfBlocksPruned(blocks uint64) {
-	c.numberOfBlocksPruned.Set(float64(blocks))
+	c.numberOfBlocksPruned.Add(float64(blocks))
 }

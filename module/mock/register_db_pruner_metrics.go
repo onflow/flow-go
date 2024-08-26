@@ -13,14 +13,14 @@ type RegisterDBPrunerMetrics struct {
 	mock.Mock
 }
 
+// ElementVisited provides a mock function with given fields:
+func (_m *RegisterDBPrunerMetrics) ElementVisited() {
+	_m.Called()
+}
+
 // NumberOfBlocksPruned provides a mock function with given fields: blocks
 func (_m *RegisterDBPrunerMetrics) NumberOfBlocksPruned(blocks uint64) {
 	_m.Called(blocks)
-}
-
-// NumberOfElementsVisited provides a mock function with given fields: elements
-func (_m *RegisterDBPrunerMetrics) NumberOfElementsVisited(elements uint64) {
-	_m.Called(elements)
 }
 
 // NumberOfRowsPruned provides a mock function with given fields: rows

@@ -927,8 +927,8 @@ type RegisterDBPrunerMetrics interface {
 	// NumberOfRowsPruned tracks the number of rows that were pruned during the operation.
 	NumberOfRowsPruned(rows uint64)
 
-	// NumberOfElementsVisited tracks the number of elements that were visited during the pruning operation.
-	NumberOfElementsVisited(elements uint64)
+	// ElementVisited records the element that were visited during the pruning operation.
+	ElementVisited()
 }
 
 type ExecutionResultStats struct {

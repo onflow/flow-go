@@ -53,6 +53,11 @@ func (_m *AccessMetrics) ConnectionFromPoolUpdated() {
 	_m.Called()
 }
 
+// ElementVisited provides a mock function with given fields:
+func (_m *AccessMetrics) ElementVisited() {
+	_m.Called()
+}
+
 // NewConnectionEstablished provides a mock function with given fields:
 func (_m *AccessMetrics) NewConnectionEstablished() {
 	_m.Called()
@@ -61,11 +66,6 @@ func (_m *AccessMetrics) NewConnectionEstablished() {
 // NumberOfBlocksPruned provides a mock function with given fields: blocks
 func (_m *AccessMetrics) NumberOfBlocksPruned(blocks uint64) {
 	_m.Called(blocks)
-}
-
-// NumberOfElementsVisited provides a mock function with given fields: elements
-func (_m *AccessMetrics) NumberOfElementsVisited(elements uint64) {
-	_m.Called(elements)
 }
 
 // NumberOfRowsPruned provides a mock function with given fields: rows
