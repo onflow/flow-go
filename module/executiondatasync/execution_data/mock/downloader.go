@@ -17,7 +17,7 @@ type Downloader struct {
 }
 
 // AddHeightUpdatesConsumer provides a mock function with given fields: _a0
-func (_m *Downloader) AddHeightUpdatesConsumer(_a0 execution_data.HeightUpdatesConsumer) {
+func (_m *Downloader) SetHeightUpdatesConsumer(_a0 execution_data.HeightUpdatesConsumer) {
 	_m.Called(_a0)
 }
 

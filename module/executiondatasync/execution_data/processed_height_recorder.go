@@ -16,9 +16,9 @@ type ProcessedHeightRecorder interface {
 	// HighestCompleteHeight returns the highest complete processed block height.
 	HighestCompleteHeight() uint64
 
-	// AddHeightUpdatesConsumer subscribe consumer for processed height updates.
+	// SetHeightUpdatesConsumer subscribe consumer for processed height updates.
 	// Callback are called synchronously and must be non-blocking
-	AddHeightUpdatesConsumer(HeightUpdatesConsumer)
+	SetHeightUpdatesConsumer(HeightUpdatesConsumer)
 }
 
 var _ ProcessedHeightRecorder = (*ProcessedHeightRecorderManager)(nil)
@@ -56,8 +56,8 @@ func (e *ProcessedHeightRecorderManager) HighestCompleteHeight() uint64 {
 	return e.highestCompleteHeight.Load()
 }
 
-// AddHeightUpdatesConsumer subscribe consumers for processed height updates.
-func (e *ProcessedHeightRecorderManager) AddHeightUpdatesConsumer(consumer HeightUpdatesConsumer) {
+// SetHeightUpdatesConsumer subscribe consumers for processed height updates.
+func (e *ProcessedHeightRecorderManager) SetHeightUpdatesConsumer(consumer HeightUpdatesConsumer) {
 	e.lock.Lock()
 	defer e.lock.Unlock()
 

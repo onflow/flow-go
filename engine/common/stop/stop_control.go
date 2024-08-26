@@ -41,7 +41,6 @@ type StopControl struct {
 //
 // Parameters:
 //   - log: The logger used for logging.
-//   - versionControl: The version control used to track node version updates.
 //
 // Returns:
 //   - A pointer to the newly created StopControl instance.
@@ -123,7 +122,7 @@ func (sc *StopControl) updateProcessedHeight(height uint64) {
 // Parameters:
 //   - recorder: The execution data height recorder to register.
 func (sc *StopControl) RegisterHeightRecorder(recorder execution_data.ProcessedHeightRecorder) {
-	recorder.AddHeightUpdatesConsumer(sc.updateProcessedHeight)
+	recorder.SetHeightUpdatesConsumer(sc.updateProcessedHeight)
 }
 
 // processEvents processes incoming events related to block heights and version updates.
@@ -139,7 +138,10 @@ func (sc *StopControl) processEvents(ctx irrecoverable.SignalerContext, ready co
 		case <-ctx.Done():
 			return
 		case height, ok := <-sc.processedHeightChannel:
-			if ok && sc.lastProcessedHeight.Set(height) {
+			if !ok {
+				return
+			}
+			if sc.lastProcessedHeight.Set(height) {
 				sc.onProcessedBlock(ctx)
 			}
 		}
