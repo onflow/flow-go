@@ -45,4 +45,5 @@ func TestBalance(t *testing.T) {
 	require.NoError(t, err)
 	ret := types.UnsafeCastOfBalanceToFloat64(bal)
 	require.Equal(t, 100.0002, ret)
+
 }
