@@ -23,6 +23,7 @@ import (
 
 	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/fvm/environment"
+	"github.com/onflow/flow-go/fvm/evm/impl"
 	"github.com/onflow/flow-go/fvm/evm/stdlib"
 	. "github.com/onflow/flow-go/fvm/evm/testutils"
 	"github.com/onflow/flow-go/fvm/evm/types"
@@ -308,9 +309,15 @@ func deployContracts(
 func newEVMTransactionEnvironment(handler types.ContractHandler, contractAddress flow.Address) runtime.Environment {
 	transactionEnvironment := runtime.NewBaseInterpreterEnvironment(runtime.Config{})
 
+	internalEVMValue := impl.NewInternalEVMContractValue(
+		nil,
+		handler,
+		contractAddress,
+	)
+
 	stdlib.SetupEnvironment(
 		transactionEnvironment,
-		handler,
+		internalEVMValue,
 		contractAddress,
 	)
 
@@ -320,9 +327,15 @@ func newEVMTransactionEnvironment(handler types.ContractHandler, contractAddress
 func newEVMScriptEnvironment(handler types.ContractHandler, contractAddress flow.Address) runtime.Environment {
 	scriptEnvironment := runtime.NewScriptInterpreterEnvironment(runtime.Config{})
 
+	internalEVMValue := impl.NewInternalEVMContractValue(
+		nil,
+		handler,
+		contractAddress,
+	)
+
 	stdlib.SetupEnvironment(
 		scriptEnvironment,
-		handler,
+		internalEVMValue,
 		contractAddress,
 	)
 
@@ -3203,7 +3216,7 @@ func TestEVMDryRun(t *testing.T) {
 		},
 	)
 	require.NoError(t, err)
-	res, err := stdlib.ResultSummaryFromEVMResultValue(val)
+	res, err := impl.ResultSummaryFromEVMResultValue(val)
 	require.NoError(t, err)
 	assert.Equal(t, types.StatusSuccessful, res.Status)
 	assert.True(t, dryRunCalled)
@@ -3335,7 +3348,7 @@ func TestEVMBatchRun(t *testing.T) {
 	require.True(t, ok)
 
 	for _, v := range resultsCadence.Values {
-		res, err := stdlib.ResultSummaryFromEVMResultValue(v)
+		res, err := impl.ResultSummaryFromEVMResultValue(v)
 		require.NoError(t, err)
 		assert.Equal(t, types.StatusSuccessful, res.Status)
 	}
