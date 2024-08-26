@@ -1,8 +1,6 @@
 package metrics
 
 import (
-	"time"
-
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 
@@ -161,9 +159,4 @@ func (ac *AccessCollector) UpdateExecutionReceiptMaxHeight(height uint64) {
 	if ac.maxReceiptHeightValue.Set(height) {
 		ac.maxReceiptHeight.Set(float64(height))
 	}
-}
-
-// Pruned records the duration of a pruning operation and updates the latest pruned height.
-func (ac *AccessCollector) Pruned(height uint64, duration time.Duration) {
-	ac.RegisterDBPrunerMetrics.Pruned(height, duration)
 }

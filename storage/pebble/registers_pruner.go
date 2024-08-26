@@ -152,6 +152,10 @@ func (p *RegisterPruner) checkPrune(ctx irrecoverable.SignalerContext) {
 			ctx.Throw(fmt.Errorf("failed to prune: %w", err))
 		}
 
+		if p.metrics != nil {
+			p.metrics.NumberOfBlocksPruned(pruneHeight - firstHeight)
+		}
+
 		// update first indexed height
 		err = p.updateFirstStoredHeight(pruneHeight)
 		if err != nil {
@@ -241,11 +245,11 @@ func (p *RegisterPruner) pruneUpToHeight(pruneHeight uint64) error {
 		return nil
 	}(p.db)
 
-	duration := time.Since(start)
-
 	if err != nil {
 		return err
 	}
+
+	duration := time.Since(start)
 
 	if p.metrics != nil {
 		p.metrics.Pruned(pruneHeight, duration)
@@ -275,6 +279,10 @@ func (p *RegisterPruner) batchDelete(lookupKeys [][]byte) error {
 
 	if err := batch.Commit(pebble.Sync); err != nil {
 		return fmt.Errorf("failed to commit batch: %w", err)
+	}
+
+	if p.metrics != nil {
+		p.metrics.NumberOfRowsPruned(uint64(len(lookupKeys)))
 	}
 
 	return nil

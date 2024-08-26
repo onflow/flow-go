@@ -10,13 +10,17 @@ import (
 )
 
 // RegisterDBPrunerCollector collects metrics for the database pruning process,
-// including the durations of pruning operations and the latest height that has been pruned.
+// including the durations of pruning operations, the latest height that has been pruned,
+// the number of blocks pruned, the number of rows pruned, and the number of elements visited.
 type RegisterDBPrunerCollector struct {
-	pruneDurations     prometheus.Summary // Summary metric for tracking pruning operation durations in milliseconds.
-	latestHeightPruned prometheus.Gauge   // Gauge metric for tracking the latest pruned block height.
+	pruneDurations          prometheus.Summary // The pruning operation durations in milliseconds.
+	latestHeightPruned      prometheus.Gauge   // The latest pruned block height.
+	numberOfBlocksPruned    prometheus.Gauge   // The number of blocks pruned.
+	numberOfRowsPruned      prometheus.Gauge   // The number of rows pruned.
+	numberOfElementsVisited prometheus.Gauge   // The number of elements visited during pruning.
 }
 
-var _ module.RegisterDBPrunerMetrics = (*AccessCollector)(nil)
+var _ module.RegisterDBPrunerMetrics = (*RegisterDBPrunerCollector)(nil)
 
 // NewRegisterDBPrunerCollector creates and returns a new RegisterDBPrunerCollector instance
 // with pre-configured Prometheus metrics for monitoring the pruning process.
@@ -43,6 +47,24 @@ func NewRegisterDBPrunerCollector() *RegisterDBPrunerCollector {
 			Subsystem: subsystemRegisterDBPruner,
 			Help:      "The latest block height that has been pruned.",
 		}),
+		numberOfBlocksPruned: promauto.NewGauge(prometheus.GaugeOpts{
+			Name:      "number_of_blocks_pruned",
+			Namespace: namespaceAccess,
+			Subsystem: subsystemRegisterDBPruner,
+			Help:      "The number of blocks that have been pruned.",
+		}),
+		numberOfRowsPruned: promauto.NewGauge(prometheus.GaugeOpts{
+			Name:      "number_of_rows_pruned",
+			Namespace: namespaceAccess,
+			Subsystem: subsystemRegisterDBPruner,
+			Help:      "The number of rows that have been pruned.",
+		}),
+		numberOfElementsVisited: promauto.NewGauge(prometheus.GaugeOpts{
+			Name:      "number_of_elements_visited",
+			Namespace: namespaceAccess,
+			Subsystem: subsystemRegisterDBPruner,
+			Help:      "The number of elements that have been visited.",
+		}),
 	}
 }
 
@@ -54,4 +76,28 @@ func NewRegisterDBPrunerCollector() *RegisterDBPrunerCollector {
 func (c *RegisterDBPrunerCollector) Pruned(height uint64, duration time.Duration) {
 	c.pruneDurations.Observe(float64(duration.Milliseconds()))
 	c.latestHeightPruned.Set(float64(height))
+}
+
+// NumberOfRowsPruned records the number of rows that were pruned during the pruning operation.
+//
+// Parameters:
+// - rows: The number of rows that were pruned.
+func (c *RegisterDBPrunerCollector) NumberOfRowsPruned(rows uint64) {
+	c.numberOfRowsPruned.Set(float64(rows))
+}
+
+// NumberOfElementsVisited records the number of elements that were visited during the pruning operation.
+//
+// Parameters:
+// - elements: The number of elements that were visited.
+func (c *RegisterDBPrunerCollector) NumberOfElementsVisited(elements uint64) {
+	c.numberOfElementsVisited.Set(float64(elements))
+}
+
+// NumberOfBlocksPruned tracks the number of blocks that were pruned during the operation.
+//
+// Parameters:
+// - blocks: The number of blocks that were pruned.
+func (c *RegisterDBPrunerCollector) NumberOfBlocksPruned(blocks uint64) {
+	c.numberOfBlocksPruned.Set(float64(blocks))
 }

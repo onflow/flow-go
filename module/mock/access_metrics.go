@@ -58,6 +58,21 @@ func (_m *AccessMetrics) NewConnectionEstablished() {
 	_m.Called()
 }
 
+// NumberOfBlocksPruned provides a mock function with given fields: blocks
+func (_m *AccessMetrics) NumberOfBlocksPruned(blocks uint64) {
+	_m.Called(blocks)
+}
+
+// NumberOfElementsVisited provides a mock function with given fields: elements
+func (_m *AccessMetrics) NumberOfElementsVisited(elements uint64) {
+	_m.Called(elements)
+}
+
+// NumberOfRowsPruned provides a mock function with given fields: rows
+func (_m *AccessMetrics) NumberOfRowsPruned(rows uint64) {
+	_m.Called(rows)
+}
+
 // ObserveHTTPRequestDuration provides a mock function with given fields: ctx, props, duration
 func (_m *AccessMetrics) ObserveHTTPRequestDuration(ctx context.Context, props metrics.HTTPReqProperties, duration time.Duration) {
 	_m.Called(ctx, props, duration)

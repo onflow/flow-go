@@ -13,6 +13,21 @@ type RegisterDBPrunerMetrics struct {
 	mock.Mock
 }
 
+// NumberOfBlocksPruned provides a mock function with given fields: blocks
+func (_m *RegisterDBPrunerMetrics) NumberOfBlocksPruned(blocks uint64) {
+	_m.Called(blocks)
+}
+
+// NumberOfElementsVisited provides a mock function with given fields: elements
+func (_m *RegisterDBPrunerMetrics) NumberOfElementsVisited(elements uint64) {
+	_m.Called(elements)
+}
+
+// NumberOfRowsPruned provides a mock function with given fields: rows
+func (_m *RegisterDBPrunerMetrics) NumberOfRowsPruned(rows uint64) {
+	_m.Called(rows)
+}
+
 // Pruned provides a mock function with given fields: height, duration
 func (_m *RegisterDBPrunerMetrics) Pruned(height uint64, duration time.Duration) {
 	_m.Called(height, duration)

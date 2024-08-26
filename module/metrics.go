@@ -920,6 +920,15 @@ type AccessMetrics interface {
 type RegisterDBPrunerMetrics interface {
 	// Pruned tracks the last pruned height and the pruning operation duration
 	Pruned(height uint64, duration time.Duration)
+
+	// NumberOfBlocksPruned tracks the number of blocks that were pruned during the operation.
+	NumberOfBlocksPruned(blocks uint64)
+
+	// NumberOfRowsPruned tracks the number of rows that were pruned during the operation.
+	NumberOfRowsPruned(rows uint64)
+
+	// NumberOfElementsVisited tracks the number of elements that were visited during the pruning operation.
+	NumberOfElementsVisited(elements uint64)
 }
 
 type ExecutionResultStats struct {
