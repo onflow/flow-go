@@ -42,6 +42,7 @@ type StagedContractsMigration struct {
 	contractNamesProvider          stdlib.AccountContractNamesProvider
 	reporter                       reporters.ReportWriter
 	verboseErrorOutput             bool
+	legacyTypeRequirements         *LegacyTypeRequirements
 }
 
 type StagedContract struct {
@@ -73,22 +74,23 @@ func NewStagedContractsMigration(
 	reporterName string,
 	log zerolog.Logger,
 	rwf reporters.ReportWriterFactory,
+	legacyTypeRequirements *LegacyTypeRequirements,
 	options StagedContractsMigrationOptions,
 ) *StagedContractsMigration {
 	return &StagedContractsMigration{
-		name:                name,
-		log:                 log,
-		chainID:             options.ChainID,
-		stagedContracts:     map[common.Address]map[string]Contract{},
-		contractsByLocation: map[common.Location][]byte{},
-		reporter:            rwf.ReportWriter(reporterName),
-		verboseErrorOutput:  options.VerboseErrorOutput,
+		name:                   name,
+		log:                    log,
+		chainID:                options.ChainID,
+		legacyTypeRequirements: legacyTypeRequirements,
+		stagedContracts:        map[common.Address]map[string]Contract{},
+		contractsByLocation:    map[common.Location][]byte{},
+		reporter:               rwf.ReportWriter(reporterName),
+		verboseErrorOutput:     options.VerboseErrorOutput,
 	}
 }
 
 func (m *StagedContractsMigration) WithContractUpdateValidation() *StagedContractsMigration {
 	m.enableUpdateValidation = true
-	m.userDefinedTypeChangeCheckFunc = NewUserDefinedTypeChangeCheckerFunc(m.chainID)
 	return m
 }
 
@@ -178,6 +180,12 @@ func (m *StagedContractsMigration) InitMigration(
 	m.elaborations = elaborations
 	m.contractAdditionHandler = mr.ContractAdditionHandler
 	m.contractNamesProvider = mr.ContractNamesProvider
+
+	// `legacyTypeRequirements` are populated by a previous migration.
+	// So it should only be used once the previous migrations are complete.
+	if m.enableUpdateValidation {
+		m.userDefinedTypeChangeCheckFunc = NewUserDefinedTypeChangeCheckerFunc(m.chainID, m.legacyTypeRequirements)
+	}
 
 	return nil
 }
@@ -646,11 +654,12 @@ func StagedContractsFromCSV(path string) ([]StagedContract, error) {
 
 func NewUserDefinedTypeChangeCheckerFunc(
 	chainID flow.ChainID,
+	legacyTypeRequirements *LegacyTypeRequirements,
 ) func(oldTypeID common.TypeID, newTypeID common.TypeID) (checked, valid bool) {
 
 	typeChangeRules := map[common.TypeID]common.TypeID{}
 
-	compositeTypeRules := NewCompositeTypeConversionRules(chainID)
+	compositeTypeRules := NewCompositeTypeConversionRules(chainID, legacyTypeRequirements)
 	for typeID, newStaticType := range compositeTypeRules {
 		typeChangeRules[typeID] = newStaticType.ID()
 	}
