@@ -47,6 +47,9 @@ type RegisterPruner struct {
 	pruneThrottleDelay time.Duration
 	// pruneTickerInterval defines how frequently pruning can be performed
 	pruneTickerInterval time.Duration
+
+	// throttleTicker controls the delay between pruning batches to manage system load
+	throttleTicker *time.Ticker
 }
 
 type PrunerOption func(*RegisterPruner)
@@ -177,6 +180,9 @@ func (p *RegisterPruner) checkPrune(ctx irrecoverable.SignalerContext) {
 //
 // No errors are expected during normal operations.
 func (p *RegisterPruner) pruneUpToHeight(pruneHeight uint64) error {
+	p.setupThrottleDelay()
+	defer p.throttleTicker.Stop()
+
 	prefix := []byte{codeRegister}
 	itemsPerBatch := deleteItemsPerBatch
 	var batchKeysToRemove [][]byte
@@ -258,6 +264,17 @@ func (p *RegisterPruner) pruneUpToHeight(pruneHeight uint64) error {
 	return nil
 }
 
+// setupThrottleDelay sets up or reset a ticker for the throttle delay to manage system load
+// during pruning operations. This ensures that there is a small pause between pruning
+// each batch of registers.
+func (p *RegisterPruner) setupThrottleDelay() {
+	if p.throttleTicker == nil {
+		p.throttleTicker = time.NewTicker(p.pruneThrottleDelay)
+	} else {
+		p.throttleTicker.Reset(p.pruneThrottleDelay)
+	}
+}
+
 // batchDelete deletes the provided keys from the database in a single batch operation.
 // It creates a new batch, deletes each key from the batch, and commits the batch to ensure
 // that the deletions are applied atomically.
@@ -284,6 +301,9 @@ func (p *RegisterPruner) batchDelete(lookupKeys [][]byte) error {
 	if p.metrics != nil {
 		p.metrics.NumberOfRowsPruned(uint64(len(lookupKeys)))
 	}
+
+	// Throttle to prevent excessive system load
+	<-p.throttleTicker.C
 
 	return nil
 }
