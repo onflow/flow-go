@@ -540,6 +540,14 @@ docker-native-build-access-corrupt:
 		-t "$(CONTAINER_REGISTRY)/access-corrupted:$(IMAGE_TAG)" .
 	./insecure/cmd/mods_restore.sh
 
+# build a binary to run on bare metal without using docker.
+# binary is written to file ./bin/app
+.PHONY: docker-native-build-access-binary
+docker-native-build-access-binary: docker-native-build-access
+	docker create --name extract "$(CONTAINER_REGISTRY)/access:latest"
+	docker cp extract:/bin/app ./flow_access_node
+	docker rm extract
+
 .PHONY: docker-native-build-observer
 docker-native-build-observer:
 	docker build -f cmd/Dockerfile --build-arg TARGET=./cmd/observer --build-arg COMMIT=$(COMMIT) --build-arg VERSION=$(IMAGE_TAG) --build-arg GOARCH=$(GOARCH) --build-arg CGO_FLAG=$(CRYPTO_FLAG) --target production \

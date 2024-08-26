@@ -1029,22 +1029,20 @@ func newInternalEVMTypeRunFunction(
 				panic(err)
 			}
 
-			// Get coinbase argument
+			// Get gas fee collector argument
 
-			coinbaseValue, ok := invocation.Arguments[1].(*interpreter.ArrayValue)
+			gasFeeCollectorValue, ok := invocation.Arguments[1].(*interpreter.ArrayValue)
 			if !ok {
 				panic(errors.NewUnreachableError())
 			}
 
-			coinbase, err := interpreter.ByteArrayValueToByteSlice(inter, coinbaseValue, locationRange)
+			gasFeeCollector, err := interpreter.ByteArrayValueToByteSlice(inter, gasFeeCollectorValue, locationRange)
 			if err != nil {
 				panic(err)
 			}
 
-			// Run
-
-			cb := types.NewAddressFromBytes(coinbase)
-			result := handler.Run(transaction, cb)
+			// run transaction
+			result := handler.Run(transaction, types.NewAddressFromBytes(gasFeeCollector))
 
 			return NewResultValue(handler, gauge, inter, locationRange, result)
 		},
@@ -1142,7 +1140,6 @@ func newInternalEVMTypeBatchRunFunction(
 			locationRange := invocation.LocationRange
 
 			// Get transactions batch argument
-
 			transactionsBatchValue, ok := invocation.Arguments[0].(*interpreter.ArrayValue)
 			if !ok {
 				panic(errors.NewUnreachableError())
@@ -1164,22 +1161,19 @@ func newInternalEVMTypeBatchRunFunction(
 				}, false, locationRange)
 			}
 
-			// Get coinbase argument
-
-			coinbaseValue, ok := invocation.Arguments[1].(*interpreter.ArrayValue)
+			// Get gas fee collector argument
+			gasFeeCollectorValue, ok := invocation.Arguments[1].(*interpreter.ArrayValue)
 			if !ok {
 				panic(errors.NewUnreachableError())
 			}
 
-			coinbase, err := interpreter.ByteArrayValueToByteSlice(inter, coinbaseValue, locationRange)
+			gasFeeCollector, err := interpreter.ByteArrayValueToByteSlice(inter, gasFeeCollectorValue, locationRange)
 			if err != nil {
 				panic(err)
 			}
 
 			// Batch run
-
-			cb := types.NewAddressFromBytes(coinbase)
-			batchResults := handler.BatchRun(transactionBatch, cb)
+			batchResults := handler.BatchRun(transactionBatch, types.NewAddressFromBytes(gasFeeCollector))
 
 			values := newResultValues(handler, gauge, inter, locationRange, batchResults)
 
