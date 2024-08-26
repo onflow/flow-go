@@ -135,6 +135,8 @@ func (p *RegisterPruner) loop(ctx irrecoverable.SignalerContext, ready component
 // Parameters:
 //   - ctx: The context for managing the pruning operation.
 func (p *RegisterPruner) checkPrune(ctx irrecoverable.SignalerContext) {
+	// TODO: Clarify whether batching can be used here for getting the first and latest heights,
+	//       and for updating the first height.
 	firstHeight, err := firstStoredHeight(p.db)
 	if err != nil {
 		ctx.Throw(fmt.Errorf("failed to get first height from register storage: %w", err))
@@ -150,6 +152,12 @@ func (p *RegisterPruner) checkPrune(ctx irrecoverable.SignalerContext) {
 	if pruneHeight-firstHeight > p.pruneInterval {
 		p.logger.Info().Uint64("prune_height", pruneHeight).Msg("pruning storage")
 
+		// update first indexed height
+		err = p.updateFirstStoredHeight(pruneHeight)
+		if err != nil {
+			ctx.Throw(fmt.Errorf("failed to update first height for register storage: %w", err))
+		}
+
 		err := p.pruneUpToHeight(pruneHeight)
 		if err != nil {
 			ctx.Throw(fmt.Errorf("failed to prune: %w", err))
@@ -157,12 +165,6 @@ func (p *RegisterPruner) checkPrune(ctx irrecoverable.SignalerContext) {
 
 		if p.metrics != nil {
 			p.metrics.NumberOfBlocksPruned(pruneHeight - firstHeight)
-		}
-
-		// update first indexed height
-		err = p.updateFirstStoredHeight(pruneHeight)
-		if err != nil {
-			ctx.Throw(fmt.Errorf("failed to update first height for register storage: %w", err))
 		}
 	}
 }
