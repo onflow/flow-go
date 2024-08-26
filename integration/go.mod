@@ -364,4 +364,4 @@ replace github.com/onflow/flow-go/insecure => ../insecure
 replace github.com/ipfs/go-ds-pebble v0.3.1 => github.com/onflow/go-ds-pebble v0.0.0-20240731130313-f186539f382c
 
 // TODO: remove it when merged
-replace github.com/onflow/flow-emulator v1.0.0-preview.36.0.20240729195722-d4eb1c30eb9f => github.com/The-K-R-O-K/flow-emulator v0.0.0-20240816104201-ccd7c1451926
+replace github.com/onflow/flow-emulator v1.0.0-preview.36.0.20240729195722-d4eb1c30eb9f => github.com/The-K-R-O-K/flow-emulator v0.0.0-20240826100127-716edf8c9715
