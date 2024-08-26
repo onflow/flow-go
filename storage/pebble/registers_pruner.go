@@ -206,6 +206,10 @@ func (p *RegisterPruner) pruneUpToHeight(pruneHeight uint64) error {
 				return fmt.Errorf("malformed lookup key %v: %w", key, err)
 			}
 
+			if p.metrics != nil {
+				p.metrics.ElementVisited()
+			}
+
 			// New register prefix, reset the state
 			if !keepKeyFound || lastRegisterID != registerID {
 				keepKeyFound = false
