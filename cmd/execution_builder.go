@@ -1156,7 +1156,7 @@ func (exeNode *ExecutionNode) LoadTransactionExecutionMetrics(
 		node.Logger,
 		exeNode.executionState,
 		node.Storage.Headers,
-		lastFinalizedHeader,
+		lastFinalizedHeader.Height,
 		exeNode.exeConf.transactionExecutionMetricsBufferSize,
 	)
 

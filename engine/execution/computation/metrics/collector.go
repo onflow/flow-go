@@ -94,21 +94,22 @@ func (c *collector) collect(
 	c.metrics[blockId] = append(c.metrics[blockId], t)
 }
 
-// Pop returns the metrics for the given block at the given height
+// Pop returns the metrics for the given finalized block at the given height
 // and clears all data up to the given height.
-func (c *collector) Pop(height uint64, blockID flow.Identifier) []TransactionExecutionMetrics {
+func (c *collector) Pop(height uint64, finalizedBlockId flow.Identifier) []TransactionExecutionMetrics {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	if height <= c.lowestAvailableHeight && c.lowestAvailableHeight != 0 {
+	if height <= c.lowestAvailableHeight {
 		c.log.Warn().
 			Uint64("height", height).
-			Stringer("blockID", blockID).
-			Msg("requested metrics for a blockID that is older or equal than the most recent blockID")
+			Stringer("finalizedBlockId", finalizedBlockId).
+			Msg("requested metrics for a finalizedBlockId that is older or equal than the most recent finalizedBlockId")
 		return nil
 	}
 
-	metrics := c.metrics[blockID]
+	// only return metrics for finalized block
+	metrics := c.metrics[finalizedBlockId]
 
 	c.advanceTo(height)
 
@@ -119,11 +120,11 @@ func (c *collector) Pop(height uint64, blockID flow.Identifier) []TransactionExe
 // all data at lower heights will be deleted
 func (c *collector) advanceTo(height uint64) {
 	for c.lowestAvailableHeight < height {
-		c.lowestAvailableHeight++
 		blocks := c.blocksAtHeight[c.lowestAvailableHeight]
 		for block := range blocks {
 			delete(c.metrics, block)
 		}
 		delete(c.blocksAtHeight, c.lowestAvailableHeight)
+		c.lowestAvailableHeight++
 	}
 }

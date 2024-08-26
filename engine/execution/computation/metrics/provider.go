@@ -48,14 +48,14 @@ func (p *provider) Push(
 	if height <= p.blockHeightAtBufferIndex {
 		p.log.Warn().
 			Uint64("height", height).
-			Uint64("lowestAvailableHeight", p.blockHeightAtBufferIndex).
+			Uint64("blockHeightAtBufferIndex", p.blockHeightAtBufferIndex).
 			Msg("received metrics for a block that is older or equal than the most recent block")
 		return
 	}
 	if height > p.blockHeightAtBufferIndex+1 {
 		p.log.Warn().
 			Uint64("height", height).
-			Uint64("lowestAvailableHeight", p.blockHeightAtBufferIndex).
+			Uint64("blockHeightAtBufferIndex", p.blockHeightAtBufferIndex).
 			Msg("received metrics for a block that is not the next block")
 
 		// Fill in the gap with nil
@@ -85,20 +85,21 @@ func (p *provider) GetTransactionExecutionMetricsAfter(height uint64) (GetTransa
 
 	// start index is the lowest block height that is in the buffer
 	// missing heights are handled below
-	startIndex := uint64(0)
+	startHeight := uint64(0)
+	// assign startHeight with the lowest buffered height
 	if p.blockHeightAtBufferIndex > uint64(p.bufferSize) {
-		startIndex = p.blockHeightAtBufferIndex - uint64(p.bufferSize)
+		startHeight = p.blockHeightAtBufferIndex - uint64(p.bufferSize)
 	}
 
 	// if the starting index is lower than the height we only need to return the data for
 	// the blocks that are later than the given height
-	if height+1 > startIndex {
-		startIndex = height + 1
+	if height+1 > startHeight {
+		startHeight = height + 1
 	}
 
-	for i := startIndex; i <= p.blockHeightAtBufferIndex; i++ {
+	for h := startHeight; h <= p.blockHeightAtBufferIndex; h++ {
 		// 0 <= diff; because of the bufferSize check above
-		diff := uint(p.blockHeightAtBufferIndex - i)
+		diff := uint(p.blockHeightAtBufferIndex - h)
 
 		// 0 <= diff < bufferSize; because of the bufferSize check above
 		// we are about to do a modulo operation with p.bufferSize on p.bufferIndex - diff, but diff could
@@ -113,7 +114,7 @@ func (p *provider) GetTransactionExecutionMetricsAfter(height uint64) (GetTransa
 			continue
 		}
 
-		data[i] = p.buffer[index]
+		data[h] = p.buffer[index]
 	}
 
 	return data, nil

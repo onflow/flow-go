@@ -77,7 +77,7 @@ type transactionExecutionMetricsProvider struct {
 	headers                storage.Headers
 	blockFinalizedNotifier engine.Notifier
 
-	latestFinalizedAndExecuted *flow.Header
+	latestFinalizedAndExecutedHeight uint64
 }
 
 var _ TransactionExecutionMetricsProvider = (*transactionExecutionMetricsProvider)(nil)
@@ -86,22 +86,22 @@ func NewTransactionExecutionMetricsProvider(
 	log zerolog.Logger,
 	executionState state.FinalizedExecutionState,
 	headers storage.Headers,
-	latestFinalizedBlock *flow.Header,
+	latestFinalizedAndExecutedHeight uint64,
 	bufferSize uint,
 ) TransactionExecutionMetricsProvider {
 	log = log.With().Str("component", "transaction_execution_metrics_provider").Logger()
 
-	collector := newCollector(log, latestFinalizedBlock.Height)
-	provider := newProvider(log, bufferSize, latestFinalizedBlock.Height)
+	collector := newCollector(log, latestFinalizedAndExecutedHeight)
+	provider := newProvider(log, bufferSize, latestFinalizedAndExecutedHeight)
 
 	p := &transactionExecutionMetricsProvider{
-		collector:                  collector,
-		provider:                   provider,
-		log:                        log,
-		executionState:             executionState,
-		headers:                    headers,
-		blockFinalizedNotifier:     engine.NewNotifier(),
-		latestFinalizedAndExecuted: latestFinalizedBlock,
+		collector:                        collector,
+		provider:                         provider,
+		log:                              log,
+		executionState:                   executionState,
+		headers:                          headers,
+		blockFinalizedNotifier:           engine.NewNotifier(),
+		latestFinalizedAndExecutedHeight: latestFinalizedAndExecutedHeight,
 	}
 
 	cm := component.NewComponentManagerBuilder()
@@ -149,8 +149,8 @@ func (p *transactionExecutionMetricsProvider) onExecutedAndFinalized() {
 
 	// the latest finalized and executed block could be more than one block further than the last one handled
 	// step through all blocks between the last one handled and the latest finalized and executed
-	for height := p.latestFinalizedAndExecuted.Height + 1; height <= latestFinalizedAndExecutedHeight; height++ {
-		header, err := p.headers.ByHeight(height)
+	for height := p.latestFinalizedAndExecutedHeight + 1; height <= latestFinalizedAndExecutedHeight; height++ {
+		blockID, err := p.headers.BlockIDByHeight(height)
 		if err != nil {
 			p.log.Warn().
 				Err(err).
@@ -159,10 +159,10 @@ func (p *transactionExecutionMetricsProvider) onExecutedAndFinalized() {
 			return
 		}
 
-		p.onBlockExecutedAndFinalized(header.ID(), height)
+		p.onBlockExecutedAndFinalized(blockID, height)
 
-		if header.Height == latestFinalizedAndExecutedHeight {
-			p.latestFinalizedAndExecuted = header
+		if height == latestFinalizedAndExecutedHeight {
+			p.latestFinalizedAndExecutedHeight = height
 		}
 	}
 }
