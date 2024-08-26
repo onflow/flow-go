@@ -81,7 +81,14 @@ func TestChangeContractCodeMigration(t *testing.T) {
 			ChainID:            flow.Emulator,
 			VerboseErrorOutput: true,
 		}
-		migration := NewStagedContractsMigration("test", "test", log, rwf, options)
+		migration := NewStagedContractsMigration(
+			"test",
+			"test",
+			log,
+			rwf,
+			&LegacyTypeRequirements{},
+			options,
+		)
 
 		registersByAccount := registers.NewByAccount()
 
@@ -113,7 +120,14 @@ func TestChangeContractCodeMigration(t *testing.T) {
 			ChainID:            flow.Emulator,
 			VerboseErrorOutput: true,
 		}
-		migration := NewStagedContractsMigration("test", "test", log, rwf, options)
+		migration := NewStagedContractsMigration(
+			"test",
+			"test",
+			log,
+			rwf,
+			&LegacyTypeRequirements{},
+			options,
+		)
 
 		registersByAccount, err := registersForStagedContracts(
 			StagedContract{
@@ -165,7 +179,14 @@ func TestChangeContractCodeMigration(t *testing.T) {
 			ChainID:            flow.Emulator,
 			VerboseErrorOutput: true,
 		}
-		migration := NewStagedContractsMigration("test", "test", log, rwf, options).
+		migration := NewStagedContractsMigration(
+			"test",
+			"test",
+			log,
+			rwf,
+			&LegacyTypeRequirements{},
+			options,
+		).
 			WithStagedContractUpdates([]StagedContract{
 				{
 					Address: common.Address(address1),
@@ -226,7 +247,14 @@ func TestChangeContractCodeMigration(t *testing.T) {
 			ChainID:            flow.Emulator,
 			VerboseErrorOutput: true,
 		}
-		migration := NewStagedContractsMigration("test", "test", log, rwf, options).
+		migration := NewStagedContractsMigration(
+			"test",
+			"test",
+			log,
+			rwf,
+			&LegacyTypeRequirements{},
+			options,
+		).
 			WithStagedContractUpdates([]StagedContract{
 				{
 					Address: common.Address(address1),
@@ -298,7 +326,14 @@ func TestChangeContractCodeMigration(t *testing.T) {
 			ChainID:            flow.Emulator,
 			VerboseErrorOutput: true,
 		}
-		migration := NewStagedContractsMigration("test", "test", log, rwf, options).
+		migration := NewStagedContractsMigration(
+			"test",
+			"test",
+			log,
+			rwf,
+			&LegacyTypeRequirements{},
+			options,
+		).
 			WithStagedContractUpdates([]StagedContract{
 				{
 					Address: common.Address(address1),
@@ -377,7 +412,14 @@ func TestChangeContractCodeMigration(t *testing.T) {
 			ChainID:            flow.Emulator,
 			VerboseErrorOutput: true,
 		}
-		migration := NewStagedContractsMigration("test", "test", log, rwf, options).
+		migration := NewStagedContractsMigration(
+			"test",
+			"test",
+			log,
+			rwf,
+			&LegacyTypeRequirements{},
+			options,
+		).
 			WithStagedContractUpdates([]StagedContract{
 				{
 					Address: common.Address(address1),
@@ -452,7 +494,14 @@ func TestChangeContractCodeMigration(t *testing.T) {
 			ChainID:            flow.Emulator,
 			VerboseErrorOutput: true,
 		}
-		migration := NewStagedContractsMigration("test", "test", log, rwf, options).
+		migration := NewStagedContractsMigration(
+			"test",
+			"test",
+			log,
+			rwf,
+			&LegacyTypeRequirements{},
+			options,
+		).
 			WithStagedContractUpdates([]StagedContract{
 				{
 					Address: common.Address(address1),
@@ -514,7 +563,14 @@ func TestChangeContractCodeMigration(t *testing.T) {
 			ChainID:            flow.Emulator,
 			VerboseErrorOutput: true,
 		}
-		migration := NewStagedContractsMigration("test", "test", log, rwf, options).
+		migration := NewStagedContractsMigration(
+			"test",
+			"test",
+			log,
+			rwf,
+			&LegacyTypeRequirements{},
+			options,
+		).
 			WithStagedContractUpdates([]StagedContract{
 				{
 					Address: common.Address(address2),
