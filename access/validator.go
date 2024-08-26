@@ -423,9 +423,9 @@ func (v *TransactionValidator) checkSufficientBalanceToPayForTransaction(ctx con
 		return fmt.Errorf("could not get indexed height: %w", err)
 	}
 
-	// instead of using latest sealed block we are using latest indexed block, so we can do a check
-	// to ensure that the difference between the latest sealed and indexed is within some tolerance
-	// to handle cases where a node is behind on indexing.
+	// we use latest indexed block to get the most up-to-date state data available for executing scripts.
+	// check here to make sure indexing is within an acceptable tolerance of sealing to avoid issues
+	// if indexing falls behind
 	sealedHeight := header.Height
 	if indexedHeight < sealedHeight-DefaultSealedIndexedHeightThreshold {
 		return IndexedHeightFarBehindError{SealedHeight: sealedHeight, IndexedHeight: indexedHeight}
