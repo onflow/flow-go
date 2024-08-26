@@ -167,6 +167,8 @@ func (e *Engine) verify(ctx context.Context, originID flow.Identifier,
 		Hex("origin", logging.ID(originID)).
 		Uint64("chunk_index", vc.Chunk.Index).
 		Hex("result_id", logging.Entity(vc.Result)).
+		Hex("block_id", logging.Entity(vc.Header)).
+		Uint64("block_height", vc.Header.Height).
 		Logger()
 
 	log.Info().Msg("verifiable chunk received by verifier engine")
@@ -200,58 +202,58 @@ func (e *Engine) verify(ctx context.Context, originID flow.Identifier,
 		// if any fault found with the chunk
 		switch chFault := err.(type) {
 		case *chmodels.CFMissingRegisterTouch:
-			e.log.Warn().
+			log.Warn().
 				Str("chunk_fault_type", "missing_register_touch").
 				Str("chunk_fault", chFault.Error()).
 				Msg("chunk fault found, could not verify chunk")
 			// still create approvals for this case
 		case *chmodels.CFNonMatchingFinalState:
 			// TODO raise challenge
-			e.log.Warn().
+			log.Warn().
 				Str("chunk_fault_type", "final_state_mismatch").
 				Str("chunk_fault", chFault.Error()).
 				Msg("chunk fault found, could not verify chunk")
 			return nil
 		case *chmodels.CFInvalidVerifiableChunk:
 			// TODO raise challenge
-			e.log.Error().
+			log.Error().
 				Str("chunk_fault_type", "invalid_verifiable_chunk").
 				Str("chunk_fault", chFault.Error()).
 				Msg("chunk fault found, could not verify chunk")
 			return nil
 		case *chmodels.CFInvalidEventsCollection:
 			// TODO raise challenge
-			e.log.Error().
+			log.Error().
 				Str("chunk_fault_type", "invalid_event_collection").
 				Str("chunk_fault", chFault.Error()).
 				Msg("chunk fault found, could not verify chunk")
 			return nil
 		case *chmodels.CFSystemChunkIncludedCollection:
-			e.log.Error().
+			log.Error().
 				Str("chunk_fault_type", "system_chunk_includes_collection").
 				Str("chunk_fault", chFault.Error()).
 				Msg("chunk fault found, could not verify chunk")
 			return nil
 		case *chmodels.CFExecutionDataBlockIDMismatch:
-			e.log.Error().
+			log.Error().
 				Str("chunk_fault_type", "execution_data_block_id_mismatch").
 				Str("chunk_fault", chFault.Error()).
 				Msg("chunk fault found, could not verify chunk")
 			return nil
 		case *chmodels.CFExecutionDataChunksLengthMismatch:
-			e.log.Error().
+			log.Error().
 				Str("chunk_fault_type", "execution_data_chunks_count_mismatch").
 				Str("chunk_fault", chFault.Error()).
 				Msg("chunk fault found, could not verify chunk")
 			return nil
 		case *chmodels.CFExecutionDataInvalidChunkCID:
-			e.log.Error().
+			log.Error().
 				Str("chunk_fault_type", "execution_data_chunk_cid_mismatch").
 				Str("chunk_fault", chFault.Error()).
 				Msg("chunk fault found, could not verify chunk")
 			return nil
 		case *chmodels.CFInvalidExecutionDataID:
-			e.log.Error().
+			log.Error().
 				Str("chunk_fault_type", "execution_data_root_cid_mismatch").
 				Str("chunk_fault", chFault.Error()).
 				Msg("chunk fault found, could not verify chunk")
