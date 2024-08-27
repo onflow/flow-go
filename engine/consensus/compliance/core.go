@@ -341,7 +341,7 @@ func (c *Core) processBlockProposal(proposal *flow.Block) error {
 			//    1. the proposer maliciously created the block for a view very far in the future (it's invalid)
 			//      -> in this case we can disregard the block
 			//    2. no blocks have been finalized within the epoch commitment deadline, and the epoch ended
-			//       (breaking a critical assumption - see EpochCommitSafetyThreshold in protocol.Params for details)
+			//       (breaking a critical assumption - see FinalizationSafetyThreshold in protocol.Params for details)
 			//      -> in this case, the network has encountered a critical failure
 			//  - we assume in general that Case 2 will not happen, therefore this must be Case 1 - an invalid block
 			return engine.NewUnverifiableInputError("unverifiable proposal with view from unknown epoch: %w", err)

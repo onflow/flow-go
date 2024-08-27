@@ -15,7 +15,7 @@ func (s *Suite) SetupTest() {
 	// to manually trigger EFM we assign very short dkg phase len ensuring the dkg will fail
 	s.DKGPhaseLen = 10
 	s.EpochLen = 80
-	s.EpochCommitSafetyThreshold = 20
+	s.FinalizationSafetyThreshold = 20
 	s.NumOfCollectionClusters = 1
 
 	// run the generic setup, which starts up the network

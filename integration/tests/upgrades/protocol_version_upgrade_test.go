@@ -36,7 +36,7 @@ func (suite *ProtocolVersionUpgradeSuite) SetupTest() {
 	// This lets us test upgrading v0->v1
 	protocolState, err := suite.net.BootstrapSnapshot.ProtocolState()
 	require.NoError(suite.T(), err)
-	finalizationThreshold := protocolState.GetEpochCommitSafetyThreshold()
+	finalizationThreshold := protocolState.GetFinalizationSafetyThreshold()
 	epochExtensionViewCount := protocolState.GetEpochExtensionViewCount()
 	suite.KVStoreFactory = func(epochStateID flow.Identifier) (protocol_state.KVStoreAPI, error) {
 		return kvstore.NewKVStoreV0(finalizationThreshold, epochExtensionViewCount, epochStateID)

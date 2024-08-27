@@ -139,7 +139,7 @@ func (model *Modelv0) GetEpochExtensionViewCount() uint64 {
 	return model.EpochExtensionViewCount
 }
 
-func (model *Modelv0) GetEpochCommitSafetyThreshold() uint64 {
+func (model *Modelv0) GetFinalizationSafetyThreshold() uint64 {
 	return model.FinalizationSafetyThreshold
 }
 

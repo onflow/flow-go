@@ -37,7 +37,7 @@ func (s *SetKeyValueStoreValueStateMachineSuite) SetupTest() {
 	s.mutator = mock.NewKVStoreMutator(s.T())
 	s.view = 1000
 
-	s.parentState.On("GetEpochCommitSafetyThreshold").Return(uint64(100)).Maybe()
+	s.parentState.On("GetFinalizationSafetyThreshold").Return(uint64(100)).Maybe()
 
 	s.stateMachine = kvstore.NewSetValueStateMachine(s.telemetry, s.view, s.parentState, s.mutator)
 	require.NotNil(s.T(), s.stateMachine)

@@ -155,10 +155,10 @@ func (c *ComplianceCore) OnBlockRange(originID flow.Identifier, batch []*flow.Bl
 				//     service event.
 				//     -> in this case we can disregard the block
 				//     Note: we could eliminate this edge case by dropping future blocks, iff their _view_
-				//           is strictly larger than `V + EpochCommitSafetyThreshold`, where `V` denotes
+				//           is strictly larger than `V + FinalizationSafetyThreshold`, where `V` denotes
 				//           the latest finalized block known to this node.
-				//  3. No blocks have been finalized for the last `EpochCommitSafetyThreshold` views. This breaks
-				//     a critical liveness assumption - see EpochCommitSafetyThreshold in protocol.Params for details.
+				//  3. No blocks have been finalized for the last `FinalizationSafetyThreshold` views. This breaks
+				//     a critical liveness assumption - see FinalizationSafetyThreshold in protocol.Params for details.
 				//     -> In this case, it is ok for the protocol to halt. Consequently, we can just disregard
 				//        the block, which will probably lead to this node eventually halting.
 				log.Err(err).Msg("unable to validate proposal with view from unknown epoch")

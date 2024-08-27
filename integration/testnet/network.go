@@ -115,11 +115,11 @@ const (
 	// PrimaryON is the container name for the primary observer node to use for API requests
 	PrimaryON = "observer_1"
 
-	DefaultViewsInStakingAuction      uint64 = 5
-	DefaultViewsInDKGPhase            uint64 = 50
-	DefaultViewsInEpoch               uint64 = 200
-	DefaultEpochCommitSafetyThreshold uint64 = 20
-	DefaultEpochExtensionViewCount    uint64 = 50
+	DefaultViewsInStakingAuction       uint64 = 5
+	DefaultViewsInDKGPhase             uint64 = 50
+	DefaultViewsInEpoch                uint64 = 200
+	DefaultFinalizationSafetyThreshold uint64 = 20
+	DefaultEpochExtensionViewCount     uint64 = 50
 
 	// DefaultMinimumNumOfAccessNodeIDS at-least 1 AN ID must be configured for LN & SN
 	DefaultMinimumNumOfAccessNodeIDS = 1
@@ -421,31 +421,31 @@ func NewConsensusFollowerConfig(t *testing.T, networkingPrivKey crypto.PrivateKe
 
 // NetworkConfig is the config for the network.
 type NetworkConfig struct {
-	Nodes                      NodeConfigs
-	ConsensusFollowers         []ConsensusFollowerConfig
-	Observers                  []ObserverConfig
-	Name                       string
-	NClusters                  uint
-	ViewsInDKGPhase            uint64
-	ViewsInStakingAuction      uint64
-	ViewsInEpoch               uint64
-	EpochCommitSafetyThreshold uint64
-	KVStoreFactory             func(epochStateID flow.Identifier) (protocol_state.KVStoreAPI, error)
+	Nodes                       NodeConfigs
+	ConsensusFollowers          []ConsensusFollowerConfig
+	Observers                   []ObserverConfig
+	Name                        string
+	NClusters                   uint
+	ViewsInDKGPhase             uint64
+	ViewsInStakingAuction       uint64
+	ViewsInEpoch                uint64
+	FinalizationSafetyThreshold uint64
+	KVStoreFactory              func(epochStateID flow.Identifier) (protocol_state.KVStoreAPI, error)
 }
 
 type NetworkConfigOpt func(*NetworkConfig)
 
 func NewNetworkConfig(name string, nodes NodeConfigs, opts ...NetworkConfigOpt) NetworkConfig {
 	c := NetworkConfig{
-		Nodes:                      nodes,
-		Name:                       name,
-		NClusters:                  1, // default to 1 cluster
-		ViewsInStakingAuction:      DefaultViewsInStakingAuction,
-		ViewsInDKGPhase:            DefaultViewsInDKGPhase,
-		ViewsInEpoch:               DefaultViewsInEpoch,
-		EpochCommitSafetyThreshold: DefaultEpochCommitSafetyThreshold,
+		Nodes:                       nodes,
+		Name:                        name,
+		NClusters:                   1, // default to 1 cluster
+		ViewsInStakingAuction:       DefaultViewsInStakingAuction,
+		ViewsInDKGPhase:             DefaultViewsInDKGPhase,
+		ViewsInEpoch:                DefaultViewsInEpoch,
+		FinalizationSafetyThreshold: DefaultFinalizationSafetyThreshold,
 		KVStoreFactory: func(epochStateID flow.Identifier) (protocol_state.KVStoreAPI, error) {
-			return kvstore.NewDefaultKVStore(DefaultEpochCommitSafetyThreshold, DefaultEpochExtensionViewCount, epochStateID)
+			return kvstore.NewDefaultKVStore(DefaultFinalizationSafetyThreshold, DefaultEpochExtensionViewCount, epochStateID)
 		},
 	}
 
@@ -461,7 +461,7 @@ func NewNetworkConfigWithEpochConfig(name string, nodes NodeConfigs, viewsInStak
 		WithViewsInStakingAuction(viewsInStakingAuction),
 		WithViewsInDKGPhase(viewsInDKGPhase),
 		WithViewsInEpoch(viewsInEpoch),
-		WithEpochCommitSafetyThreshold(safetyThreshold))
+		WithFinalizationSafetyThreshold(safetyThreshold))
 
 	for _, apply := range opts {
 		apply(&c)
@@ -488,9 +488,9 @@ func WithViewsInDKGPhase(views uint64) func(*NetworkConfig) {
 	}
 }
 
-func WithEpochCommitSafetyThreshold(threshold uint64) func(*NetworkConfig) {
+func WithFinalizationSafetyThreshold(threshold uint64) func(*NetworkConfig) {
 	return func(config *NetworkConfig) {
-		config.EpochCommitSafetyThreshold = threshold
+		config.FinalizationSafetyThreshold = threshold
 	}
 }
 

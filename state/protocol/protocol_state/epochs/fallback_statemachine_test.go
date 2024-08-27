@@ -34,7 +34,7 @@ func (s *EpochFallbackStateMachineSuite) SetupTest() {
 
 	s.kvstore = mockstate.NewKVStoreReader(s.T())
 	s.kvstore.On("GetEpochExtensionViewCount").Return(extensionViewCount).Maybe()
-	s.kvstore.On("GetEpochCommitSafetyThreshold").Return(uint64(200))
+	s.kvstore.On("GetFinalizationSafetyThreshold").Return(uint64(200))
 
 	var err error
 	s.stateMachine, err = NewFallbackStateMachine(s.kvstore, s.consumer, s.candidate.View, s.parentProtocolState.Copy())
@@ -145,7 +145,7 @@ func (s *EpochFallbackStateMachineSuite) TestProcessInvalidEpochRecover() {
 			},
 		}
 
-		candidateView := s.parentProtocolState.CurrentEpochSetup.FinalView - s.kvstore.GetEpochCommitSafetyThreshold() + 1
+		candidateView := s.parentProtocolState.CurrentEpochSetup.FinalView - s.kvstore.GetFinalizationSafetyThreshold() + 1
 		stateMachine, err := NewFallbackStateMachine(s.kvstore, s.consumer, candidateView, parentProtocolState)
 		require.NoError(s.T(), err)
 
@@ -251,7 +251,7 @@ func (s *EpochFallbackStateMachineSuite) TestProcessInvalidEpochRecover() {
 			setup.FirstView = s.parentProtocolState.CurrentEpochSetup.FinalView + 1
 			setup.FinalView = setup.FirstView + 10_000
 		})
-		thresholdView := s.parentProtocolState.CurrentEpochSetup.FinalView - s.kvstore.GetEpochCommitSafetyThreshold()
+		thresholdView := s.parentProtocolState.CurrentEpochSetup.FinalView - s.kvstore.GetFinalizationSafetyThreshold()
 		stateMachine, err := NewFallbackStateMachine(s.kvstore, s.consumer, thresholdView, s.parentProtocolState)
 		require.NoError(s.T(), err)
 
@@ -349,7 +349,7 @@ func (s *EpochFallbackStateMachineSuite) TestNewEpochFallbackStateMachine() {
 	parentProtocolState := s.parentProtocolState.Copy()
 	parentProtocolState.EpochFallbackTriggered = false
 
-	thresholdView := parentProtocolState.CurrentEpochSetup.FinalView - s.kvstore.GetEpochCommitSafetyThreshold()
+	thresholdView := parentProtocolState.CurrentEpochSetup.FinalView - s.kvstore.GetFinalizationSafetyThreshold()
 
 	// The view we enter EFM is in the staking phase. The resulting epoch state should be unchanged to the
 	// parent state _except_ that `EpochFallbackTriggered` is set to true.
@@ -501,8 +501,8 @@ func (s *EpochFallbackStateMachineSuite) TestEpochFallbackStateMachineInjectsMul
 		// In the previous test `TestNewEpochFallbackStateMachine`, we verified that the first extension is added correctly. Below we
 		// test proper addition of the subsequent extension. A new extension should be added when we reach `firstExtensionViewThreshold`.
 		// When reaching (equality) this threshold, the next extension should be added
-		firstExtensionViewThreshold := originalParentState.CurrentEpochSetup.FinalView + extensionViewCount - s.kvstore.GetEpochCommitSafetyThreshold()
-		secondExtensionViewThreshold := originalParentState.CurrentEpochSetup.FinalView + 2*extensionViewCount - s.kvstore.GetEpochCommitSafetyThreshold()
+		firstExtensionViewThreshold := originalParentState.CurrentEpochSetup.FinalView + extensionViewCount - s.kvstore.GetFinalizationSafetyThreshold()
+		secondExtensionViewThreshold := originalParentState.CurrentEpochSetup.FinalView + 2*extensionViewCount - s.kvstore.GetFinalizationSafetyThreshold()
 		// We progress through views that are strictly smaller than threshold. Up to this point, only the initial extension should exist
 
 		// we will be asserting the validity of extensions after producing multiple extensions,
@@ -596,9 +596,9 @@ func (s *EpochFallbackStateMachineSuite) TestEpochFallbackStateMachineInjectsMul
 	// In the previous test `TestNewEpochFallbackStateMachine`, we verified that the first extension is added correctly. Below we
 	// test proper addition of the subsequent extension. A new extension should be added when we reach `firstExtensionViewThreshold`.
 	// When reaching (equality) this threshold, the next extension should be added
-	firstExtensionViewThreshold := originalParentState.NextEpochSetup.FinalView + extensionViewCount - s.kvstore.GetEpochCommitSafetyThreshold()
-	secondExtensionViewThreshold := originalParentState.NextEpochSetup.FinalView + 2*extensionViewCount - s.kvstore.GetEpochCommitSafetyThreshold()
-	thirdExtensionViewThreshold := originalParentState.NextEpochSetup.FinalView + 3*extensionViewCount - s.kvstore.GetEpochCommitSafetyThreshold()
+	firstExtensionViewThreshold := originalParentState.NextEpochSetup.FinalView + extensionViewCount - s.kvstore.GetFinalizationSafetyThreshold()
+	secondExtensionViewThreshold := originalParentState.NextEpochSetup.FinalView + 2*extensionViewCount - s.kvstore.GetFinalizationSafetyThreshold()
+	thirdExtensionViewThreshold := originalParentState.NextEpochSetup.FinalView + 3*extensionViewCount - s.kvstore.GetFinalizationSafetyThreshold()
 
 	parentProtocolState := originalParentState.Copy()
 	candidateView := originalParentState.CurrentEpochSetup.FirstView + 1
@@ -697,7 +697,7 @@ func (s *EpochFallbackStateMachineSuite) TestEpochRecoverAndEjectionInSameBlock(
 	s.Run("invalid epoch recover event", func() {
 		s.kvstore = mockstate.NewKVStoreReader(s.T())
 		s.kvstore.On("GetEpochExtensionViewCount").Return(extensionViewCount).Maybe()
-		s.kvstore.On("GetEpochCommitSafetyThreshold").Return(uint64(200))
+		s.kvstore.On("GetFinalizationSafetyThreshold").Return(uint64(200))
 
 		var err error
 		s.stateMachine, err = NewFallbackStateMachine(s.kvstore, s.consumer, s.candidate.View, s.parentProtocolState.Copy())
