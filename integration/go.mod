@@ -20,13 +20,13 @@ require (
 	github.com/ipfs/go-ds-badger2 v0.1.3
 	github.com/ipfs/go-ds-pebble v0.3.1
 	github.com/libp2p/go-libp2p v0.32.2
-	github.com/onflow/cadence v1.0.0-preview.48
+	github.com/onflow/cadence v1.0.0-preview.50
 	github.com/onflow/crypto v0.25.2
 	github.com/onflow/flow-core-contracts/lib/go/contracts v1.3.1
 	github.com/onflow/flow-core-contracts/lib/go/templates v1.3.1
 	github.com/onflow/flow-emulator v1.0.0-preview.36.0.20240729195722-d4eb1c30eb9f
 	github.com/onflow/flow-go v0.37.0-crescendo-RC3.0.20240808013212-1dd0921e5306
-	github.com/onflow/flow-go-sdk v1.0.0-preview.50
+	github.com/onflow/flow-go-sdk v1.0.0-preview.53
 	github.com/onflow/flow-go/insecure v0.0.0-00010101000000-000000000000
 	github.com/onflow/flow/protobuf/go/flow v0.4.5
 	github.com/onflow/go-ethereum v1.14.7
@@ -244,7 +244,7 @@ require (
 	github.com/multiformats/go-multistream v0.5.0 // indirect
 	github.com/multiformats/go-varint v0.0.7 // indirect
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
-	github.com/onflow/atree v0.8.0-rc.5 // indirect
+	github.com/onflow/atree v0.8.0-rc.6 // indirect
 	github.com/onflow/flow-ft/lib/go/contracts v1.0.0 // indirect
 	github.com/onflow/flow-ft/lib/go/templates v1.0.0 // indirect
 	github.com/onflow/flow-nft/lib/go/contracts v1.2.1 // indirect
