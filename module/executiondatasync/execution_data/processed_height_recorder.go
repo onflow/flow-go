@@ -26,7 +26,7 @@ var _ ProcessedHeightRecorder = (*ProcessedHeightRecorderManager)(nil)
 // ProcessedHeightRecorderManager manages an execution data height recorder
 // and tracks the highest processed block height.
 type ProcessedHeightRecorderManager struct {
-	lock                  sync.Mutex
+	lock                  sync.RWMutex
 	highestCompleteHeight *atomic.Uint64
 	consumer              HeightUpdatesConsumer
 }
@@ -43,8 +43,8 @@ func (e *ProcessedHeightRecorderManager) OnBlockProcessed(height uint64) {
 	if height > e.highestCompleteHeight.Load() {
 		e.highestCompleteHeight.Store(height)
 
-		e.lock.Lock()
-		defer e.lock.Unlock()
+		e.lock.RLock()
+		defer e.lock.RUnlock()
 		if e.consumer != nil {
 			e.consumer(height)
 		}
