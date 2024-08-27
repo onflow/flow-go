@@ -44,6 +44,35 @@ type EventHandler struct {
 	committee     hotstuff.Replicas
 	safetyRules   hotstuff.SafetyRules
 	notifier      hotstuff.Consumer
+
+	// myLastProposedView is the latest view that this node has created a proposal for
+	// CAUTION: in-memory only; information will be lost once the node reboots. This is fine for the following reason:
+	//  1. At the moment, the block construction logic persists its blocks in the database, _before_ returning the
+	//     reference to the EventHandler, which subsequently publishes the block (via the `OnOwnProposal` notification).
+	//     Therefore, for each view that this consensus participant published a block for, this block is also in the database.
+	//  2. Before constructing a proposal for view v, the node confirms that there is no block for view v already stored in
+	//     its local Forks, and skips the block production otherwise. When the node boots up, it populates Forks with all
+	//     unfinalized blocks. Hence, we conclude:
+	//     Let v be a view for which this node constructed a proposal _before_ rebooting. Then, after rebooting it will never
+	//     construct another proposal for view v.
+	//  3. What remains is to show that this node will not propose for views which it has previously proposed for without any
+	//     reboots. Conceptually, this is guaranteed by the SafetyRules, but only if voting and signing proposals is _both_
+	//     done by safety rules. Unfortunately, the current implementation signs its own proposals _independently_ of safety rules.
+	//     Hence, we add the following logic:
+	//      - `myLastProposedView` is zero in case this node has not generated any proposal since its last reboot. Then, argument
+	//         2. guarantees that the node will not double-propose.
+	//      - Whenever this node constructed a proposal for view v, it will set `myLastProposedView` to value `v`, _before_
+	//        publishing the proposal (via the `OnOwnProposal` notification).
+	//      - Only if `v < myLastProposedView`, this node will engage its block production logic for view `v`. Therefore, it is
+	//        guaranteed that this node has not generated any proposal for view v since its last reboot.
+	// In summary, argument 2. and 3. guarantee that this node will not double-propose (independently of whether the node
+	// restarted or not). Note that this holds, _without_ the node needing to store newly generated proposals right away in `Forks`.
+	// On the happy path (no restarts), updating `myLastProposedView` will suffice to prevent creating two proposals for the same view.
+	// The node's own proposal will be added to Forks _after_ the broadcast the same way as proposals from other nodes.
+	// On the unhappy path, the node's own proposals will be added to Forks along with unfinalized proposals from other nodes.
+	// TODO: use safety rules also for block signing, which produces the same guarantees of not double-proposing without this extra logic
+	//       For further details, see issue https://github.com/onflow/flow-go/issues/6389
+	myLastProposedView uint64
 }
 
 var _ hotstuff.EventHandler = (*EventHandler)(nil)
@@ -313,6 +342,10 @@ func (e *EventHandler) broadcastTimeoutObjectIfAuthorized() error {
 //   - after receiving a proposal (but not changing view), if that proposal is referenced by our highest known QC,
 //     and the proposal was previously unknown, then we can propose a block in the current view
 //
+// Enforced INVARIANTS:
+//   - There will at most be `OnOwnProposal` notification emitted for views where this node is the leader, and none
+//     if another node is the leader. This holds irrespective of restarts. Formally, this prevents proposal equivocation.
+//
 // It reads the current view, and generates a proposal if we are the leader.
 // No errors are expected during normal operation.
 func (e *EventHandler) proposeForNewViewIfPrimary() error {
@@ -330,10 +363,23 @@ func (e *EventHandler) proposeForNewViewIfPrimary() error {
 
 	e.notifier.OnCurrentViewDetails(curView, finalizedView, currentLeader)
 
-	// check that I am the primary for this view and that I haven't already proposed; otherwise there is nothing to do
+	// check that I am the primary for this view
 	if e.committee.Self() != currentLeader {
 		return nil
 	}
+
+	// CASE A: Preventing proposal equivocation on the happy path
+	// We will never produce two proposals for the same view, _since_ the last reboot. This is because without a reboot,
+	// we can only proceed once beyond the following lines.
+	if curView <= e.myLastProposedView {
+		log.Debug().Msg("already proposed for current view")
+		return nil
+	}
+	e.myLastProposedView = curView
+
+	// CASE B: Preventing proposal equivocation on the unhappy path
+	// We will never produce a proposal for view v, if we already constructed a proposal for the same view _before_ the most recent reboot.
+	// This is because all unfinalized proposals are added to Forks during the reboot.
 	for _, b := range e.forks.GetBlocksForView(curView) { // on the happy path, this slice is empty
 		if b.ProposerID == e.committee.Self() {
 			log.Debug().Msg("already proposed for current view")
@@ -395,14 +441,6 @@ func (e *EventHandler) proposeForNewViewIfPrimary() error {
 	//   `TargetPublicationTime`. Technically, `TargetPublicationTime` records the publication delay
 	//    relative to its _latest_ call.
 	targetPublicationTime := e.paceMaker.TargetPublicationTime(flowProposal.View, start, flowProposal.ParentID)
-
-	// we want to store created proposal in forks to make sure that we don't create more proposals for
-	// current view. Due to asynchronous nature of our design it's possible that after creating proposal
-	// we will be asked to propose again for same view.
-	err = e.forks.AddValidatedBlock(proposedBlock)
-	if err != nil {
-		return fmt.Errorf("could not add newly created proposal (%v): %w", proposedBlock.BlockID, err)
-	}
 
 	log.Debug().
 		Uint64("block_view", proposedBlock.View).
