@@ -22,8 +22,8 @@ const contractCheckingReporterName = "contract-checking"
 const contractCountEstimate = 1000
 
 type AddressContract struct {
-	location common.AddressLocation
-	code     []byte
+	Location common.AddressLocation
+	Code     []byte
 }
 
 // NewContractCheckingMigration returns a migration that checks all contracts.
@@ -58,7 +58,7 @@ func NewContractCheckingMigration(
 
 		contractsForPrettyPrinting := make(map[common.Location][]byte, len(contracts))
 		for _, contract := range contracts {
-			contractsForPrettyPrinting[contract.location] = contract.code
+			contractsForPrettyPrinting[contract.Location] = contract.Code
 		}
 
 		// Check all contracts
@@ -120,8 +120,8 @@ func gatherContractsFromRegisters(registersByAccount *registers.ByAccount, log z
 			contracts = append(
 				contracts,
 				AddressContract{
-					location: location,
-					code:     code,
+					Location: location,
+					Code:     code,
 				},
 			)
 		}
@@ -135,7 +135,7 @@ func gatherContractsFromRegisters(registersByAccount *registers.ByAccount, log z
 	sort.Slice(contracts, func(i, j int) bool {
 		a := contracts[i]
 		b := contracts[j]
-		return a.location.ID() < b.location.ID()
+		return a.Location.ID() < b.Location.ID()
 	})
 
 	log.Info().Msgf("Gathered all contracts (%d)", len(contracts))
@@ -152,8 +152,8 @@ func checkContract(
 	importantLocations map[common.AddressLocation]struct{},
 	programs map[common.Location]*interpreter.Program,
 ) {
-	location := contract.location
-	code := contract.code
+	location := contract.Location
+	code := contract.Code
 
 	log.Info().Msgf("checking contract %s ...", location)
 
