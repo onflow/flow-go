@@ -9,9 +9,9 @@ import (
 	mocktestify "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/access/mock"
 	"github.com/onflow/flow-go/cmd/build"
-	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -30,14 +30,14 @@ func TestGetNodeVersionInfo(t *testing.T) {
 
 		nodeRootBlockHeight := unittest.Uint64InRange(10_000, 100_000)
 
-		params := &flow.NodeVersionInfo{
+		params := &access.NodeVersionInfo{
 			Semver:               build.Version(),
 			Commit:               build.Commit(),
 			SporkId:              unittest.IdentifierFixture(),
 			ProtocolVersion:      unittest.Uint64InRange(10, 30),
 			SporkRootBlockHeight: unittest.Uint64InRange(1000, 10_000),
 			NodeRootBlockHeight:  nodeRootBlockHeight,
-			CompatibleRange: &flow.CompatibleRange{
+			CompatibleRange: &access.CompatibleRange{
 				StartHeight: nodeRootBlockHeight,
 				EndHeight:   uint64(0),
 			},
@@ -54,7 +54,7 @@ func TestGetNodeVersionInfo(t *testing.T) {
 	})
 }
 
-func nodeVersionInfoExpectedStr(nodeVersionInfo *flow.NodeVersionInfo) string {
+func nodeVersionInfoExpectedStr(nodeVersionInfo *access.NodeVersionInfo) string {
 	compatibleRange := fmt.Sprintf(`"compatible_range": {
 		"start_height": "%d",
 		"end_height": "%d"

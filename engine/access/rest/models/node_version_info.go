@@ -1,11 +1,11 @@
 package models
 
 import (
+	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rest/util"
-	"github.com/onflow/flow-go/model/flow"
 )
 
-func (t *NodeVersionInfo) Build(params *flow.NodeVersionInfo) {
+func (t *NodeVersionInfo) Build(params *access.NodeVersionInfo) {
 	t.Semver = params.Semver
 	t.Commit = params.Commit
 	t.SporkId = params.SporkId.String()

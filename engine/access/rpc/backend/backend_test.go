@@ -24,8 +24,9 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/cmd/build"
-	access "github.com/onflow/flow-go/engine/access/mock"
+	accessmock "github.com/onflow/flow-go/engine/access/mock"
 	backendmock "github.com/onflow/flow-go/engine/access/rpc/backend/mock"
 	"github.com/onflow/flow-go/engine/access/rpc/connection"
 	connectionmock "github.com/onflow/flow-go/engine/access/rpc/connection/mock"
@@ -78,9 +79,9 @@ type Suite struct {
 	lastFullBlockHeight *counters.PersistentStrictMonotonicCounter
 	versionControl      *version.VersionControl
 
-	colClient              *access.AccessAPIClient
-	execClient             *access.ExecutionAPIClient
-	historicalAccessClient *access.AccessAPIClient
+	colClient              *accessmock.AccessAPIClient
+	execClient             *accessmock.ExecutionAPIClient
+	historicalAccessClient *accessmock.AccessAPIClient
 
 	connectionFactory *connectionmock.ConnectionFactory
 	communicator      *backendmock.Communicator
@@ -112,12 +113,12 @@ func (suite *Suite) SetupTest() {
 	suite.collections = new(storagemock.Collections)
 	suite.receipts = new(storagemock.ExecutionReceipts)
 	suite.results = new(storagemock.ExecutionResults)
-	suite.colClient = new(access.AccessAPIClient)
-	suite.execClient = new(access.ExecutionAPIClient)
+	suite.colClient = new(accessmock.AccessAPIClient)
+	suite.execClient = new(accessmock.ExecutionAPIClient)
 	suite.transactionResults = storagemock.NewLightTransactionResults(suite.T())
 	suite.events = storagemock.NewEvents(suite.T())
 	suite.chainID = flow.Testnet
-	suite.historicalAccessClient = new(access.AccessAPIClient)
+	suite.historicalAccessClient = new(accessmock.AccessAPIClient)
 	suite.connectionFactory = connectionmock.NewConnectionFactory(suite.T())
 
 	suite.communicator = new(backendmock.Communicator)
@@ -1593,7 +1594,7 @@ func (suite *Suite) TestGetNodeVersionInfo() {
 		state := protocol.NewState(suite.T())
 		state.On("Params").Return(stateParams, nil).Maybe()
 
-		expected := &flow.NodeVersionInfo{
+		expected := &access.NodeVersionInfo{
 			Semver:               build.Version(),
 			Commit:               build.Commit(),
 			SporkId:              sporkID,
@@ -1688,14 +1689,14 @@ func (suite *Suite) TestGetNodeVersionInfo() {
 		state := protocol.NewState(suite.T())
 		state.On("Params").Return(stateParams, nil).Maybe()
 
-		expected := &flow.NodeVersionInfo{
+		expected := &access.NodeVersionInfo{
 			Semver:               build.Version(),
 			Commit:               build.Commit(),
 			SporkId:              sporkID,
 			ProtocolVersion:      uint64(protocolVersion),
 			SporkRootBlockHeight: sporkRootBlock.Height,
 			NodeRootBlockHeight:  nodeRootBlock.Height,
-			CompatibleRange: &flow.CompatibleRange{
+			CompatibleRange: &access.CompatibleRange{
 				StartHeight: nodeRootBlock.Height + 12,
 				EndHeight:   latestBlockHeight - 9,
 			},

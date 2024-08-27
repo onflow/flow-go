@@ -15,7 +15,7 @@ type NetworkAPI interface {
 	GetLatestProtocolStateSnapshot(ctx context.Context) ([]byte, error)
 	GetProtocolStateSnapshotByBlockID(ctx context.Context, blockID flow.Identifier) ([]byte, error)
 	GetProtocolStateSnapshotByHeight(ctx context.Context, blockHeight uint64) ([]byte, error)
-	GetNodeVersionInfo(ctx context.Context) (*flow.NodeVersionInfo, error)
+	GetNodeVersionInfo(ctx context.Context) (*access.NodeVersionInfo, error)
 }
 
 type API interface {

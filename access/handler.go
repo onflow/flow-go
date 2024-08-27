@@ -100,7 +100,7 @@ func (h *Handler) GetNodeVersionInfo(
 			ProtocolVersion:      nodeVersionInfo.ProtocolVersion,
 			SporkRootBlockHeight: nodeVersionInfo.SporkRootBlockHeight,
 			NodeRootBlockHeight:  nodeVersionInfo.NodeRootBlockHeight,
-			CompatibleRange:      convert.CompatibleRangeToMessage(nodeVersionInfo.CompatibleRange),
+			CompatibleRange:      CompatibleRangeToMessage(nodeVersionInfo.CompatibleRange),
 		},
 	}, nil
 }

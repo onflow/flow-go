@@ -246,23 +246,23 @@ func (_m *API) GetNetworkParameters(ctx context.Context) access.NetworkParameter
 }
 
 // GetNodeVersionInfo provides a mock function with given fields: ctx
-func (_m *API) GetNodeVersionInfo(ctx context.Context) (*flow.NodeVersionInfo, error) {
+func (_m *API) GetNodeVersionInfo(ctx context.Context) (*access.NodeVersionInfo, error) {
 	ret := _m.Called(ctx)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetNodeVersionInfo")
 	}
 
-	var r0 *flow.NodeVersionInfo
+	var r0 *access.NodeVersionInfo
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context) (*flow.NodeVersionInfo, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context) (*access.NodeVersionInfo, error)); ok {
 		return rf(ctx)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context) *flow.NodeVersionInfo); ok {
+	if rf, ok := ret.Get(0).(func(context.Context) *access.NodeVersionInfo); ok {
 		r0 = rf(ctx)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*flow.NodeVersionInfo)
+			r0 = ret.Get(0).(*access.NodeVersionInfo)
 		}
 	}
 

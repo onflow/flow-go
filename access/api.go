@@ -15,7 +15,7 @@ import (
 type API interface {
 	Ping(ctx context.Context) error
 	GetNetworkParameters(ctx context.Context) NetworkParameters
-	GetNodeVersionInfo(ctx context.Context) (*flow.NodeVersionInfo, error)
+	GetNodeVersionInfo(ctx context.Context) (*NodeVersionInfo, error)
 
 	GetLatestBlockHeader(ctx context.Context, isSealed bool) (*flow.Header, flow.BlockStatus, error)
 	GetBlockHeaderByHeight(ctx context.Context, height uint64) (*flow.Header, flow.BlockStatus, error)
@@ -262,4 +262,35 @@ func MessageToTransactionResult(message *access.TransactionResultResponse) *Tran
 // NetworkParameters contains the network-wide parameters for the Flow blockchain.
 type NetworkParameters struct {
 	ChainID flow.ChainID
+}
+
+// CompatibleRange contains the first and the last height that the version supports.
+type CompatibleRange struct {
+	// The first block that the version supports.
+	StartHeight uint64
+	// The last block that the version supports.
+	EndHeight uint64
+}
+
+// NodeVersionInfo contains information about node, such as semver, commit, sporkID, protocolVersion, etc
+type NodeVersionInfo struct {
+	Semver               string
+	Commit               string
+	SporkId              flow.Identifier
+	ProtocolVersion      uint64
+	SporkRootBlockHeight uint64
+	NodeRootBlockHeight  uint64
+	CompatibleRange      *CompatibleRange
+}
+
+// CompatibleRangeToMessage converts a flow.CompatibleRange to a protobuf message
+func CompatibleRangeToMessage(c *CompatibleRange) *entities.CompatibleRange {
+	if c != nil {
+		return &entities.CompatibleRange{
+			StartHeight: c.StartHeight,
+			EndHeight:   c.EndHeight,
+		}
+	}
+
+	return nil
 }

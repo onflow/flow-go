@@ -7,8 +7,7 @@ import (
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/onflow/flow-go/engine/common/rpc/convert"
-	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/access"
 )
 
 // TestConvertCompatibleRange tests that converting a compatible range to a protobuf message
@@ -18,7 +17,7 @@ func TestConvertCompatibleRange(t *testing.T) {
 	startHeight := uint64(rand.Uint32())
 	endHeight := uint64(rand.Uint32())
 
-	comparableRange := &flow.CompatibleRange{
+	comparableRange := &access.CompatibleRange{
 		StartHeight: startHeight,
 		EndHeight:   endHeight,
 	}
@@ -27,6 +26,6 @@ func TestConvertCompatibleRange(t *testing.T) {
 		EndHeight:   endHeight,
 	}
 
-	msg := convert.CompatibleRangeToMessage(comparableRange)
+	msg := access.CompatibleRangeToMessage(comparableRange)
 	assert.Equal(t, msg, expected)
 }
