@@ -11,7 +11,6 @@ import (
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 
-	"github.com/onflow/flow-go/cmd/util/ledger/migrations"
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
 	"github.com/onflow/flow-go/cmd/util/ledger/util/registers"
@@ -282,6 +281,9 @@ func checkStorageHealth(
 
 		err = registersByAccount.ForEachAccount(
 			func(accountRegisters *registers.AccountRegisters) error {
+				if slices.Contains(acctsToSkip, accountRegisters.Owner()) {
+					return nil
+				}
 				jobs <- job{accountRegisters: accountRegisters}
 				return nil
 			})
@@ -323,7 +325,7 @@ func checkAccountStorageHealth(accountRegisters *registers.AccountRegisters, nWo
 	ledger := &registers.ReadOnlyLedger{Registers: accountRegisters}
 	storage := runtime.NewStorage(ledger, nil)
 
-	err = util.CheckStorageHealth(address, storage, accountRegisters, migrations.AllStorageMapDomains, nWorkers)
+	err = util.CheckStorageHealth(address, storage, accountRegisters, util.StorageMapDomains, nWorkers)
 	if err != nil {
 		issues = append(
 			issues,
