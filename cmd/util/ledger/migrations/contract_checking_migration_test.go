@@ -31,40 +31,8 @@ func oldExampleFungibleTokenCode(fungibleTokenAddress flow.Address) string {
           pub contract ExampleFungibleToken: FungibleToken {
              pub var totalSupply: UFix64
 
-             pub resource Vault: FungibleToken.Provider, FungibleToken.Receiver, FungibleToken.Balance {
+             pub resource Vault {
                  pub var balance: UFix64
-
-                 init(balance: UFix64) {
-                     self.balance = balance
-                 }
-
-                 pub fun withdraw(amount: UFix64): @FungibleToken.Vault {
-                     self.balance = self.balance - amount
-                     emit TokensWithdrawn(amount: amount, from: self.owner?.address)
-                     return <-create Vault(balance: amount)
-                 }
-
-                 pub fun deposit(from: @FungibleToken.Vault) {
-                     let vault <- from as! @ExampleToken.Vault
-                     self.balance = self.balance + vault.balance
-                     emit TokensDeposited(amount: vault.balance, to: self.owner?.address)
-                     vault.balance = 0.0
-                     destroy vault
-                 }
-
-                 destroy() {
-                     if self.balance > 0.0 {
-                         ExampleToken.totalSupply = ExampleToken.totalSupply - self.balance
-                     }
-                 }
-             }
-
-             pub fun createEmptyVault(): @Vault {
-                 return <-create Vault(balance: 0.0)
-             }
-
-             init() {
-                 self.totalSupply = 0.0
              }
           }
         `,
@@ -79,26 +47,16 @@ func oldExampleNonFungibleTokenCode(fungibleTokenAddress flow.Address) string {
 
           pub contract ExampleNFT: NonFungibleToken {
           
-              /// Total supply of ExampleNFTs in existence
               pub var totalSupply: UInt64
 
-              /// The core resource that represents a Non Fungible Token.
-              /// New instances will be created using the NFTMinter resource
-              /// and stored in the Collection resource
-              ///
-              pub resource NFT: NonFungibleToken.INFT {
-          
-                  /// The unique ID that each NFT has
-                  pub let id: UInt64
+              pub resource NFT {
 
-                  init(id: UInt64) {
-                      self.id = id
-                  }
+                  pub let id: UInt64
               }
 
-              init() {
-                  // Initialize the total supply
-                  self.totalSupply = 0
+              pub resource Collection {
+
+                  pub var ownedNFTs: @{UInt64: NonFungibleToken.NFT}
               }
           }
         `,
