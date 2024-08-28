@@ -25,6 +25,7 @@ import (
 	"github.com/onflow/flow-go/fvm/evm"
 	"github.com/onflow/flow-go/fvm/evm/emulator"
 	"github.com/onflow/flow-go/fvm/evm/events"
+	"github.com/onflow/flow-go/fvm/evm/impl"
 	"github.com/onflow/flow-go/fvm/evm/stdlib"
 	"github.com/onflow/flow-go/fvm/evm/testutils"
 	. "github.com/onflow/flow-go/fvm/evm/testutils"
@@ -195,7 +196,7 @@ func TestEVMRun(t *testing.T) {
 				require.NoError(t, err)
 				require.NoError(t, output.Err)
 
-				res, err := stdlib.ResultSummaryFromEVMResultValue(output.Value)
+				res, err := impl.ResultSummaryFromEVMResultValue(output.Value)
 				require.NoError(t, err)
 				require.Equal(t, types.StatusSuccessful, res.Status)
 				require.Equal(t, types.ErrCodeNoError, res.ErrorCode)
@@ -307,7 +308,7 @@ func TestEVMRun(t *testing.T) {
 				require.NoError(t, err)
 				require.NoError(t, output.Err)
 
-				res, err := stdlib.ResultSummaryFromEVMResultValue(output.Value)
+				res, err := impl.ResultSummaryFromEVMResultValue(output.Value)
 				require.NoError(t, err)
 				require.Equal(t, types.StatusSuccessful, res.Status)
 				require.Equal(t, types.ErrCodeNoError, res.ErrorCode)
@@ -574,7 +575,7 @@ func TestEVMBatchRun(t *testing.T) {
 
 				// make sure the retrieved value is the same as the last value
 				// that was stored by transaction batch
-				res, err := stdlib.ResultSummaryFromEVMResultValue(output.Value)
+				res, err := impl.ResultSummaryFromEVMResultValue(output.Value)
 				require.NoError(t, err)
 				require.Equal(t, types.StatusSuccessful, res.Status)
 				require.Equal(t, types.ErrCodeNoError, res.ErrorCode)
@@ -714,7 +715,7 @@ func TestEVMBatchRun(t *testing.T) {
 
 				// make sure the retrieved value is the same as the last value
 				// that was stored by transaction batch
-				res, err := stdlib.ResultSummaryFromEVMResultValue(output.Value)
+				res, err := impl.ResultSummaryFromEVMResultValue(output.Value)
 				require.NoError(t, err)
 				require.Equal(t, types.StatusSuccessful, res.Status)
 				require.Equal(t, types.ErrCodeNoError, res.ErrorCode)
@@ -858,7 +859,7 @@ func TestEVMBatchRun(t *testing.T) {
 
 				// make sure the retrieved value is the same as the last value
 				// that was stored by transaction batch
-				res, err := stdlib.ResultSummaryFromEVMResultValue(output.Value)
+				res, err := impl.ResultSummaryFromEVMResultValue(output.Value)
 				require.NoError(t, err)
 				require.Equal(t, types.ErrCodeNoError, res.ErrorCode)
 				require.Equal(t, types.StatusSuccessful, res.Status)
@@ -922,7 +923,7 @@ func TestEVMBlockData(t *testing.T) {
 			require.NoError(t, err)
 			require.NoError(t, output.Err)
 
-			res, err := stdlib.ResultSummaryFromEVMResultValue(output.Value)
+			res, err := impl.ResultSummaryFromEVMResultValue(output.Value)
 			require.NoError(t, err)
 			require.Equal(t, types.StatusSuccessful, res.Status)
 			require.Equal(t, types.ErrCodeNoError, res.ErrorCode)
@@ -1372,7 +1373,7 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 				require.NoError(t, err)
 				require.NoError(t, output.Err)
 
-				res, err := stdlib.ResultSummaryFromEVMResultValue(output.Value)
+				res, err := impl.ResultSummaryFromEVMResultValue(output.Value)
 				require.NoError(t, err)
 				require.Equal(t, types.StatusSuccessful, res.Status)
 				require.Equal(t, types.ErrCodeNoError, res.ErrorCode)
@@ -1428,7 +1429,7 @@ func TestDryRun(t *testing.T) {
 		require.NoError(t, err)
 		require.NoError(t, output.Err)
 
-		result, err := stdlib.ResultSummaryFromEVMResultValue(output.Value)
+		result, err := impl.ResultSummaryFromEVMResultValue(output.Value)
 		require.NoError(t, err)
 		return result
 	}
@@ -1541,7 +1542,7 @@ func TestDryRun(t *testing.T) {
 				require.NoError(t, err)
 				require.NoError(t, output.Err)
 
-				res, err := stdlib.ResultSummaryFromEVMResultValue(output.Value)
+				res, err := impl.ResultSummaryFromEVMResultValue(output.Value)
 				require.NoError(t, err)
 				require.Equal(t, types.StatusSuccessful, res.Status)
 				require.Equal(t, types.ErrCodeNoError, res.ErrorCode)
@@ -1675,7 +1676,7 @@ func TestDryRun(t *testing.T) {
 				require.NoError(t, err)
 				require.NoError(t, output.Err)
 
-				res, err := stdlib.ResultSummaryFromEVMResultValue(output.Value)
+				res, err := impl.ResultSummaryFromEVMResultValue(output.Value)
 				require.NoError(t, err)
 				require.Equal(t, types.StatusSuccessful, res.Status)
 				require.Equal(t, types.ErrCodeNoError, res.ErrorCode)
@@ -1807,7 +1808,7 @@ func TestDryRun(t *testing.T) {
 				require.NoError(t, err)
 				require.NoError(t, output.Err)
 
-				res, err := stdlib.ResultSummaryFromEVMResultValue(output.Value)
+				res, err := impl.ResultSummaryFromEVMResultValue(output.Value)
 				require.NoError(t, err)
 				//require.Equal(t, types.StatusSuccessful, res.Status)
 				require.Equal(t, types.ErrCodeNoError, res.ErrorCode)
@@ -1891,7 +1892,7 @@ func TestDryRun(t *testing.T) {
 				require.NoError(t, err)
 				require.NoError(t, output.Err)
 
-				res, err := stdlib.ResultSummaryFromEVMResultValue(output.Value)
+				res, err := impl.ResultSummaryFromEVMResultValue(output.Value)
 				require.NoError(t, err)
 				require.Equal(t, types.StatusSuccessful, res.Status)
 				require.Equal(t, types.ErrCodeNoError, res.ErrorCode)
