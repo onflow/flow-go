@@ -109,6 +109,17 @@ Build a Docker image for a particular node role (replace `$ROLE` with `collectio
 make docker-native-build-$ROLE
 ```
 
+#### Building a binary for the access node
+
+Build the binary for an access node that can be run directly on the machine without using Docker.
+
+```bash
+make docker-native-build-access-binary
+```
+_this builds a binary for Linux/x86_64 machine_.
+
+The make command will generate a binary called `flow_access_node`
+
 ### Importing the module
 
 When importing the `github.com/onflow/flow-go` module in your Go project, testing or building your project may require setting extra Go flags because the module requires [cgo](https://pkg.go.dev/cmd/cgo). In particular, `CGO_ENABLED` must be set to `1` if `cgo` isn't enabled by default. This constraint comes from the underlying cryptography library. Refer to the [crypto repository build](https://github.com/onflow/crypto?tab=readme-ov-file#build) for more details.

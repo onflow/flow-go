@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 
 	"github.com/dustin/go-humanize/english"
 	"github.com/onflow/cadence/runtime/common"
@@ -18,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
 	"github.com/onflow/flow-go/cmd/util/ledger/util/registers"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 	moduleUtil "github.com/onflow/flow-go/module/util"
@@ -189,6 +191,18 @@ func run(*cobra.Command, []string) {
 		)
 	}
 
+	var acctsToSkipForCadenceValueDiff []string
+
+	// Skip EVM storage account when diffing Cadence values.
+	if mode == modeValues {
+		systemContracts := systemcontracts.SystemContractsForChain(chainID)
+
+		acctsToSkipForCadenceValueDiff = append(
+			acctsToSkipForCadenceValueDiff,
+			flow.AddressToRegisterOwner(systemContracts.EVMStorage.Address),
+		)
+	}
+
 	rw := reporters.NewReportFileWriterFactoryWithFormat(flagOutputDirectory, log.Logger, reporters.ReportFormatJSONL).
 		ReportWriter(ReporterName)
 	defer rw.Close()
@@ -222,7 +236,7 @@ func run(*cobra.Command, []string) {
 		}
 	}
 
-	err := diff(registers1, registers2, chainID, rw, flagNWorker, mode)
+	err := diff(registers1, registers2, chainID, rw, flagNWorker, mode, acctsToSkipForCadenceValueDiff)
 	if err != nil {
 		log.Warn().Err(err).Msgf("failed to diff registers")
 	}
@@ -321,6 +335,7 @@ func diffAccount(
 	chainID flow.ChainID,
 	rw reporters.ReportWriter,
 	mode mode,
+	acctsToSkip []string,
 ) (err error) {
 
 	if accountRegisters1.Count() != accountRegisters2.Count() {
@@ -375,7 +390,7 @@ func diffAccount(
 		}
 	}
 
-	if diffValues {
+	if diffValues && !slices.Contains(acctsToSkip, owner) {
 		address, err := common.BytesToAddress([]byte(owner))
 		if err != nil {
 			return err
@@ -390,7 +405,7 @@ func diffAccount(
 		).DiffStates(
 			accountRegisters1,
 			accountRegisters2,
-			migrations.AllStorageMapDomains,
+			util.StorageMapDomains,
 		)
 	}
 
@@ -404,6 +419,7 @@ func diff(
 	rw reporters.ReportWriter,
 	nWorkers int,
 	mode mode,
+	acctsToSkip []string,
 ) error {
 	log.Info().Msgf("Diffing %d accounts", registers1.AccountCount())
 
@@ -445,6 +461,7 @@ func diff(
 				chainID,
 				rw,
 				mode,
+				acctsToSkip,
 			)
 			if err != nil {
 				log.Warn().Err(err).Msgf("failed to diff account %x", []byte(owner))
@@ -499,6 +516,7 @@ func diff(
 					chainID,
 					rw,
 					mode,
+					acctsToSkip,
 				)
 
 				select {
