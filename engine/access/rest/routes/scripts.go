@@ -14,22 +14,29 @@ func ExecuteScript(r *request.Request, backend access.API, _ models.LinkGenerato
 		return nil, models.NewBadRequestError(err)
 	}
 
-	if req.BlockID != flow.ZeroID {
-		return backend.ExecuteScriptAtBlockID(r.Context(), req.BlockID, req.Script.Source, req.Script.Args)
-	}
-
-	// default to sealed height
-	if req.BlockHeight == request.SealedHeight || req.BlockHeight == request.EmptyHeight {
-		return backend.ExecuteScriptAtLatestBlock(r.Context(), req.Script.Source, req.Script.Args)
-	}
-
-	if req.BlockHeight == request.FinalHeight {
+	var res []byte
+	switch {
+	case req.BlockID != flow.ZeroID:
+		res, err = backend.ExecuteScriptAtBlockID(r.Context(), req.BlockID, req.Script.Source, req.Script.Args)
+	case req.BlockHeight == request.SealedHeight || req.BlockHeight == request.EmptyHeight:
+		res, err = backend.ExecuteScriptAtLatestBlock(r.Context(), req.Script.Source, req.Script.Args)
+	case req.BlockHeight == request.FinalHeight:
 		finalBlock, _, err := backend.GetLatestBlockHeader(r.Context(), false)
 		if err != nil {
 			return nil, err
 		}
+
 		req.BlockHeight = finalBlock.Height
+		res, err = backend.ExecuteScriptAtBlockHeight(r.Context(), req.BlockHeight, req.Script.Source, req.Script.Args)
 	}
 
-	return backend.ExecuteScriptAtBlockHeight(r.Context(), req.BlockHeight, req.Script.Source, req.Script.Args)
+	if err != nil {
+		return nil, err
+	}
+
+	response := models.InlineResponse200{
+		Value: string(res[:]),
+	}
+
+	return response, nil
 }
