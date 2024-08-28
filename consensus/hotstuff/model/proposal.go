@@ -4,7 +4,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// Proposal represent a new proposed block within HotStuff (and thus a
+// Proposal represent a new proposed block within HotStuff (and thus
 // a header in the bigger picture), signed by the proposer.
 type Proposal struct {
 	Block      *Block

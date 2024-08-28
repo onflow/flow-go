@@ -8,17 +8,27 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+// CAUTION Tech Debt: The current implementation does not use SafetyRules, when a leader signs their own proposal.
+// This strongly complicates the safety argument, where enforcing the safety-critical property of only ever voting
+// once per view is distributed across different layers in the software stack.
+// For further details, see issue https://github.com/onflow/flow-go/issues/6389
+
 // SafetyRules is a dedicated module that enforces consensus safety. This component has the sole authority to generate
 // votes and timeouts. It follows voting and timeout rules for creating votes and timeouts respectively.
 // Caller can be sure that created vote or timeout doesn't break safety and can be used in consensus process.
 // SafetyRules relies on hotstuff.Persister to store latest state of hotstuff.SafetyData.
 //
 // The voting rules implemented by SafetyRules are:
-//  1. Replicas vote strictly in increasing rounds
-//  2. Each block has to include a TC or a QC from the previous round.
-//     a. [Happy path] If the previous round resulted in a QC then new QC should extend it.
+//  1. Replicas vote in strictly increasing views. At most one vote can be signed per view.
+//     Caution: The leader's block signature is formally a vote for their own proposal.
+//  2. Each block has to include a TC or a QC from the previous view.
+//     a. [Happy path] If the previous view resulted in a QC then the proposer should include it in their block.
 //     b. [Recovery path] If the previous round did *not* result in a QC, the leader of the
-//     subsequent round *must* include a valid TC for the previous round in its block.
+//     subsequent round *must* include a valid TC for the previous view in its block.
+//
+// Condition 1 guarantees a foundational security theorem for HotStuff (incl. the DiemBFT / Jolteon variant):
+//
+//	THEOREM: For each view, there can be at most 1 certified block.
 //
 // NOT safe for concurrent use.
 type SafetyRules struct {
