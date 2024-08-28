@@ -997,6 +997,8 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					return nil, err
 				}
 
+				builder.stopControl.RegisterHeightRecorder(builder.ExecutionIndexer)
+
 				return builder.ExecutionIndexer, nil
 			}, builder.IndexerDependencies)
 	}
@@ -1836,10 +1838,6 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			)
 
 			builder.versionControl.AddVersionUpdatesConsumer(stopControl.OnVersionUpdate)
-
-			if builder.executionDataIndexingEnabled {
-				stopControl.RegisterHeightRecorder(builder.ExecutionIndexer)
-			}
 
 			builder.stopControl = stopControl
 

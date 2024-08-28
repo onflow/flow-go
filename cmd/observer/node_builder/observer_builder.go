@@ -1531,6 +1531,8 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				return nil, err
 			}
 
+			builder.stopControl.RegisterHeightRecorder(builder.ExecutionIndexer)
+
 			return builder.ExecutionIndexer, nil
 		}, builder.IndexerDependencies)
 	}
@@ -1877,10 +1879,6 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		)
 
 		builder.versionControl.AddVersionUpdatesConsumer(stopControl.OnVersionUpdate)
-
-		if builder.executionDataIndexingEnabled {
-			stopControl.RegisterHeightRecorder(builder.ExecutionIndexer)
-		}
 
 		builder.stopControl = stopControl
 
