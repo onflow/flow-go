@@ -1,6 +1,8 @@
 package routes
 
 import (
+	"encoding/base64"
+
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rest/models"
 	"github.com/onflow/flow-go/engine/access/rest/request"
@@ -35,7 +37,7 @@ func ExecuteScript(r *request.Request, backend access.API, _ models.LinkGenerato
 	}
 
 	response := models.InlineResponse200{
-		Value: string(res[:]),
+		Value: base64.StdEncoding.EncodeToString(res),
 	}
 
 	return response, nil
