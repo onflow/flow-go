@@ -77,13 +77,6 @@ func TestCoreContractsKeys(t *testing.T) {
 	require.Equal(t, fvm.AccountKeyWeightThreshold, key.Weight)
 }
 
-func Test_DO_NOT_MERGE(t *testing.T) {
-	t.Parallel()
-	// this branch should not be merged to master
-	// This is only to be used for migration mainnet testing
-	t.Fail()
-}
-
 func makeSeed(t *testing.T) []byte {
 	seed := make([]byte, 32)
 	_, err := rand.Read(seed)
