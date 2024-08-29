@@ -220,26 +220,28 @@ func (p *RegisterPruner) pruneUpToHeight(ctx context.Context, pruneHeight uint64
 				lastRegisterID = registerID
 			}
 
-			if keyHeight <= pruneHeight {
-				if !keepKeyFound {
-					// Keep the first entry found for this registerID that is <= pruneHeight
-					keepKeyFound = true
-					continue
-				}
+			if keyHeight > pruneHeight {
+				continue
+			}
 
-				// Otherwise, mark this key for removal
-				// Create a copy of the key to avoid memory issues
-				keyCopy := make([]byte, len(key))
-				copy(keyCopy, key)
-				batchKeysToRemove = append(batchKeysToRemove, keyCopy)
+			if !keepKeyFound {
+				// Keep the first entry found for this registerID that is <= pruneHeight
+				keepKeyFound = true
+				continue
+			}
 
-				if len(batchKeysToRemove) == deleteItemsPerBatch {
-					// Perform batch delete
-					if err := p.batchDelete(ctx, batchKeysToRemove); err != nil {
-						return err
-					}
-					batchKeysToRemove = nil
+			// Otherwise, mark this key for removal
+			// Create a copy of the key to avoid memory issues
+			keyCopy := make([]byte, len(key))
+			copy(keyCopy, key)
+			batchKeysToRemove = append(batchKeysToRemove, keyCopy)
+
+			if len(batchKeysToRemove) == deleteItemsPerBatch {
+				// Perform batch delete
+				if err := p.batchDelete(ctx, batchKeysToRemove); err != nil {
+					return err
 				}
+				batchKeysToRemove = nil
 			}
 		}
 
@@ -276,8 +278,8 @@ func (p *RegisterPruner) batchDelete(ctx context.Context, lookupKeys [][]byte) e
 	defer batch.Close()
 
 	for _, key := range lookupKeys {
-		keyHeight, registerID, _ := lookupKeyToRegisterID(key)
 		if err := batch.Delete(key, nil); err != nil {
+			keyHeight, registerID, _ := lookupKeyToRegisterID(key)
 			return fmt.Errorf("failed to delete lookupKey: %w %d %v", err, keyHeight, registerID)
 		}
 	}
