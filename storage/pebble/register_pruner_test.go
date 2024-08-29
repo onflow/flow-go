@@ -11,6 +11,7 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/metrics"
 )
 
 // testCase defines the structure for a single test case, including initial data setup,
@@ -58,6 +59,7 @@ func TestPrune(t *testing.T) {
 					db,
 					WithPruneThreshold(5),
 					WithPruneTickerInterval(10*time.Millisecond),
+					WithPrunerMetrics(metrics.NewNoopCollector()),
 				)
 				require.NoError(t, err)
 

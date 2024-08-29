@@ -162,9 +162,7 @@ func (p *RegisterPruner) checkPrune(ctx context.Context) error {
 			return fmt.Errorf("failed to prune: %w", err)
 		}
 
-		if p.metrics != nil {
-			p.metrics.NumberOfBlocksPruned(pruneHeight - firstHeight)
-		}
+		p.metrics.NumberOfBlocksPruned(pruneHeight - firstHeight)
 	}
 
 	return nil
@@ -259,11 +257,7 @@ func (p *RegisterPruner) pruneUpToHeight(ctx context.Context, pruneHeight uint64
 		return err
 	}
 
-	duration := time.Since(start)
-
-	if p.metrics != nil {
-		p.metrics.Pruned(pruneHeight, duration)
-	}
+	p.metrics.Pruned(pruneHeight, time.Since(start))
 
 	return nil
 }
