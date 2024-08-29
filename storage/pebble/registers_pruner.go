@@ -32,7 +32,6 @@ func pruneInterval(threshold uint64) uint64 {
 
 type RegisterPruner struct {
 	component.Component
-	componentManager *component.ComponentManager
 
 	logger zerolog.Logger
 	db     *pebble.DB
@@ -99,10 +98,9 @@ func NewRegisterPruner(
 		pruneTickerInterval: DefaultPruneTickerInterval,
 	}
 
-	pruner.componentManager = component.NewComponentManagerBuilder().
+	pruner.Component = component.NewComponentManagerBuilder().
 		AddWorker(pruner.loop).
 		Build()
-	pruner.Component = pruner.componentManager
 
 	for _, opt := range opts {
 		opt(pruner)
