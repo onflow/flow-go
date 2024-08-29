@@ -246,7 +246,7 @@ func New(params Params) (*Backend, error) {
 		versionControl:    params.VersionControl,
 	}
 
-	txValidator, err := configureTransactionValidator(params.State, params.ChainID, params.ScriptExecutor, params.CheckPayerBalance)
+	txValidator, err := configureTransactionValidator(params.State, params.ChainID, params.AccessMetrics, params.ScriptExecutor, params.CheckPayerBalance)
 	if err != nil {
 		return nil, fmt.Errorf("could not create transaction validator: %w", err)
 	}
@@ -310,10 +310,17 @@ func identifierList(ids []string) (flow.IdentifierList, error) {
 	return idList, nil
 }
 
-func configureTransactionValidator(state protocol.State, chainID flow.ChainID, executor execution.ScriptExecutor, checkPayerBalance bool) (*access.TransactionValidator, error) {
+func configureTransactionValidator(
+	state protocol.State,
+	chainID flow.ChainID,
+	transactionMetrics module.TransactionValidationMetrics,
+	executor execution.ScriptExecutor,
+	checkPayerBalance bool,
+) (*access.TransactionValidator, error) {
 	return access.NewTransactionValidator(
 		access.NewProtocolStateBlocks(state),
 		chainID.Chain(),
+		transactionMetrics,
 		access.TransactionValidationOptions{
 			Expiry:                       flow.DefaultTransactionExpiry,
 			ExpiryBuffer:                 flow.DefaultTransactionExpiryBuffer,
