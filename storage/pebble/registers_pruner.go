@@ -20,9 +20,11 @@ const (
 	DefaultPruneTickerInterval = 10 * time.Minute
 )
 
-// pruneIntervalRatio represents an additional percentage of pruneThreshold which is used to calculate pruneInterval
 const (
-	pruneIntervalRatio  = 0.1
+	// pruneIntervalRatio represents an additional percentage of pruneThreshold which is used to calculate pruneInterval
+	pruneIntervalRatio = 0.1
+	// deleteItemsPerBatch defines the number of database keys to delete in each batch operation.
+	// This value is used to control the size of deletion operations during pruning.
 	deleteItemsPerBatch = 256
 )
 
@@ -133,6 +135,8 @@ func (p *RegisterPruner) loop(ctx irrecoverable.SignalerContext, ready component
 //
 // Parameters:
 //   - ctx: The context for managing the pruning throttle delay operation.
+//
+// No errors are expected during normal operations.
 func (p *RegisterPruner) checkPrune(ctx context.Context) error {
 	firstHeight, err := firstStoredHeight(p.db)
 	if err != nil {
