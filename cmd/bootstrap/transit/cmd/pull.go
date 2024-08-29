@@ -1,16 +1,20 @@
 package cmd
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io/fs"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/spf13/cobra"
+	"golang.org/x/sync/semaphore"
 
 	"github.com/onflow/flow-go/cmd/bootstrap/gcs"
+	"github.com/onflow/flow-go/cmd/bootstrap/utils"
 	model "github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -32,6 +36,7 @@ func addPullCmdFlags() {
 	pullCmd.Flags().StringVarP(&flagToken, "token", "t", "", "token provided by the Flow team to access the Transit server")
 	pullCmd.Flags().StringVarP(&flagNodeRole, "role", "r", "", `node role (can be "collection", "consensus", "execution", "verification" or "access")`)
 	pullCmd.Flags().DurationVar(&flagTimeout, "timeout", time.Second*300, `timeout for pull`)
+	pullCmd.Flags().Int64Var(&flagConcurrency, "concurrency", 2, `concurrency limit for pull`)
 
 	_ = pullCmd.MarkFlagRequired("token")
 	_ = pullCmd.MarkFlagRequired("role")
@@ -78,16 +83,33 @@ func pull(cmd *cobra.Command, args []string) {
 	}
 	log.Info().Msgf("found %d files in Google Bucket", len(files))
 
-	// download found files
+	sem := semaphore.NewWeighted(flagConcurrency)
+	wait := sync.WaitGroup{}
 	for _, file := range files {
-		fullOutpath := filepath.Join(flagBootDir, "public-root-information", filepath.Base(file))
+		wait.Add(1)
+		go func(file gcs.GCSFile) {
+			_ = sem.Acquire(ctx, 1)
+			defer func() {
+				sem.Release(1)
+				wait.Done()
+			}()
 
-		log.Info().Str("source", file).Str("dest", fullOutpath).Msgf("downloading file from transit servers")
-		err = bucket.DownloadFile(ctx, client, fullOutpath, file)
-		if err != nil {
-			log.Fatal().Err(err).Msgf("could not download google bucket file")
-		}
+			fullOutpath := filepath.Join(flagBootDir, "public-root-information", filepath.Base(file.Name))
+			fmd5 := utils.CalcMd5(fullOutpath)
+			// only skip files that have an MD5 hash
+			if file.MD5 != nil && bytes.Equal(fmd5, file.MD5) {
+				log.Info().Str("source", file.Name).Str("dest", fullOutpath).Msgf("skipping existing file from transit servers")
+				return
+			}
+			log.Info().Str("source", file.Name).Str("dest", fullOutpath).Msgf("downloading file from transit servers")
+			err = bucket.DownloadFile(ctx, client, fullOutpath, file.Name)
+			if err != nil {
+				log.Fatal().Err(err).Msgf("could not download google bucket file")
+			}
+		}(file)
 	}
+
+	wait.Wait()
 
 	// download any extra files specific to node role
 	extraFiles := getAdditionalFilesToDownload(role, nodeID)

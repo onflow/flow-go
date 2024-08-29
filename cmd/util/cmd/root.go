@@ -17,6 +17,7 @@ import (
 	checkpoint_collect_stats "github.com/onflow/flow-go/cmd/util/cmd/checkpoint-collect-stats"
 	checkpoint_list_tries "github.com/onflow/flow-go/cmd/util/cmd/checkpoint-list-tries"
 	checkpoint_trie_stats "github.com/onflow/flow-go/cmd/util/cmd/checkpoint-trie-stats"
+	debug_tx "github.com/onflow/flow-go/cmd/util/cmd/debug-tx"
 	diff_states "github.com/onflow/flow-go/cmd/util/cmd/diff-states"
 	epochs "github.com/onflow/flow-go/cmd/util/cmd/epochs/cmd"
 	export "github.com/onflow/flow-go/cmd/util/cmd/exec-data-json-export"
@@ -118,6 +119,7 @@ func addCommands() {
 	rootCmd.AddCommand(run_script.Cmd)
 	rootCmd.AddCommand(system_addresses.Cmd)
 	rootCmd.AddCommand(check_storage.Cmd)
+	rootCmd.AddCommand(debug_tx.Cmd)
 }
 
 func initConfig() {
