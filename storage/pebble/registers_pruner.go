@@ -1,6 +1,7 @@
 package pebble
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -46,9 +47,6 @@ type RegisterPruner struct {
 	pruneThrottleDelay time.Duration
 	// pruneTickerInterval defines how frequently pruning can be performed
 	pruneTickerInterval time.Duration
-
-	// throttleTicker controls the delay between pruning batches to manage system load
-	throttleTicker *time.Ticker
 }
 
 type PrunerOption func(*RegisterPruner)
@@ -122,7 +120,10 @@ func (p *RegisterPruner) loop(ctx irrecoverable.SignalerContext, ready component
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			p.checkPrune(ctx)
+			err := p.checkPrune(ctx)
+			if err != nil {
+				ctx.Throw(err)
+			}
 		}
 	}
 }
@@ -131,16 +132,16 @@ func (p *RegisterPruner) loop(ctx irrecoverable.SignalerContext, ready component
 // and triggers the pruning operation if necessary.
 //
 // Parameters:
-//   - ctx: The context for managing the pruning operation.
-func (p *RegisterPruner) checkPrune(ctx irrecoverable.SignalerContext) {
+//   - ctx: The context for managing the pruning throttle delay operation.
+func (p *RegisterPruner) checkPrune(ctx context.Context) error {
 	firstHeight, err := firstStoredHeight(p.db)
 	if err != nil {
-		ctx.Throw(fmt.Errorf("failed to get first height from register storage: %w", err))
+		return fmt.Errorf("failed to get first height from register storage: %w", err)
 	}
 
 	latestHeight, err := latestStoredHeight(p.db)
 	if err != nil {
-		ctx.Throw(fmt.Errorf("failed to get latest height from register storage: %w", err))
+		return fmt.Errorf("failed to get latest height from register storage: %w", err)
 	}
 
 	pruneHeight := latestHeight - p.pruneThreshold
@@ -153,18 +154,20 @@ func (p *RegisterPruner) checkPrune(ctx irrecoverable.SignalerContext) {
 		// view when the node starts up. Subsequent prunes will remove any leftover data.
 		err = p.updateFirstStoredHeight(pruneHeight)
 		if err != nil {
-			ctx.Throw(fmt.Errorf("failed to update first height for register storage: %w", err))
+			return fmt.Errorf("failed to update first height for register storage: %w", err)
 		}
 
-		err := p.pruneUpToHeight(pruneHeight)
+		err := p.pruneUpToHeight(ctx, pruneHeight)
 		if err != nil {
-			ctx.Throw(fmt.Errorf("failed to prune: %w", err))
+			return fmt.Errorf("failed to prune: %w", err)
 		}
 
 		if p.metrics != nil {
 			p.metrics.NumberOfBlocksPruned(pruneHeight - firstHeight)
 		}
 	}
+
+	return nil
 }
 
 // pruneUpToHeight prunes all entries in the database with heights less than or equal
@@ -176,13 +179,11 @@ func (p *RegisterPruner) checkPrune(ctx irrecoverable.SignalerContext) {
 // and uses the batchDelete function to remove them efficiently.
 //
 // Parameters:
+//   - ctx: The context for managing the pruning throttle delay operation.
 //   - pruneHeight: The maximum height of entries to prune.
 //
 // No errors are expected during normal operations.
-func (p *RegisterPruner) pruneUpToHeight(pruneHeight uint64) error {
-	p.setupThrottleDelay()
-	defer p.throttleTicker.Stop()
-
+func (p *RegisterPruner) pruneUpToHeight(ctx context.Context, pruneHeight uint64) error {
 	prefix := []byte{codeRegister}
 	var batchKeysToRemove [][]byte
 
@@ -236,7 +237,7 @@ func (p *RegisterPruner) pruneUpToHeight(pruneHeight uint64) error {
 
 				if len(batchKeysToRemove) == deleteItemsPerBatch {
 					// Perform batch delete
-					if err := p.batchDelete(batchKeysToRemove); err != nil {
+					if err := p.batchDelete(ctx, batchKeysToRemove); err != nil {
 						return err
 					}
 					batchKeysToRemove = nil
@@ -246,7 +247,7 @@ func (p *RegisterPruner) pruneUpToHeight(pruneHeight uint64) error {
 
 		if len(batchKeysToRemove) > 0 {
 			// Perform the final batch delete if there are any remaining keys
-			if err := p.batchDelete(batchKeysToRemove); err != nil {
+			if err := p.batchDelete(ctx, batchKeysToRemove); err != nil {
 				return err
 			}
 		}
@@ -267,26 +268,16 @@ func (p *RegisterPruner) pruneUpToHeight(pruneHeight uint64) error {
 	return nil
 }
 
-// setupThrottleDelay sets up or reset a ticker for the throttle delay to manage system load
-// during pruning operations. This ensures that there is a small pause between pruning
-// each batch of registers.
-func (p *RegisterPruner) setupThrottleDelay() {
-	if p.throttleTicker == nil {
-		p.throttleTicker = time.NewTicker(p.pruneThrottleDelay)
-	} else {
-		p.throttleTicker.Reset(p.pruneThrottleDelay)
-	}
-}
-
 // batchDelete deletes the provided keys from the database in a single batch operation.
 // It creates a new batch, deletes each key from the batch, and commits the batch to ensure
 // that the deletions are applied atomically.
 //
 // Parameters:
+//   - ctx: The context for managing the pruning throttle delay operation.
 //   - lookupKeys: A slice of keys to be deleted from the database.
 //
 // No errors are expected during normal operations.
-func (p *RegisterPruner) batchDelete(lookupKeys [][]byte) error {
+func (p *RegisterPruner) batchDelete(ctx context.Context, lookupKeys [][]byte) error {
 	batch := p.db.NewBatch()
 	defer batch.Close()
 
@@ -306,7 +297,10 @@ func (p *RegisterPruner) batchDelete(lookupKeys [][]byte) error {
 	}
 
 	// Throttle to prevent excessive system load
-	<-p.throttleTicker.C
+	select {
+	case <-ctx.Done():
+	case <-time.After(p.pruneThrottleDelay):
+	}
 
 	return nil
 }
