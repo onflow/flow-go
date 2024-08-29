@@ -3,6 +3,7 @@ package storage
 import (
 	"io"
 
+	"github.com/cockroachdb/pebble"
 	"github.com/dgraph-io/badger/v2"
 )
 
@@ -29,6 +30,29 @@ type BatchStorage interface {
 	Flush() error
 }
 
+type Iterator interface {
+	SeekGE()
+	Valid() bool
+	Next()
+	IterItem() IterItem
+	Close() error
+}
+
+type IterItem interface {
+	Key() []byte
+	Value(func(val []byte) error) error
+}
+
+type IteratorOption struct {
+	IterateKeyOnly bool // default false
+}
+
+func DefaultIteratorOptions() IteratorOption {
+	return IteratorOption{
+		IterateKeyOnly: false, // only needed for badger. ignored by pebble
+	}
+}
+
 type Reader interface {
 	// Get gets the value for the given key. It returns ErrNotFound if the DB
 	// does not contain the key.
@@ -38,6 +62,8 @@ type Reader interface {
 	// returned slice will remain valid until the returned Closer is closed. On
 	// success, the caller MUST call closer.Close() or a memory leak will occur.
 	Get(key []byte) (value []byte, closer io.Closer, err error)
+
+	NewIter(start, end []byte, ops IteratorOption) (Iterator, error)
 }
 
 // Writer is an interface for batch writing to a storage backend.
@@ -57,6 +83,22 @@ type Writer interface {
 
 // BadgerReaderBatchWriter is an interface for badger-specific reader and writer.
 type BadgerReaderBatchWriter interface {
+	baseReaderBatchWriter
+
+	// BadgerWriteBatch returns the underlying batch object
+	// Useful for implementing badger-specific operations
+	BadgerWriteBatch() *badger.WriteBatch
+}
+
+type PebbleReaderBatchWriter interface {
+	baseReaderBatchWriter
+
+	// PebbleWriteBatch returns the underlying pebble object
+	// Useful for implementing pebble-specific operations
+	PebbleWriterBatch() *pebble.Batch
+}
+
+type baseReaderBatchWriter interface {
 	// GlobalReader returns a database-backed reader which reads the latest committed global database state ("read-committed isolation").
 	// This reader will not read writes written to ReaderBatchWriter.Writer until the write batch is committed.
 	// This reader may observe different values for the same key on subsequent reads.
@@ -68,10 +110,6 @@ type BadgerReaderBatchWriter interface {
 	// Note:
 	// - The writer cannot be used concurrently for writing.
 	Writer() Writer
-
-	// BadgerBatch returns the underlying batch object
-	// Useful for implementing badger-specific operations
-	BadgerWriteBatch() *badger.WriteBatch
 
 	// AddCallback adds a callback to execute after the batch has been flush
 	// regardless the batch update is succeeded or failed.

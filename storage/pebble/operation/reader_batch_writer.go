@@ -5,21 +5,21 @@ import (
 	"io"
 	"sync"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble"
 
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/storage"
 )
 
 type ReaderBatchWriter struct {
-	db    *badger.DB
-	batch *badger.WriteBatch
+	db    *pebble.DB
+	batch *pebble.Batch
 
 	addingCallback sync.Mutex // protect callbacks
 	callbacks      []func(error)
 }
 
-var _ storage.BadgerReaderBatchWriter = (*ReaderBatchWriter)(nil)
+var _ storage.PebbleReaderBatchWriter = (*ReaderBatchWriter)(nil)
 
 func (b *ReaderBatchWriter) GlobalReader() storage.Reader {
 	return b
@@ -29,7 +29,7 @@ func (b *ReaderBatchWriter) Writer() storage.Writer {
 	return b
 }
 
-func (b *ReaderBatchWriter) BadgerWriteBatch() *badger.WriteBatch {
+func (b *ReaderBatchWriter) PebbleWriterBatch() *pebble.Batch {
 	return b.batch
 }
 
@@ -41,7 +41,7 @@ func (b *ReaderBatchWriter) AddCallback(callback func(error)) {
 }
 
 func (b *ReaderBatchWriter) Commit() error {
-	err := b.batch.Flush()
+	err := b.batch.Commit(nil)
 
 	b.notifyCallbacks(err)
 
@@ -57,7 +57,7 @@ func (b *ReaderBatchWriter) notifyCallbacks(err error) {
 	}
 }
 
-func WithReaderBatchWriter(db *badger.DB, fn func(storage.BadgerReaderBatchWriter) error) error {
+func WithReaderBatchWriter(db *pebble.DB, fn func(storage.PebbleReaderBatchWriter) error) error {
 	batch := NewReaderBatchWriter(db)
 
 	err := fn(batch)
@@ -74,15 +74,15 @@ func WithReaderBatchWriter(db *badger.DB, fn func(storage.BadgerReaderBatchWrite
 	return batch.Commit()
 }
 
-func NewReaderBatchWriter(db *badger.DB) *ReaderBatchWriter {
+func NewReaderBatchWriter(db *pebble.DB) *ReaderBatchWriter {
 	return &ReaderBatchWriter{
 		db:    db,
-		batch: db.NewWriteBatch(),
+		batch: db.NewBatch(),
 	}
 }
 
-// ToReader is a helper function to convert a *badger.DB to a Reader
-func ToReader(db *badger.DB) storage.Reader {
+// ToReader is a helper function to convert a *pebble.DB to a Reader
+func ToReader(db *pebble.DB) storage.Reader {
 	return NewReaderBatchWriter(db)
 }
 
@@ -97,39 +97,30 @@ var _ io.Closer = (*noopCloser)(nil)
 func (noopCloser) Close() error { return nil }
 
 func (b *ReaderBatchWriter) Get(key []byte) ([]byte, io.Closer, error) {
-	tx := b.db.NewTransaction(false)
-	defer tx.Discard()
+	value, closer, err := b.db.Get(key)
 
-	item, err := tx.Get(key)
 	if err != nil {
-		if errors.Is(err, badger.ErrKeyNotFound) {
+		if errors.Is(err, pebble.ErrNotFound) {
 			return nil, nil, storage.ErrNotFound
 		}
+
+		// exception while checking for the key
 		return nil, nil, irrecoverable.NewExceptionf("could not load data: %w", err)
 	}
 
-	var value []byte
-	err = item.Value(func(val []byte) error {
-		value = append([]byte{}, val...)
-		return nil
-	})
-	if err != nil {
-		return nil, nil, irrecoverable.NewExceptionf("could not load value: %w", err)
-	}
-
-	return value, noopCloser{}, nil
+	return value, closer, nil
 }
 
 func (b *ReaderBatchWriter) NewIter(start, end []byte, ops storage.IteratorOption) (storage.Iterator, error) {
-	return newBadgerIterator(b.db, start, end, ops), nil
+	return newPebbleIterator(b.db, start, end, ops)
 }
 
 var _ storage.Writer = (*ReaderBatchWriter)(nil)
 
 func (b *ReaderBatchWriter) Set(key, value []byte) error {
-	return b.batch.Set(key, value)
+	return b.batch.Set(key, value, nil)
 }
 
 func (b *ReaderBatchWriter) Delete(key []byte) error {
-	return b.batch.Delete(key)
+	return b.batch.Delete(key, nil)
 }
