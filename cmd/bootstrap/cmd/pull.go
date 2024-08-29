@@ -1,21 +1,26 @@
 package cmd
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/spf13/cobra"
+	"golang.org/x/sync/semaphore"
 
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/cmd/bootstrap/gcs"
+	"github.com/onflow/flow-go/cmd/bootstrap/utils"
 )
 
 var (
-	flagNetwork    string
-	flagBucketName string
+	flagNetwork     string
+	flagBucketName  string
+	flagConcurrency int64
 )
 
 // pullCmd represents a command to pull parnter node details from the google
@@ -37,6 +42,7 @@ func addPullCmdFlags() {
 	cmd.MarkFlagRequired(pullCmd, "network")
 
 	pullCmd.Flags().StringVar(&flagBucketName, "bucket", "flow-genesis-bootstrap", "google bucket name")
+	pullCmd.Flags().Int64Var(&flagConcurrency, "concurrency", 2, "concurrency limit")
 }
 
 // pull partner node info from google bucket
@@ -62,15 +68,35 @@ func pull(cmd *cobra.Command, args []string) {
 	}
 	log.Info().Msgf("found %d files in google bucket", len(files))
 
+	sem := semaphore.NewWeighted(flagConcurrency)
+	wait := sync.WaitGroup{}
 	for _, file := range files {
-		if strings.Contains(file, "node-info.pub") {
-			fullOutpath := filepath.Join(flagOutdir, file)
-			log.Printf("downloading %s", file)
+		wait.Add(1)
+		go func(file gcs.GCSFile) {
+			_ = sem.Acquire(ctx, 1)
+			defer func() {
+				sem.Release(1)
+				wait.Done()
+			}()
 
-			err = bucket.DownloadFile(ctx, client, fullOutpath, file)
-			if err != nil {
-				log.Error().Msgf("error trying download google bucket file: %v", err)
+			if strings.Contains(file.Name, "node-info.pub") {
+				fullOutpath := filepath.Join(flagOutdir, file.Name)
+
+				fmd5 := utils.CalcMd5(fullOutpath)
+				// only skip files that have an MD5 hash
+				if file.MD5 != nil && bytes.Equal(fmd5, file.MD5) {
+					log.Printf("skipping %s", file)
+					return
+				}
+
+				log.Printf("downloading %s", file)
+				err = bucket.DownloadFile(ctx, client, fullOutpath, file.Name)
+				if err != nil {
+					log.Error().Msgf("error trying download google bucket file: %v", err)
+				}
 			}
-		}
+		}(file)
 	}
+
+	wait.Wait()
 }

@@ -140,7 +140,7 @@ require (
 	github.com/ipfs/go-cid v0.4.1 // indirect
 	github.com/ipfs/go-cidutil v0.1.0 // indirect
 	github.com/ipfs/go-ds-badger2 v0.1.3 // indirect
-	github.com/ipfs/go-ds-pebble v0.3.1 // indirect
+	github.com/ipfs/go-ds-pebble v0.3.1-0.20240828032824-d745b9d3200b // indirect
 	github.com/ipfs/go-ipfs-delay v0.0.1 // indirect
 	github.com/ipfs/go-ipfs-pq v0.0.3 // indirect
 	github.com/ipfs/go-ipfs-util v0.0.3 // indirect
@@ -309,6 +309,3 @@ require (
 )
 
 replace github.com/onflow/flow-go => ../
-
-// TODO: remove it when https://github.com/ipfs/go-ds-pebble/pull/36 merged
-replace github.com/ipfs/go-ds-pebble v0.3.1 => github.com/onflow/go-ds-pebble v0.0.0-20240731130313-f186539f382c
