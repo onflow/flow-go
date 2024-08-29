@@ -1836,6 +1836,8 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 
 	versionControlDependable := module.NewProxiedReadyDoneAware()
 	builder.IndexerDependencies.Add(versionControlDependable)
+	stopControlDependable := module.NewProxiedReadyDoneAware()
+	builder.IndexerDependencies.Add(stopControlDependable)
 
 	builder.Component("version control", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		if !builder.versionControlEnabled {
@@ -1881,6 +1883,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		builder.versionControl.AddVersionUpdatesConsumer(stopControl.OnVersionUpdate)
 
 		builder.stopControl = stopControl
+		stopControlDependable.Init(builder.stopControl)
 
 		return stopControl, nil
 	})

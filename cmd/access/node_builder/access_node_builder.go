@@ -1599,6 +1599,8 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 	builder.IndexerDependencies.Add(ingestionDependable)
 	versionControlDependable := module.NewProxiedReadyDoneAware()
 	builder.IndexerDependencies.Add(versionControlDependable)
+	stopControlDependable := module.NewProxiedReadyDoneAware()
+	builder.IndexerDependencies.Add(stopControlDependable)
 	var lastFullBlockHeight *counters.PersistentStrictMonotonicCounter
 
 	builder.
@@ -1840,6 +1842,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			builder.versionControl.AddVersionUpdatesConsumer(stopControl.OnVersionUpdate)
 
 			builder.stopControl = stopControl
+			stopControlDependable.Init(builder.stopControl)
 
 			return stopControl, nil
 		}).
