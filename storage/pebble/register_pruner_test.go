@@ -116,7 +116,6 @@ func straightPruneTestCase() testCase {
 	value3 := []byte("value3")
 
 	// Set up initial register entries for different heights.
-	// Set up initial register entries for different heights.
 	initialData[3] = flow.RegisterEntries{
 		{Key: key1, Value: value1},
 		{Key: key2, Value: value2},
