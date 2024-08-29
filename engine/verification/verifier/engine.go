@@ -163,29 +163,28 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 func (e *Engine) verify(ctx context.Context, originID flow.Identifier,
 	vc *verification.VerifiableChunkData) error {
 	// log it first
-	log := e.log.With().Timestamp().
-		Hex("origin", logging.ID(originID)).
+	log := e.log.With().
 		Uint64("chunk_index", vc.Chunk.Index).
 		Hex("result_id", logging.Entity(vc.Result)).
-		Hex("block_id", logging.Entity(vc.Header)).
 		Uint64("block_height", vc.Header.Height).
+		Hex("block_id", vc.Chunk.ChunkBody.BlockID[:]).
 		Logger()
 
 	log.Info().Msg("verifiable chunk received by verifier engine")
 
 	// only accept internal calls
 	if originID != e.me.NodeID() {
-		return fmt.Errorf("invalid remote origin for verify")
+		return fmt.Errorf("invalid remote origin for verify: %v", originID)
 	}
-
-	var err error
 
 	// extracts chunk ID
 	ch, ok := vc.Result.Chunks.ByIndex(vc.Chunk.Index)
 	if !ok {
 		return engine.NewInvalidInputErrorf("chunk out of range requested: %v", vc.Chunk.Index)
 	}
-	log.With().Hex("chunk_id", logging.Entity(ch)).Logger()
+	log = log.With().
+		Hex("chunk_id", logging.Entity(ch)).
+		Logger()
 
 	// execute the assigned chunk
 	span, _ := e.tracer.StartSpanFromContext(ctx, trace.VERVerChunkVerify)
