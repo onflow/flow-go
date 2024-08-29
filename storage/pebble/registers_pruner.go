@@ -144,9 +144,8 @@ func (p *RegisterPruner) checkPrune(ctx context.Context) error {
 		return fmt.Errorf("failed to get latest height from register storage: %w", err)
 	}
 
-	pruneHeight := latestHeight - p.pruneThreshold
-
-	if pruneHeight-firstHeight > p.pruneInterval {
+	if latestHeight-firstHeight > p.pruneInterval+p.pruneThreshold {
+		pruneHeight := latestHeight - p.pruneThreshold
 		p.logger.Info().Uint64("prune_height", pruneHeight).Msg("pruning storage")
 
 		// first, update firstHeight in the db
