@@ -28,7 +28,7 @@ require (
 	github.com/onflow/flow-go v0.37.7-0.20240826193109-e211841b59f5
 	github.com/onflow/flow-go-sdk v1.0.0-preview.53
 	github.com/onflow/flow-go/insecure v0.0.0-00010101000000-000000000000
-	github.com/onflow/flow/protobuf/go/flow v0.4.5
+	github.com/onflow/flow/protobuf/go/flow v0.4.6
 	github.com/onflow/go-ethereum v1.14.7
 	github.com/prometheus/client_golang v1.18.0
 	github.com/prometheus/client_model v0.5.0
@@ -359,6 +359,3 @@ require (
 replace github.com/onflow/flow-go => ../
 
 replace github.com/onflow/flow-go/insecure => ../insecure
-
-//TODO: Should be rmoved, when emulator part will be merged
-replace github.com/onflow/flow-emulator v1.0.0-preview.36.0.20240729195722-d4eb1c30eb9f => github.com/The-K-R-O-K/flow-emulator v1.0.0-preview.12.0.20240827102115-de43e06d2699
