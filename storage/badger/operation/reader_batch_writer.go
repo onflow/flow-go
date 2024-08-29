@@ -3,20 +3,19 @@ package operation
 import (
 	"errors"
 	"io"
-	"sync"
 
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/storage"
+	op "github.com/onflow/flow-go/storage/operation"
 )
 
 type ReaderBatchWriter struct {
 	db    *badger.DB
 	batch *badger.WriteBatch
 
-	addingCallback sync.Mutex // protect callbacks
-	callbacks      []func(error)
+	callbacks op.Callbacks
 }
 
 var _ storage.BadgerReaderBatchWriter = (*ReaderBatchWriter)(nil)
@@ -34,27 +33,15 @@ func (b *ReaderBatchWriter) BadgerWriteBatch() *badger.WriteBatch {
 }
 
 func (b *ReaderBatchWriter) AddCallback(callback func(error)) {
-	b.addingCallback.Lock()
-	defer b.addingCallback.Unlock()
-
-	b.callbacks = append(b.callbacks, callback)
+	b.callbacks.AddCallback(callback)
 }
 
 func (b *ReaderBatchWriter) Commit() error {
 	err := b.batch.Flush()
 
-	b.notifyCallbacks(err)
+	b.callbacks.NotifyCallbacks(err)
 
 	return err
-}
-
-func (b *ReaderBatchWriter) notifyCallbacks(err error) {
-	b.addingCallback.Lock()
-	defer b.addingCallback.Unlock()
-
-	for _, callback := range b.callbacks {
-		callback(err)
-	}
 }
 
 func WithReaderBatchWriter(db *badger.DB, fn func(storage.BadgerReaderBatchWriter) error) error {
@@ -67,7 +54,7 @@ func WithReaderBatchWriter(db *badger.DB, fn func(storage.BadgerReaderBatchWrite
 		// in other words, fn might hold a lock to be released by a callback,
 		// we need to notify the callback for the locks to be released before
 		// returning the error.
-		batch.notifyCallbacks(err)
+		batch.callbacks.NotifyCallbacks(err)
 		return err
 	}
 

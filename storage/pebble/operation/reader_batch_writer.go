@@ -3,20 +3,19 @@ package operation
 import (
 	"errors"
 	"io"
-	"sync"
 
 	"github.com/cockroachdb/pebble"
 
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/storage"
+	op "github.com/onflow/flow-go/storage/operation"
 )
 
 type ReaderBatchWriter struct {
 	db    *pebble.DB
 	batch *pebble.Batch
 
-	addingCallback sync.Mutex // protect callbacks
-	callbacks      []func(error)
+	callbacks op.Callbacks
 }
 
 var _ storage.PebbleReaderBatchWriter = (*ReaderBatchWriter)(nil)
@@ -34,27 +33,15 @@ func (b *ReaderBatchWriter) PebbleWriterBatch() *pebble.Batch {
 }
 
 func (b *ReaderBatchWriter) AddCallback(callback func(error)) {
-	b.addingCallback.Lock()
-	defer b.addingCallback.Unlock()
-
-	b.callbacks = append(b.callbacks, callback)
+	b.callbacks.AddCallback(callback)
 }
 
 func (b *ReaderBatchWriter) Commit() error {
 	err := b.batch.Commit(nil)
 
-	b.notifyCallbacks(err)
+	b.callbacks.NotifyCallbacks(err)
 
 	return err
-}
-
-func (b *ReaderBatchWriter) notifyCallbacks(err error) {
-	b.addingCallback.Lock()
-	defer b.addingCallback.Unlock()
-
-	for _, callback := range b.callbacks {
-		callback(err)
-	}
 }
 
 func WithReaderBatchWriter(db *pebble.DB, fn func(storage.PebbleReaderBatchWriter) error) error {
@@ -67,7 +54,7 @@ func WithReaderBatchWriter(db *pebble.DB, fn func(storage.PebbleReaderBatchWrite
 		// in other words, fn might hold a lock to be released by a callback,
 		// we need to notify the callback for the locks to be released before
 		// returning the error.
-		batch.notifyCallbacks(err)
+		batch.callbacks.NotifyCallbacks(err)
 		return err
 	}
 
