@@ -20,9 +20,10 @@ const (
 	DefaultPruneTickerInterval = 10 * time.Minute
 )
 
+// TODO: This configuration should be changed after testing it with real network data for better performance.
 const (
 	// pruneIntervalRatio represents an additional percentage of pruneThreshold which is used to calculate pruneInterval
-	pruneIntervalRatio = 0.1
+	pruneIntervalRatio = 0.1 // 10%
 	// deleteItemsPerBatch defines the number of database keys to delete in each batch operation.
 	// This value is used to control the size of deletion operations during pruning.
 	deleteItemsPerBatch = 256
