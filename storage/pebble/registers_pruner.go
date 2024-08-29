@@ -91,7 +91,7 @@ func NewRegisterPruner(
 	opts ...PrunerOption,
 ) (*RegisterPruner, error) {
 	pruner := &RegisterPruner{
-		logger:              logger.With().Str("component", "register_pruner").Logger(),
+		logger:              logger.With().Str("component", "registerdb_pruner").Logger(),
 		db:                  db,
 		pruneInterval:       pruneInterval(DefaultPruneThreshold),
 		pruneThreshold:      DefaultPruneThreshold,
@@ -135,8 +135,6 @@ func (p *RegisterPruner) loop(ctx irrecoverable.SignalerContext, ready component
 // Parameters:
 //   - ctx: The context for managing the pruning operation.
 func (p *RegisterPruner) checkPrune(ctx irrecoverable.SignalerContext) {
-	// TODO: Clarify whether batching can be used here for getting the first and latest heights,
-	//       and for updating the first height.
 	firstHeight, err := firstStoredHeight(p.db)
 	if err != nil {
 		ctx.Throw(fmt.Errorf("failed to get first height from register storage: %w", err))
@@ -152,7 +150,9 @@ func (p *RegisterPruner) checkPrune(ctx irrecoverable.SignalerContext) {
 	if pruneHeight-firstHeight > p.pruneInterval {
 		p.logger.Info().Uint64("prune_height", pruneHeight).Msg("pruning storage")
 
-		// update first indexed height
+		// first, update firstHeight in the db
+		// this ensures that if the node crashes during pruning, there will still be a consistent
+		// view when the node starts up. Subsequent prunes will remove any leftover data.
 		err = p.updateFirstStoredHeight(pruneHeight)
 		if err != nil {
 			ctx.Throw(fmt.Errorf("failed to update first height for register storage: %w", err))
@@ -186,7 +186,6 @@ func (p *RegisterPruner) pruneUpToHeight(pruneHeight uint64) error {
 	defer p.throttleTicker.Stop()
 
 	prefix := []byte{codeRegister}
-	itemsPerBatch := deleteItemsPerBatch
 	var batchKeysToRemove [][]byte
 
 	start := time.Now()
@@ -237,7 +236,7 @@ func (p *RegisterPruner) pruneUpToHeight(pruneHeight uint64) error {
 				copy(keyCopy, key)
 				batchKeysToRemove = append(batchKeysToRemove, keyCopy)
 
-				if len(batchKeysToRemove) == itemsPerBatch {
+				if len(batchKeysToRemove) == deleteItemsPerBatch {
 					// Perform batch delete
 					if err := p.batchDelete(batchKeysToRemove); err != nil {
 						return err
