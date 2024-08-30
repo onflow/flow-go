@@ -56,7 +56,13 @@ func (s *Suite) getNodeInfoDirs(role flow.Role) (string, string) {
 // Returns:
 //
 //	[]cadence.Value: the transaction arguments.
-func (s *Suite) executeEFMRecoverTXArgsCMD(collectionClusters int, numViewsInEpoch, numViewsInStakingAuction, epochCounter, targetDuration, targetEndTime uint64) []cadence.Value {
+func (s *Suite) executeEFMRecoverTXArgsCMD(
+	collectionClusters int,
+	numViewsInEpoch,
+	numViewsInStakingAuction,
+	recoveryEpochCounter,
+	targetDuration uint64,
+	unsafeAllowOverWrite bool) []cadence.Value {
 	// read internal node info from one of the consensus nodes
 	internalNodePrivInfoDir, nodeConfigJson := s.getNodeInfoDirs(flow.RoleConsensus)
 	snapshot := s.GetLatestProtocolSnapshot(s.Ctx)
@@ -65,12 +71,12 @@ func (s *Suite) executeEFMRecoverTXArgsCMD(collectionClusters int, numViewsInEpo
 		internalNodePrivInfoDir,
 		nodeConfigJson,
 		collectionClusters,
-		epochCounter,
+		recoveryEpochCounter,
 		flow.Localnet,
 		numViewsInStakingAuction,
 		numViewsInEpoch,
 		targetDuration,
-		false,
+		unsafeAllowOverWrite,
 		snapshot,
 	)
 	require.NoError(s.T(), err)

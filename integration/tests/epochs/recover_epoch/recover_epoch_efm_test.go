@@ -5,10 +5,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/onflow/cadence"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	sdk "github.com/onflow/flow-go-sdk"
+
 	"github.com/onflow/flow-go/integration/utils"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -71,7 +73,8 @@ func (s *RecoverEpochSuite) TestRecoverEpoch() {
 		// cruise control is disabled for integration tests
 		// targetDuration and targetEndTime will be ignored
 		3000,
-		4000,
+		// unsafeAllowOverWrite set to false, initialize new epoch
+		false,
 	)
 
 	// 3. Submit recover epoch transaction to the network.
@@ -94,5 +97,12 @@ func (s *RecoverEpochSuite) TestRecoverEpoch() {
 	require.NoError(s.T(), err)
 	require.Equal(s.T(), events[0].Events[0].Type, eventType)
 
-	// 4. TODO(EFM, #6164) ensure EpochRecover service event is processed by the fallback state machine and the network recovers.
+	startViewOfNextEpoch := uint64(txArgs[1].(cadence.UInt64))
+	// wait for first view of recovery epoch
+	s.TimedLogf("waiting to transition into recovery epoch (finalized view %d)", startViewOfNextEpoch)
+	s.AwaitFinalizedView(s.Ctx, startViewOfNextEpoch, 2*time.Minute, 500*time.Millisecond)
+	s.TimedLogf("observed finalized first view of recovery epoch %d", startViewOfNextEpoch)
+
+	// ensure we transition into recovery epoch
+	s.AssertInEpoch(s.Ctx, 1)
 }

@@ -119,7 +119,7 @@ func TestRecoverEpochHappyPath(t *testing.T) {
 			_, ok := allNodeIdsCdc[nodeId.(cadence.String)]
 			require.True(t, ok)
 		}
-		// initNewEpoch
+		// unsafeAllowOverWrite
 		require.Equal(t, decodedValues[9], cadence.NewBool(false))
 	})
 }

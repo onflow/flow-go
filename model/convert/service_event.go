@@ -3,6 +3,7 @@ package convert
 import (
 	"encoding/hex"
 	"fmt"
+	"strings"
 
 	"github.com/coreos/go-semver/semver"
 	"github.com/onflow/cadence"
@@ -761,8 +762,7 @@ func convertClusterQCVoteData(cdcClusterQCVoteData []cadence.Value) ([]flow.Clus
 		if err != nil {
 			return nil, fmt.Errorf("failed to decode clusterQCVoteData struct: %w", err)
 		}
-
-		aggregatedSignature, err := hex.DecodeString(string(cdcAggSignature))
+		aggregatedSignature, err := hex.DecodeString(strings.ReplaceAll(string(cdcAggSignature), "0x", ""))
 		if err != nil {
 			return nil, fmt.Errorf("could not convert raw vote from hex: %w", err)
 		}
@@ -963,7 +963,7 @@ func convertDKGKeys(cdcDKGKeys []cadence.Value) (
 	hexDKGKeys = hexDKGKeys[1:]
 
 	// decode group public key
-	groupKeyBytes, err := hex.DecodeString(groupPubKeyHex)
+	groupKeyBytes, err := hex.DecodeString(strings.ReplaceAll(groupPubKeyHex, "0x", ""))
 	if err != nil {
 		return nil, nil, fmt.Errorf(
 			"could not decode group public key into bytes: %w",
@@ -979,7 +979,7 @@ func convertDKGKeys(cdcDKGKeys []cadence.Value) (
 	dkgParticipantKeys := make([]crypto.PublicKey, 0, len(hexDKGKeys))
 	for _, pubKeyString := range hexDKGKeys {
 
-		pubKeyBytes, err := hex.DecodeString(pubKeyString)
+		pubKeyBytes, err := hex.DecodeString(strings.ReplaceAll(pubKeyString, "0x", ""))
 		if err != nil {
 			return nil, nil, fmt.Errorf(
 				"could not decode individual public key into bytes: %w",

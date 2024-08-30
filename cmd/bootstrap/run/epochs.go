@@ -22,12 +22,12 @@ func GenerateRecoverEpochTxArgs(log zerolog.Logger,
 	internalNodePrivInfoDir string,
 	nodeConfigJson string,
 	collectionClusters int,
-	epochCounter uint64,
+	recoveryEpochCounter uint64,
 	rootChainID flow.ChainID,
 	numViewsInStakingAuction uint64,
 	numViewsInEpoch uint64,
 	targetDuration uint64,
-	initNewEpoch bool,
+	unsafeAllowOverWrite bool,
 	snapshot *inmem.Snapshot,
 ) ([]cadence.Value, error) {
 	epoch := snapshot.Epochs().Current()
@@ -83,7 +83,7 @@ func GenerateRecoverEpochTxArgs(log zerolog.Logger,
 	log.Info().Msg("")
 
 	log.Info().Msg("constructing root blocks for collection node clusters")
-	clusterBlocks := GenerateRootClusterBlocks(epochCounter, clusters)
+	clusterBlocks := GenerateRootClusterBlocks(recoveryEpochCounter, clusters)
 	log.Info().Msg("")
 
 	log.Info().Msg("constructing root QCs for collection node clusters")
@@ -135,6 +135,8 @@ func GenerateRecoverEpochTxArgs(log zerolog.Logger,
 	}
 
 	args := []cadence.Value{
+		// recovery epoch counter
+		cadence.NewUInt64(recoveryEpochCounter),
 		// epoch start view
 		cadence.NewUInt64(currEpochFinalView + 1),
 		// staking phase end view
@@ -155,7 +157,7 @@ func GenerateRecoverEpochTxArgs(log zerolog.Logger,
 		cadence.NewArray(nodeIds),
 		// recover the network by initializing a new recover epoch which will increment the smart contract epoch counter
 		// or overwrite the epoch metadata for the current epoch
-		cadence.NewBool(initNewEpoch),
+		cadence.NewBool(unsafeAllowOverWrite),
 	}
 
 	return args, nil

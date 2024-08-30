@@ -49,7 +49,8 @@ This recovery process has some constraints:
 	flagNumViewsInStakingAuction uint64
 	flagEpochCounter             uint64
 	flagTargetDuration           uint64
-	flagInitNewEpoch             bool
+	flagRecoveryEpochCounter     uint64
+	flagUnsafeAllowOverWrite     bool
 	flagRootChainID              string
 )
 
@@ -82,7 +83,8 @@ func addGenerateRecoverEpochTxArgsCmdFlags() error {
 	// This is needed only if a previous recoverEpoch transaction was submitted and a race condition occurred such that:
 	//   - the RecoveryEpoch in the admin transaction was accepted by the smart contract
 	//   - the RecoveryEpoch service event (after sealing latency) was rejected by the Protocol State
-	generateRecoverEpochTxArgsCmd.Flags().BoolVar(&flagInitNewEpoch, "unsafe-overwrite-epoch-data", false, "set to true if the resulting transaction is allowed to overwrite an already specified epoch in the smart contract.")
+	generateRecoverEpochTxArgsCmd.Flags().BoolVar(&flagUnsafeAllowOverWrite, "unsafe-overwrite-epoch-data", false, "set to true if the resulting transaction is allowed to overwrite an already specified epoch in the smart contract.")
+	generateRecoverEpochTxArgsCmd.Flags().Uint64Var(&flagEpochCounter, "recovery-epoch-counter", 0, "the recovery epoch counter")
 
 	err := generateRecoverEpochTxArgsCmd.MarkFlagRequired("access-address")
 	if err != nil {
@@ -108,10 +110,13 @@ func addGenerateRecoverEpochTxArgsCmdFlags() error {
 	if err != nil {
 		return fmt.Errorf("failed to mark epoch-timing-duration flag as required")
 	}
-
 	err = generateRecoverEpochTxArgsCmd.MarkFlagRequired("root-chain-id")
 	if err != nil {
 		return fmt.Errorf("failed to mark root-chain-id flag as required")
+	}
+	err = generateRecoverEpochTxArgsCmd.MarkFlagRequired("recovery-epoch-counter")
+	if err != nil {
+		return fmt.Errorf("failed to mark recovery-epoch-counter flag as required")
 	}
 	return nil
 }
@@ -150,7 +155,7 @@ func generateRecoverEpochTxArgs(getSnapshot func() *inmem.Snapshot) func(cmd *co
 			flagNumViewsInStakingAuction,
 			flagNumViewsInEpoch,
 			flagTargetDuration,
-			flagInitNewEpoch,
+			flagUnsafeAllowOverWrite,
 			getSnapshot(),
 		)
 		if err != nil {

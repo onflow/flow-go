@@ -200,8 +200,8 @@ require (
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
 	github.com/onflow/atree v0.7.0-rc.2 // indirect
 	github.com/onflow/cadence v1.0.0-preview.34 // indirect
-	github.com/onflow/flow-core-contracts/lib/go/contracts v1.3.1-0.20240710025346-d8135ebb9920 // indirect
-	github.com/onflow/flow-core-contracts/lib/go/templates v1.3.1-0.20240710025346-d8135ebb9920 // indirect
+	github.com/onflow/flow-core-contracts/lib/go/contracts v1.3.2-0.20240801155508-9f8ceed15698 // indirect
+	github.com/onflow/flow-core-contracts/lib/go/templates v1.3.2-0.20240801155508-9f8ceed15698 // indirect
 	github.com/onflow/flow-ft/lib/go/contracts v1.0.0 // indirect
 	github.com/onflow/flow-ft/lib/go/templates v1.0.0 // indirect
 	github.com/onflow/flow-go-sdk v1.0.0-preview.36 // indirect
