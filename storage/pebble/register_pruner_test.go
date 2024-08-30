@@ -2,6 +2,7 @@ package pebble
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -12,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 // testCase defines the structure for a single test case, including initial data setup,
@@ -28,6 +30,18 @@ type testCase struct {
 	prunedData map[uint64]flow.RegisterEntries
 }
 
+// TestPrune validates the pruning functionality of the RegisterPruner.
+//
+// It runs multiple test cases, each of which initializes the database with specific
+// register entries and then verifies that the pruning operation behaves as expected.
+// The test cases check that:
+// - Register entries below a certain height are pruned (i.e., removed) from the database.
+// - The remaining data in the database matches the expected state after pruning.
+// - The first height of the register entries in the database is correct after pruning.
+//
+// The test cases include:
+// - Straight pruning, where register entries are pruned up to a specific height.
+// - Pruning with different entries at varying heights, ensuring only the correct entries are kept.
 func TestPrune(t *testing.T) {
 	// Set up the test case with initial data, expected outcomes, and pruned data.
 	straightPruneData := straightPruneTestCase()
@@ -80,6 +94,72 @@ func TestPrune(t *testing.T) {
 			})
 		})
 	}
+}
+
+// TestPruneErrors checks the error handling behavior of the RegisterPruner when certain
+// conditions cause failures during the pruning process.
+//
+// This test covers scenarios where:
+// - The first stored height in the database cannot be retrieved, simulating a failure to locate it.
+// - The latest height in the database cannot be retrieved, simulating a missing entry.
+//
+// The tests ensure that the RegisterPruner handles these error conditions correctly by
+// triggering the appropriate irrecoverable errors and shutting down gracefully.
+func TestPruneErrors(t *testing.T) {
+	t.Run("not found first height", func(t *testing.T) {
+		unittest.RunWithTempDir(t, func(dir string) {
+			// Run the test with the Register storage
+			db, err := OpenRegisterPebbleDB(dir)
+			require.NoError(t, err)
+
+			pruner, err := NewRegisterPruner(
+				zerolog.Nop(),
+				db,
+				WithPruneThreshold(5),
+				WithPruneTickerInterval(10*time.Millisecond),
+				WithPrunerMetrics(metrics.NewNoopCollector()),
+			)
+			require.NoError(t, err)
+
+			err = fmt.Errorf("key not found")
+			signCtxErr := fmt.Errorf("failed to get first height from register storage: %w", err)
+			ctx := irrecoverable.NewMockSignalerContextExpectError(t, context.Background(), signCtxErr)
+
+			// Start the pruning process
+			pruner.Start(ctx)
+
+			unittest.AssertClosesBefore(t, pruner.Done(), 2*time.Second)
+		})
+	})
+
+	t.Run("not found latest height", func(t *testing.T) {
+		unittest.RunWithTempDir(t, func(dir string) {
+			// Run the test with the Register storage
+			db, err := OpenRegisterPebbleDB(dir)
+			require.NoError(t, err)
+
+			// insert initial first height to pebble
+			require.NoError(t, db.Set(firstHeightKey, encodedUint64(1), nil))
+
+			pruner, err := NewRegisterPruner(
+				zerolog.Nop(),
+				db,
+				WithPruneThreshold(5),
+				WithPruneTickerInterval(10*time.Millisecond),
+				WithPrunerMetrics(metrics.NewNoopCollector()),
+			)
+			require.NoError(t, err)
+
+			err = fmt.Errorf("key not found")
+			signCtxErr := fmt.Errorf("failed to get latest height from register storage: %w", err)
+			ctx := irrecoverable.NewMockSignalerContextExpectError(t, context.Background(), signCtxErr)
+
+			// Start the pruning process
+			pruner.Start(ctx)
+
+			unittest.AssertClosesBefore(t, pruner.Done(), 2*time.Second)
+		})
+	})
 }
 
 // requirePruning checks if the first stored height in the database matches the expected height after pruning.
