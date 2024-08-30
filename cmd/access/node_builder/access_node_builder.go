@@ -305,6 +305,7 @@ type FlowAccessNodeBuilder struct {
 	TransactionMetrics           *metrics.TransactionCollector
 	RestMetrics                  *metrics.RestCollector
 	RegisterDBPrunerMetrics      *metrics.RegisterDBPrunerCollector
+	TransactionValidationMetrics *metrics.TransactionValidationCollector
 	AccessMetrics                module.AccessMetrics
 	PingMetrics                  module.PingMetrics
 	Committee                    hotstuff.DynamicCommittee
@@ -330,7 +331,7 @@ type FlowAccessNodeBuilder struct {
 	ExecutionDataPruner          *edpruner.Pruner
 	ExecutionDatastoreManager    edstorage.DatastoreManager
 	ExecutionDataTracker         tracker.Storage
-	versionControl               *version.VersionControl
+	VersionControl               *version.VersionControl
 	RegisterDB                   *pebble.DB
 	RegisterDBPrunerDependencies *cmd.DependencyList
 
@@ -991,7 +992,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					builder.programCacheSize > 0,
 				)
 
-				err = builder.ScriptExecutor.Initialize(builder.ExecutionIndexer, scripts, builder.versionControl)
+				err = builder.ScriptExecutor.Initialize(builder.ExecutionIndexer, scripts, builder.VersionControl)
 				if err != nil {
 					return nil, err
 				}
@@ -1718,6 +1719,10 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			)
 			return nil
 		}).
+		Module("transaction validation metrics", func(node *cmd.NodeConfig) error {
+			builder.TransactionValidationMetrics = metrics.NewTransactionValidationCollector()
+			return nil
+		}).
 		Module("rest metrics", func(node *cmd.NodeConfig) error {
 			m, err := metrics.NewRestCollector(routes.URLToRoute, node.MetricsRegisterer)
 			if err != nil {
@@ -1733,6 +1738,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 		Module("access metrics", func(node *cmd.NodeConfig) error {
 			builder.AccessMetrics = metrics.NewAccessCollector(
 				metrics.WithTransactionMetrics(builder.TransactionMetrics),
+				metrics.WithTransactionValidationMetrics(builder.TransactionValidationMetrics),
 				metrics.WithBackendScriptsMetrics(builder.TransactionMetrics),
 				metrics.WithRestMetrics(builder.RestMetrics),
 				metrics.WithRegisterDBPrunerMetrics(builder.RegisterDBPrunerMetrics),
@@ -1871,8 +1877,8 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			// VersionControl needs to consume BlockFinalized events.
 			node.ProtocolEvents.AddConsumer(versionControl)
 
-			builder.versionControl = versionControl
-			versionControlDependable.Init(builder.versionControl)
+			builder.VersionControl = versionControl
+			versionControlDependable.Init(builder.VersionControl)
 
 			return versionControl, nil
 		}).
@@ -1979,6 +1985,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				TxResultQueryMode:   txResultQueryMode,
 				TxResultsIndex:      builder.TxResultsIndex,
 				LastFullBlockHeight: lastFullBlockHeight,
+				VersionControl:      builder.VersionControl,
 			})
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize backend: %w", err)

@@ -54,7 +54,7 @@ require (
 	github.com/onflow/flow-core-contracts/lib/go/contracts v1.3.1
 	github.com/onflow/flow-core-contracts/lib/go/templates v1.3.1
 	github.com/onflow/flow-go-sdk v1.0.0-preview.53
-	github.com/onflow/flow/protobuf/go/flow v0.4.5
+	github.com/onflow/flow/protobuf/go/flow v0.4.6
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58
 	github.com/pierrec/lz4 v2.6.1+incompatible
 	github.com/pkg/errors v0.9.1
@@ -255,13 +255,13 @@ require (
 	github.com/multiformats/go-multicodec v0.9.0 // indirect
 	github.com/multiformats/go-multistream v0.5.0 // indirect
 	github.com/multiformats/go-varint v0.0.7 // indirect
-	github.com/nxadm/tail v1.4.8 // indirect
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
 	github.com/onflow/flow-ft/lib/go/contracts v1.0.0 // indirect
 	github.com/onflow/flow-ft/lib/go/templates v1.0.0 // indirect
 	github.com/onflow/flow-nft/lib/go/contracts v1.2.1 // indirect
 	github.com/onflow/flow-nft/lib/go/templates v1.2.0 // indirect
 	github.com/onflow/sdks v0.6.0-preview.1 // indirect
+	github.com/onsi/ginkgo v1.16.5 // indirect
 	github.com/onsi/ginkgo/v2 v2.13.2 // indirect
 	github.com/opencontainers/runtime-spec v1.1.0 // indirect
 	github.com/opentracing/opentracing-go v1.2.0 // indirect

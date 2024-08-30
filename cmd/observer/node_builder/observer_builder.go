@@ -285,7 +285,7 @@ type ObserverServiceBuilder struct {
 	ExecutionIndexerCore *indexer.IndexerCore
 	TxResultsIndex       *index.TransactionResultsIndex
 	IndexerDependencies  *cmd.DependencyList
-	versionControl       *version.VersionControl
+	VersionControl       *version.VersionControl
 
 	ExecutionDataDownloader   execution_data.Downloader
 	ExecutionDataRequester    state_synchronization.ExecutionDataRequester
@@ -1541,7 +1541,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				builder.programCacheSize > 0,
 			)
 
-			err = builder.ScriptExecutor.Initialize(builder.ExecutionIndexer, scripts, builder.versionControl)
+			err = builder.ScriptExecutor.Initialize(builder.ExecutionIndexer, scripts, builder.VersionControl)
 			if err != nil {
 				return nil, err
 			}
@@ -1904,8 +1904,8 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		// VersionControl needs to consume BlockFinalized events.
 		node.ProtocolEvents.AddConsumer(versionControl)
 
-		builder.versionControl = versionControl
-		versionControlDependable.Init(builder.versionControl)
+		builder.VersionControl = versionControl
+		versionControlDependable.Init(builder.VersionControl)
 
 		return versionControl, nil
 	})
@@ -1980,6 +1980,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 				builder.stateStreamConf.ResponseLimit,
 				builder.stateStreamConf.ClientSendBufferSize,
 			),
+			VersionControl: builder.VersionControl,
 		}
 
 		if builder.localServiceAPIEnabled {

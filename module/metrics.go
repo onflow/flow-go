@@ -607,6 +607,7 @@ type CruiseCtlMetrics interface {
 }
 
 type CollectionMetrics interface {
+	TransactionValidationMetrics
 	// TransactionIngested is called when a new transaction is ingested by the
 	// node. It increments the total count of ingested transactions and starts
 	// a tx->col span for the transaction.
@@ -907,6 +908,7 @@ type AccessMetrics interface {
 	RestMetrics
 	GRPCConnectionPoolMetrics
 	TransactionMetrics
+	TransactionValidationMetrics
 	BackendScriptsMetrics
 	RegisterDBPrunerMetrics
 
@@ -1098,6 +1100,15 @@ type TransactionMetrics interface {
 
 	// TransactionSubmissionFailed should be called whenever we try to submit a transaction and it fails
 	TransactionSubmissionFailed()
+}
+
+type TransactionValidationMetrics interface {
+	// TransactionValidated tracks number of successfully validated transactions
+	TransactionValidated()
+	// TransactionValidationFailed tracks number of validation failed transactions with reason
+	TransactionValidationFailed(reason string)
+	// TransactionValidationSkipped tracks number of skipped transaction validations
+	TransactionValidationSkipped()
 }
 
 type PingMetrics interface {
