@@ -17,7 +17,9 @@ import (
 	accessmock "github.com/onflow/flow-go/access/mock"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 	execmock "github.com/onflow/flow-go/module/execution/mock"
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -31,9 +33,11 @@ type TransactionValidatorSuite struct {
 	header           *flow.Header
 	chain            flow.Chain
 	validatorOptions access.TransactionValidationOptions
+	metrics          module.TransactionValidationMetrics
 }
 
 func (s *TransactionValidatorSuite) SetupTest() {
+	s.metrics = metrics.NewNoopCollector()
 	s.blocks = accessmock.NewBlocks(s.T())
 	assert.NotNil(s.T(), s.blocks)
 
@@ -93,7 +97,7 @@ func (s *TransactionValidatorSuite) TestTransactionValidator_ScriptExecutorInter
 		Return(nil, errors.New("script executor internal error")).
 		Once()
 
-	validator, err := access.NewTransactionValidator(s.blocks, s.chain, s.validatorOptions, scriptExecutor)
+	validator, err := access.NewTransactionValidator(s.blocks, s.chain, s.metrics, s.validatorOptions, scriptExecutor)
 	assert.NoError(s.T(), err)
 	assert.NotNil(s.T(), validator)
 
@@ -124,7 +128,7 @@ func (s *TransactionValidatorSuite) TestTransactionValidator_SufficientBalance()
 		Return(actualResponse, nil).
 		Once()
 
-	validator, err := access.NewTransactionValidator(s.blocks, s.chain, s.validatorOptions, scriptExecutor)
+	validator, err := access.NewTransactionValidator(s.blocks, s.chain, s.metrics, s.validatorOptions, scriptExecutor)
 	assert.NoError(s.T(), err)
 	assert.NotNil(s.T(), validator)
 
@@ -159,7 +163,7 @@ func (s *TransactionValidatorSuite) TestTransactionValidator_InsufficientBalance
 	assert.NoError(s.T(), err)
 	assert.NotNil(s.T(), actualAccountResponse)
 
-	validator, err := access.NewTransactionValidator(s.blocks, s.chain, s.validatorOptions, scriptExecutor)
+	validator, err := access.NewTransactionValidator(s.blocks, s.chain, s.metrics, s.validatorOptions, scriptExecutor)
 	assert.NoError(s.T(), err)
 	assert.NotNil(s.T(), validator)
 
@@ -185,7 +189,7 @@ func (s *TransactionValidatorSuite) TestTransactionValidator_SealedIndexedHeight
 		On("IndexedHeight").
 		Return(indexedHeight, nil)
 
-	validator, err := access.NewTransactionValidator(s.blocks, s.chain, s.validatorOptions, scriptExecutor)
+	validator, err := access.NewTransactionValidator(s.blocks, s.chain, s.metrics, s.validatorOptions, scriptExecutor)
 	assert.NoError(s.T(), err)
 	assert.NotNil(s.T(), validator)
 

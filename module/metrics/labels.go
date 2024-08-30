@@ -155,6 +155,20 @@ const (
 	MessageEntityResponse      = "entity_response"
 )
 
+// transaction validation labels
+const (
+	InvalidTransactionRateLimit = "payer_exceeded_rate_limit"
+	InvalidTransactionByteSize  = "transaction_exceeded_size_limit"
+	IncompleteTransaction       = "missing_fields"
+	InvalidGasLimit             = "invalid_gas_limit"
+	ExpiredTransaction          = "transaction_expired"
+	InvalidScript               = "invalid_script"
+	InvalidAddresses            = "invalid_address"
+	InvalidSignature            = "invalid_signature"
+	DuplicatedSignature         = "duplicate_signature"
+	InsufficientBalance         = "payer_insufficient_balance"
+)
+
 const ExecutionDataRequestRetryable = "retryable"
 
 const LabelViolationReason = "reason"

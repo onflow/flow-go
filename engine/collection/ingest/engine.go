@@ -71,6 +71,7 @@ func New(
 			MaxTransactionByteSize: config.MaxTransactionByteSize,
 			MaxCollectionByteSize:  config.MaxCollectionByteSize,
 		},
+		colMetrics,
 		limiter,
 	)
 
