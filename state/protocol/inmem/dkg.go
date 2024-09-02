@@ -33,8 +33,9 @@ func (d *DKG) Index(nodeID flow.Identifier) (uint, error) {
 	return uint(index), nil
 }
 
-// KeyShare returns the public key share for the given node. Error Returns:
-// protocol.IdentityNotFoundError if nodeID is not a valid DKG participant.
+// KeyShare returns the public key share for the given node.
+// Expected error during normal operations:
+//   - protocol.IdentityNotFoundError if nodeID is not a known DKG participant
 func (d *DKG) KeyShare(nodeID flow.Identifier) (crypto.PublicKey, error) {
 	index, exists := d.DKGIndexMap[nodeID]
 	if !exists {
