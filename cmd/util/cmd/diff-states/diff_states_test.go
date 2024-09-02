@@ -34,14 +34,21 @@ func TestDiffStates(t *testing.T) {
 		file2 := filepath.Join(datadir, "second.payloads")
 
 		payloads1 := []*ledger.Payload{
+			// account 1
 			newPayload(flow.Address{1}, "a", []byte{2}),
 			newPayload(flow.Address{1}, "b", []byte{3}),
-			newPayload(flow.Address{2}, "c", []byte{4}),
+			newPayload(flow.Address{1}, "c", []byte{4}),
+			// account 2
+			newPayload(flow.Address{2}, "d", []byte{5}),
 		}
 		payloads2 := []*ledger.Payload{
+			// account 1, different values for key b and c
 			newPayload(flow.Address{1}, "a", []byte{2}),
 			newPayload(flow.Address{1}, "b", []byte{5}),
+			newPayload(flow.Address{1}, "c", []byte{6}),
+			// account 3, missing in payloads1
 			newPayload(flow.Address{3}, "d", []byte{6}),
+			// account 4, missing in payloads1
 			newPayload(flow.Address{4}, "e", []byte{7}),
 		}
 
@@ -53,54 +60,112 @@ func TestDiffStates(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, len(payloads2), numOfPayloadWritten)
 
-		Cmd.SetArgs([]string{
-			"--payloads-1", file1,
-			"--payloads-2", file2,
-			"--chain", string(flow.Emulator),
-			"--output-directory", datadir,
-			"--raw",
-		})
+		test := func(t *testing.T, mode string) []string {
 
-		err = Cmd.Execute()
-		require.NoError(t, err)
+			Cmd.SetArgs([]string{
+				"--payloads-1", file1,
+				"--payloads-2", file2,
+				"--chain", string(flow.Emulator),
+				"--output-directory", datadir,
+				"--mode", mode,
+			})
 
-		var reportPath string
-		err = filepath.Walk(
-			datadir,
-			func(path string, info fs.FileInfo, err error) error {
-				if path != datadir && info.IsDir() {
-					return filepath.SkipDir
-				}
-				if strings.HasPrefix(filepath.Base(path), ReporterName) {
-					reportPath = path
-					return filepath.SkipAll
-				}
-				return err
-			},
-		)
-		require.NoError(t, err)
-		require.NotEmpty(t, reportPath)
-
-		report, err := os.Open(reportPath)
-		require.NoError(t, err)
-
-		var msgs [][]byte
-		decoder := json.NewDecoder(report)
-		for {
-			var msg json.RawMessage
-			err = decoder.Decode(&msg)
-			if err == io.EOF {
-				break
-			}
+			err = Cmd.Execute()
 			require.NoError(t, err)
 
-			msgs = append(msgs, msg)
+			var reportPath string
+			err = filepath.Walk(
+				datadir,
+				func(path string, info fs.FileInfo, err error) error {
+					if path != datadir && info.IsDir() {
+						return filepath.SkipDir
+					}
+					if strings.HasPrefix(filepath.Base(path), ReporterName) {
+						reportPath = path
+						return filepath.SkipAll
+					}
+					return err
+				},
+			)
+			require.NoError(t, err)
+			require.NotEmpty(t, reportPath)
+
+			report, err := os.Open(reportPath)
+			require.NoError(t, err)
+
+			var msgs []string
+			decoder := json.NewDecoder(report)
+			for {
+				var msg json.RawMessage
+				err = decoder.Decode(&msg)
+				if err == io.EOF {
+					break
+				}
+				require.NoError(t, err)
+
+				msgs = append(msgs, string(msg))
+			}
+
+			return msgs
 		}
 
-		assert.Equal(t, 4, len(msgs))
-		assert.Containsf(t, msgs, []byte(`{"kind":"account-missing","owner":"0200000000000000","state":2}`), "diff report contains account-missing for 0200000000000000")
-		assert.Containsf(t, msgs, []byte(`{"kind":"account-missing","owner":"0300000000000000","state":1}`), "diff report contains account-missing for 0300000000000000")
-		assert.Containsf(t, msgs, []byte(`{"kind":"account-missing","owner":"0400000000000000","state":1}`), "diff report contains account-missing for 0400000000000000")
-		assert.Containsf(t, msgs, []byte(`{"kind":"raw-diff","owner":"0100000000000000","key":"62","value1":"03","value2":"05"}`), "diff report contains raw-diff")
+		t.Run("raw", func(t *testing.T) {
+
+			msgs := test(t, "raw")
+
+			assert.Equal(t, 5, len(msgs))
+			assert.Containsf(t,
+				msgs,
+				`{"kind":"account-missing","owner":"0200000000000000","state":2}`,
+				"diff report contains account-missing for 0200000000000000",
+			)
+			assert.Containsf(t,
+				msgs,
+				`{"kind":"account-missing","owner":"0300000000000000","state":1}`,
+				"diff report contains account-missing for 0300000000000000",
+			)
+			assert.Containsf(t,
+				msgs,
+				`{"kind":"account-missing","owner":"0400000000000000","state":1}`,
+				"diff report contains account-missing for 0400000000000000",
+			)
+			assert.Containsf(t,
+				msgs,
+				`{"kind":"raw-diff","owner":"0100000000000000","key":"62","value1":"03","value2":"05"}`,
+				"diff report contains raw-diff",
+			)
+			assert.Containsf(t,
+				msgs,
+				`{"kind":"raw-diff","owner":"0100000000000000","key":"63","value1":"04","value2":"06"}`,
+				"diff report contains raw-diff",
+			)
+		})
+
+		t.Run("accounts", func(t *testing.T) {
+
+			msgs := test(t, "accounts")
+
+			assert.Equal(t, 4, len(msgs))
+			assert.Containsf(t,
+				msgs,
+				`{"kind":"account-missing","owner":"0200000000000000","state":2}`,
+				"diff report contains account-missing for 0200000000000000",
+			)
+			assert.Containsf(t,
+				msgs,
+				`{"kind":"account-missing","owner":"0300000000000000","state":1}`,
+				"diff report contains account-missing for 0300000000000000",
+			)
+			assert.Containsf(t,
+				msgs,
+				`{"kind":"account-missing","owner":"0400000000000000","state":1}`,
+				"diff report contains account-missing for 0400000000000000",
+			)
+			assert.Containsf(t,
+				msgs,
+				`{"kind":"account-diff","owner":"0100000000000000"}`,
+				"diff report contains account-diff",
+			)
+		})
 	})
 }

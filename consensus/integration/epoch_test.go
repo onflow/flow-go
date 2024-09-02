@@ -268,7 +268,7 @@ func withNextEpoch(
 
 	// Store the modified epoch protocol state entry and corresponding KV store entry
 	rootKVStore, err := kvstore.NewDefaultKVStore(
-		originalRootKVStore.GetEpochCommitSafetyThreshold(),
+		originalRootKVStore.GetFinalizationSafetyThreshold(),
 		originalRootKVStore.GetEpochExtensionViewCount(),
 		epochRichProtocolState.ID())
 	require.NoError(t, err)

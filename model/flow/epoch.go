@@ -32,7 +32,7 @@ import (
 //	║    Notification            Notification               Notification
 //
 // However, if the Protocol State encounters any unexpected epoch service events, or the subsequent epoch
-// fails to be committed by the `EpochCommitSafetyThreshold`, then we enter Epoch Fallback Mode [EFM].
+// fails to be committed by the `FinalizationSafetyThreshold`, then we enter Epoch Fallback Mode [EFM].
 // Depending on whether the subsequent epoch has already been committed, the EFM progress differs slightly.
 // In a nutshell, we always enter the _latest_ epoch already committed on the happy path (if there is any)
 // and then follow the fallback protocol.
@@ -61,7 +61,7 @@ import (
 //	║                         Epoch N
 //	║ ···────────────────────────┴───────────────────────────────────────────────────────────────╮
 //	║              invalid service event or                         EpochRecover
-//	║         EpochCommitSafetyThreshold reached                    service event
+//	║         FinalizationSafetyThreshold reached                   service event
 //	║                           ⇣                      ┊            ⇣
 //	║  ┌────────────────────┐   ┌──────────────────────┊──────┐     ┌───────────────────────────┐
 //	║  │ EpochPhaseStaking  │   │     EpochPhaseFallback      │     │   EpochPhaseCommitted     │
@@ -129,7 +129,7 @@ const EpochSetupRandomSourceLength = 16
 // EpochSetup is a service event emitted when the preparation process for the next epoch begins.
 // EpochSetup events must:
 //   - be emitted exactly once per epoch before the corresponding EpochCommit event
-//   - be emitted prior to the epoch commitment deadline (defined by EpochCommitSafetyThreshold)
+//   - be emitted prior to the epoch commitment deadline (defined by FinalizationSafetyThreshold)
 //
 // If either of the above constraints are not met, the service event will be rejected and Epoch Fallback Mode [EFM] will be triggered.
 //
@@ -229,7 +229,7 @@ func (er *EpochRecover) EqualTo(other *EpochRecover) bool {
 // EpochCommit is a service event emitted when the preparation process for the next epoch is complete.
 // EpochCommit events must:
 //   - be emitted exactly once per epoch after the corresponding EpochSetup event
-//   - be emitted prior to the epoch commitment deadline (defined by EpochCommitSafetyThreshold)
+//   - be emitted prior to the epoch commitment deadline (defined by FinalizationSafetyThreshold)
 //
 // If either of the above constraints are not met, the service event will be rejected and Epoch Fallback Mode [EFM] will be triggered.
 //

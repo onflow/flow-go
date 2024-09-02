@@ -27,7 +27,7 @@ func (s *EpochJoinAndLeaveVNSuite) SetupTest() {
 	s.StakingAuctionLen = 100
 	s.DKGPhaseLen = 100
 	s.EpochLen = 450
-	s.EpochCommitSafetyThreshold = 20
+	s.FinalizationSafetyThreshold = 20
 	s.BaseSuite.SetupTest()
 }
 

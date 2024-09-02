@@ -190,7 +190,7 @@ func TestNewDefaultKVStore(t *testing.T) {
 		store, err := kvstore.NewDefaultKVStore(safetyParams.FinalizationSafetyThreshold, safetyParams.EpochExtensionViewCount, epochStateID)
 		require.NoError(t, err)
 		require.Equal(t, store.GetEpochStateID(), epochStateID)
-		require.Equal(t, store.GetEpochCommitSafetyThreshold(), safetyParams.FinalizationSafetyThreshold)
+		require.Equal(t, store.GetFinalizationSafetyThreshold(), safetyParams.FinalizationSafetyThreshold)
 		require.Equal(t, store.GetEpochExtensionViewCount(), safetyParams.EpochExtensionViewCount)
 		require.GreaterOrEqual(t, store.GetEpochExtensionViewCount(), 2*safetyParams.FinalizationSafetyThreshold,
 			"extension view count should be at least 2*FinalizationSafetyThreshold")

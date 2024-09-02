@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/onflow/cadence/runtime"
-	"github.com/onflow/cadence/runtime/ast"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
 )
@@ -92,8 +91,4 @@ func (r *checkingInterface) GetOrLoadProgram(
 
 func (r *checkingInterface) GetAccountContractCode(location common.AddressLocation) (code []byte, err error) {
 	return r.SystemContractCodes[location], nil
-}
-
-func (*checkingInterface) RecoverProgram(_ *ast.Program, _ common.Location) (*ast.Program, error) {
-	return nil, nil
 }

@@ -38,7 +38,7 @@ func (s *StateMachineSuite) SetupTest() {
 	s.telemetry = mock.NewStateMachineTelemetryConsumer(s.T())
 	s.view = 1000
 
-	s.parentState.On("GetEpochCommitSafetyThreshold").Return(uint64(100)).Maybe()
+	s.parentState.On("GetFinalizationSafetyThreshold").Return(uint64(100)).Maybe()
 
 	s.stateMachine = kvstore.NewPSVersionUpgradeStateMachine(s.telemetry, s.view, s.parentState, s.mutator)
 	require.NotNil(s.T(), s.stateMachine)
@@ -62,7 +62,7 @@ func (s *StateMachineSuite) TestEvolveState_ProtocolStateVersionUpgrade() {
 		s.parentState.On("GetProtocolStateVersion").Return(oldVersion)
 
 		upgrade := unittest.ProtocolStateVersionUpgradeFixture()
-		upgrade.ActiveView = s.view + s.parentState.GetEpochCommitSafetyThreshold() + 1
+		upgrade.ActiveView = s.view + s.parentState.GetFinalizationSafetyThreshold() + 1
 		upgrade.NewProtocolStateVersion = oldVersion + 1
 
 		s.telemetry.On("OnServiceEventReceived", upgrade.ServiceEvent()).Return().Once()
@@ -82,7 +82,7 @@ func (s *StateMachineSuite) TestEvolveState_ProtocolStateVersionUpgrade() {
 		s.parentState.On("GetProtocolStateVersion").Return(oldVersion)
 
 		upgrade := unittest.ProtocolStateVersionUpgradeFixture()
-		upgrade.ActiveView = s.view + s.parentState.GetEpochCommitSafetyThreshold() + 1
+		upgrade.ActiveView = s.view + s.parentState.GetFinalizationSafetyThreshold() + 1
 		upgrade.NewProtocolStateVersion = oldVersion
 
 		s.telemetry.On("OnServiceEventReceived", upgrade.ServiceEvent()).Return().Once()
@@ -101,7 +101,7 @@ func (s *StateMachineSuite) TestEvolveState_ProtocolStateVersionUpgrade() {
 		s.parentState.On("GetProtocolStateVersion").Return(oldVersion)
 
 		upgrade := unittest.ProtocolStateVersionUpgradeFixture()
-		upgrade.ActiveView = s.view + s.parentState.GetEpochCommitSafetyThreshold() + 1
+		upgrade.ActiveView = s.view + s.parentState.GetFinalizationSafetyThreshold() + 1
 		upgrade.NewProtocolStateVersion = oldVersion + 2 // has to be exactly +1
 
 		s.telemetry.On("OnServiceEventReceived", upgrade.ServiceEvent()).Return().Once()
@@ -117,7 +117,7 @@ func (s *StateMachineSuite) TestEvolveState_ProtocolStateVersionUpgrade() {
 	s.Run("invalid-activation-view", func() {
 		s.mutator = mock.NewKVStoreMutator(s.T())
 		upgrade := unittest.ProtocolStateVersionUpgradeFixture()
-		upgrade.ActiveView = s.view + s.parentState.GetEpochCommitSafetyThreshold()
+		upgrade.ActiveView = s.view + s.parentState.GetFinalizationSafetyThreshold()
 
 		s.telemetry.On("OnServiceEventReceived", upgrade.ServiceEvent()).Return().Once()
 		s.telemetry.On("OnInvalidServiceEvent", upgrade.ServiceEvent(),
