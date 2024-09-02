@@ -50,6 +50,11 @@ type ParticipantData struct {
 // the group public key). The keys are returned in the same order as the nodes appear
 // in the Participants list, which must be the DKG index order.
 func (pd *ParticipantData) PublicBeaconKeys() []crypto.PublicKey {
+	// TODO: I think the PublicBeaconKeys cannot be derived from the `ParticipantData.Participants`
+	//       See for further details: https://github.com/onflow/flow-go/pull/6338#discussion_r1735324548
+	//                                https://github.com/onflow/flow-go/pull/6338#discussion_r1735395983
+	panic("possibly incorrect usage of `ParticipantData.Participants`")
+
 	keys := make([]crypto.PublicKey, len(pd.Participants))
 	for i, participant := range pd.Participants {
 		keys[i] = participant.RandomBeaconPrivKey.PublicKey()
