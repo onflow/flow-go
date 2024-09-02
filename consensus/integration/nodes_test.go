@@ -260,7 +260,7 @@ func createRootBlockData(t *testing.T, participantData *run.ParticipantData) (*f
 	participants := unittest.CompleteIdentitySet(consensusParticipants...).Sort(flow.Canonical[flow.Identity])
 	dkgParticipants := participants.ToSkeleton().Filter(filter.IsValidDKGParticipant)
 	dkgParticipantsKeys := make([]crypto.PublicKey, 0, len(consensusParticipants))
-	dkgIndexMap := make(map[flow.Identifier]int)
+	dkgIndexMap := make(flow.DKGIndexMap)
 	for index, participant := range dkgParticipants {
 		dkgParticipantsKeys = append(dkgParticipantsKeys, participantData.DKGCommittee[participant.NodeID].KeyShare)
 		dkgIndexMap[participant.NodeID] = index

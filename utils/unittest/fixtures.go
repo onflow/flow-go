@@ -2148,7 +2148,7 @@ func WithDKGFromParticipants(participants flow.IdentitySkeletonList) func(*flow.
 	dkgParticipants := participants.Filter(filter.IsValidDKGParticipant).Sort(flow.Canonical[flow.IdentitySkeleton])
 	return func(commit *flow.EpochCommit) {
 		commit.DKGParticipantKeys = nil
-		commit.DKGIndexMap = make(map[flow.Identifier]int)
+		commit.DKGIndexMap = make(flow.DKGIndexMap)
 		for index, nodeID := range dkgParticipants.NodeIDs() {
 			commit.DKGParticipantKeys = append(commit.DKGParticipantKeys, KeyFixture(crypto.BLSBLS12381).PublicKey())
 			commit.DKGIndexMap[nodeID] = index
@@ -2857,7 +2857,7 @@ func WithValidDKG() func(*flow.RichEpochStateEntry) {
 		commit := entry.CurrentEpochCommit
 		dkgParticipants := entry.CurrentEpochSetup.Participants.Filter(filter.IsValidDKGParticipant).Sort(flow.Canonical[flow.IdentitySkeleton])
 		commit.DKGParticipantKeys = nil
-		commit.DKGIndexMap = make(map[flow.Identifier]int)
+		commit.DKGIndexMap = make(flow.DKGIndexMap)
 		for index, nodeID := range dkgParticipants.NodeIDs() {
 			commit.DKGParticipantKeys = append(commit.DKGParticipantKeys, KeyFixture(crypto.BLSBLS12381).PublicKey())
 			commit.DKGIndexMap[nodeID] = index
