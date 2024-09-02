@@ -180,7 +180,7 @@ func Test_VerifyQC_EmptySigners(t *testing.T) {
 	dkg := &mocks.DKG{}
 	pk := &modulemock.PublicKey{}
 	pk.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
-	dkg.On("GroupKey").Return(pk)
+	dkg.On("DKGGroupKey").Return(pk)
 	committee.On("DKG", mock.Anything).Return(dkg, nil)
 
 	packer := signature.NewConsensusSigDataPacker(committee)

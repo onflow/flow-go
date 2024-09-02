@@ -230,7 +230,7 @@ func withNextEpoch(
 		Counter:            nextEpochSetup.Counter,
 		ClusterQCs:         currEpochCommit.ClusterQCs,
 		DKGParticipantKeys: nextEpochParticipantData.PublicBeaconKeys(),
-		DKGGroupKey:        nextEpochParticipantData.GroupKey,
+		DKGGroupKey:        nextEpochParticipantData.DKGGroupKey,
 		DKGIndexMap:        nextEpochParticipantData.DKGIndexMap(),
 	}
 
