@@ -24,10 +24,26 @@ type Participant struct {
 	RandomBeaconPrivKey crypto.PrivateKey
 }
 
+// ParticipantData represents a subset of all consensus participants that contributing to some signing process (at the moment, we only use
+// it for the contributors for the root QC). For mainnet, this a *strict subset* of all consensus participants:
+//   - In an early step during the bootstrapping process, every node operator locally generates votes for the root block from the nodes they
+//     operate. During the vote-generation step, (see function `constructRootVotes`), `Participants` represents only the operator's own
+//     nodes (generally a small minority of the entire consensus committee).
+//   - During a subsequent step of the bootstrapping process, the Flow Foundation collects a supermajority of votes from the consensus
+//     participants and constructs the root QC  (see function `constructRootQC`). Here, `Participants` is only populated with
+//     the information of the internal does that the Flow Foundation runs, but not used.
+//
+// Furthermore, ParticipantData contains auxiliary data about the DKG to set up the random beacon. Note that the consensus committee 𝒞 and the
+// DKG committee 𝒟 are generally _not_ identical. We explicitly want to support that _either_ set can have nodes that are not in
+// the other set (formally 𝒟 \ 𝒞 ≠ ∅ and 𝒞 \ 𝒟 ≠ ∅). ParticipantData has no direct representation of the consensus committee 𝒞.
 type ParticipantData struct {
+	// Participants of the signing process: only members of the consensus committee can vote (formally Participants ⊊ 𝒞).
+	// However, we allow for consensus committee members that are _not_ part of the random beacon committee 𝒟 (formally
+	// ∅ ≠ Participants \ 𝒟).
 	Participants []Participant
-	Lookup       map[flow.Identifier]flow.DKGParticipant
-	GroupKey     crypto.PublicKey
+
+	DKGCommittee map[flow.Identifier]flow.DKGParticipant // DKG committee 𝒟 (to set up the random beacon)
+	DKGGroupKey  crypto.PublicKey                        // group key for the DKG committee 𝒟
 }
 
 // PublicBeaconKeys returns the nodes' individual public random-beacon keys (excluding
@@ -50,9 +66,17 @@ func (pd *ParticipantData) Identities() flow.IdentityList {
 }
 
 // DKGIndexMap returns a map from node ID to DKG index. Can be used to reconstruct EpochCommit.
+// This implementation guarantees the following protocol-mandated invariants (or returns an
+// exception for non-compliant `ParticipantData`):
+//   - len(DKGParticipantKeys) == len(DKGIndexMap)
+//   - DKGIndexMap values form the set {0, 1, ..., n-1} where n=len(DKGParticipantKeys)
+//
+// CAUTION: This mapping may include identifiers for nodes which do not exist in the consensus committee
+//
+//	and may NOT include identifiers for all nodes in the consensus committee.
 func (pd *ParticipantData) DKGIndexMap() map[flow.Identifier]int {
 	result := make(map[flow.Identifier]int)
-	for nodeID, participant := range pd.Lookup {
+	for nodeID, participant := range pd.DKGCommittee {
 		result[nodeID] = int(participant.Index)
 	}
 	return result
@@ -73,7 +97,7 @@ func GenerateRootQC(block *flow.Block, votes []*model.Vote, participantData *Par
 	error, // exception or could not construct qc
 ) {
 	// create consensus committee's state
-	committee, err := committees.NewStaticCommittee(identities, flow.Identifier{}, participantData.Lookup, participantData.GroupKey)
+	committee, err := committees.NewStaticCommittee(identities, flow.Identifier{}, participantData.DKGCommittee, participantData.DKGGroupKey)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -218,8 +242,8 @@ func GenerateQCParticipantData(allNodes, internalNodes []bootstrap.NodeInfo, dkg
 		})
 	}
 
-	qcData.Lookup = participantLookup
-	qcData.GroupKey = dkgData.PubGroupKey
+	qcData.DKGCommittee = participantLookup
+	qcData.DKGGroupKey = dkgData.PubGroupKey
 
 	return qcData, nil
 }
