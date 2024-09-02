@@ -23,12 +23,16 @@ func NewDKG(commit *flow.EpochCommit) *DKG {
 func (d DKG) Size() uint                 { return uint(len(d.commit.DKGParticipantKeys)) }
 func (d DKG) GroupKey() crypto.PublicKey { return d.commit.DKGGroupKey }
 
-// Index returns the index for the given node. Error Returns:
-// protocol.IdentityNotFoundError if nodeID is not a valid DKG participant.
+// Index returns the DKG index for the given node.
+// Expected error during normal operations:
+//  * protocol.IdentityNotFoundError if nodeID is not a known DKG participant
 func (d DKG) Index(nodeID flow.Identifier) (uint, error) {
 	index, exists := d.commit.DKGIndexMap[nodeID]
 	if !exists {
 		return 0, protocol.IdentityNotFoundError{NodeID: nodeID}
+	}
+	if index < 0 { // sanity check, to rule out underflow in subsequent conversion to `uint`
+		return 0, fmt.Errorf("for node %v, DKGIndexMap contains negative index %d in violation of protocol convention", nodeID, index)
 	}
 	return uint(index), nil
 }
