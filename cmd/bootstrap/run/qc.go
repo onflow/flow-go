@@ -46,22 +46,6 @@ type ParticipantData struct {
 	DKGGroupKey  crypto.PublicKey                        // group key for the DKG committee 𝒟
 }
 
-// PublicBeaconKeys returns the nodes' individual public random-beacon keys (excluding
-// the group public key). The keys are returned in the same order as the nodes appear
-// in the Participants list, which must be the DKG index order.
-func (pd *ParticipantData) PublicBeaconKeys() []crypto.PublicKey {
-	// TODO: I think the PublicBeaconKeys cannot be derived from the `ParticipantData.Participants`
-	//       See for further details: https://github.com/onflow/flow-go/pull/6338#discussion_r1735324548
-	//                                https://github.com/onflow/flow-go/pull/6338#discussion_r1735395983
-	panic("possibly incorrect usage of `ParticipantData.Participants`")
-
-	keys := make([]crypto.PublicKey, len(pd.Participants))
-	for i, participant := range pd.Participants {
-		keys[i] = participant.RandomBeaconPrivKey.PublicKey()
-	}
-	return keys
-}
-
 func (pd *ParticipantData) Identities() flow.IdentityList {
 	nodes := make([]bootstrap.NodeInfo, 0, len(pd.Participants))
 	for _, participant := range pd.Participants {
@@ -70,21 +54,24 @@ func (pd *ParticipantData) Identities() flow.IdentityList {
 	return bootstrap.ToIdentityList(nodes)
 }
 
-// DKGIndexMap returns a map from node ID to DKG index. Can be used to reconstruct EpochCommit.
+// DKGData returns a map from node ID to DKG index and a list of public keys, one per DKG participant, ordered by Random Beacon index.
+// Can be used to reconstruct EpochCommit.
 // This implementation guarantees the following protocol-mandated invariants (or returns an
 // exception for non-compliant `ParticipantData`):
-//   - len(DKGParticipantKeys) == len(DKGIndexMap)
-//   - DKGIndexMap values form the set {0, 1, ..., n-1} where n=len(DKGParticipantKeys)
+//   - len(DKGParticipantKeys) == len(DKGData)
+//   - DKGData values form the set {0, 1, ..., n-1} where n=len(DKGParticipantKeys)
 //
 // CAUTION: This mapping may include identifiers for nodes which do not exist in the consensus committee
 //
 //	and may NOT include identifiers for all nodes in the consensus committee.
-func (pd *ParticipantData) DKGIndexMap() map[flow.Identifier]int {
-	result := make(map[flow.Identifier]int)
+func (pd *ParticipantData) DKGData() (flow.DKGIndexMap, []crypto.PublicKey) {
+	indexMap := make(flow.DKGIndexMap, len(pd.DKGCommittee))
+	keys := make([]crypto.PublicKey, len(pd.DKGCommittee))
 	for nodeID, participant := range pd.DKGCommittee {
-		result[nodeID] = int(participant.Index)
+		indexMap[nodeID] = int(participant.Index)
+		keys[participant.Index] = participant.KeyShare
 	}
-	return result
+	return indexMap, keys
 }
 
 // GenerateRootQC generates QC for root block, caller needs to provide votes for root QC and
