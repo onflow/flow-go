@@ -2,6 +2,7 @@ package protocol
 
 import (
 	"fmt"
+	"golang.org/x/exp/slices"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/factory"
@@ -173,10 +174,28 @@ func IsValidEpochCommit(commit *flow.EpochCommit, setup *flow.EpochSetup) error 
 	if len(participants) > len(commit.DKGParticipantKeys) {
 		return NewInvalidServiceEventErrorf("participant list (len=%d) is bigger than dkg key list (len=%d)", len(participants), len(commit.DKGParticipantKeys))
 	}
-	// we always expect same number of keys as the number of entries in the index map.
+
+	// enforce invariant: len(DKGParticipantKeys) == len(DKGIndexMap)
 	if len(commit.DKGParticipantKeys) != len(commit.DKGIndexMap) {
 		return NewInvalidServiceEventErrorf("dkg key list (len=%d) does not match index map (len=%d)", len(commit.DKGParticipantKeys), len(commit.DKGIndexMap))
 	}
+
+	// enforce invariant: DKGIndexMap values form the set {0, 1, ..., n-1} where n=len(DKGParticipantKeys)
+	indices := make([]int, 0, len(commit.DKGIndexMap))
+	for _, index := range commit.DKGIndexMap {
+		indices = append(indices, index)
+	}
+	slices.Sort(indices)
+	// in this loop we enforce that:
+	// 	- each index is unique
+	//  - each index is from the set {0, 1, ..., n-1} where n=len(DKGParticipantKeys)
+	for i := 0; i < len(commit.DKGParticipantKeys); i++ {
+		if indices[i] != i {
+			return NewInvalidServiceEventErrorf("duplicated DKG index %d", indices[i])
+		}
+
+	}
+
 	// make sure that all participants have a DKG index
 	for _, nodeID := range participants.NodeIDs() {
 		_, ok := commit.DKGIndexMap[nodeID]

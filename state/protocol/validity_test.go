@@ -162,6 +162,43 @@ func TestBootstrapInvalidEpochCommit(t *testing.T) {
 		err := protocol.IsValidEpochCommit(commit, setup)
 		require.Error(t, err)
 	})
+
+	t.Run("DKG index map contains negative index", func(t *testing.T) {
+		_, result, _ := unittest.BootstrapFixture(participants)
+		setup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
+		commit := result.ServiceEvents[1].Event.(*flow.EpochCommit)
+		// replace entity in the index map so the size matches but with negative index.
+		nodeID := setup.Participants.Filter(filter.IsValidDKGParticipant)[0].NodeID
+		commit.DKGIndexMap[nodeID] = -1
+
+		err := protocol.IsValidEpochCommit(commit, setup)
+		require.Error(t, err)
+	})
+
+	t.Run("DKG indexes are not consecutive", func(t *testing.T) {
+		_, result, _ := unittest.BootstrapFixture(participants)
+		setup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
+		commit := result.ServiceEvents[1].Event.(*flow.EpochCommit)
+		// replace entity in the index map so the size matches but with negative index.
+		nodeID := setup.Participants.Filter(filter.IsValidDKGParticipant)[0].NodeID
+		commit.DKGIndexMap[nodeID] = len(commit.DKGParticipantKeys) // change index so it's out of bound and not consecutive
+
+		err := protocol.IsValidEpochCommit(commit, setup)
+		require.Error(t, err)
+	})
+
+	t.Run("DKG indexes are duplicated", func(t *testing.T) {
+		_, result, _ := unittest.BootstrapFixture(participants)
+		setup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
+		commit := result.ServiceEvents[1].Event.(*flow.EpochCommit)
+		// replace entity in the index map so the size matches but with negative index.
+		nodeID := setup.Participants.Filter(filter.IsValidDKGParticipant)[0].NodeID
+		otherNodeID := setup.Participants.Filter(filter.IsValidDKGParticipant)[1].NodeID
+		commit.DKGIndexMap[nodeID] = commit.DKGIndexMap[otherNodeID] // change index so it's out of bound and not consecutive
+
+		err := protocol.IsValidEpochCommit(commit, setup)
+		require.Error(t, err)
+	})
 }
 
 // TestIsValidExtendingEpochSetup tests that implementation enforces the following protocol rules in case they are violated:
