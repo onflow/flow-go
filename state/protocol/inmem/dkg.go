@@ -45,7 +45,9 @@ func (d *DKG) KeyShare(nodeID flow.Identifier) (crypto.PublicKey, error) {
 }
 
 // NodeID returns the node identifier for the given index.
-// An exception is returned if the index is >= Size().
+// An exception is returned if the index is ≥ Size().
+// Intended for use outside the hotpath, with runtime
+// scaling linearly in the number of DKG participants (ie. Size())
 func (d *DKG) NodeID(index uint) (flow.Identifier, error) {
 	for nodeID, dkgIndex := range d.DKGIndexMap {
 		if dkgIndex == int(index) {
