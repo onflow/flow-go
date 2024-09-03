@@ -807,7 +807,7 @@ func (builder *ObserverServiceBuilder) extraFlags() {
 
 		// Register DB Pruning
 		flags.Uint64Var(&builder.registerDBPruneThreshold,
-			"registerdb-pruning-enabled",
+			"registerdb-pruning-threshold",
 			defaultConfig.registerDBPruneThreshold,
 			fmt.Sprintf("specifies the number of blocks below the latest stored block height to keep in register db. default: %d", defaultConfig.registerDBPruneThreshold))
 	}).ValidateFlags(func() error {

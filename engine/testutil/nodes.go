@@ -616,7 +616,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ide
 	checkpointHeight := uint64(0)
 	require.NoError(t, esbootstrap.ImportRegistersFromCheckpoint(node.Log, checkpointFile, checkpointHeight, matchTrie.RootHash(), pebbledb, 2))
 
-	diskStore, err := storagepebble.NewRegisters(pebbledb, storagepebble.NoPruneThreshold)
+	diskStore, err := storagepebble.NewRegisters(pebbledb, storagepebble.PruningDisabled)
 	require.NoError(t, err)
 
 	reader := finalizedreader.NewFinalizedReader(headersStorage, checkpointHeight)

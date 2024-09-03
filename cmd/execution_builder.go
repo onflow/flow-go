@@ -869,7 +869,7 @@ func (exeNode *ExecutionNode) LoadRegisterStore(
 			return fmt.Errorf("could not import registers from checkpoint: %w", err)
 		}
 	}
-	diskStore, err := storagepebble.NewRegisters(pebbledb, storagepebble.NoPruneThreshold)
+	diskStore, err := storagepebble.NewRegisters(pebbledb, storagepebble.PruningDisabled)
 	if err != nil {
 		return fmt.Errorf("could not create registers storage: %w", err)
 	}

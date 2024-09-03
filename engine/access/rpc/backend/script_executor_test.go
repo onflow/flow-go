@@ -126,7 +126,7 @@ func (s *ScriptExecutorSuite) SetupTest() {
 
 	s.dbDir = unittest.TempDir(s.T())
 	db := pebbleStorage.NewBootstrappedRegistersWithPathForTest(s.T(), s.dbDir, s.height, s.height)
-	pebbleRegisters, err := pebbleStorage.NewRegisters(db, pebbleStorage.NoPruneThreshold)
+	pebbleRegisters, err := pebbleStorage.NewRegisters(db, pebbleStorage.PruningDisabled)
 	s.Require().NoError(err)
 	s.registerIndex = pebbleRegisters
 

@@ -59,7 +59,7 @@ func TestRegisterBootstrap_IndexCheckpointFile_Happy(t *testing.T) {
 		require.NoError(t, err)
 
 		// create registers instance and check values
-		reg, err := NewRegisters(pb, NoPruneThreshold)
+		reg, err := NewRegisters(pb, PruningDisabled)
 		require.NoError(t, err)
 
 		require.Equal(t, reg.LatestHeight(), rootHeight)
@@ -94,7 +94,7 @@ func TestRegisterBootstrap_IndexCheckpointFile_Empty(t *testing.T) {
 		require.NoError(t, err)
 
 		// create registers instance and check values
-		reg, err := NewRegisters(pb, NoPruneThreshold)
+		reg, err := NewRegisters(pb, PruningDisabled)
 		require.NoError(t, err)
 
 		require.Equal(t, reg.LatestHeight(), rootHeight)
@@ -176,7 +176,7 @@ func TestRegisterBootstrap_IndexCheckpointFile_MultipleBatch(t *testing.T) {
 		require.NoError(t, err)
 
 		// create registers instance and check values
-		reg, err := NewRegisters(pb, NoPruneThreshold)
+		reg, err := NewRegisters(pb, PruningDisabled)
 		require.NoError(t, err)
 
 		require.Equal(t, reg.LatestHeight(), rootHeight)

@@ -22,8 +22,8 @@ type Registers struct {
 	pruneThreshold uint64
 }
 
-// NoPruneThreshold represents the absence of a pruning threshold.
-const NoPruneThreshold = math.MaxUint64
+// PruningDisabled represents the absence of a pruning threshold.
+const PruningDisabled = math.MaxUint64
 
 var _ storage.RegisterIndex = (*Registers)(nil)
 
@@ -40,7 +40,7 @@ func NewRegisters(db *pebble.DB, pruneThreshold uint64) (*Registers, error) {
 
 	// If no pruning threshold is provided, disable pruning.
 	if pruneThreshold == 0 {
-		pruneThreshold = NoPruneThreshold
+		pruneThreshold = PruningDisabled
 	}
 
 	// All registers between firstHeight and lastHeight have been indexed
@@ -185,7 +185,7 @@ func convertNotFoundError(err error) error {
 }
 
 // updateBounds updates the stored height bounds based on the latest block height.
-// This method also handles pruning older data if the prune threshold is exceeded.
+// This method also handles marks older data as pruned if the prune threshold is exceeded.
 func (s *Registers) updateBounds(latestHeight uint64) {
 	s.latestHeight.Store(latestHeight)
 

@@ -25,7 +25,7 @@ func TestRegisters_Initialize(t *testing.T) {
 	t.Parallel()
 	p, dir := unittest.TempPebbleDBWithOpts(t, nil)
 	// fail on blank database without FirstHeight and LastHeight set
-	_, err := NewRegisters(p, NoPruneThreshold)
+	_, err := NewRegisters(p, PruningDisabled)
 	require.Error(t, err)
 	// verify the error type
 	require.True(t, errors.Is(err, storage.ErrNotBootstrapped))
@@ -296,7 +296,7 @@ func Benchmark_PayloadStorage(b *testing.B) {
 	dbpath := path.Join(b.TempDir(), "benchmark1.db")
 	db, err := pebble.Open(dbpath, opts)
 	require.NoError(b, err)
-	s, err := NewRegisters(db, NoPruneThreshold)
+	s, err := NewRegisters(db, PruningDisabled)
 	require.NoError(b, err)
 	require.NotNil(b, s)
 

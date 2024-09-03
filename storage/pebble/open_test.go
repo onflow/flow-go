@@ -66,7 +66,7 @@ func TestNewBootstrappedRegistersWithPath(t *testing.T) {
 		firstHeight := uint64(10)
 		require.NoError(t, initHeights(db2, firstHeight))
 
-		registers, err := NewRegisters(db2, NoPruneThreshold)
+		registers, err := NewRegisters(db2, PruningDisabled)
 		require.NoError(t, err)
 		require.Equal(t, firstHeight, registers.FirstHeight())
 		require.Equal(t, firstHeight, registers.LatestHeight())
