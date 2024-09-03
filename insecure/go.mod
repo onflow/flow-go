@@ -10,7 +10,7 @@ require (
 	github.com/libp2p/go-libp2p v0.32.2
 	github.com/libp2p/go-libp2p-pubsub v0.10.0
 	github.com/multiformats/go-multiaddr-dns v0.3.1
-	github.com/onflow/crypto v0.25.1
+	github.com/onflow/crypto v0.25.2
 	github.com/onflow/flow-go v0.36.2-0.20240717162253-d5d2e606ef53
 	github.com/rs/zerolog v1.29.0
 	github.com/spf13/pflag v1.0.5
@@ -51,7 +51,7 @@ require (
 	github.com/benbjohnson/clock v1.3.5 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bits-and-blooms/bitset v1.10.0 // indirect
-	github.com/btcsuite/btcd/btcec/v2 v2.2.1 // indirect
+	github.com/btcsuite/btcd/btcec/v2 v2.3.4 // indirect
 	github.com/cenkalti/backoff/v4 v4.2.1 // indirect
 	github.com/cespare/xxhash v1.1.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
@@ -140,7 +140,7 @@ require (
 	github.com/ipfs/go-cid v0.4.1 // indirect
 	github.com/ipfs/go-cidutil v0.1.0 // indirect
 	github.com/ipfs/go-ds-badger2 v0.1.3 // indirect
-	github.com/ipfs/go-ds-pebble v0.3.1 // indirect
+	github.com/ipfs/go-ds-pebble v0.3.1-0.20240828032824-d745b9d3200b // indirect
 	github.com/ipfs/go-ipfs-delay v0.0.1 // indirect
 	github.com/ipfs/go-ipfs-pq v0.0.3 // indirect
 	github.com/ipfs/go-ipfs-util v0.0.3 // indirect
@@ -200,21 +200,21 @@ require (
 	github.com/multiformats/go-multihash v0.2.3 // indirect
 	github.com/multiformats/go-multistream v0.5.0 // indirect
 	github.com/multiformats/go-varint v0.0.7 // indirect
+	github.com/nxadm/tail v1.4.8 // indirect
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
-	github.com/onflow/atree v0.8.0-rc.5 // indirect
-	github.com/onflow/cadence v1.0.0-preview.44 // indirect
+	github.com/onflow/atree v0.8.0-rc.6 // indirect
+	github.com/onflow/cadence v1.0.0-preview.52 // indirect
 	github.com/onflow/flow-core-contracts/lib/go/contracts v1.3.1 // indirect
 	github.com/onflow/flow-core-contracts/lib/go/templates v1.3.1 // indirect
 	github.com/onflow/flow-ft/lib/go/contracts v1.0.0 // indirect
 	github.com/onflow/flow-ft/lib/go/templates v1.0.0 // indirect
-	github.com/onflow/flow-go-sdk v1.0.0-preview.47 // indirect
+	github.com/onflow/flow-go-sdk v1.0.0-preview.55 // indirect
 	github.com/onflow/flow-nft/lib/go/contracts v1.2.1 // indirect
 	github.com/onflow/flow-nft/lib/go/templates v1.2.0 // indirect
-	github.com/onflow/flow/protobuf/go/flow v0.4.5 // indirect
+	github.com/onflow/flow/protobuf/go/flow v0.4.6 // indirect
 	github.com/onflow/go-ethereum v1.14.7 // indirect
 	github.com/onflow/sdks v0.6.0-preview.1 // indirect
 	github.com/onflow/wal v1.0.2 // indirect
-	github.com/onsi/ginkgo v1.16.5 // indirect
 	github.com/onsi/ginkgo/v2 v2.13.2 // indirect
 	github.com/opencontainers/runtime-spec v1.1.0 // indirect
 	github.com/opentracing/opentracing-go v1.2.0 // indirect
@@ -282,17 +282,17 @@ require (
 	go.uber.org/mock v0.4.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.26.0 // indirect
-	golang.org/x/crypto v0.22.0 // indirect
+	golang.org/x/crypto v0.26.0 // indirect
 	golang.org/x/exp v0.0.0-20240119083558-1b970713d09a // indirect
 	golang.org/x/mod v0.17.0 // indirect
-	golang.org/x/net v0.24.0 // indirect
+	golang.org/x/net v0.25.0 // indirect
 	golang.org/x/oauth2 v0.17.0 // indirect
-	golang.org/x/sync v0.7.0 // indirect
-	golang.org/x/sys v0.20.0 // indirect
-	golang.org/x/term v0.19.0 // indirect
-	golang.org/x/text v0.14.0 // indirect
+	golang.org/x/sync v0.8.0 // indirect
+	golang.org/x/sys v0.23.0 // indirect
+	golang.org/x/term v0.23.0 // indirect
+	golang.org/x/text v0.17.0 // indirect
 	golang.org/x/time v0.5.0 // indirect
-	golang.org/x/tools v0.20.0 // indirect
+	golang.org/x/tools v0.21.1-0.20240508182429-e35e4ccd0d2d // indirect
 	golang.org/x/xerrors v0.0.0-20231012003039-104605ab7028 // indirect
 	gonum.org/v1/gonum v0.14.0 // indirect
 	google.golang.org/api v0.162.0 // indirect
@@ -309,6 +309,3 @@ require (
 )
 
 replace github.com/onflow/flow-go => ../
-
-// TODO: remove it when https://github.com/ipfs/go-ds-pebble/pull/36 merged
-replace github.com/ipfs/go-ds-pebble v0.3.1 => github.com/onflow/go-ds-pebble v0.0.0-20240731130313-f186539f382c

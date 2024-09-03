@@ -5,18 +5,21 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/rs/zerolog/log"
+
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime/parser"
 	"github.com/onflow/crypto"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
-	"github.com/rs/zerolog/log"
 
 	cadenceutils "github.com/onflow/flow-go/access/utils"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/execution"
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/protocol"
 )
@@ -121,19 +124,28 @@ type TransactionValidationOptions struct {
 	CheckPayerBalanceMode        PayerBalanceMode
 }
 
+type ValidationStep struct {
+	check      func(*flow.TransactionBody) error
+	failReason string
+}
+
 type TransactionValidator struct {
-	blocks                   Blocks     // for looking up blocks to check transaction expiry
-	chain                    flow.Chain // for checking validity of addresses
-	options                  TransactionValidationOptions
-	serviceAccountAddress    flow.Address
-	limiter                  RateLimiter
-	scriptExecutor           execution.ScriptExecutor
-	verifyPayerBalanceScript []byte
+	blocks                       Blocks     // for looking up blocks to check transaction expiry
+	chain                        flow.Chain // for checking validity of addresses
+	options                      TransactionValidationOptions
+	serviceAccountAddress        flow.Address
+	limiter                      RateLimiter
+	scriptExecutor               execution.ScriptExecutor
+	verifyPayerBalanceScript     []byte
+	transactionValidationMetrics module.TransactionValidationMetrics
+
+	validationSteps []ValidationStep
 }
 
 func NewTransactionValidator(
 	blocks Blocks,
 	chain flow.Chain,
+	transactionValidationMetrics module.TransactionValidationMetrics,
 	options TransactionValidationOptions,
 	executor execution.ScriptExecutor,
 ) (*TransactionValidator, error) {
@@ -143,80 +155,68 @@ func NewTransactionValidator(
 
 	env := systemcontracts.SystemContractsForChain(chain.ChainID()).AsTemplateEnv()
 
-	return &TransactionValidator{
-		blocks:                   blocks,
-		chain:                    chain,
-		options:                  options,
-		serviceAccountAddress:    chain.ServiceAddress(),
-		limiter:                  NewNoopLimiter(),
-		scriptExecutor:           executor,
-		verifyPayerBalanceScript: templates.GenerateVerifyPayerBalanceForTxExecution(env),
-	}, nil
+	txValidator := &TransactionValidator{
+		blocks:                       blocks,
+		chain:                        chain,
+		options:                      options,
+		serviceAccountAddress:        chain.ServiceAddress(),
+		limiter:                      NewNoopLimiter(),
+		scriptExecutor:               executor,
+		verifyPayerBalanceScript:     templates.GenerateVerifyPayerBalanceForTxExecution(env),
+		transactionValidationMetrics: transactionValidationMetrics,
+	}
+
+	txValidator.initValidationSteps()
+
+	return txValidator, nil
 }
 
 func NewTransactionValidatorWithLimiter(
 	blocks Blocks,
 	chain flow.Chain,
 	options TransactionValidationOptions,
+	transactionValidationMetrics module.TransactionValidationMetrics,
 	rateLimiter RateLimiter,
 ) *TransactionValidator {
-	return &TransactionValidator{
-		blocks:                blocks,
-		chain:                 chain,
-		options:               options,
-		serviceAccountAddress: chain.ServiceAddress(),
-		limiter:               rateLimiter,
+	txValidator := &TransactionValidator{
+		blocks:                       blocks,
+		chain:                        chain,
+		options:                      options,
+		serviceAccountAddress:        chain.ServiceAddress(),
+		limiter:                      rateLimiter,
+		transactionValidationMetrics: transactionValidationMetrics,
+	}
+
+	txValidator.initValidationSteps()
+
+	return txValidator
+}
+
+func (v *TransactionValidator) initValidationSteps() {
+	v.validationSteps = []ValidationStep{
+		// rate limit transactions for specific payers.
+		// a short term solution to prevent attacks that send too many failed transactions
+		// if a transaction is from a payer that should be rate limited, all the following
+		// checks will be skipped
+		{v.checkRateLimitPayer, metrics.InvalidTransactionRateLimit},
+		{v.checkTxSizeLimit, metrics.InvalidTransactionByteSize},
+		{v.checkMissingFields, metrics.IncompleteTransaction},
+		{v.checkGasLimit, metrics.InvalidGasLimit},
+		{v.checkExpiry, metrics.ExpiredTransaction},
+		{v.checkCanBeParsed, metrics.InvalidScript},
+		{v.checkAddresses, metrics.InvalidAddresses},
+		{v.checkSignatureFormat, metrics.InvalidSignature},
+		{v.checkSignatureDuplications, metrics.DuplicatedSignature},
 	}
 }
 
 func (v *TransactionValidator) Validate(ctx context.Context, tx *flow.TransactionBody) (err error) {
-	// rate limit transactions for specific payers.
-	// a short term solution to prevent attacks that send too many failed transactions
-	// if a transaction is from a payer that should be rate limited, all the following
-	// checks will be skipped
-	err = v.checkRateLimitPayer(tx)
-	if err != nil {
-		return err
-	}
 
-	err = v.checkTxSizeLimit(tx)
-	if err != nil {
-		return err
-	}
-
-	err = v.checkMissingFields(tx)
-	if err != nil {
-		return err
-	}
-
-	err = v.checkGasLimit(tx)
-	if err != nil {
-		return err
-	}
-
-	err = v.checkExpiry(tx)
-	if err != nil {
-		return err
-	}
-
-	err = v.checkCanBeParsed(tx)
-	if err != nil {
-		return err
-	}
-
-	err = v.checkAddresses(tx)
-	if err != nil {
-		return err
-	}
-
-	err = v.checkSignatureFormat(tx)
-	if err != nil {
-		return err
-	}
-
-	err = v.checkSignatureDuplications(tx)
-	if err != nil {
-		return err
+	for _, step := range v.validationSteps {
+		if err = step.check(tx); err != nil {
+			v.transactionValidationMetrics.TransactionValidationFailed(step.failReason)
+			return err
+		}
 	}
 
 	err = v.checkSufficientBalanceToPayForTransaction(ctx, tx)
@@ -226,8 +226,7 @@ func (v *TransactionValidator) Validate(ctx context.Context, tx *flow.Transactio
 		// are 'internal' and related to script execution process. they shouldn't
 		// prevent the transaction from proceeding.
 		if IsInsufficientBalanceError(err) {
-			log.Info().Err(err).Msg("payer has insufficient balance")
-			//TODO: Metrics should go here from https://github.com/onflow/flow-go/pull/6239
+			v.transactionValidationMetrics.TransactionValidationFailed(metrics.InsufficientBalance)
 
 			if v.options.CheckPayerBalanceMode == EnforceCheck {
 				return err
@@ -235,10 +234,13 @@ func (v *TransactionValidator) Validate(ctx context.Context, tx *flow.Transactio
 		}
 
 		// log and ignore all other errors
+		v.transactionValidationMetrics.TransactionValidationSkipped()
 		log.Info().Err(err).Msg("check payer validation skipped due to error")
 	}
 
 	// TODO replace checkSignatureFormat by verifying the account/payer signatures
+
+	v.transactionValidationMetrics.TransactionValidated()
 
 	return nil
 }
@@ -367,7 +369,6 @@ func (v *TransactionValidator) checkCanBeParsed(tx *flow.TransactionBody) error 
 }
 
 func (v *TransactionValidator) checkAddresses(tx *flow.TransactionBody) error {
-
 	for _, address := range append(tx.Authorizers, tx.Payer) {
 		// we check whether this is a valid output of the address generator
 		if !v.chain.IsValid(address) {
@@ -395,7 +396,6 @@ func (v *TransactionValidator) checkSignatureDuplications(tx *flow.TransactionBo
 }
 
 func (v *TransactionValidator) checkSignatureFormat(tx *flow.TransactionBody) error {
-
 	for _, signature := range append(tx.PayloadSignatures, tx.EnvelopeSignatures...) {
 		// check the format of the signature is valid.
 		// a valid signature is an ECDSA signature of either P-256 or secp256k1 curve.
