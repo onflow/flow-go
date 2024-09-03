@@ -2,6 +2,7 @@ package protocol
 
 import (
 	"fmt"
+
 	"golang.org/x/exp/slices"
 
 	"github.com/onflow/flow-go/model/flow"
