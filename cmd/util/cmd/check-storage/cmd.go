@@ -2,6 +2,7 @@ package check_storage
 
 import (
 	"context"
+	"slices"
 
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
@@ -10,11 +11,12 @@ import (
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 
-	"github.com/onflow/flow-go/cmd/util/ledger/migrations"
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
 	"github.com/onflow/flow-go/cmd/util/ledger/util/registers"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/model/flow"
 	moduleUtil "github.com/onflow/flow-go/module/util"
 )
 
@@ -23,6 +25,7 @@ var (
 	flagState           string
 	flagStateCommitment string
 	flagOutputDirectory string
+	flagChain           string
 	flagNWorker         int
 )
 
@@ -74,9 +77,21 @@ func init() {
 		10,
 		"number of workers to use",
 	)
+
+	Cmd.Flags().StringVar(
+		&flagChain,
+		"chain",
+		"",
+		"Chain name",
+	)
+	_ = Cmd.MarkFlagRequired("chain")
 }
 
 func run(*cobra.Command, []string) {
+
+	chainID := flow.ChainID(flagChain)
+	// Validate chain ID
+	_ = chainID.Chain()
 
 	if flagPayloads == "" && flagState == "" {
 		log.Fatal().Msg("Either --payloads or --state must be provided")
@@ -85,6 +100,14 @@ func run(*cobra.Command, []string) {
 	}
 	if flagState != "" && flagStateCommitment == "" {
 		log.Fatal().Msg("--state-commitment must be provided when --state is provided")
+	}
+
+	// For now, skip EVM storage account since a different decoder is needed for decoding EVM registers.
+
+	systemContracts := systemcontracts.SystemContractsForChain(chainID)
+
+	acctsToSkip := []string{
+		flow.AddressToRegisterOwner(systemContracts.EVMStorage.Address),
 	}
 
 	// Create report in JSONL format
@@ -138,7 +161,7 @@ func run(*cobra.Command, []string) {
 		len(payloads),
 	)
 
-	failedAccountAddresses, err := checkStorageHealth(registersByAccount, flagNWorker, rw)
+	failedAccountAddresses, err := checkStorageHealth(registersByAccount, flagNWorker, rw, acctsToSkip)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to check storage health")
 	}
@@ -165,6 +188,7 @@ func checkStorageHealth(
 	registersByAccount *registers.ByAccount,
 	nWorkers int,
 	rw reporters.ReportWriter,
+	acctsToSkip []string,
 ) (failedAccountAddresses []string, err error) {
 
 	accountCount := registersByAccount.AccountCount()
@@ -185,6 +209,12 @@ func checkStorageHealth(
 		// Skip goroutine to avoid overhead
 		err = registersByAccount.ForEachAccount(
 			func(accountRegisters *registers.AccountRegisters) error {
+				defer logAccount(1)
+
+				if slices.Contains(acctsToSkip, accountRegisters.Owner()) {
+					return nil
+				}
+
 				accountStorageIssues := checkAccountStorageHealth(accountRegisters, nWorkers)
 
 				if len(accountStorageIssues) > 0 {
@@ -194,8 +224,6 @@ func checkStorageHealth(
 						rw.Write(issue)
 					}
 				}
-
-				logAccount(1)
 
 				return nil
 			})
@@ -253,6 +281,9 @@ func checkStorageHealth(
 
 		err = registersByAccount.ForEachAccount(
 			func(accountRegisters *registers.AccountRegisters) error {
+				if slices.Contains(acctsToSkip, accountRegisters.Owner()) {
+					return nil
+				}
 				jobs <- job{accountRegisters: accountRegisters}
 				return nil
 			})
@@ -294,7 +325,7 @@ func checkAccountStorageHealth(accountRegisters *registers.AccountRegisters, nWo
 	ledger := &registers.ReadOnlyLedger{Registers: accountRegisters}
 	storage := runtime.NewStorage(ledger, nil)
 
-	err = util.CheckStorageHealth(address, storage, accountRegisters, migrations.AllStorageMapDomains, nWorkers)
+	err = util.CheckStorageHealth(address, storage, accountRegisters, util.StorageMapDomains, nWorkers)
 	if err != nil {
 		issues = append(
 			issues,

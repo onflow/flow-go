@@ -185,6 +185,47 @@ func RecoveredNonFungibleTokenCode(nonFungibleTokenAddress common.Address, contr
                       %[2]s.recoveryPanic("NFT.createEmptyCollection")
                   }
               }
+
+              access(all)
+              resource Collection: NonFungibleToken.Collection {
+
+                  access(all)
+                  var ownedNFTs: @{UInt64: {NonFungibleToken.NFT}}
+
+                  init() {
+                      self.ownedNFTs <- {}
+                  }
+
+                  access(all)
+                  fun deposit(token: @{NonFungibleToken.NFT}) {
+                      %[2]s.recoveryPanic("Collection.deposit")
+                  }
+
+                  access(all)
+                  view fun getSupportedNFTTypes(): {Type: Bool} {
+                      %[2]s.recoveryPanic("Collection.getSupportedNFTTypes")
+                  }
+
+                  access(all)
+                  view fun isSupportedNFTType(type: Type): Bool {
+                      %[2]s.recoveryPanic("Collection.isSupportedNFTType")
+                  }
+
+                  access(NonFungibleToken.Withdraw)
+                  fun withdraw(withdrawID: UInt64): @{NonFungibleToken.NFT} {
+                      %[2]s.recoveryPanic("Collection.withdraw")
+                  }
+
+                  access(all)
+                  view fun borrowNFT(_ id: UInt64): &{NonFungibleToken.NFT}? {
+                      %[2]s.recoveryPanic("Collection.borrowNFT")
+                  }
+
+                  access(all)
+                  fun createEmptyCollection(): @{NonFungibleToken.Collection} {
+                      %[2]s.recoveryPanic("Collection.createEmptyCollection")
+                  }
+              }
           }
         `,
 		nonFungibleTokenAddress.HexWithPrefix(),
@@ -250,6 +291,8 @@ const nonFungibleTokenTypeIdentifier = "NonFungibleToken"
 const nonFungibleTokenTypeTotalSupplyFieldName = "totalSupply"
 const nonFungibleTokenNFTTypeIdentifier = "NFT"
 const nonFungibleTokenNFTTypeIDFieldName = "id"
+const nonFungibleTokenCollectionTypeIdentifier = "Collection"
+const nonFungibleTokenCollectionTypeOwnedNFTsFieldName = "ownedNFTs"
 
 func isFungibleTokenContract(program *ast.Program, fungibleTokenAddress common.Address) bool {
 
@@ -329,7 +372,10 @@ func isNonFungibleTokenContract(program *ast.Program, nonFungibleTokenAddress co
 	}
 
 	// Check if the contract has an NFT resource
-	nftDeclaration := contractDeclaration.Members.CompositesByIdentifier()[nonFungibleTokenNFTTypeIdentifier]
+
+	nestedComposites := contractDeclaration.Members.CompositesByIdentifier()
+
+	nftDeclaration := nestedComposites[nonFungibleTokenNFTTypeIdentifier]
 	if nftDeclaration == nil {
 		return false
 	}
@@ -345,7 +391,38 @@ func isNonFungibleTokenContract(program *ast.Program, nonFungibleTokenAddress co
 		return false
 	}
 
+	// Check if the contract has a Collection resource
+	collectionDeclaration := nestedComposites[nonFungibleTokenCollectionTypeIdentifier]
+	if collectionDeclaration == nil {
+		return false
+	}
+
+	// Check if the Collection resource has an ownedNFTs field
+	ownedNFTsFieldDeclaration := getField(collectionDeclaration, nonFungibleTokenCollectionTypeOwnedNFTsFieldName)
+	if ownedNFTsFieldDeclaration == nil {
+		return false
+	}
+
+	// Check if the ownedNFTs field is of type {UInt64: NonFungibleToken.NFT} (NOTE: old syntax)
+	ownedNFTsFieldType := ownedNFTsFieldDeclaration.TypeAnnotation.Type
+	ownedNFTsFieldDictionaryType, ok := ownedNFTsFieldType.(*ast.DictionaryType)
+	if !ok ||
+		!isNominalType(ownedNFTsFieldDictionaryType.KeyType, sema.UInt64TypeName) ||
+		!isNonFungibleTokenNFTNominalType(ownedNFTsFieldDictionaryType.ValueType) {
+
+		return false
+	}
+
 	return true
+}
+
+// isNonFungibleTokenNFTNominalType checks if the given type is a nominal type representing `NonFungibleToken.NFT`
+func isNonFungibleTokenNFTNominalType(ty ast.Type) bool {
+	nominalType, ok := ty.(*ast.NominalType)
+	return ok &&
+		nominalType.Identifier.Identifier == nonFungibleTokenTypeIdentifier &&
+		len(nominalType.NestedIdentifiers) == 1 &&
+		nominalType.NestedIdentifiers[0].Identifier == nonFungibleTokenNFTTypeIdentifier
 }
 
 func getField(declaration *ast.CompositeDeclaration, name string) *ast.FieldDeclaration {
