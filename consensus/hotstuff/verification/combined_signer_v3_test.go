@@ -148,7 +148,7 @@ func Test_VerifyQCV3(t *testing.T) {
 	// generate some BLS key as a stub of the random beacon group key and use it to generate a reconstructed beacon sig
 	privGroupKey, beaconSig := generateSignature(t, msg, msig.RandomBeaconTag)
 	dkg := &mocks.DKG{}
-	dkg.On("DKGGroupKey").Return(privGroupKey.PublicKey(), nil)
+	dkg.On("GroupKey").Return(privGroupKey.PublicKey(), nil)
 	dkg.On("Size").Return(uint(20))
 	committee := &mocks.DynamicCommittee{}
 	committee.On("DKG", mock.Anything).Return(dkg, nil)
@@ -254,7 +254,7 @@ func Test_VerifyQC_EmptySignersV3(t *testing.T) {
 	dkg := &mocks.DKG{}
 	pk := &modulemock.PublicKey{}
 	pk.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
-	dkg.On("DKGGroupKey").Return(pk)
+	dkg.On("GroupKey").Return(pk)
 	committee.On("DKG", mock.Anything).Return(dkg, nil)
 	packer := signature.NewConsensusSigDataPacker(committee)
 	verifier := NewCombinedVerifier(committee, packer)

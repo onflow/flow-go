@@ -737,11 +737,11 @@ func (s *EpochFallbackStateMachineSuite) TestEpochRecoverAndEjectionInSameBlock(
 func (s *EpochFallbackStateMachineSuite) TestProcessingMultipleEventsInTheSameBlock() {
 	rapid.Check(s.T(), func(t *rapid.T) {
 		s.SetupTest() // start each time with clean state
-		// ATTENTION: drawing a rapid value can raise a panic which unwinds stack and exists functor that is being passed to Check().
+		// ATTENTION: drawing a rapid value can raise a panic which unwinds stack and exits functor that is being passed to Check().
 		// It's not an issue on its own, but we are using telemetry to check correct invocations of state machine
 		// and when a panic occurs, it will still try to assert expectations on the consumer leading to a test failure.
 		// Specifically, for that reason, we are using a lower-level telemetry mock which allows manual assertion(in the end).
-		s.consumer = protocol_statemock.NewStateMachineTelemetryConsumer(s.T())
+		s.consumer = new(protocol_statemock.StateMachineTelemetryConsumer)
 		var err error
 		s.stateMachine, err = NewFallbackStateMachine(s.kvstore, s.consumer, s.candidate.View, s.parentProtocolState.Copy())
 		require.NoError(s.T(), err)
