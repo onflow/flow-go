@@ -834,6 +834,21 @@ func NewCadence1Migrations(
 				Migrate: NewEVMSetupMigration(opts.ChainID, log),
 			},
 		)
+		if opts.ChainID == flow.Emulator {
+
+			// In the Emulator the EVM storage account needs to be created
+
+			systemContracts := systemcontracts.SystemContractsForChain(opts.ChainID)
+			evmStorageAddress := systemContracts.EVMStorage.Address
+
+			migs = append(
+				migs,
+				NamedMigration{
+					Name:    "evm-storage-account-creation-migration",
+					Migrate: NewAccountCreationMigration(evmStorageAddress, log),
+				},
+			)
+		}
 	}
 
 	return migs
