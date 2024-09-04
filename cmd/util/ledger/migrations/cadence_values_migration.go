@@ -125,7 +125,7 @@ func (m *CadenceBaseMigration) MigrateAccount(
 	var storageHealthErrorBefore error
 	if m.checkStorageHealthBeforeMigration {
 
-		storageHealthErrorBefore = checkStorageHealth(address, storage, accountRegisters, m.nWorkers)
+		storageHealthErrorBefore = util.CheckStorageHealth(address, storage, accountRegisters, AllStorageMapDomains, m.nWorkers)
 		if storageHealthErrorBefore != nil {
 			m.log.Warn().
 				Err(storageHealthErrorBefore).
@@ -180,25 +180,15 @@ func (m *CadenceBaseMigration) MigrateAccount(
 		}
 	}
 
-	// finalize the transaction
-	result, err := migrationRuntime.TransactionState.FinalizeMainTransaction()
-	if err != nil {
-		return fmt.Errorf("failed to finalize main transaction: %w", err)
-	}
+	// Commit/finalize the transaction
 
-	// Merge the changes into the registers
 	expectedAddresses := map[flow.Address]struct{}{
 		flow.Address(address): {},
 	}
 
-	err = registers.ApplyChanges(
-		accountRegisters,
-		result.WriteSet,
-		expectedAddresses,
-		m.log,
-	)
+	err = migrationRuntime.Commit(expectedAddresses, m.log)
 	if err != nil {
-		return fmt.Errorf("failed to apply changes: %w", err)
+		return fmt.Errorf("failed to commit: %w", err)
 	}
 
 	if m.diffReporter != nil {
@@ -324,7 +314,7 @@ func NewCadence1LinkValueMigration(
 	rwf reporters.ReportWriterFactory,
 	errorMessageHandler *errorMessageHandler,
 	programs map[runtime.Location]*interpreter.Program,
-	capabilityMapping *capcons.CapabilityMapping,
+	capabilityMapping *capcons.PathCapabilityMapping,
 	opts Options,
 ) *CadenceBaseMigration {
 	var diffReporter reporters.ReportWriter
@@ -380,7 +370,9 @@ func NewCadence1CapabilityValueMigration(
 	rwf reporters.ReportWriterFactory,
 	errorMessageHandler *errorMessageHandler,
 	programs map[runtime.Location]*interpreter.Program,
-	capabilityMapping *capcons.CapabilityMapping,
+	privatePublicCapabilityMapping *capcons.PathCapabilityMapping,
+	typedStorageCapabilityMapping *capcons.PathTypeCapabilityMapping,
+	untypedStorageCapabilityMapping *capcons.PathCapabilityMapping,
 	opts Options,
 ) *CadenceBaseMigration {
 	var diffReporter reporters.ReportWriter
@@ -402,8 +394,10 @@ func NewCadence1CapabilityValueMigration(
 		) []migrations.ValueMigration {
 			return []migrations.ValueMigration{
 				&capcons.CapabilityValueMigration{
-					CapabilityMapping: capabilityMapping,
-					Reporter:          reporter,
+					PrivatePublicCapabilityMapping:  privatePublicCapabilityMapping,
+					TypedStorageCapabilityMapping:   typedStorageCapabilityMapping,
+					UntypedStorageCapabilityMapping: untypedStorageCapabilityMapping,
+					Reporter:                        reporter,
 				},
 			}
 		},
@@ -531,12 +525,24 @@ func (t *cadenceValueMigrationReporter) MissingCapabilityID(
 }
 
 func (t *cadenceValueMigrationReporter) MissingBorrowType(
-	accountAddress common.Address,
-	addressPath interpreter.AddressPath,
+	targetPath interpreter.AddressPath,
+	storedPath interpreter.AddressPath,
 ) {
 	t.reportWriter.Write(storageCapConsMissingBorrowTypeEntry{
-		AccountAddress: accountAddress,
-		AddressPath:    addressPath,
+		TargetPath: targetPath,
+		StoredPath: storedPath,
+	})
+}
+
+func (t *cadenceValueMigrationReporter) InferredMissingBorrowType(
+	targetPath interpreter.AddressPath,
+	borrowType *interpreter.ReferenceStaticType,
+	storedPath interpreter.AddressPath,
+) {
+	t.reportWriter.Write(storageCapConsInferredBorrowTypeEntry{
+		TargetPath: targetPath,
+		BorrowType: borrowType,
+		StoredPath: storedPath,
 	})
 }
 
@@ -864,14 +870,14 @@ func (e storageCapConIssuedEntry) MarshalJSON() ([]byte, error) {
 // StorageCapConMissingBorrowType
 
 type storageCapConsMissingBorrowTypeEntry struct {
-	AccountAddress common.Address
-	AddressPath    interpreter.AddressPath
+	TargetPath interpreter.AddressPath
+	StoredPath interpreter.AddressPath
 }
 
 var _ valueMigrationReportEntry = storageCapConsMissingBorrowTypeEntry{}
 
 func (e storageCapConsMissingBorrowTypeEntry) accountAddress() common.Address {
-	return e.AccountAddress
+	return e.StoredPath.Address
 }
 
 var _ json.Marshaler = storageCapConsMissingBorrowTypeEntry{}
@@ -881,11 +887,46 @@ func (e storageCapConsMissingBorrowTypeEntry) MarshalJSON() ([]byte, error) {
 		Kind           string `json:"kind"`
 		AccountAddress string `json:"account_address"`
 		Address        string `json:"address"`
-		Path           string `json:"path"`
+		TargetPath     string `json:"target_path"`
+		StoredPath     string `json:"stored_path"`
 	}{
 		Kind:           "storage-capcon-missing-borrow-type",
-		AccountAddress: e.AccountAddress.HexWithPrefix(),
-		Address:        e.AddressPath.Address.HexWithPrefix(),
-		Path:           e.AddressPath.Path.String(),
+		AccountAddress: e.StoredPath.Address.HexWithPrefix(),
+		Address:        e.TargetPath.Address.HexWithPrefix(),
+		TargetPath:     e.TargetPath.Path.String(),
+		StoredPath:     e.StoredPath.Path.String(),
+	})
+}
+
+// StorageCapConMissingBorrowType
+
+type storageCapConsInferredBorrowTypeEntry struct {
+	TargetPath interpreter.AddressPath
+	BorrowType *interpreter.ReferenceStaticType
+	StoredPath interpreter.AddressPath
+}
+
+var _ valueMigrationReportEntry = storageCapConsInferredBorrowTypeEntry{}
+var _ json.Marshaler = storageCapConsInferredBorrowTypeEntry{}
+
+func (e storageCapConsInferredBorrowTypeEntry) accountAddress() common.Address {
+	return e.StoredPath.Address
+}
+
+func (e storageCapConsInferredBorrowTypeEntry) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		Kind           string `json:"kind"`
+		AccountAddress string `json:"account_address"`
+		Address        string `json:"address"`
+		TargetPath     string `json:"target_path"`
+		BorrowType     string `json:"borrow_type"`
+		StoredPath     string `json:"stored_path"`
+	}{
+		Kind:           "storage-capcon-inferred-borrow-type",
+		AccountAddress: e.StoredPath.Address.HexWithPrefix(),
+		Address:        e.TargetPath.Address.HexWithPrefix(),
+		TargetPath:     e.TargetPath.Path.String(),
+		BorrowType:     string(e.BorrowType.ID()),
+		StoredPath:     e.StoredPath.Path.String(),
 	})
 }

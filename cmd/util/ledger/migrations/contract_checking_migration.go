@@ -22,8 +22,8 @@ const contractCheckingReporterName = "contract-checking"
 const contractCountEstimate = 1000
 
 type AddressContract struct {
-	location common.AddressLocation
-	code     []byte
+	Location common.AddressLocation
+	Code     []byte
 }
 
 // NewContractCheckingMigration returns a migration that checks all contracts.
@@ -51,70 +51,15 @@ func NewContractCheckingMigration(
 			return fmt.Errorf("failed to create interpreter migration runtime: %w", err)
 		}
 
-		// Gather all contracts
-
-		log.Info().Msg("Gathering contracts ...")
-
-		contractsForPrettyPrinting := make(map[common.Location][]byte, contractCountEstimate)
-
-		contracts := make([]AddressContract, 0, contractCountEstimate)
-
-		err = registersByAccount.ForEachAccount(func(accountRegisters *registers.AccountRegisters) error {
-			owner := accountRegisters.Owner()
-
-			encodedContractNames, err := accountRegisters.Get(owner, flow.ContractNamesKey)
-			if err != nil {
-				return err
-			}
-
-			contractNames, err := environment.DecodeContractNames(encodedContractNames)
-			if err != nil {
-				return err
-			}
-
-			for _, contractName := range contractNames {
-
-				contractKey := flow.ContractKey(contractName)
-
-				code, err := accountRegisters.Get(owner, contractKey)
-				if err != nil {
-					return err
-				}
-
-				if len(bytes.TrimSpace(code)) == 0 {
-					continue
-				}
-
-				address := common.Address([]byte(owner))
-				location := common.AddressLocation{
-					Address: address,
-					Name:    contractName,
-				}
-
-				contracts = append(
-					contracts,
-					AddressContract{
-						location: location,
-						code:     code,
-					},
-				)
-
-				contractsForPrettyPrinting[location] = code
-			}
-
-			return nil
-		})
+		contracts, err := gatherContractsFromRegisters(registersByAccount, log)
 		if err != nil {
-			return fmt.Errorf("failed to get contracts of accounts: %w", err)
+			return err
 		}
 
-		sort.Slice(contracts, func(i, j int) bool {
-			a := contracts[i]
-			b := contracts[j]
-			return a.location.ID() < b.location.ID()
-		})
-
-		log.Info().Msgf("Gathered all contracts (%d)", len(contracts))
+		contractsForPrettyPrinting := make(map[common.Location][]byte, len(contracts))
+		for _, contract := range contracts {
+			contractsForPrettyPrinting[contract.Location] = contract.Code
+		}
 
 		// Check all contracts
 
@@ -135,6 +80,68 @@ func NewContractCheckingMigration(
 	}
 }
 
+func gatherContractsFromRegisters(registersByAccount *registers.ByAccount, log zerolog.Logger) ([]AddressContract, error) {
+	log.Info().Msg("Gathering contracts ...")
+
+	contracts := make([]AddressContract, 0, contractCountEstimate)
+
+	err := registersByAccount.ForEachAccount(func(accountRegisters *registers.AccountRegisters) error {
+		owner := accountRegisters.Owner()
+
+		encodedContractNames, err := accountRegisters.Get(owner, flow.ContractNamesKey)
+		if err != nil {
+			return err
+		}
+
+		contractNames, err := environment.DecodeContractNames(encodedContractNames)
+		if err != nil {
+			return err
+		}
+
+		for _, contractName := range contractNames {
+
+			contractKey := flow.ContractKey(contractName)
+
+			code, err := accountRegisters.Get(owner, contractKey)
+			if err != nil {
+				return err
+			}
+
+			if len(bytes.TrimSpace(code)) == 0 {
+				continue
+			}
+
+			address := common.Address([]byte(owner))
+			location := common.AddressLocation{
+				Address: address,
+				Name:    contractName,
+			}
+
+			contracts = append(
+				contracts,
+				AddressContract{
+					Location: location,
+					Code:     code,
+				},
+			)
+		}
+
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get contracts of accounts: %w", err)
+	}
+
+	sort.Slice(contracts, func(i, j int) bool {
+		a := contracts[i]
+		b := contracts[j]
+		return a.Location.ID() < b.Location.ID()
+	})
+
+	log.Info().Msgf("Gathered all contracts (%d)", len(contracts))
+	return contracts, nil
+}
+
 func checkContract(
 	contract AddressContract,
 	log zerolog.Logger,
@@ -145,8 +152,8 @@ func checkContract(
 	importantLocations map[common.AddressLocation]struct{},
 	programs map[common.Location]*interpreter.Program,
 ) {
-	location := contract.location
-	code := contract.code
+	location := contract.Location
+	code := contract.Code
 
 	log.Info().Msgf("checking contract %s ...", location)
 

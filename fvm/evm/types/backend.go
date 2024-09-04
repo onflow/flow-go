@@ -17,4 +17,5 @@ type Backend interface {
 	environment.UUIDGenerator
 	environment.Tracer
 	environment.EVMMetricsReporter
+	environment.LoggerProvider
 }

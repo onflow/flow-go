@@ -46,12 +46,18 @@ jobs:
         make tool-bootstrap tool-transit
         mkdir boot-tools
         mv bootstrap transit boot-tools/
+        sha256sum boot-tools/bootstrap > boot-tools/bootstrap.sha256sum
+        cat boot-tools/bootstrap.sha256sum
+        sha256sum boot-tools/transit > boot-tools/transit.sha256sum
+        cat boot-tools/transit.sha256sum
         tar -czf boot-tools.tar ./boot-tools/
         gsutil cp boot-tools.tar gs://flow-genesis-bootstrap/tools/${{ inputs.tag }}/boot-tools.tar
     - name: Build and upload util
       run: |
         make tool-util
-        tar -czf util.tar util
+        sha256sum util > util.sha256sum
+        cat util.sha256sum
+        tar -czf util.tar util util.sha256sum
         gsutil cp util.tar gs://flow-genesis-bootstrap/tools/${{ inputs.tag }}/util.tar
     - name: Promote boot-tools
       run: |

@@ -17,7 +17,7 @@ func benchmarkBlockProposalGrowth(b *testing.B, txCounts int) {
 	testutils.RunWithTestBackend(b, func(backend *testutils.TestBackend) {
 		testutils.RunWithTestFlowEVMRootAddress(b, backend, func(rootAddr flow.Address) {
 
-			bs := handler.NewBlockStore(backend, rootAddr)
+			bs := handler.NewBlockStore(flow.Testnet, backend, rootAddr)
 			for i := 0; i < txCounts; i++ {
 				bp, err := bs.BlockProposal()
 				require.NoError(b, err)
