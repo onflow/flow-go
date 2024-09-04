@@ -66,7 +66,7 @@ func ConstructClusterAssignment(log zerolog.Logger, partnerNodes, internalNodes 
 	if len(partnerCollectors) > 0 && len(partnerCollectors) > 2*len(internalCollectors) {
 		return nil, nil, fmt.Errorf("requiring at least x>0 number of partner collection nodes and y > 2x number of internal collection nodes, but got x,y=%d,%d", len(partnerCollectors), len(internalCollectors))
 	}
-	// sanity check ^ enforces that there is at least one internal node, hence `internalNodes[0].InitialWeight` is always a valid reference weight
+	// sanity check ^ enforces that there is at least one internal node, hence `internalCollectors[0].InitialWeight` is always a valid reference weight
 	refWeight := internalCollectors[0].InitialWeight
 
 	identifierLists := make([]flow.IdentifierList, numCollectionClusters)
