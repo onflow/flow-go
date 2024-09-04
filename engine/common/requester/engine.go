@@ -65,7 +65,7 @@ func New(log zerolog.Logger, metrics module.EngineMetrics, net network.EngineReg
 		BatchInterval:   time.Second,
 		RetryInitial:    4 * time.Second,
 		RetryFunction:   RetryGeometric(2),
-		RetryMaximum:    2 * time.Minute,
+		RetryMaximum:    10 * time.Second,
 		RetryAttempts:   math.MaxUint32,
 		ValidateStaking: true,
 	}
