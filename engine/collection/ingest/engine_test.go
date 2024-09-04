@@ -172,9 +172,10 @@ func (suite *Suite) TestInvalidTransaction() {
 		suite.Assert().True(errors.As(err, &access.InvalidScriptError{}))
 	})
 
-	suite.Run("transaction script exceeds parse token limit", func() {
-		unittest.SkipUnless(suite.T(), unittest.TEST_TODO, "https://github.com/dapperlabs/flow-go/issues/6964")
-		// https://github.com/onflow/cadence/blob/master/runtime/parser/lexer/lexer.go#L32
+	// In some cases the Cadence parser will panic rather than return an error.
+	// If this happens, we should recover from the panic and return an InvalidScriptError.
+	// See: https://github.com/onflow/cadence/issues/3428, https://github.com/dapperlabs/flow-go/issues/6964
+	suite.Run("transaction script exceeds parse token limit (Cadence parser panic should be caught)", func() {
 		const tokenLimit = 1 << 19
 		script := "{};"
 		for len(script) < tokenLimit {

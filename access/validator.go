@@ -316,11 +316,20 @@ func (v *TransactionValidator) checkExpiry(tx *flow.TransactionBody) error {
 	return nil
 }
 
-func (v *TransactionValidator) checkCanBeParsed(tx *flow.TransactionBody) error {
+func (v *TransactionValidator) checkCanBeParsed(tx *flow.TransactionBody) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			if panicErr, ok := r.(error); ok {
+				err = InvalidScriptError{ParserErr: panicErr}
+			} else {
+				err = InvalidScriptError{ParserErr: fmt.Errorf("non-error-typed panic: %v", r)}
+			}
+		}
+	}()
 	if v.options.CheckScriptsParse {
-		_, err := parser.ParseProgram(nil, tx.Script, parser.Config{})
-		if err != nil {
-			return InvalidScriptError{ParserErr: err}
+		_, parseErr := parser.ParseProgram(nil, tx.Script, parser.Config{})
+		if parseErr != nil {
+			return InvalidScriptError{ParserErr: parseErr}
 		}
 	}
 
