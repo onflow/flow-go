@@ -1076,7 +1076,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 	//            this ordering defines the DKG participant's indices
 	stakedNodeInfos := bootstrap.Sort(toNodeInfos(stakedConfs), flow.Canonical[flow.Identity])
 
-	dkg, err := runBeaconKG(stakedConfs)
+	dkg, dkgIndexMap, err := runBeaconKG(stakedConfs)
 	if err != nil {
 		return nil, fmt.Errorf("failed to run DKG: %w", err)
 	}
@@ -1180,6 +1180,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 		ClusterQCs:         flow.ClusterQCVoteDatasFromQCs(qcsWithSignerIDs),
 		DKGGroupKey:        dkg.PubGroupKey,
 		DKGParticipantKeys: dkg.PubKeyShares,
+		DKGIndexMap:        dkgIndexMap,
 	}
 	root := &flow.Block{
 		Header: rootHeader,
@@ -1343,23 +1344,28 @@ func setupKeys(networkConf NetworkConfig) ([]ContainerConfig, error) {
 // and returns all DKG data. This includes the group private key, node indices,
 // and per-node public and private key-shares.
 // Only consensus nodes participate in the DKG.
-func runBeaconKG(confs []ContainerConfig) (dkgmod.DKGData, error) {
+func runBeaconKG(confs []ContainerConfig) (dkgmod.DKGData, flow.DKGIndexMap, error) {
 
 	// filter by consensus nodes
-	consensusNodes := bootstrap.FilterByRole(toNodeInfos(confs), flow.RoleConsensus)
+	consensusNodes := bootstrap.Sort(bootstrap.FilterByRole(toNodeInfos(confs), flow.RoleConsensus), flow.Canonical[flow.Identity])
 	nConsensusNodes := len(consensusNodes)
 
 	dkgSeed, err := getSeed()
 	if err != nil {
-		return dkgmod.DKGData{}, err
+		return dkgmod.DKGData{}, nil, err
 	}
 
 	dkg, err := dkg.RandomBeaconKG(nConsensusNodes, dkgSeed)
 	if err != nil {
-		return dkgmod.DKGData{}, err
+		return dkgmod.DKGData{}, nil, err
 	}
 
-	return dkg, nil
+	indexMap := make(flow.DKGIndexMap, nConsensusNodes)
+	for i, node := range consensusNodes {
+		indexMap[node.NodeID] = i
+	}
+
+	return dkg, indexMap, nil
 }
 
 // setupClusterGenesisBlockQCs generates bootstrapping resources necessary for each collector cluster:
