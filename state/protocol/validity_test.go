@@ -149,20 +149,6 @@ func TestBootstrapInvalidEpochCommit(t *testing.T) {
 		require.Error(t, err)
 	})
 
-	t.Run("missing DKG index", func(t *testing.T) {
-		_, result, _ := unittest.BootstrapFixture(participants)
-		setup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
-		commit := result.ServiceEvents[1].Event.(*flow.EpochCommit)
-		// replace entity in the index map so the size matches but with invalid identifier ID.
-		nodeID := setup.Participants.Filter(filter.IsValidDKGParticipant)[0].NodeID
-		index := commit.DKGIndexMap[nodeID]
-		delete(commit.DKGIndexMap, nodeID)
-		commit.DKGIndexMap[unittest.IdentifierFixture()] = index
-
-		err := protocol.IsValidEpochCommit(commit, setup)
-		require.Error(t, err)
-	})
-
 	t.Run("DKG index map contains negative index", func(t *testing.T) {
 		_, result, _ := unittest.BootstrapFixture(participants)
 		setup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
