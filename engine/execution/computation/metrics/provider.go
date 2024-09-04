@@ -38,6 +38,9 @@ func newProvider(
 	}
 }
 
+// Push buffers the metrics for the given height.
+// The call should ensure height are called in strictly increasing order, otherwise
+// metrics for the skipped height will not buffered.
 func (p *provider) Push(
 	height uint64,
 	data []TransactionExecutionMetrics,
