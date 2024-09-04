@@ -485,7 +485,7 @@ func (m *StagedContractsMigration) MigrateAccount(
 			(func() {
 				defer func() {
 					if r := recover(); r != nil {
-						errorDetails = fmt.Sprintf("failed to pretty print error, panic: %v", r)
+						errorDetails = fmt.Sprintf("failed to pretty print error\nerr: %v\npanic: %v", err, r)
 					}
 				}()
 
