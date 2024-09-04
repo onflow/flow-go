@@ -97,3 +97,10 @@ bft-gossipsub-tests:
 .PHONY: bft-tests
 bft-tests: bft-framework-tests bft-protocol-tests bft-gossipsub-tests
 
+.PHONY: lint
+lint:
+	golangci-lint run -v ./...
+
+.PHONY: fix-lint
+fix-lint:
+	golangci-lint run -v --fix ./...

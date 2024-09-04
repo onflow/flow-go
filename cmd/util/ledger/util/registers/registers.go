@@ -332,8 +332,9 @@ type ReadOnlyLedger struct {
 
 var _ atree.Ledger = ReadOnlyLedger{}
 
-func (l ReadOnlyLedger) GetValue(owner, key []byte) (value []byte, err error) {
-	return l.Registers.Get(string(owner), string(key))
+func (l ReadOnlyLedger) GetValue(address, key []byte) (value []byte, err error) {
+	owner := flow.AddressToRegisterOwner(flow.BytesToAddress(address))
+	return l.Registers.Get(owner, string(key))
 }
 
 func (l ReadOnlyLedger) ValueExists(owner, key []byte) (exists bool, err error) {
