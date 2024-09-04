@@ -64,7 +64,7 @@ func ConstructClusterAssignment(log zerolog.Logger, partnerNodes, internalNodes 
 	// The following is a heuristic that distributes collectors round-robbin across the specified number of clusters.
 	// This heuristic only works when all collectors have equal weight! The following sanity check enforces this:
 	if len(partnerCollectors) > 0 && len(partnerCollectors) > 2*len(internalCollectors) {
-		return nil, nil, fmt.Errorf("requiring at least x>0 number of partner nodes and y > 2x number of internal nodes, but got x,y=%d,%d", len(partnerNodes), len(internalNodes))
+		return nil, nil, fmt.Errorf("requiring at least x>0 number of partner collection nodes and y > 2x number of internal collection nodes, but got x,y=%d,%d", len(partnerNodes), len(internalNodes))
 	}
 	// sanity check ^ enforces that there is at least one internal node, hence `internalNodes[0].InitialWeight` is always a valid reference weight
 	refWeight := internalNodes[0].InitialWeight
