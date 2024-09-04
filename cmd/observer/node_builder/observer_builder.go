@@ -282,8 +282,8 @@ type ObserverServiceBuilder struct {
 	ExecutionIndexerCore *indexer.IndexerCore
 	TxResultsIndex       *index.TransactionResultsIndex
 	IndexerDependencies  *cmd.DependencyList
-	versionControl       *version.VersionControl
-	stopControl          *stop.StopControl
+	VersionControl       *version.VersionControl
+	StopControl          *stop.StopControl
 
 	ExecutionDataDownloader   execution_data.Downloader
 	ExecutionDataRequester    state_synchronization.ExecutionDataRequester
@@ -1521,7 +1521,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				builder.programCacheSize > 0,
 			)
 
-			err = builder.ScriptExecutor.Initialize(builder.ExecutionIndexer, scripts, builder.versionControl)
+			err = builder.ScriptExecutor.Initialize(builder.ExecutionIndexer, scripts, builder.VersionControl)
 			if err != nil {
 				return nil, err
 			}
@@ -1531,7 +1531,7 @@ func (builder *ObserverServiceBuilder) BuildExecutionSyncComponents() *ObserverS
 				return nil, err
 			}
 
-			builder.stopControl.RegisterHeightRecorder(builder.ExecutionIndexer)
+			builder.StopControl.RegisterHeightRecorder(builder.ExecutionIndexer)
 
 			return builder.ExecutionIndexer, nil
 		}, builder.IndexerDependencies)
@@ -1866,8 +1866,8 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 		// VersionControl needs to consume BlockFinalized events.
 		node.ProtocolEvents.AddConsumer(versionControl)
 
-		builder.versionControl = versionControl
-		versionControlDependable.Init(builder.versionControl)
+		builder.VersionControl = versionControl
+		versionControlDependable.Init(builder.VersionControl)
 
 		return versionControl, nil
 	})
@@ -1880,10 +1880,10 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 			builder.Logger,
 		)
 
-		builder.versionControl.AddVersionUpdatesConsumer(stopControl.OnVersionUpdate)
+		builder.VersionControl.AddVersionUpdatesConsumer(stopControl.OnVersionUpdate)
 
-		builder.stopControl = stopControl
-		stopControlDependable.Init(builder.stopControl)
+		builder.StopControl = stopControl
+		stopControlDependable.Init(builder.StopControl)
 
 		return stopControl, nil
 	})
@@ -1959,6 +1959,7 @@ func (builder *ObserverServiceBuilder) enqueueRPCServer() {
 				builder.stateStreamConf.ResponseLimit,
 				builder.stateStreamConf.ClientSendBufferSize,
 			),
+			VersionControl: builder.VersionControl,
 		}
 
 		if builder.localServiceAPIEnabled {
