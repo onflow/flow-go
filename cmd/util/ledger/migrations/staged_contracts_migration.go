@@ -480,21 +480,30 @@ func (m *StagedContractsMigration) MigrateAccount(
 			)
 		}
 		if err != nil {
-			var builder strings.Builder
-			errorPrinter := pretty.NewErrorPrettyPrinter(&builder, false)
-
-			location := common.AddressLocation{
-				Name:    name,
-				Address: address,
-			}
-			printErr := errorPrinter.PrettyPrintError(err, location, m.contractsByLocation)
-
 			var errorDetails string
-			if printErr == nil {
-				errorDetails = builder.String()
-			} else {
-				errorDetails = err.Error()
-			}
+
+			(func() {
+				defer func() {
+					if r := recover(); r != nil {
+						errorDetails = fmt.Sprintf("failed to pretty print error, panic: %v", r)
+					}
+				}()
+
+				var builder strings.Builder
+				errorPrinter := pretty.NewErrorPrettyPrinter(&builder, false)
+
+				location := common.AddressLocation{
+					Name:    name,
+					Address: address,
+				}
+				printErr := errorPrinter.PrettyPrintError(err, location, m.contractsByLocation)
+
+				if printErr == nil {
+					errorDetails = builder.String()
+				} else {
+					errorDetails = err.Error()
+				}
+			})()
 
 			if m.verboseErrorOutput {
 				m.log.Error().
