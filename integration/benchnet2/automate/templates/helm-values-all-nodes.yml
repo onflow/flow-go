@@ -72,6 +72,8 @@ consensus:
         - --emergency-sealing-active=false
         - --insecure-access-api=false
         - --access-node-ids=*
+        - --required-construction-seal-approvals=0
+        - --required-verification-seal-approvals=0
       env:{{template "env" .}}
       image: {{$val.docker_registry}}/consensus:{{$val.docker_tag}}
       nodeId: {{$val.node_id}}
