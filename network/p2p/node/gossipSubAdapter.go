@@ -53,7 +53,9 @@ func NewGossipSubAdapter(ctx context.Context,
 
 	gossipSub, err := pubsub.NewGossipSub(ctx, h,
 		append(gossipSubConfig.Build(),
-			pubsub.WithValidateQueueSize(10_000))...)
+			pubsub.WithValidateQueueSize(10_000),
+			pubsub.WithPeerOutboundQueueSize(10_000),
+		)...)
 	if err != nil {
 		return nil, err
 	}

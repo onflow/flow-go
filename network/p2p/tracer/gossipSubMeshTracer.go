@@ -2,6 +2,7 @@ package tracer
 
 import (
 	"fmt"
+	"github.com/onflow/flow-go/network/message"
 	"strconv"
 	"sync"
 	"time"
@@ -352,10 +353,13 @@ func (t *GossipSubMeshTracer) RejectMessage(msg *pubsub.Message, reason string) 
 		lg = lg.With().Str("remote_peer_id", p2plogging.PeerId(from)).Logger()
 	}
 
+	var parsedMsg message.Message
+	_ = parsedMsg.Unmarshal(msg.Data)
+
 	lg.Trace().
 		Str("received_from", p2plogging.PeerId(msg.ReceivedFrom)).
 		Int("message_size", size).
-		Msg("rejected pubsub message")
+		Msgf("rejected pubsub message: %s", parsedMsg.String())
 
 }
 
