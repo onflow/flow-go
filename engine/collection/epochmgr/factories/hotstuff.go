@@ -81,6 +81,7 @@ func (f *HotStuffFactory) CreateModules(
 	notifier.AddConsumer(notifications.NewLogConsumer(log))
 	notifier.AddConsumer(hotmetrics.NewMetricsConsumer(metrics))
 	notifier.AddParticipantConsumer(telemetryConsumer)
+	notifier.AddCommunicatorConsumer(telemetryConsumer)
 	notifier.AddProposalViolationConsumer(slashingConsumer)
 
 	var (
