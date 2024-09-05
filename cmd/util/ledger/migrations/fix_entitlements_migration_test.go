@@ -1,8 +1,10 @@
 package migrations
 
 import (
+	"strings"
 	"testing"
 
+	"github.com/onflow/cadence/runtime/common"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
@@ -10,7 +12,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-func TestPublicEntitlementMigration(t *testing.T) {
+func TestFixEntitlementMigrations(t *testing.T) {
 	t.Parallel()
 
 	const chainID = flow.Emulator
@@ -64,4 +66,32 @@ func TestPublicEntitlementMigration(t *testing.T) {
 	}
 
 	// TODO: validate
+}
+
+func TestReadLinkMigrationReport(t *testing.T) {
+	t.Parallel()
+
+	reader := strings.NewReader(`
+      [
+        {"kind":"link-migration-success","account_address":"0x1","path":"/public/foo","capability_id":1},
+        {"kind":"link-migration-success","account_address":"0x2","path":"/private/bar","capability_id":2}
+      ]
+    `)
+
+	mapping, err := ReadLinkMigrationReport(reader)
+	require.NoError(t, err)
+
+	require.Equal(t,
+		map[AccountCapabilityControllerID]string{
+			{
+				Address:      common.MustBytesToAddress([]byte{0x1}),
+				CapabilityID: 1,
+			}: "/public/foo",
+			{
+				Address:      common.MustBytesToAddress([]byte{0x2}),
+				CapabilityID: 2,
+			}: "/private/bar",
+		},
+		mapping,
+	)
 }
