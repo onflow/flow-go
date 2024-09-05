@@ -1048,6 +1048,7 @@ func (exeNode *ExecutionNode) LoadIngestionEngine(
 			// consistency of collection can be checked by checking hash, and hash comes from trusted source (blocks from consensus follower)
 			// hence we not need to check origin
 			requester.WithValidateStaking(false),
+			requester.WithRetryMaximum(10*time.Second),
 		)
 
 		if err != nil {
