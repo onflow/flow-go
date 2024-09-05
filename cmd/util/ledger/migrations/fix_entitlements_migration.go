@@ -1,8 +1,10 @@
 package migrations
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 
 	"github.com/onflow/cadence/migrations"
 	"github.com/onflow/cadence/runtime"
@@ -315,6 +317,74 @@ func (r *fixEntitlementsMigrationReporter) MigratedCapabilityController(
 	value *interpreter.StorageCapabilityControllerValue,
 ) {
 	// TODO:
+}
+
+type AccountCapabilityControllerID struct {
+	Address      common.Address
+	CapabilityID uint64
+}
+
+// ReadLinkMigrationReport reads a link migration report from the given reader.
+// The report is expected to be a JSON array of objects with the following structure:
+//
+// [
+//
+//	{"kind":"link-migration-success","account_address":"0x1","path":"/public/foo","capability_id":1},
+//	{"kind":"link-migration-success","account_address":"0x2","path":"/private/bar","capability_id":2}
+//
+// ]
+//
+// The function returns a mapping from account capability controller IDs to paths.
+func ReadLinkMigrationReport(reader io.Reader) (map[AccountCapabilityControllerID]string, error) {
+	mapping := make(map[AccountCapabilityControllerID]string)
+
+	dec := json.NewDecoder(reader)
+
+	token, err := dec.Token()
+	if err != nil {
+		return nil, fmt.Errorf("failed to read token: %w", err)
+	}
+	if token != json.Delim('[') {
+		return nil, fmt.Errorf("expected start of array, got %s", token)
+	}
+
+	for dec.More() {
+		var entry struct {
+			Kind         string `json:"kind"`
+			Address      string `json:"account_address"`
+			Path         string `json:"path"`
+			CapabilityID uint64 `json:"capability_id"`
+		}
+		err := dec.Decode(&entry)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode entry: %w", err)
+		}
+
+		if entry.Kind != "link-migration-success" {
+			continue
+		}
+
+		address, err := common.HexToAddress(entry.Address)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse address: %w", err)
+		}
+
+		key := AccountCapabilityControllerID{
+			Address:      address,
+			CapabilityID: entry.CapabilityID,
+		}
+		mapping[key] = entry.Path
+	}
+
+	token, err = dec.Token()
+	if err != nil {
+		return nil, fmt.Errorf("failed to read token: %w", err)
+	}
+	if token != json.Delim(']') {
+		return nil, fmt.Errorf("expected end of array, got %s", token)
+	}
+
+	return mapping, nil
 }
 
 func NewFixEntitlementsMigrations(
