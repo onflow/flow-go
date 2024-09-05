@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/migrations"
+	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
 	"github.com/onflow/flow-go/cmd/util/ledger/util/registers"
 	"github.com/onflow/flow-go/ledger"
@@ -14,6 +15,7 @@ import (
 )
 
 var (
+	flagOutputDirectory string
 	flagPayloads        string
 	flagState           string
 	flagStateCommitment string
@@ -49,12 +51,26 @@ func init() {
 	)
 
 	Cmd.Flags().StringVar(
+		&flagOutputDirectory,
+		"output-directory",
+		"",
+		"Output directory",
+	)
+
+	Cmd.Flags().StringVar(
 		&flagChain,
 		"chain",
 		"",
 		"Chain name",
 	)
 	_ = Cmd.MarkFlagRequired("chain")
+}
+
+type LinkDataPoint struct {
+	Address    string `json:"address"`
+	Identifier string `json:"identifier"`
+	TargetPath string `json:"targetPath"`
+	LinkTypeID string `json:"linkType"`
 }
 
 func run(*cobra.Command, []string) {
@@ -67,6 +83,10 @@ func run(*cobra.Command, []string) {
 	if flagState != "" && flagStateCommitment == "" {
 		log.Fatal().Msg("--state-commitment must be provided when --state is provided")
 	}
+
+	reporter := reporters.NewReportFileWriterFactory(flagOutputDirectory, log.Logger)
+	writer := reporter.ReportWriter("link-reporter")
+	defer writer.Close()
 
 	chainID := flow.ChainID(flagChain)
 	// Validate chain ID
@@ -112,7 +132,7 @@ func run(*cobra.Command, []string) {
 
 		address := common.MustBytesToAddress([]byte(accountRegisters.Owner()))
 
-		log.Info().Msgf("account: %s", address)
+		// log.Info().Msgf("account: %s", address)
 
 		publicStorage := mr.Storage.GetStorageMap(
 			address,
@@ -142,7 +162,16 @@ func run(*cobra.Command, []string) {
 				targetPath := link.TargetPath
 				linkType := link.Type
 
-				log.Info().Msgf("%s: %s -> %s = %s", address, identifier, targetPath, linkType.ID())
+				linkTypeID := linkType.ID()
+
+				writer.Write(LinkDataPoint{
+					Address:    address.String(),
+					Identifier: identifier,
+					TargetPath: targetPath.String(),
+					LinkTypeID: string(linkTypeID),
+				})
+
+				// log.Info().Msgf("%s: %s -> %s = %s", address, identifier, targetPath, linkType.ID())
 
 			case interpreter.AccountLinkValue:
 				// ignore
