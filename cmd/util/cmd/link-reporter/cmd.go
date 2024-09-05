@@ -73,6 +73,13 @@ type LinkDataPoint struct {
 	LinkTypeID string `json:"linkType"`
 }
 
+type CapDataPoint struct {
+	Address    string `json:"address"`
+	Identifier string `json:"identifier"`
+	BorrowType string `json:"borrowType"`
+	ID         string `json:"id"`
+}
+
 func run(*cobra.Command, []string) {
 
 	if flagPayloads == "" && flagState == "" {
@@ -85,8 +92,11 @@ func run(*cobra.Command, []string) {
 	}
 
 	reporter := reporters.NewReportFileWriterFactory(flagOutputDirectory, log.Logger)
-	writer := reporter.ReportWriter("link-reporter")
-	defer writer.Close()
+	linkReporter := reporter.ReportWriter("link-reporter")
+	defer linkReporter.Close()
+
+	capabilityReporter := reporter.ReportWriter("capability-reporter")
+	defer capabilityReporter.Close()
 
 	chainID := flow.ChainID(flagChain)
 	// Validate chain ID
@@ -157,28 +167,25 @@ func run(*cobra.Command, []string) {
 
 			value := interpreter.MustConvertUnmeteredStoredValue(v)
 
-			switch link := value.(type) {
+			switch obj := value.(type) {
 			case interpreter.PathLinkValue:
-				targetPath := link.TargetPath
-				linkType := link.Type
-
+				targetPath := obj.TargetPath
+				linkType := obj.Type
 				linkTypeID := linkType.ID()
 
-				writer.Write(LinkDataPoint{
+				linkReporter.Write(LinkDataPoint{
 					Address:    address.String(),
 					Identifier: identifier,
 					TargetPath: targetPath.String(),
 					LinkTypeID: string(linkTypeID),
 				})
 
-				// log.Info().Msgf("%s: %s -> %s = %s", address, identifier, targetPath, linkType.ID())
+				// temp test after the first one break
+				break
 
-			case interpreter.AccountLinkValue:
+			default:
 				// ignore
 				continue
-			default:
-				log.Fatal().Msgf("unexpected value type: %T", value)
-
 			}
 		}
 		return nil
