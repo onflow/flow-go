@@ -51,7 +51,9 @@ func NewGossipSubAdapter(ctx context.Context,
 		return nil, fmt.Errorf("invalid gossipsub config type: %T", cfg)
 	}
 
-	gossipSub, err := pubsub.NewGossipSub(ctx, h, gossipSubConfig.Build()...)
+	gossipSub, err := pubsub.NewGossipSub(ctx, h,
+		append(gossipSubConfig.Build(),
+			pubsub.WithValidateQueueSize(10_000))...)
 	if err != nil {
 		return nil, err
 	}
