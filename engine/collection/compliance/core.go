@@ -244,6 +244,12 @@ func (c *Core) processBlockAndDescendants(proposal flow.Slashable[*cluster.Block
 		Uint64("parent_view", header.ParentView).
 		Logger()
 
+	// Temporarily discard collections containing any transactions
+	if proposal.Message.Payload.Collection.Len() > 0 {
+		log.Debug().Msgf("2024-09-05 TEMPORARY LOGIC CHANGE: discarding cluster block with %d>0 transactions", proposal.Message.Payload.Collection.Len())
+		return nil
+	}
+
 	// process block itself
 	err := c.processBlockProposal(proposal.Message)
 	if err != nil {
