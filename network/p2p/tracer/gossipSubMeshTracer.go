@@ -359,7 +359,7 @@ func (t *GossipSubMeshTracer) RejectMessage(msg *pubsub.Message, reason string) 
 	lg.Trace().
 		Str("received_from", p2plogging.PeerId(msg.ReceivedFrom)).
 		Int("message_size", size).
-		Str("msg_type", message.MessageType(parsedMsg.Payload)).
+		Bytes("msg_bytes", parsedMsg.Payload).
 		Msg("rejected pubsub message")
 
 }
@@ -463,7 +463,7 @@ func (t *GossipSubMeshTracer) DropRPC(rpc *pubsub.RPC, p peer.ID) {
 			_ = parsedMsg.Unmarshal(msg.Data)
 
 			logger = logger.Str("msg_"+strconv.Itoa(i), msg.GetTopic()).
-				Str("msg_type", message.MessageType(parsedMsg.Payload))
+				Bytes("msg_bytes", parsedMsg.Payload)
 		}
 
 		logger.Msg("outbound rpc dropped")
