@@ -327,12 +327,9 @@ type AccountCapabilityControllerID struct {
 // ReadLinkMigrationReport reads a link migration report from the given reader.
 // The report is expected to be a JSON array of objects with the following structure:
 //
-// [
-//
-//	{"kind":"link-migration-success","account_address":"0x1","path":"/public/foo","capability_id":1},
-//	{"kind":"link-migration-success","account_address":"0x2","path":"/private/bar","capability_id":2}
-//
-// ]
+//	[
+//		{"kind":"link-migration-success","account_address":"0x1","path":"/public/foo","capability_id":1},
+//	]
 //
 // The function returns a mapping from account capability controller IDs to paths.
 func ReadLinkMigrationReport(reader io.Reader) (map[AccountCapabilityControllerID]string, error) {
@@ -374,6 +371,73 @@ func ReadLinkMigrationReport(reader io.Reader) (map[AccountCapabilityControllerI
 			CapabilityID: entry.CapabilityID,
 		}
 		mapping[key] = entry.Path
+	}
+
+	token, err = dec.Token()
+	if err != nil {
+		return nil, fmt.Errorf("failed to read token: %w", err)
+	}
+	if token != json.Delim(']') {
+		return nil, fmt.Errorf("expected end of array, got %s", token)
+	}
+
+	return mapping, nil
+}
+
+type LinkInfo struct {
+	BorrowType        common.TypeID
+	AccessibleMembers []string
+}
+
+// ReadLinkReport reads a link report from the given reader.
+// The report is expected to be a JSON array of objects with the following structure:
+//
+//	[
+//		{"address":"0x1","identifier":"foo","linkType":"&Foo","accessibleMembers":["foo"]}
+//	]
+//
+// The function returns a mapping from account paths to link info.
+func ReadLinkReport(reader io.Reader) (map[interpreter.AddressPath]LinkInfo, error) {
+	mapping := make(map[interpreter.AddressPath]LinkInfo)
+
+	dec := json.NewDecoder(reader)
+
+	token, err := dec.Token()
+	if err != nil {
+		return nil, fmt.Errorf("failed to read token: %w", err)
+	}
+	if token != json.Delim('[') {
+		return nil, fmt.Errorf("expected start of array, got %s", token)
+	}
+
+	for dec.More() {
+		var entry struct {
+			Address           string   `json:"address"`
+			Identifier        string   `json:"identifier"`
+			LinkTypeID        string   `json:"linkType"`
+			AccessibleMembers []string `json:"accessibleMembers"`
+		}
+		err := dec.Decode(&entry)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode entry: %w", err)
+		}
+
+		address, err := common.HexToAddress(entry.Address)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse address: %w", err)
+		}
+
+		key := interpreter.AddressPath{
+			Address: address,
+			Path: interpreter.PathValue{
+				Domain:     common.PathDomainPublic,
+				Identifier: entry.Identifier,
+			},
+		}
+		mapping[key] = LinkInfo{
+			BorrowType:        common.TypeID(entry.LinkTypeID),
+			AccessibleMembers: entry.AccessibleMembers,
+		}
 	}
 
 	token, err = dec.Token()
