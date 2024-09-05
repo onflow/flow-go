@@ -171,16 +171,19 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 	// STEP 2: build a payload of valid transactions, while at the same
 	// time figuring out the correct reference block ID for the collection.
 	span, _ = b.tracer.StartSpanFromContext(ctx, trace.COLBuildOnCreatePayload)
-	payload, err := b.buildPayload(buildCtx)
+	payload := cluster.EmptyPayload(buildCtx.refChainFinalizedID)
+
+	//
+	//payload, err := b.buildPayload(buildCtx)
 	span.End()
-	if err != nil {
-		return nil, fmt.Errorf("could not build payload: %w", err)
-	}
+	//if err != nil {
+	//	return nil, fmt.Errorf("could not build payload: %w", err)
+	//}
 
 	// STEP 3: we have a set of transactions that are valid to include on this fork.
 	// Now we create the header for the cluster block.
 	span, _ = b.tracer.StartSpanFromContext(ctx, trace.COLBuildOnCreateHeader)
-	header, err := b.buildHeader(buildCtx, payload, setter, sign)
+	header, err := b.buildHeader(buildCtx, &payload, setter, sign)
 	span.End()
 	if err != nil {
 		return nil, fmt.Errorf("could not build header: %w", err)
@@ -188,7 +191,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 
 	proposal := cluster.Block{
 		Header:  header,
-		Payload: payload,
+		Payload: &payload,
 	}
 
 	// STEP 4: insert the cluster block to the database.
