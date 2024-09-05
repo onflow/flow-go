@@ -6,6 +6,7 @@ import (
 	"github.com/onflow/cadence/runtime/ast"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
+	"github.com/onflow/cadence/runtime/sema"
 
 	"github.com/onflow/flow-go/fvm/storage"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
@@ -342,4 +343,23 @@ func (env *facadeEnvironment) RecoverProgram(program *ast.Program, location comm
 		program,
 		location,
 	)
+}
+
+func (env *facadeEnvironment) ValidateAccountCapabilitiesGet(
+	_ *interpreter.Interpreter,
+	_ interpreter.LocationRange,
+	_ interpreter.AddressValue,
+	_ interpreter.PathValue,
+	wantedBorrowType *sema.ReferenceType,
+	_ *sema.ReferenceType,
+) (bool, error) {
+	_, hasEntitlements := wantedBorrowType.Authorization.(sema.EntitlementSetAccess)
+	if hasEntitlements {
+		// TODO: maybe abort
+		//return false, interpreter.GetCapabilityError{
+		//	LocationRange: locationRange,
+		//}
+		return false, nil
+	}
+	return true, nil
 }
