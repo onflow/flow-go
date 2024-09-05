@@ -229,6 +229,7 @@ func (v *TransactionValidator) Validate(ctx context.Context, tx *flow.Transactio
 			v.transactionValidationMetrics.TransactionValidationFailed(metrics.InsufficientBalance)
 
 			if v.options.CheckPayerBalanceMode == EnforceCheck {
+				log.Warn().Err(err).Str("transactionID", tx.ID().String()).Str("payerAddress", tx.Payer.String()).Msg("enforce check error")
 				return err
 			}
 		}
