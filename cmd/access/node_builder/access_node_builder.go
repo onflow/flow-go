@@ -998,7 +998,9 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					return nil, err
 				}
 
-				builder.StopControl.RegisterHeightRecorder(builder.ExecutionIndexer)
+				if builder.stopControlEnabled {
+					builder.StopControl.RegisterHeightRecorder(builder.ExecutionIndexer)
+				}
 
 				return builder.ExecutionIndexer, nil
 			}, builder.IndexerDependencies)
