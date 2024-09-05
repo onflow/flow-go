@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/onflow/cadence/runtime/common"
+	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
@@ -91,6 +92,46 @@ func TestReadLinkMigrationReport(t *testing.T) {
 				Address:      common.MustBytesToAddress([]byte{0x2}),
 				CapabilityID: 2,
 			}: "/private/bar",
+		},
+		mapping,
+	)
+}
+
+func TestReadLinkReport(t *testing.T) {
+	t.Parallel()
+
+	reader := strings.NewReader(`
+      [
+        {"address":"0x1","identifier":"foo","linkType":"&Foo","accessibleMembers":["foo"]},
+        {"address":"0x2","identifier":"bar","linkType":"&Bar","accessibleMembers":null}
+      ]
+    `)
+
+	mapping, err := ReadLinkReport(reader)
+	require.NoError(t, err)
+
+	require.Equal(t,
+		map[interpreter.AddressPath]LinkInfo{
+			{
+				Address: common.MustBytesToAddress([]byte{0x1}),
+				Path: interpreter.PathValue{
+					Domain:     common.PathDomainPublic,
+					Identifier: "foo",
+				},
+			}: {
+				BorrowType:        "&Foo",
+				AccessibleMembers: []string{"foo"},
+			},
+			{
+				Address: common.MustBytesToAddress([]byte{0x2}),
+				Path: interpreter.PathValue{
+					Domain:     common.PathDomainPublic,
+					Identifier: "bar",
+				},
+			}: {
+				BorrowType:        "&Bar",
+				AccessibleMembers: nil,
+			},
 		},
 		mapping,
 	)
