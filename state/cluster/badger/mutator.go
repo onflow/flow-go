@@ -102,6 +102,11 @@ func (m *MutableState) Extend(candidate *cluster.Block) error {
 	parentSpan, ctx := m.tracer.StartCollectionSpan(context.Background(), candidate.ID(), trace.COLClusterStateMutatorExtend)
 	defer parentSpan.End()
 
+	// Temporarily discard collections containing any transactions
+	if candidate.Payload.Collection.Len() > 0 {
+		return state.NewInvalidExtensionErrorf("2024-09-05 TEMPORARY LOGIC CHANGE: discarding cluster block with %d>0 transactions", candidate.Payload.Collection.Len())
+	}
+
 	span, _ := m.tracer.StartSpanFromContext(ctx, trace.COLClusterStateMutatorExtendCheckHeader)
 	err := m.checkHeaderValidity(candidate)
 	span.End()
