@@ -180,9 +180,6 @@ func run(*cobra.Command, []string) {
 					LinkTypeID: string(linkTypeID),
 				})
 
-				// temp test after the first one break
-				break
-
 			default:
 				// ignore
 				continue
