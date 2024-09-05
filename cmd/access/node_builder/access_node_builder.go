@@ -1840,7 +1840,9 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 		}).
 		Component("stop control", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			if !builder.stopControlEnabled {
-				return &module.NoopReadyDoneAware{}, nil
+				noop := &module.NoopReadyDoneAware{}
+				stopControlDependable.Init(noop)
+				return noop, nil
 			}
 
 			stopControl := stop.NewStopControl(
