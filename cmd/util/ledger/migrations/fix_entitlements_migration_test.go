@@ -51,12 +51,12 @@ func TestPublicEntitlementMigration(t *testing.T) {
 
 	rwf := &testReportWriterFactory{}
 
-	options := PublicEntitlementsMigrationOptions{
+	options := FixEntitlementsMigrationOptions{
 		ChainID: chainID,
 		NWorker: nWorker,
 	}
 
-	migrations := NewPublicEntitlementsMigrations(log, rwf, options)
+	migrations := NewFixEntitlementsMigrations(log, rwf, options)
 
 	for _, namedMigration := range migrations {
 		err = namedMigration.Migrate(registersByAccount)
