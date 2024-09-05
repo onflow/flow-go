@@ -3086,3 +3086,47 @@ func TestEVM(t *testing.T) {
 		}),
 	)
 }
+
+func TestAccountCapabilitiesGetEntitledRejection(t *testing.T) {
+
+	t.Run("successful transaction", newVMTest().
+		run(func(
+			t *testing.T,
+			vm fvm.VM,
+			chain flow.Chain,
+			ctx fvm.Context,
+			snapshotTree snapshot.SnapshotTree,
+		) {
+
+			serviceAddress := chain.ServiceAddress()
+			txBody := flow.NewTransactionBody().
+				SetScript([]byte(`
+					transaction {
+                        prepare(signer: auth(Capabilities, Storage) &Account) {
+                            signer.storage.save(42, to: /storage/number)
+                            let cap = signer.capabilities.storage.issue<auth(Insert) &Int>(/storage/number)
+                            signer.capabilities.publish(cap, at: /public/number)
+
+                            let number = signer.capabilities.borrow<auth(Insert) &Int>(/public/number)
+                            assert(number == nil)
+                        }
+					}
+				`)).
+				AddAuthorizer(serviceAddress).
+				SetProposalKey(serviceAddress, 0, 0).
+				SetPayer(serviceAddress)
+
+			err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
+			require.NoError(t, err)
+
+			_, output, err := vm.Run(
+				ctx,
+				fvm.Transaction(txBody, 0),
+				snapshotTree)
+
+			require.NoError(t, err)
+			require.NoError(t, output.Err)
+		}),
+	)
+
+}
