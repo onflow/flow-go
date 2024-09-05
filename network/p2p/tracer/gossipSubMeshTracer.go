@@ -462,8 +462,9 @@ func (t *GossipSubMeshTracer) DropRPC(rpc *pubsub.RPC, p peer.ID) {
 			var parsedMsg message.Message
 			_ = parsedMsg.Unmarshal(msg.Data)
 
+			pid, _ := peer.IDFromBytes(msg.GetFrom())
 			logger = logger.Str("msg_"+strconv.Itoa(i), msg.GetTopic()).
-				Bytes("msg_bytes", parsedMsg.Payload)
+				Str("from", pid.String())
 		}
 
 		logger.Msg("outbound rpc dropped")
