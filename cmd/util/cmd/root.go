@@ -26,6 +26,7 @@ import (
 	extractpayloads "github.com/onflow/flow-go/cmd/util/cmd/extract-payloads-by-address"
 	find_inconsistent_result "github.com/onflow/flow-go/cmd/util/cmd/find-inconsistent-result"
 	find_trie_root "github.com/onflow/flow-go/cmd/util/cmd/find-trie-root"
+	link_reporter "github.com/onflow/flow-go/cmd/util/cmd/link-reporter"
 	read_badger "github.com/onflow/flow-go/cmd/util/cmd/read-badger/cmd"
 	read_execution_state "github.com/onflow/flow-go/cmd/util/cmd/read-execution-state"
 	read_hotstuff "github.com/onflow/flow-go/cmd/util/cmd/read-hotstuff/cmd"
@@ -114,6 +115,7 @@ func addCommands() {
 	rootCmd.AddCommand(atree_inlined_status.Cmd)
 	rootCmd.AddCommand(find_trie_root.Cmd)
 	rootCmd.AddCommand(run_script.Cmd)
+	rootCmd.AddCommand(link_reporter.Cmd)
 }
 
 func initConfig() {
