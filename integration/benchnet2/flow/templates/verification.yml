@@ -7,9 +7,9 @@ metadata:
   name: {{ $k }}
   labels:
     app: {{ $k }}
+    network: {{ $.Values.networkId }}
     role: verification
     service: flow
-    network: {{ $.Values.networkId }}
 
 spec:
   serviceName: {{ $k }}
