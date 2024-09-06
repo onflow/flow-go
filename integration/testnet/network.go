@@ -1169,6 +1169,9 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 
 	dkgOffsetView := rootHeader.View + networkConf.ViewsInStakingAuction - 1
 
+	// target number of seconds in epoch
+	targetDuration := networkConf.ViewsInEpoch / networkConf.ViewsPerSecond
+
 	// generate epoch service events
 	epochSetup := &flow.EpochSetup{
 		Counter:            epochCounter,
@@ -1180,8 +1183,8 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 		Participants:       participants.ToSkeleton(),
 		Assignments:        clusterAssignments,
 		RandomSource:       randomSource,
-		TargetDuration:     networkConf.ViewsInEpoch / networkConf.ViewsPerSecond,
-		TargetEndTime:      uint64(time.Now().Unix()) + networkConf.ViewsInEpoch,
+		TargetDuration:     targetDuration,
+		TargetEndTime:      uint64(time.Now().Unix()) + targetDuration,
 	}
 
 	epochCommit := &flow.EpochCommit{
