@@ -31,11 +31,11 @@ endif
 gen-bootstrap: clone-flow
 	cd flow-go/cmd/bootstrap && go run . genconfig \
 		--address-format "%s%d-${NETWORK_ID}.${NAMESPACE}:3569" \
-		--access $(ACCESS) \
-		--collection $(COLLECTION) \
-		--consensus $(CONSENSUS) \
-		--execution $(EXECUTION) \
-		--verification $(VERIFICATION) \
+		--access 15 \
+		--collection 20 \
+		--consensus 3 \
+		--execution 2 \
+		--verification 50 \
 		--weight 100 \
 		-o ./ \
 		--config ../../../bootstrap/conf/node-config.json
@@ -50,12 +50,11 @@ gen-bootstrap: clone-flow
 		--root-height 0 \
 		--root-parent 0000000000000000000000000000000000000000000000000000000000000000 \
 		--epoch-counter 0 \
-		--epoch-length 483000 \
-		--epoch-staking-phase-length 460000 \
-		--epoch-dkg-phase-length 2000 \
-		--epoch-commit-safety-threshold 500 \
-		--epoch-extension-view-count=1200 \
-		--collection-clusters 3 \
+        --epoch-length 5000 \
+        --epoch-staking-phase-length 500 \
+        --epoch-dkg-phase-length 1000 \
+        --epoch-extension-view-count=600 \
+        --collection-clusters 3 \
 		--protocol-version=0 \
 		--epoch-commit-safety-threshold=100 \
 		--use-default-epoch-timing \
