@@ -62,6 +62,7 @@ var (
 	numViewsInStakingPhase     uint64
 	numViewsInDKGPhase         uint64
 	numViewsEpoch              uint64
+	numViewsPerSecond          uint64
 	epochCommitSafetyThreshold uint64
 	profiler                   bool
 	profileUploader            bool
@@ -85,6 +86,7 @@ func init() {
 	flag.IntVar(&testExecutionCount, "test-execution", DefaultTestExecutionCount, "number of test execution")
 	flag.UintVar(&nClusters, "nclusters", DefaultNClusters, "number of collector clusters")
 	flag.Uint64Var(&numViewsEpoch, "epoch-length", 10000, "number of views in epoch")
+	flag.Uint64Var(&numViewsPerSecond, "epoch-view-rate", 1, "number of views per second")
 	flag.Uint64Var(&numViewsInStakingPhase, "epoch-staking-phase-length", 2000, "number of views in epoch staking phase")
 	flag.Uint64Var(&numViewsInDKGPhase, "epoch-dkg-phase-length", 2000, "number of views in epoch dkg phase")
 	flag.Uint64Var(&epochCommitSafetyThreshold, "epoch-commit-safety-threshold", 1000, "number of views for safety threshold T (assume: one finalization occurs within T blocks)")
@@ -126,6 +128,9 @@ func main() {
 	flowNetworkOpts := []testnet.NetworkConfigOpt{testnet.WithClusters(nClusters)}
 	if numViewsEpoch != 0 {
 		flowNetworkOpts = append(flowNetworkOpts, testnet.WithViewsInEpoch(numViewsEpoch))
+	}
+	if numViewsPerSecond != 0 {
+		flowNetworkOpts = append(flowNetworkOpts, testnet.WithViewsPerSecond(numViewsPerSecond))
 	}
 	if numViewsInStakingPhase != 0 {
 		flowNetworkOpts = append(flowNetworkOpts, testnet.WithViewsInStakingAuction(numViewsInStakingPhase))
