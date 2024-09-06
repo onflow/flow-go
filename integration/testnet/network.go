@@ -118,6 +118,7 @@ const (
 	DefaultViewsInStakingAuction      uint64 = 5
 	DefaultViewsInDKGPhase            uint64 = 50
 	DefaultViewsInEpoch               uint64 = 200
+	DefaultViewsPerSecond             uint64 = 1
 	DefaultEpochCommitSafetyThreshold uint64 = 20
 	DefaultEpochExtensionViewCount    uint64 = 50
 
@@ -429,6 +430,7 @@ type NetworkConfig struct {
 	ViewsInDKGPhase            uint64
 	ViewsInStakingAuction      uint64
 	ViewsInEpoch               uint64
+	ViewsPerSecond             uint64
 	EpochCommitSafetyThreshold uint64
 	KVStoreFactory             func(epochStateID flow.Identifier) (protocol_state.KVStoreAPI, error)
 }
@@ -443,6 +445,7 @@ func NewNetworkConfig(name string, nodes NodeConfigs, opts ...NetworkConfigOpt) 
 		ViewsInStakingAuction:      DefaultViewsInStakingAuction,
 		ViewsInDKGPhase:            DefaultViewsInDKGPhase,
 		ViewsInEpoch:               DefaultViewsInEpoch,
+		ViewsPerSecond:             DefaultViewsPerSecond,
 		EpochCommitSafetyThreshold: DefaultEpochCommitSafetyThreshold,
 		KVStoreFactory: func(epochStateID flow.Identifier) (protocol_state.KVStoreAPI, error) {
 			return kvstore.NewDefaultKVStore(DefaultEpochCommitSafetyThreshold, DefaultEpochExtensionViewCount, epochStateID)
@@ -479,6 +482,12 @@ func WithViewsInStakingAuction(views uint64) func(*NetworkConfig) {
 func WithViewsInEpoch(views uint64) func(*NetworkConfig) {
 	return func(config *NetworkConfig) {
 		config.ViewsInEpoch = views
+	}
+}
+
+func WithViewsPerSecond(views uint64) func(*NetworkConfig) {
+	return func(config *NetworkConfig) {
+		config.ViewsPerSecond = views
 	}
 }
 
@@ -1171,7 +1180,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string, chainID fl
 		Participants:       participants.ToSkeleton(),
 		Assignments:        clusterAssignments,
 		RandomSource:       randomSource,
-		TargetDuration:     networkConf.ViewsInEpoch, // 1view/s
+		TargetDuration:     networkConf.ViewsInEpoch / networkConf.ViewsPerSecond,
 		TargetEndTime:      uint64(time.Now().Unix()) + networkConf.ViewsInEpoch,
 	}
 

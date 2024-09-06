@@ -51,6 +51,7 @@ gen-bootstrap: clone-flow
 		--root-parent 0000000000000000000000000000000000000000000000000000000000000000 \
 		--epoch-counter 0 \
         --epoch-length 5000 \
+        --epoch-view-rate 3 \
         --epoch-staking-phase-length 500 \
         --epoch-dkg-phase-length 1000 \
         --epoch-extension-view-count=600 \
