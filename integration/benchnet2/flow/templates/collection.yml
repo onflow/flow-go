@@ -8,7 +8,7 @@ metadata:
   labels:
     app: {{ $k }}
     network: {{ $.Values.networkId }}
-    node: collection
+    role: collection
     owner: {{ $.Values.owner }}
     service: flow
 
@@ -18,7 +18,7 @@ spec:
   selector:
     matchLabels:
       app: {{ $k }}
-      node: collection
+      role: collection
       service: flow
 
   template:
@@ -29,7 +29,7 @@ spec:
         prometheus.io/port: "8080"
       labels:
         app: {{ $k }}
-        node: collection
+        role: collection
         service: flow
         network: {{ $.Values.networkId }}
     spec:  
