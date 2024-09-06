@@ -4,220 +4,58 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
-	"sort"
-	"strings"
 
 	"github.com/onflow/cadence/migrations"
 	"github.com/onflow/cadence/runtime"
-	"github.com/onflow/cadence/runtime/ast"
 	"github.com/onflow/cadence/runtime/common"
 	cadenceErrors "github.com/onflow/cadence/runtime/errors"
 	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/onflow/cadence/runtime/sema"
-	"github.com/onflow/cadence/runtime/stdlib"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	"golang.org/x/exp/slices"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/fvm/environment"
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// FixCapabilityControllerEntitlementsMigration
-
-type FixCapabilityControllerEntitlementsMigrationReporter interface {
-	MigratedCapabilityController(
-		storageKey interpreter.StorageKey,
-		capabilityController *interpreter.StorageCapabilityControllerValue,
-		oldAccessibleMembers []string,
-		newAccessibleMembers []string,
-	)
+type AccountCapabilityControllerID struct {
+	Address      common.Address
+	CapabilityID uint64
 }
 
-type FixCapabilityControllerEntitlementsMigration struct {
-	Reporter                  FixCapabilityControllerEntitlementsMigrationReporter
-	PublicLinkReport          PublicLinkReport
-	PublicLinkMigrationReport PublicLinkMigrationReport
-}
+// FixEntitlementsMigration
 
-var _ migrations.ValueMigration = &FixCapabilityControllerEntitlementsMigration{}
-
-func (*FixCapabilityControllerEntitlementsMigration) Name() string {
-	return "FixCapabilityControllerEntitlementsMigration"
-}
-
-var fixCapabilityControllerEntitlementsMigrationDomains = map[string]struct{}{
-	stdlib.CapabilityControllerStorageDomain: {},
-}
-
-func (*FixCapabilityControllerEntitlementsMigration) Domains() map[string]struct{} {
-	return fixCapabilityControllerEntitlementsMigrationDomains
-}
-
-func (m *FixCapabilityControllerEntitlementsMigration) Migrate(
-	storageKey interpreter.StorageKey,
-	_ interpreter.StorageMapKey,
-	value interpreter.Value,
-	inter *interpreter.Interpreter,
-	_ migrations.ValueMigrationPosition,
-) (
-	interpreter.Value,
-	error,
-) {
-	if capabilityController, ok := value.(*interpreter.StorageCapabilityControllerValue); ok {
-		address := storageKey.Address
-		capabilityID := capabilityController.CapabilityID
-
-		publicPathIdentifier := m.capabilityControllerPublicPathIdentifier(address, capabilityID)
-		if publicPathIdentifier == "" {
-			log.Warn().Msgf("missing capability controller path for account %s, capability ID %d", address, capabilityID)
-			return nil, nil
-		}
-
-		linkInfo := m.publicPathLinkInfo(address, publicPathIdentifier)
-		if linkInfo.BorrowType == "" {
-			log.Warn().Msgf("missing link info for account %s, public path %s", address, publicPathIdentifier)
-			return nil, nil
-		}
-
-		oldAccessibleMembers := linkInfo.AccessibleMembers
-		if oldAccessibleMembers == nil {
-			log.Warn().Msgf(
-				"old accessible members for account %s, capability controller %s not available",
-				address,
-				capabilityController.BorrowType,
-			)
-			return nil, nil
-		}
-
-		newAccessibleMembers, err := getAccessibleMembers(inter, capabilityController.BorrowType)
-		if err != nil {
-			log.Warn().Msgf(
-				"failed to get new accessible members for account %s, capability controller %s: %s",
-				address,
-				capabilityController.BorrowType,
-				err,
-			)
-			return nil, nil
-		}
-
-		sort.Strings(oldAccessibleMembers)
-		sort.Strings(newAccessibleMembers)
-
-		if !slices.Equal(linkInfo.AccessibleMembers, newAccessibleMembers) {
-			m.Reporter.MigratedCapabilityController(
-				storageKey,
-				capabilityController,
-				oldAccessibleMembers,
-				newAccessibleMembers,
-			)
-		}
-	}
-
-	return nil, nil
-}
-
-func (m *FixCapabilityControllerEntitlementsMigration) capabilityControllerPublicPathIdentifier(
-	address common.Address,
-	capabilityID interpreter.UInt64Value,
-) string {
-	return m.PublicLinkMigrationReport[AccountCapabilityControllerID{
-		Address:      address,
-		CapabilityID: uint64(capabilityID),
-	}]
-}
-
-func (m *FixCapabilityControllerEntitlementsMigration) publicPathLinkInfo(
-	address common.Address,
-	publicPathIdentifier string,
-) LinkInfo {
-	return m.PublicLinkReport[AddressPublicPath{
-		Address:    address,
-		Identifier: publicPathIdentifier,
-	}]
-}
-
-func getAccessibleMembers(
-	inter *interpreter.Interpreter,
-	staticType interpreter.StaticType,
-) (
-	accessibleMembers []string,
-	err error,
-) {
-	defer func() {
-		if r := recover(); r != nil {
-			err = fmt.Errorf("panic: %v", r)
-		}
-	}()
-
-	semaType, err := inter.ConvertStaticToSemaType(staticType)
-	if err != nil {
-		return nil, fmt.Errorf(
-			"failed to convert static type %s to semantic type: %w",
-			staticType.ID(),
-			err,
-		)
-	}
-	if semaType == nil {
-		return nil, fmt.Errorf(
-			"failed to convert static type %s to semantic type",
-			staticType.ID(),
-		)
-	}
-
-	// NOTE: RestrictedType.GetMembers returns *all* members,
-	// including those that are not accessible, for DX purposes.
-	// We need to resolve the members and filter out the inaccessible members,
-	// using the error reported when resolving
-
-	memberResolvers := semaType.GetMembers()
-
-	accessibleMembers = make([]string, 0, len(memberResolvers))
-
-	for memberName, memberResolver := range memberResolvers {
-		var resolveErr error
-		memberResolver.Resolve(nil, memberName, ast.EmptyRange, func(err error) {
-			resolveErr = err
-		})
-		if resolveErr != nil {
-			continue
-		}
-		accessibleMembers = append(accessibleMembers, memberName)
-	}
-
-	return accessibleMembers, nil
-}
-
-func (*FixCapabilityControllerEntitlementsMigration) CanSkip(valueType interpreter.StaticType) bool {
-	return CanSkipFixEntitlementsMigration(valueType)
-}
-
-// FixCapabilityEntitlementsMigration
-
-type FixCapabilityEntitlementsMigrationReporter interface {
+type FixEntitlementsMigrationReporter interface {
 	MigratedCapability(
 		storageKey interpreter.StorageKey,
-		capability *interpreter.IDCapabilityValue,
+		capabilityAddress common.Address,
+		capabilityID uint64,
+		newAuthorization interpreter.Authorization,
+	)
+	MigratedCapabilityController(
+		storageKey interpreter.StorageKey,
+		capabilityID uint64,
+		newAuthorization interpreter.Authorization,
 	)
 }
 
-type FixCapabilityEntitlementsMigration struct {
-	Reporter FixCapabilityEntitlementsMigrationReporter
+type FixEntitlementsMigration struct {
+	Reporter          FixEntitlementsMigrationReporter
+	NewAuthorizations map[AccountCapabilityControllerID]interpreter.Authorization
 }
 
-var _ migrations.ValueMigration = &FixCapabilityEntitlementsMigration{}
+var _ migrations.ValueMigration = &FixEntitlementsMigration{}
 
-func (*FixCapabilityEntitlementsMigration) Name() string {
-	return "FixCapabilityEntitlementsMigration"
+func (*FixEntitlementsMigration) Name() string {
+	return "FixEntitlementsMigration"
 }
 
-func (*FixCapabilityEntitlementsMigration) Domains() map[string]struct{} {
+func (*FixEntitlementsMigration) Domains() map[string]struct{} {
 	return nil
 }
 
-func (m *FixCapabilityEntitlementsMigration) Migrate(
+func (m *FixEntitlementsMigration) Migrate(
 	storageKey interpreter.StorageKey,
 	_ interpreter.StorageMapKey,
 	value interpreter.Value,
@@ -227,15 +65,82 @@ func (m *FixCapabilityEntitlementsMigration) Migrate(
 	interpreter.Value,
 	error,
 ) {
-	if capability, ok := value.(*interpreter.IDCapabilityValue); ok {
-		// TODO:
-		m.Reporter.MigratedCapability(storageKey, capability)
+	switch value := value.(type) {
+	case *interpreter.IDCapabilityValue:
+		capabilityAddress := common.Address(value.Address())
+		capabilityID := uint64(value.ID)
+
+		newAuthorization := m.NewAuthorizations[AccountCapabilityControllerID{
+			Address:      capabilityAddress,
+			CapabilityID: capabilityID,
+		}]
+		if newAuthorization == nil {
+			// Nothing to fix for this capability
+			return nil, nil
+		}
+
+		borrowType := value.BorrowType
+		if borrowType == nil {
+			log.Warn().Msgf(
+				"missing borrow type for capability with target %s#%d",
+				capabilityAddress.HexWithPrefix(),
+				capabilityID,
+			)
+		}
+
+		borrowReferenceType, ok := borrowType.(*interpreter.ReferenceStaticType)
+		if !ok {
+			log.Warn().Msgf(
+				"invalid non-reference borrow type for capability with target %s#%d: %s",
+				capabilityAddress.HexWithPrefix(),
+				capabilityID,
+				borrowType,
+			)
+			return nil, nil
+		}
+
+		borrowReferenceType.Authorization = newAuthorization
+		value.BorrowType = borrowReferenceType
+
+		m.Reporter.MigratedCapability(
+			storageKey,
+			capabilityAddress,
+			capabilityID,
+			newAuthorization,
+		)
+
+		return value, nil
+
+	case *interpreter.StorageCapabilityControllerValue:
+		// The capability controller's address is implicitly
+		// the address of the account in which it is stored
+		capabilityAddress := storageKey.Address
+		capabilityID := uint64(value.CapabilityID)
+
+		newAuthorization := m.NewAuthorizations[AccountCapabilityControllerID{
+			Address:      capabilityAddress,
+			CapabilityID: capabilityID,
+		}]
+		if newAuthorization == nil {
+			// Nothing to fix for this capability controller
+			return nil, nil
+		}
+
+		value.BorrowType.Authorization = newAuthorization
+
+		m.Reporter.MigratedCapabilityController(
+			storageKey,
+			capabilityID,
+			newAuthorization,
+		)
+
+		return value, nil
 	}
 
 	return nil, nil
 }
 
-func (*FixCapabilityEntitlementsMigration) CanSkip(valueType interpreter.StaticType) bool {
+func (*FixEntitlementsMigration) CanSkip(valueType interpreter.StaticType) bool {
 	return CanSkipFixEntitlementsMigration(valueType)
 }
 
@@ -295,25 +200,24 @@ type FixEntitlementsMigrationOptions struct {
 	CheckStorageHealthBeforeMigration bool
 }
 
-const fixCapabilityControllerEntitlementMigrationReportName = "fix-capability-controller-entitlements-migration"
+const fixEntitlementsMigrationReporterName = "fix-entitlements-migration"
 
-func NewFixCapabilityControllerEntitlementsMigration(
+func NewFixEntitlementsMigration(
 	rwf reporters.ReportWriterFactory,
 	errorMessageHandler *errorMessageHandler,
 	programs map[runtime.Location]*interpreter.Program,
-	publicLinkReport PublicLinkReport,
-	publicLinkMigrationReport PublicLinkMigrationReport,
+	newAuthorizations map[AccountCapabilityControllerID]interpreter.Authorization,
 	opts FixEntitlementsMigrationOptions,
 ) *CadenceBaseMigration {
 	var diffReporter reporters.ReportWriter
 	if opts.DiffMigrations {
-		diffReporter = rwf.ReportWriter("fix-capability-controller-entitlements-migration-diff")
+		diffReporter = rwf.ReportWriter("fix-entitlements-migration-diff")
 	}
 
-	reporter := rwf.ReportWriter(fixCapabilityControllerEntitlementMigrationReportName)
+	reporter := rwf.ReportWriter(fixEntitlementsMigrationReporterName)
 
 	return &CadenceBaseMigration{
-		name:                              "fix_capability_controller_entitlements_migration",
+		name:                              "fix_entitlements_migration",
 		reporter:                          reporter,
 		diffReporter:                      diffReporter,
 		logVerboseDiff:                    opts.LogVerboseDiff,
@@ -326,53 +230,8 @@ func NewFixCapabilityControllerEntitlementsMigration(
 		) []migrations.ValueMigration {
 
 			return []migrations.ValueMigration{
-				&FixCapabilityControllerEntitlementsMigration{
-					PublicLinkReport:          publicLinkReport,
-					PublicLinkMigrationReport: publicLinkMigrationReport,
-					Reporter: &fixEntitlementsMigrationReporter{
-						reportWriter:        reporter,
-						errorMessageHandler: errorMessageHandler,
-						verboseErrorOutput:  opts.VerboseErrorOutput,
-					},
-				},
-			}
-		},
-		errorMessageHandler: errorMessageHandler,
-		programs:            programs,
-		chainID:             opts.ChainID,
-	}
-}
-
-const fixCapabilityEntitlementsMigrationReporterName = "fix-capability-entitlements-migration"
-
-func NewFixCapabilityEntitlementsMigration(
-	rwf reporters.ReportWriterFactory,
-	errorMessageHandler *errorMessageHandler,
-	programs map[runtime.Location]*interpreter.Program,
-	opts FixEntitlementsMigrationOptions,
-) *CadenceBaseMigration {
-	var diffReporter reporters.ReportWriter
-	if opts.DiffMigrations {
-		diffReporter = rwf.ReportWriter("fix-capability-entitlements-migration-diff")
-	}
-
-	reporter := rwf.ReportWriter(fixCapabilityEntitlementsMigrationReporterName)
-
-	return &CadenceBaseMigration{
-		name:                              "fix_capability_entitlements_migration",
-		reporter:                          reporter,
-		diffReporter:                      diffReporter,
-		logVerboseDiff:                    opts.LogVerboseDiff,
-		verboseErrorOutput:                opts.VerboseErrorOutput,
-		checkStorageHealthBeforeMigration: opts.CheckStorageHealthBeforeMigration,
-		valueMigrations: func(
-			_ *interpreter.Interpreter,
-			_ environment.Accounts,
-			_ *cadenceValueMigrationReporter,
-		) []migrations.ValueMigration {
-
-			return []migrations.ValueMigration{
-				&FixCapabilityEntitlementsMigration{
+				&FixEntitlementsMigration{
+					NewAuthorizations: newAuthorizations,
 					Reporter: &fixEntitlementsMigrationReporter{
 						reportWriter:        reporter,
 						errorMessageHandler: errorMessageHandler,
@@ -393,8 +252,7 @@ type fixEntitlementsMigrationReporter struct {
 	verboseErrorOutput  bool
 }
 
-var _ FixCapabilityEntitlementsMigrationReporter = &fixEntitlementsMigrationReporter{}
-var _ FixCapabilityControllerEntitlementsMigrationReporter = &fixEntitlementsMigrationReporter{}
+var _ FixEntitlementsMigrationReporter = &fixEntitlementsMigrationReporter{}
 var _ migrations.Reporter = &fixEntitlementsMigrationReporter{}
 
 func (r *fixEntitlementsMigrationReporter) Migrated(
@@ -445,197 +303,96 @@ func (r *fixEntitlementsMigrationReporter) DictionaryKeyConflict(accountAddressP
 
 func (r *fixEntitlementsMigrationReporter) MigratedCapabilityController(
 	storageKey interpreter.StorageKey,
-	capabilityController *interpreter.StorageCapabilityControllerValue,
-	oldAccessibleMembers []string,
-	newAccessibleMembers []string,
+	capabilityID uint64,
+	newAuthorization interpreter.Authorization,
 ) {
 	r.reportWriter.Write(capabilityControllerEntitlementsFixedEntry{
-		StorageKey:           storageKey,
-		CapabilityID:         uint64(capabilityController.CapabilityID),
-		OldAccessibleMembers: oldAccessibleMembers,
-		NewAccessibleMembers: newAccessibleMembers,
+		StorageKey:       storageKey,
+		CapabilityID:     capabilityID,
+		NewAuthorization: newAuthorization,
 	})
 }
 
 func (r *fixEntitlementsMigrationReporter) MigratedCapability(
-	_ interpreter.StorageKey,
-	_ *interpreter.IDCapabilityValue,
+	storageKey interpreter.StorageKey,
+	capabilityAddress common.Address,
+	capabilityID uint64,
+	newAuthorization interpreter.Authorization,
 ) {
-	// TODO:
+	r.reportWriter.Write(capabilityEntitlementsFixedEntry{
+		StorageKey:        storageKey,
+		CapabilityAddress: capabilityAddress,
+		CapabilityID:      capabilityID,
+		NewAuthorization:  newAuthorization,
+	})
+}
+
+func jsonEncodeAuthorization(authorization interpreter.Authorization) string {
+	switch authorization {
+	case interpreter.UnauthorizedAccess, interpreter.InaccessibleAccess:
+		return ""
+	default:
+		return string(authorization.ID())
+	}
 }
 
 // capabilityControllerEntitlementsFixedEntry
 type capabilityControllerEntitlementsFixedEntry struct {
-	StorageKey           interpreter.StorageKey
-	CapabilityID         uint64
-	OldAccessibleMembers []string
-	NewAccessibleMembers []string
+	StorageKey       interpreter.StorageKey
+	CapabilityID     uint64
+	NewAuthorization interpreter.Authorization
 }
 
 var _ json.Marshaler = capabilityControllerEntitlementsFixedEntry{}
 
 func (e capabilityControllerEntitlementsFixedEntry) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
-		Kind           string `json:"kind"`
-		AccountAddress string `json:"account_address"`
-		StorageDomain  string `json:"domain"`
-		CapabilityID   uint64 `json:"capability_id"`
+		Kind             string `json:"kind"`
+		AccountAddress   string `json:"account_address"`
+		StorageDomain    string `json:"domain"`
+		CapabilityID     uint64 `json:"capability_id"`
+		NewAuthorization string `json:"new_authorization"`
 	}{
-		Kind:           "capability-controller-entitlements-fixed",
-		AccountAddress: e.StorageKey.Address.HexWithPrefix(),
-		StorageDomain:  e.StorageKey.Key,
-		CapabilityID:   e.CapabilityID,
+		Kind:             "capability-controller-entitlements-fixed",
+		AccountAddress:   e.StorageKey.Address.HexWithPrefix(),
+		StorageDomain:    e.StorageKey.Key,
+		CapabilityID:     e.CapabilityID,
+		NewAuthorization: jsonEncodeAuthorization(e.NewAuthorization),
 	})
 }
 
-type AccountCapabilityControllerID struct {
-	Address      common.Address
-	CapabilityID uint64
+// capabilityEntitlementsFixedEntry
+type capabilityEntitlementsFixedEntry struct {
+	StorageKey        interpreter.StorageKey
+	CapabilityAddress common.Address
+	CapabilityID      uint64
+	NewAuthorization  interpreter.Authorization
 }
 
-// PublicLinkMigrationReport is a mapping from account capability controller IDs to public path identifier.
-type PublicLinkMigrationReport map[AccountCapabilityControllerID]string
+var _ json.Marshaler = capabilityEntitlementsFixedEntry{}
 
-// ReadPublicLinkMigrationReport reads a link migration report from the given reader,
-// and extracts the public paths that were migrated.
-//
-// The report is expected to be a JSON array of objects with the following structure:
-//
-//	[
-//		{"kind":"link-migration-success","account_address":"0x1","path":"/public/foo","capability_id":1},
-//	]
-func ReadPublicLinkMigrationReport(reader io.Reader) (PublicLinkMigrationReport, error) {
-	mapping := PublicLinkMigrationReport{}
-
-	dec := json.NewDecoder(reader)
-
-	token, err := dec.Token()
-	if err != nil {
-		return nil, fmt.Errorf("failed to read token: %w", err)
-	}
-	if token != json.Delim('[') {
-		return nil, fmt.Errorf("expected start of array, got %s", token)
-	}
-
-	for dec.More() {
-		var entry struct {
-			Kind         string `json:"kind"`
-			Address      string `json:"account_address"`
-			Path         string `json:"path"`
-			CapabilityID uint64 `json:"capability_id"`
-		}
-		err := dec.Decode(&entry)
-		if err != nil {
-			return nil, fmt.Errorf("failed to decode entry: %w", err)
-		}
-
-		if entry.Kind != "link-migration-success" {
-			continue
-		}
-
-		identifier, ok := strings.CutPrefix(entry.Path, "/public/")
-		if !ok {
-			continue
-		}
-
-		address, err := common.HexToAddress(entry.Address)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse address: %w", err)
-		}
-
-		key := AccountCapabilityControllerID{
-			Address:      address,
-			CapabilityID: entry.CapabilityID,
-		}
-		mapping[key] = identifier
-	}
-
-	token, err = dec.Token()
-	if err != nil {
-		return nil, fmt.Errorf("failed to read token: %w", err)
-	}
-	if token != json.Delim(']') {
-		return nil, fmt.Errorf("expected end of array, got %s", token)
-	}
-
-	return mapping, nil
-}
-
-type LinkInfo struct {
-	BorrowType        common.TypeID
-	AccessibleMembers []string
-}
-
-type AddressPublicPath struct {
-	Address    common.Address
-	Identifier string
-}
-
-// PublicLinkReport is a mapping from public account paths to link info.
-type PublicLinkReport map[AddressPublicPath]LinkInfo
-
-// ReadPublicLinkReport reads a link report from the given reader.
-// The report is expected to be a JSON array of objects with the following structure:
-//
-//	[
-//		{"address":"0x1","identifier":"foo","linkType":"&Foo","accessibleMembers":["foo"]}
-//	]
-func ReadPublicLinkReport(reader io.Reader) (PublicLinkReport, error) {
-	report := PublicLinkReport{}
-
-	dec := json.NewDecoder(reader)
-
-	token, err := dec.Token()
-	if err != nil {
-		return nil, fmt.Errorf("failed to read token: %w", err)
-	}
-	if token != json.Delim('[') {
-		return nil, fmt.Errorf("expected start of array, got %s", token)
-	}
-
-	for dec.More() {
-		var entry struct {
-			Address           string   `json:"address"`
-			Identifier        string   `json:"identifier"`
-			LinkTypeID        string   `json:"linkType"`
-			AccessibleMembers []string `json:"accessibleMembers"`
-		}
-		err := dec.Decode(&entry)
-		if err != nil {
-			return nil, fmt.Errorf("failed to decode entry: %w", err)
-		}
-
-		address, err := common.HexToAddress(entry.Address)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse address: %w", err)
-		}
-
-		key := AddressPublicPath{
-			Address:    address,
-			Identifier: entry.Identifier,
-		}
-		report[key] = LinkInfo{
-			BorrowType:        common.TypeID(entry.LinkTypeID),
-			AccessibleMembers: entry.AccessibleMembers,
-		}
-	}
-
-	token, err = dec.Token()
-	if err != nil {
-		return nil, fmt.Errorf("failed to read token: %w", err)
-	}
-	if token != json.Delim(']') {
-		return nil, fmt.Errorf("expected end of array, got %s", token)
-	}
-
-	return report, nil
+func (e capabilityEntitlementsFixedEntry) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		Kind              string `json:"kind"`
+		AccountAddress    string `json:"account_address"`
+		StorageDomain     string `json:"domain"`
+		CapabilityAddress string `json:"capability_address"`
+		CapabilityID      uint64 `json:"capability_id"`
+		NewAuthorization  string `json:"new_authorization"`
+	}{
+		Kind:              "capability-entitlements-fixed",
+		AccountAddress:    e.StorageKey.Address.HexWithPrefix(),
+		StorageDomain:     e.StorageKey.Key,
+		CapabilityAddress: e.CapabilityAddress.HexWithPrefix(),
+		CapabilityID:      e.CapabilityID,
+		NewAuthorization:  jsonEncodeAuthorization(e.NewAuthorization),
+	})
 }
 
 func NewFixEntitlementsMigrations(
 	log zerolog.Logger,
 	rwf reporters.ReportWriterFactory,
-	publicLinkReport PublicLinkReport,
-	publicLinkMigrationReport PublicLinkMigrationReport,
+	newAuthorizations map[AccountCapabilityControllerID]interpreter.Authorization,
 	opts FixEntitlementsMigrationOptions,
 ) []NamedMigration {
 
@@ -650,10 +407,8 @@ func NewFixEntitlementsMigrations(
 
 	programs := make(map[common.Location]*interpreter.Program, 1000)
 
-	// TODO:
-	//fixedEntitlements := map[AccountCapabilityControllerID]struct{}{}
-
 	return []NamedMigration{
+		// TODO: unnecessary? remove?
 		{
 			Name: "check-contracts",
 			Migrate: NewContractCheckingMigration(
@@ -667,32 +422,16 @@ func NewFixEntitlementsMigrations(
 			),
 		},
 		{
-			Name: "fix-capability-controller-entitlements",
+			Name: "fix-entitlements",
 			Migrate: NewAccountBasedMigration(
 				log,
 				opts.NWorker,
 				[]AccountBasedMigration{
-					NewFixCapabilityControllerEntitlementsMigration(
+					NewFixEntitlementsMigration(
 						rwf,
 						errorMessageHandler,
 						programs,
-						publicLinkReport,
-						publicLinkMigrationReport,
-						opts,
-					),
-				},
-			),
-		},
-		{
-			Name: "fix-capability-entitlements",
-			Migrate: NewAccountBasedMigration(
-				log,
-				opts.NWorker,
-				[]AccountBasedMigration{
-					NewFixCapabilityEntitlementsMigration(
-						rwf,
-						errorMessageHandler,
-						programs,
+						newAuthorizations,
 						opts,
 					),
 				},
