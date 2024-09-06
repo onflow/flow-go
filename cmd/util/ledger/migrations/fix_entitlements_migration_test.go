@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/onflow/cadence/runtime/common"
+	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
@@ -134,7 +135,39 @@ func TestFixEntitlementMigrations(t *testing.T) {
 		require.NoError(t, err)
 	}
 
+	reporter := rwf.reportWriters[fixCapabilityControllerEntitlementMigrationReportName]
+	require.NotNil(t, reporter)
+
+	var entries []any
+
+	for _, entry := range reporter.entries {
+		switch entry := entry.(type) {
+		case capabilityControllerEntitlementsFixedEntry:
+			entries = append(entries, entry)
+		}
+	}
+
 	// TODO: validate
+
+	require.ElementsMatch(t,
+		[]any{
+			capabilityControllerEntitlementsFixedEntry{
+				StorageKey: interpreter.StorageKey{
+					Key:     "cap_con",
+					Address: common.Address(address),
+				},
+				CapabilityID: 1,
+			},
+			capabilityControllerEntitlementsFixedEntry{
+				StorageKey: interpreter.StorageKey{
+					Key:     "cap_con",
+					Address: common.Address(address),
+				},
+				CapabilityID: 2,
+			},
+		},
+		entries,
+	)
 }
 
 func TestReadPublicLinkMigrationReport(t *testing.T) {
