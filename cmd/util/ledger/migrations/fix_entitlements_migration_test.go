@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/onflow/cadence/runtime/common"
-	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
@@ -79,19 +78,15 @@ func TestReadLinkMigrationReport(t *testing.T) {
       ]
     `)
 
-	mapping, err := ReadLinkMigrationReport(reader)
+	mapping, err := ReadPublicLinkMigrationReport(reader)
 	require.NoError(t, err)
 
 	require.Equal(t,
-		map[AccountCapabilityControllerID]string{
+		LinkMigrationReport{
 			{
 				Address:      common.MustBytesToAddress([]byte{0x1}),
 				CapabilityID: 1,
-			}: "/public/foo",
-			{
-				Address:      common.MustBytesToAddress([]byte{0x2}),
-				CapabilityID: 2,
-			}: "/private/bar",
+			}: "foo",
 		},
 		mapping,
 	)
@@ -107,27 +102,21 @@ func TestReadLinkReport(t *testing.T) {
       ]
     `)
 
-	mapping, err := ReadLinkReport(reader)
+	mapping, err := ReadPublicLinkReport(reader)
 	require.NoError(t, err)
 
 	require.Equal(t,
-		map[interpreter.AddressPath]LinkInfo{
+		PublicLinkReport{
 			{
-				Address: common.MustBytesToAddress([]byte{0x1}),
-				Path: interpreter.PathValue{
-					Domain:     common.PathDomainPublic,
-					Identifier: "foo",
-				},
+				Address:    common.MustBytesToAddress([]byte{0x1}),
+				Identifier: "foo",
 			}: {
 				BorrowType:        "&Foo",
 				AccessibleMembers: []string{"foo"},
 			},
 			{
-				Address: common.MustBytesToAddress([]byte{0x2}),
-				Path: interpreter.PathValue{
-					Domain:     common.PathDomainPublic,
-					Identifier: "bar",
-				},
+				Address:    common.MustBytesToAddress([]byte{0x2}),
+				Identifier: "bar",
 			}: {
 				BorrowType:        "&Bar",
 				AccessibleMembers: nil,

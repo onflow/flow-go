@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/onflow/cadence/migrations"
 	"github.com/onflow/cadence/runtime"
@@ -12,7 +13,9 @@ import (
 	cadenceErrors "github.com/onflow/cadence/runtime/errors"
 	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/onflow/cadence/runtime/sema"
+	"github.com/onflow/cadence/runtime/stdlib"
 	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/fvm/environment"
@@ -23,13 +26,16 @@ import (
 
 type FixCapabilityControllerEntitlementsMigrationReporter interface {
 	MigratedCapabilityController(
-		key interpreter.StorageKey,
-		value *interpreter.StorageCapabilityControllerValue,
+		storageKey interpreter.StorageKey,
+		capabilityController *interpreter.StorageCapabilityControllerValue,
+		linkInfo LinkInfo,
 	)
 }
 
 type FixCapabilityControllerEntitlementsMigration struct {
-	Reporter FixCapabilityControllerEntitlementsMigrationReporter
+	Reporter            FixCapabilityControllerEntitlementsMigrationReporter
+	LinkMigrationReport LinkMigrationReport
+	LinkReport          PublicLinkReport
 }
 
 var _ migrations.ValueMigration = &FixCapabilityControllerEntitlementsMigration{}
@@ -38,8 +44,12 @@ func (*FixCapabilityControllerEntitlementsMigration) Name() string {
 	return "FixCapabilityControllerEntitlementsMigration"
 }
 
+var fixCapabilityControllerEntitlementsMigrationDomains = map[string]struct{}{
+	stdlib.CapabilityControllerStorageDomain: {},
+}
+
 func (*FixCapabilityControllerEntitlementsMigration) Domains() map[string]struct{} {
-	return nil
+	return fixCapabilityControllerEntitlementsMigrationDomains
 }
 
 func (m *FixCapabilityControllerEntitlementsMigration) Migrate(
@@ -52,12 +62,46 @@ func (m *FixCapabilityControllerEntitlementsMigration) Migrate(
 	interpreter.Value,
 	error,
 ) {
-	if capability, ok := value.(*interpreter.StorageCapabilityControllerValue); ok {
-		// TODO:
-		m.Reporter.MigratedCapabilityController(storageKey, capability)
+	if capabilityController, ok := value.(*interpreter.StorageCapabilityControllerValue); ok {
+		address := storageKey.Address
+		capabilityID := capabilityController.CapabilityID
+
+		publicPathIdentifier := m.capabilityControllerPublicPathIdentifier(address, capabilityID)
+		if publicPathIdentifier == "" {
+			log.Warn().Msgf("missing capability controller path for account %s, capability ID %d", address, capabilityID)
+			return nil, nil
+		}
+
+		linkInfo := m.publicPathLinkInfo(address, publicPathIdentifier)
+
+		m.Reporter.MigratedCapabilityController(
+			storageKey,
+			capabilityController,
+			linkInfo,
+		)
 	}
 
 	return nil, nil
+}
+
+func (m *FixCapabilityControllerEntitlementsMigration) capabilityControllerPublicPathIdentifier(
+	address common.Address,
+	capabilityID interpreter.UInt64Value,
+) string {
+	return m.LinkMigrationReport[AccountCapabilityControllerID{
+		Address:      address,
+		CapabilityID: uint64(capabilityID),
+	}]
+}
+
+func (m *FixCapabilityControllerEntitlementsMigration) publicPathLinkInfo(
+	address common.Address,
+	publicPathIdentifier string,
+) LinkInfo {
+	return m.LinkReport[AddressPublicPath{
+		Address:    address,
+		Identifier: publicPathIdentifier,
+	}]
 }
 
 func (*FixCapabilityControllerEntitlementsMigration) CanSkip(valueType interpreter.StaticType) bool {
@@ -68,8 +112,8 @@ func (*FixCapabilityControllerEntitlementsMigration) CanSkip(valueType interpret
 
 type FixCapabilityEntitlementsMigrationReporter interface {
 	MigratedCapability(
-		key interpreter.StorageKey,
-		value *interpreter.IDCapabilityValue,
+		storageKey interpreter.StorageKey,
+		capability *interpreter.IDCapabilityValue,
 	)
 }
 
@@ -306,15 +350,16 @@ func (r *fixEntitlementsMigrationReporter) DictionaryKeyConflict(accountAddressP
 }
 
 func (r *fixEntitlementsMigrationReporter) MigratedCapability(
-	key interpreter.StorageKey,
-	value *interpreter.IDCapabilityValue,
+	_ interpreter.StorageKey,
+	_ *interpreter.IDCapabilityValue,
 ) {
 	// TODO:
 }
 
 func (r *fixEntitlementsMigrationReporter) MigratedCapabilityController(
-	key interpreter.StorageKey,
-	value *interpreter.StorageCapabilityControllerValue,
+	_ interpreter.StorageKey,
+	_ *interpreter.StorageCapabilityControllerValue,
+	_ LinkInfo,
 ) {
 	// TODO:
 }
@@ -324,16 +369,19 @@ type AccountCapabilityControllerID struct {
 	CapabilityID uint64
 }
 
-// ReadLinkMigrationReport reads a link migration report from the given reader.
+// LinkMigrationReport is a mapping from account capability controller IDs to path identifier.
+type LinkMigrationReport map[AccountCapabilityControllerID]string
+
+// ReadPublicLinkMigrationReport reads a link migration report from the given reader,
+// and extracts the public paths that were migrated.
+//
 // The report is expected to be a JSON array of objects with the following structure:
 //
 //	[
 //		{"kind":"link-migration-success","account_address":"0x1","path":"/public/foo","capability_id":1},
 //	]
-//
-// The function returns a mapping from account capability controller IDs to paths.
-func ReadLinkMigrationReport(reader io.Reader) (map[AccountCapabilityControllerID]string, error) {
-	mapping := make(map[AccountCapabilityControllerID]string)
+func ReadPublicLinkMigrationReport(reader io.Reader) (LinkMigrationReport, error) {
+	mapping := LinkMigrationReport{}
 
 	dec := json.NewDecoder(reader)
 
@@ -361,6 +409,11 @@ func ReadLinkMigrationReport(reader io.Reader) (map[AccountCapabilityControllerI
 			continue
 		}
 
+		identifier, ok := strings.CutPrefix(entry.Path, "/public/")
+		if !ok {
+			continue
+		}
+
 		address, err := common.HexToAddress(entry.Address)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse address: %w", err)
@@ -370,7 +423,7 @@ func ReadLinkMigrationReport(reader io.Reader) (map[AccountCapabilityControllerI
 			Address:      address,
 			CapabilityID: entry.CapabilityID,
 		}
-		mapping[key] = entry.Path
+		mapping[key] = identifier
 	}
 
 	token, err = dec.Token()
@@ -389,16 +442,22 @@ type LinkInfo struct {
 	AccessibleMembers []string
 }
 
-// ReadLinkReport reads a link report from the given reader.
+type AddressPublicPath struct {
+	Address    common.Address
+	Identifier string
+}
+
+// PublicLinkReport is a mapping from public account paths to link info.
+type PublicLinkReport map[AddressPublicPath]LinkInfo
+
+// ReadPublicLinkReport reads a link report from the given reader.
 // The report is expected to be a JSON array of objects with the following structure:
 //
 //	[
 //		{"address":"0x1","identifier":"foo","linkType":"&Foo","accessibleMembers":["foo"]}
 //	]
-//
-// The function returns a mapping from account paths to link info.
-func ReadLinkReport(reader io.Reader) (map[interpreter.AddressPath]LinkInfo, error) {
-	mapping := make(map[interpreter.AddressPath]LinkInfo)
+func ReadPublicLinkReport(reader io.Reader) (PublicLinkReport, error) {
+	report := PublicLinkReport{}
 
 	dec := json.NewDecoder(reader)
 
@@ -427,14 +486,11 @@ func ReadLinkReport(reader io.Reader) (map[interpreter.AddressPath]LinkInfo, err
 			return nil, fmt.Errorf("failed to parse address: %w", err)
 		}
 
-		key := interpreter.AddressPath{
-			Address: address,
-			Path: interpreter.PathValue{
-				Domain:     common.PathDomainPublic,
-				Identifier: entry.Identifier,
-			},
+		key := AddressPublicPath{
+			Address:    address,
+			Identifier: entry.Identifier,
 		}
-		mapping[key] = LinkInfo{
+		report[key] = LinkInfo{
 			BorrowType:        common.TypeID(entry.LinkTypeID),
 			AccessibleMembers: entry.AccessibleMembers,
 		}
@@ -448,7 +504,7 @@ func ReadLinkReport(reader io.Reader) (map[interpreter.AddressPath]LinkInfo, err
 		return nil, fmt.Errorf("expected end of array, got %s", token)
 	}
 
-	return mapping, nil
+	return report, nil
 }
 
 func NewFixEntitlementsMigrations(
@@ -467,6 +523,9 @@ func NewFixEntitlementsMigrations(
 	// before the value migrations are run.
 
 	programs := make(map[common.Location]*interpreter.Program, 1000)
+
+	// TODO:
+	//fixedEntitlements := map[AccountCapabilityControllerID]struct{}{}
 
 	return []NamedMigration{
 		{
