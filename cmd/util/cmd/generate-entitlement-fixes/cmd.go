@@ -33,7 +33,11 @@ type PublicLinkReport map[AddressPublicPath]LinkInfo
 //	[
 //		{"address":"0x1","identifier":"foo","linkType":"&Foo","accessibleMembers":["foo"]}
 //	]
-func ReadPublicLinkReport(reader io.Reader) (PublicLinkReport, error) {
+func ReadPublicLinkReport(
+	reader io.Reader,
+	filter map[common.Address]struct{},
+) (PublicLinkReport, error) {
+
 	report := PublicLinkReport{}
 
 	dec := json.NewDecoder(reader)
@@ -61,6 +65,12 @@ func ReadPublicLinkReport(reader io.Reader) (PublicLinkReport, error) {
 		address, err := common.HexToAddress(entry.Address)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse address: %w", err)
+		}
+
+		if filter != nil {
+			if _, ok := filter[address]; !ok {
+				continue
+			}
 		}
 
 		key := AddressPublicPath{
@@ -95,7 +105,11 @@ type PublicLinkMigrationReport map[AccountCapabilityControllerID]string
 //	[
 //		{"kind":"link-migration-success","account_address":"0x1","path":"/public/foo","capability_id":1},
 //	]
-func ReadPublicLinkMigrationReport(reader io.Reader) (PublicLinkMigrationReport, error) {
+func ReadPublicLinkMigrationReport(
+	reader io.Reader,
+	filter map[common.Address]struct{},
+) (PublicLinkMigrationReport, error) {
+
 	mapping := PublicLinkMigrationReport{}
 
 	dec := json.NewDecoder(reader)
@@ -132,6 +146,12 @@ func ReadPublicLinkMigrationReport(reader io.Reader) (PublicLinkMigrationReport,
 		address, err := common.HexToAddress(entry.Address)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse address: %w", err)
+		}
+
+		if filter != nil {
+			if _, ok := filter[address]; !ok {
+				continue
+			}
 		}
 
 		key := AccountCapabilityControllerID{
