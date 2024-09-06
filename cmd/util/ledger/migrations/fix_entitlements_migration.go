@@ -73,6 +73,12 @@ func (m *FixCapabilityControllerEntitlementsMigration) Migrate(
 		}
 
 		linkInfo := m.publicPathLinkInfo(address, publicPathIdentifier)
+		if linkInfo.BorrowType == "" {
+			log.Warn().Msgf("missing link info for account %s, public path %s", address, publicPathIdentifier)
+			return nil, nil
+		}
+
+		// TODO:
 
 		m.Reporter.MigratedCapabilityController(
 			storageKey,
@@ -209,6 +215,8 @@ type FixEntitlementsMigrationOptions struct {
 	CheckStorageHealthBeforeMigration bool
 }
 
+const fixCapabilityControllerEntitlementMigrationReportName = "fix-capability-controller-entitlements-migration"
+
 func NewFixCapabilityControllerEntitlementsMigration(
 	rwf reporters.ReportWriterFactory,
 	errorMessageHandler *errorMessageHandler,
@@ -222,7 +230,7 @@ func NewFixCapabilityControllerEntitlementsMigration(
 		diffReporter = rwf.ReportWriter("fix-capability-controller-entitlements-migration-diff")
 	}
 
-	reporter := rwf.ReportWriter("fix-capability-controller-entitlements-migration")
+	reporter := rwf.ReportWriter(fixCapabilityControllerEntitlementMigrationReportName)
 
 	return &CadenceBaseMigration{
 		name:                              "fix_capability_controller_entitlements_migration",
@@ -255,6 +263,8 @@ func NewFixCapabilityControllerEntitlementsMigration(
 	}
 }
 
+const fixCapabilityEntitlementsMigrationReporterName = "fix-capability-entitlements-migration"
+
 func NewFixCapabilityEntitlementsMigration(
 	rwf reporters.ReportWriterFactory,
 	errorMessageHandler *errorMessageHandler,
@@ -266,7 +276,7 @@ func NewFixCapabilityEntitlementsMigration(
 		diffReporter = rwf.ReportWriter("fix-capability-entitlements-migration-diff")
 	}
 
-	reporter := rwf.ReportWriter("fix-capability-entitlements-migration")
+	reporter := rwf.ReportWriter(fixCapabilityEntitlementsMigrationReporterName)
 
 	return &CadenceBaseMigration{
 		name:                              "fix_capability_entitlements_migration",
@@ -353,6 +363,17 @@ func (r *fixEntitlementsMigrationReporter) DictionaryKeyConflict(accountAddressP
 	})
 }
 
+func (r *fixEntitlementsMigrationReporter) MigratedCapabilityController(
+	storageKey interpreter.StorageKey,
+	capabilityController *interpreter.StorageCapabilityControllerValue,
+	_ LinkInfo,
+) {
+	r.reportWriter.Write(capabilityControllerEntitlementsFixedEntry{
+		StorageKey:   storageKey,
+		CapabilityID: uint64(capabilityController.CapabilityID),
+	})
+}
+
 func (r *fixEntitlementsMigrationReporter) MigratedCapability(
 	_ interpreter.StorageKey,
 	_ *interpreter.IDCapabilityValue,
@@ -360,12 +381,26 @@ func (r *fixEntitlementsMigrationReporter) MigratedCapability(
 	// TODO:
 }
 
-func (r *fixEntitlementsMigrationReporter) MigratedCapabilityController(
-	_ interpreter.StorageKey,
-	_ *interpreter.StorageCapabilityControllerValue,
-	_ LinkInfo,
-) {
-	// TODO:
+// capabilityControllerEntitlementsFixedEntry
+type capabilityControllerEntitlementsFixedEntry struct {
+	StorageKey   interpreter.StorageKey
+	CapabilityID uint64
+}
+
+var _ json.Marshaler = capabilityControllerEntitlementsFixedEntry{}
+
+func (e capabilityControllerEntitlementsFixedEntry) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		Kind           string `json:"kind"`
+		AccountAddress string `json:"account_address"`
+		StorageDomain  string `json:"domain"`
+		CapabilityID   uint64 `json:"capability_id"`
+	}{
+		Kind:           "capability-controller-entitlements-fixed",
+		AccountAddress: e.StorageKey.Address.HexWithPrefix(),
+		StorageDomain:  e.StorageKey.Key,
+		CapabilityID:   e.CapabilityID,
+	})
 }
 
 type AccountCapabilityControllerID struct {
