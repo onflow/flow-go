@@ -20,6 +20,11 @@ func TestFixEntitlementMigrations(t *testing.T) {
 
 	const nWorker = 2
 
+	address, err := chain.AddressAtIndex(1000)
+	require.NoError(t, err)
+
+	require.Equal(t, "bf519681cdb888b1", address.Hex())
+
 	log := zerolog.New(zerolog.NewTestWriter(t))
 
 	bootstrapPayloads, err := newBootstrapPayloads(chainID)
@@ -28,24 +33,45 @@ func TestFixEntitlementMigrations(t *testing.T) {
 	registersByAccount, err := registers.NewByAccountFromPayloads(bootstrapPayloads)
 	require.NoError(t, err)
 
+	mr := NewBasicMigrationRuntime(registersByAccount)
+	err = mr.Accounts.Create(nil, address)
+	require.NoError(t, err)
+
+	expectedWriteAddresses := map[flow.Address]struct{}{
+		address: {},
+	}
+
+	err = mr.Commit(expectedWriteAddresses, log)
+	require.NoError(t, err)
+
 	tx := flow.NewTransactionBody().
 		SetScript([]byte(`
           transaction {
               prepare(signer: auth(Storage, Capabilities) &Account) {
-                  let cap = signer.capabilities.storage.issue<auth(Insert) &[Int]>(/storage/ints)
-                  signer.storage.save([cap], to: /storage/caps)
+                  // Capability 1 was a public, unauthorized capability.
+                  // It should lose its entitlement
+                  let cap1 = signer.capabilities.storage.issue<auth(Insert) &[Int]>(/storage/ints)
+                  signer.capabilities.publish(cap1, at: /public/ints)
+
+                  // Capability 2 was a public, unauthorized capability, stored nested in storage.
+                  // It should lose its entitlement
+                  let cap2 = signer.capabilities.storage.issue<auth(Insert) &[Int]>(/storage/ints)
+                  signer.storage.save([cap2], to: /storage/caps1)
+
+                  // Capability 3 was a private, authorized capability, stored nested in storage.
+                  // It should keep its entitlement
+                  let cap3 = signer.capabilities.storage.issue<auth(Insert) &[Int]>(/storage/ints)
+                  signer.storage.save([cap3], to: /storage/caps2)
               }
           }
         `)).
-		AddAuthorizer(chain.ServiceAddress())
+		AddAuthorizer(address)
 
 	setupTx := NewTransactionBasedMigration(
 		tx,
 		chainID,
 		log,
-		map[flow.Address]struct{}{
-			chain.ServiceAddress(): {},
-		},
+		expectedWriteAddresses,
 	)
 
 	err = setupTx(registersByAccount)
@@ -58,7 +84,50 @@ func TestFixEntitlementMigrations(t *testing.T) {
 		NWorker: nWorker,
 	}
 
-	migrations := NewFixEntitlementsMigrations(log, rwf, options)
+	// Capability 1 was a public, unauthorized capability.
+	// It should lose its entitlement
+	//
+	// Capability 2 was a public, unauthorized capability, stored nested in storage.
+	// It should lose its entitlement
+	//
+	// Capability 3 was a private, authorized capability, stored nested in storage.
+	// It should keep its entitlement
+
+	publicLinkReport := PublicLinkReport{
+		{
+			Address:    common.Address(address),
+			Identifier: "ints",
+		}: {
+			BorrowType:        "&[Int]",
+			AccessibleMembers: []string{},
+		},
+		{
+			Address:    common.Address(address),
+			Identifier: "ints2",
+		}: {
+			BorrowType:        "&[Int]",
+			AccessibleMembers: []string{},
+		},
+	}
+
+	publicLinkMigrationReport := PublicLinkMigrationReport{
+		{
+			Address:      common.Address(address),
+			CapabilityID: 1,
+		}: "ints",
+		{
+			Address:      common.Address(address),
+			CapabilityID: 2,
+		}: "ints2",
+	}
+
+	migrations := NewFixEntitlementsMigrations(
+		log,
+		rwf,
+		publicLinkReport,
+		publicLinkMigrationReport,
+		options,
+	)
 
 	for _, namedMigration := range migrations {
 		err = namedMigration.Migrate(registersByAccount)
@@ -68,7 +137,7 @@ func TestFixEntitlementMigrations(t *testing.T) {
 	// TODO: validate
 }
 
-func TestReadLinkMigrationReport(t *testing.T) {
+func TestReadPublicLinkMigrationReport(t *testing.T) {
 	t.Parallel()
 
 	reader := strings.NewReader(`
@@ -82,7 +151,7 @@ func TestReadLinkMigrationReport(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Equal(t,
-		LinkMigrationReport{
+		PublicLinkMigrationReport{
 			{
 				Address:      common.MustBytesToAddress([]byte{0x1}),
 				CapabilityID: 1,
