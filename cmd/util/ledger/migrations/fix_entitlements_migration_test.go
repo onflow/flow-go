@@ -1,6 +1,7 @@
 package migrations
 
 import (
+	"sort"
 	"strings"
 	"testing"
 
@@ -57,12 +58,17 @@ func TestFixEntitlementMigrations(t *testing.T) {
                   // Capability 2 was a public, unauthorized capability, stored nested in storage.
                   // It should lose its entitlement
                   let cap2 = signer.capabilities.storage.issue<auth(Insert) &[Int]>(/storage/ints)
-                  signer.storage.save([cap2], to: /storage/caps1)
+                  signer.storage.save([cap2], to: /storage/caps2)
 
                   // Capability 3 was a private, authorized capability, stored nested in storage.
                   // It should keep its entitlement
                   let cap3 = signer.capabilities.storage.issue<auth(Insert) &[Int]>(/storage/ints)
-                  signer.storage.save([cap3], to: /storage/caps2)
+                  signer.storage.save([cap3], to: /storage/caps3)
+
+	               // Capability 4 was a capability with unavailable accessible members, stored nested in storage.
+	               // It should keep its entitlement
+                  let cap4 = signer.capabilities.storage.issue<auth(Insert) &[Int]>(/storage/ints)
+                  signer.storage.save([cap4], to: /storage/caps4)
               }
           }
         `)).
@@ -93,6 +99,35 @@ func TestFixEntitlementMigrations(t *testing.T) {
 	//
 	// Capability 3 was a private, authorized capability, stored nested in storage.
 	// It should keep its entitlement
+	//
+	// Capability 4 was a capability with unavailable accessible members, stored nested in storage.
+	// It should keep its entitlement
+
+	readArrayMembers := []string{
+		"concat",
+		"contains",
+		"filter",
+		"firstIndex",
+		"getType",
+		"isInstance",
+		"length",
+		"map",
+		"slice",
+		"toConstantSized",
+	}
+
+	writeArrayMembers := []string{
+		"append",
+		"appendAll",
+		"insert",
+		"remove",
+		"removeFirst",
+		"removeLast",
+		"reverse",
+	}
+
+	readWriteArrayMembers := common.Concat(readArrayMembers, writeArrayMembers)
+	sort.Strings(readWriteArrayMembers)
 
 	publicLinkReport := PublicLinkReport{
 		{
@@ -100,14 +135,21 @@ func TestFixEntitlementMigrations(t *testing.T) {
 			Identifier: "ints",
 		}: {
 			BorrowType:        "&[Int]",
-			AccessibleMembers: []string{},
+			AccessibleMembers: readArrayMembers,
 		},
 		{
 			Address:    common.Address(address),
 			Identifier: "ints2",
 		}: {
 			BorrowType:        "&[Int]",
-			AccessibleMembers: []string{},
+			AccessibleMembers: readArrayMembers,
+		},
+		{
+			Address:    common.Address(address),
+			Identifier: "ints4",
+		}: {
+			BorrowType:        "&[Int]",
+			AccessibleMembers: nil,
 		},
 	}
 
@@ -120,6 +162,10 @@ func TestFixEntitlementMigrations(t *testing.T) {
 			Address:      common.Address(address),
 			CapabilityID: 2,
 		}: "ints2",
+		{
+			Address:      common.Address(address),
+			CapabilityID: 4,
+		}: "ints4",
 	}
 
 	migrations := NewFixEntitlementsMigrations(
@@ -156,14 +202,18 @@ func TestFixEntitlementMigrations(t *testing.T) {
 					Key:     "cap_con",
 					Address: common.Address(address),
 				},
-				CapabilityID: 1,
+				CapabilityID:         1,
+				OldAccessibleMembers: readArrayMembers,
+				NewAccessibleMembers: readWriteArrayMembers,
 			},
 			capabilityControllerEntitlementsFixedEntry{
 				StorageKey: interpreter.StorageKey{
 					Key:     "cap_con",
 					Address: common.Address(address),
 				},
-				CapabilityID: 2,
+				CapabilityID:         2,
+				OldAccessibleMembers: readArrayMembers,
+				NewAccessibleMembers: readWriteArrayMembers,
 			},
 		},
 		entries,
