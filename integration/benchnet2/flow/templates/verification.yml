@@ -7,9 +7,9 @@ metadata:
   name: {{ $k }}
   labels:
     app: {{ $k }}
-    nodeType: verification
+    role: verification
     service: flow
-    networkId: {{ $.Values.networkId }}
+    network: {{ $.Values.networkId }}
 
 spec:
   serviceName: {{ $k }}
@@ -17,9 +17,9 @@ spec:
   selector:
     matchLabels:
       app: {{ $k }}
-      nodeType: verification
+      role: verification
       service: flow
-      networkId: {{ $.Values.networkId }}
+      network: {{ $.Values.networkId }}
 
   template:
     metadata:
@@ -29,8 +29,8 @@ spec:
         prometheus.io/port: "8080"
       labels:
         app: {{ $k }}
-        networkId: {{ $.Values.networkId }}
-        nodeType: verification
+        network: {{ $.Values.networkId }}
+        role: verification
         owner: {{ $.Values.owner }}
         service: flow
     spec:  
@@ -83,7 +83,7 @@ spec:
     - metadata:
         name: data
         labels:
-          networkId: {{ $.Values.networkId }}
+          network: {{ $.Values.networkId }}
       spec:
         accessModes: ["ReadWriteOnce"]
         resources:
@@ -103,7 +103,7 @@ metadata:
   name: {{ $k }}
   labels:
     app: {{ $k }}
-    networkId: {{ $.Values.networkId }}
+    network: {{ $.Values.networkId }}
     owner: {{ $.Values.owner }}
 spec:
   {{ if $v.servicePorts }}
