@@ -33,9 +33,9 @@ type FixCapabilityControllerEntitlementsMigrationReporter interface {
 }
 
 type FixCapabilityControllerEntitlementsMigration struct {
-	Reporter            FixCapabilityControllerEntitlementsMigrationReporter
-	LinkMigrationReport LinkMigrationReport
-	LinkReport          PublicLinkReport
+	Reporter                  FixCapabilityControllerEntitlementsMigrationReporter
+	PublicLinkReport          PublicLinkReport
+	PublicLinkMigrationReport PublicLinkMigrationReport
 }
 
 var _ migrations.ValueMigration = &FixCapabilityControllerEntitlementsMigration{}
@@ -88,7 +88,7 @@ func (m *FixCapabilityControllerEntitlementsMigration) capabilityControllerPubli
 	address common.Address,
 	capabilityID interpreter.UInt64Value,
 ) string {
-	return m.LinkMigrationReport[AccountCapabilityControllerID{
+	return m.PublicLinkMigrationReport[AccountCapabilityControllerID{
 		Address:      address,
 		CapabilityID: uint64(capabilityID),
 	}]
@@ -98,7 +98,7 @@ func (m *FixCapabilityControllerEntitlementsMigration) publicPathLinkInfo(
 	address common.Address,
 	publicPathIdentifier string,
 ) LinkInfo {
-	return m.LinkReport[AddressPublicPath{
+	return m.PublicLinkReport[AddressPublicPath{
 		Address:    address,
 		Identifier: publicPathIdentifier,
 	}]
@@ -213,6 +213,8 @@ func NewFixCapabilityControllerEntitlementsMigration(
 	rwf reporters.ReportWriterFactory,
 	errorMessageHandler *errorMessageHandler,
 	programs map[runtime.Location]*interpreter.Program,
+	publicLinkReport PublicLinkReport,
+	publicLinkMigrationReport PublicLinkMigrationReport,
 	opts FixEntitlementsMigrationOptions,
 ) *CadenceBaseMigration {
 	var diffReporter reporters.ReportWriter
@@ -237,6 +239,8 @@ func NewFixCapabilityControllerEntitlementsMigration(
 
 			return []migrations.ValueMigration{
 				&FixCapabilityControllerEntitlementsMigration{
+					PublicLinkReport:          publicLinkReport,
+					PublicLinkMigrationReport: publicLinkMigrationReport,
 					Reporter: &fixEntitlementsMigrationReporter{
 						reportWriter:        reporter,
 						errorMessageHandler: errorMessageHandler,
@@ -369,8 +373,8 @@ type AccountCapabilityControllerID struct {
 	CapabilityID uint64
 }
 
-// LinkMigrationReport is a mapping from account capability controller IDs to path identifier.
-type LinkMigrationReport map[AccountCapabilityControllerID]string
+// PublicLinkMigrationReport is a mapping from account capability controller IDs to public path identifier.
+type PublicLinkMigrationReport map[AccountCapabilityControllerID]string
 
 // ReadPublicLinkMigrationReport reads a link migration report from the given reader,
 // and extracts the public paths that were migrated.
@@ -380,8 +384,8 @@ type LinkMigrationReport map[AccountCapabilityControllerID]string
 //	[
 //		{"kind":"link-migration-success","account_address":"0x1","path":"/public/foo","capability_id":1},
 //	]
-func ReadPublicLinkMigrationReport(reader io.Reader) (LinkMigrationReport, error) {
-	mapping := LinkMigrationReport{}
+func ReadPublicLinkMigrationReport(reader io.Reader) (PublicLinkMigrationReport, error) {
+	mapping := PublicLinkMigrationReport{}
 
 	dec := json.NewDecoder(reader)
 
@@ -510,6 +514,8 @@ func ReadPublicLinkReport(reader io.Reader) (PublicLinkReport, error) {
 func NewFixEntitlementsMigrations(
 	log zerolog.Logger,
 	rwf reporters.ReportWriterFactory,
+	publicLinkReport PublicLinkReport,
+	publicLinkMigrationReport PublicLinkMigrationReport,
 	opts FixEntitlementsMigrationOptions,
 ) []NamedMigration {
 
@@ -550,6 +556,8 @@ func NewFixEntitlementsMigrations(
 						rwf,
 						errorMessageHandler,
 						programs,
+						publicLinkReport,
+						publicLinkMigrationReport,
 						opts,
 					),
 				},
