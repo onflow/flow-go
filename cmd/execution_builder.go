@@ -534,12 +534,9 @@ func (exeNode *ExecutionNode) LoadProviderEngine(
 				return nil, fmt.Errorf("could not create evm trace uploader: %w", err)
 			}
 		}
-		evmTracer, err := debug.NewEVMCallTracer(evmTraceUploader, node.Logger)
-		if err != nil {
-			return nil, fmt.Errorf("could not create evm tracer: %w", err)
-		}
+		evmTracer := debug.NewEVMCallTracerCommon(evmTraceUploader, node.Logger)
 
-		opts = append(opts, fvm.WithEVMTracer(evmTracer))
+		opts = append(opts, fvm.WithEVMTracerCommon(evmTracer))
 	}
 
 	vmCtx := fvm.NewContext(opts...)
