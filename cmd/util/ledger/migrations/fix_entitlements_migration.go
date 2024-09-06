@@ -5,10 +5,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"sort"
 	"strings"
 
 	"github.com/onflow/cadence/migrations"
 	"github.com/onflow/cadence/runtime"
+	"github.com/onflow/cadence/runtime/ast"
 	"github.com/onflow/cadence/runtime/common"
 	cadenceErrors "github.com/onflow/cadence/runtime/errors"
 	"github.com/onflow/cadence/runtime/interpreter"
@@ -16,6 +18,7 @@ import (
 	"github.com/onflow/cadence/runtime/stdlib"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"golang.org/x/exp/slices"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/fvm/environment"
@@ -28,7 +31,8 @@ type FixCapabilityControllerEntitlementsMigrationReporter interface {
 	MigratedCapabilityController(
 		storageKey interpreter.StorageKey,
 		capabilityController *interpreter.StorageCapabilityControllerValue,
-		linkInfo LinkInfo,
+		oldAccessibleMembers []string,
+		newAccessibleMembers []string,
 	)
 }
 
@@ -56,7 +60,7 @@ func (m *FixCapabilityControllerEntitlementsMigration) Migrate(
 	storageKey interpreter.StorageKey,
 	_ interpreter.StorageMapKey,
 	value interpreter.Value,
-	_ *interpreter.Interpreter,
+	inter *interpreter.Interpreter,
 	_ migrations.ValueMigrationPosition,
 ) (
 	interpreter.Value,
@@ -78,13 +82,38 @@ func (m *FixCapabilityControllerEntitlementsMigration) Migrate(
 			return nil, nil
 		}
 
-		// TODO:
+		oldAccessibleMembers := linkInfo.AccessibleMembers
+		if oldAccessibleMembers == nil {
+			log.Warn().Msgf(
+				"old accessible members for account %s, capability controller %s not available",
+				address,
+				capabilityController.BorrowType,
+			)
+			return nil, nil
+		}
 
-		m.Reporter.MigratedCapabilityController(
-			storageKey,
-			capabilityController,
-			linkInfo,
-		)
+		newAccessibleMembers, err := getAccessibleMembers(inter, capabilityController.BorrowType)
+		if err != nil {
+			log.Warn().Msgf(
+				"failed to get new accessible members for account %s, capability controller %s: %s",
+				address,
+				capabilityController.BorrowType,
+				err,
+			)
+			return nil, nil
+		}
+
+		sort.Strings(oldAccessibleMembers)
+		sort.Strings(newAccessibleMembers)
+
+		if !slices.Equal(linkInfo.AccessibleMembers, newAccessibleMembers) {
+			m.Reporter.MigratedCapabilityController(
+				storageKey,
+				capabilityController,
+				oldAccessibleMembers,
+				newAccessibleMembers,
+			)
+		}
 	}
 
 	return nil, nil
@@ -108,6 +137,57 @@ func (m *FixCapabilityControllerEntitlementsMigration) publicPathLinkInfo(
 		Address:    address,
 		Identifier: publicPathIdentifier,
 	}]
+}
+
+func getAccessibleMembers(
+	inter *interpreter.Interpreter,
+	staticType interpreter.StaticType,
+) (
+	accessibleMembers []string,
+	err error,
+) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("panic: %v", r)
+		}
+	}()
+
+	semaType, err := inter.ConvertStaticToSemaType(staticType)
+	if err != nil {
+		return nil, fmt.Errorf(
+			"failed to convert static type %s to semantic type: %w",
+			staticType.ID(),
+			err,
+		)
+	}
+	if semaType == nil {
+		return nil, fmt.Errorf(
+			"failed to convert static type %s to semantic type",
+			staticType.ID(),
+		)
+	}
+
+	// NOTE: RestrictedType.GetMembers returns *all* members,
+	// including those that are not accessible, for DX purposes.
+	// We need to resolve the members and filter out the inaccessible members,
+	// using the error reported when resolving
+
+	memberResolvers := semaType.GetMembers()
+
+	accessibleMembers = make([]string, 0, len(memberResolvers))
+
+	for memberName, memberResolver := range memberResolvers {
+		var resolveErr error
+		memberResolver.Resolve(nil, memberName, ast.EmptyRange, func(err error) {
+			resolveErr = err
+		})
+		if resolveErr != nil {
+			continue
+		}
+		accessibleMembers = append(accessibleMembers, memberName)
+	}
+
+	return accessibleMembers, nil
 }
 
 func (*FixCapabilityControllerEntitlementsMigration) CanSkip(valueType interpreter.StaticType) bool {
@@ -366,11 +446,14 @@ func (r *fixEntitlementsMigrationReporter) DictionaryKeyConflict(accountAddressP
 func (r *fixEntitlementsMigrationReporter) MigratedCapabilityController(
 	storageKey interpreter.StorageKey,
 	capabilityController *interpreter.StorageCapabilityControllerValue,
-	_ LinkInfo,
+	oldAccessibleMembers []string,
+	newAccessibleMembers []string,
 ) {
 	r.reportWriter.Write(capabilityControllerEntitlementsFixedEntry{
-		StorageKey:   storageKey,
-		CapabilityID: uint64(capabilityController.CapabilityID),
+		StorageKey:           storageKey,
+		CapabilityID:         uint64(capabilityController.CapabilityID),
+		OldAccessibleMembers: oldAccessibleMembers,
+		NewAccessibleMembers: newAccessibleMembers,
 	})
 }
 
@@ -383,8 +466,10 @@ func (r *fixEntitlementsMigrationReporter) MigratedCapability(
 
 // capabilityControllerEntitlementsFixedEntry
 type capabilityControllerEntitlementsFixedEntry struct {
-	StorageKey   interpreter.StorageKey
-	CapabilityID uint64
+	StorageKey           interpreter.StorageKey
+	CapabilityID         uint64
+	OldAccessibleMembers []string
+	NewAccessibleMembers []string
 }
 
 var _ json.Marshaler = capabilityControllerEntitlementsFixedEntry{}
