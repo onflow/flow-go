@@ -2,226 +2,200 @@ package generate_entitlement_fixes
 
 import (
 	"encoding/json"
-	"fmt"
-	"io"
-	"strings"
 
-	"github.com/onflow/cadence/runtime/ast"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
+	"github.com/rs/zerolog/log"
+	"github.com/spf13/cobra"
+
+	"github.com/onflow/flow-go/cmd/util/ledger/migrations"
+	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
+	"github.com/onflow/flow-go/cmd/util/ledger/util"
+	"github.com/onflow/flow-go/cmd/util/ledger/util/registers"
+	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/model/flow"
 )
 
-type AccountCapabilityControllerID struct {
-	Address      common.Address
-	CapabilityID uint64
+var (
+	flagPayloads        string
+	flagState           string
+	flagStateCommitment string
+	flagOutputDirectory string
+	flagChain           string
+)
+
+var Cmd = &cobra.Command{
+	Use:   "report-links",
+	Short: "reports links",
+	Run:   run,
 }
 
-type LinkInfo struct {
-	BorrowType        common.TypeID
-	AccessibleMembers []string
+func init() {
+
+	Cmd.Flags().StringVar(
+		&flagPayloads,
+		"payloads",
+		"",
+		"Input payload file name",
+	)
+
+	Cmd.Flags().StringVar(
+		&flagState,
+		"state",
+		"",
+		"Input state file name",
+	)
+
+	Cmd.Flags().StringVar(
+		&flagStateCommitment,
+		"state-commitment",
+		"",
+		"Input state commitment",
+	)
+
+	Cmd.Flags().StringVar(
+		&flagOutputDirectory,
+		"output-directory",
+		"",
+		"Output directory",
+	)
+
+	Cmd.Flags().StringVar(
+		&flagChain,
+		"chain",
+		"",
+		"Chain name",
+	)
+	_ = Cmd.MarkFlagRequired("chain")
 }
 
-type AddressPublicPath struct {
-	Address    common.Address
-	Identifier string
-}
+const contractCountEstimate = 1000
 
-// PublicLinkReport is a mapping from public account paths to link info.
-type PublicLinkReport map[AddressPublicPath]LinkInfo
+func run(*cobra.Command, []string) {
 
-// ReadPublicLinkReport reads a link report from the given reader.
-// The report is expected to be a JSON array of objects with the following structure:
-//
-//	[
-//		{"address":"0x1","identifier":"foo","linkType":"&Foo","accessibleMembers":["foo"]}
-//	]
-func ReadPublicLinkReport(
-	reader io.Reader,
-	filter map[common.Address]struct{},
-) (PublicLinkReport, error) {
-
-	report := PublicLinkReport{}
-
-	dec := json.NewDecoder(reader)
-
-	token, err := dec.Token()
-	if err != nil {
-		return nil, fmt.Errorf("failed to read token: %w", err)
+	if flagPayloads == "" && flagState == "" {
+		log.Fatal().Msg("Either --payloads or --state must be provided")
+	} else if flagPayloads != "" && flagState != "" {
+		log.Fatal().Msg("Only one of --payloads or --state must be provided")
 	}
-	if token != json.Delim('[') {
-		return nil, fmt.Errorf("expected start of array, got %s", token)
+	if flagState != "" && flagStateCommitment == "" {
+		log.Fatal().Msg("--state-commitment must be provided when --state is provided")
 	}
 
-	for dec.More() {
-		var entry struct {
-			Address           string   `json:"address"`
-			Identifier        string   `json:"identifier"`
-			LinkTypeID        string   `json:"linkType"`
-			AccessibleMembers []string `json:"accessibleMembers"`
-		}
-		err := dec.Decode(&entry)
+	rwf := reporters.NewReportFileWriterFactory(flagOutputDirectory, log.Logger)
+
+	reporter := rwf.ReportWriter("entitlement-fixes")
+	defer reporter.Close()
+
+	chainID := flow.ChainID(flagChain)
+	// Validate chain ID
+	_ = chainID.Chain()
+
+	var payloads []*ledger.Payload
+	var err error
+
+	// Read payloads from payload file or checkpoint file
+
+	if flagPayloads != "" {
+		log.Info().Msgf("Reading payloads from %s", flagPayloads)
+
+		_, payloads, err = util.ReadPayloadFile(log.Logger, flagPayloads)
 		if err != nil {
-			return nil, fmt.Errorf("failed to decode entry: %w", err)
+			log.Fatal().Err(err).Msg("failed to read payloads")
 		}
+	} else {
+		log.Info().Msgf("Reading trie %s", flagStateCommitment)
 
-		address, err := common.HexToAddress(entry.Address)
+		stateCommitment := util.ParseStateCommitment(flagStateCommitment)
+		payloads, err = util.ReadTrie(flagState, stateCommitment)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse address: %w", err)
-		}
-
-		if filter != nil {
-			if _, ok := filter[address]; !ok {
-				continue
-			}
-		}
-
-		key := AddressPublicPath{
-			Address:    address,
-			Identifier: entry.Identifier,
-		}
-		report[key] = LinkInfo{
-			BorrowType:        common.TypeID(entry.LinkTypeID),
-			AccessibleMembers: entry.AccessibleMembers,
+			log.Fatal().Err(err).Msg("failed to read state")
 		}
 	}
 
-	token, err = dec.Token()
+	log.Info().Msgf("creating registers from payloads (%d)", len(payloads))
+
+	registersByAccount, err := registers.NewByAccountFromPayloads(payloads)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read token: %w", err)
+		log.Fatal().Err(err)
 	}
-	if token != json.Delim(']') {
-		return nil, fmt.Errorf("expected end of array, got %s", token)
+	log.Info().Msgf(
+		"created %d registers from payloads (%d accounts)",
+		registersByAccount.Count(),
+		registersByAccount.AccountCount(),
+	)
+
+	mr, err := migrations.NewInterpreterMigrationRuntime(
+		registersByAccount,
+		chainID,
+		migrations.InterpreterMigrationRuntimeConfig{},
+	)
+	if err != nil {
+		log.Fatal().Err(err)
 	}
 
-	return report, nil
+	checkContracts(registersByAccount, mr, reporter)
+
 }
 
-// PublicLinkMigrationReport is a mapping from account capability controller IDs to public path identifier.
-type PublicLinkMigrationReport map[AccountCapabilityControllerID]string
-
-// ReadPublicLinkMigrationReport reads a link migration report from the given reader,
-// and extracts the public paths that were migrated.
-//
-// The report is expected to be a JSON array of objects with the following structure:
-//
-//	[
-//		{"kind":"link-migration-success","account_address":"0x1","path":"/public/foo","capability_id":1},
-//	]
-func ReadPublicLinkMigrationReport(
-	reader io.Reader,
-	filter map[common.Address]struct{},
-) (PublicLinkMigrationReport, error) {
-
-	mapping := PublicLinkMigrationReport{}
-
-	dec := json.NewDecoder(reader)
-
-	token, err := dec.Token()
-	if err != nil {
-		return nil, fmt.Errorf("failed to read token: %w", err)
-	}
-	if token != json.Delim('[') {
-		return nil, fmt.Errorf("expected start of array, got %s", token)
-	}
-
-	for dec.More() {
-		var entry struct {
-			Kind         string `json:"kind"`
-			Address      string `json:"account_address"`
-			Path         string `json:"path"`
-			CapabilityID uint64 `json:"capability_id"`
-		}
-		err := dec.Decode(&entry)
-		if err != nil {
-			return nil, fmt.Errorf("failed to decode entry: %w", err)
-		}
-
-		if entry.Kind != "link-migration-success" {
-			continue
-		}
-
-		identifier, ok := strings.CutPrefix(entry.Path, "/public/")
-		if !ok {
-			continue
-		}
-
-		address, err := common.HexToAddress(entry.Address)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse address: %w", err)
-		}
-
-		if filter != nil {
-			if _, ok := filter[address]; !ok {
-				continue
-			}
-		}
-
-		key := AccountCapabilityControllerID{
-			Address:      address,
-			CapabilityID: entry.CapabilityID,
-		}
-		mapping[key] = identifier
-	}
-
-	token, err = dec.Token()
-	if err != nil {
-		return nil, fmt.Errorf("failed to read token: %w", err)
-	}
-	if token != json.Delim(']') {
-		return nil, fmt.Errorf("expected end of array, got %s", token)
-	}
-
-	return mapping, nil
-}
-
-func getAccessibleMembers(
-	inter *interpreter.Interpreter,
-	staticType interpreter.StaticType,
-) (
-	accessibleMembers []string,
-	err error,
+func checkContracts(
+	registersByAccount *registers.ByAccount,
+	mr *migrations.InterpreterMigrationRuntime,
+	reporter reporters.ReportWriter,
 ) {
-	defer func() {
-		if r := recover(); r != nil {
-			err = fmt.Errorf("panic: %v", r)
-		}
-	}()
-
-	semaType, err := inter.ConvertStaticToSemaType(staticType)
+	contracts, err := gatherContractsFromRegisters(registersByAccount)
 	if err != nil {
-		return nil, fmt.Errorf(
-			"failed to convert static type %s to semantic type: %w",
-			staticType.ID(),
-			err,
+		log.Fatal().Err(err)
+	}
+
+	programs := make(map[common.Location]*interpreter.Program, contractCountEstimate)
+
+	contractsForPrettyPrinting := make(map[common.Location][]byte, len(contracts))
+	for _, contract := range contracts {
+		contractsForPrettyPrinting[contract.Location] = contract.Code
+	}
+
+	log.Info().Msg("Checking contracts ...")
+
+	for _, contract := range contracts {
+		checkContract(
+			contract,
+			mr,
+			contractsForPrettyPrinting,
+			reporter,
+			programs,
 		)
 	}
-	if semaType == nil {
-		return nil, fmt.Errorf(
-			"failed to convert static type %s to semantic type",
-			staticType.ID(),
-		)
-	}
 
-	// NOTE: RestrictedType.GetMembers returns *all* members,
-	// including those that are not accessible, for DX purposes.
-	// We need to resolve the members and filter out the inaccessible members,
-	// using the error reported when resolving
-
-	memberResolvers := semaType.GetMembers()
-
-	accessibleMembers = make([]string, 0, len(memberResolvers))
-
-	for memberName, memberResolver := range memberResolvers {
-		var resolveErr error
-		memberResolver.Resolve(nil, memberName, ast.EmptyRange, func(err error) {
-			resolveErr = err
-		})
-		if resolveErr != nil {
-			continue
-		}
-		accessibleMembers = append(accessibleMembers, memberName)
-	}
-
-	return accessibleMembers, nil
+	log.Info().Msgf("Checked %d contracts ...", len(contracts))
 }
 
+func jsonEncodeAuthorization(authorization interpreter.Authorization) string {
+	switch authorization {
+	case interpreter.UnauthorizedAccess, interpreter.InaccessibleAccess:
+		return ""
+	default:
+		return string(authorization.ID())
+	}
+}
+
+type fixEntitlementsEntry struct {
+	AccountCapabilityID
+	NewAuthorization interpreter.Authorization
+}
+
+var _ json.Marshaler = fixEntitlementsEntry{}
+
+func (e fixEntitlementsEntry) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		Kind              string `json:"kind"`
+		CapabilityAddress string `json:"capability_address"`
+		CapabilityID      uint64 `json:"capability_id"`
+		NewAuthorization  string `json:"new_authorization"`
+	}{
+		Kind:              "fix-entitlements",
+		CapabilityAddress: e.Address.String(),
+		CapabilityID:      e.CapabilityID,
+		NewAuthorization:  jsonEncodeAuthorization(e.NewAuthorization),
+	})
+}
