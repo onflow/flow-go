@@ -12,7 +12,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-func TestFixEntitlementMigrations(t *testing.T) {
+func TestEntitlements(t *testing.T) {
 	t.Parallel()
 
 	const chainID = flow.Emulator
