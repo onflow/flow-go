@@ -8,6 +8,7 @@ import (
 
 	"github.com/holiman/uint256"
 	"github.com/onflow/atree"
+	"github.com/onflow/crypto/hash"
 	gethCommon "github.com/onflow/go-ethereum/common"
 	gethStateless "github.com/onflow/go-ethereum/core/stateless"
 	gethTracing "github.com/onflow/go-ethereum/core/tracing"
@@ -347,10 +348,10 @@ func (db *StateDB) Preimages() map[gethCommon.Hash][]byte {
 }
 
 // Commit commits state changes back to the underlying
-func (db *StateDB) Commit(finalize bool) error {
-	// return error if any has been acumulated
+func (db *StateDB) Commit(finalize bool) (hash.Hash, error) {
+	// return error if any has been accumulated
 	if db.cachedError != nil {
-		return wrapError(db.cachedError)
+		return nil, wrapError(db.cachedError)
 	}
 
 	var err error
@@ -378,6 +379,7 @@ func (db *StateDB) Commit(finalize bool) error {
 			return bytes.Compare(sortedAddresses[i][:], sortedAddresses[j][:]) < 0
 		})
 
+	deltaCommitter := NewDeltaCommitter()
 	// update accounts
 	for _, addr := range sortedAddresses {
 		deleted := false
@@ -385,36 +387,53 @@ func (db *StateDB) Commit(finalize bool) error {
 		if db.HasSelfDestructed(addr) {
 			err = db.baseView.DeleteAccount(addr)
 			if err != nil {
-				return wrapError(err)
+				return nil, wrapError(err)
+			}
+			err = deltaCommitter.DeleteAccount(addr)
+			if err != nil {
+				return nil, wrapError(err)
 			}
 			deleted = true
 		}
 		if deleted {
 			continue
 		}
+
+		bal := db.GetBalance(addr)
+		nonce := db.GetNonce(addr)
+		code := db.GetCode(addr)
+		codeHash := db.GetCodeHash(addr)
 		// create new accounts
 		if db.IsCreated(addr) {
 			err = db.baseView.CreateAccount(
 				addr,
-				db.GetBalance(addr),
-				db.GetNonce(addr),
-				db.GetCode(addr),
-				db.GetCodeHash(addr),
+				bal,
+				nonce,
+				code,
+				codeHash,
 			)
 			if err != nil {
-				return wrapError(err)
+				return nil, wrapError(err)
+			}
+			err = deltaCommitter.CreateAccount(addr, bal, nonce, codeHash)
+			if err != nil {
+				return nil, wrapError(err)
 			}
 			continue
 		}
 		err = db.baseView.UpdateAccount(
 			addr,
-			db.GetBalance(addr),
-			db.GetNonce(addr),
-			db.GetCode(addr),
-			db.GetCodeHash(addr),
+			bal,
+			nonce,
+			code,
+			codeHash,
 		)
 		if err != nil {
-			return wrapError(err)
+			return nil, wrapError(err)
+		}
+		err = deltaCommitter.UpdateAccount(addr, bal, nonce, codeHash)
+		if err != nil {
+			return nil, wrapError(err)
 		}
 	}
 
@@ -437,20 +456,26 @@ func (db *StateDB) Commit(finalize bool) error {
 		if db.HasSelfDestructed(sk.Address) {
 			continue
 		}
+		val := db.GetState(sk.Address, sk.Key)
 		err = db.baseView.UpdateSlot(
 			sk,
-			db.GetState(sk.Address, sk.Key),
+			val,
 		)
 		if err != nil {
-			return wrapError(err)
+			return nil, wrapError(err)
+		}
+		err = deltaCommitter.UpdateSlot(sk.Address, sk.Key, val)
+		if err != nil {
+			return nil, wrapError(err)
 		}
 	}
 
 	// don't purge views yet, people might call the logs etc
+	commit := deltaCommitter.Commitment()
 	if finalize {
-		return db.Finalize()
+		return commit, db.Finalize()
 	}
-	return nil
+	return commit, nil
 }
 
 // Finalize flushes all the changes

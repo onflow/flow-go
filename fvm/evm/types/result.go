@@ -90,6 +90,8 @@ type Result struct {
 	// PrecompiledCalls captures an encoded list of calls to the precompile
 	// during the execution of transaction
 	PrecompiledCalls []byte
+	// DeltaCommitment captures a commitment over the state delta
+	DeltaCommitment []byte
 }
 
 // Invalid returns true if transaction has been rejected
