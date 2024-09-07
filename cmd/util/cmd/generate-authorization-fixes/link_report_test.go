@@ -48,7 +48,7 @@ func TestReadLinkReport(t *testing.T) {
 		)
 	})
 
-	t.Run("unfiltered", func(t *testing.T) {
+	t.Run("filtered", func(t *testing.T) {
 
 		t.Parallel()
 
