@@ -4,10 +4,13 @@ import (
 	"testing"
 
 	"github.com/onflow/cadence/runtime/common"
+	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/migrations"
+	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/cmd/util/ledger/util/registers"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
@@ -54,6 +57,20 @@ func newBootstrapPayloads(
 
 	return payloads, nil
 }
+
+type testReportWriter struct {
+	entries []any
+}
+
+func (t *testReportWriter) Write(entry interface{}) {
+	t.entries = append(t.entries, entry)
+}
+
+func (*testReportWriter) Close() {
+	// NO-OP
+}
+
+var _ reporters.ReportWriter = &testReportWriter{}
 
 func TestFixAuthorizationsMigrations(t *testing.T) {
 	t.Parallel()
@@ -196,12 +213,35 @@ func TestFixAuthorizationsMigrations(t *testing.T) {
 		}: "ints4",
 	}
 
+	reporter := &testReportWriter{}
+
 	generator := &AuthorizationFixGenerator{
 		registersByAccount:        registersByAccount,
 		mr:                        mr2,
 		publicLinkReport:          publicLinkReport,
 		publicLinkMigrationReport: publicLinkMigrationReport,
+		reporter:                  reporter,
 	}
 	generator.generateFixesForAllAccounts()
+
+	assert.Equal(t,
+		[]any{
+			fixEntitlementsEntry{
+				AccountCapabilityID: AccountCapabilityID{
+					Address:      common.Address(address),
+					CapabilityID: 2,
+				},
+				NewAuthorization: interpreter.UnauthorizedAccess,
+			},
+			fixEntitlementsEntry{
+				AccountCapabilityID: AccountCapabilityID{
+					Address:      common.Address(address),
+					CapabilityID: 1,
+				},
+				NewAuthorization: interpreter.UnauthorizedAccess,
+			},
+		},
+		reporter.entries,
+	)
 
 }

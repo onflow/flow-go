@@ -2,12 +2,14 @@ package generate_authorization_fixes
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"sort"
 	"strings"
 
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
+	"github.com/onflow/cadence/runtime/sema"
 	"github.com/onflow/cadence/runtime/stdlib"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
@@ -379,22 +381,22 @@ func (g *AuthorizationFixGenerator) generateFixesForAccount(address common.Addre
 }
 
 func (g *AuthorizationFixGenerator) maybeGenerateFixForCapabilityController(
-	address common.Address,
+	capabilityAddress common.Address,
 	capabilityID uint64,
 	borrowType *interpreter.ReferenceStaticType,
 ) {
 	// Only fix the entitlements if the capability controller was migrated from a public link
-	publicPathIdentifier := g.capabilityControllerPublicPathIdentifier(address, capabilityID)
+	publicPathIdentifier := g.capabilityControllerPublicPathIdentifier(capabilityAddress, capabilityID)
 	if publicPathIdentifier == "" {
 		return
 	}
 
-	linkInfo := g.publicPathLinkInfo(address, publicPathIdentifier)
+	linkInfo := g.publicPathLinkInfo(capabilityAddress, publicPathIdentifier)
 	if linkInfo.BorrowType == "" {
 		log.Warn().Msgf(
 			"missing link info for /public/%s in account %s",
 			publicPathIdentifier,
-			address.HexWithPrefix(),
+			capabilityAddress.HexWithPrefix(),
 		)
 		return
 	}
@@ -407,20 +409,22 @@ func (g *AuthorizationFixGenerator) maybeGenerateFixForCapabilityController(
 		log.Warn().Msgf(
 			"missing old accessible members for for /public/%s in account %s",
 			publicPathIdentifier,
-			address.HexWithPrefix(),
+			capabilityAddress.HexWithPrefix(),
 		)
 		return
 	}
 
-	newAccessibleMembers, err := getAccessibleMembers(g.mr.Interpreter, borrowType)
+	semaBorrowType, err := convertStaticToSemaType(g.mr.Interpreter, borrowType)
 	if err != nil {
 		log.Warn().Err(err).Msgf(
 			"failed to get new accessible members for capability controller %d in account %s",
 			capabilityID,
-			address.HexWithPrefix(),
+			capabilityAddress.HexWithPrefix(),
 		)
 		return
 	}
+
+	newAccessibleMembers := getAccessibleMembers(semaBorrowType)
 
 	sort.Strings(oldAccessibleMembers)
 	sort.Strings(newAccessibleMembers)
@@ -433,12 +437,73 @@ func (g *AuthorizationFixGenerator) maybeGenerateFixForCapabilityController(
 	log.Info().Msgf(
 		"member mismatch for capability controller %d in account %s: expected %v, got %v",
 		capabilityID,
-		address.HexWithPrefix(),
+		capabilityAddress.HexWithPrefix(),
 		oldAccessibleMembers,
 		newAccessibleMembers,
 	)
 
-	// TODO: generate and report entitlement fix
+	minimalEntitlementSet := findMinimalEntitlementSet(
+		semaBorrowType,
+		oldAccessibleMembers,
+	)
+
+	newAuthorization := interpreter.UnauthorizedAccess
+	if len(minimalEntitlementSet) > 0 {
+		newAuthorization = interpreter.NewEntitlementSetAuthorization(
+			nil,
+			func() []common.TypeID {
+				typeIDs := make([]common.TypeID, 0, len(minimalEntitlementSet))
+				for _, entitlementType := range minimalEntitlementSet {
+					typeIDs = append(typeIDs, entitlementType.ID())
+				}
+				return typeIDs
+			},
+			len(minimalEntitlementSet),
+			// TODO:
+			sema.Conjunction,
+		)
+	}
+
+	g.reporter.Write(fixEntitlementsEntry{
+		AccountCapabilityID: AccountCapabilityID{
+			Address:      capabilityAddress,
+			CapabilityID: capabilityID,
+		},
+		NewAuthorization: newAuthorization,
+	})
+
+}
+
+func convertStaticToSemaType(
+	inter *interpreter.Interpreter,
+	staticType interpreter.StaticType,
+) (
+	semaType sema.Type,
+	err error,
+) {
+
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("panic: %v", r)
+		}
+	}()
+
+	semaType, err = inter.ConvertStaticToSemaType(staticType)
+	if err != nil {
+		return nil, fmt.Errorf(
+			"failed to convert static type %s to semantic type: %w",
+			staticType.ID(),
+			err,
+		)
+	}
+	if semaType == nil {
+		return nil, fmt.Errorf(
+			"failed to convert static type %s to semantic type",
+			staticType.ID(),
+		)
+	}
+
+	return semaType, nil
 }
 
 func (g *AuthorizationFixGenerator) capabilityControllerPublicPathIdentifier(
