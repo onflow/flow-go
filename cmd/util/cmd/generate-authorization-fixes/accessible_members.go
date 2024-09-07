@@ -1,4 +1,4 @@
-package generate_entitlement_fixes
+package generate_authorization_fixes
 
 import (
 	"fmt"
