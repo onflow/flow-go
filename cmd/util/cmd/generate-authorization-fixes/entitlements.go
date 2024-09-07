@@ -1,6 +1,8 @@
 package generate_authorization_fixes
 
 import (
+	"sort"
+
 	"github.com/onflow/cadence/runtime/ast"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/common/orderedmap"
@@ -8,6 +10,7 @@ import (
 	"golang.org/x/exp/slices"
 )
 
+// TODO: handle unsatisfiable case
 func findMinimalEntitlementSet(
 	ty sema.Type,
 	neededMethods []string,
@@ -53,6 +56,13 @@ func findMinimalEntitlementSet(
 			entitlements = append(entitlements, entitlement)
 		}
 	})
+
+	sort.Slice(
+		entitlements,
+		func(i, j int) bool {
+			return entitlements[i].ID() < entitlements[j].ID()
+		},
+	)
 
 	return entitlements
 }
