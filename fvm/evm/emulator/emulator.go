@@ -336,17 +336,17 @@ type procedure struct {
 
 // commit commits the changes to the state (with optional finalization)
 func (proc *procedure) commit(finalize bool) (hash.Hash, error) {
-	deltaCommitment, err := proc.state.Commit(finalize)
+	stateUpdateCommitment, err := proc.state.Commit(finalize)
 	if err != nil {
 		// if known types (state errors) don't do anything and return
 		if types.IsAFatalError(err) || types.IsAStateError(err) || types.IsABackendError(err) {
-			return deltaCommitment, err
+			return stateUpdateCommitment, err
 		}
 
 		// else is a new fatal error
-		return deltaCommitment, types.NewFatalError(err)
+		return stateUpdateCommitment, types.NewFatalError(err)
 	}
-	return deltaCommitment, nil
+	return stateUpdateCommitment, nil
 }
 
 func (proc *procedure) mintTo(
