@@ -408,7 +408,6 @@ func NewFixAuthorizationsMigrations(
 	programs := make(map[common.Location]*interpreter.Program, 1000)
 
 	return []NamedMigration{
-		// TODO: unnecessary? remove?
 		{
 			Name: "check-contracts",
 			Migrate: NewContractCheckingMigration(
