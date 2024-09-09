@@ -273,7 +273,8 @@ func jsonEncodeAuthorization(authorization interpreter.Authorization) string {
 
 type fixEntitlementsEntry struct {
 	AccountCapabilityID
-	NewAuthorization interpreter.Authorization
+	NewAuthorization  interpreter.Authorization
+	UnresolvedMembers map[string]error
 }
 
 var _ json.Marshaler = fixEntitlementsEntry{}
@@ -284,12 +285,22 @@ func (e fixEntitlementsEntry) MarshalJSON() ([]byte, error) {
 		CapabilityAddress string `json:"capability_address"`
 		CapabilityID      uint64 `json:"capability_id"`
 		NewAuthorization  string `json:"new_authorization"`
+		UnresolvedMembers map[string]string
 	}{
 		Kind:              "fix-entitlements",
 		CapabilityAddress: e.Address.String(),
 		CapabilityID:      e.CapabilityID,
 		NewAuthorization:  jsonEncodeAuthorization(e.NewAuthorization),
+		UnresolvedMembers: jsonEncodeMemberErrorMap(e.UnresolvedMembers),
 	})
+}
+
+func jsonEncodeMemberErrorMap(m map[string]error) map[string]string {
+	result := make(map[string]string, len(m))
+	for key, value := range m {
+		result[key] = value.Error()
+	}
+	return result
 }
 
 type AuthorizationFixGenerator struct {
@@ -414,6 +425,15 @@ func (g *AuthorizationFixGenerator) maybeGenerateFixForCapabilityController(
 		return
 	}
 
+	// Assume we already had access to public built-in functions.
+	// For example, forEachAttachment was added in Cadence 1.0,
+	// so we should not consider it as a new member.
+
+	oldAccessibleMembers = append(
+		[]string{"getType", "isInstance", "forEachAttachment"},
+		oldAccessibleMembers...,
+	)
+
 	semaBorrowType, err := convertStaticToSemaType(g.mr.Interpreter, borrowType)
 	if err != nil {
 		log.Warn().Err(err).Msgf(
@@ -442,26 +462,27 @@ func (g *AuthorizationFixGenerator) maybeGenerateFixForCapabilityController(
 		newAccessibleMembers,
 	)
 
-	minimalEntitlementSet := findMinimalEntitlementSet(
+	oldAccessibleMemberSet := make(map[string]struct{})
+	for _, memberName := range oldAccessibleMembers {
+		oldAccessibleMemberSet[memberName] = struct{}{}
+	}
+
+	newAuthorization, unresolvedMembers := findMinimalAuthorization(
 		semaBorrowType,
-		oldAccessibleMembers,
+		oldAccessibleMemberSet,
 	)
 
-	newAuthorization := interpreter.UnauthorizedAccess
-	if len(minimalEntitlementSet) > 0 {
-		newAuthorization = interpreter.NewEntitlementSetAuthorization(
-			nil,
-			func() []common.TypeID {
-				typeIDs := make([]common.TypeID, 0, len(minimalEntitlementSet))
-				for _, entitlementType := range minimalEntitlementSet {
-					typeIDs = append(typeIDs, entitlementType.ID())
-				}
-				return typeIDs
-			},
-			len(minimalEntitlementSet),
-			// TODO:
-			sema.Conjunction,
+	if len(unresolvedMembers) > 0 {
+		// TODO: format unresolved members
+		log.Warn().Msgf(
+			"failed to find minimal entitlement set for capability controller %d in account %s: unresolved members: %v",
+			capabilityID,
+			capabilityAddress.HexWithPrefix(),
+			unresolvedMembers,
 		)
+
+		// NOTE: still continue with the fix,
+		// we should not leave the capability controller vulnerable
 	}
 
 	g.reporter.Write(fixEntitlementsEntry{
@@ -469,7 +490,8 @@ func (g *AuthorizationFixGenerator) maybeGenerateFixForCapabilityController(
 			Address:      capabilityAddress,
 			CapabilityID: capabilityID,
 		},
-		NewAuthorization: newAuthorization,
+		NewAuthorization:  newAuthorization,
+		UnresolvedMembers: unresolvedMembers,
 	})
 
 }
