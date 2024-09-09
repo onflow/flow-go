@@ -190,7 +190,7 @@ func (r *SafetyRules) IsSafeToVote(proposal *model.Proposal) error {
 	err := r.validateEvidenceForEnteringView(blockView, proposal.Block.QC, proposal.LastViewTC)
 	if err != nil {
 		// As we are expecting the blocks to be pre-validated, any failure here is a symptom of an internal bug.
-		return fmt.Errorf("proposal failed consensus validity check")
+		return fmt.Errorf("proposal failed consensus validity check: %w", err)
 	}
 
 	// This check satisfies voting rule 1
