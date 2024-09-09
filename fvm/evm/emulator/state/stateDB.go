@@ -379,7 +379,7 @@ func (db *StateDB) Commit(finalize bool) (hash.Hash, error) {
 			return bytes.Compare(sortedAddresses[i][:], sortedAddresses[j][:]) < 0
 		})
 
-	deltaCommitter := NewDeltaCommitter()
+	deltaCommitter := NewUpdateCommitter()
 	// update accounts
 	for _, addr := range sortedAddresses {
 		deleted := false

@@ -179,7 +179,7 @@ func (bl *BlockView) RunTransaction(
 	}
 
 	// all commit errors (StateDB errors) has to be returned
-	res.DeltaCommitment, err = proc.commit(true)
+	res.StateChangeCommitment, err = proc.commit(true)
 	if err != nil {
 		return nil, err
 	}
@@ -226,7 +226,7 @@ func (bl *BlockView) BatchRunTransactions(txs []*gethTypes.Transaction) ([]*type
 		}
 
 		// all commit errors (StateDB errors) has to be returned
-		res.DeltaCommitment, err = proc.commit(false)
+		res.StateChangeCommitment, err = proc.commit(false)
 		if err != nil {
 			return nil, err
 		}
@@ -389,7 +389,7 @@ func (proc *procedure) mintTo(
 	}
 
 	// commit and finalize the state and return any stateDB error
-	res.DeltaCommitment, err = proc.commit(true)
+	res.StateChangeCommitment, err = proc.commit(true)
 	return res, err
 }
 
@@ -436,7 +436,7 @@ func (proc *procedure) withdrawFrom(
 	proc.state.SubBalance(bridge, value, gethTracing.BalanceIncreaseWithdrawal)
 
 	// commit and finalize the state and return any stateDB error
-	res.DeltaCommitment, err = proc.commit(true)
+	res.StateChangeCommitment, err = proc.commit(true)
 	return res, err
 }
 
@@ -579,7 +579,7 @@ func (proc *procedure) deployAt(
 	res.CumulativeGasUsed = proc.config.BlockTotalGasUsedSoFar + res.GasConsumed
 
 	proc.state.SetCode(addr, ret)
-	res.DeltaCommitment, err = proc.commit(true)
+	res.StateChangeCommitment, err = proc.commit(true)
 	return res, err
 }
 
@@ -596,7 +596,7 @@ func (proc *procedure) runDirect(
 		return nil, err
 	}
 	// commit and finalize the state and return any stateDB error
-	res.DeltaCommitment, err = proc.commit(true)
+	res.StateChangeCommitment, err = proc.commit(true)
 	return res, err
 }
 

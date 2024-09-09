@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestDeltaCommitter(t *testing.T) {
+func TestChangeCommitter(t *testing.T) {
 
 	addr := testutils.RandomAddress(t).ToCommon()
 	balance := uint256.NewInt(200)
@@ -21,7 +21,7 @@ func TestDeltaCommitter(t *testing.T) {
 	value := testutils.RandomCommonHash(t)
 
 	t.Run("test create account", func(t *testing.T) {
-		dc := state.NewDeltaCommitter()
+		dc := state.NewUpdateCommitter()
 		dc.CreateAccount(addr, balance, nonce, randomHash)
 
 		hasher := hash.NewSHA3_256()
@@ -43,7 +43,7 @@ func TestDeltaCommitter(t *testing.T) {
 	})
 
 	t.Run("test update account", func(t *testing.T) {
-		dc := state.NewDeltaCommitter()
+		dc := state.NewUpdateCommitter()
 		dc.UpdateAccount(addr, balance, nonce, randomHash)
 
 		hasher := hash.NewSHA3_256()
@@ -64,7 +64,7 @@ func TestDeltaCommitter(t *testing.T) {
 	})
 
 	t.Run("test delete account", func(t *testing.T) {
-		dc := state.NewDeltaCommitter()
+		dc := state.NewUpdateCommitter()
 		dc.DeleteAccount(addr)
 
 		hasher := hash.NewSHA3_256()
@@ -81,7 +81,7 @@ func TestDeltaCommitter(t *testing.T) {
 	})
 
 	t.Run("test update slot", func(t *testing.T) {
-		dc := state.NewDeltaCommitter()
+		dc := state.NewUpdateCommitter()
 		dc.UpdateSlot(addr, key, value)
 
 		hasher := hash.NewSHA3_256()
@@ -106,7 +106,7 @@ func BenchmarkDeltaCommitter(b *testing.B) {
 	balance := uint256.NewInt(200)
 	nonce := uint64(100)
 	randomHash := testutils.RandomCommonHash(b)
-	dc := state.NewDeltaCommitter()
+	dc := state.NewUpdateCommitter()
 
 	numberOfAccountUpdates := 10
 	for i := 0; i < numberOfAccountUpdates; i++ {

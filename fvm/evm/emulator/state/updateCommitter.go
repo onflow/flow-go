@@ -40,21 +40,21 @@ const (
 		hashByteSize
 )
 
-// DeltaCommitter captures operations (delta) through
-// a set of calls (order matters) and constructs a commitment over the deltas.
-type DeltaCommitter struct {
+// UpdateCommitter captures operations (delta) through
+// a set of calls (order matters) and constructs a commitment over the state changes.
+type UpdateCommitter struct {
 	hasher hash.Hasher
 }
 
-// NewDeltaCommitter constructs a new DeltaCommitter
-func NewDeltaCommitter() *DeltaCommitter {
-	return &DeltaCommitter{
+// NewUpdateCommitter constructs a new UpdateCommitter
+func NewUpdateCommitter() *UpdateCommitter {
+	return &UpdateCommitter{
 		hasher: hash.NewSHA3_256(),
 	}
 }
 
 // CreateAccount captures a create account operation
-func (dc *DeltaCommitter) CreateAccount(
+func (dc *UpdateCommitter) CreateAccount(
 	addr gethCommon.Address,
 	balance *uint256.Int,
 	nonce uint64,
@@ -78,7 +78,7 @@ func (dc *DeltaCommitter) CreateAccount(
 }
 
 // CreateAccount captures an update account operation
-func (dc *DeltaCommitter) UpdateAccount(
+func (dc *UpdateCommitter) UpdateAccount(
 	addr gethCommon.Address,
 	balance *uint256.Int,
 	nonce uint64,
@@ -101,7 +101,7 @@ func (dc *DeltaCommitter) UpdateAccount(
 }
 
 // CreateAccount captures a delete account operation
-func (dc *DeltaCommitter) DeleteAccount(addr gethCommon.Address) error {
+func (dc *UpdateCommitter) DeleteAccount(addr gethCommon.Address) error {
 	buffer := make([]byte, accountDeletionBufferSize)
 	var index int
 	buffer[0] = byte(AccountDeletionOpCode)
@@ -112,7 +112,7 @@ func (dc *DeltaCommitter) DeleteAccount(addr gethCommon.Address) error {
 }
 
 // CreateAccount captures a update slot operation
-func (dc *DeltaCommitter) UpdateSlot(
+func (dc *UpdateCommitter) UpdateSlot(
 	addr gethCommon.Address,
 	key gethCommon.Hash,
 	value gethCommon.Hash,
@@ -131,6 +131,6 @@ func (dc *DeltaCommitter) UpdateSlot(
 }
 
 // Commitment calculates and returns the commitment
-func (dc *DeltaCommitter) Commitment() hash.Hash {
+func (dc *UpdateCommitter) Commitment() hash.Hash {
 	return dc.hasher.SumHash()
 }
