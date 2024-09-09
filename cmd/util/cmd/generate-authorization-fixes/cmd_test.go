@@ -1,10 +1,15 @@
 package generate_authorization_fixes
 
 import (
+	"errors"
+	"fmt"
 	"testing"
 
+	"github.com/onflow/cadence"
+	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
+	"github.com/onflow/cadence/runtime/sema"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -72,6 +77,20 @@ func (*testReportWriter) Close() {
 
 var _ reporters.ReportWriter = &testReportWriter{}
 
+func newEntitlementSetAuthorizationFromTypeIDs(
+	typeIDs []common.TypeID,
+	setKind sema.EntitlementSetKind,
+) interpreter.EntitlementSetAuthorization {
+	return interpreter.NewEntitlementSetAuthorization(
+		nil,
+		func() []common.TypeID {
+			return typeIDs
+		},
+		len(typeIDs),
+		setKind,
+	)
+}
+
 func TestFixAuthorizationsMigrations(t *testing.T) {
 	t.Parallel()
 
@@ -105,41 +124,78 @@ func TestFixAuthorizationsMigrations(t *testing.T) {
 	err = mr.Commit(expectedWriteAddresses, log)
 	require.NoError(t, err)
 
-	tx := flow.NewTransactionBody().
+	const contractCode = `
+      access(all) contract Test {
+          access(all) entitlement E1
+          access(all) entitlement E2
+
+          access(all) struct S {
+              access(E1) fun f1() {}
+              access(E2) fun f2() {}
+              access(all) fun f3() {}
+          }
+      }
+    `
+
+	deployTX := flow.NewTransactionBody().
 		SetScript([]byte(`
-          transaction {
-              prepare(signer: auth(Storage, Capabilities) &Account) {
-                  // Capability 1 was a public, unauthorized capability.
-                  // It should lose its entitlement
-                  let cap1 = signer.capabilities.storage.issue<auth(Insert) &[Int]>(/storage/ints)
-                  signer.capabilities.publish(cap1, at: /public/ints)
-
-                  // Capability 2 was a public, unauthorized capability, stored nested in storage.
-                  // It should lose its entitlement
-                  let cap2 = signer.capabilities.storage.issue<auth(Insert) &[Int]>(/storage/ints)
-                  signer.storage.save([cap2], to: /storage/caps2)
-
-                  // Capability 3 was a private, authorized capability, stored nested in storage.
-                  // It should keep its entitlement
-                  let cap3 = signer.capabilities.storage.issue<auth(Insert) &[Int]>(/storage/ints)
-                  signer.storage.save([cap3], to: /storage/caps3)
-
-	              // Capability 4 was a capability with unavailable accessible members, stored nested in storage.
-	              // It should keep its entitlement
-                  let cap4 = signer.capabilities.storage.issue<auth(Insert) &[Int]>(/storage/ints)
-                  signer.storage.save([cap4], to: /storage/caps4)
+          transaction(code: String) {
+              prepare(signer: auth(Contracts) &Account) {
+                  signer.contracts.add(name: "Test", code: code.utf8)
               }
           }
         `)).
-		AddAuthorizer(address)
+		AddAuthorizer(address).
+		AddArgument(jsoncdc.MustEncode(cadence.String(contractCode)))
 
-	setupTx := migrations.NewTransactionBasedMigration(
-		tx,
+	runDeployTx := migrations.NewTransactionBasedMigration(
+		deployTX,
 		chainID,
 		log,
 		expectedWriteAddresses,
 	)
-	err = setupTx(registersByAccount)
+	err = runDeployTx(registersByAccount)
+	require.NoError(t, err)
+
+	setupTx := flow.NewTransactionBody().
+		SetScript([]byte(fmt.Sprintf(`
+              import Test from %s
+
+              transaction {
+                  prepare(signer: auth(Storage, Capabilities) &Account) {
+                      // Capability 1 was a public, unauthorized capability.
+                      // It should lose its entitlement
+                      let cap1 = signer.capabilities.storage.issue<auth(Test.E1, Test.E2) &Test.S>(/storage/s)
+                      signer.capabilities.publish(cap1, at: /public/s)
+
+                      // Capability 2 was a public, unauthorized capability, stored nested in storage.
+                      // It should lose its entitlement
+                      let cap2 = signer.capabilities.storage.issue<auth(Test.E1, Test.E2) &Test.S>(/storage/s)
+                      signer.storage.save([cap2], to: /storage/caps2)
+
+                      // Capability 3 was a private, authorized capability, stored nested in storage.
+                      // It should keep its entitlement
+                      let cap3 = signer.capabilities.storage.issue<auth(Test.E1, Test.E2) &Test.S>(/storage/s)
+                      signer.storage.save([cap3], to: /storage/caps3)
+
+	                  // Capability 4 was a capability with unavailable accessible members, stored nested in storage.
+	                  // It should keep its entitlement
+                      let cap4 = signer.capabilities.storage.issue<auth(Test.E1, Test.E2) &Test.S>(/storage/s)
+                      signer.storage.save([cap4], to: /storage/caps4)
+                  }
+              }
+            `,
+			address.HexWithPrefix(),
+		))).
+		AddAuthorizer(address)
+
+	runSetupTx := migrations.NewTransactionBasedMigration(
+		setupTx,
+		chainID,
+		log,
+		expectedWriteAddresses,
+	)
+	err = runSetupTx(registersByAccount)
 	require.NoError(t, err)
 
 	mr2, err := migrations.NewInterpreterMigrationRuntime(
@@ -149,51 +205,38 @@ func TestFixAuthorizationsMigrations(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	// Capability 1 was a public, unauthorized capability.
-	// It should lose its entitlement
-	//
-	// Capability 2 was a public, unauthorized capability, stored nested in storage.
-	// It should lose its entitlement
-	//
-	// Capability 3 was a private, authorized capability, stored nested in storage.
-	// It should keep its entitlement
-	//
-	// Capability 4 was a capability with unavailable accessible members, stored nested in storage.
-	// It should keep its entitlement
-
-	readArrayMembers := []string{
-		"concat",
-		"contains",
-		"filter",
-		"firstIndex",
-		"getType",
-		"isInstance",
-		"length",
-		"map",
-		"slice",
-		"toConstantSized",
+	oldAccessibleMembers := []string{
+		"f1",
+		"f3",
+		"undefined",
 	}
+
+	testContractLocation := common.AddressLocation{
+		Address: common.Address(address),
+		Name:    "Test",
+	}
+	borrowTypeID := testContractLocation.TypeID(nil, "Test.S")
 
 	publicLinkReport := PublicLinkReport{
 		{
 			Address:    common.Address(address),
-			Identifier: "ints",
+			Identifier: "s",
 		}: {
-			BorrowType:        "&[Int]",
-			AccessibleMembers: readArrayMembers,
+			BorrowType:        borrowTypeID,
+			AccessibleMembers: oldAccessibleMembers,
 		},
 		{
 			Address:    common.Address(address),
-			Identifier: "ints2",
+			Identifier: "s2",
 		}: {
-			BorrowType:        "&[Int]",
-			AccessibleMembers: readArrayMembers,
+			BorrowType:        borrowTypeID,
+			AccessibleMembers: oldAccessibleMembers,
 		},
 		{
 			Address:    common.Address(address),
-			Identifier: "ints4",
+			Identifier: "s4",
 		}: {
-			BorrowType:        "&[Int]",
+			BorrowType:        borrowTypeID,
 			AccessibleMembers: nil,
 		},
 	}
@@ -202,15 +245,15 @@ func TestFixAuthorizationsMigrations(t *testing.T) {
 		{
 			Address:      common.Address(address),
 			CapabilityID: 1,
-		}: "ints",
+		}: "s",
 		{
 			Address:      common.Address(address),
 			CapabilityID: 2,
-		}: "ints2",
+		}: "s2",
 		{
 			Address:      common.Address(address),
 			CapabilityID: 4,
-		}: "ints4",
+		}: "s4",
 	}
 
 	reporter := &testReportWriter{}
@@ -224,24 +267,41 @@ func TestFixAuthorizationsMigrations(t *testing.T) {
 	}
 	generator.generateFixesForAllAccounts()
 
+	e1TypeID := testContractLocation.TypeID(nil, "Test.E1")
+
 	assert.Equal(t,
 		[]any{
 			fixEntitlementsEntry{
 				AccountCapabilityID: AccountCapabilityID{
 					Address:      common.Address(address),
-					CapabilityID: 2,
+					CapabilityID: 1,
 				},
-				NewAuthorization: interpreter.UnauthorizedAccess,
+				NewAuthorization: newEntitlementSetAuthorizationFromTypeIDs(
+					[]common.TypeID{
+						e1TypeID,
+					},
+					sema.Conjunction,
+				),
+				UnresolvedMembers: map[string]error{
+					"undefined": errors.New("member does not exist"),
+				},
 			},
 			fixEntitlementsEntry{
 				AccountCapabilityID: AccountCapabilityID{
 					Address:      common.Address(address),
-					CapabilityID: 1,
+					CapabilityID: 2,
 				},
-				NewAuthorization: interpreter.UnauthorizedAccess,
+				NewAuthorization: newEntitlementSetAuthorizationFromTypeIDs(
+					[]common.TypeID{
+						e1TypeID,
+					},
+					sema.Conjunction,
+				),
+				UnresolvedMembers: map[string]error{
+					"undefined": errors.New("member does not exist"),
+				},
 			},
 		},
 		reporter.entries,
 	)
-
 }
