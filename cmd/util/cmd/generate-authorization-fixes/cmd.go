@@ -87,7 +87,7 @@ func init() {
 		"",
 		"Input public link report file name",
 	)
-	_ = Cmd.MarkFlagRequired("link-report")
+	_ = Cmd.MarkFlagRequired("public-link-report")
 
 	Cmd.Flags().StringVar(
 		&flagLinkMigrationReport,
@@ -253,7 +253,7 @@ func checkContracts(
 	mr *migrations.InterpreterMigrationRuntime,
 	reporter reporters.ReportWriter,
 ) {
-	contracts, err := gatherContractsFromRegisters(registersByAccount)
+	contracts, err := migrations.GatherContractsFromRegisters(registersByAccount, log.Logger)
 	if err != nil {
 		log.Fatal().Err(err)
 	}
@@ -268,11 +268,14 @@ func checkContracts(
 	log.Info().Msg("Checking contracts ...")
 
 	for _, contract := range contracts {
-		checkContract(
+		migrations.CheckContract(
 			contract,
+			log.Logger,
 			mr,
 			contractsForPrettyPrinting,
+			false,
 			reporter,
+			nil,
 			programs,
 		)
 	}
