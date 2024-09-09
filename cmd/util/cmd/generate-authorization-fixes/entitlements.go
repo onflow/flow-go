@@ -20,7 +20,6 @@ func findMinimalAuthorization(
 ) {
 	entitlements := &sema.EntitlementSet{}
 	unresolvedMembers = map[string]error{}
-	resolvedMembers := make(map[string]struct{}, len(neededMembers))
 
 	// Iterate over the members of the type, and check if they are accessible.
 	// This constructs the set of entitlements needed to access the members.
@@ -69,7 +68,7 @@ func findMinimalAuthorization(
 				panic(fmt.Errorf("unsupported set kind: %v", access.SetKind))
 			}
 
-			resolvedMembers[memberName] = struct{}{}
+			delete(neededMembers, memberName)
 
 		case *sema.EntitlementMapAccess:
 			unresolvedMembers[memberName] = fmt.Errorf(
@@ -80,7 +79,7 @@ func findMinimalAuthorization(
 		case sema.PrimitiveAccess:
 			if access == sema.PrimitiveAccess(ast.AccessAll) {
 				// member is always accessible
-				resolvedMembers[memberName] = struct{}{}
+				delete(neededMembers, memberName)
 			} else {
 				unresolvedMembers[memberName] = fmt.Errorf(
 					"member is inaccessible (%s)",
@@ -96,9 +95,6 @@ func findMinimalAuthorization(
 	// Check if all needed members were resolved
 
 	for memberName := range neededMembers {
-		if _, ok := resolvedMembers[memberName]; ok {
-			continue
-		}
 		if _, ok := unresolvedMembers[memberName]; ok {
 			continue
 		}
