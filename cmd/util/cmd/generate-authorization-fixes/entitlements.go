@@ -21,35 +21,31 @@ func findMinimalAuthorization(
 	entitlements := &sema.EntitlementSet{}
 	unresolvedMembers = map[string]error{}
 
-	// Iterate over the members of the type, and check if they are accessible.
-	// This constructs the set of entitlements needed to access the members.
-	// If a member is accessible, the entitlements needed to access it are added to the entitlements set.
-	// If a member is not accessible, it is added to the unresolved members map.
-
 	// NOTE: GetMembers might return members that are actually not accessible, for DX purposes.
 	// We need to resolve the members and filter out the inaccessible members,
 	// using the error reported when resolving
 
+	sortedNeededMembers := make([]string, 0, len(neededMembers))
+	for memberName := range neededMembers {
+		sortedNeededMembers = append(sortedNeededMembers, memberName)
+	}
+	sort.Strings(sortedNeededMembers)
+
 	memberResolvers := ty.GetMembers()
 
-	sortedMemberNames := make([]string, 0, len(memberResolvers))
-	for memberName := range memberResolvers {
-		sortedMemberNames = append(sortedMemberNames, memberName)
-	}
-	sort.Strings(sortedMemberNames)
-
-	for _, memberName := range sortedMemberNames {
-		if _, ok := neededMembers[memberName]; !ok {
+	for _, memberName := range sortedNeededMembers {
+		memberResolver, ok := memberResolvers[memberName]
+		if !ok {
+			unresolvedMembers[memberName] = errors.New("member does not exist")
 			continue
 		}
-
-		memberResolver := memberResolvers[memberName]
 
 		var resolveErr error
 		member := memberResolver.Resolve(nil, memberName, ast.EmptyRange, func(err error) {
 			resolveErr = err
 		})
 		if resolveErr != nil {
+			unresolvedMembers[memberName] = resolveErr
 			continue
 		}
 
@@ -90,15 +86,6 @@ func findMinimalAuthorization(
 		default:
 			panic(fmt.Errorf("unsupported access kind: %T", member.Access))
 		}
-	}
-
-	// Check if all needed members were resolved
-
-	for memberName := range neededMembers {
-		if _, ok := unresolvedMembers[memberName]; ok {
-			continue
-		}
-		unresolvedMembers[memberName] = errors.New("member does not exist")
 	}
 
 	return entitlementSetMinimalAuthorization(entitlements), unresolvedMembers
