@@ -379,7 +379,7 @@ func (db *StateDB) Commit(finalize bool) (hash.Hash, error) {
 			return bytes.Compare(sortedAddresses[i][:], sortedAddresses[j][:]) < 0
 		})
 
-	deltaCommitter := NewUpdateCommitter()
+	updateCommitter := NewUpdateCommitter()
 	// update accounts
 	for _, addr := range sortedAddresses {
 		deleted := false
@@ -389,7 +389,7 @@ func (db *StateDB) Commit(finalize bool) (hash.Hash, error) {
 			if err != nil {
 				return nil, wrapError(err)
 			}
-			err = deltaCommitter.DeleteAccount(addr)
+			err = updateCommitter.DeleteAccount(addr)
 			if err != nil {
 				return nil, wrapError(err)
 			}
@@ -415,7 +415,7 @@ func (db *StateDB) Commit(finalize bool) (hash.Hash, error) {
 			if err != nil {
 				return nil, wrapError(err)
 			}
-			err = deltaCommitter.CreateAccount(addr, bal, nonce, codeHash)
+			err = updateCommitter.CreateAccount(addr, bal, nonce, codeHash)
 			if err != nil {
 				return nil, wrapError(err)
 			}
@@ -431,7 +431,7 @@ func (db *StateDB) Commit(finalize bool) (hash.Hash, error) {
 		if err != nil {
 			return nil, wrapError(err)
 		}
-		err = deltaCommitter.UpdateAccount(addr, bal, nonce, codeHash)
+		err = updateCommitter.UpdateAccount(addr, bal, nonce, codeHash)
 		if err != nil {
 			return nil, wrapError(err)
 		}
@@ -464,21 +464,21 @@ func (db *StateDB) Commit(finalize bool) (hash.Hash, error) {
 		if err != nil {
 			return nil, wrapError(err)
 		}
-		err = deltaCommitter.UpdateSlot(sk.Address, sk.Key, val)
+		err = updateCommitter.UpdateSlot(sk.Address, sk.Key, val)
 		if err != nil {
 			return nil, wrapError(err)
 		}
 	}
 
 	// don't purge views yet, people might call the logs etc
-	commit := deltaCommitter.Commitment()
+	updateCommit := updateCommitter.Commitment()
 	if finalize {
 		err := db.Finalize()
 		if err != nil {
 			return nil, err
 		}
 	}
-	return commit, nil
+	return updateCommit, nil
 }
 
 // Finalize flushes all the changes
