@@ -1,8 +1,10 @@
 package generate_authorization_fixes
 
 import (
+	"compress/gzip"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"sort"
 	"strings"
@@ -30,7 +32,7 @@ var (
 	flagStateCommitment     string
 	flagOutputDirectory     string
 	flagChain               string
-	flagLinkReport          string
+	flagPublicLinkReport    string
 	flagLinkMigrationReport string
 	flagAddresses           string
 )
@@ -80,10 +82,10 @@ func init() {
 	_ = Cmd.MarkFlagRequired("chain")
 
 	Cmd.Flags().StringVar(
-		&flagLinkReport,
-		"link-report",
+		&flagPublicLinkReport,
+		"public-link-report",
 		"",
-		"Input link report file name",
+		"Input public link report file name",
 	)
 	_ = Cmd.MarkFlagRequired("link-report")
 
@@ -150,15 +152,23 @@ func run(*cobra.Command, []string) {
 
 	// Read public link report
 
-	linkReportFile, err := os.Open(flagLinkReport)
+	publicLinkReportFile, err := os.Open(flagPublicLinkReport)
 	if err != nil {
-		log.Fatal().Err(err).Msgf("can't open link report: %s", flagLinkReport)
+		log.Fatal().Err(err).Msgf("can't open link report: %s", flagPublicLinkReport)
 	}
-	defer linkReportFile.Close()
+	defer publicLinkReportFile.Close()
 
-	publicLinkReport, err := ReadPublicLinkReport(linkReportFile, addressFilter)
+	var publicLinkReportReader io.Reader = publicLinkReportFile
+	if isGzip(publicLinkReportFile) {
+		publicLinkReportReader, err = gzip.NewReader(publicLinkReportFile)
+		if err != nil {
+			log.Fatal().Err(err).Msgf("failed to create gzip reader for %s", flagPublicLinkReport)
+		}
+	}
+
+	publicLinkReport, err := ReadPublicLinkReport(publicLinkReportReader, addressFilter)
 	if err != nil {
-		log.Fatal().Err(err).Msgf("failed to read public link report %s", flagLinkReport)
+		log.Fatal().Err(err).Msgf("failed to read public link report %s", flagPublicLinkReport)
 	}
 
 	// Read link migration report
@@ -169,7 +179,15 @@ func run(*cobra.Command, []string) {
 	}
 	defer linkMigrationReportFile.Close()
 
-	publicLinkMigrationReport, err := ReadPublicLinkMigrationReport(linkMigrationReportFile, addressFilter)
+	var linkMigrationReportReader io.Reader = linkMigrationReportFile
+	if isGzip(linkMigrationReportFile) {
+		linkMigrationReportReader, err = gzip.NewReader(linkMigrationReportFile)
+		if err != nil {
+			log.Fatal().Err(err).Msgf("failed to create gzip reader for %s", flagLinkMigrationReport)
+		}
+	}
+
+	publicLinkMigrationReport, err := ReadPublicLinkMigrationReport(linkMigrationReportReader, addressFilter)
 	if err != nil {
 		log.Fatal().Err(err).Msgf("failed to read public link report: %s", flagLinkMigrationReport)
 	}
@@ -546,4 +564,8 @@ func (g *AuthorizationFixGenerator) publicPathLinkInfo(
 		Address:    address,
 		Identifier: publicPathIdentifier,
 	}]
+}
+
+func isGzip(file *os.File) bool {
+	return strings.HasSuffix(file.Name(), ".gz")
 }
