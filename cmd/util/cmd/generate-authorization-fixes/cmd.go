@@ -130,6 +130,16 @@ func run(*cobra.Command, []string) {
 			}
 			addressFilter[common.Address(addr)] = struct{}{}
 		}
+
+		addresses := make([]string, 0, len(addressFilter))
+		for addr := range addressFilter {
+			addresses = append(addresses, addr.HexWithPrefix())
+		}
+		log.Info().Msgf(
+			"Only generating fixes for %d accounts: %s",
+			len(addressFilter),
+			addresses,
+		)
 	}
 
 	if flagPayloads == "" && flagState == "" {
@@ -150,52 +160,51 @@ func run(*cobra.Command, []string) {
 	// Validate chain ID
 	_ = chainID.Chain()
 
+	publicLinkReportChan := make(chan PublicLinkReport, 1)
+	go func() {
+		publicLinkReportChan <- readPublicLinkReport(addressFilter)
+	}()
+
+	publicLinkMigrationReportChan := make(chan PublicLinkMigrationReport, 1)
+	go func() {
+		publicLinkMigrationReportChan <- readLinkMigrationReport(addressFilter)
+	}()
+
+	publicLinkReport := <-publicLinkReportChan
+	publicLinkMigrationReport := <-publicLinkMigrationReportChan
+
+	registersByAccount := loadRegistersByAccount()
+
+	mr, err := migrations.NewInterpreterMigrationRuntime(
+		registersByAccount,
+		chainID,
+		migrations.InterpreterMigrationRuntimeConfig{},
+	)
+	if err != nil {
+		log.Fatal().Err(err)
+	}
+
+	checkContracts(
+		registersByAccount,
+		mr,
+		reporter,
+	)
+
+	authorizationFixGenerator := &AuthorizationFixGenerator{
+		registersByAccount:        registersByAccount,
+		mr:                        mr,
+		publicLinkReport:          publicLinkReport,
+		publicLinkMigrationReport: publicLinkMigrationReport,
+		reporter:                  reporter,
+	}
+	authorizationFixGenerator.generateFixesForAllAccounts()
+}
+
+func loadRegistersByAccount() *registers.ByAccount {
+	// Read payloads from payload file or checkpoint file
+
 	var payloads []*ledger.Payload
 	var err error
-
-	// Read public link report
-
-	publicLinkReportFile, err := os.Open(flagPublicLinkReport)
-	if err != nil {
-		log.Fatal().Err(err).Msgf("can't open link report: %s", flagPublicLinkReport)
-	}
-	defer publicLinkReportFile.Close()
-
-	var publicLinkReportReader io.Reader = publicLinkReportFile
-	if isGzip(publicLinkReportFile) {
-		publicLinkReportReader, err = gzip.NewReader(publicLinkReportFile)
-		if err != nil {
-			log.Fatal().Err(err).Msgf("failed to create gzip reader for %s", flagPublicLinkReport)
-		}
-	}
-
-	publicLinkReport, err := ReadPublicLinkReport(publicLinkReportReader, addressFilter)
-	if err != nil {
-		log.Fatal().Err(err).Msgf("failed to read public link report %s", flagPublicLinkReport)
-	}
-
-	// Read link migration report
-
-	linkMigrationReportFile, err := os.Open(flagLinkMigrationReport)
-	if err != nil {
-		log.Fatal().Err(err).Msgf("can't open link migration report: %s", flagLinkMigrationReport)
-	}
-	defer linkMigrationReportFile.Close()
-
-	var linkMigrationReportReader io.Reader = linkMigrationReportFile
-	if isGzip(linkMigrationReportFile) {
-		linkMigrationReportReader, err = gzip.NewReader(linkMigrationReportFile)
-		if err != nil {
-			log.Fatal().Err(err).Msgf("failed to create gzip reader for %s", flagLinkMigrationReport)
-		}
-	}
-
-	publicLinkMigrationReport, err := ReadPublicLinkMigrationReport(linkMigrationReportReader, addressFilter)
-	if err != nil {
-		log.Fatal().Err(err).Msgf("failed to read public link report: %s", flagLinkMigrationReport)
-	}
-
-	// Read payloads from payload file or checkpoint file
 
 	if flagPayloads != "" {
 		log.Info().Msgf("Reading payloads from %s", flagPayloads)
@@ -226,29 +235,61 @@ func run(*cobra.Command, []string) {
 		registersByAccount.AccountCount(),
 	)
 
-	mr, err := migrations.NewInterpreterMigrationRuntime(
-		registersByAccount,
-		chainID,
-		migrations.InterpreterMigrationRuntimeConfig{},
-	)
+	return registersByAccount
+}
+
+func readPublicLinkReport(addressFilter map[common.Address]struct{}) PublicLinkReport {
+	// Read public link report
+
+	publicLinkReportFile, err := os.Open(flagPublicLinkReport)
 	if err != nil {
-		log.Fatal().Err(err)
+		log.Fatal().Err(err).Msgf("can't open link report: %s", flagPublicLinkReport)
+	}
+	defer publicLinkReportFile.Close()
+
+	var publicLinkReportReader io.Reader = publicLinkReportFile
+	if isGzip(publicLinkReportFile) {
+		publicLinkReportReader, err = gzip.NewReader(publicLinkReportFile)
+		if err != nil {
+			log.Fatal().Err(err).Msgf("failed to create gzip reader for %s", flagPublicLinkReport)
+		}
 	}
 
-	checkContracts(
-		registersByAccount,
-		mr,
-		reporter,
-	)
+	log.Info().Msgf("Reading public link report from %s ...", flagPublicLinkReport)
 
-	authorizationFixGenerator := &AuthorizationFixGenerator{
-		registersByAccount:        registersByAccount,
-		mr:                        mr,
-		publicLinkReport:          publicLinkReport,
-		publicLinkMigrationReport: publicLinkMigrationReport,
-		reporter:                  reporter,
+	publicLinkReport, err := ReadPublicLinkReport(publicLinkReportReader, addressFilter)
+	if err != nil {
+		log.Fatal().Err(err).Msgf("failed to read public link report %s", flagPublicLinkReport)
 	}
-	authorizationFixGenerator.generateFixesForAllAccounts()
+
+	return publicLinkReport
+}
+
+func readLinkMigrationReport(addressFilter map[common.Address]struct{}) PublicLinkMigrationReport {
+	// Read link migration report
+
+	linkMigrationReportFile, err := os.Open(flagLinkMigrationReport)
+	if err != nil {
+		log.Fatal().Err(err).Msgf("can't open link migration report: %s", flagLinkMigrationReport)
+	}
+	defer linkMigrationReportFile.Close()
+
+	var linkMigrationReportReader io.Reader = linkMigrationReportFile
+	if isGzip(linkMigrationReportFile) {
+		linkMigrationReportReader, err = gzip.NewReader(linkMigrationReportFile)
+		if err != nil {
+			log.Fatal().Err(err).Msgf("failed to create gzip reader for %s", flagLinkMigrationReport)
+		}
+	}
+
+	log.Info().Msgf("Reading link migration report from %s ...", flagLinkMigrationReport)
+
+	publicLinkMigrationReport, err := ReadPublicLinkMigrationReport(linkMigrationReportReader, addressFilter)
+	if err != nil {
+		log.Fatal().Err(err).Msgf("failed to read public link report: %s", flagLinkMigrationReport)
+	}
+
+	return publicLinkMigrationReport
 }
 
 func checkContracts(
