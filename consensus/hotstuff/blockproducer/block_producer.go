@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
-	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 )
@@ -46,32 +45,13 @@ func (bp *BlockProducer) MakeBlockProposal(view uint64, qc *flow.QuorumCertifica
 		return nil
 	}
 
-	// TODO: We should utilize the `EventHandler`'s `SafetyRules` to generate the block signature instead of using an independent signing logic: https://github.com/dapperlabs/flow-go/issues/6892
-	signProposal := func(header *flow.Header) error {
-		// turn the header into a block header proposal as known by hotstuff
-		block := model.Block{
-			BlockID:     header.ID(),
-			View:        view,
-			ProposerID:  header.ProposerID,
-			QC:          qc,
-			PayloadHash: header.PayloadHash,
-			Timestamp:   header.Timestamp,
-		}
-
-		// then sign the proposal
-		proposal, err := bp.signer.CreateProposal(&block)
-		if err != nil {
-			return fmt.Errorf("could not sign block proposal: %w", err)
-		}
-
-		header.ProposerSigData = proposal.SigData
-		return nil
-	}
-
-	// retrieve a fully built block header from the builder
-	header, err := bp.builder.BuildOn(qc.BlockID, setHotstuffFields, signProposal)
+	signer := newSafetyRulesConcurrencyWrapper(bp.safetyRules)
+	header, err := bp.builder.BuildOn(qc.BlockID, setHotstuffFields, signer.Sign)
 	if err != nil {
 		return nil, fmt.Errorf("could not build block proposal on top of %v: %w", qc.BlockID, err)
+	}
+	if !signer.IsSigningComplete() {
+		return nil, fmt.Errorf("signer has not yet completed signing")
 	}
 
 	return header, nil
