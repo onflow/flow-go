@@ -51,7 +51,7 @@ func NewContractCheckingMigration(
 			return fmt.Errorf("failed to create interpreter migration runtime: %w", err)
 		}
 
-		contracts, err := gatherContractsFromRegisters(registersByAccount, log)
+		contracts, err := GatherContractsFromRegisters(registersByAccount, log)
 		if err != nil {
 			return err
 		}
@@ -64,7 +64,7 @@ func NewContractCheckingMigration(
 		// Check all contracts
 
 		for _, contract := range contracts {
-			checkContract(
+			CheckContract(
 				contract,
 				log,
 				mr,
@@ -80,7 +80,7 @@ func NewContractCheckingMigration(
 	}
 }
 
-func gatherContractsFromRegisters(registersByAccount *registers.ByAccount, log zerolog.Logger) ([]AddressContract, error) {
+func GatherContractsFromRegisters(registersByAccount *registers.ByAccount, log zerolog.Logger) ([]AddressContract, error) {
 	log.Info().Msg("Gathering contracts ...")
 
 	contracts := make([]AddressContract, 0, contractCountEstimate)
@@ -142,7 +142,7 @@ func gatherContractsFromRegisters(registersByAccount *registers.ByAccount, log z
 	return contracts, nil
 }
 
-func checkContract(
+func CheckContract(
 	contract AddressContract,
 	log zerolog.Logger,
 	mr *InterpreterMigrationRuntime,

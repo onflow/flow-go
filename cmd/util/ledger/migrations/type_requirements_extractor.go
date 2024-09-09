@@ -37,7 +37,7 @@ func NewTypeRequirementsExtractingMigration(
 
 		// Gather all contracts
 
-		contracts, err := gatherContractsFromRegisters(registersByAccount, log)
+		contracts, err := GatherContractsFromRegisters(registersByAccount, log)
 		if err != nil {
 			return err
 		}
