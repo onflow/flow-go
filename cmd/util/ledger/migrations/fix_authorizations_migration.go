@@ -24,9 +24,9 @@ type AccountCapabilityControllerID struct {
 	CapabilityID uint64
 }
 
-// FixEntitlementsMigration
+// FixAuthorizationsMigration
 
-type FixEntitlementsMigrationReporter interface {
+type FixAuthorizationsMigrationReporter interface {
 	MigratedCapability(
 		storageKey interpreter.StorageKey,
 		capabilityAddress common.Address,
@@ -40,22 +40,22 @@ type FixEntitlementsMigrationReporter interface {
 	)
 }
 
-type FixEntitlementsMigration struct {
-	Reporter          FixEntitlementsMigrationReporter
+type FixAuthorizationsMigration struct {
+	Reporter          FixAuthorizationsMigrationReporter
 	NewAuthorizations map[AccountCapabilityControllerID]interpreter.Authorization
 }
 
-var _ migrations.ValueMigration = &FixEntitlementsMigration{}
+var _ migrations.ValueMigration = &FixAuthorizationsMigration{}
 
-func (*FixEntitlementsMigration) Name() string {
-	return "FixEntitlementsMigration"
+func (*FixAuthorizationsMigration) Name() string {
+	return "FixAuthorizationsMigration"
 }
 
-func (*FixEntitlementsMigration) Domains() map[string]struct{} {
+func (*FixAuthorizationsMigration) Domains() map[string]struct{} {
 	return nil
 }
 
-func (m *FixEntitlementsMigration) Migrate(
+func (m *FixAuthorizationsMigration) Migrate(
 	storageKey interpreter.StorageKey,
 	_ interpreter.StorageMapKey,
 	value interpreter.Value,
@@ -140,21 +140,21 @@ func (m *FixEntitlementsMigration) Migrate(
 	return nil, nil
 }
 
-func (*FixEntitlementsMigration) CanSkip(valueType interpreter.StaticType) bool {
-	return CanSkipFixEntitlementsMigration(valueType)
+func (*FixAuthorizationsMigration) CanSkip(valueType interpreter.StaticType) bool {
+	return CanSkipFixAuthorizationsMigration(valueType)
 }
 
-func CanSkipFixEntitlementsMigration(valueType interpreter.StaticType) bool {
+func CanSkipFixAuthorizationsMigration(valueType interpreter.StaticType) bool {
 	switch valueType := valueType.(type) {
 	case *interpreter.DictionaryStaticType:
-		return CanSkipFixEntitlementsMigration(valueType.KeyType) &&
-			CanSkipFixEntitlementsMigration(valueType.ValueType)
+		return CanSkipFixAuthorizationsMigration(valueType.KeyType) &&
+			CanSkipFixAuthorizationsMigration(valueType.ValueType)
 
 	case interpreter.ArrayStaticType:
-		return CanSkipFixEntitlementsMigration(valueType.ElementType())
+		return CanSkipFixAuthorizationsMigration(valueType.ElementType())
 
 	case *interpreter.OptionalStaticType:
-		return CanSkipFixEntitlementsMigration(valueType.Type)
+		return CanSkipFixAuthorizationsMigration(valueType.Type)
 
 	case *interpreter.CapabilityStaticType:
 		return false
@@ -191,7 +191,7 @@ func CanSkipFixEntitlementsMigration(valueType interpreter.StaticType) bool {
 	return false
 }
 
-type FixEntitlementsMigrationOptions struct {
+type FixAuthorizationsMigrationOptions struct {
 	ChainID                           flow.ChainID
 	NWorker                           int
 	VerboseErrorOutput                bool
@@ -200,24 +200,24 @@ type FixEntitlementsMigrationOptions struct {
 	CheckStorageHealthBeforeMigration bool
 }
 
-const fixEntitlementsMigrationReporterName = "fix-entitlements-migration"
+const fixAuthorizationsMigrationReporterName = "fix-authorizations-migration"
 
-func NewFixEntitlementsMigration(
+func NewFixAuhorizationsMigration(
 	rwf reporters.ReportWriterFactory,
 	errorMessageHandler *errorMessageHandler,
 	programs map[runtime.Location]*interpreter.Program,
 	newAuthorizations map[AccountCapabilityControllerID]interpreter.Authorization,
-	opts FixEntitlementsMigrationOptions,
+	opts FixAuthorizationsMigrationOptions,
 ) *CadenceBaseMigration {
 	var diffReporter reporters.ReportWriter
 	if opts.DiffMigrations {
-		diffReporter = rwf.ReportWriter("fix-entitlements-migration-diff")
+		diffReporter = rwf.ReportWriter("fix-authorizations-migration-diff")
 	}
 
-	reporter := rwf.ReportWriter(fixEntitlementsMigrationReporterName)
+	reporter := rwf.ReportWriter(fixAuthorizationsMigrationReporterName)
 
 	return &CadenceBaseMigration{
-		name:                              "fix_entitlements_migration",
+		name:                              "fix_authorizations_migration",
 		reporter:                          reporter,
 		diffReporter:                      diffReporter,
 		logVerboseDiff:                    opts.LogVerboseDiff,
@@ -230,9 +230,9 @@ func NewFixEntitlementsMigration(
 		) []migrations.ValueMigration {
 
 			return []migrations.ValueMigration{
-				&FixEntitlementsMigration{
+				&FixAuthorizationsMigration{
 					NewAuthorizations: newAuthorizations,
-					Reporter: &fixEntitlementsMigrationReporter{
+					Reporter: &fixAuthorizationsMigrationReporter{
 						reportWriter:        reporter,
 						errorMessageHandler: errorMessageHandler,
 						verboseErrorOutput:  opts.VerboseErrorOutput,
@@ -246,16 +246,16 @@ func NewFixEntitlementsMigration(
 	}
 }
 
-type fixEntitlementsMigrationReporter struct {
+type fixAuthorizationsMigrationReporter struct {
 	reportWriter        reporters.ReportWriter
 	errorMessageHandler *errorMessageHandler
 	verboseErrorOutput  bool
 }
 
-var _ FixEntitlementsMigrationReporter = &fixEntitlementsMigrationReporter{}
-var _ migrations.Reporter = &fixEntitlementsMigrationReporter{}
+var _ FixAuthorizationsMigrationReporter = &fixAuthorizationsMigrationReporter{}
+var _ migrations.Reporter = &fixAuthorizationsMigrationReporter{}
 
-func (r *fixEntitlementsMigrationReporter) Migrated(
+func (r *fixAuthorizationsMigrationReporter) Migrated(
 	storageKey interpreter.StorageKey,
 	storageMapKey interpreter.StorageMapKey,
 	migration string,
@@ -267,7 +267,7 @@ func (r *fixEntitlementsMigrationReporter) Migrated(
 	})
 }
 
-func (r *fixEntitlementsMigrationReporter) Error(err error) {
+func (r *fixAuthorizationsMigrationReporter) Error(err error) {
 
 	var migrationErr migrations.StorageMigrationError
 
@@ -295,31 +295,31 @@ func (r *fixEntitlementsMigrationReporter) Error(err error) {
 	}
 }
 
-func (r *fixEntitlementsMigrationReporter) DictionaryKeyConflict(accountAddressPath interpreter.AddressPath) {
+func (r *fixAuthorizationsMigrationReporter) DictionaryKeyConflict(accountAddressPath interpreter.AddressPath) {
 	r.reportWriter.Write(dictionaryKeyConflictEntry{
 		AddressPath: accountAddressPath,
 	})
 }
 
-func (r *fixEntitlementsMigrationReporter) MigratedCapabilityController(
+func (r *fixAuthorizationsMigrationReporter) MigratedCapabilityController(
 	storageKey interpreter.StorageKey,
 	capabilityID uint64,
 	newAuthorization interpreter.Authorization,
 ) {
-	r.reportWriter.Write(capabilityControllerEntitlementsFixedEntry{
+	r.reportWriter.Write(capabilityControllerAuthorizationFixedEntry{
 		StorageKey:       storageKey,
 		CapabilityID:     capabilityID,
 		NewAuthorization: newAuthorization,
 	})
 }
 
-func (r *fixEntitlementsMigrationReporter) MigratedCapability(
+func (r *fixAuthorizationsMigrationReporter) MigratedCapability(
 	storageKey interpreter.StorageKey,
 	capabilityAddress common.Address,
 	capabilityID uint64,
 	newAuthorization interpreter.Authorization,
 ) {
-	r.reportWriter.Write(capabilityEntitlementsFixedEntry{
+	r.reportWriter.Write(capabilityAuthorizationFixedEntry{
 		StorageKey:        storageKey,
 		CapabilityAddress: capabilityAddress,
 		CapabilityID:      capabilityID,
@@ -336,16 +336,16 @@ func jsonEncodeAuthorization(authorization interpreter.Authorization) string {
 	}
 }
 
-// capabilityControllerEntitlementsFixedEntry
-type capabilityControllerEntitlementsFixedEntry struct {
+// capabilityControllerAuthorizationFixedEntry
+type capabilityControllerAuthorizationFixedEntry struct {
 	StorageKey       interpreter.StorageKey
 	CapabilityID     uint64
 	NewAuthorization interpreter.Authorization
 }
 
-var _ json.Marshaler = capabilityControllerEntitlementsFixedEntry{}
+var _ json.Marshaler = capabilityControllerAuthorizationFixedEntry{}
 
-func (e capabilityControllerEntitlementsFixedEntry) MarshalJSON() ([]byte, error) {
+func (e capabilityControllerAuthorizationFixedEntry) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
 		Kind             string `json:"kind"`
 		AccountAddress   string `json:"account_address"`
@@ -353,7 +353,7 @@ func (e capabilityControllerEntitlementsFixedEntry) MarshalJSON() ([]byte, error
 		CapabilityID     uint64 `json:"capability_id"`
 		NewAuthorization string `json:"new_authorization"`
 	}{
-		Kind:             "capability-controller-entitlements-fixed",
+		Kind:             "capability-controller-authorizations-fixed",
 		AccountAddress:   e.StorageKey.Address.HexWithPrefix(),
 		StorageDomain:    e.StorageKey.Key,
 		CapabilityID:     e.CapabilityID,
@@ -361,17 +361,17 @@ func (e capabilityControllerEntitlementsFixedEntry) MarshalJSON() ([]byte, error
 	})
 }
 
-// capabilityEntitlementsFixedEntry
-type capabilityEntitlementsFixedEntry struct {
+// capabilityAuthorizationFixedEntry
+type capabilityAuthorizationFixedEntry struct {
 	StorageKey        interpreter.StorageKey
 	CapabilityAddress common.Address
 	CapabilityID      uint64
 	NewAuthorization  interpreter.Authorization
 }
 
-var _ json.Marshaler = capabilityEntitlementsFixedEntry{}
+var _ json.Marshaler = capabilityAuthorizationFixedEntry{}
 
-func (e capabilityEntitlementsFixedEntry) MarshalJSON() ([]byte, error) {
+func (e capabilityAuthorizationFixedEntry) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
 		Kind              string `json:"kind"`
 		AccountAddress    string `json:"account_address"`
@@ -380,7 +380,7 @@ func (e capabilityEntitlementsFixedEntry) MarshalJSON() ([]byte, error) {
 		CapabilityID      uint64 `json:"capability_id"`
 		NewAuthorization  string `json:"new_authorization"`
 	}{
-		Kind:              "capability-entitlements-fixed",
+		Kind:              "capability-authorizations-fixed",
 		AccountAddress:    e.StorageKey.Address.HexWithPrefix(),
 		StorageDomain:     e.StorageKey.Key,
 		CapabilityAddress: e.CapabilityAddress.HexWithPrefix(),
@@ -389,11 +389,11 @@ func (e capabilityEntitlementsFixedEntry) MarshalJSON() ([]byte, error) {
 	})
 }
 
-func NewFixEntitlementsMigrations(
+func NewFixAuthorizationsMigrations(
 	log zerolog.Logger,
 	rwf reporters.ReportWriterFactory,
 	newAuthorizations map[AccountCapabilityControllerID]interpreter.Authorization,
-	opts FixEntitlementsMigrationOptions,
+	opts FixAuthorizationsMigrationOptions,
 ) []NamedMigration {
 
 	errorMessageHandler := &errorMessageHandler{}
@@ -422,12 +422,12 @@ func NewFixEntitlementsMigrations(
 			),
 		},
 		{
-			Name: "fix-entitlements",
+			Name: "fix-authorizations",
 			Migrate: NewAccountBasedMigration(
 				log,
 				opts.NWorker,
 				[]AccountBasedMigration{
-					NewFixEntitlementsMigration(
+					NewFixAuhorizationsMigration(
 						rwf,
 						errorMessageHandler,
 						programs,

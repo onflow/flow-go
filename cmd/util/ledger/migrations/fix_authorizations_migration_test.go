@@ -12,7 +12,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-func TestEntitlements(t *testing.T) {
+func TestFixAuthorizationsMigration(t *testing.T) {
 	t.Parallel()
 
 	const chainID = flow.Emulator
@@ -84,7 +84,7 @@ func TestEntitlements(t *testing.T) {
 
 	rwf := &testReportWriterFactory{}
 
-	options := FixEntitlementsMigrationOptions{
+	options := FixAuthorizationsMigrationOptions{
 		ChainID: chainID,
 		NWorker: nWorker,
 	}
@@ -100,7 +100,7 @@ func TestEntitlements(t *testing.T) {
 		}: interpreter.UnauthorizedAccess,
 	}
 
-	migrations := NewFixEntitlementsMigrations(
+	migrations := NewFixAuthorizationsMigrations(
 		log,
 		rwf,
 		fixes,
@@ -112,15 +112,15 @@ func TestEntitlements(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	reporter := rwf.reportWriters[fixEntitlementsMigrationReporterName]
+	reporter := rwf.reportWriters[fixAuthorizationsMigrationReporterName]
 	require.NotNil(t, reporter)
 
 	var entries []any
 
 	for _, entry := range reporter.entries {
 		switch entry := entry.(type) {
-		case capabilityEntitlementsFixedEntry,
-			capabilityControllerEntitlementsFixedEntry:
+		case capabilityAuthorizationFixedEntry,
+			capabilityControllerAuthorizationFixedEntry:
 
 			entries = append(entries, entry)
 		}
@@ -128,7 +128,7 @@ func TestEntitlements(t *testing.T) {
 
 	require.ElementsMatch(t,
 		[]any{
-			capabilityControllerEntitlementsFixedEntry{
+			capabilityControllerAuthorizationFixedEntry{
 				StorageKey: interpreter.StorageKey{
 					Key:     "cap_con",
 					Address: common.Address(address),
@@ -136,7 +136,7 @@ func TestEntitlements(t *testing.T) {
 				CapabilityID:     1,
 				NewAuthorization: interpreter.UnauthorizedAccess,
 			},
-			capabilityControllerEntitlementsFixedEntry{
+			capabilityControllerAuthorizationFixedEntry{
 				StorageKey: interpreter.StorageKey{
 					Key:     "cap_con",
 					Address: common.Address(address),
@@ -144,7 +144,7 @@ func TestEntitlements(t *testing.T) {
 				CapabilityID:     2,
 				NewAuthorization: interpreter.UnauthorizedAccess,
 			},
-			capabilityEntitlementsFixedEntry{
+			capabilityAuthorizationFixedEntry{
 				StorageKey: interpreter.StorageKey{
 					Key:     "public",
 					Address: common.Address(address),
@@ -153,7 +153,7 @@ func TestEntitlements(t *testing.T) {
 				CapabilityID:      1,
 				NewAuthorization:  interpreter.UnauthorizedAccess,
 			},
-			capabilityEntitlementsFixedEntry{
+			capabilityAuthorizationFixedEntry{
 				StorageKey: interpreter.StorageKey{
 					Key:     "storage",
 					Address: common.Address(address),
