@@ -19,7 +19,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-type AccountCapabilityControllerID struct {
+type AccountCapabilityID struct {
 	Address      common.Address
 	CapabilityID uint64
 }
@@ -42,7 +42,7 @@ type FixAuthorizationsMigrationReporter interface {
 
 type FixAuthorizationsMigration struct {
 	Reporter          FixAuthorizationsMigrationReporter
-	NewAuthorizations map[AccountCapabilityControllerID]interpreter.Authorization
+	NewAuthorizations map[AccountCapabilityID]interpreter.Authorization
 }
 
 var _ migrations.ValueMigration = &FixAuthorizationsMigration{}
@@ -70,7 +70,7 @@ func (m *FixAuthorizationsMigration) Migrate(
 		capabilityAddress := common.Address(value.Address())
 		capabilityID := uint64(value.ID)
 
-		newAuthorization := m.NewAuthorizations[AccountCapabilityControllerID{
+		newAuthorization := m.NewAuthorizations[AccountCapabilityID{
 			Address:      capabilityAddress,
 			CapabilityID: capabilityID,
 		}]
@@ -125,7 +125,7 @@ func (m *FixAuthorizationsMigration) Migrate(
 		capabilityAddress := storageKey.Address
 		capabilityID := uint64(value.CapabilityID)
 
-		newAuthorization := m.NewAuthorizations[AccountCapabilityControllerID{
+		newAuthorization := m.NewAuthorizations[AccountCapabilityID{
 			Address:      capabilityAddress,
 			CapabilityID: capabilityID,
 		}]
@@ -225,7 +225,7 @@ func NewFixAuthorizationsMigration(
 	rwf reporters.ReportWriterFactory,
 	errorMessageHandler *errorMessageHandler,
 	programs map[runtime.Location]*interpreter.Program,
-	newAuthorizations map[AccountCapabilityControllerID]interpreter.Authorization,
+	newAuthorizations map[AccountCapabilityID]interpreter.Authorization,
 	opts FixAuthorizationsMigrationOptions,
 ) *CadenceBaseMigration {
 	var diffReporter reporters.ReportWriter
@@ -411,7 +411,7 @@ func (e capabilityAuthorizationFixedEntry) MarshalJSON() ([]byte, error) {
 func NewFixAuthorizationsMigrations(
 	log zerolog.Logger,
 	rwf reporters.ReportWriterFactory,
-	newAuthorizations map[AccountCapabilityControllerID]interpreter.Authorization,
+	newAuthorizations map[AccountCapabilityID]interpreter.Authorization,
 	opts FixAuthorizationsMigrationOptions,
 ) []NamedMigration {
 
