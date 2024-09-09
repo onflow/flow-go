@@ -172,6 +172,15 @@ func (r *SafetyRules) ProduceTimeout(curView uint64, newestQC *flow.QuorumCertif
 	return timeout, nil
 }
 
+func (r *SafetyRules) SignOwnProposal(unsignedProposal *model.Proposal) (*model.Vote, error) {
+	// check that the block is created by us
+	if unsignedProposal.Block.ProposerID != r.committee.Self() {
+		return nil, fmt.Errorf("can't sign proposal for someone else's block")
+	}
+
+	return r.ProduceVote(unsignedProposal, unsignedProposal.Block.View)
+}
+
 // IsSafeToVote checks if this proposal is valid in terms of voting rules, if voting for this proposal won't break safety rules.
 // Expected errors during normal operations:
 //   - NoVoteError if replica already acted during this view (either voted or generated timeout)

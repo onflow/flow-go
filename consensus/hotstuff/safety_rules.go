@@ -43,4 +43,6 @@ type SafetyRules interface {
 	//    normal operation, e.g. during the grace-period after Epoch switchover or after the replica self-ejected.
 	// All other errors are unexpected and potential symptoms of uncovered edge cases or corrupted internal state (fatal).
 	ProduceTimeout(curView uint64, newestQC *flow.QuorumCertificate, lastViewTC *flow.TimeoutCertificate) (*model.TimeoutObject, error)
+
+	SignOwnProposal(unsignedProposal *model.Proposal) (*model.Vote, error)
 }

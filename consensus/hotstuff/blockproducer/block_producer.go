@@ -11,9 +11,9 @@ import (
 
 // BlockProducer is responsible for producing new block proposals
 type BlockProducer struct {
-	signer    hotstuff.Signer
-	committee hotstuff.Replicas
-	builder   module.Builder
+	safetyRules hotstuff.SafetyRules
+	committee   hotstuff.Replicas
+	builder     module.Builder
 }
 
 var _ hotstuff.BlockProducer = (*BlockProducer)(nil)
@@ -21,11 +21,11 @@ var _ hotstuff.BlockProducer = (*BlockProducer)(nil)
 // New creates a new BlockProducer which wraps the chain compliance layer block builder
 // to provide hotstuff with block proposals.
 // No errors are expected during normal operation.
-func New(signer hotstuff.Signer, committee hotstuff.Replicas, builder module.Builder) (*BlockProducer, error) {
+func New(safetyRules hotstuff.SafetyRules, committee hotstuff.Replicas, builder module.Builder) (*BlockProducer, error) {
 	bp := &BlockProducer{
-		signer:    signer,
-		committee: committee,
-		builder:   builder,
+		safetyRules: safetyRules,
+		committee:   committee,
+		builder:     builder,
 	}
 	return bp, nil
 }
