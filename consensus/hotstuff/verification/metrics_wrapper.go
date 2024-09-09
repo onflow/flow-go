@@ -29,28 +29,6 @@ func NewMetricsWrapper(signer hotstuff.Signer, metrics module.HotstuffMetrics) *
 	}
 }
 
-// TODO: to be moved to VerifierMetricsWrapper
-// func (w SignerMetricsWrapper) VerifyVote(voter *flow.Identity, sigData []byte, block *model.Block) (bool, error) {
-// 	processStart := time.Now()
-// 	valid, err := w.signer.VerifyVote(voter, sigData, block)
-// 	w.metrics.SignerProcessingDuration(time.Since(processStart))
-// 	return valid, err
-// }
-//
-// func (w SignerMetricsWrapper) VerifyQC(signers flow.IdentityList, sigData []byte, block *model.Block) (bool, error) {
-// 	processStart := time.Now()
-// 	valid, err := w.signer.VerifyQC(signers, sigData, block)
-// 	w.metrics.SignerProcessingDuration(time.Since(processStart))
-// 	return valid, err
-// }
-
-func (w SignerMetricsWrapper) CreateProposal(block *model.Block) (*model.Proposal, error) {
-	processStart := time.Now()
-	proposal, err := w.signer.CreateProposal(block)
-	w.metrics.SignerProcessingDuration(time.Since(processStart))
-	return proposal, err
-}
-
 func (w SignerMetricsWrapper) CreateVote(block *model.Block) (*model.Vote, error) {
 	processStart := time.Now()
 	vote, err := w.signer.CreateVote(block)
@@ -66,10 +44,3 @@ func (w SignerMetricsWrapper) CreateTimeout(curView uint64,
 	w.metrics.SignerProcessingDuration(time.Since(processStart))
 	return timeout, err
 }
-
-// func (w SignerMetricsWrapper) CreateQC(votes []*model.Vote) (*flow.QuorumCertificate, error) {
-// 	processStart := time.Now()
-// 	qc, err := w.signer.CreateQC(votes)
-// 	w.metrics.SignerProcessingDuration(time.Since(processStart))
-// 	return qc, err
-// }

@@ -75,6 +75,36 @@ func (_m *SafetyRules) ProduceVote(proposal *model.Proposal, curView uint64) (*m
 	return r0, r1
 }
 
+// SignOwnProposal provides a mock function with given fields: unsignedProposal
+func (_m *SafetyRules) SignOwnProposal(unsignedProposal *model.Proposal) (*model.Vote, error) {
+	ret := _m.Called(unsignedProposal)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SignOwnProposal")
+	}
+
+	var r0 *model.Vote
+	var r1 error
+	if rf, ok := ret.Get(0).(func(*model.Proposal) (*model.Vote, error)); ok {
+		return rf(unsignedProposal)
+	}
+	if rf, ok := ret.Get(0).(func(*model.Proposal) *model.Vote); ok {
+		r0 = rf(unsignedProposal)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*model.Vote)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(*model.Proposal) error); ok {
+		r1 = rf(unsignedProposal)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // NewSafetyRules creates a new instance of SafetyRules. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
 // The first argument is typically a *testing.T value.
 func NewSafetyRules(t interface {

@@ -227,16 +227,6 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 	in.persist.On("PutLivenessData", mock.Anything).Return(nil)
 
 	// program the hotstuff signer behaviour
-	in.signer.On("CreateProposal", mock.Anything).Return(
-		func(block *model.Block) *model.Proposal {
-			proposal := &model.Proposal{
-				Block:   block,
-				SigData: nil,
-			}
-			return proposal
-		},
-		nil,
-	)
 	in.signer.On("CreateVote", mock.Anything).Return(
 		func(block *model.Block) *model.Vote {
 			vote := &model.Vote{
@@ -364,10 +354,6 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 	logConsumer := notifications.NewLogConsumer(log)
 	notifier.AddConsumer(logConsumer)
 	notifier.AddConsumer(in.notifier)
-
-	// initialize the block producer
-	in.producer, err = blockproducer.New(in.signer, in.committee, in.builder)
-	require.NoError(t, err)
 
 	// initialize the finalizer
 	rootBlock := model.BlockFromFlow(cfg.Root)
@@ -529,6 +515,10 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 
 	// initialize the safety rules
 	in.safetyRules, err = safetyrules.New(in.signer, in.persist, in.committee)
+	require.NoError(t, err)
+
+	// initialize the block producer
+	in.producer, err = blockproducer.New(in.safetyRules, in.committee, in.builder)
 	require.NoError(t, err)
 
 	// initialize the event handler

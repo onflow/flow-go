@@ -21,7 +21,6 @@ const safeTimeout = 2 * time.Second
 const happyPathMaxRoundFailures = 6
 
 func TestSingleInstance(t *testing.T) {
-
 	// set up a single instance to run
 	// NOTE: currently, the HotStuff logic will infinitely call back on itself
 	// with a single instance, leading to a boundlessly growing call stack,
