@@ -101,24 +101,30 @@ func TestFixAuthorizationsMigration(t *testing.T) {
 
               transaction {
                   prepare(signer: auth(Storage, Capabilities) &Account) {
+                      signer.storage.save(Test.S(), to: /storage/s)
+
                       // Capability 1 was a public, unauthorized capability.
-                      // It should lose its entitlement
+                      // It should lose entitlement E2
                       let cap1 = signer.capabilities.storage.issue<auth(Test.E1, Test.E2) &Test.S>(/storage/s)
+                      assert(cap1.borrow() != nil)
                       signer.capabilities.publish(cap1, at: /public/s)
 
                       // Capability 2 was a public, unauthorized capability, stored nested in storage.
-                      // It should lose its entitlement
+                      // It should lose entitlement E2
                       let cap2 = signer.capabilities.storage.issue<auth(Test.E1, Test.E2) &Test.S>(/storage/s)
+                      assert(cap2.borrow() != nil)
                       signer.storage.save([cap2], to: /storage/caps2)
 
                       // Capability 3 was a private, authorized capability, stored nested in storage.
-                      // It should keep its entitlement
+                      // It should keep entitlement E2
                       let cap3 = signer.capabilities.storage.issue<auth(Test.E1, Test.E2) &Test.S>(/storage/s)
+                      assert(cap3.borrow() != nil)
                       signer.storage.save([cap3], to: /storage/caps3)
 
 	                  // Capability 4 was a capability with unavailable accessible members, stored nested in storage.
-	                  // It should keep its entitlement
+	                  // It should keep entitlement E2
                       let cap4 = signer.capabilities.storage.issue<auth(Test.E1, Test.E2) &Test.S>(/storage/s)
+                      assert(cap4.borrow() != nil)
                       signer.storage.save([cap4], to: /storage/caps4)
                   }
               }
@@ -233,4 +239,42 @@ func TestFixAuthorizationsMigration(t *testing.T) {
 		},
 		entries,
 	)
+
+	// Check account
+
+	_, err = runScript(
+		chainID,
+		registersByAccount,
+		fmt.Sprintf(
+			//language=Cadence
+			`
+              import Test from %s
+
+              access(all)
+              fun main() {
+                  let account = getAuthAccount<auth(Storage) &Account>(%[1]s)
+                  // NOTE: capability can NOT be borrowed with E2 anymore
+                  assert(account.capabilities.borrow<auth(Test.E1, Test.E2) &Test.S>(/public/s) == nil)
+                  assert(account.capabilities.borrow<auth(Test.E1) &Test.S>(/public/s) != nil)
+
+                  let caps2 = account.storage.copy<[Capability]>(from: /storage/caps2)!
+                  // NOTE: capability can NOT be borrowed with E2 anymore
+                  assert(caps2[0].borrow<auth(Test.E1, Test.E2) &Test.S>() == nil)
+                  assert(caps2[0].borrow<auth(Test.E1) &Test.S>() != nil)
+
+                  let caps3 = account.storage.copy<[Capability]>(from: /storage/caps3)!
+                  // NOTE: capability can still be borrowed with E2
+                  assert(caps3[0].borrow<auth(Test.E1, Test.E2) &Test.S>() != nil)
+                  assert(caps3[0].borrow<auth(Test.E1) &Test.S>() != nil)
+
+                  let caps4 = account.storage.copy<[Capability]>(from: /storage/caps4)!
+                  // NOTE: capability can still be borrowed with E2
+                  assert(caps4[0].borrow<auth(Test.E1, Test.E2) &Test.S>() != nil)
+                  assert(caps4[0].borrow<auth(Test.E1) &Test.S>() != nil)
+              }
+            `,
+			address.HexWithPrefix(),
+		),
+	)
+	require.NoError(t, err)
 }
