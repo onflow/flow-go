@@ -125,6 +125,9 @@ func run(*cobra.Command, []string) {
 				log.Fatal().Err(err).Msgf("failed to parse address: %s", hexAddr)
 			}
 
+			if addressFilter == nil {
+				addressFilter = make(map[common.Address]struct{})
+			}
 			addressFilter[common.Address(addr)] = struct{}{}
 		}
 	}
