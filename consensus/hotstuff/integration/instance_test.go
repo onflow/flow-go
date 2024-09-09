@@ -410,13 +410,19 @@ func NewInstance(t *testing.T, options ...Option) *Instance {
 			rbRector := helper.MakeRandomBeaconReconstructor(msig.RandomBeaconThreshold(len(in.participants)))
 			rbRector.On("Verify", mock.Anything, mock.Anything).Return(nil).Maybe()
 
-			return votecollector.NewCombinedVoteProcessor(
+			processor := votecollector.NewCombinedVoteProcessor(
 				log, proposal.Block,
 				stakingSigAggtor, rbRector,
 				onQCCreated,
 				packer,
 				minRequiredWeight,
 			)
+
+			err := processor.Process(proposal.ProposerVote())
+			if err != nil {
+				t.Fatalf("invalid vote for own proposal: %v", err)
+			}
+			return processor
 		}, nil).Maybe()
 
 	voteAggregationDistributor := pubsub.NewVoteAggregationDistributor()
