@@ -2218,14 +2218,13 @@ func TestStoragePathCapabilityMigration(t *testing.T) {
 
 	aCapStorageMapKey := interpreter.StringStorageMapKey("aCap")
 
-	aCapability := &interpreter.PathCapabilityValue{
-		BorrowType: borrowType,
-		Path:       interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "a"),
-
+	aCapability := interpreter.NewUnmeteredPathCapabilityValue(
+		borrowType,
 		// Important: Capability must be for a different address,
 		// compared to where the capability is stored.
-		Address: interpreter.AddressValue(addressB),
-	}
+		interpreter.AddressValue(addressB),
+		interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "a"),
+	)
 
 	storageMapForAddressA.WriteValue(
 		migrationRuntime.Interpreter,
@@ -2238,13 +2237,14 @@ func TestStoragePathCapabilityMigration(t *testing.T) {
 
 	bCapStorageMapKey := interpreter.StringStorageMapKey("bCap")
 
-	bCapability := &interpreter.PathCapabilityValue{
-		Path: interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "b"),
-
+	bCapability := interpreter.NewUnmeteredPathCapabilityValue(
+		// NOTE: no borrow type
+		nil,
 		// Important: Capability must be for a different address,
 		// compared to where the capability is stored.
-		Address: interpreter.AddressValue(addressB),
-	}
+		interpreter.AddressValue(addressB),
+		interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "b"),
+	)
 
 	storageMapForAddressA.WriteValue(
 		migrationRuntime.Interpreter,
@@ -2269,13 +2269,14 @@ func TestStoragePathCapabilityMigration(t *testing.T) {
 
 	cCapStorageMapKey := interpreter.StringStorageMapKey("cCap")
 
-	cCapability := &interpreter.PathCapabilityValue{
-		Path: interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "c"),
-
+	cCapability := interpreter.NewUnmeteredPathCapabilityValue(
+		// NOTE: no borrow type
+		nil,
 		// Important: Capability must be for a different address,
 		// compared to where the capability is stored.
-		Address: interpreter.AddressValue(addressB),
-	}
+		interpreter.AddressValue(addressB),
+		interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "c"),
+	)
 
 	storageMapForAddressA.WriteValue(
 		migrationRuntime.Interpreter,
@@ -2297,14 +2298,13 @@ func TestStoragePathCapabilityMigration(t *testing.T) {
 
 	dCapStorageMapKey := interpreter.StringStorageMapKey("dCap")
 
-	dCapability := &interpreter.PathCapabilityValue{
-		BorrowType: dBorrowType,
-		Path:       interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "d"),
-
+	dCapability := interpreter.NewUnmeteredPathCapabilityValue(
+		dBorrowType,
 		// Important: Capability must be for a different address,
 		// compared to where the capability is stored.
-		Address: interpreter.AddressValue(addressB),
-	}
+		interpreter.AddressValue(addressB),
+		interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "d"),
+	)
 
 	storageMapForAddressA.WriteValue(
 		migrationRuntime.Interpreter,
@@ -3008,12 +3008,12 @@ func TestStorageCapsMigrationDeterminism(t *testing.T) {
 		interpreter.PrimitiveStaticTypeAnyStruct,
 	)
 
-	aCapability := &interpreter.PathCapabilityValue{
-		BorrowType: borrowType,
-		Path:       interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "a"),
+	aCapability := interpreter.NewUnmeteredPathCapabilityValue(
+		borrowType,
 		// Important: Capability must be for address A.
-		Address: interpreter.AddressValue(addressA),
-	}
+		interpreter.AddressValue(addressA),
+		interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "a"),
+	)
 
 	storageMapForAddressA := storage.GetStorageMap(
 		addressA,
@@ -3032,12 +3032,12 @@ func TestStorageCapsMigrationDeterminism(t *testing.T) {
 	// Then, create a capability with storage path, issued for account A,
 	// and store it in account B.
 
-	bCapability := &interpreter.PathCapabilityValue{
-		BorrowType: borrowType,
-		Path:       interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "b"),
+	bCapability := interpreter.NewUnmeteredPathCapabilityValue(
+		borrowType,
 		// Important: Capability must be for address A.
-		Address: interpreter.AddressValue(addressA),
-	}
+		interpreter.AddressValue(addressA),
+		interpreter.NewUnmeteredPathValue(common.PathDomainStorage, "b"),
+	)
 
 	storageMapForAddressB := storage.GetStorageMap(
 		addressB,

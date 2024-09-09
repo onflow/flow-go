@@ -98,13 +98,7 @@ func (s *TransactionStatusSuite) SetupTest() {
 	s.tempSnapshot = &protocol.Snapshot{}
 	s.db, s.dbDir = unittest.TempBadgerDB(s.T())
 
-	header := unittest.BlockHeaderFixture()
-
 	params := protocol.NewParams(s.T())
-	params.On("SporkID").Return(unittest.IdentifierFixture(), nil)
-	params.On("ProtocolVersion").Return(uint(unittest.Uint64InRange(10, 30)), nil)
-	params.On("SporkRootBlockHeight").Return(header.Height, nil)
-	params.On("SealedRoot").Return(header, nil)
 	s.state.On("Params").Return(params)
 
 	s.blocks = storagemock.NewBlocks(s.T())
