@@ -79,8 +79,8 @@ func (m *FixAuthorizationsMigration) Migrate(
 			return nil, nil
 		}
 
-		borrowType := value.BorrowType
-		if borrowType == nil {
+		oldBorrowType := value.BorrowType
+		if oldBorrowType == nil {
 			log.Warn().Msgf(
 				"missing borrow type for capability with target %s#%d",
 				capabilityAddress.HexWithPrefix(),
@@ -88,19 +88,27 @@ func (m *FixAuthorizationsMigration) Migrate(
 			)
 		}
 
-		borrowReferenceType, ok := borrowType.(*interpreter.ReferenceStaticType)
+		oldBorrowReferenceType, ok := oldBorrowType.(*interpreter.ReferenceStaticType)
 		if !ok {
 			log.Warn().Msgf(
 				"invalid non-reference borrow type for capability with target %s#%d: %s",
 				capabilityAddress.HexWithPrefix(),
 				capabilityID,
-				borrowType,
+				oldBorrowType,
 			)
 			return nil, nil
 		}
 
-		borrowReferenceType.Authorization = newAuthorization
-		value.BorrowType = borrowReferenceType
+		newBorrowType := interpreter.NewReferenceStaticType(
+			nil,
+			newAuthorization,
+			oldBorrowReferenceType.ReferencedType,
+		)
+		newCapabilityValue := interpreter.NewUnmeteredCapabilityValue(
+			interpreter.UInt64Value(capabilityID),
+			interpreter.AddressValue(capabilityAddress),
+			newBorrowType,
+		)
 
 		m.Reporter.MigratedCapability(
 			storageKey,
@@ -109,7 +117,7 @@ func (m *FixAuthorizationsMigration) Migrate(
 			newAuthorization,
 		)
 
-		return value, nil
+		return newCapabilityValue, nil
 
 	case *interpreter.StorageCapabilityControllerValue:
 		// The capability controller's address is implicitly
@@ -126,7 +134,18 @@ func (m *FixAuthorizationsMigration) Migrate(
 			return nil, nil
 		}
 
-		value.BorrowType.Authorization = newAuthorization
+		oldBorrowReferenceType := value.BorrowType
+
+		newBorrowType := interpreter.NewReferenceStaticType(
+			nil,
+			newAuthorization,
+			oldBorrowReferenceType.ReferencedType,
+		)
+		newStorageCapabilityControllerValue := interpreter.NewUnmeteredStorageCapabilityControllerValue(
+			newBorrowType,
+			interpreter.UInt64Value(capabilityID),
+			value.TargetPath,
+		)
 
 		m.Reporter.MigratedCapabilityController(
 			storageKey,
@@ -134,7 +153,7 @@ func (m *FixAuthorizationsMigration) Migrate(
 			newAuthorization,
 		)
 
-		return value, nil
+		return newStorageCapabilityControllerValue, nil
 	}
 
 	return nil, nil
