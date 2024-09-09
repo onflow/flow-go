@@ -202,7 +202,7 @@ type FixAuthorizationsMigrationOptions struct {
 
 const fixAuthorizationsMigrationReporterName = "fix-authorizations-migration"
 
-func NewFixAuhorizationsMigration(
+func NewFixAuthorizationsMigration(
 	rwf reporters.ReportWriterFactory,
 	errorMessageHandler *errorMessageHandler,
 	programs map[runtime.Location]*interpreter.Program,
@@ -415,8 +415,7 @@ func NewFixAuthorizationsMigrations(
 				rwf,
 				opts.ChainID,
 				opts.VerboseErrorOutput,
-				// TODO: what are the important locations?
-				map[common.AddressLocation]struct{}{},
+				nil,
 				programs,
 			),
 		},
@@ -426,7 +425,7 @@ func NewFixAuthorizationsMigrations(
 				log,
 				opts.NWorker,
 				[]AccountBasedMigration{
-					NewFixAuhorizationsMigration(
+					NewFixAuthorizationsMigration(
 						rwf,
 						errorMessageHandler,
 						programs,
