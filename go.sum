@@ -1964,8 +1964,6 @@ github.com/libp2p/go-libp2p-kad-dht v0.25.2 h1:FOIk9gHoe4YRWXTu8SY9Z1d0RILol0Trt
 github.com/libp2p/go-libp2p-kad-dht v0.25.2/go.mod h1:6za56ncRHYXX4Nc2vn8z7CZK0P4QiMcrn77acKLM2Oo=
 github.com/libp2p/go-libp2p-kbucket v0.6.3 h1:p507271wWzpy2f1XxPzCQG9NiN6R6lHL9GiSErbQQo0=
 github.com/libp2p/go-libp2p-kbucket v0.6.3/go.mod h1:RCseT7AH6eJWxxk2ol03xtP9pEHetYSPXOaJnOiD8i0=
-github.com/libp2p/go-libp2p-pubsub v0.10.0 h1:wS0S5FlISavMaAbxyQn3dxMOe2eegMfswM471RuHJwA=
-github.com/libp2p/go-libp2p-pubsub v0.10.0/go.mod h1:1OxbaT/pFRO5h+Dpze8hdHQ63R0ke55XTs6b6NwLLkw=
 github.com/libp2p/go-libp2p-record v0.2.0 h1:oiNUOCWno2BFuxt3my4i1frNrt7PerzB3queqa1NkQ0=
 github.com/libp2p/go-libp2p-record v0.2.0/go.mod h1:I+3zMkvvg5m2OcSdoL0KPljyJyvNDFGKX7QdlpYUcwk=
 github.com/libp2p/go-libp2p-routing-helpers v0.7.3 h1:u1LGzAMVRK9Nqq5aYDVOiq/HaB93U9WWczBzGyAC5ZY=
@@ -2197,6 +2195,8 @@ github.com/onflow/go-ds-pebble v0.0.0-20240731130313-f186539f382c h1:T0jDCm7k7uq
 github.com/onflow/go-ds-pebble v0.0.0-20240731130313-f186539f382c/go.mod h1:XYnWtulwJvHVOr2B0WVA/UC3dvRgFevjp8Pn9a3E1xo=
 github.com/onflow/go-ethereum v1.14.7 h1:gg3awYqI02e3AypRdpJKEvNTJ6kz/OhAqRti0h54Wlc=
 github.com/onflow/go-ethereum v1.14.7/go.mod h1:zV14QLrXyYu5ucvcwHUA0r6UaqveqbXaehAVQJlSW+I=
+github.com/onflow/go-libp2p-pubsub v0.0.0-20240909191821-b0a35c238013 h1:mzRr2eqd4ZHNC8cvMA5olR0r9XY11XLMRpN2C7+dOFE=
+github.com/onflow/go-libp2p-pubsub v0.0.0-20240909191821-b0a35c238013/go.mod h1:1OxbaT/pFRO5h+Dpze8hdHQ63R0ke55XTs6b6NwLLkw=
 github.com/onflow/nft-storefront/lib/go/contracts v1.0.0 h1:sxyWLqGm/p4EKT6DUlQESDG1ZNMN9GjPCm1gTq7NGfc=
 github.com/onflow/nft-storefront/lib/go/contracts v1.0.0/go.mod h1:kMeq9zUwCrgrSojEbTUTTJpZ4WwacVm2pA7LVFr+glk=
 github.com/onflow/sdks v0.5.1-0.20230912225508-b35402f12bba/go.mod h1:F0dj0EyHC55kknLkeD10js4mo14yTdMotnWMslPirrU=
