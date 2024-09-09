@@ -2,6 +2,7 @@ package votecollector
 
 import (
 	"errors"
+	"github.com/onflow/flow-go/consensus/hotstuff/safetyrules"
 	"math/rand"
 	"sync"
 	"testing"
@@ -845,9 +846,14 @@ func TestCombinedVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 	}
 
 	leader := stakingSigners[0]
-
-	block := helper.MakeBlock(helper.WithBlockView(view),
-		helper.WithBlockProposer(leader.NodeID))
+	parentBlock := helper.MakeBlock(helper.WithBlockView(view - 1))
+	proposal := helper.MakeProposal(
+		helper.WithBlock(
+			helper.MakeBlock(
+				helper.WithBlockView(view),
+				helper.WithParentBlock(parentBlock),
+				helper.WithBlockProposer(leader.NodeID))))
+	block := proposal.Block
 
 	inmemDKG, err := inmem.DKGFromEncodable(inmem.EncodableDKG{
 		GroupKey: encodable.RandomBeaconPubKey{
@@ -861,7 +867,9 @@ func TestCombinedVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 	committee.On("QuorumThresholdForView", mock.Anything).Return(committees.WeightThresholdToBuildQC(allIdentities.ToSkeleton().TotalWeight()), nil)
 	committee.On("IdentitiesByEpoch", block.View).Return(allIdentities.ToSkeleton(), nil)
 	committee.On("IdentitiesByBlock", block.BlockID).Return(allIdentities, nil)
+	committee.On("IdentityByBlock", block.BlockID, leader.NodeID).Return(leader, nil)
 	committee.On("DKG", block.View).Return(inmemDKG, nil)
+	committee.On("Self").Return(leader.NodeID)
 
 	votes := make([]*model.Vote, 0, len(allIdentities))
 
@@ -874,8 +882,17 @@ func TestCombinedVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 	}
 
 	// create and sign proposal
-	proposal, err := signers[leader.NodeID].CreateProposal(block)
+	persist := mockhotstuff.NewPersister(t)
+	safetyData := &hotstuff.SafetyData{
+		LockedOneChainView:      parentBlock.View,
+		HighestAcknowledgedView: parentBlock.View,
+	}
+	persist.On("GetSafetyData", mock.Anything).Return(safetyData, nil).Once()
+	persist.On("PutSafetyData", mock.Anything).Return(nil)
+	safetyRules, err := safetyrules.New(signers[leader.NodeID], persist, committee)
+	vote, err := safetyRules.SignOwnProposal(proposal)
 	require.NoError(t, err)
+	proposal.SigData = vote.SigData
 
 	qcCreated := false
 	onQCCreated := func(qc *flow.QuorumCertificate) {
