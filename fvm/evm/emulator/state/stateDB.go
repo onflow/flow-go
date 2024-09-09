@@ -473,7 +473,10 @@ func (db *StateDB) Commit(finalize bool) (hash.Hash, error) {
 	// don't purge views yet, people might call the logs etc
 	commit := deltaCommitter.Commitment()
 	if finalize {
-		return commit, db.Finalize()
+		err := db.Finalize()
+		if err != nil {
+			return nil, err
+		}
 	}
 	return commit, nil
 }

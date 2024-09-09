@@ -2,6 +2,8 @@ package state
 
 import (
 	"encoding/binary"
+	"encoding/hex"
+	"fmt"
 
 	"github.com/holiman/uint256"
 	"github.com/onflow/crypto/hash"
@@ -32,22 +34,26 @@ const (
 		balanceByteSize +
 		hashByteSize
 	accountUpdateBufferSize = accountCreationBufferSize
-	slotUpdateBufferSize    = addressByteSize + hashByteSize + hashByteSize
+	slotUpdateBufferSize    = opcodeByteSize +
+		addressByteSize +
+		hashByteSize +
+		hashByteSize
 )
 
-// DeltaCommitter captures a
-// commitment over deltas
+// DeltaCommitter captures operations (delta) through
+// a set of calls (order matters) and constructs a commitment over the deltas.
 type DeltaCommitter struct {
 	hasher hash.Hasher
 }
 
-// NewDeltaCommitter constructs a new delta committer
+// NewDeltaCommitter constructs a new DeltaCommitter
 func NewDeltaCommitter() *DeltaCommitter {
 	return &DeltaCommitter{
 		hasher: hash.NewSHA3_256(),
 	}
 }
 
+// CreateAccount captures a create account operation
 func (dc *DeltaCommitter) CreateAccount(
 	addr gethCommon.Address,
 	balance *uint256.Int,
@@ -60,15 +66,18 @@ func (dc *DeltaCommitter) CreateAccount(
 	index += opcodeByteSize
 	copy(buffer[index:index+addressByteSize], addr.Bytes())
 	index += addressByteSize
-	copy(buffer[index:index+balanceByteSize], balance.Bytes())
+	encodedBalance := balance.Bytes32()
+	copy(buffer[index:index+balanceByteSize], encodedBalance[:])
 	index += balanceByteSize
 	binary.BigEndian.PutUint64(buffer[index:index+nonceByteSize], nonce)
 	index += nonceByteSize
 	copy(buffer[index:index+hashByteSize], codeHash.Bytes())
+	fmt.Println(hex.EncodeToString(buffer))
 	_, err := dc.hasher.Write(buffer)
 	return err
 }
 
+// CreateAccount captures an update account operation
 func (dc *DeltaCommitter) UpdateAccount(
 	addr gethCommon.Address,
 	balance *uint256.Int,
@@ -81,7 +90,8 @@ func (dc *DeltaCommitter) UpdateAccount(
 	index += opcodeByteSize
 	copy(buffer[index:index+addressByteSize], addr.Bytes())
 	index += addressByteSize
-	copy(buffer[index:index+balanceByteSize], balance.Bytes())
+	encodedBalance := balance.Bytes32()
+	copy(buffer[index:index+balanceByteSize], encodedBalance[:])
 	index += balanceByteSize
 	binary.BigEndian.PutUint64(buffer[index:index+nonceByteSize], nonce)
 	index += nonceByteSize
@@ -90,6 +100,7 @@ func (dc *DeltaCommitter) UpdateAccount(
 	return err
 }
 
+// CreateAccount captures a delete account operation
 func (dc *DeltaCommitter) DeleteAccount(addr gethCommon.Address) error {
 	buffer := make([]byte, accountDeletionBufferSize)
 	var index int
@@ -100,6 +111,7 @@ func (dc *DeltaCommitter) DeleteAccount(addr gethCommon.Address) error {
 	return err
 }
 
+// CreateAccount captures a update slot operation
 func (dc *DeltaCommitter) UpdateSlot(
 	addr gethCommon.Address,
 	key gethCommon.Hash,
@@ -114,11 +126,11 @@ func (dc *DeltaCommitter) UpdateSlot(
 	copy(buffer[index:index+hashByteSize], key.Bytes())
 	index += hashByteSize
 	copy(buffer[index:index+hashByteSize], value.Bytes())
-	index += hashByteSize
 	_, err := dc.hasher.Write(buffer)
 	return err
 }
 
+// Commitment calculates and returns the commitment
 func (dc *DeltaCommitter) Commitment() hash.Hash {
 	return dc.hasher.SumHash()
 }
