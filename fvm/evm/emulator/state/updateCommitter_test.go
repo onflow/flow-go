@@ -5,9 +5,10 @@ import (
 
 	"github.com/holiman/uint256"
 	"github.com/onflow/crypto/hash"
+	"github.com/stretchr/testify/require"
+
 	"github.com/onflow/flow-go/fvm/evm/emulator/state"
 	"github.com/onflow/flow-go/fvm/evm/testutils"
-	"github.com/stretchr/testify/require"
 )
 
 func TestChangeCommitter(t *testing.T) {
