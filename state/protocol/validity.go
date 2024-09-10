@@ -170,23 +170,22 @@ func IsValidEpochCommit(commit *flow.EpochCommit, setup *flow.EpochSetup) error 
 	}
 
 	// enforce invariant: len(DKGParticipantKeys) == len(DKGIndexMap)
-	if len(commit.DKGParticipantKeys) != len(commit.DKGIndexMap) {
+	n := len(commit.DKGIndexMap) // size of the DKG committee
+	if len(commit.DKGParticipantKeys) != n {
 		return NewInvalidServiceEventErrorf("dkg key list (len=%d) does not match index map (len=%d)", len(commit.DKGParticipantKeys), len(commit.DKGIndexMap))
 	}
 
 	// enforce invariant: DKGIndexMap values form the set {0, 1, ..., n-1} where n=len(DKGParticipantKeys)
-	indices := make([]int, 0, len(commit.DKGIndexMap))
+	encounteredIndex := make([]bool, n)
 	for _, index := range commit.DKGIndexMap {
-		indices = append(indices, index)
-	}
-	slices.Sort(indices)
-	// in this loop we enforce that:
-	// 	- each index is unique
-	//  - each index is from the set {0, 1, ..., n-1} where n=len(DKGParticipantKeys)
-	for i := 0; i < len(commit.DKGParticipantKeys); i++ {
-		if indices[i] != i {
-			return NewInvalidServiceEventErrorf("duplicated DKG index %d", indices[i])
+		if index < 0 || index >= n {
+			return NewInvalidServiceEventErrorf("index %d is outside allowed range [0,n-1] for a DKG committee of size n=%d", encounteredIndex[index], n)
 		}
+		if encounteredIndex[index] {
+			return NewInvalidServiceEventErrorf("duplicated DKG index %d", encounteredIndex[index])
+		}
+		encounteredIndex[index] = true
 	}
+	// conclusion: there are n unique values in `DKGIndexMap`, each in the interval [0,n-1]. Hence, the values in DKGIndexMap form set {0, 1, ..., n-1}.
 	return nil
 }
