@@ -54,5 +54,5 @@ func (d *DKG) NodeID(index uint) (flow.Identifier, error) {
 			return nodeID, nil
 		}
 	}
-	return flow.ZeroID, fmt.Errorf("index %d not found in DKG", index)
+	return flow.ZeroID, fmt.Errorf("inconsistent DKG state: missing index %d", index)
 }
