@@ -23,7 +23,8 @@ func TestChangeCommitter(t *testing.T) {
 
 	t.Run("test create account", func(t *testing.T) {
 		dc := state.NewUpdateCommitter()
-		dc.CreateAccount(addr, balance, nonce, randomHash)
+		err := dc.CreateAccount(addr, balance, nonce, randomHash)
+		require.NoError(t, err)
 
 		hasher := hash.NewSHA3_256()
 
@@ -45,7 +46,8 @@ func TestChangeCommitter(t *testing.T) {
 
 	t.Run("test update account", func(t *testing.T) {
 		dc := state.NewUpdateCommitter()
-		dc.UpdateAccount(addr, balance, nonce, randomHash)
+		err := dc.UpdateAccount(addr, balance, nonce, randomHash)
+		require.NoError(t, err)
 
 		hasher := hash.NewSHA3_256()
 		input := []byte{byte(state.AccountUpdateOpCode)}
@@ -66,7 +68,8 @@ func TestChangeCommitter(t *testing.T) {
 
 	t.Run("test delete account", func(t *testing.T) {
 		dc := state.NewUpdateCommitter()
-		dc.DeleteAccount(addr)
+		err := dc.DeleteAccount(addr)
+		require.NoError(t, err)
 
 		hasher := hash.NewSHA3_256()
 		input := []byte{byte(state.AccountDeletionOpCode)}
@@ -83,7 +86,8 @@ func TestChangeCommitter(t *testing.T) {
 
 	t.Run("test update slot", func(t *testing.T) {
 		dc := state.NewUpdateCommitter()
-		dc.UpdateSlot(addr, key, value)
+		err := dc.UpdateSlot(addr, key, value)
+		require.NoError(t, err)
 
 		hasher := hash.NewSHA3_256()
 
@@ -111,12 +115,15 @@ func BenchmarkDeltaCommitter(b *testing.B) {
 
 	numberOfAccountUpdates := 10
 	for i := 0; i < numberOfAccountUpdates; i++ {
-		dc.UpdateAccount(addr.ToCommon(), balance, nonce, randomHash)
+		err := dc.UpdateAccount(addr.ToCommon(), balance, nonce, randomHash)
+		require.NoError(b, err)
 	}
 
 	numberOfSlotUpdates := 10
 	for i := 0; i < numberOfSlotUpdates; i++ {
-		dc.UpdateSlot(addr.ToCommon(), randomHash, randomHash)
+		err := dc.UpdateSlot(addr.ToCommon(), randomHash, randomHash)
+		require.NoError(b, err)
 	}
-	dc.Commitment()
+	com := dc.Commitment()
+	require.NotEmpty(b, com)
 }
