@@ -153,9 +153,6 @@ func run(*cobra.Command, []string) {
 
 	rwf := reporters.NewReportFileWriterFactory(flagOutputDirectory, log.Logger)
 
-	reporter := rwf.ReportWriter("entitlement-fixes")
-	defer reporter.Close()
-
 	chainID := flow.ChainID(flagChain)
 	// Validate chain ID
 	_ = chainID.Chain()
@@ -183,19 +180,24 @@ func run(*cobra.Command, []string) {
 	if err != nil {
 		log.Fatal().Err(err)
 	}
+	checkingReporter := rwf.ReportWriter("contract-checking")
+	defer checkingReporter.Close()
 
 	checkContracts(
 		registersByAccount,
 		mr,
-		reporter,
+		checkingReporter,
 	)
+
+	fixReporter := rwf.ReportWriter("authorization-fixes")
+	defer fixReporter.Close()
 
 	authorizationFixGenerator := &AuthorizationFixGenerator{
 		registersByAccount:        registersByAccount,
 		mr:                        mr,
 		publicLinkReport:          publicLinkReport,
 		publicLinkMigrationReport: publicLinkMigrationReport,
-		reporter:                  reporter,
+		reporter:                  fixReporter,
 	}
 	authorizationFixGenerator.generateFixesForAllAccounts()
 }
