@@ -64,8 +64,6 @@ func findMinimalAuthorization(
 				panic(fmt.Errorf("unsupported set kind: %v", access.SetKind))
 			}
 
-			delete(neededMembers, memberName)
-
 		case *sema.EntitlementMapAccess:
 			unresolvedMembers[memberName] = fmt.Errorf(
 				"member requires entitlement map access: %s",
@@ -73,10 +71,7 @@ func findMinimalAuthorization(
 			)
 
 		case sema.PrimitiveAccess:
-			if access == sema.PrimitiveAccess(ast.AccessAll) {
-				// member is always accessible
-				delete(neededMembers, memberName)
-			} else {
+			if access != sema.PrimitiveAccess(ast.AccessAll) {
 				unresolvedMembers[memberName] = fmt.Errorf(
 					"member is inaccessible (%s)",
 					access.QualifiedKeyword(),
