@@ -460,7 +460,39 @@ func (g *AuthorizationFixGenerator) generateFixesForAccount(address common.Addre
 	}
 }
 
+func newEntitlementSetAuthorizationFromTypeIDs(
+	typeIDs []common.TypeID,
+	setKind sema.EntitlementSetKind,
+) interpreter.EntitlementSetAuthorization {
+	return interpreter.NewEntitlementSetAuthorization(
+		nil,
+		func() []common.TypeID {
+			return typeIDs
+		},
+		len(typeIDs),
+		setKind,
+	)
+}
+
+var insertRemoveAuthorization = newEntitlementSetAuthorizationFromTypeIDs(
+	[]common.TypeID{
+		sema.InsertType.ID(),
+		sema.RemoveType.ID(),
+	},
+	sema.Conjunction,
+)
+
+var insertMutateRemoveAuthorization = newEntitlementSetAuthorizationFromTypeIDs(
+	[]common.TypeID{
+		sema.InsertType.ID(),
+		sema.MutateType.ID(),
+		sema.RemoveType.ID(),
+	},
+	sema.Conjunction,
+)
+
 func (g *AuthorizationFixGenerator) maybeGenerateFixForCapabilityController(
+	inter *interpreter.Interpreter,
 	capabilityAddress common.Address,
 	capabilityID uint64,
 	borrowType *interpreter.ReferenceStaticType,
@@ -552,6 +584,20 @@ func (g *AuthorizationFixGenerator) maybeGenerateFixForCapabilityController(
 
 		// NOTE: still continue with the fix,
 		// we should not leave the capability controller vulnerable
+	}
+
+	// Only fix the authorization if it is different from the old one.
+	// If the old authorization was `Insert, Mutate, Remove`,
+	// the calculated minimal authorization is `Insert, Remove`,
+	// but we ignore the difference, and keep the Mutate entitlement.
+
+	oldAuthorization := borrowType.Authorization
+	if newAuthorization.Equal(oldAuthorization) ||
+		(oldAuthorization.Equal(insertMutateRemoveAuthorization) &&
+			newAuthorization.Equal(insertRemoveAuthorization)) {
+
+		// Nothing to fix
+		return
 	}
 
 	g.reporter.Write(fixEntitlementsEntry{
