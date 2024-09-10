@@ -32,6 +32,8 @@ type StopControl struct {
 
 	// Notifier for new processed block height
 	processedHeightChannel chan uint64
+	// Signal channel to notify when processing is done
+	doneProcessingEvents chan struct{}
 
 	// Stores latest processed block height
 	lastProcessedHeight counters.StrictMonotonousCounter
@@ -54,6 +56,7 @@ func NewStopControl(
 		lastProcessedHeight:    counters.NewMonotonousCounter(0),
 		versionData:            atomic.NewPointer[VersionMetadata](nil),
 		processedHeightChannel: make(chan uint64),
+		doneProcessingEvents:   make(chan struct{}),
 	}
 
 	sc.cm = component.NewComponentManagerBuilder().
@@ -114,7 +117,10 @@ func (sc *StopControl) onProcessedBlock(ctx irrecoverable.SignalerContext) {
 // Parameters:
 //   - height: The height of the latest processed block.
 func (sc *StopControl) updateProcessedHeight(height uint64) {
-	sc.processedHeightChannel <- height
+	select {
+	case sc.processedHeightChannel <- height: // Successfully sent the height to the channel
+	case <-sc.doneProcessingEvents: // Process events are done, do not block
+	}
 }
 
 // RegisterHeightRecorder registers an execution data height recorder with the StopControl.
@@ -132,6 +138,8 @@ func (sc *StopControl) RegisterHeightRecorder(recorder execution_data.ProcessedH
 //   - ready: A function to signal that the component is ready to start processing events.
 func (sc *StopControl) processEvents(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
+
+	defer close(sc.doneProcessingEvents) // Ensure the signal channel is closed when done
 
 	for {
 		select {
