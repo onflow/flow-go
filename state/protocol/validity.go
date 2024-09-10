@@ -3,8 +3,6 @@ package protocol
 import (
 	"fmt"
 
-	"golang.org/x/exp/slices"
-
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/factory"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -179,10 +177,10 @@ func IsValidEpochCommit(commit *flow.EpochCommit, setup *flow.EpochSetup) error 
 	encounteredIndex := make([]bool, n)
 	for _, index := range commit.DKGIndexMap {
 		if index < 0 || index >= n {
-			return NewInvalidServiceEventErrorf("index %d is outside allowed range [0,n-1] for a DKG committee of size n=%d", encounteredIndex[index], n)
+			return NewInvalidServiceEventErrorf("index %d is outside allowed range [0,n-1] for a DKG committee of size n=%d", index, n)
 		}
 		if encounteredIndex[index] {
-			return NewInvalidServiceEventErrorf("duplicated DKG index %d", encounteredIndex[index])
+			return NewInvalidServiceEventErrorf("duplicated DKG index %d", index)
 		}
 		encounteredIndex[index] = true
 	}
