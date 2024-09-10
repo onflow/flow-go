@@ -177,6 +177,7 @@ type AccessNodeConfig struct {
 	checkPayerBalanceMode                string
 	versionControlEnabled                bool
 	stopControlEnabled                   bool
+	storeTxResultErrorMessages           bool
 }
 
 type PublicNetworkConfig struct {
@@ -282,6 +283,7 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 		checkPayerBalanceMode:                accessNode.Disabled.String(),
 		versionControlEnabled:                true,
 		stopControlEnabled:                   false,
+		storeTxResultErrorMessages:           false,
 	}
 }
 
@@ -850,6 +852,13 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				builder.Storage.LightTransactionResults = bstorage.NewLightTransactionResults(node.Metrics.Cache, node.DB, bstorage.DefaultCacheSize)
 				return nil
 			}).
+			Module("transaction result error messages storage", func(node *cmd.NodeConfig) error {
+				if builder.storeTxResultErrorMessages {
+					builder.Storage.TransactionResultErrorMessages = bstorage.NewTransactionResultErrorMessages(node.Metrics.Cache, node.DB, bstorage.DefaultCacheSize)
+				}
+
+				return nil
+			}).
 			DependableComponent("execution data indexer", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 				// Note: using a DependableComponent here to ensure that the indexer does not block
 				// other components from starting while bootstrapping the register db since it may
@@ -1380,6 +1389,7 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 			"tx-result-query-mode",
 			defaultConfig.rpcConf.BackendConfig.TxResultQueryMode,
 			"mode to use when querying transaction results. one of [local-only, execution-nodes-only(default), failover]")
+		flags.BoolVar(&builder.storeTxResultErrorMessages, "store-tx-result-error-messages", defaultConfig.storeTxResultErrorMessages, "whether enable storing the transaction error messages into the db")
 
 		// Script Execution
 		flags.StringVar(&builder.rpcConf.BackendConfig.ScriptExecutionMode,
