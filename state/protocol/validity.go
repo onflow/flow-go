@@ -2,6 +2,7 @@ package protocol
 
 import (
 	"fmt"
+	"github.com/onflow/flow-go/module/signature"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/factory"
@@ -185,5 +186,19 @@ func IsValidEpochCommit(commit *flow.EpochCommit, setup *flow.EpochSetup) error 
 		encounteredIndex[index] = true
 	}
 	// conclusion: there are n unique values in `DKGIndexMap`, each in the interval [0,n-1]. Hence, the values in DKGIndexMap form set {0, 1, ..., n-1}.
+	numberOfRandomBeaconParticipants := 0
+	for _, identity := range setup.Participants.Filter(filter.IsConsensusCommitteeMember) {
+		if _, found := commit.DKGIndexMap[identity.NodeID]; found {
+			numberOfRandomBeaconParticipants++
+		}
+	}
+	// enforce invariant: signature.RandomBeaconThreshold ≤ |𝒞 ∩ 𝒟| where:
+	// - 𝒞 is the set of all consensus committee members
+	// - 𝒟 is the set of all DKG participants
+	if signature.RandomBeaconThreshold(n) > numberOfRandomBeaconParticipants {
+		return NewInvalidServiceEventErrorf("not enough random beacon participants required %d, got %d",
+			signature.RandomBeaconThreshold(n), numberOfRandomBeaconParticipants)
+	}
+
 	return nil
 }
