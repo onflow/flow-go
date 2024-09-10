@@ -2,8 +2,6 @@ package state
 
 import (
 	"encoding/binary"
-	"encoding/hex"
-	"fmt"
 
 	"github.com/holiman/uint256"
 	"github.com/onflow/crypto/hash"
@@ -72,12 +70,11 @@ func (dc *UpdateCommitter) CreateAccount(
 	binary.BigEndian.PutUint64(buffer[index:index+nonceByteSize], nonce)
 	index += nonceByteSize
 	copy(buffer[index:index+hashByteSize], codeHash.Bytes())
-	fmt.Println(hex.EncodeToString(buffer))
 	_, err := dc.hasher.Write(buffer)
 	return err
 }
 
-// CreateAccount captures an update account operation
+// UpdateAccount captures an update account operation
 func (dc *UpdateCommitter) UpdateAccount(
 	addr gethCommon.Address,
 	balance *uint256.Int,
@@ -100,7 +97,7 @@ func (dc *UpdateCommitter) UpdateAccount(
 	return err
 }
 
-// CreateAccount captures a delete account operation
+// DeleteAccount captures a delete account operation
 func (dc *UpdateCommitter) DeleteAccount(addr gethCommon.Address) error {
 	buffer := make([]byte, accountDeletionBufferSize)
 	var index int
@@ -111,7 +108,7 @@ func (dc *UpdateCommitter) DeleteAccount(addr gethCommon.Address) error {
 	return err
 }
 
-// CreateAccount captures a update slot operation
+// UpdateSlot captures a update slot operation
 func (dc *UpdateCommitter) UpdateSlot(
 	addr gethCommon.Address,
 	key gethCommon.Hash,
