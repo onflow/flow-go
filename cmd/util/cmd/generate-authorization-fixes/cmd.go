@@ -342,25 +342,35 @@ func jsonEncodeAuthorization(authorization interpreter.Authorization) string {
 
 type fixEntitlementsEntry struct {
 	AccountCapabilityID
-	NewAuthorization  interpreter.Authorization
-	UnresolvedMembers map[string]error
+	ReferencedType       interpreter.StaticType
+	OldAuthorization     interpreter.Authorization
+	NewAuthorization     interpreter.Authorization
+	OldAccessibleMembers []string
+	NewAccessibleMembers []string
+	UnresolvedMembers    map[string]error
 }
 
 var _ json.Marshaler = fixEntitlementsEntry{}
 
 func (e fixEntitlementsEntry) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
-		Kind              string `json:"kind"`
-		CapabilityAddress string `json:"capability_address"`
-		CapabilityID      uint64 `json:"capability_id"`
-		NewAuthorization  string `json:"new_authorization"`
-		UnresolvedMembers map[string]string
+		CapabilityAddress    string            `json:"capability_address"`
+		CapabilityID         uint64            `json:"capability_id"`
+		ReferencedType       string            `json:"referenced_type"`
+		OldAuthorization     string            `json:"old_authorization"`
+		NewAuthorization     string            `json:"new_authorization"`
+		OldAccessibleMembers []string          `json:"old_members"`
+		NewAccessibleMembers []string          `json:"new_members"`
+		UnresolvedMembers    map[string]string `json:"unresolved_members,omitempty"`
 	}{
-		Kind:              "fix-entitlements",
-		CapabilityAddress: e.Address.String(),
-		CapabilityID:      e.CapabilityID,
-		NewAuthorization:  jsonEncodeAuthorization(e.NewAuthorization),
-		UnresolvedMembers: jsonEncodeMemberErrorMap(e.UnresolvedMembers),
+		CapabilityAddress:    e.Address.String(),
+		CapabilityID:         e.CapabilityID,
+		ReferencedType:       string(e.ReferencedType.ID()),
+		OldAuthorization:     jsonEncodeAuthorization(e.OldAuthorization),
+		NewAuthorization:     jsonEncodeAuthorization(e.NewAuthorization),
+		OldAccessibleMembers: e.OldAccessibleMembers,
+		NewAccessibleMembers: e.NewAccessibleMembers,
+		UnresolvedMembers:    jsonEncodeMemberErrorMap(e.UnresolvedMembers),
 	})
 }
 
@@ -555,18 +565,30 @@ func (g *AuthorizationFixGenerator) maybeGenerateFixForCapabilityController(
 		return
 	}
 
-	log.Info().Msgf(
-		"member mismatch for capability controller %d in account %s: expected %v, got %v",
-		capabilityID,
-		capabilityAddress.HexWithPrefix(),
-		oldAccessibleMembers,
-		newAccessibleMembers,
-	)
-
 	oldAccessibleMemberSet := make(map[string]struct{})
 	for _, memberName := range oldAccessibleMembers {
 		oldAccessibleMemberSet[memberName] = struct{}{}
 	}
+
+	newAccessibleMemberSet := make(map[string]struct{})
+	for _, memberName := range newAccessibleMembers {
+		newAccessibleMemberSet[memberName] = struct{}{}
+	}
+
+	membersAdded, membersRemoved := sortedDiffStringSets(
+		oldAccessibleMemberSet,
+		newAccessibleMemberSet,
+	)
+
+	log.Info().Msgf(
+		"member mismatch for capability controller %d in account %s: expected %v, got %v (added: %v, removed: %v)",
+		capabilityID,
+		capabilityAddress.HexWithPrefix(),
+		oldAccessibleMembers,
+		newAccessibleMembers,
+		membersAdded,
+		membersRemoved,
+	)
 
 	newAuthorization, unresolvedMembers := findMinimalAuthorization(
 		semaBorrowType,
@@ -605,8 +627,12 @@ func (g *AuthorizationFixGenerator) maybeGenerateFixForCapabilityController(
 			Address:      capabilityAddress,
 			CapabilityID: capabilityID,
 		},
-		NewAuthorization:  newAuthorization,
-		UnresolvedMembers: unresolvedMembers,
+		ReferencedType:       borrowType.ReferencedType,
+		OldAuthorization:     oldAuthorization,
+		NewAuthorization:     newAuthorization,
+		OldAccessibleMembers: oldAccessibleMembers,
+		NewAccessibleMembers: newAccessibleMembers,
+		UnresolvedMembers:    unresolvedMembers,
 	})
 
 }
@@ -665,4 +691,20 @@ func (g *AuthorizationFixGenerator) publicPathLinkInfo(
 
 func isGzip(file *os.File) bool {
 	return strings.HasSuffix(file.Name(), ".gz")
+}
+
+func sortedDiffStringSets(a, b map[string]struct{}) (added, removed []string) {
+	for key := range a {
+		if _, ok := b[key]; !ok {
+			removed = append(removed, key)
+		}
+	}
+	for key := range b {
+		if _, ok := a[key]; !ok {
+			added = append(added, key)
+		}
+	}
+	sort.Strings(added)
+	sort.Strings(removed)
+	return
 }
