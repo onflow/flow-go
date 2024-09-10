@@ -269,7 +269,7 @@ type EpochCommit struct {
 	// CAUTION: This mapping may include identifiers for nodes which do not exist in the consensus committee
 	//          and may NOT include identifiers for all nodes in the consensus committee.
 	//
-	DKGIndexMap map[Identifier]int
+	DKGIndexMap DKGIndexMap
 }
 
 // ClusterQCVoteData represents the votes for a cluster quorum certificate, as
@@ -325,7 +325,7 @@ type encodableCommit struct {
 	ClusterQCs         []ClusterQCVoteData
 	DKGGroupKey        encodable.RandomBeaconPubKey
 	DKGParticipantKeys []encodable.RandomBeaconPubKey
-	DKGIndexMap        map[Identifier]int
+	DKGIndexMap        DKGIndexMap
 }
 
 func encodableFromCommit(commit *EpochCommit) encodableCommit {
