@@ -8,12 +8,14 @@ import (
 	"os"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/onflow/cadence/runtime/sema"
 	"github.com/onflow/cadence/runtime/stdlib"
 	"github.com/rs/zerolog/log"
+	"github.com/schollz/progressbar/v3"
 	"github.com/spf13/cobra"
 	"golang.org/x/exp/slices"
 
@@ -167,25 +169,21 @@ func run(*cobra.Command, []string) {
 		publicLinkMigrationReportChan <- readLinkMigrationReport(addressFilter)
 	}()
 
+	registersByAccountChan := make(chan *registers.ByAccount, 1)
+	go func() {
+		registersByAccountChan <- loadRegistersByAccount()
+	}()
+
 	publicLinkReport := <-publicLinkReportChan
 	publicLinkMigrationReport := <-publicLinkMigrationReportChan
+	registersByAccount := <-registersByAccountChan
 
-	registersByAccount := loadRegistersByAccount()
-
-	mr, err := migrations.NewInterpreterMigrationRuntime(
-		registersByAccount,
-		chainID,
-		migrations.InterpreterMigrationRuntimeConfig{},
-	)
-	if err != nil {
-		log.Fatal().Err(err)
-	}
 	checkingReporter := rwf.ReportWriter("contract-checking")
 	defer checkingReporter.Close()
 
 	checkContracts(
 		registersByAccount,
-		mr,
+		chainID,
 		checkingReporter,
 	)
 
@@ -194,12 +192,16 @@ func run(*cobra.Command, []string) {
 
 	authorizationFixGenerator := &AuthorizationFixGenerator{
 		registersByAccount:        registersByAccount,
-		mr:                        mr,
+		chainID:                   chainID,
 		publicLinkReport:          publicLinkReport,
 		publicLinkMigrationReport: publicLinkMigrationReport,
 		reporter:                  fixReporter,
 	}
-	authorizationFixGenerator.generateFixesForAllAccounts()
+	if len(addressFilter) > 0 {
+		authorizationFixGenerator.generateFixesForAccounts(addressFilter)
+	} else {
+		authorizationFixGenerator.generateFixesForAllAccounts()
+	}
 }
 
 func loadRegistersByAccount() *registers.ByAccount {
@@ -300,7 +302,7 @@ func readLinkMigrationReport(addressFilter map[common.Address]struct{}) PublicLi
 
 func checkContracts(
 	registersByAccount *registers.ByAccount,
-	mr *migrations.InterpreterMigrationRuntime,
+	chainID flow.ChainID,
 	reporter reporters.ReportWriter,
 ) {
 	contracts, err := migrations.GatherContractsFromRegisters(registersByAccount, log.Logger)
@@ -316,6 +318,15 @@ func checkContracts(
 	}
 
 	log.Info().Msg("Checking contracts ...")
+
+	mr, err := migrations.NewInterpreterMigrationRuntime(
+		registersByAccount,
+		chainID,
+		migrations.InterpreterMigrationRuntimeConfig{},
+	)
+	if err != nil {
+		log.Fatal().Err(err)
+	}
 
 	for _, contract := range contracts {
 		migrations.CheckContract(
@@ -386,25 +397,62 @@ func jsonEncodeMemberErrorMap(m map[string]error) map[string]string {
 
 type AuthorizationFixGenerator struct {
 	registersByAccount        *registers.ByAccount
-	mr                        *migrations.InterpreterMigrationRuntime
+	chainID                   flow.ChainID
 	publicLinkReport          PublicLinkReport
 	publicLinkMigrationReport PublicLinkMigrationReport
 	reporter                  reporters.ReportWriter
 }
 
 func (g *AuthorizationFixGenerator) generateFixesForAllAccounts() {
+	var wg sync.WaitGroup
+	progress := progressbar.Default(int64(g.registersByAccount.AccountCount()), "Processing:")
+
 	err := g.registersByAccount.ForEachAccount(func(accountRegisters *registers.AccountRegisters) error {
 		address := common.MustBytesToAddress([]byte(accountRegisters.Owner()))
-		g.generateFixesForAccount(address)
+		wg.Add(1)
+		go func(address common.Address) {
+			defer wg.Done()
+			g.generateFixesForAccount(address)
+			progress.Add(1)
+		}(address)
 		return nil
 	})
 	if err != nil {
 		log.Fatal().Err(err)
 	}
+
+	wg.Wait()
+	progress.Finish()
+}
+
+func (g *AuthorizationFixGenerator) generateFixesForAccounts(addresses map[common.Address]struct{}) {
+	var wg sync.WaitGroup
+	progress := progressbar.Default(int64(len(addresses)), "Processing:")
+
+	for address := range addresses {
+		wg.Add(1)
+		go func(address common.Address) {
+			defer wg.Done()
+			g.generateFixesForAccount(address)
+			progress.Add(1)
+		}(address)
+	}
+
+	wg.Wait()
+	progress.Finish()
 }
 
 func (g *AuthorizationFixGenerator) generateFixesForAccount(address common.Address) {
-	capabilityControllerStorage := g.mr.Storage.GetStorageMap(
+	mr, err := migrations.NewInterpreterMigrationRuntime(
+		g.registersByAccount,
+		g.chainID,
+		migrations.InterpreterMigrationRuntimeConfig{},
+	)
+	if err != nil {
+		log.Fatal().Err(err)
+	}
+
+	capabilityControllerStorage := mr.Storage.GetStorageMap(
 		address,
 		stdlib.CapabilityControllerStorageDomain,
 		false,
@@ -440,6 +488,7 @@ func (g *AuthorizationFixGenerator) generateFixesForAccount(address common.Addre
 		switch borrowType.Authorization.(type) {
 		case interpreter.EntitlementSetAuthorization:
 			g.maybeGenerateFixForCapabilityController(
+				mr.Interpreter,
 				address,
 				capabilityID,
 				borrowType,
