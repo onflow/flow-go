@@ -1,6 +1,8 @@
 package operation
 
 import (
+	"bytes"
+
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/onflow/flow-go/storage"
@@ -14,11 +16,6 @@ type badgerIterator struct {
 
 var _ storage.Iterator = (*badgerIterator)(nil)
 
-func StartEndPrefixToLowerUpperBound(start, end []byte) (lowerBound, upperBound []byte) {
-	// TODO:
-	return nil, nil
-}
-
 func newBadgerIterator(db *badger.DB, start, end []byte, ops storage.IteratorOption) *badgerIterator {
 	options := badger.DefaultIteratorOptions
 	if ops.IterateKeyOnly {
@@ -28,7 +25,7 @@ func newBadgerIterator(db *badger.DB, start, end []byte, ops storage.IteratorOpt
 	tx := db.NewTransaction(false)
 	iter := tx.NewIterator(options)
 
-	lowerBound, upperBound := StartEndPrefixToLowerUpperBound(start, end)
+	lowerBound, upperBound := storage.StartEndPrefixToLowerUpperBound(start, end)
 
 	return &badgerIterator{
 		iter:       iter,
@@ -42,7 +39,12 @@ func (i *badgerIterator) SeekGE() {
 }
 
 func (i *badgerIterator) Valid() bool {
-	return i.iter.Valid()
+	// if it's beyond the upper bound, it's invalid
+	if !i.iter.Valid() {
+		return false
+	}
+	key := i.iter.Item().Key()
+	return bytes.Compare(key, i.upperBound) < 0
 }
 
 func (i *badgerIterator) Next() {

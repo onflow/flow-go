@@ -2,12 +2,14 @@ package operation
 
 import (
 	"errors"
+	"fmt"
 	"io"
 
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/operation"
 	op "github.com/onflow/flow-go/storage/operation"
 )
 
@@ -119,4 +121,19 @@ func (b *ReaderBatchWriter) Set(key, value []byte) error {
 
 func (b *ReaderBatchWriter) Delete(key []byte) error {
 	return b.batch.Delete(key)
+}
+
+func (b *ReaderBatchWriter) DeleteByRange(globalReader storage.Reader, startPrefix, endPrefix []byte) error {
+	err := operation.IteratePrefix(startPrefix, endPrefix, func(key []byte) error {
+		err := b.batch.Delete(key)
+		if err != nil {
+			return fmt.Errorf("could not add key to delete batch (%v): %w", key, err)
+		}
+		return nil
+	})(globalReader)
+
+	if err != nil {
+		return fmt.Errorf("could not find keys by range to be deleted: %w", err)
+	}
+	return nil
 }

@@ -37,7 +37,7 @@ func (b *ReaderBatchWriter) AddCallback(callback func(error)) {
 }
 
 func (b *ReaderBatchWriter) Commit() error {
-	err := b.batch.Commit(nil)
+	err := b.batch.Commit(pebble.Sync)
 
 	b.callbacks.NotifyCallbacks(err)
 
@@ -105,9 +105,13 @@ func (b *ReaderBatchWriter) NewIter(start, end []byte, ops storage.IteratorOptio
 var _ storage.Writer = (*ReaderBatchWriter)(nil)
 
 func (b *ReaderBatchWriter) Set(key, value []byte) error {
-	return b.batch.Set(key, value, nil)
+	return b.batch.Set(key, value, pebble.Sync)
 }
 
 func (b *ReaderBatchWriter) Delete(key []byte) error {
-	return b.batch.Delete(key, nil)
+	return b.batch.Delete(key, pebble.Sync)
+}
+
+func (b *ReaderBatchWriter) DeleteByRange(_ storage.Reader, startPrefix, endPrefix []byte) error {
+	return b.batch.DeleteRange(startPrefix, endPrefix, pebble.Sync)
 }
