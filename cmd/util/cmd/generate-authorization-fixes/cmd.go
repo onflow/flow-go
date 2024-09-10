@@ -538,16 +538,7 @@ func (g *AuthorizationFixGenerator) maybeGenerateFixForCapabilityController(
 		return
 	}
 
-	// Assume we already had access to public built-in functions.
-	// For example, forEachAttachment was added in Cadence 1.0,
-	// so we should not consider it as a new member.
-
-	oldAccessibleMembers = append(
-		[]string{"getType", "isInstance", "forEachAttachment"},
-		oldAccessibleMembers...,
-	)
-
-	semaBorrowType, err := convertStaticToSemaType(g.mr.Interpreter, borrowType)
+	semaBorrowType, err := convertStaticToSemaType(inter, borrowType)
 	if err != nil {
 		log.Warn().Err(err).Msgf(
 			"failed to get new accessible members for capability controller %d in account %s",
