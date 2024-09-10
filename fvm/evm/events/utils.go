@@ -1,8 +1,6 @@
 package events
 
 import (
-	"fmt"
-
 	"github.com/onflow/cadence"
 	gethCommon "github.com/onflow/go-ethereum/common"
 )
@@ -45,7 +43,6 @@ func checksumToCadenceArrayValue(checksum [4]byte) cadence.Array {
 	for i := 0; i < ChecksumLength; i++ {
 		values[i] = cadence.NewUInt8(checksum[i])
 	}
-	fmt.Println(values)
 	return cadence.NewArray(values).
 		WithType(checksumType)
 }
