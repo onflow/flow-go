@@ -82,6 +82,8 @@ func (p *transactionEvent) ToCadence(chainID flow.ChainID) (cadence.Event, error
 
 	eventType := stdlib.CadenceTypesForChain(chainID).TransactionExecuted
 
+	// the first 4 bytes of StateChangeCommitment is used as checksum
+	checksum := p.Result.StateChangeCommitment[:4]
 	return cadence.NewEvent([]cadence.Value{
 		hashToCadenceArrayValue(p.Result.TxHash),
 		cadence.NewUInt16(p.Result.Index),
@@ -95,6 +97,7 @@ func (p *transactionEvent) ToCadence(chainID flow.ChainID) (cadence.Event, error
 		cadence.NewUInt64(p.BlockHeight),
 		bytesToCadenceUInt8ArrayValue(p.Result.ReturnedData),
 		bytesToCadenceUInt8ArrayValue(p.Result.PrecompiledCalls),
+		checksumToCadenceArrayValue(checksum),
 	}).WithType(eventType), nil
 }
 
