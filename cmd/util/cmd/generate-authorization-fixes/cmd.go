@@ -262,6 +262,8 @@ func readPublicLinkReport(addressFilter map[common.Address]struct{}) PublicLinkR
 		log.Fatal().Err(err).Msgf("failed to read public link report %s", flagPublicLinkReport)
 	}
 
+	log.Info().Msgf("Read %d public link entries", len(publicLinkReport))
+
 	return publicLinkReport
 }
 
@@ -288,6 +290,8 @@ func readLinkMigrationReport(addressFilter map[common.Address]struct{}) PublicLi
 	if err != nil {
 		log.Fatal().Err(err).Msgf("failed to read public link report: %s", flagLinkMigrationReport)
 	}
+
+	log.Info().Msgf("Read %d public link migration entries", len(publicLinkMigrationReport))
 
 	return publicLinkMigrationReport
 }
