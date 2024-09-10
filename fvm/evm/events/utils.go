@@ -1,6 +1,8 @@
 package events
 
 import (
+	"fmt"
+
 	"github.com/onflow/cadence"
 	gethCommon "github.com/onflow/go-ethereum/common"
 )
@@ -38,11 +40,12 @@ const ChecksumLength = 4
 var checksumType = cadence.NewConstantSizedArrayType(ChecksumLength, cadence.UInt8Type)
 
 // checksumToCadenceArrayValue converts a checksum ([4]byte) into a Cadence array of type [UInt8;4]
-func checksumToCadenceArrayValue(checksum []byte) cadence.Array {
+func checksumToCadenceArrayValue(checksum [4]byte) cadence.Array {
 	values := make([]cadence.Value, ChecksumLength)
 	for i := 0; i < ChecksumLength; i++ {
 		values[i] = cadence.NewUInt8(checksum[i])
 	}
+	fmt.Println(values)
 	return cadence.NewArray(values).
 		WithType(checksumType)
 }

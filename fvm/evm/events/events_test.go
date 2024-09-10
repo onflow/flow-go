@@ -86,6 +86,7 @@ func TestEVMTransactionExecutedEventCCFEncodingDecoding(t *testing.T) {
 	txHash := testutils.RandomCommonHash(t)
 	blockHash := testutils.RandomCommonHash(t)
 	data := "000000000000000000000000000000000000000000000000000000000000002a"
+	stateUpdateCommit := testutils.RandomCommonHash(t).Bytes()
 	dataBytes, err := hex.DecodeString(data)
 	require.NoError(t, err)
 	blockHeight := uint64(2)
@@ -111,6 +112,7 @@ func TestEVMTransactionExecutedEventCCFEncodingDecoding(t *testing.T) {
 		ReturnedData:            dataBytes,
 		Logs:                    []*gethTypes.Log{log},
 		TxHash:                  txHash,
+		StateChangeCommitment:   stateUpdateCommit,
 	}
 
 	t.Run("evm.TransactionExecuted with failed status", func(t *testing.T) {
@@ -129,6 +131,7 @@ func TestEVMTransactionExecutedEventCCFEncodingDecoding(t *testing.T) {
 		assert.Equal(t, tep.GasConsumed, txResult.GasConsumed)
 		assert.Equal(t, tep.ErrorMessage, txResult.VMError.Error())
 		assert.Equal(t, tep.ReturnedData, txResult.ReturnedData)
+		assert.Equal(t, tep.StateUpdateChecksum[:], stateUpdateCommit[:4])
 		assert.Equal(
 			t,
 			tep.ContractAddress,

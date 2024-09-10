@@ -76,7 +76,7 @@ func TestHashToCadenceArrayValue(t *testing.T) {
 func TestHashToChecksumValue(t *testing.T) {
 	t.Parallel()
 
-	checksum := []byte{1, 2, 3, 4}
+	checksum := [4]byte{1, 2, 3, 4}
 	inCadence := checksumToCadenceArrayValue(checksum)
 	require.Equal(t,
 		cadence.NewArray([]cadence.Value{

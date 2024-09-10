@@ -83,7 +83,10 @@ func (p *transactionEvent) ToCadence(chainID flow.ChainID) (cadence.Event, error
 	eventType := stdlib.CadenceTypesForChain(chainID).TransactionExecuted
 
 	// the first 4 bytes of StateChangeCommitment is used as checksum
-	checksum := p.Result.StateChangeCommitment[:4]
+	var checksum [4]byte
+	if len(p.Result.StateChangeCommitment) >= ChecksumLength {
+		copy(checksum[:ChecksumLength], p.Result.StateChangeCommitment[:ChecksumLength])
+	}
 	return cadence.NewEvent([]cadence.Value{
 		hashToCadenceArrayValue(p.Result.TxHash),
 		cadence.NewUInt16(p.Result.Index),
@@ -191,6 +194,23 @@ func DecodeBlockEventPayload(event cadence.Event) (*BlockEventPayload, error) {
 }
 
 type TransactionEventPayload struct {
+	Hash                gethCommon.Hash `cadence:"hash"`
+	Index               uint16          `cadence:"index"`
+	TransactionType     uint8           `cadence:"type"`
+	Payload             []byte          `cadence:"payload"`
+	ErrorCode           uint16          `cadence:"errorCode"`
+	GasConsumed         uint64          `cadence:"gasConsumed"`
+	ContractAddress     string          `cadence:"contractAddress"`
+	Logs                []byte          `cadence:"logs"`
+	BlockHeight         uint64          `cadence:"blockHeight"`
+	ErrorMessage        string          `cadence:"errorMessage"`
+	ReturnedData        []byte          `cadence:"returnedData"`
+	PrecompiledCalls    []byte          `cadence:"precompiledCalls"`
+	StateUpdateChecksum [4]byte         `cadence:"stateUpdateChecksum"`
+}
+
+// transactionEventPayloadV0 legacy format of the transaction event without stateUpdateChecksum field
+type transactionEventPayloadV0 struct {
 	Hash             gethCommon.Hash `cadence:"hash"`
 	Index            uint16          `cadence:"index"`
 	TransactionType  uint8           `cadence:"type"`
@@ -205,11 +225,40 @@ type TransactionEventPayload struct {
 	PrecompiledCalls []byte          `cadence:"precompiledCalls"`
 }
 
+// decodeLegacyTransactionEventPayload decodes any legacy transaction formats into
+// current version of the transaction event payload.
+func decodeLegacyTransactionEventPayload(event cadence.Event) (*TransactionEventPayload, error) {
+	var tx transactionEventPayloadV0
+	if err := cadence.DecodeFields(event, &tx); err != nil {
+		return nil, err
+	}
+	return &TransactionEventPayload{
+		Hash:             tx.Hash,
+		Index:            tx.Index,
+		TransactionType:  tx.TransactionType,
+		Payload:          tx.Payload,
+		ErrorCode:        tx.ErrorCode,
+		GasConsumed:      tx.GasConsumed,
+		ContractAddress:  tx.ContractAddress,
+		Logs:             tx.Logs,
+		BlockHeight:      tx.BlockHeight,
+		ErrorMessage:     tx.ErrorMessage,
+		ReturnedData:     tx.ReturnedData,
+		PrecompiledCalls: tx.PrecompiledCalls,
+	}, nil
+}
+
 // DecodeTransactionEventPayload decodes Cadence event into transaction event payload.
 func DecodeTransactionEventPayload(event cadence.Event) (*TransactionEventPayload, error) {
 	var tx TransactionEventPayload
-	err := cadence.DecodeFields(event, &tx)
-	return &tx, err
+	if err := cadence.DecodeFields(event, &tx); err != nil {
+		if legTx, err := decodeLegacyTransactionEventPayload(event); err == nil {
+			return legTx, nil
+		}
+		return nil, err
+	}
+	return &tx, nil
+
 }
 
 // FLOWTokensDepositedEventPayload captures payloads for a FlowTokenDeposited event
