@@ -861,6 +861,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				// take hours to complete.
 				var err error
 				builder.RegisterDB, err = pstorage.OpenRegisterPebbleDB(builder.registersDBPath)
+				builder.Logger.Warn().Msg(fmt.Sprintf("!!!!!!!!!! builder.registersDBPath: %s", builder.registersDBPath))
 				if err != nil {
 					return nil, fmt.Errorf("could not open registers db: %w", err)
 				}
