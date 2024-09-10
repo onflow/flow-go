@@ -120,3 +120,39 @@ func LookupLightTransactionResultsByBlockIDUsingIndex(blockID flow.Identifier, t
 
 	return traverse(makePrefix(codeLightTransactionResultIndex, blockID), txErrIterFunc)
 }
+
+func BatchInsertTransactionResultErrorMessage(blockID flow.Identifier, transactionResultErrorMessage *flow.TransactionResultErrorMessage) func(batch *badger.WriteBatch) error {
+	return batchWrite(makePrefix(codeTransactionResultErrorMessage, blockID, transactionResultErrorMessage.TransactionID), transactionResultErrorMessage)
+}
+
+func BatchIndexTransactionResultErrorMessage(blockID flow.Identifier, txIndex uint32, transactionResultErrorMessage *flow.TransactionResultErrorMessage) func(batch *badger.WriteBatch) error {
+	return batchWrite(makePrefix(codeTransactionResultErrorMessageIndex, blockID, txIndex), transactionResultErrorMessage)
+}
+
+func RetrieveTransactionResultErrorMessage(blockID flow.Identifier, transactionID flow.Identifier, transactionResultErrorMessage *flow.TransactionResultErrorMessage) func(*badger.Txn) error {
+	return retrieve(makePrefix(codeTransactionResultErrorMessage, blockID, transactionID), transactionResultErrorMessage)
+}
+func RetrieveTransactionResultErrorMessageByIndex(blockID flow.Identifier, txIndex uint32, transactionResultErrorMessage *flow.TransactionResultErrorMessage) func(*badger.Txn) error {
+	return retrieve(makePrefix(codeTransactionResultErrorMessageIndex, blockID, txIndex), transactionResultErrorMessage)
+}
+
+// LookupTransactionResultErrorMessagesByBlockIDUsingIndex retrieves all tx results error messages for a block, by using
+// tx_index index. This correctly handles cases of duplicate transactions within block.
+func LookupTransactionResultErrorMessagesByBlockIDUsingIndex(blockID flow.Identifier, txResultErrorMessages *[]flow.TransactionResultErrorMessage) func(*badger.Txn) error {
+	txErrIterFunc := func() (checkFunc, createFunc, handleFunc) {
+		check := func(_ []byte) bool {
+			return true
+		}
+		var val flow.TransactionResultErrorMessage
+		create := func() interface{} {
+			return &val
+		}
+		handle := func() error {
+			*txResultErrorMessages = append(*txResultErrorMessages, val)
+			return nil
+		}
+		return check, create, handle
+	}
+
+	return traverse(makePrefix(codeTransactionResultErrorMessageIndex, blockID), txErrIterFunc)
+}
