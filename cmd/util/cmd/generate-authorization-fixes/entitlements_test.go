@@ -39,16 +39,24 @@ func TestFindMinimalAuthorization(t *testing.T) {
       entitlement E2
       entitlement E3
 
+      entitlement mapping M {}
+
       struct S {
           access(all) fun accessAll() {}
           access(self) fun accessSelf() {}
           access(contract) fun accessContract() {}
           access(account) fun accessAccount() {}
 
+          access(mapping M) let accessMapping: auth(mapping M) &Int
+
           access(E1) fun accessE1() {}
           access(E2) fun accessE2() {}
           access(E1, E2) fun accessE1AndE2() {}
           access(E1 | E2) fun accessE1OrE2() {}
+
+          init() {
+              self.accessMapping = &0
+          }
       }
 	`)
 	require.NoError(t, err)
@@ -58,7 +66,7 @@ func TestFindMinimalAuthorization(t *testing.T) {
 	e1 := RequireGlobalType(t, checker.Elaboration, "E1").(*sema.EntitlementType)
 	e2 := RequireGlobalType(t, checker.Elaboration, "E2").(*sema.EntitlementType)
 
-	t.Run("accessAll, accessSelf, accessContract, accessAccount", func(t *testing.T) {
+	t.Run("accessAll, accessSelf, accessContract, accessAccount, accessMapping", func(t *testing.T) {
 		t.Parallel()
 
 		authorization, unresolved := findMinimalAuthorization(
@@ -68,6 +76,7 @@ func TestFindMinimalAuthorization(t *testing.T) {
 				"accessSelf":     {},
 				"accessContract": {},
 				"accessAccount":  {},
+				"accessMapping":  {},
 				"undefined":      {},
 			},
 		)
@@ -77,9 +86,10 @@ func TestFindMinimalAuthorization(t *testing.T) {
 		)
 		assert.Equal(t,
 			map[string]error{
-				"accessSelf":     errors.New("member is inaccessible (access(self))"),
-				"accessContract": errors.New("member is inaccessible (access(contract))"),
-				"accessAccount":  errors.New("member is inaccessible (access(account))"),
+				"accessSelf":     errors.New("member is inaccessible: access(self)"),
+				"accessContract": errors.New("member is inaccessible: access(contract)"),
+				"accessAccount":  errors.New("member is inaccessible: access(account)"),
+				"accessMapping":  errors.New("member has entitlement map access: access(mapping M)"),
 				"undefined":      errors.New("member does not exist"),
 			},
 			unresolved,

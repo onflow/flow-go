@@ -66,14 +66,14 @@ func findMinimalAuthorization(
 
 		case *sema.EntitlementMapAccess:
 			unresolvedMembers[memberName] = fmt.Errorf(
-				"member requires entitlement map access: %s",
+				"member has entitlement map access: %s",
 				access.QualifiedKeyword(),
 			)
 
 		case sema.PrimitiveAccess:
 			if access != sema.PrimitiveAccess(ast.AccessAll) {
 				unresolvedMembers[memberName] = fmt.Errorf(
-					"member is inaccessible (%s)",
+					"member is inaccessible: %s",
 					access.QualifiedKeyword(),
 				)
 			}
