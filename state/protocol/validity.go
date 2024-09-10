@@ -2,11 +2,11 @@ package protocol
 
 import (
 	"fmt"
-	"github.com/onflow/flow-go/module/signature"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/factory"
 	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/module/signature"
 )
 
 // IsValidExtendingEpochSetup checks whether an EpochSetup service event being added to the state is valid.
