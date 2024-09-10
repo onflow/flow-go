@@ -165,7 +165,6 @@ func TestBootstrapInvalidEpochCommit(t *testing.T) {
 		_, result, _ := unittest.BootstrapFixture(participants)
 		setup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
 		commit := result.ServiceEvents[1].Event.(*flow.EpochCommit)
-		// replace entity in the index map so the size matches but with negative index.
 		nodeID := setup.Participants.Filter(filter.IsValidDKGParticipant)[0].NodeID
 		commit.DKGIndexMap[nodeID] = len(commit.DKGParticipantKeys) // change index so it's out of bound and not consecutive
 
