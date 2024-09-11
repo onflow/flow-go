@@ -3,10 +3,8 @@ package generate_authorization_fixes
 import (
 	"compress/gzip"
 	"encoding/json"
-	"fmt"
 	"io"
 	"os"
-	"sort"
 	"strings"
 	"sync"
 
@@ -17,7 +15,6 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/schollz/progressbar/v3"
 	"github.com/spf13/cobra"
-	"golang.org/x/exp/slices"
 
 	common2 "github.com/onflow/flow-go/cmd/util/common"
 	"github.com/onflow/flow-go/cmd/util/ledger/migrations"
@@ -34,7 +31,6 @@ var (
 	flagStateCommitment     string
 	flagOutputDirectory     string
 	flagChain               string
-	flagPublicLinkReport    string
 	flagLinkMigrationReport string
 	flagAddresses           string
 )
@@ -84,14 +80,6 @@ func init() {
 	_ = Cmd.MarkFlagRequired("chain")
 
 	Cmd.Flags().StringVar(
-		&flagPublicLinkReport,
-		"public-link-report",
-		"",
-		"Input public link report file name",
-	)
-	_ = Cmd.MarkFlagRequired("public-link-report")
-
-	Cmd.Flags().StringVar(
 		&flagLinkMigrationReport,
 		"link-migration-report",
 		"",
@@ -106,8 +94,6 @@ func init() {
 		"only generate fixes for given accounts (comma-separated hex-encoded addresses)",
 	)
 }
-
-const contractCountEstimate = 1000
 
 func run(*cobra.Command, []string) {
 
@@ -159,14 +145,12 @@ func run(*cobra.Command, []string) {
 	// Validate chain ID
 	_ = chainID.Chain()
 
-	publicLinkReportChan := make(chan PublicLinkReport, 1)
+	migratedPublicLinkSetChan := make(chan MigratedPublicLinkSet, 1)
 	go func() {
-		publicLinkReportChan <- readPublicLinkReport(addressFilter)
-	}()
-
-	publicLinkMigrationReportChan := make(chan PublicLinkMigrationReport, 1)
-	go func() {
-		publicLinkMigrationReportChan <- readLinkMigrationReport(addressFilter)
+		migratedPublicLinkSetChan <- readMigratedPublicLinkSet(
+			flagLinkMigrationReport,
+			addressFilter,
+		)
 	}()
 
 	registersByAccountChan := make(chan *registers.ByAccount, 1)
@@ -174,29 +158,21 @@ func run(*cobra.Command, []string) {
 		registersByAccountChan <- loadRegistersByAccount()
 	}()
 
-	publicLinkReport := <-publicLinkReportChan
-	publicLinkMigrationReport := <-publicLinkMigrationReportChan
+	migratedPublicLinkSet := <-migratedPublicLinkSetChan
 	registersByAccount := <-registersByAccountChan
-
-	checkingReporter := rwf.ReportWriter("contract-checking")
-	defer checkingReporter.Close()
-
-	checkContracts(
-		registersByAccount,
-		chainID,
-		checkingReporter,
-	)
 
 	fixReporter := rwf.ReportWriter("authorization-fixes")
 	defer fixReporter.Close()
 
 	authorizationFixGenerator := &AuthorizationFixGenerator{
-		registersByAccount:        registersByAccount,
-		chainID:                   chainID,
-		publicLinkReport:          publicLinkReport,
-		publicLinkMigrationReport: publicLinkMigrationReport,
-		reporter:                  fixReporter,
+		registersByAccount:    registersByAccount,
+		chainID:               chainID,
+		migratedPublicLinkSet: migratedPublicLinkSet,
+		reporter:              fixReporter,
 	}
+
+	log.Info().Msg("Generating authorization fixes ...")
+
 	if len(addressFilter) > 0 {
 		authorizationFixGenerator.generateFixesForAccounts(addressFilter)
 	} else {
@@ -242,106 +218,32 @@ func loadRegistersByAccount() *registers.ByAccount {
 	return registersByAccount
 }
 
-func readPublicLinkReport(addressFilter map[common.Address]struct{}) PublicLinkReport {
-	// Read public link report
+func readMigratedPublicLinkSet(path string, addressFilter map[common.Address]struct{}) MigratedPublicLinkSet {
 
-	publicLinkReportFile, err := os.Open(flagPublicLinkReport)
+	file, err := os.Open(path)
 	if err != nil {
-		log.Fatal().Err(err).Msgf("can't open link report: %s", flagPublicLinkReport)
+		log.Fatal().Err(err).Msgf("can't open link migration report: %s", path)
 	}
-	defer publicLinkReportFile.Close()
+	defer file.Close()
 
-	var publicLinkReportReader io.Reader = publicLinkReportFile
-	if isGzip(publicLinkReportFile) {
-		publicLinkReportReader, err = gzip.NewReader(publicLinkReportFile)
+	var reader io.Reader = file
+	if isGzip(file) {
+		reader, err = gzip.NewReader(file)
 		if err != nil {
-			log.Fatal().Err(err).Msgf("failed to create gzip reader for %s", flagPublicLinkReport)
+			log.Fatal().Err(err).Msgf("failed to create gzip reader for %s", path)
 		}
 	}
 
-	log.Info().Msgf("Reading public link report from %s ...", flagPublicLinkReport)
+	log.Info().Msgf("Reading link migration report from %s ...", path)
 
-	publicLinkReport, err := ReadPublicLinkReport(publicLinkReportReader, addressFilter)
+	migratedPublicLinkSet, err := ReadMigratedPublicLinkSet(reader, addressFilter)
 	if err != nil {
-		log.Fatal().Err(err).Msgf("failed to read public link report %s", flagPublicLinkReport)
+		log.Fatal().Err(err).Msgf("failed to read public link report: %s", path)
 	}
 
-	log.Info().Msgf("Read %d public link entries", len(publicLinkReport))
+	log.Info().Msgf("Read %d public link migration entries", len(migratedPublicLinkSet))
 
-	return publicLinkReport
-}
-
-func readLinkMigrationReport(addressFilter map[common.Address]struct{}) PublicLinkMigrationReport {
-	// Read link migration report
-
-	linkMigrationReportFile, err := os.Open(flagLinkMigrationReport)
-	if err != nil {
-		log.Fatal().Err(err).Msgf("can't open link migration report: %s", flagLinkMigrationReport)
-	}
-	defer linkMigrationReportFile.Close()
-
-	var linkMigrationReportReader io.Reader = linkMigrationReportFile
-	if isGzip(linkMigrationReportFile) {
-		linkMigrationReportReader, err = gzip.NewReader(linkMigrationReportFile)
-		if err != nil {
-			log.Fatal().Err(err).Msgf("failed to create gzip reader for %s", flagLinkMigrationReport)
-		}
-	}
-
-	log.Info().Msgf("Reading link migration report from %s ...", flagLinkMigrationReport)
-
-	publicLinkMigrationReport, err := ReadPublicLinkMigrationReport(linkMigrationReportReader, addressFilter)
-	if err != nil {
-		log.Fatal().Err(err).Msgf("failed to read public link report: %s", flagLinkMigrationReport)
-	}
-
-	log.Info().Msgf("Read %d public link migration entries", len(publicLinkMigrationReport))
-
-	return publicLinkMigrationReport
-}
-
-func checkContracts(
-	registersByAccount *registers.ByAccount,
-	chainID flow.ChainID,
-	reporter reporters.ReportWriter,
-) {
-	contracts, err := migrations.GatherContractsFromRegisters(registersByAccount, log.Logger)
-	if err != nil {
-		log.Fatal().Err(err)
-	}
-
-	programs := make(map[common.Location]*interpreter.Program, contractCountEstimate)
-
-	contractsForPrettyPrinting := make(map[common.Location][]byte, len(contracts))
-	for _, contract := range contracts {
-		contractsForPrettyPrinting[contract.Location] = contract.Code
-	}
-
-	log.Info().Msg("Checking contracts ...")
-
-	mr, err := migrations.NewInterpreterMigrationRuntime(
-		registersByAccount,
-		chainID,
-		migrations.InterpreterMigrationRuntimeConfig{},
-	)
-	if err != nil {
-		log.Fatal().Err(err)
-	}
-
-	for _, contract := range contracts {
-		migrations.CheckContract(
-			contract,
-			log.Logger,
-			mr,
-			contractsForPrettyPrinting,
-			false,
-			reporter,
-			nil,
-			programs,
-		)
-	}
-
-	log.Info().Msgf("Checked %d contracts ...", len(contracts))
+	return migratedPublicLinkSet
 }
 
 func jsonEncodeAuthorization(authorization interpreter.Authorization) string {
@@ -354,53 +256,33 @@ func jsonEncodeAuthorization(authorization interpreter.Authorization) string {
 }
 
 type fixEntitlementsEntry struct {
-	AccountCapabilityID
-	ReferencedType       interpreter.StaticType
-	OldAuthorization     interpreter.Authorization
-	NewAuthorization     interpreter.Authorization
-	OldAccessibleMembers []string
-	NewAccessibleMembers []string
-	UnresolvedMembers    map[string]error
+	CapabilityAddress common.Address
+	CapabilityID      uint64
+	ReferencedType    interpreter.StaticType
+	Authorization     interpreter.Authorization
 }
 
 var _ json.Marshaler = fixEntitlementsEntry{}
 
 func (e fixEntitlementsEntry) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
-		CapabilityAddress    string            `json:"capability_address"`
-		CapabilityID         uint64            `json:"capability_id"`
-		ReferencedType       string            `json:"referenced_type"`
-		OldAuthorization     string            `json:"old_authorization"`
-		NewAuthorization     string            `json:"new_authorization"`
-		OldAccessibleMembers []string          `json:"old_members"`
-		NewAccessibleMembers []string          `json:"new_members"`
-		UnresolvedMembers    map[string]string `json:"unresolved_members,omitempty"`
+		CapabilityAddress string `json:"capability_address"`
+		CapabilityID      uint64 `json:"capability_id"`
+		ReferencedType    string `json:"referenced_type"`
+		Authorization     string `json:"authorization"`
 	}{
-		CapabilityAddress:    e.Address.String(),
-		CapabilityID:         e.CapabilityID,
-		ReferencedType:       string(e.ReferencedType.ID()),
-		OldAuthorization:     jsonEncodeAuthorization(e.OldAuthorization),
-		NewAuthorization:     jsonEncodeAuthorization(e.NewAuthorization),
-		OldAccessibleMembers: e.OldAccessibleMembers,
-		NewAccessibleMembers: e.NewAccessibleMembers,
-		UnresolvedMembers:    jsonEncodeMemberErrorMap(e.UnresolvedMembers),
+		CapabilityAddress: e.CapabilityAddress.String(),
+		CapabilityID:      e.CapabilityID,
+		ReferencedType:    string(e.ReferencedType.ID()),
+		Authorization:     jsonEncodeAuthorization(e.Authorization),
 	})
 }
 
-func jsonEncodeMemberErrorMap(m map[string]error) map[string]string {
-	result := make(map[string]string, len(m))
-	for key, value := range m {
-		result[key] = value.Error()
-	}
-	return result
-}
-
 type AuthorizationFixGenerator struct {
-	registersByAccount        *registers.ByAccount
-	chainID                   flow.ChainID
-	publicLinkReport          PublicLinkReport
-	publicLinkMigrationReport PublicLinkMigrationReport
-	reporter                  reporters.ReportWriter
+	registersByAccount    *registers.ByAccount
+	chainID               flow.ChainID
+	migratedPublicLinkSet MigratedPublicLinkSet
+	reporter              reporters.ReportWriter
 }
 
 func (g *AuthorizationFixGenerator) generateFixesForAllAccounts() {
@@ -413,7 +295,7 @@ func (g *AuthorizationFixGenerator) generateFixesForAllAccounts() {
 		go func(address common.Address) {
 			defer wg.Done()
 			g.generateFixesForAccount(address)
-			progress.Add(1)
+			_ = progress.Add(1)
 		}(address)
 		return nil
 	})
@@ -422,7 +304,7 @@ func (g *AuthorizationFixGenerator) generateFixesForAllAccounts() {
 	}
 
 	wg.Wait()
-	progress.Finish()
+	_ = progress.Finish()
 }
 
 func (g *AuthorizationFixGenerator) generateFixesForAccounts(addresses map[common.Address]struct{}) {
@@ -434,12 +316,12 @@ func (g *AuthorizationFixGenerator) generateFixesForAccounts(addresses map[commo
 		go func(address common.Address) {
 			defer wg.Done()
 			g.generateFixesForAccount(address)
-			progress.Add(1)
+			_ = progress.Add(1)
 		}(address)
 	}
 
 	wg.Wait()
-	progress.Finish()
+	_ = progress.Finish()
 }
 
 func (g *AuthorizationFixGenerator) generateFixesForAccount(address common.Address) {
@@ -487,8 +369,7 @@ func (g *AuthorizationFixGenerator) generateFixesForAccount(address common.Addre
 
 		switch borrowType.Authorization.(type) {
 		case interpreter.EntitlementSetAuthorization:
-			g.maybeGenerateFixForCapabilityController(
-				mr.Interpreter,
+			g.maybeGenerateFixForEntitledCapabilityController(
 				address,
 				capabilityID,
 				borrowType,
@@ -535,207 +416,28 @@ func newEntitlementSetAuthorizationFromTypeIDs(
 	)
 }
 
-func (g *AuthorizationFixGenerator) maybeGenerateFixForCapabilityController(
-	inter *interpreter.Interpreter,
+func (g *AuthorizationFixGenerator) maybeGenerateFixForEntitledCapabilityController(
 	capabilityAddress common.Address,
 	capabilityID uint64,
 	borrowType *interpreter.ReferenceStaticType,
 ) {
-	// Only fix the entitlements if the capability controller was migrated from a public link
-	publicPathIdentifier := g.capabilityControllerPublicPathIdentifier(capabilityAddress, capabilityID)
-	if publicPathIdentifier == "" {
-		return
-	}
-
-	linkInfo := g.publicPathLinkInfo(capabilityAddress, publicPathIdentifier)
-	if linkInfo.BorrowType == "" {
-		log.Warn().Msgf(
-			"missing link info for /public/%s in account %s",
-			publicPathIdentifier,
-			capabilityAddress.HexWithPrefix(),
-		)
-		return
-	}
-
-	// Compare previously accessible members with new accessible members.
-	// They should be the same.
-
-	oldAccessibleMembers := linkInfo.AccessibleMembers
-	if oldAccessibleMembers == nil {
-		log.Warn().Msgf(
-			"missing old accessible members for for /public/%s in account %s",
-			publicPathIdentifier,
-			capabilityAddress.HexWithPrefix(),
-		)
-		return
-	}
-
-	semaBorrowType, err := convertStaticToSemaType(inter, borrowType)
-	if err != nil {
-		log.Warn().Err(err).Msgf(
-			"failed to get new accessible members for capability controller %d in account %s",
-			capabilityID,
-			capabilityAddress.HexWithPrefix(),
-		)
-		return
-	}
-
-	newAccessibleMembers := getAccessibleMembers(semaBorrowType)
-
-	sort.Strings(oldAccessibleMembers)
-	sort.Strings(newAccessibleMembers)
-
-	if slices.Equal(oldAccessibleMembers, newAccessibleMembers) {
-		// Nothing to fix
-		return
-	}
-
-	oldAccessibleMemberSet := make(map[string]struct{})
-	for _, memberName := range oldAccessibleMembers {
-		oldAccessibleMemberSet[memberName] = struct{}{}
-	}
-
-	newAccessibleMemberSet := make(map[string]struct{})
-	for _, memberName := range newAccessibleMembers {
-		newAccessibleMemberSet[memberName] = struct{}{}
-	}
-
-	membersAdded, membersRemoved := sortedDiffStringSets(
-		oldAccessibleMemberSet,
-		newAccessibleMemberSet,
-	)
-
-	log.Info().Msgf(
-		"member mismatch for capability controller %d in account %s: expected %v, got %v (added: %v, removed: %v)",
-		capabilityID,
-		capabilityAddress.HexWithPrefix(),
-		oldAccessibleMembers,
-		newAccessibleMembers,
-		membersAdded,
-		membersRemoved,
-	)
-
-	newAuthorization, unresolvedMembers := findMinimalAuthorization(
-		semaBorrowType,
-		oldAccessibleMemberSet,
-	)
-
-	if len(unresolvedMembers) > 0 {
-		// TODO: format unresolved members
-		log.Warn().Msgf(
-			"failed to find minimal entitlement set for capability controller %d in account %s: unresolved members: %v",
-			capabilityID,
-			capabilityAddress.HexWithPrefix(),
-			unresolvedMembers,
-		)
-
-		// NOTE: still continue with the fix,
-		// we should not leave the capability controller vulnerable
-	}
-
-	// If the old authorization was `Insert, Mutate, Remove`,
-	// the calculated minimal authorization is `Insert, Remove`,
-	// but we ignore the difference, and keep the Mutate entitlement.
-
-	if newEntitlementSetAuthorization, ok := newAuthorization.(interpreter.EntitlementSetAuthorization); ok {
-		if newEntitlementSetAuthorization.Entitlements.Contains(sema.InsertType.ID()) &&
-			newEntitlementSetAuthorization.Entitlements.Contains(sema.RemoveType.ID()) {
-
-			newEntitlementSetAuthorization.Entitlements.Set(sema.MutateType.ID(), struct{}{})
-		}
-	}
-
-	// Only fix the authorization if it is different from the old one.
-	oldAuthorization := borrowType.Authorization
-	if newAuthorization.Equal(oldAuthorization) {
-
-		// Nothing to fix
+	// Only remove the authorization if the capability controller was migrated from a public link
+	_, ok := g.migratedPublicLinkSet[AccountCapabilityID{
+		Address:      capabilityAddress,
+		CapabilityID: capabilityID,
+	}]
+	if !ok {
 		return
 	}
 
 	g.reporter.Write(fixEntitlementsEntry{
-		AccountCapabilityID: AccountCapabilityID{
-			Address:      capabilityAddress,
-			CapabilityID: capabilityID,
-		},
-		ReferencedType:       borrowType.ReferencedType,
-		OldAuthorization:     oldAuthorization,
-		NewAuthorization:     newAuthorization,
-		OldAccessibleMembers: oldAccessibleMembers,
-		NewAccessibleMembers: newAccessibleMembers,
-		UnresolvedMembers:    unresolvedMembers,
+		CapabilityAddress: capabilityAddress,
+		CapabilityID:      capabilityID,
+		ReferencedType:    borrowType.ReferencedType,
+		Authorization:     borrowType.Authorization,
 	})
-
-}
-
-func convertStaticToSemaType(
-	inter *interpreter.Interpreter,
-	staticType interpreter.StaticType,
-) (
-	semaType sema.Type,
-	err error,
-) {
-
-	defer func() {
-		if r := recover(); r != nil {
-			err = fmt.Errorf("panic: %v", r)
-		}
-	}()
-
-	semaType, err = inter.ConvertStaticToSemaType(staticType)
-	if err != nil {
-		return nil, fmt.Errorf(
-			"failed to convert static type %s to semantic type: %w",
-			staticType.ID(),
-			err,
-		)
-	}
-	if semaType == nil {
-		return nil, fmt.Errorf(
-			"failed to convert static type %s to semantic type",
-			staticType.ID(),
-		)
-	}
-
-	return semaType, nil
-}
-
-func (g *AuthorizationFixGenerator) capabilityControllerPublicPathIdentifier(
-	address common.Address,
-	capabilityID uint64,
-) string {
-	return g.publicLinkMigrationReport[AccountCapabilityID{
-		Address:      address,
-		CapabilityID: capabilityID,
-	}]
-}
-
-func (g *AuthorizationFixGenerator) publicPathLinkInfo(
-	address common.Address,
-	publicPathIdentifier string,
-) LinkInfo {
-	return g.publicLinkReport[AddressPublicPath{
-		Address:    address,
-		Identifier: publicPathIdentifier,
-	}]
 }
 
 func isGzip(file *os.File) bool {
 	return strings.HasSuffix(file.Name(), ".gz")
-}
-
-func sortedDiffStringSets(a, b map[string]struct{}) (added, removed []string) {
-	for key := range a {
-		if _, ok := b[key]; !ok {
-			removed = append(removed, key)
-		}
-	}
-	for key := range b {
-		if _, ok := a[key]; !ok {
-			added = append(added, key)
-		}
-	}
-	sort.Strings(added)
-	sort.Strings(removed)
-	return
 }
