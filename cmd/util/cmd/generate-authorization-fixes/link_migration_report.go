@@ -15,23 +15,23 @@ type AccountCapabilityID struct {
 	CapabilityID uint64
 }
 
-// PublicLinkMigrationReport is a mapping from account capability controller IDs to public path identifier.
-type PublicLinkMigrationReport map[AccountCapabilityID]string
+// MigratedPublicLinkSet is a set of capability controller IDs which were migrated from public links.
+type MigratedPublicLinkSet map[AccountCapabilityID]struct{}
 
-// ReadPublicLinkMigrationReport reads a link migration report from the given reader,
-// and extracts the public paths that were migrated.
+// ReadMigratedPublicLinkSet reads a link migration report from the given reader,
+// and returns a set of all capability controller IDs which were migrated from public links.
 //
 // The report is expected to be a JSON array of objects with the following structure:
 //
 //	[
 //		{"kind":"link-migration-success","account_address":"0x1","path":"/public/foo","capability_id":1},
 //	]
-func ReadPublicLinkMigrationReport(
+func ReadMigratedPublicLinkSet(
 	reader io.Reader,
 	filter map[common.Address]struct{},
-) (PublicLinkMigrationReport, error) {
+) (MigratedPublicLinkSet, error) {
 
-	mapping := PublicLinkMigrationReport{}
+	set := MigratedPublicLinkSet{}
 
 	dec := json.NewDecoder(reader)
 
@@ -59,8 +59,7 @@ func ReadPublicLinkMigrationReport(
 			continue
 		}
 
-		identifier, ok := strings.CutPrefix(entry.Path, "/public/")
-		if !ok {
+		if !strings.HasPrefix(entry.Path, "/public/") {
 			continue
 		}
 
@@ -75,11 +74,11 @@ func ReadPublicLinkMigrationReport(
 			}
 		}
 
-		key := AccountCapabilityID{
+		accountCapabilityID := AccountCapabilityID{
 			Address:      address,
 			CapabilityID: entry.CapabilityID,
 		}
-		mapping[key] = identifier
+		set[accountCapabilityID] = struct{}{}
 	}
 
 	token, err = dec.Token()
@@ -90,5 +89,5 @@ func ReadPublicLinkMigrationReport(
 		return nil, fmt.Errorf("expected end of array, got %s", token)
 	}
 
-	return mapping, nil
+	return set, nil
 }
