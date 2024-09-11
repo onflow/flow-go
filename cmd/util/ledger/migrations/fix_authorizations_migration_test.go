@@ -65,14 +65,10 @@ func TestFixAuthorizationsMigration(t *testing.T) {
 
 	const contractCode = `
       access(all) contract Test {
-          access(all) entitlement E1
-          access(all) entitlement E2
 
-          access(all) struct S {
-              access(E1) fun f1() {}
-              access(E2) fun f2() {}
-              access(all) fun f3() {}
-          }
+          access(all) entitlement E
+
+          access(all) struct S {}
       }
     `
 
@@ -104,29 +100,41 @@ func TestFixAuthorizationsMigration(t *testing.T) {
                   prepare(signer: auth(Storage, Capabilities) &Account) {
                       signer.storage.save(Test.S(), to: /storage/s)
 
-                      // Capability 1 was a public, unauthorized capability.
-                      // It should lose entitlement E2
-                      let cap1 = signer.capabilities.storage.issue<auth(Test.E1, Test.E2) &Test.S>(/storage/s)
+                      // Capability 1 was a public, unauthorized capability, which is now authorized.
+                      // It should lose its entitlement
+                      let cap1 = signer.capabilities.storage.issue<auth(Test.E) &Test.S>(/storage/s)
                       assert(cap1.borrow() != nil)
-                      signer.capabilities.publish(cap1, at: /public/s)
+                      signer.capabilities.publish(cap1, at: /public/s1)
 
-                      // Capability 2 was a public, unauthorized capability, stored nested in storage.
-                      // It should lose entitlement E2
-                      let cap2 = signer.capabilities.storage.issue<auth(Test.E1, Test.E2) &Test.S>(/storage/s)
+                      // Capability 2 was a public, unauthorized capability, which is now authorized.
+                      // It is currently only stored, nested, in storage, and is not published.
+                      // It should lose its entitlement
+                      let cap2 = signer.capabilities.storage.issue<auth(Test.E) &Test.S>(/storage/s)
                       assert(cap2.borrow() != nil)
                       signer.storage.save([cap2], to: /storage/caps2)
 
-                      // Capability 3 was a private, authorized capability, stored nested in storage.
-                      // It should keep entitlement E2
-                      let cap3 = signer.capabilities.storage.issue<auth(Test.E1, Test.E2) &Test.S>(/storage/s)
+                      // Capability 3 was a private, authorized capability.
+                      // It is currently only stored, nested, in storage, and is not published.
+                      // It should keep its entitlement
+                      let cap3 = signer.capabilities.storage.issue<auth(Test.E) &Test.S>(/storage/s)
                       assert(cap3.borrow() != nil)
                       signer.storage.save([cap3], to: /storage/caps3)
 
-	                  // Capability 4 was a capability with unavailable accessible members, stored nested in storage.
-	                  // It should keep entitlement E2
-                      let cap4 = signer.capabilities.storage.issue<auth(Test.E1, Test.E2) &Test.S>(/storage/s)
+                      // Capability 4 was a private, authorized capability.
+                      // It is currently both stored, nested, in storage, and is published.
+                      // It should keep its entitlement
+                      let cap4 = signer.capabilities.storage.issue<auth(Test.E) &Test.S>(/storage/s)
                       assert(cap4.borrow() != nil)
                       signer.storage.save([cap4], to: /storage/caps4)
+                      signer.capabilities.publish(cap4, at: /public/s4)
+
+                      // Capability 5 was a public, unauthorized capability, which is still unauthorized.
+                      // It is currently both stored, nested, in storage, and is published.
+                      // There is no need to fix it.
+                      let cap5 = signer.capabilities.storage.issue<&Test.S>(/storage/s)
+                      assert(cap5.borrow() != nil)
+                      signer.storage.save([cap5], to: /storage/caps5)
+                      signer.capabilities.publish(cap5, at: /public/s5)
                   }
               }
             `,
@@ -151,28 +159,15 @@ func TestFixAuthorizationsMigration(t *testing.T) {
 		NWorker: nWorker,
 	}
 
-	testContractLocation := common.AddressLocation{
-		Address: common.Address(address),
-		Name:    "Test",
-	}
-	e1TypeID := testContractLocation.TypeID(nil, "Test.E1")
-
-	fixedAuthorization := newEntitlementSetAuthorizationFromTypeIDs(
-		[]common.TypeID{
-			e1TypeID,
-		},
-		sema.Conjunction,
-	)
-
-	fixes := map[AccountCapabilityID]interpreter.Authorization{
+	fixes := AuthorizationFixes{
 		AccountCapabilityID{
 			Address:      common.Address(address),
 			CapabilityID: 1,
-		}: fixedAuthorization,
+		}: {},
 		AccountCapabilityID{
 			Address:      common.Address(address),
 			CapabilityID: 2,
-		}: fixedAuthorization,
+		}: {},
 	}
 
 	migrations := NewFixAuthorizationsMigrations(
@@ -208,16 +203,14 @@ func TestFixAuthorizationsMigration(t *testing.T) {
 					Key:     "cap_con",
 					Address: common.Address(address),
 				},
-				CapabilityID:     1,
-				NewAuthorization: fixedAuthorization,
+				CapabilityID: 1,
 			},
 			capabilityControllerAuthorizationFixedEntry{
 				StorageKey: interpreter.StorageKey{
 					Key:     "cap_con",
 					Address: common.Address(address),
 				},
-				CapabilityID:     2,
-				NewAuthorization: fixedAuthorization,
+				CapabilityID: 2,
 			},
 			capabilityAuthorizationFixedEntry{
 				StorageKey: interpreter.StorageKey{
@@ -226,7 +219,6 @@ func TestFixAuthorizationsMigration(t *testing.T) {
 				},
 				CapabilityAddress: common.Address(address),
 				CapabilityID:      1,
-				NewAuthorization:  fixedAuthorization,
 			},
 			capabilityAuthorizationFixedEntry{
 				StorageKey: interpreter.StorageKey{
@@ -235,7 +227,6 @@ func TestFixAuthorizationsMigration(t *testing.T) {
 				},
 				CapabilityAddress: common.Address(address),
 				CapabilityID:      2,
-				NewAuthorization:  fixedAuthorization,
 			},
 		},
 		entries,
@@ -249,31 +240,33 @@ func TestFixAuthorizationsMigration(t *testing.T) {
 		fmt.Sprintf(
 			//language=Cadence
 			`
-              import Test from %s
+	         import Test from %s
 
-              access(all)
-              fun main() {
-                  let account = getAuthAccount<auth(Storage) &Account>(%[1]s)
-                  // NOTE: capability can NOT be borrowed with E2 anymore
-                  assert(account.capabilities.borrow<auth(Test.E1, Test.E2) &Test.S>(/public/s) == nil)
-                  assert(account.capabilities.borrow<auth(Test.E1) &Test.S>(/public/s) != nil)
+	         access(all)
+	         fun main() {
+	             let account = getAuthAccount<auth(Storage) &Account>(%[1]s)
+	             // NOTE: capability can NOT be borrowed with E anymore
+	             assert(account.capabilities.borrow<auth(Test.E) &Test.S>(/public/s1) == nil)
+	             assert(account.capabilities.borrow<&Test.S>(/public/s1) != nil)
 
-                  let caps2 = account.storage.copy<[Capability]>(from: /storage/caps2)!
-                  // NOTE: capability can NOT be borrowed with E2 anymore
-                  assert(caps2[0].borrow<auth(Test.E1, Test.E2) &Test.S>() == nil)
-                  assert(caps2[0].borrow<auth(Test.E1) &Test.S>() != nil)
+	             let caps2 = account.storage.copy<[Capability]>(from: /storage/caps2)!
+	             // NOTE: capability can NOT be borrowed with E anymore
+	             assert(caps2[0].borrow<auth(Test.E) &Test.S>() == nil)
+	             assert(caps2[0].borrow<&Test.S>() != nil)
 
-                  let caps3 = account.storage.copy<[Capability]>(from: /storage/caps3)!
-                  // NOTE: capability can still be borrowed with E2
-                  assert(caps3[0].borrow<auth(Test.E1, Test.E2) &Test.S>() != nil)
-                  assert(caps3[0].borrow<auth(Test.E1) &Test.S>() != nil)
+	             let caps3 = account.storage.copy<[Capability]>(from: /storage/caps3)!
+	             // NOTE: capability can still be borrowed with E
+	             assert(caps3[0].borrow<auth(Test.E) &Test.S>() != nil)
+	             assert(caps3[0].borrow<&Test.S>() != nil)
 
-                  let caps4 = account.storage.copy<[Capability]>(from: /storage/caps4)!
-                  // NOTE: capability can still be borrowed with E2
-                  assert(caps4[0].borrow<auth(Test.E1, Test.E2) &Test.S>() != nil)
-                  assert(caps4[0].borrow<auth(Test.E1) &Test.S>() != nil)
-              }
-            `,
+	             let caps4 = account.storage.copy<[Capability]>(from: /storage/caps4)!
+	             // NOTE: capability can still be borrowed with E
+	             assert(account.capabilities.borrow<auth(Test.E) &Test.S>(/public/s4) != nil)
+	             assert(account.capabilities.borrow<&Test.S>(/public/s4) != nil)
+	             assert(caps4[0].borrow<auth(Test.E) &Test.S>() != nil)
+	             assert(caps4[0].borrow<&Test.S>() != nil)
+	         }
+	       `,
 			address.HexWithPrefix(),
 		),
 	)
@@ -285,9 +278,9 @@ func TestReadAuthorizationFixes(t *testing.T) {
 
 	validContents := `
       [
-        {"capability_address":"01","capability_id":4,"new_authorization":""},
-        {"capability_address":"02","capability_id":5,"new_authorization":"A.0000000000000001.Foo.Bar"},
-        {"capability_address":"03","capability_id":6,"new_authorization":"A.0000000000000001.Foo.Bar,A.0000000000000001.Foo.Baz"}
+        {"capability_address":"01","capability_id":4},
+        {"capability_address":"02","capability_id":5},
+        {"capability_address":"03","capability_id":6}
       ]
     `
 
@@ -305,26 +298,15 @@ func TestReadAuthorizationFixes(t *testing.T) {
 				{
 					Address:      common.MustBytesToAddress([]byte{0x1}),
 					CapabilityID: 4,
-				}: interpreter.UnauthorizedAccess,
+				}: {},
 				{
 					Address:      common.MustBytesToAddress([]byte{0x2}),
 					CapabilityID: 5,
-				}: newEntitlementSetAuthorizationFromTypeIDs(
-					[]common.TypeID{
-						"A.0000000000000001.Foo.Bar",
-					},
-					sema.Conjunction,
-				),
+				}: {},
 				{
 					Address:      common.MustBytesToAddress([]byte{0x3}),
 					CapabilityID: 6,
-				}: newEntitlementSetAuthorizationFromTypeIDs(
-					[]common.TypeID{
-						"A.0000000000000001.Foo.Bar",
-						"A.0000000000000001.Foo.Baz",
-					},
-					sema.Conjunction,
-				),
+				}: {},
 			},
 			mapping,
 		)
@@ -352,33 +334,13 @@ func TestReadAuthorizationFixes(t *testing.T) {
 				{
 					Address:      common.MustBytesToAddress([]byte{0x1}),
 					CapabilityID: 4,
-				}: interpreter.UnauthorizedAccess,
+				}: {},
 				{
 					Address:      common.MustBytesToAddress([]byte{0x3}),
 					CapabilityID: 6,
-				}: newEntitlementSetAuthorizationFromTypeIDs(
-					[]common.TypeID{
-						"A.0000000000000001.Foo.Bar",
-						"A.0000000000000001.Foo.Baz",
-					},
-					sema.Conjunction,
-				),
+				}: {},
 			},
 			mapping,
 		)
-	})
-
-	t.Run("invalid disjunction entitlement set authorization", func(t *testing.T) {
-
-		t.Parallel()
-
-		reader := strings.NewReader(`
-          [
-            {"capability_address":"03","capability_id":6,"new_authorization":"A.0000000000000001.Foo.Bar|A.0000000000000001.Foo.Baz"}
-          ]
-        `)
-
-		_, err := ReadAuthorizationFixes(reader, nil)
-		require.ErrorContains(t, err, "invalid disjunction entitlement set authorization")
 	})
 }

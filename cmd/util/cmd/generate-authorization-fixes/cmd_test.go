@@ -1,7 +1,6 @@
 package generate_authorization_fixes
 
 import (
-	"errors"
 	"fmt"
 	"testing"
 
@@ -83,8 +82,6 @@ func TestGenerateAuthorizationFixes(t *testing.T) {
 	const chainID = flow.Emulator
 	chain := chainID.Chain()
 
-	const nWorker = 2
-
 	address, err := chain.AddressAtIndex(1000)
 	require.NoError(t, err)
 
@@ -112,14 +109,10 @@ func TestGenerateAuthorizationFixes(t *testing.T) {
 
 	const contractCode = `
       access(all) contract Test {
-          access(all) entitlement E1
-          access(all) entitlement E2
 
-          access(all) struct S {
-              access(E1) fun f1() {}
-              access(E2) fun f2() {}
-              access(all) fun f3() {}
-          }
+          access(all) entitlement E
+
+          access(all) struct S {}
       }
     `
 
@@ -149,28 +142,36 @@ func TestGenerateAuthorizationFixes(t *testing.T) {
 
               transaction {
                   prepare(signer: auth(Storage, Capabilities) &Account) {
-                      // Capability 1 was a public, unauthorized capability.
+                      // Capability 1 was a public, unauthorized capability, which is now authorized.
                       // It should lose its entitlement
-                      let cap1 = signer.capabilities.storage.issue<auth(Test.E1, Test.E2) &Test.S>(/storage/s)
-                      signer.capabilities.publish(cap1, at: /public/s)
+                      let cap1 = signer.capabilities.storage.issue<auth(Test.E) &Test.S>(/storage/s)
+                      signer.capabilities.publish(cap1, at: /public/s1)
 
-                      // Capability 2 was a public, unauthorized capability, stored nested in storage.
+                      // Capability 2 was a public, unauthorized capability, which is now authorized.
+                      // It is currently only stored, nested, in storage, and is not published.
                       // It should lose its entitlement
-                      let cap2 = signer.capabilities.storage.issue<auth(Test.E1, Test.E2) &Test.S>(/storage/s)
+                      let cap2 = signer.capabilities.storage.issue<auth(Test.E) &Test.S>(/storage/s)
                       signer.storage.save([cap2], to: /storage/caps2)
 
-                      // Capability 3 was a private, authorized capability, stored nested in storage.
+                      // Capability 3 was a private, authorized capability.
+                      // It is currently only stored, nested, in storage, and is not published.
                       // It should keep its entitlement
-                      let cap3 = signer.capabilities.storage.issue<auth(Test.E1, Test.E2) &Test.S>(/storage/s)
+                      let cap3 = signer.capabilities.storage.issue<auth(Test.E) &Test.S>(/storage/s)
                       signer.storage.save([cap3], to: /storage/caps3)
 
-	                  // Capability 4 was a capability with unavailable accessible members, stored nested in storage.
-	                  // It should keep its entitlement
-                      let cap4 = signer.capabilities.storage.issue<auth(Test.E1, Test.E2) &Test.S>(/storage/s)
+                      // Capability 4 was a private, authorized capability.
+                      // It is currently both stored, nested, in storage, and is published.
+                      // It should keep its entitlement
+                      let cap4 = signer.capabilities.storage.issue<auth(Test.E) &Test.S>(/storage/s)
                       signer.storage.save([cap4], to: /storage/caps4)
+                      signer.capabilities.publish(cap4, at: /public/s4)
 
-                      let cap5 = signer.capabilities.storage.issue<auth(Insert,Mutate,Remove) &{String:String}>(/storage/dict)
-                      signer.capabilities.publish(cap5, at: /public/dict)
+                      // Capability 5 was a public, unauthorized capability, which is still unauthorized.
+                      // It is currently both stored, nested, in storage, and is published.
+                      // There is no need to fix it.
+                      let cap5 = signer.capabilities.storage.issue<&Test.S>(/storage/s)
+                      signer.storage.save([cap5], to: /storage/caps5)
+                      signer.capabilities.publish(cap5, at: /public/s5)
                   }
               }
             `,
@@ -187,164 +188,69 @@ func TestGenerateAuthorizationFixes(t *testing.T) {
 	err = runSetupTx(registersByAccount)
 	require.NoError(t, err)
 
-	oldAccessibleMembers := []string{
-		"f1",
-		"f3",
-		"forEachAttachment",
-		"getType",
-		"isInstance",
-		"undefined",
-	}
-
-	newAccessibleMembers := []string{
-		"f1",
-		"f2",
-		"f3",
-		"forEachAttachment",
-		"getType",
-		"isInstance",
-	}
-
 	testContractLocation := common.AddressLocation{
 		Address: common.Address(address),
 		Name:    "Test",
 	}
-	borrowTypeID := testContractLocation.TypeID(nil, "Test.S")
 
-	publicLinkReport := PublicLinkReport{
-		{
-			Address:    common.Address(address),
-			Identifier: "s",
-		}: {
-			BorrowType:        borrowTypeID,
-			AccessibleMembers: oldAccessibleMembers,
-		},
-		{
-			Address:    common.Address(address),
-			Identifier: "s2",
-		}: {
-			BorrowType:        borrowTypeID,
-			AccessibleMembers: oldAccessibleMembers,
-		},
-		{
-			Address:    common.Address(address),
-			Identifier: "s4",
-		}: {
-			BorrowType:        borrowTypeID,
-			AccessibleMembers: nil,
-		},
-		{
-			Address:    common.Address(address),
-			Identifier: "dict",
-		}: {
-			BorrowType: "{String:String}",
-			AccessibleMembers: []string{
-				"containsKey",
-				"forEachAttachment",
-				"forEachKey",
-				"getType",
-				"insert",
-				"isInstance",
-				"keys",
-				"length",
-				"remove",
-				"values",
-			},
-		},
-	}
-
-	publicLinkMigrationReport := PublicLinkMigrationReport{
+	migratedPublicLinkSet := MigratedPublicLinkSet{
 		{
 			Address:      common.Address(address),
 			CapabilityID: 1,
-		}: "s",
+		}: {},
 		{
 			Address:      common.Address(address),
 			CapabilityID: 2,
-		}: "s2",
-		{
-			Address:      common.Address(address),
-			CapabilityID: 4,
-		}: "s4",
+		}: {},
 		{
 			Address:      common.Address(address),
 			CapabilityID: 5,
-		}: "dict",
+		}: {},
 	}
 
 	reporter := &testReportWriter{}
 
 	generator := &AuthorizationFixGenerator{
-		registersByAccount:        registersByAccount,
-		chainID:                   chainID,
-		publicLinkReport:          publicLinkReport,
-		publicLinkMigrationReport: publicLinkMigrationReport,
-		reporter:                  reporter,
+		registersByAccount:    registersByAccount,
+		chainID:               chainID,
+		migratedPublicLinkSet: migratedPublicLinkSet,
+		reporter:              reporter,
 	}
 	generator.generateFixesForAllAccounts()
 
-	e1TypeID := testContractLocation.TypeID(nil, "Test.E1")
-	e2TypeID := testContractLocation.TypeID(nil, "Test.E2")
+	eTypeID := testContractLocation.TypeID(nil, "Test.E")
 
 	assert.Equal(t,
 		[]any{
 			fixEntitlementsEntry{
-				AccountCapabilityID: AccountCapabilityID{
-					Address:      common.Address(address),
-					CapabilityID: 1,
-				},
+				CapabilityAddress: common.Address(address),
+				CapabilityID:      1,
 				ReferencedType: interpreter.NewCompositeStaticTypeComputeTypeID(
 					nil,
 					testContractLocation,
 					"Test.S",
 				),
-				OldAuthorization: newEntitlementSetAuthorizationFromTypeIDs(
+				Authorization: newEntitlementSetAuthorizationFromTypeIDs(
 					[]common.TypeID{
-						e1TypeID,
-						e2TypeID,
+						eTypeID,
 					},
 					sema.Conjunction,
 				),
-				NewAuthorization: newEntitlementSetAuthorizationFromTypeIDs(
-					[]common.TypeID{
-						e1TypeID,
-					},
-					sema.Conjunction,
-				),
-				OldAccessibleMembers: oldAccessibleMembers,
-				NewAccessibleMembers: newAccessibleMembers,
-				UnresolvedMembers: map[string]error{
-					"undefined": errors.New("member does not exist"),
-				},
 			},
 			fixEntitlementsEntry{
-				AccountCapabilityID: AccountCapabilityID{
-					Address:      common.Address(address),
-					CapabilityID: 2,
-				},
+				CapabilityAddress: common.Address(address),
+				CapabilityID:      2,
 				ReferencedType: interpreter.NewCompositeStaticTypeComputeTypeID(
 					nil,
 					testContractLocation,
 					"Test.S",
 				),
-				OldAuthorization: newEntitlementSetAuthorizationFromTypeIDs(
+				Authorization: newEntitlementSetAuthorizationFromTypeIDs(
 					[]common.TypeID{
-						e1TypeID,
-						e2TypeID,
+						eTypeID,
 					},
 					sema.Conjunction,
 				),
-				NewAuthorization: newEntitlementSetAuthorizationFromTypeIDs(
-					[]common.TypeID{
-						e1TypeID,
-					},
-					sema.Conjunction,
-				),
-				OldAccessibleMembers: oldAccessibleMembers,
-				NewAccessibleMembers: newAccessibleMembers,
-				UnresolvedMembers: map[string]error{
-					"undefined": errors.New("member does not exist"),
-				},
 			},
 		},
 		reporter.entries,

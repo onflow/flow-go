@@ -24,19 +24,19 @@ func TestReadPublicLinkMigrationReport(t *testing.T) {
 
 		reader := strings.NewReader(contents)
 
-		mapping, err := ReadPublicLinkMigrationReport(reader, nil)
+		mapping, err := ReadMigratedPublicLinkSet(reader, nil)
 		require.NoError(t, err)
 
 		require.Equal(t,
-			PublicLinkMigrationReport{
+			MigratedPublicLinkSet{
 				{
 					Address:      common.MustBytesToAddress([]byte{0x1}),
 					CapabilityID: 1,
-				}: "foo",
+				}: struct{}{},
 				{
 					Address:      common.MustBytesToAddress([]byte{0x3}),
 					CapabilityID: 3,
-				}: "baz",
+				}: struct{}{},
 			},
 			mapping,
 		)
@@ -49,7 +49,7 @@ func TestReadPublicLinkMigrationReport(t *testing.T) {
 
 		reader := strings.NewReader(contents)
 
-		mapping, err := ReadPublicLinkMigrationReport(
+		mapping, err := ReadMigratedPublicLinkSet(
 			reader,
 			map[common.Address]struct{}{
 				address1: {},
@@ -58,11 +58,11 @@ func TestReadPublicLinkMigrationReport(t *testing.T) {
 		require.NoError(t, err)
 
 		require.Equal(t,
-			PublicLinkMigrationReport{
+			MigratedPublicLinkSet{
 				{
 					Address:      address1,
 					CapabilityID: 1,
-				}: "foo",
+				}: struct{}{},
 			},
 			mapping,
 		)

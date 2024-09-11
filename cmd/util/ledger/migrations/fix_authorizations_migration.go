@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"strings"
 
 	"github.com/onflow/cadence/migrations"
 	"github.com/onflow/cadence/runtime"
@@ -32,18 +31,16 @@ type FixAuthorizationsMigrationReporter interface {
 		storageKey interpreter.StorageKey,
 		capabilityAddress common.Address,
 		capabilityID uint64,
-		newAuthorization interpreter.Authorization,
 	)
 	MigratedCapabilityController(
 		storageKey interpreter.StorageKey,
 		capabilityID uint64,
-		newAuthorization interpreter.Authorization,
 	)
 }
 
 type FixAuthorizationsMigration struct {
-	Reporter          FixAuthorizationsMigrationReporter
-	NewAuthorizations map[AccountCapabilityID]interpreter.Authorization
+	Reporter           FixAuthorizationsMigrationReporter
+	AuthorizationFixes AuthorizationFixes
 }
 
 var _ migrations.ValueMigration = &FixAuthorizationsMigration{}
@@ -71,12 +68,12 @@ func (m *FixAuthorizationsMigration) Migrate(
 		capabilityAddress := common.Address(value.Address())
 		capabilityID := uint64(value.ID)
 
-		newAuthorization := m.NewAuthorizations[AccountCapabilityID{
+		_, ok := m.AuthorizationFixes[AccountCapabilityID{
 			Address:      capabilityAddress,
 			CapabilityID: capabilityID,
 		}]
-		if newAuthorization == nil {
-			// Nothing to fix for this capability
+		if !ok {
+			// This capability does not need to be fixed
 			return nil, nil
 		}
 
@@ -102,7 +99,7 @@ func (m *FixAuthorizationsMigration) Migrate(
 
 		newBorrowType := interpreter.NewReferenceStaticType(
 			nil,
-			newAuthorization,
+			interpreter.UnauthorizedAccess,
 			oldBorrowReferenceType.ReferencedType,
 		)
 		newCapabilityValue := interpreter.NewUnmeteredCapabilityValue(
@@ -115,7 +112,6 @@ func (m *FixAuthorizationsMigration) Migrate(
 			storageKey,
 			capabilityAddress,
 			capabilityID,
-			newAuthorization,
 		)
 
 		return newCapabilityValue, nil
@@ -126,12 +122,12 @@ func (m *FixAuthorizationsMigration) Migrate(
 		capabilityAddress := storageKey.Address
 		capabilityID := uint64(value.CapabilityID)
 
-		newAuthorization := m.NewAuthorizations[AccountCapabilityID{
+		_, ok := m.AuthorizationFixes[AccountCapabilityID{
 			Address:      capabilityAddress,
 			CapabilityID: capabilityID,
 		}]
-		if newAuthorization == nil {
-			// Nothing to fix for this capability controller
+		if !ok {
+			// This capability controller does not need to be fixed
 			return nil, nil
 		}
 
@@ -139,7 +135,7 @@ func (m *FixAuthorizationsMigration) Migrate(
 
 		newBorrowType := interpreter.NewReferenceStaticType(
 			nil,
-			newAuthorization,
+			interpreter.UnauthorizedAccess,
 			oldBorrowReferenceType.ReferencedType,
 		)
 		newStorageCapabilityControllerValue := interpreter.NewUnmeteredStorageCapabilityControllerValue(
@@ -151,7 +147,6 @@ func (m *FixAuthorizationsMigration) Migrate(
 		m.Reporter.MigratedCapabilityController(
 			storageKey,
 			capabilityID,
-			newAuthorization,
 		)
 
 		return newStorageCapabilityControllerValue, nil
@@ -242,7 +237,7 @@ func NewFixAuthorizationsMigration(
 
 			return []migrations.ValueMigration{
 				&FixAuthorizationsMigration{
-					NewAuthorizations: newAuthorizations,
+					AuthorizationFixes: newAuthorizations,
 					Reporter: &fixAuthorizationsMigrationReporter{
 						reportWriter:        reporter,
 						errorMessageHandler: errorMessageHandler,
@@ -315,12 +310,10 @@ func (r *fixAuthorizationsMigrationReporter) DictionaryKeyConflict(accountAddres
 func (r *fixAuthorizationsMigrationReporter) MigratedCapabilityController(
 	storageKey interpreter.StorageKey,
 	capabilityID uint64,
-	newAuthorization interpreter.Authorization,
 ) {
 	r.reportWriter.Write(capabilityControllerAuthorizationFixedEntry{
-		StorageKey:       storageKey,
-		CapabilityID:     capabilityID,
-		NewAuthorization: newAuthorization,
+		StorageKey:   storageKey,
+		CapabilityID: capabilityID,
 	})
 }
 
@@ -328,47 +321,33 @@ func (r *fixAuthorizationsMigrationReporter) MigratedCapability(
 	storageKey interpreter.StorageKey,
 	capabilityAddress common.Address,
 	capabilityID uint64,
-	newAuthorization interpreter.Authorization,
 ) {
 	r.reportWriter.Write(capabilityAuthorizationFixedEntry{
 		StorageKey:        storageKey,
 		CapabilityAddress: capabilityAddress,
 		CapabilityID:      capabilityID,
-		NewAuthorization:  newAuthorization,
 	})
-}
-
-func jsonEncodeAuthorization(authorization interpreter.Authorization) string {
-	switch authorization {
-	case interpreter.UnauthorizedAccess, interpreter.InaccessibleAccess:
-		return ""
-	default:
-		return string(authorization.ID())
-	}
 }
 
 // capabilityControllerAuthorizationFixedEntry
 type capabilityControllerAuthorizationFixedEntry struct {
-	StorageKey       interpreter.StorageKey
-	CapabilityID     uint64
-	NewAuthorization interpreter.Authorization
+	StorageKey   interpreter.StorageKey
+	CapabilityID uint64
 }
 
 var _ json.Marshaler = capabilityControllerAuthorizationFixedEntry{}
 
 func (e capabilityControllerAuthorizationFixedEntry) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
-		Kind             string `json:"kind"`
-		AccountAddress   string `json:"account_address"`
-		StorageDomain    string `json:"domain"`
-		CapabilityID     uint64 `json:"capability_id"`
-		NewAuthorization string `json:"new_authorization"`
+		Kind           string `json:"kind"`
+		AccountAddress string `json:"account_address"`
+		StorageDomain  string `json:"domain"`
+		CapabilityID   uint64 `json:"capability_id"`
 	}{
-		Kind:             "capability-controller-authorizations-fixed",
-		AccountAddress:   e.StorageKey.Address.HexWithPrefix(),
-		StorageDomain:    e.StorageKey.Key,
-		CapabilityID:     e.CapabilityID,
-		NewAuthorization: jsonEncodeAuthorization(e.NewAuthorization),
+		Kind:           "capability-controller-authorizations-fixed",
+		AccountAddress: e.StorageKey.Address.HexWithPrefix(),
+		StorageDomain:  e.StorageKey.Key,
+		CapabilityID:   e.CapabilityID,
 	})
 }
 
@@ -377,7 +356,6 @@ type capabilityAuthorizationFixedEntry struct {
 	StorageKey        interpreter.StorageKey
 	CapabilityAddress common.Address
 	CapabilityID      uint64
-	NewAuthorization  interpreter.Authorization
 }
 
 var _ json.Marshaler = capabilityAuthorizationFixedEntry{}
@@ -389,14 +367,12 @@ func (e capabilityAuthorizationFixedEntry) MarshalJSON() ([]byte, error) {
 		StorageDomain     string `json:"domain"`
 		CapabilityAddress string `json:"capability_address"`
 		CapabilityID      uint64 `json:"capability_id"`
-		NewAuthorization  string `json:"new_authorization"`
 	}{
 		Kind:              "capability-authorizations-fixed",
 		AccountAddress:    e.StorageKey.Address.HexWithPrefix(),
 		StorageDomain:     e.StorageKey.Key,
 		CapabilityAddress: e.CapabilityAddress.HexWithPrefix(),
 		CapabilityID:      e.CapabilityID,
-		NewAuthorization:  jsonEncodeAuthorization(e.NewAuthorization),
 	})
 }
 
@@ -449,13 +425,13 @@ func NewFixAuthorizationsMigrations(
 	}
 }
 
-type AuthorizationFixes map[AccountCapabilityID]interpreter.Authorization
+type AuthorizationFixes map[AccountCapabilityID]struct{}
 
 // ReadAuthorizationFixes reads a report of authorization fixes from the given reader.
 // The report is expected to be a JSON array of objects with the following structure:
 //
 //	[
-//		{"address":"0x1","identifier":"foo","linkType":"&Foo","accessibleMembers":["foo"]}
+//		{"capability_address":"0x1","capability_id":1}
 //	]
 func ReadAuthorizationFixes(
 	reader io.Reader,
@@ -478,7 +454,6 @@ func ReadAuthorizationFixes(
 		var entry struct {
 			CapabilityAddress string `json:"capability_address"`
 			CapabilityID      uint64 `json:"capability_id"`
-			NewAuthorization  string `json:"new_authorization"`
 		}
 		err := dec.Decode(&entry)
 		if err != nil {
@@ -496,17 +471,12 @@ func ReadAuthorizationFixes(
 			}
 		}
 
-		newAuthorization, err := jsonDecodeAuthorization(entry.NewAuthorization)
-		if err != nil {
-			return nil, fmt.Errorf("failed to decode new authorization '%s': %w", entry.NewAuthorization, err)
-		}
-
 		accountCapabilityID := AccountCapabilityID{
 			Address:      address,
 			CapabilityID: entry.CapabilityID,
 		}
 
-		fixes[accountCapabilityID] = newAuthorization
+		fixes[accountCapabilityID] = struct{}{}
 	}
 
 	token, err = dec.Token()
@@ -518,30 +488,4 @@ func ReadAuthorizationFixes(
 	}
 
 	return fixes, nil
-}
-
-func jsonDecodeAuthorization(encoded string) (interpreter.Authorization, error) {
-	if encoded == "" {
-		return interpreter.UnauthorizedAccess, nil
-	}
-
-	if strings.Contains(encoded, "|") {
-		return nil, fmt.Errorf("invalid disjunction entitlement set authorization: %s", encoded)
-	}
-
-	var typeIDs []common.TypeID
-	for _, part := range strings.Split(encoded, ",") {
-		typeIDs = append(typeIDs, common.TypeID(part))
-	}
-
-	entitlementSetAuthorization := interpreter.NewEntitlementSetAuthorization(
-		nil,
-		func() []common.TypeID {
-			return typeIDs
-		},
-		len(typeIDs),
-		sema.Conjunction,
-	)
-
-	return entitlementSetAuthorization, nil
 }
