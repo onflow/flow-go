@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"strings"
 
 	"github.com/onflow/cadence/migrations"
 	"github.com/onflow/cadence/runtime"
@@ -16,7 +18,6 @@ import (
 
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/fvm/environment"
-	"github.com/onflow/flow-go/model/flow"
 )
 
 type AccountCapabilityID struct {
@@ -210,23 +211,14 @@ func CanSkipFixAuthorizationsMigration(valueType interpreter.StaticType) bool {
 	return false
 }
 
-type FixAuthorizationsMigrationOptions struct {
-	ChainID                           flow.ChainID
-	NWorker                           int
-	VerboseErrorOutput                bool
-	LogVerboseDiff                    bool
-	DiffMigrations                    bool
-	CheckStorageHealthBeforeMigration bool
-}
-
 const fixAuthorizationsMigrationReporterName = "fix-authorizations-migration"
 
 func NewFixAuthorizationsMigration(
 	rwf reporters.ReportWriterFactory,
 	errorMessageHandler *errorMessageHandler,
 	programs map[runtime.Location]*interpreter.Program,
-	newAuthorizations map[AccountCapabilityID]interpreter.Authorization,
-	opts FixAuthorizationsMigrationOptions,
+	newAuthorizations AuthorizationFixes,
+	opts Options,
 ) *CadenceBaseMigration {
 	var diffReporter reporters.ReportWriter
 	if opts.DiffMigrations {
@@ -411,8 +403,8 @@ func (e capabilityAuthorizationFixedEntry) MarshalJSON() ([]byte, error) {
 func NewFixAuthorizationsMigrations(
 	log zerolog.Logger,
 	rwf reporters.ReportWriterFactory,
-	newAuthorizations map[AccountCapabilityID]interpreter.Authorization,
-	opts FixAuthorizationsMigrationOptions,
+	newAuthorizations AuthorizationFixes,
+	opts Options,
 ) []NamedMigration {
 
 	errorMessageHandler := &errorMessageHandler{}
@@ -455,4 +447,101 @@ func NewFixAuthorizationsMigrations(
 			),
 		},
 	}
+}
+
+type AuthorizationFixes map[AccountCapabilityID]interpreter.Authorization
+
+// ReadAuthorizationFixes reads a report of authorization fixes from the given reader.
+// The report is expected to be a JSON array of objects with the following structure:
+//
+//	[
+//		{"address":"0x1","identifier":"foo","linkType":"&Foo","accessibleMembers":["foo"]}
+//	]
+func ReadAuthorizationFixes(
+	reader io.Reader,
+	filter map[common.Address]struct{},
+) (AuthorizationFixes, error) {
+
+	fixes := AuthorizationFixes{}
+
+	dec := json.NewDecoder(reader)
+
+	token, err := dec.Token()
+	if err != nil {
+		return nil, fmt.Errorf("failed to read token: %w", err)
+	}
+	if token != json.Delim('[') {
+		return nil, fmt.Errorf("expected start of array, got %s", token)
+	}
+
+	for dec.More() {
+		var entry struct {
+			CapabilityAddress string `json:"capability_address"`
+			CapabilityID      uint64 `json:"capability_id"`
+			NewAuthorization  string `json:"new_authorization"`
+		}
+		err := dec.Decode(&entry)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode entry: %w", err)
+		}
+
+		address, err := common.HexToAddress(entry.CapabilityAddress)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse address: %w", err)
+		}
+
+		if filter != nil {
+			if _, ok := filter[address]; !ok {
+				continue
+			}
+		}
+
+		newAuthorization, err := jsonDecodeAuthorization(entry.NewAuthorization)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode new authorization '%s': %w", entry.NewAuthorization, err)
+		}
+
+		accountCapabilityID := AccountCapabilityID{
+			Address:      address,
+			CapabilityID: entry.CapabilityID,
+		}
+
+		fixes[accountCapabilityID] = newAuthorization
+	}
+
+	token, err = dec.Token()
+	if err != nil {
+		return nil, fmt.Errorf("failed to read token: %w", err)
+	}
+	if token != json.Delim(']') {
+		return nil, fmt.Errorf("expected end of array, got %s", token)
+	}
+
+	return fixes, nil
+}
+
+func jsonDecodeAuthorization(encoded string) (interpreter.Authorization, error) {
+	if encoded == "" {
+		return interpreter.UnauthorizedAccess, nil
+	}
+
+	if strings.Contains(encoded, "|") {
+		return nil, fmt.Errorf("invalid disjunction entitlement set authorization: %s", encoded)
+	}
+
+	var typeIDs []common.TypeID
+	for _, part := range strings.Split(encoded, ",") {
+		typeIDs = append(typeIDs, common.TypeID(part))
+	}
+
+	entitlementSetAuthorization := interpreter.NewEntitlementSetAuthorization(
+		nil,
+		func() []common.TypeID {
+			return typeIDs
+		},
+		len(typeIDs),
+		sema.Conjunction,
+	)
+
+	return entitlementSetAuthorization, nil
 }
