@@ -2,6 +2,7 @@ package migrations
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/onflow/cadence"
@@ -145,7 +146,7 @@ func TestFixAuthorizationsMigration(t *testing.T) {
 
 	rwf := &testReportWriterFactory{}
 
-	options := FixAuthorizationsMigrationOptions{
+	options := Options{
 		ChainID: chainID,
 		NWorker: nWorker,
 	}
@@ -277,4 +278,107 @@ func TestFixAuthorizationsMigration(t *testing.T) {
 		),
 	)
 	require.NoError(t, err)
+}
+
+func TestReadAuthorizationFixes(t *testing.T) {
+	t.Parallel()
+
+	validContents := `
+      [
+        {"capability_address":"01","capability_id":4,"new_authorization":""},
+        {"capability_address":"02","capability_id":5,"new_authorization":"A.0000000000000001.Foo.Bar"},
+        {"capability_address":"03","capability_id":6,"new_authorization":"A.0000000000000001.Foo.Bar,A.0000000000000001.Foo.Baz"}
+      ]
+    `
+
+	t.Run("unfiltered", func(t *testing.T) {
+
+		t.Parallel()
+
+		reader := strings.NewReader(validContents)
+
+		mapping, err := ReadAuthorizationFixes(reader, nil)
+		require.NoError(t, err)
+
+		require.Equal(t,
+			AuthorizationFixes{
+				{
+					Address:      common.MustBytesToAddress([]byte{0x1}),
+					CapabilityID: 4,
+				}: interpreter.UnauthorizedAccess,
+				{
+					Address:      common.MustBytesToAddress([]byte{0x2}),
+					CapabilityID: 5,
+				}: newEntitlementSetAuthorizationFromTypeIDs(
+					[]common.TypeID{
+						"A.0000000000000001.Foo.Bar",
+					},
+					sema.Conjunction,
+				),
+				{
+					Address:      common.MustBytesToAddress([]byte{0x3}),
+					CapabilityID: 6,
+				}: newEntitlementSetAuthorizationFromTypeIDs(
+					[]common.TypeID{
+						"A.0000000000000001.Foo.Bar",
+						"A.0000000000000001.Foo.Baz",
+					},
+					sema.Conjunction,
+				),
+			},
+			mapping,
+		)
+	})
+
+	t.Run("filtered", func(t *testing.T) {
+
+		t.Parallel()
+
+		address1 := common.MustBytesToAddress([]byte{0x1})
+		address3 := common.MustBytesToAddress([]byte{0x3})
+
+		addressFilter := map[common.Address]struct{}{
+			address1: {},
+			address3: {},
+		}
+
+		reader := strings.NewReader(validContents)
+
+		mapping, err := ReadAuthorizationFixes(reader, addressFilter)
+		require.NoError(t, err)
+
+		require.Equal(t,
+			AuthorizationFixes{
+				{
+					Address:      common.MustBytesToAddress([]byte{0x1}),
+					CapabilityID: 4,
+				}: interpreter.UnauthorizedAccess,
+				{
+					Address:      common.MustBytesToAddress([]byte{0x3}),
+					CapabilityID: 6,
+				}: newEntitlementSetAuthorizationFromTypeIDs(
+					[]common.TypeID{
+						"A.0000000000000001.Foo.Bar",
+						"A.0000000000000001.Foo.Baz",
+					},
+					sema.Conjunction,
+				),
+			},
+			mapping,
+		)
+	})
+
+	t.Run("invalid disjunction entitlement set authorization", func(t *testing.T) {
+
+		t.Parallel()
+
+		reader := strings.NewReader(`
+          [
+            {"capability_address":"03","capability_id":6,"new_authorization":"A.0000000000000001.Foo.Bar|A.0000000000000001.Foo.Baz"}
+          ]
+        `)
+
+		_, err := ReadAuthorizationFixes(reader, nil)
+		require.ErrorContains(t, err, "invalid disjunction entitlement set authorization")
+	})
 }
