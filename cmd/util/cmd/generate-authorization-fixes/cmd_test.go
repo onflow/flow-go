@@ -77,21 +77,7 @@ func (*testReportWriter) Close() {
 
 var _ reporters.ReportWriter = &testReportWriter{}
 
-func newEntitlementSetAuthorizationFromTypeIDs(
-	typeIDs []common.TypeID,
-	setKind sema.EntitlementSetKind,
-) interpreter.EntitlementSetAuthorization {
-	return interpreter.NewEntitlementSetAuthorization(
-		nil,
-		func() []common.TypeID {
-			return typeIDs
-		},
-		len(typeIDs),
-		setKind,
-	)
-}
-
-func TestFixAuthorizationsMigrations(t *testing.T) {
+func TestGenerateAuthorizationFixes(t *testing.T) {
 	t.Parallel()
 
 	const chainID = flow.Emulator
@@ -182,6 +168,9 @@ func TestFixAuthorizationsMigrations(t *testing.T) {
 	                  // It should keep its entitlement
                       let cap4 = signer.capabilities.storage.issue<auth(Test.E1, Test.E2) &Test.S>(/storage/s)
                       signer.storage.save([cap4], to: /storage/caps4)
+
+                      let cap5 = signer.capabilities.storage.issue<auth(Insert,Mutate,Remove) &{String:String}>(/storage/dict)
+                      signer.capabilities.publish(cap5, at: /public/dict)
                   }
               }
             `,
@@ -198,17 +187,22 @@ func TestFixAuthorizationsMigrations(t *testing.T) {
 	err = runSetupTx(registersByAccount)
 	require.NoError(t, err)
 
-	mr2, err := migrations.NewInterpreterMigrationRuntime(
-		registersByAccount,
-		chainID,
-		migrations.InterpreterMigrationRuntimeConfig{},
-	)
-	require.NoError(t, err)
-
 	oldAccessibleMembers := []string{
 		"f1",
 		"f3",
+		"forEachAttachment",
+		"getType",
+		"isInstance",
 		"undefined",
+	}
+
+	newAccessibleMembers := []string{
+		"f1",
+		"f2",
+		"f3",
+		"forEachAttachment",
+		"getType",
+		"isInstance",
 	}
 
 	testContractLocation := common.AddressLocation{
@@ -239,6 +233,24 @@ func TestFixAuthorizationsMigrations(t *testing.T) {
 			BorrowType:        borrowTypeID,
 			AccessibleMembers: nil,
 		},
+		{
+			Address:    common.Address(address),
+			Identifier: "dict",
+		}: {
+			BorrowType: "{String:String}",
+			AccessibleMembers: []string{
+				"containsKey",
+				"forEachAttachment",
+				"forEachKey",
+				"getType",
+				"insert",
+				"isInstance",
+				"keys",
+				"length",
+				"remove",
+				"values",
+			},
+		},
 	}
 
 	publicLinkMigrationReport := PublicLinkMigrationReport{
@@ -254,13 +266,17 @@ func TestFixAuthorizationsMigrations(t *testing.T) {
 			Address:      common.Address(address),
 			CapabilityID: 4,
 		}: "s4",
+		{
+			Address:      common.Address(address),
+			CapabilityID: 5,
+		}: "dict",
 	}
 
 	reporter := &testReportWriter{}
 
 	generator := &AuthorizationFixGenerator{
 		registersByAccount:        registersByAccount,
-		mr:                        mr2,
+		chainID:                   chainID,
 		publicLinkReport:          publicLinkReport,
 		publicLinkMigrationReport: publicLinkMigrationReport,
 		reporter:                  reporter,
@@ -268,6 +284,7 @@ func TestFixAuthorizationsMigrations(t *testing.T) {
 	generator.generateFixesForAllAccounts()
 
 	e1TypeID := testContractLocation.TypeID(nil, "Test.E1")
+	e2TypeID := testContractLocation.TypeID(nil, "Test.E2")
 
 	assert.Equal(t,
 		[]any{
@@ -276,12 +293,26 @@ func TestFixAuthorizationsMigrations(t *testing.T) {
 					Address:      common.Address(address),
 					CapabilityID: 1,
 				},
+				ReferencedType: interpreter.NewCompositeStaticTypeComputeTypeID(
+					nil,
+					testContractLocation,
+					"Test.S",
+				),
+				OldAuthorization: newEntitlementSetAuthorizationFromTypeIDs(
+					[]common.TypeID{
+						e1TypeID,
+						e2TypeID,
+					},
+					sema.Conjunction,
+				),
 				NewAuthorization: newEntitlementSetAuthorizationFromTypeIDs(
 					[]common.TypeID{
 						e1TypeID,
 					},
 					sema.Conjunction,
 				),
+				OldAccessibleMembers: oldAccessibleMembers,
+				NewAccessibleMembers: newAccessibleMembers,
 				UnresolvedMembers: map[string]error{
 					"undefined": errors.New("member does not exist"),
 				},
@@ -291,12 +322,26 @@ func TestFixAuthorizationsMigrations(t *testing.T) {
 					Address:      common.Address(address),
 					CapabilityID: 2,
 				},
+				ReferencedType: interpreter.NewCompositeStaticTypeComputeTypeID(
+					nil,
+					testContractLocation,
+					"Test.S",
+				),
+				OldAuthorization: newEntitlementSetAuthorizationFromTypeIDs(
+					[]common.TypeID{
+						e1TypeID,
+						e2TypeID,
+					},
+					sema.Conjunction,
+				),
 				NewAuthorization: newEntitlementSetAuthorizationFromTypeIDs(
 					[]common.TypeID{
 						e1TypeID,
 					},
 					sema.Conjunction,
 				),
+				OldAccessibleMembers: oldAccessibleMembers,
+				NewAccessibleMembers: newAccessibleMembers,
 				UnresolvedMembers: map[string]error{
 					"undefined": errors.New("member does not exist"),
 				},
