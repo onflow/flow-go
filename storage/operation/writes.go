@@ -43,9 +43,9 @@ func Remove(key []byte) func(storage.Writer) error {
 	}
 }
 
-func RemoveByPrefix(key []byte) func(storage.Writer) error {
+func RemoveByPrefix(reader storage.Reader, key []byte) func(storage.Writer) error {
 	return func(w storage.Writer) error {
-		err := w.DeleteByRange(key, PrefixUpperBound(key))
+		err := w.DeleteByRange(reader, key, PrefixUpperBound(key))
 		if err != nil {
 			return irrecoverable.NewExceptionf("could not delete item: %w", err)
 		}
