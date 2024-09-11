@@ -535,23 +535,6 @@ func newEntitlementSetAuthorizationFromTypeIDs(
 	)
 }
 
-var insertRemoveAuthorization = newEntitlementSetAuthorizationFromTypeIDs(
-	[]common.TypeID{
-		sema.InsertType.ID(),
-		sema.RemoveType.ID(),
-	},
-	sema.Conjunction,
-)
-
-var insertMutateRemoveAuthorization = newEntitlementSetAuthorizationFromTypeIDs(
-	[]common.TypeID{
-		sema.InsertType.ID(),
-		sema.MutateType.ID(),
-		sema.RemoveType.ID(),
-	},
-	sema.Conjunction,
-)
-
 func (g *AuthorizationFixGenerator) maybeGenerateFixForCapabilityController(
 	inter *interpreter.Interpreter,
 	capabilityAddress common.Address,
@@ -650,15 +633,21 @@ func (g *AuthorizationFixGenerator) maybeGenerateFixForCapabilityController(
 		// we should not leave the capability controller vulnerable
 	}
 
-	// Only fix the authorization if it is different from the old one.
 	// If the old authorization was `Insert, Mutate, Remove`,
 	// the calculated minimal authorization is `Insert, Remove`,
 	// but we ignore the difference, and keep the Mutate entitlement.
 
+	if newEntitlementSetAuthorization, ok := newAuthorization.(interpreter.EntitlementSetAuthorization); ok {
+		if newEntitlementSetAuthorization.Entitlements.Contains(sema.InsertType.ID()) &&
+			newEntitlementSetAuthorization.Entitlements.Contains(sema.RemoveType.ID()) {
+
+			newEntitlementSetAuthorization.Entitlements.Set(sema.MutateType.ID(), struct{}{})
+		}
+	}
+
+	// Only fix the authorization if it is different from the old one.
 	oldAuthorization := borrowType.Authorization
-	if newAuthorization.Equal(oldAuthorization) ||
-		(oldAuthorization.Equal(insertMutateRemoveAuthorization) &&
-			newAuthorization.Equal(insertRemoveAuthorization)) {
+	if newAuthorization.Equal(oldAuthorization) {
 
 		// Nothing to fix
 		return
