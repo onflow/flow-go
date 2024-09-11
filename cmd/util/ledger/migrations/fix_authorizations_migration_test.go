@@ -16,6 +16,20 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+func newEntitlementSetAuthorizationFromTypeIDs(
+	typeIDs []common.TypeID,
+	setKind sema.EntitlementSetKind,
+) interpreter.EntitlementSetAuthorization {
+	return interpreter.NewEntitlementSetAuthorization(
+		nil,
+		func() []common.TypeID {
+			return typeIDs
+		},
+		len(typeIDs),
+		setKind,
+	)
+}
+
 func TestFixAuthorizationsMigration(t *testing.T) {
 	t.Parallel()
 
