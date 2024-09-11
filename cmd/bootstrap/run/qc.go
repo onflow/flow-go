@@ -62,7 +62,7 @@ func (pd *ParticipantData) Identities() flow.IdentityList {
 //     i := DKGIndexMap[d] denotes the index, by which the low-level cryptographic DKG protocol references
 //     the participant. For details, please see the documentation of `flow.DKGIndexMap`.
 //   - keyShares: holds the public key share for every member of the DKG committee 𝒟 (irrespective
-//     successfully participation). For a member of the DKG committee with nodeID `d`, the respective
+//     of successful participation). For a member of the DKG committee with nodeID `d`, the respective
 //     public key share is keyShares[DKGIndexMap[d]].
 //
 // CAUTION: the returned DKG data may include identifiers for nodes which do not exist in the consensus committee
