@@ -75,27 +75,30 @@ func (r *SafetyRules) ProduceVote(proposal *model.Proposal, curView uint64) (*mo
 		return nil, fmt.Errorf("not safe to vote for proposal %x: %w", proposal.Block.BlockID, err)
 	}
 
-	// we expect that only valid proposals are submitted for voting
-	// we need to make sure that proposer is not ejected to decide to vote or not
-	_, err = r.committee.IdentityByBlock(block.BlockID, block.ProposerID)
-	if model.IsInvalidSignerError(err) {
-		// the proposer must be ejected since the proposal has already been validated,
-		// which ensures that the proposer was a valid committee member at the start of the epoch
-		return nil, model.NewNoVoteErrorf("proposer ejected: %w", err)
-	}
-	if err != nil {
-		return nil, fmt.Errorf("internal error retrieving Identity of proposer %x at block %x: %w", block.ProposerID, block.BlockID, err)
-	}
+	currentLeader, err := r.committee.LeaderForView(curView)
+	if currentLeader != r.committee.Self() {
+		// we expect that only valid proposals are submitted for voting
+		// we need to make sure that proposer is not ejected to decide to vote or not
+		_, err = r.committee.IdentityByBlock(block.BlockID, block.ProposerID)
+		if model.IsInvalidSignerError(err) {
+			// the proposer must be ejected since the proposal has already been validated,
+			// which ensures that the proposer was a valid committee member at the start of the epoch
+			return nil, model.NewNoVoteErrorf("proposer ejected: %w", err)
+		}
+		if err != nil {
+			return nil, fmt.Errorf("internal error retrieving Identity of proposer %x at block %x: %w", block.ProposerID, block.BlockID, err)
+		}
 
-	// Do not produce a vote for blocks where we are not a valid committee member.
-	// HotStuff will ask for a vote for the first block of the next epoch, even if we
-	// have zero weight in the next epoch. Such vote can't be used to produce valid QCs.
-	_, err = r.committee.IdentityByBlock(block.BlockID, r.committee.Self())
-	if model.IsInvalidSignerError(err) {
-		return nil, model.NewNoVoteErrorf("I am not authorized to vote for block %x: %w", block.BlockID, err)
-	}
-	if err != nil {
-		return nil, fmt.Errorf("could not get self identity: %w", err)
+		// Do not produce a vote for blocks where we are not a valid committee member.
+		// HotStuff will ask for a vote for the first block of the next epoch, even if we
+		// have zero weight in the next epoch. Such vote can't be used to produce valid QCs.
+		_, err = r.committee.IdentityByBlock(block.BlockID, r.committee.Self())
+		if model.IsInvalidSignerError(err) {
+			return nil, model.NewNoVoteErrorf("I am not authorized to vote for block %x: %w", block.BlockID, err)
+		}
+		if err != nil {
+			return nil, fmt.Errorf("could not get self identity: %w", err)
+		}
 	}
 
 	vote, err := r.signer.CreateVote(block)
