@@ -60,7 +60,7 @@ func (pd *ParticipantData) Identities() flow.IdentityList {
 //   - indexMap: a bijective mapping from the node IDs of the DKG committee to {0, 1, …, n-1},
 //     with n = |𝒟| the size of the DKG committee 𝒟. In a nutshell, for a nodeID `d`, integer value
 //     i := DKGIndexMap[d] denotes the index, by which the low-level cryptographic DKG protocol references
-//     the participant. For details, please see the documentation of `flow.DKGIndexMap`.
+//     the participant. For details, please see the documentation of [flow.DKGIndexMap].
 //   - keyShares: holds the public key share for every member of the DKG committee 𝒟 (irrespective
 //     of successful participation). For a member of the DKG committee with nodeID `d`, the respective
 //     public key share is keyShares[DKGIndexMap[d]].
