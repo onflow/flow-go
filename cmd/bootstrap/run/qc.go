@@ -201,7 +201,7 @@ func GenerateQCParticipantData(allNodes, internalNodes []bootstrap.NodeInfo, dkg
 	// the Random Beacon key shares are needed to sign the QC for the root block.
 	// On the one hand, a trusted dealer can generate the key shares nearly instantaneously, which significantly
 	// simplifies the coordination of the consensus committee prior to network genesis. On the other hand, there
-	//are centralization concerns of employing a trusted dealer.
+	// are centralization concerns of employing a trusted dealer.
 	// In the future, we want to re-use a DKG result from a prior Flow instance, instead of relying on a trusted dealer.
 	// However, when using DKG results later (or re-using them to recover from Epoch Fallback Mode), there is a chance
 	// that the DKG committee 𝒟 and the consensus committee 𝒞 might differ by some nodes. In this case, the following
