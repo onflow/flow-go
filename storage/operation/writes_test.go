@@ -84,11 +84,19 @@ func TestDelete(t *testing.T) {
 	RunWithStorages(t, func(t *testing.T, r storage.Reader, withWriterTx WithWriter) {
 		e := Entity{ID: 1337}
 
+		var exists bool
+		require.NoError(t, operation.Exists(e.Key(), &exists)(r))
+		require.False(t, exists, "expected key to not exist")
+
 		// Test delete nothing should return OK
 		withWriterTx(t, operation.Remove(e.Key()))
 
 		// Test write, delete, then read should return not found
 		withWriterTx(t, operation.Upsert(e.Key(), e))
+
+		require.NoError(t, operation.Exists(e.Key(), &exists)(r))
+		require.True(t, exists, "expected key to exist")
+
 		withWriterTx(t, operation.Remove(e.Key()))
 
 		var item Entity
