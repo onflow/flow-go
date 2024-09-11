@@ -3,6 +3,7 @@ package operation_test
 import (
 	"encoding/binary"
 	"errors"
+	"sync"
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
@@ -97,11 +98,59 @@ func TestDelete(t *testing.T) {
 }
 
 func TestConcurrentWrite(t *testing.T) {
-	// test concurrently writing to different keys should all succeed eventually
+	RunWithStorages(t, func(t *testing.T, r storage.Reader, withWriterTx WithWriter) {
+		var wg sync.WaitGroup
+		numWrites := 10 // number of concurrent writes
+
+		for i := 0; i < numWrites; i++ {
+			wg.Add(1)
+			go func(i int) {
+				defer wg.Done()
+				e := Entity{ID: uint64(i)}
+
+				// Simulate a concurrent write to a different key
+				withWriterTx(t, operation.Upsert(e.Key(), e))
+
+				var readBack Entity
+				require.NoError(t, operation.Retrieve(e.Key(), &readBack)(r))
+				require.Equal(t, e, readBack, "expected retrieved value to match written value for key %d", i)
+			}(i)
+		}
+
+		wg.Wait() // Wait for all goroutines to finish
+	})
 }
 
 func TestConcurrentDelete(t *testing.T) {
-	// test concurrently delete different keys should all succeed eventually
+	RunWithStorages(t, func(t *testing.T, r storage.Reader, withWriterTx WithWriter) {
+		var wg sync.WaitGroup
+		numDeletes := 10 // number of concurrent deletions
+
+		// First, insert entities to be deleted concurrently
+		for i := 0; i < numDeletes; i++ {
+			e := Entity{ID: uint64(i)}
+			withWriterTx(t, operation.Upsert(e.Key(), e))
+		}
+
+		// Now, perform concurrent deletes
+		for i := 0; i < numDeletes; i++ {
+			wg.Add(1)
+			go func(i int) {
+				defer wg.Done()
+				e := Entity{ID: uint64(i)}
+
+				// Simulate a concurrent delete
+				withWriterTx(t, operation.Remove(e.Key()))
+
+				// Check that the item is no longer retrievable
+				var item Entity
+				err := operation.Retrieve(e.Key(), &item)(r)
+				require.True(t, errors.Is(err, storage.ErrNotFound), "expected not found error after delete for key %d", i)
+			}(i)
+		}
+
+		wg.Wait() // Wait for all goroutines to finish
+	})
 }
 
 func TestIterateKeysWithPrefixRange(t *testing.T) {
