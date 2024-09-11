@@ -31,7 +31,7 @@ type Participant struct {
 //     nodes (generally a small minority of the entire consensus committee).
 //   - During a subsequent step of the bootstrapping process, the Flow Foundation collects a supermajority of votes from the consensus
 //     participants and constructs the root QC  (see function `constructRootQC`). Here, `Participants` is only populated with
-//     the information of the internal does that the Flow Foundation runs, but not used.
+//     the information of the internal nodes that the Flow Foundation runs, but not used.
 //
 // Furthermore, ParticipantData contains auxiliary data about the DKG to set up the random beacon. Note that the consensus committee 𝒞 and the
 // DKG committee 𝒟 are generally _not_ identical. We explicitly want to support that _either_ set can have nodes that are not in
