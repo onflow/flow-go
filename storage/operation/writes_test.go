@@ -160,12 +160,3 @@ func TestConcurrentDelete(t *testing.T) {
 		wg.Wait() // Wait for all goroutines to finish
 	})
 }
-
-func TestIterateKeysWithPrefixRange(t *testing.T) {
-}
-
-func TestTraverseKeysWithPrefix(t *testing.T) {
-}
-
-func TestFindHighestAtOrBelow(t *testing.T) {
-}

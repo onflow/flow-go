@@ -128,7 +128,7 @@ func (b *ReaderBatchWriter) Delete(key []byte) error {
 }
 
 func (b *ReaderBatchWriter) DeleteByRange(globalReader storage.Reader, startPrefix, endPrefix []byte) error {
-	err := operation.IteratePrefix(startPrefix, endPrefix, func(key []byte) error {
+	err := operation.IterateKeysInPrefixRange(startPrefix, endPrefix, func(key []byte) error {
 		err := b.batch.Delete(key)
 		if err != nil {
 			return fmt.Errorf("could not add key to delete batch (%v): %w", key, err)

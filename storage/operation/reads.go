@@ -12,6 +12,10 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
+// CheckFunc is a function that checks if the value should be read and decoded.
+// return (true, nil) to read the value and pass it to the CreateFunc and HandleFunc for decoding
+// return (false, nil) to skip reading the value
+// return (false, err) if running into any exception, the iteration should be stopped.
 type CheckFunc func(key []byte) (bool, error)
 
 // createFunc returns a pointer to an initialized entity that we can potentially
@@ -25,14 +29,15 @@ type CreateFunc func() interface{}
 type HandleFunc func() error
 type IterationFunc func() (CheckFunc, CreateFunc, HandleFunc)
 
-func IteratePrefix(start []byte, end []byte, check func(key []byte) error) func(storage.Reader) error {
+// IterateKeysInPrefixRange will iterate over all keys in the given range and call the check function with each key
+func IterateKeysInPrefixRange(start []byte, end []byte, check func(key []byte) error) func(storage.Reader) error {
 	return Iterate(start, end, func() (CheckFunc, CreateFunc, HandleFunc) {
 		return func(key []byte) (bool, error) {
 				err := check(key)
 				if err != nil {
 					return false, err
 				}
-				return true, nil
+				return false, nil
 			}, func() interface{} {
 				return nil
 			}, func() error {
