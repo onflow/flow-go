@@ -345,7 +345,7 @@ func run(*cobra.Command, []string) {
 
 		err := ensureCheckpointFileExist(flagExecutionStateDir)
 		if err != nil {
-			log.Fatal().Err(err).Msgf("cannot ensure checkpoint file exist in folder %v", flagExecutionStateDir)
+			log.Error().Err(err).Msgf("cannot ensure checkpoint file exist in folder %v", flagExecutionStateDir)
 		}
 
 	}
