@@ -2184,6 +2184,8 @@ github.com/onflow/flow/protobuf/go/flow v0.4.4 h1:lD1owoZGFgLcvdLZDmP0Kc4GOuQeSU
 github.com/onflow/flow/protobuf/go/flow v0.4.4/go.mod h1:NA2pX2nw8zuaxfKphhKsk00kWLwfd+tv8mS23YXO4Sk=
 github.com/onflow/go-ethereum v1.13.4 h1:iNO86fm8RbBbhZ87ZulblInqCdHnAQVY8okBrNsTevc=
 github.com/onflow/go-ethereum v1.13.4/go.mod h1:cE/gEUkAffhwbVmMJYz+t1dAfVNHNwZCgc3BWtZxBGY=
+github.com/onflow/go-libp2p-pubsub v0.0.0-20240912202513-d2b0f4f747eb h1:tiROziOZvvFRNmjIQzM7Fp3LDFfDNTOtau1miGjr2Y4=
+github.com/onflow/go-libp2p-pubsub v0.0.0-20240912202513-d2b0f4f747eb/go.mod h1:1OxbaT/pFRO5h+Dpze8hdHQ63R0ke55XTs6b6NwLLkw=
 github.com/onflow/nft-storefront/lib/go/contracts v1.0.0 h1:sxyWLqGm/p4EKT6DUlQESDG1ZNMN9GjPCm1gTq7NGfc=
 github.com/onflow/nft-storefront/lib/go/contracts v1.0.0/go.mod h1:kMeq9zUwCrgrSojEbTUTTJpZ4WwacVm2pA7LVFr+glk=
 github.com/onflow/sdks v0.5.1-0.20230912225508-b35402f12bba h1:rIehuhO6bj4FkwE4VzwEjX7MoAlOhUJENBJLqDqVxAo=
