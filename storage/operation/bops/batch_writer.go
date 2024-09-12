@@ -1,24 +1,26 @@
-package operation
+package bops
 
 import (
 	"errors"
+	"fmt"
 	"io"
 
-	"github.com/cockroachdb/pebble"
+	"github.com/dgraph-io/badger/v2"
 
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/operation"
 	op "github.com/onflow/flow-go/storage/operation"
 )
 
 type ReaderBatchWriter struct {
-	db    *pebble.DB
-	batch *pebble.Batch
+	db    *badger.DB
+	batch *badger.WriteBatch
 
 	callbacks op.Callbacks
 }
 
-var _ storage.PebbleReaderBatchWriter = (*ReaderBatchWriter)(nil)
+var _ storage.BadgerReaderBatchWriter = (*ReaderBatchWriter)(nil)
 
 func (b *ReaderBatchWriter) GlobalReader() storage.Reader {
 	return b
@@ -28,7 +30,7 @@ func (b *ReaderBatchWriter) Writer() storage.Writer {
 	return b
 }
 
-func (b *ReaderBatchWriter) PebbleWriterBatch() *pebble.Batch {
+func (b *ReaderBatchWriter) BadgerWriteBatch() *badger.WriteBatch {
 	return b.batch
 }
 
@@ -37,14 +39,14 @@ func (b *ReaderBatchWriter) AddCallback(callback func(error)) {
 }
 
 func (b *ReaderBatchWriter) Commit() error {
-	err := b.batch.Commit(pebble.Sync)
+	err := b.batch.Flush()
 
 	b.callbacks.NotifyCallbacks(err)
 
 	return err
 }
 
-func WithReaderBatchWriter(db *pebble.DB, fn func(storage.PebbleReaderBatchWriter) error) error {
+func WithReaderBatchWriter(db *badger.DB, fn func(storage.BadgerReaderBatchWriter) error) error {
 	batch := NewReaderBatchWriter(db)
 
 	err := fn(batch)
@@ -61,15 +63,15 @@ func WithReaderBatchWriter(db *pebble.DB, fn func(storage.PebbleReaderBatchWrite
 	return batch.Commit()
 }
 
-func NewReaderBatchWriter(db *pebble.DB) *ReaderBatchWriter {
+func NewReaderBatchWriter(db *badger.DB) *ReaderBatchWriter {
 	return &ReaderBatchWriter{
 		db:    db,
-		batch: db.NewBatch(),
+		batch: db.NewWriteBatch(),
 	}
 }
 
-// ToReader is a helper function to convert a *pebble.DB to a Reader
-func ToReader(db *pebble.DB) storage.Reader {
+// ToReader is a helper function to convert a *badger.DB to a Reader
+func ToReader(db *badger.DB) storage.Reader {
 	return NewReaderBatchWriter(db)
 }
 
@@ -84,38 +86,54 @@ var _ io.Closer = (*noopCloser)(nil)
 func (noopCloser) Close() error { return nil }
 
 func (b *ReaderBatchWriter) Get(key []byte) ([]byte, io.Closer, error) {
-	value, closer, err := b.db.Get(key)
+	tx := b.db.NewTransaction(false)
+	defer tx.Discard()
 
+	item, err := tx.Get(key)
 	if err != nil {
-		if errors.Is(err, pebble.ErrNotFound) {
+		if errors.Is(err, badger.ErrKeyNotFound) {
 			return nil, nil, storage.ErrNotFound
 		}
-
-		// exception while checking for the key
 		return nil, nil, irrecoverable.NewExceptionf("could not load data: %w", err)
 	}
 
-	return value, closer, nil
+	var value []byte
+	err = item.Value(func(val []byte) error {
+		value = append([]byte{}, val...)
+		return nil
+	})
+	if err != nil {
+		return nil, nil, irrecoverable.NewExceptionf("could not load value: %w", err)
+	}
+
+	return value, noopCloser{}, nil
 }
 
 func (b *ReaderBatchWriter) NewIter(startPrefix, endPrefix []byte, ops storage.IteratorOption) (storage.Iterator, error) {
-	return newPebbleIterator(b.db, startPrefix, endPrefix, ops)
+	return newBadgerIterator(b.db, startPrefix, endPrefix, ops), nil
 }
 
 var _ storage.Writer = (*ReaderBatchWriter)(nil)
 
 func (b *ReaderBatchWriter) Set(key, value []byte) error {
-	return b.batch.Set(key, value, pebble.Sync)
+	return b.batch.Set(key, value)
 }
 
 func (b *ReaderBatchWriter) Delete(key []byte) error {
-	return b.batch.Delete(key, pebble.Sync)
+	return b.batch.Delete(key)
 }
 
-// DeleteByRange deletes all keys with the given prefix defined by [startPrefix, endPrefix] (both inclusive).
-func (b *ReaderBatchWriter) DeleteByRange(_ storage.Reader, startPrefix, endPrefix []byte) error {
-	// DeleteRange takes the prefix range with start (inclusive) and end (exclusive, note: not inclusive).
-	// therefore, we need to increment the endPrefix to make it inclusive.
-	start, end := storage.StartEndPrefixToLowerUpperBound(startPrefix, endPrefix)
-	return b.batch.DeleteRange(start, end, pebble.Sync)
+func (b *ReaderBatchWriter) DeleteByRange(globalReader storage.Reader, startPrefix, endPrefix []byte) error {
+	err := operation.IterateKeysInPrefixRange(startPrefix, endPrefix, func(key []byte) error {
+		err := b.batch.Delete(key)
+		if err != nil {
+			return fmt.Errorf("could not add key to delete batch (%v): %w", key, err)
+		}
+		return nil
+	})(globalReader)
+
+	if err != nil {
+		return fmt.Errorf("could not find keys by range to be deleted: %w", err)
+	}
+	return nil
 }

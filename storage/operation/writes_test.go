@@ -11,9 +11,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/storage"
-	bops "github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/storage/operation"
-	pops "github.com/onflow/flow-go/storage/pebble/operation"
+	"github.com/onflow/flow-go/storage/operation/bops"
+	"github.com/onflow/flow-go/storage/operation/pops"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 

@@ -1,4 +1,4 @@
-package operation
+package pops
 
 import (
 	"fmt"
