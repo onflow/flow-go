@@ -109,8 +109,8 @@ func (b *ReaderBatchWriter) Get(key []byte) ([]byte, io.Closer, error) {
 	return value, noopCloser{}, nil
 }
 
-func (b *ReaderBatchWriter) NewIter(start, end []byte, ops storage.IteratorOption) (storage.Iterator, error) {
-	return newBadgerIterator(b.db, start, end, ops), nil
+func (b *ReaderBatchWriter) NewIter(startPrefix, endPrefix []byte, ops storage.IteratorOption) (storage.Iterator, error) {
+	return newBadgerIterator(b.db, startPrefix, endPrefix, ops), nil
 }
 
 var _ storage.Writer = (*ReaderBatchWriter)(nil)

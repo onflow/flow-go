@@ -16,7 +16,7 @@ type badgerIterator struct {
 
 var _ storage.Iterator = (*badgerIterator)(nil)
 
-func newBadgerIterator(db *badger.DB, start, end []byte, ops storage.IteratorOption) *badgerIterator {
+func newBadgerIterator(db *badger.DB, startPrefix, endPrefix []byte, ops storage.IteratorOption) *badgerIterator {
 	options := badger.DefaultIteratorOptions
 	if ops.IterateKeyOnly {
 		options.PrefetchValues = false
@@ -25,7 +25,7 @@ func newBadgerIterator(db *badger.DB, start, end []byte, ops storage.IteratorOpt
 	tx := db.NewTransaction(false)
 	iter := tx.NewIterator(options)
 
-	lowerBound, upperBound := storage.StartEndPrefixToLowerUpperBound(start, end)
+	lowerBound, upperBound := storage.StartEndPrefixToLowerUpperBound(startPrefix, endPrefix)
 
 	return &badgerIterator{
 		iter:       iter,
@@ -45,7 +45,8 @@ func (i *badgerIterator) Valid() bool {
 	}
 	key := i.iter.Item().Key()
 	// "< 0" means the upperBound is exclusive
-	return bytes.Compare(key, i.upperBound) < 0
+	valid := bytes.Compare(key, i.upperBound) < 0
+	return valid
 }
 
 func (i *badgerIterator) Next() {

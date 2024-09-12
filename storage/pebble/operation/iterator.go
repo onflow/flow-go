@@ -15,8 +15,8 @@ type pebbleIterator struct {
 
 var _ storage.Iterator = (*pebbleIterator)(nil)
 
-func newPebbleIterator(reader pebble.Reader, start, end []byte, ops storage.IteratorOption) (*pebbleIterator, error) {
-	lowerBound, upperBound := storage.StartEndPrefixToLowerUpperBound(start, end)
+func newPebbleIterator(reader pebble.Reader, startPrefix, endPrefix []byte, ops storage.IteratorOption) (*pebbleIterator, error) {
+	lowerBound, upperBound := storage.StartEndPrefixToLowerUpperBound(startPrefix, endPrefix)
 
 	options := pebble.IterOptions{
 		LowerBound: lowerBound,
@@ -47,7 +47,7 @@ func (i *pebbleIterator) Next() {
 }
 
 func (i *pebbleIterator) IterItem() storage.IterItem {
-	return pebbleIterItem{}
+	return pebbleIterItem{iter: i.iter}
 }
 
 type pebbleIterItem struct {

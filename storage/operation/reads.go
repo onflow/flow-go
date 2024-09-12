@@ -29,9 +29,9 @@ type CreateFunc func() interface{}
 type HandleFunc func() error
 type IterationFunc func() (CheckFunc, CreateFunc, HandleFunc)
 
-// IterateKeysInPrefixRange will iterate over all keys in the given range and call the check function with each key
-func IterateKeysInPrefixRange(start []byte, end []byte, check func(key []byte) error) func(storage.Reader) error {
-	return Iterate(start, end, func() (CheckFunc, CreateFunc, HandleFunc) {
+// IterateKeysInPrefixRange will iterate over all keys in the given range [startPrefix, endPrefix] (both inclusive)
+func IterateKeysInPrefixRange(startPrefix []byte, endPrefix []byte, check func(key []byte) error) func(storage.Reader) error {
+	return Iterate(startPrefix, endPrefix, func() (CheckFunc, CreateFunc, HandleFunc) {
 		return func(key []byte) (bool, error) {
 			err := check(key)
 			if err != nil {
@@ -42,23 +42,24 @@ func IterateKeysInPrefixRange(start []byte, end []byte, check func(key []byte) e
 	}, storage.IteratorOption{IterateKeyOnly: true})
 }
 
-func Iterate(start []byte, end []byte, iterFunc IterationFunc, opt storage.IteratorOption) func(storage.Reader) error {
+// Iterate will iterate over all keys in the given range [startPrefix, endPrefix] (both inclusive)
+func Iterate(startPrefix []byte, endPrefix []byte, iterFunc IterationFunc, opt storage.IteratorOption) func(storage.Reader) error {
 	return func(r storage.Reader) error {
 
-		if len(start) == 0 {
-			return fmt.Errorf("start prefix is empty")
+		if len(startPrefix) == 0 {
+			return fmt.Errorf("startPrefix prefix is empty")
 		}
 
-		if len(end) == 0 {
-			return fmt.Errorf("end prefix is empty")
+		if len(endPrefix) == 0 {
+			return fmt.Errorf("endPrefix prefix is empty")
 		}
 
 		// Reverse iteration is not supported by pebble
-		if bytes.Compare(start, end) > 0 {
-			return fmt.Errorf("start key must be less than or equal to end key")
+		if bytes.Compare(startPrefix, endPrefix) > 0 {
+			return fmt.Errorf("startPrefix key must be less than or equal to endPrefix key")
 		}
 
-		it, err := r.NewIter(start, end, opt)
+		it, err := r.NewIter(startPrefix, endPrefix, opt)
 		if err != nil {
 			return fmt.Errorf("can not create iterator: %w", err)
 		}
@@ -110,6 +111,7 @@ func Iterate(start []byte, end []byte, iterFunc IterationFunc, opt storage.Itera
 	}
 }
 
+// Traverse will iterate over all keys with the given prefix
 func Traverse(prefix []byte, iterFunc IterationFunc, opt storage.IteratorOption) func(storage.Reader) error {
 	return Iterate(prefix, PrefixUpperBound(prefix), iterFunc, opt)
 }
@@ -132,7 +134,7 @@ func PrefixUpperBound(prefix []byte) []byte {
 	return nil // no upper-bound
 }
 
-// exists returns true if a key exists in the database.
+// Exists returns true if a key exists in the database.
 // No errors are expected during normal operation.
 func Exists(key []byte, keyExists *bool) func(storage.Reader) error {
 	return func(r storage.Reader) error {

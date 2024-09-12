@@ -43,6 +43,10 @@ func Remove(key []byte) func(storage.Writer) error {
 	}
 }
 
+// RemoveByPrefix removes all keys with the given prefix defined by [startPrefix, endPrefix] (both inclusive).
+// If no keys exist with the given prefix, this is a no-op.
+// Error returns:
+// * generic error in case of unexpected database error
 func RemoveByPrefix(reader storage.Reader, key []byte) func(storage.Writer) error {
 	return func(w storage.Writer) error {
 		err := w.DeleteByRange(reader, key, key)

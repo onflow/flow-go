@@ -255,8 +255,7 @@ func TestRemoveRange(t *testing.T) {
 		// Remove the keys in the prefix range
 		withWriterTx(t, operation.RemoveByPrefix(r, prefix))
 
-		lg := unittest.Logger().With().
-			Logger()
+		lg := unittest.Logger().With().Logger()
 		// Verify that the keys in the prefix range have been removed
 		for i, key := range keys {
 			var exists bool

@@ -63,8 +63,8 @@ type Reader interface {
 	// success, the caller MUST call closer.Close() or a memory leak will occur.
 	Get(key []byte) (value []byte, closer io.Closer, err error)
 
-	// NewIter returns a new Iterator for the given key range [start, end], both inclusive.
-	NewIter(start, end []byte, ops IteratorOption) (Iterator, error)
+	// NewIter returns a new Iterator for the given key range [startPrefix, endPrefix], both inclusive.
+	NewIter(startPrefix, endPrefix []byte, ops IteratorOption) (Iterator, error)
 }
 
 // Writer is an interface for batch writing to a storage backend.
@@ -139,14 +139,14 @@ func OnCommitSucceed(b BadgerReaderBatchWriter, onSuccessFn func()) {
 	})
 }
 
-func StartEndPrefixToLowerUpperBound(start, end []byte) (lowerBound, upperBound []byte) {
+func StartEndPrefixToLowerUpperBound(startPrefix, endPrefix []byte) (lowerBound, upperBound []byte) {
 	// LowerBound specifies the smallest key to iterate and it's inclusive.
 	// UpperBound specifies the largest key to iterate and it's exclusive (not inclusive)
 	// in order to match all keys prefixed with the `end` bytes, we increment the bytes of end by 1,
 	// for instance, to iterate keys between "hello" and "world",
 	// we use "hello" as LowerBound, "worle" as UpperBound, so that "world", "world1", "worldffff...ffff"
 	// will all be included.
-	return start, prefixUpperBound(end)
+	return startPrefix, prefixUpperBound(endPrefix)
 }
 
 // prefixUpperBound returns a key K such that all possible keys beginning with the input prefix

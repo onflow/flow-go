@@ -8,7 +8,6 @@ import (
 
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/operation"
 	op "github.com/onflow/flow-go/storage/operation"
 )
 
@@ -99,9 +98,8 @@ func (b *ReaderBatchWriter) Get(key []byte) ([]byte, io.Closer, error) {
 	return value, closer, nil
 }
 
-func (b *ReaderBatchWriter) NewIter(start, end []byte, ops storage.IteratorOption) (storage.Iterator, error) {
-	// TODO: end + 1?
-	return newPebbleIterator(b.db, start, end, ops)
+func (b *ReaderBatchWriter) NewIter(startPrefix, endPrefix []byte, ops storage.IteratorOption) (storage.Iterator, error) {
+	return newPebbleIterator(b.db, startPrefix, endPrefix, ops)
 }
 
 var _ storage.Writer = (*ReaderBatchWriter)(nil)
@@ -118,5 +116,6 @@ func (b *ReaderBatchWriter) Delete(key []byte) error {
 func (b *ReaderBatchWriter) DeleteByRange(_ storage.Reader, startPrefix, endPrefix []byte) error {
 	// DeleteRange takes the prefix range with start (inclusive) and end (exclusive, note: not inclusive).
 	// therefore, we need to increment the endPrefix to make it inclusive.
-	return b.batch.DeleteRange(startPrefix, operation.PrefixUpperBound(endPrefix), pebble.Sync)
+	start, end := storage.StartEndPrefixToLowerUpperBound(startPrefix, endPrefix)
+	return b.batch.DeleteRange(start, end, pebble.Sync)
 }
