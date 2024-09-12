@@ -335,4 +335,4 @@ replace github.com/ipfs/boxo => github.com/onflow/boxo v0.0.0-20240201202436-f24
 // TODO: remove it when https://github.com/ipfs/go-ds-pebble/pull/36 merged
 replace github.com/ipfs/go-ds-pebble v0.3.1 => github.com/onflow/go-ds-pebble v0.0.0-20240731130313-f186539f382c
 
-//replace github.com/libp2p/go-libp2p-pubsub v0.10.0 => github.com/onflow/go-libp2p-pubsub v0.0.0-20240909191821-b0a35c238013
+replace github.com/libp2p/go-libp2p-pubsub v0.10.0 => github.com/onflow/go-libp2p-pubsub v0.0.0-20240912202513-d2b0f4f747eb
