@@ -226,6 +226,19 @@ func (s *SafetyRulesTestSuite) TestProduceVote_InvalidCurrentView() {
 	s.persister.AssertNotCalled(s.T(), "PutSafetyData")
 }
 
+// TestProduceVote_ProposerNotActive tests that no vote is created when a proposal was submitted by an identity which is not part
+// of the committee. On practice this should never happen but a safety check is added to avoid any potential issues.
+func (s *SafetyRulesTestSuite) TestProduceVote_ProposerNotActive() {
+	*s.committee = mocks.DynamicCommittee{}
+	exception := errors.New("invalid-leader-identity")
+	s.committee.On("LeaderForView", s.proposal.Block.View).Return(nil, exception).Once()
+
+	vote, err := s.safety.ProduceVote(s.proposal, s.proposal.Block.View)
+	require.ErrorIs(s.T(), err, exception)
+	require.Nil(s.T(), vote)
+	s.persister.AssertNotCalled(s.T(), "PutSafetyData")
+}
+
 // TestProduceVote_NodeEjected tests that no vote is created if block proposer is ejected
 func (s *SafetyRulesTestSuite) TestProduceVote_ProposerEjected() {
 	*s.committee = mocks.DynamicCommittee{}
@@ -748,8 +761,14 @@ func (s *SafetyRulesTestSuite) TestSignOwnProposal_SelfInvalidLeader() {
 	require.Nil(s.T(), vote)
 }
 
-// TestSignOwnProposal_SingleProposalIsSigned tests that it's only possible to sign at most one proposal per view.
-func (s *SafetyRulesTestSuite) TestSignOwnProposal_SingleProposalIsSigned() {
+// TestProduceVote_VoteEquivocation tests scenario when we try to sign multiple proposals in the same view. We require that leader
+// follows next rules:
+//   - leader proposes once per view
+//   - leader's proposals follow safety rules
+//
+// Proposing twice per round on equivocating proposals is considered a byzantine behavior.
+// Expect a `model.NoVoteError` sentinel in such scenario.
+func (s *SafetyRulesTestSuite) TestSignOwnProposal_ProposalEquivocation() {
 	s.proposal.Block.ProposerID = s.ourIdentity.NodeID
 	expectedSafetyData := &hotstuff.SafetyData{
 		LockedOneChainView:      s.proposal.Block.QC.View,
@@ -767,6 +786,7 @@ func (s *SafetyRulesTestSuite) TestSignOwnProposal_SingleProposalIsSigned() {
 	// signing same proposal again should return an error since we have already created a proposal for this view
 	vote, err = s.safety.SignOwnProposal(s.proposal)
 	require.Error(s.T(), err)
+	require.True(s.T(), model.IsNoVoteError(err))
 	require.Nil(s.T(), vote)
 }
 
