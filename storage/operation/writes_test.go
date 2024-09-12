@@ -219,7 +219,6 @@ func TestConcurrentRemove(t *testing.T) {
 }
 
 func TestRemoveRange(t *testing.T) {
-	t.Skip()
 	RunWithStorages(t, func(t *testing.T, r storage.Reader, withWriterTx WithWriter) {
 
 		// Define the prefix
@@ -256,10 +255,13 @@ func TestRemoveRange(t *testing.T) {
 		// Remove the keys in the prefix range
 		withWriterTx(t, operation.RemoveByPrefix(r, prefix))
 
+		lg := unittest.Logger().With().
+			Logger()
 		// Verify that the keys in the prefix range have been removed
 		for i, key := range keys {
 			var exists bool
 			require.NoError(t, operation.Exists(key, &exists)(r))
+			lg.Info().Msgf("key %x exists: %t", key, exists)
 
 			deleted := includeStart <= i && i <= includeEnd
 
