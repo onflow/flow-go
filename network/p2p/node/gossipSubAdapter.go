@@ -58,6 +58,8 @@ func NewGossipSubAdapter(ctx context.Context,
 		// setting default weight for each topic
 		peerGaterTopicParams[t.String()] = 1.0
 	}
+	peerGaterTopicParams[channels.ConsensusCommittee.String()] = 1.5
+	peerGaterTopicParams[channels.SyncCommittee.String()] = .5
 	peerGaterParams = peerGaterParams.WithTopicDeliveryWeights(peerGaterTopicParams)
 
 	opts = append(opts, pubsub.WithPeerGater(peerGaterParams))
