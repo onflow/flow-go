@@ -33,17 +33,13 @@ type IterationFunc func() (CheckFunc, CreateFunc, HandleFunc)
 func IterateKeysInPrefixRange(start []byte, end []byte, check func(key []byte) error) func(storage.Reader) error {
 	return Iterate(start, end, func() (CheckFunc, CreateFunc, HandleFunc) {
 		return func(key []byte) (bool, error) {
-				err := check(key)
-				if err != nil {
-					return false, err
-				}
-				return false, nil
-			}, func() interface{} {
-				return nil
-			}, func() error {
-				return nil
+			err := check(key)
+			if err != nil {
+				return false, err
 			}
-	}, storage.DefaultIteratorOptions())
+			return false, nil
+		}, nil, nil
+	}, storage.IteratorOption{IterateKeyOnly: true})
 }
 
 func Iterate(start []byte, end []byte, iterFunc IterationFunc, opt storage.IteratorOption) func(storage.Reader) error {
@@ -76,11 +72,11 @@ func Iterate(start []byte, end []byte, iterFunc IterationFunc, opt storage.Itera
 			check, create, handle := iterFunc()
 
 			// check if we should process the item at all
-			ok, err := check(key)
+			shouldReadValue, err := check(key)
 			if err != nil {
 				return err
 			}
-			if !ok {
+			if !shouldReadValue { // skip reading value
 				continue
 			}
 

@@ -80,6 +80,10 @@ func TestReadWrite(t *testing.T) {
 	})
 }
 
+func TestBatchWrite(t *testing.T) {
+
+}
+
 func TestDelete(t *testing.T) {
 	RunWithStorages(t, func(t *testing.T, r storage.Reader, withWriterTx WithWriter) {
 		e := Entity{ID: 1337}
