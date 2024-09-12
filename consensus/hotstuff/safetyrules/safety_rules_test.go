@@ -714,14 +714,6 @@ func (s *SafetyRulesTestSuite) TestProduceTimeout_NodeEjected() {
 	s.persister.AssertNotCalled(s.T(), "PutSafetyData")
 }
 
-func makeVote(block *model.Block) *model.Vote {
-	return &model.Vote{
-		BlockID: block.BlockID,
-		View:    block.View,
-		SigData: nil, // signature doesn't matter in this test case
-	}
-}
-
 // TestSignOwnProposal tests a happy path scenario where leader can sign his own proposal.
 func (s *SafetyRulesTestSuite) TestSignOwnProposal() {
 	s.proposal.Block.ProposerID = s.ourIdentity.NodeID
@@ -736,4 +728,52 @@ func (s *SafetyRulesTestSuite) TestSignOwnProposal() {
 	vote, err := s.safety.SignOwnProposal(s.proposal)
 	require.NoError(s.T(), err)
 	require.Equal(s.T(), vote, expectedVote)
+}
+
+// TestSignOwnProposal_ProposalNotSelf tests that we cannot sign a proposal that is not ours.
+func (s *SafetyRulesTestSuite) TestSignOwnProposal_ProposalNotSelf() {
+	vote, err := s.safety.SignOwnProposal(s.proposal)
+	require.Error(s.T(), err)
+	require.Nil(s.T(), vote)
+}
+
+// TestSignOwnProposal_SelfInvalidLeader tests that we cannot sign a proposal if we are not the leader for the view.
+func (s *SafetyRulesTestSuite) TestSignOwnProposal_SelfInvalidLeader() {
+	s.proposal.Block.ProposerID = s.ourIdentity.NodeID
+	exception := errors.New("invalid-signer-identity")
+	s.committee.On("LeaderForView").Unset()
+	s.committee.On("LeaderForView", s.proposal.Block.View).Return(flow.Identifier{}, exception).Once()
+	vote, err := s.safety.SignOwnProposal(s.proposal)
+	require.ErrorIs(s.T(), err, exception)
+	require.Nil(s.T(), vote)
+}
+
+// TestSignOwnProposal_SingleProposalIsSigned tests that it's only possible to sign at most one proposal per view.
+func (s *SafetyRulesTestSuite) TestSignOwnProposal_SingleProposalIsSigned() {
+	s.proposal.Block.ProposerID = s.ourIdentity.NodeID
+	expectedSafetyData := &hotstuff.SafetyData{
+		LockedOneChainView:      s.proposal.Block.QC.View,
+		HighestAcknowledgedView: s.proposal.Block.View,
+	}
+	expectedVote := makeVote(s.proposal.Block)
+	s.committee.On("LeaderForView", s.proposal.Block.View).Return(s.ourIdentity.NodeID, nil).Once()
+	s.signer.On("CreateVote", s.proposal.Block).Return(expectedVote, nil).Once()
+	s.persister.On("PutSafetyData", expectedSafetyData).Return(nil).Once()
+
+	vote, err := s.safety.SignOwnProposal(s.proposal)
+	require.NoError(s.T(), err)
+	require.Equal(s.T(), expectedVote, vote)
+
+	// signing same proposal again should return an error since we have already created a proposal for this view
+	vote, err = s.safety.SignOwnProposal(s.proposal)
+	require.Error(s.T(), err)
+	require.Nil(s.T(), vote)
+}
+
+func makeVote(block *model.Block) *model.Vote {
+	return &model.Vote{
+		BlockID: block.BlockID,
+		View:    block.View,
+		SigData: nil, // signature doesn't matter in this test case
+	}
 }
