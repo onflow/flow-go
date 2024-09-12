@@ -65,7 +65,7 @@ func main() {
 	bigQueryUpload := flag.Bool("bigquery-upload", true, "whether to upload results to BigQuery (true / false)")
 	pushgateway := flag.String("pushgateway", "disabled", "host:port for pushgateway")
 	bigQueryProjectFlag := flag.String("bigquery-project", "ff-data-platform", "project name for the bigquery uploader")
-	bigQueryDatasetFlag := flag.String("bigquery-dataset", "dev_src_flow_tps_metrics", "dataset name for the bigquery uploader")
+	bigQueryDatasetFlag := flag.String("bigquery-dataset", "dev_src_flow_performance_metrics", "dataset name for the bigquery uploader")
 	bigQueryRawTableFlag := flag.String("bigquery-raw-table", "rawResults", "table name for the bigquery raw results")
 	flag.Parse()
 
