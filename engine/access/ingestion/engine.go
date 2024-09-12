@@ -6,11 +6,16 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/dgraph-io/badger/v2"
+	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
+	commonrpc "github.com/onflow/flow-go/engine/common/rpc"
+	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
@@ -24,6 +29,7 @@ import (
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
+	badgerstorage "github.com/onflow/flow-go/storage/badger"
 )
 
 const (
@@ -81,6 +87,9 @@ type Engine struct {
 	// Notifier for queue consumer
 	finalizedBlockNotifier engine.Notifier
 
+	// blockIDChan to fetch and store transaction result error messages
+	blockIDChan chan flow.Identifier
+
 	log     zerolog.Logger   // used to log relevant actions with context
 	state   protocol.State   // used to access the  protocol state
 	me      module.Local     // used to access local node information
@@ -88,17 +97,24 @@ type Engine struct {
 
 	// storage
 	// FIX: remove direct DB access by substituting indexer module
-	blocks            storage.Blocks
-	headers           storage.Headers
-	collections       storage.Collections
-	transactions      storage.Transactions
-	executionReceipts storage.ExecutionReceipts
-	maxReceiptHeight  uint64
-	executionResults  storage.ExecutionResults
+	blocks                         storage.Blocks
+	headers                        storage.Headers
+	collections                    storage.Collections
+	transactions                   storage.Transactions
+	executionReceipts              storage.ExecutionReceipts
+	maxReceiptHeight               uint64
+	executionResults               storage.ExecutionResults
+	transactionResultErrorMessages storage.TransactionResultErrorMessages
 
 	lastFullBlockHeight *counters.PersistentStrictMonotonicCounter
 	// metrics
 	collectionExecutedMetric module.CollectionExecutedMetric
+
+	preferredENIdentifiers flow.IdentifierList
+	fixedENIdentifiers     flow.IdentifierList
+
+	backend *backend.Backend
+	db      *badger.DB
 }
 
 var _ network.MessageProcessor = (*Engine)(nil)
@@ -118,9 +134,14 @@ func New(
 	transactions storage.Transactions,
 	executionResults storage.ExecutionResults,
 	executionReceipts storage.ExecutionReceipts,
+	transactionResultErrorMessages storage.TransactionResultErrorMessages,
 	collectionExecutedMetric module.CollectionExecutedMetric,
 	processedHeight storage.ConsumerProgress,
 	lastFullBlockHeight *counters.PersistentStrictMonotonicCounter,
+	backend *backend.Backend,
+	db *badger.DB,
+	preferredExecutionNodeIDs []string,
+	fixedExecutionNodeIDs []string,
 ) (*Engine, error) {
 	executionReceiptsRawQueue, err := fifoqueue.NewFifoQueue(defaultQueueCapacity)
 	if err != nil {
@@ -143,27 +164,43 @@ func New(
 
 	collectionExecutedMetric.UpdateLastFullBlockHeight(lastFullBlockHeight.Value())
 
+	preferredENIdentifiers, err := commonrpc.IdentifierList(preferredExecutionNodeIDs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert node id string to Flow Identifier for preferred EN map: %w", err)
+	}
+
+	fixedENIdentifiers, err := commonrpc.IdentifierList(fixedExecutionNodeIDs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert node id string to Flow Identifier for fixed EN map: %w", err)
+	}
+
 	// initialize the propagation engine with its dependencies
 	e := &Engine{
-		log:                      log.With().Str("engine", "ingestion").Logger(),
-		state:                    state,
-		me:                       me,
-		request:                  request,
-		blocks:                   blocks,
-		headers:                  headers,
-		collections:              collections,
-		transactions:             transactions,
-		executionResults:         executionResults,
-		executionReceipts:        executionReceipts,
-		maxReceiptHeight:         0,
-		collectionExecutedMetric: collectionExecutedMetric,
-		finalizedBlockNotifier:   engine.NewNotifier(),
-		lastFullBlockHeight:      lastFullBlockHeight,
+		log:                            log.With().Str("engine", "ingestion").Logger(),
+		state:                          state,
+		me:                             me,
+		request:                        request,
+		blocks:                         blocks,
+		headers:                        headers,
+		collections:                    collections,
+		transactions:                   transactions,
+		executionResults:               executionResults,
+		executionReceipts:              executionReceipts,
+		transactionResultErrorMessages: transactionResultErrorMessages,
+		maxReceiptHeight:               0,
+		collectionExecutedMetric:       collectionExecutedMetric,
+		finalizedBlockNotifier:         engine.NewNotifier(),
+		lastFullBlockHeight:            lastFullBlockHeight,
 
 		// queue / notifier for execution receipts
 		executionReceiptsNotifier: engine.NewNotifier(),
+		blockIDChan:               make(chan flow.Identifier, 1),
 		executionReceiptsQueue:    executionReceiptsQueue,
 		messageHandler:            messageHandler,
+		backend:                   backend,
+		db:                        db,
+		preferredENIdentifiers:    preferredENIdentifiers,
+		fixedENIdentifiers:        fixedENIdentifiers,
 	}
 
 	// jobqueue Jobs object that tracks finalized blocks by height. This is used by the finalizedBlockConsumer
@@ -196,6 +233,7 @@ func New(
 		AddWorker(e.processBackground).
 		AddWorker(e.processExecutionReceipts).
 		AddWorker(e.runFinalizedBlockConsumer).
+		AddWorker(e.processTransactionResultErrorMessages).
 		Build()
 
 	// register engine with the execution receipt provider
@@ -337,7 +375,83 @@ func (e *Engine) processAvailableExecutionReceipts(ctx context.Context) error {
 		if err := e.handleExecutionReceipt(msg.OriginID, receipt); err != nil {
 			return err
 		}
+
+		// notify, to fetch and store transaction result error messages
+		e.blockIDChan <- receipt.BlockID
 	}
+}
+
+func (e *Engine) processTransactionResultErrorMessages(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+	ready()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case blockID := <-e.blockIDChan:
+			err := e.handleTransactionResultErrorMessages(ctx, blockID)
+			if err != nil {
+				// if an error reaches this point, it is unexpected
+				ctx.Throw(err)
+				return
+			}
+		}
+	}
+}
+
+func (e *Engine) handleTransactionResultErrorMessages(ctx context.Context, blockID flow.Identifier) error {
+	execNodes, err := commonrpc.ExecutionNodesForBlockID(ctx, blockID, e.executionReceipts, e.state, e.log, e.preferredENIdentifiers, e.preferredENIdentifiers)
+	if err != nil {
+		return fmt.Errorf("failed to select execution nodes: %w", err)
+	}
+
+	req := &execproto.GetTransactionErrorMessagesByBlockIDRequest{
+		BlockId: convert.IdentifierToMessage(blockID),
+	}
+
+	resp, execNode, err := e.backend.GetTransactionErrorMessagesFromAnyEN(ctx, execNodes, req)
+	if err != nil {
+		// continue, we will add functionality to backfill these later
+		return nil
+	}
+
+	err = e.storeTransactionResultErrorMessages(blockID, resp, execNode)
+	if err != nil {
+		return fmt.Errorf("could not store error messages: %w", err)
+	}
+
+	return nil
+}
+
+func (e *Engine) storeTransactionResultErrorMessages(
+	blockID flow.Identifier,
+	errorMessagesResponses []*execproto.GetTransactionErrorMessagesResponse_Result,
+	execNode *flow.IdentitySkeleton,
+) error {
+	// Write Batch is BadgerDB feature designed for handling lots of writes
+	// in efficient and atomic manner, hence pushing all the updates we can
+	// as tightly as possible to let Badger manage it.
+	// Note, that it does not guarantee atomicity as transactions has size limit,
+	// but it's the closest thing to atomicity we could have
+	batch := badgerstorage.NewBatch(e.db)
+
+	errorMessages := make([]flow.TransactionResultErrorMessage, len(errorMessagesResponses))
+
+	for _, value := range errorMessagesResponses {
+		errorMessage := flow.TransactionResultErrorMessage{
+			ErrorMessage:  value.ErrorMessage,
+			TransactionID: convert.MessageToIdentifier(value.TransactionId),
+			ExecutorID:    execNode.NodeID,
+		}
+		errorMessages = append(errorMessages, errorMessage)
+	}
+
+	err := e.transactionResultErrorMessages.BatchStore(blockID, errorMessages, batch)
+	if err != nil {
+		return fmt.Errorf("failed to store execution receipt: %w", err)
+	}
+
+	return nil
 }
 
 // process processes the given ingestion engine event. Events that are given
