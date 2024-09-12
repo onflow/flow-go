@@ -63,6 +63,7 @@ type Reader interface {
 	// success, the caller MUST call closer.Close() or a memory leak will occur.
 	Get(key []byte) (value []byte, closer io.Closer, err error)
 
+	// NewIter returns a new Iterator for the given key range [start, end], both inclusive.
 	NewIter(start, end []byte, ops IteratorOption) (Iterator, error)
 }
 

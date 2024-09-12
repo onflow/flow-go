@@ -2,6 +2,7 @@ package operation_test
 
 import (
 	"bytes"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -114,4 +115,77 @@ func TestTraverse(t *testing.T) {
 }
 
 func TestFindHighestAtOrBelow(t *testing.T) {
+	// Helper function to insert an entity into the storage
+	insertEntity := func(writer storage.Writer, prefix []byte, height uint64, entity Entity) error {
+		key := append(prefix, operation.EncodeHeight(height)...)
+		return operation.Upsert(key, entity)(writer)
+	}
+
+	// Entities to be inserted
+	entities := []struct {
+		height uint64
+		entity Entity
+	}{
+		{5, Entity{ID: 41}},
+		{10, Entity{ID: 42}},
+		{15, Entity{ID: 43}},
+	}
+
+	// Run test with multiple storage backends
+	RunWithStorages(t, func(t *testing.T, r storage.Reader, withWriterTx WithWriter) {
+		prefix := []byte("test_prefix")
+
+		// Insert entities into the storage
+		withWriterTx(t, func(writer storage.Writer) error {
+			for _, e := range entities {
+				if err := insertEntity(writer, prefix, e.height, e.entity); err != nil {
+					return err
+				}
+			}
+			return nil
+		})
+
+		// Declare entity to store the results of FindHighestAtOrBelow
+		var entity Entity
+
+		// Test cases
+		tests := []struct {
+			name           string
+			height         uint64
+			expectedValue  uint64
+			expectError    bool
+			expectedErrMsg string
+		}{
+			{"target first height exists", 5, 41, false, ""},
+			{"target height exists", 10, 42, false, ""},
+			{"target height above", 11, 42, false, ""},
+			{"target height above highest", 20, 43, false, ""},
+			{"target height below lowest", 4, 0, true, storage.ErrNotFound.Error()},
+			{"empty prefix", 5, 0, true, "prefix must not be empty"},
+		}
+
+		// Execute test cases
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				prefixToUse := prefix
+
+				if tt.name == "empty prefix" {
+					prefixToUse = []byte{}
+				}
+
+				err := operation.FindHighestAtOrBelow(
+					prefixToUse,
+					tt.height,
+					&entity)(r)
+
+				if tt.expectError {
+					require.Error(t, err, fmt.Sprintf("expected error but got nil, entity: %v", entity))
+					require.Contains(t, err.Error(), tt.expectedErrMsg)
+				} else {
+					require.NoError(t, err)
+					require.Equal(t, tt.expectedValue, entity.ID)
+				}
+			})
+		}
+	})
 }

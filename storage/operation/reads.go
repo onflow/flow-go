@@ -182,24 +182,15 @@ func EncodeHeight(height uint64) []byte {
 	return h
 }
 
-// FindHigestAtOrBelow finds the highest key with the given prefix and
+// FindHighestAtOrBelow finds the highest key with the given prefix and
 // height equal to or below the given height.
-func FindHigestAtOrBelow(prefix []byte, height uint64, entity interface{}) func(storage.Reader) error {
+func FindHighestAtOrBelow(prefix []byte, height uint64, entity interface{}) func(storage.Reader) error {
 	return func(r storage.Reader) error {
 		if len(prefix) == 0 {
 			return fmt.Errorf("prefix must not be empty")
 		}
 
-		// why height+1? because:
-		// UpperBound specifies the largest key to iterate and it's exclusive (not inclusive)
-		// in order to match all keys indexed by height that is equal to or below the given height,
-		// we could increment the height by 1,
-		// for instance, to find highest key equal to or below 10, we first use 11 as the UpperBound, so that
-		// if there are 4 keys: [prefix-7, prefix-9, prefix-10, prefix-11], then all keys except
-		// prefix-11 will be included. And iterating them in the increasing order will find prefix-10
-		// as the highest key.
-
-		key := append(prefix, EncodeHeight(height+1)...)
+		key := append(prefix, EncodeHeight(height)...)
 		it, err := r.NewIter(prefix, key, storage.DefaultIteratorOptions())
 		if err != nil {
 			return fmt.Errorf("can not create iterator: %w", err)
