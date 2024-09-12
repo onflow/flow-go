@@ -82,9 +82,9 @@ func ReadTrie(dir string, targetHash flow.StateCommitment) ([]*ledger.Payload, e
 		s, err2 := led.MostRecentTouchedState()
 		if err2 != nil {
 			log.Error().Err(err2).
-				Msgf("cannot get most recently touched state in %v, check the --execution-data-dir flag", dir)
+				Msgf("cannot get most recently touched state in %v, check the --execution-state-dir flag", dir)
 		} else if s == ledger.State(mtrie.NewEmptyMTrie().RootHash()) {
-			log.Error().Msgf("cannot find any trie in folder %v. check the --execution-data-dir flag", dir)
+			log.Error().Msgf("cannot find any trie in folder %v. check the --execution-state-dir flag", dir)
 		} else {
 			log.Info().
 				Str("hash", s.String()).

@@ -507,5 +507,5 @@ func ensureCheckpointFileExist(dir string) error {
 		return nil
 	}
 
-	return fmt.Errorf("no checkpoint file was found, no root checkpoint file was found in %v, check the --execution-data-dir flag", dir)
+	return fmt.Errorf("no checkpoint file was found, no root checkpoint file was found in %v, check the --execution-state-dir flag", dir)
 }
