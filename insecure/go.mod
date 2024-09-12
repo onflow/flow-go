@@ -313,4 +313,4 @@ replace github.com/onflow/flow-go => ../
 // TODO: remove it when https://github.com/ipfs/go-ds-pebble/pull/36 merged
 replace github.com/ipfs/go-ds-pebble v0.3.1 => github.com/onflow/go-ds-pebble v0.0.0-20240731130313-f186539f382c
 
-replace github.com/onflow/cadence => github.com/dapperlabs/cadence-internal v1.0.0-preview.52-patch.1
+replace github.com/onflow/cadence => github.com/dapperlabs/cadence-internal v1.0.0-preview.52-patch.2

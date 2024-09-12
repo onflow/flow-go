@@ -1257,8 +1257,8 @@ github.com/cyberdelia/templates v0.0.0-20141128023046-ca7fffd4298c/go.mod h1:GyV
 github.com/cyphar/filepath-securejoin v0.2.4 h1:Ugdm7cg7i6ZK6x3xDF1oEu1nfkyfH53EtKeQYTC3kyg=
 github.com/cyphar/filepath-securejoin v0.2.4/go.mod h1:aPGpWjXOXUn2NCNjFvBE6aRxGGx79pTxQpKOJNYHHl4=
 github.com/danieljoos/wincred v1.2.0/go.mod h1:FzQLLMKBFdvu+osBrnFODiv32YGwCfx0SkRa/eYHgec=
-github.com/dapperlabs/cadence-internal v1.0.0-preview.52-patch.1 h1:iD5d8WZpPcFa3iWcuX2/3gA0NZwToXsc4Gjh804QxOA=
-github.com/dapperlabs/cadence-internal v1.0.0-preview.52-patch.1/go.mod h1:7wvvecnAZtYOspLOS3Lh+FuAmMeSrXhAWiycC3kQ1UU=
+github.com/dapperlabs/cadence-internal v1.0.0-preview.52-patch.2 h1:HOAq/2Xiq+zO9/sMXCQjhjF3Ej/URqTqCPtQaPrn2oY=
+github.com/dapperlabs/cadence-internal v1.0.0-preview.52-patch.2/go.mod h1:7wvvecnAZtYOspLOS3Lh+FuAmMeSrXhAWiycC3kQ1UU=
 github.com/dapperlabs/testingdock v0.4.5-0.20231020233342-a2853fe18724 h1:zOOpPLu5VvH8ixyoDWHnQHWoEHtryT1ne31vwz0G7Fo=
 github.com/dapperlabs/testingdock v0.4.5-0.20231020233342-a2853fe18724/go.mod h1:U0cEcbf9hAwPSuuoPVqXKhcWV+IU4CStK75cJ52f2/A=
 github.com/dave/astrid v0.0.0-20170323122508-8c2895878b14/go.mod h1:Sth2QfxfATb/nW4EsrSi2KyJmbcniZ8TgTaji17D6ms=

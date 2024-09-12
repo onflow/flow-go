@@ -1249,8 +1249,8 @@ github.com/creack/pty v1.1.9/go.mod h1:oKZEueFk5CKHvIhNR5MUki03XCEU+Q6VDXinZuGJ3
 github.com/cskr/pubsub v1.0.2 h1:vlOzMhl6PFn60gRlTQQsIfVwaPB/B/8MziK8FhEPt/0=
 github.com/cskr/pubsub v1.0.2/go.mod h1:/8MzYXk/NJAz782G8RPkFzXTZVu63VotefPnR9TIRis=
 github.com/cyberdelia/templates v0.0.0-20141128023046-ca7fffd4298c/go.mod h1:GyV+0YP4qX0UQ7r2MoYZ+AvYDp12OF5yg4q8rGnyNh4=
-github.com/dapperlabs/cadence-internal v1.0.0-preview.52-patch.1 h1:iD5d8WZpPcFa3iWcuX2/3gA0NZwToXsc4Gjh804QxOA=
-github.com/dapperlabs/cadence-internal v1.0.0-preview.52-patch.1/go.mod h1:7wvvecnAZtYOspLOS3Lh+FuAmMeSrXhAWiycC3kQ1UU=
+github.com/dapperlabs/cadence-internal v1.0.0-preview.52-patch.2 h1:HOAq/2Xiq+zO9/sMXCQjhjF3Ej/URqTqCPtQaPrn2oY=
+github.com/dapperlabs/cadence-internal v1.0.0-preview.52-patch.2/go.mod h1:7wvvecnAZtYOspLOS3Lh+FuAmMeSrXhAWiycC3kQ1UU=
 github.com/dave/astrid v0.0.0-20170323122508-8c2895878b14/go.mod h1:Sth2QfxfATb/nW4EsrSi2KyJmbcniZ8TgTaji17D6ms=
 github.com/dave/brenda v1.1.0/go.mod h1:4wCUr6gSlu5/1Tk7akE5X7UorwiQ8Rij0SKH3/BGMOM=
 github.com/dave/courtney v0.3.0/go.mod h1:BAv3hA06AYfNUjfjQr+5gc6vxeBVOupLqrColj+QSD8=
