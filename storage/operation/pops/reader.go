@@ -43,5 +43,5 @@ func (b dbReader) NewIter(startPrefix, endPrefix []byte, ops storage.IteratorOpt
 
 // ToReader is a helper function to convert a *pebble.DB to a Reader
 func ToReader(db *pebble.DB) storage.Reader {
-	return NewReaderBatchWriter(db)
+	return dbReader{db}
 }

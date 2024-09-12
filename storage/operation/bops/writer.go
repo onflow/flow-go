@@ -67,11 +67,6 @@ func NewReaderBatchWriter(db *badger.DB) *ReaderBatchWriter {
 	}
 }
 
-// ToReader is a helper function to convert a *badger.DB to a Reader
-func ToReader(db *badger.DB) storage.Reader {
-	return NewReaderBatchWriter(db)
-}
-
 var _ storage.Writer = (*ReaderBatchWriter)(nil)
 
 func (b *ReaderBatchWriter) Set(key, value []byte) error {

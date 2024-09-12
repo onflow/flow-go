@@ -47,3 +47,8 @@ func (b dbReader) Get(key []byte) ([]byte, io.Closer, error) {
 func (b dbReader) NewIter(startPrefix, endPrefix []byte, ops storage.IteratorOption) (storage.Iterator, error) {
 	return newBadgerIterator(b.db, startPrefix, endPrefix, ops), nil
 }
+
+// ToReader is a helper function to convert a *badger.DB to a Reader
+func ToReader(db *badger.DB) storage.Reader {
+	return dbReader{db}
+}
