@@ -59,6 +59,7 @@ func (s *SafetyRulesTestSuite) SetupTest() {
 		))
 
 	s.committee.On("Self").Return(s.ourIdentity.NodeID).Maybe()
+	s.committee.On("LeaderForView", mock.Anything).Return(s.proposerIdentity.NodeID, nil).Maybe()
 	s.committee.On("IdentityByBlock", mock.Anything, s.ourIdentity.NodeID).Return(s.ourIdentity, nil).Maybe()
 	s.committee.On("IdentityByBlock", s.proposal.Block.BlockID, s.proposal.Block.ProposerID).Return(s.proposerIdentity, nil).Maybe()
 	s.committee.On("IdentityByEpoch", mock.Anything, s.ourIdentity.NodeID).Return(&s.ourIdentity.IdentitySkeleton, nil).Maybe()
@@ -229,6 +230,8 @@ func (s *SafetyRulesTestSuite) TestProduceVote_InvalidCurrentView() {
 func (s *SafetyRulesTestSuite) TestProduceVote_ProposerEjected() {
 	*s.committee = mocks.DynamicCommittee{}
 	s.committee.On("IdentityByBlock", s.proposal.Block.BlockID, s.proposal.Block.ProposerID).Return(nil, model.NewInvalidSignerErrorf("node-ejected")).Once()
+	s.committee.On("LeaderForView", s.proposal.Block.View).Return(s.proposerIdentity.NodeID, nil).Once()
+	s.committee.On("Self").Return(s.ourIdentity.NodeID).Maybe()
 
 	vote, err := s.safety.ProduceVote(s.proposal, s.proposal.Block.View)
 	require.Nil(s.T(), vote)
@@ -242,6 +245,8 @@ func (s *SafetyRulesTestSuite) TestProduceVote_ProposerEjected() {
 func (s *SafetyRulesTestSuite) TestProduceVote_InvalidProposerIdentity() {
 	*s.committee = mocks.DynamicCommittee{}
 	exception := errors.New("invalid-signer-identity")
+	s.committee.On("Self").Return(s.ourIdentity.NodeID).Maybe()
+	s.committee.On("LeaderForView", s.proposal.Block.View).Return(s.proposerIdentity.NodeID, nil).Once()
 	s.committee.On("IdentityByBlock", s.proposal.Block.BlockID, s.proposal.Block.ProposerID).Return(nil, exception).Once()
 
 	vote, err := s.safety.ProduceVote(s.proposal, s.proposal.Block.View)
@@ -260,6 +265,7 @@ func (s *SafetyRulesTestSuite) TestProduceVote_NodeEjected() {
 	s.committee.On("Self").Return(s.ourIdentity.NodeID)
 	s.committee.On("IdentityByBlock", s.proposal.Block.BlockID, s.ourIdentity.NodeID).Return(nil, model.NewInvalidSignerErrorf("node-ejected")).Once()
 	s.committee.On("IdentityByBlock", s.proposal.Block.BlockID, s.proposal.Block.ProposerID).Return(s.proposerIdentity, nil).Maybe()
+	s.committee.On("LeaderForView", s.proposal.Block.View).Return(s.proposerIdentity.NodeID, nil).Once()
 
 	vote, err := s.safety.ProduceVote(s.proposal, s.proposal.Block.View)
 	require.Nil(s.T(), vote)
@@ -276,6 +282,7 @@ func (s *SafetyRulesTestSuite) TestProduceVote_InvalidVoterIdentity() {
 	exception := errors.New("invalid-signer-identity")
 	s.committee.On("IdentityByBlock", s.proposal.Block.BlockID, s.proposal.Block.ProposerID).Return(s.proposerIdentity, nil).Maybe()
 	s.committee.On("IdentityByBlock", s.proposal.Block.BlockID, s.ourIdentity.NodeID).Return(nil, exception).Once()
+	s.committee.On("LeaderForView", s.proposal.Block.View).Return(s.proposerIdentity.NodeID, nil).Once()
 
 	vote, err := s.safety.ProduceVote(s.proposal, s.proposal.Block.View)
 	require.Nil(s.T(), vote)
