@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"github.com/vmihailenco/msgpack"
 
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/operation"
@@ -73,16 +72,12 @@ func TestTraverse(t *testing.T) {
 			{0x42, 0xff},
 		}
 		vals := []uint64{11, 13, 17, 19, 23}
-		expected := []uint64{11, 17}
+		expected := []uint64{11, 23}
 
 		// Insert the keys and values into storage
 		withWriterTx(t, func(writer storage.Writer) error {
 			for i, key := range keys {
-				enc, err := msgpack.Marshal(vals[i])
-				if err != nil {
-					return err
-				}
-				err = operation.Upsert(key, enc)(writer)
+				err := operation.Upsert(key, vals[i])(writer)
 				if err != nil {
 					return err
 				}
@@ -95,7 +90,7 @@ func TestTraverse(t *testing.T) {
 		// Define the iteration logic
 		iterationFunc := func() (operation.CheckFunc, operation.CreateFunc, operation.HandleFunc) {
 			check := func(key []byte) (bool, error) {
-				// Continue reading value until we reach the key {0x42, 0x56}
+				// Skip the key {0x42, 0x56}
 				return !bytes.Equal(key, []byte{0x42, 0x56}), nil
 			}
 			var val uint64
