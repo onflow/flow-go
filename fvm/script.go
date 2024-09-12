@@ -173,7 +173,7 @@ func (executor *scriptExecutor) Execute() error {
 }
 
 func (executor *scriptExecutor) execute() error {
-	meterParams, err := getBodyMeterParameters(
+	meterParams, _, err := getBodyMeterParameters(
 		executor.ctx,
 		executor.proc,
 		executor.txnState)
