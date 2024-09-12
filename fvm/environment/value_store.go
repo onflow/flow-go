@@ -153,7 +153,7 @@ func (store *valueStore) SetValue(
 		return errors.NewInvalidInternalStateAccessError(id, "modify")
 	}
 
-	oldValue, err := store.GetValue(owner, keyBytes)
+	oldValue, err := store.accounts.GetValue(id)
 	if err != nil {
 		return fmt.Errorf("get value failed: %w", err)
 	}
