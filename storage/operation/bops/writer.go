@@ -11,8 +11,8 @@ import (
 )
 
 type ReaderBatchWriter struct {
-	dbReader
-	batch *badger.WriteBatch
+	globalReader storage.Reader
+	batch        *badger.WriteBatch
 
 	callbacks op.Callbacks
 }
@@ -20,7 +20,7 @@ type ReaderBatchWriter struct {
 var _ storage.BadgerReaderBatchWriter = (*ReaderBatchWriter)(nil)
 
 func (b *ReaderBatchWriter) GlobalReader() storage.Reader {
-	return b.dbReader
+	return b.globalReader
 }
 
 func (b *ReaderBatchWriter) Writer() storage.Writer {
@@ -62,8 +62,8 @@ func WithReaderBatchWriter(db *badger.DB, fn func(storage.BadgerReaderBatchWrite
 
 func NewReaderBatchWriter(db *badger.DB) *ReaderBatchWriter {
 	return &ReaderBatchWriter{
-		dbReader: dbReader{db: db},
-		batch:    db.NewWriteBatch(),
+		globalReader: ToReader(db),
+		batch:        db.NewWriteBatch(),
 	}
 }
 

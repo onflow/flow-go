@@ -8,8 +8,8 @@ import (
 )
 
 type ReaderBatchWriter struct {
-	dbReader
-	batch *pebble.Batch
+	globalReader storage.Reader
+	batch        *pebble.Batch
 
 	callbacks op.Callbacks
 }
@@ -17,7 +17,7 @@ type ReaderBatchWriter struct {
 var _ storage.PebbleReaderBatchWriter = (*ReaderBatchWriter)(nil)
 
 func (b *ReaderBatchWriter) GlobalReader() storage.Reader {
-	return b.dbReader
+	return b.globalReader
 }
 
 func (b *ReaderBatchWriter) Writer() storage.Writer {
@@ -59,8 +59,8 @@ func WithReaderBatchWriter(db *pebble.DB, fn func(storage.PebbleReaderBatchWrite
 
 func NewReaderBatchWriter(db *pebble.DB) *ReaderBatchWriter {
 	return &ReaderBatchWriter{
-		dbReader: dbReader{db: db},
-		batch:    db.NewBatch(),
+		globalReader: ToReader(db),
+		batch:        db.NewBatch(),
 	}
 }
 
