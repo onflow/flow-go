@@ -28,7 +28,6 @@ func RunWithStorages(t *testing.T, fn func(*testing.T, storage.Reader, WithWrite
 				require.NoError(t, writer.Commit())
 			}
 
-			// TODO: make NewReader
 			reader := bops.ToReader(db)
 			fn(t, reader, withWriterTx)
 		})
@@ -42,7 +41,6 @@ func RunWithStorages(t *testing.T, fn func(*testing.T, storage.Reader, WithWrite
 				require.NoError(t, writer.Commit())
 			}
 
-			// TODO: make NewReader
 			reader := pops.ToReader(db)
 			fn(t, reader, withWriterTx)
 		})

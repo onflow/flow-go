@@ -2,7 +2,6 @@ package operation
 
 import (
 	"bytes"
-	"encoding/binary"
 	"errors"
 	"fmt"
 
@@ -180,13 +179,6 @@ func Retrieve(key []byte, entity interface{}) func(storage.Reader) error {
 	}
 }
 
-// TODO: Move to common functions
-func EncodeHeight(height uint64) []byte {
-	h := make([]byte, 8)
-	binary.BigEndian.PutUint64(h, height)
-	return h
-}
-
 // FindHighestAtOrBelow finds the highest key with the given prefix and
 // height equal to or below the given height.
 func FindHighestAtOrBelow(prefix []byte, height uint64, entity interface{}) func(storage.Reader) error {
@@ -195,7 +187,7 @@ func FindHighestAtOrBelow(prefix []byte, height uint64, entity interface{}) func
 			return fmt.Errorf("prefix must not be empty")
 		}
 
-		key := append(prefix, EncodeHeight(height)...)
+		key := append(prefix, EncodeKeyPart(height)...)
 		it, err := r.NewIter(prefix, key, storage.DefaultIteratorOptions())
 		if err != nil {
 			return fmt.Errorf("can not create iterator: %w", err)

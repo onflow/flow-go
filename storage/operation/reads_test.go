@@ -114,7 +114,7 @@ func TestTraverse(t *testing.T) {
 func TestFindHighestAtOrBelow(t *testing.T) {
 	// Helper function to insert an entity into the storage
 	insertEntity := func(writer storage.Writer, prefix []byte, height uint64, entity Entity) error {
-		key := append(prefix, operation.EncodeHeight(height)...)
+		key := append(prefix, operation.EncodeData(height)...)
 		return operation.Upsert(key, entity)(writer)
 	}
 

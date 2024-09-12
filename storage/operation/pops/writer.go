@@ -1,18 +1,14 @@
 package pops
 
 import (
-	"errors"
-	"io"
-
 	"github.com/cockroachdb/pebble"
 
-	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/storage"
 	op "github.com/onflow/flow-go/storage/operation"
 )
 
 type ReaderBatchWriter struct {
-	db    *pebble.DB
+	dbReader
 	batch *pebble.Batch
 
 	callbacks op.Callbacks
@@ -21,7 +17,7 @@ type ReaderBatchWriter struct {
 var _ storage.PebbleReaderBatchWriter = (*ReaderBatchWriter)(nil)
 
 func (b *ReaderBatchWriter) GlobalReader() storage.Reader {
-	return b
+	return b.dbReader
 }
 
 func (b *ReaderBatchWriter) Writer() storage.Writer {
@@ -63,43 +59,9 @@ func WithReaderBatchWriter(db *pebble.DB, fn func(storage.PebbleReaderBatchWrite
 
 func NewReaderBatchWriter(db *pebble.DB) *ReaderBatchWriter {
 	return &ReaderBatchWriter{
-		db:    db,
-		batch: db.NewBatch(),
+		dbReader: dbReader{db: db},
+		batch:    db.NewBatch(),
 	}
-}
-
-// ToReader is a helper function to convert a *pebble.DB to a Reader
-func ToReader(db *pebble.DB) storage.Reader {
-	return NewReaderBatchWriter(db)
-}
-
-/* implementing storage.Reader interface for ReaderBatchWriter */
-
-var _ storage.Reader = (*ReaderBatchWriter)(nil)
-
-type noopCloser struct{}
-
-var _ io.Closer = (*noopCloser)(nil)
-
-func (noopCloser) Close() error { return nil }
-
-func (b *ReaderBatchWriter) Get(key []byte) ([]byte, io.Closer, error) {
-	value, closer, err := b.db.Get(key)
-
-	if err != nil {
-		if errors.Is(err, pebble.ErrNotFound) {
-			return nil, nil, storage.ErrNotFound
-		}
-
-		// exception while checking for the key
-		return nil, nil, irrecoverable.NewExceptionf("could not load data: %w", err)
-	}
-
-	return value, closer, nil
-}
-
-func (b *ReaderBatchWriter) NewIter(startPrefix, endPrefix []byte, ops storage.IteratorOption) (storage.Iterator, error) {
-	return newPebbleIterator(b.db, startPrefix, endPrefix, ops)
 }
 
 var _ storage.Writer = (*ReaderBatchWriter)(nil)

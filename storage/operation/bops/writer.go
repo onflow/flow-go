@@ -1,20 +1,17 @@
 package bops
 
 import (
-	"errors"
 	"fmt"
-	"io"
 
 	"github.com/dgraph-io/badger/v2"
 
-	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/operation"
 	op "github.com/onflow/flow-go/storage/operation"
 )
 
 type ReaderBatchWriter struct {
-	db    *badger.DB
+	dbReader
 	batch *badger.WriteBatch
 
 	callbacks op.Callbacks
@@ -23,7 +20,7 @@ type ReaderBatchWriter struct {
 var _ storage.BadgerReaderBatchWriter = (*ReaderBatchWriter)(nil)
 
 func (b *ReaderBatchWriter) GlobalReader() storage.Reader {
-	return b
+	return b.dbReader
 }
 
 func (b *ReaderBatchWriter) Writer() storage.Writer {
@@ -65,52 +62,14 @@ func WithReaderBatchWriter(db *badger.DB, fn func(storage.BadgerReaderBatchWrite
 
 func NewReaderBatchWriter(db *badger.DB) *ReaderBatchWriter {
 	return &ReaderBatchWriter{
-		db:    db,
-		batch: db.NewWriteBatch(),
+		dbReader: dbReader{db: db},
+		batch:    db.NewWriteBatch(),
 	}
 }
 
 // ToReader is a helper function to convert a *badger.DB to a Reader
 func ToReader(db *badger.DB) storage.Reader {
 	return NewReaderBatchWriter(db)
-}
-
-/* implementing storage.Reader interface for ReaderBatchWriter */
-
-var _ storage.Reader = (*ReaderBatchWriter)(nil)
-
-type noopCloser struct{}
-
-var _ io.Closer = (*noopCloser)(nil)
-
-func (noopCloser) Close() error { return nil }
-
-func (b *ReaderBatchWriter) Get(key []byte) ([]byte, io.Closer, error) {
-	tx := b.db.NewTransaction(false)
-	defer tx.Discard()
-
-	item, err := tx.Get(key)
-	if err != nil {
-		if errors.Is(err, badger.ErrKeyNotFound) {
-			return nil, nil, storage.ErrNotFound
-		}
-		return nil, nil, irrecoverable.NewExceptionf("could not load data: %w", err)
-	}
-
-	var value []byte
-	err = item.Value(func(val []byte) error {
-		value = append([]byte{}, val...)
-		return nil
-	})
-	if err != nil {
-		return nil, nil, irrecoverable.NewExceptionf("could not load value: %w", err)
-	}
-
-	return value, noopCloser{}, nil
-}
-
-func (b *ReaderBatchWriter) NewIter(startPrefix, endPrefix []byte, ops storage.IteratorOption) (storage.Iterator, error) {
-	return newBadgerIterator(b.db, startPrefix, endPrefix, ops), nil
 }
 
 var _ storage.Writer = (*ReaderBatchWriter)(nil)
