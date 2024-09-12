@@ -17,10 +17,10 @@ import (
 	"github.com/cockroachdb/pebble"
 	"github.com/dgraph-io/badger/v2"
 	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/onflow/crypto"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/util"
@@ -368,6 +368,11 @@ func TempBadgerDB(t testing.TB) (*badger.DB, string) {
 	return db, dir
 }
 
+func TempPebbleDB(t testing.TB) (*pebble.DB, string) {
+	dir := TempDir(t)
+	return PebbleDB(t, dir), dir
+}
+
 func TempPebblePath(t *testing.T) string {
 	return path.Join(TempDir(t), "pebble"+strconv.Itoa(rand.Int())+".db")
 }
@@ -378,6 +383,71 @@ func TempPebbleDBWithOpts(t testing.TB, opts *pebble.Options) (*pebble.DB, strin
 	db, err := pebble.Open(dbpath, opts)
 	require.NoError(t, err)
 	return db, dbpath
+}
+
+func RunWithPebbleDB(t testing.TB, f func(*pebble.DB)) {
+	RunWithTempDir(t, func(dir string) {
+		db, err := pebble.Open(dir, &pebble.Options{})
+		require.NoError(t, err)
+		defer func() {
+			assert.NoError(t, db.Close())
+		}()
+		f(db)
+	})
+}
+
+func PebbleDB(t testing.TB, dir string) *pebble.DB {
+	db, err := pebble.Open(dir, &pebble.Options{})
+	require.NoError(t, err)
+	return db
+}
+
+func TypedPebbleDB(t testing.TB, dir string, create func(string, *pebble.Options) (*pebble.DB, error)) *pebble.DB {
+	db, err := create(dir, &pebble.Options{})
+	require.NoError(t, err)
+	return db
+}
+
+type PebbleWrapper struct {
+	db *pebble.DB
+}
+
+func (p *PebbleWrapper) View(fn func(pebble.Reader) error) error {
+	return fn(p.db)
+}
+
+func (p *PebbleWrapper) Update(fn func(pebble.Writer) error) error {
+	return fn(p.db)
+}
+
+func (p *PebbleWrapper) DB() *pebble.DB {
+	return p.db
+}
+
+func RunWithWrappedPebbleDB(t testing.TB, f func(p *PebbleWrapper)) {
+	RunWithTempDir(t, func(dir string) {
+		db, err := pebble.Open(dir, &pebble.Options{})
+		require.NoError(t, err)
+		defer func() {
+			assert.NoError(t, db.Close())
+		}()
+		f(&PebbleWrapper{db})
+	})
+
+}
+
+func RunWithTypedPebbleDB(
+	t testing.TB,
+	create func(string, *pebble.Options) (*pebble.DB, error),
+	f func(*pebble.DB)) {
+	RunWithTempDir(t, func(dir string) {
+		db, err := create(dir, &pebble.Options{})
+		require.NoError(t, err)
+		defer func() {
+			assert.NoError(t, db.Close())
+		}()
+		f(db)
+	})
 }
 
 func Concurrently(n int, f func(int)) {

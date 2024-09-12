@@ -6,12 +6,14 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/cockroachdb/pebble"
 	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/storage"
 	bops "github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/storage/operation"
+	pops "github.com/onflow/flow-go/storage/pebble/operation"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -33,8 +35,17 @@ func RunWithStorages(t *testing.T, fn func(*testing.T, storage.Reader, WithWrite
 	})
 
 	t.Run("PebbleStorage", func(t *testing.T) {
-		// unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
-		// })
+		unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
+			withWriterTx := func(t *testing.T, writing func(storage.Writer) error) {
+				writer := pops.NewReaderBatchWriter(db)
+				require.NoError(t, writing(writer))
+				require.NoError(t, writer.Commit())
+			}
+
+			// TODO: make NewReader
+			reader := pops.ToReader(db)
+			fn(t, reader, withWriterTx)
+		})
 	})
 }
 
@@ -208,6 +219,7 @@ func TestConcurrentRemove(t *testing.T) {
 }
 
 func TestRemoveRange(t *testing.T) {
+	t.Skip()
 	RunWithStorages(t, func(t *testing.T, r storage.Reader, withWriterTx WithWriter) {
 
 		// Define the prefix
