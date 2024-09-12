@@ -13,8 +13,8 @@ import (
 
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/operation"
-	"github.com/onflow/flow-go/storage/operation/bops"
-	"github.com/onflow/flow-go/storage/operation/pops"
+	"github.com/onflow/flow-go/storage/operation/badgerimpl"
+	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -256,12 +256,12 @@ func RunWithStorages(t *testing.T, fn func(*testing.T, storage.Reader, WithWrite
 	t.Run("BadgerStorage", func(t *testing.T) {
 		unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 			withWriterTx := func(t *testing.T, writing func(storage.Writer) error) {
-				writer := bops.NewReaderBatchWriter(db)
+				writer := badgerimpl.NewReaderBatchWriter(db)
 				require.NoError(t, writing(writer))
 				require.NoError(t, writer.Commit())
 			}
 
-			reader := bops.ToReader(db)
+			reader := badgerimpl.ToReader(db)
 			fn(t, reader, withWriterTx)
 		})
 	})
@@ -269,12 +269,12 @@ func RunWithStorages(t *testing.T, fn func(*testing.T, storage.Reader, WithWrite
 	t.Run("PebbleStorage", func(t *testing.T) {
 		unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
 			withWriterTx := func(t *testing.T, writing func(storage.Writer) error) {
-				writer := pops.NewReaderBatchWriter(db)
+				writer := pebbleimpl.NewReaderBatchWriter(db)
 				require.NoError(t, writing(writer))
 				require.NoError(t, writer.Commit())
 			}
 
-			reader := pops.ToReader(db)
+			reader := pebbleimpl.ToReader(db)
 			fn(t, reader, withWriterTx)
 		})
 	})

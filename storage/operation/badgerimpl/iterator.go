@@ -1,4 +1,4 @@
-package bops
+package badgerimpl
 
 import (
 	"bytes"

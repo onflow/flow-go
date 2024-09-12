@@ -12,7 +12,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
-	"github.com/onflow/flow-go/storage/operation/bops"
+	"github.com/onflow/flow-go/storage/operation/badgerimpl"
 )
 
 // ResultApprovals implements persistent storage for result approvals.
@@ -105,7 +105,7 @@ func (r *ResultApprovals) index(resultID flow.Identifier, chunkIndex uint64, app
 
 // Store stores a ResultApproval
 func (r *ResultApprovals) Store(approval *flow.ResultApproval) error {
-	return bops.WithReaderBatchWriter(r.db, r.store(approval))
+	return badgerimpl.WithReaderBatchWriter(r.db, r.store(approval))
 }
 
 // Index indexes a ResultApproval by chunk (ResultID + chunk index).
@@ -120,7 +120,7 @@ func (r *ResultApprovals) Index(resultID flow.Identifier, chunkIndex uint64, app
 	r.indexing.Lock()
 	defer r.indexing.Unlock()
 
-	err := bops.WithReaderBatchWriter(r.db, r.index(resultID, chunkIndex, approvalID))
+	err := badgerimpl.WithReaderBatchWriter(r.db, r.index(resultID, chunkIndex, approvalID))
 	if err != nil {
 		return fmt.Errorf("could not index result approval: %w", err)
 	}
@@ -129,12 +129,12 @@ func (r *ResultApprovals) Index(resultID flow.Identifier, chunkIndex uint64, app
 
 // ByID retrieves a ResultApproval by its ID
 func (r *ResultApprovals) ByID(approvalID flow.Identifier) (*flow.ResultApproval, error) {
-	return r.byID(approvalID)(bops.ToReader(r.db))
+	return r.byID(approvalID)(badgerimpl.ToReader(r.db))
 }
 
 // ByChunk retrieves a ResultApproval by result ID and chunk index. The
 // ResultApprovals store is only used within a verification node, where it is
 // assumed that there is never more than one approval per chunk.
 func (r *ResultApprovals) ByChunk(resultID flow.Identifier, chunkIndex uint64) (*flow.ResultApproval, error) {
-	return r.byChunk(resultID, chunkIndex)(bops.ToReader(r.db))
+	return r.byChunk(resultID, chunkIndex)(badgerimpl.ToReader(r.db))
 }
