@@ -127,6 +127,7 @@ verification:
         - --datadir=/data/protocol
         - --secretsdir=/data/secret
         - --bind=0.0.0.0:3569
+        - --admin-addr=0.0.0.0:9002
         - --profiler-enabled=false
         - --profile-uploader-enabled=false
         - --tracer-enabled=false
