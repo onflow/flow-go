@@ -44,6 +44,7 @@ func (i *badgerIterator) Valid() bool {
 		return false
 	}
 	key := i.iter.Item().Key()
+	// "< 0" means the upperBound is exclusive
 	return bytes.Compare(key, i.upperBound) < 0
 }
 

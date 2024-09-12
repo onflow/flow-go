@@ -99,6 +99,7 @@ func (b *ReaderBatchWriter) Get(key []byte) ([]byte, io.Closer, error) {
 }
 
 func (b *ReaderBatchWriter) NewIter(start, end []byte, ops storage.IteratorOption) (storage.Iterator, error) {
+	// TODO: end + 1?
 	return newPebbleIterator(b.db, start, end, ops)
 }
 

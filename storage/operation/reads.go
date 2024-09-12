@@ -71,8 +71,11 @@ func Iterate(start []byte, end []byte, iterFunc IterationFunc, opt storage.Itera
 			// initialize processing functions for iteration
 			check, create, handle := iterFunc()
 
+			keyCopy := make([]byte, len(key))
+			copy(keyCopy, key)
+
 			// check if we should process the item at all
-			shouldReadValue, err := check(key)
+			shouldReadValue, err := check(keyCopy)
 			if err != nil {
 				return err
 			}

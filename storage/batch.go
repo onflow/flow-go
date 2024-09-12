@@ -81,7 +81,8 @@ type Writer interface {
 	// It is safe to modify the contents of the arguments after Delete returns.
 	Delete(key []byte) error
 
-	// DeleteByRange removes all keys with a prefix that falls within the range [start, end].
+	// DeleteByRange removes all keys with a prefix that falls within the
+	// range [start, end], both inclusive.
 	DeleteByRange(globalReader Reader, startPrefix, endPrefix []byte) error
 }
 

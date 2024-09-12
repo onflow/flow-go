@@ -80,11 +80,53 @@ func TestReadWrite(t *testing.T) {
 	})
 }
 
+// Verify multiple entities can be removed in one batch update
 func TestBatchWrite(t *testing.T) {
+	RunWithStorages(t, func(t *testing.T, r storage.Reader, withWriterTx WithWriter) {
+		// Define multiple entities for batch insertion
+		entities := []Entity{
+			{ID: 1337},
+			{ID: 42},
+			{ID: 84},
+		}
 
+		// Batch write: insert multiple entities in a single transaction
+		withWriterTx(t, func(writer storage.Writer) error {
+			for _, e := range entities {
+				if err := operation.Upsert(e.Key(), e)(writer); err != nil {
+					return err
+				}
+			}
+			return nil
+		})
+
+		// Verify that each entity can be read back
+		for _, e := range entities {
+			var readBack Entity
+			require.NoError(t, operation.Retrieve(e.Key(), &readBack)(r))
+			require.Equal(t, e, readBack, "expected retrieved value to match written value for entity ID %d", e.ID)
+		}
+
+		// Batch update: remove multiple entities in a single transaction
+		withWriterTx(t, func(writer storage.Writer) error {
+			for _, e := range entities {
+				if err := operation.Remove(e.Key())(writer); err != nil {
+					return err
+				}
+			}
+			return nil
+		})
+
+		// Verify that each entity has been removed
+		for _, e := range entities {
+			var readBack Entity
+			err := operation.Retrieve(e.Key(), &readBack)(r)
+			require.True(t, errors.Is(err, storage.ErrNotFound), "expected not found error for entity ID %d after removal", e.ID)
+		}
+	})
 }
 
-func TestDelete(t *testing.T) {
+func TestRemove(t *testing.T) {
 	RunWithStorages(t, func(t *testing.T, r storage.Reader, withWriterTx WithWriter) {
 		e := Entity{ID: 1337}
 
@@ -133,7 +175,7 @@ func TestConcurrentWrite(t *testing.T) {
 	})
 }
 
-func TestConcurrentDelete(t *testing.T) {
+func TestConcurrentRemove(t *testing.T) {
 	RunWithStorages(t, func(t *testing.T, r storage.Reader, withWriterTx WithWriter) {
 		var wg sync.WaitGroup
 		numDeletes := 10 // number of concurrent deletions
@@ -163,4 +205,56 @@ func TestConcurrentDelete(t *testing.T) {
 
 		wg.Wait() // Wait for all goroutines to finish
 	})
+}
+
+func TestRemoveRange(t *testing.T) {
+	RunWithStorages(t, func(t *testing.T, r storage.Reader, withWriterTx WithWriter) {
+
+		// Define the prefix
+		prefix := []byte{0x10}
+
+		// Create a range of keys around the boundaries of the prefix
+		keys := [][]byte{
+			// before prefix -> not included in range
+			{0x09, 0xff},
+			// within the prefix -> included in range
+			{0x10, 0x00},
+			{0x10, 0x50},
+			{0x10, 0xff},
+			// after end -> not included in range
+			{0x11, 0x00},
+			{0x1A, 0xff},
+		}
+
+		// Keys expected to be in the prefix range
+		includeStart, includeEnd := 1, 3
+
+		// Insert the keys into the storage
+		withWriterTx(t, func(writer storage.Writer) error {
+			for _, key := range keys {
+				value := []byte{0x00} // value are skipped, doesn't matter
+				err := operation.Upsert(key, value)(writer)
+				if err != nil {
+					return err
+				}
+			}
+			return nil
+		})
+
+		// Remove the keys in the prefix range
+		withWriterTx(t, operation.RemoveByPrefix(r, prefix))
+
+		// Verify that the keys in the prefix range have been removed
+		for i, key := range keys {
+			var exists bool
+			require.NoError(t, operation.Exists(key, &exists)(r))
+
+			deleted := includeStart <= i && i <= includeEnd
+
+			// deleted item should not exist
+			require.Equal(t, !deleted, exists,
+				"expected key %x to be %s", key, map[bool]string{true: "deleted", false: "not deleted"})
+		}
+	})
+
 }

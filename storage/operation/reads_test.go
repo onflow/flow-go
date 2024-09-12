@@ -53,10 +53,7 @@ func TestIterateKeysInPrefixRange(t *testing.T) {
 		// Forward iteration and check boundaries
 		var found [][]byte
 		require.NoError(t, operation.IterateKeysInPrefixRange(prefixStart, prefixEnd, func(key []byte) error {
-			// Copy the key slice before appending to avoid shared memory issues
-			keyCopy := make([]byte, len(key))
-			copy(keyCopy, key)
-			found = append(found, keyCopy)
+			found = append(found, key)
 			return nil
 		})(r), "should iterate forward without error")
 		require.ElementsMatch(t, keysInRange, found, "forward iteration should return the correct keys in range")

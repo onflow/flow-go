@@ -20,10 +20,6 @@ type ReaderBatchWriter struct {
 	callbacks op.Callbacks
 }
 
-type badgerReader struct {
-	db *badger.DB
-}
-
 var _ storage.BadgerReaderBatchWriter = (*ReaderBatchWriter)(nil)
 
 func (b *ReaderBatchWriter) GlobalReader() storage.Reader {
