@@ -714,3 +714,19 @@ func makeVote(block *model.Block) *model.Vote {
 		SigData: nil, // signature doesn't matter in this test case
 	}
 }
+
+// TestSignOwnProposal tests a happy path scenario where leader can sign his own proposal.
+func (s *SafetyRulesTestSuite) TestSignOwnProposal() {
+	s.proposal.Block.ProposerID = s.ourIdentity.NodeID
+	expectedSafetyData := &hotstuff.SafetyData{
+		LockedOneChainView:      s.proposal.Block.QC.View,
+		HighestAcknowledgedView: s.proposal.Block.View,
+	}
+	expectedVote := makeVote(s.proposal.Block)
+	s.committee.On("LeaderForView", s.proposal.Block.View).Return(s.ourIdentity.NodeID, nil).Once()
+	s.signer.On("CreateVote", s.proposal.Block).Return(expectedVote, nil).Once()
+	s.persister.On("PutSafetyData", expectedSafetyData).Return(nil).Once()
+	vote, err := s.safety.SignOwnProposal(s.proposal)
+	require.NoError(s.T(), err)
+	require.Equal(s.T(), vote, expectedVote)
+}
