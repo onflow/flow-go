@@ -19,6 +19,7 @@ import (
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 	cadenceErrors "github.com/onflow/cadence/runtime/errors"
+	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/onflow/cadence/runtime/tests/utils"
 	"github.com/onflow/crypto"
 	"github.com/stretchr/testify/assert"
@@ -3128,5 +3129,81 @@ func TestAccountCapabilitiesGetEntitledRejection(t *testing.T) {
 			require.NoError(t, output.Err)
 		}),
 	)
+}
 
+func TestAccountCapabilitiesPublishEntitledRejection(t *testing.T) {
+
+	t.Run("entitled capability", newVMTest().
+		run(func(
+			t *testing.T,
+			vm fvm.VM,
+			chain flow.Chain,
+			ctx fvm.Context,
+			snapshotTree snapshot.SnapshotTree,
+		) {
+
+			serviceAddress := chain.ServiceAddress()
+			txBody := flow.NewTransactionBody().
+				SetScript([]byte(`
+					transaction {
+                        prepare(signer: auth(Capabilities, Storage) &Account) {
+                            signer.storage.save(42, to: /storage/number)
+                            let cap = signer.capabilities.storage.issue<auth(Insert) &Int>(/storage/number)
+                            signer.capabilities.publish(cap, at: /public/number)
+                        }
+					}
+				`)).
+				AddAuthorizer(serviceAddress).
+				SetProposalKey(serviceAddress, 0, 0).
+				SetPayer(serviceAddress)
+
+			err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
+			require.NoError(t, err)
+
+			_, output, err := vm.Run(
+				ctx,
+				fvm.Transaction(txBody, 0),
+				snapshotTree)
+
+			require.NoError(t, err)
+			require.ErrorAs(t, output.Err, &interpreter.EntitledCapabilityPublishingError{})
+		}),
+	)
+
+	t.Run("non entitled capability", newVMTest().
+		run(func(
+			t *testing.T,
+			vm fvm.VM,
+			chain flow.Chain,
+			ctx fvm.Context,
+			snapshotTree snapshot.SnapshotTree,
+		) {
+
+			serviceAddress := chain.ServiceAddress()
+			txBody := flow.NewTransactionBody().
+				SetScript([]byte(`
+					transaction {
+                        prepare(signer: auth(Capabilities, Storage) &Account) {
+                            signer.storage.save(42, to: /storage/number)
+                            let cap = signer.capabilities.storage.issue<&Int>(/storage/number)
+                            signer.capabilities.publish(cap, at: /public/number)
+                        }
+					}
+				`)).
+				AddAuthorizer(serviceAddress).
+				SetProposalKey(serviceAddress, 0, 0).
+				SetPayer(serviceAddress)
+
+			err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
+			require.NoError(t, err)
+
+			_, output, err := vm.Run(
+				ctx,
+				fvm.Transaction(txBody, 0),
+				snapshotTree)
+
+			require.NoError(t, err)
+			require.NoError(t, output.Err)
+		}),
+	)
 }

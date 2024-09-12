@@ -1752,6 +1752,30 @@ func (_m *Environment) ValidateAccountCapabilitiesGet(inter *interpreter.Interpr
 	return r0, r1
 }
 
+// ValidateAccountCapabilitiesPublish provides a mock function with given fields: inter, locationRange, address, path, capabilityBorrowType
+func (_m *Environment) ValidateAccountCapabilitiesPublish(inter *interpreter.Interpreter, locationRange interpreter.LocationRange, address interpreter.AddressValue, path interpreter.PathValue, capabilityBorrowType *interpreter.ReferenceStaticType) (bool, error) {
+	ret := _m.Called(inter, locationRange, address, path, capabilityBorrowType)
+
+	var r0 bool
+	var r1 error
+	if rf, ok := ret.Get(0).(func(*interpreter.Interpreter, interpreter.LocationRange, interpreter.AddressValue, interpreter.PathValue, *interpreter.ReferenceStaticType) (bool, error)); ok {
+		return rf(inter, locationRange, address, path, capabilityBorrowType)
+	}
+	if rf, ok := ret.Get(0).(func(*interpreter.Interpreter, interpreter.LocationRange, interpreter.AddressValue, interpreter.PathValue, *interpreter.ReferenceStaticType) bool); ok {
+		r0 = rf(inter, locationRange, address, path, capabilityBorrowType)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	if rf, ok := ret.Get(1).(func(*interpreter.Interpreter, interpreter.LocationRange, interpreter.AddressValue, interpreter.PathValue, *interpreter.ReferenceStaticType) error); ok {
+		r1 = rf(inter, locationRange, address, path, capabilityBorrowType)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // ValidatePublicKey provides a mock function with given fields: key
 func (_m *Environment) ValidatePublicKey(key *stdlib.PublicKey) error {
 	ret := _m.Called(key)

@@ -363,3 +363,18 @@ func (env *facadeEnvironment) ValidateAccountCapabilitiesGet(
 	}
 	return true, nil
 }
+
+func (env *facadeEnvironment) ValidateAccountCapabilitiesPublish(
+	_ *interpreter.Interpreter,
+	_ interpreter.LocationRange,
+	_ interpreter.AddressValue,
+	_ interpreter.PathValue,
+	capabilityBorrowType *interpreter.ReferenceStaticType,
+) (bool, error) {
+	_, isEntitledCapability := capabilityBorrowType.Authorization.(interpreter.EntitlementSetAuthorization)
+	if isEntitledCapability {
+		// TODO: maybe abort
+		return false, nil
+	}
+	return true, nil
+}
