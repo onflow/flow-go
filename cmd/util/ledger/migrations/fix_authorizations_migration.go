@@ -7,7 +7,6 @@ import (
 	"io"
 
 	"github.com/onflow/cadence/migrations"
-	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 	cadenceErrors "github.com/onflow/cadence/runtime/errors"
 	"github.com/onflow/cadence/runtime/interpreter"
@@ -210,9 +209,7 @@ const fixAuthorizationsMigrationReporterName = "fix-authorizations-migration"
 
 func NewFixAuthorizationsMigration(
 	rwf reporters.ReportWriterFactory,
-	errorMessageHandler *errorMessageHandler,
-	programs map[runtime.Location]*interpreter.Program,
-	newAuthorizations AuthorizationFixes,
+	authorizationFixes AuthorizationFixes,
 	opts Options,
 ) *CadenceBaseMigration {
 	var diffReporter reporters.ReportWriter
@@ -237,18 +234,15 @@ func NewFixAuthorizationsMigration(
 
 			return []migrations.ValueMigration{
 				&FixAuthorizationsMigration{
-					AuthorizationFixes: newAuthorizations,
+					AuthorizationFixes: authorizationFixes,
 					Reporter: &fixAuthorizationsMigrationReporter{
-						reportWriter:        reporter,
-						errorMessageHandler: errorMessageHandler,
-						verboseErrorOutput:  opts.VerboseErrorOutput,
+						reportWriter:       reporter,
+						verboseErrorOutput: opts.VerboseErrorOutput,
 					},
 				},
 			}
 		},
-		errorMessageHandler: errorMessageHandler,
-		programs:            programs,
-		chainID:             opts.ChainID,
+		chainID: opts.ChainID,
 	}
 }
 
@@ -379,33 +373,11 @@ func (e capabilityAuthorizationFixedEntry) MarshalJSON() ([]byte, error) {
 func NewFixAuthorizationsMigrations(
 	log zerolog.Logger,
 	rwf reporters.ReportWriterFactory,
-	newAuthorizations AuthorizationFixes,
+	authorizationFixes AuthorizationFixes,
 	opts Options,
 ) []NamedMigration {
 
-	errorMessageHandler := &errorMessageHandler{}
-
-	// The value migrations are run as account-based migrations,
-	// i.e. the migrations are only given the payloads for the account to be migrated.
-	// However, the migrations need to be able to get the code for contracts of any account.
-	//
-	// To achieve this, the contracts are extracted from the payloads once,
-	// before the value migrations are run.
-
-	programs := make(map[common.Location]*interpreter.Program, 1000)
-
 	return []NamedMigration{
-		{
-			Name: "check-contracts",
-			Migrate: NewContractCheckingMigration(
-				log,
-				rwf,
-				opts.ChainID,
-				opts.VerboseErrorOutput,
-				nil,
-				programs,
-			),
-		},
 		{
 			Name: "fix-authorizations",
 			Migrate: NewAccountBasedMigration(
@@ -414,9 +386,7 @@ func NewFixAuthorizationsMigrations(
 				[]AccountBasedMigration{
 					NewFixAuthorizationsMigration(
 						rwf,
-						errorMessageHandler,
-						programs,
-						newAuthorizations,
+						authorizationFixes,
 						opts,
 					),
 				},
