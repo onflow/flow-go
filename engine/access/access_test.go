@@ -601,6 +601,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 		all := util.StorageLayer(suite.T(), db)
 		results := bstorage.NewExecutionResults(suite.metrics, db)
 		receipts := bstorage.NewExecutionReceipts(suite.metrics, db, results, bstorage.DefaultCacheSize)
+		txResultErrorMessages := bstorage.NewTransactionResultErrorMessages(suite.metrics, db, bstorage.DefaultCacheSize)
 		enIdentities := unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
 		enNodeIDs := enIdentities.NodeIDs()
 
@@ -686,8 +687,27 @@ func (suite *Suite) TestGetSealedTransaction() {
 		// create the ingest engine
 		processedHeight := bstorage.NewConsumerProgress(db, module.ConsumeProgressIngestionEngineBlockHeight)
 
-		ingestEng, err := ingestion.New(suite.log, suite.net, suite.state, suite.me, suite.request, all.Blocks, all.Headers, collections,
-			transactions, results, receipts, collectionExecutedMetric, processedHeight, lastFullBlockHeight)
+		ingestEng, err := ingestion.New(
+			suite.log,
+			suite.net,
+			suite.state,
+			suite.me,
+			suite.request,
+			all.Blocks,
+			all.Headers,
+			collections,
+			transactions,
+			results,
+			receipts,
+			txResultErrorMessages,
+			collectionExecutedMetric,
+			processedHeight,
+			lastFullBlockHeight,
+			bnd,
+			db,
+			enNodeIDs.Strings(),
+			nil,
+		)
 		require.NoError(suite.T(), err)
 
 		// 1. Assume that follower engine updated the block storage and the protocol state. The block is reported as sealed
@@ -744,6 +764,7 @@ func (suite *Suite) TestGetTransactionResult() {
 		all := util.StorageLayer(suite.T(), db)
 		results := bstorage.NewExecutionResults(suite.metrics, db)
 		receipts := bstorage.NewExecutionReceipts(suite.metrics, db, results, bstorage.DefaultCacheSize)
+		txResultErrorMessages := bstorage.NewTransactionResultErrorMessages(suite.metrics, db, bstorage.DefaultCacheSize)
 
 		originID := unittest.IdentifierFixture()
 
@@ -849,7 +870,9 @@ func (suite *Suite) TestGetTransactionResult() {
 
 		// create the ingest engine
 		ingestEng, err := ingestion.New(suite.log, suite.net, suite.state, suite.me, suite.request, all.Blocks, all.Headers, collections,
-			transactions, results, receipts, collectionExecutedMetric, processedHeight, lastFullBlockHeight)
+			transactions, results, receipts, txResultErrorMessages, collectionExecutedMetric, processedHeight, lastFullBlockHeight, bnd, db, enNodeIDs.Strings(),
+			nil,
+		)
 		require.NoError(suite.T(), err)
 
 		background, cancel := context.WithCancel(context.Background())
@@ -1011,6 +1034,7 @@ func (suite *Suite) TestExecuteScript() {
 		collections := bstorage.NewCollections(db, transactions)
 		results := bstorage.NewExecutionResults(suite.metrics, db)
 		receipts := bstorage.NewExecutionReceipts(suite.metrics, db, results, bstorage.DefaultCacheSize)
+		txResultErrorMessages := bstorage.NewTransactionResultErrorMessages(suite.metrics, db, bstorage.DefaultCacheSize)
 
 		identities := unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
 		suite.sealedSnapshot.On("Identities", mock.Anything).Return(identities, nil)
@@ -1019,6 +1043,9 @@ func (suite *Suite) TestExecuteScript() {
 		// create a mock connection factory
 		connFactory := connectionmock.NewConnectionFactory(suite.T())
 		connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
+
+		enIdentities := unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
+		enNodeIDs := enIdentities.NodeIDs()
 
 		var err error
 		suite.backend, err = backend.New(backend.Params{
@@ -1079,7 +1106,9 @@ func (suite *Suite) TestExecuteScript() {
 
 		// create the ingest engine
 		ingestEng, err := ingestion.New(suite.log, suite.net, suite.state, suite.me, suite.request, all.Blocks, all.Headers, collections,
-			transactions, results, receipts, collectionExecutedMetric, processedHeight, lastFullBlockHeight)
+			transactions, results, receipts, txResultErrorMessages, collectionExecutedMetric, processedHeight, lastFullBlockHeight, suite.backend, db,
+			enNodeIDs.Strings(),
+			nil)
 		require.NoError(suite.T(), err)
 
 		// create another block as a predecessor of the block created earlier
