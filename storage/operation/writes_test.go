@@ -3,6 +3,7 @@ package operation_test
 import (
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"sync"
 	"testing"
 
@@ -16,46 +17,6 @@ import (
 	"github.com/onflow/flow-go/storage/operation/pops"
 	"github.com/onflow/flow-go/utils/unittest"
 )
-
-type WithWriter func(*testing.T, func(storage.Writer) error)
-
-func RunWithStorages(t *testing.T, fn func(*testing.T, storage.Reader, WithWriter)) {
-	t.Run("BadgerStorage", func(t *testing.T) {
-		unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-			withWriterTx := func(t *testing.T, writing func(storage.Writer) error) {
-				writer := bops.NewReaderBatchWriter(db)
-				require.NoError(t, writing(writer))
-				require.NoError(t, writer.Commit())
-			}
-
-			reader := bops.ToReader(db)
-			fn(t, reader, withWriterTx)
-		})
-	})
-
-	t.Run("PebbleStorage", func(t *testing.T) {
-		unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
-			withWriterTx := func(t *testing.T, writing func(storage.Writer) error) {
-				writer := pops.NewReaderBatchWriter(db)
-				require.NoError(t, writing(writer))
-				require.NoError(t, writer.Commit())
-			}
-
-			reader := pops.ToReader(db)
-			fn(t, reader, withWriterTx)
-		})
-	})
-}
-
-type Entity struct {
-	ID uint64
-}
-
-func (e Entity) Key() []byte {
-	byteSlice := make([]byte, 8) // uint64 is 8 bytes
-	binary.BigEndian.PutUint64(byteSlice, e.ID)
-	return byteSlice
-}
 
 func TestReadWrite(t *testing.T) {
 	RunWithStorages(t, func(t *testing.T, r storage.Reader, withWriterTx WithWriter) {
@@ -86,6 +47,25 @@ func TestReadWrite(t *testing.T) {
 		var anotherReadBack Entity
 		require.NoError(t, operation.Retrieve(anotherEntity.Key(), &anotherReadBack)(r))
 		require.Equal(t, anotherEntity, anotherReadBack, "expected different key to return different value")
+	})
+}
+
+func TestReadWriteMalformed(t *testing.T) {
+	RunWithStorages(t, func(t *testing.T, r storage.Reader, withWriterTx WithWriter) {
+		e := Entity{ID: 1337}
+		ue := UnencodeableEntity(e)
+
+		// Test write should return encoding error
+		withWriterTx(t, func(writer storage.Writer) error {
+			err := operation.Upsert(e.Key(), ue)(writer)
+			require.Contains(t, err.Error(), errCantEncode.Error(), "expected encoding error")
+			return nil
+		})
+
+		// Test read should return decoding error
+		var exists bool
+		require.NoError(t, operation.Exists(e.Key(), &exists)(r))
+		require.False(t, exists, "expected key to not exist")
 	})
 }
 
@@ -267,5 +247,66 @@ func TestRemoveRange(t *testing.T) {
 				"expected key %x to be %s", key, map[bool]string{true: "deleted", false: "not deleted"})
 		}
 	})
+}
 
+// helper types and functions
+type WithWriter func(*testing.T, func(storage.Writer) error)
+
+func RunWithStorages(t *testing.T, fn func(*testing.T, storage.Reader, WithWriter)) {
+	t.Run("BadgerStorage", func(t *testing.T) {
+		unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+			withWriterTx := func(t *testing.T, writing func(storage.Writer) error) {
+				writer := bops.NewReaderBatchWriter(db)
+				require.NoError(t, writing(writer))
+				require.NoError(t, writer.Commit())
+			}
+
+			reader := bops.ToReader(db)
+			fn(t, reader, withWriterTx)
+		})
+	})
+
+	t.Run("PebbleStorage", func(t *testing.T) {
+		unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
+			withWriterTx := func(t *testing.T, writing func(storage.Writer) error) {
+				writer := pops.NewReaderBatchWriter(db)
+				require.NoError(t, writing(writer))
+				require.NoError(t, writer.Commit())
+			}
+
+			reader := pops.ToReader(db)
+			fn(t, reader, withWriterTx)
+		})
+	})
+}
+
+type Entity struct {
+	ID uint64
+}
+
+func (e Entity) Key() []byte {
+	byteSlice := make([]byte, 8) // uint64 is 8 bytes
+	binary.BigEndian.PutUint64(byteSlice, e.ID)
+	return byteSlice
+}
+
+type UnencodeableEntity Entity
+
+var errCantEncode = fmt.Errorf("encoding not supported")
+var errCantDecode = fmt.Errorf("decoding not supported")
+
+func (a UnencodeableEntity) MarshalJSON() ([]byte, error) {
+	return nil, errCantEncode
+}
+
+func (a *UnencodeableEntity) UnmarshalJSON(b []byte) error {
+	return errCantDecode
+}
+
+func (a UnencodeableEntity) MarshalMsgpack() ([]byte, error) {
+	return nil, errCantEncode
+}
+
+func (a UnencodeableEntity) UnmarshalMsgpack(b []byte) error {
+	return errCantDecode
 }
