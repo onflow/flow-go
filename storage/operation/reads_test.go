@@ -12,7 +12,7 @@ import (
 )
 
 func TestIterateKeysInPrefixRange(t *testing.T) {
-	RunWithStorages(t, func(t *testing.T, r storage.Reader, withWriterTx WithWriter) {
+	RunWithStorages(t, func(t *testing.T, r storage.Reader, withWriter WithWriter) {
 		// Define the prefix range
 		prefixStart := []byte{0x10}
 		prefixEnd := []byte{0x20}
@@ -39,7 +39,7 @@ func TestIterateKeysInPrefixRange(t *testing.T) {
 		keysInRange := keys[1 : len(keys)-lastNToExclude] // these keys are between the start and end
 
 		// Insert the keys into the storage
-		withWriterTx(t, func(writer storage.Writer) error {
+		require.NoError(t, withWriter(func(writer storage.Writer) error {
 			for _, key := range keys {
 				value := []byte{0x00} // value are skipped, doesn't matter
 				err := operation.Upsert(key, value)(writer)
@@ -48,7 +48,7 @@ func TestIterateKeysInPrefixRange(t *testing.T) {
 				}
 			}
 			return nil
-		})
+		}))
 
 		// Forward iteration and check boundaries
 		var found [][]byte
@@ -61,7 +61,7 @@ func TestIterateKeysInPrefixRange(t *testing.T) {
 }
 
 func TestTraverse(t *testing.T) {
-	RunWithStorages(t, func(t *testing.T, r storage.Reader, withWriterTx WithWriter) {
+	RunWithStorages(t, func(t *testing.T, r storage.Reader, withWriter WithWriter) {
 		keys := [][]byte{
 			{0x42, 0x00},
 			{0xff},
@@ -73,7 +73,7 @@ func TestTraverse(t *testing.T) {
 		expected := []uint64{11, 23}
 
 		// Insert the keys and values into storage
-		withWriterTx(t, func(writer storage.Writer) error {
+		require.NoError(t, withWriter(func(writer storage.Writer) error {
 			for i, key := range keys {
 				err := operation.Upsert(key, vals[i])(writer)
 				if err != nil {
@@ -81,7 +81,7 @@ func TestTraverse(t *testing.T) {
 				}
 			}
 			return nil
-		})
+		}))
 
 		actual := make([]uint64, 0, len(keys))
 
@@ -129,18 +129,18 @@ func TestFindHighestAtOrBelow(t *testing.T) {
 	}
 
 	// Run test with multiple storage backends
-	RunWithStorages(t, func(t *testing.T, r storage.Reader, withWriterTx WithWriter) {
+	RunWithStorages(t, func(t *testing.T, r storage.Reader, withWriter WithWriter) {
 		prefix := []byte("test_prefix")
 
 		// Insert entities into the storage
-		withWriterTx(t, func(writer storage.Writer) error {
+		require.NoError(t, withWriter(func(writer storage.Writer) error {
 			for _, e := range entities {
 				if err := insertEntity(writer, prefix, e.height, e.entity); err != nil {
 					return err
 				}
 			}
 			return nil
-		})
+		}))
 
 		// Declare entity to store the results of FindHighestAtOrBelow
 		var entity Entity
