@@ -5,240 +5,118 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/dgraph-io/badger/v2"
-	"github.com/vmihailenco/msgpack/v4"
+	"github.com/cockroachdb/pebble"
+	"github.com/vmihailenco/msgpack"
 
-	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/storage"
 )
 
-// NOTE: This file is an _exact_ copy of storage/badger/operation/common.go with the exception
-//       that I have reordered the methods to align with the pebble implementation.
+type ReaderBatchWriter struct {
+	db        *pebble.DB
+	batch     *pebble.Batch
+	callbacks []func(error)
+}
 
-// batchWrite will encode the given entity using msgpack and will upsert the resulting
-// binary data in the badger wrote batch under the provided key - if the value already exists
-// in the database it will be overridden.
-// No errors are expected during normal operation.
-func batchWrite(key []byte, entity interface{}) func(writeBatch *badger.WriteBatch) error {
-	return func(writeBatch *badger.WriteBatch) error {
+var _ storage.PebbleReaderBatchWriter = (*ReaderBatchWriter)(nil)
 
-		// update the maximum key size if the inserted key is bigger
-		if uint32(len(key)) > max {
-			max = uint32(len(key))
-			err := SetMax(writeBatch)
-			if err != nil {
-				return fmt.Errorf("could not update max tracker: %w", err)
-			}
-		}
+func (b *ReaderBatchWriter) ReaderWriter() (pebble.Reader, pebble.Writer) {
+	return b.db, b.batch
+}
 
-		// serialize the entity data
-		val, err := msgpack.Marshal(entity)
-		if err != nil {
-			return irrecoverable.NewExceptionf("could not encode entity: %w", err)
-		}
+func (b *ReaderBatchWriter) IndexedBatch() *pebble.Batch {
+	return b.batch
+}
 
-		// persist the entity data into the DB
-		err = writeBatch.Set(key, val)
-		if err != nil {
-			return irrecoverable.NewExceptionf("could not store data: %w", err)
-		}
-		return nil
+func (b *ReaderBatchWriter) Commit() error {
+	err := b.batch.Commit(nil)
+
+	for _, callback := range b.callbacks {
+		callback(err)
+	}
+
+	return err
+}
+
+func (b *ReaderBatchWriter) AddCallback(callback func(error)) {
+	b.callbacks = append(b.callbacks, callback)
+}
+
+func NewPebbleReaderBatchWriterWithBatch(db *pebble.DB, batch *pebble.Batch) *ReaderBatchWriter {
+	return &ReaderBatchWriter{
+		db:        db,
+		batch:     batch,
+		callbacks: make([]func(error), 0),
 	}
 }
 
-// insert will encode the given entity using msgpack and will insert the resulting
-// binary data in the badger DB under the provided key. It will error if the
-// key already exists.
-// Error returns:
-//   - storage.ErrAlreadyExists if the key already exists in the database.
-//   - generic error in case of unexpected failure from the database layer or
-//     encoding failure.
-func insert(key []byte, entity interface{}) func(*badger.Txn) error {
-	return func(tx *badger.Txn) error {
-
-		// update the maximum key size if the inserted key is bigger
-		if uint32(len(key)) > max {
-			max = uint32(len(key))
-			err := SetMax(tx)
-			if err != nil {
-				return fmt.Errorf("could not update max tracker: %w", err)
-			}
-		}
-
-		// check if the key already exists in the db
-		_, err := tx.Get(key)
-		if err == nil {
-			return storage.ErrAlreadyExists
-		}
-
-		if !errors.Is(err, badger.ErrKeyNotFound) {
-			return irrecoverable.NewExceptionf("could not retrieve key: %w", err)
-		}
-
-		// serialize the entity data
-		val, err := msgpack.Marshal(entity)
-		if err != nil {
-			return irrecoverable.NewExceptionf("could not encode entity: %w", err)
-		}
-
-		// persist the entity data into the DB
-		err = tx.Set(key, val)
-		if err != nil {
-			return irrecoverable.NewExceptionf("could not store data: %w", err)
-		}
-		return nil
+func NewPebbleReaderBatchWriter(db *pebble.DB) *ReaderBatchWriter {
+	return &ReaderBatchWriter{
+		db:    db,
+		batch: db.NewIndexedBatch(),
 	}
 }
 
-// update will encode the given entity with MsgPack and update the binary data
-// under the given key in the badger DB. The key must already exist.
-// Error returns:
-//   - storage.ErrNotFound if the key does not already exist in the database.
-//   - generic error in case of unexpected failure from the database layer or
-//     encoding failure.
-func update(key []byte, entity interface{}) func(*badger.Txn) error {
-	return func(tx *badger.Txn) error {
+func WithReaderBatchWriter(db *pebble.DB, fn func(storage.PebbleReaderBatchWriter) error) error {
+	batch := NewPebbleReaderBatchWriter(db)
+	err := fn(batch)
+	if err != nil {
+		return err
+	}
+	err = batch.Commit()
+	if err != nil {
+		return err
+	}
 
-		// retrieve the item from the key-value store
-		_, err := tx.Get(key)
-		if errors.Is(err, badger.ErrKeyNotFound) {
-			return storage.ErrNotFound
-		}
-		if err != nil {
-			return irrecoverable.NewExceptionf("could not check key: %w", err)
-		}
+	return nil
+}
 
-		// serialize the entity data
-		val, err := msgpack.Marshal(entity)
+func insert(key []byte, val interface{}) func(pebble.Writer) error {
+	return func(w pebble.Writer) error {
+		value, err := msgpack.Marshal(val)
 		if err != nil {
-			return irrecoverable.NewExceptionf("could not encode entity: %w", err)
+			return irrecoverable.NewExceptionf("failed to encode value: %w", err)
 		}
 
-		// persist the entity data into the DB
-		err = tx.Set(key, val)
+		err = w.Set(key, value, pebble.Sync)
 		if err != nil {
-			return irrecoverable.NewExceptionf("could not replace data: %w", err)
+			return irrecoverable.NewExceptionf("failed to store data: %w", err)
 		}
 
 		return nil
 	}
 }
 
-// upsert will encode the given entity with MsgPack and upsert the binary data
-// under the given key in the badger DB.
-func upsert(key []byte, entity interface{}) func(*badger.Txn) error {
-	return func(tx *badger.Txn) error {
-		// update the maximum key size if the inserted key is bigger
-		if uint32(len(key)) > max {
-			max = uint32(len(key))
-			err := SetMax(tx)
-			if err != nil {
-				return fmt.Errorf("could not update max tracker: %w", err)
-			}
-		}
-
-		// serialize the entity data
-		val, err := msgpack.Marshal(entity)
+func retrieve(key []byte, sc interface{}) func(r pebble.Reader) error {
+	return func(r pebble.Reader) error {
+		val, closer, err := r.Get(key)
 		if err != nil {
-			return irrecoverable.NewExceptionf("could not encode entity: %w", err)
+			return convertNotFoundError(err)
 		}
+		defer closer.Close()
 
-		// persist the entity data into the DB
-		err = tx.Set(key, val)
+		err = msgpack.Unmarshal(val, sc)
 		if err != nil {
-			return irrecoverable.NewExceptionf("could not upsert data: %w", err)
-		}
-
-		return nil
-	}
-}
-
-// batchRemove removes entry under a given key in a write-batch.
-// if key doesn't exist, does nothing.
-// No errors are expected during normal operation.
-func batchRemove(key []byte) func(writeBatch *badger.WriteBatch) error {
-	return func(writeBatch *badger.WriteBatch) error {
-		err := writeBatch.Delete(key)
-		if err != nil {
-			return irrecoverable.NewExceptionf("could not batch delete data: %w", err)
+			return irrecoverable.NewExceptionf("failed to decode value: %w", err)
 		}
 		return nil
 	}
 }
 
-// batchRemoveByPrefix removes all items under the keys match the given prefix in a batch write transaction.
-// no error would be returned if no key was found with the given prefix.
-// all error returned should be exception
-func batchRemoveByPrefix(prefix []byte) func(tx *badger.Txn, writeBatch *badger.WriteBatch) error {
-	return func(tx *badger.Txn, writeBatch *badger.WriteBatch) error {
-
-		opts := badger.DefaultIteratorOptions
-		opts.AllVersions = false
-		opts.PrefetchValues = false
-		it := tx.NewIterator(opts)
-		defer it.Close()
-
-		for it.Seek(prefix); it.ValidForPrefix(prefix); it.Next() {
-			key := it.Item().KeyCopy(nil)
-			err := writeBatch.Delete(key)
-			if err != nil {
-				return irrecoverable.NewExceptionf("could not delete item in batch: %w", err)
-			}
-		}
-		return nil
-	}
-}
-
-// retrieve will retrieve the binary data under the given key from the badger DB
-// and decode it into the given entity. The provided entity needs to be a
-// pointer to an initialized entity of the correct type.
-// Error returns:
-//   - storage.ErrNotFound if the key does not exist in the database
-//   - generic error in case of unexpected failure from the database layer, or failure
-//     to decode an existing database value
-func retrieve(key []byte, entity interface{}) func(*badger.Txn) error {
-	return func(tx *badger.Txn) error {
-
-		// retrieve the item from the key-value store
-		item, err := tx.Get(key)
-		if errors.Is(err, badger.ErrKeyNotFound) {
-			return storage.ErrNotFound
-		}
+func exists(key []byte, keyExists *bool) func(r pebble.Reader) error {
+	return func(r pebble.Reader) error {
+		_, closer, err := r.Get(key)
 		if err != nil {
-			return irrecoverable.NewExceptionf("could not load data: %w", err)
-		}
-
-		// get the value from the item
-		err = item.Value(func(val []byte) error {
-			err := msgpack.Unmarshal(val, entity)
-			return err
-		})
-		if err != nil {
-			return irrecoverable.NewExceptionf("could not decode entity: %w", err)
-		}
-
-		return nil
-	}
-}
-
-// exists returns true if a key exists in the database.
-// No errors are expected during normal operation.
-func exists(key []byte, keyExists *bool) func(*badger.Txn) error {
-	return func(tx *badger.Txn) error {
-		_, err := tx.Get(key)
-		if err != nil {
-			// the key does not exist in the database
-			if errors.Is(err, badger.ErrKeyNotFound) {
+			if errors.Is(err, pebble.ErrNotFound) {
 				*keyExists = false
 				return nil
 			}
+
 			// exception while checking for the key
 			return irrecoverable.NewExceptionf("could not load data: %w", err)
 		}
-
-		// the key does exist in the database
 		*keyExists = true
+		defer closer.Close()
 		return nil
 	}
 }
@@ -267,51 +145,13 @@ type handleFunc func() error
 // of values, the initialization of entities and the processing.
 type iterationFunc func() (checkFunc, createFunc, handleFunc)
 
-// lookup is the default iteration function allowing us to collect a list of
-// entity IDs from an index.
-func lookup(entityIDs *[]flow.Identifier) func() (checkFunc, createFunc, handleFunc) {
-	*entityIDs = make([]flow.Identifier, 0, len(*entityIDs))
-	return func() (checkFunc, createFunc, handleFunc) {
-		check := func(key []byte) bool {
-			return true
-		}
-		var entityID flow.Identifier
-		create := func() interface{} {
-			return &entityID
-		}
-		handle := func() error {
-			*entityIDs = append(*entityIDs, entityID)
-			return nil
-		}
-		return check, create, handle
-	}
-}
-
-// withPrefetchValuesFalse configures a Badger iteration to NOT preemptively load
-// the values when iterating over keys (ie. key-only iteration). Key-only iteration
-// is several order of magnitudes faster than regular iteration, because it involves
-// access to the LSM-tree only, which is usually resident entirely in RAM.
-func withPrefetchValuesFalse(options *badger.IteratorOptions) {
-	options.PrefetchValues = false
-}
-
 // remove removes the entity with the given key, if it exists. If it doesn't
 // exist, this is a no-op.
 // Error returns:
-// * storage.ErrNotFound if the key to delete does not exist.
 // * generic error in case of unexpected database error
-func remove(key []byte) func(*badger.Txn) error {
-	return func(tx *badger.Txn) error {
-		// retrieve the item from the key-value store
-		_, err := tx.Get(key)
-		if err != nil {
-			if errors.Is(err, badger.ErrKeyNotFound) {
-				return storage.ErrNotFound
-			}
-			return irrecoverable.NewExceptionf("could not check key: %w", err)
-		}
-
-		err = tx.Delete(key)
+func remove(key []byte) func(pebble.Writer) error {
+	return func(w pebble.Writer) error {
+		err := w.Delete(key, nil)
 		if err != nil {
 			return irrecoverable.NewExceptionf("could not delete item: %w", err)
 		}
@@ -319,9 +159,27 @@ func remove(key []byte) func(*badger.Txn) error {
 	}
 }
 
-// iterate iterates over a range of keys defined by a start and end key. The
-// start key may be higher than the end key, in which case we iterate in
-// reverse order.
+// prefixUpperBound returns a key K such that all possible keys beginning with the input prefix
+// sort lower than K according to the byte-wise lexicographic key ordering used by Pebble.
+// This is used to define an upper bound for iteration, when we want to iterate over
+// all keys beginning with a given prefix.
+// referred to https://pkg.go.dev/github.com/cockroachdb/pebble#example-Iterator-PrefixIteration
+func prefixUpperBound(prefix []byte) []byte {
+	end := make([]byte, len(prefix))
+	copy(end, prefix)
+	for i := len(end) - 1; i >= 0; i-- {
+		// increment the bytes by 1
+		end[i] = end[i] + 1
+		if end[i] != 0 {
+			return end[:i+1]
+		}
+	}
+	return nil // no upper-bound
+}
+
+// iterate iterates over a range of keys defined by a start and end key.
+// The start key must be less than or equal to the end key by lexicographic ordering.
+// Both start and end keys must have non-zero length.
 //
 // The iteration range uses prefix-wise semantics. Specifically, all keys that
 // meet ANY of the following conditions are included in the iteration:
@@ -335,71 +193,42 @@ func remove(key []byte) func(*badger.Txn) error {
 // TODO: this function is unbounded – pass context.Context to this or calling functions to allow timing functions out.
 // No errors are expected during normal operation. Any errors returned by the
 // provided handleFunc will be propagated back to the caller of iterate.
-func iterate(start []byte, end []byte, iteration iterationFunc, opts ...func(*badger.IteratorOptions)) func(*badger.Txn) error {
-	return func(tx *badger.Txn) error {
+func iterate(start []byte, end []byte, iteration iterationFunc) func(pebble.Reader) error {
+	return func(tx pebble.Reader) error {
+
+		if len(start) == 0 {
+			return fmt.Errorf("start prefix is empty")
+		}
+
+		if len(end) == 0 {
+			return fmt.Errorf("end prefix is empty")
+		}
+
+		// Reverse iteration is not supported by pebble
+		if bytes.Compare(start, end) > 0 {
+			return fmt.Errorf("start key must be less than or equal to end key")
+		}
 
 		// initialize the default options and comparison modifier for iteration
-		modifier := 1
-		options := badger.DefaultIteratorOptions
-		for _, apply := range opts {
-			apply(&options)
+		options := pebble.IterOptions{
+			LowerBound: start,
+			// LowerBound specifies the smallest key to iterate and it's inclusive.
+			// UpperBound specifies the largest key to iterate and it's exclusive (not inclusive)
+			// in order to match all keys prefixed with the `end` bytes, we increment the bytes of end by 1,
+			// for instance, to iterate keys between "hello" and "world",
+			// we use "hello" as LowerBound, "worle" as UpperBound, so that "world", "world1", "worldffff...ffff"
+			// will all be included.
+			UpperBound: prefixUpperBound(end),
 		}
 
-		// In order to satisfy this function's prefix-wise inclusion semantics,
-		// we append 0xff bytes to the largest of start and end.
-		// This ensures Badger will seek to the largest key with that prefix
-		// for reverse iteration, thus including all keys with a prefix matching
-		// the starting key. It also enables us to detect boundary conditions by
-		// simple lexicographic comparison (ie. bytes.Compare) rather than
-		// explicitly comparing prefixes.
-		//
-		// See https://github.com/onflow/flow-go/pull/3310#issuecomment-618127494
-		// for discussion and more detail on this.
-
-		// If start is bigger than end, we have a backwards iteration:
-		// 1) We set the reverse option on the iterator, so we step through all
-		//    the keys backwards. This modifies the behaviour of Seek to go to
-		//    the first key that is less than or equal to the start key (as
-		//    opposed to greater than or equal in a regular iteration).
-		// 2) In order to satisfy this function's prefix-wise inclusion semantics,
-		//    we append a 0xff-byte suffix to the start key so the seek will go
-		// to the right place.
-		// 3) For a regular iteration, we break the loop upon hitting the first
-		//    item that has a key higher than the end prefix. In order to reverse
-		//    this, we use a modifier for the comparison that reverses the check
-		//    and makes it stop upon the first item lower than the end prefix.
-		if bytes.Compare(start, end) > 0 {
-			options.Reverse = true // make sure to go in reverse order
-			modifier = -1          // make sure to stop after end prefix
-			length := uint32(len(start))
-			diff := max - length
-			for i := uint32(0); i < diff; i++ {
-				start = append(start, 0xff)
-			}
-		} else {
-			// for forward iteration, add the 0xff-bytes suffix to the end
-			// prefix, to ensure we include all keys with that prefix before
-			// finishing.
-			length := uint32(len(end))
-			diff := max - length
-			for i := uint32(0); i < diff; i++ {
-				end = append(end, 0xff)
-			}
+		it, err := tx.NewIter(&options)
+		if err != nil {
+			return fmt.Errorf("can not create iterator: %w", err)
 		}
-
-		it := tx.NewIterator(options)
 		defer it.Close()
 
-		for it.Seek(start); it.Valid(); it.Next() {
-
-			item := it.Item()
-
-			key := item.Key()
-			// for forward iteration, check whether key > end, for backward
-			// iteration check whether key < end
-			if bytes.Compare(key, end)*modifier > 0 {
-				break
-			}
+		for it.SeekGE(start); it.Valid(); it.Next() {
+			key := it.Key()
 
 			// initialize processing functions for iteration
 			check, create, handle := iteration()
@@ -410,26 +239,25 @@ func iterate(start []byte, end []byte, iteration iterationFunc, opts ...func(*ba
 				continue
 			}
 
-			// process the actual item
-			err := item.Value(func(val []byte) error {
-
-				// decode into the entity
-				entity := create()
-				err := msgpack.Unmarshal(val, entity)
-				if err != nil {
-					return irrecoverable.NewExceptionf("could not decode entity: %w", err)
-				}
-
-				// process the entity
-				err = handle()
-				if err != nil {
-					return fmt.Errorf("could not handle entity: %w", err)
-				}
-
-				return nil
-			})
+			binaryValue, err := it.ValueAndErr()
 			if err != nil {
-				return fmt.Errorf("could not process value: %w", err)
+				return fmt.Errorf("failed to get value: %w", err)
+			}
+
+			// preventing caller from modifying the iterator's value slices
+			valueCopy := make([]byte, len(binaryValue))
+			copy(valueCopy, binaryValue)
+
+			entity := create()
+			err = msgpack.Unmarshal(valueCopy, entity)
+			if err != nil {
+				return irrecoverable.NewExceptionf("could not decode entity: %w", err)
+			}
+
+			// process the entity
+			err = handle()
+			if err != nil {
+				return fmt.Errorf("could not handle entity: %w", err)
 			}
 		}
 
@@ -443,56 +271,62 @@ func iterate(start []byte, end []byte, iteration iterationFunc, opts ...func(*ba
 //
 // On each iteration, it will call the iteration function to initialize
 // functions specific to processing the given key-value pair.
-func traverse(prefix []byte, iteration iterationFunc) func(*badger.Txn) error {
-	return func(tx *badger.Txn) error {
+func traverse(prefix []byte, iteration iterationFunc) func(pebble.Reader) error {
+	return func(r pebble.Reader) error {
 		if len(prefix) == 0 {
 			return fmt.Errorf("prefix must not be empty")
 		}
 
-		opts := badger.DefaultIteratorOptions
-		// NOTE: this is an optimization only, it does not enforce that all
-		// results in the iteration have this prefix.
-		opts.Prefix = prefix
+		it, err := r.NewIter(&pebble.IterOptions{
+			LowerBound: prefix,
+			// LowerBound specifies the smallest key to iterate and it's inclusive.
+			// UpperBound specifies the largest key to iterate and it's exclusive (not inclusive)
+			// in order to match all keys prefixed with the `end` bytes, we increment the bytes of end by 1,
+			// for instance, to iterate keys between "hello" and "world",
+			// we use "hello" as LowerBound, "worle" as UpperBound, so that "world", "world1", "worldffff...ffff"
+			// will all be included.
+			UpperBound: prefixUpperBound(prefix),
+		})
 
-		it := tx.NewIterator(opts)
+		if err != nil {
+			return fmt.Errorf("can not create iterator: %w", err)
+		}
 		defer it.Close()
 
 		// this is where we actually enforce that all results have the prefix
-		for it.Seek(prefix); it.ValidForPrefix(prefix); it.Next() {
-
-			item := it.Item()
+		for it.SeekGE(prefix); it.Valid(); it.Next() {
 
 			// initialize processing functions for iteration
 			check, create, handle := iteration()
 
 			// check if we should process the item at all
-			key := item.Key()
+			key := it.Key()
+
 			ok := check(key)
 			if !ok {
 				continue
 			}
 
-			// process the actual item
-			err := item.Value(func(val []byte) error {
-
-				// decode into the entity
-				entity := create()
-				err := msgpack.Unmarshal(val, entity)
-				if err != nil {
-					return irrecoverable.NewExceptionf("could not decode entity: %w", err)
-				}
-
-				// process the entity
-				err = handle()
-				if err != nil {
-					return fmt.Errorf("could not handle entity: %w", err)
-				}
-
-				return nil
-			})
+			binaryValue, err := it.ValueAndErr()
 			if err != nil {
-				return fmt.Errorf("could not process value: %w", err)
+				return fmt.Errorf("failed to get value: %w", err)
 			}
+
+			// preventing caller from modifying the iterator's value slices
+			valueCopy := make([]byte, len(binaryValue))
+			copy(valueCopy, binaryValue)
+
+			entity := create()
+			err = msgpack.Unmarshal(valueCopy, entity)
+			if err != nil {
+				return irrecoverable.NewExceptionf("could not decode entity: %w", err)
+			}
+			// process the entity
+			err = handle()
+			if err != nil {
+				return fmt.Errorf("could not handle entity: %w", err)
+			}
+
 		}
 
 		return nil
@@ -502,66 +336,80 @@ func traverse(prefix []byte, iteration iterationFunc) func(*badger.Txn) error {
 // removeByPrefix removes all the entities if the prefix of the key matches the given prefix.
 // if no key matches, this is a no-op
 // No errors are expected during normal operation.
-func removeByPrefix(prefix []byte) func(*badger.Txn) error {
-	return func(tx *badger.Txn) error {
-		opts := badger.DefaultIteratorOptions
-		opts.AllVersions = false
-		opts.PrefetchValues = false
-		it := tx.NewIterator(opts)
+func removeByPrefix(prefix []byte) func(pebble.Writer) error {
+	return func(tx pebble.Writer) error {
+		return tx.DeleteRange(prefix, prefixUpperBound(prefix), nil)
+	}
+}
+
+func convertNotFoundError(err error) error {
+	if errors.Is(err, pebble.ErrNotFound) {
+		return storage.ErrNotFound
+	}
+	return err
+}
+
+// O(N) performance
+func findHighestAtOrBelow(
+	prefix []byte,
+	height uint64,
+	entity interface{},
+) func(pebble.Reader) error {
+	return func(r pebble.Reader) error {
+		if len(prefix) == 0 {
+			return fmt.Errorf("prefix must not be empty")
+		}
+
+		// why height+1? because:
+		// UpperBound specifies the largest key to iterate and it's exclusive (not inclusive)
+		// in order to match all keys indexed by height that is equal to or below the given height,
+		// we could increment the height by 1,
+		// for instance, to find highest key equal to or below 10, we first use 11 as the UpperBound, so that
+		// if there are 4 keys: [prefix-7, prefix-9, prefix-10, prefix-11], then all keys except
+		// prefix-11 will be included. And iterating them in the increasing order will find prefix-10
+		// as the highest key.
+		key := append(prefix, b(height+1)...)
+		it, err := r.NewIter(&pebble.IterOptions{
+			LowerBound: prefix,
+			UpperBound: key,
+		})
+		if err != nil {
+			return fmt.Errorf("can not create iterator: %w", err)
+		}
 		defer it.Close()
 
-		for it.Seek(prefix); it.ValidForPrefix(prefix); it.Next() {
-			key := it.Item().KeyCopy(nil)
-			err := tx.Delete(key)
-			if err != nil {
-				return irrecoverable.NewExceptionf("could not delete item with prefix: %w", err)
-			}
+		var highestKey []byte
+		// find highest value below the given height
+		for it.SeekGE(prefix); it.Valid(); it.Next() {
+			highestKey = it.Key()
+		}
+
+		if len(highestKey) == 0 {
+			return storage.ErrNotFound
+		}
+
+		// read the value of the highest key
+		val, closer, err := r.Get(highestKey)
+		if err != nil {
+			return convertNotFoundError(err)
+		}
+
+		defer closer.Close()
+
+		err = msgpack.Unmarshal(val, entity)
+		if err != nil {
+			return irrecoverable.NewExceptionf("failed to decode value: %w", err)
 		}
 
 		return nil
 	}
 }
 
-// findHighestAtOrBelow searches for the highest key with the given prefix and a height
-// at or below the target height, and retrieves and decodes the value associated with the
-// key into the given entity.
-// If no key is found, the function returns storage.ErrNotFound.
-func findHighestAtOrBelow(
-	prefix []byte,
-	height uint64,
-	entity interface{},
-) func(*badger.Txn) error {
-	return func(tx *badger.Txn) error {
-		if len(prefix) == 0 {
-			return fmt.Errorf("prefix must not be empty")
-		}
-
-		opts := badger.DefaultIteratorOptions
-		opts.Prefix = prefix
-		opts.Reverse = true
-
-		it := tx.NewIterator(opts)
-		defer it.Close()
-
-		it.Seek(append(prefix, b(height)...))
-
-		if !it.Valid() {
-			return storage.ErrNotFound
-		}
-
-		return it.Item().Value(func(val []byte) error {
-			err := msgpack.Unmarshal(val, entity)
-			if err != nil {
-				return fmt.Errorf("could not decode entity: %w", err)
-			}
-			return nil
-		})
-	}
-}
-
-// Fail returns a DB operation function that always fails with the given error.
-func Fail(err error) func(*badger.Txn) error {
-	return func(_ *badger.Txn) error {
+func BatchUpdate(db *pebble.DB, fn func(tx pebble.Writer) error) error {
+	batch := db.NewIndexedBatch()
+	err := fn(batch)
+	if err != nil {
 		return err
 	}
+	return batch.Commit(nil)
 }

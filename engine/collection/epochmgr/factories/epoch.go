@@ -9,9 +9,10 @@ import (
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/mempool/epochs"
 	"github.com/onflow/flow-go/state/cluster"
-	"github.com/onflow/flow-go/state/cluster/badger"
+	"github.com/onflow/flow-go/state/cluster/pebble"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/pebble/procedure"
 )
 
 type EpochComponentsFactory struct {
@@ -109,13 +110,16 @@ func (factory *EpochComponentsFactory) Create(
 		blocks   storage.ClusterBlocks
 	)
 
-	stateRoot, err := badger.NewStateRoot(cluster.RootBlock(), cluster.RootQC(), cluster.EpochCounter())
+	stateRoot, err := pebble.NewStateRoot(cluster.RootBlock(), cluster.RootQC(), cluster.EpochCounter())
 	if err != nil {
 		err = fmt.Errorf("could not create valid state root: %w", err)
 		return
 	}
-	var mutableState *badger.MutableState
-	mutableState, headers, payloads, blocks, err = factory.state.Create(stateRoot)
+
+	blockIndexer := procedure.NewClusterBlockIndexer()
+
+	var mutableState *pebble.MutableState
+	mutableState, headers, payloads, blocks, err = factory.state.Create(stateRoot, blockIndexer)
 	state = mutableState
 	if err != nil {
 		err = fmt.Errorf("could not create cluster state: %w", err)
@@ -125,7 +129,7 @@ func (factory *EpochComponentsFactory) Create(
 	// get the transaction pool for the epoch
 	pool := factory.pools.ForEpoch(epochCounter)
 
-	builder, finalizer, err := factory.builder.Create(state, headers, payloads, pool, epochCounter)
+	builder, finalizer, err := factory.builder.Create(state, headers, payloads, blockIndexer, pool, epochCounter)
 	if err != nil {
 		err = fmt.Errorf("could not create builder/finalizer: %w", err)
 		return

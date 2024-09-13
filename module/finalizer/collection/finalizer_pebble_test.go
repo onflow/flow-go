@@ -1,13 +1,15 @@
 package collection_test
 
 import (
+	"sync"
 	"testing"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/model/cluster"
 	model "github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
@@ -15,14 +17,14 @@ import (
 	"github.com/onflow/flow-go/module/mempool/herocache"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/mocknetwork"
-	cluster "github.com/onflow/flow-go/state/cluster/badger"
-	"github.com/onflow/flow-go/storage/badger/operation"
-	"github.com/onflow/flow-go/storage/badger/procedure"
+	clusterpebble "github.com/onflow/flow-go/state/cluster/pebble"
+	"github.com/onflow/flow-go/storage/pebble/operation"
+	"github.com/onflow/flow-go/storage/pebble/procedure"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func TestFinalizer(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+func TestFinalizerPebble(t *testing.T) {
+	unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
 		// reference block on the main consensus chain
 		refBlock := unittest.BlockHeaderFixture()
 		// genesis block for the cluster chain
@@ -30,14 +32,14 @@ func TestFinalizer(t *testing.T) {
 
 		metrics := metrics.NewNoopCollector()
 
-		var state *cluster.State
+		var state *clusterpebble.State
 
 		pool := herocache.NewTransactions(1000, unittest.Logger(), metrics)
 
 		// a helper function to clean up shared state between tests
 		cleanup := func() {
 			// wipe the DB
-			err := db.DropAll()
+			err := dropAll(db)
 			require.Nil(t, err)
 			// clear the mempool
 			for _, tx := range pool.All() {
@@ -47,17 +49,19 @@ func TestFinalizer(t *testing.T) {
 
 		// a helper function to bootstrap with the genesis block
 		bootstrap := func() {
-			stateRoot, err := cluster.NewStateRoot(genesis, unittest.QuorumCertificateFixture(), 0)
+			stateRoot, err := clusterpebble.NewStateRoot(genesis, unittest.QuorumCertificateFixture(), 0)
 			require.NoError(t, err)
-			state, err = cluster.Bootstrap(db, stateRoot)
+			state, err = clusterpebble.Bootstrap(db, stateRoot)
 			require.NoError(t, err)
-			err = db.Update(operation.InsertHeader(refBlock.ID(), refBlock))
+			err = operation.InsertHeader(refBlock.ID(), refBlock)(db)
 			require.NoError(t, err)
 		}
 
+		blockIndexer := procedure.NewClusterBlockIndexer()
+
 		// a helper function to insert a block
 		insert := func(block model.Block) {
-			err := db.Update(procedure.InsertClusterBlock(&block))
+			err := operation.WithReaderBatchWriter(db, blockIndexer.InsertClusterBlock(&block))
 			assert.Nil(t, err)
 		}
 
@@ -67,7 +71,7 @@ func TestFinalizer(t *testing.T) {
 
 			prov := new(mocknetwork.Engine)
 			prov.On("SubmitLocal", mock.Anything)
-			finalizer := collection.NewFinalizer(db, pool, prov, metrics)
+			finalizer := collection.NewFinalizerPebble(db, pool, prov, metrics)
 
 			fakeBlockID := unittest.IdentifierFixture()
 			err := finalizer.MakeFinal(fakeBlockID)
@@ -80,7 +84,7 @@ func TestFinalizer(t *testing.T) {
 
 			prov := new(mocknetwork.Engine)
 			prov.On("SubmitLocal", mock.Anything)
-			finalizer := collection.NewFinalizer(db, pool, prov, metrics)
+			finalizer := collection.NewFinalizerPebble(db, pool, prov, metrics)
 
 			// tx1 is included in the finalized block
 			tx1 := unittest.TransactionBodyFixture(func(tx *flow.TransactionBody) { tx.ProposalKey.SequenceNumber = 1 })
@@ -106,7 +110,7 @@ func TestFinalizer(t *testing.T) {
 
 			prov := new(mocknetwork.Engine)
 			prov.On("SubmitLocal", mock.Anything)
-			finalizer := collection.NewFinalizer(db, pool, prov, metrics)
+			finalizer := collection.NewFinalizerPebble(db, pool, prov, metrics)
 
 			// create a new block that isn't connected to a parent
 			block := unittest.ClusterBlockWithParent(genesis)
@@ -124,7 +128,7 @@ func TestFinalizer(t *testing.T) {
 			defer cleanup()
 
 			prov := new(mocknetwork.Engine)
-			finalizer := collection.NewFinalizer(db, pool, prov, metrics)
+			finalizer := collection.NewFinalizerPebble(db, pool, prov, metrics)
 
 			// create a block with empty payload on genesis
 			block := unittest.ClusterBlockWithParent(genesis)
@@ -150,7 +154,7 @@ func TestFinalizer(t *testing.T) {
 
 			prov := new(mocknetwork.Engine)
 			prov.On("SubmitLocal", mock.Anything)
-			finalizer := collection.NewFinalizer(db, pool, prov, metrics)
+			finalizer := collection.NewFinalizerPebble(db, pool, prov, metrics)
 
 			// tx1 is included in the finalized block and mempool
 			tx1 := unittest.TransactionBodyFixture(func(tx *flow.TransactionBody) { tx.ProposalKey.SequenceNumber = 1 })
@@ -177,7 +181,7 @@ func TestFinalizer(t *testing.T) {
 			final, err := state.Final().Head()
 			assert.Nil(t, err)
 			assert.Equal(t, block.ID(), final.ID())
-			assertClusterBlocksIndexedByReferenceHeight(t, db, refBlock.Height, final.ID())
+			assertClusterBlocksIndexedByReferenceHeightPebble(t, db, refBlock.Height, final.ID())
 
 			// block should be passed to provider
 			prov.AssertNumberOfCalls(t, "SubmitLocal", 1)
@@ -199,7 +203,7 @@ func TestFinalizer(t *testing.T) {
 
 			prov := new(mocknetwork.Engine)
 			prov.On("SubmitLocal", mock.Anything)
-			finalizer := collection.NewFinalizer(db, pool, prov, metrics)
+			finalizer := collection.NewFinalizerPebble(db, pool, prov, metrics)
 
 			// tx1 is included in the first finalized block and mempool
 			tx1 := unittest.TransactionBodyFixture(func(tx *flow.TransactionBody) { tx.ProposalKey.SequenceNumber = 1 })
@@ -230,7 +234,7 @@ func TestFinalizer(t *testing.T) {
 			final, err := state.Final().Head()
 			assert.Nil(t, err)
 			assert.Equal(t, block2.ID(), final.ID())
-			assertClusterBlocksIndexedByReferenceHeight(t, db, refBlock.Height, block1.ID(), block2.ID())
+			assertClusterBlocksIndexedByReferenceHeightPebble(t, db, refBlock.Height, block1.ID(), block2.ID())
 
 			// both blocks should be passed to provider
 			prov.AssertNumberOfCalls(t, "SubmitLocal", 2)
@@ -260,7 +264,7 @@ func TestFinalizer(t *testing.T) {
 
 			prov := new(mocknetwork.Engine)
 			prov.On("SubmitLocal", mock.Anything)
-			finalizer := collection.NewFinalizer(db, pool, prov, metrics)
+			finalizer := collection.NewFinalizerPebble(db, pool, prov, metrics)
 
 			// tx1 is included in the finalized parent block and mempool
 			tx1 := unittest.TransactionBodyFixture(func(tx *flow.TransactionBody) { tx.ProposalKey.SequenceNumber = 1 })
@@ -292,7 +296,7 @@ func TestFinalizer(t *testing.T) {
 			final, err := state.Final().Head()
 			assert.Nil(t, err)
 			assert.Equal(t, block1.ID(), final.ID())
-			assertClusterBlocksIndexedByReferenceHeight(t, db, refBlock.Height, block1.ID())
+			assertClusterBlocksIndexedByReferenceHeightPebble(t, db, refBlock.Height, block1.ID())
 
 			// block should be passed to provider
 			prov.AssertNumberOfCalls(t, "SubmitLocal", 1)
@@ -314,7 +318,7 @@ func TestFinalizer(t *testing.T) {
 
 			prov := new(mocknetwork.Engine)
 			prov.On("SubmitLocal", mock.Anything)
-			finalizer := collection.NewFinalizer(db, pool, prov, metrics)
+			finalizer := collection.NewFinalizerPebble(db, pool, prov, metrics)
 
 			// tx1 is included in the finalized block and mempool
 			tx1 := unittest.TransactionBodyFixture(func(tx *flow.TransactionBody) { tx.ProposalKey.SequenceNumber = 1 })
@@ -346,7 +350,7 @@ func TestFinalizer(t *testing.T) {
 			final, err := state.Final().Head()
 			assert.Nil(t, err)
 			assert.Equal(t, block1.ID(), final.ID())
-			assertClusterBlocksIndexedByReferenceHeight(t, db, refBlock.Height, block1.ID())
+			assertClusterBlocksIndexedByReferenceHeightPebble(t, db, refBlock.Height, block1.ID())
 
 			// block should be passed to provider
 			prov.AssertNumberOfCalls(t, "SubmitLocal", 1)
@@ -360,15 +364,103 @@ func TestFinalizer(t *testing.T) {
 				},
 			})
 		})
+
+		// verify two guarantees:
+		// 1. concurrently finalizing blocks at different height would eventually arrive at
+		//    highest finalized height
+		// 2. In each thread of updating finalized height, calling GetFinalziedHeight after MakeFinal
+		// 		is succeeded would not see a lower finalized height
+		t.Run("concurrency safety", func(t *testing.T) {
+			bootstrap()
+			defer cleanup()
+
+			// prepare blocks
+			n := 100
+			clusterBlocks := make([]*cluster.Block, 0, n)
+
+			parent := genesis
+
+			for i := 0; i < n; i++ {
+				block := unittest.ClusterBlockWithParent(parent)
+				block.Payload.ReferenceBlockID = parent.ID()
+				block.Header.PayloadHash = block.Payload.Hash()
+				clusterBlocks = append(clusterBlocks, &block)
+				parent = &block
+			}
+
+			// insert blocks
+			for _, block := range clusterBlocks {
+				insert(*block)
+			}
+
+			prov := new(mocknetwork.Engine)
+			prov.On("SubmitLocal", mock.Anything)
+			finalizer := collection.NewFinalizerPebble(db, pool, prov, metrics)
+
+			// concurrently finalizing all blocks
+			var wg sync.WaitGroup
+			wg.Add(len(clusterBlocks))
+
+			for _, block := range clusterBlocks {
+				go func(block *cluster.Block) {
+					defer wg.Done()
+
+					height := block.Header.Height
+					require.NoError(t, finalizer.MakeFinal(block.ID()))
+
+					// query the finalized height again after MakeFinal is succeeded
+					// to ensure the finalized height is not lower than the current height
+					final, err := state.Final().Head()
+					require.NoError(t, err)
+
+					require.GreaterOrEqual(t, final.Height, height)
+				}(block)
+			}
+
+			wg.Wait()
+
+			// Check that the final height is the highest among all blocks
+			final, err := state.Final().Head()
+			require.NoError(t, err)
+			require.Equal(t, clusterBlocks[len(clusterBlocks)-1].Header.Height, final.Height)
+
+		})
 	})
+
 }
 
-// assertClusterBlocksIndexedByReferenceHeight checks the given cluster blocks have
+// assertClusterBlocksIndexedByReferenceHeightPebble checks the given cluster blocks have
 // been indexed by the given reference block height, which is expected as part of
 // finalization.
-func assertClusterBlocksIndexedByReferenceHeight(t *testing.T, db *badger.DB, refHeight uint64, clusterBlockIDs ...flow.Identifier) {
+func assertClusterBlocksIndexedByReferenceHeightPebble(t *testing.T, db *pebble.DB, refHeight uint64, clusterBlockIDs ...flow.Identifier) {
 	var ids []flow.Identifier
-	err := db.View(operation.LookupClusterBlocksByReferenceHeightRange(refHeight, refHeight, &ids))
+	err := operation.LookupClusterBlocksByReferenceHeightRange(refHeight, refHeight, &ids)(db)
 	require.NoError(t, err)
 	assert.ElementsMatch(t, clusterBlockIDs, ids)
+}
+
+func dropAll(db *pebble.DB) error {
+	// Create an iterator to go through all keys
+	iter, err := db.NewIter(nil)
+	if err != nil {
+		return err
+	}
+	defer iter.Close()
+
+	batch := db.NewBatch()
+	defer batch.Close()
+
+	// Iterate over all keys and delete them
+	for iter.First(); iter.Valid(); iter.Next() {
+		err := batch.Delete(iter.Key(), nil)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Apply the batch to the database
+	if err := batch.Commit(nil); err != nil {
+		return err
+	}
+	return nil
 }

@@ -1,12 +1,9 @@
-// (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
-
 package operation
 
 import (
 	"math/rand"
 	"testing"
 
-	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -15,7 +12,7 @@ import (
 )
 
 func TestFinalizedInsertUpdateRetrieve(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithWrappedPebbleDB(t, func(db *unittest.PebbleWrapper) {
 		height := uint64(1337)
 
 		err := db.Update(InsertFinalizedHeight(height))
@@ -39,7 +36,7 @@ func TestFinalizedInsertUpdateRetrieve(t *testing.T) {
 }
 
 func TestSealedInsertUpdateRetrieve(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithWrappedPebbleDB(t, func(db *unittest.PebbleWrapper) {
 		height := uint64(1337)
 
 		err := db.Update(InsertSealedHeight(height))
@@ -63,7 +60,7 @@ func TestSealedInsertUpdateRetrieve(t *testing.T) {
 }
 
 func TestEpochFirstBlockIndex_InsertRetrieve(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithWrappedPebbleDB(t, func(db *unittest.PebbleWrapper) {
 		height := rand.Uint64()
 		epoch := rand.Uint64()
 
@@ -84,15 +81,11 @@ func TestEpochFirstBlockIndex_InsertRetrieve(t *testing.T) {
 		// retrieve non-existent key errors
 		err = db.View(RetrieveEpochFirstHeight(epoch+1, &retrieved))
 		require.ErrorIs(t, err, storage.ErrNotFound)
-
-		// insert existent key errors
-		err = db.Update(InsertEpochFirstHeight(epoch, height))
-		require.ErrorIs(t, err, storage.ErrAlreadyExists)
 	})
 }
 
 func TestLastCompleteBlockHeightInsertUpdateRetrieve(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithWrappedPebbleDB(t, func(db *unittest.PebbleWrapper) {
 		height := uint64(1337)
 
 		err := db.Update(InsertLastCompleteBlockHeight(height))
@@ -112,29 +105,5 @@ func TestLastCompleteBlockHeightInsertUpdateRetrieve(t *testing.T) {
 		require.NoError(t, err)
 
 		assert.Equal(t, retrieved, height)
-	})
-}
-
-func TestLastCompleteBlockHeightInsertIfNotExists(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		height1 := uint64(1337)
-
-		err := db.Update(InsertLastCompleteBlockHeightIfNotExists(height1))
-		require.NoError(t, err)
-
-		var retrieved uint64
-		err = db.View(RetrieveLastCompleteBlockHeight(&retrieved))
-		require.NoError(t, err)
-
-		assert.Equal(t, retrieved, height1)
-
-		height2 := uint64(9999)
-		err = db.Update(InsertLastCompleteBlockHeightIfNotExists(height2))
-		require.NoError(t, err)
-
-		err = db.View(RetrieveLastCompleteBlockHeight(&retrieved))
-		require.NoError(t, err)
-
-		assert.Equal(t, retrieved, height1)
 	})
 }

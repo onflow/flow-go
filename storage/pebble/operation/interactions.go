@@ -1,16 +1,16 @@
 package operation
 
 import (
+	"github.com/cockroachdb/pebble"
+
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/model/flow"
-
-	"github.com/dgraph-io/badger/v2"
 )
 
 func InsertExecutionStateInteractions(
 	blockID flow.Identifier,
 	executionSnapshots []*snapshot.ExecutionSnapshot,
-) func(*badger.Txn) error {
+) func(pebble.Writer) error {
 	return insert(
 		makePrefix(codeExecutionStateInteractions, blockID),
 		executionSnapshots)
@@ -19,7 +19,7 @@ func InsertExecutionStateInteractions(
 func RetrieveExecutionStateInteractions(
 	blockID flow.Identifier,
 	executionSnapshots *[]*snapshot.ExecutionSnapshot,
-) func(*badger.Txn) error {
+) func(pebble.Reader) error {
 	return retrieve(
 		makePrefix(codeExecutionStateInteractions, blockID), executionSnapshots)
 }

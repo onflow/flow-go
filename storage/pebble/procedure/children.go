@@ -3,18 +3,38 @@ package procedure
 import (
 	"errors"
 	"fmt"
+	"sync"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/storage/pebble/operation"
 )
+
+type BlockIndexer struct {
+	// indexing is a mutex to avoid dirty reads when calling RetrieveBlockChildren
+	indexing *sync.Mutex
+}
+
+func NewBlockIndexer() *BlockIndexer {
+	return &BlockIndexer{
+		indexing: new(sync.Mutex),
+	}
+}
+
+var _ storage.BlockIndexer = (*BlockIndexer)(nil)
+
+func (bi *BlockIndexer) IndexNewBlock(blockID flow.Identifier, parentID flow.Identifier) func(storage.PebbleReaderBatchWriter) error {
+	return IndexNewBlock(bi.indexing, blockID, parentID)
+}
 
 // IndexNewBlock will add parent-child index for the new block.
 //   - Each block has a parent, we use this parent-child relationship to build a reverse index
 //   - for looking up children blocks for a given block. This is useful for forks recovery
 //     where we want to find all the pending children blocks for the lastest finalized block.
+//
+// # It's concurrent safe to call this function by multiple goroutines, as it will acquire a lock
 //
 // When adding parent-child index for a new block, we will add two indexes:
 //  1. since it's a new block, the new block should have no child, so adding an empty
@@ -24,8 +44,10 @@ import (
 //     there are two special cases for (2):
 //     - if the parent block is zero, then we don't need to add this index.
 //     - if the parent block doesn't exist, then we will insert the child index instead of updating
-func IndexNewBlock(blockID flow.Identifier, parentID flow.Identifier) func(*badger.Txn) error {
-	return func(tx *badger.Txn) error {
+func IndexNewBlock(indexing *sync.Mutex, blockID flow.Identifier, parentID flow.Identifier) func(storage.PebbleReaderBatchWriter) error {
+	return func(rw storage.PebbleReaderBatchWriter) error {
+		r, tx := rw.ReaderWriter()
+
 		// Step 1: index the child for the new block.
 		// the new block has no child, so adding an empty child index for it
 		err := operation.InsertBlockChildren(blockID, nil)(tx)
@@ -40,20 +62,25 @@ func IndexNewBlock(blockID flow.Identifier, parentID flow.Identifier) func(*badg
 			return nil
 		}
 
+		// acquiring a lock to avoid dirty reads when calling RetrieveBlockChildren
+		indexing.Lock()
+		rw.AddCallback(func(error) {
+			// the lock is not released until the batch update is committed.
+			// the lock will be released regardless the commit is successful or not.
+			indexing.Unlock()
+		})
+
 		// if the parent block is not zero, depending on whether the parent block has
 		// children or not, we will either update the index or insert the index:
 		// when parent block doesn't exist, we will insert the block children.
 		// when parent block exists already, we will update the block children,
 		var childrenIDs flow.IdentifierList
-		err = operation.RetrieveBlockChildren(parentID, &childrenIDs)(tx)
+		err = operation.RetrieveBlockChildren(parentID, &childrenIDs)(r)
 
-		var saveIndex func(blockID flow.Identifier, childrenIDs flow.IdentifierList) func(*badger.Txn) error
 		if errors.Is(err, storage.ErrNotFound) {
-			saveIndex = operation.InsertBlockChildren
+			return operation.InsertBlockChildren(parentID, flow.IdentifierList{blockID})(tx)
 		} else if err != nil {
 			return fmt.Errorf("could not look up block children: %w", err)
-		} else { // err == nil
-			saveIndex = operation.UpdateBlockChildren
 		}
 
 		// check we don't add a duplicate
@@ -66,17 +93,12 @@ func IndexNewBlock(blockID flow.Identifier, parentID flow.Identifier) func(*badg
 		// adding the new block to be another child of the parent
 		childrenIDs = append(childrenIDs, blockID)
 
-		// saving the index
-		err = saveIndex(parentID, childrenIDs)(tx)
-		if err != nil {
-			return fmt.Errorf("could not update children index: %w", err)
-		}
-
-		return nil
+		return operation.InsertBlockChildren(parentID, childrenIDs)(tx)
 	}
+
 }
 
 // LookupBlockChildren looks up the IDs of all child blocks of the given parent block.
-func LookupBlockChildren(blockID flow.Identifier, childrenIDs *flow.IdentifierList) func(tx *badger.Txn) error {
+func LookupBlockChildren(blockID flow.Identifier, childrenIDs *flow.IdentifierList) func(pebble.Reader) error {
 	return operation.RetrieveBlockChildren(blockID, childrenIDs)
 }

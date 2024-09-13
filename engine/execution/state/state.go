@@ -7,7 +7,7 @@ import (
 	"math"
 	"sync"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble"
 
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/storehouse"
@@ -18,9 +18,9 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/storage"
-	badgerstorage "github.com/onflow/flow-go/storage/badger"
-	"github.com/onflow/flow-go/storage/badger/operation"
-	"github.com/onflow/flow-go/storage/badger/procedure"
+	pebblestorage "github.com/onflow/flow-go/storage/pebble"
+	"github.com/onflow/flow-go/storage/pebble/operation"
+	"github.com/onflow/flow-go/storage/pebble/procedure"
 )
 
 var ErrExecutionStatePruned = fmt.Errorf("execution state is pruned")
@@ -104,7 +104,7 @@ type state struct {
 	events             storage.Events
 	serviceEvents      storage.ServiceEvents
 	transactionResults storage.TransactionResults
-	db                 *badger.DB
+	db                 *pebble.DB
 
 	registerStore execution.RegisterStore
 	// when it is true, registers are stored in both register store and ledger
@@ -125,7 +125,7 @@ func NewExecutionState(
 	events storage.Events,
 	serviceEvents storage.ServiceEvents,
 	transactionResults storage.TransactionResults,
-	db *badger.DB,
+	db *pebble.DB,
 	tracer module.Tracer,
 	registerStore execution.RegisterStore,
 	enableRegisterStore bool,
@@ -404,12 +404,12 @@ func (s *state) saveExecutionResults(
 		return fmt.Errorf("can not store multiple chunk data pack: %w", err)
 	}
 
-	// Write Batch is BadgerDB feature designed for handling lots of writes
+	// Write Batch is pebbleDB feature designed for handling lots of writes
 	// in efficient and atomic manner, hence pushing all the updates we can
-	// as tightly as possible to let Badger manage it.
+	// as tightly as possible to let pebble manage it.
 	// Note, that it does not guarantee atomicity as transactions has size limit,
 	// but it's the closest thing to atomicity we could have
-	batch := badgerstorage.NewBatch(s.db)
+	batch := pebblestorage.NewBatch(s.db)
 
 	defer func() {
 		// Rollback if an error occurs during batch operations
@@ -479,7 +479,7 @@ func (s *state) UpdateHighestExecutedBlockIfHigher(ctx context.Context, header *
 		defer span.End()
 	}
 
-	return operation.RetryOnConflict(s.db.Update, procedure.UpdateHighestExecutedBlockIfHigher(header))
+	return operation.WithReaderBatchWriter(s.db, procedure.UpdateHighestExecutedBlockIfHigher(header))
 }
 
 // deprecated by storehouse's GetHighestFinalizedExecuted
@@ -501,7 +501,7 @@ func (s *state) GetHighestExecutedBlockID(ctx context.Context) (uint64, flow.Ide
 
 	var blockID flow.Identifier
 	var height uint64
-	err := s.db.View(procedure.GetHighestExecutedBlock(&height, &blockID))
+	err := procedure.GetHighestExecutedBlock(&height, &blockID)(s.db)
 	if err != nil {
 		return 0, flow.ZeroID, err
 	}
@@ -516,7 +516,7 @@ func (s *state) GetHighestFinalizedExecuted() (uint64, error) {
 
 	// last finalized height
 	var finalizedHeight uint64
-	err := s.db.View(operation.RetrieveFinalizedHeight(&finalizedHeight))
+	err := operation.RetrieveFinalizedHeight(&finalizedHeight)(s.db)
 	if err != nil {
 		return 0, fmt.Errorf("could not retrieve finalized height: %w", err)
 	}

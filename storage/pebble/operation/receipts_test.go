@@ -1,11 +1,9 @@
-// (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
-
 package operation
 
 import (
 	"testing"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -14,15 +12,15 @@ import (
 )
 
 func TestReceipts_InsertRetrieve(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
 		receipt := unittest.ExecutionReceiptFixture()
 		expected := receipt.Meta()
 
-		err := db.Update(InsertExecutionReceiptMeta(receipt.ID(), expected))
+		err := InsertExecutionReceiptMeta(receipt.ID(), expected)(db)
 		require.Nil(t, err)
 
 		var actual flow.ExecutionReceiptMeta
-		err = db.View(RetrieveExecutionReceiptMeta(receipt.ID(), &actual))
+		err = RetrieveExecutionReceiptMeta(receipt.ID(), &actual)(db)
 		require.Nil(t, err)
 
 		assert.Equal(t, expected, &actual)
@@ -30,16 +28,16 @@ func TestReceipts_InsertRetrieve(t *testing.T) {
 }
 
 func TestReceipts_Index(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
 		receipt := unittest.ExecutionReceiptFixture()
 		expected := receipt.ID()
 		blockID := receipt.ExecutionResult.BlockID
 
-		err := db.Update(IndexOwnExecutionReceipt(blockID, expected))
+		err := IndexOwnExecutionReceipt(blockID, expected)(db)
 		require.Nil(t, err)
 
 		var actual flow.Identifier
-		err = db.View(LookupOwnExecutionReceipt(blockID, &actual))
+		err = LookupOwnExecutionReceipt(blockID, &actual)(db)
 		require.Nil(t, err)
 
 		assert.Equal(t, expected, actual)
@@ -47,16 +45,16 @@ func TestReceipts_Index(t *testing.T) {
 }
 
 func TestReceipts_MultiIndex(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
 		expected := []flow.Identifier{unittest.IdentifierFixture(), unittest.IdentifierFixture()}
 		blockID := unittest.IdentifierFixture()
 
 		for _, id := range expected {
-			err := db.Update(IndexExecutionReceipts(blockID, id))
+			err := IndexExecutionReceipts(blockID, id)(db)
 			require.Nil(t, err)
 		}
 		var actual []flow.Identifier
-		err := db.View(LookupExecutionReceipts(blockID, &actual))
+		err := LookupExecutionReceipts(blockID, &actual)(db)
 		require.Nil(t, err)
 
 		assert.ElementsMatch(t, expected, actual)

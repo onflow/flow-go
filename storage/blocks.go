@@ -10,12 +10,11 @@ import (
 // Blocks represents persistent storage for blocks.
 type Blocks interface {
 
-	// Store will atomically store a block with all its dependencies.
-	Store(block *flow.Block) error
-
 	// StoreTx allows us to store a new block, including its payload & header, as part of a DB transaction, while
 	// still going through the caching layer.
 	StoreTx(block *flow.Block) func(*transaction.Tx) error
+
+	StorePebble(block *flow.Block) func(PebbleReaderBatchWriter) error
 
 	// ByID returns the block with the given hash. It is available for
 	// finalized and ambiguous blocks.
@@ -42,4 +41,11 @@ type Blocks interface {
 
 	// GetLastFullBlockHeight retrieves the FullBlockHeight
 	GetLastFullBlockHeight() (height uint64, err error)
+}
+
+// BlockIndexer is an interface for indexing new blocks.
+type BlockIndexer interface {
+	// IndexNewBlock will add parent-child index for the new block.
+	// When calling by multiple goroutines, it should be thread-safe.
+	IndexNewBlock(blockID flow.Identifier, parentID flow.Identifier) func(PebbleReaderBatchWriter) error
 }

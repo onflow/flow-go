@@ -1,9 +1,9 @@
-package badger_test
+package pebble_test
 
 import (
 	"testing"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/exp/rand"
@@ -11,12 +11,12 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
-	bstorage "github.com/onflow/flow-go/storage/badger"
+	bstorage "github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestBatchStoringLightTransactionResults(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
 		metrics := metrics.NewNoopCollector()
 		store := bstorage.NewLightTransactionResults(metrics, db, 1000)
 
@@ -85,7 +85,7 @@ func TestBatchStoringLightTransactionResults(t *testing.T) {
 }
 
 func TestReadingNotStoredLightTransactionResults(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
 		metrics := metrics.NewNoopCollector()
 		store := bstorage.NewLightTransactionResults(metrics, db, 1000)
 

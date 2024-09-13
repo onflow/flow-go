@@ -4,14 +4,14 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble"
 	"github.com/rs/zerolog/log"
 
 	"github.com/onflow/flow-go/admin"
 	"github.com/onflow/flow-go/admin/commands"
 	"github.com/onflow/flow-go/cmd/util/cmd/read-light-block"
 	"github.com/onflow/flow-go/model/flow"
-	storage "github.com/onflow/flow-go/storage/badger"
+	storage "github.com/onflow/flow-go/storage/pebble"
 )
 
 var _ commands.AdminCommand = (*ReadRangeClusterBlocksCommand)(nil)
@@ -21,12 +21,12 @@ var _ commands.AdminCommand = (*ReadRangeClusterBlocksCommand)(nil)
 const Max_Range_Cluster_Block_Limit = uint64(10001)
 
 type ReadRangeClusterBlocksCommand struct {
-	db       *badger.DB
+	db       *pebble.DB
 	headers  *storage.Headers
 	payloads *storage.ClusterPayloads
 }
 
-func NewReadRangeClusterBlocksCommand(db *badger.DB, headers *storage.Headers, payloads *storage.ClusterPayloads) commands.AdminCommand {
+func NewReadRangeClusterBlocksCommand(db *pebble.DB, headers *storage.Headers, payloads *storage.ClusterPayloads) commands.AdminCommand {
 	return &ReadRangeClusterBlocksCommand{
 		db:       db,
 		headers:  headers,

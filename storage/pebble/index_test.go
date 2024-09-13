@@ -1,23 +1,23 @@
-package badger_test
+package pebble_test
 
 import (
 	"errors"
 	"testing"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/unittest"
 
-	badgerstorage "github.com/onflow/flow-go/storage/badger"
+	pebblestorage "github.com/onflow/flow-go/storage/pebble"
 )
 
 func TestIndexStoreRetrieve(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
 		metrics := metrics.NewNoopCollector()
-		store := badgerstorage.NewIndex(metrics, db)
+		store := pebblestorage.NewIndex(metrics, db)
 
 		blockID := unittest.IdentifierFixture()
 		expected := unittest.IndexFixture()

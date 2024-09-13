@@ -3,7 +3,7 @@ package operation
 import (
 	"testing"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -12,14 +12,14 @@ import (
 )
 
 func TestStateCommitments(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
 		expected := unittest.StateCommitmentFixture()
 		id := unittest.IdentifierFixture()
-		err := db.Update(IndexStateCommitment(id, expected))
+		err := IndexStateCommitment(id, expected)(db)
 		require.Nil(t, err)
 
 		var actual flow.StateCommitment
-		err = db.View(LookupStateCommitment(id, &actual))
+		err = LookupStateCommitment(id, &actual)(db)
 		require.Nil(t, err)
 		assert.Equal(t, expected, actual)
 	})

@@ -64,11 +64,14 @@ func writeJSONTo(writer io.Writer, jsonData []byte) error {
 func ExportTransactions(dataDir string, outputDir string, startHeight uint64, endHeight uint64) error {
 
 	// init dependencies
-	db := common.InitStorage(flagDatadir)
-	storages := common.InitStorages(db)
+	db, err := common.InitStoragePebble(flagDatadir)
+	if err != nil {
+		return fmt.Errorf("could not init storage: %w", err)
+	}
 	defer db.Close()
 
-	state, err := common.InitProtocolState(db, storages)
+	storages := common.InitStoragesPebble(db)
+	state, err := common.InitProtocolStatePebble(db, storages)
 	if err != nil {
 		return fmt.Errorf("could not init protocol state: %w", err)
 	}

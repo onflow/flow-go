@@ -13,7 +13,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
-	badgerstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -79,8 +78,8 @@ func TestChunkDataPacks_Store(t *testing.T) {
 // then evaluates whether they are successfully retrieved from storage.
 func WithChunkDataPacks(t *testing.T, chunks int, storeFunc func(*testing.T, []*flow.ChunkDataPack, storage.ChunkDataPacks, *pebble.DB)) {
 	RunWithBadgerDBAndPebbleDB(t, func(badgerDB *badger.DB, db *pebble.DB) {
-		transactions := badgerstorage.NewTransactions(&metrics.NoopCollector{}, badgerDB)
-		collections := badgerstorage.NewCollections(badgerDB, transactions)
+		transactions := NewTransactions(&metrics.NoopCollector{}, db)
+		collections := NewCollections(db, transactions)
 		// keep the cache size at 1 to make sure that entries are written and read from storage itself.
 		store := NewChunkDataPacks(&metrics.NoopCollector{}, db, collections, 1)
 

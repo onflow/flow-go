@@ -6,6 +6,8 @@ import (
 	flow "github.com/onflow/flow-go/model/flow"
 	mock "github.com/stretchr/testify/mock"
 
+	storage "github.com/onflow/flow-go/storage"
+
 	transaction "github.com/onflow/flow-go/storage/badger/transaction"
 )
 
@@ -144,15 +146,17 @@ func (_m *Blocks) InsertLastFullBlockHeightIfNotExists(height uint64) error {
 	return r0
 }
 
-// Store provides a mock function with given fields: block
-func (_m *Blocks) Store(block *flow.Block) error {
+// StorePebble provides a mock function with given fields: block
+func (_m *Blocks) StorePebble(block *flow.Block) func(storage.PebbleReaderBatchWriter) error {
 	ret := _m.Called(block)
 
-	var r0 error
-	if rf, ok := ret.Get(0).(func(*flow.Block) error); ok {
+	var r0 func(storage.PebbleReaderBatchWriter) error
+	if rf, ok := ret.Get(0).(func(*flow.Block) func(storage.PebbleReaderBatchWriter) error); ok {
 		r0 = rf(block)
 	} else {
-		r0 = ret.Error(0)
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(func(storage.PebbleReaderBatchWriter) error)
+		}
 	}
 
 	return r0

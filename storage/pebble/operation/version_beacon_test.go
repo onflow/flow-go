@@ -3,7 +3,7 @@ package operation
 import (
 	"testing"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -12,7 +12,7 @@ import (
 )
 
 func TestResults_IndexByServiceEvents(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
 		height1 := uint64(21)
 		height2 := uint64(37)
 		height3 := uint64(55)
@@ -51,31 +51,31 @@ func TestResults_IndexByServiceEvents(t *testing.T) {
 		}
 
 		// indexing 3 version beacons at different heights
-		err := db.Update(IndexVersionBeaconByHeight(&vb1))
+		err := IndexVersionBeaconByHeight(&vb1)(db)
 		require.NoError(t, err)
 
-		err = db.Update(IndexVersionBeaconByHeight(&vb2))
+		err = IndexVersionBeaconByHeight(&vb2)(db)
 		require.NoError(t, err)
 
-		err = db.Update(IndexVersionBeaconByHeight(&vb3))
+		err = IndexVersionBeaconByHeight(&vb3)(db)
 		require.NoError(t, err)
 
 		// index version beacon 2 again to make sure we tolerate duplicates
 		// it is possible for two or more events of the same type to be from the same height
-		err = db.Update(IndexVersionBeaconByHeight(&vb2))
+		err = IndexVersionBeaconByHeight(&vb2)(db)
 		require.NoError(t, err)
 
 		t.Run("retrieve exact height match", func(t *testing.T) {
 			var actualVB flow.SealedVersionBeacon
-			err := db.View(LookupLastVersionBeaconByHeight(height1, &actualVB))
+			err := LookupLastVersionBeaconByHeight(height1, &actualVB)(db)
 			require.NoError(t, err)
 			require.Equal(t, vb1, actualVB)
 
-			err = db.View(LookupLastVersionBeaconByHeight(height2, &actualVB))
+			err = LookupLastVersionBeaconByHeight(height2, &actualVB)(db)
 			require.NoError(t, err)
 			require.Equal(t, vb2, actualVB)
 
-			err = db.View(LookupLastVersionBeaconByHeight(height3, &actualVB))
+			err = LookupLastVersionBeaconByHeight(height3, &actualVB)(db)
 			require.NoError(t, err)
 			require.Equal(t, vb3, actualVB)
 		})
@@ -83,7 +83,7 @@ func TestResults_IndexByServiceEvents(t *testing.T) {
 		t.Run("finds highest but not higher than given", func(t *testing.T) {
 			var actualVB flow.SealedVersionBeacon
 
-			err := db.View(LookupLastVersionBeaconByHeight(height3-1, &actualVB))
+			err := LookupLastVersionBeaconByHeight(height3-1, &actualVB)(db)
 			require.NoError(t, err)
 			require.Equal(t, vb2, actualVB)
 		})
@@ -91,7 +91,7 @@ func TestResults_IndexByServiceEvents(t *testing.T) {
 		t.Run("finds highest", func(t *testing.T) {
 			var actualVB flow.SealedVersionBeacon
 
-			err := db.View(LookupLastVersionBeaconByHeight(height3+1, &actualVB))
+			err := LookupLastVersionBeaconByHeight(height3+1, &actualVB)(db)
 			require.NoError(t, err)
 			require.Equal(t, vb3, actualVB)
 		})
@@ -99,7 +99,7 @@ func TestResults_IndexByServiceEvents(t *testing.T) {
 		t.Run("height below lowest entry returns nothing", func(t *testing.T) {
 			var actualVB flow.SealedVersionBeacon
 
-			err := db.View(LookupLastVersionBeaconByHeight(height1-1, &actualVB))
+			err := LookupLastVersionBeaconByHeight(height1-1, &actualVB)(db)
 			require.ErrorIs(t, err, storage.ErrNotFound)
 		})
 	})

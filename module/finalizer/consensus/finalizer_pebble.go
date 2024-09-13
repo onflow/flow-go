@@ -1,43 +1,45 @@
-// (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
-
 package consensus
 
 import (
 	"context"
 	"fmt"
+	"sync"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/storage/pebble/operation"
 )
 
-// Finalizer is a simple wrapper around our temporary state to clean up after a
+// FinalizerPebble is a simple wrapper around our temporary state to clean up after a
 // block has been fully finalized to the persistent protocol state.
-type Finalizer struct {
-	db      *badger.DB
+type FinalizerPebble struct {
+	db      *pebble.DB
 	headers storage.Headers
 	state   protocol.FollowerState
 	cleanup CleanupFunc
 	tracer  module.Tracer
+
+	finalizing *sync.Mutex
 }
 
-// NewFinalizer creates a new finalizer for the temporary state.
-func NewFinalizer(db *badger.DB,
+// NewFinalizerPebble creates a new finalizer for the temporary state.
+func NewFinalizerPebble(db *pebble.DB,
 	headers storage.Headers,
 	state protocol.FollowerState,
 	tracer module.Tracer,
-	options ...func(*Finalizer)) *Finalizer {
-	f := &Finalizer{
-		db:      db,
-		state:   state,
-		headers: headers,
-		cleanup: CleanupNothing(),
-		tracer:  tracer,
+	options ...func(*FinalizerPebble)) *FinalizerPebble {
+	f := &FinalizerPebble{
+		db:         db,
+		state:      state,
+		headers:    headers,
+		cleanup:    CleanupNothing(),
+		tracer:     tracer,
+		finalizing: new(sync.Mutex),
 	}
 	for _, option := range options {
 		option(f)
@@ -53,10 +55,14 @@ func NewFinalizer(db *badger.DB,
 // and being finalized, entities should be present in both the volatile memory
 // pools and persistent storage.
 // No errors are expected during normal operation.
-func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
+func (f *FinalizerPebble) MakeFinal(blockID flow.Identifier) error {
 
 	span, ctx := f.tracer.StartBlockSpan(context.Background(), blockID, trace.CONFinalizerFinalizeBlock)
 	defer span.End()
+
+	// We want to ensure that only one block is being finalized at a time.
+	f.finalizing.Lock()
+	defer f.finalizing.Unlock()
 
 	// STEP ONE: This is an idempotent operation. In case we are trying to
 	// finalize a block that is already below finalized height, we want to do
@@ -64,7 +70,7 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 	// that height, it's an invalid operation. Otherwise, it is a no-op.
 
 	var finalized uint64
-	err := f.db.View(operation.RetrieveFinalizedHeight(&finalized))
+	err := operation.RetrieveFinalizedHeight(&finalized)(f.db)
 	if err != nil {
 		return fmt.Errorf("could not retrieve finalized height: %w", err)
 	}
@@ -91,7 +97,7 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 	// back to the last finalized block, this is also an invalid call.
 
 	var finalID flow.Identifier
-	err = f.db.View(operation.LookupBlockHeight(finalized, &finalID))
+	err = operation.LookupBlockHeight(finalized, &finalID)(f.db)
 	if err != nil {
 		return fmt.Errorf("could not retrieve finalized header: %w", err)
 	}

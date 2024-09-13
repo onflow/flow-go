@@ -1,29 +1,29 @@
-package badger
+package pebble
 
 import (
-	"github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/storage/badger/operation"
-	"github.com/onflow/flow-go/storage/badger/transaction"
+	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/pebble/operation"
 )
 
 // Transactions ...
 type Transactions struct {
-	db    *badger.DB
+	db    *pebble.DB
 	cache *Cache[flow.Identifier, *flow.TransactionBody]
 }
 
 // NewTransactions ...
-func NewTransactions(cacheMetrics module.CacheMetrics, db *badger.DB) *Transactions {
-	store := func(txID flow.Identifier, flowTX *flow.TransactionBody) func(*transaction.Tx) error {
-		return transaction.WithTx(operation.SkipDuplicates(operation.InsertTransaction(txID, flowTX)))
+func NewTransactions(cacheMetrics module.CacheMetrics, db *pebble.DB) *Transactions {
+	store := func(txID flow.Identifier, flowTX *flow.TransactionBody) func(storage.PebbleReaderBatchWriter) error {
+		return storage.OnlyWriter(operation.InsertTransaction(txID, flowTX))
 	}
 
-	retrieve := func(txID flow.Identifier) func(tx *badger.Txn) (*flow.TransactionBody, error) {
-		return func(tx *badger.Txn) (*flow.TransactionBody, error) {
+	retrieve := func(txID flow.Identifier) func(tx pebble.Reader) (*flow.TransactionBody, error) {
+		return func(tx pebble.Reader) (*flow.TransactionBody, error) {
 			var flowTx flow.TransactionBody
 			err := operation.RetrieveTransaction(txID, &flowTx)(tx)
 			return &flowTx, err
@@ -32,7 +32,7 @@ func NewTransactions(cacheMetrics module.CacheMetrics, db *badger.DB) *Transacti
 
 	t := &Transactions{
 		db: db,
-		cache: newCache[flow.Identifier, *flow.TransactionBody](cacheMetrics, metrics.ResourceTransaction,
+		cache: newCache(cacheMetrics, metrics.ResourceTransaction,
 			withLimit[flow.Identifier, *flow.TransactionBody](flow.DefaultTransactionExpiry+100),
 			withStore(store),
 			withRetrieve(retrieve)),
@@ -43,22 +43,20 @@ func NewTransactions(cacheMetrics module.CacheMetrics, db *badger.DB) *Transacti
 
 // Store ...
 func (t *Transactions) Store(flowTx *flow.TransactionBody) error {
-	return operation.RetryOnConflictTx(t.db, transaction.Update, t.storeTx(flowTx))
+	return operation.WithReaderBatchWriter(t.db, t.storeTx(flowTx))
 }
 
 // ByID ...
 func (t *Transactions) ByID(txID flow.Identifier) (*flow.TransactionBody, error) {
-	tx := t.db.NewTransaction(false)
-	defer tx.Discard()
-	return t.retrieveTx(txID)(tx)
+	return t.retrieveTx(txID)(t.db)
 }
 
-func (t *Transactions) storeTx(flowTx *flow.TransactionBody) func(*transaction.Tx) error {
-	return t.cache.PutTx(flowTx.ID(), flowTx)
+func (t *Transactions) storeTx(flowTx *flow.TransactionBody) func(storage.PebbleReaderBatchWriter) error {
+	return t.cache.PutPebble(flowTx.ID(), flowTx)
 }
 
-func (t *Transactions) retrieveTx(txID flow.Identifier) func(*badger.Txn) (*flow.TransactionBody, error) {
-	return func(tx *badger.Txn) (*flow.TransactionBody, error) {
+func (t *Transactions) retrieveTx(txID flow.Identifier) func(pebble.Reader) (*flow.TransactionBody, error) {
+	return func(tx pebble.Reader) (*flow.TransactionBody, error) {
 		val, err := t.cache.Get(txID)(tx)
 		if err != nil {
 			return nil, err

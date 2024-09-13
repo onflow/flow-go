@@ -62,11 +62,12 @@ import (
 	"github.com/onflow/flow-go/module/validation"
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/state/protocol"
-	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
+	pebbleState "github.com/onflow/flow-go/state/protocol/pebble"
 	"github.com/onflow/flow-go/storage"
-	bstorage "github.com/onflow/flow-go/storage/badger"
+	bstorage "github.com/onflow/flow-go/storage/pebble"
+	"github.com/onflow/flow-go/storage/pebble/procedure"
 	"github.com/onflow/flow-go/utils/io"
 )
 
@@ -132,6 +133,7 @@ func main() {
 		getSealingConfigs   module.SealingConfigsGetter
 	)
 	var deprecatedFlagBlockRateDelay time.Duration
+	blockIndexer := procedure.NewBlockIndexer()
 
 	nodeBuilder := cmd.FlowNode(flow.RoleConsensus.String())
 	nodeBuilder.ExtraFlags(func(flags *pflag.FlagSet) {
@@ -209,7 +211,7 @@ func main() {
 
 	nodeBuilder.
 		PreInit(cmd.DynamicStartPreInit).
-		ValidateRootSnapshot(badgerState.ValidRootSnapshotContainsEntityExpiryRange).
+		ValidateRootSnapshot(pebbleState.ValidRootSnapshotContainsEntityExpiryRange).
 		Module("consensus node metrics", func(node *cmd.NodeConfig) error {
 			conMetrics = metrics.NewConsensusCollector(node.Tracer, node.MetricsRegisterer)
 			return nil
@@ -244,11 +246,11 @@ func main() {
 			return err
 		}).
 		Module("mutable follower state", func(node *cmd.NodeConfig) error {
-			// For now, we only support state implementations from package badger.
+			// For now, we only support state implementations from package pebble.
 			// If we ever support different implementations, the following can be replaced by a type-aware factory
-			state, ok := node.State.(*badgerState.State)
+			state, ok := node.State.(*pebbleState.State)
 			if !ok {
-				return fmt.Errorf("only implementations of type badger.State are currently supported but read-only state has type %T", node.State)
+				return fmt.Errorf("only implementations of type pebble.State are currently supported but read-only state has type %T", node.State)
 			}
 
 			chunkAssigner, err = chmodule.NewChunkAssigner(chunkAlpha, node.State)
@@ -278,13 +280,14 @@ func main() {
 				return err
 			}
 
-			mutableState, err = badgerState.NewFullConsensusState(
+			mutableState, err = pebbleState.NewFullConsensusState(
 				node.Logger,
 				node.Tracer,
 				node.ProtocolEvents,
 				state,
 				node.Storage.Index,
 				node.Storage.Payloads,
+				blockIndexer,
 				blockTimer,
 				receiptValidator,
 				sealValidator,
@@ -559,12 +562,12 @@ func main() {
 		}).
 		Component("hotstuff modules", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			// initialize the block finalizer
-			finalize := finalizer.NewFinalizer(
+			finalize := finalizer.NewFinalizerPebble(
 				node.DB,
 				node.Storage.Headers,
 				mutableState,
 				node.Tracer,
-				finalizer.WithCleanup(finalizer.CleanupMempools(
+				finalizer.WithCleanupPebble(finalizer.CleanupMempools(
 					node.Metrics.Mempool,
 					conMetrics,
 					node.Storage.Payloads,
@@ -605,7 +608,7 @@ func main() {
 			notifier.AddFollowerConsumer(followerDistributor)
 
 			// initialize the persister
-			persist := persister.New(node.DB, node.RootChainID)
+			persist := persister.NewPersisterPebble(node.DB, node.RootChainID)
 
 			finalizedBlock, err := node.State.Final().Head()
 			if err != nil {
@@ -722,7 +725,7 @@ func main() {
 		Component("consensus participant", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			// initialize the block builder
 			var build module.Builder
-			build, err = builder.NewBuilder(
+			build, err = builder.NewBuilderPebble(
 				node.Metrics.Mempool,
 				node.DB,
 				mutableState,
@@ -730,6 +733,7 @@ func main() {
 				node.Storage.Seals,
 				node.Storage.Index,
 				node.Storage.Blocks,
+				blockIndexer,
 				node.Storage.Results,
 				node.Storage.Receipts,
 				guarantees,

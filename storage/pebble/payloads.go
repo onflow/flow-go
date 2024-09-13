@@ -1,19 +1,18 @@
-package badger
+package pebble
 
 import (
 	"errors"
 	"fmt"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/badger/operation"
-	"github.com/onflow/flow-go/storage/badger/transaction"
+	"github.com/onflow/flow-go/storage/pebble/operation"
 )
 
 type Payloads struct {
-	db         *badger.DB
+	db         *pebble.DB
 	index      *Index
 	guarantees *Guarantees
 	seals      *Seals
@@ -21,7 +20,9 @@ type Payloads struct {
 	results    *ExecutionResults
 }
 
-func NewPayloads(db *badger.DB, index *Index, guarantees *Guarantees, seals *Seals, receipts *ExecutionReceipts,
+var _ storage.Payloads = (*Payloads)(nil)
+
+func NewPayloads(db *pebble.DB, index *Index, guarantees *Guarantees, seals *Seals, receipts *ExecutionReceipts,
 	results *ExecutionResults) *Payloads {
 
 	p := &Payloads{
@@ -36,67 +37,84 @@ func NewPayloads(db *badger.DB, index *Index, guarantees *Guarantees, seals *Sea
 	return p
 }
 
-func (p *Payloads) storeTx(blockID flow.Identifier, payload *flow.Payload) func(*transaction.Tx) error {
+func (p *Payloads) storeTx(blockID flow.Identifier, payload *flow.Payload) func(storage.PebbleReaderBatchWriter) error {
 	// For correct payloads, the execution result is part of the payload or it's already stored
 	// in storage. If execution result is not present in either of those places, we error.
 	// ATTENTION: this is unnecessarily complex if we have execution receipt which points an execution result
 	// which is not included in current payload but was incorporated in one of previous blocks.
 
-	return func(tx *transaction.Tx) error {
-
+	return func(rw storage.PebbleReaderBatchWriter) error {
 		resultsByID := payload.Results.Lookup()
 		fullReceipts := make([]*flow.ExecutionReceipt, 0, len(payload.Receipts))
 		var err error
+		batch := rw.IndexedBatch()
 		for _, meta := range payload.Receipts {
 			result, ok := resultsByID[meta.ResultID]
 			if !ok {
-				result, err = p.results.ByIDTx(meta.ResultID)(tx)
-				if err != nil {
-					if errors.Is(err, storage.ErrNotFound) {
+				// if result is not in the payload of the current block,
+				// it should be in either storage or previous blocks.
+				// reading from the indexed batch can read the block from previous block
+				result, err = p.results.byID(meta.ResultID)(batch)
+				if errors.Is(err, storage.ErrNotFound) {
+					// if the result is not in the previous blocks, check storage
+					result, err = p.results.ByID(meta.ResultID)
+					if err != nil {
 						err = fmt.Errorf("invalid payload referencing unknown execution result %v, err: %w", meta.ResultID, err)
 					}
+				}
+
+				if err != nil {
 					return err
 				}
 			}
 			fullReceipts = append(fullReceipts, flow.ExecutionReceiptFromMeta(*meta, *result))
 		}
 
-		// make sure all payload guarantees are stored
-		for _, guarantee := range payload.Guarantees {
-			err := p.guarantees.storeTx(guarantee)(tx)
-			if err != nil {
-				return fmt.Errorf("could not store guarantee: %w", err)
-			}
-		}
-
-		// make sure all payload seals are stored
-		for _, seal := range payload.Seals {
-			err := p.seals.storeTx(seal)(tx)
-			if err != nil {
-				return fmt.Errorf("could not store seal: %w", err)
-			}
-		}
-
-		// store all payload receipts
-		for _, receipt := range fullReceipts {
-			err := p.receipts.storeTx(receipt)(tx)
-			if err != nil {
-				return fmt.Errorf("could not store receipt: %w", err)
-			}
-		}
-
-		// store the index
-		err = p.index.storeTx(blockID, payload.Index())(tx)
-		if err != nil {
-			return fmt.Errorf("could not store index: %w", err)
-		}
-
-		return nil
+		return p.storePayloads(rw, blockID, payload, fullReceipts)
 	}
 }
 
-func (p *Payloads) retrieveTx(blockID flow.Identifier) func(tx *badger.Txn) (*flow.Payload, error) {
-	return func(tx *badger.Txn) (*flow.Payload, error) {
+func (p *Payloads) storePayloads(
+	tx storage.PebbleReaderBatchWriter, blockID flow.Identifier, payload *flow.Payload, fullReceipts []*flow.ExecutionReceipt) error {
+	// make sure all payload guarantees are stored
+	for _, guarantee := range payload.Guarantees {
+		err := p.guarantees.storeTx(guarantee)(tx)
+		if err != nil {
+			return fmt.Errorf("could not store guarantee: %w", err)
+		}
+	}
+
+	// make sure all payload seals are stored
+	for _, seal := range payload.Seals {
+		err := p.seals.storeTx(seal)(tx)
+		if err != nil {
+			return fmt.Errorf("could not store seal: %w", err)
+		}
+	}
+
+	// store all payload receipts
+	for _, receipt := range fullReceipts {
+		err := p.receipts.storeTx(receipt)(tx)
+		if err != nil {
+			return fmt.Errorf("could not store receipt: %w", err)
+		}
+	}
+
+	// store the index
+	err := p.index.storeTx(blockID, payload.Index())(tx)
+	if err != nil {
+		return fmt.Errorf("could not store index: %w", err)
+	}
+
+	return nil
+}
+
+func (p *Payloads) Store(blockID flow.Identifier, payload *flow.Payload) error {
+	return operation.WithReaderBatchWriter(p.db, p.storeTx(blockID, payload))
+}
+
+func (p *Payloads) retrieveTx(blockID flow.Identifier) func(tx pebble.Reader) (*flow.Payload, error) {
+	return func(tx pebble.Reader) (*flow.Payload, error) {
 
 		// retrieve the index
 		idx, err := p.index.retrieveTx(blockID)(tx)
@@ -154,12 +172,6 @@ func (p *Payloads) retrieveTx(blockID flow.Identifier) func(tx *badger.Txn) (*fl
 	}
 }
 
-func (p *Payloads) Store(blockID flow.Identifier, payload *flow.Payload) error {
-	return operation.RetryOnConflictTx(p.db, transaction.Update, p.storeTx(blockID, payload))
-}
-
 func (p *Payloads) ByBlockID(blockID flow.Identifier) (*flow.Payload, error) {
-	tx := p.db.NewTransaction(false)
-	defer tx.Discard()
-	return p.retrieveTx(blockID)(tx)
+	return p.retrieveTx(blockID)(p.db)
 }

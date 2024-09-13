@@ -1,39 +1,39 @@
-package badger
+package pebble
 
 import (
 	"fmt"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble"
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/storage/badger/operation"
-	"github.com/onflow/flow-go/storage/badger/transaction"
+	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/pebble/operation"
 )
 
 // DKGState stores state information about in-progress and completed DKGs, including
 // computed keys. Must be instantiated using secrets database.
 type DKGState struct {
-	db       *badger.DB
+	db       *pebble.DB
 	keyCache *Cache[uint64, *encodable.RandomBeaconPrivKey]
 }
 
-// NewDKGState returns the DKGState implementation backed by Badger DB.
-func NewDKGState(collector module.CacheMetrics, db *badger.DB) (*DKGState, error) {
+// NewDKGState returns the DKGState implementation backed by Pebble DB.
+func NewDKGState(collector module.CacheMetrics, db *pebble.DB) (*DKGState, error) {
 	err := operation.EnsureSecretDB(db)
 	if err != nil {
 		return nil, fmt.Errorf("cannot instantiate dkg state storage in non-secret db: %w", err)
 	}
 
-	storeKey := func(epochCounter uint64, info *encodable.RandomBeaconPrivKey) func(*transaction.Tx) error {
-		return transaction.WithTx(operation.InsertMyBeaconPrivateKey(epochCounter, info))
+	storeKey := func(epochCounter uint64, info *encodable.RandomBeaconPrivKey) func(storage.PebbleReaderBatchWriter) error {
+		return storage.OnlyWriter(operation.InsertMyBeaconPrivateKey(epochCounter, info))
 	}
 
-	retrieveKey := func(epochCounter uint64) func(*badger.Txn) (*encodable.RandomBeaconPrivKey, error) {
-		return func(tx *badger.Txn) (*encodable.RandomBeaconPrivKey, error) {
+	retrieveKey := func(epochCounter uint64) func(pebble.Reader) (*encodable.RandomBeaconPrivKey, error) {
+		return func(tx pebble.Reader) (*encodable.RandomBeaconPrivKey, error) {
 			var info encodable.RandomBeaconPrivKey
 			err := operation.RetrieveMyBeaconPrivateKey(epochCounter, &info)(tx)
 			return &info, err
@@ -54,12 +54,12 @@ func NewDKGState(collector module.CacheMetrics, db *badger.DB) (*DKGState, error
 	return dkgState, nil
 }
 
-func (ds *DKGState) storeKeyTx(epochCounter uint64, key *encodable.RandomBeaconPrivKey) func(tx *transaction.Tx) error {
-	return ds.keyCache.PutTx(epochCounter, key)
+func (ds *DKGState) storeKeyTx(epochCounter uint64, key *encodable.RandomBeaconPrivKey) func(storage.PebbleReaderBatchWriter) error {
+	return ds.keyCache.PutPebble(epochCounter, key)
 }
 
-func (ds *DKGState) retrieveKeyTx(epochCounter uint64) func(tx *badger.Txn) (*encodable.RandomBeaconPrivKey, error) {
-	return func(tx *badger.Txn) (*encodable.RandomBeaconPrivKey, error) {
+func (ds *DKGState) retrieveKeyTx(epochCounter uint64) func(tx pebble.Reader) (*encodable.RandomBeaconPrivKey, error) {
+	return func(tx pebble.Reader) (*encodable.RandomBeaconPrivKey, error) {
 		val, err := ds.keyCache.Get(epochCounter)(tx)
 		if err != nil {
 			return nil, err
@@ -78,7 +78,7 @@ func (ds *DKGState) InsertMyBeaconPrivateKey(epochCounter uint64, key crypto.Pri
 		return fmt.Errorf("will not store nil beacon key")
 	}
 	encodableKey := &encodable.RandomBeaconPrivKey{PrivateKey: key}
-	return operation.RetryOnConflictTx(ds.db, transaction.Update, ds.storeKeyTx(epochCounter, encodableKey))
+	return operation.WithReaderBatchWriter(ds.db, ds.storeKeyTx(epochCounter, encodableKey))
 }
 
 // RetrieveMyBeaconPrivateKey retrieves the random beacon private key for an epoch.
@@ -87,9 +87,7 @@ func (ds *DKGState) InsertMyBeaconPrivateKey(epochCounter uint64, key crypto.Pri
 // canonical key vector and may not be valid for use in signing. Use SafeBeaconKeys
 // to guarantee only keys safe for signing are returned
 func (ds *DKGState) RetrieveMyBeaconPrivateKey(epochCounter uint64) (crypto.PrivateKey, error) {
-	tx := ds.db.NewTransaction(false)
-	defer tx.Discard()
-	encodableKey, err := ds.retrieveKeyTx(epochCounter)(tx)
+	encodableKey, err := ds.retrieveKeyTx(epochCounter)(ds.db)
 	if err != nil {
 		return nil, err
 	}
@@ -98,34 +96,34 @@ func (ds *DKGState) RetrieveMyBeaconPrivateKey(epochCounter uint64) (crypto.Priv
 
 // SetDKGStarted sets the flag indicating the DKG has started for the given epoch.
 func (ds *DKGState) SetDKGStarted(epochCounter uint64) error {
-	return ds.db.Update(operation.InsertDKGStartedForEpoch(epochCounter))
+	return operation.InsertDKGStartedForEpoch(epochCounter)(ds.db)
 }
 
 // GetDKGStarted checks whether the DKG has been started for the given epoch.
 func (ds *DKGState) GetDKGStarted(epochCounter uint64) (bool, error) {
 	var started bool
-	err := ds.db.View(operation.RetrieveDKGStartedForEpoch(epochCounter, &started))
+	err := operation.RetrieveDKGStartedForEpoch(epochCounter, &started)(ds.db)
 	return started, err
 }
 
 // SetDKGEndState stores that the DKG has ended, and its end state.
 func (ds *DKGState) SetDKGEndState(epochCounter uint64, endState flow.DKGEndState) error {
-	return ds.db.Update(operation.InsertDKGEndStateForEpoch(epochCounter, endState))
+	return operation.InsertDKGEndStateForEpoch(epochCounter, endState)(ds.db)
 }
 
 // GetDKGEndState retrieves the DKG end state for the epoch.
 func (ds *DKGState) GetDKGEndState(epochCounter uint64) (flow.DKGEndState, error) {
 	var endState flow.DKGEndState
-	err := ds.db.Update(operation.RetrieveDKGEndStateForEpoch(epochCounter, &endState))
+	err := operation.RetrieveDKGEndStateForEpoch(epochCounter, &endState)(ds.db)
 	return endState, err
 }
 
-// SafeBeaconPrivateKeys is the safe beacon key storage backed by Badger DB.
+// SafeBeaconPrivateKeys is the safe beacon key storage backed by Pebble DB.
 type SafeBeaconPrivateKeys struct {
 	state *DKGState
 }
 
-// NewSafeBeaconPrivateKeys returns a safe beacon key storage backed by Badger DB.
+// NewSafeBeaconPrivateKeys returns a safe beacon key storage backed by Pebble DB.
 func NewSafeBeaconPrivateKeys(state *DKGState) *SafeBeaconPrivateKeys {
 	return &SafeBeaconPrivateKeys{state: state}
 }
@@ -140,7 +138,7 @@ func NewSafeBeaconPrivateKeys(state *DKGState) *SafeBeaconPrivateKeys {
 //   - (nil, false, storage.ErrNotFound) if the DKG has not ended
 //   - (nil, false, error) for any unexpected exception
 func (keys *SafeBeaconPrivateKeys) RetrieveMyBeaconPrivateKey(epochCounter uint64) (key crypto.PrivateKey, safe bool, err error) {
-	err = keys.state.db.View(func(txn *badger.Txn) error {
+	err = (func(txn pebble.Reader) error {
 
 		// retrieve the end state
 		var endState flow.DKGEndState
@@ -171,6 +169,6 @@ func (keys *SafeBeaconPrivateKeys) RetrieveMyBeaconPrivateKey(epochCounter uint6
 		safe = true
 		key = encodableKey.PrivateKey
 		return nil
-	})
+	})(keys.state.db)
 	return
 }

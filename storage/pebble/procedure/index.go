@@ -3,14 +3,14 @@ package procedure
 import (
 	"fmt"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/storage/pebble/operation"
 )
 
-func InsertIndex(blockID flow.Identifier, index *flow.Index) func(tx *badger.Txn) error {
-	return func(tx *badger.Txn) error {
+func InsertIndex(blockID flow.Identifier, index *flow.Index) func(tx pebble.Writer) error {
+	return func(tx pebble.Writer) error {
 		err := operation.IndexPayloadGuarantees(blockID, index.CollectionIDs)(tx)
 		if err != nil {
 			return fmt.Errorf("could not store guarantee index: %w", err)
@@ -31,8 +31,8 @@ func InsertIndex(blockID flow.Identifier, index *flow.Index) func(tx *badger.Txn
 	}
 }
 
-func RetrieveIndex(blockID flow.Identifier, index *flow.Index) func(tx *badger.Txn) error {
-	return func(tx *badger.Txn) error {
+func RetrieveIndex(blockID flow.Identifier, index *flow.Index) func(tx pebble.Reader) error {
+	return func(tx pebble.Reader) error {
 		var collIDs []flow.Identifier
 		err := operation.LookupPayloadGuarantees(blockID, &collIDs)(tx)
 		if err != nil {

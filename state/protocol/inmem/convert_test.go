@@ -5,14 +5,14 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
-	bprotocol "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/inmem"
+	bprotocol "github.com/onflow/flow-go/state/protocol/pebble"
 	"github.com/onflow/flow-go/state/protocol/util"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -23,7 +23,7 @@ func TestFromSnapshot(t *testing.T) {
 	identities := unittest.IdentityListFixture(10, unittest.WithAllRoles())
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
 
-	util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.FollowerState) {
+	util.RunWithPebbleFollowerProtocolState(t, rootSnapshot, func(db *pebble.DB, state *bprotocol.FollowerState) {
 
 		epochBuilder := unittest.NewEpochBuilder(t, state)
 		// build epoch 1 (prepare epoch 2)

@@ -17,3 +17,9 @@ type ClusterBlocks interface {
 	// finalized blocks.
 	ByHeight(height uint64) (*cluster.Block, error)
 }
+
+type ClusterBlockIndexer interface {
+	// InsertClusterBlock inserts a cluster consensus block, updating all associated indexes.
+	// When calling by multiple goroutines, it should be thread-safe.
+	InsertClusterBlock(block *cluster.Block) func(PebbleReaderBatchWriter) error
+}

@@ -1,11 +1,9 @@
-package badger_test
+package pebble_test
 
 import (
 	"fmt"
-	mathRand "math/rand"
 	"testing"
 
-	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/exp/rand"
@@ -15,11 +13,12 @@ import (
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/unittest"
 
-	bstorage "github.com/onflow/flow-go/storage/badger"
+	bstorage "github.com/onflow/flow-go/storage/pebble"
 )
 
 func TestBatchStoringTransactionResults(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithWrappedPebbleDB(t, func(w *unittest.PebbleWrapper) {
+		db := w.DB()
 		metrics := metrics.NewNoopCollector()
 		store := bstorage.NewTransactionResults(metrics, db, 1000)
 
@@ -68,7 +67,8 @@ func TestBatchStoringTransactionResults(t *testing.T) {
 }
 
 func TestReadingNotStoreTransaction(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithWrappedPebbleDB(t, func(w *unittest.PebbleWrapper) {
+		db := w.DB()
 		metrics := metrics.NewNoopCollector()
 		store := bstorage.NewTransactionResults(metrics, db, 1000)
 
@@ -82,24 +82,4 @@ func TestReadingNotStoreTransaction(t *testing.T) {
 		_, err = store.ByBlockIDTransactionIndex(blockID, txIndex)
 		assert.ErrorIs(t, err, storage.ErrNotFound)
 	})
-}
-
-func TestKeyConversion(t *testing.T) {
-	blockID := unittest.IdentifierFixture()
-	txID := unittest.IdentifierFixture()
-	key := bstorage.KeyFromBlockIDTransactionID(blockID, txID)
-	bID, tID, err := bstorage.KeyToBlockIDTransactionID(key)
-	require.NoError(t, err)
-	require.Equal(t, blockID, bID)
-	require.Equal(t, txID, tID)
-}
-
-func TestIndexKeyConversion(t *testing.T) {
-	blockID := unittest.IdentifierFixture()
-	txIndex := mathRand.Uint32()
-	key := bstorage.KeyFromBlockIDIndex(blockID, txIndex)
-	bID, tID, err := bstorage.KeyToBlockIDIndex(key)
-	require.NoError(t, err)
-	require.Equal(t, blockID, bID)
-	require.Equal(t, txIndex, tID)
 }

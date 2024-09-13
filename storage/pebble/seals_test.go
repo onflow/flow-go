@@ -1,24 +1,24 @@
-package badger_test
+package pebble_test
 
 import (
 	"errors"
 	"testing"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/storage/pebble/operation"
 	"github.com/onflow/flow-go/utils/unittest"
 
-	badgerstorage "github.com/onflow/flow-go/storage/badger"
+	pebblestorage "github.com/onflow/flow-go/storage/pebble"
 )
 
 func TestRetrieveWithoutStore(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
 		metrics := metrics.NewNoopCollector()
-		store := badgerstorage.NewSeals(metrics, db)
+		store := pebblestorage.NewSeals(metrics, db)
 
 		_, err := store.ByID(unittest.IdentifierFixture())
 		require.True(t, errors.Is(err, storage.ErrNotFound))
@@ -30,9 +30,9 @@ func TestRetrieveWithoutStore(t *testing.T) {
 
 // TestSealStoreRetrieve verifies that a seal can be stored and retrieved by its ID
 func TestSealStoreRetrieve(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
 		metrics := metrics.NewNoopCollector()
-		store := badgerstorage.NewSeals(metrics, db)
+		store := pebblestorage.NewSeals(metrics, db)
 
 		expected := unittest.Seal.Fixture()
 		// store seal
@@ -50,11 +50,11 @@ func TestSealStoreRetrieve(t *testing.T) {
 //   - for a block, we can store (aka index) the latest sealed block along this fork.
 //
 // Note: indexing the seal for a block is currently implemented only through a direct
-// Badger operation. The Seals mempool only supports retrieving the latest sealed block.
+// pebble operation. The Seals mempool only supports retrieving the latest sealed block.
 func TestSealIndexAndRetrieve(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
 		metrics := metrics.NewNoopCollector()
-		store := badgerstorage.NewSeals(metrics, db)
+		store := pebblestorage.NewSeals(metrics, db)
 
 		expectedSeal := unittest.Seal.Fixture()
 		blockID := unittest.IdentifierFixture()
@@ -64,7 +64,7 @@ func TestSealIndexAndRetrieve(t *testing.T) {
 		require.NoError(t, err)
 
 		// index the seal ID for the heighest sealed block in this fork
-		err = operation.RetryOnConflict(db.Update, operation.IndexLatestSealAtBlock(blockID, expectedSeal.ID()))
+		err = operation.IndexLatestSealAtBlock(blockID, expectedSeal.ID())(db)
 		require.NoError(t, err)
 
 		// retrieve latest seal
@@ -77,9 +77,9 @@ func TestSealIndexAndRetrieve(t *testing.T) {
 // TestSealedBlockIndexAndRetrieve checks after indexing a seal by a sealed block ID, it can be
 // retrieved by the sealed block ID
 func TestSealedBlockIndexAndRetrieve(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
 		metrics := metrics.NewNoopCollector()
-		store := badgerstorage.NewSeals(metrics, db)
+		store := pebblestorage.NewSeals(metrics, db)
 
 		expectedSeal := unittest.Seal.Fixture()
 		blockID := unittest.IdentifierFixture()
@@ -90,7 +90,7 @@ func TestSealedBlockIndexAndRetrieve(t *testing.T) {
 		require.NoError(t, err)
 
 		// index the seal ID for the highest sealed block in this fork
-		err = operation.RetryOnConflict(db.Update, operation.IndexFinalizedSealByBlockID(expectedSeal.BlockID, expectedSeal.ID()))
+		err = operation.IndexFinalizedSealByBlockID(expectedSeal.BlockID, expectedSeal.ID())(db)
 		require.NoError(t, err)
 
 		// retrieve latest seal

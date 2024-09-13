@@ -3,7 +3,7 @@ package operation
 import (
 	"errors"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble"
 
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
@@ -16,7 +16,7 @@ import (
 // used in the context of the secrets database. This is enforced in the above
 // layer (see storage.DKGState).
 // Error returns: storage.ErrAlreadyExists
-func InsertMyBeaconPrivateKey(epochCounter uint64, info *encodable.RandomBeaconPrivKey) func(*badger.Txn) error {
+func InsertMyBeaconPrivateKey(epochCounter uint64, info *encodable.RandomBeaconPrivKey) func(pebble.Writer) error {
 	return insert(makePrefix(codeBeaconPrivateKey, epochCounter), info)
 }
 
@@ -26,22 +26,22 @@ func InsertMyBeaconPrivateKey(epochCounter uint64, info *encodable.RandomBeaconP
 // used in the context of the secrets database. This is enforced in the above
 // layer (see storage.DKGState).
 // Error returns: storage.ErrNotFound
-func RetrieveMyBeaconPrivateKey(epochCounter uint64, info *encodable.RandomBeaconPrivKey) func(*badger.Txn) error {
+func RetrieveMyBeaconPrivateKey(epochCounter uint64, info *encodable.RandomBeaconPrivKey) func(pebble.Reader) error {
 	return retrieve(makePrefix(codeBeaconPrivateKey, epochCounter), info)
 }
 
 // InsertDKGStartedForEpoch stores a flag indicating that the DKG has been started for the given epoch.
 // Returns: storage.ErrAlreadyExists
 // Error returns: storage.ErrAlreadyExists
-func InsertDKGStartedForEpoch(epochCounter uint64) func(*badger.Txn) error {
+func InsertDKGStartedForEpoch(epochCounter uint64) func(pebble.Writer) error {
 	return insert(makePrefix(codeDKGStarted, epochCounter), true)
 }
 
 // RetrieveDKGStartedForEpoch retrieves the DKG started flag for the given epoch.
 // If no flag is set, started is set to false and no error is returned.
 // No errors expected during normal operation.
-func RetrieveDKGStartedForEpoch(epochCounter uint64, started *bool) func(*badger.Txn) error {
-	return func(tx *badger.Txn) error {
+func RetrieveDKGStartedForEpoch(epochCounter uint64, started *bool) func(pebble.Reader) error {
+	return func(tx pebble.Reader) error {
 		err := retrieve(makePrefix(codeDKGStarted, epochCounter), started)(tx)
 		if errors.Is(err, storage.ErrNotFound) {
 			// flag not set - therefore DKG not started
@@ -58,12 +58,12 @@ func RetrieveDKGStartedForEpoch(epochCounter uint64, started *bool) func(*badger
 
 // InsertDKGEndStateForEpoch stores the DKG end state for the epoch.
 // Error returns: storage.ErrAlreadyExists
-func InsertDKGEndStateForEpoch(epochCounter uint64, endState flow.DKGEndState) func(*badger.Txn) error {
+func InsertDKGEndStateForEpoch(epochCounter uint64, endState flow.DKGEndState) func(pebble.Writer) error {
 	return insert(makePrefix(codeDKGEnded, epochCounter), endState)
 }
 
 // RetrieveDKGEndStateForEpoch retrieves the DKG end state for the epoch.
 // Error returns: storage.ErrNotFound
-func RetrieveDKGEndStateForEpoch(epochCounter uint64, endState *flow.DKGEndState) func(*badger.Txn) error {
+func RetrieveDKGEndStateForEpoch(epochCounter uint64, endState *flow.DKGEndState) func(pebble.Reader) error {
 	return retrieve(makePrefix(codeDKGEnded, epochCounter), endState)
 }

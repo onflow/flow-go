@@ -1,30 +1,30 @@
-package badger_test
+package pebble_test
 
 import (
 	"errors"
 
 	"testing"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/unittest"
 
-	badgerstorage "github.com/onflow/flow-go/storage/badger"
+	pebblestorage "github.com/onflow/flow-go/storage/pebble"
 )
 
 func TestPayloadStoreRetrieve(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
 		metrics := metrics.NewNoopCollector()
 
-		index := badgerstorage.NewIndex(metrics, db)
-		seals := badgerstorage.NewSeals(metrics, db)
-		guarantees := badgerstorage.NewGuarantees(metrics, db, badgerstorage.DefaultCacheSize)
-		results := badgerstorage.NewExecutionResults(metrics, db)
-		receipts := badgerstorage.NewExecutionReceipts(metrics, db, results, badgerstorage.DefaultCacheSize)
-		store := badgerstorage.NewPayloads(db, index, guarantees, seals, receipts, results)
+		index := pebblestorage.NewIndex(metrics, db)
+		seals := pebblestorage.NewSeals(metrics, db)
+		guarantees := pebblestorage.NewGuarantees(metrics, db, pebblestorage.DefaultCacheSize)
+		results := pebblestorage.NewExecutionResults(metrics, db)
+		receipts := pebblestorage.NewExecutionReceipts(metrics, db, results, pebblestorage.DefaultCacheSize)
+		store := pebblestorage.NewPayloads(db, index, guarantees, seals, receipts, results)
 
 		blockID := unittest.IdentifierFixture()
 		expected := unittest.PayloadFixture(unittest.WithAllTheFixins)
@@ -41,15 +41,15 @@ func TestPayloadStoreRetrieve(t *testing.T) {
 }
 
 func TestPayloadRetreiveWithoutStore(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
 		metrics := metrics.NewNoopCollector()
 
-		index := badgerstorage.NewIndex(metrics, db)
-		seals := badgerstorage.NewSeals(metrics, db)
-		guarantees := badgerstorage.NewGuarantees(metrics, db, badgerstorage.DefaultCacheSize)
-		results := badgerstorage.NewExecutionResults(metrics, db)
-		receipts := badgerstorage.NewExecutionReceipts(metrics, db, results, badgerstorage.DefaultCacheSize)
-		store := badgerstorage.NewPayloads(db, index, guarantees, seals, receipts, results)
+		index := pebblestorage.NewIndex(metrics, db)
+		seals := pebblestorage.NewSeals(metrics, db)
+		guarantees := pebblestorage.NewGuarantees(metrics, db, pebblestorage.DefaultCacheSize)
+		results := pebblestorage.NewExecutionResults(metrics, db)
+		receipts := pebblestorage.NewExecutionReceipts(metrics, db, results, pebblestorage.DefaultCacheSize)
+		store := pebblestorage.NewPayloads(db, index, guarantees, seals, receipts, results)
 
 		blockID := unittest.IdentifierFixture()
 

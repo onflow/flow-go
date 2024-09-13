@@ -1,10 +1,10 @@
-package badger_test
+package pebble_test
 
 import (
 	"errors"
 	"testing"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -12,16 +12,15 @@ import (
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/unittest"
 
-	badgerstorage "github.com/onflow/flow-go/storage/badger"
-	"github.com/onflow/flow-go/storage/badger/operation"
-	"github.com/onflow/flow-go/storage/badger/transaction"
+	pebblestorage "github.com/onflow/flow-go/storage/pebble"
+	"github.com/onflow/flow-go/storage/pebble/operation"
 )
 
 // TestEpochSetupStoreAndRetrieve tests that a setup can be stored, retrieved and attempted to be stored again without an error
 func TestEpochSetupStoreAndRetrieve(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
 		metrics := metrics.NewNoopCollector()
-		store := badgerstorage.NewEpochSetups(metrics, db)
+		store := pebblestorage.NewEpochSetups(metrics, db)
 
 		// attempt to get a setup that doesn't exist
 		_, err := store.ByID(unittest.IdentifierFixture())
@@ -29,7 +28,7 @@ func TestEpochSetupStoreAndRetrieve(t *testing.T) {
 
 		// store a setup in db
 		expected := unittest.EpochSetupFixture()
-		err = operation.RetryOnConflictTx(db, transaction.Update, store.StoreTx(expected))
+		err = operation.WithReaderBatchWriter(db, store.StorePebble(expected))
 		require.NoError(t, err)
 
 		// retrieve the setup by ID
@@ -38,7 +37,7 @@ func TestEpochSetupStoreAndRetrieve(t *testing.T) {
 		assert.Equal(t, expected, actual)
 
 		// test storing same epoch setup
-		err = operation.RetryOnConflictTx(db, transaction.Update, store.StoreTx(expected))
+		err = operation.WithReaderBatchWriter(db, store.StorePebble(expected))
 		require.NoError(t, err)
 	})
 }

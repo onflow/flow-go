@@ -3,21 +3,22 @@ package factories
 import (
 	"fmt"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble"
 
 	"github.com/onflow/flow-go/module"
-	clusterkv "github.com/onflow/flow-go/state/cluster/badger"
-	bstorage "github.com/onflow/flow-go/storage/badger"
+	clusterkv "github.com/onflow/flow-go/state/cluster/pebble"
+	"github.com/onflow/flow-go/storage"
+	bstorage "github.com/onflow/flow-go/storage/pebble"
 )
 
 type ClusterStateFactory struct {
-	db      *badger.DB
+	db      *pebble.DB
 	metrics module.CacheMetrics
 	tracer  module.Tracer
 }
 
 func NewClusterStateFactory(
-	db *badger.DB,
+	db *pebble.DB,
 	metrics module.CacheMetrics,
 	tracer module.Tracer,
 ) (*ClusterStateFactory, error) {
@@ -29,7 +30,7 @@ func NewClusterStateFactory(
 	return factory, nil
 }
 
-func (f *ClusterStateFactory) Create(stateRoot *clusterkv.StateRoot) (
+func (f *ClusterStateFactory) Create(stateRoot *clusterkv.StateRoot, blockIndexer storage.ClusterBlockIndexer) (
 	*clusterkv.MutableState,
 	*bstorage.Headers,
 	*bstorage.ClusterPayloads,
@@ -58,7 +59,7 @@ func (f *ClusterStateFactory) Create(stateRoot *clusterkv.StateRoot) (
 		}
 	}
 
-	mutableState, err := clusterkv.NewMutableState(clusterState, f.tracer, headers, payloads)
+	mutableState, err := clusterkv.NewMutableState(clusterState, f.tracer, headers, payloads, blockIndexer)
 	if err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("could create mutable cluster state: %w", err)
 	}

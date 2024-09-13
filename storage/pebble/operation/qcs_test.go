@@ -3,7 +3,7 @@ package operation
 import (
 	"testing"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -12,14 +12,14 @@ import (
 )
 
 func TestInsertQuorumCertificate(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
 		expected := unittest.QuorumCertificateFixture()
 
-		err := db.Update(InsertQuorumCertificate(expected))
+		err := InsertQuorumCertificate(expected)(db)
 		require.Nil(t, err)
 
 		var actual flow.QuorumCertificate
-		err = db.View(RetrieveQuorumCertificate(expected.BlockID, &actual))
+		err = RetrieveQuorumCertificate(expected.BlockID, &actual)(db)
 		require.Nil(t, err)
 
 		assert.Equal(t, expected, &actual)

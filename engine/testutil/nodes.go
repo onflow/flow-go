@@ -100,13 +100,14 @@ import (
 	"github.com/onflow/flow-go/network/p2p/cache"
 	"github.com/onflow/flow-go/network/stub"
 	"github.com/onflow/flow-go/state/protocol"
-	badgerstate "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
 	"github.com/onflow/flow-go/state/protocol/events"
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
+	pebblestate "github.com/onflow/flow-go/state/protocol/pebble"
 	"github.com/onflow/flow-go/state/protocol/util"
-	storage "github.com/onflow/flow-go/storage/badger"
+	storage "github.com/onflow/flow-go/storage/pebble"
 	storagepebble "github.com/onflow/flow-go/storage/pebble"
+	"github.com/onflow/flow-go/storage/pebble/procedure"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -243,12 +244,12 @@ func CompleteStateFixture(
 	dataDir := unittest.TempDir(t)
 	publicDBDir := filepath.Join(dataDir, "protocol")
 	secretsDBDir := filepath.Join(dataDir, "secrets")
-	db := unittest.TypedBadgerDB(t, publicDBDir, storage.InitPublic)
+	db := unittest.TypedPebbleDB(t, publicDBDir, storage.InitPublic)
 	s := storage.InitAll(metric, db)
-	secretsDB := unittest.TypedBadgerDB(t, secretsDBDir, storage.InitSecret)
+	secretsDB := unittest.TypedPebbleDB(t, secretsDBDir, storage.InitSecret)
 	consumer := events.NewDistributor()
 
-	state, err := badgerstate.Bootstrap(
+	state, err := pebblestate.Bootstrap(
 		metric,
 		db,
 		s.Headers,
@@ -264,13 +265,14 @@ func CompleteStateFixture(
 	)
 	require.NoError(t, err)
 
-	mutableState, err := badgerstate.NewFullConsensusState(
+	mutableState, err := pebblestate.NewFullConsensusState(
 		log,
 		tracer,
 		consumer,
 		state,
 		s.Index,
 		s.Payloads,
+		procedure.NewBlockIndexer(),
 		util.MockBlockTimer(),
 		util.MockReceiptValidator(),
 		util.MockSealValidator(s.Seals),
@@ -576,10 +578,10 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		return protocol.IsNodeAuthorizedAt(node.State.AtBlockID(blockID), node.Me.NodeID())
 	}
 
-	protoState, ok := node.State.(*badgerstate.ParticipantState)
+	protoState, ok := node.State.(*pebblestate.ParticipantState)
 	require.True(t, ok)
 
-	followerState, err := badgerstate.NewFollowerState(
+	followerState, err := pebblestate.NewFollowerState(
 		node.Log,
 		node.Tracer,
 		node.ProtocolEvents,
@@ -853,7 +855,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		ExecutionEngine:     computationEngine,
 		RequestEngine:       requestEngine,
 		ReceiptsEngine:      pusherEngine,
-		BadgerDB:            node.PublicDB,
+		PebbleDB:            node.PublicDB,
 		VM:                  computationEngine.VM(),
 		ExecutionState:      execState,
 		Ledger:              ls,
@@ -943,12 +945,12 @@ func (s *RoundRobinLeaderSelection) DKG(_ uint64) (hotstuff.DKG, error) {
 func createFollowerCore(
 	t *testing.T,
 	node *testmock.GenericNode,
-	followerState *badgerstate.FollowerState,
+	followerState *pebblestate.FollowerState,
 	notifier hotstuff.FollowerConsumer,
 	rootHead *flow.Header,
 	rootQC *flow.QuorumCertificate,
-) (module.HotStuffFollower, *confinalizer.Finalizer) {
-	finalizer := confinalizer.NewFinalizer(node.PublicDB, node.Headers, followerState, trace.NewNoopTracer())
+) (module.HotStuffFollower, *confinalizer.FinalizerPebble) {
+	finalizer := confinalizer.NewFinalizerPebble(node.PublicDB, node.Headers, followerState, trace.NewNoopTracer())
 
 	pending := make([]*flow.Header, 0)
 

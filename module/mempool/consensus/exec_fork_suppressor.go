@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"go.uber.org/atomic"
@@ -15,7 +15,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/storage/pebble/operation"
 )
 
 // ExecForkSuppressor is a wrapper around a conventional mempool.IncorporatedResultSeals
@@ -47,7 +47,7 @@ type ExecForkSuppressor struct {
 	lowestHeight     uint64
 	execForkDetected atomic.Bool
 	onExecFork       ExecForkActor
-	db               *badger.DB
+	db               *pebble.DB
 	log              zerolog.Logger
 }
 
@@ -59,7 +59,7 @@ type sealSet map[flow.Identifier]*flow.IncorporatedResultSeal
 // sealsList is a list of seals
 type sealsList []*flow.IncorporatedResultSeal
 
-func NewExecStateForkSuppressor(seals mempool.IncorporatedResultSeals, onExecFork ExecForkActor, db *badger.DB, log zerolog.Logger) (*ExecForkSuppressor, error) {
+func NewExecStateForkSuppressor(seals mempool.IncorporatedResultSeals, onExecFork ExecForkActor, db *pebble.DB, log zerolog.Logger) (*ExecForkSuppressor, error) {
 	conflictingSeals, err := checkExecutionForkEvidence(db)
 	if err != nil {
 		return nil, fmt.Errorf("failed to interface with storage: %w", err)
@@ -339,37 +339,31 @@ func hasConsistentStateTransitions(irSeal, irSeal2 *flow.IncorporatedResultSeal)
 
 // checkExecutionForkDetected checks the database whether evidence
 // about an execution fork is stored. Returns the stored evidence.
-func checkExecutionForkEvidence(db *badger.DB) ([]*flow.IncorporatedResultSeal, error) {
+func checkExecutionForkEvidence(db *pebble.DB) ([]*flow.IncorporatedResultSeal, error) {
 	var conflictingSeals []*flow.IncorporatedResultSeal
-	err := db.View(func(tx *badger.Txn) error {
-		err := operation.RetrieveExecutionForkEvidence(&conflictingSeals)(tx)
-		if errors.Is(err, storage.ErrNotFound) {
-			return nil // no evidence in data base; conflictingSeals is still nil slice
-		}
-		if err != nil {
-			return fmt.Errorf("failed to load evidence whether or not an execution fork occured: %w", err)
-		}
-		return nil
-	})
-	return conflictingSeals, err
+	err := operation.RetrieveExecutionForkEvidence(&conflictingSeals)(db)
+	if errors.Is(err, storage.ErrNotFound) {
+		return nil, nil // no evidence in data base; conflictingSeals is still nil slice
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to load evidence whether or not an execution fork occured: %w", err)
+	}
+	return conflictingSeals, nil
 }
 
 // storeExecutionForkEvidence stores the provided seals in the database
 // as evidence for an execution fork.
-func storeExecutionForkEvidence(conflictingSeals []*flow.IncorporatedResultSeal, db *badger.DB) error {
-	err := operation.RetryOnConflict(db.Update, func(tx *badger.Txn) error {
-		err := operation.InsertExecutionForkEvidence(conflictingSeals)(tx)
-		if errors.Is(err, storage.ErrAlreadyExists) {
-			// some evidence about execution fork already stored;
-			// we only keep the first evidence => noting more to do
-			return nil
-		}
-		if err != nil {
-			return fmt.Errorf("failed to store evidence about execution fork: %w", err)
-		}
+func storeExecutionForkEvidence(conflictingSeals []*flow.IncorporatedResultSeal, db *pebble.DB) error {
+	err := operation.InsertExecutionForkEvidence(conflictingSeals)(db)
+	if errors.Is(err, storage.ErrAlreadyExists) {
+		// some evidence about execution fork already stored;
+		// we only keep the first evidence => noting more to do
 		return nil
-	})
-	return err
+	}
+	if err != nil {
+		return fmt.Errorf("failed to store evidence about execution fork: %w", err)
+	}
+	return nil
 }
 
 // filterConflictingSeals performs filtering of provided seals by checking if there are conflicting seals for same block.

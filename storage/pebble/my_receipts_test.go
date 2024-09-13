@@ -1,19 +1,20 @@
-package badger_test
+package pebble_test
 
 import (
+	"sync"
 	"testing"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/cockroachdb/pebble"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/module/metrics"
-	bstorage "github.com/onflow/flow-go/storage/badger"
+	bstorage "github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestMyExecutionReceiptsStorage(t *testing.T) {
 	withStore := func(t *testing.T, f func(store *bstorage.MyExecutionReceipts)) {
-		unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+		unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
 			metrics := metrics.NewNoopCollector()
 			results := bstorage.NewExecutionResults(metrics, db)
 			receipts := bstorage.NewExecutionReceipts(metrics, db, results, bstorage.DefaultCacheSize)
@@ -67,6 +68,47 @@ func TestMyExecutionReceiptsStorage(t *testing.T) {
 
 			err = store.StoreMyReceipt(receipt2)
 			require.Error(t, err)
+		})
+	})
+
+	t.Run("store different receipt concurrent for same block should fail", func(t *testing.T) {
+		withStore(t, func(store *bstorage.MyExecutionReceipts) {
+			block := unittest.BlockFixture()
+
+			executor1 := unittest.IdentifierFixture()
+			executor2 := unittest.IdentifierFixture()
+
+			receipt1 := unittest.ReceiptForBlockExecutorFixture(&block, executor1)
+			receipt2 := unittest.ReceiptForBlockExecutorFixture(&block, executor2)
+
+			var wg sync.WaitGroup
+			errCh := make(chan error, 2) // Buffered channel to capture errors
+
+			wg.Add(2)
+			go func() {
+				defer wg.Done()
+				err := store.StoreMyReceipt(receipt1)
+				errCh <- err
+			}()
+
+			go func() {
+				defer wg.Done()
+				err := store.StoreMyReceipt(receipt2)
+				errCh <- err
+			}()
+
+			wg.Wait()
+			close(errCh)
+
+			// Check that at least one of the operations failed
+			errorsCount := 0
+			for err := range errCh {
+				if err != nil {
+					errorsCount++
+				}
+			}
+
+			require.Equal(t, 1, errorsCount, "One of the concurrent store operations should fail")
 		})
 	})
 }
