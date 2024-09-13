@@ -3,7 +3,6 @@ package flow
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"io"
 
 	"github.com/ethereum/go-ethereum/rlp"
@@ -270,7 +269,7 @@ type EpochCommit struct {
 	// CAUTION: This mapping may include identifiers for nodes which do not exist in the consensus committee
 	//          and may NOT include identifiers for all nodes in the consensus committee.
 	//
-	DKGIndexMap map[Identifier]int
+	DKGIndexMap DKGIndexMap
 }
 
 // ClusterQCVoteData represents the votes for a cluster quorum certificate, as
@@ -326,6 +325,7 @@ type encodableCommit struct {
 	ClusterQCs         []ClusterQCVoteData
 	DKGGroupKey        encodable.RandomBeaconPubKey
 	DKGParticipantKeys []encodable.RandomBeaconPubKey
+	DKGIndexMap        DKGIndexMap
 }
 
 func encodableFromCommit(commit *EpochCommit) encodableCommit {
@@ -338,6 +338,7 @@ func encodableFromCommit(commit *EpochCommit) encodableCommit {
 		ClusterQCs:         commit.ClusterQCs,
 		DKGGroupKey:        encodable.RandomBeaconPubKey{PublicKey: commit.DKGGroupKey},
 		DKGParticipantKeys: encKeys,
+		DKGIndexMap:        commit.DKGIndexMap,
 	}
 }
 
@@ -351,6 +352,7 @@ func commitFromEncodable(enc encodableCommit) EpochCommit {
 		ClusterQCs:         enc.ClusterQCs,
 		DKGGroupKey:        enc.DKGGroupKey.PublicKey,
 		DKGParticipantKeys: dkgKeys,
+		DKGIndexMap:        enc.DKGIndexMap,
 	}
 }
 
@@ -476,27 +478,6 @@ func (e *EjectNode) ServiceEvent() ServiceEvent {
 		Type:  ServiceEventEjectNode,
 		Event: e,
 	}
-}
-
-// ToDKGParticipantLookup constructs a DKG participant lookup from an identity
-// list and a key list. The identity list must be EXACTLY the same (order and
-// contents) as that used when initializing the corresponding DKG instance.
-// TODO(EFM, #6214): Once DKGIndexMap is populated we can remove this and use EpochCommit directly
-func ToDKGParticipantLookup(participants IdentitySkeletonList, keys []crypto.PublicKey) (map[Identifier]DKGParticipant, error) {
-	if len(participants) != len(keys) {
-		return nil, fmt.Errorf("participant list (len=%d) does not match key list (len=%d)", len(participants), len(keys))
-	}
-
-	lookup := make(map[Identifier]DKGParticipant, len(participants))
-	for i := 0; i < len(participants); i++ {
-		part := participants[i]
-		key := keys[i]
-		lookup[part.NodeID] = DKGParticipant{
-			Index:    uint(i),
-			KeyShare: key,
-		}
-	}
-	return lookup, nil
 }
 
 type DKGParticipant struct {

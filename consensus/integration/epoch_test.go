@@ -226,11 +226,13 @@ func withNextEpoch(
 		Participants: nextEpochIdentities.ToSkeleton(),
 		Assignments:  unittest.ClusterAssignment(1, nextEpochIdentities.ToSkeleton()),
 	}
+	dkgIndexMap, dkgParticipantKeys := nextEpochParticipantData.DKGData()
 	nextEpochCommit := &flow.EpochCommit{
 		Counter:            nextEpochSetup.Counter,
 		ClusterQCs:         currEpochCommit.ClusterQCs,
-		DKGParticipantKeys: nextEpochParticipantData.PublicBeaconKeys(),
-		DKGGroupKey:        nextEpochParticipantData.GroupKey,
+		DKGParticipantKeys: dkgParticipantKeys,
+		DKGGroupKey:        nextEpochParticipantData.DKGGroupKey,
+		DKGIndexMap:        dkgIndexMap,
 	}
 
 	// Construct the new min epoch state entry

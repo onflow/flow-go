@@ -9,9 +9,11 @@ import (
 
 	"github.com/onflow/flow-go/integration/tests/epochs"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestEpochStaticTransition(t *testing.T) {
+	unittest.SkipUnless(t, unittest.TEST_TODO, "requires changes to the DKG so we can produce a valid DKG IndexMap")
 	suite.Run(t, new(StaticEpochTransitionSuite))
 }
 

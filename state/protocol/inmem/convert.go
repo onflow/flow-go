@@ -3,9 +3,7 @@ package inmem
 import (
 	"fmt"
 
-	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/protocol_state"
@@ -60,29 +58,6 @@ func FromParams(from protocol.GlobalParams) (*Params, error) {
 		ProtocolVersion:      from.ProtocolVersion(),
 	}
 	return &Params{params}, nil
-}
-
-// DKGFromEncodable returns a DKG backed by the given encodable representation.
-func DKGFromEncodable(enc EncodableDKG) (*DKG, error) {
-	return &DKG{enc}, nil
-}
-
-// EncodableDKGFromEvents returns an EncodableDKG constructed from epoch setup and commit events.
-// No errors are expected during normal operations.
-func EncodableDKGFromEvents(setup *flow.EpochSetup, commit *flow.EpochCommit) (EncodableDKG, error) {
-	// filter initial participants to valid DKG participants
-	participants := setup.Participants.Filter(filter.IsValidDKGParticipant)
-	lookup, err := flow.ToDKGParticipantLookup(participants, commit.DKGParticipantKeys)
-	if err != nil {
-		return EncodableDKG{}, fmt.Errorf("could not construct dkg lookup: %w", err)
-	}
-
-	return EncodableDKG{
-		GroupKey: encodable.RandomBeaconPubKey{
-			PublicKey: commit.DKGGroupKey,
-		},
-		Participants: lookup,
-	}, nil
 }
 
 // ClusterFromEncodable returns a Cluster backed by the given encodable representation.

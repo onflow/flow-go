@@ -10,6 +10,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	mockstate "github.com/onflow/flow-go/state/protocol/mock"
+	protocol_statemock "github.com/onflow/flow-go/state/protocol/protocol_state/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -736,18 +737,17 @@ func (s *EpochFallbackStateMachineSuite) TestEpochRecoverAndEjectionInSameBlock(
 func (s *EpochFallbackStateMachineSuite) TestProcessingMultipleEventsInTheSameBlock() {
 	rapid.Check(s.T(), func(t *rapid.T) {
 		s.SetupTest() // start each time with clean state
-		var events []flow.ServiceEvent
-		// ATTENTION: explicitly grouped draw events because drawing an int range can raise a panic.
+		// ATTENTION: drawing a rapid value can raise a panic which unwinds stack and exits functor that is being passed to Check().
 		// It's not an issue on its own, but we are using telemetry to check correct invocations of state machine
 		// and when a panic occurs, it will still try to assert expectations on the consumer leading to a test failure.
-		// Specifically, for that reason, we are drawing the values before setting up the expectations on mocked objects.
-		setupEvents := rapid.IntRange(0, 5).Draw(t, "number-of-setup-events")
-		commitEvents := rapid.IntRange(0, 5).Draw(t, "number-of-commit-events")
-		recoverEvents := rapid.IntRange(0, 5).Draw(t, "number-of-recover-events")
-		includeEjection := rapid.Bool().Draw(t, "eject-node")
-		includeValidRecover := rapid.Bool().Draw(t, "include-valid-recover-event")
-		ejectionBeforeRecover := rapid.Bool().Draw(t, "ejection-before-recover")
+		// Specifically, for that reason, we are using a lower-level telemetry mock which allows manual assertion(in the end).
+		s.consumer = new(protocol_statemock.StateMachineTelemetryConsumer)
+		var err error
+		s.stateMachine, err = NewFallbackStateMachine(s.kvstore, s.consumer, s.candidate.View, s.parentProtocolState.Copy())
+		require.NoError(s.T(), err)
 
+		var events []flow.ServiceEvent
+		setupEvents := rapid.IntRange(0, 5).Draw(t, "number-of-setup-events")
 		for i := 0; i < setupEvents; i++ {
 			serviceEvent := unittest.EpochSetupFixture().ServiceEvent()
 			s.consumer.On("OnServiceEventReceived", serviceEvent).Once()
@@ -756,6 +756,7 @@ func (s *EpochFallbackStateMachineSuite) TestProcessingMultipleEventsInTheSameBl
 			events = append(events, serviceEvent)
 		}
 
+		commitEvents := rapid.IntRange(0, 5).Draw(t, "number-of-commit-events")
 		for i := 0; i < commitEvents; i++ {
 			serviceEvent := unittest.EpochCommitFixture().ServiceEvent()
 			s.consumer.On("OnServiceEventReceived", serviceEvent).Once()
@@ -764,6 +765,7 @@ func (s *EpochFallbackStateMachineSuite) TestProcessingMultipleEventsInTheSameBl
 			events = append(events, serviceEvent)
 		}
 
+		recoverEvents := rapid.IntRange(0, 5).Draw(t, "number-of-recover-events")
 		for i := 0; i < recoverEvents; i++ {
 			serviceEvent := unittest.EpochRecoverFixture().ServiceEvent()
 			s.consumer.On("OnServiceEventReceived", serviceEvent).Once()
@@ -775,6 +777,7 @@ func (s *EpochFallbackStateMachineSuite) TestProcessingMultipleEventsInTheSameBl
 		var ejectedNodes flow.IdentifierList
 		var ejectionEvents flow.ServiceEventList
 
+		includeEjection := rapid.Bool().Draw(t, "eject-node")
 		if includeEjection {
 			accessNodes := s.parentProtocolState.CurrentEpochSetup.Participants.Filter(filter.HasRole[flow.IdentitySkeleton](flow.RoleAccess))
 			identity := rapid.SampledFrom(accessNodes).Draw(t, "ejection-node")
@@ -785,6 +788,8 @@ func (s *EpochFallbackStateMachineSuite) TestProcessingMultipleEventsInTheSameBl
 			ejectedNodes = append(ejectedNodes, identity.NodeID)
 		}
 
+		includeValidRecover := rapid.Bool().Draw(t, "include-valid-recover-event")
+		ejectionBeforeRecover := rapid.Bool().Draw(t, "ejection-before-recover")
 		if includeValidRecover {
 			serviceEvent := unittest.EpochRecoverFixture(func(setup *flow.EpochSetup) {
 				nextEpochParticipants := s.parentProtocolState.CurrentEpochIdentityTable.Copy()
@@ -849,5 +854,6 @@ func (s *EpochFallbackStateMachineSuite) TestProcessingMultipleEventsInTheSameBl
 				}
 			}
 		}
+		s.consumer.AssertExpectations(s.T())
 	})
 }

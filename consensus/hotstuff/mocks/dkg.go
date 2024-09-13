@@ -92,6 +92,36 @@ func (_m *DKG) KeyShare(nodeID flow.Identifier) (crypto.PublicKey, error) {
 	return r0, r1
 }
 
+// NodeID provides a mock function with given fields: index
+func (_m *DKG) NodeID(index uint) (flow.Identifier, error) {
+	ret := _m.Called(index)
+
+	if len(ret) == 0 {
+		panic("no return value specified for NodeID")
+	}
+
+	var r0 flow.Identifier
+	var r1 error
+	if rf, ok := ret.Get(0).(func(uint) (flow.Identifier, error)); ok {
+		return rf(index)
+	}
+	if rf, ok := ret.Get(0).(func(uint) flow.Identifier); ok {
+		r0 = rf(index)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(flow.Identifier)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(uint) error); ok {
+		r1 = rf(index)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // Size provides a mock function with given fields:
 func (_m *DKG) Size() uint {
 	ret := _m.Called()

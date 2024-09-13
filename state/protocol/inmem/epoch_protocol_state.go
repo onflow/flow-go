@@ -52,12 +52,7 @@ func (s *EpochProtocolStateAdapter) EpochCommit() *flow.EpochCommit {
 // DKG returns the DKG information for the current epoch.
 // No errors are expected during normal operations.
 func (s *EpochProtocolStateAdapter) DKG() (protocol.DKG, error) {
-	dkg, err := EncodableDKGFromEvents(s.CurrentEpochSetup, s.CurrentEpochCommit)
-	if err != nil {
-		return nil, fmt.Errorf("could not construct encodable DKG from events: %w", err)
-	}
-
-	return NewDKG(dkg), nil
+	return NewDKG(s.CurrentEpochCommit), nil
 }
 
 // Entry Returns low-level protocol state entry that was used to initialize this object.

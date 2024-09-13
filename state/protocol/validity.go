@@ -6,6 +6,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/factory"
 	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/module/signature"
 )
 
 // IsValidExtendingEpochSetup checks whether an EpochSetup service event being added to the state is valid.
@@ -167,9 +168,37 @@ func IsValidEpochCommit(commit *flow.EpochCommit, setup *flow.EpochSetup) error 
 		return NewInvalidServiceEventErrorf("missing DKG public group key")
 	}
 
-	participants := setup.Participants.Filter(filter.IsValidDKGParticipant)
-	if len(participants) != len(commit.DKGParticipantKeys) {
-		return NewInvalidServiceEventErrorf("participant list (len=%d) does not match dkg key list (len=%d)", len(participants), len(commit.DKGParticipantKeys))
+	// enforce invariant: len(DKGParticipantKeys) == len(DKGIndexMap)
+	n := len(commit.DKGIndexMap) // size of the DKG committee
+	if len(commit.DKGParticipantKeys) != n {
+		return NewInvalidServiceEventErrorf("dkg key list (len=%d) does not match index map (len=%d)", len(commit.DKGParticipantKeys), len(commit.DKGIndexMap))
 	}
+
+	// enforce invariant: DKGIndexMap values form the set {0, 1, ..., n-1} where n=len(DKGParticipantKeys)
+	encounteredIndex := make([]bool, n)
+	for _, index := range commit.DKGIndexMap {
+		if index < 0 || index >= n {
+			return NewInvalidServiceEventErrorf("index %d is outside allowed range [0,n-1] for a DKG committee of size n=%d", index, n)
+		}
+		if encounteredIndex[index] {
+			return NewInvalidServiceEventErrorf("duplicated DKG index %d", index)
+		}
+		encounteredIndex[index] = true
+	}
+	// conclusion: there are n unique values in `DKGIndexMap`, each in the interval [0,n-1]. Hence, the values in DKGIndexMap form set {0, 1, ..., n-1}.
+	numberOfRandomBeaconParticipants := uint(0)
+	for _, identity := range setup.Participants.Filter(filter.IsConsensusCommitteeMember) {
+		if _, found := commit.DKGIndexMap[identity.NodeID]; found {
+			numberOfRandomBeaconParticipants++
+		}
+	}
+	// enforce invariant: RandomBeaconSafetyThreshold ≤ |𝒞 ∩ 𝒟| where:
+	// - 𝒞 is the set of all consensus committee members
+	// - 𝒟 is the set of all DKG participants
+	if RandomBeaconSafetyThreshold(uint(n)) > numberOfRandomBeaconParticipants {
+		return NewInvalidServiceEventErrorf("not enough random beacon participants required %d, got %d",
+			signature.RandomBeaconThreshold(n), numberOfRandomBeaconParticipants)
+	}
+
 	return nil
 }

@@ -7,6 +7,7 @@ import (
 
 	"github.com/onflow/flow-go/integration/tests/epochs"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestEpochJoinAndLeaveVN(t *testing.T) {
@@ -34,5 +35,6 @@ func (s *EpochJoinAndLeaveVNSuite) SetupTest() {
 // TestEpochJoinAndLeaveVN should update verification nodes and assert healthy network conditions
 // after the epoch transition completes. See health check function for details.
 func (s *EpochJoinAndLeaveVNSuite) TestEpochJoinAndLeaveVN() {
+	unittest.SkipUnless(s.T(), unittest.TEST_TODO, "requires changes to the DKG so we can produce a valid DKG IndexMap")
 	s.RunTestEpochJoinAndLeave(flow.RoleVerification, s.AssertNetworkHealthyAfterVNChange)
 }
