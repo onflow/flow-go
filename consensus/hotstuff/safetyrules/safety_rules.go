@@ -178,6 +178,20 @@ func (r *SafetyRules) ProduceTimeout(curView uint64, newestQC *flow.QuorumCertif
 	return timeout, nil
 }
 
+// SignOwnProposal takes an unsigned block proposal and produces a vote for it. Vote is a cryptographic commitment to the proposal.
+// By combining a vote and unsigned proposal caller can construct a signed block proposal. This method has to be used
+// only by the leader which has to be the proposer of the block.
+// Implementors must guarantee that:
+// - vote on the proposal satisfies safety rules
+// - maximum one proposal is signed per view
+// Returns:
+//   - (vote, nil): the passed unsigned proposal is a valid one, and it's safe to make a proposal.
+//     Subsequently, leader does _not_ produce any _other_ proposal with the same (or lower) view.
+//   - (nil, model.NoVoteError): If the safety module decides that it is not safe to sign the given proposal.
+//     This could happen because we have already proposed or timed out for the given view.
+//     This is a sentinel error and _expected_ during normal operation.
+//
+// All other errors are unexpected and potential symptoms of uncovered edge cases or corrupted internal state (fatal).
 func (r *SafetyRules) SignOwnProposal(unsignedProposal *model.Proposal) (*model.Vote, error) {
 	// check that the block is created by us
 	if unsignedProposal.Block.ProposerID != r.committee.Self() {
