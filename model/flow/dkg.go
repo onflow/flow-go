@@ -73,9 +73,9 @@ func (state DKGEndState) String() string {
 // require that every random beacon key-holder r ∈ ℛ remaining in the consensus committee is honest
 // (incl. quickly responsive) *all the time*. This is a lower bound, unsuited for decentralized production networks.
 // To reject configurations that are vulnerable to liveness failures, the protocol uses the threshold `t_safety`
-// (heuristic, see [2]), which is implemented on the smart contract level. In a nutshell, the intersection 𝒟 ∩ 𝒞
+// (heuristic, see [2]), which is implemented on the smart contract level. In a nutshell, the cardinality of intersection 𝒟 ∩ 𝒞
 // (wrt both sets 𝒟 ∩ 𝒞) should be well above 70%, values in the range 70-62% should be considered for short-term
-// recovery cases. Values of 62% or lower (i.e. |ℛ| ≤ 0.62·|𝒟| or |ℛ| ≤ 0.62·|𝒞|) are not recommend for any
+// recovery cases. Values of 62% or lower (i.e. |ℛ| ≤ 0.62·|𝒟| or |ℛ| ≤ 0.62·|𝒞|) are not recommended for any
 // production network, as single-node crashes are already enough to halt consensus.
 //
 // For further details, see
