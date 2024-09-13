@@ -7,19 +7,16 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/cockroachdb/pebble"
-	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/operation"
-	"github.com/onflow/flow-go/storage/operation/badgerimpl"
-	"github.com/onflow/flow-go/storage/operation/pebbleimpl"
+	"github.com/onflow/flow-go/storage/operation/dbtest"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestReadWrite(t *testing.T) {
-	RunWithStorages(t, func(t *testing.T, r storage.Reader, withWriter WithWriter) {
+	dbtest.RunWithStorages(t, func(t *testing.T, r storage.Reader, withWriter dbtest.WithWriter) {
 		e := Entity{ID: 1337}
 
 		// Test read nothing should return not found
@@ -51,7 +48,7 @@ func TestReadWrite(t *testing.T) {
 }
 
 func TestReadWriteMalformed(t *testing.T) {
-	RunWithStorages(t, func(t *testing.T, r storage.Reader, withWriter WithWriter) {
+	dbtest.RunWithStorages(t, func(t *testing.T, r storage.Reader, withWriter dbtest.WithWriter) {
 		e := Entity{ID: 1337}
 		ue := UnencodeableEntity(e)
 
@@ -71,7 +68,7 @@ func TestReadWriteMalformed(t *testing.T) {
 
 // Verify multiple entities can be removed in one batch update
 func TestBatchWrite(t *testing.T) {
-	RunWithStorages(t, func(t *testing.T, r storage.Reader, withWriter WithWriter) {
+	dbtest.RunWithStorages(t, func(t *testing.T, r storage.Reader, withWriter dbtest.WithWriter) {
 		// Define multiple entities for batch insertion
 		entities := []Entity{
 			{ID: 1337},
@@ -116,7 +113,7 @@ func TestBatchWrite(t *testing.T) {
 }
 
 func TestRemove(t *testing.T) {
-	RunWithStorages(t, func(t *testing.T, r storage.Reader, withWriter WithWriter) {
+	dbtest.RunWithStorages(t, func(t *testing.T, r storage.Reader, withWriter dbtest.WithWriter) {
 		e := Entity{ID: 1337}
 
 		var exists bool
@@ -141,7 +138,7 @@ func TestRemove(t *testing.T) {
 }
 
 func TestConcurrentWrite(t *testing.T) {
-	RunWithStorages(t, func(t *testing.T, r storage.Reader, withWriter WithWriter) {
+	dbtest.RunWithStorages(t, func(t *testing.T, r storage.Reader, withWriter dbtest.WithWriter) {
 		var wg sync.WaitGroup
 		numWrites := 10 // number of concurrent writes
 
@@ -165,7 +162,7 @@ func TestConcurrentWrite(t *testing.T) {
 }
 
 func TestConcurrentRemove(t *testing.T) {
-	RunWithStorages(t, func(t *testing.T, r storage.Reader, withWriter WithWriter) {
+	dbtest.RunWithStorages(t, func(t *testing.T, r storage.Reader, withWriter dbtest.WithWriter) {
 		var wg sync.WaitGroup
 		numDeletes := 10 // number of concurrent deletions
 
@@ -197,7 +194,7 @@ func TestConcurrentRemove(t *testing.T) {
 }
 
 func TestRemoveRange(t *testing.T) {
-	RunWithStorages(t, func(t *testing.T, r storage.Reader, withWriter WithWriter) {
+	dbtest.RunWithStorages(t, func(t *testing.T, r storage.Reader, withWriter dbtest.WithWriter) {
 
 		// Define the prefix
 		prefix := []byte{0x10}
@@ -246,53 +243,6 @@ func TestRemoveRange(t *testing.T) {
 			require.Equal(t, !deleted, exists,
 				"expected key %x to be %s", key, map[bool]string{true: "deleted", false: "not deleted"})
 		}
-	})
-}
-
-// helper types and functions
-type WithWriter func(func(storage.Writer) error) error
-
-func RunWithStorages(t *testing.T, fn func(*testing.T, storage.Reader, WithWriter)) {
-	t.Run("BadgerStorage", func(t *testing.T) {
-		unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-			withWriter := func(writing func(storage.Writer) error) error {
-				writer := badgerimpl.NewReaderBatchWriter(db)
-				err := writing(writer)
-				if err != nil {
-					return err
-				}
-
-				err = writer.Commit()
-				if err != nil {
-					return err
-				}
-				return nil
-			}
-
-			reader := badgerimpl.ToReader(db)
-			fn(t, reader, withWriter)
-		})
-	})
-
-	t.Run("PebbleStorage", func(t *testing.T) {
-		unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
-			withWriter := func(writing func(storage.Writer) error) error {
-				writer := pebbleimpl.NewReaderBatchWriter(db)
-				err := writing(writer)
-				if err != nil {
-					return err
-				}
-
-				err = writer.Commit()
-				if err != nil {
-					return err
-				}
-				return nil
-			}
-
-			reader := pebbleimpl.ToReader(db)
-			fn(t, reader, withWriter)
-		})
 	})
 }
 

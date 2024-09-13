@@ -9,10 +9,11 @@ import (
 
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/operation"
+	"github.com/onflow/flow-go/storage/operation/dbtest"
 )
 
 func TestIterateKeysInPrefixRange(t *testing.T) {
-	RunWithStorages(t, func(t *testing.T, r storage.Reader, withWriter WithWriter) {
+	dbtest.RunWithStorages(t, func(t *testing.T, r storage.Reader, withWriter dbtest.WithWriter) {
 		// Define the prefix range
 		prefixStart := []byte{0x10}
 		prefixEnd := []byte{0x20}
@@ -61,7 +62,7 @@ func TestIterateKeysInPrefixRange(t *testing.T) {
 }
 
 func TestTraverse(t *testing.T) {
-	RunWithStorages(t, func(t *testing.T, r storage.Reader, withWriter WithWriter) {
+	dbtest.RunWithStorages(t, func(t *testing.T, r storage.Reader, withWriter dbtest.WithWriter) {
 		keys := [][]byte{
 			{0x42, 0x00},
 			{0xff},
@@ -129,7 +130,7 @@ func TestFindHighestAtOrBelow(t *testing.T) {
 	}
 
 	// Run test with multiple storage backends
-	RunWithStorages(t, func(t *testing.T, r storage.Reader, withWriter WithWriter) {
+	dbtest.RunWithStorages(t, func(t *testing.T, r storage.Reader, withWriter dbtest.WithWriter) {
 		prefix := []byte("test_prefix")
 
 		// Insert entities into the storage
