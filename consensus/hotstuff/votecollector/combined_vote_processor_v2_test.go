@@ -2,7 +2,6 @@ package votecollector
 
 import (
 	"errors"
-	"github.com/onflow/flow-go/consensus/hotstuff/safetyrules"
 	"math/rand"
 	"sync"
 	"testing"
@@ -20,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/helper"
 	mockhotstuff "github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/consensus/hotstuff/safetyrules"
 	"github.com/onflow/flow-go/consensus/hotstuff/signature"
 	hsig "github.com/onflow/flow-go/consensus/hotstuff/signature"
 	hotstuffvalidator "github.com/onflow/flow-go/consensus/hotstuff/validator"
@@ -890,6 +890,7 @@ func TestCombinedVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 	persist.On("GetSafetyData", mock.Anything).Return(safetyData, nil).Once()
 	persist.On("PutSafetyData", mock.Anything).Return(nil)
 	safetyRules, err := safetyrules.New(signers[leader.NodeID], persist, committee)
+	require.NoError(t, err)
 	vote, err := safetyRules.SignOwnProposal(proposal)
 	require.NoError(t, err)
 	proposal.SigData = vote.SigData
