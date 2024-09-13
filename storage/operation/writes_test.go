@@ -27,7 +27,7 @@ func TestReadWrite(t *testing.T) {
 		err := operation.Retrieve(e.Key(), &item)(r)
 		require.True(t, errors.Is(err, storage.ErrNotFound), "expected not found error")
 
-		withWriterTx(t, operation.Upsert(e.Key(), e))
+		require.NoError(t, withWriterTx(operation.Upsert(e.Key(), e)))
 
 		var readBack Entity
 		require.NoError(t, operation.Retrieve(e.Key(), &readBack)(r))
@@ -35,14 +35,14 @@ func TestReadWrite(t *testing.T) {
 
 		// Test write again should overwrite
 		newEntity := Entity{ID: 42}
-		withWriterTx(t, operation.Upsert(e.Key(), newEntity))
+		require.NoError(t, withWriterTx(operation.Upsert(e.Key(), newEntity)))
 
 		require.NoError(t, operation.Retrieve(e.Key(), &readBack)(r))
 		require.Equal(t, newEntity, readBack, "expected overwritten value to be retrieved")
 
 		// Test write should not overwrite a different key
 		anotherEntity := Entity{ID: 84}
-		withWriterTx(t, operation.Upsert(anotherEntity.Key(), anotherEntity))
+		require.NoError(t, withWriterTx(operation.Upsert(anotherEntity.Key(), anotherEntity)))
 
 		var anotherReadBack Entity
 		require.NoError(t, operation.Retrieve(anotherEntity.Key(), &anotherReadBack)(r))
@@ -56,11 +56,11 @@ func TestReadWriteMalformed(t *testing.T) {
 		ue := UnencodeableEntity(e)
 
 		// Test write should return encoding error
-		withWriterTx(t, func(writer storage.Writer) error {
+		require.NoError(t, withWriterTx(func(writer storage.Writer) error {
 			err := operation.Upsert(e.Key(), ue)(writer)
 			require.Contains(t, err.Error(), errCantEncode.Error(), "expected encoding error")
 			return nil
-		})
+		}))
 
 		// Test read should return decoding error
 		var exists bool
@@ -80,14 +80,14 @@ func TestBatchWrite(t *testing.T) {
 		}
 
 		// Batch write: insert multiple entities in a single transaction
-		withWriterTx(t, func(writer storage.Writer) error {
+		require.NoError(t, withWriterTx(func(writer storage.Writer) error {
 			for _, e := range entities {
 				if err := operation.Upsert(e.Key(), e)(writer); err != nil {
 					return err
 				}
 			}
 			return nil
-		})
+		}))
 
 		// Verify that each entity can be read back
 		for _, e := range entities {
@@ -97,14 +97,14 @@ func TestBatchWrite(t *testing.T) {
 		}
 
 		// Batch update: remove multiple entities in a single transaction
-		withWriterTx(t, func(writer storage.Writer) error {
+		require.NoError(t, withWriterTx(func(writer storage.Writer) error {
 			for _, e := range entities {
 				if err := operation.Remove(e.Key())(writer); err != nil {
 					return err
 				}
 			}
 			return nil
-		})
+		}))
 
 		// Verify that each entity has been removed
 		for _, e := range entities {
@@ -124,15 +124,15 @@ func TestRemove(t *testing.T) {
 		require.False(t, exists, "expected key to not exist")
 
 		// Test delete nothing should return OK
-		withWriterTx(t, operation.Remove(e.Key()))
+		require.NoError(t, withWriterTx(operation.Remove(e.Key())))
 
 		// Test write, delete, then read should return not found
-		withWriterTx(t, operation.Upsert(e.Key(), e))
+		require.NoError(t, withWriterTx(operation.Upsert(e.Key(), e)))
 
 		require.NoError(t, operation.Exists(e.Key(), &exists)(r))
 		require.True(t, exists, "expected key to exist")
 
-		withWriterTx(t, operation.Remove(e.Key()))
+		require.NoError(t, withWriterTx(operation.Remove(e.Key())))
 
 		var item Entity
 		err := operation.Retrieve(e.Key(), &item)(r)
@@ -152,7 +152,7 @@ func TestConcurrentWrite(t *testing.T) {
 				e := Entity{ID: uint64(i)}
 
 				// Simulate a concurrent write to a different key
-				withWriterTx(t, operation.Upsert(e.Key(), e))
+				require.NoError(t, withWriterTx(operation.Upsert(e.Key(), e)))
 
 				var readBack Entity
 				require.NoError(t, operation.Retrieve(e.Key(), &readBack)(r))
@@ -172,7 +172,7 @@ func TestConcurrentRemove(t *testing.T) {
 		// First, insert entities to be deleted concurrently
 		for i := 0; i < numDeletes; i++ {
 			e := Entity{ID: uint64(i)}
-			withWriterTx(t, operation.Upsert(e.Key(), e))
+			require.NoError(t, withWriterTx(operation.Upsert(e.Key(), e)))
 		}
 
 		// Now, perform concurrent deletes
@@ -183,7 +183,7 @@ func TestConcurrentRemove(t *testing.T) {
 				e := Entity{ID: uint64(i)}
 
 				// Simulate a concurrent delete
-				withWriterTx(t, operation.Remove(e.Key()))
+				require.NoError(t, withWriterTx(operation.Remove(e.Key())))
 
 				// Check that the item is no longer retrievable
 				var item Entity
@@ -219,7 +219,7 @@ func TestRemoveRange(t *testing.T) {
 		includeStart, includeEnd := 1, 3
 
 		// Insert the keys into the storage
-		withWriterTx(t, func(writer storage.Writer) error {
+		require.NoError(t, withWriterTx(func(writer storage.Writer) error {
 			for _, key := range keys {
 				value := []byte{0x00} // value are skipped, doesn't matter
 				err := operation.Upsert(key, value)(writer)
@@ -228,10 +228,10 @@ func TestRemoveRange(t *testing.T) {
 				}
 			}
 			return nil
-		})
+		}))
 
 		// Remove the keys in the prefix range
-		withWriterTx(t, operation.RemoveByPrefix(r, prefix))
+		require.NoError(t, withWriterTx(operation.RemoveByPrefix(r, prefix)))
 
 		lg := unittest.Logger().With().Logger()
 		// Verify that the keys in the prefix range have been removed
@@ -250,15 +250,23 @@ func TestRemoveRange(t *testing.T) {
 }
 
 // helper types and functions
-type WithWriter func(*testing.T, func(storage.Writer) error)
+type WithWriter func(func(storage.Writer) error) error
 
 func RunWithStorages(t *testing.T, fn func(*testing.T, storage.Reader, WithWriter)) {
 	t.Run("BadgerStorage", func(t *testing.T) {
 		unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-			withWriterTx := func(t *testing.T, writing func(storage.Writer) error) {
+			withWriterTx := func(writing func(storage.Writer) error) error {
 				writer := badgerimpl.NewReaderBatchWriter(db)
-				require.NoError(t, writing(writer))
-				require.NoError(t, writer.Commit())
+				err := writing(writer)
+				if err != nil {
+					return err
+				}
+
+				err = writer.Commit()
+				if err != nil {
+					return err
+				}
+				return nil
 			}
 
 			reader := badgerimpl.ToReader(db)
@@ -268,10 +276,18 @@ func RunWithStorages(t *testing.T, fn func(*testing.T, storage.Reader, WithWrite
 
 	t.Run("PebbleStorage", func(t *testing.T) {
 		unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
-			withWriterTx := func(t *testing.T, writing func(storage.Writer) error) {
+			withWriterTx := func(writing func(storage.Writer) error) error {
 				writer := pebbleimpl.NewReaderBatchWriter(db)
-				require.NoError(t, writing(writer))
-				require.NoError(t, writer.Commit())
+				err := writing(writer)
+				if err != nil {
+					return err
+				}
+
+				err = writer.Commit()
+				if err != nil {
+					return err
+				}
+				return nil
 			}
 
 			reader := pebbleimpl.ToReader(db)
