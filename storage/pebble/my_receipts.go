@@ -74,7 +74,7 @@ func NewMyExecutionReceipts(collector module.CacheMetrics, db *pebble.DB, receip
 			}
 
 			if !errors.Is(err, storage.ErrNotFound) {
-				return fmt.Errorf("could not check if stored a receipt for the same before: %w", err)
+				return fmt.Errorf("could not check if stored a receipt for the same block before: %w", err)
 			}
 
 			err = indexOwnReceiptOps(w) // execute operations to index receipt as one of my own
