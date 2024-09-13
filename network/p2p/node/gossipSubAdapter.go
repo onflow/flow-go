@@ -50,20 +50,8 @@ func NewGossipSubAdapter(ctx context.Context,
 	if !ok {
 		return nil, fmt.Errorf("invalid gossipsub config type: %T", cfg)
 	}
-	opts := gossipSubConfig.Build()
 
-	peerGaterParams := pubsub.DefaultPeerGaterParams()
-	peerGaterTopicParams := make(map[string]float64)
-	for _, t := range channels.PublicChannels() {
-		// setting default weight for each topic
-		peerGaterTopicParams[t.String()] = 1.0
-	}
-	peerGaterTopicParams[channels.ConsensusCommittee.String()] = 1.5
-	peerGaterTopicParams[channels.SyncCommittee.String()] = .5
-	peerGaterParams = peerGaterParams.WithTopicDeliveryWeights(peerGaterTopicParams)
-
-	opts = append(opts, pubsub.WithPeerGater(peerGaterParams))
-	gossipSub, err := pubsub.NewGossipSub(ctx, h, opts...)
+	gossipSub, err := pubsub.NewGossipSub(ctx, h, gossipSubConfig.Build()...)
 	if err != nil {
 		return nil, err
 	}
