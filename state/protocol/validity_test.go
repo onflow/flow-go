@@ -8,7 +8,6 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
-	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -186,14 +185,14 @@ func TestBootstrapInvalidEpochCommit(t *testing.T) {
 		require.Error(t, err)
 	})
 
-	t.Run("random beacon threshold not met", func(t *testing.T) {
+	t.Run("random beacon safety threshold not met", func(t *testing.T) {
 		_, result, _ := unittest.BootstrapFixture(participants)
 		setup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
 		commit := result.ServiceEvents[1].Event.(*flow.EpochCommit)
-		requiredThreshold := signature.RandomBeaconThreshold(len(commit.DKGIndexMap))
-		require.Greater(t, requiredThreshold, 0, "threshold has to be at least 1, otherwise the test is invalid")
+		requiredThreshold := protocol.RandomBeaconSafetyThreshold(uint(len(commit.DKGIndexMap)))
+		require.Greater(t, requiredThreshold, uint(0), "threshold has to be at least 1, otherwise the test is invalid")
 		// sample one less than the required threshold, so the threshold is not met
-		sampled, err := setup.Participants.Filter(filter.IsConsensusCommitteeMember).Sample(uint(requiredThreshold - 1))
+		sampled, err := setup.Participants.Filter(filter.IsConsensusCommitteeMember).Sample(requiredThreshold - 1)
 		require.NoError(t, err)
 		setup.Participants = sampled
 

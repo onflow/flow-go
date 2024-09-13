@@ -30,3 +30,7 @@ func DefaultEpochSafetyParams(chain flow.ChainID) (SafetyParams, error) {
 	}
 	return SafetyParams{}, fmt.Errorf("unkown chain id %s", chain.String())
 }
+
+func RandomBeaconSafetyThreshold(committeeSize uint) uint {
+	return uint(0.6 * float64(committeeSize))
+}
