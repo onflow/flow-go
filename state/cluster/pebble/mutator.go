@@ -23,19 +23,21 @@ import (
 
 type MutableState struct {
 	*State
-	tracer   module.Tracer
-	headers  storage.Headers
-	payloads storage.ClusterPayloads
+	tracer       module.Tracer
+	headers      storage.Headers
+	payloads     storage.ClusterPayloads
+	blockIndexer storage.ClusterBlockIndexer
 }
 
 var _ clusterstate.MutableState = (*MutableState)(nil)
 
-func NewMutableState(state *State, tracer module.Tracer, headers storage.Headers, payloads storage.ClusterPayloads) (*MutableState, error) {
+func NewMutableState(state *State, tracer module.Tracer, headers storage.Headers, payloads storage.ClusterPayloads, clusterBlockIndexer storage.ClusterBlockIndexer) (*MutableState, error) {
 	mutableState := &MutableState{
-		State:    state,
-		tracer:   tracer,
-		headers:  headers,
-		payloads: payloads,
+		State:        state,
+		tracer:       tracer,
+		headers:      headers,
+		payloads:     payloads,
+		blockIndexer: clusterBlockIndexer,
 	}
 	return mutableState, nil
 }
@@ -138,7 +140,7 @@ func (m *MutableState) Extend(candidate *cluster.Block) error {
 	}
 
 	span, _ = m.tracer.StartSpanFromContext(ctx, trace.COLClusterStateMutatorExtendDBInsert)
-	err = operation.WithReaderBatchWriter(m.State.db, procedure.InsertClusterBlock(candidate))
+	err = operation.WithReaderBatchWriter(m.State.db, m.blockIndexer.InsertClusterBlock(candidate))
 	span.End()
 	if err != nil {
 		return fmt.Errorf("could not insert cluster block: %w", err)

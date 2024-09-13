@@ -36,12 +36,13 @@ func Bootstrap(db *pebble.DB, stateRoot *StateRoot) (*State, error) {
 
 	genesis := stateRoot.Block()
 	rootQC := stateRoot.QC()
+	indexer := procedure.NewClusterBlockIndexer()
 	// bootstrap cluster state
 	err = operation.WithReaderBatchWriter(state.db, func(tx storage.PebbleReaderBatchWriter) error {
 		_, w := tx.ReaderWriter()
 		chainID := genesis.Header.ChainID
 		// insert the block
-		err := procedure.InsertClusterBlock(genesis)(tx)
+		err := indexer.InsertClusterBlock(genesis)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert genesis block: %w", err)
 		}

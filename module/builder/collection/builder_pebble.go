@@ -20,7 +20,6 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/pebble/operation"
-	"github.com/onflow/flow-go/storage/pebble/procedure"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
@@ -37,6 +36,7 @@ type BuilderPebble struct {
 	protoState     protocol.State
 	clusterState   clusterstate.State
 	payloads       storage.ClusterPayloads
+	blockIndexer   storage.ClusterBlockIndexer
 	transactions   mempool.Transactions
 	tracer         module.Tracer
 	config         Config
@@ -56,6 +56,7 @@ func NewBuilderPebble(
 	mainHeaders storage.Headers,
 	clusterHeaders storage.Headers,
 	payloads storage.ClusterPayloads,
+	blockIndexer storage.ClusterBlockIndexer,
 	transactions mempool.Transactions,
 	log zerolog.Logger,
 	epochCounter uint64,
@@ -69,6 +70,7 @@ func NewBuilderPebble(
 		mainHeaders:    mainHeaders,
 		clusterHeaders: clusterHeaders,
 		payloads:       payloads,
+		blockIndexer:   blockIndexer,
 		transactions:   transactions,
 		config:         DefaultConfig(),
 		log:            log.With().Str("component", "cluster_builder").Logger(),
@@ -193,7 +195,7 @@ func (b *BuilderPebble) BuildOn(parentID flow.Identifier, setter func(*flow.Head
 
 	// STEP 4: insert the cluster block to the database.
 	span, _ = b.tracer.StartSpanFromContext(ctx, trace.COLBuildOnDBInsert)
-	err = operation.WithReaderBatchWriter(b.db, procedure.InsertClusterBlock(&proposal))
+	err = operation.WithReaderBatchWriter(b.db, b.blockIndexer.InsertClusterBlock(&proposal))
 	span.End()
 	if err != nil {
 		return nil, fmt.Errorf("could not insert built block: %w", err)

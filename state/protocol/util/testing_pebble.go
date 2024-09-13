@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol/events"
 	pbadger "github.com/onflow/flow-go/state/protocol/pebble"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/pebble/procedure"
 	"github.com/onflow/flow-go/storage/testingutils"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -66,7 +67,7 @@ func RunWithPebbleFullProtocolState(t testing.TB, rootSnapshot protocol.Snapshot
 		receiptValidator := MockReceiptValidator()
 		sealValidator := MockSealValidator(all.Seals)
 		mockTimer := MockBlockTimer()
-		fullState, err := pbadger.NewFullConsensusState(log, tracer, consumer, state, all.Index, all.Payloads, mockTimer, receiptValidator, sealValidator)
+		fullState, err := pbadger.NewFullConsensusState(log, tracer, consumer, state, all.Index, all.Payloads, procedure.NewBlockIndexer(), mockTimer, receiptValidator, sealValidator)
 		require.NoError(t, err)
 		f(db, fullState)
 	})
@@ -96,7 +97,7 @@ func RunWithPebbleFullProtocolStateAndMetrics(t testing.TB, rootSnapshot protoco
 		receiptValidator := MockReceiptValidator()
 		sealValidator := MockSealValidator(all.Seals)
 		mockTimer := MockBlockTimer()
-		fullState, err := pbadger.NewFullConsensusState(log, tracer, consumer, state, all.Index, all.Payloads, mockTimer, receiptValidator, sealValidator)
+		fullState, err := pbadger.NewFullConsensusState(log, tracer, consumer, state, all.Index, all.Payloads, procedure.NewBlockIndexer(), mockTimer, receiptValidator, sealValidator)
 		require.NoError(t, err)
 		f(db, fullState)
 	})
@@ -126,7 +127,7 @@ func RunWithPebbleFullProtocolStateAndValidator(t testing.TB, rootSnapshot proto
 		require.NoError(t, err)
 		sealValidator := MockSealValidator(all.Seals)
 		mockTimer := MockBlockTimer()
-		fullState, err := pbadger.NewFullConsensusState(log, tracer, consumer, state, all.Index, all.Payloads, mockTimer, validator, sealValidator)
+		fullState, err := pbadger.NewFullConsensusState(log, tracer, consumer, state, all.Index, all.Payloads, procedure.NewBlockIndexer(), mockTimer, validator, sealValidator)
 		require.NoError(t, err)
 		f(db, fullState)
 	})
@@ -185,7 +186,7 @@ func RunWithPebbleFullProtocolStateAndConsumer(t testing.TB, rootSnapshot protoc
 		receiptValidator := MockReceiptValidator()
 		sealValidator := MockSealValidator(all.Seals)
 		mockTimer := MockBlockTimer()
-		fullState, err := pbadger.NewFullConsensusState(log, tracer, consumer, state, all.Index, all.Payloads, mockTimer, receiptValidator, sealValidator)
+		fullState, err := pbadger.NewFullConsensusState(log, tracer, consumer, state, all.Index, all.Payloads, procedure.NewBlockIndexer(), mockTimer, receiptValidator, sealValidator)
 		require.NoError(t, err)
 		f(db, fullState)
 	})
@@ -214,7 +215,7 @@ func RunWithPebbleFullProtocolStateAndMetricsAndConsumer(t testing.TB, rootSnaps
 		receiptValidator := MockReceiptValidator()
 		sealValidator := MockSealValidator(all.Seals)
 		mockTimer := MockBlockTimer()
-		fullState, err := pbadger.NewFullConsensusState(log, tracer, consumer, state, all.Index, all.Payloads, mockTimer, receiptValidator, sealValidator)
+		fullState, err := pbadger.NewFullConsensusState(log, tracer, consumer, state, all.Index, all.Payloads, procedure.NewBlockIndexer(), mockTimer, receiptValidator, sealValidator)
 		require.NoError(t, err)
 		f(db, fullState)
 	})

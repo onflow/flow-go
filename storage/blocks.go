@@ -42,3 +42,10 @@ type Blocks interface {
 	// GetLastFullBlockHeight retrieves the FullBlockHeight
 	GetLastFullBlockHeight() (height uint64, err error)
 }
+
+// BlockIndexer is an interface for indexing new blocks.
+type BlockIndexer interface {
+	// IndexNewBlock will add parent-child index for the new block.
+	// When calling by multiple goroutines, it should be thread-safe.
+	IndexNewBlock(blockID flow.Identifier, parentID flow.Identifier) func(PebbleReaderBatchWriter) error
+}

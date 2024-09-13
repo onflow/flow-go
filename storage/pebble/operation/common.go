@@ -15,7 +15,7 @@ import (
 type ReaderBatchWriter struct {
 	db        *pebble.DB
 	batch     *pebble.Batch
-	callbacks []func()
+	callbacks []func(error)
 }
 
 var _ storage.PebbleReaderBatchWriter = (*ReaderBatchWriter)(nil)
@@ -29,10 +29,16 @@ func (b *ReaderBatchWriter) IndexedBatch() *pebble.Batch {
 }
 
 func (b *ReaderBatchWriter) Commit() error {
-	return b.batch.Commit(nil)
+	err := b.batch.Commit(nil)
+
+	for _, callback := range b.callbacks {
+		callback(err)
+	}
+
+	return err
 }
 
-func (b *ReaderBatchWriter) AddCallback(callback func()) {
+func (b *ReaderBatchWriter) AddCallback(callback func(error)) {
 	b.callbacks = append(b.callbacks, callback)
 }
 
@@ -40,7 +46,7 @@ func NewPebbleReaderBatchWriterWithBatch(db *pebble.DB, batch *pebble.Batch) *Re
 	return &ReaderBatchWriter{
 		db:        db,
 		batch:     batch,
-		callbacks: make([]func(), 0),
+		callbacks: make([]func(error), 0),
 	}
 }
 
@@ -60,10 +66,6 @@ func WithReaderBatchWriter(db *pebble.DB, fn func(storage.PebbleReaderBatchWrite
 	err = batch.Commit()
 	if err != nil {
 		return err
-	}
-
-	for _, callback := range batch.callbacks {
-		callback()
 	}
 
 	return nil

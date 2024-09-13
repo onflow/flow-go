@@ -67,6 +67,7 @@ import (
 	pebbleState "github.com/onflow/flow-go/state/protocol/pebble"
 	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/pebble"
+	"github.com/onflow/flow-go/storage/pebble/procedure"
 	"github.com/onflow/flow-go/utils/io"
 )
 
@@ -132,6 +133,7 @@ func main() {
 		getSealingConfigs   module.SealingConfigsGetter
 	)
 	var deprecatedFlagBlockRateDelay time.Duration
+	blockIndexer := procedure.NewBlockIndexer()
 
 	nodeBuilder := cmd.FlowNode(flow.RoleConsensus.String())
 	nodeBuilder.ExtraFlags(func(flags *pflag.FlagSet) {
@@ -285,6 +287,7 @@ func main() {
 				state,
 				node.Storage.Index,
 				node.Storage.Payloads,
+				blockIndexer,
 				blockTimer,
 				receiptValidator,
 				sealValidator,
@@ -730,6 +733,7 @@ func main() {
 				node.Storage.Seals,
 				node.Storage.Index,
 				node.Storage.Blocks,
+				blockIndexer,
 				node.Storage.Results,
 				node.Storage.Receipts,
 				guarantees,

@@ -22,6 +22,7 @@ import (
 	storerr "github.com/onflow/flow-go/storage"
 	storage "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/storage/pebble/operation"
+	"github.com/onflow/flow-go/storage/pebble/procedure"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -58,6 +59,7 @@ type BuilderSuitePebble struct {
 	index         map[flow.Identifier]*flow.Index
 	blocks        map[flow.Identifier]*flow.Block
 	blockChildren map[flow.Identifier][]flow.Identifier // ids of children blocks
+	blockIndexer  storerr.BlockIndexer
 
 	lastSeal *flow.Seal
 
@@ -206,6 +208,7 @@ func (bs *BuilderSuitePebble) SetupTest() {
 	bs.index = make(map[flow.Identifier]*flow.Index)
 	bs.blocks = make(map[flow.Identifier]*flow.Block)
 	bs.blockChildren = make(map[flow.Identifier][]flow.Identifier)
+	bs.blockIndexer = procedure.NewBlockIndexer()
 
 	// initialize behaviour tracking
 	bs.assembled = nil
@@ -418,6 +421,7 @@ func (bs *BuilderSuitePebble) SetupTest() {
 		bs.sealDB,
 		bs.indexDB,
 		bs.blockDB,
+		bs.blockIndexer,
 		bs.resultDB,
 		bs.receiptsDB,
 		bs.guarPool,
@@ -1420,6 +1424,7 @@ func (bs *BuilderSuitePebble) TestIntegration_RepopulateExecutionTreeAtStartup()
 		bs.sealDB,
 		bs.indexDB,
 		bs.blockDB,
+		bs.blockIndexer,
 		bs.resultDB,
 		bs.receiptsDB,
 		bs.guarPool,

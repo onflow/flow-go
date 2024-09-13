@@ -33,12 +33,13 @@ import (
 type FollowerState struct {
 	*State
 
-	index      storage.Index
-	payloads   storage.Payloads
-	tracer     module.Tracer
-	logger     zerolog.Logger
-	consumer   protocol.Consumer
-	blockTimer protocol.BlockTimer
+	index        storage.Index
+	payloads     storage.Payloads
+	blockIndexer storage.BlockIndexer
+	tracer       module.Tracer
+	logger       zerolog.Logger
+	consumer     protocol.Consumer
+	blockTimer   protocol.BlockTimer
 }
 
 var _ protocol.FollowerState = (*FollowerState)(nil)
@@ -65,13 +66,14 @@ func NewFollowerState(
 	blockTimer protocol.BlockTimer,
 ) (*FollowerState, error) {
 	followerState := &FollowerState{
-		State:      state,
-		index:      index,
-		payloads:   payloads,
-		tracer:     tracer,
-		logger:     logger,
-		consumer:   consumer,
-		blockTimer: blockTimer,
+		State:        state,
+		index:        index,
+		payloads:     payloads,
+		blockIndexer: procedure.NewBlockIndexer(),
+		tracer:       tracer,
+		logger:       logger,
+		consumer:     consumer,
+		blockTimer:   blockTimer,
 	}
 	return followerState, nil
 }
@@ -87,21 +89,20 @@ func NewFullConsensusState(
 	state *State,
 	index storage.Index,
 	payloads storage.Payloads,
+	blockIndexer storage.BlockIndexer,
 	blockTimer protocol.BlockTimer,
 	receiptValidator module.ReceiptValidator,
 	sealValidator module.SealValidator,
 ) (*ParticipantState, error) {
-	followerState, err := NewFollowerState(
-		logger,
-		tracer,
-		consumer,
-		state,
-		index,
-		payloads,
-		blockTimer,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("initialization of Mutable Follower State failed: %w", err)
+	followerState := &FollowerState{
+		logger:       logger,
+		tracer:       tracer,
+		consumer:     consumer,
+		State:        state,
+		index:        index,
+		payloads:     payloads,
+		blockIndexer: blockIndexer,
+		blockTimer:   blockTimer,
 	}
 	return &ParticipantState{
 		FollowerState:    followerState,
@@ -560,7 +561,7 @@ func (m *FollowerState) insert(ctx context.Context, candidate *flow.Block, certi
 		}
 
 		// index the child block for recovery
-		err = procedure.IndexNewBlock(blockID, candidate.Header.ParentID)(tx)
+		err = m.blockIndexer.IndexNewBlock(blockID, candidate.Header.ParentID)(tx)
 		if err != nil {
 			return fmt.Errorf("could not index new block: %w", err)
 		}

@@ -43,8 +43,10 @@ func (cp *ClusterPayloads) storeTx(blockID flow.Identifier, payload *cluster.Pay
 	return func(tx storage.PebbleReaderBatchWriter) error {
 		_, w := tx.ReaderWriter()
 
-		tx.AddCallback(func() {
-			cp.cache.Insert(blockID, payload)
+		tx.AddCallback(func(err error) {
+			if err != nil {
+				cp.cache.Insert(blockID, payload)
+			}
 		})
 
 		return procedure.InsertClusterPayload(blockID, payload)(w)

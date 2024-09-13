@@ -33,6 +33,7 @@ import (
 	stoerr "github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/pebble"
 	"github.com/onflow/flow-go/storage/pebble/operation"
+	"github.com/onflow/flow-go/storage/pebble/procedure"
 	"github.com/onflow/flow-go/storage/testingutils"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -119,6 +120,7 @@ func TestExtendValid(t *testing.T) {
 			state,
 			all.Index,
 			all.Payloads,
+			procedure.NewBlockIndexer(),
 			util.MockBlockTimer(),
 			util.MockReceiptValidator(),
 			util.MockSealValidator(all.Seals),
@@ -836,6 +838,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 			protoState,
 			all.Index,
 			all.Payloads,
+			procedure.NewBlockIndexer(),
 			util.MockBlockTimer(),
 			receiptValidator,
 			sealValidator,
@@ -1975,6 +1978,7 @@ func TestExtendInvalidSealsInBlock(t *testing.T) {
 			state,
 			all.Index,
 			all.Payloads,
+			procedure.NewBlockIndexer(),
 			util.MockBlockTimer(),
 			util.MockReceiptValidator(),
 			sealValidator,
@@ -2474,6 +2478,7 @@ func TestHeaderInvalidTimestamp(t *testing.T) {
 			state,
 			all.Index,
 			all.Payloads,
+			procedure.NewBlockIndexer(),
 			blockTimer,
 			util.MockReceiptValidator(),
 			util.MockSealValidator(all.Seals),

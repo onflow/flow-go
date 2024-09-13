@@ -98,7 +98,7 @@ func (suite *MutatorSuite) SetupTest() {
 	suite.NoError(err)
 	clusterState, err := Bootstrap(suite.db, clusterStateRoot)
 	suite.Assert().Nil(err)
-	suite.state, err = NewMutableState(clusterState, tracer, all.Headers, colPayloads)
+	suite.state, err = NewMutableState(clusterState, tracer, all.Headers, colPayloads, procedure.NewClusterBlockIndexer())
 	suite.Assert().Nil(err)
 }
 
