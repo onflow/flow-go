@@ -2,7 +2,6 @@ package check_storage
 
 import (
 	"context"
-	"slices"
 
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
@@ -14,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
 	"github.com/onflow/flow-go/cmd/util/ledger/util/registers"
+	"github.com/onflow/flow-go/fvm/evm/emulator/state"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
@@ -27,6 +27,14 @@ var (
 	flagOutputDirectory string
 	flagChain           string
 	flagNWorker         int
+)
+
+var (
+	evmAccount       flow.Address
+	evmStorageIDKeys = []string{
+		state.AccountsStorageIDKey,
+		state.CodesStorageIDKey,
+	}
 )
 
 var Cmd = &cobra.Command{
@@ -102,13 +110,8 @@ func run(*cobra.Command, []string) {
 		log.Fatal().Msg("--state-commitment must be provided when --state is provided")
 	}
 
-	// For now, skip EVM storage account since a different decoder is needed for decoding EVM registers.
-
-	systemContracts := systemcontracts.SystemContractsForChain(chainID)
-
-	acctsToSkip := []string{
-		flow.AddressToRegisterOwner(systemContracts.EVMStorage.Address),
-	}
+	// Get EVM account by chain
+	evmAccount = systemcontracts.SystemContractsForChain(chainID).EVMStorage.Address
 
 	// Create report in JSONL format
 	rw := reporters.NewReportFileWriterFactoryWithFormat(flagOutputDirectory, log.Logger, reporters.ReportFormatJSONL).
@@ -161,13 +164,13 @@ func run(*cobra.Command, []string) {
 		len(payloads),
 	)
 
-	failedAccountAddresses, err := checkStorageHealth(registersByAccount, flagNWorker, rw, acctsToSkip)
+	failedAccountAddresses, err := checkStorageHealth(registersByAccount, flagNWorker, rw)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to check storage health")
 	}
 
 	if len(failedAccountAddresses) == 0 {
-		log.Info().Msgf("All %d accounts are health", accountCount)
+		log.Info().Msgf("All %d accounts are healthy", accountCount)
 		return
 	}
 
@@ -188,7 +191,6 @@ func checkStorageHealth(
 	registersByAccount *registers.ByAccount,
 	nWorkers int,
 	rw reporters.ReportWriter,
-	acctsToSkip []string,
 ) (failedAccountAddresses []string, err error) {
 
 	accountCount := registersByAccount.AccountCount()
@@ -210,10 +212,6 @@ func checkStorageHealth(
 		err = registersByAccount.ForEachAccount(
 			func(accountRegisters *registers.AccountRegisters) error {
 				defer logAccount(1)
-
-				if slices.Contains(acctsToSkip, accountRegisters.Owner()) {
-					return nil
-				}
 
 				accountStorageIssues := checkAccountStorageHealth(accountRegisters, nWorkers)
 
@@ -281,9 +279,6 @@ func checkStorageHealth(
 
 		err = registersByAccount.ForEachAccount(
 			func(accountRegisters *registers.AccountRegisters) error {
-				if slices.Contains(acctsToSkip, accountRegisters.Owner()) {
-					return nil
-				}
 				jobs <- job{accountRegisters: accountRegisters}
 				return nil
 			})
@@ -318,6 +313,10 @@ func checkAccountStorageHealth(accountRegisters *registers.AccountRegisters, nWo
 			}}
 	}
 
+	if isEVMAccount(address) {
+		return checkEVMAccountStorageHealth(address, accountRegisters)
+	}
+
 	var issues []accountStorageIssue
 
 	// Check atree storage health
@@ -331,7 +330,7 @@ func checkAccountStorageHealth(accountRegisters *registers.AccountRegisters, nWo
 			issues,
 			accountStorageIssue{
 				Address: address.Hex(),
-				Kind:    storageErrorKindString[atreeStorageErrorKind],
+				Kind:    storageErrorKindString[cadenceAtreeStorageErrorKind],
 				Msg:     err.Error(),
 			})
 	}
@@ -345,12 +344,14 @@ type storageErrorKind int
 
 const (
 	otherErrorKind storageErrorKind = iota
-	atreeStorageErrorKind
+	cadenceAtreeStorageErrorKind
+	evmAtreeStorageErrorKind
 )
 
 var storageErrorKindString = map[storageErrorKind]string{
-	otherErrorKind:        "error_check_storage_failed",
-	atreeStorageErrorKind: "error_atree_storage",
+	otherErrorKind:               "error_check_storage_failed",
+	cadenceAtreeStorageErrorKind: "error_cadence_atree_storage",
+	evmAtreeStorageErrorKind:     "error_evm_atree_storage",
 }
 
 type accountStorageIssue struct {
