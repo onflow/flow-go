@@ -54,6 +54,10 @@ func (p *ReplayerPrecompiledContract) RequiredGas(input []byte) (output uint64) 
 	if p.requiredGasIndex > len(p.expectedCalls.RequiredGasCalls) {
 		panic(errUnexpectedCall)
 	}
+	// strip function selector from input, we assume order
+	if len(input) >= 4 {
+		input = input[4:]
+	}
 	if !bytes.Equal(p.expectedCalls.RequiredGasCalls[p.requiredGasIndex].Input, input) {
 		panic(errUnexpectedCall)
 	}
@@ -65,6 +69,10 @@ func (p *ReplayerPrecompiledContract) RequiredGas(input []byte) (output uint64) 
 func (p *ReplayerPrecompiledContract) Run(input []byte) (output []byte, err error) {
 	if p.runIndex > len(p.expectedCalls.RunCalls) {
 		panic(errUnexpectedCall)
+	}
+	// strip function selector from input, we assume order
+	if len(input) >= 4 {
+		input = input[4:]
 	}
 	if !bytes.Equal(p.expectedCalls.RunCalls[p.runIndex].Input, input) {
 		panic(errUnexpectedCall)
