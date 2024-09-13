@@ -75,7 +75,10 @@ func (r *SafetyRules) ProduceVote(proposal *model.Proposal, curView uint64) (*mo
 		return nil, fmt.Errorf("not safe to vote for proposal %x: %w", proposal.Block.BlockID, err)
 	}
 
-	currentLeader, err := r.committee.LeaderForView(curView)
+	currentLeader, err := r.committee.LeaderForView(block.View)
+	if err != nil {
+		return nil, fmt.Errorf("expect to have a valid leader for view %d: %w", curView, err)
+	}
 	if currentLeader != r.committee.Self() {
 		// we expect that only valid proposals are submitted for voting
 		// we need to make sure that proposer is not ejected to decide to vote or not
