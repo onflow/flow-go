@@ -67,7 +67,7 @@ func AppendShortData(input []byte, data []byte) []byte {
 
 // AppendLongData appends data shorter than 32MB
 func AppendLongData(input []byte, data []byte) []byte {
-	if len(data) > math.MaxUint32 {
+	if int64(len(data)) > math.MaxUint32 {
 		panic(fmt.Sprintf("long data too long! %d", len(data)))
 	}
 	input = AppendUint32(input, uint32(len(data)))
