@@ -69,7 +69,7 @@ func (state DKGEndState) String() string {
 // Nevertheless, there is an important liveness constraint: the intersection, 𝒟 ∩ 𝒞 = ℛ should be a larger number of
 // nodes. Specifically, an honest supermajority of consensus nodes must contain enough successful DKG participants
 // (about n/2) to produce a valid group signature for the random beacon [1, 3]. Therefore, we have the approximate
-// lower bound that |ℛ| = |𝒟 ∩ 𝒞| ≤ n/2 = |𝒟|/2 = len(DKGIndexMap)/2. Operating close to this lower bound would
+// lower bound |ℛ| = |𝒟 ∩ 𝒞| = n/2 = |𝒟|/2 = len(DKGIndexMap)/2. Operating close to this lower bound would
 // require that every random beacon key-holder r ∈ ℛ remaining in the consensus committee is honest
 // (incl. quickly responsive) *all the time*. This is a lower bound, unsuited for decentralized production networks.
 // To reject configurations that are vulnerable to liveness failures, the protocol uses the threshold `t_safety`
