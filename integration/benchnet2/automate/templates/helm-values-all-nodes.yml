@@ -134,7 +134,7 @@ verification:
         - --profiler-dir=/profiler
         - --profiler-interval=2m
         - --nodeid={{.node_id}}
-        - --peer-scoring-enabled=false
+        - --gossipsub-peer-scoring-enabled=false
 {{- end}}
 
 {{define "env"}}
