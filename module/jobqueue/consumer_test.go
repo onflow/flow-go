@@ -161,10 +161,11 @@ func TestProcessedIndexDeletion(t *testing.T) {
 		unittest.RunWithBadgerDB(t, func(db *badgerdb.DB) {
 			log := unittest.Logger().With().Str("module", "consumer").Logger()
 			jobs := NewMockJobs()
-			progress := badger.NewConsumerProgress(db, "consumer")
+			progress, err := badger.NewConsumerProgressFactory(db, "consumer").InitConsumer(0)
+			require.NoError(t, err)
 			worker := newMockWorker()
 			maxProcessing := uint64(3)
-			c, err := NewConsumer(log, jobs, progress, worker, maxProcessing, 0, 0)
+			c, err := NewConsumer(log, jobs, progress, worker, maxProcessing, 0)
 			require.NoError(t, err)
 			worker.WithConsumer(c)
 
@@ -197,8 +198,7 @@ func TestCheckBeforeStartIsNoop(t *testing.T) {
 		storedProcessedIndex := uint64(100)
 
 		worker := newMockWorker()
-		progress := badger.NewConsumerProgress(db, "consumer")
-		err := progress.InitProcessedIndex(storedProcessedIndex)
+		progress, err := badger.NewConsumerProgressFactory(db, "consumer").InitConsumer(storedProcessedIndex)
 		require.NoError(t, err)
 
 		c, err := NewConsumer(
@@ -208,7 +208,6 @@ func TestCheckBeforeStartIsNoop(t *testing.T) {
 			worker,
 			uint64(3),
 			0,
-			10,
 		)
 		require.NoError(t, err)
 		worker.WithConsumer(c)

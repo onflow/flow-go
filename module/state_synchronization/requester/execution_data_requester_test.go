@@ -412,8 +412,8 @@ func (suite *ExecutionDataRequesterSuite) prepareRequesterTest(cfg *fetchTestRun
 	cache := cache.NewExecutionDataCache(suite.downloader, headers, seals, results, heroCache)
 
 	followerDistributor := pubsub.NewFollowerDistributor()
-	processedHeight := bstorage.NewConsumerProgress(suite.db, module.ConsumeProgressExecutionDataRequesterBlockHeight)
-	processedNotification := bstorage.NewConsumerProgress(suite.db, module.ConsumeProgressExecutionDataRequesterNotification)
+	processedHeight := bstorage.NewConsumerProgressFactory(suite.db, module.ConsumeProgressExecutionDataRequesterBlockHeight)
+	processedNotification := bstorage.NewConsumerProgressFactory(suite.db, module.ConsumeProgressExecutionDataRequesterNotification)
 
 	edr, err := requester.New(
 		logger,

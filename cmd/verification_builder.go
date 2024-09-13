@@ -88,11 +88,11 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 	var (
 		followerState protocol.FollowerState
 
-		chunkStatuses        *stdmap.ChunkStatuses    // used in fetcher engine
-		chunkRequests        *stdmap.ChunkRequests    // used in requester engine
-		processedChunkIndex  *badger.ConsumerProgress // used in chunk consumer
-		processedBlockHeight *badger.ConsumerProgress // used in block consumer
-		chunkQueue           *badger.ChunksQueue      // used in chunk consumer
+		chunkStatuses        *stdmap.ChunkStatuses           // used in fetcher engine
+		chunkRequests        *stdmap.ChunkRequests           // used in requester engine
+		processedChunkIndex  *badger.ConsumerProgressFactory // used in chunk consumer
+		processedBlockHeight *badger.ConsumerProgressFactory // used in block consumer
+		chunkQueue           *badger.ChunksQueue             // used in chunk consumer
 
 		syncCore            *chainsync.Core   // used in follower engine
 		assignerEngine      *assigner.Engine  // the assigner engine
@@ -155,11 +155,11 @@ func (v *VerificationNodeBuilder) LoadComponentsAndModules() {
 			return nil
 		}).
 		Module("processed chunk index consumer progress", func(node *NodeConfig) error {
-			processedChunkIndex = badger.NewConsumerProgress(node.DB, module.ConsumeProgressVerificationChunkIndex)
+			processedChunkIndex = badger.NewConsumerProgressFactory(node.DB, module.ConsumeProgressVerificationChunkIndex)
 			return nil
 		}).
 		Module("processed block height consumer progress", func(node *NodeConfig) error {
-			processedBlockHeight = badger.NewConsumerProgress(node.DB, module.ConsumeProgressVerificationBlockHeight)
+			processedBlockHeight = badger.NewConsumerProgressFactory(node.DB, module.ConsumeProgressVerificationBlockHeight)
 			return nil
 		}).
 		Module("chunks queue", func(node *NodeConfig) error {

@@ -1,16 +1,19 @@
 package operation
 
 import (
-	"github.com/dgraph-io/badger/v2"
-
 	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/storage"
 )
 
-func InsertChunkLocator(locator *chunks.Locator) func(*badger.Txn) error {
-	return insert(makePrefix(codeChunk, locator.ID()), locator)
+func InsertChunkLocator(locator *chunks.Locator) func(storage.Writer) error {
+	return insertW(makePrefix(codeChunk, locator.ID()), locator)
 }
 
-func RetrieveChunkLocator(locatorID flow.Identifier, locator *chunks.Locator) func(*badger.Txn) error {
-	return retrieve(makePrefix(codeChunk, locatorID), locator)
+func RetrieveChunkLocator(locatorID flow.Identifier, locator *chunks.Locator) func(storage.Reader) error {
+	return retrieveR(makePrefix(codeChunk, locatorID), locator)
+}
+
+func HasChunkLocator(locatorID flow.Identifier, exist *bool) func(storage.Reader) error {
+	return existsR(makePrefix(codeChunk, locatorID), exist)
 }

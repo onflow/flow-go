@@ -27,7 +27,7 @@ type ComponentConsumer struct {
 func NewComponentConsumer(
 	log zerolog.Logger,
 	workSignal <-chan struct{},
-	progress storage.ConsumerProgress,
+	progressFactory storage.ConsumerProgressFactory,
 	jobs module.Jobs,
 	defaultIndex uint64,
 	processor JobProcessor, // method used to process jobs
@@ -48,7 +48,12 @@ func NewComponentConsumer(
 		maxProcessing,
 	)
 
-	consumer, err := NewConsumer(log, jobs, progress, worker, maxProcessing, maxSearchAhead, defaultIndex)
+	progress, err := progressFactory.InitConsumer(defaultIndex)
+	if err != nil {
+		return nil, err
+	}
+
+	consumer, err := NewConsumer(log, jobs, progress, worker, maxProcessing, maxSearchAhead)
 	if err != nil {
 		return nil, err
 	}

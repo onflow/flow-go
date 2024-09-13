@@ -144,7 +144,7 @@ func WithConsumer(
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		maxProcessing := uint64(3)
 
-		processedIndex := storage.NewConsumerProgress(db, module.ConsumeProgressVerificationChunkIndex)
+		processedIndexFactory := storage.NewConsumerProgressFactory(db, module.ConsumeProgressVerificationChunkIndex)
 		chunksQueue := storage.NewChunkQueue(db)
 		ok, err := chunksQueue.Init(chunkconsumer.DefaultJobIndex)
 		require.NoError(t, err)
@@ -158,7 +158,7 @@ func WithConsumer(
 		consumer, err := chunkconsumer.NewChunkConsumer(
 			unittest.Logger(),
 			collector,
-			processedIndex,
+			processedIndexFactory,
 			chunksQueue,
 			engine,
 			maxProcessing,

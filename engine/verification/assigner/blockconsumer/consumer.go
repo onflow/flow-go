@@ -42,7 +42,7 @@ func defaultProcessedIndex(state protocol.State) (uint64, error) {
 // index for initializing the processed index in storage.
 func NewBlockConsumer(log zerolog.Logger,
 	metrics module.VerificationMetrics,
-	processedHeight storage.ConsumerProgress,
+	processedHeightFactory storage.ConsumerProgressFactory,
 	blocks storage.Blocks,
 	state protocol.State,
 	blockProcessor assigner.FinalizedBlockProcessor,
@@ -63,7 +63,12 @@ func NewBlockConsumer(log zerolog.Logger,
 		return nil, 0, fmt.Errorf("could not read default processed index: %w", err)
 	}
 
-	consumer, err := jobqueue.NewConsumer(lg, jobs, processedHeight, worker, maxProcessing, 0, defaultIndex)
+	processedHeight, err := processedHeightFactory.InitConsumer(defaultIndex)
+	if err != nil {
+		return nil, 0, fmt.Errorf("could not initialize processed height: %w", err)
+	}
+
+	consumer, err := jobqueue.NewConsumer(lg, jobs, processedHeight, worker, maxProcessing, 0)
 	if err != nil {
 		return nil, 0, fmt.Errorf("could not create block consumer: %w", err)
 	}

@@ -75,6 +75,14 @@ func generateTestData(jobCount uint64) map[uint64]TestJob {
 	return jobData
 }
 
+type mockConsumerFactory struct {
+	progress *storagemock.ConsumerProgress
+}
+
+func (f *mockConsumerFactory) InitConsumer(defaultIndex uint64) (storage.ConsumerProgress, error) {
+	return f.progress, nil
+}
+
 func (suite *ComponentConsumerSuite) prepareTest(
 	processor JobProcessor,
 	preNotifier NotifyDone,
@@ -89,10 +97,12 @@ func (suite *ComponentConsumerSuite) prepareTest(
 	progress.On("ProcessedIndex").Return(suite.defaultIndex, nil)
 	progress.On("SetProcessedIndex", mock.AnythingOfType("uint64")).Return(nil)
 
+	progressFactory := &mockConsumerFactory{progress}
+
 	consumer, err := NewComponentConsumer(
 		zerolog.New(os.Stdout).With().Timestamp().Logger(),
 		workSignal,
-		progress,
+		progressFactory,
 		jobs,
 		suite.defaultIndex,
 		processor,

@@ -124,7 +124,7 @@ func (suite *Suite) SetupTest() {
 
 	suite.db, suite.dbDir = unittest.TempBadgerDB(suite.T())
 	suite.lastFullBlockHeight, err = counters.NewPersistentStrictMonotonicCounter(
-		bstorage.NewConsumerProgress(suite.db, module.ConsumeProgressLastFullBlockHeight),
+		bstorage.NewConsumerProgressFactory(suite.db, module.ConsumeProgressLastFullBlockHeight),
 		0,
 	)
 	suite.Require().NoError(err)

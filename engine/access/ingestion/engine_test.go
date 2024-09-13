@@ -180,11 +180,11 @@ func (s *Suite) SetupTest() {
 
 // initIngestionEngine create new instance of ingestion engine and waits when it starts
 func (s *Suite) initIngestionEngine(ctx irrecoverable.SignalerContext) *Engine {
-	processedHeight := bstorage.NewConsumerProgress(s.db, module.ConsumeProgressIngestionEngineBlockHeight)
+	processedHeight := bstorage.NewConsumerProgressFactory(s.db, module.ConsumeProgressIngestionEngineBlockHeight)
 
 	var err error
 	s.lastFullBlockHeight, err = counters.NewPersistentStrictMonotonicCounter(
-		bstorage.NewConsumerProgress(s.db, module.ConsumeProgressLastFullBlockHeight),
+		bstorage.NewConsumerProgressFactory(s.db, module.ConsumeProgressLastFullBlockHeight),
 		s.finalizedBlock.Height,
 	)
 	require.NoError(s.T(), err)

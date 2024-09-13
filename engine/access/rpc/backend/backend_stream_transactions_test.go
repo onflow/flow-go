@@ -134,7 +134,7 @@ func (s *TransactionStatusSuite) SetupTest() {
 
 	var err error
 	s.lastFullBlockHeight, err = counters.NewPersistentStrictMonotonicCounter(
-		bstorage.NewConsumerProgress(s.db, module.ConsumeProgressLastFullBlockHeight),
+		bstorage.NewConsumerProgressFactory(s.db, module.ConsumeProgressLastFullBlockHeight),
 		s.rootBlock.Header.Height,
 	)
 	require.NoError(s.T(), err)

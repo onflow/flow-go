@@ -994,7 +994,7 @@ func VerificationNode(t testing.TB,
 	}
 
 	if node.ProcessedChunkIndex == nil {
-		node.ProcessedChunkIndex = storage.NewConsumerProgress(node.PublicDB, module.ConsumeProgressVerificationChunkIndex)
+		node.ProcessedChunkIndex = storage.NewConsumerProgressFactory(node.PublicDB, module.ConsumeProgressVerificationChunkIndex)
 	}
 
 	if node.ChunksQueue == nil {
@@ -1005,7 +1005,7 @@ func VerificationNode(t testing.TB,
 	}
 
 	if node.ProcessedBlockHeight == nil {
-		node.ProcessedBlockHeight = storage.NewConsumerProgress(node.PublicDB, module.ConsumeProgressVerificationBlockHeight)
+		node.ProcessedBlockHeight = storage.NewConsumerProgressFactory(node.PublicDB, module.ConsumeProgressVerificationBlockHeight)
 	}
 
 	if node.VerifierEngine == nil {

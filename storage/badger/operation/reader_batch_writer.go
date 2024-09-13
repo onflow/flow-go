@@ -89,6 +89,23 @@ func WithReaderBatchWriter(db *badger.DB, fn func(storage.BadgerReaderBatchWrite
 	return batch.Commit()
 }
 
+func WithBatchWriter(db *badger.DB, fn func(storage.Writer) error) error {
+	batch := NewReaderBatchWriter(db)
+
+	err := storage.OnlyBadgerWriter(fn)(batch)
+	if err != nil {
+		// fn might use lock to ensure concurrent safety while reading and writing data
+		// and the lock is usually released by a callback.
+		// in other words, fn might hold a lock to be released by a callback,
+		// we need to notify the callback for the locks to be released before
+		// returning the error.
+		batch.notifyCallbacks(err)
+		return err
+	}
+
+	return batch.Commit()
+}
+
 func NewReaderBatchWriter(db *badger.DB) *ReaderBatchWriter {
 	return &ReaderBatchWriter{
 		db:    db,

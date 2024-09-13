@@ -120,7 +120,7 @@ func withConsumer(
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		maxProcessing := uint64(workerCount)
 
-		processedHeight := bstorage.NewConsumerProgress(db, module.ConsumeProgressVerificationBlockHeight)
+		processedHeight := bstorage.NewConsumerProgressFactory(db, module.ConsumeProgressVerificationBlockHeight)
 		collector := &metrics.NoopCollector{}
 		tracer := trace.NewNoopTracer()
 		log := unittest.Logger()

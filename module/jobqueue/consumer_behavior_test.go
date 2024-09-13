@@ -469,10 +469,11 @@ func testWorkOnNextAfterFastforward(t *testing.T) {
 		// rebuild a consumer with the dependencies to simulate a restart
 		// jobs need to be reused, since it stores all the jobs
 		reWorker := newMockWorker()
-		reProgress := badger.NewConsumerProgress(db, ConsumerTag)
-		reConsumer := newTestConsumer(t, reProgress, j, reWorker, 0, DefaultIndex)
+		reProgress, err := badger.NewConsumerProgressFactory(db, ConsumerTag).InitConsumer(DefaultIndex)
+		require.NoError(t, err)
+		reConsumer := newTestConsumer(t, reProgress, j, reWorker, 0)
 
-		err := reConsumer.Start()
+		err = reConsumer.Start()
 		require.NoError(t, err)
 
 		time.Sleep(1 * time.Millisecond)
@@ -560,8 +561,9 @@ func runWithSeatchAhead(t testing.TB, maxSearchAhead uint64, defaultIndex uint64
 	unittest.RunWithBadgerDB(t, func(db *badgerdb.DB) {
 		jobs := jobqueue.NewMockJobs()
 		worker := newMockWorker()
-		progress := badger.NewConsumerProgress(db, ConsumerTag)
-		consumer := newTestConsumer(t, progress, jobs, worker, maxSearchAhead, defaultIndex)
+		progress, err := badger.NewConsumerProgressFactory(db, ConsumerTag).InitConsumer(defaultIndex)
+		require.NoError(t, err)
+		consumer := newTestConsumer(t, progress, jobs, worker, maxSearchAhead)
 		runTestWith(consumer, progress, worker, jobs, db)
 	})
 }
@@ -572,10 +574,10 @@ func assertProcessed(t testing.TB, cp storage.ConsumerProgress, expectProcessed 
 	require.Equal(t, expectProcessed, processed)
 }
 
-func newTestConsumer(t testing.TB, cp storage.ConsumerProgress, jobs module.Jobs, worker jobqueue.Worker, maxSearchAhead uint64, defaultIndex uint64) module.JobConsumer {
+func newTestConsumer(t testing.TB, cp storage.ConsumerProgress, jobs module.Jobs, worker jobqueue.Worker, maxSearchAhead uint64) module.JobConsumer {
 	log := unittest.Logger().With().Str("module", "consumer").Logger()
 	maxProcessing := uint64(3)
-	c, err := jobqueue.NewConsumer(log, jobs, cp, worker, maxProcessing, maxSearchAhead, defaultIndex)
+	c, err := jobqueue.NewConsumer(log, jobs, cp, worker, maxProcessing, maxSearchAhead)
 	require.NoError(t, err)
 	return c
 }

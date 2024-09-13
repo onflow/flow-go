@@ -530,8 +530,8 @@ func (builder *FlowAccessNodeBuilder) BuildConsensusFollower() *FlowAccessNodeBu
 func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccessNodeBuilder {
 	var ds datastore.Batching
 	var bs network.BlobService
-	var processedBlockHeight storage.ConsumerProgress
-	var processedNotifications storage.ConsumerProgress
+	var processedBlockHeight storage.ConsumerProgressFactory
+	var processedNotifications storage.ConsumerProgressFactory
 	var bsDependable *module.ProxiedReadyDoneAware
 	var execDataDistributor *edrequester.ExecutionDataDistributor
 	var execDataCacheBackend *herocache.BlockExecutionData
@@ -586,9 +586,9 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			// Note: progress is stored in the datastore's DB since that is where the jobqueue
 			// writes execution data to.
 			if executionDataDBMode == execution_data.ExecutionDataDBModeBadger {
-				processedBlockHeight = bstorage.NewConsumerProgress(builder.ExecutionDatastoreManager.DB().(*badger.DB), module.ConsumeProgressExecutionDataRequesterBlockHeight)
+				processedBlockHeight = bstorage.NewConsumerProgressFactory(builder.ExecutionDatastoreManager.DB().(*badger.DB), module.ConsumeProgressExecutionDataRequesterBlockHeight)
 			} else {
-				processedBlockHeight = pstorage.NewConsumerProgress(builder.ExecutionDatastoreManager.DB().(*pebble.DB), module.ConsumeProgressExecutionDataRequesterBlockHeight)
+				processedBlockHeight = pstorage.NewConsumerProgressFactory(builder.ExecutionDatastoreManager.DB().(*pebble.DB), module.ConsumeProgressExecutionDataRequesterBlockHeight)
 			}
 			return nil
 		}).
@@ -596,9 +596,9 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			// Note: progress is stored in the datastore's DB since that is where the jobqueue
 			// writes execution data to.
 			if executionDataDBMode == execution_data.ExecutionDataDBModeBadger {
-				processedNotifications = bstorage.NewConsumerProgress(builder.ExecutionDatastoreManager.DB().(*badger.DB), module.ConsumeProgressExecutionDataRequesterNotification)
+				processedNotifications = bstorage.NewConsumerProgressFactory(builder.ExecutionDatastoreManager.DB().(*badger.DB), module.ConsumeProgressExecutionDataRequesterNotification)
 			} else {
-				processedNotifications = pstorage.NewConsumerProgress(builder.ExecutionDatastoreManager.DB().(*pebble.DB), module.ConsumeProgressExecutionDataRequesterNotification)
+				processedNotifications = pstorage.NewConsumerProgressFactory(builder.ExecutionDatastoreManager.DB().(*pebble.DB), module.ConsumeProgressExecutionDataRequesterNotification)
 			}
 			return nil
 		}).
@@ -826,7 +826,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 	}
 
 	if builder.executionDataIndexingEnabled {
-		var indexedBlockHeight storage.ConsumerProgress
+		var indexedBlockHeight storage.ConsumerProgressFactory
 
 		builder.
 			AdminCommand("execute-script", func(config *cmd.NodeConfig) commands.AdminCommand {
@@ -834,7 +834,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 			}).
 			Module("indexed block height consumer progress", func(node *cmd.NodeConfig) error {
 				// Note: progress is stored in the MAIN db since that is where indexed execution data is stored.
-				indexedBlockHeight = bstorage.NewConsumerProgress(builder.DB, module.ConsumeProgressExecutionDataIndexerBlockHeight)
+				indexedBlockHeight = bstorage.NewConsumerProgressFactory(builder.DB, module.ConsumeProgressExecutionDataIndexerBlockHeight)
 				return nil
 			}).
 			Module("transaction results storage", func(node *cmd.NodeConfig) error {
@@ -1579,7 +1579,7 @@ func (builder *FlowAccessNodeBuilder) enqueueRelayNetwork() {
 }
 
 func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
-	var processedBlockHeight storage.ConsumerProgress
+	var processedBlockHeight storage.ConsumerProgressFactory
 
 	if builder.executionDataSyncEnabled {
 		builder.BuildExecutionSyncComponents()
@@ -1769,7 +1769,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			return nil
 		}).
 		Module("processed block height consumer progress", func(node *cmd.NodeConfig) error {
-			processedBlockHeight = bstorage.NewConsumerProgress(builder.DB, module.ConsumeProgressIngestionEngineBlockHeight)
+			processedBlockHeight = bstorage.NewConsumerProgressFactory(builder.DB, module.ConsumeProgressIngestionEngineBlockHeight)
 			return nil
 		}).
 		Module("processed last full block height monotonic consumer progress", func(node *cmd.NodeConfig) error {
@@ -1777,7 +1777,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 
 			var err error
 			lastFullBlockHeight, err = counters.NewPersistentStrictMonotonicCounter(
-				bstorage.NewConsumerProgress(builder.DB, module.ConsumeProgressLastFullBlockHeight),
+				bstorage.NewConsumerProgressFactory(builder.DB, module.ConsumeProgressLastFullBlockHeight),
 				rootBlockHeight,
 			)
 			if err != nil {

@@ -29,7 +29,7 @@ type ChunkConsumer struct {
 func NewChunkConsumer(
 	log zerolog.Logger,
 	metrics module.VerificationMetrics,
-	processedIndex storage.ConsumerProgress, // to persist the processed index
+	processedIndexFactory storage.ConsumerProgressFactory, // to persist the processed index
 	chunksQueue storage.ChunksQueue, // to read jobs (chunks) from
 	chunkProcessor fetcher.AssignedChunkProcessor, // to process jobs (chunks)
 	maxProcessing uint64, // max number of jobs to be processed in parallel
@@ -39,8 +39,13 @@ func NewChunkConsumer(
 
 	jobs := &ChunkJobs{locators: chunksQueue}
 
+	processedIndex, err := processedIndexFactory.InitConsumer(DefaultJobIndex)
+	if err != nil {
+		return nil, fmt.Errorf("could not initialize processed index: %w", err)
+	}
+
 	lg := log.With().Str("module", "chunk_consumer").Logger()
-	consumer, err := jobqueue.NewConsumer(lg, jobs, processedIndex, worker, maxProcessing, 0, DefaultJobIndex)
+	consumer, err := jobqueue.NewConsumer(lg, jobs, processedIndex, worker, maxProcessing, 0)
 	if err != nil {
 		return nil, err
 	}

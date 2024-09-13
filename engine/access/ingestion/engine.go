@@ -119,7 +119,7 @@ func New(
 	executionResults storage.ExecutionResults,
 	executionReceipts storage.ExecutionReceipts,
 	collectionExecutedMetric module.CollectionExecutedMetric,
-	processedHeight storage.ConsumerProgress,
+	processedHeight storage.ConsumerProgressFactory,
 	lastFullBlockHeight *counters.PersistentStrictMonotonicCounter,
 ) (*Engine, error) {
 	executionReceiptsRawQueue, err := fifoqueue.NewFifoQueue(defaultQueueCapacity)

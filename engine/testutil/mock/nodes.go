@@ -281,12 +281,12 @@ type VerificationNode struct {
 	Receipts      storage.ExecutionReceipts
 
 	// chunk consumer and processor for fetcher engine
-	ProcessedChunkIndex storage.ConsumerProgress
+	ProcessedChunkIndex storage.ConsumerProgressFactory
 	ChunksQueue         *bstorage.ChunksQueue
 	ChunkConsumer       *chunkconsumer.ChunkConsumer
 
 	// block consumer for chunk consumer
-	ProcessedBlockHeight storage.ConsumerProgress
+	ProcessedBlockHeight storage.ConsumerProgressFactory
 	BlockConsumer        *blockconsumer.BlockConsumer
 
 	VerifierEngine  *verifier.Engine

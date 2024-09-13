@@ -26,7 +26,12 @@ type PersistentStrictMonotonicCounter struct {
 // otherwise the state may become inconsistent.
 //
 // No errors are expected during normal operation.
-func NewPersistentStrictMonotonicCounter(consumerProgress storage.ConsumerProgress, defaultIndex uint64) (*PersistentStrictMonotonicCounter, error) {
+func NewPersistentStrictMonotonicCounter(factory storage.ConsumerProgressFactory, defaultIndex uint64) (*PersistentStrictMonotonicCounter, error) {
+	consumerProgress, err := factory.InitConsumer(defaultIndex)
+	if err != nil {
+		return nil, fmt.Errorf("could not init consumer progress: %w", err)
+	}
+
 	m := &PersistentStrictMonotonicCounter{
 		consumerProgress: consumerProgress,
 	}
@@ -34,14 +39,7 @@ func NewPersistentStrictMonotonicCounter(consumerProgress storage.ConsumerProgre
 	// sync with storage for the processed index to ensure the consistency
 	value, err := m.consumerProgress.ProcessedIndex()
 	if err != nil {
-		if !errors.Is(err, storage.ErrNotFound) {
-			return nil, fmt.Errorf("could not read consumer progress: %w", err)
-		}
-		err := m.consumerProgress.InitProcessedIndex(defaultIndex)
-		if err != nil {
-			return nil, fmt.Errorf("could not init consumer progress: %w", err)
-		}
-		value = defaultIndex
+		return nil, fmt.Errorf("could not read consumer progress: %w", err)
 	}
 
 	m.counter = NewMonotonousCounter(value)

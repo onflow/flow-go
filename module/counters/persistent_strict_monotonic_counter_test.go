@@ -16,7 +16,7 @@ func TestMonotonicConsumer(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		var height1 = uint64(1234)
 		persistentStrictMonotonicCounter, err := counters.NewPersistentStrictMonotonicCounter(
-			bstorage.NewConsumerProgress(db, module.ConsumeProgressLastFullBlockHeight),
+			bstorage.NewConsumerProgressFactory(db, module.ConsumeProgressLastFullBlockHeight),
 			height1,
 		)
 		require.NoError(t, err)
@@ -42,7 +42,7 @@ func TestMonotonicConsumer(t *testing.T) {
 
 		// check that new persistent strict monotonic counter has the same value
 		persistentStrictMonotonicCounter2, err := counters.NewPersistentStrictMonotonicCounter(
-			bstorage.NewConsumerProgress(db, module.ConsumeProgressLastFullBlockHeight),
+			bstorage.NewConsumerProgressFactory(db, module.ConsumeProgressLastFullBlockHeight),
 			height1,
 		)
 		require.NoError(t, err)

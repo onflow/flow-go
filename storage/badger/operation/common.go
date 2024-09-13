@@ -315,6 +315,25 @@ func retrieveR(key []byte, entity interface{}) func(storage.Reader) error {
 
 // exists returns true if a key exists in the database.
 // No errors are expected during normal operation.
+func existsR(key []byte, keyExists *bool) func(storage.Reader) error {
+	return func(r storage.Reader) error {
+		_, closer, err := r.Get(key)
+		if err != nil {
+			if errors.Is(err, storage.ErrNotFound) {
+				*keyExists = false
+				return nil
+			}
+
+			// exception while checking for the key
+			return irrecoverable.NewExceptionf("could not load data: %w", err)
+		}
+		*keyExists = true
+		defer closer.Close()
+		return nil
+	}
+}
+
+// deprecated use existsR instead
 func exists(key []byte, keyExists *bool) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 		_, err := tx.Get(key)

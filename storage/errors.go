@@ -29,3 +29,9 @@ var (
 	// ErrNotBootstrapped is returned when the database has not been bootstrapped.
 	ErrNotBootstrapped = errors.New("pebble database not bootstrapped")
 )
+
+// IsNotFound returns true if the error is a not found error.
+// useful so we won't make mistake like errors.Is(storage.ErrNotFound, err)
+func IsNotFound(err error) bool {
+	return errors.Is(err, ErrNotFound)
+}

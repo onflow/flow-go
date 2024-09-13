@@ -17,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/module/executiondatasync/execution_data/mock"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	mempool "github.com/onflow/flow-go/module/mempool/mock"
+	"github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -82,7 +83,7 @@ func newIndexerTest(t *testing.T, availableBlocks int, lastIndexedIndex int) *in
 		indexerCoreTest.indexer,
 		exeCache,
 		test.latestHeight,
-		progress,
+		&mockProgressFactory{progress},
 	)
 	require.NoError(t, err)
 
@@ -121,12 +122,22 @@ func (w *indexerTest) run(ctx irrecoverable.SignalerContext, reachHeight uint64,
 	unittest.RequireCloseBefore(w.t, w.worker.Done(), testTimeout, "timeout waiting for the consumer to be done")
 }
 
+type mockProgressFactory struct {
+	mockProgress *mockProgress
+}
+
+func (f *mockProgressFactory) InitConsumer(defaultIndex uint64) (storage.ConsumerProgress, error) {
+	return f.mockProgress, nil
+}
+
 type mockProgress struct {
 	index     *atomic.Uint64
 	doneIndex *atomic.Uint64
 	// signal to mark the progress reached an index set with WaitForIndex
 	doneChan chan struct{}
 }
+
+var _ storage.ConsumerProgress = (*mockProgress)(nil)
 
 func newMockProgress() *mockProgress {
 	return &mockProgress{
@@ -147,11 +158,6 @@ func (w *mockProgress) SetProcessedIndex(index uint64) error {
 		close(w.doneChan)
 	}
 
-	return nil
-}
-
-func (w *mockProgress) InitProcessedIndex(index uint64) error {
-	w.index.Store(index)
 	return nil
 }
 

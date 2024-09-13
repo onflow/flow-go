@@ -678,13 +678,13 @@ func (suite *Suite) TestGetSealedTransaction() {
 		require.NoError(suite.T(), err)
 
 		lastFullBlockHeight, err := counters.NewPersistentStrictMonotonicCounter(
-			bstorage.NewConsumerProgress(db, module.ConsumeProgressLastFullBlockHeight),
+			bstorage.NewConsumerProgressFactory(db, module.ConsumeProgressLastFullBlockHeight),
 			suite.rootBlock.Height,
 		)
 		require.NoError(suite.T(), err)
 
 		// create the ingest engine
-		processedHeight := bstorage.NewConsumerProgress(db, module.ConsumeProgressIngestionEngineBlockHeight)
+		processedHeight := bstorage.NewConsumerProgressFactory(db, module.ConsumeProgressIngestionEngineBlockHeight)
 
 		ingestEng, err := ingestion.New(suite.log, suite.net, suite.state, suite.me, suite.request, all.Blocks, all.Headers, collections,
 			transactions, results, receipts, collectionExecutedMetric, processedHeight, lastFullBlockHeight)
@@ -840,9 +840,9 @@ func (suite *Suite) TestGetTransactionResult() {
 		)
 		require.NoError(suite.T(), err)
 
-		processedHeight := bstorage.NewConsumerProgress(db, module.ConsumeProgressIngestionEngineBlockHeight)
+		processedHeight := bstorage.NewConsumerProgressFactory(db, module.ConsumeProgressIngestionEngineBlockHeight)
 		lastFullBlockHeight, err := counters.NewPersistentStrictMonotonicCounter(
-			bstorage.NewConsumerProgress(db, module.ConsumeProgressLastFullBlockHeight),
+			bstorage.NewConsumerProgressFactory(db, module.ConsumeProgressLastFullBlockHeight),
 			suite.rootBlock.Height,
 		)
 		require.NoError(suite.T(), err)
@@ -1070,9 +1070,9 @@ func (suite *Suite) TestExecuteScript() {
 		suite.net.On("Register", channels.ReceiveReceipts, mock.Anything).Return(conduit, nil).
 			Once()
 
-		processedHeight := bstorage.NewConsumerProgress(db, module.ConsumeProgressIngestionEngineBlockHeight)
+		processedHeight := bstorage.NewConsumerProgressFactory(db, module.ConsumeProgressIngestionEngineBlockHeight)
 		lastFullBlockHeight, err := counters.NewPersistentStrictMonotonicCounter(
-			bstorage.NewConsumerProgress(db, module.ConsumeProgressLastFullBlockHeight),
+			bstorage.NewConsumerProgressFactory(db, module.ConsumeProgressLastFullBlockHeight),
 			suite.rootBlock.Height,
 		)
 		require.NoError(suite.T(), err)

@@ -145,8 +145,8 @@ func New(
 	edrMetrics module.ExecutionDataRequesterMetrics,
 	downloader execution_data.Downloader,
 	execDataCache *cache.ExecutionDataCache,
-	processedHeight storage.ConsumerProgress,
-	processedNotifications storage.ConsumerProgress,
+	processedHeightFactory storage.ConsumerProgressFactory,
+	processedNotificationsFactory storage.ConsumerProgressFactory,
 	state protocol.State,
 	headers storage.Headers,
 	cfg ExecutionDataConfig,
@@ -182,7 +182,7 @@ func New(
 	blockConsumer, err := jobqueue.NewComponentConsumer(
 		e.log.With().Str("module", "block_consumer").Logger(),
 		e.finalizationNotifier.Channel(), // to listen to finalization events to find newly sealed blocks
-		processedHeight,                  // read and persist the downloaded height
+		processedHeightFactory,           // read and persist the downloaded height
 		sealedBlockReader,                // read sealed blocks by height
 		e.config.InitialBlockHeight,      // initial "last processed" height for empty db
 		e.processBlockJob,                // process the sealed block job to download its execution data
@@ -221,7 +221,8 @@ func New(
 	// a block's execution data is downloaded and stored, and checks the `executionDataCache` to
 	// find if the next un-processed consecutive height is available.
 	// To know what's the height of the next un-processed consecutive height, it reads the latest
-	// consecutive height in `processedNotifications`. And it's persisted in storage to be crash-resistant.
+	// consecutive height in `processedNotifications` to be created by `processedNotificationsFactory.
+	// And it's persisted in storage to be crash-resistant.
 	// When a new consecutive height is available, it calls `processNotificationJob` to notify all the
 	// `e.consumers`.
 	// Note: the `e.consumers` will be guaranteed to receive at least one `OnExecutionDataFetched` event
@@ -229,7 +230,7 @@ func New(
 	e.notificationConsumer, err = jobqueue.NewComponentConsumer(
 		e.log.With().Str("module", "notification_consumer").Logger(),
 		executionDataNotifier.Channel(), // listen for notifications from the block consumer
-		processedNotifications,          // read and persist the notified height
+		processedNotificationsFactory,   // read and persist the notified height
 		e.executionDataReader,           // read execution data by height
 		e.config.InitialBlockHeight,     // initial "last processed" height for empty db
 		e.processNotificationJob,        // process the job to send notifications for an execution data
