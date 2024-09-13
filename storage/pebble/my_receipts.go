@@ -1,7 +1,9 @@
 package pebble
 
 import (
+	"errors"
 	"fmt"
+	"sync"
 
 	"github.com/cockroachdb/pebble"
 
@@ -17,29 +19,63 @@ import (
 // The wrapper adds the ability to "MY execution receipt", from the viewpoint
 // of an individual Execution Node.
 type MyExecutionReceipts struct {
-	genericReceipts *ExecutionReceipts
-	db              *pebble.DB
-	cache           *Cache[flow.Identifier, *flow.ExecutionReceipt]
+	genericReceipts     *ExecutionReceipts
+	db                  *pebble.DB
+	cache               *Cache[flow.Identifier, *flow.ExecutionReceipt]
+	indexingOwnReceipts sync.Mutex // lock to ensure only one receipt is stored per block
 }
 
 // NewMyExecutionReceipts creates instance of MyExecutionReceipts which is a wrapper wrapper around pebble.ExecutionReceipts
 // It's useful for execution nodes to keep track of produced execution receipts.
 func NewMyExecutionReceipts(collector module.CacheMetrics, db *pebble.DB, receipts *ExecutionReceipts) *MyExecutionReceipts {
+
+	mr := &MyExecutionReceipts{
+		genericReceipts: receipts,
+		db:              db,
+	}
+
 	store := func(key flow.Identifier, receipt *flow.ExecutionReceipt) func(storage.PebbleReaderBatchWriter) error {
 		// assemble DB operations to store receipt (no execution)
 		storeReceiptOps := receipts.storeTx(receipt)
 		// assemble DB operations to index receipt as one of my own (no execution)
 		blockID := receipt.ExecutionResult.BlockID
 		receiptID := receipt.ID()
+
+		// check if the block already has a receipt stored
 		indexOwnReceiptOps := operation.IndexOwnExecutionReceipt(blockID, receiptID)
 
 		return func(rw storage.PebbleReaderBatchWriter) error {
+
 			err := storeReceiptOps(rw) // execute operations to store receipt
 			if err != nil {
 				return fmt.Errorf("could not store receipt: %w", err)
 			}
 
-			_, w := rw.ReaderWriter()
+			r, w := rw.ReaderWriter()
+
+			// acquiring the lock is necessary to avoid dirty reads when calling LookupOwnExecutionReceipt
+			mr.indexingOwnReceipts.Lock()
+			rw.AddCallback(func() {
+				// not release the lock until the batch is committed.
+				mr.indexingOwnReceipts.Unlock()
+			})
+
+			var myOwnReceiptExecutedBefore flow.Identifier
+			err = operation.LookupOwnExecutionReceipt(blockID, &myOwnReceiptExecutedBefore)(r)
+			if err == nil {
+
+				// if the indexed receipt is the same as the one we are storing, then we can skip the index
+				if myOwnReceiptExecutedBefore == receiptID {
+					return nil
+				}
+
+				return fmt.Errorf("cannot store index own receipt because a different one already stored for block %s: %s",
+					blockID, myOwnReceiptExecutedBefore)
+			}
+
+			if !errors.Is(err, storage.ErrNotFound) {
+				return fmt.Errorf("could not check if stored a receipt for the same block before: %w", err)
+			}
 
 			err = indexOwnReceiptOps(w) // execute operations to index receipt as one of my own
 			if err != nil {
@@ -64,14 +100,13 @@ func NewMyExecutionReceipts(collector module.CacheMetrics, db *pebble.DB, receip
 		}
 	}
 
-	return &MyExecutionReceipts{
-		genericReceipts: receipts,
-		db:              db,
-		cache: newCache(collector, metrics.ResourceMyReceipt,
+	mr.cache =
+		newCache(collector, metrics.ResourceMyReceipt,
 			withLimit[flow.Identifier, *flow.ExecutionReceipt](flow.DefaultTransactionExpiry+100),
 			withStore(store),
-			withRetrieve(retrieve)),
-	}
+			withRetrieve(retrieve))
+
+	return mr
 }
 
 // storeMyReceipt assembles the operations to store the receipt and marks it as mine (trusted).
