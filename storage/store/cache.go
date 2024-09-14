@@ -1,4 +1,4 @@
-package badger
+package store
 
 import (
 	"errors"
@@ -10,63 +10,70 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-func withLimitB[K comparable, V any](limit uint) func(*CacheB[K, V]) {
-	return func(c *CacheB[K, V]) {
+// nolint:unused
+func withLimit[K comparable, V any](limit uint) func(*Cache[K, V]) {
+	return func(c *Cache[K, V]) {
 		c.limit = limit
 	}
 }
 
-type storeFuncB[K comparable, V any] func(key K, val V) func(storage.BadgerReaderBatchWriter) error
+type storeFunc[K comparable, V any] func(key K, val V) func(storage.BaseReaderBatchWriter) error
 
-func withStoreB[K comparable, V any](store storeFuncB[K, V]) func(*CacheB[K, V]) {
-	return func(c *CacheB[K, V]) {
+// nolint:unused
+func withStore[K comparable, V any](store storeFunc[K, V]) func(*Cache[K, V]) {
+	return func(c *Cache[K, V]) {
 		c.store = store
 	}
 }
 
-func noStoreB[K comparable, V any](_ K, _ V) func(storage.BadgerReaderBatchWriter) error {
-	return func(tx storage.BadgerReaderBatchWriter) error {
+// nolint:unused
+func noStore[K comparable, V any](_ K, _ V) func(storage.BaseReaderBatchWriter) error {
+	return func(tx storage.BaseReaderBatchWriter) error {
 		return fmt.Errorf("no store function for cache put available")
 	}
 }
 
 // nolint: unused
-func noopStoreB[K comparable, V any](_ K, _ V) func(storage.BadgerReaderBatchWriter) error {
-	return func(tx storage.BadgerReaderBatchWriter) error {
+func noopStore[K comparable, V any](_ K, _ V) func(storage.BaseReaderBatchWriter) error {
+	return func(tx storage.BaseReaderBatchWriter) error {
 		return nil
 	}
 }
 
-type retrieveFuncB[K comparable, V any] func(key K) func(storage.Reader) (V, error)
+type retrieveFunc[K comparable, V any] func(key K) func(storage.Reader) (V, error)
 
-func withRetrieveB[K comparable, V any](retrieve retrieveFuncB[K, V]) func(*CacheB[K, V]) {
-	return func(c *CacheB[K, V]) {
+// nolint:unused
+func withRetrieve[K comparable, V any](retrieve retrieveFunc[K, V]) func(*Cache[K, V]) {
+	return func(c *Cache[K, V]) {
 		c.retrieve = retrieve
 	}
 }
 
-func noRetrieveB[K comparable, V any](_ K) func(storage.Reader) (V, error) {
+// nolint:unused
+func noRetrieve[K comparable, V any](_ K) func(storage.Reader) (V, error) {
 	return func(tx storage.Reader) (V, error) {
 		var nullV V
 		return nullV, fmt.Errorf("no retrieve function for cache get available")
 	}
 }
 
-type CacheB[K comparable, V any] struct {
-	metrics  module.CacheMetrics
+type Cache[K comparable, V any] struct {
+	metrics module.CacheMetrics
+	// nolint:unused
 	limit    uint
-	store    storeFuncB[K, V]
-	retrieve retrieveFuncB[K, V]
+	store    storeFunc[K, V]
+	retrieve retrieveFunc[K, V]
 	resource string
 	cache    *lru.Cache[K, V]
 }
 
-func newCacheB[K comparable, V any](collector module.CacheMetrics, resourceName string, options ...func(*CacheB[K, V])) *CacheB[K, V] {
-	c := CacheB[K, V]{
+// nolint:unused
+func newCache[K comparable, V any](collector module.CacheMetrics, resourceName string, options ...func(*Cache[K, V])) *Cache[K, V] {
+	c := Cache[K, V]{
 		metrics:  collector,
 		limit:    1000,
-		store:    noStoreB[K, V],
-		retrieve: noRetrieveB[K, V],
+		store:    noStore[K, V],
+		retrieve: noRetrieve[K, V],
 		resource: resourceName,
 	}
 	for _, option := range options {
@@ -79,14 +86,14 @@ func newCacheB[K comparable, V any](collector module.CacheMetrics, resourceName 
 
 // IsCached returns true if the key exists in the cache.
 // It DOES NOT check whether the key exists in the underlying data store.
-func (c *CacheB[K, V]) IsCached(key K) bool {
+func (c *Cache[K, V]) IsCached(key K) bool {
 	return c.cache.Contains(key)
 }
 
 // Get will try to retrieve the resource from cache first, and then from the
 // injected. During normal operations, the following error returns are expected:
 //   - `storage.ErrNotFound` if key is unknown.
-func (c *CacheB[K, V]) Get(key K) func(storage.Reader) (V, error) {
+func (c *Cache[K, V]) Get(key K) func(storage.Reader) (V, error) {
 	return func(r storage.Reader) (V, error) {
 
 		// check if we have it in the cache
@@ -118,12 +125,12 @@ func (c *CacheB[K, V]) Get(key K) func(storage.Reader) (V, error) {
 	}
 }
 
-func (c *CacheB[K, V]) Remove(key K) {
+func (c *Cache[K, V]) Remove(key K) {
 	c.cache.Remove(key)
 }
 
 // Insert will add a resource directly to the cache with the given ID
-func (c *CacheB[K, V]) Insert(key K, resource V) {
+func (c *Cache[K, V]) Insert(key K, resource V) {
 	// cache the resource and eject least recently used one if we reached limit
 	evicted := c.cache.Add(key, resource)
 	if !evicted {
@@ -132,10 +139,10 @@ func (c *CacheB[K, V]) Insert(key K, resource V) {
 }
 
 // PutTx will return tx which adds a resource to the cache with the given ID.
-func (c *CacheB[K, V]) PutTx(key K, resource V) func(storage.BadgerReaderBatchWriter) error {
+func (c *Cache[K, V]) PutTx(key K, resource V) func(storage.BaseReaderBatchWriter) error {
 	storeOps := c.store(key, resource) // assemble DB operations to store resource (no execution)
 
-	return func(rw storage.BadgerReaderBatchWriter) error {
+	return func(rw storage.BaseReaderBatchWriter) error {
 		storage.OnCommitSucceed(rw, func() {
 			c.Insert(key, resource)
 		})

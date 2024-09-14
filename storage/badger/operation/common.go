@@ -44,28 +44,6 @@ func batchWrite(key []byte, entity interface{}) func(writeBatch *badger.WriteBat
 	}
 }
 
-// insertW will encode the given entity using msgpack and will insert the resulting
-// binary data in the badger DB under the provided key. It will error if the
-// key already exists.
-// Error returns:
-//   - generic error in case of unexpected failure from the database layer or
-//     encoding failure.
-func insertW(key []byte, val interface{}) func(storage.Writer) error {
-	return func(w storage.Writer) error {
-		value, err := msgpack.Marshal(val)
-		if err != nil {
-			return irrecoverable.NewExceptionf("failed to encode value: %w", err)
-		}
-
-		err = w.Set(key, value)
-		if err != nil {
-			return irrecoverable.NewExceptionf("failed to store data: %w", err)
-		}
-
-		return nil
-	}
-}
-
 // deprecated - use insertW instead
 // insert will encode the given entity using msgpack and will insert the resulting
 // binary data in the badger DB under the provided key. It will error if the
@@ -285,30 +263,6 @@ func retrieve(key []byte, entity interface{}) func(*badger.Txn) error {
 			return irrecoverable.NewExceptionf("could not decode entity: %w", err)
 		}
 
-		return nil
-	}
-}
-
-// retrieve will retrieve the binary data under the given key from the badger DB
-// and decode it into the given entity. The provided entity needs to be a
-// pointer to an initialized entity of the correct type.
-// Error returns:
-//   - storage.ErrNotFound if the key does not exist in the database
-//   - generic error in case of unexpected failure from the database layer, or failure
-//     to decode an existing database value
-func retrieveR(key []byte, entity interface{}) func(storage.Reader) error {
-	return func(r storage.Reader) error {
-		val, closer, err := r.Get(key)
-		if err != nil {
-			return err
-		}
-
-		defer closer.Close()
-
-		err = msgpack.Unmarshal(val, entity)
-		if err != nil {
-			return irrecoverable.NewExceptionf("could not decode entity: %w", err)
-		}
 		return nil
 	}
 }

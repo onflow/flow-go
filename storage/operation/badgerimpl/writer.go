@@ -43,7 +43,7 @@ func (b *ReaderBatchWriter) Commit() error {
 	return err
 }
 
-func WithReaderBatchWriter(db *badger.DB, fn func(storage.BadgerReaderBatchWriter) error) error {
+func WithReaderBatchWriter(db *badger.DB, fn func(storage.BaseReaderBatchWriter) error) error {
 	batch := NewReaderBatchWriter(db)
 
 	err := fn(batch)

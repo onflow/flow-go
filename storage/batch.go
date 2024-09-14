@@ -88,7 +88,7 @@ type Writer interface {
 
 // BadgerReaderBatchWriter is an interface for badger-specific reader and writer.
 type BadgerReaderBatchWriter interface {
-	baseReaderBatchWriter
+	BaseReaderBatchWriter
 
 	// BadgerWriteBatch returns the underlying batch object
 	// Useful for implementing badger-specific operations
@@ -96,14 +96,26 @@ type BadgerReaderBatchWriter interface {
 }
 
 type PebbleReaderBatchWriter interface {
-	baseReaderBatchWriter
+	BaseReaderBatchWriter
 
 	// PebbleWriteBatch returns the underlying pebble object
 	// Useful for implementing pebble-specific operations
 	PebbleWriterBatch() *pebble.Batch
 }
 
-type baseReaderBatchWriter interface {
+// DB is an interface for a database store that provides a reader and a writer.
+type DB interface {
+	// Reader returns a database-backed reader which reads the latest
+	// committed global database state
+	Reader() Reader
+
+	// WithReaderBatchWriter creates a batch writer and allows the caller to perform
+	// atomic batch updates to the database.
+	// Any error returned are considered fatal and the batch is not committed.
+	WithReaderBatchWriter(func(BaseReaderBatchWriter) error) error
+}
+
+type BaseReaderBatchWriter interface {
 	// GlobalReader returns a database-backed reader which reads the latest committed global database state ("read-committed isolation").
 	// This reader will not read writes written to ReaderBatchWriter.Writer until the write batch is committed.
 	// This reader may observe different values for the same key on subsequent reads.
@@ -130,8 +142,16 @@ func OnlyBadgerWriter(fn func(Writer) error) func(BadgerReaderBatchWriter) error
 	}
 }
 
+// OnlyWriter is an adapter to convert a function that takes a Writer
+// to a function that takes a BaseReaderBatchWriter.
+func OnlyWriter(fn func(Writer) error) func(BaseReaderBatchWriter) error {
+	return func(rw BaseReaderBatchWriter) error {
+		return fn(rw.Writer())
+	}
+}
+
 // OnCommitSucceed adds a callback to execute after the batch has been successfully committed.
-func OnCommitSucceed(b BadgerReaderBatchWriter, onSuccessFn func()) {
+func OnCommitSucceed(b BaseReaderBatchWriter, onSuccessFn func()) {
 	b.AddCallback(func(err error) {
 		if err == nil {
 			onSuccessFn()

@@ -40,7 +40,7 @@ func (b *ReaderBatchWriter) Commit() error {
 	return err
 }
 
-func WithReaderBatchWriter(db *pebble.DB, fn func(storage.PebbleReaderBatchWriter) error) error {
+func WithReaderBatchWriter(db *pebble.DB, fn func(storage.BaseReaderBatchWriter) error) error {
 	batch := NewReaderBatchWriter(db)
 
 	err := fn(batch)

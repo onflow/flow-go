@@ -1,31 +1,28 @@
-package badger
+package store
 
 import (
 	"errors"
 	"fmt"
 	"sync"
 
-	"github.com/dgraph-io/badger/v2"
-
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/badger/operation"
-	"github.com/onflow/flow-go/storage/operation/badgerimpl"
+	"github.com/onflow/flow-go/storage/operation"
 )
 
 // ResultApprovals implements persistent storage for result approvals.
 type ResultApprovals struct {
-	db       *badger.DB
-	cache    *CacheB[flow.Identifier, *flow.ResultApproval]
+	db       storage.DB
+	cache    *Cache[flow.Identifier, *flow.ResultApproval]
 	indexing *sync.Mutex // preventing concurrent indexing of approvals
 }
 
-func NewResultApprovals(collector module.CacheMetrics, db *badger.DB) *ResultApprovals {
+func NewResultApprovals(collector module.CacheMetrics, db storage.DB) *ResultApprovals {
 
-	store := func(key flow.Identifier, val *flow.ResultApproval) func(storage.BadgerReaderBatchWriter) error {
-		return storage.OnlyBadgerWriter(operation.InsertResultApproval(val))
+	store := func(key flow.Identifier, val *flow.ResultApproval) func(storage.BaseReaderBatchWriter) error {
+		return storage.OnlyWriter(operation.InsertResultApproval(val))
 	}
 
 	retrieve := func(approvalID flow.Identifier) func(tx storage.Reader) (*flow.ResultApproval, error) {
@@ -38,17 +35,17 @@ func NewResultApprovals(collector module.CacheMetrics, db *badger.DB) *ResultApp
 
 	res := &ResultApprovals{
 		db: db,
-		cache: newCacheB[flow.Identifier, *flow.ResultApproval](collector, metrics.ResourceResultApprovals,
-			withLimitB[flow.Identifier, *flow.ResultApproval](flow.DefaultTransactionExpiry+100),
-			withStoreB[flow.Identifier, *flow.ResultApproval](store),
-			withRetrieveB[flow.Identifier, *flow.ResultApproval](retrieve)),
+		cache: newCache[flow.Identifier, *flow.ResultApproval](collector, metrics.ResourceResultApprovals,
+			withLimit[flow.Identifier, *flow.ResultApproval](flow.DefaultTransactionExpiry+100),
+			withStore[flow.Identifier, *flow.ResultApproval](store),
+			withRetrieve[flow.Identifier, *flow.ResultApproval](retrieve)),
 		indexing: new(sync.Mutex),
 	}
 
 	return res
 }
 
-func (r *ResultApprovals) store(approval *flow.ResultApproval) func(storage.BadgerReaderBatchWriter) error {
+func (r *ResultApprovals) store(approval *flow.ResultApproval) func(storage.BaseReaderBatchWriter) error {
 	return r.cache.PutTx(approval.ID(), approval)
 }
 
@@ -74,8 +71,8 @@ func (r *ResultApprovals) byChunk(resultID flow.Identifier, chunkIndex uint64) f
 }
 
 // CAUTION: Caller must acquire `indexing` lock.
-func (r *ResultApprovals) index(resultID flow.Identifier, chunkIndex uint64, approvalID flow.Identifier) func(storage.BadgerReaderBatchWriter) error {
-	return func(rw storage.BadgerReaderBatchWriter) error {
+func (r *ResultApprovals) index(resultID flow.Identifier, chunkIndex uint64, approvalID flow.Identifier) func(storage.BaseReaderBatchWriter) error {
+	return func(rw storage.BaseReaderBatchWriter) error {
 		var storedApprovalID flow.Identifier
 		err := operation.LookupResultApproval(resultID, chunkIndex, &storedApprovalID)(rw.GlobalReader())
 		if err != nil {
@@ -105,7 +102,7 @@ func (r *ResultApprovals) index(resultID flow.Identifier, chunkIndex uint64, app
 
 // Store stores a ResultApproval
 func (r *ResultApprovals) Store(approval *flow.ResultApproval) error {
-	return badgerimpl.WithReaderBatchWriter(r.db, r.store(approval))
+	return r.db.WithReaderBatchWriter(r.store(approval))
 }
 
 // Index indexes a ResultApproval by chunk (ResultID + chunk index).
@@ -120,7 +117,7 @@ func (r *ResultApprovals) Index(resultID flow.Identifier, chunkIndex uint64, app
 	r.indexing.Lock()
 	defer r.indexing.Unlock()
 
-	err := badgerimpl.WithReaderBatchWriter(r.db, r.index(resultID, chunkIndex, approvalID))
+	err := r.db.WithReaderBatchWriter(r.index(resultID, chunkIndex, approvalID))
 	if err != nil {
 		return fmt.Errorf("could not index result approval: %w", err)
 	}
@@ -129,12 +126,12 @@ func (r *ResultApprovals) Index(resultID flow.Identifier, chunkIndex uint64, app
 
 // ByID retrieves a ResultApproval by its ID
 func (r *ResultApprovals) ByID(approvalID flow.Identifier) (*flow.ResultApproval, error) {
-	return r.byID(approvalID)(badgerimpl.ToReader(r.db))
+	return r.byID(approvalID)(r.db.Reader())
 }
 
 // ByChunk retrieves a ResultApproval by result ID and chunk index. The
 // ResultApprovals store is only used within a verification node, where it is
 // assumed that there is never more than one approval per chunk.
 func (r *ResultApprovals) ByChunk(resultID flow.Identifier, chunkIndex uint64) (*flow.ResultApproval, error) {
-	return r.byChunk(resultID, chunkIndex)(badgerimpl.ToReader(r.db))
+	return r.byChunk(resultID, chunkIndex)(r.db.Reader())
 }
