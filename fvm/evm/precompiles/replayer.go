@@ -54,10 +54,9 @@ func (p *ReplayerPrecompiledContract) RequiredGas(input []byte) (output uint64) 
 	if p.requiredGasIndex > len(p.expectedCalls.RequiredGasCalls) {
 		panic(errUnexpectedCall)
 	}
-	// strip function selector from input, we assume order
-	if len(input) >= 4 {
-		input = []byte{0, 0, 0, 0}
-	}
+
+	input = removeFunctionSelector(input)
+
 	if !bytes.Equal(p.expectedCalls.RequiredGasCalls[p.requiredGasIndex].Input, input) {
 		panic(errUnexpectedCall)
 	}
@@ -70,10 +69,8 @@ func (p *ReplayerPrecompiledContract) Run(input []byte) (output []byte, err erro
 	if p.runIndex > len(p.expectedCalls.RunCalls) {
 		panic(errUnexpectedCall)
 	}
-	// strip function selector from input, we assume order
-	if len(input) == 4 {
-		input = []byte{0, 0, 0, 0}
-	}
+	input = removeFunctionSelector(input)
+
 	if !bytes.Equal(p.expectedCalls.RunCalls[p.runIndex].Input, input) {
 		panic(errUnexpectedCall)
 	}
@@ -89,4 +86,19 @@ func (p *ReplayerPrecompiledContract) Run(input []byte) (output []byte, err erro
 func (p *ReplayerPrecompiledContract) HasReplayedAll() bool {
 	return len(p.expectedCalls.RequiredGasCalls) == p.requiredGasIndex &&
 		len(p.expectedCalls.RunCalls) == p.runIndex
+}
+
+// removeFunctionSelector sets first 4 bytes to 0, which are set
+// to an ABI encoded function name when called. We ignore this function
+// selectors for now. todo we should compare the function selector.
+func removeFunctionSelector(input []byte) []byte {
+	if len(input) < 4 {
+		return input
+	}
+
+	const funcSelectorLen = 4
+	for i := 0; i < funcSelectorLen; i++ {
+		input[i] = 0
+	}
+	return input
 }
