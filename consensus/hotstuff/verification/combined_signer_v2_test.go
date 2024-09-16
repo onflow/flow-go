@@ -60,6 +60,7 @@ func TestCombinedSignWithBeaconKey(t *testing.T) {
 	committee.On("DKG", mock.Anything).Return(dkg, nil)
 	committee.On("Self").Return(me.NodeID())
 	committee.On("IdentityByBlock", fblock.Header.ID(), fblock.Header.ProposerID).Return(proposerIdentity, nil)
+	committee.On("LeaderForView", fblock.Header.View).Return(signerID, nil).Maybe()
 
 	packer := signature.NewConsensusSigDataPacker(committee)
 	verifier := NewCombinedVerifier(committee, packer)
@@ -173,6 +174,7 @@ func TestCombinedSignWithNoBeaconKey(t *testing.T) {
 	committee.On("DKG", mock.Anything).Return(dkg, nil)
 	committee.On("Self").Return(me.NodeID())
 	committee.On("IdentityByBlock", fblock.Header.ID(), mock.Anything).Return(ourIdentity, nil)
+	committee.On("LeaderForView", mock.Anything).Return(signerID, nil).Maybe()
 
 	packer := signature.NewConsensusSigDataPacker(committee)
 	verifier := NewCombinedVerifier(committee, packer)

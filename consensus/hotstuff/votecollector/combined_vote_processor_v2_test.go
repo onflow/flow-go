@@ -864,6 +864,7 @@ func TestCombinedVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 	require.NoError(t, err)
 
 	committee := &mockhotstuff.DynamicCommittee{}
+	committee.On("LeaderForView", block.View).Return(leader.NodeID, nil).Maybe()
 	committee.On("QuorumThresholdForView", mock.Anything).Return(committees.WeightThresholdToBuildQC(allIdentities.ToSkeleton().TotalWeight()), nil)
 	committee.On("IdentitiesByEpoch", block.View).Return(allIdentities.ToSkeleton(), nil)
 	committee.On("IdentitiesByBlock", block.BlockID).Return(allIdentities, nil)
