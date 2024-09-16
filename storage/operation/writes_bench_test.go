@@ -32,3 +32,18 @@ func BenchmarkUpsert(t *testing.B) {
 		}
 	})
 }
+
+func BenchmarkDelete(t *testing.B) {
+	dbtest.BenchWithStorages(t, func(t *testing.B, r storage.Reader, withWriter dbtest.WithWriter) {
+		n := t.N
+		for i := 0; i < n; i++ {
+			e := Entity{ID: uint64(i)}
+			require.NoError(t, withWriter(operation.Upsert(e.Key(), e)))
+		}
+		t.ResetTimer()
+		for i := 0; i < n; i++ {
+			e := Entity{ID: uint64(i)}
+			require.NoError(t, withWriter(operation.Remove(e.Key())))
+		}
+	})
+}
