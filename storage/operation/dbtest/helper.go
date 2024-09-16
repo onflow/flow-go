@@ -98,3 +98,17 @@ func RunWithDB(t *testing.T, fn func(t *testing.T, store storage.DB)) {
 		})
 	})
 }
+
+func BenchWithDB(b *testing.B, fn func(*testing.B, storage.DB)) {
+	b.Run("BadgerStorage", func(b *testing.B) {
+		unittest.RunWithBadgerDB(b, func(db *badger.DB) {
+			fn(b, badgerimpl.ToDB(db))
+		})
+	})
+
+	b.Run("PebbleStorage", func(b *testing.B) {
+		unittest.RunWithPebbleDB(b, func(db *pebble.DB) {
+			fn(b, pebbleimpl.ToDB(db))
+		})
+	})
+}
