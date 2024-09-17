@@ -3,6 +3,7 @@ package gossipsubbuilder
 import (
 	"context"
 	"fmt"
+	"strconv"
 
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/host"
@@ -268,6 +269,18 @@ func (g *Builder) Build(ctx irrecoverable.SignalerContext) (p2p.PubSubAdapter, e
 		MaxMessageSize: p2pnode.DefaultMaxPubSubMsgSize,
 	})
 	gossipSubConfigs.WithMessageIdFunction(utils.MessageID)
+
+	if g.gossipSubCfg.PeerGaterParameters.Enabled {
+		topicDeliveryWeights := make(map[string]float64)
+		for topic, weightStr := range g.gossipSubCfg.PeerGaterParameters.TopicDeliveryWeightsOverride {
+			f, err := strconv.ParseFloat(weightStr, 64)
+			if err != nil {
+				return nil, err
+			}
+			topicDeliveryWeights[topic] = f
+		}
+		gossipSubConfigs.WithPeerGater(topicDeliveryWeights)
+	}
 
 	if g.routingSystem != nil {
 		gossipSubConfigs.WithRoutingDiscovery(g.routingSystem)

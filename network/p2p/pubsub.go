@@ -84,6 +84,7 @@ type PubSubAdapterConfig interface {
 	// This is used to expose the local scoring table of the GossipSub node to its higher level components.
 	WithScoreTracer(tracer PeerScoreTracer)
 	WithRpcInspector(GossipSubRPCInspector)
+	WithPeerGater(topicDeliveryWeights map[string]float64)
 }
 
 // GossipSubRPCInspector abstracts the general behavior of an app specific RPC inspector specifically
