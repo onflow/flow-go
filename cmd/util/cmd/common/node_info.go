@@ -50,7 +50,7 @@ func ReadFullPartnerNodeInfos(log zerolog.Logger, partnerWeightsPath, partnerNod
 
 		weight := weights[partner.NodeID]
 		if valid := ValidateWeight(weight); !valid {
-			return nil, fmt.Errorf(fmt.Sprintf("invalid partner weight: %d", weight))
+			return nil, fmt.Errorf(fmt.Sprintf("invalid partner weight %v: %d", partner.NodeID, weight))
 		}
 
 		if weight != flow.DefaultInitialWeight {
@@ -148,7 +148,7 @@ func ReadFullInternalNodeInfos(log zerolog.Logger, internalNodePrivInfoDir, inte
 		weight := weights[internal.Address]
 
 		if valid := ValidateWeight(weight); !valid {
-			return nil, fmt.Errorf(fmt.Sprintf("invalid partner weight: %d", weight))
+			return nil, fmt.Errorf(fmt.Sprintf("invalid partner weight %v: %d", internal.NodeID, weight))
 		}
 		if weight != flow.DefaultInitialWeight {
 			log.Warn().Msgf("internal node (id=%x) has non-default weight (%d != %d)", internal.NodeID, weight, flow.DefaultInitialWeight)
