@@ -84,3 +84,31 @@ func runWithPebble(fn func(storage.Reader, WithWriter)) func(*pebble.DB) {
 		fn(reader, withWriter)
 	}
 }
+
+func RunWithDB(t *testing.T, fn func(t *testing.T, store storage.DB)) {
+	t.Run("BadgerStorage", func(t *testing.T) {
+		unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+			fn(t, badgerimpl.ToDB(db))
+		})
+	})
+
+	t.Run("PebbleStorage", func(t *testing.T) {
+		unittest.RunWithPebbleDB(t, func(db *pebble.DB) {
+			fn(t, pebbleimpl.ToDB(db))
+		})
+	})
+}
+
+func BenchWithDB(b *testing.B, fn func(*testing.B, storage.DB)) {
+	b.Run("BadgerStorage", func(b *testing.B) {
+		unittest.RunWithBadgerDB(b, func(db *badger.DB) {
+			fn(b, badgerimpl.ToDB(db))
+		})
+	})
+
+	b.Run("PebbleStorage", func(b *testing.B) {
+		unittest.RunWithPebbleDB(b, func(db *pebble.DB) {
+			fn(b, pebbleimpl.ToDB(db))
+		})
+	})
+}
