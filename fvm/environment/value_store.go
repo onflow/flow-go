@@ -1,6 +1,7 @@
 package environment
 
 import (
+	"bytes"
 	"fmt"
 
 	"github.com/onflow/atree"
@@ -140,7 +141,6 @@ func (store *valueStore) GetValue(
 	return v, nil
 }
 
-// TODO disable SetValue for scripts, right now the view changes are discarded
 func (store *valueStore) SetValue(
 	owner []byte,
 	keyBytes []byte,
@@ -153,7 +153,16 @@ func (store *valueStore) SetValue(
 		return errors.NewInvalidInternalStateAccessError(id, "modify")
 	}
 
-	err := store.meter.MeterComputation(
+	oldValue, err := store.accounts.GetValue(id)
+	if err != nil {
+		return fmt.Errorf("get value failed: %w", err)
+	}
+	// no-op write
+	if bytes.Equal(oldValue, value) {
+		return nil
+	}
+
+	err = store.meter.MeterComputation(
 		ComputationKindSetValue,
 		uint(len(value)))
 	if err != nil {

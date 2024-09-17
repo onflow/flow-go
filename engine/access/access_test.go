@@ -865,8 +865,24 @@ func (suite *Suite) TestGetTransactionResult() {
 		require.NoError(suite.T(), err)
 
 		// create the ingest engine
-		ingestEng, err := ingestion.New(suite.log, suite.net, suite.state, suite.me, suite.request, all.Blocks, all.Headers, collections,
-			transactions, results, receipts, txResultErrorMessages, collectionExecutedMetric, processedHeight, lastFullBlockHeight, bnd, enNodeIDs.Strings(),
+		ingestEng, err := ingestion.New(
+			suite.log,
+			suite.net,
+			suite.state,
+			suite.me,
+			suite.request,
+			all.Blocks,
+			all.Headers,
+			collections,
+			transactions,
+			results,
+			receipts,
+			txResultErrorMessages,
+			collectionExecutedMetric,
+			processedHeight,
+			lastFullBlockHeight,
+			bnd,
+			enNodeIDs.Strings(),
 			nil,
 		)
 		require.NoError(suite.T(), err)
@@ -1100,10 +1116,26 @@ func (suite *Suite) TestExecuteScript() {
 		require.NoError(suite.T(), err)
 
 		// create the ingest engine
-		ingestEng, err := ingestion.New(suite.log, suite.net, suite.state, suite.me, suite.request, all.Blocks, all.Headers, collections,
-			transactions, results, receipts, txResultErrorMessages, collectionExecutedMetric, processedHeight, lastFullBlockHeight, suite.backend,
+		ingestEng, err := ingestion.New(
+			suite.log,
+			suite.net,
+			suite.state,
+			suite.me,
+			suite.request,
+			all.Blocks,
+			all.Headers,
+			collections,
+			transactions,
+			results,
+			receipts,
+			txResultErrorMessages,
+			collectionExecutedMetric,
+			processedHeight,
+			lastFullBlockHeight,
+			suite.backend,
 			enNodeIDs.Strings(),
-			nil)
+			nil,
+		)
 		require.NoError(suite.T(), err)
 
 		// create another block as a predecessor of the block created earlier

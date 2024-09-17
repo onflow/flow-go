@@ -161,7 +161,11 @@ func (c *ComplianceCore) OnBlockRange(originID flow.Identifier, batch []*flow.Bl
 				//     a critical liveness assumption - see EpochCommitSafetyThreshold in protocol.Params for details.
 				//     -> In this case, it is ok for the protocol to halt. Consequently, we can just disregard
 				//        the block, which will probably lead to this node eventually halting.
-				log.Err(err).Msg("unable to validate proposal with view from unknown epoch")
+				log.Err(err).Msg(
+					"Unable to validate proposal with view from unknown epoch. While there is noting wrong with the node, " +
+						"this could be a symptom of (i) the node being severely behind, (ii) there is a byzantine proposer in " +
+						"the network, or (iii) there was no finalization progress for hundreds of views. This should be " +
+						"investigated to confirm the cause is the benign scenario (i).")
 				return nil
 			}
 			return fmt.Errorf("unexpected error validating proposal: %w", err)

@@ -198,7 +198,8 @@ func (s *Suite) initIngestionEngine(ctx irrecoverable.SignalerContext) *Engine {
 		s.log,
 		s.net,
 		s.proto.state,
-		s.me, s.request,
+		s.me,
+		s.request,
 		s.blocks,
 		s.headers,
 		s.collections,
@@ -213,6 +214,7 @@ func (s *Suite) initIngestionEngine(ctx irrecoverable.SignalerContext) *Engine {
 		enNodeIDs.Strings(),
 		nil,
 	)
+
 	require.NoError(s.T(), err)
 
 	eng.ComponentManager.Start(ctx)
