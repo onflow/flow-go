@@ -37,7 +37,7 @@ type DKGContractClient interface {
 	// public keys for each DKG participant.
 	//
 	// SubmitResult must be called strictly after the final phase has ended.
-	SubmitResult(crypto.PublicKey, []crypto.PublicKey) error
+	SubmitResult(crypto.PublicKey, []crypto.PublicKey, flow.DKGIndexMap) error
 }
 
 // DKGController controls the execution of a Joint Feldman DKG instance.

@@ -30,6 +30,8 @@ type Client struct {
 	env templates.Environment
 }
 
+var _ module.DKGContractClient = (*Client)(nil)
+
 // NewClient initializes a new client to the Flow DKG contract
 func NewClient(
 	log zerolog.Logger,
@@ -181,7 +183,7 @@ func (c *Client) Broadcast(msg model.BroadcastDKGMessage) error {
 // SubmitResult submits the final public result of the DKG protocol. This
 // represents the group public key and the node's local computation of the
 // public keys for each DKG participant. Serialized pub keys are encoded as hex.
-func (c *Client) SubmitResult(groupPublicKey crypto.PublicKey, publicKeys []crypto.PublicKey) error {
+func (c *Client) SubmitResult(groupPublicKey crypto.PublicKey, publicKeys []crypto.PublicKey, indexMap flow.DKGIndexMap) error {
 
 	started := time.Now()
 	ctx, cancel := context.WithTimeout(context.Background(), epochs.TransactionSubmissionTimeout)
