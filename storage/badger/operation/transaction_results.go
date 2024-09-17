@@ -121,22 +121,34 @@ func LookupLightTransactionResultsByBlockIDUsingIndex(blockID flow.Identifier, t
 	return traverse(makePrefix(codeLightTransactionResultIndex, blockID), txErrIterFunc)
 }
 
+// BatchInsertTransactionResultErrorMessage inserts a transaction result error message by block ID and transaction ID
+// into the database using a batch write.
 func BatchInsertTransactionResultErrorMessage(blockID flow.Identifier, transactionResultErrorMessage *flow.TransactionResultErrorMessage) func(batch *badger.WriteBatch) error {
 	return batchWrite(makePrefix(codeTransactionResultErrorMessage, blockID, transactionResultErrorMessage.TransactionID), transactionResultErrorMessage)
 }
 
+// BatchIndexTransactionResultErrorMessage indexes a transaction result error message by index within the block using a
+// batch write.
 func BatchIndexTransactionResultErrorMessage(blockID flow.Identifier, txIndex uint32, transactionResultErrorMessage *flow.TransactionResultErrorMessage) func(batch *badger.WriteBatch) error {
 	return batchWrite(makePrefix(codeTransactionResultErrorMessageIndex, blockID, txIndex), transactionResultErrorMessage)
 }
 
+// RetrieveTransactionResultErrorMessage retrieves a transaction result error message by block ID and transaction ID.
 func RetrieveTransactionResultErrorMessage(blockID flow.Identifier, transactionID flow.Identifier, transactionResultErrorMessage *flow.TransactionResultErrorMessage) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeTransactionResultErrorMessage, blockID, transactionID), transactionResultErrorMessage)
 }
+
+// RetrieveTransactionResultErrorMessageByIndex retrieves a transaction result error message by block ID and index.
 func RetrieveTransactionResultErrorMessageByIndex(blockID flow.Identifier, txIndex uint32, transactionResultErrorMessage *flow.TransactionResultErrorMessage) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeTransactionResultErrorMessageIndex, blockID, txIndex), transactionResultErrorMessage)
 }
 
-// LookupTransactionResultErrorMessagesByBlockIDUsingIndex retrieves all tx results error messages for a block, by using
+// TransactionResultErrorMessagesExists checks whether tx result error messages exist in the database.
+func TransactionResultErrorMessagesExists(blockID flow.Identifier, blockExists *bool) func(*badger.Txn) error {
+	return exists(makePrefix(codeTransactionResultErrorMessageIndex, blockID), blockExists)
+}
+
+// LookupTransactionResultErrorMessagesByBlockIDUsingIndex retrieves all tx result error messages for a block, by using
 // tx_index index. This correctly handles cases of duplicate transactions within block.
 func LookupTransactionResultErrorMessagesByBlockIDUsingIndex(blockID flow.Identifier, txResultErrorMessages *[]flow.TransactionResultErrorMessage) func(*badger.Txn) error {
 	txErrIterFunc := func() (checkFunc, createFunc, handleFunc) {

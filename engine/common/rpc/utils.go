@@ -176,7 +176,8 @@ func findAllExecutionNodes(
 // If neither preferred nor fixed nodes are defined, then all execution node matching the executor IDs are returned.
 // e.g. If execution nodes in identity table are {1,2,3,4}, preferred ENs are defined as {2,3,4}
 // and the executor IDs is {1,2,3}, then {2, 3} is returned as the chosen subset of ENs
-func chooseExecutionNodes(state protocol.State,
+func chooseExecutionNodes(
+	state protocol.State,
 	executorIDs flow.IdentifierList,
 	preferredENIdentifiers flow.IdentifierList,
 	fixedENIdentifiers flow.IdentifierList,

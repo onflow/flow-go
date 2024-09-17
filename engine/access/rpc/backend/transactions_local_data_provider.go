@@ -35,14 +35,12 @@ type TransactionErrorMessage interface {
 
 	// LookupErrorMessageByIndex is a function type for getting transaction error message by index.
 	// Expected errors during normal operation:
-	//   - status.Error[codes.NotFound] - transaction result for given block ID and tx index is not available.
 	//   - InsufficientExecutionReceipts - found insufficient receipts for given block ID.
 	//   - status.Error - remote GRPC call to EN has failed.
 	LookupErrorMessageByIndex(ctx context.Context, blockID flow.Identifier, height uint64, index uint32) (string, error)
 
 	// LookupErrorMessagesByBlockID is a function type for getting transaction error messages by block ID.
 	// Expected errors during normal operation:
-	//   - status.Error[codes.NotFound] - transaction results for given block ID are not available.
 	//   - InsufficientExecutionReceipts - found insufficient receipts for given block ID.
 	//   - status.Error - remote GRPC call to EN has failed.
 	LookupErrorMessagesByBlockID(ctx context.Context, blockID flow.Identifier, height uint64) (map[flow.Identifier]string, error)

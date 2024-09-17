@@ -329,16 +329,15 @@ func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 		connFactory.On("GetAccessAPIClient", collNode2.Address, nil).Return(col2ApiClient, &mockCloser{}, nil)
 
 		bnd, err := backend.New(backend.Params{State: suite.state,
-			Collections:              collections,
-			Transactions:             transactions,
-			ChainID:                  suite.chainID,
-			AccessMetrics:            metrics,
-			ConnFactory:              connFactory,
-			MaxHeightRange:           backend.DefaultMaxHeightRange,
-			Log:                      suite.log,
-			SnapshotHistoryLimit:     backend.DefaultSnapshotHistoryLimit,
-			Communicator:             backend.NewNodeCommunicator(false),
-			TxErrorMessagesCacheSize: 1000,
+			Collections:          collections,
+			Transactions:         transactions,
+			ChainID:              suite.chainID,
+			AccessMetrics:        metrics,
+			ConnFactory:          connFactory,
+			MaxHeightRange:       backend.DefaultMaxHeightRange,
+			Log:                  suite.log,
+			SnapshotHistoryLimit: backend.DefaultSnapshotHistoryLimit,
+			Communicator:         backend.NewNodeCommunicator(false),
 		})
 		require.NoError(suite.T(), err)
 
@@ -662,7 +661,6 @@ func (suite *Suite) TestGetSealedTransaction() {
 			Log:                       suite.log,
 			SnapshotHistoryLimit:      backend.DefaultSnapshotHistoryLimit,
 			Communicator:              backend.NewNodeCommunicator(false),
-			TxErrorMessagesCacheSize:  1000,
 			TxResultQueryMode:         backend.IndexQueryModeExecutionNodesOnly,
 		})
 		require.NoError(suite.T(), err)
@@ -707,7 +705,6 @@ func (suite *Suite) TestGetSealedTransaction() {
 			processedHeight,
 			lastFullBlockHeight,
 			bnd,
-			db,
 			enNodeIDs.Strings(),
 			nil,
 		)
@@ -848,7 +845,6 @@ func (suite *Suite) TestGetTransactionResult() {
 			Log:                       suite.log,
 			SnapshotHistoryLimit:      backend.DefaultSnapshotHistoryLimit,
 			Communicator:              backend.NewNodeCommunicator(false),
-			TxErrorMessagesCacheSize:  1000,
 			TxResultQueryMode:         backend.IndexQueryModeExecutionNodesOnly,
 		})
 		require.NoError(suite.T(), err)
@@ -876,7 +872,7 @@ func (suite *Suite) TestGetTransactionResult() {
 
 		// create the ingest engine
 		ingestEng, err := ingestion.New(suite.log, suite.net, suite.state, suite.me, suite.request, all.Blocks, all.Headers, collections,
-			transactions, results, receipts, txResultErrorMessages, collectionExecutedMetric, processedHeight, lastFullBlockHeight, bnd, db, enNodeIDs.Strings(),
+			transactions, results, receipts, txResultErrorMessages, collectionExecutedMetric, processedHeight, lastFullBlockHeight, bnd, enNodeIDs.Strings(),
 			nil,
 		)
 		require.NoError(suite.T(), err)
@@ -1055,25 +1051,24 @@ func (suite *Suite) TestExecuteScript() {
 
 		var err error
 		suite.backend, err = backend.New(backend.Params{
-			State:                    suite.state,
-			CollectionRPC:            suite.collClient,
-			Blocks:                   all.Blocks,
-			Headers:                  all.Headers,
-			Collections:              collections,
-			Transactions:             transactions,
-			ExecutionReceipts:        receipts,
-			ExecutionResults:         results,
-			ChainID:                  suite.chainID,
-			AccessMetrics:            suite.metrics,
-			ConnFactory:              connFactory,
-			MaxHeightRange:           backend.DefaultMaxHeightRange,
-			FixedExecutionNodeIDs:    (identities.NodeIDs()).Strings(),
-			Log:                      suite.log,
-			SnapshotHistoryLimit:     backend.DefaultSnapshotHistoryLimit,
-			Communicator:             backend.NewNodeCommunicator(false),
-			ScriptExecutionMode:      backend.IndexQueryModeExecutionNodesOnly,
-			TxErrorMessagesCacheSize: 1000,
-			TxResultQueryMode:        backend.IndexQueryModeExecutionNodesOnly,
+			State:                 suite.state,
+			CollectionRPC:         suite.collClient,
+			Blocks:                all.Blocks,
+			Headers:               all.Headers,
+			Collections:           collections,
+			Transactions:          transactions,
+			ExecutionReceipts:     receipts,
+			ExecutionResults:      results,
+			ChainID:               suite.chainID,
+			AccessMetrics:         suite.metrics,
+			ConnFactory:           connFactory,
+			MaxHeightRange:        backend.DefaultMaxHeightRange,
+			FixedExecutionNodeIDs: (identities.NodeIDs()).Strings(),
+			Log:                   suite.log,
+			SnapshotHistoryLimit:  backend.DefaultSnapshotHistoryLimit,
+			Communicator:          backend.NewNodeCommunicator(false),
+			ScriptExecutionMode:   backend.IndexQueryModeExecutionNodesOnly,
+			TxResultQueryMode:     backend.IndexQueryModeExecutionNodesOnly,
 		})
 		require.NoError(suite.T(), err)
 
@@ -1115,7 +1110,7 @@ func (suite *Suite) TestExecuteScript() {
 
 		// create the ingest engine
 		ingestEng, err := ingestion.New(suite.log, suite.net, suite.state, suite.me, suite.request, all.Blocks, all.Headers, collections,
-			transactions, results, receipts, txResultErrorMessages, collectionExecutedMetric, processedHeight, lastFullBlockHeight, suite.backend, db,
+			transactions, results, receipts, txResultErrorMessages, collectionExecutedMetric, processedHeight, lastFullBlockHeight, suite.backend,
 			enNodeIDs.Strings(),
 			nil)
 		require.NoError(suite.T(), err)

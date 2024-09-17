@@ -92,6 +92,7 @@ type Params struct {
 	Transactions              storage.Transactions
 	ExecutionReceipts         storage.ExecutionReceipts
 	ExecutionResults          storage.ExecutionResults
+	TxResultErrorMessages     storage.TransactionResultErrorMessages
 	ChainID                   flow.ChainID
 	AccessMetrics             module.AccessMetrics
 	ConnFactory               connection.ConnectionFactory
@@ -103,7 +104,6 @@ type Params struct {
 	SnapshotHistoryLimit      int
 	Communicator              Communicator
 	TxResultCacheSize         uint
-	TxErrorMessagesCacheSize  uint
 	ScriptExecutor            execution.ScriptExecutor
 	ScriptExecutionMode       IndexQueryMode
 	CheckPayerBalanceMode     access.PayerBalanceMode
@@ -138,18 +138,6 @@ func New(params Params) (*Backend, error) {
 		txResCache, err = lru.New[flow.Identifier, *access.TransactionResult](int(params.TxResultCacheSize))
 		if err != nil {
 			return nil, fmt.Errorf("failed to init cache for transaction results: %w", err)
-		}
-	}
-
-	// NOTE: The transaction error message cache is currently only used by the access node and not by the observer node.
-	//       To avoid introducing unnecessary command line arguments in the observer, one case could be that the error
-	//       message cache is nil for the observer node.
-	var txErrorMessagesCache *lru.Cache[flow.Identifier, string]
-
-	if params.TxErrorMessagesCacheSize > 0 {
-		txErrorMessagesCache, err = lru.New[flow.Identifier, string](int(params.TxErrorMessagesCacheSize))
-		if err != nil {
-			return nil, fmt.Errorf("failed to init cache for transaction error messages: %w", err)
 		}
 	}
 
@@ -256,6 +244,7 @@ func New(params Params) (*Backend, error) {
 		chainID:                       params.ChainID,
 		transactions:                  params.Transactions,
 		executionReceipts:             params.ExecutionReceipts,
+		txResultErrorMessages:         params.TxResultErrorMessages,
 		transactionValidator:          txValidator,
 		transactionMetrics:            params.AccessMetrics,
 		retry:                         retry,
@@ -263,7 +252,6 @@ func New(params Params) (*Backend, error) {
 		previousAccessNodes:           params.HistoricalAccessNodes,
 		nodeCommunicator:              params.Communicator,
 		txResultCache:                 txResCache,
-		txErrorMessagesCache:          txErrorMessagesCache,
 		txResultQueryMode:             params.TxResultQueryMode,
 		systemTx:                      systemTx,
 		systemTxID:                    systemTxID,

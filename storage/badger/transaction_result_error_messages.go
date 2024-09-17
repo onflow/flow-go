@@ -91,8 +91,43 @@ func NewTransactionResultErrorMessages(collector module.CacheMetrics, db *badger
 	}
 }
 
+// Store will store transaction result error messages for the given block ID
+func (t *TransactionResultErrorMessages) Store(blockID flow.Identifier, transactionResultErrorMessages []flow.TransactionResultErrorMessage) error {
+	batch := NewBatch(t.db)
+
+	err := t.batchStore(blockID, transactionResultErrorMessages, batch)
+	if err != nil {
+		return err
+	}
+
+	err = batch.Flush()
+	if err != nil {
+		return fmt.Errorf("cannot flush batch: %w", err)
+	}
+
+	return nil
+}
+
+// Exists returns true if transaction result error messages the given ID has been stored.
+//
+// No errors are expected during normal operation.
+func (t *TransactionResultErrorMessages) Exists(blockID flow.Identifier) (bool, error) {
+	// if the block is in the cache, return true
+	key := KeyFromBlockID(blockID)
+	if ok := t.blockCache.IsCached(key); ok {
+		return ok, nil
+	}
+	// otherwise, check badger store
+	var exists bool
+	err := t.db.View(operation.TransactionResultErrorMessagesExists(blockID, &exists))
+	if err != nil {
+		return false, fmt.Errorf("could not check existence: %w", err)
+	}
+	return exists, nil
+}
+
 // BatchStore inserts a batch of transaction result error messages into a batch
-func (t *TransactionResultErrorMessages) BatchStore(blockID flow.Identifier, transactionResultErrorMessages []flow.TransactionResultErrorMessage, batch storage.BatchStorage) error {
+func (t *TransactionResultErrorMessages) batchStore(blockID flow.Identifier, transactionResultErrorMessages []flow.TransactionResultErrorMessage, batch storage.BatchStorage) error {
 	writeBatch := batch.GetWriter()
 
 	for i, result := range transactionResultErrorMessages {

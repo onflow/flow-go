@@ -37,15 +37,28 @@ type LightTransactionResults interface {
 // TransactionResultErrorMessages represents persistent storage for transaction result error messages
 type TransactionResultErrorMessages interface {
 
-	// BatchStore inserts a batch of transaction result error messages into a batch
-	BatchStore(blockID flow.Identifier, transactionResultErrorMessages []flow.TransactionResultErrorMessage, batch BatchStorage) error
+	// Store will store transaction result error messages for the given block ID.
+	//
+	// No errors are expected during normal operation.
+	Store(blockID flow.Identifier, transactionResultErrorMessages []flow.TransactionResultErrorMessage) error
 
-	// ByBlockIDTransactionID returns the transaction result error message for the given block ID and transaction ID
+	// Exists returns true if transaction result error messages the given ID has been stored.
+	//
+	// No errors are expected during normal operation.
+	Exists(blockID flow.Identifier) (bool, error)
+
+	// ByBlockIDTransactionID returns the transaction result error message for the given block ID and transaction ID.
+	//
+	// No errors are expected during normal operation.
 	ByBlockIDTransactionID(blockID flow.Identifier, transactionID flow.Identifier) (*flow.TransactionResultErrorMessage, error)
 
-	// ByBlockIDTransactionIndex returns the transaction result error message for the given blockID and transaction index
+	// ByBlockIDTransactionIndex returns the transaction result error message for the given blockID and transaction index.
+	//
+	// No errors are expected during normal operation.
 	ByBlockIDTransactionIndex(blockID flow.Identifier, txIndex uint32) (*flow.TransactionResultErrorMessage, error)
 
-	// ByBlockID gets all transaction result error messages for a block, ordered by transaction index
+	// ByBlockID gets all transaction result error messages for a block, ordered by transaction index.
+	//
+	// No errors are expected during normal operation.
 	ByBlockID(id flow.Identifier) ([]flow.TransactionResultErrorMessage, error)
 }
