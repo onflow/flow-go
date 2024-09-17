@@ -1,6 +1,7 @@
 package dkg
 
 import (
+	"github.com/onflow/flow-go/module"
 	"sync"
 
 	"github.com/onflow/crypto"
@@ -16,6 +17,8 @@ type WhiteboardClient struct {
 	nodeID     flow.Identifier
 	whiteboard *whiteboard
 }
+
+var _ module.DKGContractClient = (*WhiteboardClient)(nil)
 
 // NewWhiteboardClient instantiates a new WhiteboardClient with a reference to
 // an existing whiteboard object.

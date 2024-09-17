@@ -3,6 +3,7 @@ package dkg
 import (
 	"context"
 	"fmt"
+	"github.com/onflow/flow-go/module"
 	"time"
 
 	"github.com/onflow/crypto"
@@ -26,6 +27,8 @@ type DKGClientWrapper struct {
 	client  *dkgmod.Client
 	enabled *atomic.Bool
 }
+
+var _ module.DKGContractClient = (*DKGClientWrapper)(nil)
 
 // NewDKGClientWrapper instantiates a new DKGClientWrapper
 func NewDKGClientWrapper(client *dkgmod.Client) *DKGClientWrapper {

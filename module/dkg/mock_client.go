@@ -2,6 +2,7 @@ package dkg
 
 import (
 	"github.com/onflow/crypto"
+	"github.com/onflow/flow-go/module"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -21,6 +22,8 @@ import (
 type MockClient struct {
 	log zerolog.Logger
 }
+
+var _ module.DKGContractClient = (*MockClient)(nil)
 
 func NewMockClient(log zerolog.Logger) *MockClient {
 
