@@ -21,7 +21,10 @@ const rootBlockHappyPathLogs = "collecting partner network and staking keys" +
 	`read \d+ internal private node-info files` +
 	`read internal node configurations` +
 	`read \d+ weights for internal nodes` +
+	`remove internal partner nodes` +
+	`removed 0 internal partner nodes` +
 	`checking constraints on consensus nodes` +
+
 	`assembling network and staking keys` +
 	`wrote file \S+/node-infos.pub.json` +
 	`running DKG for consensus nodes` +
