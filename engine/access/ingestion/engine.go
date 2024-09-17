@@ -413,39 +413,41 @@ func (e *Engine) processTransactionResultErrorMessages(ctx irrecoverable.Signale
 //
 // No errors are expected during normal operation.
 func (e *Engine) handleTransactionResultErrorMessages(ctx context.Context, blockID flow.Identifier) error {
-	exists, err := e.transactionResultErrorMessages.Exists(blockID)
-	if err != nil {
-		return fmt.Errorf("could not check existance of transaction result error messages: %w", err)
-	}
-
-	if !exists {
-		execNodes, err := commonrpc.ExecutionNodesForBlockID(
-			ctx,
-			blockID,
-			e.executionReceipts,
-			e.state,
-			e.log,
-			e.preferredENIdentifiers,
-			e.preferredENIdentifiers,
-		)
+	if e.transactionResultErrorMessages != nil {
+		exists, err := e.transactionResultErrorMessages.Exists(blockID)
 		if err != nil {
-			// querying nodes by existing execution receipts failed, will continue with the next execution node from execution receipt
-			return nil
+			return fmt.Errorf("could not check existance of transaction result error messages: %w", err)
 		}
 
-		req := &execproto.GetTransactionErrorMessagesByBlockIDRequest{
-			BlockId: convert.IdentifierToMessage(blockID),
-		}
+		if !exists {
+			execNodes, err := commonrpc.ExecutionNodesForBlockID(
+				ctx,
+				blockID,
+				e.executionReceipts,
+				e.state,
+				e.log,
+				e.preferredENIdentifiers,
+				e.preferredENIdentifiers,
+			)
+			if err != nil {
+				// querying nodes by existing execution receipts failed, will continue with the next execution node from execution receipt
+				return nil
+			}
 
-		resp, execNode, err := e.backend.GetTransactionErrorMessagesFromAnyEN(ctx, execNodes, req)
-		if err != nil {
-			// continue, we will add functionality to backfill these later
-			return nil
-		}
+			req := &execproto.GetTransactionErrorMessagesByBlockIDRequest{
+				BlockId: convert.IdentifierToMessage(blockID),
+			}
 
-		err = e.storeTransactionResultErrorMessages(blockID, resp, execNode)
-		if err != nil {
-			return fmt.Errorf("could not store error messages: %w", err)
+			resp, execNode, err := e.backend.GetTransactionErrorMessagesFromAnyEN(ctx, execNodes, req)
+			if err != nil {
+				// continue, we will add functionality to backfill these later
+				return nil
+			}
+
+			err = e.storeTransactionResultErrorMessages(blockID, resp, execNode)
+			if err != nil {
+				return fmt.Errorf("could not store error messages: %w", err)
+			}
 		}
 	}
 
