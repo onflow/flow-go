@@ -1103,7 +1103,8 @@ func TestCallingExtraPrecompiles(t *testing.T) {
 					AddressFunc: func() types.Address {
 						return addr
 					},
-					RequiredGasFunc: func(input []byte) uint64 {
+					RequiredGasFunc: func(inp []byte) uint64 {
+						require.Equal(t, input, inp)
 						return uint64(10)
 					},
 					RunFunc: func(inp []byte) ([]byte, error) {
@@ -1194,6 +1195,7 @@ func TestTransactionTracing(t *testing.T) {
 			blk, uploader, tracer := blockWithTracer(t, emu)
 
 			var txID gethCommon.Hash
+			var trace json.RawMessage
 
 			blockID := flow.Identifier{0x01}
 			uploaded := make(chan struct{})
@@ -1201,7 +1203,7 @@ func TestTransactionTracing(t *testing.T) {
 			uploader.UploadFunc = func(id string, message json.RawMessage) error {
 				uploaded <- struct{}{}
 				require.Equal(t, debug.TraceID(txID, blockID), id)
-				require.NotEmpty(t, message)
+				require.Equal(t, trace, message)
 				require.Greater(t, len(message), 0)
 				return nil
 			}
@@ -1223,6 +1225,8 @@ func TestTransactionTracing(t *testing.T) {
 			require.NoError(t, res.ValidationError)
 			require.NoError(t, res.VMError)
 			txID = res.TxHash
+			trace = tracer.GetResultByTxHash(txID)
+			require.NotEmpty(t, trace)
 			tracer.Collect(txID)
 
 			testAccount.SetNonce(testAccount.Nonce() + 1)
@@ -1238,6 +1242,7 @@ func TestTransactionTracing(t *testing.T) {
 			blk, uploader, tracer := blockWithTracer(t, emu)
 
 			var txID gethCommon.Hash
+			var trace json.RawMessage
 
 			uploaded := make(chan struct{})
 			blockID := flow.Identifier{0x01}
@@ -1245,7 +1250,7 @@ func TestTransactionTracing(t *testing.T) {
 			uploader.UploadFunc = func(id string, message json.RawMessage) error {
 				uploaded <- struct{}{}
 				require.Equal(t, debug.TraceID(txID, blockID), id)
-				require.NotEmpty(t, message)
+				require.Equal(t, trace, message)
 				require.Greater(t, len(message), 0)
 				return nil
 			}
@@ -1263,6 +1268,8 @@ func TestTransactionTracing(t *testing.T) {
 			)
 			requireSuccessfulExecution(t, err, res)
 			txID = res.TxHash
+			trace = tracer.GetResultByTxHash(txID)
+			require.NotEmpty(t, trace)
 			tracer.WithBlockID(blockID)
 			tracer.Collect(txID)
 
@@ -1279,6 +1286,7 @@ func TestTransactionTracing(t *testing.T) {
 			blk, uploader, tracer := blockWithTracer(t, emu)
 
 			var txID gethCommon.Hash
+			var trace json.RawMessage
 
 			blockID := flow.Identifier{0x02}
 			uploaded := make(chan struct{})
@@ -1286,7 +1294,7 @@ func TestTransactionTracing(t *testing.T) {
 			uploader.UploadFunc = func(id string, message json.RawMessage) error {
 				uploaded <- struct{}{}
 				require.Equal(t, debug.TraceID(txID, blockID), id)
-				require.NotEmpty(t, message)
+				require.Equal(t, trace, message)
 				require.Greater(t, len(message), 0)
 				return nil
 			}
@@ -1304,6 +1312,8 @@ func TestTransactionTracing(t *testing.T) {
 			res, err := blk.RunTransaction(tx)
 			requireSuccessfulExecution(t, err, res)
 			txID = res.TxHash
+			trace = tracer.GetResultByTxHash(txID)
+			require.NotEmpty(t, trace)
 			tracer.WithBlockID(blockID)
 			tracer.Collect(txID)
 
@@ -1353,6 +1363,7 @@ func TestTransactionTracing(t *testing.T) {
 			blk, uploader, tracer := blockWithTracer(t, emu)
 
 			var txID gethCommon.Hash
+			var trace json.RawMessage
 
 			blockID := flow.Identifier{0x02}
 			uploaded := make(chan struct{})
@@ -1360,7 +1371,7 @@ func TestTransactionTracing(t *testing.T) {
 			uploader.UploadFunc = func(id string, message json.RawMessage) error {
 				uploaded <- struct{}{}
 				require.Equal(t, debug.TraceID(txID, blockID), id)
-				require.NotEmpty(t, message)
+				require.Equal(t, trace, message)
 				require.Greater(t, len(message), 0)
 				return nil
 			}
@@ -1380,6 +1391,8 @@ func TestTransactionTracing(t *testing.T) {
 			requireSuccessfulExecution(t, err, res)
 			txID = res.TxHash
 			tracer.WithBlockID(blockID)
+			trace = tracer.GetResultByTxHash(txID)
+			require.NotEmpty(t, trace)
 			tracer.Collect(txID)
 
 			testAccount.SetNonce(testAccount.Nonce() + 1)
@@ -1443,6 +1456,7 @@ func TestTransactionTracing(t *testing.T) {
 			blk, uploader, tracer := blockWithTracer(t, emu)
 
 			var txID gethCommon.Hash
+			var trace json.RawMessage
 
 			blockID := flow.Identifier{0x02}
 			uploaded := make(chan struct{})
@@ -1450,7 +1464,7 @@ func TestTransactionTracing(t *testing.T) {
 			uploader.UploadFunc = func(id string, message json.RawMessage) error {
 				uploaded <- struct{}{}
 				require.Equal(t, debug.TraceID(txID, blockID), id)
-				require.NotEmpty(t, message)
+				require.Equal(t, trace, message)
 				require.Greater(t, len(message), 0)
 				return nil
 			}
@@ -1469,6 +1483,7 @@ func TestTransactionTracing(t *testing.T) {
 			require.NoError(t, err)
 			require.Len(t, results, 1)
 			txID = results[0].TxHash
+			trace = tracer.GetResultByTxHash(txID)
 			tracer.WithBlockID(blockID)
 			tracer.Collect(txID)
 
