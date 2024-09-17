@@ -224,3 +224,19 @@ func internalWeightsByAddress(log zerolog.Logger, config string) map[string]uint
 
 	return weights
 }
+
+// Reject any partner nodes that are in the internal node list.
+func FilterInternalPartners(partners []bootstrap.NodeInfo, internal []bootstrap.NodeInfo) []bootstrap.NodeInfo {
+	lookup := make(map[flow.Identifier]struct{})
+	for _, node := range internal {
+		lookup[node.NodeID] = struct{}{}
+	}
+
+	var filtered []bootstrap.NodeInfo
+	for _, node := range partners {
+		if _, ok := lookup[node.NodeID]; !ok {
+			filtered = append(filtered, node)
+		}
+	}
+	return filtered
+}
