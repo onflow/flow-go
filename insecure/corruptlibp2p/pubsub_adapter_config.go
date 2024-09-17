@@ -157,6 +157,10 @@ func (c *CorruptPubSubAdapterConfig) WithRpcInspector(_ p2p.GossipSubRPCInspecto
 	// CorruptPubSub does not support inspector suite. This is a no-op.
 }
 
+func (c *CorruptPubSubAdapterConfig) WithPeerGater(_ map[string]float64) {
+	// CorruptPubSub does not support inspector suite. This is a no-op.
+}
+
 func (c *CorruptPubSubAdapterConfig) Build() []corrupt.Option {
 	return c.options
 }

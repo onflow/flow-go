@@ -628,6 +628,12 @@ network-config:
       # keep the entire network's size. Otherwise, the local node's view of the network will be incomplete due to cache eviction.
       # Recommended size is 10x the number of peers in the network.
       cache-size: 10000
+    peer-gater:
+      enabled: true
+      topic-delivery-weights-override:
+        consensus-committee: 1.5
+        sync-committee: .5
+
   # Application layer spam prevention
   alsp-spam-record-cache-size: 1000
   alsp-spam-report-queue-size: 10_000

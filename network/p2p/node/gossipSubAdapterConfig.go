@@ -97,6 +97,16 @@ func (g *GossipSubAdapterConfig) WithTracer(tracer p2p.PubSubTracer) {
 	g.options = append(g.options, pubsub.WithRawTracer(tracer))
 }
 
+// WithPeerGater adds a peer gater option to the config.
+// Args:
+// - params: the peer gater params to use
+// Returns:
+// -None
+func (g *GossipSubAdapterConfig) WithPeerGater(topicDeliveryWeights map[string]float64) {
+	peerGaterParams := pubsub.DefaultPeerGaterParams().WithTopicDeliveryWeights(topicDeliveryWeights)
+	g.options = append(g.options, pubsub.WithPeerGater(peerGaterParams))
+}
+
 // ScoreTracer returns the tracer for the peer score.
 // Args:
 //   - None

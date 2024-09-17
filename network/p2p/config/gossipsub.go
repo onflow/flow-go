@@ -61,6 +61,8 @@ const (
 	PeerScoringEnabledKey   = "peer-scoring-enabled"
 	ScoreParamsKey          = "scoring-parameters"
 	SubscriptionProviderKey = "subscription-provider"
+	PeerGaterKey            = "peer-gater"
+	TopicDeliveryWeightsKey = "topic-delivery-weights-override"
 )
 
 // GossipSubParameters is the configuration for the GossipSub pubsub implementation.
@@ -76,6 +78,9 @@ type GossipSubParameters struct {
 	PeerScoringEnabled   bool                           `mapstructure:"peer-scoring-enabled"`
 	SubscriptionProvider SubscriptionProviderParameters `mapstructure:"subscription-provider"`
 	ScoringParameters    ScoringParameters              `mapstructure:"scoring-parameters"`
+
+	// PeerGaterParameters is the configuration for the libp2p peer gater.
+	PeerGaterParameters PeerGaterParameters `mapstructure:"peer-gater"`
 }
 
 const (
@@ -87,6 +92,16 @@ const (
 type ScoringParameters struct {
 	PeerScoring               PeerScoringParameters     `validate:"required" mapstructure:"peer-scoring"`
 	ScoringRegistryParameters ScoringRegistryParameters `validate:"required" mapstructure:"scoring-registry"`
+}
+
+// PeerGaterParameters are the parameters for the libp2p peer gater. This config provides operators the ability
+// to override topic delivery weights for the peer gater. The default weight is 1.0.
+// Parameters are "numerical values" that are used to compute or build components that compute the score of a peer in GossipSub system.
+type PeerGaterParameters struct {
+	// Enabled enables the peer gater.
+	Enabled bool `validate:"required" mapstructure:"enabled"`
+	// TopicDeliveryWeightsOverride map of topic delivery weights that will override the default value for the specified channel.
+	TopicDeliveryWeightsOverride map[string]string `validate:"required" mapstructure:"topic-delivery-weights-override"`
 }
 
 // SubscriptionProviderParameters keys.
