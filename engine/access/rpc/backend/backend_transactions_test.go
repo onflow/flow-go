@@ -788,9 +788,6 @@ func (suite *Suite) TestLookupTransactionErrorMessages_FailedToFetch() {
 	backend, err := New(params)
 	suite.Require().NoError(err)
 
-	// pretend the first transaction has been cached, but there are multiple failed txns so still a request has to be made.
-	backend.txErrorMessagesCache.Add(resultsByBlockID[0].TransactionID, "some error")
-
 	suite.execClient.On("GetTransactionErrorMessagesByBlockID", mock.Anything, mock.Anything).Return(nil,
 		status.Error(codes.Unavailable, "")).Twice()
 
