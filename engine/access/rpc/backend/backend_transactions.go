@@ -28,21 +28,24 @@ import (
 
 type backendTransactions struct {
 	*TransactionsLocalDataProvider
-	staticCollectionRPC  accessproto.AccessAPIClient // rpc client tied to a fixed collection node
-	transactions         storage.Transactions
-	executionReceipts    storage.ExecutionReceipts
-	chainID              flow.ChainID
-	transactionMetrics   module.TransactionMetrics
-	transactionValidator *access.TransactionValidator
-	retry                *Retry
-	connFactory          connection.ConnectionFactory
+	staticCollectionRPC accessproto.AccessAPIClient // rpc client tied to a fixed collection node
+	transactions        storage.Transactions
+	executionReceipts   storage.ExecutionReceipts
+	// NOTE: The transaction error message is currently only used by the access node and not by the observer node.
+	//       To avoid introducing unnecessary command line arguments in the observer, one case could be that the error
+	//       message cache is nil for the observer node.
+	txResultErrorMessages storage.TransactionResultErrorMessages
+	chainID               flow.ChainID
+	transactionMetrics    module.TransactionMetrics
+	transactionValidator  *access.TransactionValidator
+	retry                 *Retry
+	connFactory           connection.ConnectionFactory
 
-	previousAccessNodes  []accessproto.AccessAPIClient
-	log                  zerolog.Logger
-	nodeCommunicator     Communicator
-	txResultCache        *lru.Cache[flow.Identifier, *access.TransactionResult]
-	txErrorMessagesCache *lru.Cache[flow.Identifier, string] // cache for transactions error messages, indexed by hash(block_id, tx_id).
-	txResultQueryMode    IndexQueryMode
+	previousAccessNodes []accessproto.AccessAPIClient
+	log                 zerolog.Logger
+	nodeCommunicator    Communicator
+	txResultCache       *lru.Cache[flow.Identifier, *access.TransactionResult]
+	txResultQueryMode   IndexQueryMode
 
 	systemTxID flow.Identifier
 	systemTx   *flow.TransactionBody
@@ -997,14 +1000,10 @@ func (b *backendTransactions) LookupErrorMessageByTransactionID(
 	blockID flow.Identifier,
 	transactionID flow.Identifier,
 ) (string, error) {
-	var cacheKey flow.Identifier
-	var value string
-
-	if b.txErrorMessagesCache != nil {
-		cacheKey = flow.MakeIDFromFingerPrint(append(blockID[:], transactionID[:]...))
-		value, cached := b.txErrorMessagesCache.Get(cacheKey)
-		if cached {
-			return value, nil
+	if b.txResultErrorMessages != nil {
+		res, err := b.txResultErrorMessages.ByBlockIDTransactionID(blockID, transactionID)
+		if err == nil {
+			return res.ErrorMessage, nil
 		}
 	}
 
@@ -1032,20 +1031,14 @@ func (b *backendTransactions) LookupErrorMessageByTransactionID(
 	if err != nil {
 		return "", fmt.Errorf("could not fetch error message from ENs: %w", err)
 	}
-	value = resp.ErrorMessage
 
-	if b.txErrorMessagesCache != nil {
-		b.txErrorMessagesCache.Add(cacheKey, value)
-	}
-
-	return value, nil
+	return resp.ErrorMessage, nil
 }
 
 // LookupErrorMessageByIndex returns transaction error message for specified transaction using its index.
 // If an error message for transaction can be found in cache then it will be used to serve the request, otherwise
 // an RPC call will be made to the EN to fetch that error message, fetched value will be cached in the LRU cache.
 // Expected errors during normal operation:
-//   - status.Error[codes.NotFound] - transaction result for given block ID and tx index is not available.
 //   - InsufficientExecutionReceipts - found insufficient receipts for given block ID.
 //   - status.Error - remote GRPC call to EN has failed.
 func (b *backendTransactions) LookupErrorMessageByIndex(
@@ -1054,19 +1047,10 @@ func (b *backendTransactions) LookupErrorMessageByIndex(
 	height uint64,
 	index uint32,
 ) (string, error) {
-	txResult, err := b.txResultsIndex.ByBlockIDTransactionIndex(blockID, height, index)
-	if err != nil {
-		return "", rpc.ConvertStorageError(err)
-	}
-
-	var cacheKey flow.Identifier
-	var value string
-
-	if b.txErrorMessagesCache != nil {
-		cacheKey = flow.MakeIDFromFingerPrint(append(blockID[:], txResult.TransactionID[:]...))
-		value, cached := b.txErrorMessagesCache.Get(cacheKey)
-		if cached {
-			return value, nil
+	if b.txResultErrorMessages != nil {
+		res, err := b.txResultErrorMessages.ByBlockIDTransactionIndex(blockID, index)
+		if err == nil {
+			return res.ErrorMessage, nil
 		}
 	}
 
@@ -1094,49 +1078,30 @@ func (b *backendTransactions) LookupErrorMessageByIndex(
 	if err != nil {
 		return "", fmt.Errorf("could not fetch error message from ENs: %w", err)
 	}
-	value = resp.ErrorMessage
 
-	if b.txErrorMessagesCache != nil {
-		b.txErrorMessagesCache.Add(cacheKey, value)
-	}
-
-	return value, nil
+	return resp.ErrorMessage, nil
 }
 
 // LookupErrorMessagesByBlockID returns all error messages for failed transactions by blockID.
 // An RPC call will be made to the EN to fetch missing errors messages, fetched value will be cached in the LRU cache.
 // Expected errors during normal operation:
-//   - status.Error[codes.NotFound] - transaction results for given block ID are not available.
 //   - InsufficientExecutionReceipts - found insufficient receipts for given block ID.
 //   - status.Error - remote GRPC call to EN has failed.
 func (b *backendTransactions) LookupErrorMessagesByBlockID(
 	ctx context.Context,
 	blockID flow.Identifier,
-	height uint64,
+	_ uint64,
 ) (map[flow.Identifier]string, error) {
-	txResults, err := b.txResultsIndex.ByBlockID(blockID, height)
-	if err != nil {
-		return nil, rpc.ConvertStorageError(err)
-	}
+	result := make(map[flow.Identifier]string)
 
-	results := make(map[flow.Identifier]string)
-
-	if b.txErrorMessagesCache != nil {
-		needToFetch := false
-		for _, txResult := range txResults {
-			if txResult.Failed {
-				cacheKey := flow.MakeIDFromFingerPrint(append(blockID[:], txResult.TransactionID[:]...))
-				if value, ok := b.txErrorMessagesCache.Get(cacheKey); ok {
-					results[txResult.TransactionID] = value
-				} else {
-					needToFetch = true
-				}
+	if b.txResultErrorMessages != nil {
+		res, err := b.txResultErrorMessages.ByBlockID(blockID)
+		if err == nil {
+			for _, value := range res {
+				result[value.TransactionID] = value.ErrorMessage
 			}
-		}
 
-		// all transactions were served from cache or there were no failed transactions
-		if !needToFetch {
-			return results, nil
+			return result, nil
 		}
 	}
 
@@ -1162,14 +1127,11 @@ func (b *backendTransactions) LookupErrorMessagesByBlockID(
 	if err != nil {
 		return nil, fmt.Errorf("could not fetch error message from ENs: %w", err)
 	}
-	result := make(map[flow.Identifier]string, len(resp))
+
 	for _, value := range resp {
-		if b.txErrorMessagesCache != nil {
-			cacheKey := flow.MakeIDFromFingerPrint(append(req.BlockId, value.TransactionId...))
-			b.txErrorMessagesCache.Add(cacheKey, value.ErrorMessage)
-		}
 		result[convert.MessageToIdentifier(value.TransactionId)] = value.ErrorMessage
 	}
+
 	return result, nil
 }
 

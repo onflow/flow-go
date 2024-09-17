@@ -161,7 +161,6 @@ type AccessNodeConfig struct {
 	executionDataConfig                  edrequester.ExecutionDataConfig
 	PublicNetworkConfig                  PublicNetworkConfig
 	TxResultCacheSize                    uint
-	TxErrorMessagesCacheSize             uint
 	executionDataIndexingEnabled         bool
 	registersDBPath                      string
 	checkpointFile                       string
@@ -245,7 +244,6 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 		apiRatelimits:                nil,
 		apiBurstlimits:               nil,
 		TxResultCacheSize:            0,
-		TxErrorMessagesCacheSize:     1000,
 		PublicNetworkConfig: PublicNetworkConfig{
 			BindAddress: cmd.NotSet,
 			Metrics:     metrics.NewNoopCollector(),
@@ -1240,7 +1238,6 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		flags.BoolVar(&builder.retryEnabled, "retry-enabled", defaultConfig.retryEnabled, "whether to enable the retry mechanism at the access node level")
 		flags.BoolVar(&builder.rpcMetricsEnabled, "rpc-metrics-enabled", defaultConfig.rpcMetricsEnabled, "whether to enable the rpc metrics")
 		flags.UintVar(&builder.TxResultCacheSize, "transaction-result-cache-size", defaultConfig.TxResultCacheSize, "transaction result cache size.(Disabled by default i.e 0)")
-		flags.UintVar(&builder.TxErrorMessagesCacheSize, "transaction-error-messages-cache-size", defaultConfig.TxErrorMessagesCacheSize, "transaction error messages cache size.(By default 1000)")
 		flags.StringVarP(&builder.nodeInfoFile,
 			"node-info-file",
 			"",
@@ -1475,9 +1472,6 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 			if builder.rpcConf.BackendConfig.CircuitBreakerConfig.RestoreTimeout <= 0 {
 				return errors.New("circuit-breaker-restore-timeout must be greater than 0")
 			}
-		}
-		if builder.TxErrorMessagesCacheSize == 0 {
-			return errors.New("transaction-error-messages-cache-size must be greater than 0")
 		}
 
 		if builder.checkPayerBalance && !builder.executionDataIndexingEnabled {
@@ -1910,6 +1904,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				Transactions:              node.Storage.Transactions,
 				ExecutionReceipts:         node.Storage.Receipts,
 				ExecutionResults:          node.Storage.Results,
+				TxResultErrorMessages:     node.Storage.TransactionResultErrorMessages,
 				ChainID:                   node.RootChainID,
 				AccessMetrics:             builder.AccessMetrics,
 				ConnFactory:               connFactory,
@@ -1921,7 +1916,6 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				SnapshotHistoryLimit:      backend.DefaultSnapshotHistoryLimit,
 				Communicator:              backend.NewNodeCommunicator(backendConfig.CircuitBreakerConfig.Enabled),
 				TxResultCacheSize:         builder.TxResultCacheSize,
-				TxErrorMessagesCacheSize:  builder.TxErrorMessagesCacheSize,
 				ScriptExecutor:            builder.ScriptExecutor,
 				ScriptExecutionMode:       scriptExecMode,
 				CheckPayerBalance:         builder.checkPayerBalance,
@@ -2015,7 +2009,6 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				processedBlockHeight,
 				lastFullBlockHeight,
 				builder.nodeBackend,
-				node.DB,
 				builder.rpcConf.BackendConfig.PreferredExecutionNodeIDs,
 				builder.rpcConf.BackendConfig.FixedExecutionNodeIDs,
 			)

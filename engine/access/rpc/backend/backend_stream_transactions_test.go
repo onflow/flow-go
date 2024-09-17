@@ -56,6 +56,7 @@ type TransactionStatusSuite struct {
 	transactionResults *storagemock.LightTransactionResults
 	events             *storagemock.Events
 	seals              *storagemock.Seals
+	txErrorMessages    *storagemock.TransactionResultErrorMessages
 
 	colClient              *access.AccessAPIClient
 	execClient             *access.ExecutionAPIClient
@@ -108,6 +109,7 @@ func (s *TransactionStatusSuite) SetupTest() {
 	s.receipts = storagemock.NewExecutionReceipts(s.T())
 	s.results = storagemock.NewExecutionResults(s.T())
 	s.seals = storagemock.NewSeals(s.T())
+	s.txErrorMessages = new(storagemock.TransactionResultErrorMessages)
 	s.colClient = access.NewAccessAPIClient(s.T())
 	s.archiveClient = access.NewAccessAPIClient(s.T())
 	s.execClient = access.NewExecutionAPIClient(s.T())
@@ -192,22 +194,22 @@ func (s *TransactionStatusSuite) TearDownTest() {
 // backendParams returns the Params configuration for the backend.
 func (s *TransactionStatusSuite) backendParams() Params {
 	return Params{
-		State:                    s.state,
-		Blocks:                   s.blocks,
-		Headers:                  s.headers,
-		Collections:              s.collections,
-		Transactions:             s.transactions,
-		ExecutionReceipts:        s.receipts,
-		ExecutionResults:         s.results,
-		ChainID:                  s.chainID,
-		CollectionRPC:            s.colClient,
-		MaxHeightRange:           DefaultMaxHeightRange,
-		SnapshotHistoryLimit:     DefaultSnapshotHistoryLimit,
-		Communicator:             NewNodeCommunicator(false),
-		AccessMetrics:            metrics.NewNoopCollector(),
-		Log:                      s.log,
-		TxErrorMessagesCacheSize: 1000,
-		BlockTracker:             s.blockTracker,
+		State:                 s.state,
+		Blocks:                s.blocks,
+		Headers:               s.headers,
+		Collections:           s.collections,
+		Transactions:          s.transactions,
+		ExecutionReceipts:     s.receipts,
+		ExecutionResults:      s.results,
+		TxResultErrorMessages: s.txErrorMessages,
+		ChainID:               s.chainID,
+		CollectionRPC:         s.colClient,
+		MaxHeightRange:        DefaultMaxHeightRange,
+		SnapshotHistoryLimit:  DefaultSnapshotHistoryLimit,
+		Communicator:          NewNodeCommunicator(false),
+		AccessMetrics:         metrics.NewNoopCollector(),
+		Log:                   s.log,
+		BlockTracker:          s.blockTracker,
 		SubscriptionHandler: subscription.NewSubscriptionHandler(
 			s.log,
 			s.broadcaster,

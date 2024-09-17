@@ -47,25 +47,26 @@ type Suite struct {
 		params   *protocol.Params
 	}
 
-	me             *modulemock.Local
-	net            *mocknetwork.Network
-	request        *modulemock.Requester
-	obsIdentity    *flow.Identity
-	provider       *mocknetwork.Engine
-	blocks         *storage.Blocks
-	headers        *storage.Headers
-	collections    *storage.Collections
-	transactions   *storage.Transactions
-	receipts       *storage.ExecutionReceipts
-	results        *storage.ExecutionResults
-	seals          *storage.Seals
-	conduit        *mocknetwork.Conduit
-	downloader     *downloadermock.Downloader
-	sealedBlock    *flow.Header
-	finalizedBlock *flow.Header
-	log            zerolog.Logger
-	blockMap       map[uint64]*flow.Block
-	rootBlock      flow.Block
+	me              *modulemock.Local
+	net             *mocknetwork.Network
+	request         *modulemock.Requester
+	obsIdentity     *flow.Identity
+	provider        *mocknetwork.Engine
+	blocks          *storage.Blocks
+	headers         *storage.Headers
+	collections     *storage.Collections
+	transactions    *storage.Transactions
+	receipts        *storage.ExecutionReceipts
+	results         *storage.ExecutionResults
+	seals           *storage.Seals
+	txErrorMessages *storage.TransactionResultErrorMessages
+	conduit         *mocknetwork.Conduit
+	downloader      *downloadermock.Downloader
+	sealedBlock     *flow.Header
+	finalizedBlock  *flow.Header
+	log             zerolog.Logger
+	blockMap        map[uint64]*flow.Block
+	rootBlock       flow.Block
 
 	collectionExecutedMetric *indexer.CollectionExecutedMetricImpl
 
@@ -127,6 +128,7 @@ func (s *Suite) SetupTest() {
 	s.receipts = new(storage.ExecutionReceipts)
 	s.transactions = new(storage.Transactions)
 	s.results = new(storage.ExecutionResults)
+	s.txErrorMessages = new(storage.TransactionResultErrorMessages)
 	collectionsToMarkFinalized, err := stdmap.NewTimes(100)
 	require.NoError(s.T(), err)
 	collectionsToMarkExecuted, err := stdmap.NewTimes(100)
@@ -189,8 +191,28 @@ func (s *Suite) initIngestionEngine(ctx irrecoverable.SignalerContext) *Engine {
 	)
 	require.NoError(s.T(), err)
 
-	eng, err := New(s.log, s.net, s.proto.state, s.me, s.request, s.blocks, s.headers, s.collections,
-		s.transactions, s.results, s.receipts, s.collectionExecutedMetric, processedHeight, s.lastFullBlockHeight)
+	enIdentities := unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
+	enNodeIDs := enIdentities.NodeIDs()
+
+	eng, err := New(
+		s.log,
+		s.net,
+		s.proto.state,
+		s.me, s.request,
+		s.blocks,
+		s.headers,
+		s.collections,
+		s.transactions,
+		s.results,
+		s.receipts,
+		s.txErrorMessages,
+		s.collectionExecutedMetric,
+		processedHeight,
+		s.lastFullBlockHeight,
+		nil, // TODO: add tests
+		enNodeIDs.Strings(),
+		nil,
+	)
 	require.NoError(s.T(), err)
 
 	eng.ComponentManager.Start(ctx)

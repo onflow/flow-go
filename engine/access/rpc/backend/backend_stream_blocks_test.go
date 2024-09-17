@@ -148,15 +148,14 @@ func (s *BackendBlocksSuite) SetupTest() {
 // backendParams returns the Params configuration for the backend.
 func (s *BackendBlocksSuite) backendParams() Params {
 	return Params{
-		State:                    s.state,
-		Blocks:                   s.blocks,
-		Headers:                  s.headers,
-		ChainID:                  s.chainID,
-		MaxHeightRange:           DefaultMaxHeightRange,
-		SnapshotHistoryLimit:     DefaultSnapshotHistoryLimit,
-		AccessMetrics:            metrics.NewNoopCollector(),
-		Log:                      s.log,
-		TxErrorMessagesCacheSize: 1000,
+		State:                s.state,
+		Blocks:               s.blocks,
+		Headers:              s.headers,
+		ChainID:              s.chainID,
+		MaxHeightRange:       DefaultMaxHeightRange,
+		SnapshotHistoryLimit: DefaultSnapshotHistoryLimit,
+		AccessMetrics:        metrics.NewNoopCollector(),
+		Log:                  s.log,
 		SubscriptionHandler: subscription.NewSubscriptionHandler(
 			s.log,
 			s.broadcaster,

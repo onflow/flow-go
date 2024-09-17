@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/dgraph-io/badger/v2"
 	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 	"github.com/rs/zerolog"
 
@@ -29,7 +28,6 @@ import (
 	"github.com/onflow/flow-go/network/channels"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
-	badgerstorage "github.com/onflow/flow-go/storage/badger"
 )
 
 const (
@@ -87,8 +85,8 @@ type Engine struct {
 	// Notifier for queue consumer
 	finalizedBlockNotifier engine.Notifier
 
-	// blockIDChan to fetch and store transaction result error messages
-	blockIDChan chan flow.Identifier
+	// txResultErrorMessagesChan uses to fetch and store transaction result error messages for block
+	txResultErrorMessagesChan chan flow.Identifier
 
 	log     zerolog.Logger   // used to log relevant actions with context
 	state   protocol.State   // used to access the  protocol state
@@ -114,7 +112,6 @@ type Engine struct {
 	fixedENIdentifiers     flow.IdentifierList
 
 	backend *backend.Backend
-	db      *badger.DB
 }
 
 var _ network.MessageProcessor = (*Engine)(nil)
@@ -139,7 +136,6 @@ func New(
 	processedHeight storage.ConsumerProgress,
 	lastFullBlockHeight *counters.PersistentStrictMonotonicCounter,
 	backend *backend.Backend,
-	db *badger.DB,
 	preferredExecutionNodeIDs []string,
 	fixedExecutionNodeIDs []string,
 ) (*Engine, error) {
@@ -194,11 +190,10 @@ func New(
 
 		// queue / notifier for execution receipts
 		executionReceiptsNotifier: engine.NewNotifier(),
-		blockIDChan:               make(chan flow.Identifier, 1),
+		txResultErrorMessagesChan: make(chan flow.Identifier, 1),
 		executionReceiptsQueue:    executionReceiptsQueue,
 		messageHandler:            messageHandler,
 		backend:                   backend,
-		db:                        db,
 		preferredENIdentifiers:    preferredENIdentifiers,
 		fixedENIdentifiers:        fixedENIdentifiers,
 	}
@@ -376,11 +371,18 @@ func (e *Engine) processAvailableExecutionReceipts(ctx context.Context) error {
 			return err
 		}
 
-		// notify, to fetch and store transaction result error messages
-		e.blockIDChan <- receipt.BlockID
+		// notify, to fetch and store transaction result error messages for block
+		e.txResultErrorMessagesChan <- receipt.BlockID
 	}
 }
 
+// processTransactionResultErrorMessages handles error messages related to transaction
+// results by reading from the error messages channel and processing them accordingly.
+//
+// This function listens for messages on the txResultErrorMessagesChan channel and
+// processes each transaction result error message as it arrives.
+//
+// No errors are expected during normal operation.
 func (e *Engine) processTransactionResultErrorMessages(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	ready()
 
@@ -388,7 +390,7 @@ func (e *Engine) processTransactionResultErrorMessages(ctx irrecoverable.Signale
 		select {
 		case <-ctx.Done():
 			return
-		case blockID := <-e.blockIDChan:
+		case blockID := <-e.txResultErrorMessagesChan:
 			err := e.handleTransactionResultErrorMessages(ctx, blockID)
 			if err != nil {
 				// if an error reaches this point, it is unexpected
@@ -399,42 +401,70 @@ func (e *Engine) processTransactionResultErrorMessages(ctx irrecoverable.Signale
 	}
 }
 
+// handleTransactionResultErrorMessages processes transaction result error messages for a given block ID.
+// It retrieves error messages from the backend if they do not already exist in storage.
+//
+// The function first checks if error messages for the given block ID are already present in storage.
+// If they are not, it fetches the messages from execution nodes and stores them.
+//
+// Parameters:
+// - ctx: The context for managing cancellation and deadlines during the operation.
+// - blockID: The identifier of the block for which transaction result error messages need to be processed.
+//
+// No errors are expected during normal operation.
 func (e *Engine) handleTransactionResultErrorMessages(ctx context.Context, blockID flow.Identifier) error {
-	execNodes, err := commonrpc.ExecutionNodesForBlockID(ctx, blockID, e.executionReceipts, e.state, e.log, e.preferredENIdentifiers, e.preferredENIdentifiers)
+	exists, err := e.transactionResultErrorMessages.Exists(blockID)
 	if err != nil {
-		return fmt.Errorf("failed to select execution nodes: %w", err)
+		return fmt.Errorf("could not check existance of transaction result error messages: %w", err)
 	}
 
-	req := &execproto.GetTransactionErrorMessagesByBlockIDRequest{
-		BlockId: convert.IdentifierToMessage(blockID),
-	}
+	if !exists {
+		execNodes, err := commonrpc.ExecutionNodesForBlockID(
+			ctx,
+			blockID,
+			e.executionReceipts,
+			e.state,
+			e.log,
+			e.preferredENIdentifiers,
+			e.preferredENIdentifiers,
+		)
+		if err != nil {
+			// querying nodes by existing execution receipts failed, will continue with the next execution node from execution receipt
+			return nil
+		}
 
-	resp, execNode, err := e.backend.GetTransactionErrorMessagesFromAnyEN(ctx, execNodes, req)
-	if err != nil {
-		// continue, we will add functionality to backfill these later
-		return nil
-	}
+		req := &execproto.GetTransactionErrorMessagesByBlockIDRequest{
+			BlockId: convert.IdentifierToMessage(blockID),
+		}
 
-	err = e.storeTransactionResultErrorMessages(blockID, resp, execNode)
-	if err != nil {
-		return fmt.Errorf("could not store error messages: %w", err)
+		resp, execNode, err := e.backend.GetTransactionErrorMessagesFromAnyEN(ctx, execNodes, req)
+		if err != nil {
+			// continue, we will add functionality to backfill these later
+			return nil
+		}
+
+		err = e.storeTransactionResultErrorMessages(blockID, resp, execNode)
+		if err != nil {
+			return fmt.Errorf("could not store error messages: %w", err)
+		}
 	}
 
 	return nil
 }
 
+// storeTransactionResultErrorMessages stores the transaction result error messages for a given block ID.
+//
+// Parameters:
+// - blockID: The identifier of the block for which the error messages are to be stored.
+// - errorMessagesResponses: A slice of responses containing the error messages to be stored.
+// - execNode: The execution node associated with the error messages.
+//
+// No errors are expected during normal operation.
 func (e *Engine) storeTransactionResultErrorMessages(
 	blockID flow.Identifier,
 	errorMessagesResponses []*execproto.GetTransactionErrorMessagesResponse_Result,
 	execNode *flow.IdentitySkeleton,
 ) error {
-	// Write Batch is BadgerDB feature designed for handling lots of writes
-	// in efficient and atomic manner, hence pushing all the updates we can
-	// as tightly as possible to let Badger manage it.
-	// Note, that it does not guarantee atomicity as transactions has size limit,
-	// but it's the closest thing to atomicity we could have
-	batch := badgerstorage.NewBatch(e.db)
-
 	errorMessages := make([]flow.TransactionResultErrorMessage, len(errorMessagesResponses))
 
 	for _, value := range errorMessagesResponses {
@@ -446,7 +476,7 @@ func (e *Engine) storeTransactionResultErrorMessages(
 		errorMessages = append(errorMessages, errorMessage)
 	}
 
-	err := e.transactionResultErrorMessages.BatchStore(blockID, errorMessages, batch)
+	err := e.transactionResultErrorMessages.Store(blockID, errorMessages)
 	if err != nil {
 		return fmt.Errorf("failed to store execution receipt: %w", err)
 	}
