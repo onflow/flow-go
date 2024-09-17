@@ -1090,7 +1090,7 @@ func (b *backendTransactions) LookupErrorMessageByIndex(
 func (b *backendTransactions) LookupErrorMessagesByBlockID(
 	ctx context.Context,
 	blockID flow.Identifier,
-	_ uint64,
+	height uint64,
 ) (map[flow.Identifier]string, error) {
 	result := make(map[flow.Identifier]string)
 
@@ -1125,6 +1125,9 @@ func (b *backendTransactions) LookupErrorMessagesByBlockID(
 
 	resp, _, err := b.GetTransactionErrorMessagesFromAnyEN(ctx, execNodes, req)
 	if err != nil {
+		if b.txResultErrorMessages != nil {
+			// TODO: store to db a static message "failed", with flow.ZeroID as the executor.
+		}
 		return nil, fmt.Errorf("could not fetch error message from ENs: %w", err)
 	}
 
