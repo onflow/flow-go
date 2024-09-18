@@ -130,27 +130,25 @@ func (t *TransactionResultErrorMessages) Exists(blockID flow.Identifier) (bool, 
 func (t *TransactionResultErrorMessages) batchStore(blockID flow.Identifier, transactionResultErrorMessages []flow.TransactionResultErrorMessage, batch storage.BatchStorage) error {
 	writeBatch := batch.GetWriter()
 
-	for i, result := range transactionResultErrorMessages {
+	for _, result := range transactionResultErrorMessages {
 		err := operation.BatchInsertTransactionResultErrorMessage(blockID, &result)(writeBatch)
 		if err != nil {
 			return fmt.Errorf("cannot batch insert tx result error message: %w", err)
 		}
 
-		err = operation.BatchIndexTransactionResultErrorMessage(blockID, uint32(i), &result)(writeBatch)
+		err = operation.BatchIndexTransactionResultErrorMessage(blockID, &result)(writeBatch)
 		if err != nil {
 			return fmt.Errorf("cannot batch index tx result error message: %w", err)
 		}
 	}
 
 	batch.OnSucceed(func() {
-		for i, result := range transactionResultErrorMessages {
+		for _, result := range transactionResultErrorMessages {
 			key := KeyFromBlockIDTransactionID(blockID, result.TransactionID)
 			// cache for each transaction, so that it's faster to retrieve
 			t.cache.Insert(key, result)
 
-			index := uint32(i)
-
-			keyIndex := KeyFromBlockIDIndex(blockID, index)
+			keyIndex := KeyFromBlockIDIndex(blockID, result.Index)
 			t.indexCache.Insert(keyIndex, result)
 		}
 

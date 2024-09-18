@@ -29,6 +29,7 @@ func TestStoringTransactionResultErrorMessages(t *testing.T) {
 				TransactionID: unittest.IdentifierFixture(),
 				ErrorMessage:  fmt.Sprintf("a runtime error %d", i),
 				ExecutorID:    unittest.IdentifierFixture(),
+				Index:         rand.Uint32(),
 			}
 			txErrorMessages = append(txErrorMessages, expected)
 		}
@@ -43,8 +44,8 @@ func TestStoringTransactionResultErrorMessages(t *testing.T) {
 		}
 
 		// check retrieving by ByBlockIDTransactionIndex
-		for i, txErrorMessage := range txErrorMessages {
-			actual, err := store.ByBlockIDTransactionIndex(blockID, uint32(i))
+		for _, txErrorMessage := range txErrorMessages {
+			actual, err := store.ByBlockIDTransactionIndex(blockID, txErrorMessage.Index)
 			require.NoError(t, err)
 			assert.Equal(t, txErrorMessage, *actual)
 		}
@@ -63,12 +64,12 @@ func TestStoringTransactionResultErrorMessages(t *testing.T) {
 		}
 
 		// check retrieving by index from both cache and db
-		for i := len(txErrorMessages) - 1; i >= 0; i-- {
-			actual, err := store.ByBlockIDTransactionIndex(blockID, uint32(i))
+		for i, txErrorMessage := range txErrorMessages {
+			actual, err := store.ByBlockIDTransactionIndex(blockID, txErrorMessage.Index)
 			require.NoError(t, err)
 			assert.Equal(t, txErrorMessages[i], *actual)
 
-			actual, err = newStore.ByBlockIDTransactionIndex(blockID, uint32(i))
+			actual, err = newStore.ByBlockIDTransactionIndex(blockID, txErrorMessage.Index)
 			require.NoError(t, err)
 			assert.Equal(t, txErrorMessages[i], *actual)
 		}
