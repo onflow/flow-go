@@ -17,9 +17,11 @@ import (
 
 	"github.com/onflow/atree"
 
+	"github.com/onflow/flow-go/cmd/util/ledger/util"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	"github.com/onflow/flow-go/ledger/complete"
+	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 	"github.com/onflow/flow-go/ledger/complete/wal"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
@@ -27,9 +29,14 @@ import (
 )
 
 var (
-	flagCheckpointDir string
-	flagOutputDir     string
-	flagMemProfile    bool
+	flagCheckpointDir   string
+	flagStateCommitment string
+	flagOutputDir       string
+	flagMemProfile      bool
+)
+
+const (
+	ledgerStatsReportName = "ledger.stats.json"
 )
 
 var Cmd = &cobra.Command{
@@ -42,6 +49,11 @@ func init() {
 	Cmd.Flags().StringVar(&flagCheckpointDir, "checkpoint-dir", "",
 		"Directory to load checkpoint files from")
 	_ = Cmd.MarkFlagRequired("checkpoint-dir")
+
+	// state-commitment is optional.
+	// When provided, this program only gathers stats on trie with matching state commitment.
+	Cmd.Flags().StringVar(&flagStateCommitment, "state-commitment", "",
+		"Trie state commitment")
 
 	Cmd.Flags().StringVar(&flagOutputDir, "output-dir", "",
 		"Directory to write checkpoint stats to")
@@ -111,8 +123,33 @@ func run(*cobra.Command, []string) {
 	var key ledger.Key
 	var size, valueSize int
 
+	var tries []*trie.MTrie
+
+	if flagStateCommitment != "" {
+		stateCommitment := util.ParseStateCommitment(flagStateCommitment)
+
+		t, err := led.FindTrieByStateCommit(stateCommitment)
+		if err != nil {
+			log.Fatal().Err(err).Msgf("failed to find trie with state commitment %x", stateCommitment)
+		}
+		if t == nil {
+			log.Fatal().Msgf("no trie with state commitment %x", stateCommitment)
+		}
+
+		tries = append(tries, t)
+	} else {
+		ts, err := led.Tries()
+		if err != nil {
+			log.Fatal().Err(err).Msg("failed to get tries")
+		}
+
+		tries = append(tries, ts...)
+	}
+
+	log.Info().Msgf("collecting stats on %d tries", len(tries))
+
 	valueSizesByType := make(sizesByType, 0)
-	ledgerStats, err := led.CollectStats(func(p *ledger.Payload) {
+	ledgerStats, err := complete.CollectStats(tries, func(p *ledger.Payload) {
 		key, err = p.Key()
 		if err != nil {
 			log.Fatal().Err(err).Msg("cannot load a key")
@@ -191,7 +228,7 @@ func run(*cobra.Command, []string) {
 		},
 	}
 
-	path := filepath.Join(flagOutputDir, "ledger.stats.json")
+	path := filepath.Join(flagOutputDir, ledgerStatsReportName)
 
 	fi, err := os.Create(path)
 	if err != nil {
