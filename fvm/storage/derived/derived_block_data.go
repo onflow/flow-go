@@ -3,6 +3,8 @@ package derived
 import (
 	"fmt"
 
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
+
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
 
@@ -26,6 +28,7 @@ type DerivedTransactionPreparer interface {
 		getMeterParamOverrides ValueComputer[struct{}, MeterParamOverrides],
 	) (
 		MeterParamOverrides,
+		*snapshot.ExecutionSnapshot,
 		error,
 	)
 
@@ -184,9 +187,10 @@ func (transaction *DerivedTransactionData) GetMeterParamOverrides(
 	getMeterParamOverrides ValueComputer[struct{}, MeterParamOverrides],
 ) (
 	MeterParamOverrides,
+	*snapshot.ExecutionSnapshot,
 	error,
 ) {
-	return transaction.meterParamOverrides.GetOrCompute(
+	return transaction.meterParamOverrides.GetWithStateOrCompute(
 		txnState,
 		struct{}{},
 		getMeterParamOverrides)

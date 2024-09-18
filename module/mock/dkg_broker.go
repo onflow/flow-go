@@ -21,14 +21,14 @@ func (_m *DKGBroker) Broadcast(data []byte) {
 	_m.Called(data)
 }
 
-// Disqualify provides a mock function with given fields: participant, log
-func (_m *DKGBroker) Disqualify(participant int, log string) {
-	_m.Called(participant, log)
+// Disqualify provides a mock function with given fields: index, log
+func (_m *DKGBroker) Disqualify(index int, log string) {
+	_m.Called(index, log)
 }
 
-// FlagMisbehavior provides a mock function with given fields: participant, log
-func (_m *DKGBroker) FlagMisbehavior(participant int, log string) {
-	_m.Called(participant, log)
+// FlagMisbehavior provides a mock function with given fields: index, log
+func (_m *DKGBroker) FlagMisbehavior(index int, log string) {
+	_m.Called(index, log)
 }
 
 // GetBroadcastMsgCh provides a mock function with given fields:

@@ -1207,6 +1207,8 @@ func TestTransactionTracing(t *testing.T) {
 				return nil
 			}
 
+			tracer.WithBlockID(blockID)
+
 			// interact and record trace
 			res, err := blk.DirectCall(
 				types.NewContractCall(
@@ -1219,12 +1221,12 @@ func TestTransactionTracing(t *testing.T) {
 				),
 			)
 			require.NoError(t, err)
+			require.NoError(t, res.ValidationError)
+			require.NoError(t, res.VMError)
 			txID = res.TxHash
-			trace, err = tracer.TxTracer().GetResult()
-			require.NoError(t, err)
-			tracer.WithBlockID(blockID)
-
 			tracer.Collect(txID)
+			trace = tracer.GetResultByTxHash(txID)
+			require.NotEmpty(t, trace)
 
 			testAccount.SetNonce(testAccount.Nonce() + 1)
 			require.Eventuallyf(t, func() bool {
@@ -1265,11 +1267,10 @@ func TestTransactionTracing(t *testing.T) {
 			)
 			requireSuccessfulExecution(t, err, res)
 			txID = res.TxHash
-			trace, err = tracer.TxTracer().GetResult()
-			require.NoError(t, err)
 			tracer.WithBlockID(blockID)
-
 			tracer.Collect(txID)
+			trace = tracer.GetResultByTxHash(txID)
+			require.NotEmpty(t, trace)
 
 			testAccount.SetNonce(testAccount.Nonce() + 1)
 			require.Eventuallyf(t, func() bool {
@@ -1310,11 +1311,11 @@ func TestTransactionTracing(t *testing.T) {
 			res, err := blk.RunTransaction(tx)
 			requireSuccessfulExecution(t, err, res)
 			txID = res.TxHash
-			trace, err = tracer.TxTracer().GetResult()
-			require.NoError(t, err)
 			tracer.WithBlockID(blockID)
-
 			tracer.Collect(txID)
+			trace = tracer.GetResultByTxHash(txID)
+			require.NotEmpty(t, trace)
+
 			testAccount.SetNonce(testAccount.Nonce() + 1)
 			require.Eventuallyf(t, func() bool {
 				<-uploaded
@@ -1388,12 +1389,11 @@ func TestTransactionTracing(t *testing.T) {
 			res, err := blk.RunTransaction(tx)
 			requireSuccessfulExecution(t, err, res)
 			txID = res.TxHash
-			trace, err = tracer.TxTracer().GetResult()
-			require.NoError(t, err)
-			require.NotEmpty(t, trace)
 			tracer.WithBlockID(blockID)
-
 			tracer.Collect(txID)
+			trace = tracer.GetResultByTxHash(txID)
+			require.NotEmpty(t, trace)
+
 			testAccount.SetNonce(testAccount.Nonce() + 1)
 			require.Eventuallyf(t, func() bool {
 				<-uploaded
@@ -1482,11 +1482,9 @@ func TestTransactionTracing(t *testing.T) {
 			require.NoError(t, err)
 			require.Len(t, results, 1)
 			txID = results[0].TxHash
-			trace, err = tracer.TxTracer().GetResult()
-			require.NoError(t, err)
 			tracer.WithBlockID(blockID)
-
 			tracer.Collect(txID)
+			trace = tracer.GetResultByTxHash(txID)
 
 			require.Eventuallyf(t, func() bool {
 				<-uploaded

@@ -25,6 +25,7 @@ import (
 	"github.com/onflow/flow-go/fvm/evm"
 	"github.com/onflow/flow-go/fvm/evm/emulator"
 	"github.com/onflow/flow-go/fvm/evm/events"
+	"github.com/onflow/flow-go/fvm/evm/impl"
 	"github.com/onflow/flow-go/fvm/evm/stdlib"
 	"github.com/onflow/flow-go/fvm/evm/testutils"
 	. "github.com/onflow/flow-go/fvm/evm/testutils"
@@ -70,13 +71,17 @@ func TestEVMRun(t *testing.T) {
 					sc.EVMContract.Address.HexWithPrefix(),
 				))
 
+				coinbaseAddr := types.Address{1, 2, 3}
+				coinbaseBalance := getEVMAccountBalance(t, ctx, vm, snapshot, coinbaseAddr)
+				require.Zero(t, types.BalanceToBigInt(coinbaseBalance).Uint64())
+
 				num := int64(12)
 				innerTxBytes := testAccount.PrepareSignAndEncodeTx(t,
 					testContract.DeployedAt.ToCommon(),
 					testContract.MakeCallData(t, "store", big.NewInt(num)),
 					big.NewInt(0),
 					uint64(100_000),
-					big.NewInt(0),
+					big.NewInt(1),
 				)
 
 				innerTx := cadence.NewArray(
@@ -84,7 +89,7 @@ func TestEVMRun(t *testing.T) {
 				).WithType(stdlib.EVMTransactionBytesCadenceType)
 
 				coinbase := cadence.NewArray(
-					ConvertToCadence(testAccount.Address().Bytes()),
+					ConvertToCadence(coinbaseAddr.Bytes()),
 				).WithType(stdlib.EVMAddressBytesCadenceType)
 
 				tx := fvm.Transaction(
@@ -105,10 +110,18 @@ func TestEVMRun(t *testing.T) {
 				snapshot = snapshot.Append(state)
 
 				// assert event fields are correct
-				require.Len(t, output.Events, 1)
+				require.Len(t, output.Events, 2)
 				txEvent := output.Events[0]
 				txEventPayload := testutils.TxEventToPayload(t, txEvent, sc.EVMContract.Address)
 				require.NoError(t, err)
+
+				// fee transfer event
+				feeTransferEvent := output.Events[1]
+				feeTranferEventPayload := testutils.TxEventToPayload(t, feeTransferEvent, sc.EVMContract.Address)
+				require.NoError(t, err)
+				require.Equal(t, uint16(types.ErrCodeNoError), feeTranferEventPayload.ErrorCode)
+				require.Equal(t, uint16(1), feeTranferEventPayload.Index)
+				require.Equal(t, uint64(21000), feeTranferEventPayload.GasConsumed)
 
 				// commit block
 				blockEventPayload, snapshot := callEVMHeartBeat(t,
@@ -117,10 +130,10 @@ func TestEVMRun(t *testing.T) {
 					snapshot)
 
 				require.NotEmpty(t, blockEventPayload.Hash)
-				require.Equal(t, uint64(43785), blockEventPayload.TotalGasUsed)
+				require.Equal(t, uint64(64785), blockEventPayload.TotalGasUsed)
 				require.NotEmpty(t, blockEventPayload.Hash)
 
-				txHashes := types.TransactionHashes{txEventPayload.Hash}
+				txHashes := types.TransactionHashes{txEventPayload.Hash, feeTranferEventPayload.Hash}
 				require.Equal(t,
 					txHashes.RootHash(),
 					blockEventPayload.TransactionHashRoot,
@@ -131,12 +144,15 @@ func TestEVMRun(t *testing.T) {
 				require.Equal(t, uint16(types.ErrCodeNoError), txEventPayload.ErrorCode)
 				require.Equal(t, uint16(0), txEventPayload.Index)
 				require.Equal(t, blockEventPayload.Height, txEventPayload.BlockHeight)
-				require.Equal(t, blockEventPayload.TotalGasUsed, txEventPayload.GasConsumed)
-				require.Equal(t, uint64(43785), blockEventPayload.TotalGasUsed)
+				require.Equal(t, blockEventPayload.TotalGasUsed-feeTranferEventPayload.GasConsumed, txEventPayload.GasConsumed)
 				require.Empty(t, txEventPayload.ContractAddress)
 
 				// append the state
 				snapshot = snapshot.Append(state)
+
+				// check coinbase balance
+				coinbaseBalance = getEVMAccountBalance(t, ctx, vm, snapshot, coinbaseAddr)
+				require.Equal(t, types.BalanceToBigInt(coinbaseBalance).Uint64(), txEventPayload.GasConsumed)
 
 				// query the value
 				code = []byte(fmt.Sprintf(
@@ -180,7 +196,7 @@ func TestEVMRun(t *testing.T) {
 				require.NoError(t, err)
 				require.NoError(t, output.Err)
 
-				res, err := stdlib.ResultSummaryFromEVMResultValue(output.Value)
+				res, err := impl.ResultSummaryFromEVMResultValue(output.Value)
 				require.NoError(t, err)
 				require.Equal(t, types.StatusSuccessful, res.Status)
 				require.Equal(t, types.ErrCodeNoError, res.ErrorCode)
@@ -292,7 +308,7 @@ func TestEVMRun(t *testing.T) {
 				require.NoError(t, err)
 				require.NoError(t, output.Err)
 
-				res, err := stdlib.ResultSummaryFromEVMResultValue(output.Value)
+				res, err := impl.ResultSummaryFromEVMResultValue(output.Value)
 				require.NoError(t, err)
 				require.Equal(t, types.StatusSuccessful, res.Status)
 				require.Equal(t, types.ErrCodeNoError, res.ErrorCode)
@@ -415,6 +431,10 @@ func TestEVMBatchRun(t *testing.T) {
 					sc.EVMContract.Address.HexWithPrefix(),
 				))
 
+				coinbaseAddr := types.Address{1, 2, 3}
+				coinbaseBalance := getEVMAccountBalance(t, ctx, vm, snapshot, coinbaseAddr)
+				require.Zero(t, types.BalanceToBigInt(coinbaseBalance).Uint64())
+
 				batchCount := 5
 				var storedValues []int64
 				txBytes := make([]cadence.Value, batchCount)
@@ -427,7 +447,7 @@ func TestEVMBatchRun(t *testing.T) {
 						testContract.MakeCallData(t, "storeWithLog", big.NewInt(num)),
 						big.NewInt(0),
 						uint64(100_000),
-						big.NewInt(0),
+						big.NewInt(1),
 					)
 
 					// build txs argument
@@ -437,7 +457,7 @@ func TestEVMBatchRun(t *testing.T) {
 				}
 
 				coinbase := cadence.NewArray(
-					ConvertToCadence(testAccount.Address().Bytes()),
+					ConvertToCadence(coinbaseAddr.Bytes()),
 				).WithType(stdlib.EVMAddressBytesCadenceType)
 
 				txs := cadence.NewArray(txBytes).
@@ -461,10 +481,11 @@ func TestEVMBatchRun(t *testing.T) {
 				// append the state
 				snapshot = snapshot.Append(state)
 
-				require.Len(t, output.Events, batchCount)
+				require.Len(t, output.Events, batchCount+1)
 				txHashes := make(types.TransactionHashes, 0)
+				totalGasUsed := uint64(0)
 				for i, event := range output.Events {
-					if i == batchCount { // last one is block executed
+					if i == batchCount { // skip last one
 						continue
 					}
 
@@ -486,7 +507,21 @@ func TestEVMBatchRun(t *testing.T) {
 					log := logs[0]
 					last := log.Topics[len(log.Topics)-1] // last topic is the value set in the store method
 					assert.Equal(t, storedValues[i], last.Big().Int64())
+					totalGasUsed += event.GasConsumed
 				}
+
+				// last event is fee transfer event
+				feeTransferEvent := output.Events[batchCount]
+				feeTranferEventPayload := testutils.TxEventToPayload(t, feeTransferEvent, sc.EVMContract.Address)
+				require.NoError(t, err)
+				require.Equal(t, uint16(types.ErrCodeNoError), feeTranferEventPayload.ErrorCode)
+				require.Equal(t, uint16(batchCount), feeTranferEventPayload.Index)
+				require.Equal(t, uint64(21000), feeTranferEventPayload.GasConsumed)
+				txHashes = append(txHashes, feeTranferEventPayload.Hash)
+
+				// check coinbase balance (note the gas price is 1)
+				coinbaseBalance = getEVMAccountBalance(t, ctx, vm, snapshot, coinbaseAddr)
+				require.Equal(t, types.BalanceToBigInt(coinbaseBalance).Uint64(), totalGasUsed)
 
 				// commit block
 				blockEventPayload, snapshot := callEVMHeartBeat(t,
@@ -495,7 +530,7 @@ func TestEVMBatchRun(t *testing.T) {
 					snapshot)
 
 				require.NotEmpty(t, blockEventPayload.Hash)
-				require.Equal(t, uint64(155513), blockEventPayload.TotalGasUsed)
+				require.Equal(t, uint64(176_513), blockEventPayload.TotalGasUsed)
 				require.Equal(t,
 					txHashes.RootHash(),
 					blockEventPayload.TransactionHashRoot,
@@ -540,7 +575,7 @@ func TestEVMBatchRun(t *testing.T) {
 
 				// make sure the retrieved value is the same as the last value
 				// that was stored by transaction batch
-				res, err := stdlib.ResultSummaryFromEVMResultValue(output.Value)
+				res, err := impl.ResultSummaryFromEVMResultValue(output.Value)
 				require.NoError(t, err)
 				require.Equal(t, types.StatusSuccessful, res.Status)
 				require.Equal(t, types.ErrCodeNoError, res.ErrorCode)
@@ -680,7 +715,7 @@ func TestEVMBatchRun(t *testing.T) {
 
 				// make sure the retrieved value is the same as the last value
 				// that was stored by transaction batch
-				res, err := stdlib.ResultSummaryFromEVMResultValue(output.Value)
+				res, err := impl.ResultSummaryFromEVMResultValue(output.Value)
 				require.NoError(t, err)
 				require.Equal(t, types.StatusSuccessful, res.Status)
 				require.Equal(t, types.ErrCodeNoError, res.ErrorCode)
@@ -824,7 +859,7 @@ func TestEVMBatchRun(t *testing.T) {
 
 				// make sure the retrieved value is the same as the last value
 				// that was stored by transaction batch
-				res, err := stdlib.ResultSummaryFromEVMResultValue(output.Value)
+				res, err := impl.ResultSummaryFromEVMResultValue(output.Value)
 				require.NoError(t, err)
 				require.Equal(t, types.ErrCodeNoError, res.ErrorCode)
 				require.Equal(t, types.StatusSuccessful, res.Status)
@@ -888,7 +923,7 @@ func TestEVMBlockData(t *testing.T) {
 			require.NoError(t, err)
 			require.NoError(t, output.Err)
 
-			res, err := stdlib.ResultSummaryFromEVMResultValue(output.Value)
+			res, err := impl.ResultSummaryFromEVMResultValue(output.Value)
 			require.NoError(t, err)
 			require.Equal(t, types.StatusSuccessful, res.Status)
 			require.Equal(t, types.ErrCodeNoError, res.ErrorCode)
@@ -1338,7 +1373,7 @@ func TestCadenceOwnedAccountFunctionalities(t *testing.T) {
 				require.NoError(t, err)
 				require.NoError(t, output.Err)
 
-				res, err := stdlib.ResultSummaryFromEVMResultValue(output.Value)
+				res, err := impl.ResultSummaryFromEVMResultValue(output.Value)
 				require.NoError(t, err)
 				require.Equal(t, types.StatusSuccessful, res.Status)
 				require.Equal(t, types.ErrCodeNoError, res.ErrorCode)
@@ -1394,7 +1429,7 @@ func TestDryRun(t *testing.T) {
 		require.NoError(t, err)
 		require.NoError(t, output.Err)
 
-		result, err := stdlib.ResultSummaryFromEVMResultValue(output.Value)
+		result, err := impl.ResultSummaryFromEVMResultValue(output.Value)
 		require.NoError(t, err)
 		return result
 	}
@@ -1507,7 +1542,7 @@ func TestDryRun(t *testing.T) {
 				require.NoError(t, err)
 				require.NoError(t, output.Err)
 
-				res, err := stdlib.ResultSummaryFromEVMResultValue(output.Value)
+				res, err := impl.ResultSummaryFromEVMResultValue(output.Value)
 				require.NoError(t, err)
 				require.Equal(t, types.StatusSuccessful, res.Status)
 				require.Equal(t, types.ErrCodeNoError, res.ErrorCode)
@@ -1641,7 +1676,7 @@ func TestDryRun(t *testing.T) {
 				require.NoError(t, err)
 				require.NoError(t, output.Err)
 
-				res, err := stdlib.ResultSummaryFromEVMResultValue(output.Value)
+				res, err := impl.ResultSummaryFromEVMResultValue(output.Value)
 				require.NoError(t, err)
 				require.Equal(t, types.StatusSuccessful, res.Status)
 				require.Equal(t, types.ErrCodeNoError, res.ErrorCode)
@@ -1773,7 +1808,7 @@ func TestDryRun(t *testing.T) {
 				require.NoError(t, err)
 				require.NoError(t, output.Err)
 
-				res, err := stdlib.ResultSummaryFromEVMResultValue(output.Value)
+				res, err := impl.ResultSummaryFromEVMResultValue(output.Value)
 				require.NoError(t, err)
 				//require.Equal(t, types.StatusSuccessful, res.Status)
 				require.Equal(t, types.ErrCodeNoError, res.ErrorCode)
@@ -1857,7 +1892,7 @@ func TestDryRun(t *testing.T) {
 				require.NoError(t, err)
 				require.NoError(t, output.Err)
 
-				res, err := stdlib.ResultSummaryFromEVMResultValue(output.Value)
+				res, err := impl.ResultSummaryFromEVMResultValue(output.Value)
 				require.NoError(t, err)
 				require.Equal(t, types.StatusSuccessful, res.Status)
 				require.Equal(t, types.ErrCodeNoError, res.ErrorCode)
