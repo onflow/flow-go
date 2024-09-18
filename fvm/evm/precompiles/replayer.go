@@ -1,6 +1,7 @@
 package precompiles
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 
@@ -50,31 +51,33 @@ func (p *ReplayerPrecompiledContract) Address() types.Address {
 }
 
 func (p *ReplayerPrecompiledContract) RequiredGas(input []byte) (output uint64) {
+	var in []byte
+	copy(in, input)
+
 	if p.requiredGasIndex > len(p.expectedCalls.RequiredGasCalls) {
 		panic(errUnexpectedCall)
 	}
 
-	input = removeFunctionSelector(input)
-
 	// todo temporarily disable input/output check
-	//if !bytes.Equal(p.expectedCalls.RequiredGasCalls[p.requiredGasIndex].Input, input) {
-	//	panic(errUnexpectedCall)
-	//}
+	if !bytes.Equal(p.expectedCalls.RequiredGasCalls[p.requiredGasIndex].Input, in) {
+		panic(errUnexpectedCall)
+	}
 	output = p.expectedCalls.RequiredGasCalls[p.requiredGasIndex].Output
 	p.requiredGasIndex++
 	return
 }
 
 func (p *ReplayerPrecompiledContract) Run(input []byte) (output []byte, err error) {
+	var in []byte
+	copy(in, input)
+
 	if p.runIndex > len(p.expectedCalls.RunCalls) {
 		panic(errUnexpectedCall)
 	}
-	input = removeFunctionSelector(input)
 
-	// todo temporarily disable input/output check
-	//if !bytes.Equal(p.expectedCalls.RunCalls[p.runIndex].Input, input) {
-	//	panic(errUnexpectedCall)
-	//}
+	if !bytes.Equal(p.expectedCalls.RunCalls[p.runIndex].Input, in) {
+		panic(errUnexpectedCall)
+	}
 	output = p.expectedCalls.RunCalls[p.runIndex].Output
 	errMsg := p.expectedCalls.RunCalls[p.runIndex].ErrorMsg
 	if len(errMsg) > 0 {
