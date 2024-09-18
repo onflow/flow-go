@@ -629,7 +629,7 @@ network-config:
       # Recommended size is 10x the number of peers in the network.
       cache-size: 10000
     peer-gater:
-      enabled: true
+      enable: true
       topic-delivery-weights-override:
         consensus-committee: 1.5
         sync-committee: .5
