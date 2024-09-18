@@ -419,6 +419,7 @@ func (e *Engine) handleTransactionResultErrorMessages(ctx context.Context, block
 			return fmt.Errorf("could not check existance of transaction result error messages: %w", err)
 		}
 
+		// retrieves error messages from the backend if they do not already exist in storage
 		if !exists {
 			execNodes, err := commonrpc.ExecutionNodesForBlockID(
 				ctx,
@@ -430,7 +431,8 @@ func (e *Engine) handleTransactionResultErrorMessages(ctx context.Context, block
 				e.preferredENIdentifiers,
 			)
 			if err != nil {
-				// querying nodes by existing execution receipts failed, will continue with the next execution node from execution receipt
+				// in case querying nodes by existing execution receipts failed,
+				// will continue with the next execution node from next the execution receipt for that block
 				return nil
 			}
 
@@ -481,7 +483,7 @@ func (e *Engine) storeTransactionResultErrorMessages(
 
 	err := e.transactionResultErrorMessages.Store(blockID, errorMessages)
 	if err != nil {
-		return fmt.Errorf("failed to store execution receipt: %w", err)
+		return fmt.Errorf("failed to store transaction error messages: %w", err)
 	}
 
 	return nil

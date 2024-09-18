@@ -26,6 +26,8 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
+const failedErrorMessage = "failed"
+
 type backendTransactions struct {
 	*TransactionsLocalDataProvider
 	staticCollectionRPC accessproto.AccessAPIClient // rpc client tied to a fixed collection node
@@ -1029,6 +1031,9 @@ func (b *backendTransactions) LookupErrorMessageByTransactionID(
 
 	resp, err := b.getTransactionErrorMessageFromAnyEN(ctx, execNodes, req)
 	if err != nil {
+		// If no execution nodes return a valid response,
+		// store a static message "failed", with flow.ZeroID as the executor.
+		// TODO: add storing to db, find a way to get transaction index here
 		return "", fmt.Errorf("could not fetch error message from ENs: %w", err)
 	}
 
@@ -1076,6 +1081,27 @@ func (b *backendTransactions) LookupErrorMessageByIndex(
 
 	resp, err := b.getTransactionErrorMessageByIndexFromAnyEN(ctx, execNodes, req)
 	if err != nil {
+		txResult, err := b.txResultsIndex.ByBlockIDTransactionIndex(blockID, height, index)
+		if err != nil {
+			return "", rpc.ConvertStorageError(err)
+		}
+
+		// If no execution nodes return a valid response,
+		// store a static message "failed", with flow.ZeroID as the executor.
+		if b.txResultErrorMessages != nil {
+			err = b.txResultErrorMessages.Store(blockID, []flow.TransactionResultErrorMessage{
+				{
+					TransactionID: txResult.TransactionID,
+					ErrorMessage:  failedErrorMessage,
+					ExecutorID:    flow.ZeroID,
+					Index:         index,
+				},
+			})
+			if err != nil {
+				return "", fmt.Errorf("failed to store transaction error messages: %w", err)
+			}
+		}
+
 		return "", fmt.Errorf("could not fetch error message from ENs: %w", err)
 	}
 
@@ -1125,10 +1151,32 @@ func (b *backendTransactions) LookupErrorMessagesByBlockID(
 
 	resp, _, err := b.GetTransactionErrorMessagesFromAnyEN(ctx, execNodes, req)
 	if err != nil {
-		// TODO: store to db a static message "failed", with flow.ZeroID as the executor.
-		//if b.txResultErrorMessages != nil {
-		//
-		//}
+		// If no execution nodes return a valid response,
+		// store a static message "failed", with flow.ZeroID as the executor.
+		if b.txResultErrorMessages != nil {
+			txResults, err := b.txResultsIndex.ByBlockID(blockID, height)
+			if err != nil {
+				return nil, rpc.ConvertStorageError(err)
+			}
+
+			var txErrorMessages []flow.TransactionResultErrorMessage
+
+			for i, txResult := range txResults {
+				if txResult.Failed {
+					txErrorMessages = append(txErrorMessages, flow.TransactionResultErrorMessage{
+						TransactionID: txResult.TransactionID,
+						ErrorMessage:  failedErrorMessage,
+						ExecutorID:    flow.ZeroID,
+						Index:         uint32(i),
+					})
+				}
+			}
+
+			err = b.txResultErrorMessages.Store(blockID, txErrorMessages)
+			if err != nil {
+				return nil, fmt.Errorf("failed to store transaction error messages: %w", err)
+			}
+		}
 		return nil, fmt.Errorf("could not fetch error message from ENs: %w", err)
 	}
 
