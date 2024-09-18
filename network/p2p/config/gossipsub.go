@@ -100,7 +100,7 @@ type ScoringParameters struct {
 type PeerGaterParameters struct {
 	// Enabled enables the peer gater.
 	Enabled bool `validate:"required" mapstructure:"enable"`
-	// TopicDeliveryWeightsOverride map of topic delivery weights that will override the default value for the specified channel.
+	// TopicDeliveryWeightsOverride topic delivery weights that will override the default value for the specified channel.
 	TopicDeliveryWeightsOverride TopicDeliveryWeightsOverride `validate:"required" mapstructure:"topic-delivery-weights-override"`
 }
 

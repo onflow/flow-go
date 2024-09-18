@@ -99,7 +99,7 @@ func (g *GossipSubAdapterConfig) WithTracer(tracer p2p.PubSubTracer) {
 
 // WithPeerGater adds a peer gater option to the config.
 // Args:
-// - params: the peer gater params to use
+// - params: the topic delivery weights to use
 // Returns:
 // -None
 func (g *GossipSubAdapterConfig) WithPeerGater(topicDeliveryWeights map[string]float64) {
