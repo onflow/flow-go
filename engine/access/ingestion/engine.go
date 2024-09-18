@@ -473,6 +473,7 @@ func (e *Engine) storeTransactionResultErrorMessages(
 		errorMessage := flow.TransactionResultErrorMessage{
 			ErrorMessage:  value.ErrorMessage,
 			TransactionID: convert.MessageToIdentifier(value.TransactionId),
+			Index:         value.Index,
 			ExecutorID:    execNode.NodeID,
 		}
 		errorMessages = append(errorMessages, errorMessage)

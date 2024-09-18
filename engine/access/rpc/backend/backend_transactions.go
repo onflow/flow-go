@@ -1125,9 +1125,10 @@ func (b *backendTransactions) LookupErrorMessagesByBlockID(
 
 	resp, _, err := b.GetTransactionErrorMessagesFromAnyEN(ctx, execNodes, req)
 	if err != nil {
-		if b.txResultErrorMessages != nil {
-			// TODO: store to db a static message "failed", with flow.ZeroID as the executor.
-		}
+		// TODO: store to db a static message "failed", with flow.ZeroID as the executor.
+		//if b.txResultErrorMessages != nil {
+		//
+		//}
 		return nil, fmt.Errorf("could not fetch error message from ENs: %w", err)
 	}
 

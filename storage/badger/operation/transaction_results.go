@@ -129,8 +129,8 @@ func BatchInsertTransactionResultErrorMessage(blockID flow.Identifier, transacti
 
 // BatchIndexTransactionResultErrorMessage indexes a transaction result error message by index within the block using a
 // batch write.
-func BatchIndexTransactionResultErrorMessage(blockID flow.Identifier, txIndex uint32, transactionResultErrorMessage *flow.TransactionResultErrorMessage) func(batch *badger.WriteBatch) error {
-	return batchWrite(makePrefix(codeTransactionResultErrorMessageIndex, blockID, txIndex), transactionResultErrorMessage)
+func BatchIndexTransactionResultErrorMessage(blockID flow.Identifier, transactionResultErrorMessage *flow.TransactionResultErrorMessage) func(batch *badger.WriteBatch) error {
+	return batchWrite(makePrefix(codeTransactionResultErrorMessageIndex, blockID, transactionResultErrorMessage.Index), transactionResultErrorMessage)
 }
 
 // RetrieveTransactionResultErrorMessage retrieves a transaction result error message by block ID and transaction ID.
