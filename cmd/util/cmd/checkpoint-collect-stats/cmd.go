@@ -1,11 +1,7 @@
 package checkpoint_collect_stats
 
 import (
-	"bufio"
-	"encoding/json"
 	"math"
-	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/montanaflynn/stats"
@@ -17,6 +13,7 @@ import (
 
 	"github.com/onflow/atree"
 
+	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
@@ -37,7 +34,7 @@ var (
 )
 
 const (
-	ledgerStatsReportName = "ledger.stats.json"
+	ledgerStatsReportName = "ledger-stats"
 )
 
 var Cmd = &cobra.Command{
@@ -149,7 +146,7 @@ func run(*cobra.Command, []string) {
 		},
 	}
 
-	writeStats(stats)
+	writeStats(ledgerStatsReportName, stats)
 }
 
 func getPayloadStatsFromPayloadFile(payloadCallBack func(payload *ledger.Payload)) {
@@ -283,24 +280,12 @@ func getStats(valueSizesByType sizesByType) []RegisterStatsByTypes {
 	return statsByTypes
 }
 
-func writeStats(stats *Stats) {
-	path := filepath.Join(flagOutputDir, ledgerStatsReportName)
+func writeStats(reportName string, stats interface{}) {
+	rw := reporters.NewReportFileWriterFactory(flagOutputDir, log.Logger).
+		ReportWriter(reportName)
+	defer rw.Close()
 
-	fi, err := os.Create(path)
-	if err != nil {
-		log.Fatal().Err(err).Msg("failed to create path")
-	}
-	defer fi.Close()
-
-	writer := bufio.NewWriter(fi)
-	defer writer.Flush()
-
-	encoder := json.NewEncoder(writer)
-
-	err = encoder.Encode(stats)
-	if err != nil {
-		log.Fatal().Err(err).Msg("could not json encode ledger stats")
-	}
+	rw.Write(stats)
 }
 
 func getType(key ledger.Key) string {
