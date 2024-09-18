@@ -69,7 +69,7 @@ func (b *BaseSuite) SetupSuite() {
 	b.NodeConfigs = append(b.NodeConfigs,
 		testnet.NewNodeConfig(flow.RoleAccess,
 			testnet.WithLogLevel(zerolog.FatalLevel),
-			testnet.WithAdditionalFlag("--peer-scoring-enabled=true")), // currently, peer scoring is off by default
+			testnet.WithAdditionalFlag("--gossipsub-peer-scoring-enabled=true")), // currently, peer scoring is off by default
 	)
 
 	// setup consensus nodes
@@ -85,7 +85,7 @@ func (b *BaseSuite) SetupSuite() {
 			// TODO: fix the access integration test logic to function without slowing down
 			// the block rate
 			testnet.WithAdditionalFlag("--cruise-ctl-fallback-proposal-duration=250ms"),
-			testnet.WithAdditionalFlag("--peer-scoring-enabled=true"),
+			testnet.WithAdditionalFlag("--gossipsub-peer-scoring-enabled=true"),
 		)
 		b.NodeConfigs = append(b.NodeConfigs, nodeConfig)
 	}
@@ -93,19 +93,19 @@ func (b *BaseSuite) SetupSuite() {
 	// setup single verification node
 	b.NodeConfigs = append(b.NodeConfigs,
 		testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.FatalLevel),
-			testnet.WithAdditionalFlag("--peer-scoring-enabled=true")),
+			testnet.WithAdditionalFlag("--gossipsub-peer-scoring-enabled=true")),
 	)
 
 	// setup execution nodes
 	b.NodeConfigs = append(b.NodeConfigs,
-		testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.FatalLevel), testnet.WithAdditionalFlag("--peer-scoring-enabled=true")),
-		testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.FatalLevel), testnet.WithAdditionalFlag("--peer-scoring-enabled=true")),
+		testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.FatalLevel), testnet.WithAdditionalFlag("--gossipsub-peer-scoring-enabled=true")),
+		testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.FatalLevel), testnet.WithAdditionalFlag("--gossipsub-peer-scoring-enabled=true")),
 	)
 
 	// setup collection nodes
 	b.NodeConfigs = append(b.NodeConfigs,
-		testnet.NewNodeConfig(flow.RoleCollection, testnet.WithLogLevel(zerolog.FatalLevel), testnet.WithAdditionalFlag("--hotstuff-proposal-duration=1ms"), testnet.WithAdditionalFlag("--peer-scoring-enabled=true")),
-		testnet.NewNodeConfig(flow.RoleCollection, testnet.WithLogLevel(zerolog.FatalLevel), testnet.WithAdditionalFlag("--hotstuff-proposal-duration=1ms"), testnet.WithAdditionalFlag("--peer-scoring-enabled=true")),
+		testnet.NewNodeConfig(flow.RoleCollection, testnet.WithLogLevel(zerolog.FatalLevel), testnet.WithAdditionalFlag("--hotstuff-proposal-duration=1ms"), testnet.WithAdditionalFlag("--gossipsub-peer-scoring-enabled=true")),
+		testnet.NewNodeConfig(flow.RoleCollection, testnet.WithLogLevel(zerolog.FatalLevel), testnet.WithAdditionalFlag("--hotstuff-proposal-duration=1ms"), testnet.WithAdditionalFlag("--gossipsub-peer-scoring-enabled=true")),
 	)
 
 	// Ghost Node
