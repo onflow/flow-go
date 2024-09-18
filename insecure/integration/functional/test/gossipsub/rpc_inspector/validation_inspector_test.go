@@ -44,6 +44,7 @@ func TestValidationInspector_InvalidTopicId_Detection(t *testing.T) {
 	sporkID := unittest.IdentifierFixture()
 	flowConfig, err := config.DefaultConfig()
 	require.NoError(t, err)
+	flowConfig.NetworkConfig.GossipSub.PeerScoringEnabled = true // default is false
 	inspectorConfig := flowConfig.NetworkConfig.GossipSub.RpcInspector.Validation
 
 	messageCount := 100
