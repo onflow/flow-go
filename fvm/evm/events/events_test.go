@@ -131,7 +131,7 @@ func TestEVMTransactionExecutedEventCCFEncodingDecoding(t *testing.T) {
 		assert.Equal(t, tep.GasConsumed, txResult.GasConsumed)
 		assert.Equal(t, tep.ErrorMessage, txResult.VMError.Error())
 		assert.Equal(t, tep.ReturnedData, txResult.ReturnedData)
-		assert.Equal(t, tep.StateUpdateChecksum[:], stateUpdateCommit[:4])
+		assert.Equal(t, tep.StateUpdateChecksum[:], stateUpdateCommit[:events.ChecksumLength])
 		assert.Equal(
 			t,
 			tep.ContractAddress,
