@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 
+	"github.com/onflow/flow-go/network/channels"
 	p2pconfig "github.com/onflow/flow-go/network/p2p/config"
 )
 
@@ -202,7 +203,8 @@ func AllFlagNames() []string {
 		BuildFlagName(gossipsubKey, p2pconfig.ScoreParamsKey, p2pconfig.ScoringRegistryKey, p2pconfig.MisbehaviourPenaltiesKey, p2pconfig.ClusterPrefixedReductionFactorKey),
 
 		BuildFlagName(gossipsubKey, p2pconfig.PeerGaterKey, p2pconfig.EnableKey),
-		BuildFlagName(gossipsubKey, p2pconfig.PeerGaterKey, p2pconfig.TopicDeliveryWeightsKey),
+		BuildFlagName(gossipsubKey, p2pconfig.PeerGaterKey, p2pconfig.TopicDeliveryWeightsKey, channels.ConsensusCommittee.String()),
+		BuildFlagName(gossipsubKey, p2pconfig.PeerGaterKey, p2pconfig.TopicDeliveryWeightsKey, channels.SyncCommittee.String()),
 	}
 
 	for _, scope := range []string{systemScope, transientScope, protocolScope, peerScope, peerProtocolScope} {
@@ -603,9 +605,12 @@ func InitializeNetworkFlags(flags *pflag.FlagSet, config *Config) {
 	flags.Bool(BuildFlagName(gossipsubKey, p2pconfig.PeerGaterKey, p2pconfig.EnableKey),
 		config.GossipSub.PeerGaterParameters.Enabled,
 		"enable the libp2p peer gater")
-	flags.StringToString(BuildFlagName(gossipsubKey, p2pconfig.PeerGaterKey, p2pconfig.TopicDeliveryWeightsKey),
-		config.GossipSub.PeerGaterParameters.TopicDeliveryWeightsOverride,
-		"topic delivery weights to use for the peer gater params")
+	flags.Float64(BuildFlagName(gossipsubKey, p2pconfig.PeerGaterKey, p2pconfig.TopicDeliveryWeightsKey, channels.ConsensusCommittee.String()),
+		config.GossipSub.PeerGaterParameters.TopicDeliveryWeightsOverride.ConsensusCommittee,
+		"topic delivery weights override for the consensus-committee topic")
+	flags.Float64(BuildFlagName(gossipsubKey, p2pconfig.PeerGaterKey, p2pconfig.TopicDeliveryWeightsKey, channels.SyncCommittee.String()),
+		config.GossipSub.PeerGaterParameters.TopicDeliveryWeightsOverride.SyncCommittee,
+		"topic delivery weights override for the sync-committee topic")
 
 }
 
@@ -676,6 +681,7 @@ func SetAliases(conf *viper.Viper) error {
 		// mapping should be from network-p2pconfig.key1.key2.key3... to network-config-key1-key2-key3...
 		m[strings.Join(s[1:], "-")] = key
 	}
+
 	// each flag name should correspond to exactly one key in our config store after it is loaded with the default config
 	for _, flagName := range AllFlagNames() {
 		fullKey, ok := m[flagName]
