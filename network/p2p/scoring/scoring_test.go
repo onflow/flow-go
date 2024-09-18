@@ -43,6 +43,7 @@ func TestInvalidCtrlMsgScoringIntegration(t *testing.T) {
 	cfg, err := config.DefaultConfig()
 	require.NoError(t, err)
 
+	cfg.NetworkConfig.GossipSub.PeerScoringEnabled = true                                                                     // default is false
 	cfg.NetworkConfig.GossipSub.ScoringParameters.ScoringRegistryParameters.AppSpecificScore.ScoreTTL = 10 * time.Millisecond // speed up the test
 
 	var notificationConsumer p2p.GossipSubInvCtrlMsgNotifConsumer
