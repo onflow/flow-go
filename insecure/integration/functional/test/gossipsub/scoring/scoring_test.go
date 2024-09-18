@@ -105,6 +105,7 @@ func testGossipSubInvalidMessageDeliveryScoring(t *testing.T, spamMsgFactory fun
 
 	cfg, err := config.DefaultConfig()
 	require.NoError(t, err)
+	cfg.NetworkConfig.GossipSub.PeerScoringEnabled = true // default is false
 	// we override the decay interval to 1 second so that the score is updated within 1 second intervals.
 	cfg.NetworkConfig.GossipSub.RpcTracer.ScoreTracerInterval = 1 * time.Second
 	cfg.NetworkConfig.GossipSub.ScoringParameters.PeerScoring.Internal.TopicParameters.InvalidMessageDeliveriesDecay = .99
