@@ -96,7 +96,14 @@ func TestStagedContractsMigration(t *testing.T) {
 			VerboseErrorOutput: true,
 		}
 
-		migration := NewStagedContractsMigration("test", "test", log, rwf, options).
+		migration := NewStagedContractsMigration(
+			"test",
+			"test",
+			log,
+			rwf,
+			&LegacyTypeRequirements{},
+			options,
+		).
 			WithStagedContractUpdates(stagedContracts)
 
 		registersByAccount, err := registersForStagedContracts(
@@ -161,7 +168,14 @@ func TestStagedContractsMigration(t *testing.T) {
 			VerboseErrorOutput: true,
 		}
 
-		migration := NewStagedContractsMigration("test", "test", log, rwf, options).
+		migration := NewStagedContractsMigration(
+			"test",
+			"test",
+			log,
+			rwf,
+			&LegacyTypeRequirements{},
+			options,
+		).
 			WithContractUpdateValidation()
 		migration.WithStagedContractUpdates(stagedContracts)
 
@@ -228,7 +242,14 @@ func TestStagedContractsMigration(t *testing.T) {
 			VerboseErrorOutput: true,
 		}
 
-		migration := NewStagedContractsMigration("test", "test", log, rwf, options).
+		migration := NewStagedContractsMigration(
+			"test",
+			"test",
+			log,
+			rwf,
+			&LegacyTypeRequirements{},
+			options,
+		).
 			WithContractUpdateValidation().
 			WithStagedContractUpdates(stagedContracts)
 
@@ -309,7 +330,14 @@ func TestStagedContractsMigration(t *testing.T) {
 		}
 
 		const reporterName = "test"
-		migration := NewStagedContractsMigration("test", reporterName, log, rwf, options).
+		migration := NewStagedContractsMigration(
+			"test",
+			reporterName,
+			log,
+			rwf,
+			&LegacyTypeRequirements{},
+			options,
+		).
 			WithContractUpdateValidation().
 			WithStagedContractUpdates(stagedContracts)
 
@@ -405,7 +433,14 @@ func TestStagedContractsMigration(t *testing.T) {
 		}
 
 		const reporterName = "test"
-		migration := NewStagedContractsMigration("test", reporterName, log, rwf, options).
+		migration := NewStagedContractsMigration(
+			"test",
+			reporterName,
+			log,
+			rwf,
+			&LegacyTypeRequirements{},
+			options,
+		).
 			WithStagedContractUpdates(stagedContracts)
 
 		registersByAccount, err := registersForStagedContracts(
@@ -514,7 +549,14 @@ func TestStagedContractsMigration(t *testing.T) {
 			VerboseErrorOutput: true,
 		}
 
-		migration := NewStagedContractsMigration("test", "test", log, rwf, options).
+		migration := NewStagedContractsMigration(
+			"test",
+			"test",
+			log,
+			rwf,
+			&LegacyTypeRequirements{},
+			options,
+		).
 			WithStagedContractUpdates(stagedContracts)
 
 		registersByAccount, err := registersForStagedContracts(
@@ -581,7 +623,14 @@ func TestStagedContractsMigration(t *testing.T) {
 			VerboseErrorOutput: true,
 		}
 
-		migration := NewStagedContractsMigration("test", "test", log, rwf, options).
+		migration := NewStagedContractsMigration(
+			"test",
+			"test",
+			log,
+			rwf,
+			&LegacyTypeRequirements{},
+			options,
+		).
 			WithStagedContractUpdates(stagedContracts)
 
 		// NOTE: no payloads
@@ -736,7 +785,14 @@ func TestStagedContractsMigration(t *testing.T) {
 			VerboseErrorOutput: true,
 		}
 
-		migration := NewStagedContractsMigration("test", "test", log, rwf, options)
+		migration := NewStagedContractsMigration(
+			"test",
+			"test",
+			log,
+			rwf,
+			&LegacyTypeRequirements{},
+			options,
+		)
 
 		accountOwner := string(accountAddress[:])
 
@@ -846,7 +902,14 @@ func TestStagedContractsWithImports(t *testing.T) {
 			VerboseErrorOutput: true,
 		}
 
-		migration := NewStagedContractsMigration("test", "test", log, rwf, options).
+		migration := NewStagedContractsMigration(
+			"test",
+			"test",
+			log,
+			rwf,
+			&LegacyTypeRequirements{},
+			options,
+		).
 			WithStagedContractUpdates(stagedContracts)
 
 		registersByAccount, err := registersForStagedContracts(
@@ -945,7 +1008,14 @@ func TestStagedContractsWithImports(t *testing.T) {
 			VerboseErrorOutput: true,
 		}
 
-		migration := NewStagedContractsMigration("test", "test", log, rwf, options).
+		migration := NewStagedContractsMigration(
+			"test",
+			"test",
+			log,
+			rwf,
+			&LegacyTypeRequirements{},
+			options,
+		).
 			WithContractUpdateValidation().
 			WithStagedContractUpdates(stagedContracts)
 
@@ -1060,7 +1130,14 @@ func TestStagedContractsWithImports(t *testing.T) {
 			VerboseErrorOutput: true,
 		}
 
-		migration := NewStagedContractsMigration("test", "test", log, rwf, options).
+		migration := NewStagedContractsMigration(
+			"test",
+			"test",
+			log,
+			rwf,
+			&LegacyTypeRequirements{},
+			options,
+		).
 			WithContractUpdateValidation().
 			WithStagedContractUpdates(stagedContracts)
 
@@ -1180,7 +1257,14 @@ func TestStagedContractsWithImports(t *testing.T) {
 			VerboseErrorOutput: true,
 		}
 
-		migration := NewStagedContractsMigration("test", "test", log, rwf, options).
+		migration := NewStagedContractsMigration(
+			"test",
+			"test",
+			log,
+			rwf,
+			&LegacyTypeRequirements{},
+			options,
+		).
 			WithContractUpdateValidation().
 			WithStagedContractUpdates(stagedContracts)
 
@@ -1431,7 +1515,14 @@ func TestStagedContractsWithUpdateValidator(t *testing.T) {
 			VerboseErrorOutput: true,
 		}
 
-		migration := NewStagedContractsMigration("test", "test", log, rwf, options).
+		migration := NewStagedContractsMigration(
+			"test",
+			"test",
+			log,
+			rwf,
+			&LegacyTypeRequirements{},
+			options,
+		).
 			WithContractUpdateValidation().
 			WithStagedContractUpdates(stagedContracts)
 
@@ -1548,7 +1639,14 @@ func TestStagedContractsWithUpdateValidator(t *testing.T) {
 			VerboseErrorOutput: true,
 		}
 
-		migration := NewStagedContractsMigration("test", "test", log, rwf, options).
+		migration := NewStagedContractsMigration(
+			"test",
+			"test",
+			log,
+			rwf,
+			&LegacyTypeRequirements{},
+			options,
+		).
 			WithContractUpdateValidation().
 			WithStagedContractUpdates(stagedContracts)
 
@@ -1654,7 +1752,14 @@ func TestStagedContractsWithUpdateValidator(t *testing.T) {
 			VerboseErrorOutput: true,
 		}
 
-		migration := NewStagedContractsMigration("test", "test", log, rwf, options).
+		migration := NewStagedContractsMigration(
+			"test",
+			"test",
+			log,
+			rwf,
+			&LegacyTypeRequirements{},
+			options,
+		).
 			WithContractUpdateValidation().
 			WithStagedContractUpdates(stagedContracts)
 
@@ -1786,7 +1891,14 @@ func TestStagedContractConformanceChanges(t *testing.T) {
 				VerboseErrorOutput: true,
 			}
 
-			migration := NewStagedContractsMigration("test", "test", log, rwf, options).
+			migration := NewStagedContractsMigration(
+				"test",
+				"test",
+				log,
+				rwf,
+				&LegacyTypeRequirements{},
+				options,
+			).
 				WithContractUpdateValidation().
 				WithStagedContractUpdates(stagedContracts)
 
@@ -1919,7 +2031,14 @@ func TestStagedContractConformanceChanges(t *testing.T) {
 			VerboseErrorOutput: true,
 		}
 
-		migration := NewStagedContractsMigration("test", "test", log, rwf, options).
+		migration := NewStagedContractsMigration(
+			"test",
+			"test",
+			log,
+			rwf,
+			&LegacyTypeRequirements{},
+			options,
+		).
 			WithContractUpdateValidation().
 			WithStagedContractUpdates(stagedContracts)
 
@@ -2189,7 +2308,14 @@ func TestStagedContractsUpdateValidationErrors(t *testing.T) {
 			VerboseErrorOutput: true,
 		}
 
-		migration := NewStagedContractsMigration("test", "test", log, rwf, options).
+		migration := NewStagedContractsMigration(
+			"test",
+			"test",
+			log,
+			rwf,
+			&LegacyTypeRequirements{},
+			options,
+		).
 			WithContractUpdateValidation().
 			WithStagedContractUpdates(stagedContracts)
 
@@ -2305,7 +2431,14 @@ func TestStagedContractsUpdateValidationErrors(t *testing.T) {
 			VerboseErrorOutput: true,
 		}
 
-		migration := NewStagedContractsMigration("test", "test", log, rwf, options).
+		migration := NewStagedContractsMigration(
+			"test",
+			"test",
+			log,
+			rwf,
+			&LegacyTypeRequirements{},
+			options,
+		).
 			WithContractUpdateValidation().
 			WithStagedContractUpdates(stagedContracts)
 
@@ -2406,4 +2539,388 @@ func TestContractUpdateFailureEntry_MarshalJSON(t *testing.T) {
         }`,
 		string(actual),
 	)
+}
+
+func TestTypeRequirementRemoval(t *testing.T) {
+	t.Parallel()
+
+	const chainID = flow.Testnet
+
+	t.Run("TiblesProducer contract", func(t *testing.T) {
+		t.Parallel()
+
+		tiblesAddress := mustHexToAddress("e93c412c964bdf40")
+
+		oldCode := `
+            pub contract interface TiblesProducer {
+
+                pub struct ContentLocation {}
+                pub struct interface IContentLocation {}
+
+                pub resource interface IContent {
+                    access(contract) let contentIdsToPaths: {String: TiblesProducer.ContentLocation}
+                    pub fun getMetadata(contentId: String): {String: AnyStruct}?
+                }
+
+                pub resource interface IProducer {
+                    access(contract) let minters: @{String: Minter}
+                }
+
+                pub resource Producer: IContent, IProducer {
+                    access(contract) let minters: @{String: Minter}
+                }
+
+                pub resource interface IMinter {
+                    pub let id: String
+                    pub var lastMintNumber: UInt32
+                    pub let contentCapability: Capability
+                    pub fun mintNext()
+                }
+
+                pub resource Minter: IMinter {
+                    pub let id: String
+                    pub var lastMintNumber: UInt32
+                    pub let contentCapability: Capability
+                    pub fun mintNext()
+                }
+            }
+        `
+
+		newCode := `
+            access(all) contract interface TiblesProducer {
+
+                access(all) struct interface ContentLocation {}
+                access(all) struct interface IContentLocation {}
+
+                access(all) resource interface IContent {
+                    access(contract) let contentIdsToPaths: {String: {TiblesProducer.ContentLocation}}
+                    access(all) fun getMetadata(contentId: String): {String: AnyStruct}?
+                }
+
+                access(all) resource interface IProducer {
+                    access(contract) let minters: @{String: {Minter}}
+                }
+
+                access(all) resource interface Producer: IContent, IProducer {
+                    access(contract) let minters: @{String: {Minter}}
+                }
+
+                access(all) resource interface IMinter {
+                    access(all) let id: String
+                    access(all) var lastMintNumber: UInt32
+                    access(all) let contentCapability: Capability
+                    access(all) fun mintNext()
+                }
+
+                access(all) resource interface Minter: IMinter {
+                    access(all) let id: String
+                    access(all) var lastMintNumber: UInt32
+                    access(all) let contentCapability: Capability
+                    access(all) fun mintNext()
+                }
+            }
+        `
+
+		contractName := "TiblesProducer"
+
+		stagedContracts := []StagedContract{
+			{
+				Address: tiblesAddress,
+				Contract: Contract{
+					Name: contractName,
+					Code: []byte(newCode),
+				},
+			},
+		}
+
+		logWriter := &logWriter{}
+		log := zerolog.New(logWriter)
+
+		rwf := &testReportWriterFactory{}
+
+		options := StagedContractsMigrationOptions{
+			ChainID:            chainID,
+			VerboseErrorOutput: true,
+		}
+
+		registersByAccount, err := registersForStagedContracts(
+			StagedContract{
+				Address: tiblesAddress,
+				Contract: Contract{
+					Name: contractName,
+					Code: []byte(oldCode),
+				},
+			},
+		)
+		require.NoError(t, err)
+
+		encodedContractNames, err := environment.EncodeContractNames([]string{contractName})
+		require.NoError(t, err)
+
+		err = registersByAccount.Set(
+			string(tiblesAddress[:]),
+			flow.ContractNamesKey,
+			encodedContractNames,
+		)
+		require.NoError(t, err)
+
+		// Run type-requirement extractor
+
+		legacyTypeRequirements := &LegacyTypeRequirements{}
+
+		cadenceTypeRequirementsExtractor := NewTypeRequirementsExtractingMigration(
+			log,
+			rwf,
+			nil,
+			legacyTypeRequirements,
+		)
+		err = cadenceTypeRequirementsExtractor(registersByAccount)
+		require.NoError(t, err)
+
+		require.Equal(
+			t,
+			[]TypeRequirement{
+				{
+					Address:      tiblesAddress,
+					ContractName: contractName,
+					TypeName:     "ContentLocation",
+				},
+				{
+					Address:      tiblesAddress,
+					ContractName: contractName,
+					TypeName:     "Producer",
+				},
+				{
+					Address:      tiblesAddress,
+					ContractName: contractName,
+					TypeName:     "Minter",
+				},
+			},
+			legacyTypeRequirements.typeRequirements,
+		)
+
+		// Run staged contract migration
+
+		migration := NewStagedContractsMigration(
+			"test",
+			"test",
+			log,
+			rwf,
+			legacyTypeRequirements,
+			options,
+		).
+			WithStagedContractUpdates(stagedContracts).
+			WithContractUpdateValidation()
+
+		err = migration.InitMigration(log, registersByAccount, 1)
+		require.NoError(t, err)
+
+		owner := string(tiblesAddress[:])
+		accountRegisters := registersByAccount.AccountRegisters(owner)
+
+		err = migration.MigrateAccount(
+			context.Background(),
+			tiblesAddress,
+			accountRegisters,
+		)
+		require.NoError(t, err)
+
+		err = migration.Close()
+		require.NoError(t, err)
+
+		require.Empty(t, logWriter.logs)
+
+		require.Equal(t, 2, accountRegisters.Count())
+		assert.Equal(t, newCode, contractCode(t, registersByAccount, owner, contractName))
+	})
+
+	t.Run("random contract", func(t *testing.T) {
+		t.Parallel()
+
+		addressGenerator := chainID.Chain().NewAddressGenerator()
+		randomAddress, err := addressGenerator.NextAddress()
+		require.NoError(t, err)
+
+		oldCode := `
+            pub contract interface Foo {
+
+                pub struct ContentLocation {}
+                pub struct interface IContentLocation {}
+
+                pub resource interface IContent {
+                    access(contract) let contentIdsToPaths: {String: Foo.ContentLocation}
+                    pub fun getMetadata(contentId: String): {String: AnyStruct}?
+                }
+
+                pub resource interface IProducer {
+                    access(contract) let minters: @{String: Minter}
+                }
+
+                pub resource Producer: IContent, IProducer {
+                    access(contract) let minters: @{String: Minter}
+                }
+
+                pub resource interface IMinter {
+                    pub let id: String
+                    pub var lastMintNumber: UInt32
+                    pub let contentCapability: Capability
+                    pub fun mintNext()
+                }
+
+                pub resource Minter: IMinter {
+                    pub let id: String
+                    pub var lastMintNumber: UInt32
+                    pub let contentCapability: Capability
+                    pub fun mintNext()
+                }
+            }
+        `
+
+		newCode := `
+            access(all) contract interface Foo {
+
+                access(all) struct interface ContentLocation {}
+                access(all) struct interface IContentLocation {}
+
+                access(all) resource interface IContent {
+                    access(contract) let contentIdsToPaths: {String: {Foo.ContentLocation}}
+                    access(all) fun getMetadata(contentId: String): {String: AnyStruct}?
+                }
+
+                access(all) resource interface IProducer {
+                    access(contract) let minters: @{String: {Minter}}
+                }
+
+                access(all) resource interface Producer: IContent, IProducer {
+                    access(contract) let minters: @{String: {Minter}}
+                }
+
+                access(all) resource interface IMinter {
+                    access(all) let id: String
+                    access(all) var lastMintNumber: UInt32
+                    access(all) let contentCapability: Capability
+                    access(all) fun mintNext()
+                }
+
+                access(all) resource interface Minter: IMinter {
+                    access(all) let id: String
+                    access(all) var lastMintNumber: UInt32
+                    access(all) let contentCapability: Capability
+                    access(all) fun mintNext()
+                }
+            }
+        `
+
+		fooContractName := "Foo"
+
+		stagedContracts := []StagedContract{
+			{
+				Address: common.Address(randomAddress),
+				Contract: Contract{
+					Name: fooContractName,
+					Code: []byte(newCode),
+				},
+			},
+		}
+
+		logWriter := &logWriter{}
+		log := zerolog.New(logWriter)
+
+		rwf := &testReportWriterFactory{}
+
+		options := StagedContractsMigrationOptions{
+			ChainID:            chainID,
+			VerboseErrorOutput: true,
+		}
+
+		registersByAccount, err := registersForStagedContracts(
+			StagedContract{
+				Address: common.Address(randomAddress),
+				Contract: Contract{
+					Name: fooContractName,
+					Code: []byte(oldCode),
+				},
+			},
+		)
+		require.NoError(t, err)
+
+		encodedContractNames, err := environment.EncodeContractNames([]string{fooContractName})
+		require.NoError(t, err)
+
+		err = registersByAccount.Set(
+			string(randomAddress[:]),
+			flow.ContractNamesKey,
+			encodedContractNames,
+		)
+		require.NoError(t, err)
+
+		// Run type-requirement extractor
+
+		legacyTypeRequirements := &LegacyTypeRequirements{}
+
+		cadenceTypeRequirementsExtractor := NewTypeRequirementsExtractingMigration(
+			log,
+			rwf,
+			nil,
+			legacyTypeRequirements,
+		)
+		err = cadenceTypeRequirementsExtractor(registersByAccount)
+		require.NoError(t, err)
+
+		require.Equal(
+			t,
+			[]TypeRequirement{
+				{
+					Address:      common.Address(randomAddress),
+					ContractName: fooContractName,
+					TypeName:     "ContentLocation",
+				},
+				{
+					Address:      common.Address(randomAddress),
+					ContractName: fooContractName,
+					TypeName:     "Producer",
+				},
+				{
+					Address:      common.Address(randomAddress),
+					ContractName: fooContractName,
+					TypeName:     "Minter",
+				},
+			},
+			legacyTypeRequirements.typeRequirements,
+		)
+
+		// Run staged contract migration
+
+		migration := NewStagedContractsMigration(
+			"test",
+			"test",
+			log,
+			rwf,
+			legacyTypeRequirements,
+			options,
+		).
+			WithStagedContractUpdates(stagedContracts).
+			WithContractUpdateValidation()
+
+		err = migration.InitMigration(log, registersByAccount, 1)
+		require.NoError(t, err)
+
+		owner := string(randomAddress[:])
+		accountRegisters := registersByAccount.AccountRegisters(owner)
+
+		err = migration.MigrateAccount(
+			context.Background(),
+			common.Address(randomAddress),
+			accountRegisters,
+		)
+		require.NoError(t, err)
+
+		err = migration.Close()
+		require.NoError(t, err)
+
+		require.Empty(t, logWriter.logs)
+
+		require.Equal(t, 2, accountRegisters.Count())
+		assert.Equal(t, newCode, contractCode(t, registersByAccount, owner, fooContractName))
+	})
 }

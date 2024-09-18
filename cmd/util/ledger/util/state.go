@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	"github.com/onflow/flow-go/ledger/complete"
+	mtrie "github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 	"github.com/onflow/flow-go/ledger/complete/wal"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
@@ -78,10 +79,17 @@ func ReadTrie(dir string, targetHash flow.StateCommitment) ([]*ledger.Payload, e
 
 	trie, err := led.Trie(ledger.RootHash(state))
 	if err != nil {
-		s, _ := led.MostRecentTouchedState()
-		log.Info().
-			Str("hash", s.String()).
-			Msgf("Most recently touched state")
+		s, err2 := led.MostRecentTouchedState()
+		if err2 != nil {
+			log.Error().Err(err2).
+				Msgf("cannot get most recently touched state in %v, check the --execution-state-dir flag", dir)
+		} else if s == ledger.State(mtrie.NewEmptyMTrie().RootHash()) {
+			log.Error().Msgf("cannot find any trie in folder %v. check the --execution-state-dir flag", dir)
+		} else {
+			log.Info().
+				Str("hash", s.String()).
+				Msgf("Most recently touched state")
+		}
 		return nil, fmt.Errorf("cannot get trie at the given state commitment: %w", err)
 	}
 

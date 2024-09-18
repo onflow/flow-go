@@ -28,13 +28,19 @@ func TestGetNodeVersionInfo(t *testing.T) {
 	t.Run("get node version info", func(t *testing.T) {
 		req := getNodeVersionInfoRequest(t)
 
+		nodeRootBlockHeight := unittest.Uint64InRange(10_000, 100_000)
+
 		params := &access.NodeVersionInfo{
 			Semver:               build.Version(),
 			Commit:               build.Commit(),
 			SporkId:              unittest.IdentifierFixture(),
 			ProtocolVersion:      unittest.Uint64InRange(10, 30),
 			SporkRootBlockHeight: unittest.Uint64InRange(1000, 10_000),
-			NodeRootBlockHeight:  unittest.Uint64InRange(10_000, 100_000),
+			NodeRootBlockHeight:  nodeRootBlockHeight,
+			CompatibleRange: &access.CompatibleRange{
+				StartHeight: nodeRootBlockHeight,
+				EndHeight:   uint64(0),
+			},
 		}
 
 		backend.Mock.
@@ -49,13 +55,22 @@ func TestGetNodeVersionInfo(t *testing.T) {
 }
 
 func nodeVersionInfoExpectedStr(nodeVersionInfo *access.NodeVersionInfo) string {
+	compatibleRange := fmt.Sprintf(`"compatible_range": {
+		"start_height": "%d",
+		"end_height": "%d"
+	}`,
+		nodeVersionInfo.CompatibleRange.StartHeight,
+		nodeVersionInfo.CompatibleRange.EndHeight,
+	)
+
 	return fmt.Sprintf(`{
 			"semver": "%s",
 			"commit": "%s",
 			"spork_id": "%s",
             "protocol_version": "%d",
             "spork_root_block_height": "%d",
-            "node_root_block_height": "%d"
+            "node_root_block_height": "%d",
+            %s
 		}`,
 		nodeVersionInfo.Semver,
 		nodeVersionInfo.Commit,
@@ -63,6 +78,7 @@ func nodeVersionInfoExpectedStr(nodeVersionInfo *access.NodeVersionInfo) string 
 		nodeVersionInfo.ProtocolVersion,
 		nodeVersionInfo.SporkRootBlockHeight,
 		nodeVersionInfo.NodeRootBlockHeight,
+		compatibleRange,
 	)
 }
 
