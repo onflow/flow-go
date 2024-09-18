@@ -19,6 +19,11 @@ func (_m *PubSubAdapterConfig) WithMessageIdFunction(f func([]byte) string) {
 	_m.Called(f)
 }
 
+// WithPeerGater provides a mock function with given fields: topicDeliveryWeights
+func (_m *PubSubAdapterConfig) WithPeerGater(topicDeliveryWeights map[string]float64) {
+	_m.Called(topicDeliveryWeights)
+}
+
 // WithRoutingDiscovery provides a mock function with given fields: _a0
 func (_m *PubSubAdapterConfig) WithRoutingDiscovery(_a0 routing.ContentRouting) {
 	_m.Called(_a0)
