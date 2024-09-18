@@ -1001,6 +1001,7 @@ func (b *backendTransactions) LookupErrorMessageByTransactionID(
 	ctx context.Context,
 	blockID flow.Identifier,
 	transactionID flow.Identifier,
+	height uint64,
 ) (string, error) {
 	if b.txResultErrorMessages != nil {
 		res, err := b.txResultErrorMessages.ByBlockIDTransactionID(blockID, transactionID)
@@ -1033,7 +1034,30 @@ func (b *backendTransactions) LookupErrorMessageByTransactionID(
 	if err != nil {
 		// If no execution nodes return a valid response,
 		// store a static message "failed", with flow.ZeroID as the executor.
-		// TODO: add storing to db, find a way to get transaction index here
+		// TODO: find a better way to get transaction index here
+		txResults, err := b.txResultsIndex.ByBlockID(blockID, height)
+		if err != nil {
+			return "", rpc.ConvertStorageError(err)
+		}
+
+		var txErrorMessage flow.TransactionResultErrorMessage
+		for i, txResult := range txResults {
+			if txResult.TransactionID != transactionID {
+				continue
+			}
+
+			txErrorMessage = flow.TransactionResultErrorMessage{
+				TransactionID: txResult.TransactionID,
+				ErrorMessage:  failedErrorMessage,
+				ExecutorID:    flow.ZeroID,
+				Index:         uint32(i),
+			}
+		}
+
+		err = b.txResultErrorMessages.Store(blockID, []flow.TransactionResultErrorMessage{txErrorMessage})
+		if err != nil {
+			return "", fmt.Errorf("failed to store transaction error messages: %w", err)
+		}
 		return "", fmt.Errorf("could not fetch error message from ENs: %w", err)
 	}
 
