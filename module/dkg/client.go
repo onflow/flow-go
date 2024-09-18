@@ -265,6 +265,54 @@ func (c *Client) SubmitResult(groupPublicKey crypto.PublicKey, publicKeys []cryp
 	return nil
 }
 
+// SubmitEmptyResult submits an empty result of the DKG protocol. This
+// represents an empty result when the DKG has locally failed.
+// SubmitEmptyResult must be called strictly after the final phase has ended if DKG has failed.
+func (c *Client) SubmitEmptyResult() error {
+	started := time.Now()
+	ctx, cancel := context.WithTimeout(context.Background(), epochs.TransactionSubmissionTimeout)
+	defer cancel()
+
+	// get account for given address
+	account, err := c.GetAccount(ctx)
+	if err != nil {
+		return fmt.Errorf("could not get account details: %w", err)
+	}
+
+	// get latest finalized block to execute transaction
+	latestBlock, err := c.FlowClient.GetLatestBlock(ctx, false)
+	if err != nil {
+		return fmt.Errorf("could not get latest block from node: %w", err)
+	}
+
+	tx := sdk.NewTransaction().
+		SetScript(templates.GenerateSendEmptyDKGFinalSubmissionScript(c.env)).
+		SetComputeLimit(9999).
+		SetReferenceBlockID(latestBlock.ID).
+		SetProposalKey(account.Address, c.AccountKeyIndex, account.Keys[int(c.AccountKeyIndex)].SequenceNumber).
+		SetPayer(account.Address).
+		AddAuthorizer(account.Address)
+
+	// sign envelope using account signer
+	err = tx.SignEnvelope(account.Address, c.AccountKeyIndex, c.Signer)
+	if err != nil {
+		return fmt.Errorf("could not sign transaction: %w", err)
+	}
+
+	c.Log.Info().Str("tx_id", tx.ID().Hex()).Msg("sending SubmitResult transaction")
+	txID, err := c.SendTransaction(ctx, tx)
+	if err != nil {
+		return fmt.Errorf("failed to submit transaction: %w", err)
+	}
+
+	err = c.WaitForSealed(ctx, txID, started)
+	if err != nil {
+		return fmt.Errorf("failed to wait for transaction seal: %w", err)
+	}
+
+	return nil
+}
+
 // trim0x trims the `0x` if it exists from a hexadecimal string
 // This method is required as the DKG contract expects key lengths of 192 bytes
 // the `PublicKey.String()` method returns the hexadecimal string representation of the

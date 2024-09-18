@@ -211,23 +211,29 @@ func (b *Broker) Broadcast(data []byte) {
 // SubmitResult publishes the result of the DKG protocol to the smart contract.
 func (b *Broker) SubmitResult(groupKey crypto.PublicKey, pubKeys []crypto.PublicKey) error {
 
-	// If the DKG failed locally, we will get a nil key vector here. We need to convert
-	// the nil slice to a slice of nil keys before submission.
+	// If the DKG failed locally, we will get a nil key vector here.
+	// There are two different endpoints in the DKG smart contract for submitting a happy-path and failure-path result.
 	//
 	// In general, if pubKeys does not have one key per participant, we cannot submit
 	// a valid result - therefore we submit a nil vector (indicating that we have
 	// completed the process, but we know that we don't have a valid result).
-	indexMap := make(flow.DKGIndexMap, len(pubKeys))
+	var submitResult func(client module.DKGContractClient) error
 	if len(pubKeys) == len(b.committee) {
+		indexMap := make(flow.DKGIndexMap, len(pubKeys))
 		// build a map of node IDs to indices in the key vector,
 		// this logic expects that committee is sorted in canonical order!
 		for i, participant := range b.committee {
 			indexMap[participant.NodeID] = i
 		}
+		submitResult = func(client module.DKGContractClient) error {
+			return client.SubmitResult(groupKey, pubKeys, indexMap)
+		}
 	} else {
-		b.log.Warn().Msgf("submitting dkg result with incomplete key vector (len=%d, expected=%d)", len(pubKeys), len(b.committee))
-		// create a key vector with one nil entry for each committee member
-		pubKeys = make([]crypto.PublicKey, len(b.committee))
+		b.log.Warn().Msgf("submitting empty dkg result because of incomplete key vector (len=%d, expected=%d)",
+			len(pubKeys), len(b.committee))
+		submitResult = func(client module.DKGContractClient) error {
+			return client.SubmitEmptyResult()
+		}
 	}
 
 	backoff := retry.NewExponential(b.config.RetryInitialWait)
@@ -240,10 +246,9 @@ func (b *Broker) SubmitResult(groupKey crypto.PublicKey, pubKeys []crypto.Public
 		b.log.Warn().Msgf("submit result: retrying on attempt (%d) with fallback access node at index (%d)", totalAttempts, clientIndex)
 	}
 	backoff = retrymiddleware.AfterConsecutiveFailures(b.config.RetryMaxConsecutiveFailures, backoff, onMaxConsecutiveRetries)
-
 	attempts := 1
 	err := retry.Do(b.unit.Ctx(), backoff, func(ctx context.Context) error {
-		err := dkgContractClient.SubmitResult(groupKey, pubKeys, indexMap)
+		err := submitResult(dkgContractClient)
 		if err != nil {
 			b.log.Error().Err(err).Msgf("error submitting DKG result, retrying (attempt %d)", attempts)
 			attempts++

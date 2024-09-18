@@ -80,9 +80,17 @@ func (c *DKGClientWrapper) ReadBroadcast(fromIndex uint, referenceBlock flow.Ide
 }
 
 // SubmitResult implements the DKGContractClient interface
-func (c *DKGClientWrapper) SubmitResult(groupPubKey crypto.PublicKey, pubKeys []crypto.PublicKey) error {
+func (c *DKGClientWrapper) SubmitResult(groupPubKey crypto.PublicKey, pubKeys []crypto.PublicKey, indexMap flow.DKGIndexMap) error {
 	if !c.enabled.Load() {
 		return fmt.Errorf("failed to submit DKG result: %w", errClientDisabled)
 	}
-	return c.client.SubmitResult(groupPubKey, pubKeys)
+	return c.client.SubmitResult(groupPubKey, pubKeys, indexMap)
+}
+
+// SubmitEmptyResult implements the DKGContractClient interface
+func (c *DKGClientWrapper) SubmitEmptyResult() error {
+	if !c.enabled.Load() {
+		return fmt.Errorf("failed to submit empty DKG result: %w", errClientDisabled)
+	}
+	return c.client.SubmitEmptyResult()
 }
