@@ -256,7 +256,6 @@ func (e *blockComputer) queueTransactionRequests(
 				i == len(collection.Transactions)-1)
 			txnIndex += 1
 		}
-
 	}
 
 	systemCtx := fvm.NewContextFromParent(
