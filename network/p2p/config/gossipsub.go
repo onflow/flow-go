@@ -99,9 +99,25 @@ type ScoringParameters struct {
 // Parameters are "numerical values" that are used to compute or build components that compute the score of a peer in GossipSub system.
 type PeerGaterParameters struct {
 	// Enabled enables the peer gater.
-	Enabled bool `validate:"required" mapstructure:"enabled"`
+	Enabled bool `validate:"required" mapstructure:"enable"`
 	// TopicDeliveryWeightsOverride map of topic delivery weights that will override the default value for the specified channel.
-	TopicDeliveryWeightsOverride map[string]string `validate:"required" mapstructure:"topic-delivery-weights-override"`
+	TopicDeliveryWeightsOverride TopicDeliveryWeightsOverride `validate:"required" mapstructure:"topic-delivery-weights-override"`
+}
+
+// TopicDeliveryWeightsOverride topic delivery weights used to override the default topic delivery weight 1.0 of the peer gater.
+// Parameters are "numerical values" that are used to compute or build components that compute the score of a peer in GossipSub system.
+type TopicDeliveryWeightsOverride struct {
+	ConsensusCommittee float64 `validate:"required" mapstructure:"consensus-committee"`
+	SyncCommittee      float64 `validate:"required" mapstructure:"sync-committee"`
+}
+
+// ToMap returns the topic delivery weights configured on this struct as a map[string]float64 .
+// Note: When new topic delivery weights are added to the struct this func should be updated.
+func (t *TopicDeliveryWeightsOverride) ToMap() map[string]float64 {
+	return map[string]float64{
+		"consensus-committee": t.ConsensusCommittee,
+		"sync-committee":      t.SyncCommittee,
+	}
 }
 
 // SubscriptionProviderParameters keys.
