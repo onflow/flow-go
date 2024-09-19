@@ -6,6 +6,7 @@ import (
 	"math"
 	"slices"
 	"strings"
+	"sync"
 
 	"github.com/montanaflynn/stats"
 	"github.com/pkg/profile"
@@ -20,6 +21,7 @@ import (
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
 	"github.com/onflow/flow-go/fvm/evm/emulator/state"
 	"github.com/onflow/flow-go/fvm/evm/handler"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	"github.com/onflow/flow-go/ledger/complete"
@@ -35,13 +37,17 @@ var (
 	flagStateCommitment string
 	flagPayloads        string
 	flagOutputDir       string
+	flagChain           string
 	flagTopN            int
 	flagMemProfile      bool
 )
 
 const (
-	ledgerStatsReportName = "ledger-stats"
+	ledgerStatsReportName  = "ledger-stats"
+	accountStatsReportName = "account-stats"
+)
 
+const (
 	domainTypePrefix = "domain "
 )
 
@@ -49,6 +55,11 @@ const (
 	// EVM register keys from fvm/evm/handler/blockHashList.go
 	blockHashListMetaKey         = "BlockHashListMeta"
 	blockHashListBucketKeyPrefix = "BlockHashListBucket"
+)
+
+var (
+	serviceAccountAddressOnMainnet = flow.HexToAddress("e467b9dd11fa00df")
+	serviceAccountAddressOnTestnet = flow.HexToAddress("8c5303eaa26202d6")
 )
 
 var Cmd = &cobra.Command{
@@ -78,8 +89,10 @@ func init() {
 	_ = Cmd.MarkFlagRequired("output-dir")
 
 	Cmd.Flags().IntVar(&flagTopN, "top-n", 10,
-		"number of largest payloads or accounts to report",
-	)
+		"number of largest payloads or accounts to report")
+
+	Cmd.Flags().StringVar(&flagChain, "chain", "", "Chain name")
+	_ = Cmd.MarkFlagRequired("chain")
 
 	Cmd.Flags().BoolVar(&flagMemProfile, "mem-profile", false,
 		"Enable memory profiling")
@@ -118,6 +131,25 @@ type PayloadInfo struct {
 	Size    uint64 `json:"size"`
 }
 
+type AccountStats struct {
+	AccountCount              uint64         `json:"total_account_count"`
+	AccountSizeMin            float64        `json:"account_size_min"`
+	AccountSize25thPercentile float64        `json:"account_size_25th_percentile"`
+	AccountSizeMedian         float64        `json:"account_size_median"`
+	AccountSize75thPercentile float64        `json:"account_size_75th_percentile"`
+	AccountSize95thPercentile float64        `json:"account_size_95th_percentile"`
+	AccountSizeMax            float64        `json:"account_size_max"`
+	ServiceAccount            *AccountInfo   `json:"service_account,omitempty"`
+	EVMAccount                *AccountInfo   `json:"evm_account,omitempty"`
+	TopN                      []*AccountInfo `json:"largest_accounts"`
+}
+
+type AccountInfo struct {
+	Address      string `json:"address"`
+	PayloadCount uint64 `json:"payload_count"`
+	PayloadSize  uint64 `json:"payload_size"`
+}
+
 type sizesByType map[string][]float64
 
 func run(*cobra.Command, []string) {
@@ -131,6 +163,10 @@ func run(*cobra.Command, []string) {
 	if flagCheckpointDir == "" && flagStateCommitment != "" {
 		log.Fatal().Msg("--checkpont-dir must be provided when --state-commitment is provided")
 	}
+
+	chainID := flow.ChainID(flagChain)
+	// Validate chain ID
+	_ = chainID.Chain()
 
 	if flagMemProfile {
 		defer profile.Start(profile.MemProfile).Stop()
@@ -147,11 +183,15 @@ func run(*cobra.Command, []string) {
 
 	valueSizesByType := make(sizesByType, 0)
 
+	accounts := make(map[string]*AccountInfo)
+
 	payloadCallback := func(p *ledger.Payload) {
 		key, err := p.Key()
 		if err != nil {
 			log.Fatal().Err(err).Msg("cannot load a key")
 		}
+
+		address := key.KeyParts[0].Value
 
 		size := p.Size()
 		value := p.Value()
@@ -169,11 +209,22 @@ func run(*cobra.Command, []string) {
 		// Update top N largest payloads
 		_, _ = largestPayloads.Add(
 			PayloadInfo{
-				Address: hex.EncodeToString(key.KeyParts[0].Value),
+				Address: hex.EncodeToString(address),
 				Key:     hex.EncodeToString(key.KeyParts[1].Value),
 				Type:    typ,
 				Size:    uint64(valueSize),
 			})
+
+		// Update accounts
+		account, exist := accounts[string(address)]
+		if !exist {
+			account = &AccountInfo{
+				Address: hex.EncodeToString(address),
+			}
+			accounts[string(address)] = account
+		}
+		account.PayloadCount++
+		account.PayloadSize += uint64(size)
 	}
 
 	var ledgerStats *complete.LedgerStats
@@ -185,25 +236,74 @@ func run(*cobra.Command, []string) {
 		getPayloadStatsFromPayloadFile(payloadCallback)
 	}
 
-	statsByTypes := getStats(valueSizesByType)
+	var wg sync.WaitGroup
+	wg.Add(2)
 
-	// Sort top N largest payloads by payload size in descending order
-	slices.SortFunc(largestPayloads.Tree, func(a, b PayloadInfo) int {
-		return cmp.Compare(b.Size, a.Size)
-	})
+	// Collect and write ledger stats
+	go func() {
+		defer wg.Done()
 
-	stats := &Stats{
-		LedgerStats: ledgerStats,
-		PayloadStats: &PayloadStats{
-			TotalPayloadCount:     totalPayloadCount,
-			TotalPayloadSize:      totalPayloadSize,
-			TotalPayloadValueSize: totalPayloadValueSize,
-			StatsByTypes:          statsByTypes,
-			TopN:                  largestPayloads.Tree,
-		},
-	}
+		statsByTypes := getStats(valueSizesByType)
 
-	writeStats(ledgerStatsReportName, stats)
+		// Sort top N largest payloads by payload size in descending order
+		slices.SortFunc(largestPayloads.Tree, func(a, b PayloadInfo) int {
+			return cmp.Compare(b.Size, a.Size)
+		})
+
+		stats := &Stats{
+			LedgerStats: ledgerStats,
+			PayloadStats: &PayloadStats{
+				TotalPayloadCount:     totalPayloadCount,
+				TotalPayloadSize:      totalPayloadSize,
+				TotalPayloadValueSize: totalPayloadValueSize,
+				StatsByTypes:          statsByTypes,
+				TopN:                  largestPayloads.Tree,
+			},
+		}
+
+		writeStats(ledgerStatsReportName, stats)
+	}()
+
+	// Collect and write account stats
+	go func() {
+		defer wg.Done()
+
+		accountsSlice := make([]*AccountInfo, 0, len(accounts))
+		accountSizesSlice := make([]float64, 0, len(accounts))
+
+		for _, acct := range accounts {
+			accountsSlice = append(accountsSlice, acct)
+			accountSizesSlice = append(accountSizesSlice, float64(acct.PayloadSize))
+		}
+
+		// Sort accounts by payload size in descending order
+		slices.SortFunc(accountsSlice, func(a, b *AccountInfo) int {
+			return cmp.Compare(b.PayloadSize, a.PayloadSize)
+		})
+
+		stats := getTypeStats("", accountSizesSlice)
+
+		evmAccountAddress := systemcontracts.SystemContractsForChain(chainID).EVMStorage.Address
+
+		serviceAccountAddress := serviceAccountAddressForChain(chainID)
+
+		acctStats := &AccountStats{
+			AccountCount:              uint64(len(accountsSlice)),
+			ServiceAccount:            accounts[string(serviceAccountAddress[:])],
+			EVMAccount:                accounts[string(evmAccountAddress[:])],
+			TopN:                      accountsSlice[:flagTopN],
+			AccountSizeMin:            stats.ValueSizeMin,
+			AccountSize25thPercentile: stats.ValueSize25thPercentile,
+			AccountSizeMedian:         stats.ValueSizeMedian,
+			AccountSize75thPercentile: stats.ValueSize75thPercentile,
+			AccountSize95thPercentile: stats.ValueSize95thPercentile,
+			AccountSizeMax:            stats.ValueSizeMax,
+		}
+
+		writeStats(accountStatsReportName, acctStats)
+	}()
+
+	wg.Wait()
 }
 
 func getPayloadStatsFromPayloadFile(payloadCallBack func(payload *ledger.Payload)) {
@@ -429,4 +529,15 @@ func getType(key ledger.Key) string {
 	log.Warn().Msgf("unknown payload key: %s", kstr)
 
 	return "others"
+}
+
+func serviceAccountAddressForChain(chainID flow.ChainID) flow.Address {
+	switch chainID {
+	case flow.Mainnet:
+		return serviceAccountAddressOnMainnet
+	case flow.Testnet:
+		return serviceAccountAddressOnTestnet
+	default:
+		return flow.Address{}
+	}
 }
