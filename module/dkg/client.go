@@ -209,38 +209,45 @@ func (c *Client) SubmitResult(groupPublicKey crypto.PublicKey, publicKeys []cryp
 		SetPayer(account.Address).
 		AddAuthorizer(account.Address)
 
-	// Note: We need to make sure that we pull the keys out in the same order that
-	// we have done here. Group Public key first followed by the individual public keys
-	finalSubmission := make([]cadence.Value, 0, len(publicKeys))
-
-	// first append group public key
-	if groupPublicKey != nil {
-		trimmedGroupHexString := trim0x(groupPublicKey.String())
-		cdcGroupString, err := cadence.NewString(trimmedGroupHexString)
-		if err != nil {
-			return fmt.Errorf("could not convert group key to cadence: %w", err)
-		}
-		finalSubmission = append(finalSubmission, cadence.NewOptional(cdcGroupString))
-	} else {
-		finalSubmission = append(finalSubmission, cadence.NewOptional(nil))
+	trimmedGroupHexString := trim0x(groupPublicKey.String())
+	cdcGroupString, err := cadence.NewString(trimmedGroupHexString)
+	if err != nil {
+		return fmt.Errorf("could not convert group key to cadence: %w", err)
 	}
 
+	// setup first arg - group key
+	err = tx.AddArgument(cdcGroupString)
+	if err != nil {
+		return fmt.Errorf("could not add argument to transaction: %w", err)
+	}
+
+	cdcPublicKeys := make([]cadence.Value, 0, len(publicKeys))
 	for _, publicKey := range publicKeys {
-
 		// append individual public keys
-		if publicKey != nil {
-			trimmedHexString := trim0x(publicKey.String())
-			cdcPubKey, err := cadence.NewString(trimmedHexString)
-			if err != nil {
-				return fmt.Errorf("could not convert pub keyshare to cadence: %w", err)
-			}
-			finalSubmission = append(finalSubmission, cadence.NewOptional(cdcPubKey))
-		} else {
-			finalSubmission = append(finalSubmission, cadence.NewOptional(nil))
+		trimmedHexString := trim0x(publicKey.String())
+		cdcPubKey, err := cadence.NewString(trimmedHexString)
+		if err != nil {
+			return fmt.Errorf("could not convert pub keyshare to cadence: %w", err)
 		}
+		cdcPublicKeys = append(cdcPublicKeys, cdcPubKey)
 	}
 
-	err = tx.AddArgument(cadence.NewArray(finalSubmission))
+	// setup second arg - array of public keys
+	err = tx.AddArgument(cadence.NewArray(cdcPublicKeys))
+	if err != nil {
+		return fmt.Errorf("could not add argument to transaction: %w", err)
+	}
+
+	cdcIndexMap := make([]cadence.KeyValuePair, 0, len(indexMap))
+	for nodeID, dkgIndex := range indexMap {
+		cdcIndexMap = append(cdcIndexMap, cadence.KeyValuePair{
+			Key:   cadence.String(nodeID.String()),
+			Value: cadence.NewInt(dkgIndex),
+		})
+	}
+
+	// setup third arg - IndexMap
+	err = tx.AddArgument(cadence.NewDictionary(cdcIndexMap))
 	if err != nil {
 		return fmt.Errorf("could not add argument to transaction: %w", err)
 	}
