@@ -51,15 +51,11 @@ func (p *ReplayerPrecompiledContract) Address() types.Address {
 }
 
 func (p *ReplayerPrecompiledContract) RequiredGas(input []byte) (output uint64) {
-	var in []byte
-	copy(in, input)
-
 	if p.requiredGasIndex > len(p.expectedCalls.RequiredGasCalls) {
 		panic(errUnexpectedCall)
 	}
 
-	// todo temporarily disable input/output check
-	if !bytes.Equal(p.expectedCalls.RequiredGasCalls[p.requiredGasIndex].Input, in) {
+	if !bytes.Equal(p.expectedCalls.RequiredGasCalls[p.requiredGasIndex].Input, input) {
 		panic(errUnexpectedCall)
 	}
 	output = p.expectedCalls.RequiredGasCalls[p.requiredGasIndex].Output
@@ -68,14 +64,11 @@ func (p *ReplayerPrecompiledContract) RequiredGas(input []byte) (output uint64) 
 }
 
 func (p *ReplayerPrecompiledContract) Run(input []byte) (output []byte, err error) {
-	var in []byte
-	copy(in, input)
-
 	if p.runIndex > len(p.expectedCalls.RunCalls) {
 		panic(errUnexpectedCall)
 	}
 
-	if !bytes.Equal(p.expectedCalls.RunCalls[p.runIndex].Input, in) {
+	if !bytes.Equal(p.expectedCalls.RunCalls[p.runIndex].Input, input) {
 		panic(errUnexpectedCall)
 	}
 	output = p.expectedCalls.RunCalls[p.runIndex].Output
@@ -90,19 +83,4 @@ func (p *ReplayerPrecompiledContract) Run(input []byte) (output []byte, err erro
 func (p *ReplayerPrecompiledContract) HasReplayedAll() bool {
 	return len(p.expectedCalls.RequiredGasCalls) == p.requiredGasIndex &&
 		len(p.expectedCalls.RunCalls) == p.runIndex
-}
-
-// removeFunctionSelector sets first 4 bytes to 0, which are set
-// to an ABI encoded function name when called. We ignore this function
-// selectors for now. todo we should compare the function selector.
-func removeFunctionSelector(input []byte) []byte {
-	if len(input) < 4 {
-		return input
-	}
-
-	const funcSelectorLen = 4
-	for i := 0; i < funcSelectorLen; i++ {
-		input[i] = 0
-	}
-	return input
 }
