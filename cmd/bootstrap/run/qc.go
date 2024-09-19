@@ -169,7 +169,7 @@ func GenerateQCParticipantData(allNodes, internalNodes []bootstrap.NodeInfo, dkg
 
 	// length of DKG participants needs to match stakingNodes, since we run DKG for external and internal validators
 	if len(allNodes) != len(dkgData.PrivKeyShares) {
-		return nil, fmt.Errorf("need exactly the same number of staking public keys as DKG private participants")
+		return nil, fmt.Errorf("need exactly the same number of staking public keys as DKG private participants, (all=%d, dkg=%d)", len(allNodes), len(dkgData.PrivKeyShares))
 	}
 
 	qcData := &ParticipantData{}
