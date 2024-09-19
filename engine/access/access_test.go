@@ -600,7 +600,6 @@ func (suite *Suite) TestGetSealedTransaction() {
 		all := util.StorageLayer(suite.T(), db)
 		results := bstorage.NewExecutionResults(suite.metrics, db)
 		receipts := bstorage.NewExecutionReceipts(suite.metrics, db, results, bstorage.DefaultCacheSize)
-		txResultErrorMessages := bstorage.NewTransactionResultErrorMessages(suite.metrics, db, bstorage.DefaultCacheSize)
 		enIdentities := unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
 		enNodeIDs := enIdentities.NodeIDs()
 
@@ -697,7 +696,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 			transactions,
 			results,
 			receipts,
-			txResultErrorMessages,
+			nil,
 			collectionExecutedMetric,
 			processedHeight,
 			lastFullBlockHeight,
@@ -761,8 +760,6 @@ func (suite *Suite) TestGetTransactionResult() {
 		all := util.StorageLayer(suite.T(), db)
 		results := bstorage.NewExecutionResults(suite.metrics, db)
 		receipts := bstorage.NewExecutionReceipts(suite.metrics, db, results, bstorage.DefaultCacheSize)
-		txResultErrorMessages := bstorage.NewTransactionResultErrorMessages(suite.metrics, db, bstorage.DefaultCacheSize)
-
 		originID := unittest.IdentifierFixture()
 
 		*suite.state = protocol.State{}
@@ -877,7 +874,7 @@ func (suite *Suite) TestGetTransactionResult() {
 			transactions,
 			results,
 			receipts,
-			txResultErrorMessages,
+			nil,
 			collectionExecutedMetric,
 			processedHeight,
 			lastFullBlockHeight,
@@ -1046,8 +1043,6 @@ func (suite *Suite) TestExecuteScript() {
 		collections := bstorage.NewCollections(db, transactions)
 		results := bstorage.NewExecutionResults(suite.metrics, db)
 		receipts := bstorage.NewExecutionReceipts(suite.metrics, db, results, bstorage.DefaultCacheSize)
-		txResultErrorMessages := bstorage.NewTransactionResultErrorMessages(suite.metrics, db, bstorage.DefaultCacheSize)
-
 		identities := unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
 		suite.sealedSnapshot.On("Identities", mock.Anything).Return(identities, nil)
 		suite.finalSnapshot.On("Identities", mock.Anything).Return(identities, nil)
@@ -1128,7 +1123,7 @@ func (suite *Suite) TestExecuteScript() {
 			transactions,
 			results,
 			receipts,
-			txResultErrorMessages,
+			nil,
 			collectionExecutedMetric,
 			processedHeight,
 			lastFullBlockHeight,
