@@ -600,7 +600,6 @@ func (suite *Suite) TestGetSealedTransaction() {
 		all := util.StorageLayer(suite.T(), db)
 		results := bstorage.NewExecutionResults(suite.metrics, db)
 		receipts := bstorage.NewExecutionReceipts(suite.metrics, db, results, bstorage.DefaultCacheSize)
-		txResultErrorMessages := bstorage.NewTransactionResultErrorMessages(suite.metrics, db, bstorage.DefaultCacheSize)
 		enIdentities := unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
 		enNodeIDs := enIdentities.NodeIDs()
 
@@ -700,7 +699,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 			transactions,
 			results,
 			receipts,
-			txResultErrorMessages,
+			nil,
 			collectionExecutedMetric,
 			processedHeight,
 			lastFullBlockHeight,
@@ -764,8 +763,6 @@ func (suite *Suite) TestGetTransactionResult() {
 		all := util.StorageLayer(suite.T(), db)
 		results := bstorage.NewExecutionResults(suite.metrics, db)
 		receipts := bstorage.NewExecutionReceipts(suite.metrics, db, results, bstorage.DefaultCacheSize)
-		txResultErrorMessages := bstorage.NewTransactionResultErrorMessages(suite.metrics, db, bstorage.DefaultCacheSize)
-
 		originID := unittest.IdentifierFixture()
 
 		*suite.state = protocol.State{}
@@ -871,8 +868,24 @@ func (suite *Suite) TestGetTransactionResult() {
 		require.NoError(suite.T(), err)
 
 		// create the ingest engine
-		ingestEng, err := ingestion.New(suite.log, suite.net, suite.state, suite.me, suite.request, all.Blocks, all.Headers, collections,
-			transactions, results, receipts, txResultErrorMessages, collectionExecutedMetric, processedHeight, lastFullBlockHeight, bnd, enNodeIDs.Strings(),
+		ingestEng, err := ingestion.New(
+			suite.log,
+			suite.net,
+			suite.state,
+			suite.me,
+			suite.request,
+			all.Blocks,
+			all.Headers,
+			collections,
+			transactions,
+			results,
+			receipts,
+			nil,
+			collectionExecutedMetric,
+			processedHeight,
+			lastFullBlockHeight,
+			bnd,
+			enNodeIDs.Strings(),
 			nil,
 		)
 		require.NoError(suite.T(), err)
@@ -1036,8 +1049,6 @@ func (suite *Suite) TestExecuteScript() {
 		collections := bstorage.NewCollections(db, transactions)
 		results := bstorage.NewExecutionResults(suite.metrics, db)
 		receipts := bstorage.NewExecutionReceipts(suite.metrics, db, results, bstorage.DefaultCacheSize)
-		txResultErrorMessages := bstorage.NewTransactionResultErrorMessages(suite.metrics, db, bstorage.DefaultCacheSize)
-
 		identities := unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
 		suite.sealedSnapshot.On("Identities", mock.Anything).Return(identities, nil)
 		suite.finalSnapshot.On("Identities", mock.Anything).Return(identities, nil)
@@ -1109,8 +1120,23 @@ func (suite *Suite) TestExecuteScript() {
 		require.NoError(suite.T(), err)
 
 		// create the ingest engine
-		ingestEng, err := ingestion.New(suite.log, suite.net, suite.state, suite.me, suite.request, all.Blocks, all.Headers, collections,
-			transactions, results, receipts, txResultErrorMessages, collectionExecutedMetric, processedHeight, lastFullBlockHeight, suite.backend,
+		ingestEng, err := ingestion.New(
+			suite.log,
+			suite.net,
+			suite.state,
+			suite.me,
+			suite.request,
+			all.Blocks,
+			all.Headers,
+			collections,
+			transactions,
+			results,
+			receipts,
+			nil,
+			collectionExecutedMetric,
+			processedHeight,
+			lastFullBlockHeight,
+			suite.backend,
 			enNodeIDs.Strings(),
 			nil)
 		require.NoError(suite.T(), err)
