@@ -1,6 +1,7 @@
 package checkpoint_collect_stats
 
 import (
+	"cmp"
 	"math"
 	"slices"
 	"strings"
@@ -308,6 +309,16 @@ func getStats(valueSizesByType sizesByType) []RegisterStatsByTypes {
 	allDomainStats.SubTypes = domainStats
 
 	statsByTypes = append(statsByTypes, allDomainStats)
+
+	// Sort domain stats by payload count in descending order
+	slices.SortFunc(allDomainStats.SubTypes, func(a, b RegisterStatsByTypes) int {
+		return cmp.Compare(b.Counts, a.Counts)
+	})
+
+	// Sort stats by payload count in descending order
+	slices.SortFunc(statsByTypes, func(a, b RegisterStatsByTypes) int {
+		return cmp.Compare(b.Counts, a.Counts)
+	})
 
 	return statsByTypes
 }
