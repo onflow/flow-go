@@ -82,9 +82,9 @@ execution:
   defaults:{{template "defaults"}}
     resources:
       requests:
-        memory: "32Gi"
+        memory: "30Gi"
       limits:
-        memory: "32Gi"
+        memory: "30Gi"
     storage: 50G
   nodes:
 {{- range $val := .}}{{if eq ($val.role) ("execution")}}
