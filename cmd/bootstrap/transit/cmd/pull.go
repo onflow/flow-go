@@ -77,6 +77,8 @@ func pull(cmd *cobra.Command, args []string) {
 
 	// get files to download from bucket
 	prefix := fmt.Sprintf("%s/%s/", flagToken, folderToDownload)
+	log.Info().Str("prefix", prefix).Msg("prefix")
+	log.Info().Str("bucket", bucket.Name).Msg("bucket")
 	files, err := bucket.GetFiles(ctx, client, prefix, "")
 	if err != nil {
 		log.Fatal().Err(err).Msgf("could not get list of files from GCS")
