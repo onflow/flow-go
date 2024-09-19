@@ -277,7 +277,7 @@ network-config:
          # instead, the counter will be set to 0. This is to prevent the counter from becoming a large number over time.
          skip-decay-threshold: 0.1
     # Peer scoring is the default value for enabling peer scoring
-    peer-scoring-enabled: true
+    peer-scoring-enabled: false
     scoring-parameters:
       peer-scoring:
         internal:

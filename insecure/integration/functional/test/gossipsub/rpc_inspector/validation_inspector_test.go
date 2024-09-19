@@ -44,6 +44,7 @@ func TestValidationInspector_InvalidTopicId_Detection(t *testing.T) {
 	sporkID := unittest.IdentifierFixture()
 	flowConfig, err := config.DefaultConfig()
 	require.NoError(t, err)
+	flowConfig.NetworkConfig.GossipSub.PeerScoringEnabled = true // default is false
 	inspectorConfig := flowConfig.NetworkConfig.GossipSub.RpcInspector.Validation
 
 	messageCount := 100
@@ -173,6 +174,7 @@ func TestValidationInspector_DuplicateTopicId_Detection(t *testing.T) {
 	sporkID := unittest.IdentifierFixture()
 	flowConfig, err := config.DefaultConfig()
 	require.NoError(t, err)
+	flowConfig.NetworkConfig.GossipSub.PeerScoringEnabled = true // default is false
 	inspectorConfig := flowConfig.NetworkConfig.GossipSub.RpcInspector.Validation
 
 	inspectorConfig.InspectionQueue.NumberOfWorkers = 1
@@ -282,6 +284,7 @@ func TestValidationInspector_IHaveDuplicateMessageId_Detection(t *testing.T) {
 	sporkID := unittest.IdentifierFixture()
 	flowConfig, err := config.DefaultConfig()
 	require.NoError(t, err)
+	flowConfig.NetworkConfig.GossipSub.PeerScoringEnabled = true // default is false
 	inspectorConfig := flowConfig.NetworkConfig.GossipSub.RpcInspector.Validation
 	inspectorConfig.InspectionQueue.NumberOfWorkers = 1
 
@@ -379,6 +382,7 @@ func TestValidationInspector_UnknownClusterId_Detection(t *testing.T) {
 	sporkID := unittest.IdentifierFixture()
 	flowConfig, err := config.DefaultConfig()
 	require.NoError(t, err)
+	flowConfig.NetworkConfig.GossipSub.PeerScoringEnabled = true // default is false
 	inspectorConfig := flowConfig.NetworkConfig.GossipSub.RpcInspector.Validation
 	// set hard threshold to 0 so that in the case of invalid cluster ID
 	// we force the inspector to return an error
@@ -489,6 +493,7 @@ func TestValidationInspector_ActiveClusterIdsNotSet_Graft_Detection(t *testing.T
 	sporkID := unittest.IdentifierFixture()
 	flowConfig, err := config.DefaultConfig()
 	require.NoError(t, err)
+	flowConfig.NetworkConfig.GossipSub.PeerScoringEnabled = true // default is false
 	inspectorConfig := flowConfig.NetworkConfig.GossipSub.RpcInspector.Validation
 	inspectorConfig.GraftPrune.InvalidTopicIdThreshold = 0
 	inspectorConfig.ClusterPrefixedMessage.HardThreshold = 5
@@ -570,6 +575,7 @@ func TestValidationInspector_ActiveClusterIdsNotSet_Prune_Detection(t *testing.T
 	sporkID := unittest.IdentifierFixture()
 	flowConfig, err := config.DefaultConfig()
 	require.NoError(t, err)
+	flowConfig.NetworkConfig.GossipSub.PeerScoringEnabled = true // default is false
 	inspectorConfig := flowConfig.NetworkConfig.GossipSub.RpcInspector.Validation
 	inspectorConfig.GraftPrune.InvalidTopicIdThreshold = 0
 	inspectorConfig.ClusterPrefixedMessage.HardThreshold = 5
@@ -649,6 +655,7 @@ func TestValidationInspector_UnstakedNode_Detection(t *testing.T) {
 	sporkID := unittest.IdentifierFixture()
 	flowConfig, err := config.DefaultConfig()
 	require.NoError(t, err)
+	flowConfig.NetworkConfig.GossipSub.PeerScoringEnabled = true // default is false
 	inspectorConfig := flowConfig.NetworkConfig.GossipSub.RpcInspector.Validation
 	inspectorConfig.InspectionQueue.NumberOfWorkers = 1
 	controlMessageCount := int64(1)
@@ -741,6 +748,7 @@ func TestValidationInspector_InspectIWants_CacheMissThreshold(t *testing.T) {
 	// create our RPC validation inspector
 	flowConfig, err := config.DefaultConfig()
 	require.NoError(t, err)
+	flowConfig.NetworkConfig.GossipSub.PeerScoringEnabled = true // default is false
 	inspectorConfig := flowConfig.NetworkConfig.GossipSub.RpcInspector.Validation
 	inspectorConfig.InspectionQueue.NumberOfWorkers = 1
 	inspectorConfig.IWant.CacheMissThreshold = 10
@@ -836,6 +844,7 @@ func TestValidationInspector_InspectRpcPublishMessages(t *testing.T) {
 	// create our RPC validation inspector
 	flowConfig, err := config.DefaultConfig()
 	require.NoError(t, err)
+	flowConfig.NetworkConfig.GossipSub.PeerScoringEnabled = true // default is false
 	inspectorConfig := flowConfig.NetworkConfig.GossipSub.RpcInspector.Validation
 	inspectorConfig.InspectionQueue.NumberOfWorkers = 1
 
@@ -987,6 +996,7 @@ func testGossipSubSpamMitigationIntegration(t *testing.T, msgType p2pmsg.Control
 
 	cfg, err := config.DefaultConfig()
 	require.NoError(t, err)
+	cfg.NetworkConfig.GossipSub.PeerScoringEnabled = true // default is false
 	// set the scoring parameters to be more aggressive to speed up the test
 	cfg.NetworkConfig.GossipSub.RpcTracer.ScoreTracerInterval = 100 * time.Millisecond
 	cfg.NetworkConfig.GossipSub.ScoringParameters.ScoringRegistryParameters.AppSpecificScore.ScoreTTL = 100 * time.Millisecond
