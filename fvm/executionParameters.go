@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"math"
 
+	"github.com/onflow/flow-go/fvm/storage/snapshot"
+
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime/common"
 
@@ -58,15 +60,16 @@ func getBodyMeterParameters(
 	txnState storage.TransactionPreparer,
 ) (
 	meter.MeterParameters,
+	*snapshot.ExecutionSnapshot,
 	error,
 ) {
 	procParams := getBasicMeterParameters(ctx, proc)
 
-	overrides, err := txnState.GetMeterParamOverrides(
+	overrides, meterStateRead, err := txnState.GetMeterParamOverrides(
 		txnState,
 		NewMeterParamOverridesComputer(ctx, txnState))
 	if err != nil {
-		return procParams, err
+		return procParams, nil, err
 	}
 
 	if overrides.ComputationWeights != nil {
@@ -89,7 +92,7 @@ func getBodyMeterParameters(
 			WithStorageInteractionLimit(math.MaxUint64)
 	}
 
-	return procParams, nil
+	return procParams, meterStateRead, nil
 }
 
 type MeterParamOverridesComputer struct {

@@ -49,6 +49,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/checker"
 	"github.com/onflow/flow-go/engine/execution/computation"
 	"github.com/onflow/flow-go/engine/execution/computation/committer"
+	txmetrics "github.com/onflow/flow-go/engine/execution/computation/metrics"
 	"github.com/onflow/flow-go/engine/execution/ingestion"
 	"github.com/onflow/flow-go/engine/execution/ingestion/fetcher"
 	"github.com/onflow/flow-go/engine/execution/ingestion/loader"
@@ -127,7 +128,7 @@ type ExecutionNode struct {
 
 	ingestionUnit *engine.Unit
 
-	collector              module.ExecutionMetrics
+	collector              *metrics.ExecutionCollector
 	executionState         state.ExecutionState
 	followerState          protocol.FollowerState
 	committee              hotstuff.DynamicCommittee
@@ -160,6 +161,7 @@ type ExecutionNode struct {
 	executionDataTracker   tracker.Storage
 	blobService            network.BlobService
 	blobserviceDependable  *module.ProxiedReadyDoneAware
+	metricsProvider        txmetrics.TransactionExecutionMetricsProvider
 }
 
 func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
@@ -228,6 +230,7 @@ func (builder *ExecutionNodeBuilder) LoadComponentsAndModules() {
 		Component("block data upload manager", exeNode.LoadBlockUploaderManager).
 		Component("GCP block data uploader", exeNode.LoadGCPBlockDataUploader).
 		Component("S3 block data uploader", exeNode.LoadS3BlockDataUploader).
+		Component("transaction execution metrics", exeNode.LoadTransactionExecutionMetrics).
 		Component("provider engine", exeNode.LoadProviderEngine).
 		Component("checker engine", exeNode.LoadCheckerEngine).
 		Component("ingestion engine", exeNode.LoadIngestionEngine).
@@ -544,10 +547,27 @@ func (exeNode *ExecutionNode) LoadProviderEngine(
 
 	vmCtx := fvm.NewContext(opts...)
 
+	var collector module.ExecutionMetrics
+	collector = exeNode.collector
+	if exeNode.exeConf.transactionExecutionMetricsEnabled {
+		// inject the transaction execution metrics
+		collector = exeNode.collector.WithTransactionCallback(
+			func(dur time.Duration, stats module.TransactionExecutionResultStats, info module.TransactionExecutionResultInfo) {
+				exeNode.metricsProvider.Collect(
+					info.BlockID,
+					info.BlockHeight,
+					txmetrics.TransactionExecutionMetrics{
+						TransactionID:          info.TransactionID,
+						ExecutionTime:          dur,
+						ExecutionEffortWeights: stats.ComputationIntensities,
+					})
+			})
+	}
+
 	ledgerViewCommitter := committer.NewLedgerViewCommitter(exeNode.ledgerStorage, node.Tracer)
 	manager, err := computation.New(
 		node.Logger,
-		exeNode.collector,
+		collector,
 		node.Tracer,
 		node.Me,
 		node.State,
@@ -1048,6 +1068,9 @@ func (exeNode *ExecutionNode) LoadIngestionEngine(
 			// consistency of collection can be checked by checking hash, and hash comes from trusted source (blocks from consensus follower)
 			// hence we not need to check origin
 			requester.WithValidateStaking(false),
+			// we have observed execution nodes occasionally fail to retrieve collections using this engine, which can cause temporary execution halts
+			// setting a retry maximum of 10s results in a much faster recovery from these faults (default is 2m)
+			requester.WithRetryMaximum(10*time.Second),
 		)
 
 		if err != nil {
@@ -1125,6 +1148,24 @@ func (exeNode *ExecutionNode) LoadScriptsEngine(node *NodeConfig) (module.ReadyD
 	)
 
 	return exeNode.scriptsEng, nil
+}
+
+func (exeNode *ExecutionNode) LoadTransactionExecutionMetrics(
+	node *NodeConfig,
+) (module.ReadyDoneAware, error) {
+	lastFinalizedHeader := node.LastFinalizedHeader
+
+	metricsProvider := txmetrics.NewTransactionExecutionMetricsProvider(
+		node.Logger,
+		exeNode.executionState,
+		node.Storage.Headers,
+		lastFinalizedHeader.Height,
+		exeNode.exeConf.transactionExecutionMetricsBufferSize,
+	)
+
+	node.ProtocolEvents.AddConsumer(metricsProvider)
+	exeNode.metricsProvider = metricsProvider
+	return metricsProvider, nil
 }
 
 func (exeNode *ExecutionNode) LoadConsensusCommittee(
@@ -1328,6 +1369,7 @@ func (exeNode *ExecutionNode) LoadGrpcServer(
 		exeNode.results,
 		exeNode.txResults,
 		node.Storage.Commits,
+		exeNode.metricsProvider,
 		node.RootChainID,
 		signature.NewBlockSignerDecoder(exeNode.committee),
 		exeNode.exeConf.apiRatelimits,
