@@ -70,7 +70,7 @@ func NewTransactionResultErrorMessages(collector module.CacheMetrics, db *badger
 			return txResultErrMsg, nil
 		}
 	}
-	//TODO: add/check metrics labels for error messages
+
 	return &TransactionResultErrorMessages{
 		db: db,
 		cache: newCache[string, flow.TransactionResultErrorMessage](collector, metrics.ResourceTransactionResultErrorMessages,
