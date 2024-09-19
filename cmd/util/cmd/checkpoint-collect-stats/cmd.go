@@ -48,7 +48,9 @@ const (
 )
 
 const (
-	domainTypePrefix = "domain "
+	domainTypePrefix         = "domain "
+	payloadChannelBufferSize = 100_000
+	initialAccountMapSize    = 5_000_000
 )
 
 const (
@@ -172,6 +174,13 @@ func run(*cobra.Command, []string) {
 		defer profile.Start(profile.MemProfile).Stop()
 	}
 
+	payloadChannel := make(chan *ledger.Payload, payloadChannelBufferSize)
+
+	ledgerStatsChannel := make(chan *complete.LedgerStats, 1)
+
+	// Load execution state and retrieve payloads async
+	go getPayloadsAsync(payloadChannel, ledgerStatsChannel)
+
 	var totalPayloadCount, totalPayloadSize, totalPayloadValueSize uint64
 
 	largestPayloads := util.NewTopN[PayloadInfo](
@@ -183,9 +192,10 @@ func run(*cobra.Command, []string) {
 
 	valueSizesByType := make(sizesByType, 0)
 
-	accounts := make(map[string]*AccountInfo)
+	accounts := make(map[string]*AccountInfo, initialAccountMapSize)
 
-	payloadCallback := func(p *ledger.Payload) {
+	// Process payloads until payloadChannel is closed
+	for p := range payloadChannel {
 		key, err := p.Key()
 		if err != nil {
 			log.Fatal().Err(err).Msg("cannot load a key")
@@ -227,14 +237,9 @@ func run(*cobra.Command, []string) {
 		account.PayloadSize += uint64(size)
 	}
 
-	var ledgerStats *complete.LedgerStats
+	// At this point, all payload are processed.
 
-	useCheckpointFile := flagPayloads == ""
-	if useCheckpointFile {
-		ledgerStats = getPayloadStatsFromCheckpoint(payloadCallback)
-	} else {
-		getPayloadStatsFromPayloadFile(payloadCallback)
-	}
+	ledgerStats := <-ledgerStatsChannel
 
 	var wg sync.WaitGroup
 	wg.Add(2)
@@ -304,6 +309,26 @@ func run(*cobra.Command, []string) {
 	}()
 
 	wg.Wait()
+}
+
+func getPayloadsAsync(
+	payloadChannel chan<- *ledger.Payload,
+	ledgerStatsChannel chan<- *complete.LedgerStats,
+) {
+	defer close(payloadChannel)
+	defer close(ledgerStatsChannel)
+
+	payloadCallback := func(payload *ledger.Payload) {
+		payloadChannel <- payload
+	}
+
+	useCheckpointFile := flagPayloads == ""
+
+	if useCheckpointFile {
+		ledgerStatsChannel <- getPayloadStatsFromCheckpoint(payloadCallback)
+	} else {
+		getPayloadStatsFromPayloadFile(payloadCallback)
+	}
 }
 
 func getPayloadStatsFromPayloadFile(payloadCallBack func(payload *ledger.Payload)) {
