@@ -2,6 +2,7 @@ package types
 
 import (
 	"github.com/holiman/uint256"
+	"github.com/onflow/crypto/hash"
 	gethCommon "github.com/onflow/go-ethereum/common"
 	gethTypes "github.com/onflow/go-ethereum/core/types"
 	gethVM "github.com/onflow/go-ethereum/core/vm"
@@ -11,12 +12,13 @@ import (
 type StateDB interface {
 	gethVM.StateDB
 
-	// Commit commits the changes
+	// Commit commits the changes and
+	// returns a commitment over changes
 	// setting `finalize` flag
 	// calls a subsequent call to Finalize
-	// defering finalization and calling it once at the end
+	// deferring finalization and calling it once at the end
 	// improves efficiency of batch operations.
-	Commit(finalize bool) error
+	Commit(finalize bool) (hash.Hash, error)
 
 	// Finalize flushes all the changes
 	// to the permanent storage
