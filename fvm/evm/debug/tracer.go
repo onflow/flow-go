@@ -76,16 +76,25 @@ func (t *CallTracer) GetResultByTxHash(txID gethCommon.Hash) json.RawMessage {
 }
 
 func (t *CallTracer) Collect(txID gethCommon.Hash) {
+	l := t.logger.With().
+		Str("tx-id", txID.String()).
+		Str("block-id", t.blockID.String()).
+		Logger()
+
+	// collect the trace result
+	res, found := t.resultsByTxID[txID]
+	if !found {
+		l.Error().Msg("trace result not found")
+		return
+	}
+	// remove the result
+	delete(t.resultsByTxID, txID)
+
 	// upload is concurrent and it doesn't produce any errors, as the
 	// client doesn't expect it, we don't want to break execution flow,
 	// in case there are errors we retry, and if we fail after retries
 	// we log them and continue.
 	go func() {
-		l := t.logger.With().
-			Str("tx-id", txID.String()).
-			Str("block-id", t.blockID.String()).
-			Logger()
-
 		defer func() {
 			if r := recover(); r != nil {
 				err, ok := r.(error)
@@ -98,20 +107,12 @@ func (t *CallTracer) Collect(txID gethCommon.Hash) {
 					Msg("failed to collect EVM traces")
 			}
 		}()
-
-		res, found := t.resultsByTxID[txID]
-		if !found {
-			l.Error().Msg("trace result not found")
-			return
-		}
 		if err := t.uploader.Upload(TraceID(txID, t.blockID), res); err != nil {
 			l.Error().Err(err).
 				Str("traces", string(res)).
 				Msg("failed to upload trace results, no more retries")
 			return
 		}
-		// remove the result
-		delete(t.resultsByTxID, txID)
 		l.Debug().Msg("evm traces uploaded successfully")
 	}()
 
