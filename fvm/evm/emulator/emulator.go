@@ -6,6 +6,7 @@ import (
 
 	"github.com/holiman/uint256"
 	"github.com/onflow/atree"
+	"github.com/onflow/crypto/hash"
 	gethCommon "github.com/onflow/go-ethereum/common"
 	gethCore "github.com/onflow/go-ethereum/core"
 	gethTracing "github.com/onflow/go-ethereum/core/tracing"
@@ -178,7 +179,8 @@ func (bl *BlockView) RunTransaction(
 	}
 
 	// all commit errors (StateDB errors) has to be returned
-	if err := proc.commit(true); err != nil {
+	res.StateChangeCommitment, err = proc.commit(true)
+	if err != nil {
 		return nil, err
 	}
 
@@ -224,7 +226,8 @@ func (bl *BlockView) BatchRunTransactions(txs []*gethTypes.Transaction) ([]*type
 		}
 
 		// all commit errors (StateDB errors) has to be returned
-		if err := proc.commit(false); err != nil {
+		res.StateChangeCommitment, err = proc.commit(false)
+		if err != nil {
 			return nil, err
 		}
 
@@ -332,18 +335,18 @@ type procedure struct {
 }
 
 // commit commits the changes to the state (with optional finalization)
-func (proc *procedure) commit(finalize bool) error {
-	err := proc.state.Commit(finalize)
+func (proc *procedure) commit(finalize bool) (hash.Hash, error) {
+	stateUpdateCommitment, err := proc.state.Commit(finalize)
 	if err != nil {
 		// if known types (state errors) don't do anything and return
 		if types.IsAFatalError(err) || types.IsAStateError(err) || types.IsABackendError(err) {
-			return err
+			return stateUpdateCommitment, err
 		}
 
 		// else is a new fatal error
-		return types.NewFatalError(err)
+		return stateUpdateCommitment, types.NewFatalError(err)
 	}
-	return nil
+	return stateUpdateCommitment, nil
 }
 
 func (proc *procedure) mintTo(
@@ -386,7 +389,8 @@ func (proc *procedure) mintTo(
 	}
 
 	// commit and finalize the state and return any stateDB error
-	return res, proc.commit(true)
+	res.StateChangeCommitment, err = proc.commit(true)
+	return res, err
 }
 
 func (proc *procedure) withdrawFrom(
@@ -432,7 +436,8 @@ func (proc *procedure) withdrawFrom(
 	proc.state.SubBalance(bridge, value, gethTracing.BalanceIncreaseWithdrawal)
 
 	// commit and finalize the state and return any stateDB error
-	return res, proc.commit(true)
+	res.StateChangeCommitment, err = proc.commit(true)
+	return res, err
 }
 
 // deployAt deploys a contract at the given target address
@@ -574,7 +579,8 @@ func (proc *procedure) deployAt(
 	res.CumulativeGasUsed = proc.config.BlockTotalGasUsedSoFar + res.GasConsumed
 
 	proc.state.SetCode(addr, ret)
-	return res, proc.commit(true)
+	res.StateChangeCommitment, err = proc.commit(true)
+	return res, err
 }
 
 func (proc *procedure) runDirect(
@@ -590,7 +596,8 @@ func (proc *procedure) runDirect(
 		return nil, err
 	}
 	// commit and finalize the state and return any stateDB error
-	return res, proc.commit(true)
+	res.StateChangeCommitment, err = proc.commit(true)
+	return res, err
 }
 
 // run runs a geth core.message and returns the
