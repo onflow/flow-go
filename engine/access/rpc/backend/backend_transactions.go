@@ -1057,13 +1057,14 @@ func (b *backendTransactions) LookupErrorMessageByTransactionID(
 					if err != nil {
 						return "", fmt.Errorf("failed to store transaction error messages: %w", err)
 					}
-
-					return txErrorMessage.ErrorMessage, nil
 				}
+
+				return txErrorMessage.ErrorMessage, nil
 			}
 		}
 
-		return "", fmt.Errorf("could not fetch error message from ENs: %w", err)
+		// in case tx result is not failed
+		return "", nil
 	}
 
 	return resp.ErrorMessage, nil
@@ -1135,7 +1136,8 @@ func (b *backendTransactions) LookupErrorMessageByIndex(
 			return txErrorMessage.ErrorMessage, nil
 		}
 
-		return "", fmt.Errorf("could not fetch error message from ENs: %w", err)
+		// in case tx result is not failed
+		return "", nil
 	}
 
 	return resp.ErrorMessage, nil
@@ -1217,7 +1219,8 @@ func (b *backendTransactions) LookupErrorMessagesByBlockID(
 			return result, nil
 		}
 
-		return nil, fmt.Errorf("could not fetch error message from ENs: %w", err)
+		// in case tx result is not failed
+		return nil, nil
 	}
 
 	for _, value := range resp {
