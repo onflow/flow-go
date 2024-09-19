@@ -50,13 +50,14 @@ gen-bootstrap: clone-flow
 		--root-height 0 \
 		--root-parent 0000000000000000000000000000000000000000000000000000000000000000 \
 		--epoch-counter 0 \
+		--epoch-length 5000 \
+		--epoch-staking-phase-length 500 \
+		--epoch-dkg-phase-length 1000 \
+		--epoch-extension-view-count=600 \
+		--use-default-epoch-timing \
 		--epoch-timing-ref-counter 0 \
 		--epoch-timing-ref-timestamp $(shell echo $$(( `date +%s` + 5000 ))) \
 		--epoch-timing-duration 5000 \
-		--epoch-length 15000 \
-		--epoch-staking-phase-length 1500 \
-		--epoch-dkg-phase-length 3000 \
-		--epoch-extension-view-count=1800 \
 		--collection-clusters 3 \
 		--protocol-version=0 \
 		--epoch-commit-safety-threshold=100 \
