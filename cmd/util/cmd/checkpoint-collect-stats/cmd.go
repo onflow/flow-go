@@ -2,6 +2,7 @@ package checkpoint_collect_stats
 
 import (
 	"cmp"
+	"encoding/hex"
 	"math"
 	"slices"
 	"strings"
@@ -34,6 +35,7 @@ var (
 	flagStateCommitment string
 	flagPayloads        string
 	flagOutputDir       string
+	flagTopN            int
 	flagMemProfile      bool
 )
 
@@ -75,6 +77,10 @@ func init() {
 		"Directory to write checkpoint stats to")
 	_ = Cmd.MarkFlagRequired("output-dir")
 
+	Cmd.Flags().IntVar(&flagTopN, "top-n", 10,
+		"number of largest payloads or accounts to report",
+	)
+
 	Cmd.Flags().BoolVar(&flagMemProfile, "mem-profile", false,
 		"Enable memory profiling")
 }
@@ -85,9 +91,11 @@ type Stats struct {
 }
 
 type PayloadStats struct {
+	TotalPayloadCount     uint64                 `json:"total_payload_count"`
 	TotalPayloadSize      uint64                 `json:"total_payload_size"`
 	TotalPayloadValueSize uint64                 `json:"total_payload_value_size"`
 	StatsByTypes          []RegisterStatsByTypes `json:"stats_by_types"`
+	TopN                  []PayloadInfo          `json:"largest_payloads"`
 }
 
 type RegisterStatsByTypes struct {
@@ -101,6 +109,13 @@ type RegisterStatsByTypes struct {
 	ValueSize95thPercentile float64                `json:"value_size_95th_percentile"`
 	ValueSizeMax            float64                `json:"value_size_max"`
 	SubTypes                []RegisterStatsByTypes `json:"subtypes,omitempty"`
+}
+
+type PayloadInfo struct {
+	Address string `json:"address"`
+	Key     string `json:"key"`
+	Type    string `json:"type"`
+	Size    uint64 `json:"size"`
 }
 
 type sizesByType map[string][]float64
@@ -121,7 +136,14 @@ func run(*cobra.Command, []string) {
 		defer profile.Start(profile.MemProfile).Stop()
 	}
 
-	var totalPayloadSize, totalPayloadValueSize uint64
+	var totalPayloadCount, totalPayloadSize, totalPayloadValueSize uint64
+
+	largestPayloads := util.NewTopN[PayloadInfo](
+		flagTopN,
+		func(a, b PayloadInfo) bool {
+			return a.Size < b.Size
+		},
+	)
 
 	valueSizesByType := make(sizesByType, 0)
 
@@ -134,11 +156,24 @@ func run(*cobra.Command, []string) {
 		size := p.Size()
 		value := p.Value()
 		valueSize := value.Size()
+
+		// Update total payload size and count
 		totalPayloadSize += uint64(size)
 		totalPayloadValueSize += uint64(valueSize)
+		totalPayloadCount++
 
+		// Update payload sizes by type
 		typ := getType(key)
 		valueSizesByType[typ] = append(valueSizesByType[typ], float64(valueSize))
+
+		// Update top N largest payloads
+		_, _ = largestPayloads.Add(
+			PayloadInfo{
+				Address: hex.EncodeToString(key.KeyParts[0].Value),
+				Key:     hex.EncodeToString(key.KeyParts[1].Value),
+				Type:    typ,
+				Size:    uint64(valueSize),
+			})
 	}
 
 	var ledgerStats *complete.LedgerStats
@@ -152,12 +187,19 @@ func run(*cobra.Command, []string) {
 
 	statsByTypes := getStats(valueSizesByType)
 
+	// Sort top N largest payloads by payload size in descending order
+	slices.SortFunc(largestPayloads.Tree, func(a, b PayloadInfo) int {
+		return cmp.Compare(b.Size, a.Size)
+	})
+
 	stats := &Stats{
 		LedgerStats: ledgerStats,
 		PayloadStats: &PayloadStats{
+			TotalPayloadCount:     totalPayloadCount,
 			TotalPayloadSize:      totalPayloadSize,
 			TotalPayloadValueSize: totalPayloadValueSize,
 			StatsByTypes:          statsByTypes,
+			TopN:                  largestPayloads.Tree,
 		},
 	}
 
