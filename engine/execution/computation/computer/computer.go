@@ -119,7 +119,7 @@ type blockComputer struct {
 	maxConcurrency        int
 }
 
-func SystemChunkContext(vmCtx fvm.Context) fvm.Context {
+func SystemChunkContext(vmCtx fvm.Context, metrics module.ExecutionMetrics) fvm.Context {
 	return fvm.NewContextFromParent(
 		vmCtx,
 		fvm.WithContractDeploymentRestricted(false),
@@ -131,6 +131,7 @@ func SystemChunkContext(vmCtx fvm.Context) fvm.Context {
 		fvm.WithMemoryAndInteractionLimitsDisabled(),
 		// only the system transaction is allowed to call the block entropy provider
 		fvm.WithRandomSourceHistoryCallAllowed(true),
+		fvm.WithMetricsReporter(metrics),
 	)
 }
 
@@ -158,7 +159,7 @@ func NewBlockComputer(
 		return nil, fmt.Errorf("program cache writes are not allowed in scripts on Execution nodes")
 	}
 
-	systemChunkCtx := SystemChunkContext(vmCtx)
+	systemChunkCtx := SystemChunkContext(vmCtx, metrics)
 	vmCtx = fvm.NewContextFromParent(
 		vmCtx,
 		fvm.WithMetricsReporter(metrics),
@@ -255,7 +256,6 @@ func (e *blockComputer) queueTransactionRequests(
 				i == len(collection.Transactions)-1)
 			txnIndex += 1
 		}
-
 	}
 
 	systemCtx := fvm.NewContextFromParent(

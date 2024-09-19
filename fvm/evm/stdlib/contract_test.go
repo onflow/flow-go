@@ -23,6 +23,7 @@ import (
 
 	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/fvm/environment"
+	"github.com/onflow/flow-go/fvm/evm/impl"
 	"github.com/onflow/flow-go/fvm/evm/stdlib"
 	. "github.com/onflow/flow-go/fvm/evm/testutils"
 	"github.com/onflow/flow-go/fvm/evm/types"
@@ -308,9 +309,15 @@ func deployContracts(
 func newEVMTransactionEnvironment(handler types.ContractHandler, contractAddress flow.Address) runtime.Environment {
 	transactionEnvironment := runtime.NewBaseInterpreterEnvironment(runtime.Config{})
 
+	internalEVMValue := impl.NewInternalEVMContractValue(
+		nil,
+		handler,
+		contractAddress,
+	)
+
 	stdlib.SetupEnvironment(
 		transactionEnvironment,
-		handler,
+		internalEVMValue,
 		contractAddress,
 	)
 
@@ -320,9 +327,15 @@ func newEVMTransactionEnvironment(handler types.ContractHandler, contractAddress
 func newEVMScriptEnvironment(handler types.ContractHandler, contractAddress flow.Address) runtime.Environment {
 	scriptEnvironment := runtime.NewScriptInterpreterEnvironment(runtime.Config{})
 
+	internalEVMValue := impl.NewInternalEVMContractValue(
+		nil,
+		handler,
+		contractAddress,
+	)
+
 	stdlib.SetupEnvironment(
 		scriptEnvironment,
-		handler,
+		internalEVMValue,
 		contractAddress,
 	)
 
@@ -461,10 +474,9 @@ func TestEVMEncodeABIComputation(t *testing.T) {
       access(all)
       fun main(): [UInt8] {
         let address = EVM.EVMAddress(
-          bytes: [
-            122, 88, 192, 190, 114, 190, 33, 139, 65, 198,
-            8, 183, 254, 124, 91, 182, 48, 115, 108, 113
-          ]
+            bytes: "7A58c0Be72BE218B41C608b7Fe7C5bB630736C71"
+                .decodeHex()
+                .toConstantSized<[UInt8; 20]>()!
         )
         let arr: [UInt8] = [1, 2, 3, 4, 5]
 
@@ -884,10 +896,9 @@ func TestEVMDecodeABIComputation(t *testing.T) {
       access(all)
       fun main(): [UInt8] {
         let address = EVM.EVMAddress(
-          bytes: [
-            122, 88, 192, 190, 114, 190, 33, 139, 65, 198,
-            8, 183, 254, 124, 91, 182, 48, 115, 108, 113
-          ]
+            bytes: "7A58c0Be72BE218B41C608b7Fe7C5bB630736C71"
+                .decodeHex()
+                .toConstantSized<[UInt8; 20]>()!
         )
         let arr: [UInt8] = [1, 2, 3, 4, 5]
 
@@ -997,12 +1008,10 @@ func TestEVMEncodeDecodeABIRoundtrip(t *testing.T) {
       access(all)
       fun main(): Bool {
         // Check EVM.EVMAddress encode/decode
-        // bytes for address 0x7A58c0Be72BE218B41C608b7Fe7C5bB630736C71
         let address = EVM.EVMAddress(
-          bytes: [
-            122, 88, 192, 190, 114, 190, 33, 139, 65, 198,
-            8, 183, 254, 124, 91, 182, 48, 115, 108, 113
-          ]
+            bytes: "7A58c0Be72BE218B41C608b7Fe7C5bB630736C71"
+                .decodeHex()
+                .toConstantSized<[UInt8; 20]>()!
         )
         var data = EVM.encodeABI([address])
         var values = EVM.decodeABI(types: [Type<EVM.EVMAddress>()], data: data)
@@ -2239,12 +2248,10 @@ func TestEVMEncodeABIWithSignature(t *testing.T) {
 
       access(all)
       fun main(): [UInt8] {
-        // bytes for address 0x7A58c0Be72BE218B41C608b7Fe7C5bB630736C71
         let address = EVM.EVMAddress(
-          bytes: [
-            122, 88, 192, 190, 114, 190, 33, 139, 65, 198,
-            8, 183, 254, 124, 91, 182, 48, 115, 108, 113
-          ]
+            bytes: "7A58c0Be72BE218B41C608b7Fe7C5bB630736C71"
+                .decodeHex()
+                .toConstantSized<[UInt8; 20]>()!
         )
 
         return EVM.encodeABIWithSignature(
@@ -3203,7 +3210,7 @@ func TestEVMDryRun(t *testing.T) {
 		},
 	)
 	require.NoError(t, err)
-	res, err := stdlib.ResultSummaryFromEVMResultValue(val)
+	res, err := impl.ResultSummaryFromEVMResultValue(val)
 	require.NoError(t, err)
 	assert.Equal(t, types.StatusSuccessful, res.Status)
 	assert.True(t, dryRunCalled)
@@ -3335,7 +3342,7 @@ func TestEVMBatchRun(t *testing.T) {
 	require.True(t, ok)
 
 	for _, v := range resultsCadence.Values {
-		res, err := stdlib.ResultSummaryFromEVMResultValue(v)
+		res, err := impl.ResultSummaryFromEVMResultValue(v)
 		require.NoError(t, err)
 		assert.Equal(t, types.StatusSuccessful, res.Status)
 	}

@@ -38,9 +38,9 @@ import (
 // - error: if any error occurs. Any error returned from this function is irrecoverable.
 func ConstructClusterAssignment(log zerolog.Logger, partnerNodes, internalNodes flow.IdentityList, numCollectionClusters int) (flow.AssignmentList, flow.ClusterList, error) {
 
-	partners := partnerNodes.Filter(filter.HasRole[flow.Identity](flow.RoleCollection))
-	internals := internalNodes.Filter(filter.HasRole[flow.Identity](flow.RoleCollection))
-	nCollectors := len(partners) + len(internals)
+	partnerCollectors := partnerNodes.Filter(filter.HasRole[flow.Identity](flow.RoleCollection))
+	internalCollectors := internalNodes.Filter(filter.HasRole[flow.Identity](flow.RoleCollection))
+	nCollectors := len(partnerCollectors) + len(internalCollectors)
 
 	// ensure we have at least as many collection nodes as clusters
 	if nCollectors < int(numCollectionClusters) {
@@ -49,32 +49,24 @@ func ConstructClusterAssignment(log zerolog.Logger, partnerNodes, internalNodes 
 	}
 
 	// shuffle both collector lists based on a non-deterministic algorithm
-	partners, err := partners.Shuffle()
+	partnerCollectors, err := partnerCollectors.Shuffle()
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not shuffle partners")
 	}
-	internals, err = internals.Shuffle()
+	internalCollectors, err = internalCollectors.Shuffle()
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not shuffle internals")
 	}
 
-	// The following is a heuristic for distributing the internal collector nodes (private staking key available
-	// to generate QC for cluster root block) and partner nodes (private staking unknown). We need internal nodes
-	// to control strictly more than 2/3 of the cluster's total weight.
-	// The following is a heuristic that distributes collectors round-robbin across the specified number of clusters.
-	// This heuristic only works when all collectors have equal weight! The following sanity check enforces this:
-	if len(partnerNodes) > 0 && len(partnerNodes) > 2*len(internalNodes) {
-		return nil, nil, fmt.Errorf("requiring at least x>0 number of partner nodes and y > 2x number of internal nodes, but got x,y=%d,%d", len(partnerNodes), len(internalNodes))
-	}
-	// sanity check ^ enforces that there is at least one internal node, hence `internalNodes[0].InitialWeight` is always a valid reference weight
-	refWeight := internalNodes[0].InitialWeight
+	// capture first reference weight to validate that all collectors have equal weight
+	refWeight := internalCollectors[0].InitialWeight
 
 	identifierLists := make([]flow.IdentifierList, numCollectionClusters)
 	// array to track the 2/3 internal-nodes constraint (internal_nodes > 2 * partner_nodes)
 	constraint := make([]int, numCollectionClusters)
 
 	// first, round-robin internal nodes into each cluster
-	for i, node := range internals {
+	for i, node := range internalCollectors {
 		if node.InitialWeight != refWeight {
 			return nil, nil, fmt.Errorf("current implementation requires all collectors (partner & interal nodes) to have equal weight")
 		}
@@ -84,7 +76,7 @@ func ConstructClusterAssignment(log zerolog.Logger, partnerNodes, internalNodes 
 	}
 
 	// next, round-robin partner nodes into each cluster
-	for i, node := range partners {
+	for i, node := range partnerCollectors {
 		if node.InitialWeight != refWeight {
 			return nil, nil, fmt.Errorf("current implementation requires all collectors (partner & interal nodes) to have equal weight")
 		}
@@ -102,7 +94,7 @@ func ConstructClusterAssignment(log zerolog.Logger, partnerNodes, internalNodes 
 
 	assignments := assignment.FromIdentifierLists(identifierLists)
 
-	collectors := append(partners, internals...)
+	collectors := append(partnerCollectors, internalCollectors...)
 	clusters, err := factory.NewClusterList(assignments, collectors.ToSkeleton())
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not create cluster list")

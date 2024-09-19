@@ -172,6 +172,25 @@ func (suite *Suite) TestInvalidTransaction() {
 		suite.Assert().True(errors.As(err, &access.InvalidScriptError{}))
 	})
 
+	// In some cases the Cadence parser will panic rather than return an error.
+	// If this happens, we should recover from the panic and return an InvalidScriptError.
+	// See: https://github.com/onflow/cadence/issues/3428, https://github.com/dapperlabs/flow-go/issues/6964
+	suite.Run("transaction script exceeds parse token limit (Cadence parser panic should be caught)", func() {
+		const tokenLimit = 1 << 19
+		script := "{};"
+		for len(script) < tokenLimit {
+			script += script
+		}
+
+		tx := unittest.TransactionBodyFixture()
+		tx.ReferenceBlockID = suite.root.ID()
+		tx.Script = []byte("transaction { execute {" + script + "}}")
+
+		err := suite.engine.ProcessTransaction(&tx)
+		suite.Assert().Error(err)
+		suite.Assert().True(errors.As(err, &access.InvalidScriptError{}))
+	})
+
 	suite.Run("invalid signature format", func() {
 		signer := flow.Testnet.Chain().ServiceAddress()
 		keyIndex := uint32(0)

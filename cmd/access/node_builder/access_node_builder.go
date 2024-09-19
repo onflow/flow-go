@@ -55,6 +55,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/subscription"
 	followereng "github.com/onflow/flow-go/engine/common/follower"
 	"github.com/onflow/flow-go/engine/common/requester"
+	"github.com/onflow/flow-go/engine/common/stop"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/engine/common/version"
 	"github.com/onflow/flow-go/engine/execution/computation/query"
@@ -173,6 +174,7 @@ type AccessNodeConfig struct {
 	programCacheSize                     uint
 	checkPayerBalance                    bool
 	versionControlEnabled                bool
+	stopControlEnabled                   bool
 }
 
 type PublicNetworkConfig struct {
@@ -276,6 +278,7 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 		programCacheSize:                     0,
 		checkPayerBalance:                    false,
 		versionControlEnabled:                true,
+		stopControlEnabled:                   false,
 	}
 }
 
@@ -287,43 +290,45 @@ type FlowAccessNodeBuilder struct {
 	*AccessNodeConfig
 
 	// components
-	FollowerState              protocol.FollowerState
-	SyncCore                   *chainsync.Core
-	RpcEng                     *rpc.Engine
-	FollowerDistributor        *consensuspubsub.FollowerDistributor
-	CollectionRPC              access.AccessAPIClient
-	TransactionTimings         *stdmap.TransactionTimings
-	CollectionsToMarkFinalized *stdmap.Times
-	CollectionsToMarkExecuted  *stdmap.Times
-	BlocksToMarkExecuted       *stdmap.Times
-	TransactionMetrics         *metrics.TransactionCollector
-	RestMetrics                *metrics.RestCollector
-	AccessMetrics              module.AccessMetrics
-	PingMetrics                module.PingMetrics
-	Committee                  hotstuff.DynamicCommittee
-	Finalized                  *flow.Header // latest finalized block that the node knows of at startup time
-	Pending                    []*flow.Header
-	FollowerCore               module.HotStuffFollower
-	Validator                  hotstuff.Validator
-	ExecutionDataDownloader    execution_data.Downloader
-	PublicBlobService          network.BlobService
-	ExecutionDataRequester     state_synchronization.ExecutionDataRequester
-	ExecutionDataStore         execution_data.ExecutionDataStore
-	ExecutionDataBlobstore     blobs.Blobstore
-	ExecutionDataCache         *execdatacache.ExecutionDataCache
-	ExecutionIndexer           *indexer.Indexer
-	ExecutionIndexerCore       *indexer.IndexerCore
-	ScriptExecutor             *backend.ScriptExecutor
-	RegistersAsyncStore        *execution.RegistersAsyncStore
-	Reporter                   *index.Reporter
-	EventsIndex                *index.EventsIndex
-	TxResultsIndex             *index.TransactionResultsIndex
-	IndexerDependencies        *cmd.DependencyList
-	collectionExecutedMetric   module.CollectionExecutedMetric
-	ExecutionDataPruner        *pruner.Pruner
-	ExecutionDatastoreManager  edstorage.DatastoreManager
-	ExecutionDataTracker       tracker.Storage
-	versionControl             *version.VersionControl
+	FollowerState                protocol.FollowerState
+	SyncCore                     *chainsync.Core
+	RpcEng                       *rpc.Engine
+	FollowerDistributor          *consensuspubsub.FollowerDistributor
+	CollectionRPC                access.AccessAPIClient
+	TransactionTimings           *stdmap.TransactionTimings
+	CollectionsToMarkFinalized   *stdmap.Times
+	CollectionsToMarkExecuted    *stdmap.Times
+	BlocksToMarkExecuted         *stdmap.Times
+	TransactionMetrics           *metrics.TransactionCollector
+	TransactionValidationMetrics *metrics.TransactionValidationCollector
+	RestMetrics                  *metrics.RestCollector
+	AccessMetrics                module.AccessMetrics
+	PingMetrics                  module.PingMetrics
+	Committee                    hotstuff.DynamicCommittee
+	Finalized                    *flow.Header // latest finalized block that the node knows of at startup time
+	Pending                      []*flow.Header
+	FollowerCore                 module.HotStuffFollower
+	Validator                    hotstuff.Validator
+	ExecutionDataDownloader      execution_data.Downloader
+	PublicBlobService            network.BlobService
+	ExecutionDataRequester       state_synchronization.ExecutionDataRequester
+	ExecutionDataStore           execution_data.ExecutionDataStore
+	ExecutionDataBlobstore       blobs.Blobstore
+	ExecutionDataCache           *execdatacache.ExecutionDataCache
+	ExecutionIndexer             *indexer.Indexer
+	ExecutionIndexerCore         *indexer.IndexerCore
+	ScriptExecutor               *backend.ScriptExecutor
+	RegistersAsyncStore          *execution.RegistersAsyncStore
+	Reporter                     *index.Reporter
+	EventsIndex                  *index.EventsIndex
+	TxResultsIndex               *index.TransactionResultsIndex
+	IndexerDependencies          *cmd.DependencyList
+	collectionExecutedMetric     module.CollectionExecutedMetric
+	ExecutionDataPruner          *pruner.Pruner
+	ExecutionDatastoreManager    edstorage.DatastoreManager
+	ExecutionDataTracker         tracker.Storage
+	VersionControl               *version.VersionControl
+	StopControl                  *stop.StopControl
 
 	// The sync engine participants provider is the libp2p peer store for the access node
 	// which is not available until after the network has started.
@@ -978,7 +983,7 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 					builder.programCacheSize > 0,
 				)
 
-				err = builder.ScriptExecutor.Initialize(builder.ExecutionIndexer, scripts, builder.versionControl)
+				err = builder.ScriptExecutor.Initialize(builder.ExecutionIndexer, scripts, builder.VersionControl)
 				if err != nil {
 					return nil, err
 				}
@@ -991,6 +996,10 @@ func (builder *FlowAccessNodeBuilder) BuildExecutionSyncComponents() *FlowAccess
 				err = builder.RegistersAsyncStore.Initialize(registers)
 				if err != nil {
 					return nil, err
+				}
+
+				if builder.stopControlEnabled {
+					builder.StopControl.RegisterHeightRecorder(builder.ExecutionIndexer)
 				}
 
 				return builder.ExecutionIndexer, nil
@@ -1259,6 +1268,10 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 			"version-control-enabled",
 			defaultConfig.versionControlEnabled,
 			"whether to enable the version control feature. Default value is true")
+		flags.BoolVar(&builder.stopControlEnabled,
+			"stop-control-enabled",
+			defaultConfig.stopControlEnabled,
+			"whether to enable the stop control feature. Default value is false")
 		// ExecutionDataRequester config
 		flags.BoolVar(&builder.executionDataSyncEnabled,
 			"execution-data-sync-enabled",
@@ -1589,6 +1602,8 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 	builder.IndexerDependencies.Add(ingestionDependable)
 	versionControlDependable := module.NewProxiedReadyDoneAware()
 	builder.IndexerDependencies.Add(versionControlDependable)
+	stopControlDependable := module.NewProxiedReadyDoneAware()
+	builder.IndexerDependencies.Add(stopControlDependable)
 	var lastFullBlockHeight *counters.PersistentStrictMonotonicCounter
 
 	builder.
@@ -1665,6 +1680,10 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			)
 			return nil
 		}).
+		Module("transaction validation metrics", func(node *cmd.NodeConfig) error {
+			builder.TransactionValidationMetrics = metrics.NewTransactionValidationCollector()
+			return nil
+		}).
 		Module("rest metrics", func(node *cmd.NodeConfig) error {
 			m, err := metrics.NewRestCollector(routes.URLToRoute, node.MetricsRegisterer)
 			if err != nil {
@@ -1676,6 +1695,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 		Module("access metrics", func(node *cmd.NodeConfig) error {
 			builder.AccessMetrics = metrics.NewAccessCollector(
 				metrics.WithTransactionMetrics(builder.TransactionMetrics),
+				metrics.WithTransactionValidationMetrics(builder.TransactionValidationMetrics),
 				metrics.WithBackendScriptsMetrics(builder.TransactionMetrics),
 				metrics.WithRestMetrics(builder.RestMetrics),
 			)
@@ -1813,10 +1833,28 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 			// VersionControl needs to consume BlockFinalized events.
 			node.ProtocolEvents.AddConsumer(versionControl)
 
-			builder.versionControl = versionControl
-			versionControlDependable.Init(builder.versionControl)
+			builder.VersionControl = versionControl
+			versionControlDependable.Init(builder.VersionControl)
 
 			return versionControl, nil
+		}).
+		Component("stop control", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			if !builder.stopControlEnabled {
+				noop := &module.NoopReadyDoneAware{}
+				stopControlDependable.Init(noop)
+				return noop, nil
+			}
+
+			stopControl := stop.NewStopControl(
+				builder.Logger,
+			)
+
+			builder.VersionControl.AddVersionUpdatesConsumer(stopControl.OnVersionUpdate)
+
+			builder.StopControl = stopControl
+			stopControlDependable.Init(builder.StopControl)
+
+			return stopControl, nil
 		}).
 		Component("RPC engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			config := builder.rpcConf
@@ -1921,6 +1959,7 @@ func (builder *FlowAccessNodeBuilder) Build() (cmd.Node, error) {
 				TxResultQueryMode:   txResultQueryMode,
 				TxResultsIndex:      builder.TxResultsIndex,
 				LastFullBlockHeight: lastFullBlockHeight,
+				VersionControl:      builder.VersionControl,
 			})
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize backend: %w", err)

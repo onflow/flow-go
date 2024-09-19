@@ -1296,6 +1296,18 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 		mock.Anything).
 		Return(nil)
 
+	metrics.On("RuntimeTransactionParsed", mock.Anything)
+	metrics.On("RuntimeTransactionProgramsCacheMiss")
+	metrics.On("RuntimeTransactionProgramsCacheHit")
+	metrics.On("RuntimeTransactionChecked", mock.Anything)
+	metrics.On("RuntimeTransactionInterpreted", mock.Anything)
+
+	metrics.On("EVMBlockExecuted",
+		mock.Anything,
+		mock.Anything,
+		mock.Anything,
+	)
+
 	bservice := requesterunit.MockBlobService(blockstore.NewBlockstore(dssync.MutexWrap(datastore.NewMapDatastore())))
 	trackerStorage := mocktracker.NewMockStorage()
 

@@ -125,7 +125,7 @@ func (m *CadenceBaseMigration) MigrateAccount(
 	var storageHealthErrorBefore error
 	if m.checkStorageHealthBeforeMigration {
 
-		storageHealthErrorBefore = checkStorageHealth(address, storage, accountRegisters, m.nWorkers)
+		storageHealthErrorBefore = util.CheckStorageHealth(address, storage, accountRegisters, AllStorageMapDomains, m.nWorkers)
 		if storageHealthErrorBefore != nil {
 			m.log.Warn().
 				Err(storageHealthErrorBefore).
@@ -180,25 +180,15 @@ func (m *CadenceBaseMigration) MigrateAccount(
 		}
 	}
 
-	// finalize the transaction
-	result, err := migrationRuntime.TransactionState.FinalizeMainTransaction()
-	if err != nil {
-		return fmt.Errorf("failed to finalize main transaction: %w", err)
-	}
+	// Commit/finalize the transaction
 
-	// Merge the changes into the registers
 	expectedAddresses := map[flow.Address]struct{}{
 		flow.Address(address): {},
 	}
 
-	err = registers.ApplyChanges(
-		accountRegisters,
-		result.WriteSet,
-		expectedAddresses,
-		m.log,
-	)
+	err = migrationRuntime.Commit(expectedAddresses, m.log)
 	if err != nil {
-		return fmt.Errorf("failed to apply changes: %w", err)
+		return fmt.Errorf("failed to commit: %w", err)
 	}
 
 	if m.diffReporter != nil {

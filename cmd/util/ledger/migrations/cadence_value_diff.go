@@ -111,10 +111,10 @@ func (dr *CadenceValueDiffReporter) DiffStates(oldRegs, newRegs registers.Regist
 	var loadAtreeStorageGroup errgroup.Group
 
 	loadAtreeStorageGroup.Go(func() (err error) {
-		return loadAtreeSlabsInStorage(oldStorage, oldRegs, dr.nWorkers)
+		return util.LoadAtreeSlabsInStorage(oldStorage, oldRegs, dr.nWorkers)
 	})
 
-	err := loadAtreeSlabsInStorage(newStorage, newRegs, dr.nWorkers)
+	err := util.LoadAtreeSlabsInStorage(newStorage, newRegs, dr.nWorkers)
 	if err != nil {
 		dr.reportWriter.Write(
 			diffError{

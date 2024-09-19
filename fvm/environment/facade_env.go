@@ -11,7 +11,6 @@ import (
 	"github.com/onflow/flow-go/fvm/storage/snapshot"
 	"github.com/onflow/flow-go/fvm/storage/state"
 	"github.com/onflow/flow-go/fvm/tracing"
-	"github.com/onflow/flow-go/model/flow"
 )
 
 var _ Environment = &facadeEnvironment{}
@@ -337,15 +336,8 @@ func (*facadeEnvironment) GetInterpreterSharedState() *interpreter.SharedState {
 	return nil
 }
 
-func (env *facadeEnvironment) RecoverProgram(program *ast.Program, location common.Location) (*ast.Program, error) {
-	// Enabled on all networks but Mainnet,
-	// until https://github.com/onflow/flips/pull/283 got approved.
-	if env.chain.ChainID() == flow.Mainnet {
-		return nil, nil
-	}
-
+func (env *facadeEnvironment) RecoverProgram(program *ast.Program, location common.Location) ([]byte, error) {
 	return RecoverProgram(
-		env,
 		env.chain.ChainID(),
 		program,
 		location,

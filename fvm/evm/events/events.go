@@ -127,6 +127,7 @@ func (p *blockEvent) ToCadence(chainID flow.ChainID) (cadence.Event, error) {
 		hashToCadenceArrayValue(p.ParentBlockHash),
 		hashToCadenceArrayValue(p.ReceiptRoot),
 		hashToCadenceArrayValue(p.TransactionHashRoot),
+		hashToCadenceArrayValue(p.PrevRandao),
 	}).WithType(eventType), nil
 }
 
@@ -139,13 +140,51 @@ type BlockEventPayload struct {
 	ParentBlockHash     gethCommon.Hash `cadence:"parentHash"`
 	ReceiptRoot         gethCommon.Hash `cadence:"receiptRoot"`
 	TransactionHashRoot gethCommon.Hash `cadence:"transactionHashRoot"`
+	PrevRandao          gethCommon.Hash `cadence:"prevrandao"`
+}
+
+// blockEventPayloadV0 legacy format of the block without prevrando field
+type blockEventPayloadV0 struct {
+	Height              uint64          `cadence:"height"`
+	Hash                gethCommon.Hash `cadence:"hash"`
+	Timestamp           uint64          `cadence:"timestamp"`
+	TotalSupply         cadence.Int     `cadence:"totalSupply"`
+	TotalGasUsed        uint64          `cadence:"totalGasUsed"`
+	ParentBlockHash     gethCommon.Hash `cadence:"parentHash"`
+	ReceiptRoot         gethCommon.Hash `cadence:"receiptRoot"`
+	TransactionHashRoot gethCommon.Hash `cadence:"transactionHashRoot"`
+}
+
+// decodeLegacyBlockEventPayload decodes any legacy block formats into
+// current version of the block event payload.
+func decodeLegacyBlockEventPayload(event cadence.Event) (*BlockEventPayload, error) {
+	var lb blockEventPayloadV0
+	if err := cadence.DecodeFields(event, &lb); err != nil {
+		return nil, err
+	}
+
+	return &BlockEventPayload{
+		Height:              lb.Height,
+		Hash:                lb.Hash,
+		Timestamp:           lb.Timestamp,
+		TotalSupply:         lb.TotalSupply,
+		TotalGasUsed:        lb.TotalGasUsed,
+		ParentBlockHash:     lb.ParentBlockHash,
+		ReceiptRoot:         lb.ReceiptRoot,
+		TransactionHashRoot: lb.TransactionHashRoot,
+	}, nil
 }
 
 // DecodeBlockEventPayload decodes Cadence event into block event payload.
 func DecodeBlockEventPayload(event cadence.Event) (*BlockEventPayload, error) {
 	var block BlockEventPayload
-	err := cadence.DecodeFields(event, &block)
-	return &block, err
+	if err := cadence.DecodeFields(event, &block); err != nil {
+		if block, err := decodeLegacyBlockEventPayload(event); err == nil {
+			return block, nil
+		}
+		return nil, err
+	}
+	return &block, nil
 }
 
 type TransactionEventPayload struct {

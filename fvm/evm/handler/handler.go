@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"fmt"
 	"math/big"
 
 	"github.com/onflow/cadence/runtime/common"
@@ -134,57 +135,79 @@ func (h *ContractHandler) LastExecutedBlock() *types.Block {
 }
 
 // RunOrPanic runs an rlp-encoded evm transaction and
-// collects the gas fees and pay it to the coinbase address provided.
-func (h *ContractHandler) RunOrPanic(rlpEncodedTx []byte, coinbase types.Address) {
+func (h *ContractHandler) RunOrPanic(rlpEncodedTx []byte, gasFeeCollector types.Address) {
 	// capture open tracing span
 	defer h.backend.StartChildSpan(trace.FVMEVMRun).End()
 
-	res, err := h.run(rlpEncodedTx, coinbase)
-	panicOnErrorOrInvalidOrFailedState(res, err)
+	h.runWithGasFeeRefund(gasFeeCollector, func() {
+		res, err := h.run(rlpEncodedTx)
+		panicOnErrorOrInvalidOrFailedState(res, err)
+	})
 }
 
-// Run tries to run an rlp-encoded evm transaction and
-// collects the gas fees and pay it to the coinbase address provided.
-func (h *ContractHandler) Run(rlpEncodedTx []byte, coinbase types.Address) *types.ResultSummary {
+// Run tries to run an rlp-encoded evm transaction
+// collects the gas fees and pay it to the gasFeeCollector address provided.
+func (h *ContractHandler) Run(rlpEncodedTx []byte, gasFeeCollector types.Address) *types.ResultSummary {
 	// capture open tracing span
 	defer h.backend.StartChildSpan(trace.FVMEVMRun).End()
 
-	res, err := h.run(rlpEncodedTx, coinbase)
-	panicOnError(err)
+	var res *types.Result
+	var err error
+	h.runWithGasFeeRefund(gasFeeCollector, func() {
+		// run transaction
+		res, err = h.run(rlpEncodedTx)
+		panicOnError(err)
 
+	})
 	// return the result summary
 	return res.ResultSummary()
 }
 
-// BatchRun tries to run batch of rlp-encoded transactions and
+// runWithGasFeeRefund runs a method and transfers the balance changes of the
+// coinbase address to the provided gas fee collector
+func (h *ContractHandler) runWithGasFeeRefund(gasFeeCollector types.Address, f func()) {
+	// capture coinbase init balance
+	cb := h.AccountByAddress(types.CoinbaseAddress, true)
+	initCoinbaseBalance := cb.Balance()
+	f()
+	// transfer the gas fees collected to the gas fee collector address
+	afterBalance := cb.Balance()
+	diff := new(big.Int).Sub(afterBalance, initCoinbaseBalance)
+	if diff.Sign() > 0 {
+		cb.Transfer(gasFeeCollector, diff)
+	}
+	if diff.Sign() < 0 { // this should never happen but in case
+		panic(fvmErrors.NewEVMError(fmt.Errorf("negative balance change on coinbase")))
+	}
+}
+
+// BatchRun tries to run batch of rlp-encoded transactions
 // collects the gas fees and pay it to the coinbase address provided.
 // All transactions provided in the batch are included in a single block,
 // except for invalid transactions
-func (h *ContractHandler) BatchRun(
-	rlpEncodedTxs [][]byte,
-	coinbase types.Address,
-) []*types.ResultSummary {
+func (h *ContractHandler) BatchRun(rlpEncodedTxs [][]byte, gasFeeCollector types.Address) []*types.ResultSummary {
 	// capture open tracing
 	span := h.backend.StartChildSpan(trace.FVMEVMBatchRun)
 	span.SetAttributes(attribute.Int("tx_counts", len(rlpEncodedTxs)))
 	defer span.End()
 
-	// batch run transactions and panic if any error
-	res, err := h.batchRun(rlpEncodedTxs, coinbase)
-	panicOnError(err)
+	var results []*types.Result
+	var err error
+	h.runWithGasFeeRefund(gasFeeCollector, func() {
+		// batch run transactions and panic if any error
+		results, err = h.batchRun(rlpEncodedTxs)
+		panicOnError(err)
+	})
 
 	// convert results into result summaries
-	resSummaries := make([]*types.ResultSummary, len(res))
-	for i, r := range res {
+	resSummaries := make([]*types.ResultSummary, len(results))
+	for i, r := range results {
 		resSummaries[i] = r.ResultSummary()
 	}
 	return resSummaries
 }
 
-func (h *ContractHandler) batchRun(
-	rlpEncodedTxs [][]byte,
-	coinbase types.Address,
-) ([]*types.Result, error) {
+func (h *ContractHandler) batchRun(rlpEncodedTxs [][]byte) ([]*types.Result, error) {
 	// step 1 - transaction decoding and compute total gas needed
 	// This is safe to be done before checking the gas
 	// as it has its own metering
@@ -215,7 +238,6 @@ func (h *ContractHandler) batchRun(
 	if err != nil {
 		return nil, err
 	}
-	ctx.GasFeeCollector = coinbase
 
 	// step 4 - create a block view
 	blk, err := h.emulator.NewBlockView(ctx)
@@ -331,13 +353,19 @@ func (h *ContractHandler) commitBlockProposal() error {
 		types.UnsafeCastOfBalanceToFloat64(bp.TotalSupply),
 	)
 
+	// log evm block commitment
+	logger := h.backend.Logger()
+	logger.Info().
+		Uint64("height", bp.Height).
+		Int("tx_count", len(bp.TxHashes)).
+		Uint64("total_gas_used", bp.TotalGasUsed).
+		Uint64("total_supply", bp.TotalSupply.Uint64()).
+		Msg("EVM Block Committed")
+
 	return nil
 }
 
-func (h *ContractHandler) run(
-	rlpEncodedTx []byte,
-	coinbase types.Address,
-) (*types.Result, error) {
+func (h *ContractHandler) run(rlpEncodedTx []byte) (*types.Result, error) {
 	// step 1 - transaction decoding
 	tx, err := h.decodeTransaction(rlpEncodedTx)
 	if err != nil {
@@ -355,7 +383,6 @@ func (h *ContractHandler) run(
 	if err != nil {
 		return nil, err
 	}
-	ctx.GasFeeCollector = coinbase
 
 	// step 4 - create a block view
 	blk, err := h.emulator.NewBlockView(ctx)
@@ -395,7 +422,10 @@ func (h *ContractHandler) run(
 	}
 
 	// step 9 - emit transaction event
-	err = h.emitEvent(events.NewTransactionEvent(res, rlpEncodedTx, bp.Height))
+	err = h.emitEvent(
+		events.NewTransactionEvent(res, rlpEncodedTx, bp.Height),
+	)
+
 	if err != nil {
 		return nil, err
 	}
@@ -507,11 +537,6 @@ func (h *ContractHandler) getBlockContext() (types.BlockContext, error) {
 	if err != nil {
 		return types.BlockContext{}, err
 	}
-	rand := gethCommon.Hash{}
-	err = h.backend.ReadRandom(rand[:])
-	if err != nil {
-		return types.BlockContext{}, err
-	}
 
 	return types.BlockContext{
 		ChainID:                types.EVMChainIDFromFlowChainID(h.flowChainID),
@@ -524,10 +549,11 @@ func (h *ContractHandler) getBlockContext() (types.BlockContext, error) {
 			return hash
 		},
 		ExtraPrecompiledContracts: h.precompiledContracts,
-		Random:                    rand,
+		Random:                    bp.PrevRandao,
 		Tracer:                    h.tracer.TxTracer(),
 		TxCountSoFar:              uint(len(bp.TxHashes)),
 		TotalGasUsedSoFar:         bp.TotalGasUsed,
+		GasFeeCollector:           types.CoinbaseAddress,
 	}, nil
 }
 

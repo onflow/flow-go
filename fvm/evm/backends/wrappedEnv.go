@@ -5,6 +5,7 @@ import (
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
+	"github.com/rs/zerolog"
 	otelTrace "go.opentelemetry.io/otel/trace"
 
 	"github.com/onflow/flow-go/fvm/environment"
@@ -203,6 +204,10 @@ func (we *WrappedEnvironment) EVMBlockExecuted(
 	totalSupplyInFlow float64,
 ) {
 	we.env.EVMBlockExecuted(txCount, totalGasUsed, totalSupplyInFlow)
+}
+
+func (we *WrappedEnvironment) Logger() zerolog.Logger {
+	return we.env.Logger()
 }
 
 func handleEnvironmentError(err error) error {

@@ -122,13 +122,11 @@ func (bl *BlockView) DirectCall(call *types.DirectCall) (res *types.Result, err 
 	if proc.evm.Config.Tracer != nil && proc.evm.Config.Tracer.OnTxStart != nil {
 		proc.evm.Config.Tracer.OnTxStart(proc.evm.GetVMContext(), call.Transaction(), call.From.ToCommon())
 		defer func() {
-			if proc.evm.Config.Tracer.OnTxEnd != nil {
-				if err == nil && res != nil {
-					proc.evm.Config.Tracer.OnTxEnd(res.Receipt(), res.ValidationError)
-				}
+			if proc.evm.Config.Tracer.OnTxEnd != nil &&
+				err == nil && res != nil {
+				proc.evm.Config.Tracer.OnTxEnd(res.Receipt(), res.ValidationError)
 			}
 		}()
-
 	}
 
 	// re-route based on the sub type
@@ -171,13 +169,6 @@ func (bl *BlockView) RunTransaction(
 	// call tracer
 	if proc.evm.Config.Tracer != nil && proc.evm.Config.Tracer.OnTxStart != nil {
 		proc.evm.Config.Tracer.OnTxStart(proc.evm.GetVMContext(), tx, msg.From)
-		defer func() {
-			if proc.evm.Config.Tracer.OnTxEnd != nil {
-				if err == nil && result != nil {
-					proc.evm.Config.Tracer.OnTxEnd(result.Receipt(), result.ValidationError)
-				}
-			}
-		}()
 	}
 
 	// run msg
@@ -189,6 +180,13 @@ func (bl *BlockView) RunTransaction(
 	// all commit errors (StateDB errors) has to be returned
 	if err := proc.commit(true); err != nil {
 		return nil, err
+	}
+
+	// call tracer on tx end
+	if proc.evm.Config.Tracer != nil &&
+		proc.evm.Config.Tracer.OnTxEnd != nil &&
+		res != nil {
+		proc.evm.Config.Tracer.OnTxEnd(res.Receipt(), res.ValidationError)
 	}
 
 	return res, nil
@@ -214,19 +212,9 @@ func (bl *BlockView) BatchRunTransactions(txs []*gethTypes.Transaction) ([]*type
 			continue
 		}
 
-		// call tracer
+		// call tracer on tx start
 		if proc.evm.Config.Tracer != nil && proc.evm.Config.Tracer.OnTxStart != nil {
 			proc.evm.Config.Tracer.OnTxStart(proc.evm.GetVMContext(), tx, msg.From)
-			defer func() {
-				if proc.evm.Config.Tracer.OnTxEnd != nil {
-					j := i
-					res := batchResults[j]
-					if err == nil && res != nil {
-						proc.evm.Config.Tracer.OnTxEnd(res.Receipt(), res.ValidationError)
-					}
-				}
-			}()
-
 		}
 
 		// run msg
@@ -245,6 +233,13 @@ func (bl *BlockView) BatchRunTransactions(txs []*gethTypes.Transaction) ([]*type
 
 		// collect result
 		batchResults[i] = res
+
+		// call tracer on tx end
+		if proc.evm.Config.Tracer != nil &&
+			proc.evm.Config.Tracer.OnTxEnd != nil &&
+			res != nil {
+			proc.evm.Config.Tracer.OnTxEnd(res.Receipt(), res.ValidationError)
+		}
 	}
 
 	// finalize after all the batch transactions are executed to save resources

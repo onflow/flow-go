@@ -52,25 +52,15 @@ func NewAccountStorageMigration(
 			log.Err(err).Msg("storage health check failed")
 		}
 
-		// Finalize the transaction
-		result, err := migrationRuntime.TransactionState.FinalizeMainTransaction()
-		if err != nil {
-			return fmt.Errorf("failed to finalize main transaction: %w", err)
-		}
+		// Commit/finalize the transaction
 
-		// Merge the changes into the registers
 		expectedAddresses := map[flow.Address]struct{}{
 			flow.Address(address): {},
 		}
 
-		err = registers.ApplyChanges(
-			registersByAccount,
-			result.WriteSet,
-			expectedAddresses,
-			log,
-		)
+		err = migrationRuntime.Commit(expectedAddresses, log)
 		if err != nil {
-			return fmt.Errorf("failed to apply register changes: %w", err)
+			return fmt.Errorf("failed to commit: %w", err)
 		}
 
 		return nil

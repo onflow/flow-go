@@ -155,13 +155,10 @@ func (v *VersionControl) initBoundaries(
 
 		if vb == nil {
 			// no version beacon found
-			// this is unexpected on a live network as there should always be at least the
-			// starting version beacon, but not fatal.
-			// It can happen on new or test networks if the node starts before bootstrap is finished.
-			// TODO: remove when we can guarantee that there will always be a version beacon
+			// this is only expected when a node starts up on a network that has never had a version beacon event.
 			v.log.Info().
 				Uint64("height", processedHeight).
-				Msg("No version beacon found for version control")
+				Msg("No initial version beacon found")
 
 			return nil
 		}
@@ -296,7 +293,7 @@ func (v *VersionControl) blockFinalized(
 		if err != nil {
 			v.log.Err(err).
 				Uint64("height", height).
-				Msg("Failed to get highest version beacon for version control")
+				Msg("Failed to get highest version beacon")
 
 			ctx.Throw(
 				fmt.Errorf(
@@ -305,19 +302,16 @@ func (v *VersionControl) blockFinalized(
 			return
 		}
 
+		v.lastProcessedHeight.Store(height)
+
 		if vb == nil {
 			// no version beacon found
-			// this is unexpected as there should always be at least the
-			// starting version beacon, but not fatal.
-			// It can happen if the node starts before bootstrap is finished.
-			// TODO: remove when we can guarantee that there will always be a version beacon
-			v.log.Info().
+			// this is only expected when a node starts up on a network that has never had a version beacon event.
+			v.log.Debug().
 				Uint64("height", height).
-				Msg("No version beacon found for version control")
+				Msg("No version beacon found at height")
 			continue
 		}
-
-		v.lastProcessedHeight.Store(height)
 
 		previousEndHeight := v.endHeight.Load()
 
@@ -364,4 +358,30 @@ func (v *VersionControl) blockFinalized(
 			}
 		}
 	}
+}
+
+// StartHeight return the first block that the version supports.
+// Start height is the sealed root block if there is no start boundary in the current spork.
+func (v *VersionControl) StartHeight() uint64 {
+	startHeight := v.startHeight.Load()
+
+	// in case no start boundary in the current spork
+	if startHeight == NoHeight {
+		startHeight = v.sealedRootBlockHeight.Load()
+	}
+
+	return startHeight
+}
+
+// EndHeight return the last block that the version supports.
+// End height is the last processed height if there is no end boundary in the current spork.
+func (v *VersionControl) EndHeight() uint64 {
+	endHeight := v.endHeight.Load()
+
+	// in case no end boundary in the current spork
+	if endHeight == NoHeight {
+		endHeight = v.lastProcessedHeight.Load()
+	}
+
+	return endHeight
 }
