@@ -38,8 +38,10 @@ func (ct *CallTracker) CaptureRequiredGas(address types.Address, input []byte, o
 		ct.callsByAddress[address] = calls
 	}
 
+	var in []byte
+	copy(in, input)
 	calls.RequiredGasCalls = append(calls.RequiredGasCalls, types.RequiredGasCall{
-		Input:  input,
+		Input:  in,
 		Output: output,
 	})
 }
@@ -56,13 +58,18 @@ func (ct *CallTracker) CaptureRun(address types.Address, input []byte, output []
 		}
 		ct.callsByAddress[address] = calls
 	}
+
+	var in, out []byte
+	copy(in, input)
+	copy(out, output)
+
 	errMsg := ""
 	if err != nil {
 		errMsg = err.Error()
 	}
 	calls.RunCalls = append(calls.RunCalls, types.RunCall{
-		Input:    input,
-		Output:   output,
+		Input:    in,
+		Output:   out,
 		ErrorMsg: errMsg,
 	})
 }
