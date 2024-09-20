@@ -467,23 +467,44 @@ func (txn *TableTransaction[TKey, TVal]) GetOrCompute(
 	TVal,
 	error,
 ) {
+	val, _, err := txn.GetWithStateOrCompute(txnState, key, computer)
+	return val, err
+}
+
+// GetWithStateOrCompute returns the key's value and the execution snapshot used to
+// compute it. If a pre-computed value is available,
+// then the pre-computed value is returned and the cached state is replayed on
+// txnState.  Otherwise, the value is computed using valFunc; both the value
+// and the states used to compute the value are captured.
+//
+// Note: valFunc must be an idempotent function and it must not modify
+// txnState's values.
+func (txn *TableTransaction[TKey, TVal]) GetWithStateOrCompute(
+	txnState state.NestedTransactionPreparer,
+	key TKey,
+	computer ValueComputer[TKey, TVal],
+) (
+	TVal,
+	*snapshot.ExecutionSnapshot,
+	error,
+) {
 	var defaultVal TVal
 
 	val, state, ok := txn.get(key)
 	if ok {
 		err := txnState.AttachAndCommitNestedTransaction(state)
 		if err != nil {
-			return defaultVal, fmt.Errorf(
+			return defaultVal, nil, fmt.Errorf(
 				"failed to replay cached state: %w",
 				err)
 		}
 
-		return val, nil
+		return val, state, nil
 	}
 
 	nestedTxId, err := txnState.BeginNestedTransaction()
 	if err != nil {
-		return defaultVal, fmt.Errorf("failed to start nested txn: %w", err)
+		return defaultVal, nil, fmt.Errorf("failed to start nested txn: %w", err)
 	}
 
 	val, err = computer.Compute(txnState, key)
@@ -497,12 +518,12 @@ func (txn *TableTransaction[TKey, TVal]) GetOrCompute(
 	}
 
 	if err != nil {
-		return defaultVal, fmt.Errorf("failed to derive value: %w", err)
+		return defaultVal, nil, fmt.Errorf("failed to derive value: %w", err)
 	}
 
 	txn.set(key, val, committedState)
 
-	return val, nil
+	return val, committedState, nil
 }
 
 func (txn *TableTransaction[TKey, TVal]) AddInvalidator(

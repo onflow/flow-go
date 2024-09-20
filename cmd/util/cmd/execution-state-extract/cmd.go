@@ -16,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/cmd/util/ledger/migrations"
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/cmd/util/ledger/util"
+	"github.com/onflow/flow-go/ledger/complete/wal"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
@@ -297,11 +298,6 @@ func run(*cobra.Command, []string) {
 		}
 	}
 
-	// err := ensureCheckpointFileExist(flagExecutionStateDir)
-	// if err != nil {
-	// 	log.Fatal().Err(err).Msgf("cannot ensure checkpoint file exist in folder %v", flagExecutionStateDir)
-	// }
-
 	chain := flow.ChainID(flagChain).Chain()
 
 	if flagNoReport {
@@ -346,6 +342,12 @@ func run(*cobra.Command, []string) {
 			hex.EncodeToString(stateCommitment[:]),
 			flagExecutionStateDir,
 		)
+
+		err := ensureCheckpointFileExist(flagExecutionStateDir)
+		if err != nil {
+			log.Error().Err(err).Msgf("cannot ensure checkpoint file exist in folder %v", flagExecutionStateDir)
+		}
+
 	}
 
 	var outputMsg string
@@ -484,26 +486,26 @@ func run(*cobra.Command, []string) {
 	)
 }
 
-// func ensureCheckpointFileExist(dir string) error {
-// 	checkpoints, err := wal.Checkpoints(dir)
-// 	if err != nil {
-// 		return fmt.Errorf("could not find checkpoint files: %v", err)
-// 	}
-//
-// 	if len(checkpoints) != 0 {
-// 		log.Info().Msgf("found checkpoint %v files: %v", len(checkpoints), checkpoints)
-// 		return nil
-// 	}
-//
-// 	has, err := wal.HasRootCheckpoint(dir)
-// 	if err != nil {
-// 		return fmt.Errorf("could not check has root checkpoint: %w", err)
-// 	}
-//
-// 	if has {
-// 		log.Info().Msg("found root checkpoint file")
-// 		return nil
-// 	}
-//
-// 	return fmt.Errorf("no checkpoint file was found, no root checkpoint file was found")
-// }
+func ensureCheckpointFileExist(dir string) error {
+	checkpoints, err := wal.Checkpoints(dir)
+	if err != nil {
+		return fmt.Errorf("could not find checkpoint files: %v", err)
+	}
+
+	if len(checkpoints) != 0 {
+		log.Info().Msgf("found checkpoint %v files: %v", len(checkpoints), checkpoints)
+		return nil
+	}
+
+	has, err := wal.HasRootCheckpoint(dir)
+	if err != nil {
+		return fmt.Errorf("could not check has root checkpoint: %w", err)
+	}
+
+	if has {
+		log.Info().Msg("found root checkpoint file")
+		return nil
+	}
+
+	return fmt.Errorf("no checkpoint file was found, no root checkpoint file was found in %v, check the --execution-state-dir flag", dir)
+}
