@@ -79,13 +79,13 @@ func AggregatedPrecompileCallsFromEncoded(encoded []byte) (AggregatedPrecompiled
 	if len(encoded) == 0 {
 		return apc, nil
 	}
-	switch encoded[0] {
+	switch int(encoded[0]) {
 	case 1:
 		return decodePrecompiledCallsV1(encoded)
 	case 2:
 		return apc, rlp.DecodeBytes(encoded[AggregatedPrecompiledCallsEncodingByteSize:], &apc)
 	default:
-		return nil, fmt.Errorf("unknown type for encoded AggregatedPrecompiledCalls received")
+		return nil, fmt.Errorf("unknown type for encoded AggregatedPrecompiledCalls received %d", int(encoded[0]))
 	}
 }
 
