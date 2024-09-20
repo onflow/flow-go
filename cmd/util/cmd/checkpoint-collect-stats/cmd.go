@@ -122,6 +122,7 @@ type RegisterStatsByTypes struct {
 	ValueSizeMedian         float64                `json:"value_size_median"`
 	ValueSize75thPercentile float64                `json:"value_size_75th_percentile"`
 	ValueSize95thPercentile float64                `json:"value_size_95th_percentile"`
+	ValueSize99thPercentile float64                `json:"value_size_99th_percentile"`
 	ValueSizeMax            float64                `json:"value_size_max"`
 	SubTypes                []RegisterStatsByTypes `json:"subtypes,omitempty"`
 }
@@ -140,6 +141,7 @@ type AccountStats struct {
 	AccountSizeMedian         float64        `json:"account_size_median"`
 	AccountSize75thPercentile float64        `json:"account_size_75th_percentile"`
 	AccountSize95thPercentile float64        `json:"account_size_95th_percentile"`
+	AccountSize99thPercentile float64        `json:"account_size_99th_percentile"`
 	AccountSizeMax            float64        `json:"account_size_max"`
 	ServiceAccount            *AccountInfo   `json:"service_account,omitempty"`
 	EVMAccount                *AccountInfo   `json:"evm_account,omitempty"`
@@ -302,6 +304,7 @@ func run(*cobra.Command, []string) {
 			AccountSizeMedian:         stats.ValueSizeMedian,
 			AccountSize75thPercentile: stats.ValueSize75thPercentile,
 			AccountSize95thPercentile: stats.ValueSize95thPercentile,
+			AccountSize99thPercentile: stats.ValueSize99thPercentile,
 			AccountSizeMax:            stats.ValueSizeMax,
 		}
 
@@ -437,6 +440,11 @@ func getTypeStats(t string, values []float64) RegisterStatsByTypes {
 		log.Fatal().Err(err).Msg("cannot compute the 95th percentile of values")
 	}
 
+	percentile99, err := stats.Percentile(values, 99)
+	if err != nil {
+		log.Fatal().Err(err).Msg("cannot compute the 99th percentile of values")
+	}
+
 	max, err := stats.Max(values)
 	if err != nil {
 		log.Fatal().Err(err).Msg("cannot compute the max of values")
@@ -451,6 +459,7 @@ func getTypeStats(t string, values []float64) RegisterStatsByTypes {
 		ValueSizeMedian:         median,
 		ValueSize75thPercentile: percentile75,
 		ValueSize95thPercentile: percentile95,
+		ValueSize99thPercentile: percentile99,
 		ValueSizeMax:            max,
 	}
 }
