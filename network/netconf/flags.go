@@ -605,7 +605,7 @@ func InitializeNetworkFlags(flags *pflag.FlagSet, config *Config) {
 		"enable the libp2p peer gater")
 	flags.String(BuildFlagName(gossipsubKey, p2pconfig.PeerGaterKey, p2pconfig.TopicDeliveryWeightsKey),
 		config.GossipSub.PeerGaterTopicDeliveryWeightsOverride,
-		"topic delivery weights override")
+		"topic delivery weights override, this is a comma separated with the format topic_1:2.2,topic_2:3.2,topic_3:1.7 these will be used to override the default topic weight of 1.0 for the specified topic.")
 }
 
 // LoadLibP2PResourceManagerFlags loads all CLI flags for the libp2p resource manager configuration on the provided pflag set.
