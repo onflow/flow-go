@@ -64,6 +64,7 @@ const (
 	ScoreParamsKey          = "scoring-parameters"
 	SubscriptionProviderKey = "subscription-provider"
 	PeerGaterKey            = "peer-gater"
+	SourceDecayKey          = "source-decay"
 	TopicDeliveryWeightsKey = "topic-delivery-weights-override"
 )
 
@@ -83,6 +84,8 @@ type GossipSubParameters struct {
 
 	// PeerGaterEnabled enables the peer gater.
 	PeerGaterEnabled bool `mapstructure:"peer-gater-enabled"`
+	// PeerGaterSourceDecay the per IP decay for all counters tracked by the peer gater for a peer.
+	PeerGaterSourceDecay time.Duration `mapstructure:"peer-gater-source-decay"`
 	// PeerGaterTopicDeliveryWeightsOverride topic delivery weights that will override the default value for the specified channel.
 	// This is a comma separated list "channel:weight, channel2:weight, channel3:weight".
 	// i.e: consensus-committee: 1.5, sync-committee: .75

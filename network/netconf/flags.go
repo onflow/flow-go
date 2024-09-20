@@ -202,6 +202,7 @@ func AllFlagNames() []string {
 		BuildFlagName(gossipsubKey, p2pconfig.ScoreParamsKey, p2pconfig.ScoringRegistryKey, p2pconfig.MisbehaviourPenaltiesKey, p2pconfig.ClusterPrefixedReductionFactorKey),
 
 		BuildFlagName(gossipsubKey, p2pconfig.PeerGaterKey, p2pconfig.EnabledKey),
+		BuildFlagName(gossipsubKey, p2pconfig.PeerGaterKey, p2pconfig.SourceDecayKey),
 		BuildFlagName(gossipsubKey, p2pconfig.PeerGaterKey, p2pconfig.TopicDeliveryWeightsKey),
 	}
 
@@ -601,8 +602,11 @@ func InitializeNetworkFlags(flags *pflag.FlagSet, config *Config) {
 		"the factor used to reduce the penalty for control message misbehaviours on cluster prefixed topics")
 
 	flags.Bool(BuildFlagName(gossipsubKey, p2pconfig.PeerGaterKey, p2pconfig.EnabledKey),
-		config.GossipSub.PeerScoringEnabled,
+		config.GossipSub.PeerGaterEnabled,
 		"enable the libp2p peer gater")
+	flags.Duration(BuildFlagName(gossipsubKey, p2pconfig.PeerGaterKey, p2pconfig.SourceDecayKey),
+		config.GossipSub.PeerGaterSourceDecay,
+		"the per IP decay for all counters tracked by the peer gater for a peer")
 	flags.String(BuildFlagName(gossipsubKey, p2pconfig.PeerGaterKey, p2pconfig.TopicDeliveryWeightsKey),
 		config.GossipSub.PeerGaterTopicDeliveryWeightsOverride,
 		"topic delivery weights override, this is a comma separated with the format topic_1:2.2,topic_2:3.2,topic_3:1.7 these will be used to override the default topic weight of 1.0 for the specified topic.")

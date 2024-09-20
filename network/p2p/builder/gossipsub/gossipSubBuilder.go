@@ -274,7 +274,7 @@ func (g *Builder) Build(ctx irrecoverable.SignalerContext) (p2p.PubSubAdapter, e
 		if err != nil {
 			return nil, fmt.Errorf("failed to add peer gater option: %w", err)
 		}
-		gossipSubConfigs.WithPeerGater(topicDeliveryWeights)
+		gossipSubConfigs.WithPeerGater(topicDeliveryWeights, g.gossipSubCfg.PeerGaterSourceDecay)
 	}
 
 	if g.routingSystem != nil {

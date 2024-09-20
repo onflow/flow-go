@@ -1,6 +1,8 @@
 package corruptlibp2p
 
 import (
+	"time"
+
 	pb "github.com/libp2p/go-libp2p-pubsub/pb"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/routing"
@@ -157,7 +159,7 @@ func (c *CorruptPubSubAdapterConfig) WithRpcInspector(_ p2p.GossipSubRPCInspecto
 	// CorruptPubSub does not support inspector suite. This is a no-op.
 }
 
-func (c *CorruptPubSubAdapterConfig) WithPeerGater(_ map[string]float64) {
+func (c *CorruptPubSubAdapterConfig) WithPeerGater(_ map[string]float64, _ time.Duration) {
 	// CorruptPubSub does not need peer gater. This is a no-op.
 }
 

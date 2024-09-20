@@ -104,8 +104,8 @@ func (g *GossipSubAdapterConfig) WithTracer(tracer p2p.PubSubTracer) {
 // - params: the topic delivery weights to use
 // Returns:
 // -None
-func (g *GossipSubAdapterConfig) WithPeerGater(topicDeliveryWeights map[string]float64) {
-	peerGaterParams := pubsub.NewPeerGaterParams(pubsub.DefaultPeerGaterThreshold, pubsub.DefaultPeerGaterGlobalDecay, pubsub.ScoreParameterDecay(10*time.Minute)).WithTopicDeliveryWeights(topicDeliveryWeights)
+func (g *GossipSubAdapterConfig) WithPeerGater(topicDeliveryWeights map[string]float64, sourceDecay time.Duration) {
+	peerGaterParams := pubsub.NewPeerGaterParams(pubsub.DefaultPeerGaterThreshold, pubsub.DefaultPeerGaterGlobalDecay, pubsub.ScoreParameterDecay(sourceDecay)).WithTopicDeliveryWeights(topicDeliveryWeights)
 	g.options = append(g.options, pubsub.WithPeerGater(peerGaterParams))
 }
 

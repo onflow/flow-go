@@ -628,7 +628,11 @@ network-config:
       # keep the entire network's size. Otherwise, the local node's view of the network will be incomplete due to cache eviction.
       # Recommended size is 10x the number of peers in the network.
       cache-size: 10000
-    peer-gater-enabled: true
+    # Enables or disables the libp2p peer gater.
+    peer-gater-enabled: false
+    # The per IP decay for all counters tracked by the peer gater for a peer.
+    peer-gater-source-decay: 10m
+    # The priority topic delivery weights.
     peer-gater-topic-delivery-weights-override: |
       consensus-committee: 1.5, sync-committee: .75
 
